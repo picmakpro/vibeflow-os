@@ -89,6 +89,9 @@
 #         mission-contracts.md, et dit au pilotage (§Pattern E) ; test statique, mutations.
 #   T43 — POCK-06 (P414-D-11) : forme du merge-danger call dans mission-contracts.md §Isolation de
 #         branche (côté contrat ; le gate E3 qui la lit a sa propre suite) ; mutations.
+#   T81 — #81 : doctrine d'attente des managers — scanner des blocs de code (```) des .md livrés ;
+#         boucle until/while à corps vide, sans sleep ou sans borne = rouge ; boucles de lecture exclues ;
+#         5 cas dont 3 fixtures rouges.
 #
 # Historique de numérotation : T3/T12/T13/T14 ont changé de sémantique à la v2.0.0 (les
 # anciens tests de collision de descriptions, de préséance et de synchro de la table vf-dev
@@ -7390,6 +7393,93 @@ for t43_a in "${T43_ANCRES[@]}"; do
   t414_ablate "$T43_MC" "$T414_TMP/t43-$t43_k.md" "$t43_a" "$T43_ZS" "$T43_ZE"
   t414_mutant "T43 mutant copie de mission-contracts.md privée de « $t43_a » dans §Isolation de branche" t43_check "$T43_MC" "$T414_TMP/t43-$t43_k.md"
 done
+
+
+# ---- T81 : doctrine d'attente des managers, scanner des blocs de code (#81) --------------------------
+# Invariants 1-3 de mission-flow.md (§Attendre un worker ou un état externe). Ce scanner parcourt les BLOCS
+# DE CODE clôturés (```) des .md livrés (agents, references, skills) — jamais le texte hors bloc (la table de
+# gsd-skills-index.md contient « until review » en prose). Une boucle until/while rougit si (a) son corps est
+# vide (`do :; done`, `do true; done`), ou (b) elle n'a pas, dans son corps, une temporisation (`sleep` hors
+# guillemets) ET une borne (`deadline` ou `TIMEOUT`, commentaires retirés). EXCLUSION DOCUMENTÉE : une boucle de
+# LECTURE (`while read …`, `while IFS= read …`) ne guette rien, elle consomme un flux — jamais jugée.
+# Sortie : une ligne `fichier:ligne : motif` par violation, puis `#scan fichiers=N boucles=M` (compteur
+# d'atteinte : un scanner qui ne voit aucune boucle ne prouve rien). Pas de python/node inline.
+T81_TMP="$(mktemp -d)"; vf_tmp_track "$T81_TMP"
+cat > "$T81_TMP/scan.awk" <<'EOAWK'
+function opener(w) { return (w == "until" || w == "while" || w == "for" || w == "select") }
+function evalloop(d,   t, cond, bound, nq) {
+  if (kind[d] == "for") return
+  t = txt[d]
+  if (kind[d] == "while") {
+    cond = t
+    if (match(cond, /(^|[;[:space:]])do([;[:space:]]|$)/)) cond = substr(cond, 1, RSTART)
+    if (cond ~ /(^|[^A-Za-z_-])read([^A-Za-z_-]|$)/) return
+  }
+  nloops++
+  if (t ~ /(^|[;[:space:]])do[[:space:];]*((:|true)[[:space:];]*)*done/) { print file ":" start[d] " : corps de boucle vide (do :; done)"; bad++; return }
+  nq = qtxt[d]
+  if (nq !~ /(^|[^A-Za-z_-])sleep[[:space:]]/) { print file ":" start[d] " : boucle d'attente sans temporisation (sleep)"; bad++; return }
+  if (t !~ /deadline|TIMEOUT/) { print file ":" start[d] " : boucle d'attente sans borne (deadline/TIMEOUT)"; bad++; return }
+}
+FNR == 1 { nfiles++; infence = 0; depth = 0; file = FILENAME }
+/^[[:space:]]*```/ { infence = !infence; depth = 0; next }
+infence {
+  raw = $0
+  sub(/(^|[[:space:]])#.*$/, "", raw)
+  q = raw
+  gsub(/"[^"]*"/, "", q); gsub(/'[^']*'/, "", q)
+  for (i = 1; i <= depth; i++) { txt[i] = txt[i] "\n" raw; qtxt[i] = qtxt[i] "\n" q }
+  n = split(q, w, /[;&|(){}[:space:]]+/)
+  for (j = 1; j <= n; j++) {
+    if (opener(w[j])) {
+      depth++; kind[depth] = w[j]; start[depth] = FNR; txt[depth] = raw; qtxt[depth] = q
+    } else if (w[j] == "done" && depth > 0) { evalloop(depth); depth-- }
+  }
+}
+END { printf "#scan fichiers=%d boucles=%d\n", nfiles, nloops; exit (bad > 0) }
+EOAWK
+t81_scan() { # <fichier.md>...  → violations + compteur sur stdout ; rc 1 si violation
+  awk -f "$T81_TMP/scan.awk" "$@"
+}
+T81_DIRS=("$MOD/agents" "$REFS_DIR" "$MOD/skills")
+T81_FILES=(); while IFS= read -r t81_f; do T81_FILES+=("$t81_f"); done < <(find "${T81_DIRS[@]}" -name '*.md' -type f 2>/dev/null | sort)
+
+# Cas 1 : vert sur l'arbre livré, avec au moins une boucle jugée (la forme canonique de mission-flow.md).
+t81_out="$(t81_scan "${T81_FILES[@]}")"; t81_rc=$?
+t81_n="$(printf '%s\n' "$t81_out" | sed -n 's/^#scan fichiers=[0-9]* boucles=\([0-9]*\)$/\1/p')"
+if [ "$t81_rc" -eq 0 ] && [ "${t81_n:-0}" -ge 1 ]; then
+  ok "T81 cas 1 : aucune boucle d'attente non bornée ou non temporisée dans les .md livrés ($t81_n boucle(s) jugée(s), ${#T81_FILES[@]} fichier(s))"
+else
+  ko "T81 cas 1 : attendu — rc 0 et ≥ 1 boucle jugée ; obtenu — rc=$t81_rc, boucles=${t81_n:-?} : $t81_out"
+fi
+
+# Cas 2-5 : fixtures. Chaque fixture est un .md à un bloc de code ; attendu = rc de t81_scan.
+t81_fix() { # <nom> <rc attendu> <corps du bloc de code> <motif attendu dans la sortie ou ->
+  local f="$T81_TMP/$1.md" o rc
+  printf '# fixture\n\n```sh\n%s\n```\n' "$3" > "$f"
+  o="$(t81_scan "$f")"; rc=$?
+  if [ "$rc" -eq "$2" ] && { [ "$4" = "-" ] || printf '%s' "$o" | grep -qF "$4"; }; then
+    ok "T81 $1 : rc=$rc comme attendu"
+  else
+    ko "T81 $1 : attendu — rc=$2 (motif « $4 ») ; obtenu — rc=$rc : $o"
+  fi
+}
+t81_fix cas2-corps-vide 1 'until [ -f x ]; do :; done' 'corps de boucle vide'
+t81_fix cas2b-corps-vide-multiligne 1 $'until [ -f x ]; do\n  :\ndone' 'corps de boucle vide'
+t81_fix cas3-sleep-sans-borne 1 'until cond; do sleep 15; done' 'sans borne'
+t81_fix cas3b-borne-sans-sleep 1 $'deadline=$(( $(date +%s) + 60 ))\nuntil cond; do\n  [ "$(date +%s)" -ge "$deadline" ] && exit 124\ndone' 'sans temporisation'
+t81_fix cas4-forme-canonique 0 $'deadline=$(( $(date +%s) + 1800 ))\nuntil cond; do\n  [ "$(date +%s)" -ge "$deadline" ] && { echo "TIMEOUT attente x"; exit 124; }\n  sleep 15 || { echo "TEMPORISATION REFUSÉE"; exit 125; }\ndone' -
+t81_fix cas5-boucle-de-lecture 0 $'while read l; do\n  echo "$l"\ndone < f\nwhile IFS= read -r l; do :; done < f' -
+# Le texte hors bloc de code ne compte pas.
+printf 'until review passes, do :; done\n' > "$T81_TMP/prose.md"
+t81_out="$(t81_scan "$T81_TMP/prose.md")" && ok "T81 prose hors bloc de code ignorée" || ko "T81 prose : attendu — rc 0 ; obtenu — $t81_out"
+# Mutants de la forme canonique RÉELLE : copie de mission-flow.md privée de sa temporisation, puis de sa borne.
+grep -v 'sleep 15' "$REFS_DIR/mission-flow.md" > "$T81_TMP/mut-sans-sleep.md"
+grep -v 'TIMEOUT attente' "$REFS_DIR/mission-flow.md" > "$T81_TMP/mut-sans-borne.md"
+t81_out="$(t81_scan "$T81_TMP/mut-sans-sleep.md")"; t81_rc=$?
+{ [ "$t81_rc" -eq 1 ] && printf '%s' "$t81_out" | grep -qF 'sans temporisation'; } && ok "T81 mutant mission-flow.md sans sleep : rouge" || ko "T81 mutant sans sleep : attendu — rc=1 « sans temporisation » ; obtenu — rc=$t81_rc : $t81_out"
+t81_out="$(t81_scan "$T81_TMP/mut-sans-borne.md")"; t81_rc=$?
+{ [ "$t81_rc" -eq 1 ] && printf '%s' "$t81_out" | grep -qF 'sans borne'; } && ok "T81 mutant mission-flow.md sans TIMEOUT : rouge" || ko "T81 mutant sans TIMEOUT : attendu — rc=1 « sans borne » ; obtenu — rc=$t81_rc : $t81_out"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
