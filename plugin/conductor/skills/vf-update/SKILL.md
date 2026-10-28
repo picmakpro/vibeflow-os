@@ -124,8 +124,11 @@ b. **Couche modules** : `bash <S>/vf-update-run.sh`. Le script localise **lui-m�
    faite. Relaie son résumé.
 
 c. **Couche moteur** (seulement si la ligne moteur de l'étape 3 a été acceptée) : invoque
-   `bash <S-moteur>/ensure-deps.sh --migrate-engine` (ligne legacy) **ou**
-   `bash <S-moteur>/ensure-deps.sh --upgrade-engine` (ligne périmé) et relaie son résumé — le
+   `VF_SCOPE=<scope> bash <S-moteur>/ensure-deps.sh --migrate-engine` (ligne legacy) **ou**
+   `VF_SCOPE=<scope> bash <S-moteur>/ensure-deps.sh --upgrade-engine` (ligne périmé) et relaie son résumé.
+   **Scope obligatoire** : si `./.claude/gsd-core/` existe (moteur en scope projet), `<scope>` vaut
+   `project` ; sinon `user`. Sans ce préfixe, le défaut `user` pose une seconde copie du moteur dans
+   `~/.claude`, qui masque les commandes du projet et touche tous les projets de la machine. Le
    script re-sonde lui-même le registre et ne relance `npx` que si le VERSION installé est
    toujours strictement inférieur au dernier `^1` publié. S'exécute **même si** la
    couche plugin (4a) a échoué — les confirmations sont indépendantes. Le skill n'invoque **jamais**
