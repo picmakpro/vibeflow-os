@@ -27,7 +27,10 @@
 #                      (CI, debug, run manuel). EN PRODUCTION, le skill /vibeflow-install (Phase 4)
 #                      passe TOUJOURS un VF_SCOPE explicite à l'engine ET à ce script (un seul scope
 #                      partout — cohérence ID4, spec §3/§8). Ce défaut ne co-occurre donc jamais en prod
-#                      avec le défaut LEGACY de l'engine (`project`). Une valeur explicite incohérente
+#                      avec le défaut LEGACY de l'engine (`project`). Filet (#165) : VF_SCOPE absent ET
+#                      moteur trouvé dans <racine>/.claude/gsd-core (hors moteur user, même dossier
+#                      canonisé exclu) → scope `project` dérivé, message sur stderr au moment de
+#                      l'install ; un VF_SCOPE explicite l'emporte toujours. Une valeur explicite incohérente
 #                      est rejetée tôt par la validation stricte ci-dessous (err + exit 1).
 #   VF_ENSURE_FORCE    (défaut vide) — 1 → EN DRY-RUN UNIQUEMENT, court-circuite l'early-return de
 #                      détection (skip) pour loguer la commande scopée QUI SERAIT émise, sans rien
@@ -182,6 +185,26 @@ case "$SCOPE" in
     exit 1
     ;;
 esac
+
+# Filet #165 : VF_SCOPE absent/vide ET moteur gsd-core trouvé en scope PROJET (<racine>/.claude/gsd-core,
+# distinct du moteur user) → scope `project` dérivé. Sans lui, la LECTURE (default_gsd_home_new) vise
+# le projet mais l'ÉCRITURE (--upgrade-engine, défaut `user` → --global) poserait une seconde copie dans
+# ~/.claude. Un VF_SCOPE explicite (même `user`) garde toujours la priorité. Garde : un script lancé
+# depuis $HOME hors dépôt (<racine> = $HOME) désigne le MÊME dossier que le moteur user → pas de
+# dérivation. Comparaison de chemins canonisés (pwd -P), portable bash 3.2 / Linux. Silencieux ici :
+# le message sort au seul point où une commande d'install est émise (ensure_gsd).
+SCOPE_DERIVED=""
+canon_dir() { (cd "$1" 2>/dev/null && pwd -P); }
+if [ -z "${VF_SCOPE:-}" ] && [ "$SCOPE" = "user" ]; then
+  _eng_proj="$(canon_dir "$GSD_HOME_NEW")"
+  _eng_user="$(canon_dir "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core")"
+  _root_proj="$(canon_dir "$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.claude/gsd-core")"
+  if [ -n "$_eng_proj" ] && [ "$_eng_proj" = "$_root_proj" ] && [ "$_eng_proj" != "$_eng_user" ]; then
+    SCOPE="project"
+    SCOPE_DERIVED=1
+  fi
+  unset _eng_proj _eng_user _root_proj
+fi
 
 # Dérivation des flags de scope (spec §3 / §8) :
 #   GSD :         user → --global ; project|local → --local
@@ -514,6 +537,7 @@ ensure_gsd() {
     return 0
   fi
 
+  [ -n "$SCOPE_DERIVED" ] && log "VF_SCOPE absent — moteur trouvé dans ./.claude/gsd-core : scope project dérivé"
   if [ -n "${GSD_UPGRADE_FROM:-}" ]; then
     log "GSD ${GSD_UPGRADE_FROM} périmé — mise à jour via npx (non-interactif, scope=$SCOPE → $GSD_SCOPE_FLAG)..."
   else

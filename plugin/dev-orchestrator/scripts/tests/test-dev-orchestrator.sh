@@ -501,6 +501,85 @@ else
   ko "T2b validation : VF_SCOPE=bogus aurait dû être rejeté (exit≠0)"
 fi
 
+# --- T2b-165-BEGIN ---
+# T2b-165 — filet #165 : sans VF_SCOPE, un moteur gsd-core en scope PROJET (<racine>/.claude/gsd-core)
+# dérive SCOPE=project (--local) au lieu du défaut `user` (--global, seconde copie dans ~/.claude).
+# Hermétique : lab + HOME temporaires, faux npx/npm/node/claude en tête de PATH (npx et claude
+# journalisent leur argv ; npm view rend 1.19.0), `env -u CLAUDE_CONFIG_DIR`. Aucun réseau.
+# Lab = `git init` (le chemin nominal : racine = git toplevel) ; la garde (d) tourne HORS git
+# (racine = pwd = $HOME), le cas qui désigne le moteur user.
+T165_TMP="$(mktemp -d)"; vf_tmp_track "$T165_TMP"
+T165_BIN="$T165_TMP/bin"; mkdir -p "$T165_BIN"
+printf '#!/bin/sh\necho "npx $*" >> "$T165_LOG"\nexit 0\n' > "$T165_BIN/npx"
+printf '#!/bin/sh\necho "claude $*" >> "$T165_LOG"\nexit 0\n' > "$T165_BIN/claude"
+printf '#!/bin/sh\ncase "$1" in view) echo "\\"1.19.0\\"";; *) exit 1;; esac\n' > "$T165_BIN/npm"
+printf '#!/bin/sh\necho 24\n' > "$T165_BIN/node"
+chmod +x "$T165_BIN"/*
+
+# t165_run <cwd> <HOME> <VF_SCOPE|-> -- renvoie la sortie stderr+stdout ; argv de npx dans $T165_LOG.
+t165_run() {
+  : > "$T165_LOG"
+  if [ "$3" = "-" ]; then
+    (cd "$1" && env -u CLAUDE_CONFIG_DIR -u VF_SCOPE HOME="$2" PATH="$T165_BIN:/usr/bin:/bin" \
+      bash "$ENS" --upgrade-engine 2>&1)
+  else
+    (cd "$1" && env -u CLAUDE_CONFIG_DIR HOME="$2" VF_SCOPE="$3" PATH="$T165_BIN:/usr/bin:/bin" \
+      bash "$ENS" --upgrade-engine 2>&1)
+  fi
+}
+T165_LOG="$T165_TMP/argv.log"; export T165_LOG
+t165_npx() { "$GREP" '^npx ' "$T165_LOG" | head -1; }
+
+T165_LAB="$T165_TMP/lab"; mkdir -p "$T165_LAB/.claude/gsd-core" "$T165_TMP/home1"
+echo "1.0.0" > "$T165_LAB/.claude/gsd-core/VERSION"
+git -C "$T165_LAB" init -q 2>/dev/null
+
+# (a) sans VF_SCOPE + moteur projet → --local + message
+T165_OUT="$(t165_run "$T165_LAB" "$T165_TMP/home1" -)"
+if t165_npx | "$GREP" -q -- '--local' && ! t165_npx | "$GREP" -q -- '--global' \
+   && echo "$T165_OUT" | "$GREP" -qF "VF_SCOPE absent — moteur trouvé dans ./.claude/gsd-core : scope project dérivé" \
+   && [ "$(echo "$T165_OUT" | "$GREP" -cF 'scope project dérivé')" -eq 1 ] \
+   && "$GREP" -q -- '--scope project' "$T165_LOG"; then
+  ok "T2b-165 (a) sans VF_SCOPE + moteur projet : npx --local, Superpowers --scope project, message unique"
+else
+  ko "T2b-165 (a) dérivation project attendue [npx=$(t165_npx)] [out=$T165_OUT]"
+fi
+
+# (b) VF_SCOPE=user explicite + moteur projet → --global conservé, aucun message
+T165_OUT="$(t165_run "$T165_LAB" "$T165_TMP/home1" user)"
+if t165_npx | "$GREP" -q -- '--global' && ! echo "$T165_OUT" | "$GREP" -qF 'scope project dérivé'; then
+  ok "T2b-165 (b) VF_SCOPE=user explicite prime sur le moteur projet : --global"
+else
+  ko "T2b-165 (b) VF_SCOPE=user explicite doit garder --global [npx=$(t165_npx)]"
+fi
+
+# (c) sans moteur projet → défaut user (--global)
+T165_EMPTY="$T165_TMP/empty"; mkdir -p "$T165_EMPTY"; git -C "$T165_EMPTY" init -q 2>/dev/null
+T165_OUT="$(t165_run "$T165_EMPTY" "$T165_TMP/home1" -)"
+if t165_npx | "$GREP" -q -- '--global' && ! echo "$T165_OUT" | "$GREP" -qF 'scope project dérivé'; then
+  ok "T2b-165 (c) sans moteur projet : défaut user conservé (--global)"
+else
+  ko "T2b-165 (c) défaut user attendu sans moteur projet [npx=$(t165_npx)]"
+fi
+
+# (d) garde $HOME : cwd = HOME hors git, moteur dans $HOME/.claude/gsd-core = moteur user → pas de dérivation
+T165_H2="$T165_TMP/home2"; mkdir -p "$T165_H2/.claude/gsd-core"; echo "1.0.0" > "$T165_H2/.claude/gsd-core/VERSION"
+T165_OUT="$(t165_run "$T165_H2" "$T165_H2" -)"
+if t165_npx | "$GREP" -q -- '--global' && ! echo "$T165_OUT" | "$GREP" -qF 'scope project dérivé'; then
+  ok "T2b-165 (d) garde \$HOME : moteur user trouvé depuis \$HOME hors dépôt → pas de dérivation (--global)"
+else
+  ko "T2b-165 (d) le moteur user ne doit pas être pris pour un moteur projet [npx=$(t165_npx)]"
+fi
+
+# (e) VF_SCOPE invalide → exit 1, aucun npx
+t165_run "$T165_LAB" "$T165_TMP/home1" bogus >/dev/null; T165_RC=$?
+if [ "$T165_RC" -eq 1 ] && [ -z "$(t165_npx)" ]; then
+  ok "T2b-165 (e) VF_SCOPE=bogus : exit 1, aucun npx (validation en tête inchangée)"
+else
+  ko "T2b-165 (e) VF_SCOPE=bogus doit sortir 1 sans npx [rc=$T165_RC]"
+fi
+# --- T2b-165-END ---
+
 # ---------------------------------------------------------------------------
 # T2c/T2d/T2e/T2f — piège n°1, nettoyage legacy (ADR-031), garde Node ≥ 24, dual-layout (D1)
 # ---------------------------------------------------------------------------
