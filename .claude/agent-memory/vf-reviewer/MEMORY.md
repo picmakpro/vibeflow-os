@@ -31,3 +31,4 @@
 - [Délimiteur non fermé : sonder la famille](feedback_fix-one-unclosed-delimiter-check-siblings.md) — fence corrigée mais `<!--` non fermé reste vert (check-prd.sh, Phase 59)
 - [Test de non-débordement dans la mauvaise direction](feedback_section-boundary-test-wrong-direction.md) — clause de fermeture de section supprimable sans rouge (CPV, Phase 60) ; interroger la section qui PRÉCÈDE le marqueur étranger
 - [Silence casse la suite soeur](feedback_silencing-output-breaks-sibling-witness-suite.md) — Phase 61 tour 2 : deux-clones 16/16 -> 14/16, sortie supprimee = temoin de declenchement perdu
+- [Assouplir une garde : muter la clause voisine](feedback_assouplir-garde-muter-clause-voisine.md) — Phase 60 tour 2 : après un assouplissement de conduite, muter la clause voisine inchangée et rejouer le moteur réel hors gabarit
