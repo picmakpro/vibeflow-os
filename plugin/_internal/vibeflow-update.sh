@@ -1273,6 +1273,49 @@ find_role_gate() {
   echo ""
 }
 
+# find_divergence_hook — le script du filet de divergence, depuis le cache du plugin, et lui seul. Vide
+# si absent. Aucun repli sur $TARGET_ROOT ni sur le dossier de l'engine : le hook posé dans le clone
+# n'exécute jamais du code de l'arbre du lab (audit M-2, P61-D-03).
+find_divergence_hook() {
+  local c="$CACHE_DIR/conductor/scripts/vf-divergence-hook.sh"
+  [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+# divergence_hook_apply <poste> — arme le clone (hook git post-merge) aux postes product et dev SEULEMENT
+# (P61-H-01) ; solo et sans poste ne posent rien. Le script du cache fait le travail (verbe arm) ; ses
+# codes sont relayés sur stderr et JAMAIS un échec de l'installation (P61-PL-03). Dry-run : arm --check
+# déclare chaque cible par vf_declare_write, rien n'est écrit.
+divergence_hook_apply() {
+  local poste="${1:-}" hk rc=0 out line
+  case "$poste" in product|dev) : ;; *) return 0 ;; esac
+  hk="$(find_divergence_hook)"
+  if [ -z "$hk" ]; then
+    log "[divergence] NON VERIFIABLE : vf-divergence-hook.sh absent du cache du plugin — filet non armé"
+    return 0
+  fi
+  if vf_dry_run; then
+    out="$(bash "$hk" arm --check --path "$(pwd -P)" 2>/dev/null </dev/null)" || true
+    while IFS= read -r line; do
+      case "$line" in
+        "CIBLE "*) vf_declare_write "~" "${line#CIBLE }" "(filet de divergence : hook git du clone, hors de l'arbre versionné)" ;;
+      esac
+    done <<EOF_DIVERGENCE_PLAN
+$out
+EOF_DIVERGENCE_PLAN
+    return 0
+  fi
+  bash "$hk" arm --path "$(pwd -P)" </dev/null >&2 || rc=$?
+  case "$rc" in
+    0) log "[divergence] filet armé" ;;
+    1) log "[divergence] ARMEMENT REFUSE (code 1) — voir ci-dessus ; l'installation continue" ;;
+    2) log "[divergence] armement NON VERIFIABLE (code 2) — filet non armé ; l'installation continue" ;;
+    3) log "[divergence] pas de dépôt git : filet non armé" ;;
+    *) log "[divergence] code inattendu ($rc) de vf-divergence-hook.sh arm — filet non armé ; l'installation continue" ;;
+  esac
+  return 0
+}
+
 # find_module_roles — cascade comme find_resolver : cache (prod), puis à côté de l'engine (source). Vide si absent.
 find_module_roles() {
   local candidate
@@ -1354,6 +1397,7 @@ role_apply() {
   role_gitignore_rule
   role_write_file "$poste"
   VF_ROLE_WILL_EXIST="1"
+  divergence_hook_apply "$poste"
 }
 
 # vf_gitignore_target_prefix — préfixe RELATIF AU CWD à écrire dans ./.gitignore (TGT-02).
