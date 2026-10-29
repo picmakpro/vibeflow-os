@@ -74,6 +74,7 @@ aucun compte n'est figé.
 | plugin/conductor/scripts/split-planning.sh | a2 | exempté — cible le seul sujet que le moteur vient de créer, nommé par le champ .workstream de workstream create ; aucune écriture de planning par le script (P412-D-01) ; Phase 41.2 |
 | plugin/conductor/scripts/check-state-integrity.sh | a2 | exempté — résout le compartiment ACTIF, correct pour un outil consommé par un agent en train de travailler ; c'est son APPELANT CI qui devient a1 par fan-out (plan 41.1-06) |
 | plugin/conductor/scripts/check-workstream-pointer.sh | a2 | exempté — résout le compartiment ACTIF, jamais un gate CI multi-compartiments |
+| plugin/conductor/scripts/check-phase-validation.sh | a2 | exempté — résout le compartiment NOMMÉ par --ws (vf_ws_name_valid + vf_ws_dir_resolve), jamais le compartiment actif ; lecture seule ; Phase 60 |
 | plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh | a2 | exempté — même motif |
 | plugin/dev-orchestrator/scripts/check-mission-exit.sh | a2 | exempté — même motif |
 | plugin/dev-orchestrator/scripts/check-requirements-survival.sh | a2 | exempté — même motif |
