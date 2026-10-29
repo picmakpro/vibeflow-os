@@ -2102,6 +2102,29 @@ scripts_prefix_for_scope() {
   esac
 }
 
+# run_merger <merger> <mode> <args…> — lance merge-hooks.sh, relaie son stderr SAUF la ligne
+# `[merge-hooks] local: N` (N entrées routées vers settings.local.json, compté par merge-hooks.sh
+# sur sa propre partition) et pose N dans VF_LOCAL_ROUTED. stdout (lignes [plan]) inchangé.
+VF_LOCAL_ROUTED=0
+run_merger() {
+  local errf rc=0
+  VF_LOCAL_ROUTED=0
+  errf="$(mktemp)" || return 1
+  bash "$@" 2>"$errf" || rc=$?
+  VF_LOCAL_ROUTED="$(sed -n 's/^\[merge-hooks\] local: \([0-9][0-9]*\)$/\1/p' "$errf" | tail -1)"
+  : "${VF_LOCAL_ROUTED:=0}"
+  grep -v '^\[merge-hooks\] local: ' "$errf" >&2 || true
+  rm -f "$errf"
+  return "$rc"
+}
+# Annonce explicite du routage ADR-071 (#166 volet 6) ; rien si N=0 (scope user, module sans {{VF_BASH}}).
+log_local_routing() {
+  if [ "${VF_LOCAL_ROUTED:-0}" -gt 0 ]; then
+    log "  $VF_LOCAL_ROUTED entrée(s) de hook routée(s) vers $TARGET_ROOT/settings.local.json — chemin de bash propre à cette machine (ADR-071) ; sur un autre poste, lancez /vf-update pour les poser"
+  fi
+  return 0
+}
+
 merge_module_hooks() {
   local mod="$1"
   # ROLL-02 (38-03) : 2e paramètre optionnel — un chemin de fragment explicite (ex. celui
@@ -2141,8 +2164,9 @@ merge_module_hooks() {
     esac
     local plan_rc=0
     if [ "${#plan_settings_local_args[@]}" -gt 0 ]; then
-      bash "$merger" plan "$fragment" --settings "$TARGET_ROOT/settings.json" \
+      run_merger "$merger" plan "$fragment" --settings "$TARGET_ROOT/settings.json" \
         --scripts-prefix "$(scripts_prefix_for_scope)" "${plan_settings_local_args[@]}" || plan_rc=$?
+      [ "$plan_rc" -eq 0 ] && log_local_routing
     else
       bash "$merger" plan "$fragment" --settings "$TARGET_ROOT/settings.json" \
         --scripts-prefix "$(scripts_prefix_for_scope)" || plan_rc=$?
@@ -2183,7 +2207,7 @@ merge_module_hooks() {
   esac
   local merge_rc=0
   if [ "${#settings_local_args[@]}" -gt 0 ]; then
-    bash "$merger" merge "$fragment" --settings "$TARGET_ROOT/settings.json" \
+    run_merger "$merger" merge "$fragment" --settings "$TARGET_ROOT/settings.json" \
       --scripts-prefix "$(scripts_prefix_for_scope)" "${settings_local_args[@]}" || merge_rc=$?
   else
     bash "$merger" merge "$fragment" --settings "$TARGET_ROOT/settings.json" \
@@ -2191,6 +2215,7 @@ merge_module_hooks() {
   fi
   if [ "$merge_rc" -eq 0 ]; then
     log "  hooks mergés → $TARGET_ROOT/settings.json"
+    log_local_routing
     # D-38-J (correction ciblée post-ROLL), révisé Phase 38 (T6/TD1 + D-31-16) : persiste le
     # fragment RÉELLEMENT mergé, PAR MODULE, sous TARGET_ROOT. C'est l'unique source de vérité de
     # ce qui est VRAIMENT dans settings.json à cet instant : $CACHE_DIR n'est JAMAIS rafraîchi PAR
