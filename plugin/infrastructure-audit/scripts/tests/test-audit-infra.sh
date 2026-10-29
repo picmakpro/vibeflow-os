@@ -432,6 +432,27 @@ chmod 755 "$LAB_L/.claude/scripts/oublie-x.sh"
 OUT="$(run_in "$LAB_L" "$BASH_BIN" "$SCRIPT" --axis=scripts --no-tests 2>/dev/null)"
 echo "$OUT" | grep -q '"executable_ok": 2,' && ok "T17b : une fois le bit x posé sur le script à shebang, executable_ok=2 (la lib ne compte toujours pas)" || ko "T17b executable_ok=2 attendu, sortie : $OUT"
 
+# T17c — revue lot C (#166) : dénominateur explicite, libs NOMMÉES, BOM + shebang = script.
+# scripts_total = scripts_shebang + libs_sourced ; un script exécutable dont on a oublié le
+# shebang ne disparaît pas dans un compteur : il est listé dans libs_sourced_files.
+LAB_B="$WORK/lab-bom"; mkdir -p "$LAB_B/.claude/scripts"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$LAB_B/.claude/scripts/normal.sh"; chmod 755 "$LAB_B/.claude/scripts/normal.sh"
+printf '\357\273\277#!/usr/bin/env bash\nexit 0\n' > "$LAB_B/.claude/scripts/avec-bom.sh"; chmod 755 "$LAB_B/.claude/scripts/avec-bom.sh"
+printf 'exit 0\n' > "$LAB_B/.claude/scripts/oubli-shebang.sh"; chmod 755 "$LAB_B/.claude/scripts/oubli-shebang.sh"
+printf 'vf_x() { :; }\n' > "$LAB_B/.claude/scripts/lib-x.sh"; chmod 644 "$LAB_B/.claude/scripts/lib-x.sh"
+OUT="$(run_in "$LAB_B" "$BASH_BIN" "$SCRIPT" --axis=scripts --no-tests 2>/dev/null)"
+CHK="$(printf '%s' "$OUT" | python3 -I -Xutf8 -c 'import json,sys
+d=json.loads(sys.stdin.read())
+ok = (d["scripts_total"]==4 and d["scripts_shebang"]==2 and d["libs_sourced"]==2
+      and d["scripts_total"]==d["scripts_shebang"]+d["libs_sourced"]
+      and d["executable_ok"]==2 and d["libs_sourced_files"]==["lib-x.sh","oubli-shebang.sh"])
+print("ok" if ok else "ko:"+json.dumps(d))' 2>&1)"
+if [ "$CHK" = "ok" ]; then
+  ok "T17c : JSON valide, scripts_shebang=2 (BOM+shebang compté script), libs_sourced_files = [lib-x.sh, oubli-shebang.sh], invariant total = shebang + libs"
+else
+  ko "T17c attendu total=4 shebang=2 libs=2 exec=2 files=[lib-x.sh,oubli-shebang.sh] ; obtenu : $CHK"
+fi
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]
