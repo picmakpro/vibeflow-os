@@ -104,7 +104,10 @@ When a `product` or `dev` role is installed, the installer puts two git hooks in
   signals) to the file `.git/vf-divergence/journal.tsv`. It is not versioned, it belongs to your clone
   (your worktrees share it) and it survives removal of the safety net.
 - **The state**: `bash .claude/scripts/vf-divergence-hook.sh status --path .` says whether each hook
-  is armed, third-party or absent, and how many lines the journal holds.
+  is armed, third-party or absent, and how many lines the journal holds. A hook you armed by hand
+  carries the path of the plugin cache script: ask `status` through that same script (the installed
+  plugin's `conductor/scripts/vf-divergence-hook.sh`). Asked through the lab copy in `.claude/scripts/`,
+  that hook reads as third-party, because the path in its line is not the copy's.
 - **It never runs your repository**: the check is launched from the installed plugin, not from a
   script the merge may have just brought in.
 - **It never takes the place of a hook of yours**: if a hook already exists, or if `core.hooksPath` is

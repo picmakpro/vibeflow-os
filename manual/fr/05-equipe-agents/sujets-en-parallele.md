@@ -106,7 +106,10 @@ crie plus « STATE.md absent » sur un dépôt partitionné, et les exigences se
   HEAD, signaux) au fichier `.git/vf-divergence/journal.tsv`. Il n'est pas versionné, il appartient
   à ton clone (tes worktrees le partagent) et il survit au retrait du filet.
 - **L'état** : `bash .claude/scripts/vf-divergence-hook.sh status --path .` dit si chaque hook est
-  armé, tiers ou absent, et combien de lignes compte le journal.
+  armé, tiers ou absent, et combien de lignes compte le journal. Un hook que tu as armé à la main
+  porte le chemin du script du cache du plugin : interroge `status` par ce même script (le
+  `conductor/scripts/vf-divergence-hook.sh` du plugin installé). Interrogé par la copie du lab dans
+  `.claude/scripts/`, ce hook se lit comme tiers, car le chemin de sa ligne n'est pas celui de la copie.
 - **Il n'exécute jamais ton dépôt** : le contrôle est lancé depuis le plugin installé, pas depuis un
   script que la fusion viendrait d'apporter.
 - **Il ne prend jamais la place d'un hook à toi** : si un hook existe déjà, ou si `core.hooksPath`

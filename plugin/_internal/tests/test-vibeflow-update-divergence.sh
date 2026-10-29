@@ -9,13 +9,14 @@
 #
 # Cas : VUD-TRACE (tracer), VUD-ROLE-SOLO, VUD-ROLE-DEV, VUD-PRODUCT, VUD-LOCAL, VUD-SOLO, VUD-USER,
 # VUD-TARGET, VUD-NOGIT, VUD-TIERS, VUD-DRY, VUD-IDEMPOTENT, VUD-OPTOUT, VUD-OPTOUT-INV, VUD-UNINSTALL,
-# VUD-UPDATE-REFRESH, VUD-CACHE-SEUL.
-# Mutants de l'engine (QUAL-01, VUD-MUT-1..10), copie de _internal, l'original n'est jamais touche :
+# VUD-UPDATE-REFRESH, VUD-CACHE-SEUL, VUD-CACHE-ABSENT.
+# Mutants de l'engine (QUAL-01, VUD-MUT-1..11), copie de _internal, l'original n'est jamais touche :
 #   1 appel de divergence_hook_apply retire de role_apply        6 rafraichissement de `update --all` neutralise
 #   2 armement etendu au poste solo                              7 repli de find_divergence_hook sur la cible
 #   3 retrait au poste solo neutralise                           8 refus (code 1) non relaye
 #   4 retrait de `uninstall --all` neutralise                    9 --dry-run qui arme pour de vrai
 #   5 sortie `off` ignoree                                      10 valeur invalide de VF_DIVERGENCE_HOOK acceptee
+#  11 divergence_hook_present rend toujours faux (hook nostre laisse en place sans le dire)
 #
 # Cette suite exerce `vf-divergence-hook.sh` (livre par 61-01, durci par 61-03) : le comportement du script
 # lui-meme est prouve par ses propres suites, ici on prouve ce que l'ENGINE en fait.
@@ -498,6 +499,21 @@ lab_run "$L18" VIBEFLOW_CACHE="$CP" VF_SCOPE=project -- uninstall --all >/dev/nu
 [ "$miss" -eq 0 ] && ok "VUD-CACHE-SEUL (T-61-16, P61-D-03) : script absent du cache = « NON VERIFIABLE » nomme, aucun repli, le piege pose dans le lab n'est jamais execute"
 
 # ---------------------------------------------------------------------------
+# VUD-CACHE-ABSENT — clone ARME, puis cache sans le script : le hook laisse en place est DIT, jamais tu
+# ---------------------------------------------------------------------------
+miss=0
+CQ="$WORK/cache-sans-script"
+mk_cache "$CQ" && rm -f "$CQ/$HOOKSCRIPT_REL" || { ko "VUD-CACHE-ABSENT pre-condition : cache sans script non constituable"; miss=1; }
+mk_lab; L19="$LAB"
+lab_run "$L19" VF_ROLE=dev VF_SCOPE=project -- install validator; RC=$?
+[ "$RC" -eq 0 ] && [ "$(ours_count "$L19")" -eq 2 ] || { ko "VUD-CACHE-ABSENT pre-condition : clone non arme (rc=$RC, hooks=$(ours_count "$L19"))"; miss=1; }
+lab_run "$L19" VIBEFLOW_CACHE="$CQ" VF_SCOPE=project -- role solo; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-CACHE-ABSENT : role solo rc=$RC"; miss=1; }
+"$GREP" -qF 'NON VERIFIABLE : vf-divergence-hook.sh absent du cache du plugin — hook VibeFlow laissé en place, à retirer à la main' "$WORK/err" || { ko "VUD-CACHE-ABSENT : role solo sans script dans le cache et hook nostre pose : aucune ligne « laissé en place, à retirer à la main »"; miss=1; }
+[ "$(ours_count "$L19")" -eq 2 ] || { ko "VUD-CACHE-ABSENT : un hook nostre a bouge sans le script du cache"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VUD-CACHE-ABSENT : clone arme, cache sans script, role solo -> « NON VERIFIABLE ... hook VibeFlow laissé en place, à retirer à la main », hooks intacts"
+
+# ---------------------------------------------------------------------------
 # Mutants (QUAL-01) — copie de _internal, l'original n'est jamais touche
 # ---------------------------------------------------------------------------
 MUT="$WORK/mut"; mkdir -p "$MUT"; cp -R "$INTERNAL_DIR" "$MUT/_internal"; rm -rf "$MUT/_internal/tests"
@@ -516,6 +532,7 @@ mutate() { # <n> → ecrit le mutant et rend son chemin ; 1 = identique a l'orig
     MODE == "9" && $0 == "divergence_hook_apply() {" { ina = 1 }
     MODE == "9" && ina && $0 == "  if vf_dry_run; then" { print "  if false; then"; ina = 0; next }
     MODE == "10" && index($0, "*) err \"VF_DIVERGENCE_HOOK invalide") > 0 { sub(/\*\) err .*$/, "*) : ;;"); print; next }
+    MODE == "11" && $0 == "divergence_hook_present() {" { print; print "  return 1"; next }
     { print }' "$INTERNAL_DIR/vibeflow-update.sh" > "$out"
   cmp -s "$out" "$INTERNAL_DIR/vibeflow-update.sh" && return 1
   bash -n "$out" || return 2
@@ -585,6 +602,14 @@ probe_inv() { # 10 : une valeur invalide est-elle refusee ?
   printf 'rc=%s hooks=%s' "$rc" "$(ours_count "$LAB")"
 }
 
+probe_present() { # 11 : un hook nostre laisse en place faute de script est-il dit ?
+  local pc="$WORK/pcache-sans"; rm -rf "$pc"; mk_cache "$pc"; rm -f "$pc/$HOOKSCRIPT_REL"
+  mk_lab; ENG="$1"
+  lab_run "$LAB" VF_ROLE=dev VF_SCOPE=project -- install validator
+  lab_run "$LAB" VIBEFLOW_CACHE="$pc" VF_SCOPE=project -- role solo
+  if "$GREP" -qF 'hook VibeFlow laissé en place' "$WORK/err"; then printf 'dit=oui'; else printf 'dit=non'; fi
+}
+
 kill_mutant() { # <n> <sonde> <attendu sur l'original> <libelle>
   local n="$1" probe="$2" want="$3" label="$4" m orig got mrc
   m="$(mutate "$n")"; mrc=$?
@@ -607,6 +632,7 @@ kill_mutant 7 probe_cache_seul 'piege=non' "repli de find_divergence_hook sur le
 kill_mutant 8 probe_tiers 'refuse=oui' "refus d'armement (code 1) non relaye"
 kill_mutant 9 probe_dry 'hooks=0 plan=2' "--dry-run qui arme pour de vrai"
 kill_mutant 10 probe_inv 'rc=1 hooks=0' "valeur invalide de VF_DIVERGENCE_HOOK acceptee"
+kill_mutant 11 probe_present 'dit=oui' "divergence_hook_present rend toujours faux : le hook laisse en place n'est plus dit"
 ENG="$INSTALLER"
 
 echo ""

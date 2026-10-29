@@ -21,6 +21,9 @@
 #                                      husky versionne, ou dossier global partage par tous les depots
 #         REFUS executable-dans-l-arbre  ce script est sous la racine de travail (le hook n'execute jamais
 #                                      du code de l'arbre) ; on refuse, on ne resout pas
+#         REFUS hooks-hors-depot       le chemin REEL du dossier de hooks (liens resolus) n'est pas sous le dossier
+#                                      git commun du depot : lien vers un dossier versionne du lab ou partage
+#                                      entre depots (armer ici armerait l'arbre ou des depots tiers)
 #         REFUS hook-tiers:<nom>       un hook qui n'est pas le notre occupe la place
 #         REFUS ligne-perimee:<nom>    un hook tiers porte la ligne d'appel d'un autre chemin du script
 #       Un hook tiers qui porte DEJA la ligne d'appel a jour (celle que le refus imprime) est reconnu
@@ -118,6 +121,22 @@
 set -uo pipefail
 export LC_ALL=C
 
+# safe_path — retire du PATH toute entree non absolue (`.`, `./node_modules/.bin`, entree vide = repertoire
+# courant) : sur un `git pull`, le repertoire courant est l'arbre que la fusion vient de remplir, et une commande
+# resolue par un PATH relatif y executerait du code de la branche fusionnee (P61-D-03). Aucune commande n'est
+# lancee avant cet appel.
+safe_path() {
+  local p="" e ifs="$IFS"
+  set -f; IFS=:
+  for e in $PATH; do
+    case "$e" in /*) p="${p:+$p:}$e" ;; esac
+  done
+  IFS="$ifs"; set +f
+  [ -n "$p" ] || p="/usr/bin:/bin"
+  PATH="$p"; export PATH
+}
+safe_path
+
 MARKER='# vibeflow:vf-divergence-hook v1'
 NL='
 '
@@ -208,8 +227,18 @@ write_hook() {
     printf "VF_DIVERGENCE_SCRIPT='%s'\n" "$SELF"
     printf "VF_DIVERGENCE_NOM='%s'\n" "$name"
     printf '%s\n' \
-      'if [ -f "$VF_DIVERGENCE_SCRIPT" ]; then' \
-      '  exec bash "$VF_DIVERGENCE_SCRIPT" run --hook "$VF_DIVERGENCE_NOM" "$@"' \
+      '# PATH ampute des entrees non absolues avant toute commande (une branche fusionnee ne choisit pas bash).' \
+      'vf_p=; vf_o=$IFS; set -f; IFS=:' \
+      'for vf_e in $PATH; do' \
+      '  case "$vf_e" in /*) vf_p="${vf_p:+$vf_p:}$vf_e" ;; esac' \
+      'done' \
+      'IFS=$vf_o; set +f' \
+      '[ -n "$vf_p" ] || vf_p=/usr/bin:/bin' \
+      'PATH=$vf_p; export PATH' \
+      'vf_bash="$(command -v bash 2>/dev/null)"' \
+      'case "$vf_bash" in /*) : ;; *) vf_bash= ;; esac' \
+      'if [ -f "$VF_DIVERGENCE_SCRIPT" ] && [ -n "$vf_bash" ]; then' \
+      '  exec "$vf_bash" "$VF_DIVERGENCE_SCRIPT" run --hook "$VF_DIVERGENCE_NOM" "$@"' \
       'fi' \
       '# Executable du cache disparu : jamais un silence. Dit NON VERIFIABLE, journalise, ne bloque pas.' \
       'echo "[vf-divergence] NON VERIFIABLE : executable introuvable - relancer /vf-update ou reinstaller" >&2' \
@@ -334,8 +363,10 @@ do_run() {
 
   tmp="$(mktemp "${TMPDIR:-/tmp}/vf-divergence.XXXXXX" 2>/dev/null)" || { say "NON VERIFIABLE (temporaire non creable)"; exit 2; }
   trap 'rm -f "$tmp"' EXIT
-  bash "$SELF_DIR/check-divergence.sh" --path "$root" 2> "$tmp" </dev/null || rc=$?
-  cat "$tmp" >&2
+  "${BASH:-bash}" "$SELF_DIR/check-divergence.sh" --path "$root" 2> "$tmp" </dev/null || rc=$?
+  # Les noms de dossiers de phase et de compartiment viennent de la branche fusionnee : aucun octet de controle
+  # (sauf saut de ligne et tabulation) n'atteint le terminal.
+  tr -d '\000-\010\013-\037\177' < "$tmp" >&2
   case "$rc" in
     1)
       sig="$(signals_of "$tmp")"
@@ -389,8 +420,43 @@ hand_line() { say "LIGNE A AJOUTER A LA MAIN ($1) : bash '$SELF' run --hook $1 \
 refus_fin() { say "SORTIE : VF_DIVERGENCE_HOOK=off"; printf 'BILAN verbe=arm code=1\n'; exit 1; }
 arm_fin() { printf 'BILAN verbe=arm code=%s\n' "$1"; exit "$1"; }
 
-# in_tree <chemin> <racine> — le chemin est-il la racine ou dessous ?
-in_tree() { case "$1" in "$2"|"$2"/*) return 0 ;; *) return 1 ;; esac; }
+# in_tree <chemin> <racine> — le chemin est-il la racine ou dessous ? Par IDENTITE de fichier (-ef) en remontant
+# les ancetres quand les deux existent (une comparaison de chaines se contourne par la casse sur macOS et
+# Windows : `labx/...` pour un lab `Labx`) ; comparaison de chaines sinon.
+in_tree() {
+  local p="$1" r="$2" up
+  if [ -e "$r" ] && [ -e "$p" ]; then
+    while :; do
+      [ "$p" -ef "$r" ] && return 0
+      up="$(dirname "$p")"
+      [ "$up" != "$p" ] || return 1
+      p="$up"
+    done
+  fi
+  case "$p" in "$r"|"$r"/*) return 0 ;; *) return 1 ;; esac
+}
+
+# real_dir <chemin absolu> — chemin physique (liens resolus) ; la derniere composante peut manquer. Code 1 si
+# non resoluble (parent absent, lien pendant).
+real_dir() {
+  local p="$1" d b
+  if [ -d "$p" ]; then (cd "$p" 2>/dev/null && pwd -P); return; fi
+  [ ! -L "$p" ] || return 1
+  d="$(dirname "$p")"; b="$(basename "$p")"
+  d="$(cd "$d" 2>/dev/null && pwd -P)" || return 1
+  printf '%s/%s' "$d" "$b"
+}
+
+# hooks_confined — le chemin REEL du dossier de hooks est-il sous le dossier git commun du depot ? Un
+# `.git/hooks` lien symbolique vers un dossier versionne du lab, ou partage entre depots, ne l'est pas.
+# Pose HOOKS_REAL. Code 0 ou 1.
+hooks_confined() {
+  HOOKS_REAL="$(real_dir "$HOOKS_DIR")" || return 1
+  [ -n "$HOOKS_REAL" ] || return 1
+  common_dir || return 1
+  # Deux chemins physiques (pwd -P) : une comparaison de prefixe suffit, et strictement dessous.
+  case "$HOOKS_REAL" in "$COMMON"/*) return 0 ;; *) return 1 ;; esac
+}
 
 # hooks_path_set — 0 : core.hooksPath non vide a un niveau quelconque ; 1 : absent ; 2 : illisible.
 hooks_path_set() {
@@ -436,6 +502,7 @@ do_arm() {
     hooks_path_set; rc=$?
     if [ "$rc" -eq 2 ]; then say "NON VERIFIABLE hooks-irresolu : configuration git illisible"; arm_fin 2; fi
     if [ "$rc" -eq 0 ]; then say "rien a rafraichir : core.hooksPath est configure, aucune ecriture dans le dossier qu'il designe"; arm_fin 0; fi
+    hooks_confined || { say "REFUS hooks-hors-depot : le dossier de hooks ${HOOKS_REAL:-$HOOKS_DIR} n'est pas sous le dossier git du depot — rien n'est ecrit"; refus_fin; }
     if in_tree "$SELF" "$ROOT"; then
       say "REFUS executable-dans-l-arbre : $SELF est sous l'arbre de travail — le hook n'execute jamais du code de l'arbre"
       refus_fin
@@ -463,6 +530,11 @@ do_arm() {
   if [ "$rc" -eq 2 ]; then say "NON VERIFIABLE hooks-irresolu : configuration git illisible"; arm_fin 2; fi
   if [ "$rc" -eq 0 ]; then
     say "REFUS core.hooksPath : le dossier de hooks est designe par la configuration (husky versionne, ou dossier global partage par tous les depots) — rien n'est ecrit"
+    for name in $(hook_names); do hand_line "$name"; done
+    refus_fin
+  fi
+  if ! hooks_confined; then
+    say "REFUS hooks-hors-depot : le dossier de hooks ${HOOKS_REAL:-$HOOKS_DIR} n'est pas sous le dossier git du depot (lien vers l'arbre versionne ou vers un dossier partage) — rien n'est ecrit"
     for name in $(hook_names); do hand_line "$name"; done
     refus_fin
   fi

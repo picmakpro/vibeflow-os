@@ -638,9 +638,11 @@ probe_disarm_tiers() { # M5
   return 0
 }
 probe_hooksp() { # M6
-  mk_pair "p$((++N))"; mkdir -p "$P/b/husky"; git -C "$P/b" config core.hooksPath "$P/b/husky"
+  # Le dossier designe est SOUS le dossier git du depot : seul le refus core.hooksPath peut le refuser (le
+  # confinement du chemin reel des hooks n'y voit rien a redire).
+  mk_pair "p$((++N))"; mkdir -p "$P/b/.git/husky"; git -C "$P/b" config core.hooksPath "$P/b/.git/husky"
   arm_in "$P/b"
-  { [ "$HKRC" -eq 1 ] && [ "$(ls -A "$P/b/husky" | awk 'END { print NR }')" -eq 0 ]; } || { LASTMSG="arm rc=$HKRC (attendu 1), husky contient $(ls -A "$P/b/husky" | awk 'END { print NR }') fichier(s)"; return 1; }
+  { [ "$HKRC" -eq 1 ] && [ "$(ls -A "$P/b/.git/husky" | awk 'END { print NR }')" -eq 0 ]; } || { LASTMSG="arm rc=$HKRC (attendu 1), husky contient $(ls -A "$P/b/.git/husky" | awk 'END { print NR }') fichier(s)"; return 1; }
   return 0
 }
 probe_arbre() { # M7
@@ -678,6 +680,98 @@ probe_quote() { # M11
   local save="$TARGET"; TARGET="$TMP/o'q$N/cache/conductor/scripts/vf-divergence-hook.sh"
   arm_in "$P/b"; TARGET="$save"
   { [ "$HKRC" -eq 2 ] && no_hook "$P/b"; } || { LASTMSG="arm depuis un chemin a apostrophe rc=$HKRC (attendu 2), hook ecrit=$(no_hook "$P/b" && echo non || echo oui)"; return 1; }
+  return 0
+}
+
+# --- Tour 1 de relecture (Phase 61) : sondes des constats 1 a 7
+nfiles() { ls -A "$1" 2>/dev/null | awk 'END { print NR }'; }
+probe_hooks_lien() { # M13 : .git/hooks lien vers un dossier du lab, puis vers un dossier partage
+  mk_pair "p$((++N))"
+  rm -rf "$P/b/.git/hooks"; mkdir "$P/b/.githooks"; ln -s ../.githooks "$P/b/.git/hooks"
+  arm_in "$P/b"
+  [ "$HKRC" -eq 1 ] || { LASTMSG="lien vers l'arbre : arm rc=$HKRC (attendu 1)"; return 1; }
+  [ "$(nfiles "$P/b/.githooks")" -eq 0 ] || { LASTMSG="lien vers l'arbre : le dossier versionne a recu $(nfiles "$P/b/.githooks") fichier(s)"; return 1; }
+  "$GREP" -qF 'LIGNE A AJOUTER A LA MAIN (post-merge)' "$TMP/hk.err" || { LASTMSG="lien vers l'arbre : refus sans la ligne a ajouter a la main"; return 1; }
+  local sh="$TMP/shared$N"; mkdir "$sh"
+  rm -rf "$P/a/.git/hooks"; ln -s "$sh" "$P/a/.git/hooks"
+  arm_in "$P/a"
+  { [ "$HKRC" -eq 1 ] && [ "$(nfiles "$sh")" -eq 0 ]; } || { LASTMSG="dossier partage : arm rc=$HKRC (attendu 1), $(nfiles "$sh") fichier(s) ecrit(s) chez des tiers"; return 1; }
+  return 0
+}
+probe_hooks_lien_refresh() { # M14 : hooks nostres deja dans un dossier partage -> --refresh refuse
+  mk_pair "p$((++N))"
+  arm_in "$P/b"; [ "$HKRC" -eq 0 ] || { LASTMSG="arm rc=$HKRC"; return 1; }
+  local sh="$TMP/shared$N"
+  mv "$P/b/.git/hooks" "$sh" && ln -s "$sh" "$P/b/.git/hooks" || { LASTMSG="lien non pose"; return 1; }
+  cp "$sh/post-merge" "$TMP/pm.orig"
+  mk_cache "$TMP/cr$N" "$TARGET" || { LASTMSG="cache non construit"; return 1; }
+  local save="$TARGET"; TARGET="$TMP/cr$N/conductor/scripts/vf-divergence-hook.sh"
+  hk arm --refresh --path "$P/b"; TARGET="$save"
+  { [ "$HKRC" -eq 1 ] && cmp -s "$sh/post-merge" "$TMP/pm.orig"; } || { LASTMSG="refresh rc=$HKRC (attendu 1), hook partage intact=$(cmp -s "$sh/post-merge" "$TMP/pm.orig" && echo oui || echo non)"; return 1; }
+  return 0
+}
+probe_refresh_arbre() { # M15 : arm --refresh depuis un script SOUS l'arbre
+  mk_pair "p$((++N))"
+  arm_in "$P/b"; [ "$HKRC" -eq 0 ] || { LASTMSG="arm rc=$HKRC"; return 1; }
+  cp "$P/b/.git/hooks/post-merge" "$TMP/pm.orig"
+  mk_cache "$P/b/.vibeflow-cache" "$TARGET" || { LASTMSG="cache sous l'arbre non construit"; return 1; }
+  local save="$TARGET"; TARGET="$P/b/.vibeflow-cache/conductor/scripts/vf-divergence-hook.sh"
+  hk arm --refresh --path "$P/b"; TARGET="$save"
+  { [ "$HKRC" -eq 1 ] && cmp -s "$P/b/.git/hooks/post-merge" "$TMP/pm.orig"; } || { LASTMSG="refresh depuis l'arbre rc=$HKRC (attendu 1), hook intact=$(cmp -s "$P/b/.git/hooks/post-merge" "$TMP/pm.orig" && echo oui || echo non)"; return 1; }
+  return 0
+}
+probe_relais() { # M16 : octets de controle venus de la branche fusionnee
+  mk_pair "p$((++N))"; arm_in "$P/b"
+  local esc bel
+  esc="$(printf '\033')"; bel="$(printf '\007')"
+  add_phase "$P/a" 02 x roadmap; git -C "$P/a" push -q origin main 2> /dev/null
+  add_phase "$P/b" 02 "${esc}]0;VFPWN${bel}y"
+  pull_in "$P/b" --no-rebase
+  "$GREP" -qF 'DIVERGENCE apres post-merge' "$TMP/pull.err" || { LASTMSG="divergence non criee"; return 1; }
+  "$GREP" -qF 'VFPWN' "$TMP/pull.err" || { LASTMSG="le nom de phase n'est plus relaye (temoin positif absent)"; return 1; }
+  if LC_ALL=C "$GREP" -q "[${esc}${bel}]" "$TMP/pull.err"; then LASTMSG="octet de controle (ESC/BEL) relaye au terminal"; return 1; fi
+  return 0
+}
+probe_path_fichier() { # M17 : PATH relatif chez l'utilisateur, fichier de hook
+  mk_pair "p$((++N))"; arm_in "$P/b"
+  mkdir -p "$P/b/tbin"; rm -f "$TMP/piege-path"
+  printf '#!/bin/sh\n: > "%s"\nexec "%s" "$@"\n' "$TMP/piege-path" "$BASH" > "$P/b/tbin/bash"; chmod 755 "$P/b/tbin/bash"
+  add_phase "$P/a" 02 x roadmap; git -C "$P/a" push -q origin main 2> /dev/null
+  add_phase "$P/b" 02 y
+  PULLRC=0
+  (cd "$P/b" && PATH="./tbin:$PATH" perl -e 'alarm 30; exec @ARGV' git pull -q --no-rebase --no-edit) > "$TMP/pull.out" 2> "$TMP/pull.err" < /dev/null || PULLRC=$?
+  [ ! -e "$TMP/piege-path" ] || { LASTMSG="le bash de l'arbre (PATH relatif) a ete execute par le hook"; return 1; }
+  "$GREP" -qF 'DIVERGENCE apres post-merge' "$TMP/pull.err" || { LASTMSG="le hook ne crie plus (temoin positif absent) — $(tail -2 "$TMP/pull.err")"; return 1; }
+  return 0
+}
+probe_path_run() { # M18 : PATH relatif, travail du script (run)
+  mk_pair "p$((++N))"
+  local mk; mk="$(command -v mktemp)"
+  mkdir -p "$P/b/tbin"; rm -f "$TMP/piege-run"
+  printf '#!/bin/sh\n: > "%s"\nexec "%s" "$@"\n' "$TMP/piege-run" "$mk" > "$P/b/tbin/mktemp"; chmod 755 "$P/b/tbin/mktemp"
+  (cd "$P/b" && PATH="./tbin:$PATH" perl -e 'alarm 30; exec @ARGV' "$BASH" "$TARGET" run --hook post-merge) > /dev/null 2> "$TMP/run.err" < /dev/null || :
+  [ ! -e "$TMP/piege-run" ] || { LASTMSG="le mktemp de l'arbre (PATH relatif) a ete execute par run"; return 1; }
+  return 0
+}
+probe_refresh_tiers() { # M19 : --refresh ne touche jamais un hook tiers
+  mk_pair "p$((++N))"
+  arm_in "$P/b"; [ "$HKRC" -eq 0 ] || { LASTMSG="arm rc=$HKRC"; return 1; }
+  put_tiers "$P/b" post-rewrite; cp "$P/b/.git/hooks/post-rewrite" "$TMP/tiers.orig"
+  mk_cache "$TMP/cr$N" "$TARGET" || { LASTMSG="cache non construit"; return 1; }
+  local save="$TARGET"; TARGET="$TMP/cr$N/conductor/scripts/vf-divergence-hook.sh"
+  hk arm --refresh --path "$P/b"; TARGET="$save"
+  [ "$HKRC" -eq 0 ] || { LASTMSG="refresh rc=$HKRC (attendu 0)"; return 1; }
+  "$GREP" -qF "$TMP/cr$N/" "$P/b/.git/hooks/post-merge" || { LASTMSG="le hook nostre n'a pas ete rafraichi (temoin positif absent)"; return 1; }
+  cmp -s "$P/b/.git/hooks/post-rewrite" "$TMP/tiers.orig" || { LASTMSG="le hook tiers post-rewrite a ete ecrase par --refresh"; return 1; }
+  return 0
+}
+probe_casse() { # M20 : in_tree par identite de fichier (systeme insensible a la casse)
+  local c="$((++N))" d f
+  d="$TMP/Casse$c"; mkdir -p "$d/Sub/x" "$d-autre"
+  f="$(awk '/^in_tree\(\) \{/ { p = 1 } p { print } p && /^\}/ { exit }' "$TARGET")"
+  [ -n "$f" ] || { LASTMSG="in_tree introuvable dans la cible"; return 1; }
+  ( eval "$f"; in_tree "$TMP/casse$c/sub/x" "$d" ) || { LASTMSG="in_tree compare des chaines : casse contournee (casse$c / Casse$c)"; return 1; }
+  ( eval "$f"; in_tree "$d-autre" "$d" ) && { LASTMSG="in_tree : un frere de meme prefixe est pris pour un descendant"; return 1; }
   return 0
 }
 
@@ -727,8 +821,8 @@ mutant VDH-MUT-5 '"$MARKER"*) return 0 ;;' '"$MARKER"*)' '*)' probe_disarm_tiers
   "test du marqueur retire : disarm retire un hook tiers"
 mutant VDH-MUT-6 '0) [ -n "$v" ] && return 0; return 1 ;;' 'return 0' 'return 1' probe_hooksp \
   "refus core.hooksPath retire (valeur lue puis ignoree)"
-mutant VDH-MUT-7 'in_tree() {' '"$2"/*) return 0' '"$2"/*) return 1' probe_arbre \
-  "refus du script sous l'arbre retire a l'armement"
+mutant VDH-MUT-7 '[ "$p" -ef "$r" ] && return 0' 'return 0' 'return 1' probe_arbre \
+  "refus du script sous l'arbre retire a l'armement (identite de fichier neutralisee)"
 mutant VDH-MUT-8 'if in_tree "$SELF_DIR" "$rootp"; then' 'in_tree "$SELF_DIR" "$rootp"' 'false' probe_run_arbre \
   "garde d'execution hors de l'arbre retiree"
 mutant VDH-MUT-9 '[ "${1:-}" = "rebase" ] || exit 0 ;;' '"rebase"' '"xrebase"' probe_rewrite \
@@ -739,6 +833,30 @@ mutant VDH-MUT-11 '*[[:cntrl:]]*) return 1 ;;' 'return 1' 'return 0' probe_quote
   "controle du chemin non sur retire : un chemin a apostrophe est embarque dans le hook"
 mutant VDH-MUT-12 "printf 'lien'" '[ -L "$f" ]' 'false' probe_lien \
   "lien symbolique du journal suivi"
+
+# Tour 1 de relecture (Phase 61) : un mutant par propriete.
+mutant VDH-MUT-13 'if ! hooks_confined; then' '! hooks_confined' 'false' probe_hooks_lien \
+  "arm : confinement du dossier de hooks retire (lien vers l'arbre ou vers un dossier partage suivi)"
+mutant VDH-MUT-14 'HOOKS_REAL="$(real_dir "$HOOKS_DIR")" || return 1' '"$(real_dir "$HOOKS_DIR")" || return 1' '"$HOOKS_DIR"' probe_hooks_lien \
+  "chemin du dossier de hooks non resolu (le lien symbolique passe pour un dossier du depot)"
+mutant VDH-MUT-15 'hooks_confined ||' 'hooks_confined ||' 'true ||' probe_hooks_lien_refresh \
+  "--refresh : confinement du dossier de hooks retire"
+mutant VDH-MUT-16 '    if in_tree "$SELF" "$ROOT"; then' 'in_tree "$SELF" "$ROOT"' 'false' probe_refresh_arbre \
+  "--refresh : refus du script sous l'arbre retire"
+mutant VDH-MUT-17 '< "$tmp" >&2' "tr -d '\\000-\\010\\013-\\037\\177' <" 'cat <' probe_relais \
+  "relais de la sortie de check-divergence sans filtre des caracteres de controle"
+mutant VDH-MUT-18 'case "$vf_e" in /*)' '/*)' '*)' probe_path_fichier \
+  "fichier de hook : entrees relatives du PATH conservees (bash resolu dans l'arbre)"
+mutant VDH-MUT-19 'case "$e" in /*) p=' '/*)' '*)' probe_path_run \
+  "run : entrees relatives du PATH conservees (commandes resolues dans l'arbre)"
+mutant VDH-MUT-20 '[ "$HS" = "ARME" ] || continue' '|| continue' '|| :' probe_refresh_tiers \
+  "--refresh : garde « hook nostre seulement » retiree (un hook tiers est ecrase)"
+if mkdir "$TMP/CaseProbe" 2> /dev/null && [ -d "$TMP/caseprobe" ]; then
+  mutant VDH-MUT-21 'if [ -e "$r" ] && [ -e "$p" ]; then' '[ -e "$r" ] && [ -e "$p" ]' 'false' probe_casse \
+    "in_tree compare des chaines : contournable par la casse"
+else
+  skip "VDH-MUT-21 systeme de fichiers sensible a la casse : le contournement par la casse n'existe pas ici"
+fi
 TARGET="$ORIG_TARGET"
 
 # ===========================================================================

@@ -265,7 +265,8 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   (le chemin du cache versionné change, un clone non armé n'est JAMAIS armé par une mise à jour). Il
   pose deux hooks statiques `post-merge` et `post-rewrite` dans le dossier de hooks réel du clone
   (`git rev-parse --git-path hooks`, worktrees compris), jamais par `core.hooksPath` ; un hook
-  tiers, un `core.hooksPath` configuré ou un lab qui n'est pas la racine du dépôt sont REFUSÉS
+  tiers, un `core.hooksPath` configuré, un dossier de hooks dont le chemin réel sort du dossier git du dépôt
+  (`.git/hooks` lien vers l'arbre ou un dossier partagé) ou un lab qui n'est pas la racine du dépôt sont REFUSÉS
   audiblement (code 1, ligne à ajouter à la main) sans jamais faire échouer l'installation. Le hook
   n'exécute que le script du cache du plugin (jamais un fichier de l'arbre versionné du lab) et
   inspecte le worktree courant ; chemin disparu → `NON VERIFIABLE` audible, jamais un faux conforme.
