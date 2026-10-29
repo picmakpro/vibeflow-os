@@ -4,7 +4,7 @@
 > claim inventé, sans spammer personne et sans jamais lancer un envoi tout seul** : ce module
 > installe le studio d'acquisition complet qui tient cette promesse.
 
-**Type** : `agents + skill + scripts` · **Version** : v2.0.15 · **Dépend de** : `conductor`,
+**Type** : `agents + skill + scripts` · **Version** : v2.0.16 · **Dépend de** : `conductor`,
 `planning-core`, `consolidator`, `audit-architecture`, `validator`.
 
 ---
@@ -43,16 +43,13 @@ Garde-fous métier embarqués, vérifiés par le juge :
 
 ## Installation
 
-```bash
-bash plugin/_internal/vibeflow-update.sh --scope project install --with-deps growth-bundle
-```
+Via `/vibeflow-install` : coche « growth-bundle » (moteur interne : `plugin/_internal/vibeflow-update.sh`).
 
-`--with-deps` tire la fermeture transitive des `requires` dans l'ordre : `conductor` (socle
+L'installeur tire la fermeture transitive des `requires` dans l'ordre : `conductor` (socle
 mandatory — il héberge le team-kernel et ses scripts `dag.sh`, `driver-lock.sh`,
 `check-agents.sh`), `planning-core` (socle `.planning/` + extension `growth/`), `consolidator`
 (registres, promotion de décisions), `audit-architecture` (audit du process générateur, P8),
-`validator` (filet de conformité). Alternative interactive : `/vibeflow-install` → cocher
-« growth-bundle ».
+`validator` (filet de conformité).
 
 ## Démarrer
 

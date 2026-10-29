@@ -55,6 +55,17 @@ où le champ est vide », « retire la partie sur les notifications, on avait di
 est réécrit, pas rafistolé à la marge, et tu peux le relire à nouveau. Tant que tu n'as pas dit d'y
 aller, rien n'est exécuté.
 
+### Une étape proposée attend un dev
+
+Aux postes `product` et `dev`, une étape ajoutée par l'équipe naît **proposée** : elle n'est ni
+planifiée ni exécutée tant qu'un dev ne l'a pas validée. Si tu demandes de la planifier, l'équipe
+s'arrête en nommant l'étape et le geste attendu, sans rien lancer. Pour la valider, un dev joue
+`vf-validation.sh validate --phase <N>` ; la même commande, avec
+`--architecture .planning/ARCHITECTURE.md`, valide l'architecture que le head exige avant tout
+découpage. Un poste `product` est refusé par ce verbe, sauf exception explicite, tracée dans la
+valeur de validation. Au poste `solo`, rien de tout cela n'existe : tes étapes restent validées
+d'office. Ce n'est pas un verrou : voir [gates et validation humaine](../02-concepts/gates-et-validation-humaine.md).
+
 ## La revue de plan, et les plans trop gros
 
 **La revue de plan.** Avant l'exécution d'un plan structurant, un relecteur qui n'a pas écrit le

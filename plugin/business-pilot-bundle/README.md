@@ -4,7 +4,7 @@
 > jamais rien envoyer à un client tout seul, et sans jamais inventer un chiffre** : ce module
 > installe l'équipe complète qui tient cette promesse.
 
-**Type** : `agents + skill + scripts` · **Version** : v2.0.16 · **Dépend de** : `conductor`,
+**Type** : `agents + skill + scripts` · **Version** : v2.0.17 · **Dépend de** : `conductor`,
 `planning-core`, `consolidator`, `audit-architecture`, `validator`.
 
 ---
@@ -39,16 +39,13 @@ Deux **Iron Laws** non négociables, quel que soit le mode (autonome compris) :
 
 ## Installation
 
-```bash
-bash plugin/_internal/vibeflow-update.sh --scope project install --with-deps business-pilot-bundle
-```
+Via `/vibeflow-install` : coche « business-pilot-bundle » (moteur interne : `plugin/_internal/vibeflow-update.sh`).
 
-`--with-deps` tire la fermeture transitive des `requires` dans l'ordre : `conductor` (socle
+L'installeur tire la fermeture transitive des `requires` dans l'ordre : `conductor` (socle
 mandatory — il héberge le team-kernel et ses scripts `dag.sh`, `driver-lock.sh`,
 `check-agents.sh`), `planning-core` (socle `.planning/` + extension `business/`), `consolidator`
 (registres, promotion de décisions), `audit-architecture` (audit du process générateur, P8),
-`validator` (filet de conformité). Alternative interactive : `/vibeflow-install` → cocher
-« business-pilot-bundle ».
+`validator` (filet de conformité).
 
 **Optionnel mais recommandé** : `kpi-analyst` — le pilier finance consomme son registre `KPIS.md`
 et ses extracteurs déterministes (source à privilégier pour CA/encours/marge, même Iron Law des

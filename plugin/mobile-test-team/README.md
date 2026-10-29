@@ -4,7 +4,7 @@
 > vraiment »**. Ce module ajoute la boucle manquante : trois agents cloisonnés qui testent
 > l'app réelle sur cible mobile, corrigent, et re-testent jusqu'au vert — sans jamais tricher.
 
-**Type** : agents + rules · **Version** : v1.4.7 · **Dépend de** : `mobile-test`
+**Type** : agents + rules · **Version** : v1.4.8 · **Dépend de** : `mobile-test`
 
 ---
 
@@ -36,15 +36,8 @@ execute (code + gates techniques verts)
 ## Installation
 
 Pré-requis modules (`module.json` → `requires`) : **`mobile-test`** — le pipeline mécanique que
-la boucle pilote. L'install nue ne résout **pas** les dépendances : installe-les explicitement
-dans l'ordre, ou passe `--with-deps`.
-
-```bash
-.claude/scripts/vibeflow-update.sh install mobile-test
-.claude/scripts/vibeflow-update.sh install mobile-test-team
-# ou en un coup :
-.claude/scripts/vibeflow-update.sh install --with-deps mobile-test-team
-```
+la boucle pilote. Via `/vibeflow-install` : coche « mobile-test-team » — l'installeur résout
+`mobile-test` avec lui (moteur interne : `plugin/_internal/vibeflow-update.sh`).
 
 Pré-requis **système** : ceux de `mobile-test` (Node, Maestro + JDK, Xcode/`simctl` ou `adb` +
 émulateur, projet Expo/RN, config `.vibeflow/mobile-test.json` posée). Le MCP du lab (ex.

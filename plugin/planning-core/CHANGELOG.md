@@ -1,5 +1,22 @@
 # Changelog — planning-core
 
+## [v2.10.0] — 2026-10-29 (gabarit d'architecture) — publiée dans v2.74.0
+
+**Minor** (nouvelle capacité : gabarit décisionnel d'architecture du poste product) :
+
+- **`references/templates/product/ARCHITECTURE.template.md`** (fichier neuf) : fichier DÉCISIONNEL posé avant le découpage en phases, à six rubriques (contexte, choix structurants, composants et responsabilités, données, contraintes, risques et questions ouvertes) et une ligne d'état `**Validation:**` (`proposed` à l'instanciation, `validated (<poste>, <AAAA-MM-JJ>)` posée par un dev). Il nomme ses deux homonymes : la carte descriptive `.planning/codebase/ARCHITECTURE.md` (produite par `gsd-map-codebase`, jamais une décision) et `docs/ARCHITECTURE.md` (documentation).
+- Lu par `check-architecture.sh` (module `conductor`, vert seulement sur une architecture validée et complète) et instancié par `vf-product-architect` (module `product-team-bundle`).
+- **Inchangés à l'octet** : tous les fichiers existants du module hors ce bump (gabarits, `SKILL.md`, `PROFILES.md`, scripts). Aucune release racine.
+
+
+## [v2.9.0] — 2026-10-27 (gabarit produit) — publiée dans v2.73.0
+
+**Minor** (nouvelle capacité : gabarit du poste product) :
+
+- **`references/templates/product/`** (deux fichiers neufs) : `PROJECT.template.md` (charte alignée sur les cinq rubriques du BRIEF) et `REQUIREMENTS.template.md` (une exigence = un résultat observable, avec `Acceptation :` et `Priorité :` en lignes de continuation). Dimension « poste » orthogonale aux profils Léger / Standard / Complet, jamais un 4ᵉ niveau (P59-D-03).
+- **Forme lisible par GSD** : `## v1 Requirements`, `- [ ] **PRD-NN**:`, `## Traceability` à colonne `Status`. Preuve : `gsd-tools requirements mark-complete PRD-01` sur une copie change exactement deux lignes (case et traçabilité), les continuations restent intactes.
+- **Inchangés à l'octet** : les gabarits existants, `SKILL.md` et `PROFILES.md` ; les postes `solo` et `dev` ne voient aucune différence. Le choix du gabarit produit est porté par le bundle `product-team-bundle` (P59-PL-01), pas par le skill.
+
 ## [v2.8.3] — 2026-10-23 (UTF-8 inconditionnel, clé profile) — publiée dans v2.71.1
 
 **Patch** (correctifs #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-23 ; publiée dans v2.71.1) :

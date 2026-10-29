@@ -12,14 +12,14 @@ les noms techniques ci-dessous, mais **les formulations qui les activent** — c
 page met en avant pour chacun.
 
 Cette liste vient de l'énumération de tous les fichiers `SKILL.md` du dépôt, revérifiée le
-2026-10-02, module
+2026-10-27, module
 par module — en excluant explicitement les modèles de skills sous
 `plugin/reference/content/methodology/templates/skills/`, qui ne sont pas des skills livrés mais
-des gabarits pour en fabriquer de nouveaux. Le disque en porte vingt-deux, groupés ici par module
+des gabarits pour en fabriquer de nouveaux. Le disque en porte vingt-trois, groupés ici par module
 d'origine : tu n'as que ceux dont le module correspondant est installé — le
 [catalogue des modules](../03-modules/catalogue.md) dit lequel apporte quoi.
 
-## Les vingt-deux skills, par module
+## Les vingt-trois skills, par module
 
 ### `installer`
 **`vibeflow-install`** — le tout premier geste après avoir installé le plugin. Se déclenche sur
@@ -73,6 +73,13 @@ LinkedIn », « produis les pièces de la semaine ». Point d'entrée du métier
 **`vf-growth`** — « lance une campagne cold email », « prépare les séquences LinkedIn », « analyse
 les résultats de la campagne ». Point d'entrée du métier acquisition, canal par canal.
 
+### `product-team-bundle`
+**`vf-product`** — « écris le brief », « rédige le PRD », « cadre ce produit », « ajoute les
+critères d'acceptation ». Point d'entrée du poste product : incarne `vibeflow-product`, qui écrit le
+BRIEF et le PRD puis les fait juger par `prd-gate` avant de passer la main. Ce skill n'est posé que si
+son module l'est : `product-team-bundle` n'est pas proposé au catalogue tant qu'il est
+`proposable:false`.
+
 ### `planning-core`
 **`vf-planning`** — « structure la doc de ce lab », « on perd le fil », « fais l'index de mes
 projets ». Le socle de planning des labs non-dev, et l'altitude « plusieurs labs » sur tout lab,
@@ -125,9 +132,9 @@ page séparée de ce même thème, consacrée uniquement à ça.
 
 ## D'où vient cette liste
 
-Chaque skill ci-dessus correspond à un fichier `SKILL.md` réel, énuméré (puis revérifié le 2026-10-02) plutôt que
+Chaque skill ci-dessus correspond à un fichier `SKILL.md` réel, énuméré (puis revérifié le 2026-10-27) plutôt que
 recopié d'une doc existante. Pour revérifier : depuis la racine du dépôt,
-`find plugin -iname 'SKILL.md' | grep -v reference/content` — le compte doit rester à vingt-deux tant
+`find plugin -iname 'SKILL.md' | grep -v reference/content` — le compte doit rester à vingt-trois tant
 qu'aucun skill n'a été ajouté, retiré, ou qu'aucun modèle n'a glissé hors de son dossier de
 templates.
 

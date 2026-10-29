@@ -111,6 +111,16 @@ soon as `VF_ROLE` is set.
 - **Project list**: the `vf_roles` key of `.planning/config.json`, edited by hand, says which roles
   the project admits; VibeFlow writes nothing there.
 - **Changing later**: `vibeflow-update.sh role <role>`.
+- **What it changes day to day**: at the `product` and `dev` roles, a step added by the team is born
+  **proposed** and waits for a dev to validate it, and, when a `BRIEF.md` exists, the head refuses to
+  split until `.planning/ARCHITECTURE.md` is validated. At the `solo` role, nothing changes. Details in
+  [gates and human validation](../02-concepts/gates-and-human-validation.md).
+- **Divergence safety net**: at the `product` and `dev` roles, the install arms in your git clone a
+  net that checks the planning numbering after every merge (see
+  [parallel topics](../05-agent-team/parallel-topics.md)). Never at the `solo` role.
+  `VF_DIVERGENCE_HOOK=off` to leave it unarmed. A role set before this capability existed is armed with
+  `vibeflow-update.sh role <role>`. If a hook or a `core.hooksPath` already exists, nothing is
+  overwritten: the install prints "ARMEMENT REFUSE" with the line to add by hand, and still succeeds.
 
 A role is a view, not a right: it filters what you are offered at install time, nothing is walled
 off — git, the project scope and a GSD already installed at account scope stay visible. In the `product`

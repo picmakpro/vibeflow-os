@@ -37,7 +37,7 @@ dont le module correspondant est présent dans ton lab. Le
 [catalogue des modules](../03-modules/catalogue.md) fait le lien inverse — module par module,
 plutôt qu'agent par agent.
 
-## Les 31 agents
+## Les 37 agents
 
 | Agent | Module | Famille | Modèle | Rôle en une phrase |
 |---|---|---|---|---|
@@ -46,6 +46,7 @@ plutôt qu'agent par agent.
 | `content-clarity-judge` | content-bundle | worker | sonnet | Juge de clarté d'une pièce de contenu, rubric /100, lecture seule. |
 | `copywriter-sequences` | growth-bundle | worker | sonnet | Rédige les séquences et créatives d'une campagne validée. |
 | `growth-quality-judge` | growth-bundle | worker | sonnet | Juge qualité anti-slop des livrables de campagne. |
+| `prd-gate` | product-team-bundle | worker | sonnet | Juge frais du BRIEF et du PRD, rubric /100, lecture seule. |
 | `quality-gate-client` | business-pilot-bundle | worker | sonnet | Juge tout livrable destiné au client contre une rubric /100. |
 | `skill-creator` | skill-creator | face | opus | Fabrique de nouveaux skills en 5 phases, avec boucle de recherche. |
 | `vf-app-fixer` | mobile-test-team | worker | sonnet | Corrige le code applicatif pour faire passer un test Maestro. |
@@ -64,6 +65,10 @@ plutôt qu'agent par agent.
 | `vf-design-manager` | design-orchestrator | manager | opus | Pilote une mission design : plan, dispatch, contrôle de flux. |
 | `vf-dev-manager` | dev-orchestrator | manager | opus | Pilote une mission de dev : plan, dispatch, contrôle de flux. |
 | `vf-growth-manager` | growth-bundle | manager | opus | Pilote une mission growth : plan, dispatch, contrôle de flux. |
+| `vf-product-analyst` | product-team-bundle | worker | sonnet | Rédige le BRIEF à cinq rubriques. |
+| `vf-product-architect` | product-team-bundle | worker | sonnet | Rédige la décision d'architecture (`.planning/ARCHITECTURE.md`, proposée), jamais validée par lui. |
+| `vf-product-manager` | product-team-bundle | manager | opus | Pilote une mission produit : plan, dispatch, halte sous le seuil. |
+| `vf-product-pm` | product-team-bundle | worker | sonnet | Instancie le PRD (PROJECT + REQUIREMENTS) avec critère d'acceptation et priorité par exigence. |
 | `vf-reviewer` | dev-orchestrator | worker | sonnet | Revue de code du diff produit par une mission de dev. |
 | `vf-test-orchestrator` | mobile-test-team | manager | sonnet | Pilote la boucle test → corrige → re-test d'une régression mobile. |
 | `vf-test-runner` | mobile-test-team | worker | sonnet | Écrit et lance les flows Maestro d'une régression mobile. |
@@ -71,10 +76,11 @@ plutôt qu'agent par agent.
 | `vibeflow-design` | design-orchestrator | face | opus | Directeur artistique : pilote tout le cycle design en langage naturel. |
 | `vibeflow-head` | dev-orchestrator | face | opus | Head of minds du dev : détecte l'intention, dispatche l'équipe qui porte la brique. |
 | `vibeflow-kpi-analyst` | kpi-analyst | face | sonnet | Déduit et publie les vrais indicateurs métier du lab. |
+| `vibeflow-product` | product-team-bundle | face | opus | Porte d'entrée du poste product : BRIEF et PRD. |
 | `vibeflow-validator` | validator | face | opus | Orchestre les 5 audits de conformité méthodologique du lab. |
 
 Une exception notable dans la colonne Modèle : `vf-test-orchestrator` pilote une mission comme les
-cinq autres managers, mais tourne en sonnet et non en opus — sa boucle (test → corrige → re-test
+six autres managers, mais tourne en sonnet et non en opus — sa boucle (test → corrige → re-test
 jusqu'au budget épuisé) reste un périmètre borné, sans les arbitrages ouverts d'un plan de bataille
 multi-métier. Retiens ce nom si tu compares deux agents « manager » et que leurs modèles diffèrent :
 ce n'est jamais une incohérence, c'est le périmètre réel de la mission qui varie d'un métier à
@@ -89,16 +95,22 @@ eux.
 
 ## D'où vient cette liste
 
-Établie en énumérant `plugin/*/agents/*.md` (25 fichiers, un niveau, ce qui exclut les blueprints
-sous `content/agents/`) et les 6 fichiers `AGENT.md` à la racine des modules, le 2026-08-01 — soit
-trente-et-un agents au total. Pour revérifier depuis la racine du dépôt :
-`find plugin -path '*/agents/*.md'` puis `find plugin -maxdepth 2 -name 'AGENT.md'`. Le frontmatter
-de chaque fichier (`model:`, `memory:`) est la source du champ Modèle ci-dessus, pas une
+Établie en énumérant `plugin/*/agents/*.md` (30 fichiers, un niveau, ce qui exclut les blueprints
+sous `content/agents/`) et les 7 fichiers `AGENT.md` à la racine des modules, le 2026-10-29 — soit
+trente-sept agents au total. Pour revérifier depuis la racine du dépôt, ces deux commandes bornées
+rendent 30 puis 7 :
+
+```bash
+find plugin -mindepth 3 -maxdepth 3 -type f -path 'plugin/*/agents/*.md' | awk 'END{print NR}'
+find plugin -mindepth 2 -maxdepth 2 -type f -name AGENT.md | awk 'END{print NR}'
+```
+
+Le frontmatter de chaque fichier (`model:`, `memory:`) est la source du champ Modèle ci-dessus, pas une
 reformulation — les champs obligatoires qu'un agent doit porter sont vérifiés par
 `plugin/conductor/scripts/check-agents.sh`.
 
-Répartition par modèle, comptée sur la même table : dix agents en opus (les cinq agents « visage »
-invocables, plus les cinq managers de mission), vingt-et-un en sonnet (tous les workers, plus
+Répartition par modèle, comptée sur la même table : douze agents en opus (les six agents « visage »
+invocables, plus les six managers de mission), vingt-cinq en sonnet (tous les workers, plus
 l'unique agent « visage » qui n'est pas en opus — `vibeflow-kpi-analyst`). Cette répartition est ce
 qui nourrit la page [couts-et-modeles.md](./couts-et-modeles.md) — elle n'y est pas redite, juste
 utilisée.

@@ -10,7 +10,7 @@ only have the ones whose module you installed; the [catalog](../03-modules/catal
 one brings what.
 
 Three families, and the difference between them matters more than the names. As of when this page
-was written, this repository's disk carries thirty-one in total, spread across those three
+was written, this repository's disk carries thirty-seven in total, spread across those three
 families — a number that shifts with every module added, never fixed here as a promise.
 
 ## The agents you invoke
@@ -28,6 +28,9 @@ either by naming it, or simply by phrasing a request that falls in its domain.
   tool to launch agents.
 - **`vibeflow-design`** — the same role for design and UI, from art direction down to a spacing
   detail. It also runs in your main session (via `/vf-design`), never launched as a subagent.
+- **`vibeflow-product`** — the product manager, entry point of the product role. It frames your
+  product in plain language, writes the brief and the PRD, and has them judged before handing over.
+  It runs in your main session (via `/vf-product`), never launched as a subagent.
 - **`vibeflow-validator`** — the auditor. It orchestrates several complementary audits and proposes
   remediations, never applying them on its own.
 - **`vibeflow-kpi-analyst`** — the lab's real indicators, extracted deterministically.
@@ -44,13 +47,14 @@ warrants it.
 
 There's one per tooled domain: **`vf-dev-manager`** for development, **`vf-design-manager`** for
 design, **`vf-content-manager`**, **`vf-business-manager`**, and **`vf-growth-manager`** for the
-three lines of business, and **`vf-test-orchestrator`** for the mobile testing loop.
+three lines of business, **`vf-product-manager`** for product framing, and **`vf-test-orchestrator`**
+for the mobile testing loop.
 
 What they all have in common: they **produce nothing themselves**. They plan, distribute, read the
 reports, and account for the result. If you see a manager writing code, that's a bug, not an
 optimization.
 
-Each of these six managers instantiates the same orchestration core — driver lock, mission graph,
+Each of these seven managers instantiates the same orchestration core — driver lock, mission graph,
 typed reports — rather than reinventing its own team coordination. That's why a design mission
 report reads like a dev mission report once you know the shared vocabulary, detailed in the
 [glossary](../02-concepts/glossary.md).
@@ -59,7 +63,8 @@ report reads like a dev mission report once you know the shared vocabulary, deta
 
 This is the largest family — a good twenty agents — and the only one you can't invoke. These are
 the producers and the judges: the one writing a step's code, the one reviewing it, the one auditing
-security, the one drafting a piece of content, the one scoring it, the one running tests on a
+security, the one drafting a piece of content, the one scoring it, the one writing the product brief (`vf-product-analyst`), the one deriving the PRD
+from it (`vf-product-pm`), the one drafting the architecture decision (`vf-product-architect`), the one running tests on a
 simulator, the one fixing the app to make them pass.
 
 Each of these agents declares in its own file that it is **internal**. The consequence is
@@ -75,7 +80,7 @@ while looking more serious.
 Two categories among them deserve naming, because you'll see them in reports:
 
 **The quality judges.** Every business team carries one — for content, for client deliverables, for
-campaigns — joined by the design judge and, on the dev side, the code reviewer and the security
+campaigns — joined by the judge of the brief and the PRD (`prd-gate`), the design judge and, on the dev side, the code reviewer and the security
 auditor. All of them discover the finished work without having seen it made, and the quality judges
 have no writing tools: they cannot fix what they criticize.
 

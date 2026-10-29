@@ -48,6 +48,7 @@ A chaque jalon majeur (fin MVP, V2, etc.) : passer en revue toutes les decisions
 **Decideur** : Lead Agent (valide par [Nom])
 **Contexte** : [Sprint/Phase]
 **Thinking Level** : think | think hard | ultrathink
+**Role** : [poste de l'auteur : sortie de vf-role.sh get — solo, product ou dev ; ligne omise si le lecteur rend 1, 5 ou 64, jamais solo par défaut]
 
 ### Probleme
 [Description du probleme a resoudre]

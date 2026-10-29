@@ -17,7 +17,7 @@
   BUDG/WKTR/SKIL/AGTS + QUAL-01 transverse). Recherche : `.planning/research/SUMMARY.md` +
   `ARCHITECTURE.md` (ordre de construction dicté par les fichiers).
 - 📋 **equipe-produit-v1.0** — « l'équipe produit : rôles humains, amont produit, état partagé » — Phases
-  57-62 — **inscrit 2026-10-08**, prochain jalon exécuté (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08). Germe de `SEED-001` : ses trois déclencheurs
+  57-66 — **inscrit 2026-10-08**, prochain jalon exécuté (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08). Germe de `SEED-001` : ses trois déclencheurs
   sont réunis à la clôture de `fiabilite-v1.0`. Spec : `docs/superpowers/specs/2026-09-16-equipe-produit-bmad-design.md`.
 - 📋 **ecc-inspiration-v1.0** — « ce qu'on emprunte à ECC » — Phases 51-56 — **inscrit
   2026-09-25** — six emprunts mesurés au dépôt `affaan-m/ECC` (snapshot avant compaction,
@@ -106,10 +106,14 @@
 - [ ] Phase 56: Packs de règles par langage (module optionnel) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [x] Phase 57: Verrou de driver par compartiment (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-12, mergée PR #152 le 2026-10-16 en `--admin`, revue `@picmakpro` contournée (demande explicite de Samuel, session principale Claude Code, 2026-10-16 : « merge sans willy, release + tag »), release `v2.70.0` ; 16/16 plans, DLWS-01..08 cochées
 - [x] Phase 58: Rôles de poste — installeur, profils solo / product / dev (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-22 : 12/12 plans, porte de phase verte, RLPO-01..12 cochées dont RLPO-11 par override (critère 6 et recette installeur non mesurés, Samuel, session principale, 2026-10-22 — dette dans 58-VERIFICATION.md), branche rebasée sur v2.70.1, release `v2.71.0` à venir
-- [ ] Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate (inscrite 2026-10-08, jalon equipe-produit-v1.0)
-- [ ] Phase 60: Gate architecture avant découpage et validation des phases proposées (inscrite 2026-10-08, jalon equipe-produit-v1.0)
-- [ ] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0)
+- [x] Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-27 : 8/8 plans, porte de phase verte, PRDT-01..12 cochées, release à décider
+- [x] Phase 60: Gate architecture avant découpage et validation des phases proposées (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-29 : 9/9 plans, porte de phase verte (job `gates` rejoué depuis `ci.yml`, suites une à une), ARCG-02..08, 10 et 11 cochées, ARCG-01 partielle (dette : pose à la création non prouvée par une exécution), ARCG-09 partielle (critère 6 `clients` en code 2, en attente de la liste), release à décider
+- [x] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-29 : 8/8 plans, porte de phase verte (job `gates` rejoué depuis `ci.yml`, suites une à une), COLB-01..07 cochées, COLB-09 partielle (critère 6 `clients` en code 2), COLB-08 en attente de la preuve humaine (P61-B-01, P61-B-02), release à décider
 - [ ] Phase 62: Décision sur l'approche plateforme, sur preuve (inscrite 2026-10-08, jalon equipe-produit-v1.0)
+- [ ] Phase 63: Règles produit empruntées à AIDD (inscrite 2026-10-29, jalon equipe-produit-v1.0)
+- [ ] Phase 64: Contrôles après exécution branchés en nœuds du plan de bataille (inscrite 2026-10-29, jalon equipe-produit-v1.0)
+- [ ] Phase 65: Révision des règles qui brident l'efficacité des agents (inscrite 2026-10-29, jalon equipe-produit-v1.0)
+- [ ] Phase 66: Grille de sévérité des juges et convergence des boucles de revue (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
 
@@ -177,6 +181,9 @@
 | 41.4. Emprunts Pocock — disciplines de cadrage, de revue et de skills | fiabilite-v1.0 | 11/11 | Complete — PR #135 (merge `--admin`, 2026-10-08), release `v2.69.0` | 2026-10-06 |
 | 57. Verrou de driver par compartiment | equipe-produit-v1.0 | 16/16 | Complete — PR #152 (merge `--admin`, 2026-10-16), release `v2.70.0` | 2026-10-12 |
 | 58. Rôles de poste — installeur, profils solo / product / dev | equipe-produit-v1.0 | 12/12 | Complete (2 overrides, Samuel 2026-10-22) — release `v2.71.0` à venir | 2026-10-22 |
+| 59. Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate | equipe-produit-v1.0 | 8/8 | Complete — porte de phase verte, PRDT-01..12 cochées, PR et release à décider | 2026-10-27 |
+| 60. Gate architecture avant découpage et validation des phases proposées | equipe-produit-v1.0 | 9/9 | Complete — porte de phase verte, ARCG-02..08, 10, 11 cochées, ARCG-01 et ARCG-09 partielles (dettes nommées), PR et release à décider | 2026-10-29 |
+| 61. Collaboration à deux humains — divergence armée, preuve sur lab réel | equipe-produit-v1.0 | 8/8 | Complete — porte de phase verte, COLB-01..07 cochées, COLB-09 partielle (dette nommée), COLB-08 décochée (preuve humaine attendue), PR et release à décider | 2026-10-29 |
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15 -->
 
@@ -482,7 +489,7 @@ Plans:
 
 - [ ] TBD (run /gsd-plan-phase 56 to break down)
 
-## 📋 Milestone equipe-produit-v1.0 — « l'équipe produit » (Phases 57-62)
+## 📋 Milestone equipe-produit-v1.0 — « l'équipe produit » (Phases 57-66)
 
 **Milestone Goal :** VibeFlow sert une **équipe** et plus seulement un humain qui a tous les modules. Il apporte des
 rôles de poste (solo par défaut, product, dev), des artefacts amont lisibles par un non-dev, et un état partagé entre
@@ -495,7 +502,10 @@ dont les douze arbitrages A-01 à A-12 du 2026-09-16 tiennent, sauf A-09 (révis
 **Inscription :** 2026-10-08, à la clôture de `fiabilite-v1.0`. Choix de ce jalon avant `ecc-inspiration-v1.0`, forme
 d'inscription et place du verrou : arbitrage Samuel, AskUserQuestion session principale, 2026-10-08. Même forme qu'ECC et `gouvernance-labs-v1.0` : section distincte de la
 ROADMAP plate, **sans `gsd-new-milestone`**. Les numéros 57 à 62 sont posés à la main (42-50 : compartiment
-`gouvernance` ; 51-56 : ECC).
+`gouvernance` ; 51-56 : ECC). La Phase 63 est ajoutée le 2026-10-29 par `gsd-phase` (arbitrage Samuel, AskUserQuestion
+session principale, 2026-10-29 : « phase dans le jalon actuel », règles AIDD dans notre vocabulaire). Les Phases
+64 et 65 sont ajoutées le même jour par `gsd-phase` (arbitrage Samuel, message session principale, 2026-10-29) ; elles
+portent sur le flux des agents de dev, pas sur l'équipe produit, et peuvent glisser au jalon suivant à la clôture.
 
 **Révision d'A-09, tracée.** La SEED supposait le verrou de driver par compartiment livré « avant, dans D-02 ». La
 mission D-02 du 2026-09-23 n'a fait que la partition. Mesuré le 2026-10-08 : `driver-lock.sh` ne connaît aucun
@@ -614,41 +624,88 @@ Plans:
 ### Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate
 
 **Goal:** Un bundle produit sur le moule de `business-pilot-bundle`. La front door `vibeflow-product`, sur le moule de `vibeflow-design`, produit `BRIEF.md` (le seul fichier nouveau, A-06) et le PRD (`PROJECT.md` + `REQUIREMENTS.md`, gabarit `product` de `planning-core`). Un juge frais `prd-gate`, en lecture seule et sur rubric /100, rend éliminatoire toute exigence sans critère d'acceptation. `vibeflow-head` lit le rôle pour rediriger au lieu de dispatcher `vf-coder` (A-05). Le bundle reste `proposable: false` jusqu'à preuve sur un lab réel (Q-09, défaut probable).
-**Requirements**: TBD — famille `PRDT` réservée, posée au cadrage.
+**Requirements**: PRDT-01..PRDT-12 (posées à la planification, 2026-10-27).
 **Depends on:** 58.
 **Sources:** spec §5.2 ; SEED A-05, A-06, A-10 (vocabulaire : on garde l'existant, aucun renommage) ; `plugin/business-pilot-bundle/`, `plugin/design-orchestrator/`.
 **Hors périmètre :** un fichier PRD.md séparé (A-06) ; les termes « epic » et « story » (Q-11, fermée par doctrine).
-**Plans:** 0 plans
+**Plans:** 8 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 59 to break down)
+**Wave 1**
+- [x] 59-01-PLAN.md — vague 1 : gabarits produit de planning-core (PROJECT, REQUIREMENTS), minor
+- [x] 59-02-PLAN.md — vague 1 : `check-prd.sh` et sa suite à mutants
+- [x] 59-03-PLAN.md — vague 1 : redirection du head au poste product, minor de dev-orchestrator
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 59-04-PLAN.md — vague 2 : module, visibilité par poste, manager, workers, `prd-gate`
+- [x] 59-05-PLAN.md — vague 2 : front door, skill `/vf-product`, gabarit BRIEF, README du bundle
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 59-06-PLAN.md — vague 3 : suite du bundle, baselines, compteurs des README racine
+- [x] 59-07-PLAN.md — vague 3 : manuel FR et EN
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 59-08-PLAN.md — vague 4 : porte de phase rejouée depuis `ci.yml`, ledger à la main
 
 ### Phase 60: Gate architecture avant découpage et validation des phases proposées
 
 **Goal:** Un gate séparé assemble l'existant : `software-architecture` et GSD (`gsd-map-codebase`, `gsd-graphify`). Le head refuse le découpage en phases tant que `ARCHITECTURE.md` n'est pas validée (A-08). Une phase ajoutée par le rôle product ou par le head reste **proposée** jusqu'à sa validation par un dev ; en solo, elle est auto-validée. Le mécanisme passe par un marqueur sur la phase et `check-phase-validation.sh` (A-07).
-**Requirements**: TBD — famille `ARCG` réservée, posée au cadrage.
+**Requirements**: ARCG-01, ARCG-02, ARCG-03, ARCG-04, ARCG-05, ARCG-06, ARCG-07, ARCG-08, ARCG-09, ARCG-10, ARCG-11 (posées à la planification, 2026-10-29, dérivées de P60-D-01..14 et P60-H-01..04 sans arbitrage neuf).
 **Depends on:** 59.
 **Sources:** spec §5.2 ; SEED A-07, A-08 ; `plugin/software-architecture/`, `plugin/audit-architecture/`.
-**Hors périmètre :** un gate bloquant sans halt condition (Q-04 : ADR-031 penche pour l'advisory).
-**Plans:** 0 plans
+**Hors périmètre :** un gate bloquant sans halt condition (Q-04 : ADR-031 penche pour l'advisory) ; `gsd-graphify` reste refusé (GSDA-08, P60-D-08).
+**Plans:** 9 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 60 to break down)
+**Wave 1**
+- [x] 60-01-PLAN.md — vague 1 : marqueur de phase `**Validation:**`, gate `check-phase-validation.sh` et sa suite à mutants
+- [x] 60-02-PLAN.md — vague 1 : gabarit `ARCHITECTURE` décisionnel de planning-core, gate `check-architecture.sh` et sa suite, minor de planning-core
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 60-03-PLAN.md — vague 2 : preuve sur fixture que les lecteurs GSD rendent le même résultat avec et sans marqueur
+- [x] 60-04-PLAN.md — vague 2 : verbe de pose et de validation `vf-validation.sh` (phase, architecture), poste du validateur, preuve moteur sur sa sortie
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 60-05-PLAN.md — vague 3 : worker interne `vf-product-architect`, livrable `architecture` du manager et de la front door, baseline neuve, minor du bundle
+- [x] 60-06-PLAN.md — vague 3 : refus de `vf-coder` et de `vf-auto`, §5 du head (gate architecture avant découpage), champ de brief de la pose, T45, minor de dev-orchestrator
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 60-07-PLAN.md — vague 4 : minor de conductor, catalogue de ses scripts, compte de suites des README racine
+- [x] 60-08-PLAN.md — vague 4 : manuel FR et EN (gate architecture, étapes proposées, comptes d'agents bornés)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 60-09-PLAN.md — vague 5 : porte de phase rejouée depuis `ci.yml`, ledger à la main (ARCG-01 partielle tant que la pose n'est pas prouvée), arrêt avant la PR
 
 ### Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel
 
 **Goal:** Pour un lab multi-humains, `check-divergence.sh` et son hook `post-merge` sont armés par défaut. Le champ `role:` s'ajoute aux entrées des registres (DECISIONS, LEARNINGS, BLOCKERS). La preuve est faite à **deux humains, deux clones, deux rôles, un workstream** sur un lab réel, pas sur un clone jetable (spec §9, critère 4 ; spec head §6, point 4).
-**Requirements**: TBD — famille `COLB` réservée, posée au cadrage.
+**Requirements**: COLB-01, COLB-02, COLB-03, COLB-04, COLB-05, COLB-06, COLB-07, COLB-08, COLB-09 (COLB-08, preuve sur lab réel, reste décochée : P61-B-01 et P61-B-02)
 **Depends on:** 57 et 60.
 **Sources:** spec §5.3 ; Phase 39 (`check-divergence.sh`) ; ADR-069.
 **Hors périmètre :** un workstream par rôle (deux vérités, refusé par la spec §5.3).
-**Plans:** 0 plans
+**Plans:** 8 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 61 to break down)
+**Wave 1**
+- [x] 61-01-PLAN.md — vague 1 (tracer) : `vf-divergence-hook.sh` (arm, disarm, run), armement par l'engine au poste product/dev, suite à deux clones `test-divergence-deux-clones.sh` (install → hook → cri → journal)
+- [x] 61-02-PLAN.md — vague 1 : champ `**Role**` des gabarits DECISIONS, LEARNINGS, BLOCKERS (source puis copies), suite `test-registres-role.sh` sur six consommateurs
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 61-03-PLAN.md — vague 2 : script du filet complet — `post-rewrite`, refus `core.hooksPath` / hook tiers / script sous l'arbre, armé à la main, `status`, journal blindé, suite `test-vf-divergence-hook.sh` à douze mutants
+- [x] 61-04-PLAN.md — vague 2 : engine complet — retrait au poste solo et à `uninstall --all`, sortie `VF_DIVERGENCE_HOOK=off`, rafraîchissement à `update --all`, plan `--dry-run`, suite `test-vibeflow-update-divergence.sh` à dix mutants
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 61-05-PLAN.md — vague 3 : preuve à deux clones complète (pull en avance rapide, `pull --rebase`, worktree, branche piégée, trois témoins rouges), recette du lab réel `61-RECETTE-LAB-REEL.md` et son relevé joué
+- [x] 61-06-PLAN.md — vague 3 : minors de conductor (script et engine), consolidator et reference, catalogue de conductor
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 61-07-PLAN.md — vague 4 : manuel FR et EN (filet armé, journal, limites, sortie, champ Role), compte de suites des README racine
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 61-08-PLAN.md — vague 5 : porte de phase rejouée depuis `ci.yml`, ledger à la main (COLB-08 décochée : preuve humaine), arrêt avant la PR
 
 ### Phase 62: Décision sur l'approche plateforme, sur preuve
 
@@ -662,3 +719,64 @@ Plans:
 Plans:
 
 - [x] 62-01-PLAN.md — dossier de décision `62-DECISION-plateforme.md` (statut PROPOSÉ : mesures sourcées, options A/B/C, déclencheur et plancher de date proposés) ; la décision signée (PLTF-02) reste à Samuel, la phase reste ouverte
+
+### Phase 63: Règles produit empruntées à AIDD
+
+**Goal:** Les règles de l'amont produit d'AIDD (`ai-driven-dev/framework`, MIT) sont reprises au plus près, dans notre vocabulaire et nos fichiers, pour compléter ce que posent les Phases 59 et 60 : Three Amigos en trois juges frais (produit, delivery, qualité) avec une réconciliation où « silence, majority, and severity are not approval » ; grille des zones d'ombre (7 catégories, 3 sévérités, une question par trou, comparaison entre deux passes) ; table preuve / hypothèse / décision du BRIEF ; change set gelé avant écriture, montré au dev qui valide une phase proposée (A-07) ; grille INVEST et découpe verticale pour cette validation ; scénarios de QA tirés d'un critère d'acceptation, jamais du diff ; définition de « prêt à planifier » avec refus routé vers l'artefact refusé ; section unique des questions ouvertes (`TBD: <question>`) que `check-prd.sh` admet là et refuse ailleurs.
+**Requirements**: TBD — famille réservée au cadrage.
+**Depends on:** 59, 60.
+**Sources:** `docs/research/2026-10-29-aidd-equipe-produit-inventaire.md` (inventaire atomique, chemins AIDD exacts) ; `docs/research/2026-10-29-ai-driven-dev-framework.md` ; SEED-001 A-02, A-06, A-07, A-10.
+**Hors périmètre :** le vocabulaire AIDD (epic, story, task : couche de synonymes, Q-11) ; les dossiers `aidd_docs/` et tout fichier amont au-delà de BRIEF, PROJECT, REQUIREMENTS (A-06) ; les modes autonomes de `02-backlog` et le mode `auto` de `01-sdlc` (ADR-031) ; un nom d'agent « three amigos ». Copie mot pour mot d'un gabarit AIDD : seulement avec un fichier NOTICE MIT.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 63 to break down)
+
+### Phase 64: Contrôles après exécution branchés en nœuds du plan de bataille
+
+**Goal:** Les contrôles que GSD promet après exécution tournent enfin. Mesure du 2026-10-29 : 15 VALIDATION sur 20 non conformes (`nyquist_compliant: false`), 0 LEARNINGS (que le planificateur lit pourtant), 0 UAT, 13 VERIFICATION `human_needed` ou `gaps_found` jamais reprises — les hooks internes du workflow GSD qui devaient les déclencher ne sont jamais observés. Chaque contrôle devient un **nœud explicite du plan de bataille** de `vf-dev-manager`, déclenché par un fait constatable sur disque, jamais par l'humain : (1) `gsd-extract-learnings` si VERIFICATION `passed` et pas de LEARNINGS ; (2) `gsd-audit-uat` en début de mission s'il reste une VERIFICATION ou une UAT ouverte ; (3) `gsd-assumptions-analyzer` en éclaireur avant un cadrage sans CONTEXT.md ; (4) `gsd-secure-phase` par `vf-auditer` (outil `Skill` à lui donner) quand le PLAN porte un registre de menaces ; (5) `gsd-validate-phase` en mandat `vf-coder` si `nyquist_compliant: false` ; (7) `gsd-verify-work` **proposé**, jamais imposé, par le manager si VERIFICATION `human_needed` : l'humain peut le **contourner** d'un geste (recette jugée redondante ou trop coûteuse à tester), et ce contournement est un statut à part entière — tracé dans la VERIFICATION (qui, quand, motif), compté comme clos par `audit-uat`, par la ROADMAP et par les gates de suivi — pour qu'une recette refusée ne reste jamais une dette ouverte dans la doc ni dans le suivi de projet (arbitrage Samuel, message session principale, 2026-10-29). Les juges en lecture seule de l'étage de vérification partent en un seul message.
+**Requirements**: TBD — famille réservée au cadrage.
+**Depends on:** aucune phase de ce jalon.
+**Sources:** `docs/research/2026-10-29-etude-gsd-skills-agents-non-utilises.md` (classement complet, déclencheurs, tailles) ; `docs/research/2026-10-29-etude-cout-gsd.md` ; `plugin/dev-orchestrator/references/mission-flow.md`, `mission-contracts.md`.
+**Hors périmètre :** les correcteurs automatiques (`gsd-audit-fix`, `gsd-code-fixer` : ADR-031) ; les briques classées 6, 8, 9, 10 et suivantes du rapport (inscriptibles ensuite) ; la réécriture de ces skills dans VibeFlow (étape E3 de SEED-003) — ici on les branche, on ne les réécrit pas.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 64 to break down)
+
+### Phase 65: Révision des règles qui brident l'efficacité des agents
+
+**Goal:** Les règles de VibeFlow qui limitent l'efficacité des agents sans contrepartie mesurée sont revues sur mesure : (a) la garde `check-ajout-retrait.sh` (SOBR-05) ne surveille plus que la documentation de méthode (ADR, CLAUDE.md, règles), plus les SKILL.md, scripts de garde et mémoires d'agent ; (b) le plafond de 2 agents en parallèle, posé après le crash du 2026-10-22 sans mesure, est remplacé par une valeur mesurée (mémoire consommée par agent sur ce poste), cohérente avec `max_concurrent_agents` ; (c) la « voie unique » de `vf-coder` ne s'applique plus aux juges en lecture seule, qui n'ont aucun étage à sauter ; (d) `vf-auditer` est dispatché sur un fait constatable (`mission-flow.md` §3), plus au jugement ; (e) les déclencheurs des briques dormantes sont réécrits en conditions machine ; (f) la profondeur de dispatch (limite du harness mesurée le 2026-09-17) est re-mesurée sur la version courante de Claude Code et les flux qui la heurtent (`gsd-debug` lancé depuis `vf-coder`) sont redessinés. (g) la CI cesse d'être un frein : mesure du 2026-10-29, 37 min de suites en série dont 17,3 min pour les seuls mutants du guard de verrou, et deux runs par commit de PR (push + pull_request) — suites réparties en shards parallèles, mutants joués seulement quand ils ont quelque chose à juger et sur tout push de `main`, run obsolète d'une PR annulé, `push` réservé à `main` (arbitrage Samuel, message session principale, 2026-10-29 : « on corrige le maximum », revue faite par nous, merge sans attendre la revue `@picmakpro`). (h) les mutants du guard de verrou sont répartis sur plusieurs jobs : après le volet (g), ce sont eux seuls qui fixent la durée d'un push de `main`. Mesure du 2026-10-29 (run 40910106649, `main` sur `d41afc88`) : les 7 shards finissent entre 2 min 30 et 6 min 30, le job des mutants dure 28 min 45 (19 min 50 sur la PR #181). Constat : les 59 mutants (`MUT_TOTAL`, `test-guard-driver-lock-ws.sh`) sont lancés tous ensemble en arrière-plan dans un seul job, avant un `wait` unique ; sur un runner à 4 cœurs, ils se disputent la machine. Comme ils sont indépendants (chacun a sa copie du guard et son `WORK_DIR`), on peut les répartir. Piste : un sélecteur de tranche dans la suite (même principe que `ci-shard-suites.sh`, partition déterministe par indice), une matrice de jobs de mutants, et un agrégateur qui contrôle que l'union des tranches couvre exactement les `MUT_TOTAL` mutants, sans doublon ni tranche vide (un mutant perdu doit rougir), avec un témoin rouge joué avant de conclure. Cible : un push de `main` vers 8 à 10 min. La PR #171 (autre session, borne de parallélisme des mutants dans un même job) touche la même boucle : elle est à reprendre ou à fermer avec ce volet, pas à merger à côté (arbitrage Samuel, message session principale, 2026-10-29 : « effectivement, je pense que ça serait une bonne idée », versé dans la Phase 65). (i) le cas KC2 de `test-check-method-budget.sh` (trois passes d'archivage simultanées sur la même source, `par3`) cesse de rougir au hasard : il est connu pour être instable en CI et se règle aujourd'hui en relançant le job à la main, ce qui coûte un cycle complet de CI. Constaté de nouveau le 2026-10-29 sur la PR #183 (run 40932241571, shard 6 : « KC2 — aucun refus » et « KC2 — les trois rendent 0 (rc 0 ≠ 1) »), qui ne touchait que la ROADMAP ; vert à la relance. Il faut établir la cause (une course dans le verrou d'archivage, qui serait un vrai défaut, ou une attente du test trop juste sur un runner chargé) avant de corriger, et ne jamais affaiblir l'assertion pour la faire passer : le mutant MU34 (verrou retiré) doit continuer à faire rougir KC2 (arbitrage Samuel, message session principale, 2026-10-29).
+**Requirements**: TBD — famille réservée au cadrage.
+**Depends on:** aucune phase de ce jalon ; à jouer avant ou avec la 64 si le parallélisme de l'étage de vérification en dépend.
+**Sources:** `docs/research/2026-10-29-etude-gsd-skills-agents-non-utilises.md` § règles qui brident ; `plugin/conductor/scripts/check-ajout-retrait.sh` ; mémoires « parallélisme plafonné à 2 » et « profondeur de spawn limitée à 2 ».
+**Hors périmètre :** lever une limite technique du harness par décision ; toucher ADR-031 ou le ship gaté humain.
+**Plans:** 0 plans
+
+Plans:
+
+- [x] 65-01 — accélération de la CI, volet (g) : `scripts/ci-shard-suites.sh`, mode `GW_MODE=sans-mutants`, jobs `changes` / `tests-shard` / `tests-mutants` / agrégateur au nom requis inchangé (exécuté hors plan formel, sur demande de Samuel, 2026-10-29)
+- [ ] TBD — volets (a) à (f), (h) et (i) (run /gsd-plan-phase 65 to break down)
+
+### Phase 66: Grille de sévérité des juges et convergence des boucles de revue
+
+**Goal:** Une même grille de sévérité s'applique à TOUS les juges de VibeFlow (`vf-reviewer`, `vf-design-judge`, `prd-gate`, juges adverses briefés par les managers, relecture SOBR-04), pour que les boucles de revue convergent au lieu de produire un « nouveau majeur » à chaque tour :
+- Un défaut n'est **majeur** que s'il cumule trois conditions : (1) il est démontré par une sonde exécutée ; (2) l'entrée est plausible de bonne foi, pour un agent de l'équipe ou un humain qui suit le gabarit (une faute de frappe compte, une obfuscation volontaire non) ; (3) la conséquence est réelle et sans filet : faux vert non rattrapé par la couche suivante, faux rouge sans contournement, promesse écrite contredite, ou régression.
+- Tout le reste est **mineur** et ne bloque pas le merge.
+- Le juge rapporte la **famille**, pas l'instance. Le correctif ferme la famille, de préférence en comparant à des données réelles plutôt qu'en ajoutant des motifs. Une variante d'une famille fermée ne rouvre rien.
+- Le dernier tour est rejoué par un juge frais briefé avec la grille.
+**Validation:** proposed
+
+**Constat qui la motive :** Phase 59, contrôle heuristique `check-prd.sh` : quatre juges frais d'affilée ont chacun trouvé un « nouveau majeur ». Phases 60 et 61 jugées avec la grille : chaque tour a trouvé au plus un majeur légitime (le contournement par l'identifiant a été rouvert deux fois, jusqu'à ce que la famille soit fermée par comparaison aux identifiants réels) ; les deux phases ont convergé en v2.74.0.
+**Source :** arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 : « Oui, valide la grille pour 60 et 61. Ensuite, il faudra généraliser au maximum cette solution. »
+**Rattachement :** graine `.planning/seeds/SEED-002-convergence-des-boucles-de-revue.md` (convergence des boucles de revue, veille Elephant-Goldfish).
+**Requirements**: TBD — famille `GRIL` réservée, posée au cadrage.
+**Depends on:** aucune phase bloquante.
+**Hors périmètre :** toute baisse d'exigence sur les défauts réellement majeurs.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 66 to break down)

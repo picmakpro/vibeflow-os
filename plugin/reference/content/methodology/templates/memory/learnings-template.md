@@ -38,6 +38,7 @@ Un blocker resolu genere souvent un learning. Referencez le blocker dans le cham
 **Categorie** : Performance | DX | Architecture | Process | Tool | Methodologie | Research | Terrain
 **Decouvert lors de** : [Contexte / BLK-XXX si issu d'un blocker]
 **Encode dans** : [.claude/rules/xxx.md] ou [Non encode]
+**Role** : [poste de l'auteur : sortie de vf-role.sh get — solo, product ou dev ; ligne omise si le lecteur rend 1, 5 ou 64, jamais solo par défaut]
 
 ### Contexte
 [Situation initiale]

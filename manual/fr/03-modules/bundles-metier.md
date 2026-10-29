@@ -40,6 +40,13 @@ Les trois se posent **par-dessus** le socle, jamais à sa place : chacun déclar
 installer plusieurs, mais [choisir-ses-modules.md](./choisir-ses-modules.md) explique pourquoi c'est
 rarement une bonne idée au début.
 
+Une note sur **`product-team-bundle`**, l'équipe produit (BRIEF, PRD, juge `prd-gate` à quatre-vingts
+sur cent). Elle suit la même ossature mais n'est pas comptée parmi ces trois bundles : elle ne pilote
+pas un métier, elle cadre un produit avant que le dev ne le découpe. Elle est livrée mais
+`proposable:false`, donc absente du catalogue et des presets, et ne basculera qu'après un run réel
+complet (BRIEF, PRD, juge au-dessus du seuil). Ce que le [catalogue](./catalogue.md) en dit vaut
+pour la façon de la poser.
+
 ## Ce qui les distingue d'un paquet de prompts
 
 C'est la vraie question, et elle mérite une réponse nette. On pourrait croire qu'un bundle n'est

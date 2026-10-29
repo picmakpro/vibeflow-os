@@ -92,6 +92,20 @@ ne dépend pas d'un run à venir, contrairement à l'équipe de recette mobile c
 que chacun livre, agent par agent, est dans
 [bundles-metier.md](../03-modules/bundles-metier.md).
 
+**L'équipe produit** vient avant le dev : quelqu'un doit dire ce qu'on construit. `vibeflow-product`
+(via `/vf-product`) cadre le produit, et la chaîne suit : `vf-product-analyst` rédige le BRIEF,
+`vf-product-pm` en tire le PRD (un critère d'acceptation et une priorité par exigence), le juge frais
+`prd-gate` note le tout sur cent, puis l'humain tranche, le tout sous la conduite de
+`vf-product-manager`. Sous quatre-vingts sur cent, ou devant une faute éliminatoire, l'équipe
+s'arrête et te laisse décider : jamais de relance silencieuse. Au-dessus du seuil, la suite proposée
+au head est le découpage en phases par le dev, et elle n'est jamais lancée depuis cette porte. Ce découpage
+attend une architecture validée : sur une mission d'architecture, `vf-product-architect` rédige
+`.planning/ARCHITECTURE.md`, proposée et contrôlée par `check-architecture.sh`, puis un dev la valide
+avant tout découpage. Aucun agent ne valide sa propre production.
+**Statut réel** : l'équipe produit est livrée mais pas proposée au catalogue, et ne le sera qu'après
+un run réel complet. Ne la lis donc pas comme un mécanisme éprouvé au même titre que les trois
+bundles ci-dessus.
+
 Une équipe n'est jamais présentée à égalité avec une autre si leur statut réel diffère. C'est
 volontaire : savoir qu'un module est encore à confirmer change la façon dont tu lis ses rapports, et
 te taire cette différence produirait un manuel qui promet plus que le produit ne tient.
@@ -103,7 +117,7 @@ direction artistique) produira du travail générique ; ce n'est pas un défaut 
 manque de matière à lui donner, et ça se corrige en nourrissant le lab plutôt qu'en changeant de
 module.
 
-La même lecture s'applique aux quatre équipes de cette page : ce qu'elles peuvent faire est fixé
+La même lecture s'applique aux équipes de cette page : ce qu'elles peuvent faire est fixé
 par leur conception, mais la qualité de ce qu'elles produisent dépend toujours de ce que tu as
 raconté au lab sur ton activité avant de les lancer.
 

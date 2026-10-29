@@ -610,3 +610,37 @@ AskUserQuestion n'est pas disponible. Consigner le résultat dans `41.2-VERIFICA
 
 **Déclencheur de reprise :** la prochaine initialisation réelle d'un lab de code, ou une évolution de `vf-split-planning`
 ou de `vf-new-lab`.
+
+## Mineurs laissés par les juges de la release v2.73.0 — `check-prd.sh` (bundle produit) — DIFFÉRÉ (2026-10-29)
+
+**Origine :** juges frais de la Phase 59 (heuristique `check-prd.sh`), release v2.73.0 ; classés mineurs
+(pas de sonde à conséquence sans filet : le juge LLM `prd-gate` rattrape ou le contournement existe). Tracés,
+non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re-mesurer avant correction.
+- **Faux rouge quand le texte du gabarit sert d'amorce à une vraie réponse** : `tmplword` cherche une sous-chaîne (`index(t, T[i])`, `check-prd.sh:190-192`).
+- **Titre de rubrique BRIEF apparié par préfixe** : « Problématique de stockage » compte comme Problème (`index(lab, "probl") == 1`, `check-prd.sh:421`).
+- **`--requirements` passé deux fois : la dernière valeur gagne en silence** (`check-prd.sh:111-115`, pas de garde « donné deux fois » comme `check-architecture.sh:77`).
+- **Sous-puce `  - **REQ-03** dépend de lui` rend le code 3** : faux rouge sur une liste de dépendances (règle de puce qui ouvre une exigence, `check-prd.sh:50-58`).
+
+**Déclencheur de reprise :** la prochaine évolution de `check-prd.sh` ou la Phase 63 (`TBD:` admis dans la section des questions ouvertes).
+
+## Mineurs laissés par les juges de la release v2.74.0 — `check-phase-validation.sh`, `vf-validation.sh`, `check-architecture.sh` — DIFFÉRÉ (2026-10-29)
+
+**Origine :** juges des Phases 60 et 61 (grille de sévérité), release v2.74.0 ; mineurs, non bloquants pour le merge. Fichiers sous `plugin/conductor/scripts/`.
+- **Suffixe collé après un id décimal ou à lettre (`60.1x`) : « introuvable », alors que gsd résout** ; le README promet « tout argument qui désigne une phase existante rend 64 » (`check-phase-validation.sh:121-135` et `:456-472`).
+- **Faux rouge conservateur `60-1`, `AUTH-2` : 64 au lieu de 3** (`check-phase-validation.sh:460`, alias lu avant le constat « introuvable »).
+- **Tolérance au préfixe (`phase-60`, `ZZ-60` lus comme 60) non vérifiée contre `project_code`** (`idkey`, forme tolérante, `check-phase-validation.sh:132-135`).
+- **Marqueur `**Validation:**` jamais commité, invisible depuis un worktree** : inerte tant qu'ADR-059 tient (écriture de `vf-validation.sh propose|validate`, `vf-validation.sh:461-463`).
+- **`check-architecture.sh` : faux rouge sur une rubrique dont le corps commence par `[`** (`isbody`, `check-architecture.sh:119`).
+
+**Déclencheur de reprise :** la prochaine évolution du marqueur de phase ou de la porte `check-phase-validation`.
+
+## Mineurs laissés par les juges de la release v2.74.0 — `vf-divergence-hook.sh` — DIFFÉRÉ (2026-10-29)
+
+**Origine :** juges de la Phase 61 (filet de divergence armé), release v2.74.0 ; mineurs. Fichier `plugin/conductor/scripts/vf-divergence-hook.sh`.
+- **Refus global au premier hook tiers** : un `post-commit` tiers empêche l'armement des deux autres hooks, et `update --all` ne réarme pas (`REFUS hook-tiers`, `:634`).
+- **Bruit `NON VERIFIABLE` à chaque `commit --amend` quand le cache est purgé** : le repli de `post-rewrite` passe avant le filtre amend (`:306-307`).
+- **La ligne manuelle reste muette quand le cache est purgé**, jusqu'à `update --all` (`:306-307`).
+- **Le désarmement lit le dossier résolu par `core.hooksPath`, pas `.git/hooks`** (`:241`, `do_disarm` `:671-682`).
+- **Commentaire d'en-tête inexact sur `cherry-pick`** (`:130`).
+
+**Déclencheur de reprise :** la prochaine évolution du filet de divergence ou un incident de hook tiers sur un clone réel.

@@ -11,28 +11,28 @@ chiffre en euros ou en dollars n'apparaît ci-dessous, nulle part.
 
 ## Quel modèle tourne, et pourquoi
 
-Les [31 agents](./agents.md) de VibeFlow ne tournent pas tous sur le même modèle. Le partage n'est
+Les [37 agents](./agents.md) de VibeFlow ne tournent pas tous sur le même modèle. Le partage n'est
 pas « juge contre exécutant » — sur ce dépôt, les juges de qualité tournent en sonnet, exactement
 comme les workers qu'ils évaluent. Le vrai partage tient à la **nature du jugement demandé** :
 
-- **Les agents « visage » et les managers de mission** (opus, dix agents au total) — router une
+- **Les agents « visage » et les managers de mission** (opus, douze agents au total) — router une
   demande dont l'intention n'est pas encore claire, planifier un graphe de tâches avec des
   dépendances croisées entre plusieurs pistes indépendantes, arbitrer un choix qu'aucune rubric
   explicite ne tranche à ta place. C'est un jugement ouvert, sur un périmètre qui peut changer en
   cours de mission.
-- **Les workers et les juges** (sonnet, vingt-et-un agents) — produire un livrable précis contre un
+- **Les workers et les juges** (sonnet, vingt-cinq agents) — produire un livrable précis contre un
   mandat déjà cadré, scorer un résultat contre une rubric écrite noir sur blanc, exécuter une étape
   déjà identifiée. C'est un périmètre borné, connu à l'avance.
 
 Une exception notable confirme la règle plutôt qu'elle ne la brise : `vf-test-orchestrator` pilote
-une mission comme les cinq autres managers, mais reste en sonnet — sa boucle (tester, corriger,
+une mission comme les six autres managers, mais reste en sonnet — sa boucle (tester, corriger,
 retester jusqu'au budget épuisé) est un périmètre borné dès le départ, sans les arbitrages ouverts
 d'un plan de bataille multi-métier.
 
 Le détail complet, agent par agent, vit sur [agents.md](./agents.md).
 
 Tu n'as jamais à deviner ce fait : le champ `model:` du frontmatter de chaque fichier d'agent le
-dit explicitement, et la [référence des agents](./agents.md) le reproduit pour les 31. Si tu veux
+dit explicitement, et la [référence des agents](./agents.md) le reproduit pour les 37. Si tu veux
 le lire toi-même sur le disque, `grep model: plugin/*/agents/*.md plugin/*/AGENT.md` depuis la
 racine du dépôt donne la liste complète — la même commande qu'un mainteneur lancerait avant de
 toucher à l'une des affirmations de cette page.
