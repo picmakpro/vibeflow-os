@@ -10,7 +10,9 @@
 # Cas CPV-LIEN, CPV-FIFO, CPV-DOSSIER, CPV-GROS, CPV-ILLISIBLE (refus en 5 avant lecture), CPV-NOECHO, CPV-EXEC (sans
 # évaluation de chaîne, arguments hostiles inertes), CPV-RO, CPV-CODES (ensemble observé = {0, 1, 3, 5, 64}, jamais 2).
 # Cas CPV-FERME (fermeture de la section au titre suivant), CPV-NIVEAUX (niveaux de titre 2 à 4), CPV-FENCE-INDENTEE.
-# Mutants CPV-MUT-1..15 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide (bash -n),
+# Cas CPV-IDS, CPV-PREFIXE, CPV-ID-USAGE, CPV-DETAILS, CPV-FENCE-COMMONMARK, CPV-MARQUEUR-FORMES, CPV-CR-ISOLE, CPV-GSD-IDS (grammaire de --phase
+# de gsd-core, jalons livrés <details>, barrières CommonMark, survivants MK et MI de la revue).
+# Mutants CPV-MUT-1..36 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide (bash -n),
 # rouge pour la raison attendue (code attendu/obtenu imprimé), original revérifié vert.
 # Les cas CPV-GSD-* (preuve que le marqueur ne change rien pour le moteur GSD) s'ajoutent en 60-03.
 set -uo pipefail
@@ -93,8 +95,8 @@ probe_trace4() {
   msg "aucun argument attendu rc 64 + message sur stderr"; { [ "$RC" -eq 64 ] && [ -n "$ERR" ]; } || return 1
   run --phase
   msg "--phase sans valeur attendu rc 64"; { [ "$RC" -eq 64 ] && [ -n "$ERR" ]; } || return 1
-  run --phase abc
-  msg "--phase abc attendu rc 64"; { [ "$RC" -eq 64 ] && [ -n "$ERR" ]; } || return 1
+  run --phase .5
+  msg "--phase .5 (identifiant mal formé) attendu rc 64"; { [ "$RC" -eq 64 ] && [ -n "$ERR" ]; } || return 1
   run --phase 2 --inconnu
   msg "argument inconnu attendu rc 64"; { [ "$RC" -eq 64 ] && [ -n "$ERR" ]; }
 }
@@ -208,7 +210,13 @@ probe_fence_indentee() {
   msg "marqueur dans un bloc de code dont la barrière est indentée (espaces) attendu rc 0 (marqueur absent)"
   { [ "$RC" -eq 0 ] && has 'marqueur absent'; } || return 1
   mklab fi2 '# Roadmap\n\n### Phase 2: Deuxieme\n\t~~~\n**Validation:** proposed\n\t~~~\n'; run --phase 2
-  msg "marqueur dans un bloc tilde dont la barrière est indentée (tabulation) attendu rc 0"
+  msg "une tabulation (4 colonnes) devant ~~~ n'ouvre aucune barrière : le marqueur reste lu, attendu rc 1"
+  [ "$RC" -eq 1 ] || return 1
+  mklab fi3 '# Roadmap\n\n### Phase 2: Deuxieme\n    ```\n**Validation:** proposed\n    ```\n'; run --phase 2
+  msg "quatre espaces devant trois accents graves n'ouvrent aucune barrière (code indenté) : attendu rc 1"
+  [ "$RC" -eq 1 ] || return 1
+  mklab fi4 '# Roadmap\n\n### Phase 2: Deuxieme\n   ```\n**Validation:** proposed\n   ```\n'; run --phase 2
+  msg "témoin positif : trois espaces devant trois accents graves ouvrent une barrière, attendu rc 0 (marqueur absent)"
   { [ "$RC" -eq 0 ] && has 'marqueur absent'; }
 }
 case_ CPV-VALIDATED probe_validated
@@ -225,6 +233,123 @@ case_ CPV-BOM probe_bom
 case_ CPV-FERME probe_ferme
 case_ CPV-NIVEAUX probe_niveaux
 case_ CPV-FENCE-INDENTEE probe_fence_indentee
+
+# === Grammaire de --phase alignée sur gsd-core : ids custom, suffixe lettre, préfixe projet (P60-D-02) ============
+probe_ids() {
+  mklab id1 '# Roadmap\n\n### Phase AUTH: Auth flow\n**Goal:** g\n**Validation:** proposed\n\n### Phase 12A: Suffixe\n**Goal:** g\n**Validation:** proposed\n\n### Phase 7.1A: Decimale\n**Goal:** g\n**Validation:** proposed\n'
+  run --phase AUTH
+  msg "id custom AUTH (phase add --id) attendu rc 1, la section est trouvée comme par gsd"; [ "$RC" -eq 1 ] || return 1
+  run --phase auth
+  msg "id custom en minuscules attendu rc 1 (casse indifférente comme gsd)"; [ "$RC" -eq 1 ] || return 1
+  run --phase 12A
+  msg "suffixe lettre 12A attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  run --phase 12a
+  msg "suffixe lettre en minuscule attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  run --phase 12
+  msg "12 ne désigne pas 12A, attendu rc 3 + phase introuvable"; { [ "$RC" -eq 3 ] && has 'INDETERMINE phase introuvable'; } || return 1
+  run --phase 7.1A
+  msg "segment décimal à suffixe lettre 7.1A attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  mklab id2 '# Roadmap\n\n### Phase AUTH: Auth flow\n**Goal:** g\n'
+  run --phase AUTH
+  msg "id custom sans marqueur attendu rc 0 + marqueur absent (le poste solo ne change pas)"; { [ "$RC" -eq 0 ] && has 'marqueur absent'; }
+}
+probe_prefixe() {
+  mklab pf1 '# Roadmap\n\n### Phase CK-03: Prefixee\n**Goal:** g\n**Validation:** proposed\n'
+  run --phase CK-03
+  msg "préfixe projet CK-03 attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  run --phase CK-3
+  msg "CK-3 = CK-03 (zéros de tête) attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  run --phase 3
+  msg "le numéro nu 3 désigne CK-03 quand rien d'autre ne porte 3 (lecture tolérante de gsd) attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  run --phase 03
+  msg "03 désigne CK-03 attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  mklab pf2 '# Roadmap\n\n### Phase 3: Nue\n**Goal:** g\n\n### Phase CK-03: Prefixee\n**Goal:** g\n**Validation:** proposed\n'
+  run --phase 3
+  msg "la forme exacte gagne : 3 désigne la phase nue (sans marqueur), attendu rc 0, jamais sections multiples"; [ "$RC" -eq 0 ] || return 1
+  run --phase CK-03
+  msg "CK-03 désigne la phase préfixée attendu rc 1"; [ "$RC" -eq 1 ]
+}
+probe_id_usage() {
+  RUNDIR="$FX/t1"
+  local bad
+  for bad in .5 5. a..b 'a;b' 'a b' '-x' '_x' 'a/b' "$(printf 'x%.0s' $(seq 1 65))"; do
+    run --phase "$bad"
+    msg "--phase « ${bad:0:12} » attendu rc 64"; { [ "$RC" -eq 64 ] && [ -n "$ERR" ]; } || return 1
+  done
+  mklab id3 '# Roadmap\n\n### Phase 2: Deux\n**Goal:** g\n'
+  run --phase "$(printf 'x%.0s' $(seq 1 64))"
+  msg "un id de 64 caractères reste admis (rc 3 : introuvable)"; [ "$RC" -eq 3 ]
+}
+# === Jalons livrés : blocs <details> ignorés comme le fait gsd-core (stripShippedMilestones) =====================
+probe_details() {
+  local D1='# Roadmap\n\n<details>\n<summary>v1.0 shipped</summary>\n\n### Phase 1: Vieille\n**Goal:** a\n**Validation:** proposed\n\n### Phase 2: Vieille2\n**Goal:** b\n\n### Phase 5: Seule\n**Goal:** c\n**Validation:** proposed\n\n</details>\n\n## Milestone v2\n\n### Phase 1: Neuve\n**Goal:** a\n\n### Phase 2: Neuve2\n**Goal:** b\n**Validation:** proposed\n'
+  mklab dt1 "$D1"
+  run --phase 1
+  msg "la phase 1 vivante, hors du bloc livré (qui porte une autre phase 1 proposée), attendu rc 0, jamais sections multiples"; [ "$RC" -eq 0 ] || return 1
+  run --phase 2
+  msg "la phase 2 vivante (proposée) attendu rc 1, le bloc livré ne la double pas"; [ "$RC" -eq 1 ] || return 1
+  run --phase 5
+  msg "phase 5 présente seulement dans le bloc livré attendu rc 3 + phase introuvable (gsd : found false)"
+  { [ "$RC" -eq 3 ] && has 'INDETERMINE phase introuvable'; } || return 1
+  mklab dt2 '# Roadmap\n\n<details open>\n<summary>v2 actif</summary>\n\n### Phase 4: Active\n**Goal:** a\n**Validation:** proposed\n\n</details>\n'
+  run --phase 4
+  msg "<details open> marque le jalon ACTIF et reste visible (gsd) : attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  mklab dt3 '# Roadmap\n\n<DETAILS>\n### Phase 1: Vieille\n**Validation:** proposed\n</DETAILS>\n\n### Phase 1: Neuve\n**Goal:** a\n'
+  run --phase 1
+  msg "balises en majuscules : casse indifférente, attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  mklab dt4 '# Roadmap\n\n<details>\n### Phase 6: Visible\n**Goal:** a\n**Validation:** proposed\n<details></details>\n'
+  run --phase 6
+  msg "un <details> suivi d'un autre <details> avant sa fermeture n'ouvre aucun bloc (gsd) : la phase 6 reste visible, attendu rc 1"
+  [ "$RC" -eq 1 ] || return 1
+  mklab dt5 '# Roadmap\n\n<details>\n### Phase 6: Visible\n**Goal:** a\n**Validation:** proposed\n'
+  run --phase 6
+  msg "un <details> jamais fermé n'ouvre aucun bloc : la phase 6 reste visible, attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  mklab dt6 '# Roadmap\n\n### Phase 3: Titre<details>\ncache\n</details>\n**Goal:** a\n**Validation:** proposed\n'
+  run --phase 3
+  msg "le texte qui précède un <details> sur sa ligne reste visible (le titre), attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  mklab dt7 '# Roadmap\n\n### Phase 3: Titre\n**Goal:** a\n<details>\n**Validation:** proposed\n</details>\n'
+  run --phase 3
+  msg "un marqueur à l'intérieur d'un bloc <details> est caché comme le reste (gsd), attendu rc 0"; [ "$RC" -eq 0 ]
+}
+# === Barrières de code CommonMark : ouverture, fermeture ===========================================================
+probe_fence_commonmark() {
+  mklab cm1 '# Roadmap\n\n### Phase 2: Deux\n``` `x` ```\n**Validation:** proposed\n'
+  run --phase 2
+  msg "une ligne « trois accents graves, espace, x entre accents graves » (accent grave dans l'info string) n'est pas une barrière : le marqueur reste lu, attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  mklab cm2 '# Roadmap\n\n### Phase 2: Deux\n````\n**Validation:** proposed\n```\n**Validation:** validated\n'
+  run --phase 2
+  msg "une barrière de 4 accents n'est pas fermée par 3 : bloc jamais fermé, attendu rc 3 + bloc de code non ferme"
+  { [ "$RC" -eq 3 ] && has 'INDETERMINE bloc de code non ferme'; } || return 1
+  mklab cm3 '# Roadmap\n\n### Phase 2: Deux\n````\n**Validation:** proposed\n`````\n'
+  run --phase 2
+  msg "témoin positif : 4 accents fermés par 5 cachent le marqueur, attendu rc 0 + marqueur absent"; { [ "$RC" -eq 0 ] && has 'marqueur absent'; } || return 1
+  mklab cm4 '# Roadmap\n\n### Phase 2: Deux\n```\n```js\n**Validation:** proposed\n```\n'
+  run --phase 2
+  msg "une ligne trois-accents-graves+js (info string) ne ferme pas la barrière : le marqueur reste caché, attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  mklab cm5 '# Roadmap\n\n### Phase 2: Deux\n~~~ a`b`\n**Validation:** proposed\n~~~\n'
+  run --phase 2
+  msg "une barrière tilde admet un accent grave dans son info string : marqueur caché, attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  mklab cm6 '# Roadmap\n\n### Phase 2: Deux\n~~~\n**Validation:** proposed\n```\n~~~\n'
+  run --phase 2
+  msg "une barrière tilde ne se ferme pas par des accents graves, mais par des tildes : marqueur caché, attendu rc 0"; [ "$RC" -eq 0 ]
+}
+# === Survivants de mutation de la revue (MK, MI) =====================================================================
+probe_marqueur_formes() {
+  mklab mf1 "$RM3" $'**Validation** : proposed\n'; run --phase 2
+  msg "**Validation** : proposed (espace avant les deux-points, hors du gras) attendu rc 1, jamais « marqueur absent »"
+  { [ "$RC" -eq 1 ] && has 'PHASE 2 proposee'; }
+}
+probe_cr_isole() {
+  mklab cr1 '# Roadmap\n\n### Phase 2: Deux\n**Goal**: g\r**Validation:** proposed\n'; run --phase 2
+  msg "un CR isolé est une fin de ligne : le marqueur qui le suit est une ligne, attendu rc 1"; [ "$RC" -eq 1 ]
+}
+case_ CPV-IDS probe_ids
+case_ CPV-PREFIXE probe_prefixe
+case_ CPV-ID-USAGE probe_id_usage
+case_ CPV-DETAILS probe_details
+case_ CPV-FENCE-COMMONMARK probe_fence_commonmark
+case_ CPV-MARQUEUR-FORMES probe_marqueur_formes
+case_ CPV-CR-ISOLE probe_cr_isole
 
 # === Compartiment nommé par --ws, jamais déduit (P60-PL-02, DLWS-04) ===============================
 # mkws <lab> <compartiment> <format printf> [args] : lab partitionné, ROADMAP du compartiment ; positionne RUNDIR.
@@ -545,6 +670,35 @@ if [ -f "$GSDJS" ] && command -v node > /dev/null 2>&1; then
     gsd_must_match 1 - "$PH2" "$GSD/RA" "$GSD/RB" roadmap get-phase 1
   }
   case_ CPV-GSD-RENUM probe_gsd_renum
+
+  # Grammaire de --phase : le gate trouve les phases que le moteur sert (P60-D-02, au poste solo rien ne change).
+  # A : id custom posé par `phase add --id`. B : gabarit de jalons livrés (<details>) avec numérotation remise à 1.
+  gsd_mklab AID - '### Phase 2: Deuxieme' ''
+  gsd_mklab BDT - '### Phase 2: Deuxieme' ''
+  {
+    printf '# Roadmap\n\n<details>\n<summary>v1.0 shipped</summary>\n\n'
+    printf '### Phase 1: Vieille\n**Goal:** a\n**Validation:** proposed\n\n### Phase 2: Vieille2\n**Goal:** b\n**Validation:** proposed\n\n</details>\n\n'
+    printf '## Milestone v2.0\n\n### Phase 1: Neuve\n**Goal:** a\n\n### Phase 2: Neuve2\n**Goal:** b\n'
+  } > "$GSD/BDT/.planning/ROADMAP.md"
+  probe_gsd_ids() {
+    gsd_do "$GSD/AID" - "$TMP/gsd.add" phase add "Auth flow" --id AUTH
+    LASTMSG="phase add --id AUTH rend rc $GRC"; [ "$GRC" -eq 0 ] || return 1
+    gsd_do "$GSD/AID" - "$TMP/gsd.gp" roadmap get-phase AUTH
+    LASTMSG="le moteur ne trouve pas AUTH (référence inutilisable)"; command grep -q '"found": true' "$TMP/gsd.gp" || return 1
+    gsd_gate "$GSD/AID" AUTH
+    msg "le moteur trouve AUTH : le gate attendu rc 0 + marqueur absent, jamais 3 ni 64"; { [ "$RC" -eq 0 ] && has 'marqueur absent'; } || return 1
+    gsd_do "$GSD/AID" - "$TMP/gsd.gn" roadmap get-phase NOPE
+    LASTMSG="témoin : le moteur trouve NOPE"; command grep -q '"found": false' "$TMP/gsd.gn" || return 1
+    gsd_gate "$GSD/AID" NOPE
+    msg "témoin : le moteur ne trouve pas NOPE, le gate attendu rc 3"; [ "$RC" -eq 3 ] || return 1
+    gsd_do "$GSD/BDT" - "$TMP/gsd.bg" roadmap get-phase 2
+    LASTMSG="le moteur ne rend pas la phase active Neuve2 (référence inutilisable)"; command grep -q '"phase_name": "Neuve2"' "$TMP/gsd.bg" || return 1
+    gsd_gate "$GSD/BDT" 2
+    msg "gabarit de jalons livrés : le moteur sert la phase 2 active, le gate attendu rc 0, jamais 3 sections multiples"; [ "$RC" -eq 0 ] || return 1
+    gsd_gate "$GSD/BDT" 1
+    msg "gabarit de jalons livrés : phase 1 active sans marqueur, le gate attendu rc 0 (le marqueur du bloc livré est ignoré)"; [ "$RC" -eq 0 ]
+  }
+  case_ CPV-GSD-IDS probe_gsd_ids
 else
   skip "CPV-GSD moteur GSD absent (node ou gsd-tools.cjs introuvable : la CI installe le moteur et tranche)"
 fi
@@ -593,7 +747,7 @@ mutant CPV-MUT-4 'if [ -L "$f" ]; then illisible' '[ -L "$f" ]' 'false' probe_li
   "BRUYANT : refus du lien symbolique retiré"
 mutant CPV-MUT-5 '"$size" -gt "$CPV_MAX_OCTETS"' '"$CPV_MAX_OCTETS"' '99999999999' probe_gros \
   "BRUYANT : borne de taille retirée"
-mutant CPV-MUT-6 'if (f3 == "```" || f3 == "~~~")' 'f3 == "```" || f3 == "~~~"' '0' probe_fence \
+mutant CPV-MUT-6 'if (c) { infence = 1; flen = c; return }' 'if (c)' 'if (0)' probe_fence \
   "PASS : bascule des blocs de code retirée"
 mutant CPV-MUT-7 'if (match(r, /^[ \t]*\([^)]*\)/))' 'r = substr(r, RLENGTH + 1)' 'r = r' probe_tag \
   "FAIL : tag de titre entre parenthèses non toléré"
@@ -603,16 +757,59 @@ mutant CPV-MUT-9 'then indetermine "lab partitionne sans --ws"' '[ -e "$PLAN/wor
   "INDÉTERMINÉ : contrôle « partitionné sans --ws » retiré"
 mutant CPV-MUT-10 'elif [ "$NMARK" -gt 1 ]' '[ "$NMARK" -gt 1 ]' 'false' probe_multi \
   "INDÉTERMINÉ : marqueurs multiples rendus selon le premier"
-mutant CPV-MUT-11 'if (insec && lvl <= seclvl) insec = 0' 'insec && lvl <= seclvl' '0' probe_ferme \
+mutant CPV-MUT-11 'if (insec[p] && lvl <= seclvl[p]) insec[p] = 0' 'insec[p] && lvl <= seclvl[p]' '0' probe_ferme \
   "FAIL : fermeture de la section de phase retirée, le marqueur d'une section voisine est attribué à la phase interrogée"
-mutant CPV-MUT-12 'if (insec && lvl <= seclvl) insec = 0' 'lvl <= seclvl' 'lvl < seclvl' probe_ferme \
+mutant CPV-MUT-12 'if (insec[p] && lvl <= seclvl[p]) insec[p] = 0' 'lvl <= seclvl[p]' 'lvl < seclvl[p]' probe_ferme \
   "FAIL : la section ne se ferme plus à un titre de MÊME niveau (borne <= devenue <)"
 mutant CPV-MUT-13 'if (lvl < 2 || lvl > 4) return ""' 'lvl > 4' 'lvl > 5' probe_niveaux \
   "FAIL : un titre de niveau 5 compte comme section de phase"
 mutant CPV-MUT-14 'if (lvl < 2 || lvl > 4) return ""' 'lvl < 2' 'lvl < 1' probe_niveaux \
   "FAIL : un titre de niveau 1 compte comme section de phase"
-mutant CPV-MUT-15 't = line; sub(' 'sub(/^[ \t]+/, "", t)' 't = t' probe_fence_indentee \
+mutant CPV-MUT-15 'c = substr(s, i + 1, 1)' 'i + 1' '1' probe_fence_indentee \
   "FAIL : indentation tolérée devant une barrière de bloc de code retirée"
+
+mutant CPV-MUT-16 'if (c == "`" && index(substr(s, i + n + 1), "`")) return 0' 'c == "`" &&' '0 &&' probe_fence_commonmark \
+  "FAIL : un accent grave dans l'info string d'une barrière d'accents graves n'empêche plus l'ouverture"
+mutant CPV-MUT-17 'if (n < flen) return 0' 'n < flen' '0' probe_fence_commonmark \
+  "FAIL : une barrière de fermeture plus courte que l'ouvreur la ferme"
+mutant CPV-MUT-18 'return (substr(s, i + n + 1) ~' '~ /^[ \t]*$/' '~ /^/' probe_fence_commonmark \
+  "FAIL : une ligne de fermeture avec info string ferme la barrière"
+mutant CPV-MUT-19 'if (i > 3) return 0' 'i > 3' 'i > 99' probe_fence_indentee \
+  "FAIL : l'indentation de l'ouvreur n'est plus bornée à 3 espaces"
+mutant CPV-MUT-20 'fch = c' 'fch = c' 'fch = "`"' probe_fence \
+  "FAIL : une barrière tilde n'est plus fermée par des tildes"
+mutant CPV-MUT-21 'u = toupper(s)' 'toupper(s)' 's' probe_ids \
+  "FAIL : la casse des identifiants de phase devient significative"
+mutant CPV-MUT-22 'sub(/^0+/, "", d); if (d == "") d = "0"' 'sub(/^0+/, "", d); ' '' probe_decimal \
+  "FAIL : zéros de tête des segments numériques conservés"
+mutant CPV-MUT-23 'if (!match(h, /^Phase[ \t]+[A-Za-z0-9]' '[A-Za-z0-9][A-Za-z0-9_-]*' '[0-9]' probe_ids \
+  "FAIL : un titre à id custom (AUTH) n'est plus une section"
+mutant CPV-MUT-24 'if (!match(h, /^Phase[ \t]+[A-Za-z0-9]' '(\.[A-Za-z0-9_-]+)*' '(\.[0-9]+)*' probe_ids \
+  "FAIL : un segment décimal à suffixe lettre (7.1A) n'est plus une section"
+mutant CPV-MUT-25 'p = (nsec[1] > 0) ? 1 : 2' '(nsec[1] > 0) ? 1 : 2' '2' probe_prefixe \
+  "FAIL : la lecture tolérante au préfixe projet prime sur la lecture exacte (sections multiples)"
+mutant CPV-MUT-26 'p = (nsec[1] > 0) ? 1 : 2' '(nsec[1] > 0) ? 1 : 2' '1' probe_prefixe \
+  "FAIL : plus de lecture tolérante : le numéro nu 3 ne désigne plus CK-03"
+mutant CPV-MUT-27 'if (match(u, /^[A-Z][A-Z0-9_]*-[0-9]/)) return' '(loose ? "" : substr(u, 1, RLENGTH - 1))' '(loose ? substr(u, 1, RLENGTH - 1) : substr(u, 1, RLENGTH - 1))' probe_prefixe \
+  "FAIL : la lecture tolérante conserve le préfixe projet"
+mutant CPV-MUT-28 '[ "${#PHASE}" -le 64 ]' '-le 64' '-le 9999' probe_id_usage \
+  "FAIL : borne de longueur de l'identifiant retirée"
+mutant CPV-MUT-29 'a = index(tw, "<details>")' '"<details>"' '"<detailz>"' probe_details \
+  "FAIL : les blocs <details> des jalons livrés ne sont plus cachés"
+mutant CPV-MUT-30 'w = rl; tw = tolower(rl)' 'tolower(rl)' 'rl' probe_details \
+  "FAIL : la casse des balises <details> devient significative"
+mutant CPV-MUT-31 'if (b && (!c || b < c)) {' '(!c || b < c)' '1' probe_details \
+  "FAIL : un <details> suivi d'un autre <details> avant sa fermeture ouvre un bloc (la phase visible est cachée)"
+mutant CPV-MUT-32 'for (k = 1; k <= pq_n; k++) proc(pq_not[k], pq_i[k])' 'proc(pq_not[k]' 'proc(""' probe_details \
+  "FAIL : un <details> jamais fermé cache le reste du fichier"
+mutant CPV-MUT-33 'a = index(tw, "<details>")' '"<details>"' '"<details"' probe_details \
+  "FAIL : <details open> (jalon actif) est caché comme un jalon livré"
+mutant CPV-MUT-34 'pq_blk[1] = vis substr(w, 1, a - 1)' 'substr(w, 1, a - 1)' '""' probe_details \
+  "FAIL : le texte qui précède un <details> sur sa ligne est perdu"
+mutant CPV-MUT-35 'if (match(line, /^[ \t]*\*\*Validation(:\*\*|\*\*[ \t]*:)/))' '\*\*[ \t]*:)' '\*\*:)' probe_marqueur_formes \
+  "MK : la forme « **Validation** : proposed » n'est plus un marqueur (devient « absent »)"
+mutant CPV-MUT-36 'OUT_TXT=$(sed' "| tr '\\r' '\\n' " '' probe_cr_isole \
+  "MI : le CR isolé n'est plus une fin de ligne (le marqueur est lu en queue de la ligne précédente)"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]

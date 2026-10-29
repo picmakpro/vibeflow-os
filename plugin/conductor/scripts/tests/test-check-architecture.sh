@@ -10,7 +10,8 @@
 # Cas CARCH-LIEN, CARCH-FIFO, CARCH-DOSSIER, CARCH-GROS, CARCH-ILLISIBLE (refus en 5 avant lecture), CARCH-NOECHO,
 # CARCH-EXEC (sans évaluation de chaîne, chemin hostile inerte), CARCH-RO, CARCH-CODES (ensemble observé = {0, 1, 3, 5, 64}).
 # Cas CARCH-NIVEAU (titres de tout niveau), CARCH-PREFIXE (reconnaissance par préfixe du libellé, six rubriques).
-# Mutants CARCH-MUT-1..11 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide
+# Cas CARCH-FENCE-COMMONMARK (barrières CommonMark : ouverture, fermeture, indentation).
+# Mutants CARCH-MUT-1..15 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide
 # (bash -n), une seule ligne changée, rouge pour la raison attendue (code attendu/obtenu imprimé), original revérifié vert.
 set -uo pipefail
 
@@ -224,6 +225,26 @@ probe_fence_ouverte() {
   msg "commentaire HTML non fermé attendu rc 3 + INDETERMINE commentaire HTML non ferme"
   [ "$RC" -eq 3 ] && has 'INDETERMINE commentaire HTML non ferme' && ! has 'ARCHITECTURE validee'
 }
+probe_fence_commonmark() {
+  { gen "$VAL" -; printf '\n``` `x` ```\n%s\n' "$PROP"; } > "$FX/cm1.md"; reg cm1.md; runf cm1.md
+  msg "une ligne trois-accents-graves + info string à accent grave n'est pas une barrière : la seconde ligne d'état reste lue, attendu rc 3 + statut : multiple"
+  { [ "$RC" -eq 3 ] && has 'INDETERMINE statut : multiple' && ! has 'bloc de code non ferme'; } || return 1
+  { gen "$VAL" -; printf '\n````\n%s\n```\n' "$PROP"; } > "$FX/cm2.md"; reg cm2.md; runf cm2.md
+  msg "une barrière de 4 accents n'est pas fermée par 3 : bloc jamais fermé, attendu rc 3 + bloc de code non ferme"
+  { [ "$RC" -eq 3 ] && has 'INDETERMINE bloc de code non ferme'; } || return 1
+  { gen "$VAL" -; printf '\n````\n%s\n`````\n' "$PROP"; } > "$FX/cm3.md"; reg cm3.md; runf cm3.md
+  msg "témoin positif : 4 accents fermés par 5 cachent la seconde ligne d'état, attendu rc 0 + ARCHITECTURE validee"
+  { [ "$RC" -eq 0 ] && has 'ARCHITECTURE validee'; } || return 1
+  { gen "$VAL" -; printf '\n```\n```js\n%s\n```\n' "$PROP"; } > "$FX/cm4.md"; reg cm4.md; runf cm4.md
+  msg "une ligne trois-accents-graves+js ne ferme pas la barrière : seconde ligne d'état cachée, attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  { gen "$VAL" -; printf '\n~~~ a`b`\n%s\n~~~\n' "$PROP"; } > "$FX/cm5.md"; reg cm5.md; runf cm5.md
+  msg "une barrière tilde admet un accent grave dans son info string, attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  { gen "$VAL" -; printf '\n    ```\n%s\n    ```\n' "$PROP"; } > "$FX/cm6.md"; reg cm6.md; runf cm6.md
+  msg "quatre espaces devant trois accents graves : code indenté, pas une barrière, la seconde ligne d'état reste lue, attendu rc 3 + statut : multiple"
+  { [ "$RC" -eq 3 ] && has 'INDETERMINE statut : multiple'; }
+}
+case_ CARCH-FENCE-COMMONMARK probe_fence_commonmark
+
 probe_mix() {
   mkarch mix.md - risques; runf mix.md
   msg "statut absent ET rubrique manquante attendu rc 1 (1 l'emporte sur 3) avec les deux constats"
@@ -429,7 +450,7 @@ else
 fi
 mutant CARCH-MUT-5 '*) indetermine "statut : valeur inconnue"' 'indetermine "statut : valeur inconnue"' ':' probe_statut \
   "INDÉTERMINÉ : valeur d'état inconnue rendue 0"
-mutant CARCH-MUT-6 'if (f3 == "```" || f3 == "~~~")' 'f3 == "```" || f3 == "~~~"' '0' probe_statut \
+mutant CARCH-MUT-6 'if (fl) { infence = 1; flen = fl; next }' 'if (fl)' 'if (0)' probe_statut \
   "PASS : bascule des blocs de code retirée, un état validated en bloc de code serait lu"
 mutant CARCH-MUT-7 'if [ -L "$f" ]; then illisible' '[ -L "$f" ]' 'false' probe_lien \
   "BRUYANT : refus du lien symbolique retiré"
@@ -441,6 +462,15 @@ mutant CARCH-MUT-10 'else if (index(lab, "donn") == 1)' '== 1' '> 0' probe_prefi
   "FAIL : rubrique données reconnue n'importe où dans le titre, plus au préfixe seul"
 mutant CARCH-MUT-11 'if (line ~ /^#+[ \t]/) {' '#+' '##?#?' probe_niveau \
   "FAIL : titres limités aux niveaux 1 à 3, contre l'en-tête « tout niveau »"
+
+mutant CARCH-MUT-12 'if (c == "`" && index(substr(s, i + n + 1), "`")) return 0' 'c == "`" &&' '0 &&' probe_fence_commonmark \
+  "FAIL : un accent grave dans l'info string n'empêche plus l'ouverture d'une barrière"
+mutant CARCH-MUT-13 'if (n < flen) return 0' 'n < flen' '0' probe_fence_commonmark \
+  "FAIL : une barrière de fermeture plus courte que l'ouvreur la ferme"
+mutant CARCH-MUT-14 'return (substr(s, i + n + 1) ~' '~ /^[ \t]*$/' '~ /^/' probe_fence_commonmark \
+  "FAIL : une ligne de fermeture avec info string ferme la barrière"
+mutant CARCH-MUT-15 'if (i > 3) return 0' 'i > 3' 'i > 99' probe_fence_commonmark \
+  "FAIL : l'indentation de l'ouvreur n'est plus bornée à 3 espaces"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]

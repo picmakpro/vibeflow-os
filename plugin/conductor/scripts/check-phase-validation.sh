@@ -14,8 +14,12 @@
 # Usage :
 #   check-phase-validation.sh --phase <N> [--ws <nom>]
 #   check-phase-validation.sh -h | --help
-# `--phase` est obligatoire (`--phase=<N>` admis), numéro `^[0-9]+(\.[0-9]+)*$`, segments comparés sans zéros
-# de tête (`01.1` = `1.1`, `02` = `2`). Lab plat : ROADMAP du dossier de planning du répertoire courant. Lab
+# `--phase` est obligatoire (`--phase=<N>` admis), identifiant `^[A-Za-z0-9][A-Za-z0-9._-]*$` de 64 caractères au plus,
+# sans `..` ni point final : la grammaire des phases que sert gsd-core (numéro `12`, décimal `7.1`, suffixe lettre
+# `12A`, id custom `AUTH` posé par `phase add --id`, préfixe projet `CK-03`). Comparaison sans casse, zéros de tête
+# des segments numériques ôtés (`01.1` = `1.1`, `02` = `2`, `12a` = `12A`) ; forme exacte d'abord (préfixe projet
+# conservé), puis, SEULEMENT si aucune section ne porte l'identifiant, forme tolérante au préfixe (`3` désigne
+# `CK-03`), comme la lecture de gsd. Lab plat : ROADMAP du dossier de planning du répertoire courant. Lab
 # partitionné (le dossier des compartiments existe) : `--ws <nom>` est EXPLICITE et obligatoire, validé par
 # vf_ws_name_valid puis résolu par vf_ws_dir_resolve (lien symbolique refusé), jamais déduit. Forme exec :
 # l'appelant écrit `bash <chemin résolu> --phase <N> [--ws <nom>]` en arguments séparés, sans `|| true` ni tube
@@ -25,9 +29,13 @@
 # `**Validation**:` tolérée). Jeton = premier mot en minuscules : `proposed` -> proposée ; `validated` -> validée,
 # suffixe `(<poste>, <AAAA-MM-JJ>[, override])` toléré ; tout autre jeton -> INDÉTERMINÉ. Plusieurs lignes de
 # marqueur -> INDÉTERMINÉ. Aucune ligne : phase VALIDÉE (P60-D-02, état de toutes les phases existantes).
-# Section : titre `#{2,4} Phase N`, tag entre parenthèses toléré, deux-points EXIGÉ (`## Phase 41 — note` n'en
+# Section : titre `#{2,4} Phase <id>`, tag entre parenthèses toléré, deux-points EXIGÉ (`## Phase 41 — note` n'en
 # est pas une), qui se ferme au titre suivant de niveau inférieur ou égal ; blocs de code et commentaires HTML
-# ignorés ; deux sections pour N -> INDÉTERMINÉ.
+# ignorés ; deux sections pour le même identifiant -> INDÉTERMINÉ. Les blocs `<details>` exacts (jalons livrés)
+# sont cachés comme le fait gsd-core : un `<details open>` reste visible, le premier `</details>` ferme, un
+# opener sans fermeture avant le suivant n'ouvre rien. Barrières de code CommonMark : ouverture = 3 accents graves
+# ou tildes ou plus, indentation <= 3 espaces, sans accent grave dans l'info string d'une barrière d'accents
+# graves ; fermeture = même caractère, série au moins aussi longue, sans info string.
 #
 # LIMITE FAIL-OPEN, écrite en clair (P60-D-03 c, P60-H-03) : le mode « Regenerate all » d'`edit-phase`
 # reconstruit la section à partir de ses champs et peut PERDRE le marqueur ; la phase redevient alors validée.
@@ -36,7 +44,8 @@
 # Codes de sortie (chacun énuméré, aucun implicite) :
 #   0 = validée : marqueur `validated`, ou marqueur absent.
 #   1 = proposée : marqueur `proposed`. Ni plan ni exécution de cette phase.
-#   3 = INDÉTERMINÉ : ROADMAP absent, phase introuvable, sections ou marqueurs multiples, valeur inconnue, bloc
+#   3 = INDÉTERMINÉ (marqueur non constatable ; les consommateurs ne s'y arrêtent PAS, le marqueur absent valant
+#       validée, P60-D-02) : ROADMAP absent, phase introuvable, sections ou marqueurs multiples, valeur inconnue, bloc
 #       de code ou commentaire non fermé, lab partitionné sans --ws, compartiment absent. Jamais un vert à vide.
 #   5 = entrée illisible, BRUYANTE : lien symbolique, non régulier (FIFO, dossier), illisible, taille non
 #       numérique, au-delà de 1048576 octets, analyse en échec. Refus AVANT lecture.
@@ -81,16 +90,29 @@ while [ "$#" -gt 0 ]; do
 done
 [ -n "$PHASE" ] || usage_err "--phase est obligatoire (usage : --phase <N> [--ws <nom>])"
 case "$PHASE" in
-  *[!0-9.]*|.*|*.|*..*) usage_err "--phase : numéro attendu (ex. 60 ou 41.1)" ;;
+  *[!A-Za-z0-9._-]*|[!A-Za-z0-9]*|*.|*..*) usage_err "--phase : identifiant attendu (ex. 60, 41.1, 12A, AUTH, CK-03)" ;;
 esac
+[ "${#PHASE}" -le 64 ] || usage_err "--phase : identifiant trop long"
 
 # --- Programme awk : une ligne rendue, `@ sections marqueurs classe code_ouvert commentaire_ouvert`.
 read -r -d '' AWK_PROG <<'AWKEOF'
 function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
-function normnum(s,   n, p, i, o) {
+# Clé d'identifiant de phase (grammaire de gsd-core : jeton numérique à suffixe lettre, id custom, préfixe projet) :
+# majuscules, zéros de tête de chaque segment numérique retirés (`01.1` = `1.1`, `02a` = `2A`).
+function idnorm(s,   n, p, i, o, seg, d) {
   n = split(s, p, ".")
-  for (i = 1; i <= n; i++) { sub(/^0+/, "", p[i]); if (p[i] == "") p[i] = "0"; o = o (i > 1 ? "." : "") p[i] }
+  for (i = 1; i <= n; i++) {
+    seg = p[i]
+    if (match(seg, /^[0-9]+/)) { d = substr(seg, 1, RLENGTH); seg = substr(seg, RLENGTH + 1); sub(/^0+/, "", d); if (d == "") d = "0"; seg = d seg }
+    o = o (i > 1 ? "." : "") seg
+  }
   return o
+}
+# Forme stricte (préfixe projet `CK-` conservé) puis forme tolérante (préfixe ôté : `3` désigne `CK-03`).
+function idkey(s, loose,   u) {
+  u = toupper(s)
+  if (match(u, /^[A-Z][A-Z0-9_]*-[0-9]/)) return (loose ? "" : substr(u, 1, RLENGTH - 1)) idnorm(substr(u, RLENGTH))
+  return idnorm(u)
 }
 # Niveau du titre Markdown (nombre de #, 1 à 6) si la ligne en est un, sinon 0.
 function hlevel(s,   n) {
@@ -100,19 +122,41 @@ function hlevel(s,   n) {
   if (substr(s, n + 1, 1) !~ /^[ \t]$/) return 0
   return n
 }
-# Numéro normalisé si le titre est `Phase N[ (tag)] :` de niveau 2 à 4, sinon "".
-function secnum(s, lvl,   h, r) {
+# Identifiant brut si le titre est `Phase <id>[ (tag)] :` de niveau 2 à 4, sinon "".
+function secid(s, lvl,   h, r) {
   if (lvl < 2 || lvl > 4) return ""
   h = trim(substr(s, lvl + 1))
-  if (!match(h, /^Phase[ \t]+[0-9]+(\.[0-9]+)*/)) return ""
+  if (!match(h, /^Phase[ \t]+[A-Za-z0-9][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/)) return ""
   r = substr(h, RLENGTH + 1); h = substr(h, 1, RLENGTH)
   sub(/^Phase[ \t]+/, "", h)
   if (match(r, /^[ \t]*\([^)]*\)/)) r = substr(r, RLENGTH + 1)
   if (r !~ /^[ \t]*:/) return ""
-  return normnum(h)
+  return h
 }
-# Contenu d'un span de code en ligne : un `<!--` n'y ouvre aucun commentaire (marqueur \004, retiré en sortie
-# de strip_comments). Appariement CommonMark des séries d'accents graves ; sans fermeture, elle reste littérale.
+# Barrière de bloc de code (CommonMark) : retour = longueur de la série (>= 3) si la ligne ouvre une barrière, sinon 0 ;
+# fixe fch. Indentation <= 3 espaces (une tabulation en vaut 4), série d'accents graves ou de tildes, accent grave
+# interdit dans l'info string d'une barrière d'accents graves.
+function fopen(s,   i, c, n) {
+  match(s, /^ */); i = RLENGTH
+  if (i > 3) return 0
+  c = substr(s, i + 1, 1)
+  if (c != "`" && c != "~") return 0
+  n = 0
+  while (substr(s, i + n + 1, 1) == c) n++
+  if (n < 3) return 0
+  if (c == "`" && index(substr(s, i + n + 1), "`")) return 0
+  fch = c
+  return n
+}
+# Fermeture : même caractère, série au moins aussi longue que l'ouvreur, aucune info string.
+function fclose(s,   i, n) {
+  match(s, /^ */); i = RLENGTH
+  if (i > 3 || substr(s, i + 1, 1) != fch) return 0
+  n = 0
+  while (substr(s, i + n + 1, 1) == fch) n++
+  if (n < flen) return 0
+  return (substr(s, i + n + 1) ~ /^[ \t]*$/)
+}
 function neutral(s,   n, P, i, k, nr, K, A, NX, LAST, r, c, out) {
   n = split(s, P, "`")
   if (n < 3) return s
@@ -151,33 +195,82 @@ function strip_comments(s,   a, b) {
   gsub(/\004/, "", s)
   return s
 }
-BEGIN { want = normnum(want) }
+# Blocs `<details>` exacts (jalons livrés) : cachés comme le fait gsd-core (`stripShippedMilestones`), opener `<details>`
+# sans attribut, casse indifférente, le premier `</details>` ferme, pas d'imbrication, un opener sans fermeture avant le
+# suivant (ou la fin) n'ouvre rien. La décision d'une ligne peut dépendre des suivantes : les lignes en suspens sont
+# retenues (pq_*) puis rendues à proc() dans l'ordre, cachées (vides) ou telles quelles ; les numéros de ligne sont conservés.
+function feed(rl, i,   w, tw, vis, a, b, c, inq, k, full) {
+  w = rl; tw = tolower(rl); vis = ""; inq = 0
+  while (1) {
+    if (!pend) {
+      a = index(tw, "<details>")
+      if (!a) { vis = vis w; break }
+      pend = 1; pq_n = 1; pq_i[1] = i; pq_blk[1] = vis substr(w, 1, a - 1); pq_not[1] = vis w; inq = 1
+      w = substr(w, a + 9); tw = substr(tw, a + 9); vis = ""
+      continue
+    }
+    c = index(tw, "<details>"); b = index(tw, "</details>")
+    if (b && (!c || b < c)) {
+      for (k = 1; k <= pq_n - inq; k++) proc(pq_blk[k], pq_i[k])
+      vis = inq ? pq_blk[pq_n] : ""
+      pend = 0; pq_n = 0; inq = 0
+      w = substr(w, b + 10); tw = substr(tw, b + 10)
+      continue
+    }
+    if (c) {
+      for (k = 1; k <= pq_n - inq; k++) proc(pq_not[k], pq_i[k])
+      if (inq) { full = pq_not[pq_n]; vis = substr(full, 1, length(full) - length(w) + c - 1) }
+      else vis = substr(rl, 1, length(rl) - length(w) + c - 1)
+      pend = 0; pq_n = 0; inq = 0
+      w = substr(w, c); tw = substr(tw, c)
+      continue
+    }
+    if (!inq) { pq_n++; pq_i[pq_n] = i; pq_blk[pq_n] = ""; pq_not[pq_n] = rl }
+    break
+  }
+  if (!pend) proc(vis, i)
+}
+function flush_pending(   k) {
+  if (!pend) return
+  for (k = 1; k <= pq_n; k++) proc(pq_not[k], pq_i[k])
+  pend = 0; pq_n = 0
+}
+BEGIN { wk[1] = idkey(want, 0); wk[2] = idkey(want, 1) }
+# Une ligne, déjà débarrassée des blocs <details> : sections, marqueurs, blocs de code, commentaires. Deux lectures de la
+# cible en parallèle : (1) exacte, (2) tolérante au préfixe projet ; (2) ne sert que si (1) ne trouve aucune section.
+function proc(line, nr,   t, lvl, id, p, v, tok, rest, c) {
+  if (!infence) line = strip_comments(line)
+  if (infence) { if (fclose(line)) infence = 0; return }
+  c = fopen(line)
+  if (c) { infence = 1; flen = c; return }
+  lvl = hlevel(line)
+  if (lvl) {
+    id = secid(line, lvl)
+    for (p = 1; p <= 2; p++) {
+      if (insec[p] && lvl <= seclvl[p]) insec[p] = 0
+      if (id != "" && idkey(id, p == 2) == wk[p]) { nsec[p]++; insec[p] = 1; seclvl[p] = lvl }
+    }
+    return
+  }
+  if (match(line, /^[ \t]*\*\*Validation(:\*\*|\*\*[ \t]*:)/)) {
+    v = trim(substr(line, RLENGTH + 1)); tok = v; sub(/[ \t].*$/, "", tok)
+    rest = substr(v, length(tok) + 1); sub(/^[ \t]+/, "", rest); tok = tolower(tok)
+    if (tok == "proposed") c = "proposed"
+    else if (tok == "validated" && (rest == "" || substr(rest, 1, 1) == "(")) c = "validated"
+    else c = "inconnu"
+    for (p = 1; p <= 2; p++) if (insec[p]) { nmark[p]++; if (nmark[p] == 1) cls[p] = c }
+  }
+}
 {
   line = $0
   if (NR == 1 && substr(line, 1, 3) == bom) line = substr(line, 4)
-  if (!infence) line = strip_comments(line)
-  t = line; sub(/^[ \t]+/, "", t); f3 = substr(t, 1, 3)
-  if (infence) { if (f3 == fch) infence = 0; next }
-  if (f3 == "```" || f3 == "~~~") { infence = 1; fch = f3; next }
-  lvl = hlevel(line)
-  if (lvl) {
-    if (insec && lvl <= seclvl) insec = 0
-    n = secnum(line, lvl)
-    if (n != "" && n == want) { nsec++; insec = 1; seclvl = lvl }
-    next
-  }
-  if (insec && match(line, /^[ \t]*\*\*Validation(:\*\*|\*\*[ \t]*:)/)) {
-    nmark++
-    if (nmark == 1) {
-      v = trim(substr(line, RLENGTH + 1)); tok = v; sub(/[ \t].*$/, "", tok)
-      rest = substr(v, length(tok) + 1); sub(/^[ \t]+/, "", rest); tok = tolower(tok)
-      if (tok == "proposed") cls = "proposed"
-      else if (tok == "validated" && (rest == "" || substr(rest, 1, 1) == "(")) cls = "validated"
-      else cls = "inconnu"
-    }
-  }
+  feed(line, NR)
 }
-END { printf "@ %d %d %s %d %d\n", nsec + 0, nmark + 0, (cls == "" ? "-" : cls), infence + 0, incom + 0 }
+END {
+  flush_pending()
+  p = (nsec[1] > 0) ? 1 : 2
+  printf "@ %d %d %s %d %d\n", nsec[p] + 0, nmark[p] + 0, (cls[p] == "" ? "-" : cls[p]), infence + 0, incom + 0
+}
 AWKEOF
 
 WORST=0; MARK="-"

@@ -8,7 +8,9 @@
 # Cas VFV-POSTE-*, VFV-PROPOSE-VALIDEE, VFV-IDEMPOTENT, VFV-ABSENT-VALIDATE, VFV-INCONNU, VFV-MULTI, VFV-SANS-GOAL,
 # VFV-GOAL-MULTI, VFV-OCTETS, VFV-INDENT, VFV-CRLF, VFV-MODE, VFV-WS, VFV-LIEN, VFV-ARCHI, VFV-NOECHO : règles de l'écrivain.
 # Cas VFV-GSD-* : les lecteurs du moteur GSD rendent la même chose sur la sortie de l'écrivain que sans marqueur.
-# Mutants VFV-MUT-1..9 : une ligne du script altérée, différente (cmp -s), valide (bash -n), sonde rouge sur le
+# Cas VFV-IDS, VFV-DETAILS, VFV-FENCE-COMMONMARK, VFV-ARCHI-BORNE, VFV-PLANNING-LIEN (grammaire de gsd-core, jalons livrés, barrières
+# CommonMark, bornes de --architecture et de .planning).
+# Mutants VFV-MUT-1..22 : une ligne du script altérée, différente (cmp -s), valide (bash -n), sonde rouge sur le
 # mutant puis verte sur l'original.
 set -uo pipefail
 
@@ -115,8 +117,8 @@ probe_trace4() {
   msg "--phase et --architecture ensemble attendu rc 64"; { [ "$RC" -eq 64 ] && [ -n "$ERR" ]; } || return 1
   run propose
   msg "aucune cible attendu rc 64"; { [ "$RC" -eq 64 ] && [ -n "$ERR" ]; } || return 1
-  run propose --phase abc
-  msg "--phase abc attendu rc 64"; [ "$RC" -eq 64 ]
+  run propose --phase .5
+  msg "--phase .5 attendu rc 64"; [ "$RC" -eq 64 ]
 }
 case_ VFV-TRACE-1 probe_trace1
 case_ VFV-TRACE-2 probe_trace2
@@ -397,6 +399,111 @@ probe_archi() {
 }
 case_ VFV-ARCHI probe_archi
 
+# === Grammaire de --phase alignée sur gsd-core, jalons livrés, barrières CommonMark, bornes de --architecture ==
+# written_after <fichier> <ligne exacte> : la ligne de marqueur suit immédiatement la ligne donnée.
+written_after() { [ "$(line_after "$1" "$2")" = '**Validation:** proposed' ]; }
+probe_ids_w() {
+  mklab iw1 '# Roadmap\n\n### Phase AUTH: Auth\n**Goal:** goal-auth\n\n### Phase 12A: Suf\n**Goal:** goal-12a\n\n### Phase 7.1A: Dec\n**Goal:** goal-71a\n'
+  run propose --phase AUTH
+  msg "propose --phase AUTH (id custom) attendu rc 0 + ECRIT phase AUTH : proposed"; { [ "$RC" -eq 0 ] && has 'ECRIT phase AUTH : proposed'; } || return 1
+  LASTMSG="la ligne de marqueur ne suit pas le Goal de la phase AUTH"; written_after "$(RMF)" '**Goal:** goal-auth' || return 1
+  LASTMSG="le gate sur AUTH n'a pas rendu 1"; gate_p AUTH; [ $? -eq 1 ] || return 1
+  T_ROLE=dev run validate --phase auth; T_ROLE=""
+  msg "validate --phase auth (casse indifférente) attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  LASTMSG="le gate sur AUTH n'a pas rendu 0 après validate"; gate_p AUTH || return 1
+  run propose --phase 12A
+  msg "propose --phase 12A attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  LASTMSG="le marqueur de 12A n'est pas sous son Goal"; written_after "$(RMF)" '**Goal:** goal-12a' || return 1
+  run propose --phase 7.1A
+  msg "propose --phase 7.1A attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  LASTMSG="le marqueur de 7.1A n'est pas sous son Goal"; written_after "$(RMF)" '**Goal:** goal-71a' || return 1
+  run propose --phase 12
+  msg "12 ne désigne pas 12A, attendu rc 3"; [ "$RC" -eq 3 ] || return 1
+  mklab iw2 '# Roadmap\n\n### Phase 3: Nue\n**Goal:** goal-nue\n\n### Phase CK-03: Pref\n**Goal:** goal-pref\n'
+  run propose --phase 3
+  msg "la forme exacte gagne : propose --phase 3 attendu rc 0 (jamais sections multiples)"; [ "$RC" -eq 0 ] || return 1
+  LASTMSG="le marqueur de la phase 3 n'est pas sous son Goal"; written_after "$(RMF)" '**Goal:** goal-nue' || return 1
+  LASTMSG="la phase CK-03 a été écrite à tort"; [ "$(line_after "$(RMF)" '**Goal:** goal-pref')" = '' ] || return 1
+  mklab iw3 '# Roadmap\n\n### Phase CK-03: Pref\n**Goal:** goal-pref\n'
+  run propose --phase 3
+  msg "lecture tolérante : propose --phase 3 désigne CK-03, attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  LASTMSG="le marqueur de CK-03 n'est pas sous son Goal"; written_after "$(RMF)" '**Goal:** goal-pref' || return 1
+  local bad
+  for bad in .5 'a;b' 'a..b'; do
+    run propose --phase "$bad"
+    msg "propose --phase « $bad » attendu rc 64"; { [ "$RC" -eq 64 ] && [ -n "$ERR" ]; } || return 1
+  done
+}
+probe_details_w() {
+  mklab dw1 '# Roadmap\n\n<details>\n<summary>v1.0 shipped</summary>\n\n### Phase 1: Vieille\n**Goal:** goal-vieux\n\n### Phase 5: Seule\n**Goal:** goal-seule\n\n</details>\n\n### Phase 1: Neuve\n**Goal:** goal-neuf\n'
+  local a; a="$(sum "$(RMF)")"
+  run propose --phase 1
+  msg "phase 1 vivante à côté d'une phase 1 du bloc livré : attendu rc 0, jamais sections multiples"; [ "$RC" -eq 0 ] || return 1
+  LASTMSG="le marqueur n'est pas sous le Goal de la phase vivante"; written_after "$(RMF)" '**Goal:** goal-neuf' || return 1
+  LASTMSG="le bloc livré a été écrit"; [ "$(line_after "$(RMF)" '**Goal:** goal-vieux')" = '' ] || return 1
+  [ "$(nmark "$(RMF)")" = 1 ] || { LASTMSG="plus d'un marqueur écrit"; return 1; }
+  mklab dw2 '# Roadmap\n\n<details>\n### Phase 5: Seule\n**Goal:** goal-seule\n</details>\n'
+  a="$(sum "$(RMF)")"
+  run propose --phase 5
+  msg "phase présente seulement dans le bloc livré attendu rc 3 + phase introuvable"; { [ "$RC" -eq 3 ] && has 'INDETERMINE phase introuvable'; } || return 1
+  LASTMSG="le ROADMAP a changé malgré le refus"; [ "$(sum "$(RMF)")" = "$a" ] || return 1
+  mklab dw3 '# Roadmap\n\n### Phase 3: Titre<details>\ncache\n</details>\n**Goal:** goal-t\n'
+  run propose --phase 3
+  msg "le titre qui précède un <details> sur sa ligne reste visible : attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  LASTMSG="le marqueur n'est pas sous le Goal"; written_after "$(RMF)" '**Goal:** goal-t'
+}
+probe_fence_w() {
+  mklab fw1 '# Roadmap\n\n### Phase 2: Deux\n``` `x` ```\n**Goal:** goal-deux\n'
+  run propose --phase 2
+  msg "une ligne trois-accents-graves + info string à accent grave n'est pas une barrière : le Goal reste vu, attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  LASTMSG="le marqueur n'est pas sous le Goal"; written_after "$(RMF)" '**Goal:** goal-deux' || return 1
+  mklab fw2 '# Roadmap\n\n### Phase 2: Deux\n````\n**Goal:** dedans\n```\n**Goal:** goal-deux\n'
+  local a; a="$(sum "$(RMF)")"
+  run propose --phase 2
+  msg "une barrière de 4 accents n'est pas fermée par 3 : bloc jamais fermé, attendu rc 3 + bloc de code non ferme"
+  { [ "$RC" -eq 3 ] && has 'INDETERMINE bloc de code non ferme'; } || return 1
+  LASTMSG="le ROADMAP a changé malgré le refus"; [ "$(sum "$(RMF)")" = "$a" ] || return 1
+  mklab fw3 '# Roadmap\n\n### Phase 2: Deux\n```\n```js\n**Goal:** dedans\n```\n**Goal:** goal-deux\n'
+  run propose --phase 2
+  msg "une ligne trois-accents-graves+js (info string) ne ferme pas : le premier Goal reste caché, attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  LASTMSG="le marqueur doit suivre le Goal hors bloc"; written_after "$(RMF)" '**Goal:** goal-deux'
+}
+probe_arch_borne() {
+  RUNDIR="$FX/ab"; rm -rf "$RUNDIR"; mkdir -p "$RUNDIR/lab/sub" "$RUNDIR/outside"
+  printf '%s' "$ARCH_OK" > "$RUNDIR/outside/A.md"; printf '%s' "$ARCH_OK" > "$RUNDIR/lab/sub/A.md"
+  ln -s ../outside "$RUNDIR/lab/lien"
+  local a; a="$(sum "$RUNDIR/outside/A.md")"; local root="$RUNDIR"; RUNDIR="$root/lab"
+  T_ROLE=dev run validate --architecture ../outside/A.md; T_ROLE=""
+  msg "--architecture ../outside/A.md (hors racine) attendu rc 5 + ILLISIBLE hors de la racine"; { [ "$RC" -eq 5 ] && has 'hors de la racine'; } || return 1
+  LASTMSG="le fichier hors racine a été écrit"; [ "$(sum "$root/outside/A.md")" = "$a" ] || return 1
+  T_ROLE=dev run validate --architecture "$root/outside/A.md"; T_ROLE=""
+  msg "--architecture absolu hors racine attendu rc 5"; [ "$RC" -eq 5 ] || return 1
+  T_ROLE=dev run validate --architecture lien/A.md; T_ROLE=""
+  msg "--architecture par un dossier en lien symbolique vers l'extérieur attendu rc 5"; [ "$RC" -eq 5 ] || return 1
+  LASTMSG="le fichier derrière le lien a été écrit"; [ "$(sum "$root/outside/A.md")" = "$a" ] || return 1
+  T_ROLE=dev run validate --architecture sub/A.md; T_ROLE=""
+  msg "témoin positif : --architecture sub/A.md (dans la racine) attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  T_ROLE=dev run validate --architecture sub/../sub/absent.md; T_ROLE=""
+  msg "fichier absent dans la racine attendu rc 3"; [ "$RC" -eq 3 ]
+}
+probe_planning_lien() {
+  mklab pl "$RM3" ""; mv "$RUNDIR/.planning" "$RUNDIR/vrai-planning"; ln -s vrai-planning "$RUNDIR/.planning"
+  local a; a="$(sum "$RUNDIR/vrai-planning/ROADMAP.md")"
+  run propose --phase 2
+  msg ".planning en lien symbolique attendu rc 5 + ILLISIBLE planning : lien symbolique"; { [ "$RC" -eq 5 ] && has 'ILLISIBLE planning : lien symbolique'; } || return 1
+  T_ROLE=dev run validate --phase 2; T_ROLE=""
+  msg "validate avec .planning en lien symbolique attendu rc 5"; [ "$RC" -eq 5 ] || return 1
+  LASTMSG="le ROADMAP derrière le lien a changé"; [ "$(sum "$RUNDIR/vrai-planning/ROADMAP.md")" = "$a" ] || return 1
+  mklab pl2 "$RM3" ""
+  run propose --phase 2
+  msg "témoin positif : .planning réel attendu rc 0"; [ "$RC" -eq 0 ]
+}
+case_ VFV-IDS probe_ids_w
+case_ VFV-DETAILS probe_details_w
+case_ VFV-FENCE-COMMONMARK probe_fence_w
+case_ VFV-ARCHI-BORNE probe_arch_borne
+case_ VFV-PLANNING-LIEN probe_planning_lien
+
 # === Aucun écho du contenu, formes d'appel ===================================================================
 probe_noecho() {
   mklab ne2 '# Roadmap\n\n### Phase 2: zzSECRETzz titre\n**Goal:** zzSECRETzz\n'
@@ -596,7 +703,7 @@ mutant VFV-MUT-2 'if [ "$rrc" -ne 0 ]; then illis' 'illis "poste illisible (vf-r
   "échec du lecteur de poste replié sur solo"
 mutant VFV-MUT-3 'propose:1:validated)' 'indet "deja validee : jamais repassee a proposed"' 'finish 0' probe_propose_validee \
   "propose sur une phase validée n'est plus refusé"
-mutant VFV-MUT-4 'if (ingoal) { if (t == ""' 'else goalend = NR;' 'else goalend = goalend;' probe_goal_multi \
+mutant VFV-MUT-4 'if (ingoal[p]) { if (t == ""' 'else goalend[p] = nr;' 'else goalend[p] = goalend[p];' probe_goal_multi \
   "insertion juste après la première ligne du Goal"
 mutant VFV-MUT-5 'if [ -L "$F" ]; then illis' '[ -L "$F" ]' 'false' probe_lien \
   "refus du lien symbolique retiré"
@@ -606,8 +713,35 @@ mutant VFV-MUT-7 'VAL="validated (product,' ', override)' ')' probe_poste_produc
   "override absent de la valeur écrite"
 mutant VFV-MUT-8 'then indet "lab partitionne sans --ws"' '[ -e "$PLAN/workstreams" ] || [ -L "$PLAN/workstreams" ]' 'false' probe_ws \
   "lab partitionné sans --ws traité comme lab plat"
-mutant VFV-MUT-9 'out[++m] = lead "**Validation:** " val cr[i]' 'lead "**Validation:** "' '"**Validation:** "' probe_indent \
+mutant VFV-MUT-9 'out[++m] = lead[p] "**Validation:** " val cr[i]' 'lead[p] "**Validation:** "' '"**Validation:** "' probe_indent \
   "indentation de la ligne de marqueur remplacée perdue à la réécriture"
+
+mutant VFV-MUT-10 'hors de la racine du depot' 'illis "architecture' ': "architecture' probe_arch_borne \
+  "refus d'un --architecture hors de la racine retiré"
+mutant VFV-MUT-11 'DIRP=$(cd' '&& pwd -P' '&& pwd' probe_arch_borne \
+  "liens symboliques des dossiers parents non résolus avant la comparaison à la racine"
+mutant VFV-MUT-12 'if [ -L "$PLAN" ]; then illis' '[ -L "$PLAN" ]' 'false' probe_planning_lien \
+  "refus d'un .planning en lien symbolique retiré"
+mutant VFV-MUT-13 'if (c == "`" && index(substr(s, i + n + 1), "`")) return 0' 'c == "`" &&' '0 &&' probe_fence_w \
+  "un accent grave dans l'info string n'empêche plus l'ouverture d'une barrière"
+mutant VFV-MUT-14 'if (n < flen) return 0' 'n < flen' '0' probe_fence_w \
+  "une barrière de fermeture plus courte que l'ouvreur la ferme"
+mutant VFV-MUT-15 'return (substr(s, i + n + 1) ~' '~ /^[ \t]*$/' '~ /^/' probe_fence_w \
+  "une ligne de fermeture avec info string ferme la barrière"
+mutant VFV-MUT-16 'a = index(tw, "<details>")' '"<details>"' '"<detailz>"' probe_details_w \
+  "les blocs <details> des jalons livrés ne sont plus cachés"
+mutant VFV-MUT-17 'p = (nsec[1] > 0) ? 1 : 2' '(nsec[1] > 0) ? 1 : 2' '2' probe_ids_w \
+  "la lecture tolérante au préfixe projet prime sur la lecture exacte"
+mutant VFV-MUT-18 'p = (nsec[1] > 0) ? 1 : 2' '(nsec[1] > 0) ? 1 : 2' '1' probe_ids_w \
+  "plus de lecture tolérante au préfixe projet"
+mutant VFV-MUT-19 'if (!match(h, /^Phase[ \t]+[A-Za-z0-9]' '[A-Za-z0-9][A-Za-z0-9_-]*' '[0-9]' probe_ids_w \
+  "un titre à id custom n'est plus une section"
+mutant VFV-MUT-20 'if (!match(h, /^Phase[ \t]+[A-Za-z0-9]' '(\.[A-Za-z0-9_-]+)*' '(\.[0-9]+)*' probe_ids_w \
+  "un segment décimal à suffixe lettre n'est plus une section"
+mutant VFV-MUT-21 'u = toupper(s)' 'toupper(s)' 's' probe_ids_w \
+  "la casse des identifiants de phase devient significative"
+mutant VFV-MUT-22 'pq_blk[1] = vis substr(w, 1, a - 1)' 'substr(w, 1, a - 1)' '""' probe_details_w \
+  "le texte qui précède un <details> sur sa ligne est perdu"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]

@@ -25,6 +25,10 @@
 # lignes -> INDÉTERMINÉ. La validation appartient à un dev : ce script constate la ligne, il ne vérifie ni
 # l'auteur ni la date (limite écrite : une ligne `validated` posée à la main est crue).
 #
+# Blocs de code (CommonMark) : ouverture = 3 accents graves ou tildes ou plus, indentation <= 3 espaces, sans accent
+# grave dans l'info string d'une barrière d'accents graves ; fermeture = même caractère, série au moins aussi longue
+# que l'ouvreur, sans info string.
+#
 # Six rubriques minimales (P60-PL-04), titres Markdown de tout niveau reconnus par préfixe ASCII du libellé
 # (casse, accents, numérotation, emphase indifférents) : contexte, choix_structurants (« choix »), composants
 # (« composant »), donnees (« donn »), contraintes (« contrainte »), risques (« risque »). Une rubrique se ferme
@@ -144,6 +148,30 @@ function neutral(s,   n, P, i, k, nr, K, A, NX, LAST, r, c, out) {
   for (i = 2; i <= n; i++) out = out "`" P[i]
   return out
 }
+# Barrière de bloc de code (CommonMark) : retour = longueur de la série (>= 3) si la ligne ouvre une barrière, sinon 0 ;
+# fixe fch. Indentation <= 3 espaces (une tabulation en vaut 4), série d'accents graves ou de tildes, accent grave
+# interdit dans l'info string d'une barrière d'accents graves.
+function fopen(s,   i, c, n) {
+  match(s, /^ */); i = RLENGTH
+  if (i > 3) return 0
+  c = substr(s, i + 1, 1)
+  if (c != "`" && c != "~") return 0
+  n = 0
+  while (substr(s, i + n + 1, 1) == c) n++
+  if (n < 3) return 0
+  if (c == "`" && index(substr(s, i + n + 1), "`")) return 0
+  fch = c
+  return n
+}
+# Fermeture : même caractère, série au moins aussi longue que l'ouvreur, aucune info string.
+function fclose(s,   i, n) {
+  match(s, /^ */); i = RLENGTH
+  if (i > 3 || substr(s, i + 1, 1) != fch) return 0
+  n = 0
+  while (substr(s, i + n + 1, 1) == fch) n++
+  if (n < flen) return 0
+  return (substr(s, i + n + 1) ~ /^[ \t]*$/)
+}
 function strip_comments(s,   a, b) {
   if (incom) {
     b = index(s, "-->")
@@ -164,9 +192,10 @@ BEGIN { nn = split("contexte choix_structurants composants donnees contraintes r
   line = $0
   if (NR == 1 && substr(line, 1, 3) == bom) line = substr(line, 4)
   if (!infence) line = strip_comments(line)
-  t = trim(line); f3 = substr(t, 1, 3)
-  if (infence) { if (f3 == fch) infence = 0; next }
-  if (f3 == "```" || f3 == "~~~") { infence = 1; fch = f3; next }
+  t = trim(line)
+  if (infence) { if (fclose(line)) infence = 0; next }
+  fl = fopen(line)
+  if (fl) { infence = 1; flen = fl; next }
   if (line ~ /^#+[ \t]/) {
     lvl = 0
     while (substr(line, lvl + 1, 1) == "#") lvl++

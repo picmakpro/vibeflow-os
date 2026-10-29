@@ -211,8 +211,10 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   P60-D-04) : `--phase <N> [--ws <nom>]` constate la ligne `**Validation:**` de la section de la phase du
   ROADMAP. Lecture seule, ne lit jamais le poste ; le ROADMAP n'est jamais réimprimé. Codes 0 (validée, ou
   marqueur absent : état de toutes les phases existantes), 1 (proposée), 3 (indéterminé : phase introuvable,
-  marqueurs ou sections multiples, valeur inconnue), 5 (illisible, bruyant), 64 (usage). Consommateurs :
-  `vf-coder` avant plan et exécution d'une étape, `vf-auto` avant sa boucle. Limite fail-open écrite : le mode
+  marqueurs ou sections multiples, valeur inconnue : un marqueur non constatable, où les consommateurs ne
+  s'arrêtent pas), 5 (illisible, bruyant), 64 (usage). Identifiant de phase de la grammaire de gsd-core (`12`,
+  `7.1`, `12A`, `AUTH`, `CK-03`), jalons livrés `<details>` ignorés. Consommateurs :
+  `vf-coder` avant plan et exécution d'une étape, `vf-auto` avant sa boucle ; seul un `proposed` constaté (1) les arrête. Limite fail-open écrite : le mode
   « Regenerate all » d'`edit-phase` peut perdre le marqueur et une phase ajoutée à la main n'en a pas.
 - `check-architecture.sh` — gate de l'architecture avant découpage (Phase 60, ARCG-06, ARCG-07, P60-D-05,
   P60-D-06) : `--architecture <f>` constate la ligne d'état et les six rubriques minimales (contexte, choix
