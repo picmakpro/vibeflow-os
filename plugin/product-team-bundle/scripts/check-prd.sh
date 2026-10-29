@@ -53,12 +53,16 @@
 # illisible pour le gate, donc INDÉTERMINÉ (code 3). Ligne à case `[ ]`/`[x]` qui n'a pas la forme
 # d'exigence (ID pointé, minuscules, puce `*`, numérotée) : AVERTISSEMENT par numéro de ligne (stdout et
 # stderr), jamais réimprimée, et INDÉTERMINÉ (code 3) : une exigence que le gate ne lit pas est une exigence que le gate ne
-# juge pas, donc jamais un vert (arbitrage Samuel, AskUserQuestion session principale, 2026-10-29). Le code 3 cède devant 1
+# juge pas, donc jamais un vert (arbitrage Samuel, AskUserQuestion session principale, 2026-10-29). Même sort pour une ligne de
+# liste ou de citation qui OUVRE sur un identifiant d'exigence en gras (`**PRD-02**`, éventuellement après une case vide ou
+# à tiret `[]`, `[-]`) sans être l'ouvreur reconnu : `- [] **PRD-02**`, `> - [ ] **PRD-02**`, puce suivie d'une espace
+# insécable, `> **PRD-02**`, `- **PRD-02**`. Un ID cité en cours de ligne, dans un paragraphe ou dans un bloc de code ne compte pas.
+# Le code 3 cède devant 1
 # et 5 ; le BILAN compte ces lignes (`non_reconnues`).
 # Séparateur avant le champ : `,` `—` `–` `-` (entouré d'espaces) et `(` précèdent un champ, au même titre que la
 # ponctuation et la puce (« Priorité : must, Acceptation : … ») ; un tiret COLLÉ à un mot (« pré-acceptation : ») fait un
 # mot composé, pas un champ ; « il faut, acceptation : » sans valeur reste rouge (champ vide). Une valeur qui répète le
-# libellé (`Acceptation : Acceptation`, `Acceptation : Critère d'acceptation`) est un remplissage. Le texte des gabarits
+# libellé (`Acceptation : Acceptation`, `Acceptation : Critère d'acceptation`, au pluriel ou avec article : `Les critères d'acceptation`) est un remplissage. Le texte des gabarits
 # livrés, crochets retirés (consignes du BRIEF, « quoi, combien, en combien de temps »), est un remplissage (tmplword).
 # Éliminatoire 2 : une rubrique du BRIEF manque ou n'a aucune ligne de corps (hors commentaire HTML,
 # hors ligne de remplissage selon la MÊME règle que les critères : entre crochets ou chevrons après
@@ -283,6 +287,7 @@ function usable(v,   p) {
   v = lead(v)
   if (isfill(v)) return 0
   p = fold(plain(v))
+  sub(/^(les |des |la |l )/, "", p); sub(/^criteres /, "critere ", p); sub(/acceptations$/, "acceptation", p)
   if (p == "acceptation" || p == "critere d acceptation") return 0
   if (nchars(plain(v)) < 10) return 0
   return 1
@@ -382,7 +387,11 @@ function close_block() {
     scan(substr(line, RSTART + RLENGTH))
     next
   }
-  if (line ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]+\[[ xX]\]/) {
+  u = line; qt = 0
+  while (u ~ /^[ \t]*>/) { sub(/^[ \t]*>/, "", u); qt = 1 }
+  lm = (u ~ /^[ \t]*([-*+]|[0-9]+[.)])([ \t]|\302\240)/)
+  if (lm) sub(/^[ \t]*([-*+]|[0-9]+[.)])/, "", u)
+  if (line ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]+\[[ xX]\]/ || ((qt || lm) && u ~ /^([ \t]|\302\240)*(\[[^]]?[^]]?[^]]?\]([ \t]|\302\240)*)?\*\*[A-Z][A-Z0-9]*-[A-Za-z0-9_-]+\*\*/)) {
     nunk++
     if (nunk <= 50) printf "[check-prd] AVERTISSEMENT ligne %d : case a cocher non reconnue comme exigence\n", NR
   }
