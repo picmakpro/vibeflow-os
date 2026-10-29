@@ -126,8 +126,9 @@ b. **Couche modules** : `bash <S>/vf-update-run.sh`. Le script localise **lui-m�
 c. **Couche moteur** (seulement si la ligne moteur de l'étape 3 a été acceptée) : invoque
    `VF_SCOPE=<scope> bash <S-moteur>/ensure-deps.sh --migrate-engine` (ligne legacy) **ou**
    `VF_SCOPE=<scope> bash <S-moteur>/ensure-deps.sh --upgrade-engine` (ligne périmé) et relaie son résumé.
-   **Scope obligatoire** : si `./.claude/gsd-core/` existe (moteur en scope projet), `<scope>` vaut
-   `project` ; sinon `user`. Sans ce préfixe, le défaut `user` pose une seconde copie du moteur dans
+   **Scope obligatoire** : si `$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.claude/gsd-core/` existe (même racine que
+   `ensure-deps.sh`, pas le répertoire courant : le skill peut tourner depuis un sous-dossier), `<scope>`
+   vaut `project` ; sinon `user`. Sans ce préfixe, le défaut `user` pose une seconde copie du moteur dans
    `~/.claude`, qui masque les commandes du projet et touche tous les projets de la machine. Le
    script re-sonde lui-même le registre et ne relance `npx` que si le VERSION installé est
    toujours strictement inférieur au dernier `^1` publié. S'exécute **même si** la
