@@ -4,7 +4,7 @@
 > brief, PRD, critères d'acceptation — **sans jamais rien déclarer prêt tout seul** : un juge frais
 > note le résultat, l'humain tranche, et le dev ne reçoit la main qu'au-dessus du seuil.
 
-**Type** : `agents + skill + scripts` · **Version** : v1.0.0 · **Dépend de** : `conductor`,
+**Type** : `agents + skill + scripts` · **Version** : v1.1.0 · **Dépend de** : `conductor`,
 `planning-core`, `consolidator`, `audit-architecture`, `software-architecture`.
 
 ---
@@ -20,7 +20,13 @@ une priorité.
 ```
 vibeflow-product ─▶ vf-product-manager ─▶ vf-product-analyst (BRIEF) ─▶ vf-product-pm (PRD)
                                       ─▶ prd-gate (≥ 80/100) ─▶ VALIDATION HUMAINE ─▶ découpage par le dev
+                                      ─▶ vf-product-architect (ARCHITECTURE, proposée) ─▶ validation par un dev
 ```
+
+La décision d'architecture (`.planning/ARCHITECTURE.md`) est un livrable à part : le worker
+`vf-product-architect` la rédige depuis le BRIEF et le PRD, **proposée, jamais validée par lui**.
+`check-architecture.sh` (conductor) en constate la forme, et un dev la valide par
+`vf-validation.sh validate --architecture .planning/ARCHITECTURE.md` avant le découpage en phases.
 
 **« Vert », pour ce métier** : un BRIEF et un PRD ne sont verts que si l'auto-contrôle du worker
 passe, que le juge frais `prd-gate` les note **≥ 80/100** sans éliminatoire, et que **l'humain les a
@@ -81,6 +87,7 @@ un sélecteur de gabarit), puis sert la demande. Première demande type :
 | `agents/vf-product-manager.md` | manager de mission : DAG + verrou de driver, digest par mandat, rapports typés ; ne produit jamais | opus |
 | `agents/vf-product-analyst.md` | worker interne : rédige ou met à jour `.planning/BRIEF.md` | sonnet |
 | `agents/vf-product-pm.md` | worker interne : instancie PROJECT + REQUIREMENTS depuis le gabarit `product` | sonnet |
+| `agents/vf-product-architect.md` | worker interne : décision d'architecture depuis le gabarit de planning-core, jamais validée par lui | sonnet |
 | `agents/prd-gate.md` | juge frais read-only : rubric /100 (rubric propre au BRIEF quand le livrable est le BRIEF seul), seuil 80, deux éliminatoires | sonnet |
 | `skills/vf-product/SKILL.md` | point d'entrée `/vf-product` | — |
 | `references/BRIEF.template.md` | gabarit à cinq rubriques : problème, utilisateurs, valeur, contraintes, hors périmètre | — |
@@ -107,7 +114,7 @@ bash plugin/conductor/scripts/check-skills.sh --strict --file plugin/product-tea
   engagement de prompt et de `disallowedTools`, pas une preuve de confinement.
 - **Aucun contrôle d'accès** : un poste est une vue. Rien n'est cloisonné par le poste, ni les
   gestes, ni les fichiers.
-- **Pas d'architecte dans ce module** : le découpage et l'architecture appartiennent au dev.
+- **L'architecte propose, un dev valide** : la validation de l'architecture et le découpage en phases appartiennent au dev.
 - **Pas de fichier de PRD séparé** : le PRD est `PROJECT.md` plus `REQUIREMENTS.md`.
 - **Le script constate, il ne juge pas** : « testable » reste une appréciation du juge, la note /100
   vient de lui seul.
@@ -116,9 +123,10 @@ bash plugin/conductor/scripts/check-skills.sh --strict --file plugin/product-tea
 
 A role is a view, not a permission. `product-team-bundle` is the product team of VibeFlow: a front
 door agent `vibeflow-product` (embodied in the main session by the `/vf-product` skill, never
-dispatched as a Task), a mission manager, two internal workers (BRIEF analyst, PRD writer) and a
-fresh read-only judge `prd-gate` (score out of 100, threshold 80, two eliminatory criteria backed
-by the deterministic `check-prd.sh`).
+dispatched as a Task), a mission manager, three internal workers (BRIEF analyst, PRD writer,
+architecture author) and a fresh read-only judge `prd-gate` (score out of 100, threshold 80, two eliminatory criteria backed
+by the deterministic `check-prd.sh`). The architecture author drafts `.planning/ARCHITECTURE.md`
+as proposed only; a dev validates it before any split into phases.
 
 The BRIEF lives at `.planning/BRIEF.md`, next to `PROJECT.md`; the PRD is `PROJECT.md` plus
 `REQUIREMENTS.md`, with no separate PRD file. A single-file task is produced in session and checked

@@ -95,7 +95,10 @@ BRIEF, `vf-product-pm` derives the PRD from it (one acceptance criterion and one
 requirement), the fresh judge `prd-gate` scores the whole out of a hundred, then the human decides,
 all under `vf-product-manager`. Below eighty out of a hundred, or on an eliminatory fault, the team
 stops and leaves the decision to you: no silent retry. Above the threshold, the next step proposed
-to the head is dev breaking the work into phases, and it is never launched from this door.
+to the head is dev breaking the work into phases, and it is never launched from this door. That
+splitting waits for a validated architecture: on an architecture mission, `vf-product-architect`
+drafts `.planning/ARCHITECTURE.md`, proposed and checked by `check-architecture.sh`, then a dev
+validates it before any splitting. No agent validates its own output.
 **Actual status**: the product team ships but isn't offered in the catalog, and won't be until a
 full real run. So don't read it as a proven mechanism on par with the three bundles above.
 

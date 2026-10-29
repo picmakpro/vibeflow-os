@@ -57,5 +57,38 @@
 
 - Elle ne cloisonne rien : aucun poste n'interdit un geste, aucun fichier n'est verrouillé.
 - Elle ne remplace pas l'équipe produit : le head route, `vibeflow-product` porte le geste.
-- Elle ne décide pas du découpage d'une mission, qui reste celui de la règle d'échelle de
-  `head-governance.md` §1.
+- Elle n'édicte pas la règle d'échelle du découpage d'une mission, qui reste celle de
+  `head-governance.md` §1 ; la §5 ajoute seulement un préalable au découpage (architecture
+  validée, phases proposées).
+
+---
+
+## 5. Découpage — gate architecture et phases proposées
+
+> Chargée sur une **intention de découpage** : ajouter, insérer ou découper une étape, ouvrir une
+> milestone. Le poste se lit comme au §1 (`"$S"/vf-role.sh get`) : codes 1, 5 et 64, le dire et
+> poser une question, jamais un repli en silence sur `solo`. **Un poste est une vue, pas un droit**
+> (ADR-077) : rien ici n'est un contrôle d'accès.
+
+- **Poste `solo`** : rien ne change, ni gate ni champ de brief (P60-D-02).
+- **Postes `product` et `dev`**, quand `.planning/BRIEF.md` existe (lab entré dans le flux produit,
+  P60-H-01) : le head constate l'architecture par
+  `"$S"/check-architecture.sh --architecture .planning/ARCHITECTURE.md`, en arguments séparés.
+  - **Code 0** : routage normal de la carte.
+  - **Code 1** : une phrase qui dit pourquoi (architecture absente, proposée ou rubrique manquante,
+    lu dans la ligne BILAN) et qui oriente, puis halte. Au poste `product` : `/vf-product`
+    (livrable architecture). Au poste `dev` : relire `.planning/ARCHITECTURE.md`, puis
+    `vf-validation.sh validate --architecture .planning/ARCHITECTURE.md`.
+  - **Codes 3, 5 et 64** : le dire, une question.
+  - Sur une **demande explicite réitérée** : routage normal, l'override est tracé dans
+    `Contraintes session` du brief (qui, canal, date, verbatim) et au rapport, même sémantique
+    qu'au §2.
+- **`.planning/BRIEF.md` absent** : le gate n'est pas consulté, rien ne change.
+- **Pose de « proposée »** (postes `product` et `dev`) : le brief du découpage porte
+  `Phases ajoutées : proposées` (`mission-contracts.md` §Brief de mission) ; le manager pose alors
+  le marqueur sur chaque phase créée. Une phase proposée attend `vf-validation.sh validate --phase
+  <N> [--ws <nom>]` par un dev, et `vf-coder` refuse de la planifier ou de l'exécuter.
+- **Ce que la porte ne couvre pas** : phase ajoutée à la main hors équipe (sans marqueur, donc
+  validée), mode « Regenerate all » d'`edit-phase` qui peut perdre le champ, `gsd-discuss-phase` et
+  `gsd-quick` non gardés, étape ajoutée pendant la boucle du moteur. Rien de cela n'est un
+  contrôle d'accès.

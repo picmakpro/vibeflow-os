@@ -13,6 +13,25 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.74.0] — 2026-10-29
+
+**Minor** (Phases 60 et 61 : gate architecture avant découpage et phases proposées, puis filet de divergence armé pour deux humains ; nouvelles capacités) :
+
+- **`conductor` v1.52.0** : `check-phase-validation.sh` (constate le marqueur `**Validation:**` d'une phase du ROADMAP),
+  `check-architecture.sh` (l'architecture est validée et complète) et `vf-validation.sh` (seul écrivain du marqueur, un dev
+  valide). Une ligne qui ressemble à un marqueur sans en avoir la forme est un marqueur illisible, plus « absent ».
+- **`dev-orchestrator` v2.30.0** : `vf-coder` et `vf-auto` refusent de planifier ou d'exécuter une étape « proposée » ; seule une
+  étape absente du ROADMAP laisse continuer, tout autre résultat indéterminé arrête. Le head consulte le gate d'architecture
+  devant un découpage (postes `product` et `dev`, `.planning/BRIEF.md` présent) ; champ de brief `Phases ajoutées`.
+- **Correction de revue (juges frais, 2026-10-29)** : le gate refuse (64) toute forme qui désigne une phase existante sous une autre identité (nom de dossier, préfixe projet, id custom, identifiant de plan, suffixe `_` ou `.`), comparée aux identifiants réels du ROADMAP, et normalise les blancs et le séparateur final isolé ; titres de phase lus comme gsd-core ; sosies du marqueur (espace insécable ou fine, ligne de tableau, tiret cadratin) illisibles ; tout code non listé arrête ; un `propose` non nul est un bloqueur ; limites documentées au README conductor.
+- **`planning-core` v2.10.0** : gabarit décisionnel `ARCHITECTURE.template.md`. **`product-team-bundle` v1.1.0** : worker
+  `vf-product-architect` et livrable `architecture`.
+- Manuel FR et EN à jour. Hypothèses P60-H-01..05 ratifiées et conduite P60-D-15 décidée (arbitrage Samuel, AskUserQuestion
+  session principale, 2026-10-29). Limites écrites : le volet « une phase ajoutée hors solo naît proposée » n'est prouvé que par
+  le texte (aucun run réel de mission) et le critère `clients` de la sobriété attend une liste hors dépôt.
+- **Phase 61 (collaboration à deux humains)** : `conductor` v1.52.0 ajoute `vf-divergence-hook.sh` (verbes `arm`, `disarm`, `status`, `run`) : deux hooks statiques `post-merge` et `post-rewrite` posés dans le dossier de hooks réel du clone, jamais par `core.hooksPath`, jamais en remplacement d'un hook de l'utilisateur, jamais exécutant du code que la fusion vient d'apporter ; refus audible (code 1) d'un dossier de hooks lien symbolique ou hors du dépôt ; journal `<git-common-dir>/vf-divergence/journal.tsv`. L'installeur `vibeflow-update.sh` arme aux postes `product` et `dev`, retire au poste `solo` et à `uninstall --all`, re-pointe à `update --all` ; sortie `VF_DIVERGENCE_HOOK=off`. **`consolidator` v1.12.0** et **`reference` v2.6.0** : ligne `**Role**` optionnelle dans les gabarits de registres, aucun parseur modifié. Correction ciblée de deux majeurs du juge frais : un troisième hook `post-commit` (ne juge que sur un commit de fusion) couvre la fusion en conflit conclue à la main, que `post-merge` ne voit jamais ; la ligne manuelle d'un hook tiers tolère l'absence du script (`|| true`, hook tiers sous `set -e` intact) et `arm --refresh`/`update --all` signalent une ligne périmée. Preuve à deux clones (`test-divergence-deux-clones.sh`, cas de conflit inclus) avec trois témoins rouges ; COLB-08 (preuve humaine sur lab réel) reste décochée.
+- Prend effet sur un poste après `/vf-update`. **123 suites.**
+
 ## [v2.73.1] — 2026-10-29
 
 **Patch** (lot E de la clôture des issues GitHub, PR #180 ; les deux mineurs laissés par la relecture adverse de

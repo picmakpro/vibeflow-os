@@ -1,8 +1,8 @@
 {
   "name": "product-team-bundle",
-  "version": "v1.0.0",
+  "version": "v1.1.0",
   "type": "agents + skill + scripts",
-  "description": "Équipe produit installable sur le team-kernel (product-team) : front door vibeflow-product incarnée par /vf-product ; manager de mission vf-product-manager (DAG + verrou de driver, chaîne analyste → PM → juge → humain, digest par mandat, rapports typés) ; workers cloisonnés vf-product-analyst (BRIEF) et vf-product-pm (PRD : PROJECT + REQUIREMENTS depuis le gabarit product de planning-core) ; juge frais read-only prd-gate (rubric /100, seuil 80, exigence sans critère d'acceptation et rubrique de BRIEF manquante éliminatoires, adossé à check-prd.sh). Un poste est une vue, pas un droit : le module est visible aux postes product et solo, invisible au poste dev.",
+  "description": "Équipe produit installable sur le team-kernel (product-team) : front door vibeflow-product incarnée par /vf-product ; manager de mission vf-product-manager (DAG + verrou de driver, chaîne analyste → PM → juge → humain, digest par mandat, rapports typés) ; workers cloisonnés vf-product-analyst (BRIEF), vf-product-pm (PRD : PROJECT + REQUIREMENTS depuis le gabarit product de planning-core) et vf-product-architect (décision d'architecture proposée, .planning/ARCHITECTURE.md, validée ensuite par un dev) ; juge frais read-only prd-gate (rubric /100, seuil 80, exigence sans critère d'acceptation et rubrique de BRIEF manquante éliminatoires, adossé à check-prd.sh). Un poste est une vue, pas un droit : le module est visible aux postes product et solo, invisible au poste dev.",
   "proposable": false,
   "requires": [
     "conductor",

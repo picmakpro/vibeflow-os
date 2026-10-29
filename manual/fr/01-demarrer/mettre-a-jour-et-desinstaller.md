@@ -44,6 +44,10 @@ C'est une migration qui ne se propose jamais sans que tu l'acceptes explicitemen
 À la fin, redémarre Claude Code : le plugin lui-même (commandes, agents) n'est pris en compte qu'au
 prochain démarrage de session.
 
+**Le filet de divergence suit la mise à jour.** Si ton clone est armé (postes `product` et `dev`, voir
+[sujets en parallèle](../05-equipe-agents/sujets-en-parallele.md)), la mise à jour réécrit le chemin
+du hook vers la nouvelle version du plugin. Elle n'arme jamais un clone qui ne l'était pas.
+
 **Cette règle vaut pour toute modification d'un agent, pas seulement pour une mise à jour.** Le
 registre des agents est résolu **au démarrage** : si tu édites toi-même un fichier d'agent — pour
 tester un correctif, ajuster un outil, retirer une ligne — la session en cours continue d'utiliser
@@ -78,6 +82,10 @@ disparaît, et il faudrait alors nettoyer les fichiers résiduels à la main.
 
 **Étape 1 — retirer les modules.** Dis simplement « désinstalle VibeFlow » (ou « retire tel
 module » pour un retrait ciblé) pendant que le plugin est encore installé.
+
+Ce retrait (`uninstall --all`) enlève aussi le filet de divergence de ton clone, comme le passage au
+poste `solo`, mais **garde son journal** (`.git/vf-divergence/journal.tsv`). Un hook à toi où tu avais
+ajouté la ligne à la main n'est jamais modifié : la ligne à retirer est imprimée.
 
 **Étape 2 — retirer le plugin.**
 

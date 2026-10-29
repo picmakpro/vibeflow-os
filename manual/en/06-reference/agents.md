@@ -34,7 +34,7 @@ This table has no "installed in your lab" column: you'll only actually have the 
 matching module is present in your lab. The [module catalog](../03-modules/catalog.md) makes the
 reverse link — module by module, rather than agent by agent.
 
-## The 36 agents
+## The 37 agents
 
 | Agent | Module | Family | Model | Role in one sentence |
 |---|---|---|---|---|
@@ -63,6 +63,7 @@ reverse link — module by module, rather than agent by agent.
 | `vf-dev-manager` | dev-orchestrator | manager | opus | Drives a dev mission: plan, dispatch, flow control. |
 | `vf-growth-manager` | growth-bundle | manager | opus | Drives a growth mission: plan, dispatch, flow control. |
 | `vf-product-analyst` | product-team-bundle | worker | sonnet | Writes the five-section BRIEF. |
+| `vf-product-architect` | product-team-bundle | worker | sonnet | Drafts the architecture decision (`.planning/ARCHITECTURE.md`, proposed), never validated by itself. |
 | `vf-product-manager` | product-team-bundle | manager | opus | Drives a product mission: plan, dispatch, halt below the threshold. |
 | `vf-product-pm` | product-team-bundle | worker | sonnet | Instantiates the PRD (PROJECT + REQUIREMENTS) with an acceptance criterion and a priority per requirement. |
 | `vf-reviewer` | dev-orchestrator | worker | sonnet | Reviews the code diff produced by a dev mission. |
@@ -89,16 +90,23 @@ exactly why no incarnation command gets generated for them.
 
 ## Where this list comes from
 
-Built by enumerating `plugin/*/agents/*.md` (29 files, one level deep, which excludes the
+Built by enumerating `plugin/*/agents/*.md` (30 files, one level deep, which excludes the
 blueprints under `content/agents/`) plus the 7 `AGENT.md` files at each module's root, on
-2026-10-27 — thirty-six agents in total. To check for yourself from the repo root:
-`find plugin -path '*/agents/*.md'` then `find plugin -maxdepth 2 -name 'AGENT.md'`. Each file's
+2026-10-29 — thirty-seven agents in total. To check for yourself from the repo root, these two
+bounded commands print 30 then 7:
+
+```bash
+find plugin -mindepth 3 -maxdepth 3 -type f -path 'plugin/*/agents/*.md' | awk 'END{print NR}'
+find plugin -mindepth 2 -maxdepth 2 -type f -name AGENT.md | awk 'END{print NR}'
+```
+
+Each file's
 frontmatter (`model:`, `memory:`) is the source of the Model column above, not a paraphrase — the
 required fields an agent must carry are enforced by
 `plugin/conductor/scripts/check-agents.sh`.
 
 Split by model, counted on the same table: twelve agents on opus (the six invocable "face" agents,
-plus the six mission managers), twenty-four on sonnet (every worker, plus the one "face" agent
+plus the six mission managers), twenty-five on sonnet (every worker, plus the one "face" agent
 that isn't on opus — `vibeflow-kpi-analyst`). This split is what feeds
 [cost-and-models.md](./cost-and-models.md) — it isn't restated there, just used.
 

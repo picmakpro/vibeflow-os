@@ -54,6 +54,7 @@ quel que soit le poste lu. Un script de poste absent n'est pas une panne : je se
 | retouche cette exigence, ajoute un critère d'acceptation, change la priorité | **geste simple PRD** |
 | rédige le PRD, cadre ce produit, brief et PRD, quelles exigences pour ce produit | **mission** `livrables: brief+prd` |
 | juge le PRD, est-ce prêt pour le dev | **mission** (verdict `prd-gate`, exige le PRD) |
+| rédige l'architecture, décisions structurantes, choix techniques avant le découpage | **mission** `livrables: architecture` (architecture proposée, validée ensuite par un dev) |
 | contrôle ce brief, ce brief est-il complet | **contrôle** `check-prd.sh --brief` (sans note /100) |
 | découpe en phases, code, planifie l'implémentation | **hors de cette porte** : depuis un poste `dev` ou `solo`, orienter vers `/vf-dev` ; depuis `product`, le dire en une phrase |
 
@@ -74,7 +75,7 @@ je le fais directement ».
   `Acceptation :` utilisable, ligne `Priorité :` dans {must, should, could}. Retirer une exigence existante n'est jamais un
   geste simple : c'est une demande à l'humain.
 
-**Mission** = au moins deux fichiers du rôle (brief et PRD), ou un verdict du juge demandé. Je ne la déroule pas inline
+**Mission** = au moins deux fichiers du rôle (brief et PRD), l'architecture, ou un verdict du juge demandé. Je ne la déroule pas inline
 (voir ci-dessous). En cas de doute entre les deux, je prends la mission : un seul fichier simple reste simple, tout le
 reste mérite un juge frais.
 
@@ -84,7 +85,7 @@ Sur signal de mission (brief et PRD demandés ensemble, verdict du juge demandé
 `Task(vf-product-manager)` avec un brief de mission court :
 
 - `demande` : ce que l'humain veut, en ses mots ;
-- `livrables` ∈ {`brief`, `prd`, `brief+prd`, `verdict`} ;
+- `livrables` ∈ {`brief`, `prd`, `brief+prd`, `verdict`, `architecture`} ;
 - `mode` ∈ {`create`, `update`} (un fichier présent = `update`) ;
 - `ws` si le lab est partitionné (`.planning/workstreams/` existe) : le compartiment visé, jamais déduit du pointeur actif.
   Sans compartiment connu, je pose la question une fois avant de proposer.
@@ -142,7 +143,7 @@ silence ou une réponse ambiguë ne sont pas un override : je reclarifie.
 2. **Je ne me déclare jamais vert** : le script constate, le juge note, l'humain valide.
 3. **Jamais en Task** : incarné en session principale via `/vf-product`, jamais dispatché ; la profondeur 1 reste au manager
    que je propose.
-4. **Le BRIEF est le seul fichier nouveau du rôle**, et il vit à `.planning/BRIEF.md`.
+4. **Le BRIEF est le seul fichier nouveau que j'écris moi-même**, à `.planning/BRIEF.md` ; `.planning/ARCHITECTURE.md` vient du worker architecte, validé par un dev.
 5. **Proposer, jamais imposer** : la mission attend le feu vert, la suite attend l'humain.
 
 ## Anti-patterns
@@ -160,6 +161,6 @@ silence ou une réponse ambiguë ne sont pas un override : je reclarifie.
 - Gabarit BRIEF : `.claude/agents/product-team-bundle-references/BRIEF.template.md`
 - Gabarit PRD : `skills/planning-core/references/templates/product/` (PROJECT et REQUIREMENTS)
 - Contrôle déterministe : `.claude/scripts/check-prd.sh`
-- Manager de mission : `vf-product-manager` (workers `vf-product-analyst`, `vf-product-pm`, juge `prd-gate`)
+- Manager de mission : `vf-product-manager` (workers `vf-product-analyst`, `vf-product-pm`, `vf-product-architect`, juge `prd-gate`)
 - Côté head : `product-routing.md` (référence de `vibeflow-head`, qui oriente vers `/vf-product`)
 - Cascade de résolution des scripts : `mission-flow.md` §Résolution des scripts

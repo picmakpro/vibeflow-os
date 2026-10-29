@@ -17,7 +17,7 @@
 | [mission-contracts.md](mission-contracts.md) | Contrats de mission de l'équipe manager : ce qui relie la conversation principale et les managers d'équipe. |
 | [mission-cross-team.md](mission-cross-team.md) | Doctrine business des étages croisés entre `vf-dev-manager` et `vf-design-manager` (Phase 15, étend ADR-053). |
 | [mission-flow.md](mission-flow.md) | Les patterns de sûreté du contrôle de flux de mission que `vf-dev-manager` doit suivre (Patterns A à I, ADR-053), dont le registre des agents dispatchés et la reprise après arrêt sur chien de garde (Pattern I, issue #82). |
-| [product-routing.md](product-routing.md) | Redirection du head par poste : au poste product, une intention de dev est orientée vers /vf-product ; aux postes solo et dev, une intention produit fait proposer /vf-product. |
+| [product-routing.md](product-routing.md) | Redirection du head par poste : au poste product, une intention de dev est orientée vers /vf-product ; aux postes solo et dev, une intention produit fait proposer /vf-product ; §5 : gate architecture avant découpage, phases proposées. |
 | [workstreams.md](workstreams.md) | Doctrine du compartiment de planning workstreams du moteur GSD : surface réelle, résolution, risques (GSDA-13→17). |
 
 Cet index doit rester cohérent avec le contenu du dossier.

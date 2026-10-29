@@ -98,7 +98,10 @@ que chacun livre, agent par agent, est dans
 `prd-gate` note le tout sur cent, puis l'humain tranche, le tout sous la conduite de
 `vf-product-manager`. Sous quatre-vingts sur cent, ou devant une faute éliminatoire, l'équipe
 s'arrête et te laisse décider : jamais de relance silencieuse. Au-dessus du seuil, la suite proposée
-au head est le découpage en phases par le dev, et elle n'est jamais lancée depuis cette porte.
+au head est le découpage en phases par le dev, et elle n'est jamais lancée depuis cette porte. Ce découpage
+attend une architecture validée : sur une mission d'architecture, `vf-product-architect` rédige
+`.planning/ARCHITECTURE.md`, proposée et contrôlée par `check-architecture.sh`, puis un dev la valide
+avant tout découpage. Aucun agent ne valide sa propre production.
 **Statut réel** : l'équipe produit est livrée mais pas proposée au catalogue, et ne le sera qu'après
 un run réel complet. Ne la lis donc pas comme un mécanisme éprouvé au même titre que les trois
 bundles ci-dessus.

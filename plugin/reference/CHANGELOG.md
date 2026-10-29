@@ -1,5 +1,11 @@
 # CHANGELOG — reference
 
+## [v2.6.0] — 2026-10-29 (champ Role des registres) — publiée dans v2.74.0
+
+**Minor** (capacité neuve : les gabarits de registres nomment le poste de l'auteur ; Phase 61, P61-D-07, mandat Samuel, /vf-auto session principale, 2026-10-29 ; aucune release racine, elle reste un geste du manager après merge) :
+
+- **Ligne `**Role**` dans les gabarits source** `methodology/templates/memory/{decisions,learnings,blockers}-template.md` : une ligne ajoutée à la fin du bloc de champs du squelette d'entrée, aucune retirée. Valeur = sortie de `vf-role.sh get` (`solo`, `product` ou `dev`), ligne omise si le poste est illisible, jamais `solo` par défaut ; optionnelle en lecture. Source modifiée avant les copies de `consolidator` (règle SYNC) ; preuve et consommateurs : `plugin/consolidator/scripts/tests/test-registres-role.sh`.
+
 ## [v2.5.9] — 2026-10-29 (références mortes à `vibeflow-update.sh`) — publiée dans v2.72.0
 
 **Patch** (documentation seule) — références mortes à `vibeflow-update.sh` remplacées par `/vibeflow-install` / `/vf-update` dans le README (#166).

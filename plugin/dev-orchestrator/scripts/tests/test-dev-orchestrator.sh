@@ -95,6 +95,10 @@
 #   T44 — PRDT-07 (P59-D-08, P59-PL-11) : le head lit le poste et redirige vers /vf-product ; pointeur
 #         AVANT FIRST-02 dans le garde-fou premier usage, contenu de product-routing.md, ligne de carte,
 #         index et Références ; mutants d'ablation et d'ordre.
+#   T45 — ARCG-01/03/04/05 (P60-D-01, P60-PL-13..15) : porte « phase proposée » de vf-coder, étape 0 bis de
+#         vf-auto, §5 de product-routing.md (gate architecture avant découpage), champ de brief « Phases
+#         ajoutées » ; commande citée jouée contre le gate réel, liens vers les scripts ; ablation, ordre,
+#         inversions (BRIEF, solo). La pose par le manager n'est prouvée que par le texte (P60-PL-26).
 #
 # Historique de numérotation : T3/T12/T13/T14 ont changé de sémantique à la v2.0.0 (les
 # anciens tests de collision de descriptions, de préséance et de synchro de la table vf-dev
@@ -7663,6 +7667,371 @@ t414_ablate "$AGENT_FILE" "$T414_TMP/t44-refs.md" 'dev-orchestrator-references/p
 t414_mutant "T44 mutant Références : copie d'AGENT.md privée de product-routing.md dans §Références" t44_refs_check "$AGENT_FILE" "$T414_TMP/t44-refs.md"
 t414_ablate "$T44_ROUTE" "$T414_TMP/t44-route.md" 'vf-product' "$T44_ROUTE_ZS" "$T44_ROUTE_ZE"
 t414_mutant "T44 mutant carte exhaustive : copie d'intent-routing.md privée de « vf-product » dans §Design" t44_route_check "$T44_ROUTE" "$T414_TMP/t44-route.md"
+
+# ---- T45 : phases proposées — refus par l'équipe, gate architecture au découpage (ARCG-01/03/04/05) ----
+# P60-D-01 : le refus vit dans l'équipe (vf-coder, vf-auto, head), pas dans un hook. Un refus prouvé par
+# présence seule ne peut pas rougir (T-60-23) : chaque clause a son mutant d'ablation (bornée à sa
+# section), l'ordre est gardé, les inversions sont refusées, et la commande citée est JOUÉE contre le
+# gate réel (T45 (a) exécution, T45 (f) liens). La pose de « proposée » par le manager n'est prouvée que
+# par le texte et par le lien manager → contrat : aucune exécution de mission ne la démontre (P60-PL-26).
+T45_TMP="$T414_TMP/t45"; mkdir -p "$T45_TMP/lab-prop/.planning" "$T45_TMP/lab-ok/.planning"
+printf '### Phase 2: Deux\n**Validation:** proposed\n' > "$T45_TMP/lab-prop/.planning/ROADMAP.md"
+printf '### Phase 2: Deux\n' > "$T45_TMP/lab-ok/.planning/ROADMAP.md"
+mkdir -p "$T45_TMP/lab-inc/.planning" "$T45_TMP/lab-mult/.planning" "$T45_TMP/lab-part/.planning/workstreams/w1" "$T45_TMP/lab-none/.planning"
+printf '### Phase 2: Deux\n**Validation:** proposed\n' > "$T45_TMP/lab-part/.planning/workstreams/w1/ROADMAP.md"
+printf '### Phase 2: Deux\n**Validation:** proposé\n' > "$T45_TMP/lab-inc/.planning/ROADMAP.md"
+printf '### Phase 2: Deux\n**Validation:** proposed\n**Validation:** validated\n' > "$T45_TMP/lab-mult/.planning/ROADMAP.md"
+T45_SD=""
+for t45_c in "$REPO/conductor/scripts" "$HOME/.claude/scripts"; do
+  [ -f "$t45_c/check-phase-validation.sh" ] && [ -f "$t45_c/vf-validation.sh" ] && { T45_SD="$t45_c"; break; }
+done
+
+# (a) porte de vf-coder
+T45_CODER="$MOD/agents/vf-coder.md"
+T45_CODER_ZS='^## Porte « phase proposée »'
+T45_CODER_ZE='^## Le cycle'
+T45_CODER_LIT=('check-phase-validation.sh' '--phase' 'gsd-plan-phase' 'gsd-execute-phase' 'Code 0 : étape validée' 'Code 1 : étape proposée, rends' '"statut": "blocked"' 'ask-user' 'marqueur=introuvable' 'Tout autre code 3' 'marqueur=inconnu' 'marqueur=multiple' 'code 64' 'code 5' 'BILAN' 'human_needed' "Un mandat sans numéro d'étape ROADMAP" "n'appelle aucun contrôle de marqueur")
+T45_CODER_INTERDIT=('poursuis, rends' 'étape proposée, le cycle continue' 'Codes 3, 5 et 64' 'Codes 3 et 64')
+t45_coder_check() { # <vf-coder.md> — zone, ordre (porte AVANT le cycle), littéraux, clause inversée
+  local z out
+  awk '/^## Porte « phase proposée »/{p=NR} /^## Le cycle/{c=NR} END{exit !(p && c && p < c)}' "$1" \
+    || { printf 'porte absente ou placée après « Le cycle »'; return 1; }
+  z="$(t414_zone "$1" "$T45_CODER_ZS" "$T45_CODER_ZE")"
+  [ -n "$z" ] || { printf 'section « Porte phase proposée » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T45_CODER_LIT[@]}")" || { printf 'absent de la porte : %s' "$out"; return 1; }
+  out="$(t44_forbidden "$z" "${T45_CODER_INTERDIT[@]}")" || { printf 'clause inversée dans la porte : %s' "$out"; return 1; }
+  out="$(t414_order "$z" 'Code 0' 'Code 1' '"statut": "blocked"' 'ask-user' 'marqueur=introuvable' 'Tout autre code 3')" \
+    || { printf 'ordre des codes : %s' "$out"; return 1; }
+  # P60-D-15 : SEUL « phase introuvable » (BILAN marqueur=introuvable) laisse continuer ; tout autre indéterminé, le code 64 et le code 5 arrêtent.
+  out="$(t45_clause_continue "$1" "$T45_CODER_ZS" "$T45_CODER_ZE" 'Code 3 avec' 'Tout autre code 3' 'le cycle continue' 'marqueur=introuvable')" || { printf '%s' "$out"; return 1; }
+  out="$(t45_clause_stop "$1" "$T45_CODER_ZS" "$T45_CODER_ZE" 'Tout autre code 3' "Un mandat sans numéro" 'human_needed' 'marqueur=inconnu' 'marqueur=multiple' 'code 64' 'code 5' 'BILAN')" || { printf '%s' "$out"; return 1; }
+}
+# P60-D-15 : la clause « phase introuvable » (de son début jusqu'à la clause d'arrêt) dit que l'on continue, nomme le champ
+# machine qui la distingue et ne porte aucun mot de blocage (human_needed, blocked, ask-user, arrêter).
+t45_clause_continue() { # <fichier> <début de zone> <fin de zone> <début de clause> <fin de clause> <jeton positif> <champ machine>
+  local z seg
+  z="$(t414_zone "$1" "$2" "$3" | tr '\n' ' ')"
+  seg="${z#*"$4"}"; [ "$seg" != "$z" ] || { printf 'clause « %s » absente' "$4"; return 1; }
+  case "$seg" in *"$5"*) seg="${seg%%"$5"*}" ;; *) printf 'clause « %s » sans fin « %s »' "$4" "$5"; return 1 ;; esac
+  case "$seg" in *"$6"*) ;; *) printf 'la clause « %s » ne dit pas « %s »' "$4" "$6"; return 1 ;; esac
+  case "$seg" in *"$7"*) ;; *) printf 'la clause « %s » ne nomme pas « %s »' "$4" "$7"; return 1 ;; esac
+  case "$seg" in *human_needed*|*blocked*|*arrêter*|*ask-user*) printf 'la clause « %s » bloque encore (human_needed, blocked, arrêter ou ask-user)' "$4"; return 1 ;; esac
+}
+# P60-D-04 + P60-H-04 : une clause d'ARRÊT (marqueur présent mais illisible, code 5) porte son mot d'arrêt et les champs
+# machine qu'elle cite, et aucun mot de poursuite (continue, entre dans la boucle, poursuis) : sans cela, un mutant qui
+# fait continuer sur ces codes resterait vert (l'ablation d'un littéral ne touche pas le sens de la clause).
+t45_clause_stop() { # <fichier> <début> <fin> <début de clause> <fin de clause> <littéral exigé>...
+  local f="$1" zs="$2" ze="$3" cs="$4" ce="$5" z seg lit; shift 5
+  z="$(t414_zone "$f" "$zs" "$ze" | tr '\n' ' ')"
+  seg="${z#*"$cs"}"; [ "$seg" != "$z" ] || { printf 'clause « %s » absente' "$cs"; return 1; }
+  case "$seg" in *"$ce"*) seg="${seg%%"$ce"*}" ;; *) printf 'clause « %s » sans fin « %s »' "$cs" "$ce"; return 1 ;; esac
+  for lit in "$@"; do
+    case "$seg" in *"$lit"*) ;; *) printf 'la clause « %s » ne dit pas « %s »' "$cs" "$lit"; return 1 ;; esac
+  done
+  case "$seg" in *continue*|*'entre dans la boucle'*|*poursuis*) printf 'la clause « %s » laisse encore continuer' "$cs"; return 1 ;; esac
+}
+# Commande citée (entre backquotes, préfixe "$S"/ ôté) de la zone, gabarits <N> / [--ws <nom>] résolus.
+t45_cited_args() { # <fichier> <début> <fin> <script> -> imprime « <script> <args> »
+  t414_zone "$1" "$2" "$3" | sed -n 's/.*`"\$S"\/\('"$4"'[^`]*\)`.*/\1/p' | sed -e 's/ \[--ws <nom>\]//' -e 's/<N>/2/'
+}
+t45_coder_exec() { # <vf-coder.md> — la commande citée, jouée contre le gate : étape proposée → 1, sans marqueur → 0
+  local cmd name args rcp rco
+  cmd="$(t45_cited_args "$1" "$T45_CODER_ZS" "$T45_CODER_ZE" 'check-phase-validation[A-Za-z0-9_.-]*\.sh')"
+  [ -n "$cmd" ] || { printf 'commande citée introuvable dans la porte'; return 1; }
+  name="${cmd%% *}"; args="${cmd#* }"
+  [ -f "$T45_SD/$name" ] || { printf 'script cité « %s » introuvable' "$name"; return 1; }
+  # shellcheck disable=SC2086
+  ( cd "$T45_TMP/lab-prop" && bash "$T45_SD/$name" $args >/dev/null 2>&1 ); rcp=$?
+  # shellcheck disable=SC2086
+  ( cd "$T45_TMP/lab-ok" && bash "$T45_SD/$name" $args >/dev/null 2>&1 ); rco=$?
+  [ "$rcp" -eq 1 ] || { printf 'étape proposée : code %s au lieu de 1' "$rcp"; return 1; }
+  [ "$rco" -eq 0 ] || { printf 'étape sans marqueur : code %s au lieu de 0' "$rco"; return 1; }
+  # shellcheck disable=SC2086
+  rco="$( cd "$T45_TMP/lab-ok" && bash "$T45_SD/$name" --phase 99 2>/dev/null; echo "rc=$?" )"
+  case "$rco" in *'BILAN phase=99 marqueur=introuvable code=3'*'rc=3') : ;; *) printf 'étape introuvable : attendu rc 3 et BILAN marqueur=introuvable (le seul résultat qui laisse passer), obtenu « %s »' "$(printf '%s' "$rco" | tr '\n' '|')"; return 1 ;; esac
+  # tout autre indéterminé NE porte PAS marqueur=introuvable : lab partitionné sans --ws, ROADMAP absent, étape mal formée
+  rco="$( cd "$T45_TMP/lab-part" && bash "$T45_SD/$name" --phase 2 2>/dev/null; echo "rc=$?" )"
+  case "$rco" in *marqueur=introuvable*) printf 'lab partitionné sans --ws : le BILAN dit marqueur=introuvable (la boucle passerait)'; return 1 ;; *'rc=3') : ;; *) printf 'lab partitionné sans --ws : attendu rc 3, obtenu « %s »' "$rco"; return 1 ;; esac
+  rco="$( cd "$T45_TMP/lab-none" && bash "$T45_SD/$name" --phase 2 2>/dev/null; echo "rc=$?" )"
+  case "$rco" in *marqueur=introuvable*) printf 'ROADMAP absent : le BILAN dit marqueur=introuvable (la boucle passerait)'; return 1 ;; *'rc=3') : ;; *) printf 'ROADMAP absent : attendu rc 3, obtenu « %s »' "$rco"; return 1 ;; esac
+  # shellcheck disable=SC2086
+  ( cd "$T45_TMP/lab-prop" && bash "$T45_SD/$name" --phase .5 >/dev/null 2>&1 ); rco=$?
+  [ "$rco" -eq 64 ] || { printf 'étape mal formée : attendu rc 64, obtenu %s' "$rco"; return 1; }
+  # le champ machine cité par la clause d'arrêt existe sur la ligne BILAN du gate réel
+  local lab want
+  for lab in inc:inconnu mult:multiple; do
+    # shellcheck disable=SC2086
+    rco="$( cd "$T45_TMP/lab-${lab%%:*}" && bash "$T45_SD/$name" $args 2>/dev/null | grep -c "BILAN phase=2 marqueur=${lab##*:} code=3\$" )"
+    [ "$rco" -eq 1 ] || { printf 'marqueur illisible « %s » : la ligne BILAN ne porte pas marqueur=%s code=3' "${lab%%:*}" "${lab##*:}"; return 1; }
+  done
+}
+# (f) liens : le script cité existe et son --help connaît chaque littéral cité (options, verbes).
+t45_link_check() { # <fichier> <début> <fin> <script attendu> <littéral>...
+  local f="$1" zs="$2" ze="$3" want="$4" z cmd name h lit; shift 4
+  z="$(t414_zone "$f" "$zs" "$ze")"
+  [ -n "$z" ] || { printf 'zone introuvable'; return 1; }
+  cmd="$(printf '%s' "$z" | sed -n 's/.*`"\$S"\/\([A-Za-z0-9_.-]*\.sh[^`]*\)`.*/\1/p')"
+  name="${cmd%% *}"
+  [ "$name" = "$want" ] || { printf 'script cité « %s », attendu « %s »' "$name" "$want"; return 1; }
+  [ -f "$T45_SD/$name" ] || { printf 'script « %s » introuvable sous conductor/scripts' "$name"; return 1; }
+  h="$(bash "$T45_SD/$name" --help 2>&1)"
+  for lit in "$@"; do
+    case "$cmd" in *"$lit"*) ;; *) printf 'littéral « %s » absent de la commande citée' "$lit"; return 1 ;; esac
+    case "$h" in *"$lit"*) ;; *) printf 'littéral « %s » inconnu du --help de %s' "$lit" "$name"; return 1 ;; esac
+  done
+}
+t45_coder_link() { t45_link_check "$1" "$T45_CODER_ZS" "$T45_CODER_ZE" check-phase-validation.sh '--phase' '--ws'; }
+
+t45_out="$(t45_coder_check "$T45_CODER")" && ok "T45 (a) vf-coder.md : porte « phase proposée » avant le cycle, codes 0/1/3-5-64, bloc blocked + ask-user, mandat sans étape non gardé (${#T45_CODER_LIT[@]} clauses)" \
+  || ko "T45 (a) vf-coder.md : attendu — porte « phase proposée » complète ; obtenu — $t45_out"
+if [ -z "$T45_SD" ]; then
+  skip "T45 (a) exécution et (f) liens : check-phase-validation.sh / vf-validation.sh introuvables (conductor non présent dans cette disposition)"
+else
+  t45_out="$(t45_coder_exec "$T45_CODER")" && ok "T45 (a) exécution : la commande citée par vf-coder.md rend 1 sur une étape proposée et 0 sans marqueur (gate réel)" \
+    || ko "T45 (a) exécution : attendu — commande citée jouable contre le gate ; obtenu — $t45_out"
+  t45_out="$(t45_coder_link "$T45_CODER")" && ok "T45 (f) vf-coder.md : check-phase-validation.sh existe et son --help connaît --phase et --ws" \
+    || ko "T45 (f) vf-coder.md : attendu — script cité existant, options connues ; obtenu — $t45_out"
+fi
+
+t45_k=0
+for t45_a in "${T45_CODER_LIT[@]}"; do
+  t45_k=$((t45_k+1))
+  t414_ablate "$T45_CODER" "$T45_TMP/coder-$t45_k.md" "$t45_a" "$T45_CODER_ZS" "$T45_CODER_ZE"
+  t414_mutant "T45 mutant (a) : vf-coder.md privé de « $t45_a » dans la porte" t45_coder_check "$T45_CODER" "$T45_TMP/coder-$t45_k.md"
+done
+t414_move_before "$T45_CODER" "$T45_TMP/coder-ord.md" '^# Agent : vf-coder' '## Le cycle (délégation)' '## Porte « phase proposée »'
+t414_mutant "T45 mutant (a) ordre : le cycle précède la porte" t45_coder_check "$T45_CODER" "$T45_TMP/coder-ord.md"
+sed 's/Code 1 : étape proposée, rends/Code 1 : étape proposée, poursuis, rends/' "$T45_CODER" > "$T45_TMP/coder-inv1.md"
+t414_mutant "T45 mutant (a) inversion : « Code 1 : étape proposée, poursuis »" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv1.md"
+sed -e 's/Code 0 : étape validée/CODE_X/' -e 's/Code 1 : étape proposée/Code 0 : étape proposée/' -e 's/CODE_X/Code 1 : étape validée/' "$T45_CODER" > "$T45_TMP/coder-inv2.md"
+t414_mutant "T45 mutant (a) inversion : codes 0 et 1 échangés" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv2.md"
+# P60-D-15 : seul « phase introuvable » laisse continuer. Quatre façons de rouvrir le fail-open (un indéterminé qui passe) ou de
+# refermer la porte sur le cas légitime.
+sed 's/une ligne au rapport le dit et le cycle continue\./rends `human_needed` avec le code./' "$T45_CODER" > "$T45_TMP/coder-inv3.md"
+t414_mutant "T45 mutant (a) inversion : « marqueur=introuvable … rends human_needed » (le cas légitime bloque)" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv3.md"
+sed 's/et le cycle continue\.$/et le cycle continue, sauf ask-user./' "$T45_CODER" > "$T45_TMP/coder-inv4.md"
+t414_mutant "T45 mutant (a) inversion : la clause « marqueur=introuvable » garde « le cycle continue » mais cite ask-user" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv4.md"
+sed 's/rends `human_needed` avec le code et la ligne `BILAN`, aucune brique lancée\./le cycle continue./' "$T45_CODER" > "$T45_TMP/coder-inv5.md"
+t414_mutant "T45 mutant (a) inversion : « Tout autre code 3, code 64, code 5 : le cycle continue » (le fail-open d'avant la correction)" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv5.md"
+sed 's/rends `human_needed` avec le code et la ligne `BILAN`, aucune brique lancée\./rends `human_needed` avec le code et la ligne `BILAN`, puis le cycle continue./' "$T45_CODER" > "$T45_TMP/coder-inv6.md"
+t414_mutant "T45 mutant (a) inversion : la clause d'arrêt garde human_needed mais ajoute « puis le cycle continue »" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv6.md"
+sed 's/^Code 3 avec `marqueur=introuvable`/Code 3/' "$T45_CODER" > "$T45_TMP/coder-inv7.md"
+t414_mutant "T45 mutant (a) inversion : « Code 3 » nu laisse continuer (tout code 3 passe)" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv7.md"
+if [ -n "$T45_SD" ]; then
+  sed 's/check-phase-validation\.sh/check-phase-validation-x.sh/g' "$T45_CODER" > "$T45_TMP/coder-ren.md"
+  t414_mutant "T45 mutant (a) exécution : script cité renommé" t45_coder_exec "$T45_CODER" "$T45_TMP/coder-ren.md"
+  t414_mutant "T45 mutant (f) : script cité renommé dans une copie de vf-coder.md" t45_coder_link "$T45_CODER" "$T45_TMP/coder-ren.md"
+  sed 's/check-phase-validation\.sh --phase <N>/check-phase-validation.sh <N>/' "$T45_CODER" > "$T45_TMP/coder-opt.md"
+  t414_mutant "T45 mutant (a) exécution : option --phase retirée de la commande citée" t45_coder_exec "$T45_CODER" "$T45_TMP/coder-opt.md"
+  sed 's/--ws/--workstream/g' "$T45_CODER" > "$T45_TMP/coder-ws.md"
+  t414_mutant "T45 mutant (f) : option --ws remplacée par --workstream dans la copie" t45_coder_link "$T45_CODER" "$T45_TMP/coder-ws.md"
+fi
+
+# (b) vf-auto : étape 0 bis avant le moteur direct, champ de brief au dispatch de l'équipe
+T45_AUTO="$MOD/skills/vf-auto/SKILL.md"
+T45_AUTO_ZS='^## Étape 0 bis'
+T45_AUTO_ZE='^## Moteur direct'
+T45_AUTO_LIT=('check-phase-validation.sh' 'Code 0 : l'"'"'étape entre dans la boucle' 'Code 1 : étape proposée' 'vf-validation.sh validate' 'ne démarre pas' 'marqueur=introuvable' 'Tout autre code 3' 'marqueur=inconnu' 'marqueur=multiple' 'code 64' 'code 5' 'BILAN' 'gsd-autonomous' 'pendant la boucle' 'contrôle consultatif' 'gardé par `vf-coder`')
+T45_AUTO_TZS='^### Taille'
+T45_AUTO_TZE='^## '
+T45_AUTO_TLIT=('Phases ajoutées : proposées' 'vf-role.sh get' 'mission-contracts.md')
+t45_auto_check() { # <vf-auto/SKILL.md>
+  local z out
+  awk '/^## Étape 0 bis/{e=NR} /^## Moteur direct/{m=NR} END{exit !(e && m && e < m)}' "$1" \
+    || { printf 'étape 0 bis absente ou placée après le moteur direct'; return 1; }
+  z="$(t414_zone "$1" "$T45_AUTO_ZS" "$T45_AUTO_ZE")"
+  [ -n "$z" ] || { printf 'section « Étape 0 bis » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T45_AUTO_LIT[@]}")" || { printf 'absent de l'"'"'étape 0 bis : %s' "$out"; return 1; }
+  out="$(t44_forbidden "$z" 'démarre quand même' 'démarre sans' 'Codes 3, 5 et 64' 'Codes 3 et 64')" || { printf 'clause inversée : %s' "$out"; return 1; }
+  out="$(t45_clause_continue "$1" "$T45_AUTO_ZS" "$T45_AUTO_ZE" 'Code 3 avec' 'Tout autre code 3' "entre dans la boucle" 'marqueur=introuvable')" || { printf '%s' "$out"; return 1; }
+  out="$(t45_clause_stop "$1" "$T45_AUTO_ZS" "$T45_AUTO_ZE" 'Tout autre code 3' 'Limite' "s'arrêter" 'marqueur=inconnu' 'marqueur=multiple' 'code 64' 'code 5')" || { printf '%s' "$out"; return 1; }
+  z="$(t414_zone "$1" "$T45_AUTO_TZS" "$T45_AUTO_TZE")"
+  [ -n "$z" ] || { printf 'section « Taille » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T45_AUTO_TLIT[@]}")" || { printf 'absent de la section Taille : %s' "$out"; return 1; }
+}
+t45_auto_link() { t45_link_check "$1" "$T45_AUTO_ZS" "$T45_AUTO_ZE" check-phase-validation.sh '--phase' '--ws'; }
+
+# (c) contrat de brief, carte d'intention, lien vers l'acteur
+T45_MC="$REFS_DIR/mission-contracts.md"
+T45_MC_BLOC_ZS='^## Brief de mission'
+T45_MC_BLOC_ZE='^### Champs croisés'
+T45_MC_SUB_ZS='^### Champ .Phases ajoutées.'
+T45_MC_SUB_ZE='^## '
+T45_MC_SUB_LIT=('vibeflow-head' 'vf-auto' 'vf-dev-manager' 'vf-validation.sh propose' 'vf-validation.sh validate' 'Absent → aucun marqueur' 'Risque résiduel' 'fail-open')
+T45_ROUTE="$REFS_DIR/intent-routing.md"
+T45_ROUTE_ZS='^## Cycle de vie projet'
+T45_ROUTE_ZE='^## Contexte'
+T45_MGR="$MOD/agents/vf-dev-manager.md"
+T45_MGR_ZS='^## Entrée'
+T45_MGR_ZE='^## Sources de connaissance'
+t45_contract_check() { # <mission-contracts.md>
+  local z out
+  z="$(t414_zone "$1" "$T45_MC_BLOC_ZS" "$T45_MC_BLOC_ZE")"
+  [ -n "$z" ] || { printf 'bloc MISSION introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" '- Phases ajoutées : proposées (postes product et dev) | absent (poste solo, défaut)')" || { printf 'ligne du bloc MISSION : %s' "$out"; return 1; }
+  z="$(t414_zone "$1" "$T45_MC_SUB_ZS" "$T45_MC_SUB_ZE")"
+  [ -n "$z" ] || { printf 'sous-section « Champ Phases ajoutées » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T45_MC_SUB_LIT[@]}")" || { printf 'absent du champ : %s' "$out"; return 1; }
+}
+t45_route_check() { # <intent-routing.md>
+  local z out
+  z="$(t414_zone "$1" "$T45_ROUTE_ZS" "$T45_ROUTE_ZE")"
+  [ -n "$z" ] || { printf 'section « Cycle de vie projet » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" 'vf-validation.sh propose' 'Phases ajoutées : proposées')" || { printf 'ligne gsd-phase : %s' "$out"; return 1; }
+}
+t45_mgr_check() { # <vf-dev-manager.md> — lien par lequel la consigne de pose atteint le manager (lu, jamais modifié)
+  local z out
+  z="$(t414_zone "$1" "$T45_MGR_ZS" "$T45_MGR_ZE")"
+  [ -n "$z" ] || { printf 'section « Entrée » du manager introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" 'mission-contracts.md' 'Brief de mission')" || { printf 'citation du contrat : %s' "$out"; return 1; }
+}
+# (f) liens vers vf-validation.sh : existence, verbes connus de --help
+t45_val_link() { # <mission-contracts.md>
+  t45_link_check "$1" "$T45_MC_SUB_ZS" "$T45_MC_SUB_ZE" vf-validation.sh 'propose' '--phase' '--ws'
+}
+
+t45_out="$(t45_auto_check "$T45_AUTO")" && ok "T45 (b) vf-auto/SKILL.md : étape 0 bis avant le moteur direct, codes, limite « pendant la boucle », champ de brief dans Taille (${#T45_AUTO_LIT[@]} + ${#T45_AUTO_TLIT[@]} clauses)" \
+  || ko "T45 (b) vf-auto/SKILL.md : attendu — étape 0 bis complète ; obtenu — $t45_out"
+t45_out="$(t45_contract_check "$T45_MC")" && ok "T45 (c) mission-contracts.md : ligne « Phases ajoutées » du bloc MISSION et champ P60-H-03 (producteurs, consommateur, absent → aucun marqueur, risque résiduel)" \
+  || ko "T45 (c) mission-contracts.md : attendu — champ de brief Phases ajoutées ; obtenu — $t45_out"
+t45_out="$(t45_route_check "$T45_ROUTE")" && ok "T45 (c) intent-routing.md : ligne gsd-phase annotée de la pose (vf-validation.sh propose)" \
+  || ko "T45 (c) intent-routing.md : attendu — annotation de la pose ; obtenu — $t45_out"
+t45_out="$(t45_mgr_check "$T45_MGR")" && ok "T45 (c) vf-dev-manager.md (lu) : sa section Entrée cite mission-contracts.md et « Brief de mission » — l'acteur est instruit ; l'exécution de la pose n'est PAS prouvée (P60-PL-26)" \
+  || ko "T45 (c) vf-dev-manager.md : attendu — citation du contrat de brief ; obtenu — $t45_out"
+if [ -z "$T45_SD" ]; then
+  skip "T45 (b)(c) liens : scripts du conductor introuvables"
+else
+  t45_out="$(t45_auto_link "$T45_AUTO")" && ok "T45 (f) vf-auto/SKILL.md : check-phase-validation.sh existe et son --help connaît --phase et --ws" \
+    || ko "T45 (f) vf-auto/SKILL.md : attendu — script cité existant, options connues ; obtenu — $t45_out"
+  t45_out="$(t45_val_link "$T45_MC")" && ok "T45 (f) mission-contracts.md : vf-validation.sh existe et son --help connaît propose, --phase et --ws" \
+    || ko "T45 (f) mission-contracts.md : attendu — vf-validation.sh existant, verbes connus ; obtenu — $t45_out"
+  # le verbe validate, cité par la doctrine : connu du --help
+  case "$(bash "$T45_SD/vf-validation.sh" --help 2>&1)" in *'validate'*) ok "T45 (f) vf-validation.sh : --help connaît validate" ;; *) ko "T45 (f) vf-validation.sh : --help ne connaît pas validate" ;; esac
+fi
+
+t45_k=0
+for t45_a in "${T45_AUTO_LIT[@]}"; do
+  t45_k=$((t45_k+1))
+  t414_ablate "$T45_AUTO" "$T45_TMP/auto-$t45_k.md" "$t45_a" "$T45_AUTO_ZS" "$T45_AUTO_ZE"
+  t414_mutant "T45 mutant (b) : vf-auto/SKILL.md privé de « $t45_a » dans l'étape 0 bis" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-$t45_k.md"
+done
+for t45_a in "${T45_AUTO_TLIT[@]}"; do
+  t45_k=$((t45_k+1))
+  t414_ablate "$T45_AUTO" "$T45_TMP/auto-$t45_k.md" "$t45_a" "$T45_AUTO_TZS" "$T45_AUTO_TZE"
+  t414_mutant "T45 mutant (b) : vf-auto/SKILL.md privé de « $t45_a » dans Taille" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-$t45_k.md"
+done
+t414_move_before "$T45_AUTO" "$T45_TMP/auto-ord.md" '^# vf-auto' '## Moteur direct (mission courte)' '## Étape 0 bis'
+t414_mutant "T45 mutant (b) ordre : le moteur direct précède l'étape 0 bis" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-ord.md"
+sed 's/ne démarre pas/démarre quand même/' "$T45_AUTO" > "$T45_TMP/auto-inv.md"
+t414_mutant "T45 mutant (b) inversion : le moteur direct « démarre quand même » sur une étape proposée" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv.md"
+sed "s/une ligne le dit et l'étape entre dans la boucle\./le dire et s'arrêter./" "$T45_AUTO" > "$T45_TMP/auto-inv3.md"
+t414_mutant "T45 mutant (b) inversion : « marqueur=introuvable … s'arrêter » (le cas légitime n'entre plus dans la boucle)" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv3.md"
+sed 's/l.étape entre dans la boucle\.$/l étape entre dans la boucle sauf à arrêter./' "$T45_AUTO" > "$T45_TMP/auto-inv4.md"
+t414_mutant "T45 mutant (b) inversion : la clause « marqueur=introuvable » garde « entre dans la boucle » mais cite arrêter" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv4.md"
+sed "s/le dire et s'arrêter\. Limite/l'étape entre dans la boucle. Limite/" "$T45_AUTO" > "$T45_TMP/auto-inv5.md"
+t414_mutant "T45 mutant (b) inversion : « Tout autre code 3, code 64, code 5 : l'étape entre dans la boucle » (le fail-open d'avant la correction)" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv5.md"
+sed "s/le dire et s'arrêter\. Limite/le dire, s'arrêter, puis l'étape entre dans la boucle. Limite/" "$T45_AUTO" > "$T45_TMP/auto-inv6.md"
+t414_mutant "T45 mutant (b) inversion : la clause d'arrêt garde s'arrêter mais ajoute « puis l'étape entre dans la boucle »" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv6.md"
+sed 's/^Code 3 avec `marqueur=introuvable`/Code 3/' "$T45_AUTO" > "$T45_TMP/auto-inv7.md"
+t414_mutant "T45 mutant (b) inversion : « Code 3 » nu entre dans la boucle (tout code 3 passe)" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv7.md"
+t414_ablate "$T45_MC" "$T45_TMP/mc-bloc.md" '- Phases ajoutées : proposées (postes product et dev) | absent (poste solo, défaut)' "$T45_MC_BLOC_ZS" "$T45_MC_BLOC_ZE"
+t414_mutant "T45 mutant (c) : mission-contracts.md privé de la ligne « Phases ajoutées » du bloc MISSION" t45_contract_check "$T45_MC" "$T45_TMP/mc-bloc.md"
+for t45_a in "${T45_MC_SUB_LIT[@]}"; do
+  t45_k=$((t45_k+1))
+  t414_ablate "$T45_MC" "$T45_TMP/mc-$t45_k.md" "$t45_a" "$T45_MC_SUB_ZS" "$T45_MC_SUB_ZE"
+  t414_mutant "T45 mutant (c) : champ « Phases ajoutées » privé de « $t45_a »" t45_contract_check "$T45_MC" "$T45_TMP/mc-$t45_k.md"
+done
+t414_ablate "$T45_ROUTE" "$T45_TMP/route-1.md" 'vf-validation.sh propose' "$T45_ROUTE_ZS" "$T45_ROUTE_ZE"
+t414_mutant "T45 mutant (c) : intent-routing.md privé de « vf-validation.sh propose » sur la ligne gsd-phase" t45_route_check "$T45_ROUTE" "$T45_TMP/route-1.md"
+t414_ablate "$T45_ROUTE" "$T45_TMP/route-2.md" 'Phases ajoutées : proposées' "$T45_ROUTE_ZS" "$T45_ROUTE_ZE"
+t414_mutant "T45 mutant (c) : intent-routing.md privé de « Phases ajoutées : proposées » sur la ligne gsd-phase" t45_route_check "$T45_ROUTE" "$T45_TMP/route-2.md"
+t414_ablate "$T45_MGR" "$T45_TMP/mgr-1.md" 'mission-contracts.md' "$T45_MGR_ZS" "$T45_MGR_ZE"
+t414_mutant "T45 mutant (c) lien acteur : copie de vf-dev-manager.md privée de la citation de mission-contracts.md dans Entrée" t45_mgr_check "$T45_MGR" "$T45_TMP/mgr-1.md"
+if [ -n "$T45_SD" ]; then
+  sed 's/check-phase-validation\.sh/check-phase-validation-x.sh/g' "$T45_AUTO" > "$T45_TMP/auto-ren.md"
+  t414_mutant "T45 mutant (f) : script cité renommé dans une copie de vf-auto/SKILL.md" t45_auto_link "$T45_AUTO" "$T45_TMP/auto-ren.md"
+  sed 's/vf-validation\.sh propose --phase/vf-validation-x.sh propose --phase/' "$T45_MC" > "$T45_TMP/mc-ren.md"
+  t414_mutant "T45 mutant (f) : vf-validation.sh renommé dans le champ de brief" t45_val_link "$T45_MC" "$T45_TMP/mc-ren.md"
+  sed 's/vf-validation\.sh propose --phase/vf-validation.sh enregistre --phase/' "$T45_MC" > "$T45_TMP/mc-verb.md"
+  t414_mutant "T45 mutant (f) : verbe propose remplacé par un verbe inconnu du --help" t45_val_link "$T45_MC" "$T45_TMP/mc-verb.md"
+fi
+
+# (d) pointeur d'AGENT.md : la ligne-pointeur existante est prolongée, aucune ligne ajoutée
+T45_PTR_LIT=('product-routing.md' '§5' 'découpage' 'phases proposées')
+t45_pointer_check() { # <AGENT.md> — UNE ligne de la zone porte le pointeur ET la §5 (aucune ligne ajoutée)
+  local z out n
+  z="$(t414_zone "$1" "$T44_AG_ZS" "$T44_AG_ZE")"
+  [ -n "$z" ] || { printf 'zone « Garde-fou premier usage » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T45_PTR_LIT[@]}")" || { printf 'pointeur de découpage : %s' "$out"; return 1; }
+  n="$(awk -v s="$T44_AG_ZS" -v e="$T44_AG_ZE" '$0 ~ s {on=1} on && $0 ~ e {exit}
+    on && index($0, "product-routing.md") && index($0, "§5") && index($0, "découpage") {n++} END{print n+0}' "$1")"
+  [ "$n" -eq 1 ] || { printf 'la ligne-pointeur existante ne porte pas la §5 (%s ligne)' "$n"; return 1; }
+}
+
+T45_INDEX_SRC="$REFS_DIR/_index.md"
+t45_index_check() { # <_index.md> — la ligne de product-routing.md mentionne la §5
+  local z out; z="$(t414_zone "$1" '^')"
+  [ -n "$z" ] || { printf '_index.md absent ou vide'; return 1; }
+  out="$(t414_missing "$z" '§5 : gate architecture avant découpage, phases proposées')" || { printf 'index : %s' "$out"; return 1; }
+}
+
+# (e) §5 de product-routing.md : gate architecture, conditions poste ∧ BRIEF, override, pose, limites
+T45_REF="$REFS_DIR/product-routing.md"
+T45_REF_ZS='^## 5[.]'
+T45_REF_LIT=('vf-role.sh get' 'solo' '.planning/BRIEF.md' 'check-architecture.sh --architecture .planning/ARCHITECTURE.md' 'Code 1' 'réitér' 'Contraintes session' 'Phases ajoutées : proposées' 'vf-validation.sh validate' '/vf-product' 'Regenerate all' 'gsd-discuss-phase' 'Un poste est une vue, pas un droit' 'quand `.planning/BRIEF.md` existe' "rien ne change, ni gate ni champ de brief" "le gate n'est pas consulté")
+T45_REF_INTERDIT=('BRIEF.md` est absent' 'consulté sans')
+t45_ref_check() { # <product-routing.md>
+  local z out
+  z="$(t414_zone "$1" "$T45_REF_ZS")"
+  [ -n "$z" ] || { printf 'section « 5. Découpage » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T45_REF_LIT[@]}")" || { printf 'absent de la §5 : %s' "$out"; return 1; }
+  out="$(t44_forbidden "$z" "${T45_REF_INTERDIT[@]}")" || { printf 'clause inversée dans la §5 : %s' "$out"; return 1; }
+  out="$(t414_order "$z" 'Poste `solo`' 'quand `.planning/BRIEF.md` existe' 'Code 1' 'réitér')" || { printf 'ordre de la §5 : %s' "$out"; return 1; }
+}
+t45_ref_link() { t45_link_check "$1" "$T45_REF_ZS" '' check-architecture.sh '--architecture'; }
+
+t45_out="$(t45_pointer_check "$AGENT_FILE")" && ok "T45 (d) AGENT.md : la ligne-pointeur du garde-fou premier usage porte product-routing.md et la §5 (découpage, phases proposées), sur UNE ligne" \
+  || ko "T45 (d) AGENT.md : attendu — ligne-pointeur prolongée vers la §5 ; obtenu — $t45_out"
+t45_out="$(t45_ref_check "$T45_REF")" && ok "T45 (e) product-routing.md §5 : gate architecture (poste ∧ BRIEF), code 1 → phrase et halte, override réitéré tracé, pose de « proposée », limites (${#T45_REF_LIT[@]} clauses)" \
+  || ko "T45 (e) product-routing.md §5 : attendu — gate architecture avant découpage ; obtenu — $t45_out"
+t45_out="$(t45_index_check "$T44_INDEX")" && ok "T45 (e) _index.md : la ligne de product-routing.md mentionne la §5" \
+  || ko "T45 (e) _index.md : attendu — résumé complété par la §5 ; obtenu — $t45_out"
+if [ -z "$T45_SD" ]; then
+  skip "T45 (f) §5 : scripts du conductor introuvables"
+else
+  t45_out="$(t45_ref_link "$T45_REF")" && ok "T45 (f) product-routing.md §5 : check-architecture.sh existe et son --help connaît --architecture" \
+    || ko "T45 (f) product-routing.md §5 : attendu — script cité existant, option connue ; obtenu — $t45_out"
+  case "$(bash "$T45_SD/vf-role.sh" --help 2>&1)" in *'get'*) ok "T45 (f) vf-role.sh : existe et son --help connaît get" ;; *) ko "T45 (f) vf-role.sh : --help ne connaît pas get" ;; esac
+fi
+
+for t45_a in "${T45_PTR_LIT[@]}"; do
+  t45_k=$((t45_k+1))
+  t414_ablate "$AGENT_FILE" "$T45_TMP/ptr-$t45_k.md" "$t45_a" "$T44_AG_ZS" "$T44_AG_ZE"
+  t414_mutant "T45 mutant (d) : AGENT.md privé de « $t45_a » dans le garde-fou premier usage" t45_pointer_check "$AGENT_FILE" "$T45_TMP/ptr-$t45_k.md"
+done
+# La §5 déplacée sur sa propre ligne : le pointeur existant ne la porte plus, une ligne a été ajoutée.
+sed 's/ Aux postes `product` et `dev`, devant une intention de découpage/\
+\
+Aux postes `product` et `dev`, devant une intention de découpage/' "$AGENT_FILE" > "$T45_TMP/ptr-line.md"
+t414_mutant "T45 mutant (d) : la §5 sur une ligne ajoutée (le pointeur existant ne la porte plus)" t45_pointer_check "$AGENT_FILE" "$T45_TMP/ptr-line.md"
+for t45_a in "${T45_REF_LIT[@]}"; do
+  t45_k=$((t45_k+1))
+  t414_ablate "$T45_REF" "$T45_TMP/ref-$t45_k.md" "$t45_a" "$T45_REF_ZS"
+  t414_mutant "T45 mutant (e) : product-routing.md privé de « $t45_a » dans la §5" t45_ref_check "$T45_REF" "$T45_TMP/ref-$t45_k.md"
+done
+# Pitfall 6 : la condition du BRIEF inversée refuserait tout lab existant au poste dev.
+sed 's/quand `.planning\/BRIEF.md` existe/quand `.planning\/BRIEF.md` est absent/' "$T45_REF" > "$T45_TMP/ref-brief.md"
+t414_mutant "T45 mutant (e) inversion : « BRIEF existe » remplacé par « BRIEF est absent » (gate consulté sur tout lab existant)" t45_ref_check "$T45_REF" "$T45_TMP/ref-brief.md"
+sed 's/rien ne change, ni gate ni champ de brief/gate consulté aussi au poste solo/' "$T45_REF" > "$T45_TMP/ref-solo.md"
+t414_mutant "T45 mutant (e) inversion : poste solo — « rien ne change » retiré" t45_ref_check "$T45_REF" "$T45_TMP/ref-solo.md"
+t414_ablate "$T45_INDEX_SRC" "$T45_TMP/index-5.md" '§5 : gate architecture avant découpage, phases proposées'
+t414_mutant "T45 mutant (e) : _index.md privé de la mention de la §5" t45_index_check "$T45_INDEX_SRC" "$T45_TMP/index-5.md"
+if [ -n "$T45_SD" ]; then
+  sed 's/check-architecture\.sh --architecture/check-architecture.sh --arch/' "$T45_REF" > "$T45_TMP/ref-opt.md"
+  t414_mutant "T45 mutant (f) : option --architecture remplacée par --arch dans la §5" t45_ref_link "$T45_REF" "$T45_TMP/ref-opt.md"
+  sed 's/check-architecture\.sh/check-architecture-x.sh/' "$T45_REF" > "$T45_TMP/ref-ren.md"
+  t414_mutant "T45 mutant (f) : check-architecture.sh renommé dans la §5" t45_ref_link "$T45_REF" "$T45_TMP/ref-ren.md"
+fi
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

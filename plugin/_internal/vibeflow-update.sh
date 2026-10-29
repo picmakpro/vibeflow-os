@@ -43,6 +43,18 @@
 #       même refus à la pose) puis liste les modules installés hors du nouveau poste — AUCUNE désinstallation
 #       (ADR-031). Refusé en scope user, sous --target et sous --dry-run.
 #
+# Filet de divergence (Phase 61, P61-D-01, P61-D-06, P61-PL-08) :
+#   aux postes product et dev, l'installeur arme le clone (hooks git post-merge, post-rewrite et post-commit dans le dossier de
+#   hooks réel du clone) par `conductor/scripts/vf-divergence-hook.sh`, cherché dans le cache du plugin et nulle
+#   part ailleurs (jamais dans le lab). Posé à `install` (avec un poste) et au verbe `role` ; retiré au poste solo
+#   (verbe `role solo`, ou `install` sur un fichier de poste existant) et à `uninstall --all` ; rafraîchi (chemin
+#   du cache) à `update --all`, qui n'arme JAMAIS un clone non armé. Scopes project et local seulement : rien en
+#   scope user ni sous --target. Un refus d'armement (hook tiers, core.hooksPath, ...) est relayé sur stderr et ne
+#   fait jamais échouer l'installation. Le journal du clone survit au retrait.
+#   env VF_DIVERGENCE_HOOK → vide ou `on` : armement (défaut) ; `off` : sortie explicite, rien n'est armé et un
+#   hook VibeFlow déjà posé est retiré. Toute autre valeur : refus (code 1) à `install` et `role`, valeur jamais
+#   réimprimée ; ignorée avec une ligne de log à `update --all` et `uninstall`.
+#
 # Pré-requis : $VIBEFLOW_CACHE existe (dossier des modules + leurs module.json).
 
 set -euo pipefail
@@ -173,6 +185,9 @@ VF_TARGET_NONEMPTY_OK="0"
 # fermée plus bas (sur `install` seulement) ; VF_ROLE_FLAG=1 dit que --role a été passé explicitement.
 VF_ROLE="${VF_ROLE:-}"
 VF_ROLE_FLAG="0"
+# P61-D-06 : sortie du filet de divergence (vide ou on = armé aux postes product/dev, off = rien armé et le hook
+# nôtre retiré). Validation fermée plus bas, seulement là où la valeur a un effet ; jamais réimprimée.
+VF_DIVERGENCE_HOOK="${VF_DIVERGENCE_HOOK:-}"
 
 # Détecter `--scope <val>`/`--dry-run`/`--target <val>` AVANT cmd="$1" : on filtre les
 # positionnels et on override VF_SCOPE/VF_DRY_RUN/VF_TARGET_OVERRIDE.
@@ -252,6 +267,13 @@ if [ "$#" -gt 0 ]; then
         ""|solo|product|dev) : ;;
         *) err "poste invalide (attendu solo|product|dev ; valeur non réimprimée)" ;;
       esac
+      # P61-PL-07 : la sortie du filet n'a d'effet qu'avec un poste posé ; sans poste, sa valeur est ignorée.
+      if [ -n "$VF_ROLE" ]; then
+        case "$VF_DIVERGENCE_HOOK" in
+          ""|on|off) : ;;
+          *) err "VF_DIVERGENCE_HOOK invalide (attendu on ou off ; valeur non réimprimée)" ;;
+        esac
+      fi
       ;;
     role)
       # P58-D-07 : le poste est l'ARGUMENT du verbe (il prime sur un VF_ROLE hérité) ; même validation fermée.
@@ -262,6 +284,10 @@ if [ "$#" -gt 0 ]; then
         solo|product|dev) : ;;
         *) err "poste invalide (attendu solo|product|dev ; valeur non réimprimée)" ;;
       esac
+      case "$VF_DIVERGENCE_HOOK" in
+        ""|on|off) : ;;
+        *) err "VF_DIVERGENCE_HOOK invalide (attendu on ou off ; valeur non réimprimée)" ;;
+      esac
       ;;
     *)
       if [ "$VF_ROLE_FLAG" = "1" ]; then
@@ -269,6 +295,17 @@ if [ "$#" -gt 0 ]; then
       fi
       ;;
   esac
+  # P61-PL-07 : à update --all et uninstall, une valeur invalide ne casse jamais le verbe (discipline de VF_ROLE
+  # hérité) : ignorée, comme si elle était vide, avec une ligne de log qui ne la réimprime pas.
+  if { [ "$1" = "update" ] && [ "${2:-}" = "--all" ]; } || [ "$1" = "uninstall" ]; then
+    case "$VF_DIVERGENCE_HOOK" in
+      ""|on|off) : ;;
+      *)
+        log "[divergence] VF_DIVERGENCE_HOOK invalide (attendu on ou off) : valeur ignorée, comme si elle était vide ; jamais réimprimée"
+        VF_DIVERGENCE_HOOK=""
+        ;;
+    esac
+  fi
 fi
 
 # Surface du flag --dry-run (D-31-06), validée AVANT cmd="$1" (952) : borné à install/update/
@@ -1772,6 +1809,174 @@ find_role_gate() {
   echo ""
 }
 
+# find_divergence_hook — le script du filet de divergence, depuis le cache du plugin, et lui seul. Vide
+# si absent. Aucun repli sur $TARGET_ROOT ni sur le dossier de l'engine : le hook posé dans le clone
+# n'exécute jamais du code de l'arbre du lab (audit M-2, P61-D-03).
+find_divergence_hook() {
+  local c="$CACHE_DIR/conductor/scripts/vf-divergence-hook.sh"
+  [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+# divergence_off — vrai si la sortie explicite est demandée (VF_DIVERGENCE_HOOK=off, P61-D-06). La valeur a
+# déjà été validée (ou ignorée) à l'entrée : seule la valeur exacte `off` désarme, tout le reste vaut `on`.
+divergence_off() { [ "$VF_DIVERGENCE_HOOK" = "off" ]; }
+
+# divergence_hook_present — vrai si un hook NÔTRE (marqueur en ligne 2) est posé dans le clone courant. Ne sert
+# qu'à décider s'il vaut la peine de dire « script absent du cache » quand le retrait ou le rafraîchissement
+# ne peut pas se faire : un lab jamais armé ne reçoit aucune ligne (poste solo inchangé).
+divergence_hook_present() {
+  local d n f
+  d="$(git rev-parse --git-path hooks 2>/dev/null)" || return 1
+  [ -n "$d" ] || return 1
+  for n in post-merge post-rewrite post-commit; do
+    f="$d/$n"
+    [ -f "$f" ] && [ ! -L "$f" ] || continue
+    if awk 'NR == 2 && index($0, "# vibeflow:vf-divergence-hook") == 1 { f = 1 } END { exit !f }' "$f" 2>/dev/null; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# divergence_hook_plan <~|-> <ours-seulement 0|1> — déclare au plan (--dry-run) chaque cible du script
+# (arm --check) ; avec ours-seulement=1 (rafraîchissement, retrait), seulement les hooks déjà nôtres (status).
+# N'écrit rien.
+divergence_hook_plan() {
+  local verb="$1" only="$2" hk out st line tgt name note nl
+  nl="$(printf '\nx')"; nl="${nl%x}"
+  hk="$(find_divergence_hook)"
+  [ -n "$hk" ] || return 0
+  out="$(bash "$hk" arm --check --path "$(pwd -P)" 2>/dev/null </dev/null)" || true
+  st=""
+  if [ "$only" = "1" ]; then st="$(bash "$hk" status --path "$(pwd -P)" 2>/dev/null </dev/null)" || true; fi
+  if [ "$verb" = "-" ]; then
+    note="(filet de divergence : hook VibeFlow retiré)"
+  else
+    note="(filet de divergence : hook git du clone, hors de l'arbre versionné)"
+  fi
+  while IFS= read -r line; do
+    case "$line" in
+      "CIBLE "*)
+        tgt="${line#CIBLE }"
+        name="${tgt##*/}"
+        if [ "$only" = "1" ]; then
+          case "$nl$st$nl" in
+            *"${nl}HOOK $name ARME${nl}"*|*"${nl}HOOK $name NON-EXECUTABLE${nl}"*) : ;;
+            *) continue ;;
+          esac
+        fi
+        vf_declare_write "$verb" "$tgt" "$note"
+        ;;
+    esac
+  done <<EOF_DIVERGENCE_PLAN
+$out
+EOF_DIVERGENCE_PLAN
+}
+
+# divergence_hook_disarm — retire les hooks NÔTRES du clone courant (verbe disarm du script du cache), jamais un
+# hook tiers (P61-D-02). Le journal survit. Codes relayés sur stderr, JAMAIS un échec du verbe hôte (P61-PL-03).
+# Dry-run : déclare `[plan] -` par hook nôtre, n'écrit rien.
+divergence_hook_disarm() {
+  local hk rc=0 out removed=0
+  hk="$(find_divergence_hook)"
+  if [ -z "$hk" ]; then
+    if divergence_hook_present; then
+      log "[divergence] NON VERIFIABLE : vf-divergence-hook.sh absent du cache du plugin — hook VibeFlow laissé en place, à retirer à la main"
+    fi
+    return 0
+  fi
+  if vf_dry_run; then
+    divergence_hook_plan "-" 1
+    return 0
+  fi
+  out="$(bash "$hk" disarm --path "$(pwd -P)" 2>&1 >/dev/null </dev/null)" || rc=$?
+  case "$out" in *"desarme : "*) removed=1 ;; esac
+  case "$rc" in
+    0) if [ "$removed" = "1" ]; then log "[divergence] filet retiré"; fi ;;
+    1)
+      if [ -n "$out" ]; then printf '%s\n' "$out" >&2; fi
+      log "[divergence] retrait INCOMPLET (code 1) — ligne tierce à retirer à la main (voir ci-dessus)" ;;
+    2) log "[divergence] retrait NON VERIFIABLE (code 2) — le hook VibeFlow est peut-être encore posé" ;;
+    3) : ;;
+    *) log "[divergence] code inattendu ($rc) de vf-divergence-hook.sh disarm — retrait non vérifié" ;;
+  esac
+  return 0
+}
+
+# divergence_hook_apply <poste> — pose ou retire le filet selon le poste (P61-H-01, P61-PL-08). product et dev
+# ARMENT (sauf sous VF_DIVERGENCE_HOOK=off : retrait) ; solo RETIRE ; sans poste, rien. Le script du cache fait
+# le travail ; ses codes sont relayés sur stderr et JAMAIS un échec de l'installation (P61-PL-03). Dry-run :
+# arm --check déclare chaque cible par vf_declare_write, rien n'est écrit.
+divergence_hook_apply() {
+  local poste="${1:-}" hk rc=0
+  case "$poste" in
+    product|dev) : ;;
+    solo) divergence_hook_disarm; return 0 ;;
+    *) return 0 ;;
+  esac
+  if divergence_off; then divergence_hook_disarm; return 0; fi
+  hk="$(find_divergence_hook)"
+  if [ -z "$hk" ]; then
+    log "[divergence] NON VERIFIABLE : vf-divergence-hook.sh absent du cache du plugin — filet non armé"
+    return 0
+  fi
+  if vf_dry_run; then
+    divergence_hook_plan "~" 0
+    return 0
+  fi
+  bash "$hk" arm --path "$(pwd -P)" </dev/null >&2 || rc=$?
+  case "$rc" in
+    0) log "[divergence] filet armé" ;;
+    1) log "[divergence] ARMEMENT REFUSE (code 1) — voir ci-dessus ; l'installation continue" ;;
+    2) log "[divergence] armement NON VERIFIABLE (code 2) — filet non armé ; l'installation continue" ;;
+    3) log "[divergence] pas de dépôt git : filet non armé" ;;
+    *) log "[divergence] code inattendu ($rc) de vf-divergence-hook.sh arm — filet non armé ; l'installation continue" ;;
+  esac
+  return 0
+}
+
+# divergence_hook_scope_ok — le filet ne vit qu'en scope project ou local, jamais en scope user ni sous --target.
+divergence_hook_scope_ok() { [ "$VF_SCOPE" != "user" ] && [ -z "$VF_TARGET_OVERRIDE" ]; }
+
+# divergence_hook_disarm_scoped — fin de `uninstall --all` : retire le filet du clone (scope project/local).
+divergence_hook_disarm_scoped() {
+  divergence_hook_scope_ok || return 0
+  divergence_hook_disarm
+}
+
+# divergence_hook_refresh_scoped — fin de `update --all` : réécrit un hook NÔTRE déjà posé avec le chemin du
+# cache courant (le cache est versionné : sans cela le hook resterait sur une version purgée, P61-PL-08). N'ARME
+# JAMAIS un clone qui ne l'était pas. Sous VF_DIVERGENCE_HOOK=off : retrait.
+divergence_hook_refresh_scoped() {
+  local hk rc=0 out refreshed=0
+  divergence_hook_scope_ok || return 0
+  if divergence_off; then divergence_hook_disarm; return 0; fi
+  hk="$(find_divergence_hook)"
+  if [ -z "$hk" ]; then
+    if divergence_hook_present; then
+      log "[divergence] NON VERIFIABLE : vf-divergence-hook.sh absent du cache du plugin — chemin du filet non rafraîchi"
+    fi
+    return 0
+  fi
+  if vf_dry_run; then
+    divergence_hook_plan "~" 1
+    return 0
+  fi
+  out="$(bash "$hk" arm --refresh --path "$(pwd -P)" 2>&1 >/dev/null </dev/null)" || rc=$?
+  case "$out" in *"rafraichi : "*) refreshed=1 ;; esac
+  case "$rc" in
+    0) if [ "$refreshed" = "1" ]; then log "[divergence] chemin du filet rafraîchi"; fi ;;
+    1)
+      if [ -n "$out" ]; then printf '%s\n' "$out" >&2; fi
+      log "[divergence] rafraîchissement REFUSE (code 1) — voir ci-dessus ; la mise à jour continue" ;;
+    2) log "[divergence] rafraîchissement NON VERIFIABLE (code 2) — chemin du filet inchangé ; la mise à jour continue" ;;
+    3) : ;;
+    *) log "[divergence] code inattendu ($rc) de vf-divergence-hook.sh arm --refresh — chemin du filet inchangé" ;;
+  esac
+  return 0
+}
+
 # find_module_roles — cascade comme find_resolver : cache (prod), puis à côté de l'engine (source). Vide si absent.
 find_module_roles() {
   local candidate
@@ -1853,6 +2058,7 @@ role_apply() {
   role_gitignore_rule
   role_write_file "$poste"
   VF_ROLE_WILL_EXIST="1"
+  divergence_hook_apply "$poste"
 }
 
 # vf_gitignore_target_prefix — préfixe RELATIF AU CWD à écrire dans ./.gitignore (TGT-02).
@@ -4056,6 +4262,8 @@ case "$cmd" in
       else
         log "Aucun module installé"
       fi
+      # Filet de divergence (P61-PL-08) : le chemin du cache suit la mise à jour ; un clone non armé ne l'est jamais.
+      divergence_hook_refresh_scoped
     elif [ -n "$arg" ]; then
       update_module "$arg"
     else
@@ -4081,6 +4289,9 @@ case "$cmd" in
       else
         log "Aucun module installé (pas de registre) — rien à désinstaller."
       fi
+      # Filet de divergence (P61-PL-08) : le hook vit du cache, pas d'un module ; `uninstall <module>` seul n'y
+      # touche pas, `uninstall --all` le retire (scope project/local). Le journal du clone reste.
+      divergence_hook_disarm_scoped
     elif [ -n "$arg" ]; then
       uninstall_module "$arg"
     else

@@ -7,7 +7,7 @@
 > Sur un lab de code, le planning du **projet** appartient au moteur de développement : ce module
 > redirige vers le verbe adéquat au lieu de produire un format concurrent (ADR-055).
 
-**Type** : `skill + references + scripts` · **Version** : v2.9.0 · **Dépend de** : rien.
+**Type** : `skill + references + scripts` · **Version** : v2.10.0 · **Dépend de** : rien.
 
 ---
 
@@ -84,7 +84,7 @@ planning-core/
     modele-cycles.md           # référence du modèle par cycles (recalc-planning.sh)
     templates/                 # 10 gabarits universels neutres-métier
     templates/cycles/          # 8 gabarits du modèle par cycles
-    templates/product/         # gabarits du poste product (PROJECT, REQUIREMENTS) — dimension orthogonale aux profils
+    templates/product/         # gabarits du poste product (PROJECT, REQUIREMENTS, ARCHITECTURE) — dimension orthogonale aux profils
   scripts/
     check-planning-state.sh    # garde-fou fraîcheur de STATE.md (advisory)
     detect-gsd-engine.sh       # fait « un moteur GSD est-il en place ? » (4 exits)

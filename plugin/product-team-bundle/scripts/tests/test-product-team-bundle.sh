@@ -38,8 +38,8 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 TMPW="$TMP/w.out"
 
-AGENTS="vf-product-manager vf-product-analyst vf-product-pm prd-gate"
-CORPUS="AGENT.md agents/vf-product-manager.md agents/vf-product-analyst.md agents/vf-product-pm.md agents/prd-gate.md"
+AGENTS="vf-product-manager vf-product-analyst vf-product-pm vf-product-architect prd-gate"
+CORPUS="AGENT.md agents/vf-product-manager.md agents/vf-product-analyst.md agents/vf-product-pm.md agents/vf-product-architect.md agents/prd-gate.md"
 
 # Disposition : DÉPÔT (le module est un dossier complet nommé product-team-bundle : AGENT.md, module.json, VERSION) ou
 # LAB (suite posée à plat par l'installeur sous <racine>/.claude/scripts/tests/ : le module n'existe plus comme
@@ -270,21 +270,47 @@ halte-humaine|Sous le seuil, halte humaine
 pas-de-passage-de-main|ni relance silencieuse, ni passage de main au head
 aucun-passage-de-main|Aucun passage de main au head
 override|override
-livrables-verdict|`brief+prd`, `verdict`}
+livrables-verdict|`brief+prd`, `verdict`
 verdict-seul|`verdict` ne garde que `juge` → `humain`
 prd-saute-analyste|`prd` seul saute `analyste`
 brief-mode-juge|le juge est dispatché en **mode BRIEF seul**
 brief-mode-appel|appel `check-prd.sh --brief`
-dag-chemin|.planning/missions/<AAAA-MM-JJ>-<sujet>.dag.json'
+dag-chemin|.planning/missions/<AAAA-MM-JJ>-<sujet>.dag.json
+architecte-allowlist|vf-product-architect, prd-gate)
+livrable-architecture|`verdict`, `architecture`}
+chaine-architecture|chaîne `architecte` → `humain`
+controle-architecture|check-architecture.sh --architecture .planning/ARCHITECTURE.md
+statut-proposee|statut=proposee rubriques_manquantes=0
+validation-par-un-dev|vf-validation.sh validate --architecture'
 
 # Front door : mêmes livrables que le manager (un verdict demandé est une mission acceptée), code 3 complet.
-AGENTMD_ANCHORS='livrables-verdict|`brief+prd`, `verdict`}
+AGENTMD_ANCHORS='livrables-verdict|`brief+prd`, `verdict`
 code-3-complet|indéterminé (cible absente, zéro exigence, case à cocher non reconnue, bloc ou commentaire non fermé)'
 
 # Outils exacts des deux workers producteurs (revue-59 : un outil en trop, Bash sur l'analyste qui dit ne pas l'avoir,
 # laissait la suite verte). Ligne « tools: » égale à la valeur attendue, pas un simple préfixe.
 ANALYST_TOOLS='Read, Write, Edit, Glob, Grep'
 PM_TOOLS='Read, Write, Edit, Glob, Grep'
+
+# Phase 60 (P60-D-07, P60-PL-08/09/12) : une ancre par clause porteuse de l'architecte, retirée à son tour d'une copie.
+ARCHI_ANCHORS='etat-proposed|**Validation:** proposed
+non-validation|le verdict appartient à un dev, jamais à toi
+carte-gsd|gsd-map-codebase
+dossier-carte|.planning/codebase/*.md
+ask-user|action: ask-user
+graphify|graphify.enabled
+skill-cable|  - software-architecture
+chemin-architecture|.planning/ARCHITECTURE.md
+blocked-sans-gabarit|Aucun trouvé : statut `blocked`
+sans-verbe-de-validation|aucun verbe de validation
+update-repasse|repasse la ligne d'"'"'état à `proposed`'
+
+# Front door et skill : la route d'architecture (spec §5.1) et l'Iron Law 4 reformulée.
+FRONT_ARCHI_ANCHORS='route|`livrables: architecture`
+signal|`verdict`, `architecture`}
+iron-law-4|vient du worker architecte
+references|`vf-product-architect`, juge'
+SKILL_ARCHI_ANCHORS='skill-mission|(livrable architecture)'
 
 # anchors <CAS> <fichier> <liste> : toutes les ancres de la liste doivent figurer dans le fichier.
 anchors() {
@@ -330,6 +356,23 @@ ctl_tools() { # <racine> : tools: exacts des workers analyste et pm
     got="$(awk '/^tools:/ { sub(/^tools:[[:space:]]*/, ""); print; exit }' "$1/agents/$a.md" 2>/dev/null)"
     [ "$got" = "$want" ] || { echo "KO-TOOLS:$a tools=[$got] (attendu [$want])"; r=1; }
   done
+  return $r
+}
+
+ctl_archi() {
+  local r=0 f="$1/agents/vf-product-architect.md"
+  [ -f "$f" ] || { echo "KO-ARCHI:vf-product-architect.md absent"; return 1; }
+  anchors ARCHI "$f" "$ARCHI_ANCHORS" || r=1
+  # T-60-18 : sans Bash ni Agent, l'architecte ne peut ni appeler le verbe de validation ni dispatcher.
+  if "$GREP" -qE '^tools:.*(Bash|Agent)' "$f"; then echo "KO-ARCHI:tools-sans-bash-ni-agent"; r=1; fi
+  return $r
+}
+
+ctl_front_archi() {
+  local r=0
+  [ -f "$1/AGENT.md" ] && [ -f "$1/skills/vf-product/SKILL.md" ] || { echo "KO-FRONT-ARCHI:AGENT.md ou SKILL.md absent"; return 1; }
+  anchors FRONT-ARCHI "$1/AGENT.md" "$FRONT_ARCHI_ANCHORS" || r=1
+  anchors FRONT-ARCHI "$1/skills/vf-product/SKILL.md" "$SKILL_ARCHI_ANCHORS" || r=1
   return $r
 }
 
@@ -403,6 +446,13 @@ else
   M="$(mkmut i2)"; subst "$M/agents/vf-product-manager.md" ", prd-gate)" ")" "tools:"
   mutant_ptb AGENTS-I2 "invariant I2" ctl_agents "$MOD" "$M"
 
+  # Phase 60 (P60-D-07) : l'architecte est un worker interne dispatché par le manager, en monde fermé.
+  M="$(mkmut i2archi)"; subst "$M/agents/vf-product-manager.md" "vf-product-architect, " "" "tools:"
+  mutant_ptb AGENTS-I2-ARCHI "invariant I2" ctl_agents "$MOD" "$M"
+
+  M="$(mkmut i1archi)"; subst "$M/agents/vf-product-architect.md" "Worker interne" "Ouvrier" "description:"
+  mutant_ptb AGENTS-I1-ARCHI "invariant I1 — vf-internal: true sans le marqueur" ctl_agents "$MOD" "$M"
+
 if [ "$LAB" = 1 ]; then
   skip "PTB-FRONT disposition lab : AGENT.md est posé sous agents/product-team-bundle.md (contrôle propre au dépôt)"
 else
@@ -449,9 +499,26 @@ mutant_ptb MANAGER-HALTE-INVERSEE "KO-MANAGER:halte-humaine" ctl_manager "$MOD" 
 M="$(mkmut passage)"; subst "$M/agents/vf-product-manager.md" "ni relance silencieuse, ni passage de main au head" "puis relance silencieuse, puis passage de main au head"
 mutant_ptb MANAGER-PASSAGE-INVERSE "KO-MANAGER:pas-de-passage-de-main" ctl_manager "$MOD" "$M"
 
+case_ctl "PTB-ARCHI : l'architecte porte chaque clause (état proposed, non-validation, carte lue jamais lancée, ask-user, graphify, skill câblé, sans Bash ni Agent)" ctl_archi "$MOD"
+sweep ARCHI ctl_archi agents/vf-product-architect.md "$ARCHI_ANCHORS"
+M="$(mkmut archibash)"; subst "$M/agents/vf-product-architect.md" "Glob, Grep" "Glob, Grep, Bash" "tools:"
+mutant_ptb ARCHI-TOOLS-BASH "KO-ARCHI:tools-sans-bash-ni-agent" ctl_archi "$MOD" "$M"
+M="$(mkmut archiagent)"; subst "$M/agents/vf-product-architect.md" "Glob, Grep" "Glob, Grep, Agent(prd-gate)" "tools:"
+mutant_ptb ARCHI-TOOLS-AGENT "KO-ARCHI:tools-sans-bash-ni-agent" ctl_archi "$MOD" "$M"
+M="$(mkmut archivalide)"; subst "$M/agents/vf-product-architect.md" "La ligne d'état est \`**Validation:** proposed\`, aucune autre valeur" "La ligne d'état est \`**Validation:** validated\`" 
+mutant_ptb ARCHI-AUTO-VALIDATION "KO-ARCHI:etat-proposed" ctl_archi "$MOD" "$M"
+
 case_ctl "PTB-BLOC : bloc typé passed|gaps_found|human_needed|blocked dans les quatre agents" ctl_bloc "$MOD"
 M="$(mkmut bloc)"; subst "$M/agents/vf-product-analyst.md" "passed|gaps_found|human_needed|blocked" "ok|ko"
 mutant_ptb BLOC-ANALYSTE "KO-BLOC:vf-product-analyst" ctl_bloc "$MOD" "$M"
+
+if [ "$LAB" = 1 ]; then
+  skip "PTB-FRONT-ARCHI disposition lab : AGENT.md est posé sous agents/product-team-bundle.md (contrôle propre au dépôt)"
+else
+  case_ctl "PTB-FRONT-ARCHI : la front door route l'architecture vers la mission livrables: architecture, le skill la cite" ctl_front_archi "$MOD"
+  sweep FRONT-ARCHI ctl_front_archi AGENT.md "$FRONT_ARCHI_ANCHORS"
+  sweep FRONT-ARCHI ctl_front_archi skills/vf-product/SKILL.md "$SKILL_ARCHI_ANCHORS"
+fi
 
 case_ctl "PTB-SKILL : /vf-product incarne vibeflow-product, jamais dispatché en Task, cite le manager" ctl_skill "$MOD"
 M="$(mkmut skill)"; subst "$M/skills/vf-product/SKILL.md" "jamais dispatché en" "dispatché en"

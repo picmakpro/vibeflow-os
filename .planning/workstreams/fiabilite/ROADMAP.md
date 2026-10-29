@@ -107,8 +107,8 @@
 - [x] Phase 57: Verrou de driver par compartiment (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-12, mergée PR #152 le 2026-10-16 en `--admin`, revue `@picmakpro` contournée (demande explicite de Samuel, session principale Claude Code, 2026-10-16 : « merge sans willy, release + tag »), release `v2.70.0` ; 16/16 plans, DLWS-01..08 cochées
 - [x] Phase 58: Rôles de poste — installeur, profils solo / product / dev (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-22 : 12/12 plans, porte de phase verte, RLPO-01..12 cochées dont RLPO-11 par override (critère 6 et recette installeur non mesurés, Samuel, session principale, 2026-10-22 — dette dans 58-VERIFICATION.md), branche rebasée sur v2.70.1, release `v2.71.0` à venir
 - [x] Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-27 : 8/8 plans, porte de phase verte, PRDT-01..12 cochées, release à décider
-- [ ] Phase 60: Gate architecture avant découpage et validation des phases proposées (inscrite 2026-10-08, jalon equipe-produit-v1.0)
-- [ ] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0)
+- [x] Phase 60: Gate architecture avant découpage et validation des phases proposées (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-29 : 9/9 plans, porte de phase verte (job `gates` rejoué depuis `ci.yml`, suites une à une), ARCG-02..08, 10 et 11 cochées, ARCG-01 partielle (dette : pose à la création non prouvée par une exécution), ARCG-09 partielle (critère 6 `clients` en code 2, en attente de la liste), release à décider
+- [x] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-29 : 8/8 plans, porte de phase verte (job `gates` rejoué depuis `ci.yml`, suites une à une), COLB-01..07 cochées, COLB-09 partielle (critère 6 `clients` en code 2), COLB-08 en attente de la preuve humaine (P61-B-01, P61-B-02), release à décider
 - [ ] Phase 62: Décision sur l'approche plateforme, sur preuve (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 63: Règles produit empruntées à AIDD (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 - [ ] Phase 64: Contrôles après exécution branchés en nœuds du plan de bataille (inscrite 2026-10-29, jalon equipe-produit-v1.0)
@@ -181,6 +181,8 @@
 | 57. Verrou de driver par compartiment | equipe-produit-v1.0 | 16/16 | Complete — PR #152 (merge `--admin`, 2026-10-16), release `v2.70.0` | 2026-10-12 |
 | 58. Rôles de poste — installeur, profils solo / product / dev | equipe-produit-v1.0 | 12/12 | Complete (2 overrides, Samuel 2026-10-22) — release `v2.71.0` à venir | 2026-10-22 |
 | 59. Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate | equipe-produit-v1.0 | 8/8 | Complete — porte de phase verte, PRDT-01..12 cochées, PR et release à décider | 2026-10-27 |
+| 60. Gate architecture avant découpage et validation des phases proposées | equipe-produit-v1.0 | 9/9 | Complete — porte de phase verte, ARCG-02..08, 10, 11 cochées, ARCG-01 et ARCG-09 partielles (dettes nommées), PR et release à décider | 2026-10-29 |
+| 61. Collaboration à deux humains — divergence armée, preuve sur lab réel | equipe-produit-v1.0 | 8/8 | Complete — porte de phase verte, COLB-01..07 cochées, COLB-09 partielle (dette nommée), COLB-08 décochée (preuve humaine attendue), PR et release à décider | 2026-10-29 |
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15 -->
 
@@ -648,28 +650,61 @@ Plans:
 ### Phase 60: Gate architecture avant découpage et validation des phases proposées
 
 **Goal:** Un gate séparé assemble l'existant : `software-architecture` et GSD (`gsd-map-codebase`, `gsd-graphify`). Le head refuse le découpage en phases tant que `ARCHITECTURE.md` n'est pas validée (A-08). Une phase ajoutée par le rôle product ou par le head reste **proposée** jusqu'à sa validation par un dev ; en solo, elle est auto-validée. Le mécanisme passe par un marqueur sur la phase et `check-phase-validation.sh` (A-07).
-**Requirements**: TBD — famille `ARCG` réservée, posée au cadrage.
+**Requirements**: ARCG-01, ARCG-02, ARCG-03, ARCG-04, ARCG-05, ARCG-06, ARCG-07, ARCG-08, ARCG-09, ARCG-10, ARCG-11 (posées à la planification, 2026-10-29, dérivées de P60-D-01..14 et P60-H-01..04 sans arbitrage neuf).
 **Depends on:** 59.
 **Sources:** spec §5.2 ; SEED A-07, A-08 ; `plugin/software-architecture/`, `plugin/audit-architecture/`.
-**Hors périmètre :** un gate bloquant sans halt condition (Q-04 : ADR-031 penche pour l'advisory).
-**Plans:** 0 plans
+**Hors périmètre :** un gate bloquant sans halt condition (Q-04 : ADR-031 penche pour l'advisory) ; `gsd-graphify` reste refusé (GSDA-08, P60-D-08).
+**Plans:** 9 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 60 to break down)
+**Wave 1**
+- [x] 60-01-PLAN.md — vague 1 : marqueur de phase `**Validation:**`, gate `check-phase-validation.sh` et sa suite à mutants
+- [x] 60-02-PLAN.md — vague 1 : gabarit `ARCHITECTURE` décisionnel de planning-core, gate `check-architecture.sh` et sa suite, minor de planning-core
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 60-03-PLAN.md — vague 2 : preuve sur fixture que les lecteurs GSD rendent le même résultat avec et sans marqueur
+- [x] 60-04-PLAN.md — vague 2 : verbe de pose et de validation `vf-validation.sh` (phase, architecture), poste du validateur, preuve moteur sur sa sortie
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 60-05-PLAN.md — vague 3 : worker interne `vf-product-architect`, livrable `architecture` du manager et de la front door, baseline neuve, minor du bundle
+- [x] 60-06-PLAN.md — vague 3 : refus de `vf-coder` et de `vf-auto`, §5 du head (gate architecture avant découpage), champ de brief de la pose, T45, minor de dev-orchestrator
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 60-07-PLAN.md — vague 4 : minor de conductor, catalogue de ses scripts, compte de suites des README racine
+- [x] 60-08-PLAN.md — vague 4 : manuel FR et EN (gate architecture, étapes proposées, comptes d'agents bornés)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 60-09-PLAN.md — vague 5 : porte de phase rejouée depuis `ci.yml`, ledger à la main (ARCG-01 partielle tant que la pose n'est pas prouvée), arrêt avant la PR
 
 ### Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel
 
 **Goal:** Pour un lab multi-humains, `check-divergence.sh` et son hook `post-merge` sont armés par défaut. Le champ `role:` s'ajoute aux entrées des registres (DECISIONS, LEARNINGS, BLOCKERS). La preuve est faite à **deux humains, deux clones, deux rôles, un workstream** sur un lab réel, pas sur un clone jetable (spec §9, critère 4 ; spec head §6, point 4).
-**Requirements**: TBD — famille `COLB` réservée, posée au cadrage.
+**Requirements**: COLB-01, COLB-02, COLB-03, COLB-04, COLB-05, COLB-06, COLB-07, COLB-08, COLB-09 (COLB-08, preuve sur lab réel, reste décochée : P61-B-01 et P61-B-02)
 **Depends on:** 57 et 60.
 **Sources:** spec §5.3 ; Phase 39 (`check-divergence.sh`) ; ADR-069.
 **Hors périmètre :** un workstream par rôle (deux vérités, refusé par la spec §5.3).
-**Plans:** 0 plans
+**Plans:** 8 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 61 to break down)
+**Wave 1**
+- [x] 61-01-PLAN.md — vague 1 (tracer) : `vf-divergence-hook.sh` (arm, disarm, run), armement par l'engine au poste product/dev, suite à deux clones `test-divergence-deux-clones.sh` (install → hook → cri → journal)
+- [x] 61-02-PLAN.md — vague 1 : champ `**Role**` des gabarits DECISIONS, LEARNINGS, BLOCKERS (source puis copies), suite `test-registres-role.sh` sur six consommateurs
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 61-03-PLAN.md — vague 2 : script du filet complet — `post-rewrite`, refus `core.hooksPath` / hook tiers / script sous l'arbre, armé à la main, `status`, journal blindé, suite `test-vf-divergence-hook.sh` à douze mutants
+- [x] 61-04-PLAN.md — vague 2 : engine complet — retrait au poste solo et à `uninstall --all`, sortie `VF_DIVERGENCE_HOOK=off`, rafraîchissement à `update --all`, plan `--dry-run`, suite `test-vibeflow-update-divergence.sh` à dix mutants
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 61-05-PLAN.md — vague 3 : preuve à deux clones complète (pull en avance rapide, `pull --rebase`, worktree, branche piégée, trois témoins rouges), recette du lab réel `61-RECETTE-LAB-REEL.md` et son relevé joué
+- [x] 61-06-PLAN.md — vague 3 : minors de conductor (script et engine), consolidator et reference, catalogue de conductor
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 61-07-PLAN.md — vague 4 : manuel FR et EN (filet armé, journal, limites, sortie, champ Role), compte de suites des README racine
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 61-08-PLAN.md — vague 5 : porte de phase rejouée depuis `ci.yml`, ledger à la main (COLB-08 décochée : preuve humaine), arrêt avant la PR
 
 ### Phase 62: Décision sur l'approche plateforme, sur preuve
 

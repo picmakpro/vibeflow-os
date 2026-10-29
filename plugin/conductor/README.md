@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.50.4 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.52.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -117,9 +117,13 @@ la pose, aucun contrôle d'accès n'y est adossé. En poste `product`, la chaîn
 ouvert à ce poste) pose superpowers, qui apporte aussi des skills orientés dev (TDD, débogage) : « commande dev »
 désigne les skills et agents des trois modules `roles:["dev"]` plus gsd-*, pas superpowers.
 
-## Scripts (38) — par famille
+## Scripts (42) — par famille
 
-*(Compte re-dérivé au 2026-10-16, Phase 58 : même commande → 38 ; il gagne `check-role-consistency.sh`
+*(Compte re-dérivé au 2026-10-29, Phase 61 : même commande → 42 ; il gagne `vf-divergence-hook.sh` (+1)
+au-dessus du compte 41 ci-dessous. Parenthèse historique ci-dessous, inchangée : compte re-dérivé au
+2026-10-29, Phase 60 : même commande → 41 ; il gagne `check-phase-validation.sh`,
+`check-architecture.sh` et `vf-validation.sh` (+3) au-dessus du compte 38 du 2026-10-16.
+Parenthèse historique ci-dessous, inchangée : compte re-dérivé au 2026-10-16, Phase 58 : même commande → 38 ; il gagne `check-role-consistency.sh`
 et `vf-role.sh` (+2) au-dessus du compte 36 de `origin/main`. Parenthèse historique ci-dessous,
 inchangée : compte re-dérivé au 2026-09-30 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
 '*.sh' | awk 'END{print NR}'` → 33 ; il gagne `check-ajout-retrait.sh` et `guard-fin-de-geste.sh`
@@ -205,10 +209,41 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   0 (listé), 1 (hors liste ou valeur invalide), 3 (silence : aucune source de poste, pas de liste),
   5 (illisible, bruyant). `--role <poste>` juge un poste candidat avant toute pose (refus à la pose de
   l'engine) ; `--hook` est l'entrée SessionStart (voir § Hooks).
+- `check-phase-validation.sh` — gate du marqueur de phase (Phase 60, ARCG-01, ARCG-02, P60-D-02 à
+  P60-D-04) : `--phase <N> [--ws <nom>]` constate la ligne `**Validation:**` de la section de la phase du
+  ROADMAP. Lecture seule, ne lit jamais le poste ; le ROADMAP n'est jamais réimprimé. Codes 0 (validée, ou
+  marqueur absent : état de toutes les phases existantes), 1 (proposée), 3 (indéterminé : phase introuvable,
+  marqueurs ou sections multiples, valeur inconnue, ligne qui ressemble à un marqueur sans en avoir la forme, bloc ou commentaire non fermé, lab partitionné sans `--ws` ; SEULE la phase introuvable sans autre défaut laisse
+  passer les consommateurs, la ligne `BILAN` le dit par `marqueur=introuvable`, P60-D-15), 5 (illisible, bruyant), 64 (usage). Identifiant
+  de phase de la grammaire de gsd-core (`12`, `7.1`, `12A`, `AUTH`, `CK-03`), jalons livrés `<details>` ignorés,
+  sauf ceux dont le `<summary>` porte un marqueur d'activité (`in progress`, 🚧, 🔄, ACTIVE, WIP, STARTED) : le
+  gate lit ces blocs. Limite documentée, non corrigée : le gate ne lit pas STATE.md, donc un jalon actif replié dans `<details>` SANS marqueur d'activité, que gsd-core sert via STATE.md, reste caché ici (phase lue « introuvable », code 3, la boucle continue) : ce n'est pas un surensemble de ce que gsd sert. `<N>` est le numéro du titre `### Phase <N>:`, argument normalisé (blancs et UN séparateur final `.`, `/`, `-` ôtés : `60.` vaut `60`) ; tout argument qui n'est le titre d'aucune phase mais en désigne une existante rend 64 avec le numéro à employer : préfixe d'un titre du ROADMAP suivi de `-`, `_` ou `.` (`CK-03-auth-flow`, `AUTH-login`, `60-02`, `60_gate`, `60.gate` ; le plus long préfixe gagne, `60.1` reste une décimale) ou dossier de phase du même nom ; « introuvable » (3) reste réservé au cas où ni titre ni dossier ne correspondent. `vf-validation.sh` applique la même règle. Titres lus comme gsd-core (`### PHASE 5:`, `### [WIP] Phase 5:`, `###Phase 5:`, indentation <= 3) ; sosies du marqueur (espace insécable ou fine avant les deux-points, ligne de tableau, tiret cadratin) = illisible (3) ; la faute de frappe du libellé (`Valdiation`) est un non-objectif. Consommateurs :
+  `vf-coder` avant plan et exécution d'une étape, `vf-auto` avant sa boucle ; un `proposed` constaté (1) ou un
+  tout autre résultat indéterminé (code 3 sans `marqueur=introuvable`, code 64, code 5) les arrête. Limite fail-open écrite : le mode
+  « Regenerate all » d'`edit-phase` peut perdre le marqueur et une phase ajoutée à la main n'en a pas.
+- `check-architecture.sh` — gate de l'architecture avant découpage (Phase 60, ARCG-06, ARCG-07, P60-D-05,
+  P60-D-06) : `--architecture <f>` constate la ligne d'état et les six rubriques minimales (contexte, choix
+  structurants, composants, données, contraintes, risques), chacune avec un corps non vide. Lecture seule, ne
+  lit que le fichier passé. Codes 0 (validée et complète, seule porte verte), 1 (fichier absent, `proposed`,
+  rubrique absente ou vide), 3 (statut absent, inconnu ou multiple), 5 (illisible, bruyant), 64 (usage).
+  Consommateurs : le head devant un découpage, le manager produit. Limites : une ligne `validated` posée à la
+  main est crue (ni auteur ni date vérifiés) ; une rubrique dont le corps commence par `[` (un lien) est lue vide (faux rouge, contournable en
+  anteposant un mot, documenté, non corrigé).
 - `vf-role.sh` — lecteur UNIQUE du poste (P58-D-15), interface des Phases 59 à 61 :
   `vf-role.sh get [--path <dir>]` imprime exactement une ligne `solo|product|dev` (priorité `VF_ROLE`,
   puis `<racine>/.claude/vibeflow-role`, puis `solo`), codes 0 / 1 (invalide) / 5 (fichier illisible) /
   64 (usage) ; lecture seule, l'engine est l'unique écrivain du fichier.
+- `vf-validation.sh` — SEUL écrivain de la ligne `**Validation:**` (Phase 60, P60-D-05, P60-D-10) : un
+  verbe de script, jamais un skill. `propose --phase <N> [--ws <nom>]` pose `proposed` après le paragraphe
+  `**Goal:**` de la phase ; `validate` (`--phase <N> [--ws <nom>]` ou `--architecture <f>`, ce dernier borné à l'intérieur de la racine =
+  répertoire courant physique, refus 5 hors de celle-ci) la bascule en
+  `validated (<poste>, <date>[, override])`. Le poste du validateur, lu par `vf-role.sh get` (seulement par
+  `validate`), est tracé dans la valeur ; au poste `product` le verbe refuse (code 1) sauf `--override`, tracé
+  lui aussi ; un poste illisible rend 5, jamais un repli sur `solo`. Jamais dégradé (`propose` sur une phase
+  validée rend 3), une seule ligne changée, écriture atomique. Codes 0 / 1 / 3 / 5 / 64 ; aucun commit, aucun
+  verrou de driver. Limites : un humain peut toujours éditer la ligne à la main (un poste est une vue, pas un
+  droit, ADR-077) ; le marqueur n'est jamais commité par le verbe, un worktree ne le voit donc pas (inerte tant que l'isolation reste
+  séquentielle, ADR-059).
 - `check-map-drift.sh` — gate anti-drift carte↔disque (contrat de routage par dossier).
 - `check-guard-health.sh` — lecteur générique `SessionStart` des marqueurs de santé écrits par
   `vf_guard_unavailable` (tout le parc de gardes, pas seulement le lock) : fail-open bruyant plutôt
@@ -217,10 +252,41 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   S2 + S4(a) + S4(b) + S5 (numéro de phase dupliqué dans un compartiment, cardinalité
   dossiers/entrées de feuille de route/compteurs, fuite d'une phase de compartiment vers la
   racine). Quatre codes de sortie : `0` conforme, `1` divergence, `2` non vérifiable, `3` silence
-  (dépôt non partitionné). Consommé par `scripts/hooks/post-merge` à la racine du dépôt (**opt-in**,
-  `git config core.hooksPath scripts/hooks`, jamais armé par défaut, n'interrompt jamais un merge)
-  et par le job CI `gates` (preuve locale par bascule de mutation — aucun run GitHub Actions réel
-  observé à ce jour, rien n'ayant encore été poussé). Doctrine : `dev-orchestrator/references/workstreams.md` §4.
+  (dépôt non partitionné). Consommé par `scripts/hooks/post-merge` à la racine de CE dépôt (**opt-in**,
+  `git config core.hooksPath scripts/hooks`, jamais armé par défaut ici, n'interrompt jamais un merge ;
+  fichier intouché par la Phase 61) et par le job CI `gates` (preuve locale par bascule de mutation —
+  aucun run GitHub Actions réel observé à ce jour, rien n'ayant encore été poussé). Dans un LAB, il est
+  au contraire armé par défaut aux postes `product` et `dev`, par `vf-divergence-hook.sh` (entrée
+  suivante) posé par l'installeur ; jamais au poste `solo`. Doctrine : `dev-orchestrator/references/workstreams.md` §4.
+- `vf-divergence-hook.sh` — filet de divergence ARMÉ dans un clone de lab d'équipe (Phase 61, spec
+  équipe-produit §5.3, COLB-01 à COLB-07). Verbes : `arm [--path <dir>] [--check|--refresh]`, `disarm`,
+  `status`, `run --hook <post-merge|post-rewrite|post-commit>`. L'installeur l'arme aux postes `product` et `dev`
+  (`install`, verbe `role`), le retire au poste `solo`, à `uninstall --all` et sous
+  `VF_DIVERGENCE_HOOK=off` (sortie explicite, lue à chaque install), et le rafraîchit à `update --all`
+  (le chemin du cache versionné change, un clone non armé n'est JAMAIS armé par une mise à jour). Il
+  pose trois hooks statiques `post-merge`, `post-rewrite` et `post-commit` dans le dossier de hooks réel du clone
+  (`git rev-parse --git-path hooks`, worktrees compris), jamais par `core.hooksPath` ; un hook
+  tiers, un `core.hooksPath` configuré, un dossier de hooks dont le chemin réel sort du dossier git du dépôt
+  (`.git/hooks` lien vers l'arbre ou un dossier partagé) ou un lab qui n'est pas la racine du dépôt sont REFUSÉS
+  audiblement (code 1, ligne à ajouter à la main) sans jamais faire échouer l'installation. Le hook
+  n'exécute que le script du cache du plugin (jamais un fichier de l'arbre versionné du lab) et
+  inspecte le worktree courant ; chemin disparu → `NON VERIFIABLE` audible, jamais un faux conforme.
+  Chaque exécution non silencieuse (divergence, non vérifiable) ajoute une ligne à un journal non
+  versionné `<git-common-dir>/vf-divergence/journal.tsv` (sept champs tabulés, survit au désarmement).
+  Codes de `run` : 0 silence, 1 divergence, 2 non vérifiable, 64 usage. Un troisième hook, `post-commit`,
+  ne juge que si HEAD est un commit de fusion : c'est le seul qui voit une fusion EN CONFLIT conclue à la main
+  (`git commit --no-edit`, `git merge --continue`), que git ne fait jamais passer par `post-merge`. La « ligne à
+  ajouter à la main » d'un hook tiers tolère l'absence du script (`[ -f '<script>' ] && bash '<script>' run … || true`),
+  donc un hook tiers sous `set -e` ne casse pas quand le cache versionné est purgé ; `arm --refresh` et `update --all`
+  signalent une telle ligne périmée (`REFUS ligne-perimee`, nouvelle ligne imprimée, hook tiers jamais réécrit) ;
+  `status` dit `NON-EXECUTABLE` (code 1) pour notre hook sans bit d'exécution. Limites mesurées (git 2.50.1) :
+  `git pull --rebase` avec commit local ne passe que par `post-rewrite` (doublé exprès) ; `reset --hard`,
+  `switch`/`checkout`, `cherry-pick` et un `rebase` qui ne réécrit aucun commit ne déclenchent aucun
+  hook ; une fusion faite sur la forge n'est vue qu'au `git pull` local suivant ; **lab non partitionné** (aucun
+  `.planning/workstreams/`) : filet inerte, `check-divergence` rend 3 et le hook se tait. Suites :
+  `test-vf-divergence-hook.sh` (112 contrôles dont 54 mutants ; 5 contrôles « système de fichiers sensible à la casse »
+  sautés sous Linux), `test-vibeflow-update-divergence.sh` (installeur, 19 cas, 11 mutants) et la preuve à deux
+  clones `test-divergence-deux-clones.sh` (18 cas, témoins rouges) sous `plugin/_internal/tests/`.
 - `check-instruction-budget.sh` — mesure et publie, par fichier d'agent distribué
   (`plugin/*/agents/*.md` et `plugin/*/AGENT.md`), deux métriques : lignes du fichier entier et
   instructions du body (Phase 25, BUDG-01/02, ADR-029). Ratchet par sentinelle versionnée

@@ -1,5 +1,18 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.30.0] — 2026-10-29 (phases proposées, gate architecture) — publiée dans v2.74.0
+
+**Minor** (Phase 60, ARCG-01, ARCG-03, ARCG-04, ARCG-05, ARCG-09 ; mandat Samuel, /vf-auto session principale, 2026-10-29) :
+
+- **Porte « phase proposée » de `vf-coder`** : avant `gsd-plan-phase` puis `gsd-execute-phase`, il constate le marqueur de l'étape par `check-phase-validation.sh --phase <N>` ; code 1 → rapport typé `blocked` avec un finding `action: ask-user`, aucune brique lancée ; code 3 avec `marqueur=introuvable` sur la ligne `BILAN` (étape absente du ROADMAP) → une ligne au rapport et le cycle continue, SEUL résultat indéterminé qui laisse passer (P60-D-15, arbitrage Samuel, AskUserQuestion session principale, 2026-10-29) ; tout autre code 3, code 64 et code 5 → `human_needed`; un mandat sans numéro d'étape n'appelle pas le script. `vf-dev-manager.md` n'est pas modifié.
+- **Étape 0 bis de `vf-auto`** : même contrôle avant la boucle du moteur direct `gsd-autonomous` ; une étape proposée empêche le démarrage ; `marqueur=introuvable` : une ligne et l'étape entre dans la boucle ; tout autre code 3, code 64 et code 5 : arrêt. Limite écrite : une étape ajoutée pendant la boucle n'est pas interceptée. Au dispatch de l'équipe, aux postes `product` et `dev`, le brief porte `Phases ajoutées : proposées`.
+- **§5 de `product-routing.md`** : devant une intention de découpage, aux postes `product` et `dev` et seulement si `.planning/BRIEF.md` existe, le head consulte `check-architecture.sh` ; code 1 → une phrase et halte, demande réitérée servie avec override tracé ; poste `solo` inchangé. `AGENT.md` ne gagne aucune ligne (ligne-pointeur prolongée).
+- **Champ de brief `Phases ajoutées`** (`mission-contracts.md` §Brief de mission) : consigne de pose de « proposée » lue par `vf-dev-manager` (`vf-validation.sh propose`) ; absent → aucun marqueur. Risque résiduel écrit (fail-open) ; la pose par le manager n'est prouvée que par le texte et le lien manager → contrat, pas par exécution (dette ouverte).
+- **Test T45** (`test-dev-orchestrator.sh`) : ablation par clause, ordre, inversions (code 1, BRIEF, poste solo, et mutants qui font passer un indéterminé autre que `marqueur=introuvable` ou bloquer la phase introuvable), commande citée jouée contre le gate réel, liens vers les scripts du conductor.
+- Instructions : `AGENT.md` 33, `vf-coder.md` 23 (baseline 23, marge consommée), `vf-dev-manager.md` 46 ; aucune valeur de baseline relevée.
+- **Correction de revue (2026-10-29)** : `<N>` défini comme le numéro du titre `### Phase <N>:` du ROADMAP (ni nom de dossier, ni identifiant de plan) dans `vf-coder` et `vf-auto` ; « tout autre code (5, 64, 126, 127, …) arrête » ; un code non nul de `vf-validation.sh propose` est un bloqueur remonté à l'humain (`mission-contracts.md` §Champ `Phases ajoutées`).
+
+
 ## [v2.29.1] — 2026-10-29 (gsd-run.sh sans HOME) — publiée dans v2.73.1
 
 **Patch** (relecture adverse de la release v2.72.0 ; pas d'issue liée ; publiée dans v2.73.1) :
