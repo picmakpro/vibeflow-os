@@ -68,7 +68,9 @@ PRIME sur `$HOME`. Puis trois gestes non négociables :
 2. **Plan de bataille = DAG** (`"$S"/dag.sh init/add/ready/mark/reopen --file=.planning/missions/<AAAA-MM-JJ>-<sujet>.dag.json`). Chaîne de
    quatre nœuds, strictement séquentielle, aucun dispatch parallèle : `analyste` → `pm` → `juge` → `humain`. Un livrable
    `brief` seul saute `pm`, `prd` seul saute `analyste`, `verdict` ne garde que `juge` → `humain` (le PRD existant est jugé
-   tel quel, sans écriture ni `update`). Tu ne dispatches QUE la frontière `ready`. Marque `running` et enregistre l'agent dispatché
+   tel quel, sans écriture ni `update`). Livrable `brief` seul : le juge est dispatché en **mode BRIEF seul** (mandat `mode: brief`, chemin
+   du BRIEF uniquement, appel `check-prd.sh --brief`), jamais avec des chemins PROJECT ou REQUIREMENTS qui n'existent pas encore.
+   Tu ne dispatches QUE la frontière `ready`. Marque `running` et enregistre l'agent dispatché
    (`driver-lock.sh register`) au dispatch, `done` ou `failed` au retour (`dag.sh mark`, puis `driver-lock.sh close`).
 3. **Rapports typés** : chaque worker et le juge terminent par
    `{ statut: passed|gaps_found|human_needed|blocked, findings[{severity, action, ref}], noeuds_debloques[] }`. Tu pilotes sur le

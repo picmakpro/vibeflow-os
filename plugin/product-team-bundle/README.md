@@ -81,13 +81,13 @@ un sélecteur de gabarit), puis sert la demande. Première demande type :
 | `agents/vf-product-manager.md` | manager de mission : DAG + verrou de driver, digest par mandat, rapports typés ; ne produit jamais | opus |
 | `agents/vf-product-analyst.md` | worker interne : rédige ou met à jour `.planning/BRIEF.md` | sonnet |
 | `agents/vf-product-pm.md` | worker interne : instancie PROJECT + REQUIREMENTS depuis le gabarit `product` | sonnet |
-| `agents/prd-gate.md` | juge frais read-only : rubric /100, seuil 80, deux éliminatoires | sonnet |
+| `agents/prd-gate.md` | juge frais read-only : rubric /100 (rubric propre au BRIEF quand le livrable est le BRIEF seul), seuil 80, deux éliminatoires | sonnet |
 | `skills/vf-product/SKILL.md` | point d'entrée `/vf-product` | — |
 | `references/BRIEF.template.md` | gabarit à cinq rubriques : problème, utilisateurs, valeur, contraintes, hors périmètre | — |
 | `scripts/check-prd.sh` | gate déterministe, lecture seule | — |
 
 Codes de `check-prd.sh` : `0` conforme · `1` éliminatoire · `3` indéterminé (cible absente, zéro
-exigence, bloc de code ou commentaire HTML non fermé) · `5` entrée illisible · `64` erreur d'usage. Le code 2 n'est jamais émis.
+exigence, case à cocher non reconnue comme exigence, bloc de code ou commentaire HTML non fermé) · `5` entrée illisible · `64` erreur d'usage. Le code 2 n'est jamais émis.
 
 Chemins installés : front door `.claude/agents/product-team-bundle.md` (commande
 `/product-team-bundle`), gabarit `.claude/agents/product-team-bundle-references/BRIEF.template.md`,

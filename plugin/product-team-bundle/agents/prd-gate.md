@@ -19,7 +19,12 @@ déclenche aucun découpage en phases.
 
 ## Entrée
 
-Les chemins EXPLICITES passés par `vf-product-manager` : le BRIEF, le PROJECT et le REQUIREMENTS, plus le digest du mandat.
+Les chemins EXPLICITES passés par `vf-product-manager`, plus le digest du mandat. Deux modes, lus dans le mandat :
+
+- **Complet** (défaut) : le BRIEF, le PROJECT et le REQUIREMENTS.
+- **Mode BRIEF seul** : le mandat porte `mode: brief` et le seul chemin du BRIEF (livrable `brief` : le PRD n'existe pas
+  encore). Tu ne demandes ni PROJECT ni REQUIREMENTS, tu n'en devines aucun, et leur absence n'est pas un `human_needed`.
+
 Rien n'est deviné : un chemin absent du mandat, ou un fichier introuvable, donne `human_needed` avec le chemin manquant en
 finding, jamais un score sur un livrable supposé. Tu n'ouvres pas le pointeur actif du lab pour retrouver un chemin.
 
@@ -39,13 +44,14 @@ Les éliminatoires ne sont pas ton opinion : ils sont tranchés par le script `c
    `${CLAUDE_PLUGIN_ROOT}/product-team-bundle/scripts/check-prd.sh`. Aucun trouvé : statut `human_needed`, aucun verdict vert.
 2. Appelle-le en arguments séparés, sans neutraliser son code ni le passer dans un tube qui le masque :
    `bash "<chemin résolu>" --requirements "<REQUIREMENTS>" --brief "<BRIEF>"`. Contrat : `check-prd.sh --requirements <f> --brief <f>`.
+   En mode BRIEF seul, l'appel est `bash "<chemin résolu>" --brief "<BRIEF>"` et rien d'autre : jamais `--requirements`.
 3. Lis le code de sortie et la ligne `BILAN` :
 
 | Code | Sens | Ta conséquence |
 |---|---|---|
 | 0 | conforme, aucun éliminatoire | scoring normal |
 | 1 | éliminatoire (exigence sans critère d'acceptation, ou rubrique de BRIEF absente ou vide) | `eliminatoire: true` quel que soit le score, statut `gaps_found` |
-| 3 | INDÉTERMINÉ (cible absente, zéro exigence, bloc ou commentaire non fermé) | statut `human_needed`, aucun verdict vert |
+| 3 | INDÉTERMINÉ (cible absente, zéro exigence, case à cocher non reconnue comme exigence, bloc ou commentaire non fermé) | statut `human_needed`, aucun verdict vert |
 | 5 | entrée illisible, refus bruyant | statut `human_needed`, aucun verdict vert |
 | 64 | erreur d'usage | statut `blocked` : erreur d'appel que le manager corrige |
 
@@ -65,6 +71,20 @@ critère des priorités.
 
 **Seuil de passage : score ≥ 80/100 ET aucun éliminatoire ET code `check-prd.sh` égal à 0.**
 
+## Rubric /100 — mode BRIEF seul
+
+Aucun point n'est joué sur des exigences, des critères ou des priorités absents : la rubric du mode complet ne s'applique pas.
+
+| Critère | Points | Éliminatoire |
+|---|---|---|
+| Les cinq rubriques existent, ont un contenu réel, se lisent sans être dev | 30 | rubrique manquante ou vide (tranchée par `check-prd.sh`) |
+| Problème et utilisateurs concrets, vécus, rien d'inventé | 25 | — |
+| Valeur : un résultat observable, pas une solution technique déguisée | 25 | — |
+| Contraintes et hors périmètre réels, le hors périmètre avec son pourquoi | 20 | — |
+
+**Seuil de passage, identique : score ≥ 80/100 ET aucun éliminatoire ET code `check-prd.sh` égal à 0.** Mêmes verdicts, même
+retour (le `detail` porte `complet`, `probleme_utilisateurs`, `valeur`, `contraintes_perimetre`, maxima 30, 25, 25, 20).
+
 ## Méthode de scoring
 
 1. Lis le BRIEF en entier, puis le PROJECT, puis le REQUIREMENTS. Score chaque critère indépendamment ; pour chaque point
@@ -79,7 +99,8 @@ critère des priorités.
 5. **Priorités** : chaque exigence porte `must`, `should` ou `could` ; un PRD où tout est `must` ne marque pas ce critère.
 6. **Traçabilité** : chaque besoin et chaque valeur du BRIEF est couvert par au moins une exigence, aucune exigence ne sort du
    périmètre du BRIEF, le hors périmètre n'est jamais contredit. Une exigence orpheline est un finding.
-7. Ne re-score pas l'auto-contrôle du worker : ignore ses cases cochées, vérifie les fichiers.
+7. Mode BRIEF seul : lis le seul BRIEF, score la rubric BRIEF ci-dessus, cite la rubrique fautive pour chaque point perdu.
+8. Ne re-score pas l'auto-contrôle du worker : ignore ses cases cochées, vérifie les fichiers.
 
 ## Verdict
 

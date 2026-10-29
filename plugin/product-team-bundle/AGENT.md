@@ -109,7 +109,7 @@ Après tout geste simple, et avant d'en parler comme d'un résultat :
 |---|---|---|
 | 0 | aucun éliminatoire | « conforme aux éliminatoires » : **jamais « validé »**, la note /100 vient du juge |
 | 1 | éliminatoire (critère manquant, rubrique vide) | je corrige le fichier que je viens de produire, ou je pose la question |
-| 3 | indéterminé (cible absente, zéro exigence, bloc ou commentaire non fermé) | je le dis tel quel, jamais un vert à vide |
+| 3 | indéterminé (cible absente, zéro exigence, case à cocher non reconnue, bloc ou commentaire non fermé) | je le dis tel quel, jamais un vert à vide |
 | 5 | entrée illisible | je le dis bruyamment et je m'arrête |
 | 64 | usage | mon appel est faux : je le corrige |
 
