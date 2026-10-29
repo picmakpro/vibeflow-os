@@ -8,6 +8,8 @@
 # rend 0 ou 1. Il est joué sur le module réel (témoin positif) ET sur une COPIE MUTÉE, qui doit
 # rougir avec le motif attendu, pas seulement avec un code non nul. Copie identique = NON OPPOSABLE.
 #
+#   PTB-DISPOSITION — dépôt ou lab reconnu par le NOM de la racine (signal positif), jamais par l'absence d'un fichier ;
+#                     en dépôt, retirer AGENT.md, module.json ou VERSION rougit (mutants)
 #   PTB-COMPO, PTB-MODULE, PTB-LIGNES — fichiers, frontmatters, module.json, 250 lignes (+ mutants)
 #   PTB-AGENTS, PTB-FRONT — check-agents.sh en monde fermé (mutants I6, I1 x2, I5, I2) et sur AGENT.md
 #   PTB-JUGE, PTB-MANAGER — une ancre par clause de seuil (79 n'est pas 80, rubric = 100, human_needed,
@@ -39,12 +41,23 @@ TMPW="$TMP/w.out"
 AGENTS="vf-product-manager vf-product-analyst vf-product-pm prd-gate"
 CORPUS="AGENT.md agents/vf-product-manager.md agents/vf-product-analyst.md agents/vf-product-pm.md agents/prd-gate.md"
 
-# Disposition : DÉPÔT (le module est un dossier complet : AGENT.md, module.json, VERSION) ou LAB (suite posée à
-# plat sous .claude/scripts/tests/ par l'installeur : le module n'existe plus comme dossier). Les contrôles qui
-# lisent le module entier ou les dossiers voisins du dépôt sont sautés AUDIBLEMENT en lab (SKIP compté, jamais OK).
-if [ -f "$MOD/module.json" ] && [ -f "$MOD/AGENT.md" ]; then LAB=0; else LAB=1; fi
+# Disposition : DÉPÔT (le module est un dossier complet nommé product-team-bundle : AGENT.md, module.json, VERSION) ou
+# LAB (suite posée à plat par l'installeur sous <racine>/.claude/scripts/tests/ : le module n'existe plus comme
+# dossier). Elle se reconnaît par un signal POSITIF, le nom de la racine, JAMAIS par l'absence d'un fichier contrôlé
+# (sinon supprimer AGENT.md ferait passer la suite en « lab » et sauter ses contrôles). Un nom inconnu est un KO.
+# Les contrôles qui lisent le module entier ou les dossiers voisins du dépôt sont sautés AUDIBLEMENT en lab (SKIP
+# compté, jamais OK) ; en dépôt, l'absence d'un fichier du module est un KO.
+detect_dispo() { # <racine> -> depot | lab | inconnue
+  case "$(basename "$1")" in
+    .claude) echo lab ;;
+    product-team-bundle) echo depot ;;
+    *) echo inconnue ;;
+  esac
+}
+DISPO="$(detect_dispo "$MOD")"
+if [ "$DISPO" = lab ]; then LAB=1; else LAB=0; fi
 
-echo "== test-product-team-bundle (module: $MOD) =="
+echo "== test-product-team-bundle (module: $MOD, disposition: $DISPO) =="
 [ "$LAB" = 1 ] && echo "  (disposition lab : contrôles propres au dépôt sautés — composition du module, lignes, front matter AGENT.md, noms, gabarits)"
 
 # --- Outils de mutation (aucune écriture hors de $TMP)
@@ -136,6 +149,36 @@ ctl_lignes() {
   [ "${n:-999}" -le 500 ] || { echo "KO-LIGNES:$f $n >500"; r=1; }
   return $r
 }
+
+ctl_disposition() { # <racine> : en dépôt, AGENT.md, module.json et VERSION sont exigés ; nom inconnu = rouge
+  local r=0 f
+  case "$(detect_dispo "$1")" in
+    depot) for f in AGENT.md module.json VERSION; do [ -f "$1/$f" ] || { echo "KO-DISPOSITION:absent $f en disposition dépôt"; r=1; }; done ;;
+    lab) : ;;
+    *) echo "KO-DISPOSITION:racine $(basename "$1") ni .claude ni product-team-bundle"; r=1 ;;
+  esac
+  return $r
+}
+
+# --- PTB-DISPOSITION : signal positif, jamais l'absence d'un fichier contrôlé (revue-59, tour 2)
+mkdispo() { rm -rf "$TMP/dispo.$1"; mkdir -p "$TMP/dispo.$1"; cp -R "$MOD" "$TMP/dispo.$1/product-team-bundle" 2>/dev/null && echo "$TMP/dispo.$1/product-team-bundle"; }
+case_ctl "PTB-DISPOSITION : racine réelle reconnue ($DISPO), fichiers exigés en dépôt" ctl_disposition "$MOD"
+if [ "$DISPO" = depot ]; then
+  M="$(mkdispo agent)"; rm -f "$M/AGENT.md"
+  mutant_ptb DISPO-AGENT "KO-DISPOSITION:absent AGENT.md" ctl_disposition "$MOD" "$M"
+  M="$(mkdispo json)"; rm -f "$M/module.json"
+  mutant_ptb DISPO-MODULE-JSON "KO-DISPOSITION:absent module.json" ctl_disposition "$MOD" "$M"
+  M="$(mkdispo version)"; rm -f "$M/VERSION"
+  mutant_ptb DISPO-VERSION "KO-DISPOSITION:absent VERSION" ctl_disposition "$MOD" "$M"
+fi
+mkdir -p "$TMP/dx/.claude" "$TMP/dx/product-team-bundle" "$TMP/dx/ailleurs"
+{ [ "$(detect_dispo "$TMP/dx/.claude")" = lab ] && [ "$(detect_dispo "$TMP/dx/product-team-bundle")" = depot ] \
+  && [ "$(detect_dispo "$TMP/dx/ailleurs")" = inconnue ]; } \
+  && ok "PTB-DISPOSITION : « .claude » = lab, « product-team-bundle » = dépôt, tout autre nom = inconnue" \
+  || ko "PTB-DISPOSITION : détection de la disposition par le nom de la racine"
+if ctl_disposition "$TMP/dx/ailleurs" >/dev/null 2>&1; then ko "PTB-DISPOSITION : racine inconnue acceptée (devrait rougir)"; else ok "PTB-DISPOSITION : racine inconnue rouge"; fi
+if ctl_disposition "$TMP/dx/.claude" >/dev/null 2>&1; then ok "PTB-DISPOSITION : racine « .claude » sans AGENT.md acceptée (lab)"; else ko "PTB-DISPOSITION : racine lab rouge à tort"; fi
+if ctl_disposition "$TMP/dx/product-team-bundle" >/dev/null 2>&1; then ko "PTB-DISPOSITION : dossier module vide accepté (devrait rougir)"; else ok "PTB-DISPOSITION : dossier module vide rouge en dépôt"; fi
 
 # --- PTB-COMPO / PTB-MODULE / PTB-LIGNES — cas directs puis mutants
 if [ "$LAB" = 1 ]; then
