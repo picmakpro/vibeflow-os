@@ -60,10 +60,12 @@
 #     0 = arme (hooks nostres ou armes a la main a jour)   1 = non arme   2 = non verifiable
 #     3 = pas de depot git   64 = usage
 #   run :
-#     0 = silence (check-divergence rend 0 ou 3, ou post-rewrite autre que rebase)
-#     1 = DIVERGENCE (check-divergence rend 1) : criee sur stderr et journalisee
-#     2 = NON VERIFIABLE (check-divergence rend un autre code, ou executable introuvable) : dit sur
-#         stderr et journalise, jamais un faux conforme
+#     0 = silence TOTAL (check-divergence rend 0 ou 3, ou post-rewrite autre que rebase) : ni stderr ni
+#         stdout, pas une ligne de check-divergence non plus (P61-D-04)
+#     1 = DIVERGENCE (check-divergence rend 1) : criee sur stderr (sortie de check-divergence relayee,
+#         assainie) et journalisee
+#     2 = NON VERIFIABLE (check-divergence rend un autre code, ou executable introuvable) : UNE ligne sur
+#         stderr et une ligne de journal, jamais un faux conforme, rien de la sortie de check-divergence
 #     64 = usage
 #
 # FORME DU FICHIER DE HOOK. `#!/bin/sh` (sh POSIX), ligne 2 = le marqueur constant
@@ -76,7 +78,15 @@
 # RESOLUTION HORS DE L'ARBRE VERSIONNE (le hook n'execute jamais du code que la fusion vient
 # d'apporter). L'executable est celui du cache du plugin, embarque a l'armement ; `check-divergence.sh`
 # n'est resolu que comme VOISIN de ce script ; le repertoire INSPECTE est le `--show-toplevel` du
-# hook. Rien n'est jamais resolu depuis l'arbre du lab. Defense en profondeur : `arm` refuse un script
+# hook. Rien n'est jamais resolu depuis l'arbre du lab : AUCUNE commande du fichier de hook ni de `run` n'est
+# resolue sous la racine inspectee. Le PATH est assaini avant toute commande, dans le fichier de hook comme dans
+# `run` : sont retirees les entrees non absolues (`.`, `bin`, entree vide), les entrees absolues inexistantes et les
+# entrees dont le chemin PHYSIQUE (liens resolus, identite de fichier `-ef`, donc insensible a la casse) est la
+# racine ou dessous (direnv `PATH_add bin`, `$PWD/node_modules/.bin`, lien vers l'arbre). Racine du fichier de hook
+# = son repertoire courant physique (git lance un hook a la racine de l'arbre de travail, githooks(5)) ; racine
+# de `run` = son repertoire courant puis `--show-toplevel`. Aucune commande externe avant cet assainissement.
+# `arm`, `disarm` et `status` ignorent GIT_DIR, GIT_COMMON_DIR, GIT_WORK_TREE, GIT_INDEX_FILE (et voisins) herites :
+# ils visent le depot de `--path`, jamais un depot tiers. Defense en profondeur : `arm` refuse un script
 # situe sous la racine de travail (REFUS executable-dans-l-arbre) et `run` refuse en NON-VERIFIABLE
 # (raison `executable-dans-l-arbre`, code 2) un script situe sous le `--show-toplevel` inspecte, sans jamais
 # lancer le `check-divergence.sh` voisin. Les appels git de `run` passent sous `-c core.fsmonitor=`,
@@ -121,21 +131,45 @@
 set -uo pipefail
 export LC_ALL=C
 
-# safe_path — retire du PATH toute entree non absolue (`.`, `./node_modules/.bin`, entree vide = repertoire
-# courant) : sur un `git pull`, le repertoire courant est l'arbre que la fusion vient de remplir, et une commande
-# resolue par un PATH relatif y executerait du code de la branche fusionnee (P61-D-03). Aucune commande n'est
-# lancee avant cet appel.
-safe_path() {
-  local p="" e ifs="$IFS"
+# in_tree <chemin> <racine> — le chemin est-il la racine ou dessous ? Par IDENTITE de fichier (-ef) en remontant
+# les ancetres quand les deux existent (une comparaison de chaines se contourne par la casse sur macOS et
+# Windows : `labx/...` pour un lab `Labx`) ; comparaison de chaines sinon. Aucune commande externe (elle sert avant
+# que le PATH soit assaini) : les ancetres se remontent par expansion de parametre.
+in_tree() {
+  local p="$1" r="$2" up
+  if [ -e "$r" ] && [ -e "$p" ]; then
+    while :; do
+      [ "$p" -ef "$r" ] && return 0
+      up="${p%/*}"; [ -n "$up" ] || up=/
+      [ "$up" != "$p" ] || return 1
+      p="$up"
+    done
+  fi
+  case "$p" in "$r"|"$r"/*) return 0 ;; *) return 1 ;; esac
+}
+
+# strip_path [<racine>] — assainit le PATH (P61-D-03) : une commande resolue sous l'arbre inspecte executerait du code
+# de la branche que la fusion vient d'apporter. Retire (1) toute entree non absolue (`.`, `bin`, entree vide = repertoire
+# courant), (2) toute entree absolue inexistante, (3) avec <racine>, toute entree dont le chemin PHYSIQUE (liens resolus)
+# est la racine ou dessous, par identite de fichier (direnv `PATH_add bin`, `$PWD/node_modules/.bin`, lien vers l'arbre,
+# casse differente). Les entrees gardees sont reecrites en chemin physique. Aucune commande externe. Racine `/` : pas
+# de filtre d'arbre (tout est dessous).
+strip_path() {
+  local root="${1:-}" p="" e d ifs="$IFS"
   set -f; IFS=:
   for e in $PATH; do
-    case "$e" in /*) p="${p:+$p:}$e" ;; esac
+    case "$e" in /*) : ;; *) continue ;; esac
+    d="$(cd "$e" 2>/dev/null && pwd -P)" || continue
+    [ -n "$d" ] || continue
+    if [ -n "$root" ] && [ "$root" != / ] && in_tree "$d" "$root"; then continue; fi
+    p="${p:+$p:}$d"
   done
   IFS="$ifs"; set +f
   [ -n "$p" ] || p="/usr/bin:/bin"
   PATH="$p"; export PATH
+  hash -r
 }
-safe_path
+strip_path
 
 MARKER='# vibeflow:vf-divergence-hook v1'
 NL='
@@ -151,8 +185,9 @@ usage() {
 show_help() { awk 'NR>1 && /^# ?/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"; exit 0; }
 
 # Chemin physique de ce script (le seul exécutable que le hook embarque).
-SELF_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd -P)" || SELF_DIR=""
-SELF="$SELF_DIR/$(basename "$0")"
+case "$0" in */*) SELF_DIR="${0%/*}"; [ -n "$SELF_DIR" ] || SELF_DIR=/ ;; *) SELF_DIR=. ;; esac
+SELF_DIR="$(cd "$SELF_DIR" 2>/dev/null && pwd -P)" || SELF_DIR=""
+SELF="$SELF_DIR/${0##*/}"
 
 # git_safe : le travail du hook (run). Aucun hook, aucun fsmonitor du depot inspecte n'est execute.
 git_safe() { git -C "$ROOT" -c core.fsmonitor= -c core.hooksPath=/dev/null --no-optional-locks "$@"; }
@@ -227,10 +262,22 @@ write_hook() {
     printf "VF_DIVERGENCE_SCRIPT='%s'\n" "$SELF"
     printf "VF_DIVERGENCE_NOM='%s'\n" "$name"
     printf '%s\n' \
-      '# PATH ampute des entrees non absolues avant toute commande (une branche fusionnee ne choisit pas bash).' \
+      '# PATH assaini avant toute commande : ni entree relative, ni entree (absolue, liens resolus, casse comprise) sous l arbre de travail.' \
+      '# Une branche fusionnee ne choisit ni bash ni aucune commande. Aucune commande externe avant la fin de cette boucle.' \
+      'vf_top=$(pwd -P 2>/dev/null) || vf_top=' \
       'vf_p=; vf_o=$IFS; set -f; IFS=:' \
       'for vf_e in $PATH; do' \
-      '  case "$vf_e" in /*) vf_p="${vf_p:+$vf_p:}$vf_e" ;; esac' \
+      '  case "$vf_e" in /*) : ;; *) continue ;; esac' \
+      '  vf_d=$(cd "$vf_e" 2>/dev/null && pwd -P) || continue' \
+      '  [ -n "$vf_d" ] || continue' \
+      '  vf_q=$vf_d' \
+      '  while [ -n "$vf_top" ] && [ "$vf_top" != / ]; do' \
+      '    [ "$vf_q" -ef "$vf_top" ] && continue 2' \
+      '    vf_u=${vf_q%/*}; [ -n "$vf_u" ] || vf_u=/' \
+      '    [ "$vf_u" != "$vf_q" ] || break' \
+      '    vf_q=$vf_u' \
+      '  done' \
+      '  vf_p="${vf_p:+$vf_p:}$vf_d"' \
       'done' \
       'IFS=$vf_o; set +f' \
       '[ -n "$vf_p" ] || vf_p=/usr/bin:/bin' \
@@ -345,6 +392,8 @@ do_run() {
     exit 2
   fi
   ROOT="$root"
+  rootp="$(cd "$root" 2>/dev/null && pwd -P)" || rootp="$root"
+  strip_path "$rootp"
   common="$(git_safe rev-parse --git-common-dir 2>/dev/null)" || common=""
   [ -n "$common" ] || { say "NON VERIFIABLE (dossier git commun illisible)"; exit 2; }
   common="$(abs_under "$root" "$common")"
@@ -354,7 +403,6 @@ do_run() {
 
   # Garde d'execution (defense en profondeur, P61-D-03) : un script situe sous l'arbre inspecte n'est
   # jamais execute, et son voisin check-divergence.sh encore moins.
-  rootp="$(cd "$root" 2>/dev/null && pwd -P)" || rootp="$root"
   if in_tree "$SELF_DIR" "$rootp"; then
     journal_append "$common" "$hook" NON-VERIFIABLE - "$head" - executable-dans-l-arbre || :
     say "NON VERIFIABLE : executable dans l'arbre inspecte - refuse"
@@ -363,12 +411,13 @@ do_run() {
 
   tmp="$(mktemp "${TMPDIR:-/tmp}/vf-divergence.XXXXXX" 2>/dev/null)" || { say "NON VERIFIABLE (temporaire non creable)"; exit 2; }
   trap 'rm -f "$tmp"' EXIT
-  "${BASH:-bash}" "$SELF_DIR/check-divergence.sh" --path "$root" 2> "$tmp" </dev/null || rc=$?
-  # Les noms de dossiers de phase et de compartiment viennent de la branche fusionnee : aucun octet de controle
-  # (sauf saut de ligne et tabulation) n'atteint le terminal.
-  tr -d '\000-\010\013-\037\177' < "$tmp" >&2
+  "${BASH:-bash}" "$SELF_DIR/check-divergence.sh" --path "$root" > /dev/null 2> "$tmp" </dev/null || rc=$?
   case "$rc" in
     1)
+      # Seul le code 1 relaie la sortie de check-divergence (0 et 3 = silence, P61-D-04 ; un autre code = UNE ligne).
+      # Les noms de dossiers de phase et de compartiment viennent de la branche fusionnee : aucun octet de controle
+      # (sauf saut de ligne et tabulation) n'atteint le terminal.
+      tr -d '\000-\010\013-\037\177' < "$tmp" >&2
       sig="$(signals_of "$tmp")"
       journal_append "$common" "$hook" DIVERGENCE 1 "$head" "$sig" - || :
       say "DIVERGENCE apres $hook (signaux : $sig) ; la fusion n'est pas annulee ; journal : $common/vf-divergence/journal.tsv"
@@ -419,22 +468,6 @@ hook_state() {
 hand_line() { say "LIGNE A AJOUTER A LA MAIN ($1) : bash '$SELF' run --hook $1 \"\$@\""; }
 refus_fin() { say "SORTIE : VF_DIVERGENCE_HOOK=off"; printf 'BILAN verbe=arm code=1\n'; exit 1; }
 arm_fin() { printf 'BILAN verbe=arm code=%s\n' "$1"; exit "$1"; }
-
-# in_tree <chemin> <racine> — le chemin est-il la racine ou dessous ? Par IDENTITE de fichier (-ef) en remontant
-# les ancetres quand les deux existent (une comparaison de chaines se contourne par la casse sur macOS et
-# Windows : `labx/...` pour un lab `Labx`) ; comparaison de chaines sinon.
-in_tree() {
-  local p="$1" r="$2" up
-  if [ -e "$r" ] && [ -e "$p" ]; then
-    while :; do
-      [ "$p" -ef "$r" ] && return 0
-      up="$(dirname "$p")"
-      [ "$up" != "$p" ] || return 1
-      p="$up"
-    done
-  fi
-  case "$p" in "$r"|"$r"/*) return 0 ;; *) return 1 ;; esac
-}
 
 # real_dir <chemin absolu> — chemin physique (liens resolus) ; la derniere composante peut manquer. Code 1 si
 # non resoluble (parent absent, lien pendant).
@@ -645,12 +678,19 @@ do_status() {
   exit 1
 }
 
+# clean_git_env — arm, disarm et status visent le depot de --path : un environnement herite qui designe un autre depot
+# (GIT_DIR, GIT_COMMON_DIR, GIT_WORK_TREE, GIT_INDEX_FILE et leurs voisins) ne doit jamais armer un depot tiers.
+# `run` n'y touche pas : git le lance et pose lui-meme cet environnement.
+clean_git_env() {
+  unset GIT_DIR GIT_COMMON_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE GIT_PREFIX
+}
+
 verb="${1:-}"
 case "$verb" in
   ""|-h|--help) show_help ;;
-  arm) shift; do_arm "$@" ;;
-  disarm) shift; do_disarm "$@" ;;
-  status) shift; do_status "$@" ;;
-  run) shift; do_run "$@" ;;
+  arm) shift; clean_git_env; do_arm "$@" ;;
+  disarm) shift; clean_git_env; do_disarm "$@" ;;
+  status) shift; clean_git_env; do_status "$@" ;;
+  run) shift; strip_path "$(pwd -P)"; do_run "$@" ;;
   *) usage ;;
 esac

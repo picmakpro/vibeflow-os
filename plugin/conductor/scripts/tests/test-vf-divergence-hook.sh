@@ -7,7 +7,9 @@
 #   VDH-REWRITE-AMEND    git commit --amend sur un arbre divergent -> silence, aucune ligne de journal
 #   VDH-JOURNAL          format v1 du journal : en-tete, sept champs, date, HEAD, aucun nom de phase
 # (ajoutes par les taches suivantes du plan, voir les sections plus bas : VDH-ARM-*, VDH-DISARM*,
-#  VDH-STATUS, VDH-NOGIT, VDH-USAGE, VDH-RUN-*, VDH-INTROUVABLE, VDH-JOURNAL-LIEN, VDH-CODES, VDH-MUT-1..12.)
+#  VDH-STATUS, VDH-NOGIT, VDH-USAGE, VDH-RUN-*, VDH-INTROUVABLE, VDH-JOURNAL-LIEN, VDH-CODES, VDH-MUT-*.)
+# Tour 2 de relecture : VDH-PATH-<hook|run>-<forme> (preuve generative : 7 formes d'entree de PATH x fichier de hook et
+# run), VDH-RUN-SILENCE-TOTAL, VDH-RUN-UNE-LIGNE, VDH-ENV-*, relais CR/VT/FF, et un mutant par forme (VDH-MUT-PATH-*).
 #
 # ISOLATION (P61-PL-18) : HOME jetable, GIT_CONFIG_NOSYSTEM=1, GIT_CONFIG_GLOBAL vers un fichier vide,
 # variables VF_* et GIT_DIR retirees, identite git posee localement dans chaque clone, caches de test sous
@@ -722,14 +724,15 @@ probe_refresh_arbre() { # M15 : arm --refresh depuis un script SOUS l'arbre
 }
 probe_relais() { # M16 : octets de controle venus de la branche fusionnee
   mk_pair "p$((++N))"; arm_in "$P/b"
-  local esc bel
-  esc="$(printf '\033')"; bel="$(printf '\007')"
+  local esc bel cr vt ff
+  esc="$(printf '\033')"; bel="$(printf '\007')"; cr="$(printf '\015')"; vt="$(printf '\013')"; ff="$(printf '\014')"
   add_phase "$P/a" 02 x roadmap; git -C "$P/a" push -q origin main 2> /dev/null
-  add_phase "$P/b" 02 "${esc}]0;VFPWN${bel}y"
+  add_phase "$P/b" 02 "${esc}]0;VFPWN${bel}y${cr}VFCR${vt}VFVT${ff}VFFF"
   pull_in "$P/b" --no-rebase
   "$GREP" -qF 'DIVERGENCE apres post-merge' "$TMP/pull.err" || { LASTMSG="divergence non criee"; return 1; }
   "$GREP" -qF 'VFPWN' "$TMP/pull.err" || { LASTMSG="le nom de phase n'est plus relaye (temoin positif absent)"; return 1; }
-  if LC_ALL=C "$GREP" -q "[${esc}${bel}]" "$TMP/pull.err"; then LASTMSG="octet de controle (ESC/BEL) relaye au terminal"; return 1; fi
+  "$GREP" -qF 'VFCRVFVTVFFF' "$TMP/pull.err" || { LASTMSG="le nom a CR/VT/FF n'est plus relaye (temoin positif absent)"; return 1; }
+  if LC_ALL=C "$GREP" -q "[${esc}${bel}${cr}${vt}${ff}]" "$TMP/pull.err"; then LASTMSG="octet de controle (ESC/BEL/CR/VT/FF) relaye au terminal"; return 1; fi
   return 0
 }
 probe_path_fichier() { # M17 : PATH relatif chez l'utilisateur, fichier de hook
@@ -775,6 +778,138 @@ probe_casse() { # M20 : in_tree par identite de fichier (systeme insensible a la
   return 0
 }
 
+# --- Tour 2 de relecture (Phase 61)
+# Constat 1 (PROPRIETE) : AUCUNE commande du hook ni de run n'est resolue sous la racine inspectee. Preuve generative :
+# chaque forme d'entree de PATH x {fichier de hook, run}. Un executable piege par commande utilisee est pose dans
+# l'arbre ; il ecrit un temoin puis lance le vrai. Le moindre temoin = une commande resolue dans l'arbre.
+PERLB="$(command -v perl)"; GITB="$(command -v git)"
+CASEINS=0
+if mkdir "$TMP/CaseProbe2" 2> /dev/null && [ -d "$TMP/caseprobe2" ]; then CASEINS=1; fi
+plant_traps() { # <dossier> <dossier des temoins>
+  local c real
+  for c in bash git cat mktemp tr rm date awk mkdir dirname basename sed head; do
+    real="$(command -v "$c" 2> /dev/null)" || continue
+    case "$real" in /*) : ;; *) continue ;; esac
+    printf '#!/bin/sh\n: > "%s/hit.%s"\nexec "%s" "$@"\n' "$2" "$c" "$real" > "$1/$c"
+    chmod 755 "$1/$c"
+  done
+}
+# pcell <hook|run> <rel|dot|empty|abs|link|case|sub>
+pcell() {
+  local kind="$1" form="$2" B hits trapdir pre cwd
+  mk_pair "p$((++N))"; B="$P/b"
+  hits="$TMP/hits$N"; rm -rf "$hits"; mkdir -p "$hits"
+  case "$form" in dot|empty) trapdir="$B" ;; *) trapdir="$B/bin" ;; esac
+  mkdir -p "$trapdir"; plant_traps "$trapdir" "$hits"
+  cwd="$B"
+  case "$form" in
+    rel) pre="bin" ;;
+    dot) pre="." ;;
+    empty) pre="" ;;
+    abs) pre="$B/bin" ;;
+    link) ln -s "$B/bin" "$TMP/lnk$N"; pre="$TMP/lnk$N" ;;
+    case) pre="$P/B/bin" ;;
+    sub) mkdir -p "$B/sub"; pre="../bin"; cwd="$B/sub" ;;
+  esac
+  PULLRC=0
+  if [ "$kind" = hook ]; then
+    arm_in "$B"; [ "$HKRC" -eq 0 ] || { LASTMSG="arm rc=$HKRC"; return 1; }
+    add_phase "$P/a" 02 x roadmap; git -C "$P/a" push -q origin main 2> /dev/null
+    add_phase "$B" 02 y
+    if [ "$form" = sub ]; then
+      pull_in "$B" --no-rebase
+      (cd "$cwd" && PATH="$pre:$PATH" "$PERLB" -e 'alarm 30; exec @ARGV' "$B/.git/hooks/post-merge") > "$TMP/pc.out" 2> "$TMP/pull.err" < /dev/null || :
+    else
+      (cd "$cwd" && PATH="$pre:$PATH" "$PERLB" -e 'alarm 30; exec @ARGV' "$GITB" pull -q --no-rebase --no-edit) > "$TMP/pc.out" 2> "$TMP/pull.err" < /dev/null || PULLRC=$?
+    fi
+  else
+    diverge "$P/a" "$B" 02
+    (cd "$cwd" && PATH="$pre:$PATH" "$PERLB" -e 'alarm 30; exec @ARGV' "$BASH" "$TARGET" run --hook post-merge) > "$TMP/pc.out" 2> "$TMP/pull.err" < /dev/null || :
+  fi
+  if [ "$(nfiles "$hits")" -ne 0 ]; then LASTMSG="commande(s) resolue(s) dans l'arbre ($kind/$form) : $(ls "$hits" | awk '{ printf "%s ", $0 }')"; return 1; fi
+  "$GREP" -qF 'DIVERGENCE apres post-merge' "$TMP/pull.err" || { LASTMSG="le $kind ne crie plus ($form) : temoin positif absent — $(tail -2 "$TMP/pull.err")"; return 1; }
+  return 0
+}
+for _k in hook run; do for _f in rel dot empty abs link case sub; do
+  eval "probe_pc_${_k}_${_f}() { pcell $_k $_f; }"
+done; done
+for _k in hook run; do for _f in rel dot empty abs link sub; do
+  case_ "VDH-PATH-${_k}-${_f}" "probe_pc_${_k}_${_f}" "(constat 1, P61-D-03) : entree de PATH « $_f » -> aucune commande du $_k resolue dans l'arbre, divergence toujours criee"
+done; done
+if [ "$CASEINS" -eq 1 ]; then
+  for _k in hook run; do case_ "VDH-PATH-${_k}-case" "probe_pc_${_k}_case" "(constat 1, P61-D-03) : entree de PATH absolue sous l'arbre avec une autre casse -> aucune commande du $_k resolue dans l'arbre"; done
+else
+  skip "VDH-PATH-*-case systeme de fichiers sensible a la casse : la forme n'existe pas ici"
+fi
+
+# Constat 2 : 0 et 3 = silence TOTAL (stderr et stdout), autre code = UNE ligne, 1 = relais assaini.
+probe_silence_pull() { # pull et pull --rebase ordinaires, clone arme et conforme
+  mk_pair "p$((++N))"; arm_in "$P/b"; [ "$HKRC" -eq 0 ] || { LASTMSG="arm rc=$HKRC"; return 1; }
+  add_phase "$P/a" 02 n roadmap; git -C "$P/a" push -q origin main 2> /dev/null
+  pull_in "$P/b" --no-rebase
+  [ "$PULLRC" -eq 0 ] || { LASTMSG="pull rc=$PULLRC"; return 1; }
+  if "$GREP" -qE '\[(check-divergence|vf-divergence)\]' "$TMP/pull.err" "$TMP/pull.out"; then LASTMSG="pull conforme bavard : $("$GREP" -hE '\[(check-divergence|vf-divergence)\]' "$TMP/pull.err" "$TMP/pull.out" | head -1)"; return 1; fi
+  printf 'loc\n' > "$P/b/loc.txt"; git -C "$P/b" add loc.txt; git -C "$P/b" commit -q -m loc
+  add_phase "$P/a" 03 m roadmap; git -C "$P/a" push -q origin main 2> /dev/null
+  pull_in "$P/b" --rebase
+  [ "$PULLRC" -eq 0 ] || { LASTMSG="pull --rebase rc=$PULLRC"; return 1; }
+  if "$GREP" -qE '\[(check-divergence|vf-divergence)\]' "$TMP/pull.err" "$TMP/pull.out"; then LASTMSG="pull --rebase conforme bavard : $("$GREP" -hE '\[(check-divergence|vf-divergence)\]' "$TMP/pull.err" "$TMP/pull.out" | head -1)"; return 1; fi
+  # depot non partitionne (code 3) : meme silence
+  HKDIR="$P/b" hk run --hook post-merge
+  { [ "$HKRC" -eq 0 ] && [ ! -s "$TMP/hk.err" ] && [ ! -s "$TMP/hk.out" ]; } || { LASTMSG="run direct conforme : rc=$HKRC, stderr/stdout non vides"; return 1; }
+  return 0
+}
+probe_nv_une_ligne() { # code autre que 0/1/3 : UNE ligne, rien de check-divergence
+  mk_pair "p$((++N))"
+  mk_nopol "$TMP/nopol$N" || { LASTMSG="cache prive non construit"; return 1; }
+  local save="$TARGET"; TARGET="$TMP/nopol$N/conductor/scripts/vf-divergence-hook.sh"
+  arm_in "$P/b"; local arc="$HKRC"; TARGET="$save"
+  [ "$arc" -eq 0 ] || { LASTMSG="arm depuis le cache prive rc=$arc"; return 1; }
+  diverge "$P/a" "$P/b" 02
+  "$GREP" -qF '[vf-divergence] NON VERIFIABLE (code 2)' "$TMP/pull.err" || { LASTMSG="ligne NON VERIFIABLE absente"; return 1; }
+  [ "$("$GREP" -c . "$TMP/pull.err")" -eq 1 ] || { LASTMSG="stderr de plus d'une ligne : $("$GREP" -c . "$TMP/pull.err")"; return 1; }
+  return 0
+}
+case_ VDH-RUN-SILENCE-TOTAL probe_silence_pull "(constat 2, P61-D-04) : pull et pull --rebase conformes d'un lab partitionne, puis run sur depot non partitionne -> aucune ligne [check-divergence] ni [vf-divergence], stdout vide"
+case_ VDH-RUN-UNE-LIGNE probe_nv_une_ligne "(constat 2, P61-D-04) : check-divergence rend 2 -> une seule ligne « NON VERIFIABLE (code 2) », rien d'autre sur stderr"
+
+# Constat 3 : arm, disarm, status ignorent l'environnement qui designe un autre depot.
+env_hk() { # <VAR=valeur> <verbe> <args...> — hk avec une variable d'environnement posee
+  local kv="$1"; shift
+  HKRC=0
+  (cd "${HKDIR:-.}" && env "$kv" "$PERLB" -e 'alarm 30; exec @ARGV' bash "$TARGET" "$@") > "$TMP/hk.out" 2> "$TMP/hk.err" < /dev/null || HKRC=$?
+}
+git_env_probe() { # <variable>
+  local var="$1" val
+  mk_pair "p$((++N))"
+  case "$var" in
+    GIT_DIR) val="$P/a/.git" ;;
+    GIT_COMMON_DIR) val="$P/a/.git" ;;
+    GIT_WORK_TREE) val="$P/a" ;;
+    GIT_INDEX_FILE) val="$P/a/.git/index" ;;
+  esac
+  HKDIR="$P/b" env_hk "$var=$val" arm --path "$P/b"; local rc="$HKRC"; HKDIR=""
+  [ "$rc" -eq 0 ] || { LASTMSG="$var : arm rc=$rc — $(tail -1 "$TMP/hk.err")"; return 1; }
+  [ -e "$P/b/.git/hooks/post-merge" ] || { LASTMSG="$var : arm n'a pas arme le depot demande"; return 1; }
+  [ ! -e "$P/a/.git/hooks/post-merge" ] || { LASTMSG="$var : arm a arme le depot tiers designe par l'environnement"; return 1; }
+  # status : a est non arme, b arme ; l'environnement designe a
+  HKDIR="$P/b" env_hk "$var=$val" status --path "$P/b"; rc="$HKRC"; HKDIR=""
+  [ "$rc" -eq 0 ] || { LASTMSG="$var : status du depot arme rend $rc (l'environnement a ete suivi)"; return 1; }
+  # disarm : on arme a, puis on desarme b avec l'environnement qui designe a
+  hk arm --path "$P/a"
+  HKDIR="$P/b" env_hk "$var=$val" disarm --path "$P/b"; HKDIR=""
+  [ ! -e "$P/b/.git/hooks/post-merge" ] || { LASTMSG="$var : disarm n'a pas desarme le depot demande"; return 1; }
+  [ -e "$P/a/.git/hooks/post-merge" ] || { LASTMSG="$var : disarm a desarme le depot tiers designe par l'environnement"; return 1; }
+  return 0
+}
+probe_env_GIT_DIR() { git_env_probe GIT_DIR; }
+probe_env_GIT_COMMON_DIR() { git_env_probe GIT_COMMON_DIR; }
+probe_env_GIT_WORK_TREE() { git_env_probe GIT_WORK_TREE; }
+probe_env_GIT_INDEX_FILE() { git_env_probe GIT_INDEX_FILE; }
+for _v in GIT_DIR GIT_COMMON_DIR GIT_WORK_TREE GIT_INDEX_FILE; do
+  case_ "VDH-ENV-$_v" "probe_env_$_v" "(constat 3) : $_v herite designant un autre depot -> arm, status, disarm visent le depot de --path"
+done
+
 # ===========================================================================
 # Mutants (QUAL-01) : une ligne altree chacun, cmp -s different, bash -n valide, sonde rouge sur le mutant
 # puis verte sur l'original.
@@ -797,6 +932,34 @@ mutant() {
   if ! bash -n "$MUTBIN" 2> /dev/null; then ko "$id mutant invalide (bash -n) — $desc"; return; fi
   local nl; nl="$(awk 'NR==FNR { a[FNR] = $0; next } a[FNR] != $0 { n++ } END { print n + 0 }' "$SCRIPT" "$MUTBIN")"
   if [ "$nl" != 1 ]; then ko "$id mutant mal cible ($nl lignes changees au lieu de 1) — $desc"; return; fi
+  TARGET="$MUTBIN"; LASTMSG=""; "$probe" < /dev/null; local mrc=$?; local mmsg="$LASTMSG"
+  TARGET="$ORIG_TARGET"; LASTMSG=""; "$probe" < /dev/null; local orc=$?
+  if [ "$mrc" -ne 0 ] && [ "$orc" -eq 0 ]; then
+    ok "$id tue ($desc) — sur le mutant : $mmsg"
+  elif [ "$mrc" -eq 0 ]; then
+    ko "$id mutant SURVIVANT ($desc) — la sonde ${probe#probe_} reste verte sur le mutant"
+  else
+    ko "$id original rouge apres mutation ($desc) — $LASTMSG"
+  fi
+  TARGET="$ORIG_TARGET"
+}
+
+# mutant2 <id> <repere1> <ancien1> <nouveau1> <repere2> <ancien2> <nouveau2> <sonde> <description> : deux lignes
+# alterees (deux gardes redondantes a neutraliser ensemble : chacune seule est subsumee par l'autre).
+mutant2() {
+  local id="$1" n1="$2" o1="$3" w1="$4" n2="$5" o2="$6" w2="$7" probe="$8" desc="$9"
+  [ -n "$MUTDIR" ] || { ko "$id mutants indisponibles"; return; }
+  if ! declare -F "$probe" > /dev/null; then ko "$id sonde $probe NON DEFINIE — $desc"; return; fi
+  local step="$MUTDIR/step.sh"
+  NEEDLE="$n1" OLD="$o1" NEW="$w1" awk 'BEGIN { n = ENVIRON["NEEDLE"]; o = ENVIRON["OLD"]; w = ENVIRON["NEW"] }
+    { if (index($0, n)) { i = index($0, o); if (i) $0 = substr($0, 1, i - 1) w substr($0, i + length(o)) } print }' "$SCRIPT" > "$step"
+  NEEDLE="$n2" OLD="$o2" NEW="$w2" awk 'BEGIN { n = ENVIRON["NEEDLE"]; o = ENVIRON["OLD"]; w = ENVIRON["NEW"] }
+    { if (index($0, n)) { i = index($0, o); if (i) $0 = substr($0, 1, i - 1) w substr($0, i + length(o)) } print }' "$step" > "$MUTBIN"
+  rm -f "$step"
+  if cmp -s "$MUTBIN" "$SCRIPT"; then ko "$id mutant NON OPPOSABLE (copie identique a l'original) — $desc"; return; fi
+  if ! bash -n "$MUTBIN" 2> /dev/null; then ko "$id mutant invalide (bash -n) — $desc"; return; fi
+  local nl; nl="$(awk 'NR==FNR { a[FNR] = $0; next } a[FNR] != $0 { n++ } END { print n + 0 }' "$SCRIPT" "$MUTBIN")"
+  if [ "$nl" != 2 ]; then ko "$id mutant mal cible ($nl lignes changees au lieu de 2) — $desc"; return; fi
   TARGET="$MUTBIN"; LASTMSG=""; "$probe" < /dev/null; local mrc=$?; local mmsg="$LASTMSG"
   TARGET="$ORIG_TARGET"; LASTMSG=""; "$probe" < /dev/null; local orc=$?
   if [ "$mrc" -ne 0 ] && [ "$orc" -eq 0 ]; then
@@ -845,10 +1008,6 @@ mutant VDH-MUT-16 '    if in_tree "$SELF" "$ROOT"; then' 'in_tree "$SELF" "$ROOT
   "--refresh : refus du script sous l'arbre retire"
 mutant VDH-MUT-17 '< "$tmp" >&2' "tr -d '\\000-\\010\\013-\\037\\177' <" 'cat <' probe_relais \
   "relais de la sortie de check-divergence sans filtre des caracteres de controle"
-mutant VDH-MUT-18 'case "$vf_e" in /*)' '/*)' '*)' probe_path_fichier \
-  "fichier de hook : entrees relatives du PATH conservees (bash resolu dans l'arbre)"
-mutant VDH-MUT-19 'case "$e" in /*) p=' '/*)' '*)' probe_path_run \
-  "run : entrees relatives du PATH conservees (commandes resolues dans l'arbre)"
 mutant VDH-MUT-20 '[ "$HS" = "ARME" ] || continue' '|| continue' '|| :' probe_refresh_tiers \
   "--refresh : garde « hook nostre seulement » retiree (un hook tiers est ecrase)"
 if mkdir "$TMP/CaseProbe" 2> /dev/null && [ -d "$TMP/caseprobe" ]; then
@@ -857,6 +1016,51 @@ if mkdir "$TMP/CaseProbe" 2> /dev/null && [ -d "$TMP/caseprobe" ]; then
 else
   skip "VDH-MUT-21 systeme de fichiers sensible a la casse : le contournement par la casse n'existe pas ici"
 fi
+# Tour 2 de relecture (Phase 61) : un mutant par forme d'entree de PATH et par surface (fichier de hook, run).
+# Formes relatives (rel, dot, empty) : la regle « pas d'entree relative » et le filtre d'arbre se recouvrent quand le
+# repertoire courant est la racine (git lance le hook a la racine) ; les deux sont neutralises ensemble.
+HK_REL='case "$vf_e" in /*)'; HK_TREE='-ef "$vf_top"'
+RN_REL='case "$e" in /*) : ;;'; RN_TREE='in_tree "$d" "$root"'
+for _f in rel dot empty; do
+  mutant2 "VDH-MUT-PATH-hook-$_f" "$HK_REL" '*) continue ;;' '*) : ;;' "$HK_TREE" '&& continue 2' '&& :' "probe_pc_hook_$_f" \
+    "fichier de hook : entree « $_f » du PATH conservee (regle relative et filtre d'arbre neutralises)"
+  mutant2 "VDH-MUT-PATH-run-$_f" "$RN_REL" '*) continue ;;' '*) : ;;' "$RN_TREE" 'then continue; fi' 'then :; fi' "probe_pc_run_$_f" \
+    "run : entree « $_f » du PATH conservee (regle relative et filtre d'arbre neutralises)"
+done
+mutant VDH-MUT-PATH-hook-abs "$HK_TREE" '&& continue 2' '&& :' probe_pc_hook_abs \
+  "fichier de hook : entree absolue sous l'arbre conservee"
+mutant VDH-MUT-PATH-run-abs "$RN_TREE" 'then continue; fi' 'then :; fi' probe_pc_run_abs \
+  "run : entree absolue sous l'arbre conservee"
+mutant VDH-MUT-PATH-hook-link 'vf_d=$(cd "$vf_e"' 'pwd -P)' 'pwd)' probe_pc_hook_link \
+  "fichier de hook : chemin de l'entree non resolu (lien symbolique vers l'arbre)"
+mutant VDH-MUT-PATH-run-link 'd="$(cd "$e"' 'pwd -P)' 'pwd)' probe_pc_run_link \
+  "run : chemin de l'entree non resolu (lien symbolique vers l'arbre)"
+mutant VDH-MUT-PATH-hook-sub '  case "$vf_e" in /*)' '*) continue ;;' '*) : ;;' probe_pc_hook_sub \
+  "fichier de hook : entree relative conservee quand le repertoire courant n'est pas la racine"
+mutant VDH-MUT-PATH-run-sub "$RN_REL" '*) continue ;;' '*) : ;;' probe_pc_run_sub \
+  "run : entree relative conservee quand le repertoire courant n'est pas la racine"
+if [ "$CASEINS" -eq 1 ]; then
+  mutant VDH-MUT-PATH-hook-case "$HK_TREE" '-ef' '=' probe_pc_hook_case \
+    "fichier de hook : identite de fichier remplacee par une comparaison de chaines (casse contournee)"
+  mutant2 VDH-MUT-PATH-run-case 'd="$(cd "$e"' 'pwd -P)' 'pwd)' '[ "$p" -ef "$r" ] && return 0' '-ef' '=' probe_pc_run_case \
+    "run : chemin non normalise ET identite de fichier remplacee par une comparaison de chaines (casse contournee)"
+else
+  skip "VDH-MUT-PATH-*-case systeme de fichiers sensible a la casse"
+fi
+mutant VDH-MUT-SILENCE-1 '    0|3)' '0|3)' "0|3) tr -d '\\000-\\010\\013-\\037\\177' < \"\$tmp\" >&2;" probe_silence_pull \
+  "codes 0 et 3 : la sortie de check-divergence est relayee (bruit a chaque pull)"
+mutant VDH-MUT-SILENCE-2 'NON-VERIFIABLE - "$head" - "code-$rc"' 'journal_append' "tr -d '\\000-\\010\\013-\\037\\177' < \"\$tmp\" >&2; journal_append" probe_nv_une_ligne \
+  "autre code : la sortie de check-divergence est relayee en plus de la ligne NON VERIFIABLE"
+mutant VDH-MUT-ENV-1 'unset GIT_DIR ' 'GIT_DIR ' '' probe_env_GIT_DIR \
+  "GIT_DIR herite non retire (arm arme un depot tiers)"
+mutant VDH-MUT-ENV-2 'unset GIT_DIR ' 'GIT_COMMON_DIR ' '' probe_env_GIT_COMMON_DIR \
+  "GIT_COMMON_DIR herite non retire"
+mutant VDH-MUT-ENV-3 'unset GIT_DIR ' 'GIT_WORK_TREE ' '' probe_env_GIT_WORK_TREE \
+  "GIT_WORK_TREE herite non retire"
+# GIT_INDEX_FILE : le retirer est une defense en profondeur sans effet observable (aucune des commandes git de arm,
+# disarm et status ne lit l'index) ; la sonde le pose et prouve que rien n'est suivi, mais aucun mutant ne peut le tuer.
+mutant VDH-MUT-RELAIS-CTRL '< "$tmp" >&2' '\013-\037' '\016-\037' probe_relais \
+  "filtre du relais : CR, VT et FF ne sont plus retires"
 TARGET="$ORIG_TARGET"
 
 # ===========================================================================
