@@ -93,6 +93,10 @@ SH
   chmod +x "$BELT_DIR/$_belt_rt"
 done
 export PATH="$BELT_DIR:$PATH"
+# Isolement : ensure-design-deps.sh lit un fichier d'exclusion `.vf-design-skip` sous ces deux racines ;
+# les pointer sur du vide empêche le lab de l'utilisateur (ou le dépôt courant) de fausser la suite.
+export CLAUDE_PROJECT_DIR="$BELT_DIR/project-vide"; mkdir -p "$CLAUDE_PROJECT_DIR"
+export CLAUDE_CONFIG_DIR="$BELT_DIR/config-vide"; mkdir -p "$CLAUDE_CONFIG_DIR"
 
 TEAM_AGENTS="vf-design-manager vf-crafter vf-design-judge"
 WORKERS="vf-crafter vf-design-judge"
@@ -847,6 +851,115 @@ SH
     rm -rf "$T9H_DIR" "$T9H_BIN"
     rm -f "$T9H_JOURNAL"
   fi
+
+  # ---------------------------------------------------------------------------
+  # T9s — EXCLUSION PERSISTANTE (#166 volet 2) : VF_DESIGN_SKIP et le fichier `.vf-design-skip`.
+  # Tout en dry-run + FORCE (rien d'exécuté ; le faux claude de la ceinture répond `[]` à la
+  # détection) : on lit le PLAN de commandes. Un plugin exclu n'a aucune commande planifiée, les
+  # autres si ; superpowers (dépendance dure) reste planifié et son exclusion est refusée.
+  # ---------------------------------------------------------------------------
+  t9s_plan() { # env... en arguments (VAR=val) ; sortie fusionnée du script
+    env VF_DESIGN_ENSURE_DRY_RUN=1 VF_DESIGN_ENSURE_FORCE=1 VF_SCOPE=project "$@" bash "$EDD" 2>&1
+  }
+  t9s_has() { printf '%s\n' "$1" | "$GREP" -qE -- "$2"; } # $1 = sortie, $2 = motif
+  t9s_planned() { t9s_has "$1" "^\[ensure-design-deps\] \(dry-run\).*(install|marketplace add) $2"; }
+
+  # (1) VF_DESIGN_SKIP=impeccable : aucune commande impeccable, les 3 autres planifiées.
+  T9S_OUT="$(t9s_plan VF_DESIGN_SKIP=impeccable)"; T9S_RC=$?
+  t9s_ok=1
+  [ "$T9S_RC" -eq 0 ] || { ko "T9s (1) rc=$T9S_RC attendu 0"; t9s_ok=0; }
+  t9s_has "$T9S_OUT" '^\[ensure-design-deps\] \(dry-run\).*impeccable' && { ko "T9s (1) une commande impeccable est planifiée malgré VF_DESIGN_SKIP=impeccable"; t9s_ok=0; }
+  for _n in superpowers ui-ux-pro-max frontend-design; do
+    t9s_planned "$T9S_OUT" "$_n@" || { ko "T9s (1) $_n devait rester planifié"; t9s_ok=0; }
+  done
+  t9s_has "$T9S_OUT" '^\[ensure-design-deps\] impeccable : exclu \(VF_DESIGN_SKIP\)' || { ko "T9s (1) ligne « impeccable : exclu (VF_DESIGN_SKIP) » absente"; t9s_ok=0; }
+  t9s_has "$T9S_OUT" 'Résumé :.*impeccable=exclu' || { ko "T9s (1) résumé sans impeccable=exclu"; t9s_ok=0; }
+  [ "$t9s_ok" -eq 1 ] && ok "T9s (1) VF_DESIGN_SKIP=impeccable : aucune commande impeccable, les 3 autres planifiées, ligne exclu + résumé impeccable=exclu"
+
+  # (2) espaces tolérés, nom inconnu et entrées vides ignorés (log), jamais un exit non nul.
+  T9S_OUT="$(t9s_plan "VF_DESIGN_SKIP= impeccable , bogus-plugin,,")"; T9S_RC=$?
+  if [ "$T9S_RC" -eq 0 ] && ! t9s_has "$T9S_OUT" '^\[ensure-design-deps\] \(dry-run\).*impeccable' \
+     && t9s_has "$T9S_OUT" 'nom de plugin inconnu ignoré \(bogus-plugin'; then
+    ok "T9s (2) espaces tolérés, nom inconnu journalisé et ignoré, exit 0"
+  else
+    ko "T9s (2) liste à espaces/nom inconnu mal traitée (rc=$T9S_RC)"
+  fi
+
+  # (3) fichier de lab, scope project : commentaires, lignes vides et fin de ligne CRLF tolérés.
+  T9S_PROJ="$(mktemp -d)"; T9S_CFG="$(mktemp -d)"
+  mkdir -p "$T9S_PROJ/.claude"
+  printf '# plugins exclus de ce lab\n\n  impeccable   # trop bavard\r\n' >"$T9S_PROJ/.claude/.vf-design-skip"
+  T9S_OUT="$(t9s_plan CLAUDE_PROJECT_DIR="$T9S_PROJ" CLAUDE_CONFIG_DIR="$T9S_CFG")"
+  t9s_ok=1
+  t9s_has "$T9S_OUT" '^\[ensure-design-deps\] \(dry-run\).*impeccable' && { ko "T9s (3) impeccable planifié malgré .vf-design-skip"; t9s_ok=0; }
+  for _n in superpowers ui-ux-pro-max frontend-design; do
+    t9s_planned "$T9S_OUT" "$_n@" || { ko "T9s (3) $_n devait rester planifié"; t9s_ok=0; }
+  done
+  t9s_has "$T9S_OUT" '^\[ensure-design-deps\] impeccable : exclu \(\.vf-design-skip\)' || { ko "T9s (3) ligne « exclu (.vf-design-skip) » absente"; t9s_ok=0; }
+  [ "$t9s_ok" -eq 1 ] && ok "T9s (3) fichier .vf-design-skip du projet (commentaires, vides, CRLF) : impeccable exclu, les 3 autres planifiés"
+
+  # (4) fichier de config utilisateur : lu en scope user, PAS en scope project.
+  printf 'impeccable\n' >"$T9S_CFG/.vf-design-skip"; rm -f "$T9S_PROJ/.claude/.vf-design-skip"
+  T9S_OUT_U="$(t9s_plan VF_SCOPE=user CLAUDE_PROJECT_DIR="$T9S_PROJ" CLAUDE_CONFIG_DIR="$T9S_CFG")"
+  T9S_OUT_P="$(t9s_plan VF_SCOPE=project CLAUDE_PROJECT_DIR="$T9S_PROJ" CLAUDE_CONFIG_DIR="$T9S_CFG")"
+  if ! t9s_has "$T9S_OUT_U" '^\[ensure-design-deps\] \(dry-run\).*impeccable' \
+     && t9s_has "$T9S_OUT_U" 'impeccable : exclu \(\.vf-design-skip\)' \
+     && t9s_has "$T9S_OUT_P" '^\[ensure-design-deps\] \(dry-run\).*impeccable'; then
+    ok "T9s (4) CLAUDE_CONFIG_DIR/.vf-design-skip : lu en scope user (impeccable exclu), ignoré en scope project"
+  else
+    ko "T9s (4) fichier de config utilisateur : scope user doit exclure, scope project doit ignorer"
+  fi
+
+  # (5) superpowers : exclusion refusée (variable ET fichier), reste planifié, exit 0.
+  printf 'superpowers\n' >"$T9S_PROJ/.claude/.vf-design-skip"
+  T9S_OUT="$(t9s_plan VF_DESIGN_SKIP=superpowers CLAUDE_PROJECT_DIR="$T9S_PROJ")"; T9S_RC=$?
+  if [ "$T9S_RC" -eq 0 ] && t9s_planned "$T9S_OUT" 'superpowers@' \
+     && t9s_has "$T9S_OUT" 'superpowers : exclusion refusée — dépendance dure de VibeFlow' \
+     && ! t9s_has "$T9S_OUT" 'superpowers : exclu \('; then
+    ok "T9s (5) superpowers : exclusion refusée (dépendance dure), toujours planifié, exit 0"
+  else
+    ko "T9s (5) superpowers doit refuser l'exclusion et rester planifié (rc=$T9S_RC)"
+  fi
+  rm -rf "$T9S_PROJ" "$T9S_CFG"
+
+  # (6) sans exclusion : 4 plugins planifiés, aucune mention d'exclusion, et les variables vides
+  # ne changent RIEN (sortie octet pour octet identique à l'absence de variable).
+  T9S_BASE="$(t9s_plan)"
+  T9S_EMPTY="$(t9s_plan VF_DESIGN_SKIP=)"
+  t9s_ok=1
+  [ "$T9S_BASE" = "$T9S_EMPTY" ] || { ko "T9s (6) VF_DESIGN_SKIP vide change la sortie"; t9s_ok=0; }
+  t9s_has "$T9S_BASE" 'exclu' && { ko "T9s (6) mention d'exclusion sans exclusion demandée"; t9s_ok=0; }
+  for _n in superpowers ui-ux-pro-max frontend-design impeccable; do
+    t9s_planned "$T9S_BASE" "$_n@" || { ko "T9s (6) $_n devait être planifié sans exclusion"; t9s_ok=0; }
+  done
+  [ "$t9s_ok" -eq 1 ] && ok "T9s (6) sans exclusion : 4 plugins planifiés, aucune mention d'exclusion, variable vide sans effet"
+
+  # (7) --quiet : tout-vert avec impeccable exclu et absent de la liste → muet (routine) ; sans
+  # exclusion, le même état parle (impeccable absent = anomalie). Stub JSON explicite.
+  if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; then
+    skip "T9s (7) --quiet : python3/python introuvables — stub JSON impossible dans cette disposition"
+  else
+    T9S_BIN="$(mktemp -d)"
+    cat >"$T9S_BIN/claude" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "plugin" ] && [ "$2" = "list" ] && [ "$3" = "--json" ]; then
+  echo '[{"id":"superpowers@claude-plugins-official","enabled":true},{"id":"ui-ux-pro-max@ui-ux-pro-max-skill","enabled":true},{"id":"frontend-design@claude-plugins-official","enabled":true}]'
+  exit 0
+fi
+exit 1
+SH
+    chmod +x "$T9S_BIN/claude"
+    T9S_Q_SKIP="$(PATH="$T9S_BIN:$PATH" VF_DESIGN_ENSURE_DRY_RUN=1 VF_DESIGN_SKIP=impeccable bash "$EDD" --quiet 2>&1)"
+    T9S_Q_NONE="$(PATH="$T9S_BIN:$PATH" VF_DESIGN_ENSURE_DRY_RUN=1 bash "$EDD" --quiet 2>&1)"
+    T9S_Q_LINES="$(printf '%s' "$T9S_Q_SKIP" | "$GREP" -c . || true)"
+    if [ "${T9S_Q_LINES:-0}" -eq 0 ] && t9s_has "$T9S_Q_NONE" 'Résumé :.*impeccable=manquant|impeccable : absent'; then
+      ok "T9s (7) --quiet : exclusion = routine muette (0 ligne) ; sans exclusion, impeccable absent parle"
+    else
+      ko "T9s (7) --quiet : ${T9S_Q_LINES:-?} ligne(s) avec exclusion (attendu 0) ; sans exclusion : ${T9S_Q_NONE:-<muet>}"
+    fi
+    rm -rf "$T9S_BIN"
+  fi
+  unset -f t9s_plan t9s_has t9s_planned
 fi
 
 # ---------------------------------------------------------------------------

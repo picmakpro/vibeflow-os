@@ -29,6 +29,7 @@
 #   VF_SCOPE=project ./ensure-design-deps.sh                  # scope (user|project|local), défaut user
 #   VF_DESIGN_ENSURE_DRY_RUN=1 VF_DESIGN_ENSURE_FORCE=1 ./ensure-design-deps.sh
 #     # dry-run observable : logue les 4 commandes scopées même sur une machine déjà équipée
+#   VF_DESIGN_SKIP=impeccable ./ensure-design-deps.sh         # exclut impeccable (ni installé ni activé)
 #
 # Variables d'environnement :
 #   VF_DESIGN_ENSURE_DRY_RUN (défaut vide) — 1 → `run_cmd` logue au lieu d'exécuter.
@@ -42,12 +43,25 @@
 #                             `--scope "$VF_SCOPE"` — pas de dérivation : la chaîne design n'a
 #                             pas l'asymétrie global/local du bootstrap de dev (contrat de scope
 #                             unique du repo, ID4).
+#   VF_DESIGN_SKIP           (défaut vide) — plugins EXCLUS : liste séparée par des virgules parmi
+#                             ui-ux-pro-max, frontend-design, impeccable (espaces tolérés). Un plugin
+#                             exclu n'est ni installé ni activé ; sans --quiet une ligne
+#                             `<nom> : exclu (VF_DESIGN_SKIP)` le dit, et le résumé affiche
+#                             `<nom>=exclu`. Nom inconnu → ligne log, ignoré (jamais un exit non nul).
+#                             `superpowers` est une dépendance dure de VibeFlow : son exclusion est
+#                             REFUSÉE (message clair), traitement normal ensuite.
+#
+# Fichier d'exclusion de lab `.vf-design-skip` (persistant — l'appel pendant /vf-update ne porte pas
+# l'environnement de l'utilisateur, d'où un fichier) : un nom de plugin par ligne, `#` commentaires,
+# lignes vides ignorées. Lu en UNION (avec VF_DESIGN_SKIP) à : `${CLAUDE_PROJECT_DIR:-$PWD}/.claude/
+# .vf-design-skip` ; et, en scope user (VF_SCOPE=user, le défaut), aussi `${CLAUDE_CONFIG_DIR:-$HOME/
+# .claude}/.vf-design-skip`. Même règle de refus pour superpowers et même tolérance aux noms inconnus.
 #
 # Nommage délibérément PAS partagé avec le bootstrap de dev (`VF_ENSURE_*`) : les scripts des
 # deux modules atterrissent À PLAT dans le même `$TARGET_ROOT/scripts/` chez l'utilisateur
 # (`copy_module_scripts()` de `vibeflow-update.sh`) — un nom d'env partagé piloterait deux
 # bootstraps différents par un seul export. D'où le préfixe `VF_DESIGN_` sur les deux flags
-# propres à ce script (VF_SCOPE reste partagé : c'est le contrat de scope unique du repo).
+# propres à ce script, plus VF_DESIGN_SKIP (VF_SCOPE reste partagé : c'est le contrat de scope unique du repo).
 #
 # Flags CLI (rétro-compat : tout argument inconnu est IGNORÉ avec une ligne log, jamais un exit
 # non-zéro — un rejet strict casserait un appelant non recensé) :
@@ -291,6 +305,68 @@ PY
   rm -f "$plain_tmp" 2>/dev/null
 }
 
+# ---------- Exclusions persistantes (VF_DESIGN_SKIP + fichier .vf-design-skip) ----------
+# SKIPPED = suite de segments `|<nom>=<origine>` ; l'union des sources est dédupliquée par nom.
+# Résolu dans main (après le parsing de --quiet) : un log() au niveau fichier ignorerait --quiet.
+SKIPPED=""
+SUPERPOWERS_REFUSED=0
+
+register_skip() { # nom origine
+  local n="$1" org="$2"
+  case "$n" in
+    '') ;;
+    superpowers)
+      if [ "$SUPERPOWERS_REFUSED" -eq 0 ]; then
+        SUPERPOWERS_REFUSED=1
+        notice "superpowers : exclusion refusée — dépendance dure de VibeFlow ($org)"
+      fi
+      ;;
+    ui-ux-pro-max | frontend-design | impeccable)
+      case "$SKIPPED" in
+        *"|$n="*) ;;
+        *) SKIPPED="$SKIPPED|$n=$org" ;;
+      esac
+      ;;
+    *) log "exclusion : nom de plugin inconnu ignoré ($n, $org)" ;;
+  esac
+}
+
+# Origine de l'exclusion de $1 (sur stdout), code 1 si $1 n'est pas exclu.
+skip_origin() {
+  local e="${SKIPPED#*|$1=}"
+  [ "$e" = "$SKIPPED" ] && return 1
+  printf '%s' "${e%%|*}"
+}
+
+read_skip_file() { # chemin ; absent ou illisible = aucune exclusion
+  local f="$1" line
+  [ -f "$f" ] && [ -r "$f" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%%#*}"
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    register_skip "$line" ".vf-design-skip"
+  done <"$f"
+}
+
+load_exclusions() {
+  local item cfg
+  local -a items
+  IFS=',' read -r -a items <<<"${VF_DESIGN_SKIP:-}"
+  for item in ${items[@]+"${items[@]}"}; do
+    item="${item#"${item%%[![:space:]]*}"}"
+    item="${item%"${item##*[![:space:]]}"}"
+    register_skip "$item" "VF_DESIGN_SKIP"
+  done
+  read_skip_file "${CLAUDE_PROJECT_DIR:-$PWD}/.claude/.vf-design-skip"
+  if [ "$SCOPE" = "user" ]; then
+    cfg="${CLAUDE_CONFIG_DIR:-}"
+    [ -n "$cfg" ] || { [ -n "${HOME:-}" ] && cfg="$HOME/.claude"; }
+    [ -n "$cfg" ] && read_skip_file "$cfg/.vf-design-skip"
+  fi
+  return 0
+}
+
 # ---------- État final par plugin (résumé) ----------
 ST_superpowers=""
 ST_ui_ux_pro_max=""
@@ -307,13 +383,21 @@ set_final_state() {
   # Tout ce qui n'est pas « était déjà actif » est une anomalie au sens de --quiet : y compris un
   # geste RÉUSSI (installé/réactivé), parce qu'une install qui pose des plugins dans le dos de
   # l'utilisateur doit rester visible.
-  [ "$2" = "actif" ] || ANOMALY=1
+  # Une exclusion demandée est de la routine, pas une anomalie.
+  [ "$2" = "actif" ] || [ "$2" = "exclu" ] || ANOMALY=1
 }
 
 # ---------- Traitement d'un plugin de la table ----------
 process_plugin() { # name marketplace mkt_add
   local name="$1" marketplace="$2" mkt_add="$3"
-  local matches state effective final
+  local matches state effective final org
+
+  # Exclu : ni détecté, ni installé, ni activé, ni étape manuelle (même sans CLI runtime).
+  if org="$(skip_origin "$name")"; then
+    log "$name : exclu ($org)"
+    set_final_state "$name" "exclu"
+    return 0
+  fi
 
   if [ "$INDETERMINE" -eq 1 ]; then
     print_manual_step "$name"
@@ -394,6 +478,7 @@ process_plugin() { # name marketplace mkt_add
 main() {
   log "Bootstrap chaîne d'outils design (mode=$([ -n "$DRY_RUN" ] && echo dry-run || echo apply), scope=$SCOPE)"
 
+  load_exclusions
   detect_all
 
   if [ "$INDETERMINE" -eq 1 ]; then

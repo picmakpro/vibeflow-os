@@ -1,5 +1,12 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.16] — 2026-10-29 (exclusion persistante de la chaîne design) — à publier dans la prochaine release
+
+**Patch** (#166 volets 2, 10, 11) :
+
+- **`ensure-design-deps.sh` : exclusion persistante** (#166 volet 2) : `VF_DESIGN_SKIP` (liste séparée par des virgules) et le fichier de lab `.vf-design-skip` (un nom par ligne, `#` commentaires) — lus en union, `${CLAUDE_PROJECT_DIR:-$PWD}/.claude/.vf-design-skip` puis, en scope user, `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.vf-design-skip`. Un plugin exclu n'est ni installé ni activé (résumé `<nom>=exclu`, silence sous `--quiet`) ; un nom inconnu est journalisé et ignoré (le contrat de sortie ne change pas) ; `superpowers`, dépendance dure, voit son exclusion refusée. Sans exclusion, la sortie est strictement inchangée. Avant, `/vf-update` réinstallait impeccable à chaque passage sans recours.
+- **Suite de tests** (#166 volets 10, 11) : faux `claude`/`codex` journalisants en tête de PATH pour toute la suite (T9z : aucun install/enable/add/marketplace hors cas à stub explicite) ; T9d passe en dry-run et saute si un `claude` vit dans `/usr/bin:/bin` ; la partie `module.json` de T9e saute en lab installé ; T9s couvre l'exclusion.
+
 ## [v1.5.15] — 2026-10-23 (UTF-8 inconditionnel) — publiée dans v2.71.1
 
 **Patch** (correctifs #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-23 ; publiée dans v2.71.1) :
