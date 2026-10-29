@@ -136,6 +136,7 @@ Voir `references/hooks-contract.md`.
   "scripts_count": 5,
   "syntax_ok": 5,
   "executable_ok": 5,
+  "libs_sourced": 0,
   "deps_ok": ["bash", "awk", "grep", "sed", "python3", "jq"],
   "deps_missing": [],
   "tests_suite_present": true,

@@ -414,6 +414,24 @@ fi
 OUT="$(run_in "$LAB_NOTESTS" "$BASH_BIN" "${SCRIPT_UNDER_TEST:-$SCRIPT}" --axis=scripts --no-tests 2>/dev/null)"
 echo "$OUT" | grep -q '"strict_indeterminate_reason": null' && ok "T16e #153 : hors --strict → raison null" || ko "T16e hors --strict : raison null attendue, sortie : $OUT"
 
+# T17 — #166/#153 §6.6 : une lib SOURCÉE (1re ligne sans shebang) n'a pas à être exécutable.
+# Faux lab : un script à shebang +x, un script à shebang SANS x, une lib sans shebang en 644.
+# Attendu : executable_ok=1 (sur 2 scripts à shebang), libs_sourced=1, scripts_total=3 ; le script à
+# shebang sans x reste signalé (executable_ok < nombre de scripts à shebang).
+LAB_L="$WORK/lab-libs"; mkdir -p "$LAB_L/.claude/scripts"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$LAB_L/.claude/scripts/lance.sh"; chmod 755 "$LAB_L/.claude/scripts/lance.sh"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$LAB_L/.claude/scripts/oublie-x.sh"; chmod 644 "$LAB_L/.claude/scripts/oublie-x.sh"
+printf '# lib sourcee, jamais lancee seule\nvf_lib_fn() { :; }\n' > "$LAB_L/.claude/scripts/lib-sourcee.sh"; chmod 644 "$LAB_L/.claude/scripts/lib-sourcee.sh"
+OUT="$(run_in "$LAB_L" "$BASH_BIN" "$SCRIPT" --axis=scripts --no-tests 2>/dev/null)"
+if echo "$OUT" | grep -q '"scripts_total": 3' && echo "$OUT" | grep -q '"executable_ok": 1,' && echo "$OUT" | grep -q '"libs_sourced": 1,' && echo "$OUT" | grep -q '"syntax_ok": 3'; then
+  ok "T17 #153 §6.6 : lib sans shebang exclue de executable_ok (1 sur 2 à shebang), libs_sourced=1, total=3, bash -n sur les 3"
+else
+  ko "T17 attendu total=3, executable_ok=1, libs_sourced=1, syntax_ok=3 ; sortie : $OUT"
+fi
+chmod 755 "$LAB_L/.claude/scripts/oublie-x.sh"
+OUT="$(run_in "$LAB_L" "$BASH_BIN" "$SCRIPT" --axis=scripts --no-tests 2>/dev/null)"
+echo "$OUT" | grep -q '"executable_ok": 2,' && ok "T17b : une fois le bit x posé sur le script à shebang, executable_ok=2 (la lib ne compte toujours pas)" || ko "T17b executable_ok=2 attendu, sortie : $OUT"
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]

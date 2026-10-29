@@ -428,6 +428,7 @@ audit_scripts() {
   local total=0
   local syntax_ok=0
   local exec_ok=0
+  local libs_sourced=0
   local syntax_errs=()
   local deps=("bash" "awk" "grep" "sed" "python3" "jq" "git" "date")
   local deps_missing=()
@@ -437,7 +438,14 @@ audit_scripts() {
       [ -f "$f" ] || continue
       total=$((total + 1))
       bash -n "$f" 2>/dev/null && syntax_ok=$((syntax_ok + 1)) || syntax_errs+=("$f")
-      [ -x "$f" ] && exec_ok=$((exec_ok + 1))
+      # Lib SOURCEE (1re ligne sans shebang) : jamais lancee seule, donc non tenue d'etre
+      # executable (#153 §6.6) — hors numerateur ET denominateur de executable_ok, mais comptee
+      # dans scripts_total et soumise a `bash -n`. Un script a shebang sans bit x reste signale.
+      if [ "$(head -c 2 "$f" 2>/dev/null)" != "#!" ]; then
+        libs_sourced=$((libs_sourced + 1))
+      elif [ -x "$f" ]; then
+        exec_ok=$((exec_ok + 1))
+      fi
     done
   fi
 
@@ -495,6 +503,7 @@ audit_scripts() {
   "syntax_ok": $syntax_ok,
   "syntax_errors": $syntax_errs_count,
   "executable_ok": $exec_ok,
+  "libs_sourced": $libs_sourced,
   "deps_missing": $deps_json,
   "tests_skipped": $SKIP_TESTS,
   "strict_indeterminate": $strict_indet,
