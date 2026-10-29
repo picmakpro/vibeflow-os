@@ -10,13 +10,29 @@ source_spec: docs/research/2026-10-29-dependances-gsd-superpowers.md
 
 # SEED-003 : Sortie de GSD et de superpowers — VibeFlow autonome
 
-## Décision
+## Décision — trajectoire par étapes, sortie complète décidée sur chiffres
 
-Arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 : **sortie complète de GSD**
-(option d de l'étude, préférée au statu quo, au fork figé et à l'épinglage recommandés). Étendue à
-**superpowers** par message session principale du même jour (« On sort aussi de Superpowers »).
-Motif exprimé : ne plus dépendre de frameworks tiers, à l'image d'AIDD (`ai-driven-dev/framework`),
-autonome (`docs/research/2026-10-29-ai-driven-dev-framework.md`).
+Historique de l'arbitrage, le 2026-10-29, session principale :
+
+1. AskUserQuestion : **sortie complète de GSD** (option d de l'étude), puis message : « On sort aussi
+   de Superpowers ». Motif : ne plus dépendre de frameworks tiers, à l'image d'AIDD
+   (`ai-driven-dev/framework`, autonome ; `docs/research/2026-10-29-ai-driven-dev-framework.md`).
+2. Message de Samuel, après l'avis de la session (le but est bon, la sortie d'un bloc est risquée :
+   coût d'opportunité, maintenance d'environ 400 k lignes à notre charge, 48 lecteurs de
+   `.planning/`, douleurs mesurées réglables par épinglage) : la trajectoire retenue est **par
+   étapes**, la sortie complète restant conditionnée à une mesure.
+
+| Étape | Geste | Engagée ? |
+|---|---|---|
+| E1 | **Sortir de superpowers** : internaliser les 3 skills invoqués (brainstorming, TDD, verification), retirer le refus d'exclusion de `ensure-design-deps.sh`, réécrire les frontières ADR-057 | oui |
+| E2 | **Épingler gsd-core** sur une version exacte, montée volontairement par `/vf-update` (touche ADR-058) : supprime la dérive de la plage `^1` (T28-F, Node 24) | oui |
+| E3 | **Remplacer GSD commande par commande** derrière le point de passage unique `gsd-run.sh` (motif « étrangleur ») : chaque verbe réécrit passe sous nos gates ; arrêt possible à tout moment ; le format `.planning/` est conservé | **conditionnée** à E0 |
+| E0 | **Mesurer avant d'engager E3** : (a) le nombre d'appels GSD réels dans les transcripts ; (b) le coût de la dérive et des pièges GSD (PR, commits, hotfix, CI rouge, heures), sur ce dépôt et sur Scroll-Off | lancée le 2026-10-29 |
+
+**Règle de décision pour E3** : si le coût mesuré en E0 est faible et majoritairement évitable par
+l'épinglage, E2 suffit et la sortie complète ne se justifie pas ; s'il est élevé, ou s'il tient au
+moteur lui-même et non à sa plage de versions, la sortie complète est rentable et E3 s'engage.
+Les chiffres et le verdict s'écrivent dans `docs/research/2026-10-29-etude-cout-gsd.md`.
 
 ## Pourquoi c'est un jalon et pas une phase
 
@@ -40,7 +56,9 @@ Mesures du 2026-10-29 (`source_spec`, sur `origin/main` `3656698b`, gsd-core 1.1
 
 Ordre de grandeur estimé par l'étude : 6 à 12 phases pour GSD, ~1 phase pour superpowers.
 
-## Préalables doctrinaux (à amender en tête de jalon, chacun tracé)
+## Préalables doctrinaux (à amender, chacun tracé, au moment de l'étape qui les heurte)
+
+E1 heurte ADR-057 et ADR-058 ; E2 heurte ADR-058 ; seule E3 heurte le reste de la liste.
 
 - `.planning/PROJECT.md` § Out of Scope : « Fork/réécriture des skills GSD — on délègue, on
   n'absorbe pas » ;
@@ -56,11 +74,12 @@ Ordre de grandeur estimé par l'étude : 6 à 12 phases pour GSD, ~1 phase pour 
 
 - **Garder le format `.planning/`** : c'est ce que lisent nos gates ; le changer multiplie le coût.
   Le jalon remplace l'écrivain, pas le format.
-- **Superpowers d'abord** : le plus petit morceau, sans dépendance au reste ; il libère l'installeur
-  design.
-- **Transition** : tant que le moteur VibeFlow n'est pas complet, GSD reste installé. Épingler une
-  version exacte pendant la transition évite la dérive de la plage `^1` (T28-F, Node 24) — à
-  trancher au cadrage.
+- **Superpowers d'abord** (E1, décidé) : le plus petit morceau, sans dépendance au reste ; il libère
+  l'installeur design.
+- **Transition** : tant que le moteur VibeFlow n'est pas complet, GSD reste installé et épinglé (E2,
+  décidé).
+- **Point de passage unique** : `plugin/dev-orchestrator/scripts/gsd-run.sh` existe déjà ; E3 s'y
+  adosse plutôt que de toucher chaque appelant.
 - **Ce dépôt est lui-même piloté par GSD** : la migration de son propre `.planning/` est un geste
   du jalon, pas un préalable.
 - Le compartiment `gouvernance` (Willy) utilise aussi GSD : la sortie le concerne.
@@ -69,17 +88,18 @@ Ordre de grandeur estimé par l'étude : 6 à 12 phases pour GSD, ~1 phase pour 
 
 | # | Question |
 |---|---|
-| Q-01 | Ce jalon avant V2, après V2, ou ses premières phases en tête de V2 ? |
+| Q-01 | E1 et E2 : phases du jalon V2, ou jalon dédié ? E3 : jalon dédié si E0 l'engage ? |
 | Q-02 | Réécriture des gestes utilisés seulement (29 skills) ou reprise plus large (les 72 routés) ? |
 | Q-03 | Moteur d'état : scripts bash comme le reste du plugin, ou un CLI Node (contrainte Node ≥ 24 aujourd'hui imposée par GSD) ? |
-| Q-04 | Épinglage de gsd-core pendant la transition (touche ADR-058) ? |
+| Q-04 | ~~Épinglage pendant la transition ?~~ Tranchée : oui (E2). Reste : quelle version, et le geste de montée dans `/vf-update`. |
 | Q-05 | Labs déjà installés : migration automatique par `/vf-update`, ou cohabitation ? |
 | Q-06 | Multi-runtime : aujourd'hui délégué à GSD (19 runtimes, hors-périmètre de PROJECT.md) — que reprend VibeFlow ? |
 
 ## Non mesuré (à mesurer avant de planifier)
 
-Nombre réel d'invocations dans les transcripts (seules les mentions sont comptées) ; verbes `query`
-sur le chemin des 29 skills du noyau ; coût historique de la dérive amont (PR, heures) ; rythme des
+En cours (E0, lancée le 2026-10-29) : nombre réel d'invocations dans les transcripts ; coût
+historique de la dérive amont et des pièges (PR, heures), sur ce dépôt et Scroll-Off.
+Restent : verbes `query` sur le chemin des 29 skills du noyau ; rythme des
 changements cassants de gsd-core 1.8 → 1.19 ; usage direct de GSD par Willy et les testeurs ; part
 des `references/` réellement chargée ; lesquels des 48 lecteurs de `.planning/` supposent un
 invariant que seul l'écrivain GSD garantit.
