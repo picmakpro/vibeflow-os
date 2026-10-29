@@ -21,11 +21,12 @@
 #
 # Éliminatoire 1 : une exigence `- [ ] **ID**: ...` sans critère d'acceptation utilisable. Le
 # critère est un CHAMP `Acceptation :` (ou `Critère d'acceptation :`, casse indifférente, blanc ou
-# espace insécable admis avant les deux-points) : en début de ligne de continuation indentée, ou sur la
-# ligne de l'exigence après une ponctuation de phrase ; le mot « acceptation » au fil d'une phrase
-# n'est pas un champ. Sa valeur est utilisable si, marques de mise en forme en tête retirées (puce,
-# citation, emphase, code, guillemets, soulignés) et blancs Unicode ramenés à l'espace (largeur nulle
-# ignorée), elle ne commence pas par `[` ou `<`, n'est pas vide, ne porte ni trois points ni points de
+# espace insécable admis avant les deux-points) : le mot « acceptation » n'est pas précédé d'un mot (début de
+# ligne, ponctuation, tiret, parenthèse, puce ou emphase avant lui : champ ; lettre, chiffre ou apostrophe collée
+# avant lui : « l'étape d'acceptation : … » n'est pas un champ). Sa valeur est utilisable si, marques de mise en
+# forme en tête retirées (puces `- * + • · – — ‣ ◦ ▪ ∙ ●`, numérotées `1.` `1)`, citation, emphase, code,
+# guillemets, soulignés) et blancs Unicode ramenés à l'espace (largeur nulle ignorée), elle ne commence pas par
+# `[` `<` (ni leurs formes pleine chasse), n'est pas vide, ne porte ni trois points ni points de
 # suspension, ne porte aucun marqueur de remplissage et compte au moins 10 CARACTÈRES non blancs (UTF-8
 # compté en caractères, en awk pur sous LC_ALL=C : aucune locale UTF-8 requise). Marqueurs FORTS (en
 # mot entier, partout dans la valeur) : TBD, TBA, FIXME, n/a, « à définir », « à préciser », « à compléter »,
@@ -33,8 +34,10 @@
 # légitimes en phrase : TODO et « à venir », rouges seulement ISOLÉS (en début ou fin de valeur, ou collés à
 # une ponctuation), verts au sein d'une phrase (« la todo list affiche dix éléments »). Casse et accents
 # indifférents, marques combinantes comprises. Faux rouge ASSUMÉ, plutôt qu'un faux vert : un faible isolé
-# dans une phrase légitime (« les évolutions à venir. »). La qualité « testable » reste au juge. Les blocs de
-# code et les commentaires HTML sont ignorés (un commentaire multi-ligne, lignes blanches comprises, au
+# dans une phrase légitime (« les évolutions à venir. »). Limite connue, laissée au juge : une mention à remplir
+# qui n'est pas listée (« xxx », « lorem ipsum », « ? ») passe si elle atteint 10 caractères ; de même une emphase
+# collée au mot (« la phase de **acceptation** : … ») le fait lire comme un champ. La qualité « testable » reste
+# au juge. Les blocs de code et les commentaires HTML sont ignorés (un commentaire multi-ligne, lignes blanches comprises, au
 # milieu d'une exigence ne la ferme pas). Une puce, même indentée, ouvre un nouvel élément : elle ne porte
 # pas le critère de l'exigence qui précède. Fins de ligne CRLF et CR seules traitées comme des fins de ligne.
 # Bloc de code OU commentaire HTML non fermé en fin de fichier (exigences ou rubriques) : la suite est
@@ -136,10 +139,11 @@ function norm(s) {
   gsub(/\302\240|\342\200[\200-\212]|\342\200[\250\251]|\342\200\257|\342\201\237|\343\200\200|\341\232\200/, " ", s)
   return s
 }
-# Marques de mise en forme et de liste en tête (puce, citation, emphase, code, guillemets) retirées.
+# Marques de mise en forme et de liste en tête retirées : espaces, puces (- * + • · – — ‣ ◦ ▪ ∙ ●), numérotées
+# (`1.`, `1)` suivies d'un blanc ou de la fin), citation `>`, emphase, code, guillemets (" ' « “ ‘ „), # ~ = |.
 function lead(v) {
   v = norm(v)
-  while (v != "" && match(v, /^([ \t*_`"'>+#~=|-]|\302\253|\342\200[\230\234]|\342\200\242)/)) v = substr(v, RLENGTH + 1)
+  while (v != "" && match(v, /^([ \t*_`"'>+#~=|-]|[0-9]+[.)]([ \t]|$)|\302[\253\267]|\342\200[\223\224\230\234\236\242\243]|\342\227[\246\217]|\342\226\252|\342\210\231)/)) v = substr(v, RLENGTH + 1)
   return v
 }
 # Marqueur « faible » (todo, à venir) : mot légitime dans une phrase, rouge seulement s'il est isolé
@@ -171,6 +175,7 @@ function isfill(v,   c) {
   if (v == "") return 1
   c = substr(v, 1, 1)
   if (c == "[" || c == "<") return 1
+  if (v ~ /^(\357\274[\273\234]|\343\200\210|\342\237\250)/) return 1
   if (index(v, "...") || index(v, ell)) return 1
   return fillword(fold(v))
 }
@@ -197,14 +202,23 @@ function usable(v) {
   if (nchars(v) < 10) return 0
   return 1
 }
-# Critère : seulement comme CHAMP (début de ligne après indentation/marques, ou après une ponctuation de
-# phrase sur la ligne de l'exigence), avec ou sans « Critère d' », casse indifférente, blanc avant les deux-points.
+# Critère : seulement comme CHAMP : le mot « acceptation » (avec ou sans « Critère d' », casse indifférente, blanc
+# avant les deux-points) n'est PAS précédé d'un mot. Ce qui précède (blancs retirés) est vide ou ne se termine pas
+# par une lettre, un chiffre ou une apostrophe collée à une lettre : ponctuation, tiret, parenthèse, puce, fin
+# ou début d'emphase (« Texte, Acceptation : », « Texte — Acceptation : », « (Acceptation : », « Texte
+# **Acceptation :** ») sont des champs ; « l'étape d'acceptation : » n'en est pas un. Lettres reconnues : ASCII,
+# Latin-1, Latin étendu, grec, cyrillique, marques combinantes.
+function wordbefore(p) {
+  sub(/[ \t]+$/, "", p)
+  return (p ~ /([A-Za-z0-9]|\303[\200-\226\230-\266\270-\277]|[\304-\311][\200-\277]|[\316-\321][\200-\277]|(\314|\315)[\200-\277])('|\342\200\231)?$/)
+}
 function critval(s,   low, p, off, pre, rest) {
   s = norm(s); low = tolower(s); off = 0
   while ((p = index(substr(low, off + 1), "acceptation")) > 0) {
     p += off
     pre = substr(low, 1, p - 1); rest = substr(s, p + 11)
-    if (pre ~ /(^|[:.;|!?)])[ \t*_]*(crit[^ \t]*[ \t]+d('|\342\200\231)[ \t]*)?$/ && match(rest, /^[ \t]*[*_]*[ \t]*:/)) {
+    if (match(pre, /crit[^ \t]*[ \t]+d('|\342\200\231)[ \t]*$/)) pre = substr(pre, 1, RSTART - 1)
+    if (!wordbefore(pre) && match(rest, /^[ \t]*[*_]*[ \t]*:/)) {
       if (usable(substr(rest, RLENGTH + 1))) return 1
     }
     off = p
