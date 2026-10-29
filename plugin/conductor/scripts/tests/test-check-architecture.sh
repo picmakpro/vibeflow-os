@@ -9,6 +9,8 @@
 # CARCH-STATUT, CARCH-FENCE-OUVERTE, CARCH-MIX, CARCH-DESCRIPTIF (ligne d'état, rubriques, corps).
 # Cas CARCH-LIEN, CARCH-FIFO, CARCH-DOSSIER, CARCH-GROS, CARCH-ILLISIBLE (refus en 5 avant lecture), CARCH-NOECHO,
 # CARCH-EXEC (sans évaluation de chaîne, chemin hostile inerte), CARCH-RO, CARCH-CODES (ensemble observé = {0, 1, 3, 5, 64}).
+# Mutants CARCH-MUT-1..9 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide
+# (bash -n), une seule ligne changée, rouge pour la raison attendue (code attendu/obtenu imprimé), original revérifié vert.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -357,6 +359,59 @@ probe_codes() {
 }
 case_ CARCH-CODES probe_codes
 printf '    codes observés : {%s}\n' "$(awk '{ printf "%s%s", (NR > 1 ? ", " : ""), $0 }' "$TMP/obs")"
+
+# === Mutants (QUAL-01) ===============================================================================
+MUTDIR="$TMP/mut"; mkdir -p "$MUTDIR"
+MUTBIN="$MUTDIR/check-architecture.sh"
+
+# mutant <id> <ligne repère> <ancien> <nouveau> <sonde> <description> : dans UNE ligne du script (celle qui
+# contient le repère), remplace la première occurrence littérale de <ancien> par <nouveau> (chaînes passées par
+# l'environnement : aucune séquence d'échappement interprétée). La sonde doit échouer sur le mutant, réussir
+# sur l'original ; code attendu/obtenu imprimé par msg.
+mutant() {
+  local id="$1" needle="$2" old="$3" new="$4" probe="$5" desc="$6"
+  if ! declare -F "$probe" > /dev/null; then ko "$id sonde $probe NON DÉFINIE à cet endroit — $desc"; return; fi
+  NEEDLE="$needle" OLD="$old" NEW="$new" awk 'BEGIN { n = ENVIRON["NEEDLE"]; o = ENVIRON["OLD"]; w = ENVIRON["NEW"] }
+    { if (index($0, n)) { i = index($0, o); if (i) $0 = substr($0, 1, i - 1) w substr($0, i + length(o)) } print }' \
+    "$SCRIPT" > "$MUTBIN"
+  if cmp -s "$MUTBIN" "$SCRIPT"; then ko "$id mutant NON OPPOSABLE (copie identique à l'original) — $desc"; return; fi
+  if ! bash -n "$MUTBIN" 2>/dev/null; then ko "$id mutant invalide (bash -n) — $desc"; return; fi
+  local nl; nl="$(diff "$SCRIPT" "$MUTBIN" | command grep -c '^<')"
+  if [ "$nl" != 1 ]; then ko "$id mutant mal ciblé ($nl lignes changées au lieu de 1) — $desc"; return; fi
+  TARGET="$MUTBIN"; "$probe" < /dev/null; local mrc=$?; local mmsg="$LASTMSG"
+  TARGET="$SCRIPT"; "$probe" < /dev/null; local orc=$?
+  if [ "$mrc" -ne 0 ] && [ "$orc" -eq 0 ]; then
+    ok "$id tue ($desc) — sur le mutant : $mmsg"
+  elif [ "$mrc" -eq 0 ]; then
+    ko "$id mutant SURVIVANT ($desc) — la sonde ${probe#probe_} reste verte sur le mutant"
+  else
+    ko "$id original rouge après mutation ($desc) — $LASTMSG"
+  fi
+  TARGET="$SCRIPT"
+}
+
+mutant CARCH-MUT-1 'proposed) STATUT=proposee' 'bump 1' ':' probe_proposee \
+  "FAIL : exigence de l'état validated retirée, un fichier proposed complet rendu 0"
+mutant CARCH-MUT-2 'say "ARCHITECTURE absente"' 'bump 1' ':' probe_trace3 \
+  "FAIL : fichier absent rendu 0"
+mutant CARCH-MUT-3 'nn = split("contexte' ' risques"' '"' probe_rubrique \
+  "FAIL : rubrique risques retirée de la liste exigée"
+if [ -f "$GAB" ]; then
+  mutant CARCH-MUT-4 'if (substr(w, 1, 1) == "[") return 0' 'substr(w, 1, 1) == "["' '0' probe_trace1 \
+    "FAIL : filtre du corps entre crochets retiré, le gabarit brut aurait des corps"
+else
+  skip "CARCH-MUT-4 (gabarit absent, copie à plat : la sonde CARCH-TRACE-1 ne peut pas jouer)"
+fi
+mutant CARCH-MUT-5 '*) indetermine "statut : valeur inconnue"' 'indetermine "statut : valeur inconnue"' ':' probe_statut \
+  "INDÉTERMINÉ : valeur d'état inconnue rendue 0"
+mutant CARCH-MUT-6 'if (f3 == "```" || f3 == "~~~")' 'f3 == "```" || f3 == "~~~"' '0' probe_statut \
+  "PASS : bascule des blocs de code retirée, un état validated en bloc de code serait lu"
+mutant CARCH-MUT-7 'if [ -L "$f" ]; then illisible' '[ -L "$f" ]' 'false' probe_lien \
+  "BRUYANT : refus du lien symbolique retiré"
+mutant CARCH-MUT-8 '"$size" -gt "$CARCH_MAX_OCTETS"' '"$CARCH_MAX_OCTETS"' '99999999999' probe_gros \
+  "BRUYANT : borne de taille retirée"
+mutant CARCH-MUT-9 'elif [ "$NMARK" -gt 1 ]' '[ "$NMARK" -gt 1 ]' 'false' probe_statut \
+  "INDÉTERMINÉ : lignes d'état multiples rendues selon la première"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]
