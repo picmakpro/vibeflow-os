@@ -11,7 +11,7 @@ appears below, anywhere.
 
 ## Which model runs, and why
 
-VibeFlow's [36 agents](./agents.md) don't all run on the same model. The split isn't "judge versus
+VibeFlow's [37 agents](./agents.md) don't all run on the same model. The split isn't "judge versus
 executor" — on this repo, quality judges run on sonnet, exactly like the workers they evaluate.
 The real split tracks the **nature of the judgment being asked for**:
 
@@ -19,7 +19,7 @@ The real split tracks the **nature of the judgment being asked for**:
   isn't yet clear, planning a task graph with cross-dependencies across several independent
   tracks, arbitrating a call that no explicit rubric can make for you. That's open-ended judgment,
   over a scope that can shift mid-mission.
-- **Workers and judges** (sonnet, twenty-four agents) — producing a specific deliverable against an
+- **Workers and judges** (sonnet, twenty-five agents) — producing a specific deliverable against an
   already-framed mandate, scoring a result against a rubric written out in black and white,
   executing a step already identified. That's a bounded scope, known ahead of time.
 
@@ -31,7 +31,7 @@ multi-domain battle plan.
 The full breakdown, agent by agent, lives on [agents.md](./agents.md).
 
 You never have to guess this: each agent file's `model:` frontmatter field states it explicitly,
-and the [agent reference](./agents.md) reproduces it for all 36. To read it yourself on disk,
+and the [agent reference](./agents.md) reproduces it for all 37. To read it yourself on disk,
 `grep model: plugin/*/agents/*.md plugin/*/AGENT.md` from the repo root gives the full list — the
 same command a maintainer would run before touching any of this page's claims.
 

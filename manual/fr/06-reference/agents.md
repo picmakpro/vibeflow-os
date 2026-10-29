@@ -37,7 +37,7 @@ dont le module correspondant est présent dans ton lab. Le
 [catalogue des modules](../03-modules/catalogue.md) fait le lien inverse — module par module,
 plutôt qu'agent par agent.
 
-## Les 36 agents
+## Les 37 agents
 
 | Agent | Module | Famille | Modèle | Rôle en une phrase |
 |---|---|---|---|---|
@@ -66,6 +66,7 @@ plutôt qu'agent par agent.
 | `vf-dev-manager` | dev-orchestrator | manager | opus | Pilote une mission de dev : plan, dispatch, contrôle de flux. |
 | `vf-growth-manager` | growth-bundle | manager | opus | Pilote une mission growth : plan, dispatch, contrôle de flux. |
 | `vf-product-analyst` | product-team-bundle | worker | sonnet | Rédige le BRIEF à cinq rubriques. |
+| `vf-product-architect` | product-team-bundle | worker | sonnet | Rédige la décision d'architecture (`.planning/ARCHITECTURE.md`, proposée), jamais validée par lui. |
 | `vf-product-manager` | product-team-bundle | manager | opus | Pilote une mission produit : plan, dispatch, halte sous le seuil. |
 | `vf-product-pm` | product-team-bundle | worker | sonnet | Instancie le PRD (PROJECT + REQUIREMENTS) avec critère d'acceptation et priorité par exigence. |
 | `vf-reviewer` | dev-orchestrator | worker | sonnet | Revue de code du diff produit par une mission de dev. |
@@ -94,16 +95,22 @@ eux.
 
 ## D'où vient cette liste
 
-Établie en énumérant `plugin/*/agents/*.md` (29 fichiers, un niveau, ce qui exclut les blueprints
-sous `content/agents/`) et les 7 fichiers `AGENT.md` à la racine des modules, le 2026-10-27 — soit
-trente-six agents au total. Pour revérifier depuis la racine du dépôt :
-`find plugin -path '*/agents/*.md'` puis `find plugin -maxdepth 2 -name 'AGENT.md'`. Le frontmatter
-de chaque fichier (`model:`, `memory:`) est la source du champ Modèle ci-dessus, pas une
+Établie en énumérant `plugin/*/agents/*.md` (30 fichiers, un niveau, ce qui exclut les blueprints
+sous `content/agents/`) et les 7 fichiers `AGENT.md` à la racine des modules, le 2026-10-29 — soit
+trente-sept agents au total. Pour revérifier depuis la racine du dépôt, ces deux commandes bornées
+rendent 30 puis 7 :
+
+```bash
+find plugin -mindepth 3 -maxdepth 3 -type f -path 'plugin/*/agents/*.md' | awk 'END{print NR}'
+find plugin -mindepth 2 -maxdepth 2 -type f -name AGENT.md | awk 'END{print NR}'
+```
+
+Le frontmatter de chaque fichier (`model:`, `memory:`) est la source du champ Modèle ci-dessus, pas une
 reformulation — les champs obligatoires qu'un agent doit porter sont vérifiés par
 `plugin/conductor/scripts/check-agents.sh`.
 
 Répartition par modèle, comptée sur la même table : douze agents en opus (les six agents « visage »
-invocables, plus les six managers de mission), vingt-quatre en sonnet (tous les workers, plus
+invocables, plus les six managers de mission), vingt-cinq en sonnet (tous les workers, plus
 l'unique agent « visage » qui n'est pas en opus — `vibeflow-kpi-analyst`). Cette répartition est ce
 qui nourrit la page [couts-et-modeles.md](./couts-et-modeles.md) — elle n'y est pas redite, juste
 utilisée.
