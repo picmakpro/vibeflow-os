@@ -7400,16 +7400,36 @@ done
 # DE CODE clôturés (```) des .md livrés (agents, references, skills) — jamais le texte hors bloc (la table de
 # gsd-skills-index.md contient « until review » en prose). Une boucle until/while rougit si (a) son corps est
 # vide (`do :; done`, `do true; done`), ou (b) elle n'a pas, dans son corps, une temporisation (`sleep` hors
-# guillemets) ET une borne (`deadline` ou `TIMEOUT`, commentaires retirés). EXCLUSION DOCUMENTÉE : une boucle de
+# guillemets), ou (c) sa borne n'est pas EFFECTIVE (un test de `deadline` suivi, dans sa branche, d'un exit/return
+# non nul — le mot TIMEOUT ne borne rien), ou (d) un `sleep` n'est pas gardé (`|| … exit/return` non nul). `for ((;;))` est jugée. EXCLUSION DOCUMENTÉE : une boucle de
 # LECTURE (`while read …`, `while IFS= read …`) ne guette rien, elle consomme un flux — jamais jugée.
 # Sortie : une ligne `fichier:ligne : motif` par violation, puis `#scan fichiers=N boucles=M` (compteur
 # d'atteinte : un scanner qui ne voit aucune boucle ne prouve rien). Pas de python/node inline.
 T81_TMP="$(mktemp -d)"; vf_tmp_track "$T81_TMP"
 cat > "$T81_TMP/scan.awk" <<'EOAWK'
 function opener(w) { return (w == "until" || w == "while" || w == "for" || w == "select") }
-function evalloop(d,   t, cond, bound, nq) {
-  if (kind[d] == "for") return
+# Une borne = un TEST de la deadline suivi, dans sa branche (coupée au premier `}`, `fi` ou `||`), d'un
+# exit/return NON NUL. La seule mention de TIMEOUT ou de deadline ne borne rien.
+function bounded(body,   rest, t, i) {
+  gsub(/\n/, " ", body)
+  for (i = 1; i <= 2; i++) {
+    rest = body
+    t = (i == 1) ? "\\[[^]]*(deadline|DLREF)[^]]*\\][[:space:]]*(&&|;?[[:space:]]*then)" : "\\(\\([^\n]*(deadline|DLREF)[^\n]*\\)\\)[[:space:]]*(&&|;?[[:space:]]*then)"
+    while (match(rest, t)) {
+      rest = substr(rest, RSTART + RLENGTH)
+      br = rest
+      if (match(br, /\}|(^|[;[:space:]])fi([;[:space:]]|$)|\|\|/)) br = substr(br, 1, RSTART)
+      if (br ~ /(^|[^A-Za-z_-])(exit|return)[[:space:]]+[1-9]/) return 1
+    }
+  }
+  return 0
+}
+function evalloop(d,   t, cond, nq, nl, k, ls) {
   t = txt[d]
+  if (kind[d] == "for") {
+    # `for x in …` parcourt une liste finie ; seule la forme C sans condition (`for ((;;))`) est jugée.
+    if (t !~ /for[[:space:]]*\(\([^;]*;[[:space:]]*;/) return
+  }
   if (kind[d] == "while") {
     cond = t
     if (match(cond, /(^|[;[:space:]])do([;[:space:]]|$)/)) cond = substr(cond, 1, RSTART)
@@ -7419,7 +7439,12 @@ function evalloop(d,   t, cond, bound, nq) {
   if (t ~ /(^|[;[:space:]])do[[:space:];]*((:|true)[[:space:];]*)*done/) { print file ":" start[d] " : corps de boucle vide (do :; done)"; bad++; return }
   nq = qtxt[d]
   if (nq !~ /(^|[^A-Za-z_-])sleep[[:space:]]/) { print file ":" start[d] " : boucle d'attente sans temporisation (sleep)"; bad++; return }
-  if (t !~ /deadline|TIMEOUT/) { print file ":" start[d] " : boucle d'attente sans borne (deadline/TIMEOUT)"; bad++; return }
+  if (!bounded(dtxt[d])) { print file ":" start[d] " : boucle d'attente sans borne (test de deadline suivi d'un exit/return non nul)"; bad++; return }
+  nl = split(nq, ls, "\n")
+  for (k = 1; k <= nl; k++)
+    if (ls[k] ~ /(^|[^A-Za-z_-])sleep[[:space:]]/ && ls[k] !~ /sleep[^|]*\|\|.*(exit|return)[[:space:]]+[1-9]/) {
+      print file ":" start[d] " : temporisation non gardée (sleep sans || exit/return non nul)"; bad++; return
+    }
 }
 FNR == 1 { nfiles++; infence = 0; depth = 0; file = FILENAME }
 /^[[:space:]]*```/ { infence = !infence; depth = 0; next }
@@ -7428,11 +7453,15 @@ infence {
   sub(/(^|[[:space:]])#.*$/, "", raw)
   q = raw
   gsub(/"[^"]*"/, "", q); gsub(/'[^']*'/, "", q)
-  for (i = 1; i <= depth; i++) { txt[i] = txt[i] "\n" raw; qtxt[i] = qtxt[i] "\n" q }
+  # variante où `"$deadline"` survit (DLREF) : le test de borne la lit, jamais le texte d'un message
+  dl = raw; dq = ""
+  while (match(dl, /"[^"]*"/)) { sg = substr(dl, RSTART, RLENGTH); dq = dq substr(dl, 1, RSTART - 1) ((sg ~ /\$\{?deadline/) ? " DLREF " : " "); dl = substr(dl, RSTART + RLENGTH) }
+  dq = dq dl; gsub(/'[^']*'/, "", dq)
+  for (i = 1; i <= depth; i++) { txt[i] = txt[i] "\n" raw; qtxt[i] = qtxt[i] "\n" q; dtxt[i] = dtxt[i] "\n" dq }
   n = split(q, w, /[;&|(){}[:space:]]+/)
   for (j = 1; j <= n; j++) {
     if (opener(w[j])) {
-      depth++; kind[depth] = w[j]; start[depth] = FNR; txt[depth] = raw; qtxt[depth] = q
+      depth++; kind[depth] = w[j]; start[depth] = FNR; txt[depth] = raw; qtxt[depth] = q; dtxt[depth] = dq
     } else if (w[j] == "done" && depth > 0) { evalloop(depth); depth-- }
   }
 }
@@ -7470,6 +7499,19 @@ t81_fix cas3-sleep-sans-borne 1 'until cond; do sleep 15; done' 'sans borne'
 t81_fix cas3b-borne-sans-sleep 1 $'deadline=$(( $(date +%s) + 60 ))\nuntil cond; do\n  [ "$(date +%s)" -ge "$deadline" ] && exit 124\ndone' 'sans temporisation'
 t81_fix cas4-forme-canonique 0 $'deadline=$(( $(date +%s) + 1800 ))\nuntil cond; do\n  [ "$(date +%s)" -ge "$deadline" ] && { echo "TIMEOUT attente x"; exit 124; }\n  sleep 15 || { echo "TEMPORISATION REFUSÉE"; exit 125; }\ndone' -
 t81_fix cas5-boucle-de-lecture 0 $'while read l; do\n  echo "$l"\ndone < f\nwhile IFS= read -r l; do :; done < f' -
+# Mutants de la clause clé (revue) : temporisation non gardée, « borne » par le seul mot, boucles infinies.
+t81_fix cas6-sleep-non-garde 1 $'deadline=$(( $(date +%s) + 1800 ))\nuntil cond; do\n  [ "$(date +%s)" -ge "$deadline" ] && { echo "TIMEOUT attente x"; exit 124; }\n  sleep 15\ndone' 'temporisation non gardée'
+t81_fix cas6b-sleep-garde-par-true 1 $'deadline=$(( $(date +%s) + 1800 ))\nuntil cond; do\n  [ "$(date +%s)" -ge "$deadline" ] && { echo "TIMEOUT attente x"; exit 124; }\n  sleep 15 || true\ndone' 'temporisation non gardée'
+t81_fix cas7-borne-par-le-mot 1 'deadline=1; until cond; do sleep 15 || exit 125; echo TIMEOUT; done' 'sans borne'
+t81_fix cas7b-borne-sans-exit 1 $'deadline=1\nuntil cond; do\n  [ "$(date +%s)" -ge "$deadline" ] && echo TIMEOUT\n  sleep 15 || exit 125\ndone' 'sans borne'
+t81_fix cas7c-exit-du-sleep-pris-pour-la-borne 1 $'deadline=1\nuntil cond; do\n  [ "$(date +%s)" -ge "$deadline" ] && echo "TIMEOUT"; sleep 15 || exit 125\ndone' 'sans borne'
+t81_fix cas8-for-infini 1 $'deadline=1\nfor ((;;)); do\n  sleep 15 || exit 125\ndone' 'sans borne'
+t81_fix cas8b-for-infini-vide 1 'for ((;;)); do :; done' 'corps de boucle vide'
+t81_fix cas8c-while-true 1 $'while true; do\n  sleep 15 || exit 125\ndone' 'sans borne'
+t81_fix cas8d-while-deux-points 1 $'while :\ndo\n  sleep 15 || exit 125\ndone' 'sans borne'
+t81_fix cas9-for-infini-borne 0 $'deadline=$(( $(date +%s) + 60 ))\nfor ((;;)); do\n  [ "$(date +%s)" -ge "$deadline" ] && { echo "TIMEOUT"; exit 124; }\n  sleep 15 || { echo "REFUSÉE"; exit 125; }\ndone' -
+t81_fix cas9b-for-liste-finie 0 'for f in a b c; do echo "$f"; done' -
+t81_fix cas9c-test-arithmetique 0 $'deadline=$(( $(date +%s) + 60 ))\nwhile true; do\n  if (( $(date +%s) >= deadline )); then\n    echo TIMEOUT\n    exit 124\n  fi\n  sleep 15 || return 125\ndone' -
 # Le texte hors bloc de code ne compte pas.
 printf 'until review passes, do :; done\n' > "$T81_TMP/prose.md"
 t81_out="$(t81_scan "$T81_TMP/prose.md")" && ok "T81 prose hors bloc de code ignorée" || ko "T81 prose : attendu — rc 0 ; obtenu — $t81_out"
@@ -7478,6 +7520,10 @@ grep -v 'sleep 15' "$REFS_DIR/mission-flow.md" > "$T81_TMP/mut-sans-sleep.md"
 grep -v 'TIMEOUT attente' "$REFS_DIR/mission-flow.md" > "$T81_TMP/mut-sans-borne.md"
 t81_out="$(t81_scan "$T81_TMP/mut-sans-sleep.md")"; t81_rc=$?
 { [ "$t81_rc" -eq 1 ] && printf '%s' "$t81_out" | grep -qF 'sans temporisation'; } && ok "T81 mutant mission-flow.md sans sleep : rouge" || ko "T81 mutant sans sleep : attendu — rc=1 « sans temporisation » ; obtenu — rc=$t81_rc : $t81_out"
+sed 's/ || { echo "TEMPORISATION REFUSÉE"; exit 125; }//' "$REFS_DIR/mission-flow.md" > "$T81_TMP/mut-sans-garde.md"
+cmp -s "$REFS_DIR/mission-flow.md" "$T81_TMP/mut-sans-garde.md" && ko "T81 mutant sans garde : le mutant est identique à l'original (ancre périmée)"
+t81_out="$(t81_scan "$T81_TMP/mut-sans-garde.md")"; t81_rc=$?
+{ [ "$t81_rc" -eq 1 ] && printf '%s' "$t81_out" | grep -qF 'temporisation non gardée'; } && ok "T81 mutant mission-flow.md sleep sans garde : rouge" || ko "T81 mutant sans garde : attendu — rc=1 « temporisation non gardée » ; obtenu — rc=$t81_rc : $t81_out"
 t81_out="$(t81_scan "$T81_TMP/mut-sans-borne.md")"; t81_rc=$?
 { [ "$t81_rc" -eq 1 ] && printf '%s' "$t81_out" | grep -qF 'sans borne'; } && ok "T81 mutant mission-flow.md sans TIMEOUT : rouge" || ko "T81 mutant sans TIMEOUT : attendu — rc=1 « sans borne » ; obtenu — rc=$t81_rc : $t81_out"
 
