@@ -760,7 +760,11 @@ NOWHERE = "/\x00nowhere"
 def effective_dir(cmd, cwd):
     """Dossier où les gestes concernés de `cmd` s exécutent, quand il est CERTAIN : chaîne de `cd <littéral>` liés par
     `&&` (même analyse qu outside_scan, #166). Tout doute (`;`, `||`, sous-shell, variable, popd, bash -c, -C, GIT_*,
-    gestes en des dossiers différents, parcours interrompu) rend None : le jugement garde alors le cwd du payload."""
+    gestes en des dossiers différents, parcours interrompu) rend None : le jugement retombe alors sur celui d avant le
+    lot (cwd du payload), sans promesse de refus supplémentaire. Tout `||` dans la commande rend None, même entre
+    guillemets : `a || cd X && c` se lit `(a || cd X) && c`, le cd peut être sauté et c part du dossier de départ."""
+    if "||" in cmd:
+        return None
     trace = []
     try:
         outside_scan(cmd, NOWHERE, os.path.realpath(cwd), 0, False, trace)

@@ -548,6 +548,20 @@ mkdir -p "$UNREL"; git -C "$UNREL" init -q >/dev/null 2>&1; printf 'u\n' > "$UNR
 out="$(run_guard_in "$LAB" "$(mk_bash "cd $UNREL && git add f.txt && git commit -m x" sess-B "$LAB")")"
 assert "GW-C-WT-5.1 — dépôt SANS lien avec le lab : jugé comme avant (deny sur les non-suivis du lab)" "$out" "$DENY"
 assert "GW-C-WT-5.2 — motif inchangé : alpha/config.json cité" "$out" "alpha/config.json"
+# 6 : `a || cd X && c` se lit `(a || cd X) && c` : si `a` réussit, le cd est sauté et le commit part du dossier de départ.
+# Un cd précédé de `||` ne fixe donc jamais le dossier du commit : jugé comme avant (deny sur l'arbre principal).
+# Fixture : alpha INDEXÉ dans l'arbre principal (le jugement d'avant le lot le refuse), worktree propre (jugé seul, il passerait).
+unstage "$WTX"; stage "$LAB" .planning/workstreams/alpha/config.json
+for f in 1 2 3; do
+  case $f in
+    1) c="true || cd $WTX && git commit -m x" ;;
+    2) c="git status || cd $WTX && git commit -m x" ;;
+    3) c="test -d $WTX || cd $WTX && git commit -m x" ;;
+  esac
+  out="$(run_guard_in "$LAB" "$(mk_bash "$c" sess-B "$LAB")")"
+  assert "GW-C-WT-6.$f — cd précédé de « || » : le dossier du commit n'est pas certain, jugé comme avant (deny)" "$out" "$DENY"
+done
+unstage "$LAB"
 
 echo
 echo "=== GW-NOLOCK — partition sans verrou : aucun git diff n'est lancé ==="
@@ -1841,7 +1855,7 @@ echo "=== MUTANTS GW-M-a à GW-M-w, puis GW-M-pathspec_blind à GW-M-vide_both �
 # embarqué de la copie est compilé (bash -n ne voit pas dedans). La matrice (les cas GW-* hors A/B) est rejouée en
 # sous-processus contre la copie ; l'ensemble des ASSERTIONS dont le verdict bascule (identifiant, nombre d'échecs)
 # est comparé EXACTEMENT à l'attendu : un cas basculé hors de l'ensemble, ou manquant, fait échouer.
-MUT_TOTAL=58; MUT_KILLED=0; t0=$SECONDS
+MUT_TOTAL=59; MUT_KILLED=0; t0=$SECONDS
 # a : en plus du cas nommé, GW-C-REL-tenu=2 (VERSION, docs/ADR.md) : sans -z, le « \n » reste collé au nom, qui ne correspond plus
 #     à la liste exacte des fichiers de forme de release (la prédiction du plan, NONASCII seul, ignorait cet effet de bord)
 # a : GW-C-INC-1/2 (corrections F-3, R-5, C3) : sans -z, « .planning/workstreams\n » ne se lit plus comme le chemin incertain
@@ -1944,6 +1958,8 @@ MUT_AU3REDIR="GW-AU3-01.R1=1 GW-AU3-01.R2=1"
 MUT_WTCWD="GW-C-WT-1.2=1 GW-C-WT-2.3=1 GW-C-WT-2.4=1"
 MUT_WTPREFIX="GW-C-WT-2.1=1 GW-C-WT-2.2=1 GW-C-WT-2.3=1 GW-C-WT-2.4=1"
 MUT_WTCOMMON="GW-C-WT-5.1=1 GW-C-WT-5.2=1"
+# wt_or = le cd précédé de « || » fixe de nouveau le dossier du commit (`a || cd X && c` : le cd peut être sauté, c part du dossier de départ).
+MUT_WTOR="GW-C-WT-6.1=1 GW-C-WT-6.2=1 GW-C-WT-6.3=1"
 # gitenv = le retrait de GIT_DIR/GIT_WORK_TREE/... hérités disparaît (relecture SOBR-04, 2026-10-14) ; vide_py = le jugement python du dossier
 # des compartiments vide redevient « présent » (le message du lab plat devient celui de l'ancien verrou partitionné) ; vide_both = les DEUX
 # jugements (bash et python) le font, le Write racine est alors refusé par le verrou de dépôt (P57-D-56).
@@ -2115,6 +2131,7 @@ mutant vide_both 'return 1  # D56-VIDE' 's@return 1  # D56-VIDE@return 0  # D56-
 mutant wt_cwd '^                eff = effective_dir(cmd, cwd)$' 's@effective_dir(cmd, cwd)@None@' "$MUT_WTCWD"
 mutant wt_prefix 'ecwd, etop = eff, t2  #' 's@ecwd, etop = eff, t2  #@ecwd, etop = eff, t2; prefix = os.fsencode(os.path.relpath(os.path.realpath(cwd if lab is None else lab), t2))  #@' "$MUT_WTPREFIX"
 mutant wt_common 'and common_dir_of(t2) == common_dir_of(top):' 's@and common_dir_of(t2) == common_dir_of(top):@and True:@' "$MUT_WTCOMMON"
+mutant wt_or '^    if "||" in cmd:$' 's@if "||" in cmd:@if False:@' "$MUT_WTOR"
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
