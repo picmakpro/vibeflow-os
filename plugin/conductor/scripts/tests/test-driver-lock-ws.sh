@@ -94,6 +94,44 @@ WORK_DIR="$(mktemp -d)"
 WORK_DIR="$(cd "$WORK_DIR" && pwd -P)"   # macOS : /var → /private/var, comparé canonicalisé
 trap 'rm -rf "$WORK_DIR"' EXIT
 
+# Shim `ln`/`mv` de la comparaison A/B (#166). La copie gelée (fixtures/) lance `ln -sh ... || ln -sn ...` : sa référence
+# n'a de sens que sous la sémantique GNU (-h inconnu, le repli -sn joue) ou BSD (-h réel). Sous coreutils uutils (runner
+# Ubuntu 26, 2026-10-29), `-h` vaut `--help` : aide sur stdout, rc 0, aucun lien. Détection une fois, par effet constaté ;
+# si l'outil de l'OS ne traite pas -h comme une option réelle, un shim en tête de PATH (copie gelée ET script courant,
+# mutants compris : le PATH est hérité) rend le refus GNU pour toute option courte portant `h`, sinon délègue au binaire
+# trouvé avant lui. macOS/BSD (-h réel) : aucun shim, rien ne change. La comparaison A/B reste octet pour octet.
+gnu_shim_setup() {
+  local probe="$WORK_DIR/shim-probe" shimdir="$WORK_DIR/shim-bin" tool real
+  mkdir -p "$probe" "$shimdir"
+  for tool in ln mv; do
+    rm -rf "$probe"; mkdir -p "$probe"; : > "$probe/src"
+    if [ "$tool" = ln ]; then
+      ln -sh "$probe/src" "$probe/dst" >/dev/null 2>&1 || true; [ -L "$probe/dst" ] && continue
+    else
+      mv -nh "$probe/src" "$probe/dst" >/dev/null 2>&1 || true; [ -e "$probe/dst" ] && continue
+    fi
+    real="$(command -v "$tool")"
+    { printf '#!/bin/sh\nREAL=%s\n' "'$real'"
+      cat <<'SHIM'
+for a in "$@"; do
+  case "$a" in
+    --) break ;;
+    --*) ;;
+    -*h*) printf "%s: invalid option -- 'h'\n" "${0##*/}" >&2; exit 1 ;;
+    -*) ;;
+    *) break ;;
+  esac
+done
+exec "$REAL" "$@"
+SHIM
+    } > "$shimdir/$tool"
+    chmod +x "$shimdir/$tool"
+  done
+  rm -rf "$probe"
+  if [ -n "$(ls "$shimdir")" ]; then PATH="$shimdir:$PATH"; export PATH; fi
+}
+gnu_shim_setup
+
 PASS=0; FAIL=0
 assert()     { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: $3"; echo "     obtenu:  $2"; FAIL=$((FAIL+1)); fi; }
 assert_not() { if [[ "$2" != *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     interdit: $3"; echo "     obtenu:   $2"; FAIL=$((FAIL+1)); fi; }
@@ -1381,6 +1419,16 @@ FROZEN="$HERE/fixtures/driver-lock-pre-e8771d9.sh"
 AB_REF=e8771d94
 AB_PATH_IN_REF=plugin/conductor/scripts/driver-lock.sh
 echo "  A/B : --help exclu (P57-D-37)"
+# Sémantique de ln/mv vue par la copie gelée (#166) : `-h` = option réelle (BSD, lien créé / fichier déplacé) ou refus
+# GNU (rc ≠ 0, stdout vide, aucun effet), jamais l'aide uutils ; le repli `-sn` et `mv -nT` délèguent et agissent.
+SHIMD="$WORK_DIR/shim-sem"; rm -rf "$SHIMD"; mkdir -p "$SHIMD"; : > "$SHIMD/t"; : > "$SHIMD/m"
+shim_so="$(ln -sh "$SHIMD/t" "$SHIMD/l1" 2>/dev/null)"; shim_rc=$?
+if [ -L "$SHIMD/l1" ] || { [ "$shim_rc" -ne 0 ] && [ -z "$shim_so" ]; }; then shim_v=0; else shim_v=1; fi
+assert_exit "SHIM.ln — ln -sh : lien réel ou refus GNU (rc≠0, stdout vide), jamais l'aide uutils (rc=$shim_rc, stdout=[$shim_so])" "$shim_v" 0
+shim_so="$(mv -nh "$SHIMD/m" "$SHIMD/m2" 2>/dev/null)"; shim_rc=$?
+if [ -e "$SHIMD/m2" ] || { [ "$shim_rc" -ne 0 ] && [ -z "$shim_so" ]; }; then shim_v=0; else shim_v=1; fi
+assert_exit "SHIM.mv — mv -nh : déplacement réel ou refus GNU (rc≠0, stdout vide), jamais l'aide uutils (rc=$shim_rc, stdout=[$shim_so])" "$shim_v" 0
+ln -sn "$SHIMD/t" "$SHIMD/l2" >/dev/null 2>&1; [ -L "$SHIMD/l2" ]; assert_exit "SHIM.ln-sn — ln -sn (repli de la copie gelée) crée le lien" "$?" 0
 
 # Normalisation : le chemin du script (la ligne `Usage:` l'imprime par $0), epoch à 10 chiffres, âges, ISO,
 # suffixe de génération `.gen.<epoch>.<pid>`. Les âges avant l'epoch générique pour garder leur clé lisible.
