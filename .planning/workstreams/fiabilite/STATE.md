@@ -9,11 +9,11 @@ last_activity: 2026-10-22
 last_activity_desc: Phase 58 passée avec 2 overrides (critère 6 et recette installeur, Samuel 2026-10-22), branche rebasée sur v2.70.1 — next : PR + release v2.71.0, puis Phase 59
 state_head: 45ee80db
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 2
   total_plans: 28
   completed_plans: 28
-milestone_name: « l'équipe produit » — Phases 57-62 —
+milestone_name: « l'équipe produit » — Phases 57-63 —
 stopped_at: "Phase 58 passée avec 2 overrides (dette : check-livraison-58.sh clients, recette /vibeflow-install) — next : PR + release v2.71.0, puis cadrage Phase 59"
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — EXÉCUTÉE (12/12 plans), VÉRIFIÉE human_needed 13/14 (critère 6 en attente de la liste de clients), puis PR
-Jalon courant : `equipe-produit-v1.0` (Phases 57-62, inscrit 2026-10-08) ; 1 phase sur 6 close. `fiabilite-v1.0` est CLOS
+Jalon courant : `equipe-produit-v1.0` (Phases 57-63, inscrit 2026-10-08) ; 2 phases sur 7 closes. `fiabilite-v1.0` est CLOS
 depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
 `.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).
 
@@ -60,6 +60,10 @@ Last activity: 2026-10-20 — Phase 58 vérifiée human_needed 13/14
 <!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-10-12.md -->
 
 - P58-PL-01 à P58-PL-14 : décisions de planificateur (discrétion P58-D-15..20), réalisées par les plans 58-01 à 58-12, plus P58-D-21 (filtrage des presets, plan 58-12).
+
+### Roadmap Evolution
+
+- Phase 63 added (2026-10-29) : Règles produit empruntées à AIDD — arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 (phase dans le jalon actuel ; règles AIDD dans notre vocabulaire). Même arbitrage : sortie complète de GSD, étendue à superpowers par message session principale du même jour → graine `SEED-003`, pas de phase.
 
 ### Pending Todos
 

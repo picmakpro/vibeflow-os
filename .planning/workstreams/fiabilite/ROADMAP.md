@@ -17,7 +17,7 @@
   BUDG/WKTR/SKIL/AGTS + QUAL-01 transverse). Recherche : `.planning/research/SUMMARY.md` +
   `ARCHITECTURE.md` (ordre de construction dicté par les fichiers).
 - 📋 **equipe-produit-v1.0** — « l'équipe produit : rôles humains, amont produit, état partagé » — Phases
-  57-62 — **inscrit 2026-10-08**, prochain jalon exécuté (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08). Germe de `SEED-001` : ses trois déclencheurs
+  57-63 — **inscrit 2026-10-08**, prochain jalon exécuté (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08). Germe de `SEED-001` : ses trois déclencheurs
   sont réunis à la clôture de `fiabilite-v1.0`. Spec : `docs/superpowers/specs/2026-09-16-equipe-produit-bmad-design.md`.
 - 📋 **ecc-inspiration-v1.0** — « ce qu'on emprunte à ECC » — Phases 51-56 — **inscrit
   2026-09-25** — six emprunts mesurés au dépôt `affaan-m/ECC` (snapshot avant compaction,
@@ -110,6 +110,7 @@
 - [ ] Phase 60: Gate architecture avant découpage et validation des phases proposées (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 62: Décision sur l'approche plateforme, sur preuve (inscrite 2026-10-08, jalon equipe-produit-v1.0)
+- [ ] Phase 63: Règles produit empruntées à AIDD (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
 
@@ -482,7 +483,7 @@ Plans:
 
 - [ ] TBD (run /gsd-plan-phase 56 to break down)
 
-## 📋 Milestone equipe-produit-v1.0 — « l'équipe produit » (Phases 57-62)
+## 📋 Milestone equipe-produit-v1.0 — « l'équipe produit » (Phases 57-63)
 
 **Milestone Goal :** VibeFlow sert une **équipe** et plus seulement un humain qui a tous les modules. Il apporte des
 rôles de poste (solo par défaut, product, dev), des artefacts amont lisibles par un non-dev, et un état partagé entre
@@ -495,7 +496,8 @@ dont les douze arbitrages A-01 à A-12 du 2026-09-16 tiennent, sauf A-09 (révis
 **Inscription :** 2026-10-08, à la clôture de `fiabilite-v1.0`. Choix de ce jalon avant `ecc-inspiration-v1.0`, forme
 d'inscription et place du verrou : arbitrage Samuel, AskUserQuestion session principale, 2026-10-08. Même forme qu'ECC et `gouvernance-labs-v1.0` : section distincte de la
 ROADMAP plate, **sans `gsd-new-milestone`**. Les numéros 57 à 62 sont posés à la main (42-50 : compartiment
-`gouvernance` ; 51-56 : ECC).
+`gouvernance` ; 51-56 : ECC). La Phase 63 est ajoutée le 2026-10-29 par `gsd-phase` (arbitrage Samuel, AskUserQuestion
+session principale, 2026-10-29 : « phase dans le jalon actuel », règles AIDD dans notre vocabulaire).
 
 **Révision d'A-09, tracée.** La SEED supposait le verrou de driver par compartiment livré « avant, dans D-02 ». La
 mission D-02 du 2026-09-23 n'a fait que la partition. Mesuré le 2026-10-08 : `driver-lock.sh` ne connaît aucun
@@ -662,3 +664,16 @@ Plans:
 Plans:
 
 - [x] 62-01-PLAN.md — dossier de décision `62-DECISION-plateforme.md` (statut PROPOSÉ : mesures sourcées, options A/B/C, déclencheur et plancher de date proposés) ; la décision signée (PLTF-02) reste à Samuel, la phase reste ouverte
+
+### Phase 63: Règles produit empruntées à AIDD
+
+**Goal:** Les règles de l'amont produit d'AIDD (`ai-driven-dev/framework`, MIT) sont reprises au plus près, dans notre vocabulaire et nos fichiers, pour compléter ce que posent les Phases 59 et 60 : Three Amigos en trois juges frais (produit, delivery, qualité) avec une réconciliation où « silence, majority, and severity are not approval » ; grille des zones d'ombre (7 catégories, 3 sévérités, une question par trou, comparaison entre deux passes) ; table preuve / hypothèse / décision du BRIEF ; change set gelé avant écriture, montré au dev qui valide une phase proposée (A-07) ; grille INVEST et découpe verticale pour cette validation ; scénarios de QA tirés d'un critère d'acceptation, jamais du diff ; définition de « prêt à planifier » avec refus routé vers l'artefact refusé ; section unique des questions ouvertes (`TBD: <question>`) que `check-prd.sh` admet là et refuse ailleurs.
+**Requirements**: TBD — famille réservée au cadrage.
+**Depends on:** 59, 60.
+**Sources:** `docs/research/2026-10-29-aidd-equipe-produit-inventaire.md` (inventaire atomique, chemins AIDD exacts) ; `docs/research/2026-10-29-ai-driven-dev-framework.md` ; SEED-001 A-02, A-06, A-07, A-10.
+**Hors périmètre :** le vocabulaire AIDD (epic, story, task : couche de synonymes, Q-11) ; les dossiers `aidd_docs/` et tout fichier amont au-delà de BRIEF, PROJECT, REQUIREMENTS (A-06) ; les modes autonomes de `02-backlog` et le mode `auto` de `01-sdlc` (ADR-031) ; un nom d'agent « three amigos ». Copie mot pour mot d'un gabarit AIDD : seulement avec un fichier NOTICE MIT.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 63 to break down)
