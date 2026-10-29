@@ -75,7 +75,8 @@ Deux sujets qui avancent chacun sur sa branche peuvent diverger sans conflit vis
   route n'en documente ;
 - un numéro de phase possédé par un sujet qui réapparaît dans la feuille de route de la racine.
 
-Aucun hook ne le lance dans ton lab : tu l'appelles à la main, depuis les scripts du module
+Aux postes `product` et `dev`, l'installeur le fait jouer pour toi après chaque fusion (voir plus
+bas). Au poste `solo`, rien ne le lance : tu l'appelles à la main, depuis les scripts du module
 `conductor`, quand tu fusionnes des branches qui touchent au planning.
 
 ```bash
@@ -91,6 +92,41 @@ vérifier).
 
 Les autres gardes du lab suivent, elles, le sujet actif : la vérification de l'état du planning ne
 crie plus « STATE.md absent » sur un dépôt partitionné, et les exigences se lisent par sujet.
+
+### Le filet armé aux postes product et dev
+
+À l'installation d'un poste `product` ou `dev`, l'installeur pose dans **ton clone** deux hooks git,
+`post-merge` et `post-rewrite`. Ils rejouent le contrôle après chaque `git pull`, `git merge` ou
+`git pull --rebase`. Au poste `solo`, rien n'est posé.
+
+- **Il crie sur une divergence**, mais la fusion n'est pas annulée : un hook ne peut pas la défaire.
+  Quand tout est conforme, il ne dit rien de plus. Quand il ne peut pas juger, il dit « non
+  vérifiable » : jamais un vert de complaisance.
+- **Le journal** : chaque cri et chaque « non vérifiable » ajoute une ligne (date, hook, verdict,
+  HEAD, signaux) au fichier `.git/vf-divergence/journal.tsv`. Il n'est pas versionné, il appartient
+  à ton clone (tes worktrees le partagent) et il survit au retrait du filet.
+- **L'état** : `bash .claude/scripts/vf-divergence-hook.sh status --path .` dit si chaque hook est
+  armé, tiers ou absent, et combien de lignes compte le journal.
+- **Il n'exécute jamais ton dépôt** : le contrôle est lancé depuis le plugin installé, pas depuis un
+  script que la fusion viendrait d'apporter.
+- **Il ne prend jamais la place d'un hook à toi** : si un hook existe déjà, ou si `core.hooksPath`
+  est configuré (husky, par exemple), rien n'est écrasé, et l'installeur imprime la ligne à ajouter
+  toi-même à ce hook.
+- **La sortie** : `VF_DIVERGENCE_HOOK=off` à l'installation, au changement de poste ou à la mise à
+  jour. Voir [l'installation](../01-demarrer/installation.md) et
+  [la mise à jour](../01-demarrer/mettre-a-jour-et-desinstaller.md).
+
+### Ce que le filet ne voit pas
+
+Ces limites sont mesurées, pas supposées. Le filet ne se déclenche pas sur :
+
+- `git reset --hard`, `git switch` et `git checkout` ;
+- `git cherry-pick` ;
+- un `git rebase` qui ne réécrit aucun commit.
+
+Une fusion faite sur la forge n'est vue qu'à ton `git pull` suivant. Après une mise à jour du
+plugin, lance `/vf-update` pour que le hook suive le plugin installé : sans cela, il peut dire « non
+vérifiable ». Sous Windows (Git Bash), le filet n'a pas encore été mesuré.
 
 <!-- vf-manual:nav -->
 [← Précédent](../05-equipe-agents/branches-et-worktrees.md) · [↑ Sommaire](../README.md) · [Suivant →](../05-equipe-agents/ranger-ce-qu-on-cree.md)
