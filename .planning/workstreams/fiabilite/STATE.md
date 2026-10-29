@@ -1,20 +1,20 @@
 ---
 gsd_state_version: "1.0"
 milestone: equipe-produit-v1.0
-current_phase: 59
-current_phase_name: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate
+current_phase: 60
+current_phase_name: Gate architecture avant découpage et validation des phases proposées
 status: executed
-last_updated: "2026-10-27T23:00:00.000Z"
-last_activity: 2026-10-27
-last_activity_desc: Phase 59 exécutée — 8/8 plans, porte de phase rejouée depuis ci.yml (20 étapes vertes), PRDT-01..12 cochées — next : PR par le manager, relecture adverse SOBR-04, release décidée à part
+last_updated: "2026-10-29T12:00:00.000Z"
+last_activity: 2026-10-29
+last_activity_desc: Phase 60 exécutée — 9/9 plans, porte de phase rejouée depuis ci.yml (20 étapes vertes), ARCG-02..08, 10 et 11 cochées, ARCG-01 et ARCG-09 partielles (dettes nommées) — next : PR par le manager, relecture adverse SOBR-04, minor racine décidé après merge
 state_head: 45ee80db
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 36
-  completed_plans: 36
+  completed_phases: 4
+  total_plans: 45
+  completed_plans: 45
 milestone_name: « l'équipe produit » — Phases 57-62 —
-stopped_at: "Phase 59 exécutée le 2026-10-27 (8/8 plans, porte verte) — arrêt avant merge, tag et release"
+stopped_at: "Phase 60 exécutée le 2026-10-29 (9/9 plans, porte verte) — arrêt avant PR, merge, tag et release"
 ---
 
 # Project State
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 59 (Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate) — EXÉCUTÉE (8/8 plans, porte de phase verte, PRDT-01..12 cochées) ; la Phase 58 reste close (12/12 plans)
-Jalon courant : `equipe-produit-v1.0` (Phases 57-62, inscrit 2026-10-08) ; 3 phases sur 6 closes. `fiabilite-v1.0` est CLOS
+Phase: 60 (Gate architecture avant découpage et validation des phases proposées) — EXÉCUTÉE (9/9 plans, porte de phase verte, ARCG-02..08, 10 et 11 cochées, ARCG-01 et ARCG-09 partielles) ; la Phase 59 reste exécutée (8/8) et la Phase 58 close (12/12)
+Jalon courant : `equipe-produit-v1.0` (Phases 57-62, inscrit 2026-10-08) ; 4 phases sur 6 closes ou exécutées. `fiabilite-v1.0` est CLOS
 depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
 `.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).
 
@@ -51,6 +51,7 @@ passés après trois tours de correction. Rapport : `.planning/missions/2026-10-
 Replanification 2026-10-20 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 pour ADR-077 et Q16 ; Q15 et Q17 : 2026-10-16) : ADR-077 approuvée (58-03 close, SUMMARY posé) ; plan 58-12 ajouté (presets filtrés par poste, P58-D-21, vague 6) ; 58-11 passe en vague 7 (manuel « Poste » FR+EN, liste de clients par `VF_CLIENT_NAMES_FILE`).
 Phase 58 : 58-11 close le 2026-10-20 (porte de phase rejouée depuis `ci.yml`, RLPO-01..10 et 12 cochées, RLPO-11 en attente du critère 6) ; rapport : `58-11-SUMMARY.md`.
 Phase 59 exécutée le 2026-10-27 (rapport : `59-08-SUMMARY.md`) : porte de phase rejouée depuis `ci.yml`, suites une à une, périmètre du diff contrôlé ; next : PR ouverte par le manager, relecture adverse SOBR-04, release `v2.72.0` décidée à part (arrêt avant merge, tag et release).
+Phase 60 exécutée le 2026-10-29 (rapport : `60-09-SUMMARY.md`) : porte de phase rejouée depuis `ci.yml` (20 étapes vertes, 3 sautées nommées), quatorze suites une à une, périmètre du diff contrôlé ; dettes nommées : volet pose d'ARCG-01 non prouvé par une exécution (P60-PL-26), critère 6 `clients` en code 2 (ARCG-09), aucun run réel du worker architecte ; next : PR ouverte par le manager, relecture adverse SOBR-04, revue `@picmakpro` sur le registre d'instructions, minor racine décidé après merge (arrêt avant PR, merge, tag et release).
 Next (Phase 58, historique) : dépôt de la liste de clients par Samuel (hors dépôt) puis `check-livraison-58.sh clients`, puis PR (rebase sur main = geste du manager) ; Q18 (faille `python -c` antérieure) hors cette phase, hotfix en parallèle.
 Last activity: 2026-10-20 — Phase 58 vérifiée human_needed 13/14
 
@@ -60,6 +61,7 @@ Last activity: 2026-10-20 — Phase 58 vérifiée human_needed 13/14
 
 <!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-10-12.md -->
 
+- P60-PL-01 à P60-PL-27 : décisions de planificateur (discrétion P60-D-03..06, conséquences des P60-D et P60-H), réalisées par les plans 60-01 à 60-09.
 - P59-PL-01 à P59-PL-22 : décisions de planificateur (discrétion P59-D-14..22), réalisées par les plans 59-01 à 59-08.
 - P58-PL-01 à P58-PL-14 : décisions de planificateur (discrétion P58-D-15..20), réalisées par les plans 58-01 à 58-12, plus P58-D-21 (filtrage des presets, plan 58-12).
 
