@@ -670,8 +670,8 @@ vf_lp_rel() {
 vf_lp_recorded() {
   local f
   f="$(vf_sha_path "$1")"
-  [ -f "$f" ] || return 1
-  VF_LP_P="$2" awk 'length($0) > 66 && substr($0, 65, 2) == "  " && substr($0, 67) == ENVIRON["VF_LP_P"] { print substr($0, 1, 64); f = 1; exit } END { exit !f }' "$f"
+  [ -f "$f" ] && [ -r "$f" ] || return 1
+  VF_LP_P="$2" awk 'length($0) > 66 && substr($0, 65, 2) == "  " && substr($0, 67) == ENVIRON["VF_LP_P"] { print substr($0, 1, 64); f = 1; exit } END { exit !f }' "$f" 2>/dev/null
 }
 
 # vf_lp_find_old <mod> — retrouve le module dans le cache de la version INSTALLÉE : la version du
@@ -698,7 +698,7 @@ vf_lp_find_old() {
 # [sync] = resync à version égale : pas de cycle manifeste, les chemins posés sont collectés pour
 # mettre les empreintes à jour en fin de session (sinon l'update suivant lèverait une fausse alerte).
 vf_lp_begin() {
-  local mod="$1" f curf nl=$'\n'
+  local mod="$1" f curf cand known="" nl=$'\n'
   VF_LP_MOD=""; VF_LP_OLD=""; VF_LP_MODE="none"; VF_LP_KNOWN=""; VF_LP_CAND=""
   VF_LP_NOREF_SAID=0; VF_LP_SYNC="${2:+1}"; VF_LP_SYNC="${VF_LP_SYNC:-0}"; VF_LP_PLACED=""
   vf_lp_probe
@@ -709,14 +709,24 @@ vf_lp_begin() {
   fi
   vf_lp_find_old "$mod"
   f="$(vf_sha_path "$mod")"
-  if [ -f "$f" ]; then
+  # Détection best-effort : un fichier d'empreintes illisible (permissions, E/S) la DÉGRADE — repli sur
+  # l'ancien cache ou « aucune référence », une ligne de log — et ne fait jamais échouer la pose.
+  if [ -f "$f" ] && { [ ! -r "$f" ] || ! known="$(awk 'length($0) > 66 && substr($0, 65, 2) == "  " { print substr($0, 67) }' "$f" 2>/dev/null)"; }; then
+    log "  [local-patches] $mod : empreintes illisibles ($f) — détection dégradée à cette pose"
+    f=""
+  fi
+  if [ -n "$f" ] && [ -f "$f" ]; then
     VF_LP_MODE="sha"
-    VF_LP_KNOWN="$(awk 'length($0) > 66 && substr($0, 65, 2) == "  " { print substr($0, 67) }' "$f")"
+    VF_LP_KNOWN="$known"
     if [ -n "$VF_LP_KNOWN" ] && curf="$(mktemp 2>/dev/null)"; then
-      printf '%s\n' "$VF_LP_KNOWN" | vf_lp_hash_rels > "$curf"
-      VF_LP_CAND="$nl$(awk 'NR == FNR { ok[$0] = 1; next } length($0) > 66 && !($0 in ok) { print substr($0, 67) }' "$curf" "$f")$nl"
+      printf '%s\n' "$VF_LP_KNOWN" | vf_lp_hash_rels > "$curf" 2>/dev/null || true
+      if cand="$(awk 'NR == FNR { ok[$0] = 1; next } length($0) > 66 && !($0 in ok) { print substr($0, 67) }' "$curf" "$f" 2>/dev/null)"; then
+        VF_LP_CAND="$nl$cand$nl"
+        VF_LP_KNOWN="$nl$VF_LP_KNOWN$nl"
+      else
+        VF_LP_KNOWN=""    # lecture impossible : tout fichier passe par la vérification exacte
+      fi
       rm -f "$curf"
-      VF_LP_KNOWN="$nl$VF_LP_KNOWN$nl"
     else
       VF_LP_KNOWN=""    # lot impossible : tout fichier passe par la vérification exacte
     fi
@@ -901,10 +911,15 @@ vf_sha_write() {
   if [ "$VF_LP_HASH" = "none" ]; then rm -f "$target"; return 0; fi
   vf_lp_ignore_rule
   tmp="$target.tmp.$$"
-  vf_lp_hash_rels < "$list" > "$tmp"
-  LC_ALL=C sort "$tmp" > "$tmp.s"
-  mv "$tmp.s" "$target"
-  rm -f "$tmp"
+  # Écriture best-effort : un échec (dossier ou disque non inscriptible) ne fait pas échouer la pose ; une
+  # ligne de log, et l'ancien fichier — devenu périmé — est retiré plutôt que de laisser conclure faux.
+  if vf_lp_hash_rels < "$list" > "$tmp" 2>/dev/null && LC_ALL=C sort "$tmp" > "$tmp.s" 2>/dev/null && mv "$tmp.s" "$target" 2>/dev/null; then
+    rm -f "$tmp"
+  else
+    rm -f "$tmp" "$tmp.s" 2>/dev/null || true
+    rm -f "$target" 2>/dev/null || true
+    log "  [local-patches] $mod : empreintes non écrites ($target) — détection indisponible au prochain passage"
+  fi
   return 0
 }
 
@@ -924,18 +939,27 @@ vf_lp_sync_merge() {
     if vf_manifest_excluded "$VF_LP_REL"; then continue; fi
     printf '%s\n' "$VF_LP_REL" >> "$list"
   done < "$VF_LP_PLACED"
-  LC_ALL=C sort -u "$list" | vf_lp_hash_rels > "$newf"
+  LC_ALL=C sort -u "$list" | vf_lp_hash_rels > "$newf" 2>/dev/null || true
   if [ -s "$newf" ]; then
     target="$(vf_sha_path "$VF_LP_MOD")"
     tmp="$target.tmp.$$"
     vf_lp_ignore_rule
-    mkdir -p "$TARGET_ROOT/scripts"
+    mkdir -p "$TARGET_ROOT/scripts" 2>/dev/null || true
+    # Best-effort : une fusion impossible (fichier illisible, écriture refusée) est dite, jamais fatale.
     if [ -f "$target" ]; then
-      awk 'NR == FNR { if (length($0) > 66) p[substr($0, 67)] = 1; print; next } length($0) > 66 && !(substr($0, 67) in p) { print }' "$newf" "$target" | LC_ALL=C sort > "$tmp"
+      if [ -r "$target" ] && awk 'NR == FNR { if (length($0) > 66) p[substr($0, 67)] = 1; print; next } length($0) > 66 && !(substr($0, 67) in p) { print }' "$newf" "$target" 2>/dev/null | LC_ALL=C sort > "$tmp" 2>/dev/null; then
+        if cmp -s "$tmp" "$target"; then rm -f "$tmp"
+        elif ! mv "$tmp" "$target" 2>/dev/null; then rm -f "$tmp"; log "  [local-patches] $VF_LP_MOD : empreintes non mises à jour (écriture refusée)"; fi
+      else
+        rm -f "$tmp" 2>/dev/null || true
+        log "  [local-patches] $VF_LP_MOD : empreintes illisibles ($target) — non mises à jour par la resync"
+      fi
+    elif LC_ALL=C sort "$newf" > "$tmp" 2>/dev/null && mv "$tmp" "$target" 2>/dev/null; then
+      :
     else
-      LC_ALL=C sort "$newf" > "$tmp"
+      rm -f "$tmp" 2>/dev/null || true
+      log "  [local-patches] $VF_LP_MOD : empreintes non écrites (écriture refusée)"
     fi
-    if [ -f "$target" ] && cmp -s "$tmp" "$target"; then rm -f "$tmp"; else mv "$tmp" "$target"; fi
   fi
   rm -f "$list" "$newf"
   return 0
@@ -967,13 +991,23 @@ vf_lp_refresh_agents() {
   for f in "$TARGET_ROOT/agents/"*.md; do
     if [ -f "$f" ]; then printf 'agents/%s\n' "${f##*/}"; fi
   done | vf_lp_hash_rels > "$after" || true
-  awk 'NR == FNR { if (length($0) > 66) b[substr($0, 67)] = substr($0, 1, 64); next } length($0) > 66 { r = substr($0, 67); h = substr($0, 1, 64); if ((r in b) && b[r] != h) printf "%s\t%s\t%s\n", r, b[r], h }' "$VF_LP_SNAP" "$after" > "$chg"
+  awk 'NR == FNR { if (length($0) > 66) b[substr($0, 67)] = substr($0, 1, 64); next } length($0) > 66 { r = substr($0, 67); h = substr($0, 1, 64); if ((r in b) && b[r] != h) printf "%s\t%s\t%s\n", r, b[r], h }' "$VF_LP_SNAP" "$after" > "$chg" 2>/dev/null || : > "$chg"
   if [ -s "$chg" ]; then
     for sf in "$TARGET_ROOT/scripts/".vibeflow-sha256-*; do
       [ -f "$sf" ] || continue
+      # Best-effort, module par module : un fichier d'empreintes illisible ou non réécrivable est dit et sauté.
+      if [ ! -r "$sf" ]; then
+        log "  [local-patches] empreintes illisibles ($sf) — non rafraîchies après l'injection MCP"
+        continue
+      fi
       tmp="$sf.tmp.$$"
-      awk -F'\t' 'NR == FNR { bef[$1] = $2; aft[$1] = $3; next } { r = substr($0, 67); if (length($0) > 66 && (r in bef) && substr($0, 1, 64) == bef[r]) print aft[r] "  " r; else print }' "$chg" "$sf" | LC_ALL=C sort > "$tmp"
-      if cmp -s "$tmp" "$sf"; then rm -f "$tmp"; else mv "$tmp" "$sf"; fi
+      if awk -F'\t' 'NR == FNR { bef[$1] = $2; aft[$1] = $3; next } { r = substr($0, 67); if (length($0) > 66 && (r in bef) && substr($0, 1, 64) == bef[r]) print aft[r] "  " r; else print }' "$chg" "$sf" 2>/dev/null | LC_ALL=C sort > "$tmp" 2>/dev/null; then
+        if cmp -s "$tmp" "$sf"; then rm -f "$tmp"
+        elif ! mv "$tmp" "$sf" 2>/dev/null; then rm -f "$tmp"; log "  [local-patches] empreintes non rafraîchies ($sf) — écriture refusée"; fi
+      else
+        rm -f "$tmp" 2>/dev/null || true
+        log "  [local-patches] empreintes non rafraîchies ($sf) — lecture impossible"
+      fi
     done
   fi
   rm -f "$VF_LP_SNAP" "$after" "$chg"
@@ -3317,7 +3351,10 @@ backup_module() {
   # #166 : les empreintes de pose décrivent le lab TEL QU'IL EST avant l'écrasement — le rollback les
   # restaure avec les fichiers (la preuve de réversibilité de verify-runtime-reversibility.sh compare des
   # ensembles de fichiers : un fichier d'empreintes présent avant, absent après, la rougit).
-  [ -f "$(vf_sha_path "$mod")" ] && cp -p "$(vf_sha_path "$mod")" "$bdir/.vibeflow-sha256"
+  if [ -f "$(vf_sha_path "$mod")" ] && ! cp -p "$(vf_sha_path "$mod")" "$bdir/.vibeflow-sha256" 2>/dev/null; then
+    rm -f "$bdir/.vibeflow-sha256" 2>/dev/null || true
+    log "  [local-patches] $mod : empreintes non sauvegardées (illisibles) — le rollback ne les restituera pas"
+  fi
   vf_declare_write + "$bdir"
   log "  backup → $bdir"
 }
@@ -3465,9 +3502,9 @@ rollback_module() {
   # #166 : empreintes de pose restaurées avec le backup (même instant que les fichiers) ; un backup sans
   # empreintes (lab posé avant #166) retire celles que la version annulée avait écrites.
   if [ -f "$latest/.vibeflow-sha256" ] && cp -p "$latest/.vibeflow-sha256" "$(vf_sha_path "$mod").tmp.$$" 2>/dev/null; then
-    mv -f "$(vf_sha_path "$mod").tmp.$$" "$(vf_sha_path "$mod")"
+    mv -f "$(vf_sha_path "$mod").tmp.$$" "$(vf_sha_path "$mod")" 2>/dev/null || { rm -f "$(vf_sha_path "$mod").tmp.$$" 2>/dev/null; log "  [local-patches] $mod : empreintes non restaurées (écriture refusée)"; }
   else
-    rm -f "$(vf_sha_path "$mod")"
+    rm -f "$(vf_sha_path "$mod")" 2>/dev/null || true
   fi
   trap - ERR
   [ "$rollback_had_errtrace" -eq 1 ] || set +E
@@ -3675,7 +3712,7 @@ uninstall_module() {
   local manifest_file
   manifest_file="$(vf_manifest_path "$mod")"
   [ -f "$manifest_file" ] && rm -f "$manifest_file" && log "  removed $manifest_file"
-  rm -f "$(vf_sha_path "$mod")"   # #166 : les empreintes partent avec le manifeste
+  rm -f "$(vf_sha_path "$mod")" 2>/dev/null || true   # #166 : les empreintes partent avec le manifeste
 
   mark_uninstalled "$mod"
   log "✓ $mod désinstallé"

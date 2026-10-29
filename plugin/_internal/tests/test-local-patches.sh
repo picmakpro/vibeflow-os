@@ -518,6 +518,95 @@ if ! "$GREP" -qF 'local-patches' "$T/err"; then
 else
   ko "D2b : la ligne « aucune référence » revient — $("$GREP" -F 'local-patches' "$T/err" | head -2 | tr '\n' '|')"
 fi
+# M3 (m4 de la re-revue) : la resync à version ÉGALE met à jour les empreintes quand le contenu du cache a
+#      DÉRIVÉ (même VERSION, fichier différent). Sans `sync` à l'ouverture de session, le cache est identique
+#      avant et après la resync (M2 ne le voit pas) : seule la mise à jour de la version SUIVANTE, sans
+#      aucune modification locale, révèle une empreinte périmée — par une fausse alerte.
+mk_mod "$T/dr/v1" drm 1.0.0
+mk_mod "$T/dr/v1b" drm 1.0.0; printf 'data drm DERIVE\n' > "$T/dr/v1b/drm/scripts/drm-data.txt"
+mk_mod "$T/dr/v2" drm 1.1.0
+LAB="$T/labM3"; mkdir -p "$LAB"; eng "$LAB" "$T/dr/v1" install drm
+eng "$LAB" "$T/dr/v1b" update drm; M3_RC1=$?                 # resync à version égale, contenu dérivé
+M3_POSE="$(cat "$LAB/.claude/scripts/drm-data.txt")"
+eng "$LAB" "$T/dr/v2" update drm; M3_RC2=$?                  # version suivante, aucune modification locale
+if [ "$M3_RC1" -eq 0 ] && [ "$M3_RC2" -eq 0 ] && [ "$M3_POSE" = "data drm DERIVE" ] && ! "$GREP" -qF 'local-patches' "$T/err" \
+   && cmp -s "$LAB/.claude/scripts/drm-data.txt" "$T/dr/v2/drm/scripts/drm-data.txt"; then
+  ok "M3 : resync à version égale, cache dérivé — l'update suivant, sans modification locale, ne lève aucune alerte"
+else
+  ko "M3 : empreinte périmée après la resync (rc=$M3_RC1/$M3_RC2, pose=[$M3_POSE]) — $("$GREP" -F 'local-patches' "$T/err" | head -2 | tr '\n' '|')"
+fi
+
+# ---------------------------------------------------------------------------
+# S — m1 de la re-revue : la détection est best-effort. Un fichier d'empreintes ILLISIBLE (chmod 000) la
+#      DÉGRADE (repli sur l'ancien cache, une ligne de log) mais ne fait jamais échouer la pose : ni update,
+#      ni resync, ni sauvegarde avant écrasement, ni rollback. Précondition : le chmod doit rendre le fichier
+#      illisible (sous root il ne le fait pas : KO « non vérifiable », jamais un vert par un contrôle plus faible).
+# ---------------------------------------------------------------------------
+LAB="$(newlab labS)"
+SHS="$LAB/.claude/scripts/.vibeflow-sha256-fixmod"
+chmod 000 "$SHS"
+if [ -r "$SHS" ]; then
+  ko "S : non vérifiable — le fichier d'empreintes reste lisible après chmod 000 (exécution sous root ?)"
+else
+  printf 'PATCH LOCAL du lab\n' >> "$LAB/$DATA"
+  eng "$LAB" "$T/cache/v2" update fixmod; S_RC=$?
+  if [ "$S_RC" -eq 0 ] && ! "$GREP" -q "can't open" "$T/err" && "$GREP" -qF 'empreintes illisibles' "$T/err" \
+     && "$GREP" -qF '[local-patches] 1 fichier(s)' "$T/err" \
+     && cmp -s "$LAB/$DATA" "$T/cache/v2/fixmod/scripts/fixdata.txt"; then
+    ok "S1 : empreintes illisibles — update rc=0, pose faite, repli sur l'ancien cache (patch local encore détecté), une ligne de log"
+  else
+    ko "S1 : update avec empreintes illisibles rc=$S_RC — $(tail -2 "$T/err" | cut -c1-160 | tr '\n' '|')"
+  fi
+  chmod 644 "$SHS" 2>/dev/null
+  # resync à version égale avec les empreintes illisibles (vf_lp_sync_merge) et sauvegarde avant écrasement.
+  chmod 000 "$SHS"
+  eng "$LAB" "$T/cache/v2" update fixmod; S_RC2=$?
+  if [ "$S_RC2" -eq 0 ] && ! "$GREP" -q "can't open" "$T/err"; then
+    ok "S2 : resync à version égale avec empreintes illisibles — rc=0, aucune erreur d'outil"
+  else
+    ko "S2 : resync avec empreintes illisibles rc=$S_RC2 — $(tail -2 "$T/err" | cut -c1-160 | tr '\n' '|')"
+  fi
+  chmod 644 "$SHS" 2>/dev/null
+  # un fichier d'empreintes d'un AUTRE module, illisible, ne casse pas la pose du module courant
+  # (vf_lp_refresh_agents les balaie tous après l'injection MCP).
+  mk_mod "$T/ot/v1" otm 1.0.0; mk_mod "$T/ot/v2" otm 1.1.0
+  eng "$LAB" "$T/ot/v1" install otm
+  chmod 000 "$LAB/.claude/scripts/.vibeflow-sha256-otm"
+  eng "$LAB" "$T/cache/v1" update fixmod; S_RC3=$?
+  chmod 644 "$LAB/.claude/scripts/.vibeflow-sha256-otm" 2>/dev/null
+  if [ "$S_RC3" -eq 0 ] && ! "$GREP" -q "can't open" "$T/err"; then
+    ok "S3 : empreintes illisibles d'un autre module — la pose du module courant aboutit, sans erreur d'outil"
+  else
+    ko "S3 : empreintes d'un autre module illisibles, rc=$S_RC3 — $(tail -2 "$T/err" | cut -c1-160 | tr '\n' '|')"
+  fi
+  # sauvegarde avant écrasement (backup_module) puis rollback avec empreintes illisibles
+  LAB="$(newlab labS4)"; SHS4="$LAB/.claude/scripts/.vibeflow-sha256-fixmod"
+  sleep 1
+  eng "$LAB" "$T/cache/v2" update fixmod
+  chmod 000 "$SHS4"
+  eng "$LAB" "$T/cache/v2" rollback fixmod; S_RC4=$?
+  chmod 644 "$SHS4" 2>/dev/null
+  if [ "$S_RC4" -eq 0 ]; then
+    ok "S4 : rollback avec empreintes illisibles — rc=0"
+  else
+    ko "S4 : rollback avec empreintes illisibles rc=$S_RC4 — $(tail -2 "$T/err" | cut -c1-160 | tr '\n' '|')"
+  fi
+  # S5 : l'injection MCP réécrit TOUS les agents du lab, puis rafraîchit les empreintes de TOUS les modules
+  # (vf_lp_refresh_agents) : un fichier d'empreintes illisible d'un module voisin ne fait pas échouer la pose.
+  if [ -f "$INJECTOR" ]; then
+    LAB="$T/labS5"; mkdir -p "$LAB"; printf '%s\n' "$one_mcp" > "$LAB/.mcp.json"
+    eng "$LAB" "$T/ag/v1" install agm; eng "$LAB" "$T/ag/v1" install bgm
+    chmod 000 "$LAB/.claude/scripts/.vibeflow-sha256-bgm"
+    printf '%s\n' "$two_mcp" > "$LAB/.mcp.json"
+    eng "$LAB" "$T/ag/v2" update agm; S_RC5=$?
+    chmod 644 "$LAB/.claude/scripts/.vibeflow-sha256-bgm" 2>/dev/null
+    if [ "$S_RC5" -eq 0 ] && ! "$GREP" -q "can't open" "$T/err" && "$GREP" -q 'mcp__bar__' "$LAB/.claude/agents/bgm.md"; then
+      ok "S5 : injection MCP avec le fichier d'empreintes illisible d'un module voisin — rc=0, agents réécrits, aucune erreur d'outil"
+    else
+      ko "S5 : rafraîchissement des empreintes avec un fichier voisin illisible rc=$S_RC5 — $(tail -2 "$T/err" | cut -c1-160 | tr '\n' '|')"
+    fi
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 # N — F4 : l'annonce sort UNE fois sur toute sortie qui suit un écrasement, abort compris, sans changer le code
