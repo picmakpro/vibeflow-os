@@ -151,6 +151,14 @@
 #     la résolution existante (`allowlist_agents` + `resolve_agent_name`) : aucun registre écrit à
 #     la main.
 #
+# Agents d'un module OPTIONNEL (#52) : la clé `vf-optional-agents: a, b` (chaîne séparée par des
+# virgules, ou liste YAML) déclare que ces noms de l'allowlist `Agent(...)/Task(...)` appartiennent
+# à un module qui peut ne pas être installé. En mode par défaut, un tel nom non résolu n'émet plus
+# « nom d'agent non resolu » (et ne compte pas dans les avertissements). La clé n'exempte JAMAIS
+# sous `--resolve-agents=strict` (monde fermé) : un nom introuvable y reste une erreur. Un nom
+# listé mais absent de l'allowlist donne un avertissement « clé inutile ». Aucun effet sur les
+# invariants I1-I7, sur la rétrogradation par péremption du manifeste ni sur --third-party-prefix.
+#
 # Codes de sortie : 0 = conforme · 1 = non conforme (agents non conformes, OU invocation
 #   invalide — ex. --resolve-agents=<valeur inconnue>) · 3 = INDÉTERMINÉ (--strict sur cible
 #   absente/vide : aucun verdict rendu — un vert sans rien vérifier serait un faux vert, F13).
@@ -289,8 +297,10 @@ manifest_freshness_strict = os.environ.get(\"VF_MANIFEST_FRESHNESS\", \"lenient\
 #   vf-mcp-tools (allowlist MCP NOMMÉE — un serveur, une liste d'outils explicites — consommée par
 #   le script d'injection du module dev-orchestrator ; coexiste avec vf-mcp-consumer sans le remplacer) ;
 #   vf-requires (identifiant de précondition externe déclarée par l'artefact — jointure par id avec
-#   # vf-provides: côté script, consommée par la règle 4 de check-capability-activation.sh, Phase 28).
-VIBEFLOW_FIELDS = {\"vf-internal\", \"vf-mcp-consumer\", \"vf-mcp-tools\", \"vf-requires\"}
+#   # vf-provides: côté script, consommée par la règle 4 de check-capability-activation.sh, Phase 28) ;
+#   vf-optional-agents (#52 : noms d'agents de l'allowlist Agent(...)/Task(...) appartenant a un module
+#   OPTIONNEL, chaine separee par des virgules ou liste — leur absence n'est plus un avertissement).
+VIBEFLOW_FIELDS = {\"vf-internal\", \"vf-mcp-consumer\", \"vf-mcp-tools\", \"vf-requires\", \"vf-optional-agents\"}
 MEMORY = {\"user\", \"project\", \"local\"}
 NOT_AGENTS = {\"contracts.md\", \"README.md\", \"AGENTS.md\"}
 # Task = alias legacy d'Agent depuis Claude Code v2.1.63 — traite a l'identique partout.
@@ -684,7 +694,17 @@ def resolve_agent_name(name, agents_dir_local, registry_dirs_local, prefixes):
         return \"resolved\"
     return \"unresolved\"
 
-def lint_tool_field(base, field, mode, raw, do_agent_resolution):
+def optional_agents(fm):
+    \"\"\"#52 : noms declares dans vf-optional-agents (chaine separee par des virgules, ou liste
+    YAML deja rendue par parse_frontmatter). Cle absente ou vide : ensemble vide.\"\"\"
+    v = fm.get(\"vf-optional-agents\")
+    if isinstance(v, str):
+        v = v.split(\",\")
+    if not isinstance(v, list):
+        return set()
+    return {str(x).strip() for x in v if str(x).strip()}
+
+def lint_tool_field(base, field, mode, raw, do_agent_resolution, optional=frozenset()):
     \"\"\"Applique le tokenizer + la classification a un champ tools:/disallowedTools:.\"\"\"
     global thirdparty_entries_total
     tokens, depth = tokenize_field(mode, raw)
@@ -721,6 +741,11 @@ def lint_tool_field(base, field, mode, raw, do_agent_resolution):
                     verdict = resolve_agent_name(a, agents_dir, registry_dirs, third_party_prefixes)
                     if verdict == \"thirdparty\":
                         thirdparty_entries_total += 1
+                    elif verdict == \"unresolved\" and a in optional and not resolve_agents_strict:
+                        # #52 : agent d'un module optionnel declare tel (vf-optional-agents) — son
+                        # absence est attendue en mode lenient. Sous --resolve-agents=strict (monde
+                        # ferme) la cle n'exempte JAMAIS : un nom introuvable reste une erreur.
+                        pass
                     elif verdict == \"unresolved\":
                         msg = f\"{base} : {field} — nom d'agent non resolu '{a}' (ni type natif, ni fichier {agents_dir}/{a}.md, ni registre)\"
                         # D-05 (Phase 42) : meme regime que ci-dessus — erreur sous
@@ -1134,7 +1159,10 @@ def check_file(path):
         mode, raw = extract_raw_field(fmlines, field)
         if mode is None:
             continue
-        lint_tool_field(base, field, mode, raw, do_resolution)
+        lint_tool_field(base, field, mode, raw, do_resolution, optional_agents(fm))
+    # #52 : une entree de vf-optional-agents absente de l'allowlist Agent(...)/Task(...) est inutile.
+    for opt_name in sorted(optional_agents(fm) - set(allowlist_agents(fmlines))):
+        warnings.append(f\"{base} : vf-optional-agents — cle inutile, '{opt_name}' absent de l'allowlist Agent(...)/Task(...) de tools:\")
 
     # Invariants de doctrine locaux (Phase 42, FABR-03) — TOUJOURS des erreurs (D-11), jamais
     # affectees par --strict. Une ligne d'appel UNIQUE par invariant, cible des mutants QUAL-01.

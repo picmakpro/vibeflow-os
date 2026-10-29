@@ -49,11 +49,16 @@ voit que le framework a bougé et son lab se recalibre*.
 .claude/scripts/framework-version.sh drift
 ```
 
-Compare la version framework enregistrée dans le lab (`.claude/.vibeflow-framework-version`) à la
-version courante du plugin. 3 cas :
-- **À jour** → rien à faire (le confirmer).
-- **Retard mineur (PATCH/MINOR)** → modules à rafraîchir, pas de migration structurelle.
-- **Retard majeur (MAJOR)** ou changement de doctrine → **migration** requise (étape 3).
+`drift` rend deux constats indépendants (rc 1 si l'un des deux signale un retard) :
+- **Mise à jour** : chaque module du registre du lab (`.claude/scripts/.vibeflow-installed`) est comparé
+  au cache du plugin (`<cache>/<module>/VERSION`). `RETARD (plugin X) : conductor a → b …` → le lab n'a
+  pas reçu la dernière version : proposer **`/vf-update`** d'abord, puis reprendre ici. Cache
+  introuvable → *indéterminé* (jamais « à jour »).
+- **Calibration** : la version stampée dans le lab (`.claude/.vibeflow-framework-version`) est comparée
+  à celle du registre (`conductor=`). `RETARD : lab en a, framework en b` → le lab a été mis à jour
+  depuis sa dernière calibration : poursuivre aux étapes 2-3.
+- **À jour** (les deux) → rien à faire (le confirmer). Retard mineur (PATCH/MINOR) → modules à
+  rafraîchir ; retard majeur (MAJOR) ou changement de doctrine → **migration** requise (étape 3).
 
 ### 2. Lire ce qui a changé
 
@@ -115,7 +120,7 @@ Rapport court : ce qui a été migré, ce qui reste, prochain audit conseillé.
 ## Surfaçage à l'ouverture de session (opt-in)
 
 `.claude/scripts/framework-version.sh drift --quiet` est conçu pour un **hook SessionStart opt-in** : il
-signale *« le framework a pris de l'avance, lance /vf-calibrate »* sans rien forcer (`|| true`,
+signale *« le lab a du retard sur le plugin, lance /vf-update »* ou *« le framework a pris de l'avance, lance /vf-calibrate »* sans rien forcer (`|| true`,
 jamais bloquant). Wiring documenté dans `references/migration-playbook.md` — **jamais auto-injecté**
 dans `settings.json` (respect du principe « zéro hook imposé »).
 

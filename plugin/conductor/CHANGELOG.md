@@ -1,5 +1,16 @@
 # Changelog — conductor
 
+## [v1.50.3] — 2026-10-29 (uutils, drift du framework, clé vf-optional-agents) — à publier dans la prochaine release
+
+**Patch** (#52, #165, #166, #167 ; correctifs du lot A de la clôture des issues GitHub ; à publier dans la prochaine release) :
+
+- **Verrou de driver sous uutils coreutils** (#166, cd7c66c3) : `ln -sn` seul, sans l'option que uutils refuse.
+- **`mv_noclobber`** (#166, 1b4eecbf) : essaie `-nT` avant `-nh` (uutils).
+- **Tests C7i et C7o** (#166, 8e2e2326) : la commande simulée cite `$LAB`/`$AUTRE`.
+- **Doc `vf-update` 4c** (#165, ef5457ba) : impose `VF_SCOPE` à `ensure-deps`.
+- **Drift du framework** (#167, 44061b12) : `framework-version.sh` compare le lab au cache du plugin ; (cbbcae1c) `vf-calibrate` décrit les deux constats de drift, mise à jour et calibration.
+- **Clé `vf-optional-agents`** (#52, 7cd57d5c) : `check-agents.sh` n'avertit plus d'un agent d'un module optionnel (ex. `vf-test-orchestrator` dans `vf-dev-manager`) ; la clé n'exempte jamais sous `--resolve-agents=strict`, et un nom absent de l'allowlist donne un avertissement « cle inutile ».
+
 ## [v1.50.2] — 2026-10-23 (commentaires de driver-lock) — publiée dans v2.71.2
 
 **Patch** (#159 ; release patch préparée sur demande de la session principale, 2026-10-23 ; publiée dans v2.71.2) :
