@@ -21,10 +21,16 @@ on:
   pull_request:
 
 # Un nouveau commit sur une PR annule le run précédent de la même PR (il ne prouve plus rien sur la tête de la
-# branche) ; jamais sur `main`, où chaque push garde son verdict.
+# branche). Hors PR, chaque run a SON groupe (run_id) : un groupe partagé sur `main` annulerait un run EN ATTENTE
+# quand un troisième arrive, et ce push n'aurait jamais de verdict ni d'alarme G-3 (revue de la PR #181, M1).
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Nombre de shards du job de tests : SEULE déclaration. Le shard vérifie que la matrice réelle (strategy.job-total)
+# lui est égale, l'agrégateur rejoue la partition avec la même valeur (revue de la PR #181, m1).
+env:
+  SHARDS: "7"
 
 jobs:
   # ----------------------------------------------------------------------------------------------
@@ -64,7 +70,7 @@ jobs:
                 case "$f" in
                   plugin/conductor/scripts/guard-driver-lock.sh|plugin/conductor/scripts/driver-lock.sh|\
                   plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh|plugin/_internal/lib/vf-portable.sh|\
-                  .github/workflows/ci.yml) mutants=true ;;
+                  plugin/planning-core/scripts/workstream-policy.sh|.github/workflows/ci.yml) mutants=true ;;
                 esac
               done <<EOF
           $files
@@ -82,10 +88,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Doit rester égal à SHARDS ci-dessous ET dans le job d'agrégation.
+        # Doit compter exactement SHARDS entrées (env du workflow) : vérifié à l'étape « Lancer les suites du shard ».
         shard: [0, 1, 2, 3, 4, 5, 6]
-    env:
-      SHARDS: "7"
     steps:
       - uses: actions/checkout@v4
 
@@ -284,6 +288,10 @@ jobs:
           GW_MODE: sans-mutants
         run: |
           set -u
+          if [ "${{ strategy.job-total }}" != "$SHARDS" ]; then
+            echo "::error::la matrice compte ${{ strategy.job-total }} shard(s) mais SHARDS=$SHARDS — des suites ne seraient jouées par aucun shard"
+            exit 1
+          fi
           suites="$(bash scripts/ci-shard-suites.sh "${{ matrix.shard }}" "$SHARDS")" || { echo "::error::partition illisible"; exit 1; }
           count=$(printf '%s\n' "$suites" | grep -c . || true)
           echo "== shard ${{ matrix.shard }}/$SHARDS : $count suite(s) =="
@@ -292,11 +300,16 @@ jobs:
             echo "::error::shard ${{ matrix.shard }} vide — la CI refuse de rendre un verdict vide"
             exit 1
           fi
+          # La liste est lue sur le descripteur 3 et chaque suite reçoit /dev/null en entrée : une suite qui lit son
+          # stdin ne peut plus avaler les suivantes (vert partiel). Le compte des suites JOUÉES doit égaler le compte
+          # découvert (revue de la PR #181, M2 — défaut hérité de l'ancienne étape unique).
           fail=0
-          while IFS= read -r t; do
+          ran=0
+          while IFS= read -r -u 3 t; do
             [ -n "$t" ] || continue
+            ran=$((ran + 1))
             echo "::group::$t"
-            if bash "$t"; then
+            if bash "$t" </dev/null; then
               echo "PASS $t"
             else
               rc=$?
@@ -304,10 +317,14 @@ jobs:
               fail=$((fail + 1))
             fi
             echo "::endgroup::"
-          done <<EOF
+          done 3<<EOF
           $suites
           EOF
-          echo "== bilan du shard ${{ matrix.shard }} : $count suite(s), $fail échec(s) =="
+          echo "== bilan du shard ${{ matrix.shard }} : $ran/$count suite(s) jouée(s), $fail échec(s) =="
+          if [ "$ran" -ne "$count" ]; then
+            echo "::error::$ran suite(s) jouée(s) sur $count attendue(s) dans le shard ${{ matrix.shard }}"
+            exit 1
+          fi
           [ "$fail" -eq 0 ]
 
   tests-mutants:
@@ -327,10 +344,10 @@ jobs:
     # NOM EXACT exigé par le ruleset de main (.github/rulesets/main.json) — ne pas le changer.
     name: Suites de tests (découverte non vide)
     needs: [changes, tests-shard, tests-mutants]
+    # always() et non !cancelled() : un run annulé doit laisser ce check ROUGE. Ignoré, un check requis compte comme
+    # réussi — une annulation manuelle ouvrirait alors main sans suites (revue de la PR #181, m3, écarté exprès).
     if: always()
     runs-on: ubuntu-latest
-    env:
-      SHARDS: "7"
     steps:
       - uses: actions/checkout@v4
 
