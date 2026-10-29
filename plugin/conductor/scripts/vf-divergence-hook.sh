@@ -15,13 +15,28 @@
 #       --refresh  reecrit seulement un hook deja nostre (chemin du script mis a jour), n'arme jamais.
 #       Un hook deja nostre (ligne 2 = marqueur) est reecrit ; tout autre fichier present n'est jamais
 #       ecrase, modifie ni renomme : l'armement est REFUSE (code 1) avec la ligne a ajouter a la main.
-#       Aucune ecriture de configuration git, jamais `core.hooksPath`. Derniere ligne de stdout :
-#       `BILAN verbe=arm code=<n>`.
+#       Refus, TOUS evalues AVANT la moindre ecriture (un seul suffit a ne rien ecrire) :
+#         REFUS lab-hors-racine-git    le chemin demande n'est pas la racine du depot git
+#         REFUS core.hooksPath         core.hooksPath configure a un niveau quelconque (local ou global) :
+#                                      husky versionne, ou dossier global partage par tous les depots
+#         REFUS executable-dans-l-arbre  ce script est sous la racine de travail (le hook n'execute jamais
+#                                      du code de l'arbre) ; on refuse, on ne resout pas
+#         REFUS hook-tiers:<nom>       un hook qui n'est pas le notre occupe la place
+#         REFUS ligne-perimee:<nom>    un hook tiers porte la ligne d'appel d'un autre chemin du script
+#       Un hook tiers qui porte DEJA la ligne d'appel a jour (celle que le refus imprime) est reconnu
+#       `ARME-A-LA-MAIN` : code 0, fichier intact. Chaque refus est suivi de la ligne `LIGNE A AJOUTER A
+#       LA MAIN (<nom>) : ...` (sauf le refus de l'executable dans l'arbre) et de `SORTIE :
+#       VF_DIVERGENCE_HOOK=off`. Aucune ecriture de configuration git, jamais dans le dossier de
+#       `core.hooksPath`. Derniere ligne de stdout : `BILAN verbe=arm code=<n>`.
 #       Codes : voir CODES.
 #   vf-divergence-hook.sh disarm [--path <dir>]
-#       Retire les hooks nostres (marqueur en ligne 2), jamais un autre. Le journal reste.
+#       Retire les hooks nostres (marqueur en ligne 2), jamais un autre. Le journal reste. Un hook
+#       tiers qui porte la ligne d'appel n'est JAMAIS modifie : code 1 et `LIGNE A RETIRER A LA MAIN
+#       (<nom>) : <ligne>`.
 #   vf-divergence-hook.sh status [--path <dir>]
-#       Dit si le clone est arme (tous les hooks vises portent le marqueur).
+#       Lecture seule. stdout : `HOOK <nom> ARME|ARME-A-LA-MAIN|TIERS|ABSENT` par hook vise,
+#       `JOURNAL <chemin> lignes=<n>` (lignes de donnees, en-tete exclu ; `-` si lien ou non regulier),
+#       `BILAN verbe=status code=<n>`.
 #   vf-divergence-hook.sh run --hook <post-merge|post-rewrite> [args git...]
 #       Travail du hook : joue `check-divergence.sh --path <--show-toplevel>` et se branche sur son
 #       code. `--hook post-rewrite` : seul l'argument `rebase` joue le controle (comme post-merge) ;
@@ -30,14 +45,17 @@
 # CODES (chacun enumere, aucun implicite).
 #   arm :
 #     0 = arme (ou rien a rafraichir pour --refresh) ; --check ne fait que decrire
-#     1 = refuse : un hook qui n'est pas le notre occupe la place (ligne a ajouter a la main imprimee)
-#     2 = non verifiable : chemin du script inexploitable, dossier de hooks illisible, ecriture echouee
+#     1 = refuse (voir les REFUS plus haut ; ligne a ajouter a la main imprimee)
+#     2 = non verifiable : NON VERIFIABLE chemin-non-sur (relatif, apostrophe, saut de ligne, caractere
+#         de controle), hooks-irresolu (configuration git illisible), ecriture-echouee
 #     3 = pas de depot git : rien a armer, rien ecrit
 #     64 = usage
 #   disarm :
-#     0 = retire (ou rien a retirer)   2 = non verifiable   3 = pas de depot git   64 = usage
+#     0 = retire (ou rien a retirer)   1 = ligne tierce a retirer a la main   2 = non verifiable
+#     3 = pas de depot git   64 = usage
 #   status :
-#     0 = arme   1 = non arme   2 = non verifiable   3 = pas de depot git   64 = usage
+#     0 = arme (hooks nostres ou armes a la main a jour)   1 = non arme   2 = non verifiable
+#     3 = pas de depot git   64 = usage
 #   run :
 #     0 = silence (check-divergence rend 0 ou 3, ou post-rewrite autre que rebase)
 #     1 = DIVERGENCE (check-divergence rend 1) : criee sur stderr et journalisee
@@ -110,6 +128,8 @@ SELF_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd -P)" || SELF_DIR=""
 SELF="$SELF_DIR/$(basename "$0")"
 
 git_safe() { git -C "$ROOT" -c core.fsmonitor= --no-optional-locks "$@"; }
+# git_ro : arm, disarm, status. Lecture de la configuration intacte (core.hooksPath n'est JAMAIS masque).
+git_ro() { git -C "$ROOT" -c core.fsmonitor= --no-optional-locks "$@"; }
 
 # abs_under <base> <chemin> — rend <chemin> absolu (relatif à <base> sinon).
 abs_under() {
@@ -130,18 +150,30 @@ is_ours() {
   esac
 }
 
-# resolve_repo — pose ROOT (racine physique), HOOKS_DIR (absolu). Codes : 0, 2 (non vérifiable), 3 (pas de dépôt).
+# resolve_repo — pose ROOT (racine physique du depot), REQ_ROOT (racine demandee, physique), HOOKS_DIR
+# (absolu). Codes : 0, 2 (non verifiable), 3 (pas de depot).
 resolve_repo() {
   [ -d "$ROOT" ] || return 3
   ROOT="$(cd "$ROOT" 2>/dev/null && pwd -P)" || return 3
+  REQ_ROOT="$ROOT"
   local top hp
-  export GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 GIT_OPTIONAL_LOCKS=0
-  top="$(git_safe rev-parse --show-toplevel 2>/dev/null)" || return 3
+  export GIT_TERMINAL_PROMPT=0 GIT_OPTIONAL_LOCKS=0
+  top="$(git_ro rev-parse --show-toplevel 2>/dev/null)" || return 3
   [ -n "$top" ] || return 3
   ROOT="$(cd "$top" 2>/dev/null && pwd -P)" || return 2
-  hp="$(git_safe rev-parse --git-path hooks 2>/dev/null)" || return 2
+  hp="$(git_ro rev-parse --git-path hooks 2>/dev/null)" || return 2
   [ -n "$hp" ] || return 2
   HOOKS_DIR="$(abs_under "$ROOT" "$hp")"
+  return 0
+}
+
+# common_dir — pose COMMON (dossier git commun, absolu et physique). Code 0 ou 1.
+common_dir() {
+  local c
+  c="$(git_ro rev-parse --git-common-dir 2>/dev/null)" || return 1
+  [ -n "$c" ] || return 1
+  c="$(abs_under "$ROOT" "$c")"
+  COMMON="$(cd "$c" 2>/dev/null && pwd -P)" || return 1
   return 0
 }
 
@@ -152,7 +184,7 @@ self_ok() {
     *) return 1 ;;
   esac
   case "$SELF" in
-    *"'"*|*"$NL"*) return 1 ;;
+    *"'"*|*"$NL"*|*[[:cntrl:]]*) return 1 ;;
   esac
   return 0
 }
@@ -284,8 +316,54 @@ do_run() {
 # ---------------------------------------------------------------------------
 # arm / disarm / status
 # ---------------------------------------------------------------------------
+# call_line_state <fichier> <nom> — la ligne d'appel du filet dans un hook tiers : courante (chemin de CE
+# script), perimee (autre chemin du meme script) ou absente. Lignes commentees ignorees ; un fichier non
+# regulier ou lien n'est jamais lu (une FIFO bloquerait).
+call_line_state() {
+  local f="$1" name="$2"
+  if [ ! -f "$f" ] || [ -L "$f" ]; then printf 'absente\n'; return 0; fi
+  CUR_P="'$SELF' run --hook $name" OLD_P="vf-divergence-hook.sh' run --hook $name" awk '
+    BEGIN { c = ENVIRON["CUR_P"]; o = ENVIRON["OLD_P"]; r = "absente" }
+    $0 ~ /^[ \t]*#/ { next }
+    index($0, c) { r = "courante"; exit }
+    index($0, o) { r = "perimee" }
+    END { print r }' "$f" 2>/dev/null
+}
+
+# hook_state <nom> — pose HS (ARME | ARME-A-LA-MAIN | PERIME | TIERS | ABSENT) et HFILE.
+hook_state() {
+  HFILE="$HOOKS_DIR/$1"
+  if [ ! -e "$HFILE" ] && [ ! -L "$HFILE" ]; then HS="ABSENT"; return 0; fi
+  if is_ours "$HFILE"; then HS="ARME"; return 0; fi
+  case "$(call_line_state "$HFILE" "$1")" in
+    courante) HS="ARME-A-LA-MAIN" ;;
+    perimee) HS="PERIME" ;;
+    *) HS="TIERS" ;;
+  esac
+  return 0
+}
+
+# hand_line <nom> — la ligne a ajouter a la main dans un hook tiers.
+hand_line() { say "LIGNE A AJOUTER A LA MAIN ($1) : bash '$SELF' run --hook $1 \"\$@\""; }
+refus_fin() { say "SORTIE : VF_DIVERGENCE_HOOK=off"; printf 'BILAN verbe=arm code=1\n'; exit 1; }
+arm_fin() { printf 'BILAN verbe=arm code=%s\n' "$1"; exit "$1"; }
+
+# in_tree <chemin> <racine> — le chemin est-il la racine ou dessous ?
+in_tree() { case "$1" in "$2"|"$2"/*) return 0 ;; *) return 1 ;; esac; }
+
+# hooks_path_set — 0 : core.hooksPath non vide a un niveau quelconque ; 1 : absent ; 2 : illisible.
+hooks_path_set() {
+  local v hrc=0
+  v="$(git_ro config --get core.hooksPath 2>/dev/null)" || hrc=$?
+  case "$hrc" in
+    0) [ -n "$v" ] && return 0; return 1 ;;
+    1) return 1 ;;
+    *) return 2 ;;
+  esac
+}
+
 do_arm() {
-  local mode="arm" rc name f refused
+  local mode="arm" rc name f refused ours
   ROOT="."
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -299,60 +377,88 @@ do_arm() {
     esac
   done
   resolve_repo; rc=$?
-  if [ "$rc" -eq 3 ]; then say "pas de depot git : rien a armer"; printf 'BILAN verbe=arm code=3\n'; exit 3; fi
-  if [ "$rc" -ne 0 ]; then say "NON VERIFIABLE : depot illisible"; printf 'BILAN verbe=arm code=2\n'; exit 2; fi
+  if [ "$rc" -eq 3 ]; then say "pas de depot git : rien a armer"; arm_fin 3; fi
+  if [ "$rc" -ne 0 ]; then say "NON VERIFIABLE : depot illisible"; arm_fin 2; fi
   if ! self_ok; then
-    say "NON VERIFIABLE : chemin du script inexploitable (relatif, apostrophe ou saut de ligne)"
-    printf 'BILAN verbe=arm code=2\n'; exit 2
+    say "NON VERIFIABLE chemin-non-sur : chemin du script inexploitable (relatif, apostrophe, saut de ligne ou caractere de controle)"
+    arm_fin 2
   fi
   if [ "$mode" = "check" ]; then
     for name in $(hook_names); do printf 'CIBLE %s/%s\n' "$HOOKS_DIR" "$name"; done
-    printf 'BILAN verbe=arm code=0\n'
-    exit 0
+    arm_fin 0
   fi
   if [ "$mode" = "refresh" ]; then
     # --refresh : seul un hook deja nostre est reecrit ; un clone non arme n'est jamais arme ici.
+    ours=0
+    for name in $(hook_names); do hook_state "$name"; [ "$HS" = "ARME" ] && ours=$((ours+1)); done
+    [ "$ours" -gt 0 ] || arm_fin 0
+    hooks_path_set; rc=$?
+    if [ "$rc" -eq 2 ]; then say "NON VERIFIABLE hooks-irresolu : configuration git illisible"; arm_fin 2; fi
+    if [ "$rc" -eq 0 ]; then say "rien a rafraichir : core.hooksPath est configure, aucune ecriture dans le dossier qu'il designe"; arm_fin 0; fi
+    if in_tree "$SELF" "$ROOT"; then
+      say "REFUS executable-dans-l-arbre : $SELF est sous l'arbre de travail — le hook n'execute jamais du code de l'arbre"
+      refus_fin
+    fi
     for name in $(hook_names); do
-      f="$HOOKS_DIR/$name"
-      is_ours "$f" || continue
+      hook_state "$name"
+      [ "$HS" = "ARME" ] || continue
       if write_hook "$HOOKS_DIR" "$name"; then
-        say "rafraichi : $f"
+        say "rafraichi : $HFILE"
       else
-        say "NON VERIFIABLE : ecriture de $f echouee"
-        printf 'BILAN verbe=arm code=2\n'; exit 2
+        say "NON VERIFIABLE ecriture-echouee : ecriture de $HFILE echouee"
+        arm_fin 2
       fi
     done
-    printf 'BILAN verbe=arm code=0\n'
-    exit 0
+    arm_fin 0
   fi
-  # Refus AVANT toute ecriture : un hook present qui n'est pas le notre n'est ni ecrase, ni modifie,
-  # ni renomme (P61-D-02). Aucune ecriture de configuration git.
+  # Refus AVANT toute ecriture (P61-D-02) : ce qui appartient a l'humain n'est ni ecrase, ni modifie, ni
+  # renomme, et aucune configuration git n'est ecrite.
+  if [ "$REQ_ROOT" != "$ROOT" ]; then
+    say "REFUS lab-hors-racine-git : $REQ_ROOT n'est pas la racine du depot git ($ROOT)"
+    for name in $(hook_names); do hand_line "$name"; done
+    refus_fin
+  fi
+  hooks_path_set; rc=$?
+  if [ "$rc" -eq 2 ]; then say "NON VERIFIABLE hooks-irresolu : configuration git illisible"; arm_fin 2; fi
+  if [ "$rc" -eq 0 ]; then
+    say "REFUS core.hooksPath : le dossier de hooks est designe par la configuration (husky versionne, ou dossier global partage par tous les depots) — rien n'est ecrit"
+    for name in $(hook_names); do hand_line "$name"; done
+    refus_fin
+  fi
+  if in_tree "$SELF" "$ROOT"; then
+    say "REFUS executable-dans-l-arbre : $SELF est sous l'arbre de travail — le hook n'execute jamais du code de l'arbre ; armer depuis le cache du plugin"
+    refus_fin
+  fi
   refused=0
   for name in $(hook_names); do
-    f="$HOOKS_DIR/$name"
-    if { [ -e "$f" ] || [ -L "$f" ]; } && ! is_ours "$f"; then
-      refused=1
-      say "REFUS hook-tiers:$name"
-      say "LIGNE A AJOUTER A LA MAIN ($name) : bash '$SELF' run --hook $name \"\$@\""
-      say "SORTIE : VF_DIVERGENCE_HOOK=off"
-    fi
+    hook_state "$name"
+    case "$HS" in
+      PERIME)
+        refused=1
+        say "REFUS ligne-perimee:$name"
+        hand_line "$name" ;;
+      TIERS)
+        refused=1
+        say "REFUS hook-tiers:$name"
+        hand_line "$name" ;;
+    esac
   done
-  if [ "$refused" -eq 1 ]; then
-    printf 'BILAN verbe=arm code=1\n'
-    exit 1
-  fi
-  mkdir -p "$HOOKS_DIR" 2>/dev/null || { say "NON VERIFIABLE : dossier de hooks non creable"; printf 'BILAN verbe=arm code=2\n'; exit 2; }
+  [ "$refused" -eq 0 ] || refus_fin
+  mkdir -p "$HOOKS_DIR" 2>/dev/null || { say "NON VERIFIABLE ecriture-echouee : dossier de hooks non creable"; arm_fin 2; }
   for name in $(hook_names); do
-    f="$HOOKS_DIR/$name"
+    hook_state "$name"
+    if [ "$HS" = "ARME-A-LA-MAIN" ]; then
+      say "ARME-A-LA-MAIN : $HFILE porte deja la ligne d'appel a jour, laisse intact"
+      continue
+    fi
     if write_hook "$HOOKS_DIR" "$name"; then
-      say "arme : $f"
+      say "arme : $HFILE"
     else
-      say "NON VERIFIABLE : ecriture de $f echouee"
-      printf 'BILAN verbe=arm code=2\n'; exit 2
+      say "NON VERIFIABLE ecriture-echouee : ecriture de $HFILE echouee"
+      arm_fin 2
     fi
   done
-  printf 'BILAN verbe=arm code=0\n'
-  exit 0
+  arm_fin 0
 }
 
 # parse_path_only <verbe> <args...> — verbes qui ne prennent que --path ; pose ROOT.
@@ -371,36 +477,59 @@ parse_path_only() {
 }
 
 do_disarm() {
-  local rc name f
+  local rc name line manual=0
   parse_path_only disarm "$@"
   resolve_repo; rc=$?
   if [ "$rc" -eq 3 ]; then say "pas de depot git : rien a desarmer"; exit 3; fi
   if [ "$rc" -ne 0 ]; then say "NON VERIFIABLE : depot illisible"; exit 2; fi
   for name in $(hook_names); do
-    f="$HOOKS_DIR/$name"
-    if is_ours "$f"; then
-      rm -f "$f" 2>/dev/null || { say "NON VERIFIABLE : retrait de $f echoue"; exit 2; }
-      say "desarme : $f"
-    elif [ -e "$f" ] || [ -L "$f" ]; then
-      say "hook tiers laisse intact : $f"
-    fi
+    hook_state "$name"
+    case "$HS" in
+      ARME)
+        rm -f "$HFILE" 2>/dev/null || { say "NON VERIFIABLE : retrait de $HFILE echoue"; exit 2; }
+        say "desarme : $HFILE" ;;
+      ARME-A-LA-MAIN|PERIME)
+        manual=1
+        # La ligne d'appel du tiers est imprimee telle quelle (caracteres de controle retires), jamais retiree.
+        line="$(NAME_P="$name" awk 'index($0, "vf-divergence-hook.sh'"'"' run --hook " ENVIRON["NAME_P"]) && $0 !~ /^[ \t]*#/ { print; exit }' "$HFILE" 2>/dev/null | tr -d '\000-\010\013-\037\177')"
+        say "LIGNE A RETIRER A LA MAIN ($name) : $line" ;;
+      TIERS)
+        say "hook tiers laisse intact : $HFILE" ;;
+    esac
   done
+  [ "$manual" -eq 0 ] || exit 1
   exit 0
 }
 
+# journal_lines <fichier> — lignes de donnees du journal (en-tete exclu) ; 0 si absent ; - si lien ou non regulier.
+journal_lines() {
+  if [ -L "$1" ] || { [ -e "$1" ] && [ ! -f "$1" ]; }; then printf -- '-'; return 0; fi
+  [ -f "$1" ] || { printf '0'; return 0; }
+  awk 'NR > 1 { n++ } END { print n + 0 }' "$1"
+}
+
 do_status() {
-  local rc name f armed=0 total=0
+  local rc name armed=0 total=0 jf n
   parse_path_only status "$@"
   resolve_repo; rc=$?
-  if [ "$rc" -eq 3 ]; then say "pas de depot git"; exit 3; fi
-  if [ "$rc" -ne 0 ]; then say "NON VERIFIABLE : depot illisible"; exit 2; fi
+  if [ "$rc" -eq 3 ]; then say "pas de depot git"; printf 'BILAN verbe=status code=3\n'; exit 3; fi
+  if [ "$rc" -ne 0 ]; then say "NON VERIFIABLE : depot illisible"; printf 'BILAN verbe=status code=2\n'; exit 2; fi
   for name in $(hook_names); do
-    f="$HOOKS_DIR/$name"
+    hook_state "$name"
     total=$((total+1))
-    if is_ours "$f"; then armed=$((armed+1)); say "arme : $f"; else say "non arme : $f"; fi
+    case "$HS" in
+      ARME|ARME-A-LA-MAIN) armed=$((armed+1)) ;;
+      PERIME) say "ligne d'appel perimee dans $HFILE (chemin d'un autre cache)"; HS="TIERS" ;;
+    esac
+    printf 'HOOK %s %s\n' "$name" "$HS"
   done
-  [ "$armed" -eq "$total" ] || exit 1
-  exit 0
+  common_dir || { say "NON VERIFIABLE : dossier git commun illisible"; printf 'BILAN verbe=status code=2\n'; exit 2; }
+  jf="$COMMON/vf-divergence/journal.tsv"
+  if [ -L "$COMMON/vf-divergence" ]; then n="-"; else n="$(journal_lines "$jf")"; fi
+  printf 'JOURNAL %s lignes=%s\n' "$jf" "$n"
+  if [ "$armed" -eq "$total" ]; then printf 'BILAN verbe=status code=0\n'; exit 0; fi
+  printf 'BILAN verbe=status code=1\n'
+  exit 1
 }
 
 verb="${1:-}"
