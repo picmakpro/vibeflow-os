@@ -22,7 +22,7 @@ avant les observations, provenance, observations brutes, verdict proposé, décl
 | Critère | Source | Observé (2026-10-29) | Conclusion proposée |
 |---|---|---|---|
 | C1 — un lab réel, deux humains de rôles différents, trois semaines sur B | spec §4 C (déclencheur), §9 critère 4 | Phase 61 non mergée ; recette non exécutée ; lab non désigné (P61-B-01), trois semaines non écoulées (P61-B-02) | **Non rempli** |
-| C2 — besoin non-dev sans terminal documenté (Q-06) | spec §4 C, §7 Q-06, §10 | Aucune mesure dans le dépôt ; un seul document de fondation hors dépôt qui le **suppose** ; aucune issue ne le porte | **Non rempli** |
+| C2 — besoin non-dev sans terminal documenté (Q-06) | spec §4 C, §7 Q-06, §10 | Aucune mesure dans le dépôt ; un signal anecdotique (dossier client non consulté, M15) et un document de fondation hors dépôt qui le **suppose** ; aucune issue ne le porte | **Non rempli** |
 | Option par défaut de la ROADMAP quand la preuve manque | ROADMAP Phase 62 | « le jalon se clôt sur un déclencheur daté de reprise » | **Option A applicable** |
 
 **Lecture du tableau.** Les deux critères sont une conjonction (« et », spec §4 C) : un seul non rempli
@@ -44,7 +44,8 @@ la section 3 : aucune reformulation après coup pour les faire coller aux mesure
   est-ce un vrai besoin mesuré, ou une projection ? Sans preuve, l'approche C ne se cadre pas. »
   §10 : « Le besoin non-dev est une projection » est mitigé par « Q-06 tranchée sur mesure avant toute
   approche C ». **Documenté** s'entend donc comme **mesuré** ; une affirmation de persona n'est pas une
-  mesure.
+  mesure, ni un signal anecdotique, ni un énoncé de la spec elle-même (§0 : « dont certains n'ouvrent jamais
+  un terminal »).
 - **Règle de lecture des mesures.** Une mesure absente s'écrit « non mesuré ». Rien n'est déduit d'une
   absence de trace ; une absence de trace est un fait sur le dépôt, pas sur le besoin.
 - **Contraintes de la spec qui bornent C, rappelées pour ne pas les redécouvrir au cadrage** (spec §4 C,
@@ -56,14 +57,17 @@ la section 3 : aucune reformulation après coup pour les faire coller aux mesure
 
 ## 2. Provenance
 
-- **Date des mesures :** 2026-10-29, toutes prises par `vf-coder` sur le worktree de la Phase 62
-  (branche `docs/phase-62-dossier-plateforme`, posée sur `origin/main` au commit `f6b99f4a`), commandes
-  jouées en `rtk proxy` (sortie non filtrée).
+- **Date des mesures :** 2026-10-29, toutes prises par `vf-coder`, commandes jouées en `rtk proxy` (sortie
+  non filtrée). Les mesures du dépôt (M1-M6, M11-M14) sont lancées depuis le worktree de la Phase 62
+  (branche `docs/phase-62-dossier-plateforme`, posée sur `origin/main` au commit `f6b99f4a`). Les mesures du
+  dossier hub (M7-M10) sont lancées depuis le dossier qui **contient** le dépôt principal et le dossier
+  `vibeflow-hub-v3-docs` côte à côte : le chemin `../vibeflow-hub-v3-docs` des tableaux s'entend depuis le
+  dépôt principal, il ne résout pas depuis le worktree (qui vit sous `.claude/worktrees/` du dépôt principal).
 - **Dossier hors dépôt :** `vibeflow-hub-v3-docs`, dossier frère du dépôt (désigné par son nom ; son
   chemin machine n'est pas écrit ici). Lu en **lecture seule**, rien n'y a été modifié.
 - **Branche de la Phase 61 :** lue par `git show feat/phase-61-collaboration:<cadrage>` ; ce worktree ne
   porte pas ce cadrage, les Phases 59 (PR #172), 60 (PR #174) et 61 n'étant pas mergées.
-- **Aucun client nommé** : les mesures ci-dessous ne citent aucune personne ni organisation tierce.
+- **Aucun client nommé** : les mesures ci-dessous ne citent aucune personne ni organisation tierce, et ne décrivent aucun dossier client de façon identifiante (dépôt public).
 
 ---
 
@@ -75,12 +79,13 @@ Chaque ligne : commande, résultat, date (2026-10-29). Une ligne « non mesuré 
 
 | # | Commande | Résultat | Lecture |
 |---|---|---|---|
-| M1 | `git grep -n 'Q-06'` (worktree) | 9 lignes dans 3 fichiers : la spec (4 lignes : 122, 240, 297, 306), la ROADMAP (2), `62-CONTEXT.md` (3) | Q-06 est **posée** (spec) et **rappelée** (planning) ; aucun fichier n'en rend une mesure. |
+| M1 | `git grep -n 'Q-06'` (worktree) | 9 lignes dans 3 fichiers : la spec (4 lignes : 122, 240, 297, 306), la ROADMAP (2), `62-CONTEXT.md` (3) | Q-06 est **posée** (spec) et **rappelée** (planning) ; aucun fichier n'en rend une mesure. La ligne 306 comptée ici est l'arbitrage **A-01** (Samuel, AskUserQuestion, session principale, 2026-09-16) : il fait de la capacité produit une capacité de VibeFlow, indépendante du client, et ne tranche pas Q-06 comme un besoin mesuré. |
 | M2 | `ls .planning/research/ \| wc -l` puis lecture des intitulés | 19 entrées ; aucun intitulé ne porte sur le besoin non-dev, sur Q-06, ni sur un entretien ou un relevé d'usage | Aucune étude du besoin dans le dépôt. |
-| M3 | `git grep -il -E 'sans terminal\|non-dev' -- .planning/research docs` | 7 fichiers : `FEATURES.md`, `docs/ADR.md`, 4 specs/plans de `docs/superpowers/`, la spec équipe-produit | Occurrences à ouvrir une par une : les deux de `docs/ADR.md` (lignes 843 et 857) parlent de **labs métier sans GSD** (« labs non-dev »), pas d'humains sans terminal ; l'occurrence de `FEATURES.md` (ligne 238) ordonne des bundles. **Non mesuré :** les cinq autres fichiers n'ont pas été lus ligne à ligne ; le total ne vaut pas preuve de besoin. |
+| M3 | `git grep -il -E 'sans terminal\|non-dev\|non-technique' -- . ':!<fichiers de la Phase 62>'` (tout l'arbre suivi, fichiers de cette phase exclus) | 104 fichiers (specs, plans et jalons archivés, manuel FR/EN, `plugin/` — `planning-core`, `software-architecture`, bundles —, `docs/ADR.md`, mémoire d'agents). La **locution « sans terminal »** seule, cherchée sous `docs`, `manual`, `plugin` et `.planning/seeds`, ne sort que de la spec équipe-produit (3 lignes : 21 sous la forme « n'ouvrent jamais un terminal », 89, 240). | Les occurrences de « non-dev » relevées par sondage (`docs/ADR.md` lignes 843 et 857, `FEATURES.md` ligne 238) désignent des **labs métier** hors code (bundles, GSD non pertinent), pas des humains sans terminal : elles ne mesurent pas le besoin. **Non mesuré :** les 104 fichiers n'ont pas été lus ligne à ligne ; l'affirmation « aucune mesure dans le dépôt » est établie par M1, M2 et le sondage de M3, pas par une lecture exhaustive. |
 | M4 | `gh issue list --state open --limit 100 --json number,title` | 4 issues ouvertes : #166 (patches locaux de `/vf-update`), #154 (aiguillage `/vf-dev`), #153 (scripts d'audit sous Windows), #150 (demande d'autorisation de licence d'un tiers) | Aucune ne décrit un besoin non-dev ni multi-humains. La #150 est une demande de licence, pas un besoin de plateforme. |
 | M5 | `gh issue list --state all --limit 200 --json number,title` filtré sur `multi\|humain\|non-dev\|plateforme\|hub\|Notion\|terminal\|collab\|rôle\|role` (titres seulement) | 15 issues au total (ouvertes et fermées), 0 titre correspondant | **Limite :** filtre sur les titres, corps non fouillés hors #150. |
 | M6 | Entretiens, retours d'utilisateurs non-dev, relevé d'usage hors terminal | **Non mesuré.** Aucun canal de recueil n'existe dans le dépôt ; aucun n'a été interrogé par cette phase | — |
+| M15 | Dossier client de septembre 2026, à l'origine de la spec (en-tête de `docs/superpowers/specs/2026-09-16-equipe-produit-bmad-design.md`, ligne 9 ; `.planning/seeds/SEED-001-equipe-produit-v1.md`, ligne 22 : « le déclencheur, pas la justification ») | **Non consulté, hors dépôt, non nommé** (aucune description identifiante : dépôt public). **Non mesuré.** | Signal **anecdotique**, pas une mesure : il a déclenché l'exploration, la spec n'en tire pas Q-06 (A-01 l'écarte comme justification). Il peut orienter un protocole d'option B ; il ne remplit pas C2. |
 
 ### 3.2 Le dossier hors dépôt `vibeflow-hub-v3-docs` (candidat de la spec pour C)
 
@@ -112,7 +117,9 @@ Chaque ligne : commande, résultat, date (2026-10-29). Une ligne « non mesuré 
   la date du plancher.
 - **Risque :** que le déclencheur ne soit jamais relu (aucune veille automatique n'est armée, P62-D-05) ;
   que le besoin non-dev, s'il existe, reste sans réponse pendant l'attente — il est servi, mal, par
-  l'approche B (spec §4 B, « Contre »).
+  l'approche B (spec §4 B, « Contre ») ; que la front door `vibeflow-product` (A-05, Phase 59, PR #172
+  non mergée) ne livre pas une réponse suffisante à Q-05 pendant l'attente, et que la preuve de mécanisme sur
+  lab jetable (A-03) soit lue à tort comme une preuve d'usage.
 - **Prérequis :** aucun. Applicable dès l'arbitrage.
 
 ### Option B — mesure ciblée du besoin non-dev (protocole, sans code)
@@ -135,10 +142,19 @@ Chaque ligne : commande, résultat, date (2026-10-29). Une ligne « non mesuré 
   documentaire sans code, aux zones `06`/`07` bloquées, et mono-utilisateur local.
 - **Risque :** contredire la spec (§4 C : « Pas avant ») et le risque nommé en §10 (« le besoin non-dev est
   une projection ») ; engager un produit sur une hypothèse non mesurée.
-- **Prérequis :** C1 et C2 remplis (non remplis, M11-M13 et M1-M6), plus le contrat de sortie des gates sur
+- **Prérequis :** C1 et C2 remplis (non remplis, M11-M13 et M1-M6, M15), plus le contrat de sortie des gates sur
   fichier à trancher.
 
 ---
+
+### Q-05 — la front door d'un humain « produit » qui ne code pas
+
+Q-05 (spec §7) demande quelle front door, dans quel outil : terminal Claude Code, app Claude desktop avec le
+même plugin, ou rien avant l'approche C. Ce dossier ne la tranche pas ; il note ce qui la borne. **A-03**
+(2026-09-16) limite la preuve au mécanisme sur lab jetable à deux clones, « pas l'usage » : elle ne dit rien
+d'un humain sans terminal. **A-05** pose `vibeflow-product` comme front door (livrée par la Phase 59, PR #172 **non mergée**, M11) :
+c'est une réponse **dans Claude Code**. Que cette réponse suffise à un humain sans terminal n'est **pas
+mesuré** (M6, M15). Q-05 reste **ouverte** ; la mesure du besoin (option B) est ce qui la rendrait décidable.
 
 ## 5. Recommandation (proposée)
 
@@ -181,7 +197,7 @@ date ou la corrige** : elle n'est pas arbitrée.
 
 - Il **ne tranche pas** : le choix A / B / C et la date sont à Samuel (P62-B-01). L'exigence `PLTF-02`
   reste décochée tant que cette décision n'est pas signée.
-- Il ne mesure pas le besoin non-dev : il constate que personne ne l'a fait (M1-M6), il n'interroge
+- Il ne mesure pas le besoin non-dev : il constate que personne ne l'a fait (M1-M6, M15), il n'interroge
   personne.
 - Il ne modifie rien sous `plugin/`, n'écrit aucun code, ne propose aucune architecture de plateforme.
 - Il ne juge pas la valeur du Hub : il note seulement ce que son pack documentaire contient et ne contient
