@@ -64,7 +64,7 @@ de la validation d'un dev (`vf-validation.sh validate --phase <N>`) ; le moteur 
 ne démarre pas, une phrase le dit et une question propose de valider d'abord ou de réduire le
 périmètre. Lis le code ET la ligne `BILAN`.
 Code 3 avec `marqueur=introuvable` sur la ligne `BILAN` : l'étape n'est pas au ROADMAP, seul résultat indéterminé qui laisse passer, une ligne le dit et l'étape entre dans la boucle.
-Tout autre code 3 (`marqueur=inconnu`, `marqueur=multiple`, ROADMAP absent, compartiment non nommé, bloc non fermé), tout autre code (5, 64, 126, 127, …) : le dire et s'arrêter. Limite : une étape ajoutée pendant la boucle de
+Tout autre code 3 (`marqueur=inconnu`, `marqueur=multiple`, ROADMAP absent, compartiment non nommé, bloc non fermé), le code 64, le code 5 et tout autre code (126, 127, …) : le dire et s'arrêter. Limite : une étape ajoutée pendant la boucle de
 `gsd-autonomous` n'est pas interceptée (contrôle consultatif) ; le chemin équipe
 est gardé par `vf-coder`.
 
