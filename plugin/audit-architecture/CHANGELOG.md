@@ -1,5 +1,9 @@
 # Changelog — audit-architecture
 
+## [v1.0.5] — 2026-10-29 (références mortes à `vibeflow-update.sh`) — à publier dans la prochaine release
+
+**Patch** (documentation seule) — références mortes à `vibeflow-update.sh` remplacées par `/vibeflow-install` / `/vf-update` dans le README (#166).
+
 ## [v1.0.4] — 2026-10-06 (classe d'invocation du skill, Phase 41.4)
 
 **Patch** — le `SKILL.md` déclare sa classe d'invocation (`vf-invocation: model`, vérifiée par
