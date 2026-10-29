@@ -29,6 +29,13 @@
 #   D2C-TEMOIN-DESARME       hook retire par l'engine (`role solo`)
 #   D2C-TEMOIN-CD-MUTE       copie du cache dont check-divergence.sh est aveugle a S2 (cmp -s, bash -n)
 #   D2C-TEMOIN-RUNNER-MUTE   copie du cache dont l'ecriture du journal est neutralisee : cri present, journal muet
+# Releve de la recette du lab reel (P61-D-09) : le script PRESCRIT par 61-RECETTE-LAB-REEL.md est extrait de la
+# recette et joue tel quel (jamais recopie dans la suite) :
+#   D2C-RELEVE           evenements fusion, avance rapide et fin de rebase rendus divergents et apparies au journal
+#                        par leur HEAD ; SUBIE-EN-SILENCE 0 ; conforme quand rien ne diverge ; depot intact
+#   D2C-RELEVE-TEMOIN    SUBIE-EN-SILENCE 1 (rc 1) quand une ligne de journal manque, porte un autre HEAD ou que
+#                        le journal est absent ;
+#                        rc 2 sur un cache introuvable ; redevient vert sur l'original
 # Sonde de la preuve : `sonde_cri` (cri sur stderr ET exactement une ligne de journal DIVERGENCE portant le HEAD
 # du clone). Chaque monde frais est arme PAR L'INSTALL (`monde`), jamais par un appel direct a `arm`.
 #
@@ -573,6 +580,99 @@ else
   ko "D2C-TEMOIN-RUNNER-MUTE témoin NON OPPOSABLE : $MUT_WHY"; miss=1
 fi
 [ "$miss" -eq 0 ] && ok "D2C-TEMOIN-RUNNER-MUTE : sonde rouge sur le temoin (cri present, journal muet : « $WHY_ROUGE »), verte sur l'original"
+
+# ---------------------------------------------------------------------------
+# D2C-RELEVE — le releve hebdomadaire PRESCRIT PAR LA RECETTE du lab reel (61-RECETTE-LAB-REEL.md, rubrique
+# « Releve hebdomadaire ») est joue TEL QUEL : le script est extrait de la recette (entre les marqueurs
+# releve:debut et releve:fin), jamais recopie ici. Il rejoue check-divergence.sh sur chaque evenement du reflog
+# et apparie les evenements divergents aux lignes du journal par leur HEAD (P61-D-09, P61-PL-16).
+# ---------------------------------------------------------------------------
+RECETTE=""
+if [ -d "$REPO/../.planning" ]; then
+  RECETTE="$(find "$REPO/../.planning" -name 61-RECETTE-LAB-REEL.md -type f 2>/dev/null | awk 'NR == 1 { print }')"
+fi
+RELEVE_PRET=0
+if [ ! -d "$REPO/../.planning" ]; then
+  echo "  ⊘ SKIP D2C-RELEVE, D2C-RELEVE-TEMOIN : pas de .planning/ dans cette arborescence (distribution du plugin) — la recette n'y est pas"
+elif [ -z "$RECETTE" ]; then
+  ko "D2C-RELEVE : 61-RECETTE-LAB-REEL.md introuvable sous .planning/ — le releve de la recette ne peut pas etre joue"
+else
+  awk '
+    /<!-- releve:debut -->/ { a = 1; next }
+    /<!-- releve:fin -->/ { a = 0 }
+    a && /^```bash/ { inb = 1; next }
+    a && inb && /^```/ { inb = 0; next }
+    a && inb { print }' "$RECETTE" > "$WORK/releve.sh"
+  if [ ! -s "$WORK/releve.sh" ]; then ko "D2C-RELEVE : aucun script entre les marqueurs releve:debut / releve:fin de la recette"
+  elif ! bash -n "$WORK/releve.sh" 2>/dev/null; then ko "D2C-RELEVE : le script de la recette n'est pas un script bash valide"
+  else RELEVE_PRET=1; fi
+fi
+
+# releve <clone> <dossier du cache> — rejoue la procedure de la recette ; sortie dans $WORK/releve.out, code rendu.
+releve() { bash "$WORK/releve.sh" "$1" "$2" > "$WORK/releve.out" 2> "$WORK/releve.err" </dev/null; }
+
+if [ "$RELEVE_PRET" -eq 1 ]; then
+  miss=0
+  # B : une fusion divergente (D2C-TRACE), journalisee. Le releve ne doit rien modifier du depot ni du journal.
+  cp "$(jfile "$WORK/B")" "$WORK/journal-b.avant"
+  HB_HEAD="$(git -C "$WORK/B" rev-parse HEAD)"
+  releve "$WORK/B" "$WORK/cache"; RC=$?
+  [ "$RC" -eq 0 ] || { ko "D2C-RELEVE : releve de B rc=$RC (attendu 0) — $(tail -3 "$WORK/releve.out")"; miss=1; }
+  "$GREP" -qxF "EVENEMENT $HB_HEAD divergent" "$WORK/releve.out" || { ko "D2C-RELEVE : B — l'evenement de la fusion ($HB_HEAD) n'est pas rendu divergent — $(cat "$WORK/releve.out")"; miss=1; }
+  "$GREP" -qxF 'SUBIE-EN-SILENCE 0' "$WORK/releve.out" || { ko "D2C-RELEVE : B — SUBIE-EN-SILENCE ≠ 0"; miss=1; }
+  cmp -s "$WORK/journal-b.avant" "$(jfile "$WORK/B")" || { ko "D2C-RELEVE : le releve a modifie le journal de B"; miss=1; }
+  [ "$(git -C "$WORK/B" worktree list | awk 'END { print NR }')" -eq 1 ] || { ko "D2C-RELEVE : le releve a laisse un worktree dans B"; miss=1; }
+  [ -z "$(git -C "$WORK/B" status --porcelain --untracked-files=no)" ] || { ko "D2C-RELEVE : le releve a modifie l'arbre suivi de B"; miss=1; }
+  # A : avance rapide ; rb-1 : fin de rebase ; cf-2 : aucun evenement divergent (le releve sait dire « conforme »).
+  releve "$WORK/A" "$WORK/cache"; RC=$?
+  { [ "$RC" -eq 0 ] && "$GREP" -qxF "EVENEMENT $(git -C "$WORK/A" rev-parse HEAD) divergent" "$WORK/releve.out" && "$GREP" -qxF 'SUBIE-EN-SILENCE 0' "$WORK/releve.out"; } \
+    || { ko "D2C-RELEVE : A (avance rapide) — rc=$RC, $(cat "$WORK/releve.out")"; miss=1; }
+  releve "$WORK/rb-1" "$WORK/cache"; RC=$?
+  { [ "$RC" -eq 0 ] && "$GREP" -qxF "EVENEMENT $(git -C "$WORK/rb-1" rev-parse HEAD) divergent" "$WORK/releve.out" && "$GREP" -qxF 'SUBIE-EN-SILENCE 0' "$WORK/releve.out"; } \
+    || { ko "D2C-RELEVE : rb-1 (fin de rebase) — rc=$RC, $(cat "$WORK/releve.out")"; miss=1; }
+  releve "$WORK/cf-2" "$WORK/cache"; RC=$?
+  { [ "$RC" -eq 0 ] && [ "$("$GREP" -c '^EVENEMENT ' "$WORK/releve.out")" -ge 1 ] && [ "$("$GREP" -c ' divergent$' "$WORK/releve.out")" -eq 0 ] && "$GREP" -qxF 'SUBIE-EN-SILENCE 0' "$WORK/releve.out"; } \
+    || { ko "D2C-RELEVE : cf-2 (aucune divergence) — le releve doit lister des evenements, tous conformes — rc=$RC, $(cat "$WORK/releve.out")"; miss=1; }
+  # Hooks desactives dans les worktrees du releve : un post-checkout pose dans une copie de B ne se declenche pas.
+  rm -rf "$WORK/B-hk"; cp -R "$WORK/B" "$WORK/B-hk"
+  printf '#!/bin/sh\n: > "%s/hook-witness"\n' "$WORK" > "$WORK/B-hk/.git/hooks/post-checkout"; chmod 755 "$WORK/B-hk/.git/hooks/post-checkout"
+  rm -f "$WORK/hook-witness"
+  releve "$WORK/B-hk" "$WORK/cache"; RC=$?
+  [ ! -e "$WORK/hook-witness" ] || { ko "D2C-RELEVE : un hook du clone s'est declenche pendant le releve (worktrees sans hooks desactives)"; miss=1; }
+  git -C "$WORK/B-hk" worktree add -q --detach "$WORK/B-hk-wt" HEAD >/dev/null 2>&1 </dev/null
+  [ -e "$WORK/hook-witness" ] || { ko "D2C-RELEVE temoin : un worktree ordinaire ne declenche pas le post-checkout — l'absence de marque ne prouverait rien"; miss=1; }
+  rm -f "$WORK/hook-witness"
+  [ "$miss" -eq 0 ] && ok "D2C-RELEVE (P61-D-09, P61-PL-16) : le releve extrait de la recette, joue tel quel, rend divergent l'evenement de la fusion (B), de l'avance rapide (A) et de la fin de rebase (rb-1), SUBIE-EN-SILENCE 0, conforme sur cf-2, depot et journal intacts, hooks desactives (temoin positif)"
+
+  # -------------------------------------------------------------------------
+  # D2C-RELEVE-TEMOIN — le releve sait ROUGIR : ligne de journal retiree, journal absent, cache introuvable
+  # -------------------------------------------------------------------------
+  miss=0
+  rm -rf "$WORK/B-temoin"; cp -R "$WORK/B" "$WORK/B-temoin"
+  JT="$(jfile "$WORK/B-temoin")"
+  awk 'NR == 1' "$JT" > "$JT.new" && mv -f "$JT.new" "$JT"
+  cmp -s "$JT" "$(jfile "$WORK/B")" && { ko "D2C-RELEVE-TEMOIN témoin NON OPPOSABLE : le journal de la copie est identique a l'original"; miss=1; }
+  releve "$WORK/B-temoin" "$WORK/cache"; RC=$?
+  echo "    D2C-RELEVE-TEMOIN : attendu rc=1 et SUBIE-EN-SILENCE 1 (ligne de journal retiree) ; obtenu rc=$RC et « $("$GREP" '^SUBIE' "$WORK/releve.out") »"
+  { [ "$RC" -eq 1 ] && "$GREP" -qxF 'SUBIE-EN-SILENCE 1' "$WORK/releve.out"; } || { ko "D2C-RELEVE-TEMOIN : le releve ne rougit pas quand la ligne de journal manque"; miss=1; }
+  # Ligne de journal presente mais pour un AUTRE HEAD : l'appariement se fait par le HEAD, pas par la seule presence.
+  awk -F "$TAB" -v OFS="$TAB" 'NR == 2 { $5 = "0000000000000000000000000000000000000000" } { print }' "$WORK/journal-b.avant" > "$JT"
+  cmp -s "$JT" "$WORK/journal-b.avant" && { ko "D2C-RELEVE-TEMOIN témoin NON OPPOSABLE : le HEAD du journal de la copie n'a pas change"; miss=1; }
+  releve "$WORK/B-temoin" "$WORK/cache"; RC=$?
+  echo "    D2C-RELEVE-TEMOIN : attendu rc=1 et SUBIE-EN-SILENCE 1 (ligne de journal d'un autre HEAD) ; obtenu rc=$RC et « $("$GREP" '^SUBIE' "$WORK/releve.out") »"
+  { [ "$RC" -eq 1 ] && "$GREP" -qxF 'SUBIE-EN-SILENCE 1' "$WORK/releve.out"; } || { ko "D2C-RELEVE-TEMOIN : le releve apparie par la seule presence d'une ligne DIVERGENCE, pas par le HEAD"; miss=1; }
+  rm -f "$JT"
+  releve "$WORK/B-temoin" "$WORK/cache"; RC=$?
+  echo "    D2C-RELEVE-TEMOIN : attendu rc=1 et SUBIE-EN-SILENCE 1 (journal absent) ; obtenu rc=$RC et « $("$GREP" '^SUBIE' "$WORK/releve.out") »"
+  { [ "$RC" -eq 1 ] && "$GREP" -qxF 'SUBIE-EN-SILENCE 1' "$WORK/releve.out"; } || { ko "D2C-RELEVE-TEMOIN : le releve ne rougit pas quand le journal est absent"; miss=1; }
+  releve "$WORK/B" "$WORK/cache-introuvable"; RC=$?
+  echo "    D2C-RELEVE-TEMOIN : attendu rc=2 (cache introuvable : non verifiable, jamais un faux conforme) ; obtenu rc=$RC"
+  { [ "$RC" -eq 2 ] && ! "$GREP" -q '^SUBIE' "$WORK/releve.out"; } || { ko "D2C-RELEVE-TEMOIN : cache introuvable rend $RC au lieu de 2"; miss=1; }
+  releve "$WORK/B" "$WORK/cache"; RC=$?
+  echo "    D2C-RELEVE-TEMOIN : attendu rc=0 et SUBIE-EN-SILENCE 0 sur l'original ; obtenu rc=$RC et « $("$GREP" '^SUBIE' "$WORK/releve.out") »"
+  { [ "$RC" -eq 0 ] && "$GREP" -qxF 'SUBIE-EN-SILENCE 0' "$WORK/releve.out"; } || { ko "D2C-RELEVE-TEMOIN : l'original n'est plus vert apres les temoins"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "D2C-RELEVE-TEMOIN : le releve de la recette rougit (SUBIE-EN-SILENCE 1, rc 1) quand une ligne de journal manque, porte un autre HEAD ou que le journal est absent, rend 2 sur un cache introuvable, et redevient vert (SUBIE-EN-SILENCE 0) sur l'original"
+fi
 
 # ---------------------------------------------------------------------------
 # D2C-PLAN — le plan --dry-run declare la cible, rien n'est ecrit
