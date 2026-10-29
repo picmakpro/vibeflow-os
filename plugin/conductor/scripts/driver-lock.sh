@@ -395,27 +395,38 @@ LOCK_BASE="$(basename "$LOCK_DIR")"
 
 # Remplacement ATOMIQUE d'un lien : rename(2) par-dessus le lien existant. Sans option, `mv`
 # SUIT un lien vers un dossier et deplace la source DEDANS (verifie sur ce poste) — le lock
-# serait alors intact et le nouveau claim invisible. BSD/macOS : -h ; GNU/Linux : -T.
+# serait alors intact et le nouveau claim invisible. GNU/Linux et uutils : -T ; BSD/macOS : -h. -T d'ABORD : sous
+# uutils coreutils (mv Rust) `-h` vaut --help (aide sur stdout, rc 0, rien deplace), donc un `-h` en tete court-circuite
+# le repli ; BSD/macOS rejette -T (rc 64) et retombe sur -h, qui fait le travail (#166 volet 9). Sortie de mv
+# jetee (stdout comprise : un mv qui prend -h pour --help y imprimerait son aide, dans le JSON du script) et rc
+# HONNETE : succes seulement si la source a disparu, un -h qui n'a rien deplace ne passe plus pour un succes.
 mv_link() {
-  mv -h "$1" "$2" 2>/dev/null || mv -T "$1" "$2" 2>/dev/null
+  { [ -L "$1" ] || [ -e "$1" ]; } || return 1
+  mv -T "$1" "$2" >/dev/null 2>&1 || mv -h "$1" "$2" >/dev/null 2>&1
+  [ ! -L "$1" ] && [ ! -e "$1" ]
 }
 
 # Deplacement SANS ECRASER ET SANS SUIVRE un lien (AU3-04) : `mv -n` seul, si la destination est un lien vers un
-# dossier, y deplacerait la source (elle serait enterree dans la generation d'un autre tenant). BSD/macOS : -nh ;
-# GNU/Linux : -nT. Le code de sortie n'est pas fiable (BSD rend 0 devant une destination prise) : l'appelant VERIFIE
-# le resultat (lock_gen), jamais ce code.
+# dossier, y deplacerait la source (elle serait enterree dans la generation d'un autre tenant). GNU/Linux et uutils :
+# -nT ; BSD/macOS : -nh, en repli (BSD rejette -T, rc 64). -nT d'ABORD : sous uutils `-h` vaut --help (rc 0, rien
+# deplace) et court-circuiterait le repli. Le code de sortie n'est pas fiable (BSD rend 0 devant une destination
+# prise) : l'appelant VERIFIE le resultat (lock_gen), jamais ce code.
+# La redirection de STDOUT est portee par la fonction (pas par chaque mv) : l'aide d'un mv qui prend -h pour --help
+# n'atteint jamais le JSON du script, et la ligne de commande reste celle que le mutant tk_noclobber_none vise.
 mv_noclobber() {
-  mv -nh "$1" "$2" 2>/dev/null || mv -nT "$1" "$2" 2>/dev/null
-}
+  mv -nT "$1" "$2" 2>/dev/null || mv -nh "$1" "$2" 2>/dev/null
+} >/dev/null
 
 # Creation ATOMIQUE d'un lien, qui ECHOUE si le nom est deja pris — c'est le primitif qui
 # departage les acquisitions concurrentes. MEME PIEGE que `mv` : sans option, `ln -s A B` ou B
 # est un lien vers un dossier cree `B/A` et rend 0. Le lock paraissait alors libre a chaque
-# acquisition (mesure : 8 gagnants sur 8). BSD/macOS : -h ; GNU/Linux : -n. L'enchainement
-# couvre les deux — sur l'un l'option manquante echoue, sur l'autre elle fait le travail, et un
-# nom deja pris echoue des deux cotes (c'est le refus recherche).
+# acquisition (mesure : 8 gagnants sur 8). `-n` seul, sans repli : reconnu par GNU, BSD/macOS ET uutils
+# coreutils, et un nom deja pris (lien existant vers un dossier) echoue rc 1 sans rien creer dedans — c'est le
+# refus recherche (mesure macOS : 2e `ln -sn` rc 1, aucun lien dans la cible). L'ancien `ln -sh ... || ln -sn`
+# etait faux sous uutils, ou `-h` vaut --help (aide sur stdout, rc 0, aucun lien) : le repli ne jouait jamais et un
+# 2e `acquire` recevait "acquired": true (#166 volet 9).
 ln_atomic() {
-  ln -sh "$1" "$2" 2>/dev/null || ln -sn "$1" "$2" 2>/dev/null
+  ln -sn "$1" "$2" 2>/dev/null
 }
 
 # age du lock en secondes. heartbeat_epoch s'il est numerique ; SINON mtime de la CIBLE du lien
@@ -841,7 +852,7 @@ case "$ACTION" in
     # reouverture du protocole de reprise) : garde d'EXISTENCE, testee AVANT `ln_atomic`, sur
     # `lock_present()` (couvre `-L` ET `-d`, donc les deux formes). Mesure sur le script d'avant
     # cet amendement : un lock LEGACY (vrai dossier, pas un lien) frais et tenu par un autre owner
-    # laissait `ln_atomic` echouer a departager — `ln -sh`/`ln -sn` ne protegent que si la cible
+    # laissait `ln_atomic` echouer a departager — `ln -sn` ne protege que si la cible
     # EST un lien ; sur un dossier reel, le lien candidat atterrit DEDANS (meme piege documente
     # pour `mv_link`) et la commande rend 0 — un `acquire` ordinaire rendait alors
     # `"acquired": true`, DEUX detenteurs actifs simultanement. Cette garde ne touche NI la
