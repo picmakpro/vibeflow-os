@@ -1,20 +1,20 @@
 ---
 gsd_state_version: "1.0"
 milestone: equipe-produit-v1.0
-current_phase: 61
-current_phase_name: Collaboration à deux humains — divergence armée, preuve sur lab réel
-status: executed
+current_phase: 62
+current_phase_name: Décision sur l'approche plateforme, sur preuve
+status: closed
 last_updated: "2026-10-29T18:00:00.000Z"
 last_activity: 2026-10-29
-last_activity_desc: Phase 61 exécutée — 8/8 plans, porte de phase rejouée depuis ci.yml (20 étapes vertes), COLB-01..07 cochées, COLB-09 partielle (critère 6 clients en code 2), COLB-08 décochée (preuve humaine attendue) — next : PR par le manager, relecture adverse SOBR-04, minor racine décidé après merge, recette du lab réel par Samuel
+last_activity_desc: Phase 62 close - decision A (approche C differee), reexamen 2027-01-31, PLTF-01..02 cochees ; precedent - Phase 61 exécutée — 8/8 plans, porte de phase rejouée depuis ci.yml (20 étapes vertes), COLB-01..07 cochées, COLB-09 partielle (critère 6 clients en code 2), COLB-08 décochée (preuve humaine attendue) — next : PR par le manager, relecture adverse SOBR-04, minor racine décidé après merge, recette du lab réel par Samuel
 state_head: 45ee80db
 progress:
   total_phases: 9
-  completed_phases: 5
-  total_plans: 53
-  completed_plans: 53
+  completed_phases: 6
+  total_plans: 54
+  completed_plans: 54
 milestone_name: « l'équipe produit » — Phases 57-66 —
-stopped_at: "Phase 61 exécutée le 2026-10-29 (8/8 plans, porte verte) — arrêt avant PR, merge, tag et release"
+stopped_at: "Phase 62 close le 2026-10-29 (décision A, réexamen 2027-01-31) ; précédent : Phase 61 exécutée le 2026-10-29 (8/8 plans, porte verte) — arrêt avant PR, merge, tag et release"
 ---
 
 # Project State
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 61 (Collaboration à deux humains — divergence armée, preuve sur lab réel) — EXÉCUTÉE (8/8 plans, porte de phase verte, COLB-01..07 cochées, COLB-09 partielle, COLB-08 décochée : preuve humaine attendue) ; les Phases 60 et 59 restent exécutées (9/9 et 8/8) et la Phase 58 close (12/12)
-Jalon courant : `equipe-produit-v1.0` (Phases 57-66, inscrit 2026-10-08) ; 5 phases sur 10 closes ou exécutées. `fiabilite-v1.0` est CLOS
+Phase: 62 (Décision sur l'approche plateforme, sur preuve) — CLOSE le 2026-10-29 : décision A (approche C différée), plancher de réexamen 2027-01-31, PLTF-01..02 cochées (décision déléguée par Samuel, message session principale, 2026-10-29), aucune release (ADR-073) ; les Phases 59, 60 et 61 sont livrées (`v2.73.0`, `v2.74.0`) ; précédemment, Phase 61 : EXÉCUTÉE (8/8 plans, porte de phase verte, COLB-01..07 cochées, COLB-09 partielle, COLB-08 décochée : preuve humaine attendue) ; les Phases 60 et 59 restent exécutées (9/9 et 8/8) et la Phase 58 close (12/12)
+Jalon courant : `equipe-produit-v1.0` (Phases 57-66, inscrit 2026-10-08) ; 6 phases sur 10 closes ou exécutées. `fiabilite-v1.0` est CLOS
 depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
 `.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).
 
