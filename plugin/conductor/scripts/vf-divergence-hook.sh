@@ -151,7 +151,26 @@ write_hook() {
     printf '#!/bin/sh\n'
     printf '%s - pose par vibeflow-update.sh aux postes product et dev, reecrit a chaque install, retire au poste solo et a la desinstallation ; ne pas editer\n' "$MARKER"
     printf "VF_DIVERGENCE_SCRIPT='%s'\n" "$SELF"
-    printf 'exec bash "$VF_DIVERGENCE_SCRIPT" run --hook %s "$@"\n' "$name"
+    printf "VF_DIVERGENCE_NOM='%s'\n" "$name"
+    printf '%s\n' \
+      'if [ -f "$VF_DIVERGENCE_SCRIPT" ]; then' \
+      '  exec bash "$VF_DIVERGENCE_SCRIPT" run --hook "$VF_DIVERGENCE_NOM" "$@"' \
+      'fi' \
+      '# Executable du cache disparu : jamais un silence. Dit NON VERIFIABLE, journalise, ne bloque pas.' \
+      'echo "[vf-divergence] NON VERIFIABLE : executable introuvable - relancer /vf-update ou reinstaller" >&2' \
+      'vf_common="$(git rev-parse --git-common-dir 2>/dev/null)" || exit 0' \
+      '[ -n "$vf_common" ] || exit 0' \
+      'vf_dir="$vf_common/vf-divergence"' \
+      'mkdir -p "$vf_dir" 2>/dev/null || exit 0' \
+      'vf_head="$(git rev-parse HEAD 2>/dev/null)" || vf_head="-"' \
+      '[ -n "$vf_head" ] || vf_head="-"' \
+      'vf_line="$(printf "%s\t%s\t%s\t%s\t%s\t%s\t%s" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$VF_DIVERGENCE_NOM" NON-VERIFIABLE - "$vf_head" - introuvable)"' \
+      'if [ ! -e "$vf_dir/journal.tsv" ]; then' \
+      '  printf "# vf-divergence journal v1\tdate\thook\tverdict\tcode\thead\tsignaux\traison\n%s\n" "$vf_line" >> "$vf_dir/journal.tsv" 2>/dev/null' \
+      'else' \
+      '  printf "%s\n" "$vf_line" >> "$vf_dir/journal.tsv" 2>/dev/null' \
+      'fi' \
+      'exit 0'
   } > "$tmp" 2>/dev/null || { rm -f "$tmp"; return 1; }
   chmod 755 "$tmp" 2>/dev/null || { rm -f "$tmp"; return 1; }
   mv -f "$tmp" "$dir/$name" 2>/dev/null || { rm -f "$tmp"; return 1; }

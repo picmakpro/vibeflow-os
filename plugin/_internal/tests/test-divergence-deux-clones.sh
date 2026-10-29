@@ -121,7 +121,7 @@ if [ "$RC" -ne 0 ]; then
   ko "pre-condition : le depot d'origine n'est pas conforme (check-divergence rc=$RC) — la suite ne prouverait rien"
 fi
 
-for n in A B C D G; do
+for n in A B C D E G; do
   git clone -q "$WORK/origin.git" "$WORK/$n" 2>/dev/null; ident "$WORK/$n"
 done
 
@@ -219,6 +219,36 @@ pull_divergent "$WORK/D"; RC=$?
 [ -f "$WORK/tiers-witness" ] || { ko "D2C-TRACE-TIERS : le hook tiers ne s'est pas execute au pull"; miss=1; }
 [ ! -e "$WORK/D/.git/vf-divergence" ] || { ko "D2C-TRACE-TIERS : un journal existe alors que rien n'est arme"; miss=1; }
 [ "$miss" -eq 0 ] && ok "D2C-TRACE-TIERS (P61-D-02) : hook tiers intact a l'octet, armement refuse en code 1, install aboutie, core.hooksPath absent, le hook tiers fonctionne toujours"
+
+# ---------------------------------------------------------------------------
+# D2C-TRACE-INTROUVABLE — script du cache disparu : NON VERIFIABLE audible et journalise
+# ---------------------------------------------------------------------------
+miss=0
+mk_cache "$WORK/cache-ephemere" || { ko "D2C-TRACE-INTROUVABLE pre-condition : cache ephemere non construit"; miss=1; }
+inst "$WORK/E" "$WORK/cache-ephemere" VF_ROLE=dev VF_SCOPE=project -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "D2C-TRACE-INTROUVABLE pre-condition : install E rc=$RC — $(tail -3 "$WORK/err")"; miss=1; }
+[ -f "$WORK/E/.git/hooks/post-merge" ] || { ko "D2C-TRACE-INTROUVABLE pre-condition : E n'est pas arme"; miss=1; }
+rm -rf "$WORK/cache-ephemere"
+local_commit "$WORK/E" y
+pull_divergent "$WORK/E"; RC=$?
+[ "$RC" -eq 0 ] || { ko "D2C-TRACE-INTROUVABLE : le pull de E a echoue (rc=$RC) — un hook ne doit jamais annuler la fusion"; miss=1; }
+"$GREP" -qF '[vf-divergence] NON VERIFIABLE' "$WORK/pull.err" || { ko "D2C-TRACE-INTROUVABLE : stderr du pull sans « [vf-divergence] NON VERIFIABLE » (un silence se lirait comme un conforme)"; miss=1; }
+"$GREP" -qF 'introuvable' "$WORK/pull.err" || { ko "D2C-TRACE-INTROUVABLE : stderr du pull sans « introuvable »"; miss=1; }
+JE="$WORK/E/.git/vf-divergence/journal.tsv"
+if [ -f "$JE" ]; then
+  [ "$(nlines "$JE")" -eq 2 ] || { ko "D2C-TRACE-INTROUVABLE : le journal de E n'a pas exactement 2 lignes ($(nlines "$JE"))"; miss=1; }
+  [ "$(awk -F "$TAB" 'NR==2 { print NF }' "$JE")" -eq 7 ] || { ko "D2C-TRACE-INTROUVABLE : la ligne de journal n'a pas 7 champs"; miss=1; }
+  [ "$(field "$JE" 2 2)" = "post-merge" ] || { ko "D2C-TRACE-INTROUVABLE : champ 2 ≠ post-merge"; miss=1; }
+  [ "$(field "$JE" 2 3)" = "NON-VERIFIABLE" ] || { ko "D2C-TRACE-INTROUVABLE : champ 3 ≠ NON-VERIFIABLE"; miss=1; }
+  [ "$(field "$JE" 2 4)" = "-" ] || { ko "D2C-TRACE-INTROUVABLE : champ 4 ≠ -"; miss=1; }
+  [ "$(field "$JE" 2 5)" = "$(git -C "$WORK/E" rev-parse HEAD)" ] || { ko "D2C-TRACE-INTROUVABLE : champ 5 ≠ HEAD complet de E"; miss=1; }
+  [ "$(field "$JE" 2 6)" = "-" ] || { ko "D2C-TRACE-INTROUVABLE : champ 6 ≠ -"; miss=1; }
+  [ "$(field "$JE" 2 7)" = "introuvable" ] || { ko "D2C-TRACE-INTROUVABLE : champ 7 ≠ introuvable"; miss=1; }
+  [ "$(awk -F "$TAB" 'NR==1 { print $1 }' "$JE")" = "# vf-divergence journal v1" ] || { ko "D2C-TRACE-INTROUVABLE : en-tete du journal ≠ « # vf-divergence journal v1 »"; miss=1; }
+else
+  ko "D2C-TRACE-INTROUVABLE : aucun journal sous le .git de E"; miss=1
+fi
+[ "$miss" -eq 0 ] && ok "D2C-TRACE-INTROUVABLE (P61-D-03) : cache disparu -> NON VERIFIABLE sur stderr + ligne de journal « introuvable », pull abouti"
 
 # ---------------------------------------------------------------------------
 # D2C-PLAN — le plan --dry-run declare la cible, rien n'est ecrit
