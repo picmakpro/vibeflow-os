@@ -198,6 +198,305 @@ lab_run "$L2" VF_SCOPE=project -- role dev; RC=$?
 [ "$(ours_count "$L2")" -eq 2 ] || { ko "VUD-ROLE-DEV : $(ours_count "$L2") hook(s) a marqueur apres role dev, attendu 2"; miss=1; }
 [ "$miss" -eq 0 ] && ok "VUD-ROLE-DEV : install sans poste = aucun hook ; role dev = deux hooks a marqueur"
 
+# ---------------------------------------------------------------------------
+# VUD-PRODUCT / VUD-LOCAL
+# ---------------------------------------------------------------------------
+mk_lab; L3="$LAB"
+lab_run "$L3" VF_ROLE=product VF_SCOPE=project -- install validator; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(ours_count "$L3")" -eq 2 ]; then ok "VUD-PRODUCT : le poste product arme le clone"; else ko "VUD-PRODUCT : rc=$RC hooks=$(ours_count "$L3")"; fi
+mk_lab; L4="$LAB"
+lab_run "$L4" VF_ROLE=dev VF_SCOPE=local -- install validator; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(ours_count "$L4")" -eq 2 ]; then ok "VUD-LOCAL : le scope local arme le clone"; else ko "VUD-LOCAL : rc=$RC hooks=$(ours_count "$L4")"; fi
+
+# ---------------------------------------------------------------------------
+# VUD-SOLO — sans poste et au poste solo : rien, liste du dossier de hooks = temoin (critere 2 du jalon)
+# ---------------------------------------------------------------------------
+miss=0
+mk_lab; L5="$LAB"
+lab_run "$L5" VF_SCOPE=project -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-SOLO pre-condition : install sans poste rc=$RC"; miss=1; }
+[ "$(div_lines)" -eq 0 ] || { ko "VUD-SOLO : une ligne [divergence] sans poste"; miss=1; }
+lab_run "$L5" VF_ROLE=solo VF_SCOPE=project -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-SOLO pre-condition : install solo rc=$RC"; miss=1; }
+[ "$(div_lines)" -eq 0 ] || { ko "VUD-SOLO : une ligne [divergence] au poste solo"; miss=1; }
+hooks_same_as_witness "$L5" || { ko "VUD-SOLO : le dossier de hooks differe de celui d'un git init neuf"; miss=1; }
+[ ! -e "$L5/.git/vf-divergence" ] || { ko "VUD-SOLO : un dossier vf-divergence existe"; miss=1; }
+git -C "$L5" config --get core.hooksPath >/dev/null 2>&1; RC=$?
+[ "$RC" -eq 1 ] || { ko "VUD-SOLO : core.hooksPath configure (rc=$RC)"; miss=1; }
+# Fichier de poste existant : un install solo passe par le retrait, sans rien dire quand il n'y a rien a retirer.
+lab_run "$L5" VF_ROLE=dev VF_SCOPE=project -- install validator >/dev/null 2>&1 || true
+lab_run "$L5" VF_SCOPE=project -- role solo >/dev/null 2>&1 || true
+lab_run "$L5" VF_ROLE=solo VF_SCOPE=project -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-SOLO : install solo sur fichier de poste existant rc=$RC"; miss=1; }
+[ "$(div_lines)" -eq 0 ] || { ko "VUD-SOLO : ligne [divergence] a l'install solo sur fichier de poste existant sans hook a retirer"; miss=1; }
+hooks_same_as_witness "$L5" || { ko "VUD-SOLO : dossier de hooks different du temoin apres le retour a solo"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VUD-SOLO (P61-H-01, critere 2) : sans poste ou solo, dossier de hooks = temoin, aucun vf-divergence, aucun core.hooksPath, aucune ligne [divergence]"
+
+# ---------------------------------------------------------------------------
+# VUD-USER — scope user : rien dans le depot du cwd ; un clone arme n'est pas touche
+# ---------------------------------------------------------------------------
+miss=0
+mk_lab; L6="$LAB"
+lab_run "$L6" VF_ROLE=solo -- --scope user install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-USER pre-condition : install scope user rc=$RC — $(tail -3 "$WORK/err")"; miss=1; }
+[ "$(div_lines)" -eq 0 ] || { ko "VUD-USER : une ligne [divergence] en scope user"; miss=1; }
+hooks_same_as_witness "$L6" || { ko "VUD-USER : le dossier de hooks du lab differe du temoin"; miss=1; }
+[ ! -e "$L6/.git/vf-divergence" ] || { ko "VUD-USER : un dossier vf-divergence existe"; miss=1; }
+mk_lab; L6b="$LAB"
+lab_run "$L6b" VF_ROLE=dev VF_SCOPE=project -- install validator >/dev/null 2>&1 || true
+lab_run "$L6b" -- --scope user update --all >/dev/null 2>&1 || true
+lab_run "$L6b" -- --scope user uninstall --all >/dev/null 2>&1 || true
+[ "$(ours_count "$L6b")" -eq 2 ] || { ko "VUD-USER : update/uninstall --all en scope user a touche le filet du clone ($(ours_count "$L6b") hook(s))"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VUD-USER (T-61-17) : scope user = aucun hook, aucune ligne ; update --all et uninstall --all en scope user laissent un clone arme intact"
+
+# ---------------------------------------------------------------------------
+# VUD-TARGET — sous --target : aucun hook, un clone arme n'est pas touche
+# ---------------------------------------------------------------------------
+miss=0
+mk_lab; L7="$LAB"
+T7="$WORK/tgt7"
+lab_run "$L7" VF_ROLE=dev VF_SCOPE=project -- --target "$T7" install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-TARGET pre-condition : install --target rc=$RC — $(tail -3 "$WORK/err")"; miss=1; }
+[ "$(ours_count "$L7")" -eq 0 ] || { ko "VUD-TARGET : un hook pose sous --target"; miss=1; }
+hooks_same_as_witness "$L7" || { ko "VUD-TARGET : le dossier de hooks differe du temoin sous --target"; miss=1; }
+mk_lab; L7b="$LAB"
+lab_run "$L7b" VF_ROLE=dev VF_SCOPE=project -- install validator >/dev/null 2>&1 || true
+lab_run "$L7b" VF_SCOPE=project -- --target "$T7" uninstall --all >/dev/null 2>&1 || true
+lab_run "$L7b" VF_SCOPE=project -- --target "$T7" update --all >/dev/null 2>&1 || true
+[ "$(ours_count "$L7b")" -eq 2 ] || { ko "VUD-TARGET : uninstall/update --all sous --target a touche le filet du clone ($(ours_count "$L7b") hook(s))"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VUD-TARGET (T-61-17) : sous --target, aucun hook pose et un clone arme n'est ni retire ni rafraichi"
+
+# ---------------------------------------------------------------------------
+# VUD-NOGIT — lab sans depot git : install reussit, information, rien d'arme
+# ---------------------------------------------------------------------------
+miss=0
+LN="$(mktemp -d "$WORK/nogit.XXXXXX")"
+lab_run "$LN" VF_ROLE=dev VF_SCOPE=project -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-NOGIT : install rc=$RC — $(tail -3 "$WORK/err")"; miss=1; }
+"$GREP" -qF '[divergence] pas de dépôt git' "$WORK/err" || { ko "VUD-NOGIT : stderr sans « [divergence] pas de dépôt git »"; miss=1; }
+[ ! -e "$LN/.git" ] || { ko "VUD-NOGIT : un .git a ete cree"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VUD-NOGIT : lab non git, install rc 0, « pas de dépôt git » dit, rien d'arme"
+
+# ---------------------------------------------------------------------------
+# VUD-TIERS — un post-merge tiers n'est ni ecrase ni modifie ; le refus est relaye, l'install aboutit
+# ---------------------------------------------------------------------------
+miss=0
+mk_lab; L8="$LAB"
+mkdir -p "$L8/.git/hooks"
+printf '#!/bin/sh\necho hook-tiers\n' > "$L8/.git/hooks/post-merge"; chmod +x "$L8/.git/hooks/post-merge"
+cp "$L8/.git/hooks/post-merge" "$WORK/tiers.ref"
+lab_run "$L8" VF_ROLE=dev VF_SCOPE=project -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-TIERS : install rc=$RC (un refus d'armement ne fait jamais echouer l'install)"; miss=1; }
+"$GREP" -qF 'ARMEMENT REFUSE (code 1)' "$WORK/err" || { ko "VUD-TIERS : stderr sans « ARMEMENT REFUSE (code 1) »"; miss=1; }
+"$GREP" -qF 'LIGNE A AJOUTER A LA MAIN' "$WORK/err" || { ko "VUD-TIERS : stderr sans la ligne « LIGNE A AJOUTER A LA MAIN » du script"; miss=1; }
+cmp -s "$L8/.git/hooks/post-merge" "$WORK/tiers.ref" || { ko "VUD-TIERS : le hook tiers a change (cmp -s)"; miss=1; }
+[ -f "$L8/.claude/vibeflow-role" ] || { ko "VUD-TIERS : le fichier de poste n'a pas ete pose"; miss=1; }
+[ "$(ours_count "$L8")" -eq 0 ] || { ko "VUD-TIERS : un hook a marqueur apres un refus"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VUD-TIERS (P61-PL-03) : hook tiers intact a l'octet, refus relaye (code 1 + ligne a ajouter), poste pose, engine rc 0"
+
+# ---------------------------------------------------------------------------
+# VUD-DRY — --dry-run declare chaque cible et n'ecrit rien
+# ---------------------------------------------------------------------------
+miss=0
+mk_lab; L9="$LAB"
+lab_run "$L9" VF_ROLE=dev VF_SCOPE=project -- --dry-run install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-DRY : --dry-run install rc=$RC"; miss=1; }
+bash "$HK" arm --check --path "$L9" > "$WORK/cibles" 2>/dev/null </dev/null
+ncib=0
+while IFS= read -r l; do
+  case "$l" in
+    "CIBLE "*)
+      f="${l#CIBLE }"; ncib=$((ncib+1))
+      if [ "$(count_in "$WORK/out" "[plan] ~ $f  (filet de divergence : hook git du clone, hors de l'arbre versionné)")" -ne 1 ]; then
+        ko "VUD-DRY : cible $f non declaree par « [plan] ~ »"; miss=1
+      fi
+      ;;
+  esac
+done < "$WORK/cibles"
+[ "$ncib" -eq 2 ] || { ko "VUD-DRY : arm --check imprime $ncib cible(s), attendu 2"; miss=1; }
+hooks_same_as_witness "$L9" || { ko "VUD-DRY : le dry-run a ecrit dans le dossier de hooks"; miss=1; }
+[ ! -e "$L9/.claude/vibeflow-role" ] || { ko "VUD-DRY : le dry-run a pose le fichier de poste"; miss=1; }
+# Retrait declare : lab arme, install solo en dry-run -> `[plan] -` par hook nostre, hooks encore la.
+lab_run "$L1" VF_SCOPE=project VF_ROLE=dev -- install validator >/dev/null 2>&1 || true
+lab_run "$L1" VF_ROLE=solo VF_SCOPE=project -- --dry-run install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-DRY : --dry-run install solo rc=$RC"; miss=1; }
+[ "$(awk 'index($0, "(filet de divergence : hook VibeFlow retiré)") && index($0, "[plan] - ") == 1 { n++ } END { print n+0 }' "$WORK/out")" -eq 2 ] \
+  || { ko "VUD-DRY : le retrait n'est pas declare par deux lignes « [plan] - … (filet de divergence : hook VibeFlow retiré) »"; miss=1; }
+[ "$(ours_count "$L1")" -eq 2 ] || { ko "VUD-DRY : le dry-run a retire des hooks"; miss=1; }
+# Rafraichissement declare : update --all en dry-run sur un lab arme ; rien sur un lab non arme.
+lab_run "$L1" VF_SCOPE=project -- --dry-run update --all; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-DRY : --dry-run update --all rc=$RC"; miss=1; }
+[ "$(awk 'index($0, "(filet de divergence : hook git du clone, hors de l'"'"'arbre versionné)") && index($0, "[plan] ~ ") == 1 { n++ } END { print n+0 }' "$WORK/out")" -eq 2 ] \
+  || { ko "VUD-DRY : update --all en dry-run ne declare pas les deux hooks nostres"; miss=1; }
+lab_run "$L2" VF_SCOPE=project -- role solo >/dev/null 2>&1 || true
+lab_run "$L2" VF_SCOPE=project -- --dry-run update --all >/dev/null 2>&1 || true
+[ "$(count_in "$WORK/out" "filet de divergence")" -eq 0 ] || { ko "VUD-DRY : update --all en dry-run declare le filet d'un clone NON arme"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VUD-DRY (P61-PL-03) : --dry-run declare « [plan] ~ » par cible, « [plan] - » au retrait, rafraichissement des seuls hooks nostres, rien d'ecrit"
+
+# ---------------------------------------------------------------------------
+# VUD-IDEMPOTENT — deux installs au meme poste : hooks identiques a l'octet
+# ---------------------------------------------------------------------------
+miss=0
+mk_lab; L10="$LAB"
+lab_run "$L10" VF_ROLE=dev VF_SCOPE=project -- install validator || miss=1
+cp "$L10/.git/hooks/post-merge" "$WORK/pm.1"; cp "$L10/.git/hooks/post-rewrite" "$WORK/pr.1"
+lab_run "$L10" VF_ROLE=dev VF_SCOPE=project -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-IDEMPOTENT : seconde install rc=$RC"; miss=1; }
+cmp -s "$L10/.git/hooks/post-merge" "$WORK/pm.1" || { ko "VUD-IDEMPOTENT : post-merge different apres la seconde install"; miss=1; }
+cmp -s "$L10/.git/hooks/post-rewrite" "$WORK/pr.1" || { ko "VUD-IDEMPOTENT : post-rewrite different apres la seconde install"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VUD-IDEMPOTENT : deux installs au poste dev laissent les hooks identiques a l'octet"
+
+# ---------------------------------------------------------------------------
+# VUD-OPTOUT — VF_DIVERGENCE_HOOK=off : rien n'est arme, un hook nostre est retire, le journal reste
+# ---------------------------------------------------------------------------
+miss=0
+mk_lab; L11="$LAB"
+lab_run "$L11" VF_ROLE=dev VF_SCOPE=project VF_DIVERGENCE_HOOK=off -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-OPTOUT : install dev sous off rc=$RC — $(tail -3 "$WORK/err")"; miss=1; }
+[ "$(ours_count "$L11")" -eq 0 ] || { ko "VUD-OPTOUT : un hook arme malgre off"; miss=1; }
+# lab arme puis install sous off : retire, journal conserve
+lab_run "$L11" VF_ROLE=dev VF_SCOPE=project -- install validator >/dev/null 2>&1 || true
+[ "$(ours_count "$L11")" -eq 2 ] || { ko "VUD-OPTOUT pre-condition : lab non arme"; miss=1; }
+put_journal "$L11"; AVANT="$(journal_ck "$L11")"
+lab_run "$L11" VF_ROLE=dev VF_SCOPE=project VF_DIVERGENCE_HOOK=off -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-OPTOUT : install sous off sur lab arme rc=$RC"; miss=1; }
+[ "$(ours_count "$L11")" -eq 0 ] || { ko "VUD-OPTOUT : off n'a pas retire les hooks nostres a l'install"; miss=1; }
+[ "$(journal_ck "$L11")" = "$AVANT" ] || { ko "VUD-OPTOUT : le journal a change sous off"; miss=1; }
+# update --all sous off
+lab_run "$L11" VF_ROLE=dev VF_SCOPE=project -- install validator >/dev/null 2>&1 || true
+lab_run "$L11" VF_SCOPE=project VF_DIVERGENCE_HOOK=off -- update --all; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-OPTOUT : update --all sous off rc=$RC"; miss=1; }
+[ "$(ours_count "$L11")" -eq 0 ] || { ko "VUD-OPTOUT : off n'a pas retire les hooks nostres a update --all"; miss=1; }
+# verbe role sous off
+lab_run "$L11" VF_SCOPE=project VF_DIVERGENCE_HOOK=off -- role dev; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-OPTOUT : role dev sous off rc=$RC"; miss=1; }
+[ "$(ours_count "$L11")" -eq 0 ] || { ko "VUD-OPTOUT : role dev sous off a arme"; miss=1; }
+# valeur explicite on : arme comme le defaut
+lab_run "$L11" VF_SCOPE=project VF_DIVERGENCE_HOOK=on -- role dev >/dev/null 2>&1 || true
+[ "$(ours_count "$L11")" -eq 2 ] || { ko "VUD-OPTOUT : VF_DIVERGENCE_HOOK=on n'arme pas comme le defaut"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VUD-OPTOUT (P61-D-06) : off = rien arme (install, role), hook nostre retire (install, update --all), journal conserve ; on = defaut"
+
+# ---------------------------------------------------------------------------
+# VUD-OPTOUT-INV — valeur invalide : refus a install et role, ignoree ailleurs, jamais reimprimee
+# ---------------------------------------------------------------------------
+miss=0
+SECRET='zzSECRETzz'
+mk_lab; L12="$LAB"
+lab_run "$L12" VF_ROLE=dev VF_SCOPE=project VF_DIVERGENCE_HOOK="$SECRET" -- install validator; RC=$?
+[ "$RC" -eq 1 ] || { ko "VUD-OPTOUT-INV : install dev sous valeur invalide rc=$RC, attendu 1"; miss=1; }
+if "$GREP" -qF "$SECRET" "$WORK/out" "$WORK/err"; then ko "VUD-OPTOUT-INV : la valeur invalide est reimprimee"; miss=1; fi
+"$GREP" -qF 'VF_DIVERGENCE_HOOK invalide' "$WORK/err" || { ko "VUD-OPTOUT-INV : message de refus absent"; miss=1; }
+[ ! -e "$L12/.claude" ] || { ko "VUD-OPTOUT-INV : un .claude a ete pose malgre le refus"; miss=1; }
+hooks_same_as_witness "$L12" || { ko "VUD-OPTOUT-INV : un hook a ete pose malgre le refus"; miss=1; }
+lab_run "$L12" VF_SCOPE=project VF_DIVERGENCE_HOOK="$SECRET" -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-OPTOUT-INV : install SANS poste sous valeur invalide rc=$RC, attendu 0 (valeur ignoree)"; miss=1; }
+lab_run "$L12" VF_SCOPE=project VF_DIVERGENCE_HOOK="$SECRET" -- role dev; RC=$?
+[ "$RC" -eq 1 ] || { ko "VUD-OPTOUT-INV : role dev sous valeur invalide rc=$RC, attendu 1"; miss=1; }
+if "$GREP" -qF "$SECRET" "$WORK/out" "$WORK/err"; then ko "VUD-OPTOUT-INV : role reimprime la valeur"; miss=1; fi
+[ "$(ours_count "$L12")" -eq 0 ] || { ko "VUD-OPTOUT-INV : role a arme malgre le refus"; miss=1; }
+# update --all et uninstall --all : ignoree avec une ligne de log, jamais armee, jamais un echec
+lab_run "$L12" VF_SCOPE=project VF_DIVERGENCE_HOOK="$SECRET" -- update --all; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-OPTOUT-INV : update --all sous valeur invalide rc=$RC, attendu 0"; miss=1; }
+if "$GREP" -qF "$SECRET" "$WORK/out" "$WORK/err"; then ko "VUD-OPTOUT-INV : update --all reimprime la valeur"; miss=1; fi
+"$GREP" -qF '[divergence] VF_DIVERGENCE_HOOK invalide' "$WORK/err" || { ko "VUD-OPTOUT-INV : update --all sans ligne de log sur la valeur ignoree"; miss=1; }
+[ "$(ours_count "$L12")" -eq 0 ] || { ko "VUD-OPTOUT-INV : update --all a arme un clone non arme"; miss=1; }
+lab_run "$L12" VF_ROLE=dev VF_SCOPE=project -- install validator >/dev/null 2>&1 || true
+lab_run "$L12" VF_SCOPE=project VF_DIVERGENCE_HOOK="$SECRET" -- update --all >/dev/null 2>&1 || true
+[ "$(ours_count "$L12")" -eq 2 ] || { ko "VUD-OPTOUT-INV : update --all sous valeur invalide a retire le filet (un invalide ne vaut pas off)"; miss=1; }
+lab_run "$L12" VF_SCOPE=project VF_DIVERGENCE_HOOK="$SECRET" -- uninstall --all; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-OPTOUT-INV : uninstall --all sous valeur invalide rc=$RC, attendu 0"; miss=1; }
+if "$GREP" -qF "$SECRET" "$WORK/out" "$WORK/err"; then ko "VUD-OPTOUT-INV : uninstall reimprime la valeur"; miss=1; fi
+"$GREP" -qF '[divergence] VF_DIVERGENCE_HOOK invalide' "$WORK/err" || { ko "VUD-OPTOUT-INV : uninstall --all sans ligne de log sur la valeur ignoree"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VUD-OPTOUT-INV (T-61-18) : refus rc 1 sans écho a install et role (rien pose) ; ignoree avec une ligne de log a update --all et uninstall --all, jamais armee"
+
+# ---------------------------------------------------------------------------
+# VUD-UNINSTALL — uninstall --all retire les hooks nostres, garde le journal, laisse un hook tiers
+# ---------------------------------------------------------------------------
+miss=0
+mk_lab; L13="$LAB"
+lab_run "$L13" VF_ROLE=dev VF_SCOPE=project -- install validator >/dev/null 2>&1 || true
+[ "$(ours_count "$L13")" -eq 2 ] || { ko "VUD-UNINSTALL pre-condition : lab non arme"; miss=1; }
+put_journal "$L13"; AVANT="$(journal_ck "$L13")"
+lab_run "$L13" VF_SCOPE=project -- uninstall --all; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-UNINSTALL : uninstall --all rc=$RC — $(tail -3 "$WORK/err")"; miss=1; }
+[ "$(ours_count "$L13")" -eq 0 ] || { ko "VUD-UNINSTALL : un hook nostre reste apres uninstall --all"; miss=1; }
+[ "$(journal_ck "$L13")" = "$AVANT" ] || { ko "VUD-UNINSTALL : le journal n'a pas survecu intact"; miss=1; }
+"$GREP" -qF '[divergence] filet retiré' "$WORK/err" || { ko "VUD-UNINSTALL : stderr sans « [divergence] filet retiré »"; miss=1; }
+# hook tiers present : intact
+mk_lab; L14="$LAB"
+lab_run "$L14" VF_ROLE=dev VF_SCOPE=project -- install validator >/dev/null 2>&1 || true
+printf '#!/bin/sh\necho hook-tiers\n' > "$L14/.git/hooks/post-merge"; chmod +x "$L14/.git/hooks/post-merge"
+cp "$L14/.git/hooks/post-merge" "$WORK/tiers14.ref"
+lab_run "$L14" VF_SCOPE=project -- uninstall --all; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-UNINSTALL : uninstall --all avec hook tiers rc=$RC"; miss=1; }
+cmp -s "$L14/.git/hooks/post-merge" "$WORK/tiers14.ref" || { ko "VUD-UNINSTALL : le hook tiers a ete modifie ou retire"; miss=1; }
+is_ours "$L14/.git/hooks/post-rewrite" && { ko "VUD-UNINSTALL : le post-rewrite nostre reste"; miss=1; }
+# uninstall d'un module seul : le filet reste (le hook vit du cache, pas d'un module)
+mk_lab; L15="$LAB"
+lab_run "$L15" VF_ROLE=dev VF_SCOPE=project -- install validator >/dev/null 2>&1 || true
+lab_run "$L15" VF_SCOPE=project -- uninstall validator >/dev/null 2>&1 || true
+[ "$(ours_count "$L15")" -eq 2 ] || { ko "VUD-UNINSTALL : « uninstall <module> » a retire le filet (reserve a uninstall --all)"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VUD-UNINSTALL (T-61-20) : uninstall --all retire les hooks nostres, journal intact (cksum), hook tiers intact ; uninstall <module> n'y touche pas"
+
+# ---------------------------------------------------------------------------
+# VUD-UPDATE-REFRESH — le chemin du cache suit update --all ; un clone non arme ne l'est jamais
+# ---------------------------------------------------------------------------
+miss=0
+CA="$WORK/cache-a"; CB="$WORK/cache-b"; CC="$WORK/cache-c"
+mk_cache "$CA" && mk_cache "$CB" && mk_cache "$CC" || { ko "VUD-UPDATE-REFRESH pre-condition : caches non copiables"; miss=1; }
+mk_lab; L16="$LAB"
+lab_run "$L16" VIBEFLOW_CACHE="$CA" VF_ROLE=dev VF_SCOPE=project -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-UPDATE-REFRESH pre-condition : install depuis cache-a rc=$RC"; miss=1; }
+[ "$(files_with "$L16" "$CA/")" -eq 2 ] || { ko "VUD-UPDATE-REFRESH pre-condition : les hooks ne designent pas cache-a"; miss=1; }
+lab_run "$L16" VIBEFLOW_CACHE="$CB" VF_SCOPE=project -- update --all; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-UPDATE-REFRESH : update --all depuis cache-b rc=$RC — $(tail -3 "$WORK/err")"; miss=1; }
+[ "$(files_with "$L16" "$CB/")" -eq 2 ] || { ko "VUD-UPDATE-REFRESH : les hooks ne designent pas cache-b apres update --all ($(files_with "$L16" "$CB/") fichier(s))"; miss=1; }
+[ "$(files_with "$L16" "$CA/")" -eq 0 ] || { ko "VUD-UPDATE-REFRESH : un hook designe encore cache-a"; miss=1; }
+[ "$(ours_count "$L16")" -eq 2 ] || { ko "VUD-UPDATE-REFRESH : le marqueur a disparu apres le rafraichissement"; miss=1; }
+# cache-a disparu : une fusion divergente crie toujours, sans « introuvable »
+rm -rf "$CA"
+mk_diverg "$L16"
+bash "$CB/conductor/scripts/check-divergence.sh" --path "$L16" >/dev/null 2>&1 </dev/null; RC=$?
+[ "$RC" -eq 1 ] || { ko "VUD-UPDATE-REFRESH pre-condition : le lab de test n'est pas divergent (check-divergence rc=$RC)"; miss=1; }
+(cd "$L16" && sh .git/hooks/post-merge 0 >"$WORK/hook.out" 2>"$WORK/hook.err" </dev/null); RC=$?
+# `run` rend 1 sur une divergence (git ignore le code d'un post-merge : la fusion n'est jamais annulee).
+[ "$RC" -eq 1 ] || { ko "VUD-UPDATE-REFRESH : code du hook = $RC, attendu 1 (divergence criee)"; miss=1; }
+"$GREP" -qF '[vf-divergence] DIVERGENCE' "$WORK/hook.err" || { ko "VUD-UPDATE-REFRESH : le hook ne crie pas apres la disparition de cache-a — $(tail -3 "$WORK/hook.err")"; miss=1; }
+if "$GREP" -qi 'introuvable' "$WORK/hook.err"; then ko "VUD-UPDATE-REFRESH : le hook dit « introuvable » apres le rafraichissement"; miss=1; fi
+# clone non arme : update --all ne l'arme jamais
+mk_lab; L17="$LAB"
+lab_run "$L17" VIBEFLOW_CACHE="$CC" VF_SCOPE=project -- install validator >/dev/null 2>&1 || true
+lab_run "$L17" VIBEFLOW_CACHE="$CB" VF_SCOPE=project -- update --all; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-UPDATE-REFRESH : update --all sur clone non arme rc=$RC"; miss=1; }
+[ "$(ours_count "$L17")" -eq 0 ] || { ko "VUD-UPDATE-REFRESH : update --all a ARME un clone qui ne l'etait pas"; miss=1; }
+hooks_same_as_witness "$L17" || { ko "VUD-UPDATE-REFRESH : le dossier de hooks du clone non arme a change"; miss=1; }
+[ "$(div_lines)" -eq 0 ] || { ko "VUD-UPDATE-REFRESH : ligne [divergence] sur un clone non arme"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VUD-UPDATE-REFRESH (P61-PL-08, T-61-19) : update --all re-pointe les hooks nostres vers le nouveau cache, le hook crie encore cache-a disparu, un clone non arme reste non arme"
+
+# ---------------------------------------------------------------------------
+# VUD-CACHE-SEUL — le script n'est cherche que dans le cache ; un piege dans le lab ne s'execute jamais
+# ---------------------------------------------------------------------------
+miss=0
+CP="$WORK/cache-priv"
+mk_cache "$CP" && rm -f "$CP/$HOOKSCRIPT_REL" || { ko "VUD-CACHE-SEUL pre-condition : cache prive non constituable"; miss=1; }
+mk_lab; L18="$LAB"
+mkdir -p "$L18/.claude/scripts" "$L18/scripts"
+PIEGE="$WORK/piege"
+for d in "$L18/.claude/scripts" "$L18/scripts"; do
+  printf '#!/bin/sh\n: > "%s"\nexit 0\n' "$PIEGE" > "$d/vf-divergence-hook.sh"; chmod +x "$d/vf-divergence-hook.sh"
+done
+lab_run "$L18" VIBEFLOW_CACHE="$CP" VF_ROLE=dev VF_SCOPE=project -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "VUD-CACHE-SEUL : install rc=$RC — $(tail -3 "$WORK/err")"; miss=1; }
+"$GREP" -qF '[divergence] NON VERIFIABLE : vf-divergence-hook.sh absent du cache' "$WORK/err" || { ko "VUD-CACHE-SEUL : stderr sans la ligne « NON VERIFIABLE : vf-divergence-hook.sh absent du cache »"; miss=1; }
+[ ! -e "$PIEGE" ] || { ko "VUD-CACHE-SEUL : le script piege du lab a ete EXECUTE"; miss=1; }
+[ "$(ours_count "$L18")" -eq 0 ] || { ko "VUD-CACHE-SEUL : un hook arme sans script dans le cache"; miss=1; }
+# retrait et rafraichissement : le meme piege reste inerte
+lab_run "$L18" VIBEFLOW_CACHE="$CP" VF_SCOPE=project -- role solo >/dev/null 2>&1 || true
+lab_run "$L18" VIBEFLOW_CACHE="$CP" VF_SCOPE=project -- update --all >/dev/null 2>&1 || true
+lab_run "$L18" VIBEFLOW_CACHE="$CP" VF_SCOPE=project -- uninstall --all >/dev/null 2>&1 || true
+[ ! -e "$PIEGE" ] || { ko "VUD-CACHE-SEUL : le piege a ete execute par role solo, update --all ou uninstall --all"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VUD-CACHE-SEUL (T-61-16, P61-D-03) : script absent du cache = « NON VERIFIABLE » nomme, aucun repli, le piege pose dans le lab n'est jamais execute"
+
 echo ""
 echo "Bilan : $pass OK, $fail KO — durée ${SECONDS}s"
 [ "$fail" -eq 0 ]
