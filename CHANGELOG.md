@@ -13,6 +13,32 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.73.1] — 2026-10-29
+
+**Patch** (lot E de la clôture des issues GitHub, PR #180 ; les deux mineurs laissés par la relecture adverse de
+v2.72.0 ; avance #166) :
+
+- **`conductor` v1.50.4** : `guard-driver-lock.sh` juge le commit dans le worktree où il s'exécute (#166). En lab
+  partitionné, `cd <worktree> && git add … && git commit …` lancé par une session dont le cwd est l'arbre principal
+  était refusé sur les fichiers non suivis de l'arbre PRINCIPAL (`.planning/workstreams/<compartiment>/…`), que
+  l'index du worktree ne porte pas. Le dossier effectif du commit est résolu par la même analyse qu'`outside_scan`
+  (chaîne de `cd <littéral>` liés par `&&` seulement ; `;`, sous-shell, variable, `popd`, `bash -c`, `-C`, `GIT_*`
+  ou tout `||` : jugement d'avant, cwd du payload) et n'est retenu que si son toplevel est un autre checkout du
+  MÊME dépôt. Verrou partagé, `-C`, lab plat et classe `arbre` inchangés. Suite `-ws` : cas GW-C-WT-1..6, mutants
+  `wt_cwd`, `wt_prefix`, `wt_common`, `wt_or` (59 mutants).
+- **`dev-orchestrator` v2.29.1** : `scripts/gsd-run.sh` rend 64, non 1, quand `HOME` et `CLAUDE_CONFIG_DIR` sont
+  absents ou vides (`set -u`) : le candidat scope user est sauté, jamais remplacé par un `/.claude/…` à la racine
+  du disque, et le message 64 le signale. `test-gsd-run.sh` : 30/0.
+- **Relecture adverse SOBR-04** (relecteur frais, diff `v2.73.0..<bump> -- plugin/`) : verdict mineur, aucun défaut fonctionnel, aucun cas plus permissif à tort
+  (chaque nouvel allow est un commit qui s'exécute réellement dans le worktree) ; sondes `test-gsd-run.sh` 30/0 (témoin
+  rouge sur le script de v2.73.0 : 26/4) et `test-guard-driver-lock-ws.sh` 602/0, 59/59 mutants tués (témoin rouge :
+  matrice rejouée sur le guard de v2.73.0, 474/3) ; défaut documentaire (28/0 → 30/0) corrigé au rebase de la PR #180.
+  Mineurs laissés : `common_dir_of` évalué deux fois dans `effective_dir` ; en-tête de `test-gsd-run.sh` sans les cas
+  HOME absent/vide ; message de routage `settings.local.json` répété à chaque update.
+- Le hook actif sur un poste est la copie installée (`~/.claude/scripts/guard-driver-lock.sh` en scope user) :
+  le correctif n'agit qu'après `/vf-update`.
+- Compteur de suites : 116 (inchangé).
+
 ## [v2.73.0] — 2026-10-29
 
 **Minor** (Phase 59, bundle produit ; release minor autorisée par arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 : merger #172 avec --admin si les juges ne rendent aucun majeur et que la CI est verte, puis tag et release ; le numéro est v2.73.0 et non v2.72.0, pris entre-temps par la release de main, PR #178) :
