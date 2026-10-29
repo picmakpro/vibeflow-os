@@ -274,7 +274,7 @@ probe_prefixe() {
 probe_id_usage() {
   RUNDIR="$FX/t1"
   local bad
-  for bad in .5 5. a..b 'a;b' 'a b' '-x' '_x' 'a/b' "$(printf 'x%.0s' $(seq 1 65))"; do
+  for bad in .5 a..b 'a;b' 'a b' '-x' '_x' 'a/b' "$(printf 'x%.0s' $(seq 1 65))"; do
     run --phase "$bad"
     msg "--phase « ${bad:0:12} » attendu rc 64"; { [ "$RC" -eq 64 ] && [ -n "$ERR" ]; } || return 1
   done
@@ -446,17 +446,48 @@ case_ CPV-CR-ISOLE probe_cr_isole
 case_ CPV-MARQUEUR-RESSEMBLANT probe_marqueur_ressemblant
 
 probe_ids_slug() {
-  # Revue 2026-10-29 : un nom de dossier de phase ou un identifiant de plan, que gsd résout, ne désigne aucun TITRE : le gate le refuse (64)
-  # au lieu de rendre « introuvable » (3, le cycle continue) pour une phase proposée.
+  # Revue 2026-10-29 : une forme qui désigne une phase EXISTANTE sous une autre identité (nom de dossier, préfixe projet, id custom,
+  # identifiant de plan, suffixe `_`/`.`) rend 64 au lieu de « introuvable » (3, le cycle continue). Comparaison aux identifiants RÉELS du
+  # ROADMAP, jamais à une syntaxe devinée.
   local s
-  mklab sl1 '# Roadmap\n\n### Phase 60: Gate\n**Goal:** g\n**Validation:** proposed\n\n### Phase CK-03: P\n**Goal:** g\n**Validation:** proposed\n'
-  for s in 60-gate-architecture 60-02 7.1-foo 12A-x 01-02 60-; do
+  mklab sl1 '# Roadmap\n\n### Phase 60: Gate\n**Goal:** g\n**Validation:** proposed\n\n### Phase 60.1: Dec\n**Goal:** g\n**Validation:** proposed\n\n### Phase CK-03: P\n**Goal:** g\n**Validation:** proposed\n\n### Phase AUTH: A\n**Goal:** g\n**Validation:** proposed\n\n### Phase 7.1: S\n**Goal:** g\n**Validation:** proposed\n\n### Phase 12A: L\n**Goal:** g\n**Validation:** proposed\n\n### Phase 1: U\n**Goal:** g\n**Validation:** proposed\n'
+  mkdir -p "$RUNDIR/.planning/phases/CK-03-auth-flow" "$RUNDIR/.planning/phases/AUTH-login" "$RUNDIR/.planning/phases/99-orphelin"
+  reg sl1/.planning/phases; reg sl1/.planning/phases/CK-03-auth-flow; reg sl1/.planning/phases/AUTH-login; reg sl1/.planning/phases/99-orphelin
+  for s in 60-gate-architecture 60-02 60_gate 60.gate 7.1-foo 12A-x 01-02 60.1-x CK-03-auth-flow CK-03-auth AUTH-login AUTH-x 3-x 99-orphelin; do
     run --phase "$s"
-    msg "forme slug ou plan « $s » attendu rc 64 (jamais 3 introuvable)"; [ "$RC" -eq 64 ] || return 1
+    msg "forme « $s » attendu rc 64 (jamais 3 introuvable)"; [ "$RC" -eq 64 ] || return 1
+  done
+  run --phase CK-03-auth-flow; msg "le message nomme le numéro attendu"; { [ "$RC" -eq 64 ] && [[ "$ERR" == *"--phase CK-03)"* ]]; } || return 1
+  run --phase 60.1-x; msg "le plus long préfixe gagne : 60.1-x désigne 60.1, pas 60"; { [ "$RC" -eq 64 ] && [[ "$ERR" == *"--phase 60.1)"* ]]; } || return 1
+  # faux rouges corrigés : blancs et séparateur final isolé ôtés
+  for s in "60 " " 60" "60." "60/" "60-" "CK-03-"; do
+    run --phase "$s"
+    msg "« $s » désigne la phase (blancs ou séparateur final isolé ôtés), attendu rc 1"; [ "$RC" -eq 1 ] || return 1
   done
   run --phase 60;    msg "60 attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  run --phase 60.1;  msg "60.1 existant est lu comme 60.1 (pas 60 suivi de .1), attendu rc 1 + PHASE 60.1 proposee"; { [ "$RC" -eq 1 ] && has 'PHASE 60.1 proposee'; } || return 1
   run --phase CK-03; msg "CK-03 (préfixe projet) reste accepté, attendu rc 1"; [ "$RC" -eq 1 ] || return 1
-  run --phase AUTH;  msg "AUTH reste une forme d'usage valide (introuvable ici, rc 3)"; [ "$RC" -eq 3 ]
+  run --phase AUTH;  msg "AUTH (id custom) attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  # non-régression : « introuvable » reste réservé au cas où ni titre ni dossier ne correspondent
+  for s in 77 77-x 60.2 CK-09; do
+    run --phase "$s"
+    msg "phase inexistante « $s » attendu rc 3 + introuvable"; { [ "$RC" -eq 3 ] && has 'phase introuvable' && has 'marqueur=introuvable'; } || return 1
+  done
+}
+probe_ids_slug_ws() {
+  # Même règle en lab partitionné : le dossier de phase se cherche sous le compartiment NOMMÉ, jamais sous la racine.
+  mkpart p9
+  mkdir -p "$RUNDIR/.planning/workstreams/w1/phases/2-nom-de-dossier" "$RUNDIR/.planning/phases/5-racine"
+  reg p9/.planning/workstreams/w1/phases; reg p9/.planning/workstreams/w1/phases/2-nom-de-dossier; reg p9/.planning/phases; reg p9/.planning/phases/5-racine
+  run --phase 2-nom-de-dossier --ws w1
+  msg "forme préfixe d'un titre du compartiment attendu rc 64"; [ "$RC" -eq 64 ] || return 1
+  run --phase 8-seul-dossier --ws w1
+  msg "ni titre ni dossier attendu rc 3"; [ "$RC" -eq 3 ] || return 1
+  mkdir -p "$RUNDIR/.planning/workstreams/w1/phases/hors-titre-dossier"; reg p9/.planning/workstreams/w1/phases/hors-titre-dossier
+  run --phase hors-titre-dossier --ws w1
+  msg "dossier du compartiment sans titre homonyme attendu rc 64"; [ "$RC" -eq 64 ] || return 1
+  run --phase 5-racine --ws w1
+  msg "dossier de la racine, hors du compartiment nommé, attendu rc 3 (introuvable)"; [ "$RC" -eq 3 ]
 }
 probe_titres_gsd() {
   # Titres lus comme gsd-core (`#{2,4}\s*(\[tag\]\s*)?Phase\s+`, sans casse, indentation <= 3), un par ROADMAP.
@@ -552,6 +583,7 @@ probe_poste() {
   done
 }
 case_ CPV-WS probe_ws
+case_ CPV-IDS-SLUG-WS probe_ids_slug_ws
 case_ CPV-WS-SANS probe_ws_sans
 case_ CPV-WS-ABSENT probe_ws_absent
 case_ CPV-WS-NOM probe_ws_nom
@@ -997,10 +1029,26 @@ mutant CPV-MUT-54 'then MARK=introuvable; fi' '[ "$WORST" -eq 0 ]' 'true' probe_
 mutant CPV-MUT-55 'then MARK=introuvable; fi' 'MARK=introuvable' ':' probe_bilan_illisible \
   "FAIL : la ligne BILAN ne dit plus marqueur=introuvable (les consommateurs ne distinguent plus le seul cas qui laisse passer)"
 
-mutant CPV-MUT-56 '_pre=${PHASE%%-*}' '[0-9]*-*)' '[x]*-*)' probe_ids_slug \
-  "FAIL : un nom de dossier ou un identifiant de plan n'est plus refusé (64)"
-mutant CPV-MUT-57 '_pre=${PHASE%%-*}' '; _pre=${_pre%[A-Za-z]}' '' probe_ids_slug \
-  "FAIL : la forme 12A-x (suffixe lettre puis tiret) n'est plus refusée"
+mutant CPV-MUT-56 'idkey(cand, 0) == idkey(ids[i], 0)' 'return ids[i]' 'continue' probe_ids_slug \
+  "FAIL : un préfixe suivi d'un séparateur n'est plus comparé aux identifiants réels (nom de dossier, id custom, préfixe projet)"
+mutant CPV-MUT-57 'if (ch == "." && substr(w, j + 1, 1) ~' 'ch == "." &&' '0 &&' probe_ids_slug \
+  "FAIL : un point suivi d'un chiffre devient un séparateur (60.2 inexistant pris pour un alias de 60)"
+mutant CPV-MUT-69 'if (ch != "-" && ch != "_" && ch != ".") continue' 'ch != "_" &&' '' probe_ids_slug \
+  "FAIL : le séparateur « _ » (60_gate) n'est plus reconnu"
+mutant CPV-MUT-70 'for (j = length(w); j >= 2; j--) {' 'j = length(w)' 'j = 2' probe_ids_slug \
+  "FAIL : le plus long préfixe ne gagne plus (60.1-x désigne 60)"
+mutant CPV-MUT-71 'idkey(cand, 1) == idkey(ids[i], 1)' 'idkey(cand, 1) == idkey(ids[i], 1)' '0' probe_ids_slug \
+  "FAIL : la forme tolérante au préfixe projet n'entre plus dans la comparaison (3-x pour CK-03)"
+mutant CPV-MUT-72 'if [ "$ALIAS" != "-" ]; then usage_err' '"$ALIAS" != "-"' 'false' probe_ids_slug \
+  "FAIL : l'alias d'un titre n'est plus refusé (rendu introuvable, le cycle continue)"
+mutant CPV-MUT-73 '[ "$HAS_WS" -eq 0 ] && [ -d "$PLAN/phases/$PHASE" ]' '[ -d "$PLAN/phases/$PHASE" ]' 'false' probe_ids_slug \
+  "FAIL : un dossier de phase du lab plat ne suffit plus à refuser (99-orphelin rendu introuvable)"
+mutant CPV-MUT-74 '[ "$HAS_WS" -eq 1 ] && [ -d "$VF_WS_DIR/phases/$PHASE" ]' '[ -d "$VF_WS_DIR/phases/$PHASE" ]' 'false' probe_ids_slug_ws \
+  "FAIL : le dossier de phase du compartiment nommé n'est plus cherché"
+mutant CPV-MUT-75 'PHASE=${PHASE#"${PHASE%%[![:space:]]*}"}' '${PHASE#"${PHASE%%[![:space:]]*}"}' '$PHASE' probe_ids_slug \
+  "FAIL : les blancs de début ne sont plus ôtés (faux rouge ' 60')"
+mutant CPV-MUT-76 'case "$PHASE" in *[./-]) PHASE=${PHASE%?} ;; esac' '*[./-])' '*[.-])' probe_ids_slug \
+  "FAIL : le séparateur final « / » n'est plus ôté (faux rouge 60/)"
 mutant CPV-MUT-58 'if (i >= 4) return 0' 'i >= 4' 'i >= 99' probe_titres_gsd \
   "FAIL : un titre indenté de 4 espaces devient un titre"
 mutant CPV-MUT-59 'if (n >= 2 && n <= 4 && phasehead(r)) return n' 'phasehead(r)' '0' probe_titres_gsd \

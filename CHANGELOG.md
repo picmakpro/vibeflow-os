@@ -23,7 +23,7 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 - **`dev-orchestrator` v2.30.0** : `vf-coder` et `vf-auto` refusent de planifier ou d'exécuter une étape « proposée » ; seule une
   étape absente du ROADMAP laisse continuer, tout autre résultat indéterminé arrête. Le head consulte le gate d'architecture
   devant un découpage (postes `product` et `dev`, `.planning/BRIEF.md` présent) ; champ de brief `Phases ajoutées`.
-- **Correction de revue (juges frais, 2026-10-29)** : le gate refuse (64) un nom de dossier ou un identifiant de plan à la place du numéro de titre ; titres de phase lus comme gsd-core ; sosies du marqueur (espace insécable ou fine, ligne de tableau, tiret cadratin) illisibles ; tout code non listé arrête ; un `propose` non nul est un bloqueur ; limites documentées au README conductor.
+- **Correction de revue (juges frais, 2026-10-29)** : le gate refuse (64) toute forme qui désigne une phase existante sous une autre identité (nom de dossier, préfixe projet, id custom, identifiant de plan, suffixe `_` ou `.`), comparée aux identifiants réels du ROADMAP, et normalise les blancs et le séparateur final isolé ; titres de phase lus comme gsd-core ; sosies du marqueur (espace insécable ou fine, ligne de tableau, tiret cadratin) illisibles ; tout code non listé arrête ; un `propose` non nul est un bloqueur ; limites documentées au README conductor.
 - **`planning-core` v2.10.0** : gabarit décisionnel `ARCHITECTURE.template.md`. **`product-team-bundle` v1.1.0** : worker
   `vf-product-architect` et livrable `architecture`.
 - Manuel FR et EN à jour. Hypothèses P60-H-01..05 ratifiées et conduite P60-D-15 décidée (arbitrage Samuel, AskUserQuestion

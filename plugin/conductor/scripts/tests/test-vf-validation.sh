@@ -544,16 +544,33 @@ probe_planning_lien() {
 case_ VFV-IDS probe_ids_w
 
 probe_ids_slug_w() {
-  # Revue 2026-10-29 : mêmes refus que le gate pour un nom de dossier ou un identifiant de plan (64), sans écriture.
+  # Revue 2026-10-29 : mêmes refus que le gate (une seule grammaire) : une forme qui désigne une phase EXISTANTE sous une autre identité
+  # rend 64 sans écriture ; les faux rouges (blancs, séparateur final isolé) désignent la phase ; « introuvable » reste pour le reste.
   local s a verb
-  mklab sw1 '# Roadmap\n\n### Phase 60: Gate\n**Goal:** g\n'; a="$(sum "$(RMF)")"
-  for s in 60-gate-architecture 60-02 12A-x; do
+  mklab sw1 '# Roadmap\n\n### Phase 60: Gate\n**Goal:** g\n\n### Phase 60.1: Dec\n**Goal:** g\n\n### Phase CK-03: P\n**Goal:** g\n\n### Phase AUTH: A\n**Goal:** g\n'
+  mkdir -p "$RUNDIR/.planning/phases/CK-03-auth-flow" "$RUNDIR/.planning/phases/AUTH-login" "$RUNDIR/.planning/phases/99-orphelin"
+  a="$(sum "$(RMF)")"
+  for s in 60-gate-architecture 60-02 60_gate 60.gate 60.1-x CK-03-auth-flow CK-03-auth AUTH-login 99-orphelin; do
     for verb in propose validate; do
       T_ROLE=dev run "$verb" --phase "$s"; T_ROLE=""
       msg "$verb --phase $s attendu rc 64 (jamais 3 introuvable)"; [ "$RC" -eq 64 ] || return 1
     done
   done
+  run propose --phase CK-03-auth-flow; msg "le message nomme le numéro attendu"; { [ "$RC" -eq 64 ] && [[ "$ERR" == *"--phase CK-03)"* ]]; } || return 1
+  for s in 77 77-x 60.2; do
+    run propose --phase "$s"
+    msg "phase inexistante « $s » attendu rc 3 + introuvable"; { [ "$RC" -eq 3 ] && has 'phase introuvable'; } || return 1
+  done
   LASTMSG="le ROADMAP a changé"; [ "$(sum "$(RMF)")" = "$a" ] || return 1
+  for s in "60 " " 60" "60." "60/" "60-"; do
+    mklab sw2 '# Roadmap\n\n### Phase 60: Gate\n**Goal:** g\n'
+    run propose --phase "$s"
+    msg "propose --phase « $s » désigne la phase 60, attendu rc 0 + ECRIT"; { [ "$RC" -eq 0 ] && has 'ECRIT phase 60'; } || return 1
+  done
+  mklab sw3 '# Roadmap\n\n### Phase 60: Gate\n**Goal:** g\n\n### Phase 60.1: Dec\n**Goal:** g\n'
+  run propose --phase 60.1
+  msg "propose --phase 60.1 existant est lu comme 60.1, attendu rc 0 + ECRIT phase 60.1"; { [ "$RC" -eq 0 ] && has 'ECRIT phase 60.1'; } || return 1
+  mklab sw1 '# Roadmap\n\n### Phase 60: Gate\n**Goal:** g\n'
   run propose --phase 60
   msg "propose --phase 60 attendu rc 0"; [ "$RC" -eq 0 ]
 }
@@ -837,8 +854,20 @@ mutant VFV-MUT-26 'return (w == "propo" || w == "valid")' 'w == "propo" || w == 
 mutant VFV-MUT-27 'ROOTP=$(pwd -P' 'pwd -P' 'git rev-parse --show-toplevel' probe_arch_cwd \
   "la racine de --architecture devient la racine du dépôt git au lieu du répertoire courant"
 
-mutant VFV-MUT-28 '_pre=${PHASE%%-*}' '[0-9]*-*)' '[x]*-*)' probe_ids_slug_w \
-  "un nom de dossier ou un identifiant de plan n'est plus refusé (64)"
+mutant VFV-MUT-28 'idkey(cand, 0) == idkey(ids[i], 0)' 'return ids[i]' 'continue' probe_ids_slug_w \
+  "un préfixe suivi d'un séparateur n'est plus comparé aux identifiants réels"
+mutant VFV-MUT-35 'if (ch == "." && substr(w, j + 1, 1) ~' 'ch == "." &&' '0 &&' probe_ids_slug_w \
+  "un point suivi d'un chiffre devient un séparateur (60.2 inexistant pris pour un alias de 60)"
+mutant VFV-MUT-36 'for (j = length(w); j >= 2; j--) {' 'j = length(w)' 'j = 2' probe_ids_slug_w \
+  "le plus long préfixe ne gagne plus (60.1-x désigne 60)"
+mutant VFV-MUT-37 'if [ "$alias" != "-" ]; then usage_err' '"$alias" != "-"' 'false' probe_ids_slug_w \
+  "l'alias d'un titre n'est plus refusé"
+mutant VFV-MUT-38 '[ "$HAS_WS" -eq 0 ] && [ -d "$PLAN/phases/$PHASE" ]' '[ -d "$PLAN/phases/$PHASE" ]' 'false' probe_ids_slug_w \
+  "un dossier de phase sans titre ne suffit plus à refuser"
+mutant VFV-MUT-39 'PHASE=${PHASE#"${PHASE%%[![:space:]]*}"}' '${PHASE#"${PHASE%%[![:space:]]*}"}' '$PHASE' probe_ids_slug_w \
+  "les blancs de début ne sont plus ôtés"
+mutant VFV-MUT-40 'case "$PHASE" in *[./-]) PHASE=${PHASE%?} ;; esac' '*[./-])' '*[.-])' probe_ids_slug_w \
+  "le séparateur final « / » n'est plus ôté (faux rouge)"
 mutant VFV-MUT-29 'if (n >= 2 && n <= 4 && phasehead(r)) return n' 'phasehead(r)' '0' probe_titres_gsd_w \
   "« ###Phase 2: » sans espace n'est plus un titre"
 mutant VFV-MUT-30 'if (!match(h, /^[Pp][Hh]' '[Pp][Hh][Aa][Ss][Ee]' 'Phase' probe_titres_gsd_w \
