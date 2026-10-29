@@ -16,7 +16,9 @@
 #   check-phase-validation.sh -h | --help
 # `--phase` est obligatoire (`--phase=<N>` admis), identifiant `^[A-Za-z0-9][A-Za-z0-9._-]*$` de 64 caractères au plus,
 # sans `..` ni point final : la grammaire des phases que sert gsd-core (numéro `12`, décimal `7.1`, suffixe lettre
-# `12A`, id custom `AUTH` posé par `phase add --id`, préfixe projet `CK-03`). Comparaison sans casse, zéros de tête
+# `12A`, id custom `AUTH` posé par `phase add --id`, préfixe projet `CK-03`). `<N>` est le numéro tel qu'il figure dans le TITRE
+# `### Phase <N>:` du ROADMAP : le nom de dossier (`60-gate-architecture`) et l'identifiant de plan (`60-02`), que gsd résout aussi,
+# rendent 64 (forme chiffre(s) puis tiret) ; ce gate ne lit que des titres, il rendrait sinon « introuvable » et le cycle continuerait. Comparaison sans casse, zéros de tête
 # des segments numériques ôtés (`01.1` = `1.1`, `02` = `2`, `12a` = `12A`) ; forme exacte d'abord (préfixe projet
 # conservé), puis, SEULEMENT si aucune section ne porte l'identifiant, forme tolérante au préfixe (`3` désigne
 # `CK-03`), comme la lecture de gsd. Lab plat : ROADMAP du dossier de planning du répertoire courant. Lab
@@ -29,9 +31,12 @@
 # `**Validation**:` tolérée). Jeton = premier mot en minuscules : `proposed` -> proposée ; `validated` -> validée,
 # suffixe `(<poste>, <AAAA-MM-JJ>[, override])` toléré ; tout autre jeton -> INDÉTERMINÉ. Plusieurs lignes de
 # marqueur -> INDÉTERMINÉ. Une ligne qui RESSEMBLE à un marqueur sans en avoir la forme (puce, citation, libellé sans gras ou en
-# minuscules, espace avant le deux-points, valeur `propos…` ou `valid…`) est un marqueur illisible : INDÉTERMINÉ, jamais « absent ».
-# Aucune ligne : phase VALIDÉE (P60-D-02, état de toutes les phases existantes).
-# Section : titre `#{2,4} Phase <id>`, tag entre parenthèses toléré, deux-points EXIGÉ (`## Phase 41 — note` n'en
+# minuscules, espace avant le deux-points, y compris insécable U+00A0 ou fine U+202F, ligne de tableau `| Validation | proposed |`, tiret
+# cadratin ou demi-cadratin à la place des deux-points, valeur `propos…` ou `valid…`) est un marqueur illisible : INDÉTERMINÉ, jamais « absent ».
+# Aucune ligne : phase VALIDÉE (P60-D-02, état de toutes les phases existantes). Non-objectif : une faute de frappe du libellé
+# (`Valdiation:`) n'est pas un sosie reconnu, elle lit « absent » comme toute ligne étrangère.
+# Section : titre lu comme gsd-core (`#{2,4}\s*(\[tag\]\s*)?Phase\s+<id>`, sans casse, indentation <= 3 : `### PHASE 5:`, `###Phase 5:`,
+# `### [WIP] Phase 5:`), tag entre parenthèses toléré, deux-points EXIGÉ (`## Phase 41 — note` n'en
 # est pas une), qui se ferme au titre suivant de niveau inférieur ou égal ; blocs de code et commentaires HTML
 # ignorés ; deux sections pour le même identifiant -> INDÉTERMINÉ. Les blocs `<details>` exacts (jalons livrés)
 # sont cachés comme le fait gsd-core : un `<details open>` reste visible, le premier `</details>` ferme, un
@@ -98,6 +103,12 @@ done
 case "$PHASE" in
   *[!A-Za-z0-9._-]*|[!A-Za-z0-9]*|*.|*..*) usage_err "--phase : identifiant attendu (ex. 60, 41.1, 12A, AUTH, CK-03)" ;;
 esac
+# Forme slug de dossier (`60-gate-architecture`) ou identifiant de plan (`60-02`) : gsd la résout vers la phase, pas ce gate, qui
+# ne lit que les TITRES `### Phase <N>:` ; elle rendrait « introuvable » (3, le cycle continue) pour une phase proposée. Refus d'usage.
+case "$PHASE" in
+  [0-9]*-*) _pre=${PHASE%%-*}; _pre=${_pre%[A-Za-z]}
+      case "$_pre" in *[!0-9.]*) : ;; *) usage_err "--phase : numéro du titre ROADMAP attendu, pas un nom de dossier ni un identifiant de plan (ex. 60, non 60-02 ni 60-gate-architecture)" ;; esac ;;
+esac
 [ "${#PHASE}" -le 64 ] || usage_err "--phase : identifiant trop long"
 
 # --- Programme awk : une ligne rendue, `@ sections marqueurs classe code_ouvert commentaire_ouvert`.
@@ -120,21 +131,35 @@ function idkey(s, loose,   u) {
   if (match(u, /^[A-Z][A-Z0-9_]*-[0-9]/)) return (loose ? "" : substr(u, 1, RLENGTH - 1)) idnorm(substr(u, RLENGTH))
   return idnorm(u)
 }
-# Niveau du titre Markdown (nombre de #, 1 à 6) si la ligne en est un, sinon 0.
-function hlevel(s,   n) {
-  n = 0
-  while (substr(s, n + 1, 1) == "#") n++
+# Niveau du titre Markdown (nombre de #, 1 à 6) si la ligne en est un, sinon 0. Indentation de 3 espaces au plus (comme gsd-core,
+# `^ {0,3}#{2,4}`). L'espace après les # est exigé, SAUF devant un titre de phase (`###Phase 5:`) : gsd-core lit `#{2,4}\s*Phase`.
+function hlevel(s,   n, t, i, r) {
+  match(s, /^ */); i = RLENGTH
+  if (i >= 4) return 0
+  t = substr(s, i + 1); n = 0
+  while (substr(t, n + 1, 1) == "#") n++
   if (n < 1 || n > 6) return 0
-  if (substr(s, n + 1, 1) !~ /^[ \t]$/) return 0
-  return n
+  r = substr(t, n + 1)
+  if (r ~ /^[ \t]/) return n
+  if (n >= 2 && n <= 4 && phasehead(r)) return n
+  return 0
 }
-# Identifiant brut si le titre est `Phase <id>[ (tag)] :` de niveau 2 à 4, sinon "".
+# Tête de titre de phase, casse indifférente (gsd-core : drapeau `i`) : tag entre crochets facultatif (`[WIP] Phase`), puis `Phase` et un blanc.
+function phasehead(h,   l) {
+  l = tolower(h); sub(/^[ \t]+/, "", l)
+  if (match(l, /^\[[^]]+\][ \t]*/)) l = substr(l, RLENGTH + 1)
+  return (l ~ /^phase[ \t]+/)
+}
+# Identifiant brut si le titre est `Phase <id>[ (tag)] :` de niveau 2 à 4, sinon "". Même grammaire que gsd-core : `Phase` sans
+# casse, tag de jalon entre crochets avant `Phase`, indentation <= 3, aucun espace exigé après les #.
 function secid(s, lvl,   h, r) {
   if (lvl < 2 || lvl > 4) return ""
-  h = trim(substr(s, lvl + 1))
-  if (!match(h, /^Phase[ \t]+[A-Za-z0-9][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/)) return ""
+  match(s, /^ */)
+  h = trim(substr(s, RLENGTH + lvl + 1))
+  if (match(h, /^\[[^]]+\][ \t]*/)) h = substr(h, RLENGTH + 1)
+  if (!match(h, /^[Pp][Hh][Aa][Ss][Ee][ \t]+[A-Za-z0-9][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/)) return ""
   r = substr(h, RLENGTH + 1); h = substr(h, 1, RLENGTH)
-  sub(/^Phase[ \t]+/, "", h)
+  sub(/^[Pp][Hh][Aa][Ss][Ee][ \t]+/, "", h)
   if (match(r, /^[ \t]*\([^)]*\)/)) r = substr(r, RLENGTH + 1)
   if (r !~ /^[ \t]*:/) return ""
   return h
@@ -207,8 +232,9 @@ function strip_comments(s,   a, b) {
 # (STARTED, ACTIVE, WIP, `in progress`, 🚧, 🔄 : MILESTONE_ACTIVE_MARKER_PATTERN de gsd-core) reste visible. gsd-core ne
 # le cache que par `stripShippedMilestones`, mais `roadmap get-phase` cherche d'abord dans la fenêtre du jalon courant
 # (`extractCurrentMilestone`), qui garde ce bloc quand le jalon est résolu (STATE.md ou puce 🚧 du ROADMAP). Le gate ne
-# lit pas STATE.md : il sur-approxime (surensemble) — un bloc actif que gsd cacherait faute de jalon résolu est lu, et une
-# phase `proposed` y rend 1 (refus sûr) plutôt que 3 (non constatable, la boucle continue). Un `<summary>` sans marqueur
+# lit pas STATE.md : il sur-approxime un cas — un bloc actif que gsd cacherait faute de jalon résolu est lu, et une
+# phase `proposed` y rend 1 (refus sûr) plutôt que 3 (non constatable, la boucle continue). Ce n'est PAS un surensemble : un jalon actif
+# replié sans marqueur d'activité, que gsd sert via STATE.md, reste caché ici (phase lue introuvable, 3). Limite documentée. Un `<summary>` sans marqueur
 # d'activité reste caché (README conductor, limite des `<details>`), tout comme un bloc ouvert et fermé sur une même ligne
 # (rien n'y est lisible en début de ligne). Texte du bloc : de l'opener jusqu'au `</details>`.
 function active_block(rl, w, b,   t, k, s) {
@@ -272,11 +298,11 @@ BEGIN { wk[1] = idkey(want, 0); wk[2] = idkey(want, 1) }
 # libellé sans gras, en italique, en minuscules, espace avant le deux-points, suivi d'une valeur qui commence par
 # `propos` ou `valid`. Lue « absent », elle ferait passer une phase proposée (fail-open) ; elle est donc un marqueur
 # ILLISIBLE (arrêt des consommateurs), jamais une validation. N'est appelée que si la forme exacte n'a pas reconnu la ligne.
-function loosemark(s,   t, w) {
+function loosemark(s,   t, w, c) {
   t = s
   while (1) {
     sub(/^[ \t]+/, "", t)
-    if (substr(t, 1, 1) == ">") { t = substr(t, 2); continue }
+    if (substr(t, 1, 1) == ">" || substr(t, 1, 1) == "|") { t = substr(t, 2); continue }
     if (match(t, /^([-*+]|[0-9]+[.)])[ \t]+/)) { t = substr(t, RLENGTH + 1); continue }
     if (match(t, /^\[[ xX]\][ \t]+/)) { t = substr(t, RLENGTH + 1); continue }
     break
@@ -284,12 +310,23 @@ function loosemark(s,   t, w) {
   sub(/^[*_]+/, "", t)
   if (tolower(substr(t, 1, 10)) != "validation") return 0
   t = substr(t, 11)
-  sub(/^[*_]*[ \t]*/, "", t)
-  if (substr(t, 1, 1) != ":") return 0
-  t = substr(t, 2)
-  sub(/^[ \t*_`"']+/, "", t)
+  t = skipsp(t)  # blancs avant le séparateur
+  c = substr(t, 1, 1)
+  if (c == ":" || c == "|") t = substr(t, 2)
+  else if (substr(t, 1, 3) == "\342\200\224" || substr(t, 1, 3) == "\342\200\223") t = substr(t, 4)
+  else return 0
+  t = skipsp(t)
   w = tolower(substr(t, 1, 5))
   return (w == "propo" || w == "valid")
+}
+# Saute les blancs, le gras, les guillemets et les espaces typographiques : insécable U+00A0 (\302\240) et fine insécable U+202F (\342\200\257).
+function skipsp(t) {
+  while (1) {
+    if (substr(t, 1, 2) == "\302\240") { t = substr(t, 3); continue }
+    if (substr(t, 1, 3) == "\342\200\257") { t = substr(t, 4); continue }
+    if (match(t, /^[ \t*_`"']+/)) { t = substr(t, RLENGTH + 1); continue }
+    return t
+  }
 }
 # Une ligne, déjà débarrassée des blocs <details> : sections, marqueurs, blocs de code, commentaires. Deux lectures de la
 # cible en parallèle : (1) exacte, (2) tolérante au préfixe projet ; (2) ne sert que si (1) ne trouve aucune section.

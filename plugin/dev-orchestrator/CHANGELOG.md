@@ -10,6 +10,7 @@
 - **Champ de brief `Phases ajoutées`** (`mission-contracts.md` §Brief de mission) : consigne de pose de « proposée » lue par `vf-dev-manager` (`vf-validation.sh propose`) ; absent → aucun marqueur. Risque résiduel écrit (fail-open) ; la pose par le manager n'est prouvée que par le texte et le lien manager → contrat, pas par exécution (dette ouverte).
 - **Test T45** (`test-dev-orchestrator.sh`) : ablation par clause, ordre, inversions (code 1, BRIEF, poste solo, et mutants qui font passer un indéterminé autre que `marqueur=introuvable` ou bloquer la phase introuvable), commande citée jouée contre le gate réel, liens vers les scripts du conductor.
 - Instructions : `AGENT.md` 33, `vf-coder.md` 23 (baseline 23, marge consommée), `vf-dev-manager.md` 46 ; aucune valeur de baseline relevée.
+- **Correction de revue (2026-10-29)** : `<N>` défini comme le numéro du titre `### Phase <N>:` du ROADMAP (ni nom de dossier, ni identifiant de plan) dans `vf-coder` et `vf-auto` ; « tout autre code (5, 64, 126, 127, …) arrête » ; un code non nul de `vf-validation.sh propose` est un bloqueur remonté à l'humain (`mission-contracts.md` §Champ `Phases ajoutées`).
 
 
 ## [v2.29.1] — 2026-10-29 (gsd-run.sh sans HOME) — publiée dans v2.73.1

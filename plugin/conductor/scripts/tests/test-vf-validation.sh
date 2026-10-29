@@ -542,6 +542,42 @@ probe_planning_lien() {
   msg "témoin positif : .planning réel attendu rc 0"; [ "$RC" -eq 0 ]
 }
 case_ VFV-IDS probe_ids_w
+
+probe_ids_slug_w() {
+  # Revue 2026-10-29 : mêmes refus que le gate pour un nom de dossier ou un identifiant de plan (64), sans écriture.
+  local s a verb
+  mklab sw1 '# Roadmap\n\n### Phase 60: Gate\n**Goal:** g\n'; a="$(sum "$(RMF)")"
+  for s in 60-gate-architecture 60-02 12A-x; do
+    for verb in propose validate; do
+      T_ROLE=dev run "$verb" --phase "$s"; T_ROLE=""
+      msg "$verb --phase $s attendu rc 64 (jamais 3 introuvable)"; [ "$RC" -eq 64 ] || return 1
+    done
+  done
+  LASTMSG="le ROADMAP a changé"; [ "$(sum "$(RMF)")" = "$a" ] || return 1
+  run propose --phase 60
+  msg "propose --phase 60 attendu rc 0"; [ "$RC" -eq 0 ]
+}
+probe_titres_gsd_w() {
+  local h n=0
+  for h in '### phase 2: X' '### PHASE 2: X' '### [WIP] Phase 2: X' '###Phase 2: X' ' ### Phase 2: X'; do
+    n=$((n+1)); mklab "tw-$n" '# Roadmap\n\n%s\n**Goal:** g\n' "$h"
+    run propose --phase 2
+    msg "propose sur le titre « $h » attendu rc 0 (section lue comme par le gate)"; [ "$RC" -eq 0 ] || return 1
+    LASTMSG="le gate ne lit pas la phase proposée sur « $h »"; gate_p 2; [ $? -eq 1 ] || return 1
+  done
+}
+probe_sosies_typo_w() {
+  local m n=0 a nb=$'\xc2\xa0' nn=$'\xe2\x80\xaf'
+  for m in "**Validation${nb}:** proposed" "**Validation${nn}:** proposed" '| Validation | proposed |' 'Validation — proposed'; do
+    n=$((n+1)); mklab "sw-$n" "$RM3" "$m"$'\n'; a="$(sum "$(RMF)")"
+    run propose --phase 2
+    msg "propose sur le sosie « $m » attendu rc 3 (marqueur illisible), jamais une ligne ajoutée à côté"; [ "$RC" -eq 3 ] || return 1
+    LASTMSG="le ROADMAP a changé"; [ "$(sum "$(RMF)")" = "$a" ] || return 1
+  done
+}
+case_ VFV-IDS-SLUG probe_ids_slug_w
+case_ VFV-TITRES-GSD probe_titres_gsd_w
+case_ VFV-SOSIES-TYPO probe_sosies_typo_w
 case_ VFV-DETAILS probe_details_w
 case_ VFV-DETAILS-ACTIF probe_details_actif_w
 case_ VFV-FENCE-COMMONMARK probe_fence_w
@@ -779,9 +815,9 @@ mutant VFV-MUT-17 'p = (nsec[1] > 0) ? 1 : 2' '(nsec[1] > 0) ? 1 : 2' '2' probe_
   "la lecture tolérante au préfixe projet prime sur la lecture exacte"
 mutant VFV-MUT-18 'p = (nsec[1] > 0) ? 1 : 2' '(nsec[1] > 0) ? 1 : 2' '1' probe_ids_w \
   "plus de lecture tolérante au préfixe projet"
-mutant VFV-MUT-19 'if (!match(h, /^Phase[ \t]+[A-Za-z0-9]' '[A-Za-z0-9][A-Za-z0-9_-]*' '[0-9]' probe_ids_w \
+mutant VFV-MUT-19 'if (!match(h, /^[Pp][Hh][Aa][Ss][Ee][ \t]+[A-Za-z0-9]' '[A-Za-z0-9][A-Za-z0-9_-]*' '[0-9]' probe_ids_w \
   "un titre à id custom n'est plus une section"
-mutant VFV-MUT-20 'if (!match(h, /^Phase[ \t]+[A-Za-z0-9]' '(\.[A-Za-z0-9_-]+)*' '(\.[0-9]+)*' probe_ids_w \
+mutant VFV-MUT-20 'if (!match(h, /^[Pp][Hh][Aa][Ss][Ee][ \t]+[A-Za-z0-9]' '(\.[A-Za-z0-9_-]+)*' '(\.[0-9]+)*' probe_ids_w \
   "un segment décimal à suffixe lettre n'est plus une section"
 mutant VFV-MUT-21 'u = toupper(s)' 'toupper(s)' 's' probe_ids_w \
   "la casse des identifiants de phase devient significative"
@@ -800,6 +836,21 @@ mutant VFV-MUT-26 'return (w == "propo" || w == "valid")' 'w == "propo" || w == 
 
 mutant VFV-MUT-27 'ROOTP=$(pwd -P' 'pwd -P' 'git rev-parse --show-toplevel' probe_arch_cwd \
   "la racine de --architecture devient la racine du dépôt git au lieu du répertoire courant"
+
+mutant VFV-MUT-28 '_pre=${PHASE%%-*}' '[0-9]*-*)' '[x]*-*)' probe_ids_slug_w \
+  "un nom de dossier ou un identifiant de plan n'est plus refusé (64)"
+mutant VFV-MUT-29 'if (n >= 2 && n <= 4 && phasehead(r)) return n' 'phasehead(r)' '0' probe_titres_gsd_w \
+  "« ###Phase 2: » sans espace n'est plus un titre"
+mutant VFV-MUT-30 'if (!match(h, /^[Pp][Hh]' '[Pp][Hh][Aa][Ss][Ee]' 'Phase' probe_titres_gsd_w \
+  "« ### PHASE 2: » (casse) n'est plus une section"
+mutant VFV-MUT-31 'substr(t, 1, 2) == "\302\240"' '"\302\240"' '"@@"' probe_sosies_typo_w \
+  "l'espace insécable U+00A0 avant le deux-points n'est plus un sosie"
+mutant VFV-MUT-32 'substr(t, 1, 3) == "\342\200\257"' '"\342\200\257"' '"@@@"' probe_sosies_typo_w \
+  "l'espace fine insécable U+202F avant le deux-points n'est plus un sosie"
+mutant VFV-MUT-33 'if (c == ":" || c == "|")' ' || c == "|"' '' probe_sosies_typo_w \
+  "la ligne de tableau n'est plus un sosie"
+mutant VFV-MUT-34 'substr(t, 1, 3) == "\342\200\224"' '"\342\200\224"' '"@@@"' probe_sosies_typo_w \
+  "le tiret cadratin n'est plus un sosie"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]

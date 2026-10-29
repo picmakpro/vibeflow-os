@@ -53,7 +53,9 @@ inexploitable. Le manager relit lui-même `.planning/ROADMAP.md`, `.planning/STA
   créées par la mission. Produit par : `vibeflow-head` (§5 de `product-routing.md`, devant une
   intention de découpage) et `vf-auto` (dispatch de l'équipe), d'après `"$S"/vf-role.sh get` :
   postes `product` et `dev`. Consommé par : `vf-dev-manager` — après chaque ajout ou insertion de
-  phase dans la mission (`gsd-phase`), `"$S"/vf-validation.sh propose --phase <N> [--ws <nom>]`.
+  phase dans la mission (`gsd-phase`), `"$S"/vf-validation.sh propose --phase <N> [--ws <nom>]` (`<N>` = numéro du titre `### Phase <N>:` du ROADMAP, ni nom de
+  dossier ni identifiant de plan). **Un code non nul de `propose` (3, 5, 64, 126, 127, …) est un bloqueur** : le manager le remonte à
+  l'humain (`human_needed`, code et ligne `BILAN` verbatim), la phase ne reste jamais validée en silence ni poursuivie comme si de rien n'était.
   **Absent → aucun marqueur** (comportement d'aujourd'hui, poste solo). Une phase proposée attend
   la validation d'un dev (`vf-validation.sh validate`) ; `vf-coder` refuse de la planifier ou de
   l'exécuter (porte « phase proposée »).
