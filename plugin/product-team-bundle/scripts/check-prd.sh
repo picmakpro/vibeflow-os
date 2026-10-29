@@ -391,7 +391,7 @@ function close_block() {
   while (u ~ /^[ \t]*>/) { sub(/^[ \t]*>/, "", u); qt = 1 }
   lm = (u ~ /^[ \t]*([-*+]|[0-9]+[.)])([ \t]|\302\240)/)
   if (lm) sub(/^[ \t]*([-*+]|[0-9]+[.)])/, "", u)
-  if (line ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]+\[[ xX]\]/ || ((qt || lm) && u ~ /^([ \t]|\302\240)*(\[[^]]?[^]]?[^]]?\]([ \t]|\302\240)*)?\*\*[A-Z][A-Z0-9]*-[A-Za-z0-9_-]+\*\*/)) {
+  if (line ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]+\[[ xX]\]/ || ((qt || lm) && u ~ /^([ \t]|\302\240)*(\[[^]]*\]([ \t]|\302\240)*)?\*\*[A-Z][A-Z0-9]*-[A-Za-z0-9_-]+\*\*/)) {
     nunk++
     if (nunk <= 50) printf "[check-prd] AVERTISSEMENT ligne %d : case a cocher non reconnue comme exigence\n", NR
   }
