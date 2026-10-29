@@ -84,6 +84,8 @@ new_lab b3
 OUT="$(cd "$LAB" && env -i PATH="$ONLYNODE" FAKE_LOG="$LOG" "$BASH_BIN" "$SCRIPT" config-get x 2>&1 </dev/null)"; RC=$?
 eq "b: HOME et CLAUDE_CONFIG_DIR absents → rc 64 (pas le rc 1 de set -u)" "64" "$RC"
 case "$OUT" in *"défaut d'outillage"*) ok "b: HOME absent → message défaut d'outillage";; *) ko "b: message HOME absent" "défaut d'outillage" "$OUT";; esac
+case "$OUT" in *"scope user non résolu"*) ok "b: HOME absent → la note « scope user non résolu » est émise";; *) ko "b: note scope user" "scope user non résolu" "$OUT";; esac
+case "$OUT" in *" /.claude/"*) ko "b: HOME absent" "aucun candidat /.claude/ à la racine dans la sortie" "$OUT";; *) ok "b: HOME absent → aucun candidat /.claude/ à la racine dans la sortie (le ./.claude/ du projet reste)";; esac
 OUT="$(cd "$LAB" && env -i HOME= PATH="$ONLYNODE" FAKE_LOG="$LOG" "$BASH_BIN" "$SCRIPT" config-get x 2>&1 </dev/null)"; RC=$?
 eq "b: HOME vide → rc 64, aucun candidat /.claude à la racine" "64" "$RC"
 case "$OUT" in *"Candidats essayés : "*" /.claude/"*|*", /.claude/"*) ko "b: HOME vide" "pas de candidat /.claude/..." "$OUT";; *) ok "b: HOME vide → pas de candidat /.claude/...";; esac
