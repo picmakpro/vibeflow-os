@@ -287,8 +287,8 @@ function usable(v,   p) {
   v = lead(v)
   if (isfill(v)) return 0
   p = fold(plain(v))
-  sub(/^(les |des |la |l )/, "", p); sub(/^criteres /, "critere ", p); sub(/acceptations$/, "acceptation", p)
-  if (p == "acceptation" || p == "critere d acceptation") return 0
+  sub(/^((le|la|les|l|un|une|des|du|de|d) )+/, "", p); sub(/^criteres /, "critere ", p); sub(/acceptations$/, "acceptation", p)
+  if (p == "acceptation" || p ~ /^critere (d )?acceptation$/) return 0
   if (nchars(plain(v)) < 10) return 0
   return 1
 }

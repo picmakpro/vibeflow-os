@@ -17,6 +17,7 @@
 # CPRD-IMBRICATION, CPRD-CODE-COMMENTAIRE, CPRD-CODE-MARQUEUR, CPRD-ILLISIBLE-000 (skip audible en root) ; mutants CPRD-MUT-117..159 (hors 137 et 138, jamais posés).
 # Correctifs du 2026-10-29 : CPRD-UNK-PRIORITE, CPRD-SEPARATEURS, CPRD-TIRET-COLLE, CPRD-LIBELLE-REPETE, CPRD-PUCES-NUMEROTEES, CPRD-GABARIT-SANS-CROCHETS ; mutants CPRD-MUT-160..181 (hors 161 et 168, jamais posés : vingt mutants).
 # Revue fraîche du 2026-10-29 : CPRD-CASE-MALFORMEE, CPRD-CASE-MALFORMEE-LEGITIME, CPRD-LIBELLE-PLURIEL ; mutants CPRD-MUT-182..188 (sept mutants).
+# Juge frais 2 du 2026-10-29 : CPRD-LIBELLE-PLURIEL étendu (articles le/un/une/du/de/d, « d' » facultatif, vrai critère « Le critère d'acceptation est que… » vert) ; mutants CPRD-MUT-189..193 (cinq mutants ; 188 au total).
 # Mutants CPRD-MUT-1..8 (QUAL-01), CPRD-MUT-9..26 (revue-59 F4 : un mutant par comportement documenté), CPRD-MUT-27..51 (2e relecture, hors 40 : un mutant par correctif) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide
 # (bash -n), rouge pour la raison attendue (code attendu/obtenu imprimé), original revérifié vert.
 set -uo pipefail
@@ -1404,18 +1405,33 @@ probe_case_malformee_legitime() {
   msg "puce qui mentionne l'ID en cours de ligne, puce à gras ordinaire attendu rc 0"; [ "$RC" -eq 0 ]; }
 probe_libelle_pluriel() {
   local v n=0
-  for v in "Critères d'acceptation" "Les critères d'acceptation" "Acceptations" "L'acceptation" "Des critères d’acceptation"; do
+  for v in "Critères d'acceptation" "Les critères d'acceptation" "Acceptations" "L'acceptation" "Des critères d’acceptation" \
+    "Le critère d'acceptation" "Un critère d'acceptation" "Une acceptation" "Du critère d'acceptation" "Critères acceptation" "De l'acceptation"; do
     n=$((n+1)); req1 lp$n.md "Acceptation : $v"; run --requirements "$FX/lp$n.md"
     msg "valeur [$v] qui répète le libellé au pluriel ou avec article attendu rc 1"; [ "$RC" -eq 1 ] || return 1
   done
   req1 lp9.md "Acceptation : Les acceptations sont tracées par le client en moins de 5 secondes"; run --requirements "$FX/lp9.md"
-  msg "valeur légitime qui commence par un article et le mot attendu rc 0"; [ "$RC" -eq 0 ]; }
+  msg "valeur légitime qui commence par un article et le mot attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  req1 lp10.md "Acceptation : Le critère d'acceptation est que le total s'affiche en moins de 2 s"; run --requirements "$FX/lp10.md"
+  msg "valeur « Le critère d'acceptation est que… » (vrai critère, pas la valeur réduite au libellé) attendu rc 0"; [ "$RC" -eq 0 ]; }
 probe_libelle_pluriel_critere() { req1 lq.md "Acceptation : Critères d'acceptation"; run --requirements "$FX/lq.md"
   msg "valeur « Critères d'acceptation » attendu rc 1"; [ "$RC" -eq 1 ]; }
 probe_libelle_pluriel_article() { req1 lr.md "Acceptation : Les acceptations"; run --requirements "$FX/lr.md"
   msg "valeur « Les acceptations » attendu rc 1"; [ "$RC" -eq 1 ]; }
 probe_libelle_pluriel_s() { req1 ls.md "Acceptation : Acceptations"; run --requirements "$FX/ls.md"
   msg "valeur « Acceptations » attendu rc 1"; [ "$RC" -eq 1 ]; }
+probe_libelle_le() { req1 l1.md "Acceptation : Le critère d'acceptation"; run --requirements "$FX/l1.md"
+  msg "valeur « Le critère d'acceptation » attendu rc 1"; [ "$RC" -eq 1 ]; }
+probe_libelle_indefini() { local v n=0
+  for v in "Un critère d'acceptation" "Une acceptation"; do n=$((n+1)); req1 l2$n.md "Acceptation : $v"; run --requirements "$FX/l2$n.md"
+    msg "valeur [$v] attendu rc 1"; [ "$RC" -eq 1 ] || return 1; done; }
+probe_libelle_partitif() { local v n=0
+  for v in "Du critère d'acceptation" "D'acceptation"; do n=$((n+1)); req1 l3$n.md "Acceptation : $v"; run --requirements "$FX/l3$n.md"
+    msg "valeur [$v] attendu rc 1"; [ "$RC" -eq 1 ] || return 1; done; }
+probe_libelle_sans_d() { req1 l4.md "Acceptation : Critères acceptation"; run --requirements "$FX/l4.md"
+  msg "valeur « Critères acceptation » (sans d') attendu rc 1"; [ "$RC" -eq 1 ]; }
+probe_libelle_deux_articles() { req1 l5.md "Acceptation : De l'acceptation"; run --requirements "$FX/l5.md"
+  msg "valeur « De l'acceptation » (deux articles) attendu rc 1"; [ "$RC" -eq 1 ]; }
 probe_case_malformee_nbsp() { local NB=$'\xc2\xa0'; w cn.md '# Exigences\n\n%s\n-%s[ ] **PRD-02**: x\n' "$A1" "$NB"; run --requirements "$FX/cn.md"
   msg "puce suivie d'une espace insécable attendu rc 3"; [ "$RC" -eq 3 ]; }
 probe_case_malformee_citation() { w cq.md '# Exigences\n\n%s\n> **PRD-02**: x\n' "$A1"; run --requirements "$FX/cq.md"
@@ -1450,8 +1466,8 @@ mutant CPRD-MUT-165 "$WORDN" '|(\314|\315)[\200-\277])' '|(\314|\315)[\200-\277]
 mutant CPRD-MUT-166 "$WORDN" '|(\314|\315)[\200-\277])' '|(\314|\315)[\200-\277]|\342\200\223)' probe_separateur_cadratin "FAIL : le tiret demi-cadratin avant le champ est pris pour la fin d'un mot"
 mutant CPRD-MUT-167 'if (nchars(plain(v)) < 10) return 0' '< 10' '< 0' probe_separateur_phrase "FAIL : seuil de longueur retiré, « il faut, acceptation : ok vite » devient un faux vert"
 mutant CPRD-MUT-169 'if (pre ~ /([A-Za-z0-9]|[\200-\377])-$/) return 0' '/([A-Za-z0-9]|[\200-\377])-$/' '/ZZZZZ$/' probe_tiret_colle "FAIL : mot composé terminé par un tiret collé pris pour un champ"
-mutant CPRD-MUT-170 'if (p == "acceptation" || p == "critere d acceptation") return 0' 'p == "acceptation" ||' '0 ||' probe_libelle_repete_nu "FAIL : valeur qui répète « Acceptation » acceptée"
-mutant CPRD-MUT-171 'if (p == "acceptation" || p == "critere d acceptation") return 0' '|| p == "critere d acceptation"' '|| 0' probe_libelle_repete_long "FAIL : valeur « Critère d acceptation » acceptée"
+mutant CPRD-MUT-170 'if (p == "acceptation" || p ~ /^critere (d )?acceptation$/) return 0' 'p == "acceptation" ||' '0 ||' probe_libelle_repete_nu "FAIL : valeur qui répète « Acceptation » acceptée"
+mutant CPRD-MUT-171 'if (p == "acceptation" || p ~ /^critere (d )?acceptation$/) return 0' '|| p ~ /^critere (d )?acceptation$/' '|| 0' probe_libelle_repete_long "FAIL : valeur « Critère d acceptation » acceptée"
 mutant CPRD-MUT-172 "$LEADN" '|[0-9]+[.)]([ \t]|$)' '' probe_puce_num_seule "FAIL : puce numérotée non retirée en tête"
 mutant CPRD-MUT-173 "$LEADN" '\302[\253\267]' '\302[\253]' probe_puce_point_median "FAIL : point médian · non retiré en tête"
 if [ -f "$TPL_REQ" ] && [ -f "$TPL_BRIEF" ]; then
@@ -1470,9 +1486,16 @@ mutant CPRD-MUT-182 'lm = (u ~' '([ \t]|\302\240)' '([ \t])' probe_case_malforme
 mutant CPRD-MUT-183 'while (u ~ /^[ \t]*>/)' 'qt = 1' 'qt = 0' probe_case_malformee_citation "FAIL : citation seule portant un ID en gras non reconnue"
 mutant CPRD-MUT-184 '((qt || lm) &&' '(qt || lm) &&' '1 &&' probe_case_malformee_legitime "FAIL : paragraphe ordinaire commençant par un ID en gras rougi (faux rouge)"
 mutant CPRD-MUT-185 '((qt || lm) &&' '(\[[^]]?[^]]?[^]]?\]([ \t]|\302\240)*)?' '' probe_case_malformee_crochets "FAIL : case vide [] ou [-] non lue comme case mal formée"
-mutant CPRD-MUT-186 'sub(/^(les |des |la |l )/' 'sub(/^(les |des |la |l )/, "", p);' '' probe_libelle_pluriel_article "FAIL : article avant le libellé répété non retiré"
-mutant CPRD-MUT-187 'sub(/^(les |des |la |l )/' 'sub(/^criteres /, "critere ", p);' '' probe_libelle_pluriel_critere "FAIL : « Critères » au pluriel non ramené au singulier"
-mutant CPRD-MUT-188 'sub(/^(les |des |la |l )/' 'sub(/acceptations$/, "acceptation", p)' '0' probe_libelle_pluriel_s "FAIL : « Acceptations » au pluriel non ramené au singulier"
+mutant CPRD-MUT-186 'sub(/^((le|la|les|l|un|une|des|du|de|d) )+/' 'sub(/^((le|la|les|l|un|une|des|du|de|d) )+/, "", p);' '' probe_libelle_pluriel_article "FAIL : article avant le libellé répété non retiré"
+mutant CPRD-MUT-187 'sub(/^((le|la|les|l|un|une|des|du|de|d) )+/' 'sub(/^criteres /, "critere ", p);' '' probe_libelle_pluriel_critere "FAIL : « Critères » au pluriel non ramené au singulier"
+mutant CPRD-MUT-188 'sub(/^((le|la|les|l|un|une|des|du|de|d) )+/' 'sub(/acceptations$/, "acceptation", p)' '0' probe_libelle_pluriel_s "FAIL : « Acceptations » au pluriel non ramené au singulier"
+
+# Juge frais 2 : articles et déterminants élargis, « d' » facultatif.
+mutant CPRD-MUT-189 'sub(/^((le|la|les|l|un|une|des|du|de|d) )+/' '(le|' '(' probe_libelle_le "FAIL : article « le » avant le libellé répété non retiré"
+mutant CPRD-MUT-190 'sub(/^((le|la|les|l|un|une|des|du|de|d) )+/' '|un|une' '' probe_libelle_indefini "FAIL : article indéfini (un, une) avant le libellé répété non retiré"
+mutant CPRD-MUT-191 'sub(/^((le|la|les|l|un|une|des|du|de|d) )+/' '|du|de|d)' ')' probe_libelle_partitif "FAIL : « du », « de » ou « d » avant le libellé répété non retiré"
+mutant CPRD-MUT-192 'if (p == "acceptation" || p ~ /^critere (d )?acceptation$/) return 0' '(d )?' '(d )' probe_libelle_sans_d "FAIL : « d' » rendu obligatoire entre critère et acceptation"
+mutant CPRD-MUT-193 'sub(/^((le|la|les|l|un|une|des|du|de|d) )+/' ')+/' ')/' probe_libelle_deux_articles "FAIL : un seul article retiré, « De l'acceptation » passe"
 
 echo "== cellules génératives : $GEN_TOT assertions comptées, $GEN_OK conformes (rouges ou verts attendus obtenus) =="
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
