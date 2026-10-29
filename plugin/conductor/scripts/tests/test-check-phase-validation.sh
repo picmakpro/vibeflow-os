@@ -9,7 +9,8 @@
 # nommé par --ws) ; CPV-POSTE (le gate ne lit pas le poste).
 # Cas CPV-LIEN, CPV-FIFO, CPV-DOSSIER, CPV-GROS, CPV-ILLISIBLE (refus en 5 avant lecture), CPV-NOECHO, CPV-EXEC (sans
 # évaluation de chaîne, arguments hostiles inertes), CPV-RO, CPV-CODES (ensemble observé = {0, 1, 3, 5, 64}, jamais 2).
-# Mutants CPV-MUT-1..10 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide (bash -n),
+# Cas CPV-FERME (fermeture de la section au titre suivant), CPV-NIVEAUX (niveaux de titre 2 à 4), CPV-FENCE-INDENTEE.
+# Mutants CPV-MUT-1..15 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide (bash -n),
 # rouge pour la raison attendue (code attendu/obtenu imprimé), original revérifié vert.
 # Les cas CPV-GSD-* (preuve que le marqueur ne change rien pour le moteur GSD) s'ajoutent en 60-03.
 set -uo pipefail
@@ -177,6 +178,39 @@ probe_bom() {
   mklab bm '\357\273\277### Phase 2: Deuxieme\n**Validation:** proposed\n'; run --phase 2
   msg "BOM de tête sur le titre de la section attendu rc 1"; [ "$RC" -eq 1 ]
 }
+probe_ferme() {
+  mklab fm '# Roadmap\n\n### Phase 2: Deuxieme\n**Goal:** deux\n\n### Phase 3: Troisieme\n**Goal:** trois\n**Validation:** proposed\n'; run --phase 2
+  msg "le marqueur de la phase 3, APRÈS la section de la phase 2, ne doit pas lui être attribué : attendu rc 0 (phase 2)"
+  [ "$RC" -eq 0 ] || return 1
+  run --phase 3
+  msg "témoin positif : le même marqueur appartient à la phase 3, attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  mklab fm2 '# Roadmap\n\n### Phase 2: Deuxieme\n**Goal:** deux\n\n## Autre section\n**Validation:** proposed\n'; run --phase 2
+  msg "le marqueur d'une section de niveau inférieur (## Autre section) ne déborde pas sur la phase 2 : attendu rc 0"
+  [ "$RC" -eq 0 ] || return 1
+  mklab fm3 '# Roadmap\n\n### Phase 2: Deuxieme\n**Goal:** deux\n\n#### Detail\n**Validation:** proposed\n'; run --phase 2
+  msg "témoin positif : un sous-titre plus profond appartient à la section, attendu rc 1"
+  [ "$RC" -eq 1 ]
+}
+probe_niveaux() {
+  mklab nv2 '# Roadmap\n\n## Phase 2: Deuxieme\n**Validation:** proposed\n'; run --phase 2
+  msg "titre de niveau 2 reconnu, attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  mklab nv4 '# Roadmap\n\n#### Phase 2: Deuxieme\n**Validation:** proposed\n'; run --phase 2
+  msg "titre de niveau 4 reconnu, attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  mklab nv5 '# Roadmap\n\n##### Phase 2: Deuxieme\n**Validation:** proposed\n'; run --phase 2
+  msg "titre de niveau 5 non reconnu comme section, attendu rc 3 + phase introuvable"
+  { [ "$RC" -eq 3 ] && has 'INDETERMINE phase introuvable'; } || return 1
+  mklab nv1 '# Phase 2: Deuxieme\n**Validation:** proposed\n'; run --phase 2
+  msg "titre de niveau 1 non reconnu comme section, attendu rc 3 + phase introuvable"
+  { [ "$RC" -eq 3 ] && has 'INDETERMINE phase introuvable'; }
+}
+probe_fence_indentee() {
+  mklab fi '# Roadmap\n\n### Phase 2: Deuxieme\n  ```\n**Validation:** proposed\n  ```\n'; run --phase 2
+  msg "marqueur dans un bloc de code dont la barrière est indentée (espaces) attendu rc 0 (marqueur absent)"
+  { [ "$RC" -eq 0 ] && has 'marqueur absent'; } || return 1
+  mklab fi2 '# Roadmap\n\n### Phase 2: Deuxieme\n\t~~~\n**Validation:** proposed\n\t~~~\n'; run --phase 2
+  msg "marqueur dans un bloc tilde dont la barrière est indentée (tabulation) attendu rc 0"
+  { [ "$RC" -eq 0 ] && has 'marqueur absent'; }
+}
 case_ CPV-VALIDATED probe_validated
 case_ CPV-INCONNU probe_inconnu
 case_ CPV-MULTI probe_multi
@@ -188,6 +222,9 @@ case_ CPV-SECTIONS probe_sections
 case_ CPV-DECIMAL probe_decimal
 case_ CPV-CRLF probe_crlf
 case_ CPV-BOM probe_bom
+case_ CPV-FERME probe_ferme
+case_ CPV-NIVEAUX probe_niveaux
+case_ CPV-FENCE-INDENTEE probe_fence_indentee
 
 # === Compartiment nommé par --ws, jamais déduit (P60-PL-02, DLWS-04) ===============================
 # mkws <lab> <compartiment> <format printf> [args] : lab partitionné, ROADMAP du compartiment ; positionne RUNDIR.
@@ -566,6 +603,16 @@ mutant CPV-MUT-9 'then indetermine "lab partitionne sans --ws"' '[ -e "$PLAN/wor
   "INDÉTERMINÉ : contrôle « partitionné sans --ws » retiré"
 mutant CPV-MUT-10 'elif [ "$NMARK" -gt 1 ]' '[ "$NMARK" -gt 1 ]' 'false' probe_multi \
   "INDÉTERMINÉ : marqueurs multiples rendus selon le premier"
+mutant CPV-MUT-11 'if (insec && lvl <= seclvl) insec = 0' 'insec && lvl <= seclvl' '0' probe_ferme \
+  "FAIL : fermeture de la section de phase retirée, le marqueur d'une section voisine est attribué à la phase interrogée"
+mutant CPV-MUT-12 'if (insec && lvl <= seclvl) insec = 0' 'lvl <= seclvl' 'lvl < seclvl' probe_ferme \
+  "FAIL : la section ne se ferme plus à un titre de MÊME niveau (borne <= devenue <)"
+mutant CPV-MUT-13 'if (lvl < 2 || lvl > 4) return ""' 'lvl > 4' 'lvl > 5' probe_niveaux \
+  "FAIL : un titre de niveau 5 compte comme section de phase"
+mutant CPV-MUT-14 'if (lvl < 2 || lvl > 4) return ""' 'lvl < 2' 'lvl < 1' probe_niveaux \
+  "FAIL : un titre de niveau 1 compte comme section de phase"
+mutant CPV-MUT-15 't = line; sub(' 'sub(/^[ \t]+/, "", t)' 't = t' probe_fence_indentee \
+  "FAIL : indentation tolérée devant une barrière de bloc de code retirée"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]

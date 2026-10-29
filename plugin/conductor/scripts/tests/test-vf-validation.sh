@@ -6,9 +6,9 @@
 # Le poste est fixé par cas (VF_ROLE) ; la date du jour est lue avant et après chaque appel (deux valeurs admises).
 # Cas VFV-TRACE-1..4 : poser puis valider une phase, constaté par le gate de bout en bout.
 # Cas VFV-POSTE-*, VFV-PROPOSE-VALIDEE, VFV-IDEMPOTENT, VFV-ABSENT-VALIDATE, VFV-INCONNU, VFV-MULTI, VFV-SANS-GOAL,
-# VFV-GOAL-MULTI, VFV-OCTETS, VFV-CRLF, VFV-MODE, VFV-WS, VFV-LIEN, VFV-ARCHI, VFV-NOECHO : règles de l'écrivain.
+# VFV-GOAL-MULTI, VFV-OCTETS, VFV-INDENT, VFV-CRLF, VFV-MODE, VFV-WS, VFV-LIEN, VFV-ARCHI, VFV-NOECHO : règles de l'écrivain.
 # Cas VFV-GSD-* : les lecteurs du moteur GSD rendent la même chose sur la sortie de l'écrivain que sans marqueur.
-# Mutants VFV-MUT-1..8 : une ligne du script altérée, différente (cmp -s), valide (bash -n), sonde rouge sur le
+# Mutants VFV-MUT-1..9 : une ligne du script altérée, différente (cmp -s), valide (bash -n), sonde rouge sur le
 # mutant puis verte sur l'original.
 set -uo pipefail
 
@@ -281,7 +281,23 @@ probe_mode() {
   [ "$(ls -A "$RUNDIR/.planning" | wc -l | tr -d ' ')" = 1 ]
 }
 case_ VFV-GOAL-MULTI probe_goal_multi
+probe_indent() {
+  local pad nm
+  for pad in '  ' $'\t'; do
+    nm=in$(printf '%s' "$pad" | od -An -tx1 | tr -d ' \n')
+    mklab "$nm" "$RM3" "${pad}**Validation:** proposed"$'\n'; cp "$(RMF)" "$TMP/in.orig"
+    T_ROLE=dev run validate --phase 2; T_ROLE=""
+    msg "validate sur un marqueur indenté attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+    LASTMSG="l'indentation de la ligne de marqueur n'est pas conservée (ligne attendue : indentation + validated (dev, <date>))"
+    local got; got="$(awk '/^[ \t]*\*\*Validation:\*\*/' "$(RMF)")"
+    [ "$got" = "${pad}**Validation:** validated (dev, $D1)" ] || [ "$got" = "${pad}**Validation:** validated (dev, $D2)" ] || return 1
+    LASTMSG="plus d'une ligne diffère de l'original, ou le nombre de lignes a changé"
+    awk 'NR == FNR { a[FNR] = $0; n = FNR; next } { if (a[FNR] != $0) d++; m = FNR } END { exit !(d == 1 && n == m) }' "$TMP/in.orig" "$(RMF)" || return 1
+    LASTMSG="le gate sur le marqueur indenté validé n'a pas rendu 0"; gate_p 2 || return 1
+  done
+}
 case_ VFV-OCTETS probe_octets
+case_ VFV-INDENT probe_indent
 case_ VFV-CRLF probe_crlf
 case_ VFV-MODE probe_mode
 
@@ -590,6 +606,8 @@ mutant VFV-MUT-7 'VAL="validated (product,' ', override)' ')' probe_poste_produc
   "override absent de la valeur écrite"
 mutant VFV-MUT-8 'then indet "lab partitionne sans --ws"' '[ -e "$PLAN/workstreams" ] || [ -L "$PLAN/workstreams" ]' 'false' probe_ws \
   "lab partitionné sans --ws traité comme lab plat"
+mutant VFV-MUT-9 'out[++m] = lead "**Validation:** " val cr[i]' 'lead "**Validation:** "' '"**Validation:** "' probe_indent \
+  "indentation de la ligne de marqueur remplacée perdue à la réécriture"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]

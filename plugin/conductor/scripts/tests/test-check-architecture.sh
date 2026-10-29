@@ -9,7 +9,8 @@
 # CARCH-STATUT, CARCH-FENCE-OUVERTE, CARCH-MIX, CARCH-DESCRIPTIF (ligne d'état, rubriques, corps).
 # Cas CARCH-LIEN, CARCH-FIFO, CARCH-DOSSIER, CARCH-GROS, CARCH-ILLISIBLE (refus en 5 avant lecture), CARCH-NOECHO,
 # CARCH-EXEC (sans évaluation de chaîne, chemin hostile inerte), CARCH-RO, CARCH-CODES (ensemble observé = {0, 1, 3, 5, 64}).
-# Mutants CARCH-MUT-1..9 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide
+# Cas CARCH-NIVEAU (titres de tout niveau), CARCH-PREFIXE (reconnaissance par préfixe du libellé, six rubriques).
+# Mutants CARCH-MUT-1..11 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide
 # (bash -n), une seule ligne changée, rouge pour la raison attendue (code attendu/obtenu imprimé), original revérifié vert.
 set -uo pipefail
 
@@ -252,6 +253,28 @@ DESC
   msg "carte descriptive marquée validated attendu rc 1 (six rubriques absentes)"
   [ "$RC" -eq 1 ] && ! has 'ARCHITECTURE validee'
 }
+probe_niveau() {
+  local lv
+  for lv in '#' '###' '####' '######'; do
+    gen "$VAL" - | sed "s/^## /$lv /" > "$FX/niv-${#lv}.md"; reg "niv-${#lv}.md"; runf "niv-${#lv}.md"
+    msg "six rubriques en titres « $lv » attendu rc 0 (en-tête : titres de tout niveau)"
+    { [ "$RC" -eq 0 ] && ! has 'ELIMINATOIRE'; } || return 1
+  done
+}
+prefixe_case() { # <rubrique omise> <titre qui contient le mot sans l'ouvrir>
+  { gen "$VAL" "$1"; printf '## %s\n%s\n' "$2" '- Un contenu réel, mais sous un titre qui ne désigne pas la rubrique.'; } > "$FX/pre-$1.md"
+  reg "pre-$1.md"; runf "pre-$1.md"
+  msg "le titre « $2 » ne tient pas lieu de la rubrique $1 : attendu rc 1 + ELIMINATOIRE rubrique $1 : absente"
+  { [ "$RC" -eq 1 ] && has "ELIMINATOIRE rubrique $1 : absente" && ! has 'ARCHITECTURE validee'; }
+}
+probe_prefixe() {
+  prefixe_case contexte 'Un contexte à part' || return 1
+  prefixe_case choix_structurants 'Les choix du client' || return 1
+  prefixe_case composants 'Liste des composants' || return 1
+  prefixe_case donnees 'Sources de données' || return 1
+  prefixe_case contraintes 'Nos contraintes' || return 1
+  prefixe_case risques 'Les risques' || return 1
+}
 case_ CARCH-VALIDE probe_valide
 case_ CARCH-PROPOSEE probe_proposee
 case_ CARCH-RUBRIQUE probe_rubrique
@@ -263,6 +286,8 @@ case_ CARCH-STATUT probe_statut
 case_ CARCH-FENCE-OUVERTE probe_fence_ouverte
 case_ CARCH-MIX probe_mix
 case_ CARCH-DESCRIPTIF probe_descriptif
+case_ CARCH-NIVEAU probe_niveau
+case_ CARCH-PREFIXE probe_prefixe
 
 # === Entrées non fiables : refus en 5 AVANT lecture ==================================================
 probe_lien() {
@@ -412,6 +437,10 @@ mutant CARCH-MUT-8 '"$size" -gt "$CARCH_MAX_OCTETS"' '"$CARCH_MAX_OCTETS"' '9999
   "BRUYANT : borne de taille retirée"
 mutant CARCH-MUT-9 'elif [ "$NMARK" -gt 1 ]' '[ "$NMARK" -gt 1 ]' 'false' probe_statut \
   "INDÉTERMINÉ : lignes d'état multiples rendues selon la première"
+mutant CARCH-MUT-10 'else if (index(lab, "donn") == 1)' '== 1' '> 0' probe_prefixe \
+  "FAIL : rubrique données reconnue n'importe où dans le titre, plus au préfixe seul"
+mutant CARCH-MUT-11 'if (line ~ /^#+[ \t]/) {' '#+' '##?#?' probe_niveau \
+  "FAIL : titres limités aux niveaux 1 à 3, contre l'en-tête « tout niveau »"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]
