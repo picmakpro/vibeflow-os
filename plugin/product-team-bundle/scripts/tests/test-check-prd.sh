@@ -109,7 +109,9 @@ req1() { # <nom> <ligne d'acceptation> : une exigence PRD-01 dont l'acceptation 
   w "$1" "# Exigences\n\n- [ ] **PRD-01**: Exporter la liste\n  %s\n  Priorité : must\n" "$2"
 }
 probe_gabarit() { req1 gabarit.md "Acceptation : [critère mesurable : quoi, combien, en combien de temps]"; run --requirements "$FX/gabarit.md"
-  msg "critère entre crochets attendu rc 1 + exigence nommée"; [ "$RC" -eq 1 ] && has 'ELIMINATOIRE exigence PRD-01'; }
+  msg "critère entre crochets attendu rc 1 + exigence nommée"; { [ "$RC" -eq 1 ] && has 'ELIMINATOIRE exigence PRD-01'; } || return 1
+  req1 gabarit2.md "Acceptation : [décrire ici le critère attendu pour cette exigence]"; run --requirements "$FX/gabarit2.md"
+  msg "consigne libre entre crochets (hors texte des gabarits livrés) attendu rc 1 : seul le filtre du crochet de tête la retient"; [ "$RC" -eq 1 ]; }
 probe_court() { req1 court.md "Acceptation : ok vite"; run --requirements "$FX/court.md"
   msg "critère de moins de 10 caractères non blancs attendu rc 1"; [ "$RC" -eq 1 ]; }
 probe_tbd() { req1 tbd.md "Acceptation : tbd avec le client avant la livraison"; run --requirements "$FX/tbd.md"
@@ -269,10 +271,10 @@ probe_fence_ouverte() {
 probe_case_inconnue() {
   w ci.md "# Exigences\n\n%s\n- [ ] **PRD.02**: $MARK ID pointé\n- [x] **prd-03**: minuscules\n* [ ] **PRD-04**: puce étoile\n" "$A1"
   run --requirements "$FX/ci.md"
-  msg "3 cases non reconnues attendu rc 0 + AVERTISSEMENT lignes 4 à 6 (stdout ET stderr) + non_reconnues=3, contenu jamais réimprimé"
-  [ "$RC" -eq 0 ] || return 1
+  msg "3 cases non reconnues attendu rc 3 (INDETERMINE, jamais un vert) + AVERTISSEMENT lignes 4 à 6 (stdout ET stderr) + non_reconnues=3, contenu jamais réimprimé"
+  [ "$RC" -eq 3 ] && has 'INDETERMINE exigences : case a cocher non reconnue' || return 1
   has 'AVERTISSEMENT ligne 4 :' && has 'AVERTISSEMENT ligne 5 :' && has 'AVERTISSEMENT ligne 6 :' || return 1
-  last | command grep -q 'BILAN exigences=1 .*non_reconnues=3 ' || return 1
+  last | command grep -q 'BILAN exigences=1 .*non_reconnues=3 code=3' || return 1
   printf '%s' "$ERR" | command grep -qF 'AVERTISSEMENT ligne 5 :' || return 1
   ! has "$MARK" && ! printf '%s' "$ERR" | command grep -qF "$MARK"; }
 probe_brief_remplissage() {
@@ -1222,7 +1224,7 @@ cells_field_small() { local v n
   for v in '' ' ;' ' —' ' .'; do for n in "${FNEXTS_SM[@]}"; do
     printf ' Texte — Acceptation :%s%s@@\n' "$v" "$n"; printf ' Texte@@Acceptation :%s%s\n' "$v" "$n"; done; done; }
 probe_champ_suivant() { crit_cells red cs < <(cells_field_small); }
-probe_champ_double() { crit_cells red cd < <(printf " Texte — Acceptation : Acceptation :@@\n Texte — Acceptation : Critère d'acceptation :@@\n Texte@@Acceptation : Acceptation :\n"); }
+probe_champ_double() { crit_cells red cd < <(printf " Texte — Acceptation : Acceptation :@@\n Texte — Acceptation : Critère d'acceptation :@@\n Texte@@Acceptation : Acceptation :\n Texte — Acceptation : Acceptation : [x]@@\n Texte@@Acceptation : Acceptation : [x]\n"); }
 probe_champ_phrase() { crit_cells green cp < <(printf ' Texte — Acceptation : le tarif de priorité : haute reste visible en 2 s@@\n Texte@@Acceptation : le tarif de priorité : haute reste visible en 2 s\n'); }
 probe_ellipse_milieu() { vals_probe $'Le tarif … est affiché' $'l\'export … fonctionne' $'en … secondes'; }
 
@@ -1272,6 +1274,142 @@ if [ "$(id -u)" -ne 0 ]; then
   mutant CPRD-MUT-159 'if [ ! -r "$f" ]; then illisible' '[ ! -r "$f" ]' 'false' probe_illisible_000 "BRUYANT : refus du fichier illisible (droits 000) retiré, la raison exacte se perd"
 else
   skip "CPRD-MUT-159 (exécuté en root : chmod 000 sans effet)"
+fi
+
+# === Correctifs du mandat du 2026-10-29 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-29) ==========
+# Case non reconnue = INDÉTERMINÉ (3), cédant devant 1 et 5 ; séparateurs avant le champ ; libellé répété ; gabarits
+# livrés sans crochets ; puces numérotées en tête. Un mutant par comportement ajouté.
+probe_unk_priorite() {
+  w unk3.md '# Exigences\n\n%s\n* [ ] **PRD-02**: puce étoile\n' "$A1"
+  run --requirements "$FX/unk3.md"
+  msg "une seule case non reconnue (puce *) attendu rc 3 + INDETERMINE, jamais rc 0"
+  { [ "$RC" -eq 3 ] && has 'INDETERMINE exigences : case a cocher non reconnue'; } || return 1
+  w unk1.md "# Exigences\n\n%s\n$NOCRIT\n1. [ ] **PRD-04**: numérotée\n" "$A1"
+  run --requirements "$FX/unk1.md"
+  msg "case non reconnue + exigence sans critère attendu rc 1 (1 l'emporte sur 3)"; [ "$RC" -eq 1 ] || return 1
+  ln -s "$FX/unk3.md" "$FX/unk-lien.md"
+  run --requirements "$FX/unk3.md" --brief "$FX/unk-lien.md"
+  msg "case non reconnue + BRIEF en lien symbolique attendu rc 5 (5 l'emporte sur 3)"; [ "$RC" -eq 5 ] || return 1
+  w unk4.md '# Exigences\n\n%s\n* [ ] **PRD-02**:\n- [ ] **prd-05**: a\n1. [ ] **PRD-04**: b\n' "$A1"
+  run --requirements "$FX/unk4.md"
+  msg "les trois formes du mandat (puce *, ID en minuscules, numérotée) attendu rc 3 + non_reconnues=3"
+  [ "$RC" -eq 3 ] && last | command grep -q 'non_reconnues=3 code=3'; }
+sep_req() { w "$1" '# Exigences\n\n- [ ] **PRD-01**: Afficher le total. Priorité : must%sAcceptation : le total est affiché\n' "$2"; }
+probe_separateurs() {
+  local n=0 sp
+  for sp in ', ' ' — ' ' – ' ' - ' ' (' ','; do
+    n=$((n+1)); sep_req "sep$n.md" "$sp"; run --requirements "$FX/sep$n.md"
+    msg "séparateur [$sp] avant « Acceptation : » attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  done
+  return 0; }
+probe_separateur_virgule() { sep_req sepv.md ', '; run --requirements "$FX/sepv.md"; msg "virgule avant le champ attendu rc 0"; [ "$RC" -eq 0 ]; }
+probe_separateur_paren() { sep_req sepp.md ' ('; run --requirements "$FX/sepp.md"; msg "parenthèse avant le champ attendu rc 0"; [ "$RC" -eq 0 ]; }
+probe_separateur_tiret() { sep_req sept.md ' - '; run --requirements "$FX/sept.md"; msg "tiret entouré d'espaces avant le champ attendu rc 0"; [ "$RC" -eq 0 ]; }
+probe_separateur_cadratin() { sep_req sepc.md ' — '; run --requirements "$FX/sepc.md"; msg "tiret cadratin avant le champ attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  sep_req sepd.md ' – '; run --requirements "$FX/sepd.md"; msg "tiret demi-cadratin avant le champ attendu rc 0"; [ "$RC" -eq 0 ]; }
+probe_separateur_phrase() {
+  w sf1.md '# Exigences\n\n- [ ] **PRD-01**: Il faut, acceptation :\n  Priorité : must\n'
+  run --requirements "$FX/sf1.md"
+  msg "« il faut, acceptation : » au fil d'une phrase, sans valeur, attendu rc 1 (jamais un faux vert)"; [ "$RC" -eq 1 ] || return 1
+  w sf2.md '# Exigences\n\n- [ ] **PRD-01**: Il faut, acceptation : ok vite\n  Priorité : must\n'
+  run --requirements "$FX/sf2.md"
+  msg "« il faut, acceptation : ok vite » (valeur courte) attendu rc 1"; [ "$RC" -eq 1 ]; }
+probe_tiret_colle() {
+  w tc.md '# Exigences\n\n- [ ] **PRD-01**: Afficher le total pré-acceptation : le total est affiché\n  Priorité : must\n'
+  run --requirements "$FX/tc.md"
+  msg "tiret COLLÉ à un mot (pré-acceptation :) attendu rc 1 : mot composé, pas un champ"; [ "$RC" -eq 1 ]; }
+probe_libelle_repete() {
+  req1 lr1.md "Acceptation : Acceptation"; run --requirements "$FX/lr1.md"
+  msg "valeur qui répète le libellé attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  req1 lr2.md "Acceptation : Critère d'acceptation"; run --requirements "$FX/lr2.md"
+  msg "valeur « Critère d'acceptation » attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  req1 lr3.md "Acceptation : Critère d’acceptation"; run --requirements "$FX/lr3.md"
+  msg "valeur « Critère d’acceptation » (apostrophe typographique) attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  req1 lr4.md "Critère d'acceptation : Critère d'acceptation"; run --requirements "$FX/lr4.md"
+  msg "libellé long répété attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  req1 lr5.md "Acceptation : Acceptation du tarif par le client en moins de 5 secondes"; run --requirements "$FX/lr5.md"
+  msg "valeur légitime qui COMMENCE par le mot attendu rc 0"; [ "$RC" -eq 0 ]; }
+probe_libelle_repete_nu() {
+  req1 lr1.md "Acceptation : Acceptation"; run --requirements "$FX/lr1.md"
+  msg "valeur « Acceptation » seule attendu rc 1"; [ "$RC" -eq 1 ]; }
+probe_libelle_repete_long() {
+  req1 lr2.md "Acceptation : Critère d'acceptation"; run --requirements "$FX/lr2.md"
+  msg "valeur « Critère d'acceptation » seule attendu rc 1"; [ "$RC" -eq 1 ]; }
+probe_puces_numerotees() {
+  local v n=0
+  for v in '1. [décrire le problème ici]' '12) <décrire le problème>' $'– [décrire le problème ici]' $'· [décrire le problème ici]' $'2. · – [décrire]'; do
+    n=$((n+1))
+    w "pn$n.md" "# Brief\n\n## Problème\n%s\n\n## Utilisateurs\nFreelances en France.\n\n$BR_VA$BR_CO$BR_HP" "$v"
+    run --brief "$FX/pn$n.md"
+    msg "rubrique ne portant que [$v] attendu rc 1 + problème : vide"
+    { [ "$RC" -eq 1 ] && has 'rubrique BRIEF probleme : vide'; } || return 1
+  done
+  return 0; }
+probe_puce_num_seule() { w pnn.md "# Brief\n\n## Problème\n1. [décrire le problème ici]\n\n## Utilisateurs\nFreelances en France.\n\n$BR_VA$BR_CO$BR_HP"
+  run --brief "$FX/pnn.md"; msg "1. [décrire le problème ici] seul attendu rc 1"; [ "$RC" -eq 1 ] && has 'probleme : vide'; }
+probe_puce_point_median() { w pnm.md "# Brief\n\n## Problème\n"$'\xc2\xb7'" [décrire le problème ici]\n\n## Utilisateurs\nFreelances en France.\n\n$BR_VA$BR_CO$BR_HP"
+  run --brief "$FX/pnm.md"; msg "· [décrire le problème ici] seul attendu rc 1"; [ "$RC" -eq 1 ] && has 'probleme : vide'; }
+
+# Gabarits LIVRÉS, crochets retirés (REQ : on garde la case `[ ]`, sinon plus aucune exigence ; BRIEF : tout).
+TPL_REQ="$HERE/../../../planning-core/references/templates/product/REQUIREMENTS.template.md"
+TPL_BRIEF="$HERE/../../references/BRIEF.template.md"
+probe_tpl_req() {
+  sed 's/\[\([^] ][^]]*\)\]/\1/g' "$TPL_REQ" > "$FX/tpl-req.md"
+  run --requirements "$FX/tpl-req.md"
+  msg "gabarit REQUIREMENTS sans crochets attendu rc 1 + PRD-01 et PRD-02 éliminatoires"
+  [ "$RC" -eq 1 ] && has 'ELIMINATOIRE exigence PRD-01' && has 'ELIMINATOIRE exigence PRD-02'; }
+probe_tpl_req_litteral() {
+  sed 's/\[\([^]]*\)\]/\1/g' "$TPL_REQ" > "$FX/tpl-req2.md"
+  run --requirements "$FX/tpl-req2.md"
+  msg "gabarit REQUIREMENTS, sed littéral du mandat (la case est retirée aussi) attendu rc non nul (jamais 0)"
+  [ "$RC" -ne 0 ]; }
+probe_tpl_brief() {
+  sed 's/\[\([^]]*\)\]/\1/g' "$TPL_BRIEF" > "$FX/tpl-brief.md"
+  run --brief "$FX/tpl-brief.md"
+  msg "gabarit BRIEF sans crochets attendu rc 1 + les cinq rubriques vides"
+  [ "$RC" -eq 1 ] && has 'rubrique BRIEF probleme : vide' && has 'rubrique BRIEF utilisateurs : vide' \
+    && has 'rubrique BRIEF valeur : vide' && has 'rubrique BRIEF contraintes : vide' && has 'rubrique BRIEF hors_perimetre : vide'; }
+probe_tpl_req_brut() {
+  run --requirements "$TPL_REQ"
+  msg "gabarit REQUIREMENTS brut (crochets) attendu rc 1"; [ "$RC" -eq 1 ]; }
+
+case_ CPRD-UNK-PRIORITE probe_unk_priorite
+case_ CPRD-SEPARATEURS probe_separateurs
+case_ CPRD-SEPARATEUR-PHRASE probe_separateur_phrase
+case_ CPRD-TIRET-COLLE probe_tiret_colle
+case_ CPRD-LIBELLE-REPETE probe_libelle_repete
+case_ CPRD-PUCES-NUMEROTEES probe_puces_numerotees
+if [ -f "$TPL_REQ" ] && [ -f "$TPL_BRIEF" ]; then
+  case_ CPRD-GABARIT-SANS-CROCHETS-REQ probe_tpl_req
+  case_ CPRD-GABARIT-SANS-CROCHETS-REQ-LITTERAL probe_tpl_req_litteral
+  case_ CPRD-GABARIT-SANS-CROCHETS-BRIEF probe_tpl_brief
+  case_ CPRD-GABARIT-BRUT-REQ probe_tpl_req_brut
+else
+  skip "CPRD-GABARIT-SANS-CROCHETS (gabarits livrés absents : suite posée à plat dans un lab)"
+fi
+
+mutant CPRD-MUT-160 'if [ "$NUNK" -gt 0 ]; then' '[ "$NUNK" -gt 0 ]' 'false' probe_unk_priorite \
+  "INDÉTERMINÉ : case non reconnue rendue 0 (vert à vide)"
+mutant CPRD-MUT-162 "$WORDN" '[A-Za-z0-9]' '[A-Za-z0-9,]' probe_separateur_virgule "FAIL : la virgule avant le champ est prise pour la fin d'un mot"
+mutant CPRD-MUT-163 "$WORDN" '[A-Za-z0-9]' '[A-Za-z0-9(]' probe_separateur_paren "FAIL : la parenthèse avant le champ est prise pour la fin d'un mot"
+mutant CPRD-MUT-164 "$WORDN" '[A-Za-z0-9]' '[A-Za-z0-9-]' probe_separateur_tiret "FAIL : le tiret entouré d'espaces avant le champ est pris pour la fin d'un mot"
+mutant CPRD-MUT-165 "$WORDN" '|(\314|\315)[\200-\277])' '|(\314|\315)[\200-\277]|\342\200\224)' probe_separateur_cadratin "FAIL : le tiret cadratin avant le champ est pris pour la fin d'un mot"
+mutant CPRD-MUT-166 "$WORDN" '|(\314|\315)[\200-\277])' '|(\314|\315)[\200-\277]|\342\200\223)' probe_separateur_cadratin "FAIL : le tiret demi-cadratin avant le champ est pris pour la fin d'un mot"
+mutant CPRD-MUT-167 'if (nchars(plain(v)) < 10) return 0' '< 10' '< 0' probe_separateur_phrase "FAIL : seuil de longueur retiré, « il faut, acceptation : ok vite » devient un faux vert"
+mutant CPRD-MUT-169 'if (pre ~ /([A-Za-z0-9]|[\200-\377])-$/) return 0' '/([A-Za-z0-9]|[\200-\377])-$/' '/ZZZZZ$/' probe_tiret_colle "FAIL : mot composé terminé par un tiret collé pris pour un champ"
+mutant CPRD-MUT-170 'if (p == "acceptation" || p == "critere d acceptation") return 0' 'p == "acceptation" ||' '0 ||' probe_libelle_repete_nu "FAIL : valeur qui répète « Acceptation » acceptée"
+mutant CPRD-MUT-171 'if (p == "acceptation" || p == "critere d acceptation") return 0' '|| p == "critere d acceptation"' '|| 0' probe_libelle_repete_long "FAIL : valeur « Critère d acceptation » acceptée"
+mutant CPRD-MUT-172 "$LEADN" '|[0-9]+[.)]([ \t]|$)' '' probe_puce_num_seule "FAIL : puce numérotée non retirée en tête"
+mutant CPRD-MUT-173 "$LEADN" '\302[\253\267]' '\302[\253]' probe_puce_point_median "FAIL : point médian · non retiré en tête"
+if [ -f "$TPL_REQ" ] && [ -f "$TPL_BRIEF" ]; then
+  mutant CPRD-MUT-174 'if (tmplword(t)) return 1' 'tmplword(t)' '0' probe_tpl_brief "FAIL BRIEF : texte des gabarits livrés, crochets retirés, accepté comme contenu"
+  mutant CPRD-MUT-175 'if (tmplword(t)) return 1' 'tmplword(t)' '0' probe_tpl_req "FAIL : critère du gabarit livré, crochets retirés, accepté"
+  mutant CPRD-MUT-176 'n = split("quel probleme rencontre-t-on' 'quel probleme rencontre-t-on' 'zzz1' probe_tpl_brief "FAIL BRIEF : consigne Problème du gabarit non reconnue"
+  mutant CPRD-MUT-177 'n = split("quel probleme rencontre-t-on' 'qui utilisera ce produit' 'zzz2' probe_tpl_brief "FAIL BRIEF : consigne Utilisateurs du gabarit non reconnue"
+  mutant CPRD-MUT-178 'n = split("quel probleme rencontre-t-on' 'qu est-ce qui change concretement' 'zzz3' probe_tpl_brief "FAIL BRIEF : consigne Valeur du gabarit non reconnue"
+  mutant CPRD-MUT-179 'n = split("quel probleme rencontre-t-on' 'quelles limites s imposent' 'zzz4' probe_tpl_brief "FAIL BRIEF : consigne Contraintes du gabarit non reconnue"
+  mutant CPRD-MUT-180 'n = split("quel probleme rencontre-t-on' 'qu est-ce qui est volontairement exclu' 'zzz5' probe_tpl_brief "FAIL BRIEF : consigne Hors périmètre du gabarit non reconnue"
+  mutant CPRD-MUT-181 'n = split("quel probleme rencontre-t-on' 'quoi, combien, en combien de temps' 'zzz6' probe_tpl_req "FAIL : consigne du critère du gabarit non reconnue"
 fi
 
 echo "== cellules génératives : $GEN_TOT assertions comptées, $GEN_OK conformes (rouges ou verts attendus obtenus) =="
