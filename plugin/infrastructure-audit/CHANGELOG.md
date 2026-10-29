@@ -1,6 +1,6 @@
 # CHANGELOG — infrastructure-audit
 
-## [v1.3.7] — 2026-10-29 (known-versions.txt à jour) — à publier dans la prochaine release
+## [v1.3.7] — 2026-10-29 (known-versions.txt à jour) — publiée dans v2.72.0
 
 **Patch** (#166, #153 §6.5 ; lot « clôture des issues GitHub ») :
 

@@ -1,6 +1,6 @@
 # Changelog — mobile-test
 
-## v1.0.5 — 2026-10-29 — à publier dans la prochaine release
+## v1.0.5 — 2026-10-29 — publiée dans v2.72.0
 
 ### Modifié
 - **Patch** (#153 §6.10 ; lot « clôture des issues GitHub ») — la couche jugement de `SKILL.md` (« diagnostic sur échec »)
