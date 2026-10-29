@@ -554,7 +554,7 @@ hostile). `git rev-parse --show-toplevel` n'est **pas** une frontière de confia
 chemin dérivé de l'endroit où l'on se trouve, et son repli `|| pwd` retombait littéralement sur le
 CWD qu'on cherche justement à exclure. Retrait arbitré sur le même motif que le vecteur RCE fermé
 dans `plugin/conductor/scripts/dag.sh` (5ᵉ passage du motif de confinement de chemin sur ce dépôt) —
-doctrine : ADR-070 (`docs/ADR.md`), pas recopiée ici. **Conséquence assumée, contournement qui
+doctrine : ADR-070 (`docs/ADR.md`, amendement du 2026-10-29), pas recopiée ici. **Conséquence assumée, contournement qui
 reste** : un lab qui vendorise le moteur à sa propre racine (`<repo>/gsd-core/...`) perd la
 résolution automatique de ce candidat — poser `GSD_TOOLS=<chemin absolu>` en variable
 d'environnement (désormais vérifiée en tête de cascade, avant même `CLAUDE_CONFIG_DIR`).

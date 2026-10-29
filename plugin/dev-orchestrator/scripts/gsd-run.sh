@@ -28,7 +28,7 @@
 #   Un 64 propagé par l'outil lui-même est indiscernable de celui-ci : l'appelant qui doit les
 #   distinguer relit l'état écrit (cf. vf-dev-manager.md, reset des flags), jamais `$?` seul.
 #
-# Disposition de sécurité (ADR-070 règle 2, `docs/ADR.md` ; vecteur frère : résolution CWD de
+# Disposition de sécurité (ADR-070 règle 2, amendement du 2026-10-29, `docs/ADR.md` ; vecteur frère : résolution CWD de
 # `dag.sh`, retirée). Chaque disposition cite le vecteur qu'elle accepte, jamais le risque en bloc :
 #   - ACCEPTÉ pour `./.claude/gsd-core` (raison : même frontière de confiance que
 #     `./.claude/scripts`, que le manager exécute déjà via `$S` ; sans ce candidat, un lab en scope
