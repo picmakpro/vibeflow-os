@@ -1572,7 +1572,7 @@ vf_place_tree() {
   fi
 
   # #166 : détection au grain fichier AVANT le cp -r qui écrase (même énumération source).
-  if [ -n "$VF_MANIFEST_MOD" ]; then
+  if [ -n "$VF_LP_MOD" ]; then
     local lpf
     while IFS= read -r lpf; do
       [ -n "$lpf" ] || continue
@@ -3314,6 +3314,10 @@ backup_module() {
     # acceptable, ne pas le dire ne l'est pas).
     log "  ⚠ fragment hooks non restaurable pour $mod : .vibeflow-fragments/$mod.json absent (lab installé avant la persistance par-module) — le rollback des hooks sera un no-op pour ce backup ; réinstaller régénère le fragment"
   fi
+  # #166 : les empreintes de pose décrivent le lab TEL QU'IL EST avant l'écrasement — le rollback les
+  # restaure avec les fichiers (la preuve de réversibilité de verify-runtime-reversibility.sh compare des
+  # ensembles de fichiers : un fichier d'empreintes présent avant, absent après, la rougit).
+  [ -f "$(vf_sha_path "$mod")" ] && cp -p "$(vf_sha_path "$mod")" "$bdir/.vibeflow-sha256"
   vf_declare_write + "$bdir"
   log "  backup → $bdir"
 }
@@ -3458,7 +3462,13 @@ rollback_module() {
     log "  ⚠ version restaurée inconnue — registre inchangé, vérifier manuellement"
   fi
 
-  rm -f "$(vf_sha_path "$mod")"   # #166 : le lab ne correspond plus aux empreintes enregistrées
+  # #166 : empreintes de pose restaurées avec le backup (même instant que les fichiers) ; un backup sans
+  # empreintes (lab posé avant #166) retire celles que la version annulée avait écrites.
+  if [ -f "$latest/.vibeflow-sha256" ] && cp -p "$latest/.vibeflow-sha256" "$(vf_sha_path "$mod").tmp.$$" 2>/dev/null; then
+    mv -f "$(vf_sha_path "$mod").tmp.$$" "$(vf_sha_path "$mod")"
+  else
+    rm -f "$(vf_sha_path "$mod")"
+  fi
   trap - ERR
   [ "$rollback_had_errtrace" -eq 1 ] || set +E
   log "✓ $mod rollback OK"

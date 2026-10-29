@@ -34,6 +34,7 @@
 #   O  F6 — règle d'ignorance du fichier d'empreintes : project et local oui, user et --target non.
 #   P  F7 — hachage par lots : le nombre d'appels ne dépend pas du nombre de fichiers.
 #   I4/I5  F5a — repli sur l'ancien cache sous --target (référence réécrite).
+#   R  réversibilité — install, update, rollback : le fichier d'empreintes revient (verify-runtime-reversibility).
 #
 # Convention : ok()/ko(), exit 0 si tout passe, 1 au moins un KO (calqué sur test-manifest.sh).
 
@@ -657,6 +658,35 @@ if "$GREP" -qF '[local-patches] 1 fichier(s)' "$T/err"; then
   ok "I5 : sous --target, repli sur l'ancien cache — une vraie modification locale est détectée"
 else
   ko "I5 : modification locale non détectée sous --target au repli"
+fi
+
+# ---------------------------------------------------------------------------
+# R — réversibilité (verify-runtime-reversibility.sh compare des ENSEMBLES de fichiers) : un install puis un
+#      rollback restituent le fichier d'empreintes d'avant ; un lab sans empreintes en reste sans.
+# ---------------------------------------------------------------------------
+LAB="$(newlab labR)"
+SHAR="$LAB/.claude/scripts/.vibeflow-sha256-fixmod"
+cp "$SHAR" "$T/r-sha.before"; (cd "$LAB/.claude" && find . -type f -not -path './.backups/*' | LC_ALL=C sort) > "$T/r-set.before"
+sleep 1   # le dossier de sauvegarde est horodaté à la seconde
+eng "$LAB" "$T/cache/v2" update fixmod
+eng "$LAB" "$T/cache/v2" rollback fixmod; R_RC=$?
+(cd "$LAB/.claude" && find . -type f -not -path './.backups/*' | LC_ALL=C sort) > "$T/r-set.after"
+if [ "$R_RC" -eq 0 ] && [ -f "$SHAR" ] && cmp -s "$SHAR" "$T/r-sha.before" && [ -z "$(comm -3 "$T/r-set.before" "$T/r-set.after")" ]; then
+  ok "R1 : install v1, update v2, rollback — fichier d'empreintes restitué à l'identique, même ensemble de fichiers (comm -3 vide)"
+else
+  ko "R1 : rollback rc=$R_RC — empreintes $([ -f "$SHAR" ] && echo présentes || echo ABSENTES), différence d'ensembles : $(comm -3 "$T/r-set.before" "$T/r-set.after" | tr '\n' ' ')"
+fi
+LAB="$(newlab labR2)"
+rm -f "$LAB/.claude/scripts/.vibeflow-sha256-fixmod"        # lab posé avant #166
+(cd "$LAB/.claude" && find . -type f -not -path './.backups/*' | LC_ALL=C sort) > "$T/r2-set.before"
+sleep 1
+eng "$LAB" "$T/cache/v2" update fixmod
+eng "$LAB" "$T/cache/v2" rollback fixmod
+(cd "$LAB/.claude" && find . -type f -not -path './.backups/*' | LC_ALL=C sort) > "$T/r2-set.after"
+if [ -z "$(comm -3 "$T/r2-set.before" "$T/r2-set.after")" ]; then
+  ok "R2 : lab sans empreintes avant — le rollback retire celles de la version annulée (ensemble identique)"
+else
+  ko "R2 : différence d'ensembles après rollback : $(comm -3 "$T/r2-set.before" "$T/r2-set.after" | tr '\n' ' ')"
 fi
 
 echo
