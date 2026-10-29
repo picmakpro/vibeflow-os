@@ -497,6 +497,118 @@ lab_run "$L18" VIBEFLOW_CACHE="$CP" VF_SCOPE=project -- uninstall --all >/dev/nu
 [ ! -e "$PIEGE" ] || { ko "VUD-CACHE-SEUL : le piege a ete execute par role solo, update --all ou uninstall --all"; miss=1; }
 [ "$miss" -eq 0 ] && ok "VUD-CACHE-SEUL (T-61-16, P61-D-03) : script absent du cache = « NON VERIFIABLE » nomme, aucun repli, le piege pose dans le lab n'est jamais execute"
 
+# ---------------------------------------------------------------------------
+# Mutants (QUAL-01) — copie de _internal, l'original n'est jamais touche
+# ---------------------------------------------------------------------------
+MUT="$WORK/mut"; mkdir -p "$MUT"; cp -R "$INTERNAL_DIR" "$MUT/_internal"; rm -rf "$MUT/_internal/tests"
+mutate() { # <n> → ecrit le mutant et rend son chemin ; 1 = identique a l'original, 2 = invalide
+  local out="$MUT/_internal/vibeflow-update.sh"
+  awk -v MODE="$1" '
+    MODE == "1" && $0 == "  divergence_hook_apply \"$poste\"" { print "  :"; next }
+    MODE == "2" && $0 == "    product|dev) : ;;" { print "    product|dev|solo) : ;;"; next }
+    MODE == "3" && $0 == "    solo) divergence_hook_disarm; return 0 ;;" { print "    solo) return 0 ;;"; next }
+    MODE == "4" && $0 == "      divergence_hook_disarm_scoped" { print "      :"; next }
+    MODE == "5" && index($0, "divergence_off() {") == 1 { print "divergence_off() { false; }"; next }
+    MODE == "6" && $0 == "      divergence_hook_refresh_scoped" { print "      :"; next }
+    MODE == "7" && $0 == "find_divergence_hook() {" { inf = 1 }
+    MODE == "7" && inf && $0 == "  [ -f \"$c\" ] && { echo \"$c\"; return 0; }" { print; print "  c=\"$TARGET_ROOT/scripts/vf-divergence-hook.sh\"; [ -f \"$c\" ] && { echo \"$c\"; return 0; }"; inf = 0; next }
+    MODE == "8" && index($0, "    1) log \"[divergence] ARMEMENT REFUSE (code 1)") == 1 { print "    1) : ;;"; next }
+    MODE == "9" && $0 == "divergence_hook_apply() {" { ina = 1 }
+    MODE == "9" && ina && $0 == "  if vf_dry_run; then" { print "  if false; then"; ina = 0; next }
+    MODE == "10" && index($0, "*) err \"VF_DIVERGENCE_HOOK invalide") > 0 { sub(/\*\) err .*$/, "*) : ;;"); print; next }
+    { print }' "$INTERNAL_DIR/vibeflow-update.sh" > "$out"
+  cmp -s "$out" "$INTERNAL_DIR/vibeflow-update.sh" && return 1
+  bash -n "$out" || return 2
+  echo "$out"
+}
+
+# Sondes : chacune rend un jeton court, compare entre l'original (attendu) et le mutant (obtenu).
+probe_trace() { # 1 : le poste dev arme-t-il ?
+  mk_lab; ENG="$1"
+  lab_run "$LAB" VF_ROLE=dev VF_SCOPE=project -- install validator
+  printf 'ours=%s' "$(ours_count "$LAB")"
+}
+probe_solo() { # 2 : sans poste, role solo, install solo : rien n'est arme
+  mk_lab; ENG="$1"
+  lab_run "$LAB" VF_SCOPE=project -- install validator
+  lab_run "$LAB" VF_SCOPE=project -- role solo
+  lab_run "$LAB" VF_ROLE=solo VF_SCOPE=project -- install validator
+  printf 'ours=%s' "$(ours_count "$LAB")"
+}
+probe_role_solo() { # 3 : role solo retire-t-il le filet ?
+  mk_lab; ENG="$1"
+  lab_run "$LAB" VF_ROLE=dev VF_SCOPE=project -- install validator
+  lab_run "$LAB" VF_SCOPE=project -- role solo
+  printf 'ours=%s' "$(ours_count "$LAB")"
+}
+probe_uninstall() { # 4 : uninstall --all retire-t-il le filet ?
+  mk_lab; ENG="$1"
+  lab_run "$LAB" VF_ROLE=dev VF_SCOPE=project -- install validator
+  lab_run "$LAB" VF_SCOPE=project -- uninstall --all
+  printf 'ours=%s' "$(ours_count "$LAB")"
+}
+probe_optout() { # 5 : off arme-t-il quand meme ?
+  mk_lab; ENG="$1"
+  lab_run "$LAB" VF_ROLE=dev VF_SCOPE=project VF_DIVERGENCE_HOOK=off -- install validator
+  printf 'ours=%s' "$(ours_count "$LAB")"
+}
+probe_refresh() { # 6 : update --all re-pointe-t-il les hooks vers le nouveau cache ?
+  local pa pb
+  pa="$WORK/pcache-a"; pb="$WORK/pcache-b"; rm -rf "$pa" "$pb"; mk_cache "$pa"; mk_cache "$pb"
+  mk_lab; ENG="$1"
+  lab_run "$LAB" VIBEFLOW_CACHE="$pa" VF_ROLE=dev VF_SCOPE=project -- install validator
+  lab_run "$LAB" VIBEFLOW_CACHE="$pb" VF_SCOPE=project -- update --all
+  printf 'a=%s b=%s' "$(files_with "$LAB" "$pa/")" "$(files_with "$LAB" "$pb/")"
+}
+probe_cache_seul() { # 7 : un script du lab est-il execute quand le cache n'en a pas ?
+  rm -f "$PIEGE"; mk_lab; ENG="$1"
+  mkdir -p "$LAB/.claude/scripts"
+  printf '#!/bin/sh\n: > "%s"\nexit 0\n' "$PIEGE" > "$LAB/.claude/scripts/vf-divergence-hook.sh"; chmod +x "$LAB/.claude/scripts/vf-divergence-hook.sh"
+  lab_run "$LAB" VIBEFLOW_CACHE="$CP" VF_ROLE=dev VF_SCOPE=project -- install validator
+  if [ -e "$PIEGE" ]; then printf 'piege=oui'; else printf 'piege=non'; fi
+  rm -f "$PIEGE"
+}
+probe_tiers() { # 8 : le refus d'armement est-il relaye ?
+  mk_lab; ENG="$1"
+  mkdir -p "$LAB/.git/hooks"; printf '#!/bin/sh\necho hook-tiers\n' > "$LAB/.git/hooks/post-merge"; chmod +x "$LAB/.git/hooks/post-merge"
+  lab_run "$LAB" VF_ROLE=dev VF_SCOPE=project -- install validator
+  if "$GREP" -qF 'ARMEMENT REFUSE (code 1)' "$WORK/err"; then printf 'refuse=oui'; else printf 'refuse=non'; fi
+}
+probe_dry() { # 9 : --dry-run arme-t-il pour de vrai ?
+  mk_lab; ENG="$1"
+  lab_run "$LAB" VF_ROLE=dev VF_SCOPE=project -- --dry-run install validator
+  printf 'hooks=%s plan=%s' "$(ours_count "$LAB")" "$(count_in "$WORK/out" "(filet de divergence")"
+}
+probe_inv() { # 10 : une valeur invalide est-elle refusee ?
+  mk_lab; ENG="$1"
+  lab_run "$LAB" VF_ROLE=dev VF_SCOPE=project VF_DIVERGENCE_HOOK=zzSECRETzz -- install validator; local rc=$?
+  printf 'rc=%s hooks=%s' "$rc" "$(ours_count "$LAB")"
+}
+
+kill_mutant() { # <n> <sonde> <attendu sur l'original> <libelle>
+  local n="$1" probe="$2" want="$3" label="$4" m orig got mrc
+  m="$(mutate "$n")"; mrc=$?
+  if [ "$mrc" -ne 0 ] || [ -z "$m" ]; then ko "VUD-MUT-$n : mutant non produit ou invalide (rc=$mrc) — $label"; return; fi
+  orig="$("$probe" "$INSTALLER")"
+  got="$("$probe" "$m")"
+  if [ "$orig" = "$want" ] && [ "$got" != "$orig" ]; then
+    ok "VUD-MUT-$n mutant tué : $label — attendu « $orig », obtenu « $got »"
+  else
+    ko "VUD-MUT-$n : mutant survivant ou témoin rouge — $label — original « $orig » (voulu « $want »), mutant « $got »"
+  fi
+}
+kill_mutant 1 probe_trace 'ours=2' "appel de divergence_hook_apply retire de role_apply"
+kill_mutant 2 probe_solo 'ours=0' "armement etendu au poste solo"
+kill_mutant 3 probe_role_solo 'ours=0' "retrait au poste solo neutralise"
+kill_mutant 4 probe_uninstall 'ours=0' "retrait de uninstall --all neutralise"
+kill_mutant 5 probe_optout 'ours=0' "sortie off ignoree"
+kill_mutant 6 probe_refresh 'a=0 b=2' "rafraichissement de update --all neutralise"
+kill_mutant 7 probe_cache_seul 'piege=non' "repli de find_divergence_hook sur le dossier de la cible"
+kill_mutant 8 probe_tiers 'refuse=oui' "refus d'armement (code 1) non relaye"
+kill_mutant 9 probe_dry 'hooks=0 plan=2' "--dry-run qui arme pour de vrai"
+kill_mutant 10 probe_inv 'rc=1 hooks=0' "valeur invalide de VF_DIVERGENCE_HOOK acceptee"
+ENG="$INSTALLER"
+
 echo ""
 echo "Bilan : $pass OK, $fail KO — durée ${SECONDS}s"
 [ "$fail" -eq 0 ]
