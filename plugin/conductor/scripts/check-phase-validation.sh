@@ -28,7 +28,9 @@
 # Marqueur (P60-PL-01) : dans la section de la phase, une ligne `**Validation:** <valeur>` (variante
 # `**Validation**:` tolérée). Jeton = premier mot en minuscules : `proposed` -> proposée ; `validated` -> validée,
 # suffixe `(<poste>, <AAAA-MM-JJ>[, override])` toléré ; tout autre jeton -> INDÉTERMINÉ. Plusieurs lignes de
-# marqueur -> INDÉTERMINÉ. Aucune ligne : phase VALIDÉE (P60-D-02, état de toutes les phases existantes).
+# marqueur -> INDÉTERMINÉ. Une ligne qui RESSEMBLE à un marqueur sans en avoir la forme (puce, citation, libellé sans gras ou en
+# minuscules, espace avant le deux-points, valeur `propos…` ou `valid…`) est un marqueur illisible : INDÉTERMINÉ, jamais « absent ».
+# Aucune ligne : phase VALIDÉE (P60-D-02, état de toutes les phases existantes).
 # Section : titre `#{2,4} Phase <id>`, tag entre parenthèses toléré, deux-points EXIGÉ (`## Phase 41 — note` n'en
 # est pas une), qui se ferme au titre suivant de niveau inférieur ou égal ; blocs de code et commentaires HTML
 # ignorés ; deux sections pour le même identifiant -> INDÉTERMINÉ. Les blocs `<details>` exacts (jalons livrés)
@@ -45,10 +47,12 @@
 # Codes de sortie (chacun énuméré, aucun implicite) :
 #   0 = validée : marqueur `validated`, ou marqueur absent.
 #   1 = proposée : marqueur `proposed`. Ni plan ni exécution de cette phase.
-#   3 = INDÉTERMINÉ (marqueur non constatable ; les consommateurs ne s'y arrêtent PAS, le marqueur absent valant
-#       validée, P60-D-02 — SAUF si la ligne BILAN porte `marqueur=inconnu` ou `marqueur=multiple` : un marqueur
-#       existe et n'est pas lisible, les consommateurs s'arrêtent comme au code 5, P60-D-04 + P60-H-04) : ROADMAP absent, phase introuvable, sections ou marqueurs multiples, valeur inconnue, bloc
-#       de code ou commentaire non fermé, lab partitionné sans --ws, compartiment absent. Jamais un vert à vide.
+#   3 = INDÉTERMINÉ (marqueur non constatable : ROADMAP absent, phase introuvable, sections ou marqueurs multiples,
+#       valeur inconnue ou ligne qui ressemble à un marqueur sans en avoir la forme, bloc de code ou commentaire non
+#       fermé, lab partitionné sans --ws, compartiment absent). Jamais un vert à vide. Conduite des consommateurs
+#       (vf-coder, vf-auto ; P60-D-15, arbitrage Samuel, AskUserQuestion session principale, 2026-10-29) : SEUL le cas
+#       « phase introuvable » laisse continuer, et la ligne BILAN le dit par `marqueur=introuvable` (la phase n'est pas
+#       au ROADMAP, sans autre défaut) ; tout autre code 3, le code 64 et le code 5 ARRÊTENT.
 #   5 = entrée illisible, BRUYANTE : lien symbolique, non régulier (FIFO, dossier), illisible, taille non
 #       numérique, au-delà de 1048576 octets, analyse en échec. Refus AVANT lecture.
 #   64 = erreur d'usage (phase absente ou mal formée, nom de compartiment refusé, option inconnue ou sans valeur).
@@ -58,7 +62,7 @@
 # Sortie : lignes préfixées `[check-phase-validation]` puis une étiquette ASCII fixe :
 #   PHASE <N> validee (marqueur absent)     PHASE <N> validee     PHASE <N> proposee
 #   INDETERMINE <raison>     ILLISIBLE <entree> : <raison> (aussi sur stderr)
-#   BILAN phase=<N> marqueur=<absent|proposed|validated|inconnu|multiple|-> code=<rc>
+#   BILAN phase=<N> marqueur=<absent|proposed|validated|inconnu|multiple|introuvable|-> code=<rc>
 set -uo pipefail
 export LC_ALL=C
 
@@ -264,6 +268,29 @@ function flush_pending(   k) {
   pend = 0; pq_n = 0
 }
 BEGIN { wk[1] = idkey(want, 0); wk[2] = idkey(want, 1) }
+# Ligne qui RESSEMBLE à un marqueur sans en avoir la forme exacte (Phase 60, correction de revue, P60-H-04) : puce, citation,
+# libellé sans gras, en italique, en minuscules, espace avant le deux-points, suivi d'une valeur qui commence par
+# `propos` ou `valid`. Lue « absent », elle ferait passer une phase proposée (fail-open) ; elle est donc un marqueur
+# ILLISIBLE (arrêt des consommateurs), jamais une validation. N'est appelée que si la forme exacte n'a pas reconnu la ligne.
+function loosemark(s,   t, w) {
+  t = s
+  while (1) {
+    sub(/^[ \t]+/, "", t)
+    if (substr(t, 1, 1) == ">") { t = substr(t, 2); continue }
+    if (match(t, /^([-*+]|[0-9]+[.)])[ \t]+/)) { t = substr(t, RLENGTH + 1); continue }
+    if (match(t, /^\[[ xX]\][ \t]+/)) { t = substr(t, RLENGTH + 1); continue }
+    break
+  }
+  sub(/^[*_]+/, "", t)
+  if (tolower(substr(t, 1, 10)) != "validation") return 0
+  t = substr(t, 11)
+  sub(/^[*_]*[ \t]*/, "", t)
+  if (substr(t, 1, 1) != ":") return 0
+  t = substr(t, 2)
+  sub(/^[ \t*_`"']+/, "", t)
+  w = tolower(substr(t, 1, 5))
+  return (w == "propo" || w == "valid")
+}
 # Une ligne, déjà débarrassée des blocs <details> : sections, marqueurs, blocs de code, commentaires. Deux lectures de la
 # cible en parallèle : (1) exacte, (2) tolérante au préfixe projet ; (2) ne sert que si (1) ne trouve aucune section.
 function proc(line, nr,   t, lvl, id, p, v, tok, rest, c) {
@@ -287,6 +314,8 @@ function proc(line, nr,   t, lvl, id, p, v, tok, rest, c) {
     else if (tok == "validated" && (rest == "" || substr(rest, 1, 1) == "(")) c = "validated"
     else c = "inconnu"
     for (p = 1; p <= 2; p++) if (insec[p]) { nmark[p]++; if (nmark[p] == 1) cls[p] = c }
+  } else if (loosemark(line)) {
+    for (p = 1; p <= 2; p++) if (insec[p]) { nmark[p]++; if (nmark[p] == 1) cls[p] = "inconnu" }
   }
 }
 {
@@ -370,7 +399,11 @@ if [ "$WORST" -eq 0 ]; then
     NSEC=$2; NMARK=$3; CLS=$4; NFENCE=$5; NCOM=$6
     if [ "$NFENCE" -ne 0 ]; then indetermine "bloc de code non ferme"; fi
     if [ "$NCOM" -ne 0 ]; then indetermine "commentaire HTML non ferme"; fi
-    if [ "$NSEC" -eq 0 ]; then indetermine "phase introuvable"
+    if [ "$NSEC" -eq 0 ]; then
+      # Seul constat « sans autre défaut » : la phase n'est pas au ROADMAP (P60-D-15). Avec un bloc ou un commentaire
+      # non fermé, la phase a pu être avalée : le BILAN ne dit alors pas `introuvable`, les consommateurs s'arrêtent.
+      if [ "$WORST" -eq 0 ]; then MARK=introuvable; fi
+      indetermine "phase introuvable"
     elif [ "$NSEC" -gt 1 ]; then indetermine "sections multiples"
     elif [ "$NMARK" -eq 0 ]; then
       MARK=absent; if [ "$WORST" -eq 0 ]; then say "PHASE $PHASE validee (marqueur absent)"; fi

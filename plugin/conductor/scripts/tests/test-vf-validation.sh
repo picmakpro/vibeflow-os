@@ -202,6 +202,22 @@ probe_inconnu() {
   msg "validate sur valeur inconnue attendu rc 3"; [ "$RC" -eq 3 ] || return 1
   LASTMSG="le ROADMAP a changé"; [ "$(sum "$(RMF)")" = "$a" ]
 }
+probe_ressemblant() {
+  # P60-H-04 : une ligne qui ressemble à un marqueur sans en avoir la forme (puce, citation, minuscules…) n'est ni
+  # « absent » ni écrasée : l'écrivain la lit comme un marqueur illisible (rc 3) et ne touche pas au fichier.
+  local m n=0 a
+  for m in '- **Validation:** proposed' '> **Validation:** proposed' 'Validation: proposed' '**validation:** proposed'; do
+    n=$((n+1)); mklab "re$n" "$RM3" "$m"$'\n'; a="$(sum "$(RMF)")"
+    run propose --phase 2
+    msg "propose sur la ligne « $m » attendu rc 3 (marqueur illisible), jamais une ligne ajoutée à côté"; [ "$RC" -eq 3 ] || return 1
+    T_ROLE=dev run validate --phase 2; T_ROLE=""
+    msg "validate sur la ligne « $m » attendu rc 3, jamais rc 0 « absent »"; [ "$RC" -eq 3 ] || return 1
+    LASTMSG="le ROADMAP a changé"; [ "$(sum "$(RMF)")" = "$a" ] || return 1
+  done
+  mklab "re-t" "$RM3" $'Validation: les tests passent\n'
+  T_ROLE=dev run validate --phase 2; T_ROLE=""
+  msg "ligne ordinaire sur la validation des tests : validate attendu rc 0 (marqueur absent), pas de sur-détection"; [ "$RC" -eq 0 ]
+}
 probe_multi() {
   mklab mu "$RM3" $'**Validation:** proposed\n**Validation:** proposed\n'; local a; a="$(sum "$(RMF)")"
   T_ROLE=dev run validate --phase 2; T_ROLE=""
@@ -224,6 +240,7 @@ case_ VFV-IDEMPOTENT probe_idempotent
 case_ VFV-ABSENT-VALIDATE probe_absent_validate
 case_ VFV-INCONNU probe_inconnu
 case_ VFV-MULTI probe_multi
+case_ VFV-RESSEMBLANT probe_ressemblant
 case_ VFV-SANS-GOAL probe_sans_goal
 
 # === Goal multi-ligne, octets, fins de ligne, mode ======================================================
@@ -498,6 +515,20 @@ probe_arch_borne() {
   T_ROLE=dev run validate --architecture sub/../sub/absent.md; T_ROLE=""
   msg "fichier absent dans la racine attendu rc 3"; [ "$RC" -eq 3 ]
 }
+probe_arch_cwd() {
+  # P60-H : la racine de --architecture est le RÉPERTOIRE COURANT, pas la racine du dépôt git : un fichier du dépôt mais hors du
+  # répertoire courant est refusé (rc 5), jamais écrit.
+  command -v git >/dev/null 2>&1 || { LASTMSG="git absent"; return 0; }
+  RUNDIR="$FX/ac"; rm -rf "$RUNDIR"; mkdir -p "$RUNDIR/lab"
+  ( cd "$RUNDIR" && git init -q . ) >/dev/null 2>&1 || { LASTMSG="git init impossible"; return 1; }
+  printf '%s' "$ARCH_OK" > "$RUNDIR/A.md"; printf '%s' "$ARCH_OK" > "$RUNDIR/lab/A.md"
+  local a; a="$(sum "$RUNDIR/A.md")"; local root="$RUNDIR"; RUNDIR="$root/lab"
+  T_ROLE=dev run validate --architecture ../A.md; T_ROLE=""
+  msg "--architecture ../A.md (dans le dépôt git, hors du répertoire courant) attendu rc 5 + hors de la racine"; { [ "$RC" -eq 5 ] && has 'hors de la racine'; } || return 1
+  LASTMSG="le fichier du dépôt, hors du répertoire courant, a été écrit"; [ "$(sum "$root/A.md")" = "$a" ] || return 1
+  T_ROLE=dev run validate --architecture A.md; T_ROLE=""
+  msg "témoin positif : --architecture A.md (dans le répertoire courant) attendu rc 0"; [ "$RC" -eq 0 ]
+}
 probe_planning_lien() {
   mklab pl "$RM3" ""; mv "$RUNDIR/.planning" "$RUNDIR/vrai-planning"; ln -s vrai-planning "$RUNDIR/.planning"
   local a; a="$(sum "$RUNDIR/vrai-planning/ROADMAP.md")"
@@ -515,6 +546,7 @@ case_ VFV-DETAILS probe_details_w
 case_ VFV-DETAILS-ACTIF probe_details_actif_w
 case_ VFV-FENCE-COMMONMARK probe_fence_w
 case_ VFV-ARCHI-BORNE probe_arch_borne
+case_ VFV-ARCHI-CWD probe_arch_cwd
 case_ VFV-PLANNING-LIEN probe_planning_lien
 
 # === Aucun écho du contenu, formes d'appel ===================================================================
@@ -760,6 +792,14 @@ mutant VFV-MUT-23 'if (!inq && active_block(rl, w, b)) {' 'active_block(rl, w, b
   "le jalon actif en <details> est caché comme un jalon livré"
 mutant VFV-MUT-24 'if (!inq && active_block(rl, w, b)) {' 'active_block(rl, w, b)' '1' probe_details_actif_w \
   "tout bloc <details> devient visible, le jalon livré aussi"
+
+mutant VFV-MUT-25 '  if (isc || loosemark(line)) {' 'loosemark(line)' '0' probe_ressemblant \
+  "une ligne qui ressemble à un marqueur est lue « absent » par l'écrivain (une ligne canonique est insérée à côté)"
+mutant VFV-MUT-26 'return (w == "propo" || w == "valid")' 'w == "propo" || w == "valid"' '1' probe_ressemblant \
+  "toute ligne « Validation: … » est un marqueur illisible (sur-détection)"
+
+mutant VFV-MUT-27 'ROOTP=$(pwd -P' 'pwd -P' 'git rev-parse --show-toplevel' probe_arch_cwd \
+  "la racine de --architecture devient la racine du dépôt git au lieu du répertoire courant"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]

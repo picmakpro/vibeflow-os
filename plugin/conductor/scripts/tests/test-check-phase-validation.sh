@@ -13,7 +13,8 @@
 # Cas CPV-DETAILS-ACTIF (jalon actif lu, jalon livré ou neutre caché), CPV-BILAN-ILLISIBLE (champ BILAN lu par les consommateurs).
 # Cas CPV-IDS, CPV-PREFIXE, CPV-ID-USAGE, CPV-DETAILS, CPV-FENCE-COMMONMARK, CPV-MARQUEUR-FORMES, CPV-CR-ISOLE, CPV-GSD-IDS (grammaire de --phase
 # de gsd-core, jalons livrés <details>, barrières CommonMark, survivants MK et MI de la revue).
-# Mutants CPV-MUT-1..46 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide (bash -n),
+# Cas CPV-MARQUEUR-RESSEMBLANT (ligne qui ressemble à un marqueur : illisible, jamais « absent »).
+# Mutants CPV-MUT-1..55 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide (bash -n),
 # rouge pour la raison attendue (code attendu/obtenu imprimé), original revérifié vert.
 # Les cas CPV-GSD-* (preuve que le marqueur ne change rien pour le moteur GSD) s'ajoutent en 60-03.
 set -uo pipefail
@@ -349,8 +350,27 @@ probe_bilan_illisible() {
   { [ "$RC" -eq 3 ] && last | command grep -q 'BILAN phase=2 marqueur=multiple code=3$'; } || return 1
   mklab bi3 "$RM3" ""
   run --phase 9
-  msg "phase introuvable : rc 3 et BILAN marqueur=- (les consommateurs continuent)"
-  { [ "$RC" -eq 3 ] && last | command grep -q 'BILAN phase=9 marqueur=- code=3$'; } || return 1
+  msg "phase introuvable seule : rc 3 et BILAN marqueur=introuvable (SEUL cas indéterminé où les consommateurs continuent, P60-D-15)"
+  { [ "$RC" -eq 3 ] && last | command grep -q 'BILAN phase=9 marqueur=introuvable code=3$'; } || return 1
+  # tout autre indéterminé ne porte PAS marqueur=introuvable : les consommateurs s'arrêtent
+  mklab bi4 '# Roadmap\n\n### Phase 2: Deux\n**Goal:** g\n### Phase 2: Doublon\n'; run --phase 2
+  msg "sections multiples : rc 3 et BILAN sans marqueur=introuvable"
+  { [ "$RC" -eq 3 ] && ! last | command grep -q 'marqueur=introuvable'; } || return 1
+  mklab bi5 '# Roadmap\n\n```\n### Phase 2: Deux\n**Validation:** proposed\n'; run --phase 2
+  msg "bloc de code non fermé qui avale la phase : rc 3 et BILAN sans marqueur=introuvable"
+  { [ "$RC" -eq 3 ] && ! last | command grep -q 'marqueur=introuvable'; } || return 1
+  mklab bi6 '# Roadmap\n\n<!-- jamais fermé\n### Phase 2: Deux\n**Validation:** proposed\n'; run --phase 2
+  msg "commentaire non fermé qui avale la phase : rc 3 et BILAN sans marqueur=introuvable"
+  { [ "$RC" -eq 3 ] && ! last | command grep -q 'marqueur=introuvable'; } || return 1
+  RUNDIR="$FX/bi7"; mkdir -p "$RUNDIR/.planning"; reg bi7; reg bi7/.planning; run --phase 2
+  msg "ROADMAP absent : rc 3 et BILAN sans marqueur=introuvable"
+  { [ "$RC" -eq 3 ] && ! last | command grep -q 'marqueur=introuvable'; } || return 1
+  RUNDIR="$FX/bi8"; mkdir -p "$RUNDIR/.planning/workstreams/w1"; printf -- "$RM3" "" > "$RUNDIR/.planning/workstreams/w1/ROADMAP.md"
+  reg bi8; reg bi8/.planning; reg bi8/.planning/workstreams; reg bi8/.planning/workstreams/w1; reg bi8/.planning/workstreams/w1/ROADMAP.md; run --phase 2
+  { has 'lab partitionne sans --ws'; } || { msg "témoin de la fixture : la cause attendue est « lab partitionne sans --ws »"; return 1; }
+  msg "lab partitionné sans --ws : rc 3 et BILAN sans marqueur=introuvable"
+  { [ "$RC" -eq 3 ] && ! last | command grep -q 'marqueur=introuvable'; } || return 1
+  RUNDIR="$FX/bi3"
   run --phase 2
   msg "marqueur absent : rc 0 et BILAN marqueur=absent (les consommateurs continuent)"
   { [ "$RC" -eq 0 ] && last | command grep -q 'BILAN phase=2 marqueur=absent code=0$'; }
@@ -383,6 +403,35 @@ probe_marqueur_formes() {
   msg "**Validation** : proposed (espace avant les deux-points, hors du gras) attendu rc 1, jamais « marqueur absent »"
   { [ "$RC" -eq 1 ] && has 'PHASE 2 proposee'; }
 }
+probe_marqueur_ressemblant() {
+  # P60-H-04 : une ligne qui ressemble à un marqueur sans en avoir la forme n'est JAMAIS « absent » (fail-open : la phase
+  # proposée passerait) ; elle est un marqueur illisible, rc 3 et BILAN marqueur=inconnu.
+  local m n=0
+  for m in '- **Validation:** proposed' '* **Validation:** proposed' '+ **Validation:** proposed' '1. **Validation:** proposed' \
+           '- [ ] **Validation:** proposed' '> **Validation:** proposed' 'Validation: proposed' '*Validation:* proposed' \
+           '__Validation:__ proposed' '**validation:** proposed' '**Validation :** proposed' '**Validation:** `proposed`' \
+           'Validation: validated'; do
+    n=$((n+1)); mklab "mr-$n" "$RM3" "$m"$'\n'
+    run --phase 2
+    msg "ligne « $m » : rc 3 et BILAN marqueur=inconnu, jamais rc 0 marqueur absent"
+    { [ "$RC" -eq 3 ] && last | command grep -q 'BILAN phase=2 marqueur=inconnu code=3$'; } || return 1
+  done
+  # témoins : des lignes ordinaires qui parlent de validation ne sont pas des marqueurs
+  for m in 'Validation: les tests passent' '- Validation criteria: x' 'Validation of inputs: proposed later' 'La validation: proposed' '- Validations: proposed'; do
+    n=$((n+1)); mklab "mr-$n" "$RM3" "$m"$'\n'
+    run --phase 2
+    msg "ligne ordinaire « $m » : rc 0 et marqueur absent (pas de sur-détection)"
+    { [ "$RC" -eq 0 ] && last | command grep -q 'BILAN phase=2 marqueur=absent code=0$'; } || return 1
+  done
+  # la forme exacte reste lue, et une ligne ressemblante HORS de la section de la phase interrogée ne compte pas
+  mklab "mr-x" "$RM3" $'**Validation:** proposed\n'; run --phase 2
+  msg "forme exacte inchangée : rc 1"; [ "$RC" -eq 1 ] || return 1
+  mklab "mr-y" "$RM3" $'- **Validation:** proposed\n'; run --phase 3
+  msg "ligne ressemblante en phase 2, phase 3 interrogée : rc 0"; [ "$RC" -eq 0 ] || return 1
+  mklab "mr-z" "$RM3" $'- **Validation:** proposed\n**Validation:** validated\n'; run --phase 2
+  msg "ligne ressemblante ET forme exacte : deux marqueurs, rc 3 marqueur=multiple"
+  { [ "$RC" -eq 3 ] && last | command grep -q 'BILAN phase=2 marqueur=multiple code=3$'; }
+}
 probe_cr_isole() {
   mklab cr1 '# Roadmap\n\n### Phase 2: Deux\n**Goal**: g\r**Validation:** proposed\n'; run --phase 2
   msg "un CR isolé est une fin de ligne : le marqueur qui le suit est une ligne, attendu rc 1"; [ "$RC" -eq 1 ]
@@ -394,6 +443,7 @@ case_ CPV-DETAILS probe_details
 case_ CPV-FENCE-COMMONMARK probe_fence_commonmark
 case_ CPV-MARQUEUR-FORMES probe_marqueur_formes
 case_ CPV-CR-ISOLE probe_cr_isole
+case_ CPV-MARQUEUR-RESSEMBLANT probe_marqueur_ressemblant
 case_ CPV-DETAILS-ACTIF probe_details_actif
 case_ CPV-BILAN-ILLISIBLE probe_bilan_illisible
 
@@ -785,7 +835,7 @@ mutant() {
 
 mutant CPV-MUT-1 'proposed) MARK=proposed' 'bump 1' ':' probe_trace2 \
   "FAIL : branche proposed -> 1 neutralisée"
-mutant CPV-MUT-2 'if [ "$NSEC" -eq 0 ]; then indetermine' 'indetermine "phase introuvable"' 'MARK=absent' probe_trace3 \
+mutant CPV-MUT-2 '      indetermine "phase introuvable"' 'indetermine "phase introuvable"' 'MARK=absent' probe_trace3 \
   "INDÉTERMINÉ : phase introuvable rendue 0"
 mutant CPV-MUT-3 '*) MARK=inconnu;' 'indetermine "valeur de marqueur inconnue"' ':' probe_inconnu \
   "INDÉTERMINÉ : valeur de marqueur inconnue rendue 0"
@@ -875,6 +925,26 @@ mutant CPV-MUT-45 '*) MARK=inconnu; indetermine' 'MARK=inconnu; ' '' probe_bilan
   "FAIL : la ligne BILAN ne dit plus marqueur=inconnu (les consommateurs ne distinguent plus l'illisible du non constatable)"
 mutant CPV-MUT-46 'elif [ "$NMARK" -gt 1 ]; then MARK=multiple;' 'MARK=multiple; ' '' probe_bilan_illisible \
   "FAIL : la ligne BILAN ne dit plus marqueur=multiple"
+
+mutant CPV-MUT-47 '  } else if (loosemark(line)) {' 'loosemark(line)' '0' probe_marqueur_ressemblant \
+  "FAIL : une ligne qui ressemble à un marqueur est lue « absent » (la phase proposée passe)"
+mutant CPV-MUT-48 'if (match(t, /^([-*+]|[0-9]+[.)])[ \t]+/))' 'match(t, /^([-*+]|[0-9]+[.)])[ \t]+/)' '0' probe_marqueur_ressemblant \
+  "FAIL : une puce ou un numéro devant le libellé n'est plus reconnu"
+mutant CPV-MUT-49 'if (substr(t, 1, 1) == ">") { t = substr(t, 2); continue }' 'substr(t, 1, 1) == ">"' '0' probe_marqueur_ressemblant \
+  "FAIL : une citation devant le libellé n'est plus reconnue"
+mutant CPV-MUT-50 'if (tolower(substr(t, 1, 10)) != "validation") return 0' 'tolower(substr(t, 1, 10))' 'substr(t, 1, 10)' probe_marqueur_ressemblant \
+  "FAIL : la casse du libellé devient significative"
+mutant CPV-MUT-51 'sub(/^[*_]*[ \t]*/, "", t)' '[ \t]*/' '/' probe_marqueur_ressemblant \
+  "FAIL : l'espace avant les deux-points n'est plus toléré"
+mutant CPV-MUT-52 'return (w == "propo" || w == "valid")' 'w == "propo" || w == "valid"' '1' probe_marqueur_ressemblant \
+  "FAIL : toute ligne « Validation: … » est un marqueur (sur-détection)"
+mutant CPV-MUT-53 'return (w == "propo" || w == "valid")' ' || w == "valid"' '' probe_marqueur_ressemblant \
+  "FAIL : la valeur « valid… » d'une ligne ressemblante n'est plus reconnue"
+
+mutant CPV-MUT-54 'then MARK=introuvable; fi' '[ "$WORST" -eq 0 ]' 'true' probe_bilan_illisible \
+  "FAIL : un bloc ou un commentaire non fermé qui avale la phase rend aussi marqueur=introuvable (la boucle passerait)"
+mutant CPV-MUT-55 'then MARK=introuvable; fi' 'MARK=introuvable' ':' probe_bilan_illisible \
+  "FAIL : la ligne BILAN ne dit plus marqueur=introuvable (les consommateurs ne distinguent plus le seul cas qui laisse passer)"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]

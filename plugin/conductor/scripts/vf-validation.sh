@@ -328,9 +328,32 @@ BEGIN {
   wk[1] = idkey(want, 0); wk[2] = idkey(want, 1)
   if (mode == "arch") { insec[1] = 1; nsec[1] = 1 }
 }
+# Ligne qui RESSEMBLE à un marqueur sans en avoir la forme exacte (Phase 60, correction de revue, P60-H-04) : puce, citation,
+# libellé sans gras, en italique, en minuscules, espace avant le deux-points, suivi d'une valeur qui commence par
+# `propos` ou `valid`. Lue « absent », elle ferait passer une phase proposée (fail-open) ; elle est donc un marqueur
+# ILLISIBLE (arrêt des consommateurs), jamais une validation. N'est appelée que si la forme exacte n'a pas reconnu la ligne.
+function loosemark(s,   t, w) {
+  t = s
+  while (1) {
+    sub(/^[ \t]+/, "", t)
+    if (substr(t, 1, 1) == ">") { t = substr(t, 2); continue }
+    if (match(t, /^([-*+]|[0-9]+[.)])[ \t]+/)) { t = substr(t, RLENGTH + 1); continue }
+    if (match(t, /^\[[ xX]\][ \t]+/)) { t = substr(t, RLENGTH + 1); continue }
+    break
+  }
+  sub(/^[*_]+/, "", t)
+  if (tolower(substr(t, 1, 10)) != "validation") return 0
+  t = substr(t, 11)
+  sub(/^[*_]*[ \t]*/, "", t)
+  if (substr(t, 1, 1) != ":") return 0
+  t = substr(t, 2)
+  sub(/^[ \t*_`"']+/, "", t)
+  w = tolower(substr(t, 1, 5))
+  return (w == "propo" || w == "valid")
+}
 # Une ligne, déjà débarrassée des blocs <details> (les lignes cachées arrivent vides, la sortie reprend raw[]). Deux
 # lectures de la cible en parallèle : (1) exacte, (2) tolérante au préfixe projet ; (2) ne sert que si (1) ne trouve rien.
-function proc(line, nr,   t, f, lvl, id, p, v, tok, rest, c) {
+function proc(line, nr,   t, f, lvl, id, p, v, tok, rest, c, isc) {
   if (!infence) line = strip_comments(line)
   t = line; sub(/^[ \t]+/, "", t)
   if (infence) { if (fclose(line)) infence = 0; return }
@@ -348,13 +371,16 @@ function proc(line, nr,   t, f, lvl, id, p, v, tok, rest, c) {
     }
     return
   }
-  if (match(line, /^[ \t]*\*\*Validation(:\*\*|\*\*[ \t]*:)/)) {
-    f = RLENGTH
-    v = trim(substr(line, f + 1)); tok = v; sub(/[ \t].*$/, "", tok)
-    rest = substr(v, length(tok) + 1); sub(/^[ \t]+/, "", rest); tok = tolower(tok)
-    if (tok == "proposed") c = "proposed"
-    else if (tok == "validated" && (rest == "" || substr(rest, 1, 1) == "(")) c = "validated"
-    else c = "inconnu"
+  isc = match(line, /^[ \t]*\*\*Validation(:\*\*|\*\*[ \t]*:)/)
+  if (isc || loosemark(line)) {
+    if (isc) {
+      f = RLENGTH
+      v = trim(substr(line, f + 1)); tok = v; sub(/[ \t].*$/, "", tok)
+      rest = substr(v, length(tok) + 1); sub(/^[ \t]+/, "", rest); tok = tolower(tok)
+      if (tok == "proposed") c = "proposed"
+      else if (tok == "validated" && (rest == "" || substr(rest, 1, 1) == "(")) c = "validated"
+      else c = "inconnu"
+    } else c = "inconnu"
     for (p = 1; p <= 2; p++) if (insec[p]) {
       ingoal[p] = 0; nmark[p]++
       if (nmark[p] == 1) {
