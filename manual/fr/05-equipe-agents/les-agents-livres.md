@@ -10,7 +10,7 @@ liste écrite ailleurs. Tu n'auras que ceux dont tu as installé le module ; le
 [catalogue](../03-modules/catalogue.md) dit lequel apporte quoi.
 
 Trois familles, et la différence entre elles compte plus que les noms. À la date où cette page a
-été écrite, le disque de ce dépôt en porte trente-six au total, répartis dans ces trois familles —
+été écrite, le disque de ce dépôt en porte trente-sept au total, répartis dans ces trois familles —
 un chiffre qui bouge à chaque module ajouté, jamais figé ici comme une promesse.
 
 ## Les agents que tu invoques
@@ -67,7 +67,7 @@ vocabulaire commun, détaillé dans le [glossaire](../02-concepts/glossaire.md).
 C'est la famille la plus nombreuse — une bonne vingtaine d'agents — et la seule que tu ne peux pas
 invoquer. Ce sont les producteurs et les juges : celui qui écrit le code d'une étape, celui qui la
 relit, celui qui audite la sécurité, celui qui rédige un contenu, celui qui le note, celui qui rédige le brief produit (`vf-product-analyst`), celui qui en tire le PRD
-(`vf-product-pm`), celui qui joue
+(`vf-product-pm`), celui qui rédige la décision d'architecture (`vf-product-architect`), celui qui joue
 les tests sur un simulateur, celui qui corrige l'application pour les faire passer.
 
 Chacun de ces agents déclare dans son propre fichier qu'il est **interne**. La conséquence est

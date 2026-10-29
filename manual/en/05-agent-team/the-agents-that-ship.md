@@ -10,7 +10,7 @@ only have the ones whose module you installed; the [catalog](../03-modules/catal
 one brings what.
 
 Three families, and the difference between them matters more than the names. As of when this page
-was written, this repository's disk carries thirty-six in total, spread across those three
+was written, this repository's disk carries thirty-seven in total, spread across those three
 families — a number that shifts with every module added, never fixed here as a promise.
 
 ## The agents you invoke
@@ -64,7 +64,7 @@ report reads like a dev mission report once you know the shared vocabulary, deta
 This is the largest family — a good twenty agents — and the only one you can't invoke. These are
 the producers and the judges: the one writing a step's code, the one reviewing it, the one auditing
 security, the one drafting a piece of content, the one scoring it, the one writing the product brief (`vf-product-analyst`), the one deriving the PRD
-from it (`vf-product-pm`), the one running tests on a
+from it (`vf-product-pm`), the one drafting the architecture decision (`vf-product-architect`), the one running tests on a
 simulator, the one fixing the app to make them pass.
 
 Each of these agents declares in its own file that it is **internal**. The consequence is
