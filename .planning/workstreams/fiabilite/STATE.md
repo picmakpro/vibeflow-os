@@ -9,11 +9,11 @@ last_activity: 2026-10-27
 last_activity_desc: Phase 59 exécutée — 8/8 plans, porte de phase rejouée depuis ci.yml (20 étapes vertes), PRDT-01..12 cochées — next : PR par le manager, relecture adverse SOBR-04, release décidée à part
 state_head: 45ee80db
 progress:
-  total_phases: 6
+  total_phases: 9
   completed_phases: 3
   total_plans: 36
   completed_plans: 36
-milestone_name: « l'équipe produit » — Phases 57-62 —
+milestone_name: « l'équipe produit » — Phases 57-65 —
 stopped_at: "Phase 59 exécutée le 2026-10-27 (8/8 plans, porte verte) — arrêt avant merge, tag et release"
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 59 (Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate) — EXÉCUTÉE (8/8 plans, porte de phase verte, PRDT-01..12 cochées) ; la Phase 58 reste close (12/12 plans)
-Jalon courant : `equipe-produit-v1.0` (Phases 57-62, inscrit 2026-10-08) ; 3 phases sur 6 closes. `fiabilite-v1.0` est CLOS
+Jalon courant : `equipe-produit-v1.0` (Phases 57-65, inscrit 2026-10-08) ; 3 phases sur 9 closes. `fiabilite-v1.0` est CLOS
 depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
 `.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).
 
@@ -62,6 +62,11 @@ Last activity: 2026-10-20 — Phase 58 vérifiée human_needed 13/14
 
 - P59-PL-01 à P59-PL-22 : décisions de planificateur (discrétion P59-D-14..22), réalisées par les plans 59-01 à 59-08.
 - P58-PL-01 à P58-PL-14 : décisions de planificateur (discrétion P58-D-15..20), réalisées par les plans 58-01 à 58-12, plus P58-D-21 (filtrage des presets, plan 58-12).
+
+### Roadmap Evolution
+
+- Phase 63 added (2026-10-29) : Règles produit empruntées à AIDD — arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 (phase dans le jalon actuel ; règles AIDD dans notre vocabulaire). Même jour : sortie de GSD et de superpowers, trajectoire par étapes retenue par message session principale (E1 superpowers, E2 épinglage gsd-core, E3 remplacement verbe par verbe conditionnée à l'étude de coût E0) → graine `SEED-003`, pas de phase.
+- Phases 64 et 65 added (2026-10-29) : contrôles après exécution branchés en nœuds du plan de bataille ; révision des règles qui brident l'efficacité des agents — arbitrage Samuel, message session principale, 2026-10-29, sur l'étude `docs/research/2026-10-29-etude-gsd-skills-agents-non-utilises.md`.
 
 ### Pending Todos
 
