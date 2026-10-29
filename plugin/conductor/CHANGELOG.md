@@ -1,5 +1,11 @@
 # Changelog — conductor
 
+## [v1.50.4] — 2026-10-29 (guard-driver-lock : commit lancé depuis un worktree) — à publier dans la prochaine release
+
+**Patch** (#166, anomalie du point d'étape ; correctif du lot E de la clôture des issues GitHub ; à publier dans la prochaine release) :
+
+- **`guard-driver-lock.sh` juge le commit dans le worktree où il s'exécute** (#166) : en lab partitionné, `cd <worktree> && git add … && git commit …` lancé par une session dont le cwd est l'arbre principal était refusé sur les fichiers non suivis de l'arbre PRINCIPAL (`.planning/workstreams/<compartiment>/config.json`, …), l'index du worktree n'en portant aucun. Cause : `judge_bash` calculait le toplevel et lisait `diff --cached` / `ls-files -o` depuis le cwd du payload, jamais depuis le dossier où le `cd … &&` emmène le commit. Le dossier effectif est désormais résolu par la même analyse qu'`outside_scan` (chaîne de `cd <littéral>` liés par `&&` seulement ; `;`, sous-shell, variable, `popd`, `bash -c`, `-C`, `GIT_*` : le jugement retombe sur celui d'avant le lot, le cwd du payload, sans promesse de refus supplémentaire ; tout `||` dans la commande aussi, même entre guillemets, car `a || cd X && c` se lit `(a || cd X) && c` et le `cd` peut être sauté), et n'est retenu que si son toplevel est un autre checkout du MÊME dépôt (même dossier commun git) ; le préfixe du lab garde sa position dans son propre checkout. Verrou partagé, `-C` (GW-T-C-1), lab plat et classe `arbre` inchangés. Suite `-ws` : cas GW-C-WT-* (dont GW-C-WT-6, le `cd` précédé de `||`) et mutants `wt_cwd`, `wt_prefix`, `wt_common`, `wt_or` (`MUT_TOTAL` 55 → 59).
+
 ## [v1.50.3] — 2026-10-29 (uutils, drift du framework, clé vf-optional-agents) — publiée dans v2.72.0
 
 **Patch** (#52, #165, #166, #167 ; correctifs du lot A de la clôture des issues GitHub ; publiée dans v2.72.0) :
