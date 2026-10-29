@@ -50,7 +50,7 @@ chez Samuel ; revue (majeur `.gitignore` fermé) et audit (H-1 `json.py` du dép
 passés après trois tours de correction. Rapport : `.planning/missions/2026-10-16-suite-v2700-phase-58.md`.
 Replanification 2026-10-20 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 pour ADR-077 et Q16 ; Q15 et Q17 : 2026-10-16) : ADR-077 approuvée (58-03 close, SUMMARY posé) ; plan 58-12 ajouté (presets filtrés par poste, P58-D-21, vague 6) ; 58-11 passe en vague 7 (manuel « Poste » FR+EN, liste de clients par `VF_CLIENT_NAMES_FILE`).
 Phase 58 : 58-11 close le 2026-10-20 (porte de phase rejouée depuis `ci.yml`, RLPO-01..10 et 12 cochées, RLPO-11 en attente du critère 6) ; rapport : `58-11-SUMMARY.md`.
-Phase 59 exécutée le 2026-10-27 (rapport : `59-08-SUMMARY.md`) : porte de phase rejouée depuis `ci.yml`, suites une à une, périmètre du diff contrôlé ; next : PR ouverte par le manager, relecture adverse SOBR-04, release `v2.72.0` décidée à part (arrêt avant merge, tag et release).
+Phase 59 exécutée le 2026-10-27 (rapport : `59-08-SUMMARY.md`) : porte de phase rejouée depuis `ci.yml`, suites une à une, périmètre du diff contrôlé ; next : PR ouverte par le manager, relecture adverse SOBR-04, release `v2.73.0` décidée à part (arrêt avant merge, tag et release).
 Next (Phase 58, historique) : dépôt de la liste de clients par Samuel (hors dépôt) puis `check-livraison-58.sh clients`, puis PR (rebase sur main = geste du manager) ; Q18 (faille `python -c` antérieure) hors cette phase, hotfix en parallèle.
 Last activity: 2026-10-20 — Phase 58 vérifiée human_needed 13/14
 

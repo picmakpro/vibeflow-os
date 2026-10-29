@@ -104,7 +104,7 @@ Hors de cette phase :
   - Fait à documenter : l'engine ignore `proposable`. `install --all` et une install nominale posent quand même le module ; seuls le catalogue et les presets l'excluent.
 - **P59-D-12 (hypothèses par défaut, validées « Je valide ») :**
   - au plus **250 lignes** par agent neuf (critère 5 du jalon, plus strict que les 300 de l'ADR-029) ;
-  - bump des modules touchés dans la PR, sans `VERSION` racine ni release (v2.72.0 décidée à part) ; **amendé :** la release v2.72.0 est autorisée (arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 : merger #172 avec --admin si les juges ne rendent aucun majeur et que la CI est verte, puis tag et release v2.72.0) ;
+  - bump des modules touchés dans la PR, sans `VERSION` racine ni release (v2.73.0 décidée à part) ; **amendé :** la release v2.73.0 est autorisée (arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 : merger #172 avec --admin si les juges ne rendent aucun majeur et que la CI est verte, puis tag et release v2.73.0, numéro devenu 2.73.0 car v2.72.0 a été pris par la release de main, PR #178) ;
   - pas de preset produit (`resolve-preset.sh` refuse un module `proposable:false`) ;
   - `PROJECT.md` racine périmé et table Coverage de `REQUIREMENTS.md` sans DLWS ni RLPO : en dette, hors 59.
 

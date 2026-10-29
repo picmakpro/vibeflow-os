@@ -1,6 +1,6 @@
 # Changelog — planning-core
 
-## [v2.9.0] — 2026-10-27 (gabarit produit) — publiée dans v2.72.0
+## [v2.9.0] — 2026-10-27 (gabarit produit) — publiée dans v2.73.0
 
 **Minor** (nouvelle capacité : gabarit du poste product) :
 

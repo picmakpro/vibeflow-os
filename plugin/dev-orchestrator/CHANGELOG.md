@@ -1,6 +1,6 @@
 # CHANGELOG — dev-orchestrator
 
-## [v2.29.0] — 2026-10-27 (redirection du poste product) — publiée dans v2.72.0
+## [v2.29.0] — 2026-10-27 (redirection du poste product) — publiée dans v2.73.0
 
 **Minor** (Phase 59, PRDT-07) :
 

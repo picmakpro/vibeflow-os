@@ -1,6 +1,6 @@
 # Changelog — product-team-bundle
 
-## [v1.0.0] — 2026-10-27 (naissance du bundle produit) — publiée dans v2.72.0
+## [v1.0.0] — 2026-10-27 (naissance du bundle produit) — publiée dans v2.73.0
 
 - Composition : manager `vf-product-manager`, workers internes `vf-product-analyst` (BRIEF) et `vf-product-pm` (PRD), juge interne `prd-gate` (rubric /100, seuil 80), gate déterministe `scripts/check-prd.sh`.
 - Visibilité : `roles: ["product"]` — visible aux postes `product` et `solo`, invisible au poste `dev`.
