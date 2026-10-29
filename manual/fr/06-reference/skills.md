@@ -44,7 +44,9 @@ parallèles, et en pose la structure sous ton accord.
 ### `dev-orchestrator`
 **`vf-dev`** — « aide-moi à avancer », « pilote-moi ça », « occupe-toi de ce projet ». Le point
 d'entrée de développement par défaut : déclenche `vibeflow-head`, qui détecte l'intention et
-dispatche l'équipe qui porte la bonne brique, sans demander de reformuler.
+dispatche l'équipe qui porte la bonne brique, sans demander de reformuler. Sert aussi pour une
+demande de dev précise sur un projet piloté par GSD (« ajoute X », « corrige Y », « implémente la
+phase N ») : le geste passe par l'équipe, jamais par un skill `gsd-*` en direct.
 **`vf-auto`** — « fais tout », « en autonomie », « la nuit », « débrouille-toi », « je reviens
 demain matin, avance ». Enchaîne cadrage → plan → exécution étape après étape sans supervision
 continue, avec les garde-fous du mode autonome.

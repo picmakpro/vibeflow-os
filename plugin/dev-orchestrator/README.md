@@ -8,7 +8,7 @@
 > d'intention unique**. Plus de façade de verbes : GSD est l'interface directe des équipes,
 > l'agent est l'entrée conversationnelle optionnelle.
 
-**Version** : v2.28.4
+**Version** : v2.28.5
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
@@ -51,6 +51,7 @@ S'y ajoutent :
     `[gsd-outdated]` + exit 0 si le gsd-core installé est strictement inférieur au dernier `^1`
     publié, silence sinon) et `--upgrade-engine` (relance `npx` dans ce seul cas). Le chemin par
     défaut reste sans sonde réseau.
+  - `gsd-run.sh` : lanceur de `gsd-tools` appelable par chemin, sans dépendre du `PATH` (#47).
   - `build-gsd-index.sh` : génère un **index factuel** des skills GSD installés
     (100 % auto-généré depuis le frontmatter sur disque — D4, anti-hallucination).
   - `inject-mcp-tools.sh` : injection des serveurs MCP du lab dans les agents flaggés.
@@ -87,6 +88,7 @@ dev-orchestrator/
 ├── scripts/
 │   ├── ensure-deps.sh             # bootstrap deps (idempotent, dry-run testable)
 │   ├── build-gsd-index.sh         # index factuel (VF_INDEX_OUT surchargeable)
+│   ├── gsd-run.sh                 # lanceur de gsd-tools par chemin (#47)
 │   ├── inject-mcp-tools.sh        # injection MCP dans les agents flaggés
 │   ├── discover-unintegrated-docs.sh # découverte doctrine ingestion (+ mode --hook)
 │   ├── check-dev-bootstrap.sh     # signal bootstrap/onboard/orientation GSD (Phase 17)
