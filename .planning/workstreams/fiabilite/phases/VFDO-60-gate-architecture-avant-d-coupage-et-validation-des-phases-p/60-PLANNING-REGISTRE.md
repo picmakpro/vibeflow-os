@@ -83,11 +83,15 @@ blockers:
     - "revue code owner @picmakpro sur .planning/instruction-budget-baselines.tsv (rulesets posés le 2026-09-23)"
     - "liste de clients hors dépôt pour le critère 6 : sans elle, code 2 « en attente », dette nommée (précédent Phase 58)"
     - "run réel du flux produit complet sur un lab désigné : geste de P59-D-11"
-  confirmations_attendues_de_samuel:
-    - "P60-H-01 (gate architecture seulement aux postes product/dev et avec BRIEF.md)"
-    - "P60-H-02 (un dev valide) et sa conséquence P60-PL-06 (refus au poste product, --override tracé)"
-    - "P60-H-03 (toute phase ajoutée par l'équipe aux postes product/dev naît proposée) et O-8 (friction au poste dev)"
-    - "P60-H-04 (le gate ne lit que le marqueur)"
+  confirmations_ratifiees_par_samuel:   # arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 (« Oui aux propositions par défaut pour 60 et 61 »)
+    - "P60-H-01 RATIFIÉE (gate architecture seulement aux postes product/dev et avec BRIEF.md)"
+    - "P60-H-02 RATIFIÉE (un dev valide)"
+    - "P60-H-03 RATIFIÉE (toute phase ajoutée hors poste solo naît proposée)"
+    - "P60-H-04 RATIFIÉE (le gate ne lit que le marqueur, état du lab) ; P60-H-05 RATIFIÉE (--architecture lu depuis le répertoire courant, pas la racine git)"
+    - "P60-D-15 DÉCIDÉE (seul « phase introuvable » laisse continuer vf-coder et vf-auto ; tout autre indéterminé arrête)"
+  confirmations_encore_attendues:
+    - "P60-PL-06 (refus au poste product, --override tracé) : conséquence de H-02, non nommée dans la réponse"
+    - "O-8 (friction au poste dev) : conséquence de H-03, non nommée dans la réponse"
   signaux_au_manager:
     - "O-7 : collision de version possible de planning-core avec la Phase 45 (compartiment gouvernance) ; l'ordre de merge décide qui rebase"
     - "G-1, G-2 et SOBR-05 jugent la plage merge-base(HEAD, origin/main)..HEAD = cbe97fb1..HEAD tant que origin/main n'est pas à jour, soit 54 commits antérieurs à la phase en plus (P60-PL-27)"
@@ -99,7 +103,7 @@ blockers:
 
 | ID | Hypothèse | Plans | Si fausse |
 |----|-----------|-------|-----------|
-| P60-H-01 à P60-H-04 | retenues par le cadrage faute de réponse | 01, 04, 05, 06 | réversibles : §5, branche de refus de l'écrivain, champ de brief |
+| P60-H-01 à P60-H-04 (+ H-05, D-15) | retenues par le cadrage faute de réponse, **RATIFIÉES le 2026-10-29** (arbitrage Samuel, AskUserQuestion session principale ; `60-CONTEXT.md` § Ratification) | 01, 04, 05, 06 | réversibles : §5, branche de refus de l'écrivain, champ de brief |
 | P60-PL-06, P60-PL-07, P60-PL-08 | hypothèses du planificateur (aucun défaut écrit ne tranche : refus au poste product, acteur de la pose, lecture seule de la carte du code) | 04, 05, 06 | réversibles, à confirmer par Samuel avec P60-H-01..04 |
 | A1 | la lecture awk se comporte sous mawk comme sous BWK | 01, 02, 04 | rouge en CI seulement ; rejouer en conteneur Linux |
 | A2 | un `gsd-core@^1` futur ignore toujours un champ gras inconnu | 03, 04 | CPV-GSD / VFV-GSD rougissent : arrêt (B-2) |

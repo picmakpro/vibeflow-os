@@ -157,6 +157,28 @@ Hors de cette phase :
   phase proposée est refusée à tout poste, `solo` compris, tant qu'elle n'est pas validée. Le poste ne
   décide que de la **pose** du marqueur à la création.
 
+### Ratification (arbitrage Samuel, AskUserQuestion session principale, 2026-10-29)
+
+Réponse à la proposition des défauts pour les Phases 60 et 61 : « Oui aux propositions par défaut pour 60 et 61 ».
+Les hypothèses ci-dessus cessent d'être des hypothèses ; chacune est une décision RATIFIÉE, implémentée telle quelle :
+
+- **P60-H-01 : RATIFIÉE.** Le contrôle d'architecture ne s'applique que si `.planning/BRIEF.md` existe (`product-routing.md` §5 ; T45 (e)).
+- **P60-H-02 : RATIFIÉE.** C'est un dev qui valide l'architecture (`vf-validation.sh validate --architecture`, refus au poste `product`
+  sauf `--override` tracé : `VFV-POSTE-*`). Sa conséquence P60-PL-06 (refus au poste product) suit cette ratification, sans avoir été
+  nommée dans la réponse ; elle reste à confirmer nommément avec O-8.
+- **P60-H-03 : RATIFIÉE.** Toute phase ajoutée hors du poste `solo` (donc aux postes `product` et `dev`, les seuls autres, `vf-role.sh`)
+  naît « proposée » ; au poste `solo`, aucun marqueur (champ de brief `Phases ajoutées`, `mission-contracts.md`).
+- **P60-H-04 : RATIFIÉE.** Le marqueur est un état du lab : le gate ne lit jamais le poste (`CPV-POSTE`).
+- **P60-H-05 : RATIFIÉE (précision de la portée de H-04).** L'option `--architecture` se lit depuis le RÉPERTOIRE COURANT, pas depuis la
+  racine du dépôt git : `vf-validation.sh` refuse (5) tout fichier hors du répertoire courant physique, même à l'intérieur du dépôt
+  (`VFV-ARCHI-BORNE`, `VFV-ARCHI-CWD`, mutant VFV-MUT-27).
+- **P60-D-15 : DÉCIDÉE (conduite sur résultat indéterminé du contrôle de phase).** SEUL « phase introuvable » (code 3 dont la ligne `BILAN`
+  porte `marqueur=introuvable`, sans autre défaut) laisse continuer `vf-coder` et `vf-auto` ; tout autre résultat indéterminé (code 3
+  sans cette valeur : ROADMAP absent, lab partitionné sans `--ws`, sections ou marqueurs multiples, valeur inconnue, ligne qui
+  ressemble à un marqueur, bloc ou commentaire non fermé ; code 64 ; code 5) ARRÊTE. Elle remplace la conduite des tours 2 et 3 de la revue
+  (« les codes 3 et 64 continuent sauf marqueur illisible »), qui laissait passer une phase proposée dès que le contrôle se trompait
+  de compartiment ou d'identifiant.
+
 ### Claude's Discretion (conséquences, aucun choix neuf)
 
 - Forme exacte du marqueur (P60-D-03), noms et emplacements des scripts (P60-D-04, P60-D-06), rubriques
@@ -216,6 +238,6 @@ Hors de cette phase :
 ## Deferred Ideas
 
 - Run réel du flux produit complet (BRIEF → PRD → architecture → refus) sur un lab désigné : geste humain, condition de `proposable:true`.
-- Confirmation de P60-H-01 à P60-H-04 par Samuel.
+- ~~Confirmation de P60-H-01 à P60-H-04 par Samuel.~~ Faite le 2026-10-29 (§ Ratification) ; restent P60-PL-06 et O-8, à confirmer nommément.
 
 </deferred>
