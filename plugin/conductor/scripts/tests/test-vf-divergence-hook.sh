@@ -835,7 +835,13 @@ pcell() {
     fi
   else
     diverge "$P/a" "$B" 02
-    (cd "$cwd" && PATH="$pre:$PATH" "$PERLB" -e 'alarm 30; exec @ARGV' "$BASH" "$TARGET" run --hook post-merge) > "$TMP/pc.out" 2> "$TMP/pull.err" < /dev/null || :
+    # Entree vide du PATH : bash 3.2 (macOS) accepte `cd ""` (= repertoire courant), bash >= 5 le REFUSE (« null directory »).
+    # Sous bash >= 5 la boucle de strip_path abandonne donc l'entree vide par `|| continue` MEME quand la regle « pas
+    # d'entree relative » est neutralisee : le mutant devient equivalent et survit (CI Ubuntu 26, bash 5.3). La sonde
+    # impose la semantique ancienne dans le processus juge (fonction `cd` exportee, seule l'operande vide est touchee) :
+    # la regle est alors la SEULE defense, sur les deux plateformes.
+    (cd "$cwd" && { [ "$form" != empty ] || { cd() { if [ "$#" -eq 1 ] && [ -z "$1" ]; then builtin cd .; else builtin cd "$@"; fi; }; export -f cd; }; } \
+      && PATH="$pre:$PATH" "$PERLB" -e 'alarm 30; exec @ARGV' "$BASH" "$TARGET" run --hook post-merge) > "$TMP/pc.out" 2> "$TMP/pull.err" < /dev/null || :
   fi
   if [ "$(nfiles "$hits")" -ne 0 ]; then LASTMSG="commande(s) resolue(s) dans l'arbre ($kind/$form) : $(ls "$hits" | awk '{ printf "%s ", $0 }')"; return 1; fi
   "$GREP" -qF 'DIVERGENCE apres post-merge' "$TMP/pull.err" || { LASTMSG="le $kind ne crie plus ($form) : temoin positif absent — $(tail -2 "$TMP/pull.err")"; return 1; }
