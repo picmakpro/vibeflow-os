@@ -1,8 +1,8 @@
 # CHANGELOG — dev-orchestrator
 
-## [v2.29.1] — 2026-10-29 (gsd-run.sh sans HOME) — à publier dans la prochaine release
+## [v2.29.1] — 2026-10-29 (gsd-run.sh sans HOME) — publiée dans v2.73.1
 
-**Patch** (relecture adverse de la release v2.72.0 ; pas d'issue liée) :
+**Patch** (relecture adverse de la release v2.72.0 ; pas d'issue liée ; publiée dans v2.73.1) :
 
 - **`scripts/gsd-run.sh` rend 64, non 1, quand `HOME` est absent** : `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` plantait sous `set -u` (`HOME: unbound variable`, rc 1) alors que l'en-tête documente 64 pour tout défaut d'outillage. Le répertoire user est désormais dérivé une fois (`CLAUDE_CONFIG_DIR`, sinon `$HOME/.claude`) ; sans l'un ni l'autre (absents ou vides), le candidat scope user est sauté, jamais remplacé par un `/.claude/...` à la racine du disque, et le message 64 le signale. Deux scénarios ajoutés à `test-gsd-run.sh` (HOME non exporté, HOME vide ; six assertions) : 30/0.
 
