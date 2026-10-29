@@ -353,30 +353,38 @@ else
 fi
 
 # ======================================================================================================
-# RRO-CHECK — check-registres.sh
+# RRO-CHECK — check-registres.sh. Sonde réutilisée par le témoin de mutation.
 # ======================================================================================================
-CK="$WORK/check"; fixture_pair DECISIONS "$CK"
-with_role "$CK/sans/.claude/memory/DECISIONS.md" "$CK/avec/.claude/memory/DECISIONS.md" "$ROLE_LINE"
-mkdir -p "$CK/mixte/.claude/memory"
-with_role "$CK/sans/.claude/memory/DECISIONS.md" "$CK/mixte/.claude/memory/DECISIONS.md" "$ROLE_LINE" 1
-n_mixte="$(awk '/^\*\*Role\*\* :/ { n++ } END { print n + 0 }' "$CK/mixte/.claude/memory/DECISIONS.md")"
-n_avec="$(awk '/^\*\*Role\*\* :/ { n++ } END { print n + 0 }' "$CK/avec/.claude/memory/DECISIONS.md")"
-n_sans="$(awk '/^\*\*Role\*\* :/ { n++ } END { print n + 0 }' "$CK/sans/.claude/memory/DECISIONS.md")"
-for v in sans avec mixte; do
-  ( cd "$CK/$v" && bounded bash "$CHECK" --memory-dir=.claude/memory </dev/null ) > "$CK/$v.out" 2>&1
-  echo "$?" > "$CK/$v.rc"
-done
-if [ "$n_sans" -eq 0 ] && [ "$n_avec" -eq 2 ] && [ "$n_mixte" -eq 1 ] \
-   && [ "$(cat "$CK/sans.rc")" = 0 ] && [ "$(cat "$CK/avec.rc")" = 0 ] && [ "$(cat "$CK/mixte.rc")" = 0 ]; then
-  ok "RRO-CHECK registre sans / tout avec / mixte (1 entrée sur 2) : rc 0 pour les trois"
-else
-  ko "RRO-CHECK rc attendus 0/0/0, obtenus sans=$(cat "$CK/sans.rc") avec=$(cat "$CK/avec.rc") mixte=$(cat "$CK/mixte.rc") (Role : $n_sans/$n_avec/$n_mixte)"
-fi
-if same_output "$CK/avec.out" "$CK/sans.out" && same_output "$CK/mixte.out" "$CK/sans.out"; then
-  ok "RRO-CHECK même sortie avec, sans et mixte"
-else
-  ko "RRO-CHECK la sortie de check-registres change avec le champ"
-fi
+LASTMSG=""
+# check_probe : 0 si, avec $TARGET, un registre DECISIONS sans champ, tout avec et mixte (1 entrée sur 2) rendent
+# rc 0 et la même sortie.
+check_probe() {
+  local d="$WORK/check" v n_sans n_avec n_mixte
+  fixture_pair DECISIONS "$d"
+  mkdir -p "$d/mixte/.claude/memory"
+  with_role "$d/sans/.claude/memory/DECISIONS.md" "$d/mixte/.claude/memory/DECISIONS.md" "$ROLE_LINE" 1
+  n_sans="$(awk '/^\*\*Role\*\* :/ { n++ } END { print n + 0 }' "$d/sans/.claude/memory/DECISIONS.md")"
+  n_avec="$(awk '/^\*\*Role\*\* :/ { n++ } END { print n + 0 }' "$d/avec/.claude/memory/DECISIONS.md")"
+  n_mixte="$(awk '/^\*\*Role\*\* :/ { n++ } END { print n + 0 }' "$d/mixte/.claude/memory/DECISIONS.md")"
+  for v in sans avec mixte; do
+    ( cd "$d/$v" && bounded bash "$TARGET" --memory-dir=.claude/memory </dev/null ) > "$d/$v.out" 2>&1
+    echo "$?" > "$d/$v.rc"
+  done
+  if [ "$n_sans" -ne 0 ] || [ "$n_avec" -ne 2 ] || [ "$n_mixte" -ne 1 ]; then
+    LASTMSG="fixtures inattendues (Role : $n_sans/$n_avec/$n_mixte au lieu de 0/2/1)"; return 1
+  fi
+  if [ "$(cat "$d/sans.rc")" != 0 ] || [ "$(cat "$d/avec.rc")" != 0 ] || [ "$(cat "$d/mixte.rc")" != 0 ]; then
+    LASTMSG="rc attendus 0/0/0, obtenus sans=$(cat "$d/sans.rc") avec=$(cat "$d/avec.rc") mixte=$(cat "$d/mixte.rc")"; return 1
+  fi
+  if ! same_output "$d/avec.out" "$d/sans.out" || ! same_output "$d/mixte.out" "$d/sans.out"; then
+    LASTMSG="la sortie change avec le champ"; return 1
+  fi
+  LASTMSG="rc 0 et même sortie pour sans / tout avec / mixte"
+  return 0
+}
+
+TARGET="$CHECK"
+if check_probe; then ok "RRO-CHECK $LASTMSG"; else ko "RRO-CHECK $LASTMSG"; fi
 
 # ======================================================================================================
 # RRO-REINDEX — reindex.sh : audit, dry-run, apply (trois registres). Sonde réutilisée par le témoin de mutation.
@@ -419,7 +427,164 @@ for reg in DECISIONS LEARNINGS BLOCKERS; do
   if reindex_probe "$reg"; then ok "RRO-REINDEX $reg : $LASTMSG"; else ko "RRO-REINDEX $reg : $LASTMSG"; fi
 done
 
-#<STAGE2>
+# ======================================================================================================
+# RRO-TPL — les gabarits (volet copies posées dans les labs)
+# ======================================================================================================
+tpl_checks "$CPY_DIR" copie
+for t in decisions learnings blockers; do
+  f="$CPY_DIR/$t-template.md"
+  if [ -f "$f" ] && grep -q 'SYNC' "$f" && grep -q 'Index maintenu par la machine' "$f"; then
+    ok "RRO-TPL copie/$t : bandeau SYNC et ligne « Index maintenu par la machine » conservés"
+  else
+    ko "RRO-TPL copie/$t : bandeau SYNC ou ligne « Index maintenu par la machine » perdu"
+  fi
+  if [ -d "$SRC_DIR" ]; then
+    role_extract "$SRC_DIR/$t-template.md" > "$WORK/src.$t"
+    role_extract "$f" > "$WORK/cpy.$t"
+    if [ -s "$WORK/src.$t" ] && cmp -s "$WORK/src.$t" "$WORK/cpy.$t"; then
+      ok "RRO-TPL copie/$t : ligne **Role** identique à l'octet à celle de la source"
+    else
+      ko "RRO-TPL copie/$t : ligne **Role** différente de celle de la source"
+    fi
+  fi
+done
+
+# ======================================================================================================
+# RRO-ARCHIVE — archive.sh --dry-run (seuil 0 jour), registre BLOCKERS à entrées Resolu
+# ======================================================================================================
+ARCH="$SCRIPTS/archive.sh"
+archive_run() { # <lab> <sortie>
+  ( cd "$1" && MEMORY_DIR=.claude/memory bounded bash "$TARGET" --dry-run --threshold-days=0 </dev/null ) > "$2" 2>&1
+}
+# archive_probe : 0 si, avec $TARGET, les mêmes candidats (2 entrées Resolu) ressortent avec et sans le champ.
+archive_probe() {
+  local d="$WORK/ar" n_cand
+  fixture_pair BLOCKERS "$d"
+  archive_run "$d/sans" "$d/sans.out"; archive_run "$d/avec" "$d/avec.out"
+  n_cand="$(awk '/ARCHIVABLE/ { n++ } END { print n + 0 }' "$d/sans.out")"
+  if [ "$n_cand" -ne 2 ]; then LASTMSG="témoin sans champ : $n_cand candidat(s) au lieu de 2"; return 1; fi
+  if ! same_output "$d/avec.out" "$d/sans.out"; then
+    LASTMSG="candidats différents avec le champ ($(awk '/ARCHIVABLE/ { n++ } END { print n + 0 }' "$d/avec.out") contre $n_cand)"; return 1
+  fi
+  LASTMSG="mêmes candidats avec et sans champ ($n_cand entrées Resolu)"
+  return 0
+}
+TARGET="$ARCH"
+if archive_probe; then ok "RRO-ARCHIVE $LASTMSG"; else ko "RRO-ARCHIVE $LASTMSG"; fi
+
+# ======================================================================================================
+# RRO-DUP — detect-duplicates.sh (collision d'ID et titres proches)
+# ======================================================================================================
+DUPS="$SCRIPTS/detect-duplicates.sh"
+DU="$WORK/du"; fixture_pair LEARNINGS "$DU" dup
+for v in sans avec; do
+  ( cd "$DU/$v" && MEMORY_DIR=.claude/memory bounded bash "$DUPS" --register=LEARNINGS </dev/null ) > "$DU/$v.out" 2>&1
+  echo "$?" > "$DU/$v.rc"
+done
+if grep -q '"occurrences": 2' "$DU/sans.out" && grep -q '"jaccard"' "$DU/sans.out" \
+   && [ "$(cat "$DU/sans.rc")" = "$(cat "$DU/avec.rc")" ] && same_output "$DU/avec.out" "$DU/sans.out"; then
+  ok "RRO-DUP même sortie (collision LRN-001 et titres proches), rc $(cat "$DU/sans.rc") des deux côtés"
+else
+  ko "RRO-DUP sortie différente, ou collision / titres proches absents du témoin (rc sans=$(cat "$DU/sans.rc") avec=$(cat "$DU/avec.rc"))"
+fi
+
+# ======================================================================================================
+# RRO-PROMO — detect-promotions.sh (candidats opérationnels et cluster de catégorie)
+# ======================================================================================================
+PROMO="$SCRIPTS/detect-promotions.sh"
+# promo_probe : 0 si, avec $TARGET, les mêmes candidats ressortent avec et sans le champ.
+promo_probe() {
+  local d="$WORK/pr" v
+  fixture_pair LEARNINGS "$d"
+  for v in sans avec; do
+    ( cd "$d/$v" && MEMORY_DIR=.claude/memory bounded bash "$TARGET" </dev/null ) > "$d/$v.out" 2>&1
+    echo "$?" > "$d/$v.rc"
+  done
+  if ! grep -q '"operational_single"' "$d/sans.out" || ! grep -q '"frequency_cluster"' "$d/sans.out"; then
+    LASTMSG="témoin sans champ : candidats opérationnel ou cluster absents"; return 1
+  fi
+  if [ "$(cat "$d/sans.rc")" != "$(cat "$d/avec.rc")" ] || ! same_output "$d/avec.out" "$d/sans.out"; then
+    LASTMSG="candidats différents avec le champ (rc sans=$(cat "$d/sans.rc") avec=$(cat "$d/avec.rc"))"; return 1
+  fi
+  LASTMSG="mêmes candidats (opérationnels et cluster), rc $(cat "$d/sans.rc") des deux côtés"
+  return 0
+}
+TARGET="$PROMO"
+if promo_probe; then ok "RRO-PROMO $LASTMSG"; else ko "RRO-PROMO $LASTMSG"; fi
+
+# ======================================================================================================
+# RRO-SEED — seed-registres.sh copie le gabarit ENTIER comme registre initial : le squelette porte la ligne
+# ======================================================================================================
+SD="$WORK/seed"; mkdir -p "$SD"
+bounded bash "$SCRIPTS/seed-registres.sh" --memory-dir="$SD/mem" --templates-dir="$CPY_DIR" </dev/null >"$SD/seed.out" 2>&1; seed_rc=$?
+( cd "$SD" && bounded bash "$CHECK" --strict --memory-dir="$SD/mem" </dev/null ) > "$SD/check.out" 2>&1; check_rc=$?
+seed_bad=0
+for r in DECISIONS LEARNINGS BLOCKERS; do
+  lc="$(printf '%s' "$r" | tr '[:upper:]' '[:lower:]')"
+  n="$(awk '/^\*\*Role\*\* :/ { n++ } END { print n + 0 }' "$SD/mem/$r.md" 2>/dev/null)"
+  if [ "$n" -ne 1 ] || ! cmp -s "$SD/mem/$r.md" "$CPY_DIR/$lc-template.md"; then seed_bad=1; fi
+done
+if [ "$seed_rc" -eq 0 ] && [ "$check_rc" -eq 0 ] && [ "$seed_bad" -eq 0 ]; then
+  ok "RRO-SEED registres instanciés depuis les copies : --strict rc 0, squelette d'entrée porteur de la ligne **Role**"
+else
+  ko "RRO-SEED seed rc=$seed_rc, check --strict rc=$check_rc, squelette sans la ligne ou différent du gabarit=$seed_bad"
+fi
+
+# ======================================================================================================
+# RRO-COMPARATEUR-TEMOIN — le comparateur sait rougir : deux registres dont une entrée diffère par son Statut
+# ======================================================================================================
+CT="$WORK/ct"; fixture_pair BLOCKERS "$CT"
+mkdir -p "$CT/actif/.claude/memory"
+awk '/^\*\*Statut\*\* :/ { n++; if (n == 2) { print "**Statut** : Actif"; next } } { print }' \
+  "$CT/sans/.claude/memory/BLOCKERS.md" > "$CT/actif/.claude/memory/BLOCKERS.md"
+TARGET="$ARCH"; archive_run "$CT/sans" "$CT/sans.out"; archive_run "$CT/actif" "$CT/actif.out"
+n_a="$(awk '/ARCHIVABLE/ { n++ } END { print n + 0 }' "$CT/sans.out")"
+n_b="$(awk '/ARCHIVABLE/ { n++ } END { print n + 0 }' "$CT/actif.out")"
+if same_output "$CT/actif.out" "$CT/sans.out"; then
+  ko "RRO-COMPARATEUR-TEMOIN le comparateur déclare identiques deux registres de Statut différent"
+elif [ "$n_a" -eq 2 ] && [ "$n_b" -eq 1 ]; then
+  ok "RRO-COMPARATEUR-TEMOIN le comparateur rend « différent » ($n_a candidats contre $n_b quand un Statut change)"
+else
+  ko "RRO-COMPARATEUR-TEMOIN différence détectée mais témoin inattendu ($n_a / $n_b candidats au lieu de 2 / 1)"
+fi
+
+# ======================================================================================================
+# RRO-TEMOIN-REINDEX — mutant de reindex.sh : la fenêtre d'extraction du Resume passe de 40 à 2 lignes
+# ======================================================================================================
+MUT="$WORK/mut"; mkdir -p "$MUT"
+# mutant <id> <script> <ancre> <ancien> <nouveau> <sonde> <description> : copie <script> sous $MUT, change UNE ligne
+# (celle qui porte <ancre>), vérifie que la copie diffère (cmp -s) et reste valide (bash -n), puis rejoue <sonde>
+# sur le mutant (doit rougir) et sur l'original (doit rester verte).
+mutant() {
+  local id="$1" script="$2" needle="$3" old="$4" new="$5" probe="$6" desc="$7" mutbin cnt mrc orc mmsg
+  mutbin="$MUT/$(basename "$script")"
+  if ! declare -F "$probe" > /dev/null; then ko "$id sonde $probe NON DÉFINIE — $desc"; return; fi
+  cnt="$(NEEDLE="$needle" awk 'BEGIN { n = ENVIRON["NEEDLE"] } index($0, n) { c++ } END { print c + 0 }' "$script")"
+  if [ "$cnt" -ne 1 ]; then ko "$id mutant mal ciblé ($cnt lignes portent l'ancre au lieu de 1) — $desc"; return; fi
+  NEEDLE="$needle" OLD="$old" NEW="$new" awk 'BEGIN { n = ENVIRON["NEEDLE"]; o = ENVIRON["OLD"]; w = ENVIRON["NEW"] }
+    { if (index($0, n)) { i = index($0, o); if (i) $0 = substr($0, 1, i - 1) w substr($0, i + length(o)) } print }' \
+    "$script" > "$mutbin"
+  if cmp -s "$mutbin" "$script"; then ko "$id mutant NON OPPOSABLE (copie identique à l'original) — $desc"; return; fi
+  if ! bash -n "$mutbin" 2>/dev/null; then ko "$id mutant invalide (bash -n) — $desc"; return; fi
+  TARGET="$mutbin"; "$probe" < /dev/null; mrc=$?; mmsg="$LASTMSG"
+  TARGET="$script"; "$probe" < /dev/null; orc=$?
+  if [ "$mrc" -ne 0 ] && [ "$orc" -eq 0 ]; then
+    ok "$id tue ($desc) — sur le mutant : $mmsg"
+  elif [ "$mrc" -eq 0 ]; then
+    ko "$id mutant SURVIVANT ($desc) — la sonde reste verte sur le mutant"
+  else
+    ko "$id original rouge après mutation ($desc) — $LASTMSG"
+  fi
+}
+mutant RRO-TEMOIN-REINDEX "$REINDEX" 'end = min(n, i + 40)' 'i + 40' 'i + 2' probe_reindex_dec \
+  "fenêtre d'extraction du Resume réduite : le Resume devient vide, RRO-REINDEX rougit"
+# Mutants rendant un parseur SENSIBLE au champ : la comparaison avec / sans doit alors rougir.
+mutant RRO-TEMOIN-CHECK "$CHECK" 'dups="$(grep -oE "^## ($pat)" "$file"' '"^## ($pat)"' '"^(## ($pat)|\*\*Role\*\* : [a-z]+)"' check_probe \
+  "le contrôle des IDs dupliqués lit aussi la ligne Role : deux entrées au même poste passent pour un doublon"
+mutant RRO-TEMOIN-ARCHIVE "$ARCH" '/^\*\*Statut\*\* *:/ {' '/^\*\*Statut\*\* *:/' '/^\*\*(Statut|Role)\*\* *:/' archive_probe \
+  "le Statut est relu sur la ligne Role : plus aucun candidat avec le champ"
+mutant RRO-TEMOIN-PROMO "$PROMO" "encode_match = re.search(r'\\*\\*Encode dans" 'Encode dans' 'Role' promo_probe \
+  "« Encode dans » relu sur la ligne Role : les learnings paraissent encodés avec le champ"
 
 echo "== resultat : $pass ok, $fail ko =="
 [ "$fail" -eq 0 ]
