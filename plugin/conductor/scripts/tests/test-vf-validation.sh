@@ -34,6 +34,7 @@ LASTMSG=""; RC=0; OUT=""; ERR=""; D1=""; D2=""
 # mklab <nom> <format printf> [args] : lab plat sous $FX/<nom>, ROADMAP du dossier de planning ; positionne RUNDIR.
 mklab() {
   local n="$1" fmt="$2"; shift 2; RUNDIR="$FX/$n"
+  rm -rf "$RUNDIR"
   mkdir -p "$RUNDIR/.planning"; printf -- "$fmt" "$@" > "$RUNDIR/.planning/ROADMAP.md"
 }
 RMF() { printf '%s' "$RUNDIR/.planning/ROADMAP.md"; }
@@ -155,7 +156,7 @@ probe_poste_illisible() {
   { [ "$RC" -eq 5 ] && has 'ILLISIBLE poste illisible'; } || return 1
   LASTMSG="le ROADMAP a changé (poste invalide)"; [ "$(sum "$(RMF)")" = "$a" ] || return 1
   LASTMSG="validated (solo, ...) écrit sur un poste illisible"; [ "$(nmark "$(RMF)")" -eq 1 ] || return 1
-  mkdir -p "$FX/pj/.claude"; printf 'dev\n' > "$FX/pj/target"; ln -s ../target "$FX/pj/.claude/vibeflow-role"
+  rm -rf "$FX/pj"; mkdir -p "$FX/pj/.claude"; printf 'dev\n' > "$FX/pj/target"; ln -s ../target "$FX/pj/.claude/vibeflow-role"
   T_PROJ="$FX/pj" run validate --phase 2; T_PROJ="$TMP/proj"
   msg "fichier de poste lien symbolique (lecteur code 5) attendu rc 5"; [ "$RC" -eq 5 ] || return 1
   LASTMSG="le ROADMAP a changé (fichier de poste lien symbolique)"; [ "$(sum "$(RMF)")" = "$a" ] || return 1
@@ -255,7 +256,7 @@ probe_octets() {
   msg "fichier sans fin de ligne finale attendu octet pour octet"; [ "$RC" -eq 0 ] && cmp -s "$TMP/ne.exp" "$(RMF)"
 }
 probe_crlf() {
-  mkdir -p "$FX/crlf/.planning"; RUNDIR="$FX/crlf"
+  RUNDIR="$FX/crlf"; rm -rf "$RUNDIR"; mkdir -p "$RUNDIR/.planning"
   printf "$RM3" "" | awk '{ printf "%s\r\n", $0 }' > "$(RMF)"
   run propose --phase 2
   msg "ROADMAP CRLF attendu rc 0"; [ "$RC" -eq 0 ] || return 1
@@ -286,7 +287,7 @@ case_ VFV-MODE probe_mode
 
 # === Compartiments et entrées non fiables ================================================================
 mkws() { # <nom> : lab partitionné sous $FX/<nom> (racine, w1, w2) ; positionne RUNDIR
-  RUNDIR="$FX/$1"; mkdir -p "$RUNDIR/.planning/workstreams/w1" "$RUNDIR/.planning/workstreams/w2"
+  RUNDIR="$FX/$1"; rm -rf "$RUNDIR"; mkdir -p "$RUNDIR/.planning/workstreams/w1" "$RUNDIR/.planning/workstreams/w2"
   printf "$RM3" "" > "$RUNDIR/.planning/ROADMAP.md"
   printf "$RM3" "" > "$RUNDIR/.planning/workstreams/w1/ROADMAP.md"
   printf "$RM3" "" > "$RUNDIR/.planning/workstreams/w2/ROADMAP.md"
@@ -351,7 +352,7 @@ case_ VFV-ILLISIBLE probe_illisible
 ARCH_OK=$'# Architecture — Demo\n\n**Validation:** proposed\n\n## Contexte\nProduit de demonstration.\n\n## Choix structurants\n- Choix un\n\n## Composants et responsabilites\n- Composant un\n\n## Données\nLes donnees vivent dans une base.\n\n## Contraintes\n- Contrainte une\n\n## Risques et questions ouvertes\n- Risque un\n'
 TPL="$SDIR/../../planning-core/references/templates/product/ARCHITECTURE.template.md"
 probe_archi() {
-  RUNDIR="$FX/ar"; mkdir -p "$RUNDIR"; printf '%s' "$ARCH_OK" > "$RUNDIR/A.md"
+  RUNDIR="$FX/ar"; rm -rf "$RUNDIR"; mkdir -p "$RUNDIR"; printf '%s' "$ARCH_OK" > "$RUNDIR/A.md"
   gate_a "$RUNDIR/A.md"; [ $? -eq 1 ] || { LASTMSG="témoin : l'architecture proposée n'est pas rouge au gate"; return 1; }
   T_ROLE=dev run validate --architecture "$RUNDIR/A.md"; T_ROLE=""
   msg "validate --architecture au poste dev attendu rc 0 + ECRIT architecture : validated (dev, "
@@ -411,6 +412,184 @@ probe_forme() {
 }
 case_ VFV-NOECHO probe_noecho
 case_ VFV-FORME probe_forme
+
+# === Preuve moteur GSD : la sortie de l'écrivain ne change rien pour les lecteurs du moteur (P60-D-03 a, P60-PL-19) ===
+# Même méthode que la preuve du gate de phase, écrite ICI sans dépendance d'une suite à l'autre : fixtures générées sous
+# $TMP/gsd, moteur lancé avec --cwd sur ces seuls labs, jamais dans le dépôt. Aucun numéro de version du moteur.
+GSDJS="${HOME:-/nonexistent}/.claude/gsd-core/bin/gsd-tools.cjs"
+GSD="$TMP/gsd"; mkdir -p "$GSD"
+GRC=0
+
+# gsd_roadmap <titre de la phase 2> <ligne après la 1re ligne du Goal ou vide> <ligne de suite du Goal ou vide> : ROADMAP à
+# trois phases, sur la forme que le moteur écrit (**Goal:**, **Requirements**, **Depends on:**, **Plans:**).
+gsd_roadmap() {
+  printf '# Roadmap\n\n## Milestone v1.0\n\n- [ ] Phase 1: Premiere\n- [ ] Phase 2: Deuxieme\n- [ ] Phase 3: Troisieme\n\n'
+  printf '### Phase 1: Premiere\n**Goal:** un\n**Requirements**: TBD\n**Depends on:** Nothing\n**Plans:** 0 plans\n\n'
+  printf '%s\n**Goal:** deux\n' "$1"
+  if [ -n "$2" ]; then printf '%s\n' "$2"; fi
+  if [ -n "$3" ]; then printf '%s\n' "$3"; fi
+  printf '**Requirements**: TBD\n**Depends on:** Phase 1\n**Plans:** 0 plans\n\n'
+  printf '### Phase 3: Troisieme\n**Goal:** trois\n**Requirements**: TBD\n**Depends on:** Phase 2\n**Plans:** 0 plans\n'
+}
+# gsd_mklab <nom> <compartiment ou -> <1re ligne après Goal> <suite du Goal> : lab sous $GSD/<nom>.
+gsd_mklab() {
+  local d="$GSD/$1/.planning"
+  if [ "$2" != - ]; then d="$d/workstreams/$2"; fi
+  mkdir -p "$d"; gsd_roadmap '### Phase 2: Deuxieme' "$3" "$4" > "$d/ROADMAP.md"
+}
+gsd_do() { # <lab> <compartiment ou -> <fichier de sortie> <arguments du moteur...>
+  local lab="$1" ws="$2" out="$3"; shift 3
+  if [ "$ws" = - ]; then
+    (cd "$TMP" && perl -e 'alarm 30; exec @ARGV' node "$GSDJS" "$@" --cwd "$lab") > "$out" 2> "$out.err" < /dev/null
+  else
+    (cd "$TMP" && perl -e 'alarm 30; exec @ARGV' node "$GSDJS" "$@" --cwd "$lab" --ws "$ws") > "$out" 2> "$out.err" < /dev/null
+  fi
+  GRC=$?
+}
+# gsd_norm <drop> <lab> <fichier brut> : chemin du lab remplacé par un jeton fixe ; drop=1 retire la seule ligne "section":.
+gsd_norm() {
+  LAB="$2" awk -v drop="$1" 'BEGIN { l = ENVIRON["LAB"] }
+    { if (drop == "1" && $0 ~ /^[ \t]*"section":/) next
+      while ((i = index($0, l)) > 0) $0 = substr($0, 1, i - 1) "<LAB>" substr($0, i + length(l))
+      print }' "$3"
+}
+# gsd_same <drop> <compartiment ou -> <attendu> <labA> <labB> <arguments du moteur...> -> 0 identique, 1 différent,
+# 2 référence inutilisable (moteur en erreur, sortie vide ou sans le jeton <attendu> : un « identique » ne vaudrait rien).
+gsd_same() {
+  local drop="$1" ws="$2" want="$3" a="$4" b="$5"; shift 5
+  gsd_do "$a" "$ws" "$TMP/gsd.a" "$@"
+  if [ "$GRC" -ne 0 ] || [ ! -s "$TMP/gsd.a" ] || ! command grep -qF -- "$want" "$TMP/gsd.a"; then
+    LASTMSG="référence inutilisable (rc $GRC, jeton [$want] attendu) err[$(tr '\n' '|' < "$TMP/gsd.a.err" | cut -c1-200)]"; return 2
+  fi
+  gsd_do "$b" "$ws" "$TMP/gsd.b" "$@"
+  if [ "$GRC" -ne 0 ]; then LASTMSG="le moteur rend rc $GRC sur le second lab"; return 1; fi
+  gsd_norm "$drop" "$a" "$TMP/gsd.a" > "$TMP/gsd.na"; gsd_norm "$drop" "$b" "$TMP/gsd.b" > "$TMP/gsd.nb"
+  if cmp -s "$TMP/gsd.na" "$TMP/gsd.nb"; then return 0; fi
+  LASTMSG="sorties différentes"; return 1
+}
+gsd_must_differ() { # attendu « différent » : un 0 est un comparateur aveugle, un 2 une référence inutilisable
+  gsd_same "$@"; local r=$?
+  if [ "$r" -eq 0 ]; then LASTMSG="comparateur aveugle : un témoin négatif est déclaré identique (${*:3:3})"; return 1; fi
+  if [ "$r" -eq 2 ]; then return 1; fi
+  return 0
+}
+gsd_must_match() { gsd_same "$@"; local r=$?; if [ "$r" -eq 0 ]; then return 0; fi; LASTMSG="${LASTMSG} (${*:3:3})"; return 1; }
+# gsd_write <lab> <compartiment ou -> <verbe> : l'ÉCRIVAIN sur le ROADMAP du lab (poste dev), code 0 exigé.
+gsd_write() {
+  local ws=()
+  if [ "$2" != - ]; then ws=(--ws "$2"); fi
+  RUNDIR="$GSD/$1"; T_ROLE=dev run "$3" --phase 2 ${ws[@]+"${ws[@]}"}; T_ROLE=""
+  msg "l'écrivain ($3) sur $1 attendu rc 0"; [ "$RC" -eq 0 ]
+}
+
+if [ -f "$GSDJS" ] && command -v node > /dev/null 2>&1; then
+  PH2='"phase_name": "Deuxieme"'; CNT='"phase_count": 3'
+  gsd_mklab A1 - '' ''
+  gsd_mklab A2 - '' 'suite du but'
+  gsd_mklab N2 - '**Validation:** proposed' 'suite du but'   # insertion FAUTIVE, entre les deux lignes du Goal
+  # Témoin négatif d'abord, avant toute comparaison positive : le comparateur doit savoir rougir (champ goal).
+  probe_gsd_neg() {
+    gsd_must_match 1 - "$PH2" "$GSD/A2" "$GSD/A2" roadmap get-phase 2 || { LASTMSG="témoin positif A2 = A2 non identique (comparateur toujours différent) — $LASTMSG"; return 1; }
+    gsd_must_differ 1 - "$PH2" "$GSD/A2" "$GSD/N2" roadmap get-phase 2
+  }
+  case_ VFV-GSD-NEG probe_gsd_neg
+
+  probe_gsd_propose() {
+    local v
+    for v in 1 2; do
+      cp -R "$GSD/A$v" "$GSD/P$v"
+      gsd_write "P$v" - propose || return 1
+      gsd_must_match 1 - "$PH2" "$GSD/A$v" "$GSD/P$v" roadmap get-phase 2 || return 1
+      gsd_must_match 0 - "$CNT" "$GSD/A$v" "$GSD/P$v" roadmap analyze || return 1
+    done
+    # Le champ retiré de la comparaison porte bien le marqueur : le retrait n'efface pas une différence réelle.
+    gsd_do "$GSD/P2" - "$TMP/gsd.sec" roadmap get-phase 2
+    LASTMSG="la section de P2 ne porte pas la ligne de marqueur après la seconde ligne du Goal"
+    command grep -qF 'suite du but\n**Validation:** proposed' "$TMP/gsd.sec"
+  }
+  case_ VFV-GSD-PROPOSE probe_gsd_propose
+
+  probe_gsd_validate() {
+    local v
+    for v in 1 2; do
+      cp -R "$GSD/P$v" "$GSD/V$v"
+      gsd_write "V$v" - validate || return 1
+      gsd_must_match 1 - "$PH2" "$GSD/A$v" "$GSD/V$v" roadmap get-phase 2 || return 1
+      gsd_must_match 0 - "$CNT" "$GSD/A$v" "$GSD/V$v" roadmap analyze || return 1
+    done
+  }
+  case_ VFV-GSD-VALIDATE probe_gsd_validate
+
+  # Lab partitionné : mêmes comparaisons avec --ws w1 (compartiment de fixture, aucun nom réel).
+  gsd_mklab Aw w1 '' 'suite du but'
+  gsd_mklab Nw w1 '**Validation:** proposed' 'suite du but'
+  probe_gsd_ws() {
+    gsd_must_differ 1 w1 "$PH2" "$GSD/Aw" "$GSD/Nw" roadmap get-phase 2 || return 1
+    cp -R "$GSD/Aw" "$GSD/Pw"
+    gsd_write Pw w1 propose || return 1
+    gsd_must_match 1 w1 "$PH2" "$GSD/Aw" "$GSD/Pw" roadmap get-phase 2 || return 1
+    gsd_must_match 0 w1 "$CNT" "$GSD/Aw" "$GSD/Pw" roadmap analyze || return 1
+    cp -R "$GSD/Pw" "$GSD/Vw"
+    gsd_write Vw w1 validate || return 1
+    gsd_must_match 1 w1 "$PH2" "$GSD/Aw" "$GSD/Vw" roadmap get-phase 2 || return 1
+    gsd_must_match 0 w1 "$CNT" "$GSD/Aw" "$GSD/Vw" roadmap analyze
+  }
+  case_ VFV-GSD-WS probe_gsd_ws
+else
+  skip "VFV-GSD moteur GSD absent (node ou gsd-tools.cjs introuvable : la CI installe le moteur et tranche)"
+fi
+
+# === Mutants (QUAL-01) ===============================================================================
+MUTDIR="$TMP/mut"; mkdir -p "$MUTDIR"
+MUTBIN="$MUTDIR/vf-validation.sh"
+# Lecteur de poste et règles de compartiment à côté de la copie (à plat), comme chez l'utilisateur.
+cp "$SDIR/vf-role.sh" "$MUTDIR/vf-role.sh"
+for _p in "$HERE/../workstream-policy.sh" "$HERE/../../../planning-core/scripts/workstream-policy.sh"; do
+  if [ -f "$_p" ]; then cp "$_p" "$MUTDIR/workstream-policy.sh"; break; fi
+done
+
+# mutant <id> <ligne repère> <ancien> <nouveau> <sonde> <description> : dans UNE ligne du script (celle qui
+# contient le repère), remplace la première occurrence littérale de <ancien> par <nouveau> (chaînes passées par
+# l'environnement : aucune séquence d'échappement interprétée). La sonde doit échouer sur le mutant, réussir
+# sur l'original ; code attendu/obtenu imprimé par msg.
+mutant() {
+  local id="$1" needle="$2" old="$3" new="$4" probe="$5" desc="$6"
+  if ! declare -F "$probe" > /dev/null; then ko "$id sonde $probe NON DÉFINIE à cet endroit — $desc"; return; fi
+  NEEDLE="$needle" OLD="$old" NEW="$new" awk 'BEGIN { n = ENVIRON["NEEDLE"]; o = ENVIRON["OLD"]; w = ENVIRON["NEW"] }
+    { if (index($0, n)) { i = index($0, o); if (i) $0 = substr($0, 1, i - 1) w substr($0, i + length(o)) } print }' \
+    "$SCRIPT" > "$MUTBIN"
+  if cmp -s "$MUTBIN" "$SCRIPT"; then ko "$id mutant NON OPPOSABLE (copie identique à l'original) — $desc"; return; fi
+  if ! bash -n "$MUTBIN" 2>/dev/null; then ko "$id mutant invalide (bash -n) — $desc"; return; fi
+  local nl; nl="$(diff "$SCRIPT" "$MUTBIN" | command grep -c '^<')"
+  if [ "$nl" != 1 ]; then ko "$id mutant mal ciblé ($nl lignes changées au lieu de 1) — $desc"; return; fi
+  TARGET="$MUTBIN"; "$probe" < /dev/null; local mrc=$?; local mmsg="$LASTMSG"
+  TARGET="$SCRIPT"; "$probe" < /dev/null; local orc=$?
+  if [ "$mrc" -ne 0 ] && [ "$orc" -eq 0 ]; then
+    ok "$id tue ($desc) — sur le mutant : $mmsg"
+  elif [ "$mrc" -eq 0 ]; then
+    ko "$id mutant SURVIVANT ($desc) — la sonde ${probe#probe_} reste verte sur le mutant"
+  else
+    ko "$id original rouge après mutation ($desc) — $LASTMSG"
+  fi
+  TARGET="$SCRIPT"
+}
+
+mutant VFV-MUT-1 'if [ "$OVERRIDE" -ne 1 ]; then' '[ "$OVERRIDE" -ne 1 ]' 'false' probe_poste_product \
+  "refus du poste product retiré"
+mutant VFV-MUT-2 'if [ "$rrc" -ne 0 ]; then illis' 'illis "poste illisible (vf-role.sh code $rrc) : aucune ecriture, jamais un repli sur solo"' 'ROLE=solo' probe_poste_illisible \
+  "échec du lecteur de poste replié sur solo"
+mutant VFV-MUT-3 'propose:1:validated)' 'indet "deja validee : jamais repassee a proposed"' 'finish 0' probe_propose_validee \
+  "propose sur une phase validée n'est plus refusé"
+mutant VFV-MUT-4 'if (ingoal) { if (t == ""' 'else goalend = NR;' 'else goalend = goalend;' probe_goal_multi \
+  "insertion juste après la première ligne du Goal"
+mutant VFV-MUT-5 'if [ -L "$F" ]; then illis' '[ -L "$F" ]' 'false' probe_lien \
+  "refus du lien symbolique retiré"
+mutant VFV-MUT-6 'if [ "$nsec" -eq 0 ]; then indet' 'indet "phase introuvable"' 'finish 0' probe_trace3 \
+  "phase introuvable rendue 0"
+mutant VFV-MUT-7 'VAL="validated (product,' ', override)' ')' probe_poste_product \
+  "override absent de la valeur écrite"
+mutant VFV-MUT-8 'then indet "lab partitionne sans --ws"' '[ -e "$PLAN/workstreams" ] || [ -L "$PLAN/workstreams" ]' 'false' probe_ws \
+  "lab partitionné sans --ws traité comme lab plat"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]
