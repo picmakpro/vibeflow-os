@@ -41,8 +41,14 @@ DRIVER="$SCRIPTS/driver-lock.sh"
 BASH_BIN="${BASH:-bash}"
 # Mode de la suite. `full` (défaut) : tout, A/B et mutants compris. `matrice` : sous-processus d'un mutant (GW-M-*),
 # qui rejoue les cas GW-* (A/B exclu) contre une COPIE mutée du guard (GW_GUARD) posée à côté de vf-portable.sh ;
-# ni A/B ni mutants (pas de récursion).
+# ni A/B ni mutants (pas de récursion). `sans-mutants` : tout sauf les mutants (A/B compris) — mode des shards de la
+# CI quand la PR ne touche ni le guard, ni le verrou, ni leur suite ; les mutants tournent alors dans un job dédié, ou
+# sur tout push de main (Phase 65, arbitrage Samuel, message session principale, 2026-10-29).
 GW_MODE="${GW_MODE:-full}"
+case "$GW_MODE" in
+  full|matrice|sans-mutants) ;;
+  *) echo "❌ FAIL — GW_MODE inconnu : '$GW_MODE' (attendu : full, matrice, sans-mutants)"; exit 64 ;;
+esac
 SUITE="$HERE/$(basename "$0")"
 [ -z "${GW_GUARD:-}" ] || GUARD="$GW_GUARD"
 PORTABLE="$(cd "$SCRIPTS/../../_internal/lib" && pwd)/vf-portable.sh"
@@ -512,6 +518,56 @@ dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
 out="$(run_guard_in "$LAB" "$(mk_bash 'git commit -m x' sess-B "$LAB")")"; rc=$?
 assert_exit "GW-C-EMPTY-1 — rien d'indexé : exit 0" "$rc" 0
 assert_empty "GW-C-EMPTY-2 — rien d'indexé, pas de -a, verrou alpha d'autrui : stdout vide" "$out"
+
+echo
+echo "=== GW-C-WT — un commit lancé après « cd <worktree> && » est jugé sur l'index et l'arbre de CE worktree (#166) ==="
+# Fixture : verrou alpha pris par sess-A depuis le checkout principal ; non suivis alpha/config.json et alpha/state.json dans
+# l'arbre PRINCIPAL ; worktree rangé sous le lab ; payload de sess-B dont le cwd est le checkout principal.
+LAB="$(mk_lab cwt)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+printf '{}\n' > "$LAB/.planning/workstreams/alpha/config.json"; printf '{}\n' > "$LAB/.planning/workstreams/alpha/state.json"
+WTX="$LAB/.claude/worktrees/x"
+git -C "$LAB" worktree add -q -b cwtx "$WTX" >/dev/null 2>&1
+mkdir -p "$WTX/src"; printf 'x\n' > "$WTX/src/wt.sh"; stage "$WTX" src/wt.sh
+out="$(run_guard_in "$LAB" "$(mk_bash "cd $WTX && git add src/wt.sh && git commit -m x" sess-B "$LAB")")"; rc=$?
+assert_exit "GW-C-WT-1.1 — cd <worktree> && git add && git commit : exit 0" "$rc" 0
+assert_empty "GW-C-WT-1.2 — seul un fichier hors .planning indexé dans le worktree : stdout vide (les non-suivis de l'arbre principal ne comptent pas)" "$out"
+unstage "$WTX"
+mkdir -p "$WTX/.planning/workstreams/alpha"; printf 'r\n' > "$WTX/.planning/workstreams/alpha/ROADMAP.md"; stage "$WTX" .planning/workstreams/alpha/ROADMAP.md
+out="$(run_guard_in "$LAB" "$(mk_bash "cd $WTX && git add .planning/workstreams/alpha/ROADMAP.md && git commit -m x" sess-B "$LAB")")"
+assert "GW-C-WT-2.1 — alpha indexé DANS le worktree, alpha tenu par autrui : deny" "$out" "$DENY"
+assert "GW-C-WT-2.2 — motif : le chemin indexé du worktree est cité" "$out" ".planning/workstreams/alpha/ROADMAP.md"
+out="$(run_guard_in "$LAB" "$(mk_bash "cd $WTX && git commit -m x" sess-B "$LAB")")"
+assert "GW-C-WT-2.3 — même index, sans git add dans la commande : deny (seul l'index du worktree le porte)" "$out" "$DENY"
+assert "GW-C-WT-2.4 — motif : le chemin indexé du worktree est cité (préfixe du lab pris dans SON checkout)" "$out" ".planning/workstreams/alpha/ROADMAP.md"
+unstage "$WTX"; rm -rf "$WTX/.planning/workstreams/alpha/ROADMAP.md"
+stage "$WTX" src/wt.sh
+out="$(run_guard_in "$LAB" "$(mk_bash "cd $WTX; git add src/wt.sh && git commit -m x" sess-B "$LAB")")"
+assert "GW-C-WT-3.1 — lien « ; » après le cd : le doute reste fail-closed, jugé comme avant (deny)" "$out" "$DENY"
+assert "GW-C-WT-3.2 — motif : les non-suivis de l'arbre principal sont cités" "$out" "alpha/config.json"
+out="$(run_guard_in "$LAB" "$(mk_bash "git add -A && git commit -m x" sess-B "$LAB")")"
+assert "GW-C-WT-4.1 — non-régression : git add -A && git commit depuis l'arbre principal : deny" "$out" "$DENY"
+out="$(run_guard_in "$LAB" "$(mk_bash "git commit -m x" sess-B "$LAB")")"
+assert_empty "GW-C-WT-4.2 — non-régression : git commit nu, rien d'indexé dans l'arbre principal : stdout vide" "$out"
+UNREL="$LAB/.claude/unrel"
+mkdir -p "$UNREL"; git -C "$UNREL" init -q >/dev/null 2>&1; printf 'u\n' > "$UNREL/f.txt"
+out="$(run_guard_in "$LAB" "$(mk_bash "cd $UNREL && git add f.txt && git commit -m x" sess-B "$LAB")")"
+assert "GW-C-WT-5.1 — dépôt SANS lien avec le lab : jugé comme avant (deny sur les non-suivis du lab)" "$out" "$DENY"
+assert "GW-C-WT-5.2 — motif inchangé : alpha/config.json cité" "$out" "alpha/config.json"
+# 6 : `a || cd X && c` se lit `(a || cd X) && c` : si `a` réussit, le cd est sauté et le commit part du dossier de départ.
+# Un cd précédé de `||` ne fixe donc jamais le dossier du commit : jugé comme avant (deny sur l'arbre principal).
+# Fixture : alpha INDEXÉ dans l'arbre principal (le jugement d'avant le lot le refuse), worktree propre (jugé seul, il passerait).
+unstage "$WTX"; stage "$LAB" .planning/workstreams/alpha/config.json
+for f in 1 2 3; do
+  case $f in
+    1) c="true || cd $WTX && git commit -m x" ;;
+    2) c="git status || cd $WTX && git commit -m x" ;;
+    3) c="test -d $WTX || cd $WTX && git commit -m x" ;;
+  esac
+  out="$(run_guard_in "$LAB" "$(mk_bash "$c" sess-B "$LAB")")"
+  assert "GW-C-WT-6.$f — cd précédé de « || » : le dossier du commit n'est pas certain, jugé comme avant (deny)" "$out" "$DENY"
+done
+unstage "$LAB"
 
 echo
 echo "=== GW-NOLOCK — partition sans verrou : aucun git diff n'est lancé ==="
@@ -1343,7 +1399,7 @@ unstage "$LAB"
 out="$(run_guard_in "$LAB/autre" "$(mk_write "$LAB/.planning/workstreams/alpha/f" x sess-B "$LAB/autre")")"
 assert_empty "GW-SUB-7 — cwd portant son PROPRE .planning (P57-D-29, hors périmètre) : jugé comme avant, permis" "$out"
 
-if [ "$GW_MODE" = full ]; then
+if [ "$GW_MODE" = full ] || [ "$GW_MODE" = sans-mutants ]; then
 echo
 echo "=== GW-AB — lab PLAT : la copie gelée du guard d'avant la phase et le guard courant rendent la MÊME transcription, octet pour octet, SAUF sur la liste ÉNUMÉRÉE des formes nouvellement refusées (P57-D-03, P57-D-22 ; Q4 du 2026-10-13) ==="
 # Sémantique de ln/mv vue par la copie gelée (#166) : `-h` = option réelle (BSD, lien créé / fichier déplacé) ou refus
@@ -1795,7 +1851,7 @@ for id in $GW_AB_ENUM; do
 done
 assert_exit "GW-AB-PIN.2 — dans la transcription épinglée, chaque forme énumérée est refusée pour l'intrus ($gw_ab_pin_deny/$GW_AB_ENUM_N)" "$gw_ab_pin_deny" "$GW_AB_ENUM_N"
 assert_exit "GW-AB-PIN.3 — dans la transcription épinglée, chaque forme énumérée passe pour le détenteur ($gw_ab_pin_hold/$GW_AB_ENUM_N)" "$gw_ab_pin_hold" "$GW_AB_ENUM_N"
-fi   # GW_MODE = full (A/B)
+fi   # GW_MODE = full | sans-mutants (A/B)
 
 if [ "$GW_MODE" = full ]; then
 echo
@@ -1805,7 +1861,7 @@ echo "=== MUTANTS GW-M-a à GW-M-w, puis GW-M-pathspec_blind à GW-M-vide_both �
 # embarqué de la copie est compilé (bash -n ne voit pas dedans). La matrice (les cas GW-* hors A/B) est rejouée en
 # sous-processus contre la copie ; l'ensemble des ASSERTIONS dont le verdict bascule (identifiant, nombre d'échecs)
 # est comparé EXACTEMENT à l'attendu : un cas basculé hors de l'ensemble, ou manquant, fait échouer.
-MUT_TOTAL=55; MUT_KILLED=0; t0=$SECONDS
+MUT_TOTAL=59; MUT_KILLED=0; t0=$SECONDS
 # a : en plus du cas nommé, GW-C-REL-tenu=2 (VERSION, docs/ADR.md) : sans -z, le « \n » reste collé au nom, qui ne correspond plus
 #     à la liste exacte des fichiers de forme de release (la prédiction du plan, NONASCII seul, ignorait cet effet de bord)
 # a : GW-C-INC-1/2 (corrections F-3, R-5, C3) : sans -z, « .planning/workstreams\n » ne se lit plus comme le chemin incertain
@@ -1902,6 +1958,14 @@ MUT_AU2PERSIST="GW-AU2-06.7=1"
 MUT_AU3PUNCT="GW-AU3-01.F.10=1 GW-AU3-01.F.11=1 GW-AU3-01.F.1=1 GW-AU3-01.F.2=1 GW-AU3-01.F.3=1 GW-AU3-01.F.4=1 GW-AU3-01.F.5=1 GW-AU3-01.F.6=1 GW-AU3-01.F.7=1 GW-AU3-01.F.8=1 GW-AU3-01.F.9=1 GW-AU3-01.P.10=1 GW-AU3-01.P.11=1 GW-AU3-01.P.1=1 GW-AU3-01.P.2=1 GW-AU3-01.P.3=1 GW-AU3-01.P.4=1 GW-AU3-01.P.5=1 GW-AU3-01.P.6=1 GW-AU3-01.P.7=1 GW-AU3-01.P.8=1 GW-AU3-01.P.9=1"
 MUT_AU3COARSE="GW-AU3-02.F.1=1 GW-AU3-02.F.2=1 GW-AU3-02.F.3=1 GW-AU3-02.F.4=1 GW-AU3-02.F.6=1 GW-AU3-02.P.1=1 GW-AU3-02.P.2=1 GW-AU3-02.P.3=1 GW-AU3-02.P.4=1 GW-AU3-02.P.6=1"
 MUT_AU3REDIR="GW-AU3-01.R1=1 GW-AU3-01.R2=1"
+# wt_* (#166, commit lancé après cd <worktree> &&) : wt_cwd = le dossier effectif n'est plus résolu (retour au cwd du payload) ; wt_prefix = le préfixe
+# du lab est calculé contre le toplevel du worktree (../../.. : tout classé hors, un .planning indexé PASSERAIT) ; wt_common = le dépôt du
+# dossier effectif n'est plus comparé à celui du lab (un dépôt sans lien serait jugé à la place du lab).
+MUT_WTCWD="GW-C-WT-1.2=1 GW-C-WT-2.3=1 GW-C-WT-2.4=1"
+MUT_WTPREFIX="GW-C-WT-2.1=1 GW-C-WT-2.2=1 GW-C-WT-2.3=1 GW-C-WT-2.4=1"
+MUT_WTCOMMON="GW-C-WT-5.1=1 GW-C-WT-5.2=1"
+# wt_or = le cd précédé de « || » fixe de nouveau le dossier du commit (`a || cd X && c` : le cd peut être sauté, c part du dossier de départ).
+MUT_WTOR="GW-C-WT-6.1=1 GW-C-WT-6.2=1 GW-C-WT-6.3=1"
 # gitenv = le retrait de GIT_DIR/GIT_WORK_TREE/... hérités disparaît (relecture SOBR-04, 2026-10-14) ; vide_py = le jugement python du dossier
 # des compartiments vide redevient « présent » (le message du lab plat devient celui de l'ancien verrou partitionné) ; vide_both = les DEUX
 # jugements (bash et python) le font, le Write racine est alors refusé par le verrou de dépôt (P57-D-56).
@@ -2081,6 +2145,11 @@ mutant gitenv '^            env.pop(k, None)$' 's@env.pop(k, None)@pass@' "$MUT_
 mutant vide_py 'return False  # D56-VIDE' 's@return False  # D56-VIDE@return True  # D56-VIDE@' "$MUT_VIDEPY"
 mutant vide_both 'return 1  # D56-VIDE' 's@return 1  # D56-VIDE@return 0  # D56-VIDE@' "$MUT_VIDEBOTH" 'return False  # D56-VIDE' 's@return False  # D56-VIDE@return True  # D56-VIDE@'
 
+mutant wt_cwd '^                eff = effective_dir(cmd, cwd)$' 's@effective_dir(cmd, cwd)@None@' "$MUT_WTCWD"
+mutant wt_prefix 'ecwd, etop = eff, t2  #' 's@ecwd, etop = eff, t2  #@ecwd, etop = eff, t2; prefix = os.fsencode(os.path.relpath(os.path.realpath(cwd if lab is None else lab), t2))  #@' "$MUT_WTPREFIX"
+mutant wt_common 'and common_dir_of(t2) == common_dir_of(top):' 's@and common_dir_of(t2) == common_dir_of(top):@and True:@' "$MUT_WTCOMMON"
+mutant wt_or '^    if "||" in cmd:$' 's@if "||" in cmd:@if False:@' "$MUT_WTOR"
+
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
 echo "  durée des mutants : $((SECONDS-t0))s · pic de concurrence : $MUT_PEAK matrice(s) simultanée(s) (borne GW_MUT_PAR=$GW_MUT_PAR)"
@@ -2091,6 +2160,7 @@ else
   FAIL=$((FAIL+1))
 fi
 fi   # GW_MODE = full (mutants)
+[ "$GW_MODE" != sans-mutants ] || echo "== mutants : non joués ici (GW_MODE=sans-mutants) — job dédié de la CI ou push de main =="
 
 echo
 echo "=== Bilan : $PASS PASS · $FAIL FAIL ==="

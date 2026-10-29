@@ -86,6 +86,20 @@ release_reindex_lock() {
   return 0
 }
 
+# Reporte sur un fichier temporaire le mode du registre qu'il va remplacer (#166) :
+# mktemp cree en 600, et un `mv` nu laisserait le registre en 600. On garde le `mv`
+# (rename atomique : un lecteur ne voit jamais un fichier a moitie ecrit) et on copie
+# le mode AVANT. Lecture GNU d'abord : `stat -f %Lp` sous GNU rend un statut de systeme
+# de fichiers sans echouer, `stat -c` sous BSD echoue proprement. Valeur validee (octal
+# 3-4 chiffres), sinon repli silencieux (le mode du temporaire reste : fail-open).
+keep_mode() {
+  local m
+  m=$(stat -c %a "$1" 2>/dev/null) || m=""
+  case "$m" in [0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) ;; *) m=$(stat -f %Lp "$1" 2>/dev/null) || m="" ;; esac
+  case "$m" in [0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) chmod "$m" "$2" 2>/dev/null || true ;; esac
+  return 0
+}
+
 register_file() {
   if command -v register_file_custom >/dev/null 2>&1; then
     local c; c="$(register_file_custom "$1")"; [ -n "$c" ] && { echo "$c"; return; }
@@ -476,6 +490,7 @@ PYEOF
         }
       }
     ' "$file" > "$boot_tmp"
+    keep_mode "$file" "$boot_tmp"
     mv "$boot_tmp" "$file"
     rm -f "$idx_tmp" "$orphans_tmp" "$tmp"
     # Le verrou CSL-09 est libere AVANT la recursion (elle le reprend elle-meme).
@@ -511,6 +526,7 @@ PYEOF
     state == "after" { print }
   ' "$file" > "$tmp"
 
+  keep_mode "$file" "$tmp"
   mv "$tmp" "$file"
   new_total=$(wc -l < "$file" | tr -d ' ')
   local orphan_count

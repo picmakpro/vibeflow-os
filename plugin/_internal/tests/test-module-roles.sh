@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test de module-roles.sh (Phase 58, RLPO-04/05) — autonome.
-# Cas : MR-TRACE-1..4 (tracer), MR-VAL-1..3, MR-LIST, MR-REAL, MR-CLOS (+ témoin), MR-USAGE,
+# Cas : MR-TRACE-1..4 (tracer), MR-VAL-1..3, MR-LIST, MR-REAL, MR-PRODUIT, MR-CLOS (+ témoin), MR-USAGE,
 # MR-MAND, mutants MR-MUT-1 (garde « liste vide » retirée), MR-MUT-2 (garde « ensemble fermé » retirée)
 # et MR-MUT-3 (garde « mandatory » retirée).
 set -uo pipefail
@@ -79,15 +79,23 @@ else ko "MR-MAND attendu rc 1/1 nom+mandatory cités, témoins rc 0 ; obtenu val
 # --- list / table réelle
 ALL="$(for f in "$PLUGIN"/*/module.json; do jq -r '.name' "$f"; done | LC_ALL=C sort)"
 DEVS="$(printf 'dev-orchestrator\nmobile-test\nmobile-test-team\n')"
+PRODS="$(printf 'product-team-bundle\n')"
 run "$SCRIPT" "$PLUGIN" list product; LP="$OUT"
 exp="$(printf '%s\n' "$ALL" | LC_ALL=C sort | comm -23 - <(printf '%s\n' "$DEVS" | LC_ALL=C sort))"
+expd="$(printf '%s\n' "$ALL" | LC_ALL=C sort | comm -23 - <(printf '%s\n' "$PRODS" | LC_ALL=C sort))"
 run "$SCRIPT" "$PLUGIN" list dev; LD="$OUT"
 run "$SCRIPT" "$PLUGIN" list solo; LS="$OUT"
-if [ "$LP" = "$exp" ] && [ "$LD" = "$ALL" ] && [ "$LS" = "$ALL" ]; then ok "MR-LIST product = tous moins les trois ; dev et solo = tous"
-else ko "MR-LIST product attendu [$exp] obtenu [$LP] ; dev/solo différents de la liste complète : $([ "$LD" = "$ALL" ] && echo non || echo oui)"; fi
+if [ "$LP" = "$exp" ] && [ "$LD" = "$expd" ] && [ "$LS" = "$ALL" ]; then ok "MR-LIST product = tous moins les modules dev ; dev = tous moins les modules product ; solo = tous"
+else ko "MR-LIST product attendu [$exp] obtenu [$LP] ; dev attendu [$expd] obtenu [$LD] ; solo différent de la liste complète : $([ "$LS" = "$ALL" ] && echo non || echo oui)"; fi
 REAL="$(for f in "$PLUGIN"/*/module.json; do jq -r 'select(has("roles")) | select(.roles == ["dev"]) | .name' "$f"; done | LC_ALL=C sort)"
+REALP="$(for f in "$PLUGIN"/*/module.json; do jq -r 'select(has("roles")) | select(.roles == ["product"]) | .name' "$f"; done | LC_ALL=C sort)"
 REALANY="$(for f in "$PLUGIN"/*/module.json; do jq -r 'select(has("roles")) | .name' "$f"; done | LC_ALL=C sort)"
-[ "$REAL" = "$DEVS" ] && [ "$REALANY" = "$DEVS" ] && ok "MR-REAL exactement trois modules à [\"dev\"]" || ko "MR-REAL attendu [$DEVS] obtenu [$REALANY]"
+UNION="$(printf '%s\n%s\n' "$DEVS" "$PRODS" | LC_ALL=C sort)"
+[ "$REAL" = "$DEVS" ] && [ "$REALP" = "$PRODS" ] && [ "$REALANY" = "$UNION" ] && ok "MR-REAL trois modules à [\"dev\"], un module à [\"product\"], et nul autre module ne porte roles" || ko "MR-REAL dev attendu [$DEVS] obtenu [$REAL] ; product attendu [$PRODS] obtenu [$REALP] ; tous roles attendu [$UNION] obtenu [$REALANY]"
+run "$SCRIPT" "$PLUGIN" visible product-team-bundle product; pp="$OUT"
+run "$SCRIPT" "$PLUGIN" visible product-team-bundle solo; ps="$OUT"
+run "$SCRIPT" "$PLUGIN" visible product-team-bundle dev; pd="$OUT"
+[ "$pp/$ps/$pd" = "yes/yes/no" ] && ok "MR-PRODUIT product-team-bundle visible à product et solo, invisible à dev" || ko "MR-PRODUIT attendu [yes/yes/no] obtenu [$pp/$ps/$pd]"
 
 # --- fermeture : fuites <racine> <poste> -> modules requis invisibles au poste
 fuites() {

@@ -53,6 +53,17 @@ To request a change, just say it: "task three should also cover the case where t
 "drop the notifications part, we said later". The plan gets rewritten rather than patched at the
 edges, and you can read it again. Until you say go, nothing is executed.
 
+### A proposed step waits for a dev
+
+At the `product` and `dev` roles, a step added by the team is born **proposed**: it is neither
+planned nor executed until a dev has validated it. If you ask to plan it, the team stops, naming the
+step and the expected gesture, and launches nothing. To validate it, a dev runs
+`vf-validation.sh validate --phase <N>`; the same command, with
+`--architecture .planning/ARCHITECTURE.md`, validates the architecture the head requires before any
+splitting. A `product` role is refused by that verb, except by an explicit exception traced in the
+validation value. At the `solo` role none of this exists: your steps stay validated by default. It is
+not a lock: see [gates and human validation](../02-concepts/gates-and-human-validation.md).
+
 ## Plan review, and plans that are too big
 
 **Plan review.** Before a structural plan is executed, a reviewer who didn't write it goes through

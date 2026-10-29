@@ -1,5 +1,13 @@
 # Changelog — mobile-test
 
+## v1.0.5 — 2026-10-29 — publiée dans v2.72.0
+
+### Modifié
+- **Patch** (#153 §6.10 ; lot « clôture des issues GitHub ») — la couche jugement de `SKILL.md` (« diagnostic sur échec »)
+  gagne l'étape 5 « Recherche documentaire avant tout fix (ADR-045) » : doc (context7 ou officielle) avant de proposer un
+  correctif quand la cause touche une lib, un framework, une API tierce ou une version d'OS/SDK ; sans accès web, état
+  `doc-research-required` avec la question précise. Sans elle, `check-debug-research.sh --strict` rougissait à l'installation.
+
 ## v1.0.4 — 2026-10-16
 
 ### Modifié

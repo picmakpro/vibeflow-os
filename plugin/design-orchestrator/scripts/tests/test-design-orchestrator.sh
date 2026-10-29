@@ -73,6 +73,32 @@ skip() { echo "  ⊘ SKIP $1"; skipped=$((skipped+1)); }
 # grep insensible à l'alias zsh (ugrep) : on force le binaire système.
 GREP="$(command -v grep)"
 
+# CEINTURE (#166 volet 10) : la suite ne doit JAMAIS atteindre un vrai `claude`/`codex`. Un faux de
+# chaque, journalisant son argv complet, est posé EN TÊTE de PATH pour toute la durée de la suite
+# (les cas qui réduisent PATH le gardent en tête ; un PATH réduit SANS $BELT_DIR n'est couvert que par
+# le dry-run ou le SKIP du cas, jamais par la ceinture). Le garde final
+# (T9z) lit le journal : aucun `plugin install|enable|add|marketplace` ne doit y figurer, et il doit
+# y figurer au moins un appel (témoin positif, sinon la garde serait verte à vide si la ceinture
+# n'était plus posée). Retirer la ceinture rend T9z rouge.
+BELT_DIR="$(mktemp -d)"
+BELT_JOURNAL="$BELT_DIR/journal.txt"
+: >"$BELT_JOURNAL"
+trap 'rm -rf "$BELT_DIR"' EXIT
+for _belt_rt in claude codex; do
+  cat >"$BELT_DIR/$_belt_rt" <<SH
+#!/usr/bin/env bash
+echo "$_belt_rt \$*" >> "$BELT_JOURNAL"
+if [ "\$1" = "plugin" ] && [ "\$2" = "list" ]; then echo '[]'; fi
+exit 0
+SH
+  chmod +x "$BELT_DIR/$_belt_rt"
+done
+export PATH="$BELT_DIR:$PATH"
+# Isolement : ensure-design-deps.sh lit un fichier d'exclusion `.vf-design-skip` sous ces deux racines ;
+# les pointer sur du vide empêche le lab de l'utilisateur (ou le dépôt courant) de fausser la suite.
+export CLAUDE_PROJECT_DIR="$BELT_DIR/project-vide"; mkdir -p "$CLAUDE_PROJECT_DIR"
+export CLAUDE_CONFIG_DIR="$BELT_DIR/config-vide"; mkdir -p "$CLAUDE_CONFIG_DIR"
+
 TEAM_AGENTS="vf-design-manager vf-crafter vf-design-judge"
 WORKERS="vf-crafter vf-design-judge"
 MANAGER="$MOD/agents/vf-design-manager.md"
@@ -393,10 +419,20 @@ SH
   # T9d — DÉGRADATION : PATH restreint SANS `claude` → exit 0, aucune trace d'exception, les 4
   # étapes manuelles affichées, dont la ligne à deux temps d'`impeccable`.
   # ---------------------------------------------------------------------------
+  # Dry-run + SKIP si un `claude` existe dans le PATH réduit (poste où il vit sous /usr/bin) : sans
+  # dry-run, ce cas exécutait alors le VRAI claude (install réelle) ; et la dégradation « CLI
+  # absente » n'y est de toute façon pas mesurable.
   T9D_BIN="$(mktemp -d)"
-  T9D_OUT="$(PATH="$T9D_BIN:/usr/bin:/bin" bash "$EDD" 2>&1)"
-  T9D_RC=$?
-  if [ "$T9D_RC" -eq 0 ] \
+  if (PATH="$T9D_BIN:/usr/bin:/bin"; command -v claude >/dev/null 2>&1 || command -v codex >/dev/null 2>&1); then
+    skip "T9d dégradation : un claude/codex existe dans le PATH réduit (/usr/bin:/bin) — CLI absente non simulable ici"
+    T9D_RC=skip
+  else
+    T9D_OUT="$(PATH="$T9D_BIN:/usr/bin:/bin" VF_DESIGN_ENSURE_DRY_RUN=1 bash "$EDD" 2>&1)"
+    T9D_RC=$?
+  fi
+  if [ "$T9D_RC" = skip ]; then
+    :
+  elif [ "$T9D_RC" -eq 0 ] \
     && echo "$T9D_OUT" | "$GREP" -q 'superpowers' \
     && echo "$T9D_OUT" | "$GREP" -q 'ui-ux-pro-max' \
     && echo "$T9D_OUT" | "$GREP" -q 'frontend-design' \
@@ -613,9 +649,18 @@ EOF2
   unset -f t9e_dirname_hits_new t9e_dirname_hits_old t9e_count_lines t9e_gen_render t9e_gen_run_case
 
   MJ="$MOD/module.json"
-  req_list="$(sed -n '/"requires"/,/\]/p' "$MJ" 2>/dev/null | "$GREP" -o '"[A-Za-z0-9_-]*"' | "$GREP" -v '"requires"' | tr -d '"')"
-  [ "$req_list" = "conductor" ] || { ko "T9e module.json : requires attendu ['conductor'] seul, obtenu: ${req_list:-<vide>}"; t9e_ok=0; }
-  [ "$t9e_ok" -eq 1 ] && ok "T9e autonomie (D-04) : aucune dépendance d'exécution vers un autre module, module.json requires=['conductor']"
+  # module.json n'existe qu'en disposition SOURCE du dépôt plugin : en lab installé (.claude/), la
+  # partie « requires » est sautée, jamais rougie (#166 volet 11) ; le reste de T9e reste exigé.
+  # Indicateur de disposition indépendant de module.json : dans le dépôt plugin (`_internal/` présent),
+  # un module.json absent est un KO, pas un SKIP.
+  if [ -f "$MJ" ] || [ -d "$REPO/_internal" ]; then
+    req_list="$(sed -n '/"requires"/,/\]/p' "$MJ" 2>/dev/null | "$GREP" -o '"[A-Za-z0-9_-]*"' | "$GREP" -v '"requires"' | tr -d '"')"
+    [ "$req_list" = "conductor" ] || { ko "T9e module.json : requires attendu ['conductor'] seul, obtenu: ${req_list:-<vide>}"; t9e_ok=0; }
+    [ "$t9e_ok" -eq 1 ] && ok "T9e autonomie (D-04) : aucune dépendance d'exécution vers un autre module, module.json requires=['conductor']"
+  else
+    skip "T9e module.json : disposition dépôt plugin absente (requires non vérifiable)"
+    [ "$t9e_ok" -eq 1 ] && ok "T9e autonomie (D-04) : aucune dépendance d'exécution vers un autre module (partie module.json sautée)"
+  fi
 
   # ---------------------------------------------------------------------------
   # T9f — CÂBLAGE DOUBLE : hook nommé (double garde -f, branche else best-effort) dans
@@ -777,7 +822,7 @@ SH
     # pas, aucun verbe `codex plugin` n'accepte `--scope`) — chaque attente est donc écrite pour
     # son runtime, jamais dérivée de l'autre par substitution de nom.
     : >"$T9H_JOURNAL"
-    PATH="$T9H_BIN:/usr/bin:/bin" VF_RUNTIME=claude bash "$T9H_DIR/ensure-design-deps.sh" >/dev/null 2>&1
+    PATH="$T9H_BIN:$BELT_DIR:/usr/bin:/bin" VF_RUNTIME=claude bash "$T9H_DIR/ensure-design-deps.sh" >/dev/null 2>&1
     if "$GREP" -qF "claude plugin install superpowers@claude-plugins-official --scope user" "$T9H_JOURNAL"; then
       ok "T9h dispatch réel : VF_RUNTIME=claude -> \`claude plugin install superpowers@claude-plugins-official --scope user\` capturé depuis une exécution réelle"
     else
@@ -785,7 +830,7 @@ SH
     fi
 
     : >"$T9H_JOURNAL"
-    PATH="$T9H_BIN:/usr/bin:/bin" VF_RUNTIME=codex bash "$T9H_DIR/ensure-design-deps.sh" >/dev/null 2>&1
+    PATH="$T9H_BIN:$BELT_DIR:/usr/bin:/bin" VF_RUNTIME=codex bash "$T9H_DIR/ensure-design-deps.sh" >/dev/null 2>&1
     if "$GREP" -qF "codex plugin add superpowers@claude-plugins-official" "$T9H_JOURNAL" \
        && ! "$GREP" -qF "codex plugin install" "$T9H_JOURNAL"; then
       ok "T9h dispatch réel : VF_RUNTIME=codex -> \`codex plugin add superpowers@claude-plugins-official\` capturé depuis une exécution réelle (verbe \`install\` absent, grammaire codex mesurée)"
@@ -799,7 +844,7 @@ SH
     # n'exerçait rien de plus que T9..T9g et le trou du finding 3 est toujours ouvert.
     rm -f "$T9H_DIR/runtime-cli-dispatch.sh"
     : >"$T9H_JOURNAL"
-    PATH="$T9H_BIN:/usr/bin:/bin" VF_RUNTIME=codex bash "$T9H_DIR/ensure-design-deps.sh" >/dev/null 2>&1
+    PATH="$T9H_BIN:$BELT_DIR:/usr/bin:/bin" VF_RUNTIME=codex bash "$T9H_DIR/ensure-design-deps.sh" >/dev/null 2>&1
     if "$GREP" -qF "codex plugin" "$T9H_JOURNAL"; then
       ko "T9h non-régression : sans runtime-cli-dispatch.sh à côté, 'codex' a quand même été invoqué — le test ne prouve plus le chemin dispatch"
     else
@@ -809,6 +854,130 @@ SH
     rm -rf "$T9H_DIR" "$T9H_BIN"
     rm -f "$T9H_JOURNAL"
   fi
+
+  # ---------------------------------------------------------------------------
+  # T9s — EXCLUSION PERSISTANTE (#166 volet 2) : VF_DESIGN_SKIP et le fichier `.vf-design-skip`.
+  # Tout en dry-run + FORCE (rien d'exécuté ; le faux claude de la ceinture répond `[]` à la
+  # détection) : on lit le PLAN de commandes. Un plugin exclu n'a aucune commande planifiée, les
+  # autres si ; superpowers (dépendance dure) reste planifié et son exclusion est refusée.
+  # ---------------------------------------------------------------------------
+  t9s_plan() { # env... en arguments (VAR=val) ; sortie fusionnée du script
+    env VF_DESIGN_ENSURE_DRY_RUN=1 VF_DESIGN_ENSURE_FORCE=1 VF_SCOPE=project "$@" bash "$EDD" 2>&1
+  }
+  t9s_has() { printf '%s\n' "$1" | "$GREP" -qE -- "$2"; } # $1 = sortie, $2 = motif
+  t9s_planned() { t9s_has "$1" "^\[ensure-design-deps\] \(dry-run\).*(install|marketplace add) $2"; }
+
+  # (1) VF_DESIGN_SKIP=impeccable : aucune commande impeccable, les 3 autres planifiées.
+  T9S_OUT="$(t9s_plan VF_DESIGN_SKIP=impeccable)"; T9S_RC=$?
+  t9s_ok=1
+  [ "$T9S_RC" -eq 0 ] || { ko "T9s (1) rc=$T9S_RC attendu 0"; t9s_ok=0; }
+  t9s_has "$T9S_OUT" '^\[ensure-design-deps\] \(dry-run\).*impeccable' && { ko "T9s (1) une commande impeccable est planifiée malgré VF_DESIGN_SKIP=impeccable"; t9s_ok=0; }
+  for _n in superpowers ui-ux-pro-max frontend-design; do
+    t9s_planned "$T9S_OUT" "$_n@" || { ko "T9s (1) $_n devait rester planifié"; t9s_ok=0; }
+  done
+  t9s_has "$T9S_OUT" '^\[ensure-design-deps\] impeccable : exclu \(VF_DESIGN_SKIP\)' || { ko "T9s (1) ligne « impeccable : exclu (VF_DESIGN_SKIP) » absente"; t9s_ok=0; }
+  t9s_has "$T9S_OUT" 'Résumé :.*impeccable=exclu' || { ko "T9s (1) résumé sans impeccable=exclu"; t9s_ok=0; }
+  [ "$t9s_ok" -eq 1 ] && ok "T9s (1) VF_DESIGN_SKIP=impeccable : aucune commande impeccable, les 3 autres planifiées, ligne exclu + résumé impeccable=exclu"
+
+  # (2) espaces tolérés, nom inconnu et entrées vides ignorés (log), jamais un exit non nul.
+  T9S_OUT="$(t9s_plan "VF_DESIGN_SKIP= impeccable , bogus-plugin,,")"; T9S_RC=$?
+  if [ "$T9S_RC" -eq 0 ] && ! t9s_has "$T9S_OUT" '^\[ensure-design-deps\] \(dry-run\).*impeccable' \
+     && t9s_has "$T9S_OUT" 'nom de plugin inconnu ignoré \(bogus-plugin'; then
+    ok "T9s (2) espaces tolérés, nom inconnu journalisé et ignoré, exit 0"
+  else
+    ko "T9s (2) liste à espaces/nom inconnu mal traitée (rc=$T9S_RC)"
+  fi
+
+  # (3) fichier de lab, scope project : commentaires, lignes vides et fin de ligne CRLF tolérés.
+  T9S_PROJ="$(mktemp -d)"; T9S_CFG="$(mktemp -d)"
+  mkdir -p "$T9S_PROJ/.claude"
+  printf '# plugins exclus de ce lab\n\n  impeccable   # trop bavard\r\n' >"$T9S_PROJ/.claude/.vf-design-skip"
+  T9S_OUT="$(t9s_plan CLAUDE_PROJECT_DIR="$T9S_PROJ" CLAUDE_CONFIG_DIR="$T9S_CFG")"
+  t9s_ok=1
+  t9s_has "$T9S_OUT" '^\[ensure-design-deps\] \(dry-run\).*impeccable' && { ko "T9s (3) impeccable planifié malgré .vf-design-skip"; t9s_ok=0; }
+  for _n in superpowers ui-ux-pro-max frontend-design; do
+    t9s_planned "$T9S_OUT" "$_n@" || { ko "T9s (3) $_n devait rester planifié"; t9s_ok=0; }
+  done
+  t9s_has "$T9S_OUT" '^\[ensure-design-deps\] impeccable : exclu \(\.vf-design-skip\)' || { ko "T9s (3) ligne « exclu (.vf-design-skip) » absente"; t9s_ok=0; }
+  [ "$t9s_ok" -eq 1 ] && ok "T9s (3) fichier .vf-design-skip du projet (commentaires, vides, CRLF) : impeccable exclu, les 3 autres planifiés"
+
+  # (4) fichier de config utilisateur : lu en scope user, PAS en scope project.
+  printf 'impeccable\n' >"$T9S_CFG/.vf-design-skip"; rm -f "$T9S_PROJ/.claude/.vf-design-skip"
+  T9S_OUT_U="$(t9s_plan VF_SCOPE=user CLAUDE_PROJECT_DIR="$T9S_PROJ" CLAUDE_CONFIG_DIR="$T9S_CFG")"
+  T9S_OUT_P="$(t9s_plan VF_SCOPE=project CLAUDE_PROJECT_DIR="$T9S_PROJ" CLAUDE_CONFIG_DIR="$T9S_CFG")"
+  if ! t9s_has "$T9S_OUT_U" '^\[ensure-design-deps\] \(dry-run\).*impeccable' \
+     && t9s_has "$T9S_OUT_U" 'impeccable : exclu \(\.vf-design-skip\)' \
+     && t9s_has "$T9S_OUT_P" '^\[ensure-design-deps\] \(dry-run\).*impeccable'; then
+    ok "T9s (4) CLAUDE_CONFIG_DIR/.vf-design-skip : lu en scope user (impeccable exclu), ignoré en scope project"
+  else
+    ko "T9s (4) fichier de config utilisateur : scope user doit exclure, scope project doit ignorer"
+  fi
+
+  # (5) superpowers : exclusion refusée (variable ET fichier), reste planifié, exit 0.
+  printf 'superpowers\n' >"$T9S_PROJ/.claude/.vf-design-skip"
+  T9S_OUT="$(t9s_plan VF_DESIGN_SKIP=superpowers CLAUDE_PROJECT_DIR="$T9S_PROJ")"; T9S_RC=$?
+  if [ "$T9S_RC" -eq 0 ] && t9s_planned "$T9S_OUT" 'superpowers@' \
+     && t9s_has "$T9S_OUT" 'superpowers : exclusion refusée — dépendance dure de VibeFlow' \
+     && ! t9s_has "$T9S_OUT" 'superpowers : exclu \('; then
+    ok "T9s (5) superpowers : exclusion refusée (dépendance dure), toujours planifié, exit 0"
+  else
+    ko "T9s (5) superpowers doit refuser l'exclusion et rester planifié (rc=$T9S_RC)"
+  fi
+  rm -rf "$T9S_PROJ" "$T9S_CFG"
+
+  # (6) sans exclusion : 4 plugins planifiés, aucune mention d'exclusion, et les variables vides
+  # ne changent RIEN (sortie octet pour octet identique à l'absence de variable).
+  T9S_BASE="$(t9s_plan)"
+  T9S_EMPTY="$(t9s_plan VF_DESIGN_SKIP=)"
+  t9s_ok=1
+  [ "$T9S_BASE" = "$T9S_EMPTY" ] || { ko "T9s (6) VF_DESIGN_SKIP vide change la sortie"; t9s_ok=0; }
+  t9s_has "$T9S_BASE" 'exclu' && { ko "T9s (6) mention d'exclusion sans exclusion demandée"; t9s_ok=0; }
+  for _n in superpowers ui-ux-pro-max frontend-design impeccable; do
+    t9s_planned "$T9S_BASE" "$_n@" || { ko "T9s (6) $_n devait être planifié sans exclusion"; t9s_ok=0; }
+  done
+  [ "$t9s_ok" -eq 1 ] && ok "T9s (6) sans exclusion : 4 plugins planifiés, aucune mention d'exclusion, variable vide sans effet"
+
+  # (7) --quiet : tout-vert avec impeccable exclu et absent de la liste → muet (routine) ; sans
+  # exclusion, le même état parle (impeccable absent = anomalie). Stub JSON explicite.
+  if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; then
+    skip "T9s (7) --quiet : python3/python introuvables — stub JSON impossible dans cette disposition"
+  else
+    T9S_BIN="$(mktemp -d)"
+    cat >"$T9S_BIN/claude" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "plugin" ] && [ "$2" = "list" ] && [ "$3" = "--json" ]; then
+  echo '[{"id":"superpowers@claude-plugins-official","enabled":true},{"id":"ui-ux-pro-max@ui-ux-pro-max-skill","enabled":true},{"id":"frontend-design@claude-plugins-official","enabled":true}]'
+  exit 0
+fi
+exit 1
+SH
+    chmod +x "$T9S_BIN/claude"
+    T9S_Q_SKIP="$(PATH="$T9S_BIN:$PATH" VF_DESIGN_ENSURE_DRY_RUN=1 VF_DESIGN_SKIP=impeccable bash "$EDD" --quiet 2>&1)"
+    T9S_Q_NONE="$(PATH="$T9S_BIN:$PATH" VF_DESIGN_ENSURE_DRY_RUN=1 bash "$EDD" --quiet 2>&1)"
+    T9S_Q_LINES="$(printf '%s' "$T9S_Q_SKIP" | "$GREP" -c . || true)"
+    if [ "${T9S_Q_LINES:-0}" -eq 0 ] && t9s_has "$T9S_Q_NONE" 'Résumé :.*impeccable=manquant|impeccable : absent'; then
+      ok "T9s (7) --quiet : exclusion = routine muette (0 ligne) ; sans exclusion, impeccable absent parle"
+    else
+      ko "T9s (7) --quiet : ${T9S_Q_LINES:-?} ligne(s) avec exclusion (attendu 0) ; sans exclusion : ${T9S_Q_NONE:-<muet>}"
+    fi
+    rm -rf "$T9S_BIN"
+  fi
+  # (8) nom inconnu : visible MÊME sous --quiet (le hook /vf-update appelle en --quiet), exit 0 ; un
+  # saut de ligne dans VF_DESIGN_SKIP sépare comme une virgule (pas seulement la 1re ligne lue).
+  T9S_PROJ="$(mktemp -d)"; mkdir -p "$T9S_PROJ/.claude"
+  printf 'impecable\n' >"$T9S_PROJ/.claude/.vf-design-skip"
+  T9S_OUT="$(env VF_DESIGN_ENSURE_DRY_RUN=1 VF_DESIGN_ENSURE_FORCE=1 VF_SCOPE=project CLAUDE_PROJECT_DIR="$T9S_PROJ" bash "$EDD" --quiet 2>&1)"; T9S_RC=$?
+  T9S_NL="$(t9s_plan "VF_DESIGN_SKIP=ui-ux-pro-max
+impeccable")"
+  if [ "$T9S_RC" -eq 0 ] && t9s_has "$T9S_OUT" 'nom de plugin inconnu ignoré \(impecable' \
+     && ! t9s_has "$T9S_NL" '^\[ensure-design-deps\] \(dry-run\).*(impeccable|ui-ux-pro-max)' \
+     && t9s_planned "$T9S_NL" 'superpowers@'; then
+    ok "T9s (8) nom inconnu visible sous --quiet (exit 0) ; saut de ligne = séparateur dans VF_DESIGN_SKIP"
+  else
+    ko "T9s (8) nom inconnu sous --quiet muet, ou VF_DESIGN_SKIP multi-lignes mal lu (rc=$T9S_RC)"
+  fi
+  rm -rf "$T9S_PROJ"
+  unset -f t9s_plan t9s_has t9s_planned
 fi
 
 # ---------------------------------------------------------------------------
@@ -1136,6 +1305,25 @@ if [ -f "$MANAGER" ]; then
     || { ko "T11 D-08 : section « Orchestration par écran » du manager ne cite pas le CLAUDE.md comme source"; t11_ok=0; }
 fi
 [ "$t11_ok" -eq 1 ] && ok "T11 D-08 : lecture explicite du CLAUDE.md ancrée dans le DÉROULÉ du juge, sans doublon dans l'Entrée, + digest du manager portant les interdits du lab"
+
+# ---------------------------------------------------------------------------
+# T9z — GARDE DE LA CEINTURE (#166 volet 10) : aucun geste d'écriture n'a atteint le faux claude/codex
+# de tête de PATH. Les cas qui attendent install/enable/marketplace-add posent leur propre stub
+# explicite ; tout appel d'écriture arrivé ici est donc un cas qui aurait touché le vrai binaire.
+# Témoin positif exigé (journal non vide, ceinture bien première dans PATH) : sans lui, retirer la
+# ceinture laisserait cette garde verte à vide.
+# ---------------------------------------------------------------------------
+t9z_ok=1
+[ "$(command -v claude)" = "$BELT_DIR/claude" ] \
+  || { ko "T9z ceinture : le claude de tête de PATH n'est plus la ceinture ($(command -v claude || echo absent))"; t9z_ok=0; }
+[ -s "$BELT_JOURNAL" ] \
+  || { ko "T9z ceinture : journal vide ou absent — aucun appel n'a atteint la ceinture (témoin positif manquant, ceinture retirée ?)"; t9z_ok=0; }
+# Liste BLANCHE : seule la lecture `plugin list [--json]` est émise par la suite ; tout autre appel
+# (install, enable, disable, uninstall, update, marketplace…) rougit.
+if [ -s "$BELT_JOURNAL" ] && "$GREP" -Evq '^(claude|codex) plugin list( --json)?$' "$BELT_JOURNAL"; then
+  ko "T9z ceinture : appel hors liste blanche (plugin list) capturé par la ceinture : $("$GREP" -Ev '^(claude|codex) plugin list( --json)?$' "$BELT_JOURNAL" | head -3 | tr '\n' '|')"; t9z_ok=0
+fi
+[ "$t9z_ok" -eq 1 ] && ok "T9z ceinture : $(wc -l <"$BELT_JOURNAL" | tr -d ' ') appel(s) de lecture capturés, seule la lecture plugin list — la suite n'atteint pas le vrai claude"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

@@ -43,6 +43,18 @@
 #       même refus à la pose) puis liste les modules installés hors du nouveau poste — AUCUNE désinstallation
 #       (ADR-031). Refusé en scope user, sous --target et sous --dry-run.
 #
+# Filet de divergence (Phase 61, P61-D-01, P61-D-06, P61-PL-08) :
+#   aux postes product et dev, l'installeur arme le clone (hooks git post-merge, post-rewrite et post-commit dans le dossier de
+#   hooks réel du clone) par `conductor/scripts/vf-divergence-hook.sh`, cherché dans le cache du plugin et nulle
+#   part ailleurs (jamais dans le lab). Posé à `install` (avec un poste) et au verbe `role` ; retiré au poste solo
+#   (verbe `role solo`, ou `install` sur un fichier de poste existant) et à `uninstall --all` ; rafraîchi (chemin
+#   du cache) à `update --all`, qui n'arme JAMAIS un clone non armé. Scopes project et local seulement : rien en
+#   scope user ni sous --target. Un refus d'armement (hook tiers, core.hooksPath, ...) est relayé sur stderr et ne
+#   fait jamais échouer l'installation. Le journal du clone survit au retrait.
+#   env VF_DIVERGENCE_HOOK → vide ou `on` : armement (défaut) ; `off` : sortie explicite, rien n'est armé et un
+#   hook VibeFlow déjà posé est retiré. Toute autre valeur : refus (code 1) à `install` et `role`, valeur jamais
+#   réimprimée ; ignorée avec une ligne de log à `update --all` et `uninstall`.
+#
 # Pré-requis : $VIBEFLOW_CACHE existe (dossier des modules + leurs module.json).
 
 set -euo pipefail
@@ -173,6 +185,9 @@ VF_TARGET_NONEMPTY_OK="0"
 # fermée plus bas (sur `install` seulement) ; VF_ROLE_FLAG=1 dit que --role a été passé explicitement.
 VF_ROLE="${VF_ROLE:-}"
 VF_ROLE_FLAG="0"
+# P61-D-06 : sortie du filet de divergence (vide ou on = armé aux postes product/dev, off = rien armé et le hook
+# nôtre retiré). Validation fermée plus bas, seulement là où la valeur a un effet ; jamais réimprimée.
+VF_DIVERGENCE_HOOK="${VF_DIVERGENCE_HOOK:-}"
 
 # Détecter `--scope <val>`/`--dry-run`/`--target <val>` AVANT cmd="$1" : on filtre les
 # positionnels et on override VF_SCOPE/VF_DRY_RUN/VF_TARGET_OVERRIDE.
@@ -252,6 +267,13 @@ if [ "$#" -gt 0 ]; then
         ""|solo|product|dev) : ;;
         *) err "poste invalide (attendu solo|product|dev ; valeur non réimprimée)" ;;
       esac
+      # P61-PL-07 : la sortie du filet n'a d'effet qu'avec un poste posé ; sans poste, sa valeur est ignorée.
+      if [ -n "$VF_ROLE" ]; then
+        case "$VF_DIVERGENCE_HOOK" in
+          ""|on|off) : ;;
+          *) err "VF_DIVERGENCE_HOOK invalide (attendu on ou off ; valeur non réimprimée)" ;;
+        esac
+      fi
       ;;
     role)
       # P58-D-07 : le poste est l'ARGUMENT du verbe (il prime sur un VF_ROLE hérité) ; même validation fermée.
@@ -262,6 +284,10 @@ if [ "$#" -gt 0 ]; then
         solo|product|dev) : ;;
         *) err "poste invalide (attendu solo|product|dev ; valeur non réimprimée)" ;;
       esac
+      case "$VF_DIVERGENCE_HOOK" in
+        ""|on|off) : ;;
+        *) err "VF_DIVERGENCE_HOOK invalide (attendu on ou off ; valeur non réimprimée)" ;;
+      esac
       ;;
     *)
       if [ "$VF_ROLE_FLAG" = "1" ]; then
@@ -269,6 +295,17 @@ if [ "$#" -gt 0 ]; then
       fi
       ;;
   esac
+  # P61-PL-07 : à update --all et uninstall, une valeur invalide ne casse jamais le verbe (discipline de VF_ROLE
+  # hérité) : ignorée, comme si elle était vide, avec une ligne de log qui ne la réimprime pas.
+  if { [ "$1" = "update" ] && [ "${2:-}" = "--all" ]; } || [ "$1" = "uninstall" ]; then
+    case "$VF_DIVERGENCE_HOOK" in
+      ""|on|off) : ;;
+      *)
+        log "[divergence] VF_DIVERGENCE_HOOK invalide (attendu on ou off) : valeur ignorée, comme si elle était vide ; jamais réimprimée"
+        VF_DIVERGENCE_HOOK=""
+        ;;
+    esac
+  fi
 fi
 
 # Surface du flag --dry-run (D-31-06), validée AVANT cmd="$1" (952) : borné à install/update/
@@ -530,12 +567,489 @@ vf_manifest_excluded() {
     memory/*)                     return 0 ;;  # contenu vivant du lab semé par seed-registres.sh, pas un artefact de pose
     scripts/.vibeflow-installed)  return 0 ;;  # état du moteur, pas contenu de module
     scripts/.vibeflow-manifest-*) return 0 ;;  # le manifeste ne se consigne jamais lui-même (boucle de convergence)
+    scripts/.vibeflow-sha256-*)   return 0 ;;  # empreintes de pose (#166), nom HORS du motif du manifeste : jamais découvert par glob
     .backups/*)                   return 0 ;;  # filet de sécurité, jamais candidat à suppression automatique
     settings.json)                return 0 ;;  # M5 (revue 31-03) : fichier MERGÉ par merge_module_hooks, pas posé — était
                                                  # neutralisé par un second filtre privé sous T6, hors du point UNIQUE D-31-03
     settings.local.json)          return 0 ;;  # idem, miroir --settings-local (scope project|local)
   esac
   return 1
+}
+
+# ---------- Patches locaux des modules (#166) ----------
+# Un fichier de module posé sur un fichier du lab qui a été modifié à la main perdait la
+# modification sans un mot. La détection vit dans la couture de pose (vf_place_file, boucle de
+# vf_place_tree), jamais site par site. Minimum viable : détecter, sauvegarder, avertir — le
+# moteur pose TOUJOURS la version du cache, pas d'overlay. Elle couvre TOUTE pose qui écrase un
+# fichier de module : l'install, l'update à version changée ET la resync à version égale
+# (sync_module_governance), en pose réelle comme en --dry-run (`[plan] !`).
+#
+# Une SESSION de pose par module (vf_lp_begin … vf_lp_end) porte tout l'état : jamais d'état qui
+# fuit d'un module au suivant, donc le plan et la pose ne dépendent ni de l'ordre ni du mode.
+# Référence, par priorité : (1) l'empreinte sha256 enregistrée à la pose précédente
+# (scripts/.vibeflow-sha256-<mod>, une ligne « <sha256>  <chemin relatif> », nom HORS du motif
+# .vibeflow-manifest-* que la convergence découvre par glob) ; (2) faute d'empreinte, le même
+# fichier dans le cache de la version installée du module, passé par les MÊMES retouches que la
+# pose (réécriture --target, injection MCP des agents) ; (3) sinon aucune conclusion — jamais un
+# « inchangé » affirmé, et une ligne par module et par run le dit. Hors détection : tout ce que
+# vf_manifest_excluded exclut.
+# Coût : le cas nominal (aucun patch local) ne fourche rien par fichier — un hachage PAR LOTS des
+# fichiers du lab présents dans l'empreinte précédente, au début de la session, donne l'ensemble
+# des CANDIDATS ; cmp, diff et sauvegarde ne concernent que ceux-là.
+PYX="-Xutf8"
+VF_LP_HASH=""                                # outil de hachage retenu par la sonde (ou none) ; vide = pas encore sondé
+VF_LP_TS="$(date +%Y%m%d-%H%M%S)"            # un seul dossier de sauvegarde par run
+VF_LP_RUNDIR=""                              # posé à la première détection, dossier créé paresseusement
+VF_LP_COUNT=0
+VF_LP_LIST=""                                # chemins relatifs, un par ligne (annonce de fin de run)
+# --- État PAR SESSION (module), remis à zéro par vf_lp_begin / vf_lp_end ---
+VF_LP_MOD=""                                 # module en cours de pose ; vide = hors session, aucune détection
+VF_LP_OLD=""                                 # dossier du module dans le cache de l'ancienne version
+VF_LP_MODE=""                                # sha (empreintes) | old (ancien cache) | none (aucune référence)
+VF_LP_KNOWN=""                               # chemins de l'empreinte précédente, "\n<rel>\n<rel>\n"
+VF_LP_CAND=""                                # sous-ensemble dont l'empreinte du lab diffère de celle enregistrée
+VF_LP_NOREF_SAID=0                           # la ligne « aucune référence » est émise une fois par session
+VF_LP_SYNC=0                                 # 1 = resync (pose hors cycle manifeste) : les chemins posés sont collectés
+VF_LP_PLACED=""                              # fichier temporaire des chemins posés pendant la resync
+VF_LP_REL=""                                 # sortie de vf_lp_rel (sans sous-shell)
+VF_LP_SNAP=""                                # empreintes des agents avant l'injection MCP
+
+vf_sha_path() { echo "$TARGET_ROOT/scripts/.vibeflow-sha256-$1"; }
+
+# vf_lp_run <outil> — empreinte du stdin (une seule forme de lecture pour les trois outils).
+vf_lp_run() {
+  case "$1" in
+    sha256sum) sha256sum ;;
+    shasum)    shasum -a 256 ;;
+    python3)   python3 -I $PYX -c 'import hashlib,sys;print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())' ;;
+  esac
+}
+
+# vf_lp_run_many <outil> <fichiers…> — « <sha256>  <chemin> » par fichier, UN appel d'outil.
+vf_lp_run_many() {
+  local t="$1"; shift
+  case "$t" in
+    sha256sum) sha256sum -- "$@" ;;
+    shasum)    shasum -a 256 -- "$@" ;;
+    python3)   python3 -I $PYX -c 'import hashlib,sys;print("\n".join(hashlib.sha256(open(p,"rb").read()).hexdigest()+"  "+p for p in sys.argv[1:]))' "$@" ;;
+  esac
+}
+
+# vf_lp_probe — choisit UNE fois par run le premier outil qui rend la bonne empreinte d'un témoin
+# connu (un binaire présent mais cassé ne compte pas). Appelée hors sous-shell (vf_lp_begin,
+# vf_manifest_flush) : sinon le choix se perdrait. Aucun outil → une ligne de log, aucune conclusion.
+vf_lp_probe() {
+  [ -z "$VF_LP_HASH" ] || return 0
+  local want="2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881" got t
+  for t in sha256sum shasum python3; do
+    command -v "$t" >/dev/null 2>&1 || continue
+    got="$(printf x | vf_lp_run "$t" 2>/dev/null)" || got=""
+    if [ "${got%% *}" = "$want" ]; then VF_LP_HASH="$t"; return 0; fi
+  done
+  VF_LP_HASH="none"
+  log "  détection des patches locaux indisponible : aucun outil sha256"
+  return 0
+}
+
+# vf_lp_sha <fichier> — empreinte (64 hex) sur stdout, rc 1 sans outil ou en cas d'échec.
+vf_lp_sha() {
+  case "$VF_LP_HASH" in ""|none) return 1 ;; esac
+  local out
+  out="$(vf_lp_run "$VF_LP_HASH" < "$1" 2>/dev/null)" || return 1
+  out="${out%% *}"
+  [ "${#out}" -eq 64 ] || return 1
+  printf '%s' "$out"
+}
+
+# vf_lp_hash_rels — lit des chemins relatifs à TARGET_ROOT (un par ligne) sur stdin, écrit
+# « <sha256>  <rel> » sur stdout : un appel d'outil par lot de 200, jamais un par fichier. Ignore
+# ce qui n'est pas un fichier régulier (liens compris). Un fichier illisible n'a pas de ligne.
+vf_lp_hash_rels() {
+  local rel n=0 batch
+  batch=()
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    if [ -f "$TARGET_ROOT/$rel" ] && [ ! -L "$TARGET_ROOT/$rel" ]; then
+      batch[$n]="$rel"; n=$((n + 1))
+    fi
+    if [ "$n" -ge 200 ]; then
+      ( cd "$TARGET_ROOT" && vf_lp_run_many "$VF_LP_HASH" "${batch[@]}" ) 2>/dev/null || true
+      batch=(); n=0
+    fi
+  done
+  if [ "$n" -gt 0 ]; then
+    ( cd "$TARGET_ROOT" && vf_lp_run_many "$VF_LP_HASH" "${batch[@]}" ) 2>/dev/null || true
+  fi
+  return 0
+}
+
+# vf_lp_rel <chemin> — chemin relatif à TARGET_ROOT dans VF_LP_REL, SANS sous-shell dans le cas
+# courant (chemin déjà propre sous TARGET_ROOT) ; forme à normaliser → vf_rel_to_target. rc 1 si
+# le chemin est hors de TARGET_ROOT.
+vf_lp_rel() {
+  local d="$1" r
+  VF_LP_REL=""
+  case "$d" in
+    "$TARGET_ROOT"/*)
+      r="${d#"$TARGET_ROOT"/}"
+      case "$r" in
+        ""|/*|./*|../*|*/./*|*/../*|*//*|*/.|*/..) ;;
+        *) VF_LP_REL="$r"; return 0 ;;
+      esac
+      ;;
+  esac
+  VF_LP_REL="$(vf_rel_to_target "$d")" || { VF_LP_REL=""; return 1; }
+  return 0
+}
+
+# vf_lp_recorded <mod> <rel> — empreinte enregistrée pour <rel>, rc 1 si absente. ENVIRON, pas
+# `-v` : awk interprète les antislashs d'une valeur passée par -v.
+vf_lp_recorded() {
+  local f
+  f="$(vf_sha_path "$1")"
+  [ -f "$f" ] && [ -r "$f" ] || return 1
+  VF_LP_P="$2" awk 'length($0) > 66 && substr($0, 65, 2) == "  " && substr($0, 67) == ENVIRON["VF_LP_P"] { print substr($0, 1, 64); f = 1; exit } END { exit !f }' "$f" 2>/dev/null
+}
+
+# vf_lp_find_old <mod> — retrouve le module dans le cache de la version INSTALLÉE : la version du
+# registre est celle du MODULE (≠ celle du plugin), on balaie donc les caches frères de CACHE_DIR
+# et on compare leur $mod/VERSION. Best-effort : rien de trouvé → VF_LP_OLD vide.
+vf_lp_find_old() {
+  VF_LP_OLD=""
+  local inst d cur
+  inst="$(module_version_installed "$1")"
+  case "$inst" in ""|"—"|INCONSISTENT:*) return 0 ;; esac
+  cur="${CACHE_DIR%/}"
+  for d in "$(dirname "$cur")"/*; do
+    [ -d "$d" ] || continue
+    [ "${d%/}" = "$cur" ] && continue
+    [ -f "$d/$1/VERSION" ] || continue
+    if [ "$(cat "$d/$1/VERSION" 2>/dev/null)" = "$inst" ]; then VF_LP_OLD="$d/$1"; return 0; fi
+  done
+  return 0
+}
+
+# vf_lp_begin <mod> [sync] — ouvre la session de pose d'un module : remet TOUT l'état à zéro, puis
+# charge la référence. Avec une empreinte précédente, hache d'un seul lot les fichiers du lab
+# qu'elle nomme et en tire les candidats (empreinte différente) ; sinon repli sur l'ancien cache.
+# [sync] = resync à version égale : pas de cycle manifeste, les chemins posés sont collectés pour
+# mettre les empreintes à jour en fin de session (sinon l'update suivant lèverait une fausse alerte).
+vf_lp_begin() {
+  local mod="$1" f curf cand known="" nl=$'\n'
+  VF_LP_MOD=""; VF_LP_OLD=""; VF_LP_MODE="none"; VF_LP_KNOWN=""; VF_LP_CAND=""
+  VF_LP_NOREF_SAID=0; VF_LP_SYNC="${2:+1}"; VF_LP_SYNC="${VF_LP_SYNC:-0}"; VF_LP_PLACED=""
+  vf_lp_probe
+  case "$VF_LP_HASH" in ""|none) return 0 ;; esac
+  VF_LP_MOD="$mod"
+  if [ "$VF_LP_SYNC" = "1" ] && ! vf_dry_run; then
+    VF_LP_PLACED="$(mktemp 2>/dev/null)" || VF_LP_PLACED=""
+  fi
+  vf_lp_find_old "$mod"
+  f="$(vf_sha_path "$mod")"
+  # Détection best-effort : un fichier d'empreintes illisible (permissions, E/S) la DÉGRADE — repli sur
+  # l'ancien cache ou « aucune référence », une ligne de log — et ne fait jamais échouer la pose.
+  if [ -f "$f" ] && { [ ! -r "$f" ] || ! known="$(awk 'length($0) > 66 && substr($0, 65, 2) == "  " { print substr($0, 67) }' "$f" 2>/dev/null)"; }; then
+    log "  [local-patches] $mod : empreintes illisibles ($f) — détection dégradée à cette pose"
+    f=""
+  fi
+  if [ -n "$f" ] && [ -f "$f" ]; then
+    VF_LP_MODE="sha"
+    VF_LP_KNOWN="$known"
+    if [ -n "$VF_LP_KNOWN" ] && curf="$(mktemp 2>/dev/null)"; then
+      printf '%s\n' "$VF_LP_KNOWN" | vf_lp_hash_rels > "$curf" 2>/dev/null || true
+      if cand="$(awk 'NR == FNR { ok[$0] = 1; next } length($0) > 66 && !($0 in ok) { print substr($0, 67) }' "$curf" "$f" 2>/dev/null)"; then
+        VF_LP_CAND="$nl$cand$nl"
+        VF_LP_KNOWN="$nl$VF_LP_KNOWN$nl"
+      else
+        VF_LP_KNOWN=""    # lecture impossible : tout fichier passe par la vérification exacte
+      fi
+      rm -f "$curf"
+    else
+      VF_LP_KNOWN=""    # lot impossible : tout fichier passe par la vérification exacte
+    fi
+  elif [ -n "$VF_LP_OLD" ]; then
+    VF_LP_MODE="old"
+  fi
+  return 0
+}
+
+# vf_lp_end — referme la session : en resync, met à jour les empreintes des fichiers reposés ;
+# efface tout l'état (rien ne fuit vers le module suivant).
+vf_lp_end() {
+  if [ -n "$VF_LP_PLACED" ]; then
+    vf_lp_sync_merge
+    rm -f "$VF_LP_PLACED"
+  fi
+  VF_LP_MOD=""; VF_LP_OLD=""; VF_LP_MODE=""; VF_LP_KNOWN=""; VF_LP_CAND=""
+  VF_LP_NOREF_SAID=0; VF_LP_SYNC=0; VF_LP_PLACED=""
+  return 0
+}
+
+# vf_lp_inject_copy <fichier> <rel> — rejoue, sur une COPIE, la retouche que la pose fait ensuite
+# sur les agents (injection MCP, même injecteur, même .mcp.json) : la référence d'un agent est ce
+# que le moteur aurait posé, pas le cache brut. Sans effet hors agents/*.md, sans clé vf-mcp-* ou
+# sans injecteur ; jamais d'écriture ailleurs que dans <fichier>.
+vf_lp_inject_copy() {
+  local f="$1" rel="$2" injector
+  case "$rel" in agents/*.md) ;; *) return 0 ;; esac
+  grep -q 'vf-mcp-' "$f" 2>/dev/null || return 0
+  injector="$(find_mcp_injector)"
+  [ -n "$injector" ] || return 0
+  bash "$injector" --target "$f" --mcp-json "./.mcp.json" >/dev/null 2>&1 || true
+  return 0
+}
+
+# vf_lp_check <src> <dest> — appelée AVANT l'écrasement de <dest> par <src>. Détecte, si <dest>
+# existe, diffère du nouveau fichier ET diffère de la référence ; sauvegarde la version du lab,
+# écrit le diff « nouveau → lab » à côté (il se réapplique sur la version posée), puis rend la
+# main : la pose qui suit est normale. En --dry-run : la ligne [plan] ! seule, aucune écriture.
+# Best-effort : ne fait jamais échouer la pose (retours 0 partout). Le « nouveau » et l'ancien
+# sont les contenus tels que la pose les laisserait (réécriture --target, injection MCP).
+vf_lp_check() {
+  local src="$1" dest="$2" rel newp oldp oldc ref cur tmpd rcd=0 nl=$'\n'
+  [ -n "$VF_LP_MOD" ] || return 0
+  [ -f "$dest" ] && [ ! -L "$dest" ] || return 0
+  vf_lp_rel "$dest" || return 0
+  rel="$VF_LP_REL"
+  if vf_manifest_excluded "$rel"; then return 0; fi
+  # Chemin nominal : le fichier du lab porte l'empreinte posée la dernière fois — rien à lire,
+  # rien à fourcher.
+  if [ "$VF_LP_MODE" = "sha" ]; then
+    case "$VF_LP_KNOWN" in
+      *"$nl$rel$nl"*)
+        case "$VF_LP_CAND" in *"$nl$rel$nl"*) ;; *) return 0 ;; esac
+        ;;
+    esac
+  fi
+  tmpd="$(mktemp -d 2>/dev/null)" || return 0
+  mkdir "$tmpd/new" "$tmpd/old" 2>/dev/null || { rm -rf "$tmpd"; return 0; }
+  newp="$tmpd/new/${dest##*/}"
+  cp "$src" "$newp" 2>/dev/null || { rm -rf "$tmpd"; return 0; }
+  vf_rewrite_target_refs "$newp"
+  vf_lp_inject_copy "$newp" "$rel"
+  # Lab déjà identique au nouveau fichier : rien à perdre, rien à dire.
+  if cmp -s "$dest" "$newp"; then
+    rm -rf "$tmpd"
+    return 0
+  fi
+  ref="$(vf_lp_recorded "$VF_LP_MOD" "$rel")" || ref=""
+  if [ -z "$ref" ] && [ -n "$VF_LP_OLD" ]; then
+    case "$src" in
+      "$CACHE_DIR/$VF_LP_MOD"/*)
+        oldp="$VF_LP_OLD/${src#"$CACHE_DIR/$VF_LP_MOD"/}"
+        if [ -f "$oldp" ]; then
+          oldc="$tmpd/old/${dest##*/}"
+          if cp "$oldp" "$oldc" 2>/dev/null; then
+            vf_rewrite_target_refs "$oldc"
+            vf_lp_inject_copy "$oldc" "$rel"
+            ref="$(vf_lp_sha "$oldc")" || ref=""
+          fi
+        fi
+        ;;
+    esac
+  fi
+  if [ -z "$ref" ]; then
+    if [ "$VF_LP_MODE" = "none" ] && [ "$VF_LP_NOREF_SAID" -eq 0 ]; then
+      VF_LP_NOREF_SAID=1
+      log "[local-patches] $VF_LP_MOD : aucune référence connue, détection non concluante à cette pose"
+    fi
+    rm -rf "$tmpd"
+    return 0
+  fi
+  cur="$(vf_lp_sha "$dest")" || cur=""
+  if [ -z "$cur" ] || [ "$cur" = "$ref" ]; then
+    rm -rf "$tmpd"
+    return 0
+  fi
+  if vf_dry_run; then
+    printf '[plan] ! %s  (patch local)\n' "$dest"
+    rm -rf "$tmpd"
+    return 0
+  fi
+  [ -n "$VF_LP_RUNDIR" ] || VF_LP_RUNDIR="$BACKUP_DIR/local-patches-$VF_LP_TS"
+  if mkdir -p "$(dirname "$VF_LP_RUNDIR/$rel")" 2>/dev/null && cp -p "$dest" "$VF_LP_RUNDIR/$rel" 2>/dev/null; then
+    diff -u -L "a/$rel" -L "b/$rel" "$newp" "$dest" > "$VF_LP_RUNDIR/$rel.patch" 2>/dev/null || rcd=$?
+    if [ "$rcd" -gt 1 ]; then
+      rcd=0
+      diff -u "$newp" "$dest" > "$VF_LP_RUNDIR/$rel.patch" 2>/dev/null || rcd=$?
+    fi
+    if [ "$rcd" -gt 1 ]; then
+      rm -f "$VF_LP_RUNDIR/$rel.patch"
+      log "  [local-patches] diff indisponible pour $rel — sauvegarde seule"
+    fi
+    VF_LP_COUNT=$((VF_LP_COUNT + 1))
+    VF_LP_LIST="$VF_LP_LIST$rel"$'\n'
+  else
+    log "  [local-patches] sauvegarde impossible pour $rel — fichier remplacé sans copie"
+  fi
+  rm -rf "$tmpd"
+  return 0
+}
+
+# vf_lp_report — annonce des patches remplacés pendant ce run, UNE fois (le compteur est remis à
+# zéro) même sur `update --all` multi-modules. Rien si aucun fichier. Posée en `trap … EXIT` : elle
+# sort sur TOUTE sortie qui suit un écrasement, abort `set -e` ou err() compris.
+vf_lp_report() {
+  [ "${VF_LP_COUNT:-0}" -gt 0 ] || return 0
+  log "[local-patches] $VF_LP_COUNT fichier(s) modifié(s) localement ont été remplacés — sauvegardes et diffs : $VF_LP_RUNDIR"
+  local p
+  while IFS= read -r p; do
+    if [ -n "$p" ]; then log "  $p"; fi
+  done <<EOF_LP
+$VF_LP_LIST
+EOF_LP
+  VF_LP_COUNT=0
+  VF_LP_LIST=""
+  return 0
+}
+trap 'vf_lp_report || :' EXIT
+
+# vf_lp_ignore_rule — l'empreinte d'un agent injecté dépend du .mcp.json de CETTE machine : le
+# fichier d'empreintes est un état propre à la machine, il ne se commite pas. Règle unique dans
+# ./.gitignore (scope project compris, comme le fichier de poste), posée AVANT le fichier. Rien en
+# scope user ni sous --target. Best-effort : un .gitignore inutilisable est dit, jamais fatal.
+vf_lp_ignore_rule() {
+  local rule=".claude/scripts/.vibeflow-sha256-*" f="./.gitignore" cr eol=""
+  case "$VF_SCOPE" in project|local) ;; *) return 0 ;; esac
+  if [ -n "$VF_TARGET_OVERRIDE" ]; then return 0; fi
+  cr="$(printf '\r')"
+  if vf_dry_run; then
+    if [ -f "$f" ] && grep -qxF -e "$rule" -e "$rule$cr" "$f"; then return 0; fi
+    vf_declare_write "~" "$f" "$rule"
+    return 0
+  fi
+  if [ -L "$f" ] || { [ -e "$f" ] && [ ! -f "$f" ]; }; then
+    log "  [local-patches] ./.gitignore inutilisable (lien ou non régulier) — règle $rule non écrite"
+    return 0
+  fi
+  if [ -f "$f" ]; then
+    if grep -qxF -e "$rule" -e "$rule$cr" "$f"; then return 0; fi
+    if LC_ALL=C grep -q "$cr" "$f"; then eol="$cr"; fi
+    if [ -s "$f" ] && [ "$(tail -c 1 "$f" | wc -l | tr -d ' ')" -eq 0 ]; then
+      printf '%s\n' "$eol" >> "$f" 2>/dev/null || { log "  [local-patches] écriture de ./.gitignore échouée"; return 0; }
+    fi
+  fi
+  if printf '%s%s\n' "$rule" "$eol" >> "$f" 2>/dev/null; then
+    log "  gitignore += $rule"
+  else
+    log "  [local-patches] écriture de ./.gitignore échouée — règle $rule non écrite"
+  fi
+  return 0
+}
+
+# vf_sha_write <mod> <liste triée de chemins relatifs> — écrit, atomiquement (tmp + mv, hors du
+# motif du manifeste), l'empreinte de chaque fichier tel qu'il est sur disque MAINTENANT : après
+# réécriture --target et après les retouches faites par install_module (injection MCP des agents),
+# donc la référence du prochain passage. Hachage PAR LOTS. Sans outil sha256 : aucun fichier (un
+# ancien fichier serait périmé, on le retire plutôt que de laisser conclure faux).
+vf_sha_write() {
+  local mod="$1" list="$2" target tmp
+  target="$(vf_sha_path "$mod")"
+  if [ "$VF_LP_HASH" = "none" ]; then rm -f "$target"; return 0; fi
+  vf_lp_ignore_rule
+  tmp="$target.tmp.$$"
+  # Écriture best-effort : un échec (dossier ou disque non inscriptible) ne fait pas échouer la pose ; une
+  # ligne de log, et l'ancien fichier — devenu périmé — est retiré plutôt que de laisser conclure faux.
+  if vf_lp_hash_rels < "$list" > "$tmp" 2>/dev/null && LC_ALL=C sort "$tmp" > "$tmp.s" 2>/dev/null && mv "$tmp.s" "$target" 2>/dev/null; then
+    rm -f "$tmp"
+  else
+    rm -f "$tmp" "$tmp.s" 2>/dev/null || true
+    rm -f "$target" 2>/dev/null || true
+    log "  [local-patches] $mod : empreintes non écrites ($target) — détection indisponible au prochain passage"
+  fi
+  return 0
+}
+
+# vf_lp_sync_merge — fin d'une resync : les fichiers qu'elle vient de reposer reçoivent l'empreinte
+# de ce qui est sur disque (fusion dans le fichier existant, ou création). Un fichier posé hors
+# manifeste n'entre pas au manifeste, mais son empreinte est exacte : c'est la référence du prochain
+# passage. N'écrit rien si le contenu ne change pas.
+vf_lp_sync_merge() {
+  local d list newf tmp target
+  case "$VF_LP_HASH" in ""|none) return 0 ;; esac
+  [ -s "$VF_LP_PLACED" ] || return 0
+  list="$(mktemp 2>/dev/null)" || return 0
+  newf="$(mktemp 2>/dev/null)" || { rm -f "$list"; return 0; }
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    vf_lp_rel "$d" || continue
+    if vf_manifest_excluded "$VF_LP_REL"; then continue; fi
+    printf '%s\n' "$VF_LP_REL" >> "$list"
+  done < "$VF_LP_PLACED"
+  LC_ALL=C sort -u "$list" | vf_lp_hash_rels > "$newf" 2>/dev/null || true
+  if [ -s "$newf" ]; then
+    target="$(vf_sha_path "$VF_LP_MOD")"
+    tmp="$target.tmp.$$"
+    vf_lp_ignore_rule
+    mkdir -p "$TARGET_ROOT/scripts" 2>/dev/null || true
+    # Best-effort : une fusion impossible (fichier illisible, écriture refusée) est dite, jamais fatale.
+    if [ -f "$target" ]; then
+      if [ -r "$target" ] && awk 'NR == FNR { if (length($0) > 66) p[substr($0, 67)] = 1; print; next } length($0) > 66 && !(substr($0, 67) in p) { print }' "$newf" "$target" 2>/dev/null | LC_ALL=C sort > "$tmp" 2>/dev/null; then
+        if cmp -s "$tmp" "$target"; then rm -f "$tmp"
+        elif ! mv "$tmp" "$target" 2>/dev/null; then rm -f "$tmp"; log "  [local-patches] $VF_LP_MOD : empreintes non mises à jour (écriture refusée)"; fi
+      else
+        rm -f "$tmp" 2>/dev/null || true
+        log "  [local-patches] $VF_LP_MOD : empreintes illisibles ($target) — non mises à jour par la resync"
+      fi
+    elif LC_ALL=C sort "$newf" > "$tmp" 2>/dev/null && mv "$tmp" "$target" 2>/dev/null; then
+      :
+    else
+      rm -f "$tmp" 2>/dev/null || true
+      log "  [local-patches] $VF_LP_MOD : empreintes non écrites (écriture refusée)"
+    fi
+  fi
+  rm -f "$list" "$newf"
+  return 0
+}
+
+# vf_lp_snap_agents / vf_lp_refresh_agents — encadrent l'injection MCP. Elle réécrit TOUS les
+# agents du lab, ceux des modules posés plus tôt (ou non touchés par ce run) compris : leur
+# empreinte enregistrée devient périmée sans que personne n'y ait touché. Après l'injection, tout
+# agent que le SEUL injecteur a changé (empreinte d'avant == empreinte enregistrée) reçoit son
+# empreinte d'après. Un agent déjà modifié à la main avant l'injection garde l'ancienne : le patch
+# local reste détectable. Pas d'effet en --dry-run (l'injecteur n'y tourne pas).
+vf_lp_snap_agents() {
+  local f
+  VF_LP_SNAP=""
+  vf_dry_run && return 0
+  case "$VF_LP_HASH" in ""|none) return 0 ;; esac
+  VF_LP_SNAP="$(mktemp 2>/dev/null)" || { VF_LP_SNAP=""; return 0; }
+  for f in "$TARGET_ROOT/agents/"*.md; do
+    if [ -f "$f" ]; then printf 'agents/%s\n' "${f##*/}"; fi
+  done | vf_lp_hash_rels > "$VF_LP_SNAP" || true
+  return 0
+}
+
+vf_lp_refresh_agents() {
+  local f after chg sf tmp
+  [ -n "$VF_LP_SNAP" ] || return 0
+  after="$(mktemp 2>/dev/null)" || { rm -f "$VF_LP_SNAP"; VF_LP_SNAP=""; return 0; }
+  chg="$(mktemp 2>/dev/null)" || { rm -f "$VF_LP_SNAP" "$after"; VF_LP_SNAP=""; return 0; }
+  for f in "$TARGET_ROOT/agents/"*.md; do
+    if [ -f "$f" ]; then printf 'agents/%s\n' "${f##*/}"; fi
+  done | vf_lp_hash_rels > "$after" || true
+  awk 'NR == FNR { if (length($0) > 66) b[substr($0, 67)] = substr($0, 1, 64); next } length($0) > 66 { r = substr($0, 67); h = substr($0, 1, 64); if ((r in b) && b[r] != h) printf "%s\t%s\t%s\n", r, b[r], h }' "$VF_LP_SNAP" "$after" > "$chg" 2>/dev/null || : > "$chg"
+  if [ -s "$chg" ]; then
+    for sf in "$TARGET_ROOT/scripts/".vibeflow-sha256-*; do
+      [ -f "$sf" ] || continue
+      # Best-effort, module par module : un fichier d'empreintes illisible ou non réécrivable est dit et sauté.
+      if [ ! -r "$sf" ]; then
+        log "  [local-patches] empreintes illisibles ($sf) — non rafraîchies après l'injection MCP"
+        continue
+      fi
+      tmp="$sf.tmp.$$"
+      if awk -F'\t' 'NR == FNR { bef[$1] = $2; aft[$1] = $3; next } { r = substr($0, 67); if (length($0) > 66 && (r in bef) && substr($0, 1, 64) == bef[r]) print aft[r] "  " r; else print }' "$chg" "$sf" 2>/dev/null | LC_ALL=C sort > "$tmp" 2>/dev/null; then
+        if cmp -s "$tmp" "$sf"; then rm -f "$tmp"
+        elif ! mv "$tmp" "$sf" 2>/dev/null; then rm -f "$tmp"; log "  [local-patches] empreintes non rafraîchies ($sf) — écriture refusée"; fi
+      else
+        rm -f "$tmp" 2>/dev/null || true
+        log "  [local-patches] empreintes non rafraîchies ($sf) — lecture impossible"
+      fi
+    done
+  fi
+  rm -f "$VF_LP_SNAP" "$after" "$chg"
+  VF_LP_SNAP=""
+  return 0
 }
 
 # ---------- Lecteur validant du manifeste (D-31-07, 31-05) ----------
@@ -806,6 +1320,8 @@ vf_record() {
   # directement par T4b/T5b DANS un cycle ouvert : ce chemin n'est pas affecté.
   if [ -z "$VF_MANIFEST_TMP" ]; then
     VF_NOCYCLE_COUNT=$((VF_NOCYCLE_COUNT + 1))
+    # #166 : en resync, les chemins posés sont collectés pour rafraîchir leurs empreintes.
+    if [ -n "${VF_LP_PLACED:-}" ]; then printf '%s\n' "$dest" >> "$VF_LP_PLACED"; fi
     return 0
   fi
   rel="$(vf_rel_to_target "$dest")" || return 0
@@ -818,6 +1334,8 @@ vf_manifest_reset() {
   local mod="$1"
   VF_MANIFEST_MOD="$mod"
   VF_DEGRADED_COPIES_COUNT=0
+  # #166 : ouvre la session de détection des patches locaux de CE module (état remis à zéro).
+  vf_lp_begin "$mod"
   # 31-04 (D-31-06) : en dry-run, ne JAMAIS créer d'accumulateur ni de répertoire — seul
   # VF_MANIFEST_MOD est mémorisé, pour que vf_declare_write puisse afficher le suffixe
   # `(<module> <version>)` du verbe +. VF_MANIFEST_TMP reste vide : c'est ce qui garde
@@ -863,7 +1381,10 @@ vf_manifest_flush() {
   # suffixe module/version.
   if vf_dry_run; then
     target="$(vf_manifest_path "$VF_MANIFEST_MOD")"
+    # #166 : le fichier d'empreintes est annoncé comme le manifeste (égalité plan/pose), sauf sans outil.
+    case "$VF_LP_HASH" in ""|none) ;; *) vf_lp_ignore_rule; vf_declare_write + "$(vf_sha_path "$VF_MANIFEST_MOD")" ;; esac
     vf_declare_write + "$target"
+    vf_lp_end
     VF_MANIFEST_TMP=""
     VF_MANIFEST_MOD=""
     return 0
@@ -873,8 +1394,12 @@ vf_manifest_flush() {
   target="$(vf_manifest_path "$VF_MANIFEST_MOD")"
   sorted_tmp="${VF_MANIFEST_TMP}.sorted"
   LC_ALL=C sort -u "$VF_MANIFEST_TMP" > "$sorted_tmp"
+  # #166 : empreintes de pose écrites juste avant le manifeste, une empreinte par fichier posé.
+  vf_lp_probe
+  vf_sha_write "$VF_MANIFEST_MOD" "$sorted_tmp"
   mv "$sorted_tmp" "$target"
   rm -f "$VF_MANIFEST_TMP"
+  vf_lp_end
   VF_MANIFEST_TMP=""
   VF_MANIFEST_MOD=""
 }
@@ -1002,6 +1527,7 @@ vf_rewrite_target_refs() {
 # dans ce cas aussi.
 vf_place_file() {
   local src="$1" dest="$2" mode="${3:-}"
+  vf_lp_check "$src" "$dest"   # #166 : patch local détecté AVANT l'écrasement (ou annoncé en dry-run)
   if vf_dry_run; then
     vf_declare_write + "$dest"
     return 0
@@ -1109,10 +1635,20 @@ vf_place_tree() {
       [ -n "$f" ] || continue
       rel="${f#"$src_dir"/}"
       dest_file="$dest_dir/$rel"
+      vf_lp_check "$f" "$dest_file"   # #166 : [plan] ! avant la ligne [plan] + du fichier
       vf_declare_write + "$dest_file"
     done < "$list_tmp"
     rm -f "$list_tmp"
     return 0
+  fi
+
+  # #166 : détection au grain fichier AVANT le cp -r qui écrase (même énumération source).
+  if [ -n "$VF_LP_MOD" ]; then
+    local lpf
+    while IFS= read -r lpf; do
+      [ -n "$lpf" ] || continue
+      vf_lp_check "$lpf" "$dest_dir/${lpf#"$src_dir"/}"
+    done < "$list_tmp"
   fi
 
   mkdir -p "$dest_dir"
@@ -1273,6 +1809,174 @@ find_role_gate() {
   echo ""
 }
 
+# find_divergence_hook — le script du filet de divergence, depuis le cache du plugin, et lui seul. Vide
+# si absent. Aucun repli sur $TARGET_ROOT ni sur le dossier de l'engine : le hook posé dans le clone
+# n'exécute jamais du code de l'arbre du lab (audit M-2, P61-D-03).
+find_divergence_hook() {
+  local c="$CACHE_DIR/conductor/scripts/vf-divergence-hook.sh"
+  [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+# divergence_off — vrai si la sortie explicite est demandée (VF_DIVERGENCE_HOOK=off, P61-D-06). La valeur a
+# déjà été validée (ou ignorée) à l'entrée : seule la valeur exacte `off` désarme, tout le reste vaut `on`.
+divergence_off() { [ "$VF_DIVERGENCE_HOOK" = "off" ]; }
+
+# divergence_hook_present — vrai si un hook NÔTRE (marqueur en ligne 2) est posé dans le clone courant. Ne sert
+# qu'à décider s'il vaut la peine de dire « script absent du cache » quand le retrait ou le rafraîchissement
+# ne peut pas se faire : un lab jamais armé ne reçoit aucune ligne (poste solo inchangé).
+divergence_hook_present() {
+  local d n f
+  d="$(git rev-parse --git-path hooks 2>/dev/null)" || return 1
+  [ -n "$d" ] || return 1
+  for n in post-merge post-rewrite post-commit; do
+    f="$d/$n"
+    [ -f "$f" ] && [ ! -L "$f" ] || continue
+    if awk 'NR == 2 && index($0, "# vibeflow:vf-divergence-hook") == 1 { f = 1 } END { exit !f }' "$f" 2>/dev/null; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# divergence_hook_plan <~|-> <ours-seulement 0|1> — déclare au plan (--dry-run) chaque cible du script
+# (arm --check) ; avec ours-seulement=1 (rafraîchissement, retrait), seulement les hooks déjà nôtres (status).
+# N'écrit rien.
+divergence_hook_plan() {
+  local verb="$1" only="$2" hk out st line tgt name note nl
+  nl="$(printf '\nx')"; nl="${nl%x}"
+  hk="$(find_divergence_hook)"
+  [ -n "$hk" ] || return 0
+  out="$(bash "$hk" arm --check --path "$(pwd -P)" 2>/dev/null </dev/null)" || true
+  st=""
+  if [ "$only" = "1" ]; then st="$(bash "$hk" status --path "$(pwd -P)" 2>/dev/null </dev/null)" || true; fi
+  if [ "$verb" = "-" ]; then
+    note="(filet de divergence : hook VibeFlow retiré)"
+  else
+    note="(filet de divergence : hook git du clone, hors de l'arbre versionné)"
+  fi
+  while IFS= read -r line; do
+    case "$line" in
+      "CIBLE "*)
+        tgt="${line#CIBLE }"
+        name="${tgt##*/}"
+        if [ "$only" = "1" ]; then
+          case "$nl$st$nl" in
+            *"${nl}HOOK $name ARME${nl}"*|*"${nl}HOOK $name NON-EXECUTABLE${nl}"*) : ;;
+            *) continue ;;
+          esac
+        fi
+        vf_declare_write "$verb" "$tgt" "$note"
+        ;;
+    esac
+  done <<EOF_DIVERGENCE_PLAN
+$out
+EOF_DIVERGENCE_PLAN
+}
+
+# divergence_hook_disarm — retire les hooks NÔTRES du clone courant (verbe disarm du script du cache), jamais un
+# hook tiers (P61-D-02). Le journal survit. Codes relayés sur stderr, JAMAIS un échec du verbe hôte (P61-PL-03).
+# Dry-run : déclare `[plan] -` par hook nôtre, n'écrit rien.
+divergence_hook_disarm() {
+  local hk rc=0 out removed=0
+  hk="$(find_divergence_hook)"
+  if [ -z "$hk" ]; then
+    if divergence_hook_present; then
+      log "[divergence] NON VERIFIABLE : vf-divergence-hook.sh absent du cache du plugin — hook VibeFlow laissé en place, à retirer à la main"
+    fi
+    return 0
+  fi
+  if vf_dry_run; then
+    divergence_hook_plan "-" 1
+    return 0
+  fi
+  out="$(bash "$hk" disarm --path "$(pwd -P)" 2>&1 >/dev/null </dev/null)" || rc=$?
+  case "$out" in *"desarme : "*) removed=1 ;; esac
+  case "$rc" in
+    0) if [ "$removed" = "1" ]; then log "[divergence] filet retiré"; fi ;;
+    1)
+      if [ -n "$out" ]; then printf '%s\n' "$out" >&2; fi
+      log "[divergence] retrait INCOMPLET (code 1) — ligne tierce à retirer à la main (voir ci-dessus)" ;;
+    2) log "[divergence] retrait NON VERIFIABLE (code 2) — le hook VibeFlow est peut-être encore posé" ;;
+    3) : ;;
+    *) log "[divergence] code inattendu ($rc) de vf-divergence-hook.sh disarm — retrait non vérifié" ;;
+  esac
+  return 0
+}
+
+# divergence_hook_apply <poste> — pose ou retire le filet selon le poste (P61-H-01, P61-PL-08). product et dev
+# ARMENT (sauf sous VF_DIVERGENCE_HOOK=off : retrait) ; solo RETIRE ; sans poste, rien. Le script du cache fait
+# le travail ; ses codes sont relayés sur stderr et JAMAIS un échec de l'installation (P61-PL-03). Dry-run :
+# arm --check déclare chaque cible par vf_declare_write, rien n'est écrit.
+divergence_hook_apply() {
+  local poste="${1:-}" hk rc=0
+  case "$poste" in
+    product|dev) : ;;
+    solo) divergence_hook_disarm; return 0 ;;
+    *) return 0 ;;
+  esac
+  if divergence_off; then divergence_hook_disarm; return 0; fi
+  hk="$(find_divergence_hook)"
+  if [ -z "$hk" ]; then
+    log "[divergence] NON VERIFIABLE : vf-divergence-hook.sh absent du cache du plugin — filet non armé"
+    return 0
+  fi
+  if vf_dry_run; then
+    divergence_hook_plan "~" 0
+    return 0
+  fi
+  bash "$hk" arm --path "$(pwd -P)" </dev/null >&2 || rc=$?
+  case "$rc" in
+    0) log "[divergence] filet armé" ;;
+    1) log "[divergence] ARMEMENT REFUSE (code 1) — voir ci-dessus ; l'installation continue" ;;
+    2) log "[divergence] armement NON VERIFIABLE (code 2) — filet non armé ; l'installation continue" ;;
+    3) log "[divergence] pas de dépôt git : filet non armé" ;;
+    *) log "[divergence] code inattendu ($rc) de vf-divergence-hook.sh arm — filet non armé ; l'installation continue" ;;
+  esac
+  return 0
+}
+
+# divergence_hook_scope_ok — le filet ne vit qu'en scope project ou local, jamais en scope user ni sous --target.
+divergence_hook_scope_ok() { [ "$VF_SCOPE" != "user" ] && [ -z "$VF_TARGET_OVERRIDE" ]; }
+
+# divergence_hook_disarm_scoped — fin de `uninstall --all` : retire le filet du clone (scope project/local).
+divergence_hook_disarm_scoped() {
+  divergence_hook_scope_ok || return 0
+  divergence_hook_disarm
+}
+
+# divergence_hook_refresh_scoped — fin de `update --all` : réécrit un hook NÔTRE déjà posé avec le chemin du
+# cache courant (le cache est versionné : sans cela le hook resterait sur une version purgée, P61-PL-08). N'ARME
+# JAMAIS un clone qui ne l'était pas. Sous VF_DIVERGENCE_HOOK=off : retrait.
+divergence_hook_refresh_scoped() {
+  local hk rc=0 out refreshed=0
+  divergence_hook_scope_ok || return 0
+  if divergence_off; then divergence_hook_disarm; return 0; fi
+  hk="$(find_divergence_hook)"
+  if [ -z "$hk" ]; then
+    if divergence_hook_present; then
+      log "[divergence] NON VERIFIABLE : vf-divergence-hook.sh absent du cache du plugin — chemin du filet non rafraîchi"
+    fi
+    return 0
+  fi
+  if vf_dry_run; then
+    divergence_hook_plan "~" 1
+    return 0
+  fi
+  out="$(bash "$hk" arm --refresh --path "$(pwd -P)" 2>&1 >/dev/null </dev/null)" || rc=$?
+  case "$out" in *"rafraichi : "*) refreshed=1 ;; esac
+  case "$rc" in
+    0) if [ "$refreshed" = "1" ]; then log "[divergence] chemin du filet rafraîchi"; fi ;;
+    1)
+      if [ -n "$out" ]; then printf '%s\n' "$out" >&2; fi
+      log "[divergence] rafraîchissement REFUSE (code 1) — voir ci-dessus ; la mise à jour continue" ;;
+    2) log "[divergence] rafraîchissement NON VERIFIABLE (code 2) — chemin du filet inchangé ; la mise à jour continue" ;;
+    3) : ;;
+    *) log "[divergence] code inattendu ($rc) de vf-divergence-hook.sh arm --refresh — chemin du filet inchangé" ;;
+  esac
+  return 0
+}
+
 # find_module_roles — cascade comme find_resolver : cache (prod), puis à côté de l'engine (source). Vide si absent.
 find_module_roles() {
   local candidate
@@ -1354,6 +2058,7 @@ role_apply() {
   role_gitignore_rule
   role_write_file "$poste"
   VF_ROLE_WILL_EXIST="1"
+  divergence_hook_apply "$poste"
 }
 
 # vf_gitignore_target_prefix — préfixe RELATIF AU CWD à écrire dans ./.gitignore (TGT-02).
@@ -2102,6 +2807,29 @@ scripts_prefix_for_scope() {
   esac
 }
 
+# run_merger <merger> <mode> <args…> — lance merge-hooks.sh, relaie son stderr SAUF la ligne
+# `[merge-hooks] local: N` (N entrées routées vers settings.local.json, compté par merge-hooks.sh
+# sur sa propre partition) et pose N dans VF_LOCAL_ROUTED. stdout (lignes [plan]) inchangé.
+VF_LOCAL_ROUTED=0
+run_merger() {
+  local errf rc=0
+  VF_LOCAL_ROUTED=0
+  errf="$(mktemp)" || return 1
+  bash "$@" 2>"$errf" || rc=$?
+  VF_LOCAL_ROUTED="$(sed -n 's/^\[merge-hooks\] local: \([0-9][0-9]*\)$/\1/p' "$errf" | tail -1)"
+  : "${VF_LOCAL_ROUTED:=0}"
+  grep -v '^\[merge-hooks\] local: ' "$errf" >&2 || true
+  rm -f "$errf"
+  return "$rc"
+}
+# Annonce explicite du routage ADR-071 (#166 volet 6) ; rien si N=0 (scope user, module sans {{VF_BASH}}).
+log_local_routing() {
+  if [ "${VF_LOCAL_ROUTED:-0}" -gt 0 ]; then
+    log "  $VF_LOCAL_ROUTED entrée(s) de hook routée(s) vers $TARGET_ROOT/settings.local.json — chemin de bash propre à cette machine (ADR-071) ; sur un autre poste, lancez /vf-update pour les poser"
+  fi
+  return 0
+}
+
 merge_module_hooks() {
   local mod="$1"
   # ROLL-02 (38-03) : 2e paramètre optionnel — un chemin de fragment explicite (ex. celui
@@ -2141,8 +2869,9 @@ merge_module_hooks() {
     esac
     local plan_rc=0
     if [ "${#plan_settings_local_args[@]}" -gt 0 ]; then
-      bash "$merger" plan "$fragment" --settings "$TARGET_ROOT/settings.json" \
+      run_merger "$merger" plan "$fragment" --settings "$TARGET_ROOT/settings.json" \
         --scripts-prefix "$(scripts_prefix_for_scope)" "${plan_settings_local_args[@]}" || plan_rc=$?
+      [ "$plan_rc" -eq 0 ] && log_local_routing
     else
       bash "$merger" plan "$fragment" --settings "$TARGET_ROOT/settings.json" \
         --scripts-prefix "$(scripts_prefix_for_scope)" || plan_rc=$?
@@ -2183,7 +2912,7 @@ merge_module_hooks() {
   esac
   local merge_rc=0
   if [ "${#settings_local_args[@]}" -gt 0 ]; then
-    bash "$merger" merge "$fragment" --settings "$TARGET_ROOT/settings.json" \
+    run_merger "$merger" merge "$fragment" --settings "$TARGET_ROOT/settings.json" \
       --scripts-prefix "$(scripts_prefix_for_scope)" "${settings_local_args[@]}" || merge_rc=$?
   else
     bash "$merger" merge "$fragment" --settings "$TARGET_ROOT/settings.json" \
@@ -2191,6 +2920,7 @@ merge_module_hooks() {
   fi
   if [ "$merge_rc" -eq 0 ]; then
     log "  hooks mergés → $TARGET_ROOT/settings.json"
+    log_local_routing
     # D-38-J (correction ciblée post-ROLL), révisé Phase 38 (T6/TD1 + D-31-16) : persiste le
     # fragment RÉELLEMENT mergé, PAR MODULE, sous TARGET_ROOT. C'est l'unique source de vérité de
     # ce qui est VRAIMENT dans settings.json à cet instant : $CACHE_DIR n'est JAMAIS rafraîchi PAR
@@ -2377,6 +3107,9 @@ sync_module_governance() {
   if vf_dry_run; then
     VF_MANIFEST_MOD="$mod"
   fi
+  # #166 : la resync à version égale écrase scripts, données et tests du lab — même détection que
+  # l'install, en pose réelle comme en --dry-run ; une session par module, aucun état hérité.
+  vf_lp_begin "$mod" sync
   VF_NOCYCLE_COUNT=0
   # Chemin « version inchangée » (D-04) : sans cet appel, un lab déjà à jour n'obtiendrait JAMAIS
   # la lib de portabilité — idempotent au sein du même processus (VF_ENGINE_LIB_COPIED).
@@ -2390,6 +3123,7 @@ sync_module_governance() {
   # rendrait le resync inerte sur un lab où le script n'a jamais été installé — exactement le cas
   # qu'on cherche à rattraper.
   seed_module_registres "$mod"
+  vf_lp_end   # #166 : les empreintes des fichiers reposés par la resync sont mises à jour
   if [ "$VF_NOCYCLE_COUNT" -gt 0 ]; then
     log "  $VF_NOCYCLE_COUNT chemin(s) posé(s) hors cycle manifeste, non consigné(s)"
   fi
@@ -2714,7 +3448,9 @@ install_module() {
   # global (~/.claude.json, ADR-051-B). Le balayage est filtré par ces deux clés → les agents
   # planif/revue/audit qui n'en portent aucune restent inchangés.
   if [ -f "$module_dir/AGENT.md" ] || [ -d "$module_dir/agents" ]; then
+    vf_lp_snap_agents      # #166 : l'injecteur réécrit TOUS les agents du lab — leurs empreintes suivent
     inject_lab_mcp_into_agents
+    vf_lp_refresh_agents
   fi
 
   # Hooks de gouvernance (ADR-043) : fragment hooks/hooks.json → mergé dans settings.json.
@@ -2817,6 +3553,13 @@ backup_module() {
     # jamais tu — c'est le gate de fidélité appliqué à notre propre rollback (ne pas restaurer est
     # acceptable, ne pas le dire ne l'est pas).
     log "  ⚠ fragment hooks non restaurable pour $mod : .vibeflow-fragments/$mod.json absent (lab installé avant la persistance par-module) — le rollback des hooks sera un no-op pour ce backup ; réinstaller régénère le fragment"
+  fi
+  # #166 : les empreintes de pose décrivent le lab TEL QU'IL EST avant l'écrasement — le rollback les
+  # restaure avec les fichiers (la preuve de réversibilité de verify-runtime-reversibility.sh compare des
+  # ensembles de fichiers : un fichier d'empreintes présent avant, absent après, la rougit).
+  if [ -f "$(vf_sha_path "$mod")" ] && ! cp -p "$(vf_sha_path "$mod")" "$bdir/.vibeflow-sha256" 2>/dev/null; then
+    rm -f "$bdir/.vibeflow-sha256" 2>/dev/null || true
+    log "  [local-patches] $mod : empreintes non sauvegardées (illisibles) — le rollback ne les restituera pas"
   fi
   vf_declare_write + "$bdir"
   log "  backup → $bdir"
@@ -2962,6 +3705,13 @@ rollback_module() {
     log "  ⚠ version restaurée inconnue — registre inchangé, vérifier manuellement"
   fi
 
+  # #166 : empreintes de pose restaurées avec le backup (même instant que les fichiers) ; un backup sans
+  # empreintes (lab posé avant #166) retire celles que la version annulée avait écrites.
+  if [ -f "$latest/.vibeflow-sha256" ] && cp -p "$latest/.vibeflow-sha256" "$(vf_sha_path "$mod").tmp.$$" 2>/dev/null; then
+    mv -f "$(vf_sha_path "$mod").tmp.$$" "$(vf_sha_path "$mod")" 2>/dev/null || { rm -f "$(vf_sha_path "$mod").tmp.$$" 2>/dev/null; log "  [local-patches] $mod : empreintes non restaurées (écriture refusée)"; }
+  else
+    rm -f "$(vf_sha_path "$mod")" 2>/dev/null || true
+  fi
   trap - ERR
   [ "$rollback_had_errtrace" -eq 1 ] || set +E
   log "✓ $mod rollback OK"
@@ -3168,6 +3918,7 @@ uninstall_module() {
   local manifest_file
   manifest_file="$(vf_manifest_path "$mod")"
   [ -f "$manifest_file" ] && rm -f "$manifest_file" && log "  removed $manifest_file"
+  rm -f "$(vf_sha_path "$mod")" 2>/dev/null || true   # #166 : les empreintes partent avec le manifeste
 
   mark_uninstalled "$mod"
   log "✓ $mod désinstallé"
@@ -3511,6 +4262,8 @@ case "$cmd" in
       else
         log "Aucun module installé"
       fi
+      # Filet de divergence (P61-PL-08) : le chemin du cache suit la mise à jour ; un clone non armé ne l'est jamais.
+      divergence_hook_refresh_scoped
     elif [ -n "$arg" ]; then
       update_module "$arg"
     else
@@ -3536,6 +4289,9 @@ case "$cmd" in
       else
         log "Aucun module installé (pas de registre) — rien à désinstaller."
       fi
+      # Filet de divergence (P61-PL-08) : le hook vit du cache, pas d'un module ; `uninstall <module>` seul n'y
+      # touche pas, `uninstall --all` le retire (scope project/local). Le journal du clone reste.
+      divergence_hook_disarm_scoped
     elif [ -n "$arg" ]; then
       uninstall_module "$arg"
     else
@@ -3568,3 +4324,5 @@ case "$cmd" in
     exit 1
     ;;
 esac
+
+# #166 : l'annonce des patches locaux remplacés sort du trap EXIT posé avec vf_lp_report (abort compris).

@@ -26,6 +26,7 @@
 #   T-F1 — templates de registres embarqués (references/templates-memoire/, 5 fichiers, index v2)
 #   T-F7 — reindex sur registre à 0 entrée : compteurs propres (pas de « 0\n0 », JSON valide)
 #   T-F8 — strays legacy *.bak-reindex-* à côté des registres rapatriés dans .backups/
+#   T-F9 — reindex --apply conserve le mode du registre réécrit, chemins normal et bootstrap (#166)
 #
 # Usage: ./test-consolidator.sh
 # Exit code: 0 si tous tests passent, 1 si au moins 1 échec
@@ -661,6 +662,32 @@ left=$(ls -1 "$F8D/.claude/memory/"*.bak-reindex-* 2>/dev/null | wc -l | tr -d '
 assert "T-F8.1 — plus AUCUN stray à côté des registres après --apply" "$left" "0"
 migrated=$([ -f "$F8D/.claude/memory/.backups/DECISIONS.md.bak-reindex-20250101-000000" ] && echo oui || echo non)
 assert "T-F8.2 — le stray legacy est rapatrié (pas détruit) dans .backups/" "$migrated" "oui"
+
+echo ""
+echo "=== T-F9 — reindex --apply conserve le mode du registre réécrit (#166) ==="
+# Le mktemp du script crée en 600 ; un mv nu laisse le registre en 600 (illisible pour
+# un autre compte, un hook ou un CI). Mode lu GNU d'abord (`stat -f %Lp` sous GNU rend un
+# statut de système de fichiers sans échouer), repli BSD ; valeur validée.
+file_mode() {
+  local m
+  m=$(stat -c %a "$1" 2>/dev/null) || m=""
+  case "$m" in [0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) ;; *) m=$(stat -f %Lp "$1" 2>/dev/null) || m="" ;; esac
+  printf '%s' "$m"
+}
+F9D="$WORK_DIR/f9"; mkdir -p "$F9D/.claude/memory"
+mk_dec "$F9D/.claude/memory/DECISIONS.md"
+chmod 644 "$F9D/.claude/memory/DECISIONS.md"
+(cd "$F9D" && MEMORY_DIR=".claude/memory" "$SCRIPTS/reindex.sh" --register=DECISIONS --apply >/dev/null 2>&1)
+assert "T-F9.1 — registre en 644 : mode 644 après --apply" "$(file_mode "$F9D/.claude/memory/DECISIONS.md")" "644"
+chmod 664 "$F9D/.claude/memory/DECISIONS.md"
+(cd "$F9D" && MEMORY_DIR=".claude/memory" "$SCRIPTS/reindex.sh" --register=DECISIONS --apply >/dev/null 2>&1)
+assert "T-F9.2 — registre en 664 : mode 664 après un second --apply (le mode n'est pas figé à 644)" "$(file_mode "$F9D/.claude/memory/DECISIONS.md")" "664"
+# Chemin bootstrap (boot_tmp) : registre sans bloc '## Index', 640, puis passe de recalage.
+printf '# Decisions\n\n## DEC-001 : Premiere\n\n**Date** : 2026-07-01\n\nCorps.\n' > "$F9D/.claude/memory/DECISIONS.md"
+chmod 640 "$F9D/.claude/memory/DECISIONS.md"
+(cd "$F9D" && MEMORY_DIR=".claude/memory" "$SCRIPTS/reindex.sh" --register=DECISIONS --apply >/dev/null 2>&1)
+assert "T-F9.3 — bootstrap de l'index : bloc créé" "$(grep -c '^## Index' "$F9D/.claude/memory/DECISIONS.md" || true)" "1"
+assert "T-F9.4 — bootstrap de l'index : registre en 640 reste 640" "$(file_mode "$F9D/.claude/memory/DECISIONS.md")" "640"
 
 echo ""
 echo "================================"

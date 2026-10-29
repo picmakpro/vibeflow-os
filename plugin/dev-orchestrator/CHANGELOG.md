@@ -1,5 +1,43 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.30.0] — 2026-10-29 (phases proposées, gate architecture) — publiée dans v2.74.0
+
+**Minor** (Phase 60, ARCG-01, ARCG-03, ARCG-04, ARCG-05, ARCG-09 ; mandat Samuel, /vf-auto session principale, 2026-10-29) :
+
+- **Porte « phase proposée » de `vf-coder`** : avant `gsd-plan-phase` puis `gsd-execute-phase`, il constate le marqueur de l'étape par `check-phase-validation.sh --phase <N>` ; code 1 → rapport typé `blocked` avec un finding `action: ask-user`, aucune brique lancée ; code 3 avec `marqueur=introuvable` sur la ligne `BILAN` (étape absente du ROADMAP) → une ligne au rapport et le cycle continue, SEUL résultat indéterminé qui laisse passer (P60-D-15, arbitrage Samuel, AskUserQuestion session principale, 2026-10-29) ; tout autre code 3, code 64 et code 5 → `human_needed`; un mandat sans numéro d'étape n'appelle pas le script. `vf-dev-manager.md` n'est pas modifié.
+- **Étape 0 bis de `vf-auto`** : même contrôle avant la boucle du moteur direct `gsd-autonomous` ; une étape proposée empêche le démarrage ; `marqueur=introuvable` : une ligne et l'étape entre dans la boucle ; tout autre code 3, code 64 et code 5 : arrêt. Limite écrite : une étape ajoutée pendant la boucle n'est pas interceptée. Au dispatch de l'équipe, aux postes `product` et `dev`, le brief porte `Phases ajoutées : proposées`.
+- **§5 de `product-routing.md`** : devant une intention de découpage, aux postes `product` et `dev` et seulement si `.planning/BRIEF.md` existe, le head consulte `check-architecture.sh` ; code 1 → une phrase et halte, demande réitérée servie avec override tracé ; poste `solo` inchangé. `AGENT.md` ne gagne aucune ligne (ligne-pointeur prolongée).
+- **Champ de brief `Phases ajoutées`** (`mission-contracts.md` §Brief de mission) : consigne de pose de « proposée » lue par `vf-dev-manager` (`vf-validation.sh propose`) ; absent → aucun marqueur. Risque résiduel écrit (fail-open) ; la pose par le manager n'est prouvée que par le texte et le lien manager → contrat, pas par exécution (dette ouverte).
+- **Test T45** (`test-dev-orchestrator.sh`) : ablation par clause, ordre, inversions (code 1, BRIEF, poste solo, et mutants qui font passer un indéterminé autre que `marqueur=introuvable` ou bloquer la phase introuvable), commande citée jouée contre le gate réel, liens vers les scripts du conductor.
+- Instructions : `AGENT.md` 33, `vf-coder.md` 23 (baseline 23, marge consommée), `vf-dev-manager.md` 46 ; aucune valeur de baseline relevée.
+- **Correction de revue (2026-10-29)** : `<N>` défini comme le numéro du titre `### Phase <N>:` du ROADMAP (ni nom de dossier, ni identifiant de plan) dans `vf-coder` et `vf-auto` ; « tout autre code (5, 64, 126, 127, …) arrête » ; un code non nul de `vf-validation.sh propose` est un bloqueur remonté à l'humain (`mission-contracts.md` §Champ `Phases ajoutées`).
+
+
+## [v2.29.1] — 2026-10-29 (gsd-run.sh sans HOME) — publiée dans v2.73.1
+
+**Patch** (relecture adverse de la release v2.72.0 ; pas d'issue liée ; publiée dans v2.73.1) :
+
+- **`scripts/gsd-run.sh` rend 64, non 1, quand `HOME` est absent** : `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` plantait sous `set -u` (`HOME: unbound variable`, rc 1) alors que l'en-tête documente 64 pour tout défaut d'outillage. Le répertoire user est désormais dérivé une fois (`CLAUDE_CONFIG_DIR`, sinon `$HOME/.claude`) ; sans l'un ni l'autre (absents ou vides), le candidat scope user est sauté, jamais remplacé par un `/.claude/...` à la racine du disque, et le message 64 le signale. Deux scénarios ajoutés à `test-gsd-run.sh` (HOME non exporté, HOME vide ; six assertions) : 30/0.
+
+## [v2.29.0] — 2026-10-27 (redirection du poste product) — publiée dans v2.73.0
+
+**Minor** (Phase 59, PRDT-07) :
+
+- **Le head lit le poste et oriente vers `/vf-product`** : `vibeflow-head` lit le poste par `vf-role.sh get` ; au poste `product`, une intention de dev n'est plus dispatchée, il dit pourquoi en une phrase et oriente vers `/vf-product` (une demande explicite réitérée est servie : un poste est une vue, pas un droit) ; aux postes `solo` et `dev`, une intention produit fait proposer `/vf-product`. Poste illisible (codes 1, 5, 64) : une phrase bruyante et une seule question, aucun repli silencieux sur `solo`.
+- **Nouvelle référence `references/product-routing.md`**, chargée à la demande ; `AGENT.md` ne gagne qu'une ligne-pointeur dans le garde-fou premier usage (avant FIRST-02), une ligne de Carte d'intention et une ligne de Références. Instructions d'`AGENT.md` inchangées (33).
+- **Carte exhaustive et index** : ligne `vf-product` dans `intent-routing.md`, ligne `product-routing.md` dans `_index.md`.
+- **Test T44** (`test-dev-orchestrator.sh`) : présence et ordre du pointeur, contenu de la référence, ligne de carte, index et Références, avec sept mutants d'ablation et d'ordre.
+- **Correction ciblée de la revue 59 (F5, F6 ; pas de nouveau bump)** : `product-routing.md` §2 dit aussi, au poste `product`, que le head ne redirige pas vers `/vf-product` quand le skill est absent et comment poser le module `proposable:false` (installation nominale qui nomme `product-team-bundle`). T44 garde désormais les clauses sémantiques de §2 et §3 dans leur section (« ne lance aucune équipe », demande explicite réitérée, « Aucun refus mécanique », skill absent), avec un mutant d'ablation par clause et un mutant d'inversion de sens.
+
+## [v2.28.5] — 2026-10-29 (gsd-run.sh, scope dérivé, doctrine d'attente, description vf-dev) — publiée dans v2.72.0
+
+**Patch** (#47, #165, #81, #154 point 2 ; correctifs hors feuille de route) :
+
+- **`scripts/gsd-run.sh`, lanceur de gsd-tools appelable par chemin** (#47, 489ad6bd, 3b3389e9, bf6fffbf) : `gsd_run` n'existe que dans le préambule des workflows GSD, pas dans le bash d'un agent. Le script résout le moteur (`GSD_TOOLS`, `./.claude/gsd-core`, scope user, `PATH` en dernier), transmet les arguments tels quels et rend 64 sur défaut d'outillage ; le candidat `<racine>/gsd-core` nu reste exclu (ADR-070). Suite `test-gsd-run.sh`. `vf-dev-manager` (point 5) appelle `"$S"/gsd-run.sh config-set …` et relit la valeur écrite par `gsd-run.sh config-get` (même `--ws`, donc le `config.json` que le moteur a réellement choisi, `active-workstream` compris) : tout résultat autre que `false` pour les deux clés (rc 64, rc non nul, autre valeur) rend `human_needed`, plus de repli best-effort. `mission-contracts.md` §Seuil de bascule renvoie au script ; le README du module le liste.
+- **`ensure-deps.sh` dérive le scope projet** (#165, 99f49bc2) : sans `VF_SCOPE`, un moteur installé dans `<racine>/.claude/gsd-core` fait lire et écrire au même endroit (`SCOPE=project`, message stderr au seul point d'install) au lieu de poser une seconde copie dans `~/.claude`. `VF_SCOPE` explicite reste prioritaire, une valeur invalide reste rejetée. Cinq cas T2b-165. Superpowers suit le même scope dérivé.
+- **`references/mission-flow.md`, doctrine d'attente** (#81, d13e8a19, be9f0a9c) : trois invariants (jamais de boucle shell d'attente sur un worker ; poll borné et temporisé, forme canonique unique ; attente non bornable remontée) et heartbeat à chaque réveil du manager, en remplacement de « à chaque itération d'une boucle d'attente » (D-33-E). En attendant un worker ou un poll, le manager enchaîne des temporisations bornées successives (une par appel d'outil, ≤ 600 s, donc < `STALL_WINDOW` < TTL) et bat le heartbeat à chaque réveil : le verrou reste frais sur une cadence indépendante des `dag.sh mark`, sans boucle shell (le motif de D-33-E est ainsi rétabli). Test T81 : scanner des blocs de code livrés, qui juge la garde du `sleep` et une borne en sortie d'échec effective.
+- **Description de `vf-dev` élargie** (#154 point 2, partie description seule ; 7ec396d9) : elle couvre les demandes de dev précises (« ajoute X », « corrige Y ») sur un projet piloté par GSD ; copie du manuel alignée. Le hook d'aiguillage reste hors périmètre.
+
 ## [v2.28.4] — 2026-10-23 (tableau des signaux de démarrage aligné) — publiée dans v2.71.2
 
 **Patch** (#160 ; release patch préparée sur demande de la session principale, 2026-10-23 ; publiée dans v2.71.2) :

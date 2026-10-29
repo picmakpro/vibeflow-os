@@ -12,14 +12,14 @@ les noms techniques ci-dessous, mais **les formulations qui les activent** — c
 page met en avant pour chacun.
 
 Cette liste vient de l'énumération de tous les fichiers `SKILL.md` du dépôt, revérifiée le
-2026-10-02, module
+2026-10-27, module
 par module — en excluant explicitement les modèles de skills sous
 `plugin/reference/content/methodology/templates/skills/`, qui ne sont pas des skills livrés mais
-des gabarits pour en fabriquer de nouveaux. Le disque en porte vingt-deux, groupés ici par module
+des gabarits pour en fabriquer de nouveaux. Le disque en porte vingt-trois, groupés ici par module
 d'origine : tu n'as que ceux dont le module correspondant est installé — le
 [catalogue des modules](../03-modules/catalogue.md) dit lequel apporte quoi.
 
-## Les vingt-deux skills, par module
+## Les vingt-trois skills, par module
 
 ### `installer`
 **`vibeflow-install`** — le tout premier geste après avoir installé le plugin. Se déclenche sur
@@ -44,7 +44,9 @@ parallèles, et en pose la structure sous ton accord.
 ### `dev-orchestrator`
 **`vf-dev`** — « aide-moi à avancer », « pilote-moi ça », « occupe-toi de ce projet ». Le point
 d'entrée de développement par défaut : déclenche `vibeflow-head`, qui détecte l'intention et
-dispatche l'équipe qui porte la bonne brique, sans demander de reformuler.
+dispatche l'équipe qui porte la bonne brique, sans demander de reformuler. Sert aussi pour une
+demande de dev précise sur un projet piloté par GSD (« ajoute X », « corrige Y », « implémente la
+phase N ») : le geste passe par l'équipe, jamais par un skill `gsd-*` en direct.
 **`vf-auto`** — « fais tout », « en autonomie », « la nuit », « débrouille-toi », « je reviens
 demain matin, avance ». Enchaîne cadrage → plan → exécution étape après étape sans supervision
 continue, avec les garde-fous du mode autonome.
@@ -70,6 +72,13 @@ LinkedIn », « produis les pièces de la semaine ». Point d'entrée du métier
 ### `growth-bundle`
 **`vf-growth`** — « lance une campagne cold email », « prépare les séquences LinkedIn », « analyse
 les résultats de la campagne ». Point d'entrée du métier acquisition, canal par canal.
+
+### `product-team-bundle`
+**`vf-product`** — « écris le brief », « rédige le PRD », « cadre ce produit », « ajoute les
+critères d'acceptation ». Point d'entrée du poste product : incarne `vibeflow-product`, qui écrit le
+BRIEF et le PRD puis les fait juger par `prd-gate` avant de passer la main. Ce skill n'est posé que si
+son module l'est : `product-team-bundle` n'est pas proposé au catalogue tant qu'il est
+`proposable:false`.
 
 ### `planning-core`
 **`vf-planning`** — « structure la doc de ce lab », « on perd le fil », « fais l'index de mes
@@ -123,9 +132,9 @@ page séparée de ce même thème, consacrée uniquement à ça.
 
 ## D'où vient cette liste
 
-Chaque skill ci-dessus correspond à un fichier `SKILL.md` réel, énuméré (puis revérifié le 2026-10-02) plutôt que
+Chaque skill ci-dessus correspond à un fichier `SKILL.md` réel, énuméré (puis revérifié le 2026-10-27) plutôt que
 recopié d'une doc existante. Pour revérifier : depuis la racine du dépôt,
-`find plugin -iname 'SKILL.md' | grep -v reference/content` — le compte doit rester à vingt-deux tant
+`find plugin -iname 'SKILL.md' | grep -v reference/content` — le compte doit rester à vingt-trois tant
 qu'aucun skill n'a été ajouté, retiré, ou qu'aucun modèle n'a glissé hors de son dossier de
 templates.
 

@@ -218,10 +218,12 @@ CACHE="$LAB/cache"
 if prepare_module "$CACHE" "dev-orchestrator"; then
   (cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
      bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
-  if [ -f "$LAB/.gitignore" ]; then
-    ko "T3c (négatif) project : .gitignore créé alors que le scope n'est pas local (SCOPE-04 violé)"
+  # #166 (F6) : en scope project le moteur pose UNE règle dans ./.gitignore — celle de l'état propre à
+  # la machine (empreintes des patches locaux). SCOPE-04 reste borné : aucun chemin de module n'y entre.
+  if [ -f "$LAB/.gitignore" ] && [ "$(awk '$0 != ".claude/scripts/.vibeflow-sha256-*"' "$LAB/.gitignore" | wc -l | tr -d ' ')" -ne 0 ]; then
+    ko "T3c (négatif) project : .gitignore porte autre chose que la règle d'état machine alors que le scope n'est pas local (SCOPE-04 violé)"
   else
-    ok "T3c (négatif) project : .gitignore absent/inchangé — SCOPE-04 reste borné au scope local"
+    ok "T3c (négatif) project : .gitignore absent ou réduit à la règle d'état machine — SCOPE-04 reste borné au scope local"
   fi
 else
   skip "T3c (négatif) project : dev-orchestrator non copiable dans le cache de test"
@@ -2661,6 +2663,123 @@ EOF
     && ok "T56 (HOME temporaire) : valeur vf-mcp-tools malformée relayée au journal (ERROR, malform), install rc=0, agent inchangé"
 else
   skip "T56 : inject-mcp-tools.sh ou vf-portable.sh introuvable dans le repo de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T58 (#166 volet 6, ADR-071) — le routage vers settings.local.json est ANNONCÉ : en scope
+# project/local, N entrées {{VF_BASH}} routées → une ligne stderr explicite avec N EXACT (calculé
+# par merge-hooks.sh, jamais recompté côté engine). Fixture : 2 entrées {{VF_BASH}} + 1 entrée
+# shell. (a) dry-run : ligne présente, settings.local.json préexistant intact (cmp), rien de plus
+# sur stdout ; (b) pose : ligne présente, entrées au bon fichier ; (c) module sans {{VF_BASH}} et
+# scope user : aucune ligne.
+# ---------------------------------------------------------------------------
+t58_fixture() { # <cache> <avec_vfbash 1|0>
+  local cache="$1" with="$2"
+  prepare_module "$cache" "software-architecture" || return 1
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$cache/software-architecture/scripts/extra-hook.sh"
+  python3 - "$cache/software-architecture/hooks/hooks.json" "$with" <<'PYEOF'
+import json, sys
+path, with_vfbash = sys.argv[1], sys.argv[2] == "1"
+sh = {"type": "command", "command": "bash {{VF_SCRIPTS}}/extra-hook.sh"}
+hooks = {"SessionStart": [{"hooks": [sh]}]}
+if with_vfbash:
+    ex = lambda s: {"type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/" + s]}
+    hooks["PreToolUse"] = [{"matcher": "Edit|Write", "hooks": [ex("guard-file-size.sh")]}]
+    hooks["PostToolUse"] = [{"matcher": "Edit|Write", "hooks": [ex("check-file-size.sh")]}]
+json.dump({"hooks": hooks}, open(path, "w", encoding="utf-8"), indent=2)
+PYEOF
+}
+T58_RE='entrée\(s\) de hook routée\(s\) vers .*/settings\.local\.json — chemin de bash propre à cette machine \(ADR-071\) ; sur un autre poste, lancez /vf-update pour les poser'
+LAB="$(mktemp -d)"; CACHE="$LAB/cache"; FAKE_HOME="$LAB/home"; mkdir -p "$FAKE_HOME" "$LAB/.claude"
+if t58_fixture "$CACHE" 1; then
+  printf '{"permissions":{"allow":["Bash(ls)"]}}\n' > "$LAB/.claude/settings.local.json"
+  cp "$LAB/.claude/settings.local.json" "$LAB/pre-local.json"
+  (cd "$LAB" && HOME="$FAKE_HOME" VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --dry-run install software-architecture >"$LAB/dry.out" 2>"$LAB/dry.err")
+  miss=0
+  "$GREP" -qE "^\[vibeflow-update\]   2 $T58_RE" "$LAB/dry.err" \
+    || { ko "T58a dry-run : ligne de routage avec N=2 absente de stderr (attendu: '2 entrée(s) de hook routée(s) vers …/settings.local.json — …', obtenu: $("$GREP" -c 'routée' "$LAB/dry.err") occurrence)"; miss=1; }
+  "$GREP" -q 'routée' "$LAB/dry.out" \
+    && { ko "T58a dry-run : la ligne de routage fuit sur stdout (casserait TD1/T6)"; miss=1; }
+  cmp -s "$LAB/.claude/settings.local.json" "$LAB/pre-local.json" \
+    || { ko "T58a dry-run : settings.local.json modifié (cmp)"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T58a dry-run : ligne de routage N=2 sur stderr, rien sur stdout, settings.local.json inchangé octet pour octet"
+
+  (cd "$LAB" && HOME="$FAKE_HOME" VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install software-architecture >"$LAB/real.out" 2>"$LAB/real.err")
+  miss=0
+  "$GREP" -qE "^\[vibeflow-update\]   2 $T58_RE" "$LAB/real.err" \
+    || { ko "T58b pose : ligne de routage avec N=2 absente de stderr (obtenu: $("$GREP" -c 'routée' "$LAB/real.err") occurrence)"; miss=1; }
+  "$GREP" -q 'guard-file-size.sh' "$LAB/.claude/settings.local.json" \
+    && "$GREP" -q 'check-file-size.sh' "$LAB/.claude/settings.local.json" \
+    || { ko "T58b pose : entrées {{VF_BASH}} absentes de settings.local.json"; miss=1; }
+  "$GREP" -q 'extra-hook.sh' "$LAB/.claude/settings.json" \
+    && ! "$GREP" -q 'extra-hook.sh' "$LAB/.claude/settings.local.json" \
+    || { ko "T58b pose : entrée shell pas (seulement) dans settings.json"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T58b pose : ligne de routage N=2, VF_BASH → settings.local.json, shell → settings.json"
+else
+  skip "T58a/b : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# T58c — N=0 : module sans {{VF_BASH}} (project) et scope user avec {{VF_BASH}} → aucune ligne.
+LAB="$(mktemp -d)"; CACHE="$LAB/cache"; FAKE_HOME="$LAB/home"; mkdir -p "$FAKE_HOME"
+if t58_fixture "$CACHE" 0; then
+  (cd "$LAB" && HOME="$FAKE_HOME" VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --dry-run install software-architecture >"$LAB/o1" 2>&1
+   HOME="$FAKE_HOME" VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install software-architecture >"$LAB/o2" 2>&1)
+  rm -rf "$CACHE"; t58_fixture "$CACHE" 1
+  (cd "$LAB" && HOME="$FAKE_HOME" VF_SCOPE=user VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --dry-run install software-architecture >"$LAB/o3" 2>&1
+   HOME="$FAKE_HOME" VF_SCOPE=user VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install software-architecture >"$LAB/o4" 2>&1)
+  miss=0
+  for f in o1 o2 o3 o4; do
+    "$GREP" -q 'routée' "$LAB/$f" && { ko "T58c : ligne de routage émise à tort ($f)"; miss=1; }
+  done
+  # Témoin : les sorties ne sont pas vides (un grep sur du vide serait vert à vide).
+  for f in o1 o2 o3 o4; do
+    "$GREP" -q 'hooks' "$LAB/$f" || { ko "T58c : sortie $f sans trace de hooks (témoin mort)"; miss=1; }
+  done
+  [ "$miss" -eq 0 ] && ok "T58c : N=0 (sans {{VF_BASH}} ; scope user) → aucune ligne de routage, sorties non vides"
+else
+  skip "T58c : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# T58d (#166, revue lot D) — run_merger relaie le stderr de merge-hooks.sh quand il ÉCHOUE : une ligne
+# `[merge-hooks] ERROR …` (et le reste) ressort sur stderr ; SEULE la ligne `[merge-hooks] local: N` est
+# filtrée ; le code d'échec est propagé (l'install avorte, le registre ne ment pas). Fixture : un faux
+# merge-hooks.sh dans $CACHE/_internal/ (cascade du moteur : le cache d'abord), qui émet les trois lignes
+# puis sort en 7. Un run_merger qui avale le stderr, qui ne filtre rien, ou qui perd le code, rougit.
+LAB="$(mktemp -d)"; CACHE="$LAB/cache"; FAKE_HOME="$LAB/home"; mkdir -p "$FAKE_HOME" "$LAB/.claude" "$CACHE/_internal"
+if t58_fixture "$CACHE" 1; then
+  cat > "$CACHE/_internal/merge-hooks.sh" <<'FAKEEOF'
+#!/usr/bin/env bash
+echo "warn avant" >&2
+echo "[merge-hooks] local: 3" >&2
+echo "[merge-hooks] ERROR: fragment JSON invalide (faux merger)" >&2
+exit 7
+FAKEEOF
+  chmod +x "$CACHE/_internal/merge-hooks.sh"
+  (cd "$LAB" && HOME="$FAKE_HOME" VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install software-architecture >"$LAB/fail.out" 2>"$LAB/fail.err")
+  T58D_RC=$?
+  miss=0
+  [ "$T58D_RC" -ne 0 ] || { ko "T58d : code de sortie non propagé (rc=$T58D_RC, attendu non nul : le merger sort en 7)"; miss=1; }
+  "$GREP" -qxF '[merge-hooks] ERROR: fragment JSON invalide (faux merger)' "$LAB/fail.err" \
+    || { ko "T58d : la ligne '[merge-hooks] ERROR …' n'est pas relayée sur stderr (obtenu: $("$GREP" -c 'merge-hooks' "$LAB/fail.err") ligne(s) merge-hooks)"; miss=1; }
+  "$GREP" -qxF 'warn avant' "$LAB/fail.err" \
+    || { ko "T58d : une ligne de stderr ordinaire du merger est filtrée à tort (attendu: 'warn avant')"; miss=1; }
+  "$GREP" -qF '[merge-hooks] local:' "$LAB/fail.err" \
+    && { ko "T58d : la ligne '[merge-hooks] local: N' n'est pas filtrée"; miss=1; }
+  "$GREP" -qF 'merge hooks ÉCHOUÉ pour software-architecture' "$LAB/fail.err" \
+    || { ko "T58d : message d'échec du moteur absent"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T58d : échec du merger — ligne ERROR relayée, seule 'local: N' filtrée, code d'échec propagé (rc=$T58D_RC)"
+else
+  skip "T58d : software-architecture non copiable dans le cache de test"
 fi
 rm -rf "$LAB"
 

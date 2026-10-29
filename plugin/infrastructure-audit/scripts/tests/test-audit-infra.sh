@@ -135,6 +135,18 @@ else
   ko "T6 whitelist toujours périmée (2.1.215 absent)"
 fi
 
+# T6b — #166/#153 : la version installée (2.1.312) est LISTÉE, pas seulement « supposée compatible »
+# (version_note vide : la liste ne retarde plus de 97 versions sur le poste de référence).
+OUT="$(run_in "$LAB" env PATH="$WORK/bin:$PATH" FAKE_CLAUDE_VERSION=2.1.312 "$BASH_BIN" "$SCRIPT" --axis=runtime 2>/dev/null)"
+if echo "$OUT" | grep -q '"version_known": true' && echo "$OUT" | grep -q '"version_note": ""'; then
+  ok "T6b #153 : 2.1.312 listée → known, version_note vide"
+else
+  ko "T6b 2.1.312 : known=true et version_note vide attendus, sortie : $OUT"
+fi
+for v in 2.1.296 2.1.300 2.1.301 2.1.311 2.1.312; do
+  grep -qx "$v" "$SRC_KNOWN" && ok "T6c #153 : known-versions.txt couvre $v" || ko "T6c $v absent de known-versions.txt"
+done
+
 # T7 — VG-5 (F13) : --strict sans .claude → exit 3 (INDÉTERMINÉ, plus de JSON à zéro en vert)
 EMPTY="$WORK/no-lab"; mkdir -p "$EMPTY"
 run_in "$EMPTY" "$BASH_BIN" "$SCRIPT" --strict --quick >/dev/null 2>&1
@@ -401,6 +413,45 @@ fi
 # Hors --strict la raison est null.
 OUT="$(run_in "$LAB_NOTESTS" "$BASH_BIN" "${SCRIPT_UNDER_TEST:-$SCRIPT}" --axis=scripts --no-tests 2>/dev/null)"
 echo "$OUT" | grep -q '"strict_indeterminate_reason": null' && ok "T16e #153 : hors --strict → raison null" || ko "T16e hors --strict : raison null attendue, sortie : $OUT"
+
+# T17 — #166/#153 §6.6 : une lib SOURCÉE (1re ligne sans shebang) n'a pas à être exécutable.
+# Faux lab : un script à shebang +x, un script à shebang SANS x, une lib sans shebang en 644.
+# Attendu : executable_ok=1 (sur 2 scripts à shebang), libs_sourced=1, scripts_total=3 ; le script à
+# shebang sans x reste signalé (executable_ok < nombre de scripts à shebang).
+LAB_L="$WORK/lab-libs"; mkdir -p "$LAB_L/.claude/scripts"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$LAB_L/.claude/scripts/lance.sh"; chmod 755 "$LAB_L/.claude/scripts/lance.sh"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$LAB_L/.claude/scripts/oublie-x.sh"; chmod 644 "$LAB_L/.claude/scripts/oublie-x.sh"
+printf '# lib sourcee, jamais lancee seule\nvf_lib_fn() { :; }\n' > "$LAB_L/.claude/scripts/lib-sourcee.sh"; chmod 644 "$LAB_L/.claude/scripts/lib-sourcee.sh"
+OUT="$(run_in "$LAB_L" "$BASH_BIN" "$SCRIPT" --axis=scripts --no-tests 2>/dev/null)"
+if echo "$OUT" | grep -q '"scripts_total": 3' && echo "$OUT" | grep -q '"executable_ok": 1,' && echo "$OUT" | grep -q '"libs_sourced": 1,' && echo "$OUT" | grep -q '"syntax_ok": 3'; then
+  ok "T17 #153 §6.6 : lib sans shebang exclue de executable_ok (1 sur 2 à shebang), libs_sourced=1, total=3, bash -n sur les 3"
+else
+  ko "T17 attendu total=3, executable_ok=1, libs_sourced=1, syntax_ok=3 ; sortie : $OUT"
+fi
+chmod 755 "$LAB_L/.claude/scripts/oublie-x.sh"
+OUT="$(run_in "$LAB_L" "$BASH_BIN" "$SCRIPT" --axis=scripts --no-tests 2>/dev/null)"
+echo "$OUT" | grep -q '"executable_ok": 2,' && ok "T17b : une fois le bit x posé sur le script à shebang, executable_ok=2 (la lib ne compte toujours pas)" || ko "T17b executable_ok=2 attendu, sortie : $OUT"
+
+# T17c — revue lot C (#166) : dénominateur explicite, libs NOMMÉES, BOM + shebang = script.
+# scripts_total = scripts_shebang + libs_sourced ; un script exécutable dont on a oublié le
+# shebang ne disparaît pas dans un compteur : il est listé dans libs_sourced_files.
+LAB_B="$WORK/lab-bom"; mkdir -p "$LAB_B/.claude/scripts"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$LAB_B/.claude/scripts/normal.sh"; chmod 755 "$LAB_B/.claude/scripts/normal.sh"
+printf '\357\273\277#!/usr/bin/env bash\nexit 0\n' > "$LAB_B/.claude/scripts/avec-bom.sh"; chmod 755 "$LAB_B/.claude/scripts/avec-bom.sh"
+printf 'exit 0\n' > "$LAB_B/.claude/scripts/oubli-shebang.sh"; chmod 755 "$LAB_B/.claude/scripts/oubli-shebang.sh"
+printf 'vf_x() { :; }\n' > "$LAB_B/.claude/scripts/lib-x.sh"; chmod 644 "$LAB_B/.claude/scripts/lib-x.sh"
+OUT="$(run_in "$LAB_B" "$BASH_BIN" "$SCRIPT" --axis=scripts --no-tests 2>/dev/null)"
+CHK="$(printf '%s' "$OUT" | python3 -I -Xutf8 -c 'import json,sys
+d=json.loads(sys.stdin.read())
+ok = (d["scripts_total"]==4 and d["scripts_shebang"]==2 and d["libs_sourced"]==2
+      and d["scripts_total"]==d["scripts_shebang"]+d["libs_sourced"]
+      and d["executable_ok"]==2 and d["libs_sourced_files"]==["lib-x.sh","oubli-shebang.sh"])
+print("ok" if ok else "ko:"+json.dumps(d))' 2>&1)"
+if [ "$CHK" = "ok" ]; then
+  ok "T17c : JSON valide, scripts_shebang=2 (BOM+shebang compté script), libs_sourced_files = [lib-x.sh, oubli-shebang.sh], invariant total = shebang + libs"
+else
+  ko "T17c attendu total=4 shebang=2 libs=2 exec=2 files=[lib-x.sh,oubli-shebang.sh] ; obtenu : $CHK"
+fi
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="

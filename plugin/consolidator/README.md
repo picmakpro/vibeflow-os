@@ -2,7 +2,7 @@
 
 > Skill VibeFlow qui maintient les registres mémoire structurés (DECISIONS / LEARNINGS / BLOCKERS / EVALS / JOURNAL) scalables et propres au fil des sessions, plus la couche « mémoire vivante » fichier-par-entrée.
 
-**Version** : v1.11.3
+**Version** : v1.12.0
 **Référence** : ADR-032 (piliers 1-4) + ADR-052 (pilier 5) du Lab VibeFlow
 **Iron Law** : *"La lecture d'un registre = lecture de l'index uniquement par défaut."*
 
@@ -41,6 +41,8 @@ v1.9.0, les **instancie** réellement : `seed-registres.sh` crée `.claude/memor
 `LEARNINGS.md`, `BLOCKERS.md`, `JOURNAL.md`, `EVALS.md` s'ils manquent. Il est appelé par l'engine
 à l'install **et** à chaque `update`, y compris quand la version du module n'a pas bougé — un lab
 configuré avant cette version reçoit donc sa mémoire tout seul.
+
+Les entrées DECISIONS, LEARNINGS et BLOCKERS peuvent porter une ligne `**Role**` (Phase 61, P61-D-07, spec équipe-produit H-07) : le poste de l'auteur, tel que le rend `vf-role.sh get` (`solo`, `product` ou `dev`), ligne omise si le poste est illisible, jamais `solo` par défaut. Le champ est **optionnel en lecture** : une entrée ancienne sans lui reste valide pour tous les parseurs (aucun n'a été modifié), ce que prouve `scripts/tests/test-registres-role.sh`. Il figure dans les trois copies de `references/templates-memoire/` ; la source vit dans le module `reference`.
 
 > **Non destructif, sans exception.** Le seeder ne sait que créer ce qui manque. Un registre déjà
 > présent n'est jamais écrasé, fusionné ni réordonné : les registres sont append-only et portent

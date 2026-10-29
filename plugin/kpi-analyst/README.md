@@ -4,7 +4,7 @@
 > les **vrais indicateurs** (CA, leads, MRR, vues, engagement) et les tient à jour de façon
 > **déterministe** — jamais un chiffre inventé, chaque KPI porte sa source.
 
-**Type** : agent + skill + scripts + references · **Version** : v1.0.7 · **Dépend de** : `planning-core`, `consolidator`
+**Type** : agent + skill + scripts + references · **Version** : v1.0.8 · **Dépend de** : `planning-core`, `consolidator`
 
 ---
 
@@ -39,21 +39,8 @@ tables `lab_kpi_configs` (schéma) et `kpis` (valeurs).
 
 ## Installation
 
-Via l'installeur (`/vibeflow-install`, cocher « kpi-analyst » — résolution des dépendances
-assurée) ou l'engine directement :
-
-```bash
-bash plugin/_internal/vibeflow-update.sh [--scope user|project|local] install --with-deps kpi-analyst
-```
-
-⚠️ En **install nu** (sans `--with-deps`), la résolution des `requires` n'est pas automatique :
-installer dans l'ordre —
-
-```bash
-bash plugin/_internal/vibeflow-update.sh install planning-core
-bash plugin/_internal/vibeflow-update.sh install consolidator
-bash plugin/_internal/vibeflow-update.sh install kpi-analyst
-```
+Via `/vibeflow-install` : coche « kpi-analyst » — résolution des dépendances (`planning-core`,
+`consolidator`) assurée (moteur interne : `plugin/_internal/vibeflow-update.sh`).
 
 Prérequis outillage : `jq` (les scripts l'exigent — wrapper `jqx` intégré pour la portabilité
 Windows, ADR-054).

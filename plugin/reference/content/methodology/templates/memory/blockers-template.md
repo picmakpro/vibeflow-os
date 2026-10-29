@@ -38,6 +38,7 @@ A chaque jalon majeur : archiver tous les blockers resolus (leur connaissance vi
 **Severite** : Critique | Haute | Moyenne | Basse
 **Source** : [Agent qui a trouve/resolu | Escalation sub-agent]
 **Learning associe** : [LRN-XXX] ou [A creer]
+**Role** : [poste de l'auteur : sortie de vf-role.sh get — solo, product ou dev ; ligne omise si le lecteur rend 1, 5 ou 64, jamais solo par défaut]
 
 ### Symptome
 [Message d'erreur ou comportement observe]

@@ -248,7 +248,7 @@ if prepare_module "$CACHE" "software-architecture"; then
   # T5 — aucune entrée de la liste close d'exclusions D-31-03
   if [ ! -f "$MANIFEST" ]; then
     ko "T5 : manifeste absent, exclusions D-31-03 non vérifiables"
-  elif "$GREP" -qE '^(scripts/vf-portable\.sh|scripts/runtime-cli-dispatch\.sh|scripts/\.vibeflow-target|scripts/\.vibeflow-installed|scripts/\.vibeflow-manifest-)' "$MANIFEST"; then
+  elif "$GREP" -qE '^(scripts/vf-portable\.sh|scripts/runtime-cli-dispatch\.sh|scripts/\.vibeflow-target|scripts/\.vibeflow-installed|scripts/\.vibeflow-manifest-|scripts/\.vibeflow-sha256-)' "$MANIFEST"; then
     ko "T5 : le manifeste contient une entrée de la liste close d'exclusions D-31-03"
   else
     ok "T5 : aucune entrée de la liste close d'exclusions D-31-03 dans le manifeste"
@@ -267,7 +267,7 @@ if prepare_module "$CACHE" "software-architecture"; then
   T6_DISK_SORTED="$(mktemp)"
   LC_ALL=C sort "$MANIFEST" > "$T6_MANI_SORTED" 2>/dev/null || : > "$T6_MANI_SORTED"
   find "$LAB/.claude" -type f | sed "s#^$LAB/\.claude/##" \
-    | "$GREP" -vE '^scripts/vf-portable\.sh$|^scripts/runtime-cli-dispatch\.sh$|^scripts/\.vibeflow-target$|^scripts/\.vibeflow-installed$|^scripts/\.vibeflow-manifest-|^settings\.json$|^settings\.local\.json$|^memory/|^\.backups/' \
+    | "$GREP" -vE '^scripts/vf-portable\.sh$|^scripts/runtime-cli-dispatch\.sh$|^scripts/\.vibeflow-target$|^scripts/\.vibeflow-installed$|^scripts/\.vibeflow-manifest-|^scripts/\.vibeflow-sha256-|^settings\.json$|^settings\.local\.json$|^memory/|^\.backups/' \
     | LC_ALL=C sort > "$T6_DISK_SORTED"
   T6_MISSING="$(comm -23 "$T6_DISK_SORTED" "$T6_MANI_SORTED")"
   T6_EXTRA="$(comm -13 "$T6_DISK_SORTED" "$T6_MANI_SORTED")"
@@ -296,7 +296,7 @@ if prepare_module "$CACHE" "software-architecture"; then
   # plus d'un seul site câblé.
   if [ ! -f "$MANIFEST" ]; then
     ko "T9 : manifeste absent, exclusions D-31-03 non vérifiables"
-  elif "$GREP" -qE '^(scripts/vf-portable\.sh|scripts/runtime-cli-dispatch\.sh|scripts/\.vibeflow-target|scripts/\.vibeflow-installed|scripts/\.vibeflow-manifest-)' "$MANIFEST"; then
+  elif "$GREP" -qE '^(scripts/vf-portable\.sh|scripts/runtime-cli-dispatch\.sh|scripts/\.vibeflow-target|scripts/\.vibeflow-installed|scripts/\.vibeflow-manifest-|scripts/\.vibeflow-sha256-)' "$MANIFEST"; then
     ko "T9 : le manifeste contient une entrée de la liste close d'exclusions D-31-03"
   else
     ok "T9 : aucune entrée de la liste close d'exclusions D-31-03 dans le manifeste (fixture 31-03)"
@@ -391,11 +391,13 @@ T5B_RESULT="$(
   check_excluded "scripts/.vibeflow-installed" 0
   check_excluded "scripts/.vibeflow-manifest-conductor" 0
   check_excluded ".backups/conductor-20260101/skills/x" 0
+  check_excluded "scripts/.vibeflow-sha256-conductor" 0   # #166 : empreintes de pose, hors motif du manifeste
   # Chemins voisins : ne doivent PAS matcher (want=1, anti-sur-blocage).
   check_excluded "scripts/vf-portable2.sh" 1
   check_excluded "skills/memory/SKILL.md" 1
   check_excluded "scripts/.vibeflow-installedx" 1
   check_excluded "scripts/vibeflow-manifest-conductor" 1
+  check_excluded "scripts/vibeflow-sha256-conductor" 1
   check_excluded "notbackups/conductor/x" 1
   if [ -z "$fail_list" ]; then
     echo "PASS"

@@ -45,7 +45,9 @@ work:
 - **The memory** — registers that capitalize what gets decided, learned, and blocked, so a new
   contributor can understand a past decision by reading the matching entry, instead of having to
   rebuild the context from memory. The precise vocabulary of these registers is covered in this
-  theme's glossary.
+  theme's glossary. An entry in DECISIONS, LEARNINGS or BLOCKERS can say who wrote it through its
+  `**Role**` line (the author's role, read by the plugin, never guessed); an entry without that
+  line stays valid.
 
 ## What turns a folder into a lab
 

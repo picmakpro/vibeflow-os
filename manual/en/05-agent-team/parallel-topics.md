@@ -73,8 +73,9 @@ as a safety net. It changes nothing and looks for three defects:
 - a topic with more phase folders (or completed phases) than its own roadmap documents;
 - a phase number owned by a topic that reappears in the root roadmap.
 
-No hook runs it in your lab: you call it by hand, from the `conductor` module's scripts, when you
-merge branches that touch the planning.
+At the `product` and `dev` roles, the installer makes it run for you after every merge (see below).
+At the `solo` role, nothing runs it: you call it by hand, from the `conductor` module's scripts, when
+you merge branches that touch the planning.
 
 ```bash
 bash .claude/scripts/check-divergence.sh --path .
@@ -89,6 +90,44 @@ check).
 
 The lab's other checks follow the active topic: the planning-state check no longer cries "STATE.md
 missing" on a partitioned repository, and requirements are read per topic.
+
+### The safety net armed at the product and dev roles
+
+When a `product` or `dev` role is installed, the installer puts three git hooks in **your clone**,
+`post-merge`, `post-rewrite` and `post-commit`. They replay the check after every `git pull`, `git merge` or
+`git pull --rebase`, and after a conflicted merge you finish by hand (`git commit`, `git merge --continue`). At the `solo` role, nothing is installed.
+
+- **It cries on a divergence**, but the merge is not undone: a hook cannot undo it. When everything is
+  consistent, it says nothing more. When it cannot judge, it says "cannot be verified": never a
+  courtesy green.
+- **The journal**: every cry and every "cannot be verified" appends a line (date, hook, verdict, HEAD,
+  signals) to the file `.git/vf-divergence/journal.tsv`. It is not versioned, it belongs to your clone
+  (your worktrees share it) and it survives removal of the safety net.
+- **The state**: `bash .claude/scripts/vf-divergence-hook.sh status --path .` says whether each hook
+  is armed, third-party or absent, and how many lines the journal holds. A hook you armed by hand
+  carries the path of the plugin cache script: ask `status` through that same script (the installed
+  plugin's `conductor/scripts/vf-divergence-hook.sh`). Asked through the lab copy in `.claude/scripts/`,
+  that hook reads as third-party, because the path in its line is not the copy's.
+- **It never runs your repository**: the check is launched from the installed plugin, not from a
+  script the merge may have just brought in.
+- **It never takes the place of a hook of yours**: if a hook already exists, or if `core.hooksPath` is
+  set (husky, for instance), nothing is overwritten, and the installer prints the line for you to add
+  to that hook yourself.
+- **The way out**: `VF_DIVERGENCE_HOOK=off` at install, when changing role, or when updating. See
+  [installation](../01-get-started/installation.md) and
+  [updating](../01-get-started/updating-and-uninstalling.md).
+
+### What the safety net does not see
+
+These limits are measured, not assumed. The safety net does not fire on:
+
+- `git reset --hard`, `git switch` and `git checkout`;
+- `git cherry-pick`;
+- a `git rebase` that rewrites no commit.
+
+A merge done on the forge is only seen at your next `git pull`. After a plugin update, run
+`/vf-update` so the hook follows the installed plugin: without it, it may say "cannot be verified".
+On Windows (Git Bash), the safety net has not been measured yet.
 
 <!-- vf-manual:nav -->
 [← Previous](../05-agent-team/branches-and-worktrees.md) · [↑ Contents](../README.md) · [Next →](../05-agent-team/tidying-up-after-yourself.md)

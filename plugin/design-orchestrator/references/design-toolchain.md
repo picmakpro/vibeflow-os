@@ -55,6 +55,12 @@ Contrat du script (`scripts/ensure-design-deps.sh` du module) :
    d'install) supprime la routine mais laisse TOUJOURS passer les anomalies : plugin absent ou
    désactivé, geste réellement exécuté, étape manuelle. Un appelant ne doit donc jamais rediriger
    stderr vers `/dev/null` — ce serait reproduire, un cran plus haut, le silence que ce script ferme.
+5. **Exclusion persistante** — `VF_DESIGN_SKIP=ui-ux-pro-max,impeccable` (ou un fichier
+   `.claude/.vf-design-skip` du projet, ou `${CLAUDE_CONFIG_DIR:-~/.claude}/.vf-design-skip` en scope
+   user : un nom de plugin par ligne, `#` commentaires) retire un plugin du bootstrap : ni installé
+   ni activé, résumé `<nom>=exclu`. `superpowers` ne s'exclut pas (dépendance dure, exclusion
+   refusée) ; un nom inconnu est ignoré avec une ligne de journal. Un fichier est nécessaire parce
+   que l'appel pendant `/vf-update` ne porte pas l'environnement de l'utilisateur.
 
 Marketplaces / commandes d'install (posées automatiquement par le script ci-dessus ; à proposer
 manuellement si le script est indisponible, jamais à imposer en silence) :

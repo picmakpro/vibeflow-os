@@ -15,9 +15,9 @@ Un plugin Claude Code de développement agentique piloté par la spec. Un agent 
 une équipe d'agents challenge, planifie, construit et prouve le travail, et des gates machine le
 vérifient. Rien n'est fait sans preuve, rien n'est mergé sans toi.
 
-[![Version](https://img.shields.io/badge/version-2.71.2-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.74.0-2563eb)](./VERSION)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#autres-runtimes)
-[![Modules](https://img.shields.io/badge/modules-17-16a34a)](#modules)
+[![Modules](https://img.shields.io/badge/modules-18-16a34a)](#modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [Le cycle](#comment-ça-marche) · [La preuve](#fait--prouvé) · [L'équipe](#une-équipe-pas-un-chatbot) · [La mémoire](#la-mémoire-qui-tient) · [Les labs](#un-lab-pour-chaque-métier) · [Installation](#installation) · [Manuel](./manual/README.md)
@@ -64,7 +64,7 @@ projet recule. La dernière étape t'appartient.
 
 Un vert qui ne peut pas devenir rouge ne prouve rien. Les tests s'écrivent rouges d'abord, les
 gates `check-*.sh` tournent en CI, et le juge n'est jamais l'auteur. Le dépôt s'applique la même
-règle : 112 suites tournent à chaque push, et un job « lab frais » installe le socle dans un lab
+règle : 123 suites tournent à chaque push, et un job « lab frais » installe le socle dans un lab
 vierge qui doit passer ses propres gates sans intervention.
 
 → [Les gates machine](./manual/fr/07-sous-le-capot/les-gates-machine.md)
@@ -113,7 +113,7 @@ avec une boucle d'évals.
 
 ## Modules
 
-17 modules, chacun versionné avec son `CHANGELOG.md`. `conductor` est le socle obligatoire ;
+18 modules, chacun versionné avec son `CHANGELOG.md`. `conductor` est le socle obligatoire ;
 ensuite tu choisis un lab de dev parmi des presets (`dev`, `dev-mobile`, `dev-audite`, les
 dépendances résolues pour toi) ou un lab métier sur mesure. Le README de chaque module est sa
 documentation complète, avec la même structure partout.
@@ -154,9 +154,12 @@ gate). Les trois dernières sont ci-dessous ; l'historique complet vit dans
 
 | Version | Date | Changement |
 |---------|------|------------|
+| `v2.74.0` | 2026-10-29 | **Gate d'architecture et phases proposées (minor).** `check-phase-validation.sh`, `check-architecture.sh` et `vf-validation.sh` (`conductor` v1.52.0) : une phase ajoutée hors du poste `solo` naît « proposée » jusqu'à la validation d'un dev, `vf-coder` et `vf-auto` refusent une étape proposée (seule une étape absente du ROADMAP laisse continuer, tout autre résultat indéterminé arrête), le head demande une `ARCHITECTURE.md` validée avant le découpage en phases. `dev-orchestrator` v2.30.0, `planning-core` v2.10.0, `product-team-bundle` v1.1.0 (worker `vf-product-architect`). Phase 61, deux humains sur un même dépôt : `vf-divergence-hook.sh` arme le filet de divergence (hooks `post-merge` et `post-rewrite`, jamais en remplacement d'un hook de l'utilisateur, journal dans le dossier git) aux postes `product` et `dev`, l'installeur l'arme, le re-pointe et le retire, et les entrées de registre peuvent porter un champ `Role` (`consolidator` v1.12.0, `reference` v2.6.0). Prend effet sur un poste après `/vf-update`. **123 suites.** |
+| `v2.73.1` | 2026-10-29 | **Garde de verrou jugée dans le worktree, `gsd-run.sh` rc 64 (patch).** `guard-driver-lock.sh` résout le dossier où un `cd <worktree> && git commit …` emmène le commit et juge l'index de ce checkout plutôt que les fichiers non suivis de l'arbre principal (checkouts du même dépôt seulement ; `;`, sous-shell, variable, `||`, `-C` retombent sur le jugement d'avant) ; `gsd-run.sh` rend 64, non 1, quand `HOME` et `CLAUDE_CONFIG_DIR` sont absents (`conductor` v1.50.4, `dev-orchestrator` v2.29.1). Avance #166. Effectif sur un poste après `/vf-update`. **116 suites.** |
+| `v2.73.0` | 2026-10-29 | **Bundle produit (minor).** Nouveau module `product-team-bundle` v1.0.0 : équipe produit (manager, analyste BRIEF, PM PRD, juge `prd-gate` seuil 80, gate `check-prd.sh`), front door `vibeflow-product` et skill `/vf-product`, visible aux postes `product` et `solo`. Reste `proposable: false` jusqu'à un run réel. `planning-core` v2.9.0 (gabarit produit), `dev-orchestrator` v2.29.0 (le head oriente vers `/vf-product` au poste `product`). |
+| `v2.72.0` | 2026-10-29 | **Clôture des issues GitHub (minor).** `driver-lock` fonctionne sous les coreutils uutils (runner Ubuntu 26 : `ln -sn`, `mv -T` avant le repli BSD) ; `framework-version.sh drift` compare le lab au cache du plugin au lieu de lui-même ; clé de frontmatter `vf-optional-agents` pour les agents de modules optionnels ; `gsd-run.sh` lance gsd-tools par chemin (rc 64 sans moteur) et `ensure-deps.sh` dérive le scope projet depuis `./.claude/gsd-core` ; les managers n'attendent plus un worker en boucle active ; `reindex.sh` conserve le mode du registre ; une lib sourcée n'est plus comptée non exécutable ; exclusion persistante des plugins design (`VF_DESIGN_SKIP`, `.vf-design-skip`) ; le moteur d'installation sauvegarde et annonce les patches locaux écrasés et explicite le routage vers `settings.local.json` (`conductor` v1.50.3, `dev-orchestrator` v2.28.5, `consolidator` v1.11.4, `infrastructure-audit` v1.3.7, `design-orchestrator` v1.5.16, `mobile-test` v1.0.5, 10 patches de doc). Ferme #47, #52, #81, #165, #167. **114 suites.** |
 | `v2.71.2` | 2026-10-23 | **Correctifs d'audit, de doublons et de doc (patch).** `infrastructure-audit` ne rend plus INDÉTERMINÉ sous `--strict --no-tests` quand aucune suite n'existe ; `detect-duplicates.sh` passe les titres à Python par l'entrée standard et signale ses échecs (champ `errors`, code de sortie 2) ; le tableau des signaux de démarrage de l'agent `dev-orchestrator` suit le texte réel des hooks ; les commentaires de `driver-lock` décrivent la garde hors racine (`conductor` v1.50.2, `consolidator` v1.11.3, `dev-orchestrator` v2.28.4, `infrastructure-audit` v1.3.6). |
 | `v2.71.1` | 2026-10-23 | **Correctifs Windows, audit et bootstrap (patch).** Le mode UTF-8 est posé sans condition sous `-I` et les deux gros programmes de hooks ne passent plus par la ligne de commande (Windows la plafonne à 32 767 caractères) ; `infrastructure-audit` gagne `--no-tests` et rend INDÉTERMINÉ sous `--strict` quand les suites sont sautées ; `driver-lock` refuse un sous-dossier sans `.planning/` propre ; le bootstrap de session oriente vers `/vf-dev` ; `check-gsd-config` épargne les clés propres à VibeFlow (`conductor` v1.50.1, `consolidator` v1.11.2, `design-orchestrator` v1.5.15, `dev-orchestrator` v2.28.3, `infrastructure-audit` v1.3.5, `planning-core` v2.8.3). |
-| `v2.71.0` | 2026-10-22 | **Postes par projet (minor).** `/vibeflow-install` demande le poste sur ce projet (`solo` pré-coché, `product`, `dev` ; non interactif par `VF_ROLE`). `module.json` porte `roles`, et le catalogue, les presets et `install --all` filtrent par poste, tandis qu'un module nommé explicitement s'installe toujours : un poste est une vue, pas un droit (ADR-077). `conductor` v1.50.0 ajoute le lecteur `vf-role.sh get`, le gate consultatif `check-role-consistency.sh` et une ligne « Poste : X » au SessionStart. **111 suites.** |
 
 <details>
 <summary><strong>Références méthodologiques (ADR / LRN)</strong></summary>

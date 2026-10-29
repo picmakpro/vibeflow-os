@@ -11,7 +11,7 @@ listes exhaustives (quelle commande, quel skill, quel agent existe précisément
 `06-reference/`, pas ici.
 
 Retiens l'ordre de grandeur : huit commandes contre plus d'une quinzaine de skills livrés et
-vingt-deux agents. Ce déséquilibre volontaire est la clé de lecture de toute cette page — la
+trente-sept agents. Ce déséquilibre volontaire est la clé de lecture de toute cette page — la
 plupart de ce que VibeFlow fait pour toi n'est **jamais** tapé, il se déclenche.
 
 ## Trois portes d'entrée : commande, skill, agent
@@ -66,7 +66,7 @@ planifier, distribuer et reconcilier les rapports qui reviennent.
 ## Pourquoi certains agents n'ont aucune commande d'incarnation
 
 C'est la question que se pose quiconque ouvre `plugin/*/agents/` sans y retrouver ses commandes :
-sur les vingt-deux agents livrés, la grande majorité n'a **aucune** commande `/<nom-agent>`
+sur les trente-sept agents livrés, la grande majorité n'a **aucune** commande `/<nom-agent>`
 associée. C'est voulu, pas un manque. Un **worker interne** — par exemple `quality-gate-client`,
 le juge des livrables business — n'est dispatché que par son orchestrateur de mission
 (`vf-business-manager`…), jamais directement par toi. `vf-coder` fait exception : en plus de son

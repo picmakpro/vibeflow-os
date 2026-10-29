@@ -1,5 +1,9 @@
 # CHANGELOG — kpi-analyst
 
+## [v1.0.8] — 2026-10-29 (références mortes à `vibeflow-update.sh`) — publiée dans v2.72.0
+
+**Patch** (documentation seule) — références mortes à `vibeflow-update.sh` remplacées par `/vibeflow-install` / `/vf-update` dans le README (#166).
+
 ## [v1.0.7] — 2026-10-06 (classe d'invocation du skill, Phase 41.4)
 
 **Patch** — le `SKILL.md` déclare sa classe d'invocation (`vf-invocation: model`, vérifiée par

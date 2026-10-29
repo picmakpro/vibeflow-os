@@ -10,7 +10,7 @@ liste écrite ailleurs. Tu n'auras que ceux dont tu as installé le module ; le
 [catalogue](../03-modules/catalogue.md) dit lequel apporte quoi.
 
 Trois familles, et la différence entre elles compte plus que les noms. À la date où cette page a
-été écrite, le disque de ce dépôt en porte trente-et-un au total, répartis dans ces trois familles —
+été écrite, le disque de ce dépôt en porte trente-sept au total, répartis dans ces trois familles —
 un chiffre qui bouge à chaque module ajouté, jamais figé ici comme une promesse.
 
 ## Les agents que tu invoques
@@ -30,6 +30,9 @@ domaine.
 - **`vibeflow-design`** — le même rôle pour le design et l'UI, de la direction artistique au détail
   de spacing. Il tourne lui aussi dans ta session principale (via `/vf-design`), jamais lancé
   comme sous-agent.
+- **`vibeflow-product`** — le responsable produit, porte d'entrée du poste product. Il cadre ton
+  produit en langage naturel, écrit le brief et le PRD, et les fait juger avant de passer la main. Il
+  tourne dans ta session principale (via `/vf-product`), jamais lancé comme sous-agent.
 - **`vibeflow-validator`** — l'auditeur. Il orchestre plusieurs audits complémentaires et te propose
   des remédiations, sans jamais les appliquer seul.
 - **`vibeflow-kpi-analyst`** — les indicateurs réels du lab, extraits de façon déterministe.
@@ -47,14 +50,14 @@ taille du travail le justifie.
 
 Il en existe un par domaine outillé : **`vf-dev-manager`** pour le développement,
 **`vf-design-manager`** pour le design, **`vf-content-manager`**, **`vf-business-manager`** et
-**`vf-growth-manager`** pour les trois métiers, et **`vf-test-orchestrator`** pour la boucle de
-recette mobile.
+**`vf-growth-manager`** pour les trois métiers, **`vf-product-manager`** pour le cadrage produit,
+et **`vf-test-orchestrator`** pour la boucle de recette mobile.
 
 Ce qu'ils ont tous en commun : ils **ne produisent rien eux-mêmes**. Ils planifient, distribuent,
 lisent les rapports, et rendent compte. Si tu vois un manager écrire du code, c'est un bug, pas une
 optimisation.
 
-Chacun de ces six managers instancie le même noyau d'orchestration — verrou de driver, graphe de
+Chacun de ces sept managers instancie le même noyau d'orchestration — verrou de driver, graphe de
 mission, rapports typés — plutôt que de réinventer sa propre coordination d'équipe. C'est pour ça
 qu'un rapport de mission design se lit comme un rapport de mission dev une fois qu'on a compris le
 vocabulaire commun, détaillé dans le [glossaire](../02-concepts/glossaire.md).
@@ -63,7 +66,8 @@ vocabulaire commun, détaillé dans le [glossaire](../02-concepts/glossaire.md).
 
 C'est la famille la plus nombreuse — une bonne vingtaine d'agents — et la seule que tu ne peux pas
 invoquer. Ce sont les producteurs et les juges : celui qui écrit le code d'une étape, celui qui la
-relit, celui qui audite la sécurité, celui qui rédige un contenu, celui qui le note, celui qui joue
+relit, celui qui audite la sécurité, celui qui rédige un contenu, celui qui le note, celui qui rédige le brief produit (`vf-product-analyst`), celui qui en tire le PRD
+(`vf-product-pm`), celui qui rédige la décision d'architecture (`vf-product-architect`), celui qui joue
 les tests sur un simulateur, celui qui corrige l'application pour les faire passer.
 
 Chacun de ces agents déclare dans son propre fichier qu'il est **interne**. La conséquence est
@@ -79,7 +83,7 @@ doit pas toucher, et son rapport n'irait à personne. Le résultat serait moins 
 Deux catégories méritent d'être nommées parmi eux, parce que tu verras leur nom dans les rapports :
 
 **Les juges de qualité.** Chaque équipe métier en porte un — pour le contenu, pour les livrables
-client, pour les campagnes — auxquels s'ajoutent le juge de design et, côté dev, le relecteur de
+client, pour les campagnes — auxquels s'ajoutent le juge du brief et du PRD (`prd-gate`), le juge de design et, côté dev, le relecteur de
 code et l'auditeur de sécurité. Tous découvrent le travail fini sans avoir vu sa fabrication, et
 les juges de qualité n'ont pas d'outils d'écriture : ils ne peuvent pas corriger ce qu'ils
 critiquent.

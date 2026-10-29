@@ -51,6 +51,31 @@ finalized: it returns a binary verdict, never an impression. Between two equival
 VibeFlow systematically picks the one that **blocks** over the one that merely alerts — an ignored
 alert protects no one.
 
+### Before splitting: a validated architecture, then proposed steps
+
+Two machine gates apply at the `product` and `dev` roles, in a lab that has entered the product
+flow (a `.planning/BRIEF.md` exists). At the `solo` role, nothing changes.
+
+- **No splitting without a validated architecture.** When you ask to split the work into steps
+  (add or insert a step, open a milestone), the head runs `check-architecture.sh` on
+  `.planning/ARCHITECTURE.md`. If the file is missing, merely proposed, or lacks a section, it
+  stops with one sentence saying why. If you explicitly repeat your request, it serves you, and
+  the exception is traced in the report.
+- **A step added by the team is born proposed.** It carries `**Validation:** proposed` in the
+  roadmap. `vf-coder` checks that marker with `check-phase-validation.sh` and refuses to plan or
+  execute it: it stops and says so, launching nothing. It also stops when the marker cannot be read
+  (missing roadmap, malformed marker line, ambiguous step); only a step absent from the roadmap lets
+  it continue.
+
+To lift the stop, a dev validates: `vf-validation.sh validate --phase <N>` for a step,
+`vf-validation.sh validate --architecture .planning/ARCHITECTURE.md` for the architecture. The
+worker that drafts the architecture never validates it itself.
+
+**What this mechanism does not guarantee.** It is not a lock. The marker is lost if `edit-phase`
+regenerates the whole section ("Regenerate all"); a step added by hand, with no marker, counts as
+validated; `gsd-discuss-phase` and `gsd-quick` are not guarded. A role is a view, not a right: a
+human can always edit the validation line themselves.
+
 ## What you'll actually see
 
 Three mechanisms translate this doctrine into observable behavior.
