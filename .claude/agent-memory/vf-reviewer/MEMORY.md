@@ -28,3 +28,6 @@
 - [rtk + git diff A..B intermittent](feedback_rtk-two-dot-diff-flaky.md) — sortie vide silencieuse sous rtk sur la forme origin/main..HEAD ; rtk proxy ou hashes explicites, jamais confiance à un seul run
 - [Classes de bug des gardes bash (Phase 41)](feedback_bash-gate-bug-classes-phase41.md) — quatre classes confirmées par mutation sur G-1/G-2/G-3, à ressonder sur toute nouvelle garde in-repo
 - [Hint de refus: rejouer litteralement](feedback_hint-replay-must-keep-target.md) — Phase 57 : hint takeover sans --ws reprend le mauvais verrou ; muter aussi les comportements hors liste du plan
+- [Délimiteur non fermé : sonder la famille](feedback_fix-one-unclosed-delimiter-check-siblings.md) — fence corrigée mais `<!--` non fermé reste vert (check-prd.sh, Phase 59)
+- [Test de non-débordement dans la mauvaise direction](feedback_section-boundary-test-wrong-direction.md) — clause de fermeture de section supprimable sans rouge (CPV, Phase 60) ; interroger la section qui PRÉCÈDE le marqueur étranger
+- [Silence casse la suite soeur](feedback_silencing-output-breaks-sibling-witness-suite.md) — Phase 61 tour 2 : deux-clones 16/16 -> 14/16, sortie supprimee = temoin de declenchement perdu
