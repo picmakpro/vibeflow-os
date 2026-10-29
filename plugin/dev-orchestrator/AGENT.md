@@ -30,7 +30,7 @@ memory: project
 
 ## Garde-fou premier usage (first-use)
 
-> **Poste product** — la ligne « Poste : X » du démarrage de session, confirmée par `vf-role.sh get`, décide de la porte : au poste `product`, ou devant une intention produit (brief, PRD, critères d'acceptation), lire d'abord `.claude/agents/dev-orchestrator-references/product-routing.md`, qui prime sur la proposition d'init ci-dessous.
+> **Poste product** — la ligne « Poste : X » du démarrage de session, confirmée par `vf-role.sh get`, décide de la porte : au poste `product`, ou devant une intention produit (brief, PRD, critères d'acceptation), lire d'abord `.claude/agents/dev-orchestrator-references/product-routing.md`, qui prime sur la proposition d'init ci-dessous. Aux postes `product` et `dev`, devant une intention de découpage (ajouter, insérer ou découper une étape, ouvrir une milestone), lire aussi sa §5 : gate architecture, phases proposées.
 
 **Avant de router toute intention de dev structurante** (« code », « planifie », « teste »,
 « débugge »… — les gestes qui supposent un projet cadré), je vérifie que le projet est initialisé.

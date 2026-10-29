@@ -7883,6 +7883,83 @@ if [ -n "$T45_SD" ]; then
   t414_mutant "T45 mutant (f) : verbe propose remplacé par un verbe inconnu du --help" t45_val_link "$T45_MC" "$T45_TMP/mc-verb.md"
 fi
 
+# (d) pointeur d'AGENT.md : la ligne-pointeur existante est prolongée, aucune ligne ajoutée
+T45_PTR_LIT=('product-routing.md' '§5' 'découpage' 'phases proposées')
+t45_pointer_check() { # <AGENT.md> — UNE ligne de la zone porte le pointeur ET la §5 (aucune ligne ajoutée)
+  local z out n
+  z="$(t414_zone "$1" "$T44_AG_ZS" "$T44_AG_ZE")"
+  [ -n "$z" ] || { printf 'zone « Garde-fou premier usage » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T45_PTR_LIT[@]}")" || { printf 'pointeur de découpage : %s' "$out"; return 1; }
+  n="$(awk -v s="$T44_AG_ZS" -v e="$T44_AG_ZE" '$0 ~ s {on=1} on && $0 ~ e {exit}
+    on && index($0, "product-routing.md") && index($0, "§5") && index($0, "découpage") {n++} END{print n+0}' "$1")"
+  [ "$n" -eq 1 ] || { printf 'la ligne-pointeur existante ne porte pas la §5 (%s ligne)' "$n"; return 1; }
+}
+
+T45_INDEX_SRC="$REFS_DIR/_index.md"
+t45_index_check() { # <_index.md> — la ligne de product-routing.md mentionne la §5
+  local z out; z="$(t414_zone "$1" '^')"
+  [ -n "$z" ] || { printf '_index.md absent ou vide'; return 1; }
+  out="$(t414_missing "$z" '§5 : gate architecture avant découpage, phases proposées')" || { printf 'index : %s' "$out"; return 1; }
+}
+
+# (e) §5 de product-routing.md : gate architecture, conditions poste ∧ BRIEF, override, pose, limites
+T45_REF="$REFS_DIR/product-routing.md"
+T45_REF_ZS='^## 5[.]'
+T45_REF_LIT=('vf-role.sh get' 'solo' '.planning/BRIEF.md' 'check-architecture.sh --architecture .planning/ARCHITECTURE.md' 'Code 1' 'réitér' 'Contraintes session' 'Phases ajoutées : proposées' 'vf-validation.sh validate' '/vf-product' 'Regenerate all' 'gsd-discuss-phase' 'Un poste est une vue, pas un droit' 'quand `.planning/BRIEF.md` existe' "rien ne change, ni gate ni champ de brief" "le gate n'est pas consulté")
+T45_REF_INTERDIT=('BRIEF.md` est absent' 'consulté sans')
+t45_ref_check() { # <product-routing.md>
+  local z out
+  z="$(t414_zone "$1" "$T45_REF_ZS")"
+  [ -n "$z" ] || { printf 'section « 5. Découpage » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T45_REF_LIT[@]}")" || { printf 'absent de la §5 : %s' "$out"; return 1; }
+  out="$(t44_forbidden "$z" "${T45_REF_INTERDIT[@]}")" || { printf 'clause inversée dans la §5 : %s' "$out"; return 1; }
+  out="$(t414_order "$z" 'Poste `solo`' 'quand `.planning/BRIEF.md` existe' 'Code 1' 'réitér')" || { printf 'ordre de la §5 : %s' "$out"; return 1; }
+}
+t45_ref_link() { t45_link_check "$1" "$T45_REF_ZS" '' check-architecture.sh '--architecture'; }
+
+t45_out="$(t45_pointer_check "$AGENT_FILE")" && ok "T45 (d) AGENT.md : la ligne-pointeur du garde-fou premier usage porte product-routing.md et la §5 (découpage, phases proposées), sur UNE ligne" \
+  || ko "T45 (d) AGENT.md : attendu — ligne-pointeur prolongée vers la §5 ; obtenu — $t45_out"
+t45_out="$(t45_ref_check "$T45_REF")" && ok "T45 (e) product-routing.md §5 : gate architecture (poste ∧ BRIEF), code 1 → phrase et halte, override réitéré tracé, pose de « proposée », limites (${#T45_REF_LIT[@]} clauses)" \
+  || ko "T45 (e) product-routing.md §5 : attendu — gate architecture avant découpage ; obtenu — $t45_out"
+t45_out="$(t45_index_check "$T44_INDEX")" && ok "T45 (e) _index.md : la ligne de product-routing.md mentionne la §5" \
+  || ko "T45 (e) _index.md : attendu — résumé complété par la §5 ; obtenu — $t45_out"
+if [ -z "$T45_SD" ]; then
+  skip "T45 (f) §5 : scripts du conductor introuvables"
+else
+  t45_out="$(t45_ref_link "$T45_REF")" && ok "T45 (f) product-routing.md §5 : check-architecture.sh existe et son --help connaît --architecture" \
+    || ko "T45 (f) product-routing.md §5 : attendu — script cité existant, option connue ; obtenu — $t45_out"
+  case "$(bash "$T45_SD/vf-role.sh" --help 2>&1)" in *'get'*) ok "T45 (f) vf-role.sh : existe et son --help connaît get" ;; *) ko "T45 (f) vf-role.sh : --help ne connaît pas get" ;; esac
+fi
+
+for t45_a in "${T45_PTR_LIT[@]}"; do
+  t45_k=$((t45_k+1))
+  t414_ablate "$AGENT_FILE" "$T45_TMP/ptr-$t45_k.md" "$t45_a" "$T44_AG_ZS" "$T44_AG_ZE"
+  t414_mutant "T45 mutant (d) : AGENT.md privé de « $t45_a » dans le garde-fou premier usage" t45_pointer_check "$AGENT_FILE" "$T45_TMP/ptr-$t45_k.md"
+done
+# La §5 déplacée sur sa propre ligne : le pointeur existant ne la porte plus, une ligne a été ajoutée.
+sed 's/ Aux postes `product` et `dev`, devant une intention de découpage/\
+\
+Aux postes `product` et `dev`, devant une intention de découpage/' "$AGENT_FILE" > "$T45_TMP/ptr-line.md"
+t414_mutant "T45 mutant (d) : la §5 sur une ligne ajoutée (le pointeur existant ne la porte plus)" t45_pointer_check "$AGENT_FILE" "$T45_TMP/ptr-line.md"
+for t45_a in "${T45_REF_LIT[@]}"; do
+  t45_k=$((t45_k+1))
+  t414_ablate "$T45_REF" "$T45_TMP/ref-$t45_k.md" "$t45_a" "$T45_REF_ZS"
+  t414_mutant "T45 mutant (e) : product-routing.md privé de « $t45_a » dans la §5" t45_ref_check "$T45_REF" "$T45_TMP/ref-$t45_k.md"
+done
+# Pitfall 6 : la condition du BRIEF inversée refuserait tout lab existant au poste dev.
+sed 's/quand `.planning\/BRIEF.md` existe/quand `.planning\/BRIEF.md` est absent/' "$T45_REF" > "$T45_TMP/ref-brief.md"
+t414_mutant "T45 mutant (e) inversion : « BRIEF existe » remplacé par « BRIEF est absent » (gate consulté sur tout lab existant)" t45_ref_check "$T45_REF" "$T45_TMP/ref-brief.md"
+sed 's/rien ne change, ni gate ni champ de brief/gate consulté aussi au poste solo/' "$T45_REF" > "$T45_TMP/ref-solo.md"
+t414_mutant "T45 mutant (e) inversion : poste solo — « rien ne change » retiré" t45_ref_check "$T45_REF" "$T45_TMP/ref-solo.md"
+t414_ablate "$T45_INDEX_SRC" "$T45_TMP/index-5.md" '§5 : gate architecture avant découpage, phases proposées'
+t414_mutant "T45 mutant (e) : _index.md privé de la mention de la §5" t45_index_check "$T45_INDEX_SRC" "$T45_TMP/index-5.md"
+if [ -n "$T45_SD" ]; then
+  sed 's/check-architecture\.sh --architecture/check-architecture.sh --arch/' "$T45_REF" > "$T45_TMP/ref-opt.md"
+  t414_mutant "T45 mutant (f) : option --architecture remplacée par --arch dans la §5" t45_ref_link "$T45_REF" "$T45_TMP/ref-opt.md"
+  sed 's/check-architecture\.sh/check-architecture-x.sh/' "$T45_REF" > "$T45_TMP/ref-ren.md"
+  t414_mutant "T45 mutant (f) : check-architecture.sh renommé dans la §5" t45_ref_link "$T45_REF" "$T45_TMP/ref-ren.md"
+fi
+
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]
