@@ -13,6 +13,23 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.74.0] — 2026-10-29
+
+**Minor** (Phase 60 : gate architecture avant découpage et phases proposées ; nouvelle capacité) :
+
+- **`conductor` v1.51.0** : `check-phase-validation.sh` (constate le marqueur `**Validation:**` d'une phase du ROADMAP),
+  `check-architecture.sh` (l'architecture est validée et complète) et `vf-validation.sh` (seul écrivain du marqueur, un dev
+  valide). Une ligne qui ressemble à un marqueur sans en avoir la forme est un marqueur illisible, plus « absent ».
+- **`dev-orchestrator` v2.30.0** : `vf-coder` et `vf-auto` refusent de planifier ou d'exécuter une étape « proposée » ; seule une
+  étape absente du ROADMAP laisse continuer, tout autre résultat indéterminé arrête. Le head consulte le gate d'architecture
+  devant un découpage (postes `product` et `dev`, `.planning/BRIEF.md` présent) ; champ de brief `Phases ajoutées`.
+- **`planning-core` v2.10.0** : gabarit décisionnel `ARCHITECTURE.template.md`. **`product-team-bundle` v1.1.0** : worker
+  `vf-product-architect` et livrable `architecture`.
+- Manuel FR et EN à jour. Hypothèses P60-H-01..05 ratifiées et conduite P60-D-15 décidée (arbitrage Samuel, AskUserQuestion
+  session principale, 2026-10-29). Limites écrites : le volet « une phase ajoutée hors solo naît proposée » n'est prouvé que par
+  le texte (aucun run réel de mission) et le critère `clients` de la sobriété attend une liste hors dépôt.
+- Prend effet sur un poste après `/vf-update`. **119 suites.**
+
 ## [v2.73.1] — 2026-10-29
 
 **Patch** (lot E de la clôture des issues GitHub, PR #180 ; les deux mineurs laissés par la relecture adverse de
