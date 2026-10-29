@@ -653,12 +653,12 @@ Plans:
 ### Phase 62: Décision sur l'approche plateforme, sur preuve
 
 **Goal:** Une décision écrite sur l'approche C de la spec (plateforme collaborative : hub, base centrale), prise sur mesure : le besoin non-dev sans terminal est-il réel (Q-06) ? À défaut de preuve, le jalon se clôt sur un déclencheur daté de reprise. Aucun code avant la décision.
-**Requirements**: TBD — famille `PLTF` réservée, posée au cadrage.
+**Requirements**: PLTF-01, PLTF-02
 **Depends on:** 61.
 **Sources:** spec §4 C, §7 Q-05/Q-06.
 **Hors périmètre :** toute implémentation de plateforme.
-**Plans:** 0 plans
+**Plans:** 1 plan
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 62 to break down)
+- [x] 62-01-PLAN.md — dossier de décision `62-DECISION-plateforme.md` (statut PROPOSÉ : mesures sourcées, options A/B/C, déclencheur et plancher de date proposés) ; la décision signée (PLTF-02) reste à Samuel, la phase reste ouverte
