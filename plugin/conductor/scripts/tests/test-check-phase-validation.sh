@@ -337,6 +337,128 @@ probe_codes() {
 }
 case_ CPV-CODES probe_codes
 
+# === Preuve moteur GSD : le marqueur ne change rien pour les lecteurs du moteur (P60-D-03 a, P60-PL-19) ==========
+# Fixtures générées sous $TMP/gsd (hors $FX : CPV-RO est déjà passé), moteur lancé avec --cwd sur ces seuls labs,
+# jamais dans le dépôt (T-60-36). Aucun numéro de version du moteur écrit ici : seuls des champs sont comparés.
+GSDJS="${HOME:-/nonexistent}/.claude/gsd-core/bin/gsd-tools.cjs"
+GSD="$TMP/gsd"; mkdir -p "$GSD"
+GRC=0
+GSD_VALID='**Validation:** validated (dev, 2026-10-29)'
+
+# gsd_roadmap <ligne de titre de la phase 2> <ligne de marqueur ou vide> : ROADMAP à trois phases, sur la forme que
+# le moteur écrit (**Goal:**, **Requirements**, **Depends on:**, **Plans:**), cases de checklist comprises.
+gsd_roadmap() {
+  printf '# Roadmap\n\n## Milestone v1.0\n\n- [ ] Phase 1: Premiere\n- [ ] Phase 2: Deuxieme\n- [ ] Phase 3: Troisieme\n\n'
+  printf '### Phase 1: Premiere\n**Goal:** un\n**Requirements**: TBD\n**Depends on:** Nothing\n**Plans:** 0 plans\n\n'
+  printf '%s\n**Goal:** deux\n' "$1"
+  if [ -n "$2" ]; then printf '%s\n' "$2"; fi
+  printf '**Requirements**: TBD\n**Depends on:** Phase 1\n**Plans:** 0 plans\n\n'
+  printf '### Phase 3: Troisieme\n**Goal:** trois\n**Requirements**: TBD\n**Depends on:** Phase 2\n**Plans:** 0 plans\n'
+}
+# gsd_mklab <nom> <compartiment ou -> <titre> <marqueur> : lab sous $GSD/<nom>, ROADMAP dans le dossier de planning
+# du lab plat ou dans celui du compartiment.
+gsd_mklab() {
+  local d="$GSD/$1/.planning"
+  if [ "$2" != - ]; then d="$d/workstreams/$2"; fi
+  mkdir -p "$d"; gsd_roadmap "$3" "$4" > "$d/ROADMAP.md"
+}
+# gsd_do <lab> <compartiment ou -> <fichier de sortie> <arguments du moteur...> : commande du moteur sur le lab,
+# sortie brute dans <fichier>, code dans GRC. Appel borné, cwd hors du dépôt.
+gsd_do() {
+  local lab="$1" ws="$2" out="$3"; shift 3
+  if [ "$ws" = - ]; then
+    (cd "$TMP" && perl -e 'alarm 30; exec @ARGV' node "$GSDJS" "$@" --cwd "$lab") > "$out" 2> "$out.err" < /dev/null
+  else
+    (cd "$TMP" && perl -e 'alarm 30; exec @ARGV' node "$GSDJS" "$@" --cwd "$lab" --ws "$ws") > "$out" 2> "$out.err" < /dev/null
+  fi
+  GRC=$?
+}
+# gsd_norm <drop> <lab> <fichier brut> : sortie normalisée (chemin du lab remplacé par un jeton fixe ; drop=1 retire
+# la seule ligne "section":, seul champ qui porte le texte brut de la section).
+gsd_norm() {
+  LAB="$2" awk -v drop="$1" 'BEGIN { l = ENVIRON["LAB"] }
+    { if (drop == "1" && $0 ~ /^[ \t]*"section":/) next
+      while ((i = index($0, l)) > 0) $0 = substr($0, 1, i - 1) "<LAB>" substr($0, i + length(l))
+      print }' "$3"
+}
+# gsd_same <drop> <compartiment ou -> <attendu> <labA> <labB> <arguments du moteur...> -> 0 identique, 1 différent,
+# 2 référence inutilisable (moteur en erreur, sortie vide ou sans le jeton <attendu> : un « identique » ne vaudrait rien).
+gsd_same() {
+  local drop="$1" ws="$2" want="$3" a="$4" b="$5"; shift 5
+  gsd_do "$a" "$ws" "$TMP/gsd.a" "$@"
+  if [ "$GRC" -ne 0 ] || [ ! -s "$TMP/gsd.a" ] || ! command grep -qF -- "$want" "$TMP/gsd.a"; then
+    LASTMSG="référence inutilisable (rc $GRC, jeton [$want] attendu) err[$(tr '\n' '|' < "$TMP/gsd.a.err" | cut -c1-200)]"; return 2
+  fi
+  gsd_do "$b" "$ws" "$TMP/gsd.b" "$@"
+  if [ "$GRC" -ne 0 ]; then LASTMSG="le moteur rend rc $GRC sur le second lab"; return 1; fi
+  gsd_norm "$drop" "$a" "$TMP/gsd.a" > "$TMP/gsd.na"; gsd_norm "$drop" "$b" "$TMP/gsd.b" > "$TMP/gsd.nb"
+  if cmp -s "$TMP/gsd.na" "$TMP/gsd.nb"; then return 0; fi
+  LASTMSG="sorties différentes"; return 1
+}
+# Attendu « différent » : un 0 (identique) est un comparateur aveugle, un 2 une référence inutilisable.
+gsd_must_differ() {
+  gsd_same "$@"; local r=$?
+  if [ "$r" -eq 0 ]; then LASTMSG="comparateur aveugle : un témoin négatif est déclaré identique (${*:3:3})"; return 1; fi
+  if [ "$r" -eq 2 ]; then return 1; fi
+  return 0
+}
+# Attendu « identique ».
+gsd_must_match() {
+  gsd_same "$@"; local r=$?
+  if [ "$r" -eq 0 ]; then return 0; fi
+  LASTMSG="${LASTMSG} (${*:3:3})"; return 1
+}
+
+if [ -f "$GSDJS" ] && command -v node > /dev/null 2>&1; then
+  gsd_mklab A - '### Phase 2: Deuxieme' ''
+  gsd_mklab B - '### Phase 2: Deuxieme' '**Validation:** proposed'
+  gsd_mklab C - '### Phase 2: Deuxieme' "$GSD_VALID"
+  gsd_mklab N1 - '### Phase 2 [proposed]: Deuxieme' ''
+  gsd_mklab N2 - '### Phase 2: Deuxieme (proposed)' ''
+  PH2='"phase_name": "Deuxieme"'; CNT='"phase_count": 3'
+
+  # Témoins négatifs d'abord, avant toute comparaison positive : le comparateur doit savoir rougir (T-60-35).
+  probe_gsd_neg() {
+    gsd_must_match 1 - "$PH2" "$GSD/A" "$GSD/A" roadmap get-phase 2 || { LASTMSG="témoin positif A = A non identique (comparateur toujours différent) — $LASTMSG"; return 1; }
+    gsd_must_differ 1 - "$PH2" "$GSD/A" "$GSD/N1" roadmap get-phase 2 || return 1
+    gsd_must_differ 1 - "$PH2" "$GSD/A" "$GSD/N2" roadmap get-phase 2 || return 1
+    gsd_must_differ 0 - "$CNT" "$GSD/A" "$GSD/N2" roadmap analyze
+  }
+  case_ CPV-GSD-NEG probe_gsd_neg
+
+  probe_gsd_get() {
+    gsd_must_match 1 - "$PH2" "$GSD/A" "$GSD/B" roadmap get-phase 2 || return 1
+    gsd_must_match 1 - "$PH2" "$GSD/A" "$GSD/C" roadmap get-phase 2 || return 1
+    # Le champ retiré de la comparaison porte bien le marqueur : le retrait n'efface pas une différence réelle.
+    gsd_do "$GSD/B" - "$TMP/gsd.sec" roadmap get-phase 2
+    LASTMSG="la section de B ne porte pas la ligne de marqueur"; command grep -qF 'Validation:** proposed' "$TMP/gsd.sec"
+  }
+  case_ CPV-GSD-GET probe_gsd_get
+
+  probe_gsd_analyze() {
+    gsd_must_match 0 - "$CNT" "$GSD/A" "$GSD/B" roadmap analyze || return 1
+    gsd_must_match 0 - "$CNT" "$GSD/A" "$GSD/C" roadmap analyze
+  }
+  case_ CPV-GSD-ANALYZE probe_gsd_analyze
+
+  # Lab partitionné : mêmes comparaisons avec --ws w1 (compartiment de fixture, aucun nom réel).
+  gsd_mklab Aw w1 '### Phase 2: Deuxieme' ''
+  gsd_mklab Bw w1 '### Phase 2: Deuxieme' '**Validation:** proposed'
+  gsd_mklab Cw w1 '### Phase 2: Deuxieme' "$GSD_VALID"
+  gsd_mklab N1w w1 '### Phase 2 [proposed]: Deuxieme' ''
+  probe_gsd_ws() {
+    gsd_must_differ 1 w1 "$PH2" "$GSD/Aw" "$GSD/N1w" roadmap get-phase 2 || return 1
+    gsd_must_match 1 w1 "$PH2" "$GSD/Aw" "$GSD/Bw" roadmap get-phase 2 || return 1
+    gsd_must_match 1 w1 "$PH2" "$GSD/Aw" "$GSD/Cw" roadmap get-phase 2 || return 1
+    gsd_must_match 0 w1 "$CNT" "$GSD/Aw" "$GSD/Bw" roadmap analyze || return 1
+    gsd_must_match 0 w1 "$CNT" "$GSD/Aw" "$GSD/Cw" roadmap analyze
+  }
+  case_ CPV-GSD-WS probe_gsd_ws
+  # GSD-FIN-ECRITURES
+else
+  skip "CPV-GSD moteur GSD absent (node ou gsd-tools.cjs introuvable : la CI installe le moteur et tranche)"
+fi
+
 # === Mutants (QUAL-01) ===============================================================================
 MUTDIR="$TMP/mut"; mkdir -p "$MUTDIR"
 MUTBIN="$MUTDIR/check-phase-validation.sh"
