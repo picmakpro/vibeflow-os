@@ -1,5 +1,13 @@
 # Changelog — planning-core
 
+## [v2.10.0] — 2026-10-29 (gabarit d'architecture)
+
+**Minor** (nouvelle capacité : gabarit décisionnel d'architecture du poste product) :
+
+- **`references/templates/product/ARCHITECTURE.template.md`** (fichier neuf) : fichier DÉCISIONNEL posé avant le découpage en phases, à six rubriques (contexte, choix structurants, composants et responsabilités, données, contraintes, risques et questions ouvertes) et une ligne d'état `**Validation:**` (`proposed` à l'instanciation, `validated (<poste>, <AAAA-MM-JJ>)` posée par un dev). Il nomme ses deux homonymes : la carte descriptive `.planning/codebase/ARCHITECTURE.md` (produite par `gsd-map-codebase`, jamais une décision) et `docs/ARCHITECTURE.md` (documentation).
+- Lu par `check-architecture.sh` (module `conductor`, vert seulement sur une architecture validée et complète) et instancié par `vf-product-architect` (module `product-team-bundle`).
+- **Inchangés à l'octet** : tous les fichiers existants du module hors ce bump (gabarits, `SKILL.md`, `PROFILES.md`, scripts). Aucune release racine.
+
 ## [v2.9.0] — 2026-10-27 (gabarit produit) — publiée dans v2.72.0
 
 **Minor** (nouvelle capacité : gabarit du poste product) :
