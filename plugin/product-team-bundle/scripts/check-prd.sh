@@ -21,23 +21,32 @@
 #
 # Éliminatoire 1 : une exigence `- [ ] **ID**: ...` sans critère d'acceptation utilisable. Le
 # critère est un CHAMP `Acceptation :` (ou `Critère d'acceptation :`, casse indifférente, blanc ou
-# espace insécable admis avant les deux-points) : le mot « acceptation » n'est pas précédé d'un mot (début de
+# espace insécable admis avant les deux-points ; la valeur s'arrête au champ SUIVANT reconnu : `Priorité :` ou une
+# autre `Acceptation :`, un champ vide suivi d'un autre sur la même ligne reste vide) : le mot « acceptation » n'est pas précédé d'un mot (début de
 # ligne, ponctuation, tiret, parenthèse, puce ou emphase avant lui : champ ; lettre, chiffre ou apostrophe collée
 # avant lui : « l'étape d'acceptation : … » n'est pas un champ). Sa valeur est utilisable si, marques de mise en
 # forme en tête retirées (puces `- * + • · – — ‣ ◦ ▪ ∙ ●`, numérotées `1.` `1)`, citation, emphase, code,
 # guillemets, soulignés) et blancs Unicode ramenés à l'espace (largeur nulle ignorée), elle ne commence pas par
 # `[` `<` (ni leurs formes pleine chasse), n'est pas vide, ne porte ni trois points ni points de
 # suspension, ne porte aucun marqueur de remplissage et compte au moins 10 CARACTÈRES non blancs (UTF-8
-# compté en caractères, en awk pur sous LC_ALL=C : aucune locale UTF-8 requise). Marqueurs FORTS (en
+# compté en caractères, en awk pur sous LC_ALL=C : aucune locale UTF-8 requise). MISE EN FORME EN LIGNE : avant les tests de
+# mots et le décompte, TOUTE emphase (`*` `_` `~`), code en ligne et guillemets (droits, courbes, chevrons) est retirée
+# partout, en tête, en fin et autour des mots, puis la ponctuation de tête et de fin et les blancs multiples ; à point
+# fixe (borné), à l'identique pour les critères et les corps de rubrique : un marqueur entouré de n'importe quelle
+# emphase (`_À définir_`, `__TBD__`, `**à** **définir**`) vaut le marqueur nu. Un `_` entre deux caractères de mot
+# (`tbd_label`) reste. Une valeur faite de ponctuation seule est vide. Marqueurs FORTS (en
 # mot entier, partout dans la valeur) : TBD, TBA, FIXME, n/a, « à définir », « à préciser », « à compléter »,
 # « à déterminer », « à remplir », « à renseigner », « à confirmer », « à décider » ; marqueurs FAIBLES, mots
 # légitimes en phrase : TODO et « à venir », rouges seulement ISOLÉS (en début ou fin de valeur, ou collés à
 # une ponctuation), verts au sein d'une phrase (« la todo list affiche dix éléments »). Casse et accents
 # indifférents, marques combinantes comprises. Faux rouge ASSUMÉ, plutôt qu'un faux vert : un faible isolé
 # dans une phrase légitime (« les évolutions à venir. »). Limite connue, laissée au juge : une mention à remplir
-# qui n'est pas listée (« xxx », « lorem ipsum », « ? ») passe si elle atteint 10 caractères ; de même une emphase
-# collée au mot (« la phase de **acceptation** : … ») le fait lire comme un champ. La qualité « testable » reste
-# au juge. Les blocs de code et les commentaires HTML sont ignorés (un commentaire multi-ligne, lignes blanches comprises, au
+# qui n'est pas listée (« xxx », « lorem ipsum », « ? », « {…} », « (critère à écrire) », « to be determined later »)
+# passe si elle atteint 10 caractères ; de même une emphase collée au mot (« la phase de **acceptation** : … ») le
+# fait lire comme un champ ; les champs en anglais (`Acceptance:`) ne sont pas reconnus ; un « n/a » cité ou des points
+# de suspension légitimes sont rouges. La qualité « testable » reste
+# au juge. Les blocs de code et les commentaires HTML sont ignorés (un `<!--` dans un span de code en ligne n'ouvre
+# aucun commentaire : appariement des séries d'accents graves à la CommonMark ; un commentaire multi-ligne, lignes blanches comprises, au
 # milieu d'une exigence ne la ferme pas). Une puce, même indentée, ouvre un nouvel élément : elle ne porte
 # pas le critère de l'exigence qui précède. Fins de ligne CRLF et CR seules traitées comme des fins de ligne.
 # Bloc de code OU commentaire HTML non fermé en fin de fichier (exigences ou rubriques) : la suite est
@@ -47,8 +56,11 @@
 # Éliminatoire 2 : une rubrique du BRIEF manque ou n'a aucune ligne de corps (hors commentaire HTML,
 # hors ligne de remplissage selon la MÊME règle que les critères : entre crochets ou chevrons après
 # puce/citation/emphase, points de suspension, marqueurs ci-dessus ; sans seuil de longueur) :
-# probleme, utilisateurs, valeur, contraintes, hors_perimetre (titres Markdown reconnus par préfixe
-# ASCII, casse indifférente).
+# probleme, utilisateurs, valeur, contraintes, hors_perimetre (titres Markdown reconnus par préfixe, à la
+# typographie près : casse, accents, trait d'union, souligné, espaces multiples ou insécables, emphase). Le contenu
+# sous un sous-titre plus profond appartient à la rubrique ; un titre de niveau égal ou inférieur la ferme. Limite
+# connue : un sous-titre plus profond qui porte un nom de rubrique reste dans la rubrique ouverte, il ne déclare pas
+# la sienne.
 # Avertissement (jamais d'effet sur le code) : priorité absente ou hors {must, should, could}.
 
 # Codes de sortie (chacun énuméré, aucun implicite) :
@@ -168,16 +180,69 @@ function fillword(t,   i, n, S, W) {
   for (i = 1; i <= n; i++) if (isolated(t, W[i])) return 1
   return 0
 }
+# Mise en forme Markdown EN LIGNE retirée, à point fixe : marques de tête (lead), emphase `*` `_` `~`, code, guillemets
+# (`"` « » “ ” „ ‘ ’ `'`), partout (en tête, en fin, autour des mots), puis ponctuation de tête et de fin et blancs
+# repliés. Un `_` entre deux caractères de mot (snake_case) reste : ce n'est pas une mise en forme.
+# Chaque retrait peut en découvrir un autre (`**1.** tbd`), d'où la boucle jusqu'à stabilité (bornée). Appliquée À
+# L'IDENTIQUE aux critères et aux corps de rubrique : un marqueur entouré de n'importe quelle emphase vaut le marqueur nu.
+function protect_us(v,   o) {
+  o = ""
+  while (match(v, /[A-Za-z0-9\200-\377]_[A-Za-z0-9\200-\377]/)) { o = o substr(v, 1, RSTART) "\001"; v = substr(v, RSTART + 2) }
+  return o v
+}
+function plain(v,   k, o) {
+  for (k = 0; k < 8; k++) {
+    o = v
+    v = lead(v)
+    gsub(/\342\200\231/, "'", v)
+    v = protect_us(v)
+    gsub(/[*_`"~']|\302[\253\273]|\342\200[\230-\237]/, " ", v)
+    gsub(/\001/, "_", v)
+    gsub(/[ \t]+/, " ", v)
+    sub(/^([] \t.,;:!?(){}[<>|=#+\/-]|\342\200[\223\224\242\246]|\302\267)+/, "", v)
+    sub(/([] \t.,;:!?(){}[<>|=#+\/-]|\342\200[\223\224\242\246]|\302\267)+$/, "", v)
+    if (v == o) break
+  }
+  return v
+}
 # Règle de remplissage UNIQUE (critères d'acceptation ET corps de rubrique du BRIEF) : valeur vide, entre
 # crochets ou chevrons (après marques de mise en forme), points de suspension, ou marqueur de remplissage.
-function isfill(v,   c) {
+function isfill(v,   c, p) {
   v = lead(v)
   if (v == "") return 1
   c = substr(v, 1, 1)
   if (c == "[" || c == "<") return 1
   if (v ~ /^(\357\274[\273\234]|\343\200\210|\342\237\250)/) return 1
   if (index(v, "...") || index(v, ell)) return 1
-  return fillword(fold(v))
+  p = plain(v)
+  if (p == "") return 1
+  return fillword(fold(p))
+}
+# Contenu d'un span de code en ligne : un `<!--` n'y ouvre aucun commentaire. Le marqueur invisible \004 y est inséré
+# (retiré en sortie de strip_comments). Appariement CommonMark : une série de n accents graves ferme sur la série de
+# longueur exactement n qui suit ; sans fermeture, elle reste littérale. Linéaire (split, tableaux, aucune recopie).
+function neutral(s,   n, P, i, k, nr, K, A, NX, LAST, r, c, out) {
+  n = split(s, P, "`")
+  if (n < 3) return s
+  nr = 0; i = 1
+  while (i < n) {
+    k = 1
+    while (i + k < n && P[i + k] == "") k++
+    nr++; K[nr] = k; A[nr] = i; i += k
+  }
+  split("", LAST)
+  for (r = nr; r >= 1; r--) { NX[r] = (K[r] in LAST) ? LAST[K[r]] : 0; LAST[K[r]] = r }
+  r = 1
+  while (r <= nr) {
+    if (NX[r]) {
+      c = NX[r]
+      for (i = A[r] + K[r]; i <= A[c]; i++) gsub(/<!--/, "<\004!--", P[i])
+      r = c + 1
+    } else r++
+  }
+  out = P[1]
+  for (i = 2; i <= n; i++) out = out "`" P[i]
+  return out
 }
 function strip_comments(s,   a, b) {
   if (incom) {
@@ -185,11 +250,13 @@ function strip_comments(s,   a, b) {
     if (!b) return ""
     s = substr(s, b + 3); incom = 0
   }
+  if (index(s, "`") && index(s, "<!--")) s = neutral(s)
   while ((a = index(s, "<!--")) > 0) {
     b = index(substr(s, a + 4), "-->")
-    if (!b) { incom = 1; return substr(s, 1, a - 1) }
+    if (!b) { incom = 1; s = substr(s, 1, a - 1); gsub(/\004/, "", s); return s }
     s = substr(s, 1, a - 1) substr(s, a + b + 6)
   }
+  gsub(/\004/, "", s)
   return s
 }
 AWKEOF
@@ -199,7 +266,7 @@ read -r -d '' AWK_REQ <<'AWKEOF'
 function usable(v) {
   v = lead(v)
   if (isfill(v)) return 0
-  if (nchars(v) < 10) return 0
+  if (nchars(plain(v)) < 10) return 0
   return 1
 }
 # Critère : seulement comme CHAMP : le mot « acceptation » (avec ou sans « Critère d' », casse indifférente, blanc
@@ -212,15 +279,40 @@ function wordbefore(p) {
   sub(/[ \t]+$/, "", p)
   return (p ~ /([A-Za-z0-9]|\303[\200-\226\230-\266\270-\277]|[\304-\311][\200-\277]|[\316-\321][\200-\277]|(\314|\315)[\200-\277])('|\342\200\231)?$/)
 }
-function critval(s,   low, p, off, pre, rest) {
+# Libellé de champ « acceptation » reconnu à la position p de low (s en casse d'origine) : pose lstart (début du
+# libellé, « Critère d' » compris) et lend (premier caractère de la valeur, après les deux-points).
+function acclabel(low, s, p,   pre, rest) {
+  pre = substr(low, 1, p - 1); rest = substr(s, p + 11); lstart = p
+  if (match(pre, /crit[^ \t]*[ \t]+d('|\342\200\231)[ \t]*$/)) { lstart = RSTART; pre = substr(pre, 1, RSTART - 1) }
+  if (wordbefore(pre)) return 0
+  if (!match(rest, /^[ \t]*[*_]*[ \t]*:/)) return 0
+  lend = p + 11 + RLENGTH
+  return 1
+}
+# La valeur d'un champ s'arrête au champ SUIVANT reconnu : Priorité (même règle de mot précédent), ou une autre
+# Acceptation. Un champ vide suivi d'un autre sur la même ligne reste vide.
+function fieldcut(v,   low, p, off, q, cut) {
+  low = tolower(v); cut = 0; off = 0
+  while (match(substr(low, off + 1), /priorit(e|\303[\210-\212\250-\252]|e\314[\200-\277])?[ \t*_]*:/)) {
+    p = off + RSTART
+    if (!wordbefore(substr(low, 1, p - 1))) { cut = p; break }
+    off = p
+  }
+  off = 0
+  while ((q = index(substr(low, off + 1), "acceptation")) > 0) {
+    q += off
+    if (cut && q >= cut) break
+    if (acclabel(low, v, q)) { cut = lstart; break }
+    off = q
+  }
+  if (cut) v = substr(v, 1, cut - 1)
+  return v
+}
+function critval(s,   low, p, off) {
   s = norm(s); low = tolower(s); off = 0
   while ((p = index(substr(low, off + 1), "acceptation")) > 0) {
     p += off
-    pre = substr(low, 1, p - 1); rest = substr(s, p + 11)
-    if (match(pre, /crit[^ \t]*[ \t]+d('|\342\200\231)[ \t]*$/)) pre = substr(pre, 1, RSTART - 1)
-    if (!wordbefore(pre) && match(rest, /^[ \t]*[*_]*[ \t]*:/)) {
-      if (usable(substr(rest, RLENGTH + 1))) return 1
-    }
+    if (acclabel(low, s, p) && usable(fieldcut(substr(s, lend)))) return 1
     off = p
   }
   return 0
@@ -295,7 +387,8 @@ read -r -d '' AWK_BRIEF <<'AWKEOF'
   if (line ~ /^#+[ \t]/) {
     lvl = 0
     while (substr(line, lvl + 1, 1) == "#") lvl++
-    lab = tolower(substr(line, lvl + 1)); sub(/^[^a-z]+/, "", lab)
+    lab = fold(norm(substr(line, lvl + 1)))
+    gsub(/[*_`~-]|\342\200[\220-\225]|\342\210\222/, " ", lab); gsub(/[ \t]+/, " ", lab); sub(/^[^a-z]+/, "", lab)
     name = ""
     if (index(lab, "probl") == 1) name = "probleme"
     else if (index(lab, "utilisateur") == 1) name = "utilisateurs"

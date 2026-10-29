@@ -13,6 +13,8 @@
 # CPRD-FERME-BLANC, CPRD-SOUS-PUCE, CPRD-FENCE-OUVERTE, CPRD-CASE-INCONNUE, CPRD-BRIEF-REMPLISSAGE, CPRD-BRIEF-CRLF.
 # Cas revue-59 (2e relecture) : CPRD-COM-OUVERT, CPRD-BRIEF-OUVERT, CPRD-BRIEF-MENTIONS, CPRD-BRIEF-LEGITIME, CPRD-CHAMP,
 # CPRD-MARQUES, CPRD-CR, CPRD-COM-BLANC, CPRD-MOT-LEGITIME, CPRD-COCHEE, CPRD-HORS-SUJET, CPRD-5-SUR-1, CPRD-SOUS-PUCE-SUIVIE.
+# Classes génératives tour 3 (4e relecture) : CPRD-GEN-ENVELOPPES-*, CPRD-GEN-CHAMP-VIDE/SUIVI, CPRD-GEN-PONCTUATION-*, CPRD-GEN-TITRES-* ;
+# CPRD-IMBRICATION, CPRD-CODE-COMMENTAIRE, CPRD-CODE-MARQUEUR, CPRD-ILLISIBLE-000 (skip audible en root) ; mutants CPRD-MUT-117..159.
 # Mutants CPRD-MUT-1..8 (QUAL-01), CPRD-MUT-9..26 (revue-59 F4 : un mutant par comportement documenté), CPRD-MUT-27..51 (2e relecture, hors 40 : un mutant par correctif) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide
 # (bash -n), rouge pour la raison attendue (code attendu/obtenu imprimé), original revérifié vert.
 set -uo pipefail
@@ -551,10 +553,54 @@ brief_cells() {
     for k in 0 1 2 3 4; do
       [ $((i+k)) -lt "${#V[@]}" ] || continue
       CELLS_N=$((CELLS_N+1))
-      has "ELIMINATOIRE rubrique BRIEF ${NM[$k]} : vide" \
-        || echo "cellule BRIEF [$(printf '%s' "${V[$((i+k))]}" | cut -c1-140)] attendu rouge (rubrique vide), obtenu vert, rc $RC" >> "$TMP/genfail"
+      if [ "${BMODE:-red}" = green ]; then
+        { has "ELIMINATOIRE rubrique BRIEF ${NM[$k]} :"; } \
+          && echo "cellule BRIEF [$(printf '%s' "${V[$((i+k))]}" | cut -c1-140)] attendu vert (corps lu), obtenu rubrique vide, rc $RC" >> "$TMP/genfail"
+      else
+        has "ELIMINATOIRE rubrique BRIEF ${NM[$k]} : vide" \
+          || echo "cellule BRIEF [$(printf '%s' "${V[$((i+k))]}" | cut -c1-140)] attendu rouge (rubrique vide), obtenu vert, rc $RC" >> "$TMP/genfail"
+      fi
     done
     i=$((i+5))
+  done
+  msg_gen
+  [ ! -s "$TMP/genfail" ]
+}
+# brief_grp <tag> : stdin = valeurs ; HUIT valeurs par rubrique (corps = ces huit lignes), toutes à lire comme vides. Une
+# rubrique qui n'est pas « vide » trahit au moins une valeur lue comme un corps : chacune est alors rejouée seule, la
+# trace nomme la cellule fautive.
+brief_grp() {
+  local tag=$1 line i=0 g=0 k j f idx cnt v
+  local -a V=()
+  local -a NM=(probleme utilisateurs valeur contraintes hors_perimetre)
+  local -a HD=("Problème" "Utilisateurs" "Valeur" "Contraintes" "Hors périmètre")
+  CELLS_N=0; : > "$TMP/genfail"
+  while IFS= read -r line; do V[${#V[@]}]=$line; done
+  while [ "$i" -lt "${#V[@]}" ]; do
+    g=$((g+1)); f="$FX/genbg-$tag-$g.md"
+    {
+      printf '# Brief produit\n\n'
+      for k in 0 1 2 3 4; do
+        printf '## %s\n' "${HD[$k]}"; cnt=0
+        for j in 0 1 2 3 4 5 6 7; do idx=$((i+k*8+j)); if [ "$idx" -lt "${#V[@]}" ]; then printf '%s\n' "${V[$idx]}"; cnt=$((cnt+1)); fi; done
+        if [ "$cnt" -eq 0 ]; then printf 'Un corps légitime de la rubrique.\n'; fi
+        printf '\n'
+      done
+    } > "$f"
+    reg "genbg-$tag-$g.md"
+    run --brief "$f"
+    for k in 0 1 2 3 4; do
+      cnt=0; for j in 0 1 2 3 4 5 6 7; do idx=$((i+k*8+j)); [ "$idx" -lt "${#V[@]}" ] && cnt=$((cnt+1)); done
+      [ "$cnt" -gt 0 ] || continue
+      CELLS_N=$((CELLS_N+cnt))
+      has "ELIMINATOIRE rubrique BRIEF ${NM[$k]} : vide" && continue
+      for j in 0 1 2 3 4 5 6 7; do idx=$((i+k*8+j)); [ "$idx" -lt "${#V[@]}" ] || continue
+        v=${V[$idx]}; printf '# Brief produit\n\n## Problème\n%s\n\n## Utilisateurs\nLes clients.\n\n## Valeur\nMoins d appels.\n\n## Contraintes\nCoût borné.\n\n## Hors périmètre\nPas de paiement.\n' "$v" > "$FX/genbg-solo-$g-$idx.md"; reg "genbg-solo-$g-$idx.md"
+        run --brief "$FX/genbg-solo-$g-$idx.md"
+        has "ELIMINATOIRE rubrique BRIEF probleme : vide" || echo "cellule BRIEF [$(printf '%s' "$v" | cut -c1-140)] attendu rouge (rubrique vide), obtenu vert, rc $RC" >> "$TMP/genfail"
+      done
+    done
+    i=$((i+40))
   done
   msg_gen
   [ ! -s "$TMP/genfail" ]
@@ -567,6 +613,8 @@ gen_case() {
     crit-red) crit_cells red "$id" < <("$prod") ;;
     crit-green) crit_cells green "$id" < <("$prod") ;;
     brief) brief_cells "$id" < <("$prod") ;;
+    brief-grp) brief_grp "$id" < <("$prod") ;;
+    brief-green) BMODE=green brief_cells "$id" < <("$prod") ;;
   esac
   [ -s "$TMP/genfail" ] && nfail="$(awk 'END{print NR}' "$TMP/genfail")"
   GEN_TOT=$((GEN_TOT+CELLS_N)); GEN_OK=$((GEN_OK+CELLS_N-nfail)); PASS=$((PASS+CELLS_N-nfail))
@@ -672,6 +720,177 @@ probe_com_contenu() {
   msg "critère collé à la fin d'un commentaire multi-ligne attendu rc 0"; [ "$RC" -eq 0 ]; }
 case_ CPRD-COM-CONTENU probe_com_contenu
 
+# === Classes génératives (revue-59, tour 3) : la mise en forme en ligne, par construction ========================
+# Un marqueur à remplir entouré de N'IMPORTE QUELLE emphase vaut le marqueur nu ; un champ vide reste vide quel que soit
+# ce qui le suit sur la ligne ; un titre de rubrique se lit à la typographie près. Enveloppes : aucune, paire (`*x*`
+# `_x_` `**x**` `__x__` code, guillemets droits, courbes, chevrons, `~~x~~`), tête seule, fin seule, imbriquées par
+# deux. Positions : seule, en début, en fin, au milieu, mots séparés (chaque mot enveloppé à part).
+EH=(); ET=()
+addenv() { EH[${#EH[@]}]=$1; ET[${#ET[@]}]=$2; }
+addenv '' ''
+for p in '*' '_' '**' '__' '`' '"' "'" '~~'; do addenv "$p" "$p"; done
+addenv $'«' $'»'; addenv $'« ' $' »'; addenv $'“' $'”'; addenv $'‘' $'’'
+for p in '*' '_' '**' '__' '`' '"' $'«' '~' $'“' $'‘'; do addenv "$p" ''; done
+for p in '*' '_' '**' '__' '`' '"' $'»' '~' $'”' $'’'; do addenv '' "$p"; done
+addenv '_*' '*_'; addenv '*_' '_*'; addenv '**_' '_**'; addenv '_**' '**_'; addenv '"*' '*"'; addenv '*"' '"*'
+addenv '`**' '**`'; addenv $'«_' $'_»'; addenv '**__' '__**'; addenv '"_' '_"'; addenv '_`' '`_'; addenv '~~*' '*~~'
+addenv '_*' ''; addenv '*_' ''; addenv '' '_*'; addenv '' '*_'
+STRONG=('TBD' 'TBA' 'FIXME' 'n/a' 'à définir' 'à préciser' 'à compléter' 'à déterminer' 'à remplir' 'à renseigner' 'à confirmer' 'à décider')
+WEAK=('TODO' 'à venir')
+LEGIT_S="le tarif s'affiche en 2 secondes"
+NENV=${#EH[@]}
+wrap() { printf '%s%s%s' "${EH[$1]}" "$2" "${ET[$1]}"; }
+# envs_with <sous-chaîne> : indices des enveloppes qui portent cette chaîne (tête ou fin).
+envs_with() { local e r=""; for ((e=0; e<NENV; e++)); do case "${EH[$e]}${ET[$e]}" in *"$1"*) r="$r $e" ;; esac; done; printf '%s' "$r"; }
+ALLENV=""; for ((i=0; i<NENV; i++)); do ALLENV="$ALLENV $i"; done
+# env_red [grand|petit] : valeurs qui doivent être lues comme à remplir (ENVSEL = indices ; défaut : tous).
+env_red() { local size=${1:-grand} e m w a b x
+  for e in ${ENVSEL:-$ALLENV}; do
+    if [ "$size" = grand ]; then
+      for m in "${STRONG[@]}"; do x="$(wrap "$e" "$m")"
+        printf '%s\n' "$x" "$x $LEGIT_S" "$LEGIT_S $x" "le tarif $x s'affiche en 2 secondes"
+        case "$m" in *' '*) a="${m%% *}"; b="${m#* }"; printf '%s\n' "$(wrap "$e" "$a") $(wrap "$e" "$b") $LEGIT_S" "le tarif $(wrap "$e" "$a") $(wrap "$e" "$b") s'affiche" ;; esac
+      done
+    else
+      for m in 'TBD' 'à définir'; do x="$(wrap "$e" "$m")"
+        printf '%s\n' "$x" "le tarif $x s'affiche en 2 secondes"
+        case "$m" in *' '*) a="${m%% *}"; b="${m#* }"; printf '%s\n' "$(wrap "$e" "$a") $(wrap "$e" "$b") $LEGIT_S" ;; esac
+      done
+    fi
+    for m in "${WEAK[@]}"; do x="$(wrap "$e" "$m")"
+      if [ "$size" = grand ] || [ "$m" = TODO ]; then printf '%s\n' "$x" "$x $LEGIT_S" "$LEGIT_S $x"; fi
+    done
+  done; }
+# env_green : phrases légitimes (jamais à remplir), enveloppées de toutes les façons.
+env_green() { local e x
+  for e in ${ENVSEL:-$ALLENV}; do
+    printf '%s\n' "$(wrap "$e" "$LEGIT_S")" "$(wrap "$e" 'tarif') $LEGIT_S" "$LEGIT_S $(wrap "$e" 'export CSV')" "le $(wrap "$e" 'tarif') s'affiche en 2 secondes"
+    printf '%s\n' "la $(wrap "$e" 'todo') list affiche dix éléments en 2 secondes" "le mois $(wrap "$e" 'à venir') affiche trois rapports en 2 secondes"
+  done; }
+to_crit() { local v; while IFS= read -r v; do printf ' Cellule@@Acceptation : %s\n' "$v"; done; }
+cells_env_red_crit() { env_red grand | to_crit; }
+cells_env_red_brief() { env_red grand; }
+cells_env_green_crit() { env_green | to_crit; }
+cells_env_green_brief() { env_green; }
+gen_case CPRD-GEN-ENVELOPPES-CRITERE-ROUGE "$NENV enveloppes x 12 marqueurs forts, 2 faibles, 5 positions, critère d'acceptation" crit-red cells_env_red_crit
+gen_case CPRD-GEN-ENVELOPPES-BRIEF-ROUGE "$NENV enveloppes x marqueurs x positions, corps de rubrique du BRIEF" brief-grp cells_env_red_brief
+gen_case CPRD-GEN-ENVELOPPES-CRITERE-VERT "$NENV enveloppes x phrases légitimes (dont todo et à venir au fil d'une phrase), critère" crit-green cells_env_green_crit
+gen_case CPRD-GEN-ENVELOPPES-BRIEF-VERT "$NENV enveloppes x phrases légitimes, corps de rubrique du BRIEF" brief-green cells_env_green_brief
+
+# Champ vide suivi d'un autre champ sur la même ligne (ou en continuation) : la valeur s'arrête au champ suivant.
+FSEPS=(' — ' ' ; ' '. ' ' | ' ', ' ' - ' ' (' ' « ')
+FVALS=('' ' ' '  ' "$NBSP" ' ;' ' —' ' .' ' -' ' ,' ' !' ' ?' ' |' ' ()' ' **' ' __' ' ``' ' ""' $' «»' ' ***')
+FNEXTS=('' ' Priorité : must' ' priorité: should' ' PRIORITÉ : could' ' **Priorité** : must' ' Priorite : must' ' — Priorité : must' '. Priorité : must' $' Priorite\xcc\x81 : must')
+FNEXTS_SM=('' ' Priorité : must' ' PRIORITÉ : could' ' — Priorité : must' $' Priorite\xcc\x81 : must')
+cells_field_red() { local s v n
+  for s in "${FSEPS[@]}"; do for v in "${FVALS[@]}"; do for n in "${FNEXTS[@]}"; do
+    printf ' Texte%sAcceptation :%s%s@@\n' "$s" "$v" "$n"; printf ' Texte@@Acceptation :%s%s\n' "$v" "$n"
+  done; done; done
+  for s in "${FSEPS[@]}"; do
+    printf ' Texte%sAcceptation : Acceptation :@@\n' "$s"; printf " Texte%sAcceptation : Critère d'acceptation :@@\n" "$s"
+  done; }
+cells_field_green() { local s n
+  for s in "${FSEPS[@]}"; do for n in "${FNEXTS[@]}"; do
+    printf ' Texte%sAcceptation : %s%s@@\n' "$s" "$GEN_VALID" "$n"; printf ' Texte@@Acceptation : %s%s\n' "$GEN_VALID" "$n"
+  done
+    printf ' Texte%sAcceptation : le tarif de priorité : haute reste visible en 2 s@@\n' "$s"
+  done; }
+gen_case CPRD-GEN-CHAMP-VIDE "${#FSEPS[@]} séparateurs x ${#FVALS[@]} valeurs vides, blanches ou de ponctuation x ${#FNEXTS[@]} champs suivants, sur la ligne et en continuation" crit-red cells_field_red
+gen_case CPRD-GEN-CHAMP-SUIVI "séparateurs x champs suivants avec un critère réel : verts, « de priorité : » au fil d'une phrase vert" crit-green cells_field_green
+
+# Valeurs faites de ponctuation seule, ou dont le seul poids est une mise en forme, ou de ponctuation en tête et en fin.
+PUNCT=('!!!' ';' '?' '()' '(())' '.' ',' ':' '[ ]' '{}' '|||')
+cells_punct_brief() { printf '%s\n' "${PUNCT[@]}"; }
+cells_punct_crit() { local v; for v in "${PUNCT[@]}" 'abcdefg !!!' 'abcdefg ???' 'abcdefg ;;;' 'abcdefg (((' '!!! abcdefg' '))) abcdefg' 'ok **********' 'ok __________' 'ok ~~~~~~~~~~' 'ok ``````````' 'ok """"""""""'; do printf ' Cellule@@Acceptation : %s\n' "$v"; done; }
+gen_case CPRD-GEN-PONCTUATION-CRITERE "ponctuation seule ou en tête et en fin d'un texte trop court, mise en forme seule" crit-red cells_punct_crit
+gen_case CPRD-GEN-PONCTUATION-BRIEF "ponctuation seule : une rubrique qui n'a que cela est vide" brief cells_punct_brief
+
+# Titres de rubrique du BRIEF : variantes typographiques (trait d'union, espace, casse, accents, emphase, niveau) = la même rubrique.
+TITRES_HP=('Hors-périmètre' 'Hors  périmètre' 'HORS PÉRIMÈTRE' 'hors perimetre' $'Hors\xe2\x80\x91périmètre' $'Hors\xe2\x80\x93périmètre' $'Hors\xe2\x80\x94périmètre' $'Hors\xe2\x88\x92périmètre' 'Hors_périmètre' '**Hors** périmètre' '_Hors périmètre_' '`Hors périmètre`' '~~Hors~~ périmètre' "Hors${NBSP}périmètre" 'Hors - périmètre' 'Hors périmètre :' 'Hors-Périmètre')
+TITRES_AUTRES=('PROBLÈME' 'Probleme' 'Problématique' 'Utilisateurs cibles' 'UTILISATEUR' '**Valeur**' 'Valeur ajoutée' 'Contraintes techniques' 'CONTRAINTE')
+# titre_brief <niveau> <rubrique 0-4> <titre> -> écrit $FX/titre.md (les quatre autres rubriques sont standard).
+TITRE_N=0
+titre_brief() { local lvl=$1 k=$2 t=$3 j; TITRE_N=$((TITRE_N+1))
+  local -a HD=("Problème" "Utilisateurs" "Valeur" "Contraintes" "Hors périmètre")
+  HD[$k]="$t"
+  { printf '# Brief produit\n\n'; for j in 0 1 2 3 4; do printf '%s %s\nUn corps légitime de la rubrique.\n\n' "$lvl" "${HD[$j]}"; done; } > "$FX/titre-$TITRE_N.md"; reg "titre-$TITRE_N.md"; }
+titres_probe() { local lvl=$1 k=$2 t; shift 2
+  for t in "$@"; do
+    titre_brief "$lvl" "$k" "$t"; run --brief "$FX/titre-$TITRE_N.md"
+    msg "titre [$t] au niveau $lvl attendu rc 0 (même rubrique)"; [ "$RC" -eq 0 ] || return 1
+  done; return 0; }
+probe_titres_hp() { local l; for l in '#' '##' '###' '####'; do titres_probe "$l" 4 "${TITRES_HP[@]}" || return 1; done; }
+probe_titres_autres() { local k; for k in 0 1 2 3; do
+  case $k in 0) titres_probe '##' 0 'PROBLÈME' 'Probleme' 'Problématique' || return 1 ;; 1) titres_probe '##' 1 'Utilisateurs cibles' 'UTILISATEUR' || return 1 ;; 2) titres_probe '##' 2 '**Valeur**' 'Valeur ajoutée' || return 1 ;; 3) titres_probe '##' 3 'Contraintes techniques' 'CONTRAINTE' || return 1 ;; esac
+  done; return 0; }
+probe_titre_un() { titres_probe '##' 4 "$1"; }
+probe_titre_tiret() { probe_titre_un 'Hors-périmètre'; }
+probe_titre_souligne() { probe_titre_un 'Hors_périmètre'; }
+probe_titre_etoile() { probe_titre_un '**Hors** périmètre'; }
+probe_titre_code() { titres_probe '##' 4 'Hors `périmètre`' '`Hors` périmètre' '`Hors périmètre`'; }
+probe_titre_tilde() { probe_titre_un '~~Hors~~ périmètre'; }
+probe_titre_tiret_typo() { titres_probe '##' 4 $'Hors\xe2\x80\x91périmètre' $'Hors\xe2\x80\x93périmètre' $'Hors\xe2\x80\x94périmètre'; }
+probe_titre_moins() { probe_titre_un $'Hors\xe2\x88\x92périmètre'; }
+probe_titre_espaces() { probe_titre_un 'Hors  périmètre'; }
+probe_titre_nbsp() { probe_titre_un "Hors${NBSP}périmètre"; }
+probe_titre_casse() { probe_titre_un 'HORS PÉRIMÈTRE'; }
+gen_titres() { local id=$1 desc=$2 probe=$3 n=$4
+  if "$probe"; then GEN_TOT=$((GEN_TOT+n)); GEN_OK=$((GEN_OK+n)); PASS=$((PASS+n)); echo "  ✓ $id : $n cellules conformes ($desc)"
+  else GEN_TOT=$((GEN_TOT+n)); ko "$id — $LASTMSG"; fi; }
+gen_titres CPRD-GEN-TITRES-HORS-PERIMETRE "${#TITRES_HP[@]} graphies x 4 niveaux de titre" probe_titres_hp $(( ${#TITRES_HP[@]} * 4 ))
+gen_titres CPRD-GEN-TITRES-AUTRES "variantes des quatre autres rubriques" probe_titres_autres 9
+
+# Imbrication : le contenu sous un sous-titre plus profond appartient à la rubrique parente ; un titre de niveau égal
+# ou inférieur la ferme.
+probe_imbrication() {
+  local d="# Brief\n\n## Problème\n%b\n## Utilisateurs\nLes clients.\n## Valeur\nMoins d appels.\n## Contraintes\nCoût borné.\n## Hors périmètre\nPas de paiement.\n"
+  w imb1.md "$d" "### Contexte\nLe tarif est introuvable.\n### Enjeu\nPerte de temps."; run --brief "$FX/imb1.md"
+  msg "corps uniquement sous des sous-titres ### attendu rc 0 (le contenu appartient à la rubrique parente)"; [ "$RC" -eq 0 ] || return 1
+  w imb2.md "$d" "Le tarif est introuvable.\n#### Détail\nPerte de temps.\n##### Encore plus profond\nFin."; run --brief "$FX/imb2.md"
+  msg "sous-titres #### et ##### attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  w imb3.md "$d" "### Contexte\n#### Détail\nLe tarif est introuvable."; run --brief "$FX/imb3.md"
+  msg "corps uniquement sous ### puis #### attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+  w imb4.md "$d" "# Autre titre\nLe tarif est introuvable."; run --brief "$FX/imb4.md"
+  msg "un titre de niveau inférieur ferme la rubrique : attendu rc 1 + Problème vide"; { [ "$RC" -eq 1 ] && has "rubrique BRIEF probleme : vide"; } || return 1
+  w imb5.md "$d" "## Autre titre\nLe tarif est introuvable."; run --brief "$FX/imb5.md"
+  msg "un titre de même niveau ferme la rubrique : attendu rc 1 + Problème vide"; { [ "$RC" -eq 1 ] && has "rubrique BRIEF probleme : vide"; } || return 1
+  w imb6.md "# Brief\n\n### Problème\nLe tarif.\n## Utilisateurs\nLes clients.\n#### Primaires\nLes abonnés.\n## Valeur\nMoins d appels.\n## Contraintes\nCoût borné.\n## Hors périmètre\nPas de paiement.\n"; run --brief "$FX/imb6.md"
+  msg "rubrique ### suivie d'un ## : attendu rc 0"; [ "$RC" -eq 0 ]; }
+case_ CPRD-IMBRICATION probe_imbrication
+
+# Code en ligne : un `<!--` dans un span de code n'ouvre aucun commentaire ; une série d'accents graves non fermée reste littérale.
+probe_code_commentaire() {
+  local two='- [ ] **PRD-02**: Exporter la liste\n  Priorité : should\n'
+  w cs1.md '# Exigences\n\n- [ ] **PRD-01**: Afficher\n  Acceptation : le bouton `<!--` ouvre un commentaire en HTML\n  Priorité : must\n'"$two"; run --requirements "$FX/cs1.md"
+  msg "span de code contenant <!-- : PRD-02 attendu lu et éliminatoire (BILAN exigences=2, rc 1)"; { [ "$RC" -eq 1 ] && last | command grep -q 'BILAN exigences=2 sans_critere=1 '; } || return 1
+  w cs2.md '# Exigences\n\n- [ ] **PRD-01**: Afficher\n  Acceptation : le bouton ``<!--`` ouvre un commentaire en HTML\n  Priorité : must\n'"$two"; run --requirements "$FX/cs2.md"
+  msg "span à deux accents graves contenant <!-- : PRD-02 attendu lu (exigences=2)"; last | command grep -q 'BILAN exigences=2 sans_critere=1 ' || return 1
+  w cs3.md '# Exigences\n\n- [ ] **PRD-01**: Afficher\n  Acceptation : le bouton ``a`<!--`` ouvre un commentaire en HTML\n  Priorité : must\n'"$two"; run --requirements "$FX/cs3.md"
+  msg "span a deux accents graves enveloppant un accent grave et <!-- : PRD-02 attendu lu (exigences=2)"; last | command grep -q 'BILAN exigences=2 sans_critere=1 ' || return 1
+  w cs4.md '# Exigences\n\n- [ ] **PRD-01**: Afficher\n  Acceptation : le bouton `<!-- ouvre un commentaire en HTML\n  Priorité : must\n'"$two"; run --requirements "$FX/cs4.md"
+  msg "accent grave non fermé : le <!-- ouvre bien un commentaire, attendu INDETERMINE commentaire HTML non ferme"; has "INDETERMINE exigences : commentaire HTML non ferme" || return 1
+  w cs5.md '# Exigences\n\n- [ ] **PRD-01**: Afficher\n  <!-- note `x --> Acceptation : le bouton est visible en 2 secondes\n  Priorité : must\n'; run --requirements "$FX/cs5.md"
+  msg "commentaire réel contenant un accent grave isolé : retiré, critère de la fin de ligne lu (rc 0)"; [ "$RC" -eq 0 ] || return 1
+  printf '## Problème\nLe bouton `<!--` ouvre.\n## Utilisateurs\nLes clients.\n## Valeur\nMoins d appels.\n## Contraintes\nCoût borné.\n## Hors périmètre\nPas de paiement.\n' > "$FX/cs6.md"; reg cs6.md; run --brief "$FX/cs6.md"
+  msg "BRIEF : span de code contenant <!-- attendu rc 0 (rubriques suivantes lues)"; [ "$RC" -eq 0 ]; }
+case_ CPRD-CODE-COMMENTAIRE probe_code_commentaire
+# Le marqueur invisible posé dans un span ne doit jamais atteindre le décompte des caractères.
+probe_code_marqueur() {
+  crit_cells red mq < <(printf ' Cellule@@Acceptation : abcdefgh `<!--`\n'; printf ' Cellule@@Acceptation : abcdefgh `<!--` <!-- reste du commentaire\n'); }
+case_ CPRD-CODE-MARQUEUR probe_code_marqueur
+
+# Fichier à droits 000 : refus bruyant AVANT lecture, avec sa raison exacte (pas la raison du repli « taille »).
+if [ "$(id -u)" -eq 0 ]; then
+  skip "CPRD-ILLISIBLE-000 (exécuté en root : chmod 000 sans effet)"
+else
+  probe_illisible_000() {
+    w ill.md '# Exigences\n\n%s\n' "$A1"; chmod 000 "$FX/ill.md"
+    run --requirements "$FX/ill.md"
+    msg "fichier chmod 000 attendu rc 5 + « fichier illisible »"; { [ "$RC" -eq 5 ] && has "ILLISIBLE exigences : fichier illisible"; }; local r=$?
+    chmod 600 "$FX/ill.md"; return $r; }
+  case_ CPRD-ILLISIBLE-000 probe_illisible_000
+fi
+
 # === Forme exec : aucune évaluation de chaîne, arguments séparés =====================================
 probe_exec() {
   local n; n="$(awk '!/^[[:space:]]*#/ && /(^|[^A-Za-z_])eval([^A-Za-z_]|$)/{n++} END{print n+0}' "$SCRIPT")"
@@ -713,6 +932,7 @@ MUTBIN="$MUTDIR/check-prd.sh"
 # porte le repère, pour deux lignes jumelles). La sonde doit échouer sur le mutant, réussir sur l'original.
 mutant() {
   local id="$1" needle="$2" old="$3" new="$4" probe="$5" desc="$6"
+  if ! declare -F "$probe" > /dev/null; then ko "$id sonde $probe NON DÉFINIE à cet endroit — $desc"; return; fi
   NEEDLE="$needle" OLD="$old" NEW="$new" NTH="${MUT_NTH:-0}" awk 'BEGIN { n = ENVIRON["NEEDLE"]; o = ENVIRON["OLD"]; w = ENVIRON["NEW"]; nth = ENVIRON["NTH"] + 0 }
     { if (index($0, n)) { seen++; if (nth == 0 || nth == seen) { i = index($0, o); if (i) $0 = substr($0, 1, i - 1) w substr($0, i + length(o)) } } print }' \
     "$SCRIPT" > "$MUTBIN"
@@ -806,17 +1026,15 @@ mutant CPRD-MUT-34 'while (v != "" && match(v, /^([' '`"' '"' probe_marques \
   "FAIL : code en ligne non retiré avant le test de remplissage"
 mutant CPRD-MUT-35 'while (v != "" && match(v, /^([' $'"\'>' $'\'>' probe_marques \
   "FAIL : guillemets droits non retirés avant le test de remplissage"
-mutant CPRD-MUT-36 'if (index(v, "...") || index(v, ell)) return 1' ' || index(v, ell)' '' probe_brief_mentions \
-  "FAIL BRIEF : points de suspension typographiques non reconnus"
 mutant CPRD-MUT-37 'n = split("tbd|tba|fixme' 'n/a|' '' probe_brief_mentions \
   "FAIL BRIEF : n/a retiré des marqueurs de remplissage"
 mutant CPRD-MUT-38 'n = split("tbd|tba|fixme' 'fixme|' '' probe_brief_mentions \
   "FAIL BRIEF : FIXME retiré des marqueurs de remplissage"
 mutant CPRD-MUT-39 'v = norm(v)' 'norm(v)' 'v' probe_brief_mentions \
   "FAIL : blancs Unicode et largeur nulle non normalisés avant le test de remplissage"
-mutant CPRD-MUT-41 'if (!wordbefore(pre) &&' '!wordbefore(pre) && ' '' probe_champ \
+mutant CPRD-MUT-41 'if (wordbefore(pre)) return 0' 'wordbefore(pre)' '0' probe_champ \
   "PASS : champ d'acceptation de nouveau reconnu au fil d'une phrase (ancre retirée)"
-mutant CPRD-MUT-42 'if (!wordbefore(pre) &&' ' && match(rest, /^[ \t]*[*_]*[ \t]*:/)' '' probe_champ \
+mutant CPRD-MUT-42 'if (!match(rest, /^[ \t]*[*_]*[ \t]*:/)) return 0' '!match(rest, /^[ \t]*[*_]*[ \t]*:/)' '0' probe_champ \
   "PASS : deux-points du champ non exigés"
 mutant CPRD-MUT-43 'low = tolower(s); off = 0' 's = norm(s);' 's = s;' probe_champ \
   "PASS : espace insécable avant les deux-points non toléré"
@@ -974,6 +1192,87 @@ mutant CPRD-MUT-113 "$WORDN" "('|\\342\\200\\231)?" '(\342\200\231)?' probe_mot 
 mutant CPRD-MUT-114 "$WORDN" "('|\\342\\200\\231)?" "(')?" probe_mot "FAIL : apostrophe typographique collée au mot précédent non reconnue"
 mutant CPRD-MUT-115 'sub(/[ \t]+$/, "", p)' '[ \t]+$' '[\t]+$' probe_mot "FAIL : blanc entre le mot précédent et acceptation non retiré"
 mutant CPRD-MUT-116 'if (match(pre, /crit[^ \t]*' "d('|\\342\\200\\231)" '(\342\200\231)' probe_ancre "PASS : apostrophe droite de Critère d acceptation non reconnue"
+
+# --- 4e relecture (tour 3) : un mutant par retrait de la normalisation en ligne, par règle de champ, par étape du
+# masquage des spans de code et par règle de titre. Chaque sonde nomme la cellule fautive (cas, attendu, obtenu).
+env_probe() { local rc=0 ch=$1; ENVSEL="$(envs_with "$ch")"
+  crit_cells red e3r < <(env_red petit | to_crit) || rc=1
+  if [ "$rc" -eq 0 ]; then brief_grp e3b < <(env_red petit) || rc=1; fi
+  if [ "$rc" -eq 0 ]; then crit_cells green e3g < <(env_green | to_crit) || rc=1; fi
+  if [ "$rc" -eq 0 ]; then BMODE=green brief_cells e3h < <(env_green); rc=$?; BMODE=red; fi
+  ENVSEL=""; [ "$rc" -eq 0 ] || LASTMSG="enveloppe [$ch] : $LASTMSG"; return "$rc"; }
+probe_env_etoile() { env_probe '*'; }
+probe_env_souligne() { env_probe '_'; }
+probe_env_code() { env_probe '`'; }
+probe_env_guillemet() { env_probe '"'; }
+probe_env_tilde() { env_probe '~'; }
+probe_env_apostrophe() { env_probe "'"; }
+probe_env_chevron() { env_probe $'«'; }
+probe_env_courbe() { env_probe $'\xe2\x80\x9c'; }
+vals_crit_only() { local v; for v in "$@"; do printf ' Cellule@@Acceptation : %s\n' "$v"; done; }
+probe_trim_tete() { crit_cells red tt < <(vals_crit_only '!!! abcdefg' '))) abcdefg' ';;; abcdefg' '??? abcdefg'); }
+probe_trim_fin() { crit_cells red tf < <(vals_crit_only 'abcdefg !!!' 'abcdefg ???' 'abcdefg ;;;' 'abcdefg((('); }
+probe_pointfixe() { crit_cells red pf < <(vals_crit_only '**1.** abcdefghi' '> **2)** abcdefghi' '- **3.** abcdefghi'); }
+probe_souligne_interne() { local v='le champ tbd_label est exporté en 2 secondes'
+  crit_cells green si < <(vals_crit_only "$v") || return 1; BMODE=green brief_cells si < <(printf '%s\n' "$v"); local r=$?; BMODE=red; return $r; }
+probe_collapse() { crit_cells red co < <(vals_crit '_à_ _définir_' '**à** **définir**' 'à  définir' $'à\t définir' 'à _définir_'); }
+probe_ponct_brief() { brief_cells pb < <(printf '%s\n' "${PUNCT[@]}"); }
+probe_nchars_plain() { crit_cells red np < <(vals_crit_only 'ok **********' 'ok __________' 'ok ~~~~~~~~~~' 'ok ``````````' 'ok """"""""""'); }
+cells_field_small() { local v n
+  for v in '' ' ;' ' —' ' .'; do for n in "${FNEXTS_SM[@]}"; do
+    printf ' Texte — Acceptation :%s%s@@\n' "$v" "$n"; printf ' Texte@@Acceptation :%s%s\n' "$v" "$n"; done; done; }
+probe_champ_suivant() { crit_cells red cs < <(cells_field_small); }
+probe_champ_double() { crit_cells red cd < <(printf " Texte — Acceptation : Acceptation :@@\n Texte — Acceptation : Critère d'acceptation :@@\n Texte@@Acceptation : Acceptation :\n"); }
+probe_champ_phrase() { crit_cells green cp < <(printf ' Texte — Acceptation : le tarif de priorité : haute reste visible en 2 s@@\n Texte@@Acceptation : le tarif de priorité : haute reste visible en 2 s\n'); }
+probe_ellipse_milieu() { vals_probe $'Le tarif … est affiché' $'l\'export … fonctionne' $'en … secondes'; }
+
+mutant CPRD-MUT-36 'if (index(v, "...") || index(v, ell)) return 1' ' || index(v, ell)' '' probe_ellipse_milieu \
+  "FAIL BRIEF : points de suspension typographiques non reconnus"
+mutant CPRD-MUT-117 'gsub(/[*_`"~'"'"']|' '[*_`"~' '[_`"~' probe_env_etoile "FAIL : emphase * non retirée autour des mots (mise en forme en ligne)"
+mutant CPRD-MUT-118 'gsub(/[*_`"~'"'"']|' '[*_`"~' '[*`"~' probe_env_souligne "FAIL : emphase _ non retirée autour des mots"
+mutant CPRD-MUT-119 'gsub(/[*_`"~'"'"']|' '_`"~' '_"~' probe_env_code "FAIL : code en ligne non retiré autour des mots"
+mutant CPRD-MUT-120 'gsub(/[*_`"~'"'"']|' '`"~' '`~' probe_env_guillemet "FAIL : guillemets droits non retirés autour des mots"
+mutant CPRD-MUT-121 'gsub(/[*_`"~'"'"']|' '"~' '"' probe_env_tilde "FAIL : ~~ barré non retiré autour des mots"
+mutant CPRD-MUT-122 'gsub(/[*_`"~'"'"']|' "~']" '~]' probe_env_apostrophe "FAIL : apostrophe droite en guise de guillemet non retirée"
+mutant CPRD-MUT-123 'gsub(/[*_`"~'"'"']|' '|\302[\253\273]' '' probe_env_chevron "FAIL : chevrons « » non retirés autour des mots"
+mutant CPRD-MUT-124 'gsub(/[*_`"~'"'"']|' '|\342\200[\230-\237]' '' probe_env_courbe "FAIL : guillemets courbes non retirés autour des mots"
+mutant CPRD-MUT-125 'sub(/^([] ' '.,;:!?(){}[<>|=#+\/-]' '\t]' probe_trim_tete "FAIL : ponctuation de tête non retirée avant le décompte"
+mutant CPRD-MUT-126 'sub(/([] ' '.,;:!?(){}[<>|=#+\/-]' '\t]' probe_trim_fin "FAIL : ponctuation de fin non retirée avant le décompte"
+mutant CPRD-MUT-127 'for (k = 0; k < 8; k++)' 'k < 8' 'k < 1' probe_pointfixe "FAIL : normalisation à un seul passage (le retrait suivant n'est pas découvert)"
+mutant CPRD-MUT-128 'v = protect_us(v)' 'protect_us(v)' 'v' probe_souligne_interne "PASS : _ interne d'un identifiant pris pour de l'emphase (faux rouge tbd_label)"
+mutant CPRD-MUT-129 'gsub(/[ \t]+/, " ", v)' '[ \t]+' '[\t]+' probe_collapse "FAIL : blancs multiples entre deux mots d'un marqueur non repliés"
+mutant CPRD-MUT-130 'if (p == "") return 1' 'p == ""' '0' probe_ponct_brief "FAIL BRIEF : ponctuation seule prise pour un corps"
+mutant CPRD-MUT-131 'if (nchars(plain(v)) < 10) return 0' 'plain(v)' 'v' probe_nchars_plain "FAIL : décompte sur la valeur brute (mise en forme de fin comptée)"
+mutant CPRD-MUT-132 'usable(fieldcut(substr(s, lend)))' 'fieldcut(substr(s, lend))' 'substr(s, lend)' probe_champ_suivant "FAIL : la valeur d'un champ ne s'arrête plus au champ suivant"
+mutant CPRD-MUT-133 '/priorit(e|' '|\303[\210-\212\250-\252]' '' probe_champ_suivant "FAIL : Priorité accentuée non reconnue comme champ suivant"
+mutant CPRD-MUT-134 '/priorit(e|' '|e\314[\200-\277]' '' probe_champ_suivant "FAIL : Priorité décomposée (e + U+0301) non reconnue comme champ suivant"
+mutant CPRD-MUT-135 'if (acclabel(low, v, q)) { cut = lstart; break }' 'acclabel(low, v, q)' '0' probe_champ_double "FAIL : une seconde Acceptation ne borne plus la valeur de la première"
+mutant CPRD-MUT-136 'if (!wordbefore(substr(low, 1, p - 1)))' '!wordbefore(substr(low, 1, p - 1))' '1' probe_champ_phrase "PASS : « de priorité : » au fil d'une phrase pris pour un champ"
+mutant CPRD-MUT-139 'if (index(s, "`") && index(s, "<!--")) s = neutral(s)' 's = neutral(s)' 's = s' probe_code_commentaire "FAIL : un <!-- dans un span de code ouvre un commentaire"
+mutant CPRD-MUT-140 'gsub(/<!--/, "<\004!--", P[i])' '"<\004!--"' '"<!--"' probe_code_commentaire "FAIL : le <!-- d'un span n'est pas neutralisé"
+mutant CPRD-MUT-141 'NX[r] = (K[r] in LAST)' '(K[r] in LAST) ? LAST[K[r]] : 0' '(r < nr) ? r + 1 : 0' probe_code_commentaire "FAIL : une série d'accents graves se ferme sur n'importe quelle série"
+mutant CPRD-MUT-142 'while (i + k < n && P[i + k] == "") k++' 'i + k < n &&' '0 &&' probe_code_commentaire "FAIL : les accents graves consécutifs ne forment plus une série"
+mutant CPRD-MUT-143 'for (i = A[r] + K[r]; i <= A[c]; i++)' 'i <= A[c]' 'i < A[c]' probe_code_commentaire "FAIL : dernier morceau du span non neutralisé"
+mutant CPRD-MUT-144 'for (i = A[r] + K[r]; i <= A[c]; i++)' 'A[r] + K[r];' 'A[r] + K[r] + 1;' probe_code_commentaire "FAIL : premier morceau du span non neutralisé"
+mutant CPRD-MUT-145 'if (!b) { incom = 1; s = substr(s, 1, a - 1); gsub(' 'gsub(/\004/, "", s); return s' 'return s' probe_code_marqueur "FAIL : marqueur invisible conservé quand un commentaire s'ouvre sur la ligne"
+mutant CPRD-MUT-146 '  gsub(/\004/, "", s)' 'gsub(/\004/, "", s)' 's = s' probe_code_marqueur "FAIL : marqueur invisible conservé en fin de ligne"
+mutant CPRD-MUT-147 'gsub(/[*_`~-]|' '~-]' '~]' probe_titre_tiret "FAIL BRIEF : trait d'union d'un titre non lu comme espace"
+mutant CPRD-MUT-148 'gsub(/[*_`~-]|' '[*_`' '[*`' probe_titre_souligne "FAIL BRIEF : souligné d'un titre non lu comme espace"
+mutant CPRD-MUT-149 'gsub(/[*_`~-]|' '[*_' '[_' probe_titre_etoile "FAIL BRIEF : emphase * d'un titre non retirée"
+mutant CPRD-MUT-150 'gsub(/[*_`~-]|' '_`~' '_~' probe_titre_code "FAIL BRIEF : code en ligne d'un titre non retiré"
+mutant CPRD-MUT-151 'gsub(/[*_`~-]|' '`~-' '`-' probe_titre_tilde "FAIL BRIEF : ~~ d'un titre non retiré"
+mutant CPRD-MUT-152 'gsub(/[*_`~-]|' '|\342\200[\220-\225]' '' probe_titre_tiret_typo "FAIL BRIEF : traits d'union typographiques d'un titre non lus comme espace"
+mutant CPRD-MUT-153 'gsub(/[*_`~-]|' '|\342\210\222' '' probe_titre_moins "FAIL BRIEF : signe moins d'un titre non lu comme espace"
+mutant CPRD-MUT-154 'gsub(/[ \t]+/, " ", lab)' '[ \t]+' '[\t]+' probe_titre_espaces "FAIL BRIEF : espaces multiples d'un titre non repliés"
+mutant CPRD-MUT-155 'lab = fold(norm(' 'norm(substr(line, lvl + 1))' 'substr(line, lvl + 1)' probe_titre_nbsp "FAIL BRIEF : espace insécable d'un titre non normalisée"
+mutant CPRD-MUT-156 'lab = fold(norm(' 'fold(norm(' '(norm(' probe_titre_casse "FAIL BRIEF : casse du titre non repliée"
+mutant CPRD-MUT-157 'if (cur == "" || lvl <= curlvl) {' 'cur == "" || lvl <= curlvl' '1' probe_imbrication "FAIL BRIEF : un sous-titre plus profond ferme la rubrique parente"
+mutant CPRD-MUT-158 'if (cur == "" || lvl <= curlvl) {' 'lvl <= curlvl' 'lvl < curlvl' probe_imbrication "FAIL BRIEF : un titre de même niveau ne ferme plus la rubrique"
+if [ "$(id -u)" -ne 0 ]; then
+  mutant CPRD-MUT-159 'if [ ! -r "$f" ]; then illisible' '[ ! -r "$f" ]' 'false' probe_illisible_000 "BRUYANT : refus du fichier illisible (droits 000) retiré, la raison exacte se perd"
+else
+  skip "CPRD-MUT-159 (exécuté en root : chmod 000 sans effet)"
+fi
 
 echo "== cellules génératives : $GEN_TOT assertions comptées, $GEN_OK conformes (rouges ou verts attendus obtenus) =="
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
