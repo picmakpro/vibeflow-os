@@ -936,6 +936,15 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | ARCG-09 | Phase 60 | Partial — 2026-10-29, plans 60-05, 60-06 : registre d'instructions +1 ligne et 0 retrait, aucune valeur existante relevée, `check-instruction-budget.sh` rc 0 (BOOTSTRAP `ligne 2610` inchangée), aucun skill neuf, `check-ajout-retrait --strict` COUVERT pour les deux gates, mutations rouges prouvées ; critère 6 (`clients`, zéro nom de client) NON VÉRIFIABLE : code 2, en attente de la liste (hors dépôt), comme en Phase 58 — jamais compté vert, exigence laissée décochée. |
 | ARCG-10 | Phase 60 | Complete — 2026-10-29, plans 60-08 (preuves : SUMMARY des plans et porte de phase `60-09-SUMMARY.md`) (`check-manual.sh` rc 0, 16 pages FR+EN). |
 | ARCG-11 | Phase 60 | Complete — 2026-10-29, plans 60-07, 60-09 (preuves : SUMMARY des plans et porte de phase `60-09-SUMMARY.md`). Porte rejouée depuis `ci.yml` (20 étapes vertes, 3 sautées nommées), suites une à une, ledger à la main ; arrêt avant PR, merge, tag et release. |
+| COLB-01 | Phase 61 | Pending |
+| COLB-02 | Phase 61 | Pending |
+| COLB-03 | Phase 61 | Pending |
+| COLB-04 | Phase 61 | Pending |
+| COLB-05 | Phase 61 | Pending |
+| COLB-06 | Phase 61 | Pending |
+| COLB-07 | Phase 61 | Pending |
+| COLB-08 | Phase 61 | Pending |
+| COLB-09 | Phase 61 | Pending |
 | PLTF-01 | Phase 62 | Complete — 2026-10-29, plan 62-01 (preuve : `62-DECISION-plateforme.md`, `62-01-SUMMARY.md`) |
 | PLTF-02 | Phase 62 | Pending — décision de Samuel (P62-B-01), non prise |
 
@@ -1409,6 +1418,18 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **ARCG-10**: Manuel — pages FR et EN mises à jour pour l'architecture et la validation des phases, `check-manual.sh` vert (P60-D-12).
 - [x] **ARCG-11**: Livraison — le dernier plan rejoue le job `gates` depuis `ci.yml` et les suites touchées, met le ledger à jour à la main et s'arrête avant PR, merge, tag et release ; les modules touchés reçoivent leur bump dans la phase ; le minor racine est décidé et fait par le manager après merge (P60-D-13, P60-D-14).
 
+### Collaboration à deux humains (Phase 61 — posées à la planification, 2026-10-29)
+> Reformulent P61-D-01..10 (défauts documentés, source citée sur chaque ligne de `61-CONTEXT.md`) et P61-H-01 (hypothèse retenue faute de réponse humaine, à faire confirmer par Samuel) sans rien y ajouter. Mandat : Samuel, /vf-auto session principale, 2026-10-29 — il ne vaut pas arbitrage de fond. COLB-08 dépend de P61-B-01 et P61-B-02 (bloqueurs humains) : elle reste décochée.
+
+- [ ] **COLB-01**: Armement par l'installeur — au poste `product` ou `dev` (P61-H-01), `role_apply()` (ou à côté) pose dans le clone un hook git `post-merge` qui joue `check-divergence.sh` après chaque fusion locale ; il le retire proprement quand le poste repasse à `solo` ou à la désinstallation ; au poste `solo` rien n'est posé et le comportement est inchangé (P61-D-01).
+- [ ] **COLB-02**: Jamais écraser un hook de l'utilisateur — pas de `core.hooksPath` ; le hook vit dans le répertoire de hooks réel du clone (`git rev-parse --git-path hooks`, worktrees compris) ; un `post-merge` existant qui n'est pas le nôtre n'est ni écrasé ni modifié : l'armement est refusé audiblement (message et code) avec la ligne à ajouter à la main (P61-D-02).
+- [ ] **COLB-03**: Le hook n'exécute jamais du code que la fusion vient d'apporter — l'exécutable `check-divergence.sh` est résolu hors de l'arbre versionné (cache du plugin installé), jamais depuis `.claude/scripts/` du lab ni `--show-toplevel` ; le répertoire inspecté reste le worktree courant ; exécutable introuvable = non vérifiable audible, jamais un faux conforme (P61-D-03).
+- [ ] **COLB-04**: Branchement sur les codes et journal — 1 crie, 0 et 3 silence, autre = non vérifiable sans bloquer ; chaque exécution non silencieuse ajoute une ligne horodatée à un journal non versionné propre au clone (sous le répertoire git commun), au format stable lisible par la recette ; `git pull --rebase` : la couverture par `post-rewrite` est mesurée, et s'il ne double pas `post-merge` la limite est écrite dans la doc (P61-D-04, P61-D-05).
+- [ ] **COLB-05**: Sortie — un opt-out explicite et documenté (variable d'environnement ou option de l'installeur), lu à chaque install ; non-interactif préservé (P61-D-06).
+- [ ] **COLB-06**: Champ `role:` des registres — DECISIONS, LEARNINGS et BLOCKERS portent le poste de qui a écrit l'entrée, au format existant des entrées, valeur lue par `vf-role.sh get` (codes 1, 5 et 64 jamais repliés sur `solo`) ; optionnel en lecture : une entrée sans le champ reste valide pour `check-registres`, `reindex`, `archive`, `detect-duplicates` et `detect-promotions`, prouvé par suite ; gabarit source modifié d'abord, copies ensuite (règle SYNC) (P61-D-07).
+- [ ] **COLB-07**: Preuve de mécanisme automatisée — une suite découverte par la CI crée un dépôt partitionné jetable, deux clones armés par le vrai chemin d'installation, fait diverger la numérotation d'un compartiment sur les deux, fusionne par un vrai `git pull`/`git merge`, et constate hook déclenché, divergence criée, ligne de journal écrite ; témoin rouge (hook désarmé ou exécutable muté, la suite rougit) ; aucun nom de client (P61-D-08).
+- [ ] **COLB-08**: Preuve sur lab réel — deux humains, deux clones, postes `product` et `dev`, un workstream, trois semaines : toute divergence observée dans l'historique git est présente au journal ; la phase livre la procédure de recette (prérequis, armement, relevé hebdomadaire des journaux des deux clones, critère de passage, gabarit de compte rendu) et ne simule jamais la preuve humaine ; décochée tant que P61-B-01 (lab) et P61-B-02 (durée) ne sont pas levés (P61-D-09).
+- [ ] **COLB-09**: Sobriété et livraison — aucune valeur existante de `.planning/instruction-budget-baselines.tsv` n'augmente, aucun skill neuf, agent neuf éventuel ≤ 250 lignes, bash portable (bash 3.2, ubuntu coreutils uutils, Git Bash), gates et hooks livrés en forme exec avec trois issues et mutation rouge (QUAL-01), trailer `Gate-Touche` sur tout commit qui touche `check-divergence.sh`, une suite ou une fixture surveillée, `scripts/hooks/`, `.github/` et les sentinelles `.planning/.*-armed` de ce dépôt intouchés, manuel FR et EN, le dernier plan rejoue le job `gates` depuis `ci.yml` et s'arrête avant PR, merge, tag et release (P61-D-10).
 
 ### Décision plateforme (Phase 62 — posées à la préparation, 2026-10-29)
 > Reformulent P62-D-01..05 (cadrage sans humain joignable, mandat Samuel, /vf-auto session principale, 2026-10-29) sans arbitrage neuf. La phase prépare la décision ; elle ne la prend pas.

@@ -673,7 +673,7 @@ Plans:
 ### Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel
 
 **Goal:** Pour un lab multi-humains, `check-divergence.sh` et son hook `post-merge` sont armés par défaut. Le champ `role:` s'ajoute aux entrées des registres (DECISIONS, LEARNINGS, BLOCKERS). La preuve est faite à **deux humains, deux clones, deux rôles, un workstream** sur un lab réel, pas sur un clone jetable (spec §9, critère 4 ; spec head §6, point 4).
-**Requirements**: TBD — famille `COLB` réservée, posée au cadrage.
+**Requirements**: COLB-01, COLB-02, COLB-03, COLB-04, COLB-05, COLB-06, COLB-07, COLB-08, COLB-09 (COLB-08, preuve sur lab réel, reste décochée : P61-B-01 et P61-B-02)
 **Depends on:** 57 et 60.
 **Sources:** spec §5.3 ; Phase 39 (`check-divergence.sh`) ; ADR-069.
 **Hors périmètre :** un workstream par rôle (deux vérités, refusé par la spec §5.3).
