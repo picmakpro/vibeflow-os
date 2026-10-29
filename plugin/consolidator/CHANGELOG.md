@@ -1,5 +1,11 @@
 # CHANGELOG — consolidator
 
+## [v1.11.4] — 2026-10-29 (reindex.sh conserve le mode du registre) — à publier dans la prochaine release
+
+**Patch** (#166 volet 4 ; lot « clôture des issues GitHub ») :
+
+- **`reindex.sh --apply` garde le mode du registre réécrit** (#166) : le fichier temporaire de `mktemp` est créé en 600 et le `mv` final laissait le registre en 600, illisible pour un autre compte ou un CI. Une fonction `keep_mode` copie le mode du registre sur le temporaire avant chaque `mv` (réécriture normale et bootstrap de l'index) ; le `mv` est conservé, donc le rename reste atomique sous le verrou CSL-09. Lecture GNU d'abord (`stat -c %a`), repli BSD (`stat -f %Lp`), valeur validée, repli silencieux si `stat` échoue. Cas T-F9 ajouté à `test-consolidator.sh` (644, 664, 640 par le bootstrap).
+
 ## [v1.11.3] — 2026-10-23 (detect-duplicates, échecs signalés) — publiée dans v2.71.2
 
 **Patch** (#153 ; release patch préparée sur demande de la session principale, 2026-10-23 ; publiée dans v2.71.2) :
