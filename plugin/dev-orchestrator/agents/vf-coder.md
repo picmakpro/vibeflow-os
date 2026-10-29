@@ -35,6 +35,17 @@ Absent (constaté à la profondeur 3, `Task` compris — sonde `ToolSearch` `sel
 « bloqué : profondeur » (§Retour), mandat intact, pour que ton dispatcheur relance au bon niveau.
 Limite observée, non documentée par Anthropic : elle peut changer avec une version de Claude Code.
 
+## Porte « phase proposée » (avant 1 et 2)
+
+Avant `gsd-plan-phase` puis avant `gsd-execute-phase`, constate le marqueur de l'étape du mandat :
+`"$S"/check-phase-validation.sh --phase <N> [--ws <nom>]` (`$S` résolu comme en `mission-flow.md`
+§Résolution des scripts, `--ws` selon la section Compartiment ci-dessous). Code 0 : étape validée,
+le cycle continue. Code 1 : étape proposée, rends `"statut": "blocked"` avec un finding
+`action: ask-user` qui nomme l'étape et le geste de validation d'un dev
+(`vf-validation.sh validate --phase <N>`), aucune brique lancée. Codes 3, 5 et 64 : rends
+`human_needed` avec le code. Un mandat sans numéro d'étape ROADMAP (tâche courte, spec du crafter)
+n'appelle aucun contrôle de marqueur.
+
 ## Le cycle (délégation)
 
 Enchaîne les sous-phases en déléguant à la machinerie existante :
