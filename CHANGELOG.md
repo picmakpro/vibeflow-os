@@ -13,6 +13,53 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.72.0] — 2026-10-29
+
+**Minor** (clôture des issues GitHub : quatre PR de correctifs hors feuille de route, lots A à D du 2026-10-29,
+PR #168, #169, #170, #173 ; ferme #47, #52, #81, #165, #167 ; avance #166, #153, #154) :
+
+- **`conductor` v1.50.3** (#168) : `driver-lock.sh` n'utilise plus `ln -sh`/`mv -h` (sous les coreutils uutils
+  d'Ubuntu 26, runner `ubuntu-latest` depuis le 19 octobre 2026, `-h` vaut `--help` et le verrou n'était jamais
+  posé) : `ln -sn`, `mv -T`/`-nT` avant le repli BSD ; les suites A/B à copie gelée posent un shim GNU sous uutils.
+  `framework-version.sh drift` compare le registre du lab au cache du plugin (même échelle de version) au lieu du
+  lab à lui-même, cache absent → « indéterminé » rc 0, nouvelle suite `test-framework-version.sh` (#167).
+  `check-agents.sh` : clé de frontmatter `vf-optional-agents` (agent d'un module optionnel non signalé en lenient,
+  jamais exempté en `--resolve-agents=strict`) (#52). `vf-update` 4c impose `VF_SCOPE` à `ensure-deps.sh` (#165).
+- **`dev-orchestrator` v2.28.5** (#169) : `scripts/gsd-run.sh`, lanceur de gsd-tools appelable par chemin
+  (`GSD_TOOLS`, `./.claude/gsd-core`, scope user, PATH ; rc 64 sans moteur), utilisé par `vf-dev-manager` pour
+  `config-set`/`config-get` (#47, ADR-070 amendé : `./.claude/gsd-core` accepté, arbitrage Samuel, AskUserQuestion
+  session principale, 2026-10-29). `ensure-deps.sh` dérive `SCOPE=project` sans `VF_SCOPE` quand
+  `./.claude/gsd-core` existe (#165). `mission-flow.md` : plus de boucle shell d'attente sur un worker, poll borné
+  et temporisé, heartbeat à chaque réveil (#81). Description de `/vf-dev` élargie aux demandes de dev précises
+  (#154 point 2).
+- **`consolidator` v1.11.4, `infrastructure-audit` v1.3.7, `design-orchestrator` v1.5.16, `mobile-test` v1.0.5**
+  (#170) : `reindex.sh --apply` conserve le mode du registre (#166 volet 4) ; `audit-infra.sh` ne compte plus une
+  lib sourcée sans shebang comme non exécutable (champs `libs_sourced`, `scripts_shebang`, `libs_sourced_files`),
+  `known-versions.txt` jusqu'à Claude Code 2.1.312 (#166 volet 5, #153 §6.5/§6.6) ; `ensure-design-deps.sh` :
+  exclusion persistante par `VF_DESIGN_SKIP` ou `.claude/.vf-design-skip`, `superpowers` non excluable (#166
+  volet 2), suite de tests sous faux `claude`/`codex`, plus aucune installation réelle pendant les tests (#166
+  volets 10, 11) ; `mobile-test/SKILL.md` : étape « recherche documentaire avant tout fix » (ADR-045), gate
+  `check-debug-research.sh` vert à l'installation (#153 §6.10).
+- **Moteur `plugin/_internal/vibeflow-update.sh`** (#173) : patches locaux détectés, sauvegardés et annoncés —
+  à chaque pose sur un fichier de lab qui diffère de l'empreinte sha256 de la pose précédente
+  (`scripts/.vibeflow-sha256-<module>`, sinon l'ancienne version du cache) et du nouveau fichier, le fichier et un
+  `.patch` vont dans `.backups/local-patches-<horodatage>/`, une ligne `[local-patches]` liste le tout en fin de
+  run, `--dry-run` annonce `[plan] ! <chemin> (patch local)` ; le moteur pose toujours la version du cache (#166
+  volet 1). **Changement visible** : en scope project et local, le moteur ajoute la règle
+  `.claude/scripts/.vibeflow-sha256-*` au `./.gitignore` du dépôt à chaque pose (règle dédupliquée), même sans
+  poste de rôle. Le routage des hooks en forme exec vers `settings.local.json` (ADR-071) est annoncé
+  explicitement (« N entrée(s) de hook routée(s) … sur un autre poste, lancez /vf-update ») (#166 volet 6). Les
+  liens morts `vibeflow-update.sh` des README/AGENT de dix modules renvoient à `/vibeflow-install` et
+  `/vf-update` (dix bumps patch : audit-architecture 1.0.5, business-pilot-bundle 2.0.17, content-bundle 2.0.17,
+  growth-bundle 2.0.16, kpi-analyst 1.0.8, mobile-test-team 1.4.8, reference 2.5.9, skill-creator 1.1.3,
+  software-architecture 1.6.4, validator 1.3.6).
+- **Relecture adverse SOBR-04** (relecteur frais, diff `v2.71.2..d86bf225 -- plugin/`) : aucun défaut
+  fonctionnel bloquant ; sondes `test-driver-lock.sh` sous faux uutils 255/0 (témoin rouge sur le script de
+  v2.71.2 : 111/144) et `test-local-patches.sh` 49/0, mutants tués. Mineurs laissés : `gsd-run.sh` sort rc 1 au
+  lieu de 64 quand `HOME` et `CLAUDE_CONFIG_DIR` sont tous deux absents (`set -u`) ; le message de routage
+  `settings.local.json` est répété à chaque update même sans nouvelle entrée.
+- Compteur de suites : 114.
+
 ## [v2.71.2] — 2026-10-23
 
 **Patch** (quatre correctifs mergés depuis v2.71.1, #153, #159, #160 ; release patch préparée sur demande de la session

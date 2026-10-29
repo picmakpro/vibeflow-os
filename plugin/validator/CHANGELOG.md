@@ -1,6 +1,6 @@
 # CHANGELOG — validator
 
-## [v1.3.6] — 2026-10-29 (références mortes à `vibeflow-update.sh`) — à publier dans la prochaine release
+## [v1.3.6] — 2026-10-29 (références mortes à `vibeflow-update.sh`) — publiée dans v2.72.0
 
 **Patch** (documentation seule) — références mortes à `vibeflow-update.sh` remplacées par `/vibeflow-install` / `/vf-update` dans le README et `AGENT.md` (#166).
 

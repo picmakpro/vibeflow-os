@@ -1,6 +1,6 @@
 # CHANGELOG — dev-orchestrator
 
-## [v2.28.5] — 2026-10-29 (gsd-run.sh, scope dérivé, doctrine d'attente, description vf-dev) — à publier dans la prochaine release
+## [v2.28.5] — 2026-10-29 (gsd-run.sh, scope dérivé, doctrine d'attente, description vf-dev) — publiée dans v2.72.0
 
 **Patch** (#47, #165, #81, #154 point 2 ; correctifs hors feuille de route) :
 
