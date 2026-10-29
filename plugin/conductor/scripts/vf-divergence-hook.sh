@@ -73,7 +73,11 @@
 # RESOLUTION HORS DE L'ARBRE VERSIONNE (le hook n'execute jamais du code que la fusion vient
 # d'apporter). L'executable est celui du cache du plugin, embarque a l'armement ; `check-divergence.sh`
 # n'est resolu que comme VOISIN de ce script ; le repertoire INSPECTE est le `--show-toplevel` du
-# hook. Rien n'est jamais resolu depuis l'arbre du lab.
+# hook. Rien n'est jamais resolu depuis l'arbre du lab. Defense en profondeur : `arm` refuse un script
+# situe sous la racine de travail (REFUS executable-dans-l-arbre) et `run` refuse en NON-VERIFIABLE
+# (raison `executable-dans-l-arbre`, code 2) un script situe sous le `--show-toplevel` inspecte, sans jamais
+# lancer le `check-divergence.sh` voisin. Les appels git de `run` passent sous `-c core.fsmonitor=`,
+# `-c core.hooksPath=/dev/null`, GIT_OPTIONAL_LOCKS=0 et GIT_TERMINAL_PROMPT=0.
 #
 # JOURNAL v1 (non versionne, propre au clone, partage par ses worktrees).
 #   Fichier : <git-common-dir>/vf-divergence/journal.tsv, ajout seul (une ecriture par ligne).
@@ -87,6 +91,10 @@
 #     6 signaux (S2,S4a,S4b,S5 dans cet ordre), ou -
 #     7 raison (introuvable | code-<n> | ...), ou -
 #   Aucun contenu du depot n'y entre. Le journal survit au desarmement.
+#   Garde : un dossier `vf-divergence` ou un fichier `journal.tsv` qui est un lien symbolique, une FIFO ou un
+#   dossier n'est jamais suivi ni ouvert ; `[vf-divergence] JOURNAL NON ECRIT : lien|non-regulier|fifo|
+#   dossier-lien` sur stderr, le verdict et le code de `run` restent inchanges. Meme garde dans le repli du
+#   fichier de hook.
 #
 # MATRICE DES HOOKS (mesuree a la planification, git 2.50.1 ; P61-D-05 tranche par la mesure : le filet
 # pose `post-merge` ET `post-rewrite`).
@@ -127,7 +135,8 @@ show_help() { awk 'NR>1 && /^# ?/ { sub(/^# ?/, ""); print; next } NR>1 { exit }
 SELF_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd -P)" || SELF_DIR=""
 SELF="$SELF_DIR/$(basename "$0")"
 
-git_safe() { git -C "$ROOT" -c core.fsmonitor= --no-optional-locks "$@"; }
+# git_safe : le travail du hook (run). Aucun hook, aucun fsmonitor du depot inspecte n'est execute.
+git_safe() { git -C "$ROOT" -c core.fsmonitor= -c core.hooksPath=/dev/null --no-optional-locks "$@"; }
 # git_ro : arm, disarm, status. Lecture de la configuration intacte (core.hooksPath n'est JAMAIS masque).
 git_ro() { git -C "$ROOT" -c core.fsmonitor= --no-optional-locks "$@"; }
 
@@ -207,14 +216,23 @@ write_hook() {
       'vf_common="$(git rev-parse --git-common-dir 2>/dev/null)" || exit 0' \
       '[ -n "$vf_common" ] || exit 0' \
       'vf_dir="$vf_common/vf-divergence"' \
+      'vf_j="$vf_dir/journal.tsv"' \
+      'vf_why=' \
+      'if [ -L "$vf_dir" ]; then vf_why=dossier-lien' \
+      'elif [ -e "$vf_dir" ] && [ ! -d "$vf_dir" ]; then vf_why=non-regulier' \
+      'elif [ -L "$vf_j" ]; then vf_why=lien' \
+      'elif [ -p "$vf_j" ]; then vf_why=fifo' \
+      'elif [ -e "$vf_j" ] && [ ! -f "$vf_j" ]; then vf_why=non-regulier' \
+      'fi' \
+      'if [ -n "$vf_why" ]; then echo "[vf-divergence] JOURNAL NON ECRIT : $vf_why" >&2; exit 0; fi' \
       'mkdir -p "$vf_dir" 2>/dev/null || exit 0' \
       'vf_head="$(git rev-parse HEAD 2>/dev/null)" || vf_head="-"' \
       '[ -n "$vf_head" ] || vf_head="-"' \
       'vf_line="$(printf "%s\t%s\t%s\t%s\t%s\t%s\t%s" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$VF_DIVERGENCE_NOM" NON-VERIFIABLE - "$vf_head" - introuvable)"' \
-      'if [ ! -e "$vf_dir/journal.tsv" ]; then' \
-      '  printf "# vf-divergence journal v1\tdate\thook\tverdict\tcode\thead\tsignaux\traison\n%s\n" "$vf_line" >> "$vf_dir/journal.tsv" 2>/dev/null' \
+      'if [ ! -e "$vf_j" ]; then' \
+      '  printf "# vf-divergence journal v1\tdate\thook\tverdict\tcode\thead\tsignaux\traison\n%s\n" "$vf_line" >> "$vf_j" 2>/dev/null' \
       'else' \
-      '  printf "%s\n" "$vf_line" >> "$vf_dir/journal.tsv" 2>/dev/null' \
+      '  printf "%s\n" "$vf_line" >> "$vf_j" 2>/dev/null' \
       'fi' \
       'exit 0'
   } > "$tmp" 2>/dev/null || { rm -f "$tmp"; return 1; }
@@ -226,15 +244,31 @@ write_hook() {
 # ---------------------------------------------------------------------------
 # journal et run
 # ---------------------------------------------------------------------------
+# journal_refus <dossier commun> — raison pour laquelle le journal ne doit PAS etre ouvert (vide : ouvrable).
+# Un lien symbolique, une FIFO ou un dossier n'est jamais suivi ni ouvert en ecriture (T-61-12).
+journal_refus() {
+  local d="$1/vf-divergence" f="$1/vf-divergence/journal.tsv"
+  if [ -L "$d" ]; then printf 'dossier-lien'; return 0; fi
+  if [ -e "$d" ] && [ ! -d "$d" ]; then printf 'non-regulier'; return 0; fi
+  if [ -L "$f" ]; then printf 'lien'; return 0; fi
+  if [ -p "$f" ]; then printf 'fifo'; return 0; fi
+  if [ -e "$f" ] && [ ! -f "$f" ]; then printf 'non-regulier'; return 0; fi
+  return 0
+}
+
 # journal_append <dossier commun> <hook> <verdict> <code> <head> <signaux> <raison>
+# Rend 1 sans rien ecrire quand le journal n'est pas ouvrable ; dit alors `JOURNAL NON ECRIT : <raison>` sur
+# stderr. Le verdict de run reste inchange.
 journal_append() {
-  local dir="$1/vf-divergence" f="$1/vf-divergence/journal.tsv" line
-  mkdir -p "$dir" 2>/dev/null || return 1
+  local dir="$1/vf-divergence" f="$1/vf-divergence/journal.tsv" line why
+  why="$(journal_refus "$1")"
+  if [ -n "$why" ]; then say "JOURNAL NON ECRIT : $why"; return 1; fi
+  mkdir -p "$dir" 2>/dev/null || { say "JOURNAL NON ECRIT : dossier-non-creable"; return 1; }
   line="$(printf '%s\t%s\t%s\t%s\t%s\t%s\t%s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$2" "$3" "$4" "$5" "$6" "$7")"
   if [ ! -e "$f" ]; then
-    printf '# vf-divergence journal v1\tdate\thook\tverdict\tcode\thead\tsignaux\traison\n%s\n' "$line" >> "$f" 2>/dev/null || return 1
+    printf '# vf-divergence journal v1\tdate\thook\tverdict\tcode\thead\tsignaux\traison\n%s\n' "$line" >> "$f" 2>/dev/null || { say "JOURNAL NON ECRIT : ecriture"; return 1; }
   else
-    printf '%s\n' "$line" >> "$f" 2>/dev/null || return 1
+    printf '%s\n' "$line" >> "$f" 2>/dev/null || { say "JOURNAL NON ECRIT : ecriture"; return 1; }
   fi
   return 0
 }
@@ -257,7 +291,7 @@ signals_of() {
 }
 
 do_run() {
-  local hook="" rc=0 tmp root common head sig
+  local hook="" rc=0 tmp root rootp common head sig
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --hook)
@@ -289,6 +323,15 @@ do_run() {
   head="$(git_safe rev-parse HEAD 2>/dev/null)" || head="-"
   [ -n "$head" ] || head="-"
 
+  # Garde d'execution (defense en profondeur, P61-D-03) : un script situe sous l'arbre inspecte n'est
+  # jamais execute, et son voisin check-divergence.sh encore moins.
+  rootp="$(cd "$root" 2>/dev/null && pwd -P)" || rootp="$root"
+  if in_tree "$SELF_DIR" "$rootp"; then
+    journal_append "$common" "$hook" NON-VERIFIABLE - "$head" - executable-dans-l-arbre || :
+    say "NON VERIFIABLE : executable dans l'arbre inspecte - refuse"
+    exit 2
+  fi
+
   tmp="$(mktemp "${TMPDIR:-/tmp}/vf-divergence.XXXXXX" 2>/dev/null)" || { say "NON VERIFIABLE (temporaire non creable)"; exit 2; }
   trap 'rm -f "$tmp"' EXIT
   bash "$SELF_DIR/check-divergence.sh" --path "$root" 2> "$tmp" </dev/null || rc=$?
@@ -296,8 +339,7 @@ do_run() {
   case "$rc" in
     1)
       sig="$(signals_of "$tmp")"
-      journal_append "$common" "$hook" DIVERGENCE 1 "$head" "$sig" - \
-        || say "journal non ecrit : $common/vf-divergence/journal.tsv"
+      journal_append "$common" "$hook" DIVERGENCE 1 "$head" "$sig" - || :
       say "DIVERGENCE apres $hook (signaux : $sig) ; la fusion n'est pas annulee ; journal : $common/vf-divergence/journal.tsv"
       exit 1
       ;;
@@ -305,8 +347,7 @@ do_run() {
       exit 0
       ;;
     *)
-      journal_append "$common" "$hook" NON-VERIFIABLE - "$head" - "code-$rc" \
-        || say "journal non ecrit : $common/vf-divergence/journal.tsv"
+      journal_append "$common" "$hook" NON-VERIFIABLE - "$head" - "code-$rc" || :
       say "NON VERIFIABLE (code $rc)"
       exit 2
       ;;

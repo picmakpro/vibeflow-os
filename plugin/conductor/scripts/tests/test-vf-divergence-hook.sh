@@ -447,6 +447,301 @@ done
 [ "$miss" -eq 0 ] && ok "VDH-USAGE : verbe inconnu, --hook sans valeur, hook inconnu, option inconnue -> rc 64 et message sur stderr"
 
 # ===========================================================================
+# Tache 3 : garde d'execution, journal blinde, non verifiable observe
+# ===========================================================================
+N=0
+LASTMSG=""
+# hand_hook <clone> <nom> <script> — hook ecrit a la main (sh) qui designe <script>.
+hand_hook() {
+  mkdir -p "$1/.git/hooks"
+  printf '#!/bin/sh\nexec bash %s run --hook %s "$@"\n' "'$3'" "$2" > "$1/.git/hooks/$2"
+  chmod 755 "$1/.git/hooks/$2"
+}
+
+# --- VDH-RUN-ARBRE : le fichier de hook designe une copie SOUS l'arbre ; son check-divergence.sh voisin est un piege
+miss=0
+mk_pair t20
+mk_cache "$P/b/outils/cache" "$SCRIPT" || { ko "VDH-RUN-ARBRE pre-condition : copie sous l'arbre non construite"; miss=1; }
+printf '#!/usr/bin/env bash\necho piege > "%s/piege"\nexit 1\n' "$TMP" > "$P/b/outils/cache/conductor/scripts/check-divergence.sh"
+rm -f "$TMP/piege"
+hand_hook "$P/b" post-merge "$P/b/outils/cache/conductor/scripts/vf-divergence-hook.sh"
+diverge "$P/a" "$P/b" 02
+[ "$PULLRC" -eq 0 ] || { ko "VDH-RUN-ARBRE : le pull a echoue (rc=$PULLRC)"; miss=1; }
+"$GREP" -qF 'NON VERIFIABLE' "$TMP/pull.err" || { ko "VDH-RUN-ARBRE : stderr sans « NON VERIFIABLE » — $(tail -3 "$TMP/pull.err")"; miss=1; }
+[ ! -e "$TMP/piege" ] || { ko "VDH-RUN-ARBRE : le check-divergence.sh de l'arbre A ETE EXECUTE (piege declenche)"; miss=1; }
+JA="$P/b/.git/vf-divergence/journal.tsv"
+{ [ -f "$JA" ] && [ "$(field "$JA" 2 7)" = "executable-dans-l-arbre" ] && [ "$(field "$JA" 2 3)" = "NON-VERIFIABLE" ]; } || { ko "VDH-RUN-ARBRE : ligne de journal sans la raison executable-dans-l-arbre"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VDH-RUN-ARBRE (T-61-09, P61-PL-09) : hook designant une copie sous l'arbre -> NON VERIFIABLE, raison executable-dans-l-arbre au journal, le piege voisin n'est jamais execute"
+
+# --- VDH-RUN-SILENCE : rien a dire -> rien dit, rien journalise
+miss=0
+mk_pair t21
+arm_in "$P/a"
+add_phase "$P/b" 02 n roadmap
+git -C "$P/b" push -q origin main 2> /dev/null
+pull_in "$P/a" --no-rebase
+RC=0; bash "$TMP/cache/conductor/scripts/check-divergence.sh" --path "$P/a" > /dev/null 2>&1 < /dev/null || RC=$?
+[ "$RC" -eq 0 ] || { ko "VDH-RUN-SILENCE pre-condition : l'arbre fusionne n'est pas conforme (rc=$RC)"; miss=1; }
+if "$GREP" -qF '[vf-divergence]' "$TMP/pull.err"; then ko "VDH-RUN-SILENCE : fusion conforme et sortie [vf-divergence]"; miss=1; fi
+[ ! -e "$P/a/.git/vf-divergence/journal.tsv" ] || { ko "VDH-RUN-SILENCE : fusion conforme et ligne de journal"; miss=1; }
+# depot non partitionne : silence (code 3 de check-divergence)
+P="$TMP/t22"; mkdir -p "$P"
+git_init_bare "$P/origin.git"; git_init "$P/seed"; ident "$P/seed"
+printf 'x\n' > "$P/seed/f.txt"; git -C "$P/seed" add f.txt; git -C "$P/seed" commit -q -m seed
+git -C "$P/seed" remote add origin "$P/origin.git"; git -C "$P/seed" push -q origin main 2> /dev/null
+git clone -q "$P/origin.git" "$P/a" 2> /dev/null; ident "$P/a"; git clone -q "$P/origin.git" "$P/b" 2> /dev/null; ident "$P/b"
+arm_in "$P/b"
+printf 'y\n' > "$P/a/g.txt"; git -C "$P/a" add g.txt; git -C "$P/a" commit -q -m g; git -C "$P/a" push -q origin main 2> /dev/null
+pull_in "$P/b" --no-rebase
+RC=0; bash "$TMP/cache/conductor/scripts/check-divergence.sh" --path "$P/b" > /dev/null 2>&1 < /dev/null || RC=$?
+[ "$RC" -eq 3 ] || { ko "VDH-RUN-SILENCE pre-condition : depot non partitionne, check-divergence rc=$RC (attendu 3)"; miss=1; }
+if "$GREP" -qF '[vf-divergence]' "$TMP/pull.err"; then ko "VDH-RUN-SILENCE : depot non partitionne et sortie [vf-divergence]"; miss=1; fi
+[ ! -e "$P/b/.git/vf-divergence/journal.tsv" ] || { ko "VDH-RUN-SILENCE : depot non partitionne et ligne de journal"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VDH-RUN-SILENCE : fusion conforme puis depot non partitionne -> aucune sortie [vf-divergence], aucun journal"
+
+# --- VDH-RUN-NV : politique de compartiment introuvable -> check-divergence rend 2 -> NON VERIFIABLE journalise
+mk_nopol() { # <dossier> — cache prive sans planning-core (check-divergence rend 2 sur un depot partitionne)
+  mkdir -p "$1/conductor/scripts" && cp "$TARGET" "$1/conductor/scripts/vf-divergence-hook.sh" && cp "$CONDUCTOR_DIR/check-divergence.sh" "$1/conductor/scripts/check-divergence.sh"
+}
+probe_nv() {
+  mk_pair "p$((++N))"
+  mk_nopol "$TMP/nopol$N" || { LASTMSG="cache prive non construit"; return 1; }
+  local save="$TARGET"; TARGET="$TMP/nopol$N/conductor/scripts/vf-divergence-hook.sh"
+  arm_in "$P/b"; local arc="$HKRC"
+  TARGET="$save"
+  [ "$arc" -eq 0 ] || { LASTMSG="arm depuis le cache prive rc=$arc"; return 1; }
+  diverge "$P/a" "$P/b" 02
+  "$GREP" -qF '[vf-divergence] NON VERIFIABLE (code 2)' "$TMP/pull.err" || { LASTMSG="stderr sans « NON VERIFIABLE (code 2) » (silence : lu comme un conforme) — $(tail -2 "$TMP/pull.err")"; return 1; }
+  local j="$P/b/.git/vf-divergence/journal.tsv"
+  { [ -f "$j" ] && [ "$(field "$j" 2 3)" = "NON-VERIFIABLE" ] && [ "$(field "$j" 2 7)" = "code-2" ]; } || { LASTMSG="ligne de journal NON-VERIFIABLE / code-2 absente"; return 1; }
+  return 0
+}
+case_() { # <id> <sonde> <description>
+  if "$2" < /dev/null; then ok "$1 $3"; else ko "$1 — $LASTMSG"; fi
+}
+case_ VDH-RUN-NV probe_nv "(T-61-09, P61-PL-10) : check-divergence rend 2 -> « NON VERIFIABLE (code 2) » sur stderr + ligne de journal raison code-2"
+# run direct : codes 0 / 1 / 2
+miss=0
+mk_pair t23
+HKDIR="$P/a" hk run --hook post-merge
+{ [ "$HKRC" -eq 0 ] && ! "$GREP" -qF '[vf-divergence]' "$TMP/hk.err"; } || { ko "VDH-RUN-NV : run direct sur un clone conforme rend $HKRC (attendu 0, aucune sortie [vf-divergence])"; miss=1; }
+HKDIR="$P/a" hk run --hook post-rewrite amend
+{ [ "$HKRC" -eq 0 ] && [ ! -s "$TMP/hk.err" ]; } || { ko "VDH-RUN-NV : run --hook post-rewrite amend rend $HKRC (attendu 0, silence)"; miss=1; }
+diverge "$P/a" "$P/b" 02
+HKDIR="$P/b" hk run --hook post-merge
+{ [ "$HKRC" -eq 1 ] && "$GREP" -qF '[vf-divergence] DIVERGENCE' "$TMP/hk.err"; } || { ko "VDH-RUN-NV : run direct sur un clone divergent rend $HKRC (attendu 1 + cri)"; miss=1; }
+HKDIR="$TMP/horsgit" hk run --hook post-merge
+{ [ "$HKRC" -eq 2 ] && "$GREP" -qF 'NON VERIFIABLE' "$TMP/hk.err"; } || { ko "VDH-RUN-NV : run hors depot git rend $HKRC (attendu 2 + NON VERIFIABLE)"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VDH-RUN-NV : run direct -> 0 silencieux (conforme, amend), 1 criant (divergent), 2 NON VERIFIABLE (hors depot)"
+
+# --- VDH-INTROUVABLE : script supprime du cache apres l'armement -> repli du fichier de hook
+miss=0
+mk_pair t24
+mk_cache "$TMP/cache-ephemere" "$SCRIPT"
+SAVE_TARGET="$TARGET"; TARGET="$TMP/cache-ephemere/conductor/scripts/vf-divergence-hook.sh"
+arm_in "$P/b"; [ "$HKRC" -eq 0 ] || { ko "VDH-INTROUVABLE pre-condition : arm rc=$HKRC"; miss=1; }
+TARGET="$SAVE_TARGET"
+rm -rf "$TMP/cache-ephemere"
+diverge "$P/a" "$P/b" 02
+[ "$PULLRC" -eq 0 ] || { ko "VDH-INTROUVABLE : le pull a echoue (rc=$PULLRC)"; miss=1; }
+"$GREP" -qF '[vf-divergence] NON VERIFIABLE' "$TMP/pull.err" || { ko "VDH-INTROUVABLE : stderr sans « NON VERIFIABLE »"; miss=1; }
+JI="$P/b/.git/vf-divergence/journal.tsv"
+{ [ -f "$JI" ] && [ "$(field "$JI" 2 7)" = "introuvable" ] && [ "$(field "$JI" 2 2)" = "post-merge" ]; } || { ko "VDH-INTROUVABLE : ligne de journal de raison introuvable absente"; miss=1; }
+# meme repli, journal remplace par un lien : jamais suivi
+mk_pair t25
+mk_cache "$TMP/cache-ephemere" "$SCRIPT"
+SAVE_TARGET="$TARGET"; TARGET="$TMP/cache-ephemere/conductor/scripts/vf-divergence-hook.sh"
+arm_in "$P/b"; TARGET="$SAVE_TARGET"
+rm -rf "$TMP/cache-ephemere"
+mkdir -p "$P/b/.git/vf-divergence"; printf 'X\n' > "$P/cible"; cp "$P/cible" "$TMP/cible.orig"
+ln -s "$P/cible" "$P/b/.git/vf-divergence/journal.tsv"
+diverge "$P/a" "$P/b" 02
+"$GREP" -qF 'JOURNAL NON ECRIT : lien' "$TMP/pull.err" || { ko "VDH-INTROUVABLE : le repli du hook ne refuse pas un journal lien symbolique"; miss=1; }
+cmp -s "$P/cible" "$TMP/cible.orig" || { ko "VDH-INTROUVABLE : le repli du hook a ecrit a travers le lien symbolique"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VDH-INTROUVABLE (P61-D-03) : cache supprime -> NON VERIFIABLE + ligne « introuvable » ; repli : journal lien symbolique jamais suivi"
+
+# --- VDH-JOURNAL-LIEN : lien, FIFO, dossier, dossier lien : jamais ouverts, verdict inchange
+jl_variant() { # <kind> — pose le journal piege, joue une fusion divergente
+  mk_pair "jl$((++N))"
+  arm_in "$P/b"
+  mkdir -p "$P/b/.git/vf-divergence"
+  case "$1" in
+    lien) printf 'X\n' > "$P/cible"; cp "$P/cible" "$TMP/cible.orig"; ln -s "$P/cible" "$P/b/.git/vf-divergence/journal.tsv" ;;
+    fifo) mkfifo "$P/b/.git/vf-divergence/journal.tsv" ;;
+    dir) mkdir "$P/b/.git/vf-divergence/journal.tsv" ;;
+    dlien) rmdir "$P/b/.git/vf-divergence"; mkdir "$P/dest"; ln -s "$P/dest" "$P/b/.git/vf-divergence" ;;
+  esac
+  diverge "$P/a" "$P/b" 02
+}
+probe_lien() {
+  jl_variant lien
+  [ "$PULLRC" -eq 0 ] || { LASTMSG="le pull a echoue (rc=$PULLRC)"; return 1; }
+  cmp -s "$P/cible" "$TMP/cible.orig" || { LASTMSG="la cible du lien symbolique a ete ecrite"; return 1; }
+  "$GREP" -qF '[vf-divergence] JOURNAL NON ECRIT : lien' "$TMP/pull.err" || { LASTMSG="stderr sans « JOURNAL NON ECRIT : lien »"; return 1; }
+  "$GREP" -qF '[vf-divergence] DIVERGENCE' "$TMP/pull.err" || { LASTMSG="le verdict n'est plus crie"; return 1; }
+  return 0
+}
+probe_jl_autres() {
+  if ! command -v mkfifo > /dev/null 2>&1; then return 0; fi
+  jl_variant fifo
+  [ "$PULLRC" -eq 0 ] || { LASTMSG="FIFO : le pull n'a pas abouti (rc=$PULLRC, 142 = alarme : bloque sur la FIFO)"; return 1; }
+  "$GREP" -qF 'JOURNAL NON ECRIT : fifo' "$TMP/pull.err" || { LASTMSG="FIFO : stderr sans « JOURNAL NON ECRIT : fifo »"; return 1; }
+  "$GREP" -qF '[vf-divergence] DIVERGENCE' "$TMP/pull.err" || { LASTMSG="FIFO : verdict non crie"; return 1; }
+  jl_variant dir
+  { [ "$PULLRC" -eq 0 ] && "$GREP" -qF 'JOURNAL NON ECRIT : non-regulier' "$TMP/pull.err"; } || { LASTMSG="journal-dossier : pas de « JOURNAL NON ECRIT : non-regulier »"; return 1; }
+  [ "$(ls -A "$P/b/.git/vf-divergence/journal.tsv" | awk 'END { print NR }')" -eq 0 ] || { LASTMSG="journal-dossier : le dossier a recu un fichier"; return 1; }
+  jl_variant dlien
+  { [ "$PULLRC" -eq 0 ] && "$GREP" -qF 'JOURNAL NON ECRIT : dossier-lien' "$TMP/pull.err"; } || { LASTMSG="dossier lien : pas de « JOURNAL NON ECRIT : dossier-lien »"; return 1; }
+  [ "$(ls -A "$P/dest" | awk 'END { print NR }')" -eq 0 ] || { LASTMSG="dossier lien : la cible du lien a recu un fichier"; return 1; }
+  return 0
+}
+case_ VDH-JOURNAL-LIEN probe_lien "(T-61-12) : journal lien symbolique -> cible intacte, « JOURNAL NON ECRIT : lien », verdict toujours crie"
+case_ VDH-JOURNAL-LIEN-AUTRES probe_jl_autres "(T-61-12) : FIFO (pull abouti, sous l'alarme), journal dossier, dossier lien -> « JOURNAL NON ECRIT », rien d'ecrit, verdict crie"
+
+# --- VDH-CODES : codes observes sur l'ensemble des appels directs
+miss=0
+RUNCODES="$(awk '$1=="run" { print $2 }' "$TMP/rcs" | sort -u | awk '{ printf "%s%s", (NR>1 ? " " : ""), $1 }')"
+ARMCODES="$(awk '$1=="arm" { print $2 }' "$TMP/rcs" | sort -u | awk '{ printf "%s%s", (NR>1 ? " " : ""), $1 }')"
+[ "$RUNCODES" = "0 1 2 64" ] || { ko "VDH-CODES : codes de run observes « $RUNCODES » (attendu « 0 1 2 64 »)"; miss=1; }
+[ "$ARMCODES" = "0 1 2 3 64" ] || { ko "VDH-CODES : codes de arm observes « $ARMCODES » (attendu « 0 1 2 3 64 »)"; miss=1; }
+[ "$miss" -eq 0 ] && ok "VDH-CODES (QUAL-01) : run observe {0, 1, 2, 64}, arm observe {0, 1, 2, 3, 64} — trois issues plus l'indetermine"
+
+# ===========================================================================
+# Sondes des mutants (chacune rend 0 sur l'original, non nul sur le mutant)
+# ===========================================================================
+probe_trace() { # M1
+  mk_pair "p$((++N))"; arm_in "$P/b"; [ "$HKRC" -eq 0 ] || { LASTMSG="arm rc=$HKRC"; return 1; }
+  diverge "$P/a" "$P/b" 02
+  "$GREP" -qF '[vf-divergence] DIVERGENCE' "$TMP/pull.err" || { LASTMSG="divergence non criee (silence sur le code 1)"; return 1; }
+  return 0
+}
+probe_journal() { # M2
+  mk_pair "p$((++N))"; arm_in "$P/b"
+  diverge "$P/a" "$P/b" 02
+  local j="$P/b/.git/vf-divergence/journal.tsv" n=0
+  [ -f "$j" ] && n="$(nlines "$j")"
+  [ "$n" -eq 2 ] || { LASTMSG="journal: $n lignes (attendu 2)"; return 1; }
+  return 0
+}
+probe_tiers() { # M4
+  mk_pair "p$((++N))"; put_tiers "$P/b" post-rewrite
+  arm_in "$P/b"
+  { [ "$HKRC" -eq 1 ] && [ ! -e "$P/b/.git/hooks/post-merge" ]; } || { LASTMSG="arm rc=$HKRC (attendu 1), post-merge ecrit=$([ -e "$P/b/.git/hooks/post-merge" ] && echo oui || echo non)"; return 1; }
+  return 0
+}
+probe_disarm_tiers() { # M5
+  mk_pair "p$((++N))"
+  local lm="bash '$TARGET' run --hook post-merge \"\$@\""
+  put_tiers "$P/b" post-merge "$lm"; cp "$P/b/.git/hooks/post-merge" "$TMP/m.probe"
+  hk disarm --path "$P/b"
+  { [ "$HKRC" -eq 1 ] && cmp -s "$P/b/.git/hooks/post-merge" "$TMP/m.probe"; } || { LASTMSG="disarm rc=$HKRC (attendu 1), tiers intact=$(cmp -s "$P/b/.git/hooks/post-merge" "$TMP/m.probe" 2>/dev/null && echo oui || echo non)"; return 1; }
+  return 0
+}
+probe_hooksp() { # M6
+  mk_pair "p$((++N))"; mkdir -p "$P/b/husky"; git -C "$P/b" config core.hooksPath "$P/b/husky"
+  arm_in "$P/b"
+  { [ "$HKRC" -eq 1 ] && [ "$(ls -A "$P/b/husky" | awk 'END { print NR }')" -eq 0 ]; } || { LASTMSG="arm rc=$HKRC (attendu 1), husky contient $(ls -A "$P/b/husky" | awk 'END { print NR }') fichier(s)"; return 1; }
+  return 0
+}
+probe_arbre() { # M7
+  mk_pair "p$((++N))"; mk_cache "$P/b/outils/cache" "$TARGET"
+  local save="$TARGET"; TARGET="$P/b/outils/cache/conductor/scripts/vf-divergence-hook.sh"
+  arm_in "$P/b"; TARGET="$save"
+  { [ "$HKRC" -eq 1 ] && no_hook "$P/b"; } || { LASTMSG="arm depuis l'arbre rc=$HKRC (attendu 1), hook ecrit=$(no_hook "$P/b" && echo non || echo oui)"; return 1; }
+  return 0
+}
+probe_run_arbre() { # M8
+  mk_pair "p$((++N))"; mk_cache "$P/b/outils/cache" "$TARGET"
+  printf '#!/usr/bin/env bash\necho piege > "%s/piege"\nexit 1\n' "$TMP" > "$P/b/outils/cache/conductor/scripts/check-divergence.sh"
+  rm -f "$TMP/piege"
+  hand_hook "$P/b" post-merge "$P/b/outils/cache/conductor/scripts/vf-divergence-hook.sh"
+  diverge "$P/a" "$P/b" 02
+  [ ! -e "$TMP/piege" ] || { LASTMSG="le check-divergence.sh de l'arbre a ete execute (piege declenche)"; return 1; }
+  return 0
+}
+probe_rewrite() { # M9
+  mk_pair "p$((++N))"; arm_in "$P/b"
+  add_phase "$P/b" 03 p; add_phase "$P/a" 03 q roadmap; git -C "$P/a" push -q origin main 2> /dev/null
+  pull_in "$P/b" --rebase
+  "$GREP" -qF 'DIVERGENCE apres post-rewrite' "$TMP/pull.err" || { LASTMSG="pull --rebase non crie (echappe au filet)"; return 1; }
+  return 0
+}
+probe_amend() { # M10
+  mk_pair "p$((++N))"; arm_in "$P/b"
+  add_phase "$P/b" 02 x roadmap; add_phase "$P/b" 02 y
+  runb git -C "$P/b" commit -q --amend --no-edit > /dev/null 2> "$TMP/amend.err" < /dev/null || :
+  if "$GREP" -qF '[vf-divergence]' "$TMP/amend.err"; then LASTMSG="le amend a produit une sortie [vf-divergence]"; return 1; fi
+  return 0
+}
+probe_quote() { # M11
+  mk_pair "p$((++N))"; mk_cache "$TMP/o'q$N/cache" "$TARGET"
+  local save="$TARGET"; TARGET="$TMP/o'q$N/cache/conductor/scripts/vf-divergence-hook.sh"
+  arm_in "$P/b"; TARGET="$save"
+  { [ "$HKRC" -eq 2 ] && no_hook "$P/b"; } || { LASTMSG="arm depuis un chemin a apostrophe rc=$HKRC (attendu 2), hook ecrit=$(no_hook "$P/b" && echo non || echo oui)"; return 1; }
+  return 0
+}
+
+# ===========================================================================
+# Mutants (QUAL-01) : une ligne altree chacun, cmp -s different, bash -n valide, sonde rouge sur le mutant
+# puis verte sur l'original.
+# ===========================================================================
+MUTDIR="$TMP/mut"
+mk_cache "$MUTDIR" "$SCRIPT" || { ko "mutants pre-condition : copie de travail non construite"; MUTDIR=""; }
+MUTBIN="$MUTDIR/conductor/scripts/vf-divergence-hook.sh"
+ORIG_TARGET="$TARGET"
+
+# mutant <id> <ligne repere> <ancien> <nouveau> <sonde> <description> : dans la SEULE ligne qui contient le repere,
+# remplace la premiere occurrence litterale de <ancien> par <nouveau> (chaines passees par l'environnement).
+mutant() {
+  local id="$1" needle="$2" old="$3" new="$4" probe="$5" desc="$6"
+  [ -n "$MUTDIR" ] || { ko "$id mutants indisponibles"; return; }
+  if ! declare -F "$probe" > /dev/null; then ko "$id sonde $probe NON DEFINIE — $desc"; return; fi
+  NEEDLE="$needle" OLD="$old" NEW="$new" awk 'BEGIN { n = ENVIRON["NEEDLE"]; o = ENVIRON["OLD"]; w = ENVIRON["NEW"] }
+    { if (index($0, n)) { i = index($0, o); if (i) $0 = substr($0, 1, i - 1) w substr($0, i + length(o)) } print }' \
+    "$SCRIPT" > "$MUTBIN"
+  if cmp -s "$MUTBIN" "$SCRIPT"; then ko "$id mutant NON OPPOSABLE (copie identique a l'original) — $desc"; return; fi
+  if ! bash -n "$MUTBIN" 2> /dev/null; then ko "$id mutant invalide (bash -n) — $desc"; return; fi
+  local nl; nl="$(awk 'NR==FNR { a[FNR] = $0; next } a[FNR] != $0 { n++ } END { print n + 0 }' "$SCRIPT" "$MUTBIN")"
+  if [ "$nl" != 1 ]; then ko "$id mutant mal cible ($nl lignes changees au lieu de 1) — $desc"; return; fi
+  TARGET="$MUTBIN"; LASTMSG=""; "$probe" < /dev/null; local mrc=$?; local mmsg="$LASTMSG"
+  TARGET="$ORIG_TARGET"; LASTMSG=""; "$probe" < /dev/null; local orc=$?
+  if [ "$mrc" -ne 0 ] && [ "$orc" -eq 0 ]; then
+    ok "$id tue ($desc) — sur le mutant : $mmsg"
+  elif [ "$mrc" -eq 0 ]; then
+    ko "$id mutant SURVIVANT ($desc) — la sonde ${probe#probe_} reste verte sur le mutant"
+  else
+    ko "$id original rouge apres mutation ($desc) — $LASTMSG"
+  fi
+  TARGET="$ORIG_TARGET"
+}
+
+mutant VDH-MUT-1 'DIVERGENCE apres $hook' 'say "' ': "' probe_trace \
+  "code 1 rendu silencieux : la divergence n'est plus criee"
+mutant VDH-MUT-2 "printf '# vf-divergence journal v1" '>> "$f"' '> /dev/null' probe_journal \
+  "ecriture du journal neutralisee"
+mutant VDH-MUT-3 '    0|3)' '0|3)' '0|2|3)' probe_nv \
+  "code inattendu rendu silencieux (NON VERIFIABLE avale)"
+mutant VDH-MUT-4 '[ "$refused" -eq 0 ] ||' '|| refus_fin' '|| :' probe_tiers \
+  "refus du hook tiers retire"
+mutant VDH-MUT-5 '"$MARKER"*) return 0 ;;' '"$MARKER"*)' '*)' probe_disarm_tiers \
+  "test du marqueur retire : disarm retire un hook tiers"
+mutant VDH-MUT-6 '0) [ -n "$v" ] && return 0; return 1 ;;' 'return 0' 'return 1' probe_hooksp \
+  "refus core.hooksPath retire (valeur lue puis ignoree)"
+mutant VDH-MUT-7 'in_tree() {' '"$2"/*) return 0' '"$2"/*) return 1' probe_arbre \
+  "refus du script sous l'arbre retire a l'armement"
+mutant VDH-MUT-8 'if in_tree "$SELF_DIR" "$rootp"; then' 'in_tree "$SELF_DIR" "$rootp"' 'false' probe_run_arbre \
+  "garde d'execution hors de l'arbre retiree"
+mutant VDH-MUT-9 '[ "${1:-}" = "rebase" ] || exit 0 ;;' '"rebase"' '"xrebase"' probe_rewrite \
+  "argument rebase ignore : pull --rebase echappe de nouveau au filet"
+mutant VDH-MUT-10 '[ "${1:-}" = "rebase" ] || exit 0 ;;' '|| exit 0' '|| :' probe_amend \
+  "amend non filtre : le amend est juge comme un rebase"
+mutant VDH-MUT-11 '*[[:cntrl:]]*) return 1 ;;' 'return 1' 'return 0' probe_quote \
+  "controle du chemin non sur retire : un chemin a apostrophe est embarque dans le hook"
+mutant VDH-MUT-12 "printf 'lien'" '[ -L "$f" ]' 'false' probe_lien \
+  "lien symbolique du journal suivi"
+TARGET="$ORIG_TARGET"
+
+# ===========================================================================
 echo "== resultat : $PASS ok, $FAIL ko =="
 [ "$FAIL" -eq 0 ] || exit 1
 exit 0
