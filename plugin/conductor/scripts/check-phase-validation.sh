@@ -224,7 +224,20 @@ resolve() {
   return 0
 }
 
-if resolve && [ ! -e "$ROADMAP" ] && [ ! -L "$ROADMAP" ]; then indetermine "roadmap absent"; fi
+# Contrôle d'entrée AVANT toute lecture ; rend 0 si lisible, sinon 3 ou 5 (déjà signalé, jamais le contenu).
+guard() { # <chemin>
+  local f=$1 size
+  if [ ! -e "$f" ] && [ ! -L "$f" ]; then indetermine "roadmap absent"; return 3; fi
+  if [ -L "$f" ]; then illisible roadmap "lien symbolique"; return 5; fi
+  if [ ! -f "$f" ]; then illisible roadmap "fichier non regulier"; return 5; fi
+  if [ ! -r "$f" ]; then illisible roadmap "fichier illisible"; return 5; fi
+  size=$(wc -c < "$f" 2>/dev/null | tr -d ' \t')
+  case "$size" in ''|*[!0-9]*) illisible roadmap "taille non numerique"; return 5 ;; esac
+  if [ "$size" -gt "$CPV_MAX_OCTETS" ]; then illisible roadmap "au-dela de la borne de taille"; return 5; fi
+  return 0
+}
+
+if resolve; then guard "$ROADMAP"; fi
 
 if [ "$WORST" -eq 0 ]; then
   OUT_TXT=$(sed "s/$CR\$//" "$ROADMAP" | tr '\r' '\n' | awk -v bom="$BOM" -v want="$PHASE" "$AWK_PROG"); arc=$?
