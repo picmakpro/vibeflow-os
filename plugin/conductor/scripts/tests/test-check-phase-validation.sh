@@ -454,7 +454,60 @@ if [ -f "$GSDJS" ] && command -v node > /dev/null 2>&1; then
     gsd_must_match 0 w1 "$CNT" "$GSD/Aw" "$GSD/Cw" roadmap analyze
   }
   case_ CPV-GSD-WS probe_gsd_ws
-  # GSD-FIN-ECRITURES
+
+  # Écritures du moteur (P60-D-03 a, P60-D-02) : le moteur réécrit le ROADMAP ; la case se coche, le marqueur survit.
+  # gsd_no_marker <ROADMAP> : le ROADMAP privé de la seule ligne de marqueur, sur la sortie standard.
+  gsd_no_marker() { awk '!/^\*\*Validation:\*\*/' "$1"; }
+  # gsd_phase2_dir <lab> : dossier de la phase 2 prête à clore (un PLAN, un SUMMARY, une VERIFICATION passed).
+  gsd_phase2_dir() {
+    local p="$1/.planning/phases/02-deuxieme"; mkdir -p "$p"
+    printf -- '---\nphase: 02\nplan: 01\n---\n# plan\n' > "$p/02-01-PLAN.md"
+    printf -- '---\nphase: 02\nplan: 01\nstatus: complete\n---\n# summary\n' > "$p/02-01-SUMMARY.md"
+    printf -- '---\nphase: 02\nstatus: passed\n---\n# verification\n' > "$p/02-VERIFICATION.md"
+  }
+  # gsd_gate <lab> <phase> -> RC : le gate rejoué sur le ROADMAP du lab que le moteur vient de réécrire.
+  gsd_gate() { RUNDIR="$1"; run --phase "$2"; }
+
+  gsd_mklab CA - '### Phase 2: Deuxieme' ''
+  gsd_mklab CB - '### Phase 2: Deuxieme' '**Validation:** proposed'
+  gsd_phase2_dir "$GSD/CA"; gsd_phase2_dir "$GSD/CB"
+  probe_gsd_complete() {
+    local l
+    for l in CA CB; do
+      gsd_do "$GSD/$l" - "$TMP/gsd.cmp.$l" phase complete 2
+      LASTMSG="phase complete 2 sur $l rend rc $GRC err[$(tr '\n' '|' < "$TMP/gsd.cmp.$l.err" | cut -c1-200)]"; [ "$GRC" -eq 0 ] || return 1
+      LASTMSG="la case de checklist n'est pas cochée dans $l"
+      command grep -q '^- \[x\] Phase 2:' "$GSD/$l/.planning/ROADMAP.md" || return 1
+    done
+    gsd_no_marker "$GSD/CA/.planning/ROADMAP.md" > "$TMP/gsd.cmp.na"; gsd_no_marker "$GSD/CB/.planning/ROADMAP.md" > "$TMP/gsd.cmp.nb"
+    LASTMSG="les deux ROADMAP réécrits diffèrent hors ligne de marqueur"; cmp -s "$TMP/gsd.cmp.na" "$TMP/gsd.cmp.nb" || return 1
+    LASTMSG="la ligne de marqueur n'a pas survécu à phase complete dans CB"
+    command grep -qxF '**Validation:** proposed' "$GSD/CB/.planning/ROADMAP.md" || return 1
+    gsd_gate "$GSD/CB" 2
+    msg "le gate sur le ROADMAP réécrit de CB attendu rc 1 (marqueur conservé)"; [ "$RC" -eq 1 ] || return 1
+    gsd_gate "$GSD/CA" 2
+    msg "le gate sur le ROADMAP réécrit de CA attendu rc 0 (aucun marqueur)"; [ "$RC" -eq 0 ]
+  }
+  case_ CPV-GSD-COMPLETE probe_gsd_complete
+
+  gsd_mklab RA - '### Phase 2: Deuxieme' ''
+  gsd_mklab RB - '### Phase 2: Deuxieme' '**Validation:** proposed'
+  probe_gsd_renum() {
+    local l
+    for l in RA RB; do
+      gsd_do "$GSD/$l" - "$TMP/gsd.ren.i.$l" phase insert 1 Intercalee
+      LASTMSG="phase insert 1 sur $l rend rc $GRC err[$(tr '\n' '|' < "$TMP/gsd.ren.i.$l.err" | cut -c1-200)]"; [ "$GRC" -eq 0 ] || return 1
+      gsd_do "$GSD/$l" - "$TMP/gsd.ren.r.$l" phase remove 1
+      LASTMSG="phase remove 1 sur $l rend rc $GRC err[$(tr '\n' '|' < "$TMP/gsd.ren.r.$l.err" | cut -c1-200)]"; [ "$GRC" -eq 0 ] || return 1
+    done
+    # La phase 2 est devenue la phase 1 : le marqueur a suivi sa section, l'autre lab n'en a jamais eu.
+    gsd_gate "$GSD/RB" 1
+    msg "le gate sur la phase renumérotée de RB attendu rc 1 (le marqueur suit sa section)"; [ "$RC" -eq 1 ] || return 1
+    gsd_gate "$GSD/RA" 1
+    msg "le gate sur la phase renumérotée de RA attendu rc 0"; [ "$RC" -eq 0 ] || return 1
+    gsd_must_match 1 - "$PH2" "$GSD/RA" "$GSD/RB" roadmap get-phase 1
+  }
+  case_ CPV-GSD-RENUM probe_gsd_renum
 else
   skip "CPV-GSD moteur GSD absent (node ou gsd-tools.cjs introuvable : la CI installe le moteur et tranche)"
 fi
