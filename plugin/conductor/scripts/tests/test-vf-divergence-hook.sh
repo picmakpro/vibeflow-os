@@ -702,6 +702,14 @@ probe_hooks_lien() { # M13 : .git/hooks lien vers un dossier du lab, puis vers u
   { [ "$HKRC" -eq 1 ] && [ "$(nfiles "$sh")" -eq 0 ]; } || { LASTMSG="dossier partage : arm rc=$HKRC (attendu 1), $(nfiles "$sh") fichier(s) ecrit(s) chez des tiers"; return 1; }
   return 0
 }
+probe_hooks_lien_interne() { # P61-H-01 : .git/hooks lien vers un dossier SOUS .git -> refuse aussi
+  mk_pair "p$((++N))"
+  rm -rf "$P/b/.git/hooks"; mkdir "$P/b/.git/hooks-reels"; ln -s hooks-reels "$P/b/.git/hooks"
+  arm_in "$P/b"
+  [ "$HKRC" -eq 1 ] || { LASTMSG="lien vers un dossier sous .git : arm rc=$HKRC (attendu 1)"; return 1; }
+  [ "$(nfiles "$P/b/.git/hooks-reels")" -eq 0 ] || { LASTMSG="lien interne : $(nfiles "$P/b/.git/hooks-reels") fichier(s) ecrit(s)"; return 1; }
+  return 0
+}
 probe_hooks_lien_refresh() { # M14 : hooks nostres deja dans un dossier partage -> --refresh refuse
   mk_pair "p$((++N))"
   arm_in "$P/b"; [ "$HKRC" -eq 0 ] || { LASTMSG="arm rc=$HKRC"; return 1; }
@@ -1070,12 +1078,17 @@ mutant VDH-MUT-12 "printf 'lien'" '[ -L "$f" ]' 'false' probe_lien \
   "lien symbolique du journal suivi"
 
 # Tour 1 de relecture (Phase 61) : un mutant par propriete.
-mutant VDH-MUT-13 'if ! hooks_confined; then' '! hooks_confined' 'false' probe_hooks_lien \
-  "arm : confinement du dossier de hooks retire (lien vers l'arbre ou vers un dossier partage suivi)"
-mutant VDH-MUT-14 'HOOKS_REAL="$(real_dir "$HOOKS_DIR")" || return 1' '"$(real_dir "$HOOKS_DIR")" || return 1' '"$HOOKS_DIR"' probe_hooks_lien \
-  "chemin du dossier de hooks non resolu (le lien symbolique passe pour un dossier du depot)"
-mutant VDH-MUT-15 'hooks_confined ||' 'hooks_confined ||' 'true ||' probe_hooks_lien_refresh \
-  "--refresh : confinement du dossier de hooks retire"
+# P61-H-01 ratifie : le refus du lien (L) et le confinement (C) se subsument ; C et L sont neutralises ensemble,
+# puis L seul contre un lien qui reste sous .git.
+LN='[ ! -L "$HOOKS_DIR" ] || return 1'
+mutant2 VDH-MUT-13 'if ! hooks_confined; then' '! hooks_confined' 'false' "$LN" '[ ! -L "$HOOKS_DIR" ] ||' ': ||' probe_hooks_lien \
+  "arm : confinement du dossier de hooks ET refus du lien retires (lien vers l'arbre ou vers un dossier partage suivi)"
+mutant2 VDH-MUT-14 'HOOKS_REAL="$(real_dir "$HOOKS_DIR")" || return 1' '"$(real_dir "$HOOKS_DIR")" || return 1' '"$HOOKS_DIR"' "$LN" '[ ! -L "$HOOKS_DIR" ] ||' ': ||' probe_hooks_lien \
+  "chemin du dossier de hooks non resolu ET refus du lien retire (le lien symbolique passe pour un dossier du depot)"
+mutant2 VDH-MUT-15 'hooks_confined ||' 'hooks_confined ||' 'true ||' "$LN" '[ ! -L "$HOOKS_DIR" ] ||' ': ||' probe_hooks_lien_refresh \
+  "--refresh : confinement du dossier de hooks ET refus du lien retires"
+mutant VDH-MUT-22 "$LN" '[ ! -L "$HOOKS_DIR" ] ||' ': ||' probe_hooks_lien_interne \
+  "refus du dossier de hooks lien symbolique retire : un lien vers un dossier sous .git est arme (P61-H-01)"
 mutant VDH-MUT-16 '    if in_tree "$SELF" "$ROOT"; then' 'in_tree "$SELF" "$ROOT"' 'false' probe_refresh_arbre \
   "--refresh : refus du script sous l'arbre retire"
 mutant VDH-MUT-17 '< "$tmp" >&2' "tr -d '\\000-\\010\\013-\\037\\177' <" 'cat <' probe_relais \

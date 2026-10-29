@@ -107,7 +107,7 @@ l'armement vit dans les labs, posé par l'installeur).
 
 ### Hypothèses retenues faute de réponse (à faire confirmer par Samuel)
 
-- **P61-H-01 (« lab multi-humains » = poste d'équipe).** Le clone est armé quand l'installeur pose un
+- **P61-H-01 (« lab multi-humains » = poste d'équipe) — RATIFIÉE, arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 (« Oui aux propositions par défaut pour 60 et 61 ») ; l'armement est de plus refusé quand `.git/hooks` est un lien symbolique.** Le clone est armé quand l'installeur pose un
   poste `product` ou `dev` ; jamais au poste `solo` (critère 2 du jalon, non-régression). Motif : aucun
   signal « multi-humains » n'existe (éclaireur §2) ; le poste est déclaré par chaque humain, et l'armement
   est de toute façon par clone. La clé `vf_roles` de `.planning/config.json` n'est pas retenue comme
@@ -150,6 +150,6 @@ l'armement vit dans les labs, posé par l'installeur).
 ## Deferred Ideas
 
 - Preuve d'usage sur lab réel (P61-B-01, P61-B-02).
-- Confirmation de P61-H-01 par Samuel.
+- ~~Confirmation de P61-H-01 par Samuel.~~ Ratifiée, arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 (« Oui aux propositions par défaut pour 60 et 61 »).
 
 </deferred>

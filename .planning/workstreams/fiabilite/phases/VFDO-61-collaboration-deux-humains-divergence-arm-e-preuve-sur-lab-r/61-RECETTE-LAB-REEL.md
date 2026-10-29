@@ -1,6 +1,6 @@
 # Phase 61 — Recette du lab réel (COLB-08)
 
-**Statut : procédure livrée, jamais exécutée par la mission.** COLB-08 reste **décochée** tant que P61-B-01 (quel lab
+**Statut : procédure livrée, jamais exécutée par la mission. Bloqueur humain : le lab et les deux humains restent à désigner par Samuel.** COLB-08 reste **décochée** tant que P61-B-01 (quel lab
 réel, avec quels deux humains) et P61-B-02 (trois semaines d'usage réel après armement) ne sont pas levés. Cette
 mission n'a joué aucune semaine de cette recette et n'écrit aucun compte rendu : la preuve de **mécanisme** est
 automatisée (suite `test-divergence-deux-clones.sh`), la preuve d'**usage** est humaine. Seul Samuel coche COLB-08.

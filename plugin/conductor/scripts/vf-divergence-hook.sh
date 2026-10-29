@@ -21,7 +21,8 @@
 #                                      husky versionne, ou dossier global partage par tous les depots
 #         REFUS executable-dans-l-arbre  ce script est sous la racine de travail (le hook n'execute jamais
 #                                      du code de l'arbre) ; on refuse, on ne resout pas
-#         REFUS hooks-hors-depot       le chemin REEL du dossier de hooks (liens resolus) n'est pas sous le dossier
+#         REFUS hooks-hors-depot       le dossier de hooks est un lien symbolique (P61-H-01 : quelle que soit sa cible,
+#                                      meme sous le dossier git), ou le chemin REEL du dossier de hooks (liens resolus) n'est pas sous le dossier
 #                                      git commun du depot : lien vers un dossier versionne du lab ou partage
 #                                      entre depots (armer ici armerait l'arbre ou des depots tiers)
 #         REFUS hook-tiers:<nom>       un hook qui n'est pas le notre occupe la place
@@ -488,6 +489,8 @@ real_dir() {
 # `.git/hooks` lien symbolique vers un dossier versionne du lab, ou partage entre depots, ne l'est pas.
 # Pose HOOKS_REAL. Code 0 ou 1.
 hooks_confined() {
+  # P61-H-01 (ratifie) : un dossier de hooks qui est LUI-MEME un lien symbolique est refuse, quelle que soit sa cible.
+  [ ! -L "$HOOKS_DIR" ] || return 1
   HOOKS_REAL="$(real_dir "$HOOKS_DIR")" || return 1
   [ -n "$HOOKS_REAL" ] || return 1
   common_dir || return 1
@@ -539,7 +542,7 @@ do_arm() {
     hooks_path_set; rc=$?
     if [ "$rc" -eq 2 ]; then say "NON VERIFIABLE hooks-irresolu : configuration git illisible"; arm_fin 2; fi
     if [ "$rc" -eq 0 ]; then say "rien a rafraichir : core.hooksPath est configure, aucune ecriture dans le dossier qu'il designe"; arm_fin 0; fi
-    hooks_confined || { say "REFUS hooks-hors-depot : le dossier de hooks ${HOOKS_REAL:-$HOOKS_DIR} n'est pas sous le dossier git du depot — rien n'est ecrit"; refus_fin; }
+    hooks_confined || { say "REFUS hooks-hors-depot : le dossier de hooks ${HOOKS_REAL:-$HOOKS_DIR} est un lien symbolique ou n'est pas sous le dossier git du depot — rien n'est ecrit"; refus_fin; }
     if in_tree "$SELF" "$ROOT"; then
       say "REFUS executable-dans-l-arbre : $SELF est sous l'arbre de travail — le hook n'execute jamais du code de l'arbre"
       refus_fin
@@ -571,7 +574,7 @@ do_arm() {
     refus_fin
   fi
   if ! hooks_confined; then
-    say "REFUS hooks-hors-depot : le dossier de hooks ${HOOKS_REAL:-$HOOKS_DIR} n'est pas sous le dossier git du depot (lien vers l'arbre versionne ou vers un dossier partage) — rien n'est ecrit"
+    say "REFUS hooks-hors-depot : le dossier de hooks ${HOOKS_REAL:-$HOOKS_DIR} est un lien symbolique ou n'est pas sous le dossier git du depot (lien vers l'arbre versionne ou vers un dossier partage) — rien n'est ecrit"
     for name in $(hook_names); do hand_line "$name"; done
     refus_fin
   fi
