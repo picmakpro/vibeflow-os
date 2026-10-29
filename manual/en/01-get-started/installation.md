@@ -110,7 +110,10 @@ soon as `VF_ROLE` is set.
 - **Where it lives**: the local file `.claude/vibeflow-role`, not versioned, a single value.
 - **Project list**: the `vf_roles` key of `.planning/config.json`, edited by hand, says which roles
   the project admits; VibeFlow writes nothing there.
-- **Changing later**: `vibeflow-update.sh role <role>`.
+- **What it changes day to day**: at the `product` and `dev` roles, a step added by the team is born
+  **proposed** and waits for a dev to validate it, and, when a `BRIEF.md` exists, the head refuses to
+  split until `.planning/ARCHITECTURE.md` is validated. At the `solo` role, nothing changes. Details in
+  [gates and human validation](../02-concepts/gates-and-human-validation.md).
 
 A role is a view, not a right: it filters what you are offered at install time, nothing is walled
 off — git, the project scope and a GSD already installed at account scope stay visible. In the `product`

@@ -113,6 +113,10 @@ que `VF_ROLE` est posée.
 - **Liste du projet** : la clé `vf_roles` de `.planning/config.json`, éditée à la main, dit quels postes
   le projet admet ; VibeFlow n'y écrit rien.
 - **Changer plus tard** : `vibeflow-update.sh role <poste>`.
+- **Ce que ça change au quotidien** : aux postes `product` et `dev`, une étape ajoutée par l'équipe naît
+  **proposée** et attend qu'un dev la valide, et, quand un `BRIEF.md` existe, le head refuse de découper
+  tant que `.planning/ARCHITECTURE.md` n'est pas validée. Au poste `solo`, rien ne change. Détail dans
+  [gates et validation humaine](../02-concepts/gates-et-validation-humaine.md).
 
 Un poste est une vue, pas un droit : il filtre ce qu'on te propose à la pose, rien n'est cloisonné —
 git, le scope projet et un GSD déjà installé au scope compte restent visibles. En poste `product`, la chaîne

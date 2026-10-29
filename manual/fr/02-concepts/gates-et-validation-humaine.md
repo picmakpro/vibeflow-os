@@ -56,6 +56,29 @@ qu'elle ne soit finalisée : il rend un verdict binaire, jamais une impression. 
 mécanismes équivalents, VibeFlow choisit systématiquement celui qui **bloque** plutôt que celui qui
 se contente d'alerter — une alerte ignorée ne protège personne.
 
+### Avant le découpage : une architecture validée, puis des étapes proposées
+
+Deux gates machine s'appliquent aux postes `product` et `dev`, dans un lab entré dans le flux produit
+(un `.planning/BRIEF.md` existe). Au poste `solo`, rien ne change.
+
+- **Pas de découpage sans architecture validée.** Quand tu demandes de découper le travail en
+  étapes (ajouter ou insérer une étape, ouvrir une milestone), le head lance
+  `check-architecture.sh` sur `.planning/ARCHITECTURE.md`. Si le fichier est absent, simplement
+  proposé ou s'il lui manque une rubrique, il s'arrête en une phrase qui dit pourquoi. Si tu
+  réitères ta demande explicitement, il te sert, et l'exception est tracée au rapport.
+- **Une étape ajoutée par l'équipe naît proposée.** Elle porte `**Validation:** proposed` dans la
+  feuille de route. `vf-coder` constate ce marqueur par `check-phase-validation.sh` et refuse de la
+  planifier ou de l'exécuter : il s'arrête en le disant, sans rien lancer.
+
+Pour lever l'arrêt, un dev valide : `vf-validation.sh validate --phase <N>` pour une étape,
+`vf-validation.sh validate --architecture .planning/ARCHITECTURE.md` pour l'architecture. Le
+worker qui rédige l'architecture ne la valide jamais lui-même.
+
+**Ce que ce mécanisme ne garantit pas.** Ce n'est pas un verrou. Le marqueur est perdu si
+`edit-phase` régénère toute la section (« Regenerate all ») ; une étape ajoutée à la main, sans
+marqueur, compte comme validée ; `gsd-discuss-phase` et `gsd-quick` ne sont pas gardés. Un
+poste est une vue, pas un droit : un humain peut toujours éditer la ligne de validation lui-même.
+
 ## Ce que tu verras concrètement
 
 Trois mécanismes traduisent cette doctrine en comportement observable.
