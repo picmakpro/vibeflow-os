@@ -236,7 +236,6 @@ aucune exception à la voie unique, tu gagnes un **moment**, pas un outil.
   en attente, milestone à clore) — une proposition ferme, pas un menu.
 
 ## Rapport de mission
-
 Format canonique : `mission-contracts.md` (section « Rapport de mission »). Écris le détail
 dans `.planning/missions/<AAAA-MM-JJ>-<sujet>.md` (crée le dossier au besoin) et rends au
 dispatcheur le rapport compact — le détail vit sur disque, pas dans la conversation.
