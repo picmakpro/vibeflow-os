@@ -31,10 +31,10 @@ Le chercheur délégué (`gsd-phase-researcher`, lancé 06:19) n'a rien écrit e
 
 ## 6. CI, gates, livraison (COLB-09)
 - Découverte des suites : `find plugin scripts -type f -path '*/tests/test-*.sh'` (`.github/workflows/ci.yml:218`), refus d'un verdict vide (l. 223). Une suite neuve sous `*/tests/` est découverte sans câblage.
-- Modules touchés (bump `VERSION`, `CHANGELOG.md`, `module.json`, `README.md`) : conductor v1.51.0, consolidator v1.11.3, reference v2.5.8, le module porteur de l'engine `plugin/_internal/` (à identifier à la planification : pas de `VERSION` propre mesuré). README de conductor : `check-divergence.sh` décrit l. 241-245 comme consommé par `scripts/hooks/post-merge` « opt-in » ; le compte de suites du README racine bouge avec toute suite neuve.
+- Modules touchés (bump `VERSION`, `CHANGELOG.md`, `module.json`, `README.md`) : conductor v1.51.0, consolidator v1.11.4, reference v2.5.8, le module porteur de l'engine `plugin/_internal/` (à identifier à la planification : pas de `VERSION` propre mesuré). README de conductor : `check-divergence.sh` décrit l. 241-245 comme consommé par `scripts/hooks/post-merge` « opt-in » ; le compte de suites du README racine bouge avec toute suite neuve.
 - Précédents de plans : `.planning/workstreams/fiabilite/phases/VFDO-60-*/60-0x-PLAN.md` ; porte de phase 60-09 (rejeu `replay-ci-jobs.sh --job gates` sous `.planning/milestones/fiabilite-v1.0-phases/VFDO-40.1-*/tools/`, arrêt avant PR). Suites rejouées une à une ; ledger à la main.
 
-## 7. Questions ouvertes (à écrire en bloqueurs par le planificateur si 61-CONTEXT.md n'a pas de défaut)
+## 7. Questions ouvertes (RESOLVED : Q1 P61-PL-04, Q2 P61-PL-03, Q3 P61-PL-12, cf. registre) (à écrire en bloqueurs par le planificateur si 61-CONTEXT.md n'a pas de défaut)
 - Q1 : forme exacte du désarmement quand un hook existant a été fusionné à la main par l'utilisateur (reconnaissance du hook « nôtre » : marqueur textuel versionné dans le fichier).
 - Q2 : seuil du cache « sous l'arbre versionné » (chemin relatif `.vibeflow-cache` par défaut, l. 406) : refuser ou résoudre ?
 - Q3 : module porteur du bump de l'engine `plugin/_internal/` ; manuel FR+EN : page(s) à mettre à jour (à repérer par `check-manual.sh`).

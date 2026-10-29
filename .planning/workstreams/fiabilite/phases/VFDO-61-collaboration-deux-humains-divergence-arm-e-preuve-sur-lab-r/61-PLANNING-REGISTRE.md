@@ -33,7 +33,7 @@ Gate de couverture des décisions (`check.decision-coverage-plan`) : le parseur 
   vide) ; `seed-registres.sh` copie le gabarit ENTIER comme registre initial (squelette d'entrée compris).
 - **Surfaces des gardes** : G-2 ne surveille, dans cette phase, que `plugin/conductor/scripts/tests/test-*.sh` (le script
   neuf `vf-divergence-hook.sh` n'est pas un `check-*`) ; SOBR-05 ne surveille aucun fichier que la phase ajoute.
-- **Base** : `merge-base HEAD origin/main` = `1c2ae090`, 100 commits jusqu'à HEAD ; base de phase PB = parent de
+- **Base** : `merge-base HEAD origin/main` = `4a55c4af`, 105 commits jusqu'à HEAD ; base de phase PB = parent de
   `3368a7d8` (`docs(61): cadrage de la Phase 61`).
 - **Calibration** : `estimate-calibration --ws fiabilite` → facteur 1, zéro échantillon, confiance `low`.
 
@@ -116,7 +116,7 @@ blockers:
   signaux_au_manager:
     - "la branche porte la Phase 60 non mergée (conductor v1.51.0 non publié) ; le minor de conductor de cette phase se calcule depuis la valeur lue"
     - "collision de version possible avec les Phases 45 et 48 du compartiment gouvernance (consolidator, installeur)"
-    - "G-1, G-2 et SOBR-05 jugent merge-base(HEAD, origin/main)..HEAD = 1c2ae090..HEAD (100 commits à la planification), pas la seule plage PB..HEAD"
+    - "G-1, G-2 et SOBR-05 jugent merge-base(HEAD, origin/main)..HEAD = 4a55c4af..HEAD (105 commits à la planification), pas la seule plage PB..HEAD"
     - "manifeste check-agents-manifest.json valide jusqu'au 2026-11-21"
 ```
 
