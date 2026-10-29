@@ -4,7 +4,9 @@
 # VERBE DE SCRIPT, jamais un skill. `propose` pose « proposed » à la création d'une phase (déclenché par la doctrine
 # et le champ du brief de mission, P60-H-03) ; `validate` la bascule en « validated » (un dev valide, P60-H-02).
 # Lu par `check-phase-validation.sh` et `check-architecture.sh`, dont la grammaire est reprise À L'IDENTIQUE (P60-PL-01) ; titres de
-# phase, sosies du marqueur et refus des formes slug/plan (`60-02`, `60-gate-architecture` : 64) sont ceux de `check-phase-validation.sh`.
+# phase, sosies du marqueur et refus (64) des formes qui désignent une phase existante sous une autre identité (`60-02`, `60-gate-architecture`,
+# `CK-03-auth-flow`, `AUTH-login`, `60_gate` : préfixe d'un titre du ROADMAP suivi de `-`, `_` ou `.`, ou dossier de phase du même nom), après
+# normalisation de l'argument (blancs, séparateur final isolé), sont ceux de `check-phase-validation.sh`.
 # LIMITES : `check-architecture.sh` rejette une rubrique dont le corps commence par `[` (lien) : faux rouge contournable, documenté, non corrigé ;
 # le marqueur n'est jamais commité par ce script, un worktree ne le voit donc pas : inerte tant que l'isolation reste séquentielle (ADR-059).
 #
@@ -92,12 +94,12 @@ if [ -n "$ARCH" ] && [ "$VERB" = propose ]; then usage_err "propose ne vaut que 
 if [ -n "$ARCH" ] && [ "$HAS_WS" -eq 1 ]; then usage_err "--ws ne vaut que pour --phase"; fi
 if [ "$OVERRIDE" -eq 1 ] && [ "$VERB" = propose ]; then usage_err "--override ne vaut que pour validate"; fi
 if [ -n "$PHASE" ]; then
+  # Normalisation AVANT tout refus (identique à check-phase-validation.sh) : blancs de début et de fin ôtés, puis UN séparateur final isolé.
+  PHASE=${PHASE#"${PHASE%%[![:space:]]*}"}; PHASE=${PHASE%"${PHASE##*[![:space:]]}"}
+  case "$PHASE" in *[./-]) PHASE=${PHASE%?} ;; esac
+  [ -n "$PHASE" ] || usage_err "--phase nécessite une valeur"
   case "$PHASE" in *[!A-Za-z0-9._-]*|[!A-Za-z0-9]*|*.|*..*) usage_err "--phase : identifiant attendu (ex. 60, 41.1, 12A, AUTH, CK-03)" ;; esac
   [ "${#PHASE}" -le 64 ] || usage_err "--phase : identifiant trop long"
-  case "$PHASE" in
-    [0-9]*-*) _pre=${PHASE%%-*}; _pre=${_pre%[A-Za-z]}
-        case "$_pre" in *[!0-9.]*) : ;; *) usage_err "--phase : numéro du titre ROADMAP attendu, pas un nom de dossier ni un identifiant de plan (ex. 60, non 60-02)" ;; esac ;;
-  esac
   MODE=phase; ENT=roadmap; TGT="phase-$PHASE"; CIBLE="phase $PHASE"
 else
   MODE=arch; ENT=architecture; TGT=architecture; CIBLE=architecture
@@ -163,7 +165,7 @@ case "$SIZE" in ''|*[!0-9]*) illis "$ENT : taille non numerique" ;; esac
 if [ "$SIZE" -gt "$VF_MAX_OCTETS" ]; then illis "$ENT : au-dela de la borne de taille"; fi
 
 # --- Programme awk : réécrit le fichier vers stdout en ne touchant qu'UNE ligne ; le constat va dans le fichier `st`
-# (`@ sections marqueurs classe code_ouvert commentaire_ouvert fin_goal cr_isole action`). Sections, blocs de code et
+# (`@ sections marqueurs classe code_ouvert commentaire_ouvert fin_goal cr_isole action alias`). Sections, blocs de code et
 # commentaires : celles des deux gates, à l'identique.
 read -r -d '' AWK_PROG <<'AWKEOF'
 function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
@@ -345,6 +347,22 @@ function flush_pending(   k) {
   for (k = 1; k <= pq_n; k++) proc(pq_not[k], pq_i[k])
   pend = 0; pq_n = 0
 }
+# Alias à la manière de gsd (Phase 60, correction de revue) : l'argument n'est le titre d'AUCUNE phase, mais il commence par l'identifiant
+# d'un titre du ROADMAP lu, suivi d'un séparateur (`-`, `_`, `.`) : nom de dossier (`CK-03-auth-flow`, `AUTH-login`), identifiant de plan
+# (`60-02`), forme à suffixe (`60_gate`, `60.gate`). Le plus long préfixe gagne ; un `.` suivi d'un chiffre est une décimale (`60.1`), jamais
+# un séparateur. Rend l'identifiant du titre (déjà validé par secid : caractères sûrs), ou "-".
+function aliasof(   w, j, ch, cand, i) {
+  w = toupper(want)
+  for (j = length(w); j >= 2; j--) {
+    ch = substr(w, j, 1)
+    if (ch != "-" && ch != "_" && ch != ".") continue
+    if (ch == "." && substr(w, j + 1, 1) ~ /[0-9]/) continue
+    cand = substr(w, 1, j - 1)
+    for (i = 1; i <= nid; i++)
+      if (idkey(cand, 0) == idkey(ids[i], 0) || idkey(cand, 1) == idkey(ids[i], 1)) return ids[i]
+  }
+  return "-"
+}
 BEGIN {
   wk[1] = idkey(want, 0); wk[2] = idkey(want, 1)
   if (mode == "arch") { insec[1] = 1; nsec[1] = 1 }
@@ -396,6 +414,7 @@ function proc(line, nr,   t, f, lvl, id, p, v, tok, rest, c, isc) {
     for (p = 1; p <= 2; p++) ingoal[p] = 0
     if (mode == "phase") {
       id = secid(line, lvl)
+      if (id != "") ids[++nid] = id
       for (p = 1; p <= 2; p++) {
         if (insec[p] && lvl <= seclvl[p]) insec[p] = 0
         if (id != "" && idkey(id, p == 2) == wk[p]) { nsec[p]++; insec[p] = 1; seclvl[p] = lvl }
@@ -450,7 +469,7 @@ END {
     if (act == "insert" && i == goalend[p]) out[++m] = "**Validation:** " val cr[i]
   }
   for (i = 1; i <= m; i++) { printf "%s", out[i]; if (i < m || !noeol) printf "\n" }
-  printf "@ %d %d %s %d %d %d %d %s\n", nsec[p] + 0, nmark[p] + 0, (cls[p] == "" ? "-" : cls[p]), infence + 0, incom + 0, goalend[p] + 0, lonecr + 0, act > st
+  printf "@ %d %d %s %d %d %d %d %s %s\n", nsec[p] + 0, nmark[p] + 0, (cls[p] == "" ? "-" : cls[p]), infence + 0, incom + 0, goalend[p] + 0, lonecr + 0, act, (mode == "phase" && nsec[p] == 0 ? aliasof() : "-") > st
   close(st)
 }
 AWKEOF
@@ -460,12 +479,19 @@ NOEOL=0
 if [ "$SIZE" -gt 0 ] && [ "$(tail -c 1 "$F" | od -An -tx1 | tr -d ' \n')" != "0a" ]; then NOEOL=1; fi
 awk -v bom="$BOM" -v want="$PHASE" -v mode="$MODE" -v verb="$VERB" -v val="$VAL" -v noeol="$NOEOL" -v st="$ST" "$AWK_PROG" "$F" > "$OUTF" 2>/dev/null
 arc=$?
-read -r mk nsec nmark cls infence incom goalend lonecr act < "$ST" || mk=""
+read -r mk nsec nmark cls infence incom goalend lonecr act alias < "$ST" || mk=""
 if [ "$arc" -ne 0 ] || [ "$mk" != "@" ]; then illis "$ENT : analyse en echec"; fi
 
 if [ "$lonecr" -ne 0 ]; then illis "$ENT : fin de ligne CR isole (refus, jamais reecrit)"; fi
 if [ "$infence" -ne 0 ]; then indet "bloc de code non ferme"; fi
 if [ "$incom" -ne 0 ]; then indet "commentaire HTML non ferme"; fi
+if [ "$nsec" -eq 0 ] && [ "$MODE" = phase ]; then
+  # Même règle que check-phase-validation.sh : désigner une phase existante sous une autre forme est un refus d'usage (64), jamais « introuvable ».
+  if [ "$alias" != "-" ]; then usage_err "--phase : '$PHASE' n'est pas un titre du ROADMAP mais désigne la phase $alias (utilise --phase $alias)"; fi
+  if { [ "$HAS_WS" -eq 1 ] && [ -d "$VF_WS_DIR/phases/$PHASE" ]; } || { [ "$HAS_WS" -eq 0 ] && [ -d "$PLAN/phases/$PHASE" ]; }; then
+    usage_err "--phase : '$PHASE' est un nom de dossier de phase, pas le numéro d'un titre du ROADMAP (utilise le numéro du titre)"
+  fi
+fi
 if [ "$nsec" -eq 0 ]; then indet "phase introuvable"; fi
 if [ "$nsec" -gt 1 ]; then indet "sections multiples"; fi
 if [ "$nmark" -gt 1 ]; then indet "marqueurs multiples"; fi

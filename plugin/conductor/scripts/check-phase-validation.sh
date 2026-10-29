@@ -17,8 +17,13 @@
 # `--phase` est obligatoire (`--phase=<N>` admis), identifiant `^[A-Za-z0-9][A-Za-z0-9._-]*$` de 64 caractères au plus,
 # sans `..` ni point final : la grammaire des phases que sert gsd-core (numéro `12`, décimal `7.1`, suffixe lettre
 # `12A`, id custom `AUTH` posé par `phase add --id`, préfixe projet `CK-03`). `<N>` est le numéro tel qu'il figure dans le TITRE
-# `### Phase <N>:` du ROADMAP : le nom de dossier (`60-gate-architecture`) et l'identifiant de plan (`60-02`), que gsd résout aussi,
-# rendent 64 (forme chiffre(s) puis tiret) ; ce gate ne lit que des titres, il rendrait sinon « introuvable » et le cycle continuerait. Comparaison sans casse, zéros de tête
+# `### Phase <N>:` du ROADMAP. Argument NORMALISÉ d'abord : blancs de début et de fin ôtés, puis UN séparateur final isolé (`.`, `/`, `-`) :
+# `"60 "`, `60.`, `60/`, `60-` valent `60`. Un argument qui n'est le titre d'aucune phase mais en désigne pourtant une EXISTANTE rend 64 avec le
+# numéro à employer (`utilise --phase CK-03`), jamais « introuvable » (3 : le cycle continuerait) : (a) un identifiant de titre du ROADMAP lu est
+# PRÉFIXE de l'argument suivi de `-`, `_` ou `.` (`CK-03-auth-flow`, `AUTH-login`, `60-02`, `60_gate`, `60.gate`), le plus long préfixe gagnant, un `.`
+# suivi d'un chiffre restant une décimale (`60.2` n'est pas `60` puis `.2`) ; (b) un dossier `.planning/phases/<arg>` existe (lab partitionné :
+# `<compartiment>/phases/<arg>`, jamais celui de la racine). Comparaison aux identifiants RÉELS du ROADMAP, aucune syntaxe devinée ; `vf-validation.sh`
+# applique la même règle. « Introuvable » (3) reste réservé au cas où ni titre ni dossier ne correspondent. Comparaison sans casse, zéros de tête
 # des segments numériques ôtés (`01.1` = `1.1`, `02` = `2`, `12a` = `12A`) ; forme exacte d'abord (préfixe projet
 # conservé), puis, SEULEMENT si aucune section ne porte l'identifiant, forme tolérante au préfixe (`3` désigne
 # `CK-03`), comme la lecture de gsd. Lab plat : ROADMAP du dossier de planning du répertoire courant. Lab
@@ -100,18 +105,17 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 [ -n "$PHASE" ] || usage_err "--phase est obligatoire (usage : --phase <N> [--ws <nom>])"
+# Normalisation de l'argument AVANT tout refus (Phase 60, correction de revue) : blancs de début et de fin ôtés, puis UN séparateur final
+# isolé (`.`, `/`, `-`) : `"60 "`, `60.`, `60/`, `60-` désignent la phase 60, comme pour gsd.
+PHASE=${PHASE#"${PHASE%%[![:space:]]*}"}; PHASE=${PHASE%"${PHASE##*[![:space:]]}"}
+case "$PHASE" in *[./-]) PHASE=${PHASE%?} ;; esac
+[ -n "$PHASE" ] || usage_err "--phase est obligatoire (usage : --phase <N> [--ws <nom>])"
 case "$PHASE" in
   *[!A-Za-z0-9._-]*|[!A-Za-z0-9]*|*.|*..*) usage_err "--phase : identifiant attendu (ex. 60, 41.1, 12A, AUTH, CK-03)" ;;
 esac
-# Forme slug de dossier (`60-gate-architecture`) ou identifiant de plan (`60-02`) : gsd la résout vers la phase, pas ce gate, qui
-# ne lit que les TITRES `### Phase <N>:` ; elle rendrait « introuvable » (3, le cycle continue) pour une phase proposée. Refus d'usage.
-case "$PHASE" in
-  [0-9]*-*) _pre=${PHASE%%-*}; _pre=${_pre%[A-Za-z]}
-      case "$_pre" in *[!0-9.]*) : ;; *) usage_err "--phase : numéro du titre ROADMAP attendu, pas un nom de dossier ni un identifiant de plan (ex. 60, non 60-02 ni 60-gate-architecture)" ;; esac ;;
-esac
 [ "${#PHASE}" -le 64 ] || usage_err "--phase : identifiant trop long"
 
-# --- Programme awk : une ligne rendue, `@ sections marqueurs classe code_ouvert commentaire_ouvert`.
+# --- Programme awk : une ligne rendue, `@ sections marqueurs classe code_ouvert commentaire_ouvert alias`.
 read -r -d '' AWK_PROG <<'AWKEOF'
 function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
 # Clé d'identifiant de phase (grammaire de gsd-core : jeton numérique à suffixe lettre, id custom, préfixe projet) :
@@ -293,6 +297,22 @@ function flush_pending(   k) {
   for (k = 1; k <= pq_n; k++) proc(pq_not[k], pq_i[k])
   pend = 0; pq_n = 0
 }
+# Alias à la manière de gsd (Phase 60, correction de revue) : l'argument n'est le titre d'AUCUNE phase, mais il commence par l'identifiant
+# d'un titre du ROADMAP lu, suivi d'un séparateur (`-`, `_`, `.`) : nom de dossier (`CK-03-auth-flow`, `AUTH-login`), identifiant de plan
+# (`60-02`), forme à suffixe (`60_gate`, `60.gate`). Le plus long préfixe gagne ; un `.` suivi d'un chiffre est une décimale (`60.1`), jamais
+# un séparateur. Rend l'identifiant du titre (déjà validé par secid : caractères sûrs), ou "-".
+function aliasof(   w, j, ch, cand, i) {
+  w = toupper(want)
+  for (j = length(w); j >= 2; j--) {
+    ch = substr(w, j, 1)
+    if (ch != "-" && ch != "_" && ch != ".") continue
+    if (ch == "." && substr(w, j + 1, 1) ~ /[0-9]/) continue
+    cand = substr(w, 1, j - 1)
+    for (i = 1; i <= nid; i++)
+      if (idkey(cand, 0) == idkey(ids[i], 0) || idkey(cand, 1) == idkey(ids[i], 1)) return ids[i]
+  }
+  return "-"
+}
 BEGIN { wk[1] = idkey(want, 0); wk[2] = idkey(want, 1) }
 # Ligne qui RESSEMBLE à un marqueur sans en avoir la forme exacte (Phase 60, correction de revue, P60-H-04) : puce, citation,
 # libellé sans gras, en italique, en minuscules, espace avant le deux-points, suivi d'une valeur qui commence par
@@ -338,6 +358,7 @@ function proc(line, nr,   t, lvl, id, p, v, tok, rest, c) {
   lvl = hlevel(line)
   if (lvl) {
     id = secid(line, lvl)
+    if (id != "") ids[++nid] = id
     for (p = 1; p <= 2; p++) {
       if (insec[p] && lvl <= seclvl[p]) insec[p] = 0
       if (id != "" && idkey(id, p == 2) == wk[p]) { nsec[p]++; insec[p] = 1; seclvl[p] = lvl }
@@ -363,7 +384,7 @@ function proc(line, nr,   t, lvl, id, p, v, tok, rest, c) {
 END {
   flush_pending()
   p = (nsec[1] > 0) ? 1 : 2
-  printf "@ %d %d %s %d %d\n", nsec[p] + 0, nmark[p] + 0, (cls[p] == "" ? "-" : cls[p]), infence + 0, incom + 0
+  printf "@ %d %d %s %d %d %s\n", nsec[p] + 0, nmark[p] + 0, (cls[p] == "" ? "-" : cls[p]), infence + 0, incom + 0, (nsec[p] > 0 ? "-" : aliasof())
 }
 AWKEOF
 
@@ -433,7 +454,15 @@ if [ "$WORST" -eq 0 ]; then
     illisible roadmap "analyse en echec"
   else
     set -- $OUT_TXT
-    NSEC=$2; NMARK=$3; CLS=$4; NFENCE=$5; NCOM=$6
+    NSEC=$2; NMARK=$3; CLS=$4; NFENCE=$5; NCOM=$6; ALIAS=$7
+    if [ "$NSEC" -eq 0 ]; then
+      # Aucun titre ne porte l'identifiant : si l'argument désigne pourtant une phase qui existe sous une autre forme (préfixe d'un titre
+      # suivi d'un séparateur, ou dossier de phase du même nom), refus d'usage 64 : « introuvable » (3) laisserait le cycle continuer.
+      if [ "$ALIAS" != "-" ]; then usage_err "--phase : '$PHASE' n'est pas un titre du ROADMAP mais désigne la phase $ALIAS (utilise --phase $ALIAS)"; fi
+      if { [ "$HAS_WS" -eq 1 ] && [ -d "$VF_WS_DIR/phases/$PHASE" ]; } || { [ "$HAS_WS" -eq 0 ] && [ -d "$PLAN/phases/$PHASE" ]; }; then
+        usage_err "--phase : '$PHASE' est un nom de dossier de phase, pas le numéro d'un titre du ROADMAP (utilise le numéro du titre)"
+      fi
+    fi
     if [ "$NFENCE" -ne 0 ]; then indetermine "bloc de code non ferme"; fi
     if [ "$NCOM" -ne 0 ]; then indetermine "commentaire HTML non ferme"; fi
     if [ "$NSEC" -eq 0 ]; then
