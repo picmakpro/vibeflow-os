@@ -49,6 +49,10 @@ Pour chaque flow en échec, via les outils **mobile-mcp** (`mobile_*`) :
 3. Dump les logs dans `artifactDir` : `xcrun simctl spawn <udid> log ...` ou
    `adb -s <serial> logcat -d > <artifactDir>/android-log.txt`.
 4. Rédige la section « Échec » du rapport : cause probable, écran, liens artefacts.
+5. **Recherche documentaire avant tout fix (ADR-045)** : si la cause probable touche une lib, un
+   framework, une API tierce ou une version d'OS/SDK, consulte la doc (context7 ou doc officielle)
+   avant de proposer un correctif ; sans accès web, remonte l'état `doc-research-required` avec la
+   question précise. Pas de fix à l'aveugle.
 
 mobile-mcp reste **côté agent** : le script ne l'appelle jamais.
 
