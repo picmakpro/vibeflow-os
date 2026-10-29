@@ -1,5 +1,9 @@
 # CHANGELOG — reference
 
+## [v2.5.9] — 2026-10-29 (références mortes à `vibeflow-update.sh`) — publiée dans v2.72.0
+
+**Patch** (documentation seule) — références mortes à `vibeflow-update.sh` remplacées par `/vibeflow-install` / `/vf-update` dans le README (#166).
+
 ## [v2.5.8] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1, correctif de revue H6) — non publiée
 
 **Patch** (correctif de sécurité ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; publiée dans v2.70.1) :

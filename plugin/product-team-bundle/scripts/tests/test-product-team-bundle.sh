@@ -251,7 +251,12 @@ detail-brief|"brief"
 detail-exigences|"exigences"
 detail-criteres|"criteres"
 detail-priorites|"priorites"
-detail-tracabilite|"tracabilite"'
+detail-tracabilite|"tracabilite"
+mode-brief-seul|## Rubric /100 — mode BRIEF seul
+mode-brief-appel|En mode BRIEF seul, l'"'"'appel est
+mode-brief-sans-exigences|Aucun point n'"'"'est joué sur des exigences
+mode-brief-seuil|Seuil de passage, identique : score ≥ 80/100
+methode-brief-seul|puis (sauf en mode BRIEF seul, étape 7) le PROJECT'
 MANAGER_ANCHORS='verrou|driver-lock.sh acquire
 digest|DIGEST
 human_needed|human_needed
@@ -268,6 +273,8 @@ override|override
 livrables-verdict|`brief+prd`, `verdict`
 verdict-seul|`verdict` ne garde que `juge` → `humain`
 prd-saute-analyste|`prd` seul saute `analyste`
+brief-mode-juge|le juge est dispatché en **mode BRIEF seul**
+brief-mode-appel|appel `check-prd.sh --brief`
 dag-chemin|.planning/missions/<AAAA-MM-JJ>-<sujet>.dag.json
 architecte-allowlist|vf-product-architect, prd-gate)
 livrable-architecture|`verdict`, `architecture`}
@@ -278,11 +285,11 @@ validation-par-un-dev|vf-validation.sh validate --architecture'
 
 # Front door : mêmes livrables que le manager (un verdict demandé est une mission acceptée), code 3 complet.
 AGENTMD_ANCHORS='livrables-verdict|`brief+prd`, `verdict`
-code-3-complet|indéterminé (cible absente, zéro exigence, bloc ou commentaire non fermé)'
+code-3-complet|indéterminé (cible absente, zéro exigence, case à cocher non reconnue, bloc ou commentaire non fermé)'
 
 # Outils exacts des deux workers producteurs (revue-59 : un outil en trop, Bash sur l'analyste qui dit ne pas l'avoir,
 # laissait la suite verte). Ligne « tools: » égale à la valeur attendue, pas un simple préfixe.
-ANALYST_TOOLS='Read, Write, Glob, Grep'
+ANALYST_TOOLS='Read, Write, Edit, Glob, Grep'
 PM_TOOLS='Read, Write, Edit, Glob, Grep'
 
 # Phase 60 (P60-D-07, P60-PL-08/09/12) : une ancre par clause porteuse de l'architecte, retirée à son tour d'une copie.
@@ -318,11 +325,15 @@ ANCRES
 }
 
 ctl_juge() {
-  local r=0 f="$1/agents/prd-gate.md" sum
+  local r=0 f="$1/agents/prd-gate.md" sum sums
   [ -f "$f" ] || { echo "KO-JUGE:prd-gate.md absent"; return 1; }
   anchors JUGE "$f" "$JUGE_ANCHORS" || r=1
-  sum="$(awk -F'|' '/^## Rubric/ { s = 1; next } /^## / { s = 0 } s && $3 ~ /^ *[0-9]+ *$/ { t += $3 } END { print t + 0 }' "$f")"
-  [ "$sum" = "100" ] || { echo "KO-JUGE:somme=$sum (attendu 100)"; r=1; }
+  # Une somme PAR rubric (complet ET mode BRIEF seul), chacune égale à 100 ; deux rubrics au moins.
+  sums="$(awk -F'|' '/^## Rubric/ { s = 1; n++; next } /^## / { s = 0 } s && $3 ~ /^ *[0-9]+ *$/ { t[n] += $3 } END { for (i = 1; i <= n; i++) print t[i] + 0 }' "$f")"
+  [ "$(printf '%s\n' "$sums" | awk 'NF { c++ } END { print c + 0 }')" -ge 2 ] || { echo "KO-JUGE:rubric BRIEF seul absente (deux rubrics attendues)"; r=1; }
+  for sum in $sums; do
+    [ "$sum" = "100" ] || { echo "KO-JUGE:somme=$sum (attendu 100)"; r=1; }
+  done
   return $r
 }
 
@@ -462,6 +473,10 @@ fi
 case_ctl "PTB-JUGE : prd-gate porte 79 n'est pas 80, le contrat check-prd.sh, la rubric = 100, Bash borné" ctl_juge "$MOD"
 M="$(mkmut jsomme)"; subst "$M/agents/prd-gate.md" "mesurables | 25 |" "mesurables | 24 |"
 mutant_ptb JUGE-SOMME-99 "KO-JUGE:somme=99" ctl_juge "$MOD" "$M"
+M="$(mkmut jsommeb)"; subst "$M/agents/prd-gate.md" "rien d'inventé | 25 |" "rien d'inventé | 24 |"
+mutant_ptb JUGE-SOMME-BRIEF-99 "KO-JUGE:somme=99" ctl_juge "$MOD" "$M"
+M="$(mkmut jsansb)"; subst "$M/agents/prd-gate.md" "## Rubric /100 — mode BRIEF seul" "## Section BRIEF seul"
+mutant_ptb JUGE-SANS-RUBRIC-BRIEF "KO-JUGE:rubric BRIEF seul absente" ctl_juge "$MOD" "$M"
 sweep JUGE ctl_juge agents/prd-gate.md "$JUGE_ANCHORS"
 
 case_ctl "PTB-MANAGER : verrou, DIGEST, human_needed sous le seuil, proposition jamais lancée, override tracé" ctl_manager "$MOD"
@@ -473,6 +488,8 @@ sweep AGENTMD ctl_agentmd AGENT.md "$AGENTMD_ANCHORS"
 case_ctl "PTB-TOOLS : les workers analyste et pm portent exactement leurs outils (analyste sans Bash)" ctl_tools "$MOD"
 M="$(mkmut toolsa)"; subst "$M/agents/vf-product-analyst.md" "Grep" "Grep, Bash" "tools:"
 mutant_ptb TOOLS-ANALYSTE-BASH "KO-TOOLS:vf-product-analyst" ctl_tools "$MOD" "$M"
+M="$(mkmut toolsae)"; subst "$M/agents/vf-product-analyst.md" "Write, Edit," "Write," "tools:"
+mutant_ptb TOOLS-ANALYSTE-EDIT "KO-TOOLS:vf-product-analyst" ctl_tools "$MOD" "$M"
 M="$(mkmut toolsp)"; subst "$M/agents/vf-product-pm.md" "Grep" "Grep, Bash" "tools:"
 mutant_ptb TOOLS-PM-BASH "KO-TOOLS:vf-product-pm" ctl_tools "$MOD" "$M"
 

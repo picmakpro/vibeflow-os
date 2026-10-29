@@ -1,6 +1,6 @@
 # CHANGELOG — dev-orchestrator
 
-## [v2.30.0] — 2026-10-29 (phases proposées, gate architecture)
+## [v2.30.0] — 2026-10-29 (phases proposées, gate architecture) — publiée dans v2.74.0
 
 **Minor** (Phase 60, ARCG-01, ARCG-03, ARCG-04, ARCG-05, ARCG-09 ; mandat Samuel, /vf-auto session principale, 2026-10-29) :
 
@@ -11,7 +11,14 @@
 - **Test T45** (`test-dev-orchestrator.sh`) : ablation par clause, ordre, inversions (code 1, BRIEF, poste solo, et deux mutants qui refont bloquer sur 3 ou 64), commande citée jouée contre le gate réel, liens vers les scripts du conductor.
 - Instructions inchangées (`AGENT.md` 33, `vf-coder.md` 22, `vf-dev-manager.md` 46), aucune valeur de baseline relevée, aucune release racine.
 
-## [v2.29.0] — 2026-10-27 (redirection du poste product) — publiée dans v2.72.0
+
+## [v2.29.1] — 2026-10-29 (gsd-run.sh sans HOME) — publiée dans v2.73.1
+
+**Patch** (relecture adverse de la release v2.72.0 ; pas d'issue liée ; publiée dans v2.73.1) :
+
+- **`scripts/gsd-run.sh` rend 64, non 1, quand `HOME` est absent** : `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` plantait sous `set -u` (`HOME: unbound variable`, rc 1) alors que l'en-tête documente 64 pour tout défaut d'outillage. Le répertoire user est désormais dérivé une fois (`CLAUDE_CONFIG_DIR`, sinon `$HOME/.claude`) ; sans l'un ni l'autre (absents ou vides), le candidat scope user est sauté, jamais remplacé par un `/.claude/...` à la racine du disque, et le message 64 le signale. Deux scénarios ajoutés à `test-gsd-run.sh` (HOME non exporté, HOME vide ; six assertions) : 30/0.
+
+## [v2.29.0] — 2026-10-27 (redirection du poste product) — publiée dans v2.73.0
 
 **Minor** (Phase 59, PRDT-07) :
 
@@ -21,7 +28,7 @@
 - **Test T44** (`test-dev-orchestrator.sh`) : présence et ordre du pointeur, contenu de la référence, ligne de carte, index et Références, avec sept mutants d'ablation et d'ordre.
 - **Correction ciblée de la revue 59 (F5, F6 ; pas de nouveau bump)** : `product-routing.md` §2 dit aussi, au poste `product`, que le head ne redirige pas vers `/vf-product` quand le skill est absent et comment poser le module `proposable:false` (installation nominale qui nomme `product-team-bundle`). T44 garde désormais les clauses sémantiques de §2 et §3 dans leur section (« ne lance aucune équipe », demande explicite réitérée, « Aucun refus mécanique », skill absent), avec un mutant d'ablation par clause et un mutant d'inversion de sens.
 
-## [v2.28.5] — 2026-10-29 (gsd-run.sh, scope dérivé, doctrine d'attente, description vf-dev) — à publier dans la prochaine release
+## [v2.28.5] — 2026-10-29 (gsd-run.sh, scope dérivé, doctrine d'attente, description vf-dev) — publiée dans v2.72.0
 
 **Patch** (#47, #165, #81, #154 point 2 ; correctifs hors feuille de route) :
 

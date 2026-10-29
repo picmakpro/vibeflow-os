@@ -96,7 +96,8 @@ lab_run "$L1" VF_ROLE=product VF_SCOPE=project -- install validator; RC=$?
 miss=0
 [ "$RC" -eq 0 ] || { ko "RV-TRACE-1 pré-condition : install rc=$RC — $(tail -3 "$WORK/err")"; miss=1; }
 same_bytes "$L1/.claude/vibeflow-role" 'product\n' || { ko "RV-TRACE-1 : .claude/vibeflow-role ≠ « product » + LF"; miss=1; }
-same_bytes "$L1/.gitignore" '.claude/vibeflow-role\n' || { ko "RV-TRACE-1 : .gitignore (scope project) ≠ la seule règle du poste"; miss=1; }
+# #166 (F6) : en scope project, la règle de l'état propre à la machine (empreintes des patches locaux) suit celle du poste.
+same_bytes "$L1/.gitignore" '.claude/vibeflow-role\n.claude/scripts/.vibeflow-sha256-*\n' || { ko "RV-TRACE-1 : .gitignore (scope project) ≠ la règle du poste puis la règle d'état machine"; miss=1; }
 [ "$("$GREP" -cxF '.claude/vibeflow-role' "$L1/.worktreeinclude" 2>/dev/null)" -eq 1 ] || { ko "RV-TRACE-1 : .worktreeinclude ne porte pas la ligne du poste exactement une fois"; miss=1; }
 [ "$(nlines "$L1/.worktreeinclude")" -eq 5 ] || { ko "RV-TRACE-1 : .worktreeinclude n'a pas 5 lignes"; miss=1; }
 [ "$miss" -eq 0 ] && ok "RV-TRACE-1 (P58-D-01, P58-D-16) : fichier de poste, .gitignore en scope project, .worktreeinclude à 5 lignes"
@@ -109,11 +110,11 @@ lab_run "$L2" VF_SCOPE=project -- install validator; RC=$?
 miss=0
 [ "$RC" -eq 0 ] || { ko "RV-TRACE-2 pré-condition : install rc=$RC"; miss=1; }
 [ ! -e "$L2/.claude/vibeflow-role" ] || { ko "RV-TRACE-2 : un fichier de poste a été posé sans poste"; miss=1; }
-[ ! -e "$L2/.gitignore" ] || { ko "RV-TRACE-2 : un .gitignore a été créé en scope project sans poste"; miss=1; }
+same_bytes "$L2/.gitignore" '.claude/scripts/.vibeflow-sha256-*\n' || { ko "RV-TRACE-2 : le .gitignore (scope project, sans poste) porte autre chose que la règle d'état machine (#166, F6)"; miss=1; }
 [ "$(nlines "$L2/.worktreeinclude")" -eq 4 ] || { ko "RV-TRACE-2 : .worktreeinclude n'a pas exactement 4 lignes ($(nlines "$L2/.worktreeinclude"))"; miss=1; }
 [ "$(tail -2 "$L2/.worktreeinclude" | tr '\n' '|')" = ".claude/hooks/|.claude/scripts/|" ] || { ko "RV-TRACE-2 : les deux dernières lignes ne sont pas hooks/ et scripts/"; miss=1; }
 [ "$("$GREP" -cF 'vibeflow-role' "$L2/.worktreeinclude")" -eq 0 ] || { ko "RV-TRACE-2 : une ligne du poste figure dans .worktreeinclude"; miss=1; }
-[ "$miss" -eq 0 ] && ok "RV-TRACE-2 (critère 2 du jalon) : sans poste, ni fichier, ni .gitignore, .worktreeinclude à 4 lignes"
+[ "$miss" -eq 0 ] && ok "RV-TRACE-2 (critère 2 du jalon) : sans poste, ni fichier, ni règle de poste (seule la règle d'état machine), .worktreeinclude à 4 lignes"
 
 # ---------------------------------------------------------------------------
 # RV-TRACE-3 — scope local : la règle une seule fois, à côté des lignes de gitignore_add_paths
@@ -247,7 +248,7 @@ mk_lab; L14="$LAB"; miss=0
 lab_run "$L14" VF_ROLE=solo VF_SCOPE=project -- install validator; RC=$?
 [ "$RC" -eq 0 ] || { ko "RV-SOLO pré-condition : rc=$RC"; miss=1; }
 [ ! -e "$L14/.claude/vibeflow-role" ] || { ko "RV-SOLO : fichier de poste posé pour solo"; miss=1; }
-[ ! -e "$L14/.gitignore" ] || { ko "RV-SOLO : .gitignore créé pour solo"; miss=1; }
+same_bytes "$L14/.gitignore" '.claude/scripts/.vibeflow-sha256-*\n' || { ko "RV-SOLO : règle de poste dans .gitignore pour solo (seule la règle d'état machine est attendue, #166 F6)"; miss=1; }
 [ "$(nlines "$L14/.worktreeinclude")" -eq 4 ] || { ko "RV-SOLO : .worktreeinclude n'a pas 4 lignes"; miss=1; }
 lab_run "$L14" VF_ROLE=product VF_SCOPE=project -- install validator
 lab_run "$L14" VF_ROLE=solo VF_SCOPE=project -- install validator; RC=$?
@@ -380,11 +381,11 @@ run_pose() { # <lab> : install validator en poste product, scope project ; rc da
 etat_pose() { if [ -e "$1/.claude/vibeflow-role" ]; then printf 'oui'; else printf 'non'; fi; }
 
 mk_lab; LG1="$LAB"; printf '.env' > "$LG1/.gitignore"; run_pose "$LG1"
-if [ "$PRC" -eq 0 ] && same_bytes "$LG1/.gitignore" '.env\n.claude/vibeflow-role\n'; then ok "RV-GI-EOL (S4) : dernière ligne sans fin de ligne terminée avant la règle (.env intact)"; else ko "RV-GI-EOL : rc=$PRC, .gitignore = $(od -c "$LG1/.gitignore" | head -2 | tr '\n' ' ')"; fi
+if [ "$PRC" -eq 0 ] && same_bytes "$LG1/.gitignore" '.env\n.claude/vibeflow-role\n.claude/scripts/.vibeflow-sha256-*\n'; then ok "RV-GI-EOL (S4) : dernière ligne sans fin de ligne terminée avant la règle (.env intact)"; else ko "RV-GI-EOL : rc=$PRC, .gitignore = $(od -c "$LG1/.gitignore" | head -2 | tr '\n' ' ')"; fi
 
 mk_lab; LG2="$LAB"; printf 'a\r\n.claude/vibeflow-role\r\n' > "$LG2/.gitignore"; run_pose "$LG2"
 mk_lab; LG3="$LAB"; printf 'a\r\nb' > "$LG3/.gitignore"; run_pose "$LG3"
-if [ "$PRC" -eq 0 ] && same_bytes "$LG2/.gitignore" 'a\r\n.claude/vibeflow-role\r\n' && same_bytes "$LG3/.gitignore" 'a\r\nb\r\n.claude/vibeflow-role\r\n'; then ok "RV-GI-CRLF (S4) : règle CRLF reconnue sans doublon ; ajout en CRLF sur une dernière ligne sans fin de ligne"; else ko "RV-GI-CRLF : rc=$PRC, octets inattendus"; fi
+if [ "$PRC" -eq 0 ] && same_bytes "$LG2/.gitignore" 'a\r\n.claude/vibeflow-role\r\n.claude/scripts/.vibeflow-sha256-*\r\n' && same_bytes "$LG3/.gitignore" 'a\r\nb\r\n.claude/vibeflow-role\r\n.claude/scripts/.vibeflow-sha256-*\r\n'; then ok "RV-GI-CRLF (S4) : règle CRLF reconnue sans doublon ; ajout en CRLF sur une dernière ligne sans fin de ligne"; else ko "RV-GI-CRLF : rc=$PRC, octets inattendus"; fi
 
 mk_lab; LG4="$LAB"; printf 'x\n' > "$WORK/cible-gitignore"; ln -s "$WORK/cible-gitignore" "$LG4/.gitignore"; run_pose "$LG4"
 if [ "$PRC" -eq 1 ] && "$GREP" -qF 'lien symbolique' "$WORK/err" && same_bytes "$WORK/cible-gitignore" 'x\n' && [ "$(etat_pose "$LG4")" = "non" ]; then ok "RV-GI-LIEN (S5) : .gitignore lien symbolique → refus nommé, cible intacte, aucun poste posé"; else ko "RV-GI-LIEN : rc=$PRC pose=$(etat_pose "$LG4")"; fi
@@ -431,7 +432,7 @@ mk_lab; LGA="$LAB"
 { printf '.claude/vibeflow-role\n'; awk 'BEGIN { for (i = 0; i < 6000; i++) print "fichier-" i ".log" }'; } > "$LGA/.gitignore"
 TAILLE_GI="$(wc -c < "$LGA/.gitignore" | tr -d ' ')"; AVANT_GI="$(cksum < "$LGA/.gitignore")"
 run_pose "$LGA"; run_pose "$LGA"
-if [ "$PRC" -eq 0 ] && [ "$TAILLE_GI" -gt 71680 ] && [ "$("$GREP" -cxF '.claude/vibeflow-role' "$LGA/.gitignore")" -eq 1 ] && [ "$(cksum < "$LGA/.gitignore")" = "$AVANT_GI" ]; then ok "RV-GI-GROS (revue M1) : .gitignore de $TAILLE_GI octets, règle en tête → reconnue deux fois, aucun doublon, octets intacts"; else ko "RV-GI-GROS : rc=$PRC taille=$TAILLE_GI règles=$("$GREP" -cxF '.claude/vibeflow-role' "$LGA/.gitignore")"; fi
+if [ "$PRC" -eq 0 ] && [ "$TAILLE_GI" -gt 71680 ] && [ "$("$GREP" -cxF '.claude/vibeflow-role' "$LGA/.gitignore")" -eq 1 ] && [ "$(head -c "$TAILLE_GI" "$LGA/.gitignore" | cksum)" = "$AVANT_GI" ]; then ok "RV-GI-GROS (revue M1) : .gitignore de $TAILLE_GI octets, règle en tête → reconnue deux fois, aucun doublon, octets intacts"; else ko "RV-GI-GROS : rc=$PRC taille=$TAILLE_GI règles=$("$GREP" -cxF '.claude/vibeflow-role' "$LGA/.gitignore")"; fi
 
 # ---------------------------------------------------------------------------
 # Mutants (QUAL-01) — copie de _internal, l'original n'est jamais touché
@@ -569,7 +570,7 @@ kill_mutant() { # <id> <sonde> <attendu sur l'original> <libellé>
     ko "RV-$id : mutant survivant ou témoin rouge — $label — original « $orig » (voulu « $want »), mutant « $got »"
   fi
 }
-kill_mutant M1 probe_gitignore '.claude/vibeflow-role|' "appel de role_gitignore_rule neutralisé"
+kill_mutant M1 probe_gitignore '.claude/vibeflow-role|.claude/scripts/.vibeflow-sha256-*|' "appel de role_gitignore_rule neutralisé"
 kill_mutant M2 probe_wi_sans_poste 4 "condition de l'entrée .worktreeinclude retirée"
 kill_mutant M7 probe_dry_declare declare "drapeau VF_ROLE_WILL_EXIST remplacé par un test disque"
 kill_mutant M4 probe_refus 'rc=1 pose=non' "refus à la pose neutralisé"
@@ -580,9 +581,9 @@ REG_BAD="$REG_BAD_SAVE"
 kill_mutant M6 probe_avis liste "ligne de l'avis amputée d'un module"
 kill_mutant M8 probe_gate_repli 'rc=1 temoin=non pose=non' "repli sur la porte du dépôt rétabli"
 kill_mutant M9 probe_gi_dir 'rc=1 pose=non' "fichier de poste posé AVANT la règle d'ignorance"
-kill_mutant M10 probe_gi_eol '.env|.claude/vibeflow-role|' "fin de ligne manquante non terminée avant la règle"
+kill_mutant M10 probe_gi_eol '.env|.claude/vibeflow-role|.claude/scripts/.vibeflow-sha256-*|' "fin de ligne manquante non terminée avant la règle"
 kill_mutant M11 probe_gi_lien 'rc=1 pose=non' "refus du .gitignore lien symbolique retiré"
-kill_mutant M12 probe_gi_crlf 'lignes=2' "règle CRLF non reconnue (doublon)"
+kill_mutant M12 probe_gi_crlf 'lignes=3' "règle CRLF non reconnue (doublon)"
 kill_mutant M15 probe_gi_gros 'regles=1' "recherche de la règle remise derrière un tube (SIGPIPE au-delà de ~16 Kio)"
 kill_mutant M16 probe_gi_fifo 'rc=1 pose=non surv=0' "refus du .gitignore non régulier retiré (le FIFO est ouvert)"
 kill_mutant M17 probe_mode '-rw-r--r--' "chmod 644 du fichier de poste retiré"

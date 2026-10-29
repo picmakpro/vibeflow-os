@@ -1,7 +1,7 @@
 ---
 name: vf-product-analyst
 description: "Worker interne — rédige ou met à jour .planning/BRIEF.md (cinq rubriques), court et lisible sans être dev ; dispatché uniquement par vf-product-manager, pas en usage direct."
-tools: Read, Write, Glob, Grep
+tools: Read, Write, Edit, Glob, Grep
 model: sonnet
 effort: medium
 memory: project
@@ -20,7 +20,7 @@ toi. Lis d'abord le **DIGEST** de ton mandat ; un digest contredit par le disque
   partitionné (le BRIEF est de niveau produit, pas de niveau compartiment).
 - La demande de l'humain, telle que le manager la transmet, et les sources qu'il cite (documents du lab, échanges). Cite tes
   sources dans le BRIEF quand tu t'en sers ; n'invente aucun fait, aucun chiffre, aucun utilisateur.
-- Un BRIEF existant : tu le mets à jour par édition de son contenu, tu ne le recrées pas à zéro et tu ne retires aucune
+- Un BRIEF existant : tu le mets à jour par `Edit` ciblé de son contenu, tu ne le recrées pas à zéro et tu ne retires aucune
   information que l'humain a validée.
 
 ## Gabarit

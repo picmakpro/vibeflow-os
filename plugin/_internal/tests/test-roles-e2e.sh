@@ -253,7 +253,8 @@ invariants_sans_poste() {
   local lab="$1" v=0 e r
   : > "$WORK/inv.detail"
   [ ! -e "$lab/.claude/vibeflow-role" ] || { v=$((v+1)); echo "fichier de poste présent" >> "$WORK/inv.detail"; }
-  [ ! -e "$lab/.gitignore" ] || { v=$((v+1)); echo ".gitignore présent (scope project)" >> "$WORK/inv.detail"; }
+  # #166 (F6) : la règle d'état machine (empreintes des patches locaux) est posée en scope project ; rien d'autre.
+  if [ -e "$lab/.gitignore" ] && [ "$(awk '$0 != ".claude/scripts/.vibeflow-sha256-*"' "$lab/.gitignore" | wc -l | tr -d ' ')" -ne 0 ]; then v=$((v+1)); echo ".gitignore présent avec autre chose que la règle d'état machine (scope project)" >> "$WORK/inv.detail"; fi
   if [ -f "$lab/.worktreeinclude" ]; then
     [ "$(nlines "$lab/.worktreeinclude")" -eq 4 ] || { v=$((v+1)); echo ".worktreeinclude n'a pas 4 lignes" >> "$WORK/inv.detail"; }
     "$GREP" -q 'vibeflow-role' "$lab/.worktreeinclude" && { v=$((v+1)); echo "ligne de poste dans .worktreeinclude" >> "$WORK/inv.detail"; }
@@ -277,7 +278,7 @@ miss=0
 "$GREP" -q 'vibeflow-role' "$WORK/out.C" && { ko "E2E-C2-INV : le plan --dry-run sans poste mentionne le poste"; miss=1; }
 [ "$(nlines "$WORK/out.C")" -gt 0 ] || { ko "E2E-C2-INV : plan --dry-run vide (la vérification serait à vide)"; miss=1; }
 [ -z "$(ls -A "$LC_" | "$GREP" -v '^\.git$')" ] || { ko "E2E-C2-INV : le --dry-run a écrit dans le lab"; miss=1; }
-[ "$miss" -eq 0 ] && ok "E2E-C2-INV (P58-D-10, P58-D-19) : sans poste ni fichier de poste, ni .gitignore, .worktreeinclude à 4 lignes, hook muet, plan sans poste"
+[ "$miss" -eq 0 ] && ok "E2E-C2-INV (P58-D-10, P58-D-19) : sans poste ni fichier de poste, ni règle de poste dans .gitignore, .worktreeinclude à 4 lignes, hook muet, plan sans poste"
 
 V_A="$(invariants_sans_poste "$LA")"
 if [ "$V_A" -ge 2 ]; then
