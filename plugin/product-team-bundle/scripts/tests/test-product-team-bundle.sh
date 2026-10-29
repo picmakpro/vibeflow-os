@@ -255,7 +255,8 @@ detail-tracabilite|"tracabilite"
 mode-brief-seul|## Rubric /100 — mode BRIEF seul
 mode-brief-appel|En mode BRIEF seul, l'"'"'appel est
 mode-brief-sans-exigences|Aucun point n'"'"'est joué sur des exigences
-mode-brief-seuil|Seuil de passage, identique : score ≥ 80/100'
+mode-brief-seuil|Seuil de passage, identique : score ≥ 80/100
+methode-brief-seul|puis (sauf en mode BRIEF seul, étape 7) le PROJECT'
 MANAGER_ANCHORS='verrou|driver-lock.sh acquire
 digest|DIGEST
 human_needed|human_needed

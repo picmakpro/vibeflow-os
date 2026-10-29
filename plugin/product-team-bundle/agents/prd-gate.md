@@ -87,7 +87,7 @@ retour (le `detail` porte `complet`, `probleme_utilisateurs`, `valeur`, `contrai
 
 ## Méthode de scoring
 
-1. Lis le BRIEF en entier, puis le PROJECT, puis le REQUIREMENTS. Score chaque critère indépendamment ; pour chaque point
+1. Lis le BRIEF en entier, puis (sauf en mode BRIEF seul, étape 7) le PROJECT, puis le REQUIREMENTS. Score chaque critère indépendamment ; pour chaque point
    perdu, cite précisément le passage fautif (identifiant d'exigence, titre de rubrique), jamais une déduction vague.
 2. **BRIEF** : les cinq rubriques (Problème, Utilisateurs, Valeur, Contraintes, Hors périmètre) existent, ont un contenu réel et
    se lisent sans connaissance technique ; une solution technique déguisée en besoin fait perdre des points.
