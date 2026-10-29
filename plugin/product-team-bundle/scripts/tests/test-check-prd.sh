@@ -14,7 +14,8 @@
 # Cas revue-59 (2e relecture) : CPRD-COM-OUVERT, CPRD-BRIEF-OUVERT, CPRD-BRIEF-MENTIONS, CPRD-BRIEF-LEGITIME, CPRD-CHAMP,
 # CPRD-MARQUES, CPRD-CR, CPRD-COM-BLANC, CPRD-MOT-LEGITIME, CPRD-COCHEE, CPRD-HORS-SUJET, CPRD-5-SUR-1, CPRD-SOUS-PUCE-SUIVIE.
 # Classes génératives tour 3 (4e relecture) : CPRD-GEN-ENVELOPPES-*, CPRD-GEN-CHAMP-VIDE/SUIVI, CPRD-GEN-PONCTUATION-*, CPRD-GEN-TITRES-* ;
-# CPRD-IMBRICATION, CPRD-CODE-COMMENTAIRE, CPRD-CODE-MARQUEUR, CPRD-ILLISIBLE-000 (skip audible en root) ; mutants CPRD-MUT-117..159.
+# CPRD-IMBRICATION, CPRD-CODE-COMMENTAIRE, CPRD-CODE-MARQUEUR, CPRD-ILLISIBLE-000 (skip audible en root) ; mutants CPRD-MUT-117..159 (hors 137 et 138, jamais posés).
+# Correctifs du 2026-10-29 : CPRD-UNK-PRIORITE, CPRD-SEPARATEURS, CPRD-TIRET-COLLE, CPRD-LIBELLE-REPETE, CPRD-PUCES-NUMEROTEES, CPRD-GABARIT-SANS-CROCHETS ; mutants CPRD-MUT-160..181 (hors 161 et 168, jamais posés : vingt mutants).
 # Mutants CPRD-MUT-1..8 (QUAL-01), CPRD-MUT-9..26 (revue-59 F4 : un mutant par comportement documenté), CPRD-MUT-27..51 (2e relecture, hors 40 : un mutant par correctif) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide
 # (bash -n), rouge pour la raison attendue (code attendu/obtenu imprimé), original revérifié vert.
 set -uo pipefail
