@@ -33,7 +33,8 @@
 # est pas une), qui se ferme au titre suivant de niveau inférieur ou égal ; blocs de code et commentaires HTML
 # ignorés ; deux sections pour le même identifiant -> INDÉTERMINÉ. Les blocs `<details>` exacts (jalons livrés)
 # sont cachés comme le fait gsd-core : un `<details open>` reste visible, le premier `</details>` ferme, un
-# opener sans fermeture avant le suivant n'ouvre rien. Barrières de code CommonMark : ouverture = 3 accents graves
+# opener sans fermeture avant le suivant n'ouvre rien ; un bloc dont le `<summary>` porte un marqueur d'activité
+# (`in progress`, 🚧, 🔄, ACTIVE, WIP, STARTED : jalon actif que `roadmap get-phase` sert) reste VISIBLE. Barrières de code CommonMark : ouverture = 3 accents graves
 # ou tildes ou plus, indentation <= 3 espaces, sans accent grave dans l'info string d'une barrière d'accents
 # graves ; fermeture = même caractère, série au moins aussi longue, sans info string.
 #
@@ -45,7 +46,8 @@
 #   0 = validée : marqueur `validated`, ou marqueur absent.
 #   1 = proposée : marqueur `proposed`. Ni plan ni exécution de cette phase.
 #   3 = INDÉTERMINÉ (marqueur non constatable ; les consommateurs ne s'y arrêtent PAS, le marqueur absent valant
-#       validée, P60-D-02) : ROADMAP absent, phase introuvable, sections ou marqueurs multiples, valeur inconnue, bloc
+#       validée, P60-D-02 — SAUF si la ligne BILAN porte `marqueur=inconnu` ou `marqueur=multiple` : un marqueur
+#       existe et n'est pas lisible, les consommateurs s'arrêtent comme au code 5, P60-D-04 + P60-H-04) : ROADMAP absent, phase introuvable, sections ou marqueurs multiples, valeur inconnue, bloc
 #       de code ou commentaire non fermé, lab partitionné sans --ws, compartiment absent. Jamais un vert à vide.
 #   5 = entrée illisible, BRUYANTE : lien symbolique, non régulier (FIFO, dossier), illisible, taille non
 #       numérique, au-delà de 1048576 octets, analyse en échec. Refus AVANT lecture.
@@ -157,6 +159,8 @@ function fclose(s,   i, n) {
   if (n < flen) return 0
   return (substr(s, i + n + 1) ~ /^[ \t]*$/)
 }
+# Contenu d'un span de code en ligne : un `<!--` n'y ouvre aucun commentaire (marqueur \004, retiré en sortie
+# de strip_comments). Appariement CommonMark des séries d'accents graves ; sans fermeture, elle reste littérale.
 function neutral(s,   n, P, i, k, nr, K, A, NX, LAST, r, c, out) {
   n = split(s, P, "`")
   if (n < 3) return s
@@ -195,6 +199,25 @@ function strip_comments(s,   a, b) {
   gsub(/\004/, "", s)
   return s
 }
+# Jalon ACTIF (le bloc que gsd-core sert) : un bloc `<details>` dont le `<summary>` porte un marqueur d'activité
+# (STARTED, ACTIVE, WIP, `in progress`, 🚧, 🔄 : MILESTONE_ACTIVE_MARKER_PATTERN de gsd-core) reste visible. gsd-core ne
+# le cache que par `stripShippedMilestones`, mais `roadmap get-phase` cherche d'abord dans la fenêtre du jalon courant
+# (`extractCurrentMilestone`), qui garde ce bloc quand le jalon est résolu (STATE.md ou puce 🚧 du ROADMAP). Le gate ne
+# lit pas STATE.md : il sur-approxime (surensemble) — un bloc actif que gsd cacherait faute de jalon résolu est lu, et une
+# phase `proposed` y rend 1 (refus sûr) plutôt que 3 (non constatable, la boucle continue). Un `<summary>` sans marqueur
+# d'activité reste caché (README conductor, limite des `<details>`), tout comme un bloc ouvert et fermé sur une même ligne
+# (rien n'y est lisible en début de ligne). Texte du bloc : de l'opener jusqu'au `</details>`.
+function active_block(rl, w, b,   t, k, s) {
+  t = ""
+  for (k = 1; k <= pq_n; k++) t = t pq_not[k] "\n"
+  t = t substr(rl, 1, length(rl) - length(w) + b - 1)
+  t = tolower(t)
+  if (!match(t, /<summary[^>]*>[^<]*<\/summary>/)) return 0
+  s = substr(t, RSTART, RLENGTH); sub(/^<summary[^>]*>/, "", s); sub(/<\/summary>$/, "", s)
+  if (match(s, /(^|[^a-z0-9_])(started|active|wip)([^a-z0-9_]|$)/)) return 1
+  if (s ~ /in[ \t\n]+progress/) return 1
+  return (index(s, "🚧") > 0 || index(s, "🔄") > 0)
+}
 # Blocs `<details>` exacts (jalons livrés) : cachés comme le fait gsd-core (`stripShippedMilestones`), opener `<details>`
 # sans attribut, casse indifférente, le premier `</details>` ferme, pas d'imbrication, un opener sans fermeture avant le
 # suivant (ou la fin) n'ouvre rien. La décision d'une ligne peut dépendre des suivantes : les lignes en suspens sont
@@ -211,8 +234,13 @@ function feed(rl, i,   w, tw, vis, a, b, c, inq, k, full) {
     }
     c = index(tw, "<details>"); b = index(tw, "</details>")
     if (b && (!c || b < c)) {
-      for (k = 1; k <= pq_n - inq; k++) proc(pq_blk[k], pq_i[k])
-      vis = inq ? pq_blk[pq_n] : ""
+      if (!inq && active_block(rl, w, b)) {
+        flush_pending()
+        vis = substr(rl, 1, length(rl) - length(w) + b - 1)
+      } else {
+        for (k = 1; k <= pq_n - inq; k++) proc(pq_blk[k], pq_i[k])
+        vis = inq ? pq_blk[pq_n] : ""
+      }
       pend = 0; pq_n = 0; inq = 0
       w = substr(w, b + 10); tw = substr(tw, b + 10)
       continue

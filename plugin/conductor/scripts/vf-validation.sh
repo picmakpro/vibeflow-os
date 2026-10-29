@@ -11,7 +11,7 @@
 #   vf-validation.sh validate --architecture <f> [--override]
 #   vf-validation.sh -h | --help
 # `--x=<v>` admis. Exactement UNE cible. `--phase` : identifiant de la grammaire de gsd-core (`12`, `7.1`, `12A`, `AUTH`, `CK-03` ;
-# voir `check-phase-validation.sh`, mêmes règles, sections de jalons livrés `<details>` ignorées). Lab plat : ROADMAP du dossier de
+# voir `check-phase-validation.sh`, mêmes règles, sections de jalons livrés `<details>` ignorées, sauf `<summary>` à marqueur d'activité). Lab plat : ROADMAP du dossier de
 # planning du répertoire courant ; lab partitionné : `--ws <nom>` EXPLICITE et obligatoire (vf_ws_name_valid puis
 # vf_ws_dir_resolve, lien refusé), jamais déduit du compartiment actif. `--override` : `validate` seulement.
 #
@@ -220,6 +220,8 @@ function fclose(s,   i, n) {
   if (n < flen) return 0
   return (substr(s, i + n + 1) ~ /^[ \t]*$/)
 }
+# Contenu d'un span de code en ligne : un `<!--` n'y ouvre aucun commentaire (marqueur \004, retiré en sortie
+# de strip_comments). Appariement CommonMark des séries d'accents graves ; sans fermeture, elle reste littérale.
 function neutral(s,   n, P, i, k, nr, K, A, NX, LAST, r, c, out) {
   n = split(s, P, "`")
   if (n < 3) return s
@@ -258,6 +260,25 @@ function strip_comments(s,   a, b) {
   gsub(/\004/, "", s)
   return s
 }
+# Jalon ACTIF (le bloc que gsd-core sert) : un bloc `<details>` dont le `<summary>` porte un marqueur d'activité
+# (STARTED, ACTIVE, WIP, `in progress`, 🚧, 🔄 : MILESTONE_ACTIVE_MARKER_PATTERN de gsd-core) reste visible. gsd-core ne
+# le cache que par `stripShippedMilestones`, mais `roadmap get-phase` cherche d'abord dans la fenêtre du jalon courant
+# (`extractCurrentMilestone`), qui garde ce bloc quand le jalon est résolu (STATE.md ou puce 🚧 du ROADMAP). Le gate ne
+# lit pas STATE.md : il sur-approxime (surensemble) — un bloc actif que gsd cacherait faute de jalon résolu est lu, et une
+# phase `proposed` y rend 1 (refus sûr) plutôt que 3 (non constatable, la boucle continue). Un `<summary>` sans marqueur
+# d'activité reste caché (README conductor, limite des `<details>`), tout comme un bloc ouvert et fermé sur une même ligne
+# (rien n'y est lisible en début de ligne). Texte du bloc : de l'opener jusqu'au `</details>`.
+function active_block(rl, w, b,   t, k, s) {
+  t = ""
+  for (k = 1; k <= pq_n; k++) t = t pq_not[k] "\n"
+  t = t substr(rl, 1, length(rl) - length(w) + b - 1)
+  t = tolower(t)
+  if (!match(t, /<summary[^>]*>[^<]*<\/summary>/)) return 0
+  s = substr(t, RSTART, RLENGTH); sub(/^<summary[^>]*>/, "", s); sub(/<\/summary>$/, "", s)
+  if (match(s, /(^|[^a-z0-9_])(started|active|wip)([^a-z0-9_]|$)/)) return 1
+  if (s ~ /in[ \t\n]+progress/) return 1
+  return (index(s, "🚧") > 0 || index(s, "🔄") > 0)
+}
 # Blocs `<details>` exacts (jalons livrés) : cachés comme le fait gsd-core (`stripShippedMilestones`), opener `<details>`
 # sans attribut, casse indifférente, le premier `</details>` ferme, pas d'imbrication, un opener sans fermeture avant le
 # suivant (ou la fin) n'ouvre rien. La décision d'une ligne peut dépendre des suivantes : les lignes en suspens sont
@@ -274,8 +295,13 @@ function feed(rl, i,   w, tw, vis, a, b, c, inq, k, full) {
     }
     c = index(tw, "<details>"); b = index(tw, "</details>")
     if (b && (!c || b < c)) {
-      for (k = 1; k <= pq_n - inq; k++) proc(pq_blk[k], pq_i[k])
-      vis = inq ? pq_blk[pq_n] : ""
+      if (!inq && active_block(rl, w, b)) {
+        flush_pending()
+        vis = substr(rl, 1, length(rl) - length(w) + b - 1)
+      } else {
+        for (k = 1; k <= pq_n - inq; k++) proc(pq_blk[k], pq_i[k])
+        vis = inq ? pq_blk[pq_n] : ""
+      }
       pend = 0; pq_n = 0; inq = 0
       w = substr(w, b + 10); tw = substr(tw, b + 10)
       continue

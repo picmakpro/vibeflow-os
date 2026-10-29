@@ -212,9 +212,13 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   ROADMAP. Lecture seule, ne lit jamais le poste ; le ROADMAP n'est jamais réimprimé. Codes 0 (validée, ou
   marqueur absent : état de toutes les phases existantes), 1 (proposée), 3 (indéterminé : phase introuvable,
   marqueurs ou sections multiples, valeur inconnue : un marqueur non constatable, où les consommateurs ne
-  s'arrêtent pas), 5 (illisible, bruyant), 64 (usage). Identifiant de phase de la grammaire de gsd-core (`12`,
-  `7.1`, `12A`, `AUTH`, `CK-03`), jalons livrés `<details>` ignorés. Consommateurs :
-  `vf-coder` avant plan et exécution d'une étape, `vf-auto` avant sa boucle ; seul un `proposed` constaté (1) les arrête. Limite fail-open écrite : le mode
+  s'arrêtent pas, SAUF quand la ligne `BILAN` porte `marqueur=inconnu` ou `marqueur=multiple` : le marqueur
+  existe et n'est pas lisible, ils s'arrêtent comme au code 5), 5 (illisible, bruyant), 64 (usage). Identifiant
+  de phase de la grammaire de gsd-core (`12`, `7.1`, `12A`, `AUTH`, `CK-03`), jalons livrés `<details>` ignorés,
+  sauf ceux dont le `<summary>` porte un marqueur d'activité (`in progress`, 🚧, 🔄, ACTIVE, WIP, STARTED) : le
+  gate lit ces blocs (surensemble de ce que gsd-core sert, faute de lire STATE.md). Consommateurs :
+  `vf-coder` avant plan et exécution d'une étape, `vf-auto` avant sa boucle ; un `proposed` constaté (1) ou un
+  marqueur illisible (code 5, ou code 3 avec `marqueur=inconnu|multiple`) les arrête. Limite fail-open écrite : le mode
   « Regenerate all » d'`edit-phase` peut perdre le marqueur et une phase ajoutée à la main n'en a pas.
 - `check-architecture.sh` — gate de l'architecture avant découpage (Phase 60, ARCG-06, ARCG-07, P60-D-05,
   P60-D-06) : `--architecture <f>` constate la ligne d'état et les six rubriques minimales (contexte, choix
@@ -229,7 +233,8 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   64 (usage) ; lecture seule, l'engine est l'unique écrivain du fichier.
 - `vf-validation.sh` — SEUL écrivain de la ligne `**Validation:**` (Phase 60, P60-D-05, P60-D-10) : un
   verbe de script, jamais un skill. `propose --phase <N> [--ws <nom>]` pose `proposed` après le paragraphe
-  `**Goal:**` de la phase ; `validate` (`--phase <N> [--ws <nom>]` ou `--architecture <f>`) la bascule en
+  `**Goal:**` de la phase ; `validate` (`--phase <N> [--ws <nom>]` ou `--architecture <f>`, ce dernier borné à l'intérieur de la racine =
+  répertoire courant physique, refus 5 hors de celle-ci) la bascule en
   `validated (<poste>, <date>[, override])`. Le poste du validateur, lu par `vf-role.sh get` (seulement par
   `validate`), est tracé dans la valeur ; au poste `product` le verbe refuse (code 1) sauf `--override`, tracé
   lui aussi ; un poste illisible rend 5, jamais un repli sur `solo`. Jamais dégradé (`propose` sur une phase

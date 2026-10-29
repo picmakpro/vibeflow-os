@@ -10,9 +10,10 @@
 # Cas CPV-LIEN, CPV-FIFO, CPV-DOSSIER, CPV-GROS, CPV-ILLISIBLE (refus en 5 avant lecture), CPV-NOECHO, CPV-EXEC (sans
 # évaluation de chaîne, arguments hostiles inertes), CPV-RO, CPV-CODES (ensemble observé = {0, 1, 3, 5, 64}, jamais 2).
 # Cas CPV-FERME (fermeture de la section au titre suivant), CPV-NIVEAUX (niveaux de titre 2 à 4), CPV-FENCE-INDENTEE.
+# Cas CPV-DETAILS-ACTIF (jalon actif lu, jalon livré ou neutre caché), CPV-BILAN-ILLISIBLE (champ BILAN lu par les consommateurs).
 # Cas CPV-IDS, CPV-PREFIXE, CPV-ID-USAGE, CPV-DETAILS, CPV-FENCE-COMMONMARK, CPV-MARQUEUR-FORMES, CPV-CR-ISOLE, CPV-GSD-IDS (grammaire de --phase
 # de gsd-core, jalons livrés <details>, barrières CommonMark, survivants MK et MI de la revue).
-# Mutants CPV-MUT-1..36 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide (bash -n),
+# Mutants CPV-MUT-1..46 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide (bash -n),
 # rouge pour la raison attendue (code attendu/obtenu imprimé), original revérifié vert.
 # Les cas CPV-GSD-* (preuve que le marqueur ne change rien pour le moteur GSD) s'ajoutent en 60-03.
 set -uo pipefail
@@ -311,6 +312,49 @@ probe_details() {
   run --phase 3
   msg "un marqueur à l'intérieur d'un bloc <details> est caché comme le reste (gsd), attendu rc 0"; [ "$RC" -eq 0 ]
 }
+# === Jalon ACTIF en <details> : lu comme le sert gsd-core (surensemble), un jalon livré reste caché ===========
+# gsd-core (`roadmap get-phase`) cherche d'abord dans la fenêtre du jalon courant, qui garde le bloc du jalon actif ;
+# le gate lit tout bloc dont le <summary> porte un marqueur d'activité. Un summary livré ou neutre reste caché.
+probe_details_actif() {
+  local U='# Roadmap\n\n- 🚧 **v2.0 Next** - Phases 5-6 (in progress)\n\n<details><summary>%s</summary>\n\n### Phase 5: Active\n**Goal:** a\n**Validation:** proposed\n\n</details>\n'
+  local d n=0
+  for d in '🚧 v2.0 Next' '🔄 v2.0 Next' 'v2.0 Next in progress' 'v2.0 Next IN PROGRESS' 'v2.0 Next WIP' 'v2.0 Next ACTIVE'; do
+    n=$((n+1)); mklab "da1-$n" "$U" "$d"
+    run --phase 5
+    msg "<summary> « $d » : jalon actif, bloc lu, la phase 5 proposée rend 1 (gsd la sert)"
+    [ "$RC" -eq 1 ] || return 1
+  done
+  for d in '✅ v1.0 Old SHIPPED' 'v1.0 Old' 'Details'; do
+    n=$((n+1)); mklab "da2-$n" "$U" "$d"
+    run --phase 5
+    msg "<summary> « $d » : ni actif ni lu, bloc caché, phase 5 introuvable, attendu rc 3"
+    { [ "$RC" -eq 3 ] && has 'INDETERMINE phase introuvable'; } || return 1
+  done
+  mklab da3 '# Roadmap\n\n<details>\n<summary>🚧 v2.0 IN PROGRESS</summary>\n### Phase 5: Active\n**Goal:** a\n**Validation:** proposed</details>\n'
+  run --phase 5
+  msg "marqueur sur la ligne de fermeture d'un bloc actif : lu (texte avant </details>), attendu rc 1"; [ "$RC" -eq 1 ]
+}
+# === BILAN : marqueur présent mais illisible = champ machine que lisent les consommateurs (P60-D-04, P60-H-04) =====
+probe_bilan_illisible() {
+  local m n=0
+  for m in 'proposé' 'proposée' 'proposed.'; do
+    n=$((n+1)); mklab "bi1-$n" "$RM3" "**Validation:** $m"$'\n'
+    run --phase 2
+    msg "marqueur « $m » : rc 3 et BILAN marqueur=inconnu"
+    { [ "$RC" -eq 3 ] && last | command grep -q 'BILAN phase=2 marqueur=inconnu code=3$'; } || return 1
+  done
+  mklab bi2 "$RM3" $'**Validation:** proposed\n**Validation:** validated\n'
+  run --phase 2
+  msg "deux lignes de marqueur : rc 3 et BILAN marqueur=multiple"
+  { [ "$RC" -eq 3 ] && last | command grep -q 'BILAN phase=2 marqueur=multiple code=3$'; } || return 1
+  mklab bi3 "$RM3" ""
+  run --phase 9
+  msg "phase introuvable : rc 3 et BILAN marqueur=- (les consommateurs continuent)"
+  { [ "$RC" -eq 3 ] && last | command grep -q 'BILAN phase=9 marqueur=- code=3$'; } || return 1
+  run --phase 2
+  msg "marqueur absent : rc 0 et BILAN marqueur=absent (les consommateurs continuent)"
+  { [ "$RC" -eq 0 ] && last | command grep -q 'BILAN phase=2 marqueur=absent code=0$'; }
+}
 # === Barrières de code CommonMark : ouverture, fermeture ===========================================================
 probe_fence_commonmark() {
   mklab cm1 '# Roadmap\n\n### Phase 2: Deux\n``` `x` ```\n**Validation:** proposed\n'
@@ -350,6 +394,8 @@ case_ CPV-DETAILS probe_details
 case_ CPV-FENCE-COMMONMARK probe_fence_commonmark
 case_ CPV-MARQUEUR-FORMES probe_marqueur_formes
 case_ CPV-CR-ISOLE probe_cr_isole
+case_ CPV-DETAILS-ACTIF probe_details_actif
+case_ CPV-BILAN-ILLISIBLE probe_bilan_illisible
 
 # === Compartiment nommé par --ws, jamais déduit (P60-PL-02, DLWS-04) ===============================
 # mkws <lab> <compartiment> <format printf> [args] : lab partitionné, ROADMAP du compartiment ; positionne RUNDIR.
@@ -810,6 +856,25 @@ mutant CPV-MUT-35 'if (match(line, /^[ \t]*\*\*Validation(:\*\*|\*\*[ \t]*:)/))'
   "MK : la forme « **Validation** : proposed » n'est plus un marqueur (devient « absent »)"
 mutant CPV-MUT-36 'OUT_TXT=$(sed' "| tr '\\r' '\\n' " '' probe_cr_isole \
   "MI : le CR isolé n'est plus une fin de ligne (le marqueur est lu en queue de la ligne précédente)"
+
+mutant CPV-MUT-37 'return (index(s, "🚧") > 0' '(index(s, "🚧") > 0 || index(s, "🔄") > 0)' '0' probe_details_actif \
+  "FAIL : un <summary> à 🚧 ou 🔄 n'est plus un jalon actif (gsd le sert, le gate le cache : fail-open)"
+mutant CPV-MUT-38 'if (s ~ /in[ \t\n]+progress/) return 1' 'return 1' 'return 0' probe_details_actif \
+  "FAIL : « in progress » n'est plus un marqueur d'activité"
+mutant CPV-MUT-39 'if (match(s, /(^|[^a-z0-9_])(started|active|wip)' '(started|active|wip)' '(started|active)' probe_details_actif \
+  "FAIL : WIP n'est plus un marqueur d'activité"
+mutant CPV-MUT-40 'if (!inq && active_block(rl, w, b)) {' 'active_block(rl, w, b)' '1' probe_details_actif \
+  "FAIL : tout bloc <details> devient visible, les jalons livrés ou neutres aussi (le gate refuse à tort)"
+mutant CPV-MUT-41 'if (!inq && active_block(rl, w, b)) {' 'active_block(rl, w, b)' '0' probe_details_actif \
+  "FAIL : le jalon actif en <details> est caché comme un jalon livré (rc 3, la boucle continue : le défaut du tour 2)"
+mutant CPV-MUT-42 '        flush_pending()' 'flush_pending()' 'pend = 0' probe_details_actif \
+  "FAIL : les lignes d'un bloc actif sont rendues vides (cachées malgré la décision de les lire)"
+mutant CPV-MUT-43 '        vis = substr(rl, 1, length(rl) - length(w) + b - 1)' 'substr(rl, 1, length(rl) - length(w) + b - 1)' '""' probe_details_actif \
+  "FAIL : le texte qui précède </details> sur la ligne de fermeture d'un bloc actif est perdu"
+mutant CPV-MUT-45 '*) MARK=inconnu; indetermine' 'MARK=inconnu; ' '' probe_bilan_illisible \
+  "FAIL : la ligne BILAN ne dit plus marqueur=inconnu (les consommateurs ne distinguent plus l'illisible du non constatable)"
+mutant CPV-MUT-46 'elif [ "$NMARK" -gt 1 ]; then MARK=multiple;' 'MARK=multiple; ' '' probe_bilan_illisible \
+  "FAIL : la ligne BILAN ne dit plus marqueur=multiple"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]

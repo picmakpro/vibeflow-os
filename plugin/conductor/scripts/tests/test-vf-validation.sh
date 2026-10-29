@@ -452,6 +452,18 @@ probe_details_w() {
   msg "le titre qui précède un <details> sur sa ligne reste visible : attendu rc 0"; [ "$RC" -eq 0 ] || return 1
   LASTMSG="le marqueur n'est pas sous le Goal"; written_after "$(RMF)" '**Goal:** goal-t'
 }
+# Jalon ACTIF en <details> : le gate le lit, le verbe d'écriture voit la même phase (même grammaire, même jalon).
+probe_details_actif_w() {
+  mklab da1 '# Roadmap\n\n<details>\n<summary>🚧 v2.0 in progress</summary>\n\n### Phase 5: Active\n**Goal:** goal-actif\n\n</details>\n'
+  run propose --phase 5
+  msg "phase d'un jalon actif en <details> : propose attendu rc 0 (la même phase que lit le gate)"; [ "$RC" -eq 0 ] || return 1
+  LASTMSG="le marqueur n'est pas sous le Goal de la phase active"; written_after "$(RMF)" '**Goal:** goal-actif' || return 1
+  mklab da2 '# Roadmap\n\n<details>\n<summary>✅ v1.0 SHIPPED</summary>\n\n### Phase 5: Livree\n**Goal:** goal-livre\n\n</details>\n'
+  local a; a="$(sum "$(RMF)")"
+  run propose --phase 5
+  msg "phase d'un jalon livré : propose attendu rc 3 + phase introuvable"; { [ "$RC" -eq 3 ] && has 'INDETERMINE phase introuvable'; } || return 1
+  LASTMSG="le ROADMAP a changé malgré le refus"; [ "$(sum "$(RMF)")" = "$a" ]
+}
 probe_fence_w() {
   mklab fw1 '# Roadmap\n\n### Phase 2: Deux\n``` `x` ```\n**Goal:** goal-deux\n'
   run propose --phase 2
@@ -500,6 +512,7 @@ probe_planning_lien() {
 }
 case_ VFV-IDS probe_ids_w
 case_ VFV-DETAILS probe_details_w
+case_ VFV-DETAILS-ACTIF probe_details_actif_w
 case_ VFV-FENCE-COMMONMARK probe_fence_w
 case_ VFV-ARCHI-BORNE probe_arch_borne
 case_ VFV-PLANNING-LIEN probe_planning_lien
@@ -742,6 +755,11 @@ mutant VFV-MUT-21 'u = toupper(s)' 'toupper(s)' 's' probe_ids_w \
   "la casse des identifiants de phase devient significative"
 mutant VFV-MUT-22 'pq_blk[1] = vis substr(w, 1, a - 1)' 'substr(w, 1, a - 1)' '""' probe_details_w \
   "le texte qui précède un <details> sur sa ligne est perdu"
+
+mutant VFV-MUT-23 'if (!inq && active_block(rl, w, b)) {' 'active_block(rl, w, b)' '0' probe_details_actif_w \
+  "le jalon actif en <details> est caché comme un jalon livré"
+mutant VFV-MUT-24 'if (!inq && active_block(rl, w, b)) {' 'active_block(rl, w, b)' '1' probe_details_actif_w \
+  "tout bloc <details> devient visible, le jalon livré aussi"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]

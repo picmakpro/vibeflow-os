@@ -39,12 +39,15 @@ Limite observée, non documentée par Anthropic : elle peut changer avec une ver
 
 Avant `gsd-plan-phase` puis avant `gsd-execute-phase`, constate le marqueur de l'étape du mandat :
 `"$S"/check-phase-validation.sh --phase <N> [--ws <nom>]` (`$S` résolu comme en `mission-flow.md`
-§Résolution des scripts, `--ws` selon la section Compartiment ci-dessous). Code 0 : étape validée,
-le cycle continue. Code 1 : étape proposée, rends `"statut": "blocked"` avec un finding
+§Résolution des scripts, `--ws` selon la section Compartiment ci-dessous). Lis le code ET la ligne `BILAN`.
+Code 0 : étape validée, le cycle continue.
+Code 1 : étape proposée, rends `"statut": "blocked"` avec un finding
 `action: ask-user` qui nomme l'étape et le geste de validation d'un dev
-(`vf-validation.sh validate --phase <N>`), aucune brique lancée. Codes 3 et 64 : marqueur
-non constatable, une ligne au rapport le dit et le cycle continue. Code 5 : rends `human_needed` avec le code. Un mandat sans numéro d'étape ROADMAP (tâche courte, spec du crafter)
-n'appelle aucun contrôle de marqueur.
+(`vf-validation.sh validate --phase <N>`), aucune brique lancée.
+Codes 3 et 64 : marqueur non constatable (ROADMAP absent, phase introuvable), une ligne au rapport le dit et le cycle continue.
+Code 3 avec `marqueur=inconnu` ou `marqueur=multiple` sur la ligne `BILAN` : marqueur présent mais illisible, rends `human_needed` avec le code.
+Code 5 : rends `human_needed` avec le code.
+Un mandat sans numéro d'étape ROADMAP (tâche courte, spec du crafter) n'appelle aucun contrôle de marqueur.
 
 ## Le cycle (délégation)
 

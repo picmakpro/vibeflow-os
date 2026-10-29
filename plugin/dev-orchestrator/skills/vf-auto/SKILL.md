@@ -62,7 +62,9 @@ Avant le moteur direct, pour chaque étape ciblée N (celles de `roadmap analyze
 §Résolution des scripts). Code 0 : l'étape entre dans la boucle. Code 1 : étape proposée, en attente
 de la validation d'un dev (`vf-validation.sh validate --phase <N>`) ; le moteur direct
 ne démarre pas, une phrase le dit et une question propose de valider d'abord ou de réduire le
-périmètre. Codes 3 et 64 : marqueur non constatable, une ligne le dit et l'étape entre dans la boucle.
+périmètre. Lis le code ET la ligne `BILAN`.
+Codes 3 et 64 : marqueur non constatable, une ligne le dit et l'étape entre dans la boucle.
+Code 3 avec `marqueur=inconnu` ou `marqueur=multiple` sur la ligne `BILAN` : marqueur présent mais illisible, le dire et s'arrêter.
 Code 5 : le dire et s'arrêter. Limite : une étape ajoutée pendant la boucle de
 `gsd-autonomous` n'est pas interceptée (contrôle consultatif) ; le chemin équipe
 est gardé par `vf-coder`.
