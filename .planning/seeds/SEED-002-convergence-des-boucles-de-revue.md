@@ -2,7 +2,7 @@
 id: SEED-002
 status: dormant
 planted: 2026-10-29
-planted_during: equipe-produit-v1.0 en clôture (Phase 59 exécutée non mergée, jalon V2 à créer — `.planning/notes/2026-10-29-HANDOFF-jalon-v2.md`)
+planted_during: equipe-produit-v1.0 en clôture (Phase 59 exécutée non mergée, jalon V2 à créer — note de handoff du 2026-10-29, non versionnée)
 trigger_when: "création du jalon V2 (`/gsd-new-milestone`, nom proposé `vibeflow-v2.0`) — à proposer comme phase de ce jalon, après la Phase 1 vf-signal"
 scope: phase
 source_spec: docs/research/2026-10-29-elephant-goldfish-model.md
@@ -30,6 +30,11 @@ EGM (Google) a tranché ces trois points en PR #168 (`skills/egm-review-loop/SKI
 liste de points réglés jamais rouverts, point corrigé rouvert s'il réapparaît, tour propre = aucun
 bloquant ni majeur non réglé (relecteur non exécuté = tour sale), arrêt sur deux tours propres
 consécutifs, plafond 5, churn → arrêt et question à l'humain. Étude : `source_spec`.
+
+AIDD arrive au même principe par un autre chemin (`plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md`) :
+« a finding already acted on is never routed twice », et, une fois la revue verte, seul un point
+qui contredit le contrat rouvre une zone. Il y ajoute un temps distinct : le checker conteste que
+le résultat est fiable et sert l'utilisateur. Étude : `docs/research/2026-10-29-ai-driven-dev-framework.md`.
 
 ## When to Surface
 
