@@ -3932,6 +3932,90 @@ else
 fi
 rm -f "$AG"/*.md
 
+# === T116-T120 (#52) : cle vf-optional-agents — agents d'un module optionnel =====================
+# Fixture lab SANS vf-test-orchestrator.md. Rouge sur la base cbe97fb1 : la cle y est un champ inconnu
+# et n'exempte rien (T117, T118 ne verdissent pas).
+mk_t116() { # <fichier> <ligne-optionnelle-ou-vide> [allowlist]
+  {
+    printf -- '---\nname: %s\ndescription: Manager de test. Dispatche un agent d un module optionnel.\n' "$(basename "$1" .md)"
+    printf -- 'tools: Read, SendMessage, %s\ndisallowedTools: Write, Edit\nmodel: sonnet\neffort: high\nmemory: project\n' "${3:-Agent(vf-test-orchestrator)}"
+    [ -n "$2" ] && printf -- '%s\n' "$2"
+    printf -- '---\ncorps\n'
+  } > "$1"
+}
+rm -rf "${AG:?}"/*
+T116_REG="$WORK/t116-registry"; mkdir -p "$T116_REG"
+mk_t116 "$AG/mgr-t116.md" ""
+OUT="$(run_check 2>&1)"; RC=$?
+W_SANS="$(echo "$OUT" | grep -c "nom d'agent non resolu 'vf-test-orchestrator'")"
+if [ "$RC" -eq 0 ] && [ "$W_SANS" -ge 1 ]; then
+  ok "T116 sans la cle : avertissement « nom d'agent non resolu 'vf-test-orchestrator' » conserve (garde existante)"
+else
+  ko "T116 (rc=$RC, lignes=$W_SANS) : $OUT"
+fi
+N_SANS="$(echo "$OUT" | grep -Eo '[0-9]+ warning' | head -1 | grep -Eo '^[0-9]+')"
+
+mk_t116 "$AG/mgr-t116.md" "vf-optional-agents: vf-test-orchestrator"
+OUT="$(run_check 2>&1)"; RC=$?
+N_AVEC="$(echo "$OUT" | grep -Eo '[0-9]+ warning' | head -1 | grep -Eo '^[0-9]+')"
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "non resolu" && ! echo "$OUT" | grep -q "champ inconnu" \
+   && [ -n "$N_SANS" ] && [ -n "$N_AVEC" ] && [ "$N_AVEC" -eq $((N_SANS - 1)) ]; then
+  ok "T117 avec la cle : plus de « non resolu », ni champ inconnu, avertissements $N_SANS -> $N_AVEC (-1)"
+else
+  ko "T117 (rc=$RC, avertissements $N_SANS -> $N_AVEC) : $OUT"
+fi
+
+# Forme liste YAML (comme vf-requires).
+mk_t116 "$AG/mgr-t116-liste.md" $'vf-optional-agents:\n  - vf-test-orchestrator'
+rm -f "$AG/mgr-t116.md"
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "non resolu" && ! echo "$OUT" | grep -q "champ inconnu"; then
+  ok "T117b cle en liste YAML : meme effet que la chaine"
+else
+  ko "T117b (rc=$RC) : $OUT"
+fi
+rm -f "$AG/mgr-t116-liste.md"
+
+# T118 — la cle n'exempte jamais un nom inventé sous --resolve-agents=strict (monde ferme).
+mk_t116 "$AG/mgr-t118.md" "vf-optional-agents: vf-agent-invente" "Agent(vf-agent-invente)"
+OUT="$(run_check --resolve-agents=strict --agent-registry-dir="$T116_REG" 2>&1)"; RC=$?
+if [ "$RC" -ne 0 ] && echo "$OUT" | grep -q "non resolu 'vf-agent-invente'"; then
+  ok "T118 nom inventé + cle + --resolve-agents=strict -> rc=$RC, erreur « non resolu » (la cle n'exempte pas)"
+else
+  ko "T118 (rc=$RC) : $OUT"
+fi
+# Jumeau : le nom reel resolu par le registre (module optionnel) passe en strict.
+cp "$AG/mgr-t118.md" "$WORK/t118.bak"; rm -f "$AG/mgr-t118.md"
+printf -- '---\nname: vf-test-orchestrator\ndescription: Agent de test. Worker interne, dispatche par le manager de test.\nmodel: sonnet\neffort: low\nmemory: project\nvf-internal: true\n---\ncorps\n' > "$T116_REG/vf-test-orchestrator.md"
+mk_t116 "$AG/mgr-t118b.md" "vf-optional-agents: vf-test-orchestrator"
+OUT="$(run_check --resolve-agents=strict --agent-registry-dir="$T116_REG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "non resolu"; then
+  ok "T118b nom reel resolu via le registre + cle + --resolve-agents=strict -> rc=0"
+else
+  ko "T118b (rc=$RC) : $OUT"
+fi
+rm -f "$AG/mgr-t118b.md" "$T116_REG/vf-test-orchestrator.md"
+
+# T119 — cle citant un nom absent de l'allowlist : avertissement « cle inutile » nommant le nom.
+mk_t116 "$AG/mgr-t119.md" "vf-optional-agents: vf-test-orchestrator, vf-fantome" "Agent(vf-test-orchestrator)"
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "cle inutile, 'vf-fantome'" && ! echo "$OUT" | grep -q "cle inutile, 'vf-test-orchestrator'"; then
+  ok "T119 nom absent de l'allowlist -> avertissement « cle inutile » nommant vf-fantome (rc=0)"
+else
+  ko "T119 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/mgr-t119.md"
+
+# T120 — Task(...) alias legacy : meme exemption ; --strict (champs) n'echoue pas sur la cle.
+mk_t116 "$AG/mgr-t120.md" "vf-optional-agents: vf-test-orchestrator" "Task(vf-test-orchestrator)"
+OUT="$(run_check --strict 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "non resolu" && ! echo "$OUT" | grep -q "cle inutile"; then
+  ok "T120 Task(...) + cle sous --strict -> rc=0, aucun « non resolu », aucune « cle inutile »"
+else
+  ko "T120 (rc=$RC) : $OUT"
+fi
+rm -rf "${AG:?}"/*
+
 # ---------- MUT-M1 : mutant sur la ligne d'appel de valider_mcp_tools (appel DIRECT, S6) --------
 # Patron distinct des 16 appels existants (Phase 42, substitution de commande) : ceux-là perdent
 # le comptage d'un refus dans le sous-shell créé par $(...). L'appel de MUT-M1 est DIRECT, sortie

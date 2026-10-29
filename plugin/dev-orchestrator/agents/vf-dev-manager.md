@@ -5,6 +5,7 @@ tools: Read, Write, Bash, Glob, Grep, Skill, AskUserQuestion, SendMessage, Agent
 model: opus
 effort: high
 memory: project
+vf-optional-agents: vf-test-orchestrator
 ---
 
 # Agent : vf-dev-manager
