@@ -17,7 +17,7 @@
   BUDG/WKTR/SKIL/AGTS + QUAL-01 transverse). Recherche : `.planning/research/SUMMARY.md` +
   `ARCHITECTURE.md` (ordre de construction dicté par les fichiers).
 - 📋 **equipe-produit-v1.0** — « l'équipe produit : rôles humains, amont produit, état partagé » — Phases
-  57-63 — **inscrit 2026-10-08**, prochain jalon exécuté (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08). Germe de `SEED-001` : ses trois déclencheurs
+  57-65 — **inscrit 2026-10-08**, prochain jalon exécuté (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08). Germe de `SEED-001` : ses trois déclencheurs
   sont réunis à la clôture de `fiabilite-v1.0`. Spec : `docs/superpowers/specs/2026-09-16-equipe-produit-bmad-design.md`.
 - 📋 **ecc-inspiration-v1.0** — « ce qu'on emprunte à ECC » — Phases 51-56 — **inscrit
   2026-09-25** — six emprunts mesurés au dépôt `affaan-m/ECC` (snapshot avant compaction,
@@ -111,6 +111,8 @@
 - [ ] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 62: Décision sur l'approche plateforme, sur preuve (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 63: Règles produit empruntées à AIDD (inscrite 2026-10-29, jalon equipe-produit-v1.0)
+- [ ] Phase 64: Contrôles après exécution branchés en nœuds du plan de bataille (inscrite 2026-10-29, jalon equipe-produit-v1.0)
+- [ ] Phase 65: Révision des règles qui brident l'efficacité des agents (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
 
@@ -483,7 +485,7 @@ Plans:
 
 - [ ] TBD (run /gsd-plan-phase 56 to break down)
 
-## 📋 Milestone equipe-produit-v1.0 — « l'équipe produit » (Phases 57-63)
+## 📋 Milestone equipe-produit-v1.0 — « l'équipe produit » (Phases 57-65)
 
 **Milestone Goal :** VibeFlow sert une **équipe** et plus seulement un humain qui a tous les modules. Il apporte des
 rôles de poste (solo par défaut, product, dev), des artefacts amont lisibles par un non-dev, et un état partagé entre
@@ -497,7 +499,9 @@ dont les douze arbitrages A-01 à A-12 du 2026-09-16 tiennent, sauf A-09 (révis
 d'inscription et place du verrou : arbitrage Samuel, AskUserQuestion session principale, 2026-10-08. Même forme qu'ECC et `gouvernance-labs-v1.0` : section distincte de la
 ROADMAP plate, **sans `gsd-new-milestone`**. Les numéros 57 à 62 sont posés à la main (42-50 : compartiment
 `gouvernance` ; 51-56 : ECC). La Phase 63 est ajoutée le 2026-10-29 par `gsd-phase` (arbitrage Samuel, AskUserQuestion
-session principale, 2026-10-29 : « phase dans le jalon actuel », règles AIDD dans notre vocabulaire).
+session principale, 2026-10-29 : « phase dans le jalon actuel », règles AIDD dans notre vocabulaire). Les Phases
+64 et 65 sont ajoutées le même jour par `gsd-phase` (arbitrage Samuel, message session principale, 2026-10-29) ; elles
+portent sur le flux des agents de dev, pas sur l'équipe produit, et peuvent glisser au jalon suivant à la clôture.
 
 **Révision d'A-09, tracée.** La SEED supposait le verrou de driver par compartiment livré « avant, dans D-02 ». La
 mission D-02 du 2026-09-23 n'a fait que la partition. Mesuré le 2026-10-08 : `driver-lock.sh` ne connaît aucun
@@ -677,3 +681,29 @@ Plans:
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 63 to break down)
+
+### Phase 64: Contrôles après exécution branchés en nœuds du plan de bataille
+
+**Goal:** Les contrôles que GSD promet après exécution tournent enfin. Mesure du 2026-10-29 : 15 VALIDATION sur 20 non conformes (`nyquist_compliant: false`), 0 LEARNINGS (que le planificateur lit pourtant), 0 UAT, 13 VERIFICATION `human_needed` ou `gaps_found` jamais reprises — les hooks internes du workflow GSD qui devaient les déclencher ne sont jamais observés. Chaque contrôle devient un **nœud explicite du plan de bataille** de `vf-dev-manager`, déclenché par un fait constatable sur disque, jamais par l'humain : (1) `gsd-extract-learnings` si VERIFICATION `passed` et pas de LEARNINGS ; (2) `gsd-audit-uat` en début de mission s'il reste une VERIFICATION ou une UAT ouverte ; (3) `gsd-assumptions-analyzer` en éclaireur avant un cadrage sans CONTEXT.md ; (4) `gsd-secure-phase` par `vf-auditer` (outil `Skill` à lui donner) quand le PLAN porte un registre de menaces ; (5) `gsd-validate-phase` en mandat `vf-coder` si `nyquist_compliant: false` ; (7) `gsd-verify-work` **proposé**, jamais imposé, par le manager si VERIFICATION `human_needed` : l'humain peut le **contourner** d'un geste (recette jugée redondante ou trop coûteuse à tester), et ce contournement est un statut à part entière — tracé dans la VERIFICATION (qui, quand, motif), compté comme clos par `audit-uat`, par la ROADMAP et par les gates de suivi — pour qu'une recette refusée ne reste jamais une dette ouverte dans la doc ni dans le suivi de projet (arbitrage Samuel, message session principale, 2026-10-29). Les juges en lecture seule de l'étage de vérification partent en un seul message.
+**Requirements**: TBD — famille réservée au cadrage.
+**Depends on:** aucune phase de ce jalon.
+**Sources:** `docs/research/2026-10-29-etude-gsd-skills-agents-non-utilises.md` (classement complet, déclencheurs, tailles) ; `docs/research/2026-10-29-etude-cout-gsd.md` ; `plugin/dev-orchestrator/references/mission-flow.md`, `mission-contracts.md`.
+**Hors périmètre :** les correcteurs automatiques (`gsd-audit-fix`, `gsd-code-fixer` : ADR-031) ; les briques classées 6, 8, 9, 10 et suivantes du rapport (inscriptibles ensuite) ; la réécriture de ces skills dans VibeFlow (étape E3 de SEED-003) — ici on les branche, on ne les réécrit pas.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 64 to break down)
+
+### Phase 65: Révision des règles qui brident l'efficacité des agents
+
+**Goal:** Les règles de VibeFlow qui limitent l'efficacité des agents sans contrepartie mesurée sont revues sur mesure : (a) la garde `check-ajout-retrait.sh` (SOBR-05) ne surveille plus que la documentation de méthode (ADR, CLAUDE.md, règles), plus les SKILL.md, scripts de garde et mémoires d'agent ; (b) le plafond de 2 agents en parallèle, posé après le crash du 2026-10-22 sans mesure, est remplacé par une valeur mesurée (mémoire consommée par agent sur ce poste), cohérente avec `max_concurrent_agents` ; (c) la « voie unique » de `vf-coder` ne s'applique plus aux juges en lecture seule, qui n'ont aucun étage à sauter ; (d) `vf-auditer` est dispatché sur un fait constatable (`mission-flow.md` §3), plus au jugement ; (e) les déclencheurs des briques dormantes sont réécrits en conditions machine ; (f) la profondeur de dispatch (limite du harness mesurée le 2026-09-17) est re-mesurée sur la version courante de Claude Code et les flux qui la heurtent (`gsd-debug` lancé depuis `vf-coder`) sont redessinés.
+**Requirements**: TBD — famille réservée au cadrage.
+**Depends on:** aucune phase de ce jalon ; à jouer avant ou avec la 64 si le parallélisme de l'étage de vérification en dépend.
+**Sources:** `docs/research/2026-10-29-etude-gsd-skills-agents-non-utilises.md` § règles qui brident ; `plugin/conductor/scripts/check-ajout-retrait.sh` ; mémoires « parallélisme plafonné à 2 » et « profondeur de spawn limitée à 2 ».
+**Hors périmètre :** lever une limite technique du harness par décision ; toucher ADR-031 ou le ship gaté humain.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 65 to break down)

@@ -9,11 +9,11 @@ last_activity: 2026-10-22
 last_activity_desc: Phase 58 passée avec 2 overrides (critère 6 et recette installeur, Samuel 2026-10-22), branche rebasée sur v2.70.1 — next : PR + release v2.71.0, puis Phase 59
 state_head: 45ee80db
 progress:
-  total_phases: 7
+  total_phases: 9
   completed_phases: 2
   total_plans: 28
   completed_plans: 28
-milestone_name: « l'équipe produit » — Phases 57-63 —
+milestone_name: « l'équipe produit » — Phases 57-65 —
 stopped_at: "Phase 58 passée avec 2 overrides (dette : check-livraison-58.sh clients, recette /vibeflow-install) — next : PR + release v2.71.0, puis cadrage Phase 59"
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — EXÉCUTÉE (12/12 plans), VÉRIFIÉE human_needed 13/14 (critère 6 en attente de la liste de clients), puis PR
-Jalon courant : `equipe-produit-v1.0` (Phases 57-63, inscrit 2026-10-08) ; 2 phases sur 7 closes. `fiabilite-v1.0` est CLOS
+Jalon courant : `equipe-produit-v1.0` (Phases 57-65, inscrit 2026-10-08) ; 2 phases sur 9 closes. `fiabilite-v1.0` est CLOS
 depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
 `.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).
 
@@ -64,6 +64,7 @@ Last activity: 2026-10-20 — Phase 58 vérifiée human_needed 13/14
 ### Roadmap Evolution
 
 - Phase 63 added (2026-10-29) : Règles produit empruntées à AIDD — arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 (phase dans le jalon actuel ; règles AIDD dans notre vocabulaire). Même jour : sortie de GSD et de superpowers, trajectoire par étapes retenue par message session principale (E1 superpowers, E2 épinglage gsd-core, E3 remplacement verbe par verbe conditionnée à l'étude de coût E0) → graine `SEED-003`, pas de phase.
+- Phases 64 et 65 added (2026-10-29) : contrôles après exécution branchés en nœuds du plan de bataille ; révision des règles qui brident l'efficacité des agents — arbitrage Samuel, message session principale, 2026-10-29, sur l'étude `docs/research/2026-10-29-etude-gsd-skills-agents-non-utilises.md`.
 
 ### Pending Todos
 
