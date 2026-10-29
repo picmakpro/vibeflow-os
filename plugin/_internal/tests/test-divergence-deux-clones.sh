@@ -20,6 +20,7 @@
 #                        et conforme avant la divergence ; champ 2 du journal = post-rewrite
 #   D2C-CONFORME         pull sans divergence : le hook joue le controle (sortie relayee), se tait, aucune
 #                        ligne de journal
+#   D2C-CONFLIT          fusion EN CONFLIT conclue a la main (commit --no-edit, merge --continue) : post-commit seul
 #   D2C-WORKTREE         fusion divergente DANS un worktree lie : inspecte = le worktree, journal du dossier
 #                        git commun, HEAD du worktree (P61-D-04)
 #   D2C-PIEGE            cinq check-divergence.sh / vf-divergence-hook.sh pieges poses par la branche
@@ -436,6 +437,41 @@ else
   [ ! -e "$(jfile "$WORK/cf-2")" ] || { ko "D2C-CONFORME : le journal existe alors qu'aucune divergence n'a ete vue"; miss=1; }
 fi
 [ "$miss" -eq 0 ] && ok "D2C-CONFORME : pull sans divergence -> controle declenche (temoin de declenchement : 1 invocation) et stderr vide, aucune ligne de journal"
+
+# ---------------------------------------------------------------------------
+# D2C-CONFLIT — fusion EN CONFLIT (les deux clones ajoutent une phase 2 en fin de ROADMAP) conclue a la main : git ne
+# joue alors que post-commit, jamais post-merge (majeur 1 du juge frais). Les deux issues : `git commit --no-edit`
+# puis `git merge --continue`.
+# ---------------------------------------------------------------------------
+miss=0
+if ! monde cf2 "$WORK/cache" product dev; then
+  ko "D2C-CONFLIT pre-condition : $MONDE_WHY"; miss=1
+else
+  for v in commit continue; do
+    [ "$v" = commit ] && { A="$WORK/cf2-1"; B="$WORK/cf2-2"; } || { A="$WORK/cf2-2"; B="$WORK/cf2-1"; }
+    phase_poussee "$B" 2 "x$v" || :
+    mkdir -p "$A/.planning/workstreams/w1/phases/02-y$v"
+    printf 'phase 2 y\n' > "$A/.planning/workstreams/w1/phases/02-y$v/02-CONTEXT.md"
+    printf '### Phase 2: y%s\n' "$v" >> "$A/.planning/workstreams/w1/ROADMAP.md"
+    git -C "$A" add -- .planning; git -C "$A" commit -q -m "phase 2 y$v"
+    AV="$(jdata "$A")"
+    git -C "$A" pull -q --no-rebase --no-edit > "$WORK/cfl.out" 2> "$WORK/cfl.err"; RC=$?
+    [ "$RC" -ne 0 ] || { ko "D2C-CONFLIT ($v) pre-condition : le pull aurait du tomber en conflit"; miss=1; }
+    [ "$(jdata "$A")" -eq "$AV" ] || { ko "D2C-CONFLIT ($v) : cri avant la conclusion de la fusion"; miss=1; }
+    # Resolution : les deux en-tetes sont gardes.
+    { printf '### Phase 1: a\n'; git -C "$A" show "origin/main:.planning/workstreams/w1/ROADMAP.md" | awk 'NR > 1'; printf '### Phase 2: y%s\n' "$v"; } > "$A/.planning/workstreams/w1/ROADMAP.md"
+    git -C "$A" add -- .planning
+    if [ "$v" = commit ]; then git -C "$A" commit -q --no-edit > "$WORK/cfl.out" 2> "$WORK/cfl.err"; RC=$?
+    else GIT_EDITOR=true git -C "$A" merge --continue > "$WORK/cfl.out" 2> "$WORK/cfl.err"; RC=$?; fi
+    [ "$RC" -eq 0 ] || { ko "D2C-CONFLIT ($v) : la conclusion de la fusion a echoue (rc=$RC) — $(tail -3 "$WORK/cfl.err")"; miss=1; }
+    sonde_cri "$A" "$WORK/cfl.err" "$AV" || { ko "D2C-CONFLIT ($v) : sonde rouge — $SONDE_WHY"; miss=1; }
+    [ "$(field "$(jfile "$A")" $((AV + 2)) 2)" = "post-commit" ] || { ko "D2C-CONFLIT ($v) : champ 2 du journal ≠ post-commit"; miss=1; }
+    # Le monde suivant repart de l'etat du monde : on resynchronise l'autre clone.
+    git -C "$A" push -q origin main 2>/dev/null || :
+    git -C "$B" pull -q --no-rebase --no-edit >/dev/null 2>&1 || :
+  done
+fi
+[ "$miss" -eq 0 ] && ok "D2C-CONFLIT (majeur 1) : fusion en conflit conclue par commit --no-edit puis par merge --continue -> post-commit crie et journalise (champ 2 = post-commit, HEAD du clone)"
 
 # ---------------------------------------------------------------------------
 # D2C-WORKTREE — fusion divergente faite DANS un worktree lie : repertoire inspecte = le worktree,

@@ -95,9 +95,9 @@ crie plus « STATE.md absent » sur un dépôt partitionné, et les exigences se
 
 ### Le filet armé aux postes product et dev
 
-À l'installation d'un poste `product` ou `dev`, l'installeur pose dans **ton clone** deux hooks git,
-`post-merge` et `post-rewrite`. Ils rejouent le contrôle après chaque `git pull`, `git merge` ou
-`git pull --rebase`. Au poste `solo`, rien n'est posé.
+À l'installation d'un poste `product` ou `dev`, l'installeur pose dans **ton clone** trois hooks git,
+`post-merge`, `post-rewrite` et `post-commit`. Ils rejouent le contrôle après chaque `git pull`, `git merge` ou
+`git pull --rebase`, et après une fusion en conflit que tu conclus à la main (`git commit`, `git merge --continue`). Au poste `solo`, rien n'est posé.
 
 - **Il crie sur une divergence**, mais la fusion n'est pas annulée : un hook ne peut pas la défaire.
   Quand tout est conforme, il ne dit rien de plus. Quand il ne peut pas juger, il dit « non

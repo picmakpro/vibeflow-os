@@ -260,11 +260,11 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   suivante) posé par l'installeur ; jamais au poste `solo`. Doctrine : `dev-orchestrator/references/workstreams.md` §4.
 - `vf-divergence-hook.sh` — filet de divergence ARMÉ dans un clone de lab d'équipe (Phase 61, spec
   équipe-produit §5.3, COLB-01 à COLB-07). Verbes : `arm [--path <dir>] [--check|--refresh]`, `disarm`,
-  `status`, `run --hook <post-merge|post-rewrite>`. L'installeur l'arme aux postes `product` et `dev`
+  `status`, `run --hook <post-merge|post-rewrite|post-commit>`. L'installeur l'arme aux postes `product` et `dev`
   (`install`, verbe `role`), le retire au poste `solo`, à `uninstall --all` et sous
   `VF_DIVERGENCE_HOOK=off` (sortie explicite, lue à chaque install), et le rafraîchit à `update --all`
   (le chemin du cache versionné change, un clone non armé n'est JAMAIS armé par une mise à jour). Il
-  pose deux hooks statiques `post-merge` et `post-rewrite` dans le dossier de hooks réel du clone
+  pose trois hooks statiques `post-merge`, `post-rewrite` et `post-commit` dans le dossier de hooks réel du clone
   (`git rev-parse --git-path hooks`, worktrees compris), jamais par `core.hooksPath` ; un hook
   tiers, un `core.hooksPath` configuré, un dossier de hooks dont le chemin réel sort du dossier git du dépôt
   (`.git/hooks` lien vers l'arbre ou un dossier partagé) ou un lab qui n'est pas la racine du dépôt sont REFUSÉS
@@ -273,12 +273,20 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   inspecte le worktree courant ; chemin disparu → `NON VERIFIABLE` audible, jamais un faux conforme.
   Chaque exécution non silencieuse (divergence, non vérifiable) ajoute une ligne à un journal non
   versionné `<git-common-dir>/vf-divergence/journal.tsv` (sept champs tabulés, survit au désarmement).
-  Codes de `run` : 0 silence, 1 divergence, 2 non vérifiable, 64 usage. Limites mesurées (git 2.50.1) :
+  Codes de `run` : 0 silence, 1 divergence, 2 non vérifiable, 64 usage. Un troisième hook, `post-commit`,
+  ne juge que si HEAD est un commit de fusion : c'est le seul qui voit une fusion EN CONFLIT conclue à la main
+  (`git commit --no-edit`, `git merge --continue`), que git ne fait jamais passer par `post-merge`. La « ligne à
+  ajouter à la main » d'un hook tiers tolère l'absence du script (`[ -f '<script>' ] && bash '<script>' run … || true`),
+  donc un hook tiers sous `set -e` ne casse pas quand le cache versionné est purgé ; `arm --refresh` et `update --all`
+  signalent une telle ligne périmée (`REFUS ligne-perimee`, nouvelle ligne imprimée, hook tiers jamais réécrit) ;
+  `status` dit `NON-EXECUTABLE` (code 1) pour notre hook sans bit d'exécution. Limites mesurées (git 2.50.1) :
   `git pull --rebase` avec commit local ne passe que par `post-rewrite` (doublé exprès) ; `reset --hard`,
   `switch`/`checkout`, `cherry-pick` et un `rebase` qui ne réécrit aucun commit ne déclenchent aucun
-  hook ; une fusion faite sur la forge n'est vue qu'au `git pull` local suivant. Suites : `test-vf-divergence-hook.sh`
-  (37 cas, 12 mutants), `test-vibeflow-update-divergence.sh` (installeur, 10 mutants) et la preuve à deux
-  clones `test-divergence-deux-clones.sh` (16 cas, témoins rouges) sous `plugin/_internal/tests/`.
+  hook ; une fusion faite sur la forge n'est vue qu'au `git pull` local suivant ; **lab non partitionné** (aucun
+  `.planning/workstreams/`) : filet inerte, `check-divergence` rend 3 et le hook se tait. Suites :
+  `test-vf-divergence-hook.sh` (112 contrôles dont 54 mutants ; 5 contrôles « système de fichiers sensible à la casse »
+  sautés sous Linux), `test-vibeflow-update-divergence.sh` (installeur, 19 cas, 11 mutants) et la preuve à deux
+  clones `test-divergence-deux-clones.sh` (18 cas, témoins rouges) sous `plugin/_internal/tests/`.
 - `check-instruction-budget.sh` — mesure et publie, par fichier d'agent distribué
   (`plugin/*/agents/*.md` et `plugin/*/AGENT.md`), deux métriques : lignes du fichier entier et
   instructions du body (Phase 25, BUDG-01/02, ADR-029). Ratchet par sentinelle versionnée

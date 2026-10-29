@@ -252,7 +252,7 @@ arm_in "$P/b"
 [ "$("$GREP" -cF 'ARME-A-LA-MAIN' "$TMP/hk.err")" -eq 2 ] || { ko "VDH-ARM-MAIN : « ARME-A-LA-MAIN » attendu deux fois"; miss=1; }
 { cmp -s "$P/b/.git/hooks/post-merge" "$TMP/m.orig" && cmp -s "$P/b/.git/hooks/post-rewrite" "$TMP/r.orig"; } || { ko "VDH-ARM-MAIN : un hook arme a la main a ete modifie"; miss=1; }
 # Ligne perimee : meme ligne, autre chemin du script.
-OLDM="$(printf '%s' "$LM" | sed "s#'[^']*'#'/autre/cache/conductor/scripts/vf-divergence-hook.sh'#")"
+OLDM="$(printf '%s' "$LM" | sed "s#'[^']*vf-divergence-hook.sh'#'/autre/cache/conductor/scripts/vf-divergence-hook.sh'#g")"
 put_tiers "$P/b" post-merge "$OLDM"
 cp "$P/b/.git/hooks/post-merge" "$TMP/m.orig"
 arm_in "$P/b"
@@ -424,9 +424,9 @@ put_tiers "$P/b" post-merge
 hk status --path "$P/b"
 { [ "$HKRC" -eq 1 ] && "$GREP" -qxF 'HOOK post-merge TIERS' "$TMP/hk.out"; } || { ko "VDH-STATUS : hook tiers sans ligne, rc=$HKRC / TIERS absent"; miss=1; }
 rm -f "$P/b/.git/hooks/post-merge"
-put_tiers "$P/b" post-merge; put_tiers "$P/b" post-rewrite
-arm_in "$P/b"; LM="$(hand_of post-merge)"; LR="$(hand_of post-rewrite)"
-put_tiers "$P/b" post-merge "$LM"; put_tiers "$P/b" post-rewrite "$LR"
+put_tiers "$P/b" post-merge; put_tiers "$P/b" post-rewrite; put_tiers "$P/b" post-commit
+arm_in "$P/b"; LM="$(hand_of post-merge)"; LR="$(hand_of post-rewrite)"; LC="$(hand_of post-commit)"
+put_tiers "$P/b" post-merge "$LM"; put_tiers "$P/b" post-rewrite "$LR"; put_tiers "$P/b" post-commit "$LC"
 hk status --path "$P/b"
 { [ "$HKRC" -eq 0 ] && "$GREP" -qxF 'HOOK post-merge ARME-A-LA-MAIN' "$TMP/hk.out"; } || { ko "VDH-STATUS : armes a la main, rc=$HKRC / ARME-A-LA-MAIN absent"; miss=1; }
 [ "$miss" -eq 0 ] && ok "VDH-STATUS : arme -> rc 0 + deux HOOK ARME + JOURNAL lignes=1 ; desarme -> rc 1 ABSENT ; tiers -> rc 1 TIERS ; arme a la main -> rc 0"
@@ -995,6 +995,125 @@ case_ VDH-RUN-TMP-NETTOYE probe_tmp_nettoye "(tour 3, C) : trois run successifs 
 case_ VDH-DISARM-ASSAINI probe_disarm_assaini "(tour 3, E) : la ligne tierce affichee par disarm est assainie (ESC/BEL), hook tiers intact"
 case_ VDH-REPLI-DOSSIER-LIEN probe_repli_dossier_lien "(tour 3, J3) : cache disparu et .git/vf-divergence lien symbolique -> « JOURNAL NON ECRIT : dossier-lien », rien ecrit a travers le lien"
 
+# ===========================================================================
+# Phase 61 — correction ciblee des deux majeurs du juge frais.
+# MAJEUR 1 : une fusion EN CONFLIT conclue a la main ne passe que par post-commit (jamais post-merge).
+# MAJEUR 2 : la ligne « a ajouter a la main » ne casse pas un hook tiers sous `set -e` quand le cache est purge,
+# et `arm --refresh` signale audiblement une ligne perimee.
+# ===========================================================================
+# conflict_setup <id> — clone b arme, a et b ajoutent chacun une phase 2 en fin de ROADMAP : le pull de b tombe en
+# conflit (ROADMAP.md) ; le conflit est resolu en gardant les deux en-tetes, le resultat est indexe, pas encore commite.
+conflict_setup() {
+  mk_pair "$1"; arm_in "$P/b"; [ "$HKRC" -eq 0 ] || { LASTMSG="arm rc=$HKRC"; return 1; }
+  add_phase "$P/a" 02 x roadmap; git -C "$P/a" push -q origin main 2> /dev/null
+  add_phase "$P/b" 02 y roadmap
+  pull_in "$P/b" --no-rebase
+  [ "$PULLRC" -ne 0 ] || { LASTMSG="pre-condition : le pull aurait du tomber en conflit"; return 1; }
+  [ ! -s "$P/b/.git/vf-divergence/journal.tsv" ] || { LASTMSG="pre-condition : cri avant la conclusion de la fusion"; return 1; }
+  printf '### Phase 1: a\n### Phase 2: x\n### Phase 2: y\n' > "$P/b/.planning/workstreams/w1/ROADMAP.md"
+  git -C "$P/b" add -- .planning
+}
+probe_conflit_commit() { # fusion en conflit conclue par `git commit --no-edit`
+  conflict_setup "p$((++N))" || return 1
+  runb git -C "$P/b" commit -q --no-edit > "$TMP/pc.out" 2> "$TMP/pc.err" < /dev/null || { LASTMSG="le commit de fusion a echoue — $(tail -2 "$TMP/pc.err")"; return 1; }
+  "$GREP" -qF 'DIVERGENCE apres post-commit' "$TMP/pc.err" || { LASTMSG="fusion en conflit conclue a la main : aucun cri — $(tail -2 "$TMP/pc.err")"; return 1; }
+  local J="$P/b/.git/vf-divergence/journal.tsv"
+  { [ -f "$J" ] && [ "$(nlines "$J")" -eq 2 ] && [ "$(field "$J" 2 2)" = "post-commit" ] && [ "$(field "$J" 2 3)" = "DIVERGENCE" ]; } || { LASTMSG="journal : une ligne post-commit DIVERGENCE attendue"; return 1; }
+  add_phase "$P/b" 03 z 2> "$TMP/pc2.err"
+  { ! "$GREP" -q 'vf-divergence' "$TMP/pc2.err" && [ "$(nlines "$J")" -eq 2 ]; } || { LASTMSG="un commit ordinaire (non fusion) a crie ou journalise"; return 1; }
+  return 0
+}
+probe_conflit_continue() { # idem par `git merge --continue`
+  conflict_setup "p$((++N))" || return 1
+  GIT_EDITOR=true runb git -C "$P/b" merge --continue > "$TMP/pc.out" 2> "$TMP/pc.err" < /dev/null || { LASTMSG="merge --continue a echoue — $(tail -2 "$TMP/pc.err")"; return 1; }
+  "$GREP" -qF 'DIVERGENCE apres post-commit' "$TMP/pc.err" || { LASTMSG="merge --continue : aucun cri — $(tail -2 "$TMP/pc.err")"; return 1; }
+  return 0
+}
+probe_pc_plain_run() { # run --hook post-commit sur un commit ordinaire : silence total meme sur un arbre divergent
+  mk_pair "p$((++N))"; diverge "$P/a" "$P/b" 02
+  add_phase "$P/b" 03 z 2> /dev/null
+  PCRC=0
+  (cd "$P/b" && runb bash "$TARGET" run --hook post-commit) > "$TMP/pc.out" 2> "$TMP/pc.err" < /dev/null || PCRC=$?
+  { [ "$PCRC" -eq 0 ] && [ ! -s "$TMP/pc.out" ] && [ ! -s "$TMP/pc.err" ]; } || { LASTMSG="run --hook post-commit sur un commit ordinaire : rc=$PCRC, sortie non vide — $(tail -1 "$TMP/pc.err")"; return 1; }
+  return 0
+}
+probe_pc_repli_silence() { # cache disparu : un commit ordinaire ne dit rien (le repli ne crie que sur une fusion)
+  mk_pair "p$((++N))"; mk_cache "$TMP/pcr$N" "$TARGET" || { LASTMSG="cache non construit"; return 1; }
+  local save="$TARGET"; TARGET="$TMP/pcr$N/conductor/scripts/vf-divergence-hook.sh"
+  arm_in "$P/b"; TARGET="$save"
+  [ "$HKRC" -eq 0 ] || { LASTMSG="arm rc=$HKRC"; return 1; }
+  rm -rf "$TMP/pcr$N"
+  add_phase "$P/b" 03 z 2> "$TMP/pc.err"
+  { ! "$GREP" -q 'vf-divergence' "$TMP/pc.err" && [ ! -e "$P/b/.git/vf-divergence/journal.tsv" ]; } || { LASTMSG="cache disparu : un commit ordinaire dit NON VERIFIABLE / journalise — $(tail -1 "$TMP/pc.err")"; return 1; }
+  return 0
+}
+# tiers_line <clone> <nom> — arme depuis un cache jetable, recupere la ligne a ajouter a la main du hook tiers <nom>,
+# puis purge ce cache (le chemin de la ligne n'existe plus). Pose TL ; TARGET inchange.
+tiers_line() {
+  mk_cache "$TMP/tl$N" "$TARGET" || return 1
+  local save="$TARGET"; TARGET="$TMP/tl$N/conductor/scripts/vf-divergence-hook.sh"
+  put_tiers "$1" "$2"; hk arm --path "$1"; TARGET="$save"
+  TL="$(hand_of "$2")"; rm -rf "$TMP/tl$N"
+  [ -n "$TL" ] || return 1
+}
+probe_handline_sete() { # hook tiers `set -e` + ligne manuelle + cache purge : la suite du tiers s'execute
+  mk_pair "p$((++N))"; N=$((N+1))
+  tiers_line "$P/b" post-merge || { LASTMSG="ligne manuelle non recuperee"; return 1; }
+  printf '#!/bin/sh\nset -e\n%s\necho TIERS-SUITE-EXECUTEE\n' "$TL" > "$P/b/.git/hooks/post-merge"; chmod 755 "$P/b/.git/hooks/post-merge"
+  add_phase "$P/a" 02 x roadmap; git -C "$P/a" push -q origin main 2> /dev/null
+  add_phase "$P/b" 02 y
+  pull_in "$P/b" --no-rebase
+  cat "$TMP/pull.out" "$TMP/pull.err" > "$TMP/pull.all"
+  "$GREP" -qF 'TIERS-SUITE-EXECUTEE' "$TMP/pull.all" || { LASTMSG="la suite du hook tiers n'a pas ete executee (set -e + cache purge) — $(tail -2 "$TMP/pull.all")"; return 1; }
+  ! "$GREP" -qF 'No such file' "$TMP/pull.all" || { LASTMSG="cache purge : le hook tiers affiche « No such file or directory » — $(tail -2 "$TMP/pull.all")"; return 1; }
+  return 0
+}
+probe_handline_sete_vivant() { # cache present, divergence : run rend 1 ; un hook tiers set -e ne meurt pas pour autant
+  mk_pair "p$((++N))"; N=$((N+1))
+  mk_cache "$TMP/hv$N" "$TARGET" || { LASTMSG="cache non construit"; return 1; }
+  local save="$TARGET"; TARGET="$TMP/hv$N/conductor/scripts/vf-divergence-hook.sh"
+  put_tiers "$P/b" post-merge; hk arm --path "$P/b"; TARGET="$save"
+  TL="$(hand_of post-merge)"; [ -n "$TL" ] || { LASTMSG="ligne manuelle non recuperee"; return 1; }
+  printf '#!/bin/sh\nset -e\n%s\necho TIERS-SUITE-EXECUTEE\n' "$TL" > "$P/b/.git/hooks/post-merge"; chmod 755 "$P/b/.git/hooks/post-merge"
+  add_phase "$P/a" 02 x roadmap; git -C "$P/a" push -q origin main 2> /dev/null
+  add_phase "$P/b" 02 y
+  pull_in "$P/b" --no-rebase
+  cat "$TMP/pull.out" "$TMP/pull.err" > "$TMP/pull.all"
+  "$GREP" -qF 'DIVERGENCE apres post-merge' "$TMP/pull.all" || { LASTMSG="temoin positif absent : la ligne manuelle ne crie pas — $(tail -2 "$TMP/pull.all")"; return 1; }
+  "$GREP" -qF 'TIERS-SUITE-EXECUTEE' "$TMP/pull.all" || { LASTMSG="divergence criee (run rend 1) mais la suite du hook tiers set -e n'a pas ete executee"; return 1; }
+  return 0
+}
+probe_refresh_perime() { # ligne manuelle d'un cache purge : --refresh la signale (rc 1, nouvelle ligne), sans toucher au tiers
+  mk_pair "p$((++N))"; N=$((N+1))
+  tiers_line "$P/b" post-merge || { LASTMSG="ligne manuelle non recuperee"; return 1; }
+  printf '#!/bin/sh\nset -e\n%s\necho suite\n' "$TL" > "$P/b/.git/hooks/post-merge"; chmod 755 "$P/b/.git/hooks/post-merge"
+  cp "$P/b/.git/hooks/post-merge" "$TMP/tiers.orig"
+  mk_cache "$TMP/v2$N" "$TARGET" || { LASTMSG="cache V2 non construit"; return 1; }
+  local save="$TARGET" V2; V2="$TMP/v2$N/conductor/scripts/vf-divergence-hook.sh"; TARGET="$V2"
+  hk arm --refresh --path "$P/b"; TARGET="$save"
+  [ "$HKRC" -eq 1 ] || { LASTMSG="--refresh rend $HKRC (attendu 1) sur une ligne perimee"; return 1; }
+  "$GREP" -qF 'REFUS ligne-perimee:post-merge' "$TMP/hk.err" || { LASTMSG="--refresh : stderr sans « REFUS ligne-perimee:post-merge »"; return 1; }
+  "$GREP" -qF "'$V2' run --hook post-merge" "$TMP/hk.err" || { LASTMSG="--refresh : la nouvelle ligne n'est pas imprimee"; return 1; }
+  cmp -s "$P/b/.git/hooks/post-merge" "$TMP/tiers.orig" || { LASTMSG="--refresh a modifie le hook tiers"; return 1; }
+  return 0
+}
+probe_status_nonexec() { # notre hook sans bit d'execution : status ne dit pas ARME (git l'ignore)
+  mk_pair "p$((++N))"; arm_in "$P/b"; [ "$HKRC" -eq 0 ] || { LASTMSG="arm rc=$HKRC"; return 1; }
+  chmod 644 "$P/b/.git/hooks/post-merge"
+  hk status --path "$P/b"
+  { [ "$HKRC" -eq 1 ] && "$GREP" -qxF 'HOOK post-merge NON-EXECUTABLE' "$TMP/hk.out"; } || { LASTMSG="status d'un hook non executable : rc=$HKRC — $("$GREP" 'HOOK post-merge' "$TMP/hk.out")"; return 1; }
+  return 0
+}
+case_ VDH-PC-CONFLIT-COMMIT probe_conflit_commit "(majeur 1) : fusion en conflit conclue par git commit --no-edit -> post-commit crie et journalise ; un commit ordinaire reste muet"
+case_ VDH-PC-CONFLIT-CONTINUE probe_conflit_continue "(majeur 1) : fusion en conflit conclue par git merge --continue -> post-commit crie"
+case_ VDH-PC-PLAIN-RUN probe_pc_plain_run "(majeur 1) : run --hook post-commit sur un commit ordinaire -> silence total, code 0, meme sur un arbre divergent"
+case_ VDH-PC-REPLI-SILENCE probe_pc_repli_silence "(majeur 1) : cache disparu, commit ordinaire -> aucun NON VERIFIABLE, aucun journal"
+case_ VDH-HANDLINE-SETE probe_handline_sete "(majeur 2) : hook tiers sous set -e + ligne manuelle + cache purge -> la suite du hook tiers s'execute"
+case_ VDH-HANDLINE-SETE-VIVANT probe_handline_sete_vivant "(majeur 2) : hook tiers sous set -e + ligne manuelle, cache present et divergence (run rend 1) -> la suite du tiers s'execute"
+case_ VDH-REFRESH-PERIME probe_refresh_perime "(majeur 2) : arm --refresh sur une ligne manuelle perimee -> rc 1, REFUS ligne-perimee, nouvelle ligne imprimee, tiers intact"
+case_ VDH-STATUS-NONEXEC probe_status_nonexec "(mineur) : notre hook sans bit d'execution -> status rend NON-EXECUTABLE (rc 1), jamais ARME"
+
+
 
 # ===========================================================================
 # Mutants (QUAL-01) : une ligne altree chacun, cmp -s different, bash -n valide, sonde rouge sur le mutant
@@ -1099,7 +1218,7 @@ mutant VDH-MUT-16 '    if in_tree "$SELF" "$ROOT"; then' 'in_tree "$SELF" "$ROOT
   "--refresh : refus du script sous l'arbre retire"
 mutant VDH-MUT-17 '< "$tmp" >&2' "tr -d '\\000-\\010\\013-\\037\\177' <" 'cat <' probe_relais \
   "relais de la sortie de check-divergence sans filtre des caracteres de controle"
-mutant VDH-MUT-20 '[ "$HS" = "ARME" ] || continue' '|| continue' '|| :' probe_refresh_tiers \
+mutant VDH-MUT-20 '[ "$HS" = "NON-EXECUTABLE" ] || continue' '|| continue' '|| :' probe_refresh_tiers \
   "--refresh : garde « hook nostre seulement » retiree (un hook tiers est ecrase)"
 if mkdir "$TMP/CaseProbe" 2> /dev/null && [ -d "$TMP/caseprobe" ]; then
   mutant VDH-MUT-21 'if [ -e "$r" ] && [ -e "$p" ]; then' '[ -e "$r" ] && [ -e "$p" ]' 'false' probe_casse \
@@ -1167,6 +1286,20 @@ mutant VDH-MUT-DISARM-ASSAINI 'NAME_P="$name" awk' " | tr -d '\\000-\\010\\013-\
   "disarm : la ligne du hook tiers est imprimee sans assainissement"
 mutant VDH-MUT-REPLI-LIEN 'vf_why=dossier-lien' '[ -L "$vf_dir" ]' 'false' probe_repli_dossier_lien \
   "repli du fichier de hook : dossier de journal lien symbolique suivi"
+mutant VDH-MUT-PC-NOMS 'hook_names() {' 'post-rewrite post-commit' 'post-rewrite' probe_conflit_commit \
+  "post-commit n'est plus pose : une fusion en conflit conclue a la main redevient muette"
+mutant VDH-MUT-PC-FUSION 'git_safe rev-parse -q --verify' '|| exit 0' '|| :' probe_pc_plain_run \
+  "run --hook post-commit : le test « HEAD est une fusion » retire (chaque commit ordinaire est juge)"
+mutant VDH-MUT-PC-REPLI 'rev-parse -q --verify HEAD^2 >/dev/null 2>&1 || exit 0' '|| exit 0' '|| :' probe_pc_repli_silence \
+  "fichier de hook post-commit : garde « commit de fusion seulement » retiree (le repli crie a chaque commit)"
+mutant VDH-MUT-HANDLINE 'hand_line() {' "[ -f '\$SELF' ] && " '' probe_handline_sete \
+  "ligne manuelle sans garde d'existence du script (un hook tiers set -e casse quand le cache est purge)"
+mutant VDH-MUT-HANDLINE-TRUE 'hand_line() {' ' || true"' '"' probe_handline_sete_vivant \
+  "ligne manuelle sans « || true » (le hook tiers set -e meurt quand le script rend un code non nul)"
+mutant VDH-MUT-REFRESH-PERIME 'stale=1' 'stale=1' 'stale=0' probe_refresh_perime \
+  "--refresh : la ligne perimee n'est plus comptee (rc 0 muet)"
+mutant VDH-MUT-NONEXEC 'if [ -x "$HFILE" ]; then HS="ARME"' '[ -x "$HFILE" ]' 'true' probe_status_nonexec \
+  "status : un hook nostre sans bit d'execution passe pour ARME"
 TARGET="$ORIG_TARGET"
 
 # ===========================================================================

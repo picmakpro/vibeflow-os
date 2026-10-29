@@ -44,7 +44,7 @@
 #       (ADR-031). Refusé en scope user, sous --target et sous --dry-run.
 #
 # Filet de divergence (Phase 61, P61-D-01, P61-D-06, P61-PL-08) :
-#   aux postes product et dev, l'installeur arme le clone (hooks git post-merge et post-rewrite dans le dossier de
+#   aux postes product et dev, l'installeur arme le clone (hooks git post-merge, post-rewrite et post-commit dans le dossier de
 #   hooks réel du clone) par `conductor/scripts/vf-divergence-hook.sh`, cherché dans le cache du plugin et nulle
 #   part ailleurs (jamais dans le lab). Posé à `install` (avec un poste) et au verbe `role` ; retiré au poste solo
 #   (verbe `role solo`, ou `install` sur un fichier de poste existant) et à `uninstall --all` ; rafraîchi (chemin
@@ -1829,7 +1829,7 @@ divergence_hook_present() {
   local d n f
   d="$(git rev-parse --git-path hooks 2>/dev/null)" || return 1
   [ -n "$d" ] || return 1
-  for n in post-merge post-rewrite; do
+  for n in post-merge post-rewrite post-commit; do
     f="$d/$n"
     [ -f "$f" ] && [ ! -L "$f" ] || continue
     if awk 'NR == 2 && index($0, "# vibeflow:vf-divergence-hook") == 1 { f = 1 } END { exit !f }' "$f" 2>/dev/null; then
@@ -1862,7 +1862,7 @@ divergence_hook_plan() {
         name="${tgt##*/}"
         if [ "$only" = "1" ]; then
           case "$nl$st$nl" in
-            *"${nl}HOOK $name ARME${nl}"*) : ;;
+            *"${nl}HOOK $name ARME${nl}"*|*"${nl}HOOK $name NON-EXECUTABLE${nl}"*) : ;;
             *) continue ;;
           esac
         fi

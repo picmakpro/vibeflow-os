@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # vf-divergence-hook.sh — Filet de divergence ARME dans un clone de lab aux postes product et dev.
 #
-# ROLE. Un clone d'equipe recoit un hook git `post-merge` qui rejoue `check-divergence.sh` apres
+# ROLE. Un clone d'equipe recoit les hooks git `post-merge`, `post-rewrite` et `post-commit` qui rejoue `check-divergence.sh` apres
 # chaque fusion locale, crie sur une divergence de numerotation d'un compartiment et la JOURNALISE.
 # L'armement est pose par l'installeur (`vibeflow-update.sh`, aux postes product et dev, jamais au
 # poste solo ni sans poste) ; ce script porte tout le travail du hook, l'engine n'en appelle que les
@@ -30,7 +30,9 @@
 #       Un hook tiers qui porte DEJA la ligne d'appel a jour (celle que le refus imprime) est reconnu
 #       `ARME-A-LA-MAIN` : code 0, fichier intact. Chaque refus est suivi de la ligne `LIGNE A AJOUTER A
 #       LA MAIN (<nom>) : ...` (sauf le refus de l'executable dans l'arbre) et de `SORTIE :
-#       VF_DIVERGENCE_HOOK=off`. Aucune ecriture de configuration git, jamais dans le dossier de
+#       VF_DIVERGENCE_HOOK=off`. La ligne tolere l'absence du script (`[ -f '<script>' ] && bash '<script>' run --hook <nom> "$@" || true`) :
+#       un hook tiers sous `set -e` ne casse jamais quand le cache versionne est purge ; `arm --refresh` signale alors
+#       `REFUS ligne-perimee:<nom>` et reimprime la ligne a jour (code 1), sans jamais reecrire le hook tiers. Aucune ecriture de configuration git, jamais dans le dossier de
 #       `core.hooksPath`. Derniere ligne de stdout : `BILAN verbe=arm code=<n>`.
 #       Codes : voir CODES.
 #   vf-divergence-hook.sh disarm [--path <dir>]
@@ -38,13 +40,13 @@
 #       tiers qui porte la ligne d'appel n'est JAMAIS modifie : code 1 et `LIGNE A RETIRER A LA MAIN
 #       (<nom>) : <ligne>`.
 #   vf-divergence-hook.sh status [--path <dir>]
-#       Lecture seule. stdout : `HOOK <nom> ARME|ARME-A-LA-MAIN|TIERS|ABSENT` par hook vise,
+#       Lecture seule. stdout : `HOOK <nom> ARME|ARME-A-LA-MAIN|NON-EXECUTABLE|TIERS|ABSENT` (NON-EXECUTABLE = notre fichier sans bit d'execution : git l'ignore, status rend 1) par hook vise,
 #       `JOURNAL <chemin> lignes=<n>` (lignes de donnees, en-tete exclu ; `-` si lien ou non regulier),
 #       `BILAN verbe=status code=<n>`.
-#   vf-divergence-hook.sh run --hook <post-merge|post-rewrite> [args git...]
+#   vf-divergence-hook.sh run --hook <post-merge|post-rewrite|post-commit> [args git...]
 #       Travail du hook : joue `check-divergence.sh --path <--show-toplevel>` et se branche sur son
 #       code. `--hook post-rewrite` : seul l'argument `rebase` joue le controle (comme post-merge) ;
-#       `amend` est silencieux. Un post-merge n'annule jamais la fusion : il est BRUYANT, il ne bloque pas.
+#       `amend` est silencieux. `--hook post-commit` ne juge que sur un commit de fusion. Un post-merge n'annule jamais la fusion : il est BRUYANT, il ne bloque pas.
 #
 # CODES (chacun enumere, aucun implicite).
 #   arm :
@@ -111,7 +113,7 @@
 #   fichier de hook.
 #
 # MATRICE DES HOOKS (mesuree a la planification, git 2.50.1 ; P61-D-05 tranche par la mesure : le filet
-# pose `post-merge` ET `post-rewrite`).
+# pose `post-merge`, `post-rewrite` ET `post-commit` ; une fusion sans conflit ne passe que par post-merge : pas de double cri).
 #   git pull (avance rapide)                       -> post-merge 0
 #   git pull --ff-only                             -> post-merge 0
 #   git pull --no-rebase / git merge (vraie fusion)-> post-merge 0
@@ -119,16 +121,23 @@
 #   git pull --rebase SANS commit local            -> post-merge 0
 #   git pull --rebase AVEC commit local            -> post-rewrite rebase (jamais post-merge)
 #   git commit --amend                             -> post-rewrite amend  (le filet se tait)
+#   fusion EN CONFLIT conclue a la main (`git commit --no-edit`, `git merge --continue`)
+#                                                  -> post-commit seul, JAMAIS post-merge (mesure git 2.50.1) ;
+#                                                     le filet ne juge que si HEAD est un commit de fusion
+#                                                     (`HEAD^2`), sinon silence total a chaque commit ordinaire
+#   git commit --amend d'un commit de fusion       -> post-commit : rejuge (bruyant, jamais bloquant)
 #   git reset --hard, git switch / git checkout,
 #   git cherry-pick, git rebase qui ne reecrit
-#   aucun commit                                   -> aucun des deux hooks
+#   aucun commit                                   -> aucun hook du filet
 # `run --hook post-rewrite rebase` juge comme post-merge (nom de hook `post-rewrite` dans les messages
 # et le journal) ; `amend` et tout autre argument se taisent. Git ecrit la liste des commits reecrits
 # sur l'entree standard du hook : elle est lue et jetee avant tout autre travail.
 #
 # LIMITES DE COUVERTURE (ecrites, pas tues). NE se declenchent PAS : `git reset --hard`,
 # `git switch` / `git checkout`, `git cherry-pick`, un `git rebase` qui ne reecrit aucun commit.
-# Une fusion faite sur la forge n'est vue qu'au `git pull` local suivant.
+# Une fusion faite sur la forge n'est vue qu'au `git pull` local suivant. Lab NON PARTITIONNE (aucun
+# dossier de compartiment de planning) : filet INERTE par construction, check-divergence rend 3 et `run` se tait (code 0) ;
+# armer un tel lab ne coute rien mais ne protege rien.
 set -uo pipefail
 export LC_ALL=C
 
@@ -183,7 +192,7 @@ NL='
 say() { printf '[vf-divergence] %s\n' "$*" >&2; }
 
 usage() {
-  say "usage : vf-divergence-hook.sh arm [--path <dir>] [--check|--refresh] | disarm [--path <dir>] | status [--path <dir>] | run --hook <post-merge|post-rewrite> [args...]"
+  say "usage : vf-divergence-hook.sh arm [--path <dir>] [--check|--refresh] | disarm [--path <dir>] | status [--path <dir>] | run --hook <post-merge|post-rewrite|post-commit> [args...]"
   exit 64
 }
 
@@ -207,7 +216,7 @@ abs_under() {
   esac
 }
 
-hook_names() { printf '%s\n' post-merge post-rewrite; }
+hook_names() { printf '%s\n' post-merge post-rewrite post-commit; }
 
 # is_ours <fichier> — fichier régulier (pas un lien) dont la ligne 2 commence par le marqueur.
 is_ours() {
@@ -287,6 +296,8 @@ write_hook() {
       'IFS=$vf_o; set +f' \
       '[ -n "$vf_p" ] || vf_p=/usr/bin:/bin' \
       'PATH=$vf_p; export PATH' \
+      "$(if [ "$name" = post-commit ]; then printf '%s' '# post-commit joue a chaque commit : hors commit de fusion, silence total avant toute autre chose.
+git -c core.fsmonitor= rev-parse -q --verify HEAD^2 >/dev/null 2>&1 || exit 0'; else printf '%s' ':'; fi)" \
       'vf_bash="$(command -v bash 2>/dev/null)"' \
       'case "$vf_bash" in /*) : ;; *) vf_bash= ;; esac' \
       'if [ -f "$VF_DIVERGENCE_SCRIPT" ] && [ -n "$vf_bash" ]; then' \
@@ -387,6 +398,7 @@ do_run() {
       # git ecrit la liste des commits reecrits sur l'entree standard : lue et jetee avant tout autre travail.
       cat > /dev/null 2>&1 || true
       [ "${1:-}" = "rebase" ] || exit 0 ;;
+    post-commit) : ;;
     *) usage ;;
   esac
   ROOT="."
@@ -399,6 +411,11 @@ do_run() {
   ROOT="$root"
   rootp="$(cd "$root" 2>/dev/null && pwd -P)" || rootp="$root"
   strip_path "$rootp"
+  # post-commit joue a CHAQUE commit : silence total, tout de suite, sauf si HEAD est un commit de fusion (P61 majeur 1 :
+  # une fusion en conflit conclue a la main par `git commit` / `git merge --continue` ne passe que par ce hook).
+  if [ "$hook" = post-commit ]; then
+    git_safe rev-parse -q --verify 'HEAD^2' > /dev/null 2>&1 || exit 0
+  fi
   common="$(git_safe rev-parse --git-common-dir 2>/dev/null)" || common=""
   [ -n "$common" ] || { say "NON VERIFIABLE (dossier git commun illisible)"; exit 2; }
   common="$(abs_under "$root" "$common")"
@@ -460,7 +477,11 @@ call_line_state() {
 hook_state() {
   HFILE="$HOOKS_DIR/$1"
   if [ ! -e "$HFILE" ] && [ ! -L "$HFILE" ]; then HS="ABSENT"; return 0; fi
-  if is_ours "$HFILE"; then HS="ARME"; return 0; fi
+  if is_ours "$HFILE"; then
+    # Un hook nostre sans bit d'execution est ignore par git : il n'arme rien (code 0 de status serait un faux conforme).
+    if [ -x "$HFILE" ]; then HS="ARME"; else HS="NON-EXECUTABLE"; fi
+    return 0
+  fi
   case "$(call_line_state "$HFILE" "$1")" in
     courante) HS="ARME-A-LA-MAIN" ;;
     perimee) HS="PERIME" ;;
@@ -470,7 +491,11 @@ hook_state() {
 }
 
 # hand_line <nom> — la ligne a ajouter a la main dans un hook tiers.
-hand_line() { say "LIGNE A AJOUTER A LA MAIN ($1) : bash '$SELF' run --hook $1 \"\$@\""; }
+# Elle tolere l'absence du script (cache versionne purge par une mise a jour) : un hook tiers sous `set -e` ne doit
+# jamais echouer a cause d'elle. Aucun chemin stable independant de la version du cache n'existe (le script ne vit que
+# dans le cache versionne du plugin, jamais dans l'arbre du lab) : le chemin est donc rafraichissable seulement par
+# `arm --refresh`, qui signale une ligne PERIMEE.
+hand_line() { say "LIGNE A AJOUTER A LA MAIN ($1) : [ -f '$SELF' ] && bash '$SELF' run --hook $1 \"\$@\" || true"; }
 refus_fin() { say "SORTIE : VF_DIVERGENCE_HOOK=off"; printf 'BILAN verbe=arm code=1\n'; exit 1; }
 arm_fin() { printf 'BILAN verbe=arm code=%s\n' "$1"; exit "$1"; }
 
@@ -510,7 +535,7 @@ hooks_path_set() {
 }
 
 do_arm() {
-  local mode="arm" rc name f refused ours
+  local mode="arm" rc name f refused ours stale
   ROOT="."
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -536,9 +561,22 @@ do_arm() {
   fi
   if [ "$mode" = "refresh" ]; then
     # --refresh : seul un hook deja nostre est reecrit ; un clone non arme n'est jamais arme ici.
-    ours=0
-    for name in $(hook_names); do hook_state "$name"; [ "$HS" = "ARME" ] && ours=$((ours+1)); done
-    [ "$ours" -gt 0 ] || arm_fin 0
+    ours=0; stale=0
+    for name in $(hook_names); do
+      hook_state "$name"
+      case "$HS" in
+        ARME|NON-EXECUTABLE) ours=$((ours+1)) ;;
+        PERIME)
+          # Ligne manuelle d'un hook tiers pointant un cache purge : jamais reecrite, mais DITE (majeur 2).
+          stale=1
+          say "REFUS ligne-perimee:$name : la ligne d'appel de $HFILE pointe un autre cache du script"
+          hand_line "$name" ;;
+      esac
+    done
+    if [ "$ours" -eq 0 ]; then
+      [ "$stale" -eq 0 ] || refus_fin
+      arm_fin 0
+    fi
     hooks_path_set; rc=$?
     if [ "$rc" -eq 2 ]; then say "NON VERIFIABLE hooks-irresolu : configuration git illisible"; arm_fin 2; fi
     if [ "$rc" -eq 0 ]; then say "rien a rafraichir : core.hooksPath est configure, aucune ecriture dans le dossier qu'il designe"; arm_fin 0; fi
@@ -549,7 +587,7 @@ do_arm() {
     fi
     for name in $(hook_names); do
       hook_state "$name"
-      [ "$HS" = "ARME" ] || continue
+      [ "$HS" = "ARME" ] || [ "$HS" = "NON-EXECUTABLE" ] || continue
       if write_hook "$HOOKS_DIR" "$name"; then
         say "rafraichi : $HFILE"
       else
@@ -557,6 +595,7 @@ do_arm() {
         arm_fin 2
       fi
     done
+    [ "$stale" -eq 0 ] || refus_fin
     arm_fin 0
   fi
   # Refus AVANT toute ecriture (P61-D-02) : ce qui appartient a l'humain n'est ni ecrase, ni modifie, ni
@@ -638,7 +677,7 @@ do_disarm() {
   for name in $(hook_names); do
     hook_state "$name"
     case "$HS" in
-      ARME)
+      ARME|NON-EXECUTABLE)
         rm -f "$HFILE" 2>/dev/null || { say "NON VERIFIABLE : retrait de $HFILE echoue"; exit 2; }
         say "desarme : $HFILE" ;;
       ARME-A-LA-MAIN|PERIME)
@@ -672,6 +711,7 @@ do_status() {
     total=$((total+1))
     case "$HS" in
       ARME|ARME-A-LA-MAIN) armed=$((armed+1)) ;;
+      NON-EXECUTABLE) say "hook $HFILE sans bit d'execution : git l'ignore, le filet est inerte (relancer l'armement)" ;;
       PERIME) say "ligne d'appel perimee dans $HFILE (chemin d'un autre cache)"; HS="TIERS" ;;
     esac
     printf 'HOOK %s %s\n' "$name" "$HS"

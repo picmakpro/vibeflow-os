@@ -93,9 +93,9 @@ missing" on a partitioned repository, and requirements are read per topic.
 
 ### The safety net armed at the product and dev roles
 
-When a `product` or `dev` role is installed, the installer puts two git hooks in **your clone**,
-`post-merge` and `post-rewrite`. They replay the check after every `git pull`, `git merge` or
-`git pull --rebase`. At the `solo` role, nothing is installed.
+When a `product` or `dev` role is installed, the installer puts three git hooks in **your clone**,
+`post-merge`, `post-rewrite` and `post-commit`. They replay the check after every `git pull`, `git merge` or
+`git pull --rebase`, and after a conflicted merge you finish by hand (`git commit`, `git merge --continue`). At the `solo` role, nothing is installed.
 
 - **It cries on a divergence**, but the merge is not undone: a hook cannot undo it. When everything is
   consistent, it says nothing more. When it cannot judge, it says "cannot be verified": never a
