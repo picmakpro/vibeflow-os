@@ -13,8 +13,15 @@
 #   D2C-TRACE-TIERS      un post-merge tiers n'est ni ecrase ni modifie : armement refuse en code 1,
 #                        installation aboutie (code 0), le hook tiers fonctionne toujours
 #   D2C-TRACE-INTROUVABLE  script du cache disparu : NON VERIFIABLE audible et journalise
-# Cas annonces pour le plan 61-05 (preuve complete, temoins rouges) : D2C-RELEVE, D2C-REBASE,
-# D2C-PIEGE, D2C-MUT-DESARME, D2C-MUT-EXECUTABLE.
+# Cas du plan 61-05 (preuve complete) :
+#   D2C-FF               la fusion de l'autre humain, poussee puis recue en AVANCE RAPIDE au pull suivant,
+#                        est criee (post-merge) et journalisee avec le HEAD du clone qui tire
+#   D2C-REBASE           `git pull --rebase` avec commit local : seul post-rewrite se declenche ; monde frais
+#                        et conforme avant la divergence ; champ 2 du journal = post-rewrite
+# Cas du plan 61-05 a suivre dans ce fichier (silence, worktree, branche piegee,
+# trois temoins rouges, releve de la recette).
+# Sonde de la preuve : `sonde_cri` (cri sur stderr ET exactement une ligne de journal DIVERGENCE portant le HEAD
+# du clone). Chaque monde frais est arme PAR L'INSTALL (`monde`), jamais par un appel direct a `arm`.
 #
 # ISOLATION (P61-PL-18) : HOME jetable, GIT_CONFIG_NOSYSTEM, GIT_CONFIG_GLOBAL vers un fichier vide,
 # XDG_CONFIG_HOME et VF_DIVERGENCE_HOOK retires, identite git posee dans chaque clone, caches HORS
@@ -94,6 +101,38 @@ local_commit() {
 # pull_divergent <clone> — vrai `git pull --no-rebase` ; stderr dans $WORK/pull.err.
 pull_divergent() {
   git -C "$1" pull -q --no-rebase --no-edit > "$WORK/pull.out" 2> "$WORK/pull.err"
+}
+
+# jfile <clone> — journal du clone (dossier git COMMUN : identique depuis un worktree lie).
+jfile() {
+  local c
+  c="$(git -C "$1" rev-parse --git-common-dir 2>/dev/null)" || return 1
+  case "$c" in /*|[A-Za-z]:*) : ;; *) c="$1/$c" ;; esac
+  printf '%s/vf-divergence/journal.tsv' "$c"
+}
+# jdata <clone> — lignes de DONNEES du journal (en-tete exclu) ; 0 si le journal n'existe pas.
+jdata() {
+  local jf
+  jf="$(jfile "$1")" || { printf '0'; return 0; }
+  [ -f "$jf" ] || { printf '0'; return 0; }
+  awk 'NR > 1 { n++ } END { print n + 0 }' "$jf"
+}
+
+# sonde_cri <clone> <fichier stderr> <lignes de journal avant> — la sonde de la preuve (P61-D-08).
+# 0 si stderr contient `[vf-divergence] DIVERGENCE` ET si le journal a gagne EXACTEMENT une ligne, de verdict
+# DIVERGENCE et dont le HEAD est celui du clone ; non nul sinon, avec SONDE_WHY qui dit laquelle des trois
+# conditions manque. Un temoin ne rougit que par cette fonction : elle ne lit rien d'autre.
+sonde_cri() {
+  local clone="$1" err="$2" avant="$3" jf apres head last
+  SONDE_WHY=""
+  if ! "$GREP" -qF '[vf-divergence] DIVERGENCE' "$err"; then SONDE_WHY="cri absent de stderr"; return 1; fi
+  jf="$(jfile "$clone")" || { SONDE_WHY="journal introuvable"; return 1; }
+  apres="$(jdata "$clone")"
+  if [ "$apres" -ne $((avant + 1)) ]; then SONDE_WHY="journal muet ou bavard : $((apres - avant)) ligne(s) gagnee(s), attendu 1"; return 1; fi
+  head="$(git -C "$clone" rev-parse HEAD)"
+  last="$(awk -F "$TAB" -v n=$((apres + 1)) 'NR == n { print $3 "|" $5; exit }' "$jf")"
+  if [ "$last" != "DIVERGENCE|$head" ]; then SONDE_WHY="derniere ligne du journal « $last » (attendu DIVERGENCE|$head)"; return 1; fi
+  return 0
 }
 
 if ! mk_cache "$WORK/cache"; then
@@ -249,6 +288,86 @@ else
   ko "D2C-TRACE-INTROUVABLE : aucun journal sous le .git de E"; miss=1
 fi
 [ "$miss" -eq 0 ] && ok "D2C-TRACE-INTROUVABLE (P61-D-03) : cache disparu -> NON VERIFIABLE sur stderr + ligne de journal « introuvable », pull abouti"
+
+# ---------------------------------------------------------------------------
+# monde <nom> <cache> <poste1> <poste2> — origine nue FRAICHE issue de la graine (compartiment w1, phase 1,
+# conforme) et deux clones <nom>-1, <nom>-2 armes PAR L'INSTALL (VF_ROLE=<poste>, scope project) depuis <cache>.
+# Jamais d'appel direct a `arm` : l'armement est celui de l'engine (COLB-07).
+# ---------------------------------------------------------------------------
+monde() {
+  local nom="$1" cache="$2" i role
+  MONDE_WHY=""
+  git clone -q --bare "$WORK/seed" "$WORK/$nom.git" 2>/dev/null || { MONDE_WHY="origine $nom non creee"; return 1; }
+  i=1
+  for role in "$3" "$4"; do
+    git clone -q "$WORK/$nom.git" "$WORK/$nom-$i" 2>/dev/null || { MONDE_WHY="clone $nom-$i non cree"; return 1; }
+    ident "$WORK/$nom-$i"
+    if ! inst "$WORK/$nom-$i" "$cache" "VF_ROLE=$role" VF_SCOPE=project -- install validator; then
+      MONDE_WHY="install $nom-$i (poste $role) rc!=0 — $(tail -3 "$WORK/err")"; return 1
+    fi
+    i=$((i + 1))
+  done
+  return 0
+}
+
+# phase_poussee <clone> <numero> <suffixe> — dossier de phase + en-tete au ROADMAP du compartiment, commite et pousse.
+phase_poussee() {
+  mkdir -p "$1/.planning/workstreams/w1/phases/0$2-$3"
+  printf 'phase %s %s\n' "$2" "$3" > "$1/.planning/workstreams/w1/phases/0$2-$3/0$2-CONTEXT.md"
+  printf '### Phase %s: %s\n' "$2" "$3" >> "$1/.planning/workstreams/w1/ROADMAP.md"
+  git -C "$1" add -- .planning
+  git -C "$1" commit -q -m "phase $2 $3"
+  git -C "$1" push -q origin main 2>/dev/null
+}
+
+# ---------------------------------------------------------------------------
+# D2C-FF — B pousse sa fusion divergente ; A (arme par l'install, poste product) la recoit en AVANCE RAPIDE
+# ---------------------------------------------------------------------------
+miss=0
+git -C "$WORK/B" push -q origin main 2>/dev/null || { ko "D2C-FF pre-condition : push de la fusion de B refuse"; miss=1; }
+AV="$(jdata "$WORK/A")"
+git -C "$WORK/A" pull -q --no-rebase > "$WORK/ff.out" 2> "$WORK/ff.err"; RC=$?
+[ "$RC" -eq 0 ] || { ko "D2C-FF : le pull de A a echoue (rc=$RC) — un post-merge ne doit jamais l'annuler"; miss=1; }
+[ "$(git -C "$WORK/A" rev-parse HEAD)" = "$(git -C "$WORK/B" rev-parse HEAD)" ] \
+  || { ko "D2C-FF pre-condition : A n'est pas a la fusion de B (le pull n'etait pas une avance rapide)"; miss=1; }
+sonde_cri "$WORK/A" "$WORK/ff.err" "$AV" || { ko "D2C-FF : sonde rouge sur A — $SONDE_WHY"; miss=1; }
+JA="$(jfile "$WORK/A")"
+[ "$(field "$JA" $((AV + 2)) 2)" = "post-merge" ] || { ko "D2C-FF : champ 2 du journal de A ≠ post-merge"; miss=1; }
+[ "$miss" -eq 0 ] && ok "D2C-FF (P61-D-05) : la fusion de l'autre humain, faite ailleurs et vue au pull suivant en avance rapide, est criee (post-merge) et journalisee avec le HEAD de A"
+
+# ---------------------------------------------------------------------------
+# D2C-REBASE — `git pull --rebase` AVEC commit local : seul post-rewrite se declenche. Monde frais et conforme
+# (le seul desaccord est 03-p / 03-q), arme par l'install (rb-1 product, rb-2 dev).
+# ---------------------------------------------------------------------------
+miss=0
+if ! monde rb "$WORK/cache" product dev; then
+  ko "D2C-REBASE pre-condition : $MONDE_WHY"; miss=1
+else
+  for n in 1 2; do
+    RC=0; bash "$CD" --path "$WORK/rb-$n" >/dev/null 2>&1 </dev/null || RC=$?
+    [ "$RC" -eq 0 ] || { ko "D2C-REBASE pre-condition : rb-$n n'est pas conforme avant la divergence (rc=$RC) — la preuve ne dirait rien"; miss=1; }
+  done
+  # rb-1 : phase 3-p LOCALE (en-tete en fin de ROADMAP) ; rb-2 : phase 3-q POUSSEE (en-tete en tete de ROADMAP :
+  # deux zones disjointes, pas de conflit textuel au rebase).
+  mkdir -p "$WORK/rb-1/.planning/workstreams/w1/phases/03-p" "$WORK/rb-2/.planning/workstreams/w1/phases/03-q"
+  printf 'phase 3 p\n' > "$WORK/rb-1/.planning/workstreams/w1/phases/03-p/03-CONTEXT.md"
+  printf '### Phase 3: p\n' >> "$WORK/rb-1/.planning/workstreams/w1/ROADMAP.md"
+  git -C "$WORK/rb-1" add -- .planning; git -C "$WORK/rb-1" commit -q -m "phase 3 p"
+  printf 'phase 3 q\n' > "$WORK/rb-2/.planning/workstreams/w1/phases/03-q/03-CONTEXT.md"
+  { printf '### Phase 3: q\n'; cat "$WORK/rb-2/.planning/workstreams/w1/ROADMAP.md"; } > "$WORK/rb-2.roadmap"
+  cp "$WORK/rb-2.roadmap" "$WORK/rb-2/.planning/workstreams/w1/ROADMAP.md"
+  git -C "$WORK/rb-2" add -- .planning; git -C "$WORK/rb-2" commit -q -m "phase 3 q"
+  git -C "$WORK/rb-2" push -q origin main 2>/dev/null || { ko "D2C-REBASE pre-condition : push de rb-2 refuse"; miss=1; }
+  AV="$(jdata "$WORK/rb-1")"
+  git -C "$WORK/rb-1" pull -q --rebase > "$WORK/rb.out" 2> "$WORK/rb.err"; RC=$?
+  [ "$RC" -eq 0 ] || { ko "D2C-REBASE : le pull --rebase de rb-1 a echoue (rc=$RC) — $(tail -3 "$WORK/rb.err")"; miss=1; }
+  sonde_cri "$WORK/rb-1" "$WORK/rb.err" "$AV" || { ko "D2C-REBASE : sonde rouge sur rb-1 — $SONDE_WHY"; miss=1; }
+  JR="$(jfile "$WORK/rb-1")"
+  [ "$(field "$JR" $((AV + 2)) 2)" = "post-rewrite" ] || { ko "D2C-REBASE : champ 2 du journal de rb-1 ≠ post-rewrite"; miss=1; }
+  [ "$(field "$JR" $((AV + 2)) 5)" = "$(git -C "$WORK/rb-1" rev-parse HEAD)" ] || { ko "D2C-REBASE : champ 5 ≠ HEAD de rb-1 apres le rebase"; miss=1; }
+  case "$(field "$JR" $((AV + 2)) 6)" in *S2*) : ;; *) ko "D2C-REBASE : champ 6 ne contient pas S2"; miss=1 ;; esac
+fi
+[ "$miss" -eq 0 ] && ok "D2C-REBASE (P61-D-05) : pull --rebase avec commit local, seul le hook post-rewrite se declenche : divergence criee, ligne de journal post-rewrite portant le HEAD de rb-1 apres rebase"
 
 # ---------------------------------------------------------------------------
 # D2C-PLAN — le plan --dry-run declare la cible, rien n'est ecrit
