@@ -108,7 +108,7 @@
 - [x] Phase 58: Rôles de poste — installeur, profils solo / product / dev (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-22 : 12/12 plans, porte de phase verte, RLPO-01..12 cochées dont RLPO-11 par override (critère 6 et recette installeur non mesurés, Samuel, session principale, 2026-10-22 — dette dans 58-VERIFICATION.md), branche rebasée sur v2.70.1, release `v2.71.0` à venir
 - [x] Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-27 : 8/8 plans, porte de phase verte, PRDT-01..12 cochées, release à décider
 - [x] Phase 60: Gate architecture avant découpage et validation des phases proposées (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-29 : 9/9 plans, porte de phase verte (job `gates` rejoué depuis `ci.yml`, suites une à une), ARCG-02..08, 10 et 11 cochées, ARCG-01 partielle (dette : pose à la création non prouvée par une exécution), ARCG-09 partielle (critère 6 `clients` en code 2, en attente de la liste), release à décider
-- [ ] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0)
+- [x] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-29 : 8/8 plans, porte de phase verte (job `gates` rejoué depuis `ci.yml`, suites une à une), COLB-01..07 cochées, COLB-09 partielle (critère 6 `clients` en code 2), COLB-08 en attente de la preuve humaine (P61-B-01, P61-B-02), release à décider
 - [ ] Phase 62: Décision sur l'approche plateforme, sur preuve (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
@@ -179,6 +179,7 @@
 | 58. Rôles de poste — installeur, profils solo / product / dev | equipe-produit-v1.0 | 12/12 | Complete (2 overrides, Samuel 2026-10-22) — release `v2.71.0` à venir | 2026-10-22 |
 | 59. Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate | equipe-produit-v1.0 | 8/8 | Complete — porte de phase verte, PRDT-01..12 cochées, PR et release à décider | 2026-10-27 |
 | 60. Gate architecture avant découpage et validation des phases proposées | equipe-produit-v1.0 | 9/9 | Complete — porte de phase verte, ARCG-02..08, 10, 11 cochées, ARCG-01 et ARCG-09 partielles (dettes nommées), PR et release à décider | 2026-10-29 |
+| 61. Collaboration à deux humains — divergence armée, preuve sur lab réel | equipe-produit-v1.0 | 8/8 | Complete — porte de phase verte, COLB-01..07 cochées, COLB-09 partielle (dette nommée), COLB-08 décochée (preuve humaine attendue), PR et release à décider | 2026-10-29 |
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15 -->
 
@@ -682,22 +683,22 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 61-01-PLAN.md — vague 1 (tracer) : `vf-divergence-hook.sh` (arm, disarm, run), armement par l'engine au poste product/dev, suite à deux clones `test-divergence-deux-clones.sh` (install → hook → cri → journal)
-- [ ] 61-02-PLAN.md — vague 1 : champ `**Role**` des gabarits DECISIONS, LEARNINGS, BLOCKERS (source puis copies), suite `test-registres-role.sh` sur six consommateurs
+- [x] 61-01-PLAN.md — vague 1 (tracer) : `vf-divergence-hook.sh` (arm, disarm, run), armement par l'engine au poste product/dev, suite à deux clones `test-divergence-deux-clones.sh` (install → hook → cri → journal)
+- [x] 61-02-PLAN.md — vague 1 : champ `**Role**` des gabarits DECISIONS, LEARNINGS, BLOCKERS (source puis copies), suite `test-registres-role.sh` sur six consommateurs
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 61-03-PLAN.md — vague 2 : script du filet complet — `post-rewrite`, refus `core.hooksPath` / hook tiers / script sous l'arbre, armé à la main, `status`, journal blindé, suite `test-vf-divergence-hook.sh` à douze mutants
-- [ ] 61-04-PLAN.md — vague 2 : engine complet — retrait au poste solo et à `uninstall --all`, sortie `VF_DIVERGENCE_HOOK=off`, rafraîchissement à `update --all`, plan `--dry-run`, suite `test-vibeflow-update-divergence.sh` à dix mutants
+- [x] 61-03-PLAN.md — vague 2 : script du filet complet — `post-rewrite`, refus `core.hooksPath` / hook tiers / script sous l'arbre, armé à la main, `status`, journal blindé, suite `test-vf-divergence-hook.sh` à douze mutants
+- [x] 61-04-PLAN.md — vague 2 : engine complet — retrait au poste solo et à `uninstall --all`, sortie `VF_DIVERGENCE_HOOK=off`, rafraîchissement à `update --all`, plan `--dry-run`, suite `test-vibeflow-update-divergence.sh` à dix mutants
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 61-05-PLAN.md — vague 3 : preuve à deux clones complète (pull en avance rapide, `pull --rebase`, worktree, branche piégée, trois témoins rouges), recette du lab réel `61-RECETTE-LAB-REEL.md` et son relevé joué
-- [ ] 61-06-PLAN.md — vague 3 : minors de conductor (script et engine), consolidator et reference, catalogue de conductor
+- [x] 61-05-PLAN.md — vague 3 : preuve à deux clones complète (pull en avance rapide, `pull --rebase`, worktree, branche piégée, trois témoins rouges), recette du lab réel `61-RECETTE-LAB-REEL.md` et son relevé joué
+- [x] 61-06-PLAN.md — vague 3 : minors de conductor (script et engine), consolidator et reference, catalogue de conductor
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 61-07-PLAN.md — vague 4 : manuel FR et EN (filet armé, journal, limites, sortie, champ Role), compte de suites des README racine
+- [x] 61-07-PLAN.md — vague 4 : manuel FR et EN (filet armé, journal, limites, sortie, champ Role), compte de suites des README racine
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 61-08-PLAN.md — vague 5 : porte de phase rejouée depuis `ci.yml`, ledger à la main (COLB-08 décochée : preuve humaine), arrêt avant la PR
+- [x] 61-08-PLAN.md — vague 5 : porte de phase rejouée depuis `ci.yml`, ledger à la main (COLB-08 décochée : preuve humaine), arrêt avant la PR
 
 ### Phase 62: Décision sur l'approche plateforme, sur preuve
 

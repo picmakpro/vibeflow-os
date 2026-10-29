@@ -1,20 +1,20 @@
 ---
 gsd_state_version: "1.0"
 milestone: equipe-produit-v1.0
-current_phase: 60
-current_phase_name: Gate architecture avant découpage et validation des phases proposées
+current_phase: 61
+current_phase_name: Collaboration à deux humains — divergence armée, preuve sur lab réel
 status: executed
-last_updated: "2026-10-29T12:00:00.000Z"
+last_updated: "2026-10-29T18:00:00.000Z"
 last_activity: 2026-10-29
-last_activity_desc: Phase 60 exécutée — 9/9 plans, porte de phase rejouée depuis ci.yml (20 étapes vertes), ARCG-02..08, 10 et 11 cochées, ARCG-01 et ARCG-09 partielles (dettes nommées) — next : PR par le manager, relecture adverse SOBR-04, minor racine décidé après merge
+last_activity_desc: Phase 61 exécutée — 8/8 plans, porte de phase rejouée depuis ci.yml (20 étapes vertes), COLB-01..07 cochées, COLB-09 partielle (critère 6 clients en code 2), COLB-08 décochée (preuve humaine attendue) — next : PR par le manager, relecture adverse SOBR-04, minor racine décidé après merge, recette du lab réel par Samuel
 state_head: 45ee80db
 progress:
   total_phases: 6
-  completed_phases: 4
-  total_plans: 45
-  completed_plans: 45
+  completed_phases: 5
+  total_plans: 53
+  completed_plans: 53
 milestone_name: « l'équipe produit » — Phases 57-62 —
-stopped_at: "Phase 60 exécutée le 2026-10-29 (9/9 plans, porte verte) — arrêt avant PR, merge, tag et release"
+stopped_at: "Phase 61 exécutée le 2026-10-29 (8/8 plans, porte verte) — arrêt avant PR, merge, tag et release"
 ---
 
 # Project State
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 60 (Gate architecture avant découpage et validation des phases proposées) — EXÉCUTÉE (9/9 plans, porte de phase verte, ARCG-02..08, 10 et 11 cochées, ARCG-01 et ARCG-09 partielles) ; la Phase 59 reste exécutée (8/8) et la Phase 58 close (12/12)
-Jalon courant : `equipe-produit-v1.0` (Phases 57-62, inscrit 2026-10-08) ; 4 phases sur 6 closes ou exécutées. `fiabilite-v1.0` est CLOS
+Phase: 61 (Collaboration à deux humains — divergence armée, preuve sur lab réel) — EXÉCUTÉE (8/8 plans, porte de phase verte, COLB-01..07 cochées, COLB-09 partielle, COLB-08 décochée : preuve humaine attendue) ; les Phases 60 et 59 restent exécutées (9/9 et 8/8) et la Phase 58 close (12/12)
+Jalon courant : `equipe-produit-v1.0` (Phases 57-62, inscrit 2026-10-08) ; 5 phases sur 6 closes ou exécutées. `fiabilite-v1.0` est CLOS
 depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
 `.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).
 
@@ -52,6 +52,7 @@ Replanification 2026-10-20 (arbitrage Samuel, AskUserQuestion session principale
 Phase 58 : 58-11 close le 2026-10-20 (porte de phase rejouée depuis `ci.yml`, RLPO-01..10 et 12 cochées, RLPO-11 en attente du critère 6) ; rapport : `58-11-SUMMARY.md`.
 Phase 59 exécutée le 2026-10-27 (rapport : `59-08-SUMMARY.md`) : porte de phase rejouée depuis `ci.yml`, suites une à une, périmètre du diff contrôlé ; next : PR ouverte par le manager, relecture adverse SOBR-04, release `v2.72.0` décidée à part (arrêt avant merge, tag et release).
 Phase 60 exécutée le 2026-10-29 (rapport : `60-09-SUMMARY.md`) : porte de phase rejouée depuis `ci.yml` (20 étapes vertes, 3 sautées nommées), quatorze suites une à une, périmètre du diff contrôlé ; dettes nommées : volet pose d'ARCG-01 non prouvé par une exécution (P60-PL-26), critère 6 `clients` en code 2 (ARCG-09), aucun run réel du worker architecte ; next : PR ouverte par le manager, relecture adverse SOBR-04, revue `@picmakpro` sur le registre d'instructions, minor racine décidé après merge (arrêt avant PR, merge, tag et release).
+Phase 61 exécutée le 2026-10-29 (rapport : `61-08-SUMMARY.md`) : porte de phase rejouée depuis `ci.yml` (20 étapes vertes, 3 sautées nommées), quinze suites une à une, périmètre du diff contrôlé ; COLB-08 décochée (procédure `61-RECETTE-LAB-REEL.md` livrée, preuve humaine : lab et humains P61-B-01, trois semaines P61-B-02), COLB-09 partielle (critère 6 `clients` en code 2) ; lectures à confirmer par Samuel : P61-H-01, P61-PL-03, P61-PL-08 ; next : PR ouverte par le manager, relecture adverse SOBR-04, minor racine décidé après merge, recette du lab réel par Samuel (arrêt avant PR, merge, tag et release ; la Phase 60 n'est pas mergée sous la branche).
 Next (Phase 58, historique) : dépôt de la liste de clients par Samuel (hors dépôt) puis `check-livraison-58.sh clients`, puis PR (rebase sur main = geste du manager) ; Q18 (faille `python -c` antérieure) hors cette phase, hotfix en parallèle.
 Last activity: 2026-10-20 — Phase 58 vérifiée human_needed 13/14
 
@@ -61,6 +62,7 @@ Last activity: 2026-10-20 — Phase 58 vérifiée human_needed 13/14
 
 <!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-10-12.md -->
 
+- P61-PL-01 à P61-PL-18 : décisions de planificateur (discrétion de P61-D-02 et P61-D-05, conséquences des P61-D et de P61-H-01), réalisées par les plans 61-01 à 61-08.
 - P60-PL-01 à P60-PL-27 : décisions de planificateur (discrétion P60-D-03..06, conséquences des P60-D et P60-H), réalisées par les plans 60-01 à 60-09.
 - P59-PL-01 à P59-PL-22 : décisions de planificateur (discrétion P59-D-14..22), réalisées par les plans 59-01 à 59-08.
 - P58-PL-01 à P58-PL-14 : décisions de planificateur (discrétion P58-D-15..20), réalisées par les plans 58-01 à 58-12, plus P58-D-21 (filtrage des presets, plan 58-12).
