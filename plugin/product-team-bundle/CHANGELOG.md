@@ -1,5 +1,14 @@
 # Changelog — product-team-bundle
 
+## [v1.1.0] — 2026-10-29 (worker architecte)
+
+**Minor.**
+
+- Worker interne `vf-product-architect` (P59-D-01, arbitrage Samuel, AskUserQuestion session principale, 2026-10-27) : rédige `.planning/ARCHITECTURE.md` proposée depuis le gabarit de planning-core, le BRIEF et le PRD, en assemblant le skill `software-architecture` et la carte du code quand elle existe ; sans Bash ni Agent, il ne lance aucun mappeur et ne valide jamais.
+- Livrable `architecture` du manager et de la front door : chaîne architecte → humain, contrôle par `check-architecture.sh` (conductor, état attendu `statut=proposee`), validation par un dev via `vf-validation.sh`, puis découpage.
+- Allowlist du manager étendue (monde fermé), une ligne neuve au registre d'instructions, `test-product-team-bundle.sh` étendue (ancres, mutants).
+- Aucune release racine.
+
 ## [v1.0.0] — 2026-10-27 (naissance du bundle produit) — publiée dans v2.72.0
 
 - Composition : manager `vf-product-manager`, workers internes `vf-product-analyst` (BRIEF) et `vf-product-pm` (PRD), juge interne `prd-gate` (rubric /100, seuil 80), gate déterministe `scripts/check-prd.sh`.
