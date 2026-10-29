@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.51.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.52.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -117,9 +117,11 @@ la pose, aucun contrôle d'accès n'y est adossé. En poste `product`, la chaîn
 ouvert à ce poste) pose superpowers, qui apporte aussi des skills orientés dev (TDD, débogage) : « commande dev »
 désigne les skills et agents des trois modules `roles:["dev"]` plus gsd-*, pas superpowers.
 
-## Scripts (41) — par famille
+## Scripts (42) — par famille
 
-*(Compte re-dérivé au 2026-10-29, Phase 60 : même commande → 41 ; il gagne `check-phase-validation.sh`,
+*(Compte re-dérivé au 2026-10-29, Phase 61 : même commande → 42 ; il gagne `vf-divergence-hook.sh` (+1)
+au-dessus du compte 41 ci-dessous. Parenthèse historique ci-dessous, inchangée : compte re-dérivé au
+2026-10-29, Phase 60 : même commande → 41 ; il gagne `check-phase-validation.sh`,
 `check-architecture.sh` et `vf-validation.sh` (+3) au-dessus du compte 38 du 2026-10-16.
 Parenthèse historique ci-dessous, inchangée : compte re-dérivé au 2026-10-16, Phase 58 : même commande → 38 ; il gagne `check-role-consistency.sh`
 et `vf-role.sh` (+2) au-dessus du compte 36 de `origin/main`. Parenthèse historique ci-dessous,
@@ -249,10 +251,32 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   S2 + S4(a) + S4(b) + S5 (numéro de phase dupliqué dans un compartiment, cardinalité
   dossiers/entrées de feuille de route/compteurs, fuite d'une phase de compartiment vers la
   racine). Quatre codes de sortie : `0` conforme, `1` divergence, `2` non vérifiable, `3` silence
-  (dépôt non partitionné). Consommé par `scripts/hooks/post-merge` à la racine du dépôt (**opt-in**,
-  `git config core.hooksPath scripts/hooks`, jamais armé par défaut, n'interrompt jamais un merge)
-  et par le job CI `gates` (preuve locale par bascule de mutation — aucun run GitHub Actions réel
-  observé à ce jour, rien n'ayant encore été poussé). Doctrine : `dev-orchestrator/references/workstreams.md` §4.
+  (dépôt non partitionné). Consommé par `scripts/hooks/post-merge` à la racine de CE dépôt (**opt-in**,
+  `git config core.hooksPath scripts/hooks`, jamais armé par défaut ici, n'interrompt jamais un merge ;
+  fichier intouché par la Phase 61) et par le job CI `gates` (preuve locale par bascule de mutation —
+  aucun run GitHub Actions réel observé à ce jour, rien n'ayant encore été poussé). Dans un LAB, il est
+  au contraire armé par défaut aux postes `product` et `dev`, par `vf-divergence-hook.sh` (entrée
+  suivante) posé par l'installeur ; jamais au poste `solo`. Doctrine : `dev-orchestrator/references/workstreams.md` §4.
+- `vf-divergence-hook.sh` — filet de divergence ARMÉ dans un clone de lab d'équipe (Phase 61, spec
+  équipe-produit §5.3, COLB-01 à COLB-07). Verbes : `arm [--path <dir>] [--check|--refresh]`, `disarm`,
+  `status`, `run --hook <post-merge|post-rewrite>`. L'installeur l'arme aux postes `product` et `dev`
+  (`install`, verbe `role`), le retire au poste `solo`, à `uninstall --all` et sous
+  `VF_DIVERGENCE_HOOK=off` (sortie explicite, lue à chaque install), et le rafraîchit à `update --all`
+  (le chemin du cache versionné change, un clone non armé n'est JAMAIS armé par une mise à jour). Il
+  pose deux hooks statiques `post-merge` et `post-rewrite` dans le dossier de hooks réel du clone
+  (`git rev-parse --git-path hooks`, worktrees compris), jamais par `core.hooksPath` ; un hook
+  tiers, un `core.hooksPath` configuré ou un lab qui n'est pas la racine du dépôt sont REFUSÉS
+  audiblement (code 1, ligne à ajouter à la main) sans jamais faire échouer l'installation. Le hook
+  n'exécute que le script du cache du plugin (jamais un fichier de l'arbre versionné du lab) et
+  inspecte le worktree courant ; chemin disparu → `NON VERIFIABLE` audible, jamais un faux conforme.
+  Chaque exécution non silencieuse (divergence, non vérifiable) ajoute une ligne à un journal non
+  versionné `<git-common-dir>/vf-divergence/journal.tsv` (sept champs tabulés, survit au désarmement).
+  Codes de `run` : 0 silence, 1 divergence, 2 non vérifiable, 64 usage. Limites mesurées (git 2.50.1) :
+  `git pull --rebase` avec commit local ne passe que par `post-rewrite` (doublé exprès) ; `reset --hard`,
+  `switch`/`checkout`, `cherry-pick` et un `rebase` qui ne réécrit aucun commit ne déclenchent aucun
+  hook ; une fusion faite sur la forge n'est vue qu'au `git pull` local suivant. Suites : `test-vf-divergence-hook.sh`
+  (37 cas, 12 mutants), `test-vibeflow-update-divergence.sh` (installeur, 10 mutants) et la preuve à deux
+  clones `test-divergence-deux-clones.sh` (16 cas, témoins rouges) sous `plugin/_internal/tests/`.
 - `check-instruction-budget.sh` — mesure et publie, par fichier d'agent distribué
   (`plugin/*/agents/*.md` et `plugin/*/AGENT.md`), deux métriques : lignes du fichier entier et
   instructions du body (Phase 25, BUDG-01/02, ADR-029). Ratchet par sentinelle versionnée
