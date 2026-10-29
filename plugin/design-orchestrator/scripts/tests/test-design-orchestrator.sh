@@ -75,7 +75,8 @@ GREP="$(command -v grep)"
 
 # CEINTURE (#166 volet 10) : la suite ne doit JAMAIS atteindre un vrai `claude`/`codex`. Un faux de
 # chaque, journalisant son argv complet, est posé EN TÊTE de PATH pour toute la durée de la suite
-# (les cas qui réduisent PATH le gardent en tête, ou ne lancent rien hors dry-run). Le garde final
+# (les cas qui réduisent PATH le gardent en tête ; un PATH réduit SANS $BELT_DIR n'est couvert que par
+# le dry-run ou le SKIP du cas, jamais par la ceinture). Le garde final
 # (T9z) lit le journal : aucun `plugin install|enable|add|marketplace` ne doit y figurer, et il doit
 # y figurer au moins un appel (témoin positif, sinon la garde serait verte à vide si la ceinture
 # n'était plus posée). Retirer la ceinture rend T9z rouge.
@@ -422,8 +423,8 @@ SH
   # dry-run, ce cas exécutait alors le VRAI claude (install réelle) ; et la dégradation « CLI
   # absente » n'y est de toute façon pas mesurable.
   T9D_BIN="$(mktemp -d)"
-  if (PATH="$T9D_BIN:/usr/bin:/bin"; command -v claude >/dev/null 2>&1); then
-    skip "T9d dégradation : un claude existe dans le PATH réduit (/usr/bin:/bin) — CLI absente non simulable ici"
+  if (PATH="$T9D_BIN:/usr/bin:/bin"; command -v claude >/dev/null 2>&1 || command -v codex >/dev/null 2>&1); then
+    skip "T9d dégradation : un claude/codex existe dans le PATH réduit (/usr/bin:/bin) — CLI absente non simulable ici"
     T9D_RC=skip
   else
     T9D_OUT="$(PATH="$T9D_BIN:/usr/bin:/bin" VF_DESIGN_ENSURE_DRY_RUN=1 bash "$EDD" 2>&1)"
@@ -650,7 +651,9 @@ EOF2
   MJ="$MOD/module.json"
   # module.json n'existe qu'en disposition SOURCE du dépôt plugin : en lab installé (.claude/), la
   # partie « requires » est sautée, jamais rougie (#166 volet 11) ; le reste de T9e reste exigé.
-  if [ -f "$MJ" ]; then
+  # Indicateur de disposition indépendant de module.json : dans le dépôt plugin (`_internal/` présent),
+  # un module.json absent est un KO, pas un SKIP.
+  if [ -f "$MJ" ] || [ -d "$REPO/_internal" ]; then
     req_list="$(sed -n '/"requires"/,/\]/p' "$MJ" 2>/dev/null | "$GREP" -o '"[A-Za-z0-9_-]*"' | "$GREP" -v '"requires"' | tr -d '"')"
     [ "$req_list" = "conductor" ] || { ko "T9e module.json : requires attendu ['conductor'] seul, obtenu: ${req_list:-<vide>}"; t9e_ok=0; }
     [ "$t9e_ok" -eq 1 ] && ok "T9e autonomie (D-04) : aucune dépendance d'exécution vers un autre module, module.json requires=['conductor']"
@@ -959,6 +962,21 @@ SH
     fi
     rm -rf "$T9S_BIN"
   fi
+  # (8) nom inconnu : visible MÊME sous --quiet (le hook /vf-update appelle en --quiet), exit 0 ; un
+  # saut de ligne dans VF_DESIGN_SKIP sépare comme une virgule (pas seulement la 1re ligne lue).
+  T9S_PROJ="$(mktemp -d)"; mkdir -p "$T9S_PROJ/.claude"
+  printf 'impecable\n' >"$T9S_PROJ/.claude/.vf-design-skip"
+  T9S_OUT="$(env VF_DESIGN_ENSURE_DRY_RUN=1 VF_DESIGN_ENSURE_FORCE=1 VF_SCOPE=project CLAUDE_PROJECT_DIR="$T9S_PROJ" bash "$EDD" --quiet 2>&1)"; T9S_RC=$?
+  T9S_NL="$(t9s_plan "VF_DESIGN_SKIP=ui-ux-pro-max
+impeccable")"
+  if [ "$T9S_RC" -eq 0 ] && t9s_has "$T9S_OUT" 'nom de plugin inconnu ignoré \(impecable' \
+     && ! t9s_has "$T9S_NL" '^\[ensure-design-deps\] \(dry-run\).*(impeccable|ui-ux-pro-max)' \
+     && t9s_planned "$T9S_NL" 'superpowers@'; then
+    ok "T9s (8) nom inconnu visible sous --quiet (exit 0) ; saut de ligne = séparateur dans VF_DESIGN_SKIP"
+  else
+    ko "T9s (8) nom inconnu sous --quiet muet, ou VF_DESIGN_SKIP multi-lignes mal lu (rc=$T9S_RC)"
+  fi
+  rm -rf "$T9S_PROJ"
   unset -f t9s_plan t9s_has t9s_planned
 fi
 
@@ -1300,10 +1318,12 @@ t9z_ok=1
   || { ko "T9z ceinture : le claude de tête de PATH n'est plus la ceinture ($(command -v claude || echo absent))"; t9z_ok=0; }
 [ -s "$BELT_JOURNAL" ] \
   || { ko "T9z ceinture : journal vide ou absent — aucun appel n'a atteint la ceinture (témoin positif manquant, ceinture retirée ?)"; t9z_ok=0; }
-if [ -s "$BELT_JOURNAL" ] && "$GREP" -Eq '^(claude|codex) plugin (install|enable|add|marketplace)' "$BELT_JOURNAL"; then
-  ko "T9z ceinture : appel d'écriture hors dry-run capturé par la ceinture : $("$GREP" -E '^(claude|codex) plugin (install|enable|add|marketplace)' "$BELT_JOURNAL" | head -3 | tr '\n' '|')"; t9z_ok=0
+# Liste BLANCHE : seule la lecture `plugin list [--json]` est émise par la suite ; tout autre appel
+# (install, enable, disable, uninstall, update, marketplace…) rougit.
+if [ -s "$BELT_JOURNAL" ] && "$GREP" -Evq '^(claude|codex) plugin list( --json)?$' "$BELT_JOURNAL"; then
+  ko "T9z ceinture : appel hors liste blanche (plugin list) capturé par la ceinture : $("$GREP" -Ev '^(claude|codex) plugin list( --json)?$' "$BELT_JOURNAL" | head -3 | tr '\n' '|')"; t9z_ok=0
 fi
-[ "$t9z_ok" -eq 1 ] && ok "T9z ceinture : $(wc -l <"$BELT_JOURNAL" | tr -d ' ') appel(s) de lecture capturés, aucun install/enable/add/marketplace — la suite n'atteint pas le vrai claude"
+[ "$t9z_ok" -eq 1 ] && ok "T9z ceinture : $(wc -l <"$BELT_JOURNAL" | tr -d ' ') appel(s) de lecture capturés, seule la lecture plugin list — la suite n'atteint pas le vrai claude"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

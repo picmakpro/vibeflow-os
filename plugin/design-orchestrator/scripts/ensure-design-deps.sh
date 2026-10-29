@@ -47,7 +47,8 @@
 #                             ui-ux-pro-max, frontend-design, impeccable (espaces tolérés). Un plugin
 #                             exclu n'est ni installé ni activé ; sans --quiet une ligne
 #                             `<nom> : exclu (VF_DESIGN_SKIP)` le dit, et le résumé affiche
-#                             `<nom>=exclu`. Nom inconnu → ligne log, ignoré (jamais un exit non nul).
+#                             `<nom>=exclu`. Nom inconnu → ligne notice (visible même sous --quiet),
+#                             ignoré (jamais un exit non nul). Un saut de ligne vaut séparateur.
 #                             `superpowers` est une dépendance dure de VibeFlow : son exclusion est
 #                             REFUSÉE (message clair), traitement normal ensuite.
 #
@@ -327,7 +328,9 @@ register_skip() { # nom origine
         *) SKIPPED="$SKIPPED|$n=$org" ;;
       esac
       ;;
-    *) log "exclusion : nom de plugin inconnu ignoré ($n, $org)" ;;
+    # notice et non log : /vf-update appelle en --quiet, un nom faux (faute de frappe) ne doit pas
+    # laisser le plugin s'installer sans aucune trace.
+    *) notice "exclusion : nom de plugin inconnu ignoré ($n, $org)" ;;
   esac
 }
 
@@ -352,7 +355,11 @@ read_skip_file() { # chemin ; absent ou illisible = aucune exclusion
 load_exclusions() {
   local item cfg
   local -a items
-  IFS=',' read -r -a items <<<"${VF_DESIGN_SKIP:-}"
+  # Les sauts de ligne (et CR) séparent aussi : `read` ne lit qu'une ligne.
+  local raw="${VF_DESIGN_SKIP:-}"
+  raw="${raw//$'\n'/,}"
+  raw="${raw//$'\r'/,}"
+  IFS=',' read -r -a items <<<"$raw"
   for item in ${items[@]+"${items[@]}"}; do
     item="${item#"${item%%[![:space:]]*}"}"
     item="${item%"${item##*[![:space:]]}"}"
