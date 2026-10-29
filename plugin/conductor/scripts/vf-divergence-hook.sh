@@ -249,7 +249,7 @@ do_run() {
 # arm / disarm / status
 # ---------------------------------------------------------------------------
 do_arm() {
-  local mode="arm" rc name f
+  local mode="arm" rc name f refused
   ROOT="."
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -274,6 +274,37 @@ do_arm() {
     printf 'BILAN verbe=arm code=0\n'
     exit 0
   fi
+  if [ "$mode" = "refresh" ]; then
+    # --refresh : seul un hook deja nostre est reecrit ; un clone non arme n'est jamais arme ici.
+    for name in $(hook_names); do
+      f="$HOOKS_DIR/$name"
+      is_ours "$f" || continue
+      if write_hook "$HOOKS_DIR" "$name"; then
+        say "rafraichi : $f"
+      else
+        say "NON VERIFIABLE : ecriture de $f echouee"
+        printf 'BILAN verbe=arm code=2\n'; exit 2
+      fi
+    done
+    printf 'BILAN verbe=arm code=0\n'
+    exit 0
+  fi
+  # Refus AVANT toute ecriture : un hook present qui n'est pas le notre n'est ni ecrase, ni modifie,
+  # ni renomme (P61-D-02). Aucune ecriture de configuration git.
+  refused=0
+  for name in $(hook_names); do
+    f="$HOOKS_DIR/$name"
+    if { [ -e "$f" ] || [ -L "$f" ]; } && ! is_ours "$f"; then
+      refused=1
+      say "REFUS hook-tiers:$name"
+      say "LIGNE A AJOUTER A LA MAIN ($name) : bash '$SELF' run --hook $name \"\$@\""
+      say "SORTIE : VF_DIVERGENCE_HOOK=off"
+    fi
+  done
+  if [ "$refused" -eq 1 ]; then
+    printf 'BILAN verbe=arm code=1\n'
+    exit 1
+  fi
   mkdir -p "$HOOKS_DIR" 2>/dev/null || { say "NON VERIFIABLE : dossier de hooks non creable"; printf 'BILAN verbe=arm code=2\n'; exit 2; }
   for name in $(hook_names); do
     f="$HOOKS_DIR/$name"
@@ -288,8 +319,53 @@ do_arm() {
   exit 0
 }
 
-do_disarm() { say "disarm : non livre dans cette version"; exit 64; }
-do_status() { say "status : non livre dans cette version"; exit 64; }
+# parse_path_only <verbe> <args...> — verbes qui ne prennent que --path ; pose ROOT.
+parse_path_only() {
+  ROOT="."
+  shift
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --path)
+        [ "$#" -ge 2 ] && [ -n "$2" ] || usage
+        ROOT="$2"; shift 2 ;;
+      --path=*) ROOT="${1#--path=}"; [ -n "$ROOT" ] || usage; shift ;;
+      *) usage ;;
+    esac
+  done
+}
+
+do_disarm() {
+  local rc name f
+  parse_path_only disarm "$@"
+  resolve_repo; rc=$?
+  if [ "$rc" -eq 3 ]; then say "pas de depot git : rien a desarmer"; exit 3; fi
+  if [ "$rc" -ne 0 ]; then say "NON VERIFIABLE : depot illisible"; exit 2; fi
+  for name in $(hook_names); do
+    f="$HOOKS_DIR/$name"
+    if is_ours "$f"; then
+      rm -f "$f" 2>/dev/null || { say "NON VERIFIABLE : retrait de $f echoue"; exit 2; }
+      say "desarme : $f"
+    elif [ -e "$f" ] || [ -L "$f" ]; then
+      say "hook tiers laisse intact : $f"
+    fi
+  done
+  exit 0
+}
+
+do_status() {
+  local rc name f armed=0 total=0
+  parse_path_only status "$@"
+  resolve_repo; rc=$?
+  if [ "$rc" -eq 3 ]; then say "pas de depot git"; exit 3; fi
+  if [ "$rc" -ne 0 ]; then say "NON VERIFIABLE : depot illisible"; exit 2; fi
+  for name in $(hook_names); do
+    f="$HOOKS_DIR/$name"
+    total=$((total+1))
+    if is_ours "$f"; then armed=$((armed+1)); say "arme : $f"; else say "non arme : $f"; fi
+  done
+  [ "$armed" -eq "$total" ] || exit 1
+  exit 0
+}
 
 verb="${1:-}"
 case "$verb" in

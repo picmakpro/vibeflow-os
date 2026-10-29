@@ -121,9 +121,13 @@ if [ "$RC" -ne 0 ]; then
   ko "pre-condition : le depot d'origine n'est pas conforme (check-divergence rc=$RC) — la suite ne prouverait rien"
 fi
 
-for n in A B; do
+for n in A B C D G; do
   git clone -q "$WORK/origin.git" "$WORK/$n" 2>/dev/null; ident "$WORK/$n"
 done
+
+# Temoin : la liste du dossier de hooks d'un depot neuf (modeles de git comprises).
+git_init "$WORK/temoin"
+ls -1 "$WORK/temoin/.git/hooks" > "$WORK/hooks.temoin"
 
 # ---------------------------------------------------------------------------
 # D2C-TRACE — A (product) et B (dev) armes par l'install ; A pousse la phase 2-x, B commite la 2-y et tire.
@@ -173,6 +177,99 @@ else
   ko "D2C-TRACE : aucun journal sous le .git de B"; miss=1
 fi
 [ "$miss" -eq 0 ] && ok "D2C-TRACE (P61-D-01, P61-D-04, P61-D-08) : install dev -> vrai pull divergent -> cri sur stderr + une ligne de journal v1 a sept champs"
+
+# ---------------------------------------------------------------------------
+# D2C-TRACE-SOLO — sans poste, puis au poste solo : aucun hook, aucun journal, aucun core.hooksPath
+# ---------------------------------------------------------------------------
+miss=0
+inst "$WORK/C" "$WORK/cache" VF_SCOPE=project -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "D2C-TRACE-SOLO pre-condition : install sans poste rc=$RC"; miss=1; }
+inst "$WORK/C" "$WORK/cache" VF_ROLE=solo VF_SCOPE=project -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "D2C-TRACE-SOLO pre-condition : install solo rc=$RC"; miss=1; }
+local_commit "$WORK/C" y
+pull_divergent "$WORK/C"; RC=$?
+[ "$RC" -eq 0 ] || { ko "D2C-TRACE-SOLO : le pull de C a echoue (rc=$RC)"; miss=1; }
+ls -1 "$WORK/C/.git/hooks" > "$WORK/hooks.c"
+cmp -s "$WORK/hooks.c" "$WORK/hooks.temoin" || { ko "D2C-TRACE-SOLO : le dossier de hooks de C differe de celui d'un git init neuf"; miss=1; }
+[ ! -e "$WORK/C/.git/vf-divergence" ] || { ko "D2C-TRACE-SOLO : un dossier vf-divergence existe sous le .git de C"; miss=1; }
+git -C "$WORK/C" config --get core.hooksPath > /dev/null 2>&1; RC=$?
+[ "$RC" -eq 1 ] || { ko "D2C-TRACE-SOLO : core.hooksPath est configure dans C (rc=$RC)"; miss=1; }
+if "$GREP" -qF '[vf-divergence]' "$WORK/pull.err"; then ko "D2C-TRACE-SOLO : stderr du pull de C porte [vf-divergence]"; miss=1; fi
+[ "$miss" -eq 0 ] && ok "D2C-TRACE-SOLO (critere 2 du jalon) : sans poste puis solo, aucun hook, aucun journal, aucun core.hooksPath, pull muet"
+
+# ---------------------------------------------------------------------------
+# D2C-TRACE-TIERS — un post-merge tiers n'est ni ecrase ni modifie ; l'install aboutit
+# ---------------------------------------------------------------------------
+miss=0
+printf '#!/bin/sh\necho ran > "%s/tiers-witness"\n' "$WORK" > "$WORK/D/.git/hooks/post-merge"
+chmod 755 "$WORK/D/.git/hooks/post-merge"
+cp "$WORK/D/.git/hooks/post-merge" "$WORK/tiers.orig"
+inst "$WORK/D" "$WORK/cache" VF_ROLE=dev VF_SCOPE=project -- install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "D2C-TRACE-TIERS : l'install doit aboutir malgre le refus d'armement (rc=$RC)"; miss=1; }
+[ -f "$WORK/D/.claude/vibeflow-role" ] || { ko "D2C-TRACE-TIERS : le fichier de poste n'a pas ete pose"; miss=1; }
+cmp -s "$WORK/D/.git/hooks/post-merge" "$WORK/tiers.orig" || { ko "D2C-TRACE-TIERS : le hook tiers a ete modifie"; miss=1; }
+"$GREP" -qF 'ARMEMENT REFUSE (code 1)' "$WORK/err" || { ko "D2C-TRACE-TIERS : stderr de l'install sans « ARMEMENT REFUSE (code 1) »"; miss=1; }
+"$GREP" -qF 'LIGNE A AJOUTER A LA MAIN' "$WORK/err" || { ko "D2C-TRACE-TIERS : stderr de l'install sans la ligne a ajouter a la main"; miss=1; }
+git -C "$WORK/D" config --get core.hooksPath > /dev/null 2>&1; RC=$?
+[ "$RC" -eq 1 ] || { ko "D2C-TRACE-TIERS : core.hooksPath est configure dans D (rc=$RC)"; miss=1; }
+rm -f "$WORK/tiers-witness"
+local_commit "$WORK/D" y
+pull_divergent "$WORK/D"; RC=$?
+[ "$RC" -eq 0 ] || { ko "D2C-TRACE-TIERS : le pull de D a echoue (rc=$RC)"; miss=1; }
+[ -f "$WORK/tiers-witness" ] || { ko "D2C-TRACE-TIERS : le hook tiers ne s'est pas execute au pull"; miss=1; }
+[ ! -e "$WORK/D/.git/vf-divergence" ] || { ko "D2C-TRACE-TIERS : un journal existe alors que rien n'est arme"; miss=1; }
+[ "$miss" -eq 0 ] && ok "D2C-TRACE-TIERS (P61-D-02) : hook tiers intact a l'octet, armement refuse en code 1, install aboutie, core.hooksPath absent, le hook tiers fonctionne toujours"
+
+# ---------------------------------------------------------------------------
+# D2C-PLAN — le plan --dry-run declare la cible, rien n'est ecrit
+# ---------------------------------------------------------------------------
+miss=0
+inst "$WORK/G" "$WORK/cache" VF_ROLE=dev VF_SCOPE=project -- --dry-run install validator; RC=$?
+[ "$RC" -eq 0 ] || { ko "D2C-PLAN pre-condition : dry-run rc=$RC"; miss=1; }
+"$GREP" -qF "[plan] ~ $WORK/G/.git/hooks/post-merge  (filet de divergence : hook git du clone, hors de l'arbre versionn" "$WORK/out" \
+  || { ko "D2C-PLAN : ligne de plan du hook absente — $("$GREP" -F 'plan' "$WORK/out" | tail -3)"; miss=1; }
+[ ! -e "$WORK/G/.git/hooks/post-merge" ] || { ko "D2C-PLAN : le dry-run a pose un hook"; miss=1; }
+[ "$miss" -eq 0 ] && ok "D2C-PLAN : --dry-run declare la cible du hook git et n'ecrit rien"
+
+# ---------------------------------------------------------------------------
+# D2C-VERBES — --refresh, disarm, hors depot git (contrat du script)
+# ---------------------------------------------------------------------------
+HK="$REPO/conductor/scripts/vf-divergence-hook.sh"
+CHK="$WORK/cache/conductor/scripts/vf-divergence-hook.sh"
+miss=0
+# --refresh sur un clone non arme : rc 0, rien d'ecrit
+bash "$CHK" arm --refresh --path "$WORK/C" > /dev/null 2>&1; RC=$?
+{ [ "$RC" -eq 0 ] && [ ! -e "$WORK/C/.git/hooks/post-merge" ]; } || { ko "D2C-VERBES : --refresh sur un clone non arme (rc=$RC) a arme ou echoue"; miss=1; }
+# --refresh sur un clone arme : identique a l'octet
+cp "$WORK/B/.git/hooks/post-merge" "$WORK/b.before"
+bash "$CHK" arm --refresh --path "$WORK/B" > /dev/null 2>&1; RC=$?
+{ [ "$RC" -eq 0 ] && cmp -s "$WORK/B/.git/hooks/post-merge" "$WORK/b.before"; } || { ko "D2C-VERBES : --refresh sur un clone arme (rc=$RC) a change le hook"; miss=1; }
+# disarm sur le hook tiers : intact
+bash "$CHK" disarm --path "$WORK/D" > /dev/null 2>&1; RC=$?
+{ [ "$RC" -eq 0 ] && cmp -s "$WORK/D/.git/hooks/post-merge" "$WORK/tiers.orig"; } || { ko "D2C-VERBES : disarm a touche le hook tiers (rc=$RC)"; miss=1; }
+# disarm sur un clone arme : hook retire, journal conserve
+bash "$CHK" disarm --path "$WORK/B" > /dev/null 2>&1; RC=$?
+{ [ "$RC" -eq 0 ] && [ ! -e "$WORK/B/.git/hooks/post-merge" ]; } || { ko "D2C-VERBES : disarm n'a pas retire le hook de B (rc=$RC)"; miss=1; }
+[ "$(nlines "$WORK/B/.git/vf-divergence/journal.tsv" 2>/dev/null)" -eq 2 ] || { ko "D2C-VERBES : disarm a touche au journal de B"; miss=1; }
+# status : B desarme -> 1, A arme -> 0
+bash "$CHK" status --path "$WORK/B" > /dev/null 2>&1; RC=$?
+[ "$RC" -eq 1 ] || { ko "D2C-VERBES : status d'un clone desarme (rc=$RC, attendu 1)"; miss=1; }
+bash "$CHK" status --path "$WORK/A" > /dev/null 2>&1; RC=$?
+[ "$RC" -eq 0 ] || { ko "D2C-VERBES : status d'un clone arme (rc=$RC, attendu 0)"; miss=1; }
+# hors depot git : 3
+mkdir -p "$WORK/horsgit"
+for v in "arm --check" "arm" "disarm" "status"; do
+  (cd "$WORK/horsgit" && bash "$CHK" $v > /dev/null 2>&1 </dev/null); RC=$?
+  [ "$RC" -eq 3 ] || { ko "D2C-VERBES : « $v » hors depot git rend $RC (attendu 3)"; miss=1; }
+done
+# usage : 64
+bash "$CHK" arm --inconnu > /dev/null 2>&1; RC=$?
+[ "$RC" -eq 64 ] || { ko "D2C-VERBES : option inconnue rend $RC (attendu 64)"; miss=1; }
+bash "$CHK" run --hook inconnu > /dev/null 2>&1; RC=$?
+[ "$RC" -eq 64 ] || { ko "D2C-VERBES : run --hook inconnu rend $RC (attendu 64)"; miss=1; }
+# aucune ecriture de configuration git dans le script
+[ "$(awk '!/^[[:space:]]*#/ && /git config/ && !/--get/ { n++ } END { print n+0 }' "$HK")" -eq 0 ] || { ko "D2C-VERBES : le script ecrit une configuration git"; miss=1; }
+[ "$miss" -eq 0 ] && ok "D2C-VERBES : --refresh n'arme jamais et ne change rien d'un hook a jour, disarm retire le notre et jamais un autre, journal conserve, status, hors depot = 3, usage = 64"
 
 # ---------------------------------------------------------------------------
 echo "== resultat : $pass ok, $fail ko =="
