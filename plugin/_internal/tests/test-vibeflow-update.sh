@@ -218,10 +218,12 @@ CACHE="$LAB/cache"
 if prepare_module "$CACHE" "dev-orchestrator"; then
   (cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
      bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
-  if [ -f "$LAB/.gitignore" ]; then
-    ko "T3c (négatif) project : .gitignore créé alors que le scope n'est pas local (SCOPE-04 violé)"
+  # #166 (F6) : en scope project le moteur pose UNE règle dans ./.gitignore — celle de l'état propre à
+  # la machine (empreintes des patches locaux). SCOPE-04 reste borné : aucun chemin de module n'y entre.
+  if [ -f "$LAB/.gitignore" ] && [ "$(awk '$0 != ".claude/scripts/.vibeflow-sha256-*"' "$LAB/.gitignore" | wc -l | tr -d ' ')" -ne 0 ]; then
+    ko "T3c (négatif) project : .gitignore porte autre chose que la règle d'état machine alors que le scope n'est pas local (SCOPE-04 violé)"
   else
-    ok "T3c (négatif) project : .gitignore absent/inchangé — SCOPE-04 reste borné au scope local"
+    ok "T3c (négatif) project : .gitignore absent ou réduit à la règle d'état machine — SCOPE-04 reste borné au scope local"
   fi
 else
   skip "T3c (négatif) project : dev-orchestrator non copiable dans le cache de test"
@@ -2744,6 +2746,40 @@ if t58_fixture "$CACHE" 0; then
   [ "$miss" -eq 0 ] && ok "T58c : N=0 (sans {{VF_BASH}} ; scope user) → aucune ligne de routage, sorties non vides"
 else
   skip "T58c : software-architecture non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# T58d (#166, revue lot D) — run_merger relaie le stderr de merge-hooks.sh quand il ÉCHOUE : une ligne
+# `[merge-hooks] ERROR …` (et le reste) ressort sur stderr ; SEULE la ligne `[merge-hooks] local: N` est
+# filtrée ; le code d'échec est propagé (l'install avorte, le registre ne ment pas). Fixture : un faux
+# merge-hooks.sh dans $CACHE/_internal/ (cascade du moteur : le cache d'abord), qui émet les trois lignes
+# puis sort en 7. Un run_merger qui avale le stderr, qui ne filtre rien, ou qui perd le code, rougit.
+LAB="$(mktemp -d)"; CACHE="$LAB/cache"; FAKE_HOME="$LAB/home"; mkdir -p "$FAKE_HOME" "$LAB/.claude" "$CACHE/_internal"
+if t58_fixture "$CACHE" 1; then
+  cat > "$CACHE/_internal/merge-hooks.sh" <<'FAKEEOF'
+#!/usr/bin/env bash
+echo "warn avant" >&2
+echo "[merge-hooks] local: 3" >&2
+echo "[merge-hooks] ERROR: fragment JSON invalide (faux merger)" >&2
+exit 7
+FAKEEOF
+  chmod +x "$CACHE/_internal/merge-hooks.sh"
+  (cd "$LAB" && HOME="$FAKE_HOME" VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install software-architecture >"$LAB/fail.out" 2>"$LAB/fail.err")
+  T58D_RC=$?
+  miss=0
+  [ "$T58D_RC" -ne 0 ] || { ko "T58d : code de sortie non propagé (rc=$T58D_RC, attendu non nul : le merger sort en 7)"; miss=1; }
+  "$GREP" -qxF '[merge-hooks] ERROR: fragment JSON invalide (faux merger)' "$LAB/fail.err" \
+    || { ko "T58d : la ligne '[merge-hooks] ERROR …' n'est pas relayée sur stderr (obtenu: $("$GREP" -c 'merge-hooks' "$LAB/fail.err") ligne(s) merge-hooks)"; miss=1; }
+  "$GREP" -qxF 'warn avant' "$LAB/fail.err" \
+    || { ko "T58d : une ligne de stderr ordinaire du merger est filtrée à tort (attendu: 'warn avant')"; miss=1; }
+  "$GREP" -qF '[merge-hooks] local:' "$LAB/fail.err" \
+    && { ko "T58d : la ligne '[merge-hooks] local: N' n'est pas filtrée"; miss=1; }
+  "$GREP" -qF 'merge hooks ÉCHOUÉ pour software-architecture' "$LAB/fail.err" \
+    || { ko "T58d : message d'échec du moteur absent"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T58d : échec du merger — ligne ERROR relayée, seule 'local: N' filtrée, code d'échec propagé (rc=$T58D_RC)"
+else
+  skip "T58d : software-architecture non copiable dans le cache de test"
 fi
 rm -rf "$LAB"
 
