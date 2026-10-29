@@ -677,11 +677,27 @@ Plans:
 **Depends on:** 57 et 60.
 **Sources:** spec §5.3 ; Phase 39 (`check-divergence.sh`) ; ADR-069.
 **Hors périmètre :** un workstream par rôle (deux vérités, refusé par la spec §5.3).
-**Plans:** 0 plans
+**Plans:** 8 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 61 to break down)
+**Wave 1**
+- [ ] 61-01-PLAN.md — vague 1 (tracer) : `vf-divergence-hook.sh` (arm, disarm, run), armement par l'engine au poste product/dev, suite à deux clones `test-divergence-deux-clones.sh` (install → hook → cri → journal)
+- [ ] 61-02-PLAN.md — vague 1 : champ `**Role**` des gabarits DECISIONS, LEARNINGS, BLOCKERS (source puis copies), suite `test-registres-role.sh` sur six consommateurs
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 61-03-PLAN.md — vague 2 : script du filet complet — `post-rewrite`, refus `core.hooksPath` / hook tiers / script sous l'arbre, armé à la main, `status`, journal blindé, suite `test-vf-divergence-hook.sh` à douze mutants
+- [ ] 61-04-PLAN.md — vague 2 : engine complet — retrait au poste solo et à `uninstall --all`, sortie `VF_DIVERGENCE_HOOK=off`, rafraîchissement à `update --all`, plan `--dry-run`, suite `test-vibeflow-update-divergence.sh` à dix mutants
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 61-05-PLAN.md — vague 3 : preuve à deux clones complète (pull en avance rapide, `pull --rebase`, worktree, branche piégée, trois témoins rouges), recette du lab réel `61-RECETTE-LAB-REEL.md` et son relevé joué
+- [ ] 61-06-PLAN.md — vague 3 : minors de conductor (script et engine), consolidator et reference, catalogue de conductor
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 61-07-PLAN.md — vague 4 : manuel FR et EN (filet armé, journal, limites, sortie, champ Role), compte de suites des README racine
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 61-08-PLAN.md — vague 5 : porte de phase rejouée depuis `ci.yml`, ledger à la main (COLB-08 décochée : preuve humaine), arrêt avant la PR
 
 ### Phase 62: Décision sur l'approche plateforme, sur preuve
 
