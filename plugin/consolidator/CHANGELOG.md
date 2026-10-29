@@ -1,5 +1,13 @@
 # CHANGELOG — consolidator
 
+## [v1.12.0] — 2026-10-29 (champ Role des registres)
+
+**Minor** (capacité neuve : les entrées de registre peuvent nommer le poste de leur auteur ; Phase 61, P61-D-07, mandat Samuel, /vf-auto session principale, 2026-10-29 ; aucune release racine, elle reste un geste du manager après merge) :
+
+- **Ligne `**Role**` dans les trois copies de `references/templates-memoire/`** (`decisions-template.md`, `learnings-template.md`, `blockers-template.md`) : une ligne ajoutée à la fin du bloc de champs du squelette d'entrée, aucune retirée, identique à l'octet dans les trois. Valeur = sortie de `vf-role.sh get` (`solo`, `product` ou `dev`) ; ligne omise si le lecteur rend 1, 5 ou 64, jamais `solo` par défaut. Source modifiée d'abord dans le module `reference` (règle SYNC), copies ensuite.
+- **Aucun parseur modifié** : le champ est optionnel en lecture. Suite neuve `scripts/tests/test-registres-role.sh` (30 assertions, quatre mutants-témoins tués) : `check-registres.sh`, `reindex.sh`, `archive.sh`, `detect-duplicates.sh`, `detect-promotions.sh` et `seed-registres.sh` (six consommateurs) rendent la même chose avec et sans la ligne, et le comparateur est prouvé capable de rougir.
+- Limite constatée, non corrigée : `detect-promotions.sh` lit les 500 premiers caractères d'une entrée pour repérer un mot opérationnel ; la ligne `**Role**` (une vingtaine de caractères) décale cette fenêtre. Heuristique grossière soumise au tri humain final, effet marginal.
+
 ## [v1.11.4] — 2026-10-29 (reindex.sh conserve le mode du registre) — à publier dans la prochaine release
 
 **Patch** (#166 volet 4 ; lot « clôture des issues GitHub ») :
