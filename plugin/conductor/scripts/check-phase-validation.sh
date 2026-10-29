@@ -111,10 +111,54 @@ function secnum(s, lvl,   h, r) {
   if (r !~ /^[ \t]*:/) return ""
   return normnum(h)
 }
+# Contenu d'un span de code en ligne : un `<!--` n'y ouvre aucun commentaire (marqueur \004, retiré en sortie
+# de strip_comments). Appariement CommonMark des séries d'accents graves ; sans fermeture, elle reste littérale.
+function neutral(s,   n, P, i, k, nr, K, A, NX, LAST, r, c, out) {
+  n = split(s, P, "`")
+  if (n < 3) return s
+  nr = 0; i = 1
+  while (i < n) {
+    k = 1
+    while (i + k < n && P[i + k] == "") k++
+    nr++; K[nr] = k; A[nr] = i; i += k
+  }
+  split("", LAST)
+  for (r = nr; r >= 1; r--) { NX[r] = (K[r] in LAST) ? LAST[K[r]] : 0; LAST[K[r]] = r }
+  r = 1
+  while (r <= nr) {
+    if (NX[r]) {
+      c = NX[r]
+      for (i = A[r] + K[r]; i <= A[c]; i++) gsub(/<!--/, "<\004!--", P[i])
+      r = c + 1
+    } else r++
+  }
+  out = P[1]
+  for (i = 2; i <= n; i++) out = out "`" P[i]
+  return out
+}
+function strip_comments(s,   a, b) {
+  if (incom) {
+    b = index(s, "-->")
+    if (!b) return ""
+    s = substr(s, b + 3); incom = 0
+  }
+  if (index(s, "`") && index(s, "<!--")) s = neutral(s)
+  while ((a = index(s, "<!--")) > 0) {
+    b = index(substr(s, a + 4), "-->")
+    if (!b) { incom = 1; s = substr(s, 1, a - 1); gsub(/\004/, "", s); return s }
+    s = substr(s, 1, a - 1) substr(s, a + b + 6)
+  }
+  gsub(/\004/, "", s)
+  return s
+}
 BEGIN { want = normnum(want) }
 {
   line = $0
   if (NR == 1 && substr(line, 1, 3) == bom) line = substr(line, 4)
+  if (!infence) line = strip_comments(line)
+  t = line; sub(/^[ \t]+/, "", t); f3 = substr(t, 1, 3)
+  if (infence) { if (f3 == fch) infence = 0; next }
+  if (f3 == "```" || f3 == "~~~") { infence = 1; fch = f3; next }
   lvl = hlevel(line)
   if (lvl) {
     if (insec && lvl <= seclvl) insec = 0
@@ -151,9 +195,36 @@ indetermine() { say "INDETERMINE $1"; bump 3; }
 
 PLAN=".planning"
 ROADMAP="$PLAN/ROADMAP.md"
-if [ "$HAS_WS" -eq 1 ]; then indetermine "compartiment absent"; fi
+# Règles de nom et de résolution du compartiment : sourcées seulement quand --ws est donné (`$HERE` d'abord, copie
+# à plat par l'engine, puis le module voisin dans l'arbre du dépôt).
+POLICY_OK=0
+if [ "$HAS_WS" -eq 1 ]; then
+  HERE="$(cd "$(dirname "$0")" && pwd)"
+  for _cand in "$HERE/workstream-policy.sh" "$HERE/../../planning-core/scripts/workstream-policy.sh"; do
+    if [ -f "$_cand" ]; then
+      # shellcheck source=/dev/null
+      . "$_cand"; POLICY_OK=1; break
+    fi
+  done
+fi
+# Cible : la valeur de --ws seule, jamais un canal implicite. Rend 0 si ROADMAP résolu, sinon 3 ou 5 (déjà signalé).
+resolve() {
+  local rc
+  if [ "$HAS_WS" -eq 1 ]; then
+    if [ "$POLICY_OK" -ne 1 ]; then indetermine "politique de compartiment introuvable"; return 3; fi
+    vf_ws_name_valid "$WS" || usage_err "--ws : nom de compartiment refusé par la politique"
+    vf_ws_dir_resolve "$PLAN" "$WS"; rc=$?
+    case "$rc" in
+      0) ROADMAP="$VF_WS_DIR/ROADMAP.md"; return 0 ;;
+      1) indetermine "compartiment absent"; return 3 ;;
+      *) illisible compartiment "${VF_WS_REASON:-refus}"; return 5 ;;
+    esac
+  fi
+  if [ -e "$PLAN/workstreams" ] || [ -L "$PLAN/workstreams" ]; then indetermine "lab partitionne sans --ws"; return 3; fi
+  return 0
+}
 
-if [ "$WORST" -eq 0 ] && [ ! -e "$ROADMAP" ] && [ ! -L "$ROADMAP" ]; then indetermine "roadmap absent"; fi
+if resolve && [ ! -e "$ROADMAP" ] && [ ! -L "$ROADMAP" ]; then indetermine "roadmap absent"; fi
 
 if [ "$WORST" -eq 0 ]; then
   OUT_TXT=$(sed "s/$CR\$//" "$ROADMAP" | tr '\r' '\n' | awk -v bom="$BOM" -v want="$PHASE" "$AWK_PROG"); arc=$?
