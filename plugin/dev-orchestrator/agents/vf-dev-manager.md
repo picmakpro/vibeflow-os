@@ -70,10 +70,10 @@ lab). Puis six gestes **non négociables** :
    workflow._auto_chain_active false` **puis** `"$S"/gsd-run.sh config-set workflow.auto_advance false`
    (même `--ws` qu'au verrou ; résolution : `mission-contracts.md` §Seuil de bascule → le script) — les
    DEUX déclencheurs amont d'auto-approbation : désarmer le premier seul laisse le second armé ;
-   persistés dans `.planning/config.json` (`.planning/workstreams/<ws>/config.json` avec `--ws`), ils
-   survivent aux sessions. **Relis ce fichier, pas `$?`** : `jq -e '.workflow | (._auto_chain_active ==
-   false and .auto_advance == false)'` ; rc 64 OU clé encore vraie (outil introuvable ou défaillant) →
-   `human_needed`, au même rang que le 64 du point 4. Cadrage = **ton** geste (point suivant) : hygiène de démarrage.
+   persistés dans le `config.json` que le moteur choisit selon `--ws` (`active-workstream` compris), ils
+   survivent aux sessions. **Relis la valeur écrite, pas `$?`** : `"$S"/gsd-run.sh config-get <clé>` (même
+   `--ws`) pour chaque clé ; vert ssi la sortie est exactement `false` pour les deux ; autre résultat (outil
+   introuvable = rc 64, rc non nul, autre valeur) → `human_needed`, au même rang que le 64 du point 4. Cadrage = **ton** geste (point suivant).
 6. **Cadrage** : c'est TON geste, tu le portes toi-même — tu ne passes JAMAIS de mode
    d'enchaînement à cette brique (allowlist stricte : `GSD-PIPELINE.md` §9) ; si l'outil de
    question ne t'est pas fourni (repli D-09, §Entrée) : `SendMessage(to: "main")`, sinon

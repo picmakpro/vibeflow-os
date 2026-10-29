@@ -514,7 +514,7 @@ Résolution — un script livré, jamais un chemin en dur ni un nom nu (D1) : `"
 `mission-flow.md` §Résolution). `gsd_run` n'est PAS un binaire : c'est une fonction du préambule
 des workflows amont, absente du bash d'un agent (issue #47). Forme **dérivée**, pas reprise telle
 quelle, de `gsd-core/workflows/_runtime-launcher.snippet.sh` (gsd-core 1.9.0 ; divergences en D5).
-Cascade, premier existant parmi : (1) `$GSD_TOOLS` (fichier régulier non vide) ; (2)
+Cascade, premier existant parmi : (1) `$GSD_TOOLS` (variable non vide ET fichier régulier existant) ; (2)
 `./.claude/gsd-core/bin/gsd-tools.cjs` (scope projet) ; (3)
 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs` (scope user) ; (4) `command -v
 gsd-tools` en dernier. Les arguments sont transmis tels quels (`--ws <nom>` compris). Sortie : le
