@@ -642,15 +642,32 @@ Plans:
 ### Phase 60: Gate architecture avant découpage et validation des phases proposées
 
 **Goal:** Un gate séparé assemble l'existant : `software-architecture` et GSD (`gsd-map-codebase`, `gsd-graphify`). Le head refuse le découpage en phases tant que `ARCHITECTURE.md` n'est pas validée (A-08). Une phase ajoutée par le rôle product ou par le head reste **proposée** jusqu'à sa validation par un dev ; en solo, elle est auto-validée. Le mécanisme passe par un marqueur sur la phase et `check-phase-validation.sh` (A-07).
-**Requirements**: TBD — famille `ARCG` réservée, posée au cadrage.
+**Requirements**: ARCG-01, ARCG-02, ARCG-03, ARCG-04, ARCG-05, ARCG-06, ARCG-07, ARCG-08, ARCG-09, ARCG-10, ARCG-11 (posées à la planification, 2026-10-29, dérivées de P60-D-01..14 et P60-H-01..04 sans arbitrage neuf).
 **Depends on:** 59.
 **Sources:** spec §5.2 ; SEED A-07, A-08 ; `plugin/software-architecture/`, `plugin/audit-architecture/`.
-**Hors périmètre :** un gate bloquant sans halt condition (Q-04 : ADR-031 penche pour l'advisory).
-**Plans:** 0 plans
+**Hors périmètre :** un gate bloquant sans halt condition (Q-04 : ADR-031 penche pour l'advisory) ; `gsd-graphify` reste refusé (GSDA-08, P60-D-08).
+**Plans:** 9 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 60 to break down)
+**Wave 1**
+- [ ] 60-01-PLAN.md — vague 1 : marqueur de phase `**Validation:**`, gate `check-phase-validation.sh` et sa suite à mutants
+- [ ] 60-02-PLAN.md — vague 1 : gabarit `ARCHITECTURE` décisionnel de planning-core, gate `check-architecture.sh` et sa suite, minor de planning-core
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 60-03-PLAN.md — vague 2 : preuve sur fixture que les lecteurs GSD rendent le même résultat avec et sans marqueur
+- [ ] 60-04-PLAN.md — vague 2 : verbe de pose et de validation `vf-validation.sh` (phase, architecture), poste du validateur, preuve moteur sur sa sortie
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 60-05-PLAN.md — vague 3 : worker interne `vf-product-architect`, livrable `architecture` du manager et de la front door, baseline neuve, minor du bundle
+- [ ] 60-06-PLAN.md — vague 3 : refus de `vf-coder` et de `vf-auto`, §5 du head (gate architecture avant découpage), champ de brief de la pose, T45, minor de dev-orchestrator
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 60-07-PLAN.md — vague 4 : minor de conductor, catalogue de ses scripts, compte de suites des README racine
+- [ ] 60-08-PLAN.md — vague 4 : manuel FR et EN (gate architecture, étapes proposées, comptes d'agents bornés)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 60-09-PLAN.md — vague 5 : porte de phase rejouée depuis `ci.yml`, ledger à la main (ARCG-01 partielle tant que la pose n'est pas prouvée), arrêt avant la PR
 
 ### Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel
 
