@@ -1,5 +1,11 @@
 # CHANGELOG — infrastructure-audit
 
+## [v1.3.7] — 2026-10-29 (known-versions.txt à jour) — à publier dans la prochaine release
+
+**Patch** (#166, #153 §6.5 ; lot « clôture des issues GitHub ») :
+
+- **`known-versions.txt` couvre Claude Code jusqu'à 2.1.312** (#166, #153) : ajout de 2.1.296, 2.1.300, 2.1.301, 2.1.311 et 2.1.312 ; la liste s'arrêtait à 2.1.215, donc l'axe runtime rendait `version_note` « supposée compatible » sur le poste de référence. Cas T6b et T6c ajoutés à `test-audit-infra.sh` (T6 conservé). Aucun changement de logique.
+
 ## [v1.3.6] — 2026-10-23 (--strict --no-tests sans suite découverte) — publiée dans v2.71.2
 
 **Patch** (#153 ; release patch préparée sur demande de la session principale, 2026-10-23 ; publiée dans v2.71.2) :

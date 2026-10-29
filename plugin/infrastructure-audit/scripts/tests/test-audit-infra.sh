@@ -135,6 +135,18 @@ else
   ko "T6 whitelist toujours périmée (2.1.215 absent)"
 fi
 
+# T6b — #166/#153 : la version installée (2.1.312) est LISTÉE, pas seulement « supposée compatible »
+# (version_note vide : la liste ne retarde plus de 97 versions sur le poste de référence).
+OUT="$(run_in "$LAB" env PATH="$WORK/bin:$PATH" FAKE_CLAUDE_VERSION=2.1.312 "$BASH_BIN" "$SCRIPT" --axis=runtime 2>/dev/null)"
+if echo "$OUT" | grep -q '"version_known": true' && echo "$OUT" | grep -q '"version_note": ""'; then
+  ok "T6b #153 : 2.1.312 listée → known, version_note vide"
+else
+  ko "T6b 2.1.312 : known=true et version_note vide attendus, sortie : $OUT"
+fi
+for v in 2.1.296 2.1.300 2.1.301 2.1.311 2.1.312; do
+  grep -qx "$v" "$SRC_KNOWN" && ok "T6c #153 : known-versions.txt couvre $v" || ko "T6c $v absent de known-versions.txt"
+done
+
 # T7 — VG-5 (F13) : --strict sans .claude → exit 3 (INDÉTERMINÉ, plus de JSON à zéro en vert)
 EMPTY="$WORK/no-lab"; mkdir -p "$EMPTY"
 run_in "$EMPTY" "$BASH_BIN" "$SCRIPT" --strict --quick >/dev/null 2>&1
