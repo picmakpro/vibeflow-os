@@ -24,6 +24,12 @@
 # segment) se ferment dans les DEUX régimes. GW-Q45-* (lab partitionné) en prouvent le verdict et le message ; GW-AB compare le
 # lab plat à la copie gelée sauf sur la liste énumérée GW_AB_ENUM (règle et traçage des empreintes : en tête de la section).
 #
+# Borne de parallélisme des mutants : GW_MUT_PAR (entier >= 1, défaut 4) = nombre maximal de matrices de mutants
+# simultanées. Sans borne, les ~55 matrices tournaient toutes ensemble et saturaient un runner CI 4 vCPU (le job
+# perdait la communication, runs 40327136451 et 40802859178). La borne ne change ni la liste des mutants, ni les
+# ensembles attendus, ni le verdict, ni l'ordre d'évaluation (mutant_eval rejoue dans l'ordre de MUT_IDS) ; la suite
+# affiche le pic de concurrence mesuré.
+#
 # Exit 0 si tout passe, 1 sinon, 2 si la fixture est cassée (préflight).
 
 set -uo pipefail
@@ -1923,6 +1929,15 @@ mut_run() { # <guard> <journal> → code de sortie du sous-processus
   GW_MODE=matrice GW_GUARD="$1" "$BASH_BIN" "$SUITE" > "$2" 2>&1 < /dev/null
 }
 MUT_IDS=""
+GW_MUT_PAR="${GW_MUT_PAR:-4}"
+case "$GW_MUT_PAR" in ''|*[!0-9]*|0) echo "GW_MUT_PAR invalide ($GW_MUT_PAR) : entier >= 1 attendu" >&2; exit 2 ;; esac
+MUT_PEAK=0
+mut_running() { # nombre de matrices en cours (jobs de ce shell)
+  jobs -rp > "$WORK_DIR/.jobs-en-cours"; wc -l < "$WORK_DIR/.jobs-en-cours" | tr -d ' '
+}
+mut_throttle() { # attend qu'un emplacement se libère (bash 3.2 : pas de `wait -n`, comptage + attente courte)
+  while [ "$(mut_running)" -ge "$GW_MUT_PAR" ]; do sleep 0.2; done
+}
 mutant() { # <id> <ancre BRE> <expression sed s> <attendu> [<ancre 2> <expression 2>]
   # Prépare le mutant puis lance sa matrice EN ARRIÈRE-PLAN ; le verdict est rendu par mutant_eval, dans l'ordre,
   # après `wait`. Chaque sous-processus a son propre WORK_DIR.
@@ -1944,7 +1959,9 @@ mutant() { # <id> <ancre BRE> <expression sed s> <attendu> [<ancre 2> <expressio
   gw_extract_py "$dir/guard-driver-lock.sh" "$dir/embarque.py"
   if ! gw_py_compiles "$dir/embarque.py"; then echo "le programme python embarqué du mutant ne compile pas (il rougirait pour la mauvaise raison)" > "$dir/prepko"; return; fi
   chmod +x "$dir/guard-driver-lock.sh"
+  mut_throttle
   ( mut_run "$dir/guard-driver-lock.sh" "$dir/matrice.log"; echo $? > "$dir/rc" ) &
+  local cur; cur="$(mut_running)"; [ "$cur" -gt "$MUT_PEAK" ] && MUT_PEAK="$cur"
 }
 mutant_eval() { # <id>
   local id="$1" dir="$WORK_DIR/gw-mut-$1" rc got
@@ -2066,7 +2083,7 @@ mutant vide_both 'return 1  # D56-VIDE' 's@return 1  # D56-VIDE@return 0  # D56-
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
-echo "  durée des mutants : $((SECONDS-t0))s"
+echo "  durée des mutants : $((SECONDS-t0))s · pic de concurrence : $MUT_PEAK matrice(s) simultanée(s) (borne GW_MUT_PAR=$GW_MUT_PAR)"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
   echo "== mutants : $MUT_TOTAL/$MUT_TOTAL tués =="
 else

@@ -16,6 +16,10 @@
 # Modes : `full` (défaut) joue la matrice puis les mutants ; `matrice` est le sous-processus d'un mutant
 # (CW_CGH / CW_DAG désignent la copie mutée à côté de ses voisins), sans mutants (pas de récursion).
 #
+# Borne de parallélisme des mutants : GW_MUT_PAR (entier >= 1, défaut 4, même variable que test-guard-driver-lock-ws.sh) =
+# nombre maximal de matrices de mutants simultanées ; sans borne, elles saturaient un runner CI 4 vCPU. Ni la liste des
+# mutants, ni les attendus, ni le verdict, ni l'ordre d'évaluation ne changent ; le pic mesuré est affiché.
+#
 # Exit 0 si tout passe, 1 sinon, 2 si la fixture est cassée (préflight).
 
 set -uo pipefail
@@ -479,6 +483,15 @@ echo "== mutants =="
 # rougirait pour la mauvaise raison). La matrice (tous les cas ci-dessus) est rejouée en sous-processus contre la
 # copie ; l'ensemble des cas dont le verdict bascule est comparé EXACTEMENT à l'attendu. Matrices en parallèle.
 MUT_KILLED=0; MUT_TOTAL=9; MUT_IDS=""; t0=$SECONDS
+GW_MUT_PAR="${GW_MUT_PAR:-4}"
+case "$GW_MUT_PAR" in ''|*[!0-9]*|0) echo "GW_MUT_PAR invalide ($GW_MUT_PAR) : entier >= 1 attendu" >&2; exit 2 ;; esac
+MUT_PEAK=0
+mut_running() { # nombre de matrices en cours (jobs de ce shell)
+  jobs -rp > "$WORK_DIR/.jobs-en-cours"; wc -l < "$WORK_DIR/.jobs-en-cours" | tr -d ' '
+}
+mut_throttle() { # attend qu'un emplacement se libère (bash 3.2 : pas de `wait -n`, comptage + attente courte)
+  while [ "$(mut_running)" -ge "$GW_MUT_PAR" ]; do sleep 0.2; done
+}
 mut_fail_ids() { LC_ALL=C sed -n 's/^  ✗ \(CW-[A-Za-z0-9-]*\) .*/\1/p' "$1" | LC_ALL=C sort -u; }
 mut_dir() { # <dossier> <cgh|dag|cbc> → pose les voisins réels dans le dossier d'une copie (cbc n'en source aucun)
   mkdir -p "$1"; cp "$DL" "$1/driver-lock.sh"; cp "$POLICY" "$1/workstream-policy.sh"
@@ -502,7 +515,9 @@ mutant() { # <id> <cgh|dag> <ancre BRE> <expression sed> <attendu : cas séparé
   sed -i.bak -e "/$anchor/$expr" "$dir/$f"; rm -f "$dir/$f.bak"
   if cmp -s "$dir/$f" "$dir/copie-temoin.sh"; then echo "mutant NON OPPOSABLE : la substitution n'a rien changé" > "$dir/prepko"; return; fi
   if ! bash -n "$dir/$f" 2>/dev/null; then echo "le mutant n'est pas un script valide (il rougirait pour la mauvaise raison)" > "$dir/prepko"; return; fi
+  mut_throttle
   ( mut_run "$kind" "$dir" "$dir/matrice.log"; echo $? > "$dir/rc" ) &
+  local cur; cur="$(mut_running)"; [ "$cur" -gt "$MUT_PEAK" ] && MUT_PEAK="$cur"
 }
 mutant_eval() { # <id>
   local id="$1" dir="$WORK_DIR/mut-$1" rc got fam
@@ -552,7 +567,7 @@ for t in cgh dag cbc; do
   else ko "CW-M-témoin-$t" "la copie non mutée rend $nko cas en échec (ou n'a pas atteint son bilan)"; fi
 done
 for id in $MUT_IDS; do mutant_eval "$id"; done
-echo "  durée des mutants : $((SECONDS-t0))s"
+echo "  durée des mutants : $((SECONDS-t0))s · pic de concurrence : $MUT_PEAK matrice(s) simultanée(s) (borne GW_MUT_PAR=$GW_MUT_PAR)"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
   echo "== mutants : $MUT_TOTAL/$MUT_TOTAL tués =="
 else
