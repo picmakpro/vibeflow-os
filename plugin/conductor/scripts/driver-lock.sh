@@ -397,9 +397,13 @@ LOCK_BASE="$(basename "$LOCK_DIR")"
 # SUIT un lien vers un dossier et deplace la source DEDANS (verifie sur ce poste) — le lock
 # serait alors intact et le nouveau claim invisible. GNU/Linux et uutils : -T ; BSD/macOS : -h. -T d'ABORD : sous
 # uutils coreutils (mv Rust) `-h` vaut --help (aide sur stdout, rc 0, rien deplace), donc un `-h` en tete court-circuite
-# le repli ; BSD/macOS rejette -T (rc 64) et retombe sur -h, qui fait le travail (#166 volet 9).
+# le repli ; BSD/macOS rejette -T (rc 64) et retombe sur -h, qui fait le travail (#166 volet 9). Sortie de mv
+# jetee (stdout comprise : un mv qui prend -h pour --help y imprimerait son aide, dans le JSON du script) et rc
+# HONNETE : succes seulement si la source a disparu, un -h qui n'a rien deplace ne passe plus pour un succes.
 mv_link() {
-  mv -T "$1" "$2" 2>/dev/null || mv -h "$1" "$2" 2>/dev/null
+  { [ -L "$1" ] || [ -e "$1" ]; } || return 1
+  mv -T "$1" "$2" >/dev/null 2>&1 || mv -h "$1" "$2" >/dev/null 2>&1
+  [ ! -L "$1" ] && [ ! -e "$1" ]
 }
 
 # Deplacement SANS ECRASER ET SANS SUIVRE un lien (AU3-04) : `mv -n` seul, si la destination est un lien vers un
@@ -407,9 +411,11 @@ mv_link() {
 # -nT ; BSD/macOS : -nh, en repli (BSD rejette -T, rc 64). -nT d'ABORD : sous uutils `-h` vaut --help (rc 0, rien
 # deplace) et court-circuiterait le repli. Le code de sortie n'est pas fiable (BSD rend 0 devant une destination
 # prise) : l'appelant VERIFIE le resultat (lock_gen), jamais ce code.
+# La redirection de STDOUT est portee par la fonction (pas par chaque mv) : l'aide d'un mv qui prend -h pour --help
+# n'atteint jamais le JSON du script, et la ligne de commande reste celle que le mutant tk_noclobber_none vise.
 mv_noclobber() {
   mv -nT "$1" "$2" 2>/dev/null || mv -nh "$1" "$2" 2>/dev/null
-}
+} >/dev/null
 
 # Creation ATOMIQUE d'un lien, qui ECHOUE si le nom est deja pris — c'est le primitif qui
 # departage les acquisitions concurrentes. MEME PIEGE que `mv` : sans option, `ln -s A B` ou B

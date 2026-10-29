@@ -1005,11 +1005,19 @@ assert "T66.5, ag-b seul dans l'inventaire" "$out" '"agent_id": "ag-b"'
 echo "=== T67, outillage uutils coreutils : -h vaut --help (aide sur stdout, rc 0, rien fait) ==="
 # Hypothèse SIMULÉE (aucun uutils réel n'est disponible dans cette suite) : des faux `ln` et `mv`, posés en
 # tête d'un PATH temporaire, traitent toute option contenant `h` comme --help (aide, rc 0, aucun effet) ;
-# `mv` comprend en plus -T (il le traduit en -h BSD avant de déléguer, comme le ferait un mv qui le gère).
+# `mv` comprend en plus -T : il le délègue au vrai mv avec l'option qui réalise -T SUR CET OS, sondée une fois
+# ci-dessous (-T sous GNU/uutils, -h sous BSD/macOS) sans rien supposer — la suite rend le même verdict partout.
 # Tout le reste est délégué au vrai binaire, résolu par chemin absolu AVANT de modifier le PATH. Sur le code
 # où `ln -sh`/`mv -h` passaient en premier, le repli `||` ne jouait jamais : le second propriétaire recevait
 # "acquired": true, et la reprise d'un lock périmé ne remplaçait pas le lien.
 _t67_ln="$(command -v ln)"; _t67_mv="$(command -v mv)"
+_t67_tflag=""; _t67_p="$WORK_DIR/probe67"; mkdir -p "$_t67_p/cible"
+for _t67_o in T h; do   # première option qui remplace le lien SANS enterrer la source dans sa cible
+  rm -rf "$_t67_p/l" "$_t67_p/f" "$_t67_p/cible/f"; : > "$_t67_p/f"; ln -s cible "$_t67_p/l"
+  "$_t67_mv" "-$_t67_o" "$_t67_p/f" "$_t67_p/l" >/dev/null 2>&1
+  if [ -f "$_t67_p/l" ] && [ ! -L "$_t67_p/l" ] && [ ! -e "$_t67_p/cible/f" ]; then _t67_tflag="$_t67_o"; break; fi
+done
+[ -n "$_t67_tflag" ]; assert_exit "T67.0, sonde : une option de mv (T ou h) réalise -T sur cet OS (obtenu : '$_t67_tflag')" "$?" 0
 _t67_bin="$WORK_DIR/fakebin67"; mkdir -p "$_t67_bin"
 cat > "$_t67_bin/ln" <<FAKE
 #!/bin/sh
@@ -1020,7 +1028,7 @@ cat > "$_t67_bin/mv" <<FAKE
 #!/bin/sh
 case "\$1" in
   -*h*) echo "Usage: mv [OPTION]... SOURCE DEST (faux uutils)"; exit 0 ;;
-  -*T*) o="\$1"; shift; exec "$_t67_mv" "\$(printf '%s' "\$o" | tr T h)" "\$@" ;;
+  -*T*) o="\$1"; shift; exec "$_t67_mv" "\$(printf '%s' "\$o" | tr T $_t67_tflag)" "\$@" ;;
 esac
 exec "$_t67_mv" "\$@"
 FAKE
@@ -1050,6 +1058,17 @@ _t67_d="$WORK_DIR/nc67"; rm -rf "$_t67_d"; mkdir -p "$_t67_d/src" "$_t67_d/autre
 mkdir -p "$_t67_d/src2"; echo s2 > "$_t67_d/src2/f"; ln -s autre "$_t67_d/lien"
 ( PATH="$_t67_binmv:$PATH"; mv_noclobber "$_t67_d/src2" "$_t67_d/lien" )
 [ -f "$_t67_d/src2/f" ] && [ ! -e "$_t67_d/autre/src2" ] && [ -L "$_t67_d/lien" ]; assert_exit "T67.7, nom pris par un lien vers un dossier : rien écrasé, rien enterré dans la cible" "$?" 0
+# Aucun texte de mv ne pollue la sortie du script (JSON) et un déplacement qui n'a rien fait n'est pas un succès :
+# -T échoue vraiment (destination dans un dossier absent) et le repli -h imprimerait l'aide du faux mv, rc 0.
+eval "$(sed -n '/^mv_link() {/,/^}/p' "$SCRIPT")"
+echo s > "$_t67_d/s8"
+out=$(PATH="$_t67_binmv:$PATH"; mv_link "$_t67_d/s8" "$_t67_d/absent/dst"); rc=$?
+[ -z "$out" ]; assert_exit "T67.8, mv_link : aucune sortie parasite quand le déplacement échoue" "$?" 0
+[ "$rc" -ne 0 ]; assert_exit "T67.9, mv_link qui n'a rien déplacé ne rend pas 0 (rc=$rc)" "$?" 0
+out=$(PATH="$_t67_binmv:$PATH"; mv_link "$_t67_d/inexistant" "$_t67_d/dst"); rc=$?
+[ -z "$out" ] && [ "$rc" -ne 0 ]; assert_exit "T67.9b, mv_link sur une source absente : ni sortie ni succès (rc=$rc)" "$?" 0
+out=$(PATH="$_t67_binmv:$PATH"; mv_noclobber "$_t67_d/s8" "$_t67_d/absent/dst"); rc=$?
+[ -z "$out" ]; assert_exit "T67.10, mv_noclobber : aucune sortie parasite quand le déplacement échoue" "$?" 0
 rm -rf "$_t67_d"
 rm -rf "$_t67_bin" "$_t67_binmv"
 
