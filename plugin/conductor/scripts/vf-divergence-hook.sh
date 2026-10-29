@@ -22,10 +22,10 @@
 #       Retire les hooks nostres (marqueur en ligne 2), jamais un autre. Le journal reste.
 #   vf-divergence-hook.sh status [--path <dir>]
 #       Dit si le clone est arme (tous les hooks vises portent le marqueur).
-#   vf-divergence-hook.sh run --hook post-merge [args git...]
+#   vf-divergence-hook.sh run --hook <post-merge|post-rewrite> [args git...]
 #       Travail du hook : joue `check-divergence.sh --path <--show-toplevel>` et se branche sur son
-#       code. `--hook post-rewrite` est accepte (seul l'argument `rebase` joue le controle ; `amend`
-#       est silencieux). Un post-merge n'annule jamais la fusion : il est BRUYANT, il ne bloque pas.
+#       code. `--hook post-rewrite` : seul l'argument `rebase` joue le controle (comme post-merge) ;
+#       `amend` est silencieux. Un post-merge n'annule jamais la fusion : il est BRUYANT, il ne bloque pas.
 #
 # CODES (chacun enumere, aucun implicite).
 #   arm :
@@ -70,11 +70,25 @@
 #     7 raison (introuvable | code-<n> | ...), ou -
 #   Aucun contenu du depot n'y entre. Le journal survit au desarmement.
 #
-# LIMITES DE COUVERTURE (mesurees, git 2.50.1). Se declenchent : `git pull` (avance rapide ou
-# fusion), `git merge`, `git merge --squash`, et via post-rewrite `git pull --rebase` avec commit local
-# (argument `rebase`). NE se declenchent PAS : `git reset --hard`, `git switch` / `git checkout`,
-# `git cherry-pick`, un `git rebase` qui ne reecrit aucun commit. Une fusion faite sur la forge n'est
-# vue qu'au `git pull` local suivant.
+# MATRICE DES HOOKS (mesuree a la planification, git 2.50.1 ; P61-D-05 tranche par la mesure : le filet
+# pose `post-merge` ET `post-rewrite`).
+#   git pull (avance rapide)                       -> post-merge 0
+#   git pull --ff-only                             -> post-merge 0
+#   git pull --no-rebase / git merge (vraie fusion)-> post-merge 0
+#   git merge --squash                             -> post-merge 1
+#   git pull --rebase SANS commit local            -> post-merge 0
+#   git pull --rebase AVEC commit local            -> post-rewrite rebase (jamais post-merge)
+#   git commit --amend                             -> post-rewrite amend  (le filet se tait)
+#   git reset --hard, git switch / git checkout,
+#   git cherry-pick, git rebase qui ne reecrit
+#   aucun commit                                   -> aucun des deux hooks
+# `run --hook post-rewrite rebase` juge comme post-merge (nom de hook `post-rewrite` dans les messages
+# et le journal) ; `amend` et tout autre argument se taisent. Git ecrit la liste des commits reecrits
+# sur l'entree standard du hook : elle est lue et jetee avant tout autre travail.
+#
+# LIMITES DE COUVERTURE (ecrites, pas tues). NE se declenchent PAS : `git reset --hard`,
+# `git switch` / `git checkout`, `git cherry-pick`, un `git rebase` qui ne reecrit aucun commit.
+# Une fusion faite sur la forge n'est vue qu'au `git pull` local suivant.
 set -uo pipefail
 export LC_ALL=C
 
@@ -105,7 +119,7 @@ abs_under() {
   esac
 }
 
-hook_names() { printf '%s\n' post-merge; }
+hook_names() { printf '%s\n' post-merge post-rewrite; }
 
 # is_ours <fichier> — fichier régulier (pas un lien) dont la ligne 2 commence par le marqueur.
 is_ours() {
@@ -222,7 +236,10 @@ do_run() {
   done
   case "$hook" in
     post-merge) : ;;
-    post-rewrite) [ "${1:-}" = "rebase" ] || exit 0 ;;
+    post-rewrite)
+      # git ecrit la liste des commits reecrits sur l'entree standard : lue et jetee avant tout autre travail.
+      cat > /dev/null 2>&1 || true
+      [ "${1:-}" = "rebase" ] || exit 0 ;;
     *) usage ;;
   esac
   ROOT="."
