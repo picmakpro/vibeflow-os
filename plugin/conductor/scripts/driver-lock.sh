@@ -403,11 +403,12 @@ mv_link() {
 }
 
 # Deplacement SANS ECRASER ET SANS SUIVRE un lien (AU3-04) : `mv -n` seul, si la destination est un lien vers un
-# dossier, y deplacerait la source (elle serait enterree dans la generation d'un autre tenant). BSD/macOS : -nh ;
-# GNU/Linux : -nT. Le code de sortie n'est pas fiable (BSD rend 0 devant une destination prise) : l'appelant VERIFIE
-# le resultat (lock_gen), jamais ce code.
+# dossier, y deplacerait la source (elle serait enterree dans la generation d'un autre tenant). GNU/Linux et uutils :
+# -nT ; BSD/macOS : -nh, en repli (BSD rejette -T, rc 64). -nT d'ABORD : sous uutils `-h` vaut --help (rc 0, rien
+# deplace) et court-circuiterait le repli. Le code de sortie n'est pas fiable (BSD rend 0 devant une destination
+# prise) : l'appelant VERIFIE le resultat (lock_gen), jamais ce code.
 mv_noclobber() {
-  mv -nh "$1" "$2" 2>/dev/null || mv -nT "$1" "$2" 2>/dev/null
+  mv -nT "$1" "$2" 2>/dev/null || mv -nh "$1" "$2" 2>/dev/null
 }
 
 # Creation ATOMIQUE d'un lien, qui ECHOUE si le nom est deja pris — c'est le primitif qui

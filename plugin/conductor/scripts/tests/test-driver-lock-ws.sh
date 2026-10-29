@@ -1588,7 +1588,7 @@ mutant tk_mutex_kept '# mutex-refus$' 's@rm -f "\$mutex"; trap - EXIT INT TERM #
 mutant tk_restore_dir_none 'rm -f "$LOCK_DIR"; mv_noclobber' 's@; mv_noclobber "${LOCK_DIR}.old.$$" "$LOCK_DIR"$@@' "$MUT_TKD2"
 mutant tk_final_restore_none '&& \[ ! -L "$LOCK_DIR" \] && mv_noclobber' 's@&& mv_noclobber "${LOCK_DIR}.old.$$" "$LOCK_DIR"@\&\& :@' "$MUT_TKF"
 mutant tk_verify_none 'if \[ "$(lock_gen)" = "$old_gen" \] && \[ ! -e' 's@if \[ "$(lock_gen)" = "$old_gen" \] && \[ ! -e "${LOCK_DIR}.old.$$" \]; then@if true; then@' "$MUT_TKV"
-mutant tk_noclobber_none 'mv -nh "$1" "$2"' 's@mv -nh "$1" "$2" 2>/dev/null || mv -nT "$1" "$2" 2>/dev/null@mv "$1" "$2"@' "$MUT_TKV"
+mutant tk_noclobber_none 'mv -nh "$1" "$2"' 's@mv -nT "$1" "$2" 2>/dev/null || mv -nh "$1" "$2" 2>/dev/null@mv "$1" "$2"@' "$MUT_TKV"
 mutant tk_old_deleted '_tk_after="$(vf_dl_legacy_probe)"' 's@_tk_after="$(vf_dl_legacy_probe)"@case "$old_gen" in */*|"") ;; *) rm -rf "${LOCK_PARENT:?}/$old_gen" ;; esac; _tk_after="$(vf_dl_legacy_probe)"@' "$MUT_TKO"
 
 wait

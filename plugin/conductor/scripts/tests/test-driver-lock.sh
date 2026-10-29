@@ -1039,7 +1039,19 @@ out=$(PATH="$_t67_binmv:$PATH" "$SCRIPT" takeover --owner=B67 --step=y 2>&1); rc
 assert "T67.4, mv qui prend -h pour --help : la reprise d'un lock périmé aboutit" "$out" '"acquired": true'
 assert "T67.5, le lien a réellement été remplacé (status = B67)" "$("$SCRIPT" status)" '"owner": "B67"'
 "$SCRIPT" release --owner=B67 >/dev/null 2>&1
-rm -rf "$VF_DRIVER_LOCK" "$_t67_bin" "$_t67_binmv"
+rm -rf "$VF_DRIVER_LOCK"
+# mv_noclobber (restitution d'un dossier réel pendant une reprise, chemin ws) : la fonction est extraite du script et
+# jouée seule, avec le faux mv — le chemin réel exige une course entre la sonde et la pose, injouable ici. Les cas
+# WS-TKR/TKV/TKP de test-driver-lock-ws.sh couvrent le chemin complet.
+eval "$(sed -n '/^mv_noclobber() {/,/^}/p' "$SCRIPT")"
+_t67_d="$WORK_DIR/nc67"; rm -rf "$_t67_d"; mkdir -p "$_t67_d/src" "$_t67_d/autre"; echo s > "$_t67_d/src/f"
+( PATH="$_t67_binmv:$PATH"; mv_noclobber "$_t67_d/src" "$_t67_d/dst" )
+[ -f "$_t67_d/dst/f" ] && [ ! -e "$_t67_d/src" ]; assert_exit "T67.6, mv qui prend -h pour --help : mv_noclobber déplace vers un nom libre" "$?" 0
+mkdir -p "$_t67_d/src2"; echo s2 > "$_t67_d/src2/f"; ln -s autre "$_t67_d/lien"
+( PATH="$_t67_binmv:$PATH"; mv_noclobber "$_t67_d/src2" "$_t67_d/lien" )
+[ -f "$_t67_d/src2/f" ] && [ ! -e "$_t67_d/autre/src2" ] && [ -L "$_t67_d/lien" ]; assert_exit "T67.7, nom pris par un lien vers un dossier : rien écrasé, rien enterré dans la cible" "$?" 0
+rm -rf "$_t67_d"
+rm -rf "$_t67_bin" "$_t67_binmv"
 
 echo ""
 echo "=================================="
