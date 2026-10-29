@@ -38,8 +38,8 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 TMPW="$TMP/w.out"
 
-AGENTS="vf-product-manager vf-product-analyst vf-product-pm prd-gate"
-CORPUS="AGENT.md agents/vf-product-manager.md agents/vf-product-analyst.md agents/vf-product-pm.md agents/prd-gate.md"
+AGENTS="vf-product-manager vf-product-analyst vf-product-pm vf-product-architect prd-gate"
+CORPUS="AGENT.md agents/vf-product-manager.md agents/vf-product-analyst.md agents/vf-product-pm.md agents/vf-product-architect.md agents/prd-gate.md"
 
 # Disposition : DÉPÔT (le module est un dossier complet nommé product-team-bundle : AGENT.md, module.json, VERSION) ou
 # LAB (suite posée à plat par l'installeur sous <racine>/.claude/scripts/tests/ : le module n'existe plus comme
@@ -391,6 +391,13 @@ else
 
   M="$(mkmut i2)"; subst "$M/agents/vf-product-manager.md" ", prd-gate)" ")" "tools:"
   mutant_ptb AGENTS-I2 "invariant I2" ctl_agents "$MOD" "$M"
+
+  # Phase 60 (P60-D-07) : l'architecte est un worker interne dispatché par le manager, en monde fermé.
+  M="$(mkmut i2archi)"; subst "$M/agents/vf-product-manager.md" "vf-product-architect, " "" "tools:"
+  mutant_ptb AGENTS-I2-ARCHI "invariant I2" ctl_agents "$MOD" "$M"
+
+  M="$(mkmut i1archi)"; subst "$M/agents/vf-product-architect.md" "Worker interne" "Ouvrier" "description:"
+  mutant_ptb AGENTS-I1-ARCHI "invariant I1 — vf-internal: true sans le marqueur" ctl_agents "$MOD" "$M"
 
 if [ "$LAB" = 1 ]; then
   skip "PTB-FRONT disposition lab : AGENT.md est posé sous agents/product-team-bundle.md (contrôle propre au dépôt)"
