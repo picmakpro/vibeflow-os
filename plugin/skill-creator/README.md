@@ -3,7 +3,7 @@
 > Transforme « il nous faudrait un skill pour X » en un SKILL.md chirurgical, ancré dans le réel
 > (recherche par facettes → draft → eval-loop), au lieu d'un skill générique écrit de mémoire.
 
-> **Type** : agent + 2 skills · **Version** : v1.1.2 · **Dépend de** : aucun (module autonome)
+> **Type** : agent + 2 skills · **Version** : v1.1.3 · **Dépend de** : aucun (module autonome)
 
 ---
 
@@ -34,9 +34,7 @@ de skills. Les deux coexistent, aucune revendication d'exclusivité (détection 
 
 ## Installation
 
-```bash
-bash .claude/scripts/vibeflow-update.sh install skill-creator
-```
+Via `/vibeflow-install` : coche « skill-creator » (moteur interne : `plugin/_internal/vibeflow-update.sh`).
 
 Aucune dépendance de module (`requires: []`). L'install pose :
 

@@ -209,8 +209,8 @@ Prochain audit recommandé : à la prochaine release/gros jalon (lab solo) ; YYY
 
 Si je détecte que le lab est désaligné avec la méthodologie de référence (vibeflow-os mis à jour avec breaking changes) :
 
-1. Lancer `.claude/scripts/vibeflow-update.sh status`
-2. Si modules out-of-date : proposer `vibeflow-update.sh update <module>` (manuel)
+1. Comparer le registre `.claude/scripts/.vibeflow-installed` (`module=version`) aux versions du cache plugin
+2. Si modules out-of-date : proposer `/vf-update` (changelog + validation humaine)
 3. Re-lancer audit complet après update
 
 **Jamais d'auto-update** sans validation humaine (rules contextuelles peuvent rompre).
@@ -230,7 +230,7 @@ Si je détecte que le lab est désaligné avec la méthodologie de référence (
 ## Pré-requis installation
 
 - Skills `consolidator` + `infrastructure-audit` + `audit-architecture` installés via
-  `vibeflow-update.sh install` (dépendances du module, résolues automatiquement)
+  `/vibeflow-install` (dépendances du module, résolues automatiquement)
 - Scripts `check-agents.sh` + `check-map-drift.sh` présents (module conductor, socle mandatory)
 - Dossier `reports/validator/` créé (auto à la première invocation)
 

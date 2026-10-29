@@ -1,5 +1,9 @@
 # CHANGELOG — business-pilot-bundle
 
+## [v2.0.17] — 2026-10-29 (références mortes à `vibeflow-update.sh`) — à publier dans la prochaine release
+
+**Patch** (documentation seule) — références mortes à `vibeflow-update.sh` remplacées par `/vibeflow-install` / `/vf-update` dans le README (#166).
+
 ## [v2.0.16] — 2026-10-13 (verrou de driver périmé : cas `recover`)
 
 **Patch** — `agents/vf-business-manager.md` : sur `reason: stale-requires-takeover`, le manager exécute la commande nommée par le champ

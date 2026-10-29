@@ -398,6 +398,15 @@ def split_fragment_hooks(frag_hooks):
             project_view[event] = project_groups
     return local_view, project_view
 
+def count_entries(view):
+    return sum(len(g.get("hooks", []) or []) for gs in view.values() for g in gs)
+
+def report_local_count(local_view):
+    """#166 volet 6 : N entrées routées vers --settings-local, relayé par le moteur pour annoncer
+    le routage (ADR-071). Compté sur la vue de split_fragment_hooks — jamais une 2e règle."""
+    if settings_local_path:
+        sys.stderr.write(f"[merge-hooks] local: {count_entries(local_view)}\n")
+
 def apply_merge(hooks, view_frag_hooks, other_hooks=None):
     """Algorithme de merge inchangé (dédup, réutilisation de groupe, substitution) — appliqué
     une fois par cible (projet, puis local si concernée) sur la vue scindée du fragment qui lui
@@ -540,6 +549,7 @@ if mode == "merge":
     apply_merge(hooks_project, project_view, other_hooks=hooks_local)
     if settings_local_path:
         apply_merge(hooks_local, local_view, other_hooks=hooks_project)
+    report_local_count(local_view)
 elif mode == "plan":
     # D-31-04 régime B : le seul mode qui n'écrit RIEN. Réutilise split_fragment_hooks() —
     # la MÊME répartition project/local que le merge réel — jamais une seconde implémentation
@@ -577,6 +587,7 @@ elif mode == "plan":
         verb = "~" if os.path.exists(target_path) else "+"
         sys.stdout.write(f"[plan] {verb} {target_path}  {format_plan_segments(target_view)}\n")
 
+    report_local_count(local_view)
     plan_suffix = f" (+ {settings_local_path})" if settings_local_path else ""
     sys.stderr.write(f"[merge-hooks] plan OK → {settings_path}{plan_suffix}\n")
     sys.exit(0)  # ne JAMAIS atteindre write_json — aucun fichier créé, modifié ou supprimé.

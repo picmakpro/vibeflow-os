@@ -1,5 +1,9 @@
 # Changelog — software-architecture
 
+## [v1.6.4] — 2026-10-29 (références mortes à `vibeflow-update.sh`) — à publier dans la prochaine release
+
+**Patch** (documentation seule) — références mortes à `vibeflow-update.sh` remplacées par `/vibeflow-install` / `/vf-update` dans le README (#166).
+
 ## [v1.6.3] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — publiée dans v2.70.1
 
 **Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; publiée dans v2.70.1) :

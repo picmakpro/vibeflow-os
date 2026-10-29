@@ -3,7 +3,7 @@
 > **Module doc-only** : référence canonique de la méthodologie VibeFlow.
 > 77 fichiers (612 KB) — méthodologie + 12 patterns + 5 skills + 42 fichiers de templates + 1 exemple complet.
 
-**Version** : v2.5.8 (alignement VibeFlow Core v4.2 — 9 principes P1-P9)
+**Version** : v2.5.9 (alignement VibeFlow Core v4.2 — 9 principes P1-P9)
 **Source** : le contenu canonique vit dans `plugin/reference/content/` ; l'installation le copie en `docs/reference/` dans le lab cible.
 
 ---
@@ -51,15 +51,13 @@ content/
 
 ## Installation
 
-```bash
-.claude/scripts/vibeflow-update.sh install reference
-```
+Via `/vibeflow-install` : coche « reference » (moteur interne : `plugin/_internal/vibeflow-update.sh`).
 
 **Installation = copie de `content/` vers `docs/reference/`** du lab cible (mode doc-only).
 
 Aucun fichier dans `.claude/` n'est installé — c'est de la documentation, pas du runtime.
 
-**Pré-requis** : `vibeflow-update.sh` v1.3.0+ (support modules doc-only).
+Le mode doc-only (copie sans runtime) est pris en charge par l'installeur.
 
 ---
 

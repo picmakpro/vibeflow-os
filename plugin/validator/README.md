@@ -5,7 +5,7 @@
 > process, synthèse — pour garantir qu'un lab reste fidèle à la méthodologie VibeFlow malgré
 > l'évolution Anthropic, l'append-only des registres et la dette inévitable.
 
-**Version** : v1.3.5
+**Version** : v1.3.6
 **Type** : agent-only
 **Densité** : `AGENT.md` a une marge de **50 lignes** sous le plafond ADR-029 révisé en Phase 40.1 (bloque au-delà de 300, avertissement dès 251 ; arbitrages Samuel D-01/D-05, AskUserQuestion
 session principale, 2026-09-16), mesure du 2026-09-15 par `awk 'END{print NR}'`. La prochaine
@@ -38,12 +38,9 @@ Pré-requis (`module.json` → `requires`) : modules **`consolidator`**, **`infr
 et **`audit-architecture`** installés — ce dernier porte la Phase 4 (ADR-036). Le script
 `check-agents.sh` (module `conductor`, socle mandatory) doit aussi être présent.
 
-```bash
-.claude/scripts/vibeflow-update.sh install consolidator
-.claude/scripts/vibeflow-update.sh install infrastructure-audit
-.claude/scripts/vibeflow-update.sh install audit-architecture
-.claude/scripts/vibeflow-update.sh install validator
-```
+Via `/vibeflow-install` : coche « validator » — l'installeur résout `consolidator`,
+`infrastructure-audit` et `audit-architecture` avec lui (moteur interne :
+`plugin/_internal/vibeflow-update.sh`).
 
 L'install copie :
 - `validator/AGENT.md` → `.claude/agents/validator.md` (le **fichier** prend le nom du module ;
@@ -137,8 +134,8 @@ validator/
 
 - Pas d'auto-fix (par design, ADR-031)
 - Le rapport est en markdown statique (pas de dashboard temps réel)
-- Les skills délégués doivent être installés au préalable (pas de résolution automatique des
-  dépendances par `vibeflow-update.sh`)
+- Les skills délégués doivent être installés au préalable (hors `/vibeflow-install`, qui résout
+  les dépendances)
 - Le score 0-100 reste indicatif hors gate : seul un status FAIL bloque `/vf-audit`
 
 ---
