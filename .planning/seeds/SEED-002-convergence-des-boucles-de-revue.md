@@ -56,6 +56,15 @@ ci-dessous sont des **contraintes constatées**, pas des décisions.
 - **Gradation par risque** (`mission-flow.md` §3) : deux tours propres doublent le coût d'une revue
   qui passe. La question est où l'exiger (revue pleine seulement ?), pas s'il faut l'exiger partout.
 
+## Rattachement : Phase 66 (2026-10-29)
+
+La **Phase 66** du compartiment `fiabilite` (jalon `equipe-produit-v1.0`) généralise aux juges de
+VibeFlow la grille de sévérité (défaut majeur = démontré, plausible de bonne foi, sans filet ;
+rapport par famille ; dernier tour rejoué par un juge frais) : arbitrage Samuel, AskUserQuestion
+session principale, 2026-10-29. Elle traite le critère de qualification des points ; le critère
+d'arrêt sur stabilité décrit ici reste à cadrer et se discute avec elle. Voir
+`.planning/workstreams/fiabilite/ROADMAP.md` § Phase 66.
+
 ## Questions ouvertes pour le discuss
 
 | # | Question |

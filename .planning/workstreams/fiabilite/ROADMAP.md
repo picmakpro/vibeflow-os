@@ -17,7 +17,7 @@
   BUDG/WKTR/SKIL/AGTS + QUAL-01 transverse). Recherche : `.planning/research/SUMMARY.md` +
   `ARCHITECTURE.md` (ordre de construction dicté par les fichiers).
 - 📋 **equipe-produit-v1.0** — « l'équipe produit : rôles humains, amont produit, état partagé » — Phases
-  57-65 — **inscrit 2026-10-08**, prochain jalon exécuté (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08). Germe de `SEED-001` : ses trois déclencheurs
+  57-66 — **inscrit 2026-10-08**, prochain jalon exécuté (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08). Germe de `SEED-001` : ses trois déclencheurs
   sont réunis à la clôture de `fiabilite-v1.0`. Spec : `docs/superpowers/specs/2026-09-16-equipe-produit-bmad-design.md`.
 - 📋 **ecc-inspiration-v1.0** — « ce qu'on emprunte à ECC » — Phases 51-56 — **inscrit
   2026-09-25** — six emprunts mesurés au dépôt `affaan-m/ECC` (snapshot avant compaction,
@@ -113,6 +113,7 @@
 - [ ] Phase 63: Règles produit empruntées à AIDD (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 - [ ] Phase 64: Contrôles après exécution branchés en nœuds du plan de bataille (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 - [ ] Phase 65: Révision des règles qui brident l'efficacité des agents (inscrite 2026-10-29, jalon equipe-produit-v1.0)
+- [ ] Phase 66: Grille de sévérité des juges et convergence des boucles de revue (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
 
@@ -488,7 +489,7 @@ Plans:
 
 - [ ] TBD (run /gsd-plan-phase 56 to break down)
 
-## 📋 Milestone equipe-produit-v1.0 — « l'équipe produit » (Phases 57-65)
+## 📋 Milestone equipe-produit-v1.0 — « l'équipe produit » (Phases 57-66)
 
 **Milestone Goal :** VibeFlow sert une **équipe** et plus seulement un humain qui a tous les modules. Il apporte des
 rôles de poste (solo par défaut, product, dev), des artefacts amont lisibles par un non-dev, et un état partagé entre
@@ -758,3 +759,24 @@ Plans:
 
 - [x] 65-01 — accélération de la CI, volet (g) : `scripts/ci-shard-suites.sh`, mode `GW_MODE=sans-mutants`, jobs `changes` / `tests-shard` / `tests-mutants` / agrégateur au nom requis inchangé (exécuté hors plan formel, sur demande de Samuel, 2026-10-29)
 - [ ] TBD — volets (a) à (f), (h) et (i) (run /gsd-plan-phase 65 to break down)
+
+### Phase 66: Grille de sévérité des juges et convergence des boucles de revue
+
+**Goal:** Une même grille de sévérité s'applique à TOUS les juges de VibeFlow (`vf-reviewer`, `vf-design-judge`, `prd-gate`, juges adverses briefés par les managers, relecture SOBR-04), pour que les boucles de revue convergent au lieu de produire un « nouveau majeur » à chaque tour :
+- Un défaut n'est **majeur** que s'il cumule trois conditions : (1) il est démontré par une sonde exécutée ; (2) l'entrée est plausible de bonne foi, pour un agent de l'équipe ou un humain qui suit le gabarit (une faute de frappe compte, une obfuscation volontaire non) ; (3) la conséquence est réelle et sans filet : faux vert non rattrapé par la couche suivante, faux rouge sans contournement, promesse écrite contredite, ou régression.
+- Tout le reste est **mineur** et ne bloque pas le merge.
+- Le juge rapporte la **famille**, pas l'instance. Le correctif ferme la famille, de préférence en comparant à des données réelles plutôt qu'en ajoutant des motifs. Une variante d'une famille fermée ne rouvre rien.
+- Le dernier tour est rejoué par un juge frais briefé avec la grille.
+**Validation:** proposed
+
+**Constat qui la motive :** Phase 59, contrôle heuristique `check-prd.sh` : quatre juges frais d'affilée ont chacun trouvé un « nouveau majeur ». Phases 60 et 61 jugées avec la grille : chaque tour a trouvé au plus un majeur légitime (le contournement par l'identifiant a été rouvert deux fois, jusqu'à ce que la famille soit fermée par comparaison aux identifiants réels) ; les deux phases ont convergé en v2.74.0.
+**Source :** arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 : « Oui, valide la grille pour 60 et 61. Ensuite, il faudra généraliser au maximum cette solution. »
+**Rattachement :** graine `.planning/seeds/SEED-002-convergence-des-boucles-de-revue.md` (convergence des boucles de revue, veille Elephant-Goldfish).
+**Requirements**: TBD — famille `GRIL` réservée, posée au cadrage.
+**Depends on:** aucune phase bloquante.
+**Hors périmètre :** toute baisse d'exigence sur les défauts réellement majeurs.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 66 to break down)
