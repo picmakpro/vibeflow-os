@@ -28,6 +28,7 @@
 # Temoins rouges (la sonde doit pouvoir rougir ; chacun est rejoue sur l'original, ou elle redevient verte) :
 #   D2C-TEMOIN-DESARME       hook retire par l'engine (`role solo`)
 #   D2C-TEMOIN-CD-MUTE       copie du cache dont check-divergence.sh est aveugle a S2 (cmp -s, bash -n)
+#   D2C-TEMOIN-CONFORME-DESARME  sonde du conforme (temoin de declenchement + stderr vide) : rouge sur un hook desarme
 #   D2C-TEMOIN-RUNNER-MUTE   copie du cache dont l'ecriture du journal est neutralisee : cri present, journal muet
 # Releve de la recette du lab reel (P61-D-09) : le script PRESCRIT par 61-RECETTE-LAB-REEL.md est extrait de la
 # recette et joue tel quel (jamais recopie dans la suite) :
@@ -308,6 +309,34 @@ fi
 [ "$miss" -eq 0 ] && ok "D2C-TRACE-INTROUVABLE (P61-D-03) : cache disparu -> NON VERIFIABLE sur stderr + ligne de journal « introuvable », pull abouti"
 
 # ---------------------------------------------------------------------------
+# tracer_cache <cache source> <cache copie> — TEMOIN DE DECLENCHEMENT, independant de la sortie du hook (P61-D-04 : sur
+# 0 et 3 le hook est silencieux, son silence ne dit pas s'il a joue). La copie est un cache complet dont
+# check-divergence.sh est remplace par un enveloppeur qui note chaque invocation dans $WORK/cd-trace.log
+# (« --path <racine inspectee> ») puis rend la main au vrai script de <cache source>, code de sortie inclus. Cote TEST
+# uniquement : aucun comportement de production ne sert la preuve.
+tracer_cache() {
+  local src="$1" dst="$2"
+  mk_cache "$dst" || return 1
+  printf '#!/usr/bin/env bash\nprintf '"'"'%%s\n'"'"' "$*" >> "%s/cd-trace.log"\nexec bash "%s/conductor/scripts/check-divergence.sh" "$@"\n' "$WORK" "$src" > "$dst/conductor/scripts/check-divergence.sh" || return 1
+  bash -n "$dst/conductor/scripts/check-divergence.sh" 2>/dev/null
+}
+# ntrace <clone> — nombre d'invocations de check-divergence.sh notees pour ce clone (0 si le journal de trace n'existe pas).
+ntrace() {
+  [ -f "$WORK/cd-trace.log" ] || { printf '0'; return 0; }
+  awk -v want="--path $1" '$0 == want { n++ } END { print n + 0 }' "$WORK/cd-trace.log"
+}
+# sonde_conforme <clone> <fichier stderr> <invocations avant> — la sonde du CONFORME : le hook a DECLENCHE le controle
+# exactement une fois (temoin de declenchement) ET n'a rien dit (ni [vf-divergence] ni [check-divergence] sur stderr).
+# 0 si les deux ; non nul sinon, SONDE_WHY dit laquelle manque. Un silence sans declenchement est un hook jamais joue.
+sonde_conforme() {
+  local clone="$1" err="$2" avant="$3" apres
+  SONDE_WHY=""
+  apres="$(ntrace "$clone")"
+  if [ "$apres" -ne $((avant + 1)) ]; then SONDE_WHY="hook non declenche : $((apres - avant)) invocation(s) de check-divergence, attendu 1"; return 1; fi
+  if "$GREP" -qF '[vf-divergence]' "$err" || "$GREP" -qF '[check-divergence]' "$err"; then SONDE_WHY="le hook a parle sur stderr alors que rien ne diverge"; return 1; fi
+  return 0
+}
+
 # monde <nom> <cache> <poste1> <poste2> — origine nue FRAICHE issue de la graine (compartiment w1, phase 1,
 # conforme) et deux clones <nom>-1, <nom>-2 armes PAR L'INSTALL (VF_ROLE=<poste>, scope project) depuis <cache>.
 # Jamais d'appel direct a `arm` : l'armement est celui de l'engine (COLB-07).
@@ -391,21 +420,22 @@ fi
 # D2C-CONFORME — un pull SANS divergence : le hook joue le controle, se tait, n'ecrit rien au journal
 # ---------------------------------------------------------------------------
 miss=0
-if ! monde cf "$WORK/cache" product dev; then
+if ! tracer_cache "$WORK/cache" "$WORK/cache-trace"; then
+  ko "D2C-CONFORME pre-condition : cache a temoin de declenchement non construit"; miss=1
+elif ! monde cf "$WORK/cache-trace" product dev; then
   ko "D2C-CONFORME pre-condition : $MONDE_WHY"; miss=1
 else
   phase_poussee "$WORK/cf-1" 4 z || :
-  AV="$(jdata "$WORK/cf-2")"
-  git -C "$WORK/cf-2" pull -q --no-rebase > "$WORK/cf.out" 2> "$WORK/cf.err"; RC=$?
+  AV="$(jdata "$WORK/cf-2")"; AVT="$(ntrace "$WORK/cf-2")"
+  git -C "$WORK/cf-2" pull -q --no-rebase --no-edit > "$WORK/cf.out" 2> "$WORK/cf.err"; RC=$?
   [ "$RC" -eq 0 ] || { ko "D2C-CONFORME : le pull de cf-2 a echoue (rc=$RC)"; miss=1; }
   [ -d "$WORK/cf-2/.planning/workstreams/w1/phases/04-z" ] || { ko "D2C-CONFORME pre-condition : la phase 4-z n'est pas arrivee dans cf-2"; miss=1; }
-  if "$GREP" -qF '[vf-divergence]' "$WORK/cf.err"; then ko "D2C-CONFORME : stderr du pull porte [vf-divergence] alors que rien ne diverge — $(tail -3 "$WORK/cf.err")"; miss=1; fi
-  # Preuve que le hook a REELLEMENT joue le controle : la sortie de check-divergence est relayee telle quelle.
-  "$GREP" -qF '[check-divergence]' "$WORK/cf.err" || { ko "D2C-CONFORME : aucune sortie de check-divergence — un silence pourrait etre un hook jamais declenche"; miss=1; }
+  # Conforme = le hook a REELLEMENT declenche le controle (temoin de declenchement, hors de sa sortie) ET s'est tu (P61-D-04).
+  sonde_conforme "$WORK/cf-2" "$WORK/cf.err" "$AVT" || { ko "D2C-CONFORME : sonde rouge sur cf-2 — $SONDE_WHY — $(tail -3 "$WORK/cf.err")"; miss=1; }
   [ "$(jdata "$WORK/cf-2")" -eq "$AV" ] || { ko "D2C-CONFORME : une ligne de journal a ete ajoutee"; miss=1; }
   [ ! -e "$(jfile "$WORK/cf-2")" ] || { ko "D2C-CONFORME : le journal existe alors qu'aucune divergence n'a ete vue"; miss=1; }
 fi
-[ "$miss" -eq 0 ] && ok "D2C-CONFORME : pull sans divergence -> controle joue par le hook, aucune ligne [vf-divergence], aucune ligne de journal"
+[ "$miss" -eq 0 ] && ok "D2C-CONFORME : pull sans divergence -> controle declenche (temoin de declenchement : 1 invocation) et stderr vide, aucune ligne de journal"
 
 # ---------------------------------------------------------------------------
 # D2C-WORKTREE — fusion divergente faite DANS un worktree lie : repertoire inspecte = le worktree,
@@ -530,18 +560,46 @@ fi
 [ "$miss" -eq 0 ] && ok "D2C-TEMOIN-DESARME : sonde rouge sur le temoin (hook retire par l'engine, « $WHY_ROUGE »), verte sur l'original arme"
 
 # ---------------------------------------------------------------------------
+# D2C-TEMOIN-CONFORME-DESARME — la sonde du CONFORME doit pouvoir rougir : hook desarme par l'engine (role solo), le pull
+# conforme ne declenche rien ; le silence de stderr est identique a celui d'un hook arme, seul le temoin de declenchement
+# les distingue. Rouge ici, vert sur le clone arme (D2C-CONFORME).
+# ---------------------------------------------------------------------------
+miss=0
+if ! tracer_cache "$WORK/cache" "$WORK/cache-trace-d"; then
+  ko "D2C-TEMOIN-CONFORME-DESARME pre-condition : cache a temoin de declenchement non construit"; miss=1
+elif ! monde cd "$WORK/cache-trace-d" product dev; then
+  ko "D2C-TEMOIN-CONFORME-DESARME pre-condition : $MONDE_WHY"; miss=1
+elif ! inst "$WORK/cd-2" "$WORK/cache-trace-d" VF_SCOPE=project -- role solo; then
+  ko "D2C-TEMOIN-CONFORME-DESARME pre-condition : role solo rc!=0 — $(tail -3 "$WORK/err")"; miss=1
+else
+  [ ! -e "$WORK/cd-2/.git/hooks/post-merge" ] || { ko "D2C-TEMOIN-CONFORME-DESARME pre-condition : role solo n'a pas retire le hook"; miss=1; }
+  phase_poussee "$WORK/cd-1" 4 z || :
+  AVT="$(ntrace "$WORK/cd-2")"
+  git -C "$WORK/cd-2" pull -q --no-rebase --no-edit > "$WORK/cd.out" 2> "$WORK/cd.err"; RC=$?
+  [ "$RC" -eq 0 ] || { ko "D2C-TEMOIN-CONFORME-DESARME : le pull de cd-2 a echoue (rc=$RC)"; miss=1; }
+  [ ! -s "$WORK/cd.err" ] || { ko "D2C-TEMOIN-CONFORME-DESARME pre-condition : stderr non vide, le silence ne serait pas le meme que celui d'un hook arme"; miss=1; }
+  sonde_conforme "$WORK/cd-2" "$WORK/cd.err" "$AVT"; RC=$?
+  echo "    D2C-TEMOIN-CONFORME-DESARME : attendu sonde ROUGE (hook desarme, stderr vide) ; obtenu rc=$RC (« $SONDE_WHY »)"
+  [ "$RC" -eq 1 ] || { ko "D2C-TEMOIN-CONFORME-DESARME : la sonde du conforme n'a PAS rougi alors que le hook n'a rien declenche — un silence passerait pour un conforme"; miss=1; }
+  case "$SONDE_WHY" in "hook non declenche"*) : ;; *) ko "D2C-TEMOIN-CONFORME-DESARME : rouge pour une autre raison que l'absence de declenchement (« $SONDE_WHY »)"; miss=1 ;; esac
+fi
+[ "$miss" -eq 0 ] && ok "D2C-TEMOIN-CONFORME-DESARME : sonde du conforme rouge sur un hook desarme (stderr vide mais aucun declenchement : « $SONDE_WHY »), verte sur le clone arme (D2C-CONFORME)"
+
+# ---------------------------------------------------------------------------
 # D2C-TEMOIN-CD-MUTE — check-divergence.sh mute (detection S2 neutralisee) dans une COPIE du cache
 # ---------------------------------------------------------------------------
 miss=0
 CDREL="conductor/scripts/check-divergence.sh"
 if mutant_de "$WORK/cache" "$WORK/cache-cdmut" "$CDREL" '{ if (!fait && index($0, "cnt[k] > 1) print") > 0) { sub(/cnt\[k\] > 1\) print/, "cnt[k] > 999999) print"); fait = 1 } print }'; then
   cmp -s "$WORK/cache/$CDREL" "$REPO/$CDREL" || { ko "D2C-TEMOIN-CD-MUTE : le cache ORIGINAL a ete modifie"; miss=1; }
-  epreuve cm "$WORK/cache-cdmut"; RC=$?
+  tracer_cache "$WORK/cache-cdmut" "$WORK/cache-cdmut-t" || { ko "D2C-TEMOIN-CD-MUTE pre-condition : cache a temoin de declenchement non construit"; miss=1; }
+  epreuve cm "$WORK/cache-cdmut-t"; RC=$?
   if [ "$RC" -eq 99 ]; then ko "D2C-TEMOIN-CD-MUTE pre-condition : $EP_WHY"; miss=1
   else
     WHY_ROUGE="$SONDE_WHY"
     # Le rouge vient bien du detecteur aveugle : le hook a joue, l'arbre est divergent pour l'original et conforme pour le mutant.
-    "$GREP" -qF '[check-divergence]' "$EP_ERR" || { ko "D2C-TEMOIN-CD-MUTE : le hook n'a pas joue le controle — le rouge ne viendrait pas du detecteur"; miss=1; }
+    # Le temoin de declenchement (et non la sortie, silencieuse sur 0) prouve que le hook a joue le controle.
+    [ "$(ntrace "$WORK/cm-2")" -eq 1 ] || { ko "D2C-TEMOIN-CD-MUTE : le hook n'a pas joue le controle ($(ntrace "$WORK/cm-2") invocation(s)) — le rouge ne viendrait pas du detecteur"; miss=1; }
     RC3=0; bash "$WORK/cache/$CDREL" --path "$WORK/cm-2" >/dev/null 2>&1 </dev/null || RC3=$?
     RC4=0; bash "$WORK/cache-cdmut/$CDREL" --path "$WORK/cm-2" >/dev/null 2>&1 </dev/null || RC4=$?
     { [ "$RC3" -eq 1 ] && [ "$RC4" -eq 0 ]; } || { ko "D2C-TEMOIN-CD-MUTE : sur le meme arbre l'original rend $RC3 (attendu 1) et le mutant $RC4 (attendu 0)"; miss=1; }

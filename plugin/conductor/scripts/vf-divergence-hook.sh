@@ -159,7 +159,7 @@ strip_path() {
   set -f; IFS=:
   for e in $PATH; do
     case "$e" in /*) : ;; *) continue ;; esac
-    d="$(cd "$e" 2>/dev/null && pwd -P)" || continue
+    if [ "$PATH_RESOLVED" = 1 ]; then d="$e"; else d="$(cd "$e" 2>/dev/null && pwd -P)" || continue; fi
     [ -n "$d" ] || continue
     if [ -n "$root" ] && [ "$root" != / ] && in_tree "$d" "$root"; then continue; fi
     p="${p:+$p:}$d"
@@ -167,8 +167,12 @@ strip_path() {
   IFS="$ifs"; set +f
   [ -n "$p" ] || p="/usr/bin:/bin"
   PATH="$p"; export PATH
+  PATH_RESOLVED=1
   hash -r
 }
+# Un seul passage resout les entrees (un sous-shell chacune) ; les suivants (racine de `run`) ne font que filtrer par
+# `in_tree` des entrees deja absolues et physiques. PATH_RESOLVED est remis a 0 ici : jamais lu depuis l'environnement.
+PATH_RESOLVED=0
 strip_path
 
 MARKER='# vibeflow:vf-divergence-hook v1'

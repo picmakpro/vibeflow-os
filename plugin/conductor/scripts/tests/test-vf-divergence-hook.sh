@@ -10,6 +10,8 @@
 #  VDH-STATUS, VDH-NOGIT, VDH-USAGE, VDH-RUN-*, VDH-INTROUVABLE, VDH-JOURNAL-LIEN, VDH-CODES, VDH-MUT-*.)
 # Tour 2 de relecture : VDH-PATH-<hook|run>-<forme> (preuve generative : 7 formes d'entree de PATH x fichier de hook et
 # run), VDH-RUN-SILENCE-TOTAL, VDH-RUN-UNE-LIGNE, VDH-ENV-*, relais CR/VT/FF, et un mutant par forme (VDH-MUT-PATH-*).
+# Tour 3 de relecture : VDH-PATH-VIDE-*, VDH-RUN-TMP-NETTOYE, VDH-DISARM-ASSAINI, VDH-REPLI-DOSSIER-LIEN, relais BS/DEL, et
+# sept mutants de production survivants du tour 2 (VDH-MUT-VIDE-*, -TMP-1, -RELAIS-BS/DEL, -DISARM-ASSAINI, -REPLI-LIEN).
 #
 # ISOLATION (P61-PL-18) : HOME jetable, GIT_CONFIG_NOSYSTEM=1, GIT_CONFIG_GLOBAL vers un fichier vide,
 # variables VF_* et GIT_DIR retirees, identite git posee localement dans chaque clone, caches de test sous
@@ -724,15 +726,16 @@ probe_refresh_arbre() { # M15 : arm --refresh depuis un script SOUS l'arbre
 }
 probe_relais() { # M16 : octets de controle venus de la branche fusionnee
   mk_pair "p$((++N))"; arm_in "$P/b"
-  local esc bel cr vt ff
+  local esc bel cr vt ff bs del
   esc="$(printf '\033')"; bel="$(printf '\007')"; cr="$(printf '\015')"; vt="$(printf '\013')"; ff="$(printf '\014')"
+  bs="$(printf '\010')"; del="$(printf '\177')"
   add_phase "$P/a" 02 x roadmap; git -C "$P/a" push -q origin main 2> /dev/null
-  add_phase "$P/b" 02 "${esc}]0;VFPWN${bel}y${cr}VFCR${vt}VFVT${ff}VFFF"
+  add_phase "$P/b" 02 "${esc}]0;VFPWN${bel}y${cr}VFCR${vt}VFVT${ff}VFFF${bs}VFBS${del}VFDEL"
   pull_in "$P/b" --no-rebase
   "$GREP" -qF 'DIVERGENCE apres post-merge' "$TMP/pull.err" || { LASTMSG="divergence non criee"; return 1; }
   "$GREP" -qF 'VFPWN' "$TMP/pull.err" || { LASTMSG="le nom de phase n'est plus relaye (temoin positif absent)"; return 1; }
-  "$GREP" -qF 'VFCRVFVTVFFF' "$TMP/pull.err" || { LASTMSG="le nom a CR/VT/FF n'est plus relaye (temoin positif absent)"; return 1; }
-  if LC_ALL=C "$GREP" -q "[${esc}${bel}${cr}${vt}${ff}]" "$TMP/pull.err"; then LASTMSG="octet de controle (ESC/BEL/CR/VT/FF) relaye au terminal"; return 1; fi
+  if LC_ALL=C "$GREP" -q "[${esc}${bel}${cr}${vt}${ff}${bs}${del}]" "$TMP/pull.err"; then LASTMSG="octet de controle (ESC/BEL/CR/VT/FF/BS/DEL) relaye au terminal"; return 1; fi
+  "$GREP" -qF 'VFCRVFVTVFFFVFBSVFDEL' "$TMP/pull.err" || { LASTMSG="le nom a CR/VT/FF/BS/DEL n'est plus relaye (temoin positif absent)"; return 1; }
   return 0
 }
 probe_path_fichier() { # M17 : PATH relatif chez l'utilisateur, fichier de hook
@@ -910,6 +913,75 @@ for _v in GIT_DIR GIT_COMMON_DIR GIT_WORK_TREE GIT_INDEX_FILE; do
   case_ "VDH-ENV-$_v" "probe_env_$_v" "(constat 3) : $_v herite designant un autre depot -> arm, status, disarm visent le depot de --path"
 done
 
+# --- Tour 3 de relecture (Phase 61) : mutants de production survivants du tour 2, tues par le COMPORTEMENT observe
+ENVB="$(command -v env)"
+# A / B : un PATH entierement filtre se replie sur /usr/bin:/bin, jamais sur un PATH vide (une entree vide de PATH
+# est le repertoire courant : un faux `git` ou `bash` pose dans l'arbre serait execute).
+probe_path_vide_run() { # A : travail du script (run)
+  mk_pair "p$((++N))"
+  local d="$TMP/pv$N" hits="$TMP/hitsv$N"
+  mkdir -p "$d" "$hits"; plant_traps "$d" "$hits"
+  (cd "$d" && "$ENVB" PATH=. "$PERLB" -e 'alarm 30; exec @ARGV' "$BASH" "$TARGET" run --hook post-merge) > "$TMP/pv.out" 2> "$TMP/pv.err" < /dev/null || :
+  if [ "$(nfiles "$hits")" -ne 0 ]; then LASTMSG="PATH=. entierement filtre : commande(s) du repertoire courant executee(s) par run : $(ls "$hits" | awk '{ printf "%s ", $0 }')"; return 1; fi
+  "$GREP" -qF 'NON VERIFIABLE' "$TMP/pv.err" || { LASTMSG="run n'a pas joue jusqu'au bout avec le vrai git (temoin positif absent) — $(tail -2 "$TMP/pv.err")"; return 1; }
+  return 0
+}
+probe_path_vide_hook() { # B : fichier de hook
+  mk_pair "p$((++N))"; arm_in "$P/b"; [ "$HKRC" -eq 0 ] || { LASTMSG="arm rc=$HKRC"; return 1; }
+  diverge "$P/a" "$P/b" 02
+  local hits="$TMP/hitsh$N"; mkdir -p "$hits"; plant_traps "$P/b" "$hits"
+  (cd "$P/b" && "$ENVB" PATH=. "$PERLB" -e 'alarm 30; exec @ARGV' "$P/b/.git/hooks/post-merge") > "$TMP/pv.out" 2> "$TMP/pv.err" < /dev/null || :
+  if [ "$(nfiles "$hits")" -ne 0 ]; then LASTMSG="PATH=. entierement filtre : commande(s) du repertoire courant executee(s) par le fichier de hook : $(ls "$hits" | awk '{ printf "%s ", $0 }')"; return 1; fi
+  "$GREP" -qF 'DIVERGENCE apres post-merge' "$TMP/pv.err" || { LASTMSG="le hook ne crie plus avec PATH=. (temoin positif absent) — $(tail -2 "$TMP/pv.err")"; return 1; }
+  return 0
+}
+# C : chaque run retire son temporaire (TMPDIR prive, trois runs, zero reste).
+probe_tmp_nettoye() {
+  mk_pair "p$((++N))"; arm_in "$P/b"; diverge "$P/a" "$P/b" 02
+  local td="$TMP/tmpd$N" i; mkdir -p "$td"
+  for i in 1 2 3; do
+    HKDIR="$P/b" env_hk "TMPDIR=$td" run --hook post-merge; HKDIR=""
+    { [ "$HKRC" -eq 1 ] && "$GREP" -qF '[vf-divergence] DIVERGENCE' "$TMP/hk.err"; } || { LASTMSG="run $i : rc=$HKRC, pas de cri (temoin positif absent)"; return 1; }
+  done
+  [ "$(nfiles "$td")" -eq 0 ] || { LASTMSG="trois runs ont laisse $(nfiles "$td") temporaire(s) dans TMPDIR : $(ls "$td" | awk '{ printf "%s ", $0 }')"; return 1; }
+  return 0
+}
+# E : la ligne d'un hook tiers affichee par disarm est assainie (un hook husky versionne vient de la branche).
+probe_disarm_assaini() {
+  mk_pair "p$((++N))"
+  local esc bel; esc="$(printf '\033')"; bel="$(printf '\007')"
+  put_tiers "$P/b" post-merge "${esc}]0;VFPWN${bel} bash '/ancien/cache/conductor/scripts/vf-divergence-hook.sh' run --hook post-merge \"\$@\""
+  cp "$P/b/.git/hooks/post-merge" "$TMP/pm.orig"
+  hk disarm --path "$P/b"
+  [ "$HKRC" -eq 1 ] || { LASTMSG="disarm rc=$HKRC (attendu 1)"; return 1; }
+  "$GREP" -qF 'LIGNE A RETIRER A LA MAIN (post-merge) :' "$TMP/hk.err" || { LASTMSG="la ligne a retirer a la main n'est pas imprimee (temoin positif absent)"; return 1; }
+  "$GREP" -qF 'VFPWN' "$TMP/hk.err" || { LASTMSG="le texte de la ligne tierce n'est plus imprime (temoin positif absent)"; return 1; }
+  if LC_ALL=C "$GREP" -q "[${esc}${bel}]" "$TMP/hk.err"; then LASTMSG="octet de controle (ESC/BEL) de la ligne tierce imprime au terminal"; return 1; fi
+  cmp -s "$P/b/.git/hooks/post-merge" "$TMP/pm.orig" || { LASTMSG="le hook tiers a ete modifie"; return 1; }
+  return 0
+}
+# J3 : repli du fichier de hook (cache disparu) avec `.git/vf-divergence` en lien symbolique : jamais suivi.
+probe_repli_dossier_lien() {
+  mk_pair "p$((++N))"
+  mk_cache "$TMP/ephem$N" "$TARGET" || { LASTMSG="cache non construit"; return 1; }
+  local save="$TARGET"; TARGET="$TMP/ephem$N/conductor/scripts/vf-divergence-hook.sh"
+  arm_in "$P/b"; local arc="$HKRC"; TARGET="$save"
+  [ "$arc" -eq 0 ] || { LASTMSG="arm depuis le cache prive rc=$arc"; return 1; }
+  rm -rf "$TMP/ephem$N"
+  mkdir -p "$P/b/outside" "$TMP/dehors$N"; ln -s "$TMP/dehors$N" "$P/b/.git/vf-divergence"
+  (cd "$P/b" && "$PERLB" -e 'alarm 30; exec @ARGV' "$P/b/.git/hooks/post-merge") > "$TMP/rl.out" 2> "$TMP/rl.err" < /dev/null || :
+  "$GREP" -qF 'executable introuvable' "$TMP/rl.err" || { LASTMSG="le repli du fichier de hook n'a pas joue (temoin positif absent) — $(tail -2 "$TMP/rl.err")"; return 1; }
+  "$GREP" -qF 'JOURNAL NON ECRIT : dossier-lien' "$TMP/rl.err" || { LASTMSG="dossier de journal lien symbolique suivi en silence — $(tail -2 "$TMP/rl.err")"; return 1; }
+  [ "$(nfiles "$TMP/dehors$N")" -eq 0 ] || { LASTMSG="le repli a ecrit $(nfiles "$TMP/dehors$N") fichier(s) a travers le lien symbolique"; return 1; }
+  return 0
+}
+case_ VDH-PATH-VIDE-run probe_path_vide_run "(tour 3, A) : PATH=. entierement filtre -> repli /usr/bin:/bin, aucune commande du repertoire courant executee par run"
+case_ VDH-PATH-VIDE-hook probe_path_vide_hook "(tour 3, B) : PATH=. entierement filtre -> repli /usr/bin:/bin, aucune commande du repertoire courant executee par le fichier de hook, divergence toujours criee"
+case_ VDH-RUN-TMP-NETTOYE probe_tmp_nettoye "(tour 3, C) : trois run successifs -> zero temporaire laisse dans TMPDIR"
+case_ VDH-DISARM-ASSAINI probe_disarm_assaini "(tour 3, E) : la ligne tierce affichee par disarm est assainie (ESC/BEL), hook tiers intact"
+case_ VDH-REPLI-DOSSIER-LIEN probe_repli_dossier_lien "(tour 3, J3) : cache disparu et .git/vf-divergence lien symbolique -> « JOURNAL NON ECRIT : dossier-lien », rien ecrit a travers le lien"
+
+
 # ===========================================================================
 # Mutants (QUAL-01) : une ligne altree chacun, cmp -s different, bash -n valide, sonde rouge sur le mutant
 # puis verte sur l'original.
@@ -1061,6 +1133,21 @@ mutant VDH-MUT-ENV-3 'unset GIT_DIR ' 'GIT_WORK_TREE ' '' probe_env_GIT_WORK_TRE
 # disarm et status ne lit l'index) ; la sonde le pose et prouve que rien n'est suivi, mais aucun mutant ne peut le tuer.
 mutant VDH-MUT-RELAIS-CTRL '< "$tmp" >&2' '\013-\037' '\016-\037' probe_relais \
   "filtre du relais : CR, VT et FF ne sont plus retires"
+# Tour 3 de relecture (Phase 61) : un mutant par propriete, tue par une sonde de comportement.
+mutant VDH-MUT-VIDE-run 'p="/usr/bin:/bin"' '"/usr/bin:/bin"' '""' probe_path_vide_run \
+  "run : repli d'un PATH entierement filtre remplace par un PATH vide (entree vide = repertoire courant)"
+mutant VDH-MUT-VIDE-hook 'vf_p=/usr/bin:/bin' '/usr/bin:/bin' '' probe_path_vide_hook \
+  "fichier de hook : repli d'un PATH entierement filtre remplace par un PATH vide"
+mutant VDH-MUT-TMP-1 "trap 'rm -f" "trap 'rm -f \"\$tmp\"' EXIT" ':' probe_tmp_nettoye \
+  "run : temporaire jamais retire (trap EXIT supprime)"
+mutant VDH-MUT-RELAIS-BS '< "$tmp" >&2' '\000-\010' '\000-\007' probe_relais \
+  "filtre du relais : BS (\\010) n'est plus retire"
+mutant VDH-MUT-RELAIS-DEL '< "$tmp" >&2' '\177' '' probe_relais \
+  "filtre du relais : DEL (\\177) n'est plus retire"
+mutant VDH-MUT-DISARM-ASSAINI 'NAME_P="$name" awk' " | tr -d '\\000-\\010\\013-\\037\\177'" '' probe_disarm_assaini \
+  "disarm : la ligne du hook tiers est imprimee sans assainissement"
+mutant VDH-MUT-REPLI-LIEN 'vf_why=dossier-lien' '[ -L "$vf_dir" ]' 'false' probe_repli_dossier_lien \
+  "repli du fichier de hook : dossier de journal lien symbolique suivi"
 TARGET="$ORIG_TARGET"
 
 # ===========================================================================
