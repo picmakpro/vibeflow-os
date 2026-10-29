@@ -8,14 +8,31 @@ avant les observations, provenance, observations brutes, verdict proposé, décl
 
 > ## STATUT DE CE DOCUMENT
 >
-> **PROPOSÉ — en attente d'arbitrage de Samuel.**
+> **DÉCIDÉ — option A** (2026-10-29, voir la section « Décision » ci-dessous).
 >
-> Les deux critères du déclencheur de la spec (§4 C) **ne sont pas remplis** à la date de mesure : aucun
-> lab réel à deux humains n'a tourné trois semaines sur l'approche B, et le besoin non-dev sans terminal
-> n'a jamais été mesuré dans ce dépôt. La recommandation est donc l'option **A** (différer C avec un
-> déclencheur daté). **Rien n'est décidé** : le choix A / B / C et la date de reprise sont un geste de
-> Samuel (bloqueur P62-B-01). Aucun code, aucune implémentation de plateforme n'est produit ni autorisé
-> par ce document.
+> Les observations, critères et options qui suivent sont **datés du 2026-10-29** et ne sont pas réécrits :
+> ils étaient rédigés au statut « PROPOSÉ » et restent la preuve sur laquelle la décision s'appuie. Les deux
+> critères du déclencheur de la spec (§4 C) **ne sont pas remplis** à la date de mesure. Aucun code, aucune
+> implémentation de plateforme n'est produit ni autorisé par ce document.
+
+## Décision
+
+**Source :** décision déléguée par Samuel, message session principale, 2026-10-29 : « décide pour moi les options A, B ou C. Choisis la meilleure option selon une étude de toi-même » ; option retenue par la session principale.
+
+**Option retenue : A** — approche C différée, avec le déclencheur du §6. **Plancher de réexamen confirmé : 2027-01-31.**
+À cette date, on relit C1 et C2 (§6) et on constate leur état ; aucune veille automatique (P62-D-05).
+
+**Motif, en trois points :**
+
+1. C1 et C2 ne sont pas remplis, et C coûte un produit entier qui casse « le disque fait foi » ; le seul
+   candidat, le hub (`vibeflow-hub-v3-docs`), est un pack documentaire mono-utilisateur sans code.
+2. L'option B ne lèverait que C2 : même positive, C resterait non cadrable tant que la recette COLB-08 n'a
+   pas tourné, et B coûte des entretiens à Samuel.
+3. L'ordre utile est A, puis la recette de la Phase 61 sur lab réel (COLB-08), qui alimente C1 et éclaire Q-05.
+
+**B reste ouverte** comme ajout futur, à la discrétion de Samuel ; elle n'est ni lancée ni exclue.
+
+---
 
 ## Table de verdicts
 

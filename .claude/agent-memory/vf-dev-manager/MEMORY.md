@@ -98,3 +98,6 @@
 - [CI tests shallow, PyYAML user site](project_ci-tests-shallow-pyyaml-user-site.md) — job tests sans fetch-depth = SKIP des preuves historiques ; HOME temp = PyYAML perdu, garder PYTHONUSERBASE
 - [Orphelins de test bloquent les juges](feedback_orphelins-de-test-bloquent-les-juges.md) — mutant bloqué sur FIFO survit à perl alarm et gèle un juge derrière `| tail` : interdire les tubes, borne par groupe
 - [Doc d agent : rejouer le budget d instructions](feedback_doc-d-agent-rejouer-le-budget-d-instructions.md) — « jamais » descriptif compte : #160 a rougi le gate après le bump ; gates AVANT le bump
+- [CI annulée à ~36 min : image runner](project_ci-cancelled-36min-runner-uutils.md) — cause réparée = uutils du runner Ubuntu 26 (#168), pas la charge ; #171 ouverte sur une corrélation sans témoin
+- [Assouplir sur indéterminé = fail-open](feedback_assouplir-sur-indetermine-rouvre-un-fail-open.md) — « continue sur rc 3 » laisse passer ce que le gate n'a pas lu : trier les causes, jamais le code
+- [Pile de phases, main qui bouge](project_phases-empilees-main-qui-bouge.md) — chaque merge d'autrui = rebase en chaîne + CI 55 min ; REQUIREMENTS en union, rebaser une fois avant la CI utile

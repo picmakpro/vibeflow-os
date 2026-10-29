@@ -644,3 +644,11 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 - **Commentaire d'en-tête inexact sur `cherry-pick`** (`:130`).
 
 **Déclencheur de reprise :** la prochaine évolution du filet de divergence ou un incident de hook tiers sur un clone réel.
+
+## Réexamen approche C (plateforme collaborative) — 2027-01-31 — DIFFÉRÉ (2026-10-29)
+
+**Origine :** Phase 62, décision A (approche C différée), décision déléguée par Samuel, message session principale, 2026-10-29. Échéance humaine, **sans veille automatique** (P62-D-05).
+- **À la date :** relire C1/C2 (`62-DECISION-plateforme.md` §6) et constater leur état ; si un fait manque, repousser par un nouvel arbitrage, jamais en silence.
+- C1 : compte rendu de la recette Phase 61 sur lab réel (COLB-08). C2 : besoin non-dev sans terminal documenté (option B possible, à la discrétion de Samuel).
+
+**Déclencheur de reprise :** le 2027-01-31, ou plus tôt si C1 et C2 sont établis.

@@ -1,7 +1,7 @@
 # Phase 62: Décision sur l'approche plateforme, sur preuve - Context
 
 **Gathered:** 2026-10-29
-**Status:** Ready for planning
+**Status:** Décidée — option A (2026-10-29)
 
 Cadrage porté par `vf-dev-manager` (mission-flow §Pattern F), **sans humain joignable** : mandat Samuel,
 /vf-auto session principale, 2026-10-29. La phase **prépare** la décision ; elle ne la prend pas. La
@@ -50,7 +50,7 @@ plateforme »). Phase de documentation : aucune release (ADR-073).
   automatique.
 
 ### Bloqueur humain
-- **P62-B-01.** La décision elle-même (choix A/B/C et date du déclencheur) : Samuel.
+- **P62-B-01 — LEVÉ le 2026-10-29.** La décision elle-même (choix A/B/C et date du déclencheur) : décision déléguée par Samuel, message session principale, 2026-10-29 : « décide pour moi les options A, B ou C. Choisis la meilleure option selon une étude de toi-même » ; option retenue par la session principale. Option A, approche C différée, plancher de réexamen 2027-01-31 ; voir `62-DECISION-plateforme.md` § Décision.
 
 </decisions>
 

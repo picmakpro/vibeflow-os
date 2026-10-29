@@ -106,10 +106,10 @@
 - [ ] Phase 56: Packs de règles par langage (module optionnel) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [x] Phase 57: Verrou de driver par compartiment (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-12, mergée PR #152 le 2026-10-16 en `--admin`, revue `@picmakpro` contournée (demande explicite de Samuel, session principale Claude Code, 2026-10-16 : « merge sans willy, release + tag »), release `v2.70.0` ; 16/16 plans, DLWS-01..08 cochées
 - [x] Phase 58: Rôles de poste — installeur, profils solo / product / dev (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-22 : 12/12 plans, porte de phase verte, RLPO-01..12 cochées dont RLPO-11 par override (critère 6 et recette installeur non mesurés, Samuel, session principale, 2026-10-22 — dette dans 58-VERIFICATION.md), branche rebasée sur v2.70.1, release `v2.71.0` à venir
-- [x] Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-27 : 8/8 plans, porte de phase verte, PRDT-01..12 cochées, release à décider
-- [x] Phase 60: Gate architecture avant découpage et validation des phases proposées (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-29 : 9/9 plans, porte de phase verte (job `gates` rejoué depuis `ci.yml`, suites une à une), ARCG-02..08, 10 et 11 cochées, ARCG-01 partielle (dette : pose à la création non prouvée par une exécution), ARCG-09 partielle (critère 6 `clients` en code 2, en attente de la liste), release à décider
-- [x] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-29 : 8/8 plans, porte de phase verte (job `gates` rejoué depuis `ci.yml`, suites une à une), COLB-01..07 cochées, COLB-09 partielle (critère 6 `clients` en code 2), COLB-08 en attente de la preuve humaine (P61-B-01, P61-B-02), release à décider
-- [ ] Phase 62: Décision sur l'approche plateforme, sur preuve (inscrite 2026-10-08, jalon equipe-produit-v1.0)
+- [x] Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-27 : 8/8 plans, porte de phase verte, PRDT-01..12 cochées, livrée en `v2.73.0`
+- [x] Phase 60: Gate architecture avant découpage et validation des phases proposées (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-29 : 9/9 plans, porte de phase verte (job `gates` rejoué depuis `ci.yml`, suites une à une), ARCG-02..08, 10 et 11 cochées, ARCG-01 partielle (dette : pose à la création non prouvée par une exécution), ARCG-09 partielle (critère 6 `clients` en code 2, en attente de la liste), livrée en `v2.74.0`
+- [x] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-29 : 8/8 plans, porte de phase verte (job `gates` rejoué depuis `ci.yml`, suites une à une), COLB-01..07 cochées, COLB-09 partielle (critère 6 `clients` en code 2), COLB-08 en attente de la preuve humaine (P61-B-01, P61-B-02), livrée en `v2.74.0`
+- [x] Phase 62: Décision sur l'approche plateforme, sur preuve (inscrite 2026-10-08, jalon equipe-produit-v1.0) — close 2026-10-29 : décision A (approche C différée), réexamen 2027-01-31, PLTF-01..02 cochées (aucune release : ADR-073)
 - [ ] Phase 63: Règles produit empruntées à AIDD (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 - [ ] Phase 64: Contrôles après exécution branchés en nœuds du plan de bataille (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 - [ ] Phase 65: Révision des règles qui brident l'efficacité des agents (inscrite 2026-10-29, jalon equipe-produit-v1.0)
@@ -181,9 +181,10 @@
 | 41.4. Emprunts Pocock — disciplines de cadrage, de revue et de skills | fiabilite-v1.0 | 11/11 | Complete — PR #135 (merge `--admin`, 2026-10-08), release `v2.69.0` | 2026-10-06 |
 | 57. Verrou de driver par compartiment | equipe-produit-v1.0 | 16/16 | Complete — PR #152 (merge `--admin`, 2026-10-16), release `v2.70.0` | 2026-10-12 |
 | 58. Rôles de poste — installeur, profils solo / product / dev | equipe-produit-v1.0 | 12/12 | Complete (2 overrides, Samuel 2026-10-22) — release `v2.71.0` à venir | 2026-10-22 |
-| 59. Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate | equipe-produit-v1.0 | 8/8 | Complete — porte de phase verte, PRDT-01..12 cochées, PR et release à décider | 2026-10-27 |
-| 60. Gate architecture avant découpage et validation des phases proposées | equipe-produit-v1.0 | 9/9 | Complete — porte de phase verte, ARCG-02..08, 10, 11 cochées, ARCG-01 et ARCG-09 partielles (dettes nommées), PR et release à décider | 2026-10-29 |
-| 61. Collaboration à deux humains — divergence armée, preuve sur lab réel | equipe-produit-v1.0 | 8/8 | Complete — porte de phase verte, COLB-01..07 cochées, COLB-09 partielle (dette nommée), COLB-08 décochée (preuve humaine attendue), PR et release à décider | 2026-10-29 |
+| 59. Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate | equipe-produit-v1.0 | 8/8 | Complete — porte de phase verte, PRDT-01..12 cochées, livrée en `v2.73.0` | 2026-10-27 |
+| 60. Gate architecture avant découpage et validation des phases proposées | equipe-produit-v1.0 | 9/9 | Complete — porte de phase verte, ARCG-02..08, 10, 11 cochées, ARCG-01 et ARCG-09 partielles (dettes nommées), livrée en `v2.74.0` | 2026-10-29 |
+| 61. Collaboration à deux humains — divergence armée, preuve sur lab réel | equipe-produit-v1.0 | 8/8 | Complete — porte de phase verte, COLB-01..07 cochées, COLB-09 partielle (dette nommée), COLB-08 décochée (preuve humaine attendue), livrée en `v2.74.0` | 2026-10-29 |
+| 62. Décision sur l'approche plateforme, sur preuve | equipe-produit-v1.0 | 1/1 | Complete — décision A (approche C différée), réexamen 2027-01-31, PLTF-01..02 cochées, sans release (ADR-073) | 2026-10-29 |
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15 -->
 
@@ -718,7 +719,7 @@ Plans:
 
 Plans:
 
-- [x] 62-01-PLAN.md — dossier de décision `62-DECISION-plateforme.md` (statut PROPOSÉ : mesures sourcées, options A/B/C, déclencheur et plancher de date proposés) ; la décision signée (PLTF-02) reste à Samuel, la phase reste ouverte
+- [x] 62-01-PLAN.md — dossier de décision `62-DECISION-plateforme.md` (mesures sourcées, options A/B/C) ; décision A signée par délégation le 2026-10-29 (PLTF-02), réexamen 2027-01-31 : phase close
 
 ### Phase 63: Règles produit empruntées à AIDD
 
