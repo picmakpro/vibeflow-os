@@ -49,7 +49,7 @@ set -euo pipefail
 
 # ---------- Helpers (définis tôt : utilisés dès le parsing) ----------
 log() { echo "[vibeflow-update] $*" >&2; }
-err() { echo "[vibeflow-update] ERROR: $*" >&2; exit 1; }
+err() { echo "[vibeflow-update] ERROR: $*" >&2; vf_lp_report || true; exit 1; }
 # vf_dry_run — prédicat pour VF_DRY_RUN (D-31-06). Tous les sites testent CE prédicat plutôt que
 # la variable à la main.
 vf_dry_run() { [ "$VF_DRY_RUN" = "1" ]; }
@@ -530,12 +530,205 @@ vf_manifest_excluded() {
     memory/*)                     return 0 ;;  # contenu vivant du lab semé par seed-registres.sh, pas un artefact de pose
     scripts/.vibeflow-installed)  return 0 ;;  # état du moteur, pas contenu de module
     scripts/.vibeflow-manifest-*) return 0 ;;  # le manifeste ne se consigne jamais lui-même (boucle de convergence)
+    scripts/.vibeflow-sha256-*)   return 0 ;;  # empreintes de pose (#166), nom HORS du motif du manifeste : jamais découvert par glob
     .backups/*)                   return 0 ;;  # filet de sécurité, jamais candidat à suppression automatique
     settings.json)                return 0 ;;  # M5 (revue 31-03) : fichier MERGÉ par merge_module_hooks, pas posé — était
                                                  # neutralisé par un second filtre privé sous T6, hors du point UNIQUE D-31-03
     settings.local.json)          return 0 ;;  # idem, miroir --settings-local (scope project|local)
   esac
   return 1
+}
+
+# ---------- Patches locaux des modules (#166) ----------
+# Un fichier de module posé sur un fichier du lab qui a été modifié à la main perdait la
+# modification sans un mot. La détection vit dans la couture de pose (vf_place_file, boucle de
+# vf_place_tree), jamais site par site. Minimum viable : détecter, sauvegarder, avertir — le
+# moteur pose TOUJOURS la version du cache, pas d'overlay.
+# Référence, par priorité : (1) l'empreinte sha256 enregistrée à la pose précédente
+# (scripts/.vibeflow-sha256-<mod>, une ligne « <sha256>  <chemin relatif> », nom HORS du motif
+# .vibeflow-manifest-* que la convergence découvre par glob) ; (2) faute d'empreinte, le même
+# fichier dans le cache de la version installée du module ; (3) sinon aucune conclusion — jamais
+# un « inchangé » affirmé. Hors détection : tout ce que vf_manifest_excluded exclut.
+PYX="-Xutf8"
+VF_LP_HASH=""                                # outil de hachage retenu par la sonde (ou none) ; vide = pas encore sondé
+VF_LP_TS="$(date +%Y%m%d-%H%M%S)"            # un seul dossier de sauvegarde par run
+VF_LP_RUNDIR=""                              # posé à la première détection, dossier créé paresseusement
+VF_LP_COUNT=0
+VF_LP_LIST=""                                # chemins relatifs, un par ligne (annonce de fin de run)
+VF_LP_OLD=""                                 # dossier du module dans le cache de l'ancienne version
+
+vf_sha_path() { echo "$TARGET_ROOT/scripts/.vibeflow-sha256-$1"; }
+
+# vf_lp_run <outil> — empreinte du stdin (une seule forme de lecture pour les trois outils).
+vf_lp_run() {
+  case "$1" in
+    sha256sum) sha256sum ;;
+    shasum)    shasum -a 256 ;;
+    python3)   python3 -I $PYX -c 'import hashlib,sys;print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())' ;;
+  esac
+}
+
+# vf_lp_probe — choisit UNE fois par run le premier outil qui rend la bonne empreinte d'un témoin
+# connu (un binaire présent mais cassé ne compte pas). Appelée hors sous-shell (vf_manifest_reset,
+# vf_manifest_flush) : sinon le choix se perdrait. Aucun outil → une ligne de log, aucune conclusion.
+vf_lp_probe() {
+  [ -z "$VF_LP_HASH" ] || return 0
+  local want="2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881" got t
+  for t in sha256sum shasum python3; do
+    command -v "$t" >/dev/null 2>&1 || continue
+    got="$(printf x | vf_lp_run "$t" 2>/dev/null)" || got=""
+    if [ "${got%% *}" = "$want" ]; then VF_LP_HASH="$t"; return 0; fi
+  done
+  VF_LP_HASH="none"
+  log "  détection des patches locaux indisponible : aucun outil sha256"
+  return 0
+}
+
+# vf_lp_sha <fichier> — empreinte (64 hex) sur stdout, rc 1 sans outil ou en cas d'échec.
+vf_lp_sha() {
+  case "$VF_LP_HASH" in ""|none) return 1 ;; esac
+  local out
+  out="$(vf_lp_run "$VF_LP_HASH" < "$1" 2>/dev/null)" || return 1
+  out="${out%% *}"
+  [ "${#out}" -eq 64 ] || return 1
+  printf '%s' "$out"
+}
+
+# vf_lp_recorded <mod> <rel> — empreinte enregistrée pour <rel>, rc 1 si absente. ENVIRON, pas
+# `-v` : awk interprète les antislashs d'une valeur passée par -v.
+vf_lp_recorded() {
+  local f
+  f="$(vf_sha_path "$1")"
+  [ -f "$f" ] || return 1
+  VF_LP_P="$2" awk 'length($0) > 66 && substr($0, 65, 2) == "  " && substr($0, 67) == ENVIRON["VF_LP_P"] { print substr($0, 1, 64); f = 1; exit } END { exit !f }' "$f"
+}
+
+# vf_lp_find_old <mod> — retrouve le module dans le cache de la version INSTALLÉE : la version du
+# registre est celle du MODULE (≠ celle du plugin), on balaie donc les caches frères de CACHE_DIR
+# et on compare leur $mod/VERSION. Best-effort : rien de trouvé → VF_LP_OLD vide.
+vf_lp_find_old() {
+  VF_LP_OLD=""
+  local inst d cur
+  inst="$(module_version_installed "$1")"
+  case "$inst" in ""|"—"|INCONSISTENT:*) return 0 ;; esac
+  cur="${CACHE_DIR%/}"
+  for d in "$(dirname "$cur")"/*; do
+    [ -d "$d" ] || continue
+    [ "${d%/}" = "$cur" ] && continue
+    [ -f "$d/$1/VERSION" ] || continue
+    if [ "$(cat "$d/$1/VERSION" 2>/dev/null)" = "$inst" ]; then VF_LP_OLD="$d/$1"; return 0; fi
+  done
+  return 0
+}
+
+# vf_lp_check <src> <dest> — appelée AVANT l'écrasement de <dest> par <src>. Détecte, si <dest>
+# existe, diffère du nouveau fichier ET diffère de la référence ; sauvegarde la version du lab,
+# écrit le diff « nouveau → lab » à côté (il se réapplique sur la version posée), puis rend la
+# main : la pose qui suit est normale. En --dry-run : la ligne [plan] ! seule, aucune écriture.
+# Best-effort : ne fait jamais échouer la pose (retours 0 partout). Sous --target, le « nouveau »
+# est le contenu réécrit, jamais le cache brut (même réécriture que la pose).
+vf_lp_check() {
+  local src="$1" dest="$2" rel newp oldp oldc ref cur tmpd="" rcd=0
+  [ -n "$VF_MANIFEST_MOD" ] || return 0
+  [ -f "$dest" ] && [ ! -L "$dest" ] || return 0
+  case "$VF_LP_HASH" in ""|none) return 0 ;; esac
+  rel="$(vf_rel_to_target "$dest")" || return 0
+  if vf_manifest_excluded "$rel"; then return 0; fi
+  newp="$src"
+  if [ -n "$VF_TARGET_OVERRIDE" ] && vf_target_rewrite_ext "$dest"; then
+    tmpd="$(mktemp -d 2>/dev/null)" || return 0
+    newp="$tmpd/$(basename "$dest")"
+    cp "$src" "$newp" 2>/dev/null || { rm -rf "$tmpd"; return 0; }
+    vf_rewrite_target_refs "$newp"
+  fi
+  # Lab déjà identique au nouveau fichier : rien à perdre, rien à dire.
+  if cmp -s "$dest" "$newp"; then
+    [ -z "$tmpd" ] || rm -rf "$tmpd"
+    return 0
+  fi
+  ref="$(vf_lp_recorded "$VF_MANIFEST_MOD" "$rel")" || ref=""
+  if [ -z "$ref" ] && [ -n "$VF_LP_OLD" ]; then
+    case "$src" in
+      "$CACHE_DIR/$VF_MANIFEST_MOD"/*)
+        oldp="$VF_LP_OLD/${src#"$CACHE_DIR/$VF_MANIFEST_MOD"/}"
+        if [ -f "$oldp" ]; then
+          if [ -n "$tmpd" ]; then
+            oldc="$tmpd/old-$(basename "$dest")"
+            if cp "$oldp" "$oldc" 2>/dev/null; then vf_rewrite_target_refs "$oldc"; oldp="$oldc"; fi
+          fi
+          ref="$(vf_lp_sha "$oldp")" || ref=""
+        fi
+        ;;
+    esac
+  fi
+  cur=""
+  [ -z "$ref" ] || cur="$(vf_lp_sha "$dest")" || cur=""
+  if [ -z "$ref" ] || [ -z "$cur" ] || [ "$cur" = "$ref" ]; then
+    [ -z "$tmpd" ] || rm -rf "$tmpd"
+    return 0
+  fi
+  if vf_dry_run; then
+    printf '[plan] ! %s  (patch local)\n' "$dest"
+    [ -z "$tmpd" ] || rm -rf "$tmpd"
+    return 0
+  fi
+  [ -n "$VF_LP_RUNDIR" ] || VF_LP_RUNDIR="$BACKUP_DIR/local-patches-$VF_LP_TS"
+  if mkdir -p "$(dirname "$VF_LP_RUNDIR/$rel")" 2>/dev/null && cp -p "$dest" "$VF_LP_RUNDIR/$rel" 2>/dev/null; then
+    diff -u -L "a/$rel" -L "b/$rel" "$newp" "$dest" > "$VF_LP_RUNDIR/$rel.patch" 2>/dev/null || rcd=$?
+    if [ "$rcd" -gt 1 ]; then
+      rcd=0
+      diff -u "$newp" "$dest" > "$VF_LP_RUNDIR/$rel.patch" 2>/dev/null || rcd=$?
+    fi
+    if [ "$rcd" -gt 1 ]; then
+      rm -f "$VF_LP_RUNDIR/$rel.patch"
+      log "  [local-patches] diff indisponible pour $rel — sauvegarde seule"
+    fi
+    VF_LP_COUNT=$((VF_LP_COUNT + 1))
+    VF_LP_LIST="$VF_LP_LIST$rel"$'\n'
+  else
+    log "  [local-patches] sauvegarde impossible pour $rel — fichier remplacé sans copie"
+  fi
+  [ -z "$tmpd" ] || rm -rf "$tmpd"
+  return 0
+}
+
+# vf_lp_report — annonce de fin de run, UNE fois même sur `update --all` multi-modules (le
+# compteur et le dossier sont ceux du run). Rien si aucun fichier. Appelée aussi par err() : un
+# run avorté après un écrasement ne le tait pas.
+vf_lp_report() {
+  [ "${VF_LP_COUNT:-0}" -gt 0 ] || return 0
+  log "[local-patches] $VF_LP_COUNT fichier(s) modifié(s) localement ont été remplacés — sauvegardes et diffs : $VF_LP_RUNDIR"
+  local p
+  while IFS= read -r p; do
+    if [ -n "$p" ]; then log "  $p"; fi
+  done <<EOF_LP
+$VF_LP_LIST
+EOF_LP
+  VF_LP_COUNT=0
+  return 0
+}
+
+# vf_sha_write <mod> <liste triée de chemins relatifs> — écrit, atomiquement (tmp + mv, hors du
+# motif du manifeste), l'empreinte de chaque fichier tel qu'il est sur disque MAINTENANT : après
+# réécriture --target et après les retouches faites par install_module (injection MCP des agents),
+# donc la référence du prochain passage. Sans outil sha256 : aucun fichier (un ancien fichier
+# serait périmé, on le retire plutôt que de laisser conclure faux).
+vf_sha_write() {
+  local mod="$1" list="$2" target tmp rel h
+  target="$(vf_sha_path "$mod")"
+  if [ "$VF_LP_HASH" = "none" ]; then rm -f "$target"; return 0; fi
+  tmp="$target.tmp.$$"
+  : > "$tmp"
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    [ -f "$TARGET_ROOT/$rel" ] && [ ! -L "$TARGET_ROOT/$rel" ] || continue
+    h="$(vf_lp_sha "$TARGET_ROOT/$rel")" || continue
+    printf '%s  %s\n' "$h" "$rel" >> "$tmp"
+  done < "$list"
+  LC_ALL=C sort "$tmp" > "$tmp.s"
+  mv "$tmp.s" "$target"
+  rm -f "$tmp"
+  return 0
 }
 
 # ---------- Lecteur validant du manifeste (D-31-07, 31-05) ----------
@@ -818,6 +1011,9 @@ vf_manifest_reset() {
   local mod="$1"
   VF_MANIFEST_MOD="$mod"
   VF_DEGRADED_COPIES_COUNT=0
+  # #166 : sonde sha256 (une fois par run) et ancien cache du module (référence de repli).
+  vf_lp_probe
+  vf_lp_find_old "$mod"
   # 31-04 (D-31-06) : en dry-run, ne JAMAIS créer d'accumulateur ni de répertoire — seul
   # VF_MANIFEST_MOD est mémorisé, pour que vf_declare_write puisse afficher le suffixe
   # `(<module> <version>)` du verbe +. VF_MANIFEST_TMP reste vide : c'est ce qui garde
@@ -863,6 +1059,8 @@ vf_manifest_flush() {
   # suffixe module/version.
   if vf_dry_run; then
     target="$(vf_manifest_path "$VF_MANIFEST_MOD")"
+    # #166 : le fichier d'empreintes est annoncé comme le manifeste (égalité plan/pose), sauf sans outil.
+    case "$VF_LP_HASH" in ""|none) ;; *) vf_declare_write + "$(vf_sha_path "$VF_MANIFEST_MOD")" ;; esac
     vf_declare_write + "$target"
     VF_MANIFEST_TMP=""
     VF_MANIFEST_MOD=""
@@ -873,6 +1071,9 @@ vf_manifest_flush() {
   target="$(vf_manifest_path "$VF_MANIFEST_MOD")"
   sorted_tmp="${VF_MANIFEST_TMP}.sorted"
   LC_ALL=C sort -u "$VF_MANIFEST_TMP" > "$sorted_tmp"
+  # #166 : empreintes de pose écrites juste avant le manifeste, une empreinte par fichier posé.
+  vf_lp_probe
+  vf_sha_write "$VF_MANIFEST_MOD" "$sorted_tmp"
   mv "$sorted_tmp" "$target"
   rm -f "$VF_MANIFEST_TMP"
   VF_MANIFEST_TMP=""
@@ -1002,6 +1203,7 @@ vf_rewrite_target_refs() {
 # dans ce cas aussi.
 vf_place_file() {
   local src="$1" dest="$2" mode="${3:-}"
+  vf_lp_check "$src" "$dest"   # #166 : patch local détecté AVANT l'écrasement (ou annoncé en dry-run)
   if vf_dry_run; then
     vf_declare_write + "$dest"
     return 0
@@ -1109,10 +1311,20 @@ vf_place_tree() {
       [ -n "$f" ] || continue
       rel="${f#"$src_dir"/}"
       dest_file="$dest_dir/$rel"
+      vf_lp_check "$f" "$dest_file"   # #166 : [plan] ! avant la ligne [plan] + du fichier
       vf_declare_write + "$dest_file"
     done < "$list_tmp"
     rm -f "$list_tmp"
     return 0
+  fi
+
+  # #166 : détection au grain fichier AVANT le cp -r qui écrase (même énumération source).
+  if [ -n "$VF_MANIFEST_MOD" ]; then
+    local lpf
+    while IFS= read -r lpf; do
+      [ -n "$lpf" ] || continue
+      vf_lp_check "$lpf" "$dest_dir/${lpf#"$src_dir"/}"
+    done < "$list_tmp"
   fi
 
   mkdir -p "$dest_dir"
@@ -2987,6 +3199,7 @@ rollback_module() {
     log "  ⚠ version restaurée inconnue — registre inchangé, vérifier manuellement"
   fi
 
+  rm -f "$(vf_sha_path "$mod")"   # #166 : le lab ne correspond plus aux empreintes enregistrées
   trap - ERR
   [ "$rollback_had_errtrace" -eq 1 ] || set +E
   log "✓ $mod rollback OK"
@@ -3193,6 +3406,7 @@ uninstall_module() {
   local manifest_file
   manifest_file="$(vf_manifest_path "$mod")"
   [ -f "$manifest_file" ] && rm -f "$manifest_file" && log "  removed $manifest_file"
+  rm -f "$(vf_sha_path "$mod")"   # #166 : les empreintes partent avec le manifeste
 
   mark_uninstalled "$mod"
   log "✓ $mod désinstallé"
@@ -3593,3 +3807,6 @@ case "$cmd" in
     exit 1
     ;;
 esac
+
+# #166 : annonce unique des patches locaux remplacés pendant ce run (rien si aucun).
+vf_lp_report
