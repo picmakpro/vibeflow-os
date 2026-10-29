@@ -67,6 +67,7 @@ Last activity: 2026-10-20 — Phase 58 vérifiée human_needed 13/14
 
 - Phase 63 added (2026-10-29) : Règles produit empruntées à AIDD — arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 (phase dans le jalon actuel ; règles AIDD dans notre vocabulaire). Même jour : sortie de GSD et de superpowers, trajectoire par étapes retenue par message session principale (E1 superpowers, E2 épinglage gsd-core, E3 remplacement verbe par verbe conditionnée à l'étude de coût E0) → graine `SEED-003`, pas de phase.
 - Phases 64 et 65 added (2026-10-29) : contrôles après exécution branchés en nœuds du plan de bataille ; révision des règles qui brident l'efficacité des agents — arbitrage Samuel, message session principale, 2026-10-29, sur l'étude `docs/research/2026-10-29-etude-gsd-skills-agents-non-utilises.md`.
+- Phase 65 étendue (2026-10-29) : volet (g) accélération de la CI, livré par 65-01 — arbitrage Samuel, message session principale, 2026-10-29 (« on bypass Willy, on fait la review nous-mêmes, on merge ensuite » ; « on verse tout dans la phase 65 »).
 
 ### Pending Todos
 
