@@ -680,11 +680,13 @@ def bash_targets_outside_lab(cmd, root, start=None):
     inside, outside = outside_scan(cmd, root, start, 0, False)
     return (not inside) and outside > 0
 
-def outside_scan(cmd, root, base, depth, inherit):
+def outside_scan(cmd, root, base, depth, inherit, trace=None):
     """Parcours de bash_targets_outside_lab : rend (un geste est DANS le lab ou incertain, nombre de gestes hors du
     lab). `base` : dossier courant au depart (None = indetermine). `inherit` : la cible est deja incertaine (variable
     GIT_* heritee d un shell parent). Une chaine `bash -c "..."` est parcourue a part (depth + 1), depuis le dossier
-    courant de la commande : un cd INTERNE a la chaine ne bouge pas le dossier de la commande appelante."""
+    courant de la commande : un cd INTERNE a la chaine ne bouge pas le dossier de la commande appelante.
+    `trace` (liste, #166) : reçoit le dossier visé par chaque geste concerné (None si incertain ou chaîne bash -c),
+    puis True à la fin d un parcours complet ; sans effet sur la valeur rendue."""
     try:
         flat = re.sub(r"[\n\r]+", " ; ", strip_heredocs(cmd))
         toks = lex_ops(flat)
@@ -722,6 +724,8 @@ def outside_scan(cmd, root, base, depth, inherit):
                 continue
             if bash_command_concerned(" ".join(shlex.quote(t) for t in seg), depth):
                 if name in SHELLS:
+                    if trace is not None:
+                        trace.append(None)
                     c = shell_c_string(seg, idx)
                     if not c or depth + 1 > MAX_SHELL_DEPTH:
                         return True, 0  # chaine non lue ou trop profonde : le lock s applique
@@ -740,12 +744,34 @@ def outside_scan(cmd, root, base, depth, inherit):
                     target = None
                 else:
                     target = base
+                if trace is not None:
+                    trace.append(target)
                 if is_inside(target, root):
                     return True, 0
                 outside += 1
         if op in (";", "||") and base != start:
             base = None  # la chaîne a pu s arrêter avant ou après le cd : dossier indéterminé
+    if trace is not None:
+        trace.append(True)
     return False, outside
+
+NOWHERE = "/\x00nowhere"
+
+def effective_dir(cmd, cwd):
+    """Dossier où les gestes concernés de `cmd` s exécutent, quand il est CERTAIN : chaîne de `cd <littéral>` liés par
+    `&&` (même analyse qu outside_scan, #166). Tout doute (`;`, `||`, sous-shell, variable, popd, bash -c, -C, GIT_*,
+    gestes en des dossiers différents, parcours interrompu) rend None : le jugement garde alors le cwd du payload."""
+    trace = []
+    try:
+        outside_scan(cmd, NOWHERE, os.path.realpath(cwd), 0, False, trace)
+    except Exception:
+        return None
+    if not trace or trace[-1] is not True:
+        return None
+    dirs = trace[:-1]
+    if not dirs or any(d is None for d in dirs) or len(set(dirs)) != 1:
+        return None
+    return dirs[0]
 
 # ---------------------------------------------------------------------------------------------------
 # LAB PARTITIONNE (Phase 57, plan 57-05). Aucune apostrophe dans ce bloc : il vit dans un programme
@@ -1314,6 +1340,15 @@ def cite_paths(paths):
         shown.append(json.dumps(os.fsdecode(pb)[:120], ensure_ascii=True))
     return ", ".join(shown)
 
+def common_dir_of(d):
+    out = git_hardened(["rev-parse", "--git-common-dir"], d)
+    if not out or not out.strip():
+        return None
+    g = out.strip()
+    if not os.path.isabs(g):
+        g = os.path.join(d, g)
+    return os.path.realpath(g)
+
 def same_checkout(wt, top):
     try:
         return os.path.realpath(wt) == os.path.realpath(top)
@@ -1360,7 +1395,14 @@ def judge_bash(cmd, held, cwd, lab=None):
                     raise Unreadable("rev-parse --show-toplevel")
                 rel = os.path.relpath(os.path.realpath(cwd if lab is None else lab), top)
                 prefix = b"" if rel == "." else os.fsencode(rel)
-                paths = commit_paths(g, adds, cwd, top)
+                ecwd, etop = cwd, top
+                eff = effective_dir(cmd, cwd)
+                if eff is not None and eff != os.path.realpath(cwd) and not rel.startswith(".."):
+                    t2 = toplevel_of(eff)
+                    if t2 is not None and t2 != os.path.realpath(top) and common_dir_of(t2) is not None \
+                       and common_dir_of(t2) == common_dir_of(top):
+                        ecwd, etop = eff, t2  # autre checkout du MEME depot : le commit y est juge, avec le prefixe du lab dans SON checkout
+                paths = commit_paths(g, adds, ecwd, etop)
             except Unreadable as e:
                 add(held)
                 notes.append("source illisible : " + str(e))
