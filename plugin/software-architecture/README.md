@@ -1,7 +1,7 @@
 # software-architecture (module vibeflow-os)
 
 > **Type** : single-skill + rules + scripts (composable)
-> **Version** : v1.6.3
+> **Version** : v1.6.4
 > **ADR** : ADR-035 (Doctrine Architecture Logicielle AI-Safe) + ADR-037 absorbé (gates Nyquist / Decision Coverage)
 
 Doctrine d'**architecture logicielle AI-safe** : empêcher l'IA de « casser du code ailleurs »
@@ -32,9 +32,7 @@ Spécialise le principe Core **P9 — Modulariser pour la cognition**.
 
 ## Installation
 
-```bash
-.claude/scripts/vibeflow-update.sh install software-architecture
-```
+Via `/vibeflow-install` : coche « software-architecture » (moteur interne : `plugin/_internal/vibeflow-update.sh`).
 
 Le gate est CÂBLÉ AUTOMATIQUEMENT à l'install (ADR-043) : hook `PreToolUse(Edit|Write)` →
 `guard-file-size.sh` (deny si fichier de code ≥ 300 lignes sans marqueur `vibeflow:allow-large-file`),
