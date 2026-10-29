@@ -7,21 +7,85 @@
 # check-release-tag ne tourne que sur main : une branche de feature porte légitimement une
 # VERSION dont le tag n'existe pas encore (le tag est posé après merge, cf. CLAUDE.md).
 #
-# `traffic-data` est exclue de push : cette branche ne porte que de la donnée (traffic.json),
-# aucun gate n'a de cible à y trouver, et surtout chaque job qu'on y déclencherait ferait un
-# `actions/checkout`, donc un clone de plus — la sonde polluerait précisément la mesure qu'elle
-# produit (scripts/traffic-snapshot.sh).
+# Déclencheurs (Phase 65, arbitrage Samuel, message session principale, 2026-10-29 — « la CI est beaucoup trop
+# longue ») : `push` ne vise plus que `main`, la revue d'une branche passe par `pull_request`. Avant, chaque commit
+# d'une PR lançait la CI DEUX fois (push + pull_request), soit deux jobs de tests de 40 à 50 min en concurrence.
+# Une branche poussée sans PR n'a plus de CI : elle n'a pas de chemin vers `main` sans PR (ruleset), et le push de
+# `main` rejoue tout. `traffic-data` reste hors CI de fait (elle n'est pas `main`) : la sonde de trafic ne pollue pas
+# la mesure qu'elle produit (scripts/traffic-snapshot.sh).
 name: CI
 
 on:
   push:
-    branches: ["**", "!traffic-data"]
+    branches: ["main"]
   pull_request:
 
+# Un nouveau commit sur une PR annule le run précédent de la même PR (il ne prouve plus rien sur la tête de la
+# branche) ; jamais sur `main`, où chaque push garde son verdict.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  tests:
-    name: Suites de tests (découverte non vide)
+  # ----------------------------------------------------------------------------------------------
+  # SUITES DE TESTS — découpées (Phase 65). Mesure du 2026-10-29 sur le runner : 114 suites en série, 37 min, dont
+  # 20,5 min pour test-guard-driver-lock-ws.sh et 17,3 min pour SES SEULS mutants. Trois leviers :
+  #   1. les suites tournent sur SHARDS jobs parallèles (partition déterministe : scripts/ci-shard-suites.sh) ;
+  #   2. les mutants du guard de verrou ne tournent que si la PR touche le guard, le verrou, leur suite, leur lib
+  #      portable ou ce workflow — et sur TOUT push de `main` ; sinon la suite tourne en GW_MODE=sans-mutants (A/B
+  #      compris). Une preuve qui peut rougir reste exécutée là où elle a quelque chose à juger ;
+  #   3. le job requis par le ruleset garde son nom exact (« Suites de tests (découverte non vide) ») : il agrège,
+  #      rejoue la partition et refuse une suite perdue, un shard vide ou un shard en échec.
+  # Une PR de doc pure n'est PAS dispensée des suites : dix d'entre elles lisent la doc réelle du dépôt (ADR,
+  # manuel, README, .planning/) — mesuré le 2026-10-29.
+  # ----------------------------------------------------------------------------------------------
+  changes:
+    name: Périmètre du changement (mutants du guard de verrou)
     runs-on: ubuntu-latest
+    outputs:
+      mutants: ${{ steps.perimetre.outputs.mutants }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Les mutants ont-ils quelque chose à juger ?
+        id: perimetre
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -u
+          mutants=true
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            if files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"; then
+              mutants=false
+              while IFS= read -r f; do
+                case "$f" in
+                  plugin/conductor/scripts/guard-driver-lock.sh|plugin/conductor/scripts/driver-lock.sh|\
+                  plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh|plugin/_internal/lib/vf-portable.sh|\
+                  .github/workflows/ci.yml) mutants=true ;;
+                esac
+              done <<EOF
+          $files
+          EOF
+            else
+              echo "::warning::diff de la PR illisible ($BASE_SHA...$HEAD_SHA) : mutants joués par défaut"
+            fi
+          fi
+          echo "== mutants à jouer : $mutants (événement : $GITHUB_EVENT_NAME) =="
+          echo "mutants=$mutants" >> "$GITHUB_OUTPUT"
+
+  tests-shard:
+    name: Suites de tests — shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Doit rester égal à SHARDS ci-dessous ET dans le job d'agrégation.
+        shard: [0, 1, 2, 3, 4, 5, 6]
+    env:
+      SHARDS: "7"
     steps:
       - uses: actions/checkout@v4
 
@@ -117,6 +181,8 @@ jobs:
       # celle fermée sur check-gsd-config.sh) et sa sonde vit plus bas, DANS CETTE MÊME ÉTAPE, sous
       # le même `set -eu` et le même bilan `fail`/`note` — toujours pas de second job, pas de `|| true`.
       - name: Canari de forme du moteur GSD (lecture de texte — check-gsd-config.sh)
+        # Une seule fois par run : sur le shard 0 (Phase 65).
+        if: matrix.shard == 0
         run: |
           set -eu
           LAB="$(mktemp -d)"
@@ -212,15 +278,18 @@ jobs:
           fi
           echo "== canari VERT : les trois sources du moteur installé restent lisibles par extraction de texte, ET le registre de capabilities reste lisible par le générateur =="
 
-      - name: Découvrir et lancer toutes les suites
+      - name: Lancer les suites du shard
+        env:
+          # Les mutants ne tournent jamais dans un shard : job tests-mutants (ou push de main).
+          GW_MODE: sans-mutants
         run: |
           set -u
-          suites=$(find plugin scripts -type f -path '*/tests/test-*.sh' | sort)
+          suites="$(bash scripts/ci-shard-suites.sh "${{ matrix.shard }}" "$SHARDS")" || { echo "::error::partition illisible"; exit 1; }
           count=$(printf '%s\n' "$suites" | grep -c . || true)
-          echo "== $count suite(s) découverte(s) =="
-          # Assertion de découverte non vide (F13) : 0 suite = échec, pas un vert.
+          echo "== shard ${{ matrix.shard }}/$SHARDS : $count suite(s) =="
+          # Assertion de découverte non vide (F13) : un shard vide est un échec, pas un vert.
           if [ "$count" -eq 0 ]; then
-            echo "::error::aucune suite de tests découverte (pattern */tests/test-*.sh) — la CI refuse de rendre un verdict vide"
+            echo "::error::shard ${{ matrix.shard }} vide — la CI refuse de rendre un verdict vide"
             exit 1
           fi
           fail=0
@@ -238,7 +307,69 @@ jobs:
           done <<EOF
           $suites
           EOF
-          echo "== bilan : $count suite(s), $fail échec(s) =="
+          echo "== bilan du shard ${{ matrix.shard }} : $count suite(s), $fail échec(s) =="
+          [ "$fail" -eq 0 ]
+
+  tests-mutants:
+    name: Mutants du guard de verrou (test-guard-driver-lock-ws.sh, mode full)
+    needs: changes
+    if: needs.changes.outputs.mutants == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Suite complète, mutants compris
+        env:
+          GW_MODE: full
+        run: bash plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh
+
+  tests:
+    # NOM EXACT exigé par le ruleset de main (.github/rulesets/main.json) — ne pas le changer.
+    name: Suites de tests (découverte non vide)
+    needs: [changes, tests-shard, tests-mutants]
+    if: always()
+    runs-on: ubuntu-latest
+    env:
+      SHARDS: "7"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verdict agrégé et contrôle de la partition
+        env:
+          R_CHANGES: ${{ needs.changes.result }}
+          R_SHARDS: ${{ needs.tests-shard.result }}
+          R_MUTANTS: ${{ needs.tests-mutants.result }}
+          MUTANTS: ${{ needs.changes.outputs.mutants }}
+        run: |
+          set -u
+          fail=0
+          note() { echo "::error::$1"; fail=$((fail + 1)); }
+          echo "== changes=$R_CHANGES · shards=$R_SHARDS · mutants=$R_MUTANTS (à jouer : ${MUTANTS:-?}) =="
+          [ "$R_CHANGES" = success ] || note "le job de périmètre n'a pas abouti ($R_CHANGES)"
+          [ "$R_SHARDS" = success ] || note "au moins un shard de suites n'est pas vert ($R_SHARDS)"
+          if [ "${MUTANTS:-}" = true ]; then
+            [ "$R_MUTANTS" = success ] || note "mutants attendus mais non verts ($R_MUTANTS)"
+          else
+            [ "$R_MUTANTS" = skipped ] || note "mutants non attendus mais job dans l'état $R_MUTANTS"
+          fi
+
+          # Partition : l'union des shards est EXACTEMENT la découverte, sans doublon, et aucun shard n'est vide.
+          all="$(bash scripts/ci-shard-suites.sh --all)"
+          n_all=$(printf '%s\n' "$all" | grep -c . || true)
+          [ "$n_all" -gt 0 ] || note "aucune suite découverte (pattern */tests/test-*.sh) — verdict vide refusé"
+          union=""
+          s=0
+          while [ "$s" -lt "$SHARDS" ]; do
+            part="$(bash scripts/ci-shard-suites.sh "$s" "$SHARDS")"
+            [ -n "$part" ] || note "shard $s vide"
+            union="$union$part
+          "
+            s=$((s + 1))
+          done
+          sorted="$(printf '%s' "$union" | grep . | LC_ALL=C sort)"
+          [ "$(printf '%s\n' "$sorted" | uniq -d | grep -c . || true)" -eq 0 ] || note "une suite est dans deux shards"
+          [ "$sorted" = "$all" ] || note "l'union des shards diffère de la découverte (suite perdue ou en trop)"
+          echo "== $n_all suite(s) découverte(s), réparties sur $SHARDS shard(s) =="
           [ "$fail" -eq 0 ]
 
   gates:

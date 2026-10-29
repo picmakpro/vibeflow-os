@@ -35,8 +35,14 @@ DRIVER="$SCRIPTS/driver-lock.sh"
 BASH_BIN="${BASH:-bash}"
 # Mode de la suite. `full` (défaut) : tout, A/B et mutants compris. `matrice` : sous-processus d'un mutant (GW-M-*),
 # qui rejoue les cas GW-* (A/B exclu) contre une COPIE mutée du guard (GW_GUARD) posée à côté de vf-portable.sh ;
-# ni A/B ni mutants (pas de récursion).
+# ni A/B ni mutants (pas de récursion). `sans-mutants` : tout sauf les mutants (A/B compris) — mode des shards de la
+# CI quand la PR ne touche ni le guard, ni le verrou, ni leur suite ; les mutants tournent alors dans un job dédié, ou
+# sur tout push de main (Phase 65, arbitrage Samuel, message session principale, 2026-10-29).
 GW_MODE="${GW_MODE:-full}"
+case "$GW_MODE" in
+  full|matrice|sans-mutants) ;;
+  *) echo "❌ FAIL — GW_MODE inconnu : '$GW_MODE' (attendu : full, matrice, sans-mutants)"; exit 64 ;;
+esac
 SUITE="$HERE/$(basename "$0")"
 [ -z "${GW_GUARD:-}" ] || GUARD="$GW_GUARD"
 PORTABLE="$(cd "$SCRIPTS/../../_internal/lib" && pwd)/vf-portable.sh"
@@ -1337,7 +1343,7 @@ unstage "$LAB"
 out="$(run_guard_in "$LAB/autre" "$(mk_write "$LAB/.planning/workstreams/alpha/f" x sess-B "$LAB/autre")")"
 assert_empty "GW-SUB-7 — cwd portant son PROPRE .planning (P57-D-29, hors périmètre) : jugé comme avant, permis" "$out"
 
-if [ "$GW_MODE" = full ]; then
+if [ "$GW_MODE" = full ] || [ "$GW_MODE" = sans-mutants ]; then
 echo
 echo "=== GW-AB — lab PLAT : la copie gelée du guard d'avant la phase et le guard courant rendent la MÊME transcription, octet pour octet, SAUF sur la liste ÉNUMÉRÉE des formes nouvellement refusées (P57-D-03, P57-D-22 ; Q4 du 2026-10-13) ==="
 # Sémantique de ln/mv vue par la copie gelée (#166) : `-h` = option réelle (BSD, lien créé / fichier déplacé) ou refus
@@ -1789,7 +1795,7 @@ for id in $GW_AB_ENUM; do
 done
 assert_exit "GW-AB-PIN.2 — dans la transcription épinglée, chaque forme énumérée est refusée pour l'intrus ($gw_ab_pin_deny/$GW_AB_ENUM_N)" "$gw_ab_pin_deny" "$GW_AB_ENUM_N"
 assert_exit "GW-AB-PIN.3 — dans la transcription épinglée, chaque forme énumérée passe pour le détenteur ($gw_ab_pin_hold/$GW_AB_ENUM_N)" "$gw_ab_pin_hold" "$GW_AB_ENUM_N"
-fi   # GW_MODE = full (A/B)
+fi   # GW_MODE = full | sans-mutants (A/B)
 
 if [ "$GW_MODE" = full ]; then
 echo
@@ -2074,6 +2080,7 @@ else
   FAIL=$((FAIL+1))
 fi
 fi   # GW_MODE = full (mutants)
+[ "$GW_MODE" != sans-mutants ] || echo "== mutants : non joués ici (GW_MODE=sans-mutants) — job dédié de la CI ou push de main =="
 
 echo
 echo "=== Bilan : $PASS PASS · $FAIL FAIL ==="
