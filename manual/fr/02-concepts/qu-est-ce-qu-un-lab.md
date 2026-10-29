@@ -47,6 +47,8 @@ adaptée :
   qu'un nouvel intervenant comprenne une décision passée en lisant l'entrée correspondante, sans
   devoir reconstituer le contexte de mémoire. Le vocabulaire précis de ces registres est couvert
   dans le glossaire de ce thème.
+  Une entrée de DECISIONS, LEARNINGS ou BLOCKERS peut dire qui l'a écrite par la ligne `**Role**`
+  (le poste de l'auteur, lu par le plugin, jamais deviné) ; une entrée sans cette ligne reste valide.
 
 ## Ce qui fait qu'un dossier devient un lab
 
