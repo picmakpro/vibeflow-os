@@ -1,5 +1,11 @@
 # CHANGELOG — reference
 
+## [v2.6.0] — 2026-10-29 (champ Role des registres)
+
+**Minor** (capacité neuve : les gabarits de registres nomment le poste de l'auteur ; Phase 61, P61-D-07, mandat Samuel, /vf-auto session principale, 2026-10-29 ; aucune release racine, elle reste un geste du manager après merge) :
+
+- **Ligne `**Role**` dans les gabarits source** `methodology/templates/memory/{decisions,learnings,blockers}-template.md` : une ligne ajoutée à la fin du bloc de champs du squelette d'entrée, aucune retirée. Valeur = sortie de `vf-role.sh get` (`solo`, `product` ou `dev`), ligne omise si le poste est illisible, jamais `solo` par défaut ; optionnelle en lecture. Source modifiée avant les copies de `consolidator` (règle SYNC) ; preuve et consommateurs : `plugin/consolidator/scripts/tests/test-registres-role.sh`.
+
 ## [v2.5.8] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1, correctif de revue H6) — non publiée
 
 **Patch** (correctif de sécurité ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; publiée dans v2.70.1) :
