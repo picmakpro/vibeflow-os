@@ -14,7 +14,9 @@
 # Résolution — premier existant parmi (le payload installé prime sur un bin du PATH) :
 #   1. $GSD_TOOLS, s'il est non vide ET un fichier régulier existant (sinon ignoré, jamais une erreur) ;
 #   2. ./.claude/gsd-core/bin/gsd-tools.cjs                           (scope projet, ancré au CWD) ;
-#   3. ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs  (scope user) ;
+#   3. ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs  (scope user) ; SAUTÉ (candidat
+#      noté « non résolu » dans le message) quand CLAUDE_CONFIG_DIR et HOME sont absents ou vides :
+#      jamais de plantage `set -u`, jamais de candidat `/.claude/...` à la racine du disque ;
 #   4. `command -v gsd-tools`, EN DERNIER, exécuté directement (pas via node), chemin absolu exigé.
 #   Les candidats 1 à 3 s'exécutent par `exec node <fichier> "$@"`.
 #
@@ -50,14 +52,19 @@ _try_file() { # <chemin> : retient le candidat s'il est un fichier régulier
   [ -f "$1" ]
 }
 
+# Répertoire de config user : CLAUDE_CONFIG_DIR, sinon $HOME/.claude ; vide si ni l'un ni l'autre n'est posé.
+_user_dir="${CLAUDE_CONFIG_DIR:-}"
+if [ -z "$_user_dir" ] && [ -n "${HOME:-}" ]; then _user_dir="$HOME/.claude"; fi
+
 _engine=""; _direct=0
 if [ -n "${GSD_TOOLS:-}" ] && _try_file "$GSD_TOOLS"; then
   _engine="$GSD_TOOLS"
 elif _try_file "./.claude/gsd-core/bin/gsd-tools.cjs"; then
   _engine="./.claude/gsd-core/bin/gsd-tools.cjs"
-elif _try_file "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs"; then
-  _engine="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs"
+elif [ -n "$_user_dir" ] && _try_file "$_user_dir/gsd-core/bin/gsd-tools.cjs"; then
+  _engine="$_user_dir/gsd-core/bin/gsd-tools.cjs"
 else
+  [ -n "$_user_dir" ] || _tried="${_tried:+$_tried, }<scope user non résolu : CLAUDE_CONFIG_DIR et HOME absents>"
   _tried="${_tried:+$_tried, }gsd-tools (PATH)"
   _p="$(command -v gsd-tools 2>/dev/null || true)"
   case "$_p" in

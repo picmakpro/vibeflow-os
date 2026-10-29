@@ -79,6 +79,15 @@ eq "b: node absent → rc 64 (moteur pourtant présent)" "64" "$RC"
 eq "b: node absent → le moteur n'a pas tourné" "0" "$(count)"
 case "$OUT" in *node*) ok "b: node absent → message nomme node";; *) ko "b: message node" "node" "$OUT";; esac
 
+# (b2) HOME ET CLAUDE_CONFIG_DIR absents (aucun HOME exporté) : 64, jamais le rc 1 de `set -u`
+new_lab b3
+OUT="$(cd "$LAB" && env -i PATH="$ONLYNODE" FAKE_LOG="$LOG" "$BASH_BIN" "$SCRIPT" config-get x 2>&1 </dev/null)"; RC=$?
+eq "b: HOME et CLAUDE_CONFIG_DIR absents → rc 64 (pas le rc 1 de set -u)" "64" "$RC"
+case "$OUT" in *"défaut d'outillage"*) ok "b: HOME absent → message défaut d'outillage";; *) ko "b: message HOME absent" "défaut d'outillage" "$OUT";; esac
+OUT="$(cd "$LAB" && env -i HOME= PATH="$ONLYNODE" FAKE_LOG="$LOG" "$BASH_BIN" "$SCRIPT" config-get x 2>&1 </dev/null)"; RC=$?
+eq "b: HOME vide → rc 64, aucun candidat /.claude à la racine" "64" "$RC"
+case "$OUT" in *"Candidats essayés : "*" /.claude/"*|*", /.claude/"*) ko "b: HOME vide" "pas de candidat /.claude/..." "$OUT";; *) ok "b: HOME vide → pas de candidat /.claude/...";; esac
+
 # (c) précédence projet > user
 new_lab c; mk_engine "$LAB/.claude/gsd-core/bin/gsd-tools.cjs" proj; mk_engine "$HOME_T/.claude/gsd-core/bin/gsd-tools.cjs" user
 run "$ONLYNODE" -- ping
