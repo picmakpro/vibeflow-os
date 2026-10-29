@@ -1,6 +1,6 @@
 # CHANGELOG — consolidator
 
-## [v1.11.4] — 2026-10-29 (reindex.sh conserve le mode du registre) — à publier dans la prochaine release
+## [v1.11.4] — 2026-10-29 (reindex.sh conserve le mode du registre) — publiée dans v2.72.0
 
 **Patch** (#166 volet 4 ; lot « clôture des issues GitHub ») :
 

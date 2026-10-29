@@ -1,6 +1,6 @@
 # CHANGELOG — design-orchestrator
 
-## [v1.5.16] — 2026-10-29 (exclusion persistante de la chaîne design) — à publier dans la prochaine release
+## [v1.5.16] — 2026-10-29 (exclusion persistante de la chaîne design) — publiée dans v2.72.0
 
 **Patch** (#166 volets 2, 10, 11) :
 

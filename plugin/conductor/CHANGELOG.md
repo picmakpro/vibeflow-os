@@ -1,8 +1,8 @@
 # Changelog — conductor
 
-## [v1.50.3] — 2026-10-29 (uutils, drift du framework, clé vf-optional-agents) — à publier dans la prochaine release
+## [v1.50.3] — 2026-10-29 (uutils, drift du framework, clé vf-optional-agents) — publiée dans v2.72.0
 
-**Patch** (#52, #165, #166, #167 ; correctifs du lot A de la clôture des issues GitHub ; à publier dans la prochaine release) :
+**Patch** (#52, #165, #166, #167 ; correctifs du lot A de la clôture des issues GitHub ; publiée dans v2.72.0) :
 
 - **Verrou de driver sous uutils coreutils** (#166, cd7c66c3) : `ln -sn` seul, sans l'option que uutils refuse.
 - **`mv_noclobber`** (#166, 1b4eecbf) : essaie `-nT` avant `-nh` (uutils).
