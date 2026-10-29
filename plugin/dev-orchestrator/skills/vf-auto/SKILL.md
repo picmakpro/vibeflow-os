@@ -57,15 +57,14 @@ je déploie l'équipe »).
 
 ## Étape 0 bis — étapes proposées (moteur direct)
 
-Avant le moteur direct, pour chaque étape ciblée N (celles de `roadmap analyze`, étape 0) :
+Avant le moteur direct, pour chaque étape ciblée N (celles de `roadmap analyze`, étape 0 ; `<N>` = numéro du titre `### Phase <N>:` du ROADMAP, ni nom de dossier ni identifiant de plan) :
 `"$S"/check-phase-validation.sh --phase <N> [--ws <nom>]` (`$S` par la cascade de `mission-flow.md`
 §Résolution des scripts). Code 0 : l'étape entre dans la boucle. Code 1 : étape proposée, en attente
 de la validation d'un dev (`vf-validation.sh validate --phase <N>`) ; le moteur direct
 ne démarre pas, une phrase le dit et une question propose de valider d'abord ou de réduire le
 périmètre. Lis le code ET la ligne `BILAN`.
-Codes 3 et 64 : marqueur non constatable, une ligne le dit et l'étape entre dans la boucle.
-Code 3 avec `marqueur=inconnu` ou `marqueur=multiple` sur la ligne `BILAN` : marqueur présent mais illisible, le dire et s'arrêter.
-Code 5 : le dire et s'arrêter. Limite : une étape ajoutée pendant la boucle de
+Code 3 avec `marqueur=introuvable` sur la ligne `BILAN` : l'étape n'est pas au ROADMAP, seul résultat indéterminé qui laisse passer, une ligne le dit et l'étape entre dans la boucle.
+Tout autre code 3 (`marqueur=inconnu`, `marqueur=multiple`, ROADMAP absent, compartiment non nommé, bloc non fermé), le code 64, le code 5 et tout autre code (126, 127, …) : le dire et s'arrêter. Limite : une étape ajoutée pendant la boucle de
 `gsd-autonomous` n'est pas interceptée (contrôle consultatif) ; le chemin équipe
 est gardé par `vf-coder`.
 

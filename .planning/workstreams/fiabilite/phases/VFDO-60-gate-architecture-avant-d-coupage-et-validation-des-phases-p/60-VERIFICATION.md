@@ -241,3 +241,31 @@ Aucun gap bloquant : aucune vérité FAILED, aucun artefact manquant ou stub, au
 
 _Verified: 2026-10-29_
 _Verifier: Claude (gsd-verifier)_
+
+## Reprise du 2026-10-29 (correction après fusion de main, v2.73.1)
+
+Mandat ciblé du manager, après la ratification des hypothèses (arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 :
+« Oui aux propositions par défaut pour 60 et 61 », `60-CONTEXT.md` § Ratification). Branche fusionnée avec `origin/main`
+(v2.73.1), entrées de la phase renumérotées en v2.74.0.
+
+**Écart d'implémentation trouvé et aligné.** La conduite des consommateurs sur un résultat indéterminé n'était pas celle ratifiée :
+`vf-coder` et `vf-auto` laissaient continuer sur tout code 3 ou 64 (sauf marqueur illisible). Cas où une phase marquée
+« proposée » passait : lab partitionné sans `--ws` (le contrôle regarde ailleurs), sections multiples, ROADMAP absent ou
+bloc de code non fermé qui avale la phase, identifiant mal formé (64). Aligné (P60-D-15) : seul « phase introuvable sans autre défaut »
+(`BILAN marqueur=introuvable`) laisse continuer, tout autre indéterminé arrête. Preuve rouge : `git archive` de la tête d'avant la
+correction dans une copie jetable, suites neuves posées dessus : `test-check-phase-validation.sh` 14 ko, `test-vf-validation.sh` 3 ko,
+`test-dev-orchestrator.sh` 59 ko ; verts sur la correction (104 ok, 63 ok, 448 ok).
+
+**Second cas, dans le gate.** Une ligne qui ressemble à un marqueur sans en avoir la forme exacte (`- **Validation:** proposed`,
+`> …`, `Validation: proposed`, `**validation:** proposed`, `**Validation :** proposed`, case à cocher…) était lue « marqueur absent »,
+donc phase validée (rc 0). Elle est désormais un marqueur illisible (rc 3, `marqueur=inconnu`), dans le gate ET dans l'écrivain
+(qui n'insère plus une seconde ligne à côté). Témoins de non-sur-détection : `Validation: les tests passent`, `- Validation criteria: x`.
+Sept mutants (CPV-MUT-47..53) et deux (VFV-MUT-25, 26) tués.
+
+**Avertissement 1 de ce rapport (fermeture de section) : déjà fermé** par CPV-MUT-11 et 12 (commit `51eb2aae`), rejoués verts.
+
+**Restent ouverts, non corrigeables par du code.**
+- ARCG-01, volet « une phase ajoutée hors solo naît proposée » : BLOQUÉ sur un run réel de mission (head, manager, verbe), geste humain P59-D-11.
+- ARCG-09, critère 6 `clients` : BLOQUÉ sur la liste de noms de clients, hors dépôt (code 2, jamais vert).
+- Comportement des agents (ARCG-03, 04, 05) : texte ancré et commande exécutée, aucun run ; seuil de preuve du ledger à trancher par Samuel.
+- P60-PL-06 et O-8 : conséquences de H-02 et H-03, non nommées dans la ratification.

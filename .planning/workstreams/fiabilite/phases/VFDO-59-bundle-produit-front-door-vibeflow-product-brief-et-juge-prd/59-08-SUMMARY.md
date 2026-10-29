@@ -41,4 +41,4 @@ Une case = SUMMARY des plans cités + porte verte : PRDT-01 (59-04/05/06), 02 (5
 
 ## Suite
 
-Merge, tag et release hors de ce plan ; Phase 45 non préalable (P59-D-23). Dettes hors phase : `PROJECT.md` racine, table Coverage sans DLWS ni RLPO (P59-D-12). Bascule `proposable:true` dans une PR tracée après un run réel (P59-D-11). Reste au manager : PR, relecture adverse SOBR-04, découverte complète, release `v2.72.0` décidée à part.
+Merge, tag et release hors de ce plan ; Phase 45 non préalable (P59-D-23). Dettes hors phase : `PROJECT.md` racine, table Coverage sans DLWS ni RLPO (P59-D-12). Bascule `proposable:true` dans une PR tracée après un run réel (P59-D-11). Reste au manager : PR, relecture adverse SOBR-04, découverte complète, release `v2.73.0` décidée à part.

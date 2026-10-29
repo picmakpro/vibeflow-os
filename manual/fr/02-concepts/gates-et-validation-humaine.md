@@ -68,7 +68,9 @@ Deux gates machine s'appliquent aux postes `product` et `dev`, dans un lab entr�
   réitères ta demande explicitement, il te sert, et l'exception est tracée au rapport.
 - **Une étape ajoutée par l'équipe naît proposée.** Elle porte `**Validation:** proposed` dans la
   feuille de route. `vf-coder` constate ce marqueur par `check-phase-validation.sh` et refuse de la
-  planifier ou de l'exécuter : il s'arrête en le disant, sans rien lancer.
+  planifier ou de l'exécuter : il s'arrête en le disant, sans rien lancer. Il s'arrête aussi quand le
+  marqueur ne peut pas être lu (feuille de route absente, ligne de marqueur malformée, étape
+  ambiguë) ; seule une étape absente de la feuille de route le laisse continuer.
 
 Pour lever l'arrêt, un dev valide : `vf-validation.sh validate --phase <N>` pour une étape,
 `vf-validation.sh validate --architecture .planning/ARCHITECTURE.md` pour l'architecture. Le

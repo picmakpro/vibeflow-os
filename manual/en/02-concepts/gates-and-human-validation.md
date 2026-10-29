@@ -63,7 +63,9 @@ flow (a `.planning/BRIEF.md` exists). At the `solo` role, nothing changes.
   the exception is traced in the report.
 - **A step added by the team is born proposed.** It carries `**Validation:** proposed` in the
   roadmap. `vf-coder` checks that marker with `check-phase-validation.sh` and refuses to plan or
-  execute it: it stops and says so, launching nothing.
+  execute it: it stops and says so, launching nothing. It also stops when the marker cannot be read
+  (missing roadmap, malformed marker line, ambiguous step); only a step absent from the roadmap lets
+  it continue.
 
 To lift the stop, a dev validates: `vf-validation.sh validate --phase <N>` for a step,
 `vf-validation.sh validate --architecture .planning/ARCHITECTURE.md` for the architecture. The

@@ -44,10 +44,9 @@ Code 0 : étape validée, le cycle continue.
 Code 1 : étape proposée, rends `"statut": "blocked"` avec un finding
 `action: ask-user` qui nomme l'étape et le geste de validation d'un dev
 (`vf-validation.sh validate --phase <N>`), aucune brique lancée.
-Codes 3 et 64 : marqueur non constatable (ROADMAP absent, phase introuvable), une ligne au rapport le dit et le cycle continue.
-Code 3 avec `marqueur=inconnu` ou `marqueur=multiple` sur la ligne `BILAN` : marqueur présent mais illisible, rends `human_needed` avec le code.
-Code 5 : rends `human_needed` avec le code.
-Un mandat sans numéro d'étape ROADMAP (tâche courte, spec du crafter) n'appelle aucun contrôle de marqueur.
+Code 3 avec `marqueur=introuvable` sur la ligne `BILAN` : l'étape n'est pas au ROADMAP, seul résultat indéterminé qui laisse passer, une ligne au rapport le dit et le cycle continue.
+Tout autre code 3 (`marqueur=inconnu`, `marqueur=multiple`, ROADMAP absent, compartiment non nommé, bloc non fermé), le code 64, le code 5 et tout autre code (126, 127, …) : rends `human_needed` avec le code et la ligne `BILAN`, aucune brique lancée.
+Un mandat sans numéro d'étape ROADMAP (tâche courte, spec du crafter) n'appelle aucun contrôle de marqueur ; `<N>` est le numéro du titre `### Phase <N>:` (ni nom de dossier, ni identifiant de plan).
 
 ## Le cycle (délégation)
 

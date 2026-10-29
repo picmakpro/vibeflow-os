@@ -3,7 +3,10 @@
 # P60-D-05, P60-D-10, P60-H-02, P60-H-03, P60-PL-05, P60-PL-06, P60-PL-07). Le geste de validation d'un dev est un
 # VERBE DE SCRIPT, jamais un skill. `propose` pose « proposed » à la création d'une phase (déclenché par la doctrine
 # et le champ du brief de mission, P60-H-03) ; `validate` la bascule en « validated » (un dev valide, P60-H-02).
-# Lu par `check-phase-validation.sh` et `check-architecture.sh`, dont la grammaire est reprise À L'IDENTIQUE (P60-PL-01).
+# Lu par `check-phase-validation.sh` et `check-architecture.sh`, dont la grammaire est reprise À L'IDENTIQUE (P60-PL-01) ; titres de
+# phase, sosies du marqueur et refus des formes slug/plan (`60-02`, `60-gate-architecture` : 64) sont ceux de `check-phase-validation.sh`.
+# LIMITES : `check-architecture.sh` rejette une rubrique dont le corps commence par `[` (lien) : faux rouge contournable, documenté, non corrigé ;
+# le marqueur n'est jamais commité par ce script, un worktree ne le voit donc pas : inerte tant que l'isolation reste séquentielle (ADR-059).
 #
 # Usage :
 #   vf-validation.sh propose  --phase <N> [--ws <nom>]
@@ -91,6 +94,10 @@ if [ "$OVERRIDE" -eq 1 ] && [ "$VERB" = propose ]; then usage_err "--override ne
 if [ -n "$PHASE" ]; then
   case "$PHASE" in *[!A-Za-z0-9._-]*|[!A-Za-z0-9]*|*.|*..*) usage_err "--phase : identifiant attendu (ex. 60, 41.1, 12A, AUTH, CK-03)" ;; esac
   [ "${#PHASE}" -le 64 ] || usage_err "--phase : identifiant trop long"
+  case "$PHASE" in
+    [0-9]*-*) _pre=${PHASE%%-*}; _pre=${_pre%[A-Za-z]}
+        case "$_pre" in *[!0-9.]*) : ;; *) usage_err "--phase : numéro du titre ROADMAP attendu, pas un nom de dossier ni un identifiant de plan (ex. 60, non 60-02)" ;; esac ;;
+  esac
   MODE=phase; ENT=roadmap; TGT="phase-$PHASE"; CIBLE="phase $PHASE"
 else
   MODE=arch; ENT=architecture; TGT=architecture; CIBLE=architecture
@@ -177,21 +184,35 @@ function idkey(s, loose,   u) {
   if (match(u, /^[A-Z][A-Z0-9_]*-[0-9]/)) return (loose ? "" : substr(u, 1, RLENGTH - 1)) idnorm(substr(u, RLENGTH))
   return idnorm(u)
 }
-# Niveau du titre Markdown (nombre de #, 1 à 6) si la ligne en est un, sinon 0.
-function hlevel(s,   n) {
-  n = 0
-  while (substr(s, n + 1, 1) == "#") n++
+# Niveau du titre Markdown (nombre de #, 1 à 6) si la ligne en est un, sinon 0. Indentation de 3 espaces au plus (comme gsd-core,
+# `^ {0,3}#{2,4}`). L'espace après les # est exigé, SAUF devant un titre de phase (`###Phase 5:`) : gsd-core lit `#{2,4}\s*Phase`.
+function hlevel(s,   n, t, i, r) {
+  match(s, /^ */); i = RLENGTH
+  if (i >= 4) return 0
+  t = substr(s, i + 1); n = 0
+  while (substr(t, n + 1, 1) == "#") n++
   if (n < 1 || n > 6) return 0
-  if (substr(s, n + 1, 1) !~ /^[ \t]$/) return 0
-  return n
+  r = substr(t, n + 1)
+  if (r ~ /^[ \t]/) return n
+  if (n >= 2 && n <= 4 && phasehead(r)) return n
+  return 0
 }
-# Identifiant brut si le titre est `Phase <id>[ (tag)] :` de niveau 2 à 4, sinon "".
+# Tête de titre de phase, casse indifférente (gsd-core : drapeau `i`) : tag entre crochets facultatif (`[WIP] Phase`), puis `Phase` et un blanc.
+function phasehead(h,   l) {
+  l = tolower(h); sub(/^[ \t]+/, "", l)
+  if (match(l, /^\[[^]]+\][ \t]*/)) l = substr(l, RLENGTH + 1)
+  return (l ~ /^phase[ \t]+/)
+}
+# Identifiant brut si le titre est `Phase <id>[ (tag)] :` de niveau 2 à 4, sinon "". Même grammaire que gsd-core : `Phase` sans
+# casse, tag de jalon entre crochets avant `Phase`, indentation <= 3, aucun espace exigé après les #.
 function secid(s, lvl,   h, r) {
   if (lvl < 2 || lvl > 4) return ""
-  h = trim(substr(s, lvl + 1))
-  if (!match(h, /^Phase[ \t]+[A-Za-z0-9][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/)) return ""
+  match(s, /^ */)
+  h = trim(substr(s, RLENGTH + lvl + 1))
+  if (match(h, /^\[[^]]+\][ \t]*/)) h = substr(h, RLENGTH + 1)
+  if (!match(h, /^[Pp][Hh][Aa][Ss][Ee][ \t]+[A-Za-z0-9][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/)) return ""
   r = substr(h, RLENGTH + 1); h = substr(h, 1, RLENGTH)
-  sub(/^Phase[ \t]+/, "", h)
+  sub(/^[Pp][Hh][Aa][Ss][Ee][ \t]+/, "", h)
   if (match(r, /^[ \t]*\([^)]*\)/)) r = substr(r, RLENGTH + 1)
   if (r !~ /^[ \t]*:/) return ""
   return h
@@ -264,8 +285,8 @@ function strip_comments(s,   a, b) {
 # (STARTED, ACTIVE, WIP, `in progress`, 🚧, 🔄 : MILESTONE_ACTIVE_MARKER_PATTERN de gsd-core) reste visible. gsd-core ne
 # le cache que par `stripShippedMilestones`, mais `roadmap get-phase` cherche d'abord dans la fenêtre du jalon courant
 # (`extractCurrentMilestone`), qui garde ce bloc quand le jalon est résolu (STATE.md ou puce 🚧 du ROADMAP). Le gate ne
-# lit pas STATE.md : il sur-approxime (surensemble) — un bloc actif que gsd cacherait faute de jalon résolu est lu, et une
-# phase `proposed` y rend 1 (refus sûr) plutôt que 3 (non constatable, la boucle continue). Un `<summary>` sans marqueur
+# lit pas STATE.md : il sur-approxime un cas — un bloc actif que gsd cacherait faute de jalon résolu est lu, et une
+# phase `proposed` y rend 1 (refus sûr) plutôt que 3 (non constatable, la boucle continue). Ce n'est PAS un surensemble : un jalon actif replié sans marqueur d'activité, que gsd sert via STATE.md, reste caché ici (limite documentée). Un `<summary>` sans marqueur
 # d'activité reste caché (README conductor, limite des `<details>`), tout comme un bloc ouvert et fermé sur une même ligne
 # (rien n'y est lisible en début de ligne). Texte du bloc : de l'opener jusqu'au `</details>`.
 function active_block(rl, w, b,   t, k, s) {
@@ -328,9 +349,43 @@ BEGIN {
   wk[1] = idkey(want, 0); wk[2] = idkey(want, 1)
   if (mode == "arch") { insec[1] = 1; nsec[1] = 1 }
 }
+# Ligne qui RESSEMBLE à un marqueur sans en avoir la forme exacte (Phase 60, correction de revue, P60-H-04) : puce, citation,
+# libellé sans gras, en italique, en minuscules, espace avant le deux-points, suivi d'une valeur qui commence par
+# `propos` ou `valid`. Lue « absent », elle ferait passer une phase proposée (fail-open) ; elle est donc un marqueur
+# ILLISIBLE (arrêt des consommateurs), jamais une validation. N'est appelée que si la forme exacte n'a pas reconnu la ligne.
+function loosemark(s,   t, w, c) {
+  t = s
+  while (1) {
+    sub(/^[ \t]+/, "", t)
+    if (substr(t, 1, 1) == ">" || substr(t, 1, 1) == "|") { t = substr(t, 2); continue }
+    if (match(t, /^([-*+]|[0-9]+[.)])[ \t]+/)) { t = substr(t, RLENGTH + 1); continue }
+    if (match(t, /^\[[ xX]\][ \t]+/)) { t = substr(t, RLENGTH + 1); continue }
+    break
+  }
+  sub(/^[*_]+/, "", t)
+  if (tolower(substr(t, 1, 10)) != "validation") return 0
+  t = substr(t, 11)
+  t = skipsp(t)  # blancs avant le séparateur
+  c = substr(t, 1, 1)
+  if (c == ":" || c == "|") t = substr(t, 2)
+  else if (substr(t, 1, 3) == "\342\200\224" || substr(t, 1, 3) == "\342\200\223") t = substr(t, 4)
+  else return 0
+  t = skipsp(t)
+  w = tolower(substr(t, 1, 5))
+  return (w == "propo" || w == "valid")
+}
+# Saute les blancs, le gras, les guillemets et les espaces typographiques : insécable U+00A0 (\302\240) et fine insécable U+202F (\342\200\257).
+function skipsp(t) {
+  while (1) {
+    if (substr(t, 1, 2) == "\302\240") { t = substr(t, 3); continue }
+    if (substr(t, 1, 3) == "\342\200\257") { t = substr(t, 4); continue }
+    if (match(t, /^[ \t*_`"']+/)) { t = substr(t, RLENGTH + 1); continue }
+    return t
+  }
+}
 # Une ligne, déjà débarrassée des blocs <details> (les lignes cachées arrivent vides, la sortie reprend raw[]). Deux
 # lectures de la cible en parallèle : (1) exacte, (2) tolérante au préfixe projet ; (2) ne sert que si (1) ne trouve rien.
-function proc(line, nr,   t, f, lvl, id, p, v, tok, rest, c) {
+function proc(line, nr,   t, f, lvl, id, p, v, tok, rest, c, isc) {
   if (!infence) line = strip_comments(line)
   t = line; sub(/^[ \t]+/, "", t)
   if (infence) { if (fclose(line)) infence = 0; return }
@@ -348,13 +403,16 @@ function proc(line, nr,   t, f, lvl, id, p, v, tok, rest, c) {
     }
     return
   }
-  if (match(line, /^[ \t]*\*\*Validation(:\*\*|\*\*[ \t]*:)/)) {
-    f = RLENGTH
-    v = trim(substr(line, f + 1)); tok = v; sub(/[ \t].*$/, "", tok)
-    rest = substr(v, length(tok) + 1); sub(/^[ \t]+/, "", rest); tok = tolower(tok)
-    if (tok == "proposed") c = "proposed"
-    else if (tok == "validated" && (rest == "" || substr(rest, 1, 1) == "(")) c = "validated"
-    else c = "inconnu"
+  isc = match(line, /^[ \t]*\*\*Validation(:\*\*|\*\*[ \t]*:)/)
+  if (isc || loosemark(line)) {
+    if (isc) {
+      f = RLENGTH
+      v = trim(substr(line, f + 1)); tok = v; sub(/[ \t].*$/, "", tok)
+      rest = substr(v, length(tok) + 1); sub(/^[ \t]+/, "", rest); tok = tolower(tok)
+      if (tok == "proposed") c = "proposed"
+      else if (tok == "validated" && (rest == "" || substr(rest, 1, 1) == "(")) c = "validated"
+      else c = "inconnu"
+    } else c = "inconnu"
     for (p = 1; p <= 2; p++) if (insec[p]) {
       ingoal[p] = 0; nmark[p]++
       if (nmark[p] == 1) {

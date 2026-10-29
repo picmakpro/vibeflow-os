@@ -51,15 +51,13 @@ content/
 
 ## Installation
 
-```bash
-.claude/scripts/vibeflow-update.sh install reference
-```
+Via `/vibeflow-install` : coche « reference » (moteur interne : `plugin/_internal/vibeflow-update.sh`).
 
 **Installation = copie de `content/` vers `docs/reference/`** du lab cible (mode doc-only).
 
 Aucun fichier dans `.claude/` n'est installé — c'est de la documentation, pas du runtime.
 
-**Pré-requis** : `vibeflow-update.sh` v1.3.0+ (support modules doc-only).
+Le mode doc-only (copie sans runtime) est pris en charge par l'installeur.
 
 ---
 

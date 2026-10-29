@@ -1,6 +1,6 @@
 # Changelog — planning-core
 
-## [v2.10.0] — 2026-10-29 (gabarit d'architecture)
+## [v2.10.0] — 2026-10-29 (gabarit d'architecture) — publiée dans v2.74.0
 
 **Minor** (nouvelle capacité : gabarit décisionnel d'architecture du poste product) :
 
@@ -8,7 +8,8 @@
 - Lu par `check-architecture.sh` (module `conductor`, vert seulement sur une architecture validée et complète) et instancié par `vf-product-architect` (module `product-team-bundle`).
 - **Inchangés à l'octet** : tous les fichiers existants du module hors ce bump (gabarits, `SKILL.md`, `PROFILES.md`, scripts). Aucune release racine.
 
-## [v2.9.0] — 2026-10-27 (gabarit produit) — publiée dans v2.72.0
+
+## [v2.9.0] — 2026-10-27 (gabarit produit) — publiée dans v2.73.0
 
 **Minor** (nouvelle capacité : gabarit du poste product) :
 

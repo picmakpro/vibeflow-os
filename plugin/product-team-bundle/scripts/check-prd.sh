@@ -23,7 +23,7 @@
 # critère est un CHAMP `Acceptation :` (ou `Critère d'acceptation :`, casse indifférente, blanc ou
 # espace insécable admis avant les deux-points ; la valeur s'arrête au champ SUIVANT reconnu : `Priorité :` ou une
 # autre `Acceptation :`, un champ vide suivi d'un autre sur la même ligne reste vide) : le mot « acceptation » n'est pas précédé d'un mot (début de
-# ligne, ponctuation, tiret, parenthèse, puce ou emphase avant lui : champ ; lettre, chiffre ou apostrophe collée
+# ligne, ponctuation, tiret entouré d espaces, parenthèse, puce ou emphase avant lui : champ ; lettre, chiffre ou apostrophe collée
 # avant lui : « l'étape d'acceptation : … » n'est pas un champ). Sa valeur est utilisable si, marques de mise en
 # forme en tête retirées (puces `- * + • · – — ‣ ◦ ▪ ∙ ●`, numérotées `1.` `1)`, citation, emphase, code,
 # guillemets, soulignés) et blancs Unicode ramenés à l'espace (largeur nulle ignorée), elle ne commence pas par
@@ -52,7 +52,18 @@
 # Bloc de code OU commentaire HTML non fermé en fin de fichier (exigences ou rubriques) : la suite est
 # illisible pour le gate, donc INDÉTERMINÉ (code 3). Ligne à case `[ ]`/`[x]` qui n'a pas la forme
 # d'exigence (ID pointé, minuscules, puce `*`, numérotée) : AVERTISSEMENT par numéro de ligne (stdout et
-# stderr), jamais réimprimée ; l'effet sur le code reste nul, le BILAN la compte (`non_reconnues`).
+# stderr), jamais réimprimée, et INDÉTERMINÉ (code 3) : une exigence que le gate ne lit pas est une exigence que le gate ne
+# juge pas, donc jamais un vert (arbitrage Samuel, AskUserQuestion session principale, 2026-10-29). Même sort pour une ligne de
+# liste ou de citation qui OUVRE sur un identifiant d'exigence en gras (`**PRD-02**`, éventuellement après une case vide ou
+# à tiret `[]`, `[-]`) sans être l'ouvreur reconnu : `- [] **PRD-02**`, `> - [ ] **PRD-02**`, puce suivie d'une espace
+# insécable, `> **PRD-02**`, `- **PRD-02**`. Un ID cité en cours de ligne, dans un paragraphe ou dans un bloc de code ne compte pas.
+# Le code 3 cède devant 1
+# et 5 ; le BILAN compte ces lignes (`non_reconnues`).
+# Séparateur avant le champ : `,` `—` `–` `-` (entouré d'espaces) et `(` précèdent un champ, au même titre que la
+# ponctuation et la puce (« Priorité : must, Acceptation : … ») ; un tiret COLLÉ à un mot (« pré-acceptation : ») fait un
+# mot composé, pas un champ ; « il faut, acceptation : » sans valeur reste rouge (champ vide). Une valeur qui répète le
+# libellé (`Acceptation : Acceptation`, `Acceptation : Critère d'acceptation`, au pluriel ou avec article : `Les critères d'acceptation`) est un remplissage. Le texte des gabarits
+# livrés, crochets retirés (consignes du BRIEF, « quoi, combien, en combien de temps »), est un remplissage (tmplword).
 # Éliminatoire 2 : une rubrique du BRIEF manque ou n'a aucune ligne de corps (hors commentaire HTML,
 # hors ligne de remplissage selon la MÊME règle que les critères : entre crochets ou chevrons après
 # puce/citation/emphase, points de suspension, marqueurs ci-dessus ; sans seuil de longueur) :
@@ -66,8 +77,8 @@
 # Codes de sortie (chacun énuméré, aucun implicite) :
 #   0 = conforme : aucun éliminatoire et au moins une exigence lue si --requirements est fourni.
 #   1 = éliminatoire : exigence sans critère utilisable, ou rubrique du BRIEF absente ou vide.
-#   3 = INDÉTERMINÉ : cible absente, zéro exigence détectée, ou bloc de code / commentaire HTML non
-#       fermé en fin de fichier. Jamais un vert à vide.
+#   3 = INDÉTERMINÉ : cible absente, zéro exigence détectée, ligne à case à cocher non reconnue comme
+#       exigence, ou bloc de code / commentaire HTML non fermé en fin de fichier. Jamais un vert à vide.
 #   5 = entrée illisible, BRUYANTE : lien symbolique, non régulier (FIFO, dossier), illisible,
 #       taille non numérique, au-delà de 1048576 octets, analyse en échec. Refus AVANT lecture.
 #   64 = erreur d'usage (aucune entrée, option inconnue ou sans valeur).
@@ -173,7 +184,16 @@ function isolated(t, w,   p, off, pre, post) {
   }
   return 0
 }
+# Texte des gabarits LIVRÉS (BRIEF.template.md, REQUIREMENTS.template.md du poste product) une fois les crochets retirés :
+# une consigne recopiée sans ses crochets reste un remplissage. Sous-chaîne du texte replié (accents, casse, apostrophe
+# ramenée à l'espace par plain). La suite compare ces fragments aux gabarits réels : un gabarit qui change sans eux rougit.
+function tmplword(t,   i, n, T) {
+  n = split("quel probleme rencontre-t-on|qui utilisera ce produit|qu est-ce qui change concretement|quelles limites s imposent|qu est-ce qui est volontairement exclu|quoi, combien, en combien de temps", T, "|")
+  for (i = 1; i <= n; i++) if (index(t, T[i])) return 1
+  return 0
+}
 function fillword(t,   i, n, S, W) {
+  if (tmplword(t)) return 1
   n = split("tbd|tba|fixme|n/a|a definir|a preciser|a completer|a determiner|a remplir|a renseigner|a confirmer|a decider", S, "|")
   for (i = 1; i <= n; i++) if (hasword(t, S[i])) return 1
   n = split("todo|a venir", W, "|")
@@ -263,9 +283,12 @@ AWKEOF
 
 # --- Exigences : un enregistrement par ligne, tout est imprimé par awk, dernière ligne `@ n s a`.
 read -r -d '' AWK_REQ <<'AWKEOF'
-function usable(v) {
+function usable(v,   p) {
   v = lead(v)
   if (isfill(v)) return 0
+  p = fold(plain(v))
+  sub(/^((le|la|les|l|un|une|des|du|de|d) )+/, "", p); sub(/^criteres /, "critere ", p); sub(/acceptations$/, "acceptation", p)
+  if (p == "acceptation" || p ~ /^critere (d )?acceptation$/) return 0
   if (nchars(plain(v)) < 10) return 0
   return 1
 }
@@ -285,6 +308,7 @@ function acclabel(low, s, p,   pre, rest) {
   pre = substr(low, 1, p - 1); rest = substr(s, p + 11); lstart = p
   if (match(pre, /crit[^ \t]*[ \t]+d('|\342\200\231)[ \t]*$/)) { lstart = RSTART; pre = substr(pre, 1, RSTART - 1) }
   if (wordbefore(pre)) return 0
+  if (pre ~ /([A-Za-z0-9]|[\200-\377])-$/) return 0
   if (!match(rest, /^[ \t]*[*_]*[ \t]*:/)) return 0
   lend = p + 11 + RLENGTH
   return 1
@@ -363,7 +387,11 @@ function close_block() {
     scan(substr(line, RSTART + RLENGTH))
     next
   }
-  if (line ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]+\[[ xX]\]/) {
+  u = line; qt = 0
+  while (u ~ /^[ \t]*>/) { sub(/^[ \t]*>/, "", u); qt = 1 }
+  lm = (u ~ /^[ \t]*([-*+]|[0-9]+[.)])([ \t]|\302\240)/)
+  if (lm) sub(/^[ \t]*([-*+]|[0-9]+[.)])/, "", u)
+  if (line ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]+\[[ xX]\]/ || ((qt || lm) && u ~ /^([ \t]|\302\240)*(\[[^]]*\]([ \t]|\302\240)*)?\*\*[A-Z][A-Z0-9]*-[A-Za-z0-9_-]+\*\*/)) {
     nunk++
     if (nunk <= 50) printf "[check-prd] AVERTISSEMENT ligne %d : case a cocher non reconnue comme exigence\n", NR
   }
@@ -475,6 +503,9 @@ if [ "$HAS_REQ" -eq 1 ] && guard exigences "$REQ"; then
     fi
     if [ "$NREQ" -eq 0 ]; then
       indetermine exigences "aucune exigence detectee (forme attendue - [ ] **ID**: ...)"
+    fi
+    if [ "$NUNK" -gt 0 ]; then
+      indetermine exigences "case a cocher non reconnue comme exigence (lignes signalees par AVERTISSEMENT ligne)"
     fi
     if [ "$NSANS" -gt 0 ]; then
       bump 1

@@ -123,12 +123,9 @@ dev-orchestrator/
 
 ---
 
-## Installation (via vibeflow-update.sh)
+## Installation (via `/vibeflow-install`)
 
-```bash
-# depuis votre lab
-.claude/scripts/vibeflow-update.sh install dev-orchestrator
-```
+Depuis votre lab : `/vibeflow-install`, coche « dev-orchestrator » (moteur interne : `plugin/_internal/vibeflow-update.sh`).
 
 L'installeur pose, de bout en bout :
 

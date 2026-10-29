@@ -213,22 +213,22 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   P60-D-04) : `--phase <N> [--ws <nom>]` constate la ligne `**Validation:**` de la section de la phase du
   ROADMAP. Lecture seule, ne lit jamais le poste ; le ROADMAP n'est jamais réimprimé. Codes 0 (validée, ou
   marqueur absent : état de toutes les phases existantes), 1 (proposée), 3 (indéterminé : phase introuvable,
-  marqueurs ou sections multiples, valeur inconnue : un marqueur non constatable, où les consommateurs ne
-  s'arrêtent pas, SAUF quand la ligne `BILAN` porte `marqueur=inconnu` ou `marqueur=multiple` : le marqueur
-  existe et n'est pas lisible, ils s'arrêtent comme au code 5), 5 (illisible, bruyant), 64 (usage). Identifiant
+  marqueurs ou sections multiples, valeur inconnue, ligne qui ressemble à un marqueur sans en avoir la forme, bloc ou commentaire non fermé, lab partitionné sans `--ws` ; SEULE la phase introuvable sans autre défaut laisse
+  passer les consommateurs, la ligne `BILAN` le dit par `marqueur=introuvable`, P60-D-15), 5 (illisible, bruyant), 64 (usage). Identifiant
   de phase de la grammaire de gsd-core (`12`, `7.1`, `12A`, `AUTH`, `CK-03`), jalons livrés `<details>` ignorés,
   sauf ceux dont le `<summary>` porte un marqueur d'activité (`in progress`, 🚧, 🔄, ACTIVE, WIP, STARTED) : le
-  gate lit ces blocs (surensemble de ce que gsd-core sert, faute de lire STATE.md). Consommateurs :
+  gate lit ces blocs. Limite documentée, non corrigée : le gate ne lit pas STATE.md, donc un jalon actif replié dans `<details>` SANS marqueur d'activité, que gsd-core sert via STATE.md, reste caché ici (phase lue « introuvable », code 3, la boucle continue) : ce n'est pas un surensemble de ce que gsd sert. `<N>` est le numéro du titre `### Phase <N>:` : le nom de dossier (`60-gate-architecture`) et l'identifiant de plan (`60-02`) rendent 64. Titres lus comme gsd-core (`### PHASE 5:`, `### [WIP] Phase 5:`, `###Phase 5:`, indentation <= 3) ; sosies du marqueur (espace insécable ou fine avant les deux-points, ligne de tableau, tiret cadratin) = illisible (3) ; la faute de frappe du libellé (`Valdiation`) est un non-objectif. Consommateurs :
   `vf-coder` avant plan et exécution d'une étape, `vf-auto` avant sa boucle ; un `proposed` constaté (1) ou un
-  marqueur illisible (code 5, ou code 3 avec `marqueur=inconnu|multiple`) les arrête. Limite fail-open écrite : le mode
+  tout autre résultat indéterminé (code 3 sans `marqueur=introuvable`, code 64, code 5) les arrête. Limite fail-open écrite : le mode
   « Regenerate all » d'`edit-phase` peut perdre le marqueur et une phase ajoutée à la main n'en a pas.
 - `check-architecture.sh` — gate de l'architecture avant découpage (Phase 60, ARCG-06, ARCG-07, P60-D-05,
   P60-D-06) : `--architecture <f>` constate la ligne d'état et les six rubriques minimales (contexte, choix
   structurants, composants, données, contraintes, risques), chacune avec un corps non vide. Lecture seule, ne
   lit que le fichier passé. Codes 0 (validée et complète, seule porte verte), 1 (fichier absent, `proposed`,
   rubrique absente ou vide), 3 (statut absent, inconnu ou multiple), 5 (illisible, bruyant), 64 (usage).
-  Consommateurs : le head devant un découpage, le manager produit. Limite : une ligne `validated` posée à la
-  main est crue (ni auteur ni date vérifiés).
+  Consommateurs : le head devant un découpage, le manager produit. Limites : une ligne `validated` posée à la
+  main est crue (ni auteur ni date vérifiés) ; une rubrique dont le corps commence par `[` (un lien) est lue vide (faux rouge, contournable en
+  anteposant un mot, documenté, non corrigé).
 - `vf-role.sh` — lecteur UNIQUE du poste (P58-D-15), interface des Phases 59 à 61 :
   `vf-role.sh get [--path <dir>]` imprime exactement une ligne `solo|product|dev` (priorité `VF_ROLE`,
   puis `<racine>/.claude/vibeflow-role`, puis `solo`), codes 0 / 1 (invalide) / 5 (fichier illisible) /
@@ -241,8 +241,9 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   `validate`), est tracé dans la valeur ; au poste `product` le verbe refuse (code 1) sauf `--override`, tracé
   lui aussi ; un poste illisible rend 5, jamais un repli sur `solo`. Jamais dégradé (`propose` sur une phase
   validée rend 3), une seule ligne changée, écriture atomique. Codes 0 / 1 / 3 / 5 / 64 ; aucun commit, aucun
-  verrou de driver. Limite : un humain peut toujours éditer la ligne à la main (un poste est une vue, pas un
-  droit, ADR-077).
+  verrou de driver. Limites : un humain peut toujours éditer la ligne à la main (un poste est une vue, pas un
+  droit, ADR-077) ; le marqueur n'est jamais commité par le verbe, un worktree ne le voit donc pas (inerte tant que l'isolation reste
+  séquentielle, ADR-059).
 - `check-map-drift.sh` — gate anti-drift carte↔disque (contrat de routage par dossier).
 - `check-guard-health.sh` — lecteur générique `SessionStart` des marqueurs de santé écrits par
   `vf_guard_unavailable` (tout le parc de gardes, pas seulement le lock) : fail-open bruyant plutôt

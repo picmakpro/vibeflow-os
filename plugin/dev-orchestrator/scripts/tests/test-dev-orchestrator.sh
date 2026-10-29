@@ -7677,7 +7677,8 @@ t414_mutant "T44 mutant carte exhaustive : copie d'intent-routing.md privée de 
 T45_TMP="$T414_TMP/t45"; mkdir -p "$T45_TMP/lab-prop/.planning" "$T45_TMP/lab-ok/.planning"
 printf '### Phase 2: Deux\n**Validation:** proposed\n' > "$T45_TMP/lab-prop/.planning/ROADMAP.md"
 printf '### Phase 2: Deux\n' > "$T45_TMP/lab-ok/.planning/ROADMAP.md"
-mkdir -p "$T45_TMP/lab-inc/.planning" "$T45_TMP/lab-mult/.planning"
+mkdir -p "$T45_TMP/lab-inc/.planning" "$T45_TMP/lab-mult/.planning" "$T45_TMP/lab-part/.planning/workstreams/w1" "$T45_TMP/lab-none/.planning"
+printf '### Phase 2: Deux\n**Validation:** proposed\n' > "$T45_TMP/lab-part/.planning/workstreams/w1/ROADMAP.md"
 printf '### Phase 2: Deux\n**Validation:** proposé\n' > "$T45_TMP/lab-inc/.planning/ROADMAP.md"
 printf '### Phase 2: Deux\n**Validation:** proposed\n**Validation:** validated\n' > "$T45_TMP/lab-mult/.planning/ROADMAP.md"
 T45_SD=""
@@ -7689,8 +7690,8 @@ done
 T45_CODER="$MOD/agents/vf-coder.md"
 T45_CODER_ZS='^## Porte « phase proposée »'
 T45_CODER_ZE='^## Le cycle'
-T45_CODER_LIT=('check-phase-validation.sh' '--phase' 'gsd-plan-phase' 'gsd-execute-phase' 'Code 0 : étape validée' 'Code 1 : étape proposée, rends' '"statut": "blocked"' 'ask-user' 'Codes 3 et 64' 'Code 3 avec' 'marqueur=inconnu' 'marqueur=multiple' 'BILAN' 'Code 5' 'human_needed' "Un mandat sans numéro d'étape ROADMAP" "n'appelle aucun contrôle de marqueur")
-T45_CODER_INTERDIT=('poursuis, rends' 'étape proposée, le cycle continue' 'Codes 3, 5 et 64')
+T45_CODER_LIT=('check-phase-validation.sh' '--phase' 'gsd-plan-phase' 'gsd-execute-phase' 'Code 0 : étape validée' 'Code 1 : étape proposée, rends' '"statut": "blocked"' 'ask-user' 'marqueur=introuvable' 'Tout autre code 3' 'marqueur=inconnu' 'marqueur=multiple' 'code 64' 'code 5' 'BILAN' 'human_needed' "Un mandat sans numéro d'étape ROADMAP" "n'appelle aucun contrôle de marqueur")
+T45_CODER_INTERDIT=('poursuis, rends' 'étape proposée, le cycle continue' 'Codes 3, 5 et 64' 'Codes 3 et 64')
 t45_coder_check() { # <vf-coder.md> — zone, ordre (porte AVANT le cycle), littéraux, clause inversée
   local z out
   awk '/^## Porte « phase proposée »/{p=NR} /^## Le cycle/{c=NR} END{exit !(p && c && p < c)}' "$1" \
@@ -7699,22 +7700,22 @@ t45_coder_check() { # <vf-coder.md> — zone, ordre (porte AVANT le cycle), litt
   [ -n "$z" ] || { printf 'section « Porte phase proposée » introuvable ou vide'; return 1; }
   out="$(t414_missing "$z" "${T45_CODER_LIT[@]}")" || { printf 'absent de la porte : %s' "$out"; return 1; }
   out="$(t44_forbidden "$z" "${T45_CODER_INTERDIT[@]}")" || { printf 'clause inversée dans la porte : %s' "$out"; return 1; }
-  out="$(t414_order "$z" 'Code 0' 'Code 1' '"statut": "blocked"' 'ask-user' 'Codes 3 et 64' 'Code 3 avec' 'Code 5')" \
+  out="$(t414_order "$z" 'Code 0' 'Code 1' '"statut": "blocked"' 'ask-user' 'marqueur=introuvable' 'Tout autre code 3')" \
     || { printf 'ordre des codes : %s' "$out"; return 1; }
-  out="$(t45_clause_continue "$1" "$T45_CODER_ZS" "$T45_CODER_ZE" 'le cycle continue')" || { printf '%s' "$out"; return 1; }
-  # P60-D-04 + P60-H-04 : un marqueur PRÉSENT mais illisible (BILAN marqueur=inconnu|multiple) et le code 5 arrêtent le cycle.
-  out="$(t45_clause_stop "$1" "$T45_CODER_ZS" "$T45_CODER_ZE" 'Code 3 avec' 'Code 5' 'human_needed' 'marqueur=inconnu' 'marqueur=multiple')" || { printf '%s' "$out"; return 1; }
-  out="$(t45_clause_stop "$1" "$T45_CODER_ZS" "$T45_CODER_ZE" 'Code 5' "Un mandat sans numéro" 'human_needed')" || { printf '%s' "$out"; return 1; }
+  # P60-D-15 : SEUL « phase introuvable » (BILAN marqueur=introuvable) laisse continuer ; tout autre indéterminé, le code 64 et le code 5 arrêtent.
+  out="$(t45_clause_continue "$1" "$T45_CODER_ZS" "$T45_CODER_ZE" 'Code 3 avec' 'Tout autre code 3' 'le cycle continue' 'marqueur=introuvable')" || { printf '%s' "$out"; return 1; }
+  out="$(t45_clause_stop "$1" "$T45_CODER_ZS" "$T45_CODER_ZE" 'Tout autre code 3' "Un mandat sans numéro" 'human_needed' 'marqueur=inconnu' 'marqueur=multiple' 'code 64' 'code 5' 'BILAN')" || { printf '%s' "$out"; return 1; }
 }
-# P60-D-02 : un code 3 ou 64 (marqueur non constatable) ne bloque JAMAIS — la clause « Codes 3 et 64 » (jusqu'à « Code 5 »)
-# dit que le cycle continue et ne porte aucun mot de blocage (human_needed, blocked, ask-user, arrêter).
-t45_clause_continue() { # <fichier> <début> <fin> <jeton positif>
+# P60-D-15 : la clause « phase introuvable » (de son début jusqu'à la clause d'arrêt) dit que l'on continue, nomme le champ
+# machine qui la distingue et ne porte aucun mot de blocage (human_needed, blocked, ask-user, arrêter).
+t45_clause_continue() { # <fichier> <début de zone> <fin de zone> <début de clause> <fin de clause> <jeton positif> <champ machine>
   local z seg
   z="$(t414_zone "$1" "$2" "$3" | tr '\n' ' ')"
-  seg="${z#*Codes 3 et 64}"; [ "$seg" != "$z" ] || { printf 'clause « Codes 3 et 64 » absente'; return 1; }
-  case "$seg" in *'Code 3 avec'*) seg="${seg%%Code 3 avec*}" ;; *) printf 'clause « Code 3 avec » (marqueur illisible) absente après « Codes 3 et 64 »'; return 1 ;; esac
-  case "$seg" in *"$4"*) ;; *) printf 'la clause « Codes 3 et 64 » ne dit pas « %s »' "$4"; return 1 ;; esac
-  case "$seg" in *human_needed*|*blocked*|*arrêter*|*ask-user*) printf 'la clause « Codes 3 et 64 » bloque encore (human_needed, blocked, arrêter ou ask-user)'; return 1 ;; esac
+  seg="${z#*"$4"}"; [ "$seg" != "$z" ] || { printf 'clause « %s » absente' "$4"; return 1; }
+  case "$seg" in *"$5"*) seg="${seg%%"$5"*}" ;; *) printf 'clause « %s » sans fin « %s »' "$4" "$5"; return 1 ;; esac
+  case "$seg" in *"$6"*) ;; *) printf 'la clause « %s » ne dit pas « %s »' "$4" "$6"; return 1 ;; esac
+  case "$seg" in *"$7"*) ;; *) printf 'la clause « %s » ne nomme pas « %s »' "$4" "$7"; return 1 ;; esac
+  case "$seg" in *human_needed*|*blocked*|*arrêter*|*ask-user*) printf 'la clause « %s » bloque encore (human_needed, blocked, arrêter ou ask-user)' "$4"; return 1 ;; esac
 }
 # P60-D-04 + P60-H-04 : une clause d'ARRÊT (marqueur présent mais illisible, code 5) porte son mot d'arrêt et les champs
 # machine qu'elle cite, et aucun mot de poursuite (continue, entre dans la boucle, poursuis) : sans cela, un mutant qui
@@ -7746,9 +7747,17 @@ t45_coder_exec() { # <vf-coder.md> — la commande citée, jouée contre le gate
   [ "$rcp" -eq 1 ] || { printf 'étape proposée : code %s au lieu de 1' "$rcp"; return 1; }
   [ "$rco" -eq 0 ] || { printf 'étape sans marqueur : code %s au lieu de 0' "$rco"; return 1; }
   # shellcheck disable=SC2086
-  ( cd "$T45_TMP/lab-ok" && bash "$T45_SD/$name" --phase 99 >/dev/null 2>&1 ); rco=$?
-  [ "$rco" -eq 3 ] || { printf 'étape introuvable : code %s au lieu de 3 (la clause « Codes 3 et 64 » n'"'"'aurait aucun objet)' "$rco"; return 1; }
-  # le champ machine cité par la clause « Code 3 avec » existe sur la ligne BILAN du gate réel
+  rco="$( cd "$T45_TMP/lab-ok" && bash "$T45_SD/$name" --phase 99 2>/dev/null; echo "rc=$?" )"
+  case "$rco" in *'BILAN phase=99 marqueur=introuvable code=3'*'rc=3') : ;; *) printf 'étape introuvable : attendu rc 3 et BILAN marqueur=introuvable (le seul résultat qui laisse passer), obtenu « %s »' "$(printf '%s' "$rco" | tr '\n' '|')"; return 1 ;; esac
+  # tout autre indéterminé NE porte PAS marqueur=introuvable : lab partitionné sans --ws, ROADMAP absent, étape mal formée
+  rco="$( cd "$T45_TMP/lab-part" && bash "$T45_SD/$name" --phase 2 2>/dev/null; echo "rc=$?" )"
+  case "$rco" in *marqueur=introuvable*) printf 'lab partitionné sans --ws : le BILAN dit marqueur=introuvable (la boucle passerait)'; return 1 ;; *'rc=3') : ;; *) printf 'lab partitionné sans --ws : attendu rc 3, obtenu « %s »' "$rco"; return 1 ;; esac
+  rco="$( cd "$T45_TMP/lab-none" && bash "$T45_SD/$name" --phase 2 2>/dev/null; echo "rc=$?" )"
+  case "$rco" in *marqueur=introuvable*) printf 'ROADMAP absent : le BILAN dit marqueur=introuvable (la boucle passerait)'; return 1 ;; *'rc=3') : ;; *) printf 'ROADMAP absent : attendu rc 3, obtenu « %s »' "$rco"; return 1 ;; esac
+  # shellcheck disable=SC2086
+  ( cd "$T45_TMP/lab-prop" && bash "$T45_SD/$name" --phase .5 >/dev/null 2>&1 ); rco=$?
+  [ "$rco" -eq 64 ] || { printf 'étape mal formée : attendu rc 64, obtenu %s' "$rco"; return 1; }
+  # le champ machine cité par la clause d'arrêt existe sur la ligne BILAN du gate réel
   local lab want
   for lab in inc:inconnu mult:multiple; do
     # shellcheck disable=SC2086
@@ -7796,20 +7805,18 @@ sed 's/Code 1 : étape proposée, rends/Code 1 : étape proposée, poursuis, ren
 t414_mutant "T45 mutant (a) inversion : « Code 1 : étape proposée, poursuis »" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv1.md"
 sed -e 's/Code 0 : étape validée/CODE_X/' -e 's/Code 1 : étape proposée/Code 0 : étape proposée/' -e 's/CODE_X/Code 1 : étape validée/' "$T45_CODER" > "$T45_TMP/coder-inv2.md"
 t414_mutant "T45 mutant (a) inversion : codes 0 et 1 échangés" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv2.md"
-# P60-D-02 : un marqueur non constatable (3, 64) ne doit plus jamais arrêter le cycle — deux façons de le refaire bloquer.
+# P60-D-15 : seul « phase introuvable » laisse continuer. Quatre façons de rouvrir le fail-open (un indéterminé qui passe) ou de
+# refermer la porte sur le cas légitime.
 sed 's/une ligne au rapport le dit et le cycle continue\./rends `human_needed` avec le code./' "$T45_CODER" > "$T45_TMP/coder-inv3.md"
-t414_mutant "T45 mutant (a) inversion : « Codes 3 et 64 : … rends human_needed » (le cycle ne continue plus)" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv3.md"
+t414_mutant "T45 mutant (a) inversion : « marqueur=introuvable … rends human_needed » (le cas légitime bloque)" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv3.md"
 sed 's/et le cycle continue\.$/et le cycle continue, sauf ask-user./' "$T45_CODER" > "$T45_TMP/coder-inv4.md"
-t414_mutant "T45 mutant (a) inversion : la clause « Codes 3 et 64 » garde « le cycle continue » mais cite ask-user (l ordre des codes reste intact)" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv4.md"
-# P60-D-04 + P60-H-04 : quatre façons de faire continuer le cycle sur un marqueur illisible ou un code 5.
-sed 's/^Code 5 : rends `human_needed` avec le code\./Code 5 : le cycle continue./' "$T45_CODER" > "$T45_TMP/coder-inv5.md"
-t414_mutant "T45 mutant (a) inversion : « Code 5 : le cycle continue » (mot d'arrêt absent)" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv5.md"
-sed 's/^Code 5 : rends `human_needed` avec le code\./Code 5 : rends `human_needed`, puis le cycle continue./' "$T45_CODER" > "$T45_TMP/coder-inv6.md"
-t414_mutant "T45 mutant (a) inversion : « Code 5 : human_needed, puis le cycle continue » (mot d'arrêt gardé, poursuite ajoutée)" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv6.md"
-sed 's/marqueur présent mais illisible, rends `human_needed` avec le code\./marqueur présent mais illisible, le cycle continue./' "$T45_CODER" > "$T45_TMP/coder-inv7.md"
-t414_mutant "T45 mutant (a) inversion : « Code 3 avec marqueur=inconnu : le cycle continue » (le marqueur illisible passe)" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv7.md"
-sed 's/marqueur présent mais illisible, rends `human_needed` avec le code\./marqueur présent mais illisible, rends `human_needed` et le cycle entre dans la boucle./' "$T45_CODER" > "$T45_TMP/coder-inv8.md"
-t414_mutant "T45 mutant (a) inversion : la clause du marqueur illisible garde human_needed mais ajoute « entre dans la boucle »" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv8.md"
+t414_mutant "T45 mutant (a) inversion : la clause « marqueur=introuvable » garde « le cycle continue » mais cite ask-user" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv4.md"
+sed 's/rends `human_needed` avec le code et la ligne `BILAN`, aucune brique lancée\./le cycle continue./' "$T45_CODER" > "$T45_TMP/coder-inv5.md"
+t414_mutant "T45 mutant (a) inversion : « Tout autre code 3, code 64, code 5 : le cycle continue » (le fail-open d'avant la correction)" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv5.md"
+sed 's/rends `human_needed` avec le code et la ligne `BILAN`, aucune brique lancée\./rends `human_needed` avec le code et la ligne `BILAN`, puis le cycle continue./' "$T45_CODER" > "$T45_TMP/coder-inv6.md"
+t414_mutant "T45 mutant (a) inversion : la clause d'arrêt garde human_needed mais ajoute « puis le cycle continue »" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv6.md"
+sed 's/^Code 3 avec `marqueur=introuvable`/Code 3/' "$T45_CODER" > "$T45_TMP/coder-inv7.md"
+t414_mutant "T45 mutant (a) inversion : « Code 3 » nu laisse continuer (tout code 3 passe)" t45_coder_check "$T45_CODER" "$T45_TMP/coder-inv7.md"
 if [ -n "$T45_SD" ]; then
   sed 's/check-phase-validation\.sh/check-phase-validation-x.sh/g' "$T45_CODER" > "$T45_TMP/coder-ren.md"
   t414_mutant "T45 mutant (a) exécution : script cité renommé" t45_coder_exec "$T45_CODER" "$T45_TMP/coder-ren.md"
@@ -7824,7 +7831,7 @@ fi
 T45_AUTO="$MOD/skills/vf-auto/SKILL.md"
 T45_AUTO_ZS='^## Étape 0 bis'
 T45_AUTO_ZE='^## Moteur direct'
-T45_AUTO_LIT=('check-phase-validation.sh' 'Code 0 : l'"'"'étape entre dans la boucle' 'Code 1 : étape proposée' 'vf-validation.sh validate' 'ne démarre pas' 'Codes 3 et 64' 'Code 3 avec' 'marqueur=inconnu' 'marqueur=multiple' 'BILAN' 'Code 5' 'gsd-autonomous' 'pendant la boucle' 'contrôle consultatif' 'gardé par `vf-coder`')
+T45_AUTO_LIT=('check-phase-validation.sh' 'Code 0 : l'"'"'étape entre dans la boucle' 'Code 1 : étape proposée' 'vf-validation.sh validate' 'ne démarre pas' 'marqueur=introuvable' 'Tout autre code 3' 'marqueur=inconnu' 'marqueur=multiple' 'code 64' 'code 5' 'BILAN' 'gsd-autonomous' 'pendant la boucle' 'contrôle consultatif' 'gardé par `vf-coder`')
 T45_AUTO_TZS='^### Taille'
 T45_AUTO_TZE='^## '
 T45_AUTO_TLIT=('Phases ajoutées : proposées' 'vf-role.sh get' 'mission-contracts.md')
@@ -7835,10 +7842,9 @@ t45_auto_check() { # <vf-auto/SKILL.md>
   z="$(t414_zone "$1" "$T45_AUTO_ZS" "$T45_AUTO_ZE")"
   [ -n "$z" ] || { printf 'section « Étape 0 bis » introuvable ou vide'; return 1; }
   out="$(t414_missing "$z" "${T45_AUTO_LIT[@]}")" || { printf 'absent de l'"'"'étape 0 bis : %s' "$out"; return 1; }
-  out="$(t44_forbidden "$z" 'démarre quand même' 'démarre sans' 'Codes 3, 5 et 64')" || { printf 'clause inversée : %s' "$out"; return 1; }
-  out="$(t45_clause_continue "$1" "$T45_AUTO_ZS" "$T45_AUTO_ZE" "entre dans la boucle")" || { printf '%s' "$out"; return 1; }
-  out="$(t45_clause_stop "$1" "$T45_AUTO_ZS" "$T45_AUTO_ZE" 'Code 3 avec' 'Code 5' "s'arrêter" 'marqueur=inconnu' 'marqueur=multiple')" || { printf '%s' "$out"; return 1; }
-  out="$(t45_clause_stop "$1" "$T45_AUTO_ZS" "$T45_AUTO_ZE" 'Code 5' 'Limite' "s'arrêter")" || { printf '%s' "$out"; return 1; }
+  out="$(t44_forbidden "$z" 'démarre quand même' 'démarre sans' 'Codes 3, 5 et 64' 'Codes 3 et 64')" || { printf 'clause inversée : %s' "$out"; return 1; }
+  out="$(t45_clause_continue "$1" "$T45_AUTO_ZS" "$T45_AUTO_ZE" 'Code 3 avec' 'Tout autre code 3' "entre dans la boucle" 'marqueur=introuvable')" || { printf '%s' "$out"; return 1; }
+  out="$(t45_clause_stop "$1" "$T45_AUTO_ZS" "$T45_AUTO_ZE" 'Tout autre code 3' 'Limite' "s'arrêter" 'marqueur=inconnu' 'marqueur=multiple' 'code 64' 'code 5')" || { printf '%s' "$out"; return 1; }
   z="$(t414_zone "$1" "$T45_AUTO_TZS" "$T45_AUTO_TZE")"
   [ -n "$z" ] || { printf 'section « Taille » introuvable ou vide'; return 1; }
   out="$(t414_missing "$z" "${T45_AUTO_TLIT[@]}")" || { printf 'absent de la section Taille : %s' "$out"; return 1; }
@@ -7919,15 +7925,15 @@ t414_mutant "T45 mutant (b) ordre : le moteur direct précède l'étape 0 bis" t
 sed 's/ne démarre pas/démarre quand même/' "$T45_AUTO" > "$T45_TMP/auto-inv.md"
 t414_mutant "T45 mutant (b) inversion : le moteur direct « démarre quand même » sur une étape proposée" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv.md"
 sed "s/une ligne le dit et l'étape entre dans la boucle\./le dire et s'arrêter./" "$T45_AUTO" > "$T45_TMP/auto-inv3.md"
-t414_mutant "T45 mutant (b) inversion : « Codes 3 et 64 : … s'arrêter » (l'étape n'entre plus dans la boucle)" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv3.md"
+t414_mutant "T45 mutant (b) inversion : « marqueur=introuvable … s'arrêter » (le cas légitime n'entre plus dans la boucle)" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv3.md"
 sed 's/l.étape entre dans la boucle\.$/l étape entre dans la boucle sauf à arrêter./' "$T45_AUTO" > "$T45_TMP/auto-inv4.md"
-t414_mutant "T45 mutant (b) inversion : la clause « Codes 3 et 64 » garde « entre dans la boucle » mais cite arrêter" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv4.md"
-sed "s/^Code 5 : le dire et s'arrêter\./Code 5 : l'étape entre dans la boucle./" "$T45_AUTO" > "$T45_TMP/auto-inv5.md"
-t414_mutant "T45 mutant (b) inversion : « Code 5 : l'étape entre dans la boucle » (mot d'arrêt absent)" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv5.md"
-sed "s/^Code 5 : le dire et s'arrêter\./Code 5 : le dire, s'arrêter, puis l'étape entre dans la boucle./" "$T45_AUTO" > "$T45_TMP/auto-inv6.md"
-t414_mutant "T45 mutant (b) inversion : « Code 5 : s'arrêter, puis l'étape entre dans la boucle » (mot d'arrêt gardé, poursuite ajoutée)" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv6.md"
-sed "s/marqueur présent mais illisible, le dire et s'arrêter\./marqueur présent mais illisible, l'étape entre dans la boucle./" "$T45_AUTO" > "$T45_TMP/auto-inv7.md"
-t414_mutant "T45 mutant (b) inversion : « Code 3 avec marqueur=inconnu : l'étape entre dans la boucle » (le marqueur illisible passe)" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv7.md"
+t414_mutant "T45 mutant (b) inversion : la clause « marqueur=introuvable » garde « entre dans la boucle » mais cite arrêter" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv4.md"
+sed "s/le dire et s'arrêter\. Limite/l'étape entre dans la boucle. Limite/" "$T45_AUTO" > "$T45_TMP/auto-inv5.md"
+t414_mutant "T45 mutant (b) inversion : « Tout autre code 3, code 64, code 5 : l'étape entre dans la boucle » (le fail-open d'avant la correction)" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv5.md"
+sed "s/le dire et s'arrêter\. Limite/le dire, s'arrêter, puis l'étape entre dans la boucle. Limite/" "$T45_AUTO" > "$T45_TMP/auto-inv6.md"
+t414_mutant "T45 mutant (b) inversion : la clause d'arrêt garde s'arrêter mais ajoute « puis l'étape entre dans la boucle »" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv6.md"
+sed 's/^Code 3 avec `marqueur=introuvable`/Code 3/' "$T45_AUTO" > "$T45_TMP/auto-inv7.md"
+t414_mutant "T45 mutant (b) inversion : « Code 3 » nu entre dans la boucle (tout code 3 passe)" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv7.md"
 t414_ablate "$T45_MC" "$T45_TMP/mc-bloc.md" '- Phases ajoutées : proposées (postes product et dev) | absent (poste solo, défaut)' "$T45_MC_BLOC_ZS" "$T45_MC_BLOC_ZE"
 t414_mutant "T45 mutant (c) : mission-contracts.md privé de la ligne « Phases ajoutées » du bloc MISSION" t45_contract_check "$T45_MC" "$T45_TMP/mc-bloc.md"
 for t45_a in "${T45_MC_SUB_LIT[@]}"; do
