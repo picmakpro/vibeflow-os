@@ -9,7 +9,10 @@
 #       Cache introuvable → « indéterminé », jamais « à jour » ; module absent du cache → ignoré.
 #   (B) RETARD DE CALIBRATION — la version stampée (.claude/.vibeflow-framework-version) est comparée
 #       à la version courante : celle de `conductor=` du registre quand il existe (échelle module,
-#       celle où `stamp` écrit en lab), sinon celle du plugin. Retard → /vf-calibrate.
+#       celle où `stamp` écrit en lab) si son majeur est celui du stamp ; sinon `plugin.json` du cache
+#       (un stamp posé sous --plugin-root est sur l'échelle plugin) si son majeur est celui du stamp ;
+#       sinon « échelle indéterminée », rc 0. Retard → /vf-calibrate. LIMITE : cette discrimination
+#       par majeur tient tant que le plugin (2.x) et conductor (1.x) n'ont pas le même majeur.
 #
 # Sous-commandes :
 #   current   → version courante du framework (plugin / cache, sinon registre du lab)
@@ -36,7 +39,8 @@
 set -uo pipefail
 
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${VIBEFLOW_CACHE:-}}"
-VF_PLUGIN_CACHE="${VF_PLUGIN_CACHE:-$HOME/.claude/plugins/cache/vibeflow-os/vibeflow}"
+# Sans HOME, pas de cache par défaut (jamais d'erreur sous set -u).
+VF_PLUGIN_CACHE="${VF_PLUGIN_CACHE:-${HOME:+$HOME/.claude/plugins/cache/vibeflow-os/vibeflow}}"
 LAB_ROOT="."
 FORCE_VERSION=""
 QUIET=0
@@ -102,12 +106,11 @@ semver_lt() {
 # de $VF_PLUGIN_CACHE. Rend "" si introuvable.
 cache_root() {
   [ -n "$PLUGIN_ROOT" ] && { [ -d "$PLUGIN_ROOT" ] && echo "$PLUGIN_ROOT"; return 0; }
-  [ -d "$VF_PLUGIN_CACHE" ] || return 0
+  [ -n "$VF_PLUGIN_CACHE" ] && [ -d "$VF_PLUGIN_CACHE" ] || return 0
   local d n best=""
   for d in "$VF_PLUGIN_CACHE"/*/; do
     [ -d "$d" ] || continue
     n="$(basename "$d")"
-    case "$n" in [0-9]*.[0-9]*.[0-9]*) ;; *) continue ;; esac
     printf '%s' "$n" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' || continue
     if [ -z "$best" ] || semver_lt "$best" "$n"; then best="$n"; fi
   done
@@ -158,13 +161,22 @@ case "$cmd" in
       fi
     fi
 
-    # (B) retard de calibration : stamp vs version courante (échelle module si registre).
-    ref=""
+    # (B) retard de calibration : le stamp est comparé à une référence de MÊME échelle (majeur).
+    #   registre conductor= (échelle module) si son majeur = celui du stamp ; sinon plugin.json du cache
+    #   résolu (échelle plugin, un stamp posé sous --plugin-root) si son majeur = celui du stamp ;
+    #   sinon échelle indéterminée. Sans conductor= au registre : version courante, comme avant.
+    ref=""; regc=""
+    [ -f "$reg" ] && regc="$(norm "$(grep -E '^conductor=' "$reg" 2>/dev/null | head -1 | cut -d= -f2-)")"
     if [ -n "$FORCE_VERSION" ]; then ref="$(norm "$FORCE_VERSION")"
-    elif [ -f "$reg" ] && grep -qE '^conductor=' "$reg" 2>/dev/null; then
-      ref="$(norm "$(grep -E '^conductor=' "$reg" | head -1 | cut -d= -f2-)")"
+    elif [ -n "$regc" ]; then
+      if [ -n "$rec" ] && [ "${rec%%.*}" != "${regc%%.*}" ]; then
+        pjc="$(cache_root)/.claude-plugin/plugin.json"; pvc=""
+        [ -n "$(cache_root)" ] && [ -f "$pjc" ] && command -v jq >/dev/null 2>&1 && pvc="$(norm "$(jqx -r '.version // empty' "$pjc")")"
+        if [ -n "$pvc" ] && [ "${pvc%%.*}" = "${rec%%.*}" ]; then ref="$pvc"; else ref="?"; fi
+      else ref="$regc"; fi
     else ref="$(current_version)"; fi
     if [ -z "$rec" ]; then b_state=nostamp; say "lab non stampé (version framework inconnue). Lancer: framework-version.sh stamp"
+    elif [ "$ref" = "?" ]; then b_state=undet; say "calibration : échelle indéterminée (stamp $rec, aucune référence de même échelle)."
     elif [ -z "$ref" ]; then b_state=unknown
     elif [ "$ref" = "$rec" ]; then b_state=ok
     elif semver_lt "$rec" "$ref"; then
