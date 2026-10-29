@@ -38,7 +38,7 @@
 | ADR-067 | 2026-08-04 | `hooks.community` refusé : c'est une mesure de style, pas de conformité — 6 types maison hors liste amont, 68 % des sujets > 72 caractères | Validée |
 | ADR-068 | 2026-08-04 | Profils de contexte du moteur refusés (rien à activer, notre contrat typé est per-rôle et plus strict) — et `workflow.inline_plan_threshold` inchangé à 2, la mesure étant le livrable | Validée |
 | ADR-069 | 2026-08-04 | Les workstreams GSD sont adoptés, avec leurs quatre limites datées, la condition dure « aucune partition tant qu'une phase est en vol », la révision de l'Iron Law 2 et l'amendement d'ADR-064 | Validée — amendée le 2026-09-09 (risque (b) migré au niveau commit, D-10 rouverte en équipe, couverture re-mesurée) |
-| ADR-070 | 2026-08-06 | Une disposition `accept` de registre de menaces borne le vecteur qu'elle couvre, jamais le risque en bloc — RCE CWD dans `dag.sh`, 5ᵉ passage du motif de confinement de chemin | Validée |
+| ADR-070 | 2026-08-06 | Une disposition `accept` de registre de menaces borne le vecteur qu'elle couvre, jamais le risque en bloc — RCE CWD dans `dag.sh`, 5ᵉ passage du motif de confinement de chemin | Validée — amendée le 2026-10-29 (#47 : `gsd-run.sh` accepte `./.claude/gsd-core`) |
 | ADR-072 | 2026-09-17 | Gardes in-repo sans règle côté serveur — ce qui est gardé, ce qui ne l'est pas, ce qui attend un accès admin | Validée — amendée le 2026-09-23 (volet admin : rulesets de main et des tags v*, contournement nommé Samuel et Willy) |
 | ADR-073 | 2026-09-23 | Une release publie une évolution fonctionnelle, jamais un accumulateur de doc — et la fenêtre de grâce du gate de tag | Validée (non gatée machine) |
 | ADR-074 | 2026-09-23 | Portée des gates : bloquant pour l'intégrité technique, consultatif pour le jugement métier | Validée |
@@ -2482,6 +2482,22 @@ lui-même, qui n'appartenait pas à son périmètre.
 Rouvrir si une future revue de registre de menaces constate qu'une disposition `accept` bornée selon
 cette règle a quand même laissé passer un vecteur voisin non nommé — signe que la règle elle-même
 est insuffisante, pas seulement mal appliquée.
+
+### Amendement du 2026-10-29 (#47) — `gsd-run.sh` accepte `./.claude/gsd-core`
+
+**Ce qui change.** `plugin/dev-orchestrator/scripts/gsd-run.sh` accepte le candidat
+`./.claude/gsd-core/bin/gsd-tools.cjs`, ancré au répertoire courant. Disposition bornée au format de
+la règle 2 : acceptée **pour `./.claude/gsd-core`** (raison : même frontière de confiance que
+`./.claude/scripts`, que le manager exécute déjà via `$S`), et pour `PATH`. Non évalué pour `GSD_TOOLS`.
+
+**Ce qui reste exclu.** La racine nue `<racine>/gsd-core` (sans `.claude/`) et tout candidat dérivé de
+`git rev-parse --show-toplevel` / `pwd` hors `.claude/` ; un résultat `command -v` non absolu est
+refusé. Sentinelle : `plugin/dev-orchestrator/scripts/tests/test-gsd-run.sh`, cas (e).
+
+**Motif.** Sans ce candidat, un lab en scope projet ne résolvait jamais le moteur : le reset des flags
+d'auto-approbation de `vf-dev-manager` ne démarrait jamais. `mission-contracts.md` D5(d) est aligné.
+
+**Arbitrage** : « arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 : gsd-run.sh accepte le candidat ./.claude/gsd-core (même frontière de confiance que ./.claude/scripts exécuté via $S) ; la racine nue <racine>/gsd-core reste exclue et gardée par une sentinelle de test ; ADR-070 amendé en conséquence. »
 
 ---
 

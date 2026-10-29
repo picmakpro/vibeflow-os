@@ -89,6 +89,9 @@
 #         mission-contracts.md, et dit au pilotage (§Pattern E) ; test statique, mutations.
 #   T43 — POCK-06 (P414-D-11) : forme du merge-danger call dans mission-contracts.md §Isolation de
 #         branche (côté contrat ; le gate E3 qui la lit a sa propre suite) ; mutations.
+#   T81 — #81 : doctrine d'attente des managers — scanner des blocs de code (```) des .md livrés ;
+#         boucle until/while à corps vide, sans sleep ou sans borne = rouge ; boucles de lecture exclues ;
+#         5 cas dont 3 fixtures rouges.
 #
 # Historique de numérotation : T3/T12/T13/T14 ont changé de sémantique à la v2.0.0 (les
 # anciens tests de collision de descriptions, de préséance et de synchro de la table vf-dev
@@ -500,6 +503,85 @@ if [ $? -ne 0 ]; then
 else
   ko "T2b validation : VF_SCOPE=bogus aurait dû être rejeté (exit≠0)"
 fi
+
+# --- T2b-165-BEGIN ---
+# T2b-165 — filet #165 : sans VF_SCOPE, un moteur gsd-core en scope PROJET (<racine>/.claude/gsd-core)
+# dérive SCOPE=project (--local) au lieu du défaut `user` (--global, seconde copie dans ~/.claude).
+# Hermétique : lab + HOME temporaires, faux npx/npm/node/claude en tête de PATH (npx et claude
+# journalisent leur argv ; npm view rend 1.19.0), `env -u CLAUDE_CONFIG_DIR`. Aucun réseau.
+# Lab = `git init` (le chemin nominal : racine = git toplevel) ; la garde (d) tourne HORS git
+# (racine = pwd = $HOME), le cas qui désigne le moteur user.
+T165_TMP="$(mktemp -d)"; vf_tmp_track "$T165_TMP"
+T165_BIN="$T165_TMP/bin"; mkdir -p "$T165_BIN"
+printf '#!/bin/sh\necho "npx $*" >> "$T165_LOG"\nexit 0\n' > "$T165_BIN/npx"
+printf '#!/bin/sh\necho "claude $*" >> "$T165_LOG"\nexit 0\n' > "$T165_BIN/claude"
+printf '#!/bin/sh\ncase "$1" in view) echo "\\"1.19.0\\"";; *) exit 1;; esac\n' > "$T165_BIN/npm"
+printf '#!/bin/sh\necho 24\n' > "$T165_BIN/node"
+chmod +x "$T165_BIN"/*
+
+# t165_run <cwd> <HOME> <VF_SCOPE|-> -- renvoie la sortie stderr+stdout ; argv de npx dans $T165_LOG.
+t165_run() {
+  : > "$T165_LOG"
+  if [ "$3" = "-" ]; then
+    (cd "$1" && env -u CLAUDE_CONFIG_DIR -u VF_SCOPE HOME="$2" PATH="$T165_BIN:/usr/bin:/bin" \
+      bash "$ENS" --upgrade-engine 2>&1)
+  else
+    (cd "$1" && env -u CLAUDE_CONFIG_DIR HOME="$2" VF_SCOPE="$3" PATH="$T165_BIN:/usr/bin:/bin" \
+      bash "$ENS" --upgrade-engine 2>&1)
+  fi
+}
+T165_LOG="$T165_TMP/argv.log"; export T165_LOG
+t165_npx() { "$GREP" '^npx ' "$T165_LOG" | head -1; }
+
+T165_LAB="$T165_TMP/lab"; mkdir -p "$T165_LAB/.claude/gsd-core" "$T165_TMP/home1"
+echo "1.0.0" > "$T165_LAB/.claude/gsd-core/VERSION"
+git -C "$T165_LAB" init -q 2>/dev/null
+
+# (a) sans VF_SCOPE + moteur projet → --local + message
+T165_OUT="$(t165_run "$T165_LAB" "$T165_TMP/home1" -)"
+if t165_npx | "$GREP" -q -- '--local' && ! t165_npx | "$GREP" -q -- '--global' \
+   && echo "$T165_OUT" | "$GREP" -qF "VF_SCOPE absent — moteur trouvé dans ./.claude/gsd-core : scope project dérivé" \
+   && [ "$(echo "$T165_OUT" | "$GREP" -cF 'scope project dérivé')" -eq 1 ] \
+   && "$GREP" -q -- '--scope project' "$T165_LOG"; then
+  ok "T2b-165 (a) sans VF_SCOPE + moteur projet : npx --local, Superpowers --scope project, message unique"
+else
+  ko "T2b-165 (a) dérivation project attendue [npx=$(t165_npx)] [out=$T165_OUT]"
+fi
+
+# (b) VF_SCOPE=user explicite + moteur projet → --global conservé, aucun message
+T165_OUT="$(t165_run "$T165_LAB" "$T165_TMP/home1" user)"
+if t165_npx | "$GREP" -q -- '--global' && ! echo "$T165_OUT" | "$GREP" -qF 'scope project dérivé'; then
+  ok "T2b-165 (b) VF_SCOPE=user explicite prime sur le moteur projet : --global"
+else
+  ko "T2b-165 (b) VF_SCOPE=user explicite doit garder --global [npx=$(t165_npx)]"
+fi
+
+# (c) sans moteur projet → défaut user (--global)
+T165_EMPTY="$T165_TMP/empty"; mkdir -p "$T165_EMPTY"; git -C "$T165_EMPTY" init -q 2>/dev/null
+T165_OUT="$(t165_run "$T165_EMPTY" "$T165_TMP/home1" -)"
+if t165_npx | "$GREP" -q -- '--global' && ! echo "$T165_OUT" | "$GREP" -qF 'scope project dérivé'; then
+  ok "T2b-165 (c) sans moteur projet : défaut user conservé (--global)"
+else
+  ko "T2b-165 (c) défaut user attendu sans moteur projet [npx=$(t165_npx)]"
+fi
+
+# (d) garde $HOME : cwd = HOME hors git, moteur dans $HOME/.claude/gsd-core = moteur user → pas de dérivation
+T165_H2="$T165_TMP/home2"; mkdir -p "$T165_H2/.claude/gsd-core"; echo "1.0.0" > "$T165_H2/.claude/gsd-core/VERSION"
+T165_OUT="$(t165_run "$T165_H2" "$T165_H2" -)"
+if t165_npx | "$GREP" -q -- '--global' && ! echo "$T165_OUT" | "$GREP" -qF 'scope project dérivé'; then
+  ok "T2b-165 (d) garde \$HOME : moteur user trouvé depuis \$HOME hors dépôt → pas de dérivation (--global)"
+else
+  ko "T2b-165 (d) le moteur user ne doit pas être pris pour un moteur projet [npx=$(t165_npx)]"
+fi
+
+# (e) VF_SCOPE invalide → exit 1, aucun npx
+t165_run "$T165_LAB" "$T165_TMP/home1" bogus >/dev/null; T165_RC=$?
+if [ "$T165_RC" -eq 1 ] && [ -z "$(t165_npx)" ]; then
+  ok "T2b-165 (e) VF_SCOPE=bogus : exit 1, aucun npx (validation en tête inchangée)"
+else
+  ko "T2b-165 (e) VF_SCOPE=bogus doit sortir 1 sans npx [rc=$T165_RC]"
+fi
+# --- T2b-165-END ---
 
 # ---------------------------------------------------------------------------
 # T2c/T2d/T2e/T2f — piège n°1, nettoyage legacy (ADR-031), garde Node ≥ 24, dual-layout (D1)
@@ -7311,6 +7393,139 @@ for t43_a in "${T43_ANCRES[@]}"; do
   t414_ablate "$T43_MC" "$T414_TMP/t43-$t43_k.md" "$t43_a" "$T43_ZS" "$T43_ZE"
   t414_mutant "T43 mutant copie de mission-contracts.md privée de « $t43_a » dans §Isolation de branche" t43_check "$T43_MC" "$T414_TMP/t43-$t43_k.md"
 done
+
+
+# ---- T81 : doctrine d'attente des managers, scanner des blocs de code (#81) --------------------------
+# Invariants 1-3 de mission-flow.md (§Attendre un worker ou un état externe). Ce scanner parcourt les BLOCS
+# DE CODE clôturés (```) des .md livrés (agents, references, skills) — jamais le texte hors bloc (la table de
+# gsd-skills-index.md contient « until review » en prose). Une boucle until/while rougit si (a) son corps est
+# vide (`do :; done`, `do true; done`), ou (b) elle n'a pas, dans son corps, une temporisation (`sleep` hors
+# guillemets), ou (c) sa borne n'est pas EFFECTIVE (un test de `deadline` suivi, dans sa branche, d'un exit/return
+# non nul — le mot TIMEOUT ne borne rien), ou (d) un `sleep` n'est pas gardé (`|| … exit/return` non nul). `for ((;;))` est jugée. EXCLUSION DOCUMENTÉE : une boucle de
+# LECTURE (`while read …`, `while IFS= read …`) ne guette rien, elle consomme un flux — jamais jugée.
+# Sortie : une ligne `fichier:ligne : motif` par violation, puis `#scan fichiers=N boucles=M` (compteur
+# d'atteinte : un scanner qui ne voit aucune boucle ne prouve rien). Pas de python/node inline.
+T81_TMP="$(mktemp -d)"; vf_tmp_track "$T81_TMP"
+cat > "$T81_TMP/scan.awk" <<'EOAWK'
+function opener(w) { return (w == "until" || w == "while" || w == "for" || w == "select") }
+# Une borne = un TEST de la deadline suivi, dans sa branche (coupée au premier `}`, `fi` ou `||`), d'un
+# exit/return NON NUL. La seule mention de TIMEOUT ou de deadline ne borne rien.
+function bounded(body,   rest, t, i) {
+  gsub(/\n/, " ", body)
+  for (i = 1; i <= 2; i++) {
+    rest = body
+    t = (i == 1) ? "\\[[^]]*(deadline|DLREF)[^]]*\\][[:space:]]*(&&|;?[[:space:]]*then)" : "\\(\\([^\n]*(deadline|DLREF)[^\n]*\\)\\)[[:space:]]*(&&|;?[[:space:]]*then)"
+    while (match(rest, t)) {
+      rest = substr(rest, RSTART + RLENGTH)
+      br = rest
+      if (match(br, /\}|(^|[;[:space:]])fi([;[:space:]]|$)|\|\|/)) br = substr(br, 1, RSTART)
+      if (br ~ /(^|[^A-Za-z_-])(exit|return)[[:space:]]+[1-9]/) return 1
+    }
+  }
+  return 0
+}
+function evalloop(d,   t, cond, nq, nl, k, ls) {
+  t = txt[d]
+  if (kind[d] == "for") {
+    # `for x in …` parcourt une liste finie ; seule la forme C sans condition (`for ((;;))`) est jugée.
+    if (t !~ /for[[:space:]]*\(\([^;]*;[[:space:]]*;/) return
+  }
+  if (kind[d] == "while") {
+    cond = t
+    if (match(cond, /(^|[;[:space:]])do([;[:space:]]|$)/)) cond = substr(cond, 1, RSTART)
+    if (cond ~ /(^|[^A-Za-z_-])read([^A-Za-z_-]|$)/) return
+  }
+  nloops++
+  if (t ~ /(^|[;[:space:]])do[[:space:];]*((:|true)[[:space:];]*)*done/) { print file ":" start[d] " : corps de boucle vide (do :; done)"; bad++; return }
+  nq = qtxt[d]
+  if (nq !~ /(^|[^A-Za-z_-])sleep[[:space:]]/) { print file ":" start[d] " : boucle d'attente sans temporisation (sleep)"; bad++; return }
+  if (!bounded(dtxt[d])) { print file ":" start[d] " : boucle d'attente sans borne (test de deadline suivi d'un exit/return non nul)"; bad++; return }
+  nl = split(nq, ls, "\n")
+  for (k = 1; k <= nl; k++)
+    if (ls[k] ~ /(^|[^A-Za-z_-])sleep[[:space:]]/ && ls[k] !~ /sleep[^|]*\|\|.*(exit|return)[[:space:]]+[1-9]/) {
+      print file ":" start[d] " : temporisation non gardée (sleep sans || exit/return non nul)"; bad++; return
+    }
+}
+FNR == 1 { nfiles++; infence = 0; depth = 0; file = FILENAME }
+/^[[:space:]]*```/ { infence = !infence; depth = 0; next }
+infence {
+  raw = $0
+  sub(/(^|[[:space:]])#.*$/, "", raw)
+  q = raw
+  gsub(/"[^"]*"/, "", q); gsub(/'[^']*'/, "", q)
+  # variante où `"$deadline"` survit (DLREF) : le test de borne la lit, jamais le texte d'un message
+  dl = raw; dq = ""
+  while (match(dl, /"[^"]*"/)) { sg = substr(dl, RSTART, RLENGTH); dq = dq substr(dl, 1, RSTART - 1) ((sg ~ /\$\{?deadline/) ? " DLREF " : " "); dl = substr(dl, RSTART + RLENGTH) }
+  dq = dq dl; gsub(/'[^']*'/, "", dq)
+  for (i = 1; i <= depth; i++) { txt[i] = txt[i] "\n" raw; qtxt[i] = qtxt[i] "\n" q; dtxt[i] = dtxt[i] "\n" dq }
+  n = split(q, w, /[;&|(){}[:space:]]+/)
+  for (j = 1; j <= n; j++) {
+    if (opener(w[j])) {
+      depth++; kind[depth] = w[j]; start[depth] = FNR; txt[depth] = raw; qtxt[depth] = q; dtxt[depth] = dq
+    } else if (w[j] == "done" && depth > 0) { evalloop(depth); depth-- }
+  }
+}
+END { printf "#scan fichiers=%d boucles=%d\n", nfiles, nloops; exit (bad > 0) }
+EOAWK
+t81_scan() { # <fichier.md>...  → violations + compteur sur stdout ; rc 1 si violation
+  awk -f "$T81_TMP/scan.awk" "$@"
+}
+T81_DIRS=("$MOD/agents" "$REFS_DIR" "$MOD/skills")
+T81_FILES=(); while IFS= read -r t81_f; do T81_FILES+=("$t81_f"); done < <(find "${T81_DIRS[@]}" -name '*.md' -type f 2>/dev/null | sort)
+
+# Cas 1 : vert sur l'arbre livré, avec au moins une boucle jugée (la forme canonique de mission-flow.md).
+t81_out="$(t81_scan "${T81_FILES[@]}")"; t81_rc=$?
+t81_n="$(printf '%s\n' "$t81_out" | sed -n 's/^#scan fichiers=[0-9]* boucles=\([0-9]*\)$/\1/p')"
+if [ "$t81_rc" -eq 0 ] && [ "${t81_n:-0}" -ge 1 ]; then
+  ok "T81 cas 1 : aucune boucle d'attente non bornée ou non temporisée dans les .md livrés ($t81_n boucle(s) jugée(s), ${#T81_FILES[@]} fichier(s))"
+else
+  ko "T81 cas 1 : attendu — rc 0 et ≥ 1 boucle jugée ; obtenu — rc=$t81_rc, boucles=${t81_n:-?} : $t81_out"
+fi
+
+# Cas 2-5 : fixtures. Chaque fixture est un .md à un bloc de code ; attendu = rc de t81_scan.
+t81_fix() { # <nom> <rc attendu> <corps du bloc de code> <motif attendu dans la sortie ou ->
+  local f="$T81_TMP/$1.md" o rc
+  printf '# fixture\n\n```sh\n%s\n```\n' "$3" > "$f"
+  o="$(t81_scan "$f")"; rc=$?
+  if [ "$rc" -eq "$2" ] && { [ "$4" = "-" ] || printf '%s' "$o" | grep -qF "$4"; }; then
+    ok "T81 $1 : rc=$rc comme attendu"
+  else
+    ko "T81 $1 : attendu — rc=$2 (motif « $4 ») ; obtenu — rc=$rc : $o"
+  fi
+}
+t81_fix cas2-corps-vide 1 'until [ -f x ]; do :; done' 'corps de boucle vide'
+t81_fix cas2b-corps-vide-multiligne 1 $'until [ -f x ]; do\n  :\ndone' 'corps de boucle vide'
+t81_fix cas3-sleep-sans-borne 1 'until cond; do sleep 15; done' 'sans borne'
+t81_fix cas3b-borne-sans-sleep 1 $'deadline=$(( $(date +%s) + 60 ))\nuntil cond; do\n  [ "$(date +%s)" -ge "$deadline" ] && exit 124\ndone' 'sans temporisation'
+t81_fix cas4-forme-canonique 0 $'deadline=$(( $(date +%s) + 1800 ))\nuntil cond; do\n  [ "$(date +%s)" -ge "$deadline" ] && { echo "TIMEOUT attente x"; exit 124; }\n  sleep 15 || { echo "TEMPORISATION REFUSÉE"; exit 125; }\ndone' -
+t81_fix cas5-boucle-de-lecture 0 $'while read l; do\n  echo "$l"\ndone < f\nwhile IFS= read -r l; do :; done < f' -
+# Mutants de la clause clé (revue) : temporisation non gardée, « borne » par le seul mot, boucles infinies.
+t81_fix cas6-sleep-non-garde 1 $'deadline=$(( $(date +%s) + 1800 ))\nuntil cond; do\n  [ "$(date +%s)" -ge "$deadline" ] && { echo "TIMEOUT attente x"; exit 124; }\n  sleep 15\ndone' 'temporisation non gardée'
+t81_fix cas6b-sleep-garde-par-true 1 $'deadline=$(( $(date +%s) + 1800 ))\nuntil cond; do\n  [ "$(date +%s)" -ge "$deadline" ] && { echo "TIMEOUT attente x"; exit 124; }\n  sleep 15 || true\ndone' 'temporisation non gardée'
+t81_fix cas7-borne-par-le-mot 1 'deadline=1; until cond; do sleep 15 || exit 125; echo TIMEOUT; done' 'sans borne'
+t81_fix cas7b-borne-sans-exit 1 $'deadline=1\nuntil cond; do\n  [ "$(date +%s)" -ge "$deadline" ] && echo TIMEOUT\n  sleep 15 || exit 125\ndone' 'sans borne'
+t81_fix cas7c-exit-du-sleep-pris-pour-la-borne 1 $'deadline=1\nuntil cond; do\n  [ "$(date +%s)" -ge "$deadline" ] && echo "TIMEOUT"; sleep 15 || exit 125\ndone' 'sans borne'
+t81_fix cas8-for-infini 1 $'deadline=1\nfor ((;;)); do\n  sleep 15 || exit 125\ndone' 'sans borne'
+t81_fix cas8b-for-infini-vide 1 'for ((;;)); do :; done' 'corps de boucle vide'
+t81_fix cas8c-while-true 1 $'while true; do\n  sleep 15 || exit 125\ndone' 'sans borne'
+t81_fix cas8d-while-deux-points 1 $'while :\ndo\n  sleep 15 || exit 125\ndone' 'sans borne'
+t81_fix cas9-for-infini-borne 0 $'deadline=$(( $(date +%s) + 60 ))\nfor ((;;)); do\n  [ "$(date +%s)" -ge "$deadline" ] && { echo "TIMEOUT"; exit 124; }\n  sleep 15 || { echo "REFUSÉE"; exit 125; }\ndone' -
+t81_fix cas9b-for-liste-finie 0 'for f in a b c; do echo "$f"; done' -
+t81_fix cas9c-test-arithmetique 0 $'deadline=$(( $(date +%s) + 60 ))\nwhile true; do\n  if (( $(date +%s) >= deadline )); then\n    echo TIMEOUT\n    exit 124\n  fi\n  sleep 15 || return 125\ndone' -
+# Le texte hors bloc de code ne compte pas.
+printf 'until review passes, do :; done\n' > "$T81_TMP/prose.md"
+t81_out="$(t81_scan "$T81_TMP/prose.md")" && ok "T81 prose hors bloc de code ignorée" || ko "T81 prose : attendu — rc 0 ; obtenu — $t81_out"
+# Mutants de la forme canonique RÉELLE : copie de mission-flow.md privée de sa temporisation, puis de sa borne.
+grep -v 'sleep 15' "$REFS_DIR/mission-flow.md" > "$T81_TMP/mut-sans-sleep.md"
+grep -v 'TIMEOUT attente' "$REFS_DIR/mission-flow.md" > "$T81_TMP/mut-sans-borne.md"
+t81_out="$(t81_scan "$T81_TMP/mut-sans-sleep.md")"; t81_rc=$?
+{ [ "$t81_rc" -eq 1 ] && printf '%s' "$t81_out" | grep -qF 'sans temporisation'; } && ok "T81 mutant mission-flow.md sans sleep : rouge" || ko "T81 mutant sans sleep : attendu — rc=1 « sans temporisation » ; obtenu — rc=$t81_rc : $t81_out"
+sed 's/ || { echo "TEMPORISATION REFUSÉE"; exit 125; }//' "$REFS_DIR/mission-flow.md" > "$T81_TMP/mut-sans-garde.md"
+cmp -s "$REFS_DIR/mission-flow.md" "$T81_TMP/mut-sans-garde.md" && ko "T81 mutant sans garde : le mutant est identique à l'original (ancre périmée)"
+t81_out="$(t81_scan "$T81_TMP/mut-sans-garde.md")"; t81_rc=$?
+{ [ "$t81_rc" -eq 1 ] && printf '%s' "$t81_out" | grep -qF 'temporisation non gardée'; } && ok "T81 mutant mission-flow.md sleep sans garde : rouge" || ko "T81 mutant sans garde : attendu — rc=1 « temporisation non gardée » ; obtenu — rc=$t81_rc : $t81_out"
+t81_out="$(t81_scan "$T81_TMP/mut-sans-borne.md")"; t81_rc=$?
+{ [ "$t81_rc" -eq 1 ] && printf '%s' "$t81_out" | grep -qF 'sans borne'; } && ok "T81 mutant mission-flow.md sans TIMEOUT : rouge" || ko "T81 mutant sans TIMEOUT : attendu — rc=1 « sans borne » ; obtenu — rc=$t81_rc : $t81_out"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

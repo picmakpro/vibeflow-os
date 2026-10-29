@@ -60,11 +60,37 @@ ADR-048/049). Acquisition **atomique** (un lien symbolique posé puis remplacé 
    tour qu'un `dag.sh mark` (qui écrit désormais aussi `progress_epoch`, plan 33-02), les deux
    horloges ne divergent JAMAIS — une mission gelée voit les deux s'arrêter ensemble (verdict
    abandon, jamais stall détecté à temps), une mission vivante les voit avancer ensemble (jamais de
-   stall à signaler alors qu'elle boucle). Concrètement : émettre le heartbeat aussi À CHAQUE
-   itération d'une boucle d'attente/poll du manager (attente d'un worker, relecture d'état), pas
-   SEULEMENT entre deux étapes explicites — un manager qui surveille un worker unique pendant
-   plusieurs minutes sans jamais rappeler `heartbeat` dans l'intervalle reproduit exactement le
-   couplage de cadence que cet amendement ferme.
+   stall à signaler alors qu'elle boucle). Concrètement : émettre le heartbeat à CHAQUE réveil du
+   manager — chaque tour où il reprend la main (notification de fin d'un worker, fin d'une temporisation bornée, relecture d'état
+   entre deux étapes) —, pas SEULEMENT entre deux étapes explicites. Le heartbeat ne bat plus
+   depuis une boucle shell (#81) : le manager n'en tient aucune.
+
+   **Attendre un worker ou un état externe — trois invariants (#81)** :
+   1. **Jamais de boucle shell d'attente sur un worker.** La notification de fin de tâche du
+      harnais (un worker en arrière-plan réveille son parent à sa fin) met fin à l'attente ; le
+      manager ne scrute ni son fichier de sortie ni ses commits. Pour garder la main (un sous-agent
+      qui termine son tour rend son rapport), il attend par temporisations bornées SUCCESSIVES, une
+      par appel d'outil, chacune ≤ 600 s (< `STALL_WINDOW` 900 s < TTL 1800 s), sans boucle, et bat
+      le heartbeat à CHAQUE réveil — cadence indépendante des `dag.sh mark`, jamais conditionnée à
+      « un worker plus long que le TTL » (le manager ne peut pas le savoir) — puis constate le disque.
+   2. **Un poll indispensable est borné ET temporisé.** Il ne vaut que pour un état que le
+      harnais ne notifie pas (CI distante, fichier d'un process détaché). Deadline explicite,
+      sortie en échec `TIMEOUT` au dépassement ; jamais de corps vide, jamais `do :; done` ; une
+      temporisation refusée sort de la boucle en échec, elle ne la laisse jamais tourner à vide
+      (mesuré : le refus d'un `sleep` n'arrête pas une boucle `until … do sleep 10; done`, qui
+      rend alors instantanément). Il tourne en commande d'arrière-plan du harnais, jamais en
+      `sleep` d'avant-plan ; le manager l'attend comme un worker (temporisations ≤ 600 s, heartbeat
+      à chaque réveil) : la deadline borne le poll, jamais un intervalle sans heartbeat. Forme
+      canonique, la seule admise :
+      ```sh
+      deadline=$(( $(date +%s) + 1800 ))
+      until <condition>; do
+        [ "$(date +%s)" -ge "$deadline" ] && { echo "TIMEOUT attente <quoi>"; exit 124; }
+        sleep 15 || { echo "TEMPORISATION REFUSÉE"; exit 125; }
+      done
+      ```
+   3. **Une attente qui ne peut pas être bornée n'est pas une boucle** : elle remonte — au manager
+      pour un worker, à l'humain pour un manager.
 
    Progression du watchdog (P57-D-45) : `progress_epoch` OU le commit le plus récent parmi les HEAD des worktrees du dossier
    git commun (commit futur, worktree prunable ou illisible ignorés). Limite acceptée : un commit sans rapport peut masquer

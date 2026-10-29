@@ -67,14 +67,14 @@ lab). Puis six gestes **non négociables** :
    traite les invariants comme non garantis, ne les cite pas comme preuve ; **64 = fichier
    illisible** → défaut d'outillage, remonte `human_needed`. Aucun de ces codes n'arrête la mission
    par lui-même : seul 64 appelle l'humain.
-5. **Reset des flags d'enchaînement (avant le premier dispatch)** : `gsd_run config-set
-   workflow._auto_chain_active false` (résolution : `mission-contracts.md` §Seuil de bascule, DRY)
-   **puis** `gsd_run config-set workflow.auto_advance false` — les DEUX déclencheurs amont
-   d'auto-approbation de checkpoint, désarmer le premier seul laisse le second armé. Persistés dans
-   `.planning/config.json`, ils survivent aux sessions et auto-tranchent les checkpoints tant
-   qu'ils valent vrai ; `gsd_run` introuvable → consigne au rapport, best-effort. Le cadrage étant
-   désormais **ton** geste (point suivant), plus aucun mode d'enchaînement n'est passé à cette
-   brique : ce reset redevient une hygiène de démarrage, sans fenêtre à border.
+5. **Reset des flags d'enchaînement (avant le premier dispatch)** : `"$S"/gsd-run.sh config-set
+   workflow._auto_chain_active false` **puis** `"$S"/gsd-run.sh config-set workflow.auto_advance false`
+   (même `--ws` qu'au verrou ; résolution : `mission-contracts.md` §Seuil de bascule → le script) — les
+   DEUX déclencheurs amont d'auto-approbation : désarmer le premier seul laisse le second armé ;
+   persistés dans le `config.json` que le moteur choisit selon `--ws` (`active-workstream` compris), ils
+   survivent aux sessions. **Relis la valeur écrite, pas `$?`** : `"$S"/gsd-run.sh config-get <clé>` (même
+   `--ws`) pour chaque clé ; vert ssi la sortie est exactement `false` pour les deux ; autre résultat (outil
+   introuvable = rc 64, rc non nul, autre valeur) → `human_needed`, au même rang que le 64 du point 4. Cadrage = **ton** geste (point suivant).
 6. **Cadrage** : c'est TON geste, tu le portes toi-même — tu ne passes JAMAIS de mode
    d'enchaînement à cette brique (allowlist stricte : `GSD-PIPELINE.md` §9) ; si l'outil de
    question ne t'est pas fourni (repli D-09, §Entrée) : `SendMessage(to: "main")`, sinon
