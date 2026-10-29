@@ -18,6 +18,7 @@ MISSION
 - Mode : superviser (checkpoints humains) | autonome (les panels tranchent)
 - Design : auto (défaut) | force | off
 - Livrable : specs (défaut) | specs+implementation
+- Phases ajoutées : proposées (postes product et dev) | absent (poste solo, défaut)
 - Contraintes session : <décisions déjà prises en conversation qui engagent la mission — 2-3 lignes max>
 - Budget : <optionnel : temps / tentatives ; sinon défauts du manager>
 ```
@@ -45,6 +46,21 @@ manager le mappe lui-même vers périmètre/mode/contraintes via la carte d'inte
 (`intent-routing.md`) — il demande (AskUserQuestion) seulement si le périmètre reste
 inexploitable. Le manager relit lui-même `.planning/ROADMAP.md`, `.planning/STATE.md`,
 `.planning/PROJECT.md` — le brief ne les paraphrase jamais.
+
+### Champ `Phases ajoutées` (P60-H-03)
+
+- **`Phases ajoutées : proposées`** — consigne de pose du marqueur de validation sur les phases
+  créées par la mission. Produit par : `vibeflow-head` (§5 de `product-routing.md`, devant une
+  intention de découpage) et `vf-auto` (dispatch de l'équipe), d'après `"$S"/vf-role.sh get` :
+  postes `product` et `dev`. Consommé par : `vf-dev-manager` — après chaque ajout ou insertion de
+  phase dans la mission (`gsd-phase`), `"$S"/vf-validation.sh propose --phase <N> [--ws <nom>]`.
+  **Absent → aucun marqueur** (comportement d'aujourd'hui, poste solo). Une phase proposée attend
+  la validation d'un dev (`vf-validation.sh validate`) ; `vf-coder` refuse de la planifier ou de
+  l'exécuter (porte « phase proposée »).
+- **Risque résiduel, écrit** : champ omis, phase ajoutée hors intention de découpage, à la main
+  ou par la boucle du moteur → aucun marqueur, donc phase validée (fail-open : un poste est une
+  vue, pas un droit). La pose par le manager n'est pas prouvée par exécution : T45 garde le texte
+  et le lien manager → contrat.
 
 ## Digest de mission (manager → workers)
 

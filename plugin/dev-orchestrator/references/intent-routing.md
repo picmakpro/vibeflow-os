@@ -99,7 +99,7 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
 | Intention | Brique |
 |---|---|
 | nouvelle milestone / archive la milestone / bilan de version / on clôt ? | `gsd-new-milestone`, `gsd-complete-milestone`, `gsd-milestone-summary`, `gsd-audit-milestone` |
-| ajoute une étape / supprime ce sprint / réordonne la feuille de route | `gsd-phase` |
+| ajoute une étape / supprime ce sprint / réordonne la feuille de route | `gsd-phase` ; sous brief `Phases ajoutées : proposées`, la phase ajoutée est posée proposée par `vf-validation.sh propose` (`mission-contracts.md` §Brief de mission) |
 | annule / reviens en arrière / rollback le sprint | `gsd-undo` |
 | note cette idée / le backlog / promeus cet item / garde ça pour plus tard | `gsd-review-backlog`, `gsd-capture` |
 | fais le ménage / archive les vieux dossiers | `gsd-cleanup` |

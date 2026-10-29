@@ -48,8 +48,23 @@ dans le périmètre demandé). Applique le seuil canonique `SEUIL_EQUIPE` (défi
   skill — le manager tient la boucle et rend le rapport de mission. Le signal de durée GAGNE en
   cas d'ambiguïté.
 
+Au dispatch de `vf-dev-manager`, aux postes `product` et `dev` (`"$S"/vf-role.sh get`, codes 1, 5
+et 64 : le dire, jamais `solo` par défaut), le brief porte `Phases ajoutées : proposées`
+(`mission-contracts.md` §Brief de mission).
+
 Annonce le choix en une ligne (« mission courte, traitement direct » / « mission longue,
 je déploie l'équipe »).
+
+## Étape 0 bis — étapes proposées (moteur direct)
+
+Avant le moteur direct, pour chaque étape ciblée N (celles de `roadmap analyze`, étape 0) :
+`"$S"/check-phase-validation.sh --phase <N> [--ws <nom>]` (`$S` par la cascade de `mission-flow.md`
+§Résolution des scripts). Code 0 : l'étape entre dans la boucle. Code 1 : étape proposée, en attente
+de la validation d'un dev (`vf-validation.sh validate --phase <N>`) ; le moteur direct
+ne démarre pas, une phrase le dit et une question propose de valider d'abord ou de réduire le
+périmètre. Codes 3, 5 et 64 : le dire et s'arrêter. Limite : une étape ajoutée pendant la boucle de
+`gsd-autonomous` n'est pas interceptée (contrôle consultatif) ; le chemin équipe
+est gardé par `vf-coder`.
 
 ## Moteur direct (mission courte)
 

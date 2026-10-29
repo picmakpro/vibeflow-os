@@ -7766,6 +7766,123 @@ if [ -n "$T45_SD" ]; then
   t414_mutant "T45 mutant (f) : option --ws remplacée par --workstream dans la copie" t45_coder_link "$T45_CODER" "$T45_TMP/coder-ws.md"
 fi
 
+# (b) vf-auto : étape 0 bis avant le moteur direct, champ de brief au dispatch de l'équipe
+T45_AUTO="$MOD/skills/vf-auto/SKILL.md"
+T45_AUTO_ZS='^## Étape 0 bis'
+T45_AUTO_ZE='^## Moteur direct'
+T45_AUTO_LIT=('check-phase-validation.sh' 'Code 0 : l'"'"'étape entre dans la boucle' 'Code 1 : étape proposée' 'vf-validation.sh validate' 'ne démarre pas' 'Codes 3, 5 et 64' 'gsd-autonomous' 'pendant la boucle' 'contrôle consultatif' 'gardé par `vf-coder`')
+T45_AUTO_TZS='^### Taille'
+T45_AUTO_TZE='^## '
+T45_AUTO_TLIT=('Phases ajoutées : proposées' 'vf-role.sh get' 'mission-contracts.md')
+t45_auto_check() { # <vf-auto/SKILL.md>
+  local z out
+  awk '/^## Étape 0 bis/{e=NR} /^## Moteur direct/{m=NR} END{exit !(e && m && e < m)}' "$1" \
+    || { printf 'étape 0 bis absente ou placée après le moteur direct'; return 1; }
+  z="$(t414_zone "$1" "$T45_AUTO_ZS" "$T45_AUTO_ZE")"
+  [ -n "$z" ] || { printf 'section « Étape 0 bis » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T45_AUTO_LIT[@]}")" || { printf 'absent de l'"'"'étape 0 bis : %s' "$out"; return 1; }
+  out="$(t44_forbidden "$z" 'démarre quand même' 'démarre sans')" || { printf 'clause inversée : %s' "$out"; return 1; }
+  z="$(t414_zone "$1" "$T45_AUTO_TZS" "$T45_AUTO_TZE")"
+  [ -n "$z" ] || { printf 'section « Taille » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T45_AUTO_TLIT[@]}")" || { printf 'absent de la section Taille : %s' "$out"; return 1; }
+}
+t45_auto_link() { t45_link_check "$1" "$T45_AUTO_ZS" "$T45_AUTO_ZE" check-phase-validation.sh '--phase' '--ws'; }
+
+# (c) contrat de brief, carte d'intention, lien vers l'acteur
+T45_MC="$REFS_DIR/mission-contracts.md"
+T45_MC_BLOC_ZS='^## Brief de mission'
+T45_MC_BLOC_ZE='^### Champs croisés'
+T45_MC_SUB_ZS='^### Champ .Phases ajoutées.'
+T45_MC_SUB_ZE='^## '
+T45_MC_SUB_LIT=('vibeflow-head' 'vf-auto' 'vf-dev-manager' 'vf-validation.sh propose' 'vf-validation.sh validate' 'Absent → aucun marqueur' 'Risque résiduel' 'fail-open')
+T45_ROUTE="$REFS_DIR/intent-routing.md"
+T45_ROUTE_ZS='^## Cycle de vie projet'
+T45_ROUTE_ZE='^## Contexte'
+T45_MGR="$MOD/agents/vf-dev-manager.md"
+T45_MGR_ZS='^## Entrée'
+T45_MGR_ZE='^## Sources de connaissance'
+t45_contract_check() { # <mission-contracts.md>
+  local z out
+  z="$(t414_zone "$1" "$T45_MC_BLOC_ZS" "$T45_MC_BLOC_ZE")"
+  [ -n "$z" ] || { printf 'bloc MISSION introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" '- Phases ajoutées : proposées (postes product et dev) | absent (poste solo, défaut)')" || { printf 'ligne du bloc MISSION : %s' "$out"; return 1; }
+  z="$(t414_zone "$1" "$T45_MC_SUB_ZS" "$T45_MC_SUB_ZE")"
+  [ -n "$z" ] || { printf 'sous-section « Champ Phases ajoutées » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T45_MC_SUB_LIT[@]}")" || { printf 'absent du champ : %s' "$out"; return 1; }
+}
+t45_route_check() { # <intent-routing.md>
+  local z out
+  z="$(t414_zone "$1" "$T45_ROUTE_ZS" "$T45_ROUTE_ZE")"
+  [ -n "$z" ] || { printf 'section « Cycle de vie projet » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" 'vf-validation.sh propose' 'Phases ajoutées : proposées')" || { printf 'ligne gsd-phase : %s' "$out"; return 1; }
+}
+t45_mgr_check() { # <vf-dev-manager.md> — lien par lequel la consigne de pose atteint le manager (lu, jamais modifié)
+  local z out
+  z="$(t414_zone "$1" "$T45_MGR_ZS" "$T45_MGR_ZE")"
+  [ -n "$z" ] || { printf 'section « Entrée » du manager introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" 'mission-contracts.md' 'Brief de mission')" || { printf 'citation du contrat : %s' "$out"; return 1; }
+}
+# (f) liens vers vf-validation.sh : existence, verbes connus de --help
+t45_val_link() { # <mission-contracts.md>
+  t45_link_check "$1" "$T45_MC_SUB_ZS" "$T45_MC_SUB_ZE" vf-validation.sh 'propose' '--phase' '--ws'
+}
+
+t45_out="$(t45_auto_check "$T45_AUTO")" && ok "T45 (b) vf-auto/SKILL.md : étape 0 bis avant le moteur direct, codes, limite « pendant la boucle », champ de brief dans Taille (${#T45_AUTO_LIT[@]} + ${#T45_AUTO_TLIT[@]} clauses)" \
+  || ko "T45 (b) vf-auto/SKILL.md : attendu — étape 0 bis complète ; obtenu — $t45_out"
+t45_out="$(t45_contract_check "$T45_MC")" && ok "T45 (c) mission-contracts.md : ligne « Phases ajoutées » du bloc MISSION et champ P60-H-03 (producteurs, consommateur, absent → aucun marqueur, risque résiduel)" \
+  || ko "T45 (c) mission-contracts.md : attendu — champ de brief Phases ajoutées ; obtenu — $t45_out"
+t45_out="$(t45_route_check "$T45_ROUTE")" && ok "T45 (c) intent-routing.md : ligne gsd-phase annotée de la pose (vf-validation.sh propose)" \
+  || ko "T45 (c) intent-routing.md : attendu — annotation de la pose ; obtenu — $t45_out"
+t45_out="$(t45_mgr_check "$T45_MGR")" && ok "T45 (c) vf-dev-manager.md (lu) : sa section Entrée cite mission-contracts.md et « Brief de mission » — l'acteur est instruit ; l'exécution de la pose n'est PAS prouvée (P60-PL-26)" \
+  || ko "T45 (c) vf-dev-manager.md : attendu — citation du contrat de brief ; obtenu — $t45_out"
+if [ -z "$T45_SD" ]; then
+  skip "T45 (b)(c) liens : scripts du conductor introuvables"
+else
+  t45_out="$(t45_auto_link "$T45_AUTO")" && ok "T45 (f) vf-auto/SKILL.md : check-phase-validation.sh existe et son --help connaît --phase et --ws" \
+    || ko "T45 (f) vf-auto/SKILL.md : attendu — script cité existant, options connues ; obtenu — $t45_out"
+  t45_out="$(t45_val_link "$T45_MC")" && ok "T45 (f) mission-contracts.md : vf-validation.sh existe et son --help connaît propose, --phase et --ws" \
+    || ko "T45 (f) mission-contracts.md : attendu — vf-validation.sh existant, verbes connus ; obtenu — $t45_out"
+  # le verbe validate, cité par la doctrine : connu du --help
+  case "$(bash "$T45_SD/vf-validation.sh" --help 2>&1)" in *'validate'*) ok "T45 (f) vf-validation.sh : --help connaît validate" ;; *) ko "T45 (f) vf-validation.sh : --help ne connaît pas validate" ;; esac
+fi
+
+t45_k=0
+for t45_a in "${T45_AUTO_LIT[@]}"; do
+  t45_k=$((t45_k+1))
+  t414_ablate "$T45_AUTO" "$T45_TMP/auto-$t45_k.md" "$t45_a" "$T45_AUTO_ZS" "$T45_AUTO_ZE"
+  t414_mutant "T45 mutant (b) : vf-auto/SKILL.md privé de « $t45_a » dans l'étape 0 bis" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-$t45_k.md"
+done
+for t45_a in "${T45_AUTO_TLIT[@]}"; do
+  t45_k=$((t45_k+1))
+  t414_ablate "$T45_AUTO" "$T45_TMP/auto-$t45_k.md" "$t45_a" "$T45_AUTO_TZS" "$T45_AUTO_TZE"
+  t414_mutant "T45 mutant (b) : vf-auto/SKILL.md privé de « $t45_a » dans Taille" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-$t45_k.md"
+done
+t414_move_before "$T45_AUTO" "$T45_TMP/auto-ord.md" '^# vf-auto' '## Moteur direct (mission courte)' '## Étape 0 bis'
+t414_mutant "T45 mutant (b) ordre : le moteur direct précède l'étape 0 bis" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-ord.md"
+sed 's/ne démarre pas/démarre quand même/' "$T45_AUTO" > "$T45_TMP/auto-inv.md"
+t414_mutant "T45 mutant (b) inversion : le moteur direct « démarre quand même » sur une étape proposée" t45_auto_check "$T45_AUTO" "$T45_TMP/auto-inv.md"
+t414_ablate "$T45_MC" "$T45_TMP/mc-bloc.md" '- Phases ajoutées : proposées (postes product et dev) | absent (poste solo, défaut)' "$T45_MC_BLOC_ZS" "$T45_MC_BLOC_ZE"
+t414_mutant "T45 mutant (c) : mission-contracts.md privé de la ligne « Phases ajoutées » du bloc MISSION" t45_contract_check "$T45_MC" "$T45_TMP/mc-bloc.md"
+for t45_a in "${T45_MC_SUB_LIT[@]}"; do
+  t45_k=$((t45_k+1))
+  t414_ablate "$T45_MC" "$T45_TMP/mc-$t45_k.md" "$t45_a" "$T45_MC_SUB_ZS" "$T45_MC_SUB_ZE"
+  t414_mutant "T45 mutant (c) : champ « Phases ajoutées » privé de « $t45_a »" t45_contract_check "$T45_MC" "$T45_TMP/mc-$t45_k.md"
+done
+t414_ablate "$T45_ROUTE" "$T45_TMP/route-1.md" 'vf-validation.sh propose' "$T45_ROUTE_ZS" "$T45_ROUTE_ZE"
+t414_mutant "T45 mutant (c) : intent-routing.md privé de « vf-validation.sh propose » sur la ligne gsd-phase" t45_route_check "$T45_ROUTE" "$T45_TMP/route-1.md"
+t414_ablate "$T45_ROUTE" "$T45_TMP/route-2.md" 'Phases ajoutées : proposées' "$T45_ROUTE_ZS" "$T45_ROUTE_ZE"
+t414_mutant "T45 mutant (c) : intent-routing.md privé de « Phases ajoutées : proposées » sur la ligne gsd-phase" t45_route_check "$T45_ROUTE" "$T45_TMP/route-2.md"
+t414_ablate "$T45_MGR" "$T45_TMP/mgr-1.md" 'mission-contracts.md' "$T45_MGR_ZS" "$T45_MGR_ZE"
+t414_mutant "T45 mutant (c) lien acteur : copie de vf-dev-manager.md privée de la citation de mission-contracts.md dans Entrée" t45_mgr_check "$T45_MGR" "$T45_TMP/mgr-1.md"
+if [ -n "$T45_SD" ]; then
+  sed 's/check-phase-validation\.sh/check-phase-validation-x.sh/g' "$T45_AUTO" > "$T45_TMP/auto-ren.md"
+  t414_mutant "T45 mutant (f) : script cité renommé dans une copie de vf-auto/SKILL.md" t45_auto_link "$T45_AUTO" "$T45_TMP/auto-ren.md"
+  sed 's/vf-validation\.sh propose --phase/vf-validation-x.sh propose --phase/' "$T45_MC" > "$T45_TMP/mc-ren.md"
+  t414_mutant "T45 mutant (f) : vf-validation.sh renommé dans le champ de brief" t45_val_link "$T45_MC" "$T45_TMP/mc-ren.md"
+  sed 's/vf-validation\.sh propose --phase/vf-validation.sh enregistre --phase/' "$T45_MC" > "$T45_TMP/mc-verb.md"
+  t414_mutant "T45 mutant (f) : verbe propose remplacé par un verbe inconnu du --help" t45_val_link "$T45_MC" "$T45_TMP/mc-verb.md"
+fi
+
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]
