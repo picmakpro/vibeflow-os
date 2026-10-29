@@ -117,6 +117,13 @@ que `VF_ROLE` est posée.
   **proposée** et attend qu'un dev la valide, et, quand un `BRIEF.md` existe, le head refuse de découper
   tant que `.planning/ARCHITECTURE.md` n'est pas validée. Au poste `solo`, rien ne change. Détail dans
   [gates et validation humaine](../02-concepts/gates-et-validation-humaine.md).
+- **Filet de divergence** : aux postes `product` et `dev`, l'install arme dans ton clone git un filet
+  qui contrôle la numérotation du planning après chaque fusion (voir
+  [sujets en parallèle](../05-equipe-agents/sujets-en-parallele.md)). Jamais au poste `solo`.
+  `VF_DIVERGENCE_HOOK=off` pour ne pas l'armer. Un poste posé avant cette capacité s'arme par
+  `vibeflow-update.sh role <poste>`. Si un hook ou un `core.hooksPath` existe déjà, rien n'est
+  écrasé : l'install imprime « ARMEMENT REFUSE » avec la ligne à ajouter à la main, et aboutit quand
+  même.
 
 Un poste est une vue, pas un droit : il filtre ce qu'on te propose à la pose, rien n'est cloisonné —
 git, le scope projet et un GSD déjà installé au scope compte restent visibles. En poste `product`, la chaîne

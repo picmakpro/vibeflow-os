@@ -44,6 +44,10 @@ without you explicitly accepting it.
 At the end, restart Claude Code: the plugin itself (commands, agents) only takes effect at the
 next session start.
 
+**The divergence safety net follows the update.** If your clone is armed (`product` and `dev` roles, see
+[parallel topics](../05-agent-team/parallel-topics.md)), the update rewrites the hook's path to the
+new plugin version. It never arms a clone that was not armed.
+
 **This rule covers any change to an agent, not just an update.** The agent registry is resolved
 **at startup**: if you edit an agent file yourself — to test a fix, adjust a tool, remove a line —
 the running session keeps using the definition it loaded when it started. The trap is that there
@@ -76,6 +80,10 @@ you'd have to clean up the leftover files by hand.
 
 **Step 1 — remove the modules.** Simply say "uninstall VibeFlow" (or "remove such-and-such
 module" for a targeted removal) while the plugin is still installed.
+
+This removal (`uninstall --all`) also takes the divergence safety net out of your clone, as does
+switching to the `solo` role, but **keeps its journal** (`.git/vf-divergence/journal.tsv`). A hook of
+yours where you added the line by hand is never modified: the line to remove is printed.
 
 **Step 2 — remove the plugin.**
 
