@@ -55,5 +55,10 @@ plugin/kpi-analyst/AGENT.md	96	13
 plugin/mobile-test-team/agents/vf-app-fixer.md	48	9
 plugin/mobile-test-team/agents/vf-test-orchestrator.md	60	8
 plugin/mobile-test-team/agents/vf-test-runner.md	56	4
+plugin/product-team-bundle/AGENT.md	165	36
+plugin/product-team-bundle/agents/prd-gate.md	144	20
+plugin/product-team-bundle/agents/vf-product-analyst.md	65	13
+plugin/product-team-bundle/agents/vf-product-manager.md	155	25
+plugin/product-team-bundle/agents/vf-product-pm.md	78	21
 plugin/skill-creator/AGENT.md	135	18
 plugin/validator/AGENT.md	250	17

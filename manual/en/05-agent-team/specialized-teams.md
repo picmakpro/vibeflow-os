@@ -89,6 +89,16 @@ your own credentials. You call on them through a skill named after the function 
 doesn't hinge on a run still to come, unlike the mobile QA team above. What each one ships, agent
 by agent, is in [business-bundles.md](../03-modules/business-bundles.md).
 
+**The product team** comes before dev: someone has to say what is being built. `vibeflow-product`
+(via `/vf-product`) frames the product, and the chain follows: `vf-product-analyst` writes the
+BRIEF, `vf-product-pm` derives the PRD from it (one acceptance criterion and one priority per
+requirement), the fresh judge `prd-gate` scores the whole out of a hundred, then the human decides,
+all under `vf-product-manager`. Below eighty out of a hundred, or on an eliminatory fault, the team
+stops and leaves the decision to you: no silent retry. Above the threshold, the next step proposed
+to the head is dev breaking the work into phases, and it is never launched from this door.
+**Actual status**: the product team ships but isn't offered in the catalog, and won't be until a
+full real run. So don't read it as a proven mechanism on par with the three bundles above.
+
 A team is never presented on equal footing with another when their actual status differs. That's
 deliberate: knowing a module is still to be confirmed changes how you read its reports, and hiding
 that difference would produce a manual that promises more than the product delivers.
@@ -99,7 +109,7 @@ team placed on a lab that doesn't yet carry the framing content it needs (positi
 voice, art direction) will produce generic work; that's not a flaw in the team, it's a lack of
 material to feed it, and it's fixed by feeding the lab, not by switching modules.
 
-The same read applies across all four teams on this page: what they can do is fixed by their
+The same read applies across the teams on this page: what they can do is fixed by their
 design, but how well they do it still depends on what you've told the lab about your work before
 asking it to run.
 

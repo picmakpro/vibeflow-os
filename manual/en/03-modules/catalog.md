@@ -68,6 +68,13 @@ The three bundles have their own page: [business-bundles.md](./business-bundles.
 and whether to pick one at all, is the subject of
 [choosing-your-modules.md](./choosing-your-modules.md).
 
+Apart from these three business bundles, one module exists on disk without appearing in this
+catalog: **`product-team-bundle`**, the product team (BRIEF, PRD, `prd-gate` judge). It is offered
+neither here nor in the presets while its `module.json` says `proposable:false`. That isn't a
+barrier: the install engine ignores the key, so `install --all` lays it down, and so does an
+install that names it. On `install --all` it is visible to the product and solo roles, not to the
+dev role; a role is a view, not a permission.
+
 ## Specialized capabilities and documentation
 
 These five get added case by case. Two of them carry an **experimental status** declared in their

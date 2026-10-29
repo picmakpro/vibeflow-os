@@ -30,6 +30,8 @@ memory: project
 
 ## Garde-fou premier usage (first-use)
 
+> **Poste product** — la ligne « Poste : X » du démarrage de session, confirmée par `vf-role.sh get`, décide de la porte : au poste `product`, ou devant une intention produit (brief, PRD, critères d'acceptation), lire d'abord `.claude/agents/dev-orchestrator-references/product-routing.md`, qui prime sur la proposition d'init ci-dessous.
+
 **Avant de router toute intention de dev structurante** (« code », « planifie », « teste »,
 « débugge »… — les gestes qui supposent un projet cadré), je vérifie que le projet est initialisé.
 
@@ -69,6 +71,7 @@ dominants :
 | on est où / next / la suite | lecture ROADMAP/STATE + ma proposition de next step |
 | mets à jour la doc / la doc est fausse / documente ce module | `Task(vf-dev-manager)` (confirmation) — doctrine `docs-flow.md` ; intègre une spec/plan écrit → doctrine `ingestion-flow.md` |
 | design / UI / c'est moche / la DA | skill `vf-design` (module design-orchestrator) |
+| brief produit / PRD / exigences / critères d'acceptation | skill `vf-product` (module product-team-bundle) → agent `vibeflow-product` |
 | mission multi-étapes / « étapes 3 à 5 » / build+test+revue combinés | `Task(vf-dev-manager)` — règle d'échelle : `head-governance.md` §1 |
 
 > **Intentions hors module** : conformité du lab (agents, densité) → `/vf-audit` (validator,
@@ -210,3 +213,4 @@ plutôt qu'un silence sur une perte réelle. **Écrit à la main** par qui arme 
 - Doctrine d'ingestion (découverte, manifest, garde-fous BRDG-03) : `.claude/agents/dev-orchestrator-references/ingestion-flow.md`
 - Doctrine de sortie documentaire (familles, régime de confirmation, déclencheurs) : `.claude/agents/dev-orchestrator-references/docs-flow.md`
 - Gouvernance du head (règle d'échelle, séquencement, contrat de sortie, économie) : `.claude/agents/dev-orchestrator-references/head-governance.md`
+- Redirection par poste et porte produit : `.claude/agents/dev-orchestrator-references/product-routing.md`

@@ -272,20 +272,51 @@ else
   ko "forme du stub _index.md : table Fichier/Résumé présente" "grep -c=$n, attendu >= 1"
 fi
 
-# Cas 22 — application réelle : plugin/dev-orchestrator/references/_index.md liste les 12 fichiers
-# markdown du dossier réel du dépôt, avec un résumé d'une ligne chacun, et ne se liste pas.
+# Cas 22 — application réelle : plugin/dev-orchestrator/references/_index.md liste chaque fichier markdown du
+# dossier (hors _index.md lui-même), avec un attendu DÉRIVÉ du dossier — jamais un nombre en dur : la Phase 59
+# a ajouté une référence et le « 12 » figé a rougi. Il rougit si une référence manque à l'index, si une ligne
+# ne correspond à aucun fichier du dossier, ou si l'index se liste lui-même.
 REPO_ROOT="$(cd "$(dirname "$SCRIPT")/../../.." && pwd)"
-REAL_INDEX="$REPO_ROOT/plugin/dev-orchestrator/references/_index.md"
-if [ -f "$REAL_INDEX" ]; then
-  nrows="$(grep -cE '^\| \[' "$REAL_INDEX" || true)"
-  selflist="$(grep -c '_index.md' "$REAL_INDEX" || true)"
-  if [ "$nrows" -eq 12 ] && [ "$selflist" -eq 0 ]; then
-    ok "application réelle : _index.md de dev-orchestrator/references (12 lignes, pas d'auto-listage)"
-  else
-    ko "application réelle : _index.md de dev-orchestrator/references (12 lignes, pas d'auto-listage)" "nrows=$nrows, selflist=$selflist"
-  fi
+REAL_DIR="$REPO_ROOT/plugin/dev-orchestrator/references"
+index_verdict() { # <dossier> -> « nfiles=N nrows=N manquants=… orphelins=… selflist=N »
+  local dir="$1" idx="$1/_index.md" f nfiles=0 nrows manq="" orph="" self l
+  for f in "$dir"/*.md; do
+    [ "$(basename "$f")" = "_index.md" ] && continue
+    nfiles=$((nfiles+1))
+    grep -qF "| [$(basename "$f")]($(basename "$f")) |" "$idx" || manq="$manq $(basename "$f")"
+  done
+  nrows="$(grep -cE '^\| \[' "$idx" || true)"
+  while IFS= read -r l; do
+    f="$(printf '%s' "$l" | sed -n 's/^| \[\([^]]*\)\](.*/\1/p')"
+    [ -n "$f" ] && [ ! -f "$dir/$f" ] && orph="$orph $f"
+  done < <(grep -E '^\| \[' "$idx")
+  self="$(grep -c '_index.md' "$idx" || true)"
+  echo "nfiles=$nfiles nrows=$nrows manquants=[${manq# }] orphelins=[${orph# }] selflist=$self"
+}
+index_ok() { # <verdict>
+  case "$1" in
+    *"manquants=[]"*"orphelins=[]"*"selflist=0") ;;
+    *) return 1 ;;
+  esac
+  local nf="${1#nfiles=}"; nf="${nf%% *}"; local nr="${1#*nrows=}"; nr="${nr%% *}"
+  [ "$nf" -ge 1 ] && [ "$nf" -eq "$nr" ]
+}
+L22="application réelle : _index.md de dev-orchestrator/references (une ligne par fichier du dossier, pas d'auto-listage)"
+if [ -f "$REAL_DIR/_index.md" ]; then
+  v22="$(index_verdict "$REAL_DIR")"
+  if index_ok "$v22"; then ok "$L22 — $v22"; else ko "$L22" "$v22"; fi
+  # Preuves de rouge, sur une copie jetable du dossier réel : une ligne retirée de l'index ; un fichier non indexé ;
+  # l'index qui se liste lui-même.
+  d="$(newcase case22b)"; cp "$REAL_DIR"/*.md "$d/"
+  first="$(grep -m1 -E '^\| \[' "$d/_index.md")"
+  grep -vxF "$first" "$d/_index.md" > "$d/_index.md.new" && mv "$d/_index.md.new" "$d/_index.md"
+  if index_ok "$(index_verdict "$d")"; then ko "cas 22 rougit si une référence manque à l'index" "vert alors qu'une ligne est retirée"; else ok "cas 22 rougit si une référence manque à l'index"; fi
+  d="$(newcase case22c)"; cp "$REAL_DIR"/*.md "$d/"; printf '# non indexé\n' > "$d/zz-nouvelle-reference.md"
+  if index_ok "$(index_verdict "$d")"; then ko "cas 22 rougit si un fichier du dossier n'est pas indexé" "vert alors qu'un fichier n'est pas indexé"; else ok "cas 22 rougit si un fichier du dossier n'est pas indexé"; fi
+  d="$(newcase case22d)"; cp "$REAL_DIR"/*.md "$d/"; printf '| [_index.md](_index.md) | auto-listage |\n' >> "$d/_index.md"
+  if index_ok "$(index_verdict "$d")"; then ko "cas 22 rougit si l'index se liste lui-même" "vert alors que l'index se liste"; else ok "cas 22 rougit si l'index se liste lui-même"; fi
 else
-  ko "application réelle : _index.md de dev-orchestrator/references (12 lignes, pas d'auto-listage)" "fichier absent : $REAL_INDEX"
+  ko "$L22" "fichier absent : $REAL_DIR/_index.md"
 fi
 
 # ============================================================================

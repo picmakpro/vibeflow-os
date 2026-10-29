@@ -11,7 +11,7 @@ exhaustive lists (exactly which command, which skill, which agent exists) live i
 `06-reference/`, not here.
 
 Keep the order of magnitude in mind: eight commands against more than fifteen shipped skills and
-twenty-two agents. That deliberate imbalance is the key to reading this whole page — most of what
+thirty-six agents. That deliberate imbalance is the key to reading this whole page — most of what
 VibeFlow does for you is **never** typed, it triggers.
 
 ## Three entry points: command, skill, agent
@@ -64,7 +64,7 @@ and reconcile the reports that come back.
 ## Why some agents have no invocation command
 
 That's the question anyone asks the moment they open `plugin/*/agents/` and don't find their
-commands: out of the twenty-two shipped agents, the large majority has **no** `/<agent-name>`
+commands: out of the thirty-six shipped agents, the large majority has **no** `/<agent-name>`
 command tied to it. That's intentional, not a gap. An **internal worker** — for instance
 `quality-gate-client`, the judge of business deliverables — only gets dispatched by its mission
 orchestrator (`vf-business-manager`…), never directly by you. `vf-coder` is the exception: besides

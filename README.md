@@ -15,9 +15,9 @@ A Claude Code plugin for spec-driven agentic development. One agent reads your i
 of agents challenges, plans, builds and proves the work, and machine gates check it.
 Nothing is done without proof, nothing merges without you.
 
-[![Version](https://img.shields.io/badge/version-2.72.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.73.0-2563eb)](./VERSION)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#other-runtimes)
-[![Modules](https://img.shields.io/badge/modules-17-16a34a)](#modules)
+[![Modules](https://img.shields.io/badge/modules-18-16a34a)](#modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [How it works](#how-it-works) · [Proof](#done-means-proven) · [Team](#a-team-not-a-chatbot) · [Memory](#memory-that-holds) · [Labs](#a-lab-for-any-domain) · [Install](#install) · [Manual](./manual/README.md)
@@ -62,7 +62,7 @@ on disk, so a session can die without the project losing ground. The last step i
 </picture>
 
 A green that cannot turn red proves nothing. Tests are written red first, `check-*.sh` gates run
-in CI, and the judge is never the author. The repo holds itself to the same rule: 114 suites run
+in CI, and the judge is never the author. The repo holds itself to the same rule: 116 suites run
 on every push, and a "fresh lab" job installs the baseline into an empty lab that must pass its
 own gates with zero intervention.
 
@@ -111,7 +111,7 @@ and its skills are built by `skill-creator` with an eval loop.
 
 ## Modules
 
-17 modules, each versioned with its own `CHANGELOG.md`. `conductor` is the mandatory baseline;
+18 modules, each versioned with its own `CHANGELOG.md`. `conductor` is the mandatory baseline;
 then you pick a dev lab from a preset (`dev`, `dev-mobile`, `dev-audite`, dependencies resolved
 for you) or a tailor-made domain lab. Each module's README is its full documentation, with the
 same structure everywhere.
@@ -150,10 +150,10 @@ The three latest are below; the full history lives in **[CHANGELOG.md](./CHANGEL
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.73.0` | 2026-10-29 | **Product bundle (minor).** New module `product-team-bundle` v1.0.0: product team (manager, BRIEF analyst, PRD PM, `prd-gate` judge with threshold 80, `check-prd.sh` gate), `vibeflow-product` front door and `/vf-product` skill, visible to the `product` and `solo` roles. Stays `proposable: false` until a real run. `planning-core` v2.9.0 (product template), `dev-orchestrator` v2.29.0 (the head points to `/vf-product` at the `product` role). |
 | `v2.72.0` | 2026-10-29 | **GitHub issues closure (minor).** `driver-lock` works under uutils coreutils (Ubuntu 26 runner: `ln -sn`, `mv -T` before the BSD fallback); `framework-version.sh drift` compares the lab to the plugin cache instead of to itself; `vf-optional-agents` frontmatter key for agents of optional modules; `gsd-run.sh` launches gsd-tools by path (rc 64 without an engine) and `ensure-deps.sh` derives the project scope from `./.claude/gsd-core`; managers no longer busy-wait on workers; `reindex.sh` keeps the registry mode; sourced libs are no longer counted as non-executable; persistent design-plugin exclusion (`VF_DESIGN_SKIP`, `.vf-design-skip`); the install engine backs up and reports overwritten local patches and announces the `settings.local.json` routing (`conductor` v1.50.3, `dev-orchestrator` v2.28.5, `consolidator` v1.11.4, `infrastructure-audit` v1.3.7, `design-orchestrator` v1.5.16, `mobile-test` v1.0.5, 10 doc patches). Closes #47, #52, #81, #165, #167. **114 suites.** |
 | `v2.71.2` | 2026-10-23 | **Audit, duplicates and doc fixes (patch).** `infrastructure-audit` no longer returns INDETERMINATE under `--strict --no-tests` when no suite exists; `detect-duplicates.sh` passes titles to Python on standard input and reports failures (`errors` field, exit code 2); the start-up signals table of the `dev-orchestrator` agent follows the real hook text; `driver-lock` comments describe the guard outside the root (`conductor` v1.50.2, `consolidator` v1.11.3, `dev-orchestrator` v2.28.4, `infrastructure-audit` v1.3.6). |
 | `v2.71.1` | 2026-10-23 | **Windows fixes, audit and bootstrap (patch).** UTF-8 mode is now unconditional under `-I` and the two large hook programs no longer go through the command line (Windows caps it at 32,767 characters); `infrastructure-audit` gains `--no-tests` and returns INDETERMINATE under `--strict` when suites are skipped; `driver-lock` refuses a sub-folder with no `.planning/` of its own; the session bootstrap points to `/vf-dev`; `check-gsd-config` spares VibeFlow's own keys (`conductor` v1.50.1, `consolidator` v1.11.2, `design-orchestrator` v1.5.15, `dev-orchestrator` v2.28.3, `infrastructure-audit` v1.3.5, `planning-core` v2.8.3). |
-| `v2.71.0` | 2026-10-22 | **Job roles per project (minor).** `/vibeflow-install` asks for the role on this project (`solo` pre-selected, `product`, `dev`; non-interactive with `VF_ROLE`). `module.json` carries `roles`, and the catalogue, presets and `install --all` filter by role, while a module named explicitly always installs: a role is a view, not a permission (ADR-077). `conductor` v1.50.0 adds the `vf-role.sh get` reader, the advisory `check-role-consistency.sh` gate and a `Poste : X` line at SessionStart. **111 suites.** |
 
 <details>
 <summary><strong>Methodology references (ADR / LRN)</strong></summary>

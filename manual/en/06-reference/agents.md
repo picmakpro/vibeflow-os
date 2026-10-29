@@ -34,7 +34,7 @@ This table has no "installed in your lab" column: you'll only actually have the 
 matching module is present in your lab. The [module catalog](../03-modules/catalog.md) makes the
 reverse link — module by module, rather than agent by agent.
 
-## The 31 agents
+## The 36 agents
 
 | Agent | Module | Family | Model | Role in one sentence |
 |---|---|---|---|---|
@@ -43,6 +43,7 @@ reverse link — module by module, rather than agent by agent.
 | `content-clarity-judge` | content-bundle | worker | sonnet | Judges a content piece's clarity, /100 rubric, read-only. |
 | `copywriter-sequences` | growth-bundle | worker | sonnet | Writes the sequences and creatives for a validated campaign. |
 | `growth-quality-judge` | growth-bundle | worker | sonnet | Anti-slop quality judge for campaign deliverables. |
+| `prd-gate` | product-team-bundle | worker | sonnet | Fresh judge of the BRIEF and the PRD, rubric /100, read-only. |
 | `quality-gate-client` | business-pilot-bundle | worker | sonnet | Judges any client-facing deliverable against a /100 rubric. |
 | `skill-creator` | skill-creator | face | opus | Fabricates new skills in 5 phases, with a research loop. |
 | `vf-app-fixer` | mobile-test-team | worker | sonnet | Fixes application code to make a failing Maestro test pass. |
@@ -61,6 +62,9 @@ reverse link — module by module, rather than agent by agent.
 | `vf-design-manager` | design-orchestrator | manager | opus | Drives a design mission: plan, dispatch, flow control. |
 | `vf-dev-manager` | dev-orchestrator | manager | opus | Drives a dev mission: plan, dispatch, flow control. |
 | `vf-growth-manager` | growth-bundle | manager | opus | Drives a growth mission: plan, dispatch, flow control. |
+| `vf-product-analyst` | product-team-bundle | worker | sonnet | Writes the five-section BRIEF. |
+| `vf-product-manager` | product-team-bundle | manager | opus | Drives a product mission: plan, dispatch, halt below the threshold. |
+| `vf-product-pm` | product-team-bundle | worker | sonnet | Instantiates the PRD (PROJECT + REQUIREMENTS) with an acceptance criterion and a priority per requirement. |
 | `vf-reviewer` | dev-orchestrator | worker | sonnet | Reviews the code diff produced by a dev mission. |
 | `vf-test-orchestrator` | mobile-test-team | manager | sonnet | Drives the test → fix → re-test loop of a mobile regression. |
 | `vf-test-runner` | mobile-test-team | worker | sonnet | Writes and runs the Maestro flows for a mobile regression. |
@@ -68,10 +72,11 @@ reverse link — module by module, rather than agent by agent.
 | `vibeflow-design` | design-orchestrator | face | opus | Art director: drives the whole design cycle in plain language. |
 | `vibeflow-head` | dev-orchestrator | face | opus | Head of minds for dev: detects intent, dispatches the team that carries the piece. |
 | `vibeflow-kpi-analyst` | kpi-analyst | face | sonnet | Deduces and publishes the lab's real business metrics. |
+| `vibeflow-product` | product-team-bundle | face | opus | Entry point of the product role: BRIEF and PRD. |
 | `vibeflow-validator` | validator | face | opus | Orchestrates the lab's 5 methodology-compliance audits. |
 
 One notable exception in the Model column: `vf-test-orchestrator` drives a mission like the other
-five managers, but runs on sonnet rather than opus — its loop (test → fix → re-test until budget
+six managers, but runs on sonnet rather than opus — its loop (test → fix → re-test until budget
 runs out) stays a bounded scope, without the open-ended trade-offs of a multi-domain battle plan.
 Keep this name in mind if you compare two "manager" agents and their models differ: it's never an
 inconsistency, it's the mission's actual scope that varies from one domain to another.
@@ -84,16 +89,16 @@ exactly why no incarnation command gets generated for them.
 
 ## Where this list comes from
 
-Built by enumerating `plugin/*/agents/*.md` (25 files, one level deep, which excludes the
-blueprints under `content/agents/`) plus the 6 `AGENT.md` files at each module's root, on
-2026-08-01 — thirty-one agents in total. To check for yourself from the repo root:
+Built by enumerating `plugin/*/agents/*.md` (29 files, one level deep, which excludes the
+blueprints under `content/agents/`) plus the 7 `AGENT.md` files at each module's root, on
+2026-10-27 — thirty-six agents in total. To check for yourself from the repo root:
 `find plugin -path '*/agents/*.md'` then `find plugin -maxdepth 2 -name 'AGENT.md'`. Each file's
 frontmatter (`model:`, `memory:`) is the source of the Model column above, not a paraphrase — the
 required fields an agent must carry are enforced by
 `plugin/conductor/scripts/check-agents.sh`.
 
-Split by model, counted on the same table: ten agents on opus (the five invocable "face" agents,
-plus the five mission managers), twenty-one on sonnet (every worker, plus the one "face" agent
+Split by model, counted on the same table: twelve agents on opus (the six invocable "face" agents,
+plus the six mission managers), twenty-four on sonnet (every worker, plus the one "face" agent
 that isn't on opus — `vibeflow-kpi-analyst`). This split is what feeds
 [cost-and-models.md](./cost-and-models.md) — it isn't restated there, just used.
 

@@ -106,7 +106,7 @@
 - [ ] Phase 56: Packs de règles par langage (module optionnel) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [x] Phase 57: Verrou de driver par compartiment (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-12, mergée PR #152 le 2026-10-16 en `--admin`, revue `@picmakpro` contournée (demande explicite de Samuel, session principale Claude Code, 2026-10-16 : « merge sans willy, release + tag »), release `v2.70.0` ; 16/16 plans, DLWS-01..08 cochées
 - [x] Phase 58: Rôles de poste — installeur, profils solo / product / dev (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-22 : 12/12 plans, porte de phase verte, RLPO-01..12 cochées dont RLPO-11 par override (critère 6 et recette installeur non mesurés, Samuel, session principale, 2026-10-22 — dette dans 58-VERIFICATION.md), branche rebasée sur v2.70.1, release `v2.71.0` à venir
-- [ ] Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate (inscrite 2026-10-08, jalon equipe-produit-v1.0)
+- [x] Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-27 : 8/8 plans, porte de phase verte, PRDT-01..12 cochées, release à décider
 - [ ] Phase 60: Gate architecture avant découpage et validation des phases proposées (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 62: Décision sur l'approche plateforme, sur preuve (inscrite 2026-10-08, jalon equipe-produit-v1.0)
@@ -180,6 +180,7 @@
 | 41.4. Emprunts Pocock — disciplines de cadrage, de revue et de skills | fiabilite-v1.0 | 11/11 | Complete — PR #135 (merge `--admin`, 2026-10-08), release `v2.69.0` | 2026-10-06 |
 | 57. Verrou de driver par compartiment | equipe-produit-v1.0 | 16/16 | Complete — PR #152 (merge `--admin`, 2026-10-16), release `v2.70.0` | 2026-10-12 |
 | 58. Rôles de poste — installeur, profils solo / product / dev | equipe-produit-v1.0 | 12/12 | Complete (2 overrides, Samuel 2026-10-22) — release `v2.71.0` à venir | 2026-10-22 |
+| 59. Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate | equipe-produit-v1.0 | 8/8 | Complete — porte de phase verte, PRDT-01..12 cochées, PR et release à décider | 2026-10-27 |
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15 -->
 
@@ -620,15 +621,29 @@ Plans:
 ### Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate
 
 **Goal:** Un bundle produit sur le moule de `business-pilot-bundle`. La front door `vibeflow-product`, sur le moule de `vibeflow-design`, produit `BRIEF.md` (le seul fichier nouveau, A-06) et le PRD (`PROJECT.md` + `REQUIREMENTS.md`, gabarit `product` de `planning-core`). Un juge frais `prd-gate`, en lecture seule et sur rubric /100, rend éliminatoire toute exigence sans critère d'acceptation. `vibeflow-head` lit le rôle pour rediriger au lieu de dispatcher `vf-coder` (A-05). Le bundle reste `proposable: false` jusqu'à preuve sur un lab réel (Q-09, défaut probable).
-**Requirements**: TBD — famille `PRDT` réservée, posée au cadrage.
+**Requirements**: PRDT-01..PRDT-12 (posées à la planification, 2026-10-27).
 **Depends on:** 58.
 **Sources:** spec §5.2 ; SEED A-05, A-06, A-10 (vocabulaire : on garde l'existant, aucun renommage) ; `plugin/business-pilot-bundle/`, `plugin/design-orchestrator/`.
 **Hors périmètre :** un fichier PRD.md séparé (A-06) ; les termes « epic » et « story » (Q-11, fermée par doctrine).
-**Plans:** 0 plans
+**Plans:** 8 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 59 to break down)
+**Wave 1**
+- [x] 59-01-PLAN.md — vague 1 : gabarits produit de planning-core (PROJECT, REQUIREMENTS), minor
+- [x] 59-02-PLAN.md — vague 1 : `check-prd.sh` et sa suite à mutants
+- [x] 59-03-PLAN.md — vague 1 : redirection du head au poste product, minor de dev-orchestrator
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 59-04-PLAN.md — vague 2 : module, visibilité par poste, manager, workers, `prd-gate`
+- [x] 59-05-PLAN.md — vague 2 : front door, skill `/vf-product`, gabarit BRIEF, README du bundle
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 59-06-PLAN.md — vague 3 : suite du bundle, baselines, compteurs des README racine
+- [x] 59-07-PLAN.md — vague 3 : manuel FR et EN
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 59-08-PLAN.md — vague 4 : porte de phase rejouée depuis `ci.yml`, ledger à la main
 
 ### Phase 60: Gate architecture avant découpage et validation des phases proposées
 

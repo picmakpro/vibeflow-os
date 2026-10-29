@@ -13,6 +13,18 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.73.0] — 2026-10-29
+
+**Minor** (Phase 59, bundle produit ; release minor autorisée par arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 : merger #172 avec --admin si les juges ne rendent aucun majeur et que la CI est verte, puis tag et release ; le numéro est v2.73.0 et non v2.72.0, pris entre-temps par la release de main, PR #178) :
+
+- **`product-team-bundle` v1.0.0** (module neuf, 18ᵉ) : équipe produit en monde fermé — manager `vf-product-manager`, workers internes `vf-product-analyst` (BRIEF à cinq rubriques) et `vf-product-pm` (PRD), juge `prd-gate` (rubric /100, seuil 80), gate déterministe `check-prd.sh` ; front door `vibeflow-product` et skill `/vf-product`. Visibilité par poste (`roles: ["product"]`, visible aux postes `product` et `solo`).
+- **Le bundle reste `proposable: false`** jusqu'à un run réel complet sur un lab désigné par Samuel : posé par `install --all`, jamais proposé.
+- **`planning-core` v2.9.0** : gabarit produit (`references/templates/product/` : `PROJECT.template.md`, `REQUIREMENTS.template.md`), lisible par GSD, postes `solo` et `dev` inchangés.
+- **`dev-orchestrator` v2.29.0** : `vibeflow-head` lit le poste et oriente vers `/vf-product` au poste `product` (nouvelle référence `product-routing.md`, instructions d'`AGENT.md` inchangées).
+- Manuel FR/EN, README racine (18 modules, 116 suites) et baselines mis à jour ; correctifs de revue sur `check-prd.sh` (remplissage, longueur en caractères, commentaires, blocs de code, cases non reconnues).
+- **Correctifs ciblés de la Phase 59** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-29) : `check-prd.sh` rend INDÉTERMINÉ (code 3) toute ligne à case à cocher non reconnue comme exigence (1 et 5 gardent leur priorité), reconnaît le texte des gabarits livrés sans leurs crochets comme remplissage, rougit une valeur qui répète son libellé (« Acceptation : Acceptation ») et lit un tiret collé (« pré-acceptation : ») comme un mot composé ; le juge `prd-gate` gagne un mode BRIEF seul (rubric /100 propre, même seuil 80) que `vf-product-manager` utilise pour le livrable `brief` ; `vf-product-analyst` gagne `Edit`. `test-check-prd.sh` : 20 mutants de plus (CPRD-MUT-160..181, le 161 et le 168 retirés). Juge frais : une ligne de liste ou de citation qui ouvre sur un identifiant d'exigence en gras sans être l'ouvreur reconnu (`- [] **PRD-02**`, `> - [ ] **PRD-02**`, puce + espace insécable, `- [-] **PRD-02**`) compte parmi les non reconnues (code 3) ; le pluriel et l'article ne contournent plus la règle « valeur qui répète le libellé » ; `prd-gate` : étape 1 cohérente avec le mode BRIEF seul ; sept mutants de plus (CPRD-MUT-182..188).
+- **Juge frais, second tour sur `check-prd.sh`** : la règle « valeur qui répète le libellé » retire désormais `le`, `la`, `les`, `l'`, `un`, `une`, `des`, `du`, `de`, `d'` et rend « d' » facultatif (« Le critère d'acceptation », « Une acceptation », « Critères acceptation » rougissent ; un vrai critère qui commence par « Le critère d'acceptation est que… » reste vert) ; une case de plus de 3 caractères (`- [done] **PRD-02**`) est une case non reconnue (code 3), non plus ignorée en silence ; six mutants de plus (CPRD-MUT-189..194 ; 189 au total).
+
 ## [v2.72.0] — 2026-10-29
 
 **Minor** (clôture des issues GitHub : quatre PR de correctifs hors feuille de route, lots A à D du 2026-10-29,

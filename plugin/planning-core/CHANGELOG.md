@@ -1,5 +1,13 @@
 # Changelog — planning-core
 
+## [v2.9.0] — 2026-10-27 (gabarit produit) — publiée dans v2.73.0
+
+**Minor** (nouvelle capacité : gabarit du poste product) :
+
+- **`references/templates/product/`** (deux fichiers neufs) : `PROJECT.template.md` (charte alignée sur les cinq rubriques du BRIEF) et `REQUIREMENTS.template.md` (une exigence = un résultat observable, avec `Acceptation :` et `Priorité :` en lignes de continuation). Dimension « poste » orthogonale aux profils Léger / Standard / Complet, jamais un 4ᵉ niveau (P59-D-03).
+- **Forme lisible par GSD** : `## v1 Requirements`, `- [ ] **PRD-NN**:`, `## Traceability` à colonne `Status`. Preuve : `gsd-tools requirements mark-complete PRD-01` sur une copie change exactement deux lignes (case et traçabilité), les continuations restent intactes.
+- **Inchangés à l'octet** : les gabarits existants, `SKILL.md` et `PROFILES.md` ; les postes `solo` et `dev` ne voient aucune différence. Le choix du gabarit produit est porté par le bundle `product-team-bundle` (P59-PL-01), pas par le skill.
+
 ## [v2.8.3] — 2026-10-23 (UTF-8 inconditionnel, clé profile) — publiée dans v2.71.1
 
 **Patch** (correctifs #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-23 ; publiée dans v2.71.1) :

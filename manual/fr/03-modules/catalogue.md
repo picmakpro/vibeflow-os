@@ -71,6 +71,13 @@ Les trois bundles ont leur page dédiée : [bundles-metier.md](./bundles-metier.
 et s'il faut seulement en choisir un, c'est le sujet de
 [choisir-ses-modules.md](./choisir-ses-modules.md).
 
+À part de ces trois bundles métier, un module existe sur le disque sans figurer dans ce catalogue :
+**`product-team-bundle`**, l'équipe produit (BRIEF, PRD, juge `prd-gate`). Il n'est proposé ni ici ni
+dans les presets tant que son `module.json` dit `proposable:false`. Ce n'est pas une barrière :
+l'engine d'installation ignore cette clé, donc `install --all` le pose, comme une installation qui
+le nomme. Sur `install --all`, il est visible aux postes product et solo, pas au poste dev ; un
+poste est une vue, pas un droit.
+
 ## Les capacités spécialisées et la documentation
 
 Ces cinq-là s'ajoutent au cas par cas. Deux d'entre eux portent un **statut expérimental** déclaré

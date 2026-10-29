@@ -133,6 +133,7 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
 | Intention | Brique |
 |---|---|
 | design / UI / c'est moche / la DA / le style / refais l'écran / la typo | skill `vf-design` (module design-orchestrator) → agent `vibeflow-design` |
+| brief produit / PRD / exigences / critères d'acceptation | skill `vf-product` (module product-team-bundle) → agent `vibeflow-product` ; au poste product, voir `product-routing.md` |
 | maquette-moi ça / une idée d'écran / mockup jetable | `gsd-sketch` |
 
 ## Mission multi-étapes

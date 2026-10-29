@@ -92,6 +92,9 @@
 #   T81 — #81 : doctrine d'attente des managers — scanner des blocs de code (```) des .md livrés ;
 #         boucle until/while à corps vide, sans sleep ou sans borne = rouge ; boucles de lecture exclues ;
 #         5 cas dont 3 fixtures rouges.
+#   T44 — PRDT-07 (P59-D-08, P59-PL-11) : le head lit le poste et redirige vers /vf-product ; pointeur
+#         AVANT FIRST-02 dans le garde-fou premier usage, contenu de product-routing.md, ligne de carte,
+#         index et Références ; mutants d'ablation et d'ordre.
 #
 # Historique de numérotation : T3/T12/T13/T14 ont changé de sémantique à la v2.0.0 (les
 # anciens tests de collision de descriptions, de préséance et de synchro de la table vf-dev
@@ -7526,6 +7529,140 @@ t81_out="$(t81_scan "$T81_TMP/mut-sans-garde.md")"; t81_rc=$?
 { [ "$t81_rc" -eq 1 ] && printf '%s' "$t81_out" | grep -qF 'temporisation non gardée'; } && ok "T81 mutant mission-flow.md sleep sans garde : rouge" || ko "T81 mutant sans garde : attendu — rc=1 « temporisation non gardée » ; obtenu — rc=$t81_rc : $t81_out"
 t81_out="$(t81_scan "$T81_TMP/mut-sans-borne.md")"; t81_rc=$?
 { [ "$t81_rc" -eq 1 ] && printf '%s' "$t81_out" | grep -qF 'sans borne'; } && ok "T81 mutant mission-flow.md sans TIMEOUT : rouge" || ko "T81 mutant sans TIMEOUT : attendu — rc=1 « sans borne » ; obtenu — rc=$t81_rc : $t81_out"
+# ---- T44 : redirection du head par poste (PRDT-07, P59-D-08, P59-D-20, P59-PL-11) ---------------
+# Garde la PRÉSENCE et l'ORDRE du pointeur dans le garde-fou premier usage (avant FIRST-02 : la porte
+# produit prime sur la proposition d'init), puis le contenu de product-routing.md. Une redirection
+# prouvée par présence seule ne peut pas rougir : chaque ancre a son mutant (ablation, ordre).
+T44_AG_ZS='^## Garde-fou premier usage'
+T44_AG_ZE='^## Carte d.intention'
+T44_REF="$REFS_DIR/product-routing.md"
+T44_REF_LIT=('vf-role.sh get' '/vf-product' 'Un poste est une vue, pas un droit' 'product' 'solo' 'dev' 'réitér')
+T44_REF_CODES_ZS='^## 1[.] Lire le poste'
+T44_REF_CODES_ZE='^## 2[.]'
+T44_REF_CODES=('Code 0' 'Codes 1, 5 et 64' 'vibeflow-update.sh role')
+
+# revue-59 F5/F6 : les clauses SÉMANTIQUES se gardent dans leur section (ablation bornée à la section),
+# pas sur le fichier entier où un autre passage les porte déjà ; une clause inversée est refusée.
+T44_P2_ZS='^## 2[.] Poste product'
+T44_P2_ZE='^## 3[.]'
+T44_P2_LIT=('ne lance aucune équipe' 'oriente vers `/vf-product`' 'Sur une **demande explicite réitérée**, le head exécute le routage normal' 'Aucun refus mécanique : l'"'"'humain tranche' 'Si le skill `/vf-product` est absent' 'ne redirige pas vers une commande qui n'"'"'existe pas' 'proposable:false' 'installation nominale' 'product-team-bundle')
+T44_P2_INTERDIT=('Refus systématique' 'sans rien dire' 'lance l'"'"'équipe normale')
+T44_P3_ZS='^## 3[.]'
+T44_P3_ZE='^## 4[.]'
+T44_P3_LIT=('**proposer** `/vf-product`' 'ne le lance pas à la place de l'"'"'humain' 'Si le skill est absent' 'product-team-bundle')
+
+t44_sem_check() { # <product-routing.md> — clauses sémantiques de §2 (poste product) et §3 (absence du skill)
+  local z out
+  z="$(t414_zone "$1" "$T44_P2_ZS" "$T44_P2_ZE")"
+  [ -n "$z" ] || { printf 'section « Poste product » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T44_P2_LIT[@]}")" || { printf 'clauses absentes de §2 : %s' "$out"; return 1; }
+  out="$(t44_forbidden "$z" "${T44_P2_INTERDIT[@]}")" || { printf 'clause inversée dans §2 : %s' "$out"; return 1; }
+  z="$(t414_zone "$1" "$T44_P3_ZS" "$T44_P3_ZE")"
+  [ -n "$z" ] || { printf 'section « Postes solo et dev » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T44_P3_LIT[@]}")" || { printf 'clauses absentes de §3 : %s' "$out"; return 1; }
+}
+t44_forbidden() { # <zone> <littéral>... — rc 1 si un littéral est PRÉSENT
+  local z="$1" lit bad=0; shift
+  for lit in "$@"; do case "$z" in *"$lit"*) printf '« %s » ' "$lit"; bad=1 ;; esac; done
+  [ "$bad" -eq 0 ]
+}
+t44_agent_check() { # <AGENT.md> — contrôle (a) : pointeur présent, avant FIRST-02
+  local z out; z="$(t414_zone "$1" "$T44_AG_ZS" "$T44_AG_ZE")"
+  [ -n "$z" ] || { printf 'zone « Garde-fou premier usage » introuvable ou vide'; return 1; }
+  out="$(t414_order "$z" 'product-routing.md' 'FIRST-02')" || { printf 'pointeur de poste : %s' "$out"; return 1; }
+}
+t44_ref_check() { # <product-routing.md> — contrôle (b) : contenu de la règle de redirection
+  local z zc out; z="$(t414_zone "$1" '^')"
+  [ -n "$z" ] || { printf 'product-routing.md absent ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T44_REF_LIT[@]}")" || { printf 'ancres absentes de la référence : %s' "$out"; return 1; }
+  zc="$(t414_zone "$1" "$T44_REF_CODES_ZS" "$T44_REF_CODES_ZE")"
+  [ -n "$zc" ] || { printf 'section « Lire le poste » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$zc" "${T44_REF_CODES[@]}")" || { printf 'codes de lecture absents de §1 : %s' "$out"; return 1; }
+}
+
+t44_out="$(t44_agent_check "$AGENT_FILE")" && ok "T44 (a) AGENT.md : pointeur product-routing.md dans le garde-fou premier usage, avant FIRST-02" \
+  || ko "T44 (a) AGENT.md : attendu — pointeur product-routing.md avant FIRST-02 ; obtenu — $t44_out"
+t44_out="$(t44_ref_check "$T44_REF")" && ok "T44 (b) product-routing.md : lecture par vf-role.sh get, codes 0/1/5/64, phrase ADR-077, demande réitérée (${#T44_REF_LIT[@]} ancres)" \
+  || ko "T44 (b) product-routing.md : attendu — règle de redirection par poste ; obtenu — $t44_out"
+
+t44_out="$(t44_sem_check "$T44_REF")" && ok "T44 (b2) product-routing.md : §2 ne lance aucune équipe, demande réitérée, aucun refus mécanique, skill absent → install nominale ; §3 propose sans lancer (${#T44_P2_LIT[@]} + ${#T44_P3_LIT[@]} clauses)" \
+  || ko "T44 (b2) product-routing.md : attendu — clauses sémantiques de redirection ; obtenu — $t44_out"
+t44_k=0
+for t44_a in "${T44_P2_LIT[@]}"; do
+  t44_k=$((t44_k+1))
+  t414_ablate "$T44_REF" "$T414_TMP/t44-p2-$t44_k.md" "$t44_a" "$T44_P2_ZS" "$T44_P2_ZE"
+  t414_mutant "T44 mutant §2 : product-routing.md privé de « $t44_a » dans §Poste product" t44_sem_check "$T44_REF" "$T414_TMP/t44-p2-$t44_k.md"
+done
+for t44_a in "${T44_P3_LIT[@]}"; do
+  t44_k=$((t44_k+1))
+  t414_ablate "$T44_REF" "$T414_TMP/t44-p3-$t44_k.md" "$t44_a" "$T44_P3_ZS" "$T44_P3_ZE"
+  t414_mutant "T44 mutant §3 : product-routing.md privé de « $t44_a » dans §Postes solo et dev" t44_sem_check "$T44_REF" "$T414_TMP/t44-p3-$t44_k.md"
+done
+# Inversion de sens : la phrase de redirection remplacée par son contraire doit rougir (rien à retirer, tout à lire).
+sed -e 's/ne lance aucune équipe/lance l'"'"'équipe normale sans rien dire/' -e 's/Aucun refus mécanique/Refus systématique/' "$T44_REF" > "$T414_TMP/t44-inv.md"
+t414_mutant "T44 mutant inversion : §2 dit « lance l'équipe normale sans rien dire » et « Refus systématique »" t44_sem_check "$T44_REF" "$T414_TMP/t44-inv.md"
+# La clause du skill absent doit exister en §2 (poste product) : sa disparition de §2 rougit même si §3 la porte.
+awk -v zs="$T44_P2_ZS" -v ze="$T44_P2_ZE" '$0 ~ zs { on = 1 } $0 ~ ze { on = 0 }
+  on && index($0, "- Si le skill `/vf-product` est absent") { skip = 1; next }
+  skip && /^(- |[ \t]*$)/ { skip = 0 }
+  skip { next } { print }' "$T44_REF" > "$T414_TMP/t44-p2-abs.md"
+t414_mutant "T44 mutant §2 : clause du skill absent retirée du seul poste product (§3 intacte)" t44_sem_check "$T44_REF" "$T414_TMP/t44-p2-abs.md"
+
+t414_ablate "$AGENT_FILE" "$T414_TMP/t44-ptr.md" 'product-routing.md' "$T44_AG_ZS" "$T44_AG_ZE"
+t414_mutant "T44 mutant pointeur : copie d'AGENT.md privée de « product-routing.md » dans le garde-fou premier usage" t44_agent_check "$AGENT_FILE" "$T414_TMP/t44-ptr.md"
+t414_move_before "$AGENT_FILE" "$T414_TMP/t44-ord.md" "$T44_AG_ZS" 'FIRST-02' 'product-routing.md'
+t414_mutant "T44 mutant ordre : copie d'AGENT.md où la ligne FIRST-02 précède le pointeur" t44_agent_check "$AGENT_FILE" "$T414_TMP/t44-ord.md"
+t414_ablate "$T44_REF" "$T414_TMP/t44-lec.md" 'vf-role.sh get'
+t414_mutant "T44 mutant lecture : copie de product-routing.md privée de « vf-role.sh get »" t44_ref_check "$T44_REF" "$T414_TMP/t44-lec.md"
+
+# T44 (c)(d)(e) : la ligne de carte, l'index et la ligne de Références disent la même chose que le pointeur.
+T44_CARTE_ZS='^## Carte d.intention'
+T44_CARTE_ZE='^## Next steps'
+T44_CARTE_LIT=('brief produit / PRD' 'skill `vf-product` (module product-team-bundle)' 'agent `vibeflow-product`')
+T44_REFS_ZS='^## Références'
+T44_ROUTE_ZS='^## Design'
+T44_ROUTE_ZE='^## Mission multi-étapes'
+T44_INDEX="$REFS_DIR/_index.md"
+T44_ROUTE="$REFS_DIR/intent-routing.md"
+
+t44_carte_check() { # <AGENT.md> — (c) ligne de la Carte d'intention
+  local z out; z="$(t414_zone "$1" "$T44_CARTE_ZS" "$T44_CARTE_ZE")"
+  [ -n "$z" ] || { printf 'zone « Carte d%sintention » introuvable ou vide' "'"; return 1; }
+  out="$(t414_missing "$z" "${T44_CARTE_LIT[@]}")" || { printf 'ligne vf-product absente de la carte : %s' "$out"; return 1; }
+}
+t44_index_check() { # <_index.md> — (d) ligne d'index
+  local z out; z="$(t414_zone "$1" '^')"
+  [ -n "$z" ] || { printf '_index.md absent ou vide'; return 1; }
+  out="$(t414_missing "$z" '[product-routing.md](product-routing.md)')" || { printf 'index : %s' "$out"; return 1; }
+}
+t44_refs_check() { # <AGENT.md> — (d) ligne de Références
+  local z out; z="$(t414_zone "$1" "$T44_REFS_ZS")"
+  [ -n "$z" ] || { printf 'section « Références » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" 'dev-orchestrator-references/product-routing.md')" || { printf 'Références : %s' "$out"; return 1; }
+}
+t44_route_check() { # <intent-routing.md> — (e) carte exhaustive
+  local z out; z="$(t414_zone "$1" "$T44_ROUTE_ZS" "$T44_ROUTE_ZE")"
+  [ -n "$z" ] || { printf 'section « Design » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T44_CARTE_LIT[@]}")" || { printf 'ligne vf-product absente de intent-routing.md : %s' "$out"; return 1; }
+}
+
+t44_out="$(t44_carte_check "$AGENT_FILE")" && ok "T44 (c) AGENT.md : ligne de carte vf-product → vibeflow-product dans la Carte d'intention" \
+  || ko "T44 (c) AGENT.md : attendu — ligne de carte vf-product ; obtenu — $t44_out"
+t44_out="$(t44_index_check "$T44_INDEX")" && ok "T44 (d) _index.md : ligne product-routing.md" \
+  || ko "T44 (d) _index.md : attendu — ligne product-routing.md ; obtenu — $t44_out"
+t44_out="$(t44_refs_check "$AGENT_FILE")" && ok "T44 (d) AGENT.md §Références : product-routing.md" \
+  || ko "T44 (d) AGENT.md §Références : attendu — product-routing.md ; obtenu — $t44_out"
+t44_out="$(t44_route_check "$T44_ROUTE")" && ok "T44 (e) intent-routing.md : ligne vf-product → vibeflow-product" \
+  || ko "T44 (e) intent-routing.md : attendu — ligne vf-product ; obtenu — $t44_out"
+
+t414_ablate "$AGENT_FILE" "$T414_TMP/t44-carte.md" 'vf-product' "$T44_CARTE_ZS" "$T44_CARTE_ZE"
+t414_mutant "T44 mutant carte : copie d'AGENT.md privée de « vf-product » dans la Carte d'intention" t44_carte_check "$AGENT_FILE" "$T414_TMP/t44-carte.md"
+t414_ablate "$T44_INDEX" "$T414_TMP/t44-index.md" '[product-routing.md](product-routing.md)'
+t414_mutant "T44 mutant index : copie de _index.md privée de la ligne product-routing.md" t44_index_check "$T44_INDEX" "$T414_TMP/t44-index.md"
+t414_ablate "$AGENT_FILE" "$T414_TMP/t44-refs.md" 'dev-orchestrator-references/product-routing.md' "$T44_REFS_ZS"
+t414_mutant "T44 mutant Références : copie d'AGENT.md privée de product-routing.md dans §Références" t44_refs_check "$AGENT_FILE" "$T414_TMP/t44-refs.md"
+t414_ablate "$T44_ROUTE" "$T414_TMP/t44-route.md" 'vf-product' "$T44_ROUTE_ZS" "$T44_ROUTE_ZE"
+t414_mutant "T44 mutant carte exhaustive : copie d'intent-routing.md privée de « vf-product » dans §Design" t44_route_check "$T44_ROUTE" "$T414_TMP/t44-route.md"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

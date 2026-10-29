@@ -10,14 +10,14 @@ you never need to know a skill's name to invoke it, only to say what you want. W
 need, then, isn't the technical names below but **the phrasings that trigger them** — that's what
 this page foregrounds for each one.
 
-This list comes from enumerating every `SKILL.md` file in the repo, rechecked on 2026-10-02,
+This list comes from enumerating every `SKILL.md` file in the repo, rechecked on 2026-10-27,
 module by module — explicitly excluding the skill templates under
 `plugin/reference/content/methodology/templates/skills/`, which aren't shipped skills but
-blueprints for building new ones. The disk holds twenty-two, grouped here by their originating module:
+blueprints for building new ones. The disk holds twenty-three, grouped here by their originating module:
 you only have the ones whose module is installed — the [module catalog](../03-modules/catalog.md)
 says which one brings what.
 
-## The twenty-two skills, by module
+## The twenty-three skills, by module
 
 ### `installer`
 **`vibeflow-install`** — the very first thing you do after installing the plugin. Triggers on
@@ -68,6 +68,12 @@ multi-platform adaptation.
 ### `growth-bundle`
 **`vf-growth`** — "launch a cold email campaign," "prepare the LinkedIn sequences," "analyze the
 campaign results." Entry point for the growth domain, channel by channel.
+
+### `product-team-bundle`
+**`vf-product`** — "write the brief," "draft the PRD," "frame this product," "add the acceptance
+criteria." Entry point of the product role: it embodies `vibeflow-product`, which writes the BRIEF and
+the PRD and has them judged by `prd-gate` before handing over. This skill is only installed if its
+module is: `product-team-bundle` isn't offered in the catalog while it is `proposable:false`.
 
 ### `planning-core`
 **`vf-planning`** — "structure this lab's docs," "we're losing track of things," "index my
@@ -122,9 +128,9 @@ entirely to that.
 
 ## Where this list comes from
 
-Every skill above corresponds to a real `SKILL.md` file, enumerated (then rechecked on 2026-10-02) rather than
+Every skill above corresponds to a real `SKILL.md` file, enumerated (then rechecked on 2026-10-27) rather than
 copied from an existing doc. To check for yourself: from the repo root,
-`find plugin -iname 'SKILL.md' | grep -v reference/content` — the count should stay at twenty-two
+`find plugin -iname 'SKILL.md' | grep -v reference/content` — the count should stay at twenty-three
 unless a skill has been added, removed, or a template has drifted out of its templates folder.
 
 <!-- vf-manual:nav -->

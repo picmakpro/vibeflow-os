@@ -1,20 +1,20 @@
 ---
 gsd_state_version: "1.0"
 milestone: equipe-produit-v1.0
-current_phase: 58
-current_phase_name: Rôles de poste — installeur, profils solo / product / dev
-status: complete
-last_updated: "2026-10-20T18:00:00.000Z"
-last_activity: 2026-10-22
-last_activity_desc: Phase 58 passée avec 2 overrides (critère 6 et recette installeur, Samuel 2026-10-22), branche rebasée sur v2.70.1 — next : PR + release v2.71.0, puis Phase 59
+current_phase: 59
+current_phase_name: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate
+status: executed
+last_updated: "2026-10-27T23:00:00.000Z"
+last_activity: 2026-10-27
+last_activity_desc: Phase 59 exécutée — 8/8 plans, porte de phase rejouée depuis ci.yml (20 étapes vertes), PRDT-01..12 cochées — next : PR par le manager, relecture adverse SOBR-04, release décidée à part
 state_head: 45ee80db
 progress:
   total_phases: 9
-  completed_phases: 2
-  total_plans: 28
-  completed_plans: 28
+  completed_phases: 3
+  total_plans: 36
+  completed_plans: 36
 milestone_name: « l'équipe produit » — Phases 57-65 —
-stopped_at: "Phase 58 passée avec 2 overrides (dette : check-livraison-58.sh clients, recette /vibeflow-install) — next : PR + release v2.71.0, puis cadrage Phase 59"
+stopped_at: "Phase 59 exécutée le 2026-10-27 (8/8 plans, porte verte) — arrêt avant merge, tag et release"
 ---
 
 # Project State
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — EXÉCUTÉE (12/12 plans), VÉRIFIÉE human_needed 13/14 (critère 6 en attente de la liste de clients), puis PR
-Jalon courant : `equipe-produit-v1.0` (Phases 57-65, inscrit 2026-10-08) ; 2 phases sur 9 closes. `fiabilite-v1.0` est CLOS
+Phase: 59 (Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate) — EXÉCUTÉE (8/8 plans, porte de phase verte, PRDT-01..12 cochées) ; la Phase 58 reste close (12/12 plans)
+Jalon courant : `equipe-produit-v1.0` (Phases 57-65, inscrit 2026-10-08) ; 3 phases sur 9 closes. `fiabilite-v1.0` est CLOS
 depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
 `.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).
 
@@ -50,7 +50,8 @@ chez Samuel ; revue (majeur `.gitignore` fermé) et audit (H-1 `json.py` du dép
 passés après trois tours de correction. Rapport : `.planning/missions/2026-10-16-suite-v2700-phase-58.md`.
 Replanification 2026-10-20 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 pour ADR-077 et Q16 ; Q15 et Q17 : 2026-10-16) : ADR-077 approuvée (58-03 close, SUMMARY posé) ; plan 58-12 ajouté (presets filtrés par poste, P58-D-21, vague 6) ; 58-11 passe en vague 7 (manuel « Poste » FR+EN, liste de clients par `VF_CLIENT_NAMES_FILE`).
 Phase 58 : 58-11 close le 2026-10-20 (porte de phase rejouée depuis `ci.yml`, RLPO-01..10 et 12 cochées, RLPO-11 en attente du critère 6) ; rapport : `58-11-SUMMARY.md`.
-Next : dépôt de la liste de clients par Samuel (hors dépôt) puis `check-livraison-58.sh clients`, puis PR (rebase sur main = geste du manager) ; Q18 (faille `python -c` antérieure) hors cette phase, hotfix en parallèle.
+Phase 59 exécutée le 2026-10-27 (rapport : `59-08-SUMMARY.md`) : porte de phase rejouée depuis `ci.yml`, suites une à une, périmètre du diff contrôlé ; next : PR ouverte par le manager, relecture adverse SOBR-04, release `v2.73.0` décidée à part (arrêt avant merge, tag et release).
+Next (Phase 58, historique) : dépôt de la liste de clients par Samuel (hors dépôt) puis `check-livraison-58.sh clients`, puis PR (rebase sur main = geste du manager) ; Q18 (faille `python -c` antérieure) hors cette phase, hotfix en parallèle.
 Last activity: 2026-10-20 — Phase 58 vérifiée human_needed 13/14
 
 ## Accumulated Context
@@ -59,6 +60,7 @@ Last activity: 2026-10-20 — Phase 58 vérifiée human_needed 13/14
 
 <!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-10-12.md -->
 
+- P59-PL-01 à P59-PL-22 : décisions de planificateur (discrétion P59-D-14..22), réalisées par les plans 59-01 à 59-08.
 - P58-PL-01 à P58-PL-14 : décisions de planificateur (discrétion P58-D-15..20), réalisées par les plans 58-01 à 58-12, plus P58-D-21 (filtrage des presets, plan 58-12).
 
 ### Roadmap Evolution
@@ -80,6 +82,7 @@ Tableau complet dans l'archive (section `### Quick Tasks Completed`) ; les nouve
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
+| 261027-rzy | Correction ciblée revue-59 F2-F6 (check-prd, sondes, ancres, redirection) | 2026-10-27 | bd9a3ef1 | [261027-rzy](./quick/261027-rzy-correction-ciblee-revue-59-f2-f6-check-p/) |
 
 ## Deferred Items
 
