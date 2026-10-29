@@ -1,5 +1,12 @@
 # CHANGELOG — infrastructure-audit
 
+## [v1.3.7] — 2026-10-29 (known-versions.txt à jour) — à publier dans la prochaine release
+
+**Patch** (#166, #153 §6.5 ; lot « clôture des issues GitHub ») :
+
+- **`known-versions.txt` couvre Claude Code jusqu'à 2.1.312** (#166, #153) : ajout de 2.1.296, 2.1.300, 2.1.301, 2.1.311 et 2.1.312 ; la liste s'arrêtait à 2.1.215, donc l'axe runtime rendait `version_note` « supposée compatible » sur le poste de référence. Cas T6b et T6c ajoutés à `test-audit-infra.sh` (T6 conservé). Aucun changement de logique de l'axe runtime.
+- **Une lib sourcée sans shebang n'est plus comptée non exécutable** (#166, #153 §6.6) : dans l'axe scripts, un `.sh` dont la première ligne n'est pas un shebang (`#!`) est une lib sourcée, exclue du numérateur et du dénominateur de `executable_ok` ; elle reste comptée dans `scripts_total` et passe `bash -n`. Champ JSON neuf `libs_sourced` à côté d'`executable_ok`. Un script à shebang sans bit x reste signalé. Cas T17 et T17b ajoutés à `test-audit-infra.sh`. `vf-portable.sh` (lib de l'engine, posée non exécutable par doctrine) n'est donc plus un faux signal ; aucun fichier de `plugin/_internal/` touché. Revue lot C : champs `scripts_shebang` (dénominateur explicite, `scripts_total` = `scripts_shebang` + `libs_sourced`) et `libs_sourced_files` (noms de base des libs, pour qu'un script exécutable sans shebang soit visible) ; un BOM UTF-8 devant `#!` compte comme script ; cas T17c.
+
 ## [v1.3.6] — 2026-10-23 (--strict --no-tests sans suite découverte) — publiée dans v2.71.2
 
 **Patch** (#153 ; release patch préparée sur demande de la session principale, 2026-10-23 ; publiée dans v2.71.2) :

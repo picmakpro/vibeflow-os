@@ -4,7 +4,7 @@
 > traduit l'intention design en le bon workflow — sans que l'utilisateur ait à connaître la
 > chaîne d'outils qui travaille en coulisse.
 
-**Type** : agent + skills + équipe de mission · **Version** : v1.5.15 · **Dépend de** : `conductor`
+**Type** : agent + skills + équipe de mission · **Version** : v1.5.16 · **Dépend de** : `conductor`
 
 ---
 
@@ -129,7 +129,8 @@ technique) → `gsd-spike` · la construction une fois la direction validée →
   développement (`gsd-execute-phase`). Le module cadre, critique et crafte.
 - **La chaîne d'outils n'est pas embarquée** : référentiel UX, direction créative et atelier de
   craft restent des plugins tiers. Leur **présence et leur activation** sont désormais vérifiées
-  et rétablies automatiquement (`ensure-design-deps.sh`, présence + enabled/disabled) ; la
+  et rétablies automatiquement (`ensure-design-deps.sh`, présence + enabled/disabled ; un plugin
+  s'exclut durablement par `VF_DESIGN_SKIP` ou `.vf-design-skip`, sauf `superpowers`) ; la
   dégradation gracieuse sur les premiers principes reste le filet quand l'install échoue ou que
   la CLI `claude` est absente, et l'agent le signale.
 - **Couverture inégale par stack** : le référentiel UX couvre web + mobile ; direction créative et

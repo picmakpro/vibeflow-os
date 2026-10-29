@@ -124,7 +124,7 @@ Voir `references/hooks-contract.md`.
 ### Verifications
 
 - Tous les `.claude/scripts/*.sh` passent `bash -n` (syntaxe)
-- Tous sont executables (`-x`)
+- Tous les scripts a shebang (`#!`, BOM UTF-8 toléré) sont executables (`-x`) ; une lib sourcee (sans shebang) n'a pas a l'etre : elle est listee a part (`libs_sourced_files`), jamais comptee muette. Invariant : `scripts_total` = `scripts_shebang` + `libs_sourced`
 - Toutes les dependencies binaires sont presentes (jq, python3, awk, sed, grep)
 - Si une suite de tests existe (`.claude/scripts/tests/test-*.sh`), elle est lancee et doit passer
 
@@ -133,9 +133,12 @@ Voir `references/hooks-contract.md`.
 ```json
 {
   "axis": "scripts",
-  "scripts_count": 5,
-  "syntax_ok": 5,
+  "scripts_total": 6,
+  "syntax_ok": 6,
+  "scripts_shebang": 5,
   "executable_ok": 5,
+  "libs_sourced": 1,
+  "libs_sourced_files": ["vf-portable.sh"],
   "deps_ok": ["bash", "awk", "grep", "sed", "python3", "jq"],
   "deps_missing": [],
   "tests_suite_present": true,
