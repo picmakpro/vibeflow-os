@@ -1,5 +1,15 @@
 # Changelog — conductor
 
+## [v1.51.0] — 2026-10-29 (phases proposées et gate architecture)
+
+**Minor** (capacité neuve : deux gates et un verbe de validation ; Phase 60, mandat Samuel, /vf-auto session principale, 2026-10-29 ; aucune release racine, elle reste un geste du manager après merge) :
+
+- **`check-phase-validation.sh`** : constate le marqueur `**Validation:**` d'une phase du ROADMAP (0 validée ou marqueur absent, 1 proposée, 3 indéterminé, 5 illisible, 64 usage), lecture seule, sans lire le poste. Suite `test-check-phase-validation.sh` : 30 cas, 10 mutants tués, plus la preuve moteur (`CPV-GSD-*` : le marqueur est invisible à `roadmap get-phase`, `roadmap analyze`, `phase complete`, `phase insert` et `phase remove`, comparateur prouvé capable de rougir).
+- **`check-architecture.sh`** : gate de l'architecture avant découpage (ligne d'état `validated` et six rubriques à corps non vide ; 0 / 1 / 3 / 5 / 64), lecture seule. Suite `test-check-architecture.sh` : 34 cas, 9 mutants tués.
+- **`vf-validation.sh`** : seul écrivain de la ligne `**Validation:**` (`propose`, `validate`), poste du validateur tracé, refus au poste `product` sauf `--override` tracé, jamais dégradé, aucun commit ni verrou. Suite `test-vf-validation.sh` : 35 cas, 8 mutants tués, preuve moteur `VFV-GSD-*`.
+- **Recensement** : `check-phase-validation.sh` et `vf-validation.sh` inscrits parmi les consommateurs a2 de `references/workstream-planning-consumers.md` (compartiment NOMMÉ par `--ws`, jamais l'actif).
+- Limite écrite : le mode « Regenerate all » d'`edit-phase` peut perdre le marqueur, et une phase ajoutée à la main n'en a pas ; l'absence vaut validée.
+
 ## [v1.50.3] — 2026-10-29 (uutils, drift du framework, clé vf-optional-agents) — à publier dans la prochaine release
 
 **Patch** (#52, #165, #166, #167 ; correctifs du lot A de la clôture des issues GitHub ; à publier dans la prochaine release) :

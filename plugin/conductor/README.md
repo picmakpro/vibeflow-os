@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.50.3 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.51.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -117,9 +117,11 @@ la pose, aucun contrôle d'accès n'y est adossé. En poste `product`, la chaîn
 ouvert à ce poste) pose superpowers, qui apporte aussi des skills orientés dev (TDD, débogage) : « commande dev »
 désigne les skills et agents des trois modules `roles:["dev"]` plus gsd-*, pas superpowers.
 
-## Scripts (38) — par famille
+## Scripts (41) — par famille
 
-*(Compte re-dérivé au 2026-10-16, Phase 58 : même commande → 38 ; il gagne `check-role-consistency.sh`
+*(Compte re-dérivé au 2026-10-29, Phase 60 : même commande → 41 ; il gagne `check-phase-validation.sh`,
+`check-architecture.sh` et `vf-validation.sh` (+3) au-dessus du compte 38 du 2026-10-16.
+Parenthèse historique ci-dessous, inchangée : compte re-dérivé au 2026-10-16, Phase 58 : même commande → 38 ; il gagne `check-role-consistency.sh`
 et `vf-role.sh` (+2) au-dessus du compte 36 de `origin/main`. Parenthèse historique ci-dessous,
 inchangée : compte re-dérivé au 2026-09-30 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
 '*.sh' | awk 'END{print NR}'` → 33 ; il gagne `check-ajout-retrait.sh` et `guard-fin-de-geste.sh`
@@ -205,10 +207,33 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   0 (listé), 1 (hors liste ou valeur invalide), 3 (silence : aucune source de poste, pas de liste),
   5 (illisible, bruyant). `--role <poste>` juge un poste candidat avant toute pose (refus à la pose de
   l'engine) ; `--hook` est l'entrée SessionStart (voir § Hooks).
+- `check-phase-validation.sh` — gate du marqueur de phase (Phase 60, ARCG-01, ARCG-02, P60-D-02 à
+  P60-D-04) : `--phase <N> [--ws <nom>]` constate la ligne `**Validation:**` de la section de la phase du
+  ROADMAP. Lecture seule, ne lit jamais le poste ; le ROADMAP n'est jamais réimprimé. Codes 0 (validée, ou
+  marqueur absent : état de toutes les phases existantes), 1 (proposée), 3 (indéterminé : phase introuvable,
+  marqueurs ou sections multiples, valeur inconnue), 5 (illisible, bruyant), 64 (usage). Consommateurs :
+  `vf-coder` avant plan et exécution d'une étape, `vf-auto` avant sa boucle. Limite fail-open écrite : le mode
+  « Regenerate all » d'`edit-phase` peut perdre le marqueur et une phase ajoutée à la main n'en a pas.
+- `check-architecture.sh` — gate de l'architecture avant découpage (Phase 60, ARCG-06, ARCG-07, P60-D-05,
+  P60-D-06) : `--architecture <f>` constate la ligne d'état et les six rubriques minimales (contexte, choix
+  structurants, composants, données, contraintes, risques), chacune avec un corps non vide. Lecture seule, ne
+  lit que le fichier passé. Codes 0 (validée et complète, seule porte verte), 1 (fichier absent, `proposed`,
+  rubrique absente ou vide), 3 (statut absent, inconnu ou multiple), 5 (illisible, bruyant), 64 (usage).
+  Consommateurs : le head devant un découpage, le manager produit. Limite : une ligne `validated` posée à la
+  main est crue (ni auteur ni date vérifiés).
 - `vf-role.sh` — lecteur UNIQUE du poste (P58-D-15), interface des Phases 59 à 61 :
   `vf-role.sh get [--path <dir>]` imprime exactement une ligne `solo|product|dev` (priorité `VF_ROLE`,
   puis `<racine>/.claude/vibeflow-role`, puis `solo`), codes 0 / 1 (invalide) / 5 (fichier illisible) /
   64 (usage) ; lecture seule, l'engine est l'unique écrivain du fichier.
+- `vf-validation.sh` — SEUL écrivain de la ligne `**Validation:**` (Phase 60, P60-D-05, P60-D-10) : un
+  verbe de script, jamais un skill. `propose --phase <N> [--ws <nom>]` pose `proposed` après le paragraphe
+  `**Goal:**` de la phase ; `validate` (`--phase <N> [--ws <nom>]` ou `--architecture <f>`) la bascule en
+  `validated (<poste>, <date>[, override])`. Le poste du validateur, lu par `vf-role.sh get` (seulement par
+  `validate`), est tracé dans la valeur ; au poste `product` le verbe refuse (code 1) sauf `--override`, tracé
+  lui aussi ; un poste illisible rend 5, jamais un repli sur `solo`. Jamais dégradé (`propose` sur une phase
+  validée rend 3), une seule ligne changée, écriture atomique. Codes 0 / 1 / 3 / 5 / 64 ; aucun commit, aucun
+  verrou de driver. Limite : un humain peut toujours éditer la ligne à la main (un poste est une vue, pas un
+  droit, ADR-077).
 - `check-map-drift.sh` — gate anti-drift carte↔disque (contrat de routage par dossier).
 - `check-guard-health.sh` — lecteur générique `SessionStart` des marqueurs de santé écrits par
   `vf_guard_unavailable` (tout le parc de gardes, pas seulement le lock) : fail-open bruyant plutôt
