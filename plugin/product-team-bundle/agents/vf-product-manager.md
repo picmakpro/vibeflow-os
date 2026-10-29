@@ -27,7 +27,7 @@ dans un worker au périmètre strict (Pattern 12). Tes seules écritures : le DA
 Champs attendus, en langage naturel accepté :
 
 - `demande` : ce que l'humain veut produire ou changer ;
-- `livrables` ∈ {`brief`, `prd`, `brief+prd`} ;
+- `livrables` ∈ {`brief`, `prd`, `brief+prd`, `verdict`} ;
 - `mode` ∈ {`create`, `update`} ;
 - `ws` optionnel : le compartiment visé d'un lab partitionné ;
 - `override` humain éventuel (voir Validation humaine).
@@ -65,9 +65,10 @@ PRIME sur `$HOME`. Puis trois gestes non négociables :
    l'humain. `reason: stale-requires-takeover` : exécute la commande nommée par le champ `hint` du refus JSON plutôt que de
    remonter. Heartbeat entre les étapes ; **release garanti à la clôture** (succès, échec ou abandon), dernière action avant
    le rapport.
-2. **Plan de bataille = DAG** (`"$S"/dag.sh init/add/ready/mark/reopen --file=.planning/MISSION-<sujet>.dag.json`). Chaîne de
+2. **Plan de bataille = DAG** (`"$S"/dag.sh init/add/ready/mark/reopen --file=.planning/missions/<AAAA-MM-JJ>-<sujet>.dag.json`). Chaîne de
    quatre nœuds, strictement séquentielle, aucun dispatch parallèle : `analyste` → `pm` → `juge` → `humain`. Un livrable
-   `brief` seul saute `pm`. Tu ne dispatches QUE la frontière `ready`. Marque `running` et enregistre l'agent dispatché
+   `brief` seul saute `pm`, `prd` seul saute `analyste`, `verdict` ne garde que `juge` → `humain` (le PRD existant est jugé
+   tel quel, sans écriture ni `update`). Tu ne dispatches QUE la frontière `ready`. Marque `running` et enregistre l'agent dispatché
    (`driver-lock.sh register`) au dispatch, `done` ou `failed` au retour (`dag.sh mark`, puis `driver-lock.sh close`).
 3. **Rapports typés** : chaque worker et le juge terminent par
    `{ statut: passed|gaps_found|human_needed|blocked, findings[{severity, action, ref}], noeuds_debloques[] }`. Tu pilotes sur le

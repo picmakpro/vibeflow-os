@@ -264,7 +264,20 @@ vert-juge|Un vert ne vient que de `prd-gate`
 halte-humaine|Sous le seuil, halte humaine
 pas-de-passage-de-main|ni relance silencieuse, ni passage de main au head
 aucun-passage-de-main|Aucun passage de main au head
-override|override'
+override|override
+livrables-verdict|`brief+prd`, `verdict`}
+verdict-seul|`verdict` ne garde que `juge` → `humain`
+prd-saute-analyste|`prd` seul saute `analyste`
+dag-chemin|.planning/missions/<AAAA-MM-JJ>-<sujet>.dag.json'
+
+# Front door : mêmes livrables que le manager (un verdict demandé est une mission acceptée), code 3 complet.
+AGENTMD_ANCHORS='livrables-verdict|`brief+prd`, `verdict`}
+code-3-complet|indéterminé (cible absente, zéro exigence, bloc ou commentaire non fermé)'
+
+# Outils exacts des deux workers producteurs (revue-59 : un outil en trop, Bash sur l'analyste qui dit ne pas l'avoir,
+# laissait la suite verte). Ligne « tools: » égale à la valeur attendue, pas un simple préfixe.
+ANALYST_TOOLS='Read, Write, Glob, Grep'
+PM_TOOLS='Read, Write, Edit, Glob, Grep'
 
 # anchors <CAS> <fichier> <liste> : toutes les ancres de la liste doivent figurer dans le fichier.
 anchors() {
@@ -291,6 +304,22 @@ ctl_manager() {
   local f="$1/agents/vf-product-manager.md"
   [ -f "$f" ] || { echo "KO-MANAGER:vf-product-manager.md absent"; return 1; }
   anchors MANAGER "$f" "$MANAGER_ANCHORS"
+}
+
+ctl_agentmd() {
+  local f="$1/AGENT.md"
+  [ -f "$f" ] || { echo "KO-AGENTMD:AGENT.md absent"; return 1; }
+  anchors AGENTMD "$f" "$AGENTMD_ANCHORS"
+}
+
+ctl_tools() { # <racine> : tools: exacts des workers analyste et pm
+  local r=0 a want got
+  for a in vf-product-analyst vf-product-pm; do
+    case "$a" in vf-product-analyst) want="$ANALYST_TOOLS" ;; *) want="$PM_TOOLS" ;; esac
+    got="$(awk '/^tools:/ { sub(/^tools:[[:space:]]*/, ""); print; exit }' "$1/agents/$a.md" 2>/dev/null)"
+    [ "$got" = "$want" ] || { echo "KO-TOOLS:$a tools=[$got] (attendu [$want])"; r=1; }
+  done
+  return $r
 }
 
 # sweep <CAS> <contrôle> <fichier relatif> <liste> : un mutant par ancre (ablation du texte exact).
@@ -387,6 +416,15 @@ sweep JUGE ctl_juge agents/prd-gate.md "$JUGE_ANCHORS"
 
 case_ctl "PTB-MANAGER : verrou, DIGEST, human_needed sous le seuil, proposition jamais lancée, override tracé" ctl_manager "$MOD"
 sweep MANAGER ctl_manager agents/vf-product-manager.md "$MANAGER_ANCHORS"
+
+case_ctl "PTB-AGENTMD : le front door annonce les mêmes livrables que le manager et le code 3 complet" ctl_agentmd "$MOD"
+sweep AGENTMD ctl_agentmd AGENT.md "$AGENTMD_ANCHORS"
+
+case_ctl "PTB-TOOLS : les workers analyste et pm portent exactement leurs outils (analyste sans Bash)" ctl_tools "$MOD"
+M="$(mkmut toolsa)"; subst "$M/agents/vf-product-analyst.md" "Grep" "Grep, Bash" "tools:"
+mutant_ptb TOOLS-ANALYSTE-BASH "KO-TOOLS:vf-product-analyst" ctl_tools "$MOD" "$M"
+M="$(mkmut toolsp)"; subst "$M/agents/vf-product-pm.md" "Grep" "Grep, Bash" "tools:"
+mutant_ptb TOOLS-PM-BASH "KO-TOOLS:vf-product-pm" ctl_tools "$MOD" "$M"
 
 # PRDT-06 : inversion de la clause de halte et de l'interdiction de passage de main (pas seulement leur ablation).
 M="$(mkmut halte)"; subst "$M/agents/vf-product-manager.md" "Sous le seuil, halte humaine" "Sous le seuil, relance libre"
