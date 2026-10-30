@@ -24,6 +24,10 @@
 # Toute invocation du script se fait depuis un sous-shell qui `cd` dans une fixture jetable, jamais
 # depuis le vrai dépôt (piège P2) : le dossier commun du clone vient de `git rev-parse` sur le cwd.
 #
+# Borne de parallélisme des mutants : GW_MUT_PAR (entier >= 1, défaut 4, même variable que test-guard-driver-lock-ws.sh) =
+# nombre maximal de matrices de mutants simultanées ; sans borne, elles saturaient un runner CI 4 vCPU. Ni la liste des
+# mutants, ni les attendus, ni le verdict, ni l'ordre d'évaluation ne changent ; le pic mesuré est affiché.
+#
 # Exit 0 si tout passe, 1 sinon, 2 si la fixture est cassée (préflight).
 
 set -uo pipefail
@@ -1564,6 +1568,15 @@ mut_run() { # <script> <journal> → code de sortie du sous-processus
   DLWS_MODE=matrice DLWS_SCRIPT="$1" python3 -c 'import os, signal, sys; signal.signal(signal.SIGPIPE, signal.SIG_DFL); os.execvp(sys.argv[1], sys.argv[1:])' bash "$SUITE" > "$2" 2>&1
 }
 MUT_IDS=""
+GW_MUT_PAR="${GW_MUT_PAR:-4}"
+case "$GW_MUT_PAR" in ''|*[!0-9]*|0) echo "GW_MUT_PAR invalide ($GW_MUT_PAR) : entier >= 1 attendu" >&2; exit 2 ;; esac
+MUT_PEAK=0
+mut_running() { # nombre de matrices en cours (jobs de ce shell)
+  jobs -rp > "$WORK_DIR/.jobs-en-cours"; wc -l < "$WORK_DIR/.jobs-en-cours" | tr -d ' '
+}
+mut_throttle() { # attend qu'un emplacement se libère (bash 3.2 : pas de `wait -n`, comptage + attente courte)
+  while [ "$(mut_running)" -ge "$GW_MUT_PAR" ]; do sleep 0.2; done
+}
 mutant() { # <id> <ancre BRE> <expression sed s> <attendu : cas séparés par des espaces>
   # Prépare le mutant puis lance sa matrice EN ARRIÈRE-PLAN (neuf matrices en série dépassent la borne de durée) ;
   # le verdict est rendu par mutant_eval, dans l'ordre, après `wait`. Chaque sous-processus a son propre WORK_DIR.
@@ -1578,7 +1591,9 @@ mutant() { # <id> <ancre BRE> <expression sed s> <attendu : cas séparés par de
   if cmp -s "$dir/driver-lock.sh" "$dir/copie-temoin.sh"; then echo "mutant NON OPPOSABLE : la substitution n'a rien changé" > "$dir/prepko"; return; fi
   if ! bash -n "$dir/driver-lock.sh" 2>/dev/null; then echo "le mutant n'est pas un script valide (il rougirait pour la mauvaise raison)" > "$dir/prepko"; return; fi
   chmod +x "$dir/driver-lock.sh"
+  mut_throttle
   ( mut_run "$dir/driver-lock.sh" "$dir/matrice.log"; echo $? > "$dir/rc" ) &
+  local cur; cur="$(mut_running)"; [ "$cur" -gt "$MUT_PEAK" ] && MUT_PEAK="$cur"
 }
 mutant_eval() { # <id>
   local id="$1" dir="$WORK_DIR/mut-$1" rc got
@@ -1641,7 +1656,7 @@ mutant tk_old_deleted '_tk_after="$(vf_dl_legacy_probe)"' 's@_tk_after="$(vf_dl_
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
-echo "  durée des mutants : $((SECONDS-t0))s"
+echo "  durée des mutants : $((SECONDS-t0))s · pic de concurrence : $MUT_PEAK matrice(s) simultanée(s) (borne GW_MUT_PAR=$GW_MUT_PAR)"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
   echo "== mutants : 29/29 tués =="
 else
