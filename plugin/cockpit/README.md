@@ -40,8 +40,9 @@ Le verbe `/vf-cockpit` lance ce script (poses `project` et `local`) ou `$HOME/.c
 
 Les formes courantes de l'onglet Projet (« Où en est-on ? », « phase N ») sont répondues sur place. Les autres passent par
 `claude -p`, confiné : mode `dontAsk`, outils `Read,Grep,Glob,Bash`, Bash limité aux deux scripts de requête, lecture bornée à
-`./**`. Modèle : sélecteur de la page > variable `VF_COCKPIT_MODEL` > `sonnet`, parmi une liste fermée ; une valeur hors liste
-est refusée.
+`./**`, aucun réglage chargé (`--setting-sources ""` : ni hooks du lab, ni règle `allow` de l'utilisateur) et aucun serveur MCP
+hors configuration explicite. Modèle : sélecteur de la page > variable `VF_COCKPIT_MODEL` > `sonnet`, parmi une liste fermée ; une valeur
+hors liste est refusée. Mesures : `67-MESURE-claude-p.md` (dossier de la phase 67).
 
 ## Interface en français
 
@@ -59,7 +60,10 @@ rougir le test. **À rejouer à chaque synchro amont** (`amont/SYNCHRO.md`) : re
 
 Écoute sur `127.0.0.1` seulement, contrôle du `Host`, jeton propre au serveur, segments cachés refusés. La dernière commande
 d'une session n'est jamais diffusée ni exportée ; elle se révèle à la demande, dans la ligne cliquée. Aucun appel sortant, hors
-l'agent qui répond aux questions.
+l'agent qui répond aux questions. Le lab observé n'est jamais une source de code : aucun de ses scripts n'est exécuté (le mode
+« modifier le plan » n'exécute que le moteur du module), aucun lien symbolique de la sortie n'est suivi, et la page porte une
+Content-Security-Policy (scripts en ligne par empreintes, `connect-src 'self'`). Hypothèse assumée : une machine à un seul utilisateur
+(le jeton est servi à tout processus local, `.cache/server.json` est en 0600).
 
 ## Sortie dans le lab
 
