@@ -1,0 +1,4 @@
+- P61-PL-01 à P61-PL-18 : décisions de planificateur (discrétion de P61-D-02 et P61-D-05, conséquences des P61-D et de P61-H-01), réalisées par les plans 61-01 à 61-08.
+- P60-PL-01 à P60-PL-27 : décisions de planificateur (discrétion P60-D-03..06, conséquences des P60-D et P60-H), réalisées par les plans 60-01 à 60-09.
+- P59-PL-01 à P59-PL-22 : décisions de planificateur (discrétion P59-D-14..22), réalisées par les plans 59-01 à 59-08.
+- P58-PL-01 à P58-PL-14 : décisions de planificateur (discrétion P58-D-15..20), réalisées par les plans 58-01 à 58-12, plus P58-D-21 (filtrage des presets, plan 58-12).

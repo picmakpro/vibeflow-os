@@ -947,18 +947,18 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | COLB-09 | Phase 61 | Partial — 2026-10-29, tous les plans 61-01 à 61-08 : aucune valeur de `.planning/instruction-budget-baselines.tsv` relevée, `check-instruction-budget.sh` rc 0 (37 fichiers, BOOTSTRAP `ligne 2610`), aucun skill ni agent touché, `scripts/hooks`, `.github` et sentinelles intacts, G-2 rc 0 (marqueurs 32/32), `check-ajout-retrait --strict` rc 0, `check-version-sync` et `check-manual` rc 0, job `gates` rejoué depuis `ci.yml` (20 rejouées, 0 en échec), quinze suites une à une vertes, arrêt avant PR ; critère 6 (`clients`, zéro nom de client) NON VÉRIFIABLE : code 2, en attente de la liste (hors dépôt), comme en Phases 58 et 60 — jamais compté vert, exigence laissée décochée. |
 | PLTF-01 | Phase 62 | Complete — 2026-10-29, plan 62-01 (preuve : `62-DECISION-plateforme.md`, `62-01-SUMMARY.md`) |
 | PLTF-02 | Phase 62 | Complete — 2026-10-29, décision A signée par délégation (preuve : `62-DECISION-plateforme.md` § Décision, `62-CONTEXT.md` P62-B-01 levé) ; réexamen 2027-01-31 |
-| CKPT-01 | Phase 67 | Planned — 2026-11-01 |
-| CKPT-02 | Phase 67 | Planned — 2026-11-01 |
-| CKPT-03 | Phase 67 | Planned — 2026-11-01 |
-| CKPT-04 | Phase 67 | Planned — 2026-11-01 |
-| CKPT-05 | Phase 67 | Planned — 2026-11-01 |
-| CKPT-06 | Phase 67 | Planned — 2026-11-01 |
-| CKPT-07 | Phase 67 | Planned — 2026-11-01 |
-| CKPT-08 | Phase 67 | Planned — 2026-11-01 |
-| CKPT-09 | Phase 67 | Planned — 2026-11-01 |
-| CKPT-10 | Phase 67 | Planned — 2026-11-01 |
-| CKPT-11 | Phase 67 | Planned — 2026-11-01 |
-| CKPT-12 | Phase 67 | Planned — 2026-11-01 (ajoutée par la correction B, nœud `fix-67-b` ; preuve : `test-cockpit-responsive.sh`, `67-FIX-B-SUMMARY.md`) |
+| CKPT-01 | Phase 67 | Implemented — 2026-11-01 (clôture en attente : appréciation visuelle de Samuel, merge) |
+| CKPT-02 | Phase 67 | Implemented — 2026-11-01 (clôture en attente : appréciation visuelle de Samuel, merge) |
+| CKPT-03 | Phase 67 | Implemented — 2026-11-01 (clôture en attente : appréciation visuelle de Samuel, merge) |
+| CKPT-04 | Phase 67 | Implemented — 2026-11-01 (clôture en attente : appréciation visuelle de Samuel, merge) |
+| CKPT-05 | Phase 67 | Implemented — 2026-11-01 (clôture en attente : appréciation visuelle de Samuel, merge) |
+| CKPT-06 | Phase 67 | Implemented — 2026-11-01 (clôture en attente : appréciation visuelle de Samuel, merge) |
+| CKPT-07 | Phase 67 | Implemented — 2026-11-01 (clôture en attente : appréciation visuelle de Samuel, merge) |
+| CKPT-08 | Phase 67 | Implemented — 2026-11-01 (clôture en attente : appréciation visuelle de Samuel, merge) |
+| CKPT-09 | Phase 67 | Implemented — 2026-11-01 (clôture en attente : appréciation visuelle de Samuel, merge) |
+| CKPT-10 | Phase 67 | Implemented — 2026-11-01 (clôture en attente : appréciation visuelle de Samuel, merge) |
+| CKPT-11 | Phase 67 | Implemented — 2026-11-01 (clôture en attente : appréciation visuelle de Samuel, merge) |
+| CKPT-12 | Phase 67 | Implemented — 2026-11-01 (clôture en attente : appréciation visuelle de Samuel, merge) (ajoutée par la correction B, nœud `fix-67-b` ; preuve : `test-cockpit-responsive.sh`, `67-FIX-B-SUMMARY.md`) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
