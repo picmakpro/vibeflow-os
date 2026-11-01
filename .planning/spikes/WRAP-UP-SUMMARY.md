@@ -1,8 +1,8 @@
 # Spike Wrap-Up Summary
 
 **Date:** 2026-11-01
-**Spikes processed:** 3 (002 au premier passage, 003 et 004 au second, même jour)
-**Feature areas:** Cockpit Code + Projet, Cockpit en direct, Signal « au travail »
+**Spikes processed:** 5 (002 ; 003 et 004 ; 005 et 006 — trois passages le même jour)
+**Feature areas:** Cockpit Code + Projet, Cockpit en direct, Signal « au travail », Questions sur l'onglet Projet, Types dédiés et interface en français
 **Skill output:** `.claude/skills/spike-findings-vibeflow-os/` (arbre principal du dépôt, ignoré par git)
 
 ## Processed Spikes
@@ -11,6 +11,8 @@
 | 002 | cockpit-code-projet | standard | VALIDATED | Cockpit Code + Projet |
 | 003 | cockpit-floorplan-live | standard (intégration 001 × 002) | VALIDATED | Cockpit en direct |
 | 004 | signal-au-travail | standard (frontière) | VALIDATED | Signal « au travail » |
+| 005 | questions-onglet-projet | comparison | VALIDATED | Questions sur l'onglet Projet |
+| 006 | types-et-chrome-fr | comparison | VALIDATED | Types dédiés et interface en français |
 
 Le spike 001 (`cockpit-live`) vit sur la branche `spike/cockpit-live` et n'est pas dans cet
 arbre : il n'est pas emballé ici.
@@ -53,3 +55,22 @@ arbre : il n'est pas emballé ici.
   de forme dans le module. Le panneau montre le dernier appel d'outil : à filtrer si partagé.
 - **Dépendance de dépôt** : 003 et 004 s'appuient sur des fichiers du dossier du spike 002
   (P6, `70-vf-live.js`, `vf-project-graph.mjs`), non suivi par git à la date du wrap-up.
+
+### Troisième passage (005, 006)
+
+- **Questions sur l'onglet Projet** : la barre native de floorplan répond sur le graphe Projet
+  grâce à un second jeton injecté dans `project.html` (patch P7 de `serve.mjs`, aucun patch du
+  viewer). Les formes courantes sont calculées en 2 à 6 ms, sans token, avec des ids toujours
+  valides ; toute question de raisonnement va à l'agent `claude -p` (15 à 30 s, réponses
+  sourcées dans `.planning/`). Piège : une voie locale qui capte un « pourquoi » répond à côté
+  avec l'air juste.
+- **Types et chrome** : un type nommé en français s'affiche en français (le viewer montre le nom
+  du type) ; P8 (une ligne) accepte les pictogrammes du graphe. Le chrome passe en français par
+  une extension (dictionnaire de phrases exactes + `MutationObserver`) : 0 anglais visible,
+  1 à 2 ms, rien au repos. Deux défauts trouvés : la recherche poussée sur l'onglet par les
+  libellés longs, une boucle infinie sur les attributs vides (onglet Code seulement).
+- **Suites** : croiser les « en cours » des réponses avec le collecteur du spike 004 ; un test
+  qui rougit sur toute chaîne anglaise visible (97 des 258 au dictionnaire) ; libellés courts
+  sous ≈ 1 400 px.
+- **Dépendance de dépôt** : P7, P8, `80-vf-fr.js`, le générateur aux types français et le script
+  d'assemblage vivent dans le dossier du spike 002, toujours non suivi à la date du wrap-up.
