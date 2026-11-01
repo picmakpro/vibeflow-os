@@ -4,8 +4,9 @@
 //   <resize>    « 1920:1024 » : charge à la première largeur puis redimensionne À CHAUD à la seconde, puis revient ; « - » = rien
 // Rend sur une ligne { mesures: { "<largeur>" | "resize:<a>:<b>" | "resize:<b>:<a>": { v: [violations], m: {chiffres} } } } ou { erreur }.
 // Une violation = deux éléments frères visibles qui se recouvrent, un texte rogné (scrollWidth > clientWidth), un élément hors de la fenêtre,
-// une recherche, un logo ou une barre de question sous leur taille minimale (sur plusieurs lignes tolérée sous 1 000 px : le gabarit étroit du viewer). Le HOME réel est rendu à Chrome (REAL_HOME).
-import { spawn } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+// un bouton ou lien d'en-tête qui sort de la fenêtre (x + largeur > innerWidth), une recherche, un logo ou une barre de question sous leur taille minimale (sur plusieurs lignes tolérée sous 1 000 px : le gabarit étroit du viewer). RESP_INJECT : expression évaluée après le chargement (boutons d'en-tête optionnels de l'onglet Code, absents d'un lab de test). Le HOME réel est rendu à Chrome (REAL_HOME).
+import fs from 'node:fs'; import path from 'node:path';
+import { executer } from './chrome-session.mjs';
 const [, , chrome, url, largeurs, resize, shots] = process.argv;
 const HAUT = { 390: 844, 800: 600, 1024: 768, 1280: 800, 1440: 900, 1920: 1080, 2560: 1300 };
 const hauteur = (w) => HAUT[w] || Math.round(w * 0.625);
@@ -25,6 +26,8 @@ const MESURE = `(() => {
   const items = [...hd.querySelectorAll('.brand, .vf-tabs, #btn-up, #crumbs, #search-btn, #hdr-ext > *, .hr > :not(#hdr-ext)')].filter(vis);
   m.enteteElements = items.length; m.enteteHauteur = Math.round(rec(hd).height);
   paires(items, 'en-tête'); dedans(items, 'en-tête');
+  // sortie d'écran : TOUT élément visible de l'en-tête, à n'importe quelle profondeur (x + largeur > innerWidth), pas seulement les éléments terminaux listés
+  dedans([...hd.querySelectorAll('button, a, input, .bl')].filter(vis), 'en-tête (sortie d\\'écran)');
   rogne([hd, ...items, ...hd.querySelectorAll('#proj-name, .bl, .vf-tabs a')].filter(vis), 'en-tête');
   if (document.documentElement.scrollWidth > vw + 1) v.push('page : défilement horizontal (' + document.documentElement.scrollWidth + ' > ' + vw + ')');
 
@@ -65,40 +68,20 @@ const MESURE = `(() => {
   return { v, m };
 })()`;
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cdp-resp-'));
-const ch = spawn(chrome, ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', `--user-data-dir=${dir}`, '--remote-debugging-port=0', 'about:blank'],
-  { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, HOME: process.env.REAL_HOME || process.env.HOME } });
-const fin = (o) => { try { ch.kill('SIGKILL'); } catch {} try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} console.log(JSON.stringify(o)); process.exit(0); };
-setTimeout(() => fin({ erreur: 'delai' }), 180000);
-let buf = '', started = false;
-ch.stderr.on('data', async (d) => {
-  buf += d; const m = /ws:\/\/127\.0\.0\.1:(\d+)\//.exec(buf); if (!m || started) return; started = true;
-  try {
-    const t = await (await fetch(`http://127.0.0.1:${m[1]}/json/new?about:blank`, { method: 'PUT' })).json();
-    const ws = new WebSocket(t.webSocketDebuggerUrl); let id = 0; const pend = new Map();
-    const send = (method, params = {}) => new Promise((res) => { const i = ++id; pend.set(i, res); ws.send(JSON.stringify({ id: i, method, params })); });
-    ws.onmessage = (e) => { const j = JSON.parse(e.data); if (j.id && pend.has(j.id)) pend.get(j.id)(j.result); };
-    await new Promise((r) => (ws.onopen = r));
-    await send('Page.enable');
-    const taille = (w) => send('Emulation.setDeviceMetricsOverride', { width: w, height: hauteur(w), deviceScaleFactor: 1, mobile: false });
-    const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
-    const mesurer = async (cle) => {
-      const r = await send('Runtime.evaluate', { expression: MESURE, returnByValue: true });
-      let valeur = r?.result?.value; if (!valeur) valeur = { v: ['mesure impossible : ' + JSON.stringify(r?.exceptionDetails?.text || r)], m: {} };
-      if (shots) { const s = await send('Page.captureScreenshot', { format: 'png' }); fs.mkdirSync(shots, { recursive: true }); fs.writeFileSync(path.join(shots, cle.replace(/[^\w]+/g, '-') + '.png'), Buffer.from(s.data, 'base64')); }
-      mesures[cle] = valeur;
-    };
-    const mesures = {};
-    for (const w of largeurs.split(',').map(Number)) {
-      await taille(w); await send('Page.navigate', { url: 'about:blank' }); await send('Page.navigate', { url }); await attendre(2500);
-      await mesurer(String(w));
-    }
-    if (resize && resize !== '-') {
-      const [a, b] = resize.split(':').map(Number);
-      await taille(a); await send('Page.navigate', { url: 'about:blank' }); await send('Page.navigate', { url }); await attendre(2500);
-      await taille(b); await attendre(1500); await mesurer(`resize:${a}:${b}`);
-      await taille(a); await attendre(1500); await mesurer(`resize:${b}:${a}`);
-    }
-    fin({ mesures });
-  } catch (e) { fin({ erreur: String(e.message) }); }
+const PRET = `document.readyState === 'complete' && !!document.querySelector('header .brand .mark') && document.querySelector('header .brand .mark').naturalWidth > 0 && !!document.querySelector('#ask-form')`;
+await executer(chrome, async (s) => {
+  const taille = async (w) => { await s.send('Emulation.setDeviceMetricsOverride', { width: w, height: hauteur(w), deviceScaleFactor: 1, mobile: false }); await s.attendre(`innerWidth === ${w}`, `largeur ${w} appliquée`); };
+  const mesures = {};
+  const mesurer = async (cle) => { // un relevé n'est retenu que lorsque deux relevés consécutifs sont identiques (mise en page posée)
+    mesures[cle] = await s.stable(MESURE, `mesure de la mise en page à ${cle}`);
+    if (shots) { const c = await s.send('Page.captureScreenshot', { format: 'png' }); fs.mkdirSync(shots, { recursive: true }); fs.writeFileSync(path.join(shots, cle.replace(/[^\w]+/g, '-') + '.png'), Buffer.from(c.data, 'base64')); }
+  };
+  const charger = async (w) => { await taille(w); await s.naviguer(url); await s.attendre(PRET, `page prête à ${w} px`); if (process.env.RESP_INJECT) await s.ev(process.env.RESP_INJECT); };
+  for (const w of largeurs.split(',').map(Number)) { await charger(w); await mesurer(String(w)); }
+  if (resize && resize !== '-') {
+    const [a, b] = resize.split(':').map(Number);
+    await charger(a); await taille(b); await mesurer(`resize:${a}:${b}`);
+    await taille(a); await mesurer(`resize:${b}:${a}`);
+  }
+  return { mesures };
 });

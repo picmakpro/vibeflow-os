@@ -4,6 +4,7 @@
 #   N3 « Réessayer » relance le sondage · N4 témoin rouge : le module d'avant (le navigateur réessaie seul, chaque seconde, pour chacun des deux flux)
 # Les délais sont raccourcis par la page (window.__vfLive.reco) : 200 ms jusqu'à 1,5 s, 600 ms, arrêt à 4 s. Chrome headless ; sans navigateur la suite est SAUTÉE.
 set -uo pipefail
+libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; ENG="$SCRIPTS/../skills/cockpit-moteur"
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
@@ -26,7 +27,7 @@ mklab() {
 }
 srv() { # srv <sortie> -> SRV_PORT SRV_PID
   local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
-  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" node "$o/serve.mjs" --no-open --port $((5000 + RANDOM % 900)) > "$o/../serve.out" 2>&1 ) &
+  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) &
   SRV_PID=$!; PIDS+=($SRV_PID)
   for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
   SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
@@ -46,6 +47,12 @@ assert_eq "N2.1 — arrêt : aucune requête entre 5 s et 9 s" "$(printf '%s' "$
 assert_has "N2.2 — un message dit que le cockpit ne répond plus" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.banniere')" "ne répond plus"
 assert_has "N2.3 — le message porte le bouton « Réessayer »" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.banniere')" "Réessayer"
 assert_eq "N3.1 — « Réessayer » relance le sondage" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.apresClic>=2')" "true"
+echo "=== N4 — témoin rouge : le module d'avant (la page ne ferme pas ses flux : le navigateur réessaie seul, chaque seconde) ==="
+LABM="$WORK/lab-mutant"; cp -R "$LAB" "$LABM"; MP="$LABM/.vibeflow/cockpit/project.html"
+assert_eq "N4.0 — le mutant retire bien l'inscription de la reconnexion à recul (motif présent avant, absent après)" "$(before=$(grep -c 'window.VF_COCKPIT_STREAM_LOST = perdu;' "$MP"); sed -i.bak 's#window.VF_COCKPIT_STREAM_LOST = perdu;#/* mutant N4 */#' "$MP"; echo "$before,$(grep -c 'window.VF_COCKPIT_STREAM_LOST = perdu;' "$MP")")" "1,0"
+RM="$(reco "$LABM" project.html)"
+assert_eq "N4.1 — témoin rouge : sans le recul, des requêtes continuent entre 5 s et 9 s (N2.1 rougirait)" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" '!j.erreur && j.tard>0')" "true"
+
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

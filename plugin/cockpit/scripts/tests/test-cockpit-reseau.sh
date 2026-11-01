@@ -5,6 +5,7 @@
 # La sonde et les pages jetables sont écrites par la suite dans mktemp. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
+libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
@@ -110,7 +111,7 @@ assert_eq "R1.2 — témoin : un fetch externe est enregistré" "$(grep -c '^fet
 rm -f "$SONDE_OUT" "$SONDE_OUT.charge"
 lancer() { # lancer <serve.mjs> -> PORT, TOK, PTOK ; le serveur tourne sous la sonde
   rm -f "$OUT/.cache/server.json"
-  VF_SONDE_OUT="$SONDE_OUT" node --import "$AUX/sonde.mjs" "$1" --no-open --port $((4400 + RANDOM % 500)) > "$WORK/serve.out" 2>&1 &
+  VF_SONDE_OUT="$SONDE_OUT" node --import "$AUX/sonde.mjs" "$1" --no-open --port $(libre) > "$WORK/serve.out" 2>&1 &
   SRV=$!
   for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
   PORT=$(node "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)

@@ -6,6 +6,7 @@
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
+libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 MOTEUR="$SCRIPTS/../skills/cockpit-moteur"
@@ -67,7 +68,7 @@ echo "=== M1 — aucune occurrence visible du nom amont ==="
 assert_eq "M1.0 — l'assemblage rend 0" "$BRC" "0"
 assert_eq "M1.1 — témoin positif : le compteur voit le nom dans une chaîne jetable" "$(printf '%s\n' 'le moteur Floor''plan' | occ)" "1"
 assert_eq "M1.2 — témoin : une ligne de licence est exemptée" "$(printf '%s\n' '<!-- vibeflow:licence-tierce floor''plan -->' | occ)" "0"
-PORT=$((4900 + RANDOM % 500))
+PORT=$(libre)
 node "$OUT/serve.mjs" --no-open --port "$PORT" > "$WORK/serve.out" 2>&1 &
 SRV=$!
 for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done

