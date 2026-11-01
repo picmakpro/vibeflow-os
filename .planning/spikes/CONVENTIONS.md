@@ -22,3 +22,8 @@
   Chaque extension expose une sonde `window.__vf*` lue par Playwright pour prouver sans capture.
 - **Écriture d'un fichier lu en concurrence** (spikes 003, 004) : `.tmp` puis `rename`, jamais
   `open(file, "w")` direct ; côté lecteur, un retrait n'est cru qu'après une seconde lecture.
+- **Les deux onglets à chaque preuve** (spikes 005, 006) : une extension se vérifie sur Code et sur
+  Projet ; chaque spike a eu un défaut visible sur un seul onglet (barre masquée, boucle sur un
+  attribut vide).
+- **Libellés français = mise en page à revérifier** (spike 006) : mesurer les positions de l'en-tête
+  après traduction, pas seulement la présence du texte.
