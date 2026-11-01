@@ -26,6 +26,20 @@ AskUserQuestion session principale, 2026-11-01.
 - **Sortie sous `.vibeflow/cockpit/`** (P67-D-06) — ignorée par git, ce dossier compris.
 - **Chrome en français, test d'inventaire qui rougit** (CKPT-09, P67-D-03, P67-D-18) — dictionnaire (deux fichiers `assets/ui/78` et `79`), gabarits à variables, motifs et fonction pure `window.__vfFrTraduire` (`80-vf-fr.js`) ; inventaire déterministe des chaînes anglaises du rendu servi (`vf-cockpit-fr-inventaire.mjs`) comparé au dictionnaire, aux gabarits, aux motifs et aux exclusions justifiées (`vf-cockpit-fr-exclusions.json`) ; statuts de STATE affichés en français ; direction artistique du moteur conservée.
 
+### Interface ajustable et corrections de la recette (correction B de la Phase 67, avant toute publication)
+- **Fenêtre ajustable de 1 024 à 2 560 px** (CKPT-12, P67-D-21 ; demande de Samuel, message session principale, 2026-11-01) — en-tête en ligne souple
+  (`assets/ui/01-vf-responsive.js`) : nom de projet tronqué avec une ellipse, recherche gardée à 200 px, boutons d'action en icône seule sous 1 600 px,
+  barre de question sur une ligne, zoom au-dessus de la barre jusqu'à 1 279 px ; la règle de grille de `80-vf-fr.js` qui écrasait la recherche est retirée.
+  Suite `test-cockpit-responsive.sh` (boîtes mesurées dans Chrome headless, redimensionnement à chaud, témoin rouge intégré).
+- **Logo VibeFlow lisible** (il était inversé par le viewer : un tiret orange) ; titre d'onglet « <nom> — Code » ; export nommé « …-carte.html » (P20).
+- **Lab sans `STATE.md`** : plus de « ? » ni de parenthèses vides dans le sous-titre et le panneau d'ensemble.
+- **« Au travail »** : badge compact (le détail du verrou est dans l'infobulle et le panneau) ; les nœuds `running` de `.planning/missions/*.dag.json` sont lus ;
+  la dernière commande d'une session très active est retrouvée (remontée jusqu'à la dernière action de l'assistant, fenêtres jusqu'à 8 Mio : un gros résultat
+  d'outil en dernière ligne rendait « Indisponible » et pouvait cacher la session) ; journal minimal authentifié `GET /api/vf/journal`.
+- **Reconnexion à recul** (E-6, P21) : serveur arrêté, la page sonde une fois par seconde pendant 30 s, puis toutes les 5 s, puis s'arrête avec un message
+  et « Réessayer » (un seul sondage pour les deux flux, au lieu de deux requêtes par seconde sans fin). Suite `test-cockpit-reconnexion.sh`.
+- **Direct** : le résumé d'une carte de mission suit le statut de ses nœuds ; « Thinking… » traduit avant la peinture.
+
 ### Sécurité et robustesse (correction A de la Phase 67, avant toute publication)
 - **Chaîne lab piégé -> XSS -> jeton -> exécution de code rompue à trois endroits** — échappement de tout champ du graphe (patch P16), Content-Security-Policy
   par empreintes avec `connect-src 'self'` et en-têtes `nosniff`/`DENY` (P17), « modifier le plan » durci : seuls `plan.mjs` et `build.mjs` du moteur du module

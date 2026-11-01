@@ -85,4 +85,5 @@ chaque patch, ajout et retrait dans `VENDORED.txt`. Vérifier : `bash plugin/coc
 - Le format interne de Claude Code (session « au travail ») est surveillé : s'il change, l'état passe à `forme-inconnue` au
   lieu de mentir.
 - La surveillance récursive de fichiers est mesurée sur macOS et en CI Linux seulement ; Windows n'est pas mesuré.
-- L'en-tête chargé se tasse sous ≈ 1 400 px de largeur.
+- Fenêtre : mise en page mesurée de 1 024 à 2 560 px (`scripts/tests/test-cockpit-responsive.sh`) ; sous 1 024 px le gabarit étroit du moteur s'applique (mesuré à 800 et 390 px : en-tête sans superposition, barre de question entière).
+- Serveur arrêté : la page cesse de sonder après 5 minutes et propose « Réessayer ».

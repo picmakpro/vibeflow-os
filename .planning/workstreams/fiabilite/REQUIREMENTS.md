@@ -958,6 +958,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | CKPT-09 | Phase 67 | Planned — 2026-11-01 |
 | CKPT-10 | Phase 67 | Planned — 2026-11-01 |
 | CKPT-11 | Phase 67 | Planned — 2026-11-01 |
+| CKPT-12 | Phase 67 | Planned — 2026-11-01 (ajoutée par la correction B, nœud `fix-67-b` ; preuve : `test-cockpit-responsive.sh`, `67-FIX-B-SUMMARY.md`) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1458,9 +1459,10 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **CKPT-06**: Onglet Projet sur tout lab GSD (plat ou partitionné) ; onglet Code conditionnel : extracteur VibeFlow si `plugin/*/module.json`, sinon scan brut, aucun LLM à l'assemblage (P67-D-17).
 - [ ] **CKPT-07**: Questions — formes courantes locales, agent `claude -p` confiné (lecture bornée à la racine du lab, Bash limité aux scripts de requête), modèle `sonnet` par défaut, variable d'environnement et sélecteur de modèle validé côté serveur (P67-D-08, P67-D-15).
 - [ ] **CKPT-08**: Dernière commande des sessions masquée : absente du flux SSE, des fichiers générés et de l'export, révélée par requête authentifiée ponctuelle ; test qui le prouve (P67-D-14).
-- [ ] **CKPT-09**: Chrome en français, zéro anglais visible, test qui rougit (P67-D-03, P67-D-18).
+- [ ] **CKPT-09**: Chrome en français par défaut ; les textes produits par le moteur (Santé, couverture de l'onglet Code) peuvent rester en anglais — motif : réponse E1 de Samuel (« on pourrait avoir des gens qui utilise l'anglais, donc en soit l'anglais n'est pas dérangeant et peut etre un des langues autorisées », AskUserQuestion session principale, 2026-11-01), voir `67-CONTEXT.md` P67-D-20 ; test qui rougit (P67-D-03, P67-D-18).
 - [ ] **CKPT-10**: Module toggable `plugin/cockpit` (`module.json`, `VERSION`, `CHANGELOG`, `README`), verbe `/vf-cockpit`, posé par l'engine y compris les binaires, sortie `.vibeflow/cockpit/` avec son `.gitignore` ; aucun bump de la `VERSION` racine (P67-D-05, P67-D-06).
 - [ ] **CKPT-11**: `dag.sh` — écriture atomique de `save()` (fichier temporaire du même dossier puis `os.replace`), témoin rouge d'abord (lecture pendant une écriture lente) ; validation ADR-031 limitée à ce correctif (P67-D-09).
+- [ ] **CKPT-12**: Responsive minimal — la fenêtre du cockpit est ajustable : de 1 024 à 2 560 px de large, au chargement comme au redimensionnement à chaud, aucune superposition ni rognage de l'en-tête, des panneaux et de la barre de question ; rendu non cassé en dessous ; la carte se recadre au redimensionnement ; test qui mesure les boîtes à 1 024, 1 280, 1 440 et 1 920 px (demande de Samuel, message session principale, 2026-11-01 : « au moins pouvoir avoir la fenêtre ajustable » ; `67-CONTEXT.md` P67-D-21).
 
 ---
 *Requirements defined: 2026-06-04*

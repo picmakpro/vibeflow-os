@@ -652,3 +652,11 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 - C1 : compte rendu de la recette Phase 61 sur lab réel (COLB-08). C2 : besoin non-dev sans terminal documenté (option B possible, à la discrétion de Samuel).
 
 **Déclencheur de reprise :** le 2027-01-31, ou plus tôt si C1 et C2 sont établis.
+
+## Choix de la langue de l'interface du cockpit (français / anglais) — DIFFÉRÉ (2026-11-01)
+
+**Origine :** Phase 67, réponse E1 de Samuel (AskUserQuestion session principale, 2026-11-01) : « on pourrait avoir des gens qui utilise l'anglais, donc en soit l'anglais n'est pas dérangeant et peut etre un des langues autorisées » (`67-CONTEXT.md` P67-D-20). L'interface du cockpit est en français par défaut ; les textes du moteur (Santé, couverture de l'onglet Code) restent en anglais (CKPT-09 reformulé).
+- **À faire :** un choix de langue (français / anglais) dans l'interface, gardé dans le navigateur ; l'anglais devient une langue autorisée et non plus un défaut à masquer. Le paramètre `?lang=en` existe déjà (80-vf-fr.js : désactive la traduction), c'est le point d'appui.
+- **Hors 67 :** aucune traduction du panneau Santé ni de la couverture de l'onglet Code dans la phase.
+
+**Déclencheur de reprise :** la prochaine évolution de l'interface du cockpit, ou la première demande d'un utilisateur anglophone.

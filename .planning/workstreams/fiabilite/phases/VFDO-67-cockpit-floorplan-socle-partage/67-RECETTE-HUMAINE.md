@@ -47,10 +47,18 @@ Ouvrir les deux adresses imprimées (onglets **Code** et **Projet**). Pour arrê
    dernière commande » la révèle dans la ligne ; un export téléchargé (« Exporter ») ne la contient pas.
 5. **Réseau.** Outils réseau du navigateur (onglet Réseau, filtre « tout ») : aucune requête vers un autre hôte ni un autre port
    que celui du cockpit au chargement des deux onglets.
-6. **Direct.** Dans le lab jetable : cocher la case de la Phase 2 met la carte à jour en moins de 2 s sans perdre le zoom :
+6. **Direct.** Dans le lab jetable : basculer le statut d'un nœud de DAG met la carte à jour en moins de 2 s, sans recharger la
+   page ni perdre le zoom (cocher la dernière phase du seul jalon est une modification STRUCTURELLE : la page se recharge et le
+   zoom est perdu, elle ne teste donc pas le direct) :
    ```bash
-   perl -pi -e 's/- \[ \] \*\*Phase 2/- [x] **Phase 2/' "$LAB/.planning/ROADMAP.md"
+   # le nœud « b » du DAG passe de running à done : la carte de la mission se met à jour (résumé « 2 nœuds, 2 faits », pied 2/2)
+   perl -pi -e 's/("id":"b"[^}]*"status":")running/${1}done/' "$LAB/.planning/missions/demo.dag.json"
+   # pour recommencer : le remettre en cours
+   perl -pi -e 's/("id":"b"[^}]*"status":")done/${1}running/' "$LAB/.planning/missions/demo.dag.json"
    ```
+7. **Fenêtre ajustable (CKPT-12).** Sur les deux onglets, ouvrir le cockpit à 1 920 px puis réduire la fenêtre à la main
+   jusqu'à 1 024 px, et la rouvrir : rien ne se superpose, rien n'est rogné (en-tête, panneau, barre de question), le nom de
+   projet long se termine par une ellipse, la carte se recadre. Sous 1 024 px (tablette, fenêtre étroite) le rendu reste lisible.
 
 ## 3. Réponses de Samuel (à remplir par lui, jamais par un agent)
 
@@ -61,4 +69,5 @@ Ouvrir les deux adresses imprimées (onglets **Code** et **Projet**). Pour arrê
 | 3. Questions et modèle | | | |
 | 4. « Au travail » et dernière commande | | | |
 | 5. Réseau | | | |
-| 6. Direct | | | |
+| 6. Direct (bascule d'un nœud de DAG) | | | |
+| 7. Fenêtre ajustable (1 920 → 1 024 px, à chaud) | | | |

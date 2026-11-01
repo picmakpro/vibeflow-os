@@ -809,14 +809,15 @@ La graine `SEED-004` (retrait de `vf-cockpit`) reste dormante : elle se déclenc
 > Cadrée le 2026-11-01 (`67-CONTEXT.md`, P67-D-01..18) ; planifiée le 2026-11-01.
 
 **Goal:** Un module VibeFlow distribué et toggable ouvre, dans tout lab GSD, un cockpit à onglets Projet (au cœur) et Code, sur un socle partagé (collecteur « qui est au travail » + graphe Projet) que `vf-signal` réutilise ; il remplace le module `vf-cockpit` jamais mergé.
-**Requirements**: CKPT-01..CKPT-11
+**Requirements**: CKPT-01..CKPT-12
 **Depends on:** rien dans le jalon.
 **Success criteria** (observables, à confirmer au cadrage) :
 1. Sur un lab GSD quelconque (un `.planning/` suffit), le verbe du module ouvre le cockpit et l'onglet Projet montre racine, jalon, phase et plan.
 2. L'onglet Code est riche sur vibeflow-os (extracteur VibeFlow) et retombe sur le scan brut de floorplan ailleurs, sans erreur.
 3. Le direct (statuts, « au travail ») arrive par le serveur floorplan unique, sans second port ni CORS.
 4. L'onglet Projet se questionne : formes courantes locales et gratuites, agent actif (`claude -p`, modèle réglable) pour le raisonnement.
-5. La dernière commande des sessions est masquée par défaut dans « Au travail », révélée sur demande, jamais exportée ; le chrome est en français sans anglais visible (test qui rougit).
+5. La dernière commande des sessions est masquée par défaut dans « Au travail », révélée sur demande, jamais exportée ; le chrome est en français par défaut (les textes produits par le moteur, Santé et couverture de l'onglet Code, peuvent rester en anglais, P67-D-20) sans anglais dans le reste de l'interface (test qui rougit).
+6. La fenêtre est ajustable (CKPT-12, P67-D-21) : de 1 024 à 2 560 px, au chargement comme au redimensionnement à chaud, aucune superposition ni rognage de l'en-tête, des panneaux et de la barre de question ; rendu non cassé en dessous (test qui mesure les boîtes).
 **Sources:** `.planning/notes/2026-11-01-cockpit-facettes.md` (arbitrages 1-4, choix de session, limites connues) ; `.planning/spikes/002-cockpit-code-projet/` (extensions, patchs P1-P8) ; `docs/research/2026-11-01-etude-floorplan-cockpit.md`.
 **Hors périmètre :** enrichir l'onglet Code par stack (suite) ; retirer `vf-cockpit` (SEED-004, à la livraison).
 **Plans:** 7 plans
