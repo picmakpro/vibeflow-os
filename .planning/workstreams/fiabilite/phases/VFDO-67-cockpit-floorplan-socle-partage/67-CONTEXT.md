@@ -159,3 +159,28 @@ l'exécution.
 - `plugin/_internal/vibeflow-update.sh` — règles de pose des modules.
 
 </canonical_refs>
+
+## Addendum post-exécution (2026-11-01)
+
+Décisions prises après l'exécution des plans 67-01 à 67-07, relayées par la session principale.
+
+- **P67-D-19 (gate python, D1 option 1).** `scripts/check-python-isolation.sh` exclut le seul motif
+  `*/assets/vendor/*` : `elk.bundled.js` (une ligne de 620 020 caractères) le bloquait plus de 5 min.
+  Arbitrage Samuel, AskUserQuestion session principale, 2026-11-01 ; validation ADR-031 pour ce
+  correctif seulement (commit `eb2e786d`, témoin rouge joué, gate en 1,7 s).
+- **P67-D-20 (anglais de l'onglet Code, E1).** Réponse de Samuel, mot pour mot (AskUserQuestion session
+  principale, 2026-11-01) : « on pourrait avoir des gens qui utilise l'anglais, donc en soit l'anglais
+  n'est pas dérangeant et peut etre un des langues autorisées ». Lecture du head, retenue par le
+  manager (lecture, pas arbitrage) : ni masquage ni traduction du panneau Santé dans la 67. CKPT-09
+  devient « chrome en français par défaut ; les textes produits par le moteur (Santé, couverture de
+  l'onglet Code) peuvent rester en anglais ». Le choix de langue de l'interface (français / anglais)
+  est une suite tracée au BACKLOG, hors 67.
+- **P67-D-21 (responsive minimal, CKPT-12).** Demande de Samuel (message session principale,
+  2026-11-01) : « au moins pouvoir avoir la fenêtre ajustable ». CKPT-12 : aucune superposition ni
+  rognage de l'en-tête, des panneaux et de la barre de question de 1 024 à 2 560 px, au chargement
+  comme au redimensionnement ; rendu non cassé en dessous ; test qui mesure les boîtes à 1 024, 1 280,
+  1 440 et 1 920 px.
+- **P67-D-22 (recette déléguée).** Samuel (message session principale, 2026-11-01) : « Lance le test
+  toi-même ». La recette `67-RECETTE-HUMAINE.md` est jouée au navigateur par le head sur délégation ;
+  elle est consignée comme « jouée par le head sur délégation de Samuel », jamais comme réponse de
+  Samuel. Reste à Samuel : l'appréciation visuelle d'ensemble après les corrections d'interface.
