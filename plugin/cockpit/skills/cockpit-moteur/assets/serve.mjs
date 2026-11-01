@@ -58,8 +58,8 @@ function exportMap(include, extraFlows = []) {
   if (!on.includes('recent')) delete out.recent;
   if (!on.includes('health')) delete out.health;
   const json = JSON.stringify(out).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
-  const slug = String(g.project?.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'floorplan';
-  return { html: html.slice(0, a + DATA_START.length) + json + html.slice(b), name: `${slug}-map.html`, include: on, plan: !!g.meta?.blueprint };
+  const slug = String(g.project?.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'vibeflow';
+  return { html: html.slice(0, a + DATA_START.length) + json + html.slice(b), name: `${slug}-carte.html`, include: on, plan: !!g.meta?.blueprint };
 }
 /** Flows requested from the map since it was last built, as the page sends them: checked and trimmed. */
 const cleanFlows = (list) => (Array.isArray(list) ? list : []).slice(0, 50)

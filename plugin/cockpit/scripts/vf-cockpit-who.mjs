@@ -25,20 +25,29 @@ const CC = IFACE.claudeCode || {};
 const REQ_TR = CC.transcript?.requis || ['cwd', 'type', 'message', 'timestamp', 'sessionId'];
 const REQ_META = CC.metaSousAgent?.requis || ['agentType', 'description'];
 
-// dernière ligne user/assistant d'un jsonl, en ne lisant que la fin du fichier (256 Kio)
-const tail = (f, bytes = 256 << 10) => {
-  let fd = null;
-  try {
-    fd = fs.openSync(f, 'r'); const size = fs.fstatSync(fd).size; const len = Math.min(size, bytes);
-    const buf = Buffer.alloc(len); fs.readSync(fd, buf, 0, len, size - len);
-    for (const l of buf.toString('utf8').split('\n').reverse()) {
+// recherche en partant de la fin d'un jsonl, sur des fenêtres de plus en plus larges (256 Kio, 2 Mio, 8 Mio) : `accepte(ligne)` rend la valeur
+// cherchée ou null. Une ligne plus longue que la fenêtre (un gros résultat d'outil) est ignorée au lieu de faire croire qu'il n'y a rien :
+// c'était la cause d'une session très active absente du badge « au travail » ou sans dernière commande (E-5).
+const FENETRES = [256 << 10, 2 << 20, 8 << 20];
+const cherche = (f, accepte) => {
+  for (const bytes of FENETRES) {
+    let fd = null, size = 0, lignes = [];
+    try {
+      fd = fs.openSync(f, 'r'); size = fs.fstatSync(fd).size; const len = Math.min(size, bytes);
+      const buf = Buffer.alloc(len); fs.readSync(fd, buf, 0, len, size - len);
+      lignes = buf.toString('utf8').split('\n'); if (size > len) lignes.shift(); // la première ligne de la fenêtre est coupée
+    } catch { return null; } finally { if (fd !== null) { try { fs.closeSync(fd); } catch {} } } // le descripteur se ferme aussi quand readSync lève
+    for (const l of lignes.reverse()) {
       if (!l.trim()) continue;
       let d; try { d = JSON.parse(l); } catch { continue; }
-      if (d && (d.type === 'user' || d.type === 'assistant')) return d;
+      const r = d && accepte(d); if (r) return r;
     }
-  } catch {} finally { if (fd !== null) { try { fs.closeSync(fd); } catch {} } } // le descripteur se ferme aussi quand readSync lève
+    if (size <= bytes) break;
+  }
   return null;
 };
+// dernière ligne user/assistant d'un jsonl
+const tail = (f) => cherche(f, (d) => (d.type === 'user' || d.type === 'assistant' ? d : null));
 const formeOk = (d) => !!d && REQ_TR.every((k) => k in d);
 
 // collecte interne : les travailleurs gardent `_tr` (chemin du transcript) hors de la sortie publique
@@ -121,7 +130,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
   }
 
   // 4 — DAG : nœuds running, dans .planning/ et dans le dossier commun des verrous
-  const dagDirs = [path.join(root, '.planning'), ...ls(path.join(common, 'vf-driver', 'ws')).map((w) => path.join(common, 'vf-driver', 'ws', w)), path.join(common, 'vf-driver', 'repo')];
+  const dagDirs = [path.join(root, '.planning'), path.join(root, '.planning', 'missions'), ...ls(path.join(common, 'vf-driver', 'ws')).map((w) => path.join(common, 'vf-driver', 'ws', w)), path.join(common, 'vf-driver', 'repo')];
   let dags = 0, running = 0, staleNodes = 0;
   for (const d of dagDirs) for (const f of ls(d).filter((x) => x.endsWith('.dag.json'))) {
     dags++;
@@ -160,9 +169,12 @@ const MASQUES = [
 const masque = (t) => MASQUES.reduce((a, re) => a.replace(re, '[masqué]'), t);
 const lastText = (d) => {
   const c = d?.message?.content; if (!c) return '';
-  const s = typeof c === 'string' ? c : c.map((x) => x.text || (x.type === 'tool_use' ? `▸ ${x.name}${x.input?.description ? ' : ' + x.input.description : ''}` : '')).filter(Boolean).join(' ');
+  const s = typeof c === 'string' ? c : c.map((x) => x.text || (x.type === 'tool_use' ? `▸ ${x.name}${x.input?.description || x.input?.command ? ' : ' + (x.input.description || x.input.command) : ''}` : '')).filter(Boolean).join(' ');
   return masque(s.replace(/\s+/g, ' ')).slice(0, 120);
 };
+// E-5 : la dernière ligne d'une session active est presque toujours un résultat d'outil (message user sans texte) ou une réflexion : on remonte
+// jusqu'à la dernière action de l'assistant qui a un texte ou un appel d'outil.
+const lastDoing = (f) => cherche(f, (d) => (d.type === 'assistant' ? lastText(d) : null));
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 // identifiant au format strict ET présent dans une collecte fraîche : aucun chemin construit depuis l'entrée (T-67-07)
@@ -170,7 +182,8 @@ export function revealDoing(root, id, opts = {}) {
   if (typeof id !== 'string' || !ID_RE.test(id)) return { schema: 'vibeflow/cockpit-doing@1', id: String(id), doing: null, erreur: 'id-invalide' };
   const w = gather(root, opts).workers.find((x) => (x.kind === 'session' || x.kind === 'subagent') && x.id === id && x._tr);
   if (!w) return { schema: 'vibeflow/cockpit-doing@1', id, doing: null, erreur: 'inconnu' };
-  return { schema: 'vibeflow/cockpit-doing@1', id, doing: lastText(tail(w._tr)) };
+  const doing = lastDoing(w._tr);
+  return doing ? { schema: 'vibeflow/cockpit-doing@1', id, doing } : { schema: 'vibeflow/cockpit-doing@1', id, doing: null, erreur: 'sans-action' };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {

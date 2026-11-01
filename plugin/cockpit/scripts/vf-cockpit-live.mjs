@@ -20,13 +20,13 @@ const POLL_MS = 2000, DEBOUNCE_MS = 300, HOLD_MS = 600, NET_MS = 5000;
 
 const index = (g) => {
   const m = new Map();
-  for (const n of g.nodes) m.set('n:' + n.id, { st: n.st || '', foot: n.foot || '' });
+  for (const n of g.nodes) m.set('n:' + n.id, { st: n.st || '', foot: n.foot || '', sum: n.summary || '' }); // sum : le résumé d'une mission (« 2 nœuds, 1 fait ») suit le direct comme son pied
   for (const f of g.files) m.set('f:' + f.p, { st: f.st || '', foot: f.foot || '' });
   return m;
 };
 const diff = (a, b) => {
   const patch = []; let added = 0, removed = 0;
-  for (const [ref, v] of b) { const o = a.get(ref); if (!o) { added++; continue; } if (o.st !== v.st || o.foot !== v.foot) patch.push({ ref, ...v }); }
+  for (const [ref, v] of b) { const o = a.get(ref); if (!o) { added++; continue; } if (o.st !== v.st || o.foot !== v.foot || o.sum !== v.sum) patch.push({ ref, ...v }); }
   for (const ref of a.keys()) if (!b.has(ref)) removed++;
   return { patch, structural: added + removed > 0, retrait: removed > 0, removed }; // retrait : même avec un ajout, une lecture tronquée en fait partie
 };

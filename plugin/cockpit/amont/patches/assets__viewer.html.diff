@@ -65,7 +65,38 @@
    // extensions add sections: 'overview' on the codebase panel, 'item' on a selected/opened item
    const where = sel && typeof sel === 'object' ? null : sel ? 'item' : state.container === 'root' ? 'overview' : state.container === 'q:answer' ? null : 'item';
    const target = sel && typeof sel === 'string' ? (sel.startsWith('x:') ? connEntity(sel) : sel.startsWith('m:') ? 'f:' + sel.slice(2) : sel) : state.container;
-@@ -2191,16 +2196,7 @@ if (EXPORTED) {
+@@ -1805,16 +1810,21 @@ async function loadCustomFlows() {
+   const S = window.FLOORPLAN_SERVER;
+   if (!S || typeof EventSource === 'undefined') return;
+   const reload = () => { toast('Map updated'); setTimeout(() => location.reload(), 500); };
+-  const es = new EventSource('/api/events?token=' + encodeURIComponent(S.token));
+-  es.addEventListener('reload', reload);
+-  es.onerror = () => {
+-    if (es.readyState !== EventSource.CLOSED) return; // a dropped connection retries on its own
+-    // every second at first (a restart takes about that long), then every 5s, for up to 30 minutes
+-    const t0 = Date.now();
+-    const check = () => fetch('/', { cache: 'no-store' }).then((r) => (r.ok ? reload() : next()), next);
+-    const next = () => { const age = Date.now() - t0; if (age < 30 * 60000) setTimeout(check, age < 30000 ? 1000 : 5000); };
+-    check();
++  const connect = () => {
++    const es = new EventSource('/api/events?token=' + encodeURIComponent(S.token));
++    es.addEventListener('reload', reload);
++    es.onerror = () => {
++      // vibeflow P21: a host page that owns the reconnection gets the lost stream (the browser would retry every second, forever)
++      if (window.FLOORPLAN_STREAM_LOST) { es.close(); window.FLOORPLAN_STREAM_LOST('map', connect); return; }
++      if (es.readyState !== EventSource.CLOSED) return; // a dropped connection retries on its own
++      // every second at first (a restart takes about that long), then every 5s, for up to 30 minutes
++      const t0 = Date.now();
++      const check = () => fetch('/', { cache: 'no-store' }).then((r) => (r.ok ? reload() : next()), next);
++      const next = () => { const age = Date.now() - t0; if (age < 30 * 60000) setTimeout(check, age < 30000 ? 1000 : 5000); };
++      check();
++    };
+   };
++  connect();
+ })();
+ 
+ async function requestFlow(prompt) {
+@@ -2191,16 +2201,7 @@ if (EXPORTED) {
    tag.textContent = isNaN(at) ? 'Exported copy' : `Exported ${at.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
    tag.title = 'A copy of this map to look around in. Asking questions needs Floorplan with Claude Code or Codex, in the codebase itself.';
    $('#proj-name').after(tag);
@@ -83,7 +114,7 @@
  }
  document.title = `${G.project.name} map`;
  $('#btn-up').onclick = up;
-@@ -2372,6 +2368,8 @@ window.Floorplan = Object.freeze({
+@@ -2372,6 +2373,8 @@ window.Floorplan = Object.freeze({
    technical, setTechnical,
    store,
    on(event, fn) { (ext.listeners[event] ||= []).push(fn); },

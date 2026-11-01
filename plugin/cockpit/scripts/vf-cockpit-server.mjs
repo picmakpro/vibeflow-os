@@ -5,6 +5,7 @@
 //   avantQuestion, modes, argsAgent } (les trois derniers : crochets P14 des questions, 67-05).
 //   GET /api/vf/events  flux SSE : retry, hello { seq, lock, who }, puis patch / structural / who / lock
 //   GET /api/vf/etat    { mode, seq, derniereMaj, clients }
+//   GET /api/vf/journal  { evenements } : les 100 derniers événements du direct (nom, séquence, date, compte), sans contenu
 //   GET /api/vf/doing?id=  dernière commande d'UNE session, à la demande (schéma vibeflow/cockpit-doing@1)
 //   GET /api/vf/modeles    { modeles, defaut, lab } : liste fermée des modèles, défaut effectif, identifiant du lab
 // La dernière commande (`doing`) ne figure jamais dans le flux ni dans un fichier : un test interne refuse
@@ -36,8 +37,17 @@ export function attach({ here, root, token, inject, log = () => {} }) {
   if (dep.avertissement) log('warn', dep.avertissement);
 
   const clients = new Set();
+  // journal du direct (derniers événements poussés, borné à 100) : GET /api/vf/journal, derrière le jeton ; que des comptes et des dates, jamais de `doing`
+  const journal = [];
+  const noter = (nom, d) => {
+    const e = { evenement: nom, seq: d?.seq ?? null, at: d?.at ?? Date.now() };
+    if (nom === 'patch') e.statuts = Array.isArray(d.patch) ? d.patch.length : 0;
+    else if (nom === 'who') e.actifs = (d.who?.workers || []).filter((w) => !w.stale).length;
+    journal.push(e); if (journal.length > 100) journal.shift();
+  };
   const diffuser = (nom, data) => {
     if (porteDoing(data)) { log('error', `événement ${nom} refusé : porte une clé doing`); return; }
+    noter(nom, data);
     const s = `event: ${nom}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const c of clients) c.write(s);
   };
@@ -63,6 +73,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
       return true;
     }
     if (url.pathname === '/api/vf/etat') { json(res, 200, { ...(live ? live.etat() : { mode: 'absent', seq: 0, derniereMaj: null }), clients: clients.size }); return true; }
+    if (url.pathname === '/api/vf/journal') { json(res, 200, { evenements: journal }); return true; }
     if (url.pathname === '/api/vf/doing') {
       const id = url.searchParams.get('id');
       if (typeof id !== 'string' || !ID_RE.test(id)) { json(res, 400, { erreur: 'id-invalide' }); return true; }

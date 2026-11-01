@@ -59,6 +59,9 @@ const j = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const v = new Function('j', 'return (' + process.argv[3] + ')')(j);
 console.log(typeof v === 'string' ? v : JSON.stringify(v));
 JS
+cat > "$AUX/stdin-js.mjs" <<'JS'
+import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); console.log(JSON.stringify(new Function('j', 'return (' + process.argv[2] + ')')(j)));
+JS
 status() { node "$AUX/get.mjs" "$@" | sed -n 1p; }
 
 # --- lab neutre + sessions fraîches dans le HOME jetable ---
@@ -149,6 +152,21 @@ echo "=== S8 — l'export ne la porte pas ==="
 node "$OUT/serve.mjs" --export "$WORK/export.html" > "$WORK/export.out" 2>&1; assert_eq "S8.1 — l'export rend 0" "$?" "0"
 assert_eq "S8.2 — témoin de données : l'export contient un fichier du lab" "$([ "$(grep -c 'util.js' "$WORK/export.html")" -ge 1 ] && echo oui || echo non)" "oui"
 assert_eq "S8.3 — ni clé doing ni marqueur dans l'export" "$(grep -cE '"doing"[[:space:]]*:' "$WORK/export.html")$(grep -c "$MARK" "$WORK/export.html")" "00"
+
+echo "=== S9 — journal du direct, nom du fichier exporté (E-7) ==="
+cat > "$AUX/post.mjs" <<'JS'
+// post.mjs <port> <chemin> <jeton> <corps> : ligne 1 = statut, ligne 2 = en-têtes (JSON)
+import http from 'node:http';
+const [, , port, p, token, body] = process.argv;
+const r = http.request({ host: '127.0.0.1', port: Number(port), path: p, method: 'POST', headers: { Host: `127.0.0.1:${port}`, 'content-type': 'application/json', 'x-vf-cockpit-token': token } }, (res) => { res.resume(); res.on('end', () => { console.log(res.statusCode); console.log(JSON.stringify(res.headers)); }); });
+r.on('error', (e) => console.log('ERR ' + e.code)); r.end(body);
+JS
+J9="$(node "$AUX/get.mjs" "$PORT" /api/vf/journal "" "$TOK")"
+assert_eq "S9.1 — journal avec jeton : 200" "$(sed -n 1p <<<"$J9")" "200"
+assert_eq "S9.2 — le journal compte les événements poussés (évènement, séquence, date)" "$(sed -n '3,$p' <<<"$J9" | node "$AUX/stdin-js.mjs" 'Array.isArray(j.evenements)&&j.evenements.length>=1&&j.evenements.every(e=>e.evenement&&"seq" in e&&e.at)')" "true"
+assert_eq "S9.3 — le journal sans jeton : 403" "$(status "$PORT" /api/vf/journal)" "403"
+assert_eq "S9.4 — aucune clé doing dans le journal" "$(sed -n '3,$p' <<<"$J9" | grep -cE '"doing"[[:space:]]*:')" "0"
+assert_has "S9.5 — le fichier exporté porte un nom français (« -carte.html »)" "$(node "$AUX/post.mjs" "$PORT" /api/export "$TOK" "{}" | sed -n 2p)" '-carte.html'
 stop_srv
 
 echo ""

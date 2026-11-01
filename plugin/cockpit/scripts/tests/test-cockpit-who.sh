@@ -180,6 +180,36 @@ assert_eq "W10.1 — schéma dans la sortie de la CLI" "$(grep -c '"schema": "vi
 assert_eq "W10.2 — aucune clé doing" "$(grep -c '"doing"' "$WORK/cli.json")" "0"
 assert_eq "W10.3 — le marqueur est absent" "$(grep -c "$MARK" "$WORK/cli.json")" "0"
 
+echo "=== W11 — E-5 : la dernière action d'une session active, dernière ligne = résultat d'outil ==="
+cat > "$AUX/mk-e5.mjs" <<'JS'
+// mk-e5.mjs <fichier> <cwd> <forme> : transcript Claude Code. forme = outil (assistant tool_use puis user tool_result court)
+//   · geant (… puis un tool_result de 300 Kio sur UNE ligne) · sansaction (que des lignes user)
+import fs from 'node:fs';
+const [, , f, cwd, forme] = process.argv;
+const base = { cwd, sessionId: 'aaaa1111-2222-3333-4444-555566667777', gitBranch: 'main', version: '2.1.316' };
+const L = (o, t) => JSON.stringify({ ...base, timestamp: t, ...o });
+const lignes = [L({ type: 'user', message: { content: 'salut' } }, '2026-11-01T10:00:00Z')];
+if (forme !== 'sansaction') {
+  lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { description: 'COMMANDE-E5', command: 'echo bonjour' } }] } }, '2026-11-01T10:00:05Z'));
+  lignes.push(L({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'x', content: forme === 'geant' ? 'x'.repeat(300 * 1024) : 'ok' }] } }, '2026-11-01T10:00:06Z'));
+} else lignes.push(L({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'x', content: 'ok' }] } }, '2026-11-01T10:00:06Z'));
+fs.writeFileSync(f, lignes.join('\n') + '\n');
+JS
+H11="$WORK/home11"; mkdir -p "$H11/.claude/projects/-lab"
+for forme in outil geant; do
+  node "$AUX/mk-e5.mjs" "$H11/.claude/projects/-lab/$SID.jsonl" "$LAB" "$forme"
+  assert_has "W11 — forme « $forme » : la dernière action est rendue (pas « indisponible »)" "$(Q reveal "$LAB" "$H11" "$NOSCRIPTS" "$SID" | node "$AUX/stdin-get.mjs" 'j.doing')" "COMMANDE-E5"
+done
+node "$AUX/mk-e5.mjs" "$H11/.claude/projects/-lab/$SID.jsonl" "$LAB" sansaction
+R11="$(Q reveal "$LAB" "$H11" "$NOSCRIPTS" "$SID")"
+assert_eq "W11.3 — sans aucune action de l'assistant : doing nul, cause nommée" "$(printf '%s' "$R11" | node "$AUX/stdin-get.mjs" '[j.doing,j.erreur]')" '[null,"sans-action"]'
+
+echo "=== W12 — E-7 : un nœud running d'un DAG sous .planning/missions apparaît « au travail » ==="
+LABM="$WORK/labm"; mkdir -p "$LABM/.planning/missions"; git -C "$LABM" init -q
+printf '{"nodes":[{"id":"b","step":"seconde étape","stage":"","deps":[],"scope":[],"status":"running"}]}\n' > "$LABM/.planning/missions/demo.dag.json"
+Q who "$LABM" "$H0" "$NOSCRIPTS" > "$WORK/whom.json"
+assert_eq "W12.1 — le nœud running du DAG de mission est un travailleur dag-node" "$(G "$WORK/whom.json" 'j.workers.filter(w=>w.kind==="dag-node").map(w=>w.id).join(",")')" "b"
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"

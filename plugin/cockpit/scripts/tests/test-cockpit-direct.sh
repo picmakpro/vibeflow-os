@@ -188,6 +188,16 @@ wait "$C"
 assert_eq "D5.4 — en scrutation, un PLAN ajouté produit un structural" "$(node "$AUX/ev.mjs" "$WORK/e5s.jsonl" 'E.filter(e=>e.event==="structural").length')" "1"
 stop_srv
 
+echo "=== D6 — le résumé d'une carte de mission suit le direct (« 2 nœuds, 1 fait ») ==="
+printf '{"nodes":[{"id":"a","step":"un","deps":[],"status":"running"},{"id":"b","step":"deux","deps":["a"],"status":"ready"}]}\n' > "$LAB/.planning/missions/MISSION-1-x.dag.json"
+demarrer "$LAB"
+: > "$WORK/e6.jsonl"; node "$AUX/sse.mjs" "$PORT" "$PTOK" 9000 patch "$WORK/e6.jsonl" & C=$!
+attendre_hello "$WORK/e6.jsonl"
+printf '{"nodes":[{"id":"a","step":"un","deps":[],"status":"done"},{"id":"b","step":"deux","deps":["a"],"status":"ready"}]}\n' > "$LAB/.planning/missions/MISSION-1-x.dag.json"
+wait "$C"
+assert_has "D6.1 — le patch de la mission porte son résumé à jour (1 nœud fait)" "$(node "$AUX/ev.mjs" "$WORK/e6.jsonl" 'E.filter(e=>e.event==="patch").flatMap(e=>e.data.patch).filter(p=>p.ref==="n:dag-MISSION-1-x").map(p=>p.sum).join("|")')" "2 nœuds, 1 fait."
+stop_srv
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"

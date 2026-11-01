@@ -1810,16 +1810,21 @@ async function loadCustomFlows() {
   const S = window.FLOORPLAN_SERVER;
   if (!S || typeof EventSource === 'undefined') return;
   const reload = () => { toast('Map updated'); setTimeout(() => location.reload(), 500); };
-  const es = new EventSource('/api/events?token=' + encodeURIComponent(S.token));
-  es.addEventListener('reload', reload);
-  es.onerror = () => {
-    if (es.readyState !== EventSource.CLOSED) return; // a dropped connection retries on its own
-    // every second at first (a restart takes about that long), then every 5s, for up to 30 minutes
-    const t0 = Date.now();
-    const check = () => fetch('/', { cache: 'no-store' }).then((r) => (r.ok ? reload() : next()), next);
-    const next = () => { const age = Date.now() - t0; if (age < 30 * 60000) setTimeout(check, age < 30000 ? 1000 : 5000); };
-    check();
+  const connect = () => {
+    const es = new EventSource('/api/events?token=' + encodeURIComponent(S.token));
+    es.addEventListener('reload', reload);
+    es.onerror = () => {
+      // vibeflow P21: a host page that owns the reconnection gets the lost stream (the browser would retry every second, forever)
+      if (window.FLOORPLAN_STREAM_LOST) { es.close(); window.FLOORPLAN_STREAM_LOST('map', connect); return; }
+      if (es.readyState !== EventSource.CLOSED) return; // a dropped connection retries on its own
+      // every second at first (a restart takes about that long), then every 5s, for up to 30 minutes
+      const t0 = Date.now();
+      const check = () => fetch('/', { cache: 'no-store' }).then((r) => (r.ok ? reload() : next()), next);
+      const next = () => { const age = Date.now() - t0; if (age < 30 * 60000) setTimeout(check, age < 30000 ? 1000 : 5000); };
+      check();
+    };
   };
+  connect();
 })();
 
 async function requestFlow(prompt) {
