@@ -13,7 +13,7 @@ const ARGS = ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run
 
 // ouvrir(chrome) -> session { send, ev, naviguer, attendre, stable, fermer, violations }
 export async function ouvrir(chrome, { csp = false } = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cdp-chrome-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `cdp-chrome-${process.env.VF_CDP_TAG ? process.env.VF_CDP_TAG + '-' : ''}`)); // VF_CDP_TAG : marque de la suite (hygiene.sh), pour retrouver ce Chrome-là et nul autre
   const ch = spawn(chrome, [...ARGS, `--user-data-dir=${dir}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, HOME: process.env.REAL_HOME || process.env.HOME } });
   let sorti = false; const sortie = new Promise((r) => ch.once('exit', () => { sorti = true; r(); }));
   const fermer = async () => { try { ch.kill('SIGKILL'); } catch {} if (!sorti) await Promise.race([sortie, pause(3000)]); try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} };
