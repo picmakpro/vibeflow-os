@@ -14,7 +14,8 @@ WORK="$(mktemp -d)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
 export HOME="$WORK/home"
 SRV=""
 stop_srv() { [ -n "$SRV" ] && { kill "$SRV" 2>/dev/null; wait "$SRV" 2>/dev/null; }; SRV=""; }
-trap 'stop_srv; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
+trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
+. "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -199,6 +200,7 @@ wait "$C"
 assert_has "D6.1 — le patch de la mission porte son résumé à jour (1 nœud fait)" "$(node "$AUX/ev.mjs" "$WORK/e6.jsonl" 'E.filter(e=>e.event==="patch").flatMap(e=>e.data.patch).filter(p=>p.ref==="n:dag-MISSION-1-x").map(p=>p.sum).join("|")')" "2 nœuds, 1 fait."
 stop_srv
 
+vf_hyg_assert
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"

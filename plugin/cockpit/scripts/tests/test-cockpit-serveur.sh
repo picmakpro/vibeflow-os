@@ -15,7 +15,8 @@ WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"
 export HOME="$WORK/home"
 SRV=""
 stop_srv() { [ -n "$SRV" ] && { kill "$SRV" 2>/dev/null; wait "$SRV" 2>/dev/null; }; SRV=""; }
-trap 'stop_srv; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
+trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
+. "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -170,6 +171,7 @@ assert_eq "S9.4 — aucune clé doing dans le journal" "$(sed -n '3,$p' <<<"$J9"
 assert_has "S9.5 — le fichier exporté porte un nom français (« -carte.html »)" "$(node "$AUX/post.mjs" "$PORT" /api/export "$TOK" "{}" | sed -n 2p)" '-carte.html'
 stop_srv
 
+vf_hyg_assert
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"

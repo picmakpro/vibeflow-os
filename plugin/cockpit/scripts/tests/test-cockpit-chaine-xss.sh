@@ -22,8 +22,9 @@ export REAL_HOME="$HOME"; export HOME="$WORK/home"
 export CHROME_SESSION="$(cd "$(dirname "$0")" && pwd)/chrome-session.mjs"
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
 PIDS=()
-cleanup() { for p in ${PIDS[@]+"${PIDS[@]}"}; do kill "$p" 2>/dev/null; wait "$p" 2>/dev/null; done; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }
+cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }
 trap cleanup EXIT
+. "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -119,7 +120,7 @@ manche() {
   local m; for m in "$@"; do mutant "$o" "$m" || { R_CHARGES="mutant-sans-effet"; return; }; done
   rm -f "$WORK/MARQUEUR-SCRIPT-DU-LAB"; : > "$COLL_LOG"
   local eng="$SCRIPTS/../skills/cockpit-moteur"
-  ( cd "$LAB" && VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" node "$o/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-$label.out" 2>&1 ) &
+  ( cd "$LAB" && VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-$label.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
   local pid=$!; PIDS+=($pid)
   for _ in $(seq 1 100); do [ -s "$o/.cache/server.json" ] && grep -q '"port"' "$o/.cache/server.json" && break; sleep 0.1; done
   local port; port="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)")"
@@ -201,6 +202,7 @@ assert_eq "C4.2 — témoin : le jeton est exfiltré (la CSP est retirée)" "$R_
 assert_eq "C4.3 — maillon rompu : le script désigné par le lab n'est PAS exécuté" "$R_MARQUEUR" "non"
 fi
 
+vf_hyg_assert
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"

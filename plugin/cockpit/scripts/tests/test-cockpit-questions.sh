@@ -14,7 +14,8 @@ WORK="$(mktemp -d)"; mkdir -p "$WORK/aux" "$WORK/home"; WORK="$(cd "$WORK" && pw
 export HOME="$WORK/home"; NODE="$(command -v node)"
 SRV=""
 stop_srv() { [ -n "$SRV" ] && { kill "$SRV" 2>/dev/null; wait "$SRV" 2>/dev/null; }; SRV=""; }
-trap 'stop_srv; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
+trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
+. "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 assert_has() { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -205,6 +206,7 @@ if [ -n "$MESURE" ]; then
   assert_eq "Q11.4 — la comparaison a porté sur une constante non vide et un fichier attendu non vide" "$([ -s "$WORK/const.txt" ] && [ -s "$WORK/attendu.txt" ] && echo oui || echo non)" "oui"
 else echo "  ⊘ Q11 sauté : mesure absente du dépôt installé (non comptée comme réussie)"; fi
 
+vf_hyg_assert
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"

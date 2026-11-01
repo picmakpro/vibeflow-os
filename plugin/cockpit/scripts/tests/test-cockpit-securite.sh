@@ -11,7 +11,8 @@ SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && p
 ENG="$SCRIPTS/../skills/cockpit-moteur"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
-PIDS=(); cleanup() { for p in ${PIDS[@]+"${PIDS[@]}"}; do kill "$p" 2>/dev/null; wait "$p" 2>/dev/null; done; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
+PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
+. "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 assert_has() { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): [$3]"; echo "     obtenu:  [${2:0:300}]"; FAIL=$((FAIL+1)); fi; }
@@ -88,7 +89,7 @@ MD
 }
 srv() { # srv <sortie> [PATH-extra] -> SRV_PORT SRV_PID ; serveur depuis la sortie, avec les deux chemins du module (comme le lanceur)
   local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
-  ( cd "$lab" && PATH="${2:+$2:}$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) &
+  ( cd "$lab" && PATH="${2:+$2:}$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
   SRV_PID=$!; PIDS+=($SRV_PID)
   for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
   SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
@@ -227,7 +228,7 @@ assert_eq "E3 — l'export (serve.mjs) échappe de même" "$(grep -c "replace(/<
 
 echo "=== C — sans vf-cockpit-server.mjs : échec franc ==="
 cp -R "$OUT" "$WORK/sortie-sans"; rm -f "$WORK/sortie-sans/vf-cockpit-server.mjs"
-( cd "$LAB" && node "$WORK/sortie-sans/serve.mjs" --no-open --port 5990 > "$WORK/c.out" 2>&1 & CP=$!; sleep 2; if kill -0 $CP 2>/dev/null; then echo vivant > "$WORK/c.etat"; kill $CP; else echo mort > "$WORK/c.etat"; fi; wait $CP 2>/dev/null )
+( cd "$LAB"; node "$WORK/sortie-sans/serve.mjs" --no-open --port $(libre) > "$WORK/c.out" 2>&1 & CP=$!; sleep 2; if kill -0 $CP 2>/dev/null; then echo vivant > "$WORK/c.etat"; kill $CP; else echo mort > "$WORK/c.etat"; fi; wait $CP 2>/dev/null )
 assert_eq "C1 — le serveur refuse de démarrer (jamais de repli sur l'agent amont)" "$(cat "$WORK/c.etat")" "mort"
 assert_has "C2 — message en français" "$(cat "$WORK/c.out")" "est absent"
 
@@ -271,6 +272,7 @@ srv "$LM/.vibeflow/cockpit"; XM="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 
 assert_has "X3 — témoin rouge : sans h() sur le pied de carte, le champ « foot » est détecté" "$(printf '%s' "$XM" | node "$AUX/ev.mjs" '[...new Set(j.resultats.flatMap(r=>r.valeur||[]))]')" "foot"
 fi
 
+vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

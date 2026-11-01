@@ -5,7 +5,7 @@
 # GARDE-FOUS (incident du 2026-11-02 : une marque vide faisait passer tout processus de la machine pour « de la suite », puis TERM/KILL à tous) :
 #   G1 la marque atteint awk par son environnement (ps | VF_T=… awk), jamais par un préfixe qui ne vise que ps
 #   G2 marque validée avant tout usage (tmp. + ≥ 6 alphanumériques, ≥ 8 caractères) — sinon FAIL nommé, et plus rien n'est listé ni tué
-#   G3 plafond anti-massacre : plus de VF_HYG_MAX (20) processus marqués → aucun kill, FAIL « marque trop large »
+#   G3 plafond anti-massacre : plus de VF_HYG_MAX (20) processus marqués → aucun kill, FAIL « marque trop large » (assert : rouge ; fin : rc 1)
 #   G4 jamais $$, $PPID, BASHPID ni un ancêtre du shell de la suite, jamais pid ≤ 1
 #   G5 VF_HYG_DRY=1 : afficher ce qui serait tué, ne rien tuer
 #   vf_hyg_init      valide et pose la marque, exporte VF_CDP_TAG, arme les signaux, compte « avant » (+ fuite injectée VF_TEST_INJECTER_FUITE=1|chrome)
@@ -32,9 +32,10 @@ vf_hyg_ancetres() { ps -eo pid,ppid | VF_ME="$$" VF_PP="$PPID" VF_B="${BASHPID:-
 vf_hyg_vivants() {
   vf_hyg_tag_ok || return 0
   ps -eo pid,ppid,args | VF_T="$VF_HYG_TAG" VF_ME="$$" VF_PP="$PPID" VF_B="${BASHPID:-$$}" awk '
-    BEGIN { t = ENVIRON["VF_T"]; if (length(t) < 8) exit }
+    BEGIN { t = ENVIRON["VF_T"]; ok = (length(t) >= 8 && t ~ /^tmp\.[A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]+$/) }
     NR > 1 { pid[NR] = $1; pp[$1] = $2; a = $0; sub(/^ *[0-9]+ +[0-9]+ +/, "", a); arg[NR] = a }
     END {
+      if (!ok) exit   # un exit dans BEGIN exécuterait quand même END : la garde vit ici
       n = split(ENVIRON["VF_ME"] " " ENVIRON["VF_PP"] " " ENVIRON["VF_B"], s, " ")
       for (i = 1; i <= n; i++) { p = s[i]; k = 0; while (p + 0 > 1 && k < 64) { prot[p] = 1; p = pp[p]; k++ } }
       for (r = 2; r <= NR; r++) if ((r in pid) && !(pid[r] in prot) && index(arg[r], t) > 0) print pid[r] " " arg[r]
@@ -65,6 +66,7 @@ vf_hyg_arreter() {
 vf_hyg_assert() {
   local v i; vf_hyg_arreter
   for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do v="$(vf_hyg_vivants)"; [ -z "$v" ] && break; sleep 0.2; done  # grâce bornée (3 s) : les processus fils d'un Chrome tué s'éteignent seuls
+  if [ "$(printf '%s\n' "$v" | grep -c .)" -gt "$VF_HYG_MAX" ]; then assert_eq "H1 — marque trop large ($VF_HYG_TAG) : plus de $VF_HYG_MAX processus la portent, aucun kill" "$(printf '%s\n' "$v" | grep -c .)" "0"; return 0; fi
   assert_eq "H0 — aucun serveur ni Chrome de cette suite ne survit (avant : ${VF_HYG_AVANT:-0})" "${v:-aucun}" "aucun"
 }
 vf_hyg_fin() {
@@ -73,7 +75,7 @@ vf_hyg_fin() {
   for i in 1 2 3 4; do
     v="$(vf_hyg_vivants | awk '{print $1}')"; [ -n "$v" ] || break
     n="$(printf '%s\n' "$v" | wc -l | tr -d ' ')"
-    if [ "$n" -gt "$VF_HYG_MAX" ]; then echo "  ❌ FAIL — H1 marque trop large : $n processus portent la marque [$VF_HYG_TAG] (plafond $VF_HYG_MAX) — aucun kill" >&2; return 0; fi
+    if [ "$n" -gt "$VF_HYG_MAX" ]; then echo "  ❌ FAIL — H1 marque trop large : $n processus portent la marque [$VF_HYG_TAG] (plafond $VF_HYG_MAX) — aucun kill" >&2; return 1; fi
     # shellcheck disable=SC2086
     vf_hyg_kill $([ "$i" -lt 3 ] && echo TERM || echo KILL) $v; sleep 0.3
   done

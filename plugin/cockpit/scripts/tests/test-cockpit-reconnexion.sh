@@ -11,7 +11,8 @@ CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/
 if [ -z "$CHROME" ]; then echo "  ⊘ SUITE SAUTÉE : aucun navigateur — la reconnexion à recul n'est PAS vérifiée, non comptée comme réussie"; exit 0; fi
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
-PIDS=(); cleanup() { for p in ${PIDS[@]+"${PIDS[@]}"}; do kill "$p" 2>/dev/null; wait "$p" 2>/dev/null; done; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
+PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
+. "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [${2:0:400}]"; FAIL=$((FAIL+1)); fi; }
 assert_has() { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): [$3]"; echo "     obtenu:  [${2:0:400}]"; FAIL=$((FAIL+1)); fi; }
@@ -27,14 +28,16 @@ mklab() {
 }
 srv() { # srv <sortie> -> SRV_PORT SRV_PID
   local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
-  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) &
+  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
   SRV_PID=$!; PIDS+=($SRV_PID)
   for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
   SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
 }
 reco() { # le PID du serveur est celui que celui-ci écrit dans server.json (SRV_PID est celui du sous-shell)
   local o="$1/.vibeflow/cockpit" pid; srv "$o"; pid="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).pid)")"
-  REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-reco.mjs" "$CHROME" "http://127.0.0.1:$SRV_PORT/$2" "$pid" "$SRV_PORT"
+  local r; r="$(REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-reco.mjs" "$CHROME" "http://127.0.0.1:$SRV_PORT/$2" "$pid" "$SRV_PORT")"
+  vf_hyg_kill TERM "$pid" # la mesure l'arrête déjà ; si elle a échoué avant (Chrome sous charge), le serveur ne doit pas survivre à l'appel
+  printf '%s\n' "$r"
 }
 
 LAB="$WORK/lab"; mklab "$LAB"
@@ -53,6 +56,7 @@ assert_eq "N4.0 — le mutant retire bien l'inscription de la reconnexion à rec
 RM="$(reco "$LABM" project.html)"
 assert_eq "N4.1 — témoin rouge : sans le recul, des requêtes continuent entre 5 s et 9 s (N2.1 rougirait)" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" '!j.erreur && j.tard>0')" "true"
 
+vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1
