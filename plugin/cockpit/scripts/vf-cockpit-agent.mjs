@@ -4,7 +4,9 @@
 // élément par élément et dans l'ordre : aucun argument ajouté de mémoire. Pourquoi chaque pièce (mesuré) :
 //   - mode explicite `dontAsk` : un `bypassPermissions` de l'utilisateur défait toute liste sans mode explicite ;
 //   - `Read/Grep/Glob(./**)` : les noms nus laissent lire hors de la racine du lab ;
-//   - Bash limité aux deux scripts de requête : tout autre Bash, composé compris, est refusé.
+//   - Bash limité aux deux scripts de requête : tout autre Bash, composé compris, est refusé ;
+//   - `--setting-sources ""` (mesuré le 2026-11-01, correction 67-FIX-A) : ni les hooks du lab, ni ceux de l'utilisateur, ni aucune règle
+//     `permissions.allow` des réglages (utilisateur compris) ne sont chargés ; `--strict-mcp-config` : aucun serveur MCP hors configuration explicite.
 // Exports : MODELES, MODELE_DEFAUT, ARGS_CONFINEMENT, resoudreModele({ choix, env }), argsAgent(argsAmont, { modele }).
 export const MODELES = ['sonnet', 'opus', 'haiku'];
 export const MODELE_DEFAUT = 'sonnet';
@@ -13,6 +15,8 @@ export const ARGS_CONFINEMENT = [
   '--permission-mode', 'dontAsk',
   '--tools', 'Read,Grep,Glob,Bash',
   '--allowedTools', 'Bash(node .vibeflow/cockpit/query.mjs:*)', 'Bash(node .vibeflow/cockpit/vf-cockpit-query.mjs:*)', 'Read(./**)', 'Grep(./**)', 'Glob(./**)',
+  '--setting-sources', '',
+  '--strict-mcp-config',
 ];
 
 // Préséance : sélecteur (corps de la requête) > variable VF_COCKPIT_MODEL > sonnet. Le choix du sélecteur vient du navigateur :
