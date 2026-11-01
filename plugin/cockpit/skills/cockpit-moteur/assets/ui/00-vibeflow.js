@@ -59,6 +59,7 @@
   const V = G.meta.vf;
   if (TAB === 'project' && V) {
     SC.setOverview(() => {
+      const V = G.meta.vf; // relu à chaque rendu : le direct (70-vf-live.js) remplace G.meta.vf sur un patch
       const ms = V.milestones.map((m) => {
         const pc = m.total ? Math.round((100 * m.done) / m.total) : 0;
         return `<div class="vf-ms" data-vf-go="${h(m.id)}"><div class="t"><span>${h(m.key)}</span><span>${m.done}/${m.total} · ${pc} %</span></div><div class="vf-bar" style="--c-st:var(--st-${m.st})"><i style="width:${pc}%"></i></div></div>`;

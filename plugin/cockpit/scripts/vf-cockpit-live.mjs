@@ -1,0 +1,147 @@
+// vf-cockpit-live — le direct du cockpit, sans serveur HTTP propre (67-04, P67-D-13, P67-D-16 ; promu du spike 003).
+// Surveille <root>/.planning et le dossier des verrous (<git-common-dir>/vf-driver), reconstruit le graphe Projet en
+// processus, pousse le diff de statuts à `onEvent`, et réécrit <sortie>/project.html par fichier temporaire puis
+// rename quand la structure change. Lecture seule sur le dépôt observé.
+// Export : startLive({ root, sortie, onEvent, log, mode }) -> { etat(), snapshot(), stop() }.
+//   mode : 'auto' (fs.watch récursif, repli par scrutation des mtimes si l'appel lève ou si le watcher échoue),
+//          'poll' (scrutation d'emblée) ; défaut = VF_COCKPIT_WATCH. etat().mode vaut 'watch' ou 'poll'.
+// Événements : patch { seq, at, patch, vf? } · structural { seq, at } · who { seq, at, who } · lock { seq, at, lock }.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { buildProjectGraph } from './vf-cockpit-project.mjs';
+import { collectWho } from './vf-cockpit-who.mjs';
+import { driverLockScript, gitCommonDir, resolveScriptsDir } from './vf-cockpit-paths.mjs';
+import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
+
+const IGNORE = /(^|\/)\.git(\/|$)|\.tmp$|~$|\.swp$/;
+const POLL_MS = 2000, DEBOUNCE_MS = 300, HOLD_MS = 600, NET_MS = 5000;
+
+const index = (g) => {
+  const m = new Map();
+  for (const n of g.nodes) m.set('n:' + n.id, { st: n.st || '', foot: n.foot || '' });
+  for (const f of g.files) m.set('f:' + f.p, { st: f.st || '', foot: f.foot || '' });
+  return m;
+};
+const diff = (a, b) => {
+  const patch = []; let added = 0, removed = 0;
+  for (const [ref, v] of b) { const o = a.get(ref); if (!o) { added++; continue; } if (o.st !== v.st || o.foot !== v.foot) patch.push({ ref, ...v }); }
+  for (const ref of a.keys()) if (!b.has(ref)) removed++;
+  return { patch, structural: added + removed > 0, onlyRemoved: removed > 0 && !added, removed };
+};
+// scrutation : « chemin -> mtime:taille » de tout fichier sous dir (hors chemins ignorés)
+const empreinte = (dir) => {
+  const out = new Map();
+  const walk = (d, rel) => {
+    let ents = []; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of ents) {
+      const r = rel ? rel + '/' + e.name : e.name; if (IGNORE.test(r)) continue;
+      if (e.isDirectory()) walk(path.join(d, e.name), r);
+      else { try { const s = fs.statSync(path.join(d, e.name)); out.set(r, `${s.mtimeMs}:${s.size}`); } catch {} }
+    }
+  };
+  walk(dir, ''); return out;
+};
+const changes = (a, b) => [...new Set([...a.keys(), ...b.keys()])].filter((k) => a.get(k) !== b.get(k));
+
+export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mode = process.env.VF_COCKPIT_WATCH || 'auto' }) {
+  root = path.resolve(root);
+  const common = gitCommonDir(root);
+  const driverDir = process.env.VF_DRIVER_DIR || (common && path.join(common, 'vf-driver'));
+  const scriptsDir = resolveScriptsDir(sortie);
+  const state = { mode: mode === 'poll' ? 'poll' : 'watch', seq: 0, derniereMaj: null };
+  const timers = new Set(), watchers = new Map();
+  let stopped = false;
+
+  const lockStatus = () => {
+    const dl = driverLockScript({ scriptsDir, labRoot: root, home: os.homedir() });
+    if (dl.etat === 'absent') return { available: false };
+    try { return JSON.parse(execFileSync('bash', [dl.chemin, 'status', '--all'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })); }
+    catch (e) { try { return JSON.parse(e.stdout); } catch { return { error: String(e.message).slice(0, 200) }; } }
+  };
+  const whoNow = () => { try { return collectWho(root, { scriptsDir }); } catch (e) { return { workers: [], sources: {}, error: e.message }; } };
+  // « qui » : poussé seulement quand la liste change (pas à chaque seconde d'âge qui passe)
+  const whoSig = (w) => JSON.stringify((w.workers || []).map((x) => [x.kind, x.id, x.tree, !!x.stale, x.task || '']));
+
+  let graph = buildProjectGraph(root), idx = index(graph), lock = lockStatus(), who = whoNow();
+  const snapshot = () => ({ seq: state.seq, lock, who });
+  const emit = (nom, data) => { try { onEvent(nom, data); } catch (e) { log('error', `onEvent(${nom}) : ${e.message}`); } };
+
+  // project.html : le gabarit est la page courante de la sortie ; meta.root et meta.vfLogos viennent de l'assemblage
+  const ecrirePage = (g) => {
+    const f = path.join(sortie, 'project.html');
+    const html = fs.readFileSync(f, 'utf8');
+    try { const old = extraireGraphe(html); g.meta.root = old.meta?.root; g.meta.vfLogos = old.meta?.vfLogos; } catch {}
+    fs.writeFileSync(f + '.tmp', insererGraphe(html, g));
+    fs.renameSync(f + '.tmp', f); // jamais de page à moitié écrite
+  };
+
+  const refresh = (reasons) => {
+    if (stopped) return;
+    let g;
+    try { g = buildProjectGraph(root); } catch (e) { log('error', `graphe illisible, état précédent gardé : ${String(e.message).slice(0, 200)}`); return; }
+    const nidx = index(g);
+    const { patch, structural, onlyRemoved, removed } = diff(idx, nidx);
+    // dag.sh save() peut laisser un fichier tronqué : un retrait pur n'est cru qu'à la seconde lecture, 600 ms plus tard
+    if (onlyRemoved && !reasons.includes('confirm')) {
+      log('hold', `${removed} carte(s) disparue(s) : seconde lecture avant de croire`);
+      const t = setTimeout(() => { timers.delete(t); refresh(['confirm', ...reasons]); }, HOLD_MS); timers.add(t);
+      return;
+    }
+    const nlock = lockStatus();
+    const lockChanged = JSON.stringify(nlock) !== JSON.stringify(lock);
+    const vfChanged = JSON.stringify(g.meta?.vf) !== JSON.stringify(graph.meta?.vf);
+    graph = g; idx = nidx; lock = nlock; state.seq++; state.derniereMaj = new Date().toISOString();
+    if (structural) { try { ecrirePage(g); } catch (e) { log('error', `project.html non réécrit : ${e.message}`); } }
+    log('refresh', `${patch.length} patch(s)${structural ? ', structure' : ''}${lockChanged ? ', verrou' : ''}`);
+    const at = Date.now();
+    if (structural) emit('structural', { seq: state.seq, at });
+    else if (patch.length || vfChanged) emit('patch', { seq: state.seq, at, patch, ...(vfChanged ? { vf: g.meta.vf } : {}) });
+    if (lockChanged) emit('lock', { seq: state.seq, at, lock });
+  };
+
+  // anti-rebond : une seule régénération par rafale
+  let debounce = null, pending = [];
+  const poke = (src, file) => {
+    if (file && src === 'planning' && IGNORE.test(String(file).replace(/\\/g, '/'))) return;
+    pending.push(`${src}:${file || '?'}`);
+    clearTimeout(debounce);
+    debounce = setTimeout(() => { const r = pending; pending = []; refresh(r); }, DEBOUNCE_MS);
+  };
+
+  const scruter = (src, dir) => {
+    let prev = empreinte(dir);
+    const t = setInterval(() => { const cur = empreinte(dir); const ch = changes(prev, cur); prev = cur; if (ch.length) poke(src, ch[0]); }, POLL_MS);
+    t.unref?.(); timers.add(t);
+    watchers.set(src, { close: () => clearInterval(t) });
+    log('watch', `scrutation de ${src} (${POLL_MS} ms)`);
+  };
+  const surveiller = (src, dir) => {
+    if (watchers.has(src) || !dir || !fs.existsSync(dir)) return;
+    if (state.mode === 'poll') return scruter(src, dir);
+    try {
+      const w = fs.watch(dir, { recursive: true }, (_, f) => poke(src, f));
+      w.on('error', () => { try { w.close(); } catch {} watchers.delete(src); state.mode = 'poll'; log('watch', `watcher perdu : ${src}, repli`); surveiller(src, dir); });
+      watchers.set(src, w); log('watch', `surveille ${src}`);
+    } catch (e) { state.mode = 'poll'; log('watch', `récursif refusé (${e.message}), repli`); scruter(src, dir); }
+  };
+  surveiller('planning', path.join(root, '.planning'));
+  surveiller('driver', driverDir);
+
+  // filet toutes les 5 s : l'âge d'un verrou avance sans écriture, et vf-driver/ peut naître après le démarrage
+  const filet = setInterval(() => {
+    surveiller('driver', driverDir);
+    const nw = whoNow();
+    if (whoSig(nw) !== whoSig(who)) { who = nw; emit('who', { seq: ++state.seq, at: Date.now(), who }); }
+    const n = lockStatus();
+    if (JSON.stringify(n) !== JSON.stringify(lock)) { lock = n; emit('lock', { seq: ++state.seq, at: Date.now(), lock }); }
+  }, NET_MS);
+  filet.unref?.(); timers.add(filet);
+
+  return {
+    etat: () => ({ mode: state.mode, seq: state.seq, derniereMaj: state.derniereMaj }),
+    snapshot,
+    stop() { stopped = true; clearTimeout(debounce); for (const t of timers) { clearTimeout(t); clearInterval(t); } for (const w of watchers.values()) { try { w.close(); } catch {} } },
+  };
+}

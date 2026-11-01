@@ -15,37 +15,25 @@
  const argv = process.argv.slice(2);
  const opt = (name, dflt) => { const i = argv.indexOf('--' + name); return i < 0 ? dflt : argv[i + 1]; };
  const has = (name) => argv.includes('--' + name);
-@@ -169,6 +170,11 @@ if (cli) { try { version = execFileSync(cli.cmd, [...cli.args, '--version'], { e
+@@ -169,6 +170,9 @@ if (cli) { try { version = execFileSync(cli.cmd, [...cli.args, '--version'], { e
  // code). Loaded at start and again whenever the map is rebuilt.
  const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange })};</script>`;
  let page, G, core, MODES;
-+// vibeflow P7 : l'onglet Projet (project.html) a sa barre de question, sur son propre graphe. Son jeton dit de
-+// quel onglet vient la question ; vf-ask.mjs répond seul aux questions courantes, l'agent au reste.
-+const VF = fs.existsSync(path.join(here, 'vf-ask.mjs')) ? await import(new URL('./vf-ask.mjs', import.meta.url)) : null;
-+const ptoken = crypto.randomBytes(16).toString('hex');
-+let pageP = null, GP = null, MODESP = null;
++// vibeflow P13 : serveur unique. Le direct, « au travail » et la page Projet vivent dans vf-cockpit-server.mjs, posé à côté de
++// vibeflow P13 : ce fichier ; absent, le serveur reste celui de l'amont. Même port que la page, aucun en-tête CORS.
++const VF = fs.existsSync(path.join(here, 'vf-cockpit-server.mjs')) ? (await import(new URL('./vf-cockpit-server.mjs', import.meta.url))).attach({ here, root, token, inject, log: (cat, msg) => { if (cat === 'error') console.error(`vf-cockpit : ${msg}`); } }) : null; // vibeflow P13
  function load() {
    const html = fs.readFileSync(path.join(here, 'index.html'), 'utf8');
    const g = JSON.parse(fs.readFileSync(path.join(here, 'graph.json'), 'utf8'));
-@@ -184,6 +190,11 @@ function load() {
+@@ -184,6 +188,7 @@ function load() {
      flow: { instructions: core.floorplanFlowInstructions(G, 'cli'), schema: core.FLOORPLAN_FLOW_SCHEMA, file: path.join(here, '.cache', 'flow-schema.json') },
      ...(G.meta?.blueprint && canChange ? { change: { instructions: core.floorplanChangeInstructions(G), schema: core.FLOORPLAN_CHANGE_SCHEMA, file: path.join(here, '.cache', 'change-schema.json') } } : {}),
    };
-+  if (VF && fs.existsSync(path.join(here, 'project.html'))) { // vibeflow P7
-+    const h = fs.readFileSync(path.join(here, 'project.html'), 'utf8');
-+    GP = VF.extract(h); pageP = h.replace('</head>', inject.replace(token, ptoken) + '</head>');
-+    MODESP = { ...MODES, ask: { ...MODES.ask, instructions: VF.instructions(GP) } }; // flow et change gardent leur schéma
-+  }
++  VF?.load(); // vibeflow P13 : la page Projet est relue avec la carte
    if (ENGINES[engine]?.schemaFile) {
      fs.mkdirSync(path.join(here, '.cache'), { recursive: true });
      for (const m of Object.values(MODES)) fs.writeFileSync(m.file, JSON.stringify(strict(m.schema)));
-@@ -208,52 +219,13 @@ fs.watchFile(path.join(here, 'index.html'), { interval: 1000 }, (cur, prev) => {
-   clearTimeout(reloadTimer);
-   reloadTimer = setTimeout(() => { try { load(); broadcast('reload'); console.log('map rebuilt: reloaded open tabs'); } catch {} }, 800);
- });
-+// vibeflow P7 : project.html réécrit par le direct (spike 003) → page et graphe Projet relus, sans diffusion
-+fs.watchFile(path.join(here, 'project.html'), { interval: 1000 }, (cur, prev) => { if (cur.mtimeMs !== prev.mtimeMs) setTimeout(() => { try { load(); } catch {} }, 300); });
- if (idleExit) setInterval(() => { if (!tabs.size && !running.size && Date.now() - lastTab > idleExit) process.exit(0); }, 60000).unref();
+@@ -212,48 +217,7 @@ if (idleExit) setInterval(() => { if (!tabs.size && !running.size && Date.now()
  const flowsFile = path.join(here, 'custom-flows.json');
  const readFlows = () => { try { return JSON.parse(fs.readFileSync(flowsFile, 'utf8')).flows || []; } catch { return []; } };
  
@@ -95,45 +83,19 @@
  
  // ---------- asking ----------
  const nameFor = (id) => { try { return core.q.brief(id)?.name || id; } catch { return id; } };
-@@ -308,7 +280,7 @@ const failCode = (msg) => /not logged in|logged out|\/login|log ?in again|sign i
- function claudeRun(body, mode) {
-   const args = [...cli.args, '-p', '--output-format', 'stream-json', '--verbose',
-     '--json-schema', JSON.stringify(mode.schema), '--append-system-prompt', mode.instructions,
--    '--tools', 'Read,Grep,Glob,Bash', '--allowedTools', 'Bash(node floorplan/query.mjs:*)', 'Read', 'Grep', 'Glob'];
-+    '--tools', 'Read,Grep,Glob,Bash', '--allowedTools', 'Bash(node floorplan/query.mjs:*)', 'Bash(node floorplan/vf-query.mjs:*)', 'Read', 'Grep', 'Glob']; // vibeflow P7
-   if (body.session) args.push('--resume', String(body.session));
-   if (model) args.push('--model', model);
-   return {
-@@ -354,7 +326,8 @@ const CLOSED = Symbol('closed'); // the browser went away mid-request
- /** Runs the agent once for a request and resolves with its answer, streaming progress through `send`. */
- function runAgent(res, send, body) {
-   return new Promise((resolve, reject) => {
--    const run = ENGINES[engine].run(body, MODES[body.mode] || MODES.ask);
-+    const M = body.project && MODESP ? MODESP : MODES; // vibeflow P7
-+    const run = ENGINES[engine].run(body, M[body.mode] || M.ask);
-     const child = spawn(cli.cmd, run.args, { cwd: root, env: cliEnv(), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
-     const id = crypto.randomBytes(6).toString('hex');
-     running.set(id, child);
-@@ -397,6 +370,9 @@ function ask(req, res, body) {
-   const send = (event, data) => { if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
-   if (!cli) { send('failure', { code: 'cli_missing', message: `${ENGINES[want].name} not found.` }); return res.end(); }
-   if (body.mode === 'change') return changePlan(res, send, body);
-+  body.project = req.headers['x-floorplan-token'] === ptoken && !!GP; // vibeflow P7
-+  const t0 = Date.now(), local = body.project && body.mode !== 'flow' && !body.session ? VF.answerLocally(GP, String(body.question || '')) : null;
-+  if (local) { console.log(`projet · local · ${Date.now() - t0} ms · ${String(body.question).slice(0, 60)}`); send('answer', local); return res.end(); }
-   runAgent(res, send, body)
-     .then((a) => send('answer', a), (e) => { if (e !== CLOSED) send('failure', { code: failCode(e.message), message: e.message }); })
-     .finally(() => res.end());
-@@ -518,7 +494,7 @@ const server = http.createServer((req, res) => {
+@@ -517,8 +481,9 @@ const server = http.createServer((req, res) => {
+   const sameOrigin = !req.headers.origin || req.headers.origin === `http://${req.headers.host}`;
    if (url.pathname.startsWith('/api/')) {
      // EventSource can't send headers, so the events stream takes the token in the query string
-     const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' ? url.searchParams.get('token') : null);
+-    const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' ? url.searchParams.get('token') : null);
 -    if (!sameOrigin || given !== token) { res.writeHead(403); return res.end(); }
-+    if (!sameOrigin || (given !== token && given !== ptoken)) { res.writeHead(403); return res.end(); } // vibeflow P7
++    const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' || url.pathname === '/api/vf/events' ? url.searchParams.get('token') : null); // vibeflow P13
++    if (!sameOrigin || (given !== token && !VF?.jetonValide(given))) { res.writeHead(403); return res.end(); } // vibeflow P13
++    if (VF && url.pathname.startsWith('/api/vf/') && VF.route(req, res, url)) return; // vibeflow P13 : routes du serveur unique, après le Host et le jeton
      if (req.method === 'GET' && url.pathname === '/api/events') {
        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
        res.write('retry: 1000\n\n'); // reconnect quickly after a restart
-@@ -544,26 +520,6 @@ const server = http.createServer((req, res) => {
+@@ -544,26 +509,6 @@ const server = http.createServer((req, res) => {
          return;
        }
      }
@@ -160,14 +122,16 @@
      if (req.method === 'POST' && url.pathname === '/api/plan/undo') {
        const r = changing ? { ok: false, error: 'A change is still being made.' } : undoChange();
        res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(r));
-@@ -594,12 +550,13 @@ const server = http.createServer((req, res) => {
+@@ -594,12 +539,15 @@ const server = http.createServer((req, res) => {
      }
      res.writeHead(404); return res.end();
    }
-+  if (url.pathname === '/project.html' && pageP) { res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' }); return res.end(pageP); } // vibeflow P7
++  if (url.pathname === '/project.html' && VF?.pageProjet()) { res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' }); return res.end(VF.pageProjet()); } // vibeflow P13
    if (url.pathname === '/' || url.pathname === '/index.html') { res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' }); return res.end(page); }
    let file;
    try { file = path.join(here, decodeURIComponent(url.pathname)); } catch { res.writeHead(400); return res.end('bad address'); }
++  // vibeflow P13 : jamais un segment caché (.cache/server.json porte le jeton, .gitignore) ni un segment qui sort du dossier
++  if (path.relative(here, file).split(path.sep).some((seg) => seg.startsWith('.'))) { res.writeHead(404); return res.end('not found'); } // vibeflow P13
    // inside this folder only: a neighbour like ../floorplan-old/ also starts with this folder's path
    if (!file.startsWith(here + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); return res.end('not found'); }
 -  res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
