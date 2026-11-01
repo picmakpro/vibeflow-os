@@ -439,7 +439,7 @@ const page = (g) => template
   .replace('/*__GRAPH_QUERY__*/', () => graphQuery.replace(/<\/script/gi, '<\\/script'))
   .replace('<!--__ELK_SCRIPT__-->', () => elkTag)
   .replace('/*__FONTS__*/', () => fontCss)
-  .replace('/*__FLOORPLAN_DATA__*/null', () => JSON.stringify(g).replace(/<\/(script)/gi, '<\\/$1').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029'))
+  .replace('/*__FLOORPLAN_DATA__*/null', () => JSON.stringify(g).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029'))
   .replace(/__FLOORPLAN_TITLE__/g, () => escapeHtml(`${arch.project.name} map`))
   .replace(/__FLOORPLAN_LOGO__/g, () => svgUri('vibeflow-logo-clair.svg')) // vibeflow P12
   .replace(/__FLOORPLAN_FAVICON__/g, () => svgUri('vibeflow-logo-clair.svg')) // vibeflow P12

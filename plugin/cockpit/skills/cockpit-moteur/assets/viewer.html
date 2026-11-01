@@ -929,8 +929,8 @@ function cardFoot(item) {
   if (i.n?.foot || i.f?.foot) size = i.n?.foot || i.f?.foot; // vibeflow P2
   const vst = i.n?.st || i.f?.st;
   const rec = recentOf(item), inside = recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item);
-  const pill = vst ? `<span class="vst vst-${vst}">${({ done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' })[vst] || vst}</span>` : rec ? `<span class="rw">${recentLabel(rec)}</span>` : inside ? `<span class="rw soft">${inside.length} changed</span>` : '';
-  return size || pill ? `<div class="foot">${size ? `<span class="meta">${size}</span>` : '<span></span>'}${pill}</div>` : '';
+  const pill = vst ? `<span class="vst vst-${h(vst).replace(/[^\w-]/g, '')}">${h(({ done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' })[vst] || vst)}</span>` : rec ? `<span class="rw">${recentLabel(rec)}</span>` : inside ? `<span class="rw soft">${inside.length} changed</span>` : '';
+  return size || pill ? `<div class="foot">${size ? `<span class="meta">${h(size)}</span>` : '<span></span>'}${pill}</div>` : '';
 }
 /** Extra height a card needs beyond its base size: a footer, and a title long enough to wrap. */
 function cardExtraH(item) {
@@ -968,7 +968,7 @@ function cardHTML(item) {
   }
   const note = answerNote(item);
   const noteHTML = note ? `<div class="anote"><b>${note.n}</b><span>${h(note.text)}</span></div>` : '';
-  if (i.n?.st || i.f?.st) cls += ' st-' + (i.n?.st || i.f?.st); // vibeflow P3
+  if (i.n?.st || i.f?.st) cls += ' st-' + String(i.n?.st || i.f?.st).replace(/[^\w-]/g, ''); // vibeflow P3, P16 : la classe ne porte que des caractères de mot
   if (recentOf(item)) cls += ' recent';
   else if (recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item)) cls += ' recent-in';
   return `<div class="card ${cls}" style="--c:${colorOf(i)}"><div class="head">${head}</div>${title}${desc}${noteHTML}${cardFoot(item)}</div>`;

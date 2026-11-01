@@ -65,13 +65,13 @@
       const V = G.meta.vf; // relu à chaque rendu : le direct (70-vf-live.js) remplace G.meta.vf sur un patch
       const ms = V.milestones.map((m) => {
         const pc = m.total ? Math.round((100 * m.done) / m.total) : 0;
-        return `<div class="vf-ms" data-vf-go="${h(m.id)}"><div class="t"><span>${h(m.key)}</span><span>${m.done}/${m.total} · ${pc} %</span></div><div class="vf-bar" style="--c-st:var(--st-${m.st})"><i style="width:${pc}%"></i></div></div>`;
+        return `<div class="vf-ms" data-vf-go="${h(m.id)}"><div class="t"><span>${h(m.key)}</span><span>${Number(m.done) || 0}/${Number(m.total) || 0} · ${pc} %</span></div><div class="vf-bar" style="--c-st:var(--st-${h(m.st).replace(/[^\w-]/g, '')})"><i style="width:${pc}%"></i></div></div>`;
       }).join('');
       const next = V.next.map((n) => `<a class="vf-link" data-vf-go="${h(n.id)}"><span class="vst vst-todo">À faire</span><span>${h(n.label)}</span></a>`).join('');
       const c = V.counts;
       return `<div class="sec"><div class="ph"><span class="kind">Projet</span></div><h2 class="pt">${h(G.project.name)}</h2>
           <div class="vf-now" style="margin-top:12px"><b>Maintenant · ${h(V.milestone || '')}</b>Phase ${h(V.phase)} — ${h(V.phaseName || '')} <span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span><div style="margin-top:6px;color:var(--text-3);font-size:12px">${h((V.lastDesc || '').slice(0, 260))}${(V.lastDesc || '').length > 260 ? '…' : ''}</div></div>
-          <div class="stats vf-stats" style="margin-top:14px"><div><b>${c.phases}</b><span>phases</span></div><div><b>${c.plans}</b><span>plans</span></div><div><b>${c.reqsDone}/${c.reqs}</b><span>exigences</span></div></div></div>
+          <div class="stats vf-stats" style="margin-top:14px"><div><b>${Number(c.phases) || 0}</b><span>phases</span></div><div><b>${Number(c.plans) || 0}</b><span>plans</span></div><div><b>${Number(c.reqsDone) || 0}/${Number(c.reqs) || 0}</b><span>exigences</span></div></div></div>
         <div class="sec"><h3>Prochaines phases <span class="c">${V.next.length}</span></h3>${next || '<p class="pd">Rien en attente dans le jalon en cours.</p>'}</div>
         <div class="sec"><h3>Jalons <span class="c">${V.milestones.length}</span></h3>${ms}</div>
         <div class="sec" style="color:var(--text-3);line-height:1.7;font-size:12px">Double-clic sur une carte pour plonger · <span class="kbd">⌫</span> remonter · <span class="kbd">/</span> chercher</div>`;
@@ -97,7 +97,7 @@
       const f = fileOf(id);
       const list = f && touch[f.p];
       if (!list || !list.length) return '';
-      const rows = list.slice(0, 30).map((t) => `<a class="vf-link" href="project.html#r=${encodeURIComponent(t.ref)}"><span class="vst vst-${t.st}">${ST[t.st] || t.st}</span><span>${h(t.label)}</span></a>`).join('');
+      const rows = list.slice(0, 30).map((t) => `<a class="vf-link" href="project.html#r=${encodeURIComponent(t.ref)}"><span class="vst vst-${h(t.st).replace(/[^\w-]/g, '')}">${h(ST[t.st] || t.st)}</span><span>${h(t.label)}</span></a>`).join('');
       return `<div class="sec"><h3>Touché par <span class="c">${list.length}</span></h3>${rows}</div>`;
     });
   }

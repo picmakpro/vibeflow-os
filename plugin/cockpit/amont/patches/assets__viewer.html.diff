@@ -34,7 +34,7 @@
  const icon = (k) => `<svg viewBox="0 0 24 24">${P[k] || P.file}</svg>`;
  const iconI = (k) => `<svg class="i" viewBox="0 0 24 24">${P[k] || P.file}</svg>`;
  const symIcon = (kind) => (['class', 'interface', 'struct', 'type', 'enum', 'record', 'trait', 'object'].includes(kind) ? 'class' : 'function');
-@@ -924,8 +926,10 @@ function cardFoot(item) {
+@@ -924,9 +926,11 @@ function cardFoot(item) {
    else if (i.type === 'dir') size = plural(statsOf(item).files, 'file');
    else if (i.type === 'module') size = 'this file';
    else if (i.type === 'file') { const nr = (routesByFile.get(i.f.p) || []).length; size = nr ? plural(nr, 'endpoint') : ''; }
@@ -42,15 +42,17 @@
 +  const vst = i.n?.st || i.f?.st;
    const rec = recentOf(item), inside = recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item);
 -  const pill = rec ? `<span class="rw">${recentLabel(rec)}</span>` : inside ? `<span class="rw soft">${inside.length} changed</span>` : '';
-+  const pill = vst ? `<span class="vst vst-${vst}">${({ done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' })[vst] || vst}</span>` : rec ? `<span class="rw">${recentLabel(rec)}</span>` : inside ? `<span class="rw soft">${inside.length} changed</span>` : '';
-   return size || pill ? `<div class="foot">${size ? `<span class="meta">${size}</span>` : '<span></span>'}${pill}</div>` : '';
+-  return size || pill ? `<div class="foot">${size ? `<span class="meta">${size}</span>` : '<span></span>'}${pill}</div>` : '';
++  const pill = vst ? `<span class="vst vst-${h(vst).replace(/[^\w-]/g, '')}">${h(({ done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' })[vst] || vst)}</span>` : rec ? `<span class="rw">${recentLabel(rec)}</span>` : inside ? `<span class="rw soft">${inside.length} changed</span>` : '';
++  return size || pill ? `<div class="foot">${size ? `<span class="meta">${h(size)}</span>` : '<span></span>'}${pill}</div>` : '';
  }
  /** Extra height a card needs beyond its base size: a footer, and a title long enough to wrap. */
+ function cardExtraH(item) {
 @@ -964,6 +968,7 @@ function cardHTML(item) {
    }
    const note = answerNote(item);
    const noteHTML = note ? `<div class="anote"><b>${note.n}</b><span>${h(note.text)}</span></div>` : '';
-+  if (i.n?.st || i.f?.st) cls += ' st-' + (i.n?.st || i.f?.st); // vibeflow P3
++  if (i.n?.st || i.f?.st) cls += ' st-' + String(i.n?.st || i.f?.st).replace(/[^\w-]/g, ''); // vibeflow P3, P16 : la classe ne porte que des caractères de mot
    if (recentOf(item)) cls += ' recent';
    else if (recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item)) cls += ' recent-in';
    return `<div class="card ${cls}" style="--c:${colorOf(i)}"><div class="head">${head}</div>${title}${desc}${noteHTML}${cardFoot(item)}</div>`;

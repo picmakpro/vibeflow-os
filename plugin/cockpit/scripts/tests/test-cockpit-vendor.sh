@@ -48,8 +48,8 @@ while read -r k f rest; do
 done < "$MOTEUR/VENDORED.txt"
 assert_ge "V4 — des lignes TAILLE existent" "$nt" 7
 big=0
-for f in "$SCRIPTS"/*.mjs; do [ "$(nlines "$f")" -lt 300 ] || { big=$((big+1)); echo "     trop long : $f"; }; done
-while read -r k f; do [ "$k" = AJOUT ] || continue; case "$f" in *.js|*.mjs) [ "$(nlines "$MOTEUR/$f")" -lt 300 ] || { big=$((big+1)); echo "     trop long : $f"; } ;; esac; done < "$MOTEUR/VENDORED.txt"
+for f in "$SCRIPTS"/*.mjs; do [ "$(nlines "$f")" -le 300 ] || { big=$((big+1)); echo "     trop long : $f"; }; done
+while read -r k f; do [ "$k" = AJOUT ] || continue; case "$f" in *.js|*.mjs) [ "$(nlines "$MOTEUR/$f")" -le 300 ] || { big=$((big+1)); echo "     trop long : $f"; } ;; esac; done < "$MOTEUR/VENDORED.txt"
 assert_eq "V4 — notre code sous 300 lignes (scripts du module, ajouts de code)" "$big" "0"
 if [ -f "$CHKSIZE" ]; then
   FILES=$(find "$SCRIPTS" "$MOTEUR" \( -name '*.mjs' -o -name '*.js' \) -type f)

@@ -29,7 +29,7 @@ const readState = () => { try { return JSON.parse(fs.readFileSync(stateFile, 'ut
 if (has('stop')) {
   const s = readState();
   let stopped = false;
-  if (s?.pid) { try { process.kill(s.pid); stopped = true; } catch {} }
+  if (Number.isInteger(s?.pid) && s.pid > 1) { try { process.kill(s.pid); stopped = true; } catch {} } // vibeflow P18 : pid entier > 1 seulement (le fichier vient du lab)
   try { fs.unlinkSync(stateFile); } catch {}
   console.log(stopped ? `Stopped the map server (${s.url}).` : 'The map server was not running.');
   process.exit(0);
@@ -57,7 +57,7 @@ function exportMap(include, extraFlows = []) {
   };
   if (!on.includes('recent')) delete out.recent;
   if (!on.includes('health')) delete out.health;
-  const json = JSON.stringify(out).replace(/<\/(script)/gi, '<\\/$1').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  const json = JSON.stringify(out).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
   const slug = String(g.project?.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'floorplan';
   return { html: html.slice(0, a + DATA_START.length) + json + html.slice(b), name: `${slug}-map.html`, include: on, plan: !!g.meta?.blueprint };
 }
@@ -93,7 +93,7 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.json': 'application/json'
 // ---------- find the CLI that answers: Claude Code or Codex ----------
 function which(cmd) {
   try {
-    const out = execFileSync(process.platform === 'win32' ? 'where' : 'which', [cmd], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const out = execFileSync(process.platform === 'win32' ? 'where' : 'which', [cmd], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }); // vibeflow P18 : timeout
     return out.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
   } catch { return []; }
 }
@@ -172,7 +172,8 @@ const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !
 let page, G, core, MODES;
 // vibeflow P13 : serveur unique. Le direct, « au travail » et la page Projet vivent dans vf-cockpit-server.mjs, posé à côté de
 // vibeflow P13 : ce fichier ; absent, le serveur reste celui de l'amont. Même port que la page, aucun en-tête CORS.
-const VF = fs.existsSync(path.join(here, 'vf-cockpit-server.mjs')) ? (await import(new URL('./vf-cockpit-server.mjs', import.meta.url))).attach({ here, root, token, inject, log: (cat, msg) => { if (cat === 'error' || cat === 'warn') console.error(`vf-cockpit : ${msg}`); } }) : null; // vibeflow P13
+if (!fs.existsSync(path.join(here, 'vf-cockpit-server.mjs'))) { console.error('vf-cockpit : vf-cockpit-server.mjs est absent : refus de servir sans le confinement du cockpit. Relancer « vf-cockpit build ».'); process.exit(1); } // vibeflow P18 : jamais de repli sur l'agent amont non confiné
+const VF = (await import(new URL('./vf-cockpit-server.mjs', import.meta.url))).attach({ here, root, token, inject, log: (cat, msg) => { if (cat === 'error' || cat === 'warn') console.error(`vf-cockpit : ${msg}`); } }); // vibeflow P13
 function load() {
   const html = fs.readFileSync(path.join(here, 'index.html'), 'utf8');
   const g = JSON.parse(fs.readFileSync(path.join(here, 'graph.json'), 'utf8'));
@@ -273,7 +274,7 @@ function claudeRun(body, mode) {
   const args = [...cli.args, '-p', '--output-format', 'stream-json', '--verbose',
     '--json-schema', JSON.stringify(mode.schema), '--append-system-prompt', mode.instructions,
     '--tools', 'Read,Grep,Glob,Bash', '--allowedTools', 'Bash(node floorplan/query.mjs:*)', 'Read', 'Grep', 'Glob'];
-  if (body.session) args.push('--resume', String(body.session));
+  if (typeof body.session === 'string' && /^[0-9a-f-]{36}$/i.test(body.session)) args.push(`--resume=${body.session}`); // vibeflow P18 : un identifiant de session, jamais un drapeau
   if (model) args.push('--model', model);
   return {
     args: VF ? VF.argsAgent(args, body) : args, input: String(body.question || '').slice(0, 4000), // vibeflow P14 : confinement mesuré et modèle validé
@@ -373,6 +374,7 @@ function ask(req, res, body) {
 // checks them with the skill's plan.mjs and build.mjs (build.mjs records where they are), saves them and
 // redraws the map, which reloads every open tab. Each change keeps the files it replaced, for Undo.
 const historyDir = path.join(here, '.cache', 'history');
+try { fs.rmSync(path.join(here, '.cache', 'skill.json'), { force: true }); fs.rmSync(historyDir, { recursive: true, force: true }); } catch {} // vibeflow P15 : l'état d'un lab n'est jamais cru
 const PLAN_FILES = ['plan.json', 'architecture.json', 'recent-work.json'];
 let changing = false;
 function snapshot() {
@@ -386,10 +388,12 @@ function restore(dir) {
   for (const f of PLAN_FILES) { const from = path.join(dir, f), to = path.join(here, f); if (fs.existsSync(from)) fs.copyFileSync(from, to); else fs.rmSync(to, { force: true }); }
 }
 /** Runs one of the skill's scripts on this project; throws with its output when it fails. */
+// vibeflow P15 : jamais un script désigné par le lab. Le moteur vient du module (VF_COCKPIT_ENGINE_DIR, posé par le lanceur) et seuls
+// plan.mjs et build.mjs s'exécutent ; .cache/skill.json et .cache/history/ préexistants sont ignorés (supprimés au démarrage).
+const engineDirFromLauncher = () => { const d = process.env.VF_COCKPIT_ENGINE_DIR; return d && path.isAbsolute(d) ? d : null; };
 function skillScript(name, ...args) {
-  let dir;
-  try { dir = JSON.parse(fs.readFileSync(path.join(here, '.cache', 'skill.json'), 'utf8')).dir; } catch {}
-  if (!dir || !fs.existsSync(path.join(dir, 'scripts', name))) throw new Error('This map’s server can’t find the Floorplan scripts. Ask Claude Code or Codex to update the floorplan once, then try again.');
+  const dir = engineDirFromLauncher();
+  if (!['plan.mjs', 'build.mjs'].includes(name) || !dir || !fs.existsSync(path.join(dir, 'scripts', name))) throw new Error('This map’s server can’t find the Floorplan scripts. Ask Claude Code or Codex to update the floorplan once, then try again.');
   try { return execFileSync(process.execPath, [path.join(dir, 'scripts', name), root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, timeout: 120000 }); }
   catch (e) { throw Object.assign(new Error(String(e.stdout || '') + String(e.stderr || '') || e.message), { checks: true }); }
 }
@@ -475,7 +479,27 @@ function undoChange() {
 }
 
 // ---------- http ----------
+// vibeflow P18 : un corps n'est cru que s'il est un objet JSON (null, 5, "s", [..] : 400, jamais une exception)
+const parseBody = (raw) => { try { const b = JSON.parse(raw); return b && typeof b === 'object' && !Array.isArray(b) ? b : null; } catch { return null; } };
+const bad = (res) => { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Requête invalide : un objet JSON est attendu.' })); };
+// vibeflow P17 : en-têtes de toutes les réponses. La page ne charge que ses scripts en ligne (empreintes), aucune origine tierce,
+// ne se laisse pas encadrer, n'envoie aucun formulaire. Les polices et logos sont des data: ; les styles en ligne sont admis (36 attributs style).
+const BASE_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+const cspMemo = new Map(); // les pages pèsent ~2 Mo : une empreinte par contenu, pas par requête
+const pageCsp = (html) => {
+  if (cspMemo.has(html)) return cspMemo.get(html);
+  const hashes = [...String(html).matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${crypto.createHash('sha256').update(m[1]).digest('base64')}'`);
+  const csp = `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;
+  if (cspMemo.size >= 4) cspMemo.clear();
+  cspMemo.set(html, csp);
+  return csp;
+};
+const sendPage = (res, html) => { res.setHeader('Content-Security-Policy', pageCsp(html)); res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' }); return res.end(html); };
 const server = http.createServer((req, res) => {
+  res.setHeader('Content-Security-Policy', BASE_CSP); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
+  try { route(req, res); } catch (e) { console.error(`vf-cockpit : requête en échec : ${e?.message || e}`); try { if (!res.headersSent) res.writeHead(500); res.end(); } catch {} }
+});
+function route(req, res) {
   // only this machine's own names: a website that points its domain at 127.0.0.1 (DNS rebinding) would
   // otherwise count as the same origin as the map, and could read its token from the page
   if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(String(req.headers.host || '').toLowerCase())) { res.writeHead(403); return res.end('unknown host'); }
@@ -501,13 +525,13 @@ const server = http.createServer((req, res) => {
       if (req.method === 'POST' || req.method === 'DELETE') {
         let raw = '';
         req.on('data', (d) => { raw += d; if (raw.length > 50000) req.destroy(); });
-        req.on('end', () => {
-          let body = {}; try { body = JSON.parse(raw); } catch {}
+        req.on('end', () => { try {
+          const body = parseBody(raw); if (!body) return bad(res);
           let flows = readFlows().filter((x) => x.id !== body.id && x.id !== body.flow?.id);
           if (req.method === 'POST' && body.flow?.id && Array.isArray(body.flow.steps)) flows.push({ ...body.flow, createdAt: new Date().toISOString() });
           fs.writeFileSync(flowsFile, JSON.stringify({ flows }, null, 2) + '\n');
           res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ flows }));
-        });
+        } catch (e) { console.error(`vf-cockpit : /api/flows : ${e.message}`); try { res.writeHead(500); res.end(); } catch {} } });
         return;
       }
     }
@@ -520,7 +544,7 @@ const server = http.createServer((req, res) => {
       let raw = '';
       req.on('data', (d) => { raw += d; if (raw.length > 500000) req.destroy(); });
       req.on('end', () => {
-        let body = {}; try { body = JSON.parse(raw); } catch {}
+        const body = parseBody(raw); if (!body) return bad(res);
         try {
           const x = exportMap(Array.isArray(body.include) ? body.include.map(String) : EXPORT_DEFAULT, cleanFlows(body.flows));
           res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Content-Disposition': `attachment; filename="${x.name}"`, 'Cache-Control': 'no-store' });
@@ -536,22 +560,27 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/ask') {
       let raw = '';
       req.on('data', (d) => { raw += d; if (raw.length > 20000) req.destroy(); });
-      req.on('end', () => { let body = {}; try { body = JSON.parse(raw); } catch {} ask(req, res, body); });
+      req.on('end', () => { const body = parseBody(raw); if (!body) return bad(res); try { ask(req, res, body); } catch (e) { console.error(`vf-cockpit : /api/ask : ${e.message}`); try { if (!res.headersSent) res.writeHead(500); res.end(); } catch {} } });
       return;
     }
     res.writeHead(404); return res.end();
   }
-  if (url.pathname === '/project.html' && VF?.pageProjet()) { res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' }); return res.end(VF.pageProjet()); } // vibeflow P13
-  if (url.pathname === '/' || url.pathname === '/index.html') { res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' }); return res.end(page); }
+  if (url.pathname === '/project.html' && VF?.pageProjet()) return sendPage(res, VF.pageProjet()); // vibeflow P13, P17
+  if (url.pathname === '/' || url.pathname === '/index.html') return sendPage(res, page);
   let file;
   try { file = path.join(here, decodeURIComponent(url.pathname)); } catch { res.writeHead(400); return res.end('bad address'); }
   // vibeflow P13 : jamais un segment caché (.cache/server.json porte le jeton, .gitignore) ni un segment qui sort du dossier
   if (path.relative(here, file).split(path.sep).some((seg) => seg.startsWith('.'))) { res.writeHead(404); return res.end('not found'); } // vibeflow P13
   // inside this folder only: a neighbour like ../floorplan-old/ also starts with this folder's path
   if (!file.startsWith(here + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); return res.end('not found'); }
+  // vibeflow P19 : un lien symbolique n'est servi que s'il reste dans ce dossier (realpath), jamais vers un fichier du lab ou d'ailleurs
+  try { if (!fs.realpathSync(file).startsWith(fs.realpathSync(here) + path.sep)) { res.writeHead(404); return res.end('not found'); } } catch { res.writeHead(404); return res.end('not found'); }
   res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' }); // vibeflow P5
   fs.createReadStream(file).pipe(res);
-});
+}
+// vibeflow P18 : une exception perdue se journalise, le serveur (détaché, personne ne le relance) ne meurt pas
+process.on('uncaughtException', (e) => { console.error(`vf-cockpit : exception non rattrapée : ${e?.stack || e}`); });
+process.on('unhandledRejection', (e) => { console.error(`vf-cockpit : promesse rejetée : ${e?.stack || e}`); });
 // another map (or anything else) on the port: take the next free one
 let port = wantPort;
 server.on('error', (e) => {
@@ -564,7 +593,8 @@ server.on('listening', () => {
   const u = `http://127.0.0.1:${port}`;
   try {
     fs.mkdirSync(path.dirname(stateFile), { recursive: true });
-    fs.writeFileSync(stateFile, JSON.stringify({ pid: process.pid, port, url: u, token, hash: selfHash, startedAt: new Date().toISOString() }, null, 2));
+    fs.writeFileSync(stateFile, JSON.stringify({ pid: process.pid, port, url: u, token, hash: selfHash, startedAt: new Date().toISOString() }, null, 2), { mode: 0o600 });
+    fs.chmodSync(stateFile, 0o600); // vibeflow P18 : le jeton n'est lisible que du propriétaire (le fichier peut préexister en 0644)
   } catch {}
   const forget = () => { try { if (readState()?.pid === process.pid) fs.unlinkSync(stateFile); } catch {} };
   process.on('exit', forget);
