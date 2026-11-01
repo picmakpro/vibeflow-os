@@ -8,6 +8,8 @@
   if (!SC) return;
   const { h, graph: G } = SC;
   const TAB = G.meta.vfTab === 'project' ? 'project' : 'code';
+  // titre de l'onglet du navigateur : « <nom> — Code » ou « <nom> — Projet » (le viewer écrit « <nom> map », qui devenait le nom seul)
+  document.title = `${String(G.project.name || '').replace(/ — Projet$/, '')} — ${TAB === 'project' ? 'Projet' : 'Code'}`;
   const ST = { done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' };
   // P67-D-04 : logo VibeFlow clair ou sombre selon le thème du viewer (meta.vfLogos est posé par l'assemblage)
   const LOGOS = G.meta.vfLogos;
@@ -69,8 +71,13 @@
       }).join('');
       const next = V.next.map((n) => `<a class="vf-link" data-vf-go="${h(n.id)}"><span class="vst vst-todo">À faire</span><span>${h(n.label)}</span></a>`).join('');
       const c = V.counts;
+      // « Maintenant » : seulement les champs connus (un lab sans STATE.md n'a ni jalon, ni phase, ni statut)
+      const desc = V.lastDesc || '';
+      const now = V.milestone || V.phase || V.status
+        ? `<div class="vf-now" style="margin-top:12px"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${V.status ? `<span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span>` : ''}${desc ? `<div style="margin-top:6px;color:var(--text-3);font-size:12px">${h(desc.slice(0, 260))}${desc.length > 260 ? '…' : ''}</div>` : ''}</div>`
+        : '';
       return `<div class="sec"><div class="ph"><span class="kind">Projet</span></div><h2 class="pt">${h(G.project.name)}</h2>
-          <div class="vf-now" style="margin-top:12px"><b>Maintenant · ${h(V.milestone || '')}</b>Phase ${h(V.phase)} — ${h(V.phaseName || '')} <span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span><div style="margin-top:6px;color:var(--text-3);font-size:12px">${h((V.lastDesc || '').slice(0, 260))}${(V.lastDesc || '').length > 260 ? '…' : ''}</div></div>
+          ${now}
           <div class="stats vf-stats" style="margin-top:14px"><div><b>${Number(c.phases) || 0}</b><span>phases</span></div><div><b>${Number(c.plans) || 0}</b><span>plans</span></div><div><b>${Number(c.reqsDone) || 0}/${Number(c.reqs) || 0}</b><span>exigences</span></div></div></div>
         <div class="sec"><h3>Prochaines phases <span class="c">${V.next.length}</span></h3>${next || '<p class="pd">Rien en attente dans le jalon en cours.</p>'}</div>
         <div class="sec"><h3>Jalons <span class="c">${V.milestones.length}</span></h3>${ms}</div>

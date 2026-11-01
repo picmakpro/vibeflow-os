@@ -1,7 +1,7 @@
 // chrome-cdp.mjs — client minimal du protocole DevTools pour les suites du cockpit (aucune dépendance : WebSocket et fetch de node).
 // Usage : node chrome-cdp.mjs <chrome> <attenteMs> <expressionJs> <url> [<url> ...]
 //   ouvre UN Chrome headless, charge chaque URL (changement de hash seul : navigation complète quand même), attend, évalue l'expression
-//   (JSON-sérialisable) dans la page et rend { resultats: [{ url, valeur, violations }] } sur une ligne.
+//   (JSON-sérialisable, ou une promesse qui s'y résout) dans la page et rend { resultats: [{ url, valeur, violations }] } sur une ligne.
 // Le HOME réel est rendu à Chrome (REAL_HOME) : sous un HOME jetable il ne démarre pas sur macOS ; son profil est un dossier jetable.
 import { spawn } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 const [, , chrome, wait, expr, ...urls] = process.argv;
@@ -26,7 +26,7 @@ ch.stderr.on('data', async (d) => {
       await send('Page.navigate', { url: 'about:blank' });
       await send('Page.navigate', { url });
       await new Promise((r) => setTimeout(r, Number(wait)));
-      const r = await send('Runtime.evaluate', { expression: `JSON.stringify((${expr}))`, returnByValue: true });
+      const r = await send('Runtime.evaluate', { expression: `(async () => JSON.stringify(await (${expr})))()`, awaitPromise: true, returnByValue: true }); // l'expression peut rendre une promesse
       let valeur = null; try { valeur = JSON.parse(r?.result?.value); } catch {}
       resultats.push({ url, valeur, violations });
     }

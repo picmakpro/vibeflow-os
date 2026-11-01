@@ -92,7 +92,7 @@ export function buildProjectGraph(root, { layout } = {}) {
     let parent = tp && nodes.some((n) => n.id === phId(tp)) ? phId(tp) : null;
     if (!parent) { orphan ||= node({ id: 'missions', parent: null, label: 'Missions hors phase', kind: 'mission', summary: 'Plans de bataille de missions qui ne portent pas un numéro de phase.' }); parent = orphan; }
     const doneN = d.nodes.filter((x) => x.status === 'done').length;
-    const mId = node({ id: 'dag-' + d.name, parent, label: `Mission ${d.name.replace(/^MISSION-/, '')}`, kind: 'mission', summary: `Plan de bataille : ${d.nodes.length} nœuds, ${doneN} faits.`,
+    const mId = node({ id: 'dag-' + d.name, parent, label: `Mission ${d.name.replace(/^MISSION-/, '')}`, kind: 'mission', summary: `Plan de bataille : ${d.nodes.length} nœuds, ${doneN} fait${doneN > 1 ? 's' : ''}.`,
       st: doneN === d.nodes.length ? 'done' : d.nodes.some((x) => x.status === 'running') ? 'active' : d.nodes.some((x) => x.status === 'failed') ? 'blocked' : 'todo', foot: `${doneN}/${d.nodes.length} nœuds`, paths: [d.file] });
     for (const x of d.nodes) file({ p: `${d.file}#${x.id}`, n: mId, name: x.id, d: sentence(x.step, 200), st: DST[x.status] || 'todo', foot: x.stage || '', note: x.scope?.length ? `Périmètre : ${x.scope.join(', ')}` : undefined, touched: x.scope });
     for (const x of d.nodes) for (const dep of x.deps || []) link(`f:${d.file}#${dep}`, `f:${d.file}#${x.id}`, 'queue', 'puis');
@@ -125,9 +125,17 @@ export function buildProjectGraph(root, { layout } = {}) {
         next: active ? active.ks.filter((p) => !p.done).map((p) => ({ id: 'n:' + phId(p), label: `Phase ${p.n} · ${p.name}` })) : [],
         counts: { phases: phases.size, plans: files.filter((f) => f.p.endsWith('-PLAN.md')).length, reqs: reqs.size, reqsDone: [...reqs.values()].filter((r) => r.done).length, dags: P.dags.length } },
       layout: { forme: layout.forme, actif: layout.actif } },
-    project: { name: `${P.projectName} — Projet`, summary: `Jalon ${state.milestone || '?'} · phase ${curPhase || '?'} (${state.current_phase_name || ''}) · ${state.status || ''}.` },
+    project: { name: `${P.projectName} — Projet`, summary: resume(state, curPhase, phases.size, files) },
     nodes, files, routes: [], links: links.filter((l) => [l.a, l.b].every((x) => (x.startsWith('n:') ? ids.has(x) : fids.has(x)))), flows, tour: [],
   };
+}
+
+// sous-titre du projet : seulement les champs connus (un lab sans STATE.md n'affiche ni « ? » ni parenthèses vides), sinon les effectifs
+function resume(state, curPhase, nbPhases, files) {
+  const seg = [state.milestone ? `Jalon ${state.milestone}` : '', curPhase ? `phase ${curPhase}${state.current_phase_name ? ` (${state.current_phase_name})` : ''}` : '', state.status || ''].filter(Boolean);
+  if (seg.length) return seg.join(' · ') + '.';
+  const plans = files.filter((f) => f.p.endsWith('-PLAN.md')).length;
+  return `${nbPhases} phase${nbPhases > 1 ? 's' : ''} · ${plans} plan${plans > 1 ? 's' : ''}.`;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) process.stdout.write(JSON.stringify(buildProjectGraph(process.argv[2] || '.')));

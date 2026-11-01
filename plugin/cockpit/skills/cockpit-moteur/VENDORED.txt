@@ -16,6 +16,7 @@ RETRAIT SKILL.md
 RETRAIT assets/ui/50-cloud.js
 RETRAIT agents/openai.yaml
 AJOUT assets/ui/00-vibeflow.js
+AJOUT assets/ui/01-vf-responsive.js
 AJOUT assets/ui/70-vf-live.js
 AJOUT assets/ui/75-vf-modele.js
 AJOUT assets/ui/78-vf-fr-dict-a.js

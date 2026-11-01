@@ -24,7 +24,7 @@
   const R = [
     [/^(\d+) things?$/, (_, n) => `${n} point${n > 1 ? 's' : ''}`],
     [/^Answer · (\d+) cards?$/, (_, n) => `Réponse · ${n} carte${n > 1 ? 's' : ''}`],
-    [/^Ask anything about (.+?)…$/, (_, x) => `Posez une question sur ${x.replace(/ — Projet$/, '')}…`],
+    [/^Ask anything about (.+?)…$/, () => 'Posez une question sur ce projet…'], // le nom du projet est déjà dans l'en-tête : l'invite tient dans la barre à toute largeur
     [/^(.+) map$/, (_, x) => x],
     [/^Searching the map for "(.+)"$/, (_, x) => `Cherche « ${x} » dans la carte`],
     [/^Searching code for "(.+)"$/, (_, x) => `Cherche « ${x} » dans le code`],
@@ -62,11 +62,7 @@
     document.head.appendChild(st);
   }
 
-  // les libellés français sont plus longs : la grille « 1fr auto 1fr » du viewer pousse alors la recherche
-  // sur les onglets. Au-dessus du gabarit mobile, la colonne centrale prend la place qui reste.
-  const lay = document.createElement('style');
-  lay.textContent = `@media (min-width: 701px) { header { grid-template-columns: auto minmax(0, 1fr) auto; } header #hc { display: flex; justify-content: center; min-width: 0; } header #search-btn { max-width: 100%; } }`;
-  document.head.appendChild(lay);
+  // la mise en page de l'en-tête (libellés français plus longs) est le travail de 01-vf-responsive.js
 
   const probe = (window.__vfFr = { nodes: 0, attrs: 0, passes: 0, ms: 0 });
   const ATTRS = ['placeholder', 'title', 'aria-label'];
@@ -85,12 +81,12 @@
   document.documentElement.lang = 'fr';
   // le viewer réécrit le titre après coup (« <nom> map ») : on le suit
   new MutationObserver(() => { const v = tr(document.title); if (v != null) document.title = v; }).observe(document.querySelector('title'), { childList: true });
-  // regroupe les mutations d'une même frame : un rendu du viewer en produit des centaines
-  let queued = new Set(), raf = 0;
-  const flush = () => { raf = 0; const q = queued; queued = new Set(); for (const el of q) if (el.isConnected) fix(el); };
+  // regroupe les mutations d'un même lot (un rendu du viewer en produit des centaines) et les traduit avant la peinture : le callback d'un
+  // MutationObserver part en fin de tâche, avant l'image suivante ; passer par requestAnimationFrame laissait « Thinking… » une image en anglais
   new MutationObserver((ms) => {
-    for (const m of ms) queued.add(m.type === 'characterData' ? m.target.parentElement : m.target);
-    if (!raf) raf = requestAnimationFrame(flush);
+    const q = new Set();
+    for (const m of ms) q.add(m.type === 'characterData' ? m.target.parentElement : m.target);
+    for (const el of q) if (el?.isConnected) fix(el);
   }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ATTRS });
   fix(document.body);
   // le glossaire découpe les nœuds de texte du panneau et du contexte dans une microtâche : traduire avant (écouteurs synchrones)
