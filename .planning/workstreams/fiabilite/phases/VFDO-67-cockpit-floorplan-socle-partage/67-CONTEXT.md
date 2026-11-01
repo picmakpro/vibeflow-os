@@ -167,7 +167,11 @@ Décisions prises après l'exécution des plans 67-01 à 67-07, relayées par la
 - **P67-D-19 (gate python, D1 option 1).** `scripts/check-python-isolation.sh` exclut le seul motif
   `*/assets/vendor/*` : `elk.bundled.js` (une ligne de 620 020 caractères) le bloquait plus de 5 min.
   Arbitrage Samuel, AskUserQuestion session principale, 2026-11-01 ; validation ADR-031 pour ce
-  correctif seulement (commit `eb2e786d`, témoin rouge joué, gate en 1,7 s).
+  correctif seulement (commit `eb2e786d`, témoin rouge joué, gate en 1,7 s). **Resserré** ensuite à
+  `*/assets/vendor/*.js` : un `.sh` sous `assets/vendor/` reste contrôlé (arbitrage Samuel,
+  AskUserQuestion session principale, 2026-11-01 ; validation ADR-031 pour ce changement précis ;
+  commit `7a4b8117`, témoin rouge joué). Même jour : le jeton servi à tout processus local est accepté
+  comme limite documentée (0600 + hypothèse mono-utilisateur), même canal.
 - **P67-D-20 (anglais de l'onglet Code, E1).** Réponse de Samuel, mot pour mot (AskUserQuestion session
   principale, 2026-11-01) : « on pourrait avoir des gens qui utilise l'anglais, donc en soit l'anglais
   n'est pas dérangeant et peut etre un des langues autorisées ». Lecture du head, retenue par le
