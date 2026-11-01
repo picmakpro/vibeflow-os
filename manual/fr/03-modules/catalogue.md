@@ -80,7 +80,7 @@ poste est une vue, pas un droit.
 
 ## Les capacités spécialisées et la documentation
 
-Ces cinq-là s'ajoutent au cas par cas. Deux d'entre eux portent un **statut expérimental** déclaré
+Ces six-là s'ajoutent au cas par cas. Deux d'entre eux portent un **statut expérimental** déclaré
 dans leur propre `module.json` — c'est dit ici parce que ça change ce que tu peux en attendre.
 
 - **`software-architecture`** — la doctrine d'architecture. Elle s'invoque quand tu crées ou
@@ -94,6 +94,10 @@ dans leur propre `module.json` — c'est dit ici parce que ça change ce que tu 
   que le module attend son premier run réellement vert pour perdre ce statut.
 - **`mobile-test-team`** *(expérimental)* — la boucle autonome au-dessus du précédent : teste,
   corrige, re-teste jusqu'au vert ou jusqu'à épuisement du budget. Il dépend de `mobile-test`.
+- **`cockpit`** — le cockpit local du lab, ouvert en tapant `/vf-cockpit`. Une page web en lecture
+  seule, sur ta machine, dit où en est le lab (jalons, phases, plans, exigences, missions, qui
+  travaille en ce moment), répond à tes questions et cartographie le code. Elle ne fait aucun appel
+  sortant hors l'agent qui répond aux questions, et tous les postes la voient.
 - **`reference`** — le module de documentation. Il ne pose ni agent ni script : il apporte la
   méthodologie VibeFlow et ses patterns d'architecture, à lire quand tu veux comprendre *pourquoi*
   le framework est fait comme ça.

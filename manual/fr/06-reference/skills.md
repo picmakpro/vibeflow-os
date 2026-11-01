@@ -12,14 +12,14 @@ les noms techniques ci-dessous, mais **les formulations qui les activent** — c
 page met en avant pour chacun.
 
 Cette liste vient de l'énumération de tous les fichiers `SKILL.md` du dépôt, revérifiée le
-2026-10-27, module
+2026-11-01, module
 par module — en excluant explicitement les modèles de skills sous
 `plugin/reference/content/methodology/templates/skills/`, qui ne sont pas des skills livrés mais
-des gabarits pour en fabriquer de nouveaux. Le disque en porte vingt-trois, groupés ici par module
+des gabarits pour en fabriquer de nouveaux. Le disque en porte vingt-quatre, groupés ici par module
 d'origine : tu n'as que ceux dont le module correspondant est installé — le
 [catalogue des modules](../03-modules/catalogue.md) dit lequel apporte quoi.
 
-## Les vingt-trois skills, par module
+## Les vingt-quatre skills, par module
 
 ### `installer`
 **`vibeflow-install`** — le tout premier geste après avoir installé le plugin. Se déclenche sur
@@ -110,6 +110,10 @@ un chiffre saisi à la main.
 sprint », « reproduis ce bug mobile ». Recette réelle sur simulateur ou émulateur, statut
 expérimental à la date de rédaction de cette page.
 
+### `cockpit`
+**`vf-cockpit`** — se tape `/vf-cockpit`, ne se déclenche jamais seul. Ouvre le cockpit local du lab
+(onglets Projet et Code, en lecture seule, sur cette machine).
+
 ### `software-architecture`
 **`software-architecture`** — se déclenche dès qu'on crée ou édite du code, qu'un fichier grossit,
 ou qu'on planifie un refactor. Applique la doctrine d'architecture AI-safe (fichiers courts,
@@ -124,17 +128,18 @@ Tu ne le nommeras jamais dans une phrase.
 
 ## Deux précisions qui évitent une confusion
 
-D'abord, deux des skills ci-dessus (`vf-design` et `vf-sketch`) se ressemblent à des commandes en
-surface — ce ne sont pas des commandes, elles n'ont aucun fichier sous `plugin/commands/`. Vois
+D'abord, trois des skills ci-dessus (`vf-design`, `vf-sketch` et `vf-cockpit`) se ressemblent à des commandes en
+surface — ce ne sont pas des commandes, elles n'ont aucun fichier sous `plugin/commands/`. `vf-cockpit` est un skill de classe
+utilisateur, tapé comme une commande, jamais déclenché par une phrase. Vois
 [commandes.md](./commandes.md) pour la vraie liste. Ensuite, un skill n'est jamais un agent : le skill décrit **quand** intervenir, l'agent (ou
 l'équipe d'agents) fait ensuite le travail une fois invoqué — la référence des agents vit sur une
 page séparée de ce même thème, consacrée uniquement à ça.
 
 ## D'où vient cette liste
 
-Chaque skill ci-dessus correspond à un fichier `SKILL.md` réel, énuméré (puis revérifié le 2026-10-27) plutôt que
+Chaque skill ci-dessus correspond à un fichier `SKILL.md` réel, énuméré (puis revérifié le 2026-11-01) plutôt que
 recopié d'une doc existante. Pour revérifier : depuis la racine du dépôt,
-`find plugin -iname 'SKILL.md' | grep -v reference/content` — le compte doit rester à vingt-trois tant
+`find plugin -iname 'SKILL.md' | grep -v reference/content` — le compte doit rester à vingt-quatre tant
 qu'aucun skill n'a été ajouté, retiré, ou qu'aucun modèle n'a glissé hors de son dossier de
 templates.
 
