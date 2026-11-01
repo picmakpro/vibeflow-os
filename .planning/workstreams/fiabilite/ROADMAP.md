@@ -806,10 +806,10 @@ La graine `SEED-004` (retrait de `vf-cockpit`) reste dormante : elle se déclenc
 
 ### Phase 67: Cockpit floorplan sur socle partagé
 
-> **Non cadrée — cadrage par le manager à suivre.** Les critères ci-dessous sont tirés de la note d'entrée, pas encore arbitrés phase par phase.
+> Cadrée le 2026-11-01 (`67-CONTEXT.md`, P67-D-01..18) ; planifiée le 2026-11-01.
 
 **Goal:** Un module VibeFlow distribué et toggable ouvre, dans tout lab GSD, un cockpit à onglets Projet (au cœur) et Code, sur un socle partagé (collecteur « qui est au travail » + graphe Projet) que `vf-signal` réutilise ; il remplace le module `vf-cockpit` jamais mergé.
-**Requirements**: TBD — famille réservée, posée au cadrage.
+**Requirements**: CKPT-01..CKPT-11
 **Depends on:** rien dans le jalon.
 **Success criteria** (observables, à confirmer au cadrage) :
 1. Sur un lab GSD quelconque (un `.planning/` suffit), le verbe du module ouvre le cockpit et l'onglet Projet montre racine, jalon, phase et plan.
@@ -819,11 +819,28 @@ La graine `SEED-004` (retrait de `vf-cockpit`) reste dormante : elle se déclenc
 5. La dernière commande des sessions est masquée par défaut dans « Au travail », révélée sur demande, jamais exportée ; le chrome est en français sans anglais visible (test qui rougit).
 **Sources:** `.planning/notes/2026-11-01-cockpit-facettes.md` (arbitrages 1-4, choix de session, limites connues) ; `.planning/spikes/002-cockpit-code-projet/` (extensions, patchs P1-P8) ; `docs/research/2026-11-01-etude-floorplan-cockpit.md`.
 **Hors périmètre :** enrichir l'onglet Code par stack (suite) ; retirer `vf-cockpit` (SEED-004, à la livraison).
-**Plans:** 0 plans
+**Plans:** 7 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 67 to break down)
+**Wave 1**
+- [ ] 67-01-PLAN.md — `dag.sh` : écriture atomique de `save()`, témoin rouge d'abord (CKPT-11)
+- [ ] 67-02-PLAN.md — Socle partagé : collecteur « au travail » + graphe Projet, schémas versionnés, test de forme des transcripts (CKPT-01, CKPT-06)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 67-03-PLAN.md — Vendorisation floorplan v0.6.0 @ 92d6854, retrait Cloud, marque blanche, logo (CKPT-02, CKPT-03, CKPT-04)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 67-04-PLAN.md — Mesure `claude -p`, serveur unique, direct SSE, dernière commande masquée (CKPT-05, CKPT-08, CKPT-03)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 67-05-PLAN.md — Questions : formes locales, agent confiné, sélecteur de modèle, onglet Code (CKPT-07, CKPT-06)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 67-06-PLAN.md — Module `plugin/cockpit`, skill `/vf-cockpit`, pose par l'engine (CKPT-10)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 67-07-PLAN.md — Chrome en français, test qui rougit, recette humaine (CKPT-09)
 
 ### Phase 68: Embarquer vf-signal sur le socle partagé
 

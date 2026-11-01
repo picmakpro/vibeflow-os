@@ -947,6 +947,17 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | COLB-09 | Phase 61 | Partial — 2026-10-29, tous les plans 61-01 à 61-08 : aucune valeur de `.planning/instruction-budget-baselines.tsv` relevée, `check-instruction-budget.sh` rc 0 (37 fichiers, BOOTSTRAP `ligne 2610`), aucun skill ni agent touché, `scripts/hooks`, `.github` et sentinelles intacts, G-2 rc 0 (marqueurs 32/32), `check-ajout-retrait --strict` rc 0, `check-version-sync` et `check-manual` rc 0, job `gates` rejoué depuis `ci.yml` (20 rejouées, 0 en échec), quinze suites une à une vertes, arrêt avant PR ; critère 6 (`clients`, zéro nom de client) NON VÉRIFIABLE : code 2, en attente de la liste (hors dépôt), comme en Phases 58 et 60 — jamais compté vert, exigence laissée décochée. |
 | PLTF-01 | Phase 62 | Complete — 2026-10-29, plan 62-01 (preuve : `62-DECISION-plateforme.md`, `62-01-SUMMARY.md`) |
 | PLTF-02 | Phase 62 | Complete — 2026-10-29, décision A signée par délégation (preuve : `62-DECISION-plateforme.md` § Décision, `62-CONTEXT.md` P62-B-01 levé) ; réexamen 2027-01-31 |
+| CKPT-01 | Phase 67 | Planned — 2026-11-01 |
+| CKPT-02 | Phase 67 | Planned — 2026-11-01 |
+| CKPT-03 | Phase 67 | Planned — 2026-11-01 |
+| CKPT-04 | Phase 67 | Planned — 2026-11-01 |
+| CKPT-05 | Phase 67 | Planned — 2026-11-01 |
+| CKPT-06 | Phase 67 | Planned — 2026-11-01 |
+| CKPT-07 | Phase 67 | Planned — 2026-11-01 |
+| CKPT-08 | Phase 67 | Planned — 2026-11-01 |
+| CKPT-09 | Phase 67 | Planned — 2026-11-01 |
+| CKPT-10 | Phase 67 | Planned — 2026-11-01 |
+| CKPT-11 | Phase 67 | Planned — 2026-11-01 |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1435,6 +1446,21 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 > Reformulent P62-D-01..05 (cadrage sans humain joignable, mandat Samuel, /vf-auto session principale, 2026-10-29) sans arbitrage neuf. La phase prépare la décision ; elle ne la prend pas.
 - [x] **PLTF-01**: Dossier de décision — `62-DECISION-plateforme.md` écrit sur la forme de `27-DECISION-claude-orchestration.md` : critères de la spec §4 C écrits avant les observations, mesures sourcées (commande et date, « non mesuré » pour toute mesure absente), options A / B / C avec coût, risque et prérequis, recommandation motivée, déclencheur de reprise et plancher de date proposés ; statut « PROPOSÉ ». Aucun code (P62-D-01..05).
 - [x] **PLTF-02**: Décision signée par Samuel — option retenue (A, B ou C) et date de reprise confirmée ou corrigée, inscrites dans le dossier. Cochée le 2026-10-29 : option A, réexamen 2027-01-31 ; décision déléguée par Samuel, message session principale, 2026-10-29 : « décide pour moi les options A, B ou C. Choisis la meilleure option selon une étude de toi-même » ; option retenue par la session principale (P62-B-01 levé).
+
+### Cockpit floorplan sur socle partagé (Phase 67 — posées à la planification, 2026-11-01)
+> Reformulent P67-D-01..18 (`67-CONTEXT.md` ; arbitrages Samuel, AskUserQuestion session principale, 2026-11-01) sans arbitrage neuf. Famille `CKPT` vérifiée libre le 2026-11-01. Jalon `vibeflow-v2.0`.
+
+- [ ] **CKPT-01**: Socle partagé — collecteur « au travail » et graphe Projet en bibliothèque node du module, interface JSON documentée et versionnée (schéma nommé VibeFlow), test de forme des transcripts et `meta.json` de Claude Code (P67-D-12).
+- [ ] **CKPT-02**: Vendorisation floorplan v0.6.0 @ 92d6854 — patchs rejouables, LICENSE MIT et copyright conservés, ligne dans un fichier de licences tierces du module, `VENDORED.txt`, marqueur `vibeflow:allow-large-file` sur les fichiers vendorisés, procédure de synchro documentée (P67-D-03, P67-D-07, P67-D-11).
+- [ ] **CKPT-03**: Aucun appel sortant hors l'agent `claude -p` des questions — fonction Cloud retirée en entier (liste d'attente, `claude auth status`, `~/.floorplan/`) ; témoins grep et réseau qui rougissent (P67-D-02).
+- [ ] **CKPT-04**: Marque blanche par renommage mécanique à l'assemblage, logo VibeFlow inliné, zéro « Floorplan » visible hors commentaire de licence ; test qui rougit si une occurrence réapparaît (P67-D-03, P67-D-04).
+- [ ] **CKPT-05**: Serveur unique — direct SSE, questions et « au travail » sur le serveur patché, sans second port ni CORS, bind `127.0.0.1`, jeton et contrôle du Host conservés, repli par polling (P67-D-13, P67-D-16).
+- [ ] **CKPT-06**: Onglet Projet sur tout lab GSD (plat ou partitionné) ; onglet Code conditionnel : extracteur VibeFlow si `plugin/*/module.json`, sinon scan brut, aucun LLM à l'assemblage (P67-D-17).
+- [ ] **CKPT-07**: Questions — formes courantes locales, agent `claude -p` confiné (lecture bornée à la racine du lab, Bash limité aux scripts de requête), modèle `sonnet` par défaut, variable d'environnement et sélecteur de modèle validé côté serveur (P67-D-08, P67-D-15).
+- [ ] **CKPT-08**: Dernière commande des sessions masquée : absente du flux SSE, des fichiers générés et de l'export, révélée par requête authentifiée ponctuelle ; test qui le prouve (P67-D-14).
+- [ ] **CKPT-09**: Chrome en français, zéro anglais visible, test qui rougit (P67-D-03, P67-D-18).
+- [ ] **CKPT-10**: Module toggable `plugin/cockpit` (`module.json`, `VERSION`, `CHANGELOG`, `README`), verbe `/vf-cockpit`, posé par l'engine y compris les binaires, sortie `.vibeflow/cockpit/` avec son `.gitignore` ; aucun bump de la `VERSION` racine (P67-D-05, P67-D-06).
+- [ ] **CKPT-11**: `dag.sh` — écriture atomique de `save()` (fichier temporaire du même dossier puis `os.replace`), témoin rouge d'abord (lecture pendant une écriture lente) ; validation ADR-031 limitée à ce correctif (P67-D-09).
 
 ---
 *Requirements defined: 2026-06-04*
