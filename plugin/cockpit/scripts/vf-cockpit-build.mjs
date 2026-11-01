@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { findLabRoot, engineDir, outputDir, resolveScriptsDir } from './vf-cockpit-paths.mjs';
+import { findLabRoot, engineDir, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
 import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { ecrireArchitecture } from './vf-cockpit-code.mjs';
 import { insererGraphe } from './vf-cockpit-embed.mjs';
@@ -23,9 +23,14 @@ const GITIGNORE = '# Sortie générée par le cockpit VibeFlow : ignorée par gi
 const fin = (code, msg) => { const e = new Error(msg); e.code = code; return e; };
 const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };
 const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/[`*]/g, '').trim(); const i = s.search(/[.!?](\s|$)/); s = i > 25 ? s.slice(0, i + 1) : s; return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+// la cause remonte (lignes d'erreur du moteur, jusqu'à 4), pas seulement sa dernière ligne ; timeout : un moteur bloqué ne gèle pas le lanceur
 const run = (engine, script, lab, ...a) => {
-  try { return execFileSync(process.execPath, [path.join(engine, 'scripts', script), lab, ...a], { encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'pipe'] }); }
-  catch (e) { const last = String(e.stderr || e.stdout || e.message).trim().split('\n').pop(); throw fin(4, `échec de l'étape ${script} : ${last}`); }
+  try { return execFileSync(process.execPath, [path.join(engine, 'scripts', script), lab, ...a], { encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'pipe'], timeout: 600000 }); }
+  catch (e) {
+    const lines = String(e.stderr || e.stdout || e.message).split('\n').map((l) => l.trim()).filter(Boolean);
+    const cause = (lines.filter((l) => /^(✗|-|error|Error)/.test(l)).slice(0, 4).join(' · ') || lines.slice(-1)[0] || 'cause inconnue').slice(0, 400);
+    throw fin(4, `échec de l'étape ${script} du moteur du cockpit. Cause : ${cause}`);
+  }
 };
 
 export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
@@ -36,7 +41,9 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
   const eng = engineDir(scriptsDir);
   if (eng.etat !== 'trouve') throw fin(3, 'moteur du cockpit introuvable : réinstaller le module cockpit.');
   const sortie = outputDir(lab);
+  if (fs.existsSync(path.dirname(sortie))) verifierSortie(lab, path.dirname(sortie)); // M4 : aucun lien symbolique avant la moindre écriture
   fs.mkdirSync(sortie, { recursive: true });
+  verifierSortie(lab, sortie);
 
   run(eng.chemin, 'scan.mjs', lab); // le moteur refuse un dossier de sortie non vide qui n'est pas encore une carte : .gitignore après
   const arch = ecrireArchitecture({ lab, sortie });
@@ -66,7 +73,7 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
     else if (f.p.endsWith('.md')) d = txt.replace(/^#.*$/gm, '').split(/\n\s*\n/).find((p) => p.trim().length > 30) || '';
     if (d) { f.d = sentence(d); f.auto = false; decrits++; }
   }
-  const touch = {};
+  const touch = Object.create(null); // un chemin `constructor` ou `__proto__` du lab n'est qu'une clé
   for (const f of project.files) for (const p of f.touched || []) (touch[p] ||= []).push({ ref: 'f:' + f.p, label: f.name.slice(0, 90), st: f.st });
   const logo = (n) => 'data:image/svg+xml;base64,' + fs.readFileSync(path.join(eng.chemin, 'assets', n)).toString('base64');
   const vfLogos = { clair: logo('vibeflow-logo-clair.svg'), sombre: logo('vibeflow-logo-sombre.svg') };

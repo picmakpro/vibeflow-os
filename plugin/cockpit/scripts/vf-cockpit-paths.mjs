@@ -1,6 +1,6 @@
 // vf-cockpit-paths — résolution des chemins du socle du cockpit (P67-D-12). Lecture seule.
-// Exports : findLabRoot, planningLayout, stateFile, resolveScriptsDir, driverLockScript,
-//           engineDir, outputDir, gitCommonDir.
+// Exports : findLabRoot, planningLayout, stateFile, resolveScriptsDir, trustedScriptsDir, driverLockScript,
+//           engineDir, outputDir, gitCommonDir, confiner, verifierSortie, realUnder.
 // Aucun nom de compartiment, de jalon ou de projet codé en dur : tout vient du disque.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -48,27 +48,61 @@ export function stateFile(root, layout) {
   return f && isFile(f) ? f : null;
 }
 
-// dossier des scripts : champ scriptsDir de <here>/.cache/vf-cockpit.json s'il pointe un dossier, sinon here
+// dossier des scripts du MODULE : VF_COCKPIT_SCRIPTS_DIR (posé par le lanceur) s'il pointe un dossier, sinon <here>. Le serveur,
+// lui, ne se fie qu'à trustedScriptsDir() : un .cache/ ou un dossier du lab ne désigne jamais un dossier de scripts (67-SECURITY M3).
 export function resolveScriptsDir(here) {
-  try {
-    const j = JSON.parse(fs.readFileSync(path.join(here, '.cache', 'vf-cockpit.json'), 'utf8'));
-    if (j && typeof j.scriptsDir === 'string' && isDir(j.scriptsDir)) return j.scriptsDir;
-  } catch {}
-  return here;
+  return trustedScriptsDir() || here;
+}
+export function trustedScriptsDir() {
+  const e = process.env.VF_COCKPIT_SCRIPTS_DIR;
+  return e && path.isAbsolute(e) && isDir(e) ? e : null;
 }
 
-// T-67-06 : jamais un script pris sous <labRoot>/plugin/ (arbre observé, potentiellement piégé)
+const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
+export const realUnder = (p, dir) => { const r = real(p), d = real(dir); return r === d || r.startsWith(d + path.sep); };
+
+// T-67-06 : jamais un script pris dans l'arbre observé. Comparaison sur realpath (un lien `.claude/scripts -> plugin/x` ne passe pas) :
+// aucun candidat sous le lab, sauf le dossier de scripts du module (posé par le lanceur) s'il n'est pas dans la sortie .vibeflow/ du lab.
 export function driverLockScript({ scriptsDir, labRoot, home } = {}) {
+  const sortie = labRoot ? path.join(labRoot, '.vibeflow') : null;
   const cands = [];
-  if (scriptsDir) cands.push(path.join(scriptsDir, 'driver-lock.sh'));
-  if (labRoot) cands.push(path.join(labRoot, '.claude', 'scripts', 'driver-lock.sh'));
-  if (home) cands.push(path.join(home, '.claude', 'scripts', 'driver-lock.sh'));
-  const plugin = labRoot ? path.resolve(labRoot, 'plugin') + path.sep : null;
-  for (const c of cands) {
-    if (plugin && path.resolve(c).startsWith(plugin)) continue;
-    if (isFile(c)) return { chemin: c, etat: 'trouve' };
+  if (scriptsDir) cands.push({ c: path.join(scriptsDir, 'driver-lock.sh'), module: true });
+  if (home) cands.push({ c: path.join(home, '.claude', 'scripts', 'driver-lock.sh'), module: false });
+  for (const { c, module } of cands) {
+    if (!isFile(c)) continue;
+    if (labRoot && module && sortie && realUnder(c, sortie)) continue;
+    if (labRoot && !module && realUnder(c, labRoot)) continue;
+    return { chemin: c, etat: 'trouve' };
   }
   return { chemin: null, etat: 'absent' };
+}
+
+// garde partagée (67-SECURITY M4) : <sortie> ne doit être, ni lui ni aucun de ses fichiers, un lien symbolique sortant du lab.
+// confiner(lab, cible) : cible dans le lab par realpath ; refuse un lien symbolique ou un fichier qui en sort. Lève sinon.
+export function confiner(lab, cible) {
+  let st = null; try { st = fs.lstatSync(cible); } catch {}
+  if (st?.isSymbolicLink()) throw Object.assign(new Error(`lien symbolique refusé dans la sortie du cockpit : ${cible}`), { code: 4 });
+  const parent = real(path.dirname(cible));
+  const racine = real(lab);
+  if (parent !== racine && !parent.startsWith(racine + path.sep)) throw Object.assign(new Error(`écriture hors du lab refusée : ${cible}`), { code: 4 });
+  return cible;
+}
+
+// verifierSortie(lab, sortie) : la sortie est sous le lab (realpath) et aucun de ses éléments n'est un lien symbolique ; lève sinon.
+export function verifierSortie(lab, sortie) {
+  const racine = real(lab);
+  const r = real(sortie);
+  if (r !== racine && !r.startsWith(racine + path.sep)) throw Object.assign(new Error(`sortie du cockpit hors du lab : ${sortie}`), { code: 4 });
+  const marche = (d) => {
+    for (const e of ls(d)) {
+      const p = path.join(d, e);
+      let st; try { st = fs.lstatSync(p); } catch { continue; }
+      if (st.isSymbolicLink()) throw Object.assign(new Error(`lien symbolique refusé dans la sortie du cockpit : ${p}`), { code: 4 });
+      if (st.isDirectory()) marche(p);
+    }
+  };
+  if (fs.lstatSync(sortie).isSymbolicLink()) throw Object.assign(new Error(`lien symbolique refusé : ${sortie}`), { code: 4 });
+  marche(sortie);
 }
 
 // scripts/ et skills/ sont frères sous TARGET_ROOT (dépôt et trois scopes)
@@ -83,7 +117,7 @@ export const outputDir = (labRoot) => path.join(labRoot, '.vibeflow', 'cockpit')
 export function gitCommonDir(root) {
   try {
     const out = execFileSync('git', ['-C', root, 'rev-parse', '--path-format=absolute', '--git-common-dir'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000 }).trim();
     return out || null;
   } catch { return null; }
 }

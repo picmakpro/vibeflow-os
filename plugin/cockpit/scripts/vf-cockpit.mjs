@@ -6,8 +6,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn, spawnSync } from 'node:child_process';
-import { findLabRoot, engineDir, outputDir, resolveScriptsDir } from './vf-cockpit-paths.mjs';
+import { spawn, execFileSync } from 'node:child_process';
+import { findLabRoot, engineDir, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const AIDE = `Usage : node vf-cockpit.mjs [open|build|stop|status] [--lab <dossier>] [--no-open] [--port <p>] [--rebuild]
@@ -41,11 +41,21 @@ const serveurVivant = (sortie) => { const s = lireEtat(sortie); return s && s.pi
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const adresses = (url) => `Cockpit : ${url}/ (Code) · ${url}/project.html (Projet)`;
 
+// 67-SECURITY M3 : le lanceur n'exécute JAMAIS un script du lab (serve.mjs de la sortie compris). Arrêt par signal, sur un PID que le fichier
+// d'état du lab (donc non fiable) désigne : entier > 1, ni le nôtre, vivant, et dont la ligne de commande est le serve.mjs de CETTE sortie.
+function estNotre(pid, serve) {
+  if (!Number.isInteger(pid) || pid <= 1 || pid === process.pid || !vivant(pid)) return false;
+  if (process.platform === 'win32') return true; // pas de `ps` : le PID vient du fichier d'état, reste borné ci-dessus
+  try {
+    const cmd = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 });
+    return cmd.includes(serve) || cmd.includes(fs.realpathSync(serve));
+  } catch { return false; }
+}
 function arreter(sortie) {
+  const s = lireEtat(sortie);
   const serve = path.join(sortie, 'serve.mjs');
-  if (!fs.existsSync(serve)) return false;
-  const r = spawnSync(process.execPath, [serve, '--stop'], { encoding: 'utf8' });
-  return r.status === 0;
+  if (!s || !estNotre(s.pid, serve)) return false;
+  try { process.kill(s.pid, 'SIGTERM'); return true; } catch { return false; }
 }
 
 async function assemblerLab(lab, scriptsDir) {
@@ -56,11 +66,14 @@ async function assemblerLab(lab, scriptsDir) {
 
 async function demarrer(lab, sortie, o) {
   try { fs.unlinkSync(etatFile(sortie)); } catch {} // état d'un serveur mort : jamais pris pour un démarrage
+  verifierSortie(lab, sortie);
   const logFd = fs.openSync(path.join(sortie, '.cache', 'serveur.log'), 'a');
   const args = [path.join(sortie, 'serve.mjs'), '--idle-exit', '60'];
   if (o.noOpen) args.push('--no-open');
   if (o.port) args.push('--port', String(o.port));
-  const enfant = spawn(process.execPath, args, { cwd: lab, detached: true, stdio: ['ignore', logFd, logFd] });
+  // le serveur ne se fie qu'à ces deux chemins, posés ici depuis le module (jamais lus dans un .cache/ du lab)
+  const env = { ...process.env, VF_COCKPIT_ENGINE_DIR: engineDir(resolveScriptsDir(HERE)).chemin || '', VF_COCKPIT_SCRIPTS_DIR: resolveScriptsDir(HERE) };
+  const enfant = spawn(process.execPath, args, { cwd: lab, env, detached: true, stdio: ['ignore', logFd, logFd] });
   enfant.unref();
   fs.closeSync(logFd);
   for (let i = 0; i < 100; i++) { // borné à 10 s
@@ -88,7 +101,7 @@ async function main() {
   if (o.verbe === 'stop') {
     const s = serveurVivant(sortie);
     if (!s) { console.log('Cockpit déjà arrêté.'); return; }
-    arreter(sortie);
+    if (!arreter(sortie)) { console.error(`PID ${s.pid} non reconnu comme le serveur de ce cockpit : rien n'a été arrêté (fichier d'état du lab non fiable).`); process.exit(5); }
     for (let i = 0; i < 30 && vivant(s.pid); i++) await attendre(100);
     console.log(vivant(s.pid) ? `Le serveur (PID ${s.pid}) tarde à s'arrêter.` : 'Cockpit arrêté.');
     return;
@@ -98,7 +111,7 @@ async function main() {
   // open : réutiliser un serveur vivant du même lab, sauf --rebuild
   const vif = serveurVivant(sortie);
   if (vif && !o.rebuild) { console.log(adresses(vif.url)); return; }
-  if (vif) { arreter(sortie); for (let i = 0; i < 30 && vivant(vif.pid); i++) await attendre(100); }
+  if (vif) { if (!arreter(sortie)) { console.error(`PID ${vif.pid} non reconnu comme le serveur de ce cockpit : rien n'a été arrêté.`); process.exit(5); } for (let i = 0; i < 30 && vivant(vif.pid); i++) await attendre(100); }
   if (engineDir(scriptsDir).etat !== 'trouve') { console.error('moteur du cockpit introuvable : réinstaller le module cockpit.'); process.exit(3); }
   await assemblerLab(lab, scriptsDir);
   const s = await demarrer(lab, sortie, o);
