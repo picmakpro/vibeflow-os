@@ -79,8 +79,13 @@ export function answerLocally(G, question) {
     return answer(`${xs.length} en cours`, xs.length ? `En cours${scope} :\n${xs.slice(0, 12).map((x) => line(I, x)).join('\n')}` : `Rien en cours${scope} d'après .planning/. Pour les agents réellement au travail, voir le badge d'en-tête.`, xs.map((x) => item(I, x)));
   }
   if (/reste|a faire|prochain|suivant|restant|ensuite|next/.test(q)) {
-    const t = target || curMs;
-    if (!t) return null; // aucun jalon courant reconnu (ex. STATE `milestone: v1.0` sans section homonyme du ROADMAP) : c'est à l'agent de lire le planning
+    // CKPT-07 : sans jalon courant reconnu (STATE `milestone: v1.0` sans section homonyme), le jalon UNIQUE du ROADMAP ; à défaut, les phases à finir
+    const jalons = G.nodes.filter((n) => /^ms-/.test(n.id || '')), t = target || curMs || (jalons.length === 1 ? jalons[0] : null);
+    if (!t) {
+      const phases = G.nodes.filter((n) => n.kind === 'phase'); if (!phases.length) return null; // rien à calculer : c'est à l'agent de lire le planning
+      const reste = phases.filter((x) => x.st === 'todo' || x.st === 'active');
+      return answer('Reste', reste.length ? `${reste.length} phase(s) à finir (aucun jalon courant reconnu) :\n${reste.slice(0, 12).map((x) => line(I, x)).join('\n')}${reste.length > 12 ? `\n- … et ${reste.length - 12} autre(s)` : ''}` : 'Toutes les phases du planning sont terminées.', reste.map((x) => item(I, x)));
+    }
     const xs = (t ? I.under(t.id) : pool).filter((x) => x !== t && (x.st === 'todo' || x.st === 'active') && (x.id ? x.kind === 'phase' || /^dag-/.test(x.id) : !x.p.startsWith('req/') || /^ph-/.test(t?.id || '')));
     return answer(`Reste${t ? ' · ' + I.label(t).split(' · ')[0] : ''}`, `${xs.length} à finir dans [[${I.ref(t)}]]${t?.foot ? ` (${t.foot})` : ''} :\n${xs.slice(0, 12).map((x) => line(I, x)).join('\n')}${xs.length > 12 ? `\n- … et ${xs.length - 12} autre(s)` : ''}`,
       [item(I, t), ...xs.map((x) => item(I, x))], xs[0] ? [`Qu'est-ce qui bloque dans ${I.label(t).split(' · ')[0]} ?`] : []);

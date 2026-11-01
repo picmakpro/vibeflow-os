@@ -7,6 +7,7 @@
 # Faux binaires claude et codex (node) en tête du PATH ; aucun vrai appel. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
+libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"; mkdir -p "$WORK/aux" "$WORK/home"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"
@@ -70,7 +71,7 @@ node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet > "$WORK/build.out" 2>&1 || 
 OUT="$LAB/.vibeflow/cockpit"; LABR="$(cd "$LAB" && pwd -P)"
 demarrer() { # demarrer <dossier-faux> <PATH> [VAR=val ...] -> PORT, TOK, PTOK ; VF_FAKE_DIR = <dossier-faux>
   local FK="$1" P="$2"; shift 2; stop_srv; rm -f "$OUT/.cache/server.json"; [ -n "${NOCLEAR:-}" ] || rm -f "$FK"/call-*.json
-  env PATH="$P" VF_FAKE_DIR="$FK" "$@" "$NODE" "$OUT/serve.mjs" --no-open --port $((4400 + RANDOM % 500)) > "$WORK/serve.out" 2>&1 &
+  env PATH="$P" VF_FAKE_DIR="$FK" "$@" "$NODE" "$OUT/serve.mjs" --no-open --port $(libre) > "$WORK/serve.out" 2>&1 &
   SRV=$!
   for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
   PORT=$(H json "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0); TOK=$(H tok "$PORT" /); PTOK=$(H tok "$PORT" /project.html)
@@ -176,6 +177,24 @@ H loc "$SCRIPTS" "$L5" "Qu'est-ce qui reste dans la phase 1 du compartiment deux
 assert_eq "Q10.3 — le compartiment nommé lève l'ambiguïté (vise cette phase seule)" "$(H json "$WORK/l5b.json" 'j.items[0].id')" "n:ph-1@deux"
 H loc "$SCRIPTS" "$LAB" "Qu'est-ce qui reste dans la phase 2 ?" > "$WORK/l1.json"
 assert_eq "Q10.4 — numéro unique : la réponse vise directement ph-2" "$(H json "$WORK/l1.json" 'j.items[0].id')" "n:ph-2"
+
+echo "=== Q12 — CKPT-07 : « ce qui reste » sans jalon courant reconnu reste local (jamais un appel à l'agent) ==="
+mkl() { # mkl <dir> <nbJalons> : STATE.md dont le jalon (v9.9) n'existe pas dans le ROADMAP ; phases 2i-1 (faite) et 2i (à faire) par jalon ji
+  local D="$1" N="$2" i; mkdir -p "$D/.planning/phases/01-x"; printf '# Roadmap\n\n## Milestones\n\n' > "$D/.planning/ROADMAP.md"
+  for i in $(seq 1 "$N"); do printf -- '- 🚧 **j%s** - Phases %s-%s\n' "$i" "$((i*2-1))" "$((i*2))" >> "$D/.planning/ROADMAP.md"; done
+  printf '\n## Phases\n\n' >> "$D/.planning/ROADMAP.md"
+  for i in $(seq 1 "$N"); do printf -- '- [x] **Phase %s: Socle %s** - fait\n- [ ] **Phase %s: Suite %s** - à faire\n' "$((i*2-1))" "$i" "$((i*2))" "$i" >> "$D/.planning/ROADMAP.md"; done
+  printf -- '---\nmilestone: v9.9\nstatus: executing\n---\n# State\n' > "$D/.planning/STATE.md"; printf '<objective>x</objective>\n' > "$D/.planning/phases/01-x/01-01-PLAN.md"
+  git -C "$D" init -q && git -C "$D" add -A && git -C "$D" -c user.email=t@t -c user.name=t commit -q -m init
+}
+mkl "$WORK/m1" 1; H loc "$SCRIPTS" "$WORK/m1" "Qu'est-ce qui reste ?" > "$WORK/m1.json"
+assert_eq "Q12.1 — jalon unique non reconnu par le STATE : réponse locale sur ce jalon (le jalon et sa phase à faire)" "$(H json "$WORK/m1.json" 'j&&j.engine+" "+j.items.map(i=>i.id).join(",")')" "local n:ms-j1,n:ph-2"
+mkl "$WORK/m2" 2; H loc "$SCRIPTS" "$WORK/m2" "prochaine étape ?" > "$WORK/m2.json"
+assert_eq "Q12.2 — deux jalons, aucun reconnu : réponse locale sur le pool des phases à faire (les deux sont listées)" "$(H json "$WORK/m2.json" 'j&&j.engine+" "+j.items.map(i=>i.id).sort().join(",")')" "local n:ph-2,n:ph-4"
+mkl "$WORK/m3" 2; sed -i.bak 's/^milestone: v9.9$/milestone: j1/' "$WORK/m3/.planning/STATE.md"; H loc "$SCRIPTS" "$WORK/m3" "reste" > "$WORK/m3.json"
+assert_eq "Q12.3 — témoin : jalon courant reconnu (j1 parmi deux), comportement inchangé : ce jalon seul" "$(H json "$WORK/m3.json" 'j&&j.engine+" "+j.items.map(i=>i.id).join(",")')" "local n:ms-j1,n:ph-2"
+mkdir -p "$WORK/m4/.planning"; printf '# vide\n' > "$WORK/m4/.planning/ROADMAP.md"; git -C "$WORK/m4" init -q; H loc "$SCRIPTS" "$WORK/m4" "Qu'est-ce qui reste ?" > "$WORK/m4.json"
+assert_eq "Q12.4 — aucune phase du tout : rien à calculer, la question repart à l'agent (null)" "$(cat "$WORK/m4.json")" "null"
 
 echo "=== Q11 — constante = mesure ==="
 if [ -n "$MESURE" ]; then
