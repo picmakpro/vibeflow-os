@@ -7,6 +7,7 @@
 # recherche >= 200 px, logo >= 20x18 sans filtre, barre de question sur une ligne avec son invite entière.
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
 set -uo pipefail
+libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 ENG="$SCRIPTS/../skills/cockpit-moteur"
@@ -50,7 +51,7 @@ mklab() { # mklab <dir> : lab GSD sans STATE.md, deux phases, un DAG de mission 
 }
 srv() { # srv <sortie> -> SRV_PORT SRV_PID
   local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
-  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" node "$o/serve.mjs" --no-open --port $((5000 + RANDOM % 900)) > "$o/../serve.out" 2>&1 ) &
+  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) &
   SRV_PID=$!; PIDS+=($SRV_PID)
   for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
   SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
@@ -58,6 +59,9 @@ srv() { # srv <sortie> -> SRV_PORT SRV_PID
 unsrv() { kill "$SRV_PID" 2>/dev/null; wait "$SRV_PID" 2>/dev/null; }
 mes() { REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-responsive.mjs" "$CHROME" "$@"; } # mes <url> <largeurs> <resize|-> [<captures>]
 LARGES="1024,1280,1440,1920,2560"
+# boutons d'en-tête OPTIONNELS de l'onglet Code (Travail récent et Écrans n'existent que si le lab a un historique récent et des pages) : ajoutés par l'API
+# d'extension du viewer, avec leur libellé et leur icône d'origine, pour mesurer le pire en-tête réel — sans eux R-1 (bouton rogné à 1 024 px) restait invisible
+INJ_CODE="(() => { const SC = window.VibeFlow; SC.addHeaderButton({ id: 'btn-recent', label: 'Recent work', icon: 'recent', title: 'What was just worked on, on one board', onClick() {} }); SC.addHeaderButton({ id: 'screens-btn', label: 'Screens', icon: 'ui', title: 'Pick a screen of the app', onClick() {} }); return true; })()"
 
 LC="$WORK/lab-court"; mklab "$LC"
 LL="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mklab "$LL"
@@ -66,7 +70,8 @@ for spec in "court:$LC" "long:$LL"; do
   nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; P=$SRV_PORT
   assert_eq "0 — serveur du lab « $nom » démarré" "$([ "$P" -gt 0 ] && echo oui || echo non)" "oui"
   for onglet in index project; do
-    R="$(mes "http://127.0.0.1:$P/$onglet.html" "$LARGES" 1920:1024 ${SHOTS:+"$SHOTS/$nom-$onglet"})"
+    inj=""; [ "$onglet" = index ] && inj="$INJ_CODE"
+    R="$(RESP_INJECT="$inj" mes "http://127.0.0.1:$P/$onglet.html" "$LARGES" 1920:1024 ${SHOTS:+"$SHOTS/$nom-$onglet"})"
     echo "$R" > "$WORK/mes-$nom-$onglet.json"
     for w in ${LARGES//,/ }; do assert_eq "R1 — $nom / $onglet / $w px : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w")" "aucune"; done
     assert_eq "R2 — $nom / $onglet : 1 920 -> 1 024 à chaud" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "resize:1920:1024")" "aucune"
@@ -101,6 +106,26 @@ const fs=require('fs');for(const f of ['index.html','project.html']){const p='$L
 const n=h.replace(/<script>\/\* ui\/01-vf-responsive\.js \*\/[\s\S]*?<\/script>/,'<script>/* mutant */</script>');if(n===h){console.error('mutant : bloc 01-vf-responsive.js introuvable');process.exit(1)}fs.writeFileSync(p,n)}" || FAIL=$((FAIL+1))
 srv "$LM/.vibeflow/cockpit"; RM="$(mes "http://127.0.0.1:$SRV_PORT/project.html" 1440 - )"; unsrv
 assert_has "R4.1 — témoin rouge : sans 01-vf-responsive.js, l'en-tête à 1 440 px est signalé" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" 'j.mesures["1440"].v.join(" | ")')" "en-tête"
+
+# R4.2 — témoin rouge de R-1 : la borne d'avant (colonne gauche de 300 px) fait sortir le dernier bouton de l'onglet Code à 1 024 px
+LM2="$WORK/lab-mutant2"; mkdir -p "$LM2/.planning/missions" "$LM2/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$LM2/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$LM2/.planning/missions/"
+node -e "
+const fs=require('fs');const p='$LM2/.vibeflow/cockpit/index.html';const h=fs.readFileSync(p,'utf8');
+const n=h.replace('header .hl { flex: 1 1 0; min-width: 264px; }','header .hl { flex: 1 1 0; min-width: 300px; }');if(n===h){console.error('mutant : borne de 264 px introuvable');process.exit(1)}fs.writeFileSync(p,n)" || FAIL=$((FAIL+1))
+srv "$LM2/.vibeflow/cockpit"; RM2="$(RESP_INJECT="$INJ_CODE" mes "http://127.0.0.1:$SRV_PORT/index.html" 1024 - )"; unsrv
+assert_has "R4.2 — témoin rouge : avec la colonne gauche à 300 px, un bouton de l'en-tête sort de la fenêtre à 1 024 px (onglet Code)" "$(printf '%s' "$RM2" | node "$AUX/ev.mjs" 'j.mesures["1024"].v.join(" | ")')" "sort de la fenêtre"
+
+echo "=== R7 — chaque bouton d'en-tête a un nom accessible et une infobulle ; badge « au travail » ==="
+srv "$LC/.vibeflow/cockpit"; PC7=$SRV_PORT
+EXPR='({ aria: (document.getElementById("vf-lock")||{}).getAttribute ? document.getElementById("vf-lock").getAttribute("aria-label") : null, titre: (document.getElementById("vf-lock")||{}).title, sansInfobulle: [...document.querySelectorAll("header .hr button")].filter((b) => b.getBoundingClientRect().width > 0 && !b.title).map((b) => b.id || b.className), sansNom: [...document.querySelectorAll("header .hr button")].filter((b) => b.getBoundingClientRect().width > 0 && !b.getAttribute("aria-label") && !(b.innerText || "").trim()).map((b) => b.id || b.className) })'
+X7="$(RESP_INJECT="" CDP_PRET="document.readyState === 'complete' && !!document.getElementById('flows-btn') && !!document.getElementById('vf-lock') && /travail/.test(document.getElementById('vf-lock').textContent)" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 500 "$EXPR" "http://127.0.0.1:$PC7/index.html" "http://127.0.0.1:$PC7/project.html")"; unsrv
+assert_eq "R7.0 — témoin : la mesure a eu lieu sur les deux onglets (aucune erreur, deux résultats)" "$(printf '%s' "$X7" | node "$AUX/ev.mjs" '(j.erreur||"")+"|"+(j.resultats||[]).length')" "|2"
+for i in 0 1; do on=$([ $i = 0 ] && echo Code || echo Projet)
+  assert_eq "R7.1 — $on : l'aria-label du badge dit l'état (plus « … » figé)" "$(printf '%s' "$X7" | node "$AUX/ev.mjs" "/au travail|Personne/.test(j.resultats[$i].valeur.aria)")" "true"
+  assert_eq "R7.2 — $on : l'infobulle du badge ne contient jamais « undefined »" "$(printf '%s' "$X7" | node "$AUX/ev.mjs" "!/undefined/.test(j.resultats[$i].valeur.titre)")" "true"
+  assert_eq "R7.3 — $on : aucun bouton visible de la zone d'actions de l'en-tête sans infobulle (icône seule sous 1 600 px)" "$(printf '%s' "$X7" | node "$AUX/ev.mjs" "j.resultats[$i].valeur.sansInfobulle.length+'/'+j.resultats[$i].valeur.sansInfobulle.join(',')")" "0/"
+  assert_eq "R7.4 — $on : aucun bouton visible de la zone d'actions de l'en-tête sans nom accessible" "$(printf '%s' "$X7" | node "$AUX/ev.mjs" "j.resultats[$i].valeur.sansNom.length+'/'+j.resultats[$i].valeur.sansNom.join(',')")" "0/"
+done
 
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

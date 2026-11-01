@@ -4,10 +4,12 @@
 #   B task, cwd et chemin de session bornés et masqués · K files_modified: [constructor] · U lockText en lab plat · V remplacement sans $-motifs · W resynchronisation sur hello.seq
 # Chaque famille a son témoin ; la suite rougit sur un module antérieur aux correctifs. Exit 0 si tout passe.
 set -uo pipefail
+libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; ENG="$SCRIPTS/../skills/cockpit-moteur"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts" "$WORK/fk" "$WORK/fkd"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
+export CHROME_SESSION="$(cd "$(dirname "$0")" && pwd)/chrome-session.mjs"
 PIDS=(); cleanup() { for p in ${PIDS[@]+"${PIDS[@]}"}; do kill "$p" 2>/dev/null; wait "$p" 2>/dev/null; done; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -34,7 +36,7 @@ JS
 chmod +x "$AUX/fakeclaude"; cp "$AUX/fakeclaude" "$WORK/fk/claude"
 build() { node "$SCRIPTS/vf-cockpit-build.mjs" "$1" --quiet > "$2" 2>&1; echo $?; }
 srv() { local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
-  ( cd "$lab" && PATH="$WORK/fk:$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" node "$o/serve.mjs" --no-open --port $((5000 + RANDOM % 900)) > "$o/../serve.out" 2>&1 ) &
+  ( cd "$lab" && PATH="$WORK/fk:$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) &
   SRV_PID=$!; PIDS+=($SRV_PID); for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
   SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"; }
 tok() { node "$AUX/req.mjs" "$1" GET "$2" | sed -n 's/.*VF_COCKPIT_SERVER={"token":"\([0-9a-f]*\)".*/\1/p' | head -1; }
@@ -65,10 +67,11 @@ JS
 R1="$(node "$AUX/ask.mjs" "$L1/.vibeflow/cockpit")"
 assert_eq "S1.1 — « reste », « prochaine étape », « next » : jamais d'exception ; « où en est-on » : une réponse sans « undefined »" "$(printf '%s' "$R1" | node "$AUX/ev.mjs" 'Object.values(j).filter(v=>/EXCEPTION|undefined/.test(v)).length')" "0"
 assert_eq "S1.2 — « Où en est-on ? » répond localement" "$(printf '%s' "$R1" | node "$AUX/ev.mjs" 'j["Où en est-on ?"]')" "réponse"
+assert_eq "S1.2b — CKPT-07 : « reste », « prochaine étape », « next » répondent localement (jalon unique, STATE non reconnu)" "$(printf '%s' "$R1" | node "$AUX/ev.mjs" 'Object.values(j).slice(0,3).join(",")')" "réponse,réponse,réponse"
 srv "$L1/.vibeflow/cockpit"; P1=$SRV_PORT; PT1="$(tok "$P1" /project.html)"
 for q in "Qu'est-ce qui reste ?" "prochaine étape" "next"; do node "$AUX/req.mjs" "$P1" POST /api/ask "$PT1" "{\"question\":\"$q\"}" > /dev/null; done
 assert_eq "S1.3 — le serveur a survécu aux trois questions (état 200)" "$(node "$AUX/req.mjs" "$P1" GET /api/vf/etat "$PT1" | sed -n 1p)" "200"
-assert_eq "S1.4 — témoin : ces questions sans réponse locale sont confiées à l'agent confiné (3 appels du faux claude)" "$(ls "$WORK"/fkd/call-*.json 2>/dev/null | wc -l | tr -d ' ')" "3"
+assert_eq "S1.4 — CKPT-07 : ces questions sont calculées par le serveur, sans appel à l'agent (0 appel du faux claude)" "$(ls "$WORK"/fkd/call-*.json 2>/dev/null | wc -l | tr -d ' ')" "0"
 kill "$SRV_PID" 2>/dev/null; wait "$SRV_PID" 2>/dev/null
 
 echo "=== S3 — verrou tenu en lab plat : « occupé » ==="
@@ -107,9 +110,13 @@ echo "=== U — lockText de la page, lab plat ==="
 cat > "$AUX/locktext.mjs" <<'JS'
 import fs from 'node:fs'; const src = fs.readFileSync(process.argv[2], 'utf8');
 const a = src.indexOf('const lockText = '), b = src.indexOf('const KIND = '); const lockText = new Function(src.slice(a, b) + '; return lockText;')();
-console.log(JSON.stringify({ plat: lockText({ present: true, owner: 'rev', step: 'x', age_seconds: 3 }).cls, partitionne: lockText({ locks: [{ present: true, owner: 'm', step: 's' }] }).cls, libre: lockText({ present: false }).cls }));
+const plat = lockText({ present: true, owner: 'rev', step: 'x', age_seconds: 3 });
+console.log(JSON.stringify({ plat: plat.cls, partitionne: lockText({ locks: [{ present: true, owner: 'm', step: 's' }] }).cls, libre: lockText({ present: false }).cls,
+  titrePlat: plat.title, titrePart: lockText({ locks: [{ present: true, scope: 'repo', ws: 'fiabilite', owner: 'm', step: 's' }] }).title, titreScope: lockText({ locks: [{ present: true, scope: 'repo', owner: 'm', step: 's' }] }).title }));
 JS
 assert_eq "U1 — verrou plat : classe held ; partitionné : held ; absent : vide" "$(node "$AUX/locktext.mjs" "$ENG/assets/ui/70-vf-live.js" | node "$AUX/ev.mjs" 'j.plat+","+j.partitionne+","+j.libre')" "held,held,"
+assert_eq "U2 — infobulle du badge en lab plat : jamais « undefined », propriétaire et étape seuls" "$(node "$AUX/locktext.mjs" "$ENG/assets/ui/70-vf-live.js" | node "$AUX/ev.mjs" 'j.titrePlat')" "rev (x)"
+assert_eq "U3 — infobulle du badge partitionné : portée, compartiment, propriétaire, étape ; sans compartiment : la portée seule" "$(node "$AUX/locktext.mjs" "$ENG/assets/ui/70-vf-live.js" | node "$AUX/ev.mjs" 'j.titrePart+" | "+j.titreScope')" "repo fiabilite : m (s) | repo : m (s)"
 
 echo "=== P1 — lab sans code : l'assemblage réussit ==="
 for kind in seul markdown; do
@@ -150,38 +157,35 @@ LW="$WORK/lw"; mkdir -p "$LW/src"; echo 'x' > "$LW/src/a.js"; mkdir -p "$LW/.pla
 git -C "$LW" init -q && git -C "$LW" add -A && git -C "$LW" -c user.email=t@t -c user.name=t commit -q -m init; build "$LW" "$WORK/w.out" > /dev/null
 srv "$LW/.vibeflow/cockpit"; WP=$SRV_PORT
 cat > "$AUX/resync.mjs" <<'JS'
-// resync.mjs <chrome> <port> <plan.md> : la page Projet est chargée à travers un relais (Host réécrit) ; le relais coupe le flux SSE et refuse sa
-// reconnexion, le planning change pendant la coupure (le serveur émet dans le vide), puis le relais rouvre : le hello suivant porte une autre séquence.
-import http from 'node:http'; import { spawn } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-const [, , chrome, sport, plan] = process.argv; const live = new Set(); let blocked = false;
+// resync.mjs <chrome> <port> <plan.md> <server.json> : la page Projet est chargée à travers un relais (Host réécrit) ; le relais coupe le flux SSE et
+// refuse sa reconnexion, le planning change pendant la coupure (le serveur émet dans le vide), puis le relais rouvre : le hello suivant porte une autre séquence.
+// Chaque étape attend une CONDITION (page connectée, flux tombé, séquence du serveur avancée, page rechargée), pas une durée.
+import http from 'node:http'; import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
+const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const [, , chrome, sport, plan, serverJson] = process.argv; const live = new Set(); let blocked = false;
 const relais = http.createServer((q, r) => {
   if (blocked && q.url.startsWith('/api/vf/events')) { q.socket.destroy(); return; } // une erreur réseau (pas un 503 : EventSource abandonne alors pour de bon)
   const up = http.request({ host: '127.0.0.1', port: Number(sport), path: q.url, method: q.method, headers: { ...q.headers, host: `127.0.0.1:${sport}` } }, (ur) => { r.writeHead(ur.statusCode, ur.headers); ur.pipe(r); });
   live.add(up); live.add(r); q.pipe(up); up.on('error', () => r.destroy()); r.on('close', () => { live.delete(up); live.delete(r); up.destroy(); });
 });
 await new Promise((ok) => relais.listen(0, '127.0.0.1', ok)); const rport = relais.address().port;
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rs-'));
-const ch = spawn(chrome, ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', `--user-data-dir=${dir}`, '--remote-debugging-port=0', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, HOME: process.env.REAL_HOME || process.env.HOME } });
-const fin = (o) => { try { ch.kill('SIGKILL'); } catch {} fs.rmSync(dir, { recursive: true, force: true }); console.log(JSON.stringify(o)); process.exit(0); };
-setTimeout(() => fin({ erreur: 'delai' }), 60000); let buf = '', go = false;
-ch.stderr.on('data', async (d) => { buf += d; const m = /ws:\/\/127\.0\.0\.1:(\d+)\//.exec(buf); if (!m || go) return; go = true;
-  try {
-    const t = await (await fetch(`http://127.0.0.1:${m[1]}/json/new?about:blank`, { method: 'PUT' })).json(); const ws = new WebSocket(t.webSocketDebuggerUrl); let id = 0; const pend = new Map();
-    const send = (method, params = {}) => new Promise((res) => { const i = ++id; pend.set(i, res); ws.send(JSON.stringify({ id: i, method, params })); });
-    ws.onmessage = (e) => { const j = JSON.parse(e.data); if (j.id && pend.has(j.id)) pend.get(j.id)(j.result); };
-    await new Promise((r) => (ws.onopen = r)); await send('Page.enable');
-    await send('Page.navigate', { url: `http://127.0.0.1:${rport}/project.html` }); await new Promise((r) => setTimeout(r, 3000));
-    const ev = async (e) => (await send('Runtime.evaluate', { expression: e, returnByValue: true }))?.result?.value;
-    await ev('window.__temoin = 1'); const avant = await ev('window.__vfLive && window.__vfLive.connected');
-    blocked = true; for (const x of live) x.destroy();            // coupure : le flux tombe, la reconnexion est refusée
-    await new Promise((r) => setTimeout(r, 1500)); fs.writeFileSync(plan, '<objective>x</objective>\n'); fs.writeFileSync(plan.replace('PLAN', 'SUMMARY'), 'ok\n');
-    await new Promise((r) => setTimeout(r, 2500)); const coupe = await ev('window.__vfLive.connected');
-    blocked = false;                                               // le relais rouvre : EventSource se reconnecte, un hello arrive
-    await new Promise((r) => setTimeout(r, 6000));
-    fin({ connecteAvant: avant, coupe, temoinApres: await ev('window.__temoin === 1') });
-  } catch (e) { fin({ erreur: String(e.message) }); } });
+const token = JSON.parse(fs.readFileSync(serverJson, 'utf8')).token;
+const seqServeur = async () => { const r = await fetch(`http://127.0.0.1:${sport}/api/vf/etat`, { headers: { host: `127.0.0.1:${sport}`, 'x-vf-cockpit-token': token } }); return (await r.json()).seq; };
+await executer(chrome, async (s) => {
+  await s.naviguer(`http://127.0.0.1:${rport}/project.html`);
+  await s.attendre('!!(window.__vfLive && window.__vfLive.connected)', 'page connectée au direct avant la coupure');
+  await s.ev('window.__temoin = 1'); const avant = await s.ev('window.__vfLive.connected'); const seq0 = await seqServeur();
+  blocked = true; for (const x of live) x.destroy();            // coupure : le flux tombe, la reconnexion est refusée
+  await s.attendre('window.__vfLive.connected === false', 'flux tombé après la coupure');
+  fs.writeFileSync(plan, '<objective>x</objective>\n'); fs.writeFileSync(plan.replace('PLAN', 'SUMMARY'), 'ok\n');
+  const fin = Date.now() + 90000; while ((await seqServeur()) <= seq0) { if (Date.now() > fin) throw new Error('le serveur n\'a pas émis le changement de planning (séquence inchangée)'); await pause(200); }
+  const coupe = await s.ev('window.__vfLive.connected');
+  blocked = false;                                               // le relais rouvre : EventSource se reconnecte, un hello arrive
+  await s.attendre('window.__temoin !== 1', 'page rechargée après la reconnexion', 60000).catch(() => {}); // absent = le témoin survit : le verdict W2 le dira
+  return { connecteAvant: avant, coupe, temoinApres: await s.ev('window.__temoin === 1') };
+});
 JS
-RS="$(node "$AUX/resync.mjs" "$CHROME" "$WP" "$LW/.planning/phases/01-x/01-01-PLAN.md")"
+RS="$(node "$AUX/resync.mjs" "$CHROME" "$WP" "$LW/.planning/phases/01-x/01-01-PLAN.md" "$LW/.vibeflow/cockpit/.cache/server.json")"
 assert_eq "W1 — témoin : la page était connectée au direct avant la coupure" "$(printf '%s' "$RS" | node "$AUX/ev.mjs" 'j.connecteAvant')" "true"
 assert_eq "W1b — témoin : la coupure a bien fait tomber le flux" "$(printf '%s' "$RS" | node "$AUX/ev.mjs" 'j.coupe')" "false"
 assert_eq "W2 — après la reconnexion, la page s'est rechargée (le témoin posé avant la coupure a disparu)" "$(printf '%s' "$RS" | node "$AUX/ev.mjs" 'j.temoinApres')" "false"

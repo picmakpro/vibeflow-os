@@ -4,6 +4,8 @@
 // test-cockpit-responsive.sh : de 1 024 à 2 560 px, au chargement comme au redimensionnement, aucune superposition, aucun rognage.
 //   - en-tête (>= 1 000 px) : une ligne souple ; la gauche cède la première (nom de projet tronqué avec une ellipse), la recherche garde 200 px,
 //     la droite garde son contenu ; sous 1 600 px les boutons d'action passent en icône seule (le libellé reste dans l'infobulle) ;
+//   - bornes mesurées à 1 024 px sur l'onglet Code AVEC ses boutons optionnels (Travail récent, Écrans) : aucun bouton ne sort de la fenêtre ;
+//   - infobulle : tout bouton d'en-tête sans `title` reprend son libellé (le viewer n'en pose pas sur « Parcours »), car sous 1 600 px il n'est plus qu'une icône ;
 //   - zoom au-dessus de la barre de question jusqu'à 1 279 px (comme le viewer le fait déjà sur écran tactile) ;
 //   - logo VibeFlow : le viewer inverse le logo clair du thème (il attend un logo blanc) ; nos deux logos ont déjà le bon contraste ;
 //   - sous 1 000 px : la barre de question range l'invite sur sa propre ligne ; sous 700 px le fil d'Ariane cède sa place au zoom.
@@ -13,7 +15,7 @@
     .brand .mark, :root[data-theme="light"] .brand .mark, :root[data-theme="light"] #madewith .mark { filter: none !important; }
     @media (min-width: 1280px), (min-width: 1000px) and (pointer: fine) {
       header { display: flex; grid-template-columns: none; }
-      header .hl { flex: 1 1 0; min-width: 300px; }
+      header .hl { flex: 1 1 0; min-width: 264px; } /* marque 84 + onglets 123 + remonter 36 + marges : le plus étroit qui ne rogne pas ; 300 faisait sortir de 12 px le dernier bouton à 1 024 px (onglet Code avec Travail récent et Écrans) */
       header .hc { flex: 0 1 400px; min-width: 200px; justify-content: stretch; }
       header .hr { flex: 1 1 0; min-width: min-content; }
       header .brand { flex: 0 6 auto; min-width: 84px; }
@@ -38,4 +40,8 @@
     @media (max-width: 700px) { header #crumbs { display: none; } }
   `;
   document.head.appendChild(style);
+  // infobulle des boutons d'en-tête passés en icône seule : le libellé (traduit, donc relu après le traducteur) ; ne remplace jamais un title existant
+  const hd = document.querySelector('header');
+  const infobulles = () => { for (const b of hd.querySelectorAll('button')) { if (b.getAttribute('title')) continue; const t = b.getAttribute('aria-label') || b.querySelector('.bl')?.textContent.trim(); if (t) b.setAttribute('title', t); } };
+  if (hd) { infobulles(); new MutationObserver(infobulles).observe(hd, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label', 'title'] }); }
 })();
