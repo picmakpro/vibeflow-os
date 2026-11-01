@@ -17,3 +17,8 @@
 - **Témoin positif d'abord** (spikes 001, 004) : avant de conclure « personne / rien », produire un
   cas qui doit être vu (session, sous-agent en arrière-plan lancé exprès, verrou pris) et vérifier
   qu'il l'est.
+- **Extension du viewer** (spikes 002, 003) : un fichier par fonction dans `assets/ui/NN-vf-*.js`,
+  injecté au build, qui ne parle au viewer que par `window.Floorplan` (et les patchs `vibeflow Pn`).
+  Chaque extension expose une sonde `window.__vf*` lue par Playwright pour prouver sans capture.
+- **Écriture d'un fichier lu en concurrence** (spikes 003, 004) : `.tmp` puis `rename`, jamais
+  `open(file, "w")` direct ; côté lecteur, un retrait n'est cru qu'après une seconde lecture.
