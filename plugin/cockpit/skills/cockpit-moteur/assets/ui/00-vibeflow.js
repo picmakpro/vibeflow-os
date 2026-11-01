@@ -56,6 +56,9 @@
   }
 
   // ---------- onglet Projet : panneau d'ensemble ----------
+  // statuts de STATE affichés en français (valeur inconnue : telle quelle)
+  const STATUT = { closed: 'clos', complete: 'terminée', completed: 'terminée', executing: 'en exécution', planning: 'en planification', paused: 'en pause', verifying: 'en vérification' };
+  const statut = (x) => STATUT[x] || x || '';
   const V = G.meta.vf;
   if (TAB === 'project' && V) {
     SC.setOverview(() => {
@@ -67,7 +70,7 @@
       const next = V.next.map((n) => `<a class="vf-link" data-vf-go="${h(n.id)}"><span class="vst vst-todo">À faire</span><span>${h(n.label)}</span></a>`).join('');
       const c = V.counts;
       return `<div class="sec"><div class="ph"><span class="kind">Projet</span></div><h2 class="pt">${h(G.project.name)}</h2>
-          <div class="vf-now" style="margin-top:12px"><b>Maintenant · ${h(V.milestone || '')}</b>Phase ${h(V.phase)} — ${h(V.phaseName || '')} <span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(V.status || '')}</span><div style="margin-top:6px;color:var(--text-3);font-size:12px">${h((V.lastDesc || '').slice(0, 260))}${(V.lastDesc || '').length > 260 ? '…' : ''}</div></div>
+          <div class="vf-now" style="margin-top:12px"><b>Maintenant · ${h(V.milestone || '')}</b>Phase ${h(V.phase)} — ${h(V.phaseName || '')} <span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span><div style="margin-top:6px;color:var(--text-3);font-size:12px">${h((V.lastDesc || '').slice(0, 260))}${(V.lastDesc || '').length > 260 ? '…' : ''}</div></div>
           <div class="stats vf-stats" style="margin-top:14px"><div><b>${c.phases}</b><span>phases</span></div><div><b>${c.plans}</b><span>plans</span></div><div><b>${c.reqsDone}/${c.reqs}</b><span>exigences</span></div></div></div>
         <div class="sec"><h3>Prochaines phases <span class="c">${V.next.length}</span></h3>${next || '<p class="pd">Rien en attente dans le jalon en cours.</p>'}</div>
         <div class="sec"><h3>Jalons <span class="c">${V.milestones.length}</span></h3>${ms}</div>
