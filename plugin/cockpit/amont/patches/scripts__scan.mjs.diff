@@ -1,0 +1,8 @@
+--- a/scripts/scan.mjs
++++ b/scripts/scan.mjs
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env node
++// vibeflow:allow-large-file (code vendorisé, VENDORED.txt)
+ // floorplan scanner: discover every repo under a codebase root, list files, extract imports,
+ // symbols and HTTP routes/calls, resolve them, and write floorplan/.cache/scan.json.
+ // Prints a compact summary meant to be read by Claude (the JSON itself can be large).

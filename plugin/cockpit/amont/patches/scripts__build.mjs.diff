@@ -1,0 +1,8 @@
+--- a/scripts/build.mjs
++++ b/scripts/build.mjs
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env node
++// vibeflow:allow-large-file (code vendorisé, VENDORED.txt)
+ // floorplan builder: validate floorplan/architecture.json against the scan, assign every file to a
+ // node, attach import/HTTP/external edges, and write floorplan/graph.json + floorplan/index.html.
+ //

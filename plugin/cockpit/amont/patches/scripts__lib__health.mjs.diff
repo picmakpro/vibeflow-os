@@ -1,0 +1,7 @@
+--- a/scripts/lib/health.mjs
++++ b/scripts/lib/health.mjs
+@@ -1,3 +1,4 @@
++// vibeflow:allow-large-file (code vendorisé, VENDORED.txt)
+ // Health check: plain-language warnings about the codebase (secrets, endpoints anyone can call,
+ // the usual Supabase / Firebase / Stripe / CORS mistakes, unused files, oversized files), written for
+ // people who built an app with AI and don't know its insides. It's a check, not an audit. Precision

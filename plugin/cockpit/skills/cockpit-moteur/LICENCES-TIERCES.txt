@@ -1,0 +1,5 @@
+Composants tiers embarqués dans le cockpit VibeFlow (hors de toute interface affichée).
+floorplan (MIT) — LICENSE
+elkjs (EPL-2.0, d'après le fichier de licence livré) — assets/vendor/elkjs-LICENSE.md
+Inter (SIL OFL 1.1, d'après le fichier de licence livré) — assets/vendor/fonts/inter-LICENSE.txt
+JetBrains Mono (SIL OFL 1.1, d'après le fichier de licence livré) — assets/vendor/fonts/jetbrains-mono-LICENSE.txt

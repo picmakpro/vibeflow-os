@@ -1,0 +1,7 @@
+--- a/scripts/lib/screens.mjs
++++ b/scripts/lib/screens.mjs
+@@ -1,3 +1,4 @@
++// vibeflow:allow-large-file (code vendorisé, VENDORED.txt)
+ // Screens: the pages a person can open in the app (Next.js routes, React Router routes, …), so the
+ // map can be entered from what people recognise ("the checkout page") instead of code layers.
+ //

@@ -1,0 +1,29 @@
+floorplan v0.6.0 @ 92d6854 (haydenschmitty/floorplan, MIT) — copie de skills/floorplan
+Reconstruction et vérification hors réseau : plugin/cockpit/amont/SYNCHRO.md (synchro.sh).
+Lignes machine : PATCH <chemin> <Pn[,Pm]> <description> · AJOUT <chemin> · RETRAIT <chemin> · TAILLE <chemin> <lignes>.
+Licence : MIT, copyright d'origine conservé dans LICENSE ; composants tiers dans LICENCES-TIERCES.txt.
+
+PATCH assets/viewer.html P1,P2,P3,P4,P6,P8 libellés de liens, pied de carte et pastille de statut, classe st-<statut>, setOverview, rerender, pictogrammes fournis par le graphe
+PATCH assets/serve.mjs P5,P7,P9 Cache-Control no-store ; onglet Projet questionnable (project.html, jeton propre, /api/ask) ; marqueur de taille
+PATCH scripts/build.mjs P9 marqueur de taille
+PATCH scripts/scan.mjs P9 marqueur de taille
+PATCH scripts/lib/health.mjs P9 marqueur de taille
+PATCH scripts/lib/screens.mjs P9 marqueur de taille
+PATCH scripts/lib/extract.mjs P9 marqueur de taille
+PATCH assets/vendor/elk.bundled.js P9 marqueur de taille
+RETRAIT SKILL.md
+RETRAIT agents/openai.yaml
+AJOUT assets/ui/00-vibeflow.js
+AJOUT assets/ui/80-vf-fr.js
+AJOUT assets/vibeflow-logo-clair.svg
+AJOUT assets/vibeflow-logo-sombre.svg
+AJOUT VENDORED.txt
+AJOUT LICENCES-TIERCES.txt
+TAILLE assets/serve.mjs 648
+TAILLE assets/vendor/elk.bundled.js 6697
+TAILLE assets/viewer.html 2394 .html, hors gate
+TAILLE scripts/build.mjs 483
+TAILLE scripts/lib/extract.mjs 599
+TAILLE scripts/lib/health.mjs 1199
+TAILLE scripts/lib/screens.mjs 639
+TAILLE scripts/scan.mjs 317
