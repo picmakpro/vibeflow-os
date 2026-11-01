@@ -26,7 +26,9 @@ AMONT="floor""plan" # le nom du produit amont n'est jamais écrit d'un bloc dans
 # prepare_module : recopié de test-vibeflow-update.sh (cache jetable portant un module du dépôt)
 prepare_module() { local cache="$1" mod="$2"; mkdir -p "$cache/$mod"; cp -r "$REPO/$mod/." "$cache/$mod/" 2>/dev/null || return 1; [ -f "$cache/$mod/VERSION" ] || return 1; }
 
-snapshot_home_claude() { find "$HOME/.claude/agents" "$HOME/.claude/skills" "$HOME/.claude/scripts" "$HOME/.claude/rules" "$HOME/.claude/commands" "$HOME/.claude/settings.json" -type f 2>/dev/null | wc -l | tr -d ' '; }
+# Empreinte des seuls fichiers du cockpit (nom contenant « cockpit ») du vrai ~/.claude : une session concurrente qui ajoute un agent ou une
+# règle ne fait plus échouer I7 ; ce que le test garde, c'est qu'aucun fichier du cockpit n'est posé ni retiré dans le vrai répertoire.
+snapshot_home_claude() { find "$HOME/.claude/agents" "$HOME/.claude/skills" "$HOME/.claude/scripts" "$HOME/.claude/rules" "$HOME/.claude/commands" -iname '*cockpit*' 2>/dev/null | sort | cksum | tr -d ' '; }
 HOME_BEFORE=$(snapshot_home_claude)
 
 WORK="$(mktemp -d)"; CACHE="$WORK/cache"; FH="$WORK/home"; mkdir -p "$FH"
@@ -171,7 +173,7 @@ if cmp -s <(norm_src "$SRC/scripts/vf-cockpit.mjs") <(restaure "$WORK/alt.mjs");
 [ "$miss" -eq 0 ] && ok "I8 : sous --target, seule la réécriture de .claude/ a eu lieu, binaires à l'octet, rendu sans le nom amont (0 occurrence)"
 
 # ---- I7 : vrai ~/.claude ------------------------------------------------------------------------
-[ "$(snapshot_home_claude)" = "$HOME_BEFORE" ] && ok "I7 : le vrai ~/.claude est inchangé ($HOME_BEFORE fichiers)" || ko "I7 : le vrai ~/.claude a changé"
+[ "$(snapshot_home_claude)" = "$HOME_BEFORE" ] && ok "I7 : aucun fichier du cockpit posé ni retiré dans le vrai ~/.claude (empreinte $HOME_BEFORE)" || ko "I7 : le vrai ~/.claude a changé"
 
 echo "== resultat : $pass ok, $fail ko =="
 [ $((pass + fail)) -gt 0 ] || { echo "ÉCHEC ANTI-VERT-À-VIDE : aucun cas exécuté"; exit 1; }

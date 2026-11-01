@@ -46,7 +46,8 @@ export function answerLocally(G, question) {
   const reqId = /\b([A-Z][A-Z0-9]{1,7}-\d{2,3})\b/.exec(question)?.[1];
   const reqs = reqId ? G.files.filter((f) => f.p === 'req/' + reqId || (f.p.startsWith('req/') && f.p.endsWith('/' + reqId))) : [];
   const req = reqs.length === 1 ? reqs[0] : null;
-  const pathHit = /([\w.-]+\/[\w./-]+\.(?:sh|md|mjs|js|json|ts|yml))/.exec(question)?.[1];
+  // chemin ancré (début ou séparateur avant, fin ou ponctuation après), segments séparés par `/` : borné, jamais de retour arrière en cascade
+  const pathHit = /(?:^|[\s'"`(])([\w.-]+(?:\/[\w.-]+)+\.(?:sh|md|mjs|js|json|ts|yml))(?=$|[\s'"`),;:?!])/.exec(question)?.[1];
   const target = phase || mission || ms;
   // plusieurs compartiments portent ce numéro : on les liste, on ne choisit pas
   if (phases.length > 1 && !phase) {
@@ -79,6 +80,7 @@ export function answerLocally(G, question) {
   }
   if (/reste|a faire|prochain|suivant|restant|ensuite|next/.test(q)) {
     const t = target || curMs;
+    if (!t) return null; // aucun jalon courant reconnu (ex. STATE `milestone: v1.0` sans section homonyme du ROADMAP) : c'est à l'agent de lire le planning
     const xs = (t ? I.under(t.id) : pool).filter((x) => x !== t && (x.st === 'todo' || x.st === 'active') && (x.id ? x.kind === 'phase' || /^dag-/.test(x.id) : !x.p.startsWith('req/') || /^ph-/.test(t?.id || '')));
     return answer(`Reste${t ? ' · ' + I.label(t).split(' · ')[0] : ''}`, `${xs.length} à finir dans [[${I.ref(t)}]]${t?.foot ? ` (${t.foot})` : ''} :\n${xs.slice(0, 12).map((x) => line(I, x)).join('\n')}${xs.length > 12 ? `\n- … et ${xs.length - 12} autre(s)` : ''}`,
       [item(I, t), ...xs.map((x) => item(I, x))], xs[0] ? [`Qu'est-ce qui bloque dans ${I.label(t).split(' · ')[0]} ?`] : []);
@@ -96,7 +98,8 @@ export function answerLocally(G, question) {
   if (/ou en (est|sommes)|on en est|etat|avancement|resume|statut|progression/.test(q)) {
     const cur = curMs, p = I.N.get('ph-' + vf.phase) || G.nodes.find((n) => n.kind === 'phase' && String(n.num) === String(vf.phase));
     const nexts = cur ? I.under(cur.id).filter((x) => x.kind === 'phase' && x.st !== 'done') : [];
-    return answer('Où on en est', `Jalon en cours : [[${I.ref(cur || {})}]]${cur?.foot ? ` (${cur.foot})` : ''}. Dernière phase : ${p ? `[[${I.ref(p)}]]` : vf.phase} · ${vf.status || ''}, le ${vf.lastActivity || '?'}.\n\nÀ finir dans le jalon :\n${nexts.slice(0, 8).map((x) => line(I, x)).join('\n')}`,
+    const jalon = cur ? `[[${I.ref(cur)}]]${cur.foot ? ` (${cur.foot})` : ''}` : `${vf.milestone ? `« ${vf.milestone} » (aucune carte de jalon ne porte ce nom dans le ROADMAP)` : 'non reconnu'}`;
+    return answer('Où on en est', `Jalon en cours : ${jalon}. Dernière phase : ${p ? `[[${I.ref(p)}]]` : vf.phase ?? '?'} · ${vf.status || ''}, le ${vf.lastActivity || '?'}.\n\nÀ finir dans le jalon :\n${nexts.slice(0, 8).map((x) => line(I, x)).join('\n')}`,
       [cur, p, ...nexts].filter(Boolean).map((x) => item(I, x)), ["Qu'est-ce qui bloque ?", "Qu'est-ce qui est en cours ?"]);
   }
   return null;

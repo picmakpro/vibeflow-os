@@ -14,7 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { driverLockScript, gitCommonDir, resolveScriptsDir } from './vf-cockpit-paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const sh = (cmd, args, cwd) => { try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch (e) { return e.stdout || ''; } };
+const sh = (cmd, args, cwd) => { try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000 }); } catch (e) { return e.stdout || ''; } }; // timeout : un git ou un bash bloqué ne gèle pas la boucle
 const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
 const mtime = (f) => { try { return fs.statSync(f).mtimeMs; } catch { return 0; } };
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
@@ -27,15 +27,16 @@ const REQ_META = CC.metaSousAgent?.requis || ['agentType', 'description'];
 
 // dernière ligne user/assistant d'un jsonl, en ne lisant que la fin du fichier (256 Kio)
 const tail = (f, bytes = 256 << 10) => {
+  let fd = null;
   try {
-    const fd = fs.openSync(f, 'r'); const size = fs.fstatSync(fd).size; const len = Math.min(size, bytes);
-    const buf = Buffer.alloc(len); fs.readSync(fd, buf, 0, len, size - len); fs.closeSync(fd);
+    fd = fs.openSync(f, 'r'); const size = fs.fstatSync(fd).size; const len = Math.min(size, bytes);
+    const buf = Buffer.alloc(len); fs.readSync(fd, buf, 0, len, size - len);
     for (const l of buf.toString('utf8').split('\n').reverse()) {
       if (!l.trim()) continue;
       let d; try { d = JSON.parse(l); } catch { continue; }
       if (d && (d.type === 'user' || d.type === 'assistant')) return d;
     }
-  } catch {}
+  } catch {} finally { if (fd !== null) { try { fs.closeSync(fd); } catch {} } } // le descripteur se ferme aussi quand readSync lève
   return null;
 };
 const formeOk = (d) => !!d && REQ_TR.every((k) => k in d);
@@ -107,6 +108,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
   else {
     const DL = dl.chemin; let st = {};
     try { st = JSON.parse(sh('bash', [DL, 'status', '--all'], root)); } catch { sources.locks = { etat: 'erreur' }; }
+    st = { ...st, locks: Array.isArray(st?.locks) ? st.locks : st?.present ? [st] : [] }; // lab plat : `status --all` rend l'objet d'UN verrou, sans `locks`
     for (const l of (st.locks || []).filter((x) => x.present)) workers.push({ kind: 'lock', id: l.owner, task: l.step, tree: l.ws ? `compartiment ${l.ws}` : l.scope, ageS: l.age_seconds, stale: !!l.stale, children: l.children_running, source: 'driver-lock' });
     const wsList = ['', ...ls(path.join(common, 'vf-driver', 'ws'))];
     let reg = 0;
@@ -139,14 +141,21 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
 
 export function collectWho(root, opts = {}) {
   const g = gather(root, opts);
-  const workers = g.workers.map(({ _tr, ...w }) => w);
-  return { schema: 'vibeflow/cockpit-who@1', at: g.at, root: g.root, trees: g.trees, fresh: g.fresh, busy: workers.some((w) => !w.stale), workers, sources: g.sources };
+  // task, cwd et role viennent de fichiers que d'autres écrivent (meta.json, transcripts, verrous) : bornés et masqués avant le flux SSE
+  const bornes = (v, n) => (typeof v === 'string' ? masque(v).slice(0, n) : v);
+  const workers = g.workers.map(({ _tr, ...w }) => ({ ...w, ...(w.task !== undefined ? { task: bornes(w.task, 160) } : {}), ...(w.cwd !== undefined ? { cwd: bornes(w.cwd, 200) } : {}), ...(w.role !== undefined ? { role: bornes(w.role, 80) } : {}) }));
+  const sources = { ...g.sources };
+  if (typeof sources.sessions?.path === 'string') sources.sessions = { ...sources.sessions, path: sources.sessions.path.replace(opts.home || os.homedir(), '~') };
+  return { schema: 'vibeflow/cockpit-who@1', at: g.at, root: g.root, trees: g.trees, fresh: g.fresh, busy: workers.some((w) => !w.stale), workers, sources };
 }
 
 // P67-D-14 : la dernière commande ne sort que par cette révélation ponctuelle, masquée (T-67-05)
 const MASQUES = [
-  /\bgh[pousr]_[A-Za-z0-9]{20,}/g, /\bsk-[A-Za-z0-9_-]{16,}/g, /\bAKIA[A-Z0-9]{16}/g, /\bxox[baprs]-[A-Za-z0-9-]+/g,
-  /\bBearer\s+[A-Za-z0-9._~+\/=-]{16,}/gi, /\b(?:password|passwd|secret|token)=\S+/gi,
+  /\bgh[pousr]_[A-Za-z0-9]{20,}/g, /\bgithub_pat_[A-Za-z0-9_]{20,}/g, /\bsk-[A-Za-z0-9_-]{16,}/g, /\bAKIA[A-Z0-9]{16}/g, /\bxox[baprs]-[A-Za-z0-9-]+/g,
+  /\bBearer\s+[A-Za-z0-9._~+\/=-]{16,}/gi,
+  // un nom de variable ou de clé qui finit par un mot sensible (GITHUB_TOKEN=, AWS_SECRET_ACCESS_KEY=, API_KEY=) : `\b` ne coupe pas après `_`, d'où `[A-Za-z0-9_]*`
+  /[A-Za-z0-9_]*(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential)[A-Za-z0-9_]*=\S+/gi,
+  /--(?:password|passwd|secret|token|api[_-]?key)(?:=|\s+)\S+/gi, /\bX-Api-Key:\s*\S+/gi,
 ];
 const masque = (t) => MASQUES.reduce((a, re) => a.replace(re, '[masqué]'), t);
 const lastText = (d) => {

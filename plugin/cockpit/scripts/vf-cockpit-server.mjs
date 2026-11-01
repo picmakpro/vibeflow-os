@@ -43,7 +43,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
   };
   let live = null;
   try {
-    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => { if (nom === 'structural') load(); diffuser(nom, data); } });
+    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => { if (nom === 'structural' || nom === 'patch') load(); diffuser(nom, data); } });
   } catch (e) { log('error', `direct indisponible : ${e.message}`); }
 
   const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
@@ -71,7 +71,8 @@ export function attach({ here, root, token, inject, log = () => {} }) {
       return true;
     }
     if (url.pathname === '/api/vf/modeles') {
-      json(res, 200, { modeles: MODELES, defaut: dep.modele, lab: crypto.createHash('sha256').update(fs.realpathSync(root)).digest('hex').slice(0, 12) });
+      let reel = root; try { reel = fs.realpathSync(root); } catch {} // le lab peut disparaître en cours de route : jamais une exception
+      json(res, 200, { modeles: MODELES, defaut: dep.modele, lab: crypto.createHash('sha256').update(reel).digest('hex').slice(0, 12) });
       return true;
     }
     res.writeHead(404); res.end(); return true;
@@ -84,7 +85,9 @@ export function attach({ here, root, token, inject, log = () => {} }) {
     if (r.erreur) { send('failure', { code: 'modele_refuse', message: `Modèle refusé : seuls ${MODELES.join(', ')} sont admis.` }); return 'repondu'; }
     body.modeleResolu = r.modele; // écrasé à chaque question, jamais écrit sur disque ni journalisé avec la question
     if (body.project && (!body.mode || body.mode === 'ask') && !body.session) {
-      const t0 = Date.now(), local = answerLocally(GP, String(body.question || ''));
+      const t0 = Date.now();
+      let local = null;
+      try { local = answerLocally(GP, String(body.question || '')); } catch (e) { log('warn', `réponse locale en échec, repli sur l'agent : ${String(e.message).slice(0, 120)}`); } // jamais une exception qui tue le serveur
       if (local) { log('local', `projet · réponse locale · ${Date.now() - t0} ms`); send('answer', local); return 'repondu'; }
     }
     return 'agent';

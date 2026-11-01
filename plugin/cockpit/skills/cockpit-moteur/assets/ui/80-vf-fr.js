@@ -47,7 +47,7 @@
   const tr = (s) => {
     const t = typeof s === 'string' ? s.trim() : ''; if (!t || t.length > 600 || !/[A-Za-z]/.test(t)) return null; // chaîne vide → rien : garde contre la boucle des attributs vides
     const out = noyau(t);
-    return out == null || out === t ? null : s.replace(t, out);
+    return out == null || out === t ? null : s.replace(t, () => out); // une fonction : `$&`, `$'`, `$$` d'un chemin ne sont jamais interprétés
   };
   window.__vfFrTraduire = tr;
   tr.motifs = R.length; tr.gabarits = P.length; // lu par le test chrome-fr

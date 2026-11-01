@@ -32,7 +32,7 @@
 
   let badge = null, who = null;
   const lockText = (l) => {
-    const held = (l?.locks || []).filter((x) => x.present);
+    const held = (Array.isArray(l?.locks) ? l.locks : l?.present ? [l] : []).filter((x) => x.present); // lab plat : un seul verrou, sans `locks`
     if (!held.length) return { cls: '', text: 'Driver libre', title: 'Aucun verrou de driver tenu' };
     const x = held[0];
     return { cls: 'held', text: `${x.owner || '?'} · ${x.step || ''} · ${x.age_seconds ?? '?'} s`, title: held.map((y) => `${y.scope}${y.ws ? ' ' + y.ws : ''} : ${y.owner} (${y.step})`).join('\n') };
@@ -74,11 +74,18 @@
 
   const find = (ref) => ref.startsWith('n:') ? G.nodes.find((n) => n.id === ref.slice(2)) : G.files.find((f) => f.p === ref.slice(2));
   const es = new EventSource('/api/vf/events?token=' + encodeURIComponent(SRV.token));
-  es.addEventListener('hello', (e) => { probe.connected = true; const d = JSON.parse(e.data); setWho(d.who); showLock(d.lock); });
-  es.addEventListener('who', (e) => setWho(JSON.parse(e.data).who));
-  es.addEventListener('lock', (e) => showLock(JSON.parse(e.data).lock));
+  // resynchronisation : un `hello` dont la séquence a bougé depuis le dernier événement vu = des événements ont été manqués (coupure) : la page se recharge
+  let lastSeq = null;
+  const vu = (d) => { if (typeof d?.seq === 'number') lastSeq = d.seq; return d; };
+  es.addEventListener('hello', (e) => {
+    probe.connected = true; const d = JSON.parse(e.data);
+    if (TAB === 'project' && lastSeq !== null && typeof d.seq === 'number' && d.seq !== lastSeq) { probe.resync = (probe.resync || 0) + 1; location.reload(); return; }
+    vu(d); setWho(d.who); showLock(d.lock);
+  });
+  es.addEventListener('who', (e) => setWho(vu(JSON.parse(e.data)).who));
+  es.addEventListener('lock', (e) => showLock(vu(JSON.parse(e.data)).lock));
   es.addEventListener('patch', (e) => {
-    const d = JSON.parse(e.data);
+    const d = vu(JSON.parse(e.data));
     probe.patches++;
     if (TAB !== 'project') return; // les refs du patch sont celles du graphe Projet
     let n = 0;
@@ -88,6 +95,6 @@
     probe.lastLatencyMs = Date.now() - d.at;
     if (n) { SC.rerender(); SC.toast(`${n} statut(s) mis à jour`); }
   });
-  es.addEventListener('structural', () => { probe.structural++; if (TAB === 'project') { SC.toast('Projet modifié : rechargement'); setTimeout(() => location.reload(), 400); } });
+  es.addEventListener('structural', (e) => { vu(JSON.parse(e.data)); probe.structural++; if (TAB === 'project') { SC.toast('Projet modifié : rechargement'); setTimeout(() => location.reload(), 400); } });
   es.onerror = () => { probe.connected = false; showLock(null, true); };
 })();

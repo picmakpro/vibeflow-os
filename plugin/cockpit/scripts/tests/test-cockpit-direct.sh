@@ -69,6 +69,12 @@ const j = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const v = new Function('j', 'return (' + process.argv[3] + ')')(j);
 console.log(typeof v === 'string' ? v : JSON.stringify(v));
 JS
+cat > "$AUX/pg.mjs" <<'JS'
+// pg.mjs <dossier-sortie> <page.html> <expression sur g> : le graphe de la page (module d'embarquement de la sortie)
+import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
+const [, , out, file, expr] = process.argv; const m = await import(pathToFileURL(out + '/vf-cockpit-embed.mjs').href);
+console.log(String(new Function('g', 'return (' + expr + ')')(m.extraireGraphe(fs.readFileSync(file, 'utf8')))));
+JS
 cat > "$AUX/now.mjs" <<'JS'
 console.log(Date.now());
 JS
@@ -124,6 +130,10 @@ assert_eq "D2.2 — le patch nomme la carte de la phase 2" "$(node "$AUX/ev.mjs"
 assert_eq "D2.3 — le patch porte le résumé du projet (vf) quand il change" "$(node "$AUX/ev.mjs" "$WORK/e2.jsonl" 'typeof E.filter(e=>e.event==="patch")[0].data.vf')" "object"
 LAT=$(( $(node "$AUX/ev.mjs" "$WORK/e2.jsonl" 'E.filter(e=>e.event==="patch")[0].abs') - T0 ))
 assert_lt "D2.4 — latence du patch en ms" "$LAT" 5000
+# S2 : un patch non structurel réécrit aussi project.html (F5, nouvel onglet, réponses locales à jour)
+assert_eq "D2.5 — project.html SUR DISQUE porte la phase 2 faite (pas l'instantané du dernier structural)" "$(node "$AUX/pg.mjs" "$OUT" "$OUT/project.html" 'g.nodes.find(n=>n.id==="ph-2").st')" "done"
+node "$AUX/get.mjs" "$PORT" /project.html | sed '1,2d' > "$WORK/servi.html"
+assert_eq "D2.6 — GET /project.html sert la phase 2 faite (le serveur a rechargé la page)" "$(node "$AUX/pg.mjs" "$OUT" "$WORK/servi.html" 'g.nodes.find(n=>n.id==="ph-2").st')" "done"
 
 echo "=== D3 — PLAN ajouté -> structural, page réécrite et servie ==="
 assert_eq "D3.0 — témoin : le nouveau plan est absent de la page avant" "$(grep -c '02-01-PLAN.md' "$OUT/project.html")" "0"
@@ -151,7 +161,14 @@ attendre_hello "$WORK/e4b.jsonl"
 rm -f "$DAGF"
 wait "$C"
 assert_eq "D4.3 — témoin : une disparition durable est crue à la seconde lecture (structural)" "$(node "$AUX/ev.mjs" "$WORK/e4b.jsonl" 'E.filter(e=>e.event==="structural").length')" "1"
-cp "$WORK/dag.save" "$DAGF"
+cp "$WORK/dag.save" "$DAGF"; sleep 1.8
+# hystérésis aussi pour un ajout ET un retrait simultanés (lecture tronquée qui renomme) : 3 s d'écoute, aucun structural
+: > "$WORK/e4c.jsonl"; node "$AUX/sse.mjs" "$PORT" "$PTOK" 3500 none "$WORK/e4c.jsonl" & C=$!
+attendre_hello "$WORK/e4c.jsonl"
+sed 's/"id":"a"/"id":"x"/; s/"deps":\["a"\]/"deps":["x"]/' "$WORK/dag.save" > "$DAGF"; sleep 0.45; cp "$WORK/dag.save" "$DAGF"
+wait "$C"
+assert_eq "D4.4 — ajout + retrait simultanés pendant 450 ms : aucun structural" "$(node "$AUX/ev.mjs" "$WORK/e4c.jsonl" 'E.filter(e=>e.event==="structural").length')" "0"
+sleep 1
 
 echo "=== D5 — repli par scrutation (VF_COCKPIT_WATCH=poll) ==="
 stop_srv

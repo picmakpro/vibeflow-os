@@ -12,7 +12,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { collectWho } from './vf-cockpit-who.mjs';
-import { driverLockScript, gitCommonDir, resolveScriptsDir } from './vf-cockpit-paths.mjs';
+import { driverLockScript, gitCommonDir, resolveScriptsDir, confiner } from './vf-cockpit-paths.mjs';
 import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
 
 const IGNORE = /(^|\/)\.git(\/|$)|\.tmp$|~$|\.swp$/;
@@ -28,7 +28,7 @@ const diff = (a, b) => {
   const patch = []; let added = 0, removed = 0;
   for (const [ref, v] of b) { const o = a.get(ref); if (!o) { added++; continue; } if (o.st !== v.st || o.foot !== v.foot) patch.push({ ref, ...v }); }
   for (const ref of a.keys()) if (!b.has(ref)) removed++;
-  return { patch, structural: added + removed > 0, onlyRemoved: removed > 0 && !added, removed };
+  return { patch, structural: added + removed > 0, retrait: removed > 0, removed }; // retrait : même avec un ajout, une lecture tronquée en fait partie
 };
 // scrutation : « chemin -> mtime:taille » de tout fichier sous dir (hors chemins ignorés)
 const empreinte = (dir) => {
@@ -57,7 +57,7 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
   const lockStatus = () => {
     const dl = driverLockScript({ scriptsDir, labRoot: root, home: os.homedir() });
     if (dl.etat === 'absent') return { available: false };
-    try { return JSON.parse(execFileSync('bash', [dl.chemin, 'status', '--all'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })); }
+    try { return JSON.parse(execFileSync('bash', [dl.chemin, 'status', '--all'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000 })); }
     catch (e) { try { return JSON.parse(e.stdout); } catch { return { error: String(e.message).slice(0, 200) }; } }
   };
   const whoNow = () => { try { return collectWho(root, { scriptsDir }); } catch (e) { return { workers: [], sources: {}, error: e.message }; } };
@@ -71,20 +71,22 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
   // project.html : le gabarit est la page courante de la sortie ; meta.root et meta.vfLogos viennent de l'assemblage
   const ecrirePage = (g) => {
     const f = path.join(sortie, 'project.html');
+    confiner(root, f); confiner(root, f + '.tmp'); // aucun lien symbolique dans la sortie : ni lu, ni écrasé
     const html = fs.readFileSync(f, 'utf8');
     try { const old = extraireGraphe(html); g.meta.root = old.meta?.root; g.meta.vfLogos = old.meta?.vfLogos; } catch {}
     fs.writeFileSync(f + '.tmp', insererGraphe(html, g));
     fs.renameSync(f + '.tmp', f); // jamais de page à moitié écrite
   };
 
-  const refresh = (reasons) => {
+  const refresh = (reasons) => { try { refreshSur(reasons); } catch (e) { log('error', `refresh : ${e.message}`); } };
+  const refreshSur = (reasons) => {
     if (stopped) return;
     let g;
     try { g = buildProjectGraph(root); } catch (e) { log('error', `graphe illisible, état précédent gardé : ${String(e.message).slice(0, 200)}`); return; }
     const nidx = index(g);
-    const { patch, structural, onlyRemoved, removed } = diff(idx, nidx);
-    // dag.sh save() peut laisser un fichier tronqué : un retrait pur n'est cru qu'à la seconde lecture, 600 ms plus tard
-    if (onlyRemoved && !reasons.includes('confirm')) {
+    const { patch, structural, retrait, removed } = diff(idx, nidx);
+    // dag.sh save() peut laisser un fichier tronqué : tout retrait (seul ou avec un ajout) n'est cru qu'à la seconde lecture, 600 ms plus tard
+    if (retrait && !reasons.includes('confirm')) {
       log('hold', `${removed} carte(s) disparue(s) : seconde lecture avant de croire`);
       const t = setTimeout(() => { timers.delete(t); refresh(['confirm', ...reasons]); }, HOLD_MS); timers.add(t);
       return;
@@ -93,7 +95,8 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
     const lockChanged = JSON.stringify(nlock) !== JSON.stringify(lock);
     const vfChanged = JSON.stringify(g.meta?.vf) !== JSON.stringify(graph.meta?.vf);
     graph = g; idx = nidx; lock = nlock; state.seq++; state.derniereMaj = new Date().toISOString();
-    if (structural) { try { ecrirePage(g); } catch (e) { log('error', `project.html non réécrit : ${e.message}`); } }
+    // la page sur disque suit TOUT changement (F5, nouvel onglet, réponses locales et vf-cockpit-query lisent project.html) : avant l'événement
+    if (structural || patch.length || vfChanged) { try { ecrirePage(g); } catch (e) { log('error', `project.html non réécrit : ${e.message}`); } }
     log('refresh', `${patch.length} patch(s)${structural ? ', structure' : ''}${lockChanged ? ', verrou' : ''}`);
     const at = Date.now();
     if (structural) emit('structural', { seq: state.seq, at });
@@ -112,7 +115,7 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
 
   const scruter = (src, dir) => {
     let prev = empreinte(dir);
-    const t = setInterval(() => { const cur = empreinte(dir); const ch = changes(prev, cur); prev = cur; if (ch.length) poke(src, ch[0]); }, POLL_MS);
+    const t = setInterval(() => { try { const cur = empreinte(dir); const ch = changes(prev, cur); prev = cur; if (ch.length) poke(src, ch[0]); } catch (e) { log('error', `scrutation ${src} : ${e.message}`); } }, POLL_MS);
     t.unref?.(); timers.add(t);
     watchers.set(src, { close: () => clearInterval(t) });
     log('watch', `scrutation de ${src} (${POLL_MS} ms)`);
@@ -130,13 +133,13 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
   surveiller('driver', driverDir);
 
   // filet toutes les 5 s : l'âge d'un verrou avance sans écriture, et vf-driver/ peut naître après le démarrage
-  const filet = setInterval(() => {
+  const filet = setInterval(() => { try {
     surveiller('driver', driverDir);
     const nw = whoNow();
     if (whoSig(nw) !== whoSig(who)) { who = nw; emit('who', { seq: ++state.seq, at: Date.now(), who }); }
     const n = lockStatus();
     if (JSON.stringify(n) !== JSON.stringify(lock)) { lock = n; emit('lock', { seq: ++state.seq, at: Date.now(), lock }); }
-  }, NET_MS);
+  } catch (e) { log('error', `filet : ${e.message}`); } }, NET_MS);
   filet.unref?.(); timers.add(filet);
 
   return {
