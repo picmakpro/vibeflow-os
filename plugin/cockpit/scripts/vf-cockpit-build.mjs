@@ -11,7 +11,8 @@ import { execFileSync } from 'node:child_process';
 import { findLabRoot, engineDir, outputDir, resolveScriptsDir } from './vf-cockpit-paths.mjs';
 import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { ecrireArchitecture } from './vf-cockpit-code.mjs';
-import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
+import { insererGraphe } from './vf-cockpit-embed.mjs';
+import { renommerHtml, renommerTexte, MARQUEUR_LICENCE } from './vf-cockpit-rename.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // outils d'assemblage et de test : jamais recopiés dans la sortie (le motif général les y mettrait)
@@ -67,17 +68,26 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
   }
   const touch = {};
   for (const f of project.files) for (const p of f.touched || []) (touch[p] ||= []).push({ ref: 'f:' + f.p, label: f.name.slice(0, 90), st: f.st });
-  g.meta.vfTab = 'code'; g.meta.vfTouch = touch; g.meta.vfCodeExtractor = arch.extracteur;
+  const logo = (n) => 'data:image/svg+xml;base64,' + fs.readFileSync(path.join(eng.chemin, 'assets', n)).toString('base64');
+  const vfLogos = { clair: logo('vibeflow-logo-clair.svg'), sombre: logo('vibeflow-logo-sombre.svg') };
+  g.meta.vfTab = 'code'; g.meta.vfTouch = touch; g.meta.vfCodeExtractor = arch.extracteur; g.meta.vfLogos = vfLogos;
+  g.schema = 'vf-cockpit/graph@1'; // seul champ de données amont qui porte le nom du produit
   fs.writeFileSync(path.join(sortie, 'graph.json'), JSON.stringify(g));
 
   // les deux pages : même viewer, données différentes
   const html = read(path.join(sortie, 'index.html'));
   fs.writeFileSync(path.join(sortie, 'index.html'), insererGraphe(html, g).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Code</title>'));
-  project.meta.root = g.meta.root;
+  project.meta.root = g.meta.root; project.meta.vfLogos = vfLogos;
   fs.writeFileSync(path.join(sortie, 'project.html'), insererGraphe(html, project).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Projet</title>'));
 
   // code d'exécution du socle, licences, pointeur de dossier de scripts (jamais de modèle ni de dernière commande)
   for (const f of fichiersExecution(scriptsDir)) fs.copyFileSync(path.join(scriptsDir, f), path.join(sortie, f));
+  for (const f of ['index.html', 'project.html']) { // marque blanche : la sortie seulement, jamais la copie amont ni les données du lab
+    const p = path.join(sortie, f); const h = renommerHtml(read(p));
+    const licence = `<!-- ${MARQUEUR_LICENCE} : logiciel tiers sous licence MIT, voir LICENSE et LICENCES-TIERCES.txt (floorplan) -->`;
+    fs.writeFileSync(p, /^<!doctype[^\n]*\n/i.test(h) ? h.replace(/^(<!doctype[^\n]*\n)/i, `$1${licence}\n`) : `${licence}\n${h}`);
+  }
+  for (const f of ['serve.mjs', 'query.mjs', ...fichiersExecution(scriptsDir)]) { const p = path.join(sortie, f); fs.writeFileSync(p, renommerTexte(read(p))); }
   fs.copyFileSync(path.join(scriptsDir, 'vf-cockpit-interface.json'), path.join(sortie, 'vf-cockpit-interface.json'));
   for (const f of ['LICENSE', 'LICENCES-TIERCES.txt']) fs.copyFileSync(path.join(eng.chemin, f), path.join(sortie, f));
   fs.mkdirSync(path.join(sortie, '.cache'), { recursive: true });

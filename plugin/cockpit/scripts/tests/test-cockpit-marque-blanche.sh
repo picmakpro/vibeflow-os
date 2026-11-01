@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# test-cockpit-marque-blanche.sh — marque blanche VibeFlow de la sortie (CKPT-04 ; P67-D-03, D-04).
+#   M1 aucune occurrence du nom amont dans le rendu servi ni dans les messages du serveur (lab neutre)
+#   M2 logo VibeFlow en data:image/svg+xml, jamais le PNG amont · M3 la syntaxe survit au renommage
+#   M4 les données du lab ne sont jamais renommées, schéma du graphe Code réécrit
+# Exit 0 si tout passe, 1 sinon.
+
+set -uo pipefail
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
+MOTEUR="$SCRIPTS/../skills/cockpit-moteur"
+WORK="$(mktemp -d)"; AUX="$WORK/aux"; mkdir -p "$AUX"
+SRV=""
+trap '[ -n "$SRV" ] && { kill "$SRV" 2>/dev/null; wait "$SRV" 2>/dev/null; }; rm -rf "$WORK"' EXIT
+
+PASS=0; FAIL=0
+assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
+assert_ge() { if [ "$2" -ge "$3" ] 2>/dev/null; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 ($2 < $3)"; FAIL=$((FAIL+1)); fi; }
+# nombre d'occurrences du nom amont (insensible à la casse) hors lignes de licence
+occ() { grep -v 'vibeflow:licence-tierce' | grep -ci 'floor''plan'; }
+
+cat > "$AUX/get.mjs" <<'JS'
+import http from 'node:http';
+const [, , port, p] = process.argv;
+http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}` } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => process.stdout.write(b)); }).on('error', () => {});
+JS
+cat > "$AUX/json.mjs" <<'JS'
+import fs from 'node:fs';
+const j = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const v = new Function('j', 'return (' + process.argv[3] + ')')(j);
+console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
+cat > "$AUX/donnees.mjs" <<'JS'
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const { extraireGraphe } = await import(pathToFileURL(path.join(process.argv[2], 'vf-cockpit-embed.mjs')).href);
+const j = extraireGraphe(fs.readFileSync(process.argv[3], 'utf8'));
+const v = new Function('j', 'return (' + process.argv[4] + ')')(j);
+console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
+cat > "$AUX/blocs.mjs" <<'JS'
+// blocs.mjs <page.html> : compile chaque bloc <script> en ligne (sans src) par vm.Script ; imprime « compilés=<n> échecs=<n> »
+import fs from 'node:fs';
+import vm from 'node:vm';
+const h = fs.readFileSync(process.argv[2], 'utf8');
+let ok = 0, ko = 0;
+for (const m of h.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)) { try { new vm.Script(m[1]); ok++; } catch (e) { ko++; console.error('bloc invalide :', e.message); } }
+console.log(`compilés=${ok} échecs=${ko}`);
+JS
+cat > "$AUX/prefixe.mjs" <<'JS'
+import fs from 'node:fs';
+console.log(fs.readFileSync(process.argv[2]).toString('base64').slice(0, 64));
+JS
+
+mklab() { # $1 = dossier, $2 = nom de la phase
+  mkdir -p "$1/src" "$1/.planning/phases/01-x"
+  printf 'import { u } from "./util.js";\nconsole.log(u());\n' > "$1/src/app.js"; printf 'export const u = () => 1;\n' > "$1/src/util.js"
+  printf -- '- [x] **Phase 1: %s** - premier jet\n' "$2" > "$1/.planning/ROADMAP.md"
+  printf '<objective>Faire le socle</objective>\n' > "$1/.planning/phases/01-x/01-01-PLAN.md"; echo ok > "$1/.planning/phases/01-x/01-01-SUMMARY.md"
+  git -C "$1" init -q && git -C "$1" add -A && git -C "$1" -c user.email=t@t -c user.name=t commit -q -m init
+}
+LAB="$WORK/neutre"; mklab "$LAB" "Socle"; OUT="$LAB/.vibeflow/cockpit"
+node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet >/dev/null 2>&1; BRC=$?
+
+echo "=== M1 — aucune occurrence visible du nom amont ==="
+assert_eq "M1.0 — l'assemblage rend 0" "$BRC" "0"
+assert_eq "M1.1 — témoin positif : le compteur voit le nom dans une chaîne jetable" "$(printf '%s\n' 'le moteur Floor''plan' | occ)" "1"
+assert_eq "M1.2 — témoin : une ligne de licence est exemptée" "$(printf '%s\n' '<!-- vibeflow:licence-tierce floor''plan -->' | occ)" "0"
+PORT=$((4900 + RANDOM % 500))
+node "$OUT/serve.mjs" --no-open --port "$PORT" > "$WORK/serve.out" 2>&1 &
+SRV=$!
+for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
+RP=$(node "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)
+for _ in $(seq 1 50); do [ -s "$WORK/serve.out" ] && break; sleep 0.1; done
+node "$AUX/get.mjs" "$RP" / > "$WORK/racine.html"; node "$AUX/get.mjs" "$RP" /project.html > "$WORK/projet.html"
+kill "$SRV" 2>/dev/null; wait "$SRV" 2>/dev/null; SRV=""
+assert_ge "M1.3 — la page / est servie (non vide)" "$(wc -c < "$WORK/racine.html" | tr -d ' ')" 1000
+assert_ge "M1.4 — la page /project.html est servie (non vide)" "$(wc -c < "$WORK/projet.html" | tr -d ' ')" 1000
+assert_eq "M1.5 — GET / : 0 occurrence" "$(occ < "$WORK/racine.html")" "0"
+assert_eq "M1.6 — GET /project.html : 0 occurrence" "$(occ < "$WORK/projet.html")" "0"
+assert_eq "M1.7 — messages du serveur : 0 occurrence" "$(occ < "$WORK/serve.out")" "0"
+assert_ge "M1.8 — le serveur a bien écrit son message de démarrage" "$(grep -c 'VibeFlow' "$WORK/serve.out")" 1
+bad=0; for f in "$OUT"/*.mjs "$OUT"/*.html; do [ "$(occ < "$f")" = 0 ] || { bad=$((bad+1)); echo "     occurrence dans $f"; }; done
+assert_eq "M1.9 — aucune occurrence dans les fichiers de la sortie (hors licences)" "$bad" "0"
+
+echo "=== M2 — logo VibeFlow inliné ==="
+PFX=$(node "$AUX/prefixe.mjs" "$MOTEUR/assets/logo.png")
+assert_ge "M2.1 — préfixe du PNG amont non vide" "${#PFX}" 64
+assert_eq "M2.2 — témoin : le préfixe est retrouvé dans une chaîne qui le contient" "$(printf 'xx%sxx' "$PFX" | grep -c -F "$PFX")" "1"
+assert_ge "M2.3 — data:image/svg+xml dans la page servie" "$(grep -c 'data:image/svg+xml' "$WORK/racine.html")" 1
+assert_eq "M2.4 — le PNG amont n'est pas dans la page" "$(grep -c -F "$PFX" "$WORK/racine.html")" "0"
+assert_eq "M2.5 — les deux logos sont dans les données" "$(node "$AUX/donnees.mjs" "$OUT" "$OUT/index.html" 'Object.keys(j.meta.vfLogos).sort().join(",")')" "clair,sombre"
+
+echo "=== M3 — la syntaxe survit au renommage ==="
+bad=0; for f in "$OUT"/serve.mjs "$OUT"/query.mjs "$OUT"/vf-cockpit-*.mjs; do node --check "$f" 2>/dev/null || { bad=$((bad+1)); echo "     syntaxe invalide : $f"; }; done
+assert_eq "M3.1 — node --check sur serve.mjs, query.mjs et chaque vf-cockpit-*.mjs" "$bad" "0"
+B=$(node "$AUX/blocs.mjs" "$OUT/index.html" 2>&1)
+assert_eq "M3.2 — aucun bloc <script> invalide dans index.html" "$(printf '%s' "$B" | grep -c 'échecs=0')" "1"
+assert_ge "M3.3 — au moins 5 blocs compilés (témoin d'exposition)" "$(printf '%s' "$B" | sed -n 's/.*compilés=\([0-9]*\).*/\1/p')" 5
+assert_eq "M3.4 — le serveur de la sortie garde le marqueur de taille" "$(head -n 5 "$OUT/serve.mjs" | grep -c 'vibeflow:allow-large-file')" "1"
+
+echo "=== M4 — les données du lab ne sont jamais renommées ==="
+LABB="$WORK/lab-b"; mklab "$LABB" "Carte floor""plan du quartier"
+node "$SCRIPTS/vf-cockpit-build.mjs" "$LABB" --quiet >/dev/null 2>&1
+assert_eq "M4.1 — la phase du lab garde son nom" "$(node "$AUX/donnees.mjs" "$LABB/.vibeflow/cockpit" "$LABB/.vibeflow/cockpit/project.html" 'j.nodes.filter(n=>n.kind==="phase").map(n=>n.label).join(",")' | grep -c 'Carte floor''plan du quartier')" "1"
+assert_eq "M4.2 — schéma du graphe Code" "$(node "$AUX/donnees.mjs" "$OUT" "$OUT/index.html" 'j.schema')" "vf-cockpit/graph@1"
+
+echo ""
+echo "=================================="
+echo "  Résultats : $PASS PASS / $FAIL FAIL"
+echo "=================================="
+TOTAL=$((PASS+FAIL))
+if [ "$TOTAL" -eq 0 ]; then
+  echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE — zéro assertion exécutée, résultat non fiable"
+  exit 1
+fi
+[ "$FAIL" -eq 0 ] && exit 0 || exit 1

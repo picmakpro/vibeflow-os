@@ -441,8 +441,8 @@ const page = (g) => template
   .replace('/*__FONTS__*/', () => fontCss)
   .replace('/*__FLOORPLAN_DATA__*/null', () => JSON.stringify(g).replace(/<\/(script)/gi, '<\\/$1').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029'))
   .replace(/__FLOORPLAN_TITLE__/g, () => escapeHtml(`${arch.project.name} map`))
-  .replace(/__FLOORPLAN_LOGO__/g, () => dataUri('logo.png'))
-  .replace(/__FLOORPLAN_FAVICON__/g, () => dataUri('favicon.png'))
+  .replace(/__FLOORPLAN_LOGO__/g, () => svgUri('vibeflow-logo-clair.svg')) // vibeflow P12
+  .replace(/__FLOORPLAN_FAVICON__/g, () => svgUri('vibeflow-logo-clair.svg')) // vibeflow P12
   .replace('<!--__UI_EXTENSIONS__-->', () => uiScripts);
 const uiDir = path.join(SKILL_DIR, 'assets', 'ui');
 const uiScripts = fs.existsSync(uiDir) ? fs.readdirSync(uiDir).filter((n) => n.endsWith('.js')).sort().map((n) => `<script>/* ui/${n} */\n${fs.readFileSync(path.join(uiDir, n), 'utf8').replace(/<\/script/gi, '<\\/script')}</script>`).join('\n') : '';
@@ -459,6 +459,7 @@ fs.copyFileSync(path.join(SKILL_DIR, 'assets', 'serve.mjs'), path.join(outDir, '
 // a blueprint can be changed from the map: serve.mjs redraws it with this skill's plan.mjs and build.mjs
 if (scan.blueprint) { fs.mkdirSync(path.join(outDir, '.cache'), { recursive: true }); fs.writeFileSync(path.join(outDir, '.cache', 'skill.json'), JSON.stringify({ dir: SKILL_DIR })); }
 // the logo and tab icon are inlined so the map stays one self-contained file
+function svgUri(name) { return 'data:image/svg+xml;base64,' + fs.readFileSync(path.join(SKILL_DIR, 'assets', name)).toString('base64'); } // vibeflow P12
 function dataUri(name) { return 'data:image/png;base64,' + fs.readFileSync(path.join(SKILL_DIR, 'assets', name)).toString('base64'); }
 function escapeHtml(s) { return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
 

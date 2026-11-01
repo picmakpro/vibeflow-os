@@ -5,3 +5,30 @@
  // Health check: plain-language warnings about the codebase (secrets, endpoints anyone can call,
  // the usual Supabase / Firebase / Stripe / CORS mistakes, unused files, oversized files), written for
  // people who built an app with AI and don't know its insides. It's a check, not an audit. Precision
+@@ -526,7 +527,7 @@ export function findIssues(src, f) {
+ // ======================= build: turn findings into issues =======================
+ 
+ const SEV_ORDER = { high: 0, medium: 1, low: 2 };
+-const PUBLIC_PATH = /(^|\/)(health|healthz|healthcheck|ping|status|ready|readiness|live|liveness|version|metrics|robots\.txt|sitemap[\w.]*|favicon[\w.]*|\.well-known|login|logout|signin|pair|sign-in|signout|signup|sign-up|register|forgot[\w-]*|reset[\w-]*|verify[\w-]*|oauth\w*|callback|auth|token|refresh|static|assets|public|newsletter|contact|waitlist|unsubscribe|openapi\.json|docs|swagger[\w.]*|i|images?)(\/|$)/i;
++const PUBLIC_PATH = /(^|\/)(health|healthz|healthcheck|ping|status|ready|readiness|live|liveness|version|metrics|robots\.txt|sitemap[\w.]*|favicon[\w.]*|\.well-known|login|logout|signin|pair|sign-in|signout|signup|sign-up|register|forgot[\w-]*|reset[\w-]*|verify[\w-]*|oauth\w*|callback|auth|token|refresh|static|assets|public|newsletter|contact|wait[l]ist|unsubscribe|openapi\.json|docs|swagger[\w.]*|i|images?)(\/|$)/i;
+ const WEBHOOK_PATH = /webhook|\/hooks?\//i;
+ // endpoints under a webhook URL that manage the webhooks (create, list, test…) rather than receive them
+ const WEBHOOK_ADMIN = /\/(manage|admin|setup|settings|config|list|create|register|delete|test[\w-]*)(\/|$)/i;
+@@ -775,7 +776,7 @@ export function buildHealth({ graph, scan, arch, root }) {
+         issues.push({
+           id: 'open-policy:' + repo, kind: 'database-rules', severity: 'medium',
+           title: loose.length === 1 ? `A database rule lets anyone change your ${short(loose[0].table)} table` : `${loose.length} database rules let anyone change your data`,
+-          detail: `${loose.length === 1 ? `The rule “${loose[0].policy}” lets anyone` : `These rules let anyone`}${loose.some((pol) => pol.signedOut) ? ', even people who aren’t signed in,' : ''} ${loose.length === 1 ? rowsOf(loose[0].cmd, short(loose[0].table)) : `add, change or delete rows in ${[...new Set(loose.map((pol) => short(pol.table)))].slice(0, 5).join(', ')}`}. If a table is a public form (like a waitlist or contact form), letting anyone add rows is fine; otherwise limit it to signed-in users and their own rows.`,
++          detail: `${loose.length === 1 ? `The rule “${loose[0].policy}” lets anyone` : `These rules let anyone`}${loose.some((pol) => pol.signedOut) ? ', even people who aren’t signed in,' : ''} ${loose.length === 1 ? rowsOf(loose[0].cmd, short(loose[0].table)) : `add, change or delete rows in ${[...new Set(loose.map((pol) => short(pol.table)))].slice(0, 5).join(', ')}`}. If a table is a public form (like a mailing-list or contact form), letting anyone add rows is fine; otherwise limit it to signed-in users and their own rows.`,
+           items, notes,
+           locations: loose.map((pol) => ({ file: pol.file, line: pol.line })),
+           fix: [
+@@ -827,7 +828,7 @@ export function buildHealth({ graph, scan, arch, root }) {
+       title = reads.length && !deepWrites.length ? `Anyone can read everything in your Firebase ${service}` : `Anyone can change part of your Firebase ${service}`;
+       detail = [
+         reads.length ? `A rule in ${base} (line ${reads[0].line}) lets anyone read every ${files ? 'file' : 'record'}, including data that may belong to your users. If everything there is meant to be public, that’s fine; otherwise it needs a sign-in check.` : '',
+-        deepWrites.length ? `A rule in ${base} (line ${deepWrites[0].line}) lets anyone ${deepWrites[0].createOnly ? 'add to' : 'change'} ${deepWrites[0].where} without signing in. If that’s a public form (like a waitlist or contact form), that can be fine; otherwise it needs a sign-in check.` : '',
++        deepWrites.length ? `A rule in ${base} (line ${deepWrites[0].line}) lets anyone ${deepWrites[0].createOnly ? 'add to' : 'change'} ${deepWrites[0].where} without signing in. If that’s a public form (like a mailing-list or contact form), that can be fine; otherwise it needs a sign-in check.` : '',
+       ].filter(Boolean).join(' ');
+     } else {
+       severity = 'medium';

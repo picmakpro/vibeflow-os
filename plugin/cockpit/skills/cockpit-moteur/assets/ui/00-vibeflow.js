@@ -9,6 +9,13 @@
   const { h, graph: G } = SC;
   const TAB = G.meta.vfTab === 'project' ? 'project' : 'code';
   const ST = { done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' };
+  // P67-D-04 : logo VibeFlow clair ou sombre selon le thème du viewer (meta.vfLogos est posé par l'assemblage)
+  const LOGOS = G.meta.vfLogos;
+  if (LOGOS) {
+    const mark = document.querySelector('.brand .mark');
+    const sync = () => { if (mark) mark.src = document.documentElement.getAttribute('data-theme') === 'dark' ? LOGOS.sombre : LOGOS.clair; };
+    sync(); window.addEventListener('floorplan-theme-change', sync);
+  }
 
   const style = document.createElement('style');
   style.textContent = `

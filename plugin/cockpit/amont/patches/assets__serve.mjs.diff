@@ -39,7 +39,7 @@
    if (ENGINES[engine]?.schemaFile) {
      fs.mkdirSync(path.join(here, '.cache'), { recursive: true });
      for (const m of Object.values(MODES)) fs.writeFileSync(m.file, JSON.stringify(strict(m.schema)));
-@@ -208,6 +219,8 @@ fs.watchFile(path.join(here, 'index.html'), { interval: 1000 }, (cur, prev) => {
+@@ -208,52 +219,13 @@ fs.watchFile(path.join(here, 'index.html'), { interval: 1000 }, (cur, prev) => {
    clearTimeout(reloadTimer);
    reloadTimer = setTimeout(() => { try { load(); broadcast('reload'); console.log('map rebuilt: reloaded open tabs'); } catch {} }, 800);
  });
@@ -48,7 +48,54 @@
  if (idleExit) setInterval(() => { if (!tabs.size && !running.size && Date.now() - lastTab > idleExit) process.exit(0); }, 60000).unref();
  const flowsFile = path.join(here, 'custom-flows.json');
  const readFlows = () => { try { return JSON.parse(fs.readFileSync(flowsFile, 'utf8')).flows || []; } catch { return []; } };
-@@ -308,7 +321,7 @@ const failCode = (msg) => /not logged in|logged out|\/login|log ?in again|sign i
+ 
+-// ---------- Floorplan Cloud waitlist (opt-in) ----------
+-// The map may ask, once, whether you want an email when Floorplan Cloud launches. Nothing is sent unless
+-// you click "Notify me", and then only the email you see in the box and whether it's for you or a team.
+-// Where it goes: a small Cloud Run service that adds it to a Google Sheet (docs/privacy-and-security.md
+-// links its code). Your answer (joined, later,
+-// never) is kept in ~/.floorplan/settings.json so every project's map remembers it.
+-// FLOORPLAN_NO_PROMPTS=1 turns the question off.
+-const WAITLIST_URL = process.env.FLOORPLAN_WAITLIST_URL || 'https://floorplan-waitlist-690500262396.us-central1.run.app/';
+-const settingsFile = path.join(process.env.HOME || process.env.USERPROFILE || here, '.floorplan', 'settings.json');
+-const readSettings = () => { try { return JSON.parse(fs.readFileSync(settingsFile, 'utf8')); } catch { return {}; } };
+-function saveCloud(cloud) {
+-  try { fs.mkdirSync(path.dirname(settingsFile), { recursive: true }); fs.writeFileSync(settingsFile, JSON.stringify({ ...readSettings(), cloud }, null, 2) + '\n'); } catch {}
+-}
+-function cloudPrompt() {
+-  if (!WAITLIST_URL || /^(1|true|yes)$/i.test(process.env.FLOORPLAN_NO_PROMPTS || '')) return false;
+-  const c = readSettings().cloud || {};
+-  return !c.status || (c.status === 'later' && Date.now() > Date.parse(c.until || 0));
+-}
+-/** The email of the claude.ai account Claude Code is signed in with, or null (API key, Bedrock, not signed in). */
+-function claudeEmail() {
+-  if (engine !== 'claude') return null;
+-  try {
+-    const out = execFileSync(cli.cmd, [...cli.args, 'auth', 'status', '--json'], { encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true, env: cliEnv() });
+-    const email = JSON.parse(out).email;
+-    return typeof email === 'string' && EMAIL.test(email) ? email : null;
+-  } catch { return null; }
+-}
+-// starts with a letter or digit, so a spreadsheet never reads it as a formula
+-const EMAIL = /^[A-Za-z0-9][^\s@]{0,63}@[^\s@]+\.[^\s@]{2,}$/;
+-async function joinWaitlist(body) {
+-  const email = String(body.email || '').trim();
+-  const use = body.use === 'team' ? 'team' : 'solo';
+-  if (!WAITLIST_URL) return { ok: false, error: 'not_configured' };
+-  if (email.length > 254 || !EMAIL.test(email)) return { ok: false, error: 'bad_email' };
+-  try {
+-    const r = await fetch(WAITLIST_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ email, use }), redirect: 'follow', signal: AbortSignal.timeout(20000) });
+-    const out = await r.json().catch(() => ({}));
+-    if (!r.ok || !out.ok) return { ok: false, error: out.error || 'send_failed' };
+-  } catch { return { ok: false, error: 'send_failed' }; }
+-  saveCloud({ status: 'joined', at: new Date().toISOString() });
+-  return { ok: true };
+-}
++// vibeflow P11 : la fonction Cloud amont (liste d'attente, e-mail du compte, réglages personnels) est retirée : aucune donnée ne sort.
+ 
+ // ---------- asking ----------
+ const nameFor = (id) => { try { return core.q.brief(id)?.name || id; } catch { return id; } };
+@@ -308,7 +280,7 @@ const failCode = (msg) => /not logged in|logged out|\/login|log ?in again|sign i
  function claudeRun(body, mode) {
    const args = [...cli.args, '-p', '--output-format', 'stream-json', '--verbose',
      '--json-schema', JSON.stringify(mode.schema), '--append-system-prompt', mode.instructions,
@@ -57,7 +104,7 @@
    if (body.session) args.push('--resume', String(body.session));
    if (model) args.push('--model', model);
    return {
-@@ -354,7 +367,8 @@ const CLOSED = Symbol('closed'); // the browser went away mid-request
+@@ -354,7 +326,8 @@ const CLOSED = Symbol('closed'); // the browser went away mid-request
  /** Runs the agent once for a request and resolves with its answer, streaming progress through `send`. */
  function runAgent(res, send, body) {
    return new Promise((resolve, reject) => {
@@ -67,7 +114,7 @@
      const child = spawn(cli.cmd, run.args, { cwd: root, env: cliEnv(), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
      const id = crypto.randomBytes(6).toString('hex');
      running.set(id, child);
-@@ -397,6 +411,9 @@ function ask(req, res, body) {
+@@ -397,6 +370,9 @@ function ask(req, res, body) {
    const send = (event, data) => { if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
    if (!cli) { send('failure', { code: 'cli_missing', message: `${ENGINES[want].name} not found.` }); return res.end(); }
    if (body.mode === 'change') return changePlan(res, send, body);
@@ -77,7 +124,7 @@
    runAgent(res, send, body)
      .then((a) => send('answer', a), (e) => { if (e !== CLOSED) send('failure', { code: failCode(e.message), message: e.message }); })
      .finally(() => res.end());
-@@ -518,7 +535,7 @@ const server = http.createServer((req, res) => {
+@@ -518,7 +494,7 @@ const server = http.createServer((req, res) => {
    if (url.pathname.startsWith('/api/')) {
      // EventSource can't send headers, so the events stream takes the token in the query string
      const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' ? url.searchParams.get('token') : null);
@@ -86,7 +133,34 @@
      if (req.method === 'GET' && url.pathname === '/api/events') {
        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
        res.write('retry: 1000\n\n'); // reconnect quickly after a restart
-@@ -594,12 +611,13 @@ const server = http.createServer((req, res) => {
+@@ -544,26 +520,6 @@ const server = http.createServer((req, res) => {
+         return;
+       }
+     }
+-    if (url.pathname.startsWith('/api/cloud/')) {
+-      const json = (data) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(data)); };
+-      if (req.method === 'GET' && url.pathname === '/api/cloud/prompt') return json({ show: cloudPrompt() });
+-      if (req.method === 'POST') {
+-        let raw = '';
+-        req.on('data', (d) => { raw += d; if (raw.length > 2000) req.destroy(); });
+-        req.on('end', async () => {
+-          let body = {}; try { body = JSON.parse(raw); } catch {}
+-          // read only when the person clicks "Use my Claude email"
+-          if (url.pathname === '/api/cloud/claude-email') return json({ email: claudeEmail() });
+-          if (url.pathname === '/api/cloud/join') return json(await joinWaitlist(body));
+-          if (url.pathname === '/api/cloud/dismiss') {
+-            saveCloud(body.forever ? { status: 'never' } : { status: 'later', until: new Date(Date.now() + 14 * 864e5).toISOString() });
+-            return json({ ok: true });
+-          }
+-          res.writeHead(404); res.end();
+-        });
+-        return;
+-      }
+-    }
+     if (req.method === 'POST' && url.pathname === '/api/plan/undo') {
+       const r = changing ? { ok: false, error: 'A change is still being made.' } : undoChange();
+       res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(r));
+@@ -594,12 +550,13 @@ const server = http.createServer((req, res) => {
      }
      res.writeHead(404); return res.end();
    }

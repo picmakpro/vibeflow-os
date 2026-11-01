@@ -3,16 +3,17 @@ Reconstruction et vérification hors réseau : plugin/cockpit/amont/SYNCHRO.md (
 Lignes machine : PATCH <chemin> <Pn[,Pm]> <description> · AJOUT <chemin> · RETRAIT <chemin> · TAILLE <chemin> <lignes>.
 Licence : MIT, copyright d'origine conservé dans LICENSE ; composants tiers dans LICENCES-TIERCES.txt.
 
-PATCH assets/viewer.html P1,P2,P3,P4,P6,P8 libellés de liens, pied de carte et pastille de statut, classe st-<statut>, setOverview, rerender, pictogrammes fournis par le graphe
-PATCH assets/serve.mjs P5,P7,P9,P10 Cache-Control no-store ; onglet Projet questionnable (project.html, jeton propre, /api/ask) ; marqueur de taille ; racine du lab à deux niveaux
-PATCH scripts/build.mjs P9 marqueur de taille
+PATCH assets/viewer.html P1,P2,P3,P4,P6,P8,P11,P12 libellés de liens, pied de carte et pastille de statut, classe st-<statut>, setOverview, rerender, pictogrammes fournis par le graphe ; résidu CSS de la carte Cloud retiré ; lien de crédit retiré ; favicon SVG
+PATCH assets/serve.mjs P5,P7,P9,P10,P11 Cache-Control no-store ; onglet Projet questionnable (project.html, jeton propre, /api/ask) ; marqueur de taille ; racine du lab à deux niveaux ; fonction Cloud retirée (liste d'attente, e-mail du compte, réglages personnels)
+PATCH scripts/build.mjs P9,P12 marqueur de taille ; logo et favicon VibeFlow (data URI SVG)
 PATCH scripts/scan.mjs P9,P10 marqueur de taille ; dossier de sortie à deux segments exclu du scan
-PATCH scripts/lib/health.mjs P9 marqueur de taille
+PATCH scripts/lib/health.mjs P9,P11 marqueur de taille ; littéral de liste d'attente retiré des exemples et du motif de chemins publics
 PATCH scripts/lib/screens.mjs P9 marqueur de taille
 PATCH scripts/lib/extract.mjs P9 marqueur de taille
 PATCH scripts/lib/common.mjs P10 MAP_DIR = .vibeflow/cockpit ; commentaire du .gitignore de sortie
 PATCH assets/vendor/elk.bundled.js P9 marqueur de taille
 RETRAIT SKILL.md
+RETRAIT assets/ui/50-cloud.js
 RETRAIT agents/openai.yaml
 AJOUT assets/ui/00-vibeflow.js
 AJOUT assets/ui/80-vf-fr.js
@@ -20,10 +21,10 @@ AJOUT assets/vibeflow-logo-clair.svg
 AJOUT assets/vibeflow-logo-sombre.svg
 AJOUT VENDORED.txt
 AJOUT LICENCES-TIERCES.txt
-TAILLE assets/serve.mjs 648
+TAILLE assets/serve.mjs 587
 TAILLE assets/vendor/elk.bundled.js 6697
-TAILLE assets/viewer.html 2394 .html, hors gate
-TAILLE scripts/build.mjs 483
+TAILLE assets/viewer.html 2385 .html, hors gate
+TAILLE scripts/build.mjs 484
 TAILLE scripts/lib/extract.mjs 599
 TAILLE scripts/lib/health.mjs 1199
 TAILLE scripts/lib/screens.mjs 639

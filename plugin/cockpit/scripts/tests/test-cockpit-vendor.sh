@@ -83,7 +83,27 @@ echo "=== V8 — binaires ==="
 assert_eq "V8.1 — quatre .woff2 non vides" "$(find "$MOTEUR" -name '*.woff2' -size +0 | grep -c .)" "4"
 assert_eq "V8.2 — deux .png non vides" "$(find "$MOTEUR" -name '*.png' -size +0 | grep -c .)" "2"
 
-#--V5--
+echo "=== V5 — aucun littéral de la fonction Cloud amont dans le code du module (P67-D-02) ==="
+# motif (ERE, insensible à la casse) ::: ligne d'exemple qui doit le déclencher (témoin positif d'abord)
+V5=(
+  'run\.app ::: https://service.example.run.app/x'
+  'waitlist ::: const waitlist = true'
+  'auth status ::: claude auth status --json'
+  'WAITLIST_URL ::: const WAITLIST_URL = 1'
+  'FLOORPLAN_WAITLIST_URL ::: process.env.FLOORPLAN_WAITLIST_URL'
+  "['\"/]\.floorplan(['\"/]|\$) ::: path.join(h, '.floorplan', 's')"
+  'claudeEmail ::: claudeEmail()'
+  'cloud-card ::: #cloud-card { left: 1px; }'
+  '50-cloud ::: ui/50-cloud.js'
+)
+CODE=$(find "$MOTEUR" -type f \( -name '*.mjs' -o -name '*.js' -o -name '*.html' -o -name '*.css' -o -name '*.json' \); find "$SCRIPTS" -maxdepth 1 -type f \( -name '*.mjs' -o -name '*.json' \))
+for e in "${V5[@]}"; do
+  pat="${e%% ::: *}"; ex="${e#* ::: }"
+  printf '%s\n' "$ex" > "$WORK/v5-temoin.txt"
+  assert_ge "V5 — témoin positif : « $pat » se déclenche sur sa ligne d'exemple" "$(grep -ciE "$pat" "$WORK/v5-temoin.txt")" 1
+  n=0; while IFS= read -r f; do c=$(grep -ciE "$pat" "$f"); n=$((n+c)); done <<< "$CODE"
+  assert_eq "V5 — « $pat » : 0 occurrence dans le code du module" "$n" "0"
+done
 
 echo ""
 echo "=================================="

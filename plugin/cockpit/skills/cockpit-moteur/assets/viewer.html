@@ -27,7 +27,7 @@
 })();
 </script>
 <title>__FLOORPLAN_TITLE__</title>
-<link rel="icon" type="image/png" href="__FLOORPLAN_FAVICON__">
+<link rel="icon" type="image/svg+xml" href="__FLOORPLAN_FAVICON__">
 <style>/*__FONTS__*/</style>
 <style>
 :root {
@@ -545,7 +545,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
   header #zoom { position: static; flex: none; flex-direction: row; padding: 0; gap: 0; border-radius: 22px; } /* moved into the top row, left of the search icon */
   /* menus open as full-width cards under the bar */
   #flowmenu, #legend { position: fixed; top: calc(var(--hh, 56px) + 4px); left: 8px; right: 8px; width: auto; max-height: 60vh; overflow: auto; }
-  body #tour, body #cloud-card { left: 8px; right: 8px; width: auto; }
+  body #tour { left: 8px; right: 8px; width: auto; }
 }
 @media (prefers-reduced-motion: reduce) and (max-width: 999px), (prefers-reduced-motion: reduce) and (pointer: coarse) {
   #panel, body.no-panel #panel, #viewport.anim, #ask, #flowbar, #zoom button { transition: none; }
@@ -2196,16 +2196,7 @@ if (EXPORTED) {
   tag.textContent = isNaN(at) ? 'Exported copy' : `Exported ${at.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
   tag.title = 'A copy of this map to look around in. Asking questions needs Floorplan with Claude Code or Codex, in the codebase itself.';
   $('#proj-name').after(tag);
-  // whoever receives a copy can find where it came from
-  const made = document.createElement('a');
-  made.id = 'madewith'; made.className = 'glass';
-  made.href = 'https://github.com/haydenschmitty/floorplan'; made.target = '_blank'; made.rel = 'noopener';
-  const logo = $('.brand .mark').cloneNode();
-  logo.alt = '';
-  const name = document.createElement('b'); name.textContent = 'Floorplan';
-  const free = document.createElement('span'); free.className = 'x'; free.textContent = '· free and open source';
-  made.append('Made with', logo, name, free);
-  $('#stage').appendChild(made);
+  // vibeflow P12 : le lien de crédit vers le dépôt amont est retiré (la licence reste dans LICENSE et LICENCES-TIERCES.txt)
 }
 document.title = `${G.project.name} map`;
 $('#btn-up').onclick = up;
