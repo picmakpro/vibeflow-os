@@ -67,19 +67,20 @@ with open(sortie, "w") as fh:
     fh.write("%d %d\n" % (lectures, tronquees))
 PY
 
-echo "=== A1 — lecture concurrente pendant dag.sh add ==="
+echo "=== A1 — lecture concurrente pendant dag.sh add (x3) ==="
 python3 -I "$AUX/lecteur.py" "$F" "$AUX/stop" "$AUX/pret" "$AUX/compteurs" &
 LPID=$!
 for _ in $(seq 1 100); do [ -e "$AUX/pret" ] && break; sleep 0.1; done
 if [ ! -e "$AUX/pret" ]; then echo "  ❌ FAIL — A1.0 — le lecteur n'est jamais prêt"; FAIL=$((FAIL+1)); fi
-run_bounded "$SCRIPT" add --file="$F" --id=z-nouveau --step=x >/dev/null
+# trois `add` d'affilée : élargit l'exposition (une lecture de gros DAG coûte autant qu'un add)
+for k in 1 2 3; do run_bounded "$SCRIPT" add --file="$F" --id="z-nouveau-$k" --step=x >/dev/null; done
 touch "$AUX/stop"; wait "$LPID" 2>/dev/null
 read -r LECT TRONC < "$AUX/compteurs" 2>/dev/null || { LECT=0; TRONC=-1; }
 echo "A1 compteurs : lectures=$LECT tronquees=$TRONC"
 assert_eq "A1.1 — aucune lecture tronquée" "$TRONC" "0"
 assert_ge "A1.2 — le lecteur a lu pendant l'écriture (>= 20 lectures)" "$LECT" 20
 N=$(python3 -I -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["nodes"]))' "$F" 2>/dev/null || echo ERR)
-assert_eq "A1.3 — DAG final lisible, $((NODES+1)) nœuds" "$N" "$((NODES+1))"
+assert_eq "A1.3 — DAG final lisible, $((NODES+3)) nœuds" "$N" "$((NODES+3))"
 
 echo "=== A2 — aucun résidu dans le dossier du DAG ==="
 L=$(python3 -I -c 'import os,sys; print(",".join(sorted(os.listdir(sys.argv[1]))))' "$D")
