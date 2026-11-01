@@ -1,11 +1,19 @@
 // vf-cockpit-code — onglet Code brut, sans modèle (67-03). Écrit <sortie>/architecture.json à partir du scan :
 // un nœud par dossier de premier niveau portant du code, un nœud « Racine » pour les fichiers de premier niveau.
-// Export : ecrireArchitecture({ lab, sortie }) -> { extracteur: 'brut', noeuds }.
-// Point d'extension : un extracteur plus riche (plan 67-05) remplace ce module en rendant un autre `extracteur`.
+// Export : ecrireArchitecture({ lab, sortie }) -> { extracteur: 'vibeflow' | 'brut', noeuds }.
+// 67-05 (P67-D-17) : un lab qui porte au moins un plugin/*/module.json reçoit l'extracteur VibeFlow (vf-cockpit-code-vf.mjs) ;
+// tout autre lab, l'architecture brute ci-dessous. Aucun appel à un modèle dans les deux cas.
 import fs from 'node:fs';
 import path from 'node:path';
+import { architectureVibeflow } from './vf-cockpit-code-vf.mjs';
+
+const aDesModules = (lab) => { try { return fs.readdirSync(path.join(lab, 'plugin'), { withFileTypes: true }).some((e) => e.isDirectory() && fs.existsSync(path.join(lab, 'plugin', e.name, 'module.json'))); } catch { return false; } };
 
 export function ecrireArchitecture({ lab, sortie }) {
+  return aDesModules(lab) ? architectureVibeflow({ lab, sortie }) : architectureBrute({ lab, sortie });
+}
+
+function architectureBrute({ lab, sortie }) {
   const scan = JSON.parse(fs.readFileSync(path.join(sortie, '.cache', 'scan.json'), 'utf8'));
   const code = scan.files.filter((f) => f.category === 'code').map((f) => f.path);
   const dossiers = new Map(); let racine = 0;
