@@ -1,10 +1,12 @@
 // vf-cockpit-server — le crochet VibeFlow du serveur unique (67-04, P67-D-13, P67-D-14). Le serveur patché
 // (serve.mjs, patch P13) l'importe à côté de lui et lui délègue tout /api/vf/* APRÈS son contrôle du Host et du
 // jeton : même port que la page, aucun en-tête CORS. Le direct vient de vf-cockpit-live.mjs.
-// Export : attach({ here, root, token, inject, log }) -> { ptoken, load, pageProjet, jetonValide, route, stop }.
+// Export : attach({ here, root, token, inject, log }) -> { ptoken, load, pageProjet, jetonValide, route, stop,
+//   avantQuestion, modes, argsAgent } (les trois derniers : crochets P14 des questions, 67-05).
 //   GET /api/vf/events  flux SSE : retry, hello { seq, lock, who }, puis patch / structural / who / lock
 //   GET /api/vf/etat    { mode, seq, derniereMaj, clients }
 //   GET /api/vf/doing?id=  dernière commande d'UNE session, à la demande (schéma vibeflow/cockpit-doing@1)
+//   GET /api/vf/modeles    { modeles, defaut, lab } : liste fermée des modèles, défaut effectif, identifiant du lab
 // La dernière commande (`doing`) ne figure jamais dans le flux ni dans un fichier : un test interne refuse
 // d'émettre tout objet qui porte cette clé, à n'importe quelle profondeur (ceinture en plus des bretelles du socle).
 import fs from 'node:fs';
@@ -13,18 +15,25 @@ import crypto from 'node:crypto';
 import { startLive } from './vf-cockpit-live.mjs';
 import { revealDoing } from './vf-cockpit-who.mjs';
 import { resolveScriptsDir } from './vf-cockpit-paths.mjs';
+import { extraireGraphe } from './vf-cockpit-embed.mjs';
+import { answerLocally, instructions } from './vf-cockpit-ask.mjs';
+import { MODELES, resoudreModele, argsAgent as argsConfines } from './vf-cockpit-agent.mjs';
 
 const porteDoing = (o) => !!o && typeof o === 'object' && Object.entries(o).some(([k, v]) => k === 'doing' || porteDoing(v));
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 export function attach({ here, root, token, inject, log = () => {} }) {
   const ptoken = crypto.randomBytes(16).toString('hex'); // onglet Projet : dit de quel onglet vient une requête
-  let pageP = null;
+  let pageP = null, GP = null;
   const load = () => { // relue après chaque réécriture de project.html par le direct
-    try { pageP = fs.readFileSync(path.join(here, 'project.html'), 'utf8').replace('</head>', inject.replace(token, ptoken) + '</head>'); }
-    catch { pageP = null; }
+    try {
+      const html = fs.readFileSync(path.join(here, 'project.html'), 'utf8');
+      GP = extraireGraphe(html); pageP = html.replace('</head>', inject.replace(token, ptoken) + '</head>');
+    } catch { pageP = null; GP = null; }
   };
   load();
+  const dep = resoudreModele({ env: process.env });
+  if (dep.avertissement) log('warn', dep.avertissement);
 
   const clients = new Set();
   const diffuser = (nom, data) => {
@@ -61,11 +70,30 @@ export function attach({ here, root, token, inject, log = () => {} }) {
       json(res, 200, revealDoing(root, id, { scriptsDir: resolveScriptsDir(here) }));
       return true;
     }
+    if (url.pathname === '/api/vf/modeles') {
+      json(res, 200, { modeles: MODELES, defaut: dep.modele, lab: crypto.createHash('sha256').update(fs.realpathSync(root)).digest('hex').slice(0, 12) });
+      return true;
+    }
     res.writeHead(404); res.end(); return true;
   }
 
+  // ---- crochets des questions (P14) : la page d'où vient la question se reconnaît à son jeton ----
+  function avantQuestion({ req, body, send }) {
+    body.project = req.headers['x-floorplan-token'] === ptoken && !!GP; // jamais lu du corps : le navigateur ne le fixe pas
+    const r = resoudreModele({ choix: body.model, env: process.env });
+    if (r.erreur) { send('failure', { code: 'modele_refuse', message: `Modèle refusé : seuls ${MODELES.join(', ')} sont admis.` }); return 'repondu'; }
+    body.modeleResolu = r.modele; // écrasé à chaque question, jamais écrit sur disque ni journalisé avec la question
+    if (body.project && (!body.mode || body.mode === 'ask') && !body.session) {
+      const t0 = Date.now(), local = answerLocally(GP, String(body.question || ''));
+      if (local) { log('local', `projet · réponse locale · ${Date.now() - t0} ms`); send('answer', local); return 'repondu'; }
+    }
+    return 'agent';
+  }
+  const modes = (MODES, body) => (body.project && GP ? { ...MODES, ask: { ...MODES.ask, instructions: instructions(GP) } } : MODES); // flow et change gardent leur schéma
+  const argsAgent = (args, body) => argsConfines(args, { modele: body.modeleResolu || resoudreModele({ env: process.env }).modele });
+
   return {
-    ptoken, load, route,
+    ptoken, load, route, avantQuestion, modes, argsAgent,
     pageProjet: () => pageP,
     jetonValide: (j) => typeof j === 'string' && j === ptoken,
     stop() { live?.stop(); for (const c of clients) c.end(); },

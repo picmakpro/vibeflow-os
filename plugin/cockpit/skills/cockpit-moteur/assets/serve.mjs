@@ -153,9 +153,9 @@ const ENGINES = {
 const builtBy = (() => { try { return JSON.parse(fs.readFileSync(path.join(here, 'graph.json'), 'utf8')).meta?.agent; } catch { return null; } })();
 const asked = opt('engine', process.env.FLOORPLAN_ENGINE);
 const isEngine = (k) => typeof k === 'string' && Object.hasOwn(ENGINES, k);
-const want = isEngine(asked) ? asked : isEngine(builtBy) ? builtBy : 'claude';
+const want = 'claude'; // vibeflow P14 : Claude Code seul est un agent admis (aucun autre appel sortant) ; --engine et le repli sur codex sont ignorés
 let engine = null, cli = null;
-for (const k of isEngine(asked) ? [asked] : [want, ...Object.keys(ENGINES).filter((k) => k !== want)]) { cli = ENGINES[k].find(); if (cli) { engine = k; break; } }
+for (const k of ['claude']) { cli = ENGINES[k].find(); if (cli) { engine = k; break; } } // vibeflow P14
 const canChange = !engine || ENGINES[engine].structured;
 // Started from inside a Claude Code or Codex session? Don't let the CLI think it's nested in it.
 function cliEnv() {
@@ -172,7 +172,7 @@ const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !
 let page, G, core, MODES;
 // vibeflow P13 : serveur unique. Le direct, « au travail » et la page Projet vivent dans vf-cockpit-server.mjs, posé à côté de
 // vibeflow P13 : ce fichier ; absent, le serveur reste celui de l'amont. Même port que la page, aucun en-tête CORS.
-const VF = fs.existsSync(path.join(here, 'vf-cockpit-server.mjs')) ? (await import(new URL('./vf-cockpit-server.mjs', import.meta.url))).attach({ here, root, token, inject, log: (cat, msg) => { if (cat === 'error') console.error(`vf-cockpit : ${msg}`); } }) : null; // vibeflow P13
+const VF = fs.existsSync(path.join(here, 'vf-cockpit-server.mjs')) ? (await import(new URL('./vf-cockpit-server.mjs', import.meta.url))).attach({ here, root, token, inject, log: (cat, msg) => { if (cat === 'error' || cat === 'warn') console.error(`vf-cockpit : ${msg}`); } }) : null; // vibeflow P13
 function load() {
   const html = fs.readFileSync(path.join(here, 'index.html'), 'utf8');
   const g = JSON.parse(fs.readFileSync(path.join(here, 'graph.json'), 'utf8'));
@@ -276,7 +276,7 @@ function claudeRun(body, mode) {
   if (body.session) args.push('--resume', String(body.session));
   if (model) args.push('--model', model);
   return {
-    args, input: String(body.question || '').slice(0, 4000),
+    args: VF ? VF.argsAgent(args, body) : args, input: String(body.question || '').slice(0, 4000), // vibeflow P14 : confinement mesuré et modèle validé
     onEvent(ev, out) {
       if (ev.type === 'assistant') for (const c of ev.message?.content || []) if (c.type === 'tool_use') out.progress(describeTool(c.name, c.input));
       if (ev.type !== 'result') return;
@@ -318,7 +318,8 @@ const CLOSED = Symbol('closed'); // the browser went away mid-request
 /** Runs the agent once for a request and resolves with its answer, streaming progress through `send`. */
 function runAgent(res, send, body) {
   return new Promise((resolve, reject) => {
-    const run = ENGINES[engine].run(body, MODES[body.mode] || MODES.ask);
+    const M = VF ? VF.modes(MODES, body) : MODES; // vibeflow P14 : consigne de l'onglet Projet
+    const run = ENGINES[engine].run(body, M[body.mode] || M.ask);
     const child = spawn(cli.cmd, run.args, { cwd: root, env: cliEnv(), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     const id = crypto.randomBytes(6).toString('hex');
     running.set(id, child);
@@ -359,6 +360,7 @@ function runAgent(res, send, body) {
 function ask(req, res, body) {
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
   const send = (event, data) => { if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+  if (VF && VF.avantQuestion({ req, body, send }) === 'repondu') return res.end(); // vibeflow P14 : réponse locale ou refus de modèle
   if (!cli) { send('failure', { code: 'cli_missing', message: `${ENGINES[want].name} not found.` }); return res.end(); }
   if (body.mode === 'change') return changePlan(res, send, body);
   runAgent(res, send, body)

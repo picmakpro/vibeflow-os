@@ -1,0 +1,119 @@
+// vf-cockpit-ask — questions sur l'onglet Projet (67-05, promu du spike 005). Chargé par le serveur (vf-cockpit-server.mjs) et
+// par vf-cockpit-query.mjs, copié à côté d'eux dans .vibeflow/cockpit/. Deux voies, même format de réponse que le moteur
+// ({ title, answer, items, steps, followups }, ids [[n:…]] / [[f:…]] cliquables) :
+//   - answerLocally : les questions courantes, calculées sur le graphe Projet, sans modèle ni jeton ;
+//   - instructions  : la consigne de l'agent (claude -p) pour tout le reste, outillé par vf-cockpit-query.mjs.
+// Identité d'une phase = (compartiment, numéro) : « phase N » se résout par le champ `num` des nœuds de phase ; si plusieurs
+// compartiments portent ce numéro, la réponse les liste avec leur compartiment et ne choisit pas au hasard.
+// Exports : projectIndex(G), answerLocally(G, question), instructions(G).
+const ST = { done: 'fait', active: 'en cours', todo: 'à faire', blocked: 'bloqué' };
+const fold = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+export function projectIndex(G) {
+  const N = new Map(G.nodes.map((n) => [n.id, n])), F = new Map(G.files.map((f) => [f.p, f]));
+  const kids = new Map(), files = new Map();
+  for (const n of G.nodes) if (n.parent) (kids.get(n.parent) || kids.set(n.parent, []).get(n.parent)).push(n);
+  for (const f of G.files) (files.get(f.n) || files.set(f.n, []).get(f.n)).push(f);
+  const ref = (x) => (x.p != null ? 'f:' + x.p : 'n:' + x.id);
+  const label = (x) => x.label || x.name;
+  const get = (id) => (id?.startsWith('f:') ? F.get(id.slice(2)) : N.get(String(id || '').replace(/^n:/, '')));
+  // tout ce qui vit sous une carte (sous-cartes et éléments), elle comprise
+  const under = (id) => { const out = []; const walk = (n) => { out.push(n); for (const f of files.get(n.id) || []) out.push(f); for (const k of kids.get(n.id) || []) walk(k); }; const n = N.get(id); if (n) walk(n); return out; };
+  return { N, F, kids, files, ref, label, get, under };
+}
+
+const line = (I, x, note) => `- [[${I.ref(x)}]]${/\.req$/.test(x.id || '') ? ` (${String(x.id).slice(3, -4).replace(/^/, 'phase ')})` : ''} · ${ST[x.st] || 'sans statut'}${x.foot ? ' · ' + x.foot : ''}${note ? ' · ' + note : ''}`;
+const item = (I, x, note) => ({ id: I.ref(x), note: (note || `${ST[x.st] || 'sans statut'}${x.foot ? ' · ' + x.foot : ''}`).slice(0, 90) });
+const answer = (title, md, items, followups = []) => ({ title, answer: md, items: items.slice(0, 14), steps: [], followups, engine: 'local' });
+const count = (xs) => { const c = {}; for (const x of xs) if (x.st) c[x.st] = (c[x.st] || 0) + 1; return Object.entries(c).map(([k, v]) => `${v} ${ST[k] || k}`).join(', ') || 'aucun statut'; };
+
+/** Réponse calculée, ou null si la question sort des formes connues (→ agent). */
+export function answerLocally(G, question) {
+  const I = projectIndex(G), q = fold(question), vf = G.meta?.vf || {};
+  // une question de raisonnement (pourquoi, comment, risque, conseil) n'a pas de réponse calculable : l'agent
+  if (/\b(pourquoi|comment|explique|quel(le)? risque|faut-il|devrai|conseill|compare|difference|impact)/.test(q)) return null;
+  // cibles nommées dans la question
+  const ph = /\bphase\s+(\d+(?:\.\d+)?)\b/.exec(q)?.[1];
+  const phases = ph ? G.nodes.filter((n) => n.kind === 'phase' && String(n.num) === ph) : [];
+  const byWs = phases.filter((p) => p.ws && q.includes(fold(p.ws)));
+  const phase = phases.length === 1 ? phases[0] : byWs.length === 1 ? byWs[0] : null;
+  const nodeOf = (m) => I.N.get(String(m.id).replace(/^n:/, ''));
+  const msHit = (vf.milestones || []).filter((m) => q.includes(fold(m.key))).sort((a, b) => b.key.length - a.key.length)[0];
+  const curMs = (() => { const m = (vf.milestones || []).find((x) => x.key === vf.milestone); return m ? nodeOf(m) : I.N.get('ms-' + vf.milestone); })();
+  const ms = msHit ? nodeOf(msHit) : /jalon (en cours|actuel|courant)/.test(q) ? curMs : null;
+  const mi = /\bmission\s+([\w.-]+)/.exec(q)?.[1];
+  const mission = mi && (I.N.get('dag-MISSION-' + mi.toUpperCase()) || I.N.get('dag-MISSION-' + mi));
+  const reqId = /\b([A-Z][A-Z0-9]{1,7}-\d{2,3})\b/.exec(question)?.[1];
+  const reqs = reqId ? G.files.filter((f) => f.p === 'req/' + reqId || (f.p.startsWith('req/') && f.p.endsWith('/' + reqId))) : [];
+  const req = reqs.length === 1 ? reqs[0] : null;
+  const pathHit = /([\w.-]+\/[\w./-]+\.(?:sh|md|mjs|js|json|ts|yml))/.exec(question)?.[1];
+  const target = phase || mission || ms;
+  // plusieurs compartiments portent ce numéro : on les liste, on ne choisit pas
+  if (phases.length > 1 && !phase) {
+    return answer(`Phase ${ph} : ${phases.length} compartiments`, `Plusieurs compartiments portent une « Phase ${ph} » ; dis lequel :\n${phases.map((p) => line(I, p, `compartiment ${p.ws || 'racine'}`)).join('\n')}`,
+      phases.map((p) => item(I, p, `compartiment ${p.ws || 'racine'}`)), phases.map((p) => `Qu'est-ce qui reste dans la phase ${ph} du compartiment ${p.ws || 'racine'} ?`));
+  }
+  if (reqs.length > 1) return answer(reqId, `${reqs.length} exigences portent l'identifiant **${reqId}** (une par compartiment) :\n${reqs.map((r) => line(I, r, r.p.split('/').slice(1, -1).join('/') || 'racine')).join('\n')}`, reqs.map((r) => item(I, r)));
+  if (/\bphase\s+\d/.test(q) && !phase) return answer(`Phase ${ph} introuvable`, `Aucune carte « Phase ${ph} » dans le graphe Projet (ni ROADMAP active, ni jalon archivé).`, []);
+
+  if (req) {
+    const owner = I.N.get(req.n), phaseNode = owner?.parent && I.N.get(owner.parent);
+    return answer(reqId, `**${reqId}** · ${ST[req.st] || 'sans statut'}${phaseNode ? ` · portée par [[${I.ref(phaseNode)}]]` : ''}.\n\n${req.d || ''}`,
+      [item(I, req), ...(phaseNode ? [item(I, phaseNode)] : [])], phaseNode ? [`Qu'est-ce qui reste dans la ${phaseNode.label.split(' · ')[0].toLowerCase()} ?`] : []);
+  }
+  if (pathHit) {
+    const plans = G.files.filter((f) => (f.touched || []).includes(pathHit));
+    if (!plans.length) return answer('Aucun plan', `Aucun plan ni nœud de mission ne déclare avoir touché \`${pathHit}\` (champ \`files_modified\`).`, []);
+    return answer(`Qui a touché ${pathHit.split('/').pop()}`, `${plans.length} plan(s) déclarent \`${pathHit}\` :\n${plans.slice(0, 12).map((p) => line(I, p)).join('\n')}`, plans.map((p) => item(I, p)));
+  }
+  const pool = target ? I.under(target.id) : [...G.nodes, ...G.files];
+  const scope = target ? ` dans [[${I.ref(target)}]]` : '';
+  if (/bloqu|coince|en echec|echoue/.test(q)) {
+    const xs = pool.filter((x) => x.st === 'blocked');
+    if (!xs.length) { const act = pool.filter((x) => x.st === 'active'); return answer('Rien de bloqué', `Rien n'est bloqué${scope}. En cours : ${act.length}.\n${act.slice(0, 8).map((x) => line(I, x)).join('\n')}`, act.map((x) => item(I, x))); }
+    return answer(`${xs.length} bloqué(s)`, `${xs.length} élément(s) bloqué(s)${scope} (étape de mission en échec) :\n${xs.map((x) => line(I, x, I.label(I.N.get(x.n || x.parent) || {}) || '')).join('\n')}`, xs.map((x) => item(I, x)));
+  }
+  if (/en cours|actif|au travail|qui travaille/.test(q)) {
+    const xs = pool.filter((x) => x.st === 'active');
+    return answer(`${xs.length} en cours`, xs.length ? `En cours${scope} :\n${xs.slice(0, 12).map((x) => line(I, x)).join('\n')}` : `Rien en cours${scope} d'après .planning/. Pour les agents réellement au travail, voir le badge d'en-tête.`, xs.map((x) => item(I, x)));
+  }
+  if (/reste|a faire|prochain|suivant|restant|ensuite|next/.test(q)) {
+    const t = target || curMs;
+    const xs = (t ? I.under(t.id) : pool).filter((x) => x !== t && (x.st === 'todo' || x.st === 'active') && (x.id ? x.kind === 'phase' || /^dag-/.test(x.id) : !x.p.startsWith('req/') || /^ph-/.test(t?.id || '')));
+    return answer(`Reste${t ? ' · ' + I.label(t).split(' · ')[0] : ''}`, `${xs.length} à finir dans [[${I.ref(t)}]]${t?.foot ? ` (${t.foot})` : ''} :\n${xs.slice(0, 12).map((x) => line(I, x)).join('\n')}${xs.length > 12 ? `\n- … et ${xs.length - 12} autre(s)` : ''}`,
+      [item(I, t), ...xs.map((x) => item(I, x))], xs[0] ? [`Qu'est-ce qui bloque dans ${I.label(t).split(' · ')[0]} ?`] : []);
+  }
+  if (/exigence/.test(q) && phase) {
+    const xs = I.files.get(phase.id + '.req') || [];
+    return answer(`Exigences · Phase ${ph}`, `${xs.length} exigence(s) pour [[${I.ref(phase)}]] (${count(xs)}) :\n${xs.slice(0, 14).map((x) => line(I, x, x.d?.slice(0, 70))).join('\n')}`, xs.map((x) => item(I, x)));
+  }
+  if (target) {
+    const sub = I.under(target.id).filter((x) => x !== target);
+    const direct = [...(I.kids.get(target.id) || []), ...(I.files.get(target.id) || [])];
+    return answer(I.label(target).split(' · ')[0], `[[${I.ref(target)}]] · ${ST[target.st] || 'sans statut'}${target.foot ? ' · ' + target.foot : ''}.\n\n${target.summary || ''}\n\nContenu : ${sub.length ? count(sub) : 'rien encore (pas de plan)'}.\n${direct.slice(0, 10).map((x) => line(I, x)).join('\n')}`,
+      [item(I, target), ...direct.map((x) => item(I, x))], [`Qu'est-ce qui reste dans ${I.label(target).split(' · ')[0]} ?`, `Qu'est-ce qui bloque dans ${I.label(target).split(' · ')[0]} ?`]);
+  }
+  if (/ou en (est|sommes)|on en est|etat|avancement|resume|statut|progression/.test(q)) {
+    const cur = curMs, p = I.N.get('ph-' + vf.phase) || G.nodes.find((n) => n.kind === 'phase' && String(n.num) === String(vf.phase));
+    const nexts = cur ? I.under(cur.id).filter((x) => x.kind === 'phase' && x.st !== 'done') : [];
+    return answer('Où on en est', `Jalon en cours : [[${I.ref(cur || {})}]]${cur?.foot ? ` (${cur.foot})` : ''}. Dernière phase : ${p ? `[[${I.ref(p)}]]` : vf.phase} · ${vf.status || ''}, le ${vf.lastActivity || '?'}.\n\nÀ finir dans le jalon :\n${nexts.slice(0, 8).map((x) => line(I, x)).join('\n')}`,
+      [cur, p, ...nexts].filter(Boolean).map((x) => item(I, x)), ["Qu'est-ce qui bloque ?", "Qu'est-ce qui est en cours ?"]);
+  }
+  return null;
+}
+
+/** Prompt de l'agent pour l'onglet Projet (voie LLM). */
+export function instructions(G) {
+  return [
+    `Tu réponds à des questions sur l'avancement du projet « ${G.project.name} » (méthode VibeFlow, planning dans .planning/), pour quelqu'un qui explore la carte interactive de ce planning. Réponds en français.`,
+    'Cartes de la carte : jalons (n:ms-<clé>), phases (n:ph-<N>), groupe des exigences d\'une phase (n:ph-<N>.req), missions (n:dag-MISSION-<N>), Historique, Backlog, Graines, Releases ; éléments : plans (f:<chemin du PLAN.md>), exigences (f:req/<ID>), étapes de mission, entrées de backlog, tags (f:tag/<vX>).',
+    'Chaque carte porte un statut st (done = fait, active = en cours, todo = à faire, blocked = étape de mission en échec) et un pied foot (progression, vague, nombre de fichiers). « blocked » de dag.sh (attend ses dépendances) est déjà ramené à todo.',
+    'Interroge la carte depuis le shell : `node .vibeflow/cockpit/vf-cockpit-query.mjs overview`, `find "<mots>"`, `show <id>`, `status <done|active|todo|blocked> [--in <id>]`, `path <idA> <idB>`. Chaque résultat est du JSON avec ids et statuts. Lis les fichiers de .planning/ (ROADMAP, PLAN, SUMMARY, STATE) seulement pour un détail que la carte n\'a pas.',
+    'Quelques requêtes, pas des dizaines. Puis réponds en JSON seulement : {"title", "answer", "items", "steps", "followups"}.',
+    '- answer : Markdown, ~180 mots au plus, concret. Cite les cartes en ligne sous la forme [[id]] (elles deviennent cliquables).',
+    '- items : les 3 à 14 cartes qui montrent la réponse, la plus importante d\'abord, chacune avec une note de 15 mots au plus.',
+    '- steps : une suite ordonnée quand la réponse est une séquence (enchaînement de phases, étapes d\'une mission) ; sinon [].',
+    '- followups : 2 ou 3 questions de suite, courtes, en français.',
+    'N\'utilise que des ids rendus par la carte.',
+  ].join('\n');
+}
