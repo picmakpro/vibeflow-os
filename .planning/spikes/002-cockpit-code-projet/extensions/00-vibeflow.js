@@ -1,0 +1,100 @@
+// VibeFlow (spike 002) : deux onglets sur le même viewer — Code (la carte floorplan) et Projet
+// (jalons → phases → plans, exigences, missions, backlog). Statuts sur les cartes, panneau
+// d'ensemble du projet, et pont entre les deux onglets : un plan ou un nœud de mission renvoie aux
+// fichiers qu'il touche, un fichier de code renvoie aux plans qui l'ont touché.
+// Ne parle au viewer que par window.Floorplan (+ patchs P1-P4, cf. VENDORED.txt).
+(() => {
+  const SC = window.Floorplan;
+  if (!SC) return;
+  const { h, graph: G } = SC;
+  const TAB = G.meta.vfTab === 'project' ? 'project' : 'code';
+  const ST = { done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' };
+
+  const style = document.createElement('style');
+  style.textContent = `
+    :root { --st-done: var(--recent); --st-active: #f59e0b; --st-todo: var(--text-4); --st-blocked: #ef4444; }
+    .vf-tabs { display: inline-flex; gap: 2px; padding: 3px; margin-left: 14px; border-radius: 12px; background: var(--raise); flex: none; }
+    .vf-tabs a { padding: 5px 13px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text-3); text-decoration: none; line-height: 1.4; }
+    .vf-tabs a:hover { color: var(--text-1, inherit); }
+    .vf-tabs a.on { background: var(--surface); color: var(--text-1, inherit); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+    .vst { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+      color: var(--c-st); background: color-mix(in srgb, var(--c-st) 14%, transparent); }
+    .vst-done { --c-st: var(--st-done); } .vst-active { --c-st: var(--st-active); } .vst-todo { --c-st: var(--st-todo); } .vst-blocked { --c-st: var(--st-blocked); }
+    .card.st-active { box-shadow: 0 0 0 1.5px var(--st-active), 0 8px 28px color-mix(in srgb, var(--st-active) 22%, transparent); }
+    .card.st-blocked { box-shadow: 0 0 0 1.5px var(--st-blocked); }
+    .card.st-done .desc { opacity: .78; }
+    .vf-bar { height: 6px; border-radius: 99px; background: var(--raise-2); overflow: hidden; margin-top: 6px; }
+    .vf-bar i { display: block; height: 100%; border-radius: 99px; background: var(--c-st, var(--st-done)); }
+    .vf-ms { padding: 9px 12px; border-radius: 14px; cursor: pointer; margin-bottom: 4px; }
+    .vf-ms:hover { background: var(--surface-hover); }
+    .vf-ms .t { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 500; }
+    .vf-ms .t span:last-child { color: var(--text-3); font-weight: 400; font-variant-numeric: tabular-nums; }
+    .vf-now { padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--st-active) 8%, transparent); font-size: 13px; line-height: 1.55; }
+    .vf-now b { display: block; font-size: 11.5px; color: var(--st-active); margin-bottom: 3px; font-weight: 600; }
+    .vf-link { display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; border-radius: 10px; font-size: 12.5px; color: inherit; text-decoration: none; }
+    .vf-link:hover { background: var(--surface-hover); }
+    .vf-link code { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-2); word-break: break-all; }
+  `;
+  // spike 005 : la barre de question reste visible quand serve.mjs (P7) sert l'onglet Projet
+  if (TAB === 'project') style.textContent += `#btn-health${window.FLOORPLAN_SERVER ? '' : ', #ask'} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }`;
+  document.head.appendChild(style);
+
+  // ---------- onglets ----------
+  const brand = document.querySelector('header .brand');
+  if (brand) {
+    const tabs = document.createElement('nav');
+    tabs.className = 'vf-tabs';
+    tabs.innerHTML = `<a href="index.html" class="${TAB === 'code' ? 'on' : ''}">Code</a><a href="project.html" class="${TAB === 'project' ? 'on' : ''}">Projet</a>`;
+    brand.after(tabs);
+  }
+
+  // ---------- onglet Projet : panneau d'ensemble ----------
+  const V = G.meta.vf;
+  if (TAB === 'project' && V) {
+    SC.setOverview(() => {
+      const ms = V.milestones.map((m) => {
+        const pc = m.total ? Math.round((100 * m.done) / m.total) : 0;
+        return `<div class="vf-ms" data-vf-go="${h(m.id)}"><div class="t"><span>${h(m.key)}</span><span>${m.done}/${m.total} · ${pc} %</span></div><div class="vf-bar" style="--c-st:var(--st-${m.st})"><i style="width:${pc}%"></i></div></div>`;
+      }).join('');
+      const next = V.next.map((n) => `<a class="vf-link" data-vf-go="${h(n.id)}"><span class="vst vst-todo">À faire</span><span>${h(n.label)}</span></a>`).join('');
+      const c = V.counts;
+      return `<div class="sec"><div class="ph"><span class="kind">Projet</span></div><h2 class="pt">${h(G.project.name)}</h2>
+          <div class="vf-now" style="margin-top:12px"><b>Maintenant · ${h(V.milestone || '')}</b>Phase ${h(V.phase)} — ${h(V.phaseName || '')} <span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(V.status || '')}</span><div style="margin-top:6px;color:var(--text-3);font-size:12px">${h((V.lastDesc || '').slice(0, 260))}${(V.lastDesc || '').length > 260 ? '…' : ''}</div></div>
+          <div class="stats vf-stats" style="margin-top:14px"><div><b>${c.phases}</b><span>phases</span></div><div><b>${c.plans}</b><span>plans</span></div><div><b>${c.reqsDone}/${c.reqs}</b><span>exigences</span></div></div></div>
+        <div class="sec"><h3>Prochaines phases <span class="c">${V.next.length}</span></h3>${next || '<p class="pd">Rien en attente dans le jalon en cours.</p>'}</div>
+        <div class="sec"><h3>Jalons <span class="c">${V.milestones.length}</span></h3>${ms}</div>
+        <div class="sec" style="color:var(--text-3);line-height:1.7;font-size:12px">Double-clic sur une carte pour plonger · <span class="kbd">⌫</span> remonter · <span class="kbd">/</span> chercher</div>`;
+    });
+  }
+  document.addEventListener('click', (ev) => {
+    const a = ev.target.closest('[data-vf-go]');
+    if (a) { ev.preventDefault(); SC.reveal(a.dataset.vfGo); }
+  });
+
+  // ---------- pont entre onglets ----------
+  const fileOf = (id) => id && id.startsWith('f:') ? SC.files.get?.(id.slice(2)) || (G.files || []).find((f) => 'f:' + f.p === id) : null;
+  if (TAB === 'project') {
+    SC.addPanelSection('item', (id) => {
+      const f = fileOf(id);
+      if (!f || !f.touched || !f.touched.length) return '';
+      const rows = f.touched.slice(0, 40).map((p) => `<a class="vf-link" href="index.html#r=${encodeURIComponent(p)}"><span>→</span><code>${h(p)}</code></a>`).join('');
+      return `<div class="sec"><h3>Fichiers touchés dans l'onglet Code <span class="c">${f.touched.length}</span></h3>${rows}</div>`;
+    });
+  } else {
+    const touch = G.meta.vfTouch || {};
+    SC.addPanelSection('item', (id) => {
+      const f = fileOf(id);
+      const list = f && touch[f.p];
+      if (!list || !list.length) return '';
+      const rows = list.slice(0, 30).map((t) => `<a class="vf-link" href="project.html#r=${encodeURIComponent(t.ref)}"><span class="vst vst-${t.st}">${ST[t.st] || t.st}</span><span>${h(t.label)}</span></a>`).join('');
+      return `<div class="sec"><h3>Touché par <span class="c">${list.length}</span></h3>${rows}</div>`;
+    });
+  }
+  // arrivée depuis l'autre onglet : #r=<chemin ou id> révèle la carte visée
+  SC.on('ready', () => {
+    const r = new URLSearchParams(location.hash.slice(1)).get('r');
+    if (!r) return;
+    const id = /^[nf]:/.test(r) ? r : 'f:' + r;
+    if (SC.exists(id)) SC.reveal(id); else SC.toast(`Pas sur cette carte : ${r}`);
+  });
+})();
