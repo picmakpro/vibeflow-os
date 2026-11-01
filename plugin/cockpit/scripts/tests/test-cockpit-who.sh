@@ -210,6 +210,57 @@ printf '{"nodes":[{"id":"b","step":"seconde étape","stage":"","deps":[],"scope"
 Q who "$LABM" "$H0" "$NOSCRIPTS" > "$WORK/whom.json"
 assert_eq "W12.1 — le nœud running du DAG de mission est un travailleur dag-node" "$(G "$WORK/whom.json" 'j.workers.filter(w=>w.kind==="dag-node").map(w=>w.id).join(",")')" "b"
 
+echo "=== W13 — M-1 : le masque reste linéaire sur un mot géant ; M-2 : un meta.json qui n'est pas un objet ne fait pas lever ==="
+cat > "$AUX/mk-mot.mjs" <<'JS'
+// mk-mot.mjs <fichier> <cwd> <taille> : transcript dont la dernière commande est UN mot de <taille> caractères de mot, suivi d'un secret
+import fs from 'node:fs';
+const [, , f, cwd, taille] = process.argv; const base = { cwd, sessionId: 'aaaa1111-2222-3333-4444-555566667777', gitBranch: 'main', version: '2.1.316' };
+const L = (o, t) => JSON.stringify({ ...base, timestamp: t, ...o });
+fs.writeFileSync(f, [L({ type: 'user', message: { content: 'salut' } }, '2026-11-01T10:00:00Z'),
+  L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'a'.repeat(Number(taille)) + ' GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwx' } }] } }, '2026-11-01T10:00:05Z')].join('\n') + '\n');
+JS
+cat > "$AUX/temps.mjs" <<'JS'
+// temps.mjs <scripts> <lab> <home> <scriptsDir> <id> : durée de revealDoing (ms) et résultat
+import { pathToFileURL } from 'node:url'; import path from 'node:path';
+const [, , scripts, root, home, scriptsDir, id] = process.argv; const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-who.mjs')).href);
+const t = Date.now(); const r = m.revealDoing(root, id, { home, scriptsDir }); console.log(JSON.stringify({ ms: Date.now() - t, doing: r.doing, erreur: r.erreur }));
+JS
+H13="$WORK/home13"; mkdir -p "$H13/.claude/projects/-lab"
+node "$AUX/mk-mot.mjs" "$H13/.claude/projects/-lab/$SID.jsonl" "$LAB" 100000
+T13="$(node "$AUX/temps.mjs" "$SCRIPTS" "$LAB" "$H13" "$NOSCRIPTS" "$SID")"
+assert_eq "W13.1 — témoin : la session est trouvée et sa dernière action rendue" "$(printf '%s' "$T13" | node "$AUX/stdin-get.mjs" 'typeof j.doing')" "string"
+assert_eq "W13.2 — un mot de 100 000 caractères est masqué en moins de 1 500 ms (17 s avant la borne)" "$(printf '%s' "$T13" | node "$AUX/stdin-get.mjs" 'j.ms < 1500')" "true"
+node "$AUX/mk-mot.mjs" "$H13/.claude/projects/-lab/$SID.jsonl" "$LAB" 20
+assert_has "W13.3 — témoin : le secret placé après un mot court est toujours masqué" "$(node "$AUX/temps.mjs" "$SCRIPTS" "$LAB" "$H13" "$NOSCRIPTS" "$SID")" "[masqué]"
+H14="$WORK/home14"; mkdir -p "$H14/.claude/projects/-lab/$SID/subagents"; SD14="$H14/.claude/projects/-lab/$SID/subagents"
+mk_session "$H14/.claude/projects/-lab/$SID.jsonl" cwd "x"
+echo '{"agentType":"vf-coder","description":"tâche","spawnDepth":2}' > "$SD14/agent-ok.meta.json"; mk_session "$SD14/agent-ok.jsonl" cwd "x"
+for brut in 5 '[]' '"x"' null; do echo "$brut" > "$SD14/agent-bad.meta.json"; mk_session "$SD14/agent-bad.jsonl" cwd "x"
+  Q who "$LAB" "$H14" "$NOSCRIPTS" > "$WORK/who14.json" 2>"$WORK/who14.err"
+  assert_eq "W13.4 — meta.json « $brut » : pas d'exception, le sous-agent conforme reste listé, l'autre compte en forme inconnue" "$(G "$WORK/who14.json" '[j.workers.filter(w=>w.kind==="subagent").map(w=>w.id).join(","), j.sources.sessions.formeInconnue].join("|")' 2>&1)" "ok|1"
+done
+
+echo "=== W14 — R-2 : la branche d'un arbre connu vient de « git worktree list », jamais du gitBranch du transcript (celui de l'arbre de lancement) ==="
+LABT="$WORK/labt"; mkdir -p "$LABT"; git -C "$LABT" init -q; git -C "$LABT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m i; git -C "$LABT" branch -m principale
+git -C "$LABT" worktree add -q "$WORK/labt-wt" -b feat/travail; LABT="$(cd "$LABT" && pwd -P)"; WT="$(cd "$WORK/labt-wt" && pwd -P)"
+cat > "$AUX/mk-rattache.mjs" <<'JS'
+// mk-rattache.mjs <fichier> <cwd> <cdVers|-> : session dont le gitBranch (docs/autre) est celui de l'arbre de lancement ; cdVers = chemin cité par la dernière action
+import fs from 'node:fs'; const [, , f, cwd, cd] = process.argv; const base = { cwd, sessionId: 'aaaa1111-2222-3333-4444-555566667777', gitBranch: 'docs/autre', version: '2.1.316' };
+const L = (o, t) => JSON.stringify({ ...base, timestamp: t, ...o });
+fs.writeFileSync(f, [L({ type: 'user', message: { content: 'salut' } }, '2026-11-01T10:00:00Z'),
+  L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: cd === '-' ? 'ls' : 'cd ' + cd + ' && ls' } }] } }, '2026-11-01T10:00:05Z')].join('\n') + '\n');
+JS
+H15="$WORK/home15"; mkdir -p "$H15/.claude/projects/-lab"
+node "$AUX/mk-rattache.mjs" "$H15/.claude/projects/-lab/$SID.jsonl" "$LABT" "$WT"
+Q who "$LABT" "$H15" "$NOSCRIPTS" > "$WORK/who15.json"
+assert_eq "W14.1 — cwd = arbre principal, arbre déduit de l'activité : branche de l'arbre déduit" "$(G "$WORK/who15.json" 'j.workers.filter(w=>w.kind==="session").map(w=>w.treeBy+"|"+w.branch).join(",")')" "activité|feat/travail"
+node "$AUX/mk-rattache.mjs" "$H15/.claude/projects/-lab/$SID.jsonl" "$WT" "-"
+Q who "$LABT" "$H15" "$NOSCRIPTS" > "$WORK/who15b.json"
+assert_eq "W14.2 — cwd dans le worktree : la branche est celle du worktree, pas le gitBranch périmé du transcript" "$(G "$WORK/who15b.json" 'j.workers.filter(w=>w.kind==="session").map(w=>w.treeBy+"|"+w.branch).join(",")')" "cwd|feat/travail"
+node "$AUX/mk-rattache.mjs" "$H15/.claude/projects/-lab/$SID.jsonl" "$LABT" "-"
+Q who "$LABT" "$H15" "$NOSCRIPTS" > "$WORK/who15c.json"
+assert_eq "W14.3 — cwd = arbre principal : sa branche vient aussi de git" "$(G "$WORK/who15c.json" 'j.workers.filter(w=>w.kind==="session").map(w=>w.treeBy+"|"+w.branch).join(",")')" "cwd|principale"
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"

@@ -62,7 +62,7 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
   };
   const whoNow = () => { try { return collectWho(root, { scriptsDir }); } catch (e) { return { workers: [], sources: {}, error: e.message }; } };
   // « qui » : poussé seulement quand la liste change (pas à chaque seconde d'âge qui passe)
-  const whoSig = (w) => JSON.stringify((w.workers || []).map((x) => [x.kind, x.id, x.tree, !!x.stale, x.task || '']));
+  const whoSig = (w) => JSON.stringify((w.workers || []).map((x) => [x.kind, x.id, x.tree, x.branch || '', !!x.stale, x.task || '']));
 
   let graph = buildProjectGraph(root), idx = index(graph), lock = lockStatus(), who = whoNow();
   const snapshot = () => ({ seq: state.seq, lock, who });

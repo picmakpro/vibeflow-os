@@ -56,6 +56,8 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
   const sources = {}; const workers = [];
   const porcelain = sh('git', ['-C', root, 'worktree', 'list', '--porcelain'], root);
   const branchOf = new Map(porcelain.split('\n\n').map((b) => [/^worktree (.*)$/m.exec(b)?.[1], /^branch refs\/heads\/(.*)$/m.exec(b)?.[1] || (b.includes('detached') ? '(détachée)' : '')]).filter(([t]) => t && fs.existsSync(t)).map(([t, br]) => [fs.realpathSync(t), br]));
+  // la branche vient de `git worktree list` pour TOUT arbre connu (cwd ou activité) ; le gitBranch du transcript est celui de l'arbre de LANCEMENT : repli seulement
+  const branche = (t, ...transcript) => branchOf.get(t) || transcript.find(Boolean) || '';
   const trees = porcelain.split('\n').filter((l) => l.startsWith('worktree ')).map((l) => l.slice(9)).filter((t) => fs.existsSync(t)).map((t) => fs.realpathSync(t));
   if (!trees.length) trees.push(root);
   const real = (p) => { try { return fs.realpathSync(p); } catch { return p; } };
@@ -80,7 +82,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
         const id = f.slice(0, -6); const subDir = path.join(dir, id, 'subagents');
         const subs = [];
         for (const m of ls(subDir).filter((x) => x.endsWith('.meta.json'))) {
-          const meta = readJson(path.join(subDir, m)) || {};
+          const brut = readJson(path.join(subDir, m)); const meta = brut && typeof brut === 'object' && !Array.isArray(brut) ? brut : {}; // un meta.json `5` ou `[]` est une forme inconnue, jamais une exception
           const tr = path.join(subDir, m.replace(/\.meta\.json$/, '.jsonl'));
           const sAge = (now - mtime(tr)) / 1000;
           if (meta.finished || sAge >= fresh) continue;
@@ -96,13 +98,13 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
         if (age <= fresh) {
           live++;
           const at = byActivity(last, tree);
-          workers.push({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: at.how === 'activité' ? branchOf.get(at.tree) : last.gitBranch || '', cwd: last.cwd, ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', _tr: file });
+          workers.push({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, last.gitBranch), cwd: last.cwd, ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', _tr: file });
         }
         for (const s of subs) {
           subLive++;
           const sl = tail(s.tr), at = byActivity(sl, inScope(sl?.cwd) || tree);
           workers.push({ kind: 'subagent', id: s.agentId, parent: id, role: s.meta.agentType, task: s.meta.description || '', depth: s.meta.spawnDepth ?? null, background: s.meta.requestShape === 'background',
-            tree: label(at.tree), treeBy: at.how, branch: at.how === 'activité' ? branchOf.get(at.tree) : sl?.gitBranch || last?.gitBranch || '', ageS: Math.round(s.age), source: 'subagent-meta', _tr: s.tr });
+            tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, sl?.gitBranch, last?.gitBranch), ageS: Math.round(s.age), source: 'subagent-meta', _tr: s.tr });
         }
       }
     }
@@ -163,10 +165,13 @@ const MASQUES = [
   /\bgh[pousr]_[A-Za-z0-9]{20,}/g, /\bgithub_pat_[A-Za-z0-9_]{20,}/g, /\bsk-[A-Za-z0-9_-]{16,}/g, /\bAKIA[A-Z0-9]{16}/g, /\bxox[baprs]-[A-Za-z0-9-]+/g,
   /\bBearer\s+[A-Za-z0-9._~+\/=-]{16,}/gi,
   // un nom de variable ou de clé qui finit par un mot sensible (GITHUB_TOKEN=, AWS_SECRET_ACCESS_KEY=, API_KEY=) : `\b` ne coupe pas après `_`, d'où `[A-Za-z0-9_]*`
-  /[A-Za-z0-9_]*(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential)[A-Za-z0-9_]*=\S+/gi,
+  /[A-Za-z0-9_]{0,64}(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential)[A-Za-z0-9_]{0,64}=\S+/gi,
   /--(?:password|passwd|secret|token|api[_-]?key)(?:=|\s+)\S+/gi, /\bX-Api-Key:\s*\S+/gi,
 ];
-const masque = (t) => MASQUES.reduce((a, re) => a.replace(re, '[masqué]'), t);
+// l'entrée est bornée AVANT les masques (les sorties sont tronquées à 200 car. au plus) : le nom de variable sensible est en {0,64} et l'entrée en MAX_MASQUE,
+// sinon un mot de 100 Kio rendait le masque quadratique (17 s)
+const MAX_MASQUE = 4000;
+const masque = (t) => MASQUES.reduce((a, re) => a.replace(re, '[masqué]'), String(t).slice(0, MAX_MASQUE));
 const lastText = (d) => {
   const c = d?.message?.content; if (!c) return '';
   const s = typeof c === 'string' ? c : c.map((x) => x.text || (x.type === 'tool_use' ? `▸ ${x.name}${x.input?.description || x.input?.command ? ' : ' + (x.input.description || x.input.command) : ''}` : '')).filter(Boolean).join(' ');
