@@ -61,6 +61,12 @@ for (const k of spec.meta?.requis || []) if (!(k in (out.meta || {}))) errs.push
 console.log(errs.length ? 'KO ' + errs.join(' | ') : 'OK');
 process.exit(errs.length ? 1 : 0);
 JS
+cat > "$AUX/stdin-get.mjs" <<'JS'
+import fs from 'node:fs';
+const j = JSON.parse(fs.readFileSync(0, 'utf8'));
+const v = new Function('j', 'return (' + process.argv[2] + ')')(j);
+console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
 Q() { node "$AUX/q.mjs" "$SCRIPTS" "$@"; }
 G() { node "$AUX/get.mjs" "$@"; }
 IFACE="$SCRIPTS/vf-cockpit-interface.json"
@@ -114,7 +120,65 @@ R=$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-who@1 "$WORK/who-doing.js
 assert_has "W4.3 — témoin : un champ doing ajouté est refusé" "$R" "clé interdite présente : doing"
 assert_eq "W4.4 — témoin : code de sortie non nul" "$RC" "1"
 
-#--W5-W10--
+echo "=== W5 — la collecte ne porte jamais la dernière commande ==="
+MARK="MARQUEUR-DERNIERE-COMMANDE"
+assert_eq "W5.1 — aucune clé doing à aucune profondeur" "$(grep -c '"doing"' "$WORK/who.json")" "0"
+assert_eq "W5.2 — le marqueur est absent de la collecte" "$(grep -c "$MARK" "$WORK/who.json")" "0"
+Q reveal "$LAB" "$HOME_T" "$NOSCRIPTS" "$SID" > "$WORK/rev.json"
+assert_has "W5.3 — témoin positif : revealDoing rend le marqueur" "$(G "$WORK/rev.json" 'j.doing')" "$MARK"
+assert_eq "W5.4 — schéma de la révélation" "$(G "$WORK/rev.json" 'j.schema')" "vibeflow/cockpit-doing@1"
+
+echo "=== W6 — identifiant strict ==="
+assert_eq "W6.1 — traversée refusée" "$(Q reveal "$LAB" "$HOME_T" "$NOSCRIPTS" '../../etc/passwd' | node "$AUX/stdin-get.mjs" 'j.erreur')" "id-invalide"
+assert_eq "W6.2 — identifiant bien formé absent de la collecte" "$(Q reveal "$LAB" "$HOME_T" "$NOSCRIPTS" 'inconnu-1234' | node "$AUX/stdin-get.mjs" 'j.erreur')" "inconnu"
+
+echo "=== W7 — masquage des jetons ==="
+TOK1="ghp_$(printf 'a%.0s' $(seq 1 36))"; TOK2="sk-$(printf 'b%.0s' $(seq 1 24))"
+mk_session "$TRD/$SID.jsonl" cwd "deploy avec $TOK1 puis $TOK2 fin"
+R=$(Q reveal "$LAB" "$HOME_T" "$NOSCRIPTS" "$SID" | node "$AUX/stdin-get.mjs" 'j.doing')
+assert_has "W7.1 — [masqué] à la place des jetons" "$R" "[masqué]"
+assert_eq "W7.2 — aucun jeton ghp_ ni sk- dans la révélation" "$(printf '%s' "$R" | grep -cE 'ghp_|sk-')" "0"
+mk_session "$TRD/$SID.jsonl" cwd "$MARK"
+
+echo "=== W8 — forme inconnue d'un transcript ou d'un meta.json ==="
+H8="$WORK/home8"; mkdir -p "$H8/.claude/projects/-lab"
+mk_session "$H8/.claude/projects/-lab/$SID.jsonl" workdir "x"
+Q who "$LAB" "$H8" "$NOSCRIPTS" > "$WORK/who8.json"
+assert_eq "W8.1 — la session à clé renommée n'est pas listée" "$(G "$WORK/who8.json" 'j.workers.filter(w=>w.kind==="session").length')" "0"
+assert_eq "W8.2 — état forme-inconnue" "$(G "$WORK/who8.json" 'j.sources.sessions.etat')" "forme-inconnue"
+assert_eq "W8.3 — compteur >= 1" "$(G "$WORK/who8.json" 'j.sources.sessions.formeInconnue>=1')" "true"
+H9="$WORK/home9"; mkdir -p "$H9/.claude/projects/-lab/$SID/subagents"
+mk_session "$H9/.claude/projects/-lab/$SID.jsonl" cwd "x"
+SD="$H9/.claude/projects/-lab/$SID/subagents"
+echo '{"agentType":"vf-coder","description":"tâche","spawnDepth":2}' > "$SD/agent-ok.meta.json"; mk_session "$SD/agent-ok.jsonl" cwd "x"
+echo '{"description":"sans type"}' > "$SD/agent-bad.meta.json"; mk_session "$SD/agent-bad.jsonl" cwd "x"
+Q who "$LAB" "$H9" "$NOSCRIPTS" > "$WORK/who9.json"
+assert_eq "W8.4 — témoin : le sous-agent conforme est listé, pas l'autre" "$(G "$WORK/who9.json" 'j.workers.filter(w=>w.kind==="subagent").map(w=>w.id).join(",")')" "ok"
+assert_eq "W8.5 — le meta.json sans agentType compte en forme inconnue" "$(G "$WORK/who9.json" 'j.sources.sessions.formeInconnue')" "1"
+assert_eq "W8.6 — témoin : la fixture conforme rend lue" "$(G "$WORK/who9.json" 'j.sources.sessions.etat')" "lue"
+
+echo "=== W9 — jamais de script pris dans l'arbre observé ==="
+H0="$WORK/home0"; mkdir -p "$H0"
+TRAP="$WORK/trap.sh"
+cat > "$TRAP" <<SH
+#!/usr/bin/env bash
+touch "$WORK/EXECUTE"
+case "\$1" in status) echo '{"locks":[{"present":true,"owner":"PIEGE","step":"x","ws":"","scope":"repo","age_seconds":1,"stale":false}]}' ;; orphans) echo '{"orphans":[]}' ;; esac
+SH
+mkdir -p "$LAB/plugin/conductor/scripts"; cp "$TRAP" "$LAB/plugin/conductor/scripts/driver-lock.sh"
+Q who "$LAB" "$H0" "$NOSCRIPTS" > "$WORK/who-w9.json"
+assert_eq "W9.1 — source locks absente" "$(G "$WORK/who-w9.json" 'j.sources.locks.etat')" "absente"
+assert_eq "W9.2 — aucun travailleur PIEGE" "$(G "$WORK/who-w9.json" 'j.workers.filter(w=>w.id==="PIEGE").length')" "0"
+assert_eq "W9.3 — le script piégé n'a jamais été exécuté" "$([ -e "$WORK/EXECUTE" ] && echo oui || echo non)" "non"
+OKD="$WORK/okdir"; mkdir -p "$OKD"; cp "$TRAP" "$OKD/driver-lock.sh"
+Q who "$LAB" "$H0" "$OKD" > "$WORK/who-w9b.json"
+assert_eq "W9.4 — témoin positif : le même script hors de l'arbre est exécuté" "$(G "$WORK/who-w9b.json" 'j.workers.filter(w=>w.id==="PIEGE").length')" "1"
+
+echo "=== W10 — la CLI --json ne porte jamais la dernière commande ==="
+HOME="$HOME_T" node "$SCRIPTS/vf-cockpit-who.mjs" "$LAB" --json > "$WORK/cli.json"
+assert_eq "W10.1 — schéma dans la sortie de la CLI" "$(grep -c '"schema": "vibeflow/cockpit-who@1"' "$WORK/cli.json")" "1"
+assert_eq "W10.2 — aucune clé doing" "$(grep -c '"doing"' "$WORK/cli.json")" "0"
+assert_eq "W10.3 — le marqueur est absent" "$(grep -c "$MARK" "$WORK/cli.json")" "0"
 
 echo ""
 echo "=================================="

@@ -143,12 +143,28 @@ export function collectWho(root, opts = {}) {
   return { schema: 'vibeflow/cockpit-who@1', at: g.at, root: g.root, trees: g.trees, fresh: g.fresh, busy: workers.some((w) => !w.stale), workers, sources: g.sources };
 }
 
-// tracer : implémentée en tâche 3
-export function revealDoing(root, id) {
-  return { schema: 'vibeflow/cockpit-doing@1', id, doing: null, erreur: 'non-implemente' };
+// P67-D-14 : la dernière commande ne sort que par cette révélation ponctuelle, masquée (T-67-05)
+const MASQUES = [
+  /\bgh[pousr]_[A-Za-z0-9]{20,}/g, /\bsk-[A-Za-z0-9_-]{16,}/g, /\bAKIA[A-Z0-9]{16}/g, /\bxox[baprs]-[A-Za-z0-9-]+/g,
+  /\bBearer\s+[A-Za-z0-9._~+\/=-]{16,}/gi, /\b(?:password|passwd|secret|token)=\S+/gi,
+];
+const masque = (t) => MASQUES.reduce((a, re) => a.replace(re, '[masqué]'), t);
+const lastText = (d) => {
+  const c = d?.message?.content; if (!c) return '';
+  const s = typeof c === 'string' ? c : c.map((x) => x.text || (x.type === 'tool_use' ? `▸ ${x.name}${x.input?.description ? ' : ' + x.input.description : ''}` : '')).filter(Boolean).join(' ');
+  return masque(s.replace(/\s+/g, ' ')).slice(0, 120);
+};
+const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+
+// identifiant au format strict ET présent dans une collecte fraîche : aucun chemin construit depuis l'entrée (T-67-07)
+export function revealDoing(root, id, opts = {}) {
+  if (typeof id !== 'string' || !ID_RE.test(id)) return { schema: 'vibeflow/cockpit-doing@1', id: String(id), doing: null, erreur: 'id-invalide' };
+  const w = gather(root, opts).workers.find((x) => (x.kind === 'session' || x.kind === 'subagent') && x.id === id && x._tr);
+  if (!w) return { schema: 'vibeflow/cockpit-doing@1', id, doing: null, erreur: 'inconnu' };
+  return { schema: 'vibeflow/cockpit-doing@1', id, doing: lastText(tail(w._tr)) };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
   const root = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : '.';
   const fresh = Number(process.argv[process.argv.indexOf('--fresh') + 1]) || 180;
   const r = collectWho(root, { fresh });

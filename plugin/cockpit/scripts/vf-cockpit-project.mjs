@@ -130,4 +130,4 @@ export function buildProjectGraph(root, { layout } = {}) {
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.stdout.write(JSON.stringify(buildProjectGraph(process.argv[2] || '.')));
+if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) process.stdout.write(JSON.stringify(buildProjectGraph(process.argv[2] || '.')));
