@@ -97,7 +97,7 @@ export const HARD_IGNORE_DIRS = new Set([
 ]);
 
 /** The folder the map lives in, at the codebase root. Maps made before the rename used show-code/. */
-export const MAP_DIR = 'floorplan';
+export const MAP_DIR = '.vibeflow/cockpit'; // vibeflow P10 : sortie du cockpit, deux niveaux sous la racine du lab
 export const LEGACY_MAP_DIR = 'show-code';
 /** True for a folder holding a map, so a project's own folder that happens to be called "floorplan" isn't taken for one. */
 export const isMapDir = (d) => ['architecture.json', 'plan.json', 'graph.json', '.cache'].some((f) => fs.existsSync(path.join(d, f)));
@@ -108,7 +108,7 @@ export const isMapDir = (d) => ['architecture.json', 'plan.json', 'graph.json', 
  */
 export function keepOutOfGit(dir) {
   const gi = path.join(dir, '.gitignore');
-  const want = '# Floorplan keeps its map out of git: this ignores everything in this folder, this file included.\n*\n';
+  const want = '# Sortie générée par le cockpit VibeFlow : ignorée par git (ce fichier compris).\n*\n'; // vibeflow P10
   fs.mkdirSync(dir, { recursive: true });
   try { if (!fs.existsSync(gi) || fs.readFileSync(gi, 'utf8') !== want) fs.writeFileSync(gi, want); } catch {}
   const tracked = (git(dir, ['ls-files', '--', '.']) || '').split('\n').filter(Boolean);

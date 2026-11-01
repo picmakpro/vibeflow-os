@@ -33,9 +33,11 @@ const seen = new Set();
 const mapDirs = new Map();
 const inMap = (p) => {
   const segs = p.split('/');
+  const depth = MAP_DIR.split('/').length; // vibeflow P10 : le dossier de sortie compte deux segments
   for (let i = 0; i < segs.length - 1; i++) {
-    if (segs[i] !== MAP_DIR && segs[i] !== LEGACY_MAP_DIR) continue;
-    const d = segs.slice(0, i + 1).join('/');
+    const isMap = segs.slice(i, i + depth).join('/') === MAP_DIR;
+    if (!isMap && segs[i] !== LEGACY_MAP_DIR) continue;
+    const d = segs.slice(0, i + (isMap ? depth : 1)).join('/');
     if (!mapDirs.has(d)) mapDirs.set(d, isMapDir(path.join(root, d)));
     if (mapDirs.get(d)) return true;
   }
