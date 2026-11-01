@@ -104,7 +104,7 @@ printf '%s\n' 'ok' > "$FLAT/.planning/phases/01-x/01-01-SUMMARY.md"
 Q project "$FLAT" > "$WORK/proj.json"
 assert_eq "W3.1 — schéma Projet nommé VibeFlow" "$(G "$WORK/proj.json" 'j.schema')" "vibeflow/cockpit-project@1"
 assert_eq "W3.2 — ph-1 est fait" "$(G "$WORK/proj.json" 'j.nodes.filter(n=>n.id==="ph-1").map(n=>n.st).join(",")')" "done"
-assert_eq "W3.3 — le plan 01-01 est fait" "$(G "$WORK/proj.json" 'j.files.filter(f=>f.name==="01-01").map(f=>f.st).join(",")')" "done"
+assert_eq "W3.3 — le plan 01-01 est fait" "$(G "$WORK/proj.json" 'j.files.filter(f=>f.name.startsWith("01-01")).map(f=>f.st).join(",")')" "done"
 
 echo "=== W4 — validateur du contrat versionné ==="
 assert_eq "W4.1 — sortie « au travail » conforme" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-who@1 "$WORK/who2.json")" "OK"
