@@ -51,4 +51,4 @@ Avant trailer : `CHEMIN-NON-DECLARE: plugin/conductor/scripts/tests/test-dag-ato
 - `test-dag.sh` : 161 PASS / 0 FAIL sous HOME réel ; sous `HOME=$(mktemp -d)` 6 échecs T25/T26/T28 (calcul des `stages` : le moteur gsd-tools est cherché sous `$HOME`, artefact d'environnement, pas du correctif).
 - `test-driver-lock-consumers-ws.sh` rc 0 ; `test-check-mission-exit.sh` 135 ok / 0 ko ; `check-python-isolation.sh --min-sites 40` rc 0.
 - `check-version-sync.sh` : seules les deux lignes « 123 suites ≠ 124 » (tenues par 67-03).
-- Suite : 129 lignes (≤ 300), aucune occurrence de `stat -f/-c` ni `timeout`.
+- Suite : 113 lignes (≤ 300), aucune occurrence de `stat -f/-c` ni `timeout`.
