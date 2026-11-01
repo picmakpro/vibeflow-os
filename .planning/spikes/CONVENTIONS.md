@@ -8,3 +8,12 @@
   sous forme ASCII, car certains outils d'écriture les convertissent en caractères réels.
 - **Preuve visuelle** : captures dans `captures/` du spike, prises dans un vrai navigateur sur le
   dépôt réel, jamais sur un jeu de démonstration.
+- **Direct** (spikes 001, 003) : serveur Node sans dépendance, SSE + `fs.watch` récursif, anti-rebond
+  de 300 ms, plus un filet de scrutation de 5 s (un dossier qui naît après le démarrage n'est pas
+  surveillé, et un âge avance sans écriture). Journal forensique servi sur un endpoint (`/log`).
+- **Sondes sur bac à sable** (spikes 003, 004) : toute mutation de `.planning/` ou d'un verrou se
+  fait sur une copie git dans le scratchpad, jamais sur le dépôt ; la sonde refuse le chemin réel.
+- **Lire du JSON servi** : `fetch` Node direct, jamais `curl` à travers rtk (sortie corrompue).
+- **Témoin positif d'abord** (spikes 001, 004) : avant de conclure « personne / rien », produire un
+  cas qui doit être vu (session, sous-agent en arrière-plan lancé exprès, verrou pris) et vérifier
+  qu'il l'est.

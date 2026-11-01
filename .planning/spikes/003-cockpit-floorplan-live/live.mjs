@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { collect } from '../004-signal-au-travail/who.mjs'; // spike 004 : qui est au travail
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SPIKE2 = path.join(HERE, '..', '002-cockpit-code-projet');
@@ -39,6 +40,10 @@ const index = (g) => {
   return m;
 };
 let graph = genGraph(), idx = index(graph), lock = lockStatus(), seq = 0;
+// « qui » : on ne pousse que quand la liste change (pas à chaque seconde d'âge qui passe)
+const whoNow = () => { try { return collect(root); } catch (e) { return { error: e.message, workers: [], sources: {} }; } };
+const whoSig = (w) => JSON.stringify((w.workers || []).map((x) => [x.kind, x.id, x.tree, !!x.stale, x.doing || x.task || '']));
+let who = whoNow();
 ev('boot', 'état initial', { cards: idx.size, lockPresent: lock.present, driverDir: DRIVER_DIR, lockScript: LOCK_SCRIPT });
 
 const diff = (a, b) => {
@@ -107,6 +112,7 @@ attach('driver', DRIVER_DIR);
 // filet toutes les 5 s : l'âge du verrou avance sans écriture, et vf-driver/ peut naître après le démarrage
 setInterval(() => {
   attach('driver', DRIVER_DIR, true);
+  const nw = whoNow(); if (whoSig(nw) !== whoSig(who)) { who = nw; send('who', { seq: ++seq, at: Date.now(), who }); ev('who', `${who.workers.filter((x) => !x.stale).length} actif(s)`); }
   const n = lockStatus(); if (JSON.stringify(n) !== JSON.stringify(lock)) { lock = n; send('lock', { seq: ++seq, at: Date.now(), lock }); ev('pulse', 'verrou changé (scrutation)'); }
 }, 5000).unref();
 
@@ -115,7 +121,7 @@ http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname === '/events') {
     res.writeHead(200, { ...cors, 'Content-Type': 'text/event-stream', Connection: 'keep-alive' });
-    res.write(`event: hello\ndata: ${JSON.stringify({ seq, lock })}\n\n`);
+    res.write(`event: hello\ndata: ${JSON.stringify({ seq, lock, who })}\n\n`);
     clients.add(res); ev('sse', 'client connecté', { n: clients.size });
     const ka = setInterval(() => res.write(': ka\n\n'), 15000);
     req.on('close', () => { clearInterval(ka); clients.delete(res); ev('sse', 'client parti', { n: clients.size }); });
