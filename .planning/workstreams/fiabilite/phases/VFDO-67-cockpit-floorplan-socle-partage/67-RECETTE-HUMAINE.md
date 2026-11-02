@@ -88,3 +88,21 @@ Phase suivante : refonte mobile (D4, I4, I5, I6) et clarté de la visite guidée
 Backlog : commande `/vf-recette` ; le MCP Wispr Flow n'est pas retenu.
 
 Le commit local `54b2d0fa` (autre session du 2026-11-02) et ses entrées de `BACKLOG.md` partent avec cette PR (Samuel, AskUserQuestion session principale, 2026-11-02).
+
+## 5. Suites traitées (mission du 2026-11-02, rédigé par vf-dev-manager)
+
+Rapport détaillé : `.planning/missions/2026-11-02-67-recette-fix.md`. Chaque correctif a un témoin rouge sur l'ancien code.
+
+| Point | Statut | Commit(s) |
+|-------|--------|-----------|
+| D3 dernière commande | corrigé : dernière commande Bash, masquée puis coupée à 120 car. ; masque élargi après revue | `a9355579`, `8a72c600` |
+| CI 1 024 px Linux | corrigé : cause = `(pointer: fine)` faux sous Chrome headless Linux (aucun pointeur), pas les polices | `e20e7959` |
+| D2 tiroir « Au travail » | corrigé : marge des panneaux, hauteur au contenu, plafond et défilement | `a9355579` |
+| D1 double croix | corrigé : chevron « suivant » inactif à la dernière étape | `7434afd8` |
+| V1 « Où en est-on ? » | corrigé : la voie locale ne dépendait que de l'absence de session d'agent | `8207eb31` |
+| Libellé « Library » | corrigé : type de carte = chrome, traduit | `a9985d63` |
+| I2 flou | corrigé | `bc31d88d` |
+| I3 animation en direct | corrigé : seules les cartes basculées clignotent | `84e683f4` |
+
+V1 — effet de bord arbitré : une relance qui dépend du fil et contient un mot de la voie locale reçoit la réponse
+locale (Samuel, « A : garder le correctif (Recommandé) », AskUserQuestion session principale, 2026-11-02).

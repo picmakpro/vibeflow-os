@@ -1,0 +1,95 @@
+{
+  "nodes": [
+    {
+      "id": "exec-a1",
+      "step": "D3+D2 tiroir Au travail (who.mjs, 70-vf-live.js, tests who/securite/serveur)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-b1",
+      "step": "CI en-tete 1024 Linux (01-vf-responsive.js, viewer.html en-tete, amont/patches viewer)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-a2",
+      "step": "V1 Ou en est-on sans agent (ask/query/75-vf-modele, test-questions)",
+      "stage": "",
+      "deps": [
+        "exec-a1"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-b2",
+      "step": "D1 double croix, I2 flou, I3 animation, Library (viewer.html, 40-tour.js, dicts fr, 70-vf-live.js)",
+      "stage": "",
+      "deps": [
+        "exec-b1",
+        "exec-a1"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue",
+      "step": "vf-reviewer sur e61ae376..HEAD",
+      "stage": "",
+      "deps": [
+        "exec-a2",
+        "exec-b2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gates",
+      "step": "rejeu job gates + suites cockpit + push + CI Linux",
+      "stage": "",
+      "deps": [
+        "revue"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire (recette §5, CHANGELOG cockpit, rapport)",
+      "stage": "",
+      "deps": [
+        "exec-a1",
+        "exec-a2",
+        "exec-b1",
+        "exec-b2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-revue",
+      "step": "correction ciblee F-1 masque, F-2 temoins D3, F-3a/b doc",
+      "stage": "",
+      "deps": [
+        "revue"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "re-revue",
+      "step": "re-revue ciblee fix-revue",
+      "stage": "",
+      "deps": [
+        "fix-revue"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}
