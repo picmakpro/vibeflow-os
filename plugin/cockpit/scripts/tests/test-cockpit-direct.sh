@@ -243,6 +243,27 @@ cat > "$AUX/i2.js" <<'JS'
   return out;
 })()
 JS
+cat > "$AUX/i3.js" <<'JS'
+(async () => {
+  if (window.__i3) return window.__i3;
+  const SC = window.VibeFlow, pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  const att = async (f, n = 100) => { for (let i = 0; i < n; i++) { const v = f(); if (v) return v; await pause(50); } return null; };
+  const ENTREE = /^(cardIn|fadeIn|panelIn)$/, vp = () => document.getElementById('viewport'), tr = () => vp().getAttribute('transform') || vp().style.transform;
+  SC.reveal('n:ph-2');
+  if (!await att(() => document.querySelector('#viewport .node .card'))) return { erreur: 'aucune carte' };
+  await att(() => !document.getAnimations().some((a) => ENTREE.test(a.animationName || '')), 200); // les animations d'entrée de la page sont finies
+  document.getElementById('z-in').click(); document.getElementById('z-in').click();
+  await att(() => !document.getAnimations().some((a) => a.transitionProperty === 'transform'), 100); await pause(300);
+  const vieille = document.querySelector('#viewport .node .card'), avant = { t: tr(), cartes: document.querySelectorAll('#viewport .node .card').length };
+  const a0 = window.__vfLive.applied;
+  const marque = new EventSource('/api/vf/events?token=' + encodeURIComponent(window.VF_COCKPIT_SERVER.token)); // un second client : le signal « prêt » que la suite lit sur /api/vf/etat
+  if (!await att(() => window.__vfLive.applied > a0 && !vieille.isConnected, 600)) return { erreur: 'patch non appliqué', applied: window.__vfLive.applied };
+  await pause(120);
+  const anims = document.getAnimations().filter((a) => a.animationName && a.effect?.target?.closest?.('#stage, #panel'));
+  marque.close();
+  return window.__i3 = { avant, apres: { t: tr(), cartes: document.querySelectorAll('#viewport .node .card').length }, entree: anims.filter((a) => ENTREE.test(a.animationName)).map((a) => a.animationName), flash: anims.filter((a) => a.animationName === 'flash').length, autres: anims.filter((a) => !ENTREE.test(a.animationName) && a.animationName !== 'flash').map((a) => a.animationName) };
+})()
+JS
 LABN="$WORK/labn"; mkdir -p "$LABN/src" "$LABN/library" "$LABN/config" "$LABN/.planning/phases/01-x" "$LABN/.planning/missions"
 printf 'export const u = () => 1;\n' > "$LABN/src/util.js"; printf 'export const l = () => 2;\n' > "$LABN/library/lib.js"; printf 'export const c = () => 3;\n' > "$LABN/config/conf.js"
 printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n- [ ] **Phase 2: Suite** - deuxième jet\n- [ ] **Phase 3: Fin** - dernier jet\n' > "$LABN/.planning/ROADMAP.md"
@@ -273,6 +294,16 @@ for P in "index.html" "project.html"; do
   done
 done
 
+# I3 : le patch arrive pendant que la page est ouverte ; la suite le déclenche quand un SECOND client SSE (posé par la sonde après son relevé « avant ») est connecté
+CDP_PRET="document.readyState === 'complete' && !!window.__vfLive && window.__vfLive.connected" cdp 500 i3.js "$URLP" > "$WORK/i3.json" 2>"$WORK/i3.err" & CDPP=$!
+for _ in $(seq 1 400); do [ "$(node "$AUX/get.mjs" "$PORT" /api/vf/etat "" "$TOK" | sed -n '3,$p' | node "$AUX/jg.mjs" 'j.clients' 2>/dev/null)" = "2" ] && break; sleep 0.1; done
+printf -- '- [x] **Phase 1: Socle** - premier jet\n- [x] **Phase 2: Suite** - deuxième jet\n- [ ] **Phase 3: Fin** - dernier jet\n' > "$LABN/.planning/ROADMAP.md"
+wait "$CDPP"
+XI3="$(cat "$WORK/i3.json")"
+assert_eq "D7.10 — I3 témoin : le patch a été appliqué dans la page ouverte, des cartes sont affichées" "$(printf '%s' "$XI3" | node "$AUX/jg.mjs" "($V.erreur||j.erreur||'')+'|'+($V.apres.cartes>0)")" "|true"
+assert_eq "D7.11 — I3 : aucune animation d'apparition (cardIn, fadeIn, panelIn) après la bascule" "$(printf '%s' "$XI3" | node "$AUX/jg.mjs" "$V.entree")" "[]"
+assert_eq "D7.12 — I3 : seule une carte dont l'état a basculé s'anime (flash), rien d'autre" "$(printf '%s' "$XI3" | node "$AUX/jg.mjs" "[$V.flash>=1,$V.autres]")" "[true,[]]"
+assert_eq "D7.13 — I3 : zoom et position identiques avant et après la bascule" "$(printf '%s' "$XI3" | node "$AUX/jg.mjs" "$V.avant.t===$V.apres.t&&$V.avant.cartes===$V.apres.cartes")" "true"
 
 stop_srv
 fi

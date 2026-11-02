@@ -83,6 +83,21 @@
   };
   const setWho = (w) => { if (!w) return; who = probe.who = w; showLock(); };
 
+  // I3 (recette 2026-11-02) : une bascule en direct redessine la carte, qui rejouait son animation d'apparition (cartes, liens, colonnes,
+  // panneau). On ne l'anime plus : les éléments redessinés portent `animation: none` en ligne AVANT la première image (la suite de
+  // rerender() s'exécute en microtâche, avant la peinture), sauf les cartes dont l'état a basculé, qui reçoivent le clignotement du viewer
+  // (`flash`). Zoom et position restent ceux de rerender() (keepTransform). Les éléments neufs d'une vraie navigation ne portent rien.
+  const titreDe = (c) => c.querySelector('.title')?.textContent || '';
+  const sansEntree = async () => {
+    const avant = new Map([...document.querySelectorAll('#viewport .node .card')].map((c) => [titreDe(c), c.className]));
+    await SC.rerender();
+    for (const c of document.querySelectorAll('#viewport .node .card')) {
+      const g = c.closest('g.node'), k = titreDe(c); // la carte porte aussi la classe node : on vise le groupe SVG
+      if (g && avant.has(k) && avant.get(k) !== c.className) { g.classList.remove('flash'); g.classList.add('flash'); } else c.style.animation = 'none';
+    }
+    for (const e of document.querySelectorAll('#viewport .edges, #viewport .cols, #panel > *')) e.style.animation = 'none';
+  };
+
   const find = (ref) => ref.startsWith('n:') ? G.nodes.find((n) => n.id === ref.slice(2)) : G.files.find((f) => f.p === ref.slice(2));
   // ---------- reconnexion à recul : un seul sondage pour les deux flux ----------
   const lost = { t0: 0, timer: null, flux: new Map() };
@@ -137,7 +152,7 @@
       if (d.vf) { G.meta.vf = d.vf; n++; }
       probe.applied += n;
       probe.lastLatencyMs = Date.now() - d.at;
-      if (n) { SC.rerender(); SC.toast(`${n} statut(s) mis à jour`); }
+      if (n) { sansEntree().catch(() => {}); SC.toast(`${n} statut(s) mis à jour`); }
     });
     es.addEventListener('structural', (e) => { vu(JSON.parse(e.data)); probe.structural++; if (TAB === 'project') { SC.toast('Projet modifié : rechargement'); setTimeout(() => location.reload(), 400); } });
     es.onerror = () => { es.close(); perdu('direct', connecter); };
