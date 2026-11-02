@@ -264,6 +264,22 @@ cat > "$AUX/i3.js" <<'JS'
   return window.__i3 = { avant, apres: { t: tr(), cartes: document.querySelectorAll('#viewport .node .card').length }, entree: anims.filter((a) => ENTREE.test(a.animationName)).map((a) => a.animationName), flash: anims.filter((a) => a.animationName === 'flash').length, autres: anims.filter((a) => !ENTREE.test(a.animationName) && a.animationName !== 'flash').map((a) => a.animationName) };
 })()
 JS
+cat > "$AUX/lib.js" <<'JS'
+(async () => {
+  const SC = window.VibeFlow, pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  const att = async (f) => { for (let i = 0; i < 100; i++) { const v = f(); if (v) return v; await pause(50); } return null; };
+  const lib = SC.graph.nodes.find((n) => n.kind === 'library');
+  if (!lib) return { erreur: 'aucun nœud de type library' };
+  SC.select('n:' + lib.id);
+  if (!await att(() => document.querySelector('#panel .kindlabel'))) return { erreur: 'panneau sans libellé de type' };
+  await pause(400);
+  const panneau = document.querySelector('#panel .kindlabel').textContent;
+  const g = [...document.querySelectorAll('#viewport .node')].find((x) => x.querySelector('.title')?.textContent === lib.label);
+  let infobulle = null;
+  if (g) { g.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, clientX: 400, clientY: 300 })); infobulle = await att(() => document.querySelector('#tooltip .td')?.textContent || null); }
+  return { lib: lib.label, panneau, infobulle, titres: [...document.querySelectorAll('#viewport .node .title')].map((t) => t.textContent), anglais: /\blibrary\b/i.test(document.getElementById('panel').innerText + ' ' + (document.getElementById('tooltip')?.innerText || '')) };
+})()
+JS
 LABN="$WORK/labn"; mkdir -p "$LABN/src" "$LABN/library" "$LABN/config" "$LABN/.planning/phases/01-x" "$LABN/.planning/missions"
 printf 'export const u = () => 1;\n' > "$LABN/src/util.js"; printf 'export const l = () => 2;\n' > "$LABN/library/lib.js"; printf 'export const c = () => 3;\n' > "$LABN/config/conf.js"
 printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n- [ ] **Phase 2: Suite** - deuxième jet\n- [ ] **Phase 3: Fin** - dernier jet\n' > "$LABN/.planning/ROADMAP.md"
@@ -305,6 +321,11 @@ assert_eq "D7.11 — I3 : aucune animation d'apparition (cardIn, fadeIn, panelIn
 assert_eq "D7.12 — I3 : seule une carte dont l'état a basculé s'anime (flash), rien d'autre" "$(printf '%s' "$XI3" | node "$AUX/jg.mjs" "[$V.flash>=1,$V.autres]")" "[true,[]]"
 assert_eq "D7.13 — I3 : zoom et position identiques avant et après la bascule" "$(printf '%s' "$XI3" | node "$AUX/jg.mjs" "$V.avant.t===$V.apres.t&&$V.avant.cartes===$V.apres.cartes")" "true"
 
+XL="$(CDP_PRET="document.readyState === 'complete' && !!window.VibeFlow && !!document.querySelector('#viewport .node .card')" cdp 500 lib.js "$URLC")"
+assert_eq "D7.14 — libellé témoin : la mesure a eu lieu et le nœud library existe" "$(printf '%s' "$XL" | node "$AUX/jg.mjs" "($V.erreur||j.erreur||'')+'|'+($V.panneau.length>0)")" "|true"
+assert_eq "D7.15 — libellé : le type « library » est en français dans le panneau" "$(printf '%s' "$XL" | node "$AUX/jg.mjs" "$V.panneau.toLowerCase()")" "bibliothèque"
+assert_eq "D7.16 — libellé : le type est en français dans l'infobulle (et plus de « library » nulle part dans l'interface)" "$(printf '%s' "$XL" | node "$AUX/jg.mjs" "[/^bibliothèque/i.test($V.infobulle||''),$V.anglais]")" "[true,false]"
+assert_eq "D7.17 — libellé : une DONNÉE du lab (dossiers nommés library et config) n'est jamais traduite" "$(printf '%s' "$XL" | node "$AUX/jg.mjs" "['library','config','src'].every((t)=>$V.titres.includes(t))")" "true"
 stop_srv
 fi
 

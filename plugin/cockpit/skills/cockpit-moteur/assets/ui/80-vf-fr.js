@@ -51,6 +51,19 @@
   };
   window.__vfFrTraduire = tr;
   tr.motifs = R.length; tr.gabarits = P.length; // lu par le test chrome-fr
+  // Types fixes de carte (recette 2026-11-02 : « Library » au-dessus du dossier). Le viewer écrit le NOM DU TYPE tel quel (minuscule, ou 1re lettre
+  // en capitale dans l'en-tête de la vue) à quatre endroits : libellé du panneau, en-tête de la vue, rang de la recherche, première partie de
+  // l'infobulle. Ils sont traduits PAR EMPLACEMENT, jamais par le dictionnaire : un dossier du lab nommé « library » ou « config » est une donnée et reste intact.
+  const TYPES = { ui: 'interface', service: 'service', worker: 'tâche de fond', library: 'bibliothèque', feature: 'fonctionnalité', data: 'données', config: 'configuration', test: 'test', script: 'script',
+    infra: 'infrastructure', external: 'service externe', misc: 'divers', endpoint: "point d'accès", function: 'fonction', class: 'classe', route: 'route', dir: 'dossier', module: 'module' };
+  const type = (s) => { const t = typeof s === 'string' ? s.trim() : '', k = Object.prototype.hasOwnProperty.call(TYPES, t.toLowerCase()) ? TYPES[t.toLowerCase()] : null; return k == null ? null : s.replace(t, () => (/^[A-Z]/.test(t) ? k[0].toUpperCase() + k.slice(1) : k)); };
+  window.__vfFrType = type;
+  const typeDuTexte = (n) => {
+    const p = n.parentElement, t = n.nodeValue; if (!p) return null;
+    if (p.matches('.kindlabel, #results .rk, #context .k')) return type(t);
+    if (p.matches('#tooltip .td')) { const i = t.indexOf(' · '), k = type(i < 0 ? t : t.slice(0, i)); return k == null ? null : k + (i < 0 ? '' : t.slice(i)); }
+    return null;
+  };
   if (!SC || new URLSearchParams(location.search).get('lang') === 'en') return;
 
   // couleurs des types : sombre par défaut, clair sous data-theme="light" (même règle que le viewer)
@@ -72,6 +85,7 @@
     const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let n = w.nextNode(); n; n = w.nextNode()) {
       if (n.parentElement?.closest(SKIP)) continue;
+      const k = typeDuTexte(n); if (k != null && k !== n.nodeValue) { n.nodeValue = k; probe.nodes++; continue; }
       const v = tr(n.nodeValue); if (v != null) { n.nodeValue = v; probe.nodes++; }
     }
     const els = root.nodeType === 1 ? [root, ...root.querySelectorAll('[placeholder],[title],[aria-label]')] : [];
