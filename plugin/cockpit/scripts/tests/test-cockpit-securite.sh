@@ -169,6 +169,33 @@ R="$(node "$AUX/mask.mjs" "$SCRIPTS" "$LAB" "$WORK/home")"
 assert_eq "M1 — aucune des six valeurs secrètes ne ressort" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.fuites')" "[]"
 assert_has "M2 — témoin : la commande sort bien (le début « curl » est là, le reste masqué)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.doing')" "curl"
 
+# F-1 (revue de D3) : la dernière commande est une commande Bash, qui porte plus souvent un secret qu'un message texte. Formes d'identifiants hors « NOM=valeur » :
+# identifiants d'URL, -u/--user user:pass, en-tête Authorization (tout schéma), -p collé de mysql/mariadb et -p de sshpass. Les `export FOO=valeur` génériques ne sont PAS masqués (seuls les noms sensibles le sont).
+cat > "$AUX/mask-formes.mjs" <<'JS'
+// mask-formes.mjs <scripts> <lab> <home> : une session par commande ; rend, par commande, le texte révélé
+import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import path from 'node:path';
+const [, , scripts, lab, home] = process.argv; const { revealDoing } = await import(pathToFileURL(scripts + '/vf-cockpit-who.mjs').href);
+const d = path.join(home, '.claude', 'projects', '-lab'); fs.mkdirSync(d, { recursive: true });
+const cmds = JSON.parse(fs.readFileSync(0, 'utf8')); const out = [];
+cmds.forEach((c, i) => {
+  const sid = 'ffff' + String(i).padStart(4, '0') + '-2222-3333-4444-555566667777';
+  const line = (type, content) => JSON.stringify({ type, cwd: lab, sessionId: sid, timestamp: '2026-11-01T10:00:00Z', gitBranch: 'main', version: '2.1', message: { content } });
+  fs.writeFileSync(path.join(d, sid + '.jsonl'), line('user', 'salut') + '\n' + line('assistant', [{ type: 'tool_use', name: 'Bash', input: { command: c } }]) + '\n');
+  out.push(revealDoing(lab, sid, { home }).doing);
+});
+console.log(JSON.stringify(out));
+JS
+FORMES='["curl -u admin:Hunter2pass https://x","git clone https://user:ghSECRETpass@host/r.git","curl -H \"Authorization: Basic dXNlcjpwYXNz\" https://x","mysql -pMotDePasse123 -u root","curl --user=admin:Hunter2pass https://x","curl -H \"Authorization: Token abcdef123456\" https://x","curl -H \"Authorization: Digest username=\\\"bob\\\", response=\\\"RESP9\\\"\" https://x","sshpass -p Zebre9999 ssh host","mysqldump -pMotDePasse123 db"]'
+RF="$(printf '%s' "$FORMES" | node "$AUX/mask-formes.mjs" "$SCRIPTS" "$LAB" "$WORK/home")"
+for v in "0:Hunter2pass" "1:ghSECRETpass" "2:dXNlcjpwYXNz" "3:MotDePasse123" "4:Hunter2pass" "5:abcdef123456" "6:RESP9" "7:Zebre9999" "8:MotDePasse123"; do
+  assert_eq "M3.${v%%:*} — forme ${v%%:*} : le secret « ${v#*:} » ne sort pas" "$(printf '%s' "$RF" | node "$AUX/ev.mjs" "j[${v%%:*}].includes('${v#*:}')")" "false"
+done
+assert_has "M3.9 — témoin : la forme -u masquée garde le début de la commande" "$(printf '%s' "$RF" | node "$AUX/ev.mjs" 'j[0]')" "curl"
+# non-régression : ni « -u root » seul, ni une URL sans identifiants, ni « mysql -p » invite, ni un `mkdir -p`, ni un export générique ne sont masqués
+NEG='["curl -u root https://example.com/a","git clone https://github.com/a/b.git","mysql -u root -p","mkdir -p dir/sub","export FOO=valeur","ssh -p 2222 host","git push -u origin main"]'
+RN="$(printf '%s' "$NEG" | node "$AUX/mask-formes.mjs" "$SCRIPTS" "$LAB" "$WORK/home")"
+assert_eq "M4 — aucune de ces commandes ordinaires n'est touchée (« -u root », URL nue, -p invite, mkdir -p, export, ssh -p, push -u)" "$(printf '%s' "$RN" | node "$AUX/ev.mjs" 'j')" "$NEG"
+
 echo "=== L — aucun script du lab n'est exécuté ==="
 TRAP="$WORK/trap.sh"; printf '#!/usr/bin/env bash\ntouch "%s/EXEC-$(basename "$(dirname "$0")")"\ncase "$1" in status) echo "{\\"locks\\":[]}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' "$WORK" > "$TRAP"
 LB="$WORK/labL"; mkdir -p "$LB/.planning" "$LB/.claude/scripts" "$LB/.vibeflow/cockpit" "$LB/plugin/x"; cp "$TRAP" "$LB/.claude/scripts/driver-lock.sh"; cp "$TRAP" "$LB/.vibeflow/cockpit/driver-lock.sh"

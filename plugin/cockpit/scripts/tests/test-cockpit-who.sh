@@ -219,6 +219,15 @@ const lignes = [L({ type: 'user', message: { content: 'salut' } }, '2026-11-01T1
 if (forme === 'cmd-puis-texte') {
   lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { description: 'DESC-D3', command: 'git status --short COMMANDE-BASH-D3' } }] } }, '2026-11-01T10:00:05Z'));
   lignes.push(L({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'x', content: 'ok' }] } }, '2026-11-01T10:00:06Z'));
+} else if (forme === 'deux-bash-un-message') { // F-2 : deux appels Bash dans UN message, le dernier du tableau est le plus récent
+  lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'echo PREMIER-D3' } }, { type: 'tool_use', name: 'Bash', input: { command: 'echo SECOND-D3' } }] } }, '2026-11-01T10:00:05Z'));
+} else if (forme === 'deux-messages-bash') { // F-2 : deux messages Bash successifs, séparés par un résultat d'outil ; le plus récent gagne
+  lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'echo ANCIEN-D3' } }] } }, '2026-11-01T10:00:05Z'));
+  lignes.push(L({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'x', content: 'ok' }] } }, '2026-11-01T10:00:06Z'));
+  lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'echo RECENT-D3' } }] } }, '2026-11-01T10:00:07Z'));
+  lignes.push(L({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'y', content: 'ok' }] } }, '2026-11-01T10:00:08Z'));
+} else if (forme === 'jeton-a-cheval') { // F-2 : un jeton sk- qui franchit le 120e caractère ; coupé avant le masque, sa partie visible (15 car.) ne ressemble plus à un jeton
+  lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'echo ' + 'a'.repeat(100) + ' sk-' + 'b'.repeat(24) + ' fin' } }] } }, '2026-11-01T10:00:05Z'));
 } else if (forme === 'autre-outil') {
   lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Read', input: { file_path: '/x/LECTURE-D3' } }] } }, '2026-11-01T10:00:05Z'));
 }
@@ -235,6 +244,17 @@ for forme in texte-seul autre-outil; do
   node "$AUX/mk-d3.mjs" "$H15D/.claude/projects/-lab/$SID.jsonl" "$LAB" "$forme"
   R15="$(Q reveal "$LAB" "$H15D" "$NOSCRIPTS" "$SID")"
   assert_eq "W15.4 — forme « $forme » : aucune commande Bash, doing nul et cause nommée (jamais le texte en repli)" "$(printf '%s' "$R15" | node "$AUX/stdin-get.mjs" '[j.doing,j.erreur]')" '[null,"sans-action"]'
+done
+
+# F-2 (revue de D3) : trois mutants de D3 survivaient (ordre dans un message, ordre entre messages, coupe à 120 avant le masque)
+for forme in deux-bash-un-message deux-messages-bash jeton-a-cheval; do
+  node "$AUX/mk-d3.mjs" "$H15D/.claude/projects/-lab/$SID.jsonl" "$LAB" "$forme"
+  D15="$(Q reveal "$LAB" "$H15D" "$NOSCRIPTS" "$SID" | node "$AUX/stdin-get.mjs" 'j.doing')"
+  case "$forme" in
+    deux-bash-un-message) assert_has "W15.5 — deux appels Bash dans un message : le DERNIER du tableau" "$D15" "SECOND-D3"; assert_not "W15.5b — ... et pas le premier" "$D15" "PREMIER-D3" ;;
+    deux-messages-bash) assert_has "W15.6 — deux messages Bash successifs : le plus RÉCENT" "$D15" "RECENT-D3"; assert_not "W15.6b — ... et pas l'ancien" "$D15" "ANCIEN-D3" ;;
+    jeton-a-cheval) assert_not "W15.7 — un jeton à cheval sur le 120e caractère : aucune partie ne fuit (masque AVANT la coupe)" "$D15" "sk-bbbb"; assert_has "W15.7b — témoin : le jeton est remplacé par [masqué]" "$D15" "[masqué]" ;;
+  esac
 done
 
 echo "=== W12 — E-7 : un nœud running d'un DAG sous .planning/missions apparaît « au travail » ==="
