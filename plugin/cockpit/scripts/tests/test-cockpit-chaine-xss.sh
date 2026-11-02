@@ -155,7 +155,7 @@ manche() {
     [ "$ok" = 1 ] && break; [ -z "$want" ] && break; sleep 0.2
   done
   sleep 1
-  kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+  vf_hyg_stop "$pid"
   R_CHARGES="$(printf '%s' "$res" | jq_ 'j.charges')"
   R_MARQUEUR=non; [ -f "$WORK/MARQUEUR-SCRIPT-DU-LAB" ] && R_MARQUEUR=oui
   R_EXFIL=non; grep -q '?t=[0-9a-f]\{16,\}' "$COLL_LOG" && R_EXFIL=oui

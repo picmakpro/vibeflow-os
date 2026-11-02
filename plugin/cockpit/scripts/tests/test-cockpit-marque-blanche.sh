@@ -12,7 +12,7 @@ SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 MOTEUR="$SCRIPTS/../skills/cockpit-moteur"
 WORK="$(mktemp -d)"; AUX="$WORK/aux"; mkdir -p "$AUX"
 SRV=""
-trap '[ -n "$SRV" ] && { kill "$SRV" 2>/dev/null; wait "$SRV" 2>/dev/null; }; vf_hyg_fin; rm -rf "$WORK"' EXIT
+trap '[ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; vf_hyg_fin; rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 
 PASS=0; FAIL=0
@@ -76,7 +76,7 @@ for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; 
 RP=$(node "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)
 for _ in $(seq 1 50); do [ -s "$WORK/serve.out" ] && break; sleep 0.1; done
 node "$AUX/get.mjs" "$RP" / > "$WORK/racine.html"; node "$AUX/get.mjs" "$RP" /project.html > "$WORK/projet.html"
-kill "$SRV" 2>/dev/null; wait "$SRV" 2>/dev/null; SRV=""
+vf_hyg_stop "$SRV"; SRV=""
 assert_ge "M1.3 — la page / est servie (non vide)" "$(wc -c < "$WORK/racine.html" | tr -d ' ')" 1000
 assert_ge "M1.4 — la page /project.html est servie (non vide)" "$(wc -c < "$WORK/projet.html" | tr -d ' ')" 1000
 assert_eq "M1.5 — GET / : 0 occurrence" "$(occ < "$WORK/racine.html")" "0"

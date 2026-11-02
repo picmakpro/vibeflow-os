@@ -94,7 +94,7 @@ srv() { # srv <sortie> [PATH-extra] -> SRV_PORT SRV_PID ; serveur depuis la sort
   for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
   SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
 }
-unsrv() { kill "$SRV_PID" 2>/dev/null; wait "$SRV_PID" 2>/dev/null; }
+unsrv() { vf_hyg_stop "$SRV_PID"; }
 tok() { node "$AUX/req.mjs" "$1" GET "$2" | sed -n 's/.*VF_COCKPIT_SERVER={"token":"\([0-9a-f]*\)".*/\1/p' | head -1; }
 hdr() { node "$AUX/req.mjs" "$1" "${4:-GET}" "$2" "${3:-}" | sed -n 2p; }
 sta() { node "$AUX/req.mjs" "$@" | sed -n 1p; }
@@ -192,7 +192,7 @@ import { pathToFileURL } from 'node:url'; const m = await import(pathToFileURL(p
 JS
 assert_eq "L4 — resolveScriptsDir ignore le scriptsDir d'un .cache/ du lab" "$(node "$AUX/rsd.mjs" "$SCRIPTS" "$LB/.vibeflow/cockpit")" "true"
 LS="$WORK/labS"; mklab "$LS"; printf 'import fs from "node:fs"; fs.writeFileSync("%s/EXEC-serve", "x");\n' "$WORK" > "$LS/.vibeflow/cockpit/serve.mjs"
-sleep 300 & SL=$!; PIDS+=($SL); mkdir -p "$LS/.vibeflow/cockpit/.cache"; printf '{"pid":%s,"port":1,"url":"http://127.0.0.1:1","token":"x"}\n' "$SL" > "$LS/.vibeflow/cockpit/.cache/server.json"
+node -e "setTimeout(()=>{},3e5)" "$WORK/etranger-L6" >/dev/null 2>&1 </dev/null & SL=$!; PIDS+=($SL); mkdir -p "$LS/.vibeflow/cockpit/.cache"; printf '{"pid":%s,"port":1,"url":"http://127.0.0.1:1","token":"x"}\n' "$SL" > "$LS/.vibeflow/cockpit/.cache/server.json"
 ( cd "$LS" && node "$SCRIPTS/vf-cockpit.mjs" stop > "$WORK/stop.out" 2>&1; echo "$?" > "$WORK/stop.rc" )
 assert_eq "L5 — stop : le serve.mjs du lab n'est pas exécuté" "$([ -e "$WORK/EXEC-serve" ] && echo oui || echo non)" "non"
 assert_eq "L6 — stop : un processus étranger désigné par le fichier d'état du lab reste vivant" "$(kill -0 "$SL" 2>/dev/null && echo vivant || echo mort)" "vivant"
@@ -228,7 +228,7 @@ assert_eq "E3 — l'export (serve.mjs) échappe de même" "$(grep -c "replace(/<
 
 echo "=== C — sans vf-cockpit-server.mjs : échec franc ==="
 cp -R "$OUT" "$WORK/sortie-sans"; rm -f "$WORK/sortie-sans/vf-cockpit-server.mjs"
-( cd "$LAB"; node "$WORK/sortie-sans/serve.mjs" --no-open --port $(libre) > "$WORK/c.out" 2>&1 & CP=$!; sleep 2; if kill -0 $CP 2>/dev/null; then echo vivant > "$WORK/c.etat"; kill $CP; else echo mort > "$WORK/c.etat"; fi; wait $CP 2>/dev/null )
+( cd "$LAB"; node "$WORK/sortie-sans/serve.mjs" --no-open --port $(libre) > "$WORK/c.out" 2>&1 & CP=$!; sleep 2; if kill -0 $CP 2>/dev/null; then echo vivant > "$WORK/c.etat"; vf_hyg_stop $CP; else echo mort > "$WORK/c.etat"; fi; wait $CP 2>/dev/null )
 assert_eq "C1 — le serveur refuse de démarrer (jamais de repli sur l'agent amont)" "$(cat "$WORK/c.etat")" "mort"
 assert_has "C2 — message en français" "$(cat "$WORK/c.out")" "est absent"
 

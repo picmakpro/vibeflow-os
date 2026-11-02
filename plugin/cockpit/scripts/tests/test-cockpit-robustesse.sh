@@ -73,7 +73,7 @@ srv "$L1/.vibeflow/cockpit"; P1=$SRV_PORT; PT1="$(tok "$P1" /project.html)"
 for q in "Qu'est-ce qui reste ?" "prochaine étape" "next"; do node "$AUX/req.mjs" "$P1" POST /api/ask "$PT1" "{\"question\":\"$q\"}" > /dev/null; done
 assert_eq "S1.3 — le serveur a survécu aux trois questions (état 200)" "$(node "$AUX/req.mjs" "$P1" GET /api/vf/etat "$PT1" | sed -n 1p)" "200"
 assert_eq "S1.4 — CKPT-07 : ces questions sont calculées par le serveur, sans appel à l'agent (0 appel du faux claude)" "$(ls "$WORK"/fkd/call-*.json 2>/dev/null | wc -l | tr -d ' ')" "0"
-kill "$SRV_PID" 2>/dev/null; wait "$SRV_PID" 2>/dev/null
+vf_hyg_stop "$SRV_PID"
 
 echo "=== S3 — verrou tenu en lab plat : « occupé » ==="
 cat > "$WORK/home/.claude/scripts/driver-lock.sh" <<'SH'
@@ -130,7 +130,7 @@ for kind in seul markdown; do
 done
 srv "$WORK/lp-seul/.vibeflow/cockpit"
 assert_eq "P1 — le serveur sert la page Projet et la page Code du lab sans code" "$(node "$AUX/req.mjs" "$SRV_PORT" GET /project.html | sed -n 1p)$(node "$AUX/req.mjs" "$SRV_PORT" GET / | sed -n 1p)" "200200"
-kill "$SRV_PID" 2>/dev/null; wait "$SRV_PID" 2>/dev/null
+vf_hyg_stop "$SRV_PID"
 
 echo "=== F — échec d'une étape du moteur : message en français avec la cause ==="
 cp -R "$SCRIPTS/.." "$WORK/module"; printf 'console.error("✗ 1 erreur"); console.error("  - la cause précise"); process.exit(1);\n' > "$WORK/module/skills/cockpit-moteur/scripts/scan.mjs"
@@ -190,7 +190,7 @@ RS="$(node "$AUX/resync.mjs" "$CHROME" "$WP" "$LW/.planning/phases/01-x/01-01-PL
 assert_eq "W1 — témoin : la page était connectée au direct avant la coupure" "$(printf '%s' "$RS" | node "$AUX/ev.mjs" 'j.connecteAvant')" "true"
 assert_eq "W1b — témoin : la coupure a bien fait tomber le flux" "$(printf '%s' "$RS" | node "$AUX/ev.mjs" 'j.coupe')" "false"
 assert_eq "W2 — après la reconnexion, la page s'est rechargée (le témoin posé avant la coupure a disparu)" "$(printf '%s' "$RS" | node "$AUX/ev.mjs" 'j.temoinApres')" "false"
-kill "$SRV_PID" 2>/dev/null; wait "$SRV_PID" 2>/dev/null
+vf_hyg_stop "$SRV_PID"
 fi
 
 vf_hyg_assert

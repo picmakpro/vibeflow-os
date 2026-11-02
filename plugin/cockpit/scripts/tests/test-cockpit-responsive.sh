@@ -57,7 +57,7 @@ srv() { # srv <sortie> -> SRV_PORT SRV_PID
   for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
   SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
 }
-unsrv() { kill "$SRV_PID" 2>/dev/null; wait "$SRV_PID" 2>/dev/null; }
+unsrv() { vf_hyg_stop "$SRV_PID"; }
 mes() { REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-responsive.mjs" "$CHROME" "$@"; } # mes <url> <largeurs> <resize|-> [<captures>]
 LARGES="1024,1280,1440,1920,2560"
 # boutons d'en-tête OPTIONNELS de l'onglet Code (Travail récent et Écrans n'existent que si le lab a un historique récent et des pages) : ajoutés par l'API

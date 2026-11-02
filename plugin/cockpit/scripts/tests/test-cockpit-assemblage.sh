@@ -10,7 +10,7 @@ export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"; AUX="$WORK/aux"; mkdir -p "$AUX"
 SRV=""
-trap '[ -n "$SRV" ] && { kill "$SRV" 2>/dev/null; wait "$SRV" 2>/dev/null; }; vf_hyg_fin; rm -rf "$WORK"' EXIT
+trap '[ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; vf_hyg_fin; rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 
 PASS=0; FAIL=0
@@ -82,7 +82,7 @@ for page in / /project.html; do
   assert_has "A3 — GET $page rend du HTML" "$R" "<html"
 done
 assert_eq "A3.4 — Host étranger rend 403" "$(node "$AUX/get.mjs" "$RP" / "evil.example:$RP" | head -1)" "403"
-kill "$SRV" 2>/dev/null; wait "$SRV" 2>/dev/null; SRV=""
+vf_hyg_stop "$SRV"; SRV=""
 
 echo "=== A4 — refus en français, aucun appel à claude ==="
 NOLAB="$WORK/sans-planning"; mkdir -p "$NOLAB"
