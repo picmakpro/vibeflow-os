@@ -1,0 +1,1 @@
+- P67-G1 : 4e tour de correction hors budget, hygiène des tests seule (accord de Samuel, AskUserQuestion session principale, 2026-11-02) ; détail et incident du 2026-11-02 dans `.planning/missions/2026-11-01-v2-cockpit.md`.

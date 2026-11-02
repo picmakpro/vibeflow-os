@@ -64,7 +64,7 @@ Last activity: 2026-10-20 — Phase 58 vérifiée human_needed 13/14
 
 <!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-11-01.md -->
 
-- P67-G1 : 4e tour de correction hors budget, hygiène des tests seule (accord de Samuel, AskUserQuestion session principale, 2026-11-02) ; détail et incident du 2026-11-02 dans `.planning/missions/2026-11-01-v2-cockpit.md`.
+<!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-11-02.md -->
 
 ### Roadmap Evolution
 
