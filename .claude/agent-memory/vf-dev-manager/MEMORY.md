@@ -101,3 +101,4 @@
 - [CI annulée à ~36 min : image runner](project_ci-cancelled-36min-runner-uutils.md) — cause réparée = uutils du runner Ubuntu 26 (#168), pas la charge ; #171 ouverte sur une corrélation sans témoin
 - [Assouplir sur indéterminé = fail-open](feedback_assouplir-sur-indetermine-rouvre-un-fail-open.md) — « continue sur rc 3 » laisse passer ce que le gate n'a pas lu : trier les causes, jamais le code
 - [Pile de phases, main qui bouge](project_phases-empilees-main-qui-bouge.md) — chaque merge d'autrui = rebase en chaîne + CI 55 min ; REQUIREMENTS en union, rebaser une fois avant la CI utile
+- [Nettoyeur de test qui tue tout](project_hygiene-test-tue-tout-awk-env.md) — crash 2026-11-02 : env préfixé sur ps pas awk + index vide=1 macOS ; marque validée, plafond, preuve à sec, leurre

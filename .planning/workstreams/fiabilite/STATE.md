@@ -64,6 +64,8 @@ Last activity: 2026-10-20 — Phase 58 vérifiée human_needed 13/14
 
 <!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-11-01.md -->
 
+- P67-G1 : 4e tour de correction hors budget, hygiène des tests seule (accord de Samuel, AskUserQuestion session principale, 2026-11-02) ; détail et incident du 2026-11-02 dans `.planning/missions/2026-11-01-v2-cockpit.md`.
+
 ### Roadmap Evolution
 
 - Phase 63 added (2026-10-29) : Règles produit empruntées à AIDD — arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 (phase dans le jalon actuel ; règles AIDD dans notre vocabulaire). Même jour : sortie de GSD et de superpowers, trajectoire par étapes retenue par message session principale (E1 superpowers, E2 épinglage gsd-core, E3 remplacement verbe par verbe conditionnée à l'étude de coût E0) → graine `SEED-003`, pas de phase.

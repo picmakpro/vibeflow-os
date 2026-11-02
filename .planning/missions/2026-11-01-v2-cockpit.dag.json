@@ -1,0 +1,215 @@
+{
+  "nodes": [
+    {
+      "id": "n0-spikes",
+      "step": "commit spike 002 sans copie floorplan + patchs P1-P8 en diff + etude",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/spikes/002-cockpit-code-projet/**",
+        "docs/research/2026-11-01-etude-floorplan-cockpit.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "n1-jalon",
+      "step": "inscription jalon vibeflow-v2.0, phases 67 et 68",
+      "stage": "",
+      "deps": [
+        "n0-spikes"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/ROADMAP.md",
+        ".planning/workstreams/fiabilite/STATE.md",
+        ".planning/workstreams/fiabilite/phases/67-*/**",
+        ".planning/workstreams/fiabilite/phases/68-*/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "discuss-67",
+      "step": "cadrage phase 67 (manager)",
+      "stage": "",
+      "deps": [
+        "n1-jalon"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/67-*/67-CONTEXT.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan-67",
+      "step": "plan phase 67",
+      "stage": "",
+      "deps": [
+        "discuss-67"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/67-*/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-67",
+      "step": "execution phase 67",
+      "stage": "",
+      "deps": [
+        "plan-67"
+      ],
+      "scope": [
+        "plugin/**",
+        ".planning/workstreams/fiabilite/phases/67-*/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-67",
+      "step": "revue code phase 67",
+      "stage": "",
+      "deps": [
+        "exec-67"
+      ],
+      "scope": [
+        "plugin/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "audit-67",
+      "step": "audit securite phase 67 (serveur local, transcripts, claude -p)",
+      "stage": "",
+      "deps": [
+        "exec-67"
+      ],
+      "scope": [
+        "plugin/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire",
+      "stage": "",
+      "deps": [
+        "revue-67",
+        "audit-67"
+      ],
+      "scope": [
+        "docs/**",
+        "plugin/**/README.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "gates",
+      "step": "rejeu job CI gates + PR",
+      "stage": "",
+      "deps": [
+        "docs"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "fix-gate-d1",
+      "step": "D1 exclusion vendor dans check-python-isolation",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "scripts/check-python-isolation.sh",
+        "scripts/tests/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-67-a",
+      "step": "correction ciblée A sécurité+robustesse",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/cockpit/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-67-b",
+      "step": "correction ciblée B interface responsive",
+      "stage": "",
+      "deps": [
+        "fix-67-a"
+      ],
+      "scope": [
+        "plugin/cockpit/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "rerevue-67",
+      "step": "re-revue+re-audit pleins",
+      "stage": "",
+      "deps": [
+        "fix-67-b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-gate-d2",
+      "step": "resserrer exclusion python a */assets/vendor/*.js",
+      "stage": "",
+      "deps": [
+        "fix-67-b"
+      ],
+      "scope": [
+        "scripts/check-python-isolation.sh",
+        "scripts/tests/test-check-python-isolation.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-67-c",
+      "step": "correction ciblée C : mineurs re-revue, R-1, R-2, suites navigateur sous charge",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/cockpit/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "rerevue-67-c",
+      "step": "re-revue pleine du comblement C",
+      "stage": "",
+      "deps": [
+        "fix-67-c"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-67-d",
+      "step": "4e tour P67-G1 : hygiène des tests (fuites serveurs/Chrome)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/cockpit/scripts/tests/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-fix-67-d",
+      "step": "revue du 4e tour (hygiène des tests)",
+      "stage": "",
+      "deps": [
+        "fix-67-d"
+      ],
+      "scope": [
+        "lecture seule"
+      ],
+      "status": "done",
+      "review_regime": "full"
+    }
+  ],
+  "ws": "fiabilite"
+}
