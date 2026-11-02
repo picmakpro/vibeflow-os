@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # test-cockpit-onglet-code.sh — onglet Code conditionnel, sans modèle (CKPT-06, volet Code ; P67-D-17).
 #   C1 lab à modules : extracteur VibeFlow (dispatch, source, plus de liens que le même lab en brut)
+#   C4 dossier de plugin/ sans module.json : nœud infra générique + enfant tests (sans liste de noms)
 #   C2 lab neutre : architecture brute · C3 aucun assemblage n'appelle `claude` (faux binaire consignant tout appel)
 # Labs jetables dans mktemp, isolation git, HOME jetable. Exit 0 si tout passe, 1 sinon.
 
@@ -61,6 +62,19 @@ NV=$(donnee "$LM" 'j.links.length')
 LB="$WORK/brut"; mklab "$LB" modules; for m in a b; do git -C "$LB" mv "plugin/$m/module.json" "plugin/$m/module.json.off"; done; git -C "$LB" -c user.email=t@t -c user.name=t commit -q -m off
 assert_eq "C1.7 — témoin : sans module.json le même lab est assemblé en brut" "$(assembler "$LB")$(donnee "$LB" 'j.meta.vfCodeExtractor')" "0brut"
 assert_gt "C1.8 — l'extracteur VibeFlow produit strictement plus de liens que le brut sur le même lab" "$NV" "$(donnee "$LB" 'j.links.length')"
+
+echo "=== C4 — dossier de plugin/ sans module.json (installeur, commandes…) ==="
+LI="$WORK/interne"; mklab "$LI" modules
+mkdir -p "$LI/plugin/c/tests" "$LI/plugin/c/lib" "$LI/plugin/d/tests/fixtures"
+printf '#!/usr/bin/env bash\necho c\n' > "$LI/plugin/c/run.sh"; printf '#!/usr/bin/env bash\necho t\n' > "$LI/plugin/c/tests/t.sh"; printf '#!/usr/bin/env bash\necho l\n' > "$LI/plugin/c/lib/l.sh"
+printf '#!/usr/bin/env bash\necho f\n' > "$LI/plugin/d/tests/fixtures/f.sh"
+git -C "$LI" add -A && git -C "$LI" -c user.email=t@t -c user.name=t commit -q -m interne
+assert_eq "C4.1 — l'assemblage rend 0" "$(assembler "$LI")" "0"
+assert_eq "C4.2 — un dossier sans module.json qui porte des fichiers a un nœud infra, sans version" "$(donnee "$LI" 'j.nodes.filter(n=>n.id==="m-c").map(n=>n.kind+"|"+n.label+"|"+(n.tags||[]).length).join(",")')" "infra|c|0"
+assert_eq "C4.3 — son sous-dossier tests direct est un enfant de kind test" "$(donnee "$LI" 'j.nodes.filter(n=>n.id==="m-c.tests").map(n=>n.kind+"|"+n.parent).join(",")')" "test|m-c"
+assert_eq "C4.4 — aucun fichier de ce dossier ne reste dans unassigned" "$(donnee "$LI" 'j.files.filter(f=>f.n==="unassigned"&&f.p.startsWith("plugin/c/")).length')" "0"
+assert_eq "C4.5 — un dossier sans module.json qui ne porte que des fichiers ignorés n'a aucun nœud" "$(donnee "$LI" 'j.nodes.filter(n=>n.id==="m-d").length')" "0"
+assert_eq "C4.6 — les modules existants gardent leur nature (a : agents, b : doc-only)" "$(donnee "$LI" 'j.nodes.filter(n=>n.id==="m-a"||n.id==="m-b").map(n=>n.kind).join(",")')" "service,config"
 
 echo "=== C2 — lab neutre : architecture brute ==="
 LN="$WORK/neutre"; mklab "$LN" neutre

@@ -12,7 +12,7 @@ const IGNORE = ['.planning/**', 'docs/**', '.claude/**', 'manual/**', 'reports/*
 const re = (g) => new RegExp('^' + g.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*\//g, '\u0001').replace(/\*\*/g, '\u0002').replace(/\*/g, '[^/]*').replace(/\u0001/g, '(?:.*/)?').replace(/\u0002/g, '.*') + '$');
 const IGN = IGNORE.map(re);
 const SUB = { agents: ['Agents', 'ui', 'Les rôles incarnés ou dispatchés.'], skills: ['Skills', 'feature', 'Les gestes invocables.'],
-  scripts: ['Scripts', 'script', 'Gates, moteurs et outils en shell.'], 'scripts/tests': ['Tests', 'test', 'Suites qui prouvent les scripts.'],
+  scripts: ['Scripts', 'script', 'Gates, moteurs et outils en shell.'], tests: ['Tests', 'test', 'Suites qui prouvent le dossier.'], 'scripts/tests': ['Tests', 'test', 'Suites qui prouvent les scripts.'],
   references: ['Références', 'config', 'Doctrine chargée à la demande.'], hooks: ['Hooks', 'worker', 'Ce qui se déclenche sur les événements de session.'],
   content: ['Contenu', 'config', 'Ressources installées dans le lab.'] };
 // nature d'un module : lue dans son module.json (champ type), jamais dans une liste de noms
@@ -27,11 +27,15 @@ export function architectureVibeflow({ lab, sortie }) {
   const dirs = (p) => { try { return fs.readdirSync(path.join(lab, p), { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith('.')).map((e) => e.name); } catch { return []; } };
 
   // ---------- nœuds : un par module (plugin/*/module.json), ses dossiers types en enfants ----------
+  // Un dossier de plugin/ sans module.json mais portant des fichiers retenus (installeur, commandes…) reçoit un nœud infra,
+  // sans version : sinon ses fichiers tombent dans « unassigned ». Règle générique, aucune liste de noms.
   const nodes = [];
   for (const m of dirs('plugin')) {
-    let mj; try { mj = JSON.parse(read(`plugin/${m}/module.json`)); } catch { continue; }
+    let mj; try { mj = JSON.parse(read(`plugin/${m}/module.json`)); } catch { mj = null; }
+    if (!mj && !has(`plugin/${m}`)) continue;
     const id = 'm-' + m.replace(/[^a-z0-9]+/gi, '-').replace(/^-/, '');
-    nodes.push({ id, label: m, kind: kindOf(String(mj.type || '')), summary: firstSentence(mj.description) || `Module ${m}.`, paths: [`plugin/${m}`], tags: [read(`plugin/${m}/VERSION`).trim()].filter(Boolean) });
+    if (mj) nodes.push({ id, label: m, kind: kindOf(String(mj.type || '')), summary: firstSentence(mj.description) || `Module ${m}.`, paths: [`plugin/${m}`], tags: [read(`plugin/${m}/VERSION`).trim()].filter(Boolean) });
+    else nodes.push({ id, label: m, kind: 'infra', summary: 'Dossier interne du plugin, sans module.json.', paths: [`plugin/${m}`], tags: [] }); // infra : outillage du dépôt, comme le nœud « Gates du dépôt », pas une bibliothèque installable
     for (const [sub, [label, kind, summary]] of Object.entries(SUB)) {
       const dir = `plugin/${m}/${sub}`;
       if (!has(dir)) continue;
