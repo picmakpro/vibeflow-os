@@ -3,7 +3,7 @@
 // signal ou sur échéance globale. Aucune attente à durée fixe pour décider d'un état : on interroge la page (attendre), avec une échéance bornée.
 // Échéances (millisecondes, surchargeables) : VF_CDP_ECHEANCE_MS = par attente (défaut 90 000) · VF_CDP_GLOBAL_MS = par exécution (défaut 600 000).
 // Une mesure indisponible lève une erreur NOMMÉE (« attente de <nom> dépassée ») : jamais un résultat vide silencieux.
-// Le HOME réel est rendu à Chrome (REAL_HOME) : sous un HOME jetable il ne démarre pas sur macOS.
+// Le HOME du compte est rendu à Chrome (chromeHome) : sous un HOME jetable il ne démarre pas sur macOS.
 import { spawn } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 
 export const ECHEANCE = Number(process.env.VF_CDP_ECHEANCE_MS) || 90000;
@@ -11,10 +11,13 @@ export const GLOBAL = Number(process.env.VF_CDP_GLOBAL_MS) || 600000;
 export const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const ARGS = ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0'];
 
+// HOME de Chrome : celui du compte (base des comptes, jamais l'environnement : un rejeu sous HOME=$(mktemp -d), ou une suite qui fait
+// REAL_HOME=$HOME après l'avoir remplacé, donnerait à Chrome un HOME vide et il ne répondrait plus) ; REAL_HOME puis HOME en repli.
+const chromeHome = () => { try { return os.userInfo().homedir; } catch { return process.env.REAL_HOME || process.env.HOME; } };
 // ouvrir(chrome) -> session { send, ev, naviguer, attendre, stable, fermer, violations }
 export async function ouvrir(chrome, { csp = false } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `cdp-chrome-${process.env.VF_CDP_TAG ? process.env.VF_CDP_TAG + '-' : ''}`)); // VF_CDP_TAG : marque de la suite (hygiene.sh), pour retrouver ce Chrome-là et nul autre
-  const ch = spawn(chrome, [...ARGS, `--user-data-dir=${dir}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, HOME: process.env.REAL_HOME || process.env.HOME } });
+  const ch = spawn(chrome, [...ARGS, `--user-data-dir=${dir}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, HOME: chromeHome() } });
   let sorti = false; const sortie = new Promise((r) => ch.once('exit', () => { sorti = true; r(); }));
   const fermer = async () => { try { ch.kill('SIGKILL'); } catch {} if (!sorti) await Promise.race([sortie, pause(3000)]); try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} };
   try {

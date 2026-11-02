@@ -265,11 +265,11 @@ LX="$WORK/labX"; mklab "$LX"; node "$AUX/marquer.mjs" "$LX/.vibeflow/cockpit/pro
 srv "$LX/.vibeflow/cockpit"; XP=$SRV_PORT; URLS=(); while read -r u; do URLS+=("http://127.0.0.1:$XP/$u"); done < "$WORK/urls.txt"
 EXPR='[...document.querySelectorAll("[onerror]")].map((e)=>e.getAttribute("data-f")||"?")'
 XR="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "${URLS[@]}")"; unsrv
-assert_eq "X1 — témoin : les ${#URLS[@]} adresses (accueil, conteneurs, éléments) ont été chargées" "$(printf '%s' "$XR" | node "$AUX/ev.mjs" 'j.resultats.length')" "${#URLS[@]}"
-assert_eq "X2 — aucun marqueur n'est devenu un élément, dans AUCUN champ" "$(printf '%s' "$XR" | node "$AUX/ev.mjs" '[...new Set(j.resultats.flatMap(r=>r.valeur||[]))]')" "[]"
+assert_eq "X1 — témoin : les ${#URLS[@]} adresses (accueil, conteneurs, éléments) ont été chargées" "$(printf '%s' "$XR" | node "$AUX/ev.mjs" 'j.resultats?j.resultats.length:"mesure indisponible : "+j.erreur')" "${#URLS[@]}"
+assert_eq "X2 — aucun marqueur n'est devenu un élément, dans AUCUN champ" "$(printf '%s' "$XR" | node "$AUX/ev.mjs" 'j.resultats?[...new Set(j.resultats.flatMap(r=>r.valeur||[]))]:"mesure indisponible : "+j.erreur')" "[]"
 LM="$WORK/labXm"; mkdir -p "$LM/.planning"; cp -R "$LX/.vibeflow" "$LM/.vibeflow"; sed -i.bak 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' "$LM/.vibeflow/cockpit/project.html"
 srv "$LM/.vibeflow/cockpit"; XM="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "http://127.0.0.1:$SRV_PORT/project.html#v=n:ph-1" "http://127.0.0.1:$SRV_PORT/project.html#v=n:ph-2")"; unsrv
-assert_has "X3 — témoin rouge : sans h() sur le pied de carte, le champ « foot » est détecté" "$(printf '%s' "$XM" | node "$AUX/ev.mjs" '[...new Set(j.resultats.flatMap(r=>r.valeur||[]))]')" "foot"
+assert_has "X3 — témoin rouge : sans h() sur le pied de carte, le champ « foot » est détecté" "$(printf '%s' "$XM" | node "$AUX/ev.mjs" 'j.resultats?[...new Set(j.resultats.flatMap(r=>r.valeur||[]))]:"mesure indisponible : "+j.erreur')" "foot"
 fi
 
 vf_hyg_assert
