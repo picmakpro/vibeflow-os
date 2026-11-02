@@ -191,11 +191,21 @@ for v in "0:Hunter2pass" "1:ghSECRETpass" "2:dXNlcjpwYXNz" "3:MotDePasse123" "4:
   assert_eq "M3.${v%%:*} — forme ${v%%:*} : le secret « ${v#*:} » ne sort pas" "$(printf '%s' "$RF" | node "$AUX/ev.mjs" "j[${v%%:*}].includes('${v#*:}')")" "false"
 done
 assert_has "M3.9 — témoin : la forme -u masquée garde le début de la commande" "$(printf '%s' "$RF" | node "$AUX/ev.mjs" 'j[0]')" "curl"
-# non-régression : ni « -u root » seul, ni une URL sans identifiants, ni « mysql -p » invite, ni un `mkdir -p`, ni un export générique ne sont masqués
+# non-régression : rien d'ordinaire n'est masqué à tort (« -u root » seul, URL nue, « mysql -p » invite, `mkdir -p`, export générique, `ssh -p`, `push -u`).
+# Depuis la décision du 2026-11-02 (Samuel, AskUserQuestion session principale) la commande est réduite au programme et à son premier argument : un premier argument « -x » disparaît dans « … ».
 NEG='["curl -u root https://example.com/a","git clone https://github.com/a/b.git","mysql -u root -p","mkdir -p dir/sub","export FOO=valeur","ssh -p 2222 host","git push -u origin main"]'
 RN="$(printf '%s' "$NEG" | node "$AUX/mask-formes.mjs" "$SCRIPTS" "$LAB" "$WORK/home")"
-assert_eq "M4 — aucune de ces commandes ordinaires n'est touchée (« -u root », URL nue, -p invite, mkdir -p, export, ssh -p, push -u)" "$(printf '%s' "$RN" | node "$AUX/ev.mjs" 'j')" "$NEG"
+assert_eq "M4 — ces commandes ordinaires sont réduites au programme et au premier argument (export générique intact)" "$(printf '%s' "$RN" | node "$AUX/ev.mjs" 'j')" '["curl …","git clone …","mysql …","mkdir …","export FOO=valeur","ssh …","git push …"]'
+assert_eq "M4b — aucune n'est masquée à tort (jamais « [masqué] »)" "$(printf '%s' "$RN" | node "$AUX/ev.mjs" 'j.some((x) => x.includes("[masqué]"))')" "false"
 
+# D3, décision du 2026-11-02 (Samuel, AskUserQuestion session principale, « N'afficher que le programme ») : « Voir la dernière commande » n'affiche que le programme et son premier
+# argument. Des secrets que AUCUN masque ne connaît (redis -a, cookie, JSON, docker -p, variable d'environnement en tête) ne sortent donc jamais : rien au-delà du premier argument.
+cat > "$AUX/formes-d3.json" <<'JSON'
+["redis-cli -a Secret99 ping","curl -H 'Cookie: session=SessSecret99' https://x","curl -d '{\"password\":\"JsonSecret99\"}' https://x","docker login -u u -p Secret99","GITHUB_TOKEN=EnvSecret99 gh pr list","git push origin main","sshpass -pXXX ssh h","mysql -pXXX -u root","ls","curl https://u:Secret99@h/x","FOO=\"a Secret99\" gh pr list","git commit -m \"msg Secret99\"","curl \"https://x?k=Secret99\"","echo sk-abcdefghijklmnopqrstuvwx"]
+JSON
+R5="$(node "$AUX/mask-formes.mjs" "$SCRIPTS" "$LAB" "$WORK/home" < "$AUX/formes-d3.json")"
+assert_eq "M5.1 — formes attendues exactes : programme + premier argument + « … » ; secrets non listés, affectation citée, -m et chaîne citée absents" "$(printf '%s' "$R5" | node "$AUX/ev.mjs" 'j')" '["redis-cli …","curl …","curl …","docker login …","gh pr …","git push …","sshpass …","mysql …","ls","curl https://[masqué]@h/x","gh pr …","git commit …","curl …","echo [masqué]"]'
+assert_eq "M5.2 — aucun des secrets (Secret99, SessSecret99, JsonSecret99, EnvSecret99) ne sort, dans aucune forme" "$(printf '%s' "$R5" | node "$AUX/ev.mjs" '/Secret99/.test(JSON.stringify(j))')" "false"
 echo "=== L — aucun script du lab n'est exécuté ==="
 TRAP="$WORK/trap.sh"; printf '#!/usr/bin/env bash\ntouch "%s/EXEC-$(basename "$(dirname "$0")")"\ncase "$1" in status) echo "{\\"locks\\":[]}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' "$WORK" > "$TRAP"
 LB="$WORK/labL"; mkdir -p "$LB/.planning" "$LB/.claude/scripts" "$LB/.vibeflow/cockpit" "$LB/plugin/x"; cp "$TRAP" "$LB/.claude/scripts/driver-lock.sh"; cp "$TRAP" "$LB/.vibeflow/cockpit/driver-lock.sh"

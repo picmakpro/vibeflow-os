@@ -135,7 +135,7 @@ assert_eq "W6.2 — identifiant bien formé absent de la collecte" "$(Q reveal "
 
 echo "=== W7 — masquage des jetons ==="
 TOK1="ghp_$(printf 'a%.0s' $(seq 1 36))"; TOK2="sk-$(printf 'b%.0s' $(seq 1 24))"
-mk_session "$TRD/$SID.jsonl" cwd "deploy avec $TOK1 puis $TOK2 fin"
+mk_session "$TRD/$SID.jsonl" cwd "deploy $TOK1 puis $TOK2 fin"
 R=$(Q reveal "$LAB" "$HOME_T" "$NOSCRIPTS" "$SID" | node "$AUX/stdin-get.mjs" 'j.doing')
 assert_has "W7.1 — [masqué] à la place des jetons" "$R" "[masqué]"
 assert_eq "W7.2 — aucun jeton ghp_ ni sk- dans la révélation" "$(printf '%s' "$R" | grep -cE 'ghp_|sk-')" "0"
@@ -217,7 +217,7 @@ const L = (o, t) => JSON.stringify({ ...base, timestamp: t, ...o });
 const texte = { type: 'assistant', message: { content: [{ type: 'text', text: "J'ai consigné l'étape 3. **Verdict :** TEXTE-ASSISTANT-D3" }] } };
 const lignes = [L({ type: 'user', message: { content: 'salut' } }, '2026-11-01T10:00:00Z')];
 if (forme === 'cmd-puis-texte') {
-  lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { description: 'DESC-D3', command: 'git status --short COMMANDE-BASH-D3' } }] } }, '2026-11-01T10:00:05Z'));
+  lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { description: 'DESC-D3', command: 'echo COMMANDE-BASH-D3 reste de la commande' } }] } }, '2026-11-01T10:00:05Z'));
   lignes.push(L({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'x', content: 'ok' }] } }, '2026-11-01T10:00:06Z'));
 } else if (forme === 'deux-bash-un-message') { // F-2 : deux appels Bash dans UN message, le dernier du tableau est le plus récent
   lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'echo PREMIER-D3' } }, { type: 'tool_use', name: 'Bash', input: { command: 'echo SECOND-D3' } }] } }, '2026-11-01T10:00:05Z'));
@@ -226,8 +226,10 @@ if (forme === 'cmd-puis-texte') {
   lignes.push(L({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'x', content: 'ok' }] } }, '2026-11-01T10:00:06Z'));
   lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'echo RECENT-D3' } }] } }, '2026-11-01T10:00:07Z'));
   lignes.push(L({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'y', content: 'ok' }] } }, '2026-11-01T10:00:08Z'));
-} else if (forme === 'jeton-a-cheval') { // F-2 : un jeton sk- qui franchit le 120e caractère ; coupé avant le masque, sa partie visible (15 car.) ne ressemble plus à un jeton
-  lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'echo ' + 'a'.repeat(100) + ' sk-' + 'b'.repeat(24) + ' fin' } }] } }, '2026-11-01T10:00:05Z'));
+} else if (forme === 'jeton-a-cheval') { // F-2 : un jeton sk- que la coupe d'affichage (80 car.) partagerait ; masqué AVANT la coupe, sa partie restante (12 car. de jeton) ne ressemble plus à un jeton
+  lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'echo ' + 'a'.repeat(59) + ':sk-' + 'b'.repeat(24) + ' fin' } }] } }, '2026-11-01T10:00:05Z'));
+} else if (forme === 'mot-geant') { // décision du 2026-11-02 : une borne de longueur sur l'affichage, même pour un seul mot de 4 000 caractères
+  lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'echo ' + 'm'.repeat(4000) } }] } }, '2026-11-01T10:00:05Z'));
 } else if (forme === 'autre-outil') {
   lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Read', input: { file_path: '/x/LECTURE-D3' } }] } }, '2026-11-01T10:00:05Z'));
 }
@@ -238,6 +240,7 @@ H15D="$WORK/home15d"; mkdir -p "$H15D/.claude/projects/-lab"
 node "$AUX/mk-d3.mjs" "$H15D/.claude/projects/-lab/$SID.jsonl" "$LAB" cmd-puis-texte
 R15="$(Q reveal "$LAB" "$H15D" "$NOSCRIPTS" "$SID")"
 assert_has "W15.1 — un appel Bash suivi d'un message texte : on rend la commande Bash" "$(printf '%s' "$R15" | node "$AUX/stdin-get.mjs" 'j.doing')" "COMMANDE-BASH-D3"
+assert_eq "W15.1b — décision du 2026-11-02 (Samuel, AskUserQuestion session principale) : le programme et son premier argument seulement, rien au-delà" "$(printf '%s' "$R15" | node "$AUX/stdin-get.mjs" 'j.doing')" "echo COMMANDE-BASH-D3 …"
 assert_not "W15.2 — le texte de l'assistant n'apparaît pas" "$(printf '%s' "$R15" | node "$AUX/stdin-get.mjs" 'j.doing')" "TEXTE-ASSISTANT-D3"
 assert_not "W15.3 — la description de l'appel n'est pas présentée comme la commande" "$(printf '%s' "$R15" | node "$AUX/stdin-get.mjs" 'j.doing')" "DESC-D3"
 for forme in texte-seul autre-outil; do
@@ -247,13 +250,14 @@ for forme in texte-seul autre-outil; do
 done
 
 # F-2 (revue de D3) : trois mutants de D3 survivaient (ordre dans un message, ordre entre messages, coupe à 120 avant le masque)
-for forme in deux-bash-un-message deux-messages-bash jeton-a-cheval; do
+for forme in deux-bash-un-message deux-messages-bash jeton-a-cheval mot-geant; do
   node "$AUX/mk-d3.mjs" "$H15D/.claude/projects/-lab/$SID.jsonl" "$LAB" "$forme"
   D15="$(Q reveal "$LAB" "$H15D" "$NOSCRIPTS" "$SID" | node "$AUX/stdin-get.mjs" 'j.doing')"
   case "$forme" in
     deux-bash-un-message) assert_has "W15.5 — deux appels Bash dans un message : le DERNIER du tableau" "$D15" "SECOND-D3"; assert_not "W15.5b — ... et pas le premier" "$D15" "PREMIER-D3" ;;
     deux-messages-bash) assert_has "W15.6 — deux messages Bash successifs : le plus RÉCENT" "$D15" "RECENT-D3"; assert_not "W15.6b — ... et pas l'ancien" "$D15" "ANCIEN-D3" ;;
-    jeton-a-cheval) assert_not "W15.7 — un jeton à cheval sur le 120e caractère : aucune partie ne fuit (masque AVANT la coupe)" "$D15" "sk-bbbb"; assert_has "W15.7b — témoin : le jeton est remplacé par [masqué]" "$D15" "[masqué]" ;;
+    jeton-a-cheval) assert_not "W15.7 — un jeton que la coupe de 80 caractères partagerait : aucune partie ne fuit (masque AVANT la coupe)" "$D15" "sk-bbbb"; assert_has "W15.7b — témoin : le jeton est remplacé par [masqué]" "$D15" "[masqué]" ;;
+    mot-geant) assert_eq "W15.8 — un premier argument de 4 000 caractères ne sort pas entier : affichage borné à 80 caractères" "$(printf '%s' "$D15" | wc -m | tr -d ' ')" "80" ;;
   esac
 done
 
@@ -365,7 +369,7 @@ vf_hyg_stop "$SRVD"
 [ -z "${KEEPXD:-}" ] || echo "$XD" > "$KEEPXD"
 V='j.resultats[0].valeur'
 assert_eq "W16.0 — témoin : la mesure a eu lieu (aucune erreur) et le tiroir est ouvert" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" '(j.erreur||"")+"|"+('$V'.erreur||"")+"|"+'$V'.titre')" "||Au travail (1)"
-assert_eq "W16.1 — D3 dans le tiroir : « Voir la dernière commande » montre la commande Bash" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "$V.doing")" "git status --short COMMANDE-BASH-D3"
+assert_eq "W16.1 — D3 dans le tiroir : « Voir la dernière commande » montre la commande Bash" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "$V.doing")" "echo COMMANDE-BASH-D3 …"
 assert_eq "W16.2 — témoin : le panneau de référence a une marge gauche (>= 16 px)" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "$V.refMarge >= 16")" "true"
 assert_eq "W16.3 — D2 : la marge gauche du titre du tiroir est au moins celle du panneau de référence" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "$V.marge >= $V.refMarge")" "true"
 assert_eq "W16.4 — D2 : le titre est contenu dans le tiroir et non rogné, aucun débordement horizontal" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "[$V.h3Dedans, $V.h3Rogne, $V.debordeX]")" "[true,false,false]"
