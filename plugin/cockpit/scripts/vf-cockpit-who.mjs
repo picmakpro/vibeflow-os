@@ -190,8 +190,8 @@ const BORNE_COMMANDE = 80;
 const SIMPLE = /^[A-Za-z0-9_.\/:@%+,~-]+$/;
 const AFFECTATION = /^[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_.\/:@%+,~-]*$/;
 const resume = (cmd) => {
-  // un retour à la ligne est un séparateur de commandes : il devient un mot non simple (comme `;`), jamais un simple espace, sinon le mot de la ligne suivante serait pris pour un argument
-  const mots = cmd.trim().replace(/\s*\n\s*/g, ' \n ').split(/[ \t\r\f\v]+/).filter(Boolean); let i = 0;
+  // le shell ne sépare les mots que sur espace, tabulation et retour à la ligne : `\r`, `\f`, `\v` restent DANS le mot (non simple, donc « … »). Un retour à la ligne (`\r\n` compris, `\s` couvre `\r`) est un séparateur de commandes : il devient un mot non simple (comme `;`), jamais un simple espace, sinon le mot de la ligne suivante serait pris pour un argument
+  const mots = cmd.trim().replace(/\s*\n\s*/g, ' \n ').split(/[ \t]+/).filter(Boolean); let i = 0;
   while (i < mots.length && AFFECTATION.test(mots[i])) i++;
   const prog = mots[i]; if (prog === undefined || !SIMPLE.test(prog) || prog.startsWith('-')) return '…';
   const arg = mots[i + 1]; const montre = arg !== undefined && SIMPLE.test(arg) && !arg.startsWith('-');
