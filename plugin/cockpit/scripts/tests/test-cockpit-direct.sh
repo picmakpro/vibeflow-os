@@ -200,6 +200,61 @@ wait "$C"
 assert_has "D6.1 — le patch de la mission porte son résumé à jour (1 nœud fait)" "$(node "$AUX/ev.mjs" "$WORK/e6.jsonl" 'E.filter(e=>e.event==="patch").flatMap(e=>e.data.patch).filter(p=>p.ref==="n:dag-MISSION-1-x").map(p=>p.sum).join("|")')" "2 nœuds, 1 fait."
 stop_srv
 
+
+echo "=== D7 — recette humaine du 2026-11-02 dans le navigateur (D1 parcours, I2 titre flouté, I3 direct sans réapparition, libellé de type) ==="
+CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
+if [ -z "$CHROME" ]; then echo "  ⊘ D7 SAUTÉ : aucun navigateur (Chrome, Chromium) — D1, I2, I3 et le libellé de type NON vérifiés, non comptés comme réussis"; else
+cat > "$AUX/jg.mjs" <<'JS'
+// jg.mjs <expression sur j> : j = JSON lu sur l'entrée standard (sortie de chrome-cdp)
+import fs from 'node:fs';
+const j = JSON.parse(fs.readFileSync(0, 'utf8') || '{}');
+const v = new Function('j', 'return (' + process.argv[2] + ')')(j);
+console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
+cat > "$AUX/d1.js" <<'JS'
+(async () => {
+  const SC = window.VibeFlow, pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  const att = async (f) => { for (let i = 0; i < 100; i++) { const v = f(); if (v) return v; await pause(50); } return null; };
+  const f = SC.graph.flows.find((x) => x.id === 'trajectoire');
+  if (!f) return { erreur: 'parcours trajectoire absent' };
+  const tpl = document.createElement('template'); tpl.innerHTML = SC.iconI('x');
+  const dX = tpl.content.querySelector('path').getAttribute('d');
+  const bar = () => document.getElementById('flowbar');
+  const actif = (b) => { if (!b || b.disabled || b.hidden) return false; const r = b.getBoundingClientRect(), cs = getComputedStyle(b); return r.width > 0 && r.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden'; };
+  const mesure = () => { const bs = [...bar().querySelectorAll('button')]; return { croix: bs.filter((b) => b.querySelector('path')?.getAttribute('d') === dX && actif(b)).length, suivantActif: actif(document.getElementById('fl-next')), precedentActif: actif(document.getElementById('fl-prev')), fermer: actif(document.getElementById('fl-x')) }; };
+  SC.startFlow('trajectoire');
+  if (!await att(() => !bar().hidden && document.getElementById('fl-next'))) return { erreur: 'barre de parcours absente' };
+  const debut = mesure();
+  for (let i = 0; i < f.steps.length - 1; i++) { const vieux = document.getElementById('fl-next'); vieux.click(); if (!await att(() => !vieux.isConnected && document.getElementById('fl-next'))) return { erreur: 'étape ' + (i + 2) + ' non atteinte' }; }
+  const fin = mesure();
+  document.getElementById('fl-x').click(); await pause(200);
+  return { etapes: f.steps.length, debut, fin, barreFermee: bar().hidden };
+})()
+JS
+LABN="$WORK/labn"; mkdir -p "$LABN/src" "$LABN/library" "$LABN/config" "$LABN/.planning/phases/01-x" "$LABN/.planning/missions"
+printf 'export const u = () => 1;\n' > "$LABN/src/util.js"; printf 'export const l = () => 2;\n' > "$LABN/library/lib.js"; printf 'export const c = () => 3;\n' > "$LABN/config/conf.js"
+printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n- [ ] **Phase 2: Suite** - deuxième jet\n- [ ] **Phase 3: Fin** - dernier jet\n' > "$LABN/.planning/ROADMAP.md"
+printf '<objective>Faire le socle</objective>\n' > "$LABN/.planning/phases/01-x/01-01-PLAN.md"; echo ok > "$LABN/.planning/phases/01-x/01-01-SUMMARY.md"
+printf '{"nodes":[{"id":"a","step":"un","deps":[],"status":"running"},{"id":"b","step":"deux","deps":["a"],"status":"ready"}]}\n' > "$LABN/.planning/missions/MISSION-1-x.dag.json"
+git -C "$LABN" init -q && git -C "$LABN" add -A && git -C "$LABN" -c user.email=t@t -c user.name=t commit -q -m init
+node "$SCRIPTS/vf-cockpit-build.mjs" "$LABN" --quiet > "$WORK/build-n.out" 2>&1 || { echo "assemblage KO"; cat "$WORK/build-n.out"; }
+demarrer "$LABN"
+URLC="http://127.0.0.1:$PORT/index.html"; URLP="http://127.0.0.1:$PORT/project.html"
+cdp() { local g="$1" e="$2"; shift 2; CDP_VIEWPORT=1280x800 node "$SCRIPTS/tests/chrome-cdp.mjs" "$CHROME" "$g" "$(cat "$AUX/$e")" "$@"; }
+V='j.resultats[0].valeur'
+
+XD1="$(CDP_PRET="document.readyState === 'complete' && !!window.VibeFlow && !!document.getElementById('vf-lock')" cdp 500 d1.js "$URLP")"
+assert_eq "D7.1 — D1 témoin : la mesure a eu lieu, le parcours « trajectoire » a plusieurs étapes" "$(printf '%s' "$XD1" | node "$AUX/jg.mjs" "($V.erreur||j.erreur||'')+'|'+($V.etapes>=3)")" "|true"
+assert_eq "D7.2 — D1 témoin : à la première étape, « précédent » est inactif et « suivant » actif, une seule croix" "$(printf '%s' "$XD1" | node "$AUX/jg.mjs" "[$V.debut.precedentActif,$V.debut.suivantActif,$V.debut.croix]")" "[false,true,1]"
+assert_eq "D7.3 — D1 : à la dernière étape, exactement UNE croix de fermeture visible" "$(printf '%s' "$XD1" | node "$AUX/jg.mjs" "$V.fin.croix")" "1"
+assert_eq "D7.4 — D1 : à la dernière étape, le chevron « suivant » est inactif ou masqué" "$(printf '%s' "$XD1" | node "$AUX/jg.mjs" "$V.fin.suivantActif")" "false"
+assert_eq "D7.5 — D1 : la croix restante ferme bien le parcours" "$(printf '%s' "$XD1" | node "$AUX/jg.mjs" "[$V.fin.fermer,$V.barreFermee]")" "[true,true]"
+
+
+
+stop_srv
+fi
+
 vf_hyg_assert
 echo ""
 echo "=================================="

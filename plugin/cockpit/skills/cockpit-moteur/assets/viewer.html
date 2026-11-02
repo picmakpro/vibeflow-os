@@ -1872,9 +1872,9 @@ function flowStep() {
   const container = b ? lcaContainer(a, b) : parentOf.get(a) || 'root';
   const bar = $('#flowbar'); bar.hidden = false;
   bar.innerHTML = `<div class="ft"><div class="fk">${h(f.title)} · step ${i + 1} of ${f.steps.length}</div><b>${h(info(a).name)}</b>${b ? ` <span>→</span> <b>${h(info(b).name)}</b>` : ''}<br><span>${h(f.steps[i].note)}</span><div class="dots">${f.steps.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div></div>
-    <button class="btn icon" id="fl-prev" ${i === 0 ? 'disabled' : ''}>${iconI('left')}</button><button class="btn icon" id="fl-next">${iconI(i >= f.steps.length - 1 ? 'x' : 'right')}</button><button class="btn icon" id="fl-x" title="Exit">${iconI('x')}</button>`;
+    <button class="btn icon" id="fl-prev" ${i === 0 ? 'disabled' : ''}>${iconI('left')}</button><button class="btn icon" id="fl-next" ${i >= f.steps.length - 1 ? 'disabled' : ''}>${iconI('right')}</button><button class="btn icon" id="fl-x" title="Exit">${iconI('x')}</button>`;
   $('#fl-prev').onclick = () => { state.flow.i--; flowStep(); };
-  $('#fl-next').onclick = () => { if (state.flow.i >= f.steps.length - 1) stopFlow(); else { state.flow.i++; flowStep(); } };
+  $('#fl-next').onclick = () => { if (state.flow.i < f.steps.length - 1) { state.flow.i++; flowStep(); } }; // vibeflow P22 : à la dernière étape le chevron est inactif (comme « précédent » à la première) ; la fermeture est la seule croix
   $('#fl-x').onclick = stopFlow;
   // an answer's walkthrough plays on the answer board itself
   if (state.flow.inPlace) { if (state.container === 'q:answer') highlightFlow(a, b); else go('q:answer', { after: () => highlightFlow(a, b) }); }
