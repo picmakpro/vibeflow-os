@@ -40,6 +40,17 @@ AskUserQuestion session principale, 2026-11-01.
   et « Réessayer » (un seul sondage pour les deux flux, au lieu de deux requêtes par seconde sans fin). Suite `test-cockpit-reconnexion.sh`.
 - **Direct** : le résumé d'une carte de mission suit le statut de ses nœuds ; « Thinking… » traduit avant la peinture.
 
+### Corrigé (recette humaine du 2026-11-02, avant toute publication)
+- **En-tête à 1 024 px** (R8, R9) — la mise en page souris est conditionnée à `not (pointer: coarse)` au lieu de `(pointer: fine)` : Chrome headless sous Linux n'annonce aucun pointeur et retombait à tort sur la mise en page tactile ; tests R8 et R9 ajoutés. Source : recette humaine du 2026-11-02.
+- **« Voir la dernière commande »** (D3) — montre la dernière commande Bash de la session, plus le dernier message de l'assistant. Source : recette humaine du 2026-11-02.
+- **Tiroir « Au travail »** (D2) — marge et hauteur ajustées. Source : recette humaine du 2026-11-02.
+- **« Où en est-on ? » après une réponse de l'agent** (V1) — les formes courantes répondent sur place même une fois l'agent intervenu : la voie locale ne dépend plus de l'absence de session. Effet de bord arbitré : une relance qui dépend du fil et contient un mot de la voie locale reçoit la réponse locale (arbitrage Samuel, option A, AskUserQuestion session principale, 2026-11-02). Source : recette humaine du 2026-11-02.
+- **Parcours « Trajectoire »** (D1) — à la dernière étape, le chevron « suivant » est inactif et il ne reste qu'une croix. Source : recette humaine du 2026-11-02.
+- **Vue d'ensemble** (I2) — léger flou et fond translucide derrière le titre et le sous-titre. Source : recette humaine du 2026-11-02.
+- **Mise à jour en direct** (I3) — la carte ne rejoue plus son animation d'apparition ; seules les cartes basculées clignotent. Source : recette humaine du 2026-11-02.
+- **Types de carte en français** — « Library » et ses pairs sont traduits dans le chrome de l'onglet Code. Source : recette humaine du 2026-11-02.
+- **Onglet Code, dossiers de `plugin/` sans `module.json`** — ils ont désormais leur nœud (kind infra, outillage) au lieu de tomber dans « non assigné » ; règle générique, sans liste de noms. Source : recette humaine du 2026-11-02 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-02).
+
 ### Sécurité et robustesse (correction A de la Phase 67, avant toute publication)
 - **Chaîne lab piégé -> XSS -> jeton -> exécution de code rompue à trois endroits** — échappement de tout champ du graphe (patch P16), Content-Security-Policy
   par empreintes avec `connect-src 'self'` et en-têtes `nosniff`/`DENY` (P17), « modifier le plan » durci : seuls `plan.mjs` et `build.mjs` du moteur du module
