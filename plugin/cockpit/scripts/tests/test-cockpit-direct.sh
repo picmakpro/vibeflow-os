@@ -231,6 +231,18 @@ cat > "$AUX/d1.js" <<'JS'
   return { etapes: f.steps.length, debut, fin, barreFermee: bar().hidden };
 })()
 JS
+cat > "$AUX/i2.js" <<'JS'
+(async () => {
+  const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  const ctx = document.getElementById('context'), out = { titre: ctx.querySelector('h1')?.textContent || '' };
+  for (const th of ['light', 'dark']) {
+    document.documentElement.setAttribute('data-theme', th); await pause(150);
+    const cs = getComputedStyle(ctx), m = /rgba?\(([^)]+)\)/.exec(cs.backgroundColor), p = m ? m[1].split(',').map(Number) : [];
+    out[th] = { theme: document.documentElement.getAttribute('data-theme'), fond: getComputedStyle(document.documentElement).getPropertyValue('--bg-rgb').trim(), filtre: cs.backdropFilter, alpha: p.length === 4 ? p[3] : p.length === 3 ? 1 : null, evenements: cs.pointerEvents, largeur: Math.round(ctx.getBoundingClientRect().width), gauche: Math.round(ctx.querySelector('h1').getBoundingClientRect().left) };
+  }
+  return out;
+})()
+JS
 LABN="$WORK/labn"; mkdir -p "$LABN/src" "$LABN/library" "$LABN/config" "$LABN/.planning/phases/01-x" "$LABN/.planning/missions"
 printf 'export const u = () => 1;\n' > "$LABN/src/util.js"; printf 'export const l = () => 2;\n' > "$LABN/library/lib.js"; printf 'export const c = () => 3;\n' > "$LABN/config/conf.js"
 printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n- [ ] **Phase 2: Suite** - deuxième jet\n- [ ] **Phase 3: Fin** - dernier jet\n' > "$LABN/.planning/ROADMAP.md"
@@ -250,6 +262,16 @@ assert_eq "D7.3 — D1 : à la dernière étape, exactement UNE croix de fermetu
 assert_eq "D7.4 — D1 : à la dernière étape, le chevron « suivant » est inactif ou masqué" "$(printf '%s' "$XD1" | node "$AUX/jg.mjs" "$V.fin.suivantActif")" "false"
 assert_eq "D7.5 — D1 : la croix restante ferme bien le parcours" "$(printf '%s' "$XD1" | node "$AUX/jg.mjs" "[$V.fin.fermer,$V.barreFermee]")" "[true,true]"
 
+for P in "index.html" "project.html"; do
+  XI2="$(CDP_PRET="document.readyState === 'complete' && !!document.querySelector('#context h1')" cdp 500 i2.js "http://127.0.0.1:$PORT/$P")"
+  assert_eq "D7.6 ($P) — I2 témoin : mesure faite, titre présent, les deux thèmes ont bien changé de fond" "$(printf '%s' "$XI2" | node "$AUX/jg.mjs" "($V.erreur||j.erreur||'')+'|'+($V.titre.length>0)+'|'+($V.light.theme+$V.dark.theme)+'|'+($V.light.fond!==$V.dark.fond)")" "|true|lightdark|true"
+  for TH in light dark; do
+    assert_eq "D7.7 ($P, $TH) — I2 : backdrop-filter derrière le titre et le sous-titre" "$(printf '%s' "$XI2" | node "$AUX/jg.mjs" "/blur\\(/.test($V.$TH.filtre)")" "true"
+    assert_eq "D7.8 ($P, $TH) — I2 : fond translucide (0 < alpha < 1)" "$(printf '%s' "$XI2" | node "$AUX/jg.mjs" "$V.$TH.alpha>0&&$V.$TH.alpha<1")" "true"
+    assert_eq "D7.9 ($P, $TH) — I2 : la zone ne capte aucun événement de la carte et reste au texte (pas plus large que le bloc de titre)" "$(printf '%s' "$XI2" | node "$AUX/jg.mjs" "[$V.$TH.evenements,$V.$TH.largeur<=600]")" '["none",true]'
+    assert_eq "D7.9b ($P, $TH) — I2 : le texte reste à sa place (marge gauche du titre = 24 px, comme avant le flou)" "$(printf '%s' "$XI2" | node "$AUX/jg.mjs" "$V.$TH.gauche")" "24"
+  done
+done
 
 
 stop_srv

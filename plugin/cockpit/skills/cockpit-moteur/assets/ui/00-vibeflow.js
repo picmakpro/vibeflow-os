@@ -43,6 +43,11 @@
     .vf-link { display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; border-radius: 10px; font-size: 12.5px; color: inherit; text-decoration: none; }
     .vf-link:hover { background: var(--surface-hover); }
     .vf-link code { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-2); word-break: break-all; }
+    /* I2 (recette 2026-11-02) : le titre et le sous-titre de la vue d'ensemble se mélangeaient aux graphes que l'on fait glisser dessous.
+       Fond translucide + léger flou derrière le texte (les deux thèmes : --bg-rgb suit le thème) ; la marge négative compense le remplissage, le texte ne bouge pas.
+       #context ne capte aucun événement (pointer-events: none, hérité du viewer) : la carte reste glissable sous la zone. */
+    #context { padding: 8px 14px 10px; margin: -8px -14px -10px; border-radius: 16px; background: rgba(var(--bg-rgb), .55); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+    #context:empty { display: none; }
   `;
   // spike 005 : la barre de question reste visible quand serve.mjs (P7) sert l'onglet Projet
   if (TAB === 'project') style.textContent += `#btn-health${window.FLOORPLAN_SERVER ? '' : ', #ask'} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }`;
