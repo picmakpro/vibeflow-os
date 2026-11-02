@@ -95,7 +95,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
     const r = resoudreModele({ choix: body.model, env: process.env });
     if (r.erreur) { send('failure', { code: 'modele_refuse', message: `Modèle refusé : seuls ${MODELES.join(', ')} sont admis.` }); return 'repondu'; }
     body.modeleResolu = r.modele; // écrasé à chaque question, jamais écrit sur disque ni journalisé avec la question
-    if (body.project && (!body.mode || body.mode === 'ask') && !body.session) {
+    if (body.project && (!body.mode || body.mode === 'ask')) { // même avec une conversation de l'agent en cours : le navigateur renvoie `session` après toute réponse de l'agent, et une forme courante doit rester immédiate (recette 67, 2026-11-02)
       const t0 = Date.now();
       let local = null;
       try { local = answerLocally(GP, String(body.question || '')); } catch (e) { log('warn', `réponse locale en échec, repli sur l'agent : ${String(e.message).slice(0, 120)}`); } // jamais une exception qui tue le serveur
