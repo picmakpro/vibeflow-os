@@ -31,7 +31,7 @@
 - [Gate repo-wide en acceptance criteria](feedback_gate-repo-wide-en-acceptance-criteria.md) — rouge à cause d'un fichier hors `<files>` : déviation déclarée minimale en commit séparé, jamais un HALT
 - [Halt tardif : cherry-pick, pas stash](feedback_halt-tardif-cherry-pick-pas-stash.md) — le worker a déjà commité quand l'ordre arrive ; arbre principal sale = worktree, jamais checkout
 - [Une liste de cas ne ferme pas une classe](feedback_liste-de-cas-ne-ferme-pas-une-classe.md) — 4 défauts d'affilée sur la même normalisation : exiger point fixe + preuve générative, pas un Nième point-fix
-- [`gsd_run` absent, flags déjà désarmés](project_gsd-run-absent-flags-deja-desarmes.md) — le reset d'enchaînement échoue toujours ici ; vérifier les deux flags par lecture de `.planning/config.json`, ne pas escalader
+- [Reset des flags : config-set --ws crée un config de compartiment](project_gsd-run-absent-flags-deja-desarmes.md) — lire par config-get avant d écrire ; le fichier créé masque la racine, le supprimer
 - [Attestation sur SHA figé](feedback_attestation-sur-sha-fige.md) — `git show HEAD:` se sabote au commit ; « 57/57 » rapporté, 56/1 réel : rejouer APRÈS le commit
 - [Preuve du chemin heureux ≠ chemin d'échec](feedback_preuve-du-chemin-heureux-ne-couvre-pas-l-echec.md) — md5 sur 262 fichiers + 3 suites vertes, et 4 bloquants quand même : exiger une injection de panne
 - [Non-régression sur la découverte COMPLÈTE](feedback_non-regression-sur-la-decouverte-complete.md) — 3 suites vérifiées sur 62 : une régression d'un autre module a traversé 6 revues sans être vue
@@ -102,3 +102,4 @@
 - [Assouplir sur indéterminé = fail-open](feedback_assouplir-sur-indetermine-rouvre-un-fail-open.md) — « continue sur rc 3 » laisse passer ce que le gate n'a pas lu : trier les causes, jamais le code
 - [Pile de phases, main qui bouge](project_phases-empilees-main-qui-bouge.md) — chaque merge d'autrui = rebase en chaîne + CI 55 min ; REQUIREMENTS en union, rebaser une fois avant la CI utile
 - [Nettoyeur de test qui tue tout](project_hygiene-test-tue-tout-awk-env.md) — crash 2026-11-02 : env préfixé sur ps pas awk + index vide=1 macOS ; marque validée, plafond, preuve à sec, leurre
+- [Rouge CSS Linux seulement : pointer, pas polices](project_chrome-headless-linux-pointer-none.md) — Chrome headless Linux = pointer: none ; replay --job tests ne rejoue plus rien (matrice)
