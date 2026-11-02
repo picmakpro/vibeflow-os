@@ -169,32 +169,36 @@ const MASQUES = [
   /[A-Za-z0-9_]{0,64}(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential)[A-Za-z0-9_]{0,64}=\S+/gi,
   /--(?:password|passwd|secret|token|api[_-]?key)(?:=|\s+)\S+/gi, /\bX-Api-Key:\s*\S+/gi,
   // F-1 (revue de D3) : identifiants d'une commande Bash hors « NOM=valeur ». Tous les quantificateurs sont bornés (pas de retour quadratique) ; le contexte est en lookbehind,
-  // seule la valeur secrète est remplacée. Les `export FOO=valeur` génériques ne sont pas masqués : seuls les noms sensibles le sont (règle plus haut).
-  // (les motifs propres à la syntaxe d'un programme, `mysql -pXXX` et `sshpass -p XXX`, ont été retirés : leur option commence par « - », que la dernière commande n'affiche plus)
+  // seule la valeur secrète est remplacée. Les `export FOO=valeur` génériques ne sont pas masqués par ces règles : seuls les noms sensibles le sont (règle plus haut).
+  // `mysql -pXXX` et `sshpass -p XXX` : la dernière commande ne les affiche plus (option en « - »), mais task/cwd/role (`bornes`) les diffusent encore, d'où leur maintien.
+  /(?<=\b(?:mysql|mysqladmin|mysqldump|mariadb)\b[^|;&\n]{0,100}\s-p)\S+/g, // mysql -pMotDePasse (collé) ; « -p » seul = invite, intact
+  /(?<=\bsshpass\s{1,5}-p\s{0,3})\S+/g, // sshpass -p <mot de passe>
   /(?<=:\/\/)[^\s:@\/]{1,128}:[^\s@\/]{1,256}(?=@)/g, // scheme://user:pass@hôte
   /(?<=(?:^|\s)(?:-u|--user)[ =]{0,3})[^\s:]{1,128}:\S+/g, // curl -u user:pass, --user=user:pass (« -u root » seul n'a pas de « : »)
   /\bAuthorization:\s{0,8}(?:Digest\s[^'\n]{1,300}|(?:[A-Za-z]{1,20}\s{1,8})?[^\s"']+)/gi, // en-tête Authorization, tout schéma (Basic, Bearer, Token, Digest…)
 ];
-// l'entrée est bornée AVANT les masques (les sorties sont tronquées à 200 car. au plus) : le nom de variable sensible est en {0,64} et l'entrée en MAX_MASQUE,
+// l'entrée est bornée AVANT les masques (les sorties sont tronquées à 200 car. au plus pour task/cwd/role, à 80 pour la dernière commande) : le nom de variable sensible est en {0,64} et l'entrée en MAX_MASQUE,
 // sinon un mot de 100 Kio rendait le masque quadratique (17 s)
 const MAX_MASQUE = 4000;
 const masque = (t) => MASQUES.reduce((a, re) => a.replace(re, '[masqué]'), String(t).slice(0, MAX_MASQUE));
-// D3 (recette 2026-11-02) : « la dernière commande » est la dernière commande de l'outil Bash (tool_use name=Bash, input.command) de la session.
-// Un message texte de l'assistant n'est jamais rendu, même en repli : sans appel Bash lisible, `lastDoing` rend null (erreur « sans-action »).
 const BORNE_COMMANDE = 80;
-// réduit une commande au programme et à son premier argument (« git push … ») : jamais la commande entière. Les affectations d'environnement en tête (`NOM=valeur`,
-// valeur citée sur plusieurs mots comprise) sont sautées, sinon le « programme » serait le secret. Un premier argument qui commence par « - » (`-pXXX`, `-a Secret`),
-// par un guillemet (un mot coupé au milieu d'une chaîne citée), par `$(` ou par un backtick n'est pas affiché ; un programme qui commence ainsi non plus.
+// réduit une commande au programme et à son premier argument (« git push … ») ; limite acceptée : un secret passé en premier argument positionnel (`ls Secret99`) reste visible.
+// Les affectations d'environnement en tête (`NOM=valeur`, valeur citée sur plusieurs mots comprise) sont sautées, sinon le « programme » serait le secret ; une affectation dont la valeur
+// contient `$(`, un backtick ou finit par `\` (espace échappé) ne se lit pas de façon sûre : la sortie est « … ». Un premier argument qui commence par « - » (`-pXXX`, `-a Secret`), par un guillemet,
+// par `$(` ou un backtick, ou qui contient « = » (`DB_PASS=…`, chaîne de requête `?key=…`) n'est pas affiché ; un programme qui commence par « - », un guillemet, `$(` ou un backtick non plus.
 const resume = (cmd) => {
   const mots = cmd.split(/\s+/).filter(Boolean); let i = 0;
   for (; i < mots.length; i++) {
     const m = /^[A-Za-z_][A-Za-z0-9_]*=(["']?)/.exec(mots[i]); if (!m) break;
-    let clos = !m[1] || mots[i].slice(m[0].length).endsWith(m[1]); while (!clos && ++i < mots.length) clos = mots[i].endsWith(m[1]); if (!clos) return '…';
+    if (/\$\(|`|\\$/.test(mots[i])) return '…';
+    let clos = !m[1] || mots[i].slice(m[0].length).endsWith(m[1]); while (!clos && ++i < mots.length) { if (/\$\(|`|\\$/.test(mots[i])) return '…'; clos = mots[i].endsWith(m[1]); } if (!clos) return '…';
   }
-  const prog = mots[i]; if (prog === undefined || /^(?:["'`(]|\$\()/.test(prog)) return '…';
-  const arg = mots[i + 1]; const montre = arg !== undefined && !/^(?:-|["'`]|\$\()/.test(arg);
+  const prog = mots[i]; if (prog === undefined || /^(?:[-"'`(]|\$\()/.test(prog)) return '…';
+  const arg = mots[i + 1]; const montre = arg !== undefined && !/^(?:-|["'`]|\$\()/.test(arg) && !arg.includes('=');
   return [prog, ...(montre ? [arg] : []), ...(mots.length > i + (montre ? 2 : 1) ? ['…'] : [])].join(' ');
 };
+// D3 (recette 2026-11-02) : « la dernière commande » est la dernière commande de l'outil Bash (tool_use name=Bash, input.command) de la session.
+// Un message texte de l'assistant n'est jamais rendu, même en repli : sans appel Bash lisible, `lastDoing` rend null (erreur « sans-action »).
 const lastCommand = (d) => {
   const c = d?.message?.content; if (!Array.isArray(c)) return '';
   for (const x of [...c].reverse()) if (x?.type === 'tool_use' && x.name === 'Bash' && typeof x.input?.command === 'string' && x.input.command.trim()) return masque(resume(x.input.command.slice(0, MAX_MASQUE))).slice(0, BORNE_COMMANDE);

@@ -170,7 +170,8 @@ assert_eq "M1 — aucune des six valeurs secrètes ne ressort" "$(printf '%s' "$
 assert_has "M2 — témoin : la commande sort bien (le début « curl » est là, le reste masqué)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.doing')" "curl"
 
 # F-1 (revue de D3) : la dernière commande est une commande Bash, qui porte plus souvent un secret qu'un message texte. Formes d'identifiants hors « NOM=valeur » :
-# identifiants d'URL, -u/--user user:pass, en-tête Authorization (tout schéma), -p collé de mysql/mariadb et -p de sshpass. Les `export FOO=valeur` génériques ne sont PAS masqués (seuls les noms sensibles le sont).
+# identifiants d'URL, -u/--user user:pass, en-tête Authorization (tout schéma), -p collé de mysql/mariadb et -p de sshpass. Depuis la décision du 2026-11-02 la dernière commande est réduite à deux mots :
+# M3 ne garde plus que cette réduction (règle « - ») ; les masques eux-mêmes sont gardés par le canal task/cwd/role, cas MB plus bas.
 cat > "$AUX/mask-formes.mjs" <<'JS'
 // mask-formes.mjs <scripts> <lab> <home> : une session par commande ; rend, par commande, le texte révélé
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import path from 'node:path';
@@ -188,14 +189,14 @@ JS
 FORMES='["curl -u admin:Hunter2pass https://x","git clone https://user:ghSECRETpass@host/r.git","curl -H \"Authorization: Basic dXNlcjpwYXNz\" https://x","mysql -pMotDePasse123 -u root","curl --user=admin:Hunter2pass https://x","curl -H \"Authorization: Token abcdef123456\" https://x","curl -H \"Authorization: Digest username=\\\"bob\\\", response=\\\"RESP9\\\"\" https://x","sshpass -p Zebre9999 ssh host","mysqldump -pMotDePasse123 db"]'
 RF="$(printf '%s' "$FORMES" | node "$AUX/mask-formes.mjs" "$SCRIPTS" "$LAB" "$WORK/home")"
 for v in "0:Hunter2pass" "1:ghSECRETpass" "2:dXNlcjpwYXNz" "3:MotDePasse123" "4:Hunter2pass" "5:abcdef123456" "6:RESP9" "7:Zebre9999" "8:MotDePasse123"; do
-  assert_eq "M3.${v%%:*} — forme ${v%%:*} : le secret « ${v#*:} » ne sort pas" "$(printf '%s' "$RF" | node "$AUX/ev.mjs" "j[${v%%:*}].includes('${v#*:}')")" "false"
+  assert_eq "M3.${v%%:*} — réduction à deux mots (règle « - ») : le secret « ${v#*:} » de la forme ${v%%:*} ne sort pas" "$(printf '%s' "$RF" | node "$AUX/ev.mjs" "j[${v%%:*}].includes('${v#*:}')")" "false"
 done
-assert_has "M3.9 — témoin : la forme -u masquée garde le début de la commande" "$(printf '%s' "$RF" | node "$AUX/ev.mjs" 'j[0]')" "curl"
+assert_has "M3.9 — témoin : la forme -u réduite garde le début de la commande" "$(printf '%s' "$RF" | node "$AUX/ev.mjs" 'j[0]')" "curl"
 # non-régression : rien d'ordinaire n'est masqué à tort (« -u root » seul, URL nue, « mysql -p » invite, `mkdir -p`, export générique, `ssh -p`, `push -u`).
 # Depuis la décision du 2026-11-02 (Samuel, AskUserQuestion session principale) la commande est réduite au programme et à son premier argument : un premier argument « -x » disparaît dans « … ».
 NEG='["curl -u root https://example.com/a","git clone https://github.com/a/b.git","mysql -u root -p","mkdir -p dir/sub","export FOO=valeur","ssh -p 2222 host","git push -u origin main"]'
 RN="$(printf '%s' "$NEG" | node "$AUX/mask-formes.mjs" "$SCRIPTS" "$LAB" "$WORK/home")"
-assert_eq "M4 — ces commandes ordinaires sont réduites au programme et au premier argument (export générique intact)" "$(printf '%s' "$RN" | node "$AUX/ev.mjs" 'j')" '["curl …","git clone …","mysql …","mkdir …","export FOO=valeur","ssh …","git push …"]'
+assert_eq "M4 — réduction à deux mots : un premier argument en « - » ou contenant « = » (export FOO=valeur) disparaît dans « … »" "$(printf '%s' "$RN" | node "$AUX/ev.mjs" 'j')" '["curl …","git clone …","mysql …","mkdir …","export …","ssh …","git push …"]'
 assert_eq "M4b — aucune n'est masquée à tort (jamais « [masqué] »)" "$(printf '%s' "$RN" | node "$AUX/ev.mjs" 'j.some((x) => x.includes("[masqué]"))')" "false"
 
 # D3, décision du 2026-11-02 (Samuel, AskUserQuestion session principale, « N'afficher que le programme ») : « Voir la dernière commande » n'affiche que le programme et son premier
@@ -206,6 +207,32 @@ JSON
 R5="$(node "$AUX/mask-formes.mjs" "$SCRIPTS" "$LAB" "$WORK/home" < "$AUX/formes-d3.json")"
 assert_eq "M5.1 — formes attendues exactes : programme + premier argument + « … » ; secrets non listés, affectation citée, -m et chaîne citée absents" "$(printf '%s' "$R5" | node "$AUX/ev.mjs" 'j')" '["redis-cli …","curl …","curl …","docker login …","gh pr …","git push …","sshpass …","mysql …","ls","curl https://[masqué]@h/x","gh pr …","git commit …","curl …","echo [masqué]"]'
 assert_eq "M5.2 — aucun des secrets (Secret99, SessSecret99, JsonSecret99, EnvSecret99) ne sort, dans aucune forme" "$(printf '%s' "$R5" | node "$AUX/ev.mjs" '/Secret99/.test(JSON.stringify(j))')" "false"
+# F2/F1 (revue de 54e40b5e) : affectation de tête dont la valeur contient `$(`, un backtick ou finit par `\` -> « … » ; premier argument qui contient « = » (env, export, chaîne de requête) -> programme seul ; programme en « - » rejeté.
+cat > "$AUX/formes-f12.json" <<'JSON'
+["X=$(redis-cli -a Secret99 get k) echo hi","FOO=$(echo Secret99) gh pr list","FOO=a\\ Secret99 gh pr list","FOO=`echo Secret99` ls","env DB_PASS=Secret99 cmd","export STRIPE_KEY=Secret99","curl https://api.x/y?key=Secret99","export FOO=valeur","-a Secret99 ping"]
+JSON
+RF12="$(node "$AUX/mask-formes.mjs" "$SCRIPTS" "$LAB" "$WORK/home" < "$AUX/formes-f12.json")"
+assert_eq "M6.1 — formes attendues exactes : affectation de tête illisible -> « … », premier argument avec « = » -> programme seul" "$(printf '%s' "$RF12" | node "$AUX/ev.mjs" 'j')" '["…","…","…","…","env …","export …","curl …","export …","…"]'
+assert_eq "M6.2 — Secret99 ne sort dans aucune de ces formes" "$(printf '%s' "$RF12" | node "$AUX/ev.mjs" '/Secret99/.test(JSON.stringify(j))')" "false"
+# MB : canal task de `bornes` (description d'un sous-agent, diffusée en SSE). Un cas par motif de MASQUES : chaque valeur doit sortir masquée, et retirer un motif fait rougir son cas.
+cat > "$AUX/mask-bornes.mjs" <<'JS'
+// mask-bornes.mjs <scripts> <lab> <home> : description de sous-agent -> task bornée et masquée, une par entrée de stdin (JSON)
+import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import path from 'node:path';
+const [, , scripts, lab, home] = process.argv; const m = await import(pathToFileURL(scripts + '/vf-cockpit-who.mjs').href);
+const descs = JSON.parse(fs.readFileSync(0, 'utf8')); const sid = 'bbbb1111-2222-3333-4444-555566667777', d = path.join(home, '.claude', 'projects', '-lab');
+fs.mkdirSync(path.join(d, sid, 'subagents'), { recursive: true });
+const ligne = (type) => JSON.stringify({ type, cwd: lab, sessionId: sid, timestamp: new Date().toISOString(), gitBranch: 'main', version: '2.1', message: { content: 'ok' } });
+fs.writeFileSync(path.join(d, sid + '.jsonl'), ligne('user') + '\n' + ligne('assistant') + '\n');
+descs.forEach((t, i) => { fs.writeFileSync(path.join(d, sid, 'subagents', `agent-b${i}.meta.json`), JSON.stringify({ agentType: 'vf-coder', description: t })); fs.writeFileSync(path.join(d, sid, 'subagents', `agent-b${i}.jsonl`), ligne('assistant') + '\n'); });
+const w = m.collectWho(lab, { home }).workers.filter((x) => x.kind === 'subagent'); console.log(JSON.stringify(descs.map((_, i) => w.find((x) => x.id === `b${i}`)?.task)));
+JS
+BDESC='["token ghp_abcdefghijklmnopqrstuvwx fin","tok github_pat_ABCDEFGHIJKLMNOPQRSTUV fin","cle sk-abcdefghijklmnopqrstuvwx fin","aws AKIAABCDEFGHIJKLMNOP fin","slack xoxb-12345-abcdefg fin","curl Bearer abcdefghijklmnopqrstuv fin","MY_TOKEN=Tok12345 fin","--password Hunter2x fin","X-Api-Key: kkk111 fin","git clone https://usr:ghSECRETpass@h/r fin","curl -u admin:Hunter2pass x fin","curl Authorization: Basic dXNlcjpwYXNz fin","mysql -pMotDePasse123 db fin","sshpass -p Zebre9999 ssh h fin"]'
+BSEC=("ghp_abcdefghijklmnopqrstuvwx" "github_pat_ABCDEFGHIJKLMNOPQRSTUV" "sk-abcdefghijklmnopqrstuvwx" "AKIAABCDEFGHIJKLMNOP" "xoxb-12345-abcdefg" "abcdefghijklmnopqrstuv" "Tok12345" "Hunter2x" "kkk111" "ghSECRETpass" "Hunter2pass" "dXNlcjpwYXNz" "MotDePasse123" "Zebre9999")
+BNOM=("ghp_" "github_pat_" "sk-" "AKIA" "xox" "Bearer" "NOM=valeur sensible" "--password" "X-Api-Key" "identifiants d'URL" "-u user:pass" "Authorization" "mysql -p" "sshpass -p")
+RB="$(printf '%s' "$BDESC" | node "$AUX/mask-bornes.mjs" "$SCRIPTS" "$LAB" "$WORK/home")"
+for k in "${!BSEC[@]}"; do
+  assert_eq "MB.$k — motif « ${BNOM[$k]} » : la valeur « ${BSEC[$k]} » ne sort pas par task, et le masque est posé" "$(printf '%s' "$RB" | node "$AUX/ev.mjs" "j[$k].includes('${BSEC[$k]}')+','+j[$k].includes('[masqué]')")" "false,true"
+done
 echo "=== L — aucun script du lab n'est exécuté ==="
 TRAP="$WORK/trap.sh"; printf '#!/usr/bin/env bash\ntouch "%s/EXEC-$(basename "$(dirname "$0")")"\ncase "$1" in status) echo "{\\"locks\\":[]}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' "$WORK" > "$TRAP"
 LB="$WORK/labL"; mkdir -p "$LB/.planning" "$LB/.claude/scripts" "$LB/.vibeflow/cockpit" "$LB/plugin/x"; cp "$TRAP" "$LB/.claude/scripts/driver-lock.sh"; cp "$TRAP" "$LB/.vibeflow/cockpit/driver-lock.sh"

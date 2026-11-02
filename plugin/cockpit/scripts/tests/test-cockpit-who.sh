@@ -269,12 +269,12 @@ assert_eq "W12.1 — le nœud running du DAG de mission est un travailleur dag-n
 
 echo "=== W13 — M-1 : le masque reste linéaire sur un mot géant ; M-2 : un meta.json qui n'est pas un objet ne fait pas lever ==="
 cat > "$AUX/mk-mot.mjs" <<'JS'
-// mk-mot.mjs <fichier> <cwd> <taille> : transcript dont la dernière commande est UN mot de <taille> caractères de mot, suivi d'un secret
+// mk-mot.mjs <fichier> <cwd> <taille> : transcript dont la dernière commande est UN mot de <taille> caractères de mot, suivi d'un jeton nu (premier argument ; un « NOM=valeur » ne s'afficherait plus, règle « = »)
 import fs from 'node:fs';
 const [, , f, cwd, taille] = process.argv; const base = { cwd, sessionId: 'aaaa1111-2222-3333-4444-555566667777', gitBranch: 'main', version: '2.1.316' };
 const L = (o, t) => JSON.stringify({ ...base, timestamp: t, ...o });
 fs.writeFileSync(f, [L({ type: 'user', message: { content: 'salut' } }, '2026-11-01T10:00:00Z'),
-  L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'a'.repeat(Number(taille)) + ' GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwx' } }] } }, '2026-11-01T10:00:05Z')].join('\n') + '\n');
+  L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'a'.repeat(Number(taille)) + ' ghp_abcdefghijklmnopqrstuvwx' } }] } }, '2026-11-01T10:00:05Z')].join('\n') + '\n');
 JS
 cat > "$AUX/temps.mjs" <<'JS'
 // temps.mjs <scripts> <lab> <home> <scriptsDir> <id> : durée de revealDoing (ms) et résultat
