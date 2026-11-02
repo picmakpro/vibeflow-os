@@ -65,6 +65,7 @@ const MESURE = `(() => {
     m.carte = Math.round(g.l) + '..' + Math.round(g.r) + ' / libre 0..' + Math.round(libreD);
     if (g.r > libreD + 1 || g.l < -1) v.push('carte : sort de la zone libre (' + m.carte + ')');
   }
+  m.pointeur = ['none', 'coarse', 'fine'].find((p) => matchMedia('(pointer: ' + p + ')').matches) || '?';
   return { v, m };
 })()`;
 

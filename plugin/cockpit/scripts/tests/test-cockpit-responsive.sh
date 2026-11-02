@@ -116,6 +116,35 @@ const n=h.replace('header .hl { flex: 1 1 0; min-width: 264px; }','header .hl { 
 srv "$LM2/.vibeflow/cockpit"; RM2="$(RESP_INJECT="$INJ_CODE" mes "http://127.0.0.1:$SRV_PORT/index.html" 1024 - )"; unsrv
 assert_has "R4.2 — témoin rouge : avec la colonne gauche à 300 px, un bouton de l'en-tête sort de la fenêtre à 1 024 px (onglet Code)" "$(printf '%s' "$RM2" | node "$AUX/ev.mjs" 'j.mesures["1024"].v.join(" | ")')" "sort de la fenêtre"
 
+# R8 — témoin indépendant de la police ET de la plateforme : Chrome headless sous Linux n'a aucun périphérique de pointage (`pointer: none`) ; la mise en page
+# « souris » du cockpit était écrite `(pointer: fine)` et ne s'appliquait pas là (CI, run 41370886002, 8 rouges à 1 024 px) alors que macOS (`fine`) passait. Le même
+# Chrome, lancé avec `--blink-settings` sans pointeur, reproduit ce cas sur n'importe quel poste : mêmes assertions R1, onglets Code (avec ses boutons optionnels) et Projet.
+echo "=== R8 — aucun périphérique de pointage (pointer: none) : mêmes assertions R1 à 1 024, 1 280 et 1 440 px ==="
+CHROME_NOPTR="$AUX/chrome-sans-pointeur.sh"
+printf '#!/bin/sh\nexec "%s" --blink-settings=primaryPointerType=1,availablePointerTypes=1,primaryHoverType=1,availableHoverTypes=1 "$@"\n' "$CHROME" > "$CHROME_NOPTR"; chmod +x "$CHROME_NOPTR"
+for spec in "court:$LC" "long:$LL"; do
+  nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; P=$SRV_PORT
+  for onglet in index project; do
+    inj=""; [ "$onglet" = index ] && inj="$INJ_CODE"
+    R="$(RESP_INJECT="$inj" REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-responsive.mjs" "$CHROME_NOPTR" "http://127.0.0.1:$P/$onglet.html" 1024,1280,1440 -)"
+    assert_eq "R8.0 — $nom / $onglet : le Chrome du témoin n'a bien aucun pointeur" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.mesures["1024"].m.pointeur')" "none"
+    for w in 1024 1280 1440; do assert_eq "R8 — $nom / $onglet / $w px sans pointeur : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w")" "aucune"; done
+  done
+  unsrv
+done
+
+# R9 — témoin indépendant de la police : des métriques de texte plus larges que celles d'Inter (interlettrage +5 % sur tout l'en-tête, injecté après le chargement)
+# ne doivent faire ni recouvrir, ni rogner, ni sortir de la fenêtre un seul élément de l'en-tête à 1 024 px — la mise en page ne dépend d'aucune largeur de police calibrée.
+INJ_LARGE="(() => { const st = document.createElement('style'); st.textContent = 'header, header * { letter-spacing: 0.05em !important; }'; document.head.appendChild(st); return true; })()"
+echo "=== R9 — métriques de texte élargies (interlettrage +5 %) : mêmes assertions R1 à 1 024 px ==="
+srv "$LL/.vibeflow/cockpit"; P=$SRV_PORT
+for onglet in index project; do
+  inj="$INJ_LARGE"; [ "$onglet" = index ] && inj="$INJ_CODE; $INJ_LARGE"
+  R="$(RESP_INJECT="$inj" mes "http://127.0.0.1:$P/$onglet.html" 1024 -)"
+  assert_eq "R9 — long / $onglet / 1 024 px, texte élargi : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "1024")" "aucune"
+done
+unsrv
+
 echo "=== R7 — chaque bouton d'en-tête a un nom accessible et une infobulle ; badge « au travail » ==="
 srv "$LC/.vibeflow/cockpit"; PC7=$SRV_PORT
 EXPR='({ aria: (document.getElementById("vf-lock")||{}).getAttribute ? document.getElementById("vf-lock").getAttribute("aria-label") : null, titre: (document.getElementById("vf-lock")||{}).title, sansInfobulle: [...document.querySelectorAll("header .hr button")].filter((b) => b.getBoundingClientRect().width > 0 && !b.title).map((b) => b.id || b.className), sansNom: [...document.querySelectorAll("header .hr button")].filter((b) => b.getBoundingClientRect().width > 0 && !b.getAttribute("aria-label") && !(b.innerText || "").trim()).map((b) => b.id || b.className) })'
