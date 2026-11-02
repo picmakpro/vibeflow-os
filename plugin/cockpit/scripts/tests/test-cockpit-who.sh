@@ -9,7 +9,8 @@ set -uo pipefail
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+trap 'vf_hyg_fin; rm -rf "$WORK"' EXIT
+. "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 AUX="$WORK/aux"; HOME_T="$WORK/home"; NOSCRIPTS="$WORK/noscripts"
 mkdir -p "$AUX" "$HOME_T/.claude/scripts" "$NOSCRIPTS"
 
@@ -77,7 +78,7 @@ SID="aaaa1111-2222-3333-4444-555566667777"
 TRD="$HOME_T/.claude/projects/-lab"; mkdir -p "$TRD"
 mk_session() { # $1 = fichier, $2 = clé du cwd, $3 = description du dernier appel
   printf '%s\n' "{\"type\":\"user\",\"$2\":\"$LAB\",\"sessionId\":\"$SID\",\"timestamp\":\"2026-11-01T10:00:00Z\",\"gitBranch\":\"main\",\"version\":\"2.1.316\",\"message\":{\"content\":\"salut\"}}" \
-    "{\"type\":\"assistant\",\"$2\":\"$LAB\",\"sessionId\":\"$SID\",\"timestamp\":\"2026-11-01T10:00:05Z\",\"gitBranch\":\"main\",\"version\":\"2.1.316\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"description\":\"$3\"}}]}}" > "$1"
+    "{\"type\":\"assistant\",\"$2\":\"$LAB\",\"sessionId\":\"$SID\",\"timestamp\":\"2026-11-01T10:00:05Z\",\"gitBranch\":\"main\",\"version\":\"2.1.316\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"description\":\"$3\",\"command\":\"$3\"}}]}}" > "$1"
 }
 mk_session "$TRD/$SID.jsonl" cwd "MARQUEUR-DERNIERE-COMMANDE"
 
@@ -190,7 +191,7 @@ const base = { cwd, sessionId: 'aaaa1111-2222-3333-4444-555566667777', gitBranch
 const L = (o, t) => JSON.stringify({ ...base, timestamp: t, ...o });
 const lignes = [L({ type: 'user', message: { content: 'salut' } }, '2026-11-01T10:00:00Z')];
 if (forme !== 'sansaction') {
-  lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { description: 'COMMANDE-E5', command: 'echo bonjour' } }] } }, '2026-11-01T10:00:05Z'));
+  lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { description: 'echo bonjour', command: 'echo COMMANDE-E5' } }] } }, '2026-11-01T10:00:05Z'));
   lignes.push(L({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'x', content: forme === 'geant' ? 'x'.repeat(300 * 1024) : 'ok' }] } }, '2026-11-01T10:00:06Z'));
 } else lignes.push(L({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'x', content: 'ok' }] } }, '2026-11-01T10:00:06Z'));
 fs.writeFileSync(f, lignes.join('\n') + '\n');
@@ -203,6 +204,38 @@ done
 node "$AUX/mk-e5.mjs" "$H11/.claude/projects/-lab/$SID.jsonl" "$LAB" sansaction
 R11="$(Q reveal "$LAB" "$H11" "$NOSCRIPTS" "$SID")"
 assert_eq "W11.3 — sans aucune action de l'assistant : doing nul, cause nommée" "$(printf '%s' "$R11" | node "$AUX/stdin-get.mjs" '[j.doing,j.erreur]')" '[null,"sans-action"]'
+
+echo "=== W15 — D3 : « la dernière commande » est la dernière commande Bash, jamais le texte de l'assistant ==="
+cat > "$AUX/mk-d3.mjs" <<'JS'
+// mk-d3.mjs <fichier> <cwd> <forme> : transcript Claude Code.
+//   · cmd-puis-texte : assistant tool_use Bash (commande), résultat d'outil, PUIS message texte de l'assistant en markdown (la forme constatée en recette)
+//   · texte-seul : que du texte d'assistant, aucun appel Bash · autre-outil : un appel Read (pas Bash) puis du texte
+import fs from 'node:fs';
+const [, , f, cwd, forme] = process.argv;
+const base = { cwd, sessionId: 'aaaa1111-2222-3333-4444-555566667777', gitBranch: 'main', version: '2.1.316' };
+const L = (o, t) => JSON.stringify({ ...base, timestamp: t, ...o });
+const texte = { type: 'assistant', message: { content: [{ type: 'text', text: "J'ai consigné l'étape 3. **Verdict :** TEXTE-ASSISTANT-D3" }] } };
+const lignes = [L({ type: 'user', message: { content: 'salut' } }, '2026-11-01T10:00:00Z')];
+if (forme === 'cmd-puis-texte') {
+  lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { description: 'DESC-D3', command: 'git status --short COMMANDE-BASH-D3' } }] } }, '2026-11-01T10:00:05Z'));
+  lignes.push(L({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'x', content: 'ok' }] } }, '2026-11-01T10:00:06Z'));
+} else if (forme === 'autre-outil') {
+  lignes.push(L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Read', input: { file_path: '/x/LECTURE-D3' } }] } }, '2026-11-01T10:00:05Z'));
+}
+lignes.push(L(texte, '2026-11-01T10:00:07Z'));
+fs.writeFileSync(f, lignes.join('\n') + '\n');
+JS
+H15D="$WORK/home15d"; mkdir -p "$H15D/.claude/projects/-lab"
+node "$AUX/mk-d3.mjs" "$H15D/.claude/projects/-lab/$SID.jsonl" "$LAB" cmd-puis-texte
+R15="$(Q reveal "$LAB" "$H15D" "$NOSCRIPTS" "$SID")"
+assert_has "W15.1 — un appel Bash suivi d'un message texte : on rend la commande Bash" "$(printf '%s' "$R15" | node "$AUX/stdin-get.mjs" 'j.doing')" "COMMANDE-BASH-D3"
+assert_not "W15.2 — le texte de l'assistant n'apparaît pas" "$(printf '%s' "$R15" | node "$AUX/stdin-get.mjs" 'j.doing')" "TEXTE-ASSISTANT-D3"
+assert_not "W15.3 — la description de l'appel n'est pas présentée comme la commande" "$(printf '%s' "$R15" | node "$AUX/stdin-get.mjs" 'j.doing')" "DESC-D3"
+for forme in texte-seul autre-outil; do
+  node "$AUX/mk-d3.mjs" "$H15D/.claude/projects/-lab/$SID.jsonl" "$LAB" "$forme"
+  R15="$(Q reveal "$LAB" "$H15D" "$NOSCRIPTS" "$SID")"
+  assert_eq "W15.4 — forme « $forme » : aucune commande Bash, doing nul et cause nommée (jamais le texte en repli)" "$(printf '%s' "$R15" | node "$AUX/stdin-get.mjs" '[j.doing,j.erreur]')" '[null,"sans-action"]'
+done
 
 echo "=== W12 — E-7 : un nœud running d'un DAG sous .planning/missions apparaît « au travail » ==="
 LABM="$WORK/labm"; mkdir -p "$LABM/.planning/missions"; git -C "$LABM" init -q
@@ -260,6 +293,66 @@ assert_eq "W14.2 — cwd dans le worktree : la branche est celle du worktree, pa
 node "$AUX/mk-rattache.mjs" "$H15/.claude/projects/-lab/$SID.jsonl" "$LABT" "-"
 Q who "$LABT" "$H15" "$NOSCRIPTS" > "$WORK/who15c.json"
 assert_eq "W14.3 — cwd = arbre principal : sa branche vient aussi de git" "$(G "$WORK/who15c.json" 'j.workers.filter(w=>w.kind==="session").map(w=>w.treeBy+"|"+w.branch).join(",")')" "cwd|principale"
+
+
+echo "=== W16 — D2/D3 dans le navigateur : le tiroir « Au travail » a sa marge, sa hauteur au contenu, et rend la commande Bash ==="
+CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
+if [ -z "$CHROME" ]; then echo "  ⊘ W16 SAUTÉ : aucun navigateur (Chrome, Chromium) — D2 et la commande dans le tiroir NON vérifiés, non comptés comme réussis"; else
+ENG="$SCRIPTS/../skills/cockpit-moteur"
+LABD="$WORK/labd"; mkdir -p "$LABD/src" "$LABD/.planning/phases/01-socle" "$LABD/.planning/missions"
+printf 'export const u = () => 1;\n' > "$LABD/src/util.js"
+printf '# Roadmap\n\n## Jalon démo\n\n- [ ] **Phase 1: Socle** - premier jet\n' > "$LABD/.planning/ROADMAP.md"
+printf '<objective>Faire le socle</objective>\n' > "$LABD/.planning/phases/01-socle/01-01-PLAN.md"
+git -C "$LABD" init -q && git -C "$LABD" add -A && git -C "$LABD" -c user.email=t@t -c user.name=t commit -q -m init
+LABD="$(cd "$LABD" && pwd -P)"
+node "$SCRIPTS/vf-cockpit-build.mjs" "$LABD" --quiet > "$WORK/build-d.out" 2>&1 || cat "$WORK/build-d.out"
+HD="$WORK/homed"; mkdir -p "$HD/.claude/projects/-lab"
+node "$AUX/mk-d3.mjs" "$HD/.claude/projects/-lab/$SID.jsonl" "$LABD" cmd-puis-texte
+PORTD="$(node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"
+OUTD="$LABD/.vibeflow/cockpit"
+( cd "$LABD" && HOME="$HD" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$OUTD/serve.mjs" --no-open --port "$PORTD" > "$WORK/serve-d.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
+SRVD=$!; PIDS+=($SRVD)
+for _ in $(seq 1 100); do grep -q '"port"' "$OUTD/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
+PORTD="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUTD/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+cat > "$AUX/tiroir.js" <<'JS'
+(async () => {
+  const SC = window.VibeFlow || window.Floorplan, pa = document.getElementById('panel');
+  const att = async (f) => { for (let i = 0; i < 100; i++) { const v = f(); if (v) return v; await new Promise((r) => setTimeout(r, 50)); } return null; };
+  const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  // panneau de référence : un panneau ouvert par SC.showPanel avec le gabarit commun (.sec), mesuré dans le même Chrome
+  SC.showPanel('<div class="sec"><h3>Référence</h3><p>x</p></div>'); await pause(700);
+  const refMarge = Math.round(pa.querySelector('.sec h3').getBoundingClientRect().left - pa.getBoundingClientRect().left);
+  document.getElementById('vf-lock').click();
+  const w = await att(() => pa.querySelector('.vf-whop'));
+  const bouton = await att(() => pa.querySelector('[data-vf-doing]'));
+  if (!w || !bouton) return { erreur: 'tiroir ou bouton absent : ' + pa.innerText.slice(0, 120) };
+  bouton.click();
+  const zone = bouton.nextElementSibling;
+  await att(() => !zone.hidden && zone.textContent);
+  await pause(700);
+  const tr = pa.getBoundingClientRect(), h3 = w.querySelector('h3'), hr = h3.getBoundingClientRect();
+  const m = { vh: innerHeight, vw: innerWidth, refMarge, marge: Math.round(hr.left - tr.left), h3Dedans: hr.left >= tr.left && hr.right <= tr.right && hr.top >= tr.top,
+    h3Rogne: h3.scrollWidth > h3.clientWidth + 1, debordeX: pa.scrollWidth > pa.clientWidth + 1, hauteur: Math.round(tr.height), doing: zone.textContent, overflowY: getComputedStyle(pa).overflowY, titre: h3.textContent };
+  for (let i = 0; i < 40; i++) { const d = document.createElement('div'); d.className = 'vf-who'; d.textContent = 'ligne ' + i; w.appendChild(d); }
+  await pause(100);
+  const tl = pa.getBoundingClientRect();
+  Object.assign(m, { longHauteur: Math.round(tl.height), longBas: Math.round(tl.bottom), longScroll: pa.scrollHeight > pa.clientHeight + 1 });
+  return m;
+})()
+JS
+XD="$(CDP_VIEWPORT=1280x800 CDP_PRET="document.readyState === 'complete' && !!document.getElementById('vf-lock') && /travail/.test(document.getElementById('vf-lock').textContent)" node "$SCRIPTS/tests/chrome-cdp.mjs" "$CHROME" 300 "$(cat "$AUX/tiroir.js")" "http://127.0.0.1:$PORTD/index.html")"
+vf_hyg_stop "$SRVD"
+[ -z "${KEEPXD:-}" ] || echo "$XD" > "$KEEPXD"
+V='j.resultats[0].valeur'
+assert_eq "W16.0 — témoin : la mesure a eu lieu (aucune erreur) et le tiroir est ouvert" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" '(j.erreur||"")+"|"+('$V'.erreur||"")+"|"+'$V'.titre')" "||Au travail (1)"
+assert_eq "W16.1 — D3 dans le tiroir : « Voir la dernière commande » montre la commande Bash" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "$V.doing")" "git status --short COMMANDE-BASH-D3"
+assert_eq "W16.2 — témoin : le panneau de référence a une marge gauche (>= 16 px)" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "$V.refMarge >= 16")" "true"
+assert_eq "W16.3 — D2 : la marge gauche du titre du tiroir est au moins celle du panneau de référence" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "$V.marge >= $V.refMarge")" "true"
+assert_eq "W16.4 — D2 : le titre est contenu dans le tiroir et non rogné, aucun débordement horizontal" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "[$V.h3Dedans, $V.h3Rogne, $V.debordeX]")" "[true,false,false]"
+assert_eq "W16.5 — D2 : contenu court, la hauteur du tiroir suit le contenu (< 60 % de la fenêtre)" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "$V.hauteur < $V.vh * 0.6")" "true"
+assert_eq "W16.6 — D2 : contenu long, le tiroir reste dans la fenêtre et défile" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "[$V.longBas <= $V.vh, $V.longHauteur < $V.vh, $V.overflowY, $V.longScroll]")" '[true,true,"auto",true]'
+fi
+vf_hyg_assert
 
 echo ""
 echo "=================================="

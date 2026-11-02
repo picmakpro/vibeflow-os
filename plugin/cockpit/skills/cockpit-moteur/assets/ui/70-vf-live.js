@@ -22,6 +22,10 @@
     #vf-lock.held .dot { background: var(--st-active, #f59e0b); animation: vfpulse 1.6s ease-in-out infinite; }
     #vf-lock.off .dot { background: var(--st-blocked, #ef4444); }
     @keyframes vfpulse { 50% { opacity: .25; } }
+    /* D2 (recette 2026-11-02) : le tiroir reprend la marge des panneaux ouverts par showPanel (.sec : 22px 20px) ; sur grand écran sa boîte suit son contenu (plafonnée à la fenêtre, défilement au-delà) au lieu de s'étirer jusqu'en bas.
+       Sous 701 px le panneau est un tiroir du bas dont la mise en page appartient au viewer : on n'y touche pas. */
+    .vf-whop { padding: 22px 20px; }
+    @media (min-width: 701px) { #panel:has(> .vf-whop) { bottom: auto; max-height: calc(100vh - var(--hh, 64px) - 20px); overflow: auto; } }
     .vf-whop h3 { margin: 0 0 4px; } .vf-whop h4 { margin: 16px 0 6px; color: var(--text-3); }
     .vf-whop .regle { color: var(--text-3); font-size: 12px; margin: 0 0 10px; }
     .vf-who { padding: 8px 0; border-top: 1px solid rgba(var(--ink), .08); font-size: 13px; }
@@ -62,8 +66,8 @@
     try {
       const r = await fetch('/api/vf/doing?id=' + encodeURIComponent(b.dataset.vfDoing), { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' });
       const d = r.ok ? await r.json() : null;
-      // `doing` vide : une session très active finit souvent sur un résultat d'outil ; le serveur remonte alors à la dernière action de l'assistant
-      zone.textContent = d?.doing || (d?.erreur === 'inconnu' ? 'Plus active : rien à montrer.' : d?.erreur === 'sans-action' ? "Aucune action de l'assistant lisible dans la fin du journal de cette session." : 'Indisponible.');
+      // `doing` vide : le serveur remonte à la dernière commande Bash de la session ; sans appel Bash lisible il n'y a rien à montrer, jamais un texte de l'assistant en repli (D3)
+      zone.textContent = d?.doing || (d?.erreur === 'inconnu' ? 'Plus active : rien à montrer.' : d?.erreur === 'sans-action' ? "Aucune commande Bash dans la fin du journal de cette session." : 'Indisponible.');
     } catch { zone.textContent = 'Indisponible.'; }
     zone.hidden = false; b.disabled = false;
   });

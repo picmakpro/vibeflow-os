@@ -161,7 +161,7 @@ const [, , scripts, lab, home] = process.argv; const { revealDoing } = await imp
 const secrets = ['GITHUB_TOKEN=ghx12345678', 'AWS_SECRET_ACCESS_KEY=abcdef12345', 'API_KEY=zzz987', 'github_pat_ABCDEFGHIJKLMNOPQRSTUV', '--password hunter2', 'X-Api-Key: kkk111'];
 const d = path.join(home, '.claude', 'projects', '-lab'); fs.mkdirSync(d, { recursive: true });
 const line = (type, content) => JSON.stringify({ type, cwd: lab, sessionId: 'mmmm1111-2222-3333-4444-555566667777', timestamp: '2026-11-01T10:00:00Z', gitBranch: 'main', version: '2.1', message: { content } });
-fs.writeFileSync(path.join(d, 'mmmm1111-2222-3333-4444-555566667777.jsonl'), line('user', 'salut') + '\n' + line('assistant', [{ type: 'text', text: 'curl ' + secrets.join(' ') }]) + '\n');
+fs.writeFileSync(path.join(d, 'mmmm1111-2222-3333-4444-555566667777.jsonl'), line('user', 'salut') + '\n' + line('assistant', [{ type: 'tool_use', name: 'Bash', input: { command: 'curl ' + secrets.join(' ') } }]) + '\n');
 const r = revealDoing(lab, 'mmmm1111-2222-3333-4444-555566667777', { home });
 console.log(JSON.stringify({ doing: r.doing, fuites: secrets.map((s) => s.split(/[ =:]+/).pop()).filter((v) => r.doing && r.doing.includes(v)) }));
 JS

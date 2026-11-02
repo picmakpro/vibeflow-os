@@ -172,14 +172,16 @@ const MASQUES = [
 // sinon un mot de 100 Kio rendait le masque quadratique (17 s)
 const MAX_MASQUE = 4000;
 const masque = (t) => MASQUES.reduce((a, re) => a.replace(re, '[masqué]'), String(t).slice(0, MAX_MASQUE));
-const lastText = (d) => {
-  const c = d?.message?.content; if (!c) return '';
-  const s = typeof c === 'string' ? c : c.map((x) => x.text || (x.type === 'tool_use' ? `▸ ${x.name}${x.input?.description || x.input?.command ? ' : ' + (x.input.description || x.input.command) : ''}` : '')).filter(Boolean).join(' ');
-  return masque(s.replace(/\s+/g, ' ')).slice(0, 120);
+// D3 (recette 2026-11-02) : « la dernière commande » est la dernière commande de l'outil Bash (tool_use name=Bash, input.command) de la session.
+// Un message texte de l'assistant n'est jamais rendu, même en repli : sans appel Bash lisible, `lastDoing` rend null (erreur « sans-action »).
+const lastCommand = (d) => {
+  const c = d?.message?.content; if (!Array.isArray(c)) return '';
+  for (const x of [...c].reverse()) if (x?.type === 'tool_use' && x.name === 'Bash' && typeof x.input?.command === 'string' && x.input.command.trim()) return masque(x.input.command.replace(/\s+/g, ' ')).slice(0, 120);
+  return '';
 };
 // E-5 : la dernière ligne d'une session active est presque toujours un résultat d'outil (message user sans texte) ou une réflexion : on remonte
-// jusqu'à la dernière action de l'assistant qui a un texte ou un appel d'outil.
-const lastDoing = (f) => cherche(f, (d) => (d.type === 'assistant' ? lastText(d) : null));
+// jusqu'au dernier appel Bash de l'assistant.
+const lastDoing = (f) => cherche(f, (d) => (d.type === 'assistant' ? lastCommand(d) : null));
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 // identifiant au format strict ET présent dans une collecte fraîche : aucun chemin construit depuis l'entrée (T-67-07)

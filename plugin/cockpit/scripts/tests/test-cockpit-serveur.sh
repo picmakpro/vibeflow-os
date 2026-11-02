@@ -76,7 +76,7 @@ TRD="$HOME/.claude/projects/-lab"; mkdir -p "$TRD"
 MARK="MARQUEUR-DERNIERE-COMMANDE"
 mk_session() { # $1 = id de session, $2 = description du dernier appel
   printf '%s\n' "{\"type\":\"user\",\"cwd\":\"$LAB\",\"sessionId\":\"$1\",\"timestamp\":\"2026-11-01T10:00:00Z\",\"gitBranch\":\"main\",\"version\":\"2.1.316\",\"message\":{\"content\":\"salut\"}}" \
-    "{\"type\":\"assistant\",\"cwd\":\"$LAB\",\"sessionId\":\"$1\",\"timestamp\":\"2026-11-01T10:00:05Z\",\"gitBranch\":\"main\",\"version\":\"2.1.316\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"description\":\"$2\"}}]}}" > "$TRD/$1.jsonl"
+    "{\"type\":\"assistant\",\"cwd\":\"$LAB\",\"sessionId\":\"$1\",\"timestamp\":\"2026-11-01T10:00:05Z\",\"gitBranch\":\"main\",\"version\":\"2.1.316\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"description\":\"$2\",\"command\":\"$2\"}}]}}" > "$TRD/$1.jsonl"
 }
 SID1="aaaa1111-2222-3333-4444-555566667777"; SID2="bbbb1111-2222-3333-4444-555566667777"
 mk_session "$SID1" "$MARK"
