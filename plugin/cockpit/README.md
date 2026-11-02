@@ -60,7 +60,7 @@ Les types de carte de l'onglet Code (« Library » et pairs) sont traduits aussi
 
 Écoute sur `127.0.0.1` seulement, contrôle du `Host`, jeton propre au serveur, segments cachés refusés. La dernière commande Bash
 d'une session n'est jamais diffusée ni exportée ; elle se révèle à la demande, dans la ligne cliquée, réduite au programme et à son
-premier argument au plus (« git push … ») ; programme seul si ce premier argument commence par « - » ou contient « = » ; limite acceptée : un secret passé en premier argument positionnel (`ls Secret99`) reste visible. Décision
+premier argument au plus (« git push … ») ; liste blanche, sans lecture des guillemets : un mot n'est affiché que s'il ne contient que lettres ASCII, chiffres et `_ . / : @ % + , ~ -` (programme seul si le premier argument n'est pas de cette forme, commence par « - » ou contient « = » ; « … » si le programme ne l'est pas, ou si une affectation de tête n'est pas `NOM=<mot simple ou vide>`) ; limite acceptée : un secret passé en premier argument positionnel (`ls Secret99`) reste visible. Décision
 de Samuel, AskUserQuestion session principale, 2026-11-02 ; les règles « = » et « - » prolongent cette décision. Aucun appel sortant, hors
 l'agent qui répond aux questions. Le lab observé n'est jamais une source de code : aucun de ses scripts n'est exécuté (le mode
 « modifier le plan » n'exécute que le moteur du module), aucun lien symbolique de la sortie n'est suivi, et la page porte une

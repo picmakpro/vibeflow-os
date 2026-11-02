@@ -183,25 +183,27 @@ const MAX_MASQUE = 4000;
 const masque = (t) => MASQUES.reduce((a, re) => a.replace(re, '[masqué]'), String(t).slice(0, MAX_MASQUE));
 const BORNE_COMMANDE = 80;
 // réduit une commande au programme et à son premier argument (« git push … ») ; limite acceptée : un secret passé en premier argument positionnel (`ls Secret99`) reste visible.
-// Les affectations d'environnement en tête (`NOM=valeur`, valeur citée sur plusieurs mots comprise) sont sautées, sinon le « programme » serait le secret ; une affectation dont la valeur
-// contient `$(`, un backtick ou finit par `\` (espace échappé) ne se lit pas de façon sûre : la sortie est « … ». Un premier argument qui commence par « - » (`-pXXX`, `-a Secret`), par un guillemet,
-// par `$(` ou un backtick, ou qui contient « = » (`DB_PASS=…`, chaîne de requête `?key=…`) n'est pas affiché ; un programme qui commence par « - », un guillemet, `$(` ou un backtick non plus.
+// Liste blanche, aucune lecture des guillemets : un mot est « simple » s'il ne contient que des lettres ASCII, des chiffres et `_ . / : @ % + , ~ -` (donc jamais de guillemet, `$`, backtick, `\`,
+// parenthèse, `;`, `|`, `&`, `<`, `>`, `*`, `?`, `[`, `]`, `{`, `}`, `!`, `#`, `=`). Les affectations de tête ne sont sautées que si le mot entier vaut `NOM=<mot simple ou vide>` ; tout autre mot de tête
+// (valeur citée, `$(…)`, tableau, espace échappé) arrête la lecture et le programme, non simple, donne « … ». Le programme n'est affiché que s'il est simple et ne commence pas par « - » ;
+// un retour à la ligne compte comme `;` (non simple) ; le premier argument que s'il est simple, ne commence pas par « - » et ne contient pas « = » (`DB_PASS=…` en est exclu par la liste blanche). « … » s'il reste des mots non affichés.
+const SIMPLE = /^[A-Za-z0-9_.\/:@%+,~-]+$/;
+const AFFECTATION = /^[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_.\/:@%+,~-]*$/;
 const resume = (cmd) => {
-  const mots = cmd.split(/\s+/).filter(Boolean); let i = 0;
-  for (; i < mots.length; i++) {
-    const m = /^[A-Za-z_][A-Za-z0-9_]*=(["']?)/.exec(mots[i]); if (!m) break;
-    if (/\$\(|`|\\$/.test(mots[i])) return '…';
-    let clos = !m[1] || mots[i].slice(m[0].length).endsWith(m[1]); while (!clos && ++i < mots.length) { if (/\$\(|`|\\$/.test(mots[i])) return '…'; clos = mots[i].endsWith(m[1]); } if (!clos) return '…';
-  }
-  const prog = mots[i]; if (prog === undefined || /^(?:[-"'`(]|\$\()/.test(prog)) return '…';
-  const arg = mots[i + 1]; const montre = arg !== undefined && !/^(?:-|["'`]|\$\()/.test(arg) && !arg.includes('=');
+  // un retour à la ligne est un séparateur de commandes : il devient un mot non simple (comme `;`), jamais un simple espace, sinon le mot de la ligne suivante serait pris pour un argument
+  const mots = cmd.trim().replace(/\s*\n\s*/g, ' \n ').split(/[ \t\r\f\v]+/).filter(Boolean); let i = 0;
+  while (i < mots.length && AFFECTATION.test(mots[i])) i++;
+  const prog = mots[i]; if (prog === undefined || !SIMPLE.test(prog) || prog.startsWith('-')) return '…';
+  const arg = mots[i + 1]; const montre = arg !== undefined && SIMPLE.test(arg) && !arg.startsWith('-');
   return [prog, ...(montre ? [arg] : []), ...(mots.length > i + (montre ? 2 : 1) ? ['…'] : [])].join(' ');
 };
 // D3 (recette 2026-11-02) : « la dernière commande » est la dernière commande de l'outil Bash (tool_use name=Bash, input.command) de la session.
 // Un message texte de l'assistant n'est jamais rendu, même en repli : sans appel Bash lisible, `lastDoing` rend null (erreur « sans-action »).
+// forme affichée d'une commande : réduction, masque PUIS borne (exportée pour la preuve générative, qui ne peut pas passer par une session disque par commande)
+export const commandeAffichee = (cmd) => masque(resume(String(cmd).slice(0, MAX_MASQUE))).slice(0, BORNE_COMMANDE);
 const lastCommand = (d) => {
   const c = d?.message?.content; if (!Array.isArray(c)) return '';
-  for (const x of [...c].reverse()) if (x?.type === 'tool_use' && x.name === 'Bash' && typeof x.input?.command === 'string' && x.input.command.trim()) return masque(resume(x.input.command.slice(0, MAX_MASQUE))).slice(0, BORNE_COMMANDE);
+  for (const x of [...c].reverse()) if (x?.type === 'tool_use' && x.name === 'Bash' && typeof x.input?.command === 'string' && x.input.command.trim()) return commandeAffichee(x.input.command);
   return '';
 };
 // E-5 : la dernière ligne d'une session active est presque toujours un résultat d'outil (message user sans texte) ou une réflexion : on remonte

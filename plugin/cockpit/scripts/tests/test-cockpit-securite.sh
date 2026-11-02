@@ -205,7 +205,7 @@ cat > "$AUX/formes-d3.json" <<'JSON'
 ["redis-cli -a Secret99 ping","curl -H 'Cookie: session=SessSecret99' https://x","curl -d '{\"password\":\"JsonSecret99\"}' https://x","docker login -u u -p Secret99","GITHUB_TOKEN=EnvSecret99 gh pr list","git push origin main","sshpass -pXXX ssh h","mysql -pXXX -u root","ls","curl https://u:Secret99@h/x","FOO=\"a Secret99\" gh pr list","git commit -m \"msg Secret99\"","curl \"https://x?k=Secret99\"","echo sk-abcdefghijklmnopqrstuvwx"]
 JSON
 R5="$(node "$AUX/mask-formes.mjs" "$SCRIPTS" "$LAB" "$WORK/home" < "$AUX/formes-d3.json")"
-assert_eq "M5.1 — formes attendues exactes : programme + premier argument + « … » ; secrets non listés, affectation citée, -m et chaîne citée absents" "$(printf '%s' "$R5" | node "$AUX/ev.mjs" 'j')" '["redis-cli …","curl …","curl …","docker login …","gh pr …","git push …","sshpass …","mysql …","ls","curl https://[masqué]@h/x","gh pr …","git commit …","curl …","echo [masqué]"]'
+assert_eq "M5.1 — formes attendues exactes : programme + premier argument + « … » ; secrets non listés, -m et chaîne citée absents, affectation de tête citée -> « … » (liste blanche, plus de lecture des guillemets)" "$(printf '%s' "$R5" | node "$AUX/ev.mjs" 'j')" '["redis-cli …","curl …","curl …","docker login …","gh pr …","git push …","sshpass …","mysql …","ls","curl https://[masqué]@h/x","…","git commit …","curl …","echo [masqué]"]'
 assert_eq "M5.2 — aucun des secrets (Secret99, SessSecret99, JsonSecret99, EnvSecret99) ne sort, dans aucune forme" "$(printf '%s' "$R5" | node "$AUX/ev.mjs" '/Secret99/.test(JSON.stringify(j))')" "false"
 # F2/F1 (revue de 54e40b5e) : affectation de tête dont la valeur contient `$(`, un backtick ou finit par `\` -> « … » ; premier argument qui contient « = » (env, export, chaîne de requête) -> programme seul ; programme en « - » rejeté.
 cat > "$AUX/formes-f12.json" <<'JSON'
@@ -214,6 +214,70 @@ JSON
 RF12="$(node "$AUX/mask-formes.mjs" "$SCRIPTS" "$LAB" "$WORK/home" < "$AUX/formes-f12.json")"
 assert_eq "M6.1 — formes attendues exactes : affectation de tête illisible -> « … », premier argument avec « = » -> programme seul" "$(printf '%s' "$RF12" | node "$AUX/ev.mjs" 'j')" '["…","…","…","…","env …","export …","curl …","export …","…"]'
 assert_eq "M6.2 — Secret99 ne sort dans aucune de ces formes" "$(printf '%s' "$RF12" | node "$AUX/ev.mjs" '/Secret99/.test(JSON.stringify(j))')" "false"
+
+# FB3 (re-revue de dc9fe679) : la normalisation ne lit plus les guillemets. Liste blanche : un mot simple ne contient que des lettres ASCII, des chiffres et `_ . / : @ % + , ~ -` ;
+# une affectation de tête n'est sautée que si le mot entier vaut NOM=<mot simple ou vide>, tout autre mot de tête donne « … ». Formes fixes de la re-revue (rouges sur dc9fe679) + garde `$(`.
+cat > "$AUX/formes-fb3.json" <<'JSON'
+["FOO=$'pa Secret99' gh pr list","FOO=(pa Secret99) gh pr list","FOO=ab'cd Secret99'gh gh pr list","PGPASSWORD=pa\"ss Secret99\" psql db","FOO=\"a b\\\" Secret99 c\" gh pr list","FOO='it'\\''s Secret99' gh pr list","FOO=\"a $(echo \"b\" ) Secret99\" gh pr list","FOO=\"a ${X} Secret99\" gh pr list","FOO=$\"pa Secret99\" gh pr list","FOO=$'pa ss' gh pr list","FOO=(pa ss) gh pr list","FOO=bar gh pr list","PGPASSWORD= psql db"]
+JSON
+RB3="$(node "$AUX/mask-formes.mjs" "$SCRIPTS" "$LAB" "$WORK/home" < "$AUX/formes-fb3.json")"
+assert_eq "FB3.1 — formes de la re-revue et de F9 : affectation de tête non simple -> « … » (jamais un mot de la valeur) ; affectations simples ou vides sautées" "$(printf '%s' "$RB3" | node "$AUX/ev.mjs" 'j')" '["…","…","…","…","…","…","…","…","…","…","…","gh pr …","psql db"]'
+assert_eq "FB3.2 — Secret99 ne sort dans aucune de ces formes" "$(printf '%s' "$RB3" | node "$AUX/ev.mjs" '/Secret99/.test(JSON.stringify(j))')" "false"
+
+# FB3 — preuve générative. Grammaire : 0-3 affectations de tête (nues, vides, citées simple/double, $'…', $"…", $(…), backticks, (…), \ et \", mélanges), programme, 0-4 arguments (simples, citées,
+# options, « = », $(…), $VAR, glob…), puis opérateur (; && | ||) et mots de queue ; séparateurs espace, tabulation, retour à la ligne. Un marqueur unique est inséré dans UN composant tiré au hasard.
+# Propriété (sur chaque sortie) : le marqueur n'apparaît QUE s'il a été placé dans le programme ou le premier argument ET que ce mot entier est simple (liste blanche écrite ici indépendamment du code),
+# sans « - » initial, et pour l'argument sans « = » — la limite acceptée. Graine fixe, affichée ; en échec : commande, sortie, graine. Témoin positif : le marqueur sort bien au moins une fois.
+cat > "$AUX/gen.mjs" <<'JS'
+// gen.mjs <scripts> <lab> <home> <graine> <n> : sort {n, fuites:[{cmd,out,slot,mot}], legit, ms} ; `commandeAffichee` (la fonction même que revealDoing applique) sur les n commandes, et le chemin disque complet sur 1 commande sur 100
+import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import path from 'node:path';
+const [, , scripts, lab, home, seedS, nS] = process.argv; const N = Number(nS);
+const { revealDoing, commandeAffichee } = await import(pathToFileURL(scripts + '/vf-cockpit-who.mjs').href);
+let a = Number(seedS) >>> 0; const rnd = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+const pick = (xs) => xs[Math.floor(rnd() * xs.length)]; const MARK = 'ZqMark7391';
+const BLANC = /^[A-Za-z0-9_.\/:@%+,~-]+$/; // liste blanche du test, écrite indépendamment du code testé
+const FILL = ['gh', 'pr', 'list', 'x', 'a1', 'foo', 'bar', 'node', 'ls', 'src/a.js', 'v1.2', 'ab', 'b-c', 'k'];
+// formes d'un mot portant le contenu c (c peut valoir le marqueur) ; certaines contiennent des espaces (mot cité sur plusieurs « mots » shell)
+const MOT = [(c) => c, (c) => c, (c) => c, (c) => `-${c}`, (c) => `--k=${c}`, (c) => `k=${c}`, (c) => `'${c}'`, (c) => `"${c}"`, (c) => `$'${c}'`, (c) => `$"${c}"`, (c) => `$(${c})`, (c) => '`' + c + '`', (c) => `(${c})`,
+  (c) => `a\\ ${c}`, (c) => `a\\"${c}`, (c) => `"a ${c}"`, (c) => `"a \\" ${c} b"`, (c) => `a"b ${c}"d`, (c) => `a'b ${c}'d`, (c) => `${c};`, (c) => `${c}|x`, (c) => `${c}&&x`, (c) => `\${${c}}`, (c) => `$${c}`, (c) => `${c}*`,
+  (c) => `${c}#x`, (c) => `é ${c}`, (c) => `${c}/d`, (c) => `${c}.d`, (c) => `'it'\\''s ${c}'`, (c) => `${c}?`, (c) => `[${c}]`, (c) => `{${c},x}`, (c) => `~/${c}`, (c) => `@${c}`, (c) => `%${c}`, (c) => `${c}\\`, (c) => `a\\\n${c}`];
+// en position de programme, la forme `k=c` serait en réalité une affectation de tête (sémantique shell) : exclue, le programme réel serait le mot suivant
+const MOT_PROG = MOT.filter((_, i) => i !== 5);
+const NOMS = ['FOO', 'X', 'PGPASSWORD', 'GITHUB_TOKEN', '_a1', 'DB_PASS', 'k'];
+const VAL = [(c) => c, (c) => '', (c) => `"${c} w"`, (c) => `'${c} w'`, (c) => `$'${c} w'`, (c) => `$"${c} w"`, (c) => `$(echo ${c} w)`, (c) => '`echo ' + c + ' w`', (c) => `(${c} w)`, (c) => `a\\ ${c}`, (c) => `a\\"${c}`, (c) => `"a \\" ${c} b"`,
+  (c) => `ab'cd ${c}'gh`, (c) => `pa"ss ${c}"`, (c) => `"a $(echo "b" ) ${c}"`, (c) => `"a \${X} ${c}"`, (c) => `${c}.v`, (c) => `\\${c}`, (c) => `"${c}"`, (c) => `${c}=z`, (c) => `$'${c}\\' x'`];
+const SEP = [' ', ' ', ' ', '  ', '\t', '\n', ' \t ', '\n  '];
+const OPS = [';', '&&', '|', '||', ';;', '&', '\n'];
+const home_d = path.join(home, '.claude', 'projects', '-lab'); fs.mkdirSync(home_d, { recursive: true });
+const sid = 'eeee0001-2222-3333-4444-555566667777'; const file = path.join(home_d, sid + '.jsonl');
+const line = (type, content) => JSON.stringify({ type, cwd: lab, sessionId: sid, timestamp: new Date().toISOString(), gitBranch: 'main', version: '2.1', message: { content } });
+const t0 = Date.now(); const fuites = []; let legit = 0;
+for (let n = 0; n < N; n++) {
+  const nh = Math.floor(rnd() * 4), na = Math.floor(rnd() * 5);
+  const comps = []; // {slot, texte}
+  for (let i = 0; i < nh; i++) comps.push({ slot: 'head', f: (c) => `${pick(NOMS)}=${pick(VAL)(c)}` });
+  comps.push({ slot: 'prog', f: pick(MOT_PROG) }); for (let i = 0; i < na; i++) comps.push({ slot: i === 0 ? 'arg0' : 'arg', f: pick(MOT) });
+  const nq = rnd() < 0.5 ? 0 : 1 + Math.floor(rnd() * 3); for (let i = 0; i < nq; i++) comps.push({ slot: 'queue', f: pick(MOT) });
+  // la moitié des tirages vise programme / premier argument : le témoin positif ne reste pas rare
+  const cible = rnd() < 0.5 ? nh + Math.floor(rnd() * Math.min(2, comps.length - nh)) : Math.floor(rnd() * comps.length); const mots = comps.map((c, i) => c.f(i === cible ? MARK : pick(FILL)));
+  let cmd = ''; comps.forEach((c, i) => { if (i === nh + 1 + na && nq) cmd += pick(SEP) + pick(OPS); cmd += (i ? pick(SEP) : '') + mots[i]; });
+  const slot = comps[cible].slot; const mot = mots[cible];
+  let out = commandeAffichee(cmd);
+  if (n % 100 === 0) { // chemin complet (transcript -> revealDoing) : même sortie que la fonction directe
+    fs.writeFileSync(file, line('user', 'salut') + '\n' + line('assistant', [{ type: 'tool_use', name: 'Bash', input: { command: cmd } }]) + '\n');
+    const disque = revealDoing(lab, sid, { home }).doing ?? ''; if (disque !== out) { out = `DIVERGENCE disque=${JSON.stringify(disque)} direct=${JSON.stringify(out)}`; fuites.push({ cmd, out, slot: 'chemin', mot: '' }); }
+  }
+  const permis = (slot === 'prog' && BLANC.test(mot) && !mot.startsWith('-')) || (slot === 'arg0' && BLANC.test(mot) && !mot.startsWith('-') && !mot.includes('='));
+  if (out.includes(MARK)) { if (permis) legit++; else fuites.push({ cmd, out, slot, mot }); }
+}
+console.log(JSON.stringify({ n: N, fuites: fuites.slice(0, 5), nFuites: fuites.length, legit, ms: Date.now() - t0 }));
+JS
+SEED=20261103; NGEN=6000
+GEN="$(node "$AUX/gen.mjs" "$SCRIPTS" "$LAB" "$WORK/home" "$SEED" "$NGEN")"
+echo "  graine=$SEED commandes=$NGEN ; sortie : $(printf '%s' "$GEN" | node "$AUX/ev.mjs" '"fuites="+j.nFuites+" legit="+j.legit+""+" ms="+j.ms')"
+assert_eq "FB3.3 — $NGEN commandes générées (graine $SEED) : le marqueur ne sort que placé dans le programme ou le premier argument ET simple (échec : commande, sortie, graine)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.nFuites+" fuite(s) : "+JSON.stringify(j.fuites.slice(0,2))+" graine='$SEED'"')" "0 fuite(s) : [] graine=$SEED"
+assert_eq "FB3.4 — témoin positif : le marqueur sort bien dans plus de 100 cas légitimes (programme ou premier argument simples), la mesure n'est pas à vide" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.legit > 100')" "true"
+assert_eq "FB3.5 — le cas génératif tient en moins de 10 s" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.ms < 10000')" "true"
 # MB : canal task de `bornes` (description d'un sous-agent, diffusée en SSE). Un cas par motif de MASQUES : chaque valeur doit sortir masquée, et retirer un motif fait rougir son cas.
 cat > "$AUX/mask-bornes.mjs" <<'JS'
 // mask-bornes.mjs <scripts> <lab> <home> : description de sous-agent -> task bornée et masquée, une par entrée de stdin (JSON)
