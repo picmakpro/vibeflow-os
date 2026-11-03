@@ -2,13 +2,14 @@
 
 - date : 2026-11-03
 - base : HEAD `03518b44`, `vf-cockpit.mjs` sans `--terminal` (`argument inconnu : --terminal`, sortie 64)
-- commande : `bash plugin/cockpit/scripts/tests/test-cockpit-terminal-lanceur.sh > 71-10-t1.out 2>&1` — rc=1, `Résultats : 8 PASS / 26 FAIL`
-- témoins verts sur la base (contrôles positifs) : L0 (build, status), L11 (garde existante sur PID leurre, `--rebuild`), L7 témoin (sans drapeau : sortie 0, pas de clé terminal), L4 « cible inchangée », L6 témoin `--no-open`, L10 « aucun amorçage ».
-- écart au plan : L11 est scindé en L11 (garde existante, vert sur la base) et L11b (même scénario avec `--terminal`, rouge sur la base : le plan demande un L11 vert sur la base ET `open --terminal` ; les deux ne tiennent que séparés).
+- commande : suite jouée contre le lanceur de la base (copie du module dont `vf-cockpit.mjs` = `git show 03518b44:plugin/cockpit/scripts/vf-cockpit.mjs`) : `bash test-cockpit-terminal-lanceur.sh` — rc=1, `Résultats : 7 PASS / 27 FAIL`
+- première passe (commit `26dd20d6`, avant correction de deux défauts de la suite : arguments du client `flux`, couche de garde de L4) : 8 PASS / 26 FAIL, mêmes causes ; la trace ci-dessous est celle de la suite finale.
+- témoins verts sur la base (contrôles positifs) : L0 (build, status), L11 (garde existante sur PID leurre, `--rebuild`), L7 témoin (sans drapeau : sortie 0, pas de clé terminal), L6 témoin `--no-open`, L10 « aucun amorçage ».
+- écart au plan : L11 est scindé en L11 (garde existante, vert sur la base) et L11b (même scénario avec `--terminal`, rouge sur la base) ; le plan demande un L11 vert sur la base ET `open --terminal`, ce que sortie 64 empêche.
 
 Chaque rouge a la même cause racine : le lanceur rejette `--terminal` (sortie 64, « argument inconnu : --terminal »), donc aucun serveur avec terminal, aucun amorçage, aucune ouverture de Q ; les quatre mutants n'ont rien à muter (« mutant sans effet »).
 
-## Témoins rouges (26)
+## Témoins rouges (27)
 
 ### FAIL — L1 — open --terminal --no-open sort 0
 - attendu : `[0]`
@@ -54,21 +55,25 @@ Chaque rouge a la même cause racine : le lanceur rejette `--terminal` (sortie 6
 - attendu : `[oui]`
 - obtenu : `[non : [] Q= P=]`
 
-### FAIL — L4 — refus nommé OU fichier ordinaire à la place du lien (jamais une écriture à travers)
+### FAIL — L4 — serveur arrêté, lien préplacé : la cible est intacte, refus nommé ou fichier ordinaire
 - attendu : `[sur]`
-- obtenu : `[aucun]`
+- obtenu : `[non]`
+
+### FAIL — L4 — serveur vivant avec terminal (O2 c), lien préplacé : la cible est intacte, refus nommé ou fichier ordinaire
+- attendu : `[sur]`
+- obtenu : `[non]`
 
 ### FAIL — L7 — le PID du serveur a changé, l'ancien est mort, terminal.url est présent
 - attendu : `[oui]`
-- obtenu : `[non : 21695 -> 21695]`
+- obtenu : `[non : 37270 -> 37270]`
 
 ### FAIL — L8 — l'amorçage 1 est accepté (200)
 - attendu : `[200]`
 - obtenu : `[ERREUR ECONNREFUSED]`
 
 ### FAIL — L8 — même PID de serveur, sortie 0
-- attendu : `[0 21695]`
-- obtenu : `[64 21695]`
+- attendu : `[0 37270]`
+- obtenu : `[64 37270]`
 
 ### FAIL — L8 — nouvel amorçage en 600, différent du premier
 - attendu : `[600 different]`
