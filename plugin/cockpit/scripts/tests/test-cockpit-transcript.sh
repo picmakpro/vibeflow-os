@@ -404,6 +404,40 @@ JS
 fi
 vf_hyg_stop "$SRV_PID"
 
+# =====================================================================================================================
+echo "=== T24F — correction d'audit : masque avant la coupe, coût borné par ce qui sort (F1, F4 ; P69-D-19) ==="
+cat > "$AUX/mk-f1.mjs" <<'JS'
+// mk-f1.mjs <fichier> <secret> : mandat portant le secret à 3 980 et à 7 980 caractères, un message le portant à 1 980 (les bornes de coupe)
+import fs from 'node:fs';
+const [, , out, S] = process.argv; const pad = (n) => 'x'.repeat(n);
+const mandat = pad(3980) + S + pad(7980 - 3980 - S.length) + S + pad(100), message = pad(1980) + S + pad(500);
+const side = (o) => ({ isSidechain: true, agentId: 'f1', ...o });
+fs.writeFileSync(out, [side({ type: 'user', message: { role: 'user', content: mandat } }), side({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: message }] } })].map((l) => JSON.stringify(l)).join('\n') + '\n');
+JS
+cat > "$AUX/mk-f4.mjs" <<'JS'
+// mk-f4.mjs <fichier> <racineLab> texte|outils : 8,5 Mio de lignes assistant, soit des blocs text de 3 900 caractères (motif dense pour le masque), soit des tool_use Read
+import fs from 'node:fs';
+const [, , out, lab, mode] = process.argv; const motif = 'tokensecret'.repeat(355).slice(0, 3900);
+const L = [JSON.stringify({ type: 'user', isSidechain: true, agentId: 'f4', message: { role: 'user', content: 'MANDAT-VISIBLE-69' } })]; let n = 0;
+while (n < 8.5 * 1048576) {
+  const c = mode === 'outils' ? [{ type: 'tool_use', id: 'u', name: 'Read', input: { file_path: `${lab}/src/a.js` } }] : [{ type: 'text', text: motif }];
+  const l = JSON.stringify({ type: 'assistant', isSidechain: true, agentId: 'f4', message: { role: 'assistant', content: c } }); L.push(l); n += l.length + 1;
+}
+fs.writeFileSync(out, L.join('\n') + '\n');
+JS
+i=0; for P in 'ghp_|ghp_abcdefghijklmnopqrstuvwxyz0123456789' 'github_pat_|github_pat_abcdefghijklmnopqrstuvwxyz0123456789' 'sk-|sk-abcdefghijklmnopqrstuvwxyz0123456789' 'AKIA|AKIAABCDEFGHIJKLMNOP' 'Bearer|Bearer abcdefghijklmnopqrstuvwxyz0123456789'; do
+  i=$((i+1)); PRE="${P%%|*}"; SEC="${P#*|}"
+  node "$AUX/mk-f1.mjs" "$AUX/fx/f1-$i.jsonl" "$SEC"; node "$AUX/red.mjs" "$SCRIPTS" "$AUX/fx/f1-$i.jsonl" "$LAB0" > "$WORK/f1-$i.json"
+  assert_eq "T24F1.$i.0 — contrôle positif : la fixture porte $PRE trois fois et la sortie existe" "$(grep -o -- "$PRE" "$AUX/fx/f1-$i.jsonl" | wc -l | tr -d ' ')|$(G "$WORK/f1-$i.json" 'j.absent||"sortie"')" "3|sortie"
+  assert_eq "T24F1.$i.1 — aucun fragment de $PRE au point de coupe du mandat (4 000, 8 000) ni du message (2 000)" "$(G "$WORK/f1-$i.json" 'j.absent||(()=>{const s=JSON.stringify(j.r);return s.includes("[masqué]")?(s.includes("'"$PRE"'")?"fragment présent":"ok"):"rien de masqué"})()')" "ok"
+done
+mkdir -p "$AUX/f4/lab/src"; echo ok > "$AUX/f4/lab/src/a.js"
+node "$AUX/mk-f4.mjs" "$AUX/fx/f4-texte.jsonl" "$AUX/f4/lab" texte; node "$AUX/mk-f4.mjs" "$AUX/fx/f4-outils.jsonl" "$AUX/f4/lab" outils
+node "$AUX/red.mjs" "$SCRIPTS" "$AUX/fx/f4-texte.jsonl" "$AUX/f4/lab" > "$WORK/f4-texte.json"; node "$AUX/red.mjs" "$SCRIPTS" "$AUX/fx/f4-outils.jsonl" "$AUX/f4/lab" > "$WORK/f4-outils.json"
+assert_eq "T24F4.0 — contrôle positif : fixtures de plus de 8 Mio, 50 messages et 200 outils rendus" "$([ "$(wc -c < "$AUX/fx/f4-texte.jsonl" | tr -d ' ')" -gt 8388608 ] && [ "$(wc -c < "$AUX/fx/f4-outils.jsonl" | tr -d ' ')" -gt 8388608 ] && echo grosses)|$(G "$WORK/f4-texte.json" 'j.absent||j.r.messages.length')|$(G "$WORK/f4-outils.json" 'j.absent||j.r.outils.length')" "grosses|50|200"
+assert_eq "T24F4.1 — 8,5 Mio de blocs text au motif dense : moins de 2 000 ms (le masque ne couvre que les 50 messages gardés)" "$(G "$WORK/f4-texte.json" 'j.absent||(j.ms<2000?"ok":"ms="+j.ms)')" "ok"
+assert_eq "T24F4.2 — 8,5 Mio de tool_use Read : moins de 2 000 ms (étiquette des seuls 200 outils gardés)" "$(G "$WORK/f4-outils.json" 'j.absent||(j.ms<2000?"ok":"ms="+j.ms)')" "ok"
+
 vf_hyg_assert
 
 echo ""

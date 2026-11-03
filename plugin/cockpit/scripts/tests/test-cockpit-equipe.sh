@@ -518,6 +518,52 @@ assert_eq "EUI.5 — agentsDuNoeud : le lien vers la carte de w1 pour le nœud r
 assert_eq "EUI.6 — pied(a-bash) dit « actif » et « lance une commande »" "$(G "$WORK/vm-pied.json" 'j.erreur||(String(j.retour).includes("actif")+"|"+String(j.retour).includes("lance une commande"))')" "true|true"
 assert_eq "EUI.7 — chaque session et sous-agent de l'arbre (5) porte un bouton data-vf-doing" "$(grep -o 'data-vf-doing=' "$WORK/arbre.html" | wc -l | tr -d ' ')" "5"
 
+echo "=== E29 — correction d'audit : champs libres, forme typée, taille des meta.json (F2, F3, F4 ; P69-D-23) ==="
+cat > "$AUX/spec-e29.json" <<'JSON'
+{"sessionAgeS":5,"agents":[
+ {"id":"mgr1","spawnDepth":1,"ageS":5,"role":"vf-dev-manager"},
+ {"id":"ok1","spawnDepth":2,"parent":"mgr1","ageS":3},
+ {"id":"a-obj","spawnDepth":2,"parent":"mgr1","ageS":3},
+ {"id":"a-cwd","spawnDepth":2,"parent":"mgr1","ageS":3},
+ {"id":"a-gros","spawnDepth":2,"parent":"mgr1","ageS":3}]}
+JSON
+H29="$(mkhome e29 "$AUX/spec-e29.json" "$LAB")"
+cat > "$AUX/abime-e29.mjs" <<'JS'
+// abime-e29.mjs <home> : description et agentType non chaînes, horodatage de 9 Ko, cwd objet, meta de 512 Kio, candidat au nom de fichier piégé, session au cwd numérique
+import fs from 'node:fs';
+import path from 'node:path';
+const home = process.argv[2]; const dir = path.join(home, '.claude', 'projects', '-lab');
+const sid = fs.readdirSync(dir).find((f) => f.endsWith('.jsonl')).slice(0, -6); const sub = path.join(dir, sid, 'subagents');
+const meta = (id, f) => { const p = path.join(sub, `agent-${id}.meta.json`); const m = JSON.parse(fs.readFileSync(p, 'utf8')); f(m); fs.writeFileSync(p, JSON.stringify(m)); };
+meta('a-obj', (m) => { m.description = { x: 'OBJET-69' }; m.agentType = ['TABLEAU-69']; });
+meta('a-gros', (m) => { m.description = 'z'.repeat(512 * 1024); });
+const dernier = (f, g) => { const L = fs.readFileSync(f, 'utf8').trim().split('\n'); const o = JSON.parse(L[L.length - 1]); g(o); L[L.length - 1] = JSON.stringify(o); const st = fs.statSync(f); fs.writeFileSync(f, L.join('\n') + '\n'); fs.utimesSync(f, st.atimeMs / 1000, st.mtimeMs / 1000); };
+dernier(path.join(sub, 'agent-a-cwd.jsonl'), (o) => { o.cwd = { a: 'CWD-OBJET-69' }; });
+dernier(path.join(dir, sid + '.jsonl'), (o) => { o.timestamp = 'T' + '9'.repeat(9000); });
+const piege = '<img src=x onerror=alert(1)>';
+fs.copyFileSync(path.join(sub, 'agent-ok1.meta.json'), path.join(sub, `agent-${piege}.meta.json`)); fs.copyFileSync(path.join(sub, 'agent-ok1.jsonl'), path.join(sub, `agent-${piege}.jsonl`));
+const d2 = path.join(home, '.claude', 'projects', '-lab2'); fs.mkdirSync(d2, { recursive: true });
+const ligne = JSON.parse(fs.readFileSync(path.join(dir, sid + '.jsonl'), 'utf8').trim().split('\n')[0]); ligne.cwd = 42; ligne.sessionId = 'sess-cwd-num';
+fs.writeFileSync(path.join(d2, 'sess-cwd-num.jsonl'), JSON.stringify(ligne) + '\n');
+JS
+node "$AUX/abime-e29.mjs" "$H29"
+Q who "$LAB" "$H29" "$NOSCRIPTS" "$NOW" > "$WORK/who-e29.json" 2> "$WORK/who-e29.err"
+assert_eq "E29.0 — contrôle positif : la collecte aboutit (JSON) et liste ok1, a-obj, a-cwd ... avec leur état" "$(G "$WORK/who-e29.json" 'j.workers?j.workers.filter(x=>x.kind==="subagent"&&["ok1","a-obj"].includes(x.id)).length:"pas de collecte"')" "2"
+assert_eq "E29.1 (F2) — aucune description ni agentType objet ou tableau en sortie, a-obj reste listé" "$(grep -cE 'OBJET-69|TABLEAU-69' "$WORK/who-e29.json")|$(sf "$WORK/who-e29.json" a-obj 'w.etat')" "0|actif"
+assert_eq "E29.2 (F2) — tout champ libre est une chaîne bornée ou absent (task <= 160, role <= 80, lastAt <= 40)" "$(G "$WORK/who-e29.json" 'j.workers?(j.workers.every(w=>[["task",160],["role",80],["lastAt",40],["cwd",200],["branch",200]].every(([k,n])=>w[k]===undefined||(typeof w[k]==="string"&&w[k].length<=n)))?"ok":"champ libre non borné"):"pas de collecte"')" "ok"
+assert_eq "E29.3 (F2) — aucun identifiant ne sort hors de ID_RE, le candidat au nom de fichier piégé est exclu et la source passe en forme-inconnue" "$(grep -c 'onerror' "$WORK/who-e29.json")|$(G "$WORK/who-e29.json" 'j.workers?(j.workers.filter(w=>["session","subagent","registered"].includes(w.kind)).every(w=>/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(w.id))?"ok":"id hors ID_RE")+"|"+j.sources.sessions.etat:"pas de collecte"')" "0|ok|forme-inconnue"
+assert_eq "E29.4 (F3) — un cwd objet (sous-agent) ou numérique (session) ne fait pas lever la collecte : ok1 reste listé, a-cwd est exclu, une erreur de forme est comptée" "$(cat "$WORK/who-e29.err" | grep -c 'startsWith')|$(sf "$WORK/who-e29.json" ok1 w.etat)|$(sf "$WORK/who-e29.json" a-cwd w.etat)|$(G "$WORK/who-e29.json" 'j.sources?String(j.sources.sessions.formeInconnue>=2):"x"')" "0|actif|absent|true"
+assert_eq "E29.5 (F4) — un meta.json de 512 Kio (au-delà de la borne) met l'agent en forme-inconnue : a-gros absent, ok1 présent" "$(sf "$WORK/who-e29.json" a-gros w.etat)|$(sf "$WORK/who-e29.json" ok1 w.etat)" "absent|actif"
+cat > "$AUX/rv-e29.mjs" <<'JS'
+// rv-e29.mjs <scripts> <root> <home> <id>... : revealTranscript pour chaque identifiant ; une ligne par identifiant, « exception » si elle remonte
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, root, home, ...ids] = process.argv;
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-who.mjs')).href);
+for (const id of ids) { try { const r = m.revealTranscript(root, id, { home, scriptsDir: '/nonexistent' }); console.log(id + '|' + r.schema + '|' + (r.erreur || 'rendu')); } catch (e) { console.log(id + '|exception|' + e.message); } }
+JS
+assert_eq "E29.6 (F3) — revealTranscript ne lève jamais : agent sain rendu, agent à cwd objet et identifiant inconnu sans exception" "$(node "$AUX/rv-e29.mjs" "$SCRIPTS" "$LAB" "$H29" ok1 a-cwd absent-xyz | tr '\n' ' ')" "ok1|vibeflow/cockpit-transcript@1|rendu a-cwd|vibeflow/cockpit-transcript@1|inconnu absent-xyz|vibeflow/cockpit-transcript@1|inconnu "
+
 vf_hyg_assert
 
 echo ""
