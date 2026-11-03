@@ -110,3 +110,4 @@
 - [Guard lock juge l'arbre principal](project_guard-lock-evalue-arbre-principal-en-worktree.md) — en worktree .claude/worktrees, refus de commit fantôme sur les non-suivis du principal
 - [Runner Ubuntu 26 = uutils](project_runner-ubuntu-26-uutils.md) — depuis 2026-10-19, `-h` = --help en CI : les copies gelées `ln -sh` cassent en silence ; juger sous BSD, GNU ET uutils
 - [Lire l en-tête de la suite avant d y loger un test](feedback_lire-l-en-tete-de-la-suite-avant-d-y-loger-un-test.md) — le brief visait la suite plate GELÉE (P57-D-03) : preuve partitionnée = suite -ws + mutant
+- [Reprendre le correcteur par SendMessage](feedback_reprendre-le-correcteur-par-sendmessage.md) — un worker fini se reprend avec son contexte ; chaque passe de correction repasse devant un checker frais scopé au diff
