@@ -16,7 +16,7 @@
         "research-71"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "discuss-71",
@@ -26,7 +26,7 @@
         "ask-71"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "plan-71",
@@ -36,7 +36,7 @@
         "discuss-71"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "craft-terminal",
@@ -46,7 +46,7 @@
         "discuss-71"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-71",

@@ -108,6 +108,24 @@ scratchpad de la mission, rejouable ; résultats repris ci-dessous).
 - **P71-D-19 (thème, sur F2 de `71-UI-SPEC.md`).** Le thème passe au cadre par un paramètre d'URL non sensible ; une bascule
   recharge le cadre, qui rejoue le tampon de reprise (256 Ko). Accepté : le sens P → Q reste fermé.
 
+### Décisions du manager sur les hypothèses du planificateur (vf-dev-manager, 2026-11-03 ; `71-01-PLAN.md` § Hypothèses à confirmer)
+
+- **P71-D-20 (O1 → option B).** Le tiroir est servi à la volée, SEULEMENT avec `--terminal`, depuis
+  `scripts/vf-cockpit-terminal-tiroir*.mjs`, et non par un `assets/ui/9x-vf-terminal.js` inliné. Motif : TERM-01 exige une
+  CSP de page octet pour octet identique sans le drapeau ; un script de plus dans `assets/ui/` y ajouterait une empreinte.
+  Cette décision remplace la mention `assets/ui/9x-vf-terminal.js` de P71-D-17 ; le principe « fichiers neufs, branchement
+  minimal » reste.
+- **P71-D-21 (O2 à O6, O8 à O11 confirmées telles qu'écrites).** O2 relance/réamorçage du lanceur ; O3 amorçage par
+  `.cache/terminal-amorce` en 0600, création exclusive, supprimé à l'échange ; O4 identifiant d'onglet dans le
+  `sessionStorage` de Q (même onglet = reprise, autre = 409) ; O5 reprise du plein écran assumée et écrite au README ; O6 P
+  ouvert par `localhost:P` = tiroir désactivé avec message ; O8 `sandbox` du cadre mesuré avant d'être choisi ; O9 Q dans le
+  processus de `serve.mjs` ; O10 clés `vf.terminal.*` ; O11 suite neuve `test-cockpit-terminal-xss.sh`.
+- **P71-D-22 (O7, PROVISOIRE, remonté à Samuel le 2026-11-03).** `TERM=xterm-256color` et `COLORTERM=truecolor` sont posés
+  TOUJOURS (pas « seulement si absents ») : le terminal émulé est xterm.js, le `TERM` hérité décrit le terminal du lanceur
+  (voire `dumb`), et c'est ce que fait tout émulateur de terminal ; sans eux, `claude` perd ses couleurs (critère de
+  P71-D-06). Une seule constante, réversible. Ce n'est PAS un arbitrage de Samuel : sa décision P71-D-03 (« tout
+  l'environnement, sauf ces variables ») ne parle pas de `TERM` ; s'il tranche autrement, la constante change.
+
 ### Contraintes héritées (Phase 67, `v2.75.0`)
 
 - Le lab observé n'est jamais une source de code : aucun script du lab exécuté par le serveur (le shell, lui, est l'usage
