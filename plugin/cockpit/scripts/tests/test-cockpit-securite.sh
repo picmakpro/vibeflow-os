@@ -104,7 +104,7 @@ srv "$OUT"; PORT=$SRV_PORT; TOK="$(tok "$PORT" /)"; PTOK="$(tok "$PORT" /project
 assert_eq "0 — serveur démarré, jetons lus" "$([ "$PORT" -gt 0 ] && [ ${#TOK} -ge 16 ] && [ ${#PTOK} -ge 16 ] && echo oui || echo non)" "oui"
 
 echo "=== H — en-têtes sur toutes les réponses ==="
-for p in / /project.html /equipe.html /graph.json /inexistant "/api/vf/etat" ; do
+for p in / /project.html /equipe.html /graph.json /inexistant "/api/vf/etat" "/api/vf/transcript?id=x" ; do
   H="$(hdr "$PORT" "$p" "$TOK")"
   assert_eq "H1 — $p : nosniff, DENY, CSP présents" "$(printf '%s' "$H" | node "$AUX/ev.mjs" '(j["x-content-type-options"]==="nosniff")+","+(j["x-frame-options"]==="DENY")+","+!!j["content-security-policy"]')" "true,true,true"
 done
