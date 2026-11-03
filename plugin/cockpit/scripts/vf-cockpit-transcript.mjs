@@ -15,6 +15,9 @@ export const VERBES = Object.freeze(Object.assign(Object.create(null), {
 const VERBE_MCP = 'utilise', VERBE_AUTRE = 'utilise un outil', HORS = 'un fichier hors du lab';
 const BORNE_CIBLE = 120, BORNE_MANDAT = 8000, MAX_MESSAGES = 50, BORNE_MESSAGE = 2000, MAX_OUTILS = 200, TETE = 256 << 10, QUEUE = 8 << 20;
 
+// un texte coupé à la borne le dit : la mention vient APRÈS la coupe (masqueCoupe reste la seule voie de coupe, le masque passe avant), avec la borne réelle, jamais écrite en dur
+const milliers = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const coupe = (t, n) => { const r = masqueCoupe(t, n); return t.length > n ? `${r} … (tronqué, ${milliers(n)} caractères)` : r; };
 const chaine = (v) => (typeof v === 'string' ? v : '');
 const fin = (s) => masque(chaine(s).replace(/\s+/g, ' ').trim()).slice(0, BORNE_CIBLE);
 const real = (p) => { try { return fs.realpathSync(p); } catch { return null; } };
@@ -86,7 +89,7 @@ function reduire(fichier, root) {
   let tronque = false, mandat = '';
   const tete = fenetre(fichier, TETE, false);
   if (tete?.coupe && !tete.texte.includes('\n')) tronque = true; // la première ligne dépasse la fenêtre de tête : le mandat est illisible
-  if (tete) { const p = json(tete.texte.split('\n')[0]); if (p?.type === 'user' && typeof p.message?.content === 'string') { const c = p.message.content; if (c.length > BORNE_MANDAT) tronque = true; mandat = masqueCoupe(c, BORNE_MANDAT); } }
+  if (tete) { const p = json(tete.texte.split('\n')[0]); if (p?.type === 'user' && typeof p.message?.content === 'string') { const c = p.message.content; if (c.length > BORNE_MANDAT) tronque = true; mandat = coupe(c, BORNE_MANDAT); } }
   const q = fenetre(fichier, QUEUE, true);
   if (!q) return { mandat, messages: [], outils: [], tronque };
   const lignes = q.texte.split('\n'); if (q.coupe) { lignes.shift(); tronque = true; } // la première ligne de la fenêtre est coupée
@@ -105,5 +108,5 @@ function reduire(fichier, root) {
   if (msgs.length > MAX_MESSAGES) { msgs = msgs.slice(-MAX_MESSAGES); tronque = true; }
   if (outs.length > MAX_OUTILS) { outs = outs.slice(-MAX_OUTILS); tronque = true; }
   if (msgs.some((t) => t.length > BORNE_MESSAGE)) tronque = true;
-  return { mandat, messages: msgs.map((t) => masqueCoupe(t, BORNE_MESSAGE)), outils: outs.map((o) => etiquette(o.n, o.i, root)), tronque };
+  return { mandat, messages: msgs.map((t) => coupe(t, BORNE_MESSAGE)), outils: outs.map((o) => etiquette(o.n, o.i, root)), tronque };
 }
