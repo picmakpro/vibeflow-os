@@ -126,6 +126,8 @@ scratchpad de la mission, rejouable ; résultats repris ci-dessous).
   P71-D-06). Une seule constante, réversible. Ce n'est PAS un arbitrage de Samuel : sa décision P71-D-03 (« tout
   l'environnement, sauf ces variables ») ne parle pas de `TERM` ; s'il tranche autrement, la constante change.
 
+- **P71-D-23 (Q8 : `TERM` et `COLORTERM` ; arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-03).** Réponse, mot pour mot : « Toujours xterm-256color + truecolor (Recommandé) ». Le choix provisoire P71-D-22 devient définitif : `TERM=xterm-256color` et `COLORTERM=truecolor` sont posés TOUJOURS, quel que soit l'environnement hérité.
+
 ### Contraintes héritées (Phase 67, `v2.75.0`)
 
 - Le lab observé n'est jamais une source de code : aucun script du lab exécuté par le serveur (le shell, lui, est l'usage

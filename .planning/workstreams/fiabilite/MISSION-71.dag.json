@@ -130,7 +130,7 @@
         "plan-71"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "ex-02",
@@ -140,7 +140,7 @@
         "ex-01"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "ex-03",
@@ -150,7 +150,7 @@
         "ex-01"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "ex-04",
@@ -160,7 +160,7 @@
         "ex-01"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "ex-10",
@@ -170,7 +170,7 @@
         "ex-01"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "ex-11",
@@ -180,7 +180,7 @@
         "ex-01"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "ex-05",
