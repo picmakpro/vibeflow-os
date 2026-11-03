@@ -1,5 +1,27 @@
 # Changelog — conductor
 
+## [v1.53.0] — 2026-11-03 (verrou de driver par phase) — non publié
+
+**Minor** (capacité neuve ; aucune release racine, elle sera groupée). Règle de Samuel (session principale Claude Code, 2026-11-03) : « la regle est de parallèliser le plus possible, pas de regle "1 seul manager" on lance autant d'agent et sous agent qu'on peut. Plusieur worktree peuvent etre necessaire » ; arbitrage (AskUserQuestion, session principale, 2026-11-03) : « Un verrou par phase (Recommandé) ».
+
+- **`driver-lock.sh --ws=<sujet> --phase=<N>`** : un verrou nommé par phase à l'intérieur d'un compartiment
+  (`vf-driver/ws/<sujet>/phases/<N>/DRIVER.lock`). Deux phases d'un même compartiment s'acquièrent en parallèle, la même
+  phase deux fois est refusée (`held`). Toute la mécanique (lien remplacé par `rename(2)`, mutex, TTL, heartbeat, takeover,
+  registre `register --node`, journal) est paramétrée par l'emplacement, pas copiée ; la sonde de l'ancien verrou est
+  généralisée (`vf_dl_probe`) au lieu d'être dupliquée. Le verrou de compartiment nu reste valide et inchangé.
+- **Hiérarchie** : verrou nu et verrous de phase du même compartiment s'excluent dans les deux sens à `acquire` et `takeover`
+  (sonde avant la pose, re-sonde après) : `compartment-lock-held`, `phase-lock-held`, `stale-requires-takeover` avec le `recover`
+  cible. `--phase` sans `--ws` ou avec `--depot` : `ws-invalid` ; nom hors `[0-9]+(.[0-9]+)*` : `phase-invalid` ; lab plat :
+  inerte. `status --all` liste les phases (`scope: phase`, champ `phase`).
+- **`guard-driver-lock.sh`** : un verrou de phase tenu par une autre session couvre le dossier de SA phase
+  (`phases/<préfixe->N-…/`) ; la session détentrice commite et écrit librement ; les fichiers partagés du compartiment ne sont
+  pas couverts (limite écrite). **`dag.sh init --ws --phase`** : `mark` avance le `progress_epoch` du verrou de la phase.
+  **`check-guard-health.sh`** nomme la phase dans la ligne du chien de garde ; **`check-branch-claim.sh`** examine aussi les verrous de phase.
+- **Suites** : `test-driver-lock-phase.sh` (80), `test-guard-driver-lock-phase.sh` (26), `test-driver-lock-phase-consumers.sh` (12),
+  chacune rouge avant le correctif et verte après ; les ancres de mutants de `test-driver-lock-ws.sh` suivent le renommage des
+  appels de sonde (`vf_dl_blocker_probe`, `vf_dl_blocker_refuse`).
+- **Limite** : deux acquisitions simultanées du verrou nu et d'une phase peuvent se retirer toutes les deux (au plus un gagnant, jamais deux) ; le rejeu réussit.
+
 ## [v1.52.1] — 2026-11-01 (écriture atomique de dag.sh, Phase 67)
 
 **Patch** : `save()` de `dag.sh` écrit dans un temporaire du même dossier puis `os.replace` (un lecteur concurrent — cockpit, collecteur, manager — lisait un JSON tronqué, spike 003), avec `fsync` et mode conservé (copie du mode d'un DAG existant, 0666 moins umask pour un DAG neuf), nettoyage du temporaire sur exception, et résolution du lien symbolique (`os.path.realpath`) avant l'écriture : un DAG lien symbolique reste un lien et c'est sa cible qui est mise à jour, le temporaire vivant dans le dossier de la cible (relecture adverse SOBR-04 de v2.75.0, F4 ; correction décidée par Samuel, AskUserQuestion session principale, 2026-11-03 ; cas A5 du test). Suite voisine `test-dag-atomic-save.sh` à témoin rouge joué avant le correctif. Validation ADR-031 limitée à ce correctif (P67-D-09, arbitrage Samuel, AskUserQuestion session principale, 2026-11-01). Publiée dans VibeFlow v2.75.0.

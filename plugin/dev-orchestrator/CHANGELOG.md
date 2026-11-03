@@ -1,5 +1,13 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.31.0] — 2026-11-03 (un manager par phase) — non publié
+
+**Minor** (doctrine + option ; aucune release racine, elle sera groupée). Règle de Samuel (session principale Claude Code, 2026-11-03) : « la regle est de parallèliser le plus possible, pas de regle "1 seul manager" on lance autant d'agent et sous agent qu'on peut. Plusieur worktree peuvent etre necessaire » ; arbitrage (AskUserQuestion, session principale, 2026-11-03) : « Un verrou par phase (Recommandé) ».
+
+- **`head-governance.md` §2** : la décision D-02 (« un manager à la fois ») est amendée ; un verrou par phase, chaque mandat de
+  manager porte `--ws <sujet> --phase <N>`. **`mission-flow.md`** et **`mission-cross-team.md`** suivent.
+- **`check-mission-exit.sh --phase <N>`** : E1 et l'identité d'E7 jugent le verrou de la phase (`status --ws --phase`).
+
 ## [v2.30.0] — 2026-10-29 (phases proposées, gate architecture) — publiée dans v2.74.0
 
 **Minor** (Phase 60, ARCG-01, ARCG-03, ARCG-04, ARCG-05, ARCG-09 ; mandat Samuel, /vf-auto session principale, 2026-10-29) :

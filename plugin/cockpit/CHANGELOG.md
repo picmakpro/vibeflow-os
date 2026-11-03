@@ -1,5 +1,11 @@
 # Changelog — cockpit
 
+## v1.0.2 — 2026-11-03 — non publié
+
+### Ajouté
+- **Verrous de phase dans « qui est au travail »** : `vf-cockpit-who.mjs` affiche `compartiment <sujet> phase <N>` et lit le
+  registre des agents de chaque phase tenue (`orphans --ws --phase`). Règle de Samuel, session principale, 2026-11-03.
+
 ## v1.0.1 — 2026-11-03
 
 Publiée dans VibeFlow v2.75.1.
