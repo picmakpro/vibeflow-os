@@ -71,6 +71,13 @@
     confirmer.
   - INFO : le texte du `fails_when` de la tâche 1 de 68-01 ne cite pas V9 ni V10. Reporté à `revalid-68`.
 
+## À jouer au nœud `revalid-68` (consigne de la session principale, 2026-11-03)
+
+- P68-D-27 (décision du manager, consignée dans le CONTEXT) : ajouter à 68-01 un témoin qui fige le cas « verrou de
+  phase présent mais périmé + compartiment tenu → `abandonnee` », avec une copie mutée qui ferait gagner le repli.
+- INFO du dernier checker : aligner le texte du `fails_when` de la tâche 1 de 68-01 sur V0 à V10.
+- Plus les reports déjà notés : rebase sur `main` après le merge de la 69 et de la PR #196, puis un plan-checker frais.
+
 ## Preuves E6
 
 Aucune preuve d'exécution : la mission ne produit que des plans, et aucun bloc typé de vf-coder ne porte de `preuves`.

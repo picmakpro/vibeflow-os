@@ -144,6 +144,11 @@ Relayés par la session principale (SendMessage) ; réponses mot pour mot entre 
   relayé par la session principale). Règle : le verrou de la phase passe d'abord ; sans verrou de phase, si le
   verrou du compartiment est tenu ou récent, la mission est vivante ; sinon `abandonnee` ; une source illisible donne
   `inconnu` (P68-D-23). Précise P68-D-22.
+- **P68-D-27 (verrou de phase périmé, compartiment tenu) — décision du manager, pas un arbitrage de Samuel.**
+  Cas laissé ouvert par P68-D-26 : le plan garde « la phase d'abord », même périmée, donc la mission sort
+  `abandonnee`. Motif : le script empêche presque toujours ce cas, car le compartiment refuse l'acquire tant qu'un
+  verrou de phase, même périmé, n'a pas été repris. La session principale a choisi de ne pas poser la question à
+  Samuel (consigne du 2026-11-03). Un témoin figera ce comportement ; il sera ajouté à 68-01 au nœud `revalid-68`.
 
 ### Points de procédure (documentés, sans arbitrage — consigne de la session principale, 2026-11-03)
 
