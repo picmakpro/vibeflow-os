@@ -43,11 +43,13 @@
     .vf-link { display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; border-radius: 10px; font-size: 12.5px; color: inherit; text-decoration: none; }
     .vf-link:hover { background: var(--surface-hover); }
     .vf-link code { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-2); word-break: break-all; }
-    /* I2 (recette 2026-11-02, reprise 2026-11-03) : le titre et le sous-titre de la vue d'ensemble se mélangeaient aux graphes que l'on fait glisser dessous.
-       Matériau « verre dépoli » à la iOS : fond très translucide, flou large mais doux, saturation relevée (la même recette que .glass du viewer : blur + saturate),
-       coins très arrondis en haut et peu en bas, filet de lumière fin. Les deux thèmes : --bg-rgb et --ink suivent le thème. La marge négative compense le remplissage, le texte ne bouge pas.
-       #context ne capte aucun événement (pointer-events: none, hérité du viewer) : la carte reste glissable sous la zone. */
-    #context { padding: 8px 14px 10px; margin: -8px -14px -10px; border-radius: 22px 22px 6px 6px; background: rgba(var(--bg-rgb), .3); -webkit-backdrop-filter: blur(24px) saturate(1.8); backdrop-filter: blur(24px) saturate(1.8); box-shadow: inset 0 0 0 .5px rgba(var(--ink), .1), inset 0 1px 0 rgba(255, 255, 255, .22); }
+    /* I2 (recette 2026-11-02, reprise 2026-11-03, avis de Samuel, Wispr Flow, session principale, 2026-11-03 : « pas de bordure, un flou dégradé qui part du haut gauche et descend, comme le header, en mode iOS 26 ») :
+       le titre et le sous-titre de la vue d'ensemble se mélangeaient aux graphes que l'on fait glisser dessous. Plus de carte : #context n'a ni fond, ni bordure, ni rayon, ni ombre.
+       Le flou vit sur #context::before (qui déborde du texte pour un fondu doux) : backdrop-filter blur + saturate (la recette de .glass) et un fond --bg-rgb léger (le matériau du header),
+       le tout masqué par un dégradé radial ancré en haut à gauche : plein derrière le début du titre, il s'estompe vers le bas et vers la droite. Les deux thèmes suivent --bg-rgb.
+       isolation: isolate garde la couche derrière le texte. #context ne capte aucun événement (pointer-events: none, hérité du viewer) : la carte reste glissable sous la zone. */
+    #context { isolation: isolate; background: none; border: 0; border-radius: 0; box-shadow: none; }
+    #context::before { inset: -22px -80px -64px -36px; background: rgba(var(--bg-rgb), .28); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6); -webkit-mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%); mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%); border: 0; border-radius: 0; box-shadow: none; }
     #context:empty { display: none; }
   `;
   // spike 005 : la barre de question reste visible quand serve.mjs (P7) sert l'onglet Projet

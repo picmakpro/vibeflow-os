@@ -220,13 +220,15 @@ mutant_o2b 2 hors '@media (max-width: 999px) { #ask-input' '@media (min-width: 1
 mutant_o2b 3 ordre 'button:not([data-vf-court]):not(:first-child):not(.cur) { flex: 0 100000 auto; }' 'button:not([data-vf-court]):not(:first-child):not(.cur) { flex: 0 1 auto; }' "milieu au même poids que les bouts"
 
 # I2 (recette 3, retour de Samuel, saisie texte, session principale, 2026-11-03) : « le flou sous le titre est trop dense, il faut aussi qu'il ai un radius fort en haut faible en bas, il doit etre comparable au blur iOS ».
-# Matériau retenu : blur(24px) saturate(1.8), fond à 30 % d'opacité, coins 22 px en haut et 6 px en bas — mesuré dans le style calculé, deux thèmes, deux onglets.
-echo "=== I2 — le titre de la vue d'ensemble : verre dépoli à la iOS (filtre, fond translucide, rayons fort en haut / faible en bas) ==="
+# Reprise (avis de Samuel, Wispr Flow, session principale, 2026-11-03 : « pas de bordure, un flou dégradé qui part du haut gauche et descend, comme le header, en mode iOS 26 ») :
+# plus de carte bordée ; le flou vit sur #context::before : backdrop-filter blur + saturate, masque en dégradé (mask-image et -webkit-mask-image), aucune bordure, aucun rayon, aucune ombre (#context et ::before) — mesuré dans le style calculé, deux thèmes, deux onglets.
+echo "=== I2 — le titre de la vue d'ensemble : flou progressif à la iOS 26 (filtre, masque en dégradé, ni bordure ni rayon ni ombre) ==="
 cat > "$AUX/i2.js" <<'JS'
 (async () => { const pause = (ms) => new Promise((r) => setTimeout(r, ms)); const ctx = document.getElementById('context'), out = {};
   for (const th of ['light', 'dark']) { document.documentElement.setAttribute('data-theme', th); await pause(150);
-    const cs = getComputedStyle(ctx), m = /rgba?\(([^)]+)\)/.exec(cs.backgroundColor), p = m ? m[1].split(',').map(Number) : [];
-    out[th] = { filtre: cs.backdropFilter, alpha: p.length === 4 ? p[3] : 1, haut: [parseFloat(cs.borderTopLeftRadius), parseFloat(cs.borderTopRightRadius)], bas: [parseFloat(cs.borderBottomLeftRadius), parseFloat(cs.borderBottomRightRadius)] }; }
+    const lire = (cs) => ({ filtre: cs.backdropFilter, masque: cs.maskImage || cs.webkitMaskImage || '', bord: ['Top', 'Right', 'Bottom', 'Left'].map((c) => parseFloat(cs['border' + c + 'Width'])).reduce((a, b) => a + b, 0),
+      rayon: ['TopLeft', 'TopRight', 'BottomLeft', 'BottomRight'].map((c) => parseFloat(cs['border' + c + 'Radius'])).reduce((a, b) => a + b, 0), ombre: cs.boxShadow });
+    out[th] = { ctx: lire(getComputedStyle(ctx)), av: lire(getComputedStyle(ctx, '::before')), ctxFiltre: getComputedStyle(ctx).backdropFilter }; }
   return out; })()
 JS
 srv "$LC/.vibeflow/cockpit"; PI=$SRV_PORT
@@ -234,9 +236,9 @@ for onglet in index project; do
   XI="$(CDP_VIEWPORT=1280x800 CDP_PRET="document.readyState === 'complete' && !!document.querySelector('#context h1')" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 300 "$(cat "$AUX/i2.js")" "http://127.0.0.1:$PI/$onglet.html")"
   for th in light dark; do
     VI="j.resultats[0].valeur.$th"
-    assert_eq "I2.1 — $onglet / $th : flou large mais doux, saturation relevée (blur(24px) saturate(1.8))" "$(printf '%s' "$XI" | node "$AUX/ev.mjs" "$VI.filtre")" "blur(24px) saturate(1.8)"
-    assert_eq "I2.2 — $onglet / $th : fond nettement plus transparent (opacité <= 0,35, > 0)" "$(printf '%s' "$XI" | node "$AUX/ev.mjs" "$VI.alpha>0&&$VI.alpha<=0.35")" "true"
-    assert_eq "I2.3 — $onglet / $th : coins très arrondis en haut (22 px), peu en bas (6 px)" "$(printf '%s' "$XI" | node "$AUX/ev.mjs" "[$VI.haut,$VI.bas]")" "[[22,22],[6,6]]"
+    assert_eq "I2.1 — $onglet / $th : flou présent sur la couche (backdrop-filter blur + saturate)" "$(printf '%s' "$XI" | node "$AUX/ev.mjs" "/^blur\\([0-9.]+px\\) saturate\\(/.test($VI.av.filtre)")" "true"
+    assert_eq "I2.2 — $onglet / $th : masque en dégradé sur la couche (mask-image radial ou linéaire)" "$(printf '%s' "$XI" | node "$AUX/ev.mjs" "/gradient\\(/.test($VI.av.masque)")" "true"
+    assert_eq "I2.3 — $onglet / $th : aucune bordure, aucun rayon, aucune ombre (#context et ::before) et pas de flou sur #context lui-même" "$(printf '%s' "$XI" | node "$AUX/ev.mjs" "[$VI.ctx.bord,$VI.av.bord,$VI.ctx.rayon,$VI.av.rayon,$VI.ctx.ombre,$VI.av.ombre,$VI.ctxFiltre].join('|')")" "0|0|0|0|none|none|none"
   done
 done
 unsrv
