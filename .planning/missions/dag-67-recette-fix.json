@@ -303,6 +303,43 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "cloture-67",
+      "step": "ledger : recette, exigences CKPT, ROADMAP, STATE",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "bump-2750",
+      "step": "bump v2.75.0 (VERSION, plugin.json, marketplace.json, README x2)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "sobr04",
+      "step": "relecture adverse v2.74.0..release -- plugin/",
+      "stage": "",
+      "deps": [
+        "bump-2750"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gates-release",
+      "step": "gates, push, CI",
+      "stage": "",
+      "deps": [
+        "cloture-67",
+        "sobr04"
+      ],
+      "scope": [],
+      "status": "running"
     }
   ]
 }
