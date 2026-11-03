@@ -1,5 +1,31 @@
 # Changelog — cockpit
 
+## v1.1.0 — 2026-11-03
+
+Phase 69 : suivi du travail en cours. Décision du bump : arbitrage Samuel, AskUserQuestion session principale,
+2026-11-03 (P69-D-26, « Bump v1.1.0 »). Les gestes de release racine (version, tag, release GitHub) restent humains.
+
+### Ajouté
+- **État d'avancement dérivé des phases** (CKPT-13 à CKPT-18) — « à faire », « en cours », « à recetter », « fait », calculé
+  depuis les plans et leurs SUMMARY ; plans de correction comptés à part ; missions rattachées à leur phase ; contrat `avancement@1`.
+- **Équipe en arbre avec historique de 24 h** (CKPT-19, CKPT-20, CKPT-27, CKPT-28) — session -> manager -> workers, terminés
+  repliés ; forme des sous-agents de Claude Code mesurée (2.1.317) et stricte (`forme-inconnue` plutôt qu'un mensonge) ;
+  contrat `vibeflow/cockpit-who@2` (remplace `@1`) et `vibeflow/cockpit-equipe@1`.
+- **Onglet « Équipe »** (CKPT-23) — troisième onglet, page `/equipe.html` servie en mémoire, mise à jour en place.
+- **Dernière action lisible et lien vers le nœud de mission** (CKPT-21, CKPT-22) — table fermée de verbes (libellés provisoires) ;
+  un agent non rattaché dit pourquoi.
+- **Transcript à la demande** (CKPT-24 à CKPT-26) — réduit au mandat, aux messages et à la liste des outils, masque des
+  secrets au mieux, route `GET /api/vf/transcript` authentifiée, jamais dans le flux, les fichiers, le journal ni l'export,
+  garde d'émission lue du contrat et fermée par défaut ; contrat `vibeflow/cockpit-transcript@1`.
+
+### Modifié
+- Forme Claude Code étendue et mesurée (fenêtre de 24 h, aucune lecture hors fenêtre).
+- Onglets resserrés pour tenir à trois dans l'en-tête (borne `.hl` 264 -> 280 px) ; retour aux valeurs d'origine en Phase 70 (P69-D-28).
+
+### Limites
+- Masque des secrets au mieux sur la prose des mandats et des messages ; jeton lisible par tout processus local : risque accepté
+  (P69-D-27, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
+
 ## v1.0.0 — 2026-11-01
 
 Première version du module (publiée dans VibeFlow v2.75.0). Décisions : arbitrages Samuel,
