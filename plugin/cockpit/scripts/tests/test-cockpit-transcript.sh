@@ -283,6 +283,7 @@ cat > "$AUX/spec-t25.json" <<'JSON'
  {"id":"mgr1","spawnDepth":1,"ageS":2,"role":"vf-dev-manager"},
  {"id":"ag1","spawnDepth":2,"parent":"mgr1","ageS":2},
  {"id":"ximg","spawnDepth":2,"parent":"mgr1","ageS":2},
+ {"id":"xsec","spawnDepth":2,"parent":"mgr1","ageS":2},
  {"id":"ag2h","spawnDepth":2,"parent":"mgr1","ageS":7200,"finished":true,"mandat":"MANDAT-VISIBLE-69 ag2h"},
  {"id":"ag25h","spawnDepth":2,"parent":"mgr1","ageS":90000,"finished":true,"mandat":"MANDAT-VISIBLE-69 ag25h"}]}
 JSON
@@ -291,7 +292,19 @@ node "$AUX/mk-agents.mjs" "$H" "$LABS" "$SID" "$NOW" "$AUX/spec-t25.json" || ech
 SUBD="$H/.claude/projects/-lab/$SID/subagents"
 node "$AUX/mk-transcript.mjs" "$SUBD/agent-ag1.jsonl" "$LABS" --id=ag1 --age=2
 node "$AUX/mk-transcript.mjs" "$SUBD/agent-ximg.jsonl" "$LABS" --id=ximg --payload --age=2
-rafraichir() { touch "$SUBD/agent-mgr1.jsonl" "$SUBD/agent-ag1.jsonl" "$SUBD/agent-ximg.jsonl" "$H/.claude/projects/-lab/$SID.jsonl"; }
+cat > "$AUX/mk-f3.mjs" <<'JS'
+// mk-f3.mjs <fichier> <racineLab> <secret> : un mandat propre, un message de l'assistant, un outil Read dont la CIBLE porte le secret et un outil dont le NOM le porte
+import fs from 'node:fs';
+const [, , out, lab, S] = process.argv;
+let k = 0; const side = (o) => JSON.stringify({ cwd: lab, sessionId: 'sess-synthetique', gitBranch: 'main', version: '2.1.317', isSidechain: true, agentId: 'xsec', timestamp: new Date(Date.now() - 600000 + 1000 * k++).toISOString(), ...o });
+const tu = (name, input) => side({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'u', name, input }] } });
+fs.writeFileSync(out, [side({ type: 'user', message: { role: 'user', content: 'MANDAT-VISIBLE-69' } }),
+  side({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'MESSAGE-VISIBLE-69 la clé est ' + S + ' fin' }] } }),
+  tu('Read', { file_path: `${lab}/src/${S}.js` }), tu('Outil ' + S, {})].join('\n') + '\n');
+JS
+SECRET_F3="ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+node "$AUX/mk-f3.mjs" "$SUBD/agent-xsec.jsonl" "$LABS" "$SECRET_F3"
+rafraichir() { touch "$SUBD/agent-mgr1.jsonl" "$SUBD/agent-ag1.jsonl" "$SUBD/agent-ximg.jsonl" "$SUBD/agent-xsec.jsonl" "$H/.claude/projects/-lab/$SID.jsonl"; }
 demarrer() { # $1 dossier de sortie, $2 HOME -> SRV_PID SRV_PORT (le serveur est celui de la sortie assemblée ; sa racine est <sortie>/../..)
   local o="$1"; rm -f "$o/.cache/server.json"
   HOME="$2" node "$o/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-$(basename "$o").out" 2>&1 &
@@ -318,6 +331,8 @@ RQ GET "/api/vf/transcript?id=ag25h" "$TOK" > "$WORK/t7.out"
 assert_eq "T25.7 — terminé depuis 25 h (hors fenêtre) : 200 et erreur inconnu (apparié à T25.6)" "$(sed -n 1p "$WORK/t7.out")|$(sed '1,2d' "$WORK/t7.out" | node "$AUX/jq.mjs" 'j.erreur')" "200|inconnu"
 assert_eq "T25.8 — la réponse du transcript porte Cache-Control: no-store" "$(sed -n 2p "$WORK/t1.out" | node "$AUX/jq.mjs" 'j["cache-control"]')" "no-store"
 assert_eq "T25.9 — POST avec jeton : 405" "$(RQ POST "/api/vf/transcript?id=ag1" "$TOK" '{}' | sed -n 1p)" "405"
+RQ GET "/api/vf/transcript?id=xsec" "$TOK" > "$WORK/t10.out"; sed '1,2d' "$WORK/t10.out" > "$WORK/t10.body"
+assert_eq "T25.9b — la route masque le secret d'un message, d'une cible d'outil et d'un nom d'outil (apparié aux positifs : message et 2 outils rendus, 3 masques)" "$(sed -n 1p "$WORK/t10.out")|$(node "$AUX/jget.mjs" "$WORK/t10.body" 'String(j.messages).includes("MESSAGE-VISIBLE-69")&&(j.outils||[]).length===2?(JSON.stringify(j).includes("ghp_")?"fuite":(JSON.stringify(j).split("[masqué]").length-1)+" masques"):"positifs absents : "+JSON.stringify(j).slice(0,120)')" "200|3 masques"
 # flux : le hello liste ag1 (positif) ; une session neuve force un événement who ; ni mandat ni message dans le flux
 rafraichir
 : > "$WORK/flux.jsonl"; node "$AUX/sse.mjs" "$PORT" "$TOK" 12000 who "$WORK/flux.jsonl" & CSSE=$!
@@ -395,12 +410,13 @@ else
   const attendre = async (sel) => { for (let i = 0; i < 100 && !document.querySelector(sel); i++) await new Promise((r) => setTimeout(r, 100)); return document.querySelector(sel); };
   if (!document.querySelector('.vf-transcript')) { const b = await attendre('[data-vf-transcript]'); if (!b) return { erreur: 'bouton Lire le transcript absent' }; b.click(); }
   const c = await attendre('.vf-transcript'); if (!c) return { erreur: 'conteneur .vf-transcript absent' };
-  return { img: c.querySelectorAll('img').length, texte: c.textContent.includes('<img src=x onerror=') };
+  return { img: c.querySelectorAll('img').length, texte: c.textContent.includes('<img src=x onerror='), sel: window.VibeFlow.state.selected };
 })()
 JS
   rafraichir
   VF_CDP_ECHEANCE_MS=20000 CDP_PRET="document.readyState === 'complete'" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 500 "$(cat "$AUX/chrome-t26.js")" "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg" > "$WORK/chrome-t26.json" 2>&1
   assert_eq "T26.7 — Chrome : le transcript d'un agent au message <img onerror> s'affiche en texte (0 élément img, la source lisible)" "$(G "$WORK/chrome-t26.json" 'j.erreur||(j.resultats[0].valeur.erreur||("img="+j.resultats[0].valeur.img+"|texte="+j.resultats[0].valeur.texte))')" "img=0|texte=true"
+  assert_eq "T26.8 — Chrome : arriver sur equipe.html#r=n:ag-ximg sélectionne la carte visée (state.selected), quel que soit l'ordre de livraison du flux (F2)" "$(G "$WORK/chrome-t26.json" 'j.erreur||(j.resultats[0].valeur.erreur||String(j.resultats[0].valeur.sel))')" "n:ag-ximg"
 fi
 vf_hyg_stop "$SRV_PID"
 
@@ -438,6 +454,18 @@ node "$AUX/red.mjs" "$SCRIPTS" "$AUX/fx/f4-texte.jsonl" "$AUX/f4/lab" > "$WORK/f
 assert_eq "T24F4.0 — contrôle positif : fixtures de plus de 8 Mio, 50 messages et 200 outils rendus" "$([ "$(wc -c < "$AUX/fx/f4-texte.jsonl" | tr -d ' ')" -gt 8388608 ] && [ "$(wc -c < "$AUX/fx/f4-outils.jsonl" | tr -d ' ')" -gt 8388608 ] && echo grosses)|$(G "$WORK/f4-texte.json" 'j.absent||j.r.messages.length')|$(G "$WORK/f4-outils.json" 'j.absent||j.r.outils.length')" "grosses|50|200"
 assert_eq "T24F4.1 — 8,5 Mio de blocs text au motif dense : moins de 2 000 ms (le masque ne couvre que les 50 messages gardés)" "$(G "$WORK/f4-texte.json" 'j.absent||(j.ms<2000?"ok":"ms="+j.ms)')" "ok"
 assert_eq "T24F4.2 — 8,5 Mio de tool_use Read : moins de 2 000 ms (étiquette des seuls 200 outils gardés)" "$(G "$WORK/f4-outils.json" 'j.absent||(j.ms<2000?"ok":"ms="+j.ms)')" "ok"
+
+# =====================================================================================================================
+echo "=== T24F3 — correction de revue : chacun des sites de masque (message de l'assistant, cible d'outil, nom d'outil) a son témoin et son mutant (F3 ; P69-D-19) ==="
+node "$AUX/mk-f3.mjs" "$AUX/fx/f3.jsonl" "$LAB0" "$SECRET_F3"
+f3() { node "$AUX/red.mjs" "$1" "$AUX/fx/f3.jsonl" "$LAB0" | G /dev/stdin 'j.absent||(()=>{const s=JSON.stringify(j.r);const o=j.r.outils||[];const pos=s.includes("MESSAGE-VISIBLE-69")&&o.length===2&&String(o[0].cible).startsWith("src/")&&String(o[0].outil)==="Read";if(!pos)return "positifs absents : "+s.slice(0,160);return s.includes("ghp_")?"fuite : "+(String(j.r.messages).includes("ghp_")?"message ":"")+(o.some((x)=>String(x.cible).includes("ghp_"))?"cible ":"")+(o.some((x)=>String(x.outil).includes("ghp_"))?"nom d outil":""):"ok"})()'; }
+assert_eq "T24F3.0 — contrôle positif : la fixture porte le secret trois fois (message, cible, nom d'outil)" "$(grep -o -- "$SECRET_F3" "$AUX/fx/f3.jsonl" | wc -l | tr -d ' ')" "3"
+assert_eq "T24F3.1 — reduireTranscript : le secret d'un message de l'assistant, d'une cible d'outil et d'un nom d'outil sort masqué (apparié aux positifs)" "$(f3 "$SCRIPTS")" "ok"
+MUTD="$AUX/mutsrc"; mkdir -p "$MUTD"; cp "$SCRIPTS"/vf-cockpit-*.mjs "$MUTD/"
+mutant() { cp "$SCRIPTS/vf-cockpit-transcript.mjs" "$MUTD/vf-cockpit-transcript.mjs"; sed -i.bak "s#$1#$2#" "$MUTD/vf-cockpit-transcript.mjs"; if cmp -s "$SCRIPTS/vf-cockpit-transcript.mjs" "$MUTD/vf-cockpit-transcript.mjs"; then echo "MUTANT VIDE"; else f3 "$MUTD"; fi; }
+assert_eq "T24F3.2 — mutant : message de l'assistant non masqué -> détecté" "$(mutant 'msgs.map((t) => masqueCoupe(t, BORNE_MESSAGE))' 'msgs.map((t) => t.slice(0, BORNE_MESSAGE))')" "fuite : message "
+assert_eq "T24F3.3 — mutant : cible d'outil non masquée -> détecté" "$(mutant 'return { outil, verbe, cible: fin(cible) };' 'return { outil, verbe, cible };')" "fuite : cible "
+assert_eq "T24F3.4 — mutant : nom d'outil non masqué -> détecté" "$(mutant "const outil = fin(name) || '?';" "const outil = chaine(name) || '?';")" "fuite : nom d outil"
 
 vf_hyg_assert
 

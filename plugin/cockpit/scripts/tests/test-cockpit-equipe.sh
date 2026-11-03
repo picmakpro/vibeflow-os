@@ -388,6 +388,7 @@ const [, , scripts, ...fichiers] = process.argv;
 const { litteraux, estAnglais } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-fr-inventaire.mjs')).href);
 const CONNU = {
   '70-vf-live.js': ['Driver libre', 'Session', 'Verrou', 'Nœud de DAG', '{} min', ' · orphelin', '<p>Personne. Sources lues : ', 'Personne'],
+  '71-vf-equipe-rendu.js': ['Session', 'en attente', '{} min', ' · orphelin', 'Agent', 'Mandat', 'Messages', 'Outils'], // libellés français affichés, que estAnglais prend pour de l'anglais faute d'accent (la sonde voit tout autre littéral)
   '00-vibeflow.js': ['Projet', 'Code', ', #ask', '#btn-health{} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }', 'header .brand', 'en planification', 'en pause', 'Phase {}{} '],
 };
 const sortie = [];
@@ -563,6 +564,163 @@ const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-who.mjs')).h
 for (const id of ids) { try { const r = m.revealTranscript(root, id, { home, scriptsDir: '/nonexistent' }); console.log(id + '|' + r.schema + '|' + (r.erreur || 'rendu')); } catch (e) { console.log(id + '|exception|' + e.message); } }
 JS
 assert_eq "E29.6 (F3) — revealTranscript ne lève jamais : agent sain rendu, agent à cwd objet et identifiant inconnu sans exception" "$(node "$AUX/rv-e29.mjs" "$SCRIPTS" "$LAB" "$H29" ok1 a-cwd absent-xyz | tr '\n' ' ')" "ok1|vibeflow/cockpit-transcript@1|rendu a-cwd|vibeflow/cockpit-transcript@1|inconnu absent-xyz|vibeflow/cockpit-transcript@1|inconnu "
+
+echo "=== EUI2 — correction de revue : rechargement, arrivée sur une carte, échappement, badge, lien jamais deviné (P69-D-14, D-15 ; F1, F2, F4, F5) ==="
+cat > "$AUX/jq.mjs" <<'JS'
+// jq.mjs <expression sur j> : lit un JSON sur l'entrée standard, écrit la valeur de l'expression
+import fs from 'node:fs';
+const j = JSON.parse(fs.readFileSync(0, 'utf8'));
+const v = new Function('j', 'return (' + process.argv[2] + ')')(j);
+console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
+cat > "$AUX/vm72.mjs" <<'JS'
+// vm72.mjs <72-vf-equipe.js> <71-vf-equipe-rendu.js> <scénario> : exécute l'onglet Équipe hors navigateur (vm), viewer factice. Le premier rendu du viewer n'aboutit jamais
+// (`ready` non émis : le cas d'un rerender() lancé pendant le premier rendu) sauf pour le scénario arrivee-ready. Sortie : une ligne JSON.
+import fs from 'node:fs';
+import vm from 'node:vm';
+const [, , f72, f71, sc] = process.argv;
+const h = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+let now = 1000000; const timers = []; const store = new Map(); const dom = {}; const hand = {}; const sections = [];
+const out = { reloads: 0, rerenders: 0, reveals: [] };
+const S = { kind: 'session', id: 'S', etat: 'actif', tree: '.' };
+const A = { kind: 'subagent', id: 'A', etat: 'actif', parent: 'S', role: 'vf-dev-manager', tree: '.' };
+const F = { kind: 'subagent', id: 'F', etat: 'termine', parent: 'A', tree: '.' };
+const n = (id, st, parent) => ({ id, st, parent });
+let who = { workers: [S, A, F] };
+let nodes = [n('se-S', 'active', null), n('ag-A', 'active', 'se-S'), n('ag-A~termines', 'done', 'ag-A'), n('ag-F', 'done', 'ag-A~termines')];
+let hash = '';
+if (sc === 'nouveau' || sc === 'borne') nodes = [n('se-S', 'active', null)];
+if (sc === 'arrivee' || sc === 'arrivee-ready') hash = '#r=' + encodeURIComponent('n:ag-A');
+if (sc === 'piege') who = { workers: [{ kind: 'subagent', id: 'i"><x-id>', etat: 'actif', role: '<x-role>', branch: '<x-branch>', tree: '.', action: { verbe: 'lit', cible: '<x-cible>' }, rattachement: { etat: 'non-rattache', raison: '<x-raison>', dag: 'D', noeud: 'N' } }] };
+const SC = { graph: { meta: { vfTab: 'equipe', vf: {} }, nodes, project: { name: 'p' } }, h, setOverview() {}, addPanelSection: (w, fn) => sections.push(fn),
+  on: (e, fn) => { (hand[e] ||= []).push(fn); }, rerender: async () => { out.rerenders++; }, exists: (id) => nodes.some((x) => 'n:' + x.id === id), reveal: (id) => out.reveals.push(id) };
+const window = { Floorplan: SC, FLOORPLAN_SERVER: { token: 't' }, __vfLive: { who }, addEventListener() {} };
+const document = { addEventListener: (e, f) => { (dom[e] ||= []).push(f); }, querySelector: () => null, querySelectorAll: () => [] };
+const location = { hash, reload: () => { out.reloads++; } };
+const sessionStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => { store.set(k, String(v)); } };
+const ctx = vm.createContext({ window, document, location, sessionStorage, URLSearchParams, encodeURIComponent, Date: { now: () => now }, setTimeout: (fn, ms) => { timers.push({ fn, at: now + ms }); return timers.length; }, fetch: async () => null, console });
+const lancer = async () => { await Promise.all((dom['vf-who'] || []).map((f) => f())); };
+try {
+  vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(f72, 'utf8'), ctx, { timeout: 5000 });
+  if (sc === 'borne') {
+    await lancer(); out.r1 = out.reloads;
+    now += 1000; await lancer(); out.r2 = out.reloads;
+    now += 16000; for (const t of timers.splice(0)) if (t.at <= now) await t.fn(); out.r3 = out.reloads;
+  } else if (sc === 'piege') {
+    out.html = sections.map((f) => f('n:ag-' + who.workers[0].id)).join('');
+  } else {
+    if (sc === 'arrivee-ready') for (const f of hand.ready || []) f();
+    await lancer();
+  }
+  console.log(JSON.stringify(out));
+} catch (e) { console.log(JSON.stringify({ erreur: 'exécution : ' + String(e.message).slice(0, 160) })); }
+JS
+cat > "$AUX/vm70.mjs" <<'JS'
+// vm70.mjs <70-vf-live.js> <71-vf-equipe-rendu.js> : le tiroir et le badge hors navigateur (vm), un `who` livré par un EventSource factice.
+// Sortie : { badge, panneau } (texte du badge, titre du panneau « Au travail (N) »), ou { erreur }.
+import fs from 'node:fs';
+import vm from 'node:vm';
+const [, , f70, f71] = process.argv;
+const h = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+class ES { constructor() { ES.last = this; this.l = {}; } addEventListener(n, f) { this.l[n] = f; } close() {} }
+let bouton = null, panneau = '';
+const el = () => ({ setAttribute() {}, appendChild() {}, remove() {}, style: {} });
+const SC = { graph: { meta: { vfTab: 'equipe' }, nodes: [], files: [] }, h, toast() {}, rerender: async () => {}, addPanelSection() {}, showPanel: (x) => { panneau = x; },
+  addHeaderButton: (o) => { bouton = { ...o, className: '', innerHTML: '', setAttribute() {} }; return bouton; } };
+const document = { createElement: el, head: { appendChild() {} }, body: { appendChild() {} }, addEventListener() {}, dispatchEvent: () => true, getElementById: () => null, querySelectorAll: () => [], querySelector: () => null };
+const window = { Floorplan: SC, FLOORPLAN_SERVER: { token: 't' } };
+const ctx = vm.createContext({ window, document, EventSource: ES, CustomEvent: class { constructor(t) { this.type = t; } }, location: { reload() {} }, fetch: async () => ({ ok: false }), setTimeout, clearTimeout, Date, console, encodeURIComponent });
+try {
+  vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(f70, 'utf8'), ctx, { timeout: 5000 });
+  const w = [{ kind: 'subagent', id: 'a', etat: 'actif', tree: '.' }, { kind: 'subagent', id: 'f', etat: 'termine', tree: '.', parent: 'a' }, { kind: 'subagent', id: 'w', etat: 'en-attente', tree: '.' }];
+  ES.last.l.who({ data: JSON.stringify({ seq: 1, who: { workers: w, sources: {} } }) });
+  bouton.onClick();
+  console.log(JSON.stringify({ badge: bouton.innerHTML.replace(/<[^>]*>/g, ''), panneau: (/Au travail \((\d+)\)/.exec(panneau) || [])[1] || 'titre absent' }));
+} catch (e) { console.log(JSON.stringify({ erreur: 'exécution : ' + String(e.message).slice(0, 160) })); }
+JS
+cat > "$AUX/juge71.mjs" <<'JS'
+// juge71.mjs <71-vf-equipe-rendu.js> : « ok », ou la liste des propriétés violées. Id, rôle, branche, cible d'action, raison et tâche piégés (balises <x-…>) ne sortent
+// jamais en balise, dans l'arbre, le pied et la liste d'un nœud ; un agent non rattaché n'a jamais de lien vers un nœud (même avec dag et noeud renseignés).
+import fs from 'node:fs';
+import vm from 'node:vm';
+const ctx = vm.createContext({ window: {}, encodeURIComponent });
+const h = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+const ko = [];
+try {
+  vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), ctx, { timeout: 5000 });
+  const R = ctx.window.__vfEquipeRendu;
+  const piege = { kind: 'subagent', id: 'i"><x-id>', etat: 'actif', role: '<x-role>', branch: '<x-branch>', task: '<x-tache>', tree: '.', action: { verbe: 'lit', cible: '<x-cible>' }, rattachement: { etat: 'non-rattache', raison: '<x-raison>', dag: 'D', noeud: 'N' } };
+  const html = R.arbre([piege], h);
+  if (html.includes('<x-')) ko.push('balise piégée dans l\'arbre');
+  for (const [cle, attendu] of [['id', 'i&quot;&gt;&lt;x-id&gt;'], ['rôle', '&lt;x-role&gt;'], ['branche', '&lt;x-branch&gt;'], ['cible', '&lt;x-cible&gt;'], ['raison', '&lt;x-raison&gt;']]) if (!html.includes(attendu)) ko.push(cle + ' non échappé(e) ou absent(e) de l\'arbre');
+  if (/data-vf-agent="[^"]*<x-/.test(html) || /data-vf-agent="i"/.test(html)) ko.push('attribut data-vf-agent brut');
+  if (R.pied(piege) !== 'actif · ' + 'lit <x-cible>') ko.push('pied : texte brut attendu, obtenu ' + R.pied(piege));
+  if (html.includes('project.html#r=')) ko.push('lien deviné vers un nœud pour un agent non rattaché');
+  if (!html.includes('non rattaché (')) ko.push('« non rattaché » absent');
+  const lie = { kind: 'subagent', id: 'k', etat: 'actif', role: '<x-role>', task: '<x-tache>', rattachement: { etat: 'rattache', dag: 'D', noeud: 'N' } };
+  const liste = R.agentsDuNoeud([lie, piege], 'f:D#N', h);
+  if (liste.includes('<x-')) ko.push('balise piégée dans la liste d\'un nœud');
+  if (!liste.includes('&lt;x-role&gt;')) ko.push('liste d\'un nœud : rôle absent');
+  if (liste.includes('i&quot;') || liste.includes('n%3Aag-i')) ko.push('liste d\'un nœud : un agent non rattaché y figure');
+} catch (e) { ko.push('exécution : ' + String(e.message).slice(0, 100)); }
+console.log(ko.length ? ko.join(' ; ') : 'ok');
+JS
+cat > "$AUX/mutant.sh" <<'SH'
+#!/usr/bin/env bash
+# mutant.sh <source> <sortie> <motif sed> <remplacement> : copie <source> vers <sortie> avec UNE substitution, et échoue si elle n'a rien changé (un mutant identique à l'original ne prouve rien)
+sed -e "s#$3#$4#" "$1" > "$2"; cmp -s "$1" "$2" && { echo "mutant identique à l'original" >&2; exit 1; }; exit 0
+SH
+MUT="$WORK/mut"; mkdir -p "$MUT"
+M() { bash "$AUX/mutant.sh" "$1" "$2" "$3" "$4" || echo "MUTANT VIDE : $3"; }
+J71() { node "$AUX/juge71.mjs" "$1"; }
+V72() { node "$AUX/vm72.mjs" "$1" "$2" "$3"; }
+U72="$UI/72-vf-equipe.js"
+
+# F4, F5b : échappement et lien jamais deviné (rendus de 71), puis chaque mutant doit rougir
+assert_eq "EUI2.1 — 71 : id, rôle, branche, cible, raison et tâche piégés sortent échappés ; un agent non rattaché n'a aucun lien de nœud" "$(J71 "$RENDU")" "ok"
+M "$RENDU" "$MUT/71-id.js" 'data-vf-agent="${h(w.id)}"' 'data-vf-agent="${w.id}"'
+assert_has "EUI2.2 — mutant : data-vf-agent brut -> détecté" "$(J71 "$MUT/71-id.js")" "balise piégée dans l'arbre"
+M "$RENDU" "$MUT/71-role.js" "' · ' + h(w.role)" "' · ' + w.role"
+assert_has "EUI2.3 — mutant : rôle brut dans bloc() -> détecté" "$(J71 "$MUT/71-role.js")" "balise piégée dans l'arbre"
+M "$RENDU" "$MUT/71-pied.js" 'h(pied(w))' 'pied(w)'
+assert_has "EUI2.4 — mutant : pied(w) brut dans l'arbre (il porte la cible) -> détecté" "$(J71 "$MUT/71-pied.js")" "balise piégée dans l'arbre"
+M "$RENDU" "$MUT/71-branche.js" "' · ' + h(w.branch)" "' · ' + w.branch"
+assert_has "EUI2.5 — mutant : branche brute -> détecté" "$(J71 "$MUT/71-branche.js")" "balise piégée dans l'arbre"
+M "$RENDU" "$MUT/71-lien.js" "w.rattachement && w.rattachement.etat === 'rattache' ?" "w.rattachement ?"
+assert_has "EUI2.6 — mutant : lien vers un nœud pour tout rattachement (même non établi) -> détecté" "$(J71 "$MUT/71-lien.js")" "lien deviné"
+M "$RENDU" "$MUT/71-noeudrole.js" 'h(w.role || '"'"'Agent'"'"')' '(w.role || '"'"'Agent'"'"')'
+assert_has "EUI2.7 — mutant : rôle brut dans la liste d'un nœud -> détecté" "$(J71 "$MUT/71-noeudrole.js")" "balise piégée dans la liste d'un nœud"
+# le panneau de l'onglet Équipe (72) : mêmes propriétés, via le panneau d'un agent piégé
+assert_eq "EUI2.8 — panneau d'un agent piégé (72) : aucune balise, le pied et la raison échappés" "$(V72 "$U72" "$RENDU" piege | node "$AUX/jq.mjs" 'j.erreur||(!j.html.includes("<x-")&&j.html.includes("&lt;x-cible&gt;")&&j.html.includes("&lt;x-raison&gt;")&&!j.html.includes("project.html#r=")?"ok":"panneau : "+j.html.slice(0,200))')" "ok"
+M "$U72" "$MUT/72-pied.js" 'h(R().pied(w))' 'R().pied(w)'
+assert_has "EUI2.9 — mutant : pied brut dans le panneau -> détecté" "$(V72 "$MUT/72-pied.js" "$RENDU" piege | node "$AUX/jq.mjs" 'j.erreur||(j.html.includes("<x-")?"balise dans le panneau":"ok")')" "balise dans le panneau"
+
+# F1 : tant que l'ensemble des agents (états compris) est stable, aucun rechargement, bloc « Terminés » compris ; F1 bis : la borne de 15 s
+assert_eq "EUI2.10 — un agent actif et un agent terminé (bloc « Terminés » dans les cartes) : 0 rechargement, 1 rendu" "$(V72 "$U72" "$RENDU" termine | node "$AUX/jq.mjs" 'j.erreur||(j.reloads+"|"+j.rerenders)')" "0|1"
+M "$U72" "$MUT/72-signature.js" "&& !x.id.includes('~')" ""
+assert_eq "EUI2.11 — mutant : le bloc « Terminés » compte comme un agent -> 1 rechargement, détecté" "$(V72 "$MUT/72-signature.js" "$RENDU" termine | node "$AUX/jq.mjs" 'j.erreur||(j.reloads+"|"+j.rerenders)')" "1|0"
+assert_eq "EUI2.12 — borne : un agent nouveau recharge une fois, puis rien avant 15 s, puis une fois de plus à l'échéance" "$(V72 "$U72" "$RENDU" borne | node "$AUX/jq.mjs" 'j.erreur||[j.r1,j.r2,j.r3].join("|")')" "1|1|2"
+M "$U72" "$MUT/72-borne.js" 'const PAUSE_MS = 15000' 'const PAUSE_MS = 0'
+assert_eq "EUI2.13 — mutant : borne à 0 -> le deuxième événement recharge aussitôt, détecté" "$(V72 "$MUT/72-borne.js" "$RENDU" borne | node "$AUX/jq.mjs" 'j.erreur||[j.r1,j.r2,j.r3].join("|")')" "1|2|2"
+
+# F2 : l'arrivée sur #r=n:<carte> révèle la carte même quand `ready` n'est jamais émis ; une seule fois, et jamais en double quand 00-vibeflow.js l'a traitée à `ready`
+assert_eq "EUI2.14 — arrivée sur #r=n:ag-A sans ready : la carte est révélée une fois, après le premier rendu" "$(V72 "$U72" "$RENDU" arrivee | node "$AUX/jq.mjs" 'j.erreur||j.reveals.join(",")')" "n:ag-A"
+assert_eq "EUI2.15 — avec ready émis avant (00-vibeflow.js a révélé la carte) : 72 ne la révèle pas une seconde fois" "$(V72 "$U72" "$RENDU" arrivee-ready | node "$AUX/jq.mjs" 'j.erreur||("["+j.reveals.join(",")+"]")')" "[]"
+M "$U72" "$MUT/72-arrivee.js" '^    arrivee();$' '    void 0;'
+assert_eq "EUI2.16 — mutant : plus de révélation après le rendu -> aucune carte révélée, détecté" "$(V72 "$MUT/72-arrivee.js" "$RENDU" arrivee | node "$AUX/jq.mjs" 'j.erreur||("["+j.reveals.join(",")+"]")')" "[]"
+
+# F5a : le badge et le titre du tiroir ne comptent que les agents actifs (ni terminé, ni en attente)
+assert_eq "EUI2.17 — un actif, un terminé, un en attente : badge « 1 au travail » et titre « Au travail (1) »" "$(node "$AUX/vm70.mjs" "$UI/70-vf-live.js" "$RENDU" | node "$AUX/jq.mjs" 'j.erreur||(j.badge+"|"+j.panneau)')" "1 au travail|1"
+M "$UI/70-vf-live.js" "$MUT/70-badge.js" "(w.etat || 'actif') === 'actif'" "true"
+assert_eq "EUI2.18 — mutant : le terminé et l'agent en attente comptent -> 3, détecté" "$(node "$AUX/vm70.mjs" "$MUT/70-badge.js" "$RENDU" | node "$AUX/jq.mjs" 'j.erreur||(j.badge+"|"+j.panneau)')" "3 au travail|3"
+
+# F6 : la liste CONNU de la sonde ne couvre que les mots français affichés par 71 ; un libellé anglais ajouté à une copie de 71 reste vu
+mkdir -p "$AUX/sonde"; cp "$RENDU" "$AUX/sonde/71-vf-equipe-rendu.js"
+assert_eq "EUI2.19a — contrôle positif : 71 tel quel n'a rien de nouveau pour la sonde" "$(node "$AUX/sonde-fr.mjs" "$SCRIPTS" "$AUX/sonde/71-vf-equipe-rendu.js")" "aucune"
+printf "\nconst libelleTemoin = 'Show the transcript now';\n" >> "$AUX/sonde/71-vf-equipe-rendu.js"
+assert_has "EUI2.19 — témoin : la sonde voit un libellé anglais ajouté à une copie de 71" "$(node "$AUX/sonde-fr.mjs" "$SCRIPTS" "$AUX/sonde/71-vf-equipe-rendu.js")" "Show the transcript now"
 
 vf_hyg_assert
 
