@@ -273,8 +273,8 @@ des étages croisés (quand les insérer, forme DAG, budgets, invariants) :
 ## Verrou par compartiment (lab partitionné)
 
 Un dépôt est partitionné quand `.planning/workstreams/` existe. Le verrou se nomme alors par compartiment :
-une seule mission pilote par compartiment, des missions de compartiments différents en parallèle, un seul
-geste de dépôt à la fois (P57-D-01, P57-D-02). Il vit au niveau du clone, `<git-common-dir>/vf-driver/{ws/<sujet>,repo}`
+une seule mission pilote par compartiment (ou par **phase** quand le mandat porte `--phase`, voir plus bas), des
+missions de compartiments différents en parallèle, un seul geste de dépôt à la fois (P57-D-01, P57-D-02). Il vit au niveau du clone, `<git-common-dir>/vf-driver/{ws/<sujet>,repo}`
 (P57-D-07, P57-D-21). `--ws=<sujet du mandat>` se passe à chaque verbe ; `--depot` désigne les gestes de dépôt
 (release du plugin, `BACKLOG.md`, `docs/ADR.md`, fichiers racine de `.planning/`, partition) ; un verbe sans
 `--ws` vise le dépôt (P57-D-05, P57-D-24) ; l'ancien `.planning/DRIVER.lock` vaut verrou de dépôt jusqu'à son
@@ -284,8 +284,19 @@ lancent depuis la racine du lab : un verbe qui écrit, avec ou sans `--ws`/`--de
 partitionné ; `status`/`orphans` exceptés, sauf avec `--ws`/`--depot` en lab partitionné), et le guard détecte le lab partitionné depuis la racine git, pas depuis le cwd ; sa
 comparaison du segment `.planning` ignore la casse en lab partitionné (P57-D-38).
 
+**Verrou de phase** (règle de Samuel, session principale Claude Code, 2026-11-03 : « parallèliser le plus possible, pas
+de regle "1 seul manager" » ; arbitrage « Un verrou par phase », AskUserQuestion, session principale, 2026-11-03).
+`--ws=<sujet> --phase=<N>` pose un verrou nommé DANS le compartiment (`vf-driver/ws/<sujet>/phases/<N>/DRIVER.lock`) :
+mêmes garanties que le verrou de compartiment (rename(2), TTL, heartbeat, takeover, registre `register --node`),
+mécanique partagée et non copiée. Deux phases s'acquièrent en parallèle ; la même phase deux fois est refusée (`held`) ;
+le verrou nu et les phases du même compartiment s'excluent dans les deux sens (`phase-lock-held`,
+`compartment-lock-held`). Le guard couvre le dossier de la phase tenue par autrui, pas les fichiers partagés du
+compartiment. `dag.sh init --ws --phase` lie le DAG à la phase (`progress_epoch`). Un manager de phase passe donc
+`--ws <sujet> --phase <N>` à chaque verbe.
+
 ```bash
 "$S"/driver-lock.sh acquire --owner="<id>" --step="mission" --ws="<sujet>"
+"$S"/driver-lock.sh acquire --owner="<id>" --step="mission" --ws="<sujet>" --phase="<N>"   # verrou de phase
 "$S"/driver-lock.sh heartbeat --owner="<id>" --ws="<sujet>"
 "$S"/driver-lock.sh status --ws="<sujet>" | jq -r .generation   # jeton de fence du compartiment
 "$S"/driver-lock.sh release --owner="<id>" --ws="<sujet>"
