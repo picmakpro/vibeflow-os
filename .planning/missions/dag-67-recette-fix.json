@@ -90,6 +90,106 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "fix-fb",
+      "step": "F-B affichage programme + premier argument (who.mjs, tests who/securite, README/CHANGELOG)",
+      "stage": "",
+      "deps": [
+        "gates"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-fb",
+      "step": "revue ciblee fix-fb",
+      "stage": "",
+      "deps": [
+        "fix-fb"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gates-fb",
+      "step": "gates + suites cockpit + push + CI",
+      "stage": "",
+      "deps": [
+        "revue-fb"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-fb2",
+      "step": "correction ciblee revue-fb F1-F5,F7",
+      "stage": "",
+      "deps": [
+        "revue-fb"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-fb2",
+      "step": "re-revue fix-fb2",
+      "stage": "",
+      "deps": [
+        "fix-fb2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-fb3",
+      "step": "F8/F9 : allowlist des affectations de tete + preuve generative",
+      "stage": "",
+      "deps": [
+        "revue-fb2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-fb3",
+      "step": "re-revue fix-fb3",
+      "stage": "",
+      "deps": [
+        "fix-fb3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-fb4",
+      "step": "FB3-1 separateurs, FB3-2/3 doc",
+      "stage": "",
+      "deps": [
+        "revue-fb3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-fb4",
+      "step": "re-revue fix-fb4",
+      "stage": "",
+      "deps": [
+        "fix-fb4"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-fb5",
+      "step": "FB4-2/FB4-4 epinglages de test, FB4-3 doc (aucun code)",
+      "stage": "",
+      "deps": [
+        "revue-fb4"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }

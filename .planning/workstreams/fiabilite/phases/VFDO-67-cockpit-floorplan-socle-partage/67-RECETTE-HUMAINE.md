@@ -95,7 +95,7 @@ Rapport détaillé : `.planning/missions/2026-11-02-67-recette-fix.md`. Chaque c
 
 | Point | Statut | Commit(s) |
 |-------|--------|-----------|
-| D3 dernière commande | corrigé : dernière commande Bash, masquée puis coupée à 120 car. ; masque élargi après revue | `a9355579`, `8a72c600` |
+| D3 dernière commande | corrigé : programme et premier argument de la dernière commande Bash seulement (décision F-B ci-dessous) | `a9355579`, `8a72c600`, `54e40b5e` |
 | CI 1 024 px Linux | corrigé : cause = `(pointer: fine)` faux sous Chrome headless Linux (aucun pointeur), pas les polices | `e20e7959` |
 | D2 tiroir « Au travail » | corrigé : marge des panneaux, hauteur au contenu, plafond et défilement | `a9355579` |
 | D1 double croix | corrigé : chevron « suivant » inactif à la dernière étape | `7434afd8` |
@@ -106,3 +106,10 @@ Rapport détaillé : `.planning/missions/2026-11-02-67-recette-fix.md`. Chaque c
 
 V1 — effet de bord arbitré : une relance qui dépend du fil et contient un mot de la voie locale reçoit la réponse
 locale (Samuel, « A : garder le correctif (Recommandé) », AskUserQuestion session principale, 2026-11-02).
+
+F-B — « N'afficher que le programme (Recommandé) » (Samuel, AskUserQuestion session principale, 2026-11-02) : « Voir la
+dernière commande » n'affiche plus que le programme et son premier argument ; programme seul quand ce premier argument
+commence par `-`. Limite acceptée par construction : un secret passé en premier argument positionnel reste visible.
+
+F-4 — « Acceptable » (Samuel, AskUserQuestion session principale, 2026-11-02) : à la dernière étape de la Trajectoire, la
+flèche droite ne ferme pas le parcours ; rien ne change.
