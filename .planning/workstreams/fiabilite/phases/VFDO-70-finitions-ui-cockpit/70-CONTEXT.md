@@ -79,6 +79,11 @@ Réponse unique de Samuel aux six questions de cadrage, mot pour mot : « Tout a
     tenir à 390 px (rangée unique) et à 1 024 px. La borne `.hl` et le témoin R4.2 sont recalculés depuis
     la nouvelle mise en page, jamais simplement élargis. → UIFN-01, UIFN-09.
 
+- **P70-D-17 (captures hors dépôt).** Arbitrage de Samuel, mot pour mot : « Non, hors dépôt (Recommandé) »
+  (AskUserQuestion, session principale Claude Code, 2026-11-03, relayée par la session principale). Les captures
+  avant/après de 70-09 ne sont pas versionnées : elles restent dans le dossier temporaire de la session
+  d'exécution. Le rapport de recette (`70-CAPTURES.md`) les nomme et décrit ce que chacune montre. → UIFN-10.
+
 ### Choix du manager (vf-dev-manager, 2026-11-03 — pas des arbitrages de Samuel)
 
 Annoncés à Samuel dans le message de cadrage, sans question ; il ne les a pas contredits, mais n'a pas non
@@ -195,7 +200,7 @@ Relevé par le plan-checker frais (passe 2, `3edc7e51`, verdict passed, infos no
   code de la 69 (mesuré 1/1 sur `feat/phase-69-suivi-travail`).
 - 70-09 : le bump attend `v1.1.1` au-dessus de la `v1.1.0` de la 69 ; sur la branche actuelle, le module est encore en
   `v1.0.0` et la sonde rougit par construction.
-- 70-09 versionne 34 captures PNG dans le dossier de phase (précédent `spikes/002`) : point ouvert pour Samuel.
+- 70-09 ne versionne plus aucune capture PNG (P70-D-17, tranché le 2026-11-03).
 
 </revalidation>
 
