@@ -147,3 +147,19 @@ d'un lab écoute sur un port dérivé du lab (plage 4378-4477, repli +1). La vis
 « En fait, mon avis sur le flou, c'est que là, actuellement, il est avec des bordures. Moi, j'aimerais que ça soit un effet dégradé. C'est-à-dire que le flou parte du haut gauche du titre, enfin de la section, enfin de la carte, quoi. Et qu'il y a un espèce de flou dégradé qui aille vers le bas. Comme on peut retrouver, par exemple, dans le header de la page, quoi. Je trouve ça pas mal de faire ça comme ça. Vraiment en mode iOS 26, quoi. Ça peut vraiment être cool. »
 
 Relevé : plus de carte bordée ; un flou progressif (dégradé) qui part du haut à gauche de la zone du titre et s'estompe vers le bas, sur le modèle de l'en-tête de la page (iOS 26). Le merge de la PR #187 attend ce réglage (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
+
+### 8.1. Flou en dégradé livré, puis avis de Samuel (2026-11-03)
+
+`4615dfb4` : la carte bordée derrière le titre de la vue d'ensemble est remplacée par un flou progressif. Pas de bordure,
+pas de rayon, pas d'ombre ; `blur(22px) saturate(1.6)`, fond à 28 %, masque radial ancré en haut à gauche. Fait en mode
+rapide à la demande de Samuel (saisie texte, session principale, 2026-11-03 : « lance un quick pour faire ça »), sans revue.
+`35392f9a` adapte les cas D7.7 et D7.8 au nouveau rendu.
+
+Avis de Samuel sur `4615dfb4`, mot pour mot (Wispr Flow, session principale, 2026-11-03) : « Ok, c'est pas mal. Seul petit
+défaut que je vois, c'est qu'il y a un gap où il n'y a pas de flou entre du coup le texte vu d'ensemble et le header avec le
+logo et le nom du projet ou de la branche. Je remarque qu'à cet endroit-là, du coup, il y a un petit espace entre le flou et
+le header, et je pense qu'il faudrait le supprimer, allonger un petit peu le flou pour qu'il aille jusqu'au header, en fait. »
+— Suite (`a01cf44d`) : la couche floue monte jusqu'au haut de la page, derrière l'en-tête, dont elle ne recouvre pas le
+contenu. Mesure : la couche touchait déjà l'en-tête (14 px de chevauchement) ; la bande nette venait du fondu de l'en-tête
+(opaque jusqu'à 35 %, transparent à 64 px), qui laissait voir la carte sans flou entre y≈22 et 50. Le dégradé autour du titre
+est inchangé.
