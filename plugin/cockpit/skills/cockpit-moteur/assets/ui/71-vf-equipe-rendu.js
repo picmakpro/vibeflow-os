@@ -6,6 +6,8 @@
   const ETAT = { actif: 'actif', 'en-attente': 'en attente', termine: 'terminé' };
   const etat = (w) => ETAT[w.etat] || 'actif';
   const dedans = (w) => w && (w.kind === 'session' || w.kind === 'subagent') && typeof w.id === 'string';
+  // un agent « actif » : session ou sous-agent ni terminé ni en attente (effectifs de l'onglet Équipe et badge de l'en-tête)
+  const actif = (w) => !!dedans(w) && w.etat !== 'termine' && w.etat !== 'en-attente';
   const lien = (page, ref) => `${page}#r=${encodeURIComponent(ref)}`;
   const carte = (w) => (w.kind === 'session' ? 'n:se-' : 'n:ag-') + w.id;
   const noeud = (w) => (w.rattachement && w.rattachement.etat === 'rattache' ? `f:${w.rattachement.dag}#${w.rattachement.noeud}` : null);
@@ -79,5 +81,5 @@
     return f;
   };
 
-  window.__vfEquipeRendu = { arbre, agentsDuNoeud, transcript, pied, duree, versNoeud };
+  window.__vfEquipeRendu = { arbre, agentsDuNoeud, transcript, pied, duree, versNoeud, actif };
 })();

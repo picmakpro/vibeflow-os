@@ -54,8 +54,9 @@
   const KIND = { session: 'Session', subagent: 'Sous-agent', lock: 'Verrou', registered: 'Enregistré', 'dag-node': 'Nœud de DAG' };
   const duree = (s) => window.__vfEquipeRendu.duree(s); // le format vit dans 71-vf-equipe-rendu.js (chargé après ce fichier, appelé après)
   const AGENT = (w) => w.kind === 'session' || w.kind === 'subagent';
-  // « au travail » : un agent `actif` non périmé ; un terminé ou un agent en attente n'y est jamais compté (P69-D-14)
-  const auTravail = (w) => !w.stale && (w.etat || 'actif') === 'actif';
+  // « au travail » : un agent (session ou sous-agent) `actif` ; ni verrou, ni nœud de DAG, ni terminé, ni agent en attente (P69-D-14, P69-D-33). Même prédicat que
+  // les effectifs de l'onglet Équipe (71-vf-equipe-rendu.js) : pour une même collecte, le badge égale « actifs ».
+  const auTravail = (w) => window.__vfEquipeRendu.actif(w);
   const htmlTiroir = () => {
     const ws = who?.workers || [], act = ws.filter(auTravail), reste = ws.filter((w) => !AGENT(w));
     const row = (w) => `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${h(duree(w.ageS))}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span><div>${h(w.task || '')}</div></div>`;

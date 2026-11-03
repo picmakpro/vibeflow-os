@@ -8,8 +8,8 @@
   if (!SC) return;
   const { h, graph: G } = SC;
   const TAB = G.meta.vfTab === 'project' ? 'project' : G.meta.vfTab === 'equipe' ? 'equipe' : 'code';
-  // titre de l'onglet du navigateur : « <nom> — Code », « <nom> — Projet » ou « <nom> — Équipe » (le viewer écrit « <nom> map », qui devenait le nom seul)
-  document.title = `${String(G.project.name || '').replace(/ — (Projet|Équipe)$/, '')} — ${TAB === 'project' ? 'Projet' : TAB === 'equipe' ? 'Équipe' : 'Code'}`;
+  // titre de l'onglet du navigateur : « <nom> — Code », « <nom> — Projet » ou « Équipe · <nom> » (le viewer écrit « <nom> map », qui devenait le nom seul)
+  { const nom = String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''); document.title = TAB === 'equipe' ? `Équipe · ${nom}` : `${nom} — ${TAB === 'project' ? 'Projet' : 'Code'}`; }
   const ST = { done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' };
   // P67-D-04 : logo VibeFlow clair ou sombre selon le thème du viewer (meta.vfLogos est posé par l'assemblage)
   const LOGOS = G.meta.vfLogos;

@@ -25,6 +25,12 @@
       <div class="sec"><h3>Sources lues <span class="c">${Object.keys(G.meta.vf?.sources || {}).length}</span></h3>${src || '<p class="pd">Aucune source lue.</p>'}</div>`;
   });
 
+  // P69-D-33 : la recherche de cet onglet trouve des agents et des sessions (les cartes), pas des fichiers, des routes ni des modules
+  const LIB = 'Chercher un agent ou une session';
+  const bouton = document.getElementById('search-btn'), champ = document.getElementById('search');
+  if (bouton) { bouton.setAttribute('aria-label', LIB); const st = bouton.querySelector('.st'); if (st) st.textContent = LIB; }
+  if (champ) champ.placeholder = 'Chercher par nom, rôle ou description';
+
   const idCarte = (w) => (w.kind === 'session' ? 'se-' : 'ag-') + w.id;
   const equipe = (who) => (Array.isArray(who?.workers) ? who.workers : []).filter((w) => w && (w.kind === 'session' || w.kind === 'subagent') && typeof w.id === 'string');
   // l'ensemble des agents, avec leur appartenance aux terminés (qui change leur place dans l'arbre des cartes)
@@ -90,7 +96,7 @@
     if (signature(direct) !== signature(dansCarte())) { recharger(); return; }
     const parId = new Map(liste.map((w) => [idCarte(w), w]));
     const compte = { actif: 0, enAttente: 0, termine: 0 };
-    for (const w of liste) { if (w.etat === 'termine') compte.termine++; else if (w.etat === 'en-attente') compte.enAttente++; else compte.actif++; }
+    for (const w of liste) { if (R().actif(w)) compte.actif++; else if (w.etat === 'termine') compte.termine++; else compte.enAttente++; } // même prédicat que le badge de l'en-tête (70-vf-live.js)
     for (const x of G.nodes) { const w = parId.get(x.id); if (w) { x.st = w.etat === 'termine' ? 'done' : 'active'; x.foot = R().pied(w); } }
     G.meta.vf = { ...G.meta.vf, compte };
     await SC.rerender();
