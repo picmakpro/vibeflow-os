@@ -966,11 +966,20 @@ Plans:
 **Requirements**: TERM-01, TERM-02, TERM-03, TERM-04, TERM-05, TERM-06, TERM-07, TERM-08, TERM-09, TERM-10, TERM-11, TERM-12
 **Depends on:** Phase 67 (serveur unique) ; ordre du jalon : après la 70 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « 69 → 68 → 70 → 71 → 72 (Recommandé) »).
 **Sources:** `69-CONTEXT.md` P69-D-19 et P69-D-20.
-**Plans:** 0 plans
+**Plans:** 10 plans (5 vagues)
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 71 to break down)
+- [ ] 71-01-PLAN.md — vague 1 : tranche traçante `--terminal` de bout en bout (patch P25 de `serve.mjs`, serveur Q, amorçage, session, assistant PTY dans l'arbre du moteur) — TERM-01, 05, 07
+- [ ] 71-02-PLAN.md — vague 2 : contrôles Host/Origin/jeton de Q, tenue des secrets — TERM-02, 03
+- [ ] 71-03-PLAN.md — vague 2 : assistant PTY complet, environnement filtré, plein écran par le flux, orphelins — TERM-06, 07, 08, 09
+- [ ] 71-04-PLAN.md — vague 2 : session unique, grâce de 30 s, tampon de 256 Kio, rien sur disque — TERM-08, 11
+- [ ] 71-05-PLAN.md — vague 2 : xterm.js vendorisé, page Q et sa CSP, thème, parité des variables — TERM-05, 10, 12
+- [ ] 71-10-PLAN.md — vague 2 : lanceur `--terminal` et amorçage — TERM-01, 03, 04, 07
+- [ ] 71-06-PLAN.md — vague 3 : client Q, cadre sous `sandbox`, canal Q vers P, 0 violation CSP — TERM-04, 05, 10, 12
+- [ ] 71-07-PLAN.md — vague 4 : tiroir dans Projet et Code (bloqué tant que O1 n'est pas décidé) — TERM-01, 05, 07, 12
+- [ ] 71-08-PLAN.md — vague 4 : bout en bout dans Chrome, séquences hostiles, chaîne XSS — TERM-09, 10, 12
+- [ ] 71-09-PLAN.md — vague 5 : recette humaine, docs, version, gates, `71-SECURITY.md` — TERM-05, 08, 09, 12
 
 ### Phase 72: Lancer du travail depuis les cartes du cockpit
 
