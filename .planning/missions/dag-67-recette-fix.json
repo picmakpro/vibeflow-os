@@ -190,6 +190,109 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "exec-p3a",
+      "step": "O1 cd && + O4 visite par lab (who.mjs, 40-tour.js, 75-vf-modele.js, suites securite/who/direct)",
+      "stage": "",
+      "deps": [
+        "gates-fb"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-p3b",
+      "step": "I2 materiau iOS, O2 fil d'Ariane, O3 italique, O6 aria chevrons (00-vibeflow.js, 01-vf-responsive.js, viewer.html)",
+      "stage": "",
+      "deps": [
+        "gates-fb"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-p3",
+      "step": "revue 00bbb02e..tete",
+      "stage": "",
+      "deps": [
+        "exec-p3a",
+        "exec-p3b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gates-p3",
+      "step": "gates, suites, push, CI",
+      "stage": "",
+      "deps": [
+        "revue-p3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-o4c",
+      "step": "O4 option C : port stable par lab, cookie retire (vf-cockpit.mjs, 75-vf-modele.js, tests serveur/projet)",
+      "stage": "",
+      "deps": [
+        "exec-p3a"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs-p3",
+      "step": "CHANGELOG/README passe 3",
+      "stage": "",
+      "deps": [
+        "fix-o4c",
+        "exec-p3b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-p3-o2",
+      "step": "F1/F2 budget de largeur du fil d'Ariane",
+      "stage": "",
+      "deps": [
+        "revue-p3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-p3-min",
+      "step": "F3/F4 cas cd, F5 VENDORED P23, F6 realpath natif",
+      "stage": "",
+      "deps": [
+        "revue-p3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-p3b",
+      "step": "re-revue fix-p3",
+      "stage": "",
+      "deps": [
+        "fix-p3-o2",
+        "fix-p3-min"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-p3c",
+      "step": "M1 cas du repli, M2 aria du repli, M3 marge FB3.5/FB3.6",
+      "stage": "",
+      "deps": [
+        "revue-p3b"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }

@@ -134,3 +134,10 @@ Constats nouveaux de l'agent. Arbitrage Samuel, AskUserQuestion session principa
   - O1 : `cd <chemin> && …` n'affiche que « … ».
   - O6 : les chevrons de la Trajectoire n'ont pas de libellé accessible.
 - **Au backlog** : O5, l'anglais et les coquilles du chrome (« Calls · 27 », « ⌫ up », « 1 minor », la phrase mixte « still use generated names. Run the skill again », « viennent de le CLI », « 1 fichiers »).
+
+## 7. Suites traitées (passe 3, rédigé par vf-dev-manager)
+
+I2, O1, O2, O3, O4, O6 corrigés : détail et témoins rouges dans `.planning/missions/2026-11-02-67-recette-fix.md` § Passe 3.
+O4, option C : « C : port stable par lab (Recommandé) » (Samuel, AskUserQuestion session principale, 2026-11-03). Le cockpit
+d'un lab écoute sur un port dérivé du lab (plage 4378-4477, repli +1). La visite « vue » est en localStorage par lab, sans cookie.
+À revoir en recette : le flou I2 (`blur(24px) saturate(1.8)`, fond 30 %, rayons 22/22/6/6) et le fil d'Ariane à 1 280-1 440 px.
