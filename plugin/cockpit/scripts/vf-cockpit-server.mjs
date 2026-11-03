@@ -126,7 +126,9 @@ export function attach({ here, root, token, inject, log = () => {} }) {
     // onglet Équipe (69-05, P69-D-17) : construite en mémoire à chaque appel depuis le gabarit de project.html, jamais écrite ; jeton de la page Code (inject tel quel)
     pageEquipe: () => {
       if (!gabarit) return null;
-      const g = buildEquipeGraph(live ? live.snapshot().who : null, { nom: GP?.meta?.rootName || path.basename(root), racine: GP?.meta?.root, logos: GP?.meta?.vfLogos });
+      const who = live ? live.snapshot().who : null;
+      if (!INTERDITS.length || (who && porteInterdit(who))) { log('error', 'page Équipe refusée : contrat illisible ou contenu interdit'); return null; } // même garde que le flux, fermée par défaut
+      const g = buildEquipeGraph(who, { nom: GP?.meta?.rootName || path.basename(root), racine: GP?.meta?.root, logos: GP?.meta?.vfLogos });
       return insererGraphe(gabarit, g).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Équipe</title>').replace('</head>', () => inject + '</head>');
     },
     jetonValide: (j) => typeof j === 'string' && j === ptoken,
