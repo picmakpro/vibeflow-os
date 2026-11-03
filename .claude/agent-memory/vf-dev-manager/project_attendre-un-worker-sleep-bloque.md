@@ -10,3 +10,5 @@ Dans le Bash du manager, un `sleep` en avant-plan est refusé. Résultat : une b
 **Why:** une attente qui rend immédiatement ressemble à une condition remplie. On lit alors un état intermédiaire comme final.
 
 **How to apply:** attendre un worker ou un rejeu détaché par `python3 … time.sleep`, en tranches inférieures au `timeout` de l'outil, avec un heartbeat du verrou à chaque tranche. Imposer la même consigne aux workers qui suivent un rejeu long. Voir [[rejeu-long-detache-nohup]], [[verrou-driver-non-contraignant]].
+
+**Mise à jour 2026-10-29 (lot E, PR #180)** : une tranche de 240 s a été basculée d'office en tâche de fond par le harnais au bout de 180 s, alors que le `timeout` d'outil était de 300 s. Le tour suivant ne voit alors plus la fin de l'attente. Les tranches de 170 s sont restées en avant-plan. Le même basculement a frappé un worker : sa suite `-ws` de 20 min est partie en tâche de fond sans qu'il l'ait demandé, et elle a terminé normalement. Tranches ≤ 170 s.

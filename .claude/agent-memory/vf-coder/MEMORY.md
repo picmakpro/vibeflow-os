@@ -45,3 +45,4 @@
 - [Le scratchpad est partagé entre workers](project_scratchpad-partage-entre-workers.md) — un `tests.rc` homonyme d'un lot précédent se lit comme le sien ; vérifier pgrep avant de lire.
 - [Un gate exigé garde plus que la `files_modified`](feedback_gate-qui-garde-plus-que-la-files-modified.md) — check-version-sync gate aussi les README de module ; l'écart créé par le bump se ferme.
 - [Codex hooks : schéma Claude-Code + double gate de confiance](project_codex-hooks-schema-et-trust-gate.md) — marqueur d'un hook lu dans le JSONL de session, jamais dans la réponse ; témoin différentiel exige de lever le gate pour obtenir un positif AVANT de tester l'effet du flag seul.
+- [Gate : forme voisine lue « absent » + conduite sur indéterminé](project_gate-marqueur-ressemblant-et-conduite-indetermine.md) — Phase 60 : marqueur ressemblant = illisible ; seul `marqueur=introuvable` continue ; preuve rouge sur git archive de la tête d avant.
