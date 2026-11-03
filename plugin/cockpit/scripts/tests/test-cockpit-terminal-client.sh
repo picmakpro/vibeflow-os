@@ -125,7 +125,8 @@ await executer(chrome, async (s) => {
       await att(INVITE, 'invite du shell');
       r.invite = true;
     });
-    const secret = /^[0-9a-f]{64}$/.test(r.secretQ || '') ? r.secretQ : '';
+    r.secretOk = /^[0-9a-f]{64}$/.test(r.secretQ || '');
+    const secret = r.secretOk ? r.secretQ : '';
     // --- S4 : P : aucun cookie, aucune trace de l'amorçage ni du secret ; stockage de Q illisible depuis P ---
     r.cookieP = '?'; r.scanP = null; r.stockageCadre = '?'; r.stockageP = '?';
     await essai('retour-P', async () => {
@@ -306,7 +307,7 @@ run_t6 "$OUT"; J="$T6J"; OP="http://127.0.0.1:$T6_P"
 assert_eq "T6.0 — témoin : le scénario n'a pas échoué globalement" "$(rj "$J" 'j.erreur||"ok"')" "ok"
 assert_eq "T6.1 — Q/#t=… mène à P/project.html sans fragment ni paramètre ; aucune entrée d'historique ne porte #t=" "$(rj "$J" '"adresse="+j.adresse1+" historique_avec_fragment="+j.histoireFrag')" "adresse=$OP/project.html historique_avec_fragment=0"
 assert_eq "T6.1b — échange refusé : Q reste, adresse sans fragment, carte « Session expirée »" "$(rj "$J" '"hash=["+j.refus.hash+"] port="+j.refus.port+" carte="+(j.refus.carte.includes("Session expirée")?"oui":"non")')" "hash=[] port=$T6_Q carte=oui"
-SECRET_OK="$(rj "$J" '/^[0-9a-f]{64}$/.test(j.secretQ||"")?"oui":"non"')"
+SECRET_OK="$(rj "$J" 'j.secretOk?"oui":"non"')"
 assert_eq "T6.3 — le secret (64 hexadécimaux) est rangé dans le stockage de Q (Q en premier niveau), terminal vivant" "secret=$SECRET_OK invite=$(rj "$J" 'j.invite')" "secret=oui invite=true"
 assert_eq "T6.2 — document.cookie vide sur P et sur Q (témoin : le secret existe bien, sinon le vide ne prouve rien)" "P=[$(rj "$J" 'j.cookieP')] Q=[$(rj "$J" 'j.cookieQ')] secret_connu=$SECRET_OK" "P=[] Q=[] secret_connu=oui"
 assert_eq "T6.4 — depuis P, le stockage du cadre de Q lève SecurityError (témoins : le secret est dans Q, le stockage de P est lisible)" "$(rj "$J" 'j.stockageCadre')/secret_dans_q=$SECRET_OK/stockage_p=$(rj "$J" 'j.stockageP')" "SecurityError/secret_dans_q=oui/stockage_p=lisible"
