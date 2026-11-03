@@ -51,6 +51,9 @@ AskUserQuestion session principale, 2026-11-01.
 - **Types de carte en français** — « Library » et ses pairs sont traduits dans le chrome de l'onglet Code. Source : recette humaine du 2026-11-02.
 - **Onglet Code, dossiers de `plugin/` sans `module.json`** — ils ont désormais leur nœud (kind infra, outillage) au lieu de tomber dans « non assigné » ; règle générique, sans liste de noms. Source : recette humaine du 2026-11-02 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-02).
 
+### Corrigé (recette 3, 2026-11-03, avant toute publication ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-03)
+- **« Voir la dernière commande » derrière un `cd`** (O1) — `cd <chemin> && git status` affichait « … » seul (ou « cd … ») alors que c'est la forme la plus fréquente : un `cd` simple (un seul mot simple, `&&` ou `;` en mot séparé ou collé à la fin du chemin) s'efface et la règle s'applique une fois à la commande qui suit (« git status ») ; le chemin du `cd` ne sort jamais, tout autre `cd` (chemin cité, `||`, option, second `cd`) rend « … ».
+
 ### Sécurité et robustesse (correction A de la Phase 67, avant toute publication)
 - **Chaîne lab piégé -> XSS -> jeton -> exécution de code rompue à trois endroits** — échappement de tout champ du graphe (patch P16), Content-Security-Policy
   par empreintes avec `connect-src 'self'` et en-têtes `nosniff`/`DENY` (P17), « modifier le plan » durci : seuls `plan.mjs` et `build.mjs` du moteur du module

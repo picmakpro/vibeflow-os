@@ -191,9 +191,17 @@ const SIMPLE = /^[A-Za-z0-9_.\/:@%+,~-]+$/;
 const AFFECTATION = /^[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_.\/:@%+,~-]*$/;
 const resume = (cmd) => {
   // le shell ne sépare les mots que sur espace, tabulation et retour à la ligne : `\r`, `\f`, `\v` restent DANS le mot (non simple, donc « … »). Un retour à la ligne (`\r\n` compris, `\s` couvre `\r`) est un séparateur de commandes : il devient un mot non simple (comme `;`), jamais un simple espace, sinon le mot de la ligne suivante serait pris pour un argument
-  const mots = cmd.trim().replace(/\s*\n\s*/g, ' \n ').split(/[ \t]+/).filter(Boolean); let i = 0;
+  let mots = cmd.trim().replace(/\s*\n\s*/g, ' \n ').split(/[ \t]+/).filter(Boolean); let i = 0;
+  // `cd <chemin> && …` / `cd <chemin>; …` (recette 3, O1) : forme la plus fréquente. Un cd SIMPLE (un seul mot simple, sans « - » initial, suivi de `&&` ou `;` comme mot séparé, ou collé à la fin du chemin : `cd x;`, `cd x&&`)
+  // s'efface, la règle ci-dessous s'applique UNE fois à la commande qui suit ; pas de récursion (un second `cd` rend « … »). Le chemin du cd n'est jamais affiché, et tout `cd` qui n'est pas de cette forme (`||`, chemin cité, option, rien après) rend « … ».
+  if (mots[0] === 'cd') {
+    let chemin = mots[1], reste = null; const coll = chemin !== undefined ? /^(.+?)(;|&&)$/.exec(chemin) : null;
+    if (coll) { chemin = coll[1]; reste = mots.slice(2); } else if (mots[2] === '&&' || mots[2] === ';') reste = mots.slice(3);
+    if (reste === null || !SIMPLE.test(chemin) || chemin.startsWith('-')) return '…';
+    mots = reste;
+  }
   while (i < mots.length && AFFECTATION.test(mots[i])) i++;
-  const prog = mots[i]; if (prog === undefined || !SIMPLE.test(prog) || prog.startsWith('-')) return '…';
+  const prog = mots[i]; if (prog === undefined || prog === 'cd' || !SIMPLE.test(prog) || prog.startsWith('-')) return '…';
   const arg = mots[i + 1]; const montre = arg !== undefined && SIMPLE.test(arg) && !arg.startsWith('-');
   return [prog, ...(montre ? [arg] : []), ...(mots.length > i + (montre ? 2 : 1) ? ['…'] : [])].join(' ');
 };

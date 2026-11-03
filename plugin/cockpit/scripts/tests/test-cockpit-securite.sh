@@ -224,6 +224,15 @@ RB3="$(node "$AUX/mask-formes.mjs" "$SCRIPTS" "$LAB" "$WORK/home" < "$AUX/formes
 assert_eq "FB3.1 — formes de la re-revue et de F9 : affectation de tête non simple -> « … » (jamais un mot de la valeur) ; affectations simples ou vides sautées" "$(printf '%s' "$RB3" | node "$AUX/ev.mjs" 'j')" '["…","…","…","…","…","…","…","…","…","…","…","gh pr …","psql db","…","…","…","…","…","…","…","…","mycli …"]'
 assert_eq "FB3.2 — Secret99 ne sort dans aucune de ces formes" "$(printf '%s' "$RB3" | node "$AUX/ev.mjs" '/Secret99/.test(JSON.stringify(j))')" "false"
 
+# O1 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : `cd <chemin> && …` / `cd <chemin>; …` — la forme la plus fréquente — rend la commande qui suit, réduite par la règle ci-dessus UNE fois ;
+# le chemin du cd n'est jamais affiché ; tout `cd` qui n'est pas de cette forme rend « … » (chemin cité, `||`, option, rien après, second cd, retour à la ligne). Formes fixes, rouges sur 4e72aa05 là où l'attendu change.
+cat > "$AUX/formes-cd.json" <<'JSON'
+["cd /x && git status","cd src; npm test","cd x&& ls","cd x; npm test","cd \"a b\" && ls","cd x && FOO=a$(b) c","cd x || rm -rf y","cd /x","cd x && cd y && ls","cd - && ls","cd -P x && ls","cd x &&","cd x;;ls","cd x\n&& ls","cd x && ls Secret99 y","cd x && FOO=1 gh pr list","cd secret-dir && git push origin main"]
+JSON
+RCD="$(node "$AUX/mask-formes.mjs" "$SCRIPTS" "$LAB" "$WORK/home" < "$AUX/formes-cd.json")"
+assert_eq "O1.1 — cd simple : la commande suivante, une fois ; tout autre cd -> « … » ; le chemin du cd ne sort jamais" "$(printf '%s' "$RCD" | node "$AUX/ev.mjs" 'j')" '["git status","npm test","ls","npm test","…","…","…","…","…","…","…","…","…","…","ls Secret99 …","gh pr …","git push …"]'
+assert_eq "O1.2 — le chemin du cd (secret-dir, /x, src) ne sort dans aucune de ces formes" "$(printf '%s' "$RCD" | node "$AUX/ev.mjs" '/secret-dir|\/x|src/.test(JSON.stringify(j))')" "false"
+
 # FB3 — preuve générative. Grammaire : 0-3 affectations de tête (nues, vides, citées simple/double, $'…', $"…", $(…), backticks, (…), \ et \", mélanges), programme, 0-4 arguments (simples, citées,
 # options, « = », $(…), $VAR, glob…), puis opérateur (; && | ||) et mots de queue ; séparateurs espace, tabulation, retour à la ligne. Un marqueur unique est inséré dans UN composant tiré au hasard.
 # Propriété (sur chaque sortie) : le marqueur n'apparaît QUE s'il a été placé dans le programme ou le premier argument ET que ce mot entier est simple (liste blanche écrite ici indépendamment du code),
@@ -251,7 +260,7 @@ const OPS = [';', '&&', '|', '||', ';;', '&', '\n'];
 const home_d = path.join(home, '.claude', 'projects', '-lab'); fs.mkdirSync(home_d, { recursive: true });
 const sid = 'eeee0001-2222-3333-4444-555566667777'; const file = path.join(home_d, sid + '.jsonl');
 const line = (type, content) => JSON.stringify({ type, cwd: lab, sessionId: sid, timestamp: new Date().toISOString(), gitBranch: 'main', version: '2.1', message: { content } });
-const t0 = Date.now(); const fuites = []; let legit = 0;
+const t0 = Date.now(); const fuites = []; let legit = 0, legitCd = 0;
 for (let n = 0; n < N; n++) {
   const nh = Math.floor(rnd() * 4), na = Math.floor(rnd() * 5);
   const comps = []; // {slot, texte}
@@ -259,24 +268,35 @@ for (let n = 0; n < N; n++) {
   comps.push({ slot: 'prog', f: pick(MOT_PROG) }); for (let i = 0; i < na; i++) comps.push({ slot: i === 0 ? 'arg0' : 'arg', f: pick(MOT) });
   const nq = rnd() < 0.5 ? 0 : 1 + Math.floor(rnd() * 3); for (let i = 0; i < nq; i++) comps.push({ slot: 'queue', f: pick(MOT) });
   // la moitié des tirages vise programme / premier argument : le témoin positif ne reste pas rare
-  const cible = rnd() < 0.5 ? nh + Math.floor(rnd() * Math.min(2, comps.length - nh)) : Math.floor(rnd() * comps.length); const mots = comps.map((c, i) => c.f(i === cible ? MARK : pick(FILL)));
+  // O1 (recette 3) : une commande sur deux est précédée de `cd <mot> && ` ou `cd <mot>; ` (opérateur en mot séparé ou collé à la fin du chemin) ; le marqueur peut tomber dans le chemin du cd (cible -1) ou dans le reste
+  const cd = rnd() < 0.5; const cdCible = cd && rnd() < 0.25;
+  const cible = cdCible ? -1 : rnd() < 0.5 ? nh + Math.floor(rnd() * Math.min(2, comps.length - nh)) : Math.floor(rnd() * comps.length); const mots = comps.map((c, i) => c.f(i === cible ? MARK : pick(FILL)));
+  let pre = '', cdSimple = false;
+  if (cd) {
+    const cc = cdCible ? MARK : pick(FILL), mc = rnd() < 0.5 ? cc : pick(MOT)(cc), op = pick(['&&', ';']), colle = rnd() < 0.3, e1 = pick(SEP), e2 = pick(SEP), e3 = pick(SEP);
+    pre = 'cd' + e1 + mc + (colle ? op + e3 : e2 + op + e3);
+    // oracle du cd simple, écrit ici indépendamment du code : un seul mot de la liste blanche, sans « - » initial, aucun retour à la ligne dans les blancs du préfixe
+    cdSimple = BLANC.test(mc) && !mc.startsWith('-') && ![e1, colle ? '' : e2, e3].some((e) => e.includes('\n'));
+  }
   let cmd = ''; comps.forEach((c, i) => { if (i === nh + 1 + na && nq) cmd += pick(SEP) + pick(OPS); cmd += (i ? pick(SEP) : '') + mots[i]; });
-  const slot = comps[cible].slot; const mot = mots[cible];
+  cmd = pre + cmd;
+  const slot = cdCible ? 'cd' : comps[cible].slot; const mot = cdCible ? '' : mots[cible];
   let out = commandeAffichee(cmd);
   if (n % 100 === 0) { // chemin complet (transcript -> revealDoing) : même sortie que la fonction directe
     fs.writeFileSync(file, line('user', 'salut') + '\n' + line('assistant', [{ type: 'tool_use', name: 'Bash', input: { command: cmd } }]) + '\n');
     const disque = revealDoing(lab, sid, { home }).doing ?? ''; if (disque !== out) { out = `DIVERGENCE disque=${JSON.stringify(disque)} direct=${JSON.stringify(out)}`; fuites.push({ cmd, out, slot: 'chemin', mot: '' }); }
   }
-  const permis = (slot === 'prog' && BLANC.test(mot) && !mot.startsWith('-')) || (slot === 'arg0' && BLANC.test(mot) && !mot.startsWith('-') && !mot.includes('='));
-  if (out.includes(MARK)) { if (permis) legit++; else fuites.push({ cmd, out, slot, mot }); }
+  const permis = (!cd || cdSimple) && ((slot === 'prog' && BLANC.test(mot) && !mot.startsWith('-')) || (slot === 'arg0' && BLANC.test(mot) && !mot.startsWith('-') && !mot.includes('=')));
+  if (out.includes(MARK)) { if (permis) { legit++; if (cd) legitCd++; } else fuites.push({ cmd, out, slot, mot }); }
 }
-console.log(JSON.stringify({ n: N, fuites: fuites.slice(0, 5), nFuites: fuites.length, legit, ms: Date.now() - t0 }));
+console.log(JSON.stringify({ n: N, fuites: fuites.slice(0, 5), nFuites: fuites.length, legit, legitCd, ms: Date.now() - t0 }));
 JS
-SEED=20261103; NGEN=6000
+SEED=20261103; NGEN=12000
 GEN="$(node "$AUX/gen.mjs" "$SCRIPTS" "$LAB" "$WORK/home" "$SEED" "$NGEN")"
-echo "  graine=$SEED commandes=$NGEN ; sortie : $(printf '%s' "$GEN" | node "$AUX/ev.mjs" '"fuites="+j.nFuites+" legit="+j.legit+""+" ms="+j.ms')"
+echo "  graine=$SEED commandes=$NGEN ; sortie : $(printf '%s' "$GEN" | node "$AUX/ev.mjs" '"fuites="+j.nFuites+" legit="+j.legit+""+" legitCd="+j.legitCd+" ms="+j.ms')"
 assert_eq "FB3.3 — $NGEN commandes générées (graine $SEED) : le marqueur ne sort que placé dans le programme ou le premier argument ET simple (échec : commande, sortie, graine)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.nFuites+" fuite(s) : "+JSON.stringify(j.fuites.slice(0,2))+" graine='$SEED'"')" "0 fuite(s) : [] graine=$SEED"
 assert_eq "FB3.4 — témoin positif : le marqueur sort bien dans plus de 100 cas légitimes (programme ou premier argument simples), la mesure n'est pas à vide" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.legit > 100')" "true"
+assert_eq "FB3.6 — témoin positif du cd : le marqueur sort aussi, derrière un cd simple, dans plus de 30 cas légitimes (la branche cd du générateur n'est pas à vide)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.legitCd > 30')" "true"
 assert_eq "FB3.5 — le cas génératif tient en moins de 10 s" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.ms < 10000')" "true"
 # MB : canal task de `bornes` (description d'un sous-agent, diffusée en SSE). Un cas par motif de MASQUES : chaque valeur doit sortir masquée, et retirer un motif fait rougir son cas.
 cat > "$AUX/mask-bornes.mjs" <<'JS'
