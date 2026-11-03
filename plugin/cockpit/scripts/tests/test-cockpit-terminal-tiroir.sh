@@ -148,12 +148,12 @@ await executer(chrome, async (s) => {
   });
   await essai('P', async () => { await s.naviguer(`${OP}/project.html`); await att(`!!document.querySelector('button.vf-term-pastille')`, 'pastille Terminal'); });
   r.tu2 = await essai('tu2', async () => ({ ...(await s.ev(`(() => { const b = document.querySelector('button.vf-term-pastille'); return { n: document.querySelectorAll('button.vf-term-pastille').length, texte: b.textContent.trim(), aria: b.getAttribute('aria-label'), titre: b.title, iframes: document.querySelectorAll('iframe').length }; })()`)), etat: session() }));
-  await essai('ouvreur', () => s.ev(`(() => { const b = document.createElement('button'); b.id = 'ouvreur'; b.textContent = 'o'; b.style.cssText = 'position:fixed;left:0;top:0;width:12px;height:12px;z-index:1'; document.body.appendChild(b); b.focus(); return true; })()`));
+  await essai('ouvreur', () => s.ev(`(() => { const b = document.createElement('button'); b.id = 'ouvreur'; b.textContent = 'o'; b.style.cssText = 'position:fixed;left:0;top:0;width:12px;height:12px;z-index:1'; document.body.appendChild(b); b.focus(); window.__annonces = []; new MutationObserver(() => window.__annonces.push(document.querySelector('.vf-term-annonce').textContent)).observe(document.querySelector('.vf-term-annonce'), { childList: true, characterData: true, subtree: true }); return true; })()`));
   // TU.3 / TU.4 temps 1 : le raccourci ouvre, le cadre est créé, le focus lui est donné
   await essai('ouvrir', async () => { await raccourci(); await att(OUVERT, 'tiroir ouvert'); await att(`document.activeElement && document.activeElement.tagName === 'IFRAME'`, 'focus au cadre'); await att(`${MSG('ready')} && ${MSG('etat:connecte')}`, 'ready puis etat:connecte'); });
   r.tu3 = await essai('tu3', async () => ({ ...(await s.ev(`(() => { const f = document.querySelector('iframe'); return { n: document.querySelectorAll('iframe').length, src: f.getAttribute('src'), title: f.title, sandbox: f.getAttribute('sandbox'), allow: f.hasAttribute('allow'),
     barre: (document.querySelector('.vf-term-etat') || {}).textContent, region: document.querySelector('.vf-term-tiroir').getAttribute('role') + '/' + document.querySelector('.vf-term-tiroir').getAttribute('aria-label'),
-    annonce: (document.querySelector('.vf-term-annonce') || {}).textContent, ready: ${MSG('ready')}, connecte: ${MSG('etat:connecte')} }; })()`)), etat: session(), violations: [...s.violations], pid: pid() }));
+    annonce: window.__annonces[0], ready: ${MSG('ready')}, connecte: ${MSG('etat:connecte')} }; })()`)), etat: session(), violations: [...s.violations], pid: pid() }));
   if (A.court) { /* mode donnee : pas de gestes intermédiaires */ } else {
   await essai('tu4b', async () => { await s.ev(`document.getElementById('ouvreur').focus()`); await raccourci(); await pause(300);
     r.tu4b = await s.ev(`({ ouvert: ${OUVERT}, actif: document.activeElement.tagName })`); });
