@@ -6,7 +6,10 @@
 #   T3 sans secret, secret d'une autre longueur, secret faux, sans Origin, OPTIONS, corps bornés, en-têtes de toute réponse
 #   T4 amorçage : usage unique, rejeu, suppression, lien symbolique, mode lâche, absent des pages · T5 aucun secret dans aucune sortie
 #   TD `Upgrade: websocket` jamais 101, secret en paramètre d'adresse refusé
-#   M-* mutants (copies de la sortie) : M-ORIGIN, M-HOST, M-JETON, M-SANSORIGIN, M-REJEU, M-SERVI, M-LOG, M-URL
+#   S2  lecture du mode d'un fichier : même valeur sous macOS, GNU et uutils (faux `stat` des trois familles)
+#   TC  T-71-10 : le secret se compare en temps constant (égalité condensée + timingSafeEqual, aucune comparaison directe)
+#   TM  moteur : un assistant sous .vibeflow/ ou en lien symbolique est refusé (terminal inerte, rien n'est lancé)
+#   M-* mutants (copies de la sortie) : M-ORIGIN, M-HOST, M-JETON, M-SANSORIGIN, M-REJEU, M-SERVI, M-LOG, M-URL, M-TD1, M-TEMPS-CONSTANT, M-EGAL, M-MOTEUR-VIBEFLOW, M-MOTEUR-LIEN
 # Chaque refus a son témoin positif ; « 0 assistant » = aucun enfant du serveur dont la ligne de commande contient vf-cockpit-pty.py.
 # Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
@@ -204,7 +207,29 @@ unsrv; wait "$FP" 2>/dev/null
 echo "=== T4 — amorçage à usage unique (TERM-03, T-71-11) ==="
 temoin_compteur T4
 srvq; AM="$OUT/.cache/terminal-amorce"
-mode_de() { stat -f %Lp "$1" 2>/dev/null || stat -c %a "$1" 2>/dev/null; }
+mode_de() { # lecture GNU d'abord, valeur validée en octal ; BSD/macOS ensuite (même forme que plugin/consolidator/scripts/reindex.sh, keep_mode) : sous GNU et uutils `stat -f %Lp` imprime sans réussir
+  local m; m=$(stat -c %a "$1" 2>/dev/null) || m=""
+  case "$m" in [0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) ;; *) m=$(stat -f %Lp "$1" 2>/dev/null) || m="" ;; esac
+  case "$m" in [0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) echo "$m" ;; *) echo "illisible" ;; esac
+}
+mode_de_ancien() { stat -f %Lp "$1" 2>/dev/null || stat -c %a "$1" 2>/dev/null; } # forme d'avant la correction, gardée pour prouver que les faux stat reproduisent le défaut
+for k in gnu uutils bsd; do # faux `stat` des trois familles : GNU (-f imprime et réussit), uutils (-f imprime puis échoue), BSD (-c échoue)
+  mkdir -p "$WORK/fk-$k"; cat > "$WORK/fk-$k/stat" <<SH
+#!/bin/sh
+octal() { perl -e 'printf "%o\n", (stat \$ARGV[0])[2] & 07777' "\$1"; }
+case "$k:\$1" in
+  gnu:-c|uutils:-c) octal "\$3" ;;
+  gnu:-f) printf '  File: "%s"\n    ID: 0 Namelen: 255 Type: ext2/ext3\n' "\$3"; exit 0 ;;
+  uutils:-f) printf '  File: "%s"\n    ID: 0 Namelen: 255 Type: ext2/ext3\n' "\$3"; exit 1 ;;
+  bsd:-f) octal "\$3" ;;
+  *) echo "stat: option invalide" >&2; exit 1 ;;
+esac
+SH
+  chmod +x "$WORK/fk-$k/stat"
+done
+printf x > "$WORK/mode-temoin"; chmod 600 "$WORK/mode-temoin"
+assert_eq "S2.0 — témoin : l'ancienne forme (stat -f d'abord) se trompe sous les faux GNU et uutils (elle ne rend pas 600)" "$([ "$(PATH="$WORK/fk-gnu:$PATH" mode_de_ancien "$WORK/mode-temoin")" != 600 ] && [ "$(PATH="$WORK/fk-uutils:$PATH" mode_de_ancien "$WORK/mode-temoin")" != 600 ] && echo defaut-reproduit || echo "non reproduit")" "defaut-reproduit"
+assert_eq "S2.1 — la lecture du mode rend 600 sous le faux GNU, le faux uutils, le faux BSD et le stat réel du poste" "$(for k in gnu uutils bsd; do PATH="$WORK/fk-$k:$PATH" mode_de "$WORK/mode-temoin"; done | tr '\n' ' ')$(mode_de "$WORK/mode-temoin")" "600 600 600 600"
 assert_eq "T4.3 — avant l'échange, le fichier d'amorçage existe en 0600" "$(mode_de "$AM")" "600"
 rq "$QP" GET / --sans-origin --corps-vers "$WORK/t4-q.html" > /dev/null; rq "$SRV_PORT" GET / --corps-vers "$WORK/t4-p-index.html" > /dev/null; rq "$SRV_PORT" GET /project.html --corps-vers "$WORK/t4-p-projet.html" > /dev/null
 assert_eq "T4.6 — témoin : les trois pages sont lues en entier (Q et les deux pages de P)" "$([ -s "$WORK/t4-q.html" ] && [ "$(wc -c < "$WORK/t4-p-index.html")" -gt 100000 ] && [ "$(wc -c < "$WORK/t4-p-projet.html")" -gt 100000 ] && echo oui || echo non)" "oui"
@@ -337,6 +362,34 @@ assert_eq "T6.0 — témoin (navigateur réel) : GET /etat sans Origin, same-ori
 assert_eq "T6.0b — témoin (navigateur réel) : GET /flux sans Origin, same-origin, secret valide rend 200" "$(nav GET /flux "$SECRET" same-origin -)" "200"
 unsrv
 
+echo "=== TC — T-71-10 : comparaison du secret en temps constant (sonde statique sur le chemin de comparaison) ==="
+sonde_tc() { # sonde_tc <dossier de sortie> -> « egal=<n> directes=<n> condense=<oui|non> » : usages de egal() sur le secret, comparaisons directes, timingSafeEqual dans egal()
+  local d="$1" e dir c
+  e="$(grep -c "egal(req.headers\['x-vf-terminal'\], secret)" "$d/vf-cockpit-terminal.mjs" || true)"
+  dir="$(grep -v '^ *//' "$d/vf-cockpit-terminal.mjs" | grep -cE "x-vf-terminal'\] *[!=]==?|[!=]==? *req\.headers\['x-vf-terminal'\]|[!=]==? *secret\b|\bsecret *[!=]==" || true)"
+  c="$(grep -c 'crypto.timingSafeEqual' "$d/vf-cockpit-terminal-amorce.mjs" || true)"
+  echo "egal=$e directes=$dir condense=$([ "$c" -ge 1 ] && echo oui || echo non)"
+}
+assert_eq "TC.1 — le secret est comparé par egal() (deux sites : contrôle et routage), aucune comparaison directe, et egal() s'appuie sur timingSafeEqual" "$(sonde_tc "$OUT")" "egal=2 directes=0 condense=oui"
+assert_eq "TC.0 — témoin : la sonde voit une comparaison directe dans un fichier jetable" "$(mkdir -p "$WORK/tc0"; printf "if (req.headers['x-vf-terminal'] === secret) {}\n" > "$WORK/tc0/vf-cockpit-terminal.mjs"; : > "$WORK/tc0/vf-cockpit-terminal-amorce.mjs"; sonde_tc "$WORK/tc0")" "egal=0 directes=1 condense=non"
+
+echo "=== TM — moteur : assistant sous .vibeflow/ ou en lien symbolique refusé ==="
+srv_moteur() { # srv_moteur <sortie> <dossier du moteur> : le serveur démarre avec ce moteur ; rend le journal dans SRV_OUT ; attend server.json (le terminal n'y vient que s'il est actif)
+  local save="$ENG"; ENG="$2"; srv "$1" 1; ENG="$save"
+}
+terminal_actif() { sj '"terminal" in j' ; }
+sonde_moteur() { # sonde_moteur <sortie> <dossier du moteur> -> « terminal=<true|false> journal=<refus|autre> »
+  srv_moteur "$1" "$2"; local a j=autre; a="$(terminal_actif)"; grep -q 'assistant du terminal introuvable' "$SRV_OUT" && j=refus
+  unsrv; echo "terminal=$a journal=$j"
+}
+MOT_OK="$WORK/moteur-ok"; rm -rf "$MOT_OK"; cp -R "$ENG" "$MOT_OK"
+MOT_VF="$LAB/.vibeflow/moteur-copie"; rm -rf "$MOT_VF"; cp -R "$ENG" "$MOT_VF"
+MOT_LIEN="$WORK/moteur-lien"; rm -rf "$MOT_LIEN"; cp -R "$ENG" "$MOT_LIEN"; rm "$MOT_LIEN/terminal/vf-cockpit-pty.py"; ln -s "$ENG/terminal/vf-cockpit-pty.py" "$MOT_LIEN/terminal/vf-cockpit-pty.py"
+assert_eq "TM.0 — témoin : une copie ordinaire du moteur, hors du lab, donne un terminal actif" "$(sonde_moteur "$OUT" "$MOT_OK")" "terminal=true journal=autre"
+assert_eq "TM.1 — moteur sous <lab>/.vibeflow/ : assistant refusé, terminal inerte (journal : assistant introuvable)" "$(sonde_moteur "$OUT" "$MOT_VF")" "terminal=false journal=refus"
+rm -rf "$MOT_VF" # copie de 3 Mo : les mutants qui suivent copient <lab>/.vibeflow
+assert_eq "TM.2 — assistant en lien symbolique : refusé, terminal inerte (journal : assistant introuvable)" "$(sonde_moteur "$OUT" "$MOT_LIEN")" "terminal=false journal=refus"
+
 echo "=== Mutants — chacun rougit sa sonde ==="
 rouge() { echo "     [mutant] obtenu $1, le code sain rend $2" >&2; [ "$1" != "$2" ] && echo rouge || echo "identique : $1"; }
 mut() { mutant "$1" "$2" "$3" && return 0; assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; return 1; }
@@ -368,6 +421,19 @@ navmut NAV-SANS-SFS "s/ *&& req.headers\['sec-fetch-site'\] === 'same-origin' &&
 navmut NAV-SANS-SECRET "s/ && egal(req.headers\['x-vf-terminal'\], secret);/;/" 403 GET /etat - same-origin -
 navmut NAV-POST "s/req.method === 'GET' \&\& (url.pathname === '\/flux' || url.pathname === '\/etat')/true/" 403 POST /entree @S same-origin -
 navmut NAV-ORIGIN "s/else if (o !== origineQ())/else if (o !== origineQ() \&\& !navigateur)/" 403 GET /etat @S same-origin @P
+
+echo "=== M-TD1 / M-TEMPS-CONSTANT / M-EGAL / M-MOTEUR-* — mutants de la tenue du serveur ==="
+if mut td1 vf-cockpit-terminal.mjs "s|^\(  const q = http.createServer.*\)\$|\1 q.on('upgrade', (rq2, so) => { so.end('HTTP/1.1 101 Switching Protocols\\\\r\\\\nUpgrade: websocket\\\\r\\\\n\\\\r\\\\n'); });|"; then
+  srvq "$MUT_OUT"; echanger; assert_eq "M-TD1 — le mutant (écouteur « upgrade » qui accepte la montée) rougit TD.1 : 101 au lieu de 401" "$(rouge "$(node "$AUX/upg.mjs" "$QP" /flux '' "http://127.0.0.1:$QP")" 401)" "rouge"; unsrv; fi
+if mut tc vf-cockpit-terminal.mjs "s/egal(req.headers\['x-vf-terminal'\], secret)/req.headers['x-vf-terminal'] === secret/g"; then
+  assert_eq "M-TEMPS-CONSTANT — le mutant (comparaison directe ===) rougit TC.1" "$(rouge "$(sonde_tc "$MUT_OUT")" "egal=2 directes=0 condense=oui")" "rouge"; fi
+if mut egal vf-cockpit-terminal-amorce.mjs "s/return crypto.timingSafeEqual(condense(a), condense(b));/return a === b;/"; then
+  assert_eq "M-EGAL — le mutant (egal() sans timingSafeEqual) rougit TC.1" "$(rouge "$(sonde_tc "$MUT_OUT")" "egal=2 directes=0 condense=oui")" "rouge"; fi
+if mut moteurvf vf-cockpit-terminal.mjs "s/ && !realUnder(f, path.join(root, '.vibeflow'))//"; then
+  cp -R "$ENG" "$MUT_OUT/../moteur-copie"
+  assert_eq "M-MOTEUR-VIBEFLOW — le mutant (plus de refus sous .vibeflow/) rougit TM.1 : le terminal devient actif" "$(rouge "$(sonde_moteur "$MUT_OUT" "$MUT_OUT/../moteur-copie")" "terminal=false journal=refus")" "rouge"; fi
+if mut moteurlien vf-cockpit-terminal.mjs "s/fs.lstatSync(f).isFile()/fs.statSync(f).isFile()/"; then
+  assert_eq "M-MOTEUR-LIEN — le mutant (lstat remplacé par stat : le lien est suivi) rougit TM.2 : le terminal devient actif" "$(rouge "$(sonde_moteur "$MUT_OUT" "$MOT_LIEN")" "terminal=false journal=refus")" "rouge"; fi
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

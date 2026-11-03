@@ -8,7 +8,8 @@
 #   L7  O2 a : serveur vivant sans terminal -> relancé    L8 O2 c : serveur vivant avec terminal -> même PID, nouvel amorçage, l'ancien refusé
 #   L9  échange, flux, commande, puis `stop` : serveur, assistant et shell disparus   L10 win32 simulé : message, ni amorçage ni ouverture
 #   L11 server.json qui désigne un PID leurre : le leurre reste vivant, sortie 5
-#   M-*  mutants (copies du module, jamais le module) : M-MODE (L3), M-SUIT-LIEN (L4), M-IMPRIME (L5), M-OUVRE-P (L6)
+#   M-*  mutants (copies du module, jamais le module) : M-MODE (L3), M-SUIT-LIEN (L4), M-IMPRIME (L5), M-OUVRE-P (L6), M-LEURRE-TERMINAL (L11b)
+#   L5.0 le contrôle de l'environnement du serveur est JOUÉ sous Linux (/proc/<pid>/environ) comme sous macOS (ps -Eww), jamais sauté faute de la forme BSD
 # Aucun vrai navigateur : `open` et `xdg-open` factices en tête du PATH. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
@@ -81,14 +82,23 @@ V="$(cat "$AM" 2>/dev/null)"; SPID="$(sj j.pid)"
 assert_eq "L5 — témoin : l'amorçage lu est 64 hexadécimaux" "$([[ "$V" =~ ^[0-9a-f]{64}$ ]] && echo oui || echo "non : ${V:-vide}")" "oui"
 cherche() { if [ -z "$V" ]; then echo "pas de valeur"; else cat "$@" 2>/dev/null | grep -c -F -e "$V" || true; fi; }
 PSCMD="$(ps -o command= -p "$SPID" 2>/dev/null)"
-PSENV="$(ps -Eww -o command= -p "$SPID" 2>/dev/null)"
+# environnement du serveur : /proc/<pid>/environ (Linux, séparé par NUL) d'abord, `ps -Eww` (BSD, macOS) ensuite ; VF_PROC_ROOT ne sert qu'à la sonde L5.0
+env_du_serveur() { local f="${VF_PROC_ROOT:-/proc}/$1/environ"; if [ -r "$f" ]; then tr '\0' '\n' < "$f"; else ps -Eww -o command= -p "$1" 2>/dev/null; fi; }
+verdict_env() { # verdict_env <pid> <valeur> -> « saute » (environnement illisible) ou « oui » (valeur absente) / « non » (valeur présente)
+  local e; e="$(env_du_serveur "$1")"
+  if [[ "$e" == *VF_COCKPIT_SCRIPTS_DIR* ]]; then if [[ "$e" == *"$2"* ]]; then echo non; else echo oui; fi; else echo saute; fi
+}
+mkdir -p "$WORK/fauxproc/4242" "$WORK/fauxps"; printf 'A=1\0VF_COCKPIT_SCRIPTS_DIR=/x\0B=secret-temoin\0' > "$WORK/fauxproc/4242/environ"
+printf '#!/bin/sh\nexit 1\n' > "$WORK/fauxps/ps"; chmod +x "$WORK/fauxps/ps"
+assert_eq "L5.0 — sous une forme de ps qui refuse -E (Linux) et avec /proc/<pid>/environ : le contrôle est joué, jamais sauté (valeur absente -> oui, valeur présente -> non)" "$(PATH="$WORK/fauxps:$PATH" VF_PROC_ROOT="$WORK/fauxproc" verdict_env 4242 absente-du-tout) $(PATH="$WORK/fauxps:$PATH" VF_PROC_ROOT="$WORK/fauxproc" verdict_env 4242 secret-temoin) $(PATH="$WORK/fauxps:$PATH" VF_PROC_ROOT="$WORK/inexistant" verdict_env 4242 x)" "oui non saute"
+PSENV_V="$(verdict_env "$SPID" "$V")"
 assert_eq "L5 — témoin : la recherche trouve la valeur dans le fichier d'amorçage" "$(cherche "$AM")" "1"
 assert_eq "L5 — l'amorçage n'est pas dans la sortie du lanceur" "$(cherche "$LOUT_A")" "0"
 assert_eq "L5 — l'amorçage n'est pas dans le journal du serveur" "$(cherche "$OUT/.cache/serveur.log")" "0"
 assert_eq "L5 — l'amorçage n'est pas dans server.json" "$(cherche "$SJ")" "0"
 assert_eq "L5 — l'amorçage n'est pas dans la ligne de commande du serveur (témoin : elle cite serve.mjs)" "$([[ "$PSCMD" == *serve.mjs* ]] && ! [[ "$PSCMD" == *"$V"* ]] && echo oui || echo "non : $PSCMD")" "oui"
-if [[ "$PSENV" == *VF_COCKPIT_SCRIPTS_DIR* ]]; then assert_eq "L5 — l'amorçage n'est pas dans l'environnement du serveur (témoin : ps le montre)" "$([[ "$PSENV" == *"$V"* ]] && echo non || echo oui)" "oui"
-else echo "  ⚠ SKIP — L5 environnement : illisible par ps sur ce poste"; fi
+if [ "$PSENV_V" != saute ]; then assert_eq "L5 — l'amorçage n'est pas dans l'environnement du serveur (témoin : l'environnement est lisible et porte VF_COCKPIT_SCRIPTS_DIR)" "$PSENV_V" "oui"
+else echo "  ⚠ SKIP — L5 environnement : illisible sur ce poste (ni /proc/<pid>/environ ni ps -Eww)"; fi
 assert_eq "L6 — témoin : --no-open, aucune ouverture" "$([ -s "$OUVERT" ] && echo ouvert || echo rien)" "rien"
 arrete; attendre_mort "$SPID"
 
@@ -189,6 +199,17 @@ if mutant ouvrep 's|s\.terminal\.url}/#t=|s.url}/#t=|'; then
   assert_eq "M-OUVRE-P — le mutant rougit L6 (l'adresse ouverte n'est plus celle de Q)" "$([[ "$(sed -n 1p "$OUVERT" 2>/dev/null)" != "http://127.0.0.1:$MQ/#t="* ]] && echo rouge || echo "identique")" "rouge"
   arrete; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-OUVRE-P — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
+echo "=== M-LEURRE-TERMINAL — le garde de l'arrêt n'est plus tenu quand --terminal est donné ==="
+if mutant leurreterm 's/if (vif) { if (!arreter(sortie))/if (vif) { if (o.avecQ ? false : !arreter(sortie))/'; then
+  node -e 'setInterval(()=>{},1000)' "$WORK/leurre-m" & LEURRE_M=$!; PIDS+=($LEURRE_M)
+  mkdir -p "$OUT/.cache"; rm -f "$SJ"
+  printf '{"pid":%s,"port":9,"url":"http://127.0.0.1:9","token":"x","startedAt":"2026-01-01T00:00:00.000Z"}\n' "$LEURRE_M" > "$SJ"
+  lance "$MUT_L" open --terminal --no-open; RC_M="$LRC"; S_M="$(sj j.pid)"
+  assert_eq "M-LEURRE-TERMINAL — le mutant (arrêt sans garde sur la voie --terminal) rougit L11b : la sortie n'est plus 5" "$([ "$RC_M" != 5 ] && echo rouge || echo "identique : $RC_M")" "rouge"
+  [ -n "$S_M" ] && [ "$S_M" != "$LEURRE_M" ] && { arrete; attendre_mort "$S_M"; }
+  vf_hyg_stop "$LEURRE_M"; rm -f "$SJ"
+else assert_eq "M-LEURRE-TERMINAL — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
