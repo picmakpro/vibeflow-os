@@ -960,10 +960,10 @@ Plans:
 
 ### Phase 71: Terminal intégré au cockpit
 
-> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Terminal intégré dans la page »).
+> **Cadrée le 2026-11-03** (`71-CONTEXT.md`, P71-D-01..17 ; arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-03). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Terminal intégré dans la page »).
 
 **Goal:** Le cockpit ouvre un terminal dans la page (xterm.js et une PTY native), à la racine du lab, sans changer d'outil ; un audit de sécurité complet accompagne la phase, parce qu'un shell complet derrière le serveur local change le modèle de menace du cockpit.
-**Requirements**: TBD — posées au cadrage.
+**Requirements**: TERM-01, TERM-02, TERM-03, TERM-04, TERM-05, TERM-06, TERM-07, TERM-08, TERM-09, TERM-10, TERM-11, TERM-12
 **Depends on:** Phase 67 (serveur unique) ; ordre du jalon : après la 70 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « 69 → 68 → 70 → 71 → 72 (Recommandé) »).
 **Sources:** `69-CONTEXT.md` P69-D-19 et P69-D-20.
 **Plans:** 0 plans
