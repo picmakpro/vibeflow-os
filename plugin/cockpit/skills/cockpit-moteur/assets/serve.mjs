@@ -169,7 +169,9 @@ if (cli) { try { version = execFileSync(cli.cmd, [...cli.args, '--version'], { e
 
 // The page, the graph, and the instructions and answer schema (from query.mjs's inlined graph-query
 // code). Loaded at start and again whenever the map is rebuilt.
-const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange })};</script>`;
+let TERM = null; // vibeflow P25 : terminal intégré, chargé seulement avec --terminal (second écouteur 127.0.0.1, aucun effet sans le drapeau)
+if (has('terminal')) { try { TERM = (await import(new URL('./vf-cockpit-terminal.mjs', import.meta.url))).preparerTerminal({ here, root, jetons: () => [token, VF?.ptoken] }); } catch (e) { console.error(`vf-cockpit : terminal indisponible : ${e.message}. Relancer « vf-cockpit build ».`); } } // vibeflow P25
+const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange })};</script>` + (TERM ? TERM.injection() : ''); // vibeflow P25
 let page, G, core, MODES;
 // vibeflow P13 : serveur unique. Le direct, « au travail » et la page Projet vivent dans vf-cockpit-server.mjs, posé à côté de
 // vibeflow P13 : ce fichier ; absent, le serveur reste celui de l'amont. Même port que la page, aucun en-tête CORS.
@@ -215,7 +217,7 @@ fs.watchFile(path.join(here, 'index.html'), { interval: 1000 }, (cur, prev) => {
   clearTimeout(reloadTimer);
   reloadTimer = setTimeout(() => { try { load(); broadcast('reload'); console.log('map rebuilt: reloaded open tabs'); } catch {} }, 800);
 });
-if (idleExit) setInterval(() => { if (!tabs.size && !running.size && Date.now() - lastTab > idleExit) process.exit(0); }, 60000).unref();
+if (idleExit) setInterval(() => { if (!tabs.size && !running.size && !TERM?.occupe() && Date.now() - lastTab > idleExit) process.exit(0); }, 60000).unref(); // vibeflow P25 : une session de terminal ouverte empêche l'arrêt pour inactivité
 const flowsFile = path.join(here, 'custom-flows.json');
 const readFlows = () => { try { return JSON.parse(fs.readFileSync(flowsFile, 'utf8')).flows || []; } catch { return []; } };
 
@@ -495,7 +497,7 @@ const pageCsp = (html) => {
   cspMemo.set(html, csp);
   return csp;
 };
-const sendPage = (res, html) => { res.setHeader('Content-Security-Policy', pageCsp(html)); res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' }); return res.end(html); };
+const sendPage = (res, html) => { res.setHeader('Content-Security-Policy', pageCsp(html) + (TERM ? TERM.frameSrc() : '')); res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' }); return res.end(html); }; // vibeflow P25 : frame-src de la CSP de page s'ajoute hors de pageCsp (v2.75.0 intacte)
 const server = http.createServer((req, res) => {
   res.setHeader('Content-Security-Policy', BASE_CSP); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
   try { route(req, res); } catch (e) { console.error(`vf-cockpit : requête en échec : ${e?.message || e}`); try { if (!res.headersSent) res.writeHead(500); res.end(); } catch {} }
@@ -510,6 +512,7 @@ function route(req, res) {
     // EventSource can't send headers, so the events stream takes the token in the query string
     const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' || url.pathname === '/api/vf/events' ? url.searchParams.get('token') : null); // vibeflow P13
     if (!sameOrigin || (given !== token && !VF?.jetonValide(given))) { res.writeHead(403); return res.end(); } // vibeflow P13
+    if (TERM && req.method === 'GET' && url.pathname === '/api/vf/terminal') return TERM.routeP(req, res); // vibeflow P25 : état du terminal (jamais un secret), après le Host et le jeton
     if (VF && url.pathname.startsWith('/api/vf/') && VF.route(req, res, url)) return; // vibeflow P13 : routes du serveur unique, après le Host et le jeton
     if (req.method === 'GET' && url.pathname === '/api/events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
@@ -598,6 +601,7 @@ server.on('listening', () => {
     fs.writeFileSync(stateFile, JSON.stringify({ pid: process.pid, port, url: u, token, hash: selfHash, startedAt: new Date().toISOString() }, null, 2), { mode: 0o600 });
     fs.chmodSync(stateFile, 0o600); // vibeflow P18 : le jeton n'est lisible que du propriétaire (le fichier peut préexister en 0644)
   } catch {}
+  TERM?.demarrer(port); // vibeflow P25 : second écouteur du terminal, une fois server.json écrit
   const forget = () => { try { if (readState()?.pid === process.pid) fs.unlinkSync(stateFile); } catch {} };
   process.on('exit', forget);
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => process.exit(0));

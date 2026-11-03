@@ -12,7 +12,7 @@
  const here = path.dirname(fileURLToPath(import.meta.url));
 -const root = path.resolve(here, '..');
 +const root = path.resolve(here, '..', '..'); // vibeflow P10 : la sortie est sous <lab>/.vibeflow/cockpit
-+if (!fs.existsSync(path.join(here, 'vf-cockpit-env.mjs'))) { console.error('vf-cockpit : vf-cockpit-env.mjs est absent : refus de lancer des outils sans PATH assaini. Relancer « vf-cockpit build ».'); process.exit(1); } process.env.PATH = (await import(new URL('./vf-cockpit-env.mjs', import.meta.url))).assainirPath(process.env.PATH, root); // vibeflow P25 : jamais d'outil du lab (H-1) ; ce processus seul, pas le shell
++if (!fs.existsSync(path.join(here, 'vf-cockpit-env.mjs'))) { console.error('vf-cockpit : vf-cockpit-env.mjs est absent : refus de lancer des outils sans PATH assaini. Relancer « vf-cockpit build ».'); process.exit(1); } process.env.PATH = (await import(new URL('./vf-cockpit-env.mjs', import.meta.url))).assainirPath(process.env.PATH, root); // vibeflow P26 : jamais d'outil du lab (H-1) ; ce processus seul, pas le shell
  const argv = process.argv.slice(2);
  const opt = (name, dflt) => { const i = argv.indexOf('--' + name); return i < 0 ? dflt : argv[i + 1]; };
  const has = (name) => argv.includes('--' + name);
@@ -59,9 +59,14 @@
  const canChange = !engine || ENGINES[engine].structured;
  // Started from inside a Claude Code or Codex session? Don't let the CLI think it's nested in it.
  function cliEnv() {
-@@ -169,6 +171,10 @@ if (cli) { try { version = execFileSync(cli.cmd, [...cli.args, '--version'], { e
+@@ -167,8 +169,14 @@ if (cli) { try { version = execFileSync(cli.cmd, [...cli.args, '--version'], { e
+ 
+ // The page, the graph, and the instructions and answer schema (from query.mjs's inlined graph-query
  // code). Loaded at start and again whenever the map is rebuilt.
- const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange })};</script>`;
+-const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange })};</script>`;
++let TERM = null; // vibeflow P26 : terminal intégré, chargé seulement avec --terminal (second écouteur 127.0.0.1, aucun effet sans le drapeau)
++if (has('terminal')) { try { TERM = (await import(new URL('./vf-cockpit-terminal.mjs', import.meta.url))).preparerTerminal({ here, root, jetons: () => [token, VF?.ptoken] }); } catch (e) { console.error(`vf-cockpit : terminal indisponible : ${e.message}. Relancer « vf-cockpit build ».`); } } // vibeflow P26
++const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange })};</script>` + (TERM ? TERM.injection() : ''); // vibeflow P26
  let page, G, core, MODES;
 +// vibeflow P13 : serveur unique. Le direct, « au travail » et la page Projet vivent dans vf-cockpit-server.mjs, posé à côté de
 +// vibeflow P13 : ce fichier ; absent, le serveur reste celui de l'amont. Même port que la page, aucun en-tête CORS.
@@ -70,7 +75,7 @@
  function load() {
    const html = fs.readFileSync(path.join(here, 'index.html'), 'utf8');
    const g = JSON.parse(fs.readFileSync(path.join(here, 'graph.json'), 'utf8'));
-@@ -184,6 +190,7 @@ function load() {
+@@ -184,6 +192,7 @@ function load() {
      flow: { instructions: core.floorplanFlowInstructions(G, 'cli'), schema: core.FLOORPLAN_FLOW_SCHEMA, file: path.join(here, '.cache', 'flow-schema.json') },
      ...(G.meta?.blueprint && canChange ? { change: { instructions: core.floorplanChangeInstructions(G), schema: core.FLOORPLAN_CHANGE_SCHEMA, file: path.join(here, '.cache', 'change-schema.json') } } : {}),
    };
@@ -78,7 +83,12 @@
    if (ENGINES[engine]?.schemaFile) {
      fs.mkdirSync(path.join(here, '.cache'), { recursive: true });
      for (const m of Object.values(MODES)) fs.writeFileSync(m.file, JSON.stringify(strict(m.schema)));
-@@ -212,48 +219,7 @@ if (idleExit) setInterval(() => { if (!tabs.size && !running.size && Date.now()
+@@ -208,52 +217,11 @@ fs.watchFile(path.join(here, 'index.html'), { interval: 1000 }, (cur, prev) => {
+   clearTimeout(reloadTimer);
+   reloadTimer = setTimeout(() => { try { load(); broadcast('reload'); console.log('map rebuilt: reloaded open tabs'); } catch {} }, 800);
+ });
+-if (idleExit) setInterval(() => { if (!tabs.size && !running.size && Date.now() - lastTab > idleExit) process.exit(0); }, 60000).unref();
++if (idleExit) setInterval(() => { if (!tabs.size && !running.size && !TERM?.occupe() && Date.now() - lastTab > idleExit) process.exit(0); }, 60000).unref(); // vibeflow P26 : une session de terminal ouverte empêche l'arrêt pour inactivité
  const flowsFile = path.join(here, 'custom-flows.json');
  const readFlows = () => { try { return JSON.parse(fs.readFileSync(flowsFile, 'utf8')).flows || []; } catch { return []; } };
  
@@ -128,7 +138,7 @@
  
  // ---------- asking ----------
  const nameFor = (id) => { try { return core.q.brief(id)?.name || id; } catch { return id; } };
-@@ -309,10 +275,10 @@ function claudeRun(body, mode) {
+@@ -309,10 +277,10 @@ function claudeRun(body, mode) {
    const args = [...cli.args, '-p', '--output-format', 'stream-json', '--verbose',
      '--json-schema', JSON.stringify(mode.schema), '--append-system-prompt', mode.instructions,
      '--tools', 'Read,Grep,Glob,Bash', '--allowedTools', 'Bash(node floorplan/query.mjs:*)', 'Read', 'Grep', 'Glob'];
@@ -141,7 +151,7 @@
      onEvent(ev, out) {
        if (ev.type === 'assistant') for (const c of ev.message?.content || []) if (c.type === 'tool_use') out.progress(describeTool(c.name, c.input));
        if (ev.type !== 'result') return;
-@@ -354,7 +320,8 @@ const CLOSED = Symbol('closed'); // the browser went away mid-request
+@@ -354,7 +322,8 @@ const CLOSED = Symbol('closed'); // the browser went away mid-request
  /** Runs the agent once for a request and resolves with its answer, streaming progress through `send`. */
  function runAgent(res, send, body) {
    return new Promise((resolve, reject) => {
@@ -151,7 +161,7 @@
      const child = spawn(cli.cmd, run.args, { cwd: root, env: cliEnv(), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
      const id = crypto.randomBytes(6).toString('hex');
      running.set(id, child);
-@@ -395,6 +362,7 @@ function runAgent(res, send, body) {
+@@ -395,6 +364,7 @@ function runAgent(res, send, body) {
  function ask(req, res, body) {
    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
    const send = (event, data) => { if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
@@ -159,7 +169,7 @@
    if (!cli) { send('failure', { code: 'cli_missing', message: `${ENGINES[want].name} not found.` }); return res.end(); }
    if (body.mode === 'change') return changePlan(res, send, body);
    runAgent(res, send, body)
-@@ -407,6 +375,7 @@ function ask(req, res, body) {
+@@ -407,6 +377,7 @@ function ask(req, res, body) {
  // checks them with the skill's plan.mjs and build.mjs (build.mjs records where they are), saves them and
  // redraws the map, which reloads every open tab. Each change keeps the files it replaced, for Undo.
  const historyDir = path.join(here, '.cache', 'history');
@@ -167,7 +177,7 @@
  const PLAN_FILES = ['plan.json', 'architecture.json', 'recent-work.json'];
  let changing = false;
  function snapshot() {
-@@ -420,10 +389,12 @@ function restore(dir) {
+@@ -420,10 +391,12 @@ function restore(dir) {
    for (const f of PLAN_FILES) { const from = path.join(dir, f), to = path.join(here, f); if (fs.existsSync(from)) fs.copyFileSync(from, to); else fs.rmSync(to, { force: true }); }
  }
  /** Runs one of the skill's scripts on this project; throws with its output when it fails. */
@@ -183,7 +193,7 @@
    try { return execFileSync(process.execPath, [path.join(dir, 'scripts', name), root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, timeout: 120000 }); }
    catch (e) { throw Object.assign(new Error(String(e.stdout || '') + String(e.stderr || '') || e.message), { checks: true }); }
  }
-@@ -509,7 +480,27 @@ function undoChange() {
+@@ -509,7 +482,27 @@ function undoChange() {
  }
  
  // ---------- http ----------
@@ -202,7 +212,7 @@
 +  cspMemo.set(html, csp);
 +  return csp;
 +};
-+const sendPage = (res, html) => { res.setHeader('Content-Security-Policy', pageCsp(html)); res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' }); return res.end(html); };
++const sendPage = (res, html) => { res.setHeader('Content-Security-Policy', pageCsp(html) + (TERM ? TERM.frameSrc() : '')); res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' }); return res.end(html); }; // vibeflow P26 : frame-src de la CSP de page s'ajoute hors de pageCsp (v2.75.0 intacte)
  const server = http.createServer((req, res) => {
 +  res.setHeader('Content-Security-Policy', BASE_CSP); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
 +  try { route(req, res); } catch (e) { console.error(`vf-cockpit : requête en échec : ${e?.message || e}`); try { if (!res.headersSent) res.writeHead(500); res.end(); } catch {} }
@@ -211,7 +221,7 @@
    // only this machine's own names: a website that points its domain at 127.0.0.1 (DNS rebinding) would
    // otherwise count as the same origin as the map, and could read its token from the page
    if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(String(req.headers.host || '').toLowerCase())) { res.writeHead(403); return res.end('unknown host'); }
-@@ -517,8 +508,9 @@ const server = http.createServer((req, res) => {
+@@ -517,8 +510,10 @@ const server = http.createServer((req, res) => {
    const sameOrigin = !req.headers.origin || req.headers.origin === `http://${req.headers.host}`;
    if (url.pathname.startsWith('/api/')) {
      // EventSource can't send headers, so the events stream takes the token in the query string
@@ -219,11 +229,12 @@
 -    if (!sameOrigin || given !== token) { res.writeHead(403); return res.end(); }
 +    const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' || url.pathname === '/api/vf/events' ? url.searchParams.get('token') : null); // vibeflow P13
 +    if (!sameOrigin || (given !== token && !VF?.jetonValide(given))) { res.writeHead(403); return res.end(); } // vibeflow P13
++    if (TERM && req.method === 'GET' && url.pathname === '/api/vf/terminal') return TERM.routeP(req, res); // vibeflow P26 : état du terminal (jamais un secret), après le Host et le jeton
 +    if (VF && url.pathname.startsWith('/api/vf/') && VF.route(req, res, url)) return; // vibeflow P13 : routes du serveur unique, après le Host et le jeton
      if (req.method === 'GET' && url.pathname === '/api/events') {
        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
        res.write('retry: 1000\n\n'); // reconnect quickly after a restart
-@@ -534,33 +526,13 @@ const server = http.createServer((req, res) => {
+@@ -534,33 +529,13 @@ const server = http.createServer((req, res) => {
        if (req.method === 'POST' || req.method === 'DELETE') {
          let raw = '';
          req.on('data', (d) => { raw += d; if (raw.length > 50000) req.destroy(); });
@@ -260,7 +271,7 @@
          return;
        }
      }
-@@ -573,7 +545,7 @@ const server = http.createServer((req, res) => {
+@@ -573,7 +548,7 @@ const server = http.createServer((req, res) => {
        let raw = '';
        req.on('data', (d) => { raw += d; if (raw.length > 500000) req.destroy(); });
        req.on('end', () => {
@@ -269,7 +280,7 @@
          try {
            const x = exportMap(Array.isArray(body.include) ? body.include.map(String) : EXPORT_DEFAULT, cleanFlows(body.flows));
            res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Content-Disposition': `attachment; filename="${x.name}"`, 'Cache-Control': 'no-store' });
-@@ -589,19 +561,28 @@ const server = http.createServer((req, res) => {
+@@ -589,19 +564,28 @@ const server = http.createServer((req, res) => {
      if (req.method === 'POST' && url.pathname === '/api/ask') {
        let raw = '';
        req.on('data', (d) => { raw += d; if (raw.length > 20000) req.destroy(); });
@@ -302,7 +313,7 @@
  // another map (or anything else) on the port: take the next free one
  let port = wantPort;
  server.on('error', (e) => {
-@@ -614,7 +595,8 @@ server.on('listening', () => {
+@@ -614,8 +598,10 @@ server.on('listening', () => {
    const u = `http://127.0.0.1:${port}`;
    try {
      fs.mkdirSync(path.dirname(stateFile), { recursive: true });
@@ -310,5 +321,7 @@
 +    fs.writeFileSync(stateFile, JSON.stringify({ pid: process.pid, port, url: u, token, hash: selfHash, startedAt: new Date().toISOString() }, null, 2), { mode: 0o600 });
 +    fs.chmodSync(stateFile, 0o600); // vibeflow P18 : le jeton n'est lisible que du propriétaire (le fichier peut préexister en 0644)
    } catch {}
++  TERM?.demarrer(port); // vibeflow P26 : second écouteur du terminal, une fois server.json écrit
    const forget = () => { try { if (readState()?.pid === process.pid) fs.unlinkSync(stateFile); } catch {} };
    process.on('exit', forget);
+   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => process.exit(0));
