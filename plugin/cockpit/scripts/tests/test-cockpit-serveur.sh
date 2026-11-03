@@ -236,6 +236,51 @@ assert_eq "PS.12c — aucun serveur lancé pour ces refus : ni server.json ni do
 RC12B=""; for ok in 1024 65535; do node "$SCRIPTS/vf-cockpit.mjs" status --port "$ok" --lab "$P12" >/dev/null 2>&1; RC12B="$RC12B$?,"; done
 assert_eq "PS.12d — --port 1024 et 65535 passent le parseur (status : jamais 64)" "$RC12B" "0,0,"
 
+# F3 (relecture SOBR-04 de v2.75.0) : la ceinture `porteDoing` de vf-cockpit-server.mjs refuse d'émettre tout objet portant une clé `doing`, à toute profondeur,
+# dans le flux (diffuser) et dans le hello. Le collecteur réel ne produit jamais `doing` : on remplace seulement vf-cockpit-live.mjs (par un crochet de résolution ESM)
+# par un double qui rend la main sur onEvent et sur snapshot ; le serveur, lui, est le vrai (attach + route, derrière un http.createServer).
+cat > "$AUX/live-double.mjs" <<'JS'
+export function startLive({ onEvent }) { globalThis.__vfOnEvent = onEvent; return { snapshot: () => globalThis.__vfSnap, etat: () => ({ mode: 'double', seq: 0 }), stop() {} }; }
+JS
+cat > "$AUX/reg-double.mjs" <<'JS'
+import { register } from 'node:module';
+register('data:text/javascript,' + encodeURIComponent(`export async function resolve(s, c, n) { if (s === './vf-cockpit-live.mjs') return { url: process.env.VF_DOUBLE_LIVE, shortCircuit: true }; return n(s, c); }`));
+JS
+cat > "$AUX/doing.mjs" <<'JS'
+import http from 'node:http'; import { pathToFileURL } from 'node:url';
+const [, , scripts, lab] = process.argv; const logs = [];
+const { attach } = await import(pathToFileURL(scripts + '/vf-cockpit-server.mjs').href);
+const a = attach({ here: lab, root: lab, token: 'tk', inject: '', log: (niv, msg) => logs.push(niv + ' ' + msg) });
+const srv = http.createServer((req, res) => { if (!a.route(req, res, new URL(req.url, 'http://x'))) { res.writeHead(404); res.end(); } });
+await new Promise((r) => srv.listen(0, '127.0.0.1', r)); const port = srv.address().port;
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+const lire = (ms) => new Promise((resolve) => { const ev = []; let fini = false; const rq = http.get({ host: '127.0.0.1', port, path: '/api/vf/events' }, (res) => { let b = ''; res.on('data', (c) => { b += c; for (const m of b.matchAll(/event: (\S+)\ndata: (.*)\n\n/g)) if (!ev.includes(m[1] + m[2])) ev.push(m[1] + m[2]); }); res.on('end', () => { fini = true; }); setTimeout(() => { rq.destroy(); resolve({ ev: ev.map((e) => e.split('{')[0]), brut: ev, fini }); }, ms); }); rq.on('error', () => {}); });
+const sortie = {};
+globalThis.__vfSnap = { seq: 0, lock: { available: false }, who: { workers: [], sources: {} } };
+const flux = lire(900); await pause(300);
+globalThis.__vfOnEvent('patch', { seq: 1, patch: [], at: 1 });                                                        // témoin positif : un événement propre part
+globalThis.__vfOnEvent('who', { seq: 2, at: 2, who: { workers: [{ id: 'w', detail: [{ x: [{ doing: 'commande-secrete' }] }] }] } }); // `doing` à trois niveaux de profondeur
+globalThis.__vfOnEvent('patch', { seq: 3, patch: [], at: 3, doing: 'commande-secrete' });                             // `doing` à la racine
+sortie.flux = await flux;
+globalThis.__vfSnap = { seq: 4, lock: { available: false }, who: { workers: [{ id: 'w', sub: { doing: 'commande-secrete' } }], sources: {} } };
+sortie.hello = await lire(500);
+sortie.logs = logs; sortie.fuite = JSON.stringify(sortie).includes('commande-secrete'); // `brut` garde les données du flux : un oubli de la ceinture s'y verrait
+sortie.journal = await new Promise((r) => http.get({ host: '127.0.0.1', port, path: '/api/vf/journal' }, (res) => { let b = ''; res.on('data', (c) => (b += c)); res.on('end', () => r(JSON.parse(b).evenements.map((e) => e.evenement))); }));
+console.log(JSON.stringify(sortie)); a.stop(); srv.close(); setTimeout(() => process.exit(0), 100); setTimeout(() => process.exit(1), 8000).unref();
+JS
+mkdir -p "$WORK/lab-doing"
+DG="$(VF_DOUBLE_LIVE="file://$AUX/live-double.mjs" node --import "$AUX/reg-double.mjs" "$AUX/doing.mjs" "$SCRIPTS" "$WORK/lab-doing" 2>"$WORK/doing.err")"
+dgev() { printf '%s' "$DG" | node "$AUX/json-stdin.mjs" "$1"; }
+cat > "$AUX/json-stdin.mjs" <<'JS'
+import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); const v = new Function('j', 'return (' + process.argv[2] + ')')(j); console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
+assert_eq "DO.1 — témoin positif : le hello puis l'événement propre (patch seq 1) arrivent dans le flux" "$(dgev 'j.flux.ev.join(",")')" "hello,patch"
+assert_eq "DO.2 — un événement portant doing (profondeur 3, puis racine) n'arrive pas dans le flux : un seul patch, aucun who" "$(dgev 'j.flux.ev.filter(e=>e!=="hello").join(",")')" "patch"
+assert_eq "DO.3 — le journal ne retient que l'événement propre" "$(dgev 'j.journal.join(",")')" "patch"
+assert_eq "DO.4 — deux refus journalisés en erreur, nommant l'événement" "$(dgev 'j.logs.filter(l=>/^error événement (who|patch) refusé/.test(l)).length')" "2"
+assert_eq "DO.5 — un snapshot portant doing : le hello n'est pas émis, la réponse est close, l'erreur est journalisée" "$(dgev 'j.hello.ev.length+","+j.hello.fini+","+j.logs.filter(l=>/hello refusé/.test(l)).length')" "0,true,1"
+assert_eq "DO.6 — la valeur de doing ne figure nulle part dans la sortie du serveur (flux, journal, logs)" "$(dgev 'j.fuite')" "false"
+
 vf_hyg_assert
 echo ""
 echo "=================================="
