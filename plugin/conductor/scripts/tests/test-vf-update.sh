@@ -96,5 +96,27 @@ ok "baseline : hook du module mandatory mergé"         "$(grep -q 'cond-banner.
 ok "resync : hook d'un module à jour re-mergé"         "$(grep -q 'other-hook.sh' "$SET" && echo true || echo false)"
 ok "placeholder {{VF_SCRIPTS}} résolu dans settings"   "$(grep -q '{{VF_SCRIPTS}}' "$SET" && echo false || echo true)"
 
+echo "== vf-update-run.sh (modules nouveaux du catalogue : proposés, jamais posés d'office) =="
+NM_BASE="$TMP/nm-base"; NM_HOME="$TMP/nm-home"; NM_LOG="$TMP/nm.log"
+mkdir -p "$NM_BASE/3.0.0/_internal" "$NM_BASE/3.0.0/conductor/scripts" "$NM_HOME/.claude/scripts"
+printf 'conductor=v1.0.0\n' > "$NM_HOME/.claude/scripts/.vibeflow-installed"
+printf '#!/usr/bin/env bash\necho "$*" >> "%s"\n[ "${3:-}" = "new-modules" ] && echo "cockpit=v1.0.1"\nexit 0\n' "$NM_LOG" > "$NM_BASE/3.0.0/_internal/vibeflow-update.sh"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$NM_BASE/3.0.0/conductor/scripts/check-plugin-update.sh"
+: > "$NM_LOG"
+out="$(cd "$TMP/work" && HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" 2>&1)"
+ok "nouveau : le module du catalogue absent du registre est listé" "$(echo "$out" | grep -qx '\[vf-update-run\] NOUVEAU_MODULE scope=user cockpit=v1.0.1' && echo true || echo false)"
+ok "nouveau : rien n'est posé d'office (aucun install)"            "$(grep -q 'install' "$NM_LOG" && echo false || echo true)"
+: > "$NM_LOG"
+HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user cockpit >/dev/null 2>&1
+ok "offer : module accepté posé avec ses dépendances, puis catalogue inscrit" "$([ "$(cat "$NM_LOG")" = "$(printf -- '--scope user install --with-deps cockpit\n--scope user mark-offered')" ] && echo true || echo false)"
+: > "$NM_LOG"
+HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user >/dev/null 2>&1
+ok "offer sans module (refus) : seule l'inscription a lieu"        "$([ "$(cat "$NM_LOG")" = '--scope user mark-offered' ] && echo true || echo false)"
+: > "$NM_LOG"
+HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user '../x' >/dev/null 2>&1
+ok "offer : un nom de module douteux n'atteint jamais l'engine"    "$(grep -q 'install' "$NM_LOG" && echo false || echo true)"
+HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer local >/dev/null 2>&1
+ok "offer : scope inconnu refusé (exit 64)"                         "$([ $? -eq 64 ] && echo true || echo false)"
+
 echo; echo "== Résultat : $PASS OK · $FAIL KO =="
 [ "$FAIL" -eq 0 ]

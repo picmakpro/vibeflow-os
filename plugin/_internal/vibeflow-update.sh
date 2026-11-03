@@ -566,6 +566,7 @@ vf_manifest_excluded() {
     vibeflow-role)                return 0 ;;  # idem (role_write_file, P58-D-01) — poste du lab, fichier local engine-owned
     memory/*)                     return 0 ;;  # contenu vivant du lab semé par seed-registres.sh, pas un artefact de pose
     scripts/.vibeflow-installed)  return 0 ;;  # état du moteur, pas contenu de module
+    scripts/.vibeflow-offered)    return 0 ;;  # idem : modules déjà proposés par /vf-update, état du moteur
     scripts/.vibeflow-manifest-*) return 0 ;;  # le manifeste ne se consigne jamais lui-même (boucle de convergence)
     scripts/.vibeflow-sha256-*)   return 0 ;;  # empreintes de pose (#166), nom HORS du motif du manifeste : jamais découvert par glob
     .backups/*)                   return 0 ;;  # filet de sécurité, jamais candidat à suppression automatique
@@ -3924,6 +3925,39 @@ uninstall_module() {
   log "✓ $mod désinstallé"
 }
 
+# ---------- Modules nouveaux du catalogue (lab déjà posé) ----------
+# `update --all` ne suit que le registre : un module apparu dans une release (cockpit en v2.75.0) n'y
+# entre jamais et n'est signalé à personne. Deux verbes, sobres, pour que /vf-update le PROPOSE :
+#   new-modules   (lecture seule) un `module=version` par ligne : dans le catalogue, absent du registre,
+#                 jamais déjà proposé, visible du poste. Registre absent = lab non posé : rien à proposer.
+#   mark-offered  inscrit TOUT le catalogue courant dans scripts/.vibeflow-offered. Appelé une fois la
+#                 réponse reçue (accord ou refus) : un module refusé ou retiré exprès n'est jamais reproposé.
+# Le moteur ne traçait pas les retraits (uninstall retire juste la ligne du registre) ; ce fichier est la
+# trace minimale, sans toucher à uninstall. Premier passage sans fichier : tout module non posé est proposé
+# une fois (un retrait antérieur n'a pas laissé de trace), puis le fichier existe.
+VF_OFFERED_RELPATH="scripts/.vibeflow-offered"
+
+list_new_modules() {
+  require_cache
+  [ -f "$INSTALLED_REGISTRY" ] || return 0
+  local mod offered="$TARGET_ROOT/$VF_OFFERED_RELPATH"
+  for mod in $(list_available_modules); do
+    [ "$(module_version_installed "$mod")" = "—" ] || continue
+    if [ -f "$offered" ] && grep -qx "$mod" "$offered"; then continue; fi
+    role_visible "$mod" || continue
+    echo "$mod=$(module_version_available "$mod")"
+  done
+}
+
+mark_offered() {
+  require_cache
+  [ -f "$INSTALLED_REGISTRY" ] || { log "lab non posé (pas de registre) : rien à inscrire"; return 0; }
+  local offered="$TARGET_ROOT/$VF_OFFERED_RELPATH"
+  list_available_modules | LC_ALL=C sort > "${offered}.tmp"
+  mv "${offered}.tmp" "$offered"
+  log "catalogue inscrit comme proposé : $offered"
+}
+
 # ---------- Status ----------
 show_status() {
   require_cache
@@ -4314,6 +4348,12 @@ case "$cmd" in
     ;;
   status)
     show_status
+    ;;
+  new-modules)
+    list_new_modules
+    ;;
+  mark-offered)
+    mark_offered
     ;;
   sync)
     # No-op explicite (SCOPE-02) : la source est le cache fourni, plus de sync git.

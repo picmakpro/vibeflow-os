@@ -1,5 +1,14 @@
 # Changelog — conductor
 
+## [v1.53.1] — 2026-11-05 (non publié : /vf-update propose les modules nouveaux du catalogue)
+
+**Patch** (aucune release racine : elle sera groupée) : `/vf-update` ne mettait à jour que les modules du registre et ne disait rien d'un module apparu dans une release — `cockpit` (v2.75.0) manquait ainsi chez tout utilisateur mis à jour en v2.75.x.
+
+- **`vf-update-run.sh`** : après `update --all`, liste par scope les modules du catalogue posé absents du registre et jamais proposés (`NOUVEAU_MODULE scope=<s> <module>=<version>`), sans rien poser. Mode neuf `offer <user|project> [module ...]` : pose les modules cochés (`install --with-deps`) puis inscrit le catalogue comme proposé ; nom de module hors `[a-z0-9-]` refusé, scope inconnu exit 64.
+- **Skill `vf-update`** : étape 4d, une AskUserQuestion cochable par scope, jamais d'installation d'office (ADR-031).
+- **Retraits** : le moteur ne les traçait pas (`uninstall` retire seulement la ligne du registre). Trace minimale dans l'engine (`vibeflow-update.sh`, verbes `new-modules` et `mark-offered`, fichier `scripts/.vibeflow-offered`) : un module refusé ou retiré exprès n'est jamais reproposé. Limite : un retrait antérieur à ce correctif n'a laissé aucune trace, ses modules sont proposés une fois.
+- **Suites** : `test-vibeflow-update-nouveaux-modules.sh` (engine, 7 contrôles, témoin rouge sur le catalogue courant face à un registre sans `cockpit`) et 6 contrôles ajoutés à `test-vf-update.sh`.
+
 ## [v1.53.0] — 2026-11-03 (verrou de driver par phase) — non publié
 
 **Minor** (capacité neuve ; aucune release racine, elle sera groupée). Règle de Samuel (session principale Claude Code, 2026-11-03) : « la regle est de parallèliser le plus possible, pas de regle "1 seul manager" on lance autant d'agent et sous agent qu'on peut. Plusieur worktree peuvent etre necessaire » ; arbitrage (AskUserQuestion, session principale, 2026-11-03) : « Un verrou par phase (Recommandé) ».

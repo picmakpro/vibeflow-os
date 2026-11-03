@@ -24,11 +24,30 @@ ENGINE="$NEW/_internal/vibeflow-update.sh"
 [ -f "$ENGINE" ] || { echo "[vf-update-run] engine introuvable : $ENGINE" >&2; exit 1; }
 echo "[vf-update-run] cache le plus récent : $(basename "$NEW")"
 
+# Mode `offer <user|project> [module ...]` : suite de la proposition des modules nouveaux (étape 4d du
+# skill). Pose les modules ACCEPTÉS (fermeture de dépendances), puis inscrit tout le catalogue comme
+# proposé — accord ou refus, un module n'est proposé qu'une fois. Sans module : tout est refusé.
+if [ "${1:-}" = "offer" ]; then
+  scope="${2:-}"
+  case "$scope" in user|project) ;; *) echo "usage : vf-update-run.sh offer <user|project> [module ...]" >&2; exit 64 ;; esac
+  shift 2
+  for m in "$@"; do
+    case "$m" in ''|*[!a-z0-9-]*) echo "[vf-update-run] nom de module refusé : $m" >&2; continue ;; esac
+    VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" install --with-deps "$m"
+  done
+  VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" mark-offered
+  exit 0
+fi
+
 run_scope() {
-  local scope="$1" root="$2"
+  local scope="$1" root="$2" l
   [ -f "$root/scripts/.vibeflow-installed" ] || return 1
   echo "[vf-update-run] scope $scope → update --all ($root)"
   VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" update --all
+  # Modules du catalogue absents du registre et jamais proposés : listés, JAMAIS posés d'office (ADR-031).
+  VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" new-modules 2>/dev/null | while IFS= read -r l; do
+    [ -n "$l" ] && echo "[vf-update-run] NOUVEAU_MODULE scope=$scope $l"
+  done
   return 0
 }
 

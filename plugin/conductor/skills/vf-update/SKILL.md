@@ -136,6 +136,13 @@ c. **Couche moteur** (seulement si la ligne moteur de l'étape 3 a été accept�
    l'installeur amont directement : il route vers `ensure-deps.sh`, point de vérité unique du scope
    et du plafond de version (Iron Law 2, `plugin/conductor/AGENT.md:114`).
 
+d. **Modules nouveaux** (hors `--check`) : le résumé de 4b liste, par scope, les modules du catalogue
+   posé absents du registre et jamais proposés (`NOUVEAU_MODULE scope=<s> <module>=<version>`). S'il y
+   en a, pose une AskUserQuestion cochable par scope, description lue dans le `module.json` du module,
+   indépendante des autres confirmations : jamais posés d'office (ADR-031). Dès la réponse, lance
+   `bash <S>/vf-update-run.sh offer <scope> <modules cochés>` (sans module si tout est refusé) : il pose
+   les cochés et inscrit le catalogue comme proposé, donc un module refusé ou retiré exprès n'est jamais reproposé.
+
 ### 5 — Rappel de redémarrage
 
 Termine par : « Modules à jour sur disque. **Redémarre Claude Code** pour recharger le plugin
