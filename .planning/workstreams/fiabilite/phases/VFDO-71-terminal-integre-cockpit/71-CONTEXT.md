@@ -128,6 +128,8 @@ scratchpad de la mission, rejouable ; résultats repris ci-dessous).
 
 - **P71-D-23 (Q8 : `TERM` et `COLORTERM` ; arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-03).** Réponse, mot pour mot : « Toujours xterm-256color + truecolor (Recommandé) ». Le choix provisoire P71-D-22 devient définitif : `TERM=xterm-256color` et `COLORTERM=truecolor` sont posés TOUJOURS, quel que soit l'environnement hérité.
 
+- **P71-D-24 (amende P71-D-10 ; décision du manager, vf-dev-manager, 2026-11-03).** Mesuré par l'exécuteur de 71-06 dans Chrome 156 : un `fetch` GET de même origine n'envoie jamais d'en-tête `Origin` (spec Fetch), donc `GET /flux` et `GET /etat` rendaient 403 en navigateur réel ; les suites de 71-02 restaient vertes parce que leur client Node posait `Origin` à la main (témoin aveugle). Règle : pour `GET /flux` et `GET /etat` SEULEMENT, l'absence d'`Origin` est admise si et seulement si `Sec-Fetch-Site: same-origin` ET le secret en en-tête `X-VF-Terminal` est valide ; une `Origin` présente doit toujours être exactement celle du serveur ; un `Sec-Fetch-Site` absent ou autre que `same-origin` sans `Origin` = refus ; les POST gardent `Origin` obligatoire. Motif de sûreté : une page tierce ne peut pas poser `X-VF-Terminal` sans préflight, auquel Q ne répond jamais ; une requête simple sans cet en-tête n'a pas de secret. À vérifier par l'audit ; les suites portent désormais un témoin qui reproduit le navigateur (GET sans `Origin`).
+
 ### Contraintes héritées (Phase 67, `v2.75.0`)
 
 - Le lab observé n'est jamais une source de code : aucun script du lab exécuté par le serveur (le shell, lui, est l'usage
