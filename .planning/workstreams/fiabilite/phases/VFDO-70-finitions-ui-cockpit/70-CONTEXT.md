@@ -1,7 +1,7 @@
 # Phase 70: Finitions UI du cockpit - Context
 
 **Gathered:** 2026-11-03
-**Status:** Cadrée (2026-11-03, P70-D-01..15) — planification en cours ; exécution après le merge de la 69
+**Status:** Cadrée (2026-11-03, P70-D-01..16) — planification en cours ; exécution après le merge de la 69
 
 **Exigences :** UIFN-01 à UIFN-10 (préfixe neuf, P70-D-12), inscrites dans `REQUIREMENTS.md` du compartiment
 et dans la ligne `Requirements` de la Phase 70 du ROADMAP.
@@ -65,6 +65,19 @@ Réponse unique de Samuel aux six questions de cadrage, mot pour mot : « Tout a
   (AskUserQuestion, session principale, 2026-11-03). Il s'agit de finitions visuelles, donc ni revue ni audit
   séparés à l'exécution. Un seul codeur. Des tests seulement là où un comportement change. Recherche et plans
   courts.
+
+- **P70-D-16 (onglets resserrés par la 69, retour à DESIGN.md).** Ajout au périmètre, arbitrage de Samuel, mot
+  pour mot : « Garder en 69, corriger en 70 (Recommandé) » (AskUserQuestion, session principale Claude Code,
+  2026-11-03, relayée par la session principale).
+  - Ce que la 69 a fait : pour faire tenir le 3e onglet « Équipe » (plan 69-05) à 1 024 et 390 px, elle a
+    resserré `.vf-tabs` dans `ui/00-vibeflow.js` (police 12 px au lieu de 13, padding de piste 2 px au lieu
+    de 3, onglet 5 × 6 px). Elle a aussi élargi la borne `.hl` de 264 à 280 px dans `ui/01-vf-responsive.js`,
+    et le témoin R4.2 de `test-cockpit-responsive.sh` est passé de 300 à 316 px (commit `1efcc691` sur
+    `feat/phase-69-suivi-travail`).
+  - Ce que fait la 70 : elle revient aux valeurs de `DESIGN.md` (onglets à 13 px, piste à 3 px de padding,
+    §3 et §5) en même temps que la refonte de l'en-tête (P70-D-01), avec les trois onglets. L'en-tête doit
+    tenir à 390 px (rangée unique) et à 1 024 px. La borne `.hl` et le témoin R4.2 sont recalculés depuis
+    la nouvelle mise en page, jamais simplement élargis. → UIFN-01, UIFN-09.
 
 ### Choix du manager (vf-dev-manager, 2026-11-03 — pas des arbitrages de Samuel)
 

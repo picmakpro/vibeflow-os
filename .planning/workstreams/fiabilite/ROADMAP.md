@@ -916,7 +916,7 @@ Plans:
 
 ### Phase 70: Finitions UI du cockpit
 
-> **Cadrée le 2026-11-03** (`70-CONTEXT.md`, P70-D-01..15 ; « Tout accepter (Recommandé) », arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Exécution après le merge de la Phase 69, plans revalidés d'abord (P70-D-14). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Phase à part »).
+> **Cadrée le 2026-11-03** (`70-CONTEXT.md`, P70-D-01..16 ; « Tout accepter (Recommandé) », arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Exécution après le merge de la Phase 69, plans revalidés d'abord (P70-D-14). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Phase à part »).
 
 **Goal:** Le cockpit tient en largeur mobile avec une information hiérarchisée, sa visite guidée est plus claire, et le chrome ne montre plus d'anglais résiduel ni de coquilles.
 **Requirements**: UIFN-01, UIFN-02, UIFN-03, UIFN-04, UIFN-05, UIFN-06, UIFN-07, UIFN-08, UIFN-09, UIFN-10
