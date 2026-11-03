@@ -853,6 +853,9 @@ if [ -f "$GSDJS" ] && command -v node > /dev/null 2>&1; then
   # Grammaire de --phase : le gate trouve les phases que le moteur sert (P60-D-02, au poste solo rien ne change).
   # A : id custom posé par `phase add --id`. B : gabarit de jalons livrés (<details>) avec numérotation remise à 1.
   gsd_mklab AID - '### Phase 2: Deuxieme' ''
+  # gsd-core 1.20.0 refuse `phase add --id` (rc 1) tant que phase_naming n'est pas "custom" dans .planning/config.json
+  # (phase.cjs recordNewPhase, phase-id.cjs phaseDirectoryContext). Sous 1.19.0 la clé est déjà lue (`--id` suffisait) : sans effet ici.
+  printf '{"phase_naming": "custom"}\n' > "$GSD/AID/.planning/config.json"
   gsd_mklab BDT - '### Phase 2: Deuxieme' ''
   {
     printf '# Roadmap\n\n<details>\n<summary>v1.0 shipped</summary>\n\n'
