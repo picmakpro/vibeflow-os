@@ -249,6 +249,43 @@ printf '%s' "$(cat "$B/ROADMAP.md")" > "$B/ROADMAP.md"   # sans saut de ligne fi
 node "$DR" "$L7" --diff > "$WORK/p7.patch"
 assert_eq "P6.14 — correctif sans « ## Phases » ni saut final : appliqué, puis conforme" "$( (cd "$L7" && git apply "$WORK/p7.patch") && node "$DR" "$L7" | head -1)" "Format de la planification conforme."
 
+# ---------- P7 — la détection de dérive ne lit aucun fichier non régulier du lab (famille de read(), merge 69 / main v1.0.1) ----------
+# Un ROADMAP en tube FIFO ou un STATE lié à /dev/zero ne doit ni bloquer buildProjectGraph ni remplir la mémoire. Enfant node borné par SIGKILL
+# (harnais de A14 de test-cockpit-avancement.sh), tubes et liens supprimés dans tous les cas. Mutant : le `read` local non borné de main est rétabli dans une copie.
+echo "=== P7 — drift : lecture bornée des fichiers du lab ==="
+cat > "$AUX/borne.mjs" <<'JS'
+// borne.mjs <ms> <commande node et arguments...> : enfant node borné par une limite de temps (SIGKILL, sans tube) ; une ligne JSON { timedOut, status, out }
+import { spawnSync } from 'node:child_process';
+const [, , ms, ...args] = process.argv;
+const r = spawnSync(process.execPath, args, { timeout: Number(ms), killSignal: 'SIGKILL', encoding: 'utf8', maxBuffer: 64 << 20 });
+console.log(JSON.stringify({ timedOut: r.error?.code === 'ETIMEDOUT', status: r.status, out: r.stdout || '' }));
+JS
+cat > "$AUX/mutsub.mjs" <<'JS'
+// mutsub.mjs <fichier> — remplace UNE occurrence exacte de $FROM par $TO dans une COPIE ; "ancre absente" si $FROM n'y est pas
+import fs from 'node:fs';
+const f = process.argv[2]; const t = fs.readFileSync(f, 'utf8');
+if (!t.includes(process.env.FROM)) { console.log('ancre absente'); process.exit(1); }
+fs.writeFileSync(f, t.replace(process.env.FROM, () => process.env.TO)); console.log('muté');
+JS
+mut7() { local d="$WORK/mut-$1"; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$d/"; FROM="$3" TO="$4" node "$AUX/mutsub.mjs" "$d/$2"; }
+QB7() { node "$AUX/borne.mjs" 6000 "$AUX/q.mjs" "$1" project "$2" > "$WORK/qb7.json"; G "$WORK/qb7.json" "(j.timedOut?\"bloqué\":\"rendu\")+\"|\"+(()=>{try{return JSON.parse(j.out).meta.vf.counts.phases}catch{return \"illisible\"}})()"; }
+L70="$WORK/lab-p70"; L71="$WORK/lab-p71"; L72="$WORK/lab-p72"
+printf -- '- [ ] **Phase 1: Un** - a\n' | wr "$L70/.planning/ROADMAP.md"; printf '<objective>Plan</objective>\n' | wr "$L70/.planning/phases/01-a/01-01-PLAN.md"; git -C "$L70" init -q
+printf -- '- [ ] **Phase 1: Un** - a\n' | wr "$L71/.planning/ROADMAP.md"; printf '<objective>Plan</objective>\n' | wr "$L71/.planning/phases/01-a/01-01-PLAN.md"; git -C "$L71" init -q
+printf -- '- [ ] **Phase 1: Un** - a\n' | wr "$L72/.planning/ROADMAP.md"; printf '<objective>Plan</objective>\n' | wr "$L72/.planning/phases/01-a/01-01-PLAN.md"; git -C "$L72" init -q
+assert_eq "P7.0 — contrôle positif : sans fichier spécial, le graphe se rend (1 phase, enfant borné)" "$(QB7 "$SCRIPTS" "$L70")" "rendu|1"
+mut7 driftlocal vf-cockpit-drift.mjs "import { readPlanning, fm, read } from './vf-cockpit-planning.mjs';" "import { readPlanning, fm } from './vf-cockpit-planning.mjs';
+const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };" > "$WORK/ancre-drift.txt"
+rm -f "$L71/.planning/ROADMAP.md"; mkfifo "$L71/.planning/ROADMAP.md"
+rm -f "$L72/.planning/STATE.md"; ln -s /dev/zero "$L72/.planning/STATE.md"
+R71="$(QB7 "$SCRIPTS" "$L71")"; M71="$(QB7 "$WORK/mut-driftlocal" "$L71")"
+R72="$(QB7 "$SCRIPTS" "$L72")"
+rm -f "$L71/.planning/ROADMAP.md" "$L72/.planning/STATE.md"
+assert_eq "P7.1 — un ROADMAP en tube FIFO ne bloque pas le graphe Projet (détection de dérive comprise)" "$R71" "rendu|0"
+assert_eq "P7.2 — un STATE lié à /dev/zero ne bloque pas le graphe Projet (non-régression ; stateFile le refuse déjà : seul le tube FIFO du ROADMAP discrimine, P7.1 et P7.3)" "$R72" "rendu|1"
+assert_eq "P7.3 — mutant (read local non borné rétabli, ancre présente) : le tube FIFO bloque, détecté" "$(cat "$WORK/ancre-drift.txt")|$M71" "muté|bloqué|illisible"
+assert_eq "P7.5 — vf-cockpit-drift.mjs n'a plus de lecture à lui (read partagé de planning)" "$(grep -c 'const read = ' "$SCRIPTS/vf-cockpit-drift.mjs")" "0"
+
 # ---------- P4 — contrat, syntaxe, aucun nom de compartiment de ce dépôt ----------
 echo "=== P4 — contrat et généralité ==="
 for n in 1 2 3 5 6; do assert_eq "P4.$n — graphe $n conforme au contrat" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-project@1 "$WORK/g$n.json")" "OK"; done
