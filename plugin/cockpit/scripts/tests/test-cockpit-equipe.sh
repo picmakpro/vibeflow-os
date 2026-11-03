@@ -8,6 +8,8 @@
 #   E22 dernière action lisible (verbe + cible), jamais l'argument d'une commande, ni dans who ni dans le flux SSE
 #   E28 schéma vibeflow/cockpit-who@2 conforme au contrat, qui ne déclare plus @1
 #   EP  coût de collecte sur 40 sous-agents (garde de non-régression, T-69-06)
+#   E23 onglet Équipe : page /equipe.html, graphe cockpit-equipe@1, couche d'onglets, sonde de libellés (CKPT-23 ; P69-D-17)
+#   EUI rendu de l'arbre hors navigateur (vm) : imbrication, terminés repliés, liens dans les deux sens, pied (CKPT-19 à 22 ; P69-D-14 à P69-D-18)
 # 69-04 ajoute E23 et EUI.
 # Exit 0 si tout passe, 1 sinon.
 
@@ -356,6 +358,164 @@ HEP="$(mkhome ep "$AUX/spec-ep.json" "$LAB")"
 Q whotime "$LAB" "$HEP" "$NOSCRIPTS" "$NOW" > "$WORK/ep.json"
 assert_eq "EP.1 — collectWho rend en moins de 3 000 ms (garde, vert avant le code ; ce n'est pas un témoin)" "$(G "$WORK/ep.json" 'j.ms < 3000')" "true"
 assert_eq "EP.2 — les 40 sous-agents (20 actifs, 20 terminés depuis moins de 24 h) sont listés" "$(G "$WORK/ep.json" 'j.n')" "40"
+
+echo "=== E23 — onglet Équipe : page, graphe, onglets, libellés (P69-D-17 ; CKPT-23) ==="
+UI="$SCRIPTS/../skills/cockpit-moteur/assets/ui"
+cat > "$AUX/fetchp.mjs" <<'JS'
+// fetchp.mjs <port> <chemin> <sortie> : écrit le corps dans <sortie>, rend le statut ; « ERR <code> » si la connexion échoue
+import http from 'node:http';
+import fs from 'node:fs';
+const [, , port, p, out] = process.argv;
+http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}` } }, (r) => { const c = []; r.on('data', (d) => c.push(d)); r.on('end', () => { fs.writeFileSync(out, Buffer.concat(c)); console.log(r.statusCode); }); }).on('error', (e) => console.log('ERR ' + e.code));
+JS
+cat > "$AUX/graphe.mjs" <<'JS'
+// graphe.mjs <scripts> <page.html> : le graphe embarqué de la page (extraireGraphe du module), ou { erreur }
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, f] = process.argv;
+const { extraireGraphe } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-embed.mjs')).href);
+try { console.log(JSON.stringify(extraireGraphe(fs.readFileSync(f, 'utf8')))); } catch (e) { console.log(JSON.stringify({ erreur: 'graphe illisible : ' + String(e.message).slice(0, 80) })); }
+JS
+cat > "$AUX/sonde-fr.mjs" <<'JS'
+// sonde-fr.mjs <scripts> <fichier.js>... : les littéraux que `litteraux` + `estAnglais` jugent anglais ET qui ne figuraient pas déjà, tels quels,
+// dans le fichier de v2.75.0 (bruit connu de estAnglais sur du français sans accent : « Session », « Verrou »…). Un fichier nouveau n'a pas de passif.
+// Sortie : « aucune », ou une ligne « nom : chaîne » par littéral, ou « fichier absent : nom ».
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, ...fichiers] = process.argv;
+const { litteraux, estAnglais } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-fr-inventaire.mjs')).href);
+const CONNU = {
+  '70-vf-live.js': ['Driver libre', 'Session', 'Verrou', 'Nœud de DAG', '{} min', ' · orphelin', '<p>Personne. Sources lues : ', 'Personne'],
+  '00-vibeflow.js': ['Projet', 'Code', ', #ask', '#btn-health{} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }', 'header .brand', 'en planification', 'en pause', 'Phase {}{} '],
+};
+const sortie = [];
+for (const f of fichiers) {
+  const nom = path.basename(f);
+  if (!fs.existsSync(f)) { sortie.push('fichier absent : ' + nom); continue; }
+  const connu = new Set(CONNU[nom] || []);
+  for (const s of litteraux(fs.readFileSync(f, 'utf8'))) if (estAnglais(s) && !connu.has(s)) sortie.push(nom + ' : ' + s);
+}
+console.log(sortie.length ? sortie.join('\n') : 'aucune');
+JS
+cat > "$AUX/spec-e23.json" <<'JSON'
+{"sessionAgeS":5,"agents":[
+ {"id":"mgr1","spawnDepth":1,"ageS":5,"role":"vf-dev-manager"},
+ {"id":"w1","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"vf-coder"},
+ {"id":"fin2h","spawnDepth":2,"parent":"mgr1","ageS":7200,"finished":true}]}
+JSON
+NOW="$(node -e 'console.log(Date.now())')"
+H23="$(mkhome e23 "$AUX/spec-e23.json" "$LABS")"
+rm -f "$OUT/.cache/server.json"
+HOME="$H23" node "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve23.out" 2>&1 &
+SRV23=$!; PIDS+=("$SRV23")
+for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
+PORT23="$(G "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
+S23="$(node "$AUX/fetchp.mjs" "$PORT23" /equipe.html "$WORK/equipe.html")"
+P23="$(node "$AUX/fetchp.mjs" "$PORT23" /project.html "$WORK/project23.html")"
+assert_eq "E23.0 — contrôle positif : serveur démarré et /project.html servi (200)" "$([ "$PORT23" -gt 0 ] && echo serveur)|$P23" "serveur|200"
+assert_eq "E23.1 — GET /equipe.html -> 200" "$S23" "200"
+assert_has "E23.2 — le titre de la page contient « VibeFlow · Équipe »" "$(grep -o '<title>[^<]*</title>' "$WORK/equipe.html" 2>/dev/null || echo 'aucun titre')" "VibeFlow · Équipe"
+node "$AUX/graphe.mjs" "$SCRIPTS" "$WORK/equipe.html" > "$WORK/graphe-e23.json"
+assert_eq "E23.3 — le graphe embarqué porte le schéma vibeflow/cockpit-equipe@1 et meta.vfTab = equipe" "$(G "$WORK/graphe-e23.json" 'j.erreur||(j.schema+"|"+(j.meta||{}).vfTab)')" "vibeflow/cockpit-equipe@1|equipe"
+assert_eq "E23.4 — cartes : session racine, manager sous la session, worker sous son manager, terminés sous un bloc du manager, st active/done, aucun fichier" "$(G "$WORK/graphe-e23.json" 'j.erreur||(()=>{const n=(id)=>(j.nodes||[]).find((x)=>x.id===id)||{};return [n("se-'$SID'").parent??"-",n("ag-mgr1").parent,n("ag-w1").parent,n("ag-mgr1~termines").parent,n("ag-fin2h").parent,n("ag-w1").st,n("ag-fin2h").st,(j.files||[]).length].join("|")})()')" "-|se-$SID|ag-mgr1|ag-mgr1|ag-mgr1~termines|active|done|0"
+assert_eq "E23.5 — le graphe est conforme au schéma vibeflow/cockpit-equipe@1 du contrat" "$(node "$AUX/validate2.mjs" "$IFACE" vibeflow/cockpit-equipe@1 "$WORK/graphe-e23.json")" "OK"
+assert_eq "E23.6 — 00-vibeflow.js reconnaît la valeur equipe de vfTab et porte le lien equipe.html intitulé « Équipe »" "$([ "$(grep -c "'equipe'" "$UI/00-vibeflow.js")" -ge 1 ] && echo vfTab)|$([ "$(grep -c 'equipe\.html' "$UI/00-vibeflow.js")" -ge 1 ] && echo lien)|$([ "$(grep -c 'Équipe' "$UI/00-vibeflow.js")" -ge 1 ] && echo intitule)" "vfTab|lien|intitule"
+assert_eq "E23.7 — sonde de libellés : aucune chaîne anglaise nouvelle dans le chrome de l'équipe (couche d'affichage, onglet, tiroir, onglets)" "$(node "$AUX/sonde-fr.mjs" "$SCRIPTS" "$UI/71-vf-equipe-rendu.js" "$UI/72-vf-equipe.js" "$UI/70-vf-live.js" "$UI/00-vibeflow.js")" "aucune"
+mkdir -p "$AUX/sonde"; cp "$UI/70-vf-live.js" "$AUX/sonde/70-vf-live.js"
+assert_eq "E23.8a — contrôle positif de la sonde : le tiroir tel quel n'a rien de nouveau" "$(node "$AUX/sonde-fr.mjs" "$SCRIPTS" "$AUX/sonde/70-vf-live.js")" "aucune"
+printf "\nconst libelleTemoin = 'Show the transcript now';\n" >> "$AUX/sonde/70-vf-live.js"
+assert_has "E23.8 — témoin : la sonde voit la chaîne anglaise Show the transcript now ajoutée à une copie de 70-vf-live.js" "$(node "$AUX/sonde-fr.mjs" "$SCRIPTS" "$AUX/sonde/70-vf-live.js")" "Show the transcript now"
+assert_eq "E23.9 — la page n'est jamais écrite sur disque (equipe.html absent), contrôle positif : project.html existe" "equipe:$([ -e "$OUT/equipe.html" ] && echo present || echo absent)|project:$([ -e "$OUT/project.html" ] && echo present || echo absent)" "equipe:absent|project:present"
+vf_hyg_stop "$SRV23"
+
+echo "=== EUI — rendu de l'arbre hors navigateur : imbrication, terminés repliés, liens, pied (P69-D-14, D-15, D-16, D-18) ==="
+cat > "$AUX/vm-rendu.mjs" <<'JS'
+// vm-rendu.mjs <couche.js> <pilote.js> [<données.json>] : exécute la couche d'affichage hors navigateur (vm), fenêtre et document factices (C9).
+// Les éléments créés enregistrent leur balise ; tout texte posé (textContent, createTextNode) est conservé ; toute affectation innerHTML est comptée.
+// Sortie : une ligne JSON { tags, textes, innerHTML, retour } (retour = la variable __r posée par le pilote), ou { erreur } ; « fichier absent » si la couche n'existe pas.
+import fs from 'node:fs';
+import vm from 'node:vm';
+const [, , couche, pilote, donnees] = process.argv;
+if (!fs.existsSync(couche)) { console.log(JSON.stringify({ erreur: 'fichier absent' })); process.exit(0); }
+const journal = { tags: [], textes: [], innerHTML: 0 };
+const texte = (s) => { journal.textes.push(String(s)); };
+function elt(tag, compter = true) {
+  const o = { tag, children: [], attrs: {}, className: '', style: {}, dataset: {}, hidden: false, _t: '' };
+  if (compter) journal.tags.push(tag);
+  for (const k of ['textContent', 'innerText']) Object.defineProperty(o, k, { get: () => o._t, set: (v) => { o._t = String(v); texte(v); } });
+  for (const k of ['innerHTML', 'outerHTML']) Object.defineProperty(o, k, { get: () => '', set: () => { journal.innerHTML++; } });
+  o.insertAdjacentHTML = () => { journal.innerHTML++; };
+  o.appendChild = (c) => { o.children.push(c); return c; };
+  o.append = (...cs) => { for (const c of cs) { if (typeof c === 'string') texte(c); o.children.push(c); } };
+  o.setAttribute = (k, v) => { o.attrs[k] = String(v); };
+  o.getAttribute = (k) => (k in o.attrs ? o.attrs[k] : null);
+  o.classList = { add() {}, remove() {}, toggle() {}, contains: () => false };
+  o.addEventListener = () => {};
+  o.replaceChildren = (...cs) => { o.children = cs; };
+  return o;
+}
+const document = { createElement: (t) => elt(String(t).toLowerCase()), createDocumentFragment: () => elt('#fragment', false), createTextNode: (s) => { texte(s); return { nodeValue: String(s), textContent: String(s) }; } };
+const h = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+const ctx = vm.createContext({ window: {}, document, h, DONNEES: donnees ? JSON.parse(fs.readFileSync(donnees, 'utf8')) : null, console });
+try {
+  vm.runInContext(fs.readFileSync(couche, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(pilote, 'utf8'), ctx, { timeout: 5000 });
+  console.log(JSON.stringify({ tags: journal.tags, textes: journal.textes, innerHTML: journal.innerHTML, retour: ctx.__r === undefined ? null : ctx.__r }));
+} catch (e) { console.log(JSON.stringify({ erreur: 'exécution : ' + String(e.message).slice(0, 120) })); }
+JS
+cat > "$AUX/nid.mjs" <<'JS'
+// nid.mjs <html.txt> <id>... : pour chaque id, l'identifiant du plus proche ancêtre porteur de data-vf-agent (« - » s'il n'en a pas, « absent » s'il n'est pas dans la sortie), séparés par des virgules.
+// nid.mjs <html.txt> --termine <id> : « ferme|resume » si l'élément est dans un <details class="vf-termines"> SANS attribut open dont le résumé contient « Terminés depuis moins de 24 h ».
+import fs from 'node:fs';
+const [, , f, ...args] = process.argv;
+const html = fs.readFileSync(f, 'utf8');
+const VOID = new Set(['br', 'hr', 'img', 'input', 'meta', 'link', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr']);
+const re = /<(\/?)([A-Za-z][\w-]*)((?:"[^"]*"|'[^']*'|[^'">])*)>/g;
+const pile = []; const vus = new Map(); let m;
+while ((m = re.exec(html))) {
+  const [tout, ferme, tag, attrs] = m; const t = tag.toLowerCase();
+  if (ferme) { for (let i = pile.length - 1; i >= 0; i--) if (pile[i].tag === t) { pile.length = i; break; } continue; }
+  const agent = /\bdata-vf-agent="([^"]*)"/.exec(attrs)?.[1];
+  if (agent !== undefined) { const anc = [...pile].reverse().find((p) => p.agent !== undefined); vus.set(agent, { anc: anc ? anc.agent : '-', pile: pile.map((p) => ({ ...p })) }); }
+  if (!VOID.has(t) && !/\/\s*$/.test(attrs)) pile.push({ tag: t, agent, brut: tout, fin: re.lastIndex });
+}
+if (!vus.size) { console.log('aucun élément data-vf-agent : ' + html.slice(0, 60)); process.exit(0); }
+if (args[0] === '--termine') {
+  const v = vus.get(args[1]); if (!v) { console.log('absent'); process.exit(0); }
+  const d = [...v.pile].reverse().find((p) => p.tag === 'details' && /class="[^"]*\bvf-termines\b/.test(p.brut));
+  if (!d) { console.log('pas dans un details.vf-termines'); process.exit(0); }
+  if (/\sopen(\s|=|>|\/)/.test(d.brut)) { console.log('details ouvert'); process.exit(0); }
+  const s = /<summary[^>]*>([\s\S]*?)<\/summary>/.exec(html.slice(d.fin))?.[1] || '';
+  console.log(s.includes('Terminés depuis moins de 24 h') ? 'ferme|resume' : 'ferme|resume absent : ' + s.slice(0, 60));
+} else console.log(args.map((id) => (vus.has(id) ? vus.get(id).anc : 'absent')).join(','));
+JS
+cat > "$AUX/workers-eui.json" <<JSON
+{"workers":[
+ {"kind":"session","id":"$SID","tree":".","source":"transcript","etat":"actif","task":"salut"},
+ {"kind":"subagent","id":"mgr1","tree":".","source":"transcript","etat":"actif","role":"vf-dev-manager","task":"tâche synthétique mgr1","parent":"$SID","depth":1},
+ {"kind":"subagent","id":"w1","tree":".","source":"transcript","etat":"actif","role":"vf-coder","task":"tâche synthétique w1","parent":"mgr1","depth":2,"rattachement":{"etat":"rattache","source":"registre","dag":".planning/missions/m1.dag.json","noeud":"revue-p3"}},
+ {"kind":"subagent","id":"a-bash","tree":".","source":"transcript","etat":"actif","role":"vf-coder","task":"tâche synthétique a-bash","parent":"mgr1","depth":2,"action":{"verbe":"lance une commande","cible":""}},
+ {"kind":"subagent","id":"fin2h","tree":".","source":"transcript","etat":"termine","role":"vf-coder","task":"tâche synthétique fin2h","parent":"mgr1","depth":2,"finAt":"2026-11-03T08:00:00.000Z","dureeS":300}]}
+JSON
+echo '__r = window.__vfEquipeRendu.arbre(DONNEES.workers, h);' > "$AUX/pilote-arbre.js"
+cat > "$AUX/pilote-noeud.js" <<'JS'
+__r = { a: window.__vfEquipeRendu.agentsDuNoeud(DONNEES.workers, 'f:.planning/missions/m1.dag.json#revue-p3', h), b: window.__vfEquipeRendu.agentsDuNoeud(DONNEES.workers, 'f:autre#x', h) };
+JS
+echo "__r = window.__vfEquipeRendu.pied(DONNEES.workers.find((w) => w.id === 'a-bash'));" > "$AUX/pilote-pied.js"
+RENDU="$UI/71-vf-equipe-rendu.js"
+node "$AUX/vm-rendu.mjs" "$RENDU" "$AUX/pilote-arbre.js" "$AUX/workers-eui.json" > "$WORK/vm-arbre.json"
+node "$AUX/vm-rendu.mjs" "$RENDU" "$AUX/pilote-noeud.js" "$AUX/workers-eui.json" > "$WORK/vm-noeud.json"
+node "$AUX/vm-rendu.mjs" "$RENDU" "$AUX/pilote-pied.js" "$AUX/workers-eui.json" > "$WORK/vm-pied.json"
+G "$WORK/vm-arbre.json" 'j.erreur||j.retour' > "$WORK/arbre.html"
+assert_eq "EUI.1 — arbre : w1 est imbriqué sous mgr1 et mgr1 sous la session" "$(node "$AUX/nid.mjs" "$WORK/arbre.html" w1 mgr1)" "mgr1,$SID"
+assert_eq "EUI.2 — le tiroir (70-vf-live.js) appelle __vfEquipeRendu.arbre" "$([ "$(grep -c '__vfEquipeRendu\.arbre' "$UI/70-vf-live.js")" -ge 1 ] && echo appelle || echo non)" "appelle"
+assert_eq "EUI.3 — fin2h est dans un details.vf-termines fermé dont le résumé dit « Terminés depuis moins de 24 h »" "$(node "$AUX/nid.mjs" "$WORK/arbre.html" --termine fin2h)" "ferme|resume"
+assert_has "EUI.4 — un agent rattaché porte le lien vers son nœud de mission" "$(cat "$WORK/arbre.html")" 'href="project.html#r=f%3A.planning%2Fmissions%2Fm1.dag.json%23revue-p3"'
+assert_eq "EUI.5 — agentsDuNoeud : le lien vers la carte de w1 pour le nœud rattaché, une chaîne vide pour un nœud sans agent" "$(G "$WORK/vm-noeud.json" 'j.erreur||(String(j.retour.a).includes("equipe.html#r=n%3Aag-w1")+"|"+JSON.stringify(j.retour.b))')" 'true|""'
+assert_eq "EUI.6 — pied(a-bash) dit « actif » et « lance une commande »" "$(G "$WORK/vm-pied.json" 'j.erreur||(String(j.retour).includes("actif")+"|"+String(j.retour).includes("lance une commande"))')" "true|true"
+assert_eq "EUI.7 — chaque session et sous-agent de l'arbre (5) porte un bouton data-vf-doing" "$(grep -o 'data-vf-doing=' "$WORK/arbre.html" | wc -l | tr -d ' ')" "5"
 
 vf_hyg_assert
 
