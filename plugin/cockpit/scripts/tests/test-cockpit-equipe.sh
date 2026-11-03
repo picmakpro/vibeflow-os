@@ -541,7 +541,7 @@ const dernier = (f, g) => { const L = fs.readFileSync(f, 'utf8').trim().split('\
 dernier(path.join(sub, 'agent-a-cwd.jsonl'), (o) => { o.cwd = { a: 'CWD-OBJET-69' }; });
 dernier(path.join(dir, sid + '.jsonl'), (o) => { o.timestamp = 'T' + '9'.repeat(9000); });
 const piege = '<img src=x onerror=alert(1)>';
-fs.copyFileSync(path.join(sub, 'agent-ok1.meta.json'), path.join(sub, `agent-${piege}.meta.json`)); fs.copyFileSync(path.join(sub, 'agent-ok1.jsonl'), path.join(sub, `agent-${piege}.jsonl`));
+fs.copyFileSync(path.join(sub, 'agent-ok1.meta.json'), path.join(sub, `agent-${piege}.meta.json`)); fs.writeFileSync(path.join(sub, `agent-${piege}.jsonl`), fs.readFileSync(path.join(sub, 'agent-ok1.jsonl'), 'utf8').split('"agentId":"ok1"').join('"agentId":' + JSON.stringify(piege))); // la première ligne porte l'identifiant piégé : seul ID_RE l'exclut
 const d2 = path.join(home, '.claude', 'projects', '-lab2'); fs.mkdirSync(d2, { recursive: true });
 const ligne = JSON.parse(fs.readFileSync(path.join(dir, sid + '.jsonl'), 'utf8').trim().split('\n')[0]); ligne.cwd = 42; ligne.sessionId = 'sess-cwd-num';
 fs.writeFileSync(path.join(d2, 'sess-cwd-num.jsonl'), JSON.stringify(ligne) + '\n');
