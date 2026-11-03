@@ -73,7 +73,7 @@
       for (let k = 1; k < bs.length - 1 && fil.scrollWidth > fil.clientWidth + 1; k++) {
         const sep = bs[k].previousElementSibling;
         if (k === 1) fil.insertBefore(ell, bs[1]); else if (sep) sep.setAttribute('data-vf-masque', '');
-        bs[k].setAttribute('data-vf-masque', ''); noms.push(bs[k].textContent.trim()); ell.title = noms.join(' / ');
+        bs[k].setAttribute('data-vf-masque', ''); noms.push(bs[k].textContent.trim()); ell.title = noms.join(' / '); ell.setAttribute('aria-label', ell.title);
       }
     }
     if (obs) { obs.takeRecords(); obs.observe(fil, { childList: true, characterData: true, subtree: true }); }

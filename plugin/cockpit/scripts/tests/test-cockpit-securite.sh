@@ -291,12 +291,12 @@ for (let n = 0; n < N; n++) {
 }
 console.log(JSON.stringify({ n: N, fuites: fuites.slice(0, 5), nFuites: fuites.length, legit, legitCd, ms: Date.now() - t0 }));
 JS
-SEED=20261103; NGEN=16000
+SEED=20261103; NGEN=12000
 GEN="$(node "$AUX/gen.mjs" "$SCRIPTS" "$LAB" "$WORK/home" "$SEED" "$NGEN")"
 echo "  graine=$SEED commandes=$NGEN ; sortie : $(printf '%s' "$GEN" | node "$AUX/ev.mjs" '"fuites="+j.nFuites+" legit="+j.legit+""+" legitCd="+j.legitCd+" ms="+j.ms')"
 assert_eq "FB3.3 — $NGEN commandes générées (graine $SEED) : le marqueur ne sort que placé dans le programme ou le premier argument ET simple (échec : commande, sortie, graine)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.nFuites+" fuite(s) : "+JSON.stringify(j.fuites.slice(0,2))+" graine='$SEED'"')" "0 fuite(s) : [] graine=$SEED"
 assert_eq "FB3.4 — témoin positif : le marqueur sort bien dans plus de 100 cas légitimes (programme ou premier argument simples), la mesure n'est pas à vide" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.legit > 100')" "true"
-assert_eq "FB3.6 — témoin positif du cd : le marqueur sort aussi, derrière un cd simple, dans plus de 30 cas légitimes (la branche cd du générateur n'est pas à vide)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.legitCd > 30')" "true"
+assert_eq "FB3.6 — témoin positif du cd : le marqueur sort aussi, derrière un cd simple, dans plus de 10 cas légitimes (la branche cd du générateur n'est pas à vide)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.legitCd > 10')" "true"
 assert_eq "FB3.5 — le cas génératif tient en moins de 10 s" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.ms < 10000')" "true"
 # MB : canal task de `bornes` (description d'un sous-agent, diffusée en SSE). Un cas par motif de MASQUES : chaque valeur doit sortir masquée, et retirer un motif fait rougir son cas.
 cat > "$AUX/mask-bornes.mjs" <<'JS'

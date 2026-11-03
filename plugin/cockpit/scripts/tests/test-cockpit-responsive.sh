@@ -136,14 +136,15 @@ cat > "$AUX/o2b.js" <<'JS'
   if (location.pathname.endsWith('index.html') && !document.getElementById('btn-recent')) { SC.addHeaderButton({ id: 'btn-recent', label: 'Recent work', icon: 'recent', title: 'What was just worked on, on one board', onClick() {} }); SC.addHeaderButton({ id: 'screens-btn', label: 'Screens', icon: 'ui', title: 'Pick a screen of the app', onClick() {} }); }
   for (let i = 0; i < 100 && !/travail/.test((document.getElementById('vf-lock') || {}).textContent || ''); i++) await pause(50);
   const fil = document.getElementById('crumbs'), proto = fil.querySelector('button'), sep0 = fil.querySelector('.sep') || Object.assign(document.createElement('span'), { className: 'sep', textContent: '/' });
-  const jeux = { s3: ["Vue d'ensemble", 'dev-orchestrator', 'design-orchestrator'], s6: ["Vue d'ensemble", 'conductor-references', 'db', 'planning-core-lib', 'src', 'dev-orchestrator-refs'] }, out = { W: innerWidth };
+  const jeux = { s3: ["Vue d'ensemble", 'dev-orchestrator', 'design-orchestrator'], s6: ["Vue d'ensemble", 'conductor-references', 'db', 'planning-core-lib', 'src', 'dev-orchestrator-refs'], s8: ["Vue d'ensemble", 'conductor-references', 'planning-core-lib', 'dev-orchestrator-refs', 'design-orchestrator', 'cockpit-moteur-assets', 'skills-references', 'last-segment-name-long'] }, out = { W: innerWidth };
   for (const [cle, segs] of Object.entries(jeux)) {
     fil.innerHTML = ''; segs.forEach((t, i) => { if (i) fil.appendChild(sep0.cloneNode(true)); const b = proto.cloneNode(false); b.textContent = t; b.className = i === segs.length - 1 ? 'cur' : ''; b.removeAttribute('data-vf-court'); b.removeAttribute('data-vf-masque'); fil.appendChild(b); });
     await pause(500);
     const hd = document.querySelector('header'), R = (e) => e.getBoundingClientRect(), vis = (e) => R(e).width > 0;
     const bs = [...fil.querySelectorAll('button')].filter(vis), n = bs.length, hl = R(document.querySelector('header .hl')), sb = R(document.getElementById('search-btn')), cr = R(fil);
     const pn = document.getElementById('proj-name');
-    out[cle] = { pn: [pn.scrollWidth, pn.clientWidth], lock: !!document.getElementById('vf-lock'), nbVisibles: n, nbMasques: fil.querySelectorAll('button[data-vf-masque]').length, ell: !!fil.querySelector('.vf-ell'), hdrSW: hd.scrollWidth,
+    const ellE = fil.querySelector('.vf-ell'), masques = [...fil.querySelectorAll('button[data-vf-masque]')].map((e) => e.textContent.trim());
+    out[cle] = { repli: { ell: !!ellE, title: ellE ? ellE.getAttribute('title') : null, aria: ellE ? ellE.getAttribute('aria-label') : null, masquesNoms: masques.join(' / '), premier: n ? bs[0].textContent : null, dernier: n ? bs[n - 1].textContent : null, dernierR: n ? Math.round(R(bs[n - 1]).right * 10) / 10 : null, filR: Math.round(cr.right * 10) / 10, attPremier: segs[0], attDernier: segs[segs.length - 1] }, pn: [pn.scrollWidth, pn.clientWidth], lock: !!document.getElementById('vf-lock'), nbVisibles: n, nbMasques: fil.querySelectorAll('button[data-vf-masque]').length, ell: !!fil.querySelector('.vf-ell'), hdrSW: hd.scrollWidth,
       dehors: [...hd.querySelectorAll('button, a, input')].filter((e) => vis(e) && (R(e).right > innerWidth + 0.5 || R(e).left < -0.5)).map((e) => e.id || e.textContent.trim().slice(0, 12)),
       courts: bs.filter((e) => e.textContent.trim().length < 12 && e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent + ' ' + e.scrollWidth + '>' + e.clientWidth),
       fil: { dansHl: cr.right <= hl.right + 0.5, surRecherche: cr.right > sb.left + 0.5, crR: Math.round(cr.right), hlR: Math.round(hl.right), sbL: Math.round(sb.left) },
@@ -165,6 +166,13 @@ j.resultats.forEach((r, i) => { const x = r.valeur?.[jeu], w = r.valeur?.W, et =
   if (nat === 'fil' && (!x.fil.dansHl || x.fil.surRecherche)) v.push(et + ' : fil hors de sa colonne (fil.right ' + x.fil.crR + ', .hl.right ' + x.fil.hlR + ', recherche.left ' + x.fil.sbL + ')');
   if (nat === 'ordre') { const bout = x.deficit.filter((d) => d.bout && d.d > 1), mil = x.deficit.filter((d) => d.milieu && d.cw > 65); if (bout.length && mil.length) v.push(et + ' : un bout est tronqué (' + bout.map((d) => d.t + ' -' + d.d).join(', ') + ') alors qu\'un segment du milieu garde plus de 64 px (' + mil.map((d) => d.t + ' ' + d.cw).join(', ') + ')'); }
   if (nat === 'plainte') { const t = x.deficit.filter((d) => d.d > 1).map((d) => d.t + ' -' + d.d); if (x.pn[0] > x.pn[1]) t.push('nom du projet ' + x.pn[0] + '>' + x.pn[1]); if (t.length) v.push(et + ' : ' + t.join(', ')); }
+  if (nat === 'repli') { const r = x.repli, p = [];
+    if (!r.ell) p.push('repli « … » absent'); if (!(x.nbMasques > 0)) p.push('aucun segment masqué (' + x.nbMasques + ')');
+    if (!(r.dernierR <= r.filR + 0.5) || r.dernier !== r.attDernier) p.push('dernier segment « ' + r.dernier + ' » hors de la colonne du fil (right ' + r.dernierR + ' > fil.right ' + r.filR + ')');
+    if (r.premier !== r.attPremier) p.push('premier segment non visible (' + r.premier + ')');
+    if (!r.masquesNoms || r.title !== r.masquesNoms) p.push('title du « … » [' + r.title + '] != noms masqués [' + r.masquesNoms + ']');
+    if (!r.aria || r.aria !== r.title) p.push('aria-label du « … » [' + r.aria + '] != title [' + r.title + ']');
+    if (p.length) v.push(et + ' : ' + p.join(' ; ')); }
   if (nat === 'sollicite' && !(x.nbMasques > 0 || x.deficit.some((d) => d.d > 0))) v.push(et + ' : témoin, aucune troncature ni masquage sollicité');
 });
 console.log(v.length ? v.slice(0, 4).join(' | ') : 'aucune');
@@ -176,7 +184,7 @@ o2b_mesure() { # o2b_mesure <port> <largeur> -> JSON (onglet Code puis Projet)
 echo "=== O2b — budget du fil d'Ariane (revue de la recette 3, F1/F2) : fils de 3 et 6 segments longs, badge présent, 1 280 / 1 300 / 1 320 / 1 440 px, onglets Code et Projet ==="
 for spec in "court:$LC" "long:$LL"; do
   nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; PB=$SRV_PORT
-  for w in 1280 1300 1320 1440; do
+  for w in 1280 1300 1320 1366 1440; do
     XB="$(o2b_mesure "$PB" "$w")"; echo "$XB" > "$WORK/o2b-$nom-$w.json"
     for jeu in s3 s6; do
       E="Code $nom,Projet $nom"; fq="$jeu"
@@ -185,6 +193,9 @@ for spec in "court:$LC" "long:$LL"; do
       assert_eq "O2b.3 — $nom / $jeu / $w px : le fil reste dans sa colonne (ni hors de .hl, ni sur la recherche)" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" fil $jeu "$E")" "aucune"
       assert_eq "O2b.4 — $nom / $jeu / $w px : la troncature porte d'abord sur le milieu (le premier et le dernier ne sont rognés que lorsque les segments longs du milieu sont à leur plancher de 64 px)" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" ordre $jeu "$E")" "aucune"
     done
+    case "$w" in 1280|1300|1366) # O2b.7 (re-revue de la recette 3, M1/M2) : le repli « … » d'un fil de 8 segments longs : présent, segments du milieu masqués, dernier segment contenu dans la colonne du fil, premier visible, title = noms masqués, aria-label = title
+      assert_eq "O2b.7 — $nom / s8 / $w px : repli « … » présent (nombre de segments masqués > 0), dernier segment dans la colonne du fil (right <= fil.right), premier visible, title et aria-label du « … » = noms masqués" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" repli s8 "Code $nom,Projet $nom")" "aucune" ;;
+    esac
   done
   if [ "$nom" = court ]; then assert_eq "O2b.6 — plainte d'origine, lab court / 1 440 px, fil de 3 segments : « Vue d'ensemble », le nom du projet et les autres segments ne sont plus rognés" "$(printf '%s' "$(cat "$WORK/o2b-court-1440.json")" | node "$AUX/o2b-viol.mjs" plainte s3 "Code court,Projet court")" "aucune"; fi
   XB="$(cat "$WORK/o2b-$nom-1280.json")"
