@@ -876,7 +876,7 @@ vf_dl_legacy_refuse() { # <sortie de vf_dl_legacy_probe>
 # refus si vivant, options de cible du verrou bloquant ; ou rien. Phase demandee -> sonde le compartiment nu ;
 # compartiment demande -> sonde chaque phase (un verrou vivant l'emporte sur un perime pour le message).
 vf_dl_hier_probe() {
-  local cand r first="" ph="" fl d ph_found=""
+  local cand r first="" ph="" fl d
   [ "$PARTITIONED" = 1 ] || return 0
   case "$SCOPE" in
     phase)

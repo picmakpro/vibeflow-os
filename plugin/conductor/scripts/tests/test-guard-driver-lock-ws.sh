@@ -2074,7 +2074,7 @@ mutant f 'if not wt or top is None or same_checkout(wt, top):' 's@if not wt or t
 # g : session courante traitée comme autrui -> le détenteur est refusé comme un tiers
 mutant g '^    if sid and sid in session_ids:$' 's@in session_ids:$@in session_ids and False:@' "$MUT_G"
 # h : cartographie par compartiment retirée -> tout verrou d'autrui bloque tout chemin
-mutant h 'kind, seg = map_path(abs_path, lab)' 's@map_path(abs_path, lab)@("incertain", "")@' "$MUT_H"
+mutant h 'kind, seg, rest = map_path_rest(abs_path, lab)' 's@map_path_rest(abs_path, lab)@("incertain", "", [])@' "$MUT_H"
 # i : RELEASE_FORM_FILES vidée -> VERSION et docs/ADR.md ne sont plus des gestes de dépôt
 mutant i 'if pb in RELEASE_FORM_FILES:' 's@RELEASE_FORM_FILES:@():@' "$MUT_I"
 # j : source `-a` retirée -> `git commit -a` n'embarque plus les modifications non indexées
