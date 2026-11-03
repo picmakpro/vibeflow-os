@@ -3,6 +3,7 @@
 #   S1 jetons · S2 Host étranger · S3 fichiers cachés et traversée · S4 aucun CORS
 #   S5 le flux ne porte jamais la dernière commande (témoin positif : la session y figure) · S6 révélation authentifiée
 #   S7 aucun fichier généré ne la porte · S8 l'export non plus
+#   DO garde d'émission (clés interdites lues du contrat) · F4 contrat illisible : rien n'est émis (fermé par défaut, P69-D-23)
 # Lab neutre assemblé dans mktemp, HOME jetable portant une session fraîche, isolation git, clients node auto-bornés.
 # Exit 0 si tout passe, 1 sinon.
 
@@ -280,6 +281,19 @@ assert_eq "DO.3 — le journal ne retient que l'événement propre" "$(dgev 'j.j
 assert_eq "DO.4 — deux refus journalisés en erreur, nommant l'événement" "$(dgev 'j.logs.filter(l=>/^error événement (who|patch) refusé/.test(l)).length')" "2"
 assert_eq "DO.5 — un snapshot portant doing : le hello n'est pas émis, la réponse est close, l'erreur est journalisée" "$(dgev 'j.hello.ev.length+","+j.hello.fini+","+j.logs.filter(l=>/hello refusé/.test(l)).length')" "0,true,1"
 assert_eq "DO.6 — la valeur de doing ne figure nulle part dans la sortie du serveur (flux, journal, logs)" "$(dgev 'j.fuite')" "false"
+
+# F4 (69-07, P69-D-23) : la liste des clés interdites vient du contrat. Une copie de la sortie dont vf-cockpit-interface.json est retirée ne peut plus
+# la lire : le serveur de la copie doit tout refuser d'émettre (fermé par défaut). Témoin : le serveur d'origine a émis son hello (S4.2, S5.1).
+F4="$LAB/.vibeflow/mut-contrat"; rm -rf "$F4"; cp -R "$OUT" "$F4"; rm -rf "$F4/.cache"; rm -f "$F4/vf-cockpit-interface.json"
+node "$F4/serve.mjs" --no-open --port $(libre) > "$WORK/f4.out" 2>&1 &
+F4PID=$!
+for _ in $(seq 1 100); do [ -s "$F4/.cache/server.json" ] && break; sleep 0.1; done
+F4PORT=$(node "$AUX/json.mjs" "$F4/.cache/server.json" 'j.port' 2>/dev/null || echo 0)
+F4TOK=$(node "$AUX/token.mjs" "$F4PORT" /)
+: > "$WORK/f4.jsonl"; node "$AUX/sse.mjs" "$F4PORT" "$F4TOK" 2000 hello "$WORK/f4.jsonl"
+assert_eq "F4.0 — témoin : la copie est sans contrat, son serveur répond (jeton lu, flux ouvert en 200)" "contrat:$([ -e "$F4/vf-cockpit-interface.json" ] && echo present || echo absent)|jeton:$([ "${#F4TOK}" -ge 16 ] && echo oui || echo non)|flux:$(node "$AUX/ev.mjs" "$WORK/f4.jsonl" 'E[0].status')" "contrat:absent|jeton:oui|flux:200"
+assert_eq "F4 — contrat illisible : aucun événement hello n'est émis" "$(node "$AUX/ev.mjs" "$WORK/f4.jsonl" 'E.filter(e=>e.event).length')" "0"
+vf_hyg_stop "$F4PID"
 
 vf_hyg_assert
 echo ""
