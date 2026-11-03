@@ -673,7 +673,7 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 - **I6** : regrouper les autres boutons.
 - **I1** : la visite guidée « manque un chouïa de clarté ».
 
-**Déclencheur de reprise :** la phase qui suit la 67 sur le cockpit, après le merge de la PR #187.
+**Déclencheur de reprise :** Phase 70 « Finitions UI du cockpit » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
 
 ## Commande `/vf-recette` — recette humaine pas à pas — DIFFÉRÉ (2026-11-02)
 
@@ -696,4 +696,4 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 - Phrase mixte : « 1 fichier et points d'accès still use generated names. Run the skill again to describe them. »
 - Coquilles : « Les réponses viennent de le CLI Claude Code » (au lieu de « du CLI ») ; « 1 fichiers de code ».
 
-**Déclencheur de reprise :** la phase qui suit la 67 sur le cockpit (avec la refonte mobile).
+**Déclencheur de reprise :** Phase 70 « Finitions UI du cockpit » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).

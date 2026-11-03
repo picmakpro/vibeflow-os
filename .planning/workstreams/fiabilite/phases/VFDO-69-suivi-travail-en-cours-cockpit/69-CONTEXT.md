@@ -103,15 +103,17 @@ par le témoin (b) plus un test qui rougit si `curPhase` redevient une source de
 - Liste d'étapes déclarée en frontmatter (`etapes:`) et cochée à la main : vert déclaré, non lu.
 - B pourra revenir pièce par pièce si un besoin réel apparaît après la Phase 68.
 
-### Points ouverts (à trancher avant ou au plan)
+### Arbitrages ultérieurs de Samuel (AskUserQuestion session principale, 2026-11-03)
 
-- **Dépendance à la Phase 68** : posée « Depends on: 67 » seulement. La 68 consommera `avancement` ; l'ordre
-  d'exécution 68 / 69 n'est pas arbitré.
-- **Regroupement avec la refonte mobile** : la note dit « avec la refonte mobile ». Les entrées BACKLOG
-  « Cockpit en largeur mobile et clarté de la visite guidée » (2026-11-02) et « Cockpit : anglais résiduel
-  et coquilles du chrome » (2026-11-03) ont pour déclencheur « la phase qui suit la 67 ». Aucune exigence
-  n'est posée ici pour elles ; à confirmer par Samuel si elles entrent dans la 69 ou dans une phase à part.
-- **Ligne `phase` du DAG de la 67** : à poser par le manager de la mission 67 (ou en correctif ciblé).
+- **P69-D-10 (ordre 69 avant 68).** Réponse de Samuel, mot pour mot : « 69 avant 68 (Recommandé) ». La
+  Phase 68 dépend de la 69 : « Depends on » de la 68 mis à jour dans le ROADMAP ; la 68 consomme `avancement`.
+- **P69-D-11 (refonte mobile hors 69).** Réponse de Samuel : « Phase à part (Recommandé) ». La refonte mobile,
+  I1 et O5 relèvent de la Phase 70 « Finitions UI du cockpit » (inscrite 2026-11-03) ; les déclencheurs des
+  deux entrées BACKLOG du cockpit y renvoient. La 69 n'a aucune exigence sur ce sujet.
+
+### Point ouvert
+
+- **Ligne `phase` du DAG de la 67** : à poser côté mission 67 (Samuel la traite, même date).
 
 </decisions>
 

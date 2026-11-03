@@ -27,9 +27,9 @@
   dans la ROADMAP plate **sans `gsd-new-milestone`** (même forme que `gouvernance-labs-v1.0`) ;
   **exécution après la clôture de `fiabilite-v1.0`**, en parallèle du jalon de Willy
   (compartiment `gouvernance`) — arbitrage Samuel, AskUserQuestion session principale, 2026-09-25.
-- 📋 **vibeflow-v2.0** — « le cockpit VibeFlow » — Phases 67-69 — **inscrit 2026-11-01** — le cockpit en tête :
+- 📋 **vibeflow-v2.0** — « le cockpit VibeFlow » — Phases 67-70 — **inscrit 2026-11-01** — le cockpit en tête :
   un cockpit floorplan (onglets Projet et Code) sur un socle partagé, puis `vf-signal` embarqué sur ce même socle, puis
-  le suivi du travail en cours dans le cockpit (Phase 69, inscrite 2026-11-03).
+  le suivi du travail en cours dans le cockpit (Phase 69, inscrite 2026-11-03), puis les finitions UI du cockpit (Phase 70, inscrite 2026-11-03).
   `equipe-produit-v1.0` reste ouvert, son sort se tranche à sa clôture (arbitrage Samuel, AskUserQuestion session
   principale, 2026-11-01). Sources : `.planning/notes/2026-11-01-cockpit-facettes.md`,
   `docs/research/2026-11-01-etude-floorplan-cockpit.md`, `.planning/spikes/WRAP-UP-SUMMARY.md`. Même forme que ECC : section
@@ -124,6 +124,7 @@
 - [x] Phase 67: Cockpit floorplan sur socle partagé (inscrite 2026-11-01, jalon vibeflow-v2.0) — complete 2026-11-03 : 7/7 plans et 4 tours de correction (FIX-A à FIX-D), recette humaine validée par Samuel (`67-RECETTE-HUMAINE.md` § 8.2), CKPT-01..12 cochées ; release `v2.75.0` préparée (tag et release GitHub après le merge de la PR #187, geste de Samuel)
 - [ ] Phase 68: Embarquer vf-signal sur le socle partagé (inscrite 2026-11-01, jalon vibeflow-v2.0)
 - [ ] Phase 69: Suivi du travail en cours dans le cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
+- [ ] Phase 70: Finitions UI du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
 
@@ -792,7 +793,7 @@ Plans:
 
 - [ ] TBD (run /gsd-plan-phase 66 to break down)
 
-## 📋 Milestone vibeflow-v2.0 — « le cockpit VibeFlow » (Phases 67-69)
+## 📋 Milestone vibeflow-v2.0 — « le cockpit VibeFlow » (Phases 67-70)
 
 **Milestone Goal :** un saut d'usage visible pour qui installe VibeFlow : un cockpit qui montre le projet, le code
 et qui est au travail, dans tout lab GSD, sur un socle partagé avec le panneau compact `vf-signal`. Le cockpit
@@ -802,7 +803,7 @@ floorplan remplace le module `vf-cockpit` (page Mermaid, branche `feat/vf-cockpi
 
 **Inscription :** 2026-11-01, arbitrage Samuel, AskUserQuestion session principale, 2026-11-01 (cockpit en tête du
 jalon ; `equipe-produit-v1.0`, phases 63-66, reste ouvert ; la réponse initiale « go » a été reclarifiée par une seconde
-question). Même forme qu'ECC : section distincte de la ROADMAP plate, **sans `gsd-new-milestone`**. Numéros 67-69 posés à la
+question). Même forme qu'ECC : section distincte de la ROADMAP plate, **sans `gsd-new-milestone`**. Numéros 67-70 posés à la
 main (le moteur propose un mauvais numéro sur ce dépôt ; 36 reste réservé, dossier orphelin ; 42-50 : compartiment `gouvernance`).
 La graine `SEED-004` (retrait de `vf-cockpit`) reste dormante : elle se déclenche à la livraison de la Phase 67.
 
@@ -854,7 +855,7 @@ Plans:
 
 **Goal:** Le mod `vf-signal` (aujourd'hui dans `~/.claude/mods/vf-signal`) est embarqué dans le plugin `vibeflow`, branché sur le socle partagé de la Phase 67, avec un bouton « Ouvrir le cockpit » ; il est livré dans une release.
 **Requirements**: TBD — famille réservée, posée au cadrage.
-**Depends on:** Phase 67.
+**Depends on:** Phase 69 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « 69 avant 68 ») ; Phase 67 en amont.
 **Sources:** `.planning/notes/2026-10-29-HANDOFF-jalon-v2.md` § 3 (points à trancher : gating par module, emplacement, API des mods « early access », chemins de `driver-lock.sh`, mobile, ADR-035/031, SOBR-04) ; mémoire `vf-signal-a-embarquer-dans-vibeflow`.
 **Plans:** 0 plans
 
@@ -864,11 +865,11 @@ Plans:
 
 ### Phase 69: Suivi du travail en cours dans le cockpit
 
-> Cadrée le 2026-11-03 (`69-CONTEXT.md`, P69-D-01..09) ; non planifiée.
+> Cadrée le 2026-11-03 (`69-CONTEXT.md`, P69-D-01..11) ; non planifiée.
 
 **Goal:** La carte Projet du cockpit dit où en est vraiment une phase : un état dérivé de traces locales (`a-faire`, `en-cours`, `a-recetter`, `fait`), un décompte des plans qui ne mêle plus les correctifs de mission, les missions rattachées à leur phase, un jalon qui n'affiche plus « 0 % à faire » quand ses plans sont exécutés ; la règle STATE → statut, seule source fausse, est retirée.
 **Requirements**: CKPT-13..CKPT-18
-**Depends on:** Phase 67 (le module `plugin/cockpit` et sa lib de lecture `readPlanning` existent). Phase 68 non requise : elle consommera l'objet `avancement` (point ouvert, voir `69-CONTEXT.md`).
+**Depends on:** Phase 67 (le module `plugin/cockpit` et sa lib de lecture `readPlanning` existent). La Phase 68 en dépend et consommera l'objet `avancement` (P69-D-10).
 **Success criteria** (observables, à confirmer au cadrage) :
 1. Sur le lab de la 67 (7 plans faits, 4 correctifs, STATE sur une autre phase), la carte affiche « 7/7 plans · 4 correctifs » et l'état « à recetter », jamais « 11/7 » ni « à faire ».
 2. Le DAG de mission de la 67 est rattaché à la 67 (champ `phase`, puis nom `MISSION-<n>`, puis dossier de phase), plus listé dans « Missions hors phase ».
@@ -882,3 +883,17 @@ Plans:
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 69 to break down)
+
+### Phase 70: Finitions UI du cockpit
+
+> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Phase à part »).
+
+**Goal:** Le cockpit tient en largeur mobile avec une information hiérarchisée, sa visite guidée est plus claire, et le chrome ne montre plus d'anglais résiduel ni de coquilles.
+**Requirements**: TBD — posées au cadrage.
+**Depends on:** Phase 67.
+**Sources:** `BACKLOG.md` § « Cockpit en largeur mobile et clarté de la visite guidée » (D4, I4, I5, I6, I1) et § « Cockpit : anglais résiduel et coquilles du chrome » (O5) ; `67-RECETTE-HUMAINE.md`.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 70 to break down)
