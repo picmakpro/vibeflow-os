@@ -2,7 +2,7 @@
 // serve.mjs (patch vibeflow P25) l'importe seulement sous `--terminal` : AUCUN effet de bord à l'import.
 // Export : preparerTerminal({ here, root, jetons, plateforme }) -> { actif, indisponible, injection(), frameSrc(), occupe(), routeP(req, res), demarrer(portP) }.
 // Q est un second écouteur HTTP du MÊME processus, sur 127.0.0.1 seulement, d'un port éphémère : une origine distincte de la page hôte P.
-// Chaque requête passe par controle() avant tout routage : Host exact, Origin exacte de Q, secret de session en temps constant. Aucun
+// Chaque requête passe par controle() avant tout routage : Host exact, Origin exacte de Q (GET /flux et /etat sans Origin : same-origin + secret, P71-D-24), secret de session en temps constant. Aucun
 // WebSocket, aucun `upgrade`, aucun cookie, aucun en-tête CORS, aucun secret dans une adresse. L'assistant PTY se lit dans l'arbre du moteur
 // (VF_COCKPIT_ENGINE_DIR, posé par le lanceur), jamais dans la sortie du lab. Les messages nomment des états, jamais des données.
 // Routes de Q : GET / · POST /amorce · GET /flux · POST /entree · POST /taille · GET /etat. Côté P : GET /api/vf/terminal -> { etat, port? }.
@@ -56,8 +56,12 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
     const page = req.method === 'GET' && url.pathname === '/';
     const hotes = [`127.0.0.1:${portQ}`, ...(page ? [`localhost:${portQ}`] : [])]; // localhost : la page seule, jamais une route d'action
     if (!hotes.includes(String(req.headers.host || '').toLowerCase())) return { statut: 403, raison: 'Host' };
+    // P71-D-24 : un fetch GET de même origine n'envoie jamais Origin (Fetch) ; GET /flux et GET /etat, SEULS, l'admettent sans Origin si
+    // Sec-Fetch-Site vaut same-origin ET le secret en en-tête est valide. Les POST gardent Origin obligatoire ; une Origin présente est toujours celle de Q.
+    const navigateur = req.method === 'GET' && (url.pathname === '/flux' || url.pathname === '/etat')
+      && req.headers['sec-fetch-site'] === 'same-origin' && egal(req.headers['x-vf-terminal'], secret);
     const o = req.headers.origin;
-    if (o === undefined) { if (!page) return { statut: 403, raison: 'Origin absente' }; } else if (o !== origineQ()) return { statut: 403, raison: 'Origin' };
+    if (o === undefined) { if (!page && !navigateur) return { statut: 403, raison: 'Origin absente' }; } else if (o !== origineQ()) return { statut: 403, raison: 'Origin' };
     return null;
   }
   // toute réponse, refus compris : jamais d'en-tête CORS, de cookie ni de X-Frame-Options ; la page de Q remplace la CSP de base par la sienne

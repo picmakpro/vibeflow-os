@@ -143,7 +143,7 @@ temoin_compteur T3
 srvq; echanger; echo 0 > "$WORK/t3.cnt"
 rqf() { local n; n=$(( $(cat "$WORK/t3.cnt") + 1 )); echo "$n" > "$WORK/t3.cnt"; rq "$@" > "$WORK/t3/$n.out"; sed -n 1p "$WORK/t3/$n.out"; } # compteur dans un fichier : rqf s'appelle en sous-shell
 cnt() { cat "$WORK/t3.cnt"; }
-FAUX="$(printf '%s' "$SECRET" | sed 's/^./Z/;s/^Z/0/')"; [ "$FAUX" = "$SECRET" ] && FAUX="1${SECRET:1}"
+FAUX="$(printf '%s' "$SECRET" | sed 's/^./Z/;s/^Z/0/')"; [ "$FAUX" = "$SECRET" ] && FAUX="1${SECRET:1}"; FAUX6="$FAUX"
 assert_eq "T3.0 — témoin : GET /etat avec le bon secret rend 200" "$(rqf "$QP" GET /etat --secret "$SECRET")" "200"; F200=$(cnt)
 assert_eq "T3.1 — POST /entree sans secret rend 401" "$(rqf "$QP" POST /entree --onglet o1 --corps x)" "401"; F401=$(cnt)
 assert_eq "T3.1b — GET /flux sans secret rend 401" "$(rqf "$QP" GET /flux --onglet o1 --echeance 1500)" "401"
@@ -306,6 +306,37 @@ assert_eq "TD.2b — POST /entree?s=<secret> sans en-tête rend 401" "$(sta "$QP
 assert_eq "TD.pty — TD.1 et TD.2 n'ont lancé aucun assistant (0)" "$(pty_compte)" "0"
 unsrv
 
+echo "=== T6 — fetch GET de même origine d'un navigateur : pas d'Origin, Sec-Fetch-Site same-origin (P71-D-24) ==="
+cat > "$AUX/nav.mjs" <<'JS'
+// nav.mjs <port> <METHODE> <chemin> <secret|-> <sec-fetch-site|-> <origin|-> [onglet] : requête telle que la pose Chrome pour un fetch de même origine ; statut dès les en-têtes
+import http from 'node:http';
+const [, , port, methode, chemin, secret, sfs, origin, onglet = 'o6'] = process.argv;
+const h = { Host: `127.0.0.1:${port}`, 'X-VF-Onglet': onglet };
+if (secret !== '-') h['X-VF-Terminal'] = secret; if (sfs !== '-') h['Sec-Fetch-Site'] = sfs; if (origin !== '-') h.Origin = origin;
+if (methode === 'POST') h['Content-Length'] = '1';
+const r = http.request({ host: '127.0.0.1', port: +port, path: chemin, method: methode, headers: h, agent: false }, (res) => { console.log(res.statusCode); res.destroy(); process.exit(0); });
+r.on('error', (e) => { console.log('ERREUR ' + (e.code || e.message)); process.exit(0); });
+setTimeout(() => { console.log('ERREUR ETIMEDOUT'); process.exit(0); }, 4000);
+if (methode === 'POST') r.write('x'); r.end();
+JS
+temoin_compteur T6
+srvq; echanger; P6=$SRV_PORT; nav() { node "$AUX/nav.mjs" "$QP" "$@"; }
+for ch in /etat /flux; do
+  assert_eq "T6.1 — GET $ch sans Origin, Sec-Fetch-Site same-site, secret valide : refus 403" "$(nav GET $ch "$SECRET" same-site -)" "403"
+  assert_eq "T6.2 — GET $ch sans Origin, Sec-Fetch-Site cross-site, secret valide : refus 403" "$(nav GET $ch "$SECRET" cross-site -)" "403"
+  assert_eq "T6.3 — GET $ch sans Origin, Sec-Fetch-Site none, secret valide : refus 403" "$(nav GET $ch "$SECRET" none -)" "403"
+  assert_eq "T6.4 — GET $ch sans Origin ni Sec-Fetch-Site, secret valide : refus 403" "$(nav GET $ch "$SECRET" - -)" "403"
+  assert_eq "T6.5 — GET $ch sans Origin, same-origin, sans secret : refus 403" "$(nav GET $ch - same-origin -)" "403"
+  assert_eq "T6.6 — GET $ch sans Origin, same-origin, faux secret : refus 403" "$(nav GET $ch "$FAUX6" same-origin -)" "403"
+  assert_eq "T6.8 — GET $ch avec l'Origin de P (127.0.0.1:<P>), same-origin, secret valide : refus 403" "$(nav GET $ch "$SECRET" same-origin "http://127.0.0.1:$P6")" "403"
+done
+assert_eq "T6.7 — POST /entree sans Origin, même en same-origin, secret valide : refus 403" "$(nav POST /entree "$SECRET" same-origin -)" "403"
+assert_eq "T6.7b — POST /taille sans Origin, même en same-origin, secret valide : refus 403" "$(nav POST /taille "$SECRET" same-origin -)" "403"
+assert_eq "T6.pty — les refus n'ont lancé aucun assistant (0)" "$(pty_compte)" "0"
+assert_eq "T6.0 — témoin (navigateur réel) : GET /etat sans Origin, same-origin, secret valide rend 200" "$(nav GET /etat "$SECRET" same-origin -)" "200"
+assert_eq "T6.0b — témoin (navigateur réel) : GET /flux sans Origin, same-origin, secret valide rend 200" "$(nav GET /flux "$SECRET" same-origin -)" "200"
+unsrv
+
 echo "=== Mutants — chacun rougit sa sonde ==="
 rouge() { echo "     [mutant] obtenu $1, le code sain rend $2" >&2; [ "$1" != "$2" ] && echo rouge || echo "identique : $1"; }
 mut() { mutant "$1" "$2" "$3" && return 0; assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; return 1; }
@@ -315,7 +346,7 @@ if mut hote vf-cockpit-terminal.mjs "s/!hotes.includes(String(req.headers.host |
   srvq "$MUT_OUT"; echanger; assert_eq "M-HOST — le mutant rougit T2.1 : un Host de rebinding n'est plus refusé (403)" "$(rouge "$(sta "$QP" POST /entree --secret "$SECRET" --onglet o1 --host "evil.example:$QP" --corps x)" 403)" "rouge"; unsrv; fi
 if mut jeton vf-cockpit-terminal.mjs "s/!egal(req.headers\['x-vf-terminal'\], secret)/(req.headers['x-vf-terminal'] !== undefined \&\& !egal(req.headers['x-vf-terminal'], secret))/"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-JETON — le mutant rougit T3.1 : l'absence de secret est admise (≠ 401)" "$(rouge "$(sta "$QP" POST /entree --onglet o1 --corps x)" 401)" "rouge"; unsrv; fi
-if mut sansorigine vf-cockpit-terminal.mjs "s/if (!page) return /if (false) return /"; then
+if mut sansorigine vf-cockpit-terminal.mjs "s/if (!page && !navigateur) return /if (false) return /"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-SANSORIGIN — le mutant rougit T3.4 : POST /entree sans Origin n'est plus refusé (403)" "$(rouge "$(sta "$QP" POST /entree --secret "$SECRET" --onglet o1 --sans-origin --corps x)" 403)" "rouge"; unsrv; fi
 if mut rejeu vf-cockpit-terminal-amorce.mjs "s/fs\.unlinkSync(fichier)/0/"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-REJEU — le mutant rougit T4.2 : le rejeu de l'amorçage n'est plus refusé (403)" "$(rouge "$(node "$TA" amorcer "$QP" "$WORK/amorce.copy" | sed -n 1p)" 403)" "rouge"; unsrv; fi
@@ -326,6 +357,17 @@ if mut journal vf-cockpit-terminal.mjs "s/log('terminal actif (127.0.0.1 seuleme
   srvq "$MUT_OUT"; echanger; sleep 0.3; assert_eq "M-LOG — le mutant rougit T5.4 : le journal contient le secret" "$(rouge "$(cherche "$SECRET" "$SRV_OUT" | wc -l | tr -d ' ')" 0)" "rouge"; unsrv; fi
 if mut url vf-cockpit-terminal.mjs "s/egal(req.headers\['x-vf-terminal'\], secret)/egal(req.headers['x-vf-terminal'] ?? url.searchParams.get('s'), secret)/"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-URL — le mutant rougit TD.2 : le secret en ?s= est admis (≠ 401)" "$(rouge "$(sta "$QP" GET "/etat?s=$SECRET")" 401)" "rouge"; unsrv; fi
+
+navmut() { # navmut <nom> <expression sed> <statut sain> <argument de nav>... : le mutant doit changer le statut de la requête refusée
+  local nom="$1" sedx="$2" sain="$3"; shift 3
+  if mut "$nom" vf-cockpit-terminal.mjs "$sedx"; then srvq "$MUT_OUT"; echanger; P6=$SRV_PORT; local a=(); for x in "$@"; do case "$x" in @S) a+=("$SECRET") ;; @P) a+=("http://127.0.0.1:$P6") ;; *) a+=("$x") ;; esac; done # le secret et le port changent à chaque serveur : substitués ici
+    assert_eq "M-$nom — le mutant assouplit trop : la requête refusée n'est plus refusée ($sain)" "$(rouge "$(node "$AUX/nav.mjs" "$QP" "${a[@]}")" "$sain")" "rouge"; unsrv; fi
+}
+navmut NAV-SFS "s/req.headers\['sec-fetch-site'\] === 'same-origin'/req.headers['sec-fetch-site'] !== undefined/" 403 GET /etat @S same-site -
+navmut NAV-SANS-SFS "s/ *&& req.headers\['sec-fetch-site'\] === 'same-origin' &&/ \&\&/" 403 GET /etat @S - -
+navmut NAV-SANS-SECRET "s/ && egal(req.headers\['x-vf-terminal'\], secret);/;/" 403 GET /etat - same-origin -
+navmut NAV-POST "s/req.method === 'GET' \&\& (url.pathname === '\/flux' || url.pathname === '\/etat')/true/" 403 POST /entree @S same-origin -
+navmut NAV-ORIGIN "s/else if (o !== origineQ())/else if (o !== origineQ() \&\& !navigateur)/" 403 GET /etat @S same-origin @P
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
