@@ -17,7 +17,7 @@
 > entre parenthèses que pour un agent incarné en fenêtre principale (`claude --agent`) — il
 > l'ignore quand l'agent est dispatché en sous-agent. Le **verrou de driver** (T1, couvert en
 > continu par `test-driver-lock.sh` T2) reste donc, dans tous les cas, la garantie machine de
-> dernier ressort de l'invariant « un seul manager actif PAR COMPARTIMENT » (lab partitionné : un verrou par
+> dernier ressort de l'invariant « un seul manager actif PAR COMPARTIMENT, ou PAR PHASE sous un verrou de phase » (lab partitionné : un verrou par
 > compartiment, `mission-flow.md` §Verrou par compartiment ; vers un AUTRE compartiment, la chaîne manager → worker →
 > manager n'est plus fermée par construction mais par les allowlists `Agent(...)`, un lint — P57-D-20).
 
@@ -100,7 +100,7 @@
   sable runtime : le runtime Claude Code n'applique la liste entre parenthèses que pour un agent
   incarné en fenêtre principale (`claude --agent`), jamais pour un agent dispatché en sous-agent.
   C'est pourquoi le **verrou de driver** reste, dans tous les cas, la garantie machine de dernier
-  ressort de l'invariant « un seul manager actif PAR COMPARTIMENT » : un second `acquire` sur le MÊME compartiment
+  ressort de l'invariant « un seul manager actif PAR COMPARTIMENT, ou PAR PHASE sous un verrou de phase » : un second `acquire` sur le MÊME compartiment (ou la même phase)
   est refusé tant que le premier manager pilote (T1, couvert en continu par `test-driver-lock.sh` T2), y compris si
   une allowlist était mal posée ou absente. Vers un AUTRE compartiment le verrou ne ferme plus la chaîne manager →
   worker → manager : elle reste tenue par les allowlists `Agent(...)` (un lint, pas un cloisonnement runtime) —

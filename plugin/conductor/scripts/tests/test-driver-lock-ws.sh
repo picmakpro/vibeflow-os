@@ -1638,13 +1638,13 @@ mutant k 'status|orphans) mutating=0 ;; esac' 's@status|orphans) mutating=0 ;; e
 mutant acq_fallback 'if \[ "$ACTION" != acquire \] && \[ "$ALL" = 0 \]' 's@\[ "$ACTION" != acquire \] \&\& @@' "$MUT_ACQ"
 mutant fallback_depotpresent '\[ ! -L "$LOCK_DIR" \] && \[ ! -d "$LOCK_DIR" \]' 's@ \&\& \[ ! -L "$LOCK_DIR" \] \&\& \[ ! -d "$LOCK_DIR" \]@@' "$MUT_FDP"
 mutant skip_link_d 'if \[ -L "$d" \] || ! vf_ws_name_valid "$name"; then' 's@\[ -L "$d" \] || @@' "$MUT_SKL"
-mutant reprobe_none '_leg_after="$(vf_dl_legacy_probe)"' 's@_leg_after="$(vf_dl_legacy_probe)"@_leg_after=""@' "$MUT_REP"
+mutant reprobe_none '_leg_after="$(vf_dl_blocker_probe)"' 's@_leg_after="$(vf_dl_blocker_probe)"@_leg_after=""@' "$MUT_REP"
 mutant pose_kept '= "$gen" \] && rm -f "$LOCK_DIR"' 's@\&\& rm -f "$LOCK_DIR"@\&\& :@' "$MUT_REP"
 mutant gen_kept '{gen:?}' 's@rm -rf "${LOCK_PARENT:?}/${gen:?}"@:@' "$MUT_REP"
 # takeover --ws (Q5, arbitrage Samuel, AskUserQuestion session principale, 2026-10-13) : sonde de tête, re-sonde, retrait de la pose.
-mutant tk_nosonde '\[ -n "$_leg" \] && vf_dl_legacy_refuse "$_leg"' 's@\[ -n "$_leg" \] \&\& vf_dl_legacy_refuse "$_leg"@[ -n "$_leg" ] \&\& :@' "$MUT_TKH"
-mutant tk_stale_resume '\[ -n "$_leg" \] && vf_dl_legacy_refuse "$_leg"' 's@\[ -n "$_leg" \] && vf_dl_legacy_refuse "$_leg"@case "$_leg" in vivant*) vf_dl_legacy_refuse "$_leg" ;; esac@' "$MUT_TKS"
-mutant tk_reprobe_none '_tk_after="$(vf_dl_legacy_probe)"' 's@_tk_after="$(vf_dl_legacy_probe)"@_tk_after=""@' "$MUT_TKRP"
+mutant tk_nosonde '\[ -n "$_leg" \] && vf_dl_blocker_refuse "$_leg"' 's@\[ -n "$_leg" \] \&\& vf_dl_blocker_refuse "$_leg"@[ -n "$_leg" ] \&\& :@' "$MUT_TKH"
+mutant tk_stale_resume '\[ -n "$_leg" \] && vf_dl_blocker_refuse "$_leg"' 's@\[ -n "$_leg" \] && vf_dl_blocker_refuse "$_leg"@case "$_leg" in legacy*vivant*) vf_dl_blocker_refuse "$_leg" ;; esac@' "$MUT_TKS"
+mutant tk_reprobe_none '_tk_after="$(vf_dl_blocker_probe)"' 's@_tk_after="$(vf_dl_blocker_probe)"@_tk_after=""@' "$MUT_TKRP"
 mutant tk_restore_none 'ln_atomic "$old_gen"' 's@ln_atomic "$old_gen" "${LOCK_DIR}.new.$$" \&\& mv_link "${LOCK_DIR}.new.$$" "$LOCK_DIR"@:@' "$MUT_TKR"
 mutant tk_gen_kept 'retire sa pose$' 's@rm -rf "${LOCK_PARENT:?}/$gen"@:@' "$MUT_TKGK"
 mutant tk_mutex_kept '# mutex-refus$' 's@rm -f "\$mutex"; trap - EXIT INT TERM # mutex-refus@trap - EXIT INT TERM@' "$MUT_TKM"
@@ -1652,7 +1652,7 @@ mutant tk_restore_dir_none 'rm -f "$LOCK_DIR"; mv_noclobber' 's@; mv_noclobber "
 mutant tk_final_restore_none '&& \[ ! -L "$LOCK_DIR" \] && mv_noclobber' 's@&& mv_noclobber "${LOCK_DIR}.old.$$" "$LOCK_DIR"@\&\& :@' "$MUT_TKF"
 mutant tk_verify_none 'if \[ "$(lock_gen)" = "$old_gen" \] && \[ ! -e' 's@if \[ "$(lock_gen)" = "$old_gen" \] && \[ ! -e "${LOCK_DIR}.old.$$" \]; then@if true; then@' "$MUT_TKV"
 mutant tk_noclobber_none 'mv -nh "$1" "$2"' 's@mv -nT "$1" "$2" 2>/dev/null || mv -nh "$1" "$2" 2>/dev/null@mv "$1" "$2"@' "$MUT_TKV"
-mutant tk_old_deleted '_tk_after="$(vf_dl_legacy_probe)"' 's@_tk_after="$(vf_dl_legacy_probe)"@case "$old_gen" in */*|"") ;; *) rm -rf "${LOCK_PARENT:?}/$old_gen" ;; esac; _tk_after="$(vf_dl_legacy_probe)"@' "$MUT_TKO"
+mutant tk_old_deleted '_tk_after="$(vf_dl_blocker_probe)"' 's@_tk_after="$(vf_dl_blocker_probe)"@case "$old_gen" in */*|"") ;; *) rm -rf "${LOCK_PARENT:?}/$old_gen" ;; esac; _tk_after="$(vf_dl_blocker_probe)"@' "$MUT_TKO"
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done

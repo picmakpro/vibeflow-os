@@ -38,6 +38,10 @@
 # d'E7 et la surcharge d'E4 (premier canal de la résolution, devant GSD_WORKSTREAM). Lab PLAT : accepté, sans effet.
 # Lab PARTITIONNÉ sans --ws : E1 INDÉTERMINÉ (jamais un vert), `--budget-snapshot` exit 4, avant toute écriture.
 #
+# --phase <N> (verrou de phase, règle de Samuel session principale 2026-11-03 + arbitrage « Un verrou par phase »,
+# AskUserQuestion session principale, 2026-11-03) : avec --ws, E1 et l'identité d'E7 jugent le verrou de CETTE phase
+# (`driver-lock.sh status --ws=<sujet> --phase=<N>`) au lieu du verrou de compartiment nu. Sans effet en lab plat.
+#
 # --hook ne change que le format d'affichage (parité d'interface avec les autres gates du dépôt) ;
 # --quiet supprime les diagnostics informatifs sur la sortie d'erreur. Mutuellement exclusifs.
 #
@@ -113,6 +117,7 @@ HOOK=0
 QUIET=0
 BUDGET_SNAPSHOT=0
 WS=""
+PHASE=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -140,6 +145,12 @@ while [ "$#" -gt 0 ]; do
         exit 64
       fi
       WS="$2"; shift 2 ;;
+    --phase)
+      if [ "$#" -lt 2 ]; then
+        echo "[check-mission-exit] --phase nécessite une valeur" >&2
+        exit 64
+      fi
+      PHASE="$2"; shift 2 ;;
     --hook) HOOK=1; shift ;;
     --quiet) QUIET=1; shift ;;
     --budget-snapshot) BUDGET_SNAPSHOT=1; shift ;;
@@ -240,7 +251,7 @@ cur_lock_gen() {
     [ -n "$WS" ] || { printf '?'; return 0; }
     sd="$(resolve_S)" || { printf '?'; return 0; }
     [ -f "$sd/driver-lock.sh" ] || { printf '?'; return 0; }
-    out="$( cd "$ROOT" 2>/dev/null && VF_DRIVER_LOCK= "$sd/driver-lock.sh" status --ws="$WS" 2>/dev/null )" || { printf '?'; return 0; }
+    out="$( cd "$ROOT" 2>/dev/null && VF_DRIVER_LOCK= "$sd/driver-lock.sh" status --ws="$WS" ${PHASE:+--phase="$PHASE"} 2>/dev/null )" || { printf '?'; return 0; }
     pr="$(printf '%s' "$out" | jq -r 'if has("present") then (.present | tostring) else "" end' 2>/dev/null)"
     case "$pr" in
       false) printf -- '-' ;;
@@ -315,7 +326,7 @@ else
     # Lab partitionné (P57-D-15, P57-D-22) : le verrou jugé est celui du compartiment DÉSIGNÉ, lu par le
     # driver-lock.sh du lab depuis --root, VF_DRIVER_LOCK vidé (un export hérité forcerait le mode verrou
     # unique et déplacerait la cible). Un driver-lock.sh d'avant la phase rend rc 1 : indéterminé, jamais sain.
-    E1_OUT="$( cd "$ROOT" 2>/dev/null && VF_DRIVER_LOCK= "$E1_S_DIR/driver-lock.sh" status --ws="$WS" 2>/dev/null )"
+    E1_OUT="$( cd "$ROOT" 2>/dev/null && VF_DRIVER_LOCK= "$E1_S_DIR/driver-lock.sh" status --ws="$WS" ${PHASE:+--phase="$PHASE"} 2>/dev/null )"
     E1_RC=$?
   else
     E1_OUT="$(VF_DRIVER_LOCK="$ROOT/.planning/DRIVER.lock" "$E1_S_DIR/driver-lock.sh" status 2>/dev/null)"

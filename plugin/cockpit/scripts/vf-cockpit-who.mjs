@@ -120,13 +120,14 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
     const DL = dl.chemin; let st = {};
     try { st = JSON.parse(sh('bash', [DL, 'status', '--all'], root)); } catch { sources.locks = { etat: 'erreur' }; }
     st = { ...st, locks: Array.isArray(st?.locks) ? st.locks : st?.present ? [st] : [] }; // lab plat : `status --all` rend l'objet d'UN verrou, sans `locks`
-    for (const l of (st.locks || []).filter((x) => x.present)) workers.push({ kind: 'lock', id: l.owner, task: l.step, tree: l.ws ? `compartiment ${l.ws}` : l.scope, ageS: l.age_seconds, stale: !!l.stale, children: l.children_running, source: 'driver-lock' });
-    const wsList = ['', ...ls(path.join(common, 'vf-driver', 'ws'))];
+    for (const l of (st.locks || []).filter((x) => x.present)) workers.push({ kind: 'lock', id: l.owner, task: l.step, tree: l.ws ? `compartiment ${l.ws}${l.phase ? ` phase ${l.phase}` : ''}` : l.scope, ageS: l.age_seconds, stale: !!l.stale, children: l.children_running, source: 'driver-lock' });
+    // cibles du registre : dépôt, chaque compartiment, et chaque verrou de PHASE présent (registre frère du verrou de phase)
+    const cibles = [{ ws: '', ph: '' }, ...ls(path.join(common, 'vf-driver', 'ws')).map((w) => ({ ws: w, ph: '' })), ...(st.locks || []).filter((x) => x.present && x.phase).map((x) => ({ ws: x.ws, ph: x.phase }))];
     let reg = 0;
-    for (const ws of wsList) {
-      let o = {}; try { o = JSON.parse(sh('bash', [DL, 'orphans', ...(ws ? [`--ws=${ws}`] : [])], root)); } catch {}
-      const held = (st.locks || []).some((l) => l.present && !l.stale && (l.ws || '') === ws);
-      for (const a of o.orphans || []) { reg++; workers.push({ kind: 'registered', id: a.agent_id, role: a.role, task: a.node || '', parent: a.parent || '', depth: a.depth ?? null, tree: ws ? `compartiment ${ws}` : 'dépôt', ageS: a.age_seconds, stale: !held, orphan: !held, source: 'registre' }); }
+    for (const { ws, ph } of cibles) {
+      let o = {}; try { o = JSON.parse(sh('bash', [DL, 'orphans', ...(ws ? [`--ws=${ws}`] : []), ...(ph ? [`--phase=${ph}`] : [])], root)); } catch {}
+      const held = (st.locks || []).some((l) => l.present && !l.stale && (l.ws || '') === ws && (l.phase || '') === ph);
+      for (const a of o.orphans || []) { reg++; workers.push({ kind: 'registered', id: a.agent_id, role: a.role, task: a.node || '', parent: a.parent || '', depth: a.depth ?? null, tree: ws ? `compartiment ${ws}${ph ? ` phase ${ph}` : ''}` : 'dépôt', ageS: a.age_seconds, stale: !held, orphan: !held, source: 'registre' }); }
     }
     sources.locks ||= { etat: 'lue', held: (st.locks || []).filter((x) => x.present).length, registered: reg };
   }

@@ -363,6 +363,7 @@ if not isinstance(data, dict):
 # pour la famille ; `extra_signals` compte les AUTRES entrees en signal.
 ws = ""
 scope = ""
+phase = ""
 extra = 0
 if "locks" in data:
     locks = data.get("locks")
@@ -398,7 +399,8 @@ if "locks" in data:
     else:
         extra = signals - 1 if best is not None else 0
         scope = str(entry.get("scope", ""))
-        ws = str(entry.get("ws", "")) if scope == "compartiment" else ""
+        ws = str(entry.get("ws", "")) if scope in ("compartiment", "phase") else ""
+        phase = str(entry.get("phase", "")) if scope == "phase" else ""  # verrou de phase : la ligne nomme la phase
 else:
     entry = data
 present = entry.get("present")
@@ -415,6 +417,7 @@ print("progress_age_seconds=%s" % ("" if progress_age is None else progress_age)
 print("ttl=%s" % ("" if ttl is None else ttl))
 print("ws=%s" % ws)
 print("scope=%s" % scope)
+print("phase=%s" % phase)
 print("extra_signals=%s" % extra)
 PYEOF
 )"
@@ -423,7 +426,7 @@ PYEOF
     return 0
   fi
 
-  local d_present="" d_stale="" d_owner="" d_step="" d_progress_age="" d_ttl="" d_ws="" d_scope="" d_extra=0
+  local d_present="" d_stale="" d_owner="" d_step="" d_progress_age="" d_ttl="" d_ws="" d_scope="" d_phase="" d_extra=0
   while IFS='=' read -r k v; do
     case "$k" in
       present) d_present="$v" ;;
@@ -434,6 +437,7 @@ PYEOF
       ttl) d_ttl="$v" ;;
       ws) d_ws="$v" ;;
       scope) d_scope="$v" ;;
+      phase) d_phase="$v" ;;
       extra_signals) d_extra="$v" ;;
     esac
   done <<STATUS_PARSED
@@ -461,6 +465,7 @@ STATUS_PARSED
   local tag="" suffix=""
   case "$d_scope" in
     compartiment) [ -n "$d_ws" ] && tag=" ws=$d_ws" ;;
+    phase) [ -n "$d_ws" ] && tag=" ws=$d_ws phase=$d_phase" ;;
     depot) tag=" scope=depot" ;;
   esac
   case "$d_extra" in ''|*[!0-9]*) d_extra=0 ;; esac
