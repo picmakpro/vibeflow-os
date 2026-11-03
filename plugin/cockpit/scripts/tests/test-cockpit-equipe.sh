@@ -590,7 +590,9 @@ let who = { workers: [S, A, F] };
 let nodes = [n('se-S', 'active', null), n('ag-A', 'active', 'se-S'), n('ag-A~termines', 'done', 'ag-A'), n('ag-F', 'done', 'ag-A~termines')];
 let hash = '';
 if (sc === 'nouveau' || sc === 'borne') nodes = [n('se-S', 'active', null)];
+if (sc === 'passe') nodes = [n('se-S', 'active', null), n('ag-A', 'active', 'se-S'), n('ag-F', 'active', 'ag-A')]; // F était actif : il passe terminé sans que les cartes aient changé
 if (sc === 'arrivee' || sc === 'arrivee-ready') hash = '#r=' + encodeURIComponent('n:ag-A');
+if (sc === 'piege2') who = { workers: [{ kind: 'subagent', id: 'r1', etat: 'actif', tree: '.', rattachement: { etat: 'rattache', source: 'registre', dag: '<x-dag>', noeud: '<x-noeud>' } }] };
 if (sc === 'piege') who = { workers: [{ kind: 'subagent', id: 'i"><x-id>', etat: 'actif', role: '<x-role>', branch: '<x-branch>', tree: '.', action: { verbe: 'lit', cible: '<x-cible>' }, rattachement: { etat: 'non-rattache', raison: '<x-raison>', dag: 'D', noeud: 'N' } }] };
 const SC = { graph: { meta: { vfTab: 'equipe', vf: {} }, nodes, project: { name: 'p' } }, h, setOverview() {}, addPanelSection: (w, fn) => sections.push(fn),
   on: (e, fn) => { (hand[e] ||= []).push(fn); }, rerender: async () => { out.rerenders++; }, exists: (id) => nodes.some((x) => 'n:' + x.id === id), reveal: (id) => out.reveals.push(id) };
@@ -603,11 +605,11 @@ const lancer = async () => { await Promise.all((dom['vf-who'] || []).map((f) => 
 try {
   vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
   vm.runInContext(fs.readFileSync(f72, 'utf8'), ctx, { timeout: 5000 });
-  if (sc === 'borne') {
+  if (sc === 'borne' || sc === 'passe') {
     await lancer(); out.r1 = out.reloads;
     now += 1000; await lancer(); out.r2 = out.reloads;
     now += 16000; for (const t of timers.splice(0)) if (t.at <= now) await t.fn(); out.r3 = out.reloads;
-  } else if (sc === 'piege') {
+  } else if (sc === 'piege' || sc === 'piege2') {
     out.html = sections.map((f) => f('n:ag-' + who.workers[0].id)).join('');
   } else {
     if (sc === 'arrivee-ready') for (const f of hand.ready || []) f();
@@ -652,13 +654,15 @@ try {
   vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), ctx, { timeout: 5000 });
   const R = ctx.window.__vfEquipeRendu;
   const piege = { kind: 'subagent', id: 'i"><x-id>', etat: 'actif', role: '<x-role>', branch: '<x-branch>', task: '<x-tache>', tree: '.', action: { verbe: 'lit', cible: '<x-cible>' }, rattachement: { etat: 'non-rattache', raison: '<x-raison>', dag: 'D', noeud: 'N' } };
-  const html = R.arbre([piege], h);
+  const lieP = { kind: 'subagent', id: 'r1', etat: 'actif', tree: '.', rattachement: { etat: 'rattache', source: 'registre', dag: '<x-dag>', noeud: '<x-noeud>' } };
+  const html = R.arbre([piege, lieP], h);
+  if (!html.includes('Nœud &lt;x-noeud&gt;')) ko.push('noeud d\'un agent rattaché non échappé ou absent');
   if (html.includes('<x-')) ko.push('balise piégée dans l\'arbre');
   for (const [cle, attendu] of [['id', 'i&quot;&gt;&lt;x-id&gt;'], ['rôle', '&lt;x-role&gt;'], ['branche', '&lt;x-branch&gt;'], ['cible', '&lt;x-cible&gt;'], ['raison', '&lt;x-raison&gt;']]) if (!html.includes(attendu)) ko.push(cle + ' non échappé(e) ou absent(e) de l\'arbre');
   if (/data-vf-agent="[^"]*<x-/.test(html) || /data-vf-agent="i"/.test(html)) ko.push('attribut data-vf-agent brut');
   if (R.pied(piege) !== 'actif · ' + 'lit <x-cible>') ko.push('pied : texte brut attendu, obtenu ' + R.pied(piege));
-  if (html.includes('project.html#r=')) ko.push('lien deviné vers un nœud pour un agent non rattaché');
-  if (!html.includes('non rattaché (')) ko.push('« non rattaché » absent');
+  if (R.arbre([piege], h).includes('project.html#r=')) ko.push('lien deviné vers un nœud pour un agent non rattaché');
+  if (!R.arbre([piege], h).includes('non rattaché (')) ko.push('« non rattaché » absent');
   const lie = { kind: 'subagent', id: 'k', etat: 'actif', role: '<x-role>', task: '<x-tache>', rattachement: { etat: 'rattache', dag: 'D', noeud: 'N' } };
   const liste = R.agentsDuNoeud([lie, piege], 'f:D#N', h);
   if (liste.includes('<x-')) ko.push('balise piégée dans la liste d\'un nœud');
@@ -749,10 +753,11 @@ assert_eq "E30.1 (points 4, 5) — trois tubes (meta.json, transcript de sous-ag
 LAB30="$WORK/lab30"; mkdir -p "$LAB30/.planning/missions"; git -C "$LAB30" init -q
 printf -- '- [ ] **Phase 1: Socle** - premier jet\n' > "$LAB30/.planning/ROADMAP.md"
 LONG30="$(printf 'N%.0s' $(seq 1 3000))"
-printf '{"nodes":[{"id":"%s","step":"x","stage":"s","deps":[],"scope":[],"status":"ready"},{"id":"run1","step":"%s ghp_abcdefghijklmnopqrstuvwxyz0123456789 fin","stage":"s","deps":[],"scope":[],"status":"running"}]}\n' "$LONG30" "$(printf 'x%.0s' $(seq 1 90))" > "$LAB30/.planning/missions/m30.dag.json"
+printf '{"nodes":[{"id":"%s","step":"x","stage":"s","deps":[],"scope":[],"status":"ready"},{"id":"run1","step":"%s ghp_abcdefghijklmnopqrstuvwxyz0123456789 fin","stage":"s","deps":[],"scope":[],"status":"running"},{"id":"n-ghp_abcdefghijklmnopqrstuvwxyz0123456789","step":"y","stage":"s","deps":[],"scope":[],"status":"ready"}]}\n' "$LONG30" "$(printf 'x%.0s' $(seq 1 90))" > "$LAB30/.planning/missions/m30.dag.json"
 cat > "$AUX/orphans-e30.json" <<JSON
 {"orphans":[
  {"agent_id":"w1","role":"vf-coder","node":"$LONG30","parent":"mgr1","depth":2,"age_seconds":3,"status":"running"},
+ {"agent_id":"ok1","role":"vf-coder","node":"n-ghp_abcdefghijklmnopqrstuvwxyz0123456789","parent":"mgr1","depth":2,"age_seconds":3,"status":"running"},
  {"agent_id":"reg1","role":"vf-coder","node":{"o":"OBJET-NOEUD-69"},"parent":"mgr1","depth":"profond","age_seconds":{"o":"OBJET-AGE-69"},"status":"running"}]}
 JSON
 H30B="$(mkhome e30b "$AUX/spec-e30.json" "$LAB30" "$AUX/orphans-e30.json")"
@@ -761,6 +766,58 @@ assert_eq "E30.2 — contrôle positif : w1 est rattaché par le registre au nœ
 assert_eq "E30.3 (point 3) — rattachement.noeud <= 128 et rattachement.dag <= 200 caractères" "$(sf "$WORK/who-e30.json" w1 '(w.rattachement.noeud.length<=128&&w.rattachement.dag.length<=200)?"ok":"noeud="+w.rattachement.noeud.length+" dag="+w.rattachement.dag.length')" "ok"
 assert_eq "E30.4 (point 7) — une entrée de registre à nœud objet, profondeur chaîne et âge objet : listée sans ces valeurs" "$(G "$WORK/who-e30.json" '(w=>w?(JSON.stringify(w).includes("OBJET-")||typeof w.depth==="string"?"valeur conservée":"ok"):"absente")(j.workers.find(x=>x.id==="reg1"))')" "ok"
 assert_eq "E30.5 (point 2) — l'étape d'un nœud running (jeton à cheval sur 100 caractères) : task sans fragment ghp_ (masque avant la coupe)" "$(G "$WORK/who-e30.json" '(w=>w?(w.task.includes("ghp")?"fragment":(w.task.length>0?"ok":"vide")):"absent")(j.workers.find(x=>x.kind==="dag-node"&&x.id==="run1"))')" "ok"
+
+# points 1 à 3 de la dernière passe : un agent qui passe terminé recharge (borne de 15 s), noeud et dag piégés, libellés exacts
+cat > "$AUX/libelles71.mjs" <<'JS'
+// libelles71.mjs <71-vf-equipe-rendu.js> : « ok », ou les libellés qui diffèrent de ce que l'interface doit afficher
+import fs from 'node:fs';
+import vm from 'node:vm';
+const ctx = vm.createContext({ window: {}, encodeURIComponent });
+const h = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const ko = [];
+try {
+  vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), ctx, { timeout: 5000 });
+  const R = ctx.window.__vfEquipeRendu;
+  const S = { kind: 'session', id: 'S', etat: 'actif', tree: '.' }, A = { kind: 'subagent', id: 'A', etat: 'en-attente', parent: 'S', tree: '.' }, F = { kind: 'subagent', id: 'F', etat: 'termine', parent: 'S', tree: '.' };
+  const html = R.arbre([S, A, F], h);
+  for (const [nom, attendu] of [['titre session', '<b>Session</b>'], ['titre sous-agent', '<b>Sous-agent</b>'], ['titre du bloc des terminés', 'Terminés depuis moins de 24 h (1)']]) if (!html.includes(attendu)) ko.push(nom);
+  if (!R.pied(A).startsWith('en attente')) ko.push('pied en attente : ' + R.pied(A));
+  if (!R.pied(F).startsWith('terminé')) ko.push('pied terminé : ' + R.pied(F));
+  if (!R.pied(S).startsWith('actif')) ko.push('pied actif : ' + R.pied(S));
+} catch (e) { ko.push('exécution : ' + String(e.message).slice(0, 100)); }
+console.log(ko.length ? ko.join(' ; ') : 'ok');
+JS
+assert_eq "EUI2.20 — libellés exacts : Session, Sous-agent, « en attente », « terminé », bloc « Terminés depuis moins de 24 h (1) »" "$(node "$AUX/libelles71.mjs" "$RENDU")" "ok"
+M "$RENDU" "$MUT/71-attente.js" "'en attente'" "'en-attente'"
+assert_has "EUI2.21 — mutant : « en attente » devient « en-attente » -> détecté" "$(node "$AUX/libelles71.mjs" "$MUT/71-attente.js")" "pied en attente"
+M "$RENDU" "$MUT/71-noeud.js" 'Nœud ${h(w.rattachement.noeud)}' 'Nœud ${w.rattachement.noeud}'
+assert_has "EUI2.22 — mutant : noeud brut dans l'arbre -> détecté" "$(J71 "$MUT/71-noeud.js")" "balise piégée dans l'arbre"
+assert_eq "EUI2.23 — panneau d'un agent rattaché à un nœud et un DAG piégés : aucune balise, noeud échappé" "$(V72 "$U72" "$RENDU" piege2 | node "$AUX/jq.mjs" 'j.erreur||(!j.html.includes("<x-")&&j.html.includes("&lt;x-noeud&gt;")?"ok":"panneau : "+j.html.slice(0,200))')" "ok"
+assert_has "EUI2.24 — mutant : noeud brut dans le panneau (71 muté) -> détecté" "$(V72 "$U72" "$MUT/71-noeud.js" piege2 | node "$AUX/jq.mjs" 'j.erreur||(j.html.includes("<x-")?"balise dans le panneau":"ok")')" "balise dans le panneau"
+assert_eq "EUI2.25 — un agent passe d'actif à terminé (cartes inchangées) : 1 rechargement, puis aucun avant 15 s" "$(V72 "$U72" "$RENDU" passe | node "$AUX/jq.mjs" 'j.erreur||[j.r1,j.r2].join("|")')" "1|1"
+M "$U72" "$MUT/72-fini.js" "\${id}\${fini ? '~' : ''}" '${id}'
+assert_eq "EUI2.26 — mutant : l'appartenance aux terminés sort de la signature -> aucun rechargement, détecté" "$(V72 "$MUT/72-fini.js" "$RENDU" passe | node "$AUX/jq.mjs" 'j.erreur||[j.r1,j.r2].join("|")')" "0|0"
+
+assert_eq "E30.6 (point 5) — contrôle positif : ok1 est rattaché par le registre à un nœud dont l'identifiant porte un jeton" "$(sf "$WORK/who-e30.json" ok1 'w.rattachement.etat+"|"+w.rattachement.source')" "rattache|registre"
+assert_eq "E30.7 (point 5) — le jeton du nœud rattaché ne sort pas en clair (rattachement.noeud masqué)" "$(G "$WORK/who-e30.json" '(w=>w?(JSON.stringify(w).includes("ghp_")?"jeton en clair":(JSON.stringify(w).includes("[masqué]")?"ok":"rien de masqué")):"absent")(j.workers.find(x=>x.id==="ok1"))')" "ok"
+MSRC="$WORK/mutwho"; mkdir -p "$MSRC"; cp "$SCRIPTS"/vf-cockpit-*.mjs "$MSRC/"
+M "$SCRIPTS/vf-cockpit-who.mjs" "$MSRC/vf-cockpit-who.mjs" 'r\[k\] = bornes(o\[k\], n)' 'r[k] = o[k].slice(0, n)'
+Q_MUT() { node "$AUX/q.mjs" "$MSRC" who "$LAB30" "$H30B" "$NOSCRIPTS" "$NOW"; }
+assert_eq "E30.8 — mutant : champs imbriqués seulement coupés, jamais masqués -> le jeton sort en clair, détecté" "$(Q_MUT | node "$AUX/jq.mjs" '(w=>w?(JSON.stringify(w).includes("ghp_")?"jeton en clair":"ok"):"absent")(j.workers.find(x=>x.id==="ok1"))')" "jeton en clair"
+# point 6 : un *.dag.json qui est un tube ou un lien vers /dev/zero ne bloque ni ne remplit la mémoire
+LAB31="$WORK/lab31"; mkdir -p "$LAB31/.planning/missions"; git -C "$LAB31" init -q
+printf -- '- [ ] **Phase 1: Socle** - premier jet\n' > "$LAB31/.planning/ROADMAP.md"
+printf '{"nodes":[{"id":"okrun","step":"visible","stage":"s","deps":[],"scope":[],"status":"running"}]}\n' > "$LAB31/.planning/missions/ok.dag.json"
+H31="$(mkhome e31 "$AUX/spec-e30.json" "$LAB31")"
+QB() { node "$AUX/borne.mjs" 6000 "$AUX/q.mjs" "$1" who "$LAB31" "$H31" "$NOSCRIPTS" "$NOW" | node "$AUX/jq.mjs" '(j.timedOut?"bloqué":"rendu")+"|"+(()=>{try{return JSON.parse(j.out).workers.filter(w=>w.id==="okrun").length}catch{return "illisible"}})()'; }
+assert_eq "E31.0 — contrôle positif : sans fichier spécial, le nœud running d'un DAG est listé (enfant borné)" "$(QB "$SCRIPTS")" "rendu|1"
+MSRC31="$WORK/mutplan"; mkdir -p "$MSRC31"; cp "$SCRIPTS"/vf-cockpit-*.mjs "$MSRC31/"
+M "$SCRIPTS/vf-cockpit-planning.mjs" "$MSRC31/vf-cockpit-planning.mjs" "return st.isFile() && st.size <= MAX_LECTURE ? fs.readFileSync(f, 'utf8') : '';" "return fs.readFileSync(f, 'utf8');"
+mkfifo "$LAB31/.planning/missions/a.dag.json"; ln -s /dev/zero "$LAB31/.planning/missions/b.dag.json"
+RES31="$(QB "$SCRIPTS")"; MUT31="$(QB "$MSRC31")"
+rm -f "$LAB31/.planning/missions/a.dag.json" "$LAB31/.planning/missions/b.dag.json"
+assert_eq "E31.1 — un *.dag.json en tube et un lien vers /dev/zero ne bloquent pas la collecte et le DAG régulier reste lu" "$RES31" "rendu|1"
+assert_eq "E31.2 — mutant : lecture sans contrôle du type de fichier -> la collecte est bloquée (tuée par SIGKILL), détecté" "$MUT31" "bloqué|illisible"
 
 vf_hyg_assert
 
