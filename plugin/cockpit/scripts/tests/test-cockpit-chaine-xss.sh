@@ -12,6 +12,7 @@
 #   C0 témoin : les trois maillons retirés -> la chaîne ABOUTIT (script du lab exécuté, jeton reçu par l'origine tierce)
 #   C1 code livré : rien n'aboutit · C2 échappement seul · C3 CSP seule · C4 garde seule
 # CHAINE_SEUL=temoin : ne joue que C0 (mesure « avant » sur un module antérieur aux correctifs).
+# Volet terminal intégré (Phase 71, TERM-12) : test-cockpit-terminal-xss.sh (même lab piégé, chaîne prolongée jusqu'au serveur du terminal).
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
