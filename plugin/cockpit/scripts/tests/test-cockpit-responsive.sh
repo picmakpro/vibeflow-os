@@ -100,6 +100,55 @@ EXPR='(async () => { const d = document.createElement("div"); d.textContent = "T
 XT="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "http://127.0.0.1:$PC/project.html")"; unsrv
 assert_eq "R6.3 — « Thinking… » inséré est traduit avant toute image (deux micro-tâches)" "$(printf '%s' "$XT" | node "$AUX/ev.mjs" 'j.resultats[0].valeur')" "Réflexion…"
 
+# O2 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : un fil d'Ariane profond (Vue d'ensemble / Historique / Phases) à 1 280 et 1 440 px.
+# Un segment de moins de 12 caractères n'est jamais rogné (scrollWidth <= clientWidth) ; si une troncature est nécessaire, elle porte sur un segment du MILIEU, jamais le premier ni le dernier.
+echo "=== O2 — fil d'Ariane profond : aucun segment court rogné, troncature au milieu d'abord (1 280 et 1 440 px, labs court et long) ==="
+cat > "$AUX/o2.js" <<'JS'
+(async () => { const SC = window.VibeFlow, pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  SC.reveal('n:ph-1');
+  for (let i = 0; i < 100; i++) { const b = [...document.querySelectorAll('#crumbs button')]; if (b.length === 3 && b[0].textContent === "Vue d'ensemble") break; await pause(50); }
+  await pause(400);
+  const b = [...document.querySelectorAll('#crumbs button')];
+  return { seg: b.map((e, i) => ({ t: e.textContent, n: e.textContent.trim().length, i, rogne: e.scrollWidth > e.clientWidth + 1, sw: e.scrollWidth, cw: e.clientWidth })), nb: b.length, W: innerWidth,
+    entete: [...document.querySelectorAll('header button, header a, header input')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.right > innerWidth + 0.5 || r.left < -0.5); }).length }; })()
+JS
+# deux labs dont le jalon est clos : le projet range ses phases sous « Historique », d'où un fil de trois segments (Vue d'ensemble / Historique / Phases)
+mkdir -p "$WORK/deep-court" "$WORK/deep-long"; LDC="$WORK/deep-court/lab-court"; LDL="$WORK/deep-long/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mklab "$LDC"; mklab "$LDL"
+for d in "$LDC" "$LDL"; do printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n- [x] **Phase 2: Suite** - la suite\n' > "$d/.planning/ROADMAP.md"; node "$SCRIPTS/vf-cockpit-build.mjs" "$d" --quiet > "$WORK/build-deep.out" 2>&1 || cat "$WORK/build-deep.out"; done
+for spec in "court:$LDC" "long:$LDL"; do
+  nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; PO=$SRV_PORT
+  for w in 1280x800 1440x900; do
+    XO2="$(CDP_VIEWPORT=$w node "$HERE_T/chrome-cdp.mjs" "$CHROME" 300 "$(cat "$AUX/o2.js")" "http://127.0.0.1:$PO/project.html")"
+    V2='j.resultats[0].valeur'
+    assert_eq "O2.0 — $nom / $w : témoin, trois segments mesurés, aucun bouton d'en-tête hors de la fenêtre" "$(printf '%s' "$XO2" | node "$AUX/ev.mjs" "($V2.erreur||j.erreur||'')+'|'+$V2.nb+'|'+$V2.entete")" "|3|0"
+    assert_eq "O2.1 — $nom / $w : aucun segment de moins de 12 caractères n'est rogné" "$(printf '%s' "$XO2" | node "$AUX/ev.mjs" "$V2.seg.filter((x)=>x.n<12&&x.rogne).map((x)=>x.t+' '+x.sw+'>'+x.cw).join(' | ')||'aucun'")" "aucun"
+    assert_eq "O2.2 — $nom / $w : aucune troncature sur le premier ni le dernier segment" "$(printf '%s' "$XO2" | node "$AUX/ev.mjs" "$V2.seg.filter((x)=>x.rogne&&(x.i===0||x.i===$V2.seg.length-1)).map((x)=>x.t+' '+x.sw+'>'+x.cw).join(' | ')||'aucun'")" "aucun"
+  done
+  unsrv
+done
+
+# I2 (recette 3, retour de Samuel, saisie texte, session principale, 2026-11-03) : « le flou sous le titre est trop dense, il faut aussi qu'il ai un radius fort en haut faible en bas, il doit etre comparable au blur iOS ».
+# Matériau retenu : blur(24px) saturate(1.8), fond à 30 % d'opacité, coins 22 px en haut et 6 px en bas — mesuré dans le style calculé, deux thèmes, deux onglets.
+echo "=== I2 — le titre de la vue d'ensemble : verre dépoli à la iOS (filtre, fond translucide, rayons fort en haut / faible en bas) ==="
+cat > "$AUX/i2.js" <<'JS'
+(async () => { const pause = (ms) => new Promise((r) => setTimeout(r, ms)); const ctx = document.getElementById('context'), out = {};
+  for (const th of ['light', 'dark']) { document.documentElement.setAttribute('data-theme', th); await pause(150);
+    const cs = getComputedStyle(ctx), m = /rgba?\(([^)]+)\)/.exec(cs.backgroundColor), p = m ? m[1].split(',').map(Number) : [];
+    out[th] = { filtre: cs.backdropFilter, alpha: p.length === 4 ? p[3] : 1, haut: [parseFloat(cs.borderTopLeftRadius), parseFloat(cs.borderTopRightRadius)], bas: [parseFloat(cs.borderBottomLeftRadius), parseFloat(cs.borderBottomRightRadius)] }; }
+  return out; })()
+JS
+srv "$LC/.vibeflow/cockpit"; PI=$SRV_PORT
+for onglet in index project; do
+  XI="$(CDP_VIEWPORT=1280x800 CDP_PRET="document.readyState === 'complete' && !!document.querySelector('#context h1')" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 300 "$(cat "$AUX/i2.js")" "http://127.0.0.1:$PI/$onglet.html")"
+  for th in light dark; do
+    VI="j.resultats[0].valeur.$th"
+    assert_eq "I2.1 — $onglet / $th : flou large mais doux, saturation relevée (blur(24px) saturate(1.8))" "$(printf '%s' "$XI" | node "$AUX/ev.mjs" "$VI.filtre")" "blur(24px) saturate(1.8)"
+    assert_eq "I2.2 — $onglet / $th : fond nettement plus transparent (opacité <= 0,35, > 0)" "$(printf '%s' "$XI" | node "$AUX/ev.mjs" "$VI.alpha>0&&$VI.alpha<=0.35")" "true"
+    assert_eq "I2.3 — $onglet / $th : coins très arrondis en haut (22 px), peu en bas (6 px)" "$(printf '%s' "$XI" | node "$AUX/ev.mjs" "[$VI.haut,$VI.bas]")" "[[22,22],[6,6]]"
+  done
+done
+unsrv
+
 echo "=== R4 — témoin rouge : sans la mise en page du cockpit, la mesure rougit ==="
 LM="$WORK/lab-mutant"; mkdir -p "$LM/.planning" "$LM/.vibeflow" "$LM/.planning/missions"; cp -R "$LL/.vibeflow/cockpit" "$LM/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$LM/.planning/missions/"
 node -e "

@@ -43,10 +43,11 @@
     .vf-link { display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; border-radius: 10px; font-size: 12.5px; color: inherit; text-decoration: none; }
     .vf-link:hover { background: var(--surface-hover); }
     .vf-link code { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-2); word-break: break-all; }
-    /* I2 (recette 2026-11-02) : le titre et le sous-titre de la vue d'ensemble se mélangeaient aux graphes que l'on fait glisser dessous.
-       Fond translucide + léger flou derrière le texte (les deux thèmes : --bg-rgb suit le thème) ; la marge négative compense le remplissage, le texte ne bouge pas.
+    /* I2 (recette 2026-11-02, reprise 2026-11-03) : le titre et le sous-titre de la vue d'ensemble se mélangeaient aux graphes que l'on fait glisser dessous.
+       Matériau « verre dépoli » à la iOS : fond très translucide, flou large mais doux, saturation relevée (la même recette que .glass du viewer : blur + saturate),
+       coins très arrondis en haut et peu en bas, filet de lumière fin. Les deux thèmes : --bg-rgb et --ink suivent le thème. La marge négative compense le remplissage, le texte ne bouge pas.
        #context ne capte aucun événement (pointer-events: none, hérité du viewer) : la carte reste glissable sous la zone. */
-    #context { padding: 8px 14px 10px; margin: -8px -14px -10px; border-radius: 16px; background: rgba(var(--bg-rgb), .55); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+    #context { padding: 8px 14px 10px; margin: -8px -14px -10px; border-radius: 22px 22px 6px 6px; background: rgba(var(--bg-rgb), .3); -webkit-backdrop-filter: blur(24px) saturate(1.8); backdrop-filter: blur(24px) saturate(1.8); box-shadow: inset 0 0 0 .5px rgba(var(--ink), .1), inset 0 1px 0 rgba(255, 255, 255, .22); }
     #context:empty { display: none; }
   `;
   // spike 005 : la barre de question reste visible quand serve.mjs (P7) sert l'onglet Projet

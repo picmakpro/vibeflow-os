@@ -11,6 +11,8 @@
 //   - zoom au-dessus de la barre de question jusqu'à 1 279 px (comme le viewer le fait déjà sur écran tactile) ;
 //   - logo VibeFlow : le viewer inverse le logo clair du thème (il attend un logo blanc) ; nos deux logos ont déjà le bon contraste ;
 //   - sous 1 000 px : la barre de question range l'invite sur sa propre ligne ; sous 700 px le fil d'Ariane cède sa place au zoom.
+//   - fil d'Ariane (O2, recette 2026-11-03) : un segment court (moins de 12 caractères) n'est jamais rogné tant qu'un segment long peut l'être, et on rogne d'abord ceux du milieu (poids de rétrécissement 8, puis premier et dernier longs, 2,
+//     puis les courts, 0,05) ; dès 1 280 px la colonne gauche de l'en-tête s'élargit de la largeur naturelle du fil (mesurée ci-dessous, avec le nom du projet jusqu'à 170 px, plafonnée à 50 % de la fenêtre) au prix d'une recherche moins large (jamais sous 200 px).
 (() => {
   const style = document.createElement('style');
   style.textContent = `
@@ -38,10 +40,27 @@
       #context { max-width: min(520px, calc(100% - var(--pw) - 104px)); }
       #ask { width: min(700px, calc(100% - var(--pw) - 48px)); }
     }
+    @media (min-width: 1280px) {
+      header #crumbs { flex: 0 .05 auto; } /* le nom du projet (poids 6) cède avant le fil */
+      header #crumbs button { flex: 0 2 auto; }
+      header #crumbs button:not(:first-child):not(.cur) { flex: 0 8 auto; }
+      header #crumbs button[data-vf-court] { flex: 0 .05 auto; }
+      header .hl { min-width: min(calc(280px + var(--vf-crumbs, 0px) + var(--vf-pn, 0px)), 50vw); }
+    }
     @media (max-width: 999px) { #ask-input { flex: 1 1 100%; } }
     @media (max-width: 700px) { header #crumbs { display: none; } }
   `;
   document.head.appendChild(style);
+  // fil d'Ariane : étiquette les segments courts et publie la largeur naturelle du fil (--vf-crumbs), relues à chaque rendu du fil et quand les polices sont prêtes
+  const fil = document.getElementById('crumbs');
+  const mesureFil = () => {
+    let n = 0;
+    for (const e of fil.children) { if (e.tagName === 'BUTTON') { if (e.textContent.trim().length < 12) e.setAttribute('data-vf-court', ''); else e.removeAttribute('data-vf-court'); n += e.scrollWidth; } else n += e.offsetWidth; }
+    document.documentElement.style.setProperty('--vf-crumbs', n + 'px');
+    const pn = document.getElementById('proj-name'); document.documentElement.style.setProperty('--vf-pn', (pn ? Math.max(0, Math.min(pn.scrollWidth, 170) - 46) : 0) + 'px');
+  };
+  const nomProjet = document.getElementById('proj-name');
+  if (fil) { if (nomProjet) new MutationObserver(mesureFil).observe(nomProjet, { childList: true, characterData: true, subtree: true }); mesureFil(); new MutationObserver(mesureFil).observe(fil, { childList: true, characterData: true, subtree: true }); if (document.fonts?.ready) document.fonts.ready.then(mesureFil); window.addEventListener('load', mesureFil); }
   // infobulle des boutons d'en-tête passés en icône seule : le libellé (traduit, donc relu après le traducteur) ; ne remplace jamais un title existant
   const hd = document.querySelector('header');
   const infobulles = () => { for (const b of hd.querySelectorAll('button')) { if (b.getAttribute('title')) continue; const t = b.getAttribute('aria-label') || b.querySelector('.bl')?.textContent.trim(); if (t) b.setAttribute('title', t); } };
