@@ -1,0 +1,230 @@
+#!/usr/bin/env bash
+# test-cockpit-terminal-session.sh — session du terminal : une seule, grâce, tampon de reprise, inactivité, rien sur disque
+# (TERM-08, TERM-11 ; P71-D-05, P71-D-19 ; plan 71-04). Durée annoncée : environ 90 s, dont 65 s d'attente pour T12.5 (menée en parallèle des autres sondes).
+#   T12.1 un autre onglet reçoit 409 sur /flux, sans processus de plus   T12.2 flux fermé, retour avant la grâce : même shell, tampon rejoué
+#   T12.3 grâce écoulée : assistant et shell disparus, /etat absente      T12.5 un terminal ouvert empêche l'arrêt sur inactivité
+#   T12.6 un autre onglet : 409 sur /entree et /taille, aucun octet écrit T12.7 tampon borné à 256 Kio, la fin de la production présente
+#   T12.8 fin du shell rapportée (code), 410 sans session                 T15.1 aucune frappe ni sortie hors de la mémoire de la session
+#   T15.2 le tampon est vidé à la fin : une nouvelle session ne rejoue rien de l'ancienne
+#   M-*   mutants (copies de la sortie, jamais le module) : M-GRACE0, M-UNIQUE, M-PROPRIO, M-IDLE, M-TAMPON, M-JOURNAL
+# Chaque témoin négatif a son contrôle positif ; un mutant sans effet est un FAIL. Exit 0 si tout passe, 1 sinon.
+set -uo pipefail
+libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
+ENG="$SCRIPTS/../skills/cockpit-moteur"; TA="$HERE_T/terminal-aux.mjs"
+WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home" "$WORK/bin" "$WORK/tmp-serveur"
+export HOME="$WORK/home"
+PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
+. "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+PASS=0; FAIL=0
+court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; } # une valeur longue montre son début ET sa fin
+assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
+
+cat > "$AUX/ev.mjs" <<'JS'
+import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); const v = new Function('j', 'return (' + process.argv[2] + ')')(j); console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
+cat > "$AUX/sse.mjs" <<'JS'
+// sse.mjs <port> <jeton> <ms> : première ligne « STATUT <code> », puis tout ce que le flux d'événements de P envoie pendant <ms>
+import http from 'node:http';
+const [, , port, token, ms] = process.argv;
+const req = http.get({ host: '127.0.0.1', port: Number(port), path: '/api/vf/events?token=' + token, headers: { Host: `127.0.0.1:${port}` } }, (res) => { console.log('STATUT ' + res.statusCode); res.on('data', (c) => process.stdout.write(c)); });
+req.on('error', () => { console.log('STATUT erreur'); process.exit(0); });
+setTimeout(() => process.exit(0), Number(ms));
+JS
+cat > "$AUX/idx.mjs" <<'JS'
+// idx.mjs <fichier> <sous-chaine> : décalage en octets de la première occurrence (-1 si absente)
+import fs from 'node:fs'; let t = ''; try { t = fs.readFileSync(process.argv[2]).toString('latin1'); } catch {} console.log(t.indexOf(process.argv[3]));
+JS
+# shell de test (P71-PL-11) : marqué par son chemin, lance un shell interactif SANS exec (PID du script = PID du shell vu par pgrep)
+printf '#!/bin/sh\n/bin/sh -i\n' > "$WORK/bin/shell-test"; chmod +x "$WORK/bin/shell-test"
+export SHELL="$WORK/bin/shell-test"
+
+hex32() { node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"; }
+ONG_A="$(hex32)"; ONG_B="$(hex32)"
+rq() { node "$TA" req "$@"; }
+sta() { rq "$@" | sed -n 1p; }
+sj() { node "$AUX/ev.mjs" "$1" < "$SRV_O/.cache/server.json" 2>/dev/null; }
+mklab() { # mklab <dir> : lab GSD minimal, construit ; sortie dans <dir>/.vibeflow/cockpit
+  local L="$1" B="$1/.planning"; mkdir -p "$L/src" "$B/phases/01-socle"; printf 'export const u = 1;\n' > "$L/src/u.js"
+  printf -- '## Phases\n\n- [x] **Phase 1: Socle** - premier jet\n\n### Phase 1: Socle\n**Goal**: Poser le socle\n' > "$B/ROADMAP.md"
+  printf -- '---\nstatus: executing\ncurrent_phase: 1\nmilestone: v1.0 MVP\n---\n' > "$B/STATE.md"
+  printf -- '---\nwave: 1\nfiles_modified: [src/u.js]\n---\n<objective>Poser le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"
+  git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
+  node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
+}
+SRVN=0; GRACE_T=3000
+srv() { # srv <sortie> [arguments du serveur…] -> SRV_PID SRV_O SRV_OUT QP SEC ; serveur lancé directement avec --terminal, comme le lanceur
+  local o="$1"; shift; local lab; lab="$(cd "$o/../.." && pwd)"
+  SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN.out"; rm -f "$o/.cache/server.json"; mkdir -p "$o/.cache"
+  local amorce; amorce="$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")"; (umask 077; printf '%s' "$amorce" > "$o/.cache/terminal-amorce"); (umask 077; printf '%s' "$amorce" > "$WORK/amorce-$SRVN")
+  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" VF_COCKPIT_TERM_GRACE_MS="$GRACE_T" TMPDIR="$WORK/tmp-serveur" exec node "$o/serve.mjs" --no-open --terminal "$@" --port "$(libre)" > "$SRV_OUT" 2>&1 ) </dev/null >/dev/null 2>&1 &
+  SRV_PID=$!; PIDS+=($SRV_PID)
+  for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
+  QP="$(sj '(j.terminal&&j.terminal.url)||""')"; QP="${QP##*:}"; SEC=""
+  if [ -n "$QP" ]; then SEC="$(node "$TA" amorcer "$QP" "$WORK/amorce-$SRVN" | sed -n 2p)"; fi
+}
+unsrv() { vf_hyg_stop "$SRV_PID"; }
+mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> -> MUT_OUT ; code 1 si la cible manque ou si la copie n'a pas changé
+  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
+  cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
+}
+copie() { local d="$WORK/cp-$1"; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"; MUT_OUT="$d/.vibeflow/cockpit"; }
+# clients : flux en arrière-plan (PID enregistré dans FL), commande tapée par un onglet, attente bornée
+flux() { # flux <fichier> <ms> [onglet] -> FL
+  node "$TA" flux "$QP" "$SEC" "${3:-$ONG_A}" "$1" "$2" > "$1.log" 2>&1 & FL=$!; PIDS+=($FL); }
+tape() { node "$TA" entree "$QP" "$SEC" "${2:-$ONG_A}" "$1"; }
+vu() { node "$TA" attendre "$1" "$2" "$3"; }
+python_de() { pgrep -P "$SRV_PID" | sed -n 1p; }
+shell_de() { local a; a="$(python_de)"; [ -n "$a" ] && pgrep -P "$a" | sed -n 1p; }
+attendre_python() { for _ in $(seq 1 80); do [ -n "$(python_de)" ] && return 0; sleep 0.1; done; return 1; }
+corps_etat() { node "$TA" etat "$QP" "$SEC" | sed -n 3p; }
+etat_s() { corps_etat | node "$AUX/ev.mjs" 'j.session' 2>/dev/null; }
+morts() { local fin=$((SECONDS+${1})); shift; local v; while [ $SECONDS -le $fin ]; do v=""; for p in "$@"; do [ -n "$p" ] && kill -0 "$p" 2>/dev/null && v="$v $p"; done; [ -z "$v" ] && return 0; sleep 0.2; done; return 1; }
+
+LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"
+
+# ----- sondes (rejouées sur le code puis sur les mutants) -----
+sonde_unique() { # A attaché ; B -> 409 sur /flux ; rend « B=<statut> assistants=<n> A=<vu> »
+  local f="$WORK/f-uniq-$SRVN.bin" st n a
+  flux "$f" 40000; attendre_python; tape "echo ATTA''CHE-A\\r" > /dev/null
+  a="$(vu "$f" ATTACHE-A 8000)"
+  st="$(rq "$QP" GET /flux --secret "$SEC" --onglet "$ONG_B" --echeance 1500 | sed -n 1p)"
+  n="$(pgrep -P "$SRV_PID" | grep -c . || true)"
+  vf_hyg_stop "$FL"; echo "B=$st assistants=$n A=$a"
+}
+sonde_proprio() { # A attaché ; B tente /entree (touch) et /taille ; rend « entree=<s> taille=<s> fichierB=<existe|absent> fichierA=<existe|absent> »
+  local f="$WORK/f-prop-$SRVN.bin" fb="$WORK/proprio-b-$SRVN.flag" fa="$WORK/proprio-a-$SRVN.flag" se st eb ea
+  flux "$f" 40000; attendre_python
+  se="$(tape "touch $fb\\r" "$ONG_B")"; st="$(node "$TA" taille "$QP" "$SEC" "$ONG_B" 30 100)"; sleep 1.5
+  eb=absent; [ -e "$fb" ] && eb=existe
+  tape "touch $fa\\r" > /dev/null; for _ in $(seq 1 60); do [ -e "$fa" ] && break; sleep 0.1; done
+  ea=absent; [ -e "$fa" ] && ea=existe
+  vf_hyg_stop "$FL"; echo "entree=$se taille=$st fichierB=$eb fichierA=$ea"
+}
+sonde_grace() { # A tape un marqueur, ferme son flux, revient après 1 s ; rend « memeshell=<oui|non> etat=<s> rejeu=<TROUVE|ABSENT> »
+  local f1="$WORK/f-gr1-$SRVN.bin" f2="$WORK/f-gr2-$SRVN.bin" m="MARQ-AVANT-$RANDOM" sh1 sh2 r
+  flux "$f1" 60000; attendre_python; tape "echo $m\\r" > /dev/null; vu "$f1" "$m" 8000 > /dev/null
+  sh1="$(shell_de)"; vf_hyg_stop "$FL"; sleep 1
+  flux "$f2" 20000; r="$(vu "$f2" "$m" 4000)"; sh2="$(shell_de)"
+  echo "memeshell=$([ -n "$sh1" ] && [ "$sh1" = "$sh2" ] && echo oui || echo non) etat=$(etat_s) rejeu=$r"
+  vf_hyg_stop "$FL"
+}
+sonde_confid() { # frappe + sortie ; rend « temoin=<oui|non> export=<s> sse=<s> fuites=<n> » (fuites = fichiers qui portent un marqueur hors du flux du client)
+  local f="$WORK/f-conf-$SRVN.bin" n=$RANDOM tok p="$(sj j.port)" mf mo tw ex ss fu
+  mf="MARQUEUR-FRAPPE-$n"; mo="MARQUEUR-SORTIE-$n"
+  flux "$f" 40000; attendre_python; tape "echo $mf\\r" > /dev/null; tape "echo MARQUEUR-SOR''TIE-$n\\r" > /dev/null
+  tw=non; [ "$(vu "$f" "$mo" 8000)" = TROUVE ] && [ "$(vu "$f" "$mf" 2000)" = TROUVE ] && tw=oui
+  tok="$(sj j.token)"
+  node "$AUX/sse.mjs" "$p" "$tok" 3000 > "$WORK/sse-$SRVN.out" 2>&1
+  ex="$(rq "$p" POST /api/export --jeton "$tok" --entete "x-floorplan-token:$tok" --corps '{}' --corps-vers "$WORK/export-$SRVN.out" | sed -n 1p)"
+  ss="$(sed -n 1p "$WORK/sse-$SRVN.out")"
+  fu="$(grep -rlF -e "$mf" -e "$mo" "$(cd "$SRV_O/../.." && pwd)" "$SRV_OUT" "$WORK/tmp-serveur" "$WORK/sse-$SRVN.out" "$WORK/export-$SRVN.out" 2>/dev/null | grep -c . || true)"
+  vf_hyg_stop "$FL"; echo "temoin=$tw export=$ex sse=$ss fuites=$fu"
+}
+sonde_tampon() { # un marqueur dans la session, `exit`, nouvelle session ; rend « ancien=<vu|non> nouvelle=<OK|non> rejeu=<n> »
+  local f1="$WORK/f-tp1-$SRVN.bin" f2="$WORK/f-tp2-$SRVN.bin" m="MARQUEUR-ANCIEN-$RANDOM" a rj ok
+  flux "$f1" 40000; attendre_python; tape "echo $m\\r" > /dev/null; a="$(vu "$f1" "$m" 8000)"
+  tape "exit\\r" > /dev/null; for _ in $(seq 1 80); do [ "$(etat_s)" = terminee ] && break; sleep 0.1; done; vf_hyg_stop "$FL"
+  flux "$f2" 20000; attendre_python; tape "echo NOUVEAU-OK\\r" > /dev/null; ok="$(vu "$f2" NOUVEAU-OK 8000)"
+  rj="$(node "$AUX/idx.mjs" "$f2" MARQUEUR-ANCIEN)"
+  vf_hyg_stop "$FL"; echo "ancien=$([ "$a" = TROUVE ] && echo vu || echo non) nouvelle=$([ "$ok" = TROUVE ] && echo OK || echo non) rejeu=$([ "$rj" = -1 ] && echo aucun || echo "present@$rj")"
+}
+
+echo "=== T12.5 — lancement des deux serveurs d'inactivité (code et M-IDLE, en parallèle de la suite) ==="
+copie idle-code; IDLE_C="$MUT_OUT"
+if mutant idle vf-cockpit-terminal-session.mjs "s/^    occupe: .*/    occupe: () => false,/"; then IDLE_M="$MUT_OUT"; else IDLE_M=""; fi
+IDLE_T0=$SECONDS
+srv "$IDLE_C" --idle-exit 0.01; IC_PID=$SRV_PID; IC_Q=$QP; IC_S=$SEC; IC_O=$SRV_O
+node "$TA" flux "$IC_Q" "$IC_S" "$ONG_A" "$WORK/f-idle-c.bin" 90000 > "$WORK/f-idle-c.log" 2>&1 & PIDS+=($!); IC_F=$!
+if [ -n "$IDLE_M" ]; then
+  srv "$IDLE_M" --idle-exit 0.01; IM_PID=$SRV_PID; IM_Q=$QP; IM_S=$SEC
+  node "$TA" flux "$IM_Q" "$IM_S" "$ONG_A" "$WORK/f-idle-m.bin" 90000 > "$WORK/f-idle-m.log" 2>&1 & PIDS+=($!); IM_F=$!
+fi
+for _ in $(seq 1 60); do [ -n "$(pgrep -P "$IC_PID" | sed -n 1p)" ] && break; sleep 0.1; done
+IDLE_ATTACHE="$([ -n "$(pgrep -P "$IC_PID" | sed -n 1p)" ] && echo oui || echo non)"
+
+echo "=== T12.8 — fin du shell rapportée ; sans session : 410 ==="
+srv "$OUT"; MAIN_PID=$SRV_PID
+assert_eq "T12.8 — témoin : le serveur a un second écouteur et l'échange de l'amorçage donne un secret de 64 hexadécimaux" "$([[ "$SEC" =~ ^[0-9a-f]{64}$ ]] && echo oui || echo "non : ${SEC:-vide}")" "oui"
+assert_eq "T12.8 — sans session : /etat = absente" "$(etat_s)" "absente"
+assert_eq "T12.8 — sans session : POST /entree -> 410" "$(tape 'echo x\r')" "410"
+assert_eq "T12.8 — sans session : POST /taille -> 410" "$(node "$TA" taille "$QP" "$SEC" "$ONG_A" 30 100)" "410"
+flux "$WORK/f-exit.bin" 40000; attendre_python; tape "echo VIVANT-8\\r" > /dev/null
+assert_eq "T12.8 — témoin : la session est vivante et répond avant le exit" "$(vu "$WORK/f-exit.bin" VIVANT-8 8000)" "TROUVE"
+tape "exit 3\\r" > /dev/null; for _ in $(seq 1 80); do grep -q 'FIN-FLUX' "$WORK/f-exit.bin.log" 2>/dev/null && break; sleep 0.1; done
+assert_eq "T12.8 — le flux se termine à la fin du shell (FIN-FLUX fin)" "$(grep -c 'FIN-FLUX fin' "$WORK/f-exit.bin.log" || true)" "1"
+assert_eq "T12.8 — /etat = {\"session\":\"terminee\",\"code\":3,\"signal\":null}" "$(corps_etat)" '{"session":"terminee","code":3,"signal":null}'
+assert_eq "T12.8 — après la fin : POST /entree -> 410" "$(tape 'echo x\r')" "410"
+vf_hyg_stop "$FL"
+
+echo "=== T12.1 / T12.6 — une seule session, propriétaire d'onglet ==="
+unsrv; srv "$OUT"
+assert_eq "T12.1 — B reçoit 409 sur /flux pendant qu'A est attaché, un seul assistant ; témoin : A reçoit sa propre réponse" "$(sonde_unique)" "B=409 assistants=1 A=TROUVE"
+assert_eq "T12.6 — B : 409 sur /entree et /taille, son fichier n'est jamais créé ; témoin : A crée le sien" "$(sonde_proprio)" "entree=409 taille=409 fichierB=absent fichierA=existe"
+
+echo "=== T12.2 / T12.3 — grâce : retour avant l'échéance, puis disparition après ==="
+unsrv; srv "$OUT"
+assert_eq "T12.2 — A revient après 1 s : même shell, /etat vivante, le marqueur tapé avant la fermeture est rejoué" "$(sonde_grace)" "memeshell=oui etat=vivante rejeu=TROUVE"
+flux "$WORK/f-g3.bin" 40000; for _ in $(seq 1 30); do [ "$(etat_s)" = vivante ] && break; sleep 0.1; done
+AP3="$(python_de)"; SH3="$(shell_de)"
+assert_eq "T12.3 — témoin : un assistant et un shell vivent avant la fermeture du flux" "$([ -n "$AP3" ] && [ -n "$SH3" ] && kill -0 "$AP3" 2>/dev/null && kill -0 "$SH3" 2>/dev/null && echo oui || echo "non (assistant=${AP3:-aucun} shell=${SH3:-aucun})")" "oui"
+vf_hyg_stop "$FL"; sleep 1
+assert_eq "T12.3 — témoin : 1 s après la fermeture, la session est détachée mais l'assistant vit encore" "$(etat_s) $(kill -0 "$AP3" 2>/dev/null && echo vivant || echo mort)" "detachee vivant"
+sleep $((GRACE_T/1000+1))
+assert_eq "T12.3 — grâce + 2 s : assistant et shell disparus (attente bornée), /etat = absente" "$(morts 8 "$AP3" "$SH3" && echo morts || echo "survivants"; etat_s)" "$(printf 'morts\nabsente')"
+flux "$WORK/f-g3b.bin" 20000; attendre_python; SH3B="$(shell_de)"
+assert_eq "T12.3 — un nouveau flux crée un nouveau shell (PID différent)" "$([ -n "$SH3B" ] && [ "$SH3B" != "$SH3" ] && echo oui || echo "non (ancien=$SH3 nouveau=${SH3B:-aucun})")" "oui"
+vf_hyg_stop "$FL"
+
+echo "=== T12.7 — tampon borné à 256 Kio (400 Kio produits pendant qu'A est détaché) ==="
+unsrv; GRACE_T=12000; srv "$OUT"
+flux "$WORK/f-t7a.bin" 40000; attendre_python; tape "echo PRET-7\\r" > /dev/null; vu "$WORK/f-t7a.bin" PRET-7 8000 > /dev/null
+vf_hyg_stop "$FL"
+tape "head -c 409600 /dev/zero | tr '\\0' 'x'; echo FIN-PROD''UCTION\\r" > /dev/null; sleep 2
+flux "$WORK/f-t7b.bin" 30000; sleep 1; tape "echo APR''ES-7\\r" > /dev/null
+T7V="$(vu "$WORK/f-t7b.bin" APRES-7 10000)"; T7N="$(node "$AUX/idx.mjs" "$WORK/f-t7b.bin" APRES-7)"
+assert_eq "T12.7 — témoin : la production a eu lieu pendant le détachement et le rejeu atteint le plafond (≥ 262144 octets)" "$T7V $([ "$T7N" -ge 262144 ] && echo plein || echo "court:$T7N")" "TROUVE plein"
+assert_eq "T12.7 — le rejeu ne dépasse pas 262144 octets + 4096" "$([ "$T7N" -le 266240 ] && echo borne || echo "trop long:$T7N")" "borne"
+assert_eq "T12.7 — la fin de la production est présente dans le rejeu" "$(vu "$WORK/f-t7b.bin" FIN-PRODUCTION 2000)" "TROUVE"
+vf_hyg_stop "$FL"; unsrv; GRACE_T=3000
+
+echo "=== T15 — rien sur disque, rien dans le journal, le SSE, l'export ; tampon vidé à la fin ==="
+srv "$OUT"
+assert_eq "T15.1 — témoin : les deux marqueurs sont dans le flux du client ; export 200 ; SSE 200 ; aucun fichier ne les porte" "$(sonde_confid)" "temoin=oui export=200 sse=STATUT 200 fuites=0"
+unsrv; srv "$OUT"
+assert_eq "T15.2 — après exit, une nouvelle session fonctionne et ne rejoue rien de l'ancienne" "$(sonde_tampon)" "ancien=vu nouvelle=OK rejeu=aucun"
+unsrv
+
+echo "=== mutants ==="
+GRACE_T=3000
+if mutant grace0 vf-cockpit-terminal-session.mjs "s/^export const GRACE_MS = .*/export const GRACE_MS = 0;/"; then
+  srv "$MUT_OUT"
+  R="$(sonde_grace)"; assert_eq "M-GRACE0 — le mutant rougit T12.2 (grâce nulle : le shell et le tampon ne survivent pas)" "$([ "$R" != "memeshell=oui etat=vivante rejeu=TROUVE" ] && echo rouge || echo "identique : $R")" "rouge"; unsrv
+else assert_eq "M-GRACE0 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant unique vf-cockpit-terminal-session.mjs "s/if (s && s.etat !== .terminee. && s.onglet !== onglet) return 409;/if (s) s.onglet = onglet;/"; then
+  srv "$MUT_OUT"; R="$(sonde_unique)"; assert_eq "M-UNIQUE — le mutant rougit T12.1 (un autre onglet remplace le propriétaire)" "$([ "$R" != "B=409 assistants=1 A=TROUVE" ] && echo rouge || echo "identique : $R")" "rouge"; unsrv
+else assert_eq "M-UNIQUE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant proprio vf-cockpit-terminal-session.mjs "/ecrire(octets, onglet)/,/stdin.write/s/if (s.onglet !== onglet) return 409;//"; then
+  srv "$MUT_OUT"; R="$(sonde_proprio)"; assert_eq "M-PROPRIO — le mutant rougit T12.6 (le fichier de B est créé)" "$([ "$R" != "entree=409 taille=409 fichierB=absent fichierA=existe" ] && echo rouge || echo "identique : $R")" "rouge"; unsrv
+else assert_eq "M-PROPRIO — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant tampon vf-cockpit-terminal-session.mjs "s/^  const vider = .*/  const vider = () => {};/"; then
+  srv "$MUT_OUT"; R="$(sonde_tampon)"; assert_eq "M-TAMPON — le mutant rougit T15.2 (le tampon de l'ancienne session est rejoué)" "$([ "$R" != "ancien=vu nouvelle=OK rejeu=aucun" ] && echo rouge || echo "identique : $R")" "rouge"; unsrv
+else assert_eq "M-TAMPON — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant journal vf-cockpit-terminal-session.mjs "s/enfant\.stdout\.on(.data., (b) => {/& console.error(b.toString(\"latin1\"));/"; then
+  srv "$MUT_OUT"; R="$(sonde_confid)"; assert_eq "M-JOURNAL — le mutant rougit T15.1 (la sortie du shell est journalisée)" "$([ "$R" != "temoin=oui export=200 sse=STATUT 200 fuites=0" ] && echo rouge || echo "identique : $R")" "rouge"; unsrv
+else assert_eq "M-JOURNAL — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
+echo "=== T12.5 — inactivité : un terminal ouvert empêche l'arrêt (attente bornée jusqu'à 65 s après le lancement) ==="
+while [ $((SECONDS-IDLE_T0)) -lt 65 ]; do sleep 1; done
+assert_eq "T12.5 — témoin : le terminal de la sonde était bien ouvert (un assistant enfant du serveur)" "$IDLE_ATTACHE" "oui"
+assert_eq "T12.5 — --idle-exit 0.01, session attachée, aucun onglet P : le serveur est vivant après 65 s" "$(kill -0 "$IC_PID" 2>/dev/null && echo vivant || echo sorti)" "vivant"
+if [ -n "$IDLE_M" ]; then assert_eq "M-IDLE — le mutant rougit T12.5 : le même serveur, sans occupe(), est sorti" "$(kill -0 "$IM_PID" 2>/dev/null && echo vivant || echo sorti)" "sorti"
+else assert_eq "M-IDLE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+vf_hyg_stop "$IC_PID"; [ -n "$IDLE_M" ] && vf_hyg_stop "$IM_PID"
+
+vf_hyg_assert
+echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
+[ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
+[ "$FAIL" -eq 0 ] && exit 0 || exit 1
