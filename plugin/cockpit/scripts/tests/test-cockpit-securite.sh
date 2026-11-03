@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test-cockpit-securite.sh — correction A de la Phase 67 (audit 67-SECURITY : B2, M1-M11) ; la chaîne complète est dans test-cockpit-chaine-xss.sh.
-#   H en-têtes (CSP, nosniff, DENY) · X aucun champ du graphe n'est interprété (navigateur ; mutant : h() retiré) · B corps non objet
+#   H en-têtes (CSP, nosniff, DENY ; pages Code, Projet et Équipe) · X aucun champ du graphe n'est interprété (navigateur ; mutant : h() retiré) · B corps non objet
 #   S session = uuid · J server.json 0600 · M masque de la dernière commande · L aucun script du lab exécuté · Y liens symboliques
 #   E « < » du graphe · C échec franc sans le serveur du cockpit · T timeouts · R regex de chemin bornée
 # Chaque famille a son témoin (positif ou rouge) ; la suite rougit sur un module antérieur aux correctifs. Exit 0 si tout passe.
@@ -104,7 +104,7 @@ srv "$OUT"; PORT=$SRV_PORT; TOK="$(tok "$PORT" /)"; PTOK="$(tok "$PORT" /project
 assert_eq "0 — serveur démarré, jetons lus" "$([ "$PORT" -gt 0 ] && [ ${#TOK} -ge 16 ] && [ ${#PTOK} -ge 16 ] && echo oui || echo non)" "oui"
 
 echo "=== H — en-têtes sur toutes les réponses ==="
-for p in / /project.html /graph.json /inexistant "/api/vf/etat" ; do
+for p in / /project.html /equipe.html /graph.json /inexistant "/api/vf/etat" ; do
   H="$(hdr "$PORT" "$p" "$TOK")"
   assert_eq "H1 — $p : nosniff, DENY, CSP présents" "$(printf '%s' "$H" | node "$AUX/ev.mjs" '(j["x-content-type-options"]==="nosniff")+","+(j["x-frame-options"]==="DENY")+","+!!j["content-security-policy"]')" "true,true,true"
 done
@@ -112,6 +112,8 @@ assert_eq "H2 — un 403 (sans jeton) porte aussi les en-têtes" "$(hdr "$PORT" 
 PAGE="$WORK/page.html"; node "$AUX/req.mjs" "$PORT" GET /project.html | sed '1,2d' > "$PAGE"; CSP="$(hdr "$PORT" /project.html | node "$AUX/ev.mjs" 'j["content-security-policy"]')"
 for d in "connect-src 'self'" "frame-ancestors 'none'" "form-action 'none'" "img-src 'self' data:" "base-uri 'none'"; do assert_has "H3 — la CSP de la page contient « $d »" "$CSP" "$d"; done
 assert_eq "H4 — script-src sans 'unsafe-inline' ni 'unsafe-eval' ni origine" "$(printf '%s' "$CSP" | tr ';' '\n' | grep -E '^ *script-src' | grep -cE "unsafe-|http|\*|'self'")" "0"
+CSPE="$(hdr "$PORT" /equipe.html | node "$AUX/ev.mjs" 'j["content-security-policy"]')"
+assert_eq "H4bis — la CSP de /equipe.html : script-src présent, sans 'unsafe-inline' ni 'unsafe-eval' ni origine" "$(printf '%s' "$CSPE" | tr ';' '\n' | grep -E '^ *script-src' | grep -cE "unsafe-|http|\*|'self'")|$(printf '%s' "$CSPE" | tr ';' '\n' | grep -cE '^ *script-src')" "0|1"
 cat > "$AUX/empreintes.mjs" <<'JS'
 import fs from 'node:fs'; import crypto from 'node:crypto';
 const h = fs.readFileSync(process.argv[2], 'utf8'), csp = process.argv[3];
