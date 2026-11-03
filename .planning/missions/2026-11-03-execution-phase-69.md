@@ -112,6 +112,28 @@ Les `preuves` sont relayées telles que les workers les ont rendues.
 - **69-08** : equipe 68/0 ; transcript 60/0 ; who, vendor, chrome-fr, responsive, chaine-xss rc 0 ; synchro.sh verifier rc 0.
 - **69-09** : replay-ci-jobs.sh --job gates rc 0 ; check-version-sync 0 ; check-machine-paths 0 ; 21 suites du cockpit rc 0.
 
+Bloc machine. Il reprend tel quel le bloc typé de chaque juge, puis ajoute les rejeux du manager :
+
+```json
+{"preuves": [
+  {"verdict": "revue", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-avancement.sh (extraction git archive 8586e032)", "exit_code": 0, "sha": "8586e032"},
+  {"verdict": "audit", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-equipe.sh", "exit_code": 0, "sha": "f1a5f9e4271b6daf1048418080f835f30c56d4ca"},
+  {"verdict": "audit", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-transcript.sh", "exit_code": 0, "sha": "f1a5f9e4271b6daf1048418080f835f30c56d4ca"},
+  {"verdict": "audit", "commande": "bash plugin/cockpit/amont/synchro.sh verifier (extraction 945613b6)", "exit_code": 0, "sha": "945613b6"},
+  {"verdict": "revue", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-equipe.sh (arbre figé 945613b6)", "exit_code": 0, "sha": "945613b6"},
+  {"verdict": "revue", "commande": "bash test-cockpit-transcript.sh, equipe, who, forme-claude sur git archive 02145ab3", "exit_code": 0, "sha": "02145ab3"},
+  {"verdict": "revue", "commande": "suites test-cockpit-{equipe,transcript,chrome-fr,responsive,chaine-xss,vendor}.sh et synchro.sh verifier sur l'extraction 8fb39eeb", "exit_code": 0, "sha": "8fb39eeb"},
+  {"verdict": "revue", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-transcript.sh (+ equipe, who, forme-claude, robustesse, securite) sur git archive 2177a34f", "exit_code": 0, "sha": "2177a34f"},
+  {"verdict": "revue", "commande": "bash test-cockpit-{avancement,projet,who,direct,equipe}.sh sur git archive a7cf1dd8 plugin/cockpit", "exit_code": 0, "sha": "a7cf1dd8"},
+  {"verdict": "revue", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-{avancement,projet,assemblage,onglet-code,marque-blanche,vendor,direct}.sh sur git archive 823e0b9e plugin/cockpit", "exit_code": 0, "sha": "823e0b9e72e5005ca6fdaf9141850ece1e9a928d"},
+  {"verdict": "gates", "commande": "replay-ci-jobs.sh --job gates (20 rejouées, 3 sautées, 0 échec)", "exit_code": 0, "sha": "2177a34f7bbb4d4f9aef281ce84bc00f27a85c68"},
+  {"verdict": "non-regression", "commande": "146 suites de scripts/ci-shard-suites.sh --all, GW_MODE=sans-mutants, une à une (146 jouées, 0 échec)", "exit_code": 0, "sha": "2177a34f7bbb4d4f9aef281ce84bc00f27a85c68"},
+  {"verdict": "gates", "commande": "replay-ci-jobs.sh --job gates (20 rejouées, 3 sautées, 0 échec)", "exit_code": 0, "sha": "823e0b9e72e5005ca6fdaf9141850ece1e9a928d"},
+  {"verdict": "non-regression", "commande": "21 suites plugin/cockpit/scripts/tests/test-cockpit-*.sh, GW_MODE=sans-mutants, une à une", "exit_code": 0, "sha": "823e0b9e72e5005ca6fdaf9141850ece1e9a928d"},
+  {"verdict": "recette", "preuve": "amont"}
+]}
+```
+
 `estimate` et `actuals` sont relayés tels quels. Chaque plan porte son estimation en `confidence: low`, entre 70 000 et 115 000 tokens. Aucun worker n'a produit d'actuals mesurés, l'exécution étant directe et hors moteur.
 
 ## Décompte de mission
