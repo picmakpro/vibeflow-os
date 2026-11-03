@@ -2,7 +2,8 @@
 # test-cockpit-responsive.sh — CKPT-12 (P67-D-21) : la fenêtre du cockpit est ajustable, de 1 024 à 2 560 px, sans superposition ni rognage.
 #   R1 chargement à 1 024 / 1 280 / 1 440 / 1 920 / 2 560 px · R2 redimensionnement à chaud 1 920 -> 1 024 -> 1 920 · R3 rendu non cassé à 800 et 390 px
 #   R4 témoin rouge : le même lab sans la mise en page du cockpit rougit · R5 lab sans STATE.md : aucun champ vide dans le sous-titre ni le panneau
-# Deux onglets (Code, Projet) × deux labs (nom court, nom de 60 caractères), badge « au travail » rempli (verrou + nœud de DAG).
+# Deux onglets (Code, Projet) × deux labs (nom court, nom de 60 caractères), badge « au travail » rempli : une session active par lab (P69-D-33 : le badge ne compte que les agents ;
+# un verrou ou un nœud de DAG ne suffisent plus). R7.5 : un lab sans agent actif, badge « Personne ».
 # Mesure : getBoundingClientRect dans un Chrome headless (chrome-responsive.mjs) — recouvrement des éléments frères, scrollWidth > clientWidth,
 # recherche >= 200 px, logo >= 20x18 sans filtre, barre de question sur une ligne avec son invite entière.
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
@@ -40,13 +41,21 @@ case "$1" in
   orphans) echo '{"orphans":[]}' ;;
 esac
 SH
-mklab() { # mklab <dir> : lab GSD sans STATE.md, deux phases, un DAG de mission avec un nœud en cours
+NSESS=0
+agent_actif() { # agent_actif <lab> : une session Claude Code récente de ce lab (forme réelle) : un agent actif, que le badge compte ; sa date est rafraîchie tant que la suite vit (fraîcheur de 3 minutes)
+  local L="$1"
+  local SID D TS; NSESS=$((NSESS+1)); SID="aaaa1111-2222-3333-4444-$(printf '%012d' "$NSESS")"; D="$HOME/.claude/projects/-lab-$NSESS"; TS="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"; mkdir -p "$D"
+    printf '{"type":"user","cwd":"%s","sessionId":"%s","gitBranch":"main","version":"2.1.317","timestamp":"%s","message":{"content":"salut"}}\n{"type":"assistant","cwd":"%s","sessionId":"%s","gitBranch":"main","version":"2.1.317","timestamp":"%s","message":{"content":[{"type":"text","text":"bonjour"}]}}\n' "$L" "$SID" "$TS" "$L" "$SID" "$TS" > "$D/$SID.jsonl"
+    ( while kill -0 $$ 2>/dev/null; do touch "$D/$SID.jsonl"; sleep 10; done ) </dev/null >/dev/null 2>&1 &
+}
+mklab() { # mklab <dir> [sans-agent] : lab GSD sans STATE.md, deux phases, un DAG de mission avec un nœud en cours, une session active (sauf sans-agent)
   local L="$1" B="$1/.planning"; mkdir -p "$L/src" "$B/phases/01-socle" "$B/phases/02-suite" "$B/missions"
   printf 'export const u = () => 1;\n' > "$L/src/util.js"
   printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n- [ ] **Phase 2: Suite** - la suite\n' > "$B/ROADMAP.md"
   printf '<objective>Faire le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"; echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
   printf '<objective>Faire la suite</objective>\n' > "$B/phases/02-suite/02-01-PLAN.md"
   printf '{"nodes":[{"id":"a","step":"première étape","stage":"","deps":[],"scope":["src/**"],"status":"done"},{"id":"b","step":"seconde étape","stage":"","deps":["a"],"scope":["src/**"],"status":"running"}]}\n' > "$B/missions/demo.dag.json"
+  [ "${2:-}" = sans-agent ] || agent_actif "$L"
   git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
   node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build-$(basename "$L").out" 2>&1 || cat "$WORK/build-$(basename "$L").out"
 }
@@ -245,6 +254,7 @@ unsrv
 
 echo "=== R4 — témoin rouge : sans la mise en page du cockpit, la mesure rougit ==="
 LM="$WORK/lab-mutant"; mkdir -p "$LM/.planning" "$LM/.vibeflow" "$LM/.planning/missions"; cp -R "$LL/.vibeflow/cockpit" "$LM/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$LM/.planning/missions/"
+agent_actif "$LM"
 node -e "
 const fs=require('fs');for(const f of ['index.html','project.html']){const p='$LM/.vibeflow/cockpit/'+f;const h=fs.readFileSync(p,'utf8');
 const n=h.replace(/<script>\/\* ui\/01-vf-responsive\.js \*\/[\s\S]*?<\/script>/,'<script>/* mutant */</script>');if(n===h){console.error('mutant : bloc 01-vf-responsive.js introuvable');process.exit(1)}fs.writeFileSync(p,n)}" || FAIL=$((FAIL+1))
@@ -253,6 +263,7 @@ assert_has "R4.1 — témoin rouge : sans 01-vf-responsive.js, l'en-tête à 1 4
 
 # R4.2 — témoin rouge de R-1 (recalé en 69-05 : trois onglets, borne de 280 px, mutant à 280 + 36 = 316 px, même marge qu'avant : 264 -> 300) : la borne d'avant (colonne gauche de 316 px) fait sortir le dernier bouton de l'onglet Code à 1 024 px
 LM2="$WORK/lab-mutant2"; mkdir -p "$LM2/.planning/missions" "$LM2/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$LM2/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$LM2/.planning/missions/"
+agent_actif "$LM2"   # sans agent actif le badge dit « Personne », plus étroit : la mesure ne verrait plus le même en-tête
 node -e "
 const fs=require('fs');const p='$LM2/.vibeflow/cockpit/index.html';const h=fs.readFileSync(p,'utf8');
 const n=h.replace('header .hl { flex: 1 1 0; min-width: 280px; }','header .hl { flex: 1 1 0; min-width: 316px; }');if(n===h){console.error('mutant : borne de 280 px introuvable');process.exit(1)}fs.writeFileSync(p,n)" || FAIL=$((FAIL+1))
@@ -298,6 +309,16 @@ for i in 0 1; do on=$([ $i = 0 ] && echo Code || echo Projet)
   assert_eq "R7.2 — $on : l'infobulle du badge ne contient jamais « undefined »" "$(printf '%s' "$X7" | node "$AUX/ev.mjs" "!/undefined/.test(j.resultats[$i].valeur.titre)")" "true"
   assert_eq "R7.3 — $on : aucun bouton visible de la zone d'actions de l'en-tête sans infobulle (icône seule sous 1 600 px)" "$(printf '%s' "$X7" | node "$AUX/ev.mjs" "j.resultats[$i].valeur.sansInfobulle.length+'/'+j.resultats[$i].valeur.sansInfobulle.join(',')")" "0/"
   assert_eq "R7.4 — $on : aucun bouton visible de la zone d'actions de l'en-tête sans nom accessible" "$(printf '%s' "$X7" | node "$AUX/ev.mjs" "j.resultats[$i].valeur.sansNom.length+'/'+j.resultats[$i].valeur.sansNom.join(',')")" "0/"
+done
+
+# R7.5 — un lab SANS agent actif (le verrou du faux driver et le nœud de DAG « en cours » restent là) : le badge dit « Personne » et ne ment pas
+LP="$WORK/lab-sans-agent"; mklab "$LP" sans-agent
+srv "$LP/.vibeflow/cockpit"; PP7=$SRV_PORT
+XP="$(RESP_INJECT="" CDP_PRET="document.readyState === 'complete' && !!document.getElementById('flows-btn') && !!document.getElementById('vf-lock') && /Personne/.test(document.getElementById('vf-lock').textContent)" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 500 "$EXPR" "http://127.0.0.1:$PP7/index.html" "http://127.0.0.1:$PP7/project.html")"; unsrv
+assert_eq "R7.5.0 — témoin : la mesure du lab sans agent a eu lieu sur les deux onglets" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" '(j.erreur||"")+"|"+(j.resultats||[]).length')" "|2"
+for i in 0 1; do on=$([ $i = 0 ] && echo Code || echo Projet)
+  assert_eq "R7.5.1 — $on, sans agent actif : l'aria-label du badge dit « Personne au travail »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" "j.resultats[$i].valeur.aria")" "Personne au travail"
+  assert_eq "R7.5.2 — $on, sans agent actif : l'infobulle du badge dit « Personne au travail » et ne contient jamais « undefined »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" "(/^Personne au travail/.test(j.resultats[$i].valeur.titre)&&!/undefined/.test(j.resultats[$i].valeur.titre))+'|'+j.resultats[$i].valeur.titre.slice(0,60)")" "true|Personne au travail · repo : vf-dev-manager-v2-cockpit (miss"
 done
 
 vf_hyg_assert
