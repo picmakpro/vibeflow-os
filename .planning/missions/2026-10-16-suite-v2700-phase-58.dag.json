@@ -132,7 +132,7 @@
         "exec-58"
       ],
       "scope": [],
-      "status": "ready",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -143,7 +143,7 @@
         "exec-58"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "docs",
@@ -227,7 +227,7 @@
         "hotfix-py"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "verif-58",
