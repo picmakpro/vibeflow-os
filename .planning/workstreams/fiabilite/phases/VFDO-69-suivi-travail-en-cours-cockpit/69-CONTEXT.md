@@ -189,7 +189,27 @@ Réponses de Samuel consignées mot pour mot ; canal et date : AskUserQuestion, 
 
 ### Point ouvert
 
-- **Ligne `phase` du DAG de la 67** : à poser côté mission 67 (Samuel la traite, même date).
+- **Ligne `phase` du DAG de la 67** : à poser côté mission 67 (Samuel la traite, même date). Constat du
+  manager à la planification (2026-11-03) : déjà posée, commit `40bc239c`.
+
+### Arbitrages de planification (AskUserQuestion, session principale, 2026-11-03)
+
+Questions ouvertes par la recherche (`69-RESEARCH.md`, OQ-1, OQ-8, OQ-9), posées à Samuel par la session
+principale et relayées au manager ; libellés de l'option choisie, mot pour mot.
+
+- **P69-D-25 (OQ-1, affichage de `a-recetter`).** « Couleur « en cours » + mot (Recommandé) » : la carte garde
+  la couleur `active` et porte le mot « à recetter » en tête du pied ; l'état exact reste dans `avancement.etat` ;
+  aucun patch du viewer vendorisé. Une distinction visuelle propre relève de la Phase 70.
+- **P69-D-26 (OQ-8, version du module).** « Bump v1.1.0 (Recommandé) » : le dernier plan porte le bump `v1.1.0`
+  du module `cockpit` (`VERSION`, `module.json`, `CHANGELOG.md`) ; la release racine reste hors mission (geste
+  humain).
+- **P69-D-27 (OQ-9, risque résiduel du transcript).** « J'accepte » : niveau de risque accepté pour un affichage
+  local à la demande (secret en prose masqué au mieux, jeton de page lisible par tout processus local, M7 de la
+  Phase 67).
+
+Les autres défauts des plans (OQ-2 à OQ-7, OQ-10, choix d'usage du planificateur) sont des **décisions du
+manager** (vf-dev-manager, planification 2026-11-03), non soumises une à une à Samuel : elles ne valent pas
+arbitrage humain et peuvent être rouvertes sur simple objection.
 
 </decisions>
 
