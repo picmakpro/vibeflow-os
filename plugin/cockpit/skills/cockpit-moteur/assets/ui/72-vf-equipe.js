@@ -52,8 +52,8 @@
     z = document.createElement('div'); z.className = 'vf-transcript'; z.dataset.vfDe = b.dataset.vfTranscript;
     b.after(z); return z;
   };
-  // arrivée par un lien `equipe.html#r=n:<carte>` : 00-vibeflow.js la traite à `ready`, mais un rerender() lancé pendant le premier rendu annule son
-  // `after` et `ready` n'est alors jamais émis ; on révèle la carte visée après le premier rendu qui aboutit (une seule fois par page)
+  // arrivée par un lien `equipe.html#r=n:<carte>` : 00-vibeflow.js la traite à `ready` et à chaque changement de fragment, mais un rerender() lancé pendant le premier rendu
+  // annule son `after` et `ready` n'est alors jamais émis ; on révèle la carte visée après le premier rendu qui aboutit (une seule fois par page)
   let arrive = false;
   const arrivee = () => {
     if (arrive) return;
@@ -62,6 +62,27 @@
     if (r && /^n:/.test(r) && SC.exists(r)) SC.reveal(r);
   };
   const parCarte = () => new Map(equipe(window.__vfLive?.who).map((w) => [idCarte(w), w]));
+
+  // transcript lu : gardé en mémoire de la page seulement (jamais dans le graphe, le stockage ni l'export), reposé par un observateur chaque fois que le panneau est redessiné
+  // (à chaque `who`, par le viewer, par l'arrivée sur une carte) ; il disparaît quand le panneau montre un autre agent. Seul l'identifiant de l'agent est gardé dans
+  // sessionStorage, pour redemander le transcript après un rechargement de la page (structure de l'équipe changée, « Map updated »).
+  const CLE_OUVERT = 'vf-equipe-ouvert';
+  let lu = null, redemande = false;
+  const marque = (id) => { try { if (id) sessionStorage.setItem(CLE_OUVERT, id); else sessionStorage.removeItem(CLE_OUVERT); } catch {} };
+  const boutons = () => [...document.querySelectorAll('[data-vf-transcript]')];
+  const remettre = () => {
+    const bs = boutons(); if (!bs.length) return;
+    if (!lu) {
+      let id = null; try { id = sessionStorage.getItem(CLE_OUVERT); } catch {}
+      const b = id && !redemande ? bs.find((x) => x.dataset.vfTranscript === id) : null;
+      if (b) { redemande = true; b.click(); }
+      return;
+    }
+    const b = bs.find((x) => x.dataset.vfTranscript === lu.id);
+    if (!b) { lu = null; marque(null); return; } // un autre agent : le transcript lu disparaît
+    const z = zoneDe(b); if (!z.firstChild) z.replaceChildren(...lu.noeuds);
+  };
+  new MutationObserver(remettre).observe(document.documentElement, { childList: true, subtree: true });
   async function suivre() {
     const liste = equipe(window.__vfLive?.who);
     if (!window.__vfLive?.who) return;
@@ -72,12 +93,7 @@
     for (const w of liste) { if (w.etat === 'termine') compte.termine++; else if (w.etat === 'en-attente') compte.enAttente++; else compte.actif++; }
     for (const x of G.nodes) { const w = parId.get(x.id); if (w) { x.st = w.etat === 'termine' ? 'done' : 'active'; x.foot = R().pied(w); } }
     G.meta.vf = { ...G.meta.vf, compte };
-    // le panneau est redessiné par rerender() : le transcript déjà lu passe d'un conteneur à l'autre, en mémoire de la page seulement
-    const ouvert = document.querySelector('.vf-transcript');
-    const garde = ouvert ? { id: ouvert.dataset.vfDe, noeuds: [...ouvert.childNodes] } : null;
     await SC.rerender();
-    const b = garde && [...document.querySelectorAll('[data-vf-transcript]')].find((x) => x.dataset.vfTranscript === garde.id);
-    if (b) zoneDe(b).replaceChildren(...garde.noeuds);
     arrivee();
   }
   document.addEventListener('vf-who', suivre);
@@ -92,22 +108,15 @@
       <button type="button" data-vf-doing="${h(w.id)}">Voir la dernière commande</button><div class="vf-doing" hidden></div>
       <button type="button" data-vf-transcript="${h(w.id)}">Lire le transcript</button></div>`;
   });
-  // lecture à la demande : requête authentifiée, texte seulement (createElement + textContent dans le rendu), rien n'est conservé
+  // lecture à la demande : requête authentifiée, texte seulement (createElement + textContent dans le rendu)
   document.addEventListener('click', async (ev) => {
     const b = ev.target.closest?.('[data-vf-transcript]');
     if (!b) return;
-    const zone = zoneDe(b);
+    const id = b.dataset.vfTranscript;
     b.disabled = true;
-    try {
-      const r = SRV && SRV.token ? await fetch('/api/vf/transcript?id=' + encodeURIComponent(b.dataset.vfTranscript), { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' }) : null;
-      const d = r && r.ok ? await r.json() : null;
-      if (d) zone.replaceChildren(R().transcript(d, document)); else zone.textContent = 'Indisponible.';
-    } catch { zone.textContent = 'Indisponible.'; }
-    b.disabled = false;
-  });
-  // un lien vers une autre carte de cette page (tiroir « Au travail ») ne recharge pas la page : on révèle la carte visée
-  window.addEventListener('hashchange', () => {
-    const r = new URLSearchParams(location.hash.slice(1)).get('r');
-    if (r && /^n:/.test(r) && SC.exists(r)) SC.reveal(r);
+    let d = null;
+    try { const r = SRV && SRV.token ? await fetch('/api/vf/transcript?id=' + encodeURIComponent(id), { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' }) : null; d = r && r.ok ? await r.json() : null; } catch {}
+    lu = { id, noeuds: [...R().transcript(d, document).childNodes] }; marque(id);
+    for (const x of boutons()) if (x.dataset.vfTranscript === id) { zoneDe(x).replaceChildren(...lu.noeuds); x.disabled = false; }
   });
 })();

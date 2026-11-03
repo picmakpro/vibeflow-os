@@ -130,11 +130,14 @@
       return `<div class="sec"><h3>Touché par <span class="c">${list.length}</span></h3>${rows}</div>`;
     });
   }
-  // arrivée depuis l'autre onglet : #r=<chemin ou id> révèle la carte visée
-  SC.on('ready', () => {
+  // arrivée par `#r=<chemin ou id>` : depuis l'autre onglet (à `ready`) ET par un lien de la même page (clic sur un lien de nœud ou d'agent du tiroir ou d'un panneau :
+  // seul le fragment change, la page ne se recharge pas, `ready` n'est pas rejoué et le viewer, à `popstate`, revient à la vue d'ensemble : on révèle la cible après lui)
+  const arriver = () => {
     const r = new URLSearchParams(location.hash.slice(1)).get('r');
     if (!r) return;
     const id = /^[nf]:/.test(r) ? r : 'f:' + r;
     if (SC.exists(id)) SC.reveal(id); else SC.toast(`Pas sur cette carte : ${r}`);
-  });
+  };
+  SC.on('ready', arriver);
+  window.addEventListener('hashchange', arriver);
 })();

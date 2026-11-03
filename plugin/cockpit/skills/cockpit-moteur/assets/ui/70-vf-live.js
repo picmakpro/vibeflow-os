@@ -56,26 +56,54 @@
   const AGENT = (w) => w.kind === 'session' || w.kind === 'subagent';
   // « au travail » : un agent `actif` non périmé ; un terminé ou un agent en attente n'y est jamais compté (P69-D-14)
   const auTravail = (w) => !w.stale && (w.etat || 'actif') === 'actif';
-  const whoPanel = () => {
+  const htmlTiroir = () => {
     const ws = who?.workers || [], act = ws.filter(auTravail), reste = ws.filter((w) => !AGENT(w));
     const row = (w) => `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${h(duree(w.ageS))}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span><div>${h(w.task || '')}</div></div>`;
     const src = Object.entries(who?.sources || {}).map(([k, v]) => `${k} : ${v.etat}`).join(' · ');
     const arbre = window.__vfEquipeRendu.arbre(ws, h);
-    SC.showPanel(`<div class="vf-whop"><h3>Au travail (${act.length})</h3><p class="regle">${h(lockText(probe.lock).text)}.</p><p class="regle">Règle de fraîcheur : ${FRAICHEUR}, actifs et terminés depuis moins de 24 h ; la dernière commande et le transcript ne s'affichent que sur demande.</p>${arbre || (reste.length ? '' : '<p>Personne. Sources lues : ' + h(src) + '</p>')}${reste.length ? `<h4>Verrous et nœuds</h4>${reste.map(row).join('')}` : ''}<p class="src">${h(src)}</p></div>`);
+    return (`<div class="vf-whop"><h3>Au travail (${act.length})</h3><p class="regle">${h(lockText(probe.lock).text)}.</p><p class="regle">Règle de fraîcheur : ${FRAICHEUR}, actifs et terminés depuis moins de 24 h ; la dernière commande et le transcript ne s'affichent que sur demande.</p>${arbre || (reste.length ? '' : '<p>Personne. Sources lues : ' + h(src) + '</p>')}${reste.length ? `<h4>Verrous et nœuds</h4>${reste.map(row).join('')}` : ''}<p class="src">${h(src)}</p></div>`);
   };
-  // révélation ponctuelle : la réponse reste dans la ligne cliquée
+  let dernier = '';
+  const whoPanel = () => { dernier = htmlTiroir(); SC.showPanel(dernier); };
+  // tant que le tiroir est ouvert il suit le flux : redessiné à chaque `who` qui change l'arbre, l'état ou la dernière action (pas d'image identique), en gardant le défilement
+  // et l'état replié ou déplié des « Terminés » ; les commandes demandées sont reposées par l'observateur ci-dessous
+  const cleDe = (d) => d.closest('[data-vf-agent]')?.dataset.vfAgent || ''; // le bloc « Terminés » est repéré par l'agent qui le porte (stable quand un terminé s'y ajoute)
+  const redessiner = () => {
+    if (!document.querySelector('.vf-whop') || document.body.classList.contains('no-panel')) return; // tiroir fermé ou remplacé : on ne le rouvre pas
+    const html = htmlTiroir();
+    if (html === dernier) return;
+    const p = document.getElementById('panel'), haut = p ? p.scrollTop : 0;
+    const ouverts = new Set([...document.querySelectorAll('.vf-whop details.vf-termines[open]')].map(cleDe));
+    dernier = html; SC.showPanel(html);
+    for (const d of document.querySelectorAll('.vf-whop details.vf-termines')) if (ouverts.has(cleDe(d))) d.open = true;
+    for (const e of document.querySelectorAll('#panel > *')) e.style.animation = 'none';
+    if (p) p.scrollTop = haut;
+  };
+  // révélation ponctuelle : la réponse reste affichée tant que sa ligne l'est. Elle est gardée en mémoire de la page seulement (ni graphe, ni stockage, ni export) et reposée
+  // par un observateur dès que le bouton réapparaît : le tiroir et le panneau d'un agent sont redessinés à chaque `who`, et une réponse qui arrive pendant un redessin
+  // ne doit pas tomber dans une ligne détachée (recette 2026-11-03)
+  const demandes = new Map();
+  const poser = (b) => {
+    const t = demandes.get(b.dataset.vfDoing), z = b.nextElementSibling;
+    if (t !== undefined && z && z.classList.contains('vf-doing') && z.textContent !== t) { z.textContent = t; z.hidden = false; }
+  };
+  new MutationObserver(() => { for (const b of document.querySelectorAll('[data-vf-doing]')) poser(b); }).observe(document.documentElement, { childList: true, subtree: true });
   document.addEventListener('click', async (ev) => {
     const b = ev.target.closest?.('[data-vf-doing]');
     if (!b) return;
-    const zone = b.nextElementSibling;
+    const id = b.dataset.vfDoing;
     b.disabled = true;
+    let texte;
     try {
-      const r = await fetch('/api/vf/doing?id=' + encodeURIComponent(b.dataset.vfDoing), { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' });
+      const r = await fetch('/api/vf/doing?id=' + encodeURIComponent(id), { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' });
       const d = r.ok ? await r.json() : null;
       // `doing` vide : le serveur remonte à la dernière commande Bash de la session ; sans appel Bash lisible il n'y a rien à montrer, jamais un texte de l'assistant en repli (D3)
-      zone.textContent = d?.doing || (d?.erreur === 'inconnu' ? 'Plus active : rien à montrer.' : d?.erreur === 'sans-action' ? "Aucune commande Bash dans la fin du journal de cette session." : 'Indisponible.');
-    } catch { zone.textContent = 'Indisponible.'; }
-    zone.hidden = false; b.disabled = false;
+      texte = d?.doing || (d?.erreur === 'inconnu' ? 'Plus active : rien à montrer.' : d?.erreur === 'sans-action' ? "Aucune commande Bash dans la fin du journal de cette session." : 'Indisponible.');
+    } catch { texte = 'Indisponible.'; }
+    if (demandes.size >= 50) demandes.delete(demandes.keys().next().value);
+    demandes.set(id, texte);
+    for (const x of document.querySelectorAll('[data-vf-doing]')) if (x.dataset.vfDoing === id) { poser(x); x.disabled = false; }
+    b.disabled = false;
   });
   const showLock = (l, off) => {
     if (l !== undefined) probe.lock = l;
@@ -86,6 +114,7 @@
     // compact : le détail (propriétaire du verrou, étape, durée) est dans l'infobulle et dans le panneau « Au travail »
     badge.setAttribute('aria-label', off ? t.text : n ? `${n} au travail` : 'Personne au travail'); // sinon figé à « … » (libellé de création)
     badge.innerHTML = `<span class="dot"></span><span class="bl">${off ? t.text : n ? `${n} au travail` : 'Personne'}</span>`;
+    redessiner();
   };
   const setWho = (w) => { if (!w) return; who = probe.who = w; showLock(); document.dispatchEvent(new CustomEvent('vf-who')); }; // 69-05 : l'onglet Équipe (72-vf-equipe.js) suit le même flux
 
