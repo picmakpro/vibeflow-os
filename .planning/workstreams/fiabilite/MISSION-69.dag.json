@@ -33,7 +33,7 @@
         "plugin/cockpit",
         ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit"
       ],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "revue-69",
@@ -103,6 +103,190 @@
       ],
       "scope": [],
       "status": "blocked"
+    },
+    {
+      "id": "x69-01",
+      "step": "69-01 avancement (vf-coder)",
+      "stage": "",
+      "deps": [
+        "plan-69"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-avancement.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-planning.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-project.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-interface.json",
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/00-vibeflow.js",
+        "plugin/cockpit/scripts/tests/test-cockpit-avancement.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-projet.sh",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-01-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "x69-02",
+      "step": "69-02 temoins equipe+forme (vf-coder)",
+      "stage": "",
+      "deps": [
+        "plan-69"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/tests/test-cockpit-equipe.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-forme-claude.sh",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-02-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "x69-03",
+      "step": "69-03 mesure forme + who@2 (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-01",
+        "x69-02"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-interface.json",
+        "plugin/cockpit/scripts/vf-cockpit-lecture.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-equipe.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-who.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-live.mjs",
+        "plugin/cockpit/scripts/tests/test-cockpit-who.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-robustesse.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-securite.sh",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-03-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "x69-04",
+      "step": "69-04 temoins transcript (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-02"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/tests/test-cockpit-transcript.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-equipe.sh",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-04-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "x69-05",
+      "step": "69-05 onglet Equipe serveur+UI (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-03",
+        "x69-04"
+      ],
+      "scope": [
+        "plugin/cockpit/skills/cockpit-moteur/assets/serve.mjs",
+        "plugin/cockpit/skills/cockpit-moteur/VENDORED.txt",
+        "plugin/cockpit/amont/patches/assets__serve.mjs.diff",
+        "plugin/cockpit/scripts/vf-cockpit-server.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-equipe-carte.mjs",
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/00-vibeflow.js",
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/70-vf-live.js",
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/72-vf-equipe.js",
+        "plugin/cockpit/scripts/tests/test-cockpit-securite.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-reseau.sh",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-05-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "x69-06",
+      "step": "69-06 transcript + equipe (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-03",
+        "x69-04"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-transcript.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-equipe.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-who.mjs",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-06-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "x69-07",
+      "step": "69-07 routes serveur (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-05",
+        "x69-06"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-server.mjs",
+        "plugin/cockpit/scripts/tests/test-cockpit-serveur.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-securite.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-reseau.sh",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-07-*"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "x69-08",
+      "step": "69-08 rendu UI equipe (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-05",
+        "x69-06"
+      ],
+      "scope": [
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/71-vf-equipe-rendu.js",
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/70-vf-live.js",
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/72-vf-equipe.js",
+        "plugin/cockpit/skills/cockpit-moteur/VENDORED.txt",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-08-*"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "x69-09",
+      "step": "69-09 doc + bump v1.1.0 + validation (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-07",
+        "x69-08"
+      ],
+      "scope": [
+        "README.md",
+        "README.fr.md",
+        "plugin/cockpit/README.md",
+        "plugin/cockpit/VERSION",
+        "plugin/cockpit/module.json",
+        "plugin/cockpit/CHANGELOG.md",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-VALIDATION.md",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-09-*"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-69-01",
+      "step": "revue anticipee du diff 69-01 (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "x69-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-01",
+      "step": "correction ciblee revue 69-01 : temoins manquants (vf-coder)",
+      "stage": "",
+      "deps": [
+        "revue-69-01"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/tests/test-cockpit-avancement.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-projet.sh"
+      ],
+      "status": "done"
     }
   ]
 }

@@ -207,6 +207,16 @@ principale et relayées au manager ; libellés de l'option choisie, mot pour mot
   local à la demande (secret en prose masqué au mieux, jeton de page lisible par tout processus local, M7 de la
   Phase 67).
 
+Question ouverte pendant l'exécution, posée à Samuel par la session principale sur remontée du manager
+(arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-03) ; libellé de l'option choisie, mot pour mot.
+
+- **P69-D-28 (onglets resserrés, écart avec la direction artistique Graphite).** « Garder en 69, corriger en 70
+  (Recommandé) ». Le troisième onglet « Équipe » (69-05, commit `1efcc691`) a obligé à resserrer `.vf-tabs` :
+  police 12 px au lieu de 13 px, padding de piste 2 px au lieu de 3 px (DESIGN.md, PR #196). Il a aussi fallu
+  élargir la borne `.hl` de 264 à 280 px dans `01-vf-responsive.js` et recaler le témoin R4.2 de
+  `test-cockpit-responsive.sh` de 300 à 316 px (même marge, témoin toujours rouge). L'écart reste en 69 ; le
+  retour aux valeurs DA, avec un en-tête qui tient à 1 024 px et à 390 px, revient à la Phase 70.
+
 Les autres défauts des plans (OQ-2 à OQ-7, OQ-10, choix d'usage du planificateur) sont des **décisions du
 manager** (vf-dev-manager, planification 2026-11-03), non soumises une à une à Samuel : elles ne valent pas
 arbitrage humain et peuvent être rouvertes sur simple objection.
