@@ -975,6 +975,19 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | CKPT-26 | Phase 69 | Complete — 2026-11-04 (Phase 69, PR #198) |
 | CKPT-27 | Phase 69 | Complete — 2026-11-04 (Phase 69, PR #198) |
 | CKPT-28 | Phase 69 | Complete — 2026-11-04 (Phase 69, PR #198) |
+| VFSG-01 | Phase 68 | Pending — 2026-11-03 (cadrage) |
+| VFSG-02 | Phase 68 | Pending — 2026-11-03 (cadrage) |
+| VFSG-03 | Phase 68 | Pending — 2026-11-03 (cadrage) |
+| VFSG-04 | Phase 68 | Pending — 2026-11-03 (cadrage) |
+| VFSG-05 | Phase 68 | Pending — 2026-11-03 (cadrage) |
+| VFSG-06 | Phase 68 | Pending — 2026-11-03 (cadrage) |
+| VFSG-07 | Phase 68 | Pending — 2026-11-03 (cadrage) |
+| VFSG-08 | Phase 68 | Pending — 2026-11-03 (cadrage) |
+| VFSG-09 | Phase 68 | Pending — 2026-11-03 (cadrage) |
+| VFSG-10 | Phase 68 | Pending — 2026-11-03 (cadrage) |
+| VFSG-11 | Phase 68 | Pending — 2026-11-03 (cadrage) |
+| VFSG-12 | Phase 68 | Pending — 2026-11-03 (cadrage) |
+| VFSG-13 | Phase 68 | Pending — 2026-11-03 (cadrage) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1504,6 +1517,24 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **CKPT-26**: Le contenu de l'équipe et des transcripts est rendu comme du texte, jamais comme du HTML ; la CSP du cockpit reste celle de `v2.75.0` ; témoin rouge : message d'agent porteur de `<img src=x onerror=…>` → rendu en texte, aucun nœud `img` créé, en-tête CSP identique (P69-D-23).
 - [x] **CKPT-27**: Le test de forme de Claude Code (CKPT-01) couvre tous les champs nouvellement lus (`meta.json` : `parentAgentId`, `spawnDepth`, `finished`, `toolUseId`, `requestShape` ; transcript de sous-agent : `isSidechain`, `agentId`), déclarés dans `vf-cockpit-interface.json` ; un champ disparu rend la source `forme-inconnue`, jamais un arbre faux ; témoin rouge : fixture amputée de `parentAgentId` → test rouge et source `forme-inconnue` (P69-D-22).
 - [x] **CKPT-28**: Tout le calcul de l'équipe vit dans la bibliothèque du socle (`who`), sous un schéma JSON versionné dont la version monte ; aucune requête réseau ajoutée (suite de CKPT-03) ; aucune couche de synonymes ; témoin rouge : test qui rougit si la sortie ne porte pas la nouvelle version de schéma, et témoin réseau de CKPT-03 rejoué sur le serveur de la phase (P69-D-23).
+
+### vf-signal embarqué sur le socle partagé (Phase 68 — posées au cadrage, 2026-11-03)
+
+> Reformulent P68-D-01..21 (`68-CONTEXT.md` ; arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-03, « Tout accepter (Recommandé) » ; décisions techniques du manager sur mesure) sans arbitrage neuf. Famille `VFSG` proposée par le handoff du 2026-10-29 § 3, vérifiée libre le 2026-11-03. Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code.
+
+- [ ] **VFSG-01**: Le mod `vf-signal` est embarqué dans le module `cockpit` (aucun nouveau module), déclaré au niveau du plugin par un `hooks.json` qui ne porte que `modules` et ne s'appelle pas `plugin/cockpit/hooks/hooks.json` ; clés d'état `vibeflow.*` ; `claude plugin validate plugin` vert ; l'install du module `cockpit` par l'engine reste verte ; témoin rouge : un `hooks.json` sans clé `hooks` posé sous `plugin/cockpit/hooks/` fait échouer l'install (P68-D-01, D-11, D-12, D-13).
+- [ ] **VFSG-02**: Le mod n'enregistre ni pane, ni bandeau, ni commande sans ligne `cockpit=` dans `scripts/.vibeflow-installed` (scope projet puis user) ; témoin rouge : registre sans `cockpit=` → aucune surface (aujourd'hui : toujours actif) (P68-D-01, D-18).
+- [ ] **VFSG-03**: Le socle publie un émetteur JSON unique, schéma versionné déclaré dans `vf-cockpit-interface.json`, qui sérialise sans recalcul phases avec `avancement`, jalon, missions, worktrees, retard sur `main` et équipe `who@2` ; aucune lecture réseau ; la lecture maison du planning du mod (`disk.ts` : STATE, ROADMAP, MILESTONES, BACKLOG, scan des DAG par date) et le choix de phase par `current_phase` sont retirés ; témoin rouge : test qui rougit si le mod lit un fichier de `.planning/` directement (P68-D-02, D-15, D-17).
+- [ ] **VFSG-04**: L'arbre des agents de la pane vient de `who@2` (toutes sessions, tous worktrees, 24 h) ; les gestes « voir » et « demander l'arrêt » ne s'offrent qu'aux agents de la session courante ; témoin rouge : un agent d'une autre session apparaît dans l'arbre sans geste (P68-D-03).
+- [ ] **VFSG-05**: Sans réseau, l'en-tête signale un arbre en retard sur `main` local et sur `origin/main` local (« en retard de N commits sur main, dernier fetch il y a X ») et liste chaque worktree avec sa branche et sa phase active ; témoin rouge : fixture d'arbre en retard de 3 commits → badge « en retard de 3 », fixture à deux worktrees → deux lignes (aujourd'hui : rien) ; témoin réseau : aucun `git fetch` ni requête (P68-D-04).
+- [ ] **VFSG-06**: Dans le socle, une mission n'est « en cours » que si son verrou de driver est tenu et non périmé ou si son `progress_epoch` date de moins que le TTL (1 800 s) ; sinon elle est « abandonnée, nœuds non refermés », grisée dans la pane, avec le bouton humain d'élagage ; la version du schéma `avancement` monte ; jamais la date de modification d'un DAG ; témoin rouge : DAG avec un nœud `running` sans verrou ni progrès récent → `abandonnee` (aujourd'hui : en cours), sur la pane et sur la carte Projet (P68-D-05, D-16).
+- [ ] **VFSG-07**: La pane suit « Graphite » (`DESIGN.md`) : couleurs de statut seulement, tokens nommés, aucun hex en dur hors du fichier de tokens, plus de cyan ni d'orange de marque, « à recetter » écrit en toutes lettres ; témoin rouge : test qui rougit sur un hex en dur dans une vue (P68-D-06, D-17).
+- [ ] **VFSG-08**: La CI joue `claude plugin validate` et `claude plugin test` du mod (étape ajoutée à `ci.yml`, trailer `Gate-Touche`, revue `@picmakpro`) ; prouvé sous Linux avec un témoin rouge (test cassé → job rouge) (P68-D-07).
+- [ ] **VFSG-09**: Le mod embarqué détecte l'ancien `~/.claude/mods/vf-signal` et l'affiche (risque de deux panes) ; aucun retrait automatique ; le retrait est documenté comme geste humain ; témoin rouge : fixture avec l'ancien mod présent → signal affiché (P68-D-08).
+- [ ] **VFSG-10**: Un bouton humain « Ouvrir le cockpit » lance `vf-cockpit.mjs open` (posé, sinon depuis `$.plugin.root`) et affiche l'URL rendue ; aucun geste d'agent (ADR-031) ; test simulé qui prouve l'argv et l'analyse de la sortie (P68-D-19).
+- [ ] **VFSG-11**: Le mod appelle le socle par `$.process.run(['node', …])` ; un rejet (node absent du PATH) affiche « node introuvable dans le PATH » sans planter ; un JSON illisible est signalé ; la chaîne réelle node + émetteur est prouvée par un test de l'émetteur dans les suites du cockpit ; témoins rouges : rejet simulé et stdout tronqué (P68-D-14).
+- [ ] **VFSG-12**: Recette humaine pas à pas sur terminal plein écran, inline, VS Code et mobile, plus un passage `claude -p --plugin-dir` consigné ; doc du module et README racine FR/EN à jour ; aucun chemin de machine dans les fichiers suivis (`check-machine-paths.sh`) (P68-D-08, D-14, D-20).
+- [ ] **VFSG-13**: Release minor préparée (bump cohérent, version du module `cockpit` montée, relecture adverse SOBR-04 avec sonde exécutée) ; tag et release GitHub après merge, geste de Samuel (P68-D-08, D-21).
 
 ---
 *Requirements defined: 2026-06-04*

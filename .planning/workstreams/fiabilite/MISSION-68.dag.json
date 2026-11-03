@@ -34,7 +34,7 @@
         "rech-pack"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "discuss-68",
@@ -44,7 +44,7 @@
         "arbitrages"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "plan-68",
@@ -65,6 +65,14 @@
       ],
       "scope": [],
       "status": "blocked"
+    },
+    {
+      "id": "sonde-node",
+      "step": "sonde: mod -> node script --json via process.run",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
     }
   ]
 }

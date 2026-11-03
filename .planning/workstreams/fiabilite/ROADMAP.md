@@ -860,13 +860,20 @@ Plans:
 
 ### Phase 68: Embarquer vf-signal sur le socle partagé
 
-> **Non cadrée — cadrage par le manager à suivre.**
+> Cadrée le 2026-11-03 (`68-CONTEXT.md`, P68-D-01..21 ; P68-D-01..08 : arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-03, « Tout accepter (Recommandé) ») ; exécution après le merge de la 69 et de la PR #196 (P68-D-09, P68-D-10).
 
 **Goal:** Le mod `vf-signal` (aujourd'hui dans `~/.claude/mods/vf-signal`) est embarqué dans le plugin `vibeflow`, branché sur le socle partagé de la Phase 67, avec un bouton « Ouvrir le cockpit » ; il est livré dans une release.
-**Requirements**: TBD — famille réservée, posée au cadrage.
+**Requirements**: VFSG-01..VFSG-13
 **Depends on:** Phase 69 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « 69 avant 68 ») ; Phase 67 en amont.
 **Sources:** `.planning/notes/2026-10-29-HANDOFF-jalon-v2.md` § 3 (points à trancher : gating par module, emplacement, API des mods « early access », chemins de `driver-lock.sh`, mobile, ADR-035/031, SOBR-04) ; mémoire `vf-signal-a-embarquer-dans-vibeflow`.
 **Point à cadrer (constat du 2026-11-03, accord de Samuel en session principale Claude Code, 2026-11-03) :** l'en-tête de vf-signal lit le `STATE.md` et le dossier `missions/` de l'arbre courant. Sur un arbre principal resté sur une branche ancienne, il montrait la Phase 58 et la mission 58, alors que `main` était en v2.75.0. Il ne voit pas non plus une phase menée dans un worktree (la 69 cadrée dans `.claude/worktrees/phase-69b`). Il doit signaler un arbre en retard sur `main` et voir la phase active d'un worktree. Il ne doit pas prendre une mission aux nœuds jamais refermés pour la mission en cours.
+**Success criteria** (observables) :
+1. Le mod vit dans le module `cockpit`, déclaré dans `plugin.json` ; `claude plugin validate plugin` est vert et l'install du module `cockpit` reste verte ; sans `cockpit=` dans le registre des modules installés, aucune surface (VFSG-01, 02).
+2. La pane ne lit plus `.planning/` elle-même : ses données viennent d'un émetteur JSON versionné du socle, sans réseau (VFSG-03, 04).
+3. Sur un arbre en retard de N commits sur `main` local, l'en-tête l'écrit, avec l'âge du dernier fetch ; chaque worktree apparaît avec sa branche et sa phase active (VFSG-05).
+4. Une mission dont un nœud est resté `running` sans verrou ni progrès depuis plus de 1 800 s s'affiche « abandonnée », sur la pane comme sur la carte Projet (VFSG-06).
+5. La pane suit Graphite, un bouton « Ouvrir le cockpit » ouvre le cockpit du lab, l'ancien mod est signalé, l'absence de `node` est dite (VFSG-07, 09, 10, 11).
+6. La CI joue `validate` et `test` du mod, avec un témoin rouge sous Linux (VFSG-08) ; recette humaine sur quatre surfaces ; release minor préparée (VFSG-12, 13).
 **Plans:** 0 plans
 
 Plans:
