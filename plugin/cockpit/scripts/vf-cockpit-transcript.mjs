@@ -4,7 +4,7 @@
 // Lecture seule, aucun réseau ; liste blanche ; aucune valeur d'entrée d'outil ne sort hors de la cible réduite (chemin du lab, hôte, type d'agent, nom de skill ou de serveur).
 import fs from 'node:fs';
 import path from 'node:path';
-import { cherche, masque, MAX_MASQUE } from './vf-cockpit-lecture.mjs';
+import { cherche, masque, masqueCoupe, MARGE_MASQUE } from './vf-cockpit-lecture.mjs';
 
 // libellés provisoires (P69-PL-19) : à valider avant la publication
 export const VERBES = Object.freeze(Object.assign(Object.create(null), {
@@ -77,24 +77,31 @@ const json = (l) => { try { return JSON.parse(l); } catch { return null; } };
 
 // liste blanche : mandat = contenu chaîne de la première ligne `user` ; messages = blocs `text` des lignes `assistant` ; outils = nom et cible réduite des blocs `tool_use`.
 // Tout le reste (lignes user ultérieures, api-request*, attachment, blocs thinking et tool_result, champ des résultats d'outils) n'est jamais lu.
+// Le coût est borné par ce qui sort (F4) : la fenêtre n'est qu'analysée ; masque et étiquette (donc realpath) ne s'appliquent qu'aux 50 messages et 200 outils gardés.
 export function reduireTranscript(fichier, { root } = {}) {
+  try { return reduire(fichier, root); } catch { return { mandat: '', messages: [], outils: [], tronque: true }; } // aucune exception ne remonte à l'appelant
+}
+function reduire(fichier, root) {
   let tronque = false, mandat = '';
   const tete = fenetre(fichier, TETE, false);
-  if (tete) { const p = json(tete.texte.split('\n')[0]); if (p?.type === 'user' && typeof p.message?.content === 'string') { const c = p.message.content; if (c.length > Math.min(BORNE_MANDAT, MAX_MASQUE)) tronque = true; mandat = masque(c.slice(0, BORNE_MANDAT)); } }
+  if (tete) { const p = json(tete.texte.split('\n')[0]); if (p?.type === 'user' && typeof p.message?.content === 'string') { const c = p.message.content; if (c.length > BORNE_MANDAT) tronque = true; mandat = masqueCoupe(c, BORNE_MANDAT); } }
   const q = fenetre(fichier, QUEUE, true);
   if (!q) return { mandat, messages: [], outils: [], tronque };
   const lignes = q.texte.split('\n'); if (q.coupe) { lignes.shift(); tronque = true; } // la première ligne de la fenêtre est coupée
-  let messages = [], outils = [];
+  let msgs = [], outs = [];
   for (const l of lignes) {
     if (!l.trim() || !l.includes('"assistant"')) continue; // écarte sans analyser les lignes d'une autre sorte
     const d = json(l); if (!d || d.type !== 'assistant') continue;
     const c = typeof d.message?.content === 'string' ? [{ type: 'text', text: d.message.content }] : d.message?.content; if (!Array.isArray(c)) continue;
     for (const b of c) {
-      if (b?.type === 'text' && typeof b.text === 'string' && b.text.trim()) { if (b.text.length > BORNE_MESSAGE) tronque = true; messages.push(masque(b.text.slice(0, BORNE_MESSAGE)).slice(0, BORNE_MESSAGE)); }
-      else if (b?.type === 'tool_use' && typeof b.name === 'string') outils.push(etiquette(b.name, b.input, root));
+      if (b?.type === 'text' && typeof b.text === 'string' && b.text.trim()) msgs.push(b.text.slice(0, BORNE_MESSAGE + MARGE_MASQUE));
+      else if (b?.type === 'tool_use' && typeof b.name === 'string') outs.push({ n: b.name, i: b.input });
     }
+    if (msgs.length > 2 * MAX_MESSAGES) { msgs = msgs.slice(-MAX_MESSAGES); tronque = true; }
+    if (outs.length > 2 * MAX_OUTILS) { outs = outs.slice(-MAX_OUTILS); tronque = true; }
   }
-  if (messages.length > MAX_MESSAGES) { messages = messages.slice(-MAX_MESSAGES); tronque = true; }
-  if (outils.length > MAX_OUTILS) { outils = outils.slice(-MAX_OUTILS); tronque = true; }
-  return { mandat, messages, outils, tronque };
+  if (msgs.length > MAX_MESSAGES) { msgs = msgs.slice(-MAX_MESSAGES); tronque = true; }
+  if (outs.length > MAX_OUTILS) { outs = outs.slice(-MAX_OUTILS); tronque = true; }
+  if (msgs.some((t) => t.length > BORNE_MESSAGE)) tronque = true;
+  return { mandat, messages: msgs.map((t) => masqueCoupe(t, BORNE_MESSAGE)), outils: outs.map((o) => etiquette(o.n, o.i, root)), tronque };
 }
