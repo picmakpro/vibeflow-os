@@ -13,6 +13,18 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.75.1] — 2026-11-03
+
+**Patch** (correctif du module `cockpit`) :
+
+- **`cockpit` v1.0.1** : l'onglet Projet lit un ROADMAP écrit à la française — `Phase N : nom` (espace avant les deux-points,
+  insécable comprise), `## Jalons`, `**Objectif**`, `**Dépend de**` ; la valeur de `Depends on` s'arrête au champ suivant de
+  la même ligne. Le lab Scroll-Off n'affichait aucune phase de son jalon en cours (constaté le 2026-11-03).
+- Nouveau `vf-cockpit-drift.mjs` : dérive de format mesurée avant la lecture (`phases-illisibles`, `phase-deux-points`,
+  `depends-on`, `jalons-absents`, `phase-courante-absente`), affichée dans le panneau d'ensemble ; `--diff` propose un
+  correctif unifié vers le gabarit GSD, jamais écrit sur disque (ADR-031). PR #194.
+- Relecture adverse SOBR-04 (relecteur frais) : verdict mineur, 5 mineurs corrigés avant le tag (F1 à F5).
+
 ## [v2.75.0] — 2026-11-03
 
 **Minor** (Phase 67 : nouveau module `cockpit`, nouvelle capacité) :
