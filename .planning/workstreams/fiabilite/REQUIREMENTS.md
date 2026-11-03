@@ -975,6 +975,16 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | CKPT-26 | Phase 69 | Complete — 2026-11-04 (Phase 69, PR #198) |
 | CKPT-27 | Phase 69 | Complete — 2026-11-04 (Phase 69, PR #198) |
 | CKPT-28 | Phase 69 | Complete — 2026-11-04 (Phase 69, PR #198) |
+| UIFN-01 | Phase 70 | Pending — 2026-11-03 (cadrage ; en-tête mobile sur une rangée) |
+| UIFN-02 | Phase 70 | Pending — 2026-11-03 (cadrage ; zoom en pile verticale) |
+| UIFN-03 | Phase 70 | Pending — 2026-11-03 (cadrage ; tiroir sans bouton Détail) |
+| UIFN-04 | Phase 70 | Pending — 2026-11-03 (cadrage ; visite corrigée) |
+| UIFN-05 | Phase 70 | Pending — 2026-11-03 (cadrage ; visite propre à l’onglet Projet) |
+| UIFN-06 | Phase 70 | Pending — 2026-11-03 (cadrage ; anglais résiduel du chrome) |
+| UIFN-07 | Phase 70 | Pending — 2026-11-03 (cadrage ; garde du français durci) |
+| UIFN-08 | Phase 70 | Pending — 2026-11-03 (cadrage ; « Où en est-on ? » sans STATE) |
+| UIFN-09 | Phase 70 | Pending — 2026-11-03 (cadrage ; écarts DESIGN.md) |
+| UIFN-10 | Phase 70 | Pending — 2026-11-03 (cadrage ; captures et recette proposée) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1504,6 +1514,20 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **CKPT-26**: Le contenu de l'équipe et des transcripts est rendu comme du texte, jamais comme du HTML ; la CSP du cockpit reste celle de `v2.75.0` ; témoin rouge : message d'agent porteur de `<img src=x onerror=…>` → rendu en texte, aucun nœud `img` créé, en-tête CSP identique (P69-D-23).
 - [x] **CKPT-27**: Le test de forme de Claude Code (CKPT-01) couvre tous les champs nouvellement lus (`meta.json` : `parentAgentId`, `spawnDepth`, `finished`, `toolUseId`, `requestShape` ; transcript de sous-agent : `isSidechain`, `agentId`), déclarés dans `vf-cockpit-interface.json` ; un champ disparu rend la source `forme-inconnue`, jamais un arbre faux ; témoin rouge : fixture amputée de `parentAgentId` → test rouge et source `forme-inconnue` (P69-D-22).
 - [x] **CKPT-28**: Tout le calcul de l'équipe vit dans la bibliothèque du socle (`who`), sous un schéma JSON versionné dont la version monte ; aucune requête réseau ajoutée (suite de CKPT-03) ; aucune couche de synonymes ; témoin rouge : test qui rougit si la sortie ne porte pas la nouvelle version de schéma, et témoin réseau de CKPT-03 rejoué sur le serveur de la phase (P69-D-23).
+
+### Finitions UI du cockpit (Phase 70 — posées au cadrage, 2026-11-03)
+> Reformulent P70-D-01..10 (`70-CONTEXT.md` ; « Tout accepter (Recommandé) », arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 ; P70-D-07 et P70-D-08 : arbitrages antérieurs, même canal, même date ; P70-D-09 et P70-D-10 : choix du manager). Préfixe neuf `UIFN` (P70-D-12), vérifié libre le 2026-11-03. Jalon `vibeflow-v2.0`. Exécution après le merge de la Phase 69.
+
+- [ ] **UIFN-01**: À ≤ 700 px, l'en-tête tient sur une seule rangée : logo, onglets, recherche, point « au travail », bouton « ⋯ » ; le menu du « ⋯ » donne un libellé visible à chaque action (thème, Santé, Travail récent, Écrans, Visite, Exporter, Parcours, Types de liens) et porte les pastilles de compte ; témoin rouge : à 390 px, l'en-tête fait aujourd'hui 3 rangées (~148 px) et ses actions sont des icônes sans libellé (P70-D-01).
+- [ ] **UIFN-02**: À ≤ 700 px, les trois boutons de zoom forment une pile verticale à gauche, au-dessus de la barre de question, sans recouvrir « Remonter d'un niveau » ; la tablette est inchangée ; chaque bouton de zoom a un `aria-label` français à toutes les largeurs ; témoin rouge : aujourd'hui, ils sont dans l'en-tête, avec un `title` sans `aria-label` (P70-D-09).
+- [ ] **UIFN-03**: À ≤ 700 px, aucun bouton « Détail » ; le tiroir s'ouvre au tap d'une carte ou du titre de la vue d'ensemble, et porte une poignée et une croix visibles avec un nom accessible ; Échap et le tap dans le vide le ferment toujours ; témoin rouge : aujourd'hui, `#btn-panel` est visible et le tiroir n'a pas de croix (P70-D-10).
+- [ ] **UIFN-04**: Visite « Par où commencer » : chaque étape cible un élément et y centre la carte, le texte s'affiche entier, « Passer » reste visible à chaque étape, un repère « n sur N » est affiché, le texte nomme les boutons tels qu'ils s'affichent (« La lire »), aucun mot anglais (« at the top », « and ») ; témoin rouge sur chacun des constats de `70-CONTEXT.md` (P70-D-02).
+- [ ] **UIFN-05**: L'onglet Projet a sa propre visite (jalon, phase en cours, missions, au travail), fournie par les données de la page (`tour` non vide) ; aucune étape n'y dit « La base de code » ni « dans le code » ; témoin rouge : aujourd'hui, `tour: []` et repli sur la visite du code (P70-D-02).
+- [ ] **UIFN-06**: Plus aucun anglais ni coquille dans l'interface en mode français : liste O5 (« Calls », « ⌫ up », compteurs Santé, phrase mixte « still use generated names », « de le CLI », « 1 fichiers »), pluriels construits à l'exécution, « Claude Code and GSD », « Contrôle De Santé », élision « de » + voyelle, statuts bruts ; les constats du panneau Santé restent en anglais (P67-D-20) ; `?lang=en` est inchangé (P70-D-03, P70-D-04).
+- [ ] **UIFN-07**: Le garde du français voit les formes de UIFN-06 (mots isolés, mots courts, pluriels rendus à l'exécution, gabarits pris dans le mauvais ordre) ; témoin rouge : rejoué sur le code d'avant la phase, il rougit sur au moins une chaîne de chaque forme (P70-D-04).
+- [ ] **UIFN-08**: Sur un lab sans `STATE.md`, « Où en est-on ? » (voie locale) omet les champs absents ou dit qu'il n'y a pas de `STATE.md`, et ne rend ni champ vide ni « ? » ; témoin rouge : aujourd'hui, « Dernière phase : ? · , le ?. » (P70-D-05).
+- [ ] **UIFN-09**: Conformité à `DESIGN.md` : `--st-active` vaut `var(--sev-medium)`, `--st-blocked` vaut `var(--sev-high)`, `--text-1` n'est plus utilisée, aucune couleur en dur dans `ui/00-vibeflow.js` et les fichiers `ui/*vf*` hors exceptions justifiées ; témoin rouge : sonde rejouée sur le code d'avant la phase (P70-D-07).
+- [ ] **UIFN-10**: Captures Playwright avant et après à 390, 768 et 1 440 px, dans les deux thèmes, consignées ; une recette humaine de 4 points (en-tête mobile, tiroir, zoom, visite) est proposée à Samuel, jamais remplie par un agent (P70-D-06).
 
 ---
 *Requirements defined: 2026-06-04*

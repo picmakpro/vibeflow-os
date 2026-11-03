@@ -1,0 +1,61 @@
+{
+  "nodes": [
+    {
+      "id": "scout-code",
+      "step": "inventaire du code UI concerné (lecture seule)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/cockpit"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "scout-captures",
+      "step": "captures mobile/desktop du cockpit (Playwright, lecture seule)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "scratchpad"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "cadrage-70",
+      "step": "cadrage 70 : questions Samuel + CONTEXT (manager)",
+      "stage": "",
+      "deps": [
+        "scout-code",
+        "scout-captures"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-70-finitions-ui-cockpit"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "plan-70",
+      "step": "recherche courte + plans 70 (vf-coder)",
+      "stage": "",
+      "deps": [
+        "cadrage-70"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-70-finitions-ui-cockpit"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "plancheck-70",
+      "step": "plan-checker frais (lecture seule)",
+      "stage": "",
+      "deps": [
+        "plan-70"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-70-finitions-ui-cockpit"
+      ],
+      "status": "blocked"
+    }
+  ]
+}

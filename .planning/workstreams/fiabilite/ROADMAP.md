@@ -916,12 +916,12 @@ Plans:
 
 ### Phase 70: Finitions UI du cockpit
 
-> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Phase à part »).
+> **Cadrée le 2026-11-03** (`70-CONTEXT.md`, P70-D-01..15 ; « Tout accepter (Recommandé) », arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Exécution après le merge de la Phase 69, plans revalidés d'abord (P70-D-14). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Phase à part »).
 
 **Goal:** Le cockpit tient en largeur mobile avec une information hiérarchisée, sa visite guidée est plus claire, et le chrome ne montre plus d'anglais résiduel ni de coquilles.
-**Requirements**: TBD — posées au cadrage.
-**Depends on:** Phase 67.
-**Sources:** `BACKLOG.md` § « Cockpit en largeur mobile et clarté de la visite guidée » (D4, I4, I5, I6, I1) et § « Cockpit : anglais résiduel et coquilles du chrome » (O5) ; `67-RECETTE-HUMAINE.md`.
+**Requirements**: UIFN-01, UIFN-02, UIFN-03, UIFN-04, UIFN-05, UIFN-06, UIFN-07, UIFN-08, UIFN-09, UIFN-10
+**Depends on:** Phase 67 ; Phase 69 pour l'exécution (mêmes fichiers du cockpit, P70-D-14).
+**Sources:** `BACKLOG.md` § « Cockpit en largeur mobile et clarté de la visite guidée » (D4, I4, I5, I6, I1) et § « Cockpit : anglais résiduel et coquilles du chrome » (O5) ; § « Où en est-on ? sur un lab sans STATE » (F5, P70-D-05) ; `67-RECETTE-HUMAINE.md` ; `DESIGN.md` (direction « Graphite », PR #196, P70-D-07).
 **Plans:** 0 plans
 
 Plans:
