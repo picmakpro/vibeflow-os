@@ -184,14 +184,14 @@ Chacune porte un témoin rouge joué avant le code (sur un mutant ou sur la base
 - **TERM-07** PTY : assistant Python stdlib, lancé isolé (`-I`), redimensionnement, Ctrl-C (SIGINT au groupe de premier
   plan), macOS et Linux ; sous Windows, message « indisponible » et aucun second serveur (P71-D-06, P71-D-07).
 - **TERM-08** Session : une seule, la deuxième est refusée ; survie au rechargement (30 s de grâce, tampon de 256 Ko en
-  mémoire) ; SIGHUP au groupe après la grâce ; aucun processus survivant à l'arrêt du serveur ; le terminal ouvert empêche
+  mémoire) ; SIGHUP au groupe après la grâce ; aucun processus de la session du terminal survivant à l'arrêt du serveur, `nohup` et `disown` compris (un processus sorti de la session par `setsid` est une limite écrite, P71-D-28) ; le terminal ouvert empêche
   l'arrêt sur inactivité (P71-D-05).
 - **TERM-09** Usage réel : un programme plein écran (alternate screen, couleurs 256/truecolor, SIGWINCH, SIGINT) se comporte
   normalement dans le terminal (test automatisé avec un programme témoin) ; `claude` démarre à la racine du lab et y voit son
   `CLAUDE.md` et ses skills, et une commande VibeFlow tourne (recette humaine, macOS ; Linux par la CI pour la partie
   automatisée) (P71-D-01, P71-D-06).
 - **TERM-10** xterm.js vendorisé avec sha256 et licence ; aucun addon presse-papiers ; séquences OSC 52, OSC 8, DCS, CSI 21t,
-  DECRQSS dans la sortie : presse-papiers inchangé, aucun octet réinjecté dans l'entrée du PTY (P71-D-16).
+  DECRQSS dans la sortie : presse-papiers inchangé, aucun octet choisi par la sortie réinjecté dans l'entrée du PTY (seules les réponses de format fixe d'xterm — DA1, DA2, DSR, CPR, DECRQM, couleurs OSC — le sont, F8 de l'audit, P71-D-25) (P71-D-16).
 - **TERM-11** Aucune frappe ni sortie du terminal sur disque ni dans les flux du cockpit (journal, SSE, export) ; le tampon
   de reprise est vidé à la fin de la session.
 - **TERM-12** Non-régression et chaîne XSS : toutes les suites du cockpit restent vertes ; la chaîne de
