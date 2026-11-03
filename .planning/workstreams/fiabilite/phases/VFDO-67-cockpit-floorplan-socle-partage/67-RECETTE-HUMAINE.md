@@ -141,3 +141,9 @@ I2, O1, O2, O3, O4, O6 corrigés : détail et témoins rouges dans `.planning/mi
 O4, option C : « C : port stable par lab (Recommandé) » (Samuel, AskUserQuestion session principale, 2026-11-03). Le cockpit
 d'un lab écoute sur un port dérivé du lab (plage 4378-4477, repli +1). La visite « vue » est en localStorage par lab, sans cookie.
 À revoir en recette : le flou I2 (`blur(24px) saturate(1.8)`, fond 30 %, rayons 22/22/6/6) et le fil d'Ariane à 1 280-1 440 px.
+
+## 8. Avis de Samuel sur le flou de la passe 3 (Wispr Flow, session principale, 2026-11-03)
+
+« En fait, mon avis sur le flou, c'est que là, actuellement, il est avec des bordures. Moi, j'aimerais que ça soit un effet dégradé. C'est-à-dire que le flou parte du haut gauche du titre, enfin de la section, enfin de la carte, quoi. Et qu'il y a un espèce de flou dégradé qui aille vers le bas. Comme on peut retrouver, par exemple, dans le header de la page, quoi. Je trouve ça pas mal de faire ça comme ça. Vraiment en mode iOS 26, quoi. Ça peut vraiment être cool. »
+
+Relevé : plus de carte bordée ; un flou progressif (dégradé) qui part du haut à gauche de la zone du titre et s'estompe vers le bas, sur le modèle de l'en-tête de la page (iOS 26). Le merge de la PR #187 attend ce réglage (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
