@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { planningLayout, stateFile } from './vf-cockpit-paths.mjs';
+import { avancement } from './vf-cockpit-avancement.mjs';
 
 const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };
 const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
@@ -106,6 +107,11 @@ export function readPlanning(root, layout) {
       let j; try { j = JSON.parse(read(path.join(d, f))); } catch { continue; }
       if (j && Array.isArray(j.nodes)) dags.push({ name: f.replace(/\.dag\.json$/, ''), ws, file: rel(path.join(d, f)), nodes: j.nodes });
     }
+  }
+  // avancement de chaque phase, calculé sur les fichiers de son dossier (CKPT-13, CKPT-14)
+  for (const ph of phases.values()) {
+    const dir = phaseDirs.get(`${ph.ws || ''}|${ph.n}`) || phaseDirs.get(`*|${ph.n}`);
+    ph.avancement = avancement({ fichiers: ls(dir) });
   }
   const backlog = read(path.join(B, 'BACKLOG.md'));
   const seeds = ls(path.join(B, 'seeds')).filter((f) => f.endsWith('.md')).map((f) => ({ file: rel(path.join(B, 'seeds', f)), text: read(path.join(B, 'seeds', f)) }));

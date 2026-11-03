@@ -64,10 +64,11 @@ export function buildProjectGraph(root, { layout } = {}) {
     const st = phaseStatus(ph), dir = dirOf(ph);
     const planFiles = ls(dir).filter((f) => /-PLAN\.md$/.test(f)).sort();
     const sums = new Set(ls(dir).filter((f) => /-SUMMARY\.md$/.test(f)).map((f) => f.replace('-SUMMARY.md', '')));
+    const av = ph.avancement;
     const phReqs = ownReqs(ph); const id = phId(ph);
     node({ id, parent: msId, label: `Phase ${ph.n} · ${ph.name}`, kind: 'phase', num: ph.n, ws: ph.ws, summary: sentence(ph.goal || ph.line || ph.name, 200),
       details: [ph.goal, ph.depends.length ? `Dépend de : Phase ${ph.depends.join(', ')}.` : '', ph.line ? `Ligne de ROADMAP : ${ph.line}` : '', `Source : ${ph.roadmap}${dir ? ` · dossier ${rel(dir)}` : ''}`].filter(Boolean).join('\n\n'),
-      st, foot: [planFiles.length ? `${sums.size}/${planFiles.length} plans` : '', phReqs.length ? `${phReqs.filter((r) => r.done).length}/${phReqs.length} exigences` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [] });
+      st, foot: [av.plans.total ? `${av.plans.faits}/${av.plans.total} plans` : '', av.correctifs ? `${av.correctifs} correctif${av.correctifs > 1 ? 's' : ''}` : '', phReqs.length ? `${phReqs.filter((r) => r.done).length}/${phReqs.length} exigences` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [] });
     for (const pf of planFiles) {
       const txt = read(path.join(dir, pf)); const meta = fm(txt); const pid = pf.replace('-PLAN.md', '');
       const obj = /<objective>\s*([\s\S]*?)<\/objective>/.exec(txt)?.[1] || /^#\s+(.*)$/m.exec(txt)?.[1] || '';
