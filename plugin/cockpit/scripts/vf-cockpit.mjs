@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn, execFileSync } from 'node:child_process';
 import { findLabRoot, engineDir, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
+import { portPrefere } from './vf-cockpit-port.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const AIDE = `Usage : node vf-cockpit.mjs [open|build|stop|status] [--lab <dossier>] [--no-open] [--port <p>] [--rebuild]
@@ -70,7 +71,8 @@ async function demarrer(lab, sortie, o) {
   const logFd = fs.openSync(path.join(sortie, '.cache', 'serveur.log'), 'a');
   const args = [path.join(sortie, 'serve.mjs'), '--idle-exit', '60'];
   if (o.noOpen) args.push('--no-open');
-  if (o.port) args.push('--port', String(o.port));
+  // port stable par lab (O4) : --port de l'utilisateur d'abord, sinon l'empreinte du lab ; le repli port+1 reste celui du serveur
+  args.push('--port', String(o.port || portPrefere(lab)));
   // le serveur ne se fie qu'à ces deux chemins, posés ici depuis le module (jamais lus dans un .cache/ du lab)
   const env = { ...process.env, VF_COCKPIT_ENGINE_DIR: engineDir(resolveScriptsDir(HERE)).chemin || '', VF_COCKPIT_SCRIPTS_DIR: resolveScriptsDir(HERE) };
   const enfant = spawn(process.execPath, args, { cwd: lab, env, detached: true, stdio: ['ignore', logFd, logFd] });

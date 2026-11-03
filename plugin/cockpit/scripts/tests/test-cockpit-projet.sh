@@ -195,39 +195,58 @@ assert_eq "P4.7 — témoin positif : le contrôle de noms voit un nom codé en 
 assert_eq "P4.8 — aucun nom de compartiment de ce dépôt dans les sources du socle" "$(cat "$SCRIPTS"/vf-cockpit-*.mjs | grep -cE 'fiabilite|gouvernance')" "0"
 
 # O4 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : la visite « Par où commencer » revenait à chaque chargement et recouvrait la réponse. Cause : son « déjà vue » vivait dans le localStorage
-# de l'ORIGINE (port compris) et le port du serveur change à chaque lancement. Elle est désormais mémorisée par lab (vibeflow-cockpit:visite:<lab>, même identifiant que le sélecteur de modèle, 75-vf-modele.js).
-# Un Chrome, un profil : A et B = le même lab sur deux ports (deux lancements), C = un autre lab. Sans navigateur la section est SAUTÉE, jamais comptée comme réussie.
-echo "=== O4 — la visite « Par où commencer » ne revient pas d'elle-même, par lab, d'un lancement du serveur à l'autre ==="
+# de l'ORIGINE (port compris) et le port du serveur changeait à chaque lancement. Décision (même date, « C : port stable par lab ») : port stable par lab (vf-cockpit-port.mjs), « déjà vue » en localStorage seul,
+# par lab (vibeflow-cockpit:visite:<lab>, 75-vf-modele.js), aucun cookie. Serveurs lancés par le VRAI lanceur (vf-cockpit.mjs), plage de ports décalée (VF_COCKPIT_PORT_BASE : 4378 et 4379 tiennent les serveurs de recette).
+# Un Chrome, un profil. Cas : visite au premier chargement ; fermée (croix) puis rechargée sur le MÊME port ; fermée (Échap) idem ; passée jusqu'au bout (autre lab) idem ; serveur relancé (même port stable) ;
+# bouton qui la rouvre ; aucun cookie. O4.3 (« même lab, AUTRE port ») n'a plus de sens avec le port stable : remplacé par la relance du serveur. Sans navigateur la section est SAUTÉE, jamais comptée comme réussie.
+echo "=== O4 — la visite « Par où commencer » ne revient pas d'elle-même : port stable par lab, localStorage seul, aucun cookie ==="
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
 if [ -z "$CHROME" ]; then echo "  ⊘ O4 SAUTÉ : aucun navigateur (Chrome, Chromium) — la visite par lab n'est PAS vérifiée, non comptée comme réussie"; else
-export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null; ENG="$SCRIPTS/../skills/cockpit-moteur"
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
-SRVPIDS=(); trap 'for p in "${SRVPIDS[@]}"; do vf_hyg_stop "$p"; done; vf_hyg_fin; rm -rf "$WORK"' EXIT
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
+SRVPIDS=(); LABS4=()
+fin4() { for L in ${LABS4[@]+"${LABS4[@]}"}; do node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L" >/dev/null 2>&1; done; for p in ${SRVPIDS[@]+"${SRVPIDS[@]}"}; do vf_hyg_stop "$p"; done; vf_hyg_fin; rm -rf "$WORK"; }
+trap fin4 EXIT
 mklab4() {
   local L="$1" B="$1/.planning"; mkdir -p "$L/src" "$B/phases/01-socle"
   printf 'export const u = () => 1;\n' > "$L/src/util.js"; printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n- [ ] **Phase 2: Suite** - deuxième jet\n- [ ] **Phase 3: Fin** - dernier jet\n' > "$B/ROADMAP.md"
   printf '<objective>Faire le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"; echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
   git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
-  node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build4.out" 2>&1 || cat "$WORK/build4.out"
+  LABS4+=("$L")
 }
-srv4() { # srv4 <lab> -> SP (port)
-  local L="$1" o="$1/.vibeflow/cockpit"; rm -f "$o/.cache/server.json"
-  ( cd "$L" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  SP="$(node "$AUX/get.mjs" "$o/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"; SRVPIDS+=("$(node "$AUX/get.mjs" "$o/.cache/server.json" 'j.pid' 2>/dev/null || echo 0)")
-}
-L4="$WORK/lab4"; LC4="$WORK/lab4c"; mklab4 "$L4"; cp -R "$L4" "$LC4"
-srv4 "$L4"; PA="$SP"; srv4 "$L4"; PB="$SP"; srv4 "$LC4"; PC="$SP"
-XV="$(node "$SCRIPTS/tests/chrome-visite.mjs" "$CHROME" "http://127.0.0.1:$PA/index.html" "http://127.0.0.1:$PB/index.html" "http://127.0.0.1:$PC/index.html")"
+# plage décalée : base prise au hasard au-dessus des ports de recette, jamais 4378..4500
+export VF_COCKPIT_PORT_BASE=$((30000 + (RANDOM * 11) % 30000))
+adr4() { node "$SCRIPTS/vf-cockpit.mjs" open --no-open --lab "$1" | sed -En 's#^Cockpit : (http://127\.0\.0\.1:[0-9]+)/ .*#\1/index.html#p' | head -1; }
+pid4() { node "$AUX/get.mjs" "$1/.vibeflow/cockpit/.cache/server.json" 'j.pid' 2>/dev/null || echo 0; }
+pref4() { node --input-type=module -e "import('$SCRIPTS/vf-cockpit-port.mjs').then(m=>console.log(m.portPrefere(process.argv[1])))" "$1"; }
+# trois labs dont les ports préférés sont éloignés (≥ 25) : jamais de collision, donc jamais de repli, qui rendrait le cas dépendant du hasard des noms de dossier
+for i in $(seq 1 80); do L4="$WORK/lab4-$i"; LC4="$WORK/lab4c-$i"; LE4="$WORK/lab4e-$i"; mkdir -p "$L4" "$LC4" "$LE4"; x=$(pref4 "$L4"); y=$(pref4 "$LC4"); z=$(pref4 "$LE4")
+  [ $((x>y ? x-y : y-x)) -ge 25 ] && [ $((x>z ? x-z : z-x)) -ge 25 ] && [ $((y>z ? y-z : z-y)) -ge 25 ] && break; done
+rmdir "$L4" "$LC4" "$LE4" 2>/dev/null; mklab4 "$L4"; mklab4 "$LC4"; mklab4 "$LE4"
+UA="$(adr4 "$L4")"; SRVPIDS+=("$(pid4 "$L4")"); UC="$(adr4 "$LC4")"; SRVPIDS+=("$(pid4 "$LC4")"); UE="$(adr4 "$LE4")"; SRVPIDS+=("$(pid4 "$LE4")")
+cat > "$WORK/relance4.sh" <<RELANCE
+#!/usr/bin/env bash
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null VF_COCKPIT_PORT_BASE=$VF_COCKPIT_PORT_BASE
+for l in "$L4" "$LC4" "$LE4"; do node "$SCRIPTS/vf-cockpit.mjs" stop --lab "\$l" >/dev/null 2>&1; done
+op() { node "$SCRIPTS/vf-cockpit.mjs" open --no-open --lab "\$1" | sed -En 's#^Cockpit : (http://127\.0\.0\.1:[0-9]+)/ .*#\1/index.html#p' | head -1; }
+c=\$(op "$LC4"); e=\$(op "$LE4"); a=\$(op "$L4"); printf '%s\n%s\n%s\n' "\$a" "\$c" "\$e"
+RELANCE
+chmod +x "$WORK/relance4.sh"
+XV="$(node "$SCRIPTS/tests/chrome-visite.mjs" "$CHROME" "$UA" "$UC" "$UE" "$WORK/relance4.sh")"
+SRVPIDS+=("$(pid4 "$L4")" "$(pid4 "$LC4")" "$(pid4 "$LE4")")
 [ -n "${DBG:-}" ] && echo "RAW: $XV"
-assert_eq "O4.0 — témoin : trois serveurs sur trois ports distincts, la mesure a eu lieu sans erreur" "$([ "$PA" != "$PB" ] && [ "$PB" != "$PC" ] && [ "$PA" != "$PC" ] && echo distincts)|$(printf '%s' "$XV" | node "$AUX/get.mjs" /dev/stdin "j.erreur||''")" "distincts|"
-assert_eq "O4.1 — premier chargement du lab, la visite s'affiche" "$(printf '%s' "$XV" | node "$AUX/get.mjs" /dev/stdin 'j.premiere')" "true"
-assert_eq "O4.2 — fermée, elle ne revient pas au rechargement" "$(printf '%s' "$XV" | node "$AUX/get.mjs" /dev/stdin 'j.memeOrigine')" "false"
-assert_eq "O4.3 — même lab, AUTRE port de serveur : elle ne revient pas (page initialisée, lab connu)" "$(printf '%s' "$XV" | node "$AUX/get.mjs" /dev/stdin '[j.autrePort,j.temoins]')" "[false,true]"
-assert_eq "O4.4 — le bouton « Par où commencer » la rouvre" "$(printf '%s' "$XV" | node "$AUX/get.mjs" /dev/stdin 'j.bouton')" "true"
-assert_eq "O4.5 — un AUTRE lab la voit à son premier chargement (le rangement est par lab, pas global)" "$(printf '%s' "$XV" | node "$AUX/get.mjs" /dev/stdin 'j.autreLab')" "true"
-for p in "${SRVPIDS[@]}"; do vf_hyg_stop "$p"; done; SRVPIDS=()
+x4() { printf '%s' "$XV" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O4.0 — témoin : deux labs sur deux ports, la mesure a eu lieu sans erreur, le port du lab est celui de l'empreinte" "$([ "$UA" != "$UC" ] && echo distincts)|$(x4 "j.erreur||''")|$([ "${UA##*:}" = "$(node --input-type=module -e "import('$SCRIPTS/vf-cockpit-port.mjs').then(m=>console.log(m.portPrefere(process.argv[1])))" "$L4")/index.html" ] && echo stable)" "distincts||stable"
+assert_eq "O4.1 — premier chargement du lab, la visite s'affiche" "$(x4 'j.premiere')" "true"
+assert_eq "O4.2 — fermée par la croix, elle ne revient pas au rechargement sur le même port" "$(x4 'j.croix')" "false"
+assert_eq "O4.2b — fermée par Échap (troisième lab, vu pour la première fois), elle ne revient pas au rechargement" "$(x4 'j.echap')" "false"
+assert_eq "O4.3 — les trois serveurs arrêtés puis relancés dans un autre ordre (même port stable) : elle ne revient pas (page initialisée, lab connu ; adresse identique)" "$(x4 '[j.relance,j.temoins]')|$([ "$(x4 'j.urlRelance')" = "$UA" ] && echo meme-adresse)" "[false,true]|meme-adresse"
+assert_eq "O4.4 — le bouton « Par où commencer » la rouvre" "$(x4 'j.bouton')" "true"
+assert_eq "O4.5 — un AUTRE lab la voit à son premier chargement (le rangement est par lab, pas global)" "$(x4 'j.autreLab')" "true"
+assert_eq "O4.6 — passée jusqu'au bout (autre lab), elle ne revient pas au rechargement" "$(x4 'j.passee')" "false"
+assert_eq "O4.7 — aucun cookie posé : document.cookie vide sur chaque page chargée (témoin : au moins 6 relevés)" "$(x4 'j.cookies.filter(Boolean).length')|$(x4 'j.cookies.length>=6')" "0|true"
+unset VF_COCKPIT_PORT_BASE
+for L in "${LABS4[@]}"; do node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L" >/dev/null 2>&1; done; for p in "${SRVPIDS[@]}"; do vf_hyg_stop "$p"; done; SRVPIDS=()
 vf_hyg_assert
 fi
 

@@ -171,6 +171,54 @@ assert_eq "S9.4 — aucune clé doing dans le journal" "$(sed -n '3,$p' <<<"$J9"
 assert_has "S9.5 — le fichier exporté porte un nom français (« -carte.html »)" "$(node "$AUX/post.mjs" "$PORT" /api/export "$TOK" "{}" | sed -n 2p)" '-carte.html'
 stop_srv
 
+echo "=== PS — port stable par lab, repli déterministe, aucun cookie (recette 3, O4 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-03, « C : port stable par lab ») ==="
+# Plage de test décalée (VF_COCKPIT_PORT_BASE) : les serveurs de recette tiennent 4378 et 4379, les suites n'y touchent jamais.
+mkplab() { local L="$1"; mkdir -p "$L/.planning/phases/01-x"; printf -- '- [x] **Phase 1: Socle** - premier jet\n' > "$L/.planning/ROADMAP.md"; printf '<objective>x</objective>\n' > "$L/.planning/phases/01-x/01-01-PLAN.md"; echo ok > "$L/.planning/phases/01-x/01-01-SUMMARY.md"; git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init; }
+pref() { node --input-type=module -e "import('$SCRIPTS/vf-cockpit-port.mjs').then(m=>console.log(m.portPrefere(process.argv[1])))" "$1"; }
+portlibre_p() { node -e "const s=require('net').createServer();s.on('error',()=>process.exit(1));s.listen(Number(process.argv[1]),'127.0.0.1',()=>s.close(()=>process.exit(0)))" "$1"; }
+ecoute_p() { node -e "const c=require('net').connect(Number(process.argv[1]),'127.0.0.1');c.on('connect',()=>{c.destroy();process.exit(0)});c.on('error',()=>process.exit(1))" "$1"; }
+lance() { node "$SCRIPTS/vf-cockpit.mjs" open --no-open --lab "$1" 2>"$WORK/lance.err" | sed -En 's#.*127\.0\.0\.1:([0-9]+)/.*#\1#p' | head -1; }
+arrete() { node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$1" >/dev/null 2>&1; }
+note_pid() { PIDS+=("$(node "$AUX/json.mjs" "$1/.vibeflow/cockpit/.cache/server.json" 'j.pid' 2>/dev/null || echo 0)"); }
+PSOK=""
+for essai in $(seq 1 60); do
+  PSB=$((30000 + (RANDOM * 7 + essai * 977) % 30000)); export VF_COCKPIT_PORT_BASE="$PSB"
+  PA="$WORK/psA$essai"; PB="$WORK/psB$essai"; PD="$WORK/psD$essai"; mkdir -p "$PA" "$PB" "$PD"
+  a=$(pref "$PA"); b=$(pref "$PB"); d=$(pref "$PD")
+  [ $((a>b ? a-b : b-a)) -ge 25 ] && [ $((a>d ? a-d : d-a)) -ge 25 ] && [ $((b>d ? b-d : d-b)) -ge 25 ] || continue
+  ok=1; for q in $a $b $d $((d+1)) $((d+2)); do portlibre_p "$q" || ok=0; done; [ "$ok" = 1 ] || continue
+  PSOK=1; break
+done
+assert_eq "PS.0 — témoin : trois labs aux ports préférés distincts et libres, dans la plage décalée" "$PSOK|$([ "$a" -ge "$PSB" ] && [ "$a" -lt $((PSB+100)) ] && echo plage)" "1|plage"
+for L in "$PA" "$PB" "$PD"; do mkplab "$L"; done
+# ordre 1 : A puis B ; ordre 2 : B puis A (après arrêt) ; A relancé encore
+pa1=$(lance "$PA"); note_pid "$PA"; pb1=$(lance "$PB"); note_pid "$PB"
+arrete "$PA"; arrete "$PB"
+pb2=$(lance "$PB"); note_pid "$PB"; pa2=$(lance "$PA"); note_pid "$PA"
+arrete "$PA"; pa3=$(lance "$PA"); note_pid "$PA"
+assert_eq "PS.1 — le port d'un lab est son port préféré (empreinte de sa racine réelle)" "$pa1|$pb1" "$a|$b"
+assert_eq "PS.2 — même port à deux lancements, quel que soit l'ordre (A,B puis B,A puis A seul)" "$pa2|$pb2|$pa3" "$a|$b|$a"
+assert_eq "PS.3 — témoin : deux labs, deux ports distincts ; status rend l'adresse du lab sur ce port" "$([ "$pa1" != "$pb1" ] && echo distincts)|$(node "$SCRIPTS/vf-cockpit.mjs" status --lab "$PA" | grep -c "127.0.0.1:$a/")" "distincts|1"
+assert_eq "PS.4 — --port de l'utilisateur garde la priorité sur le port préféré" "$(arrete "$PB"; xp=$(portlibre_p $((PSB+300)) && echo $((PSB+300))); node "$SCRIPTS/vf-cockpit.mjs" open --no-open --port "$xp" --lab "$PB" | grep -c "127.0.0.1:$xp/"; note_pid "$PB")" "1"
+arrete "$PA"; arrete "$PB"
+assert_eq "PS.5 — stop : les deux serveurs sont arrêtés (aucun ne répond plus sur son port)" "$(ecoute_p "$a" && echo vivant || echo arrete)|$(for _ in 1 2 3 4 5 6 7 8 9 10; do ecoute_p "$b" || break; sleep 0.2; done; ecoute_p "$b" && echo vivant || echo arrete)" "arrete|arrete"
+# collision : un processus étranger (leurre, marqué par le dossier de la suite pour que l'hygiène l'arrête par son PID) tient le port préféré de D
+cat > "$WORK/leurre.mjs" <<'JS'
+import net from 'node:net'; const s = net.createServer((c) => { c.on('error', () => {}); c.end('leurre\n'); }); s.listen(Number(process.argv[2]), '127.0.0.1');
+JS
+node "$WORK/leurre.mjs" "$d" & LEURRE=$!; PIDS+=("$LEURRE")
+for _ in $(seq 1 50); do ecoute_p "$d" && break; sleep 0.1; done
+pd1=$(lance "$PD"); note_pid "$PD"; arrete "$PD"; pd2=$(lance "$PD"); note_pid "$PD"
+assert_eq "PS.6 — port préféré occupé par un autre processus : le lab prend le suivant, le même à chaque lancement" "$pd1|$pd2" "$((d+1))|$((d+1))"
+assert_eq "PS.7 — le leurre n'est jamais tué par le cockpit (même PID vivant, port toujours à lui)" "$(kill -0 "$LEURRE" 2>/dev/null && echo vivant)|$(ecoute_p "$d" && echo ecoute)" "vivant|ecoute"
+arrete "$PD"; vf_hyg_stop "$LEURRE"
+pd3=$(lance "$PD"); note_pid "$PD"
+assert_eq "PS.8 — le leurre parti, le lab retrouve son port préféré (rien de mémorisé d'un lancement à l'autre)" "$pd3" "$d"
+H="$(node "$AUX/get.mjs" "$d" / | sed -n 2p)"
+assert_eq "PS.9 — aucun en-tête Set-Cookie sur la page (témoin : les en-têtes ont été lus)" "$(grep -c 'content-type' <<<"$H")|$(grep -ci 'set-cookie' <<<"$H")" "1|0"
+assert_eq "PS.10 — la couche de page ne pose ni ne lit aucun cookie (75-vf-modele.js)" "$(grep -c 'document\.cookie' "$SCRIPTS/../skills/cockpit-moteur/assets/ui/75-vf-modele.js")" "0"
+arrete "$PD"; unset VF_COCKPIT_PORT_BASE
+
 vf_hyg_assert
 echo ""
 echo "=================================="
