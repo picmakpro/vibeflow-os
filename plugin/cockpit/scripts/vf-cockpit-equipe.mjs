@@ -1,5 +1,6 @@
 // vf-cockpit-equipe — collecte des sessions Claude Code et de leurs sous-agents en arbre (P69-D-14, P69-D-18, P69-D-22).
-// Exports : FENETRE (86400 s), collecteAgents(ctx) -> { workers, source }, formeSousAgent(meta, premiere, id, CC) -> 'complete' | 'arretee' | null
+// Exports : FENETRE (86400 s), collecteAgents(ctx) -> { workers, source }, formeSousAgent(meta, premiere, id, CC) -> 'complete' | 'arretee' | null,
+//           rattacher(workers, { index, registre, mandatDe }) -> champ `rattachement` des sous-agents (P69-D-15), indexDesNoeuds(dags) -> Map nœud -> [{ dag, ws, wsDeclare }]
 // Lecture seule, aucun réseau ; les listes de forme viennent du contrat (vf-cockpit-interface.json, bloc claudeCode passé en ctx.CC), jamais du code.
 // Seuls les candidats de la fenêtre (le .jsonl voisin modifié depuis moins de `fenetre`) et leurs ancêtres retrouvés par identifiant sont ouverts.
 import fs from 'node:fs';
@@ -94,4 +95,35 @@ export function collecteAgents(ctx) {
   }
   const inconnue = inconnuSub > 0 || (inconnuSession > 0 && live + subLive === 0);
   return { workers, source: { etat: inconnue ? 'forme-inconnue' : 'lue', path: projects, recentFiles: scanned, liveSessions: live, liveSubagents: subLive, formeInconnue: inconnuSub + inconnuSession } };
+}
+
+// index des nœuds de mission : Map identifiant de nœud -> [{ dag, ws, wsDeclare }] (une entrée par DAG ; une Map, la clé vient d'un fichier : T-69-09)
+export function indexDesNoeuds(dags) {
+  const index = new Map();
+  for (const d of dags) for (const n of d.nodes || []) {
+    if (typeof n?.id !== 'string') continue;
+    const l = index.get(n.id) || []; if (!l.some((e) => e.dag === d.file)) l.push({ dag: d.file, ws: d.ws ?? null, wsDeclare: d.wsDeclare ?? null });
+    index.set(n.id, l);
+  }
+  return index;
+}
+
+// P69-D-15 : le registre, quand il porte un nœud pour l'agent, décide seul (candidats : DAG du compartiment de l'appel `orphans`, tous pour le dépôt) ;
+// sinon les citations du mandat. Un seul DAG -> rattache ; aucun -> inconnu ; plusieurs -> ambigu ; aucune citation -> sans-citation. Jamais deviné.
+export function rattacher(workers, { index, registre, mandatDe }) {
+  const non = (raison) => ({ etat: 'non-rattache', raison });
+  for (const w of workers) {
+    if (w.kind !== 'subagent') continue;
+    const r = registre.get(w.id);
+    if (r && typeof r.noeud === 'string' && r.noeud) {
+      const c = (index.get(r.noeud) || []).filter((e) => !r.ws || e.ws === r.ws || e.wsDeclare === r.ws);
+      w.rattachement = c.length === 1 ? { etat: 'rattache', source: 'registre', dag: c[0].dag, noeud: r.noeud } : non(c.length ? 'ambigu' : 'inconnu');
+      continue;
+    }
+    const ids = citationsDuMandat(mandatDe(w.id));
+    if (!ids.length) { w.rattachement = non('sans-citation'); continue; }
+    const paires = []; let multiple = false;
+    for (const id of ids) { const c = index.get(id) || []; if (c.length > 1) multiple = true; for (const e of c) paires.push({ dag: e.dag, noeud: id }); }
+    w.rattachement = multiple || paires.length > 1 ? non('ambigu') : paires.length === 1 ? { etat: 'rattache', source: 'mandat', ...paires[0] } : non('inconnu');
+  }
 }

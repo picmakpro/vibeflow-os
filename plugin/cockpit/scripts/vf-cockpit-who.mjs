@@ -2,6 +2,8 @@
 // vf-cockpit-who — « qui est au travail ? » (socle du cockpit, P67-D-12, promu du spike 004). Lecture seule.
 // Exports : collectWho(root, opts) -> schéma vibeflow/cockpit-who@2 (JAMAIS de champ `doing`, P67-D-14)
 //           revealDoing(root, id, opts) -> schéma vibeflow/cockpit-doing@1 (dernière commande, à la demande)
+//           revealTranscript(root, id, opts) -> schéma vibeflow/cockpit-transcript@1 (mandat, messages, outils : jamais une sortie d'outil, P69-D-19)
+//           agentsConnus(root, opts) -> sessions et sous-agents seuls (collecte allégée d'un clic, T-69-06) ; commandeAffichee(cmd)
 // Quatre sources disque : sessions Claude Code (~/.claude/projects), sous-agents (meta.json), verrous et
 // registre (driver-lock.sh, résolu hors de l'arbre observé : T-67-06), DAG de mission (nœuds running).
 // Chaque source rend son état (lue, absente, erreur, forme-inconnue) : un « personne » n'est jamais aveugle.
@@ -11,9 +13,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { driverLockScript, gitCommonDir, resolveScriptsDir } from './vf-cockpit-paths.mjs';
-import { ls, mtime, readJson, cherche, masque, MAX_MASQUE, ID_RE } from './vf-cockpit-lecture.mjs';
-import { FENETRE, collecteAgents } from './vf-cockpit-equipe.mjs';
+import { driverLockScript, gitCommonDir, resolveScriptsDir, planningLayout } from './vf-cockpit-paths.mjs';
+import { ls, mtime, readJson, cherche, masque, MAX_MASQUE, ID_RE, premiereLigne } from './vf-cockpit-lecture.mjs';
+import { FENETRE, collecteAgents, indexDesNoeuds, rattacher } from './vf-cockpit-equipe.mjs';
+import { lireDags } from './vf-cockpit-planning.mjs';
+import { reduireTranscript } from './vf-cockpit-transcript.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const sh = (cmd, args, cwd) => { try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000 }); } catch (e) { return e.stdout || ''; } }; // timeout : un git ou un bash bloqué ne gèle pas la boucle
@@ -27,10 +31,9 @@ const REQ_TR = CC.transcript?.requis || ['cwd', 'type', 'message', 'timestamp', 
 const tail = (f) => cherche(f, (d) => (d.type === 'user' || d.type === 'assistant' ? d : null));
 const formeOk = (d) => !!d && REQ_TR.every((k) => k in d);
 
-// collecte interne : les travailleurs gardent `_tr` (chemin du transcript) hors de la sortie publique
-function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 1800, now = Date.now(), home = os.homedir(), scriptsDir } = {}) {
+// contexte de collecte des sessions et sous-agents : arbres git du lab, portée, étiquettes
+function contexte(root, { fresh, now, home }) {
   root = path.resolve(root);
-  const sources = {}; const workers = [];
   const porcelain = sh('git', ['-C', root, 'worktree', 'list', '--porcelain'], root);
   const branchOf = new Map(porcelain.split('\n\n').map((b) => [/^worktree (.*)$/m.exec(b)?.[1], /^branch refs\/heads\/(.*)$/m.exec(b)?.[1] || (b.includes('detached') ? '(détachée)' : '')]).filter(([t]) => t && fs.existsSync(t)).map(([t, br]) => [fs.realpathSync(t), br]));
   // la branche vient de `git worktree list` pour TOUT arbre connu (cwd ou activité) ; le gitBranch du transcript est celui de l'arbre de LANCEMENT : repli seulement
@@ -47,9 +50,21 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
     return hit ? { tree: hit, how: 'activité' } : { tree: fallback, how: 'cwd' };
   };
 
-  // 1 + 2 — sessions et sous-agents, en arbre (vf-cockpit-equipe.mjs : fenêtre de 24 h, forme Claude Code lue du contrat)
   const projects = path.join(home, '.claude', 'projects');
-  const eq = collecteAgents({ projects, now, fresh, fenetre: FENETRE, inScope, label, branche, byActivity, CC, tail, formeOk, root });
+  return { root, trees, label, collecte: () => collecteAgents({ projects, now, fresh, fenetre: FENETRE, inScope, label, branche, byActivity, CC, tail, formeOk, root }) };
+}
+
+// sessions et sous-agents seuls : pas de verrous, de registre ni de DAG (un clic ne rejoue pas toute la collecte)
+export function agentsConnus(root, { fresh = 180, now = Date.now(), home = os.homedir() } = {}) {
+  return contexte(root, { fresh, now, home }).collecte().workers;
+}
+
+// collecte interne : les travailleurs gardent `_tr` (chemin du transcript) hors de la sortie publique
+function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 1800, now = Date.now(), home = os.homedir(), scriptsDir } = {}) {
+  const cx = contexte(root, { fresh, now, home }); root = cx.root;
+  const { trees, label } = cx; const sources = {}; const workers = [];
+  // 1 + 2 — sessions et sous-agents, en arbre (vf-cockpit-equipe.mjs : fenêtre de 24 h, forme Claude Code lue du contrat)
+  const eq = cx.collecte();
   workers.push(...eq.workers); sources.sessions = eq.source;
   const presents = new Set(eq.workers.filter((w) => w.kind === 'subagent').map((w) => w.id)); const registre = new Map(); // carte privée, jamais dans la sortie publique
 
@@ -72,22 +87,30 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
     sources.locks ||= { etat: 'lue', held: (st.locks || []).filter((x) => x.present).length, registered: reg };
   }
 
-  // 4 — DAG : nœuds running, dans .planning/ et dans le dossier commun des verrous
-  const dagDirs = [path.join(root, '.planning'), path.join(root, '.planning', 'missions'), ...ls(path.join(common, 'vf-driver', 'ws')).map((w) => path.join(common, 'vf-driver', 'ws', w)), path.join(common, 'vf-driver', 'repo')];
-  let dags = 0, running = 0, staleNodes = 0;
-  for (const d of dagDirs) for (const f of ls(d).filter((x) => x.endsWith('.dag.json'))) {
-    dags++;
-    const fp = path.join(d, f); const j = readJson(fp); if (!j) continue;
+  // rattachement des sous-agents aux nœuds de mission (P69-D-15) : une seule découverte de DAG (lireDags), partagée avec le source 4
+  let dags = [];
+  try { dags = lireDags(root, planningLayout(root)); } catch {}
+  const trDe = new Map(workers.filter((w) => w.kind === 'subagent' && w._tr).map((w) => [w.id, w._tr]));
+  rattacher(workers, { index: indexDesNoeuds(dags), registre, mandatDe: (id) => { const c = trDe.has(id) ? premiereLigne(trDe.get(id))?.message?.content : ''; return typeof c === 'string' ? c : ''; } });
+
+  // 4 — DAG : nœuds running, dans les DAG du lab (lireDags : .planning, compartiments, missions, phases) et dans le dossier commun des verrous
+  const fichiers = dags.map((g) => { const fp = path.join(root, g.file); return { d: path.dirname(fp), f: path.basename(fp), nodes: g.nodes }; });
+  for (const d of [...ls(path.join(common, 'vf-driver', 'ws')).map((w) => path.join(common, 'vf-driver', 'ws', w)), path.join(common, 'vf-driver', 'repo')])
+    for (const f of ls(d).filter((x) => x.endsWith('.dag.json'))) { const j = readJson(path.join(d, f)); if (j) fichiers.push({ d, f, nodes: Array.isArray(j.nodes) ? j.nodes : [] }); }
+  let nDags = 0, running = 0, staleNodes = 0;
+  for (const { d, f, nodes } of fichiers) {
+    nDags++;
+    const fp = path.join(d, f);
     let age = Math.round((now - mtime(fp)) / 1000);
-    if (age <= ttl && (j.nodes || []).some((x) => x.status === 'running')) {
+    if (age <= ttl && nodes.some((x) => x.status === 'running')) {
       const tracked = sh('git', ['-C', d, 'ls-files', '--error-unmatch', f], d).trim(), dirty = sh('git', ['-C', d, 'status', '--porcelain', '--', f], d).trim();
       const ct = Number(sh('git', ['-C', d, 'log', '-1', '--format=%ct', '--', f], d).trim());
       if (tracked && !dirty && ct) age = Math.round(now / 1000 - ct); // contenu identique au commit : écrit au plus tard à cette date
     }
     const stale = age > ttl;
-    for (const n of (j.nodes || []).filter((x) => x.status === 'running')) { running++; if (stale) staleNodes++; workers.push({ kind: 'dag-node', id: n.id, role: n.stage || '', task: (n.step || '').slice(0, 100), tree: path.relative(root, d) || d, dag: f, ageS: age, stale, source: 'dag' }); }
+    for (const n of nodes.filter((x) => x.status === 'running')) { running++; if (stale) staleNodes++; workers.push({ kind: 'dag-node', id: n.id, role: n.stage || '', task: String(n.step || '').slice(0, 100), tree: path.relative(root, d) || d, dag: f, ageS: age, stale, source: 'dag' }); }
   }
-  sources.dags = { etat: 'lue', files: dags, running, stale: staleNodes };
+  sources.dags = { etat: 'lue', files: nDags, running, stale: staleNodes };
   return { at: new Date(now).toISOString(), root, trees: trees.map(label), fresh, fenetre: FENETRE, workers, sources, _registre: registre };
 }
 
@@ -146,6 +169,15 @@ export function revealDoing(root, id, opts = {}) {
   if (!w) return { schema: 'vibeflow/cockpit-doing@1', id, doing: null, erreur: 'inconnu' };
   const doing = lastDoing(w._tr);
   return doing ? { schema: 'vibeflow/cockpit-doing@1', id, doing } : { schema: 'vibeflow/cockpit-doing@1', id, doing: null, erreur: 'sans-action' };
+}
+
+// P69-D-19 : le transcript d'un agent connu, réduit à son mandat, ses messages et ses outils (liste blanche, vf-cockpit-transcript.mjs) ; le chemin vient de la collecte, jamais de l'entrée (T-69-02)
+export function revealTranscript(root, id, opts = {}) {
+  const S = 'vibeflow/cockpit-transcript@1';
+  if (typeof id !== 'string' || !ID_RE.test(id)) return { schema: S, id: String(id), erreur: 'id-invalide' };
+  const connus = new Map(agentsConnus(root, opts).filter((x) => (x.kind === 'session' || x.kind === 'subagent') && x._tr).map((x) => [x.id, x]));
+  const w = connus.get(id);
+  return w ? { schema: S, id, ...reduireTranscript(w._tr, { root: path.resolve(root) }) } : { schema: S, id, erreur: 'inconnu' };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
