@@ -130,6 +130,24 @@ scratchpad de la mission, rejouable ; résultats repris ci-dessous).
 
 - **P71-D-24 (amende P71-D-10 ; décision du manager, vf-dev-manager, 2026-11-03).** Mesuré par l'exécuteur de 71-06 dans Chrome 156 : un `fetch` GET de même origine n'envoie jamais d'en-tête `Origin` (spec Fetch), donc `GET /flux` et `GET /etat` rendaient 403 en navigateur réel ; les suites de 71-02 restaient vertes parce que leur client Node posait `Origin` à la main (témoin aveugle). Règle : pour `GET /flux` et `GET /etat` SEULEMENT, l'absence d'`Origin` est admise si et seulement si `Sec-Fetch-Site: same-origin` ET le secret en en-tête `X-VF-Terminal` est valide ; une `Origin` présente doit toujours être exactement celle du serveur ; un `Sec-Fetch-Site` absent ou autre que `same-origin` sans `Origin` = refus ; les POST gardent `Origin` obligatoire. Motif de sûreté : une page tierce ne peut pas poser `X-VF-Terminal` sans préflight, auquel Q ne répond jamais ; une requête simple sans cet en-tête n'a pas de secret. À vérifier par l'audit ; les suites portent désormais un témoin qui reproduit le navigateur (GET sans `Origin`).
 
+### Arbitrages de Samuel sur l'audit (AskUserQuestion, session principale Claude Code, 2026-11-04, relayés au manager)
+
+- **P71-D-25 (Q9, validation ADR-031 ; arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-04).** « Valider le lot tel quel
+  (Recommandé) ». Couvre F1 (le lanceur reconstruit l'adresse de Q depuis un port entier validé et vérifie que le processus est le sien), F3
+  (`python3` en chemin absolu, éléments relatifs ou vides du `PATH` filtrés), F4 (le terminal ne se connecte que dans son cadre), les libellés de
+  TERM-10 et de P71-D-15, et les assertions rouges des protections sans témoin (F7).
+- **P71-D-26 (Q10, collage piégé F2 ; arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-04).** « Confirmer les collages
+  multi-lignes (Recommandé) » : un bandeau « Coller / Annuler » dans le terminal quand le texte collé contient un retour à la ligne ou un caractère
+  de contrôle.
+- **P71-D-27 (Q11, amorçage dans `ps` F6 ; arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-04).** « Le sortir de la ligne
+  de commande (Recommandé) » : le lanceur écrit une page de redirection en 0600 dans `.cache`, l'ouvre puis la supprime ; le jeton d'amorçage
+  expire en 60 s.
+- **P71-D-28 (Q12, périmètre de l'arrêt, TERM-08 ; arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-04).** « Tués aussi
+  (Recommandé) » : à l'arrêt, tout processus encore dans la session du terminal meurt, `nohup` et `disown` compris ; un processus sorti de la
+  session par `setsid` est une limite écrite au README.
+- **P71-D-15 reformulée (F5, validée par P71-D-25).** « Q n'a aucun écouteur `message` propre » : le vendor xterm.js garde un écouteur interne
+  sans contrôle d'origine (planificateur `vscodeScheduleAsyncWork`), sans donnée ni commande ; le vendor épinglé n'est pas patché.
+
 ### Contraintes héritées (Phase 67, `v2.75.0`)
 
 - Le lab observé n'est jamais une source de code : aucun script du lab exécuté par le serveur (le shell, lui, est l'usage
