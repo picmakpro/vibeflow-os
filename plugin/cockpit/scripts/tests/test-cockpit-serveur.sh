@@ -89,6 +89,12 @@ for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; 
 PORT=$(node "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)
 TOK=$(node "$AUX/token.mjs" "$PORT" /); PTOK=$(node "$AUX/token.mjs" "$PORT" /project.html)
 assert_eq "S0 — serveur démarré, jetons lus dans les deux pages" "$([ "$PORT" -gt 0 ] && [ "${#TOK}" -ge 16 ] && [ "${#PTOK}" -ge 16 ] && echo oui || echo non)" "oui"
+cat > "$AUX/statut.mjs" <<'JS'
+import http from 'node:http';
+const [, , port, p] = process.argv;
+http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}` } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => console.log(r.statusCode + '|' + (b.includes('VibeFlow · Équipe') ? 'page' : 'sans-page'))); }).on('error', (e) => console.log('ERR ' + e.message));
+JS
+assert_eq "EQ.0 — témoin : le serveur d'origine sert /equipe.html (200, page Équipe)" "$(node "$AUX/statut.mjs" "$PORT" /equipe.html)" "200|page"
 
 echo "=== S1 — jetons de /api/vf/etat ==="
 assert_eq "S1.1 — sans jeton : 403" "$(status "$PORT" /api/vf/etat)" "403"
@@ -282,6 +288,28 @@ assert_eq "DO.4 — deux refus journalisés en erreur, nommant l'événement" "$
 assert_eq "DO.5 — un snapshot portant doing : le hello n'est pas émis, la réponse est close, l'erreur est journalisée" "$(dgev 'j.hello.ev.length+","+j.hello.fini+","+j.logs.filter(l=>/hello refusé/.test(l)).length')" "0,true,1"
 assert_eq "DO.6 — la valeur de doing ne figure nulle part dans la sortie du serveur (flux, journal, logs)" "$(dgev 'j.fuite')" "false"
 
+# EQ (69-07, audit sécurité de la route) : /equipe.html sérialise un instantané `who` ; elle passe sous la MÊME garde que le flux (clés interdites du contrat, fermée par défaut).
+# Le double de collecte rend un `who` simulé ; le serveur, lui, est le vrai (attach + pageEquipe) avec un project.html généré par le vrai lanceur.
+cat > "$AUX/equipe-garde.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab] = process.argv;
+const { attach } = await import(pathToFileURL(scripts + '/vf-cockpit-server.mjs').href);
+const a = attach({ here: lab, root: lab, token: 'tk', inject: '', log: () => {} });
+a.load();
+const page = () => { const p = a.pageEquipe(); return p === null ? 'null' : typeof p === 'string' && p.includes('VibeFlow · Équipe') ? 'page' : 'autre'; };
+const sortie = {};
+globalThis.__vfSnap = { seq: 1, lock: { available: false }, who: { workers: [{ kind: 'session', id: 'w1', tree: 't', source: 's' }], sources: {} } };
+sortie.propre = page();
+globalThis.__vfSnap = { seq: 2, lock: { available: false }, who: { workers: [{ kind: 'session', id: 'w1', tree: 't', source: 's', sub: { doing: 'commande-secrete' } }], sources: {} } };
+const p = a.pageEquipe(); sortie.interdit = page(); sortie.fuite = typeof p === 'string' && p.includes('commande-secrete');
+console.log(JSON.stringify(sortie)); a.stop(); process.exit(0);
+JS
+mkdir -p "$WORK/lab-eq"; printf '%s' '<html><head><title>t</title></head><body><script>window.FLOORPLAN = {"meta":{"rootName":"x"},"nodes":[],"files":[],"links":[]};</script></body></html>' > "$WORK/lab-eq/project.html"
+EQ="$(VF_DOUBLE_LIVE="file://$AUX/live-double.mjs" node --import "$AUX/reg-double.mjs" "$AUX/equipe-garde.mjs" "$SCRIPTS" "$WORK/lab-eq" 2>"$WORK/eq.err")"
+eqev() { printf '%s' "$EQ" | node "$AUX/json-stdin.mjs" "$1"; }
+assert_eq "EQ.1 — témoin positif : un who propre donne la page Équipe" "$(eqev 'j.propre')" "page"
+assert_eq "EQ.2 — un who portant une clé interdite (profondeur 2) : aucune page d'équipe, rien ne sort" "$(eqev 'j.interdit+"|"+j.fuite')" "null|false"
+
 # F4 (69-07, P69-D-23) : la liste des clés interdites vient du contrat. Une copie de la sortie dont vf-cockpit-interface.json est retirée ne peut plus
 # la lire : le serveur de la copie doit tout refuser d'émettre (fermé par défaut). Témoin : le serveur d'origine a émis son hello (S4.2, S5.1).
 F4="$LAB/.vibeflow/mut-contrat"; rm -rf "$F4"; cp -R "$OUT" "$F4"; rm -rf "$F4/.cache"; rm -f "$F4/vf-cockpit-interface.json"
@@ -293,6 +321,7 @@ F4TOK=$(node "$AUX/token.mjs" "$F4PORT" /)
 : > "$WORK/f4.jsonl"; node "$AUX/sse.mjs" "$F4PORT" "$F4TOK" 2000 hello "$WORK/f4.jsonl"
 assert_eq "F4.0 — témoin : la copie est sans contrat, son serveur répond (jeton lu, flux ouvert en 200)" "contrat:$([ -e "$F4/vf-cockpit-interface.json" ] && echo present || echo absent)|jeton:$([ "${#F4TOK}" -ge 16 ] && echo oui || echo non)|flux:$(node "$AUX/ev.mjs" "$WORK/f4.jsonl" 'E[0].status')" "contrat:absent|jeton:oui|flux:200"
 assert_eq "F4 — contrat illisible : aucun événement hello n'est émis" "$(node "$AUX/ev.mjs" "$WORK/f4.jsonl" 'E.filter(e=>e.event).length')" "0"
+assert_eq "EQ.3 — contrat illisible : /equipe.html n'émet aucune donnée d'équipe (ni 200 avec la page)" "$(node "$AUX/statut.mjs" "$F4PORT" /equipe.html | grep -c '^200|page')" "0"
 vf_hyg_stop "$F4PID"
 
 vf_hyg_assert
