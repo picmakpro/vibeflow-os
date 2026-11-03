@@ -119,7 +119,8 @@ export function buildProjectGraph(root, { layout } = {}) {
   for (const [id, unit] of [['backlog', 'entrées'], ['seeds', 'graines']]) nodes.find((x) => x.id === id).foot = `${files.filter((f) => f.n === id).length} ${unit}`;
   nodes.find((n) => n.id === 'releases').foot = `${P.tags.length} tags`;
 
-  const active = msList.find((m) => m.st === 'active') || msList.at(-1);
+  // jalon mis en avant : celui que nomme le STATE du compartiment actif tant qu'il n'est pas clos, sinon le premier en cours (CKPT-16) ; le STATE ne décide jamais de l'état d'une PHASE (P69-D-08)
+  const active = msList.find((m) => state.milestone && m.key === state.milestone && m.ws === (layout.actif || null) && m.st !== 'done') || msList.find((m) => m.st === 'active') || msList.at(-1);
   const flows = active ? [{ id: 'trajectoire', title: `Trajectoire de ${active.key}`, description: "Les phases du jalon en cours, dans l'ordre.", steps: active.ks.map((p) => ({ ref: 'n:' + phId(p), note: `${p.done ? '✓' : '○'} ${p.name}` })) }] : [];
   const ids = new Set(nodes.map((n) => 'n:' + n.id)), fids = new Set(files.map((f) => 'f:' + f.p));
   return {
