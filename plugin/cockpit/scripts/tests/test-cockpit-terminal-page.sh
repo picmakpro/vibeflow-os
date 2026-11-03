@@ -5,10 +5,12 @@
 #   T9  en-têtes de GET / de Q : directives exactes, aucun X-Frame-Options, nosniff / no-referrer / no-store, thème clair idem
 #   TS  aucun <script> à attribut ; le <style> de xterm a le sha256 épinglé de xterm.css
 #   TH  thème par ?theme= à liste fermée, valeur jamais reflétée, aucun autre paramètre ne change la page
-#   TF  JetBrains Mono embarquée en data:font/woff2, octets égaux aux fichiers vendorisés
+#   TF  JetBrains Mono embarquée en data:font/woff2 (latin, latin-ext, traits de boîte 2.304), octets égaux aux fichiers vendorisés
 #   TV  un octet du vendor (ou SHA256SUMS) altéré : le terminal refuse de démarrer
 #   T18 parité des 25 variables Graphite avec viewer.html, sombre et clair, jamais sur un ensemble vide
-#   M-* mutants (copies de la sortie) : M-ANCETRES, M-XFO, M-EMPREINTE, M-THEME, M-PARITE (a à d)
+#   T19 parité de la palette xterm de vue.mjs avec viewer.html (J10 de la critique 71 : les 15 couleurs de l'UI-SPEC §4.2 qui ont une variable Graphite
+#       d'origine, par thème, jamais sur un ensemble vide)
+#   M-* mutants (copies de la sortie) : M-ANCETRES, M-XFO, M-EMPREINTE, M-THEME, M-PARITE (a à d), M-PALETTE (a à d)
 # Aucun navigateur : serveur lancé directement avec --terminal, pages lues par terminal-aux.mjs. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
@@ -68,6 +70,28 @@ for (const theme of ['sombre', 'clair']) for (const nom of NOMS) {
   n[theme]++; if (v !== q) console.log(`variable ${nom} (${theme}) : viewer.html=${v}, Q=${q}`);
 }
 console.log(`PARITE ${n.sombre}/${n.clair}`);
+JS
+cat > "$AUX/palette.mjs" <<'JS'
+// palette.mjs <viewer.html> <vue.mjs> : la palette xterm de vue.mjs contre les variables Graphite de viewer.html, par thème. Seules les couleurs que l'UI-SPEC §4.2
+// donne comme venant d'une variable (colonne « Origine ») sont comparées ; les autres (éclaircies, voiles) n'ont pas de variable d'origine.
+import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
+const ORIGINE = { background: '--surface', foreground: '--text', cursor: '--on', cursorAccent: '--on-text', red: '--sev-high', green: '--recent', yellow: '--sev-medium',
+  blue: '--k-http', magenta: '--k-call', cyan: '--k-data', white: '--text-2', brightBlack: '--text-3', brightRed: '--err-text', brightYellow: '--warn-text', brightWhite: '--text' };
+const norm = (v) => { v = String(v).trim().toLowerCase().replace(/\s+/g, ' '); const m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(v); return m ? `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}` : v; };
+const decl = (css, sel) => Object.fromEntries([...(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*{([^}]*)}').exec(css)?.[1] || '').matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], norm(m[2])]));
+const css = fs.readFileSync(process.argv[2], 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''); const V = { s: decl(css, ':root'), c: decl(css, ':root[data-theme="light"]') };
+globalThis.window = {}; const m = await import(pathToFileURL(process.argv[3]).href); m.vueTerminal({});
+const n = { sombre: 0, clair: 0 };
+for (const theme of ['sombre', 'clair']) {
+  const pal = window.vfTermVue.theme(theme === 'clair');
+  for (const [cle, nom] of Object.entries(ORIGINE)) {
+    const v = theme === 'clair' && nom in V.c ? V.c[nom] : V.s[nom], q = pal[cle] === undefined ? undefined : norm(pal[cle]);
+    if (v === undefined) { console.log(`ABSENTE ${nom} viewer.html ${theme}`); continue; }
+    if (q === undefined) { console.log(`ABSENTE ${cle} palette ${theme}`); continue; }
+    n[theme]++; if (v !== q) console.log(`couleur ${cle} (${theme}) : viewer.html ${nom}=${v}, palette=${q}`);
+  }
+}
+console.log(`PALETTE ${n.sombre}/${n.clair}`);
 JS
 cat > "$AUX/pagegen.mjs" <<'JS'
 // pagegen.mjs <sortie> <moteur> <theme> <fichier> : page et CSP rendues par le module de la sortie (sans serveur) ; CSP dans <fichier>.csp
@@ -143,14 +167,19 @@ assert_eq "TH.3 — la valeur balisée n'est reflétée nulle part (corps)" "$(g
 page orig "/?origineP=http://evil.test:9&theme=dark"
 assert_eq "TH.4 — ?origineP=… sans effet : même page, même CSP" "$(node "$AUX/csp.mjs" sha "$PG/orig.html") $(entete "$PG/orig.out" 'j["content-security-policy"]')" "$(node "$AUX/csp.mjs" sha "$PG/dark.html") $CSP"
 POL="$(node "$AUX/csp.mjs" polices "$PG/dark.html")"
-assert_eq "TF.1 — deux @font-face JetBrains Mono en data:font/woff2;base64" "$(printf '%s\n' "$POL" | sed -n 1p)" "n=2"
-V1="$ENG/assets/vendor/fonts/jetbrains-mono-latin-wght-normal.woff2"; V2="$ENG/assets/vendor/fonts/jetbrains-mono-latin-ext-wght-normal.woff2"
-assert_eq "TF.2 — octets décodés = fichiers vendorisés latin et latin-ext (sha256)" "$(printf '%s\n' "$POL" | sed 1d | grep . | tr '\n' ' ')" "$(printf '%s\n%s\n' "$(node "$AUX/csp.mjs" sha "$V1")" "$(node "$AUX/csp.mjs" sha "$V2")" | sort | tr '\n' ' ')"
+assert_eq "TF.1 — trois @font-face JetBrains Mono en data:font/woff2;base64 (latin, latin-ext, traits de boîte)" "$(printf '%s\n' "$POL" | sed -n 1p)" "n=3"
+V1="$ENG/assets/vendor/fonts/jetbrains-mono-latin-wght-normal.woff2"; V2="$ENG/assets/vendor/fonts/jetbrains-mono-latin-ext-wght-normal.woff2"; V3="$ENG/assets/vendor/fonts/jetbrains-mono-2.304-regular.woff2"
+assert_eq "TF.2 — octets décodés = fichiers vendorisés latin, latin-ext et traits de boîte 2.304 (sha256)" "$(printf '%s\n' "$POL" | sed 1d | grep . | tr '\n' ' ')" "$(printf '%s\n%s\n%s\n' "$(node "$AUX/csp.mjs" sha "$V1")" "$(node "$AUX/csp.mjs" sha "$V2")" "$(node "$AUX/csp.mjs" sha "$V3")" | sort | tr '\n' ' ')"
+assert_eq "TF.3 — la face des traits de boîte couvre U+2500-259F, avec la plage de poids 100 900 des faces latines (un poids exact change la police primaire de xterm : cellule de 15 px au lieu de 17)" "$(grep -o '@font-face{[^}]*unicode-range:U+2500-259F[^}]*}' "$PG/dark.html" | sed 's/src:url([^)]*)/src:URL/')" '@font-face{font-family:"JetBrains Mono";font-style:normal;font-display:block;font-weight:100 900;unicode-range:U+2500-259F;src:URL format("woff2")}'
 PAR="$(node "$AUX/parite.mjs" "$VIEWER" "$PG/dark.html")"
 assert_eq "T18.0 — les 25 noms sont présents dans les deux sources, par thème (anti-vide)" "$(printf '%s\n' "$PAR" | grep '^PARITE ')" "PARITE 25/25"
 echo "  mesure : $(printf '%s\n' "$PAR" | grep '^PARITE ') (viewer.html contre la page servie)"
 assert_eq "T18.1 — parité sombre : aucun écart ni variable absente" "$(printf '%s\n' "$PAR" | grep -E '\(sombre\)| sombre$' || true)" ""
 assert_eq "T18.2 — parité claire (valeur effective) : aucun écart ni variable absente" "$(printf '%s\n' "$PAR" | grep -E '\(clair\)| clair$' || true)" ""
+PAL="$(node "$AUX/palette.mjs" "$VIEWER" "$OUT/vf-cockpit-terminal-vue.mjs")"
+assert_eq "T19.0 — les 15 couleurs de la palette qui ont une variable d'origine sont présentes dans les deux sources, par thème (anti-vide)" "$(printf '%s\n' "$PAL" | grep '^PALETTE ')" "PALETTE 15/15"
+echo "  mesure : $(printf '%s\n' "$PAL" | grep '^PALETTE ') (viewer.html contre la palette xterm de vue.mjs)"
+assert_eq "T19.1 — parité de la palette xterm, sombre et clair : aucun écart ni couleur absente" "$(printf '%s\n' "$PAL" | grep -v '^PALETTE ' || true)" ""
 unsrv
 
 echo "=== M-ANCETRES / M-EMPREINTE / M-THEME — mutants de la page ==="
@@ -192,6 +221,21 @@ if mutant pariteter vf-cockpit-terminal-style.mjs 's/--text: #161616/--text: #16
   assert_has "T18.6 — (d) --text clair de Q seul changé" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pd.html")" "variable --text (clair) : viewer.html=#161616, Q=#161617"
 else assert_eq "T18.6 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
+echo "=== M-PALETTE — quatre variantes (J10) ==="
+if mutant paletta vf-cockpit-terminal-vue.mjs "s/green: '#4ade80'/green: '#4ade81'/"; then
+  assert_has "T19.2 — (a) vert sombre de la palette changé" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_OUT/vf-cockpit-terminal-vue.mjs")" "couleur green (sombre) : viewer.html --recent=#4ade80, palette=#4ade81"
+else assert_eq "T19.2 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant palettb vf-cockpit-terminal-vue.mjs "s/brightRed: '#b42323',//"; then
+  assert_has "T19.3 — (b) brightRed retiré de la palette claire" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_OUT/vf-cockpit-terminal-vue.mjs")" "ABSENTE brightRed palette clair"
+else assert_eq "T19.3 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+sed 's/--recent: #4ade80;/--recent: #4ade7f;/' "$VIEWER" > "$WORK/viewer-pal.html"
+if ! cmp -s "$VIEWER" "$WORK/viewer-pal.html"; then
+  assert_has "T19.4 — (c) --recent sombre de viewer.html changé (l'amont dérive)" "$(node "$AUX/palette.mjs" "$WORK/viewer-pal.html" "$OUT/vf-cockpit-terminal-vue.mjs")" "couleur green (sombre) : viewer.html --recent=#4ade7f, palette=#4ade80"
+else assert_eq "T19.4 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant palettd vf-cockpit-terminal-vue.mjs "s/cursorAccent: '#ffffff'/cursorAccent: '#fffffe'/"; then
+  assert_has "T19.5 — (d) cursorAccent clair seul changé (#fff de viewer.html contre #fffffe)" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_OUT/vf-cockpit-terminal-vue.mjs")" "couleur cursorAccent (clair) : viewer.html --on-text=#ffffff, palette=#fffffe"
+else assert_eq "T19.5 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
 echo "=== TV — intégrité du vendor au démarrage (TERM-10) ==="
 copie() { rm -rf "$WORK/moteur-$1"; cp -R "$ENG" "$WORK/moteur-$1"; } # copie du moteur, modifiable sans toucher au dépôt
 verdict() { # verdict <nom> : démarre Q sur la copie, rend « etat/écouteurs »
@@ -206,6 +250,13 @@ copie sommes; sed -i.bak 's/^854a7c0f/954a7c0f/' "$WORK/moteur-sommes/assets/ven
 assert_eq "TV.2 — SHA256SUMS incohérent : arrete, un seul écouteur" "$VERD" "arrete/1"
 copie absent; rm -f "$WORK/moteur-absent/assets/vendor/xterm/xterm.js"; verdict absent
 assert_eq "TV.3 — xterm.js absent : arrete" "$VERD $(printf '%s' "$VJ" | grep -c 'fichiers xterm absents')" "arrete/1 1"
+
+copie fonte; node -e "const f=process.argv[1],b=require('fs').readFileSync(f);b[2000]^=1;require('fs').writeFileSync(f,b)" "$WORK/moteur-fonte/assets/vendor/fonts/jetbrains-mono-2.304-regular.woff2"
+verdict fonte
+assert_eq "TV.4 — un octet de la police des traits de boîte changé : arrete, un seul écouteur" "$VERD" "arrete/1"
+assert_has "TV.4 — le journal dit « fichiers xterm altérés »" "$VJ" "fichiers xterm altérés"
+copie sommesfonte; sed -i.bak 's/^a9cb1cd8/b9cb1cd8/' "$WORK/moteur-sommesfonte/assets/vendor/fonts/SHA256SUMS"; verdict sommesfonte
+assert_eq "TV.5 — SHA256SUMS des polices incohérent : arrete, un seul écouteur" "$VERD" "arrete/1"
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

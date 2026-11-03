@@ -7,8 +7,11 @@
 #   T14  programme hostile (temoins/hostile.py : OSC 52, OSC 8, DCS, XTGETTCAP, CSI 21t/18t/14t/16t, DECRQSS puis DA1) : T14.1 l'entrée reçue est la réponse à DA1
 #        SEULE (témoin T14.1a : elle est reçue), T14.2 aucun appel au presse-papiers, T14.3 ni window.open ni confirm sans clic, T14.4 un clic sur le lien
 #        OSC 8 l'ouvre une fois en noopener sans confirm, T14.5 témoin de l'espion (un appel délibéré au presse-papiers est compté)
+#   T15  traits de boîte (J3 de la critique 71) : ╭──╮│╰──╯ imprimée dans le shell de la page Q réelle, relevée par balayage de pixels le long de ses quatre
+#        bords aux densités 1, 1.25, 1.5, 2 et 2.2 : aucun pixel de trou (T15.1, avec témoin : la boîte est trouvée et sa capture n'est pas vide)
+#   T16  liens non http (F7 de l'audit, partie xterm) : un lien OSC 8 javascript: ou data: ne s'ouvre pas au clic, un lien https le fait dans la même scène (témoin)
 #   M-*  mutants (copies de la sortie ou du moteur, « mutant sans effet » = FAIL) : M-CTRLC (T13.8), M-DCS et M-WINOPT (T14.1, mesure de A2),
-#        M-CLIP (T14.2), M-LIEN (T14.3/T14.4)
+#        M-CLIP (T14.2), M-LIEN (T14.3/T14.4), M-BOITE (T15.1 : police des traits de boîte retirée de la page), M-PROTO (T16 : allowNonHttpProtocols ouvert)
 # Chrome requis pour toutes les sections : sans lui la suite annonce « SUITE SAUTÉE (navigateur) », ne compte rien et sort 1 (anti-vert-à-vide).
 # Limite assumée : Chrome headless Linux n'a pas de pointeur fin (pointer: none) et son presse-papiers n'est pas observable depuis la page ; on
 # mesure donc les APPELS à navigator.clipboard.* et document.execCommand par espions posés avant la page, jamais le contenu du presse-papiers du poste.
@@ -51,13 +54,27 @@ else if (cmd === 're') console.log(new RegExp(arg).test(h) ? 'oui' : 'non');
 else console.log(Buffer.from(h, 'hex').length);
 JS
 cat > "$AUX/chrome-xterm.mjs" <<'JS'
-// chrome-xterm.mjs <chrome> <mode> <json> : scénarios navigateur du terminal réel ; UNE ligne JSON. Modes : plein · hostile.
+// chrome-xterm.mjs <chrome> <mode> <json> : scénarios navigateur du terminal réel ; UNE ligne JSON. Modes : plein · hostile · boite · liens.
 // Q est jouée en PREMIER niveau (le secret est dans son stockage) après l'amorçage ; saisie par Input.insertText puis Entrée par dispatchKeyEvent.
 // Chaque étape est isolée (essai) : une mesure indisponible est nommée dans `erreurs`, jamais un résultat vide. Amorçage et secret ne sont jamais rendus.
 import { pathToFileURL } from 'node:url';
+// décodeur PNG minimal (RGB/RGBA 8 bits, non entrelacé) : la capture de Chrome n'a pas d'autre forme
+import zlib from 'node:zlib';
+function png(buf) {
+  let p = 8, w, h, ct; const idat = [];
+  while (p < buf.length) { const len = buf.readUInt32BE(p), type = buf.toString('ascii', p + 4, p + 8), d = buf.subarray(p + 8, p + 8 + len);
+    if (type === 'IHDR') { w = d.readUInt32BE(0); h = d.readUInt32BE(4); ct = d[9]; } if (type === 'IDAT') idat.push(d); p += 12 + len; }
+  const bpp = ct === 6 ? 4 : 3, raw = zlib.inflateSync(Buffer.concat(idat)), st = w * bpp, px = Buffer.alloc(h * st);
+  for (let y = 0; y < h; y++) { const f = raw[y * (st + 1)]; for (let x = 0; x < st; x++) { const a = x >= bpp ? px[y * st + x - bpp] : 0, b = y ? px[(y - 1) * st + x] : 0, c = x >= bpp && y ? px[(y - 1) * st + x - bpp] : 0;
+      let v = raw[y * (st + 1) + 1 + x]; if (f === 1) v += a; else if (f === 2) v += b; else if (f === 3) v += (a + b) >> 1; else if (f === 4) { const q = a + b - c, pa = Math.abs(q - a), pb = Math.abs(q - b), pc = Math.abs(q - c); v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c; } px[y * st + x] = v & 255; } }
+  return { w, h, lum: (x, y) => { const i = y * st + x * bpp; return (px[i] + px[i + 1] + px[i + 2]) / 3; } };
+}
+// trous le long d'un trait : un pixel du trait sans encre (luminance > 60 dans ±2 densités autour de l'axe) est un trou
+const PHASES = [0, 0.25, 0.5, 0.75];
+const trous = (arr) => arr.reduce((n, v) => n + (v ? 0 : 1), 0);
 const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv;
-const { P, Q, amorce, plein, hostile, sortieHex, recepteurHex, avecRecepteur } = JSON.parse(brut);
+const { P, Q, amorce, plein, hostile, sortieHex, recepteurHex, avecRecepteur, densite } = JSON.parse(brut);
 const OQ = `http://127.0.0.1:${Q}`, MS = Number(process.env.VF_XTERM_MS) || 20000;
 const erreurs = {};
 const essai = async (nom, f) => { try { return await f(); } catch (e) { erreurs[nom] = String(e.message).slice(0, 140); return undefined; } };
@@ -85,6 +102,62 @@ await executer(chrome, async (s) => {
   });
   await essai('invite', async () => { await s.naviguer(`${OQ}/`); await att(`${TXT}.includes('VFP>')`, 'invite du shell'); r.invite = true; });
   if (!r.invite) return r;
+
+  if (mode === 'boite') { // une boîte de 8 colonnes sur 4 lignes dans le shell réel, une page neuve par densité de pixels
+    const BOITE = "clear; printf '\\342\\225\\255\\342\\224\\200\\342\\224\\200\\342\\224\\200\\342\\224\\200\\342\\224\\200\\342\\224\\200\\342\\225\\256\\n\\342\\224\\202      \\342\\224\\202\\n\\342\\224\\202      \\342\\224\\202\\n\\342\\225\\260\\342\\224\\200\\342\\224\\200\\342\\224\\200\\342\\224\\200\\342\\224\\200\\342\\224\\200\\342\\225\\257\\n'";
+    r.boite = {}; const d = densite; // la densité est celle du navigateur lui-même (--force-device-scale-factor, posé par le lanceur de la suite)
+    await essai(`boite-${d}`, async () => {
+      await s.send('Emulation.setDeviceMetricsOverride', { width: 700, height: 420, deviceScaleFactor: d, mobile: false });
+      // xterm mesure la cellule une fois, à l'ouverture : si la police n'est pas encore décodée il mesure la police de secours (15 px au lieu de 17) et rien ne la remesure.
+      // Un poste qui a déjà servi la page (police en cache) mesure la bonne : on recharge jusqu'à ce que la cellule soit celle de JetBrains Mono, sinon échec nommé.
+      let ok = false;
+      for (let k = 0; k < 5 && !ok; k++) {
+        await s.naviguer(`${OQ}/`); await att(`${TXT}.includes('VFP>')`, `invite du shell à la densité ${d}`);
+        await att(`document.fonts.status === 'loaded' && document.fonts.check('13px "JetBrains Mono"')`, 'polices chargées');
+        ok = (await s.ev(`document.querySelector('.xterm-char-measure-element').getBoundingClientRect().height`)) >= 16.5;
+      }
+      if (!ok) throw new Error('la cellule du terminal n\'a jamais été mesurée avec JetBrains Mono (cinq chargements)');
+      r.boite[d] = { pixels: 0, trous: 0, phases: {}, cellule: 0 };
+      // la phase est le décalage vertical sous-pixel de la grille (px CSS) : à densité fractionnaire, les coutures entre lignes en dépendent
+      for (const ph of PHASES) {
+        await s.ev(`document.getElementById('terminal').style.top = '${ph}px'`); await pause(300);
+        await taper(BOITE);
+        const GEO = `(() => { const w = document.createTreeWalker(document.querySelector('.xterm-rows'), NodeFilter.SHOW_TEXT); let n, hit = null;
+          while ((n = w.nextNode())) { const i = n.data.indexOf('╭──────╮'); if (i >= 0) hit = { n, i }; }
+          if (!hit) return null; const rg = document.createRange(); rg.setStart(hit.n, hit.i); rg.setEnd(hit.n, hit.i + 1); const a = rg.getBoundingClientRect();
+          rg.setStart(hit.n, hit.i + 7); rg.setEnd(hit.n, hit.i + 8); const b = rg.getBoundingClientRect(); const ligne = hit.n.parentElement.closest('.xterm-rows > div').getBoundingClientRect();
+          return { ox: a.left, cw: (b.right - a.left) / 8, oy: ligne.top, ch: ligne.height, dpr: devicePixelRatio }; })()`;
+        await att(`!!(${GEO})`, "boîte à l'écran");
+        await pause(400); // la grille est posée : la capture suit
+        const g = await s.ev(GEO), shot = await s.send('Page.captureScreenshot', { format: 'png' }), im = png(Buffer.from(shot.data, 'base64')), S = g.dpr;
+        const encre = (x, y, axe) => { for (let k = -2 * S; k <= 2 * S; k++) { const X = Math.round(axe === 'v' ? x + k : x), Y = Math.round(axe === 'v' ? y : y + k); if (im.lum(X, Y) > 60) return true; } return false; };
+        const vert = (col) => { const a = [], x = (g.ox + (col + 0.5) * g.cw) * S; for (let y = Math.ceil((g.oy + 0.5 * g.ch) * S) + 2 * S; y < (g.oy + 3.5 * g.ch) * S - 2 * S; y++) a.push(encre(x, y, 'v')); return a; };
+        const hori = (row) => { const a = [], y = (g.oy + (row + 0.5) * g.ch) * S; for (let x = Math.ceil((g.ox + 0.5 * g.cw) * S) + 2 * S; x < (g.ox + 7.5 * g.cw) * S - 2 * S; x++) a.push(encre(x, y, 'h')); return a; };
+        const bords = [vert(0), vert(7), hori(0), hori(3)], px = bords.reduce((n, a) => n + a.length, 0), tr = bords.reduce((n, a) => n + trous(a), 0);
+        r.boite[d].cellule = g.ch; r.boite[d].phases[ph] = tr; r.boite[d].pixels += px; r.boite[d].trous += tr; r.boite[d].echelle = S;
+      }
+    });
+    return r;
+  }
+  if (mode === 'liens') { // trois liens OSC 8 dans le shell réel : https (témoin), javascript: et data:
+    await essai('liens', async () => {
+      const L = (u, t) => `\\033]8;;${u}\\033\\\\${t}\\033]8;;\\033\\\\`;
+      await taper(`clear; printf '${L('https://ok.test/', 'LIENOK')} ${L('javascript:void(0)', 'LIENJS')} ${L('data:text/html,x', 'LIENDATA')}\\n'`);
+      await att(`${TXT}.includes('LIENOK') && ${TXT}.includes('LIENDATA') && !${TXT}.includes('printf')`, "trois liens à l'écran");
+      for (const lib of ['LIENOK', 'LIENJS', 'LIENDATA']) {
+        const pt = await s.ev(`(() => { const w = document.createTreeWalker(document.querySelector('.xterm-rows'), NodeFilter.SHOW_TEXT); let n, hit = null;
+          while ((n = w.nextNode())) { const i = n.data.lastIndexOf(${JSON.stringify(lib)}); if (i >= 0 && n.data.indexOf('printf') < 0) hit = { n, i }; }
+          if (!hit) return null; const rg = document.createRange(); rg.setStart(hit.n, hit.i + 1); rg.setEnd(hit.n, hit.i + 3); const b = rg.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+        if (!pt) throw new Error(`cellule ${lib} absente de la grille`);
+        await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pt.x - 2, y: pt.y }); await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pt.x, y: pt.y }); await pause(150);
+        await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: pt.x, y: pt.y, button: 'left', clickCount: 1 });
+        await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: pt.x, y: pt.y, button: 'left', clickCount: 1 });
+        await pause(300);
+      }
+      r.ouvertures = await s.ev(`JSON.parse(JSON.stringify(window.__esp.open))`);
+    });
+    return r;
+  }
 
   if (mode === 'plein') {
     await essai('plein-ecran', async () => {
@@ -195,6 +268,21 @@ run_hostile() { # run_hostile <sortie> -> HJ ; le relevé hexadécimal de l'entr
   HJ="$(navig hostile "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"hostile\":\"$WORK/temoins/hostile.py\",\"sortieHex\":\"$WORK/hostile.hex\"}")"; unsrv
 }
 
+DENS="1 1.25 1.5 2 2.2"
+run_boite() { # run_boite <sortie> <étiquette> -> $WORK/boite-<étiquette>-<d>.json ; un serveur neuf, un amorçage neuf, un Chrome neuf par densité
+  local d
+  for d in $DENS; do
+    srv "$1"
+    node "$AUX/chrome-xterm.mjs" "$CHROME" boite "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"densite\":$d}" > "$WORK/boite-$2-$d.json"
+    unsrv
+  done
+}
+mesure_boite() { rj "$(cat "$WORK/boite-$1-$2.json")" "$3"; } # mesure_boite <étiquette> <d> <expression sur j>
+resume_boite() { local d; for d in $DENS; do printf 'd%s=%s ' "$d" "$(mesure_boite "$1" "$d" 'j.boite&&j.boite["'"$d"'"]?j.boite["'"$d"'"].trous:"absente"')"; done; }
+run_liens() { # run_liens <sortie> -> LJ
+  srv "$1"
+  LJ="$(navig liens "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\"}")"; unsrv
+}
 LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"
 
 echo "=== T13 — programme plein écran témoin dans la page Q réelle (TERM-09 navigateur) ==="
@@ -214,6 +302,16 @@ assert_eq "T14.5 — témoin de l'espion : un appel délibéré à navigator.cli
 assert_eq "T14.2 — presse-papiers : 0 appel (navigator.clipboard.*, document.execCommand) après OSC 52 écriture et lecture" "$(rj "$H" 'j.avant.clip+"/"+j.avant.exec')" "0/0"
 assert_eq "T14.3 — sans clic : 0 window.open, 0 confirm" "$(rj "$H" 'j.avant.open.length+"/"+j.avant.confirm')" "0/0"
 assert_eq "T14.4 — clic sur la cellule LIEN : un seul window.open('https://exemple.test/', '_blank', 'noopener'), 0 confirm" "cellule=$(rj "$H" 'j.cellule') $(rj "$H" 'JSON.stringify(j.apres.open)') confirm=$(rj "$H" 'j.apres.confirm')" 'cellule=true [["https://exemple.test/","_blank","noopener"]] confirm=0'
+
+echo "=== T15 — traits de boîte continus à toutes les densités (J3 de la critique 71, UI-SPEC F3) ==="
+run_boite "$OUT" sain
+assert_eq "T15.0 — témoin : aucun scénario n'a échoué, et chaque densité a livré une mesure (boîte trouvée, capture à l'échelle de la densité, des centaines de pixels balayés)" "$(for d in $DENS; do mesure_boite sain "$d" 'j.erreur||JSON.stringify(j.erreurs)'; done | tr '\n' ' ')$(for d in $DENS; do mesure_boite sain "$d" 'j.boite&&j.boite["'"$d"'"]?(Math.abs(j.boite["'"$d"'"].echelle-'"$d"')<0.01&&j.boite["'"$d"'"].pixels>150):"absente"'; done | tr '\n' ' ')" "{} {} {} {} {} true true true true true "
+assert_eq "T15.1 — le balayage de pixels le long des quatre bords de ╭──╮│╰──╯ ne trouve aucun trou aux densités 1, 1.25, 1.5, 2 et 2.2" "$(resume_boite sain)" "d1=0 d1.25=0 d1.5=0 d2=0 d2.2=0 "
+
+echo "=== T16 — liens non http : rien ne s'ouvre (F7 de l'audit, partie xterm ; P71-D-16) ==="
+run_liens "$OUT"; LK="$LJ"
+assert_eq "T16.0 — témoin : le scénario n'a pas échoué" "$(rj "$LK" 'j.erreur||JSON.stringify(j.erreurs)')" "{}"
+assert_eq "T16.1 — après un clic sur chacun des trois liens (https, javascript:, data:), un seul window.open : celui du lien https, en noopener (témoin : le lien https s'ouvre dans la même scène)" "$(rj "$LK" 'JSON.stringify(j.ouvertures)')" '[["https://ok.test/","_blank","noopener"]]'
 
 echo "=== M-* — mutants : chaque protection rougit sa sonde ==="
 if mutant_eng ctrlc 's/^                vers_shell += donnees$/                vers_shell += donnees.replace(b"\\x03", b"")/'; then
@@ -236,6 +334,15 @@ if mutant lien vf-cockpit-terminal-client.mjs 's|^    linkHandler: .*$||'; then
   run_hostile "$MUT_OUT"
   assert_eq "M-LIEN — linkHandler retiré (comportement natif de xterm) : le clic appelle confirm, T14.4 rouge" "$(rouge "confirm=$(rj "$HJ" 'j.apres&&j.apres.confirm')" "confirm=0")" "rouge"
 else sans_effet "M-LIEN"; fi
+
+if mutant boite vf-cockpit-terminal-page.mjs "s|const PLAGE_BOITE = 'U+2500-259F';|const PLAGE_BOITE = 'U+E000';|"; then
+  run_boite "$MUT_OUT" mutant
+  assert_eq "M-BOITE — police des traits de boîte retirée de la page (plage sans caractère) : des trous apparaissent (T15.1 rouge) ; le mutant est mesuré aux cinq densités" "$(rouge "$(resume_boite mutant)" "d1=0 d1.25=0 d1.5=0 d2=0 d2.2=0 ")" "rouge"
+else sans_effet "M-BOITE"; fi
+if mutant proto vf-cockpit-terminal-client.mjs 's|allowNonHttpProtocols: false|allowNonHttpProtocols: true|'; then
+  run_liens "$MUT_OUT"
+  assert_eq "M-PROTO — allowNonHttpProtocols ouvert : les liens javascript: et data: s'ouvrent au clic, T16.1 rouge" "$(rouge "$(rj "$LJ" 'j.ouvertures.length')" "1")" "rouge"
+else sans_effet "M-PROTO"; fi
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

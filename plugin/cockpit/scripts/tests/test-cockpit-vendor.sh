@@ -2,7 +2,7 @@
 # test-cockpit-vendor.sh — copie vendorisée de floorplan (CKPT-02, CKPT-03 volet code ; P67-D-03, D-07, D-11).
 #   V1 sentinelles et licence · V2 licences tierces · V3 rien que check-skills ou la CI jugeraient
 #   V4 tailles et marqueurs · V6 amont retrouvé à l'octet · V7 ajouts, patchs, retraits · V8 binaires
-#   V9 vendor xterm, assistant du terminal, P25 et TAILLE de serve.mjs (Phase 71)
+#   V9 vendor xterm, police des traits de boîte (JetBrains Mono 2.304 Regular, V9.5), assistant du terminal, P25 et TAILLE de serve.mjs (Phase 71)
 # Les contrôles de patchs (V6, V7) sont sautés audiblement quand amont/ est absent (lab installé).
 # Exit 0 si tout passe, 1 sinon.
 
@@ -32,7 +32,7 @@ n=0
 while IFS= read -r l; do
   case "$l" in *" — "*) p="${l##* — }"; n=$((n+1)); assert_eq "V2 — licence présente : $p" "$([ -s "$MOTEUR/$p" ] && echo oui || echo non)" "oui" ;; esac
 done < "$MOTEUR/LICENCES-TIERCES.txt"
-assert_eq "V2 — six composants listés" "$n" "6"
+assert_eq "V2 — sept composants listés (dont JetBrains Mono 2.304, traits de boîte du terminal)" "$n" "7"
 
 echo "=== V3 — rien que check-skills ou la CI jugeraient ==="
 assert_eq "V3.1 — aucun SKILL.md" "$(find "$MOTEUR" -name SKILL.md | grep -c .)" "0"
@@ -81,7 +81,7 @@ if [ -d "$AMONT/patches" ]; then
 else skip "V7"; fi
 
 echo "=== V8 — binaires ==="
-assert_eq "V8.1 — quatre .woff2 non vides" "$(find "$MOTEUR" -name '*.woff2' -size +0 | grep -c .)" "4"
+assert_eq "V8.1 — cinq .woff2 non vides (quatre polices du cockpit, JetBrains Mono 2.304 Regular)" "$(find "$MOTEUR" -name '*.woff2' -size +0 | grep -c .)" "5"
 assert_eq "V8.2 — deux .png non vides" "$(find "$MOTEUR" -name '*.png' -size +0 | grep -c .)" "2"
 
 echo "=== V5 — aucun littéral de la fonction Cloud amont dans le code du module (P67-D-02) ==="
@@ -135,6 +135,25 @@ assert_eq "V9.4 — TAILLE assets/serve.mjs = lignes réelles" "$(taille_de "$MO
 # témoin positif : une TAILLE décalée de 1 dans une copie est vue
 sed "s|^TAILLE assets/serve.mjs .*|TAILLE assets/serve.mjs $(( $(nlines "$MOTEUR/assets/serve.mjs") + 1 ))|" "$MOTEUR/VENDORED.txt" > "$WORK/VENDORED-decale.txt"
 assert_eq "V9.4 — témoin : une TAILLE décalée de 1 est vue" "$([ "$(taille_de "$WORK/VENDORED-decale.txt")" != "$(nlines "$MOTEUR/assets/serve.mjs")" ] && echo vu || echo aveugle)" "vu"
+
+echo "--- V9.5 — police des traits de boîte (J3 de la critique 71) ---"
+FT="$MOTEUR/assets/vendor/fonts"
+PIN_BOITE=a9cb1cd82332b23a47e3a1239d25d13c86d16c4220695e34b243effa999f45f2   # release v2.304 de JetBrains/JetBrainsMono, fonts/webfonts/JetBrainsMono-Regular.woff2
+PIN_OFL=30f0c136e3c88e422d0791acd97238870f9054a9729bc34cf2ff0d4ed8cac4ad     # OFL.txt de la même release
+assert_eq "V9.5 — sha256 de jetbrains-mono-2.304-regular.woff2 = valeur épinglée (octets de la release officielle)" "$(sha "$FT/jetbrains-mono-2.304-regular.woff2")" "$PIN_BOITE"
+assert_eq "V9.5 — sha256 de la licence jetbrains-mono-2.304-OFL.txt = valeur épinglée" "$(sha "$FT/jetbrains-mono-2.304-OFL.txt")" "$PIN_OFL"
+assert_eq "V9.5 — SHA256SUMS des polices : ligne de la police = valeur épinglée" "$(awk '$2=="jetbrains-mono-2.304-regular.woff2"{print $1}' "$FT/SHA256SUMS" 2>/dev/null)" "$PIN_BOITE"
+assert_eq "V9.5 — SHA256SUMS des polices : ligne de la licence = valeur épinglée" "$(awk '$2=="jetbrains-mono-2.304-OFL.txt"{print $1}' "$FT/SHA256SUMS" 2>/dev/null)" "$PIN_OFL"
+assert_eq "V9.5 — la licence nomme son projet et sa licence (SIL Open Font License, JetBrains Mono Project)" "$(grep -c -E 'SIL OPEN FONT LICENSE|JetBrains Mono Project' "$FT/jetbrains-mono-2.304-OFL.txt" | awk '$1>=2{print "oui"}')" "oui"
+for f in jetbrains-mono-2.304-regular.woff2 jetbrains-mono-2.304-OFL.txt; do
+  assert_eq "V9.5 — une ligne AJOUT pour $f" "$(grep -cx "AJOUT assets/vendor/fonts/$f" "$MOTEUR/VENDORED.txt")" "1"
+done
+assert_eq "V9.5 — la ligne AJOUT de SHA256SUMS des polices existe" "$(grep -cx 'AJOUT assets/vendor/fonts/SHA256SUMS' "$MOTEUR/VENDORED.txt")" "1"
+assert_eq "V9.5 — LICENCES-TIERCES.txt nomme JetBrains Mono 2.304 et sa licence" "$(grep -c 'JetBrains Mono 2.304.*jetbrains-mono-2.304-OFL.txt' "$MOTEUR/LICENCES-TIERCES.txt")" "1"
+# témoin : un octet changé dans une copie jetable de la police est vu
+cp "$FT/jetbrains-mono-2.304-regular.woff2" "$WORK/boite-mut.woff2"
+node -e 'const f=require("fs"),p=process.argv[1],b=f.readFileSync(p);b[10]=b[10]^1;f.writeFileSync(p,b)' "$WORK/boite-mut.woff2"
+assert_eq "V9.5 — M-SHA : un octet changé dans la police des traits de boîte est vu" "$([ "$(sha "$WORK/boite-mut.woff2")" != "$PIN_BOITE" ] && echo vu || echo aveugle)" "vu"
 
 echo ""
 echo "=================================="

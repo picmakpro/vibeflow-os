@@ -1,5 +1,5 @@
 // vf-cockpit-terminal-page — page servie par le serveur du terminal Q (71-01 pour l'amorce, 71-05 pour la page finale).
-// Exports : EMPREINTES_XTERM · preparerPage({ engineDir }) · pageTerminal({ theme, origineP }) -> { html, csp }.
+// Exports : EMPREINTES_XTERM · EMPREINTES_BOITE · preparerPage({ engineDir }) · pageTerminal({ theme, origineP }) -> { html, csp }.
 // preparerPage lit le vendor xterm du moteur (VF_COCKPIT_ENGINE_DIR/assets/vendor/xterm) et le vérifie contre le code ET SHA256SUMS : une
 // altération lève une erreur, et le serveur de Q refuse de démarrer (TERM-10). pageTerminal assemble tout en ligne (P71-D-16) : deux <style>
 // (polices et feuille de Q, puis xterm.css à l'octet), quatre <script> sans attribut (xterm, addon-fit, vue, client) dont la CSP porte les
@@ -18,6 +18,14 @@ export const EMPREINTES_XTERM = Object.freeze({
   'xterm.css': '854a7c0fb70e8b1a083c16797ab827299fb18744f5ad34f227b48337e33293c6',
   'addon-fit.js': 'ba3ea256ce0620a0992a197d6c9baea64823fc93d8da07a9e366ca9943c18527',
 });
+// JetBrains Mono 2.304 Regular (release officielle JetBrains/JetBrainsMono, OFL-1.1), fichier pris tel quel : il ne sert que pour les traits de boîte
+// U+2500-259F (le sous-ensemble latin n'en porte aucun et Chrome les dessinait en police système : traits discontinus, UI-SPEC F3, J3 de la critique 71).
+// La plage de poids déclarée (100 900) est celle des faces latines, et NON 400 : une face à poids exact change la police primaire du moteur DOM, la cellule
+// passe de 17 à 15 px de haut (mesuré). Un seul fichier : ces traits n'ont pas de variante grasse.
+export const EMPREINTES_BOITE = Object.freeze({
+  'jetbrains-mono-2.304-regular.woff2': { sha: 'a9cb1cd82332b23a47e3a1239d25d13c86d16c4220695e34b243effa999f45f2' },
+});
+const PLAGE_BOITE = 'U+2500-259F';
 const PLAGES = {
   latin: 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD',
   'latin-ext': 'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF',
@@ -36,8 +44,15 @@ export function preparerPage({ engineDir } = {}) {
     if (h !== EMPREINTES_XTERM[nom]) throw new Error(`fichiers xterm altérés : ${nom}`);
     if (!sommes.split('\n').some((l) => l.trim().split(/\s+/).join(' ') === `${h} ${nom}`)) throw new Error(`fichiers xterm altérés : SHA256SUMS (${nom})`);
   }
+  const sommesP = lire('fonts', 'SHA256SUMS').toString('utf8');
+  const boite = Object.entries(EMPREINTES_BOITE).map(([nom, { sha: pin }]) => {
+    const buf = lire('fonts', nom), h = sha256(buf);
+    if (h !== pin) throw new Error(`fichiers xterm altérés : ${nom}`);
+    if (!sommesP.split('\n').some((l) => l.trim().split(/\s+/).join(' ') === `${h} ${nom}`)) throw new Error(`fichiers xterm altérés : SHA256SUMS des polices (${nom})`);
+    return `@font-face{font-family:"JetBrains Mono";font-style:normal;font-display:block;font-weight:100 900;unicode-range:${PLAGE_BOITE};src:url(data:font/woff2;base64,${buf.toString('base64')}) format("woff2")}`;
+  });
   const polices = Object.entries(PLAGES).map(([sous, plage]) =>
-    `@font-face{font-family:"JetBrains Mono";font-style:normal;font-display:block;font-weight:100 900;unicode-range:${plage};src:url(data:font/woff2;base64,${lire('fonts', `jetbrains-mono-${sous}-wght-normal.woff2`).toString('base64')}) format("woff2")}`).join('\n');
+    `@font-face{font-family:"JetBrains Mono";font-style:normal;font-display:block;font-weight:100 900;unicode-range:${plage};src:url(data:font/woff2;base64,${lire('fonts', `jetbrains-mono-${sous}-wght-normal.woff2`).toString('base64')}) format("woff2")}`).concat(boite).join('\n');
   vendor = { js: fichiers['xterm.js'].toString('utf8'), fit: fichiers['addon-fit.js'].toString('utf8'), css: fichiers['xterm.css'].toString('utf8'), polices };
   memo.clear();
 }

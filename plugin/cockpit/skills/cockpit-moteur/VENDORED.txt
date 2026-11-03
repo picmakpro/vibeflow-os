@@ -34,6 +34,9 @@ AJOUT assets/vendor/xterm/addon-fit.js
 AJOUT assets/vendor/xterm/LICENSE-xterm.txt
 AJOUT assets/vendor/xterm/LICENSE-addon-fit.txt
 AJOUT assets/vendor/xterm/SHA256SUMS
+AJOUT assets/vendor/fonts/jetbrains-mono-2.304-regular.woff2
+AJOUT assets/vendor/fonts/jetbrains-mono-2.304-OFL.txt
+AJOUT assets/vendor/fonts/SHA256SUMS
 AJOUT terminal/vf-cockpit-pty.py
 AJOUT VENDORED.txt
 AJOUT LICENCES-TIERCES.txt
