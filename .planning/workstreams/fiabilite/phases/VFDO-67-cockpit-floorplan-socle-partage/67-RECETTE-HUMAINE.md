@@ -1,6 +1,6 @@
 # 67 — Recette humaine de fin de phase (bloc `<human-check>` de 67-07, tâche 2)
 
-**Statut : FAITE le 2026-11-02 — 7/7 réponses consignées (session principale).** Ce fichier prépare la recette ; il ne la remplit pas. Chaque point reste
+**Statut : FAITE — close le 2026-11-03 (passes 1 à 4 ; 7/7 réponses consignées le 2026-11-02, validation finale de Samuel sur `955cb39f` le 2026-11-03).** Ce fichier prépare la recette ; il ne la remplit pas. Chaque point reste
 décoché tant que Samuel n'a pas répondu ; sa réponse est ensuite consignée **mot pour mot, avec son canal et sa date**
 (mémoire « arbitrage humain jamais inférable »). Le vérificateur de phase consolide ce fichier dans le fichier UAT.
 
@@ -163,3 +163,23 @@ le header, et je pense qu'il faudrait le supprimer, allonger un petit peu le flo
 contenu. Mesure : la couche touchait déjà l'en-tête (14 px de chevauchement) ; la bande nette venait du fondu de l'en-tête
 (opaque jusqu'à 35 %, transparent à 64 px), qui laissait voir la carte sans flou entre y≈22 et 50. Le dégradé autour du titre
 est inchangé.
+
+### 8.2. Validation de Samuel sur `955cb39f` (2026-11-03)
+
+Samuel, mot pour mot (saisie texte, session principale, 2026-11-03) : « Ouais, parfait. »
+
+Portée de cette validation : l'état de la recette consigné à `955cb39f` (flou en dégradé de `4615dfb4`, § 8.1), qui levait la
+condition posée par l'arbitrage du 2026-11-03 (« le merge de la PR #187 attend ce réglage », § 8). `a01cf44d` (le flou monte
+jusqu'au haut de l'en-tête) et `35392f9a` (cas D7.7 et D7.8) sont antérieurs à `955cb39f` dans l'historique de la branche.
+
+## 9. Consolidation (passes 1 à 4)
+
+| Passe | Contenu | Où c'est consigné |
+|-------|---------|-------------------|
+| 1 (2026-11-02) | Recette pas à pas, 7 points, réponses mot pour mot ; tri des suites (AskUserQuestion session principale, 2026-11-02) : D1-D3, V1, I2, I3, « Library » et la CI dans la PR #187 ; refonte mobile (D4, I4-I6), visite guidée (I1) et `/vf-recette` au BACKLOG | §§ 3, 4 ; `.planning/BACKLOG.md` |
+| 2 (2026-11-02) | Correctifs avec témoin rouge sur l'ancien code ; contrôle d'agent Playwright sur `00bbb02e` (D1-D3, V1, I3 conformes, I2 à reprendre, constats O1-O6) ; tri des constats (AskUserQuestion session principale, 2026-11-03) | §§ 5, 6 ; `.planning/missions/2026-11-02-67-recette-fix.md` |
+| 3 (2026-11-03) | I2, O1, O2, O3, O4, O6 corrigés, revue `revue-p3` (un majeur, fermé) puis `revue-p3b` passed ; O4 option C (Samuel, AskUserQuestion session principale, 2026-11-03) | § 7 ; rapport de mission § Passe 3 |
+| 4 (2026-11-03) | Flou en dégradé (`4615dfb4`, mode rapide, sans revue) puis prolongé jusqu'à l'en-tête (`a01cf44d`) ; validation « Ouais, parfait. » | §§ 8, 8.1, 8.2 |
+
+Reste hors de la phase, au BACKLOG : refonte mobile (D4, I4, I5, I6), clarté de la visite guidée (I1), commande `/vf-recette`,
+choix de langue français / anglais, O5 (anglais résiduel et coquilles du chrome, § « Cockpit : anglais résiduel »). Clôture de la phase : `67-CLOTURE.md`.

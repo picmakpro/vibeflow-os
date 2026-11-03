@@ -120,7 +120,7 @@
 - [ ] Phase 64: Contrôles après exécution branchés en nœuds du plan de bataille (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 - [ ] Phase 65: Révision des règles qui brident l'efficacité des agents (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 - [ ] Phase 66: Grille de sévérité des juges et convergence des boucles de revue (inscrite 2026-10-29, jalon equipe-produit-v1.0)
-- [ ] Phase 67: Cockpit floorplan sur socle partagé (inscrite 2026-11-01, jalon vibeflow-v2.0)
+- [x] Phase 67: Cockpit floorplan sur socle partagé (inscrite 2026-11-01, jalon vibeflow-v2.0) — complete 2026-11-03 : 7/7 plans et 4 tours de correction (FIX-A à FIX-D), recette humaine validée par Samuel (`67-RECETTE-HUMAINE.md` § 8.2), CKPT-01..12 cochées ; release `v2.75.0` préparée (tag et release GitHub après le merge de la PR #187, geste de Samuel)
 - [ ] Phase 68: Embarquer vf-signal sur le socle partagé (inscrite 2026-11-01, jalon vibeflow-v2.0)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
