@@ -10,6 +10,7 @@ import { derniereAction, citationsDuMandat } from './vf-cockpit-transcript.mjs';
 
 export const FENETRE = 86400;
 const PROFONDEUR_MAX = 8;
+const META_MAX = 256 << 10; // un meta.json plus gros n'est pas lu : l'agent est de forme inconnue (F4)
 const REQUIS_PAR_DEFAUT = ['agentType', 'description', 'spawnDepth', 'toolUseId', 'requestShape'];
 const objet = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
@@ -34,14 +35,17 @@ export function collecteAgents(ctx) {
   for (const slug of ls(projects)) {
     const dir = path.join(projects, slug);
     for (const f of ls(dir).filter((x) => x.endsWith('.jsonl'))) {
+     try { // F3 : une session ou un agent qui fait lever la lecture est compté en forme inconnue, jamais fatal pour les autres
       const file = path.join(dir, f); const age = (now - mtime(file)) / 1000;
-      const id = f.slice(0, -6); const subDir = path.join(dir, id, 'subagents');
+      const id = f.slice(0, -6); if (!ID_RE.test(id)) { inconnuSession++; continue; }
+      const subDir = path.join(dir, id, 'subagents');
       const infos = new Map(); // identifiant -> { id, meta, tr, sAge, forme, premiere }
       const charge = (aid, candidat) => {
         if (infos.has(aid)) return infos.get(aid);
         const mj = path.join(subDir, `agent-${aid}.meta.json`); let r = null;
+        if (!ID_RE.test(aid)) return null; // l'identifiant vient d'un nom de fichier : jamais émis hors ID_RE (F2)
         if (candidat || (ID_RE.test(aid) && fs.existsSync(mj))) {
-          const tr = path.join(subDir, `agent-${aid}.jsonl`), meta = readJson(mj), premiere = premiereLigne(tr);
+          const tr = path.join(subDir, `agent-${aid}.jsonl`), meta = readJson(mj, META_MAX), premiere = premiereLigne(tr);
           r = { id: aid, meta, tr, sAge: (now - mtime(tr)) / 1000, premiere, forme: formeSousAgent(meta, premiere, aid, CC) };
         }
         infos.set(aid, r); return r;
@@ -51,7 +55,8 @@ export function collecteAgents(ctx) {
         const aid = m.replace(/^agent-|\.meta\.json$/g, '');
         const sAge = (now - mtime(path.join(subDir, `agent-${aid}.jsonl`))) / 1000;
         if (sAge >= fenetre) continue; // FENETRE-24H
-        cands.push(charge(aid, true));
+        const c = charge(aid, true); if (!c) { inconnuSub++; continue; } // identifiant hors ID_RE
+        cands.push(c);
       }
       const propre = (c) => (c.meta.finished === true || c.forme === 'arretee' ? 'termine' : c.sAge < fresh ? 'actif' : 'en-attente');
       const inclus = new Map(); // identifiant -> { c, etat }
@@ -81,8 +86,9 @@ export function collecteAgents(ctx) {
         workers.push(action({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, last.gitBranch), cwd: last.cwd, ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', etat: age <= fresh ? 'actif' : desc ? 'en-attente' : 'termine', _tr: file }));
       }
       for (const { c, etat } of inclus.values()) {
+        const sl = tail(c.tr); if (sl && !ctx.formeOk(sl)) { inconnuSub++; continue; } // dernière ligne hors forme : l'agent est exclu
         subLive++;
-        const sl = tail(c.tr), at = byActivity(sl, inScope(sl?.cwd) || tree);
+        const at = byActivity(sl, inScope(sl?.cwd) || tree);
         const parent = c.forme === 'complete' && c.meta.spawnDepth >= seuil ? c.meta.parentAgentId : id;
         const t0 = Date.parse(c.premiere?.timestamp), fin = etat === 'termine' ? mtime(c.tr) : null;
         const w = { kind: 'subagent', id: c.id, parent, role: c.meta.agentType, task: c.meta.description || '', ...(c.forme === 'complete' ? { depth: c.meta.spawnDepth, background: c.meta.requestShape === 'background' } : {}),
@@ -91,6 +97,7 @@ export function collecteAgents(ctx) {
         if (Number.isFinite(t0)) w.dureeS = Math.max(0, Math.round(((fin || now) - t0) / 1000));
         w._tr = c.tr; workers.push(action(w));
       }
+     } catch { inconnuSub++; }
     }
   }
   const inconnue = inconnuSub > 0 || (inconnuSession > 0 && live + subLive === 0);

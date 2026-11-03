@@ -29,7 +29,8 @@ const REQ_TR = CC.transcript?.requis || ['cwd', 'type', 'message', 'timestamp', 
 
 // dernière ligne user/assistant d'un jsonl
 const tail = (f) => cherche(f, (d) => (d.type === 'user' || d.type === 'assistant' ? d : null));
-const formeOk = (d) => !!d && REQ_TR.every((k) => k in d);
+// forme typée (F3) : un cwd, un type, un horodatage ou un identifiant de session qui n'est pas une chaîne est une ligne hors forme
+const formeOk = (d) => !!d && REQ_TR.every((k) => k in d) && ['cwd', 'type', 'timestamp', 'sessionId'].every((k) => typeof d[k] === 'string');
 
 // contexte de collecte des sessions et sous-agents : arbres git du lab, portée, étiquettes
 function contexte(root, { fresh, now, home }) {
@@ -41,7 +42,7 @@ function contexte(root, { fresh, now, home }) {
   const trees = porcelain.split('\n').filter((l) => l.startsWith('worktree ')).map((l) => l.slice(9)).filter((t) => fs.existsSync(t)).map((t) => fs.realpathSync(t));
   if (!trees.length) trees.push(root);
   const real = (p) => { try { return fs.realpathSync(p); } catch { return p; } };
-  const inScope = (cwd) => { if (!cwd) return null; const r = real(cwd); return trees.filter((t) => r === t || r.startsWith(t + path.sep)).sort((a, b) => b.length - a.length)[0] || null; };
+  const inScope = (cwd) => { if (typeof cwd !== 'string' || !cwd) return null; const r = real(cwd); return trees.filter((t) => r === t || r.startsWith(t + path.sep)).sort((a, b) => b.length - a.length)[0] || null; };
   const label = (t) => (t === trees[0] ? 'arbre principal' : path.relative(trees[0], t) || t);
   // le cwd d'un transcript reste celui du lancement : on préfère l'arbre le plus profond cité par le dernier appel
   const byActivity = (d, fallback) => {
@@ -82,7 +83,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
     for (const ws of wsList) {
       let o = {}; try { o = JSON.parse(sh('bash', [DL, 'orphans', ...(ws ? [`--ws=${ws}`] : [])], root)); } catch {}
       const held = (st.locks || []).some((l) => l.present && !l.stale && (l.ws || '') === ws);
-      for (const a of o.orphans || []) { reg++; if (presents.has(a.agent_id)) { registre.set(a.agent_id, { noeud: a.node || '', role: a.role, ws }); continue; } workers.push({ kind: 'registered', id: a.agent_id, role: a.role, task: a.node || '', parent: a.parent || '', depth: a.depth ?? null, tree: ws ? `compartiment ${ws}` : 'dépôt', ageS: a.age_seconds, stale: !held, orphan: !held, source: 'registre' }); }
+      for (const a of Array.isArray(o.orphans) ? o.orphans : []) { if (typeof a?.agent_id !== 'string' || !ID_RE.test(a.agent_id)) continue; reg++; if (presents.has(a.agent_id)) { registre.set(a.agent_id, { noeud: a.node || '', role: a.role, ws }); continue; } workers.push({ kind: 'registered', id: a.agent_id, role: a.role, task: a.node || '', parent: a.parent || '', depth: a.depth ?? null, tree: ws ? `compartiment ${ws}` : 'dépôt', ageS: a.age_seconds, stale: !held, orphan: !held, source: 'registre' }); }
     }
     sources.locks ||= { etat: 'lue', held: (st.locks || []).filter((x) => x.present).length, registered: reg };
   }
@@ -116,9 +117,16 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
 
 export function collectWho(root, opts = {}) {
   const g = gather(root, opts);
-  // task, cwd et role viennent de fichiers que d'autres écrivent (meta.json, transcripts, verrous) : bornés et masqués avant le flux SSE
-  const bornes = (v, n) => (typeof v === 'string' ? masque(v).slice(0, n) : v);
-  const workers = g.workers.map(({ _tr, ...w }) => ({ ...w, ...(w.task !== undefined ? { task: bornes(w.task, 160) } : {}), ...(w.cwd !== undefined ? { cwd: bornes(w.cwd, 200) } : {}), ...(w.role !== undefined ? { role: bornes(w.role, 80) } : {}) }));
+  // tout champ libre vient d'un fichier que d'autres écrivent : chaîne masquée et bornée, sinon absent (F2) ; les nombres sont finis ou absents ; un identifiant hors forme exclut le travailleur
+  const bornes = (v, n) => masque(v).slice(0, n);
+  const LIBRES = { task: 160, cwd: 200, role: 80, branch: 200, tree: 200, lastAt: 40, parent: 128, dag: 200, treeBy: 20 }, NOMBRES = ['ageS', 'depth', 'dureeS', 'children'];
+  const IDS = new Set(['session', 'subagent', 'registered']);
+  const workers = g.workers.filter((w) => typeof w.id === 'string' && (!IDS.has(w.kind) || ID_RE.test(w.id))).map(({ _tr, ...w }) => {
+    w.id = bornes(w.id, 128);
+    for (const [k, n] of Object.entries(LIBRES)) if (k in w) { if (typeof w[k] === 'string') w[k] = bornes(w[k], n); else delete w[k]; }
+    for (const k of NOMBRES) if (k in w && !(Number.isFinite(w[k]) || (k === 'depth' && w[k] === null))) delete w[k];
+    return w;
+  });
   const sources = { ...g.sources };
   if (typeof sources.sessions?.path === 'string') sources.sessions = { ...sources.sessions, path: sources.sessions.path.replace(opts.home || os.homedir(), '~') };
   return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees, fresh: g.fresh, fenetre: g.fenetre, busy: workers.some((w) => !w.stale && w.etat !== 'termine'), workers, sources };
@@ -174,7 +182,10 @@ export function revealDoing(root, id, opts = {}) {
 // P69-D-19 : le transcript d'un agent connu, réduit à son mandat, ses messages et ses outils (liste blanche, vf-cockpit-transcript.mjs) ; le chemin vient de la collecte, jamais de l'entrée (T-69-02)
 export function revealTranscript(root, id, opts = {}) {
   const S = 'vibeflow/cockpit-transcript@1';
-  if (typeof id !== 'string' || !ID_RE.test(id)) return { schema: S, id: String(id), erreur: 'id-invalide' };
+  if (typeof id !== 'string' || !ID_RE.test(id)) return { schema: S, id: String(id).slice(0, 128), erreur: 'id-invalide' };
+  try { return reveler(root, id, opts, S); } catch { return { schema: S, id, erreur: 'inconnu' }; } // aucune exception ne remonte à l'appelant (F3)
+}
+function reveler(root, id, opts, S) {
   const connus = new Map(agentsConnus(root, opts).filter((x) => (x.kind === 'session' || x.kind === 'subagent') && x._tr).map((x) => [x.id, x]));
   const w = connus.get(id);
   return w ? { schema: S, id, ...reduireTranscript(w._tr, { root: path.resolve(root) }) } : { schema: S, id, erreur: 'inconnu' };
