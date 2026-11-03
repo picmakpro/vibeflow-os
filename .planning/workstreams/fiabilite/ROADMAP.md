@@ -857,6 +857,7 @@ Plans:
 **Requirements**: TBD — famille réservée, posée au cadrage.
 **Depends on:** Phase 69 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « 69 avant 68 ») ; Phase 67 en amont.
 **Sources:** `.planning/notes/2026-10-29-HANDOFF-jalon-v2.md` § 3 (points à trancher : gating par module, emplacement, API des mods « early access », chemins de `driver-lock.sh`, mobile, ADR-035/031, SOBR-04) ; mémoire `vf-signal-a-embarquer-dans-vibeflow`.
+**Point à cadrer (constat du 2026-11-03, accord de Samuel en session principale Claude Code, 2026-11-03) :** l'en-tête de vf-signal lit le `STATE.md` et le dossier `missions/` de l'arbre courant. Sur un arbre principal resté sur une branche ancienne, il montrait la Phase 58 et la mission 58, alors que `main` était en v2.75.0. Il ne voit pas non plus une phase menée dans un worktree (la 69 cadrée dans `.claude/worktrees/phase-69b`). Il doit signaler un arbre en retard sur `main` et voir la phase active d'un worktree. Il ne doit pas prendre une mission aux nœuds jamais refermés pour la mission en cours.
 **Plans:** 0 plans
 
 Plans:
