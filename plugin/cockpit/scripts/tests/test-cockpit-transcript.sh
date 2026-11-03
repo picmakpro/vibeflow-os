@@ -407,10 +407,11 @@ vf_hyg_stop "$SRV_PID"
 # =====================================================================================================================
 echo "=== T24F — correction d'audit : masque avant la coupe, coût borné par ce qui sort (F1, F4 ; P69-D-19) ==="
 cat > "$AUX/mk-f1.mjs" <<'JS'
-// mk-f1.mjs <fichier> <secret> : mandat portant le secret à 3 980 et à 7 980 caractères, un message le portant à 1 980 (les bornes de coupe)
+// mk-f1.mjs <fichier> <secret> : mandat portant le secret à 10 caractères avant 4 000 et avant 8 000, un message le portant à 10 caractères avant 2 000 (les bornes de coupe : il ne reste que 10 caractères du secret, trop peu pour qu'un masque appliqué APRÈS la coupe le reconnaisse)
 import fs from 'node:fs';
 const [, , out, S] = process.argv; const pad = (n) => 'x'.repeat(n);
-const mandat = pad(3980) + S + pad(7980 - 3980 - S.length) + S + pad(100), message = pad(1980) + S + pad(500);
+// le secret est séparé de son remplissage par une espace (les motifs de secret exigent une frontière de mot)
+const mandat = pad(3989) + ' ' + S + pad(7989 - 3989 - S.length) + ' ' + S + ' ' + pad(100), message = pad(1989) + ' ' + S + ' ' + pad(500);
 const side = (o) => ({ isSidechain: true, agentId: 'f1', ...o });
 fs.writeFileSync(out, [side({ type: 'user', message: { role: 'user', content: mandat } }), side({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: message }] } })].map((l) => JSON.stringify(l)).join('\n') + '\n');
 JS
