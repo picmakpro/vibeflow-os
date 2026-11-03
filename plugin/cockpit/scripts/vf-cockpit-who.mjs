@@ -77,8 +77,9 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
     const DL = dl.chemin; let st = {};
     try { st = JSON.parse(sh('bash', [DL, 'status', '--all'], root)); } catch { sources.locks = { etat: 'erreur' }; }
     st = { ...st, locks: Array.isArray(st?.locks) ? st.locks : st?.present ? [st] : [] }; // lab plat : `status --all` rend l'objet d'UN verrou, sans `locks`
-    // ws et phase partent en argument d'un script : forme stricte (ID_RE, numéro de phase), sinon la cible est écartée (les champs libres sortent masqués et bornés par collectWho)
-    const PH_RE = /^[0-9]{1,4}(\.[0-9]{1,3})?$/, ok = (ws, ph) => (ws === '' || ID_RE.test(ws)) && (ph === '' || PH_RE.test(ph));
+    // ws et phase partent en argument d'un script : grammaire EXACTE de driver-lock.sh, sinon la cible est écartée (champs libres masqués et bornés par collectWho).
+    // ws = vf_ws_name_valid (alphanumérique en tête, puis alphanumérique . _ -, jamais `..`) ; phase = vf_dl_phase_valid (chiffres séparés par des points : 69, 41.1, 1.2.3)
+    const WS_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/, PH_RE = /^[0-9]+(\.[0-9]+)*$/, ok = (ws, ph) => (ws === '' || WS_RE.test(ws) && !ws.includes('..')) && (ph === '' || PH_RE.test(ph));
     for (const l of (st.locks || []).filter((x) => x.present)) workers.push({ kind: 'lock', id: l.owner, task: l.step, tree: l.ws ? `compartiment ${l.ws}${l.phase && PH_RE.test(String(l.phase)) ? ` phase ${l.phase}` : ''}` : l.scope, ageS: l.age_seconds, stale: !!l.stale, children: l.children_running, source: 'driver-lock' });
     // cibles du registre : dépôt, chaque compartiment, et chaque verrou de PHASE présent (registre frère du verrou de phase)
     const cibles = [{ ws: '', ph: '' }, ...ls(path.join(common, 'vf-driver', 'ws')).map((w) => ({ ws: w, ph: '' })), ...(st.locks || []).filter((x) => x.present && x.phase && typeof x.ws === 'string').map((x) => ({ ws: x.ws, ph: String(x.phase) }))].filter((c) => ok(c.ws, c.ph));
