@@ -8,11 +8,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { planningLayout } from './vf-cockpit-paths.mjs';
-import { readPlanning, clip, sentence, num, fm, list } from './vf-cockpit-planning.mjs';
+import { readPlanning, read, clip, sentence, num, fm, list } from './vf-cockpit-planning.mjs';
 import { trouverPhase, LIBELLES_RESTE } from './vf-cockpit-avancement.mjs';
 import { KIND_ICONS, KIND_COLORS } from './vf-cockpit-types.mjs';
 
-const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };
 const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
 const DST = { done: 'done', running: 'active', ready: 'todo', blocked: 'todo', failed: 'blocked' }; // dag.sh : blocked = en attente des deps
 const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);

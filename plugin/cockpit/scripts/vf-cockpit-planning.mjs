@@ -12,7 +12,7 @@ import { avancement, rattacherMission } from './vf-cockpit-avancement.mjs';
 
 // jamais d'ouverture d'un fichier non régulier (un tube FIFO bloque ; un lien vers /dev/zero ne finit pas, et git versionne les liens symboliques) ni d'un fichier au-delà de MAX_LECTURE
 const MAX_LECTURE = 8 << 20;
-const read = (f) => { try { const st = fs.statSync(f); return st.isFile() && st.size <= MAX_LECTURE ? fs.readFileSync(f, 'utf8') : ''; } catch { return ''; } };
+export const read = (f) => { try { const st = fs.statSync(f); return st.isFile() && st.size <= MAX_LECTURE ? fs.readFileSync(f, 'utf8') : ''; } catch { return ''; } };
 const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
 export const clip = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').replace(/\*\*/g, '').replace(/`/g, '').trim(); return s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s; };
 export const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/\*\*/g, '').replace(/`/g, '').trim(); const i = s.search(/[.!?](\s|$)/); return clip(i > 25 ? s.slice(0, i + 1) : s, n); };

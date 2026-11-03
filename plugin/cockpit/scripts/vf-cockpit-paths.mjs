@@ -32,7 +32,8 @@ export function planningLayout(root) {
   if (!compartiments.length) return { forme: 'plat', actif: null, compartiments: [{ ws: null, dir: base }] };
   let actif = null;
   try {
-    const nom = fs.readFileSync(path.join(base, 'active-workstream'), 'utf8').trim();
+    const pf = path.join(base, 'active-workstream'); const st = fs.statSync(pf); // jamais un fichier non régulier ni démesuré (un lien vers /dev/zero ne finit pas)
+    const nom = st.isFile() && st.size <= 4096 ? fs.readFileSync(pf, 'utf8').trim() : '';
     if (compartiments.some((c) => c.ws === nom)) actif = nom;
   } catch {}
   if (!actif && compartiments.length === 1) actif = compartiments[0].ws;
