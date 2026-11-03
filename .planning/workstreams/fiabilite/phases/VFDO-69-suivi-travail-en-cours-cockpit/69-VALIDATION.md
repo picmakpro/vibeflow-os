@@ -42,10 +42,10 @@ remplie par 69-09.
 | 69-01 | T3 | CKPT-13 (contrat), CKPT-17 | `test-cockpit-avancement.sh` A7 ; `-who.sh`, `-assemblage.sh`, `-vendor.sh`, `-reseau.sh`, `-chrome-fr.sh` | A7 « clé avancement absente » ; R1.5 ; V4 | A7 rouge tracé | |
 | 69-02 | T1 (tracer) | CKPT-19 | `test-cockpit-equipe.sh` E0, E19.1 | E0 en FAIL (fixture) ; E19.1 vert avant le code | E19.1 `parent` = session | |
 | 69-02 | T2 | CKPT-20, 21, 22, 28 | `test-cockpit-equipe.sh` E20, E21, E22, E28, EP | contrôles positifs en FAIL ; E28.1/E21.2/E22.8 verts avant le code | `fin2h` absent, aucun `rattachement`, aucune `action`, `who@1` — `69-02-RED-TRACE.md` | |
-| 69-02 | T3 | CKPT-27 | `test-cockpit-forme-claude.sh` F0-F13 ; trace | F0.2/F13 en FAIL ; F1.b/F11 verts avant le code | F1.b..F12 `lue` au lieu de `forme-inconnue` | |
+| 69-02 | T3 | CKPT-27 | `test-cockpit-forme-claude.sh` F0-F16 ; trace | F0.2/F13/F14.1-2/F15.3/F16.2 en FAIL ; F1.b/F11/F14.3/F16.1 verts avant le code | F1.b..F12 `lue` au lieu de `forme-inconnue` ; F14.3 parent = session ; F15.1 forme arrêtée absente ; F16.1 lecture de vieux meta.json — `69-02-RED-TRACE.md` | |
 | 69-03 | T1 (tracer) | CKPT-19, 27, 28 | `test-cockpit-equipe.sh` E19.1-3, E28.1 ; `-who.sh` | FAIL ; W5-W7/W13 rouges (lecteurs déplacés) | (69-02) | |
-| 69-03 | T2 | CKPT-19, 20, 27 | `test-cockpit-forme-claude.sh` ; `-equipe.sh` E19, E20, E28, EP ; `-who.sh`, `-robustesse.sh`, `-securite.sh` | FAIL ; écart de mesure nommé = blocage, jamais contournement | (69-02) | |
-| 69-03 | T3 | CKPT-28 | `-serveur.sh`, `-direct.sh`, `-reseau.sh`, `-vendor.sh` | S5, D1-D5, R1.5, V4 | (69-02 E28) | |
+| 69-03 | T2 | CKPT-19, 20, 27 | `test-cockpit-forme-claude.sh` (dont F14-F16 : fenêtre, forme arrêtée, zéro lecture hors fenêtre) ; `-equipe.sh` E19, E20, E28, EP ; `-who.sh`, `-robustesse.sh`, `-securite.sh` ; mutation de la fenêtre sur copie | FAIL ; écart de mesure nommé = blocage, jamais contournement ; mutant vert = fenêtre non tenue | (69-02) | |
+| 69-03 | T3 | CKPT-28 | `-serveur.sh`, `-direct.sh`, `-reseau.sh`, `-vendor.sh` ; F14-F16 ; collecte sur le poste réel < 3 000 ms | S5, D1-D5, R1.5, V4 ; F16.1 absent des PASS ; plafond dépassé | (69-02 E28, F16.1) | |
 | 69-04 | T1 (tracer) | CKPT-24 | `test-cockpit-transcript.sh` T0, T24.1 | T0 en FAIL (marqueur absent de la fixture) ; T24.1 vert avant le code | « module absent » | |
 | 69-04 | T2 | CKPT-25, 26 | `test-cockpit-transcript.sh` T25, T26 (mutants M-JETON, M-PORTE) | contrôles positifs (403, 405, leurre, CSP de /project.html) en FAIL ; T25.1/T25.16/T26.5 verts avant le code | 404, `mandat` émis, « fichier absent » — `69-04-RED-TRACE.md` | |
 | 69-04 | T3 | CKPT-19..23 (interface) | `test-cockpit-equipe.sh` E23, EUI ; trace | E23.8 (témoin de la sonde) en FAIL ; E23.1/EUI.4 verts avant le code | 404, « fichier absent : 71-vf-equipe-rendu.js » | |
@@ -58,9 +58,9 @@ remplie par 69-09.
 | 69-07 | T1 (tracer) | CKPT-24, 25 | `-transcript.sh` T25 ; `-serveur.sh` F3, F4 | 200 sans jeton ; marqueur dans flux/fichiers/journal/export ; mutant non vu ; F4 | (69-04) | |
 | 69-07 | T2 | CKPT-25, 28 | `-securite.sh`, `-reseau.sh`, `-direct.sh`, `-questions.sh`, `-robustesse.sh`, `-chaine-xss.sh` | H1 transcript ; R1.5 | — | |
 | 69-08 | T1 (tracer) | CKPT-19, 20 | `-equipe.sh` EUI.1-3, EUI.7 ; `-who.sh` W16 ; `-vendor.sh` | imbrication ; terminés dépliés ; bouton perdu ; V4/V7 | (69-04) | |
-| 69-08 | T2 | CKPT-21, 22, 23, 26 | `-equipe.sh` (tout) ; `-transcript.sh` (tout) ; `-chrome-fr.sh`, `-chaine-xss.sh`, `-who.sh` | EUI.4-6, E23.7, T26.1-3 (T26.7 sous Chrome) | (69-04) | |
-| 69-09 | T1 | CKPT-13..28 (doc) | `scripts/check-version-sync.sh` ; `scripts/check-affirmation-non-mesuree.sh` | « N suites » ≠ réel ; affirmation non mesurée | — | |
-| 69-09 | T2 | CKPT-13..28 | rejeu du job `gates` depuis `ci.yml` ; 21 suites du module une à une + `test-vibeflow-update-cockpit.sh` ; `fichiersExecution` | étape ou suite à code non nul ; < 21 suites ; module neuf non recopié | — | |
+| 69-08 | T2 | CKPT-21, 22, 23, 26 | `-equipe.sh` (tout) ; `-transcript.sh` (tout) ; `-chrome-fr.sh`, `-chaine-xss.sh`, `-who.sh` | EUI.4-6, E23.7, T26.0-6 (T25 et T26.7 dépendent de 69-07 : exigées par 69-09) | (69-04) | |
+| 69-09 | T1 | CKPT-13..28 (doc), bump P69-D-26 | `scripts/check-version-sync.sh` (points 6 et 8) ; `scripts/check-affirmation-non-mesuree.sh` ; triade du module à `v1.1.0` | « N suites » ≠ réel ; affirmation non mesurée ; module encore à `v1.0.0` | module à `v1.0.0` à la planification | |
+| 69-09 | T2 | CKPT-13..28 | rejeu du job `gates` depuis `ci.yml` ; 21 suites du module une à une + `test-vibeflow-update-cockpit.sh` ; T26.7 exigée verte si Chrome ; `fichiersExecution` ; périmètre du diff (`awk` + témoin) ; ordre suite -> trace -> code (`merge-base --is-ancestor` + témoin) | étape ou suite à code non nul ; < 21 suites ; T26.7 absente ou rouge ; module neuf non recopié ; chemin hors périmètre ; `VERSION` racine touchée ; ordre inversé | témoins de périmètre et d'ordre | |
 
 ## Wave 0 Requirements
 
