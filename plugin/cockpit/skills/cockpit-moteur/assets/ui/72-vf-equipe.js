@@ -29,7 +29,8 @@
   const equipe = (who) => (Array.isArray(who?.workers) ? who.workers : []).filter((w) => w && (w.kind === 'session' || w.kind === 'subagent') && typeof w.id === 'string');
   // l'ensemble des agents, avec leur appartenance aux terminés (qui change leur place dans l'arbre des cartes)
   const signature = (liste) => liste.map(([id, fini]) => `${id}${fini ? '~' : ''}`).sort().join('|');
-  const dansCarte = () => G.nodes.filter((x) => /^(se|ag)-/.test(x.id)).map((x) => [x.id, x.st === 'done']);
+  // les cartes d'agent seulement : le bloc « Terminés » (`<carte>~termines`) n'est pas un agent et ne figure jamais dans la liste reçue
+  const dansCarte = () => G.nodes.filter((x) => /^(se|ag)-/.test(x.id) && !x.id.includes('~')).map((x) => [x.id, x.st === 'done']);
   let minuterie = null;
 
   const recharger = () => {
@@ -51,6 +52,15 @@
     z = document.createElement('div'); z.className = 'vf-transcript'; z.dataset.vfDe = b.dataset.vfTranscript;
     b.after(z); return z;
   };
+  // arrivée par un lien `equipe.html#r=n:<carte>` : 00-vibeflow.js la traite à `ready`, mais un rerender() lancé pendant le premier rendu annule son
+  // `after` et `ready` n'est alors jamais émis ; on révèle la carte visée après le premier rendu qui aboutit (une seule fois par page)
+  let arrive = false;
+  const arrivee = () => {
+    if (arrive) return;
+    arrive = true;
+    const r = new URLSearchParams(location.hash.slice(1)).get('r');
+    if (r && /^n:/.test(r) && SC.exists(r)) SC.reveal(r);
+  };
   const parCarte = () => new Map(equipe(window.__vfLive?.who).map((w) => [idCarte(w), w]));
   async function suivre() {
     const liste = equipe(window.__vfLive?.who);
@@ -68,17 +78,16 @@
     await SC.rerender();
     const b = garde && [...document.querySelectorAll('[data-vf-transcript]')].find((x) => x.dataset.vfTranscript === garde.id);
     if (b) zoneDe(b).replaceChildren(...garde.noeuds);
+    arrivee();
   }
   document.addEventListener('vf-who', suivre);
-  SC.on('ready', () => { for (const [id, w] of parCarte()) { const x = G.nodes.find((n) => n.id === id); if (x) x.foot = R().pied(w); } });
+  SC.on('ready', () => { arrive = true; for (const [id, w] of parCarte()) { const x = G.nodes.find((n) => n.id === id); if (x) x.foot = R().pied(w); } });
 
   // panneau d'une carte d'agent ou de session
   SC.addPanelSection('item', (id) => {
     const w = typeof id === 'string' && id.startsWith('n:') ? parCarte().get(id.slice(2)) : null;
     if (!w) return '';
-    const n = w.rattachement && w.rattachement.etat === 'rattache' ? w.rattachement : null;
-    const vers = n ? `<a class="vf-link" href="project.html#r=${encodeURIComponent('f:' + n.dag + '#' + n.noeud)}">Nœud ${h(n.noeud)}</a>`
-      : w.kind === 'subagent' ? `<p class="pd">non rattaché (${h((w.rattachement && w.rattachement.raison) || 'inconnu')})</p>` : '';
+    const vers = R().versNoeud(w, h);
     return `<div class="sec"><h3>Activité</h3><p class="pd">${h(R().pied(w))}</p>${vers}
       <button type="button" data-vf-doing="${h(w.id)}">Voir la dernière commande</button><div class="vf-doing" hidden></div>
       <button type="button" data-vf-transcript="${h(w.id)}">Lire le transcript</button></div>`;
