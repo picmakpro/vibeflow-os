@@ -391,6 +391,31 @@ for k in requis missionEtats; do
 done
 assert_eq "A12.3 — normalisation des numéros : 01, 1, 02.1, 2.10 se résolvent comme normNum" "$(node "$AUX/unit.mjs" "$SCRIPTS" norm)" "true,true,true,true"
 
+# ---------- A13 — le jalon en cours est celui du STATE (CKPT-16) ----------
+# L9 : deux jalons ouverts, le premier du ROADMAP (alpha) n'est pas celui que nomme le STATE (beta). Le STATE ne décide pas de l'état des PHASES (P69-D-08) : il choisit seulement quel jalon la vue « en cours » met en avant.
+L9="$WORK/lab-l9"; B="$L9/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+## Milestones
+
+- 🚧 **alpha** - Phases 1
+- 🚧 **beta** - Phases 2
+
+## Phases
+
+- [ ] **Phase 1: Un** - a
+- [ ] **Phase 2: Deux** - b
+MD
+printf -- '---\nmilestone: beta\nstatus: executing\ncurrent_phase: 1\n---\n' | wr "$B/STATE.md"
+plans "$B/phases/01-a" 01 2 1; plans "$B/phases/02-b" 02 2 1
+initgit "$L9"
+graph "$L9" "$WORK/g9.json"
+FLUX='j.flows.map(f=>f.title).join()+"|"+j.meta.vf.next.map(n=>n.id).join()'
+echo "=== A13 — jalon en cours = jalon du STATE ==="
+assert_eq "A13.0 — contrôle positif : les deux jalons sont ouverts (le premier du ROADMAP l'est aussi)" "$(NDF "$WORK/g9.json" ms-alpha .st)|$(NDF "$WORK/g9.json" ms-beta .st)" "active|active"
+assert_eq "A13.1 — le STATE nomme beta : la trajectoire et les prochaines phases sont celles de beta" "$(G "$WORK/g9.json" "$FLUX")" "Trajectoire de beta|n:ph-2"
+r="$(mut sans-state "$P_" "msList.find((m) => state.milestone && m.key === state.milestone && m.ws === (layout.actif || null) && m.st !== 'done') || " "")"; node "$AUX/q.mjs" "$WORK/mut-sans-state" project "$L9" > "$WORK/g9-mut.json" 2>/dev/null
+assert_eq "A13.2 — mutant « le STATE n'est plus lu » : la trajectoire redevient celle d'alpha, A13.1 le voit" "$r|$(G "$WORK/g9-mut.json" "$FLUX")" "muté|Trajectoire de alpha|n:ph-1"
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
