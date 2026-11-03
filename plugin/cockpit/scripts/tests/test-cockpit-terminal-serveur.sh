@@ -306,13 +306,13 @@ unsrv
 echo "=== Mutants — chacun rougit sa sonde ==="
 rouge() { echo "     [mutant] obtenu $1, le code sain rend $2" >&2; [ "$1" != "$2" ] && echo rouge || echo "identique : $1"; }
 mut() { mutant "$1" "$2" "$3" && return 0; assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; return 1; }
-if mut origine vf-cockpit-terminal.mjs "s/else if (o !== origineQ()) return 403;/else if (false) return 403;/"; then
+if mut origine vf-cockpit-terminal.mjs "s/else if (o !== origineQ())/else if (false)/"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-ORIGIN — le mutant rougit T1.1 : une Origin tierce n'est plus refusée (403)" "$(rouge "$(sta "$QP" POST /entree --secret "$SECRET" --onglet o1 --origin "$EVIL" --corps x)" 403)" "rouge"; unsrv; fi
 if mut hote vf-cockpit-terminal.mjs "s/!hotes.includes(String(req.headers.host || '').toLowerCase())/!String(req.headers.host || '').endsWith(':' + portQ)/"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-HOST — le mutant rougit T2.1 : un Host de rebinding n'est plus refusé (403)" "$(rouge "$(sta "$QP" POST /entree --secret "$SECRET" --onglet o1 --host "evil.example:$QP" --corps x)" 403)" "rouge"; unsrv; fi
 if mut jeton vf-cockpit-terminal.mjs "s/!egal(req.headers\['x-vf-terminal'\], secret)/(req.headers['x-vf-terminal'] !== undefined \&\& !egal(req.headers['x-vf-terminal'], secret))/"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-JETON — le mutant rougit T3.1 : l'absence de secret est admise (≠ 401)" "$(rouge "$(sta "$QP" POST /entree --onglet o1 --corps x)" 401)" "rouge"; unsrv; fi
-if mut sansorigine vf-cockpit-terminal.mjs "s/if (o === undefined) { if (!page) return 403; }/if (o === undefined) { }/"; then
+if mut sansorigine vf-cockpit-terminal.mjs "s/if (!page) return /if (false) return /"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-SANSORIGIN — le mutant rougit T3.4 : POST /entree sans Origin n'est plus refusé (403)" "$(rouge "$(sta "$QP" POST /entree --secret "$SECRET" --onglet o1 --sans-origin --corps x)" 403)" "rouge"; unsrv; fi
 if mut rejeu vf-cockpit-terminal-amorce.mjs "s/fs\.unlinkSync(fichier)/0/"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-REJEU — le mutant rougit T4.2 : le rejeu de l'amorçage n'est plus refusé (403)" "$(rouge "$(node "$TA" amorcer "$QP" "$WORK/amorce.copy" | sed -n 1p)" 403)" "rouge"; unsrv; fi
