@@ -29,6 +29,8 @@ Le verbe `/vf-cockpit` lance ce script (poses `project` et `local`) ou `$HOME/.c
 | 4 | assemblage en échec |
 | 5 | serveur non démarré (journal : `.vibeflow/cockpit/.cache/serveur.log`) |
 
+Le cockpit d'un lab écoute toujours sur le même port : un port préféré dérivé de l'empreinte de la racine du lab, dans la plage 4378 à 4477. Il ne dépend ni de l'ordre de lancement ni du nombre de labs ouverts. Si ce port est pris par un autre processus, le serveur prend le suivant (jusqu'à 20 essais), et ce choix est le même à chaque lancement tant que l'état des ports ne change pas. `--port <p>` garde la priorité.
+
 ## Les deux onglets
 
 - **Projet** : jalons, phases, plans, exigences, missions ; badge « au travail » (sessions en direct), mise à jour en
