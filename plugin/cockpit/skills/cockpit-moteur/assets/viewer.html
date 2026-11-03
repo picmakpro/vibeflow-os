@@ -1872,7 +1872,7 @@ function flowStep() {
   const container = b ? lcaContainer(a, b) : parentOf.get(a) || 'root';
   const bar = $('#flowbar'); bar.hidden = false;
   bar.innerHTML = `<div class="ft"><div class="fk">${h(f.title)} · step ${i + 1} of ${f.steps.length}</div><b>${h(info(a).name)}</b>${b ? ` <span>→</span> <b>${h(info(b).name)}</b>` : ''}<br><span>${h(f.steps[i].note)}</span><div class="dots">${f.steps.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div></div>
-    <button class="btn icon" id="fl-prev" ${i === 0 ? 'disabled' : ''}>${iconI('left')}</button><button class="btn icon" id="fl-next" ${i >= f.steps.length - 1 ? 'disabled' : ''}>${iconI('right')}</button><button class="btn icon" id="fl-x" title="Exit">${iconI('x')}</button>`;
+    <button class="btn icon" id="fl-prev" aria-label="Previous step" title="Previous step" ${i === 0 ? 'disabled' : ''}>${iconI('left')}</button><button class="btn icon" id="fl-next" aria-label="Next step" title="Next step" ${i >= f.steps.length - 1 ? 'disabled' : ''}>${iconI('right')}</button><button class="btn icon" id="fl-x" title="Exit">${iconI('x')}</button>`;
   $('#fl-prev').onclick = () => { state.flow.i--; flowStep(); };
   $('#fl-next').onclick = () => { if (state.flow.i < f.steps.length - 1) { state.flow.i++; flowStep(); } }; // vibeflow P22 : à la dernière étape le chevron est inactif (comme « précédent » à la première) ; la fermeture est la seule croix
   $('#fl-x').onclick = stopFlow;
@@ -1961,7 +1961,10 @@ function refChip(id) {
   return `<span class="ref" data-ref="${h(id)}" style="--c:${colorOf(ii)}"><i></i>${h(b.name)}</span>`;
 }
 function md(src) {
-  const inline = (s) => h(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\[\[([^\]]+)\]\]/g, (_, id) => refChip(id.replace(/&#39;|&quot;/g, '').trim()));
+  // *italique* et _italique_ (P23) : après l'échappement, hors des <code>, jamais sur du texte déjà balisé. Bornes de mot : l'ouvrant suit le début ou un caractère qui n'est ni lettre, chiffre, `_`, `*` ni `\` (et pas `/` pour `*`, donc `**/*.js`),
+  // le fermant précède la fin ou un non-mot ; ni l'un ni l'autre n'est collé à une espace (`a * b * c`), l'ouvrant `*` n'est jamais suivi d'un point (`*.js,*.ts`), et le contenu ne porte ni `<` ni le marqueur (`snake_case_var`, `2*3*4`, `***x***` restent tels quels).
+  const em = (t) => t.replace(/(^|[^\w*\\/])\*(?![\s*.])([^*<\n]*[^*<\s])\*(?![\w*])/g, '$1<em>$2</em>').replace(/(^|[^\w\\])_(?!\s)([^_<\n]*[^_<\s])_(?!\w)/g, '$1<em>$2</em>');
+  const inline = (s) => h(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>').split(/(<code>.*?<\/code>)/).map((p, i) => (i % 2 ? p : em(p))).join('').replace(/\[\[([^\]]+)\]\]/g, (_, id) => refChip(id.replace(/&#39;|&quot;/g, '').trim()));
   const out = [];
   let list = null;
   for (const raw of String(src || '').split('\n')) {

@@ -326,6 +326,37 @@ assert_eq "D7.14 — libellé témoin : la mesure a eu lieu et le nœud library 
 assert_eq "D7.15 — libellé : le type « library » est en français dans le panneau" "$(printf '%s' "$XL" | node "$AUX/jg.mjs" "$V.panneau.toLowerCase()")" "bibliothèque"
 assert_eq "D7.16 — libellé : le type est en français dans l'infobulle (et plus de « library » nulle part dans l'interface)" "$(printf '%s' "$XL" | node "$AUX/jg.mjs" "[/^bibliothèque/i.test($V.infobulle||''),$V.anglais]")" "[true,false]"
 assert_eq "D7.17 — libellé : une DONNÉE du lab (dossiers nommés library et config) n'est jamais traduite" "$(printf '%s' "$XL" | node "$AUX/jg.mjs" "['library','config','src'].every((t)=>$V.titres.includes(t))")" "true"
+
+# O3 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : *italique* et _italique_ rendus dans les réponses de l'agent (VibeFlow.md, le rendu du viewer).
+# Bornes de mot : l'ouvrant suit le début ou un non-mot (ni lettre, chiffre, `_`, `*`, `\`, ni `/` pour `*`) et n'est pas suivi d'une espace ; le fermant n'est pas précédé d'une espace et est suivi d'un non-mot.
+cat > "$AUX/o3.js" <<'JS'
+(() => { const m = window.VibeFlow.md;
+  return { etoile: m('le *floorplan* ici'), tiret: m('un _mot_ ici'), gras: m('**gras** et *ital*'), liste: m('* item un\n* item deux'), espaces: m('a * b * c'), snake: m('snake_case_var et autre_chose_ici'),
+    glob: m('glob **/*.js ok'), globs: m('*.js,*.ts'), chiffres: m('2*3*4'), code: m('`*x*` et `_y_`'), xss: m('*<img src=x onerror=alert(1)>* et _<b>g</b>_'), gras2: m('**seul**'), bord: m('_a_b_') }; })()
+JS
+XO3="$(CDP_PRET="document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.md" cdp 300 o3.js "$URLP")"
+assert_eq "D7.18 — O3 témoin : la mesure a eu lieu (VibeFlow.md rendu)" "$(printf '%s' "$XO3" | node "$AUX/jg.mjs" "($V.erreur||j.erreur||'')+'|'+(typeof $V.etoile)")" "|string"
+assert_eq "D7.19 — O3 : « *floorplan* » devient <em>" "$(printf '%s' "$XO3" | node "$AUX/jg.mjs" "$V.etoile")" "<p>le <em>floorplan</em> ici</p>"
+assert_eq "D7.20 — O3 : « _mot_ » devient <em>" "$(printf '%s' "$XO3" | node "$AUX/jg.mjs" "$V.tiret")" "<p>un <em>mot</em> ici</p>"
+assert_eq "D7.21 — O3 : **gras** reste gras, *ital* à côté devient <em>" "$(printf '%s' "$XO3" | node "$AUX/jg.mjs" "$V.gras")" "<p><strong>gras</strong> et <em>ital</em></p>"
+assert_eq "D7.22 — O3 : une liste à puces « * item » reste une liste" "$(printf '%s' "$XO3" | node "$AUX/jg.mjs" "$V.liste")" "<ul><li>item un</li><li>item deux</li></ul>"
+assert_eq "D7.23 — O3 : « a * b * c » reste tel quel" "$(printf '%s' "$XO3" | node "$AUX/jg.mjs" "$V.espaces")" "<p>a * b * c</p>"
+assert_eq "D7.24 — O3 : snake_case_var et autre_chose_ici restent tels quels" "$(printf '%s' "$XO3" | node "$AUX/jg.mjs" "$V.snake")" "<p>snake_case_var et autre_chose_ici</p>"
+assert_eq "D7.25 — O3 : le chemin « **/*.js », la liste « *.js,*.ts » et « 2*3*4 » restent tels quels" "$(printf '%s' "$XO3" | node "$AUX/jg.mjs" "[$V.glob,$V.globs,$V.chiffres]")" '["<p>glob **/*.js ok</p>","<p>*.js,*.ts</p>","<p>2*3*4</p>"]'
+assert_eq "D7.26 — O3 : dans un span de code, les marqueurs ne sont pas interprétés ; « _a_b_ » reste tel quel" "$(printf '%s' "$XO3" | node "$AUX/jg.mjs" "[$V.code,$V.bord]")" '["<p><code>*x*</code> et <code>_y_</code></p>","<p>_a_b_</p>"]'
+assert_eq "D7.27 — O3 : une balise entre marqueurs reste échappée (aucun <img>, aucun <b> réel)" "$(printf '%s' "$XO3" | node "$AUX/jg.mjs" "[/<img|<b>/.test($V.xss),/&lt;img/.test($V.xss)]")" "[false,true]"
+
+# O6 (recette 3, même arbitrage) : les chevrons de la Trajectoire ont un nom accessible et une infobulle, en français.
+cat > "$AUX/o6.js" <<'JS'
+(async () => { const SC = window.VibeFlow, pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  SC.startFlow('trajectoire'); for (let i = 0; i < 100 && !document.getElementById('fl-next'); i++) await pause(50);
+  for (let i = 0; i < 60 && !/Étape/.test(document.getElementById('fl-prev').getAttribute('title') || ''); i++) await pause(50); // la traduction passe après la pose
+  const a = (id) => { const b = document.getElementById(id); return b ? [b.getAttribute('aria-label'), b.getAttribute('title')] : null; };
+  return { prev: a('fl-prev'), next: a('fl-next') }; })()
+JS
+XO6="$(CDP_PRET="document.readyState === 'complete' && !!window.VibeFlow && !!document.getElementById('vf-lock')" cdp 500 o6.js "$URLP")"
+assert_eq "D7.28 — O6 : le chevron « précédent » porte aria-label et title « Étape précédente »" "$(printf '%s' "$XO6" | node "$AUX/jg.mjs" "$V.prev")" '["Étape précédente","Étape précédente"]'
+assert_eq "D7.29 — O6 : le chevron « suivant » porte aria-label et title « Étape suivante »" "$(printf '%s' "$XO6" | node "$AUX/jg.mjs" "$V.next")" '["Étape suivante","Étape suivante"]'
 stop_srv
 fi
 

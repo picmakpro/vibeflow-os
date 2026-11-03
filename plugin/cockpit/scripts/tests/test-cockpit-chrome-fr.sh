@@ -58,7 +58,7 @@ const dico = code.__vfFrDict;
 const fautive = fautif ? controler(JSON.parse(fs.readFileSync(fautif, 'utf8'))) : [];
 console.log(JSON.stringify({ inventaire: inv.length, dict: Object.keys(dico).length, motifs: code.__vfFrTraduire.motifs, gabarits: code.__vfFrTraduire.gabarits, exclusions: excl.length,
   nonTraduits, sansObjet, problemesDico: controler(dico), problemesTemoin: fautive,
-  f6: { motif: tr('Answer · 3 cards'), exact: tr('Fit to screen'), gabarit: tr('Your Claude session expired. Sign in again.'), vide: tr(''), espaces: tr('   '), inconnu: tr('Ma phrase de données'), projet: proj.__vfFrTraduire('File'), code: code.__vfFrTraduire('File'), pluriels: [proj.__vfFrTraduire('files'), code.__vfFrTraduire('files')], donnees: [tr('Top of the world'), tr('Fix with Claude Code'), tr('3 of 4'), tr('Health check: nothing urgent')],
+  f6: { etapes: [tr('Previous step'), tr('Next step')], motif: tr('Answer · 3 cards'), exact: tr('Fit to screen'), gabarit: tr('Your Claude session expired. Sign in again.'), vide: tr(''), espaces: tr('   '), inconnu: tr('Ma phrase de données'), projet: proj.__vfFrTraduire('File'), code: code.__vfFrTraduire('File'), pluriels: [proj.__vfFrTraduire('files'), code.__vfFrTraduire('files')], donnees: [tr('Top of the world'), tr('Fix with Claude Code'), tr('3 of 4'), tr('Health check: nothing urgent')],
     types: typeof code.__vfFrType === 'function' ? [code.__vfFrType('library'), code.__vfFrType('Library'), code.__vfFrType('Ma donnée'), code.__vfFrType('config'), tr('library')] : 'absent' }}));
 JS
 cat > "$AUX/lire.mjs" <<'JS'
@@ -108,6 +108,7 @@ assert_eq "F6.7 : pluriel composé à l'exécution (« files » → éléments s
 assert_eq "F6.8 : un gabarit court n'abîme pas une donnée (« Top of the world » reste intacte)" "$(lire "$WORK/m.json" 'j.f6.donnees[0]')" "null"
 assert_eq "F6.9 : le même gabarit s'applique si une variable se traduit ou est un nombre" "$(lire "$WORK/m.json" 'j.f6.donnees.slice(1)')" "[\"Corriger avec Claude Code\",\"3 sur 4\",\"Contrôle de santé : rien d'urgent\"]"
 assert_eq "F6.10 : types fixes de carte (recette 2026-11-02, « Library ») : traduits par emplacement, capitale conservée, donnée inconnue intacte, JAMAIS par le dictionnaire (un dossier « library » reste « library »)" "$(lire "$WORK/m.json" 'j.f6.types')" '["bibliothèque","Bibliothèque",null,"configuration",null]'
+assert_eq "F6.11 : O6 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) — les chevrons de la Trajectoire (« Previous step », « Next step ») sont traduits en « Étape précédente » et « Étape suivante »" "$(lire "$WORK/m.json" 'j.f6.etapes')" '["Étape précédente","Étape suivante"]'
 
 echo "[F3] témoin du détecteur : une chaîne anglaise inventée"
 T3="$WORK/t3"; cp -R "$SORTIE" "$T3"

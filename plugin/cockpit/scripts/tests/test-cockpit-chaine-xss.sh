@@ -200,6 +200,32 @@ manche garde M-ESC M-CSP
 assert_eq "C4.1 — témoin : la charge est dans le DOM" "$([ "${R_CHARGES:-0}" -ge 1 ] 2>/dev/null && echo oui || echo non)" "oui"
 assert_eq "C4.2 — témoin : le jeton est exfiltré (la CSP est retirée)" "$R_EXFIL" "oui"
 assert_eq "C4.3 — maillon rompu : le script désigné par le lab n'est PAS exécuté" "$R_MARQUEUR" "non"
+
+# C5 — O3 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : le rendu *italique* / _italique_ des réponses de l'agent (VibeFlow.md) s'applique APRÈS l'échappement.
+# Une balise entre marqueurs, y compris la charge de ce lab, reste du texte : insérée dans la page servie sous sa CSP, aucun élément onerror, aucune violation, et le texte brut figure dans le DOM.
+if [ -n "$CHROME" ]; then
+echo "=== C5 — l'italique rendu ne rouvre pas la porte : *<img onerror>* reste du texte sous la CSP ==="
+cat > "$AUX/italique.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const { executer } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const [, , chrome, url] = process.argv;
+await executer(chrome, async (s) => {
+  await s.naviguer(url); await s.attendre("document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.md", 'rendu md disponible');
+  return await s.ev(`(() => { const d = document.createElement('div'); d.id = 'c5';
+    d.innerHTML = window.VibeFlow.md('*<img src=x onerror=document.title=1>* puis _<svg onload=document.title=2>_ et **<b onclick=1>x</b>** *ok*'); document.body.appendChild(d);
+    return { charges: document.querySelectorAll('#c5 [onerror], #c5 [onload], #c5 [onclick], #c5 img, #c5 svg, #c5 b').length, texte: d.textContent, em: d.querySelectorAll('em').length, titre: document.title }; })()`)
+    .then(async (r) => ({ ...r, violations: [...s.violations] }));
+}, { csp: true });
+JS
+o="$WORK/sortie-livre"; ( cd "$LAB" && VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-c5.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
+pid5=$!; PIDS+=($pid5)
+for _ in $(seq 1 100); do [ -s "$o/.cache/server.json" ] && grep -q '"port"' "$o/.cache/server.json" && break; sleep 0.1; done
+port5="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)")"
+X5="$(node "$AUX/italique.mjs" "$CHROME" "http://127.0.0.1:$port5/project.html")"; vf_hyg_stop "$pid5"
+assert_eq "C5.1 — la charge entre marqueurs ne devient aucun élément (img, svg, b, onerror, onload, onclick)" "$(printf '%s' "$X5" | jq_ '(j.erreur||"")+"|"+j.charges')" "|0"
+assert_eq "C5.2 — le texte de la charge est affiché tel quel et le titre de la page n'a pas bougé" "$(printf '%s' "$X5" | jq_ '[/<img src=x onerror=document.title=1>/.test(j.texte), /<svg onload=/.test(j.texte), j.titre!=="1"&&j.titre!=="2"]')" "[true,true,true]"
+assert_eq "C5.3 — témoin : l'italique est bien rendu ailleurs dans la même réponse, aucune violation de CSP" "$(printf '%s' "$X5" | jq_ '[j.em>=1, j.violations.length]')" "[true,0]"
+fi
 fi
 
 vf_hyg_assert
