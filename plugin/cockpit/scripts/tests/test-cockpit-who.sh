@@ -80,11 +80,14 @@ mk_session() { # $1 = fichier, $2 = clé du cwd, $3 = description du dernier app
   printf '%s\n' "{\"type\":\"user\",\"$2\":\"$LAB\",\"sessionId\":\"$SID\",\"timestamp\":\"2026-11-01T10:00:00Z\",\"gitBranch\":\"main\",\"version\":\"2.1.316\",\"message\":{\"content\":\"salut\"}}" \
     "{\"type\":\"assistant\",\"$2\":\"$LAB\",\"sessionId\":\"$SID\",\"timestamp\":\"2026-11-01T10:00:05Z\",\"gitBranch\":\"main\",\"version\":\"2.1.316\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"description\":\"$3\",\"command\":\"$3\"}}]}}" > "$1"
 }
+# mk_sub <dossier> <id> <meta.json> : sous-agent à la forme réelle (meta + transcript dont la première ligne porte isSidechain et agentId)
+mk_sub() { printf '%s\n' "$3" > "$1/agent-$2.meta.json"; mk_session "$1/agent-$2.jsonl" cwd "x"; sed -i.bak '1s/^{/{"isSidechain":true,"agentId":"'"$2"'",/' "$1/agent-$2.jsonl" && rm -f "$1/agent-$2.jsonl.bak"; }
+META_REELLE='{"agentType":"vf-coder","description":"tâche","spawnDepth":1,"toolUseId":"toolu_x","requestShape":"background"}'
 mk_session "$TRD/$SID.jsonl" cwd "MARQUEUR-DERNIERE-COMMANDE"
 
 echo "=== W1 — session fraîche listée ==="
 Q who "$LAB" "$HOME_T" "$NOSCRIPTS" > "$WORK/who.json"
-assert_eq "W1.1 — schéma nommé VibeFlow" "$(G "$WORK/who.json" 'j.schema')" "vibeflow/cockpit-who@1"
+assert_eq "W1.1 — schéma nommé VibeFlow" "$(G "$WORK/who.json" 'j.schema')" "vibeflow/cockpit-who@2"
 assert_eq "W1.2 — la session fraîche est un travailleur kind=session" "$(G "$WORK/who.json" 'j.workers.filter(w=>w.kind==="session"&&w.id==="'$SID'").length')" "1"
 assert_eq "W1.3 — source sessions lue" "$(G "$WORK/who.json" 'j.sources.sessions.etat')" "lue"
 
@@ -114,10 +117,10 @@ assert_eq "W3.2 — ph-1 est fait" "$(G "$WORK/proj.json" 'j.nodes.filter(n=>n.i
 assert_eq "W3.3 — le plan 01-01 est fait" "$(G "$WORK/proj.json" 'j.files.filter(f=>f.name.startsWith("01-01")).map(f=>f.st).join(",")')" "done"
 
 echo "=== W4 — validateur du contrat versionné ==="
-assert_eq "W4.1 — sortie « au travail » conforme" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-who@1 "$WORK/who2.json")" "OK"
+assert_eq "W4.1 — sortie « au travail » conforme" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-who@2 "$WORK/who2.json")" "OK"
 assert_eq "W4.2 — graphe Projet conforme" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-project@1 "$WORK/proj.json")" "OK"
 node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));j.workers[0].doing="x";fs.writeFileSync(process.argv[2],JSON.stringify(j))' "$WORK/who2.json" "$WORK/who-doing.json"
-R=$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-who@1 "$WORK/who-doing.json"); RC=$?
+R=$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-who@2 "$WORK/who-doing.json"); RC=$?
 assert_has "W4.3 — témoin : un champ doing ajouté est refusé" "$R" "clé interdite présente : doing"
 assert_eq "W4.4 — témoin : code de sortie non nul" "$RC" "1"
 
@@ -151,8 +154,8 @@ assert_eq "W8.3 — compteur >= 1" "$(G "$WORK/who8.json" 'j.sources.sessions.fo
 H9="$WORK/home9"; mkdir -p "$H9/.claude/projects/-lab/$SID/subagents"
 mk_session "$H9/.claude/projects/-lab/$SID.jsonl" cwd "x"
 SD="$H9/.claude/projects/-lab/$SID/subagents"
-echo '{"agentType":"vf-coder","description":"tâche","spawnDepth":2}' > "$SD/agent-ok.meta.json"; mk_session "$SD/agent-ok.jsonl" cwd "x"
-echo '{"description":"sans type"}' > "$SD/agent-bad.meta.json"; mk_session "$SD/agent-bad.jsonl" cwd "x"
+mk_sub "$SD" ok "$META_REELLE"
+mk_sub "$SD" bad '{"description":"sans type"}'
 Q who "$LAB" "$H9" "$NOSCRIPTS" > "$WORK/who9.json"
 assert_eq "W8.4 — témoin : le sous-agent conforme est listé, pas l'autre" "$(G "$WORK/who9.json" 'j.workers.filter(w=>w.kind==="subagent").map(w=>w.id).join(",")')" "ok"
 assert_eq "W8.5 — le meta.json sans agentType compte en forme inconnue" "$(G "$WORK/who9.json" 'j.sources.sessions.formeInconnue')" "1"
@@ -177,7 +180,7 @@ assert_eq "W9.4 — témoin positif : le même script hors de l'arbre est exécu
 
 echo "=== W10 — la CLI --json ne porte jamais la dernière commande ==="
 HOME="$HOME_T" node "$SCRIPTS/vf-cockpit-who.mjs" "$LAB" --json > "$WORK/cli.json"
-assert_eq "W10.1 — schéma dans la sortie de la CLI" "$(grep -c '"schema": "vibeflow/cockpit-who@1"' "$WORK/cli.json")" "1"
+assert_eq "W10.1 — schéma dans la sortie de la CLI" "$(grep -c '"schema": "vibeflow/cockpit-who@2"' "$WORK/cli.json")" "1"
 assert_eq "W10.2 — aucune clé doing" "$(grep -c '"doing"' "$WORK/cli.json")" "0"
 assert_eq "W10.3 — le marqueur est absent" "$(grep -c "$MARK" "$WORK/cli.json")" "0"
 
@@ -291,8 +294,8 @@ node "$AUX/mk-mot.mjs" "$H13/.claude/projects/-lab/$SID.jsonl" "$LAB" 20
 assert_has "W13.3 — témoin : le secret placé après un mot court est toujours masqué" "$(node "$AUX/temps.mjs" "$SCRIPTS" "$LAB" "$H13" "$NOSCRIPTS" "$SID")" "[masqué]"
 H14="$WORK/home14"; mkdir -p "$H14/.claude/projects/-lab/$SID/subagents"; SD14="$H14/.claude/projects/-lab/$SID/subagents"
 mk_session "$H14/.claude/projects/-lab/$SID.jsonl" cwd "x"
-echo '{"agentType":"vf-coder","description":"tâche","spawnDepth":2}' > "$SD14/agent-ok.meta.json"; mk_session "$SD14/agent-ok.jsonl" cwd "x"
-for brut in 5 '[]' '"x"' null; do echo "$brut" > "$SD14/agent-bad.meta.json"; mk_session "$SD14/agent-bad.jsonl" cwd "x"
+mk_sub "$SD14" ok "$META_REELLE"
+for brut in 5 '[]' '"x"' null; do mk_sub "$SD14" bad "$brut"
   Q who "$LAB" "$H14" "$NOSCRIPTS" > "$WORK/who14.json" 2>"$WORK/who14.err"
   assert_eq "W13.4 — meta.json « $brut » : pas d'exception, le sous-agent conforme reste listé, l'autre compte en forme inconnue" "$(G "$WORK/who14.json" '[j.workers.filter(w=>w.kind==="subagent").map(w=>w.id).join(","), j.sources.sessions.formeInconnue].join("|")' 2>&1)" "ok|1"
 done

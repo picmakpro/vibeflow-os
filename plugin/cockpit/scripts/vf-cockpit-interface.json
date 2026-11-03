@@ -10,13 +10,18 @@
     "missionEtats": ["running", "failed", "done", "ready"]
   },
   "schemas": {
-    "vibeflow/cockpit-who@1": {
-      "requis": { "at": "string", "root": "string", "trees": "array", "fresh": "number", "busy": "boolean", "workers": "array", "sources": "object" },
+    "vibeflow/cockpit-who@2": {
+      "requis": { "at": "string", "root": "string", "trees": "array", "fresh": "number", "fenetre": "number", "busy": "boolean", "workers": "array", "sources": "object" },
       "travailleur": {
         "requis": ["kind", "id", "tree", "source"],
-        "optionnels": ["role", "task", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag"]
+        "optionnels": ["role", "task", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "action", "rattachement"],
+        "etats": ["actif", "en-attente", "termine"]
       },
-      "interdits": ["doing"],
+      "rattachement": {
+        "etats": ["rattache", "non-rattache"],
+        "raisons": ["sans-citation", "inconnu", "ambigu"]
+      },
+      "interdits": ["doing", "mandat", "messages", "outils"],
       "kinds": ["session", "subagent", "lock", "registered", "dag-node"],
       "etatsSource": ["lue", "absente", "erreur", "forme-inconnue"]
     },
@@ -28,20 +33,36 @@
       "statuts": ["done", "active", "todo", "blocked"],
       "meta": { "requis": ["vfTab", "vf", "kindLabels"] }
     },
+    "vibeflow/cockpit-transcript@1": {
+      "requis": { "schema": "string", "id": "string" },
+      "optionnels": ["mandat", "messages", "outils", "tronque", "erreur"]
+    },
+    "vibeflow/cockpit-equipe@1": {
+      "requis": { "schema": "string", "meta": "object", "project": "object", "nodes": "array", "files": "array", "links": "array", "flows": "array" },
+      "noeud": { "requis": ["id", "label", "kind"] },
+      "lien": { "requis": ["a", "b", "k"] },
+      "statuts": ["done", "active"],
+      "interdits": ["doing", "mandat", "messages", "outils"],
+      "meta": { "requis": ["vfTab", "vf", "kindLabels"] }
+    },
     "vibeflow/cockpit-doing@1": {
       "requis": { "schema": "string", "id": "string", "doing": "any" }
     }
   },
   "claudeCode": {
-    "verifieSur": "2.1.316",
+    "verifieSur": "2.1.317",
     "transcript": {
       "requis": ["cwd", "type", "message", "timestamp", "sessionId"],
       "attendus": ["gitBranch", "version"]
     },
     "metaSousAgent": {
-      "requis": ["agentType", "description"],
-      "attendus": ["spawnDepth", "parentAgentId", "toolUseId"],
-      "drapeauFin": ["finished"]
+      "requis": ["agentType", "description", "spawnDepth", "toolUseId", "requestShape"],
+      "requisSiProfondeur": { "parentAgentId": 2 },
+      "booleensFacultatifs": ["finished"],
+      "formeArretee": { "requis": ["agentType", "stoppedByUser"], "booleens": ["stoppedByUser"] }
+    },
+    "transcriptSousAgent": {
+      "requis": ["isSidechain", "agentId"]
     }
   }
 }
