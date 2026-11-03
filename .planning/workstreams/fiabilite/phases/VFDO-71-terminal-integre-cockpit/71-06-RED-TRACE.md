@@ -122,3 +122,9 @@
 MESURE-O8 minimal=bloque popups=ouvert opener=nul
 
 ## Après la tâche 2
+
+- commit de code : `ac5dc453` ; `vf-cockpit-terminal-client.mjs` 138 lignes, `-vue.mjs` 61 lignes
+- vert : `Résultats : 35 PASS / 0 FAIL`, sans « SUITE SAUTÉE » (Chrome 156), mutants tous rouges (M-COOKIE, M-FRAGMENT, M-STOCKAGE, M-ETOILE, M-ECOUTE, M-CLIP, M-ANCETRES, M-SETCOOKIE)
+- dépendance : T9.5, T9.7, T17.Q4, TQ.1, O4.1 exigent que GET /flux et GET /etat passent sans Origin (Chrome n'en envoie pas sur un GET de même origine, mesuré) ; vert mesuré sur une copie du module portant le correctif P71-D-24, puis sur l'arbre de travail quand le correctif de l'autre exécuteur y est apparu (non encore commité au moment de la mesure)
+
+MESURE-O8 minimal=bloque popups=ouvert opener=nul
