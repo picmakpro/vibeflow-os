@@ -27,3 +27,16 @@ Read lit · Write/Edit/MultiEdit/NotebookEdit modifie · Grep/Glob cherche dans 
 
 ## Témoins
 E21.0-E21.7, E22.0-E22.10, E28, EP, E0/E19/E20 verts ; T0, T24.1-T24.16 verts ; who 69/0, sécurité 88/0, réseau 14/0. E23/EUI et T25/T26 restent rouges (69-05/07/08).
+
+## Correction d'audit (fix-69-lecture, mandat du vf-dev-manager)
+
+Quatre findings de gravité basse de l'audit anticipé, chacun avec un témoin rouge avant le code (fixtures synthétiques).
+
+| Finding | Correction | Témoin (rouge sur l'ancien code -> vert) |
+|---|---|---|
+| F1 masque après la coupe | `masqueCoupe(t, n)` dans `vf-cockpit-lecture.mjs` : masque d'une tranche élargie de `MARGE_MASQUE` (700), puis coupe. Le mandat passe de 4 000 à 8 000 caractères effectifs. | T24F1.1 à .5 (secret à 10 caractères de 4 000, 8 000 et 2 000) : 5 rouges -> verts |
+| F2 champs libres | `collectWho` : tout champ libre est une chaîne masquée et bornée, sinon absent ; nombres finis ou absents ; identifiant hors `ID_RE` exclu (`collecteAgents`, registre, sortie) | E29.1, E29.2, E29.3 (mutants : chaque garde retirée fait rougir son témoin) |
+| F3 forme typée | `formeOk` exige des chaînes ; `inScope` robuste ; dernière ligne d'un sous-agent contrôlée ; corps de boucle de `collecteAgents` sous try (compté en forme inconnue) ; `revealTranscript` ne lève jamais | E29.4, E29.6 |
+| F4 coût | `readJson(f, max)` (meta.json > 256 Kio : forme inconnue) ; `reduireTranscript` n'analyse que, masque et étiquette (realpath) que les 50 messages et 200 outils gardés ; `isFile()` avant ouverture (cherche, premiereLigne) | E29.5 ; T24F4.1 (10,5 s -> < 2 s) |
+
+Limites : T24F4.2 (8,5 Mio de tool_use) passait déjà sur l'ancien code (0,8 s) : il garde la borne sans la discriminer. Le coût d'un `meta.json` est borné par `META_MAX` mais `premiereLigne` garde son cache d'échec (consigné, hors périmètre). Le motif de masque `=\S+` rend, au point de coupe, `[masqué]` d'un seul bloc.
