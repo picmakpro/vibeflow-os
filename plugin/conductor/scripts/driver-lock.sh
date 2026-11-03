@@ -87,6 +87,19 @@
 # REGISTRE PAR VERROU (P57-D-31) : en lab partitionne le registre des agents est le frere du verrou
 # resolu (vf-driver/ws/<sujet>/DRIVER.lock.children.jsonl) ; VF_DRIVER_CHILDREN n'est honoree qu'en
 # mode verrou unique. Tous les verbes portent --ws et le suffixe de portee (scope, ws, location).
+# VERROU DE PHASE (regle de Samuel, session principale Claude Code, 2026-11-03 : « parallèliser le plus possible, pas de
+# regle "1 seul manager" » ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Un verrou par phase ») :
+#   --ws=<sujet> --phase=<N>   un verrou NOMME a l'interieur du compartiment (N = 69, 41.1…). Deux phases d'un meme
+#                              compartiment s'acquierent en parallele ; la meme phase deux fois est refusee (held).
+#   Emplacement : <git-common-dir>/vf-driver/ws/<sujet>/phases/<N>/DRIVER.lock — UN dossier par verrou, donc toute la
+#   mecanique (lien remplace par rename(2), mutex nomme d'apres la generation, TTL, heartbeat, takeover, registre
+#   --node, journal) est PARAMETREE par LOCK_DIR, jamais recopiee. Le JSON porte "scope": "phase", "ws", "phase".
+#   Hierarchie : le verrou de compartiment NU entre en conflit avec tout verrou de phase du meme compartiment, dans
+#   les deux sens (acquire et takeover, sonde avant la pose puis re-sonde apres, comme l'ancien verrou) : refus
+#   « compartment-lock-held » (phase demandee, compartiment tenu) ou « phase-lock-held » (compartiment demande, phase
+#   tenue) ; perime, « stale-requires-takeover » avec le recover cible. Le verrou de depot reste independant.
+#   --phase sans --ws : ws-invalid ; --phase avec --depot : ws-invalid ; nom de phase hors [0-9]+(.[0-9]+)* :
+#   phase-invalid. Lab plat ou VF_DRIVER_LOCK : --phase est inerte, comme --ws. status --all liste aussi les phases.
 # VF_DRIVER_LOCK non vide, ou lab plat : mode verrou unique, --ws/--depot acceptes et sans effet
 # (P57-D-22, P57-D-31) ; vf_dl_resolve rend la main avant toute lecture de ces options.
 # VF_DRIVER_LOCK non vide : comportement historique, au bit pres (vf_dl_resolve rend la main
@@ -107,7 +120,7 @@ SESSION_MAX="${VF_DRIVER_SESSION_MAX:-8}"
 case "$SESSION_MAX" in ''|*[!0-9]*) SESSION_MAX=8 ;; esac  # meme garde que TTL (D-32-03, plafond LRU)
 
 ACTION=""; OWNER=""; STEP=""
-WS=""; WS_GIVEN=0; DEPOT=0; ALL=0
+WS=""; WS_GIVEN=0; DEPOT=0; ALL=0; PHASE=""; PHASE_GIVEN=0
 AGENT=""; ROLE=""; NODE=""; PARENT=""; DEPTH=""; CSTATUS=""
 for arg in "$@"; do
   case "$arg" in
@@ -115,6 +128,7 @@ for arg in "$@"; do
     --owner=*)  OWNER="${arg#*=}" ;;
     --step=*)   STEP="${arg#*=}" ;;
     --ws=*)     WS="${arg#*=}"; WS_GIVEN=1 ;;
+    --phase=*)  PHASE="${arg#*=}"; PHASE_GIVEN=1 ;;
     --depot)    DEPOT=1 ;;
     --all)      ALL=1 ;;
     --agent=*)  AGENT="${arg#*=}" ;;
@@ -285,6 +299,12 @@ vf_dl_ws_present() { # <chemin du dossier workstreams> -> 0 = partitionne (ou il
   return 1  # D56-VIDE
 }
 
+# Numero de phase : chiffres separes par des points internes (69, 41.1). Le nom entre dans un chemin ET un JSON.
+vf_dl_phase_valid() { # <nom> -> 0 = valide
+  case "$1" in ''|*[!0-9.]*|.*|*.|*..*) return 1 ;; esac
+  return 0
+}
+
 vf_dl_resolve() {
   [ -n "$ACTION" ] || return 0
   [ -z "${VF_DRIVER_LOCK:-}" ] || return 0
@@ -344,8 +364,11 @@ vf_dl_resolve() {
   fi
 
   # status --all vise le lab entier : une cible designee en plus est une erreur (P57-D-32).
-  if [ "$ALL" = 1 ] && { [ "$WS_GIVEN" = 1 ] || [ "$DEPOT" = 1 ]; }; then
-    vf_dl_refuse ws-invalid "--all lit tous les verrous du lab : rejouer sans --ws ni --depot, ou avec --ws=<sujet> sans --all"
+  if [ "$ALL" = 1 ] && { [ "$WS_GIVEN" = 1 ] || [ "$DEPOT" = 1 ] || [ "$PHASE_GIVEN" = 1 ]; }; then
+    vf_dl_refuse ws-invalid "--all lit tous les verrous du lab : rejouer sans --ws, --phase ni --depot, ou avec --ws=<sujet> sans --all"
+  fi
+  if [ "$PHASE_GIVEN" = 1 ] && [ "$WS_GIVEN" = 0 ]; then
+    vf_dl_refuse ws-invalid "--phase se pose dans un compartiment : rejouer avec --ws=<sujet> --phase=<N>"
   fi
   if [ "$WS_GIVEN" = 1 ]; then
     # Validation AVANT tout chemin ou JSON (T-57-01, T-57-06). La liste n'est jamais passee dans
@@ -358,10 +381,19 @@ vf_dl_resolve() {
       2) vf_dl_refuse ws-invalid "le compartiment designe est un lien symbolique, refuse : rejouer avec un compartiment reel" ;;
       *) vf_dl_refuse unknown-ws "aucun compartiment de ce nom : lister les compartiments avec driver-lock.sh status --all puis rejouer" "$WS" ;;
     esac
-    LOCK_DIR="$LOCK_ROOT/ws/$WS/DRIVER.lock"
-    SCOPE="compartiment"
-    HINT_TARGET=" --ws=$WS"
-    SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"$WS\", \"location\": \"$LOCATION\""
+    if [ "$PHASE_GIVEN" = 1 ]; then
+      # Verrou de phase : meme validation de nom AVANT tout chemin ou JSON (le nom entre dans les deux).
+      vf_dl_phase_valid "$PHASE" || vf_dl_refuse phase-invalid "--phase attend un numero de phase (chiffres, points internes : 69, 41.1) : rejouer avec --phase=<N>, ou sans --phase pour le verrou du compartiment" "$WS"
+      LOCK_DIR="$LOCK_ROOT/ws/$WS/phases/$PHASE/DRIVER.lock"
+      SCOPE="phase"
+      HINT_TARGET=" --ws=$WS --phase=$PHASE"
+      SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"$WS\", \"phase\": \"$PHASE\", \"location\": \"$LOCATION\""
+    else
+      LOCK_DIR="$LOCK_ROOT/ws/$WS/DRIVER.lock"
+      SCOPE="compartiment"
+      HINT_TARGET=" --ws=$WS"
+      SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"$WS\", \"location\": \"$LOCATION\""
+    fi
   else
     # Cible = DEPOT : un emplacement distinct (`repo/`, jamais `ws/…`), independant de tout verrou
     # de compartiment (P57-D-01, P57-D-02). Sans --ws NI --depot, la cible n'a pas ete designee :
@@ -789,6 +821,16 @@ EOF
     { [ -L "$lp" ] || [ -d "$lp" ]; } || continue
     vf_dl_all_add "$lp" ", \"scope\": \"compartiment\", \"ws\": \"$name\", \"location\": \"$LOCATION\"" optionnel
   done
+  # verrous de phase : <racine>/ws/<sujet>/phases/<N>/DRIVER.lock, presents seulement (entrees optionnelles)
+  local pd phn
+  for pd in "$LOCK_ROOT"/ws/*/phases/*/; do
+    [ -e "$pd" ] || continue
+    pd="${pd%/}"; phn="$(basename "$pd")"; name="$(basename "$(dirname "$(dirname "$pd")")")"
+    if [ -L "$pd" ] || ! vf_ws_name_valid "$name" || ! vf_dl_phase_valid "$phn"; then ALL_SKIPPED=$((ALL_SKIPPED + 1)); continue; fi
+    lp="$pd/DRIVER.lock"
+    { [ -L "$lp" ] || [ -d "$lp" ]; } || continue
+    vf_dl_all_add "$lp" ", \"scope\": \"phase\", \"ws\": \"$name\", \"phase\": \"$phn\", \"location\": \"$LOCATION\"" optionnel
+  done
   [ "$ALL_SKIPPED" -eq 0 ] || log "status --all : $ALL_SKIPPED nom(s) de dossier ecarte(s) (nom invalide ou lien symbolique), jamais imprime(s) dans le JSON"
   printf '{"present": %s, "scope": "lab", "location": "%s", "legacy_lock": %s, "locks": [%s], "children_running": %s}\n' \
     "$ALL_PRESENT" "$LOCATION" "$LEGACY_PRESENT" "$ALL_LOCKS" "$ALL_CHILDREN"
@@ -799,9 +841,9 @@ EOF
 # LOCK_DIR/META : aucune copie de leur logique, et le shell appelant garde sa cible. Rend trois
 # lignes (etat vivant|perime, age, owner) ou rien si l'ancien verrou est absent. Lecture seule :
 # ni reprise, ni suppression, ni relachement.
-vf_dl_legacy_probe() {
+vf_dl_probe() { # <dossier du verrou> -> etat, age, owner (ou rien si absent)
   (
-    LOCK_DIR="$LEGACY_DIR"; META="$LOCK_DIR/meta"
+    LOCK_DIR="$1"; META="$LOCK_DIR/meta"
     lock_present || exit 0
     _age="$(lock_age)"
     if [ "$_age" -le "$TTL" ]; then echo vivant; else echo perime; fi
@@ -809,6 +851,7 @@ vf_dl_legacy_probe() {
     sanitize_field "$(meta_get owner)"; echo
   )
 }
+vf_dl_legacy_probe() { vf_dl_probe "$LEGACY_DIR"; }
 
 # Refus d'acquisition devant un ancien verrou tenu (P57-D-26) : UN SEUL texte, qu'il soit rendu avant la pose ou
 # apres (correction R-4, re-sonde). Argument : la sortie de vf_dl_legacy_probe (etat, age, owner). Sort en 1.
@@ -827,6 +870,69 @@ vf_dl_legacy_refuse() { # <sortie de vf_dl_legacy_probe>
   exit 1
 }
 
+# HIERARCHIE (verrou de phase) : le verrou de compartiment nu et les verrous de phase du MEME compartiment s'excluent,
+# dans les deux sens. Meme patron que l'ancien verrou : sonde en lecture seule (vf_dl_probe, donc lock_present/lock_age/
+# meta_get reutilises, aucune copie), refus nomme, re-sonde apres la pose. Rend cinq lignes : etat, age, owner, raison du
+# refus si vivant, options de cible du verrou bloquant ; ou rien. Phase demandee -> sonde le compartiment nu ;
+# compartiment demande -> sonde chaque phase (un verrou vivant l'emporte sur un perime pour le message).
+vf_dl_hier_probe() {
+  local cand r first="" ph="" fl d ph_found=""
+  [ "$PARTITIONED" = 1 ] || return 0
+  case "$SCOPE" in
+    phase)
+      r="$(vf_dl_probe "$LOCK_ROOT/ws/$WS/DRIVER.lock")"
+      [ -n "$r" ] || return 0
+      printf '%s\n%s\n%s\n%s\n%s\n' "$(printf '%s\n' "$r" | sed -n 1p)" "$(printf '%s\n' "$r" | sed -n 2p)" \
+        "$(printf '%s\n' "$r" | sed -n 3p)" "compartment-lock-held" " --ws=$WS" ;;
+    compartiment)
+      for cand in "$LOCK_ROOT/ws/$WS/phases/"*/DRIVER.lock; do
+        { [ -L "$cand" ] || [ -d "$cand" ]; } || continue
+        d="${cand%/DRIVER.lock}"; d="${d##*/}"
+        vf_dl_phase_valid "$d" || continue
+        r="$(vf_dl_probe "$cand")"; [ -n "$r" ] || continue
+        fl="$(printf '%s\n' "$r" | sed -n 1p)"
+        if [ "$fl" = vivant ]; then first="$r"; ph="$d"; break; fi
+        [ -n "$first" ] || { first="$r"; ph="$d"; }
+      done
+      [ -n "$first" ] || return 0
+      printf '%s\n%s\n%s\n%s\n%s\n' "$(printf '%s\n' "$first" | sed -n 1p)" "$(printf '%s\n' "$first" | sed -n 2p)" \
+        "$(printf '%s\n' "$first" | sed -n 3p)" "phase-lock-held" " --ws=$WS --phase=$ph" ;;
+  esac
+}
+
+# Refus devant un verrou de la hierarchie (vivant : la raison nommee + release cible ; perime : recover cible).
+vf_dl_hier_refuse() { # <sortie de vf_dl_hier_probe>
+  local st age owner reason target
+  st="$(printf '%s\n' "$1" | sed -n 1p)"; age="$(printf '%s\n' "$1" | sed -n 2p)"
+  owner="$(printf '%s\n' "$1" | sed -n 3p)"; reason="$(printf '%s\n' "$1" | sed -n 4p)"
+  target="$(printf '%s\n' "$1" | sed -n 5p)"
+  if [ "$st" = vivant ]; then
+    printf '{"acquired": false, "reason": "%s", "held_by": "%s", "age_seconds": %s, "hint": "driver-lock.sh release --owner=%s%s"%s}\n' \
+      "$reason" "$owner" "$age" "$owner" "$target" "$SCOPE_JSON"
+  else
+    printf '{"acquired": false, "reason": "stale-requires-takeover", "held_by": "%s", "age_seconds": %s, "hint": "driver-lock.sh recover%s"%s}\n' \
+      "$owner" "$age" "$target" "$SCOPE_JSON"
+  fi
+  exit 1
+}
+
+# Un seul point d'entree pour acquire/takeover : l'ancien verrou d'abord (refus octet pour octet inchange), puis la
+# hierarchie. Premiere ligne = nature du bloquant (legacy|hier), le reste est la sortie de la sonde correspondante.
+vf_dl_blocker_probe() {
+  local r
+  r="$(vf_dl_legacy_probe)"
+  if [ -n "$r" ]; then printf 'legacy\n%s\n' "$r"; return 0; fi
+  r="$(vf_dl_hier_probe)"
+  [ -n "$r" ] && printf 'hier\n%s\n' "$r"
+  return 0
+}
+vf_dl_blocker_refuse() { # <sortie de vf_dl_blocker_probe>
+  local kind rest
+  kind="$(printf '%s\n' "$1" | sed -n 1p)"; rest="$(printf '%s\n' "$1" | sed -n '2,$p')"
+  if [ "$kind" = hier ]; then vf_dl_hier_refuse "$rest"; fi
+  vf_dl_legacy_refuse "$rest"
+}
+
 require_owner() {
   [ -n "$OWNER" ] || { log "--owner requis pour '$ACTION'"; printf '{"error": "owner-required"%s}\n' "$SCOPE_JSON"; exit 1; }
 }
@@ -839,9 +945,9 @@ case "$ACTION" in
     #    commande exacte a rejouer ; JAMAIS de reprise, de relachement ni de suppression ici. Place
     #    AVANT new_generation : un refus ne laisse aucun dechet de generation.
     if [ "$PARTITIONED" = 1 ]; then
-      _leg="$(vf_dl_legacy_probe)"
+      _leg="$(vf_dl_blocker_probe)"
       if [ -n "$_leg" ]; then
-        vf_dl_legacy_refuse "$_leg"
+        vf_dl_blocker_refuse "$_leg"
       fi
     fi
     # 1. VOIE LIBRE — generation complete d'abord, publication par `ln -s` ensuite. `ln -s` echoue
@@ -864,11 +970,11 @@ case "$ACTION" in
       # pose ; s'il est la, on retire SA propre pose (le lien, puis sa generation) et on refuse exactement comme
       # si l'ancien verrou avait ete la avant : meme reason, meme hint, aucun champ neuf. Lab partitionne seulement.
       if [ "$PARTITIONED" = 1 ]; then
-        _leg_after="$(vf_dl_legacy_probe)"
+        _leg_after="$(vf_dl_blocker_probe)"
         if [ -n "$_leg_after" ]; then
           [ "$(readlink "$LOCK_DIR" 2>/dev/null)" = "$gen" ] && rm -f "$LOCK_DIR"
           rm -rf "${LOCK_PARENT:?}/${gen:?}"
-          vf_dl_legacy_refuse "$_leg_after"
+          vf_dl_blocker_refuse "$_leg_after"
         fi
       fi
       _lease="$(lease_age)" && : || _lease="null"
@@ -918,8 +1024,8 @@ case "$ACTION" in
     # meme reason, meme hint (vf_dl_legacy_refuse) qu'acquire dans le meme etat : vivant, legacy-lock-held ;
     # PERIME, stale-requires-takeover avec le recover cible. Rien n'est repris ni supprime.
     if [ "$PARTITIONED" = 1 ]; then
-      _leg="$(vf_dl_legacy_probe)"
-      [ -n "$_leg" ] && vf_dl_legacy_refuse "$_leg"
+      _leg="$(vf_dl_blocker_probe)"
+      [ -n "$_leg" ] && vf_dl_blocker_refuse "$_leg"
     fi
     lock_present || { printf '{"acquired": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 1; }
     age="$(lock_age)"; held="$(meta_get owner)"; observed_gen="$(lock_gen)"
@@ -979,7 +1085,7 @@ case "$ACTION" in
       # APRES la re-sonde, jamais avant, sinon le refus detruirait ce qu'il pretend ne pas avoir repris (AU2-04).
       # Le mutex reste tenu jusqu'a la restitution.
       if [ "$PARTITIONED" = 1 ]; then
-        _tk_after="$(vf_dl_legacy_probe)"
+        _tk_after="$(vf_dl_blocker_probe)"
         if [ -n "$_tk_after" ]; then
           if [ -e "${LOCK_DIR}.old.$$" ]; then
             # Dossier reel (lock legacy du compartiment) : un seul `mv -n`, apres le retrait de NOTRE lien. Si un
@@ -995,7 +1101,7 @@ case "$ACTION" in
           if [ "$(lock_gen)" = "$old_gen" ] && [ ! -e "${LOCK_DIR}.old.$$" ]; then
             rm -rf "${LOCK_PARENT:?}/$gen" # retire sa pose
             rm -f "$mutex"; trap - EXIT INT TERM # mutex-refus
-            vf_dl_legacy_refuse "$_tk_after"
+            vf_dl_blocker_refuse "$_tk_after"
           fi
           rm -f "$mutex"; trap - EXIT INT TERM
           log "restitution du verrou anterieur impossible : generation posee et ${LOCK_DIR}.old.$$ laisses en place"
