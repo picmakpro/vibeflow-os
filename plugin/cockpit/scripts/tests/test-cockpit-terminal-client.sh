@@ -76,7 +76,7 @@ cat > "$AUX/chrome-client.mjs" <<'JS'
 import { pathToFileURL } from 'node:url';
 const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv;
-const { P, Q, amorce, tierce } = JSON.parse(brut);
+const { P, Q, amorce, tierce, secret: secretN = '', pid: pidN = 0 } = JSON.parse(brut);
 const OP = `http://127.0.0.1:${P}`, OQ = `http://127.0.0.1:${Q}`, MS = Number(process.env.VF_CLIENT_MS) || 20000;
 const LISTE = ['ready', 'etat:connecte', 'etat:reconnexion', 'etat:termine', 'etat:refuse', 'etat:expire', 'etat:arrete', 'toggle'];
 const erreurs = {};
@@ -97,6 +97,62 @@ await executer(chrome, async (s) => {
     r.violations = [...s.violations];
     r.msgs = await s.ev('JSON.stringify(window.__msgs)').then((x) => JSON.parse(x || '[]')).catch(() => []);
     return masquer(r);
+  }
+
+  // --- scénarios sur le serveur réel : secret périmé (J2), serveur arrêté (J2), « Terminé » (J12), onBinary (S5), contre-pression (S3) ---
+  if (['perime', 'arret', 'termine', 'binaire', 'pression'].includes(mode)) {
+    const texte = () => s.ev(`(document.getElementById('etat') || {}).textContent || ''`).catch(() => '');
+    const invite = () => s.ev(INVITE).catch(() => false);
+    const lignes = () => s.ev(`(document.querySelector('.xterm-rows') || {}).textContent || ''`).catch(() => '');
+    const taper = async (t) => {
+      for (const c of t) { await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: c, text: c, unmodifiedText: c }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: c }); }
+      await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+      await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+    };
+    const etatServeur = () => s.ev(`fetch('/etat', { headers: { 'X-VF-Terminal': localStorage.getItem('vf.terminal.secret'), 'X-VF-Onglet': sessionStorage.getItem('vf.terminal.onglet') }, cache: 'no-store' }).then((x) => x.json()).then((j) => j.session)`).catch(() => '?');
+    // le secret est posé dans le stockage de Q (premier niveau) : la page se charge ensuite comme après un amorçage réussi
+    await essai('secret', async () => { await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', ${JSON.stringify(secretN)})`); });
+    r.mode = mode;
+    if (mode === 'perime') {
+      const t0 = Date.now();
+      await essai('carte-expiree', async () => { await s.naviguer(`${OQ}/`); await att(`(document.getElementById('etat') || {}).textContent && document.getElementById('etat').textContent.includes('Session expirée')`, 'carte Session expirée (secret périmé)'); });
+      r.duree = Date.now() - t0; r.carte = await texte();
+    } else if (mode === 'arret') {
+      await essai('invite', async () => { await s.naviguer(`${OQ}/`); await att(INVITE, 'invite du shell'); });
+      try { process.kill(pidN, 'SIGTERM'); r.tue = true; } catch (e) { r.tue = false; }
+      await essai('carte-arret', async () => { await s.attendre(`(document.getElementById('etat') || {}).textContent && document.getElementById('etat').textContent.includes('Serveur arrêté')`, 'carte Serveur arrêté', 60000); });
+      r.carte = await texte();
+    } else if (mode === 'termine') {
+      const BANDEAU = `((document.getElementById('etat') || {}).textContent || '').includes('terminé')`;
+      await essai('invite', async () => { await s.naviguer(`${OQ}/`); await att(INVITE, 'invite du shell'); });
+      await essai('exit', async () => { await taper('exit'); await att(BANDEAU, 'bandeau « Le shell s’est terminé »'); });
+      r.avant = { bandeau: (await texte()).includes('terminé'), session: await etatServeur() };
+      await essai('rechargement', async () => { await s.naviguer(`${OQ}/`); await poll(async () => (await texte()).includes('terminé') || (await invite()), 'bandeau ou invite après rechargement'); });
+      r.apres = { bandeau: (await texte()).includes('terminé'), session: await etatServeur() };
+      await essai('relance', async () => {
+        await s.ev(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.includes('Relancer')); if (b) b.click(); return !!b; })()`);
+        await poll(async () => (await invite()) && (await etatServeur()) === 'vivante', 'nouveau shell après « Relancer le shell »');
+      });
+      r.relance = { bandeau: (await texte()).includes('terminé'), session: await etatServeur() };
+    } else if (mode === 'binaire') {
+      await essai('invite', async () => { await s.naviguer(`${OQ}/`); await att(INVITE, 'invite du shell'); });
+      // suivi de la souris en codage par défaut : xterm l'émet par onBinary ; le noyau renvoie l'écho des octets reçus (ESC affiché « ^[ »)
+      await essai('souris', async () => {
+        await taper(`printf '\\033[?1000h';cat -v`);
+        await poll(async () => {
+          await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: 200, y: 100, button: 'left', buttons: 1, clickCount: 1 });
+          await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 200, y: 100, button: 'left', buttons: 0, clickCount: 1 });
+          return (await lignes()).includes('^[[M');
+        }, 'rapport de souris (onBinary) revenu du shell');
+      });
+      r.rapport = (await lignes()).includes('^[[M');
+    } else if (mode === 'pression') {
+      await essai('invite', async () => { await s.naviguer(`${OQ}/`); await att(INVITE, 'invite du shell'); });
+      await s.ev(`(() => { window.__e = 0; const f0 = window.fetch; window.fetch = function (u) { if (String(u) === '/entree') { window.__e++; if (window.__e <= 2) return Promise.resolve(new Response(null, { status: 429 })); } return f0.apply(this, arguments); }; })()`);
+      await essai('saisie', async () => { await taper(`echo PRESS""ION-OK`); await poll(async () => (await lignes()).includes('PRESSION-OK'), 'sortie de la commande saisie sous contre-pression'); });
+      r.appels = await s.ev('window.__e').catch(() => -1); r.sortie = (await lignes()).includes('PRESSION-OK');
+    }
+    return masquer(r, secretN);
   }
 
   // --- S1 : amorçage dans l'onglet ---
@@ -353,6 +409,49 @@ if mutant ancetres vf-cockpit-terminal-page.mjs 's|frame-ancestors \${origineP}|
   VF_CLIENT_MS=6000 J="$(navig tierce "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"tierce\":\"http://127.0.0.1:$TP/\"}")"; vf_hyg_stop "$TIERCE_PID"; unsrv
   assert_eq "M-ANCETRES — le mutant rougit T9.6 : aucune violation frame-ancestors (la page tierce encadre Q)" "$(rj "$J" '(j.violations||[]).some(v=>/frame-ancestors/.test(v))?"oui":"non"')" "non"
 else sans_effet "M-ANCETRES"; fi
+
+echo "=== J2 / J12 / S5 / S3 — scénarios sur le serveur réel (secret périmé, serveur arrêté, « Terminé », onBinary, contre-pression) ==="
+secret_neuf() { # secret_neuf <sortie> -> SRV_* et SECRET_N : serveur neuf, amorçage échangé
+  srv "$1"; cp "$SRV_O/.cache/terminal-amorce" "$WORK/am-$SRVN.copy"
+  SECRET_N="$(node "$TA" amorcer "$QP" "$WORK/am-$SRVN.copy" | sed -n 2p)"; [[ "$SECRET_N" =~ ^[0-9a-f]{64}$ ]] || SECRET_N=""
+}
+scenario() { # scenario <sortie> <mode> [secret imposé] -> SCJ ; sert le serveur, joue le scénario dans un Chrome neuf, arrête le serveur s'il vit encore
+  secret_neuf "$1"; [ -n "${3:-}" ] && SECRET_N="$3"
+  SCJ="$(VF_CLIENT_MS="${MS_SC:-20000}" navig "$2" "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"secret\":\"$SECRET_N\",\"pid\":$SRV_PID}")"
+  SC_SECRET="$SECRET_N"; unsrv
+}
+FAUX_SEC="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
+scenario "$OUT" perime "$FAUX_SEC"
+assert_eq "J2.0 — témoin : le scénario n'a pas échoué globalement" "$(rj "$SCJ" 'j.erreur||"ok"')" "ok"
+assert_eq "J2.1 — secret périmé (serveur relancé) : la carte « Session expirée » s'affiche en moins de 10 s, jamais « Serveur arrêté »" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" expiree="+(j.carte||"").includes("Session expirée")+" arrete="+(j.carte||"").includes("Serveur arrêté")+" rapide="+(j.duree<10000)')" "erreurs={} expiree=true arrete=false rapide=true"
+MS_SC=60000 scenario "$OUT" arret
+assert_eq "J2.2 — serveur réellement arrêté en cours de session : « Serveur arrêté », jamais « Session expirée » (témoin : le PID enregistré a reçu le signal)" "$(rj "$SCJ" '"tue="+j.tue+" erreurs="+JSON.stringify(j.erreurs)+" arrete="+((j.carte||"").includes("Serveur arrêté"))+" expiree="+((j.carte||"").includes("Session expirée"))')" "tue=true erreurs={} arrete=true expiree=false"
+scenario "$OUT" termine
+assert_eq "J12.1 — témoin : « exit » dans le shell affiche « Le shell s'est terminé », le serveur dit terminee" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" bandeau="+(j.avant&&j.avant.bandeau)+" session="+(j.avant&&j.avant.session)')" "erreurs={} bandeau=true session=terminee"
+assert_eq "J12.2 — rechargement du cadre dans le même onglet après « Terminé » : le bandeau est toujours là et aucun nouveau shell ne démarre (session = terminee)" "$(rj "$SCJ" '"bandeau="+(j.apres&&j.apres.bandeau)+" session="+(j.apres&&j.apres.session)')" "bandeau=true session=terminee"
+assert_eq "J12.3 — seul « Relancer le shell » démarre un nouveau shell : invite revenue, session = vivante, bandeau retiré" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" bandeau="+(j.relance&&j.relance.bandeau)+" session="+(j.relance&&j.relance.session)')" "erreurs={} bandeau=false session=vivante"
+scenario "$OUT" binaire
+assert_eq "S5.1 — le rapport de souris émis par xterm (onBinary) atteint le shell : l'écho « ^[[M » revient (témoin : mode souris enfoncé par printf, cat -v actif)" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" rapport="+j.rapport')" "erreurs={} rapport=true"
+scenario "$OUT" pression
+assert_eq "S3.1 — contre-pression 429 sur /entree : le client garde ses octets et les renvoie (la commande saisie s'exécute, au moins 3 POST)" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" sortie="+j.sortie+" appels>=3="+(j.appels>=3)')" "erreurs={} sortie=true appels>=3=true"
+
+echo "=== M-J2 / M-J12 / M-S5 / M-429 — mutants du client sur le serveur réel ==="
+if mutant mj2 vf-cockpit-terminal-client.mjs "s|return r.status === 401; } catch|return false; } catch|"; then
+  MS_SC=8000 scenario "$MUT_OUT" perime "$FAUX_SEC"
+  assert_eq "M-J2 — le mutant (la sonde ne reconnaît plus le secret périmé) rougit J2.1 : pas de carte « Session expirée »" "$(rj "$SCJ" '(j.carte||"").includes("Session expirée")?"expiree":"pas expiree"')" "pas expiree"
+else sans_effet "M-J2"; fi
+if mutant mj12 vf-cockpit-terminal-client.mjs "s|sessionStorage.setItem(CLE_FIN, |void (|"; then
+  scenario "$MUT_OUT" termine
+  assert_eq "M-J12 — le mutant (l'état « Terminé » n'est pas retenu) rougit J12.2 : un nouveau shell démarre au rechargement" "$(rj "$SCJ" '"bandeau="+(j.apres&&j.apres.bandeau)+" session="+(j.apres&&j.apres.session)')" "bandeau=false session=vivante"
+else sans_effet "M-J12"; fi
+if mutant ms5 vf-cockpit-terminal-client.mjs "s|term.onBinary(|void (|"; then
+  MS_SC=6000 scenario "$MUT_OUT" binaire
+  assert_eq "M-S5 — le mutant (onBinary non relayé) rougit S5.1 : aucun écho de rapport de souris" "$(rj "$SCJ" '"rapport="+j.rapport')" "rapport=false"
+else sans_effet "M-S5"; fi
+if mutant m429 vf-cockpit-terminal-client.mjs "s|if (r.status === 429) {|if (false) {|"; then
+  MS_SC=6000 scenario "$MUT_OUT" pression
+  assert_eq "M-429 — le mutant (429 ignoré, octets perdus) rougit S3.1 : la commande saisie ne s'exécute pas" "$(rj "$SCJ" '"sortie="+j.sortie')" "sortie=false"
+else sans_effet "M-429"; fi
 fi
 
 vf_hyg_assert

@@ -8,7 +8,7 @@ export function clientTerminal(cfg) {
     ready: 'ready', connecte: 'etat:connecte', reconnexion: 'etat:reconnexion', termine: 'etat:termine',
     refuse: 'etat:refuse', expire: 'etat:expire', arrete: 'etat:arrete', toggle: 'toggle',
   });
-  const CLE_SECRET = 'vf.terminal.secret', CLE_ONGLET = 'vf.terminal.onglet';
+  const CLE_SECRET = 'vf.terminal.secret', CLE_ONGLET = 'vf.terminal.onglet', CLE_FIN = 'vf.terminal.fin';
   const RACCOURCI = Object.freeze({ code: 'Space', ctrl: true, shift: true });
   const ATTENTES = [500, 1000, 2000, 4000], LIMITE_MS = 30000;
   const vue = window.vfTermVue;
@@ -28,6 +28,7 @@ export function clientTerminal(cfg) {
   if (location.hash.indexOf('#t=') === 0) {
     const amorce = location.hash.slice(3);
     history.replaceState(null, '', location.pathname + location.search);
+    sessionStorage.removeItem(CLE_FIN);
     fetch('/amorce', { method: 'POST', headers: { 'X-VF-Amorce': amorce }, cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('refus'))))
       .then((j) => {
@@ -65,7 +66,7 @@ export function clientTerminal(cfg) {
   });
   term.focus(); window.addEventListener('focus', () => term.focus());
 
-  // entrée : une requête à la fois, dans l'ordre ; 409 ou 410 vide la file et fait relire l'état
+  // entrée : une requête à la fois, dans l'ordre ; 429 (contre-pression) garde les octets et réessaie ; 409 ou 410 vide la file et fait relire l'état
   const file = []; let envoi = false, ctrl = null;
   const vider = async () => {
     if (envoi) return; envoi = true;
@@ -74,12 +75,14 @@ export function clientTerminal(cfg) {
       for (const c of file.splice(0)) { corps.set(c, k); k += c.length; }
       try {
         const r = await fetch('/entree', { method: 'POST', headers: entetes(), body: corps, cache: 'no-store' });
+        if (r.status === 429) { file.unshift(corps); await attendre(100); continue; }
         if (r.status === 409 || r.status === 410) { file.length = 0; if (ctrl) ctrl.abort(); }
       } catch (e) { file.length = 0; }
     }
     envoi = false;
   };
   term.onData((d) => { file.push(new TextEncoder().encode(d)); vider(); });
+  term.onBinary((d) => { const b = new Uint8Array(d.length); for (let i = 0; i < d.length; i++) b[i] = d.charCodeAt(i) & 255; file.push(b); vider(); }); // rapports de souris : octets bruts
 
   // taille : regroupée par image d'animation, envoyée au plus toutes les 100 ms et seulement si elle change
   let derniere = '', tPost = 0, minut = 0, raf = 0;
@@ -91,6 +94,10 @@ export function clientTerminal(cfg) {
   };
   new ResizeObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; fit.fit(); taille(); }); }).observe(document.getElementById('terminal'));
 
+  // /flux et /etat répondent 403 (et non 401) à un secret périmé sans Origin : POST /taille, corps vide, rend 401 au secret périmé et 400 au secret valide (rien n'est redimensionné)
+  const secretPerime = async () => {
+    try { const r = await fetch('/taille', { method: 'POST', headers: entetes(), body: '', cache: 'no-store' }); return r.status === 401; } catch (e) { return false; }
+  };
   // flux : 'fin' = connecté puis coupé, 'echec' = jamais connecté, 'stop' = carte affichée
   let eteint = false, dejaVu = false;
   const flux = async () => {
@@ -98,6 +105,7 @@ export function clientTerminal(cfg) {
     let r;
     try { r = await fetch('/flux', { headers: Object.assign(entetes(), { 'X-VF-Taille': term.rows + 'x' + term.cols }), cache: 'no-store', signal: ctrl.signal }); } catch (e) { return 'echec'; }
     if (r.status === 401) { expire(); return 'stop'; }
+    if (r.status === 403) { if (await secretPerime()) { expire(); return 'stop'; } return 'echec'; } // 403 sans Origin : secret périmé ou serveur d'ailleurs, la sonde départage
     if (r.status === 409) { vue.carte('refuse', () => { vue.effacer(); boucle(); }); emettre('refuse'); return 'stop'; }
     if (r.status !== 200) return 'echec';
     derniere = term.rows + ' ' + term.cols;
@@ -114,7 +122,12 @@ export function clientTerminal(cfg) {
       return r.ok ? await r.json() : null;
     } catch (e) { return null; }
   };
-  const relancer = () => { vue.effacer(); term.reset(); term.focus(); boucle(); };
+  // « Terminé » survit au rechargement du cadre (même onglet) : seul « Relancer le shell » démarre un nouveau shell
+  const marquerFin = (type, detail) => { try { sessionStorage.setItem(CLE_FIN, JSON.stringify({ type, detail })); } catch (e) { void e; } };
+  const finRetenue = () => {
+    try { const j = JSON.parse(sessionStorage.getItem(CLE_FIN) || 'null'); return j && (j.type === 'termine' || j.type === 'fermee') ? j : null; } catch (e) { return null; }
+  };
+  const relancer = () => { try { sessionStorage.removeItem(CLE_FIN); } catch (e) { void e; } vue.effacer(); term.reset(); term.focus(); boucle(); };
   const boucle = async () => {
     if (eteint) return; eteint = true;
     let essais = 0, perte = 0;
@@ -124,8 +137,8 @@ export function clientTerminal(cfg) {
       if (res === 'fin') { essais = 0; perte = Date.now(); } else if (!perte) perte = Date.now();
       const e = await etat();
       if (e === 'stop') { expire(); break; }
-      if (e && e.session === 'terminee') { vue.bandeau('termine', { code: e.code, signal: e.signal }, relancer); emettre('termine'); break; }
-      if (e && e.session === 'absente' && dejaVu) { vue.bandeau('fermee', null, relancer); emettre('termine'); break; }
+      if (e && e.session === 'terminee') { const d = { code: e.code, signal: e.signal }; marquerFin('termine', d); vue.bandeau('termine', d, relancer); emettre('termine'); break; }
+      if (e && e.session === 'absente' && dejaVu) { marquerFin('fermee', null); vue.bandeau('fermee', null, relancer); emettre('termine'); break; }
       if (Date.now() - perte > LIMITE_MS) { vue.carte('arrete'); emettre('arrete'); break; }
       vue.bandeau('reconnexion'); emettre('reconnexion');
       await attendre(ATTENTES[Math.min(essais++, ATTENTES.length - 1)]);
@@ -134,5 +147,8 @@ export function clientTerminal(cfg) {
   };
   // premier ajustement après le chargement des polices : la grille est mesurée une seule fois
   const polices = Promise.all([document.fonts.load('13px "JetBrains Mono"'), document.fonts.ready]).catch(() => {});
-  polices.then(() => { fit.fit(); boucle(); });
+  polices.then(() => {
+    fit.fit(); const fin = finRetenue();
+    if (fin) { vue.bandeau(fin.type, fin.detail, relancer); emettre('termine'); } else boucle();
+  });
 }
