@@ -44,7 +44,7 @@
         "arbitrages"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "plan-68",
@@ -54,7 +54,7 @@
         "discuss-68"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "plancheck-68",
@@ -64,7 +64,7 @@
         "plan-68"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "sonde-node",
@@ -73,6 +73,16 @@
       "deps": [],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "revalid-68",
+      "step": "après merge de la 69 et de la PR #196 : rebase sur main, plan-checker frais (W1 découpe 68-04, W2 témoin I9 après import, W3 contrats 69 relus sur main), puis exec",
+      "stage": "",
+      "deps": [
+        "plancheck-68"
+      ],
+      "scope": [],
+      "status": "ready"
     }
   ]
 }
