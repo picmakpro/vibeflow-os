@@ -34,6 +34,12 @@
     .vf-who button { margin-top: 6px; font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); }
     .vf-who .vf-doing { margin-top: 6px; font-family: var(--mono, monospace); font-size: 12px; word-break: break-word; }
     .vf-whop .src { color: var(--text-4); font-size: 11px; margin-top: 14px; }
+    .vf-arbre-enfants { margin-left: 14px; padding-left: 10px; border-left: 1px solid rgba(var(--ink), .12); }
+    .vf-who .vf-pied { color: var(--text-3); font-size: 12px; } .vf-who .vf-link { display: inline-block; margin: 4px 10px 0 0; font-size: 12px; color: var(--text-2); }
+    .vf-termines > summary { cursor: pointer; padding: 8px 0; color: var(--text-3); font-size: 12px; }
+    .vf-transcript { max-height: 320px; overflow-y: auto; margin-top: 8px; font-size: 12px; color: var(--text-2); }
+    .vf-transcript h4 { margin: 10px 0 4px; color: var(--text-3); } .vf-transcript p, .vf-transcript li { margin: 2px 0; word-break: break-word; }
+    .vf-transcript pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var(--mono, monospace); }
     #vf-reco { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 12px 14px 12px 18px; border-radius: 20px; font-size: 13px; line-height: 1.5; color: var(--text); }
     #vf-reco button { flex: none; border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer; font: inherit; font-size: 12.5px; background: var(--on); color: var(--on-text); }`;
   document.head.appendChild(style);
@@ -46,16 +52,16 @@
     return { cls: 'held', text: `${x.owner || '?'} · ${x.step || ''} · ${x.age_seconds ?? '?'} s`, title: held.map((y) => `${[y.scope, y.ws].filter(Boolean).join(' ')}${y.scope || y.ws ? ' : ' : ''}${y.owner || '?'}${y.step ? ` (${y.step})` : ''}`).join('\n') }; // lab plat : pas de scope, jamais « undefined : … »
   };
   const KIND = { session: 'Session', subagent: 'Sous-agent', lock: 'Verrou', registered: 'Enregistré', 'dag-node': 'Nœud de DAG' };
-  const age = (s) => s == null ? '' : s < 90 ? `${s} s` : s < 5400 ? `${Math.round(s / 60)} min` : s < 172800 ? `${Math.round(s / 3600)} h` : `${Math.round(s / 86400)} j`;
+  const duree = (s) => window.__vfEquipeRendu.duree(s); // le format vit dans 71-vf-equipe-rendu.js (chargé après ce fichier, appelé après)
+  const AGENT = (w) => w.kind === 'session' || w.kind === 'subagent';
+  // « au travail » : un agent `actif` non périmé ; un terminé ou un agent en attente n'y est jamais compté (P69-D-14)
+  const auTravail = (w) => !w.stale && (w.etat || 'actif') === 'actif';
   const whoPanel = () => {
-    const ws = who?.workers || [], act = ws.filter((w) => !w.stale), old = ws.filter((w) => w.stale);
-    const row = (w) => {
-      const rev = w.kind === 'session' || w.kind === 'subagent';
-      return `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${age(w.ageS)}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span>`
-        + `<div>${h(w.task || '')}</div>${rev ? `<button type="button" data-vf-doing="${h(w.id)}">Voir la dernière commande</button><div class="vf-doing" hidden></div>` : ''}</div>`;
-    };
+    const ws = who?.workers || [], act = ws.filter(auTravail), reste = ws.filter((w) => !AGENT(w));
+    const row = (w) => `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${duree(w.ageS)}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span><div>${h(w.task || '')}</div></div>`;
     const src = Object.entries(who?.sources || {}).map(([k, v]) => `${k} : ${v.etat}`).join(' · ');
-    SC.showPanel(`<div class="vf-whop"><h3>Au travail (${act.length})</h3><p class="regle">${h(lockText(probe.lock).text)}.</p><p class="regle">Règle de fraîcheur : ${FRAICHEUR}. La dernière commande n'est affichée que sur demande.</p>${act.map(row).join('') || '<p>Personne. Sources lues : ' + h(src) + '</p>'}${old.length ? `<h4>Signaux périmés (${old.length})</h4>${old.map(row).join('')}` : ''}<p class="src">${h(src)}</p></div>`);
+    const arbre = window.__vfEquipeRendu.arbre(ws, h);
+    SC.showPanel(`<div class="vf-whop"><h3>Au travail (${act.length})</h3><p class="regle">${h(lockText(probe.lock).text)}.</p><p class="regle">Règle de fraîcheur : ${FRAICHEUR}, actifs et terminés depuis moins de 24 h ; la dernière commande et le transcript ne s'affichent que sur demande.</p>${arbre || (reste.length ? '' : '<p>Personne. Sources lues : ' + h(src) + '</p>')}${reste.length ? `<h4>Verrous et nœuds</h4>${reste.map(row).join('')}` : ''}<p class="src">${h(src)}</p></div>`);
   };
   // révélation ponctuelle : la réponse reste dans la ligne cliquée
   document.addEventListener('click', async (ev) => {
@@ -75,7 +81,7 @@
     if (l !== undefined) probe.lock = l;
     if (!badge) badge = SC.addHeaderButton({ id: 'vf-lock', label: '…', title: 'Qui est au travail', onClick: whoPanel });
     const t = off ? { cls: 'off', text: 'Direct coupé', title: 'Le serveur du cockpit ne répond pas' } : lockText(probe.lock);
-    const n = (who?.workers || []).filter((w) => !w.stale).length;
+    const n = (who?.workers || []).filter(auTravail).length;
     badge.className = 'btn ' + (n ? 'held' : t.cls); badge.title = off ? t.title : `${n ? n + ' au travail' : 'Personne au travail'} · ${t.title}`;
     // compact : le détail (propriétaire du verrou, étape, durée) est dans l'infobulle et dans le panneau « Au travail »
     badge.setAttribute('aria-label', off ? t.text : n ? `${n} au travail` : 'Personne au travail'); // sinon figé à « … » (libellé de création)
@@ -98,6 +104,12 @@
     for (const e of document.querySelectorAll('#viewport .edges, #viewport .cols, #panel > *')) e.style.animation = 'none';
   };
 
+  // onglet Projet, panneau d'un nœud de mission (`f:<dag>#<noeud>`) : les agents rattachés à ce nœud, lien vers leur carte (P69-D-15)
+  if (G.meta.vfTab === 'project' && SC.addPanelSection) SC.addPanelSection('item', (id) => {
+    if (typeof id !== 'string' || !id.startsWith('f:') || !id.includes('#')) return '';
+    const l = window.__vfEquipeRendu.agentsDuNoeud(who?.workers, id, h);
+    return l ? `<div class="sec"><h3>Agents sur ce nœud</h3>${l}</div>` : '';
+  });
   const find = (ref) => ref.startsWith('n:') ? G.nodes.find((n) => n.id === ref.slice(2)) : G.files.find((f) => f.p === ref.slice(2));
   // ---------- reconnexion à recul : un seul sondage pour les deux flux ----------
   const lost = { t0: 0, timer: null, flux: new Map() };
