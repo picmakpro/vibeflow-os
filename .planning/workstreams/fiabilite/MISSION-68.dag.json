@@ -123,6 +123,26 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "fix-68-d26",
+      "step": "P68-D-26 repli compartiment + 2 warnings 68-01",
+      "stage": "",
+      "deps": [
+        "plancheck-68c"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-68d",
+      "step": "checker frais ciblé 68-01 après D-26",
+      "stage": "",
+      "deps": [
+        "fix-68-d26"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }

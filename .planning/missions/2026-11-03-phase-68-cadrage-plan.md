@@ -57,6 +57,20 @@
   compartiment nu (la forme d'avant la PR #197) s'affiche `abandonnee` alors qu'elle vit. C'est à confirmer par
   Samuel avant l'exécution.
 
+## Tour P68-D-26 (2026-11-03)
+
+- P68-D-26 : « Repli sur le verrou du compartiment (Recommandé) » (arbitrage Samuel, AskUserQuestion, session
+  principale Claude Code, 2026-11-03, relayé par la session principale). Le point ouvert précédent est fermé.
+- Commit `d46e915e` (68-01, 68-03, PATTERNS). La cascade est : verrou de phase, puis verrou de compartiment, puis
+  absence ; une source illisible donne `inconnu`. Nouveaux témoins : V10.1 à V10.4, avec la copie mutée V10.3, qui
+  retire le repli. Deux avertissements de la passe précédente sont fermés : V9.4b (phase en chaîne seulement), puis
+  V9.6 et V9.7 (`069` et `69` coexistants).
+- Plan-checker frais ciblé : PASSED, 0 BLOCKER, 1 WARNING, 1 INFO.
+  - WARNING : un verrou de phase présent mais périmé, alors que le compartiment est tenu, donne `abandonnee`. C'est
+    la lecture du planificateur, P68-D-26 ne le dit pas, et aucun témoin ne couvre le cas. Il faut le faire
+    confirmer.
+  - INFO : le texte du `fails_when` de la tâche 1 de 68-01 ne cite pas V9 ni V10. Reporté à `revalid-68`.
+
 ## Preuves E6
 
 Aucune preuve d'exécution : la mission ne produit que des plans, et aucun bloc typé de vf-coder ne porte de `preuves`.
