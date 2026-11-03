@@ -83,6 +83,46 @@
       ],
       "scope": [],
       "status": "ready"
+    },
+    {
+      "id": "revision-68",
+      "step": "révision ciblée des plans : P68-D-22..25, W2, vérif reste",
+      "stage": "",
+      "deps": [
+        "plancheck-68"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-68b",
+      "step": "plan-checker externe frais après révision",
+      "stage": "",
+      "deps": [
+        "revision-68"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-68-01",
+      "step": "2 warnings auto-fix 68-01 (normalisation phase, compte de champs)",
+      "stage": "",
+      "deps": [
+        "plancheck-68b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-68c",
+      "step": "checker frais ciblé 68-01",
+      "stage": "",
+      "deps": [
+        "fix-68-01"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }

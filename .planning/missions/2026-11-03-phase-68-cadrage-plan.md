@@ -40,6 +40,23 @@
 4. Le gate natif de couverture des décisions rend `could-not-parse` sur les identifiants préfixés `P6x-D-NN`. C'est le
    même constat que sur la 69 ; la couverture a été vérifiée à la main.
 
+## Tour de révision (2026-11-03, même jour)
+
+- P68-D-22..25 consignés dans `68-CONTEXT.md` : arbitrage Samuel, AskUserQuestion, session principale Claude Code,
+  2026-11-03, relayé par la session principale. Les points 5 à 7 sont documentés comme procédure, sans arbitrage.
+- Révision ciblée des plans : `de439110`, puis `1a5508ec` après deux avertissements sur 68-01. Le verrou est lu
+  sur la phase de la mission et comparé en chaîne normalisée. L'état `inconnu` est ajouté. Les points 3 et 4 sont
+  retirés des points à décider. Le témoin I9 rougit vraiment après l'import.
+- `reste` pour une phase `a-faire` : la 69 rend `["verification","cloture"]`. Aucun des onze plans de la 68 ne lit
+  cette valeur : elle est sérialisée telle quelle, donc conforme.
+- Plan-checker frais sur l'ensemble : PASSED, 0 BLOCKER, 2 WARNING, tous deux corrigés. Plan-checker frais ciblé
+  sur 68-01 : PASSED, 0 BLOCKER, 2 WARNING, reportés à `revalid-68` :
+  - type gardé du champ `phase` du verrou (chaîne ou nombre) ;
+  - règle de choix quand `phases/069` et `phases/69` coexistent, et le témoin qui la prouve.
+- Point ouvert relevé par le correcteur : au sens littéral de P68-D-22, une mission conduite sous un verrou de
+  compartiment nu (la forme d'avant la PR #197) s'affiche `abandonnee` alors qu'elle vit. C'est à confirmer par
+  Samuel avant l'exécution.
+
 ## Preuves E6
 
 Aucune preuve d'exécution : la mission ne produit que des plans, et aucun bloc typé de vf-coder ne porte de `preuves`.
