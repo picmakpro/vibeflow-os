@@ -11,8 +11,11 @@
 //   - zoom au-dessus de la barre de question jusqu'à 1 279 px (comme le viewer le fait déjà sur écran tactile) ;
 //   - logo VibeFlow : le viewer inverse le logo clair du thème (il attend un logo blanc) ; nos deux logos ont déjà le bon contraste ;
 //   - sous 1 000 px : la barre de question range l'invite sur sa propre ligne ; sous 700 px le fil d'Ariane cède sa place au zoom.
-//   - fil d'Ariane (O2, recette 2026-11-03) : un segment court (moins de 12 caractères) n'est jamais rogné tant qu'un segment long peut l'être, et on rogne d'abord ceux du milieu (poids de rétrécissement 8, puis premier et dernier longs, 2,
-//     puis les courts, 0,05) ; dès 1 280 px la colonne gauche de l'en-tête s'élargit de la largeur naturelle du fil (mesurée ci-dessous, avec le nom du projet jusqu'à 170 px, plafonnée à 50 % de la fenêtre) au prix d'une recherche moins large (jamais sous 200 px).
+//   - fil d'Ariane (O2, recette 2026-11-03 ; budget revu après la revue de la recette 3, F1/F2) : dès 1 280 px, la colonne gauche de l'en-tête prend la largeur naturelle de son contenu (`flex: 1 1 auto`) et c'est la RECHERCHE qui cède
+//     la première (poids de rétrécissement 100 000, jamais sous 200 px) ; le nom du projet (100 000) cède avant le fil (1) ; la colonne de droite garde son contenu (badge « au travail » compris). Le fil prend donc ce qui reste, jamais plus : aucun `min-width` n'est dérivé de sa largeur.
+//     Dans le fil, ordre de troncature : le nom du projet, puis les segments LONGS du milieu (poids 100 000), puis le premier et le dernier longs (poids 1 : ils ne cèdent qu'une fois le milieu à son plancher, à un centième de pixel près : un poids égal à 1 contre 1 000 laissait rogner le nom du projet de 1 px à 1 440 px), chaque segment long gardant 64 px ; un segment COURT (moins de 12 caractères, soit 11 au plus)
+//     ne rétrécit jamais (poids 0). Si, tous les longs réduits à leur plancher, le fil déborde encore, les segments du milieu sont masqués un à un (du plus proche du premier) derrière un « … » (infobulle : leurs noms) ; le premier et le dernier restent.
+//     Le masquage ne joue qu'à partir de 1 280 px et se rejoue au rendu du fil, au changement de nom, à la mise à jour de la largeur de la colonne gauche (badge, redimensionnement) et au chargement des polices.
 (() => {
   const style = document.createElement('style');
   style.textContent = `
@@ -41,26 +44,46 @@
       #ask { width: min(700px, calc(100% - var(--pw) - 48px)); }
     }
     @media (min-width: 1280px) {
-      header #crumbs { flex: 0 .05 auto; } /* le nom du projet (poids 6) cède avant le fil */
-      header #crumbs button { flex: 0 2 auto; }
-      header #crumbs button:not(:first-child):not(.cur) { flex: 0 8 auto; }
-      header #crumbs button[data-vf-court] { flex: 0 .05 auto; }
-      header .hl { min-width: min(calc(280px + var(--vf-crumbs, 0px) + var(--vf-pn, 0px)), 50vw); }
+      header .hl { flex: 1 1 auto; } /* sa largeur naturelle ; il cède après la recherche */
+      header .hc { flex: 0 100000 400px; } /* la recherche rétrécit la première, jusqu'à son plancher de 200 px */
+      header .brand { flex: 0 100000 auto; } /* le nom du projet cède avant le fil (la somme des poids non gelés doit atteindre 1, sinon la flexbox n'absorbe qu'une fraction du manque) */
+      header #crumbs { flex: 0 1 auto; }
+      header #crumbs button:not([data-vf-court]) { flex: 0 1 auto; min-width: 64px; }
+      header #crumbs button:not([data-vf-court]):not(:first-child):not(.cur) { flex: 0 100000 auto; }
+      header #crumbs button[data-vf-court] { flex: 0 0 auto; } /* un segment court n'est jamais rogné */
+      header #crumbs [data-vf-masque] { display: none; }
+      header #crumbs .vf-ell { flex: none; color: var(--text-4); padding: 0 6px; cursor: default; }
     }
     @media (max-width: 999px) { #ask-input { flex: 1 1 100%; } }
     @media (max-width: 700px) { header #crumbs { display: none; } }
   `;
   document.head.appendChild(style);
-  // fil d'Ariane : étiquette les segments courts et publie la largeur naturelle du fil (--vf-crumbs), relues à chaque rendu du fil et quand les polices sont prêtes
-  const fil = document.getElementById('crumbs');
-  const mesureFil = () => {
-    let n = 0;
-    for (const e of fil.children) { if (e.tagName === 'BUTTON') { if (e.textContent.trim().length < 12) e.setAttribute('data-vf-court', ''); else e.removeAttribute('data-vf-court'); n += e.scrollWidth; } else n += e.offsetWidth; }
-    document.documentElement.style.setProperty('--vf-crumbs', n + 'px');
-    const pn = document.getElementById('proj-name'); document.documentElement.style.setProperty('--vf-pn', (pn ? Math.max(0, Math.min(pn.scrollWidth, 170) - 46) : 0) + 'px');
+  // fil d'Ariane : étiquette les segments courts (moins de 12 caractères), puis masque derrière « … » les segments du milieu tant que le fil déborde (CSS : un segment long garde 64 px)
+  const fil = document.getElementById('crumbs'), nomProjet = document.getElementById('proj-name'), gauche = document.querySelector('header .hl');
+  let obs = null;
+  const ajuste = () => {
+    if (!fil) return;
+    if (obs) obs.disconnect(); // nos propres retouches du fil ne relancent pas l'ajustement
+    for (const e of fil.querySelectorAll('[data-vf-masque]')) e.removeAttribute('data-vf-masque');
+    fil.querySelector('.vf-ell')?.remove();
+    const bs = [...fil.querySelectorAll('button')];
+    for (const b of bs) { if (b.textContent.trim().length < 12) b.setAttribute('data-vf-court', ''); else b.removeAttribute('data-vf-court'); }
+    if (matchMedia('(min-width: 1280px)').matches && bs.length > 2) {
+      const ell = document.createElement('span'); ell.className = 'vf-ell'; ell.textContent = '…'; const noms = [];
+      for (let k = 1; k < bs.length - 1 && fil.scrollWidth > fil.clientWidth + 1; k++) {
+        const sep = bs[k].previousElementSibling;
+        if (k === 1) fil.insertBefore(ell, bs[1]); else if (sep) sep.setAttribute('data-vf-masque', '');
+        bs[k].setAttribute('data-vf-masque', ''); noms.push(bs[k].textContent.trim()); ell.title = noms.join(' / ');
+      }
+    }
+    if (obs) { obs.takeRecords(); obs.observe(fil, { childList: true, characterData: true, subtree: true }); }
   };
-  const nomProjet = document.getElementById('proj-name');
-  if (fil) { if (nomProjet) new MutationObserver(mesureFil).observe(nomProjet, { childList: true, characterData: true, subtree: true }); mesureFil(); new MutationObserver(mesureFil).observe(fil, { childList: true, characterData: true, subtree: true }); if (document.fonts?.ready) document.fonts.ready.then(mesureFil); window.addEventListener('load', mesureFil); }
+  if (fil) {
+    obs = new MutationObserver(ajuste); ajuste();
+    if (nomProjet) new MutationObserver(ajuste).observe(nomProjet, { childList: true, characterData: true, subtree: true });
+    if (gauche && window.ResizeObserver) new ResizeObserver(ajuste).observe(gauche);
+    window.addEventListener('resize', ajuste); window.addEventListener('load', ajuste); if (document.fonts?.ready) document.fonts.ready.then(ajuste);
+  }
   // infobulle des boutons d'en-tête passés en icône seule : le libellé (traduit, donc relu après le traducteur) ; ne remplace jamais un title existant
   const hd = document.querySelector('header');
   const infobulles = () => { for (const b of hd.querySelectorAll('button')) { if (b.getAttribute('title')) continue; const t = b.getAttribute('aria-label') || b.querySelector('.bl')?.textContent.trim(); if (t) b.setAttribute('title', t); } };

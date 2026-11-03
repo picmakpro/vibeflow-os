@@ -127,6 +127,87 @@ for spec in "court:$LDC" "long:$LDL"; do
   unsrv
 done
 
+# O2b (revue de la recette 3, F1/F2, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : le budget du fil d'Ariane tient compte de la colonne de droite (badge « au travail » compris) et du plancher
+# de la recherche. Noms de module réalistes de 15 à 21 caractères, fil de 3 puis de 6 segments dont 2 courts (moins de 12 caractères), onglets Code (avec ses boutons optionnels) ET Projet, badge présent,
+# à 1 280, 1 300, 1 320 et 1 440 px. Quatre mesures : aucun bouton d'en-tête hors fenêtre (header.scrollWidth <= innerWidth), aucun segment court rogné, le fil reste dans sa colonne (ni hors de .hl, ni sur la
+# recherche), et la troncature porte d'abord sur le milieu (le premier et le dernier ne sont rognés que lorsque les segments longs du milieu sont à leur plancher de 64 px).
+cat > "$AUX/o2b.js" <<'JS'
+(async () => { const pause = (ms) => new Promise((r) => setTimeout(r, ms)), SC = window.VibeFlow;
+  if (location.pathname.endsWith('index.html') && !document.getElementById('btn-recent')) { SC.addHeaderButton({ id: 'btn-recent', label: 'Recent work', icon: 'recent', title: 'What was just worked on, on one board', onClick() {} }); SC.addHeaderButton({ id: 'screens-btn', label: 'Screens', icon: 'ui', title: 'Pick a screen of the app', onClick() {} }); }
+  for (let i = 0; i < 100 && !/travail/.test((document.getElementById('vf-lock') || {}).textContent || ''); i++) await pause(50);
+  const fil = document.getElementById('crumbs'), proto = fil.querySelector('button'), sep0 = fil.querySelector('.sep') || Object.assign(document.createElement('span'), { className: 'sep', textContent: '/' });
+  const jeux = { s3: ["Vue d'ensemble", 'dev-orchestrator', 'design-orchestrator'], s6: ["Vue d'ensemble", 'conductor-references', 'db', 'planning-core-lib', 'src', 'dev-orchestrator-refs'] }, out = { W: innerWidth };
+  for (const [cle, segs] of Object.entries(jeux)) {
+    fil.innerHTML = ''; segs.forEach((t, i) => { if (i) fil.appendChild(sep0.cloneNode(true)); const b = proto.cloneNode(false); b.textContent = t; b.className = i === segs.length - 1 ? 'cur' : ''; b.removeAttribute('data-vf-court'); b.removeAttribute('data-vf-masque'); fil.appendChild(b); });
+    await pause(500);
+    const hd = document.querySelector('header'), R = (e) => e.getBoundingClientRect(), vis = (e) => R(e).width > 0;
+    const bs = [...fil.querySelectorAll('button')].filter(vis), n = bs.length, hl = R(document.querySelector('header .hl')), sb = R(document.getElementById('search-btn')), cr = R(fil);
+    const pn = document.getElementById('proj-name');
+    out[cle] = { pn: [pn.scrollWidth, pn.clientWidth], lock: !!document.getElementById('vf-lock'), nbVisibles: n, nbMasques: fil.querySelectorAll('button[data-vf-masque]').length, ell: !!fil.querySelector('.vf-ell'), hdrSW: hd.scrollWidth,
+      dehors: [...hd.querySelectorAll('button, a, input')].filter((e) => vis(e) && (R(e).right > innerWidth + 0.5 || R(e).left < -0.5)).map((e) => e.id || e.textContent.trim().slice(0, 12)),
+      courts: bs.filter((e) => e.textContent.trim().length < 12 && e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent + ' ' + e.scrollWidth + '>' + e.clientWidth),
+      fil: { dansHl: cr.right <= hl.right + 0.5, surRecherche: cr.right > sb.left + 0.5, crR: Math.round(cr.right), hlR: Math.round(hl.right), sbL: Math.round(sb.left) },
+      deficit: bs.map((e, i) => ({ t: e.textContent, i, d: Math.max(0, e.scrollWidth - e.clientWidth), cw: e.clientWidth, milieu: i > 0 && i < n - 1 && e.textContent.trim().length >= 12, bout: (i === 0 || i === n - 1) && e.textContent.trim().length >= 12 })) };
+  }
+  return out; })()
+JS
+cat > "$AUX/o2b-viol.mjs" <<'JS'
+// usage : o2b-viol.mjs <nature> <jeu s3|s6> <étiquette-par-url, séparées par une virgule> ; lit le JSON de chrome-cdp.mjs sur l'entrée ; « aucune » si tout va bien, sinon les violations
+import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); const [nat, jeu, etiq] = process.argv.slice(2), noms = (etiq || '').split(',');
+if (!j.resultats) { console.log('mesure absente : ' + (j.erreur || '?')); process.exit(0); }
+const v = [];
+j.resultats.forEach((r, i) => { const x = r.valeur?.[jeu], w = r.valeur?.W, et = (noms[i] || i) + ' ' + w + ' px';
+  if (!x) { v.push(et + ' : mesure absente'); return; }
+  if (!x.lock) v.push(et + ' : témoin, badge « au travail » absent');
+  if (x.nbVisibles + 0 < 2) v.push(et + ' : témoin, fil de moins de 2 segments visibles');
+  if (nat === 'hors' && (x.dehors.length || x.hdrSW > w)) v.push(et + ' : hors fenêtre [' + x.dehors.join(',') + '] header.scrollWidth ' + x.hdrSW + ' > ' + w);
+  if (nat === 'court' && x.courts.length) v.push(et + ' : segment court rogné ' + x.courts.join(', '));
+  if (nat === 'fil' && (!x.fil.dansHl || x.fil.surRecherche)) v.push(et + ' : fil hors de sa colonne (fil.right ' + x.fil.crR + ', .hl.right ' + x.fil.hlR + ', recherche.left ' + x.fil.sbL + ')');
+  if (nat === 'ordre') { const bout = x.deficit.filter((d) => d.bout && d.d > 1), mil = x.deficit.filter((d) => d.milieu && d.cw > 65); if (bout.length && mil.length) v.push(et + ' : un bout est tronqué (' + bout.map((d) => d.t + ' -' + d.d).join(', ') + ') alors qu\'un segment du milieu garde plus de 64 px (' + mil.map((d) => d.t + ' ' + d.cw).join(', ') + ')'); }
+  if (nat === 'plainte') { const t = x.deficit.filter((d) => d.d > 1).map((d) => d.t + ' -' + d.d); if (x.pn[0] > x.pn[1]) t.push('nom du projet ' + x.pn[0] + '>' + x.pn[1]); if (t.length) v.push(et + ' : ' + t.join(', ')); }
+  if (nat === 'sollicite' && !(x.nbMasques > 0 || x.deficit.some((d) => d.d > 0))) v.push(et + ' : témoin, aucune troncature ni masquage sollicité');
+});
+console.log(v.length ? v.slice(0, 4).join(' | ') : 'aucune');
+JS
+O2B_U="index.html project.html"
+o2b_mesure() { # o2b_mesure <port> <largeur> -> JSON (onglet Code puis Projet)
+  CDP_VIEWPORT="$2x$(( $2 * 5 / 8 ))" CDP_PRET="document.readyState === 'complete' && !!document.querySelector('#crumbs button') && !!document.getElementById('vf-lock')" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 300 "$(cat "$AUX/o2b.js")" "http://127.0.0.1:$1/index.html" "http://127.0.0.1:$1/project.html"
+}
+echo "=== O2b — budget du fil d'Ariane (revue de la recette 3, F1/F2) : fils de 3 et 6 segments longs, badge présent, 1 280 / 1 300 / 1 320 / 1 440 px, onglets Code et Projet ==="
+for spec in "court:$LC" "long:$LL"; do
+  nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; PB=$SRV_PORT
+  for w in 1280 1300 1320 1440; do
+    XB="$(o2b_mesure "$PB" "$w")"; echo "$XB" > "$WORK/o2b-$nom-$w.json"
+    for jeu in s3 s6; do
+      E="Code $nom,Projet $nom"; fq="$jeu"
+      assert_eq "O2b.1 — $nom / $jeu / $w px : aucun bouton d'en-tête hors de la fenêtre (header.scrollWidth <= innerWidth), badge présent" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" hors $jeu "$E")" "aucune"
+      assert_eq "O2b.2 — $nom / $jeu / $w px : aucun segment court (moins de 12 caractères) rogné" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" court $jeu "$E")" "aucune"
+      assert_eq "O2b.3 — $nom / $jeu / $w px : le fil reste dans sa colonne (ni hors de .hl, ni sur la recherche)" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" fil $jeu "$E")" "aucune"
+      assert_eq "O2b.4 — $nom / $jeu / $w px : la troncature porte d'abord sur le milieu (le premier et le dernier ne sont rognés que lorsque les segments longs du milieu sont à leur plancher de 64 px)" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" ordre $jeu "$E")" "aucune"
+    done
+  done
+  if [ "$nom" = court ]; then assert_eq "O2b.6 — plainte d'origine, lab court / 1 440 px, fil de 3 segments : « Vue d'ensemble », le nom du projet et les autres segments ne sont plus rognés" "$(printf '%s' "$(cat "$WORK/o2b-court-1440.json")" | node "$AUX/o2b-viol.mjs" plainte s3 "Code court,Projet court")" "aucune"; fi
+  XB="$(cat "$WORK/o2b-$nom-1280.json")"
+  assert_eq "O2b.5 — $nom / 1 280 px : témoin, le fil de 6 segments sollicite bien la troncature ou le masquage (jamais un vert à vide)" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" sollicite s6 "Code $nom,Projet $nom")" "aucune"
+  unsrv
+done
+
+# O2b — témoins rouges sur COPIE du lab long (jamais le moteur) : chaque mutant défait UNE règle du budget du fil et doit rougir la mesure qui la garde, à 1 280 px (onglet Code, badge présent).
+#   m1 règle des segments courts supprimée -> « segment court rogné » · m2 le min-width de 3a9331c8 (colonne gauche = 280 px + largeur du fil + nom du projet, plafond 50 %) remis -> « hors de la fenêtre »
+#   m3 le milieu au même poids que les bouts (1, au lieu de 100 000 : on ne tronque plus le milieu d'abord) -> « le premier est tronqué alors que le milieu garde plus de 64 px »
+mutant_o2b() { # mutant_o2b <nom> <nature> <ancien> <nouveau> : <ancien> doit exister dans la page (sinon FAIL nommé)
+  local M="$WORK/mut-o2b-$1"; mkdir -p "$M/.planning/missions" "$M/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$M/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$M/.planning/missions/"
+  node -e "
+const fs=require('fs');let n=0;for(const f of ['index.html','project.html']){const p='$M/.vibeflow/cockpit/'+f;const h=fs.readFileSync(p,'utf8');const o=process.argv[1],r=process.argv[2];if(!h.includes(o))continue;fs.writeFileSync(p,h.split(o).join(r));n++}
+if(!n){console.error('mutant $1 : motif introuvable');process.exit(1)}" "$3" "$4" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : motif introuvable dans la page"; return; }
+  srv "$M/.vibeflow/cockpit"; local XM; XM="$(o2b_mesure "$SRV_PORT" 1280)"; unsrv
+  assert_neq_aucune "O2b.m$1 — mutant « $5 » : la mesure « $2 » rougit à 1 280 px" "$(printf '%s' "$XM" | node "$AUX/o2b-viol.mjs" "$2" s6 "Code mutant,Projet mutant")"
+}
+assert_neq_aucune() { if [ "$2" != "aucune" ] && [[ "$2" != "mesure absente"* ]] && [[ "$2" != *"témoin"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: une violation de la nature visée"; echo "     obtenu:  [${2:0:600}]"; FAIL=$((FAIL+1)); fi; }
+mutant_o2b 1 court 'header #crumbs button[data-vf-court] { flex: 0 0 auto; }' '' "règle des segments courts supprimée"
+mutant_o2b 2 hors '@media (max-width: 999px) { #ask-input' '@media (min-width: 1280px) { :root { --vf-crumbs: 560px; --vf-pn: 100px; } header .hl { min-width: min(calc(280px + var(--vf-crumbs, 0px) + var(--vf-pn, 0px)), 50vw); } } @media (max-width: 999px) { #ask-input' "min-width de 3a9331c8 remis"
+mutant_o2b 3 ordre 'button:not([data-vf-court]):not(:first-child):not(.cur) { flex: 0 100000 auto; }' 'button:not([data-vf-court]):not(:first-child):not(.cur) { flex: 0 1 auto; }' "milieu au même poids que les bouts"
+
 # I2 (recette 3, retour de Samuel, saisie texte, session principale, 2026-11-03) : « le flou sous le titre est trop dense, il faut aussi qu'il ai un radius fort en haut faible en bas, il doit etre comparable au blur iOS ».
 # Matériau retenu : blur(24px) saturate(1.8), fond à 30 % d'opacité, coins 22 px en haut et 6 px en bas — mesuré dans le style calculé, deux thèmes, deux onglets.
 echo "=== I2 — le titre de la vue d'ensemble : verre dépoli à la iOS (filtre, fond translucide, rayons fort en haut / faible en bas) ==="
