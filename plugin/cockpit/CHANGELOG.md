@@ -70,3 +70,4 @@ AskUserQuestion session principale, 2026-11-01.
 
 ### Corrigé (relecture adverse SOBR-04 de v2.75.0, avant la publication ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-03, « Corriger maintenant »)
 - **`--port` borné à 1024..65535** (F1) — `--port 99999` lançait un serveur qui ne pouvait pas écouter, survivait sans `server.json` et échappait à `stop` ; le lanceur refuse maintenant tout port hors bornes (code 64) avant de lancer quoi que ce soit. Test `PS.12` de `test-cockpit-serveur.sh`.
+- **Mode de question hors liste** (F2, patch P14) — `constructor`, `__proto__`, `toString` ou `hasOwnProperty` en `mode` lançaient l'agent avec `--json-schema undefined` ; seuls les modes propres de la table comptent, le reste retombe sur `ask`. Test `Q4b` de `test-cockpit-questions.sh`.

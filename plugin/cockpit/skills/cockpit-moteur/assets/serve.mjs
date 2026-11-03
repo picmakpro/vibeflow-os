@@ -320,7 +320,7 @@ const CLOSED = Symbol('closed'); // the browser went away mid-request
 function runAgent(res, send, body) {
   return new Promise((resolve, reject) => {
     const M = VF ? VF.modes(MODES, body) : MODES; // vibeflow P14 : consigne de l'onglet Projet
-    const run = ENGINES[engine].run(body, M[body.mode] || M.ask);
+    const run = ENGINES[engine].run(body, Object.hasOwn(M, body.mode) ? M[body.mode] : M.ask);
     const child = spawn(cli.cmd, run.args, { cwd: root, env: cliEnv(), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     const id = crypto.randomBytes(6).toString('hex');
     running.set(id, child);

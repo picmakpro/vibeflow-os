@@ -132,6 +132,15 @@ poser "$PTOK" "Pourquoi ?"
 assert_eq "Q4.7 — VF_COCKPIT_MODEL=foo : --model sonnet" "$(H call "$WORK/fk3" 1 'c.argv.slice(-2).join(" ")')" "--model sonnet"
 assert_has "Q4.8 — un avertissement nomme la variable sur la sortie du serveur" "$(cat "$WORK/serve.out")" "VF_COCKPIT_MODEL=foo hors liste"
 
+echo "=== Q4b — mode hors liste : jamais une clé de prototype (relecture SOBR-04 de v2.75.0, F2) ==="
+mkfake "$WORK/fk6" claude; demarrer "$WORK/fk6" "$WORK/fk6:$PATH"
+poser "$PTOK" "Pourquoi ?"
+assert_eq "Q4b.0 — témoin : le mode ask (défaut) lance l'agent, avec --json-schema et --append-system-prompt" "$(H ncalls "$WORK/fk6")|$(H call "$WORK/fk6" 1 'c.argv.includes("--json-schema")&&c.argv.includes("--append-system-prompt")')" "1|true"
+ARGV0="$(H call "$WORK/fk6" 1 'JSON.stringify(c.argv)')"; N6=1
+for m in constructor __proto__ toString hasOwnProperty; do
+  N6=$((N6+1)); poser "$PTOK" "Pourquoi ?" "{\"mode\":\"$m\"}"
+  assert_eq "Q4b.$N6 — mode=$m : l'agent est lancé avec l'argv du mode par défaut (consigne et schéma présents, aucun « undefined »)" "$(H ncalls "$WORK/fk6")|$(H call "$WORK/fk6" "$N6" 'c.argv.includes("undefined")')|$([ "$(H call "$WORK/fk6" "$N6" 'JSON.stringify(c.argv)')" = "$ARGV0" ] && echo identique)" "$N6|false|identique"
+done
 echo "=== Q5 — question piégée : aucun effet ==="
 demarrer "$FK" "$BASEPATH"
 cat > "$WORK/piege.txt" <<'TXT'
