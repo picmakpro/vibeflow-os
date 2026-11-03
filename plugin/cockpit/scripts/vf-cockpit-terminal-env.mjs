@@ -1,17 +1,35 @@
-// vf-cockpit-terminal-env — environnement et choix du shell du terminal intégré (amorce posée par 71-01, remplie par 71-03).
-// Exports : envShell(env, secrets) -> copie de l'environnement ; choisirShell(env) -> chemin absolu du shell.
-// Ici : aucune variable VF_COCKPIT_* ni aucune valeur qui contienne un secret ne passe au shell ; le filtre complet (liste fermée) est celui de 71-03.
+// vf-cockpit-terminal-env — environnement et choix du shell du terminal intégré (71-01 en pose l'amorce, 71-03 le filtre complet).
+// Exports : envShell(env, secrets) -> copie de l'environnement ; choisirShell(env) -> chemin absolu du shell ; AJOUTS_TOUJOURS.
+// Liste NOIRE seulement (P71-D-03, D-14) : CLAUDECODE, CLAUDE_CODE_*, VF_COCKPIT_* et toute valeur qui contient un jeton du cockpit sont retirés ;
+// le reste passe tel quel (NODE_OPTIONS compris : le cockpit ne le pose pas). Un jeton de moins de 16 caractères n'écarte rien (trop de faux positifs).
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+
+// P71-D-23 (arbitrage de Samuel, AskUserQuestion, session principale Claude Code, 2026-11-03, rend définitive P71-D-22) : le terminal émulé est xterm.js,
+// le TERM hérité décrit le terminal du lanceur (voire `dumb`). Posés TOUJOURS, ils écrasent la valeur héritée. Une seule constante : réversible.
+export const AJOUTS_TOUJOURS = { TERM: 'xterm-256color', COLORTERM: 'truecolor' };
+const LONGUEUR_JETON = 16;
 
 export function envShell(env, secrets = []) {
   const sortie = {};
-  const interdits = secrets.filter((s) => typeof s === 'string' && s !== '');
+  const interdits = secrets.filter((s) => typeof s === 'string' && s.length >= LONGUEUR_JETON);
   for (const [k, v] of Object.entries(env || {})) {
-    if (/^VF_COCKPIT_/.test(k)) continue;
+    if (k === 'CLAUDECODE' || k.startsWith('CLAUDE_CODE_') || k.startsWith('VF_COCKPIT_')) continue;
     if (typeof v === 'string' && interdits.some((s) => v.includes(s))) continue;
     sortie[k] = v;
   }
+  Object.assign(sortie, AJOUTS_TOUJOURS);
   return sortie;
 }
 
-export const choisirShell = (env) => (env && typeof env.SHELL === 'string' && path.isAbsolute(env.SHELL) ? env.SHELL : '/bin/sh');
+const executable = (p) => {
+  try { return typeof p === 'string' && path.isAbsolute(p) && fs.statSync(p).isFile() && (fs.accessSync(p, fs.constants.X_OK), true); } catch { return false; }
+};
+
+// P71-D-04 : $SHELL s'il est absolu, ordinaire et exécutable, sinon le shell du compte aux mêmes conditions, sinon /bin/sh.
+export function choisirShell(env) {
+  if (executable(env && env.SHELL)) return env.SHELL;
+  let compte = null; try { compte = os.userInfo().shell; } catch {}
+  return executable(compte) ? compte : '/bin/sh';
+}

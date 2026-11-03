@@ -7,8 +7,11 @@ le 2 reçoit l'état (une ligne « FIN <code> » quand le shell sort, « SIG <n>
 le 3 reçoit le contrôle (lignes « R <lignes> <colonnes> » : nouvelle taille du terminal).
 Le dossier courant et l'environnement sont ceux du processus : le serveur les pose, cet assistant n'invente rien.
 
-Arrêt : fin du descripteur 0 (le serveur est parti ou a fermé la session) ou SIGTERM -> SIGHUP au groupe du shell,
-fermeture du maître, au plus 3 s d'attente, SIGKILL du groupe, sortie. Compatible Python 3.9, aucune dépendance.
+Arrêt : fin du descripteur 0 (le serveur est parti ou a fermé la session) ou SIGTERM -> SIGHUP au groupe du shell ET au groupe de
+premier plan du terminal (un shell interactif se met dans son propre groupe : seul ce second groupe l'atteint, et il relaie SIGHUP à ses
+travaux), fermeture du maître, au plus 3 s d'attente, SIGKILL des mêmes groupes, sortie. Limite : un processus détaché volontairement
+(nohup, setsid, disown) ou un travail d'un shell qui ne relaie pas SIGHUP peut survivre. Aucun octet du shell n'est journalisé.
+Compatible Python 3.9, aucune dépendance.
 """
 import fcntl
 import os
@@ -59,37 +62,68 @@ def lire_controle(tampon, maitre):
         mots = ligne.split()
         if len(mots) == 3 and mots[0] == b'R' and mots[1].isdigit() and mots[2].isdigit():
             l, c = int(mots[1]), int(mots[2])
-            if 0 < l < 1000 and 0 < c < 1000:
+            if 0 < l <= 500 and 0 < c <= 1000:
                 taille(maitre, l, c)
     return tampon[-256:]
 
 
-def arreter(pid, maitre):
-    """SIGHUP au groupe du shell, fermeture du maître, SIGKILL du groupe si le shell tarde."""
+def groupes(pid, maitre):
+    """Groupe du shell et groupe de premier plan du terminal (distincts dès que le shell interactif a son propre groupe)."""
+    gs = {pid}
     try:
-        os.killpg(pid, signal.SIGHUP)
+        gs.add(os.tcgetpgrp(maitre))
     except OSError:
         pass
+    return gs
+
+
+def signaler(gs, sig):
+    for g in gs:
+        if g > 1:
+            try:
+                os.killpg(g, sig)
+            except OSError:
+                pass
+
+
+def vivants(gs):
+    for g in gs:
+        if g > 1:
+            try:
+                os.killpg(g, 0)
+                return True
+            except ProcessLookupError:
+                pass
+            except OSError:
+                return True
+    return False
+
+
+def arreter(pid, maitre):
+    """SIGHUP aux groupes, fermeture du maître, attente de 3 s au plus, SIGKILL des mêmes groupes si quelque chose reste."""
+    gs = groupes(pid, maitre)
+    signaler(gs, signal.SIGHUP)
     try:
         os.close(maitre)
     except OSError:
         pass
+    reape = False
     fin = time.time() + GRACE
     while time.time() < fin:
-        try:
-            if os.waitpid(pid, os.WNOHANG)[0]:
-                return
-        except ChildProcessError:
+        if not reape:
+            try:
+                reape = bool(os.waitpid(pid, os.WNOHANG)[0])
+            except ChildProcessError:
+                reape = True
+        if reape and not vivants(gs):
             return
         time.sleep(0.05)
-    try:
-        os.killpg(pid, signal.SIGKILL)
-    except OSError:
-        pass
-    try:
-        os.waitpid(pid, 0)
-    except ChildProcessError:
-        pass
+    signaler(gs, signal.SIGKILL)
+    if not reape:
+        try:
+            os.waitpid(pid, 0)
+        except ChildProcessError:
+            pass
 
 
 def vider(maitre):
@@ -113,6 +147,11 @@ def main():
         return 64
     lignes, colonnes, shell = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3]
     signal.signal(signal.SIGTERM, sur_term)
+    avec_controle = True
+    try:
+        os.set_inheritable(3, False)  # le shell et ses travaux ne gardent pas le canal de contrôle
+    except OSError:
+        avec_controle = False  # lancé sans canal de contrôle : la taille initiale reste la seule
     pid, maitre = pty.fork()
     if pid == 0:
         try:
@@ -120,11 +159,7 @@ def main():
         finally:
             os._exit(127)
     taille(maitre, lignes, colonnes)
-    entrees = [0, maitre, 3]
-    try:
-        os.fstat(3)
-    except OSError:
-        entrees.remove(3)  # lancé sans canal de contrôle : la taille initiale reste la seule
+    entrees = [0, maitre, 3] if avec_controle else [0, maitre]
     controle = b''
     try:
         while not arret:
@@ -141,20 +176,18 @@ def main():
                     donnees = b''
                 if donnees:
                     ecrire(1, donnees)
-            if 3 in pret:
+            if avec_controle and 3 in pret:  # sans canal de contrôle, le descripteur 3 peut être le maître lui-même
                 donnees = os.read(3, 4096)
                 if donnees:
                     controle = lire_controle(controle + donnees, maitre)
                 else:
                     entrees.remove(3)
+                    avec_controle = False
             termine, st = os.waitpid(pid, os.WNOHANG)
             if termine:
                 vider(maitre)
                 statut(2, fin_du_shell(pid, st))
-                try:
-                    os.killpg(pid, signal.SIGHUP)
-                except OSError:
-                    pass
+                signaler(groupes(pid, maitre), signal.SIGHUP)
                 return 0
     except OSError:
         pass
