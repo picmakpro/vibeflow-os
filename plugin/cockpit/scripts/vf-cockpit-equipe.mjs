@@ -1,0 +1,95 @@
+// vf-cockpit-equipe — collecte des sessions Claude Code et de leurs sous-agents en arbre (P69-D-14, P69-D-18, P69-D-22).
+// Exports : FENETRE (86400 s), collecteAgents(ctx) -> { workers, source }, formeSousAgent(meta, premiere, id, CC) -> 'complete' | 'arretee' | null
+// Lecture seule, aucun réseau ; les listes de forme viennent du contrat (vf-cockpit-interface.json, bloc claudeCode passé en ctx.CC), jamais du code.
+// Seuls les candidats de la fenêtre (le .jsonl voisin modifié depuis moins de `fenetre`) et leurs ancêtres retrouvés par identifiant sont ouverts.
+import fs from 'node:fs';
+import path from 'node:path';
+import { ls, mtime, readJson, ID_RE, premiereLigne } from './vf-cockpit-lecture.mjs';
+
+export const FENETRE = 86400;
+const PROFONDEUR_MAX = 8;
+const REQUIS_PAR_DEFAUT = ['agentType', 'description', 'spawnDepth', 'toolUseId', 'requestShape'];
+const objet = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+
+export function formeSousAgent(meta, premiere, id, CC) {
+  const M = CC?.metaSousAgent || {}, T = CC?.transcriptSousAgent?.requis || ['isSidechain', 'agentId'];
+  if (!objet(meta) || !objet(premiere) || !T.every((k) => k in premiere) || premiere.isSidechain !== true || premiere.agentId !== id) return null;
+  const ar = M.formeArretee;
+  if (ar && Object.keys(meta).length === ar.requis.length && ar.requis.every((k) => k in meta) && (ar.booleens || []).every((k) => typeof meta[k] === 'boolean')) return 'arretee';
+  if (!(M.requis || REQUIS_PAR_DEFAUT).every((k) => k in meta) || typeof meta.spawnDepth !== 'number') return null;
+  for (const [k, d] of Object.entries(M.requisSiProfondeur || {})) if (meta.spawnDepth >= d && typeof meta[k] !== 'string') return null;
+  for (const k of M.booleensFacultatifs || []) if (k in meta && typeof meta[k] !== 'boolean') return null;
+  return 'complete';
+}
+
+export function collecteAgents(ctx) {
+  const { projects, now, fresh, fenetre = FENETRE, inScope, label, branche, byActivity, CC, tail } = ctx;
+  if (!fs.existsSync(projects)) return { workers: [], source: { etat: 'absente', path: projects } };
+  const seuil = CC?.metaSousAgent?.requisSiProfondeur?.parentAgentId ?? 2;
+  const workers = [];
+  let scanned = 0, live = 0, subLive = 0, inconnuSub = 0, inconnuSession = 0;
+  for (const slug of ls(projects)) {
+    const dir = path.join(projects, slug);
+    for (const f of ls(dir).filter((x) => x.endsWith('.jsonl'))) {
+      const file = path.join(dir, f); const age = (now - mtime(file)) / 1000;
+      const id = f.slice(0, -6); const subDir = path.join(dir, id, 'subagents');
+      const infos = new Map(); // identifiant -> { id, meta, tr, sAge, forme, premiere }
+      const charge = (aid, candidat) => {
+        if (infos.has(aid)) return infos.get(aid);
+        const mj = path.join(subDir, `agent-${aid}.meta.json`); let r = null;
+        if (candidat || (ID_RE.test(aid) && fs.existsSync(mj))) {
+          const tr = path.join(subDir, `agent-${aid}.jsonl`), meta = readJson(mj), premiere = premiereLigne(tr);
+          r = { id: aid, meta, tr, sAge: (now - mtime(tr)) / 1000, premiere, forme: formeSousAgent(meta, premiere, aid, CC) };
+        }
+        infos.set(aid, r); return r;
+      };
+      const cands = [];
+      for (const m of ls(subDir).filter((x) => x.endsWith('.meta.json'))) {
+        const aid = m.replace(/^agent-|\.meta\.json$/g, '');
+        const sAge = (now - mtime(path.join(subDir, `agent-${aid}.jsonl`))) / 1000;
+        if (sAge >= fenetre) continue; // FENETRE-24H
+        cands.push(charge(aid, true));
+      }
+      const propre = (c) => (c.meta.finished === true || c.forme === 'arretee' ? 'termine' : c.sAge < fresh ? 'actif' : 'en-attente');
+      const inclus = new Map(); // identifiant -> { c, etat }
+      for (const c of cands) {
+        if (!c.forme) { inconnuSub++; continue; }
+        const anc = []; let cur = c, casse = false; const vus = new Set([c.id]);
+        while (cur.forme === 'complete' && cur.meta.spawnDepth >= seuil) {
+          const pid = cur.meta.parentAgentId; const p = anc.length < PROFONDEUR_MAX && !vus.has(pid) ? charge(pid, false) : null;
+          if (!p || !p.forme) { casse = true; break; }
+          vus.add(pid); anc.push(p); cur = p;
+        }
+        if (casse) { inconnuSub++; continue; }
+        const etat = propre(c);
+        if (etat === 'en-attente') continue; // un candidat ni fini ni frais n'est présent que comme ancêtre
+        for (const x of [c, ...anc]) if (!inclus.has(x.id)) inclus.set(x.id, { c: x, etat: propre(x) });
+      }
+      if (age > fresh && !inclus.size) continue;
+      scanned++;
+      const last = tail(file);
+      if (last && !ctx.formeOk(last)) { inconnuSession++; continue; }
+      const tree = inScope(last?.cwd);
+      if (!tree) continue;
+      if (age <= fresh) live++;
+      if (age <= fresh || inclus.size) {
+        const at = byActivity(last, tree);
+        const desc = [...inclus.values()].some((x) => x.etat !== 'termine');
+        workers.push({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, last.gitBranch), cwd: last.cwd, ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', etat: age <= fresh ? 'actif' : desc ? 'en-attente' : 'termine', _tr: file });
+      }
+      for (const { c, etat } of inclus.values()) {
+        subLive++;
+        const sl = tail(c.tr), at = byActivity(sl, inScope(sl?.cwd) || tree);
+        const parent = c.forme === 'complete' && c.meta.spawnDepth >= seuil ? c.meta.parentAgentId : id;
+        const t0 = Date.parse(c.premiere?.timestamp), fin = etat === 'termine' ? mtime(c.tr) : null;
+        const w = { kind: 'subagent', id: c.id, parent, role: c.meta.agentType, task: c.meta.description || '', ...(c.forme === 'complete' ? { depth: c.meta.spawnDepth, background: c.meta.requestShape === 'background' } : {}),
+          tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, sl?.gitBranch, last.gitBranch), ageS: Math.round(c.sAge), source: 'subagent-meta', etat };
+        if (fin) w.finAt = new Date(fin).toISOString();
+        if (Number.isFinite(t0)) w.dureeS = Math.max(0, Math.round(((fin || now) - t0) / 1000));
+        w._tr = c.tr; workers.push(w);
+      }
+    }
+  }
+  const inconnue = inconnuSub > 0 || (inconnuSession > 0 && live + subLive === 0);
+  return { workers, source: { etat: inconnue ? 'forme-inconnue' : 'lue', path: projects, recentFiles: scanned, liveSessions: live, liveSubagents: subLive, formeInconnue: inconnuSub + inconnuSession } };
+}

@@ -13,6 +13,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { driverLockScript, gitCommonDir, resolveScriptsDir } from './vf-cockpit-paths.mjs';
 import { ls, mtime, readJson, cherche, masque, MAX_MASQUE, ID_RE } from './vf-cockpit-lecture.mjs';
+import { FENETRE, collecteAgents } from './vf-cockpit-equipe.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const sh = (cmd, args, cwd) => { try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000 }); } catch (e) { return e.stdout || ''; } }; // timeout : un git ou un bash bloqué ne gèle pas la boucle
@@ -21,7 +22,6 @@ const sh = (cmd, args, cwd) => { try { return execFileSync(cmd, args, { cwd, enc
 const IFACE = readJson(path.join(HERE, 'vf-cockpit-interface.json')) || {};
 const CC = IFACE.claudeCode || {};
 const REQ_TR = CC.transcript?.requis || ['cwd', 'type', 'message', 'timestamp', 'sessionId'];
-const REQ_META = CC.metaSousAgent?.requis || ['agentType', 'description'];
 
 // dernière ligne user/assistant d'un jsonl
 const tail = (f) => cherche(f, (d) => (d.type === 'user' || d.type === 'assistant' ? d : null));
@@ -47,47 +47,11 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
     return hit ? { tree: hit, how: 'activité' } : { tree: fallback, how: 'cwd' };
   };
 
-  // 1 + 2 — sessions et sous-agents
+  // 1 + 2 — sessions et sous-agents, en arbre (vf-cockpit-equipe.mjs : fenêtre de 24 h, forme Claude Code lue du contrat)
   const projects = path.join(home, '.claude', 'projects');
-  if (!fs.existsSync(projects)) sources.sessions = { etat: 'absente', path: projects };
-  else {
-    let scanned = 0, live = 0, subLive = 0, formeInconnue = 0;
-    for (const slug of ls(projects)) {
-      const dir = path.join(projects, slug);
-      for (const f of ls(dir).filter((x) => x.endsWith('.jsonl'))) {
-        const file = path.join(dir, f); const age = (now - mtime(file)) / 1000;
-        const id = f.slice(0, -6); const subDir = path.join(dir, id, 'subagents');
-        const subs = [];
-        for (const m of ls(subDir).filter((x) => x.endsWith('.meta.json'))) {
-          const brut = readJson(path.join(subDir, m)); const meta = brut && typeof brut === 'object' && !Array.isArray(brut) ? brut : {}; // un meta.json `5` ou `[]` est une forme inconnue, jamais une exception
-          const tr = path.join(subDir, m.replace(/\.meta\.json$/, '.jsonl'));
-          const sAge = (now - mtime(tr)) / 1000;
-          if (meta.finished || sAge >= fresh) continue;
-          if (!REQ_META.every((k) => k in meta)) { formeInconnue++; continue; }
-          subs.push({ meta, tr, age: sAge, agentId: m.replace(/^agent-|\.meta\.json$/g, '') });
-        }
-        if (age > fresh && !subs.length) continue;
-        scanned++;
-        const last = tail(file);
-        if (last && !formeOk(last)) { formeInconnue++; continue; }
-        const tree = inScope(last?.cwd);
-        if (!tree) continue;
-        if (age <= fresh) {
-          live++;
-          const at = byActivity(last, tree);
-          workers.push({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, last.gitBranch), cwd: last.cwd, ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', _tr: file });
-        }
-        for (const s of subs) {
-          subLive++;
-          const sl = tail(s.tr), at = byActivity(sl, inScope(sl?.cwd) || tree);
-          workers.push({ kind: 'subagent', id: s.agentId, parent: s.meta.spawnDepth >= 2 && typeof s.meta.parentAgentId === 'string' ? s.meta.parentAgentId : id, role: s.meta.agentType, task: s.meta.description || '', depth: s.meta.spawnDepth ?? null, background: s.meta.requestShape === 'background',
-            tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, sl?.gitBranch, last?.gitBranch), ageS: Math.round(s.age), source: 'subagent-meta', _tr: s.tr });
-        }
-      }
-    }
-    const inconnue = formeInconnue > 0 && live + subLive === 0;
-    sources.sessions = { etat: inconnue ? 'forme-inconnue' : 'lue', path: projects, recentFiles: scanned, liveSessions: live, liveSubagents: subLive, formeInconnue };
-  }
+  const eq = collecteAgents({ projects, now, fresh, fenetre: FENETRE, inScope, label, branche, byActivity, CC, tail, formeOk });
+  workers.push(...eq.workers); sources.sessions = eq.source;
+  const presents = new Set(eq.workers.filter((w) => w.kind === 'subagent').map((w) => w.id)); const registre = new Map(); // carte privée, jamais dans la sortie publique
 
   // 3 — verrous et registre (script résolu hors de l'arbre observé)
   const dl = driverLockScript({ scriptsDir: scriptsDir || resolveScriptsDir(HERE), labRoot: root, home });
@@ -103,7 +67,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
     for (const ws of wsList) {
       let o = {}; try { o = JSON.parse(sh('bash', [DL, 'orphans', ...(ws ? [`--ws=${ws}`] : [])], root)); } catch {}
       const held = (st.locks || []).some((l) => l.present && !l.stale && (l.ws || '') === ws);
-      for (const a of o.orphans || []) { reg++; workers.push({ kind: 'registered', id: a.agent_id, role: a.role, task: a.node || '', parent: a.parent || '', depth: a.depth ?? null, tree: ws ? `compartiment ${ws}` : 'dépôt', ageS: a.age_seconds, stale: !held, orphan: !held, source: 'registre' }); }
+      for (const a of o.orphans || []) { reg++; if (presents.has(a.agent_id)) { registre.set(a.agent_id, { noeud: a.node || '', role: a.role, ws }); continue; } workers.push({ kind: 'registered', id: a.agent_id, role: a.role, task: a.node || '', parent: a.parent || '', depth: a.depth ?? null, tree: ws ? `compartiment ${ws}` : 'dépôt', ageS: a.age_seconds, stale: !held, orphan: !held, source: 'registre' }); }
     }
     sources.locks ||= { etat: 'lue', held: (st.locks || []).filter((x) => x.present).length, registered: reg };
   }
@@ -124,7 +88,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
     for (const n of (j.nodes || []).filter((x) => x.status === 'running')) { running++; if (stale) staleNodes++; workers.push({ kind: 'dag-node', id: n.id, role: n.stage || '', task: (n.step || '').slice(0, 100), tree: path.relative(root, d) || d, dag: f, ageS: age, stale, source: 'dag' }); }
   }
   sources.dags = { etat: 'lue', files: dags, running, stale: staleNodes };
-  return { at: new Date(now).toISOString(), root, trees: trees.map(label), fresh, workers, sources };
+  return { at: new Date(now).toISOString(), root, trees: trees.map(label), fresh, fenetre: FENETRE, workers, sources, _registre: registre };
 }
 
 export function collectWho(root, opts = {}) {
@@ -134,7 +98,7 @@ export function collectWho(root, opts = {}) {
   const workers = g.workers.map(({ _tr, ...w }) => ({ ...w, ...(w.task !== undefined ? { task: bornes(w.task, 160) } : {}), ...(w.cwd !== undefined ? { cwd: bornes(w.cwd, 200) } : {}), ...(w.role !== undefined ? { role: bornes(w.role, 80) } : {}) }));
   const sources = { ...g.sources };
   if (typeof sources.sessions?.path === 'string') sources.sessions = { ...sources.sessions, path: sources.sessions.path.replace(opts.home || os.homedir(), '~') };
-  return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees, fresh: g.fresh, fenetre: 86400, busy: workers.some((w) => !w.stale), workers, sources };
+  return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees, fresh: g.fresh, fenetre: g.fenetre, busy: workers.some((w) => !w.stale && w.etat !== 'termine'), workers, sources };
 }
 
 // P67-D-14 : la dernière commande ne sort que par cette révélation ponctuelle (T-67-05), réduite au programme et à son premier argument (décision de Samuel, AskUserQuestion session principale, 2026-11-02).

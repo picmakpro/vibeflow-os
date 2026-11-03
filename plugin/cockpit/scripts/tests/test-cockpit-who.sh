@@ -159,7 +159,12 @@ mk_sub "$SD" bad '{"description":"sans type"}'
 Q who "$LAB" "$H9" "$NOSCRIPTS" > "$WORK/who9.json"
 assert_eq "W8.4 — témoin : le sous-agent conforme est listé, pas l'autre" "$(G "$WORK/who9.json" 'j.workers.filter(w=>w.kind==="subagent").map(w=>w.id).join(",")')" "ok"
 assert_eq "W8.5 — le meta.json sans agentType compte en forme inconnue" "$(G "$WORK/who9.json" 'j.sources.sessions.formeInconnue')" "1"
-assert_eq "W8.6 — témoin : la fixture conforme rend lue" "$(G "$WORK/who9.json" 'j.sources.sessions.etat')" "lue"
+assert_eq "W8.6 — un meta.json hors forme rend la source forme-inconnue (change de sens par conception, CKPT-27 : plus de « lue » tant qu'un sous-agent vivant est conforme)" "$(G "$WORK/who9.json" 'j.sources.sessions.etat')" "forme-inconnue"
+H9B="$WORK/home9b"; mkdir -p "$H9B/.claude/projects/-lab/$SID/subagents"
+mk_session "$H9B/.claude/projects/-lab/$SID.jsonl" cwd "x"
+mk_sub "$H9B/.claude/projects/-lab/$SID/subagents" ok "$META_REELLE"
+Q who "$LAB" "$H9B" "$NOSCRIPTS" > "$WORK/who9b.json"
+assert_eq "W8.7 — témoin : un dossier de sous-agents tous conformes rend lue, sous-agent listé" "$(G "$WORK/who9b.json" 'j.sources.sessions.etat+"|"+j.workers.filter(w=>w.kind==="subagent").map(w=>w.id).join(",")')" "lue|ok"
 
 echo "=== W9 — jamais de script pris dans l'arbre observé ==="
 H0="$WORK/home0"; mkdir -p "$H0"

@@ -99,8 +99,8 @@ const [, , scripts, lab, home] = process.argv; const m = await import(pathToFile
 const sid = 'cccc1111-2222-3333-4444-555566667777', d = path.join(home, '.claude', 'projects', '-lab'); fs.mkdirSync(path.join(d, sid, 'subagents'), { recursive: true });
 const ligne = (type) => JSON.stringify({ type, cwd: lab + '/' + 'x'.repeat(400), sessionId: sid, timestamp: '2026-11-01T10:00:00Z', gitBranch: 'main', version: '2.1', message: { content: 'ok' } });
 fs.writeFileSync(path.join(d, sid + '.jsonl'), ligne('user') + '\n' + ligne('assistant') + '\n');
-fs.writeFileSync(path.join(d, sid, 'subagents', 'agent-a1.meta.json'), JSON.stringify({ agentType: 'vf-coder', description: 'GITHUB_TOKEN=abc123secret ' + 'y'.repeat(500) }));
-fs.writeFileSync(path.join(d, sid, 'subagents', 'agent-a1.jsonl'), ligne('assistant') + '\n');
+fs.writeFileSync(path.join(d, sid, 'subagents', 'agent-a1.meta.json'), JSON.stringify({ agentType: 'vf-coder', description: 'GITHUB_TOKEN=abc123secret ' + 'y'.repeat(500), spawnDepth: 1, toolUseId: 'toolu_a1', requestShape: 'background' }));
+fs.writeFileSync(path.join(d, sid, 'subagents', 'agent-a1.jsonl'), JSON.stringify({ ...JSON.parse(ligne('user')), isSidechain: true, agentId: 'a1' }) + '\n' + ligne('assistant') + '\n');
 const w = m.collectWho(lab, { home }); const sub = w.workers.find((x) => x.kind === 'subagent'), ses = w.workers.find((x) => x.kind === 'session');
 console.log(JSON.stringify({ taskLen: sub?.task.length, fuite: /abc123secret/.test(JSON.stringify(w)), cwdLen: ses?.cwd.length, chemin: w.sources.sessions.path.startsWith('~') }));
 JS
