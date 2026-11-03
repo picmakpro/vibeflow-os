@@ -1,12 +1,12 @@
 // vf-cockpit-lecture — lecteurs bas niveau partagés du socle du cockpit (déplacés de vf-cockpit-who.mjs, comportement inchangé).
-// Exports : ls, mtime, readJson, cherche (recherche en fin de fichier), masque / MAX_MASQUE (masques de secrets), ID_RE, premiereLigne.
+// Exports : ls, mtime, readJson, cherche (recherche en fin de fichier), masque / MAX_MASQUE (masques de secrets), masqueCoupe / MARGE_MASQUE (masquer avant de couper), ID_RE, premiereLigne.
 // Lecture seule, aucun réseau.
 import fs from 'node:fs';
 
 export const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
 export const mtime = (f) => { try { return fs.statSync(f).mtimeMs; } catch { return 0; } };
 // `max` (octets) : au-delà, le fichier n'est pas lu (null) — un meta.json de 300 Mio ne doit pas peser sur la mémoire (F4)
-export const readJson = (f, max = Infinity) => { try { if (max !== Infinity && fs.statSync(f).size > max) return null; return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
+export const readJson = (f, max = Infinity) => { try { const st = fs.statSync(f); if (!st.isFile() || st.size > max) return null; return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 
 // recherche en partant de la fin d'un jsonl, sur des fenêtres de plus en plus larges (256 Kio, 2 Mio, 8 Mio) : `accepte(ligne)` rend la valeur
 // cherchée ou null. Une ligne plus longue que la fenêtre (un gros résultat d'outil) est ignorée au lieu de faire croire qu'il n'y a rien :
@@ -53,22 +53,30 @@ export const MAX_MASQUE = 4000;
 export const masque = (t, max = MAX_MASQUE) => MASQUES.reduce((a, re) => a.replace(re, '[masqué]'), String(t).slice(0, max));
 // F1 : masquer AVANT de couper. La tranche masquée dépasse la borne d'une marge (plus longue que le plus long secret reconnu, ~600 car.), la coupe vient après :
 // un jeton à cheval sur la borne est remplacé en entier, jamais rendu en fragment. Le coût reste borné (borne + marge).
-export const MARGE_MASQUE = 700;
-export const masqueCoupe = (t, n) => masque(t, n + MARGE_MASQUE).slice(0, n);
+// Aucun caractère venu au-delà de n dans le texte brut n'est rendu : on garde le plus long préfixe commun au masque de [0, n) et au masque de [0, n + marge) (limite : le masque
+// de la tranche élargie voit le secret en entier, celui de la tranche courte n'en voit qu'un fragment : ils divergent au début du secret, qui n'est jamais rendu).
+export const MARGE_MASQUE = 700; // > 385 caractères, la plus longue portée d'un motif (`://user:pass@`)
+export const masqueCoupe = (t, n) => {
+  const s = String(t), a = masque(s, n); if (s.length <= n) return a;
+  const b = masque(s, n + MARGE_MASQUE), m = Math.min(a.length, b.length); let i = 0;
+  while (i < m && a.charCodeAt(i) === b.charCodeAt(i)) i++;
+  return a.slice(0, Math.min(i, n));
+};
 export const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
-// première ligne d'un jsonl (256 premiers Kio), analysée en JSON ; null si illisible. Cache par chemin, borné : vidé au-delà de 4 000 entrées.
+// première ligne d'un jsonl (256 premiers Kio), analysée en JSON ; null si illisible. Cache par chemin, borné (vidé au-delà de 4 000 entrées) et invalidé par la date et la taille :
+// un échec transitoire (fichier vide lu avant son écriture) n'est jamais retenu.
 const CACHE = new Map();
 export const premiereLigne = (f) => {
-  if (CACHE.has(f)) return CACHE.get(f);
-  let fd = null, r = null;
+  let st = null, fd = null, r = null;
+  try { st = fs.statSync(f); } catch { return null; }
+  const c = CACHE.get(f); if (c && c.mt === st.mtimeMs && c.size === st.size) return c.r;
   try {
-    if (!fs.statSync(f).isFile()) throw new Error('pas un fichier');
+    if (!st.isFile()) throw new Error('pas un fichier'); // un tube (FIFO) bloquerait l'ouverture
     fd = fs.openSync(f, 'r'); const buf = Buffer.alloc(256 << 10); const n = fs.readSync(fd, buf, 0, buf.length, 0);
-    const ligne = buf.toString('utf8', 0, n).split('\n')[0];
-    r = JSON.parse(ligne);
+    r = JSON.parse(buf.toString('utf8', 0, n).split('\n')[0]);
   } catch { r = null; } finally { if (fd !== null) { try { fs.closeSync(fd); } catch {} } }
   if (CACHE.size >= 4000) CACHE.clear();
-  CACHE.set(f, r);
+  CACHE.set(f, { mt: st.mtimeMs, size: st.size, r });
   return r;
 };

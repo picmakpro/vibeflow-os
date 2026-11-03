@@ -68,6 +68,7 @@ export function citationsDuMandat(texte) {
 function fenetre(fichier, octets, depuisLaFin) {
   let fd = null;
   try {
+    if (!fs.statSync(fichier).isFile()) return null; // un tube (FIFO) bloquerait l'ouverture
     fd = fs.openSync(fichier, 'r'); const size = fs.fstatSync(fd).size, len = Math.min(size, octets), buf = Buffer.alloc(len);
     fs.readSync(fd, buf, 0, len, depuisLaFin ? size - len : 0);
     return { texte: buf.toString('utf8'), coupe: size > len };
@@ -84,6 +85,7 @@ export function reduireTranscript(fichier, { root } = {}) {
 function reduire(fichier, root) {
   let tronque = false, mandat = '';
   const tete = fenetre(fichier, TETE, false);
+  if (tete?.coupe && !tete.texte.includes('\n')) tronque = true; // la première ligne dépasse la fenêtre de tête : le mandat est illisible
   if (tete) { const p = json(tete.texte.split('\n')[0]); if (p?.type === 'user' && typeof p.message?.content === 'string') { const c = p.message.content; if (c.length > BORNE_MANDAT) tronque = true; mandat = masqueCoupe(c, BORNE_MANDAT); } }
   const q = fenetre(fichier, QUEUE, true);
   if (!q) return { mandat, messages: [], outils: [], tronque };

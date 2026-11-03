@@ -109,7 +109,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
       if (tracked && !dirty && ct) age = Math.round(now / 1000 - ct); // contenu identique au commit : écrit au plus tard à cette date
     }
     const stale = age > ttl;
-    for (const n of nodes.filter((x) => x.status === 'running')) { running++; if (stale) staleNodes++; workers.push({ kind: 'dag-node', id: n.id, role: n.stage || '', task: String(n.step || '').slice(0, 100), tree: path.relative(root, d) || d, dag: f, ageS: age, stale, source: 'dag' }); }
+    for (const n of nodes.filter((x) => x.status === 'running')) { running++; if (stale) staleNodes++; workers.push({ kind: 'dag-node', id: n.id, role: n.stage || '', task: String(n.step || ''), tree: path.relative(root, d) || d, dag: f, ageS: age, stale, source: 'dag' }); }
   }
   sources.dags = { etat: 'lue', files: nDags, running, stale: staleNodes };
   return { at: new Date(now).toISOString(), root, trees: trees.map(label), fresh, fenetre: FENETRE, workers, sources, _registre: registre };
@@ -123,13 +123,16 @@ export function collectWho(root, opts = {}) {
   const IDS = new Set(['session', 'subagent', 'registered']);
   const workers = g.workers.filter((w) => typeof w.id === 'string' && (!IDS.has(w.kind) || ID_RE.test(w.id))).map(({ _tr, ...w }) => {
     w.id = bornes(w.id, 128);
-    for (const [k, n] of Object.entries(LIBRES)) if (k in w) { if (typeof w[k] === 'string') w[k] = bornes(w[k], n); else delete w[k]; }
+    for (const [k, n] of Object.entries(LIBRES)) if (k in w) { if (typeof w[k] === 'string') w[k] = bornes(w[k], k === 'task' && w.kind === 'dag-node' ? 100 : n); else delete w[k]; }
     for (const k of NOMBRES) if (k in w && !(Number.isFinite(w[k]) || (k === 'depth' && w[k] === null))) delete w[k];
+    const sous = (o, bornesDe) => { const r = {}; for (const [k, n] of Object.entries(bornesDe)) if (typeof o?.[k] === 'string') r[k] = bornes(o[k], n); return r; }; // objets imbriqués : mêmes règles
+    if (w.rattachement) w.rattachement = sous(w.rattachement, { etat: 20, source: 20, raison: 20, dag: 200, noeud: 128 });
+    if (w.action) w.action = sous(w.action, { verbe: 80, cible: 120 });
     return w;
   });
   const sources = { ...g.sources };
   if (typeof sources.sessions?.path === 'string') sources.sessions = { ...sources.sessions, path: sources.sessions.path.replace(opts.home || os.homedir(), '~') };
-  return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees, fresh: g.fresh, fenetre: g.fenetre, busy: workers.some((w) => !w.stale && w.etat !== 'termine'), workers, sources };
+  return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees.map((t) => bornes(t, 200)), fresh: g.fresh, fenetre: g.fenetre, busy: workers.some((w) => !w.stale && w.etat !== 'termine'), workers, sources };
 }
 
 // P67-D-14 : la dernière commande ne sort que par cette révélation ponctuelle (T-67-05), réduite au programme et à son premier argument (décision de Samuel, AskUserQuestion session principale, 2026-11-02).
