@@ -148,6 +148,7 @@ V1="$ENG/assets/vendor/fonts/jetbrains-mono-latin-wght-normal.woff2"; V2="$ENG/a
 assert_eq "TF.2 — octets décodés = fichiers vendorisés latin et latin-ext (sha256)" "$(printf '%s\n' "$POL" | sed 1d | grep . | tr '\n' ' ')" "$(printf '%s\n%s\n' "$(node "$AUX/csp.mjs" sha "$V1")" "$(node "$AUX/csp.mjs" sha "$V2")" | sort | tr '\n' ' ')"
 PAR="$(node "$AUX/parite.mjs" "$VIEWER" "$PG/dark.html")"
 assert_eq "T18.0 — les 25 noms sont présents dans les deux sources, par thème (anti-vide)" "$(printf '%s\n' "$PAR" | grep '^PARITE ')" "PARITE 25/25"
+echo "  mesure : $(printf '%s\n' "$PAR" | grep '^PARITE ') (viewer.html contre la page servie)"
 assert_eq "T18.1 — parité sombre : aucun écart ni variable absente" "$(printf '%s\n' "$PAR" | grep -E '\(sombre\)| sombre$' || true)" ""
 assert_eq "T18.2 — parité claire (valeur effective) : aucun écart ni variable absente" "$(printf '%s\n' "$PAR" | grep -E '\(clair\)| clair$' || true)" ""
 unsrv
