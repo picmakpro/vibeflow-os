@@ -293,6 +293,16 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "fix-gsd120",
+      "step": "fixture phase_naming custom (worktree fix-gsd-phase-naming, PR vers main)",
+      "stage": "",
+      "deps": [
+        "gates-p3"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
