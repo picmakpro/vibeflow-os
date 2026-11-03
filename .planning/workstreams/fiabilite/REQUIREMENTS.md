@@ -959,6 +959,12 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | CKPT-10 | Phase 67 | Complete — 2026-11-03, phase close (preuves : plugin/_internal/tests/test-vibeflow-update-cockpit.sh ; 67-06-SUMMARY.md ; 7f5f5421, ebc63e98. Le bump racine v2.75.0 est postérieur à la phase (arbitrage Samuel, AskUserQuestion session principale, 2026-11-02) : la contrainte « aucun bump » valait pendant la phase ; recette `67-RECETTE-HUMAINE.md` validée, § 8.2 ; détail : `67-CLOTURE.md`) |
 | CKPT-11 | Phase 67 | Complete — 2026-11-03, phase close (preuves : plugin/conductor/scripts/tests/test-dag-atomic-save.sh ; 67-01-SUMMARY.md ; 0ac4e7f1, 5d535143, 3c30769b ; recette `67-RECETTE-HUMAINE.md` validée, § 8.2 ; détail : `67-CLOTURE.md`) |
 | CKPT-12 | Phase 67 | Complete — 2026-11-03, phase close (preuves : test-cockpit-responsive.sh (R1-R4) ; 67-FIX-B-SUMMARY.md, 67-FIX-C-SUMMARY.md ; a253d713, ce63c0b1 ; recette `67-RECETTE-HUMAINE.md` validée, § 8.2 ; détail : `67-CLOTURE.md`) |
+| CKPT-13 | Phase 69 | Pending — 2026-11-03 (inscrite ; avancement dérivé à quatre états) |
+| CKPT-14 | Phase 69 | Pending — 2026-11-03 (inscrite ; décompte des plans) |
+| CKPT-15 | Phase 69 | Pending — 2026-11-03 (inscrite ; rattachement des missions) |
+| CKPT-16 | Phase 69 | Pending — 2026-11-03 (inscrite ; jalon) |
+| CKPT-17 | Phase 69 | Pending — 2026-11-03 (inscrite ; étapes restantes) |
+| CKPT-18 | Phase 69 | Pending — 2026-11-03 (inscrite ; retrait de la règle STATE) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1463,6 +1469,16 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **CKPT-10**: Module toggable `plugin/cockpit` (`module.json`, `VERSION`, `CHANGELOG`, `README`), verbe `/vf-cockpit`, posé par l'engine y compris les binaires, sortie `.vibeflow/cockpit/` avec son `.gitignore` ; aucun bump de la `VERSION` racine (P67-D-05, P67-D-06).
 - [x] **CKPT-11**: `dag.sh` — écriture atomique de `save()` (fichier temporaire du même dossier puis `os.replace`), témoin rouge d'abord (lecture pendant une écriture lente) ; validation ADR-031 limitée à ce correctif (P67-D-09).
 - [x] **CKPT-12**: Responsive minimal — la fenêtre du cockpit est ajustable : de 1 024 à 2 560 px de large, au chargement comme au redimensionnement à chaud, aucune superposition ni rognage de l'en-tête, des panneaux et de la barre de question ; rendu non cassé en dessous ; la carte se recadre au redimensionnement ; test qui mesure les boîtes à 1 024, 1 280, 1 440 et 1 920 px (demande de Samuel, message session principale, 2026-11-01 : « au moins pouvoir avoir la fenêtre ajustable » ; `67-CONTEXT.md` P67-D-21).
+
+### Suivi du travail en cours dans le cockpit (Phase 69 — posées à l'inscription, 2026-11-03)
+> Reformulent P69-D-01..09 (`69-CONTEXT.md` ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) sans arbitrage neuf. Suite de la famille `CKPT` (CKPT-13 à CKPT-18 vérifiés libres le 2026-11-03). Jalon `vibeflow-v2.0`.
+
+- [ ] **CKPT-13**: `readPlanning` expose par phase un objet versionné `avancement` (`version`, `etat`, `plans`, `correctifs`, `mission`, `reste`) à quatre états, chacun prouvé par une trace locale : `a-faire` (aucun SUMMARY de plan), `en-cours` (au moins un plan fait, ou mission rattachée avec un nœud `running`), `a-recetter` (tous les plans faits, phase non cochée), `fait` (case de ROADMAP cochée) ; témoin rouge : STATE sur une autre phase et plans faits → `a-recetter` (aujourd'hui : à faire) (P69-D-02, D-03).
+- [ ] **CKPT-14**: Un plan est fait s'il a un `*-PLAN.md` et son `*-SUMMARY.md` ; les SUMMARY sans PLAN sont comptés à part (« N correctifs ») ; témoin rouge : 7 PLAN, 7 SUMMARY et 4 SUMMARY de correctif → `7/7 plans · 4 correctifs` (aujourd'hui : 11/7) (P69-D-04).
+- [ ] **CKPT-15**: Une mission est rattachée à sa phase dans l'ordre : champ `phase` du DAG, nom `MISSION-<n>`, DAG situé dans le dossier de la phase ; témoin rouge : DAG avec `phase: 67` → rattaché à la 67 (aujourd'hui : « Missions hors phase ») (P69-D-05).
+- [ ] **CKPT-16**: Le jalon est `en-cours` dès qu'une de ses phases est `en-cours` ou `a-recetter`, quel que soit le STATE ; son pied lit « N clos · N à recetter · N à faire · N % », pourcentage strict (phases closes seulement), jamais pondéré ; témoin rouge : jalon `📋` avec une phase `a-recetter` → `en-cours` (aujourd'hui : à faire) (P69-D-06).
+- [ ] **CKPT-17**: `reste` liste les étapes restantes déduites de traces locales seulement (recette humaine : un `*-RECETTE-HUMAINE.md` dont le statut n'est pas « FAITE » ; vérification : pas de `*-VERIFICATION.md` ; clôture : case de ROADMAP non cochée) ; aucune lecture réseau, CI, merge et PR ne sont ni lus ni affichés ; test qui le prouve (P69-D-07).
+- [ ] **CKPT-18**: La règle `ph.n === curPhase` (STATE → statut de phase) est retirée de `phaseStatus` : le STATE ne pilote plus le statut d'une phase sur la carte (un ajout = un retrait, SOBR-01..08) ; test qui rougit si elle réapparaît (P69-D-08).
 
 ---
 *Requirements defined: 2026-06-04*
