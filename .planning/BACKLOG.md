@@ -681,3 +681,12 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 - **À faire :** outiller ce va-et-vient à partir d'un fichier `*-RECETTE-HUMAINE.md` existant, sans jamais remplir une réponse à la place de l'humain.
 
 **Déclencheur de reprise :** la prochaine recette humaine de fin de phase.
+
+## Cockpit : anglais résiduel et coquilles du chrome — DIFFÉRÉ (2026-11-03)
+
+**Origine :** vérification Playwright des correctifs de la Phase 67 (`67-RECETTE-HUMAINE.md` § 6), laissée hors de la PR #187 par arbitrage Samuel (AskUserQuestion session principale, 2026-11-03).
+- Anglais dans le chrome : « Calls · 27 » dans le panneau, « ⌫ up » dans l'aide des raccourcis, « 1 minor » dans Santé.
+- Phrase mixte : « 1 fichier et points d'accès still use generated names. Run the skill again to describe them. »
+- Coquilles : « Les réponses viennent de le CLI Claude Code » (au lieu de « du CLI ») ; « 1 fichiers de code ».
+
+**Déclencheur de reprise :** la phase qui suit la 67 sur le cockpit (avec la refonte mobile).

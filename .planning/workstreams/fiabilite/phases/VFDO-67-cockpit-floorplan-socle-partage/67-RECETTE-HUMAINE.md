@@ -113,3 +113,24 @@ commence par `-`. Limite acceptée par construction : un secret passé en premie
 
 F-4 — « Acceptable » (Samuel, AskUserQuestion session principale, 2026-11-02) : à la dernière étape de la Trajectoire, la
 flèche droite ne ferme pas le parcours ; rien ne change.
+
+## 6. Vérification des correctifs par l'agent (Playwright, session principale, 2026-11-03)
+
+Contrôle d'agent, pas une réponse de Samuel. Il a été fait sur `00bbb02e`, serveurs redémarrés, avec Chrome via Playwright à 1 440 × 900.
+- D2 et D3 conformes : le tiroir a sa marge, son titre est entier, sa hauteur suit le contenu ; « Voir la dernière commande » affiche `git status …`.
+- D1 conforme : à l'étape 6 sur 6, le chevron « suivant » est désactivé et il ne reste qu'une croix.
+- « Bibliothèque » conforme.
+- I2 présent : `backdrop-filter: blur(8px)`, fond à 55 % d'opacité. Pas de constat visuel d'une carte passée sous le titre.
+- V1 conforme : « Où on en est » s'affiche dès la saisie après une question « pourquoi », sans nouvel appel à l'agent dans `serveur.log`.
+- I3 conforme : bascule d'un nœud de DAG sans rechargement, une seule animation (`vfpulse`), pied de carte repassé à 1/2.
+
+Retour de Samuel sur I2, mot pour mot (saisie texte, session principale, 2026-11-03) : « le flou sous le titre est trop dense, il faut aussi qu'il ai un radius fort en haut faible en bas, il doit etre comparable au blur iOS ».
+
+Constats nouveaux de l'agent. Arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 :
+- **Dans la PR #187** :
+  - O2 : le fil d'Ariane est tronqué à 1 440 px (« src » → « s… », « v2-c… », « Vue d… »).
+  - O3 : l'italique markdown n'est pas rendu dans les réponses (`*floorplan*`).
+  - O4 : la visite « Par où commencer » réapparaît à chaque chargement et recouvre la réponse.
+  - O1 : `cd <chemin> && …` n'affiche que « … ».
+  - O6 : les chevrons de la Trajectoire n'ont pas de libellé accessible.
+- **Au backlog** : O5, l'anglais et les coquilles du chrome (« Calls · 27 », « ⌫ up », « 1 minor », la phrase mixte « still use generated names. Run the skill again », « viennent de le CLI », « 1 fichiers »).
