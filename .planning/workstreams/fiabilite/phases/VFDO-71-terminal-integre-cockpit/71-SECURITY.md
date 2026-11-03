@@ -1,7 +1,7 @@
 # 71-SECURITY — audit sécurité et dette, Phase 71 (terminal intégré au cockpit)
 
-Nœud audit-71 · code figé à `227be6c5` (empreinte du commit audité à inscrire par l'audit) · 2026-11-03 · auditeur : à désigner par le manager · statut : **registre pré-rempli, audit non rendu**
-Verdict : à rendre par l'audit
+Nœud audit-71 · code audité `227be6c5` (HEAD de l'arbre au verdict : `d57ca6bd`, docs seulement depuis `227be6c5`) · 2026-11-04 · auditeur : `vf-auditer`, recoupé avec `gsd-security-auditor` · statut : **gaps_found** (0 bloquant, 2 majeurs, 7 mineurs)
+Verdict : gaps_found — rendu par vf-auditer le 2026-11-04 sur `227be6c5` ; correctifs de sécurité soumis à la validation de Samuel (ADR-031), voir § Verdict de l'audit
 
 Ce fichier est livré par le plan 71-09 (écrit par l'exécuteur, calqué sur la forme de `67-SECURITY.md`). Il contient le registre complet des menaces, la
 re-vérification demandée pour P71-D-09 à P71-D-19 (« à vérifier par l'audit », ADR-031) et l'état **mesuré** des suites qui prouvent chaque menace. Il ne rend
@@ -169,6 +169,60 @@ Décisions du manager (vf-dev-manager, 2026-11-03), prises sur mesures et non ar
 
 ## Verdict de l'audit
 
-À compléter par le manager avec le rapport de vf-auditer (ou de `gsd-secure-phase 71`) : verdict nommé, daté, attribué, empreinte du commit audité, état « fermée » ou « ouverte » relevé par l'auditeur pour chaque menace du registre. Ce plan n'en rend aucun.
+**gaps_found**, rendu par `vf-auditer` (recoupé avec `gsd-security-auditor`) le 2026-11-04 sur `227be6c5`. Aucun bloquant. Sondes rejouables
+dans le dossier temporaire de la mission (hors dépôt, `audit-71/probes/p1..p13.mjs`, Chrome 156 headless par CDP), chacune avec un témoin positif
+(mutant extrait par `git archive`, jamais dans l'arbre). L'arbre n'a pas été modifié par l'audit.
 
-_Section laissée vide._
+### Réponses aux dix questions (résumé)
+
+1. **Site tiers** : FERMÉ. POST `no-cors`, préflight, EventSource, WebSocket (403 à la poignée de main), formulaire `text/plain`, cadre de Q chez un
+   tiers, DNS rebinding : aucun marqueur, une seule session. Hors navigateur : 29 OK / 0 KO ; les mutants sans Origin, sans secret ou sans Host
+   rougissent ; le mutant « trio » laisse passer la brèche (le harnais sait la voir).
+2. **XSS de classe B2 dans P vers le shell** : FERMÉ pour l'exécution directe (stockage et document du cadre en `SecurityError`, `connect-src`,
+   préflight, cinq `postMessage` ignorés, `MessageEvent` forgé ignoré, popup illisible). Reste le presse-papiers (F2) et le popup de Q (F4).
+3. **Processus local, autre compte** : hypothèse mono-utilisateur écrite ; `server.json` et `terminal-amorce` en 0600 ; aucune valeur sensible
+   dans le journal ni dans l'environnement des processus ; MAIS l'argv de l'ouvreur porte l'amorçage (F6, course prouvée jusqu'au shell).
+4. **Jetons et secrets** : FERMÉ. Usage unique, lecture durcie, `timingSafeEqual` (non gardé par un test : F7) ; aucune occurrence dans HTTP, SSE,
+   export, `.vibeflow/cockpit/`, `ps`.
+5. **Sortie du shell** : FERMÉ. 35 séquences par le vrai pipeline : seules des réponses de format fixe sont réinjectées (DA1, DA2, DSR, CPR,
+   DECRQM, couleurs OSC) ; OSC 52 sans effet ; liens OSC 8 non HTTP neutralisés. Aucune CVE connue pour `@xterm/xterm` 6.0.0 ni `addon-fit` 0.11.0
+   (GHSA, OSV ; l'absence d'advisory n'est pas une preuve d'absence de défaut).
+6. **Cycle de vie** : fin de grâce, SIGKILL et `stop` tuent arrière-plan, avant-plan, shell et assistant en moins de 2 s ; `nohup` survit (A5) ;
+   session unique (409) ; inactivité tenue. La revue a mesuré un intermittent sur les travaux d'arrière-plan (S1, T12.4) : traité au lot B.
+7. **Environnement du shell** : FERMÉ, conforme à P71-D-03, D-14, D-23 ; descripteurs 0, 1, 2 seulement.
+8. **P71-D-24** : aucune voie ouverte ; sans secret, la branche navigateur n'est jamais atteinte ; résiduel : si le secret fuit, Origin n'est plus
+   une seconde barrière pour `GET /flux` et `GET /etat`.
+9. **Chaîne d'approvisionnement** : vendor identique à l'octet au tarball npm (sha512 = `dist.integrity`) ; altération = terminal non démarré
+   (échec fermé) ; assistant en `python3 -I` ; MAIS `python3` résolu par un `PATH` relatif ou vide dans le cwd du lab (F3) et lanceur qui ouvre une
+   URL tirée du lab (F1).
+10. **Socle 67** : FERMÉ. Sans `--terminal`, `/` et `/project.html` identiques à la base `7370d604` (23 empreintes, même CSP) ; M4 tenu.
+
+### Findings
+
+| Id | Sévérité | Constat | Suite |
+|----|----------|---------|-------|
+| F1 | majeur | `vf-cockpit.mjs` ouvre `terminal.url` lu dans `.cache/server.json` d'un lab piégé, sans vérifier le processus (`file:///…` remis à l'ouvreur, sondé par un ouvreur factice) — famille M3 de la 67 | lot B, validation Samuel |
+| F2 | majeur | Collage piégé : une page P compromise écrit le presse-papiers, le collage dans le tiroir exécute (bash 3.2 immédiat, zsh à l'Entrée) | lot B, choix Samuel (Q10) |
+| F3 | mineur | `spawn('python3', cwd=lab)` : `PATH` relatif ou vide = `<lab>/python3` exécuté par le serveur | lot B |
+| F4 | mineur | Popup de Q ouvert par P : hérite de l'identifiant d'onglet, prend la session ou lance un shell sans frappe | lot B |
+| F5 | mineur | Le vendor xterm garde un écouteur `message` sans contrôle d'origine : P71-D-15 et T-71-33/34 à reformuler (« Q n'a aucun écouteur propre ») | lot B (doc) |
+| F6 | mineur | L'amorçage dans l'argv de l'ouvreur est lisible de tout utilisateur (`ps`) et donne le shell | lot B, choix Samuel (Q11) |
+| F7 | mineur | Dette de test : T-71-10 et sept mitigations sans assertion rouge | lot A2 (et A1 pour `allowNonHttpProtocols`) |
+| F8 | mineur | Libellé de TERM-10 inexact (réponses de format fixe réinjectées) | lot B (doc) |
+| F9 | mineur | Ce fichier à compléter ; recette humaine non jouée (T-71-46) | fait (ce paragraphe) ; recette à jouer |
+
+### Mitigations
+
+Fermées par sonde : T-71-01 à 09, 11 à 32, 35 à 45, 47, 48 et T-71-SC ; T-71-33 et T-71-34 avec réserve (F5) ; T-71-31 avec réserve (CSI 21t jamais
+exercé, xterm 6.0 n'y répond pas). Ouvertes, non bloquantes : T-71-10 (correcte à la lecture, non gardée), T-71-46 (recette). Deux menaces neuves à
+inscrire au registre : F1, F2.
+
+### Limites de la mesure
+
+macOS seulement (Linux et `dash` non mesurés, `xdg-open` lu) ; un seul compte (F6 inter-comptes déduit de la lisibilité de `ps`) ; F1 prouvé avec
+un ouvreur factice ; F2 par un collage CDP, glisser-déposer non sondé ; matrice de séquences xterm de 35 cas, sans fuzz.
+
+### Suite donnée (manager, 2026-11-04)
+
+Correctifs ordinaires de revue et de design lancés (lots A1, A2). Correctifs de sécurité (F1 à F6, F8) soumis à la validation de Samuel (ADR-031)
+avec trois choix (Q10 collage, Q11 amorçage hors argv, Q12 périmètre de l'arrêt) ; un re-audit ciblé suivra les correctifs.
