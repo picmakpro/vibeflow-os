@@ -682,6 +682,13 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 
 **Déclencheur de reprise :** la prochaine recette humaine de fin de phase.
 
+## Cockpit : « Où en est-on ? » sur un lab sans STATE rend des champs vides — DIFFÉRÉ (2026-11-03)
+
+**Origine :** relecture adverse SOBR-04 de la release v2.75.0 (finding F5), reportée par arbitrage Samuel (« Corriger maintenant (Recommandé) » pour F1 à F4, F5 au BACKLOG ; AskUserQuestion session principale, 2026-11-03).
+- Sur un lab sans `STATE.md`, la voie locale répond « Jalon en cours : non reconnu. Dernière phase :  · , le ?. » : les champs absents sont rendus vides au lieu d'être omis ou nommés. `plugin/cockpit/scripts/vf-cockpit-ask.mjs:107`. Cosmétique, pas de crash.
+
+**Déclencheur de reprise :** la phase qui suit la 67 sur le cockpit.
+
 ## Cockpit : anglais résiduel et coquilles du chrome — DIFFÉRÉ (2026-11-03)
 
 **Origine :** vérification Playwright des correctifs de la Phase 67 (`67-RECETTE-HUMAINE.md` § 6), laissée hors de la PR #187 par arbitrage Samuel (AskUserQuestion session principale, 2026-11-03).
