@@ -8,13 +8,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { planningLayout } from './vf-cockpit-paths.mjs';
-import { readPlanning, clip, sentence, num, normNum, fm, list } from './vf-cockpit-planning.mjs';
+import { readPlanning, clip, sentence, num, fm, list } from './vf-cockpit-planning.mjs';
+import { trouverPhase, LIBELLES_RESTE } from './vf-cockpit-avancement.mjs';
 import { KIND_ICONS, KIND_COLORS } from './vf-cockpit-types.mjs';
 
 const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };
 const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
 const DST = { done: 'done', running: 'active', ready: 'todo', blocked: 'todo', failed: 'blocked' }; // dag.sh : blocked = en attente des deps
 const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
+// projection de l'état d'avancement sur les statuts du viewer : « à recetter » prend la couleur « en cours » (P69-D-25, P69-PL-02) ; l'état exact reste dans avancement.etat
+const PROJECTION_ST = { fait: 'done', 'a-recetter': 'active', 'en-cours': 'active', 'a-faire': 'todo' };
+// pied de jalon : « N clos · [N en cours · ]N à recetter · N à faire · N % » ; le pourcentage ne compte que les phases closes (P69-D-06, P69-PL-03)
+function piedJalon(ks) {
+  const n = (e) => ks.filter((p) => p.avancement.etat === e).length; const clos = n('fait'), enc = n('en-cours');
+  return [`${clos} clos`, enc ? `${enc} en cours` : '', `${n('a-recetter')} à recetter`, `${n('a-faire')} à faire`, `${pct(clos, ks.length)} %`].filter(Boolean).join(' · ');
+}
 
 export function buildProjectGraph(root, { layout } = {}) {
   root = path.resolve(root); layout = layout || planningLayout(root);
@@ -26,14 +34,11 @@ export function buildProjectGraph(root, { layout } = {}) {
   const curPhase = String(state.current_phase || '');
   const count = new Map(); for (const ph of phases.values()) count.set(ph.n, (count.get(ph.n) || 0) + 1);
   const phId = (ph) => (count.get(ph.n) > 1 && ph.ws ? `ph-${ph.n}@${ph.ws}` : `ph-${ph.n}`);
-  // une référence se résout d'abord dans le compartiment qui la porte, sinon par numéro unique dans le lab
-  const findPhase = (n, ws) => { const c = [...phases.values()].filter((p) => p.n === normNum(n)); return c.find((p) => (p.ws || '') === (ws || '')) || (c.length === 1 ? c[0] : null); };
   const dirOf = (ph) => P.phaseDirs.get(`${ph.ws || ''}|${ph.n}`) || P.phaseDirs.get(`*|${ph.n}`);
   const reqOf = (id, ws) => reqs.get(`${ws || ''}|${id}`) || reqs.get(`*|${id}`);
   const reqPath = (r) => `req/${r.ws ? r.ws + '/' : ''}${r.id}`;
   const ownReqs = (ph) => [...reqs.values()].filter((r) => r.phase === ph.n && (r.wsKey === '*' || r.wsKey === (ph.ws || '')));
-  const activeWs = layout.forme === 'partitionne' ? layout.actif : null;
-  const phaseStatus = (ph) => ph.done ? 'done' : (ph.n === curPhase && state.status !== 'closed' && (!activeWs || ph.ws === activeWs)) ? 'active' : 'todo';
+  const phaseStatus = (ph) => PROJECTION_ST[ph.avancement.etat] || 'todo'; // l'avancement vient des fichiers, jamais du STATE (CKPT-18)
 
   // jalons : ceux de la section « ## Milestones », sinon un jalon synthétique « Phases » ; les phases orphelines y vont aussi
   const inMs = new Set(P.milestones.flatMap((m) => [...m.phases]));
@@ -44,7 +49,8 @@ export function buildProjectGraph(root, { layout } = {}) {
   const msList = ms0.map((ms) => {
     const ks = [...ms.phases].map((k) => phases.get(k)).filter(Boolean).sort(sortPh);
     const done = ks.filter((p) => p.done).length;
-    const st = ms.icon === '✅' ? 'done' : done > 0 && done < ks.length ? 'active' : done === ks.length && ks.length ? 'done' : ms.icon === '🚧' || (ms.synthetic && ks.length) ? 'active' : 'todo';
+    const enCours = ks.some((p) => p.avancement.etat === 'en-cours' || p.avancement.etat === 'a-recetter');
+    const st = ms.icon === '✅' ? 'done' : done === ks.length && ks.length ? 'done' : enCours || done > 0 || ms.icon === '🚧' || (ms.synthetic && ks.length) ? 'active' : 'todo';
     return { ...ms, ks, done, st };
   });
   const closed = msList.filter((m) => m.st === 'done');
@@ -53,7 +59,7 @@ export function buildProjectGraph(root, { layout } = {}) {
   for (const ms of msList) {
     const wk = ms.ws || '';
     const msId = node({ id: ms.id, parent: ms.st === 'done' ? hist : null, label: ms.key, kind: 'jalon', summary: sentence(ms.text.replace(/^[^—]*—\s*/, ''), 180) || ms.text, details: ms.text, st: ms.st,
-      foot: `${ms.done}/${ms.ks.length} phases · ${pct(ms.done, ms.ks.length)} %`, tags: [ms.ws ? 'compartiment ' + ms.ws : ''].filter(Boolean) });
+      foot: piedJalon(ms.ks), tags: [ms.ws ? 'compartiment ' + ms.ws : ''].filter(Boolean) });
     const pv = prev.get(wk);
     if (pv && ms.st !== 'done' && closed.some((m) => m.id === pv)) { link('n:history', 'n:' + msId, 'event', 'puis'); prev.set(wk, msId); }
     else if (pv && pv !== msId) { link('n:' + pv, 'n:' + msId, 'event', 'puis'); prev.set(wk, msId); }
@@ -65,15 +71,16 @@ export function buildProjectGraph(root, { layout } = {}) {
     const planFiles = ls(dir).filter((f) => /-PLAN\.md$/.test(f)).sort();
     const sums = new Set(ls(dir).filter((f) => /-SUMMARY\.md$/.test(f)).map((f) => f.replace('-SUMMARY.md', '')));
     const av = ph.avancement;
+    const enCours = P.dags.filter((d) => d.phaseKey === ph.key).flatMap((d) => d.nodes.filter((x) => x?.status === 'running')); // un plan non fait est actif si un nœud running d'une mission rattachée le désigne (P69-PL-04)
     const phReqs = ownReqs(ph); const id = phId(ph);
     node({ id, parent: msId, label: `Phase ${ph.n} · ${ph.name}`, kind: 'phase', num: ph.n, ws: ph.ws, summary: sentence(ph.goal || ph.line || ph.name, 200),
-      details: [ph.goal, ph.depends.length ? `Dépend de : Phase ${ph.depends.join(', ')}.` : '', ph.line ? `Ligne de ROADMAP : ${ph.line}` : '', `Source : ${ph.roadmap}${dir ? ` · dossier ${rel(dir)}` : ''}`].filter(Boolean).join('\n\n'),
-      st, foot: [av.plans.total ? `${av.plans.faits}/${av.plans.total} plans` : '', av.correctifs ? `${av.correctifs} correctif${av.correctifs > 1 ? 's' : ''}` : '', phReqs.length ? `${phReqs.filter((r) => r.done).length}/${phReqs.length} exigences` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [] });
+      details: [ph.goal, av.reste.length ? `Reste : ${av.reste.map((c) => LIBELLES_RESTE[c]).join(', ')}.` : '', av.mission ? `Mission : ${av.mission.nom} (${av.mission.etat}).` : '', ph.depends.length ? `Dépend de : Phase ${ph.depends.join(', ')}.` : '', ph.line ? `Ligne de ROADMAP : ${ph.line}` : '', `Source : ${ph.roadmap}${dir ? ` · dossier ${rel(dir)}` : ''}`].filter(Boolean).join('\n\n'),
+      st, foot: [av.etat === 'a-recetter' ? 'à recetter' : '', av.plans.total ? `${av.plans.faits}/${av.plans.total} plans` : '', av.correctifs ? `${av.correctifs} correctif${av.correctifs > 1 ? 's' : ''}` : '', phReqs.length ? `${phReqs.filter((r) => r.done).length}/${phReqs.length} exigences` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [] });
     for (const pf of planFiles) {
       const txt = read(path.join(dir, pf)); const meta = fm(txt); const pid = pf.replace('-PLAN.md', '');
       const obj = /<objective>\s*([\s\S]*?)<\/objective>/.exec(txt)?.[1] || /^#\s+(.*)$/m.exec(txt)?.[1] || '';
       const touched = list(meta.files_modified); const p = rel(path.join(dir, pf));
-      file({ p, n: id, name: `${pid} — ${clip(obj.split('\n').find((l) => l.trim()) || '', 70)}`, d: sentence(obj, 220), st: sums.has(pid) || ph.done ? 'done' : st === 'active' ? 'active' : 'todo',
+      file({ p, n: id, name: `${pid} — ${clip(obj.split('\n').find((l) => l.trim()) || '', 70)}`, d: sentence(obj, 220), st: sums.has(pid) || ph.done ? 'done' : enCours.some((x) => x.id === pid || (Array.isArray(x.scope) && x.scope.includes(p))) ? 'active' : 'todo',
         foot: `vague ${meta.wave || '?'}${touched.length ? ` · ${touched.length} fichiers` : ''}`, note: touched.length ? `Fichiers touchés : ${touched.slice(0, 12).join(', ')}${touched.length > 12 ? ` … (+${touched.length - 12})` : ''}` : undefined, touched });
       for (const dep of list(meta.depends_on)) { const dp = planFiles.find((x) => x.startsWith(dep.length <= 3 ? `${pf.split('-')[0]}-${dep.padStart(2, '0')}` : dep)); if (dp) link('f:' + rel(path.join(dir, dp)), 'f:' + p, 'import', 'puis'); }
       for (const r of list(meta.requirements)) { const rq = reqOf(r, ph.ws); if (rq) link('f:' + p, 'f:' + reqPath(rq), 'data', 'couvre'); }
@@ -83,13 +90,12 @@ export function buildProjectGraph(root, { layout } = {}) {
       for (const r of phReqs) file({ p: reqPath(r), n: rId, name: r.id, d: sentence(r.text, 220), st: r.done ? 'done' : 'todo', foot: r.file.split('/').pop() });
     }
   }
-  for (const ph of phases.values()) for (const d of ph.depends) { const dp = findPhase(d, ph.ws); if (dp && nodes.some((n) => n.id === phId(dp)) && nodes.some((n) => n.id === phId(ph))) link('n:' + phId(dp), 'n:' + phId(ph), 'import', 'dépend de'); }
+  for (const ph of phases.values()) for (const d of ph.depends) { const dp = trouverPhase(phases, d, ph.ws); if (dp && nodes.some((n) => n.id === phId(dp)) && nodes.some((n) => n.id === phId(ph))) link('n:' + phId(dp), 'n:' + phId(ph), 'import', 'dépend de'); }
 
-  // missions : chaque DAG rattaché à sa phase quand son nom le dit, sinon « hors phase »
+  // missions : chaque DAG rattaché à sa phase par le module d'avancement (champ `phase`, nom, dossier de phase), sinon « hors phase »
   let orphan = null;
   for (const d of P.dags) {
-    const k = /^MISSION-(\d+(?:\.\d+)?)/.exec(d.name)?.[1];
-    const tp = k ? findPhase(k, d.ws) : null;
+    const tp = d.phaseKey ? phases.get(d.phaseKey) : null;
     let parent = tp && nodes.some((n) => n.id === phId(tp)) ? phId(tp) : null;
     if (!parent) { orphan ||= node({ id: 'missions', parent: null, label: 'Missions hors phase', kind: 'mission', summary: 'Plans de bataille de missions qui ne portent pas un numéro de phase.' }); parent = orphan; }
     const doneN = d.nodes.filter((x) => x.status === 'done').length;
@@ -123,7 +129,7 @@ export function buildProjectGraph(root, { layout } = {}) {
       kindLabels: { import: 'Dépend de', event: 'Enchaînement', data: 'Couvre', queue: 'Étape suivante', call: 'Dispatche', contains: 'Contient' },
       vf: { milestone: state.milestone, phase: curPhase, phaseName: state.current_phase_name, status: state.status, lastActivity: state.last_activity, lastDesc: state.last_activity_desc, progress: state.progress,
         milestones: msList.map((m) => ({ key: m.key, st: m.st, done: m.done, total: m.ks.length, id: 'n:' + m.id })),
-        next: active ? active.ks.filter((p) => !p.done).map((p) => ({ id: 'n:' + phId(p), label: `Phase ${p.n} · ${p.name}` })) : [],
+        next: active ? active.ks.filter((p) => !p.done).map((p) => ({ id: 'n:' + phId(p), label: `Phase ${p.n} · ${p.name}`, etat: p.avancement.etat })) : [],
         counts: { phases: phases.size, plans: files.filter((f) => f.p.endsWith('-PLAN.md')).length, reqs: reqs.size, reqsDone: [...reqs.values()].filter((r) => r.done).length, dags: P.dags.length } },
       layout: { forme: layout.forme, actif: layout.actif } },
     project: { name: `${P.projectName} — Projet`, summary: resume(state, curPhase, phases.size, files) },

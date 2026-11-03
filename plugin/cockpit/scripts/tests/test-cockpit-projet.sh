@@ -103,11 +103,11 @@ wr "$B/phases/02-ecran/02-01-PLAN.md" <<'MD'
 MD
 graph "$L1" "$WORK/g1.json"
 echo "=== P1 — lab plat au gabarit GSD ==="
-assert_eq "P1.1 — ph-1 done, ph-2 active" "$(G "$WORK/g1.json" 'j.nodes.filter(n=>/^ph-\d$/.test(n.id)).map(n=>n.id+":"+n.st).join(",")')" "ph-1:done,ph-2:active"
-assert_eq "P1.2 — plan 01-01 done, 02-01 active" "$(G "$WORK/g1.json" 'j.files.filter(f=>/^0\d-01 /.test(f.name)).map(f=>f.name.slice(0,5)+":"+f.st).join(",")')" "01-01:done,02-01:active"
+assert_eq "P1.1 — ph-1 done, ph-2 todo (le STATE ne pilote plus le statut : aucun plan fait en phase 2, CKPT-18)" "$(G "$WORK/g1.json" 'j.nodes.filter(n=>/^ph-\d$/.test(n.id)).map(n=>n.id+":"+n.st).join(",")')" "ph-1:done,ph-2:todo"
+assert_eq "P1.2 — plan 01-01 done, 02-01 todo (aucun nœud running ne le désigne, CKPT-18)" "$(G "$WORK/g1.json" 'j.files.filter(f=>/^0\d-01 /.test(f.name)).map(f=>f.name.slice(0,5)+":"+f.st).join(",")')" "01-01:done,02-01:todo"
 assert_eq "P1.3 — lien ph-1 vers ph-2 de type import" "$(G "$WORK/g1.json" 'j.links.filter(l=>l.a==="n:ph-1"&&l.b==="n:ph-2"&&l.k==="import").length')" "1"
 assert_eq "P1.4 — exigence AUTH-01 sous ph-1.req" "$(G "$WORK/g1.json" 'j.files.filter(f=>f.n==="ph-1.req").map(f=>f.name).join(",")')" "AUTH-01"
-assert_eq "P1.5 — jalon v1.0 MVP actif, pied 1/2" "$(G "$WORK/g1.json" 'j.nodes.filter(n=>n.id==="ms-v1.0-mvp").map(n=>n.st+"|"+n.foot).join(",")')" "active|1/2 phases · 50 %"
+assert_eq "P1.5 — jalon v1.0 MVP actif, pied « 1 clos · 0 à recetter · 1 à faire · 50 % » (CKPT-16)" "$(G "$WORK/g1.json" 'j.nodes.filter(n=>n.id==="ms-v1.0-mvp").map(n=>n.st+"|"+n.foot).join(",")')" "active|1 clos · 0 à recetter · 1 à faire · 50 %"
 assert_eq "P1.6 — meta.vf.phase = 2" "$(G "$WORK/g1.json" 'j.meta.vf.phase')" "2"
 
 # ---------- P2 — lab partitionné, deux compartiments, numéros uniques ----------

@@ -1,13 +1,14 @@
 // vf-cockpit-planning — lecteurs de .planning (plat, partitionné, archivé) du socle du cockpit (CKPT-06).
 // Export principal : readPlanning(root, layout) -> { phases, phaseDirs, reqs, milestones, state, dags,
-//   backlog, seeds, tags, projectName }. Utilitaires partagés : fm, clip, sentence, list, num, normNum.
+//   backlog, seeds, tags, projectName } ; chaque phase porte `avancement` (vf-cockpit-avancement.mjs), chaque DAG `phaseKey` et `regle`.
+//   lireDags(root, layout) : la découverte unique des DAG (compartiments, .planning, .planning/missions, dossiers de phase). Utilitaires partagés : fm, clip, sentence, list, num, normNum.
 // Identité d'une phase = couple (compartiment, numéro) : `key` = `<ws>|<n>` ('' pour un lab plat).
 // Aucun nom de compartiment, de jalon ou de projet codé en dur. Lecture seule.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { planningLayout, stateFile } from './vf-cockpit-paths.mjs';
-import { avancement } from './vf-cockpit-avancement.mjs';
+import { avancement, rattacherMission } from './vf-cockpit-avancement.mjs';
 
 const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };
 const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
@@ -62,12 +63,43 @@ function parseMilestones(txt, ws, phases, out) {
   }
 }
 
+// dossiers de phase : NN-slug ou PREFIXE-NN-slug ; clé `<ws>|<n>`, repli `*|<n>` pour les archives
+function dossiersDePhase(B, comps) {
+  const phaseDirs = new Map(); const archives = ls(path.join(B, 'milestones'));
+  const bases = [...comps.map((c) => [c.ws || '', path.join(c.dir, 'phases')]), ...archives.filter((d) => d.endsWith('-phases')).map((d) => ['*', path.join(B, 'milestones', d)])];
+  for (const [ws, base] of bases) for (const d of ls(base)) {
+    const m = /^(?:[A-Z][A-Z0-9]*-)?(\d+(?:\.\d+)?)-/.exec(d);
+    if (m && !phaseDirs.has(`${ws}|${normNum(m[1])}`)) phaseDirs.set(`${ws}|${normNum(m[1])}`, path.join(base, d));
+  }
+  return phaseDirs;
+}
+
+// DAG : .planning, chaque compartiment, .planning/missions, puis chaque dossier de phase (JSON illisible ignoré).
+// Chaque DAG : name, ws (dossier), wsDeclare (champ `ws` du DAG), phase (champ `phase` du DAG), file, nodes, dossierPhase.
+export function lireDags(root, layout, phaseDirs) {
+  root = path.resolve(root); layout = layout || planningLayout(root);
+  const B = path.join(root, '.planning'); const comps = layout.compartiments || [];
+  phaseDirs ||= dossiersDePhase(B, comps);
+  const dags = []; const seen = new Set();
+  const lots = [...comps.map((c) => [c.ws, c.dir, null]), [null, B, null], [null, path.join(B, 'missions'), null],
+    ...[...phaseDirs].map(([k, d]) => [k.split('|')[0] === '*' || k.startsWith('|') ? null : k.split('|')[0], d, k])];
+  for (const [ws, d, dossierPhase] of lots) {
+    if (seen.has(d)) continue; seen.add(d);
+    for (const f of ls(d).filter((x) => x.endsWith('.dag.json'))) {
+      let j; try { j = JSON.parse(read(path.join(d, f))); } catch { continue; }
+      if (j && Array.isArray(j.nodes)) dags.push({ name: f.replace(/\.dag\.json$/, ''), ws, wsDeclare: typeof j.ws === 'string' ? j.ws : null,
+        phase: typeof j.phase === 'string' || typeof j.phase === 'number' ? String(j.phase) : null, file: path.relative(root, path.join(d, f)).split(path.sep).join('/'), nodes: j.nodes, dossierPhase });
+    }
+  }
+  return dags;
+}
+
 export function readPlanning(root, layout) {
   root = path.resolve(root); layout = layout || planningLayout(root);
   const B = path.join(root, '.planning');
   const rel = (abs) => path.relative(root, abs).split(path.sep).join('/');
   const archives = ls(path.join(B, 'milestones'));
-  const phases = new Map(), reqs = new Map(), milestones = [], phaseDirs = new Map();
+  const phases = new Map(), reqs = new Map(), milestones = [];
   const comps = layout.compartiments.length ? layout.compartiments : [];
 
   for (const c of comps) parseRoadmap(read(path.join(c.dir, 'ROADMAP.md')), c.ws, rel(path.join(c.dir, 'ROADMAP.md')), phases);
@@ -79,12 +111,7 @@ export function readPlanning(root, layout) {
   for (const c of comps) parseMilestones(read(path.join(c.dir, 'ROADMAP.md')), c.ws, phases, milestones);
   for (const ms of milestones) for (const k of [...ms.phases]) if (!phases.has(k)) ms.phases.delete(k);
 
-  // dossiers de phase : NN-slug ou PREFIXE-NN-slug ; clé `<ws>|<n>`, repli `*|<n>` pour les archives
-  const bases = [...comps.map((c) => [c.ws || '', path.join(c.dir, 'phases')]), ...archives.filter((d) => d.endsWith('-phases')).map((d) => ['*', path.join(B, 'milestones', d)])];
-  for (const [ws, base] of bases) for (const d of ls(base)) {
-    const m = /^(?:[A-Z][A-Z0-9]*-)?(\d+(?:\.\d+)?)-/.exec(d);
-    if (m && !phaseDirs.has(`${ws}|${normNum(m[1])}`)) phaseDirs.set(`${ws}|${normNum(m[1])}`, path.join(base, d));
-  }
+  const phaseDirs = dossiersDePhase(B, comps);
 
   // exigences : cases à cocher et table de traçabilité, rattachées dans le compartiment du fichier porteur
   const reqFiles = [...comps.map((c) => [c.ws || '', path.join(c.dir, 'REQUIREMENTS.md')]), ...archives.filter((f) => f.endsWith('-REQUIREMENTS.md')).map((f) => ['*', path.join(B, 'milestones', f)])];
@@ -99,19 +126,15 @@ export function readPlanning(root, layout) {
   const state = fm(sTxt);
   if (!state.current_phase) { const b = new RegExp(`^Phase:\\s*${NUM}`, 'm').exec(sTxt)?.[1]; if (b) state.current_phase = normNum(b); }
 
-  // DAG : .planning, chaque compartiment, .planning/missions (JSON illisible ignoré)
-  const dags = []; const seen = new Set();
-  for (const [ws, d] of [...comps.map((c) => [c.ws, c.dir]), [null, B], [null, path.join(B, 'missions')]]) {
-    if (seen.has(d)) continue; seen.add(d);
-    for (const f of ls(d).filter((x) => x.endsWith('.dag.json'))) {
-      let j; try { j = JSON.parse(read(path.join(d, f))); } catch { continue; }
-      if (j && Array.isArray(j.nodes)) dags.push({ name: f.replace(/\.dag\.json$/, ''), ws, file: rel(path.join(d, f)), nodes: j.nodes });
-    }
+  // DAG puis avancement de chaque phase : missions rattachées par rattacherMission, état calculé sur les fichiers du dossier
+  const dags = lireDags(root, layout, phaseDirs); const parPhase = new Map();
+  for (const d of dags) {
+    const r = rattacherMission(d, phases); d.phaseKey = r ? r.cle : null; d.regle = r ? r.regle : null;
+    if (r) parPhase.set(r.cle, [...(parPhase.get(r.cle) || []), { nom: d.name, regle: r.regle, nodes: d.nodes }]);
   }
-  // avancement de chaque phase, calculé sur les fichiers de son dossier (CKPT-13, CKPT-14)
   for (const ph of phases.values()) {
     const dir = phaseDirs.get(`${ph.ws || ''}|${ph.n}`) || phaseDirs.get(`*|${ph.n}`);
-    ph.avancement = avancement({ fichiers: ls(dir) });
+    ph.avancement = avancement({ ph, fichiers: ls(dir), missions: parPhase.get(ph.key) || [], lire: (f) => read(path.join(dir, f)) });
   }
   const backlog = read(path.join(B, 'BACKLOG.md'));
   const seeds = ls(path.join(B, 'seeds')).filter((f) => f.endsWith('.md')).map((f) => ({ file: rel(path.join(B, 'seeds', f)), text: read(path.join(B, 'seeds', f)) }));

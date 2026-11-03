@@ -1,6 +1,18 @@
 // vf-cockpit-avancement — avancement d'une phase, calculé en bibliothèque du socle (CKPT-13 à CKPT-17 ; P69-D-01 à P69-D-09).
-// Exports : decompte, avancement (la tâche suivante ajoute ETATS, RESTE, libellés, rattachement des missions, reste).
+// Exports : ETATS, RESTE, LIBELLES_ETAT, LIBELLES_RESTE, decompte, trouverPhase, rattacherMission, etatMission, reste, avancement.
+// Contrat figé en version 1 (déclaré dans vf-cockpit-interface.json, clé `avancement`, lu par la Phase 68) :
+//   { version: 1, etat, plans: { faits, total }, correctifs, mission: { nom, etat } | null, reste: [codes] } — ajouts de champs seulement.
 // Module pur : ne lit que ce qu'on lui passe, aucune lecture réseau, aucun nom de lab codé en dur.
+
+export const ETATS = ['a-faire', 'en-cours', 'a-recetter', 'fait'];
+export const RESTE = ['recette', 'verification', 'cloture'];
+export const LIBELLES_ETAT = { 'a-faire': 'à faire', 'en-cours': 'en cours', 'a-recetter': 'à recetter', fait: 'fait' };
+export const LIBELLES_RESTE = { recette: 'recette humaine', verification: 'vérification', cloture: 'clôture' };
+
+const NUM_STRICT = /^\d+(?:\.\d+)?$/;
+const MOTIF_MISSION = /^MISSION-(\d+(?:\.\d+)?)/;
+// 01 -> 1, 02.1 -> 2.1 (même règle que normNum de vf-cockpit-planning, qui importe ce module : pas de cycle)
+const norm = (s) => { const [a, b] = String(s).split('.'); return `${Number(a)}${b !== undefined ? '.' + b : ''}`; };
 
 // Un plan est fait s'il a son *-PLAN.md ET son *-SUMMARY.md ; un SUMMARY sans PLAN est un correctif (P69-D-04).
 // `fichiers` = noms de fichiers du dossier de phase. Rend { faits, total, correctifs }.
@@ -16,8 +28,67 @@ export function decompte(fichiers) {
   return { faits, total: plans.size, correctifs };
 }
 
-// Objet versionné posé par readPlanning sur chaque phase (contrat figé en version 1 : ajouts de champs seulement).
-export function avancement({ fichiers } = {}) {
+// Une référence de phase se résout d'abord dans le compartiment qui la porte, sinon par numéro unique dans le lab.
+// Comparaison par égalité après normalisation ; jamais une RegExp construite depuis une valeur du lab (T-69-08).
+export function trouverPhase(phases, n, ws) {
+  if (!NUM_STRICT.test(String(n))) return null;
+  const c = [...phases.values()].filter((p) => p.n === norm(n));
+  return c.find((p) => (p.ws || '') === (ws || '')) || (c.length === 1 ? c[0] : null);
+}
+
+// Rattachement d'une mission à une phase (P69-D-05) : règle 1 le champ `phase` du DAG (il décide seul, P69-PL-06),
+// règle 2 le nom `MISSION-<n>`, règle 3 le dossier de phase qui le porte. Rend { cle, regle } ou null (hors phase).
+export function rattacherMission(dag, phases) {
+  const ws = dag.ws || dag.wsDeclare || null;
+  if (dag.phase != null) { const p = trouverPhase(phases, dag.phase, ws); return p ? { cle: p.key, regle: 1 } : null; }
+  const k = MOTIF_MISSION.exec(dag.name || '')?.[1];
+  if (k) { const p = trouverPhase(phases, k, ws); if (p) return { cle: p.key, regle: 2 }; }
+  if (dag.dossierPhase) {
+    const [w, n] = String(dag.dossierPhase).split('|');
+    const p = trouverPhase(phases, n, w === '*' || w === '' ? null : w);
+    if (p) return { cle: p.key, regle: 3 };
+  }
+  return null;
+}
+
+// État d'une mission, vocabulaire de dag.sh : running > failed > done (tous, au moins un nœud) > ready.
+export function etatMission(nodes) {
+  const ns = Array.isArray(nodes) ? nodes : [];
+  if (ns.some((x) => x?.status === 'running')) return 'running';
+  if (ns.some((x) => x?.status === 'failed')) return 'failed';
+  if (ns.length && ns.every((x) => x?.status === 'done')) return 'done';
+  return 'ready';
+}
+
+// Étapes restantes (P69-D-07, P69-PL-07) : seulement ce que disent les fichiers du dossier de phase et la case de ROADMAP.
+// `lire(nom)` rend le texte d'un fichier du dossier. Vide pour une phase `fait`.
+export function reste({ ph, fichiers, lire }) {
+  if (ph?.done) return [];
+  const fs = fichiers || [], r = [];
+  const rec = fs.filter((f) => f.endsWith('-RECETTE-HUMAINE.md')).sort()[0];
+  if (rec) {
+    const ligne = String((lire && lire(rec)) || '').split('\n').find((l) => l.startsWith('**Statut :')) || '';
+    if (!ligne.split(/[^\p{L}\p{N}]+/u).includes('FAITE')) r.push('recette');
+  }
+  if (!fs.some((f) => f.endsWith('-VERIFICATION.md'))) r.push('verification');
+  r.push('cloture');
+  return r;
+}
+
+// Mission désignée quand plusieurs sont rattachées : celle qui a un nœud `running`, puis la plus petite règle, puis le nom le plus petit.
+function choisir(missions) {
+  const l = missions.map((m) => ({ nom: m.nom, regle: m.regle ?? 9, etat: etatMission(m.nodes) }));
+  l.sort((a, b) => (b.etat === 'running') - (a.etat === 'running') || a.regle - b.regle || (a.nom < b.nom ? -1 : a.nom > b.nom ? 1 : 0));
+  return l.length ? { nom: l[0].nom, etat: l[0].etat } : null;
+}
+
+// Objet versionné posé par readPlanning sur chaque phase. `missions` = [{ nom, regle, nodes }] rattachées à la phase.
+// Évaluation (P69-D-03) : fait (case cochée) > a-recetter (tous les plans faits) > en-cours (un plan fait ou un nœud running) > a-faire.
+// Ni current_phase ni le compartiment actif n'entrent dans le calcul.
+export function avancement({ ph, fichiers, missions, lire } = {}) {
+  const ms = missions || [];
   const { faits, total, correctifs } = decompte(fichiers);
-  return { version: 1, plans: { faits, total }, correctifs };
+  const lance = ms.some((m) => etatMission(m.nodes) === 'running');
+  const etat = ph?.done ? 'fait' : total > 0 && faits === total ? 'a-recetter' : faits > 0 || lance ? 'en-cours' : 'a-faire';
+  return { version: 1, etat, plans: { faits, total }, correctifs, mission: choisir(ms), reste: reste({ ph, fichiers, lire }) };
 }
