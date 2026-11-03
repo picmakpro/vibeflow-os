@@ -45,6 +45,12 @@
 # `mark-progress --ws`). Un DAG sans `ws` garde le comportement d'avant, octet pour octet (lecture
 # tolerante, P-02). `--ws` est refuse hors `init`.
 #
+# phase (verrou de phase, regle de Samuel session principale 2026-11-03 + arbitrage « Un verrou par phase »,
+# AskUserQuestion session principale, 2026-11-03) : `init --ws=<sujet> --phase=<N>` ecrit en plus un champ additif
+# `phase` ; `mark` avance alors `progress_epoch` du verrou de CETTE phase (`status --ws --phase`,
+# `mark-progress --ws --phase`) et non du compartiment nu. Meme lecture tolerante (un DAG sans `phase` : comportement
+# d'avant). `--phase` exige `--ws` et est refuse hors `init`.
+#
 # progress_epoch (D-33-A, WTCH-01, plan 33-02) : `mark` avance `progress_epoch` sur le driver-lock
 # COURANT s'il existe, en best-effort APRES save(dag), sans jamais bloquer ni faire echouer le DAG
 # (ADR-031 — degradation silencieuse, sauf le seul cas ou le lock est confirme present+detenu mais
@@ -75,7 +81,7 @@ set -uo pipefail
 # Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
 PYX="-Xutf8"
 
-ACTION=""; FILE=""; ID=""; STEP=""; STAGE=""; DEPS=""; STATUS=""; SCOPE=""; WS=""; WS_GIVEN=0
+ACTION=""; FILE=""; ID=""; STEP=""; STAGE=""; DEPS=""; STATUS=""; SCOPE=""; WS=""; WS_GIVEN=0; PHASE=""; PHASE_GIVEN=0
 for arg in "$@"; do
   case "$arg" in
     init|add|ready|mark|reopen|status|tree) ACTION="$arg" ;;
@@ -87,6 +93,7 @@ for arg in "$@"; do
     --scope=*)  SCOPE="${arg#*=}" ;;
     --status=*) STATUS="${arg#*=}" ;;
     --ws=*)     WS="${arg#*=}"; WS_GIVEN=1 ;;
+    --phase=*)  PHASE="${arg#*=}"; PHASE_GIVEN=1 ;;
     -h|--help)  grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "Unknown arg: $arg" >&2; exit 1 ;;
   esac
@@ -98,6 +105,11 @@ done
 # le porte ensuite dans son champ `ws`. Ailleurs, une erreur d'usage nette plutot qu'une option ignoree.
 if [ "$WS_GIVEN" = 1 ] && [ "$ACTION" != "init" ]; then
   echo "dag.sh: --ws n'est admis que par init (action : $ACTION) ; le DAG porte son compartiment dans le champ ws" >&2
+  exit 1
+fi
+
+if [ "$PHASE_GIVEN" = 1 ] && { [ "$ACTION" != "init" ] || [ "$WS_GIVEN" = 0 ]; }; then
+  echo "dag.sh: --phase n'est admis que par init, avec --ws (action : $ACTION) ; le DAG porte sa phase dans le champ phase" >&2
   exit 1
 fi
 
@@ -114,13 +126,14 @@ DRIVER_LOCK_SH="$SCRIPT_DIR/driver-lock.sh"
 CHECK_GUARD_HEALTH_SH="$SCRIPT_DIR/check-guard-health.sh"
 NOTIFY_SH="$SCRIPT_DIR/notify.sh"
 
-python3 -I $PYX - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" "$SCOPE" "$DRIVER_LOCK_SH" "$CHECK_GUARD_HEALTH_SH" "$NOTIFY_SH" "$WS" <<'PYEOF'
+python3 -I $PYX - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" "$SCOPE" "$DRIVER_LOCK_SH" "$CHECK_GUARD_HEALTH_SH" "$NOTIFY_SH" "$WS" "$PHASE" <<'PYEOF'
 import sys, os, json, subprocess, tempfile, shutil
 
 action, file, nid, step, stage, deps_raw, status, scope_raw = sys.argv[1:9]
 driver_lock_sh = sys.argv[9]
 check_guard_health_sh, notify_sh = sys.argv[10:12]
 ws_arg = sys.argv[12]
+phase_arg = sys.argv[13]
 VALID = {"blocked", "ready", "running", "done", "failed"}
 
 def load():
@@ -224,7 +237,7 @@ def resolve_gsd_tools_cmd():
         return [node_bin, resolved] if node_bin else None
     return [resolved]
 
-def record_progress(driver_lock_sh, ws=None):
+def record_progress(driver_lock_sh, ws=None, phase=None):
     """Cable `driver-lock.sh mark-progress` (plan 33-01, WTCH-01) au point `mark` de dag.sh, APRES
     save(dag) (jamais avant) ET APRES check_stall_signal() (33-05-correctif D-33-G) — cet appel
     rafraichit `progress_epoch` du lock courant, donc doit lire APRES que le verdict de stall ait
@@ -242,6 +255,8 @@ def record_progress(driver_lock_sh, ws=None):
         if not os.path.isfile(driver_lock_sh):
             return
         ws_args = [f"--ws={ws}"] if isinstance(ws, str) and ws else []
+        if ws_args and isinstance(phase, str) and phase:
+            ws_args.append(f"--phase={phase}")  # verrou de phase : la cible du DAG est SA phase, pas le compartiment nu
         st = subprocess.run([driver_lock_sh, "status"] + ws_args, capture_output=True, text=True,
                              timeout=2, check=False)
         if st.returncode != 0:
@@ -362,6 +377,9 @@ if action == "init":
     if ws_arg:  # champ additif : ecrit seulement si --ws est donne (sinon octets d'avant)
         init_dag["ws"] = ws_arg
         init_out["ws"] = ws_arg
+        if phase_arg:
+            init_dag["phase"] = phase_arg
+            init_out["phase"] = phase_arg
     save(init_dag)
     emit(init_out)
     sys.exit(0)
@@ -421,7 +439,7 @@ if action == "mark":
     # WTCH-02 (33-05, D-33-F) : relais best-effort du verdict check-guard-health.sh --hook, a
     # CHAQUE mark, sans filtre de statut, LU AVANT tout rafraichissement de progress_epoch.
     check_stall_signal(check_guard_health_sh)
-    record_progress(driver_lock_sh, dag.get("ws"))
+    record_progress(driver_lock_sh, dag.get("ws"), dag.get("phase"))
     # WTCH-03 (33-05) : notification best-effort via notify.sh, UNIQUEMENT sur done/failed.
     record_milestone(notify_sh, nid, status, file)
     emit({"id": nid, "status": status,
