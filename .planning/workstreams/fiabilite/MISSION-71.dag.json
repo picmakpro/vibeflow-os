@@ -36,7 +36,7 @@
         "discuss-71"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "craft-terminal",
@@ -57,7 +57,7 @@
         "craft-terminal"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "revue-71",
@@ -118,6 +118,124 @@
       "deps": [
         "gates-71",
         "docs"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "ex-01",
+      "step": "exec 71-01",
+      "stage": "",
+      "deps": [
+        "plan-71"
+      ],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "ex-02",
+      "step": "exec 71-02",
+      "stage": "",
+      "deps": [
+        "ex-01"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "ex-03",
+      "step": "exec 71-03",
+      "stage": "",
+      "deps": [
+        "ex-01"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "ex-04",
+      "step": "exec 71-04",
+      "stage": "",
+      "deps": [
+        "ex-01"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "ex-10",
+      "step": "exec 71-10",
+      "stage": "",
+      "deps": [
+        "ex-01"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "ex-11",
+      "step": "exec 71-11",
+      "stage": "",
+      "deps": [
+        "ex-01"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "ex-05",
+      "step": "exec 71-05",
+      "stage": "",
+      "deps": [
+        "ex-01",
+        "ex-11"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "ex-06",
+      "step": "exec 71-06",
+      "stage": "",
+      "deps": [
+        "ex-05"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "ex-07",
+      "step": "exec 71-07",
+      "stage": "",
+      "deps": [
+        "ex-04",
+        "ex-06"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "ex-08",
+      "step": "exec 71-08",
+      "stage": "",
+      "deps": [
+        "ex-02",
+        "ex-03",
+        "ex-04",
+        "ex-06"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "ex-09",
+      "step": "exec 71-09 (docs, recette écrite, gates)",
+      "stage": "",
+      "deps": [
+        "ex-07",
+        "ex-08",
+        "ex-10",
+        "ex-11"
       ],
       "scope": [],
       "status": "blocked"
