@@ -6,7 +6,8 @@
 # Cas :
 #   A1 lecture concurrente : un lecteur relit le DAG en boucle pendant `dag.sh add` sur un gros DAG ;
 #      aucune lecture tronquée, et au moins 20 lectures (témoin d'exposition).
-#   A2 aucun résidu dans le dossier du DAG ; A3 mode conservé (640) ; A4 mode d'un DAG neuf.
+#   A2 aucun résidu dans le dossier du DAG ; A3 mode conservé (640) ; A4 mode d'un DAG neuf ;
+#   A5 DAG en lien symbolique (la cible est écrite, le lien reste un lien, aucun .tmp).
 # Mécanisme : gros DAG pour élargir la fenêtre d'écriture. Témoin rouge : jouée contre le save()
 # d'origine (open "w" puis json.dump), A1 rougit (tronquees > 0).
 #
@@ -100,6 +101,30 @@ u = os.umask(0); os.umask(u)
 m = os.stat(sys.argv[1]).st_mode & 0o777
 print("ok" if m == (0o666 & ~u) else "mode %s attendu %s" % (oct(m), oct(0o666 & ~u)))' "$WORK_DIR/neuf/n.dag.json" 2>&1)
 assert_eq "A4.1 — DAG neuf = 0666 moins umask" "$R" "ok"
+
+echo "=== A5 — DAG en lien symbolique (même dossier, puis dossier différent) ==="
+S1="$WORK_DIR/sym1"; S2="$WORK_DIR/sym2"; mkdir -p "$S1" "$S2/cible"
+"$SCRIPT" init --file="$S1/real.dag.json" >/dev/null 2>&1
+ln -s real.dag.json "$S1/link.dag.json"
+"$SCRIPT" add --file="$S1/link.dag.json" --id=a --step=x >/dev/null 2>&1
+"$SCRIPT" mark --file="$S1/link.dag.json" --id=a --status=done >/dev/null 2>&1
+[ -L "$S1/link.dag.json" ] && LK=lien || LK=ordinaire
+assert_eq "A5.1 — le lien reste un lien symbolique" "$LK" "lien"
+C=$(python3 -I -c 'import json,sys; print(",".join(n["id"]+":"+n["status"] for n in json.load(open(sys.argv[1]))["nodes"]))' "$S1/real.dag.json" 2>/dev/null || echo ERR)
+assert_eq "A5.2 — la cible porte le nœud et sa marque" "$C" "a:done"
+L=$(python3 -I -c 'import os,sys; print(",".join(sorted(os.listdir(sys.argv[1]))))' "$S1")
+assert_eq "A5.3 — aucun .tmp résiduel (dossier commun)" "$L" "link.dag.json,real.dag.json"
+"$SCRIPT" init --file="$S2/cible/real.dag.json" >/dev/null 2>&1
+ln -s cible/real.dag.json "$S2/link.dag.json"
+"$SCRIPT" add --file="$S2/link.dag.json" --id=b --step=x >/dev/null 2>&1
+[ -L "$S2/link.dag.json" ] && LK=lien || LK=ordinaire
+assert_eq "A5.4 — lien vers un autre dossier : reste un lien" "$LK" "lien"
+C=$(python3 -I -c 'import json,sys; print(",".join(n["id"] for n in json.load(open(sys.argv[1]))["nodes"]))' "$S2/cible/real.dag.json" 2>/dev/null || echo ERR)
+assert_eq "A5.5 — la cible (autre dossier) porte le nœud" "$C" "b"
+L1=$(python3 -I -c 'import os,sys; print(",".join(sorted(os.listdir(sys.argv[1]))))' "$S2")
+L2=$(python3 -I -c 'import os,sys; print(",".join(sorted(os.listdir(sys.argv[1]))))' "$S2/cible")
+assert_eq "A5.6 — aucun .tmp résiduel (dossier du lien)" "$L1" "cible,link.dag.json"
+assert_eq "A5.7 — aucun .tmp résiduel (dossier de la cible)" "$L2" "real.dag.json"
 
 echo ""
 echo "=================================="
