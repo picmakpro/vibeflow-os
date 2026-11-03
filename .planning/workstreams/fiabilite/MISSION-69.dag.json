@@ -20,7 +20,7 @@
       "scope": [
         ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-69",
@@ -33,7 +33,7 @@
         "plugin/cockpit",
         ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-69",

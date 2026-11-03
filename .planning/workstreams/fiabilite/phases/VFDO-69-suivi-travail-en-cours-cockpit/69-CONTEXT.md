@@ -2,7 +2,7 @@
 
 **Gathered:** 2026-11-03
 **Updated:** 2026-11-03 (mise à jour du cadrage : équipe au travail, P69-D-12..24 ; Phases 71 et 72 inscrites)
-**Status:** Cadrée — non planifiée
+**Status:** Planifiée (2026-11-03, 9 plans 69-01..09) — non exécutée
 
 Inscription et cadrage documentaires (aucun code). Entrée unique :
 `.planning/notes/2026-11-03-cockpit-progression-en-cours.md` (note de conception, copiée telle quelle).
