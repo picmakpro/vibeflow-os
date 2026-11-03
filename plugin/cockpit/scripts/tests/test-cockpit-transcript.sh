@@ -264,13 +264,15 @@ i=4; for m in "${NEG[@]}"; do i=$((i+1)); assert_eq "T24.$i — la sortie ne con
 assert_eq "T24.13 — aucune clé input à aucune profondeur (appariée aux positifs)" "$(RX '(()=>{const s=JSON.stringify(j.r);if(!(s.includes("MANDAT-VISIBLE-69")&&s.includes("MESSAGE-VISIBLE-69")))return "positifs absents";const f=(o)=>!!o&&typeof o==="object"&&Object.entries(o).some(([k,v])=>k==="input"||f(v));return f(j.r)?"clé input présente":"ok"})()')" "ok"
 assert_eq "T24.14 — fixture --gros : tronque = vrai et réponse en moins de 2 000 ms" "$(G "$WORK/red-gros.json" 'j.absent||(j.r.tronque===true&&j.ms<2000?"ok":"tronque="+j.r.tronque+" ms="+j.ms)')" "ok"
 assert_eq "T24.15 — fixture normale : tronque = faux" "$(RX 'j.r.tronque===false?"ok":"tronque="+j.r.tronque')" "ok"
-assert_eq "T24.16 — fixture --gros : le mandat tient en 8 000 caractères, de 1 à 50 messages de 2 000 caractères au plus" "$(G "$WORK/red-gros.json" 'j.absent||(()=>{const m=j.r.messages||[];return String(j.r.mandat).length<=8000&&m.length>=1&&m.length<=50&&m.every((x)=>String(x).length<=2000)?"ok":"mandat="+String(j.r.mandat).length+" messages="+m.length+" max="+Math.max(0,...m.map((x)=>String(x).length))})()')" "ok"
+assert_eq "T24.16 — fixture --gros : le mandat tient en 8 000 caractères, de 1 à 50 messages de 2 000 caractères au plus (hors mention de coupe)" "$(G "$WORK/red-gros.json" 'j.absent||(()=>{const MENTION=/ … \(tronqué, [0-9 ]+ caractères\)$/;const m=j.r.messages||[];return String(j.r.mandat).replace(MENTION,"").length<=8000&&m.length>=1&&m.length<=50&&m.every((x)=>String(x).replace(MENTION,"").length<=2000)?"ok":"mandat="+String(j.r.mandat).length+" messages="+m.length+" max="+Math.max(0,...m.map((x)=>String(x).length))})()')" "ok"
 
 # =====================================================================================================================
 echo "=== T25 — GET /api/vf/transcript : jeton, identifiants, fenêtre, aucune fuite (P69-D-19, P69-D-23 ; CKPT-25) ==="
 LABS="$WORK/labsrv"; mkdir -p "$LABS/src" "$LABS/.planning/phases/01-x"
 printf 'export const util = () => 1;\n' > "$LABS/src/util.js"
 printf -- '- [x] **Phase 1: Socle** - premier jet\n' > "$LABS/.planning/ROADMAP.md"
+printf '# Labo-Recette\n' > "$LABS/.planning/PROJECT.md"   # le nom que la page Projet affiche, distinct du nom du dossier (labsrv)
+mkdir -p "$LABS/.planning/missions"; printf '{"nodes":[{"id":"revue-p3","step":"Revue","stage":"s","deps":[],"scope":[],"status":"ready"}]}\n' > "$LABS/.planning/missions/m1.dag.json"
 printf '<objective>Faire le socle</objective>\n' > "$LABS/.planning/phases/01-x/01-01-PLAN.md"; echo ok > "$LABS/.planning/phases/01-x/01-01-SUMMARY.md"
 git -C "$LABS" init -q && git -C "$LABS" add -A && git -C "$LABS" -c user.email=t@t -c user.name=t commit -q -m init
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LABS" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
@@ -417,6 +419,123 @@ JS
   VF_CDP_ECHEANCE_MS=20000 CDP_PRET="document.readyState === 'complete'" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 500 "$(cat "$AUX/chrome-t26.js")" "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg" > "$WORK/chrome-t26.json" 2>&1
   assert_eq "T26.7 — Chrome : le transcript d'un agent au message <img onerror> s'affiche en texte (0 élément img, la source lisible)" "$(G "$WORK/chrome-t26.json" 'j.erreur||(j.resultats[0].valeur.erreur||("img="+j.resultats[0].valeur.img+"|texte="+j.resultats[0].valeur.texte))')" "img=0|texte=true"
   assert_eq "T26.8 — Chrome : arriver sur equipe.html#r=n:ag-ximg sélectionne la carte visée (state.selected), quel que soit l'ordre de livraison du flux (F2)" "$(G "$WORK/chrome-t26.json" 'j.erreur||(j.resultats[0].valeur.erreur||String(j.resultats[0].valeur.sel))')" "n:ag-ximg"
+
+  # ---- recette 69 (A, B, C ; F1 à F3 du volet 2) : le vrai navigateur, les vrais scripts, un flux `who` livré à la main par un EventSource enveloppé ----
+  cat > "$AUX/chrome-inj.mjs" <<'JS'
+// chrome-inj.mjs <chrome> <scénario.js> <url> [<url>...] : comme chrome-cdp.mjs, mais le scénario s'exécute UNE fois par URL (window.__i = rang de l'URL) et un script est
+// injecté avant ceux de la page : il enveloppe EventSource pour que le scénario livre lui-même des événements `who` (et d'autres) aux écouteurs réels de 70-vf-live.js.
+import fs from 'node:fs';
+const { executer } = await import(process.env.CHROME_SESSION);
+const [, , chrome, fichier, ...urls] = process.argv;
+const scenario = fs.readFileSync(fichier, 'utf8');
+const INJ = `(() => { const R = window.EventSource; window.__es = []; window.EventSource = class extends R {
+  constructor(u, o) { super(u, o); this.__l = {}; window.__es.push(this); }
+  addEventListener(n, f, o) { (this.__l[n] ||= []).push(f); super.addEventListener(n, f, o); }
+  __emit(n, d) { for (const f of this.__l[n] || []) f({ data: JSON.stringify(d) }); } }; })();`;
+const PRET = `document.readyState === 'complete' && !!document.querySelector('header .brand .mark') && document.querySelector('header .brand .mark').naturalWidth > 0`;
+await executer(chrome, async (s) => {
+  await s.send('Page.addScriptToEvaluateOnNewDocument', { source: INJ });
+  const resultats = [];
+  for (let i = 0; i < urls.length; i++) {
+    await s.naviguer(urls[i]); await s.attendre(PRET, `page prête (${urls[i]})`);
+    await s.ev(`window.__i = ${i}`);
+    resultats.push({ url: urls[i], valeur: await s.ev(scenario) });
+  }
+  return { resultats };
+}, { csp: true });
+JS
+  export CHROME_SESSION="file://$HERE_T/chrome-session.mjs"
+  COMMUN="const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); const attendre = async (f, ms = 15000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { const v = f(); if (v) return v; await sleep(100); } return null; };
+  const flux = () => window.__es.find((e) => e.url.includes('/api/vf/events')); let seq = 1000; const emettre = (workers) => flux().__emit('who', { seq: seq++, at: Date.now(), who: { workers, sources: {} } });"
+  # (un fragment dans l'URL empêche la visite guidée de se lancer seule au premier passage : elle remplace le panneau ouvert par la vue d'ensemble)
+  # A : le tiroir « Au travail » suit le flux tant qu'il est ouvert (project.html, trois événements `who`)
+  cat > "$AUX/sc-a.js" <<JS
+(async () => { $COMMUN
+  const S = { kind: 'session', id: 'S1', etat: 'actif', tree: '.', task: 'session' }, M = { kind: 'subagent', id: 'M1', etat: 'actif', role: 'vf-dev-manager', tree: '.', parent: 'S1', task: 'manager', dureeS: 60 };
+  const C = { kind: 'subagent', id: 'C1', etat: 'actif', role: 'vf-coder', tree: '.', parent: 'M1', task: 'coder', dureeS: 30 }, F = { kind: 'subagent', id: 'F1', etat: 'termine', role: 'vf-reviewer', tree: '.', parent: 'M1', task: 'revu', dureeS: 90 };
+  if (!await attendre(() => flux() && document.querySelector('#vf-lock'))) return 'badge absent';
+  emettre([S, M, C, F]); await sleep(200);
+  document.querySelector('#vf-lock').click();
+  const titre = () => (document.querySelector('.vf-whop h3') || {}).textContent || 'tiroir absent';
+  const avant = titre();
+  const d = document.querySelector('.vf-whop details.vf-termines'); if (d) d.open = true;
+  emettre([S, M, { ...C, etat: 'termine', dureeS: 45 }, F]); await sleep(300);
+  const apres = await attendre(() => titre() !== avant && titre(), 3000) || titre();
+  const dans = !!document.querySelector('.vf-whop details.vf-termines [data-vf-agent="C1"]');
+  const ouvert = !!(document.querySelector('.vf-whop details.vf-termines') || {}).open;
+  emettre([S, M, { ...C, etat: 'termine', dureeS: 45 }, F, { kind: 'subagent', id: 'N1', etat: 'actif', role: 'vf-coder', tree: '.', parent: 'M1', task: 'nouveau', dureeS: 1 }]); await sleep(300);
+  const nouveau = !!document.querySelector('.vf-whop [data-vf-agent="N1"]') ;
+  return [avant, apres, 'C1 replié=' + dans, 'Terminés resté ouvert=' + ouvert, 'N1 visible=' + nouveau].join(' | ');
+})()
+JS
+  # B : un lien de nœud ou d'agent de la MÊME page révèle et sélectionne sa cible sans rechargement
+  cat > "$AUX/sc-b.js" <<JS
+(async () => { $COMMUN
+  const VF = window.VibeFlow; if (!await attendre(() => VF && VF.state && VF.state.layout)) return 'viewer absent';
+  const marque = Math.random(); window.__marque = marque;
+  const cible = location.pathname.includes('equipe') ? 'n:ag-ag1' : 'f:.planning/missions/m1.dag.json#revue-p3';
+  if (!VF.exists(cible)) return 'cible inconnue du viewer : ' + cible;
+  const a = document.createElement('a'); a.href = location.pathname.split('/').pop() + '#r=' + encodeURIComponent(cible); document.body.appendChild(a); a.click(); a.remove();
+  await attendre(() => VF.state.selected === cible, 5000);
+  return 'sélection=' + VF.state.selected + ' | sans rechargement=' + (window.__marque === marque);
+})()
+JS
+  # C : le contenu demandé (transcript, dernière commande) reste affiché quel que soit le nombre de `who`, même quand ils arrivent pendant la requête ; disparaît avec l'agent
+  cat > "$AUX/sc-c.js" <<JS
+(async () => { $COMMUN
+  const VF = window.VibeFlow; if (!await attendre(() => flux() && VF && VF.state && VF.state.selected === 'n:ag-ximg' && document.querySelector('[data-vf-transcript]'))) return 'panneau absent';
+  const base = window.__vfLive.who.workers; let n = 0;
+  const bouge = () => emettre(base.map((w) => ({ ...w, ageS: (w.ageS || 0) + ++n })));
+  const long = () => { const z = document.querySelector('.vf-transcript'); return z ? z.textContent.length : -1; };
+  const cmd = () => { const z = document.querySelector('.vf-doing'); return z ? z.textContent.length : -1; };
+  document.querySelector('[data-vf-transcript]').click(); bouge(); await sleep(60); bouge();     // `who` pendant la requête
+  document.querySelector('[data-vf-doing]').click(); bouge(); await sleep(60); bouge();
+  const t1 = await attendre(() => long() > 0 && long(), 6000) || long(), c1 = await attendre(() => cmd() > 0 && cmd(), 6000) || cmd();
+  for (let i = 0; i < 4; i++) { bouge(); await sleep(250); }
+  const t2 = long(), c2 = cmd();
+  VF.select('n:ag-ag1'); await sleep(400);
+  const apres = !document.querySelector('.vf-transcript');
+  return ['transcript lu=' + (t1 > 0), 'transcript après 4 who=' + (t2 > 0), 'commande lue=' + (c1 > 0), 'commande après 4 who=' + (c2 > 0), 'disparu avec l\'agent=' + apres].join(' | ');
+})()
+JS
+  # C bis : un rechargement de la page (structure de l'équipe changée, « Map updated ») rouvre le transcript de l'agent affiché : deux navigations successives
+  cat > "$AUX/sc-c2.js" <<JS
+(async () => { $COMMUN
+  if (!await attendre(() => document.querySelector('[data-vf-transcript]'))) return 'panneau absent';
+  const long = () => { const z = document.querySelector('.vf-transcript'); return z ? z.textContent.length : -1; };
+  if (window.__i === 0) { document.querySelector('[data-vf-transcript]').click(); return 'ouvert=' + ((await attendre(() => long() > 0 && long(), 6000)) > 0); }
+  return 'rouvert après rechargement=' + ((await attendre(() => long() > 0 && long(), 6000)) > 0);
+})()
+JS
+  # F1 (volet 2) : le badge égale les actifs de l'onglet Équipe, ni verrou ni nœud de DAG ; F2 : titre de l'onglet ; F3 : libellé du champ de recherche
+  cat > "$AUX/sc-f.js" <<JS
+(async () => { $COMMUN
+  const VF = window.VibeFlow; if (!await attendre(() => flux() && VF && VF.state && VF.state.layout && document.querySelector('#vf-lock'))) return 'page absente';
+  const base = window.__vfLive.who.workers.filter((w) => w.kind === 'session' || w.kind === 'subagent');
+  emettre([...base, { kind: 'lock', id: 'v1', tree: '.', task: 'verrou' }, { kind: 'dag-node', id: 'd1', tree: '.', task: 'nœud', etat: 'actif' }, { kind: 'registered', id: 'r1', tree: '.', task: 'registre' }]); await sleep(400);
+  const badge = (document.querySelector('#vf-lock .bl') || {}).textContent || '';
+  const stat = (document.querySelector('.vf-stats b') || {}).textContent || '';
+  const lib = (document.querySelector('#search-btn .st') || {}).textContent || '';
+  document.querySelector('#search-btn').click(); const si = document.querySelector('#search'); si.value = 'vf-dev-manager'; si.dispatchEvent(new Event('input')); await sleep(300);
+  const trouves = document.querySelectorAll('#results .r').length;
+  return ['badge=' + badge.replace(/\\D/g, ''), 'actifs=' + stat, 'titre=' + document.title, 'libelle=' + lib, 'trouves=' + (trouves > 0)].join(' | ');
+})()
+JS
+  CI() { VF_CDP_ECHEANCE_MS=30000 node "$AUX/chrome-inj.mjs" "$CHROME" "$AUX/$1" "${@:2}" 2>/dev/null | G /dev/stdin 'j.erreur||j.resultats.map((r)=>r.valeur).join(" ;; ")'; }
+  rafraichir
+  assert_eq "T27.A — recette : le tiroir « Au travail » ouvert suit le flux (titre, bloc « Terminés » replié et resté ouvert, nouvel agent visible) sur trois événements who" "$(CI sc-a.js "http://127.0.0.1:$PORT/project.html#t")" "Au travail (3) | Au travail (2) | C1 replié=true | Terminés resté ouvert=true | N1 visible=true"
+  assert_eq "T27.B1 — recette : cliquer le lien d'un nœud de mission sur project.html le sélectionne sans rechargement" "$(CI sc-b.js "http://127.0.0.1:$PORT/project.html#t")" "sélection=f:.planning/missions/m1.dag.json#revue-p3 | sans rechargement=true"
+  assert_eq "T27.B2 — recette : cliquer le lien d'une carte d'agent sur equipe.html la sélectionne sans rechargement" "$(CI sc-b.js "http://127.0.0.1:$PORT/equipe.html#t")" "sélection=n:ag-ag1 | sans rechargement=true"
+  rafraichir
+  assert_eq "T27.C1 — recette : transcript et dernière commande demandés pendant des who restent affichés après quatre autres who, et disparaissent avec l'agent" "$(CI sc-c.js "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg")" "transcript lu=true | transcript après 4 who=true | commande lue=true | commande après 4 who=true | disparu avec l'agent=true"
+  rafraichir
+  assert_eq "T27.C2 — recette : après un rechargement de la page, le transcript de l'agent affiché est redemandé (jamais son contenu gardé)" "$(CI sc-c2.js "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg" "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg")" "ouvert=true ;; rouvert après rechargement=true"
+  rafraichir
+  RF="$(CI sc-f.js "http://127.0.0.1:$PORT/equipe.html#t")"
+  assert_eq "T27.F1 — recette : le badge « au travail » égale les actifs de l'onglet Équipe, même avec un verrou, un nœud de DAG et un enregistrement dans la collecte (apparié : le nombre est non nul)" "$(echo "$RF" | sed -E 's/^badge=([0-9]+) \| actifs=([0-9]+) .*/\1 \2/' | awk '{print ($1==$2 && $1>0) ? "égaux" : "badge=" $1 " actifs=" $2}')" "égaux"
+  assert_eq "T27.F2 — recette : le titre de l'onglet est « Équipe · <nom que la page Projet affiche> », jamais le nom du dossier" "$(echo "$RF" | sed -E 's/.* \| titre=([^|]*) \| libelle.*/\1/' | sed 's/ *$//')" "Équipe · Labo-Recette"
+  assert_eq "T27.F3 — recette : la recherche de l'onglet Équipe trouve des agents (un rôle tapé rend des résultats) et son libellé le dit" "$(echo "$RF" | sed -E 's/.* \| libelle=(.*)$/\1/')" "Chercher un agent ou une session | trouves=true"
+
 fi
 vf_hyg_stop "$SRV_PID"
 
@@ -463,7 +582,7 @@ assert_eq "T24F3.0 — contrôle positif : la fixture porte le secret trois fois
 assert_eq "T24F3.1 — reduireTranscript : le secret d'un message de l'assistant, d'une cible d'outil et d'un nom d'outil sort masqué (apparié aux positifs)" "$(f3 "$SCRIPTS")" "ok"
 MUTD="$AUX/mutsrc"; mkdir -p "$MUTD"; cp "$SCRIPTS"/vf-cockpit-*.mjs "$MUTD/"
 mutant() { cp "$SCRIPTS/vf-cockpit-transcript.mjs" "$MUTD/vf-cockpit-transcript.mjs"; sed -i.bak "s#$1#$2#" "$MUTD/vf-cockpit-transcript.mjs"; if cmp -s "$SCRIPTS/vf-cockpit-transcript.mjs" "$MUTD/vf-cockpit-transcript.mjs"; then echo "MUTANT VIDE"; else f3 "$MUTD"; fi; }
-assert_eq "T24F3.2 — mutant : message de l'assistant non masqué -> détecté" "$(mutant 'msgs.map((t) => masqueCoupe(t, BORNE_MESSAGE))' 'msgs.map((t) => t.slice(0, BORNE_MESSAGE))')" "fuite : message "
+assert_eq "T24F3.2 — mutant : message de l'assistant non masqué -> détecté" "$(mutant 'const r = masqueCoupe(t, n);' 'const r = t.slice(0, n);')" "fuite : message "
 assert_eq "T24F3.3 — mutant : cible d'outil non masquée -> détecté" "$(mutant 'return { outil, verbe, cible: fin(cible) };' 'return { outil, verbe, cible };')" "fuite : cible "
 assert_eq "T24F3.4 — mutant : nom d'outil non masqué -> détecté" "$(mutant "const outil = fin(name) || '?';" "const outil = chaine(name) || '?';")" "fuite : nom d outil"
 
@@ -524,6 +643,34 @@ JS
 rm -f "$AUX/fx/fifo.jsonl"; mkfifo "$AUX/fx/fifo.jsonl"
 node "$AUX/borne.mjs" 5000 "$AUX/red.mjs" "$SCRIPTS" "$AUX/fx/fifo.jsonl" "$LAB0" > "$WORK/fifo.json"; rm -f "$AUX/fx/fifo.jsonl"
 assert_eq "T24G5 (points 4, 5) — un transcript qui est un tube (FIFO) ne bloque pas reduireTranscript (enfant borné à 5 s) : ni délai dépassé, ni mandat" "$(G "$WORK/fifo.json" '(j.timedOut?"bloqué":"rendu")+"|"+(j.out.includes("mandat")?"mandat":"sans mandat")')" "rendu|mandat"
+
+# =====================================================================================================================
+echo "=== T24M — un texte coupé à la borne le dit, avec la borne réelle (F4 de la recette ; P69-D-33) ==="
+cat > "$AUX/mk-f4m.mjs" <<'JS'
+// mk-f4m.mjs <fichier> : mandat de 9 000 caractères, trois messages (2 500, exactement 2 000, 40 caractères) ; remplissages distincts pour les reconnaître
+import fs from 'node:fs';
+const side = (o) => JSON.stringify({ isSidechain: true, agentId: 'f4m', ...o });
+const msg = (t) => side({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: t }] } });
+fs.writeFileSync(process.argv[2], [side({ type: 'user', message: { role: 'user', content: 'm'.repeat(9000) } }), msg('a'.repeat(2500)), msg('b'.repeat(2000)), msg('c'.repeat(40))].join('\n') + '\n');
+JS
+cat > "$AUX/juge-f4m.mjs" <<'JS'
+// juge-f4m.mjs <scripts> <fichier> <lab> <bornes messages> <borne mandat> : « <message coupé>|<message de 2 000 intact>|<message court intact>|<mandat coupé> » en vrai/faux
+// (la mention « … (tronqué, <borne> caractères) » suit exactement la coupe, la borne est celle donnée, et un texte qui tient n'a pas de mention)
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, fichier, lab, B, M] = process.argv;
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-transcript.mjs')).href);
+const r = m.reduireTranscript(fichier, { root: lab });
+const coupe = (x, c, n) => x.endsWith(` … (tronqué, ${n} caractères)`) && x.slice(0, x.length - ` … (tronqué, ${n} caractères)`.length) === c.repeat(Number(n.replace(/ /g, '')));
+console.log([coupe(r.messages[0], 'a', B), r.messages[1] === 'b'.repeat(2000), r.messages[2] === 'c'.repeat(40), coupe(r.mandat, 'm', M)].join('|'));
+JS
+node "$AUX/mk-f4m.mjs" "$AUX/fx/f4m.jsonl"
+f4m() { node "$AUX/juge-f4m.mjs" "$1" "$AUX/fx/f4m.jsonl" "$LAB0" "$2" "$3"; }
+mutantF4() { cp "$SCRIPTS/vf-cockpit-transcript.mjs" "$MUTD/vf-cockpit-transcript.mjs"; sed -i.bak "s#$1#$2#" "$MUTD/vf-cockpit-transcript.mjs"; if cmp -s "$SCRIPTS/vf-cockpit-transcript.mjs" "$MUTD/vf-cockpit-transcript.mjs"; then echo "MUTANT VIDE"; else f4m "$MUTD" "$3" "$4"; fi; }
+assert_eq "T24M.1 — message de 2 500 coupé : « … (tronqué, 2 000 caractères) » juste après 2 000 caractères ; mandat de 9 000 : « … (tronqué, 8 000 caractères) » après 8 000 ; messages de 2 000 et de 40 sans mention" "$(f4m "$SCRIPTS" "2 000" "8 000")" "true|true|true|true"
+assert_eq "T24M.2 — mutant : borne des messages à 1 500 -> la mention dit « 1 500 » (lue dans la constante), le message de 2 000 est coupé à son tour, détecté" "$(mutantF4 'BORNE_MESSAGE = 2000' 'BORNE_MESSAGE = 1500' "1 500" "8 000")" "true|false|true|true"
+assert_eq "T24M.3 — mutant : borne du mandat à 5 000 -> la mention dit « 5 000 »" "$(mutantF4 'BORNE_MANDAT = 8000' 'BORNE_MANDAT = 5000' "2 000" "5 000")" "true|true|true|true"
+assert_eq "T24M.4 — mutant : aucune mention -> messages et mandat coupés rendus sans mention, détecté" "$(mutantF4 'return t.length > n ?' 'return false ?' "2 000" "8 000")" "false|true|true|false"
 
 vf_hyg_assert
 

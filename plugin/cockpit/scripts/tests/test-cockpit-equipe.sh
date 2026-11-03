@@ -590,6 +590,8 @@ let who = { workers: [S, A, F] };
 let nodes = [n('se-S', 'active', null), n('ag-A', 'active', 'se-S'), n('ag-A~termines', 'done', 'ag-A'), n('ag-F', 'done', 'ag-A~termines')];
 let hash = '';
 if (sc === 'nouveau' || sc === 'borne') nodes = [n('se-S', 'active', null)];
+if (sc === 'compte') who = { workers: [{ kind: 'subagent', id: 'a', etat: 'actif', tree: '.' }, { kind: 'subagent', id: 'f', etat: 'termine', tree: '.', parent: 'a' }, { kind: 'subagent', id: 'w', etat: 'en-attente', tree: '.' }, { kind: 'lock', id: 'v', tree: '.' }, { kind: 'dag-node', id: 'd', tree: '.', etat: 'actif' }, { kind: 'registered', id: 'r', tree: '.' }] }; // la collecte de vm70.mjs
+if (sc === 'compte') nodes = [n('ag-a', 'active', null), n('ag-a~termines', 'done', 'ag-a'), n('ag-f', 'done', 'ag-a~termines'), n('ag-w', 'active', null)];
 if (sc === 'passe') nodes = [n('se-S', 'active', null), n('ag-A', 'active', 'se-S'), n('ag-F', 'active', 'ag-A')]; // F était actif : il passe terminé sans que les cartes aient changé
 if (sc === 'arrivee' || sc === 'arrivee-ready') hash = '#r=' + encodeURIComponent('n:ag-A');
 if (sc === 'piege2') who = { workers: [{ kind: 'subagent', id: 'r1', etat: 'actif', tree: '.', rattachement: { etat: 'rattache', source: 'registre', dag: '<x-dag>', noeud: '<x-noeud>' } }] };
@@ -597,10 +599,10 @@ if (sc === 'piege') who = { workers: [{ kind: 'subagent', id: 'i"><x-id>', etat:
 const SC = { graph: { meta: { vfTab: 'equipe', vf: {} }, nodes, project: { name: 'p' } }, h, setOverview() {}, addPanelSection: (w, fn) => sections.push(fn),
   on: (e, fn) => { (hand[e] ||= []).push(fn); }, rerender: async () => { out.rerenders++; }, exists: (id) => nodes.some((x) => 'n:' + x.id === id), reveal: (id) => out.reveals.push(id) };
 const window = { Floorplan: SC, FLOORPLAN_SERVER: { token: 't' }, __vfLive: { who }, addEventListener() {} };
-const document = { addEventListener: (e, f) => { (dom[e] ||= []).push(f); }, querySelector: () => null, querySelectorAll: () => [] };
+const document = { addEventListener: (e, f) => { (dom[e] ||= []).push(f); }, querySelector: () => null, querySelectorAll: () => [], getElementById: () => null, documentElement: {} };
 const location = { hash, reload: () => { out.reloads++; } };
 const sessionStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => { store.set(k, String(v)); } };
-const ctx = vm.createContext({ window, document, location, sessionStorage, URLSearchParams, encodeURIComponent, Date: { now: () => now }, setTimeout: (fn, ms) => { timers.push({ fn, at: now + ms }); return timers.length; }, fetch: async () => null, console });
+const ctx = vm.createContext({ window, document, location, sessionStorage, URLSearchParams, MutationObserver: class { observe() {} }, encodeURIComponent, Date: { now: () => now }, setTimeout: (fn, ms) => { timers.push({ fn, at: now + ms }); return timers.length; }, fetch: async () => null, console });
 const lancer = async () => { await Promise.all((dom['vf-who'] || []).map((f) => f())); };
 try {
   vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
@@ -609,6 +611,8 @@ try {
     await lancer(); out.r1 = out.reloads;
     now += 1000; await lancer(); out.r2 = out.reloads;
     now += 16000; for (const t of timers.splice(0)) if (t.at <= now) await t.fn(); out.r3 = out.reloads;
+  } else if (sc === 'compte') {
+    await lancer(); out.compte = SC.graph.meta.vf.compte;
   } else if (sc === 'piege' || sc === 'piege2') {
     out.html = sections.map((f) => f('n:ag-' + who.workers[0].id)).join('');
   } else {
@@ -630,13 +634,13 @@ let bouton = null, panneau = '';
 const el = () => ({ setAttribute() {}, appendChild() {}, remove() {}, style: {} });
 const SC = { graph: { meta: { vfTab: 'equipe' }, nodes: [], files: [] }, h, toast() {}, rerender: async () => {}, addPanelSection() {}, showPanel: (x) => { panneau = x; },
   addHeaderButton: (o) => { bouton = { ...o, className: '', innerHTML: '', setAttribute() {} }; return bouton; } };
-const document = { createElement: el, head: { appendChild() {} }, body: { appendChild() {} }, addEventListener() {}, dispatchEvent: () => true, getElementById: () => null, querySelectorAll: () => [], querySelector: () => null };
+const document = { createElement: el, head: { appendChild() {} }, body: { appendChild() {}, classList: { contains: () => false } }, documentElement: {}, addEventListener() {}, dispatchEvent: () => true, getElementById: () => null, querySelectorAll: () => [], querySelector: () => null };
 const window = { Floorplan: SC, FLOORPLAN_SERVER: { token: 't' } };
-const ctx = vm.createContext({ window, document, EventSource: ES, CustomEvent: class { constructor(t) { this.type = t; } }, location: { reload() {} }, fetch: async () => ({ ok: false }), setTimeout, clearTimeout, Date, console, encodeURIComponent });
+const ctx = vm.createContext({ window, document, MutationObserver: class { observe() {} }, EventSource: ES, CustomEvent: class { constructor(t) { this.type = t; } }, location: { reload() {} }, fetch: async () => ({ ok: false }), setTimeout, clearTimeout, Date, console, encodeURIComponent });
 try {
   vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
   vm.runInContext(fs.readFileSync(f70, 'utf8'), ctx, { timeout: 5000 });
-  const w = [{ kind: 'subagent', id: 'a', etat: 'actif', tree: '.' }, { kind: 'subagent', id: 'f', etat: 'termine', tree: '.', parent: 'a' }, { kind: 'subagent', id: 'w', etat: 'en-attente', tree: '.' }];
+  const w = [{ kind: 'subagent', id: 'a', etat: 'actif', tree: '.' }, { kind: 'subagent', id: 'f', etat: 'termine', tree: '.', parent: 'a' }, { kind: 'subagent', id: 'w', etat: 'en-attente', tree: '.' }, { kind: 'lock', id: 'v', tree: '.' }, { kind: 'dag-node', id: 'd', tree: '.', etat: 'actif' }, { kind: 'registered', id: 'r', tree: '.' }]; // un actif, un terminé, un en attente, puis ce qui n'est pas un agent
   ES.last.l.who({ data: JSON.stringify({ seq: 1, who: { workers: w, sources: {} } }) });
   bouton.onClick();
   console.log(JSON.stringify({ badge: bouton.innerHTML.replace(/<[^>]*>/g, ''), panneau: (/Au travail \((\d+)\)/.exec(panneau) || [])[1] || 'titre absent' }));
@@ -716,9 +720,12 @@ M "$U72" "$MUT/72-arrivee.js" '^    arrivee();$' '    void 0;'
 assert_eq "EUI2.16 — mutant : plus de révélation après le rendu -> aucune carte révélée, détecté" "$(V72 "$MUT/72-arrivee.js" "$RENDU" arrivee | node "$AUX/jq.mjs" 'j.erreur||("["+j.reveals.join(",")+"]")')" "[]"
 
 # F5a : le badge et le titre du tiroir ne comptent que les agents actifs (ni terminé, ni en attente)
-assert_eq "EUI2.17 — un actif, un terminé, un en attente : badge « 1 au travail » et titre « Au travail (1) »" "$(node "$AUX/vm70.mjs" "$UI/70-vf-live.js" "$RENDU" | node "$AUX/jq.mjs" 'j.erreur||(j.badge+"|"+j.panneau)')" "1 au travail|1"
-M "$UI/70-vf-live.js" "$MUT/70-badge.js" "(w.etat || 'actif') === 'actif'" "true"
-assert_eq "EUI2.18 — mutant : le terminé et l'agent en attente comptent -> 3, détecté" "$(node "$AUX/vm70.mjs" "$MUT/70-badge.js" "$RENDU" | node "$AUX/jq.mjs" 'j.erreur||(j.badge+"|"+j.panneau)')" "3 au travail|3"
+assert_eq "EUI2.17 — un actif, un terminé, un en attente, un verrou, un nœud de DAG, un enregistrement : badge « 1 au travail » et titre « Au travail (1) » (seuls les agents actifs comptent)" "$(node "$AUX/vm70.mjs" "$UI/70-vf-live.js" "$RENDU" | node "$AUX/jq.mjs" 'j.erreur||(j.badge+"|"+j.panneau)')" "1 au travail|1"
+M "$RENDU" "$MUT/71-actif.js" "w.etat !== 'termine' \&\& w.etat !== 'en-attente'" "true"
+assert_eq "EUI2.18 — mutant : le terminé et l'agent en attente comptent -> 3, détecté" "$(node "$AUX/vm70.mjs" "$UI/70-vf-live.js" "$MUT/71-actif.js" | node "$AUX/jq.mjs" 'j.erreur||(j.badge+"|"+j.panneau)')" "3 au travail|3"
+M "$UI/70-vf-live.js" "$MUT/70-badge.js" "window.__vfEquipeRendu.actif(w)" "!w.stale"
+assert_eq "EUI2.18b — mutant : le badge compte aussi verrous, nœuds de DAG et enregistrements (le défaut de la recette) -> 6, détecté" "$(node "$AUX/vm70.mjs" "$MUT/70-badge.js" "$RENDU" | node "$AUX/jq.mjs" 'j.erreur||(j.badge+"|"+j.panneau)')" "6 au travail|6"
+assert_eq "EUI2.18c — même collecte : les effectifs « actifs » de l'onglet Équipe valent ceux du badge (1), verrou et nœud de DAG exclus" "$(V72 "$U72" "$RENDU" compte | node "$AUX/jq.mjs" 'j.erreur||(j.compte.actif+"|"+j.compte.enAttente+"|"+j.compte.termine)')" "1|1|1"
 
 # F6 : la liste CONNU de la sonde ne couvre que les mots français affichés par 71 ; un libellé anglais ajouté à une copie de 71 reste vu
 mkdir -p "$AUX/sonde"; cp "$RENDU" "$AUX/sonde/71-vf-equipe-rendu.js"
