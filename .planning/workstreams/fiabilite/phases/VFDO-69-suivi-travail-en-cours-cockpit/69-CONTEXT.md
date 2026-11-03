@@ -138,6 +138,10 @@ Réponses de Samuel consignées mot pour mot ; canal et date : AskUserQuestion, 
   - **P69-D-16 (fil d'Ariane).** Pour chaque agent actif, sa dernière action lisible (« lit X », « lance les tests »),
     sans le détail des commandes (CKPT-22).
   - **P69-D-17 (vue dédiée).** Un troisième onglet « Équipe », en carte comme Code et Projet (CKPT-23).
+  - **Validation des choix du manager dans P69-D-14 à P69-D-16** : retrait de la liste plate (D-14), ordre des sources
+    de rattachement sans jamais deviner (D-15), fil d'Ariane réduit au verbe et à la cible, jamais l'argument d'une
+    commande (D-16). Réponse de Samuel, mot pour mot : « je valide D14 D15 D16 » (session principale Claude Code,
+    2026-11-03). La planification peut partir.
 - **P69-D-18 (historique).** Réponse : « Actifs + terminés récents (collapsable) ». Les agents en cours, plus ceux finis
   dans les dernières 24 h, grisés et repliables (CKPT-20).
 - **P69-D-19 (transcripts).** Réponse, mot pour mot : « Message et action, sans les sorties. Je veux aussi anticiper à
