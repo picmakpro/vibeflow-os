@@ -384,6 +384,73 @@ assert_eq "W16.4 — D2 : le titre est contenu dans le tiroir et non rogné, auc
 assert_eq "W16.5 — D2 : contenu court, la hauteur du tiroir suit le contenu (< 60 % de la fenêtre)" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "$V.hauteur < $V.vh * 0.6")" "true"
 assert_eq "W16.6 — D2 : contenu long, le tiroir reste dans la fenêtre et défile" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "[$V.longBas <= $V.vh, $V.longHauteur < $V.vh, $V.overflowY, $V.longScroll]")" '[true,true,"auto",true]'
 fi
+# ---------- W17 — verrous de PHASE : libellé, registre par phase, grammaire des arguments (merge 69 / PR #197) ----------
+# Le verrou et le registre viennent du VRAI driver-lock.sh (acquire --ws --phase, register), dans un dépôt git jetable ; un faux driver-lock.sh
+# journalise ses arguments et rend un `status` hostile. Grammaire = celle de driver-lock.sh : ws = vf_ws_name_valid (alphanumérique en tête, puis
+# alphanumérique . _ -, jamais `..`), phase = vf_dl_phase_valid (chiffres séparés par des points, `1.2.3` accepté, jamais `..` ni point en tête ou en queue).
+echo "=== W17 — verrous de phase dans « qui est au travail » ==="
+cat > "$AUX/mutsub.mjs" <<'JS'
+import fs from 'node:fs';
+const f = process.argv[2]; const t = fs.readFileSync(f, 'utf8');
+if (!t.includes(process.env.FROM)) { console.log('ancre absente'); process.exit(1); }
+fs.writeFileSync(f, t.replace(process.env.FROM, () => process.env.TO)); console.log('muté');
+JS
+mut17() { local d="$WORK/mut17-$1"; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$d/"; FROM="$3" TO="$4" node "$AUX/mutsub.mjs" "$d/$2"; }
+DLREEL="$(cd "$SCRIPTS/../../conductor/scripts" && pwd)"
+L17="$WORK/lab-w17"; mkdir -p "$L17/.planning/workstreams/x" "$L17/.planning/workstreams/v1.2"; git -C "$L17" init -q
+( cd "$L17" && bash "$DLREEL/driver-lock.sh" acquire --ws=x --phase=5 --owner=mgr-p5 --step=exec >/dev/null 2>&1 \
+  && bash "$DLREEL/driver-lock.sh" register --ws=x --phase=5 --agent=ag-p5 --role=vf-coder --node=n1 --depth=2 >/dev/null 2>&1 \
+  && bash "$DLREEL/driver-lock.sh" acquire --ws=v1.2 --phase=1.2.3 --owner=mgr-v --step=exec >/dev/null 2>&1 \
+  && bash "$DLREEL/driver-lock.sh" register --ws=v1.2 --phase=1.2.3 --agent=ag-v --role=vf-coder --node=n2 --depth=2 >/dev/null 2>&1 )
+assert_eq "W17.0 — contrôle positif : les deux verrous de phase et leurs agents existent (vrai driver-lock.sh)" "$(ls "$L17/.git/vf-driver/ws/x/phases/5" "$L17/.git/vf-driver/ws/v1.2/phases/1.2.3" | grep -c 'children.jsonl')" "2"
+Q who "$L17" "$HOME_T" "$DLREEL" > "$WORK/who17.json"
+assert_eq "W17.1 — le verrou de phase est libellé « compartiment x phase 5 »" "$(G "$WORK/who17.json" 'j.workers.filter(w=>w.kind==="lock"&&w.id==="mgr-p5").map(w=>w.tree).join("|")')" "compartiment x phase 5"
+assert_eq "W17.2 — l'agent enregistré sous la phase 5 est vu, rattaché à sa phase et tenu (non orphelin)" "$(G "$WORK/who17.json" 'j.workers.filter(w=>w.id==="ag-p5").map(w=>w.tree+"/"+w.orphan).join("|")')" "compartiment x phase 5/false"
+assert_eq "W17.3 — ws « v1.2 » (point) et phase « 1.2.3 » (deux niveaux) : verrou libellé juste" "$(G "$WORK/who17.json" 'j.workers.filter(w=>w.kind==="lock"&&w.id==="mgr-v").map(w=>w.tree).join("|")')" "compartiment v1.2 phase 1.2.3"
+assert_eq "W17.4 — l'agent enregistré sous ws=v1.2 phase=1.2.3 est vu" "$(G "$WORK/who17.json" 'j.workers.filter(w=>w.id==="ag-v").map(w=>w.tree).join("|")')" "compartiment v1.2 phase 1.2.3"
+# faux driver-lock.sh : journalise ses arguments, `status` hostile (ws et phases qui n'ont rien à faire dans une ligne de commande)
+HOS="$WORK/hostile17"; mkdir -p "$HOS"; LOG17="$WORK/hostile17.log"
+cat > "$HOS/driver-lock.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$HOSTILE_LOG"
+case "$1" in
+  status) cat <<'JSON'
+{"locks":[
+{"present":true,"owner":"h1","step":"s","ws":"../x","phase":"5","scope":"phase","age_seconds":1,"stale":false},
+{"present":true,"owner":"h2","step":"s","ws":"$(id)","phase":"5","scope":"phase","age_seconds":1,"stale":false},
+{"present":true,"owner":"h3","step":"s","ws":"x","phase":"1;rm","scope":"phase","age_seconds":1,"stale":false},
+{"present":true,"owner":"h4","step":"s","ws":"x","phase":"5 --all","scope":"phase","age_seconds":1,"stale":false},
+{"present":true,"owner":"h5","step":"s","ws":"x","phase":"1..2","scope":"phase","age_seconds":1,"stale":false},
+{"present":true,"owner":"h6","step":"s","ws":"a/b","phase":".5","scope":"phase","age_seconds":1,"stale":false},
+{"present":true,"owner":"h7","step":"s","ws":"x","phase":7,"scope":"phase","age_seconds":1,"stale":false},
+{"present":true,"owner":"h8","step":"s","ws":"v1.2","phase":"1.2.3","scope":"phase","age_seconds":1,"stale":false}]}
+JSON
+  ;;
+  orphans) echo '{"orphans":[]}' ;;
+esac
+SH
+L18="$WORK/lab-w17h"; mkdir -p "$L18"; git -C "$L18" init -q
+mkdir -p "$L18/.git/vf-driver/ws/ok1" "$L18/.git/vf-driver/ws/..x" "$L18/.git/vf-driver/ws/a b" "$L18/.git/vf-driver/ws/x;y" "$L18/.git/vf-driver/ws/.caché" "$L18/.git/vf-driver/ws/v1.2"
+mkdir -p "$L18/.git/vf-driver/ws/--all"
+run18() { : > "$LOG17"; HOSTILE_LOG="$LOG17" Q who "$1" "$HOME_T" "$2" > "$WORK/who18.json"; }
+run18 "$L18" "$HOS"
+BADARGS="$(grep '^orphans' "$LOG17" | grep -cvE '^orphans( --ws=[A-Za-z0-9][A-Za-z0-9._-]*( --phase=[0-9]+(\.[0-9]+)*)?)?$')"
+assert_eq "W17.5 — aucun ws ni numéro de phase hostile n'arrive en argument de driver-lock.sh" "$BADARGS" "0"
+assert_eq "W17.6 — témoin : les cibles valides ont bien été interrogées (x phase 5 absent du status, v1.2 phase 1.2.3 et ok1 présents)" "$(grep -cE '^orphans --ws=(v1\.2 --phase=1\.2\.3|ok1|v1\.2)$' "$LOG17")" "3"
+assert_eq "W17.7 — les phases hostiles ne sont pas libellées (« 5 --all », « 1;rm », « 1..2 »)" "$(G "$WORK/who18.json" 'j.workers.filter(w=>w.kind==="lock"&&["h3","h4","h5"].includes(w.id)).map(w=>w.tree).join("|")')" "compartiment x|compartiment x|compartiment x"
+assert_eq "W17.8 — une phase numérique (7) du status est ramenée à une chaîne valide et interrogée" "$(grep -c '^orphans --ws=x --phase=7$' "$LOG17")" "1"
+M1="$(mut17 sansfiltre vf-cockpit-who.mjs "ok = (ws, ph) => (ws === '' || WS_RE.test(ws) && !ws.includes('..')) && (ph === '' || PH_RE.test(ph));" "ok = () => true;")"
+run18 "$L18" "$HOS" ; : > "$LOG17"; HOSTILE_LOG="$LOG17" node "$AUX/q.mjs" "$WORK/mut17-sansfiltre" who "$L18" "$HOME_T" "$HOS" > /dev/null
+assert_eq "W17.9 — mutant (filtre ok() supprimé, ancre présente) : des arguments hostiles arrivent au script, détecté" "$M1|$(grep '^orphans' "$LOG17" | grep -cvE '^orphans( --ws=[A-Za-z0-9][A-Za-z0-9._-]*( --phase=[0-9]+(\.[0-9]+)*)?)?$' | awk '{print ($1>0)?"rougit":"vert"}')" "muté|rougit"
+M2="$(mut17 sanslibelle vf-cockpit-who.mjs '${l.phase && PH_RE.test(String(l.phase)) ? ` phase ${l.phase}` : '"''"'}' "")"
+assert_eq "W17.10 — mutant (libellé « phase N » supprimé) : W17.1 rougit" "$M2|$(node "$AUX/q.mjs" "$WORK/mut17-sanslibelle" who "$L17" "$HOME_T" "$DLREEL" | node "$AUX/stdin-get.mjs" 'j.workers.filter(w=>w.kind==="lock"&&w.id==="mgr-p5").map(w=>w.tree).join("|")')" "muté|compartiment x"
+M3="$(mut17 sanscible vf-cockpit-who.mjs ".filter((x) => x.present && x.phase && typeof x.ws === 'string')" ".filter(() => false)")"
+assert_eq "W17.11 — mutant (cibles de phase supprimées) : l'agent enregistré sous la phase 5 disparaît" "$M3|$(node "$AUX/q.mjs" "$WORK/mut17-sanscible" who "$L17" "$HOME_T" "$DLREEL" | node "$AUX/stdin-get.mjs" 'j.workers.filter(w=>w.id==="ag-p5").length')" "muté|0"
+M4="$(mut17 grammaireetroite vf-cockpit-who.mjs "WS_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*\$/" "WS_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*\$/")"
+assert_eq "W17.12 — mutant (ws sans point, ancien ID_RE) : l'agent de ws=v1.2 disparaît" "$M4|$(node "$AUX/q.mjs" "$WORK/mut17-grammaireetroite" who "$L17" "$HOME_T" "$DLREEL" | node "$AUX/stdin-get.mjs" 'j.workers.filter(w=>w.id==="ag-v").length')" "muté|0"
+M5="$(mut17 phaseunniveau vf-cockpit-who.mjs "PH_RE = /^[0-9]+(\\.[0-9]+)*\$/" "PH_RE = /^[0-9]{1,4}(\\.[0-9]{1,3})?\$/")"
+assert_eq "W17.13 — mutant (phase à un seul niveau décimal) : le verrou 1.2.3 perd sa phase" "$M5|$(node "$AUX/q.mjs" "$WORK/mut17-phaseunniveau" who "$L17" "$HOME_T" "$DLREEL" | node "$AUX/stdin-get.mjs" 'j.workers.filter(w=>w.id==="mgr-v").map(w=>w.tree).join("|")')" "muté|compartiment v1.2"
+
 vf_hyg_assert
 
 echo ""
