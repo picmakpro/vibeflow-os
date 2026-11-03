@@ -59,3 +59,7 @@ Dix mineurs d'une revue sur l'arbre 02145ab3. Mutants rejoués sur une copie (sc
 | 10 première ligne trop longue | `tronque` vrai quand la fenêtre de tête coupe la première ligne | « sans tronque » -> T24G3 |
 
 Nombres du registre (`NOMBRES`) : témoin E30.4, mutant « sans NOMBRES » -> E30.4. Défenses redondantes SANS témoin propre : `ID_RE` de `charge` (compensée par le filtre `IDS` de `collectWho`, et inversement), le `try` de `collecteAgents` et celui de `revealTranscript` (aucune fixture bon marché ne fait lever le corps), le bornage de `trees` (valeur dérivée des chemins d'arbres git). La borne de `meta.json` est 256 Kio (la section précédente nommait une fixture de 512 Kio).
+
+## Dernière passe (mineurs 5 et 6)
+- Point 5 : E30.6 à E30.8 — l'identifiant d'un nœud rattaché porte un jeton ; `rattachement.noeud` sort masqué ; mutant `bornes(o[k], n)` -> `o[k].slice(0, n)` détecté (jeton en clair).
+- Point 6 : `read()` de `vf-cockpit-planning.mjs` n'ouvre plus qu'un fichier régulier d'au plus 8 Mio (`statSync().isFile()`). Témoins E31.0 à E31.2 : un `*.dag.json` en tube et un lien vers `/dev/zero` ne bloquent plus la collecte (enfant borné, SIGKILL, tubes supprimés) ; mutant sans contrôle -> collecte bloquée. Le `read` local de `vf-cockpit-project.mjs` (STATE, PLAN, sans DAG) a la même forme et n'est pas dans ce périmètre.
