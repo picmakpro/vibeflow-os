@@ -1,0 +1,160 @@
+#!/usr/bin/env node
+// vf-cockpit-fr-inventaire — inventaire déterministe des chaînes d'interface ANGLAISES d'un rendu servi (67-07, CKPT-09).
+// Base de la synchro amont : à rejouer après chaque resynchronisation du moteur (amont/SYNCHRO.md).
+// Entrées : le HTML des pages servies (index.html, project.html) et le source de serve.mjs de la sortie.
+// Sortie : liste triée et dédoublonnée (ordre des points de code), `${…}` d'un gabarit écrit `{}`.
+// Exports : inventaire({ html: [...], serveur }), litteraux(src), textesHtml(html), estAnglais(chaine).
+// CLI : node vf-cockpit-fr-inventaire.mjs <sortie> [--json]   Code 0 ; 2 sortie sans index.html.
+//
+// Ce qui entre : littéraux (apostrophes, guillemets, gabarits) des blocs <script> en ligne, texte et attributs
+// placeholder/title/aria-label/alt des balises, y compris celles que décrit un littéral HTML ; pour serve.mjs, les seuls
+// littéraux des messages renvoyés à la page (lignes `message:`, `error:`, `text:`, `new Error(` et les fonctions
+// `describe*`), jamais une ligne de journal console. Ce qui n'y entre pas : la zone de données du lab, les blocs portant
+// le marqueur `// vibeflow:fr` (le dictionnaire lui-même) ou un marqueur d'extension VibeFlow (déjà en français).
+// Règle « texte anglais » (estAnglais) : un mot d'au moins 3 lettres ASCII, ni URL, chemin, sélecteur ou propriété CSS,
+// tracé SVG, identifiant sans espace en minuscules (classe, événement, clé), ni marque de français (accent, mot-outil).
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const MOTS_FR = new Set(['le', 'la', 'les', 'des', 'du', 'un', 'une', 'est', 'et', 'ou', 'pour', 'sur', 'dans', 'par', 'aux', 'ce', 'cette', 'qui', 'que', 'vous', 'nous', 'votre', 'avec', 'sans', 'aucun', 'aucune', 'jamais', 'tous', 'toutes', 'où', 'au', 'cours', 'fait']);
+const AVANT_REGEX = new Set(['return', 'typeof', 'case', 'in', 'of', 'delete', 'void', 'throw', 'new', 'else', 'do', 'yield', 'await']);
+const ID = /[\w$]/;
+
+// --- littéraux d'un source JavaScript ---------------------------------------------------------------
+// Parcours récursif : commentaires et expressions régulières sautés, gabarits lus avec leurs `${…}` (les littéraux
+// imbriqués sont lus à leur tour, le gabarit hôte les écrit `{}`).
+export function litteraux(src) {
+  const out = [];
+  let i = 0;
+  const n = src.length;
+  const motPrecedent = (k) => { let j = k; while (j > 0 && ID.test(src[j - 1])) j--; return src.slice(j, k); };
+  function chaine(q) { // i sur la quote ouvrante ; rend la valeur, i après la quote fermante
+    let v = ''; i++;
+    while (i < n && src[i] !== q) {
+      if (src[i] === '\\') { const c = src[i + 1]; v += c === 'n' ? '\n' : c === 't' ? '\t' : c === 'u' || c === 'x' ? '' : c; i += 2; continue; }
+      if (src[i] === '\n') break; v += src[i++];
+    }
+    i++; return v;
+  }
+  function gabarit() { // i sur le backtick ouvrant
+    let v = ''; i++;
+    while (i < n && src[i] !== '`') {
+      if (src[i] === '\\') { v += src[i + 1] === 'n' ? '\n' : src[i + 1]; i += 2; continue; }
+      if (src[i] === '$' && src[i + 1] === '{') { i += 2; code(1); v += '{}'; continue; }
+      v += src[i++];
+    }
+    i++; out.push(v); return v;
+  }
+  function code(profondeur) { // lit jusqu'à l'accolade fermante qui ramène la profondeur à 0 (0 = fichier entier)
+    let dernier = '';
+    while (i < n) {
+      const c = src[i];
+      if (c === '/' && src[i + 1] === '/') { while (i < n && src[i] !== '\n') i++; continue; }
+      if (c === '/' && src[i + 1] === '*') { const e = src.indexOf('*/', i + 2); i = e < 0 ? n : e + 2; continue; }
+      if (c === '"' || c === "'") { out.push(chaine(c)); dernier = 'x'; continue; }
+      if (c === '`') { gabarit(); dernier = 'x'; continue; }
+      if (c === '/') {
+        const regex = dernier === '' || '(,=:[!&|?{};+-*%<>~^'.includes(dernier) || AVANT_REGEX.has(motPrecedent(i - (src.slice(0, i).match(/\s*$/)[0].length)));
+        if (regex) { i++; let cls = false; while (i < n && (src[i] !== '/' || cls) && src[i] !== '\n') { if (src[i] === '\\') i++; else if (src[i] === '[') cls = true; else if (src[i] === ']') cls = false; i++; } i++; while (i < n && /[a-z]/.test(src[i])) i++; dernier = 'x'; continue; }
+      }
+      if (c === '{' && profondeur > 0) { profondeur++; }
+      if (c === '}' && profondeur > 0) { profondeur--; if (profondeur === 0) { i++; return; } }
+      if (!/\s/.test(c)) dernier = c;
+      i++;
+    }
+  }
+  code(0);
+  return out;
+}
+
+// --- texte et attributs d'un fragment HTML ----------------------------------------------------------
+const ATTRS = /\b(?:placeholder|title|aria-label|alt)=(?:"([^"]*)"|'([^']*)')/g;
+export function textesHtml(html) {
+  const r = [];
+  for (const m of html.matchAll(ATTRS)) r.push(m[1] ?? m[2]);
+  const nu = html.replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ').replace(/<!--[\s\S]*?-->/g, ' ');
+  for (const t of nu.split(/<[^>]*>/)) r.push(t);
+  return r;
+}
+
+// --- règle « texte anglais d'interface » -------------------------------------------------------------
+export function estAnglais(s, texte = false) {
+  const t = s.replace(/\s+/g, ' ').trim();
+  if (t.length < 3 || t.length > 600 || !(/[A-Za-z]{3,}/.test(t) || /\{\}\s+[a-z]{2,}\s+\{\}/.test(t))) return false;
+  if (/[À-ÿ…«»’]/.test(t) && /[À-ÿ«»]/.test(t)) return false; // accent français : pas de l'anglais
+  if (/^(https?:|\/\/|\.{0,2}\/|[a-z]:\\)/i.test(t) || /^[\w.-]+\/[\w./+-]+$/.test(t)) return false; // URL, chemin, type MIME
+  if (/^[#.@:[]|^--|^\*|^\$|^<|^[\[(]|^\{(?!\})/.test(t) && !/\s[A-Za-z]{3,}\s/.test(t)) return false; // sélecteur, propriété, balise
+  if (/[;{}]/.test(t) && /:/.test(t) && !/\{\}/.test(t)) return false; // déclaration CSS
+  if (/[[\]]/.test(t) && /,/.test(t)) return false; // liste de sélecteurs
+  if (/^[A-Z][A-Z0-9_]+s?$/.test(t)) return false; // sigle ou constante en majuscules (API, JSON, ORTHOGONAL) : identique dans les deux langues
+  if (/\d(px|em|rem|vh|vw|ms|s)\b|rgba?\(|hsla?\(|#[0-9a-f]{3,8}\b|var\(|calc\(|translate|gradient/i.test(t)) return false;
+  if (/^[MmLlHhVvCcSsQqTtAaZz0-9 .,-]+$/.test(t)) return false; // tracé SVG
+  if (!texte && !/\s/.test(t) && !/^[A-Z]/.test(t)) return false; // identifiant, classe, événement, clé : un seul mot en minuscules (hors nœud de texte)
+  if (!/\s/.test(t) && /[a-z][A-Z]|[_-]|\./.test(t)) return false; // camelCase, snake_case, kebab-case, point
+  if (/^[\w-]+(\.\w+)+$/.test(t) || /\.(js|mjs|json|html|css|md|svg|png|txt)\b/i.test(t) && !/\s/.test(t)) return false;
+  if (/^(application|text|image)\//.test(t) || /^(GET|POST|PUT|DELETE|HEAD)$/.test(t)) return false;
+  if (/^[a-z]+(\s+[a-z]+){0,3}$/.test(t) && /^(div|span|button|input|path|svg|rect|circle|text|line|g|a|ul|li)\b/.test(t)) return false;
+  for (const w of t.toLowerCase().split(/[^a-zà-ÿ']+/)) if (MOTS_FR.has(w)) return false;
+  return true;
+}
+const normaliser = (s) => s.replace(/\s+/g, ' ').trim();
+function ajouter(set, brut, texte = false) {
+  if (/<[a-z!/][^>]*>/i.test(brut)) { for (const t of textesHtml(brut)) { const x = normaliser(t); if (x && estAnglais(x, true)) { set.add(x); if (/^\{\}[A-Za-z]/.test(x)) set.add(x.slice(2)); } } return; } // gabarit HTML : son texte ; un `{}` collé peut être une icône : le nœud réel est alors le reste
+  const x = normaliser(brut);
+  if (x && estAnglais(x, texte)) set.add(x);
+}
+
+// --- pages servies --------------------------------------------------------------------------------------
+// blocs jamais comptés : le dictionnaire (« // vibeflow:fr »), les extensions VibeFlow (« // VibeFlow ( », déjà en français,
+// derrière l'en-tête `/* ui/<fichier> */` posé par le build) et le bloc des requêtes sur le graphe, dont les littéraux sont des
+// descriptions d'outils et des réponses lues par l'agent (jamais affichés), et la bibliothèque de mise en page vendorisée
+// (marqueur `vibeflow:allow-large-file`, messages d'erreur internes)
+const MARQUEURS_FR = /^\s*(?:\/\* ui\/[\w.-]+ \*\/\s*)?\/\/ (?:vibeflow:fr|vibeflow:allow-large-file|VibeFlow \()|^\s*\/\/ [\w-]+ graph queries, shared by the viewer/
+const DONNEES = /<script>window\.[A-Z_]+ = /;
+const sansJournal = (src) => src.split('\n').filter((l) => !/console\.(log|error|warn|info)\(/.test(l)).join('\n'); // jamais une ligne de journal
+function blocs(html) { // { scripts: [source], reste: html sans données ni scripts }
+  const d = DONNEES.exec(html);
+  let h = html;
+  if (d) { const fin = html.indexOf(';</script>', d.index); h = html.slice(0, d.index) + html.slice(fin + ';</script>'.length); }
+  const scripts = [];
+  const reste = h.replace(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi, (_, s) => { if (!MARQUEURS_FR.test(s)) scripts.push(s); return ' '; });
+  return { scripts, reste };
+}
+
+// lignes de serve.mjs dont les littéraux atteignent la page ; jamais une ligne de journal console
+const LIGNE_MESSAGE = /\b(message|error|text|title|label)\s*:|new Error\(|\bplain\b/;
+function litterauxServeur(src) {
+  const out = [];
+  let dansDescribe = false;
+  for (const l of src.split('\n')) {
+    if (/^function describe\w*\(/.test(l)) dansDescribe = true;
+    else if (/^}/.test(l)) dansDescribe = false;
+    if (/console\.(log|error|warn)/.test(l) || /^\s*\/\//.test(l)) continue;
+    if (dansDescribe || LIGNE_MESSAGE.test(l)) out.push(...litteraux(l));
+  }
+  return out;
+}
+
+export function inventaire({ html = [], serveur = '' } = {}) {
+  const set = new Set();
+  for (const page of html) {
+    const { scripts, reste } = blocs(page);
+    for (const s of scripts) for (const l of litteraux(sansJournal(s))) ajouter(set, l);
+    for (const t of textesHtml(reste)) ajouter(set, t, true);
+  }
+  for (const l of litterauxServeur(serveur)) ajouter(set, l);
+  return [...set].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
+export function inventaireDeSortie(sortie) {
+  const lire = (f) => { try { return fs.readFileSync(path.join(sortie, f), 'utf8'); } catch { return ''; } };
+  return inventaire({ html: [lire('index.html'), lire('project.html')].filter(Boolean), serveur: lire('serve.mjs') });
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
+  const sortie = process.argv.slice(2).find((a) => !a.startsWith('--'));
+  if (!sortie || !fs.existsSync(path.join(sortie, 'index.html'))) { console.error('usage : vf-cockpit-fr-inventaire.mjs <sortie du cockpit> [--json]'); process.exit(2); }
+  const inv = inventaireDeSortie(path.resolve(sortie));
+  console.log(process.argv.includes('--json') ? JSON.stringify(inv, null, 1) : inv.join('\n'));
+}

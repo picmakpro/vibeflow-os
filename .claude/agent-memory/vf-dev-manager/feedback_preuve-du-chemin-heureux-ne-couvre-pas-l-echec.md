@@ -46,3 +46,5 @@ et un « second passage = rien » qui sortait avant la preuve. Pour tout outil q
 fichier vivant, exiger le cycle « transformer, commiter, ajouter du neuf, retransformer ». Le test
 isolé as-installed en fin de vague trouve ce que les juges ne voient pas : le commander AVANT la
 revue finale, pas après.
+
+**Variante en mise en page (2026-11-03, Phase 67, O2) :** un correctif du fil d'Ariane a élargi la colonne gauche de l'en-tête jusqu'à 50vw, sans compter la place des boutons de droite. La suite responsive est restée verte (94/0) avec ses segments courts. Sur un vrai lab, à 1 280 px, le bouton du panneau sortait de la fenêtre. Pour tout correctif de largeur, exiger une fixture aux noms longs réalistes, aux largeurs proches du seuil (1 280-1 320).

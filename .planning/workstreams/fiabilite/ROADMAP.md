@@ -27,6 +27,12 @@
   dans la ROADMAP plate **sans `gsd-new-milestone`** (même forme que `gouvernance-labs-v1.0`) ;
   **exécution après la clôture de `fiabilite-v1.0`**, en parallèle du jalon de Willy
   (compartiment `gouvernance`) — arbitrage Samuel, AskUserQuestion session principale, 2026-09-25.
+- 📋 **vibeflow-v2.0** — « le cockpit VibeFlow » — Phases 67-68 — **inscrit 2026-11-01** — le cockpit en tête :
+  un cockpit floorplan (onglets Projet et Code) sur un socle partagé, puis `vf-signal` embarqué sur ce même socle.
+  `equipe-produit-v1.0` reste ouvert, son sort se tranche à sa clôture (arbitrage Samuel, AskUserQuestion session
+  principale, 2026-11-01). Sources : `.planning/notes/2026-11-01-cockpit-facettes.md`,
+  `docs/research/2026-11-01-etude-floorplan-cockpit.md`, `.planning/spikes/WRAP-UP-SUMMARY.md`. Même forme que ECC : section
+  distincte de la ROADMAP plate, **sans `gsd-new-milestone`** (le STATE reste sur `equipe-produit-v1.0`).
 
 > **Origine des Phases 23 à 25, dite franchement.** Elles ont été inscrites au ROADMAP le
 > 2026-07-31 par une session concurrente, **hors du périmètre confié** à la mission qui tournait
@@ -114,6 +120,8 @@
 - [ ] Phase 64: Contrôles après exécution branchés en nœuds du plan de bataille (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 - [ ] Phase 65: Révision des règles qui brident l'efficacité des agents (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 - [ ] Phase 66: Grille de sévérité des juges et convergence des boucles de revue (inscrite 2026-10-29, jalon equipe-produit-v1.0)
+- [x] Phase 67: Cockpit floorplan sur socle partagé (inscrite 2026-11-01, jalon vibeflow-v2.0) — complete 2026-11-03 : 7/7 plans et 4 tours de correction (FIX-A à FIX-D), recette humaine validée par Samuel (`67-RECETTE-HUMAINE.md` § 8.2), CKPT-01..12 cochées ; release `v2.75.0` préparée (tag et release GitHub après le merge de la PR #187, geste de Samuel)
+- [ ] Phase 68: Embarquer vf-signal sur le socle partagé (inscrite 2026-11-01, jalon vibeflow-v2.0)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
 
@@ -781,3 +789,70 @@ Plans:
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 66 to break down)
+
+## 📋 Milestone vibeflow-v2.0 — « le cockpit VibeFlow » (Phases 67-68)
+
+**Milestone Goal :** un saut d'usage visible pour qui installe VibeFlow : un cockpit qui montre le projet, le code
+et qui est au travail, dans tout lab GSD, sur un socle partagé avec le panneau compact `vf-signal`. Le cockpit
+floorplan remplace le module `vf-cockpit` (page Mermaid, branche `feat/vf-cockpit-module`, jamais mergée). Entrée du cadrage :
+`.planning/notes/2026-11-01-cockpit-facettes.md` ; savoir technique : skill local `spike-findings-vibeflow-os`,
+`.planning/spikes/WRAP-UP-SUMMARY.md` (spikes 002 à 006) et `docs/research/2026-11-01-etude-floorplan-cockpit.md`.
+
+**Inscription :** 2026-11-01, arbitrage Samuel, AskUserQuestion session principale, 2026-11-01 (cockpit en tête du
+jalon ; `equipe-produit-v1.0`, phases 63-66, reste ouvert ; la réponse initiale « go » a été reclarifiée par une seconde
+question). Même forme qu'ECC : section distincte de la ROADMAP plate, **sans `gsd-new-milestone`**. Numéros 67-68 posés à la
+main (le moteur propose un mauvais numéro sur ce dépôt ; 36 reste réservé, dossier orphelin ; 42-50 : compartiment `gouvernance`).
+La graine `SEED-004` (retrait de `vf-cockpit`) reste dormante : elle se déclenche à la livraison de la Phase 67.
+
+### Phase 67: Cockpit floorplan sur socle partagé
+
+> Cadrée le 2026-11-01 (`67-CONTEXT.md`, P67-D-01..18) ; planifiée le 2026-11-01.
+
+**Goal:** Un module VibeFlow distribué et toggable ouvre, dans tout lab GSD, un cockpit à onglets Projet (au cœur) et Code, sur un socle partagé (collecteur « qui est au travail » + graphe Projet) que `vf-signal` réutilise ; il remplace le module `vf-cockpit` jamais mergé.
+**Requirements**: CKPT-01..CKPT-12
+**Depends on:** rien dans le jalon.
+**Success criteria** (observables, à confirmer au cadrage) :
+1. Sur un lab GSD quelconque (un `.planning/` suffit), le verbe du module ouvre le cockpit et l'onglet Projet montre racine, jalon, phase et plan.
+2. L'onglet Code est riche sur vibeflow-os (extracteur VibeFlow) et retombe sur le scan brut de floorplan ailleurs, sans erreur.
+3. Le direct (statuts, « au travail ») arrive par le serveur floorplan unique, sans second port ni CORS.
+4. L'onglet Projet se questionne : formes courantes locales et gratuites, agent actif (`claude -p`, modèle réglable) pour le raisonnement.
+5. La dernière commande des sessions est masquée par défaut dans « Au travail », révélée sur demande, jamais exportée ; le chrome est en français par défaut (les textes produits par le moteur, Santé et couverture de l'onglet Code, peuvent rester en anglais, P67-D-20) sans anglais dans le reste de l'interface (test qui rougit).
+6. La fenêtre est ajustable (CKPT-12, P67-D-21) : de 1 024 à 2 560 px, au chargement comme au redimensionnement à chaud, aucune superposition ni rognage de l'en-tête, des panneaux et de la barre de question ; rendu non cassé en dessous (test qui mesure les boîtes).
+**Sources:** `.planning/notes/2026-11-01-cockpit-facettes.md` (arbitrages 1-4, choix de session, limites connues) ; `.planning/spikes/002-cockpit-code-projet/` (extensions, patchs P1-P8) ; `docs/research/2026-11-01-etude-floorplan-cockpit.md`.
+**Hors périmètre :** enrichir l'onglet Code par stack (suite) ; retirer `vf-cockpit` (SEED-004, à la livraison).
+**Plans:** 7 plans
+
+Plans:
+
+**Wave 1**
+- [x] 67-01-PLAN.md — `dag.sh` : écriture atomique de `save()`, témoin rouge d'abord (CKPT-11)
+- [x] 67-02-PLAN.md — Socle partagé : collecteur « au travail » + graphe Projet, schémas versionnés, test de forme des transcripts (CKPT-01, CKPT-06)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 67-03-PLAN.md — Vendorisation floorplan v0.6.0 @ 92d6854, retrait Cloud, marque blanche, logo (CKPT-02, CKPT-03, CKPT-04)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 67-04-PLAN.md — Mesure `claude -p`, serveur unique, direct SSE, dernière commande masquée (CKPT-05, CKPT-08, CKPT-03)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 67-05-PLAN.md — Questions : formes locales, agent confiné, sélecteur de modèle, onglet Code (CKPT-07, CKPT-06)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 67-06-PLAN.md — Module `plugin/cockpit`, skill `/vf-cockpit`, pose par l'engine (CKPT-10)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 67-07-PLAN.md — Chrome en français, test qui rougit, recette humaine (CKPT-09)
+
+### Phase 68: Embarquer vf-signal sur le socle partagé
+
+> **Non cadrée — cadrage par le manager à suivre.**
+
+**Goal:** Le mod `vf-signal` (aujourd'hui dans `~/.claude/mods/vf-signal`) est embarqué dans le plugin `vibeflow`, branché sur le socle partagé de la Phase 67, avec un bouton « Ouvrir le cockpit » ; il est livré dans une release.
+**Requirements**: TBD — famille réservée, posée au cadrage.
+**Depends on:** Phase 67.
+**Sources:** `.planning/notes/2026-10-29-HANDOFF-jalon-v2.md` § 3 (points à trancher : gating par module, emplacement, API des mods « early access », chemins de `driver-lock.sh`, mobile, ADR-035/031, SOBR-04) ; mémoire `vf-signal-a-embarquer-dans-vibeflow`.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 68 to break down)

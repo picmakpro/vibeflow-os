@@ -14,7 +14,8 @@
 #
 # CE QU'IL BALAIE : les fichiers SUIVIS par git sous plugin/, scripts/ et .github/, hors
 # `*/tests/*` (les suites tournent depuis le dépôt de distribution, sur des fixtures qu'elles
-# fabriquent — elles ne sont pas posées chez l'utilisateur), hors `*.md` (prose) et `*.py` (du
+# fabriquent — elles ne sont pas posées chez l'utilisateur), hors `*/assets/vendor/*.js` (code tiers
+# vendorisé, JS minifié à lignes géantes — D1 2026-11-01), hors `*.md` (prose) et `*.py` (du
 # Python, pas une invocation), hors ce gate. Lecture à `awk` seul : le `grep` de certains postes de
 # dev est proxifié et tronque en silence — un gate qui compte dessus rend un vert à vide.
 #
@@ -102,7 +103,9 @@ cd "$ROOT" || exit 3
 FILES=()
 while IFS= read -r -d '' f; do
   case "$f" in
-    */tests/*|*.md|*.py|scripts/check-python-isolation.sh) continue ;;
+    # */assets/vendor/*.js : JS minifié tiers vendorisé, lignes de centaines de milliers de caractères
+    # qui bloquent le balayage awk (arbitrage D1, 2026-11-01) — ni écrit ici, ni posé comme script.
+    */tests/*|*/assets/vendor/*.js|*.md|*.py|scripts/check-python-isolation.sh) continue ;;
   esac
   [ -f "$f" ] || continue
   FILES+=("$f")

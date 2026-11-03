@@ -652,3 +652,48 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 - C1 : compte rendu de la recette Phase 61 sur lab réel (COLB-08). C2 : besoin non-dev sans terminal documenté (option B possible, à la discrétion de Samuel).
 
 **Déclencheur de reprise :** le 2027-01-31, ou plus tôt si C1 et C2 sont établis.
+
+## Choix de la langue de l'interface du cockpit (français / anglais) — DIFFÉRÉ (2026-11-01)
+
+**Origine :** Phase 67, réponse E1 de Samuel (AskUserQuestion session principale, 2026-11-01) : « on pourrait avoir des gens qui utilise l'anglais, donc en soit l'anglais n'est pas dérangeant et peut etre un des langues autorisées » (`67-CONTEXT.md` P67-D-20). L'interface du cockpit est en français par défaut ; les textes du moteur (Santé, couverture de l'onglet Code) restent en anglais (CKPT-09 reformulé).
+- **À faire :** un choix de langue (français / anglais) dans l'interface, gardé dans le navigateur ; l'anglais devient une langue autorisée et non plus un défaut à masquer. Le paramètre `?lang=en` existe déjà (80-vf-fr.js : désactive la traduction), c'est le point d'appui.
+- **Hors 67 :** aucune traduction du panneau Santé ni de la couverture de l'onglet Code dans la phase.
+
+**Déclencheur de reprise :** la prochaine évolution de l'interface du cockpit, ou la première demande d'un utilisateur anglophone.
+
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-11-02.md — ## Installeur et tests `plugin/_internal` sans module dans la carte — DIFFÉRÉ (2026-11-02) — CLOS (2026-11-02) -->
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-11-02.md — ## `dev-orchestrator` : 26 500 lignes et responsabilités mêlées — DIFFÉRÉ (2026-11-02) — CLOS (2026-11-02) -->
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-11-02.md — ## Gates de `dev-orchestrator` à rejouer sur témoin rouge — DIFFÉRÉ (2026-11-02) — CLOS (2026-11-02) -->
+## Cockpit en largeur mobile et clarté de la visite guidée — DIFFÉRÉ (2026-11-02)
+
+**Origine :** recette humaine de la Phase 67, étapes 1 et 7 (`67-RECETTE-HUMAINE.md` § 3, Samuel, Wispr Flow et saisie texte, session principale, 2026-11-02). Reporté hors de la PR #187 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-02).
+- **D4** : en largeur mobile, tous les boutons passent en une rangée de petites icônes sans libellé ; hiérarchie de l'information jugée « atroce ».
+- **I4** : le zoom (− [] +) en pile verticale, même design, à gauche au-dessus de la barre de question.
+- **I5** : le tiroir (sheet mobile, apprécié) s'ouvre au clic sur une carte ou le titre selon le contexte, sans bouton dédié.
+- **I6** : regrouper les autres boutons.
+- **I1** : la visite guidée « manque un chouïa de clarté ».
+
+**Déclencheur de reprise :** la phase qui suit la 67 sur le cockpit, après le merge de la PR #187.
+
+## Commande `/vf-recette` — recette humaine pas à pas — DIFFÉRÉ (2026-11-02)
+
+**Origine :** recette de la Phase 67 menée en session principale le 2026-11-02 : une étape à la fois, retour dicté (Wispr Flow) ou tapé, relevé verdict / défauts / idées validé par Samuel, consignation mot pour mot avec canal et date, tri final en AskUserQuestion. Mise au backlog par arbitrage Samuel (AskUserQuestion session principale, 2026-11-02). Le serveur MCP en lecture seule sur l'historique local de Wispr Flow n'est pas retenu (base non documentée, fragile).
+- **À faire :** outiller ce va-et-vient à partir d'un fichier `*-RECETTE-HUMAINE.md` existant, sans jamais remplir une réponse à la place de l'humain.
+
+**Déclencheur de reprise :** la prochaine recette humaine de fin de phase.
+
+## Cockpit : « Où en est-on ? » sur un lab sans STATE rend des champs vides — DIFFÉRÉ (2026-11-03)
+
+**Origine :** relecture adverse SOBR-04 de la release v2.75.0 (finding F5), reportée par arbitrage Samuel (« Corriger maintenant (Recommandé) » pour F1 à F4, F5 au BACKLOG ; AskUserQuestion session principale, 2026-11-03).
+- Sur un lab sans `STATE.md`, la voie locale répond « Jalon en cours : non reconnu. Dernière phase :  · , le ?. » : les champs absents sont rendus vides au lieu d'être omis ou nommés. `plugin/cockpit/scripts/vf-cockpit-ask.mjs:107`. Cosmétique, pas de crash.
+
+**Déclencheur de reprise :** la phase qui suit la 67 sur le cockpit.
+
+## Cockpit : anglais résiduel et coquilles du chrome — DIFFÉRÉ (2026-11-03)
+
+**Origine :** vérification Playwright des correctifs de la Phase 67 (`67-RECETTE-HUMAINE.md` § 6), laissée hors de la PR #187 par arbitrage Samuel (AskUserQuestion session principale, 2026-11-03).
+- Anglais dans le chrome : « Calls · 27 » dans le panneau, « ⌫ up » dans l'aide des raccourcis, « 1 minor » dans Santé.
+- Phrase mixte : « 1 fichier et points d'accès still use generated names. Run the skill again to describe them. »
+- Coquilles : « Les réponses viennent de le CLI Claude Code » (au lieu de « du CLI ») ; « 1 fichiers de code ».
+
+**Déclencheur de reprise :** la phase qui suit la 67 sur le cockpit (avec la refonte mobile).

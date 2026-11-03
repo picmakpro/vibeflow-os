@@ -32,3 +32,13 @@ une preuve qui passe pour la mauvaise raison) et [[re-deriver-les-listes-d-une-r
 Corollaire de budget : le plafond de 3 tours par nœud se dépasse **délibérément et consigné** quand
 le correctif cesse d'être exploratoire (juge ayant donné le fix exact) ET que la méthode de preuve
 change. Un 4e tour qui rejoue la même méthode est une halt condition, pas un tour de plus.
+
+**Récidive (2026-11-02/03, Phase 67, « Voir la dernière commande ») :** même schéma sur une réduction de commande shell.
+Liste noire de motifs de secret, puis lecture des guillemets : 3 tours, chacun refermé sur l'exemple cité par le juge.
+Le 4e tour a changé de méthode : liste blanche de caractères et 6 000 commandes générées (958 fuites avant, 0 après).
+Le juge a encore trouvé une fuite par `\r` interne. Le générateur découpait comme le code jugé, donc il ne tirait jamais
+un séparateur que le code coupe et que le shell ne coupe pas. À exiger dans le mandat : l'oracle et le générateur ne
+reprennent pas le découpage du code jugé, et chaque caractère hors liste blanche est tiré À L'INTÉRIEUR d'un mot.
+Après correction du `\r`, la re-revue a trouvé deux voisins non figés : l'espacement Unicode (U+00A0, U+3000) et `trim()`,
+qui a sa propre définition de l'espace. Quand un correctif resserre un découpage, commander aussi deux mutants : la famille
+Unicode seule, et la lecture des extrémités.

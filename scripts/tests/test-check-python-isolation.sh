@@ -215,6 +215,17 @@ if mutate MUT3 's#\*/tests/\*|##'; then
   run "$TMP/MUT3.sh" "$tonly"; rc=$?
   [ "$rc" -eq 1 ] && ok "MUT3 exclusion retirée → rouge (1)" || ko "MUT3" "rc=$rc (attendu 1) — l'exclusion tests/ n'est pas appliquée"
 fi
+# Code tiers vendorisé (`*/assets/vendor/*.js`, D1 2026-11-01) : exclu du balayage — seuls les .js vendorisés.
+vend="$(mkrepo mvend)"; put "$vend" plugin/x/scripts/ok.sh "$PY -I \$PYX -c 'x'"; put "$vend" plugin/x/assets/vendor/lib.js "$PY -c 'import json'"
+expect "vendor : seul un fichier sous */assets/vendor/* sale → vert" 0 "$SCRIPT" "$vend"
+vnot="$(mkrepo mnotvend)"; put "$vnot" plugin/x/scripts/ok.sh "$PY -I \$PYX -c 'x'"; put "$vnot" plugin/x/assets/notvendor/a.sh "$PY -c 'import json'"
+expect "garde : appel nu sous */assets/notvendor/* → rouge" 1 "$SCRIPT" "$vnot"
+vsh="$(mkrepo mvendsh)"; put "$vsh" plugin/x/ok.sh "$PY -I \$PYX -c 'x'"; put "$vsh" plugin/x/vendor.sh "$PY -c 'import json'"
+expect "garde : appel nu dans plugin/x/vendor.sh → rouge" 1 "$SCRIPT" "$vsh"
+vroot="$(mkrepo mvendroot)"; put "$vroot" plugin/x/ok.sh "$PY -I \$PYX -c 'x'"; put "$vroot" plugin/x/assets/vendorx/a.sh "$PY -c 'import json'"
+expect "garde : appel nu sous */assets/vendorx/* → rouge" 1 "$SCRIPT" "$vroot"
+vsc="$(mkrepo mvendsc)"; put "$vsc" plugin/x/ok.sh "$PY -I \$PYX -c 'x'"; put "$vsc" plugin/x/assets/vendor/run.sh "$PY -c 'import json'"
+expect "garde : appel nu dans un .sh sous */assets/vendor/ → rouge" 1 "$SCRIPT" "$vsc"
 runfile="$(mkrepo mfile)"; put "$runfile" plugin/x/scripts/b.sh "$PY -I \$PYX -c 'x'"; put "$runfile" plugin/x/scripts/a.sh "$PY \"\$PASS_A_PY\" < \"\$LIST\" > out"
 expect "témoin MUT4 : lancement d'un fichier → vert" 0 "$SCRIPT" "$runfile"
 if mutate MUT4 's/^    if (!prog) { i = j; continue }/    if (!prog) { continue }/'; then

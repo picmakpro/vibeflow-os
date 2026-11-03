@@ -77,7 +77,7 @@ dev role; a role is a view, not a permission.
 
 ## Specialized capabilities and documentation
 
-These five get added case by case. Two of them carry an **experimental status** declared in their
+These six get added case by case. Two of them carry an **experimental status** declared in their
 own `module.json` — it's said here because it changes what you can expect from them.
 
 - **`software-architecture`** — the architecture doctrine. It kicks in when you create or change
@@ -91,6 +91,10 @@ own `module.json` — it's said here because it changes what you can expect from
   the module is waiting for its first genuinely green run to drop that label.
 - **`mobile-test-team`** *(experimental)* — the autonomous loop on top of the previous one: test,
   fix, re-test until green or until the budget runs out. It depends on `mobile-test`.
+- **`cockpit`** — the lab's local control panel, opened by typing `/vf-cockpit`. A read-only web page
+  on your machine shows where the lab stands (milestones, phases, plans, requirements, missions, who
+  is working right now), lets you ask it questions, and maps the code. It makes no outgoing request
+  apart from the agent that answers your questions, and it is available to every role.
 - **`reference`** — the documentation module. It lays down neither agent nor script: it brings the
   VibeFlow methodology and its architecture patterns, to read when you want to understand *why* the
   framework is shaped the way it is.

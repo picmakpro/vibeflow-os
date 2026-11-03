@@ -1,0 +1,372 @@
+{
+  "nodes": [
+    {
+      "id": "exec-a1",
+      "step": "D3+D2 tiroir Au travail (who.mjs, 70-vf-live.js, tests who/securite/serveur)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-b1",
+      "step": "CI en-tete 1024 Linux (01-vf-responsive.js, viewer.html en-tete, amont/patches viewer)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-a2",
+      "step": "V1 Ou en est-on sans agent (ask/query/75-vf-modele, test-questions)",
+      "stage": "",
+      "deps": [
+        "exec-a1"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-b2",
+      "step": "D1 double croix, I2 flou, I3 animation, Library (viewer.html, 40-tour.js, dicts fr, 70-vf-live.js)",
+      "stage": "",
+      "deps": [
+        "exec-b1",
+        "exec-a1"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue",
+      "step": "vf-reviewer sur e61ae376..HEAD",
+      "stage": "",
+      "deps": [
+        "exec-a2",
+        "exec-b2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gates",
+      "step": "rejeu job gates + suites cockpit + push + CI Linux",
+      "stage": "",
+      "deps": [
+        "revue"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire (recette §5, CHANGELOG cockpit, rapport)",
+      "stage": "",
+      "deps": [
+        "exec-a1",
+        "exec-a2",
+        "exec-b1",
+        "exec-b2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-revue",
+      "step": "correction ciblee F-1 masque, F-2 temoins D3, F-3a/b doc",
+      "stage": "",
+      "deps": [
+        "revue"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "re-revue",
+      "step": "re-revue ciblee fix-revue",
+      "stage": "",
+      "deps": [
+        "fix-revue"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-fb",
+      "step": "F-B affichage programme + premier argument (who.mjs, tests who/securite, README/CHANGELOG)",
+      "stage": "",
+      "deps": [
+        "gates"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-fb",
+      "step": "revue ciblee fix-fb",
+      "stage": "",
+      "deps": [
+        "fix-fb"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gates-fb",
+      "step": "gates + suites cockpit + push + CI",
+      "stage": "",
+      "deps": [
+        "revue-fb"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-fb2",
+      "step": "correction ciblee revue-fb F1-F5,F7",
+      "stage": "",
+      "deps": [
+        "revue-fb"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-fb2",
+      "step": "re-revue fix-fb2",
+      "stage": "",
+      "deps": [
+        "fix-fb2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-fb3",
+      "step": "F8/F9 : allowlist des affectations de tete + preuve generative",
+      "stage": "",
+      "deps": [
+        "revue-fb2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-fb3",
+      "step": "re-revue fix-fb3",
+      "stage": "",
+      "deps": [
+        "fix-fb3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-fb4",
+      "step": "FB3-1 separateurs, FB3-2/3 doc",
+      "stage": "",
+      "deps": [
+        "revue-fb3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-fb4",
+      "step": "re-revue fix-fb4",
+      "stage": "",
+      "deps": [
+        "fix-fb4"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-fb5",
+      "step": "FB4-2/FB4-4 epinglages de test, FB4-3 doc (aucun code)",
+      "stage": "",
+      "deps": [
+        "revue-fb4"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-p3a",
+      "step": "O1 cd && + O4 visite par lab (who.mjs, 40-tour.js, 75-vf-modele.js, suites securite/who/direct)",
+      "stage": "",
+      "deps": [
+        "gates-fb"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-p3b",
+      "step": "I2 materiau iOS, O2 fil d'Ariane, O3 italique, O6 aria chevrons (00-vibeflow.js, 01-vf-responsive.js, viewer.html)",
+      "stage": "",
+      "deps": [
+        "gates-fb"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-p3",
+      "step": "revue 00bbb02e..tete",
+      "stage": "",
+      "deps": [
+        "exec-p3a",
+        "exec-p3b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gates-p3",
+      "step": "gates, suites, push, CI",
+      "stage": "",
+      "deps": [
+        "revue-p3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-o4c",
+      "step": "O4 option C : port stable par lab, cookie retire (vf-cockpit.mjs, 75-vf-modele.js, tests serveur/projet)",
+      "stage": "",
+      "deps": [
+        "exec-p3a"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs-p3",
+      "step": "CHANGELOG/README passe 3",
+      "stage": "",
+      "deps": [
+        "fix-o4c",
+        "exec-p3b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-p3-o2",
+      "step": "F1/F2 budget de largeur du fil d'Ariane",
+      "stage": "",
+      "deps": [
+        "revue-p3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-p3-min",
+      "step": "F3/F4 cas cd, F5 VENDORED P23, F6 realpath natif",
+      "stage": "",
+      "deps": [
+        "revue-p3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-p3b",
+      "step": "re-revue fix-p3",
+      "stage": "",
+      "deps": [
+        "fix-p3-o2",
+        "fix-p3-min"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-p3c",
+      "step": "M1 cas du repli, M2 aria du repli, M3 marge FB3.5/FB3.6",
+      "stage": "",
+      "deps": [
+        "revue-p3b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-gsd120",
+      "step": "fixture phase_naming custom (worktree fix-gsd-phase-naming, PR vers main)",
+      "stage": "",
+      "deps": [
+        "gates-p3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "cloture-67",
+      "step": "ledger : recette, exigences CKPT, ROADMAP, STATE",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "bump-2750",
+      "step": "bump v2.75.0 (VERSION, plugin.json, marketplace.json, README x2)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "sobr04",
+      "step": "relecture adverse v2.74.0..release -- plugin/",
+      "stage": "",
+      "deps": [
+        "bump-2750"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gates-release",
+      "step": "gates, push, CI",
+      "stage": "",
+      "deps": [
+        "cloture-67",
+        "sobr04"
+      ],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "fix-sobr04-cockpit",
+      "step": "F1 borne du port, F2 Object.hasOwn P14, F3 test porteDoing",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-sobr04-dag",
+      "step": "F4 dag.sh realpath avant ecriture",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "resonde-sobr04",
+      "step": "re-sondage cible F1-F4",
+      "stage": "",
+      "deps": [
+        "fix-sobr04-cockpit",
+        "fix-sobr04-dag"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

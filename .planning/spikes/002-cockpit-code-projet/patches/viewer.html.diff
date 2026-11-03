@@ -1,0 +1,57 @@
+# base = floorplan v0.6.0 @ 92d6854 (haydenschmitty/floorplan, skills/floorplan/assets/viewer.html) — patchs vibeflow P1-P8
+--- a/assets/viewer.html
++++ b/assets/viewer.html
+@@ -635,6 +635,7 @@
+ // connection names: plain by default, developer terms when "Show technical detail" is on
+ const KIND_TECH = { contains: 'Contains', import: 'Imports', http: 'HTTP', call: 'Calls', rpc: 'RPC', event: 'Events', queue: 'Queues', data: 'Data', config: 'Config' };
+ const KIND_PLAIN = { contains: 'Contains', import: 'Uses', http: 'Web requests', call: 'Calls', rpc: 'Calls', event: 'Events', queue: 'Background jobs', data: 'Reads & writes data', config: 'Settings' };
++if (G.meta.kindLabels) { Object.assign(KIND_PLAIN, G.meta.kindLabels); Object.assign(KIND_TECH, G.meta.kindLabels); } // vibeflow P1
+ const KIND_LABEL = new Proxy({}, { get: (_, k) => (technical() ? KIND_TECH : KIND_PLAIN)[k] || k });
+ let technicalFlag = false;
+ const technical = () => technicalFlag;
+@@ -686,6 +687,7 @@
+   left: '<path d="m15 18-6-6 6-6"/>',
+   right: '<path d="m9 18 6-6-6-6"/>',
+ };
++Object.assign(P, G.meta?.kindIcons || {}); // vibeflow P8 : pictogrammes des types fournis par le graphe
+ const icon = (k) => `<svg viewBox="0 0 24 24">${P[k] || P.file}</svg>`;
+ const iconI = (k) => `<svg class="i" viewBox="0 0 24 24">${P[k] || P.file}</svg>`;
+ const symIcon = (kind) => (['class', 'interface', 'struct', 'type', 'enum', 'record', 'trait', 'object'].includes(kind) ? 'class' : 'function');
+@@ -924,8 +926,10 @@
+   else if (i.type === 'dir') size = plural(statsOf(item).files, 'file');
+   else if (i.type === 'module') size = 'this file';
+   else if (i.type === 'file') { const nr = (routesByFile.get(i.f.p) || []).length; size = nr ? plural(nr, 'endpoint') : ''; }
++  if (i.n?.foot || i.f?.foot) size = i.n?.foot || i.f?.foot; // vibeflow P2
++  const vst = i.n?.st || i.f?.st;
+   const rec = recentOf(item), inside = recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item);
+-  const pill = rec ? `<span class="rw">${recentLabel(rec)}</span>` : inside ? `<span class="rw soft">${inside.length} changed</span>` : '';
++  const pill = vst ? `<span class="vst vst-${vst}">${({ done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' })[vst] || vst}</span>` : rec ? `<span class="rw">${recentLabel(rec)}</span>` : inside ? `<span class="rw soft">${inside.length} changed</span>` : '';
+   return size || pill ? `<div class="foot">${size ? `<span class="meta">${size}</span>` : '<span></span>'}${pill}</div>` : '';
+ }
+ /** Extra height a card needs beyond its base size: a footer, and a title long enough to wrap. */
+@@ -964,6 +968,7 @@
+   }
+   const note = answerNote(item);
+   const noteHTML = note ? `<div class="anote"><b>${note.n}</b><span>${h(note.text)}</span></div>` : '';
++  if (i.n?.st || i.f?.st) cls += ' st-' + (i.n?.st || i.f?.st); // vibeflow P3
+   if (recentOf(item)) cls += ' recent';
+   else if (recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item)) cls += ' recent-in';
+   return `<div class="card ${cls}" style="--c:${colorOf(i)}"><div class="head">${head}</div>${title}${desc}${noteHTML}${cardFoot(item)}</div>`;
+@@ -1520,7 +1525,7 @@
+   else if (sel && sel.startsWith('x:')) html = itemPanel(connEntity(sel), true);
+   else if (sel && sel.startsWith('m:')) html = itemPanel('f:' + sel.slice(2));
+   else if (sel) html = itemPanel(sel);
+-  else html = state.container === 'root' ? overviewPanel() : state.container === 'q:answer' ? answerPanel() : itemPanel(state.container);
++  else html = state.container === 'root' ? (ext.overview ? ext.overview() : overviewPanel()) : state.container === 'q:answer' ? answerPanel() : itemPanel(state.container);
+   // extensions add sections: 'overview' on the codebase panel, 'item' on a selected/opened item
+   const where = sel && typeof sel === 'object' ? null : sel ? 'item' : state.container === 'root' ? 'overview' : state.container === 'q:answer' ? null : 'item';
+   const target = sel && typeof sel === 'string' ? (sel.startsWith('x:') ? connEntity(sel) : sel.startsWith('m:') ? 'f:' + sel.slice(2) : sel) : state.container;
+@@ -2372,6 +2377,8 @@
+   technical, setTechnical,
+   store,
+   on(event, fn) { (ext.listeners[event] ||= []).push(fn); },
++  setOverview(fn) { ext.overview = fn; }, // vibeflow P4
++  rerender() { return render({ keepTransform: true, after: () => renderPanel() }); }, // vibeflow P6
+ });
+ technicalFlag = !!store.get('technical', false);
+ 

@@ -1,0 +1,7 @@
+{
+  "name": "cockpit",
+  "version": "v1.0.0",
+  "type": "skill + scripts + moteur vendorisé",
+  "description": "Cockpit web local du lab : onglet Projet (jalons, phases, plans, exigences, missions, qui est au travail en direct, questions locales ou à l'agent claude -p confiné) et onglet Code. Lecture seule, 127.0.0.1, aucun appel sortant hors l'agent. Ouvert par /vf-cockpit, sortie sous .vibeflow/cockpit/.",
+  "requires": []
+}

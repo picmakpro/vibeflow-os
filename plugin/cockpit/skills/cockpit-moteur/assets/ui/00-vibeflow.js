@@ -1,0 +1,128 @@
+// VibeFlow (spike 002) : deux onglets sur le même viewer — Code (la carte floorplan) et Projet
+// (jalons → phases → plans, exigences, missions, backlog). Statuts sur les cartes, panneau
+// d'ensemble du projet, et pont entre les deux onglets : un plan ou un nœud de mission renvoie aux
+// fichiers qu'il touche, un fichier de code renvoie aux plans qui l'ont touché.
+// Ne parle au viewer que par window.Floorplan (+ patchs P1-P4, cf. VENDORED.txt).
+(() => {
+  const SC = window.Floorplan;
+  if (!SC) return;
+  const { h, graph: G } = SC;
+  const TAB = G.meta.vfTab === 'project' ? 'project' : 'code';
+  // titre de l'onglet du navigateur : « <nom> — Code » ou « <nom> — Projet » (le viewer écrit « <nom> map », qui devenait le nom seul)
+  document.title = `${String(G.project.name || '').replace(/ — Projet$/, '')} — ${TAB === 'project' ? 'Projet' : 'Code'}`;
+  const ST = { done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' };
+  // P67-D-04 : logo VibeFlow clair ou sombre selon le thème du viewer (meta.vfLogos est posé par l'assemblage)
+  const LOGOS = G.meta.vfLogos;
+  if (LOGOS) {
+    const mark = document.querySelector('.brand .mark');
+    const sync = () => { if (mark) mark.src = document.documentElement.getAttribute('data-theme') === 'dark' ? LOGOS.sombre : LOGOS.clair; };
+    sync(); window.addEventListener('floorplan-theme-change', sync);
+  }
+
+  const style = document.createElement('style');
+  style.textContent = `
+    :root { --st-done: var(--recent); --st-active: #f59e0b; --st-todo: var(--text-4); --st-blocked: #ef4444; }
+    .vf-tabs { display: inline-flex; gap: 2px; padding: 3px; margin-left: 14px; border-radius: 12px; background: var(--raise); flex: none; }
+    .vf-tabs a { padding: 5px 13px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text-3); text-decoration: none; line-height: 1.4; }
+    .vf-tabs a:hover { color: var(--text-1, inherit); }
+    .vf-tabs a.on { background: var(--surface); color: var(--text-1, inherit); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+    .vst { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+      color: var(--c-st); background: color-mix(in srgb, var(--c-st) 14%, transparent); }
+    .vst-done { --c-st: var(--st-done); } .vst-active { --c-st: var(--st-active); } .vst-todo { --c-st: var(--st-todo); } .vst-blocked { --c-st: var(--st-blocked); }
+    .card.st-active { box-shadow: 0 0 0 1.5px var(--st-active), 0 8px 28px color-mix(in srgb, var(--st-active) 22%, transparent); }
+    .card.st-blocked { box-shadow: 0 0 0 1.5px var(--st-blocked); }
+    .card.st-done .desc { opacity: .78; }
+    .vf-bar { height: 6px; border-radius: 99px; background: var(--raise-2); overflow: hidden; margin-top: 6px; }
+    .vf-bar i { display: block; height: 100%; border-radius: 99px; background: var(--c-st, var(--st-done)); }
+    .vf-ms { padding: 9px 12px; border-radius: 14px; cursor: pointer; margin-bottom: 4px; }
+    .vf-ms:hover { background: var(--surface-hover); }
+    .vf-ms .t { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 500; }
+    .vf-ms .t span:last-child { color: var(--text-3); font-weight: 400; font-variant-numeric: tabular-nums; }
+    .vf-now { padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--st-active) 8%, transparent); font-size: 13px; line-height: 1.55; }
+    .vf-now b { display: block; font-size: 11.5px; color: var(--st-active); margin-bottom: 3px; font-weight: 600; }
+    .vf-link { display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; border-radius: 10px; font-size: 12.5px; color: inherit; text-decoration: none; }
+    .vf-link:hover { background: var(--surface-hover); }
+    .vf-link code { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-2); word-break: break-all; }
+    /* I2 (recette 2026-11-02, reprise 2026-11-03, avis de Samuel, Wispr Flow, session principale, 2026-11-03 : « pas de bordure, un flou dégradé qui part du haut gauche et descend, comme le header, en mode iOS 26 ») :
+       le titre et le sous-titre de la vue d'ensemble se mélangeaient aux graphes que l'on fait glisser dessous. Plus de carte : #context n'a ni fond, ni bordure, ni rayon, ni ombre.
+       Le flou vit sur #context::before (qui déborde du texte pour un fondu doux) : backdrop-filter blur + saturate (la recette de .glass) et un fond --bg-rgb léger (le matériau du header),
+       le tout masqué par un dégradé radial ancré en haut à gauche : plein derrière le début du titre, il s'estompe vers le bas et vers la droite. Les deux thèmes suivent --bg-rgb.
+       Reprise (avis de Samuel, Wispr Flow, session principale, 2026-11-03 : « un gap sans flou entre le texte et le header, allonger le flou jusqu'au header ») : le dégradé de l'en-tête s'estompe sur sa hauteur et laissait voir la carte nette
+       entre le bas de la couche et ce fondu ; la couche monte donc jusqu'au haut de l'en-tête (inset relatif à --hh, jamais une valeur calée sur une largeur), DERRIÈRE lui (z-index 10), et le dégradé garde sa taille d'avant (masque en deux couches : le radial sur la hauteur d'avant, calé en bas ; au-dessus, la bande reprend son profil de bord haut, plein puis estompé vers la droite) : l'aspect autour du titre ne change pas.
+       isolation: isolate garde la couche derrière le texte. #context ne capte aucun événement (pointer-events: none, hérité du viewer) : la carte reste glissable sous la zone. */
+    #context { isolation: isolate; background: none; border: 0; border-radius: 0; box-shadow: none; }
+    #context::before { inset: calc(-1 * (var(--hh, 64px) + 8px)) -80px -64px -36px; background: rgba(var(--bg-rgb), .28); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6); -webkit-mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); -webkit-mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); -webkit-mask-position: 0 100%, 0 0; mask-position: 0 100%, 0 0; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; border: 0; border-radius: 0; box-shadow: none; }
+    #context:empty { display: none; }
+  `;
+  // spike 005 : la barre de question reste visible quand serve.mjs (P7) sert l'onglet Projet
+  if (TAB === 'project') style.textContent += `#btn-health${window.FLOORPLAN_SERVER ? '' : ', #ask'} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }`;
+  document.head.appendChild(style);
+
+  // ---------- onglets ----------
+  const brand = document.querySelector('header .brand');
+  if (brand) {
+    const tabs = document.createElement('nav');
+    tabs.className = 'vf-tabs';
+    tabs.innerHTML = `<a href="index.html" class="${TAB === 'code' ? 'on' : ''}">Code</a><a href="project.html" class="${TAB === 'project' ? 'on' : ''}">Projet</a>`;
+    brand.after(tabs);
+  }
+
+  // ---------- onglet Projet : panneau d'ensemble ----------
+  // statuts de STATE affichés en français (valeur inconnue : telle quelle)
+  const STATUT = { closed: 'clos', complete: 'terminée', completed: 'terminée', executing: 'en exécution', planning: 'en planification', paused: 'en pause', verifying: 'en vérification' };
+  const statut = (x) => STATUT[x] || x || '';
+  const V = G.meta.vf;
+  if (TAB === 'project' && V) {
+    SC.setOverview(() => {
+      const V = G.meta.vf; // relu à chaque rendu : le direct (70-vf-live.js) remplace G.meta.vf sur un patch
+      const ms = V.milestones.map((m) => {
+        const pc = m.total ? Math.round((100 * m.done) / m.total) : 0;
+        return `<div class="vf-ms" data-vf-go="${h(m.id)}"><div class="t"><span>${h(m.key)}</span><span>${Number(m.done) || 0}/${Number(m.total) || 0} · ${pc} %</span></div><div class="vf-bar" style="--c-st:var(--st-${h(m.st).replace(/[^\w-]/g, '')})"><i style="width:${pc}%"></i></div></div>`;
+      }).join('');
+      const next = V.next.map((n) => `<a class="vf-link" data-vf-go="${h(n.id)}"><span class="vst vst-todo">À faire</span><span>${h(n.label)}</span></a>`).join('');
+      const c = V.counts;
+      // « Maintenant » : seulement les champs connus (un lab sans STATE.md n'a ni jalon, ni phase, ni statut)
+      const desc = V.lastDesc || '';
+      const now = V.milestone || V.phase || V.status
+        ? `<div class="vf-now" style="margin-top:12px"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${V.status ? `<span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span>` : ''}${desc ? `<div style="margin-top:6px;color:var(--text-3);font-size:12px">${h(desc.slice(0, 260))}${desc.length > 260 ? '…' : ''}</div>` : ''}</div>`
+        : '';
+      return `<div class="sec"><div class="ph"><span class="kind">Projet</span></div><h2 class="pt">${h(G.project.name)}</h2>
+          ${now}
+          <div class="stats vf-stats" style="margin-top:14px"><div><b>${Number(c.phases) || 0}</b><span>phases</span></div><div><b>${Number(c.plans) || 0}</b><span>plans</span></div><div><b>${Number(c.reqsDone) || 0}/${Number(c.reqs) || 0}</b><span>exigences</span></div></div></div>
+        <div class="sec"><h3>Prochaines phases <span class="c">${V.next.length}</span></h3>${next || '<p class="pd">Rien en attente dans le jalon en cours.</p>'}</div>
+        <div class="sec"><h3>Jalons <span class="c">${V.milestones.length}</span></h3>${ms}</div>
+        <div class="sec" style="color:var(--text-3);line-height:1.7;font-size:12px">Double-clic sur une carte pour plonger · <span class="kbd">⌫</span> remonter · <span class="kbd">/</span> chercher</div>`;
+    });
+  }
+  document.addEventListener('click', (ev) => {
+    const a = ev.target.closest('[data-vf-go]');
+    if (a) { ev.preventDefault(); SC.reveal(a.dataset.vfGo); }
+  });
+
+  // ---------- pont entre onglets ----------
+  const fileOf = (id) => id && id.startsWith('f:') ? SC.files.get?.(id.slice(2)) || (G.files || []).find((f) => 'f:' + f.p === id) : null;
+  if (TAB === 'project') {
+    SC.addPanelSection('item', (id) => {
+      const f = fileOf(id);
+      if (!f || !f.touched || !f.touched.length) return '';
+      const rows = f.touched.slice(0, 40).map((p) => `<a class="vf-link" href="index.html#r=${encodeURIComponent(p)}"><span>→</span><code>${h(p)}</code></a>`).join('');
+      return `<div class="sec"><h3>Fichiers touchés dans l'onglet Code <span class="c">${f.touched.length}</span></h3>${rows}</div>`;
+    });
+  } else {
+    const touch = G.meta.vfTouch || {};
+    SC.addPanelSection('item', (id) => {
+      const f = fileOf(id);
+      const list = f && touch[f.p];
+      if (!list || !list.length) return '';
+      const rows = list.slice(0, 30).map((t) => `<a class="vf-link" href="project.html#r=${encodeURIComponent(t.ref)}"><span class="vst vst-${h(t.st).replace(/[^\w-]/g, '')}">${h(ST[t.st] || t.st)}</span><span>${h(t.label)}</span></a>`).join('');
+      return `<div class="sec"><h3>Touché par <span class="c">${list.length}</span></h3>${rows}</div>`;
+    });
+  }
+  // arrivée depuis l'autre onglet : #r=<chemin ou id> révèle la carte visée
+  SC.on('ready', () => {
+    const r = new URLSearchParams(location.hash.slice(1)).get('r');
+    if (!r) return;
+    const id = /^[nf]:/.test(r) ? r : 'f:' + r;
+    if (SC.exists(id)) SC.reveal(id); else SC.toast(`Pas sur cette carte : ${r}`);
+  });
+})();

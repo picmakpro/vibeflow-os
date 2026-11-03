@@ -1,12 +1,12 @@
 ---
 gsd_state_version: "1.0"
 milestone: equipe-produit-v1.0
-current_phase: 62
-current_phase_name: Décision sur l'approche plateforme, sur preuve
+current_phase: 67
+current_phase_name: Cockpit floorplan sur socle partagé
 status: closed
-last_updated: "2026-10-29T18:00:00.000Z"
-last_activity: 2026-10-29
-last_activity_desc: Phase 62 close - decision A (approche C differee), reexamen 2027-01-31, PLTF-01..02 cochees ; precedent - Phase 61 exécutée — 8/8 plans, porte de phase rejouée depuis ci.yml (20 étapes vertes), COLB-01..07 cochées, COLB-09 partielle (critère 6 clients en code 2), COLB-08 décochée (preuve humaine attendue) — next : PR par le manager, relecture adverse SOBR-04, minor racine décidé après merge, recette du lab réel par Samuel
+last_updated: "2026-11-03T18:00:00.000Z"
+last_activity: 2026-11-03
+last_activity_desc: Phase 67 close - CKPT-01..12 cochees, recette humaine validee par Samuel (2026-11-03), release v2.75.0 preparee (tag et release GitHub apres le merge de la PR #187) ; next - phase de suite du cockpit (suivi du travail en cours, option A, + refonte mobile, I1, O5)
 state_head: 45ee80db
 progress:
   total_phases: 9
@@ -14,7 +14,7 @@ progress:
   total_plans: 54
   completed_plans: 54
 milestone_name: « l'équipe produit » — Phases 57-66 —
-stopped_at: "Phase 62 close le 2026-10-29 (décision A, réexamen 2027-01-31) ; précédent : Phase 61 exécutée le 2026-10-29 (8/8 plans, porte verte) — arrêt avant PR, merge, tag et release"
+stopped_at: "Phase 67 close le 2026-11-03 (CKPT-01..12 cochees, 67-CLOTURE.md) ; arret avant merge de la PR #187, tag et release v2.75.0 (gestes de Samuel)"
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 62 (Décision sur l'approche plateforme, sur preuve) — CLOSE le 2026-10-29 : décision A (approche C différée), plancher de réexamen 2027-01-31, PLTF-01..02 cochées (décision déléguée par Samuel, message session principale, 2026-10-29), aucune release (ADR-073) ; les Phases 59, 60 et 61 sont livrées (`v2.73.0`, `v2.74.0`) ; précédemment, Phase 61 : EXÉCUTÉE (8/8 plans, porte de phase verte, COLB-01..07 cochées, COLB-09 partielle, COLB-08 décochée : preuve humaine attendue) ; les Phases 60 et 59 restent exécutées (9/9 et 8/8) et la Phase 58 close (12/12)
+Phase: 67 (Cockpit floorplan sur socle partagé, jalon `vibeflow-v2.0`) — CLOSE le 2026-11-03 : 7/7 plans, quatre tours de correction (FIX-A à FIX-D), CKPT-01..12 cochées, recette humaine validée par Samuel (`67-RECETTE-HUMAINE.md` § 8.2) ; release `v2.75.0` préparée, tag et release GitHub après le merge de la PR #187 (geste de Samuel). Suite : phase du cockpit à inscrire (note `.planning/notes/2026-11-03-cockpit-progression-en-cours.md`, option A, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) avec les reports du `BACKLOG.md` (refonte mobile D4/I4-I6, visite guidée I1, O5) ; la Phase 68 (vf-signal embarqué) reste non cadrée. Précédemment, Phase 62 CLOSE le 2026-10-29 (décision A, réexamen 2027-01-31, aucune release : ADR-073) ; les Phases 59, 60 et 61 sont livrées (`v2.73.0`, `v2.74.0`)
 Jalon courant : `equipe-produit-v1.0` (Phases 57-66, inscrit 2026-10-08) ; 6 phases sur 10 closes ou exécutées. `fiabilite-v1.0` est CLOS
 depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
 `.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).
@@ -62,16 +62,16 @@ Last activity: 2026-10-20 — Phase 58 vérifiée human_needed 13/14
 
 <!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-10-12.md -->
 
-- P61-PL-01 à P61-PL-18 : décisions de planificateur (discrétion de P61-D-02 et P61-D-05, conséquences des P61-D et de P61-H-01), réalisées par les plans 61-01 à 61-08.
-- P60-PL-01 à P60-PL-27 : décisions de planificateur (discrétion P60-D-03..06, conséquences des P60-D et P60-H), réalisées par les plans 60-01 à 60-09.
-- P59-PL-01 à P59-PL-22 : décisions de planificateur (discrétion P59-D-14..22), réalisées par les plans 59-01 à 59-08.
-- P58-PL-01 à P58-PL-14 : décisions de planificateur (discrétion P58-D-15..20), réalisées par les plans 58-01 à 58-12, plus P58-D-21 (filtrage des presets, plan 58-12).
+<!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-11-01.md -->
+
+<!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-11-02.md -->
 
 ### Roadmap Evolution
 
 - Phase 63 added (2026-10-29) : Règles produit empruntées à AIDD — arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 (phase dans le jalon actuel ; règles AIDD dans notre vocabulaire). Même jour : sortie de GSD et de superpowers, trajectoire par étapes retenue par message session principale (E1 superpowers, E2 épinglage gsd-core, E3 remplacement verbe par verbe conditionnée à l'étude de coût E0) → graine `SEED-003`, pas de phase.
 - Phases 64 et 65 added (2026-10-29) : contrôles après exécution branchés en nœuds du plan de bataille ; révision des règles qui brident l'efficacité des agents — arbitrage Samuel, message session principale, 2026-10-29, sur l'étude `docs/research/2026-10-29-etude-gsd-skills-agents-non-utilises.md`.
 - Phase 65 étendue (2026-10-29) : volet (g) accélération de la CI, livré par 65-01 — arbitrage Samuel, message session principale, 2026-10-29 (« on bypass Willy, on fait la review nous-mêmes, on merge ensuite » ; « on verse tout dans la phase 65 »).
+- Jalon `vibeflow-v2.0` inscrit (2026-11-01) : Phases 67 (cockpit floorplan sur socle partagé) et 68 (vf-signal embarqué), non cadrées ; `equipe-produit-v1.0` reste le jalon courant — arbitrage Samuel, AskUserQuestion session principale, 2026-11-01.
 
 ### Pending Todos
 

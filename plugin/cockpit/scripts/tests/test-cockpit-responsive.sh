@@ -1,0 +1,306 @@
+#!/usr/bin/env bash
+# test-cockpit-responsive.sh — CKPT-12 (P67-D-21) : la fenêtre du cockpit est ajustable, de 1 024 à 2 560 px, sans superposition ni rognage.
+#   R1 chargement à 1 024 / 1 280 / 1 440 / 1 920 / 2 560 px · R2 redimensionnement à chaud 1 920 -> 1 024 -> 1 920 · R3 rendu non cassé à 800 et 390 px
+#   R4 témoin rouge : le même lab sans la mise en page du cockpit rougit · R5 lab sans STATE.md : aucun champ vide dans le sous-titre ni le panneau
+# Deux onglets (Code, Projet) × deux labs (nom court, nom de 60 caractères), badge « au travail » rempli (verrou + nœud de DAG).
+# Mesure : getBoundingClientRect dans un Chrome headless (chrome-responsive.mjs) — recouvrement des éléments frères, scrollWidth > clientWidth,
+# recherche >= 200 px, logo >= 20x18 sans filtre, barre de question sur une ligne avec son invite entière.
+# Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
+set -uo pipefail
+libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
+ENG="$SCRIPTS/../skills/cockpit-moteur"
+CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
+if [ -z "$CHROME" ]; then echo "  ⊘ SUITE SAUTÉE : aucun navigateur (Chrome, Chromium) — CKPT-12 NON vérifié, non compté comme réussi"; exit 0; fi
+WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts"
+export REAL_HOME="$HOME"; export HOME="$WORK/home"
+PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
+. "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+PASS=0; FAIL=0
+assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [${2:0:600}]"; FAIL=$((FAIL+1)); fi; }
+assert_has() { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): [$3]"; echo "     obtenu:  [${2:0:600}]"; FAIL=$((FAIL+1)); fi; }
+
+cat > "$AUX/ev.mjs" <<'JS'
+import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); const v = new Function('j', 'return (' + process.argv[2] + ')')(j); console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
+# violations d'une clé de mesure (une ligne par violation, « - » si aucune) ; la mesure elle-même doit exister
+cat > "$AUX/viol.mjs" <<'JS'
+import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); const m = j.mesures?.[process.argv[2]];
+if (!m) { console.log('mesure absente : ' + (j.erreur || process.argv[2])); process.exit(0); }
+const bas = process.argv[3] === 'bas'; // sous 1 000 px le panneau est un tiroir fermé : seul l'en-tête et la barre de question sont mesurés
+const plein = m.m.enteteElements >= (bas ? 3 : 6) && (bas || /#panel/.test(m.m.surfaces || '')) && /#ask/.test(m.m.surfaces || '');
+console.log(!plein ? 'mesure vide : ' + JSON.stringify(m.m) : m.v.length ? m.v.slice(0, 4).join(' | ') : 'aucune');
+JS
+# faux verrou de driver (HOME jetable) : un propriétaire au nom long, comme en vraie mission
+cat > "$HOME/.claude/scripts/driver-lock.sh" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  status) echo '{"locks":[{"present":true,"owner":"vf-dev-manager-v2-cockpit","step":"mission","ws":"","scope":"repo","age_seconds":135,"stale":false,"children_running":1}]}' ;;
+  orphans) echo '{"orphans":[]}' ;;
+esac
+SH
+mklab() { # mklab <dir> : lab GSD sans STATE.md, deux phases, un DAG de mission avec un nœud en cours
+  local L="$1" B="$1/.planning"; mkdir -p "$L/src" "$B/phases/01-socle" "$B/phases/02-suite" "$B/missions"
+  printf 'export const u = () => 1;\n' > "$L/src/util.js"
+  printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n- [ ] **Phase 2: Suite** - la suite\n' > "$B/ROADMAP.md"
+  printf '<objective>Faire le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"; echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
+  printf '<objective>Faire la suite</objective>\n' > "$B/phases/02-suite/02-01-PLAN.md"
+  printf '{"nodes":[{"id":"a","step":"première étape","stage":"","deps":[],"scope":["src/**"],"status":"done"},{"id":"b","step":"seconde étape","stage":"","deps":["a"],"scope":["src/**"],"status":"running"}]}\n' > "$B/missions/demo.dag.json"
+  git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
+  node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build-$(basename "$L").out" 2>&1 || cat "$WORK/build-$(basename "$L").out"
+}
+srv() { # srv <sortie> -> SRV_PORT SRV_PID
+  local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
+  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
+  SRV_PID=$!; PIDS+=($SRV_PID)
+  for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
+  SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+}
+unsrv() { vf_hyg_stop "$SRV_PID"; }
+mes() { REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-responsive.mjs" "$CHROME" "$@"; } # mes <url> <largeurs> <resize|-> [<captures>]
+LARGES="1024,1280,1440,1920,2560"
+# boutons d'en-tête OPTIONNELS de l'onglet Code (Travail récent et Écrans n'existent que si le lab a un historique récent et des pages) : ajoutés par l'API
+# d'extension du viewer, avec leur libellé et leur icône d'origine, pour mesurer le pire en-tête réel — sans eux R-1 (bouton rogné à 1 024 px) restait invisible
+INJ_CODE="(() => { const SC = window.VibeFlow; SC.addHeaderButton({ id: 'btn-recent', label: 'Recent work', icon: 'recent', title: 'What was just worked on, on one board', onClick() {} }); SC.addHeaderButton({ id: 'screens-btn', label: 'Screens', icon: 'ui', title: 'Pick a screen of the app', onClick() {} }); return true; })()"
+
+LC="$WORK/lab-court"; mklab "$LC"
+LL="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mklab "$LL"
+echo "=== R1, R2 — chargement et redimensionnement à chaud : deux onglets, deux labs ==="
+for spec in "court:$LC" "long:$LL"; do
+  nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; P=$SRV_PORT
+  assert_eq "0 — serveur du lab « $nom » démarré" "$([ "$P" -gt 0 ] && echo oui || echo non)" "oui"
+  for onglet in index project; do
+    inj=""; [ "$onglet" = index ] && inj="$INJ_CODE"
+    R="$(RESP_INJECT="$inj" mes "http://127.0.0.1:$P/$onglet.html" "$LARGES" 1920:1024 ${SHOTS:+"$SHOTS/$nom-$onglet"})"
+    echo "$R" > "$WORK/mes-$nom-$onglet.json"
+    for w in ${LARGES//,/ }; do assert_eq "R1 — $nom / $onglet / $w px : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w")" "aucune"; done
+    assert_eq "R2 — $nom / $onglet : 1 920 -> 1 024 à chaud" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "resize:1920:1024")" "aucune"
+    assert_eq "R2 — $nom / $onglet : 1 024 -> 1 920 à chaud (retour)" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "resize:1024:1920")" "aucune"
+  done
+  if [ "$nom" = court ]; then
+    echo "=== R3 — en dessous de 1 024 px : rendu non cassé (800 et 390 px) ==="
+    for onglet in index project; do
+      R="$(mes "http://127.0.0.1:$P/$onglet.html" 800,390 -)"
+      for w in 800 390; do assert_eq "R3 — $onglet / $w px : aucune superposition d'en-tête, aucun défilement horizontal" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w" bas)" "aucune"; done
+    done
+  fi
+  unsrv
+done
+echo "=== R5, R6 — lab sans STATE.md : aucun champ vide ; titre de l'onglet ; traduction avant la peinture ==="
+srv "$LC/.vibeflow/cockpit"; PC=$SRV_PORT
+EXPR='({ titre: document.title, ctx: (document.getElementById("context")||{}).innerText||"", panneau: (document.getElementById("panel")||{}).innerText||"" })'
+XP="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 2000 "$EXPR" "http://127.0.0.1:$PC/project.html" "http://127.0.0.1:$PC/index.html")"
+assert_eq "R5.1 — sous-titre du projet sans « ? » ni parenthèses vides" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" '/[?]|[(][)]/.test(j.resultats[0].valeur.ctx)')" "false"
+assert_eq "R5.2 — panneau d'ensemble sans bloc « Maintenant » ni « Phase — »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" '/Maintenant|Phase —/.test(j.resultats[0].valeur.panneau)')" "false"
+assert_has "R5.3 — témoin : le panneau montre bien les effectifs du lab" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[0].valeur.panneau')" "phases"
+assert_eq "R6.1 — titre de l'onglet Projet : « <nom> — Projet »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[0].valeur.titre')" "lab-court — Projet"
+assert_eq "R6.2 — titre de l'onglet Code : « <nom> — Code »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[1].valeur.titre')" "lab-court — Code"
+EXPR='(async () => { const d = document.createElement("div"); d.textContent = "Thinking…"; document.body.appendChild(d); await Promise.resolve(); await Promise.resolve(); const t = d.textContent; d.remove(); return t; })()'
+XT="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "http://127.0.0.1:$PC/project.html")"; unsrv
+assert_eq "R6.3 — « Thinking… » inséré est traduit avant toute image (deux micro-tâches)" "$(printf '%s' "$XT" | node "$AUX/ev.mjs" 'j.resultats[0].valeur')" "Réflexion…"
+
+# O2 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : un fil d'Ariane profond (Vue d'ensemble / Historique / Phases) à 1 280 et 1 440 px.
+# Un segment de moins de 12 caractères n'est jamais rogné (scrollWidth <= clientWidth) ; si une troncature est nécessaire, elle porte sur un segment du MILIEU, jamais le premier ni le dernier.
+echo "=== O2 — fil d'Ariane profond : aucun segment court rogné, troncature au milieu d'abord (1 280 et 1 440 px, labs court et long) ==="
+cat > "$AUX/o2.js" <<'JS'
+(async () => { const SC = window.VibeFlow, pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  SC.reveal('n:ph-1');
+  for (let i = 0; i < 100; i++) { const b = [...document.querySelectorAll('#crumbs button')]; if (b.length === 3 && b[0].textContent === "Vue d'ensemble") break; await pause(50); }
+  await pause(400);
+  const b = [...document.querySelectorAll('#crumbs button')];
+  return { seg: b.map((e, i) => ({ t: e.textContent, n: e.textContent.trim().length, i, rogne: e.scrollWidth > e.clientWidth + 1, sw: e.scrollWidth, cw: e.clientWidth })), nb: b.length, W: innerWidth,
+    entete: [...document.querySelectorAll('header button, header a, header input')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.right > innerWidth + 0.5 || r.left < -0.5); }).length }; })()
+JS
+# deux labs dont le jalon est clos : le projet range ses phases sous « Historique », d'où un fil de trois segments (Vue d'ensemble / Historique / Phases)
+mkdir -p "$WORK/deep-court" "$WORK/deep-long"; LDC="$WORK/deep-court/lab-court"; LDL="$WORK/deep-long/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mklab "$LDC"; mklab "$LDL"
+for d in "$LDC" "$LDL"; do printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n- [x] **Phase 2: Suite** - la suite\n' > "$d/.planning/ROADMAP.md"; node "$SCRIPTS/vf-cockpit-build.mjs" "$d" --quiet > "$WORK/build-deep.out" 2>&1 || cat "$WORK/build-deep.out"; done
+for spec in "court:$LDC" "long:$LDL"; do
+  nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; PO=$SRV_PORT
+  for w in 1280x800 1440x900; do
+    XO2="$(CDP_VIEWPORT=$w node "$HERE_T/chrome-cdp.mjs" "$CHROME" 300 "$(cat "$AUX/o2.js")" "http://127.0.0.1:$PO/project.html")"
+    V2='j.resultats[0].valeur'
+    assert_eq "O2.0 — $nom / $w : témoin, trois segments mesurés, aucun bouton d'en-tête hors de la fenêtre" "$(printf '%s' "$XO2" | node "$AUX/ev.mjs" "($V2.erreur||j.erreur||'')+'|'+$V2.nb+'|'+$V2.entete")" "|3|0"
+    assert_eq "O2.1 — $nom / $w : aucun segment de moins de 12 caractères n'est rogné" "$(printf '%s' "$XO2" | node "$AUX/ev.mjs" "$V2.seg.filter((x)=>x.n<12&&x.rogne).map((x)=>x.t+' '+x.sw+'>'+x.cw).join(' | ')||'aucun'")" "aucun"
+    assert_eq "O2.2 — $nom / $w : aucune troncature sur le premier ni le dernier segment" "$(printf '%s' "$XO2" | node "$AUX/ev.mjs" "$V2.seg.filter((x)=>x.rogne&&(x.i===0||x.i===$V2.seg.length-1)).map((x)=>x.t+' '+x.sw+'>'+x.cw).join(' | ')||'aucun'")" "aucun"
+  done
+  unsrv
+done
+
+# O2b (revue de la recette 3, F1/F2, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : le budget du fil d'Ariane tient compte de la colonne de droite (badge « au travail » compris) et du plancher
+# de la recherche. Noms de module réalistes de 15 à 21 caractères, fil de 3 puis de 6 segments dont 2 courts (moins de 12 caractères), onglets Code (avec ses boutons optionnels) ET Projet, badge présent,
+# à 1 280, 1 300, 1 320 et 1 440 px. Quatre mesures : aucun bouton d'en-tête hors fenêtre (header.scrollWidth <= innerWidth), aucun segment court rogné, le fil reste dans sa colonne (ni hors de .hl, ni sur la
+# recherche), et la troncature porte d'abord sur le milieu (le premier et le dernier ne sont rognés que lorsque les segments longs du milieu sont à leur plancher de 64 px).
+cat > "$AUX/o2b.js" <<'JS'
+(async () => { const pause = (ms) => new Promise((r) => setTimeout(r, ms)), SC = window.VibeFlow;
+  if (location.pathname.endsWith('index.html') && !document.getElementById('btn-recent')) { SC.addHeaderButton({ id: 'btn-recent', label: 'Recent work', icon: 'recent', title: 'What was just worked on, on one board', onClick() {} }); SC.addHeaderButton({ id: 'screens-btn', label: 'Screens', icon: 'ui', title: 'Pick a screen of the app', onClick() {} }); }
+  for (let i = 0; i < 100 && !/travail/.test((document.getElementById('vf-lock') || {}).textContent || ''); i++) await pause(50);
+  const fil = document.getElementById('crumbs'), proto = fil.querySelector('button'), sep0 = fil.querySelector('.sep') || Object.assign(document.createElement('span'), { className: 'sep', textContent: '/' });
+  const jeux = { s3: ["Vue d'ensemble", 'dev-orchestrator', 'design-orchestrator'], s6: ["Vue d'ensemble", 'conductor-references', 'db', 'planning-core-lib', 'src', 'dev-orchestrator-refs'], s8: ["Vue d'ensemble", 'conductor-references', 'planning-core-lib', 'dev-orchestrator-refs', 'design-orchestrator', 'cockpit-moteur-assets', 'skills-references', 'last-segment-name-long'] }, out = { W: innerWidth };
+  for (const [cle, segs] of Object.entries(jeux)) {
+    fil.innerHTML = ''; segs.forEach((t, i) => { if (i) fil.appendChild(sep0.cloneNode(true)); const b = proto.cloneNode(false); b.textContent = t; b.className = i === segs.length - 1 ? 'cur' : ''; b.removeAttribute('data-vf-court'); b.removeAttribute('data-vf-masque'); fil.appendChild(b); });
+    await pause(500);
+    const hd = document.querySelector('header'), R = (e) => e.getBoundingClientRect(), vis = (e) => R(e).width > 0;
+    const bs = [...fil.querySelectorAll('button')].filter(vis), n = bs.length, hl = R(document.querySelector('header .hl')), sb = R(document.getElementById('search-btn')), cr = R(fil);
+    const pn = document.getElementById('proj-name');
+    const ellE = fil.querySelector('.vf-ell'), masques = [...fil.querySelectorAll('button[data-vf-masque]')].map((e) => e.textContent.trim());
+    out[cle] = { repli: { ell: !!ellE, title: ellE ? ellE.getAttribute('title') : null, aria: ellE ? ellE.getAttribute('aria-label') : null, masquesNoms: masques.join(' / '), premier: n ? bs[0].textContent : null, dernier: n ? bs[n - 1].textContent : null, dernierR: n ? Math.round(R(bs[n - 1]).right * 10) / 10 : null, filR: Math.round(cr.right * 10) / 10, attPremier: segs[0], attDernier: segs[segs.length - 1] }, pn: [pn.scrollWidth, pn.clientWidth], lock: !!document.getElementById('vf-lock'), nbVisibles: n, nbMasques: fil.querySelectorAll('button[data-vf-masque]').length, ell: !!fil.querySelector('.vf-ell'), hdrSW: hd.scrollWidth,
+      dehors: [...hd.querySelectorAll('button, a, input')].filter((e) => vis(e) && (R(e).right > innerWidth + 0.5 || R(e).left < -0.5)).map((e) => e.id || e.textContent.trim().slice(0, 12)),
+      courts: bs.filter((e) => e.textContent.trim().length < 12 && e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent + ' ' + e.scrollWidth + '>' + e.clientWidth),
+      fil: { dansHl: cr.right <= hl.right + 0.5, surRecherche: cr.right > sb.left + 0.5, crR: Math.round(cr.right), hlR: Math.round(hl.right), sbL: Math.round(sb.left) },
+      deficit: bs.map((e, i) => ({ t: e.textContent, i, d: Math.max(0, e.scrollWidth - e.clientWidth), cw: e.clientWidth, milieu: i > 0 && i < n - 1 && e.textContent.trim().length >= 12, bout: (i === 0 || i === n - 1) && e.textContent.trim().length >= 12 })) };
+  }
+  return out; })()
+JS
+cat > "$AUX/o2b-viol.mjs" <<'JS'
+// usage : o2b-viol.mjs <nature> <jeu s3|s6> <étiquette-par-url, séparées par une virgule> ; lit le JSON de chrome-cdp.mjs sur l'entrée ; « aucune » si tout va bien, sinon les violations
+import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); const [nat, jeu, etiq] = process.argv.slice(2), noms = (etiq || '').split(',');
+if (!j.resultats) { console.log('mesure absente : ' + (j.erreur || '?')); process.exit(0); }
+const v = [];
+j.resultats.forEach((r, i) => { const x = r.valeur?.[jeu], w = r.valeur?.W, et = (noms[i] || i) + ' ' + w + ' px';
+  if (!x) { v.push(et + ' : mesure absente'); return; }
+  if (!x.lock) v.push(et + ' : témoin, badge « au travail » absent');
+  if (x.nbVisibles + 0 < 2) v.push(et + ' : témoin, fil de moins de 2 segments visibles');
+  if (nat === 'hors' && (x.dehors.length || x.hdrSW > w)) v.push(et + ' : hors fenêtre [' + x.dehors.join(',') + '] header.scrollWidth ' + x.hdrSW + ' > ' + w);
+  if (nat === 'court' && x.courts.length) v.push(et + ' : segment court rogné ' + x.courts.join(', '));
+  if (nat === 'fil' && (!x.fil.dansHl || x.fil.surRecherche)) v.push(et + ' : fil hors de sa colonne (fil.right ' + x.fil.crR + ', .hl.right ' + x.fil.hlR + ', recherche.left ' + x.fil.sbL + ')');
+  if (nat === 'ordre') { const bout = x.deficit.filter((d) => d.bout && d.d > 1), mil = x.deficit.filter((d) => d.milieu && d.cw > 65); if (bout.length && mil.length) v.push(et + ' : un bout est tronqué (' + bout.map((d) => d.t + ' -' + d.d).join(', ') + ') alors qu\'un segment du milieu garde plus de 64 px (' + mil.map((d) => d.t + ' ' + d.cw).join(', ') + ')'); }
+  if (nat === 'plainte') { const t = x.deficit.filter((d) => d.d > 1).map((d) => d.t + ' -' + d.d); if (x.pn[0] > x.pn[1]) t.push('nom du projet ' + x.pn[0] + '>' + x.pn[1]); if (t.length) v.push(et + ' : ' + t.join(', ')); }
+  if (nat === 'repli') { const r = x.repli, p = [];
+    if (!r.ell) p.push('repli « … » absent'); if (!(x.nbMasques > 0)) p.push('aucun segment masqué (' + x.nbMasques + ')');
+    if (!(r.dernierR <= r.filR + 0.5) || r.dernier !== r.attDernier) p.push('dernier segment « ' + r.dernier + ' » hors de la colonne du fil (right ' + r.dernierR + ' > fil.right ' + r.filR + ')');
+    if (r.premier !== r.attPremier) p.push('premier segment non visible (' + r.premier + ')');
+    if (!r.masquesNoms || r.title !== r.masquesNoms) p.push('title du « … » [' + r.title + '] != noms masqués [' + r.masquesNoms + ']');
+    if (!r.aria || r.aria !== r.title) p.push('aria-label du « … » [' + r.aria + '] != title [' + r.title + ']');
+    if (p.length) v.push(et + ' : ' + p.join(' ; ')); }
+  if (nat === 'sollicite' && !(x.nbMasques > 0 || x.deficit.some((d) => d.d > 0))) v.push(et + ' : témoin, aucune troncature ni masquage sollicité');
+});
+console.log(v.length ? v.slice(0, 4).join(' | ') : 'aucune');
+JS
+O2B_U="index.html project.html"
+o2b_mesure() { # o2b_mesure <port> <largeur> -> JSON (onglet Code puis Projet)
+  CDP_VIEWPORT="$2x$(( $2 * 5 / 8 ))" CDP_PRET="document.readyState === 'complete' && !!document.querySelector('#crumbs button') && !!document.getElementById('vf-lock')" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 300 "$(cat "$AUX/o2b.js")" "http://127.0.0.1:$1/index.html" "http://127.0.0.1:$1/project.html"
+}
+echo "=== O2b — budget du fil d'Ariane (revue de la recette 3, F1/F2) : fils de 3 et 6 segments longs, badge présent, 1 280 / 1 300 / 1 320 / 1 440 px, onglets Code et Projet ==="
+for spec in "court:$LC" "long:$LL"; do
+  nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; PB=$SRV_PORT
+  for w in 1280 1300 1320 1366 1440; do
+    XB="$(o2b_mesure "$PB" "$w")"; echo "$XB" > "$WORK/o2b-$nom-$w.json"
+    for jeu in s3 s6; do
+      E="Code $nom,Projet $nom"; fq="$jeu"
+      assert_eq "O2b.1 — $nom / $jeu / $w px : aucun bouton d'en-tête hors de la fenêtre (header.scrollWidth <= innerWidth), badge présent" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" hors $jeu "$E")" "aucune"
+      assert_eq "O2b.2 — $nom / $jeu / $w px : aucun segment court (moins de 12 caractères) rogné" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" court $jeu "$E")" "aucune"
+      assert_eq "O2b.3 — $nom / $jeu / $w px : le fil reste dans sa colonne (ni hors de .hl, ni sur la recherche)" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" fil $jeu "$E")" "aucune"
+      assert_eq "O2b.4 — $nom / $jeu / $w px : la troncature porte d'abord sur le milieu (le premier et le dernier ne sont rognés que lorsque les segments longs du milieu sont à leur plancher de 64 px)" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" ordre $jeu "$E")" "aucune"
+    done
+    case "$w" in 1280|1300|1366) # O2b.7 (re-revue de la recette 3, M1/M2) : le repli « … » d'un fil de 8 segments longs : présent, segments du milieu masqués, dernier segment contenu dans la colonne du fil, premier visible, title = noms masqués, aria-label = title
+      assert_eq "O2b.7 — $nom / s8 / $w px : repli « … » présent (nombre de segments masqués > 0), dernier segment dans la colonne du fil (right <= fil.right), premier visible, title et aria-label du « … » = noms masqués" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" repli s8 "Code $nom,Projet $nom")" "aucune" ;;
+    esac
+  done
+  if [ "$nom" = court ]; then assert_eq "O2b.6 — plainte d'origine, lab court / 1 440 px, fil de 3 segments : « Vue d'ensemble », le nom du projet et les autres segments ne sont plus rognés" "$(printf '%s' "$(cat "$WORK/o2b-court-1440.json")" | node "$AUX/o2b-viol.mjs" plainte s3 "Code court,Projet court")" "aucune"; fi
+  XB="$(cat "$WORK/o2b-$nom-1280.json")"
+  assert_eq "O2b.5 — $nom / 1 280 px : témoin, le fil de 6 segments sollicite bien la troncature ou le masquage (jamais un vert à vide)" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" sollicite s6 "Code $nom,Projet $nom")" "aucune"
+  unsrv
+done
+
+# O2b — témoins rouges sur COPIE du lab long (jamais le moteur) : chaque mutant défait UNE règle du budget du fil et doit rougir la mesure qui la garde, à 1 280 px (onglet Code, badge présent).
+#   m1 règle des segments courts supprimée -> « segment court rogné » · m2 le min-width de 3a9331c8 (colonne gauche = 280 px + largeur du fil + nom du projet, plafond 50 %) remis -> « hors de la fenêtre »
+#   m3 le milieu au même poids que les bouts (1, au lieu de 100 000 : on ne tronque plus le milieu d'abord) -> « le premier est tronqué alors que le milieu garde plus de 64 px »
+mutant_o2b() { # mutant_o2b <nom> <nature> <ancien> <nouveau> : <ancien> doit exister dans la page (sinon FAIL nommé)
+  local M="$WORK/mut-o2b-$1"; mkdir -p "$M/.planning/missions" "$M/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$M/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$M/.planning/missions/"
+  node -e "
+const fs=require('fs');let n=0;for(const f of ['index.html','project.html']){const p='$M/.vibeflow/cockpit/'+f;const h=fs.readFileSync(p,'utf8');const o=process.argv[1],r=process.argv[2];if(!h.includes(o))continue;fs.writeFileSync(p,h.split(o).join(r));n++}
+if(!n){console.error('mutant $1 : motif introuvable');process.exit(1)}" "$3" "$4" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : motif introuvable dans la page"; return; }
+  srv "$M/.vibeflow/cockpit"; local XM; XM="$(o2b_mesure "$SRV_PORT" 1280)"; unsrv
+  assert_neq_aucune "O2b.m$1 — mutant « $5 » : la mesure « $2 » rougit à 1 280 px" "$(printf '%s' "$XM" | node "$AUX/o2b-viol.mjs" "$2" s6 "Code mutant,Projet mutant")"
+}
+assert_neq_aucune() { if [ "$2" != "aucune" ] && [[ "$2" != "mesure absente"* ]] && [[ "$2" != *"témoin"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: une violation de la nature visée"; echo "     obtenu:  [${2:0:600}]"; FAIL=$((FAIL+1)); fi; }
+mutant_o2b 1 court 'header #crumbs button[data-vf-court] { flex: 0 0 auto; }' '' "règle des segments courts supprimée"
+mutant_o2b 2 hors '@media (max-width: 999px) { #ask-input' '@media (min-width: 1280px) { :root { --vf-crumbs: 560px; --vf-pn: 100px; } header .hl { min-width: min(calc(280px + var(--vf-crumbs, 0px) + var(--vf-pn, 0px)), 50vw); } } @media (max-width: 999px) { #ask-input' "min-width de 3a9331c8 remis"
+mutant_o2b 3 ordre 'button:not([data-vf-court]):not(:first-child):not(.cur) { flex: 0 100000 auto; }' 'button:not([data-vf-court]):not(:first-child):not(.cur) { flex: 0 1 auto; }' "milieu au même poids que les bouts"
+
+# I2 (recette 3, retour de Samuel, saisie texte, session principale, 2026-11-03) : « le flou sous le titre est trop dense, il faut aussi qu'il ai un radius fort en haut faible en bas, il doit etre comparable au blur iOS ».
+# Reprise (avis de Samuel, Wispr Flow, session principale, 2026-11-03 : « pas de bordure, un flou dégradé qui part du haut gauche et descend, comme le header, en mode iOS 26 ») :
+# plus de carte bordée ; le flou vit sur #context::before : backdrop-filter blur + saturate, masque en dégradé (mask-image et -webkit-mask-image), aucune bordure, aucun rayon, aucune ombre (#context et ::before) — mesuré dans le style calculé, deux thèmes, deux onglets.
+echo "=== I2 — le titre de la vue d'ensemble : flou progressif à la iOS 26 (filtre, masque en dégradé, ni bordure ni rayon ni ombre) ==="
+cat > "$AUX/i2.js" <<'JS'
+(async () => { const pause = (ms) => new Promise((r) => setTimeout(r, ms)); const ctx = document.getElementById('context'), out = {};
+  for (const th of ['light', 'dark']) { document.documentElement.setAttribute('data-theme', th); await pause(150);
+    const lire = (cs) => ({ filtre: cs.backdropFilter, masque: cs.maskImage || cs.webkitMaskImage || '', bord: ['Top', 'Right', 'Bottom', 'Left'].map((c) => parseFloat(cs['border' + c + 'Width'])).reduce((a, b) => a + b, 0),
+      rayon: ['TopLeft', 'TopRight', 'BottomLeft', 'BottomRight'].map((c) => parseFloat(cs['border' + c + 'Radius'])).reduce((a, b) => a + b, 0), ombre: cs.boxShadow });
+    out[th] = { ctx: lire(getComputedStyle(ctx)), av: lire(getComputedStyle(ctx, '::before')), ctxFiltre: getComputedStyle(ctx).backdropFilter }; }
+  return out; })()
+JS
+srv "$LC/.vibeflow/cockpit"; PI=$SRV_PORT
+for onglet in index project; do
+  XI="$(CDP_VIEWPORT=1280x800 CDP_PRET="document.readyState === 'complete' && !!document.querySelector('#context h1')" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 300 "$(cat "$AUX/i2.js")" "http://127.0.0.1:$PI/$onglet.html")"
+  for th in light dark; do
+    VI="j.resultats[0].valeur.$th"
+    assert_eq "I2.1 — $onglet / $th : flou présent sur la couche (backdrop-filter blur + saturate)" "$(printf '%s' "$XI" | node "$AUX/ev.mjs" "/^blur\\([0-9.]+px\\) saturate\\(/.test($VI.av.filtre)")" "true"
+    assert_eq "I2.2 — $onglet / $th : masque en dégradé sur la couche (mask-image radial ou linéaire)" "$(printf '%s' "$XI" | node "$AUX/ev.mjs" "/gradient\\(/.test($VI.av.masque)")" "true"
+    assert_eq "I2.3 — $onglet / $th : aucune bordure, aucun rayon, aucune ombre (#context et ::before) et pas de flou sur #context lui-même" "$(printf '%s' "$XI" | node "$AUX/ev.mjs" "[$VI.ctx.bord,$VI.av.bord,$VI.ctx.rayon,$VI.av.rayon,$VI.ctx.ombre,$VI.av.ombre,$VI.ctxFiltre].join('|')")" "0|0|0|0|none|none|none"
+  done
+done
+unsrv
+
+echo "=== R4 — témoin rouge : sans la mise en page du cockpit, la mesure rougit ==="
+LM="$WORK/lab-mutant"; mkdir -p "$LM/.planning" "$LM/.vibeflow" "$LM/.planning/missions"; cp -R "$LL/.vibeflow/cockpit" "$LM/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$LM/.planning/missions/"
+node -e "
+const fs=require('fs');for(const f of ['index.html','project.html']){const p='$LM/.vibeflow/cockpit/'+f;const h=fs.readFileSync(p,'utf8');
+const n=h.replace(/<script>\/\* ui\/01-vf-responsive\.js \*\/[\s\S]*?<\/script>/,'<script>/* mutant */</script>');if(n===h){console.error('mutant : bloc 01-vf-responsive.js introuvable');process.exit(1)}fs.writeFileSync(p,n)}" || FAIL=$((FAIL+1))
+srv "$LM/.vibeflow/cockpit"; RM="$(mes "http://127.0.0.1:$SRV_PORT/project.html" 1440 - )"; unsrv
+assert_has "R4.1 — témoin rouge : sans 01-vf-responsive.js, l'en-tête à 1 440 px est signalé" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" 'j.mesures["1440"].v.join(" | ")')" "en-tête"
+
+# R4.2 — témoin rouge de R-1 : la borne d'avant (colonne gauche de 300 px) fait sortir le dernier bouton de l'onglet Code à 1 024 px
+LM2="$WORK/lab-mutant2"; mkdir -p "$LM2/.planning/missions" "$LM2/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$LM2/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$LM2/.planning/missions/"
+node -e "
+const fs=require('fs');const p='$LM2/.vibeflow/cockpit/index.html';const h=fs.readFileSync(p,'utf8');
+const n=h.replace('header .hl { flex: 1 1 0; min-width: 264px; }','header .hl { flex: 1 1 0; min-width: 300px; }');if(n===h){console.error('mutant : borne de 264 px introuvable');process.exit(1)}fs.writeFileSync(p,n)" || FAIL=$((FAIL+1))
+srv "$LM2/.vibeflow/cockpit"; RM2="$(RESP_INJECT="$INJ_CODE" mes "http://127.0.0.1:$SRV_PORT/index.html" 1024 - )"; unsrv
+assert_has "R4.2 — témoin rouge : avec la colonne gauche à 300 px, un bouton de l'en-tête sort de la fenêtre à 1 024 px (onglet Code)" "$(printf '%s' "$RM2" | node "$AUX/ev.mjs" 'j.mesures["1024"].v.join(" | ")')" "sort de la fenêtre"
+
+# R8 — témoin indépendant de la police ET de la plateforme : Chrome headless sous Linux n'a aucun périphérique de pointage (`pointer: none`) ; la mise en page
+# « souris » du cockpit était écrite `(pointer: fine)` et ne s'appliquait pas là (CI, run 41370886002, 8 rouges à 1 024 px) alors que macOS (`fine`) passait. Le même
+# Chrome, lancé avec `--blink-settings` sans pointeur, reproduit ce cas sur n'importe quel poste : mêmes assertions R1, onglets Code (avec ses boutons optionnels) et Projet.
+echo "=== R8 — aucun périphérique de pointage (pointer: none) : mêmes assertions R1 à 1 024, 1 280 et 1 440 px ==="
+CHROME_NOPTR="$AUX/chrome-sans-pointeur.sh"
+printf '#!/bin/sh\nexec "%s" --blink-settings=primaryPointerType=1,availablePointerTypes=1,primaryHoverType=1,availableHoverTypes=1 "$@"\n' "$CHROME" > "$CHROME_NOPTR"; chmod +x "$CHROME_NOPTR"
+for spec in "court:$LC" "long:$LL"; do
+  nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; P=$SRV_PORT
+  for onglet in index project; do
+    inj=""; [ "$onglet" = index ] && inj="$INJ_CODE"
+    R="$(RESP_INJECT="$inj" REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-responsive.mjs" "$CHROME_NOPTR" "http://127.0.0.1:$P/$onglet.html" 1024,1280,1440 -)"
+    assert_eq "R8.0 — $nom / $onglet : le Chrome du témoin n'a bien aucun pointeur" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.mesures["1024"].m.pointeur')" "none"
+    for w in 1024 1280 1440; do assert_eq "R8 — $nom / $onglet / $w px sans pointeur : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w")" "aucune"; done
+  done
+  unsrv
+done
+
+# R9 — témoin indépendant de la police : des métriques de texte plus larges que celles d'Inter (interlettrage +5 % sur tout l'en-tête, injecté après le chargement)
+# ne doivent faire ni recouvrir, ni rogner, ni sortir de la fenêtre un seul élément de l'en-tête à 1 024 px — la mise en page ne dépend d'aucune largeur de police calibrée.
+INJ_LARGE="(() => { const st = document.createElement('style'); st.textContent = 'header, header * { letter-spacing: 0.05em !important; }'; document.head.appendChild(st); return true; })()"
+echo "=== R9 — métriques de texte élargies (interlettrage +5 %) : mêmes assertions R1 à 1 024 px ==="
+srv "$LL/.vibeflow/cockpit"; P=$SRV_PORT
+for onglet in index project; do
+  inj="$INJ_LARGE"; [ "$onglet" = index ] && inj="$INJ_CODE; $INJ_LARGE"
+  R="$(RESP_INJECT="$inj" mes "http://127.0.0.1:$P/$onglet.html" 1024 -)"
+  assert_eq "R9 — long / $onglet / 1 024 px, texte élargi : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "1024")" "aucune"
+done
+unsrv
+
+echo "=== R7 — chaque bouton d'en-tête a un nom accessible et une infobulle ; badge « au travail » ==="
+srv "$LC/.vibeflow/cockpit"; PC7=$SRV_PORT
+EXPR='({ aria: (document.getElementById("vf-lock")||{}).getAttribute ? document.getElementById("vf-lock").getAttribute("aria-label") : null, titre: (document.getElementById("vf-lock")||{}).title, sansInfobulle: [...document.querySelectorAll("header .hr button")].filter((b) => b.getBoundingClientRect().width > 0 && !b.title).map((b) => b.id || b.className), sansNom: [...document.querySelectorAll("header .hr button")].filter((b) => b.getBoundingClientRect().width > 0 && !b.getAttribute("aria-label") && !(b.innerText || "").trim()).map((b) => b.id || b.className) })'
+X7="$(RESP_INJECT="" CDP_PRET="document.readyState === 'complete' && !!document.getElementById('flows-btn') && !!document.getElementById('vf-lock') && /travail/.test(document.getElementById('vf-lock').textContent)" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 500 "$EXPR" "http://127.0.0.1:$PC7/index.html" "http://127.0.0.1:$PC7/project.html")"; unsrv
+assert_eq "R7.0 — témoin : la mesure a eu lieu sur les deux onglets (aucune erreur, deux résultats)" "$(printf '%s' "$X7" | node "$AUX/ev.mjs" '(j.erreur||"")+"|"+(j.resultats||[]).length')" "|2"
+for i in 0 1; do on=$([ $i = 0 ] && echo Code || echo Projet)
+  assert_eq "R7.1 — $on : l'aria-label du badge dit l'état (plus « … » figé)" "$(printf '%s' "$X7" | node "$AUX/ev.mjs" "/au travail|Personne/.test(j.resultats[$i].valeur.aria)")" "true"
+  assert_eq "R7.2 — $on : l'infobulle du badge ne contient jamais « undefined »" "$(printf '%s' "$X7" | node "$AUX/ev.mjs" "!/undefined/.test(j.resultats[$i].valeur.titre)")" "true"
+  assert_eq "R7.3 — $on : aucun bouton visible de la zone d'actions de l'en-tête sans infobulle (icône seule sous 1 600 px)" "$(printf '%s' "$X7" | node "$AUX/ev.mjs" "j.resultats[$i].valeur.sansInfobulle.length+'/'+j.resultats[$i].valeur.sansInfobulle.join(',')")" "0/"
+  assert_eq "R7.4 — $on : aucun bouton visible de la zone d'actions de l'en-tête sans nom accessible" "$(printf '%s' "$X7" | node "$AUX/ev.mjs" "j.resultats[$i].valeur.sansNom.length+'/'+j.resultats[$i].valeur.sansNom.join(',')")" "0/"
+done
+
+vf_hyg_assert
+echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
+[ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
+[ "$FAIL" -eq 0 ] && exit 0 || exit 1

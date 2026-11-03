@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "description": "Contrat versionné des sorties JSON du socle du cockpit VibeFlow (P67-D-12) et des clés internes de Claude Code dont il dépend.",
+  "schemas": {
+    "vibeflow/cockpit-who@1": {
+      "requis": { "at": "string", "root": "string", "trees": "array", "fresh": "number", "busy": "boolean", "workers": "array", "sources": "object" },
+      "travailleur": {
+        "requis": ["kind", "id", "tree", "source"],
+        "optionnels": ["role", "task", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag"]
+      },
+      "interdits": ["doing"],
+      "kinds": ["session", "subagent", "lock", "registered", "dag-node"],
+      "etatsSource": ["lue", "absente", "erreur", "forme-inconnue"]
+    },
+    "vibeflow/cockpit-project@1": {
+      "requis": { "schema": "string", "meta": "object", "project": "object", "nodes": "array", "files": "array", "links": "array", "flows": "array" },
+      "noeud": { "requis": ["id", "label", "kind"] },
+      "element": { "requis": ["p", "n", "name"] },
+      "lien": { "requis": ["a", "b", "k"] },
+      "statuts": ["done", "active", "todo", "blocked"],
+      "meta": { "requis": ["vfTab", "vf", "kindLabels"] }
+    },
+    "vibeflow/cockpit-doing@1": {
+      "requis": { "schema": "string", "id": "string", "doing": "any" }
+    }
+  },
+  "claudeCode": {
+    "verifieSur": "2.1.316",
+    "transcript": {
+      "requis": ["cwd", "type", "message", "timestamp", "sessionId"],
+      "attendus": ["gitBranch", "version"]
+    },
+    "metaSousAgent": {
+      "requis": ["agentType", "description"],
+      "attendus": ["spawnDepth", "parentAgentId", "toolUseId"],
+      "drapeauFin": ["finished"]
+    }
+  }
+}

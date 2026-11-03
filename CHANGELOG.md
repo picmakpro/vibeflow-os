@@ -13,6 +13,19 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.75.0] — 2026-11-03
+
+**Minor** (Phase 67 : nouveau module `cockpit`, nouvelle capacité) :
+
+- **`cockpit` v1.0.0** (nouveau module) : cockpit web local du lab, en lecture seule sur `127.0.0.1` — onglet Projet (plan du
+  lab : jalons, phases, plans, exigences, missions, qui est au travail en direct) et onglet Code ; en français ; questions
+  locales ou à l'agent `claude -p` confiné. Ouvert par `/vf-cockpit`, sortie sous `.vibeflow/cockpit/`.
+- **`conductor` v1.52.1** : `dag.sh save()` écrit de façon atomique (temporaire du même dossier, `fsync`, `os.replace`, mode
+  conservé) — un lecteur concurrent ne lit plus un JSON tronqué (CKPT-11).
+- Test `CPV-GSD-IDS` compatible gsd-core 1.20.0 (`phase_naming` custom posé avant `phase add`, PR #190).
+- Décision de clore la Phase 67 et de couper cette release minor : arbitrage Samuel, AskUserQuestion session principale,
+  2026-11-02.
+
 ## [v2.74.0] — 2026-10-29
 
 **Minor** (Phases 60 et 61 : gate architecture avant découpage et phases proposées, puis filet de divergence armé pour deux humains ; nouvelles capacités) :

@@ -1,0 +1,17 @@
+floorplan v0.6.0 @ 92d6854 (haydenschmitty/floorplan, MIT) — copie de skills/floorplan
+
+Patchs VibeFlow sur assets/viewer.html (marqués « vibeflow Pn ») :
+  P1 libellés des liens fournis par le graphe (G.meta.kindLabels)
+  P2 pied de carte : texte fourni (foot) et pastille de statut (st : done | active | todo | blocked)
+  P3 classe st-<statut> sur la carte
+  P4 window.Floorplan.setOverview(fn) : une extension remplace le panneau d'ensemble
+Ajout : assets/ui/00-vibeflow.js (onglets Code / Projet, styles de statut, panneau d'ensemble Projet,
+pont plan → fichiers de code).
+  P5 assets/serve.mjs : Cache-Control no-store sur les fichiers servis (project.html se rechargeait depuis le cache)
+  P6 viewer.html : window.Floorplan.rerender() — re-rendu en gardant zoom/position (spike 003, statuts en direct)
+  70-vf-live.js : ajout du spike 003 (client SSE du sidecar live.mjs)
+  P7 assets/serve.mjs : onglet Projet questionnable — project.html servi avec son propre jeton, /api/ask route ce jeton
+     vers vf-ask.mjs (réponse locale) puis vers l'agent avec les instructions Projet et vf-query.mjs (spike 005)
+  P8 viewer.html : Object.assign(P, G.meta.kindIcons) — pictogrammes des types fournis par le graphe (spike 006)
+  80-vf-fr.js : ajout du spike 006 (chrome en français par dictionnaire + observateur, couleurs des types, en-tête élargi)
+  00-vibeflow.js : barre de question visible sur l'onglet Projet quand serve.mjs la sert (spike 005)

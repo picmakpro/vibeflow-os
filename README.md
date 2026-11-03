@@ -15,9 +15,9 @@ A Claude Code plugin for spec-driven agentic development. One agent reads your i
 of agents challenges, plans, builds and proves the work, and machine gates check it.
 Nothing is done without proof, nothing merges without you.
 
-[![Version](https://img.shields.io/badge/version-2.74.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.75.0-2563eb)](./VERSION)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#other-runtimes)
-[![Modules](https://img.shields.io/badge/modules-18-16a34a)](#modules)
+[![Modules](https://img.shields.io/badge/modules-19-16a34a)](#modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [How it works](#how-it-works) · [Proof](#done-means-proven) · [Team](#a-team-not-a-chatbot) · [Memory](#memory-that-holds) · [Labs](#a-lab-for-any-domain) · [Install](#install) · [Manual](./manual/README.md)
@@ -62,7 +62,7 @@ on disk, so a session can die without the project losing ground. The last step i
 </picture>
 
 A green that cannot turn red proves nothing. Tests are written red first, `check-*.sh` gates run
-in CI, and the judge is never the author. The repo holds itself to the same rule: 123 suites run
+in CI, and the judge is never the author. The repo holds itself to the same rule: 142 suites run
 on every push, and a "fresh lab" job installs the baseline into an empty lab that must pass its
 own gates with zero intervention.
 
@@ -111,7 +111,7 @@ and its skills are built by `skill-creator` with an eval loop.
 
 ## Modules
 
-18 modules, each versioned with its own `CHANGELOG.md`. `conductor` is the mandatory baseline;
+19 modules, each versioned with its own `CHANGELOG.md`. `conductor` is the mandatory baseline;
 then you pick a dev lab from a preset (`dev`, `dev-mobile`, `dev-audite`, dependencies resolved
 for you) or a tailor-made domain lab. Each module's README is its full documentation, with the
 same structure everywhere.
@@ -150,6 +150,7 @@ The three latest are below; the full history lives in **[CHANGELOG.md](./CHANGEL
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.75.0` | 2026-11-03 | **Cockpit (minor).** New module `cockpit` v1.0.0: local web cockpit of the lab, read-only on `127.0.0.1`, in French and live — Project tab (plan of the lab: milestones, phases, plans, requirements, missions, who is at work) and Code tab, local questions or to a confined `claude -p` agent; opened by `/vf-cockpit`. `dag.sh save()` now writes atomically (`conductor` v1.52.1, CKPT-11). The `CPV-GSD-IDS` test is compatible with gsd-core 1.20.0 (PR #190). Takes effect on a workstation after `/vf-update`. **142 suites.** |
 | `v2.74.0` | 2026-10-29 | **Architecture gate and proposed phases (minor).** `check-phase-validation.sh`, `check-architecture.sh` and `vf-validation.sh` (`conductor` v1.52.0): a phase added outside the `solo` role is born "proposed" until a dev validates it, `vf-coder` and `vf-auto` refuse a proposed step (only a step missing from the ROADMAP lets them continue, any other indeterminate result stops), the head asks for a validated `ARCHITECTURE.md` before splitting into phases. `dev-orchestrator` v2.30.0, `planning-core` v2.10.0, `product-team-bundle` v1.1.0 (`vf-product-architect` worker). Phase 61, two humans on one repo: `vf-divergence-hook.sh` arms the divergence net (`post-merge` and `post-rewrite` hooks, never replacing a user hook, journal in the git dir) on the `product` and `dev` workstations, the installer arms, refreshes and removes it, and registry entries may carry a `Role` field (`consolidator` v1.12.0, `reference` v2.6.0). Takes effect on a workstation after `/vf-update`. **123 suites.** |
 | `v2.73.1` | 2026-10-29 | **Lock guard judged in the worktree, `gsd-run.sh` rc 64 (patch).** `guard-driver-lock.sh` resolves the directory a `cd <worktree> && git commit …` lands in and judges that checkout's index instead of the main tree's untracked files (same-repository checkouts only; `;`, subshell, variable, `||`, `-C` fall back to the previous judgement); `gsd-run.sh` returns 64, not 1, when `HOME` and `CLAUDE_CONFIG_DIR` are both absent (`conductor` v1.50.4, `dev-orchestrator` v2.29.1). Advances #166. Takes effect on a workstation after `/vf-update`. **116 suites.** |
 | `v2.73.0` | 2026-10-29 | **Product bundle (minor).** New module `product-team-bundle` v1.0.0: product team (manager, BRIEF analyst, PRD PM, `prd-gate` judge with threshold 80, `check-prd.sh` gate), `vibeflow-product` front door and `/vf-product` skill, visible to the `product` and `solo` roles. Stays `proposable: false` until a real run. `planning-core` v2.9.0 (product template), `dev-orchestrator` v2.29.0 (the head points to `/vf-product` at the `product` role). |

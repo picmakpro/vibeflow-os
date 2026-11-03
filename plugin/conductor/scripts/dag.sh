@@ -129,11 +129,34 @@ def load():
     with open(file, encoding="utf-8") as fh:
         return json.load(fh)
 
+# Ecriture atomique (P67-D-09, spike 003 : un lecteur concurrent lisait un JSON tronque) :
+# temporaire du meme dossier puis os.replace, patron de merge-hooks.sh write_json.
+# Un DAG lien symbolique : on ecrit la CIBLE (realpath), jamais le lien, sinon os.replace
+# le remplacerait par un fichier ordinaire. Le temporaire reste dans le dossier de la cible.
 def save(dag):
-    os.makedirs(os.path.dirname(file) or ".", exist_ok=True)
-    with open(file, "w", encoding="utf-8") as fh:
-        json.dump(dag, fh, indent=2, ensure_ascii=False)
-        fh.write("\n")
+    target = os.path.realpath(file)
+    d = os.path.dirname(target) or "."
+    os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=d, prefix="." + os.path.basename(target) + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(dag, fh, indent=2, ensure_ascii=False)
+            fh.write("\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        if os.path.exists(target):
+            shutil.copymode(target, tmp)
+        else:
+            um = os.umask(0)
+            os.umask(um)
+            os.chmod(tmp, 0o666 & ~um)
+        os.replace(tmp, target)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 def by_id(nodes):
     return {n["id"]: n for n in nodes}

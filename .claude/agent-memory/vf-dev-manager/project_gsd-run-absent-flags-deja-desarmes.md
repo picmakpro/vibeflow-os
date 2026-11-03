@@ -1,21 +1,20 @@
 ---
 name: gsd-run-absent-flags-deja-desarmes
-description: Sur vibeflow-os, `gsd_run config-set` n'existe pas comme commande shell — le reset des flags d'enchaînement se vérifie par lecture de .planning/config.json
+description: Reset des flags d'enchaînement sur vibeflow-os — `gsd-run.sh config-set --ws` crée un config.json de compartiment qui masque la racine ; les flags sont déjà false à la racine
 metadata:
   type: project
 ---
 
-Le geste de démarrage « `gsd_run config-set workflow._auto_chain_active false` puis
-`workflow.auto_advance false` » échoue systématiquement dans ce repo : `gsd_run` n'est pas résolu
-(`command not found`), ni comme binaire ni comme fonction de shell. Constaté le 2026-08-16
-(mission Phase 31), sur une machine où gsd-core est pourtant installé.
+Le reset de démarrage passe aujourd'hui par `plugin/dev-orchestrator/scripts/gsd-run.sh config-set …`
+(l'ancien `gsd_run` nu n'existait pas, constaté le 2026-08-16). Le 2026-11-02, `config-set --ws fiabilite`
+a **créé** `.planning/workstreams/fiabilite/config.json` (non suivi, deux clés seulement) : un fichier de
+compartiment qui peut masquer tout le `.planning/config.json` racine pour ce compartiment. Les deux flags
+valaient déjà `false` à la racine.
 
-**Why:** la doctrine du manager impose ce reset avant le premier dispatch, et son échec ressemble à
-un défaut d'outillage bloquant alors que les deux flags sont déjà persistés à `false` dans
-`.planning/config.json` (bloc `workflow`) — ils y survivent aux sessions.
+**Why:** le geste prescrit « désarmer » fabrique un artefact d'état neuf, invisible tant qu'on ne relit
+pas `git status`, et qui changerait la configuration effective du moteur pour tout le compartiment.
 
-**How to apply:** tenter la commande en best-effort, puis **vérifier par lecture** de
-`.planning/config.json` que `workflow._auto_chain_active` et `workflow.auto_advance` valent bien
-`false`. Si oui, consigner « déjà désarmés, vérifiés par lecture » au rapport et enchaîner — ne pas
-escalader, ne pas éditer le fichier à la main. Voir aussi [[resolution-scripts-sur-le-repo-source]]
-pour la résolution de `$S` dans le même geste de démarrage.
+**How to apply:** avant le `config-set`, lire `workflow._auto_chain_active` et `workflow.auto_advance`
+par `gsd-run.sh config-get` (même `--ws`). S'ils valent déjà `false`, ne pas écrire. Si un `config-set` a
+créé `.planning/workstreams/<ws>/config.json`, le supprimer (artefact de la mission) puis relire
+`config-get` → `false`. Le signaler au rapport. Voir [[resolution-scripts-sur-le-repo-source]].
