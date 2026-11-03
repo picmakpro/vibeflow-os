@@ -922,11 +922,19 @@ Plans:
 **Requirements**: UIFN-01, UIFN-02, UIFN-03, UIFN-04, UIFN-05, UIFN-06, UIFN-07, UIFN-08, UIFN-09, UIFN-10
 **Depends on:** Phase 67 ; Phase 69 pour l'exécution (mêmes fichiers du cockpit, P70-D-14).
 **Sources:** `BACKLOG.md` § « Cockpit en largeur mobile et clarté de la visite guidée » (D4, I4, I5, I6, I1) et § « Cockpit : anglais résiduel et coquilles du chrome » (O5) ; § « Où en est-on ? sur un lab sans STATE » (F5, P70-D-05) ; `67-RECETTE-HUMAINE.md` ; `DESIGN.md` (direction « Graphite », PR #196, P70-D-07).
-**Plans:** 0 plans
+**Plans:** 9 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 70 to break down)
+- [ ] 70-01-PLAN.md — garde du français durci, témoins rouges (UIFN-07) — vague 1
+- [ ] 70-02-PLAN.md — écarts DESIGN.md : statuts, `--text`, couleurs en dur (UIFN-09) — vague 1
+- [ ] 70-03-PLAN.md — anglais résiduel et coquilles du chrome, texte de la visite (UIFN-06, UIFN-04) — vague 2
+- [ ] 70-04-PLAN.md — en-tête mobile sur une rangée, menu « ⋯ », onglets à 13 px (UIFN-01, P70-D-16) — vague 2
+- [ ] 70-05-PLAN.md — zoom en pile, tiroir téléphone, titre coupé (UIFN-02, UIFN-03, UIFN-06) — vague 3
+- [ ] 70-06-PLAN.md — « Où en est-on ? » sans STATE, statuts en français (UIFN-08, UIFN-06) — vague 3
+- [ ] 70-07-PLAN.md — visite « Par où commencer » corrigée (UIFN-04) — vague 4
+- [ ] 70-08-PLAN.md — visite propre à l'onglet Projet (UIFN-05) — vague 5
+- [ ] 70-09-PLAN.md — captures avant/après, recette humaine proposée, bump patch (UIFN-10) — vague 6
 
 ### Phase 71: Terminal intégré au cockpit
 
