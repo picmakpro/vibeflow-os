@@ -32,3 +32,4 @@
 - [Test de non-débordement dans la mauvaise direction](feedback_section-boundary-test-wrong-direction.md) — clause de fermeture de section supprimable sans rouge (CPV, Phase 60) ; interroger la section qui PRÉCÈDE le marqueur étranger
 - [Silence casse la suite soeur](feedback_silencing-output-breaks-sibling-witness-suite.md) — Phase 61 tour 2 : deux-clones 16/16 -> 14/16, sortie supprimee = temoin de declenchement perdu
 - [Assouplir une garde : muter la clause voisine](feedback_assouplir-garde-muter-clause-voisine.md) — Phase 60 tour 2 : après un assouplissement de conduite, muter la clause voisine inchangée et rejouer le moteur réel hors gabarit
+- [Affectation de tête : formes de quote qui fuient](feedback_head-assignment-skip-quote-forms.md) — resume() cockpit-who D3 : $'..', (..), \" interne ; garde interne non mutée (revue-fb2)
