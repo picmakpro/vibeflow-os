@@ -109,6 +109,13 @@
 # copie gelee (decoupage grossier de la chaine), est permis (le cd interne d une chaine lue sert a la decision « hors du lab »).
 # AUCUN CROCHET DE TEST (R-6) : le guard ne lit aucune variable de test ; la suite provoque l exception fail-closed
 # dans une COPIE du guard qu elle fabrique elle-meme.
+# VERROU DE PHASE (regle de Samuel, session principale, 2026-11-03 ; arbitrage « Un verrou par phase », AskUserQuestion
+# session principale, 2026-11-03) : <vf-driver>/ws/<sujet>/phases/<N>/DRIVER.lock est decouvert avec les autres (scope
+# « phase », ws, phase). Une session dont l'identifiant figure dans ses session_ids commite et ecrit librement (meme
+# regle que tout verrou, held_by_other). Tenu par autrui, un verrou de phase ne couvre QUE le dossier de sa phase
+# (.planning/workstreams/<sujet>/phases/<prefixe->N[-…]/) : les fichiers partages du compartiment (ROADMAP, STATE…) restent
+# a la charge du verrou de compartiment nu et ne sont pas bloques par un verrou de phase — sinon deux phases d'un meme
+# compartiment ne pourraient jamais progresser en parallele. Un chemin « incertain » reste refuse sous tout verrou.
 # LIMITE (P57-D-20) : le guard isole des SESSIONS, pas des managers d'une même session (ils partagent le
 # session_id, règle 3) ; aucun refus actif neuf n'est ajouté pour les séparer. Latence ajoutée, chemin
 # partitionné seulement : un interprète python + un `git rev-parse` durci (hypothèse A5 de la recherche).
@@ -1005,6 +1012,17 @@ def discover_locks(cwd):
             p = os.path.join(wsdir, n, "DRIVER.lock")
             if present_strict(p):
                 locks.append({"path": p, "scope": "compartiment", "ws": n})
+            phdir = os.path.join(wsdir, n, "phases")
+            try:
+                pnames = sorted(os.listdir(phdir))
+            except (FileNotFoundError, NotADirectoryError, ValueError):
+                pnames = []
+            except OSError:
+                raise LockUnreadable(phdir)
+            for pn in pnames:
+                pp = os.path.join(phdir, pn, "DRIVER.lock")
+                if present_strict(pp):
+                    locks.append({"path": pp, "scope": "phase", "ws": n, "phase": pn})
     legacy = os.path.join(cwd, ".planning", "DRIVER.lock")
     if os.path.lexists(legacy):
         locks.append({"path": legacy, "scope": "ancien", "ws": ""})
@@ -1065,6 +1083,21 @@ def held_by_other(lk, sid):
     return out
 
 def map_path(abs_path, cwd):
+    """Voir map_path_rest ; garde la forme historique (kind, seg)."""
+    kind, seg, _rest = map_path_rest(abs_path, cwd)
+    return (kind, seg)
+
+def phase_covers(h, rest):
+    """Un verrou de phase couvre-t-il ce chemin ? rest = segments apres le compartiment. Couvre seulement le dossier de SA
+    phase : phases/<prefixe->N[-_ .]…/ (prefixe lettres-chiffres optionnel, zeros de tete ignores). Les fichiers partages du
+    compartiment et les autres phases ne sont pas couverts."""
+    if h.get("scope") != "phase" or len(rest) < 2 or rest[0].casefold() != "phases":
+        return False
+    num = h.get("phase", "").lstrip("0") or "0"
+    pat = r"^(?:[A-Za-z][A-Za-z0-9]*-)?0*" + re.escape(num) + r"(?:[-_ ]|$)"
+    return re.match(pat, rest[1]) is not None
+
+def map_path_rest(abs_path, cwd):
     """Cartographie un chemin vers ce qu il touche, sur son realpath relatif a <cwd>/.planning :
     workstreams/<seg>/... -> ("compartiment", seg) ; autre chemin sous .planning/ -> ("racine", "") ;
     chemin qui sort de .planning/, ou `workstreams` seul -> ("incertain", ""). Ne valide aucun nom."""
@@ -1078,15 +1111,17 @@ def map_path(abs_path, cwd):
         real = os.sep.join(pp + rp[len(pp):])
     rel = os.path.relpath(real, planning)
     if rel == ".." or rel.startswith(".." + os.sep):
-        return ("incertain", "")
+        return ("incertain", "", [])
     parts = [x for x in rel.split(os.sep) if x and x != "."]
     if parts and parts[0].casefold() == "workstreams":
         if len(parts) < 2:
-            return ("incertain", "")
-        return ("compartiment", parts[1])
-    return ("racine", "")
+            return ("incertain", "", [])
+        return ("compartiment", parts[1], parts[2:])
+    return ("racine", "", [])
 
 def scope_label(lk):
+    if lk["scope"] == "phase":
+        return "phase " + lk["phase"] + " du compartiment « " + lk["ws"] + " »"
     if lk["scope"] == "compartiment":
         return "compartiment « " + lk["ws"] + " »"
     if lk["scope"] == "depot":
@@ -1095,6 +1130,8 @@ def scope_label(lk):
 
 def reclaim_command(lk):
     base = "driver-lock.sh reclaim --owner=" + lk["owner"]
+    if lk["scope"] == "phase":
+        return base + " --ws=" + lk["ws"] + " --phase=" + lk["phase"]
     if lk["scope"] == "compartiment":
         return base + " --ws=" + lk["ws"]
     if lk["scope"] == "depot":
@@ -1320,23 +1357,27 @@ def commit_paths(g, adds, cwd, top):
     return paths
 
 def map_repo_path(pb, prefix):
+    kind, seg, _rest = map_repo_path_rest(pb, prefix)
+    return (kind, seg)
+
+def map_repo_path_rest(pb, prefix):
     """Chemin (octets, relatif au toplevel) -> ("compartiment", segment) | ("commun", b"") | ("incertain", b"")
     | ("hors", b""). prefix : chemin du lab sous le toplevel (octets, vide si le lab est le toplevel).
     Commun : racine de .planning/ ou membre de RELEASE_FORM_FILES (P57-D-18)."""
     if prefix:
         if not pb.startswith(prefix + b"/"):
-            return ("hors", b"")
+            return ("hors", b"", [])
         pb = pb[len(prefix) + 1:]
     parts = pb.split(b"/")
     if parts[0].lower() == b".planning":
         if len(parts) >= 2 and parts[1].lower() == b"workstreams":
             if len(parts) < 3:
-                return ("incertain", b"")
-            return ("compartiment", parts[2])
-        return ("commun", b"")
+                return ("incertain", b"", [])
+            return ("compartiment", parts[2], [os.fsdecode(x) for x in parts[3:]])
+        return ("commun", b"", [])
     if pb in RELEASE_FORM_FILES:
-        return ("commun", b"")
-    return ("hors", b"")
+        return ("commun", b"", [])
+    return ("hors", b"", [])
 
 def cite_paths(paths):
     shown = []
@@ -1417,11 +1458,11 @@ def judge_bash(cmd, held, cwd, lab=None):
                 continue
             hit = []
             for pb in paths:
-                kind, seg = map_repo_path(pb, prefix)
+                kind, seg, rest = map_repo_path_rest(pb, prefix)
                 if kind == "compartiment":
                     sd = os.fsdecode(seg)
-                    hs = [h for h in held if h["scope"] == "compartiment"
-                          and (h["ws"] == sd or h["ws"].casefold() == sd.casefold())]
+                    hs = [h for h in held if (h["ws"] == sd or h["ws"].casefold() == sd.casefold())
+                          and (h["scope"] == "compartiment" or phase_covers(h, rest))]
                 elif kind == "commun":
                     hs = [h for h in held if h["scope"] in ("depot", "ancien")]
                 elif kind == "incertain":
@@ -1456,10 +1497,10 @@ def decide_partitioned(tool, target, abs_path, sid, cwd, text_for_marker, lab):
     if tool == "Bash":
         blockers, notes = judge_bash(target, held, cwd, lab)
     else:
-        kind, seg = map_path(abs_path, lab)
+        kind, seg, rest = map_path_rest(abs_path, lab)
         if kind == "compartiment":
-            blockers = [h for h in held if h["scope"] == "compartiment"
-                        and (h["ws"] == seg or h["ws"].casefold() == seg.casefold())]
+            blockers = [h for h in held if (h["ws"] == seg or h["ws"].casefold() == seg.casefold())
+                        and (h["scope"] == "compartiment" or phase_covers(h, rest))]
         elif kind == "racine":
             blockers = [h for h in held if h["scope"] in ("depot", "ancien")]
         else:

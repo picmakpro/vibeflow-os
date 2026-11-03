@@ -196,9 +196,11 @@ if [ "$LOCK_GIVEN" -eq 0 ]; then
   if [ -n "$COMMON" ]; then
     add_cand "$COMMON/vf-driver/repo/DRIVER.lock"
     for cand in "$COMMON/vf-driver/ws/"*/DRIVER.lock; do add_cand "$cand"; done
+    for cand in "$COMMON/vf-driver/ws/"*/phases/*/DRIVER.lock; do add_cand "$cand"; done  # verrous de phase
   fi
   add_cand "$CUR_WORKTREE/.planning/DRIVER.lock.d/repo/DRIVER.lock"
   for cand in "$CUR_WORKTREE/.planning/DRIVER.lock.d/ws/"*/DRIVER.lock; do add_cand "$cand"; done
+  for cand in "$CUR_WORKTREE/.planning/DRIVER.lock.d/ws/"*/phases/*/DRIVER.lock; do add_cand "$cand"; done
 fi
 
 # Aucun verrou du clone : le chemin d'avant, rejoue tel quel (lab plat inchange, P57-D-03).
@@ -225,6 +227,7 @@ while IFS= read -r lk; do
   case "$rc" in
     0)
       case "$lk" in
+        */ws/*/phases/*/DRIVER.lock) sj="${lk%/DRIVER.lock}"; sw="${sj%/phases/*}"; CL_DETAIL="$CL_DETAIL, phase ${sj##*/} du compartiment ${sw##*/}" ;;
         */ws/*/DRIVER.lock) sj="${lk%/DRIVER.lock}"; CL_DETAIL="$CL_DETAIL, compartiment ${sj##*/}" ;;
         */repo/DRIVER.lock) CL_DETAIL="$CL_DETAIL, verrou de depot" ;;
       esac

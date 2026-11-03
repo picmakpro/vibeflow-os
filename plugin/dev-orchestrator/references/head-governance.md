@@ -78,8 +78,10 @@ questions de `mission-flow.md` §Pattern F, sans en recopier les règles : un re
 ## 2. Séquencement (parallélisme au niveau mission)
 
 Le manager parallélise des **nœuds** à périmètres disjoints (frontière `ready`, team-kernel). Le
-head parallélise des **missions** — et **sur ce dépôt, aujourd'hui, il les sérialise** (D-02) : un
-manager à la fois. Ce qu'il fait réellement de plus :
+head parallélise des **missions**. Règle de Samuel (session principale Claude Code, 2026-11-03) : « la regle est de
+parallèliser le plus possible, pas de regle "1 seul manager" on lance autant d'agent et sous agent qu'on peut.
+Plusieur worktree peuvent etre necessaire ». **D-02 (« un manager à la fois ») est amendée** par cette règle et
+l'arbitrage « Un verrou par phase » (AskUserQuestion, session principale, 2026-11-03). Ce qu'il fait réellement de plus :
 
 - lire les dépendances déclarées de la feuille de route (`Depends on:` dans `ROADMAP.md`) ;
 - ordonner les missions restantes en conséquence ;
@@ -92,16 +94,15 @@ périmètres et les plafonds de budget (`autonomous-guardrails.md`). La formule 
 ou trois agents d'un coup » est un signal d'alerte sur l'**ajout d'agents au catalogue** dans une
 PR — jamais une limite d'orchestration à l'exécution.
 
-**Un manager par compartiment — mécanisme livré (Phase 57), usage réel à prouver (Phase 61).** Un lab
-réellement partitionné (`workstreams.md` §5 « La condition dure ») peut avoir plusieurs managers en parallèle,
-un par compartiment. Les points 1 à 3 du spec head §6 sont livrés : verrou nommé par compartiment
-(`driver-lock.sh --ws`, amendement daté d'ADR-053), `guard-driver-lock.sh` aligné, `--ws` et
-`GSD_SESSION_KEY` distincts par manager. Le quatrième, la preuve d'usage concurrent **réel** (deux humains, deux
-terminaux), est porté par la Phase 61. D'ici là le head sérialise SES propres managers (D-02 du registre de la
-Phase 40, inchangée ; P57-D-34) et chaque mandat porte `--ws <sujet>` et `GSD_SESSION_KEY=vf-<sujet>-<owner>` :
-le verrou par compartiment sert d'abord des sessions distinctes, qui ne se bloquent plus d'un compartiment à
-l'autre. Limite assumée : les managers d'une même session partagent son identifiant, le guard ne les sépare pas
-(P57-D-20).
+**Un verrou par phase (amende D-02, 2026-11-03).** Un lab réellement partitionné (`workstreams.md` §5 « La condition
+dure ») porte un manager par **phase** : `driver-lock.sh --ws <sujet> --phase <N>` (deuxième amendement daté
+d'ADR-053). Deux phases d'un même compartiment s'acquièrent en parallèle, la même phase deux fois est refusée, et le
+verrou de compartiment nu (`--ws` sans `--phase`) entre en conflit avec toute phase du compartiment, dans les deux
+sens. **Chaque mandat de manager porte `--ws <sujet> --phase <N>`** et `GSD_SESSION_KEY=vf-<sujet>-<N>-<owner>` ; un
+worktree par manager dès que leurs écritures de code se recouvrent. Le head ne sérialise plus que ce qui partage une
+dépendance déclarée (`Depends on:`) ou des fichiers. Limites assumées : le guard couvre le dossier de la phase
+(`phases/<N>-…/`), pas les fichiers partagés du compartiment (ROADMAP, STATE) ; les managers d'une même session
+partagent son identifiant, le guard ne les sépare pas (P57-D-20).
 
 ## 3. Contrat de sortie (vérifier le témoin, pas refaire le travail)
 

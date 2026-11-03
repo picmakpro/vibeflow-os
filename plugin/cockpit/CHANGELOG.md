@@ -26,6 +26,29 @@ Phase 69 : suivi du travail en cours. Décision du bump : arbitrage Samuel, AskU
 - Masque des secrets au mieux sur la prose des mandats et des messages ; jeton lisible par tout processus local : risque accepté
   (P69-D-27, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
 
+## v1.0.2 — 2026-11-03 — non publié
+
+### Ajouté
+- **Verrous de phase dans « qui est au travail »** : `vf-cockpit-who.mjs` affiche `compartiment <sujet> phase <N>` et lit le
+  registre des agents de chaque phase tenue (`orphans --ws --phase`). Règle de Samuel, session principale, 2026-11-03.
+
+## v1.0.1 — 2026-11-03
+
+Publiée dans VibeFlow v2.75.1.
+
+### Corrigé
+- **ROADMAP écrit à la française lu par l'onglet Projet** — `Phase N : nom` (espace avant les deux-points, insécable
+  comprise) était ignoré : le lab Scroll-Off n'affichait aucune phase de son jalon en cours (constaté le 2026-11-03).
+  La ligne `**Depends on**: rien · **Parallélisable avec**: Phase 4` ne crée plus de dépendance à la Phase 4 ;
+  `## Jalons` vaut `## Milestones`, `**Objectif**` vaut `**Goal**`, `**Dépend de**` vaut `**Depends on**`.
+
+### Ajouté
+- **Détection de dérive de format avant la lecture** (`scripts/vf-cockpit-drift.mjs`) — quatre règles
+  (`phases-illisibles` bloquant, `phase-deux-points` et `depends-on` tolérés, `jalons-absents` et
+  `phase-courante-absente` en info). Le panneau d'ensemble de l'onglet Projet les affiche dans une section « Format de
+  la planification » (`meta.vf.drift`). `--diff` propose un correctif au format unifié vers le gabarit GSD, jamais
+  écrit sur disque : on le relit puis on l'applique avec `git apply` (ADR-031). Suite `test-cockpit-projet.sh` (P6.1 à P6.14, dont les mineurs F1 à F5 de la relecture adverse SOBR-04).
+
 ## v1.0.0 — 2026-11-01
 
 Première version du module (publiée dans VibeFlow v2.75.0). Décisions : arbitrages Samuel,

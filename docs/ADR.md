@@ -717,6 +717,48 @@ Phase 30, l'acquisition est un lien remplacé par `rename(2)` : `mkdir` seul lai
 plusieurs gagnants sous concurrence. Le texte d'origine n'est pas réécrit ; chaque verrou nommé
 réutilise la mécanique actuelle telle quelle.
 
+### Amendement du 2026-11-03 — un verrou par phase, à l'intérieur d'un compartiment
+
+**Origine.** Règle de Samuel, session principale Claude Code, 2026-11-03 : « la regle est de
+parallèliser le plus possible, pas de regle "1 seul manager" on lance autant d'agent et sous agent
+qu'on peut. Plusieur worktree peuvent etre necessaire ». Arbitrage de Samuel, AskUserQuestion
+session principale, 2026-11-03 : « Un verrou par phase (Recommandé) ». Le jalon vibeflow-v2.0
+(Phases 68 à 72) vit tout entier dans le compartiment `fiabilite` : avec un verrou par compartiment,
+un seul manager pouvait le piloter. Cet amendement complète celui du 2026-10-10 sans le réécrire.
+
+**Invariant amendé.** « Un manager par compartiment » devient « **un manager par phase** » : un
+verrou nommé `--ws=<sujet> --phase=<N>` à l'intérieur du compartiment. Le verrou de compartiment nu
+(`--ws` sans `--phase`) reste valide, au bit près pour ses détenteurs actuels.
+
+**Mécanisme.**
+- Emplacement : `<git-common-dir>/vf-driver/ws/<sujet>/phases/<N>/DRIVER.lock`, un dossier par
+  verrou. Toute la mécanique (lien remplacé par `rename(2)`, mutex nommé d'après la génération,
+  TTL, heartbeat, takeover, registre `register --node`, journal) est paramétrée par l'emplacement,
+  pas copiée. `N` : chiffres et points internes (`69`, `41.1`), sinon `phase-invalid`.
+- Deux phases d'un compartiment s'acquièrent en parallèle ; la même phase deux fois est refusée
+  (`held`).
+- Hiérarchie : le verrou nu et les verrous de phase du même compartiment s'excluent dans les deux
+  sens, à `acquire` et à `takeover`, par sonde avant la pose puis re-sonde après (même patron que
+  l'ancien verrou, R-4). Refus nommés : `compartment-lock-held` (phase demandée, compartiment
+  tenu), `phase-lock-held` (compartiment demandé, phase tenue) ; périmé,
+  `stale-requires-takeover` avec le `recover` cible. Le verrou de dépôt reste indépendant.
+- Consommateurs alignés : `guard-driver-lock.sh` (un verrou de phase tenu par une autre session
+  couvre le dossier de SA phase ; la session détentrice commite librement), `dag.sh init --phase`
+  (`progress_epoch` du verrou de la phase), `check-guard-health.sh` (la ligne du chien de garde
+  nomme la phase), `check-branch-claim.sh`, `check-mission-exit.sh --phase`, cockpit (`who`).
+- Lab plat, ou `VF_DRIVER_LOCK` posé : `--phase` est inerte, comme `--ws`.
+
+**Limites assumées.**
+- Le guard ne couvre pas les fichiers partagés du compartiment (ROADMAP, STATE) sous un verrou de
+  phase : sinon deux phases ne pourraient pas progresser ensemble. Seul le verrou de compartiment
+  nu les garde.
+- L'attribution d'un dossier à une phase se fait sur son nom (`[préfixe-]N[-…]`) ; un nom de dossier
+  hors de cette forme n'est pas couvert.
+- Acquisitions simultanées du verrou nu et d'une phase : au plus un gagnant, mais les deux peuvent
+  se retirer (mesuré 6 fois sur 6) ; le refus est sûr, le rejeu réussit.
+- Le guard isole des sessions : les managers d'une même session partagent le `session_id`
+  (P57-D-20). Un worktree par manager reste nécessaire dès que leurs écritures de code se recouvrent.
+
 ---
 
 ## ADR-054 : Portabilité Windows — normalisation CRLF, préflight, gardes réellement actives, gate de synchro versions

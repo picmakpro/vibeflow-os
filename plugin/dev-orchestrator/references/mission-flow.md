@@ -162,6 +162,11 @@ valeurs du mandat (P57-D-23, P57-D-35) :
   laisse donc le verrou du compartiment tenu (E1 le rattrape à la sortie, `check-mission-exit.sh --ws <sujet>`).
   Un `acquire` sans `--ws` prend le dépôt et le dit (`scope: depot`, `scope_reason: ws-absent`, P57-D-05) : la
   mission est alors sérialisée comme avant. Lab plat : `--ws` y est sans effet (P57-D-31).
+- **Mandat de phase : `--ws <sujet> --phase <N>` partout** (règle de Samuel, session principale, 2026-11-03 ;
+  arbitrage « Un verrou par phase », AskUserQuestion, session principale, 2026-11-03). Chaque verbe de ce bloc
+  (`acquire`, `heartbeat`, `register`, `release`…), `dag.sh init --ws --phase` et `check-mission-exit.sh --ws --phase`
+  visent le verrou de la phase ; deux phases d'un même compartiment tournent en parallèle, le compartiment nu et
+  une phase s'excluent (`phase-lock-held`, `compartment-lock-held`).
 - **Un seul compartiment par mission.** Le transverse passe par le dépôt ou se découpe en deux missions (P57-D-06).
   Le gate de sortie sans `--ws` sur un lab partitionné est INDÉTERMINÉ ; `--budget-snapshot` sans `--ws` sort 4
   (P57-D-35).

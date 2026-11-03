@@ -185,9 +185,73 @@ assert_eq "P5.1 — deux phases distinctes" "$(G "$WORK/g5.json" 'j.nodes.filter
 assert_eq "P5.2 — chaque plan dans son compartiment" "$(G "$WORK/g5.json" 'j.files.filter(f=>f.p.endsWith("PLAN.md")).map(f=>f.n+"="+f.p.split("/")[2]).sort().join(",")')" "ph-1@deux=deux,ph-1@un=un"
 assert_eq "P5.3 — chaque exigence dans son compartiment" "$(G "$WORK/g5.json" 'j.files.filter(f=>f.p.startsWith("req/")).map(f=>f.n+"="+f.name).sort().join(",")')" "ph-1@deux.req=DEUX-01,ph-1@un.req=UN-01"
 
+# ---------- P6 — ROADMAP à la française : lu malgré la dérive, dérive détectée, correctif proposé ----------
+# Cas réel (lab Scroll-Off, 2026-11-03) : « Phase N : » partout, aucune phase lue, carte vide sans explication.
+L6="$WORK/p6"; B="$L6/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+# Roadmap
+
+## Phases
+
+- [x] **Phase 1 : Socle** — premier jet
+- [ ] **Phase 2 : Écran** — second jet
+
+## Phase Details
+
+### Phase 1 : Socle
+**Goal**: Poser le socle
+**Depends on**: rien · **Parallélisable avec**: Phase 2
+
+### Phase 2 : Écran
+**Goal**: Poser l'écran
+**Depends on**: Phase 1
+MD
+wr "$B/STATE.md" <<'MD'
+---
+milestone: v2.0
+status: executing
+---
+MD
+graph "$L6" "$WORK/g6.json"
+DR="$SCRIPTS/vf-cockpit-drift.mjs"
+echo "=== P6 — dérive de format ==="
+assert_eq "P6.1 — « Phase N : » lu : deux phases, ph-1 done" "$(G "$WORK/g6.json" 'j.nodes.filter(n=>n.kind==="phase").map(n=>n.id+":"+n.st).join(",")')" "ph-1:done,ph-2:todo"
+assert_eq "P6.2 — « rien · **Parallélisable avec**: Phase 2 » n'est pas une dépendance à 2" "$(G "$WORK/g6.json" 'j.links.filter(l=>l.k==="import").map(l=>l.a+">"+l.b).join(",")')" "n:ph-1>n:ph-2"
+assert_eq "P6.3 — règles signalées dans meta.vf.drift" "$(G "$WORK/g6.json" 'j.meta.vf.drift.regles.map(r=>r.regle+":"+r.n).join(",")')" "phase-deux-points:4,depends-on:1,jalons-absents:1,phase-courante-absente:1"
+assert_eq "P6.4 — témoin : le lab au gabarit GSD (P1) est conforme" "$(G "$WORK/g1.json" 'j.meta.vf.drift.regles.length')" "0"
+git -C "$L6" init -q && git -C "$L6" add -A && git -C "$L6" -c user.email=t@t -c user.name=t commit -qm init
+node "$DR" "$L6" --diff > "$WORK/p6.patch"
+avant="$(cd "$L6" && git hash-object .planning/ROADMAP.md)"
+assert_eq "P6.5 — le détecteur n'écrit rien sur disque" "$(cd "$L6" && git status --porcelain | wc -l | tr -d ' ')|$(cd "$L6" && git hash-object .planning/ROADMAP.md)" "0|$avant"
+assert_eq "P6.6 — le correctif proposé s'applique (git apply --check)" "$(git -C "$L6" apply --check "$WORK/p6.patch" && echo ok)" "ok"
+git -C "$L6" apply "$WORK/p6.patch"
+graph "$L6" "$WORK/g6b.json"
+assert_eq "P6.7 — après correctif : reste seulement la phase courante, non devinable" "$(G "$WORK/g6b.json" 'j.meta.vf.drift.regles.map(r=>r.regle).join(",")')" "phase-courante-absente"
+assert_eq "P6.8 — après correctif : jalon v2.0 réel, même lecture des phases" "$(G "$WORK/g6b.json" 'j.nodes.filter(n=>n.kind==="jalon").map(n=>n.label).join(",")')|$(G "$WORK/g6b.json" 'j.nodes.filter(n=>n.kind==="phase").map(n=>n.id+":"+n.st).join(",")')" "v2.0|ph-1:done,ph-2:todo"
+printf -- '- [ ] Phase 1 — sans deux-points\n' | wr "$L6/x/.planning/ROADMAP.md"
+assert_eq "P6.9 — phases citées mais illisibles : niveau bloquant" "$(node "$DR" "$L6/x" --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).constats.filter(c=>c.niveau==="bloquant").map(c=>c.regle).join(",")))')" "phases-illisibles"
+
+# P6.10-14 — relecture adverse SOBR-04 de v2.75.1 : coupe au champ suivant, gras dans la valeur, « aucune » suivi d'un ordre,
+# correctif sur un ROADMAP sans « ## Phases » et sans saut de ligne final, statut de jalon clos
+L7="$WORK/p7"; B="$L7/.planning"; mkdir -p "$B"
+printf '%s\n' '# Roadmap' '' '- [ ] **Phase 1: Un** - a' '- [ ] **Phase 2: Deux** - b' '- [ ] **Phase 3: Trois** - c' '- [ ] **Phase 4: Quatre** - d' '- [ ] **Phase 5: Cinq** - e' '' \
+  '### Phase 3: Trois' '**Depends on**: Phase 1 · **Parallélisable avec**: Phase 2' '' \
+  '### Phase 4: Quatre' '**Depends on**: Phase 1 **et Phase 2** (ordre)' '' \
+  '### Phase 5: Cinq' '**Depends on**: aucune dépendance de code ; après 4' > "$B/ROADMAP.md"
+printf -- '---\nstatus: milestone_complete\n---\n' > "$B/STATE.md"
+graph "$L7" "$WORK/g7.json"
+deps() { G "$WORK/g7.json" "j.links.filter(l=>l.k===\"import\"&&l.b===\"n:ph-$1\").map(l=>l.a.slice(5)).sort().join(\",\")"; }
+assert_eq "P6.10 — « Phase 1 · **Parallélisable avec**: Phase 2 » : dépend de 1 seulement" "$(deps 3)" "1"
+assert_eq "P6.11 — « Phase 1 **et Phase 2** » : le gras ne coupe pas la valeur" "$(deps 4)" "1,2"
+assert_eq "P6.12 — « aucune dépendance de code ; après 4 » garde 4" "$(deps 5)" "4"
+assert_eq "P6.13 — statut milestone_complete : pas de phase-courante-absente" "$(G "$WORK/g7.json" 'j.meta.vf.drift.regles.map(r=>r.regle).join(",")')" "depends-on,jalons-absents"
+printf '%s' "$(cat "$B/ROADMAP.md")" > "$B/ROADMAP.md"   # sans saut de ligne final
+node "$DR" "$L7" --diff > "$WORK/p7.patch"
+assert_eq "P6.14 — correctif sans « ## Phases » ni saut final : appliqué, puis conforme" "$( (cd "$L7" && git apply "$WORK/p7.patch") && node "$DR" "$L7" | head -1)" "Format de la planification conforme."
+
 # ---------- P4 — contrat, syntaxe, aucun nom de compartiment de ce dépôt ----------
 echo "=== P4 — contrat et généralité ==="
-for n in 1 2 3 5; do assert_eq "P4.$n — graphe $n conforme au contrat" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-project@1 "$WORK/g$n.json")" "OK"; done
+for n in 1 2 3 5 6; do assert_eq "P4.$n — graphe $n conforme au contrat" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-project@1 "$WORK/g$n.json")" "OK"; done
 BAD=0; for f in "$SCRIPTS"/vf-cockpit-*.mjs; do node --check "$f" || BAD=$((BAD+1)); done
 assert_eq "P4.6 — node --check passe sur chaque .mjs du socle" "$BAD" "0"
 printf '%s\n' "const w = 'fiabilite';" > "$WORK/temoin.mjs"
