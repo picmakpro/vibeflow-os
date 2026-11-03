@@ -416,6 +416,42 @@ assert_eq "A13.1 — le STATE nomme beta : la trajectoire et les prochaines phas
 r="$(mut sans-state "$P_" "msList.find((m) => state.milestone && m.key === state.milestone && m.ws === (layout.actif || null) && m.st !== 'done') || " "")"; node "$AUX/q.mjs" "$WORK/mut-sans-state" project "$L9" > "$WORK/g9-mut.json" 2>/dev/null
 assert_eq "A13.2 — mutant « le STATE n'est plus lu » : la trajectoire redevient celle d'alpha, A13.1 le voit" "$r|$(G "$WORK/g9-mut.json" "$FLUX")" "muté|Trajectoire de alpha|n:ph-1"
 
+# ---------- A14 — aucune lecture du graphe Projet n'ouvre un fichier non régulier (famille de read(), 69-01) ----------
+# Un PLAN lié à /dev/zero ou un pointeur active-workstream lié à /dev/zero (git versionne les liens symboliques) ne doit ni bloquer ni remplir la mémoire.
+# Enfant borné par SIGKILL (harnais de E31 de test-cockpit-equipe.sh) ; liens supprimés dans tous les cas.
+cat > "$AUX/borne.mjs" <<'JS'
+// borne.mjs <ms> <commande node et arguments...> : enfant node borné par une limite de temps (SIGKILL, sans tube) ; une ligne JSON { timedOut, status, out }
+import { spawnSync } from 'node:child_process';
+const [, , ms, ...args] = process.argv;
+const r = spawnSync(process.execPath, args, { timeout: Number(ms), killSignal: 'SIGKILL', encoding: 'utf8', maxBuffer: 64 << 20 });
+console.log(JSON.stringify({ timedOut: r.error?.code === 'ETIMEDOUT', status: r.status, out: r.stdout || '' }));
+JS
+L10="$WORK/lab-l10"; B="$L10/.planning"
+printf -- '- [ ] **Phase 1: Un** - a\n' | wr "$B/ROADMAP.md"
+plans "$B/phases/01-a" 01 1 0
+initgit "$L10"
+L11="$WORK/lab-l11"; B11="$L11/.planning"
+printf -- '- [ ] **Phase 1: Un** - a\n' | wr "$B11/workstreams/alpha/ROADMAP.md"
+plans "$B11/workstreams/alpha/phases/01-a" 01 1 0
+initgit "$L11"
+# QB <dossier de scripts> <lab> <expression sur le graphe> : « rendu|<valeur> » ou « bloqué|illisible »
+QB() { node "$AUX/borne.mjs" 6000 "$AUX/q.mjs" "$1" project "$2" > "$WORK/qb.json"; G "$WORK/qb.json" "(j.timedOut?\"bloqué\":\"rendu\")+\"|\"+(()=>{try{const g=JSON.parse(j.out);return $3}catch{return \"illisible\"}})()"; }
+NPLANS='g.files.filter(f=>f.p.endsWith("-PLAN.md")).length'; NNODES='g.nodes.length>0'
+echo "=== A14 — lecture bornée des fichiers du dépôt ==="
+assert_eq "A14.0 — contrôle positif : sans lien spécial, le graphe se rend (1 plan, enfant borné)" "$(QB "$SCRIPTS" "$L10" "$NPLANS")" "rendu|1"
+assert_eq "A14.1 — contrôle positif : lab partitionné sans lien, le graphe se rend" "$(QB "$SCRIPTS" "$L11" "$NNODES")" "rendu|true"
+assert_eq "A14.2 — le source de project.mjs n'a plus de lecture à lui (read partagé de planning)" "$(grep -c 'const read = ' "$SCRIPTS/vf-cockpit-project.mjs")" "0"
+ln -s /dev/zero "$B/phases/01-a/01-02-PLAN.md"; ln -s /dev/zero "$B11/active-workstream"
+mut gardeplan vf-cockpit-planning.mjs "return st.isFile() && st.size <= MAX_LECTURE ? fs.readFileSync(f, 'utf8') : '';" "return fs.readFileSync(f, 'utf8');" >/dev/null
+mut gardepointeur vf-cockpit-paths.mjs "st.isFile() && st.size <= 4096 ? fs.readFileSync(pf, 'utf8').trim() : ''" "fs.readFileSync(pf, 'utf8').trim()" > "$WORK/ancre-pointeur.txt"
+R1="$(QB "$SCRIPTS" "$L10" "$NPLANS")"; M1="$(QB "$WORK/mut-gardeplan" "$L10" "$NPLANS")"
+R2="$(QB "$SCRIPTS" "$L11" "$NNODES")"; M2="$(QB "$WORK/mut-gardepointeur" "$L11" "$NNODES")"
+rm -f "$B/phases/01-a/01-02-PLAN.md" "$B11/active-workstream"
+assert_eq "A14.3 — un PLAN lié à /dev/zero ne bloque pas le graphe Projet (les deux plans sont listés)" "$R1" "rendu|2"
+assert_eq "A14.4 — mutant : lecture sans contrôle du type -> le graphe est bloqué (SIGKILL), détecté" "$M1" "bloqué|illisible"
+assert_eq "A14.5 — un pointeur active-workstream lié à /dev/zero ne bloque pas la résolution du compartiment" "$R2" "rendu|true"
+assert_eq "A14.6 — mutant : pointeur lu sans contrôle (ancre présente) -> bloqué, détecté" "$(cat "$WORK/ancre-pointeur.txt")|$M2" "muté|bloqué|illisible"
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
