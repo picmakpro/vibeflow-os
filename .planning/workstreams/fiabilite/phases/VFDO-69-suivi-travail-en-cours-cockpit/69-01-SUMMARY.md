@@ -45,3 +45,11 @@ Quatre mineurs, tous des témoins manquants ; aucun défaut de code découvert. 
 - A10 (P69-PL-06) : repli sur la règle 2 -> `ph-3` au lieu de `missions`.
 - A11 : `&& !lance` -> `en-cours` au lieu de `a-recetter` ; suffixe décimal retiré -> `{"faits":1,"total":1}|a-recetter` au lieu de `{"faits":1,"total":2}|en-cours` ; tri supprimé -> `MISSION-3` au lieu de `zeta` (appel direct, ordre d'entrée maîtrisé).
 - A12 : le contrat compare `requis` aux clés rendues par `avancement()` (et leurs types) et `missionEtats` au vocabulaire de `etatMission` ; copies sans `requis.reste` / avec `missionEtats` réduit -> `dérive : requis` / `dérive : missionEtats`. A12.3 : égalité de `norm` et `normNum` sur 01, 1, 02.1, 2.10.
+
+## Correction : jalon en cours
+
+- Défaut présent à HEAD fceb88a2 : le cockpit affichait « Trajectoire de equipe-produit-v1.0 » alors que le STATE du compartiment actif nomme `vibeflow-v2.0`. Cause : `active` prenait le premier jalon `active` du ROADMAP.
+- Témoin rouge avant le code (commit `868116e5`, A13) : STATE nomme beta, premier jalon ouvert alpha ; attendu « Trajectoire de beta|n:ph-2 », obtenu « Trajectoire de alpha|n:ph-1 ». Correctif `8fdad186` : le jalon du STATE (même compartiment, non clos) est préféré, sinon le premier en cours. Mutant « STATE non lu » (A13.2) rend alpha. Sur le dépôt réel : « Trajectoire de vibeflow-v2.0 ».
+- Pas de tension avec P69-D-08 : le STATE ne choisit que le jalon mis en avant, jamais l'état d'une phase ni le `st` des jalons (equipe-produit-v1.0 reste `active` par ses phases).
+- Dérive documentaire (`94933794`) : description de `/vf-cockpit` et en-têtes de `00-vibeflow.js`, `70-vf-live.js`, `75-vf-modele.js` citent l'onglet Équipe. check-skills, check-description-fidelity, synchro.sh verifier : rc 0 (fichiers AJOUT non épinglés).
+- Volet 3 : `/equipe.html` sous la garde du flux (`f0ded0fb`, témoins rouges `9da4d796` : EQ.2 « page|false » au lieu de « null|false », EQ.3 200 avec contrat supprimé) ; durée échappée par `h()` dans `row()` (`538c9676`).
