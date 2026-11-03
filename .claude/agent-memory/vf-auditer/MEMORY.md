@@ -9,3 +9,4 @@
 - [Phase 57 verrou par compartiment](project-phase57-verrou-compartiment-audit.md) -- SECURED (2026-10-11) puis 2e passage passed 2026-10-12 (6 lows : R-5 partiel via cd+GIT_DIR, globaux git a argument, pin R-7)
 - [Phase 57 tour 3 : Q4/Q5/Q1/Q6](project-phase57-q45-audit-tour3.md) -- 2026-10-13 HEAD 42d490b1 : formes fermees verifiees, 5 lows (cd+bash -c+add relatif, ReDoS coarse, takeover detruit le perime, quoting G-2)
 - [Phase 57 re-audit AU3 (HEAD 560f4390)](project-phase57-audit-tour4-au3.md) -- 2026-10-13 : AU2 fermes ; trou anterieur `);`+`bash -c` (shlex fusionne) ; lows takeover/watchdog/cout
+- [Phase 67 cockpit, audit 2026-11-01](project-phase67-cockpit-audit.md) — XSS foot + hooks du lab dans claude -p + famille lab piégé ; fermé : CSRF/rebinding/symlink Read

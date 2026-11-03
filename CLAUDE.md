@@ -69,6 +69,7 @@ correctif / durcissement → **patch**. Le tag reprend **exactement** la valeur 
   (description + model + memory requis). Un worker **interne** (dispatché uniquement par un
   orchestrateur) déclare `vf-internal: true` → pas de commande d'incarnation exposée (Pattern 12).
 - **Commits** : messages en français, cohérents avec l'historique du repo.
+- **Design** : toute interface VibeFlow (cockpit, vf-signal) suit `DESIGN.md`, direction « Graphite ».
 - **Traçabilité des arbitrages** : un commit qui invoque une décision humaine nomme le **canal et la
   date** — « arbitrage Samuel, AskUserQuestion session principale, 2026-09-09 ». Un simple
   « arbitrage Samuel » a la même forme qu'il soit vrai ou fabriqué : c'est le lecteur d'après qui
