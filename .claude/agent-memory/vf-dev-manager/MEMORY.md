@@ -89,7 +89,7 @@
 - [Contrat de verdict sans seuil](feedback_contrat-de-verdict-sans-seuil.md) — sans seuil de « passed », un juge rougit au premier mineur : 2 tours de sonde brûlés en 41.4
 - [Commiter avant de rendre](feedback_commiter-avant-de-rendre.md) — 2 workers figés après rédaction, avant commit : exiger le commit avant le rapport, aucun rejeu long en fin de mandat
 - [`git log` via rtk masque les merges](project_rtk-git-log-masque-les-merges.md) — pointe d'origin/main lue fausse (2aa307df au lieu du merge 0c14757b) : SHA de base par `git rev-parse`
-- [Attendre un worker : sleep bloqué](project_attendre-un-worker-sleep-bloque.md) — une boucle `until … sleep` rend instantanément ; attendre par `python3 time.sleep` + heartbeat
+- [Attendre un worker : sleep bloqué](project_attendre-un-worker-sleep-bloque.md) — `until … sleep` rend instantanément ; `python3 time.sleep` en tranches ≤ 170 s (au-delà : bascule en fond)
 - [Rapport de mission = fichier versionné](feedback_rapport-de-mission-passe-les-gates.md) — un chemin absolu dans le bloc E6 a rougi gates+tests après une livraison verte : `check-machine-paths` avant push
 - [Porte de décisions et ids préfixés](project_porte-decisions-gsd-ids-prefixes.md) — check.decision-coverage-plan rend could-not-parse sur P57-D-NN : rejouer sur un miroir D57-NN, rouge avant / vert après
 - [Archivage auto dans l'arbre partagé](project_archivage-auto-dans-l-arbre-partage.md) — un diff .planning/archives ou ROADMAP non produit par la mission se restaure, jamais ne se commite (revert 2026-10-10, #143)
@@ -103,3 +103,10 @@
 - [Pile de phases, main qui bouge](project_phases-empilees-main-qui-bouge.md) — chaque merge d'autrui = rebase en chaîne + CI 55 min ; REQUIREMENTS en union, rebaser une fois avant la CI utile
 - [Nettoyeur de test qui tue tout](project_hygiene-test-tue-tout-awk-env.md) — crash 2026-11-02 : env préfixé sur ps pas awk + index vide=1 macOS ; marque validée, plafond, preuve à sec, leurre
 - [Rouge CSS Linux seulement : pointer, pas polices](project_chrome-headless-linux-pointer-none.md) — Chrome headless Linux = pointer: none ; replay --job tests ne rejoue plus rien (matrice)
+- [Guard du verrou juge l'arbre principal](project_guard-verrou-juge-l-arbre-principal-depuis-un-worktree.md) — commit d'un worktree refusé sous le verrou d'une autre mission : arbitrage du marqueur dans le mandat initial, ou commit par le manager
+- [Rejeu tests sous HOME temporaire](project_rejeu-tests-home-temporaire-3-suites-moteur.md) — 3 suites rougissent sur « moteur introuvable » : artefact, rejouer avec le moteur réel ; `ps` proxifié rend vide
+- [Dérogation relayée : les workers refusent](feedback_derogation-relayee-par-agent-refusee-par-les-workers.md) — accord humain cité par un agent = invérifiable ; commit-pret.sh exécuté par la session qui détient l'accord
+- [E2E-C5 : plafond dur à 250 lignes](project_e2e-c5-plafond-250-lignes.md) — test-roles-e2e rougit à 251 alors que check-agents et le budget restent verts ; prévoir le retrait compensatoire
+- [Guard lock juge l'arbre principal](project_guard-lock-evalue-arbre-principal-en-worktree.md) — en worktree .claude/worktrees, refus de commit fantôme sur les non-suivis du principal
+- [Runner Ubuntu 26 = uutils](project_runner-ubuntu-26-uutils.md) — depuis 2026-10-19, `-h` = --help en CI : les copies gelées `ln -sh` cassent en silence ; juger sous BSD, GNU ET uutils
+- [Lire l en-tête de la suite avant d y loger un test](feedback_lire-l-en-tete-de-la-suite-avant-d-y-loger-un-test.md) — le brief visait la suite plate GELÉE (P57-D-03) : preuve partitionnée = suite -ws + mutant

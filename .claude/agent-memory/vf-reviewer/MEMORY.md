@@ -33,3 +33,6 @@
 - [Silence casse la suite soeur](feedback_silencing-output-breaks-sibling-witness-suite.md) — Phase 61 tour 2 : deux-clones 16/16 -> 14/16, sortie supprimee = temoin de declenchement perdu
 - [Assouplir une garde : muter la clause voisine](feedback_assouplir-garde-muter-clause-voisine.md) — Phase 60 tour 2 : après un assouplissement de conduite, muter la clause voisine inchangée et rejouer le moteur réel hors gabarit
 - [Affectation de tête : formes de quote qui fuient](feedback_head-assignment-skip-quote-forms.md) — resume() cockpit-who D3 : $'..', (..), \" interne ; garde interne non mutée (revue-fb2)
+- [Seuil en octets + ancres de prompt](feedback_byte-threshold-accents-and-prompt-anchor-tests.md) — revue-59 : placeholders FR accentues passent un seuil LC_ALL=C ; ancres presence-seule non discriminantes
+- [Remplacer une prescription : garder sa mitigation](feedback_replace-prescription-keep-its-mitigation.md) — #81 : heartbeat retire de l attente, TTL 1800 s non couvert
+- [Gate à lecture partielle sans effet sur le code](feedback_gate-partial-read-warning-only.md) — compteur non_reconnues sans effet + juge qui l ignore (check-prd, Phase 59) ; livrable brief seul = impasse rc 3
