@@ -31,7 +31,7 @@ function lireArgs(argv) {
     else if (VERBES.includes(a)) o.verbe = a;
     else return { erreur: `argument inconnu : ${a}` };
   }
-  if (o.port !== null && !/^\d{1,5}$/.test(String(o.port))) return { erreur: `port invalide : ${o.port}` };
+  if (o.port !== null && !(/^\d{1,5}$/.test(String(o.port)) && Number(o.port) >= 1024 && Number(o.port) <= 65535)) return { erreur: `port invalide : ${o.port}` };
   return o;
 }
 

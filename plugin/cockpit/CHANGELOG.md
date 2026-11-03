@@ -67,3 +67,6 @@ AskUserQuestion session principale, 2026-11-01.
 - **`claude -p` confiné aussi côté réglages** — `--setting-sources ""` (ni hooks du lab ou de l'utilisateur, ni règle `allow`) et `--strict-mcp-config`, mesurés.
 - **Robustesse** — une question courante ne fait plus tomber le serveur, la page rechargée est à jour après un patch, verrou tenu visible en lab plat,
   lab sans code assemblé, masque des secrets étendu, corps JSON non objet refusé, `<!--` neutralisé, timeouts partout.
+
+### Corrigé (relecture adverse SOBR-04 de v2.75.0, avant la publication ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-03, « Corriger maintenant »)
+- **`--port` borné à 1024..65535** (F1) — `--port 99999` lançait un serveur qui ne pouvait pas écouter, survivait sans `server.json` et échappait à `stop` ; le lanceur refuse maintenant tout port hors bornes (code 64) avant de lancer quoi que ce soit. Test `PS.12` de `test-cockpit-serveur.sh`.

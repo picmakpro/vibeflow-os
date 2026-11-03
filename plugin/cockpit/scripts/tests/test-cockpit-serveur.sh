@@ -226,6 +226,16 @@ else
   echo "  SKIP — PS.11 : système de fichiers sensible à la casse ($(uname -s)), deux casses d'un chemin sont deux dossiers distincts : cas non applicable ici, vérifié sous macOS seulement"
 fi
 
+# F1 (relecture SOBR-04 de v2.75.0) : --port borné à 1024..65535 par le lanceur, AVANT tout lancement. Hors bornes : code 64 (usage), aucun serveur, aucun server.json.
+# 1024 et 65535 passent le parseur : vérifié par `status` (même parseur, ne lance rien) — code 0 au lieu de 64.
+P12="$WORK/ps12"; mkdir -p "$P12"; mkplab "$P12"
+RC12=""; for bad in 0 1023 65536 99999 123456 -1 abc; do node "$SCRIPTS/vf-cockpit.mjs" open --no-open --port "$bad" --lab "$P12" >/dev/null 2>"$WORK/ps12.err"; RC12="$RC12$?,"; done
+assert_eq "PS.12 — --port 0, 1023, 65536, 99999, 123456, -1, abc : refusés avec le code d'usage 64" "$RC12" "64,64,64,64,64,64,64,"
+assert_has "PS.12b — témoin : le refus nomme le port et rappelle l'usage" "$(cat "$WORK/ps12.err")" "port invalide : abc"
+assert_eq "PS.12c — aucun serveur lancé pour ces refus : ni server.json ni dossier de sortie" "$([ -e "$P12/.vibeflow/cockpit/.cache/server.json" ] && echo json; [ -e "$P12/.vibeflow/cockpit" ] && echo sortie; echo fin)" "fin"
+RC12B=""; for ok in 1024 65535; do node "$SCRIPTS/vf-cockpit.mjs" status --port "$ok" --lab "$P12" >/dev/null 2>&1; RC12B="$RC12B$?,"; done
+assert_eq "PS.12d — --port 1024 et 65535 passent le parseur (status : jamais 64)" "$RC12B" "0,0,"
+
 vf_hyg_assert
 echo ""
 echo "=================================="
