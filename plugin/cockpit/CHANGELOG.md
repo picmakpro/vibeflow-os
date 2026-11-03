@@ -1,5 +1,38 @@
 # Changelog — cockpit
 
+## v1.3.0 — 2026-11-04 — non publié
+
+Phase 71 : terminal intégré. Décisions : arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-03,
+pour P71-D-01 à P71-D-08 et P71-D-23 ; décisions du manager (vf-dev-manager, 2026-11-03) pour P71-D-09 à P71-D-22 et P71-D-24
+(O1 à O11 tranchées par P71-D-20 et P71-D-21 ; P71-D-22, d'abord provisoire, est devenue définitive par P71-D-23). Les gestes de
+release racine (version, tag, release GitHub) restent humains. Numéro de version recalculé à la fusion avec les Phases 68 et 70 (P71-PL-12) : mineure suivante de la v1.2.1 de main.
+
+### Ajouté — Terminal intégré (Phase 71)
+- **`--terminal`** — le lanceur ouvre un shell de votre compte dans un tiroir en bas des pages Projet et Code, dans la même
+  fenêtre : `$SHELL -l` dans la racine du lab, `claude` y tourne avec son `CLAUDE.md` et ses skills (P71-D-01, D-03, D-04, D-06,
+  D-08). Désactivé par défaut : sans le drapeau, aucun port, aucune route, aucun tiroir, politique de contenu de la v1.0.x
+  (P71-D-02).
+- **Second serveur d'une autre origine** (`127.0.0.1`, port éphémère) rendu dans un cadre ; sortie par `fetch` en flux, entrées
+  par `POST`, pas de WebSocket (P71-D-09) ; `Host`, `Origin` et secret contrôlés sur chaque requête (P71-D-10, P71-D-24).
+- **Amorçage à usage unique** (fichier 0600 effacé à l'échange, fragment d'adresse effacé), secret de session dans le stockage de
+  la page du terminal, jamais de cookie (P71-D-11 à D-13).
+- **Assistant PTY en Python standard** lancé isolé (`python3 -I`), redimensionnement, Ctrl-C ; une session, grâce de 30 s,
+  tampon de reprise de 256 Kio en mémoire ; `TERM=xterm-256color` et `COLORTERM=truecolor` posés toujours (P71-D-05, D-06,
+  D-23). Windows : indisponible (P71-D-07).
+- **xterm.js 6.0.0 et addon-fit 0.11.0 vendorisés** (MIT, sha256, licences), aucun addon presse-papiers, séquences OSC 52,
+  OSC 8, DCS et DECRQSS neutralisées (P71-D-16) ; canal de la page du terminal vers la page Projet limité à une liste fermée de
+  valeurs fixes (P71-D-18) ; thème par paramètre d'adresse (P71-D-19).
+- **Patch amont `P25` de `serve.mjs`** (`vibeflow P25`, diff dans `amont/patches/`), `AJOUT` des fichiers xterm et de l'assistant
+  dans `VENDORED.txt`.
+- **Suites** : `test-cockpit-terminal-activation.sh`, `-serveur.sh`, `-pty.sh`, `-session.sh`, `-page.sh`, `-client.sh`,
+  `-tiroir.sh`, `-xterm.sh`, `-xss.sh`, `-lanceur.sh` (dix suites) ; `test-cockpit-chaine-xss.sh` et `test-cockpit-vendor.sh`
+  étendues.
+
+### Limites connues
+- Voir la section « Limites connues » du README : limite de fond (votre compte, dépôt potentiellement hostile, extensions de
+  navigateur), processus détachés, reprise du plein écran, déni de service du cadre par la page Projet, Windows, Safari et Firefox
+  non mesurés.
+
 ## v1.2.2 — 2026-11-04
 
 Phase 70 : finitions de l'interface. Décisions : P70-D-01 à P70-D-07 et P70-D-16, arbitrages Samuel, AskUserQuestion session principale,

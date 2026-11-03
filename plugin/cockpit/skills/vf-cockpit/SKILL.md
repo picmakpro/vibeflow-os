@@ -17,7 +17,7 @@ l'agent `claude -p` confiné qui répond aux questions de l'onglet Projet.
    sinon `$HOME/.claude/scripts/vf-cockpit.mjs` (pose `user`).
 2. Exécuter `node <lanceur> <argument>` depuis la racine du lab ; l'argument vaut `open` par défaut, ou `build`
    (assemble sans serveur), `stop` (arrête le serveur), `status` (adresse et PID, ou « arrêté »). Options :
-   `--lab <dossier>`, `--no-open`, `--port <p>`, `--rebuild`.
+   `--lab <dossier>`, `--no-open`, `--port <p>`, `--rebuild`, `--terminal` (ouvre aussi un terminal dans le tiroir, macOS et Linux ; le cockpit n'est alors plus en lecture seule : le terminal est un shell du compte).
 3. Relayer l'adresse imprimée : `Cockpit : <adresse>/ (Code) · <adresse>/project.html (Projet)`.
 
 Codes de sortie : 0 succès · 2 lab sans `.planning/` · 3 moteur absent (réinstaller le module) · 4 assemblage en

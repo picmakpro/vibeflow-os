@@ -3,17 +3,17 @@
 > Une page locale, en lecture seule, qui dit où en est le lab : jalons, phases (à faire, en cours, à recetter, faites), plans,
 > exigences, missions, et qui travaille en ce moment, en arbre. Ouverte par `/vf-cockpit`.
 
-**Type** : skill + scripts + moteur vendorisé · **Version** : v1.2.2 · **Dépend de** : aucun module (lit le verrou de `conductor` s'il est posé)
+**Type** : skill + scripts + moteur vendorisé · **Version** : v1.3.0 · **Dépend de** : aucun module (lit le verrou de `conductor` s'il est posé)
 
 ## Ce que ça donne
 
 Trois onglets sur une même page servie en local : **Projet** (la vie du lab, calculée depuis `.planning/`), **Équipe** (qui
-travaille, en arbre) et **Code** (la carte du code). Lecture seule : le module n'écrit jamais dans `.planning/`.
+travaille, en arbre) et **Code** (la carte du code). Lecture seule : le module n'écrit jamais dans `.planning/`. Exception à « en lecture seule » : quand il est lancé avec `--terminal`, le cockpit ouvre aussi un **shell de votre compte** dans un tiroir en bas des pages Projet et Code (voir « Terminal intégré »). Ce shell écrit où vous le décidez ; le cockpit lui-même reste sans écriture dans `.planning/`.
 
 ## Ouvrir
 
 ```bash
-node .claude/scripts/vf-cockpit.mjs [open|build|stop|status] [--lab <dossier>] [--no-open] [--port <p>] [--rebuild]
+node .claude/scripts/vf-cockpit.mjs [open|build|stop|status] [--lab <dossier>] [--no-open] [--port <p>] [--rebuild] [--terminal]
 ```
 
 Le verbe `/vf-cockpit` lance ce script (poses `project` et `local`) ou `$HOME/.claude/scripts/vf-cockpit.mjs` (pose `user`).
@@ -30,6 +30,10 @@ Le verbe `/vf-cockpit` lance ce script (poses `project` et `local`) ou `$HOME/.c
 | 5 | serveur non démarré (journal : `.vibeflow/cockpit/.cache/serveur.log`) |
 
 Le cockpit d'un lab écoute toujours sur le même port : un port préféré dérivé de l'empreinte de la racine du lab, dans la plage 4378 à 4477. Il ne dépend ni de l'ordre de lancement ni du nombre de labs ouverts. Si ce port est pris par un autre processus, le serveur prend le suivant (jusqu'à 20 essais), et ce choix est le même à chaque lancement tant que l'état des ports ne change pas. `--port <p>` garde la priorité.
+
+### Terminal intégré (`--terminal`)
+
+Sans `--terminal`, rien de ce qui suit n'existe : aucun second écouteur, aucune route, aucun tiroir, la politique de contenu de la page est celle de la v1.0.x. Avec `--terminal` (macOS et Linux, `python3` requis), le lanceur ouvre le cockpit dans le même onglet et la page Projet porte une pastille « Terminal » en bas à gauche ; un clic ou **Ctrl+Maj+Espace** ouvre un tiroir qui s'étend au bas des pages Projet et Code (hauteur réglable à la souris et au clavier, mémorisée). Le shell est `$SHELL -l`, lancé dans la racine du lab (on y `cd` librement), avec tout l'environnement du serveur sauf `CLAUDECODE`, `CLAUDE_CODE_*`, `VF_COCKPIT_*` et les valeurs de jeton du cockpit ; `TERM=xterm-256color` et `COLORTERM=truecolor` sont posés toujours (P71-D-23). `claude` y tourne normalement, avec le `CLAUDE.md` du dépôt et ses skills ; les commandes VibeFlow aussi. Il n'y a qu'une session par serveur (une seconde est refusée) ; elle survit 30 s à un rechargement de la page, avec un tampon de reprise de 256 Kio gardé en mémoire seulement ; passé le délai, ou à l'arrêt du serveur, le shell reçoit SIGHUP. Un terminal ouvert empêche l'arrêt du serveur sur inactivité. Relancer `open --terminal` sur un cockpit déjà vivant sans terminal le redémarre avec le drapeau ; sur un cockpit déjà vivant avec terminal, il rend un nouvel amorçage au même serveur. Windows : « Terminal indisponible sous Windows. » (aucun second serveur).
 
 ## Les trois onglets
 
@@ -104,6 +108,14 @@ l'agent qui répond aux questions. Le lab observé n'est jamais une source de co
 « modifier le plan » n'exécute que le moteur du module), aucun lien symbolique de la sortie n'est suivi, et la page porte une
 Content-Security-Policy (scripts en ligne par empreintes, `connect-src 'self'`). Hypothèse assumée : une machine à un seul utilisateur
 (le jeton est servi à tout processus local, `.cache/server.json` est en 0600).
+
+**Avec `--terminal`**, ce qui circule et ce qui ne circule pas :
+
+- Un **second serveur** écoute sur `127.0.0.1` seulement, sur un port éphémère : une autre origine que la page Projet, rendue dans un cadre du tiroir. La page Projet ajoute `frame-src` (cette origine exacte) à sa politique de contenu, et seulement avec le drapeau ; la page du terminal a sa propre politique stricte (scripts par empreintes, `connect-src 'self'`, `frame-ancestors` = les origines de la page Projet). Chaque requête au second serveur est contrôlée : `Host`, `Origin` exacte (les `GET` de même origine qui n'envoient pas `Origin` sont admis sous `Sec-Fetch-Site: same-origin` et secret valide, P71-D-24) et secret en en-tête, comparé en temps constant ; aucun shell n'est lancé avant ce contrôle. Pas de WebSocket : la sortie arrive par un flux `fetch`, l'entrée et le redimensionnement par `POST`.
+- Le **jeton d'amorçage** est à usage unique : le lanceur l'écrit dans `.vibeflow/cockpit/.cache/terminal-amorce` (mode 0600, création exclusive, aucun lien suivi), le passe dans le fragment de l'adresse d'ouverture, et le fichier est effacé à l'échange. Il n'est jamais servi par HTTP, ni écrit dans `serveur.log`, `server.json`, le flux d'événements ou l'export. Le **secret de session** qui lui succède ne vit que dans le stockage de la page du terminal : jamais de cookie, jamais dans une adresse, inaccessible depuis la page Projet.
+- Rien du terminal (frappes, sortie, tampon de reprise) n'est écrit sur disque ni dans le journal, le flux d'événements ou l'export ; le tampon est vidé à la fin de la session. Le tiroir n'est injecté qu'à la volée, avec le drapeau : il n'est jamais dans la page écrite sur disque ni dans l'export.
+- La page du terminal peut envoyer à la page Projet des messages de valeur fixe tirés d'une liste fermée (sortie du focus clavier, état de la session, terminal joignable), avec l'origine cible exacte ; jamais un octet du shell, un jeton ou un secret. Le sens inverse est fermé.
+- Le shell garde son historique comme tout terminal : c'est celui de votre compte.
 
 ## Sortie dans le lab
 
@@ -241,7 +253,19 @@ chaque patch, ajout et retrait dans `VENDORED.txt`. Vérifier : `bash plugin/coc
   machine à un seul utilisateur).
 - CI, merge et PR ne sont jamais lus (aucun appel réseau) : l'état « à recetter » vient des seuls fichiers de `.planning/`.
 - Les libellés de la « dernière action » sont provisoires (table fermée de verbes, à valider).
-
+- **Limite de fond du terminal.** Le terminal, c'est votre compte, dans un dépôt potentiellement hostile : un prompt git, `direnv`, des hooks peuvent exécuter du code du dépôt dès l'ouverture. Une extension de navigateur ayant accès à `http://127.0.0.1/*` lit et pilote toute page locale. Le serveur ne peut fermer ni l'un ni l'autre.
+- **Windows** : le terminal est indisponible (le reste du cockpit n'est pas mesuré sous Windows non plus).
+- P71-D-15 : la page Projet peut renvoyer le cadre du terminal vers `about:blank` et le vider ; ce déni de service du cadre est accepté (le flux est alors coupé : la session suit la règle des 30 s, recharger la page dans ce délai la reprend, au-delà elle est fermée).
+- O5 : après un rechargement, une application plein écran (`claude`, un éditeur) peut s'afficher fausse jusqu'à son prochain redessin ; l'historique rejoué est borné à 256 Kio, ce qui est perdu à la bascule de thème aussi (le cadre est rechargé).
+- F4 : tiroir fermé, puis page rechargée après plus de 30 s : la session est fermée, car le cadre qui la tenait n'existe plus ; fermer le tiroir sans recharger ne coûte rien.
+- A4 : l'amorçage passe une fraction de seconde dans les arguments de la commande d'ouverture du navigateur (visible d'un autre processus du compte) ; hypothèse mono-utilisateur, comme M7.
+- A5 : un processus détaché volontairement (`nohup`, `setsid`, `disown`) survit par nature à la fin de la session ; un travail d'arrière-plan d'un shell qui ne relaie pas SIGHUP (`dash`) peut aussi survivre. Les autres sont arrêtés (mesuré avec `bash`, `zsh` et `sh` sous macOS).
+- A6 : « dupliquer l'onglet » peut copier l'identifiant d'onglet de la session : l'onglet dupliqué reprend alors la session au lieu d'être refusé.
+- O6 : la page Projet ouverte par `localhost` (au lieu de `127.0.0.1`) désactive le tiroir, avec un message : le stockage y est cloisonné autrement ; utiliser `127.0.0.1`.
+- O8 : les liens du terminal (OSC 8) ne s'ouvrent que sur clic, dans un nouvel onglet en `noopener` ; le cadre est en `sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"`, sans `allow-top-navigation` ni `allow`.
+- F6 : la sortie du terminal n'est pas exposée au lecteur d'écran (terminal DOM sans mode lecteur), et le texte atténué du terminal reste sous 4,5:1 par nature.
+- A7 : seul Chrome est mesuré par les suites ; Safari et Firefox relèvent de la recette humaine (raccourci Ctrl+Maj+Espace, stockage du cadre).
+- Marge basse de la page Projet : la page Projet est la même vue que la carte, sans conteneur défilant ; seule la barre de question monte de la hauteur du tiroir. À contrôler en recette.
 - Le format interne de Claude Code (session « au travail ») est surveillé : s'il change, l'état passe à `forme-inconnue` au
   lieu de mentir.
 - La surveillance récursive de fichiers est mesurée sur macOS et en CI Linux seulement ; Windows n'est pas mesuré.
