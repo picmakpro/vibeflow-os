@@ -12,10 +12,10 @@ export function vueTerminal(cfg) {
   };
   const bouton = (texte, action) => { const b = el('button', 'vf-q-bouton', texte); b.type = 'button'; b.addEventListener('click', () => action && action()); return b; };
   const zone = () => document.getElementById('etat');
-  const vider = () => { const z = zone(); while (z.firstChild) z.removeChild(z.firstChild); return z; };
+  const vider = () => { const z = zone(); while (z.firstChild) z.removeChild(z.firstChild); document.getElementById('terminal').classList.remove('vf-q-cache'); return z; };
   const COMMANDE = '/vf-cockpit --terminal';
   const CARTES = {
-    refuse: { role: 'status', titre: 'Terminal déjà ouvert', corps: ['Un terminal est déjà ouvert dans un autre onglet. Fermez-le, puis réessayez.'], bouton: 'Réessayer', d: 'M3 3h10v10H3z M6 8h4' },
+    refuse: { role: 'status', masque: true, titre: 'Terminal déjà ouvert', corps: ['Un terminal est déjà ouvert dans un autre onglet. Fermez-le, puis réessayez.'], bouton: 'Réessayer', d: 'M3 3h10v10H3z M6 8h4' },
     expire: { role: 'alert', titre: 'Session expirée', corps: ['Relancez ', COMMANDE, '.'], d: 'M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2z M8 5v3.5l2 1.5' },
     arrete: { role: 'alert', titre: 'Serveur arrêté', corps: ['Le cockpit est arrêté. Relancez ', COMMANDE, '.'], d: 'M8 2v6 M4.5 4.5a5 5 0 1 0 7 0' },
   };
@@ -41,9 +41,14 @@ export function vueTerminal(cfg) {
       z.appendChild(el('div', 'vf-q-voile'));
       const k = el('div', 'vf-q-carte'); k.setAttribute('role', c.role); k.tabIndex = -1;
       k.appendChild(picto(c.d)); k.appendChild(el('h1', 'vf-q-titre', c.titre));
-      const corps = el('p', 'vf-q-corps'); for (const t of c.corps) corps.appendChild(t === COMMANDE ? el('span', 'vf-q-commande', t) : document.createTextNode(t)); k.appendChild(corps);
+      const corps = el('p', 'vf-q-corps');
+      c.corps.forEach((t, i) => { // la commande et le point qui la suit sont un seul bloc insécable : jamais coupée, jamais décollée de son point
+        if (t === COMMANDE) { const b = el('span', 'vf-q-insecable'); b.appendChild(el('span', 'vf-q-commande', t)); if (c.corps[i + 1] === '.') b.appendChild(document.createTextNode('.')); corps.appendChild(b); }
+        else if (!(t === '.' && c.corps[i - 1] === COMMANDE)) corps.appendChild(document.createTextNode(t));
+      });
+      k.appendChild(corps);
       const b = c.bouton ? bouton(c.bouton, action) : null; if (b) k.appendChild(b);
-      z.appendChild(k); (b || k).focus();
+      z.appendChild(k); if (c.masque) document.getElementById('terminal').classList.add('vf-q-cache'); (b || k).focus(); // masque : sous la carte « déjà ouvert » aucun terminal vide ni curseur
     },
     bandeau(type, detail, action) {
       const z = vider(); z.hidden = false;

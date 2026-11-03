@@ -45,12 +45,15 @@ button { font: inherit; color: inherit; }
 #terminal { position: fixed; inset: 0; padding: 8px 12px; background: var(--surface); }
 #terminal .xterm { height: 100%; }
 :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+#terminal.vf-q-cache { visibility: hidden; }
 #etat[hidden] { display: none; }
+.vf-q-carte:focus-visible { outline: none; }
 .vf-q-voile { position: fixed; inset: 0; background: rgba(var(--ink), .06); }
 .vf-q-carte { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 7px; padding: 16px 18px; background: var(--raise); border-radius: var(--r-card); box-shadow: 0 0 0 1px var(--hair-2); }
 .vf-q-carte svg.i { width: 16px; height: 16px; fill: none; stroke: var(--text-3); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .vf-q-titre { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.015em; color: var(--text); }
 .vf-q-corps { margin: 0; font-size: 12.5px; font-weight: 400; line-height: 1.5; color: var(--text-2); }
+.vf-q-insecable { white-space: nowrap; }
 .vf-q-commande { font-family: var(--mono); font-size: 12px; padding: 1px 6px; border-radius: 8px; background: var(--raise-2); user-select: all; }
 .vf-q-bandeau { position: fixed; left: 0; right: 0; bottom: 0; margin: 8px; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 14px; background: var(--raise); border-radius: var(--r-ctl); border: 1px solid var(--hair-2); }
 .vf-q-pastille { width: 8px; height: 8px; border-radius: 999px; flex: none; background: var(--text-4); }

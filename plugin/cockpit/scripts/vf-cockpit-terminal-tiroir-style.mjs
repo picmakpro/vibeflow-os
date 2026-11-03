@@ -24,7 +24,9 @@ export const STYLE_TIROIR = `
 .vf-term-espace { flex: 1; }
 .vf-term-bouton { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: var(--text-2); cursor: pointer; transition: background .15s, color .15s; }
 .vf-term-bouton:hover { background: var(--raise-2); color: var(--text); }
-.vf-term-pastille:focus-visible, .vf-term-poignee:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.vf-term-pastille:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.vf-term-poignee:focus-visible { outline: none; }
+.vf-term-poignee:focus-visible .vf-term-grip { outline: 2px solid var(--ring); outline-offset: 2px; }
 .vf-term-bouton:focus-visible, .vf-term-zone iframe:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .vf-term-zone { position: relative; flex: 1; min-height: 0; background: var(--surface); }
 .vf-term-zone iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--surface); }
@@ -36,11 +38,13 @@ export const STYLE_TIROIR = `
 body.resizing { user-select: none; }
 body.resizing .vf-term-zone iframe { pointer-events: none; }
 .vf-term-carte { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100% - 32px)); padding: 16px 18px; border-radius: var(--r-card); background: var(--raise); border: 1px solid var(--hair-2); font: 400 12.5px/1.5 var(--sans); color: var(--text-2); }
+.vf-term-insecable { white-space: nowrap; }
 .vf-term-carte code { font: 400 12px var(--mono); padding: 1px 6px; border-radius: 8px; background: var(--raise-2); color: var(--text); }
 .vf-term-annonce { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 body.vf-term-ouvert #ask { bottom: calc(var(--vf-term-h, 0px) + 28px); }
 @media (max-width: 999px), (pointer: coarse) { .vf-term-tiroir { left: 8px; right: 8px; bottom: 8px; } }
 @media (max-width: 700px) { .vf-term-pastille, .vf-term-puce { bottom: 72px; } }
+@media (pointer: coarse) { .vf-term-barre { height: 52px; } .vf-term-bouton { width: 44px; height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .vf-term-tiroir.vf-term-entree { animation: none; } .vf-term-grip, .vf-term-pastille, .vf-term-bouton { transition: none; } }
 html.theme-switching .vf-term-tiroir, html.theme-switching .vf-term-tiroir * { animation: none !important; transition: none !important; }
 `;

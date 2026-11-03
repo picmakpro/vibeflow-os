@@ -35,6 +35,7 @@ export function construireTiroir(document, textes) {
   const annonce = el('div', 'vf-term-annonce'); annonce.setAttribute('role', 'status'); annonce.setAttribute('aria-live', 'polite');
   const puce = el('div', 'vf-term-puce'); puce.setAttribute('role', 'status');
   const carteInjoignable = el('div', 'vf-term-carte'); carteInjoignable.setAttribute('role', 'alert'); carteInjoignable.tabIndex = -1;
-  carteInjoignable.appendChild(document.createTextNode(textes.injoignable)); carteInjoignable.appendChild(el('code', '', textes.commande)); carteInjoignable.appendChild(document.createTextNode('.'));
+  carteInjoignable.appendChild(document.createTextNode(textes.injoignable));
+  const colle = el('span', 'vf-term-insecable'); colle.appendChild(el('code', '', textes.commande)); colle.appendChild(document.createTextNode('.')); carteInjoignable.appendChild(colle); // commande et point final ne se coupent jamais
   return { pastille, point, region, barre, etatPoint, etatTexte, boutonPlein, boutonFermer, poignee, emplacementCadre, charge, annonce, puce, carteInjoignable };
 }

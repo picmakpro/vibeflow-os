@@ -7,6 +7,9 @@
 #         et retour du focus · TU.5 poignée au clavier, rechargement · TU.6 Agrandir · TU.7 glissement souris · TU.8 thème par l'adresse du cadre · TU.9 O6 localhost
 #         · TU.10 puce Windows · TU.11 injoignable après 8 s · TU.12 page hors Projet et Code
 #   T8    T8.2 tiroir ouvert : 0 violation de CSP, ready reçu · T8.3 sans frame-src : violation, aucun ready (M-FRAMESRC)
+#   T20   critique design 71 (lot A1) : J1 libellé de la barre = état de la carte (refusé, expiré) · J4 focus de la poignée sur le grip · J5 commande et point jamais coupés
+#         (cartes de P et de Q, balayage de largeurs) · J6 aucun terminal sous la carte « déjà ouvert » · J7 boutons de la barre >= 44 px sous pointer: coarse · J13 pas de bague
+#         de focus sur une carte d'alerte focalisée par programme
 #   T17   T17.1 témoin (messages réels de Q) · T17.2 postMessage de P ignoré · T17.3 MessageEvent forgé ignoré · T17.5 espion : liste fermée, aucun octet du shell (M-MSG-DONNEE)
 # Mesure O8 (71-06-SUMMARY, MESURE-O8 minimal=bloque popups=ouvert opener=nul) + décision du manager : cinq jetons de sandbox, aucun autre.
 # Sans Chrome : les sections statiques tournent, la suite annonce « SUITE SAUTÉE (navigateur) ». VF_TIROIR_MS : échéance d'une attente (20000). Exit 0 si tout passe, 1 sinon.
@@ -83,7 +86,7 @@ http.createServer((q, r) => {
 }).listen(Number(port), '127.0.0.1');
 JS
 cat > "$AUX/chrome-tiroir.mjs" <<'JS'
-// chrome-tiroir.mjs <chrome> <mode> <json> : scénarios navigateur du tiroir ; UNE ligne JSON. Modes : sans · flag · donnee · froid · localhost · page.
+// chrome-tiroir.mjs <chrome> <mode> <json> : scénarios navigateur du tiroir ; UNE ligne JSON. Modes : sans · flag · donnee · froid · localhost · page · etats.
 // Chaque étape est isolée (essai) ; en mode flag, la première étape en échec arrête le reste (les mesures absentes sont nommées dans `erreurs`).
 // Gestes par Input.dispatchMouseEvent / Input.dispatchKeyEvent seulement. Le secret de session n'apparaît jamais en sortie.
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import { execFileSync } from 'node:child_process';
@@ -113,6 +116,22 @@ await executer(chrome, async (s) => {
   const raccourci = () => touche(' ', 'Space', 32, 10);
   const texte = (sel) => s.ev(`(document.querySelector(${JSON.stringify(sel)}) || {}).textContent || ''`);
 
+  // J5 : la commande ne se coupe jamais et le point final reste sur sa ligne ; balayage de largeurs de fenêtre (le renvoi à la ligne en dépend)
+  const COUPURE = (cmd, corps) => `(() => { const c = document.querySelector(${JSON.stringify(cmd)}); const k = document.querySelector(${JSON.stringify(corps)}); if (!c || !k) return null;
+    const w = document.createTreeWalker(k, NodeFilter.SHOW_TEXT); let n, dernier = null; while ((n = w.nextNode())) dernier = n; if (!dernier || dernier.data.slice(-1) !== '.') return { sansPoint: true };
+    const rg = document.createRange(); rg.setStart(dernier, dernier.data.length - 1); rg.setEnd(dernier, dernier.data.length); const p = rg.getBoundingClientRect(), rs = c.getClientRects(), d = rs[rs.length - 1];
+    return { coupee: rs.length > 1, decolle: Math.abs(p.top - d.top) > d.height / 2, larg: Math.round(k.getBoundingClientRect().width) }; })()`;
+  const balayer = async (cmd, corps, largeurs) => {
+    const mal = [], vus = new Set();
+    for (const W of largeurs) {
+      await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: 800, deviceScaleFactor: 1, mobile: false }); await pause(150);
+      const m = await s.ev(COUPURE(cmd, corps)); if (!m || m.sansPoint) throw new Error(`carte illisible à ${W} px`);
+      vus.add(m.larg); if (m.coupee || m.decolle) mal.push(`${W}:${m.coupee ? 'coupee' : ''}${m.decolle ? 'decolle' : ''}`);
+    }
+    return { mal, largeurs: vus.size };
+  };
+  const LARGEURS = [260, 280, 300, 320, 340, 360, 380, 400];
+
   if (mode === 'sans' || mode === 'localhost' || mode === 'page') {
     const url = mode === 'sans' ? `${OP}/${A.chemin || ''}` : mode === 'localhost' ? `http://localhost:${A.P}/project.html` : `http://127.0.0.1:${A.T}${A.chemin}`;
     await essai('page', async () => { await s.naviguer(url); await att(`document.readyState === 'complete'`, 'page chargée'); });
@@ -129,8 +148,42 @@ await executer(chrome, async (s) => {
   if (mode === 'froid') {
     await essai('ouverture', async () => { await s.naviguer(`${OP}/project.html`); await att(`!!document.querySelector('button.vf-term-pastille')`, 'pastille'); await clic('button.vf-term-pastille'); });
     if (A.attendre === 'carte') await essai('carte', () => att(`!!document.querySelector('.vf-term-carte') && document.querySelector('.vf-term-carte').textContent.length > 0`, 'carte injoignable', 15000));
+    if (A.attendre === 'carte') await essai('coupure', async () => { A.coupure = await balayer('.vf-term-carte code', '.vf-term-carte', LARGEURS); });
     else await essai('violation', async () => { const fin = Date.now() + MS; while (!s.violations.length && Date.now() < fin) await pause(100); await pause(2500); });
-    return { erreurs, carte: await texte('.vf-term-carte').catch(() => ''), violations: [...s.violations], ready: await s.ev(MSG('ready')).catch(() => false), iframes: await s.ev(`document.querySelectorAll('iframe').length`).catch(() => -1) };
+    return { erreurs, coupure: A.coupure, carte: await texte('.vf-term-carte').catch(() => ''), violations: [...s.violations], ready: await s.ev(MSG('ready')).catch(() => false), iframes: await s.ev(`document.querySelectorAll('iframe').length`).catch(() => -1) };
+  }
+
+  if (mode === 'etats') { // les états de la carte vus par Q seul, puis par la barre du tiroir de P (J1, J5, J6, J13)
+    const r = { erreurs };
+    const INVITE = `((document.querySelector('.xterm-rows') || {}).textContent || '').trim().length > 0`;
+    const CARTE = (t) => `((document.getElementById('etat') || {}).textContent || '').includes(${JSON.stringify(t)})`;
+    await essai('amorcage', async () => {
+      await s.naviguer(`${OQ}/#t=${A.amorce}`);
+      await att(`location.port === '${A.P}' && location.pathname === '/project.html' && document.readyState === 'complete'`, 'arrivée sur P');
+    });
+    await essai('connecte', async () => { await s.naviguer(`${OQ}/`); await att(INVITE, 'invite du shell dans Q (la session est prise par cet onglet)'); });
+    await essai('refuse-q', async () => { // J6 : un autre onglet (sessionStorage vide) ; sous la carte, ni terminal ni curseur visibles
+      await s.ev(`sessionStorage.clear()`); await s.naviguer(`${OQ}/`); await att(CARTE('Terminal déjà ouvert'), 'carte Terminal déjà ouvert');
+      r.refuse = await s.ev(`(() => { const v = (e) => !!e && e.checkVisibility({ visibilityProperty: true }); return { terminal: v(document.getElementById('terminal')), xterm: v(document.querySelector('.xterm')), curseur: [...document.querySelectorAll('.xterm-cursor, .xterm-cursor-outline, .xterm-cursor-block')].filter(v).length, xtermPresent: !!document.querySelector('.xterm'), carte: v(document.querySelector('.vf-q-carte')), titre: (document.querySelector('.vf-q-titre') || {}).textContent, bouton: document.activeElement && document.activeElement.tagName }; })()`);
+    });
+    await essai('refuse-p', async () => { // J1 : la barre dit « Déjà ouvert » (autre onglet que celui de Q ci-dessus)
+      await s.naviguer(`${OP}/project.html`); await att(`!!document.querySelector('button.vf-term-pastille')`, 'pastille'); await clic('button.vf-term-pastille');
+      await att(`(document.querySelector('.vf-term-etat') || {}).textContent && document.querySelector('.vf-term-etat').textContent !== 'Connecté'`, 'état de la barre');
+      r.barreRefuse = { texte: await texte('.vf-term-etat'), point: await s.ev(`document.querySelector('.vf-term-etat-point').getAttribute('data-etat')`), annonce: await texte('.vf-term-annonce') };
+    });
+    await essai('expire-p', async () => { // J1 : secret absent, la barre dit « Session expirée »
+      await s.naviguer(`${OQ}/`); await s.ev(`localStorage.removeItem('vf.terminal.secret')`);
+      await s.naviguer(`${OP}/project.html`); await att(`!!document.querySelector('button.vf-term-pastille')`, 'pastille'); await clic('button.vf-term-pastille');
+      await att(`(document.querySelector('.vf-term-etat') || {}).textContent`, 'état de la barre');
+      r.barreExpire = { texte: await texte('.vf-term-etat'), point: await s.ev(`document.querySelector('.vf-term-etat-point').getAttribute('data-etat')`) };
+    });
+    await essai('expire-q', async () => { // J13 : carte d'alerte focalisée par programme ; J5 : commande et point jamais coupés
+      await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+      await s.naviguer(`${OQ}/`); await att(CARTE('Session expirée'), 'carte Session expirée');
+      r.alerte = await s.ev(`(() => { const k = document.querySelector('.vf-q-carte'), c = getComputedStyle(k); return { titre: (document.querySelector('.vf-q-titre') || {}).textContent, focus: document.activeElement === k, fv: k.matches(':focus-visible'), role: k.getAttribute('role'), contour: c.outlineStyle }; })()`);
+      r.coupure = await balayer('.vf-q-commande', '.vf-q-corps', LARGEURS);
+    });
+    return r;
   }
 
   // --- flag / donnee : amorçage dans Chrome, secret lu sans démarrer le shell, puis P ---
@@ -194,6 +247,19 @@ await executer(chrome, async (s) => {
     await s.ev(`dispatchEvent(new MessageEvent('message', { data: 'toggle', origin: ${JSON.stringify(OQ)}, source: document.querySelector('iframe').contentWindow }))`); await pause(600); r.t17.forge = await s.ev(OUVERT);
   });
   }
+  await essai('tu14', async () => { // J4 : focus clavier de la poignée = bague autour du grip, pas deux bandes pleine largeur
+    await s.ev(`document.querySelector('.vf-term-plein').focus()`); await touche('Tab', 'Tab', 9, 8); await pause(200); // Maj+Tab depuis le bouton : le clavier amène le focus sur la poignée
+    r.tu14 = await s.ev(`(() => { const p = document.querySelector('.vf-term-poignee'), g = document.querySelector('.vf-term-grip'), cp = getComputedStyle(p), cg = getComputedStyle(g), b = g.getBoundingClientRect(), q = p.getBoundingClientRect();
+      return { sur_poignee: document.activeElement === p, fv: p.matches(':focus-visible'), poignee: cp.outlineStyle, grip: cg.outlineStyle + '/' + cg.outlineWidth, opaque: cg.opacity, grip_larg: Math.round(b.width), poignee_larg: Math.round(q.width) }; })()`);
+  });
+  await essai('tu15', async () => { // J7 : sous pointer: coarse les boutons de la barre font au moins 44 px et la barre les contient ; sous pointeur fin, 28 px
+    const mesure = () => s.ev(`(() => { const bs = [...document.querySelectorAll('.vf-term-bouton')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height); }); return { coarse: matchMedia('(pointer: coarse)').matches, boutons: bs.join(','), barre: Math.round(document.querySelector('.vf-term-barre').getBoundingClientRect().height) }; })()`);
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await pause(200);
+    r.tu15 = { fin: await mesure() };
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: true }); await s.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 }); await pause(400);
+    r.tu15.tactile = await mesure();
+    await s.send('Emulation.setTouchEmulationEnabled', { enabled: false }); await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await pause(200);
+  });
   // T17.5 : saisie au clavier dans le cadre, relevé de l'espion
   await essai('t175', async () => {
     if (!(await s.ev(OUVERT))) { await clic('button.vf-term-pastille'); await att(OUVERT, 'tiroir ouvert pour la saisie'); }
@@ -242,6 +308,9 @@ mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> -> MUT
 }
 sans_effet() { assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; }
 navig() { node "$AUX/chrome-tiroir.mjs" "$CHROME" "$@"; } # navig <mode> <json>
+run_etats() { # run_etats <sortie> -> EJ ; un serveur neuf, un amorçage neuf, un Chrome neuf
+  srv "$1" 1; EJ="$(navig etats "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\"}")"; unsrv
+}
 LISTE_JSON='["ready","etat:connecte","etat:reconnexion","etat:termine","etat:refuse","etat:expire","etat:arrete","toggle"]'
 run_flag() { # run_flag <sortie> <court 0|1> -> FJ FP FQ ; un serveur neuf, un amorçage neuf, un Chrome neuf
   srv "$1" 1; FP=$SRV_PORT; FQ=$QP; FMARQ="MARQUEUR-P-$RANDOM$RANDOM"; rm -f "$WORK/run/m.txt" "$WORK/run/shell.pid"
@@ -300,6 +369,9 @@ assert_eq "T17.2 — postMessage('toggle') émis par P vers elle-même : ignoré
 assert_eq "T17.3 — MessageEvent forgé (origine de Q, source = le cadre) : ignoré, car non fiable (tiroir ouvert avant et après)" "$(rj "$J" '"avant="+j.t17.avant+" apres="+j.t17.forge')" "avant=true apres=true"
 assert_eq "T17.5 — espion : après une commande tapée dans le shell, tout message d'origine Q est dans la liste fermée ; ni le marqueur, ni le secret, ni l'amorçage n'y figurent (témoin : la commande a tourné)" "$(rj "$J" '"fichier="+j.t175.fichier+" hors_liste="+j.t175.hors_liste+" marqueur="+j.t175.marqueur+" secret="+j.t175.secret+" amorce="+j.t175.amorce+" ready_et_connecte="+(j.t175.vus.includes("ready")&&j.t175.vus.includes("etat:connecte"))')" "fichier=true hors_liste=0 marqueur=0 secret=0 amorce=0 ready_et_connecte=true"
 
+assert_eq "T20.4 (J4) — poignée focalisée au clavier : le contour est sur le grip (40 px, 2 px pleins, visible), jamais sur la poignée pleine largeur (témoin : :focus-visible est vrai)" "$(rj "$J" '"sur="+j.tu14.sur_poignee+" fv="+j.tu14.fv+" poignee="+j.tu14.poignee+" grip="+j.tu14.grip+" opaque="+j.tu14.opaque+" grip_larg="+j.tu14.grip_larg+" large="+(j.tu14.poignee_larg>400)')" "sur=true fv=true poignee=none grip=solid/2px opaque=1 grip_larg=40 large=true"
+assert_eq "T20.7 (J7) — pointeur fin : boutons de 28 px, barre de 36 px ; pointer: coarse (témoin : le média est vrai) : boutons d'au moins 44 px et barre qui les contient" "$(rj "$J" '"fin="+j.tu15.fin.coarse+" "+j.tu15.fin.boutons+" "+j.tu15.fin.barre+" / tactile="+j.tu15.tactile.coarse+" "+(j.tu15.tactile.boutons.split(",").every((b)=>b.split("x").every((n)=>Number(n)>=44)))+" "+(j.tu15.tactile.barre>=44)')" "fin=false 28x28,28x28 36 / tactile=true true true"
+
 echo "=== TU.9 / TU.10 / TU.12 — localhost, Windows, autres pages ==="
 srv "$OUT" 1
 J="$(navig localhost "{\"P\":$SRV_PORT,\"attendre\":\".vf-term-puce\"}")"; unsrv
@@ -311,10 +383,20 @@ PORT_T="$(libre)"; node "$AUX/page-tiroir.mjs" "$OUT" "$PORT_T" 0 & PID_T=$!; PI
 J="$(navig page "{\"P\":0,\"T\":$PORT_T,\"chemin\":\"/project.html\",\"attendre\":\"[class*=vf-term]\"}")"; JA="$(navig page "{\"P\":0,\"T\":$PORT_T,\"chemin\":\"/autre.html\"}")"; vf_hyg_stop "$PID_T"
 assert_eq "TU.12 — la même injection : des nœuds sous /project.html (témoin), aucun nœud, aucune clé et aucun cadre sous /autre.html" "$(rj "$J" '"projet_noeuds>0="+(j.noeuds>0)')/$(rj "$JA" '"vivante="+j.vivante+" noeuds="+j.noeuds+" cles="+j.cles+" iframes="+j.iframes')" "projet_noeuds>0=true/vivante=true noeuds=0 cles=0 iframes=0"
 
+echo "=== T20 — états de la carte : barre de P et page de Q (critique design 71, J1, J5, J6, J13) ==="
+run_etats "$OUT"; E="$EJ"
+assert_eq "T20.0 — témoin : le scénario n'a pas échoué (aucune étape en erreur)" "$(rj "$E" 'j.erreur||JSON.stringify(j.erreurs)')" "{}"
+assert_eq "T20.1 (J1) — barre du tiroir, état refusé (autre onglet) : libellé « Déjà ouvert », pastille d'état refuse, annonce du lecteur d'écran identique ; état expiré : « Session expirée », pastille expire" "$(rj "$E" '"refuse="+j.barreRefuse.texte+"/"+j.barreRefuse.point+"/"+j.barreRefuse.annonce+" expire="+j.barreExpire.texte+"/"+j.barreExpire.point')" "refuse=Déjà ouvert/refuse/Déjà ouvert expire=Session expirée/expire"
+assert_eq "T20.2 (J1) — la barre dit le même état que la carte de Q : le libellé de la barre est contenu dans le titre de la carte, pour refusé et expiré" "$(rj "$E" '"refuse="+j.refuse.titre.toLowerCase().includes(j.barreRefuse.texte.toLowerCase())+" expire="+j.alerte.titre.toLowerCase().includes(j.barreExpire.texte.toLowerCase())')" "refuse=true expire=true"
+assert_eq "T20.3 (J6) — sous la carte « déjà ouvert » : ni terminal, ni grille xterm, ni curseur visibles (témoin : la grille existe dans le DOM et la carte est visible)" "$(rj "$E" '"terminal="+j.refuse.terminal+" xterm="+j.refuse.xterm+" curseur="+j.refuse.curseur+" present="+j.refuse.xtermPresent+" carte="+j.refuse.carte')" "terminal=false xterm=false curseur=0 present=true carte=true"
+assert_eq "T20.6 (J13) — carte d'alerte focalisée par programme : elle a le focus et :focus-visible est vrai (témoin), mais aucune bague de focus" "$(rj "$E" '"focus="+j.alerte.focus+" fv="+j.alerte.fv+" role="+j.alerte.role+" contour="+j.alerte.contour')" "focus=true fv=true role=alert contour=none"
+assert_eq "T20.5 (J5, carte de Q) — la commande /vf-cockpit --terminal ne se coupe jamais et son point final reste collé, à huit largeurs de fenêtre (témoin : la carte a changé de largeur au moins trois fois)" "$(rj "$E" '"mal="+JSON.stringify(j.coupure.mal)+" larges="+(j.coupure.largeurs>=3)')" 'mal=[] larges=true'
+
 echo "=== TU.11 / T8.3 — cadre injoignable, frame-src absent (mutants jouées en navigateur) ==="
 if mutant injoignable vf-cockpit-terminal.mjs "s|{ etat: 'actif', port: portQ }|{ etat: 'actif', port: 1 }|"; then
   srv "$MUT_OUT" 1; J="$(navig froid "{\"P\":$SRV_PORT,\"attendre\":\"carte\"}")"; unsrv
   assert_eq "TU.11 — aucun ready : après 8 s, carte « Le terminal ne répond pas. Relancez /vf-cockpit --terminal. »" "$(rj "$J" '"carte="+j.carte+" ready="+j.ready')" "carte=Le terminal ne répond pas. Relancez /vf-cockpit --terminal. ready=false"
+  assert_eq "T20.5 (J5, carte de P) — la commande /vf-cockpit --terminal ne se coupe jamais et son point final reste collé, à huit largeurs de fenêtre (témoin : la carte a changé de largeur au moins trois fois)" "$(rj "$J" '"mal="+JSON.stringify(j.coupure&&j.coupure.mal)+" larges="+(j.coupure&&j.coupure.largeurs>=3)')" 'mal=[] larges=true'
 else sans_effet "TU.11 (injection de panne)"; fi
 if mutant framesrc vf-cockpit-terminal.mjs "s#frameSrc: () => (portQ ? \`; frame-src http://127\.0\.0\.1:\${portQ}\` : ''),#frameSrc: () => '',#"; then
   srv "$MUT_OUT" 1; J="$(navig froid "{\"P\":$SRV_PORT,\"attendre\":\"violation\"}")"; unsrv
