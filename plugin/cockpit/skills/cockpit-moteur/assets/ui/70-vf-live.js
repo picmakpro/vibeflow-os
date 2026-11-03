@@ -81,7 +81,7 @@
     badge.setAttribute('aria-label', off ? t.text : n ? `${n} au travail` : 'Personne au travail'); // sinon figé à « … » (libellé de création)
     badge.innerHTML = `<span class="dot"></span><span class="bl">${off ? t.text : n ? `${n} au travail` : 'Personne'}</span>`;
   };
-  const setWho = (w) => { if (!w) return; who = probe.who = w; showLock(); };
+  const setWho = (w) => { if (!w) return; who = probe.who = w; showLock(); document.dispatchEvent(new CustomEvent('vf-who')); }; // 69-05 : l'onglet Équipe (72-vf-equipe.js) suit le même flux
 
   // I3 (recette 2026-11-02) : une bascule en direct redessine la carte, qui rejouait son animation d'apparition (cartes, liens, colonnes,
   // panneau). On ne l'anime plus : les éléments redessinés portent `animation: none` en ligne AVANT la première image (la suite de

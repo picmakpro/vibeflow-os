@@ -7,9 +7,9 @@
   const SC = window.Floorplan;
   if (!SC) return;
   const { h, graph: G } = SC;
-  const TAB = G.meta.vfTab === 'project' ? 'project' : 'code';
-  // titre de l'onglet du navigateur : « <nom> — Code » ou « <nom> — Projet » (le viewer écrit « <nom> map », qui devenait le nom seul)
-  document.title = `${String(G.project.name || '').replace(/ — Projet$/, '')} — ${TAB === 'project' ? 'Projet' : 'Code'}`;
+  const TAB = G.meta.vfTab === 'project' ? 'project' : G.meta.vfTab === 'equipe' ? 'equipe' : 'code';
+  // titre de l'onglet du navigateur : « <nom> — Code », « <nom> — Projet » ou « <nom> — Équipe » (le viewer écrit « <nom> map », qui devenait le nom seul)
+  document.title = `${String(G.project.name || '').replace(/ — (Projet|Équipe)$/, '')} — ${TAB === 'project' ? 'Projet' : TAB === 'equipe' ? 'Équipe' : 'Code'}`;
   const ST = { done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' };
   // P67-D-04 : logo VibeFlow clair ou sombre selon le thème du viewer (meta.vfLogos est posé par l'assemblage)
   const LOGOS = G.meta.vfLogos;
@@ -56,6 +56,8 @@
   `;
   // spike 005 : la barre de question reste visible quand serve.mjs (P7) sert l'onglet Projet
   if (TAB === 'project') style.textContent += `#btn-health${window.FLOORPLAN_SERVER ? '' : ', #ask'} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }`;
+  // onglet Équipe (69-05, P69-PL-09) : ni bouton de santé ni barre de question (la question porte sur le code ou le projet)
+  if (TAB === 'equipe') style.textContent += '#btn-health, #ask { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }';
   document.head.appendChild(style);
 
   // ---------- onglets ----------
@@ -63,7 +65,7 @@
   if (brand) {
     const tabs = document.createElement('nav');
     tabs.className = 'vf-tabs';
-    tabs.innerHTML = `<a href="index.html" class="${TAB === 'code' ? 'on' : ''}">Code</a><a href="project.html" class="${TAB === 'project' ? 'on' : ''}">Projet</a>`;
+    tabs.innerHTML = `<a href="index.html" class="${TAB === 'code' ? 'on' : ''}">Code</a><a href="project.html" class="${TAB === 'project' ? 'on' : ''}">Projet</a><a href="equipe.html" class="${TAB === 'equipe' ? 'on' : ''}">Équipe</a>`;
     brand.after(tabs);
   }
 
@@ -110,7 +112,7 @@
       const rows = f.touched.slice(0, 40).map((p) => `<a class="vf-link" href="index.html#r=${encodeURIComponent(p)}"><span>→</span><code>${h(p)}</code></a>`).join('');
       return `<div class="sec"><h3>Fichiers touchés dans l'onglet Code <span class="c">${f.touched.length}</span></h3>${rows}</div>`;
     });
-  } else {
+  } else if (TAB === 'code') {
     const touch = G.meta.vfTouch || {};
     SC.addPanelSection('item', (id) => {
       const f = fileOf(id);
