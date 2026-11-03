@@ -192,6 +192,9 @@ for bad in "abc" "0 0" "24 0" "501 80" "24 1001" "99999 80" "24 80 extra" "-1 80
   assert_eq "T3.8 — POST /taille « $bad » rend 400" "$(rqf "$QP" POST /taille --secret "$SECRET" --onglet ob --corps "$bad")" "400"; F400=$(cnt)
 done
 assert_eq "T3.8 — POST /taille de 40 octets rend 400" "$(rqf "$QP" POST /taille --secret "$SECRET" --onglet ob --corps-octets 40)" "400"
+for bad in 501x80 999x999 24x1001 1000x80 0x80 24x0 24x80x1 abc; do # une seule borne (500 x 1000) pour /flux comme pour /taille : refusée, jamais acceptée puis ignorée
+  assert_eq "T3.8d — GET /flux, X-VF-Taille « $bad » rend 400" "$(rqf "$QP" GET /flux --secret "$SECRET" --onglet ob --entete "x-vf-taille:$bad" --echeance 3000)" "400"
+done
 assert_eq "T3.8c — onglet invalide (hors de [A-Za-z0-9_-]) rend 4xx, jamais 204" "$([ "$(sta "$QP" POST /entree --secret "$SECRET" --onglet 'a b' --corps x)" = 204 ] && echo 204 || echo refus)" "refus"
 for pair in "204:$F204" "413:$F413" "400:$F400"; do
   IFS=: read -r nom num <<<"$pair"; assert_eq "T3.9 — en-têtes de P71-PL-16 sur la réponse $nom" "$(ent_ok "$WORK/t3/$num.out" 0)" "ok"

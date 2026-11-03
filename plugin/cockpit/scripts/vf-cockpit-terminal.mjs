@@ -11,14 +11,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { realUnder } from './vf-cockpit-paths.mjs';
 import { FICHIER_AMORCE, nouveauSecret, egal, consommerAmorce } from './vf-cockpit-terminal-amorce.mjs';
-import { creerSessions } from './vf-cockpit-terminal-session.mjs';
+import { creerSessions, TAILLE_MAX } from './vf-cockpit-terminal-session.mjs';
 import { preparerPage, pageTerminal } from './vf-cockpit-terminal-page.mjs';
 import { injectionTiroir } from './vf-cockpit-terminal-tiroir.mjs';
 
 const log = (m) => console.error(`vf-cockpit (terminal) : ${m}`);
 const json = (res, statut, objet) => { res.writeHead(statut, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(objet)); };
 export const CORPS_ENTREE_MAX = 65536; // P71-D-10 : au-delà, 413 et rien n'est écrit au shell
-export const TAILLE_MAX = { lignes: 500, colonnes: 1000 };
+export { TAILLE_MAX }; // définie avec la session, qui la fait respecter aussi à l'attache du flux
 const CORPS_TAILLE_MAX = 32;
 // lit le corps par morceaux jusqu'à `max` octets ; null au-delà (le reste est écarté sans être gardé). Content-Length annoncé trop grand : null sans rien lire.
 const lireCorps = (req, max) => new Promise((resolve) => {
@@ -70,7 +70,7 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
     if (raison && ++nRefus <= 50) log(`requête refusée : ${raison}.`);
     res.writeHead(statut, statut === 413 ? { Connection: 'close' } : {}); res.end();
   };
-  const taille = (v) => { const m = /^(\d{1,3})x(\d{1,3})$/.exec(String(v || '')); return m ? { lignes: Number(m[1]), colonnes: Number(m[2]) } : null; };
+  const taille = (v) => { const m = /^(\d{1,4})x(\d{1,4})$/.exec(String(v || '')); return m ? { lignes: Number(m[1]), colonnes: Number(m[2]) } : null; };
   const tailleCorps = (b) => { // « <lignes> <colonnes> » : deux entiers décimaux dans les bornes
     const m = /^(\d{1,4}) (\d{1,4})$/.exec(b.toString('utf8')); if (!m) return null;
     const l = Number(m[1]), c = Number(m[2]);

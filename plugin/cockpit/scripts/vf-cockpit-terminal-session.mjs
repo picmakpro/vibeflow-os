@@ -15,6 +15,7 @@ import { nouveauSecret } from './vf-cockpit-terminal-amorce.mjs';
 const ONGLET_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const log = (m) => console.error(`vf-cockpit (terminal) : ${m}`);
 export const TAMPON_MAX = 262144;
+export const TAILLE_MAX = { lignes: 500, colonnes: 1000 }; // l'unique borne de taille : le serveur (/flux, /taille) et l'assistant PTY (vf-cockpit-pty.py) la tiennent à l'identique
 const graceDepuis = (v) => { const n = Number(v); return Number.isInteger(n) && n >= 100 && n <= 30000 ? n : 30000; }; // réglage de test seulement (P71-PL-18)
 export const GRACE_MS = graceDepuis(process.env.VF_COCKPIT_TERM_GRACE_MS);
 const actif = (c) => !!c && (c.etat === 'vivante' || c.etat === 'detachee');
@@ -83,7 +84,7 @@ export function creerSessions({ engineDir, lab, jetons = () => [] }) {
     // rend 200 (réponse prise en charge), 400 ou 409 ; les autres statuts sont écrits par l'appelant
     attacher(req, res, { onglet, lignes = 24, colonnes = 80 } = {}) {
       if (!ONGLET_RE.test(String(onglet || ''))) return 400;
-      if (!Number.isInteger(lignes) || !Number.isInteger(colonnes) || lignes < 1 || lignes > 999 || colonnes < 1 || colonnes > 999) return 400;
+      if (!Number.isInteger(lignes) || !Number.isInteger(colonnes) || lignes < 1 || lignes > TAILLE_MAX.lignes || colonnes < 1 || colonnes > TAILLE_MAX.colonnes) return 400;
       if (s && s.etat !== 'terminee' && s.onglet !== onglet) return 409;
       if (!s || s.etat === 'terminee') s = lancer(onglet, lignes, colonnes);
       const cible = s; clearTimeout(cible.minuterie);

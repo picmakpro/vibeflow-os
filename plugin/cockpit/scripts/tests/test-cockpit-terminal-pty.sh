@@ -53,7 +53,7 @@ if (cas === 'filtre') {
 }
 JS
 cat > "$AUX/pilote.mjs" <<'JS'
-// pilote.mjs <assistant> <shell> <sortie1> <sortie2> <action>... : lance l'assistant seul (quatre tubes) ; actions : w:<texte> · c:<ligne de contrôle> · e (ferme fd 0) · a:<sous-chaîne attendue sur fd 1>
+// pilote.mjs <assistant> <shell> <sortie1> <sortie2> <action>... : lance l'assistant seul (quatre tubes) ; actions : w:<texte> · W:<n> (n octets 'a') · t (SIGTERM) · s:<ms> · c:<ligne de contrôle> · e (ferme fd 0) · a:<sous-chaîne attendue sur fd 1>
 import { spawn } from 'node:child_process'; import fs from 'node:fs';
 const [, , assistant, shell, o1, o2, ...actions] = process.argv; fs.writeFileSync(o1, ''); fs.writeFileSync(o2, '');
 const e = spawn('python3', ['-I', assistant, '24', '80', shell], { stdio: ['pipe', 'pipe', 'pipe', 'pipe'] });
@@ -61,7 +61,8 @@ e.stdout.on('data', (c) => fs.appendFileSync(o1, c)); e.stderr.on('data', (c) =>
 let fini = null; e.on('close', (code, sig) => { fini = `code=${code} sig=${sig}`; });
 const interp = (t) => t.replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16))).replace(/\\n/g, '\n').replace(/\\r/g, '\r');
 for (const x of actions) {
-  if (x.startsWith('w:')) e.stdin.write(interp(x.slice(2))); else if (x.startsWith('c:')) e.stdio[3].write(interp(x.slice(2)) + '\n'); else if (x === 'e') e.stdin.end();
+  if (x.startsWith('W:')) e.stdin.write(Buffer.alloc(Number(x.slice(2)), 97)); else if (x === 't') e.kill('SIGTERM'); else if (x.startsWith('s:')) await new Promise((r) => setTimeout(r, Number(x.slice(2))));
+  else if (x.startsWith('w:')) e.stdin.write(interp(x.slice(2))); else if (x.startsWith('c:')) e.stdio[3].write(interp(x.slice(2)) + '\n'); else if (x === 'e') e.stdin.end();
   else if (x.startsWith('a:')) { const fin = Date.now() + 8000; while (Date.now() < fin && !fs.readFileSync(o1).toString('latin1').includes(x.slice(2))) await new Promise((r) => setTimeout(r, 50)); }
 }
 for (let i = 0; i < 160 && fini === null; i++) await new Promise((r) => setTimeout(r, 50));
@@ -81,7 +82,13 @@ cat > "$WORK/bin/dormir" <<'SH'
 echo $$ > "$VFT_RUN/$2.pid"
 sleep "$1"
 SH
-chmod +x "$WORK/bin/shell-test" "$WORK/bin/dormir"; export SHELL="$WORK/bin/shell-test"
+cat > "$WORK/bin/shell-sourd" <<'SH'
+#!/bin/sh
+echo $$ > "$VFT_RUN/sourd.pid"
+stty raw -echo
+exec sleep 299
+SH
+chmod +x "$WORK/bin/shell-test" "$WORK/bin/dormir" "$WORK/bin/shell-sourd"; export SHELL="$WORK/bin/shell-test"
 
 rq() { node "$TA" req "$@"; }
 amorce_neuve() { node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"; }
@@ -109,7 +116,8 @@ sess() { # sess <nom> <sortie> [moteur] : serveur, échange, flux, attente de l'
   srv "$2" "${3:-$ENG}"; S_PID=$SRV_PID; S_Q="$(sj '(j.terminal&&j.terminal.url)||""')"; S_Q="${S_Q##*:}"
   [ -n "$S_Q" ] && read -r _c S_SEC < <(node "$TA" amorcer "$S_Q" "$WORK/amorce.copy" | tr '\n' ' ')
   [[ "$S_SEC" =~ ^[0-9a-f]{64}$ ]] || { S_SEC=""; return 1; }
-  node "$TA" flux "$S_Q" "$S_SEC" "onglet-$1" "$S_FL" 40000 > "$WORK/flux-$1.log" 2>&1 & S_FPID=$!
+  node "$TA" flux "$S_Q" "$S_SEC" "onglet-$1" "$S_FL" 40000 ${S_TAILLE:+--taille $S_TAILLE} > "$WORK/flux-$1.log" 2>&1 & S_FPID=$!
+  [ -n "${SANS_INVITE:-}" ] && return 0 # shell qui ne parle pas (T14) : pas d'invite à attendre
   [ "$(node "$TA" attendre "$S_FL" 'VFP> ' 10000)" = TROUVE ]
 }
 ent() { node "$TA" entree "$S_Q" "$S_SEC" "onglet-$S_NOM" "$1"; }
@@ -175,6 +183,15 @@ SD="$ENG/terminal/vf-cockpit-pty.py"; RUN="$WORK/run/pilote"; mkdir -p "$RUN"
 PIL="$(VFT_RUN="$RUN" node "$AUX/pilote.mjs" "$SD" "$WORK/bin/shell-test" "$WORK/pilote1.out" "$WORK/pilote2.out" 'a:VFP> ' 'w:exit 3\r' 2>&1)"
 assert_eq "T11.5 — assistant seul : exit 3 -> fd 2 porte exactement « FIN 3 » (aucun octet du shell) et l'assistant sort de lui-même" "$(tr -d '\r' < "$WORK/pilote2.out") | $PIL" "FIN 3 | code=0 sig=null"
 
+S_TAILLE=500x1000 sess t11b "$OUT"; S_TAILLE=""
+ent "echo SZB-\$(stty size | tr ' ' x)\\r" > /dev/null
+assert_eq "T11.6 — flux ouvert à la borne 500x1000 (X-VF-Taille) : le shell mesure 500x1000 (une seule borne, serveur et assistant)" "$(wf SZB-500x1000 5000)" "TROUVE"
+fin_sess
+PIL="$(VFT_RUN="$RUN" node "$AUX/pilote.mjs" "$SD" "$WORK/bin/shell-test" "$WORK/pilote3.out" "$WORK/pilote4.out" 'a:VFP> ' 'c:R 500 1000' 's:300' 'c:R 501 80' 'c:R 24 1001' 'c:R 0 80' 's:300' 'w:echo SZC-$(stty size | tr " " x)\r' 'a:SZC-' 'w:exit 0\r' 2>&1)"
+assert_eq "T11.7 — assistant seul : R 500 1000 appliquée, R 501 80 / R 24 1001 / R 0 80 ignorées (SZC-500x1000)" "$(grep -a -c 'SZC-500x1000' "$WORK/pilote3.out") $PIL" "1 code=0 sig=null"
+python3 -I "$SD" 501 80 /bin/true 3</dev/null </dev/null >/dev/null 2>&1; R1=$?; python3 -I "$SD" 24 1001 /bin/true 3</dev/null </dev/null >/dev/null 2>&1; R2=$?
+assert_eq "T11.8 — assistant lancé avec une taille hors borne (501x80, 24x1001) : usage, code 64, aucun shell" "$R1 $R2" "64 64"
+
 echo "=== T12 — serveur tué par SIGKILL : rien ne survit (TERM-08 orphelins ; P71-D-05) ==="
 orphelins() { # orphelins <nom> <sortie> [moteur] -> O_RES : « <état avant> <survivants> »
   sess "$1" "$2" "${3:-$ENG}"; ent "$WORK/bin/dormir 300 bg &\\r" > /dev/null; ent "echo \$\$ > $WORK/run/$1/bash.pid\\r" > /dev/null
@@ -205,6 +222,33 @@ assert_eq "T13.4 — 0x03 : SIGINT-RECU, précédé de la sortie d'écran altern
 assert_eq "T13.5 — après SIGINT-RECU, l'invite du shell revient" "$(node "$AUX/aide.mjs" attendre-n "$S_FL" 'VFP> ' $((N1+1)) 5000)" "TROUVE"
 fin_sess
 
+echo "=== T14 — entrées en attente : l'assistant reste réactif, rien ne survit (TERM-08 ; P71-D-05) ==="
+tuer_si() { # tuer_si <pid> <sous-chaîne de sa ligne de commande> : arrête un survivant enregistré, par PID, après avoir relu sa ligne de commande
+  [ -n "$1" ] && case "$(ps -o args= -p "$1" 2>/dev/null)" in *"$2"*) kill -KILL "$1" 2>/dev/null ;; esac; true
+}
+attendre_mort() { local i p; for i in $(seq 1 60); do for p in "$@"; do [ -n "$p" ] && [ "$(vivant "$p")" = oui ] && { sleep 0.1; continue 2; }; done; return 0; done; return 1; }
+sourd() { # sourd <nom> <sortie> [moteur] -> SO_RES : « avant=<assistant> <shell> <statut POST> apres=<assistant> <shell> » ; serveur tué par SIGKILL après une entrée de 65 536 octets que le shell ne lit pas
+  ENVX=(SHELL="$WORK/bin/shell-sourd"); SANS_INVITE=1 sess "$1" "$2" "${3:-$ENG}"; ENVX=(); local a s st av ap
+  attendre_fichier "$WORK/run/$1/sourd.pid"; a="$(pgrep -P "$S_PID" | sed -n 1p)"; s="$(cat "$WORK/run/$1/sourd.pid" 2>/dev/null)"
+  st="$(ent "$(head -c 65536 /dev/zero | tr '\0' a)")"; sleep 0.5; av="$(vivant "${a:-0}") $(vivant "${s:-0}")"
+  kill -KILL "$S_PID"; wait "$S_PID" 2>/dev/null; vf_hyg_stop "$S_PID"
+  attendre_mort "$a" "$s"; ap="$(vivant "${a:-0}") $(vivant "${s:-0}")"
+  tuer_si "$a" vf-cockpit-pty.py; tuer_si "$s" "sleep 299"
+  [ -n "$S_FPID" ] && { wait "$S_FPID" 2>/dev/null; true; }
+  SO_RES="avant=$av POST=$st apres=$ap"
+}
+sourd t14 "$OUT"
+assert_eq "T14.1 — shell qui ne lit pas, POST /entree de 65 536 octets, serveur tué par SIGKILL : l'assistant et le shell disparaissent en moins de 6 s (PID enregistrés)" "$SO_RES" "avant=oui oui POST=204 apres=non non"
+pilote_sourd() { # pilote_sourd <nom> <action>... -> PS_RES : « <fin de l'assistant> shell=<vivant après 6 s> »
+  local n="$1"; shift; RUN="$WORK/run/$n"; mkdir -p "$RUN"; rm -f "$RUN/sourd.pid"
+  local r s; r="$(SHELL="$WORK/bin/shell-sourd" VFT_RUN="$RUN" node "$AUX/pilote.mjs" "${PIL_SD:-$ENG/terminal/vf-cockpit-pty.py}" "$WORK/bin/shell-sourd" "$WORK/$n.1" "$WORK/$n.2" "$@" 2>&1)"
+  s="$(cat "$RUN/sourd.pid" 2>/dev/null)"; attendre_mort "$s"; PS_RES="$r shell=$(vivant "${s:-0}")"; tuer_si "$s" "sleep 299"
+}
+pilote_sourd t14b s:300 W:65536 s:500 e
+assert_eq "T14.2 — assistant seul, 65 536 octets en attente chez un shell sourd, puis fin du fd 0 : il sort de lui-même, le shell aussi" "$PS_RES" "code=0 sig=null shell=non"
+pilote_sourd t14c s:300 W:65536 s:500 t
+assert_eq "T14.3 — assistant seul, mêmes octets en attente, puis SIGTERM : il sort de lui-même, le shell aussi" "$PS_RES" "code=0 sig=null shell=non"
+
 echo "=== M-* — mutants du lanceur et du filtre (copies de la sortie) ==="
 if mutant envlarge vf-cockpit-terminal-env.mjs 's/export function envShell/function envShellOrig/' 'export const envShell = (env) => ({ PATH: env.PATH, HOME: env.HOME, SHELL: env.SHELL, VFT_RUN: env.VFT_RUN });'; then
   passe1 m1 "$MUT_OUT" "$MUT_OUT"; assert_eq "M-ENVLARGE — le mutant (liste blanche PATH, HOME, SHELL) rougit T10.2 : PATH présent, AUTRE et NODE_OPTIONS absents" "$(grep -a -c '^PATH=' "$P_ENV" 2>/dev/null) $(grep -a -c -x -e 'AUTRE=ok' -e 'NODE_OPTIONS=--no-warnings' "$P_ENV" 2>/dev/null)" "1 0"; fin_sess
@@ -231,10 +275,10 @@ ctrlc() { # ctrlc <nom> <moteur> : lance dormir 30 au premier plan, envoie 0x03 
   ent "\\x03" > /dev/null; sleep 1.5; CC_RES="$(vivant "${d:-0}") $(vivant "${b:-0}")"
   vf_hyg_stop "$d" > /dev/null 2>&1; fin_sess
 }
-if mutant_eng sigint 's/^                ecrire(maitre, donnees)$/                ecrire(maitre, donnees) if b"\\x03" not in donnees else os.killpg(pid, signal.SIGKILL)/'; then
+if mutant_eng sigint 's/^                vers_shell += donnees$/                (vers_shell.extend(donnees) if b"\\x03" not in donnees else os.killpg(pid, signal.SIGKILL))/'; then
   ctrlc m6 "$MUT_ENG"; assert_eq "M-SIGINT — le mutant tue le groupe du shell sur 0x03 : le shell ne survit pas, T11.3 rouge" "$CC_RES" "non non"
 else sans_effet M-SIGINT; fi
-if mutant_eng ctrlc 's/^                ecrire(maitre, donnees)$/                ecrire(maitre, donnees.replace(b"\\x03", b""))/'; then
+if mutant_eng ctrlc 's/^                vers_shell += donnees$/                vers_shell += donnees.replace(b"\\x03", b"")/'; then
   ctrlc m7 "$MUT_ENG"; assert_eq "M-CTRLC — le mutant retire 0x03 de l'entrée : le programme de premier plan survit, T11.3 rouge" "$CC_RES" "oui oui"
 else sans_effet M-CTRLC; fi
 if mutant_eng resize 's/^                taille(maitre, l, c)$/                pass/'; then
@@ -246,6 +290,9 @@ if mutant_eng noeof 's/^                    break$/                    entrees.r
   orphelins m9 "$OUT" "$MUT_ENG"; assert_eq "M-NOEOF — le mutant ignore l'EOF du fd 0 : l'assistant et le shell survivent (T12.4 rouge)" "$O_RES" "5 survivants"
 else sans_effet M-NOEOF; fi
 
+if mutant_eng bloquant 's/os.set_blocking(maitre, False)/os.set_blocking(maitre, True)/'; then
+  sourd m10 "$OUT" "$MUT_ENG"; assert_eq "M-ECRITURE-BLOQUANTE — le mutant remet le maître en écriture bloquante : l'assistant et le shell survivent au serveur (T14.1 rouge)" "$SO_RES" "avant=oui oui POST=204 apres=oui oui"
+else sans_effet M-ECRITURE-BLOQUANTE; fi
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
