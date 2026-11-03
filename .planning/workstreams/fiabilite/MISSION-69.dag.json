@@ -102,7 +102,7 @@
         "docs"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "x69-01",
@@ -447,6 +447,26 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "merge-main-69",
+      "step": "integration origin/main + conflits v1.0.1/v1.0.2 (vf-coder)",
+      "stage": "",
+      "deps": [
+        "gates-69"
+      ],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "recette-pw-69",
+      "step": "recette 69 deroulee dans Playwright, sans cocher (general-purpose)",
+      "stage": "",
+      "deps": [
+        "recette-69"
+      ],
+      "scope": [],
+      "status": "running"
     }
   ]
 }

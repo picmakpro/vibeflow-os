@@ -217,6 +217,17 @@ Question ouverte pendant l'exécution, posée à Samuel par la session principal
   `test-cockpit-responsive.sh` de 300 à 316 px (même marge, témoin toujours rouge). L'écart reste en 69 ; le
   retour aux valeurs DA, avec un en-tête qui tient à 1 024 px et à 390 px, revient à la Phase 70.
 
+Questions de livraison, posées à Samuel par la session principale en fin d'exécution (arbitrage Samuel, AskUserQuestion
+session principale Claude Code, 2026-11-03) ; libellés de l'option choisie, mot pour mot.
+
+- **P69-D-29 (PR).** « PR séparées, release groupée (Recommandé) » : la 69 a sa propre PR, mergée seule dès qu'elle
+  est prête, sans release ; la release est groupée plus tard. Remplace le « PR et releases groupées » du mandat initial.
+- **P69-D-30 (recette).** « Plus tard, la PR avance d'abord (Recommandé) » : la PR est ouverte avant la recette
+  humaine ; Samuel déroule `69-RECETTE-HUMAINE.md` AVANT le merge.
+- **P69-D-31 (latence de la suite responsive).** « Accepter, l'alléger en 70 (Recommandé) » : les 175 s de
+  `test-cockpit-responsive.sh` (cible de 60 s de `69-VALIDATION.md`) sont acceptées en 69 ; l'allègement revient à la
+  Phase 70.
+
 Les autres défauts des plans (OQ-2 à OQ-7, OQ-10, choix d'usage du planificateur) sont des **décisions du
 manager** (vf-dev-manager, planification 2026-11-03), non soumises une à une à Samuel : elles ne valent pas
 arbitrage humain et peuvent être rouvertes sur simple objection.
