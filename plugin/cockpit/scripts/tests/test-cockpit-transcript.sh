@@ -423,11 +423,11 @@ vf_hyg_stop "$SRV_PID"
 # =====================================================================================================================
 echo "=== T24F — correction d'audit : masque avant la coupe, coût borné par ce qui sort (F1, F4 ; P69-D-19) ==="
 cat > "$AUX/mk-f1.mjs" <<'JS'
-// mk-f1.mjs <fichier> <secret> : mandat portant le secret à 10 caractères avant 4 000 et avant 8 000, un message le portant à 10 caractères avant 2 000 (les bornes de coupe : il ne reste que 10 caractères du secret, trop peu pour qu'un masque appliqué APRÈS la coupe le reconnaisse)
+// mk-f1.mjs <fichier> <secret> : mandat portant le secret à 16 caractères avant 4 000 et avant 8 000, un message le portant à 16 caractères avant 2 000 (les bornes de coupe : il reste son préfixe et quelques caractères, trop peu pour qu'un masque appliqué APRÈS la coupe le reconnaisse)
 import fs from 'node:fs';
 const [, , out, S] = process.argv; const pad = (n) => 'x'.repeat(n);
 // le secret est séparé de son remplissage par une espace (les motifs de secret exigent une frontière de mot)
-const mandat = pad(3989) + ' ' + S + pad(7989 - 3989 - S.length) + ' ' + S + ' ' + pad(100), message = pad(1989) + ' ' + S + ' ' + pad(500);
+const mandat = pad(3983) + ' ' + S + pad(7983 - 3983 - S.length) + ' ' + S + ' ' + pad(100), message = pad(1983) + ' ' + S + ' ' + pad(500);
 const side = (o) => ({ isSidechain: true, agentId: 'f1', ...o });
 fs.writeFileSync(out, [side({ type: 'user', message: { role: 'user', content: mandat } }), side({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: message }] } })].map((l) => JSON.stringify(l)).join('\n') + '\n');
 JS
@@ -453,7 +453,7 @@ node "$AUX/mk-f4.mjs" "$AUX/fx/f4-texte.jsonl" "$AUX/f4/lab" texte; node "$AUX/m
 node "$AUX/red.mjs" "$SCRIPTS" "$AUX/fx/f4-texte.jsonl" "$AUX/f4/lab" > "$WORK/f4-texte.json"; node "$AUX/red.mjs" "$SCRIPTS" "$AUX/fx/f4-outils.jsonl" "$AUX/f4/lab" > "$WORK/f4-outils.json"
 assert_eq "T24F4.0 — contrôle positif : fixtures de plus de 8 Mio, 50 messages et 200 outils rendus" "$([ "$(wc -c < "$AUX/fx/f4-texte.jsonl" | tr -d ' ')" -gt 8388608 ] && [ "$(wc -c < "$AUX/fx/f4-outils.jsonl" | tr -d ' ')" -gt 8388608 ] && echo grosses)|$(G "$WORK/f4-texte.json" 'j.absent||j.r.messages.length')|$(G "$WORK/f4-outils.json" 'j.absent||j.r.outils.length')" "grosses|50|200"
 assert_eq "T24F4.1 — 8,5 Mio de blocs text au motif dense : moins de 2 000 ms (le masque ne couvre que les 50 messages gardés)" "$(G "$WORK/f4-texte.json" 'j.absent||(j.ms<2000?"ok":"ms="+j.ms)')" "ok"
-assert_eq "T24F4.2 — 8,5 Mio de tool_use Read : moins de 2 000 ms (étiquette des seuls 200 outils gardés)" "$(G "$WORK/f4-outils.json" 'j.absent||(j.ms<2000?"ok":"ms="+j.ms)')" "ok"
+assert_eq "T24F4.2 — GARDE NON DISCRIMINANTE (durée seule : l'ancien code passait en 0,8 s) ; la borne de l'étiquette est prouvée par T24G2 — 8,5 Mio de tool_use Read en moins de 2 000 ms" "$(G "$WORK/f4-outils.json" 'j.absent||(j.ms<2000?"ok":"ms="+j.ms)')" "ok"
 
 # =====================================================================================================================
 echo "=== T24F3 — correction de revue : chacun des sites de masque (message de l'assistant, cible d'outil, nom d'outil) a son témoin et son mutant (F3 ; P69-D-19) ==="
@@ -466,6 +466,64 @@ mutant() { cp "$SCRIPTS/vf-cockpit-transcript.mjs" "$MUTD/vf-cockpit-transcript.
 assert_eq "T24F3.2 — mutant : message de l'assistant non masqué -> détecté" "$(mutant 'msgs.map((t) => masqueCoupe(t, BORNE_MESSAGE))' 'msgs.map((t) => t.slice(0, BORNE_MESSAGE))')" "fuite : message "
 assert_eq "T24F3.3 — mutant : cible d'outil non masquée -> détecté" "$(mutant 'return { outil, verbe, cible: fin(cible) };' 'return { outil, verbe, cible };')" "fuite : cible "
 assert_eq "T24F3.4 — mutant : nom d'outil non masqué -> détecté" "$(mutant "const outil = fin(name) || '?';" "const outil = chaine(name) || '?';")" "fuite : nom d outil"
+
+echo "=== T24G — revue fraîche : masque borné au texte brut, première ligne trop longue, tube, cache, borne d'étiquette (points 1, 4, 5, 6, 8, 9, 10) ==="
+cat > "$AUX/mk-f1b.mjs" <<'JS'
+// mk-f1b.mjs <fichier> blob|url : mandat (borne 8 000) et message (borne 2 000).
+// blob : un blob masqué de 1 200 caractères avant la borne (le masque raccourcit la tranche) puis un jeton à cheval sur la borne de la tranche ÉLARGIE ;
+// url : identifiants d'URL (portée 385 caractères) commençant 10 caractères avant la borne, leur « @ » se trouvant 375 caractères après.
+import fs from 'node:fs';
+const [, , out, mode] = process.argv; const pad = (n) => 'x'.repeat(n); const S = 'ghp_abcdefghijklmnopqrstuvwxyz0123456789';
+const texte = (n) => { if (mode === 'blob') { const b = 'API_TOKEN=' + 'a'.repeat(1200) + ' '; return b + pad(n + 684 - b.length) + ' ' + S; } return pad(n - 14) + ' ://' + 'U'.repeat(128) + ':' + 'P'.repeat(256) + '@h.example ' + 'y'.repeat(50); };
+const side = (o) => ({ isSidechain: true, agentId: 'f1b', ...o });
+fs.writeFileSync(out, [side({ type: 'user', message: { role: 'user', content: texte(8000) } }), side({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: texte(2000) }] } })].map((l) => JSON.stringify(l)).join('\n') + '\n');
+JS
+node "$AUX/mk-f1b.mjs" "$AUX/fx/f1b-blob.jsonl" blob; node "$AUX/mk-f1b.mjs" "$AUX/fx/f1b-url.jsonl" url
+node "$AUX/red.mjs" "$SCRIPTS" "$AUX/fx/f1b-blob.jsonl" "$LAB0" > "$WORK/f1b-blob.json"; node "$AUX/red.mjs" "$SCRIPTS" "$AUX/fx/f1b-url.jsonl" "$LAB0" > "$WORK/f1b-url.json"
+assert_eq "T24G1.0 — contrôle positif : les fixtures portent le jeton (ghp_) et les identifiants d'URL (U, P), les sorties existent" "$(grep -c 'ghp_' "$AUX/fx/f1b-blob.jsonl")|$(grep -c '://UUUU' "$AUX/fx/f1b-url.jsonl")|$(G "$WORK/f1b-blob.json" 'j.absent||"sortie"')|$(G "$WORK/f1b-url.json" 'j.absent||"sortie"')" "2|2|sortie|sortie"
+assert_eq "T24G1.1 (point 1) — un blob masqué raccourcit la tranche : aucun caractère de la zone d'extension (ghp) dans le mandat ni le message" "$(G "$WORK/f1b-blob.json" 'j.absent||(()=>{const m=String(j.r.mandat),g=j.r.messages.join("");return m.includes("[masqué]")&&g.includes("[masqué]")?(/ghp/.test(m+g)?"fuite de la zone d extension":"ok"):"blob non masqué"})()')" "ok"
+assert_eq "T24G1.2 (point 6) — identifiants d'URL (portée 385) commençant avant la borne : aucun fragment (U, P) au mandat ni au message, sorties non vides" "$(G "$WORK/f1b-url.json" 'j.absent||(()=>{const m=String(j.r.mandat),g=j.r.messages.join("");return m.length>100&&g.length>100?(/UUUU|PPPP/.test(m+g)?"fragment d identifiants":"ok"):"sortie vide"})()')" "ok"
+cat > "$AUX/cnt.mjs" <<'JS'
+// cnt.mjs <scripts> <fichier> <racine> : nombre d'appels à fs.realpathSync pendant reduireTranscript (la borne de l'étiquette, sans horloge)
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, fichier, root] = process.argv; const orig = fs.realpathSync; let n = 0;
+fs.realpathSync = (...a) => { n++; return orig(...a); };
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-transcript.mjs')).href);
+const r = m.reduireTranscript(fichier, { root }); console.log(JSON.stringify({ n, outils: r.outils.length }));
+JS
+assert_eq "T24G2 (point 9) — 8,5 Mio de tool_use Read : au plus 2 appels à realpath par outil gardé (200 outils, 410 appels), donc pas d'étiquette sur les outils écartés" "$(node "$AUX/cnt.mjs" "$SCRIPTS" "$AUX/fx/f4-outils.jsonl" "$AUX/f4/lab" | node "$AUX/jq.mjs" 'j.outils===200&&j.n>0&&j.n<=410?"ok":"n="+j.n+" outils="+j.outils')" "ok"
+cat > "$AUX/mk-long.mjs" <<'JS'
+// mk-long.mjs <fichier> : première ligne user de 300 Kio (au-delà de la fenêtre de tête de 256 Kio), puis un message
+import fs from 'node:fs';
+const side = (o) => JSON.stringify({ isSidechain: true, agentId: 'long', ...o });
+fs.writeFileSync(process.argv[2], side({ type: 'user', message: { role: 'user', content: 'L'.repeat(300 * 1024) } }) + '\n' + side({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'MESSAGE-VISIBLE-69' }] } }) + '\n');
+JS
+node "$AUX/mk-long.mjs" "$AUX/fx/long.jsonl"; node "$AUX/red.mjs" "$SCRIPTS" "$AUX/fx/long.jsonl" "$LAB0" > "$WORK/long.json"
+assert_eq "T24G3 (point 10) — première ligne de 300 Kio : mandat vide ET tronque = vrai (le message reste rendu : contrôle positif)" "$(G "$WORK/long.json" 'j.absent||(j.r.messages.join("").includes("MESSAGE-VISIBLE-69")?(j.r.mandat===""&&j.r.tronque===true?"ok":"mandat="+j.r.mandat.length+" tronque="+j.r.tronque):"message absent")')" "ok"
+cat > "$AUX/pl.mjs" <<'JS'
+// pl.mjs <scripts> <fichier> : premiereLigne d'un fichier vide (échec), puis du même fichier une fois écrit
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, f] = process.argv;
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-lecture.mjs')).href);
+fs.writeFileSync(f, ''); const a = m.premiereLigne(f);
+fs.writeFileSync(f, JSON.stringify({ type: 'user', ok: 1 }) + '\n'); const b = m.premiereLigne(f);
+console.log(JSON.stringify({ a, b }));
+JS
+assert_eq "T24G4 (point 8) — un échec transitoire (fichier vide) n'est pas retenu : null puis l'objet une fois le fichier écrit" "$(node "$AUX/pl.mjs" "$SCRIPTS" "$AUX/fx/pl.jsonl" | node "$AUX/jq.mjs" 'j.a===null&&j.b&&j.b.ok===1?"ok":JSON.stringify(j)')" "ok"
+cat > "$AUX/borne.mjs" <<'JS'
+// borne.mjs <ms> <commande node et arguments...> : exécute un enfant node borné par une limite de temps (SIGKILL, sans tube) ; une ligne JSON { timedOut, status, out }
+import { spawnSync } from 'node:child_process';
+const [, , ms, ...args] = process.argv;
+const r = spawnSync(process.execPath, args, { timeout: Number(ms), killSignal: 'SIGKILL', encoding: 'utf8', maxBuffer: 64 << 20 });
+console.log(JSON.stringify({ timedOut: r.error?.code === 'ETIMEDOUT', status: r.status, out: r.stdout || '' }));
+JS
+rm -f "$AUX/fx/fifo.jsonl"; mkfifo "$AUX/fx/fifo.jsonl"
+node "$AUX/borne.mjs" 5000 "$AUX/red.mjs" "$SCRIPTS" "$AUX/fx/fifo.jsonl" "$LAB0" > "$WORK/fifo.json"; rm -f "$AUX/fx/fifo.jsonl"
+assert_eq "T24G5 (points 4, 5) — un transcript qui est un tube (FIFO) ne bloque pas reduireTranscript (enfant borné à 5 s) : ni délai dépassé, ni mandat" "$(G "$WORK/fifo.json" '(j.timedOut?"bloqué":"rendu")+"|"+(j.out.includes("mandat")?"mandat":"sans mandat")')" "rendu|mandat"
 
 vf_hyg_assert
 

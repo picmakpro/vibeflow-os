@@ -722,6 +722,46 @@ assert_eq "EUI2.19a — contrôle positif : 71 tel quel n'a rien de nouveau pour
 printf "\nconst libelleTemoin = 'Show the transcript now';\n" >> "$AUX/sonde/71-vf-equipe-rendu.js"
 assert_has "EUI2.19 — témoin : la sonde voit un libellé anglais ajouté à une copie de 71" "$(node "$AUX/sonde-fr.mjs" "$SCRIPTS" "$AUX/sonde/71-vf-equipe-rendu.js")" "Show the transcript now"
 
+echo "=== E30 — revue fraîche : tubes, champs imbriqués, nombres, coupe avant masque (points 2, 3, 5, 7) ==="
+cat > "$AUX/borne.mjs" <<'JS'
+// borne.mjs <ms> <commande node et arguments...> : exécute un enfant node borné par une limite de temps (SIGKILL, sans tube) ; une ligne JSON { timedOut, status, out }
+import { spawnSync } from 'node:child_process';
+const [, , ms, ...args] = process.argv;
+const r = spawnSync(process.execPath, args, { timeout: Number(ms), killSignal: 'SIGKILL', encoding: 'utf8', maxBuffer: 64 << 20 });
+console.log(JSON.stringify({ timedOut: r.error?.code === 'ETIMEDOUT', status: r.status, out: r.stdout || '' }));
+JS
+cat > "$AUX/spec-e30.json" <<'JSON'
+{"sessionAgeS":5,"agents":[
+ {"id":"mgr1","spawnDepth":1,"ageS":5,"role":"vf-dev-manager"},
+ {"id":"ok1","spawnDepth":2,"parent":"mgr1","ageS":3,"mandat":"Nœud `revue-p3` — fais la revue"},
+ {"id":"w1","spawnDepth":2,"parent":"mgr1","ageS":3,"mandat":"Exécute."}]}
+JSON
+H30="$(mkhome e30 "$AUX/spec-e30.json" "$LAB21" )"
+SUB30="$H30/.claude/projects/-lab/$SID/subagents"; DIR30="$H30/.claude/projects/-lab"
+cp "$SUB30/agent-ok1.meta.json" "$SUB30/agent-fifoB.meta.json"
+cp "$SUB30/agent-ok1.jsonl" "$SUB30/agent-fifoA.jsonl" # le tube meta.json est candidat : son transcript voisin est récent
+mkfifo "$SUB30/agent-fifoA.meta.json" "$SUB30/agent-fifoB.jsonl" "$DIR30/fifoS.jsonl"
+node "$AUX/borne.mjs" 8000 "$AUX/q.mjs" "$SCRIPTS" who "$LAB21" "$H30" "$NOSCRIPTS" "$NOW" > "$WORK/fifo-who.json"
+rm -f "$SUB30/agent-fifoA.meta.json" "$SUB30/agent-fifoB.jsonl" "$DIR30/fifoS.jsonl"
+assert_eq "E30.0 — contrôle positif : sans tube, la collecte de la même fixture aboutit et liste ok1 (enfant borné)" "$(node "$AUX/borne.mjs" 8000 "$AUX/q.mjs" "$SCRIPTS" who "$LAB21" "$H30" "$NOSCRIPTS" "$NOW" | node "$AUX/jq.mjs" '(j.timedOut?"bloqué":"rendu")+"|"+(()=>{try{return JSON.parse(j.out).workers.filter(w=>w.id==="ok1").map(w=>w.etat).join()}catch{return "illisible"}})()')" "rendu|actif"
+assert_eq "E30.1 (points 4, 5) — trois tubes (meta.json, transcript de sous-agent, session) ne bloquent pas la collecte (enfant borné à 8 s) et ok1 reste listé" "$(G "$WORK/fifo-who.json" '(j.timedOut?"bloqué":"rendu")+"|"+(()=>{try{return JSON.parse(j.out).workers.filter(w=>w.id==="ok1").map(w=>w.etat).join()}catch{return "illisible"}})()')" "rendu|actif"
+# point 3 : rattachement.noeud / dag venus d'un identifiant de nœud de 3 000 caractères ; point 7 : nombres et chaînes du registre qui ne sont pas ce qu'ils doivent être
+LAB30="$WORK/lab30"; mkdir -p "$LAB30/.planning/missions"; git -C "$LAB30" init -q
+printf -- '- [ ] **Phase 1: Socle** - premier jet\n' > "$LAB30/.planning/ROADMAP.md"
+LONG30="$(printf 'N%.0s' $(seq 1 3000))"
+printf '{"nodes":[{"id":"%s","step":"x","stage":"s","deps":[],"scope":[],"status":"ready"},{"id":"run1","step":"%s ghp_abcdefghijklmnopqrstuvwxyz0123456789 fin","stage":"s","deps":[],"scope":[],"status":"running"}]}\n' "$LONG30" "$(printf 'x%.0s' $(seq 1 90))" > "$LAB30/.planning/missions/m30.dag.json"
+cat > "$AUX/orphans-e30.json" <<JSON
+{"orphans":[
+ {"agent_id":"w1","role":"vf-coder","node":"$LONG30","parent":"mgr1","depth":2,"age_seconds":3,"status":"running"},
+ {"agent_id":"reg1","role":"vf-coder","node":{"o":"OBJET-NOEUD-69"},"parent":"mgr1","depth":"profond","age_seconds":{"o":"OBJET-AGE-69"},"status":"running"}]}
+JSON
+H30B="$(mkhome e30b "$AUX/spec-e30.json" "$LAB30" "$AUX/orphans-e30.json")"
+Q who "$LAB30" "$H30B" "$NOSCRIPTS" "$NOW" > "$WORK/who-e30.json"
+assert_eq "E30.2 — contrôle positif : w1 est rattaché par le registre au nœud de 3 000 caractères" "$(sf "$WORK/who-e30.json" w1 'w.rattachement.etat+"|"+w.rattachement.source')" "rattache|registre"
+assert_eq "E30.3 (point 3) — rattachement.noeud <= 128 et rattachement.dag <= 200 caractères" "$(sf "$WORK/who-e30.json" w1 '(w.rattachement.noeud.length<=128&&w.rattachement.dag.length<=200)?"ok":"noeud="+w.rattachement.noeud.length+" dag="+w.rattachement.dag.length')" "ok"
+assert_eq "E30.4 (point 7) — une entrée de registre à nœud objet, profondeur chaîne et âge objet : listée sans ces valeurs" "$(G "$WORK/who-e30.json" '(w=>w?(JSON.stringify(w).includes("OBJET-")||typeof w.depth==="string"?"valeur conservée":"ok"):"absente")(j.workers.find(x=>x.id==="reg1"))')" "ok"
+assert_eq "E30.5 (point 2) — l'étape d'un nœud running (jeton à cheval sur 100 caractères) : task sans fragment ghp_ (masque avant la coupe)" "$(G "$WORK/who-e30.json" '(w=>w?(w.task.includes("ghp")?"fragment":(w.task.length>0?"ok":"vide")):"absent")(j.workers.find(x=>x.kind==="dag-node"&&x.id==="run1"))')" "ok"
+
 vf_hyg_assert
 
 echo ""
