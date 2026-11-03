@@ -1,0 +1,70 @@
+{
+  "nodes": [
+    {
+      "id": "rech-mod",
+      "step": "recherche: inventaire du mod vf-signal + point à cadrer (arbre en retard, worktrees, missions non refermées)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rech-socle",
+      "step": "recherche: socle partagé 67 + contrat avancement 69 + DESIGN Graphite",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rech-pack",
+      "step": "recherche: packaging mod dans plugin (hooks module, gating, validate, CI, scopes)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "arbitrages",
+      "step": "envoi groupé des zones grises à Samuel",
+      "stage": "",
+      "deps": [
+        "rech-mod",
+        "rech-socle",
+        "rech-pack"
+      ],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "discuss-68",
+      "step": "CONTEXT.md + exigences VFSG + bloc ROADMAP/STATE 68",
+      "stage": "",
+      "deps": [
+        "arbitrages"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "plan-68",
+      "step": "plans 68 (gsd-plan-phase via vf-coder)",
+      "stage": "",
+      "deps": [
+        "discuss-68"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "plancheck-68",
+      "step": "plan-checker externe frais",
+      "stage": "",
+      "deps": [
+        "plan-68"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}
