@@ -891,11 +891,28 @@ Plans:
 8. Le test de forme du format Claude Code rougit si un champ lu (`parentAgentId`, `spawnDepth`, `finished`, `toolUseId`, `requestShape`, `isSidechain`, `agentId`) disparaît.
 **Sources:** `.planning/notes/2026-11-03-cockpit-progression-en-cours.md` (causes C1-C5, option A) ; `plugin/cockpit/scripts/vf-cockpit-project.mjs`, `vf-cockpit-planning.mjs`, `vf-cockpit-who.mjs` ; `69-CONTEXT.md` P69-D-12..24.
 **Hors périmètre :** option B (pourcentage pondéré, exigence à trois états `[~]`, étapes cochées à la main) ; CI, merge, release sur la carte ; terminal intégré (Phase 71) ; lancer du travail depuis le cockpit (Phase 72).
-**Plans:** 0 plans
+**Plans:** 9 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 69 to break down)
+**Wave 1**
+- [ ] 69-01-PLAN.md — Avancement : témoins (a)-(d) rouges d'abord, objet `avancement@1` dans readPlanning, missions rattachées, pied du jalon, règle STATE retirée (CKPT-13..18)
+- [ ] 69-02-PLAN.md — Témoins rouges de la collecte de l'équipe : arbre, 24 h, rattachement, dernière action, forme Claude Code, who@2 (CKPT-19..22, 27, 28)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 69-03-PLAN.md — Socle who@2 : contrat de l'équipe, forme mesurée, arbre et historique de 24 h, direct (CKPT-19, 20, 27, 28)
+- [ ] 69-04-PLAN.md — Témoins rouges du transcript, de l'onglet Équipe et du rendu de l'arbre (CKPT-19..26)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 69-05-PLAN.md — Onglet Équipe servi en mémoire (patch P24), graphe equipe@1, direct (CKPT-23)
+- [ ] 69-06-PLAN.md — Dernière action, rattachement agent -> nœud, réducteur de transcript (CKPT-21, 22, 24, 28)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 69-07-PLAN.md — Transcript servi à la demande, garde d'émission lue du contrat (CKPT-24..26, 28)
+- [ ] 69-08-PLAN.md — Tiroir en arbre, liens dans les deux sens, transcript rendu en texte (CKPT-19..23, 26)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 69-09-PLAN.md — Porte de phase rejouée depuis ci.yml, suites une à une, documentation, compte de suites (CKPT-13..28)
 
 ### Phase 70: Finitions UI du cockpit
 
