@@ -3,3 +3,5 @@ floorplan (MIT) — LICENSE
 elkjs (EPL-2.0, d'après le fichier de licence livré) — assets/vendor/elkjs-LICENSE.md
 Inter (SIL OFL 1.1, d'après le fichier de licence livré) — assets/vendor/fonts/inter-LICENSE.txt
 JetBrains Mono (SIL OFL 1.1, d'après le fichier de licence livré) — assets/vendor/fonts/jetbrains-mono-LICENSE.txt
+xterm.js (MIT, d'après le fichier de licence livré) — assets/vendor/xterm/LICENSE-xterm.txt
+@xterm/addon-fit (MIT, d'après le fichier de licence livré) — assets/vendor/xterm/LICENSE-addon-fit.txt
