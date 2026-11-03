@@ -22,7 +22,7 @@
     .brand .mark, :root[data-theme="light"] .brand .mark, :root[data-theme="light"] #madewith .mark { filter: none !important; }
     @media (min-width: 1280px), (min-width: 1000px) and (not (pointer: coarse)) {
       header { display: flex; grid-template-columns: none; }
-      header .hl { flex: 1 1 0; min-width: 264px; } /* marque 84 + onglets 123 + remonter 36 + marges : le plus étroit qui ne rogne pas ; 300 faisait sortir de 12 px le dernier bouton à 1 024 px (onglet Code avec Travail récent et Écrans) */
+      header .hl { flex: 1 1 0; min-width: 280px; } /* marque 84 + onglets 143 (trois onglets resserrés sous 1 280 px, 69-05) + remonter 36 + marges : le plus étroit qui ne rogne pas ; 300 faisait sortir de 12 px le dernier bouton à 1 024 px (onglet Code avec Travail récent et Écrans) */
       header .hc { flex: 0 1 400px; min-width: 200px; justify-content: stretch; }
       header .hr { flex: 1 1 0; min-width: min-content; }
       header .brand { flex: 0 6 auto; min-width: 84px; }

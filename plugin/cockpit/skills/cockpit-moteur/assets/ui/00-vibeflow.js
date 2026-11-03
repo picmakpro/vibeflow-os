@@ -26,6 +26,8 @@
     .vf-tabs a { padding: 5px 13px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text-3); text-decoration: none; line-height: 1.4; }
     .vf-tabs a:hover { color: var(--text-1, inherit); }
     .vf-tabs a.on { background: var(--surface); color: var(--text-1, inherit); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+    /* 69-05 : trois onglets au lieu de deux : resserrés à toute largeur pour tenir à côté de la marque, du fil d'Ariane, de la recherche et du zoom (mesuré par test-cockpit-responsive.sh) */
+      .vf-tabs { margin-left: 10px; padding: 2px; } .vf-tabs a { padding: 5px 6px; font-size: 12px; }
     .vst { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
       color: var(--c-st); background: color-mix(in srgb, var(--c-st) 14%, transparent); }
     .vst-done { --c-st: var(--st-done); } .vst-active { --c-st: var(--st-active); } .vst-todo { --c-st: var(--st-todo); } .vst-blocked { --c-st: var(--st-blocked); }
