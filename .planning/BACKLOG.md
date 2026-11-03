@@ -707,3 +707,13 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 - **Source :** `plugin/conductor/scripts/guard-fin-de-geste.sh` (copie posée dans `~/.claude/scripts/`). Correctif = PR plus release patch.
 
 **Déclencheur de reprise :** la prochaine reprise de la garde de fin de geste (avec les résidus 1 à 3 de la Phase 41.3), ou un nouveau blocage à tort.
+
+## `/vf-update` ne propose pas un module apparu dans une release — DIFFÉRÉ (2026-11-03)
+
+**Origine :** session principale du 2026-11-03. Après avoir mis VibeFlow en v2.75.0, Samuel n'a pas `/vf-cockpit`. Inscription demandée par Samuel, avec un correctif après la planification de la Phase 69 (session principale Claude Code, 2026-11-03).
+- **Constat, mesuré :** le plugin 2.75.0 est bien dans le cache (`~/.claude/plugins/cache/vibeflow-os/vibeflow/2.75.0/`), mais le registre `~/.claude/scripts/.vibeflow-installed` liste 13 modules sans `cockpit`. `/vf-update` ne met à jour que les modules déjà inscrits au registre et ne dit rien des modules du catalogue qui n'y sont pas.
+- **Conséquence :** un module livré dans une release reste invisible pour les utilisateurs existants. Il n'arrive que par un `/vibeflow-install` qu'ils n'ont aucune raison de relancer.
+- **Piste :** en fin de `/vf-update`, comparer les modules du catalogue de la version posée à ceux du registre et proposer les nouveaux, sous confirmation, jamais installés d'office. Il ne faut pas reproposer un module que l'utilisateur a retiré exprès. Témoin rouge : un registre sans `cockpit` face au catalogue v2.75.0 → aucune proposition aujourd'hui.
+- **Source :** `plugin/conductor/skills/vf-update/SKILL.md` et `plugin/_internal/vibeflow-update.sh`. Correctif = PR plus release patch.
+
+**Déclencheur de reprise :** juste après la planification de la Phase 69 (demande de Samuel, session principale Claude Code, 2026-11-03).
