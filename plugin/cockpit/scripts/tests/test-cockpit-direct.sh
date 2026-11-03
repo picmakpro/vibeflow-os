@@ -237,8 +237,8 @@ cat > "$AUX/i2.js" <<'JS'
   const ctx = document.getElementById('context'), out = { titre: ctx.querySelector('h1')?.textContent || '' };
   for (const th of ['light', 'dark']) {
     document.documentElement.setAttribute('data-theme', th); await pause(150);
-    const cs = getComputedStyle(ctx), m = /rgba?\(([^)]+)\)/.exec(cs.backgroundColor), p = m ? m[1].split(',').map(Number) : [];
-    out[th] = { theme: document.documentElement.getAttribute('data-theme'), fond: getComputedStyle(document.documentElement).getPropertyValue('--bg-rgb').trim(), filtre: cs.backdropFilter, alpha: p.length === 4 ? p[3] : p.length === 3 ? 1 : null, evenements: cs.pointerEvents, largeur: Math.round(ctx.getBoundingClientRect().width), gauche: Math.round(ctx.querySelector('h1').getBoundingClientRect().left) };
+    const cs = getComputedStyle(ctx), av = getComputedStyle(ctx, '::before'), m = /rgba?\(([^)]+)\)/.exec(av.backgroundColor), p = m ? m[1].split(',').map(Number) : [];
+    out[th] = { theme: document.documentElement.getAttribute('data-theme'), fond: getComputedStyle(document.documentElement).getPropertyValue('--bg-rgb').trim(), filtre: av.backdropFilter, alpha: p.length === 4 ? p[3] : p.length === 3 ? 1 : null, evenements: cs.pointerEvents, largeur: Math.round(ctx.getBoundingClientRect().width), gauche: Math.round(ctx.querySelector('h1').getBoundingClientRect().left) };
   }
   return out;
 })()
