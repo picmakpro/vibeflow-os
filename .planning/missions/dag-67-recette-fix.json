@@ -340,6 +340,33 @@
       ],
       "scope": [],
       "status": "running"
+    },
+    {
+      "id": "fix-sobr04-cockpit",
+      "step": "F1 borne du port, F2 Object.hasOwn P14, F3 test porteDoing",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-sobr04-dag",
+      "step": "F4 dag.sh realpath avant ecriture",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "resonde-sobr04",
+      "step": "re-sondage cible F1-F4",
+      "stage": "",
+      "deps": [
+        "fix-sobr04-cockpit",
+        "fix-sobr04-dag"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
