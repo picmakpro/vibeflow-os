@@ -1,0 +1,108 @@
+{
+  "nodes": [
+    {
+      "id": "cadrage-69",
+      "step": "cadrage 69 + inscription 71/72 (manager)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan-69",
+      "step": "recherche + plan-phase 69 + plan-check (vf-coder)",
+      "stage": "",
+      "deps": [
+        "cadrage-69"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "exec-69",
+      "step": "execute-phase 69 (vf-coder)",
+      "stage": "",
+      "deps": [
+        "plan-69"
+      ],
+      "scope": [
+        "plugin/cockpit",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-69",
+      "step": "revue vf-reviewer",
+      "stage": "",
+      "deps": [
+        "exec-69"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "audit-69",
+      "step": "audit securite vf-auditer (transcripts)",
+      "stage": "",
+      "deps": [
+        "exec-69"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "gates-69",
+      "step": "gates ci.yml + non-regression complete (manager)",
+      "stage": "",
+      "deps": [
+        "revue-69",
+        "audit-69"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "recette-69",
+      "step": "69-RECETTE-HUMAINE.md (vf-coder)",
+      "stage": "",
+      "deps": [
+        "exec-69"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-RECETTE-HUMAINE.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire (audit read-only)",
+      "stage": "",
+      "deps": [
+        "exec-69"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "pr-69",
+      "step": "push + PR vers main + CI (manager)",
+      "stage": "",
+      "deps": [
+        "gates-69",
+        "recette-69",
+        "docs"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}
