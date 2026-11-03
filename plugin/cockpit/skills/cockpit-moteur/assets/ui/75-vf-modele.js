@@ -4,6 +4,7 @@
 // vibeflow-cockpit:modele:<lab> ; il n'est ni écrit dans un fichier généré ni exporté. Une question (POST /api/ask) ne porte
 // `model` que si un choix est gardé : sinon la variable ou le défaut s'appliquent côté serveur. Le serveur revalide tout.
 // Ne touche pas au viewer : une enveloppe de window.fetch limitée à ce chemin ajoute le champ.
+// Même fichier, autre sujet (O4) : la visite « Par où commencer » est mémorisée par lab, voir plus bas.
 (() => {
   const SC = window.Floorplan, SRV = window.FLOORPLAN_SERVER;
   if (!SC || !SRV || !SRV.token) return; // page exportée ou ouverte en fichier : pas de serveur, pas d'agent
@@ -26,6 +27,38 @@
     #vf-modele:hover { color: var(--text); } #vf-modele:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }`;
   document.head.appendChild(style);
 
+  // O4 (recette 3) : la visite « Par où commencer » (40-tour.js) garde son « déjà vue » dans SC.store, donc dans le localStorage de l'ORIGINE, port compris : le port du serveur change à chaque
+  // lancement, la page repartait d'un stockage vide et la visite recouvrait la réponse à chaque chargement. Ici, sans toucher au moteur vendorisé, ce « déjà vue » est rangé par lab, sous
+  // vibeflow-cockpit:visite:<lab> (même identifiant de lab que le sélecteur ci-dessous, servi par /api/vf/modeles). Un localStorage ne franchit pas un changement de port (l'origine change) : la même
+  // marque est donc aussi posée en cookie `vibeflow-cockpit-visite-<lab>` (les cookies ne distinguent pas les ports d'un même hôte), un an, SameSite=Strict ; l'une OU l'autre suffit. Le sélecteur de modèle,
+  // lui, reste par origine (limite connue, hors périmètre). Tant que le lab n'est pas connu, la visite ne démarre pas d'elle-même ;
+  // le bouton « Par où commencer » reste utilisable. Lab inconnu (serveur muet) : pas de démarrage automatique, jamais un retour au stockage par port.
+  let visiteVue = true, visiteCle = null, visiteMarquee = false;
+  const tourCle = (k) => typeof k === 'string' && k.startsWith('tour-seen:');
+  const stockGet = SC.store.get, stockSet = SC.store.set;
+  SC.store.get = (k, d) => (tourCle(k) ? visiteVue : stockGet(k, d));
+  SC.store.set = (k, v) => {
+    if (!tourCle(k)) return stockSet(k, v);
+    visiteVue = !!v; if (v) { visiteMarquee = true; if (visiteCle) marquer(); }
+  };
+  const nomCookie = () => visiteCle.replace(/^vibeflow-cockpit:visite:/, 'vibeflow-cockpit-visite-');
+  const marquer = () => { try { localStorage.setItem(visiteCle, '1'); } catch {} try { document.cookie = nomCookie() + '=1; Max-Age=31536000; Path=/; SameSite=Strict'; } catch {} };
+  const dejaVue = () => { try { if (localStorage.getItem(visiteCle)) return true; } catch {} try { return document.cookie.split('; ').includes(nomCookie() + '=1'); } catch { return false; } };
+  const visitePose = (lab) => {
+    if (typeof lab !== 'string' || !lab || visiteCle) return;
+    visiteCle = 'vibeflow-cockpit:visite:' + lab;
+    const vue = dejaVue();
+    if (visiteMarquee) { marquer(); return; } // la personne l'a déjà lancée avec le bouton avant que le lab soit connu
+    visiteVue = vue; if (vue) return;
+    let auto = false;
+    const go = () => {
+      if (auto) return; auto = true;
+      if (location.hash.length > 1) return; // un lien qui désigne un endroit précis : pas de visite d'office (comme 40-tour.js)
+      setTimeout(() => { const T = window.FloorplanTour; if (T && !visiteVue && !T.active() && !SC.state.flow && SC.state.container === 'root') T.start(); }, 700);
+    };
+    if (SC.state.layout) go(); else SC.on('ready', go);
+  };
+
   const init = async () => {
     let d;
     try {
@@ -33,6 +66,7 @@
       if (!r.ok) return;
       d = await r.json();
     } catch { return; }
+    visitePose(d.lab);
     if (!Array.isArray(d.modeles) || !d.modeles.length) return;
     const key = 'vibeflow-cockpit:modele:' + d.lab;
     try { const v = localStorage.getItem(key); if (v && d.modeles.includes(v)) choix = v; } catch {}

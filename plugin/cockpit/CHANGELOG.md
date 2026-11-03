@@ -53,6 +53,7 @@ AskUserQuestion session principale, 2026-11-01.
 
 ### Corrigé (recette 3, 2026-11-03, avant toute publication ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-03)
 - **« Voir la dernière commande » derrière un `cd`** (O1) — `cd <chemin> && git status` affichait « … » seul (ou « cd … ») alors que c'est la forme la plus fréquente : un `cd` simple (un seul mot simple, `&&` ou `;` en mot séparé ou collé à la fin du chemin) s'efface et la règle s'applique une fois à la commande qui suit (« git status ») ; le chemin du `cd` ne sort jamais, tout autre `cd` (chemin cité, `||`, option, second `cd`) rend « … ».
+- **Visite « Par où commencer » qui revenait à chaque chargement** (O4) — son « déjà vue » vivait dans le localStorage de l'origine, port compris, et le port du serveur change à chaque lancement : la page repartait d'un stockage vide. Il est désormais mémorisé par lab (`vibeflow-cockpit:visite:<lab>`, identifiant servi par `/api/vf/modeles`) en localStorage ET en cookie (un cookie ne distingue pas les ports) ; une fois passée ou fermée elle ne revient plus d'elle-même, le bouton la rouvre. Dans la couche VibeFlow (`75-vf-modele.js`), moteur vendorisé intact. Suite `test-cockpit-projet.sh` (O4, Chrome headless, deux ports, deux labs).
 
 ### Sécurité et robustesse (correction A de la Phase 67, avant toute publication)
 - **Chaîne lab piégé -> XSS -> jeton -> exécution de code rompue à trois endroits** — échappement de tout champ du graphe (patch P16), Content-Security-Policy
