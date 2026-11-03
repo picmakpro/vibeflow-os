@@ -17,11 +17,13 @@ export const normNum = (s) => { const [a, b] = String(s).split('.'); return `${N
 export const fm = (txt) => { const m = /^---\n([\s\S]*?)\n---/.exec(txt); const o = {}; if (!m) return o; for (const l of m[1].split('\n')) { const k = /^([\w-]+):\s*(.*)$/.exec(l); if (k) o[k[1]] = k[2].trim(); } return o; };
 export const list = (v) => (v || '').replace(/^\[|\]$/g, '').split(',').map((s) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
 const NUM = '(\\d+(?:\\.\\d+)?)';
+// deux-points après le numéro : collé (gabarit GSD) ou précédé d'une espace, insécable comprise (typographie française)
+export const COLON = '[ \\t\\u00a0\\u202f]*:';
 const STATUS_SUFFIX = /\s*\((inscrite|completed|INSERTED|exécutée|cadrée|complete|clôturée|clos|CLOSE).*$/i;
 
 function parseRoadmap(txt, ws, rel, phases) {
-  // cases de phase : avec ou sans gras autour de « Phase N: nom », suffixe « - … » ou « — … » retiré
-  for (const m of txt.matchAll(new RegExp(`^- \\[([ x])\\]\\s+(?:\\*\\*)?Phase ${NUM}:\\s*(.*)$`, 'gm'))) {
+  // cases de phase : avec ou sans gras autour de « Phase N: nom » (ou « Phase N : nom »), suffixe « - … » ou « — … » retiré
+  for (const m of txt.matchAll(new RegExp(`^- \\[([ x])\\]\\s+(?:\\*\\*)?Phase ${NUM}${COLON}\\s*(.*)$`, 'gm'))) {
     const n = normNum(m[2]); const key = `${ws || ''}|${n}`;
     if (phases.has(key)) continue;
     let name = m[3].includes('**') ? m[3].split('**')[0] : m[3].replace(/\s+[-—]\s.*$/, '');
@@ -29,20 +31,21 @@ function parseRoadmap(txt, ws, rel, phases) {
     phases.set(key, { key, n, ws: ws || null, name: clip(name, 90), done: m[1] === 'x', line: m[3], roadmap: rel, goal: '', depends: [] });
   }
   // sections « ### Phase N: nom » ou « #### … » : corps jusqu'au prochain en-tête de niveau 2 à 4
-  for (const m of txt.matchAll(new RegExp(`^#{3,4} Phase ${NUM}:\\s*(.*)\\n([\\s\\S]*?)(?=^#{2,4} |(?![\\s\\S]))`, 'gm'))) {
+  for (const m of txt.matchAll(new RegExp(`^#{3,4} Phase ${NUM}${COLON}\\s*(.*)\\n([\\s\\S]*?)(?=^#{2,4} |(?![\\s\\S]))`, 'gm'))) {
     const n = normNum(m[1]); const key = `${ws || ''}|${n}`;
     let ph = phases.get(key);
     if (!ph) { ph = { key, n, ws: ws || null, name: clip(m[2].replace(/^\[|\]$/g, ''), 90), done: false, line: '', roadmap: rel, goal: '', depends: [] }; phases.set(key, ph); }
     if (ph.goal) continue;
-    ph.goal = (/\*\*Goal(?::\*\*|\*\*:)\s*([\s\S]*?)(?=\n\*\*|\n\n|(?![\s\S]))/.exec(m[3])?.[1] || '').trim();
-    const dep = /\*\*Depends on(?::\*\*|\*\*:)\s*(.*)/.exec(m[3])?.[1] || '';
-    ph.depends = /^\s*nothing/i.test(dep) ? [] : [...dep.matchAll(/\b(\d+(?:\.\d+)?)\b/g)].map((x) => normNum(x[1])).filter((x) => x !== n);
+    ph.goal = (/\*\*(?:Goal|Objectif)(?::\*\*|\*\*\s*:)\s*([\s\S]*?)(?=\n\*\*|\n\n|(?![\s\S]))/.exec(m[3])?.[1] || '').trim();
+    // dépendances : la valeur s'arrête au champ suivant posé sur la même ligne (« · **Autre**: … »)
+    const dep = (/\*\*(?:Depends on|Dépend de)(?::\*\*|\*\*\s*:)\s*(.*)/.exec(m[3])?.[1] || '').split(/\s+·\s+|\s+\*\*/)[0];
+    ph.depends = /^\s*(nothing|none|rien|aucune?\b|—|-\s*$)/i.test(dep) ? [] : [...dep.matchAll(/\b(\d+(?:\.\d+)?)\b/g)].map((x) => normNum(x[1])).filter((x) => x !== n);
   }
 }
 
 // jalons de la section « ## Milestones » : tiret simple ou cadratin, clé pouvant contenir des espaces
 function parseMilestones(txt, ws, phases, out) {
-  const sec = /## Milestones\n([\s\S]*?)(?=\n## |\n> |(?![\s\S]))/.exec(txt)?.[1] || '';
+  const sec = /## (?:Milestones|Jalons)\n([\s\S]*?)(?=\n## |\n> |(?![\s\S]))/.exec(txt)?.[1] || '';
   for (const entry of ('\n' + sec).split(/\n(?=- )/).filter((e) => e.startsWith('- '))) {
     const m = /^- (\S+) \*\*([^*]+)\*\*\s+[-—]\s+([\s\S]*)$/.exec(entry.trim());
     if (!m) continue;

@@ -185,9 +185,55 @@ assert_eq "P5.1 — deux phases distinctes" "$(G "$WORK/g5.json" 'j.nodes.filter
 assert_eq "P5.2 — chaque plan dans son compartiment" "$(G "$WORK/g5.json" 'j.files.filter(f=>f.p.endsWith("PLAN.md")).map(f=>f.n+"="+f.p.split("/")[2]).sort().join(",")')" "ph-1@deux=deux,ph-1@un=un"
 assert_eq "P5.3 — chaque exigence dans son compartiment" "$(G "$WORK/g5.json" 'j.files.filter(f=>f.p.startsWith("req/")).map(f=>f.n+"="+f.name).sort().join(",")')" "ph-1@deux.req=DEUX-01,ph-1@un.req=UN-01"
 
+# ---------- P6 — ROADMAP à la française : lu malgré la dérive, dérive détectée, correctif proposé ----------
+# Cas réel (lab Scroll-Off, 2026-11-03) : « Phase N : » partout, aucune phase lue, carte vide sans explication.
+L6="$WORK/p6"; B="$L6/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+# Roadmap
+
+## Phases
+
+- [x] **Phase 1 : Socle** — premier jet
+- [ ] **Phase 2 : Écran** — second jet
+
+## Phase Details
+
+### Phase 1 : Socle
+**Goal**: Poser le socle
+**Depends on**: rien · **Parallélisable avec**: Phase 2
+
+### Phase 2 : Écran
+**Goal**: Poser l'écran
+**Depends on**: Phase 1
+MD
+wr "$B/STATE.md" <<'MD'
+---
+milestone: v2.0
+status: executing
+---
+MD
+graph "$L6" "$WORK/g6.json"
+DR="$SCRIPTS/vf-cockpit-drift.mjs"
+echo "=== P6 — dérive de format ==="
+assert_eq "P6.1 — « Phase N : » lu : deux phases, ph-1 done" "$(G "$WORK/g6.json" 'j.nodes.filter(n=>n.kind==="phase").map(n=>n.id+":"+n.st).join(",")')" "ph-1:done,ph-2:todo"
+assert_eq "P6.2 — « rien · **Parallélisable avec**: Phase 2 » n'est pas une dépendance à 2" "$(G "$WORK/g6.json" 'j.links.filter(l=>l.k==="import").map(l=>l.a+">"+l.b).join(",")')" "n:ph-1>n:ph-2"
+assert_eq "P6.3 — règles signalées dans meta.vf.drift" "$(G "$WORK/g6.json" 'j.meta.vf.drift.regles.map(r=>r.regle+":"+r.n).join(",")')" "phase-deux-points:4,depends-on:1,jalons-absents:1,phase-courante-absente:1"
+assert_eq "P6.4 — témoin : le lab au gabarit GSD (P1) est conforme" "$(G "$WORK/g1.json" 'j.meta.vf.drift.regles.length')" "0"
+git -C "$L6" init -q && git -C "$L6" add -A && git -C "$L6" -c user.email=t@t -c user.name=t commit -qm init
+node "$DR" "$L6" --diff > "$WORK/p6.patch"
+avant="$(cd "$L6" && git hash-object .planning/ROADMAP.md)"
+assert_eq "P6.5 — le détecteur n'écrit rien sur disque" "$(cd "$L6" && git status --porcelain | wc -l | tr -d ' ')|$(cd "$L6" && git hash-object .planning/ROADMAP.md)" "0|$avant"
+assert_eq "P6.6 — le correctif proposé s'applique (git apply --check)" "$(git -C "$L6" apply --check "$WORK/p6.patch" && echo ok)" "ok"
+git -C "$L6" apply "$WORK/p6.patch"
+graph "$L6" "$WORK/g6b.json"
+assert_eq "P6.7 — après correctif : reste seulement la phase courante, non devinable" "$(G "$WORK/g6b.json" 'j.meta.vf.drift.regles.map(r=>r.regle).join(",")')" "phase-courante-absente"
+assert_eq "P6.8 — après correctif : jalon v2.0 réel, même lecture des phases" "$(G "$WORK/g6b.json" 'j.nodes.filter(n=>n.kind==="jalon").map(n=>n.label).join(",")')|$(G "$WORK/g6b.json" 'j.nodes.filter(n=>n.kind==="phase").map(n=>n.id+":"+n.st).join(",")')" "v2.0|ph-1:done,ph-2:todo"
+printf -- '- [ ] Phase 1 — sans deux-points\n' | wr "$L6/x/.planning/ROADMAP.md"
+assert_eq "P6.9 — phases citées mais illisibles : niveau bloquant" "$(node "$DR" "$L6/x" --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).constats.filter(c=>c.niveau==="bloquant").map(c=>c.regle).join(",")))')" "phases-illisibles"
+
 # ---------- P4 — contrat, syntaxe, aucun nom de compartiment de ce dépôt ----------
 echo "=== P4 — contrat et généralité ==="
-for n in 1 2 3 5; do assert_eq "P4.$n — graphe $n conforme au contrat" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-project@1 "$WORK/g$n.json")" "OK"; done
+for n in 1 2 3 5 6; do assert_eq "P4.$n — graphe $n conforme au contrat" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-project@1 "$WORK/g$n.json")" "OK"; done
 BAD=0; for f in "$SCRIPTS"/vf-cockpit-*.mjs; do node --check "$f" || BAD=$((BAD+1)); done
 assert_eq "P4.6 — node --check passe sur chaque .mjs du socle" "$BAD" "0"
 printf '%s\n' "const w = 'fiabilite';" > "$WORK/temoin.mjs"

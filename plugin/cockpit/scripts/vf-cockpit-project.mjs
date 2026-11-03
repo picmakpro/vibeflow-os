@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url';
 import { planningLayout } from './vf-cockpit-paths.mjs';
 import { readPlanning, clip, sentence, num, normNum, fm, list } from './vf-cockpit-planning.mjs';
 import { KIND_ICONS, KIND_COLORS } from './vf-cockpit-types.mjs';
+import { detectDrift } from './vf-cockpit-drift.mjs';
 
 const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };
 const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
@@ -18,6 +19,8 @@ const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
 
 export function buildProjectGraph(root, { layout } = {}) {
   root = path.resolve(root); layout = layout || planningLayout(root);
+  // dérive de format mesurée AVANT la lecture : le panneau propose le correctif au lieu d'une carte vide sans explication
+  let drift; try { drift = detectDrift(root, layout); } catch (e) { drift = { constats: [], resume: `Contrôle de format impossible : ${e.message}` }; }
   const P = readPlanning(root, layout); const { rel, state, phases, reqs } = P;
   const nodes = [], files = [], links = [];
   const node = (o) => { nodes.push({ details: '', tags: [], paths: [], packages: [], hosts: [], stats: { files: 0, loc: 0, langs: {}, repos: ['.'] }, ...o }); return o.id; };
@@ -123,6 +126,8 @@ export function buildProjectGraph(root, { layout } = {}) {
       vf: { milestone: state.milestone, phase: curPhase, phaseName: state.current_phase_name, status: state.status, lastActivity: state.last_activity, lastDesc: state.last_activity_desc, progress: state.progress,
         milestones: msList.map((m) => ({ key: m.key, st: m.st, done: m.done, total: m.ks.length, id: 'n:' + m.id })),
         next: active ? active.ks.filter((p) => !p.done).map((p) => ({ id: 'n:' + phId(p), label: `Phase ${p.n} · ${p.name}` })) : [],
+        drift: { resume: drift.resume, regles: Object.values(drift.constats.reduce((o, c) => { (o[c.regle] ||= { regle: c.regle, niveau: c.niveau, message: c.message, fichier: c.fichier, n: 0 }).n++; return o; }, {})),
+          corrigeable: drift.constats.some((c) => c.apres !== undefined) },
         counts: { phases: phases.size, plans: files.filter((f) => f.p.endsWith('-PLAN.md')).length, reqs: reqs.size, reqsDone: [...reqs.values()].filter((r) => r.done).length, dags: P.dags.length } },
       layout: { forme: layout.forme, actif: layout.actif } },
     project: { name: `${P.projectName} — Projet`, summary: resume(state, curPhase, phases.size, files) },

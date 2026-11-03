@@ -71,6 +71,11 @@
   // statuts de STATE affichés en français (valeur inconnue : telle quelle)
   const STATUT = { closed: 'clos', complete: 'terminée', completed: 'terminée', executing: 'en exécution', planning: 'en planification', paused: 'en pause', verifying: 'en vérification' };
   const statut = (x) => STATUT[x] || x || '';
+  // dérive de format de la planification (vf-cockpit-drift.mjs) : rien n'est corrigé d'ici, le panneau donne la commande
+  const NIV = { bloquant: 'blocked', 'toléré': 'todo', info: 'todo' };
+  const derive = (D) => !D || !D.regles || !D.regles.length ? '' : `<div class="sec"><h3>Format de la planification <span class="c">${D.regles.reduce((s, r) => s + (Number(r.n) || 0), 0)}</span></h3>
+      ${D.regles.map((r) => `<div class="vf-link"><span class="vst vst-${NIV[r.niveau] || 'todo'}">${h(r.niveau)}</span><span>${h(r.message)} <span style="color:var(--text-3)">(${Number(r.n) || 0} · ${h(r.fichier)})</span></span></div>`).join('')}
+      ${D.corrigeable ? `<p class="pd" style="margin-top:8px">Correctif proposé, jamais appliqué d'ici : <code>node vf-cockpit-drift.mjs &lt;lab&gt; --diff</code>, à relire puis appliquer avec <code>git apply</code>.</p>` : ''}</div>`;
   const V = G.meta.vf;
   if (TAB === 'project' && V) {
     SC.setOverview(() => {
@@ -91,6 +96,7 @@
           <div class="stats vf-stats" style="margin-top:14px"><div><b>${Number(c.phases) || 0}</b><span>phases</span></div><div><b>${Number(c.plans) || 0}</b><span>plans</span></div><div><b>${Number(c.reqsDone) || 0}/${Number(c.reqs) || 0}</b><span>exigences</span></div></div></div>
         <div class="sec"><h3>Prochaines phases <span class="c">${V.next.length}</span></h3>${next || '<p class="pd">Rien en attente dans le jalon en cours.</p>'}</div>
         <div class="sec"><h3>Jalons <span class="c">${V.milestones.length}</span></h3>${ms}</div>
+        ${derive(V.drift)}
         <div class="sec" style="color:var(--text-3);line-height:1.7;font-size:12px">Double-clic sur une carte pour plonger · <span class="kbd">⌫</span> remonter · <span class="kbd">/</span> chercher</div>`;
     });
   }
