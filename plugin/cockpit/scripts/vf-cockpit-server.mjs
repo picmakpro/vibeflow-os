@@ -1,7 +1,7 @@
 // vf-cockpit-server — le crochet VibeFlow du serveur unique (67-04, P67-D-13, P67-D-14). Le serveur patché
 // (serve.mjs, patch P13) l'importe à côté de lui et lui délègue tout /api/vf/* APRÈS son contrôle du Host et du
 // jeton : même port que la page, aucun en-tête CORS. Le direct vient de vf-cockpit-live.mjs.
-// Export : attach({ here, root, token, inject, log }) -> { ptoken, load, pageProjet, jetonValide, route, stop,
+// Export : attach({ here, root, token, inject, log }) -> { ptoken, load, pageProjet, pageEquipe, jetonValide, route, stop,
 //   avantQuestion, modes, argsAgent } (les trois derniers : crochets P14 des questions, 67-05).
 //   GET /api/vf/events  flux SSE : retry, hello { seq, lock, who }, puis patch / structural / who / lock
 //   GET /api/vf/etat    { mode, seq, derniereMaj, clients }
@@ -16,7 +16,8 @@ import crypto from 'node:crypto';
 import { startLive } from './vf-cockpit-live.mjs';
 import { revealDoing } from './vf-cockpit-who.mjs';
 import { resolveScriptsDir } from './vf-cockpit-paths.mjs';
-import { extraireGraphe } from './vf-cockpit-embed.mjs';
+import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
+import { buildEquipeGraph } from './vf-cockpit-equipe-carte.mjs';
 import { answerLocally, instructions } from './vf-cockpit-ask.mjs';
 import { MODELES, resoudreModele, argsAgent as argsConfines } from './vf-cockpit-agent.mjs';
 
@@ -25,12 +26,12 @@ const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 export function attach({ here, root, token, inject, log = () => {} }) {
   const ptoken = crypto.randomBytes(16).toString('hex'); // onglet Projet : dit de quel onglet vient une requête
-  let pageP = null, GP = null;
+  let pageP = null, GP = null, gabarit = null;
   const load = () => { // relue après chaque réécriture de project.html par le direct
     try {
       const html = fs.readFileSync(path.join(here, 'project.html'), 'utf8');
-      GP = extraireGraphe(html); pageP = html.replace('</head>', inject.replace(token, ptoken) + '</head>');
-    } catch { pageP = null; GP = null; }
+      GP = extraireGraphe(html); gabarit = html; pageP = html.replace('</head>', inject.replace(token, ptoken) + '</head>');
+    } catch { pageP = null; GP = null; gabarit = null; }
   };
   load();
   const dep = resoudreModele({ env: process.env });
@@ -109,6 +110,12 @@ export function attach({ here, root, token, inject, log = () => {} }) {
   return {
     ptoken, load, route, avantQuestion, modes, argsAgent,
     pageProjet: () => pageP,
+    // onglet Équipe (69-05, P69-D-17) : construite en mémoire à chaque appel depuis le gabarit de project.html, jamais écrite ; jeton de la page Code (inject tel quel)
+    pageEquipe: () => {
+      if (!gabarit) return null;
+      const g = buildEquipeGraph(live ? live.snapshot().who : null, { nom: GP?.meta?.rootName || path.basename(root), racine: GP?.meta?.root, logos: GP?.meta?.vfLogos });
+      return insererGraphe(gabarit, g).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Équipe</title>').replace('</head>', () => inject + '</head>');
+    },
     jetonValide: (j) => typeof j === 'string' && j === ptoken,
     stop() { live?.stop(); for (const c of clients) c.end(); },
   };

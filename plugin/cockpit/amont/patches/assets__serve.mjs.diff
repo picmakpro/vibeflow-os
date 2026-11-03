@@ -268,7 +268,7 @@
          try {
            const x = exportMap(Array.isArray(body.include) ? body.include.map(String) : EXPORT_DEFAULT, cleanFlows(body.flows));
            res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Content-Disposition': `attachment; filename="${x.name}"`, 'Cache-Control': 'no-store' });
-@@ -589,19 +560,27 @@ const server = http.createServer((req, res) => {
+@@ -589,19 +560,28 @@ const server = http.createServer((req, res) => {
      if (req.method === 'POST' && url.pathname === '/api/ask') {
        let raw = '';
        req.on('data', (d) => { raw += d; if (raw.length > 20000) req.destroy(); });
@@ -279,6 +279,7 @@
      res.writeHead(404); return res.end();
    }
 -  if (url.pathname === '/' || url.pathname === '/index.html') { res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' }); return res.end(page); }
++  if (url.pathname === '/equipe.html') { const pe = VF?.pageEquipe?.(); if (pe) return sendPage(res, pe); } // vibeflow P24
 +  if (url.pathname === '/project.html' && VF?.pageProjet()) return sendPage(res, VF.pageProjet()); // vibeflow P13, P17
 +  if (url.pathname === '/' || url.pathname === '/index.html') return sendPage(res, page);
    let file;
@@ -300,7 +301,7 @@
  // another map (or anything else) on the port: take the next free one
  let port = wantPort;
  server.on('error', (e) => {
-@@ -614,7 +593,8 @@ server.on('listening', () => {
+@@ -614,7 +594,8 @@ server.on('listening', () => {
    const u = `http://127.0.0.1:${port}`;
    try {
      fs.mkdirSync(path.dirname(stateFile), { recursive: true });
