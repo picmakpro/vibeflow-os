@@ -2,7 +2,7 @@
 
 ## v1.0.0 — 2026-11-01
 
-Première version du module (non publiée : aucune release n'est coupée pour l'instant). Décisions : arbitrages Samuel,
+Première version du module (publiée dans VibeFlow v2.75.0). Décisions : arbitrages Samuel,
 AskUserQuestion session principale, 2026-11-01.
 
 ### Ajouté

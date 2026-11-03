@@ -2,7 +2,7 @@
 
 ## [v1.52.1] — 2026-11-01 (écriture atomique de dag.sh, Phase 67)
 
-**Patch** : `save()` de `dag.sh` écrit dans un temporaire du même dossier puis `os.replace` (un lecteur concurrent — cockpit, collecteur, manager — lisait un JSON tronqué, spike 003), avec `fsync` et mode conservé (copie du mode d'un DAG existant, 0666 moins umask pour un DAG neuf), nettoyage du temporaire sur exception. Suite voisine `test-dag-atomic-save.sh` à témoin rouge joué avant le correctif. Validation ADR-031 limitée à ce correctif (P67-D-09, arbitrage Samuel, AskUserQuestion session principale, 2026-11-01). Aucune release racine (geste humain, ADR-073).
+**Patch** : `save()` de `dag.sh` écrit dans un temporaire du même dossier puis `os.replace` (un lecteur concurrent — cockpit, collecteur, manager — lisait un JSON tronqué, spike 003), avec `fsync` et mode conservé (copie du mode d'un DAG existant, 0666 moins umask pour un DAG neuf), nettoyage du temporaire sur exception. Suite voisine `test-dag-atomic-save.sh` à témoin rouge joué avant le correctif. Validation ADR-031 limitée à ce correctif (P67-D-09, arbitrage Samuel, AskUserQuestion session principale, 2026-11-01). Publiée dans VibeFlow v2.75.0.
 
 ## [v1.52.0] — 2026-10-29 (filet de divergence armé au poste d'équipe) — publiée dans v2.74.0
 
