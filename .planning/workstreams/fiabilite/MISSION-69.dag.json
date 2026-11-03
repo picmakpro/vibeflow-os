@@ -456,7 +456,7 @@
         "gates-69"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "recette-pw-69",
@@ -464,6 +464,16 @@
       "stage": "",
       "deps": [
         "recette-69"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-recette",
+      "step": "correction des defauts A, B, C de la recette Playwright (vf-coder)",
+      "stage": "",
+      "deps": [
+        "recette-pw-69"
       ],
       "scope": [],
       "status": "running"

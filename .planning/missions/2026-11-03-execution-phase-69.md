@@ -86,6 +86,28 @@ Chaque passe de correction est ensuite repassée devant un vérificateur frais, 
 5. `reste` vaut `["verification","cloture"]` pour une phase `a-faire` sans dossier : c'est la lecture littérale de P69-D-07. À confirmer si la 68 attend autre chose.
 6. Le panneau Équipe affiche encore la section « Santé » du viewer, sans objet sur cette page.
 
+## Constats pour la Phase 70
+
+Ces constats viennent de la recette pré-déroulée dans Playwright le 2026-11-03 (nœud `recette-pw-69`, tête `410e73a9`, cockpit lancé sur ce dépôt). Ils ne sont pas corrigés dans la 69 (P69-D-34). Le manager de la 70 les reprend à sa revalidation.
+
+**D. Superpositions à 1 024 px sur l'onglet Équipe (étape 12 de la recette)**
+- Le fil d'Ariane « Vue d'ensemble / Session… » passe sous le champ de recherche. Le chevauchement est mesuré.
+- Les boutons de zoom (−, ajuster, +) flottent au milieu du canevas, par-dessus la carte de l'agent sélectionné.
+- À la même largeur, l'onglet Projet tient : les titres sont tronqués (« Vibe… », « V… »), sans superposition.
+
+**E. Défauts visuels mineurs (étapes 3, 4 et 8)**
+- Le badge d'état est rogné au bord droit des cartes dont le pied est long. Exemples : Phase 69 (« En cour ») et session active (« En co »).
+- Au premier affichage d'Équipe et d'une session, la première carte est cachée sous le titre de la page. La touche F (ajuster) corrige l'affichage.
+- « Voir la dernière commande » et « Lire le transcript » gardent le style par défaut du navigateur : gris plein en thème sombre.
+- Dans le panneau d'agent, les champs Rôle, État, Branche, Arbre et Nœud forment un seul paragraphe continu.
+- Dans le tiroir, « non rattaché » et « (sans-citation) » se coupent sur deux lignes, à 390 px comme en largeur normale.
+- Le lien « Nœud exec-69 » ne se distingue pas visuellement d'un texte.
+- La dernière action de la session affiche un identifiant brut d'agent (« écrit à <id d'agent> »).
+
+**À reprendre aussi en 70**
+- P69-D-28 : les onglets resserrés à 12 px et le padding de piste de 2 px repassent aux valeurs Graphite, et la page Équipe entre dans la matrice responsive.
+- P69-D-31 : `test-cockpit-responsive.sh` (175 s) doit être allégé.
+
 ## Rejeux du manager
 
 Rejeu complet à la tête `2177a34f` :

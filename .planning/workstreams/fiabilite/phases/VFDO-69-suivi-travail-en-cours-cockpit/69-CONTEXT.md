@@ -228,6 +228,20 @@ session principale Claude Code, 2026-11-03) ; libellés de l'option choisie, mot
   `test-cockpit-responsive.sh` (cible de 60 s de `69-VALIDATION.md`) sont acceptées en 69 ; l'allègement revient à la
   Phase 70.
 
+Constats de la recette pré-déroulée dans Playwright (nœud `recette-pw-69`), soumis à Samuel par la session principale
+(arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-03).
+
+- **P69-D-32 (défauts fonctionnels A, B, C).** Samuel valide leur correction dans la 69, avant sa recette : tiroir
+  « Au travail » figé tant qu'il est ouvert (A), lien vers un nœud sans effet avant rechargement (B), transcript ou
+  commande effacés du panneau d'agent au redessin (C).
+- **P69-D-33 (points F).** « Oui, corriger dans la 69 (Recommandé) », avec les recommandations présentées, appliquées
+  telles quelles : (1) le badge « au travail » compte les agents seulement, plus les nœuds de DAG ; (2) le titre de
+  l'onglet Équipe devient « Équipe · <nom du lab> » ; (3) le champ de recherche de l'onglet Équipe reçoit un libellé
+  adapté à l'onglet, ou il est masqué si la recherche n'y sert à rien ; (4) un message tronqué finit par
+  « … (tronqué, 2 000 caractères) », avec la borne réelle. Chaque point a son témoin rouge puis vert.
+- **P69-D-34 (visuels D et E).** « À la Phase 70 (Recommandé) » : non corrigés dans la 69, consignés tels que
+  constatés dans `.planning/missions/2026-11-03-execution-phase-69.md` § Constats pour la Phase 70.
+
 Les autres défauts des plans (OQ-2 à OQ-7, OQ-10, choix d'usage du planificateur) sont des **décisions du
 manager** (vf-dev-manager, planification 2026-11-03), non soumises une à une à Samuel : elles ne valent pas
 arbitrage humain et peuvent être rouvertes sur simple objection.
