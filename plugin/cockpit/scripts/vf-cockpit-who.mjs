@@ -49,7 +49,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
 
   // 1 + 2 — sessions et sous-agents, en arbre (vf-cockpit-equipe.mjs : fenêtre de 24 h, forme Claude Code lue du contrat)
   const projects = path.join(home, '.claude', 'projects');
-  const eq = collecteAgents({ projects, now, fresh, fenetre: FENETRE, inScope, label, branche, byActivity, CC, tail, formeOk });
+  const eq = collecteAgents({ projects, now, fresh, fenetre: FENETRE, inScope, label, branche, byActivity, CC, tail, formeOk, root });
   workers.push(...eq.workers); sources.sessions = eq.source;
   const presents = new Set(eq.workers.filter((w) => w.kind === 'subagent').map((w) => w.id)); const registre = new Map(); // carte privée, jamais dans la sortie publique
 

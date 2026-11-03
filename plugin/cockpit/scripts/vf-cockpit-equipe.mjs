@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ls, mtime, readJson, ID_RE, premiereLigne } from './vf-cockpit-lecture.mjs';
+import { derniereAction, citationsDuMandat } from './vf-cockpit-transcript.mjs';
 
 export const FENETRE = 86400;
 const PROFONDEUR_MAX = 8;
@@ -23,7 +24,8 @@ export function formeSousAgent(meta, premiere, id, CC) {
 }
 
 export function collecteAgents(ctx) {
-  const { projects, now, fresh, fenetre = FENETRE, inScope, label, branche, byActivity, CC, tail } = ctx;
+  const { projects, now, fresh, fenetre = FENETRE, inScope, label, branche, byActivity, CC, tail, root } = ctx;
+  const action = (w) => { if (w.etat === 'actif') { const a = derniereAction(w._tr, root); if (a) w.action = a; } return w; }; // P69-D-16 : agents actifs seulement
   if (!fs.existsSync(projects)) return { workers: [], source: { etat: 'absente', path: projects } };
   const seuil = CC?.metaSousAgent?.requisSiProfondeur?.parentAgentId ?? 2;
   const workers = [];
@@ -75,7 +77,7 @@ export function collecteAgents(ctx) {
       if (age <= fresh || inclus.size) {
         const at = byActivity(last, tree);
         const desc = [...inclus.values()].some((x) => x.etat !== 'termine');
-        workers.push({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, last.gitBranch), cwd: last.cwd, ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', etat: age <= fresh ? 'actif' : desc ? 'en-attente' : 'termine', _tr: file });
+        workers.push(action({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, last.gitBranch), cwd: last.cwd, ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', etat: age <= fresh ? 'actif' : desc ? 'en-attente' : 'termine', _tr: file }));
       }
       for (const { c, etat } of inclus.values()) {
         subLive++;
@@ -86,7 +88,7 @@ export function collecteAgents(ctx) {
           tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, sl?.gitBranch, last.gitBranch), ageS: Math.round(c.sAge), source: 'subagent-meta', etat };
         if (fin) w.finAt = new Date(fin).toISOString();
         if (Number.isFinite(t0)) w.dureeS = Math.max(0, Math.round(((fin || now) - t0) / 1000));
-        w._tr = c.tr; workers.push(w);
+        w._tr = c.tr; workers.push(action(w));
       }
     }
   }
