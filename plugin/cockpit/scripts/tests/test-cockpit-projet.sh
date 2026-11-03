@@ -231,6 +231,24 @@ assert_eq "P6.8 — après correctif : jalon v2.0 réel, même lecture des phase
 printf -- '- [ ] Phase 1 — sans deux-points\n' | wr "$L6/x/.planning/ROADMAP.md"
 assert_eq "P6.9 — phases citées mais illisibles : niveau bloquant" "$(node "$DR" "$L6/x" --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).constats.filter(c=>c.niveau==="bloquant").map(c=>c.regle).join(",")))')" "phases-illisibles"
 
+# P6.10-14 — relecture adverse SOBR-04 de v2.75.1 : coupe au champ suivant, gras dans la valeur, « aucune » suivi d'un ordre,
+# correctif sur un ROADMAP sans « ## Phases » et sans saut de ligne final, statut de jalon clos
+L7="$WORK/p7"; B="$L7/.planning"; mkdir -p "$B"
+printf '%s\n' '# Roadmap' '' '- [ ] **Phase 1: Un** - a' '- [ ] **Phase 2: Deux** - b' '- [ ] **Phase 3: Trois** - c' '- [ ] **Phase 4: Quatre** - d' '- [ ] **Phase 5: Cinq** - e' '' \
+  '### Phase 3: Trois' '**Depends on**: Phase 1 · **Parallélisable avec**: Phase 2' '' \
+  '### Phase 4: Quatre' '**Depends on**: Phase 1 **et Phase 2** (ordre)' '' \
+  '### Phase 5: Cinq' '**Depends on**: aucune dépendance de code ; après 4' > "$B/ROADMAP.md"
+printf -- '---\nstatus: milestone_complete\n---\n' > "$B/STATE.md"
+graph "$L7" "$WORK/g7.json"
+deps() { G "$WORK/g7.json" "j.links.filter(l=>l.k===\"import\"&&l.b===\"n:ph-$1\").map(l=>l.a.slice(5)).sort().join(\",\")"; }
+assert_eq "P6.10 — « Phase 1 · **Parallélisable avec**: Phase 2 » : dépend de 1 seulement" "$(deps 3)" "1"
+assert_eq "P6.11 — « Phase 1 **et Phase 2** » : le gras ne coupe pas la valeur" "$(deps 4)" "1,2"
+assert_eq "P6.12 — « aucune dépendance de code ; après 4 » garde 4" "$(deps 5)" "4"
+assert_eq "P6.13 — statut milestone_complete : pas de phase-courante-absente" "$(G "$WORK/g7.json" 'j.meta.vf.drift.regles.map(r=>r.regle).join(",")')" "depends-on,jalons-absents"
+printf '%s' "$(cat "$B/ROADMAP.md")" > "$B/ROADMAP.md"   # sans saut de ligne final
+node "$DR" "$L7" --diff > "$WORK/p7.patch"
+assert_eq "P6.14 — correctif sans « ## Phases » ni saut final : appliqué, puis conforme" "$( (cd "$L7" && git apply "$WORK/p7.patch") && node "$DR" "$L7" | head -1)" "Format de la planification conforme."
+
 # ---------- P4 — contrat, syntaxe, aucun nom de compartiment de ce dépôt ----------
 echo "=== P4 — contrat et généralité ==="
 for n in 1 2 3 5 6; do assert_eq "P4.$n — graphe $n conforme au contrat" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-project@1 "$WORK/g$n.json")" "OK"; done

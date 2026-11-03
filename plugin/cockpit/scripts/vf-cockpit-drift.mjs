@@ -42,19 +42,24 @@ export function detectDrift(root, layout) {
       message: 'Le ROADMAP cite des phases mais aucune n\'a la forme « - [ ] **Phase N: nom** » ni « ### Phase N: nom » : le cockpit n\'en affiche aucune.' });
     if (nb && !/^## (?:Milestones|Jalons)$/m.test(txt)) {
       const st = fm(read(stateFile(root, layout) || ''));
-      const nums = [...P.phases.values()].filter((p) => !p.archive && (p.ws || null) === (c.ws || null)).map((p) => parseFloat(p.n)).sort((a, b) => a - b);
+      const nums = [...P.phases.values()].filter((p) => !p.archive && (p.ws || null) === (c.ws || null) && parseFloat(p.n) < 999).map((p) => parseFloat(p.n)).sort((a, b) => a - b);
       const cle = (st.milestone || 'Jalon en cours').replace(/\*/g, '');
-      const ancre = lignes.findIndex((l) => /^## Phases\s*$/.test(l));
-      const section = ['## Milestones', '', `- 🚧 **${cle}** — Phases ${nums[0]}-${nums.at(-1)}${st.milestone_name ? ` (${st.milestone_name.replace(/^["']|["']$/g, '')})` : ''}`, ''];
-      constats.push({ regle: 'jalons-absents', niveau: 'info', fichier, ligne: ancre >= 0 ? ancre + 1 : lignes.length,
+      const nom = (st.milestone_name || '').replace(/^["']|["']$/g, '');
+      // ancre : avant « ## Phases », sinon juste après le titre « # … », sinon en tête ; toujours une ligne réelle du fichier
+      const reelles = txt.endsWith('\n') ? lignes.length - 1 : lignes.length;
+      const h1 = lignes.findIndex((l) => /^# /.test(l));
+      let ancre = lignes.findIndex((l) => /^## Phases\s*$/.test(l));
+      if (ancre < 0) ancre = h1 >= 0 && h1 + 1 < reelles ? h1 + 1 : 0;
+      const section = ['## Milestones', '', `- 🚧 **${cle}** — Phases ${nums[0]}-${nums.at(-1)}${nom && !/[*:]/.test(nom) ? ` (${nom})` : ''}`, ''];
+      if (nums.length) constats.push({ regle: 'jalons-absents', niveau: 'info', fichier, ligne: ancre + 1,
         message: 'Pas de section « ## Milestones » : les phases sont rangées sous un jalon générique « Phases du lab ».',
-        avant: ancre >= 0 ? lignes[ancre] : null, apres: ancre >= 0 ? [...section, lignes[ancre]].join('\n') : section.join('\n'), insertion: ancre < 0 });
+        avant: lignes[ancre], apres: [...section, lignes[ancre]].join('\n') });
     }
   }
   const sf = stateFile(root, layout);
   if (sf) {
     const st = fm(read(sf));
-    if (st.status && st.status !== 'closed' && !st.current_phase && !new RegExp('^Phase:\\s*\\d', 'm').test(read(sf)))
+    if (st.status && !/closed|complete|archived|shipped/i.test(st.status) && !st.current_phase && !new RegExp('^Phase:\\s*\\d', 'm').test(read(sf)))
       constats.push({ regle: 'phase-courante-absente', niveau: 'info', fichier: rel(sf), ligne: 0,
         message: 'STATE.md sans « current_phase » : le cockpit ne sait pas quelle phase est en cours. À compléter à la main, la phase ne se devine pas.' });
   }
@@ -74,8 +79,7 @@ export function patchDrift(root, constats) {
     const rempl = new Map();
     for (const c of cs) {
       const i = c.ligne - 1; const base = rempl.get(i) ?? [anciennes[i]];
-      if (c.insertion) rempl.set(i, [...base, ...c.apres.split('\n')]);
-      else if (c.regle === 'jalons-absents') rempl.set(i, [...c.apres.split('\n').slice(0, -1), ...base]);
+      if (c.regle === 'jalons-absents') rempl.set(i, [...c.apres.split('\n').slice(0, -1), ...base]);
       else rempl.set(i, c.apres.split('\n'));
     }
     const idx = [...rempl.keys()].sort((a, b) => a - b);
@@ -86,8 +90,11 @@ export function patchDrift(root, constats) {
     for (const b of blocs) {
       const deb = Math.max(0, b[0] - 3), fin = Math.min(anciennes.length - 1, b.at(-1) + 3);
       const corps = []; let nA = 0, nN = 0;
+      const sansFin = !brut.endsWith('\n'); // dernière ligne sans saut : marqueur git, la nouvelle version en reçoit un
       for (let i = deb; i <= fin; i++) {
-        if (rempl.has(i)) { corps.push('-' + anciennes[i]); nA++; for (const l of rempl.get(i)) { corps.push('+' + l); nN++; } }
+        const derniere = sansFin && i === anciennes.length - 1;
+        if (rempl.has(i)) { corps.push('-' + anciennes[i]); nA++; if (derniere) corps.push('\\ No newline at end of file'); for (const l of rempl.get(i)) { corps.push('+' + l); nN++; } }
+        else if (derniere) { corps.push('-' + anciennes[i], '\\ No newline at end of file', '+' + anciennes[i]); nA++; nN++; }
         else { corps.push(' ' + anciennes[i]); nA++; nN++; }
       }
       out += `@@ -${deb + 1},${nA} +${deb + 1 + decalage},${nN} @@\n${corps.join('\n')}\n`;

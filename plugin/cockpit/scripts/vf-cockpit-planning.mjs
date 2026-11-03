@@ -37,9 +37,10 @@ function parseRoadmap(txt, ws, rel, phases) {
     if (!ph) { ph = { key, n, ws: ws || null, name: clip(m[2].replace(/^\[|\]$/g, ''), 90), done: false, line: '', roadmap: rel, goal: '', depends: [] }; phases.set(key, ph); }
     if (ph.goal) continue;
     ph.goal = (/\*\*(?:Goal|Objectif)(?::\*\*|\*\*\s*:)\s*([\s\S]*?)(?=\n\*\*|\n\n|(?![\s\S]))/.exec(m[3])?.[1] || '').trim();
-    // dépendances : la valeur s'arrête au champ suivant posé sur la même ligne (« · **Autre**: … »)
-    const dep = (/\*\*(?:Depends on|Dépend de)(?::\*\*|\*\*\s*:)\s*(.*)/.exec(m[3])?.[1] || '').split(/\s+·\s+|\s+\*\*/)[0];
-    ph.depends = /^\s*(nothing|none|rien|aucune?\b|—|-\s*$)/i.test(dep) ? [] : [...dep.matchAll(/\b(\d+(?:\.\d+)?)\b/g)].map((x) => normNum(x[1])).filter((x) => x !== n);
+    // dépendances : la valeur s'arrête au champ suivant posé sur la même ligne (« · » ou « **Autre**: … »), jamais sur un simple gras
+    const dep = (/\*\*(?:Depends on|Dépend de)(?::\*\*|\*\*\s*:)\s*(.*)/.exec(m[3])?.[1] || '').split(/\s+·\s+|\s+(?=\*\*[^*]+(?::\*\*|\*\*\s*:))/)[0];
+    // vide : « Nothing… » comme avant, ou un mot seul (« rien », « aucune », tiret) ; « aucune dépendance de code ; après 51 » garde 51
+    ph.depends = /^\s*(nothing|none)/i.test(dep) || /^\s*(rien|aucune?|—|-)\s*$/i.test(dep) ? [] : [...dep.matchAll(/\b(\d+(?:\.\d+)?)\b/g)].map((x) => normNum(x[1])).filter((x) => x !== n);
   }
 }
 
