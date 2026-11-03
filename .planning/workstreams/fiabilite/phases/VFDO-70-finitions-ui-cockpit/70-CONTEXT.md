@@ -201,6 +201,12 @@ Relevé par le plan-checker frais (passe 2, `3edc7e51`, verdict passed, infos no
 - 70-09 : le bump attend `v1.1.1` au-dessus de la `v1.1.0` de la 69 ; sur la branche actuelle, le module est encore en
   `v1.0.0` et la sonde rougit par construction.
 - 70-09 ne versionne plus aucune capture PNG (P70-D-17, tranché le 2026-11-03).
+- **P70-D-18 (durée de `test-cockpit-responsive.sh`).** Ajout au périmètre, arbitrage de Samuel, mot pour mot :
+  « Accepter, l'alléger en 70 (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-03,
+  relayée par la session principale). Après la 69, la suite dure 175 s pour une cible de 60 s. La 70 la ramène
+  vers sa cible au moment où elle refait l'en-tête mobile (70-04, puis 70-05). Aucun témoin n'est retiré : le
+  gain vient du regroupement des mesures et du nombre de lancements de Chrome. Durée avant et après consignée.
+  → UIFN-01.
 
 </revalidation>
 
