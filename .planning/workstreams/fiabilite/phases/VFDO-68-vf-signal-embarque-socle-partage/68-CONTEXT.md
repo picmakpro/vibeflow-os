@@ -138,6 +138,12 @@ Relayés par la session principale (SendMessage) ; réponses mot pour mot entre 
 - **P68-D-24 (bloc backlog de la vue macro).** « Le retirer (Recommandé) ». Confirme P68-PL-11.
 - **P68-D-25 (ordre du lanceur du cockpit).** « Le module posé dans le projet (Recommandé) ». Confirme P68-PL-12
   (posé projet, posé user, puis `$.plugin.root`).
+- **P68-D-26 (mission sous verrou de compartiment seul).** Question posée : une mission menée sous le seul verrou
+  du compartiment (forme d'avant la PR #197) s'afficherait-elle « abandonnée » ? Réponse de Samuel, mot pour mot :
+  « Repli sur le verrou du compartiment (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-03,
+  relayé par la session principale). Règle : le verrou de la phase passe d'abord ; sans verrou de phase, si le
+  verrou du compartiment est tenu ou récent, la mission est vivante ; sinon `abandonnee` ; une source illisible donne
+  `inconnu` (P68-D-23). Précise P68-D-22.
 
 ### Points de procédure (documentés, sans arbitrage — consigne de la session principale, 2026-11-03)
 
