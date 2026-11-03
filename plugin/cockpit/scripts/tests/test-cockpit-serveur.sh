@@ -218,6 +218,13 @@ H="$(node "$AUX/get.mjs" "$d" / | sed -n 2p)"
 assert_eq "PS.9 — aucun en-tête Set-Cookie sur la page (témoin : les en-têtes ont été lus)" "$(grep -c 'content-type' <<<"$H")|$(grep -ci 'set-cookie' <<<"$H")" "1|0"
 assert_eq "PS.10 — la couche de page ne pose ni ne lit aucun cookie (75-vf-modele.js)" "$(grep -c 'document\.cookie' "$SCRIPTS/../skills/cockpit-moteur/assets/ui/75-vf-modele.js")" "0"
 arrete "$PD"; unset VF_COCKPIT_PORT_BASE
+# F6 (revue de 6313f03b) : deux casses du même lab = le même port (realpathSync.native canonise la casse sous macOS). Ne vaut que sur un système de fichiers insensible à la casse : sinon SKIP explicite, jamais un vert vide.
+mkdir -p "$WORK/CasLabPS"
+if [ -d "$WORK/caslabps" ]; then
+  assert_eq "PS.11 — deux casses du même lab (CasLabPS / caslabps) : le même port préféré" "$(pref "$WORK/CasLabPS")" "$(pref "$WORK/caslabps")"
+else
+  echo "  SKIP — PS.11 : système de fichiers sensible à la casse ($(uname -s)), deux casses d'un chemin sont deux dossiers distincts : cas non applicable ici, vérifié sous macOS seulement"
+fi
 
 vf_hyg_assert
 echo ""

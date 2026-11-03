@@ -14,9 +14,10 @@ export function basePort(env = process.env) {
   return BASE_DEFAUT;
 }
 
+// realpathSync.native : sous macOS (APFS insensible à la casse) la casse du chemin est canonisée par le système ; `realpathSync` seul la laisse telle que saisie (deux casses = deux ports = deux localStorage).
 export function portPrefere(lab, env = process.env) {
   let reel = lab;
-  try { reel = fs.realpathSync(lab); } catch {}
+  try { reel = fs.realpathSync.native(lab); } catch {}
   const h = crypto.createHash('sha1').update(reel).digest().readUInt32BE(0);
   return basePort(env) + (h % PLAGE);
 }

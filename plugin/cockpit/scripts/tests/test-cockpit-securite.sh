@@ -227,10 +227,10 @@ assert_eq "FB3.2 — Secret99 ne sort dans aucune de ces formes" "$(printf '%s' 
 # O1 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : `cd <chemin> && …` / `cd <chemin>; …` — la forme la plus fréquente — rend la commande qui suit, réduite par la règle ci-dessus UNE fois ;
 # le chemin du cd n'est jamais affiché ; tout `cd` qui n'est pas de cette forme rend « … » (chemin cité, `||`, option, rien après, second cd, retour à la ligne). Formes fixes, rouges sur 4e72aa05 là où l'attendu change.
 cat > "$AUX/formes-cd.json" <<'JSON'
-["cd /x && git status","cd src; npm test","cd x&& ls","cd x; npm test","cd \"a b\" && ls","cd x && FOO=a$(b) c","cd x || rm -rf y","cd /x","cd x && cd y && ls","cd - && ls","cd -P x && ls","cd x &&","cd x;;ls","cd x\n&& ls","cd x && ls Secret99 y","cd x && FOO=1 gh pr list","cd secret-dir && git push origin main"]
+["cd /x && git status","cd src; npm test","cd x&& ls","cd x; npm test","cd \"a b\" && ls","cd x && FOO=a$(b) c","cd x || rm -rf y","cd /x","cd x && cd y && ls","cd - && ls","cd -P x && ls","cd x &&","cd x;;ls","cd x\n&& ls","cd x && ls Secret99 y","cd x && FOO=1 gh pr list","cd secret-dir && git push origin main","cd x;y a Secret99","cd x&&y Secret99","cd x ; ls"]
 JSON
 RCD="$(node "$AUX/mask-formes.mjs" "$SCRIPTS" "$LAB" "$WORK/home" < "$AUX/formes-cd.json")"
-assert_eq "O1.1 — cd simple : la commande suivante, une fois ; tout autre cd -> « … » ; le chemin du cd ne sort jamais" "$(printf '%s' "$RCD" | node "$AUX/ev.mjs" 'j')" '["git status","npm test","ls","npm test","…","…","…","…","…","…","…","…","…","…","ls Secret99 …","gh pr …","git push …"]'
+assert_eq "O1.1 — cd simple : la commande suivante, une fois ; tout autre cd -> « … » ; le chemin du cd ne sort jamais" "$(printf '%s' "$RCD" | node "$AUX/ev.mjs" 'j')" '["git status","npm test","ls","npm test","…","…","…","…","…","…","…","…","…","…","ls Secret99 …","gh pr …","git push …","…","…","ls"]'
 assert_eq "O1.2 — le chemin du cd (secret-dir, /x, src) ne sort dans aucune de ces formes" "$(printf '%s' "$RCD" | node "$AUX/ev.mjs" '/secret-dir|\/x|src/.test(JSON.stringify(j))')" "false"
 
 # FB3 — preuve générative. Grammaire : 0-3 affectations de tête (nues, vides, citées simple/double, $'…', $"…", $(…), backticks, (…), \ et \", mélanges), programme, 0-4 arguments (simples, citées,
@@ -273,10 +273,10 @@ for (let n = 0; n < N; n++) {
   const cible = cdCible ? -1 : rnd() < 0.5 ? nh + Math.floor(rnd() * Math.min(2, comps.length - nh)) : Math.floor(rnd() * comps.length); const mots = comps.map((c, i) => c.f(i === cible ? MARK : pick(FILL)));
   let pre = '', cdSimple = false;
   if (cd) {
-    const cc = cdCible ? MARK : pick(FILL), mc = rnd() < 0.5 ? cc : pick(MOT)(cc), op = pick(['&&', ';']), colle = rnd() < 0.3, e1 = pick(SEP), e2 = pick(SEP), e3 = pick(SEP);
+    let e3; const cc = cdCible ? MARK : pick(FILL), mc = rnd() < 0.5 ? cc : pick(MOT)(cc), op = pick(['&&', ';']), colle = rnd() < 0.3, e1 = pick(SEP), e2 = pick(SEP); e3 = pick(SEP); if (colle && e3 === ' ') e3 = ''; // F3 : séparateur collé SANS blanc derrière (`cd x;y`, `cd x&&y`) : le mot suivant est collé au chemin, ce n'est pas un cd simple
     pre = 'cd' + e1 + mc + (colle ? op + e3 : e2 + op + e3);
     // oracle du cd simple, écrit ici indépendamment du code : un seul mot de la liste blanche, sans « - » initial, aucun retour à la ligne dans les blancs du préfixe
-    cdSimple = BLANC.test(mc) && !mc.startsWith('-') && ![e1, colle ? '' : e2, e3].some((e) => e.includes('\n'));
+    cdSimple = BLANC.test(mc) && !mc.startsWith('-') && ![e1, colle ? '' : e2, e3].some((e) => e.includes('\n')) && !(colle && e3 === '');
   }
   let cmd = ''; comps.forEach((c, i) => { if (i === nh + 1 + na && nq) cmd += pick(SEP) + pick(OPS); cmd += (i ? pick(SEP) : '') + mots[i]; });
   cmd = pre + cmd;
@@ -291,7 +291,7 @@ for (let n = 0; n < N; n++) {
 }
 console.log(JSON.stringify({ n: N, fuites: fuites.slice(0, 5), nFuites: fuites.length, legit, legitCd, ms: Date.now() - t0 }));
 JS
-SEED=20261103; NGEN=12000
+SEED=20261103; NGEN=16000
 GEN="$(node "$AUX/gen.mjs" "$SCRIPTS" "$LAB" "$WORK/home" "$SEED" "$NGEN")"
 echo "  graine=$SEED commandes=$NGEN ; sortie : $(printf '%s' "$GEN" | node "$AUX/ev.mjs" '"fuites="+j.nFuites+" legit="+j.legit+""+" legitCd="+j.legitCd+" ms="+j.ms')"
 assert_eq "FB3.3 — $NGEN commandes générées (graine $SEED) : le marqueur ne sort que placé dans le programme ou le premier argument ET simple (échec : commande, sortie, graine)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.nFuites+" fuite(s) : "+JSON.stringify(j.fuites.slice(0,2))+" graine='$SEED'"')" "0 fuite(s) : [] graine=$SEED"
