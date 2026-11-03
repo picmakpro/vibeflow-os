@@ -31,7 +31,7 @@
       "scope": [
         ".planning/workstreams/fiabilite/phases/VFDO-70-finitions-ui-cockpit"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "plan-70",
@@ -43,7 +43,7 @@
       "scope": [
         ".planning/workstreams/fiabilite/phases/VFDO-70-finitions-ui-cockpit"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "plancheck-70",
@@ -55,7 +55,7 @@
       "scope": [
         ".planning/workstreams/fiabilite/phases/VFDO-70-finitions-ui-cockpit"
       ],
-      "status": "blocked"
+      "status": "done"
     }
   ]
 }

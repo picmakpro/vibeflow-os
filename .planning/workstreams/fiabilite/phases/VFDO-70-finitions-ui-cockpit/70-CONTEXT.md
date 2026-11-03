@@ -1,7 +1,7 @@
 # Phase 70: Finitions UI du cockpit - Context
 
 **Gathered:** 2026-11-03
-**Status:** Cadrée (2026-11-03, P70-D-01..16) — planification en cours ; exécution après le merge de la 69
+**Status:** Planifiée (2026-11-03, 9 plans 70-01..09 en 6 vagues, plan-checker frais passed sur `3edc7e51`) — non exécutée ; exécution après le merge de la 69 et la revalidation P70-D-14
 
 **Exigences :** UIFN-01 à UIFN-10 (préfixe neuf, P70-D-12), inscrites dans `REQUIREMENTS.md` du compartiment
 et dans la ligne `Requirements` de la Phase 70 du ROADMAP.
@@ -182,6 +182,22 @@ Captures : `scratchpad/captures-70/` de la session du manager (non versionnées)
   liste « À finir » vide. Aucun test de la voie locale sur un lab sans STATE.
 
 </facts>
+
+<revalidation>
+## À reprendre à la revalidation après le merge de la 69 (P70-D-14)
+
+Relevé par le plan-checker frais (passe 2, `3edc7e51`, verdict passed, infos non bloquantes) :
+- 70-09, bloc `<traces_sans_chemin_machine>` : il nomme `70-09-CAPTURES.md` ; l'artefact s'appelle `70-CAPTURES.md`
+  (et `70-RECETTE-HUMAINE.md`) partout ailleurs dans le plan.
+- `scripts/check-machine-paths.sh` ne balaie que les fichiers suivis : la relecture d'une RED-TRACE neuve se fait
+  après `git add` et avant le commit, sinon elle est verte sans avoir lu le fichier.
+- 70-04 tâche 2 : le critère « 12 px / 2 px = 0 occurrence » est déjà à 0 avant la 69 ; il n'a de sens que sur le
+  code de la 69 (mesuré 1/1 sur `feat/phase-69-suivi-travail`).
+- 70-09 : le bump attend `v1.1.1` au-dessus de la `v1.1.0` de la 69 ; sur la branche actuelle, le module est encore en
+  `v1.0.0` et la sonde rougit par construction.
+- 70-09 versionne 34 captures PNG dans le dossier de phase (précédent `spikes/002`) : point ouvert pour Samuel.
+
+</revalidation>
 
 <canonical_refs>
 ## Canonical References
