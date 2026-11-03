@@ -33,7 +33,7 @@
         "plugin/cockpit",
         ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-69",
@@ -45,7 +45,7 @@
       "scope": [
         ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "audit-69",
@@ -57,7 +57,7 @@
       "scope": [
         ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "gates-69",
@@ -68,7 +68,7 @@
         "audit-69"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "recette-69",
@@ -80,7 +80,7 @@
       "scope": [
         ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-RECETTE-HUMAINE.md"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "docs",
@@ -90,7 +90,7 @@
         "exec-69"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "pr-69",
@@ -102,7 +102,7 @@
         "docs"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "x69-01",
@@ -226,7 +226,7 @@
         "plugin/cockpit/scripts/tests/test-cockpit-reseau.sh",
         ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-07-*"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "x69-08",
@@ -243,7 +243,7 @@
         "plugin/cockpit/skills/cockpit-moteur/VENDORED.txt",
         ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-08-*"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "x69-09",
@@ -263,7 +263,7 @@
         ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-VALIDATION.md",
         ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-09-*"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "revue-69-01",
@@ -286,6 +286,166 @@
         "plugin/cockpit/scripts/tests/test-cockpit-avancement.sh",
         "plugin/cockpit/scripts/tests/test-cockpit-projet.sh"
       ],
+      "status": "done"
+    },
+    {
+      "id": "audit-69-lecture",
+      "step": "audit anticipe couche de lecture (vf-auditer)",
+      "stage": "",
+      "deps": [
+        "x69-06"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-lecture",
+      "step": "correction ciblee audit lecture F1-F4 (vf-coder)",
+      "stage": "",
+      "deps": [
+        "audit-69-lecture"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-transcript.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-lecture.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-who.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-equipe.mjs"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "recette-69-redac",
+      "step": "redaction 69-RECETTE-HUMAINE.md, anticipee des que l UI est posee (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-08"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-RECETTE-HUMAINE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-69-ui",
+      "step": "revue serveur+UI+suites 69-02..08 hors lecture (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "x69-07",
+        "x69-08"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-69-ui",
+      "step": "audit securite route+UI (vf-auditer)",
+      "stage": "",
+      "deps": [
+        "x69-07",
+        "x69-08"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-69-lecture",
+      "step": "revue fraiche couche de lecture + correctif audit (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "fix-69-lecture"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-jalon",
+      "step": "correction ciblee jalon en cours CKPT-16 + derive doc 3e onglet (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-09"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-ui",
+      "step": "correction ciblee revue UI F1-F6 (vf-coder)",
+      "stage": "",
+      "deps": [
+        "revue-69-ui"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-lecture-2",
+      "step": "correction ciblee n2 revue fraiche lecture (10 mineurs) (vf-coder)",
+      "stage": "",
+      "deps": [
+        "revue-69-lecture"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-fix-69-ui",
+      "step": "verification fraiche du correctif UI (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "fix-69-ui"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-fix-69-lecture-2",
+      "step": "verification fraiche correctif lecture n2 (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "fix-69-lecture-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-mineurs",
+      "step": "derniere passe : 6 mineurs des verifications fraiches (vf-coder)",
+      "stage": "",
+      "deps": [
+        "verif-fix-69-ui",
+        "verif-fix-69-lecture-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-fix-69-mineurs",
+      "step": "verification fraiche derniere passe (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "fix-69-mineurs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-read-project",
+      "step": "fermer la famille read() dans vf-cockpit-project.mjs (vf-coder)",
+      "stage": "",
+      "deps": [
+        "fix-69-mineurs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-fix-69-read-project",
+      "step": "verification fraiche lecture bornee (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "fix-69-read-project"
+      ],
+      "scope": [],
       "status": "done"
     }
   ]
