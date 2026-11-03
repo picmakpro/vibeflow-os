@@ -75,7 +75,7 @@
   const CLE_OUVERT = 'vf-equipe-ouvert';
   let lu = null, redemande = false;
   const marque = (id) => { try { if (id) sessionStorage.setItem(CLE_OUVERT, id); else sessionStorage.removeItem(CLE_OUVERT); } catch {} };
-  const boutons = () => [...document.querySelectorAll('[data-vf-transcript]')];
+  const boutons = () => [...document.querySelectorAll('#panel [data-vf-transcript]')];
   const remettre = () => {
     const bs = boutons(); if (!bs.length) return;
     if (!lu) {
@@ -88,7 +88,7 @@
     if (!b) { lu = null; marque(null); return; } // un autre agent : le transcript lu disparaît
     const z = zoneDe(b); if (!z.firstChild) z.replaceChildren(...lu.noeuds);
   };
-  new MutationObserver(remettre).observe(document.documentElement, { childList: true, subtree: true });
+  new MutationObserver(remettre).observe(document.getElementById('panel') || document.documentElement, { childList: true, subtree: true }); // le panneau seulement
   async function suivre() {
     const liste = equipe(window.__vfLive?.who);
     if (!window.__vfLive?.who) return;

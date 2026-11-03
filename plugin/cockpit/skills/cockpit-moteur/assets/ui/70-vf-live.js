@@ -88,7 +88,8 @@
     const t = demandes.get(b.dataset.vfDoing), z = b.nextElementSibling;
     if (t !== undefined && z && z.classList.contains('vf-doing') && z.textContent !== t) { z.textContent = t; z.hidden = false; }
   };
-  new MutationObserver(() => { for (const b of document.querySelectorAll('[data-vf-doing]')) poser(b); }).observe(document.documentElement, { childList: true, subtree: true });
+  // observé : le panneau seulement (la carte du code compte des milliers d'éléments redessinés en rafale) ; rien à reposer tant qu'aucune commande n'a été demandée
+  new MutationObserver(() => { if (demandes.size) for (const b of document.querySelectorAll('#panel [data-vf-doing]')) poser(b); }).observe(document.getElementById('panel') || document.documentElement, { childList: true, subtree: true });
   document.addEventListener('click', async (ev) => {
     const b = ev.target.closest?.('[data-vf-doing]');
     if (!b) return;
