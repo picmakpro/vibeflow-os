@@ -31,7 +31,8 @@ function lireArgs(argv) {
     else if (VERBES.includes(a)) o.verbe = a;
     else return { erreur: `argument inconnu : ${a}` };
   }
-  if (o.port !== null && !(/^\d{1,5}$/.test(String(o.port)) && Number(o.port) >= 1024 && Number(o.port) <= 65535)) return { erreur: `port invalide : ${o.port}` };
+  // Borne haute 65515 = 65535 − 20 : le repli de serve.mjs tente port+1 sur 20 essais ; au-delà de 65515 il sortirait de la plage (65536 : ERR_SOCKET_BAD_PORT avalée, serveur orphelin sans server.json).
+  if (o.port !== null && !(/^\d{1,5}$/.test(String(o.port)) && Number(o.port) >= 1024 && Number(o.port) <= 65515)) return { erreur: `port invalide : ${o.port}` };
   return o;
 }
 
