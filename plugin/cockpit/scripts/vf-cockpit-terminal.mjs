@@ -17,12 +17,18 @@ import { injectionTiroir } from './vf-cockpit-terminal-tiroir.mjs';
 
 const log = (m) => console.error(`vf-cockpit (terminal) : ${m}`);
 const json = (res, statut, objet) => { res.writeHead(statut, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(objet)); };
-const MAX_CORPS = 65536;
-const lireCorps = (req) => new Promise((resolve) => {
-  const morceaux = []; let n = 0;
-  req.on('data', (c) => { n += c.length; if (n > MAX_CORPS) { resolve(null); req.destroy(); } else morceaux.push(c); });
-  req.on('end', () => resolve(Buffer.concat(morceaux)));
-  req.on('error', () => resolve(null));
+export const CORPS_ENTREE_MAX = 65536; // P71-D-10 : au-delà, 413 et rien n'est écrit au shell
+export const TAILLE_MAX = { lignes: 500, colonnes: 1000 };
+const CORPS_TAILLE_MAX = 32;
+// lit le corps par morceaux jusqu'à `max` octets ; null au-delà (le reste est écarté sans être gardé). Content-Length annoncé trop grand : null sans rien lire.
+const lireCorps = (req, max) => new Promise((resolve) => {
+  const annonce = Number(req.headers['content-length']);
+  if (Number.isFinite(annonce) && annonce > max) { req.resume(); return resolve(null); }
+  const morceaux = []; let n = 0, fini = false;
+  const clore = (v) => { if (!fini) { fini = true; resolve(v); } };
+  req.on('data', (c) => { n += c.length; if (n > max) { morceaux.length = 0; clore(null); req.resume(); } else if (!fini) morceaux.push(c); });
+  req.on('end', () => clore(Buffer.concat(morceaux)));
+  req.on('error', () => clore(null));
 });
 
 export function preparerTerminal({ here, root, jetons = () => [], plateforme = process.platform } = {}) {
@@ -44,37 +50,51 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
   sessions = creerSessions({ engineDir: moteur, lab: root, jetons: () => [...jetons(), secret] });
 
   const origineQ = () => `http://127.0.0.1:${portQ}`;
-  // un seul point d'entrée : rend 0 si la requête est admise, sinon le statut du refus
+  // un seul point d'entrée, appelé avant tout routage et toute lecture de corps : null si la requête est admise, sinon { statut, raison }
   function controle(req, url) {
-    if (req.method !== 'GET' && req.method !== 'POST') return 403; // aucun préflight, aucune autre méthode
+    if (req.method !== 'GET' && req.method !== 'POST') return { statut: 403, raison: 'méthode' }; // aucun préflight (OPTIONS), aucune autre méthode
     const page = req.method === 'GET' && url.pathname === '/';
-    const hotes = [`127.0.0.1:${portQ}`, ...(page ? [`localhost:${portQ}`] : [])];
-    if (!hotes.includes(String(req.headers.host || '').toLowerCase())) return 403;
+    const hotes = [`127.0.0.1:${portQ}`, ...(page ? [`localhost:${portQ}`] : [])]; // localhost : la page seule, jamais une route d'action
+    if (!hotes.includes(String(req.headers.host || '').toLowerCase())) return { statut: 403, raison: 'Host' };
     const o = req.headers.origin;
-    if (o === undefined) { if (!page) return 403; } else if (o !== origineQ()) return 403;
-    return 0;
+    if (o === undefined) { if (!page) return { statut: 403, raison: 'Origin absente' }; } else if (o !== origineQ()) return { statut: 403, raison: 'Origin' };
+    return null;
   }
-  const entetes = (res) => { res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Cache-Control', 'no-store'); };
-  const refus = (res, statut) => { res.writeHead(statut); res.end(); };
+  // toute réponse, refus compris : jamais d'en-tête CORS, de cookie ni de X-Frame-Options ; la page de Q remplace la CSP de base par la sienne
+  const entetes = (res) => {
+    res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+  };
+  let nRefus = 0;
+  const refus = (res, statut, raison) => { // le journal nomme la raison, jamais une valeur reçue ; plafonné
+    if (raison && ++nRefus <= 50) log(`requête refusée : ${raison}.`);
+    res.writeHead(statut, statut === 413 ? { Connection: 'close' } : {}); res.end();
+  };
   const taille = (v) => { const m = /^(\d{1,3})x(\d{1,3})$/.exec(String(v || '')); return m ? { lignes: Number(m[1]), colonnes: Number(m[2]) } : null; };
+  const tailleCorps = (b) => { // « <lignes> <colonnes> » : deux entiers décimaux dans les bornes
+    const m = /^(\d{1,4}) (\d{1,4})$/.exec(b.toString('utf8')); if (!m) return null;
+    const l = Number(m[1]), c = Number(m[2]);
+    return l >= 1 && l <= TAILLE_MAX.lignes && c >= 1 && c <= TAILLE_MAX.colonnes ? { l, c } : null;
+  };
 
   async function traiter(req, res) {
     entetes(res);
-    const url = new URL(req.url, origineQ());
-    const c = controle(req, url); if (c) return refus(res, c);
+    let url; try { url = new URL(req.url, origineQ()); } catch { return refus(res, 400, 'adresse'); }
+    const c = controle(req, url); if (c) return refus(res, c.statut, c.raison);
     const { pathname: p } = url, m = req.method;
     if (p === '/' && m === 'GET') {
       const { html, csp } = pageTerminal({ theme: url.searchParams.get('theme') === 'light' ? 'light' : 'dark', origineP: `http://127.0.0.1:${portP}` });
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': csp }); return res.end(html);
     }
+    if (p === '/amorce' && m === 'POST') { // l'amorçage n'est jamais lu qu'à l'échange ; il se consomme une seule fois
+      if (!consommerAmorce(fichierAmorce, req.headers['x-vf-amorce'])) return refus(res, 403, 'amorçage');
+      return json(res, 200, { secret });
+    }
+    // le secret précède le routage : une route inconnue ne se devine pas sans lui
+    if (!egal(req.headers['x-vf-terminal'], secret)) return refus(res, 401, 'secret');
     const routes = { '/amorce': 'POST', '/flux': 'GET', '/entree': 'POST', '/taille': 'POST', '/etat': 'GET' };
     if (!(p in routes)) return refus(res, 404);
     if (routes[p] !== m) return refus(res, 405);
-    if (p === '/amorce') { // l'amorçage n'est jamais lu qu'à l'échange ; il se consomme une seule fois
-      if (!consommerAmorce(fichierAmorce, req.headers['x-vf-amorce'])) return refus(res, 403);
-      return json(res, 200, { secret });
-    }
-    if (!egal(req.headers['x-vf-terminal'], secret)) return refus(res, 401);
     const onglet = req.headers['x-vf-onglet'];
     if (p === '/etat') return json(res, 200, sessions.etat());
     if (p === '/flux') {
@@ -82,10 +102,10 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
       if (!t) return refus(res, 400);
       const r = sessions.attacher(req, res, { onglet, ...t }); return r === 200 ? undefined : refus(res, r);
     }
-    const corps = await lireCorps(req); if (!corps) return refus(res, 413);
-    if (p === '/entree') return refus(res, sessions.ecrire(corps, onglet));
-    const t = /^(\d{1,3}) (\d{1,3})$/.exec(corps.toString('utf8')); // /taille
-    return refus(res, t ? sessions.redimensionner(Number(t[1]), Number(t[2]), onglet) : 400);
+    const corps = await lireCorps(req, p === '/entree' ? CORPS_ENTREE_MAX : CORPS_TAILLE_MAX);
+    if (p === '/entree') return corps ? refus(res, sessions.ecrire(corps, onglet)) : refus(res, 413, 'corps trop grand');
+    const t = corps ? tailleCorps(corps) : null; // /taille
+    return refus(res, t ? sessions.redimensionner(t.l, t.c, onglet) : 400);
   }
 
   const q = http.createServer((req, res) => { traiter(req, res).catch(() => { try { if (!res.headersSent) refus(res, 500); else res.end(); } catch {} }); });
