@@ -1,6 +1,6 @@
 ---
 name: vf-cockpit
-description: "Ouvre le cockpit web local du lab courant : onglet Projet (jalons, phases, plans, exigences, missions, qui est au travail) et onglet Code. Verbe tapé par l'utilisateur : `/vf-cockpit [open|stop|status|build]`."
+description: "Ouvre le cockpit web local du lab courant : onglet Projet (jalons, phases, plans, exigences, missions, qui est au travail), onglet Équipe (agents au travail) et onglet Code. Verbe tapé par l'utilisateur : `/vf-cockpit [open|stop|status|build]`."
 vf-invocation: user
 disable-model-invocation: true
 ---

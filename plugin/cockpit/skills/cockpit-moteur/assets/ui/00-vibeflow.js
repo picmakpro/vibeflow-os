@@ -1,6 +1,6 @@
-// VibeFlow (spike 002) : deux onglets sur le même viewer — Code (la carte floorplan) et Projet
-// (jalons → phases → plans, exigences, missions, backlog). Statuts sur les cartes, panneau
-// d'ensemble du projet, et pont entre les deux onglets : un plan ou un nœud de mission renvoie aux
+// VibeFlow (spike 002) : trois onglets sur le même viewer — Code (la carte floorplan), Projet
+// (jalons → phases → plans, exigences, missions, backlog) et Équipe (qui est au travail). Statuts sur les cartes, panneau
+// d'ensemble du projet, et pont entre les onglets Code et Projet : un plan ou un nœud de mission renvoie aux
 // fichiers qu'il touche, un fichier de code renvoie aux plans qui l'ont touché.
 // Ne parle au viewer que par window.Floorplan (+ patchs P1-P4, cf. VENDORED.txt).
 (() => {

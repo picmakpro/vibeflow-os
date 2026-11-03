@@ -1,7 +1,7 @@
 // VibeFlow (67-04) : le direct, sur le port de la page. Écoute /api/vf/events (SSE, même origine, jeton de la
 // page) et applique les statuts dans la page ouverte sans la recharger : on modifie le graphe en place puis
 // Floorplan.rerender() garde le zoom, la position et la sélection. Changement de structure → rechargement (la
-// vue vit dans le hash). Badge « au travail » dans l'en-tête, sur les deux onglets. La dernière commande d'une
+// vue vit dans le hash). Badge « au travail » dans l'en-tête, sur les trois onglets. La dernière commande d'une
 // session n'est jamais dans le flux : elle se demande à l'unité (/api/vf/doing, jeton en en-tête), et reste
 // dans la ligne cliquée (ni graphe, ni localStorage, ni export). Flux coupé : un seul sondage pour les deux flux (celui-ci et le
 // rechargement du viewer), à recul — 1 s pendant 30 s, puis 5 s, puis arrêt avec un message et « Réessayer » (E-6).
