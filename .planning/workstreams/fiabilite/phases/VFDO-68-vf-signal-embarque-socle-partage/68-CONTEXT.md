@@ -125,6 +125,33 @@ recommandations sont donc retenues :
 - **P68-D-21 (version du module).** Pas de nouveau `module.json` : les compteurs de modules des README ne bougent
   pas (`check-version-sync.sh`). Le module `cockpit` monte d'une minor après la version posée par la 69.
 
+### Arbitrages de Samuel sur les points à décider de 68-01 (AskUserQuestion, session principale Claude Code, 2026-11-03)
+
+Relayés par la session principale (SendMessage) ; réponses mot pour mot entre guillemets.
+
+- **P68-D-22 (deux DAG d'un même compartiment).** « Oui, par le verrou de phase (Recommandé) ». Une mission est
+  vivante si le verrou de **sa phase** (`driver-lock.sh --ws --phase`, mergé sur main par la PR #197) est tenu ou
+  récent ; le DAG porte sa phase ; `driver-lock.sh` n'est pas modifié. Précise P68-D-05 et P68-D-16 ; remplace
+  l'hypothèse P68-PL-02 (verrou du compartiment).
+- **P68-D-23 (source des verrous illisible).** « « État inconnu » ». Troisième état explicite, ni `running` ni
+  `abandonnee`, porté par le contrat `avancement`, affiché et testé. Remplace l'hypothèse P68-PL-03.
+- **P68-D-24 (bloc backlog de la vue macro).** « Le retirer (Recommandé) ». Confirme P68-PL-11.
+- **P68-D-25 (ordre du lanceur du cockpit).** « Le module posé dans le projet (Recommandé) ». Confirme P68-PL-12
+  (posé projet, posé user, puis `$.plugin.root`).
+
+### Points de procédure (documentés, sans arbitrage — consigne de la session principale, 2026-11-03)
+
+- Version minimale de Claude Code : aucun champ de version minimale n'est documenté pour les mods ; la version
+  de `claude` utilisée en CI et à la recette est consignée (68-09, 68-10).
+- Délai de revue de Willy : la PR qui touche `.github/` attend la revue `@picmakpro` ; délai hors de la main de
+  la mission, constaté à 68-09.
+- Croisement des identifiants `who@2` et `$.agent.list()` : constaté à la recette (68-10), pas tranché d'avance.
+
+### Attendu sur `reste` (point venu du manager de la 69, 2026-11-03)
+
+Pour une phase `a-faire`, la 69 livre `reste = ["verification","cloture"]` (lecture littérale de P69-D-07). Vérifié
+contre les plans de la 68 au tour de révision (voir 68-01).
+
 ### Constats mesurés (trois recherches et une sonde en lecture seule, 2026-11-03)
 
 - Mod : 17 fichiers source (≤ 226 lignes chacun, ADR-035 tenu), `tsc` strict, `claude plugin validate --strict`

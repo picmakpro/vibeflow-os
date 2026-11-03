@@ -13,7 +13,7 @@ Tous sont des fichiers suivis. Aucun miroir gitignoré cité.
 | Point | Plan 69 | Code `phase-69b` | Conséquence 68 |
 |---|---|---|---|
 | Dossier des suites | prompt : `plugin/cockpit/tests/` | **`plugin/cockpit/scripts/tests/`** (`plugin/cockpit/tests/` n'existe pas) | Nouvelles suites : `plugin/cockpit/scripts/tests/test-cockpit-<x>.sh`. La découverte CI est `find plugin scripts -path '*/tests/test-*.sh'` (`scripts/ci-shard-suites.sh:20`). |
-| Contrat `avancement` | clé `avancement`, `version: 1`, `requis`, `etats`, `reste` | idem **plus** `missionEtats: ["running","failed","done","ready"]` (`vf-cockpit-interface.json:4-11`), absent du plan (grep `missionEtats` : 0 dans 69-01/69-03) | La montée de version ajoute `abandonnee` à `missionEtats` ; A7 compare ce vocabulaire à `etatMission` (`test-cockpit-avancement.sh:87-88`). |
+| Contrat `avancement` | clé `avancement`, `version: 1`, `requis`, `etats`, `reste` | idem **plus** `missionEtats: ["running","failed","done","ready"]` (`vf-cockpit-interface.json:4-11`), absent du plan (grep `missionEtats` : 0 dans 69-01/69-03) | La montée de version ajoute `abandonnee` et `inconnu` (P68-D-23) à `missionEtats` ; A7 compare ce vocabulaire à `etatMission` (`test-cockpit-avancement.sh:87-88`). |
 | Exports `avancement.mjs` | `ETATS, RESTE, LIBELLES_ETAT, LIBELLES_RESTE, decompte, trouverPhase, rattacherMission, etatMission, reste, avancement` | identiques (`vf-cockpit-avancement.mjs:2`) | Aucun écart de noms. |
 | Forme `mission` | `{ nom, etat }` | `{ nom, etat }` (`choisir`, l.78-83) ; `etatMission(nodes)` ne reçoit **que** des nœuds | La règle de vie (verrou) ne peut pas vivre dans `etatMission` sans changer sa signature. Le module est déclaré « pur : ne lit que ce qu'on lui passe » (l.4). Il faut donc passer l'état du verrou **dans** `missions[]` (champ `vie`), lu en amont. |
 | `who` | `cockpit-who@2` | `schema: 'vibeflow/cockpit-who@2'` (`who.mjs:121`), champ `rattachement` et `etatsSource` déclarés | Contrat `who@2` réel : `requis {at, root, trees, fresh, fenetre, busy, workers, sources}`. Le `schema` n'est PAS dans `requis` de l'interface (alors qu'il l'est pour project/equipe) : à ne pas copier tel quel pour `signal@1`. |
@@ -102,12 +102,13 @@ export function avancement({ ph, fichiers, missions, lire } = {}) {  // l.88-94
   return { version: 1, etat, plans: {faits,total}, correctifs, mission: choisir(ms), reste: reste(...) };
 }
 ```
-**À faire (forme)** : `missions[]` reçoit un champ `vie` (`{tenu, stale, progressAgeS}` ou `null`), calculé **hors** du module pur (lecteur de verrou, groupe suivant) ; `etatMission(nodes, vie)` rend `abandonnee` si un nœud `running` existe, que le verrou n'est pas tenu/est `stale` et que `progress_age_seconds` ≥ 1800 (ou `null`). `lance` (l.89) ne doit plus compter une mission `abandonnee` : sinon la phase reste `en-cours`. Montée : `version: 2`, `missionEtats` + `abandonnee` dans `interface.json`, `avancement.version` dans A2.5/A7.
+**À faire (forme)** : `missions[]` reçoit un champ `vie` (`{tenu, stale, progressAgeS, ttl}` ou `null`), calculé **hors** du module pur (lecteur de verrou, groupe suivant), sur le verrou **de la phase** de la mission (P68-D-22 : entrée `scope: phase` de `status --all`, mêmes `ws` et `phase` que la phase rattachée par `rattacherMission`) ; `etatMission(nodes, vie)` rend `inconnu` si un nœud `running` existe et que `vie` vaut `null` (source illisible, P68-D-23), `abandonnee` si le verrou n'est pas tenu/est `stale` et que `progress_age_seconds` ≥ `ttl` (ou `null`), `running` sinon (et si `vie` est `undefined`). `lance` (l.89) ne doit plus compter une mission `abandonnee` ni `inconnu` : sinon la phase reste `en-cours`. Montée : `version: 2`, `missionEtats` + `abandonnee` + `inconnu` dans `interface.json`, `avancement.version` dans A2.5/A7.
 
 **Pièges** :
 - `who.mjs:116` (nœuds `running` + TTL 1800 déjà appliqué côté `who` via `age`, `stale`) vs `avancement` qui ne l'applique pas : même TTL, deux calculs. Réutiliser la valeur de TTL du JSON de `driver-lock.sh status` (`"ttl"`), pas un second littéral 1800.
 - Jamais la date de modification d'un DAG (P68-D-16, mesuré égale après checkout).
 - Un lock posé par l'ancien script rend `progress_epoch`/`progress_age_seconds` = `null` littéral (`driver-lock.sh:724-727`) : traiter `null` comme « pas de progrès récent » sans planter.
+- Source illisible ≠ verrou absent (P68-D-23) : un script de verrous introuvable ou un JSON illisible rend `inconnu`, jamais `abandonnee` ; seul un verrou **lu** et absent (aucune entrée de phase dans `status --all`, qui ne liste un verrou de phase que s'il est présent) rend `abandonnee`.
 - Le plan 69-01 fige « ajouts de champs seulement en version 1, renommage = version 2 » (69-01-PLAN l.139-140) : un état de mission **ajouté** à un vocabulaire fermé teste `missionEtats` (A7) : c'est la raison de la montée, à écrire dans le CHANGELOG.
 
 **Test à copier** : A7 (`test-cockpit-avancement.sh:76-90, 291-296`) compare `interface.json` aux exports et détecte une copie mutée (`mut/`, l.285) : étendre `vocab` avec `etatMission(..., vieAbandonnee)`.
@@ -259,6 +260,7 @@ assert_has() { ... } assert_not() { ... }
 | À faire | `--st-todo` | `var(--text-4)` (`#5c5c5c` / `#666666`) |
 | Bloqué | `--st-blocked` | `var(--sev-high)` (`#f28b8b` / `#c94a4a`) |
 | `abandonnee` (nouveau) | à nommer dans le plan | proposer `--st-todo` (grisée, D-05) + libellé « abandonnée, nœuds non refermés » |
+| `inconnu` (nouveau, P68-D-23) | couleur de statut neutre | `--st-todo` (aucun token neuf) + libellé « état inconnu » |
 
 Écart connu documenté dans DESIGN.md : `--st-active` vaut en dur `#f59e0b` et `--st-blocked` `#ef4444` dans `ui/00-vibeflow.js` (corrigé en Phase 70) : la pane doit déjà utiliser la colonne « Doit valoir », pas ces hex.
 
