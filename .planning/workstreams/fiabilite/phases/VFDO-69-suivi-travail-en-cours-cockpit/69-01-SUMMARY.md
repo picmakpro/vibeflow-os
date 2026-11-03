@@ -36,3 +36,12 @@ Trace du rouge avant le code : `69-01-RED-TRACE.md` (25 témoins rouges, 10 cont
 - Ajout non prévu : A18.0 (le source réel ne contient plus `=== curPhase`).
 - A4.3 est strict (pied complet égal) au lieu de « contient ».
 - Complément de mandat du manager (DA Graphite) : le code neuf de `00-vibeflow.js` n'utilise que des classes existantes (`vst-todo`, `vst-active`), aucune couleur en dur ; non vérifié visuellement dans les deux thèmes (aucun navigateur lancé).
+
+## Correction de revue (nœud fix-69-01, mandat vf-dev-manager)
+
+Quatre mineurs, tous des témoins manquants ; aucun défaut de code découvert. Sections A9 à A12 de `test-cockpit-avancement.sh` : chaque mutant est appliqué sur une copie fraîche des scripts (`mut`, ancre vérifiée « muté » sinon « ancre absente ») et l'assertion rejoue la fixture sur la copie.
+
+- A9 (P69-PL-04) : mutants `false ? 'active'`, `st === 'active' ? 'active'`, id seul retiré, scope seul retiré -> valeurs divergentes `todo,todo,todo`, `active,active,active`, `todo,active,todo`, `active,todo,todo` contre `active,active,todo` sur l'original.
+- A10 (P69-PL-06) : repli sur la règle 2 -> `ph-3` au lieu de `missions`.
+- A11 : `&& !lance` -> `en-cours` au lieu de `a-recetter` ; suffixe décimal retiré -> `{"faits":1,"total":1}|a-recetter` au lieu de `{"faits":1,"total":2}|en-cours` ; tri supprimé -> `MISSION-3` au lieu de `zeta` (appel direct, ordre d'entrée maîtrisé).
+- A12 : le contrat compare `requis` aux clés rendues par `avancement()` (et leurs types) et `missionEtats` au vocabulaire de `etatMission` ; copies sans `requis.reste` / avec `missionEtats` réduit -> `dérive : requis` / `dérive : missionEtats`. A12.3 : égalité de `norm` et `normNum` sur 01, 1, 02.1, 2.10.

@@ -82,6 +82,12 @@ const ecarts = [];
 if (a.version !== 1) ecarts.push('version');
 if (!eq(a.etats, m.ETATS)) ecarts.push('etats');
 if (!eq(a.reste, m.RESTE)) ecarts.push('reste');
+const echantillon = m.avancement({ ph: { done: false }, fichiers: [], missions: [] });
+if (!eq(Object.keys(a.requis || {}).sort(), Object.keys(echantillon).sort())) ecarts.push('requis');
+const typeDe = (v) => (Array.isArray(v) ? 'array' : typeof v);
+for (const [k, t] of Object.entries(a.requis || {})) if (t !== 'any' && k in echantillon && typeDe(echantillon[k]) !== t) ecarts.push('type:' + k);
+const vocab = [m.etatMission([{ status: 'running' }]), m.etatMission([{ status: 'failed' }]), m.etatMission([{ status: 'done' }]), m.etatMission([])].sort();
+if (!eq([...(a.missionEtats || [])].sort(), vocab)) ecarts.push('missionEtats');
 console.log(ecarts.length ? 'dérive : ' + ecarts.join(',') : 'ok');
 JS
 cat > "$AUX/mutate.mjs" <<'JS'
@@ -94,6 +100,10 @@ if (what === 'phaseStatus') {
   if (i < 0) { console.log('ancre absente'); process.exit(1); }
   lines[i] = "  const phaseStatus = (ph) => ph.done ? 'done' : ph.n === curPhase ? 'active' : 'todo';";
   fs.writeFileSync(f, lines.join('\n'));
+} else if (what === 'requis' || what === 'missionEtats') {
+  const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+  if (what === 'requis') delete j.avancement.requis.reste; else j.avancement.missionEtats = ['running'];
+  fs.writeFileSync(f, JSON.stringify(j, null, 2));
 } else {
   const j = JSON.parse(fs.readFileSync(f, 'utf8'));
   if (j.avancement) j.avancement.etats = j.avancement.etats.filter((e) => e !== 'a-recetter');
@@ -101,6 +111,30 @@ if (what === 'phaseStatus') {
 }
 console.log('muté');
 JS
+cat > "$AUX/mutsub.mjs" <<'JS'
+// mutsub.mjs <fichier> — remplace UNE occurrence exacte de $FROM par $TO dans une COPIE ; "ancre absente" si $FROM n'y est pas
+import fs from 'node:fs';
+const f = process.argv[2]; const t = fs.readFileSync(f, 'utf8');
+if (!t.includes(process.env.FROM)) { console.log('ancre absente'); process.exit(1); }
+fs.writeFileSync(f, t.replace(process.env.FROM, () => process.env.TO)); console.log('muté');
+JS
+cat > "$AUX/unit.mjs" <<'JS'
+// unit.mjs <dossier de scripts> choix|norm — appels directs du module d'avancement
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , dir, what] = process.argv;
+const a = await import(pathToFileURL(path.join(dir, 'vf-cockpit-avancement.mjs')).href);
+if (what === 'choix') {
+  const ms = [{ nom: 'MISSION-3', regle: 2, nodes: [{ status: 'ready' }] }, { nom: 'zeta', regle: 1, nodes: [{ status: 'running' }] }];
+  console.log(JSON.stringify(a.avancement({ ph: { done: false }, fichiers: [], missions: ms }).mission));
+} else {
+  const p = await import(pathToFileURL(path.join(dir, 'vf-cockpit-planning.mjs')).href);
+  const ok = ['01', '1', '02.1', '2.10'].map((x) => { const ph = { n: p.normNum(x), ws: null }; return a.trouverPhase(new Map([['k', ph]]), x, null) === ph; });
+  console.log(ok.join());
+}
+JS
+# mut <nom> <fichier> <de> <vers> : copie fraîche des scripts dans $WORK/mut-<nom>, une substitution exacte ; rend « muté » ou « ancre absente »
+mut() { local d="$WORK/mut-$1"; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$d/"; FROM="$3" TO="$4" node "$AUX/mutsub.mjs" "$d/$2"; }
 Q() { node "$AUX/q.mjs" "$SCRIPTS" "$@"; }
 G() { node "$AUX/get.mjs" "$@"; }
 wr() { mkdir -p "$(dirname "$1")"; cat > "$1"; }   # wr <fichier> < contenu
@@ -163,6 +197,9 @@ wr "$B/missions/MISSION-4.dag.json" <<'JSON'
 {"phase":"1","nodes":[{"id":"a","step":"s","deps":[],"status":"ready"}]}
 JSON
 wr "$B/missions/perdu.dag.json" <<'JSON'
+{"phase":"99","nodes":[{"id":"a","step":"s","deps":[],"status":"ready"}]}
+JSON
+wr "$B/missions/MISSION-3.dag.json" <<'JSON'
 {"phase":"99","nodes":[{"id":"a","step":"s","deps":[],"status":"ready"}]}
 JSON
 initgit "$L3"
@@ -297,6 +334,62 @@ assert_has "A7.2 — copie mutée du contrat (un état retiré) : la dérive est
 # ---------- A8 — indépendance du compartiment actif ----------
 echo "=== A8 — compartiment actif sans effet ==="
 assert_eq "A8.1 — lab partitionné, pointeur sur beta : la phase 1 d'alpha est a-recetter" "$(PHF "$WORK/p6.json" 'alpha|1' etat)" "a-recetter"
+
+# ---------- A9 à A12 — correction de revue : chaque mutant doit rougir ----------
+P_="vf-cockpit-project.mjs"; V_="vf-cockpit-avancement.mjs"
+# L7 : statut d'un plan non fait (P69-PL-04) — un nœud running le désigne par id (01-01) ou par chemin dans scope (01-02) ; 01-03 n'est pas désigné
+L7="$WORK/lab-l7"; B="$L7/.planning"
+printf -- '- [ ] **Phase 1: Un** - a\n' | wr "$B/ROADMAP.md"
+plans "$B/phases/01-a" 01 3 0
+wr "$B/missions/MISSION-1.dag.json" <<'JSON'
+{"nodes":[{"id":"01-01","step":"s","deps":[],"status":"running"},{"id":"zz","step":"s","deps":[],"status":"running","scope":[".planning/phases/01-a/01-02-PLAN.md"]}]}
+JSON
+initgit "$L7"
+# L8 : décimal, mission running sur une phase à 100 % de plans faits
+L8="$WORK/lab-l8"; B="$L8/.planning"
+printf -- '- [ ] **Phase 1: Un** - a\n- [ ] **Phase 2: Deux** - b\n' | wr "$B/ROADMAP.md"
+plans "$B/phases/01-a" 01 1 1; printf '<objective>Correctif décimal</objective>\n' | wr "$B/phases/01-a/01-01.1-PLAN.md"
+plans "$B/phases/02-b" 02 2 2
+wr "$B/missions/MISSION-2.dag.json" <<'JSON'
+{"nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}
+JSON
+initgit "$L8"
+FILES7='j.files.filter(f=>f.p.endsWith("-PLAN.md")).map(f=>f.name.slice(0,5)+":"+f.st).join()'
+P1='JSON.stringify(j.phases[0].avancement?.plans)+"|"+j.phases[0].avancement?.etat'
+echo "=== A9 — statut d'un plan non fait (P69-PL-04) ==="
+graph "$L7" "$WORK/g7.json"
+assert_eq "A9.1 — nœud désignant par id (01-01) et par scope (01-02) : actifs ; 01-03 voisin non désigné : todo" "$(G "$WORK/g7.json" "$FILES7")" "01-01:active,01-02:active,01-03:todo"
+i=2
+for m in "faux~enCours.some((x) => x.id === pid || (Array.isArray(x.scope) && x.scope.includes(p))) ? 'active'~false ? 'active'~01-01:todo,01-02:todo,01-03:todo" \
+         "phase-active~enCours.some((x) => x.id === pid || (Array.isArray(x.scope) && x.scope.includes(p))) ? 'active'~st === 'active' ? 'active'~01-01:active,01-02:active,01-03:active" \
+         "sans-id~x.id === pid || (Array~false || (Array~01-01:todo,01-02:active,01-03:todo" \
+         "sans-scope~(Array.isArray(x.scope) && x.scope.includes(p))~false~01-01:active,01-02:todo,01-03:todo"; do
+  IFS='~' read -r nom de vers attendu <<<"$m"
+  r="$(mut "pl04-$nom" "$P_" "$de" "$vers")"; node "$AUX/q.mjs" "$WORK/mut-pl04-$nom" project "$L7" > "$WORK/g7-$nom.json" 2>/dev/null
+  assert_eq "A9.$i — mutant « $nom » : l'assertion A9.1 le voit" "$r|$(G "$WORK/g7-$nom.json" "$FILES7")" "muté|$attendu"; i=$((i+1))
+done
+echo "=== A10 — un champ « phase » inconnu ne se corrige jamais (P69-PL-06) ==="
+assert_eq "A10.1 — MISSION-3 portant « phase: 99 » : hors phase" "$(NDF "$WORK/g3.json" dag-MISSION-3 .parent)" "missions"
+r="$(mut repli-regle2 "$V_" "return p ? { cle: p.key, regle: 1 } : null; }" "if (p) return { cle: p.key, regle: 1 }; }")"; node "$AUX/q.mjs" "$WORK/mut-repli-regle2" project "$L3" > "$WORK/g3-mut.json" 2>/dev/null
+assert_eq "A10.2 — mutant « repli sur la règle 2 » : MISSION-3 irait à ph-3, A10.1 le voit" "$r|$(NDF "$WORK/g3-mut.json" dag-MISSION-3 .parent)" "muté|ph-3"
+echo "=== A11 — décompte, état et choix de la mission ==="
+plan "$L8" "$WORK/p8.json"
+assert_eq "A11.1 — 01-01.1-PLAN.md sans SUMMARY est un plan à part : 1 fait sur 2, en-cours" "$(G "$WORK/p8.json" "$P1")" '{"faits":1,"total":2}|en-cours'
+r="$(mut sans-decimal "$V_" "plans.add(f.slice(0, -'-PLAN.md'.length))" "plans.add(f.slice(0, -'-PLAN.md'.length).replace(/\\.\\d+$/, ''))")"; node "$AUX/q.mjs" "$WORK/mut-sans-decimal" planning "$L8" > "$WORK/p8-m1.json" 2>/dev/null
+assert_eq "A11.2 — mutant « suffixe décimal retiré » : A11.1 le voit" "$r|$(G "$WORK/p8-m1.json" "$P1")" 'muté|{"faits":1,"total":1}|a-recetter'
+assert_eq "A11.3 — phase 2 à 2/2 plans faits avec une mission running : a-recetter" "$(G "$WORK/p8.json" 'j.phases[1].avancement?.etat')" "a-recetter"
+r="$(mut sans-lance "$V_" "faits === total ? 'a-recetter'" "faits === total && !lance ? 'a-recetter'")"; node "$AUX/q.mjs" "$WORK/mut-sans-lance" planning "$L8" > "$WORK/p8-m2.json" 2>/dev/null
+assert_eq "A11.4 — mutant « && !lance » : A11.3 le voit" "$r|$(G "$WORK/p8-m2.json" 'j.phases[1].avancement?.etat')" "muté|en-cours"
+assert_eq "A11.5 — deux missions rattachées dont une running : mission désigne la running" "$(node "$AUX/unit.mjs" "$SCRIPTS" choix)" '{"nom":"zeta","etat":"running"}'
+r="$(mut sans-tri "$V_" "  l.sort(" "  l.slice(")"
+assert_eq "A11.6 — mutant « tri supprimé » : A11.5 le voit" "$r|$(node "$AUX/unit.mjs" "$WORK/mut-sans-tri" choix)" 'muté|{"nom":"MISSION-3","etat":"ready"}'
+echo "=== A12 — le contrat suit l'objet rendu et le vocabulaire des missions ==="
+for k in requis missionEtats; do
+  rm -rf "$WORK/mut-c-$k"; mkdir -p "$WORK/mut-c-$k"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$WORK/mut-c-$k/"
+  node "$AUX/mutate.mjs" "$k" "$WORK/mut-c-$k/vf-cockpit-interface.json" >/dev/null
+  assert_eq "A12 — copie du contrat sans « $k » conforme : la dérive est nommée" "$(node "$AUX/contrat.mjs" "$WORK/mut-c-$k")" "dérive : $k"
+done
+assert_eq "A12.3 — normalisation des numéros : 01, 1, 02.1, 2.10 se résolvent comme normNum" "$(node "$AUX/unit.mjs" "$SCRIPTS" norm)" "true,true,true,true"
 
 echo ""
 echo "=================================="
