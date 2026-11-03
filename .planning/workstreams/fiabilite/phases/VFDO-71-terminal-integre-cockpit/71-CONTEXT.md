@@ -99,6 +99,15 @@ scratchpad de la mission, rejouable ; résultats repris ci-dessous).
   branchement dans des fichiers existants sont listés et minimaux (drapeau du lanceur, démarrage du second serveur, port
   exposé à la page sous jeton, `frame-src` dans `pageCsp` + son patch amont, docs du module). Ils sont recensés pour le merge.
 
+- **P71-D-18 (canal sortant Q → P, sur F1 de `71-UI-SPEC.md`).** Q peut envoyer à P des messages `postMessage` de valeur
+  FIXE, tirés d'une liste fermée (sortie du focus clavier, état de la session pour la barre, Q joignable), avec `targetOrigin`
+  exactement l'origine de P ; jamais un octet du shell, jamais un jeton ni un secret. P n'accepte que les messages dont
+  `event.origin` est exactement l'origine de Q ET `event.source` le cadre, et dont la valeur est dans la liste. Le sens
+  entrant P → Q reste fermé (P71-D-15). Motif : sans ce canal, un utilisateur au clavier reste piégé dans le terminal.
+  À vérifier par l'audit (sonde : message hors liste ou d'une autre source ignoré ; aucune donnée du shell dans un message).
+- **P71-D-19 (thème, sur F2 de `71-UI-SPEC.md`).** Le thème passe au cadre par un paramètre d'URL non sensible ; une bascule
+  recharge le cadre, qui rejoue le tampon de reprise (256 Ko). Accepté : le sens P → Q reste fermé.
+
 ### Contraintes héritées (Phase 67, `v2.75.0`)
 
 - Le lab observé n'est jamais une source de code : aucun script du lab exécuté par le serveur (le shell, lui, est l'usage
