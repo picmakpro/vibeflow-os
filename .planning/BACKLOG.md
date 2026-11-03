@@ -673,7 +673,7 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 - **I6** : regrouper les autres boutons.
 - **I1** : la visite guidée « manque un chouïa de clarté ».
 
-**Déclencheur de reprise :** la phase qui suit la 67 sur le cockpit, après le merge de la PR #187.
+**Déclencheur de reprise :** Phase 70 « Finitions UI du cockpit » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
 
 ## Commande `/vf-recette` — recette humaine pas à pas — DIFFÉRÉ (2026-11-02)
 
@@ -696,4 +696,14 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 - Phrase mixte : « 1 fichier et points d'accès still use generated names. Run the skill again to describe them. »
 - Coquilles : « Les réponses viennent de le CLI Claude Code » (au lieu de « du CLI ») ; « 1 fichiers de code ».
 
-**Déclencheur de reprise :** la phase qui suit la 67 sur le cockpit (avec la refonte mobile).
+**Déclencheur de reprise :** Phase 70 « Finitions UI du cockpit » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
+
+## `guard-fin-de-geste.sh` impute à la session un objet antérieur qui change d'état — DIFFÉRÉ (2026-11-03)
+
+**Origine :** session principale du 2026-11-03 (release v2.75.0). Le Stop a bloqué 3 fois sur deux worktrees créés par d'autres sessions : `.claude/worktrees/v2-cockpit` (le 2026-11-01) et `.claude/worktrees/etude-floorplan`. Samuel a demandé de l'inscrire ici (session principale, 2026-11-03).
+- **Cause, mesurée :** l'attribution (M3) compare des **lignes de verdict** de `check-method-budget.sh`, pas l'existence des objets : `comm -23 "$NOW" "$SNAP"` sur la sortie filtrée par `jetons()`. Au démarrage, les deux worktrees existaient mais leurs branches n'étaient pas intégrées, donc il n'y avait aucune ligne `RANGEABLE`. On le vérifie dans le snapshot `…/vibeflow-fin-de-geste-501/1261415488-af7b6da6-….snap`. Le merge de la PR #187 a intégré `feat/v2-cockpit` et `docs/etude-floorplan` (dont les commits étaient dans la PR). Deux lignes `RANGEABLE … déjà intégrée dans origin/main` sont apparues et ont été imputées à la session.
+- **Conséquence :** le Stop bloque sur des objets que la session ne doit pas supprimer : l'un portait du travail non commité d'une autre session (l'audit vf-auditer de la 67), l'autre servait un cockpit de recette encore ouvert. Le coupe-circuit à 3 blocages borne le coût, mais chaque blocage coûte un tour de session.
+- **Piste :** que le snapshot enregistre l'**identité** des objets (chemins des worktrees, noms des branches locales, SHA des stashes, chemins des mémoires), et n'imputer un verdict `RANGEABLE` que si son objet n'existait pas au démarrage. Témoin rouge : un worktree présent au snapshot dont la branche est intégrée pendant la session → aucun blocage. Il rougit aujourd'hui.
+- **Source :** `plugin/conductor/scripts/guard-fin-de-geste.sh` (copie posée dans `~/.claude/scripts/`). Correctif = PR plus release patch.
+
+**Déclencheur de reprise :** la prochaine reprise de la garde de fin de geste (avec les résidus 1 à 3 de la Phase 41.3), ou un nouveau blocage à tort.
