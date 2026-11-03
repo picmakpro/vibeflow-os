@@ -79,7 +79,9 @@
         const pc = m.total ? Math.round((100 * m.done) / m.total) : 0;
         return `<div class="vf-ms" data-vf-go="${h(m.id)}"><div class="t"><span>${h(m.key)}</span><span>${Number(m.done) || 0}/${Number(m.total) || 0} · ${pc} %</span></div><div class="vf-bar" style="--c-st:var(--st-${h(m.st).replace(/[^\w-]/g, '')})"><i style="width:${pc}%"></i></div></div>`;
       }).join('');
-      const next = V.next.map((n) => `<a class="vf-link" data-vf-go="${h(n.id)}"><span class="vst vst-todo">À faire</span><span>${h(n.label)}</span></a>`).join('');
+      // état réel de chaque phase (avancement.etat) ; classes existantes seulement, valeur inconnue -> « À faire »
+      const ETAT_UI = { 'a-faire': ['vst-todo', 'À faire'], 'en-cours': ['vst-active', 'En cours'], 'a-recetter': ['vst-active', 'À recetter'] };
+      const next = V.next.map((n) => { const u = Object.prototype.hasOwnProperty.call(ETAT_UI, n.etat) ? ETAT_UI[n.etat] : ETAT_UI['a-faire']; return `<a class="vf-link" data-vf-go="${h(n.id)}"><span class="vst ${u[0]}">${u[1]}</span><span>${h(n.label)}</span></a>`; }).join('');
       const c = V.counts;
       // « Maintenant » : seulement les champs connus (un lab sans STATE.md n'a ni jalon, ni phase, ni statut)
       const desc = V.lastDesc || '';
