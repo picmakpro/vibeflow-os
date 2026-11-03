@@ -101,12 +101,18 @@ assert_eq "L6 — l'adresse ouverte est http://127.0.0.1:<Q>/#t=<amorçage du fi
 arrete; attendre_mort "$SPID"
 
 echo "=== L4 — un lien préplacé n'est jamais suivi (O3) ==="
+# deux couches : la garde « aucun lien dans la sortie » (assemblage, puis verifierSortie) et, dans ecrireAmorce, suppression préalable + création exclusive
+verdict_lien() { # verdict_lien <sortie du lanceur> : « sur » si la cible est intacte ET (fichier ordinaire OU refus nommé)
+  local ok=non; if [ "$(cksum < "$WORK/cible")" = "$EMP" ]; then if [ ! -L "$AM" ] && [ -f "$AM" ]; then ok=sur; elif grep -q -e 'amorçage du terminal impossible' -e 'lien symbolique refusé' "$1"; then ok=sur; fi; fi; echo "$ok"
+}
 printf 'contenu-cible\n' > "$WORK/cible"; EMP="$(cksum < "$WORK/cible")"; rm -f "$AM"; mkdir -p "$OUT/.cache"; ln -s "$WORK/cible" "$AM"
 lance "$LAUNCH" open --terminal --no-open; SPID="$(sj j.pid)"
-assert_eq "L4 — la cible du lien est inchangée" "$(cksum < "$WORK/cible")" "$EMP"
-L4R="aucun"; if [ ! -L "$AM" ] && [ -f "$AM" ]; then L4R=sur; elif grep -q 'amorçage du terminal impossible' "$LOUT"; then L4R=sur; fi
-assert_eq "L4 — refus nommé OU fichier ordinaire à la place du lien (jamais une écriture à travers)" "$L4R" "sur"
-arrete; [ -n "$SPID" ] && attendre_mort "$SPID"; rm -f "$AM"
+assert_eq "L4 — serveur arrêté, lien préplacé : la cible est intacte, refus nommé ou fichier ordinaire" "$(verdict_lien "$LOUT")" "sur"
+rm -f "$AM"; [ -n "$SPID" ] && { arrete; attendre_mort "$SPID"; }
+lance "$LAUNCH" open --terminal --no-open; SPID="$(sj j.pid)"; rm -f "$AM"; ln -s "$WORK/cible" "$AM"
+lance "$LAUNCH" open --terminal --no-open
+assert_eq "L4 — serveur vivant avec terminal (O2 c), lien préplacé : la cible est intacte, refus nommé ou fichier ordinaire" "$(verdict_lien "$LOUT")" "sur"
+rm -f "$AM"; arrete; [ -n "$SPID" ] && attendre_mort "$SPID"
 
 echo "=== L7 — O2 a : serveur vivant sans terminal, relancé avec le drapeau ==="
 lance "$LAUNCH" open --no-open; P7="$(sj j.pid)"
@@ -128,9 +134,9 @@ echo "=== L9 — flux, commande, puis stop : plus rien ne survit ==="
 [[ "$SECRET" =~ ^[0-9a-f]{64}$ ]] || SECRET=""
 FPID=""; APID=""; TROUVE="pas de secret"
 if [ -n "$SECRET" ]; then
-  node "$TA" flux "$Q8" "$SECRET" onglet-l 25000 > "$WORK/flux.out" 2>&1 & FPID=$!
+  node "$TA" flux "$Q8" "$SECRET" onglet-test-1 "$WORK/flux.out" 25000 > "$WORK/flux.log" 2>&1 & FPID=$!
   for _ in $(seq 1 50); do [ -n "$N7" ] && [ -n "$(pgrep -P "$N7")" ] && break; sleep 0.1; done
-  node "$TA" entree "$Q8" "$SECRET" onglet-l "echo TRAC''EUR-OK\\r" > /dev/null 2>&1
+  node "$TA" entree "$Q8" "$SECRET" onglet-test-1 "echo TRAC''EUR-OK\\r" > /dev/null 2>&1
   TROUVE="$(node "$TA" attendre "$WORK/flux.out" TRACEUR-OK 10000)"
 fi
 assert_eq "L9 — une commande envoyée revient dans le flux (TRACEUR-OK)" "$TROUVE" "TROUVE"
@@ -166,11 +172,12 @@ if mutant mode 's/MODE_AMORCE = 0o600/MODE_AMORCE = 0o644/'; then
   assert_eq "M-MODE — le mutant rougit L3 (mode ≠ 600)" "$([ "$MM" != 600 ] && echo rouge || echo "identique : $MM")" "rouge"
   arrete; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-MODE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant lien -e "s/fs.unlinkSync(f)/0/" -e "s/'wx'/'w'/"; then
+if mutant lien -e "s/fs.unlinkSync(f)/0/" -e "s/'wx'/'w'/" -e "s/verifierSortie(lab, sortie); return/return/"; then
+  lance "$LAUNCH" open --terminal --no-open; MS="$(sj j.pid)"
   printf 'contenu-cible\n' > "$WORK/cible"; EMP="$(cksum < "$WORK/cible")"; rm -f "$AM"; ln -s "$WORK/cible" "$AM"
-  lance "$MUT_L" open --terminal --no-open; MS="$(sj j.pid)"
-  assert_eq "M-SUIT-LIEN — le mutant rougit L4 (la cible est écrasée)" "$([ "$(cksum < "$WORK/cible")" != "$EMP" ] && echo rouge || echo "identique")" "rouge"
-  arrete; [ -n "$MS" ] && attendre_mort "$MS"
+  lance "$MUT_L" open --terminal --no-open
+  assert_eq "M-SUIT-LIEN — le mutant (sans suppression préalable, sans création exclusive, sans garde) rougit L4 : la cible est écrasée" "$([ "$(cksum < "$WORK/cible")" != "$EMP" ] && echo rouge || echo "identique")" "rouge"
+  rm -f "$AM"; arrete; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-SUIT-LIEN — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant imprime 's|^function ouvrirQ(s, amorce, o) {|& console.log(amorce);|'; then
   rm -f "$AM"; lance "$MUT_L" open --terminal --no-open; MS="$(sj j.pid)"; V="$(cat "$AM" 2>/dev/null)"
