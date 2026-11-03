@@ -5,7 +5,8 @@
 #   T11  assistant lancé en `python3 -I`, taille par le canal de contrôle (`stty size`), Ctrl-C au premier plan, état `FIN <code>` sur fd 2
 #   T12  serveur tué par SIGKILL : assistant, shell et travail d'arrière-plan disparaissent en moins de 5 s
 #   T13  programme plein écran témoin, par le flux direct : écran alterné, 256 couleurs, truecolor, SIGWINCH, SIGINT
-#   M-*  mutants (copies de la sortie ou du moteur, jamais le module) : M-ENVLARGE, M-CWD, M-SI-ABSENT, M-SANS-I, M-SANS-L, M-SIGINT, M-CTRLC, M-RESIZE, M-NOEOF
+#   T11.9 le shell n'hérite pas du descripteur 3 (canal de contrôle)     S3  entrée en attente côté serveur bornée : au-delà, 429 explicite
+#   M-*  mutants (copies de la sortie ou du moteur, jamais le module) : M-INHERIT, M-ATTENTE-NON-BORNEE, M-ENVLARGE, M-CWD, M-SI-ABSENT, M-SANS-I, M-SANS-L, M-SIGINT, M-CTRLC, M-RESIZE, M-NOEOF
 # Les attentes cherchent des sous-chaînes (le noyau double les fins de ligne, l'écho ^C précède la sortie). Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
@@ -67,6 +68,19 @@ for (const x of actions) {
 }
 for (let i = 0; i < 160 && fini === null; i++) await new Promise((r) => setTimeout(r, 50));
 console.log(fini === null ? 'vivant' : fini); if (fini === null) e.kill('SIGKILL'); process.exit(0);
+JS
+
+cat > "$AUX/rafale.mjs" <<'JS'
+// rafale.mjs <port> <secret> <onglet> <n> <taille> : n POST /entree séquentiels de <taille> octets ; une ligne JSON {statut: nombre}
+import http from 'node:http';
+const [, , port, secret, onglet, n, taille] = process.argv;
+const corps = Buffer.alloc(+taille, 97);
+const un = () => new Promise((ok) => {
+  const r = http.request({ host: '127.0.0.1', port: +port, path: '/entree', method: 'POST', agent: false, headers: { Host: `127.0.0.1:${port}`, Origin: `http://127.0.0.1:${port}`, 'X-VF-Terminal': secret, 'X-VF-Onglet': onglet, 'Content-Length': corps.length } }, (res) => { res.resume(); res.on('end', () => ok(res.statusCode)); });
+  r.on('error', () => ok(0)); r.end(corps);
+});
+const c = {}; for (let i = 0; i < +n; i++) { const s = await un(); c[s] = (c[s] || 0) + 1; }
+console.log(JSON.stringify(c)); process.exit(0);
 JS
 
 # shell de test (P71-PL-11) : marqué par son chemin, décrit ce qu'il reçoit dans $VFT_RUN, lance bash SANS exec ; `bash --rcfile` porte la marque
@@ -191,6 +205,12 @@ PIL="$(VFT_RUN="$RUN" node "$AUX/pilote.mjs" "$SD" "$WORK/bin/shell-test" "$WORK
 assert_eq "T11.7 — assistant seul : R 500 1000 appliquée, R 501 80 / R 24 1001 / R 0 80 ignorées (SZC-500x1000)" "$(grep -a -c 'SZC-500x1000' "$WORK/pilote3.out") $PIL" "1 code=0 sig=null"
 python3 -I "$SD" 501 80 /bin/true 3</dev/null </dev/null >/dev/null 2>&1; R1=$?; python3 -I "$SD" 24 1001 /bin/true 3</dev/null </dev/null >/dev/null 2>&1; R2=$?
 assert_eq "T11.8 — assistant lancé avec une taille hors borne (501x80, 24x1001) : usage, code 64, aucun shell" "$R1 $R2" "64 64"
+fd3() { # fd3 <nom> <sortie> [moteur] -> FD3_RES : « <FERME vu> <OUVERT vu> » ; le shell tente d'écrire (rien) sur le descripteur 3, ouvert chez l'assistant seulement
+  sess "$1" "$2" "${3:-$ENG}"; ent "{ : >&3; } 2>/dev/null && echo FD3-OUV\"\"ERT || echo FD3-FER\"\"ME\\r" > /dev/null
+  FD3_RES="$(wf FD3-FERME 5000) $(wf FD3-OUVERT 500)"; fin_sess
+}
+fd3 t11d "$OUT"
+assert_eq "T11.9 — le shell n'hérite pas du descripteur 3 : l'écriture sur le descripteur 3 échoue (FD3-FERME vu, FD3-OUVERT jamais) ; témoin : le shell répond" "$FD3_RES" "TROUVE ABSENT"
 
 echo "=== T12 — serveur tué par SIGKILL : rien ne survit (TERM-08 orphelins ; P71-D-05) ==="
 orphelins() { # orphelins <nom> <sortie> [moteur] -> O_RES : « <état avant> <survivants> »
@@ -248,6 +268,13 @@ pilote_sourd t14b s:300 W:65536 s:500 e
 assert_eq "T14.2 — assistant seul, 65 536 octets en attente chez un shell sourd, puis fin du fd 0 : il sort de lui-même, le shell aussi" "$PS_RES" "code=0 sig=null shell=non"
 pilote_sourd t14c s:300 W:65536 s:500 t
 assert_eq "T14.3 — assistant seul, mêmes octets en attente, puis SIGTERM : il sort de lui-même, le shell aussi" "$PS_RES" "code=0 sig=null shell=non"
+rafale() { # rafale <nom> <sortie> -> RAF : 60 POST de 64 Kio vers un shell qui ne lit pas ; JSON des statuts
+  ENVX=(SHELL="$WORK/bin/shell-sourd"); SANS_INVITE=1 sess "$1" "$2"; ENVX=(); attendre_fichier "$WORK/run/$1/sourd.pid"
+  RAF="$(node "$AUX/rafale.mjs" "$S_Q" "$S_SEC" "onglet-$1" 60 65536)"; fin_sess
+}
+verdict_rafale() { printf '%s\n' "$RAF" | node "$AUX/ev.mjs" '(j["429"]||0)>=1&&(j["204"]||0)>=1&&(j["204"]||0)<=30&&(j["204"]||0)+(j["429"]||0)===60?"borne":JSON.stringify(j)' 2>/dev/null; }
+rafale t14d "$OUT"
+assert_eq "S3.1 — 60 POST de 64 Kio vers un shell qui ne lit pas : des 204 au début, puis 429 explicite ; jamais plus de 30 acceptés (≈ 1,9 Mio, borne de l'assistant 1 Mio + 256 Kio d'attente côté serveur) ; aucun autre statut" "$(verdict_rafale)" "borne"
 
 echo "=== M-* — mutants du lanceur et du filtre (copies de la sortie) ==="
 if mutant envlarge vf-cockpit-terminal-env.mjs 's/export function envShell/function envShellOrig/' 'export const envShell = (env) => ({ PATH: env.PATH, HOME: env.HOME, SHELL: env.SHELL, VFT_RUN: env.VFT_RUN });'; then
@@ -293,6 +320,12 @@ else sans_effet M-NOEOF; fi
 if mutant_eng bloquant 's/os.set_blocking(maitre, False)/os.set_blocking(maitre, True)/'; then
   sourd m10 "$OUT" "$MUT_ENG"; assert_eq "M-ECRITURE-BLOQUANTE — le mutant remet le maître en écriture bloquante : l'assistant et le shell survivent au serveur (T14.1 rouge)" "$SO_RES" "avant=oui oui POST=204 apres=oui oui"
 else sans_effet M-ECRITURE-BLOQUANTE; fi
+if mutant_eng inherit "s/os.set_inheritable(3, False)/os.set_inheritable(3, True)/"; then
+  fd3 m11 "$OUT" "$MUT_ENG"; assert_eq "M-INHERIT — le mutant (descripteur 3 héritable) rougit T11.9 : le shell écrit sur le canal de contrôle" "$FD3_RES" "ABSENT TROUVE"
+else sans_effet M-INHERIT; fi
+if mutant attente vf-cockpit-terminal-session.mjs "s/if (s.enfant.stdin.writableLength + octets.length > ENTREE_ATTENTE_MAX) return 429;//"; then
+  rafale m12 "$MUT_OUT"; assert_eq "M-ATTENTE-NON-BORNEE — le mutant (aucune borne, aucun 429) rougit S3.1 : les 60 POST sont acceptés" "$([ "$(verdict_rafale)" != borne ] && echo rouge || echo "identique : $RAF")" "rouge"
+else sans_effet M-ATTENTE-NON-BORNEE; fi
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

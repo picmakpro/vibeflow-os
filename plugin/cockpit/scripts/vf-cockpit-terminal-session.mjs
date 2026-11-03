@@ -6,6 +6,8 @@
 // Cycle de vie (71-04 ; P71-D-05, P71-D-19) : un seul onglet propriétaire (autre onglet : 409) ; flux fermé -> état « detachee » et grâce de GRACE_MS ;
 // retour du même onglet avant l'échéance -> même shell, tampon (TAMPON_MAX octets, MÉMOIRE SEULEMENT) rejoué puis direct ; échéance ou fin du shell -> EOF à
 // l'assistant (SIGHUP au groupe), tampon vidé. Aucun octet du terminal n'est écrit sur disque ni passé à console.* (TERM-11).
+// Une seule session à tout instant (P71-D-05) : à l'échéance la place reste prise (« fermeture ») jusqu'à la MORT de l'assistant, qui peut mettre 3 s ; une
+// attache entre-temps reçoit 503 (le client réessaie). Entrée : au plus ENTREE_ATTENTE_MAX octets en attente côté serveur, au-delà 429 (rien n'est écrit, le client garde ses octets).
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -16,6 +18,8 @@ const ONGLET_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const log = (m) => console.error(`vf-cockpit (terminal) : ${m}`);
 export const TAMPON_MAX = 262144;
 export const TAILLE_MAX = { lignes: 500, colonnes: 1000 }; // l'unique borne de taille : le serveur (/flux, /taille) et l'assistant PTY (vf-cockpit-pty.py) la tiennent à l'identique
+export const ENTREE_ATTENTE_MAX = 262144;
+const FERMETURE_MAX_MS = 6000; // un assistant qui n'est pas mort 6 s après l'EOF (grâce interne 3 s + SIGKILL) reçoit SIGTERM : la place ne reste jamais prise
 const graceDepuis = (v) => { const n = Number(v); return Number.isInteger(n) && n >= 100 && n <= 30000 ? n : 30000; }; // réglage de test seulement (P71-PL-18)
 export const GRACE_MS = graceDepuis(process.env.VF_COCKPIT_TERM_GRACE_MS);
 const actif = (c) => !!c && (c.etat === 'vivante' || c.etat === 'detachee');
@@ -35,15 +39,17 @@ export function creerSessions({ engineDir, lab, jetons = () => [] }) {
   };
   const reprendre = (c) => { if (c.pause) { c.pause = false; c.enfant.stdout.resume(); } };
   const terminer = (cible) => { // l'unique voie de fin : état, flux du client, minuterie, tampon
-    if (cible.etat === 'terminee') return;
+    if (cible.etat === 'terminee' || (cible.etat === 'fermeture' && !cible.sorti)) return; // en fermeture, la place n'est rendue qu'à la sortie (réapée) de l'assistant
+    const fermait = cible.etat === 'fermeture';
     clearTimeout(cible.minuterie); cible.etat = 'terminee';
     const r = cible.res; cible.res = null; try { r?.end(); } catch {}
-    if (cible === s) vider();
+    if (cible === s) { vider(); if (fermait) s = null; } // fin d'une expiration : la session disparaît, la place est libre
   };
-  const expirer = (cible) => { // échéance de la grâce : EOF à l'assistant (il envoie SIGHUP au groupe), la session disparaît
+  const expirer = (cible) => { // échéance de la grâce : EOF à l'assistant (il envoie SIGHUP au groupe) ; la place reste prise jusqu'à sa mort (terminer la libère)
     if (s !== cible || cible.etat !== 'detachee') return;
-    s = null; vider(); cible.etat = 'terminee';
+    cible.etat = 'fermeture'; vider();
     try { cible.enfant.stdin.end(); } catch {}
+    const garde = setTimeout(() => { if (cible.etat === 'fermeture') { try { cible.enfant.kill('SIGTERM'); } catch {} } }, FERMETURE_MAX_MS); garde.unref?.();
   };
   const detacher = (cible, res) => {
     if (cible.res !== res || cible.etat !== 'vivante') return;
@@ -56,9 +62,9 @@ export function creerSessions({ engineDir, lab, jetons = () => [] }) {
     const enfant = spawn('python3', ['-I', assistant, String(lignes), String(colonnes), choisirShell(process.env)], {
       cwd: fs.realpathSync(lab), env: envShell(process.env, [...jetons(), secretShell]), stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
     });
-    const cible = { enfant, onglet, res: null, etat: 'vivante', code: null, signal: null, minuterie: null, pause: false };
+    const cible = { enfant, onglet, res: null, etat: 'vivante', code: null, signal: null, minuterie: null, pause: false, sorti: false };
     enfant.stdout.on('data', (b) => { // lue même sans flux attaché : le tampon se remplit pendant la grâce
-      if (cible !== s || cible.etat === 'terminee') return;
+      if (cible !== s || !actif(cible)) return;
       ajouter(b);
       const r = cible.res; if (!r) return;
       if (!r.write(b) && !cible.pause) { cible.pause = true; enfant.stdout.pause(); r.once('drain', () => reprendre(cible)); }
@@ -76,15 +82,16 @@ export function creerSessions({ engineDir, lab, jetons = () => [] }) {
     });
     enfant.stdin.on('error', () => {}); enfant.stdio[3].on('error', () => {});
     enfant.on('error', () => { log('python3 est introuvable ou ne se lance pas : le terminal est arrêté.'); terminer(cible); });
-    enfant.on('exit', () => { setTimeout(() => terminer(cible), 2000).unref?.(); }); // filet : un tube retenu ne bloque pas la fin
+    enfant.on('exit', () => { cible.sorti = true; if (cible.etat === 'fermeture') terminer(cible); setTimeout(() => terminer(cible), 2000).unref?.(); }); // filet : un tube retenu ne bloque pas la fin
     return cible;
   }
 
   return {
-    // rend 200 (réponse prise en charge), 400 ou 409 ; les autres statuts sont écrits par l'appelant
+    // rend 200 (réponse prise en charge), 400, 409 ou 503 (ancienne session en fermeture) ; les autres statuts sont écrits par l'appelant
     attacher(req, res, { onglet, lignes = 24, colonnes = 80 } = {}) {
       if (!ONGLET_RE.test(String(onglet || ''))) return 400;
       if (!Number.isInteger(lignes) || !Number.isInteger(colonnes) || lignes < 1 || lignes > TAILLE_MAX.lignes || colonnes < 1 || colonnes > TAILLE_MAX.colonnes) return 400;
+      if (s && s.etat === 'fermeture') return 503;
       if (s && s.etat !== 'terminee' && s.onglet !== onglet) return 409;
       if (!s || s.etat === 'terminee') s = lancer(onglet, lignes, colonnes);
       const cible = s; clearTimeout(cible.minuterie);
@@ -99,6 +106,7 @@ export function creerSessions({ engineDir, lab, jetons = () => [] }) {
     ecrire(octets, onglet) {
       if (!actif(s)) return 410;
       if (s.onglet !== onglet) return 409;
+      if (s.enfant.stdin.writableLength + octets.length > ENTREE_ATTENTE_MAX) return 429; // contre-pression : rien n'est écrit, le client garde ses octets et réessaie
       try { s.enfant.stdin.write(octets); } catch { return 410; }
       return 204;
     },
@@ -108,7 +116,7 @@ export function creerSessions({ engineDir, lab, jetons = () => [] }) {
       try { s.enfant.stdio[3].write(`R ${lignes} ${colonnes}\n`); } catch { return 410; }
       return 204;
     },
-    etat: () => ({ session: s ? s.etat : 'absente', code: s ? s.code : null, signal: s ? s.signal : null }),
+    etat: () => { const c = s && s.etat !== 'fermeture' ? s : null; return { session: c ? c.etat : 'absente', code: c ? c.code : null, signal: c ? c.signal : null }; },
     occupe: () => actif(s),
     arreterTout() {
       if (!s) return;
