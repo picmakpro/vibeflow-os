@@ -5,16 +5,30 @@ Résultat : `Résultats : 24 PASS / 8 FAIL`, rc=1, `H0` vert (aucun survivant de
 
 ## Rouges sur la base (assertion, attendu, obtenu)
 
-| Sonde | Attendu | Obtenu |
-|-------|---------|--------|
-| T10.1 absentes : CLAUDECODE, CLAUDE_CODE_FOO, CLAUDE_CODE_ENTRYPOINT, VF_COCKPIT_X | `0` | `3` (seul `VF_COCKPIT_X` est retiré par la tranche) |
-| T10.8 serveur, passe 1 (TERM=vt100, COLORTERM absent) | `COLORTERM=truecolor TERM=xterm-256color` | `TERM=vt100` |
-| T10.8 serveur, passe 2 (TERM=dumb, COLORTERM=24bit) | `COLORTERM=truecolor TERM=xterm-256color` | `COLORTERM=24bit TERM=dumb` |
-| T10.5 `envShell` unitaire (clés restantes) | `AUTRE,CLAUDE_AUTRE,COURT,NODE_OPTIONS` | `AUTRE,CLAUDECODE,CLAUDE_AUTRE,CLAUDE_CODE_X,NODE_OPTIONS` |
-| T10.8 `envShell` unitaire (4 entrées) | `xterm-256color\|truecolor` x4 | `vt100\|undefined dumb\|24bit undefined\|undefined undefined\|24bit` |
-| T10.6 `choisirShell` | `relatif=oui sans-x=oui dossier=oui absent=oui valide=oui` | `relatif=oui sans-x=non:<pas-exec> dossier=non:<dossier> absent=oui valide=oui` |
-| T12.4 cinq processus vivants, serveur tué par SIGKILL, aucun survivant après 5 s | `5 aucun` | `5 survivants` |
-| M-SI-ABSENT | `effet` | `sans effet` (la constante `AJOUTS_TOUJOURS` n'existe pas encore : l'ancre du mutant manque, attendu sur la base) |
+- **T10.1** absentes : CLAUDECODE, CLAUDE_CODE_FOO, CLAUDE_CODE_ENTRYPOINT, VF_COCKPIT_X
+  - attendu `0`
+  - obtenu `3` (seul `VF_COCKPIT_X` est retiré par la tranche)
+- **T10.8** serveur, passe 1 (TERM=vt100, COLORTERM absent)
+  - attendu `COLORTERM=truecolor TERM=xterm-256color`
+  - obtenu `TERM=vt100`
+- **T10.8** serveur, passe 2 (TERM=dumb, COLORTERM=24bit)
+  - attendu `COLORTERM=truecolor TERM=xterm-256color`
+  - obtenu `COLORTERM=24bit TERM=dumb`
+- **T10.5** `envShell` unitaire (clés restantes)
+  - attendu `AUTRE,CLAUDE_AUTRE,COURT,NODE_OPTIONS`
+  - obtenu `AUTRE,CLAUDECODE,CLAUDE_AUTRE,CLAUDE_CODE_X,NODE_OPTIONS`
+- **T10.8** `envShell` unitaire (quatre entrées)
+  - attendu `xterm-256color|truecolor` quatre fois
+  - obtenu `vt100|undefined dumb|24bit undefined|undefined undefined|24bit`
+- **T10.6** `choisirShell`
+  - attendu `relatif=oui sans-x=oui dossier=oui absent=oui valide=oui`
+  - obtenu `relatif=oui sans-x=non:<fichier non exécutable> dossier=non:<dossier> absent=oui valide=oui`
+- **T12.4** cinq processus vivants, serveur tué par SIGKILL, aucun survivant après 5 s
+  - attendu `5 aucun`
+  - obtenu `5 survivants`
+- **M-SI-ABSENT**
+  - attendu `effet`
+  - obtenu `sans effet` (la constante `AJOUTS_TOUJOURS` n'existe pas encore : l'ancre du mutant manque, attendu sur la base)
 
 ## Écart avec le plan : verts sur la base alors que le plan les annonçait rouges
 
