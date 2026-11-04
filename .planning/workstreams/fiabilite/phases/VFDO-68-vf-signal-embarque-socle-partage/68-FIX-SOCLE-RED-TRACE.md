@@ -35,3 +35,6 @@ Rouge sur `387df78b` (scratchpad `fix-socle-f03-rouge.out`) :
 | W19.3 émetteur entier : `signal@1` produit, script jamais exécuté | `vibeflow/cockpit-signal@1\|intact` | `vibeflow/cockpit-signal@1\|exécuté` |
 
 Témoins non rouges : W19.0 (le script s'exécute bien sur un `git status` nu : le rouge n'est pas un fichier témoin inatteignable), W19.1 (le nœud est lu : le chemin git est parcouru).
+
+Correctif : `GIT_SUR` déplacé dans `vf-cockpit-paths.mjs` (ré-exporté par `vf-cockpit-arbres.mjs`) et appliqué aux cinq appels git du socle (who ×3, planning `for-each-ref`, paths `rev-parse`). Plus aucun `execFileSync('git'` ni `sh('git'` sans le préfixe.
+Vert : `test-cockpit-who.sh` 91 PASS / 0 FAIL ; `test-cockpit-retard.sh` (R5.3 : chaque appel git journalisé porte `core.fsmonitor=false`) vert.

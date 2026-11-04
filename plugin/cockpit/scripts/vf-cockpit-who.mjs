@@ -14,7 +14,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { envEnfant } from './vf-cockpit-env.mjs';
-import { driverLockScript, gitCommonDir, resolveScriptsDir, planningLayout } from './vf-cockpit-paths.mjs';
+import { driverLockScript, gitCommonDir, resolveScriptsDir, planningLayout, GIT_SUR } from './vf-cockpit-paths.mjs';
 import { ls, mtime, readJson, cherche, masque, MAX_MASQUE, ID_RE, premiereLigne } from './vf-cockpit-lecture.mjs';
 import { FENETRE, collecteAgents, indexDesNoeuds, rattacher } from './vf-cockpit-equipe.mjs';
 import { lireDags } from './vf-cockpit-planning.mjs';
@@ -109,8 +109,8 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
     const fp = path.join(d, f);
     let age = Math.round((now - mtime(fp)) / 1000);
     if (age <= ttl && nodes.some((x) => x.status === 'running')) {
-      const tracked = sh('git', ['-C', d, 'ls-files', '--error-unmatch', f], d, root).trim(), dirty = sh('git', ['-C', d, 'status', '--porcelain', '--', f], d, root).trim();
-      const ct = Number(sh('git', ['-C', d, 'log', '-1', '--format=%ct', '--', f], d, root).trim());
+      const tracked = sh('git', [...GIT_SUR, '-C', d, 'ls-files', '--error-unmatch', f], d, root).trim(), dirty = sh('git', [...GIT_SUR, '-C', d, 'status', '--porcelain', '--', f], d, root).trim();
+      const ct = Number(sh('git', [...GIT_SUR, '-C', d, 'log', '-1', '--format=%ct', '--', f], d, root).trim());
       if (tracked && !dirty && ct) age = Math.round(now / 1000 - ct); // contenu identique au commit : écrit au plus tard à cette date
     }
     const stale = age > ttl;

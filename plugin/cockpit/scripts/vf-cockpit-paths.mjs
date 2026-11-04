@@ -119,9 +119,12 @@ export function engineDir(scriptsDir) {
 
 export const outputDir = (labRoot) => path.join(labRoot, '.vibeflow', 'cockpit');
 
+// un `.git/config` écrit par d'autres peut déclarer un core.fsmonitor exécutable : chaque appel git du socle commence par ce préfixe (T-68-04, F-03)
+export const GIT_SUR = ['-c', 'core.fsmonitor=false'];
+
 export function gitCommonDir(root) {
   try {
-    const out = execFileSync('git', ['-C', root, 'rev-parse', '--path-format=absolute', '--git-common-dir'],
+    const out = execFileSync('git', [...GIT_SUR, '-C', root, 'rev-parse', '--path-format=absolute', '--git-common-dir'],
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000, env: envEnfant(root) }).trim();
     return out || null;
   } catch { return null; }
