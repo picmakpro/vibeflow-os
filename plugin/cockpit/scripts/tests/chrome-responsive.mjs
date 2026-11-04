@@ -5,6 +5,7 @@
 // Rend sur une ligne { mesures: { "<largeur>" | "resize:<a>:<b>" | "resize:<b>:<a>": { v: [violations], m: {chiffres} } } } ou { erreur }.
 // Une violation = deux éléments frères visibles qui se recouvrent, un texte rogné (scrollWidth > clientWidth), un élément hors de la fenêtre,
 // un bouton ou lien d'en-tête qui sort de la fenêtre (x + largeur > innerWidth), une recherche, un logo ou une barre de question sous leur taille minimale (sur plusieurs lignes tolérée sous 1 000 px : le gabarit étroit du viewer). RESP_INJECT : expression évaluée après le chargement (boutons d'en-tête optionnels de l'onglet Code, absents d'un lab de test). Le HOME réel est rendu à Chrome (REAL_HOME).
+// 70-12 : fenetre, nCartes, carte1, titreRect, titreCarte, zoomCartes, filRect, rechercheRect, filRecherche (page Équipe, UIFN-14).
 // 70-04 : mesures neuves rangées dans `m` seulement (rangees, actionsRangee, plus, plusPastille, sources, menu, onglets, zoom, askRect, upRect, btnPanel, tiroir, poignee, croix, titreMots) ; les interactions (ouvrir le menu, taper une carte, le titre, la croix, Échap, le vide, lancer un parcours) passent par RESP_INJECT, une interaction par chargement (la mesure attend deux relevés identiques : la mise en page est posée).
 import fs from 'node:fs'; import path from 'node:path';
 import { executer } from './chrome-session.mjs';
@@ -98,6 +99,17 @@ const MESURE = `(() => {
       m.titreMots.push({ mot: w[0], rect: rs.length, large: larg > h1.clientWidth }); }
     m.titreBoite = h1.clientWidth; m.titreTexte = txt;
   }
+  // 70-12 (UIFN-14, P70-D-20) : mesures de la page Équipe (zoom, titre, première carte, fil d'Ariane, recherche), rangées dans m seulement (jamais dans v : R1 à R9 gardent leur sens)
+  const aire = (a, b) => { const x = Math.min(a.right, b.right) - Math.max(a.left, b.left), y = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top); return x > 0 && y > 0 ? Math.round(x * y) : 0; };
+  m.fenetre = [vw, vh];
+  const cartes = [...document.querySelectorAll('#svg g.node .card')].filter(vis).sort((a, b) => rec(a).top - rec(b).top || rec(a).left - rec(b).left);
+  m.nCartes = cartes.length; m.carte1 = cartes[0] ? arr(rec(cartes[0])) : null;
+  m.titreRect = h1 && vis(h1) ? arr(rec(h1)) : null;
+  m.titreCarte = h1 && vis(h1) && cartes[0] ? aire(rec(h1), rec(cartes[0])) : null; // aire (px²) du titre qui recouvre la première carte
+  m.zoomCartes = zm && vis(zm) ? cartes.filter((c) => aire(rec(zm), rec(c)) > 0).length : null; // nombre de cartes que le zoom recouvre
+  const fil = document.querySelector('#crumbs');
+  m.filRect = fil && vis(fil) ? arr(rec(fil)) : null; m.rechercheRect = sb && vis(sb) ? arr(rec(sb)) : null;
+  m.filRecherche = fil && vis(fil) && sb && vis(sb) ? aire(rec(fil), rec(sb)) : null; // aire (px²) du fil d'Ariane qui recouvre la recherche
   m.pointeur = ['none', 'coarse', 'fine'].find((p) => matchMedia('(pointer: ' + p + ')').matches) || '?';
   return { v, m };
 })()`;

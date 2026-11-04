@@ -3,6 +3,7 @@
 #   R1 chargement à 1 024 / 1 280 / 1 440 / 1 920 / 2 560 px · R2 redimensionnement à chaud 1 920 -> 1 024 -> 1 920 · R3 rendu non cassé à 800 et 390 px
 #   R4 témoin rouge : le même lab sans la mise en page du cockpit rougit · R5 lab sans STATE.md : aucun champ vide dans le sous-titre ni le panneau
 #   R13 à R16 (70-04, Phase 70) : téléphone — en-tête sur une rangée avec menu « ⋯ », onglets à 13 px / piste à 3 px, zoom, tiroir, titre de la vue d'ensemble (voir le bloc en fin de suite)
+#   R17 à R20 (70-12, Phase 70 ; P70-D-20) : onglet Équipe — R17 zoom en rangée en bas à gauche dès 701 px (Code et Projet inchangés), R18 fil d'Ariane / recherche, R19 titre / première carte, R20 page Équipe dans la matrice
 # Deux onglets (Code, Projet) × deux labs (nom court, nom de 60 caractères), badge « au travail » rempli : une session active par lab (P69-D-33 : le badge ne compte que les agents ;
 # un verrou ou un nœud de DAG ne suffisent plus). R7.5 : un lab sans agent actif, badge « Personne ».
 # Mesure : getBoundingClientRect dans un Chrome headless (chrome-responsive.mjs) — recouvrement des éléments frères, scrollWidth > clientWidth,
@@ -32,8 +33,9 @@ JS
 cat > "$AUX/viol.mjs" <<'JS'
 import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); const m = j.mesures?.[process.argv[2]];
 if (!m) { console.log('mesure absente : ' + (j.erreur || process.argv[2])); process.exit(0); }
-const bas = process.argv[3] === 'bas'; // sous 1 000 px le panneau est un tiroir fermé : seul l'en-tête et la barre de question sont mesurés
-const plein = m.m.enteteElements >= (bas ? 3 : 6) && (bas || /#panel/.test(m.m.surfaces || '')) && /#ask/.test(m.m.surfaces || '');
+const bas = /bas/.test(process.argv[3] || ''); // sous 1 000 px le panneau est un tiroir fermé : seul l'en-tête et la barre de question sont mesurés
+const equipe = /equipe/.test(process.argv[3] || ''); // 70-12 : l'onglet Équipe n'a pas de barre de question (« equipe » ou « equipe-bas »)
+const plein = m.m.enteteElements >= (bas ? 3 : 6) && (bas || /#panel/.test(m.m.surfaces || '')) && (equipe || /#ask/.test(m.m.surfaces || ''));
 console.log(!plein ? 'mesure vide : ' + JSON.stringify(m.m) : m.v.length ? m.v.slice(0, 4).join(' | ') : 'aucune');
 JS
 # faux verrou de driver (HOME jetable) : un propriétaire au nom long, comme en vraie mission
@@ -436,6 +438,52 @@ for spec in "long:r16-long" "trait:r16-trait"; do
   for w in 768 1440; do
     assert_eq "R16 — lab « ${spec%%:*} » / $w px : aucun mot du titre de la vue d'ensemble n'est coupé sur deux lignes (sauf un mot plus large que sa boîte)" "$(mv_ "$WORK/${spec#*:}.json" "(()=>{const m=j.mesures[\"$w\"].m;if(!m.titreMots||!m.titreMots.length)return 'mesure vide : titre absent';return m.titreMots.filter((w)=>w.rect>1&&!w.large).map((w)=>w.mot+' x'+w.rect+' (boîte '+m.titreBoite+' px)').join(' | ')||'aucun'})()")" "aucun"
   done
+done
+
+# R17 à R20 (70-12 ; P70-D-20 : choix du manager, vf-dev-manager, 2026-11-04, PAS un arbitrage de Samuel) — l'onglet Équipe (UIFN-14), sur un lab STABLE : une session et un sous-agent
+# jetables (la première carte ne varie pas), nom de lab long (le fil d'Ariane et la recherche se disputent la colonne gauche de l'en-tête à 1 024 px).
+#   R17.1 zoom : à 768, 1 024 et 1 440 px (donc dès 701 px) la rangée en bas à gauche du viewer d'origine (x=16, 16 px au-dessus du bas, direction « row »), sans recouvrir une carte (R17.1b) ;
+#   R17.2 Code et Projet gardent la position du zoom de 794c6dba ; R18 fil d'Ariane et recherche ne se recouvrent pas à 1 024 px (Projet et Équipe) ;
+#   R19 le titre `#context h1` ne recouvre pas la première carte, au premier affichage (R19.1 : 390, 768, 1 024, 1 440 px) et après l'ouverture de la session (R19.2 : 390, 1 024 px) ;
+#   R20 la page Équipe entre dans la matrice : aucune superposition d'en-tête ni de surfaces, aucun défilement horizontal (R1 et R3 appliqués à `equipe.html`, 390 / 768 / 1 024 / 1 440 px).
+echo "=== R17 à R20 — onglet Équipe : zoom, titre, fil d'Ariane, matrice (UIFN-14) ==="
+sous_agent() { # sous_agent <numéro de session de agent_actif> <lab> : un sous-agent actif (forme réelle) sous la session du lab ; sa date est rafraîchie tant que la suite vit
+  local N="$1" L="$2" SID D TS; SID="aaaa1111-2222-3333-4444-$(printf '%012d' "$N")"; D="$HOME/.claude/projects/-lab-$N/$SID/subagents"; mkdir -p "$D"; TS="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+  printf '{"agentType":"vf-coder","isBuiltIn":false,"launchedWithDefaults":false,"description":"tâche synthétique","toolUseId":"toolu_s1","spawnDepth":1,"requestShape":"background","requestNonInteractive":true}' > "$D/agent-s1.meta.json"
+  printf '{"type":"user","isSidechain":true,"agentId":"s1","parentUuid":null,"cwd":"%s","sessionId":"%s","gitBranch":"main","version":"2.1.317","timestamp":"%s","message":{"role":"user","content":"mandat synthétique"}}\n{"type":"assistant","isSidechain":true,"agentId":"s1","cwd":"%s","sessionId":"%s","gitBranch":"main","version":"2.1.317","timestamp":"%s","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_x","name":"Read","input":{"file_path":"%s/README.md"}}]}}\n' "$L" "$SID" "$TS" "$L" "$SID" "$TS" "$L" > "$D/agent-s1.jsonl"
+  ( while kill -0 $$ 2>/dev/null; do touch "$D/agent-s1.jsonl"; sleep 10; done ) </dev/null >/dev/null 2>&1 &
+}
+LE="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-equipe"; mklab "$LE"; sous_agent "$NSESS" "$LE"
+srv "$LE/.vibeflow/cockpit"; P_e=$SRV_PORT; PID_e=$SRV_PID
+zoom_base() { case "$1" in 768) echo "308|108|52|144" ;; 1024) echo "574|72|42|114" ;; 1440) echo "16|842|114|42" ;; esac; } # x|y|largeur|hauteur du zoom de Code et de Projet, relevés sur 794c6dba (labs de la suite)
+J_PAUSE_E='const p = (ms) => new Promise((r) => setTimeout(r, ms));'
+INJ_SESSION="(async () => { $J_PAUSE_E const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0); nd?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); for (let i = 0; i < 60 && !/^Session/.test(document.querySelector('#context .k')?.textContent || ''); i++) await p(50); await p(400); return true; })()"
+OPIDS=()
+mes "http://127.0.0.1:$P_e/equipe.html" 390,768,1024,1440 - > "$WORK/r17-equipe.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_SESSION" mes "http://127.0.0.1:$P_e/equipe.html" 390,1024 - > "$WORK/r19-session.json" & OPIDS+=($!)
+mes "http://127.0.0.1:$P_e/project.html" 1024 - > "$WORK/r18-projet.json" & OPIDS+=($!)
+wait "${OPIDS[@]}"
+SRV_PID=$PID_e; unsrv
+assert_eq "R17.0 — témoin : la fixture de l'onglet Équipe montre au moins une carte à 1 024 px" "$(mv_ "$WORK/r17-equipe.json" 'j.mesures["1024"].m.nCartes>=1')" "true"
+for w in 768 1024 1440; do
+  assert_eq "R17.1 — Équipe / $w px : le zoom est la rangée en bas à gauche (x, écart au bas de la fenêtre, direction)" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;const z=m.zoom;if(!z)return 'zoom absent';return z.r[0]+'|'+(m.fenetre[1]-(z.r[1]+z.r[3]))+'|'+z.dir})()")" "16|16|row"
+  assert_eq "R17.1b — Équipe / $w px : le zoom ne recouvre aucune carte" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1?String(m.zoomCartes):'témoin : aucune carte'})()")" "0"
+  for onglet in index project; do
+    assert_eq "R17.2 — $onglet / $w px : la position du zoom est celle de 794c6dba (x,y,largeur,hauteur)" "$(mv_ "$WORK/r13-$onglet.json" "(()=>{const z=j.mesures[\"$w\"].m.zoom;return z?z.r.join('|'):'zoom absent'})()")" "$(zoom_base "$w")"
+  done
+done
+for spec in "Équipe:$WORK/r17-equipe.json" "Projet:$WORK/r18-projet.json"; do
+  assert_eq "R18 — ${spec%%:*} / 1 024 px, lab au nom long : le fil d'Ariane ne recouvre pas la recherche (aire en px² ; témoin : les deux sont visibles)" "$(mv_ "${spec#*:}" '(()=>{const m=j.mesures["1024"].m;return m.filRecherche===null?"témoin : fil ou recherche absents":String(m.filRecherche)})()')" "0"
+done
+for w in 390 768 1024 1440; do
+  assert_eq "R19.1 — Équipe / $w px, premier affichage : le titre ne recouvre pas la première carte (aire en px²)" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1&&m.titreRect?String(m.titreCarte):'témoin : titre ou carte absents'})()")" "0"
+done
+for w in 390 1024; do
+  assert_eq "R19.2 — Équipe / $w px, session ouverte : le titre ne recouvre pas la première carte (aire en px²)" "$(mv_ "$WORK/r19-session.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1&&m.titreRect?String(m.titreCarte):'témoin : titre ou carte absents'})()")" "0"
+done
+for w in 390 768 1024 1440; do
+  mode=equipe; [ "$w" -lt 1000 ] && mode=equipe-bas
+  assert_eq "R20 — Équipe / $w px : aucune superposition d'en-tête ni de surfaces, aucun défilement horizontal" "$(printf '%s' "$(cat "$WORK/r17-equipe.json")" | node "$AUX/viol.mjs" "$w" "$mode")" "aucune"
 done
 
 vf_hyg_assert
