@@ -1,9 +1,9 @@
 # Phase 70: Finitions UI du cockpit - Context
 
 **Gathered:** 2026-11-03
-**Status:** Planifiée (2026-11-03, 9 plans 70-01..09 en 6 vagues, plan-checker frais passed sur `3edc7e51`) — non exécutée ; exécution après le merge de la 69 et la revalidation P70-D-14
+**Status:** Revalidée le 2026-11-04 contre `794c6dba` (Phase 69 mergée, cockpit `v1.1.1`) : 12 plans 70-01..12 en 6 vagues (3 plans ajoutés : 70-10, 70-11, 70-12 ; 70-02, 70-04, 70-05, 70-06, 70-08, 70-09 corrigés d'après le relevé d'un plan-checker frais) — non exécutée ; la revalidation P70-D-14 est traitée
 
-**Exigences :** UIFN-01 à UIFN-10 (préfixe neuf, P70-D-12), inscrites dans `REQUIREMENTS.md` du compartiment
+**Exigences :** UIFN-01 à UIFN-14 (préfixe neuf, P70-D-12 ; UIFN-11 à UIFN-14 ajoutées le 2026-11-04, P70-D-21), inscrites dans `REQUIREMENTS.md` du compartiment
 et dans la ligne `Requirements` de la Phase 70 du ROADMAP.
 
 Cadrage documentaire (aucun code), par vf-dev-manager, sur la branche `feat/phase-70-finitions-ui` partie de
@@ -51,8 +51,10 @@ Réponse unique de Samuel aux six questions de cadrage, mot pour mot : « Tout a
 - **P70-D-05 (« Où en est-on ? » sans STATE, BACKLOG F5 ; Q5-A).** Ajouté à la 70. La réponse locale omet les
   champs absents ou dit qu'il n'y a pas de `STATE.md`, et un test le couvre. → UIFN-08.
 - **P70-D-06 (recette ; Q6-A).** En fin d'exécution, l'agent compare des captures Playwright avant et après,
-  à 390, 768 et 1 440 px, dans les deux thèmes. Puis une recette humaine pas à pas de 4 points est
-  **proposée** à Samuel (en-tête mobile, tiroir, zoom, visite), sans lui être imposée. → UIFN-10.
+  à 390, 768 et 1 440 px, dans les deux thèmes. Puis une recette humaine pas à pas de 4 points était
+  **proposée** à Samuel (en-tête mobile, tiroir, zoom, visite). **Amendé par P70-D-19 (2026-11-04) : la recette
+  humaine de 4 points est remplacée par une recette par juges frais ; seuls les points de goût remontent à Samuel.**
+  → UIFN-10.
 - **P70-D-07 (écarts DESIGN.md).** Arbitrage antérieur de Samuel, mot pour mot : « Les règles dans DESIGN.md,
   la correction en 70 (Recommandé) » (AskUserQuestion, session principale, 2026-11-03).
   - `--st-active` vaut `var(--sev-medium)` et `--st-blocked` vaut `var(--sev-high)`.
@@ -84,6 +86,16 @@ Réponse unique de Samuel aux six questions de cadrage, mot pour mot : « Tout a
   avant/après de 70-09 ne sont pas versionnées : elles restent dans le dossier temporaire de la session
   d'exécution. Le rapport de recette (`70-CAPTURES.md`) les nomme et décrit ce que chacune montre. → UIFN-10.
 
+- **P70-D-19 (méthode de recette : des juges, pas Samuel).** Arbitrage de méthode de Samuel, mot pour mot :
+  « si c'est pour me demande ca ca sert a rien, lance des juge qui prenne des screenshot pour les tests, appele moi
+  seulement si tu ne peux pas faire (gout, avis humain indispensable) » (session principale Claude Code, 2026-11-04 ;
+  déjà consigné dans `phases/VFDO-69-suivi-travail-en-cours-cockpit/69-RECETTE-HUMAINE.md` § Tri, source vérifiable).
+  Remplace la recette humaine de 4 points de P70-D-06 et le texte d'UIFN-10. Plan 70-09 : captures avant / après
+  (390, 768, 1 440 px, deux thèmes ; les « avant » sont déjà prises par le manager sur `794c6dba`, hors dépôt,
+  P70-D-17) puis recette par juges frais, chacun sur son propre Chromium headless piloté par la bibliothèque
+  `playwright` (jamais le MCP partagé), deux thèmes, 390 / 1 024 / 1 440 px ; seuls les points de goût remontent à
+  Samuel, groupés en un seul tri ; aucun correctif sans arbitrage (ADR-031). → UIFN-10.
+
 ### Choix du manager (vf-dev-manager, 2026-11-03 — pas des arbitrages de Samuel)
 
 Annoncés à Samuel dans le message de cadrage, sans question ; il ne les a pas contredits, mais n'a pas non
@@ -110,8 +122,22 @@ plus été interrogé dessus.
   (numéros de ligne, `00-vibeflow.js`, `70-vf-live.js`, `72-vf-equipe.js`, version du module). Aucune exécution
   sur un plan non revalidé.
 - **P70-D-15 (version du module).** Bump **patch** du module `cockpit`, au-dessus de la version laissée par la
-  69 (`v1.1.0`, P69-D-26) : ce sont des finitions, sans nouvelle capacité (le choix de langue est exclu). La
+  69 (`v1.1.0` à P69-D-26, puis `v1.1.1` à `794c6dba` : la cible est donc `v1.1.2`) : ce sont des finitions, sans nouvelle capacité (le choix de langue est exclu). La
   release racine reste un geste humain.
+
+
+### Choix du manager (vf-dev-manager, 2026-11-04 — pas des arbitrages de Samuel)
+
+Issus des captures « avant » mesurées sur `794c6dba` et du relevé du plan-checker ; aucune question posée à Samuel.
+- **P70-D-20 (zoom de l'onglet Équipe, défaut D).** Sur l'onglet Équipe, qui n'a pas de barre de question, à TOUTE
+  largeur ≥ 701 px, le zoom est la rangée en bas à gauche comme dans le viewer d'origine à 1 440 px. Mesuré : colonne à
+  x=574, y=72 (42×114) à 1 024 px et x=308, y=108 (52×144) à 768 px, par-dessus les cartes. Les onglets Code et Projet
+  gardent leur position actuelle (la barre de question occupe le bas). ≤ 700 px : P70-D-09 inchangé. → UIFN-14 (70-12).
+- **P70-D-21 (périmètre ajouté, UIFN-11 à UIFN-14).** Relevés de la recette de la 69 sans plan, ajoutés sans arbitrage :
+  UIFN-11 réglages visuels de l'onglet Équipe (70-02) ; UIFN-12 focus clavier du tiroir (70-11) ; UIFN-13 témoins des
+  cinq mineurs de la 69 (70-11) ; UIFN-14 zoom, titre / première carte, fil d'Ariane et matrice responsive de l'onglet
+  Équipe (70-12). Le point « écrit à <id d'agent> » (`vf-cockpit-transcript.mjs:12`) est exclu : il attend un
+  arbitrage de goût de Samuel.
 
 </decisions>
 
@@ -186,27 +212,70 @@ Captures : `scratchpad/captures-70/` de la session du manager (non versionnées)
   `vf.lastActivity || '?'` (:107), `nexts = []` sans `curMs` (:105) → « Dernière phase : ? · , le ?. » et une
   liste « À finir » vide. Aucun test de la voie locale sur un lab sans STATE.
 
+
+## Re-mesures du 2026-11-04 (code `794c6dba`, Phase 69 mergée)
+
+Les numéros de ligne ci-dessus datent de `7370d604` ; ceux-ci les remplacent (mesurés par `grep -n`). Les lignes de
+`viewer.html` citées plus haut (1591, 1596, 620, 636-637) sont inchangées.
+- `40-tour.js` : « One real path » à `:47` (et non `:74-75`) ; `autoSteps()` `:49` ; construction des étapes `:72-73`.
+- `vf-cockpit-ask.mjs` : « Où on en est » `:105-108` (et non `:103-109`) ; `nexts` `:105` ; `vf.phase ?? '?'` sur la ligne `:107`.
+- `00-vibeflow.js` : `--st-active: var(--sev-medium)` et `--st-blocked: var(--sev-high)` DÉJÀ posés `:24` ; `--text-1`
+  n'existe plus ; restent `rgba(0,0,0,.18)` `:28` et `#000` ×4 `:57` (masque). Plus de `#f59e0b|#ef4444` dans `70-vf-live.js`
+  (`#vf-lock` lit `var(--st-active)` `:22`). Les écarts M5.1 et M5.2 sont donc déjà soldés ; seule M5.3 est rouge.
+- `01-vf-responsive.js` : `header .hl { min-width: 280px }` `:25` ; zoom en colonne en haut à droite de 1 000 à 1 279 px `:42` ;
+  tranche 1 000-1 599 px à la souris `:35`.
+- `vf-cockpit-equipe-carte.mjs` : détail joint par `'\n'` à la ligne `:35` (et non `:34`) ; `viewer.html:1625` découpe sur `\n\n+`.
+- `72-vf-equipe.js` : clé de rechargement `:88`, `sessionStorage` `:75-82`, `b.disabled = true` `:122`, panneau `:109-116`.
+  `70-vf-live.js` : redessin du tiroir `:72-82` (`SC.showPanel` `:78`), commande rendue en `textContent` `:86-89`, style `.vf-who button` `:34`, `.vf-link` `:38`.
+  `vf-cockpit-who.mjs:82` : `WS_RE` et clause `..`.
+- Identifiants de témoins : R9 existe déjà (`test-cockpit-responsive.sh:292-300`) et `Q12` aussi (`test-cockpit-questions.sh`) ; les
+  neufs sont R13 à R20, Q15 à Q17, EK1 à EK7 et W19 (vérifiés absents par `grep`).
+- Défauts mesurés sur les captures « avant » du manager : zoom de l'onglet Équipe au milieu du canevas (P70-D-20) ; titre qui
+  recouvre la première carte de l'onglet Équipe, 22 752 px² à 390 px et ~17 400 px² à 768, 1 024 et 1 440 px ; fil d'Ariane rogné
+  à 31 px (« V… ») à 1 024 px sur Projet et Équipe sans chevauchement de la recherche dans ce lab (le chevauchement de la
+  recette 69 n'est donc pas reproduit partout : témoin sur la fixture qui le provoque, ou « non reproduit, témoin négatif »).
+- Durée de `test-cockpit-responsive.sh` : 175 s, 11 lancements de Chrome (70-10, P70-D-18).
+
 </facts>
 
 <revalidation>
-## À reprendre à la revalidation après le merge de la 69 (P70-D-14)
+## Revalidation après le merge de la 69 (P70-D-14) — TRAITÉE le 2026-11-04
 
-Relevé par le plan-checker frais (passe 2, `3edc7e51`, verdict passed, infos non bloquantes) :
-- 70-09, bloc `<traces_sans_chemin_machine>` : il nomme `70-09-CAPTURES.md` ; l'artefact s'appelle `70-CAPTURES.md`
-  (et `70-RECETTE-HUMAINE.md`) partout ailleurs dans le plan.
+Relevé par le plan-checker frais (passe 2, `3edc7e51`, verdict passed, infos non bloquantes), TRAITÉ le 2026-11-04
+contre `794c6dba` (nouveau relevé d'un plan-checker frais appliqué : voir « Re-mesures » et le tableau des vagues) :
+- 70-09, bloc `<traces_sans_chemin_machine>` : nommait `70-09-CAPTURES.md` ; corrigé en `70-CAPTURES.md` et `70-RECETTE-JUGES.md`.
 - `scripts/check-machine-paths.sh` ne balaie que les fichiers suivis : la relecture d'une RED-TRACE neuve se fait
   après `git add` et avant le commit, sinon elle est verte sans avoir lu le fichier.
-- 70-04 tâche 2 : le critère « 12 px / 2 px = 0 occurrence » est déjà à 0 avant la 69 ; il n'a de sens que sur le
-  code de la 69 (mesuré 1/1 sur `feat/phase-69-suivi-travail`).
-- 70-09 : le bump attend `v1.1.1` au-dessus de la `v1.1.0` de la 69 ; sur la branche actuelle, le module est encore en
-  `v1.0.0` et la sonde rougit par construction.
-- 70-09 ne versionne plus aucune capture PNG (P70-D-17, tranché le 2026-11-03).
+- 70-04 tâche 2 : le critère « 12 px / 2 px = 0 occurrence » a retrouvé son sens sur `794c6dba` (`00-vibeflow.js:30` à 12 px / 2 px) : conservé.
+- 70-09 : le bump vise `v1.1.2` au-dessus de la `v1.1.1` de `794c6dba` (la sonde OK-BUMP base + 1 reste juste).
+- 70-09 ne versionne aucune capture PNG (P70-D-17, tranché le 2026-11-03).
 - **P70-D-18 (durée de `test-cockpit-responsive.sh`).** Ajout au périmètre, arbitrage de Samuel, mot pour mot :
   « Accepter, l'alléger en 70 (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-03,
   relayée par la session principale). Après la 69, la suite dure 175 s pour une cible de 60 s. La 70 la ramène
   vers sa cible au moment où elle refait l'en-tête mobile (70-04, puis 70-05). Aucun témoin n'est retiré : le
   gain vient du regroupement des mesures et du nombre de lancements de Chrome. Durée avant et après consignée.
   → UIFN-01.
+
+### Découpage en vagues (2026-11-04) — aucune collision de fichiers dans une même vague
+
+Vérifié par script sur `files_modified` des 12 plans (hors fichiers de trace), sans collision ; chaque dépendance pointe vers une vague strictement antérieure.
+
+| Vague | Plan | depends_on | Fichiers modifiés (résumé) | Régime |
+|-------|------|------------|-----------------------------|--------|
+| 1 | 70-01 | — | garde du français (`test-cockpit-chrome-fr.sh`, `chrome-fr-rendu.mjs`, inventaire, exclusions, `test-cockpit-onglet-code.sh`) | tests |
+| 1 | 70-02 | — | `test-cockpit-marque-blanche.sh`, `00-vibeflow.js`, `70-vf-live.js`, `71-vf-equipe-rendu.js`, `vf-cockpit-equipe-carte.mjs` | M5 + quick |
+| 1 | 70-10 | — | `test-cockpit-responsive.sh`, `chrome-responsive.mjs` (seul propriétaire en V1) | allègement |
+| 1 | 70-11 | — | `chrome-equipe-clavier.mjs`, `test-cockpit-equipe.sh`, `test-cockpit-who.sh`, `72-vf-equipe.js` | témoins |
+| 2 | 70-03 | 70-01 | dictionnaires `78`/`79`, `80-vf-fr.js`, `vf-cockpit-code.mjs`, exclusions | français |
+| 2 | 70-04 | 70-02, 70-10 | `chrome-responsive.mjs`, `test-cockpit-responsive.sh`, `00-vibeflow.js`, `01-vf-responsive.js`, `02-vf-telephone.js`, `VENDORED.txt` | R13 à R16, en-tête |
+| 3 | 70-05 | 70-04 | `02-vf-telephone.js`, `01-vf-responsive.js` (+ viewer et patch si inévitable) | zoom, tiroir, titre |
+| 3 | 70-06 | 70-01, 70-03, 70-04 | `test-cockpit-questions.sh`, `vf-cockpit-project.mjs`, `vf-cockpit-ask.mjs`, `00-vibeflow.js` | Q15 à Q17 |
+| 4 | 70-07 | 70-03, 70-05, 70-06 | `chrome-visite-etapes.mjs`, `test-cockpit-projet.sh`, `40-tour.js`, patch, `VENDORED.txt`, `79-vf-fr-dict-b.js` | visite |
+| 4 | 70-12 | 70-05, 70-10, 70-11 | `chrome-responsive.mjs`, `test-cockpit-responsive.sh`, `00-vibeflow.js`, `01-vf-responsive.js`, `72-vf-equipe.js` (jamais `viewer.html` ni `VENDORED.txt`) | R17 à R20 |
+| 5 | 70-08 | 70-06, 70-07 | `test-cockpit-projet.sh`, `vf-cockpit-project.mjs` | visite Projet |
+| 6 | 70-09 | tous | `70-CAPTURES.md`, `70-RECETTE-JUGES.md`, version et documentation du module | juges |
+
+Points de séquencement : 70-02 et 70-11 ne se partagent aucun fichier (la correction du focus ne touche pas `70-vf-live.js` ; si sa cause y est, 70-11 s'arrête et le manager séquence la retouche après 70-02). En vague 4, 70-07 et 70-12 ne partagent aucun fichier (`VENDORED.txt` est interdit à 70-12). La suite responsive est lancée au plus une fois par plan, en fin de plan ; deux fois pour 70-04 et 70-12, dont la tâche tracer doit prouver son rouge. Chaque exécuteur d'une même vague travaille dans son worktree (règle de parallélisme maximal de Samuel, mot pour mot : « la regle est de parallèliser le plus possible, pas de regle "1 seul manager" on lance autant d'agent et sous agent qu'on peut. Plusieur worktree peuvent etre necessaire », session principale Claude Code, 2026-11-03) ; les suites se rejouent à la jointure de la vague.
 
 </revalidation>
 
