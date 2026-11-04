@@ -2064,6 +2064,57 @@ jobs:
               ;;
           esac
 
+      # Node 24, même épinglage que `tests-shard` : le CLI `claude` de l'étape suivante est un paquet npm.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Mod vf-signal du module cockpit — claude plugin validate --strict et claude plugin test (VFSG-08)
+        # OBJET (P68-D-07). Le mod `plugin/cockpit/signal/` est un mod Claude Code : seul le CLI sait
+        # le valider (`validate --strict`) et jouer ses tests (`test`). Cette étape fait jouer les deux
+        # à chaque run du job requis `gates`.
+        # TÉMOIN INTÉGRÉ. Une copie de `plugin/` reçoit un test cassé par construction ; `claude plugin
+        # test` y doit sortir non nul. Un code nul fait échouer l'étape (« le témoin rouge est resté
+        # vert ») : l'étape ne peut pas devenir inerte sans se dénoncer. La découverte non vide (au
+        # moins un `*.test.tsx`) applique le principe F13 de l'en-tête de ce fichier.
+        # ÉPINGLAGE (T-68-SC). Version exacte du paquet, validée par un humain (porte du plan 68-09),
+        # jamais `@latest`, `^`, `~` ni `npm install -g`. Préfixe temporaire (`mktemp -d`) : un rejeu
+        # local n'installe rien globalement. HOME est un dossier vide : le CLI n'a ni session ni
+        # configuration, aucun secret n'est passé à l'étape (T-68-25).
+        run: |
+          set -eu
+          pfx="$(mktemp -d)"
+          home_vide="$(mktemp -d)"
+          npm install --prefix "$pfx" --no-audit --no-fund @anthropic-ai/claude-code@2.1.318
+          cli="$pfx/node_modules/.bin/claude"
+          HOME="$home_vide" "$cli" --version
+
+          nb="$(find plugin/cockpit/signal -type f -name '*.test.tsx' | grep -c . || true)"
+          echo "== découverte : $nb fichier(s) *.test.tsx sous plugin/cockpit/signal/ =="
+          if [ "$nb" -lt 1 ]; then
+            echo "::error::aucun *.test.tsx sous plugin/cockpit/signal/ : l'étape ne prouverait rien (F13)"
+            exit 1
+          fi
+
+          HOME="$home_vide" "$cli" plugin validate --strict plugin
+
+          # Témoin rouge intégré : une copie de plugin/ avec un test cassé exprès.
+          copie="$(mktemp -d)"
+          cp -R plugin "$copie/plugin"
+          printf '%s\n' "import { expect, test } from 'claude-code/testing'" \
+            "test('temoin rouge VFSG-08 — doit échouer', () => { expect(1).toBe(2) })" \
+            > "$copie/plugin/cockpit/signal/tests/temoin-rouge.test.tsx"
+          rc=0
+          (cd "$copie" && HOME="$home_vide" "$cli" plugin test plugin) > "$copie/temoin.out" 2>&1 || rc=$?
+          tail -n 6 "$copie/temoin.out"
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::le témoin rouge est resté vert : claude plugin test n'a pas échoué sur un test cassé"
+            exit 1
+          fi
+          echo "== témoin rouge : claude plugin test sort rc=$rc sur la copie au test cassé (attendu non nul) =="
+
+          HOME="$home_vide" "$cli" plugin test plugin
+
       - name: check-release-tag (main uniquement — VERSION doit être taggée et poussée)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         # GH_TOKEN requis : sans lui le gh du runner échoue en auth et le gate lisait cet
