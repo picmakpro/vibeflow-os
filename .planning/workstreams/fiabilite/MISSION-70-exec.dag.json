@@ -214,10 +214,13 @@
         "fix-reg-aim",
         "fix-sec-button",
         "fix-recette-fr",
-        "fix-recette-equipe"
+        "fix-recette-equipe",
+        "arb-visite",
+        "arb-equipe",
+        "arb-docs"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "fix-focus-tiroir",
@@ -245,7 +248,7 @@
         "plugin/cockpit/skills/cockpit-moteur/assets/ui/01-vf-responsive.js",
         "plugin/cockpit/scripts/tests/test-cockpit-responsive.sh"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "fix-visite-reload",
@@ -344,6 +347,36 @@
       "scope": [
         "plugin/cockpit/skills/cockpit-moteur/assets/ui/40-tour.js"
       ],
+      "status": "done"
+    },
+    {
+      "id": "arb-visite",
+      "step": "Q6 Q7 Q9 Q13 visite",
+      "stage": "",
+      "deps": [
+        "juge-A"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "arb-equipe",
+      "step": "Q2 Q3 Q12 Équipe",
+      "stage": "",
+      "deps": [
+        "juge-A"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "arb-docs",
+      "step": "P70-D-22..24, recette, BACKLOG",
+      "stage": "",
+      "deps": [
+        "juge-A"
+      ],
+      "scope": [],
       "status": "done"
     }
   ]
