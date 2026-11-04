@@ -239,7 +239,7 @@ async function main() {
   if (vif && !o.rebuild) {
     // R4 (P71-D-36) : --terminal écarté (python3 absent, Windows) alors que le serveur vit déjà : le message dit « le cockpit s'ouvre sans terminal », on l'ouvre (comme au cas sans serveur) ;
     // une relance ordinaire, sans --terminal, garde son comportement : l'adresse seule.
-    if (!o.avecQ) { if (demande && !o.noOpen) ouvrir(vif.url, `Ouvrez ${vif.url} dans un navigateur.`); console.log(adresses(vif.url)); return; }
+    if (!o.avecQ) { if (demande && !o.noOpen && estNotre(vif.pid, path.join(sortie, 'serve.mjs'))) ouvrir(vif.url, `Ouvrez ${vif.url} dans un navigateur.`); console.log(adresses(vif.url)); return; }
     if (termOuvrable(vif, sortie)) { const suivi = ouvrirQ(vif, amorcer(lab, sortie), o, sortie); console.log(adresses(vif.url)); await attendreOuverture(suivi, sortie); return; } // O2 c : même serveur, nouvel amorçage
   }
   if (vif) { if (!arreter(sortie)) { console.error(`PID ${vif.pid} non reconnu comme le serveur de ce cockpit : rien n'a été arrêté.`); process.exit(5); } for (let i = 0; i < 30 && vivant(vif.pid); i++) await attendre(100); }

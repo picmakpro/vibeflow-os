@@ -390,7 +390,8 @@ else assert_eq "M-SANS-PYTHON3 — mutant sans effet (cible absente ou inchangé
 echo "=== L19b — R4 (P71-D-36) : serveur DÉJÀ vivant + --terminal sans python3 : le message promet « le cockpit s'ouvre sans terminal », donc il s'ouvre (jamais une promesse sans ouverture) ==="
 relance_sans_py() { # relance_sans_py <lanceur> [--no-open] -> LRC, LOUT ; le serveur vivant est conservé, PATH sans python3
   rm -f "$OUVERT" "$WORK/run/page-ouverte.html"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"
-  (cd "$LAB" && PATH="$WORK/minbin:$WORK/fauxbin" node "$1" open --terminal "${@:2}" --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); LRC=$?
+  mkdir -p "$WORK/psbin"; ln -sf "$(command -v ps)" "$WORK/psbin/ps" # N13 : estNotre exige ps, qui existe sur le poste réel (seul python3 manque)
+  (cd "$LAB" && PATH="$WORK/minbin:$WORK/psbin:$WORK/fauxbin" node "$1" open --terminal "${@:2}" --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); LRC=$?
   [ -s "$OUVERT" ] || sleep 0.5
 }
 for variante in sans-terminal avec-terminal; do
@@ -404,11 +405,23 @@ for variante in sans-terminal avec-terminal; do
   assert_eq "L19b ($variante) — avec --no-open : rien n'est ouvert" "$LRC ouvert=$([ -s "$OUVERT" ] && echo oui || echo non)" "0 ouvert=non"
   vf_hyg_stop "$S19B"; rm -f "$SJ"
 done
-if mutant rquatre 's/if (demande \&\& !o.noOpen) ouvrir(vif.url/if (false) ouvrir(vif.url/'; then
+if mutant rquatre 's/if (demande .*) ouvrir(vif.url/if (false) ouvrir(vif.url/'; then
   lance "$LAUNCH" open --no-open; S19B="$(sj j.pid)"; P19B="http://127.0.0.1:$(sj j.port)"; relance_sans_py "$MUT_L"
   assert_eq "M-R4-SANS-OUVERTURE — le mutant (plus d'ouverture) rougit L19b : l'adresse de P n'est plus ouverte" "$([ "$(cat "$OUVERT" 2>/dev/null | grep -c -F -e "$P19B" || true)" = 0 ] && echo rouge || echo identique)" "rouge"
   vf_hyg_stop "$S19B"; rm -f "$SJ"
 else assert_eq "M-R4-SANS-OUVERTURE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
+echo "=== L19c — N13 (P71-D-25) : un server.json planté (PID étranger vivant, port 1235) n'est jamais ouvert quand --terminal est écarté : l'adresse n'est remise à l'ouvreur que si le processus est le serveur de CETTE sortie (estNotre) ==="
+plante_etranger() { rm -f "$SJ" "$OUVERT"; mkdir -p "$(dirname "$SJ")"; /bin/sleep 300 & ETR=$!; printf '{"pid":%s,"port":1235,"url":"http://127.0.0.1:1235","token":"x"}' "$ETR" > "$SJ"; }
+plante_etranger; relance_sans_py "$LAUNCH"
+assert_eq "L19c — témoin : le PID étranger est vivant et le server.json est celui qu'on a planté" "$(kill -0 "$ETR" 2>/dev/null && echo vivant || echo mort) $(sj j.port)" "vivant 1235"
+assert_eq "L19c — sortie 0, adresse imprimée, mais AUCUNE ouverture d'une adresse décrite par un processus étranger" "$LRC ouvert=$([ -s "$OUVERT" ] && echo oui || echo non)" "0 ouvert=non"
+kill "$ETR" 2>/dev/null; rm -f "$SJ"
+if mutant sansestnotre "s/&& !o.noOpen && estNotre(vif.pid, path.join(sortie, 'serve.mjs'))) ouvrir(vif.url/\&\& !o.noOpen) ouvrir(vif.url/"; then
+  plante_etranger; relance_sans_py "$MUT_L"
+  assert_eq "M-N13-SANS-ESTNOTRE — le mutant (sans vérification du processus) rougit L19c : l'adresse étrangère est ouverte" "$([ -s "$OUVERT" ] && echo rouge || echo identique)" "rouge"
+  kill "$ETR" 2>/dev/null; rm -f "$SJ"
+else assert_eq "M-N13-SANS-ESTNOTRE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== L20 — E5 : un serveur qui écrit son état après 15 s (machine chargée) : le lanceur attend, dit « démarrage lent » une fois, sort 0 ; la borne existe encore ==="
 # serveur factice (copie du module, jamais le module) : écrit server.json après FAKE_SRV_MS, son PID est consigné dès le départ
