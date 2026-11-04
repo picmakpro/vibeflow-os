@@ -2,7 +2,8 @@
 // vf-cockpit — lanceur du cockpit d'un lab (67-06 ; P67-D-05, P67-D-06).
 // Verbes : open (défaut) · build · stop · status. Options : --lab <dossier> · --no-open · --port <p> · --rebuild · --terminal · --help.
 // Écrit sous <lab>/.vibeflow/cockpit/ (ignoré par git), sert 127.0.0.1 par le serveur unique de la sortie.
-// Codes : 0 succès · 2 lab sans .planning/ · 3 moteur absent · 4 assemblage en échec · 5 serveur non démarré · 64 usage.
+// Codes : 0 succès · 2 lab sans .planning/ · 3 moteur absent · 4 assemblage en échec (lien symbolique refusé dans la sortie compris) · 5 serveur non démarré · 64 usage.
+// Aucun échec ne sort avec une trace : le message est écrit, le code est l'un de ceux-là (main().catch en bas).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +21,7 @@ const AIDE = `Usage : node vf-cockpit.mjs [open|build|stop|status] [--lab <dossi
   stop    arrête le serveur du lab
   status  dit l'adresse et le PID du serveur, ou « arrêté »
   --terminal  ouvre aussi un terminal dans le tiroir de la page (macOS, Linux)
-Codes : 0 succès · 2 lab sans .planning/ · 3 moteur absent · 4 assemblage en échec · 5 serveur non démarré`;
+Codes : 0 succès · 2 lab sans .planning/ · 3 moteur absent · 4 assemblage en échec (lien symbolique refusé dans la sortie compris) · 5 serveur non démarré`;
 
 const VERBES = ['open', 'build', 'stop', 'status'];
 function lireArgs(argv) {
@@ -95,10 +96,17 @@ function ecrireAmorce(sortie) {
 }
 const amorcer = (lab, sortie) => { verifierSortie(lab, sortie); return ecrireAmorce(sortie); };
 const effacerAmorce = (sortie) => { try { fs.unlinkSync(path.join(sortie, '.cache', 'terminal-amorce')); } catch {} };
-// même ouvreur que serve.mjs, détaché, sorties ignorées
-function ouvrir(url) {
+// même ouvreur que serve.mjs, détaché, sorties ignorées. L'erreur ASYNCHRONE du spawn (ouvreur absent : ENOENT, pas de xdg-open) est rattrapée : sans écouteur
+// elle ferait tomber le lanceur avec une trace. `surErreur(err)` la reçoit ; par défaut elle est dite en clair avec `marche`.
+const OUVERTURE_MS = (() => { const n = Number(process.env.VF_COCKPIT_OUVERTURE_MS); return Number.isInteger(n) && n >= 100 && n <= 60000 ? n : 15000; })(); // réglage de test seulement
+function ouvrir(url, marche = '', surErreur = null) {
   const op = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
-  try { spawn(op[0], op[1], { stdio: 'ignore', detached: true }).unref(); } catch {}
+  const dire = (e) => { if (surErreur) surErreur(e); else console.error(`ouverture impossible : « ${op[0]} » ne se lance pas (${(e && e.code) || (e && e.message) || 'erreur'}).${marche ? ' ' + marche : ''}`); };
+  try {
+    const enfant = spawn(op[0], op[1], { stdio: 'ignore', detached: true });
+    enfant.on('error', dire);
+    enfant.unref();
+  } catch (e) { dire(e); }
 }
 // P71-D-12, P71-D-27 (F6) : l'onglet s'ouvre sur la page du terminal (Q) ; l'amorçage n'est JAMAIS dans l'argv de l'ouvreur (lisible par `ps`).
 // Le lanceur écrit une page de redirection (0600, suppression préalable puis création exclusive : aucun lien suivi) dans .cache, l'ouvreur ne reçoit
@@ -113,11 +121,26 @@ function ecrirePageOuvrir(sortie, cible) {
   } catch { return null; }
   return f;
 }
+// Rend { page, echec } : `echec` reçoit l'erreur asynchrone de l'ouvreur (lue par attendreOuverture), null si l'ouverture n'est pas tentée.
 function ouvrirQ(s, amorce, o, sortie) {
-  if (o.noOpen) return;
+  if (o.noOpen) return null;
   const page = ecrirePageOuvrir(sortie, `${s.terminal.url}/#t=${amorce}`);
-  if (!page) { effacerAmorce(sortie); console.error("ouverture du terminal impossible : fichier inattendu dans .cache"); return; }
-  ouvrir(page);
+  if (!page) { effacerAmorce(sortie); console.error("ouverture du terminal impossible : fichier inattendu dans .cache"); return null; }
+  const suivi = { page, echec: null };
+  ouvrir(page, '', (e) => { suivi.echec = e; });
+  return suivi;
+}
+// M6 : l'ouvreur du poste (association de fichiers) peut ne pas charger la page : `.html` associé à un éditeur, navigateur sans accès aux dossiers cachés (Firefox
+// en snap sous Linux), ouvreur absent. Il ne rend jamais d'échec : la seule preuve d'ouverture est l'amorçage consommé par le serveur (fichier effacé à l'échange).
+// Au-delà de OUVERTURE_MS (15 s) sans cette preuve, ou dès que l'ouvreur ne se lance pas, le lanceur le dit avec la marche à suivre ; le principe de P71-D-27 ne change pas.
+async function attendreOuverture(suivi, sortie) {
+  if (!suivi) return;
+  const amorce = path.join(sortie, '.cache', 'terminal-amorce');
+  const fin = Date.now() + OUVERTURE_MS;
+  while (!suivi.echec && fs.existsSync(amorce) && Date.now() < fin) await attendre(100);
+  if (!suivi.echec && !fs.existsSync(amorce)) return;
+  const cause = suivi.echec ? `l'ouvreur du poste ne se lance pas (${suivi.echec.code || suivi.echec.message || 'erreur'})` : `le navigateur n'a pas chargé la page en ${Math.round(OUVERTURE_MS / 1000)} s (ouvreur qui envoie le .html à un éditeur, ou navigateur sans accès aux dossiers cachés, comme Firefox en snap sous Linux)`;
+  console.error(`le terminal ne s'est pas ouvert : ${cause}. Ouvrez ce fichier dans un navigateur, dans la minute qui suit : ${suivi.page} ; ou relancez cette commande après avoir réglé l'ouvreur du poste pour les fichiers .html.`);
 }
 // F1 : une adresse de Q n'est remise à l'ouvreur que si le processus de server.json est le serveur de CETTE sortie (estNotre)
 const termOuvrable = (s, sortie) => !!(s && s.terminal && s.terminal.url) && estNotre(s.pid, path.join(sortie, 'serve.mjs'));
@@ -185,19 +208,21 @@ async function main() {
   const vif = serveurVivant(sortie);
   if (vif && !o.rebuild) {
     if (!o.avecQ) { console.log(adresses(vif.url)); return; }
-    if (termOuvrable(vif, sortie)) { ouvrirQ(vif, amorcer(lab, sortie), o, sortie); console.log(adresses(vif.url)); return; } // O2 c : même serveur, nouvel amorçage
+    if (termOuvrable(vif, sortie)) { const suivi = ouvrirQ(vif, amorcer(lab, sortie), o, sortie); console.log(adresses(vif.url)); await attendreOuverture(suivi, sortie); return; } // O2 c : même serveur, nouvel amorçage
   }
   if (vif) { if (!arreter(sortie)) { console.error(`PID ${vif.pid} non reconnu comme le serveur de ce cockpit : rien n'a été arrêté.`); process.exit(5); } for (let i = 0; i < 30 && vivant(vif.pid); i++) await attendre(100); }
   if (engineDir(scriptsDir).etat !== 'trouve') { console.error('moteur du cockpit introuvable : réinstaller le module cockpit.'); process.exit(3); }
   await assemblerLab(lab, scriptsDir);
   const amorce = o.avecQ ? amorcer(lab, sortie) : null; // avant le démarrage : le serveur ne reçoit jamais la valeur
-  let s = await demarrer(lab, sortie, o);
+  let s = await demarrer(lab, sortie, o), suivi = null;
   if (s && o.avecQ) {
     const t = await attendreTerminal(sortie);
-    if (t) { s = t; ouvrirQ(t, amorce, o, sortie); }
-    else { effacerAmorce(sortie); console.error("le terminal n'a pas démarré (voir serveur.log) ; le cockpit est ouvert sans terminal."); if (!o.noOpen) ouvrir(s.url); }
+    if (t) { s = t; suivi = ouvrirQ(t, amorce, o, sortie); }
+    else { effacerAmorce(sortie); console.error("le terminal n'a pas démarré (voir serveur.log) ; le cockpit est ouvert sans terminal."); if (!o.noOpen) ouvrir(s.url, `Ouvrez ${s.url} dans un navigateur.`); }
   }
   if (!s) { console.error(`le serveur n'a pas démarré : voir ${path.join(sortie, '.cache', 'serveur.log')}`); process.exit(5); }
   console.log(adresses(s.url));
+  await attendreOuverture(suivi, sortie);
 }
-main();
+// Jamais de trace : un échec non prévu (lien symbolique planté sur le chemin de sortie en voie de réutilisation du serveur, par exemple) s'écrit en une ligne et sort avec un code documenté.
+main().catch((e) => { console.error(e && e.message ? e.message : String(e)); process.exit(e && [2, 3, 4, 5, 64].includes(e.code) ? e.code : 5); });

@@ -10,13 +10,16 @@
 #   L11 server.json qui désigne un PID leurre : le leurre reste vivant, sortie 5
 #   L12 F1 : server.json planté (PID étranger, terminal.url file:///…) : l'ouvreur ne reçoit jamais cette adresse (D-25)
 #   L13 F6 : page de redirection en 0600, jamais suivie par un lien, supprimée à l'échange, balayée à 60 s ; amorçage refusé après 60 s (D-27)
+#   L14 ouvreur absent : erreur asynchrone rattrapée, marche à suivre dite (M6)  L15 navigateur qui ne charge pas la page : annoncé, jamais un succès muet ; témoin d'un ouvreur conforme
+#   L4  N6a : lien planté sur le chemin de sortie, serveur vivant : message, code 4, aucune trace
 #   M-*  mutants (copies du module, jamais le module) : M-MODE (L3), M-SUIT-LIEN (L4), M-IMPRIME (L5), M-OUVRE-P (L6), M-LEURRE-TERMINAL (L11b),
-#        M-F1-PID (L12a), M-F1-VALID (L12b), M-ARGV (L6), M-PAGE-MODE, M-PAGE-LIEN (L13)
+#        M-F1-PID (L12a), M-F1-VALID (L12b), M-ARGV (L6), M-PAGE-MODE, M-PAGE-LIEN (L13), M-OUVREUR-ERREUR (L14), M-SANS-ANNONCE, M-TOUJOURS-ANNONCE (L15), M-SANS-RATTRAPAGE (L4)
 #   L5.0 le contrôle de l'environnement du serveur est JOUÉ sous Linux (/proc/<pid>/environ) comme sous macOS (ps -Eww), jamais sauté faute de la forme BSD
 # Aucun vrai navigateur : `open` et `xdg-open` factices en tête du PATH. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+export VF_COCKPIT_OUVERTURE_MS=300 # attente de l'ouverture réelle (M6) : 15 s par défaut, ramenée ici (les ouvreurs factices n'échangent jamais l'amorçage) ; L15 la règle à part
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 MODULE="$(cd "$SCRIPTS/.." && pwd)"; LAUNCH="$SCRIPTS/vf-cockpit.mjs"; TA="$HERE_T/terminal-aux.mjs"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/bin" "$WORK/run" "$WORK/fauxbin"
@@ -129,6 +132,7 @@ rm -f "$AM"; [ -n "$SPID" ] && { arrete; attendre_mort "$SPID"; }
 lance "$LAUNCH" open --terminal --no-open; SPID="$(sj j.pid)"; rm -f "$AM"; ln -s "$WORK/cible" "$AM"
 lance "$LAUNCH" open --terminal --no-open
 assert_eq "L4 — serveur vivant avec terminal (O2 c), lien préplacé : la cible est intacte, refus nommé ou fichier ordinaire" "$(verdict_lien "$LOUT")" "sur"
+assert_eq "L4 — N6a : lien préplacé sur le chemin de sortie en voie de réutilisation du serveur : message clair, code 4 documenté, aucune trace de pile (jamais le code 1 d'une exception non rattrapée)" "$LRC $(grep -c -e 'node:internal' -e '^ *at ' "$LOUT" || true) $(grep -c 'lien symbolique refusé' "$LOUT" || true)" "4 0 1"
 rm -f "$AM"; arrete; [ -n "$SPID" ] && attendre_mort "$SPID"
 
 echo "=== L7 — O2 a : serveur vivant sans terminal, relancé avec le drapeau ==="
@@ -231,6 +235,32 @@ lance "$LAUNCH" open --terminal
 assert_eq "L13 — page préplacée en lien symbolique : la cible est intacte, refus nommé ou page ordinaire en 600" "$([ "$(cksum < "$WORK/cible")" = "$EMP" ] && { { [ ! -L "$PAGE" ] && [ -f "$PAGE" ] && [ "$(mode "$PAGE")" = 600 ]; } || grep -q -e 'lien symbolique refusé' "$LOUT"; } && echo sur || echo non)" "sur"
 rm -f "$PAGE"; arrete; [ -n "$S13" ] && attendre_mort "$S13"
 
+echo "=== L14 — ouvreur absent : l'erreur asynchrone du spawn est rattrapée, la marche à suivre est dite (M6, N6b) ==="
+mkdir -p "$WORK/sansouvreur"; for t in node ps git sh env python3 sed cat; do c="$(command -v "$t")"; [ -n "$c" ] && ln -sf "$c" "$WORK/sansouvreur/$t"; done
+sans_ouvreur() { # sans_ouvreur <lanceur> -> LRC, LOUT : PATH sans open ni xdg-open
+  NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; (cd "$LAB" && PATH="$WORK/sansouvreur" node "$1" open --terminal --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); LRC=$?
+}
+sans_ouvreur "$LAUNCH"; S14="$(sj j.pid)"
+assert_eq "L14 — aucun ouvreur dans le PATH : le lanceur sort 0 sans trace, dit que l'ouvreur ne se lance pas (ENOENT) et nomme la page à ouvrir à la main" "$LRC trace=$(grep -c -e 'node:internal' -e '^ *at ' "$LOUT" || true) ENOENT=$(grep -c 'ENOENT' "$LOUT" || true) page=$(grep -c -F "$PAGE" "$LOUT" || true) dit=$(grep -c "le terminal ne s'est pas ouvert" "$LOUT" || true)" "0 trace=0 ENOENT=1 page=1 dit=1"
+arrete; [ -n "$S14" ] && attendre_mort "$S14"
+
+echo "=== L15 — le navigateur ne charge pas la page : annoncé en clair, jamais un succès muet (M6, N6b) ==="
+rm -f "$OUVERT" "$AM" "$SJ"; lance "$LAUNCH" open --terminal; S15="$(sj j.pid)"
+assert_eq "L15 — ouvreur qui n'ouvre rien (l'amorçage n'est jamais consommé) : le lanceur sort 0 et le dit, avec la page à ouvrir à la main et la limite Linux (Firefox en snap)" "$LRC dit=$(grep -c "le terminal ne s'est pas ouvert" "$LOUT" || true) navigateur=$(grep -c "le navigateur n'a pas chargé la page" "$LOUT" || true) page=$(grep -c -F "$PAGE" "$LOUT" || true) snap=$(grep -c 'Firefox en snap' "$LOUT" || true)" "0 dit=1 navigateur=1 page=1 snap=1"
+arrete; [ -n "$S15" ] && attendre_mort "$S15"
+# ouvreur conforme : lit la page, suit sa redirection et échange l'amorçage comme le ferait un navigateur
+mkdir -p "$WORK/bonbin"
+for o in open xdg-open; do cat > "$WORK/bonbin/$o" <<SH
+#!/bin/sh
+u="\$(sed -n 's/.*url=\\(http[^"]*\\)".*/\\1/p' "\$1")"; q="\${u#http://127.0.0.1:}"; q="\${q%%/*}"; a="\${u##*#t=}"
+printf '%s' "\$a" > "$WORK/run/amorce-conforme"; node "$TA" amorcer "\$q" "$WORK/run/amorce-conforme" >> "$WORK/run/conforme.log" 2>&1
+SH
+chmod +x "$WORK/bonbin/$o"; done
+rm -f "$AM" "$SJ" "$WORK/run/conforme.log"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; T0=$SECONDS
+(cd "$LAB" && VF_COCKPIT_OUVERTURE_MS=20000 PATH="$WORK/bonbin:$PATH" node "$LAUNCH" open --terminal --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); LRC=$?; S15B="$(sj j.pid)"
+assert_eq "L15 — témoin : un ouvreur conforme qui échange l'amorçage : sortie 0 sans message d'échec, rendue bien avant la borne de 20 s (l'échange a réussi : 200 dans le journal de l'ouvreur)" "$LRC dit=$(grep -c "ne s'est pas ouvert" "$LOUT" || true) rapide=$([ $((SECONDS-T0)) -lt 12 ] && echo oui || echo non) echange=$(sed -n 1p "$WORK/run/conforme.log" 2>/dev/null)" "0 dit=0 rapide=oui echange=200"
+arrete; [ -n "$S15B" ] && attendre_mort "$S15B"
+
 echo "=== M-MODE / M-SUIT-LIEN / M-IMPRIME / M-OUVRE-P — mutants du lanceur ==="
 if mutant mode 's/MODE_AMORCE = 0o600/MODE_AMORCE = 0o644/'; then
   lance "$MUT_L" open --terminal --no-open; MS="$(sj j.pid)"; MM="$(mode "$AM")"
@@ -256,7 +286,7 @@ if mutant ouvrep 's|s\.terminal\.url}/#t=|s.url}/#t=|'; then
 else assert_eq "M-OUVRE-P — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-ARGV / M-PAGE-MODE / M-PAGE-LIEN / M-F1-PID / M-F1-VALID — mutants de F1 et F6 ==="
-if mutant argv 's|^  ouvrir(page);|  ouvrir(`${s.terminal.url}/#t=${amorce}`);|'; then
+if mutant argv 's|^  ouvrir(page, |  ouvrir(`${s.terminal.url}/#t=${amorce}`, |'; then
   rm -f "$OUVERT" "$AM" "$SJ"; lance "$MUT_L" open --terminal; fichier_ouvert; sleep 0.5; MS="$(sj j.pid)"; V="$(cat "$AM" 2>/dev/null)"
   assert_eq "M-ARGV — le mutant (l'adresse avec l'amorçage dans l'argv) rougit L6 : la valeur est lisible dans l'argv de l'ouvreur" "$([ -n "$V" ] && grep -q -F -e "$V" "$OUVERT" && echo rouge || echo identique)" "rouge"
   arrete; [ -n "$MS" ] && attendre_mort "$MS"
@@ -285,6 +315,30 @@ if mutant f1valid -e 's/^const portDeUrl = .*$/const portDeUrl = (u) => (typeof 
   assert_eq "M-F1-VALID — le mutant (sans validation ni reconstruction du port) rougit L12b : la page mène à file:///…" "$(grep -q 'file:' "$WORK/run/page-ouverte.html" 2>/dev/null && echo rouge || echo identique)" "rouge"
   rm -f "$AM" "$PAGE"; arrete; { [ -n "$MS" ] && attendre_mort "$MS"; [ -n "$MS2" ] && attendre_mort "$MS2"; } 2>/dev/null; true
 else assert_eq "M-F1-VALID — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
+echo "=== M-OUVREUR-ERREUR / M-SANS-ANNONCE / M-TOUJOURS-ANNONCE / M-SANS-RATTRAPAGE — mutants de M6 et N6a ==="
+if mutant ouvreurerreur "s/    enfant.on('error', dire);//"; then
+  sans_ouvreur "$MUT_L"; MS="$(sj j.pid)"
+  assert_eq "M-OUVREUR-ERREUR — le mutant (aucun écouteur sur l'erreur du spawn) rougit L14 : le lanceur tombe avec la trace de l'exception" "$([ "$LRC" != 0 ] && [ "$(grep -c -e 'node:internal' -e '^ *at ' "$LOUT" || true)" != 0 ] && echo rouge || echo "identique : rc=$LRC")" "rouge"
+  arrete; [ -n "$MS" ] && attendre_mort "$MS"
+else assert_eq "M-OUVREUR-ERREUR — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant sansannonce "s/^  console.error(\`le terminal ne s'est pas ouvert/  void (\`le terminal ne s'est pas ouvert/"; then
+  rm -f "$OUVERT" "$AM" "$SJ"; lance "$MUT_L" open --terminal; MS="$(sj j.pid)"
+  assert_eq "M-SANS-ANNONCE — le mutant (l'échec d'ouverture n'est plus dit) rougit L15 : succès muet" "$([ "$(grep -c "ne s'est pas ouvert" "$LOUT" || true)" = 0 ] && echo rouge || echo identique)" "rouge"
+  arrete; [ -n "$MS" ] && attendre_mort "$MS"
+else assert_eq "M-SANS-ANNONCE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant toujoursannonce 's/  if (!suivi.echec \&\& !fs.existsSync(amorce)) return;//'; then
+  rm -f "$AM" "$SJ" "$WORK/run/conforme.log"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"
+  (cd "$LAB" && VF_COCKPIT_OUVERTURE_MS=20000 PATH="$WORK/bonbin:$PATH" node "$MUT_L" open --terminal --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); MS="$(sj j.pid)"
+  assert_eq "M-TOUJOURS-ANNONCE — le mutant (annonce même quand l'amorçage a été consommé) rougit le témoin de L15" "$([ "$(grep -c "ne s'est pas ouvert" "$LOUT" || true)" != 0 ] && echo rouge || echo identique)" "rouge"
+  arrete; [ -n "$MS" ] && attendre_mort "$MS"
+else assert_eq "M-TOUJOURS-ANNONCE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant sansrattrapage 's/^main().catch(.*$/main();/'; then
+  lance "$LAUNCH" open --terminal --no-open; MS="$(sj j.pid)"; rm -f "$AM"; ln -s "$WORK/cible" "$AM"
+  lance "$MUT_L" open --terminal --no-open
+  assert_eq "M-SANS-RATTRAPAGE — le mutant (aucun rattrapage final) rougit L4 : l'exception du lien planté sort avec le code 1 et une trace" "$LRC trace=$([ "$(grep -c -e 'node:internal' -e '^ *at ' "$LOUT" || true)" != 0 ] && echo oui || echo non)" "1 trace=oui"
+  rm -f "$AM"; arrete; [ -n "$MS" ] && attendre_mort "$MS"
+else assert_eq "M-SANS-RATTRAPAGE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-LEURRE-TERMINAL — le garde de l'arrêt n'est plus tenu quand --terminal est donné ==="
 if mutant leurreterm 's/if (vif) { if (!arreter(sortie))/if (vif) { if (o.avecQ ? false : !arreter(sortie))/'; then
