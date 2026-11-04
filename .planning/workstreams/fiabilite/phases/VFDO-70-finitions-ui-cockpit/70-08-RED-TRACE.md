@@ -18,3 +18,10 @@ Le champ `tour` du graphe Projet est une liste vide (`tour: []`) : la visite ret
 | O6.5b Chrome : première étape = jalon, dernière = au travail | `4\|true\|true\|0` | `3\|false\|false\|0` |
 
 O6.2, O6.3, O6.8 et O6.5c à O6.5g sont verts avant le code : vides sur une visite vide (O6.2, O6.3), ou mesures du repli (O6.5c-g). Ils protègent les non-régressions une fois la visite posée.
+
+## Vert — 2026-11-04, tête b83df5c9
+
+- `bash plugin/cockpit/scripts/tests/test-cockpit-projet.sh` : 86 PASS / 0 FAIL (O6.1 à O6.8 verts, O4 et O5 non sautés).
+- `test-cockpit-chrome-fr.sh` : 0 FAIL ; `test-cockpit-questions.sh` : 65 PASS / 0 FAIL ; `test-cockpit-avancement.sh` : 61 PASS / 0 FAIL.
+
+Écart relevé en cours de route (non corrigé, hors périmètre) : sur un profil Chrome qui a déjà chargé la page, le centrage de la première étape, quand c'est une carte, dérive (étape 1 à 390 px, `centre` faux, x décalé de ~85 px) ; sur un profil neuf il est juste. Reproduit avec `chrome-visite-etapes.mjs` en `390,390` et `390,1440` sur `project.html`. La suite mesure donc chaque largeur dans un Chrome neuf (O6.5).
