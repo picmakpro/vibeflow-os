@@ -53,7 +53,7 @@ const [, , port, secret, onglet, pause, out] = process.argv;
 const r = http.request({ host: '127.0.0.1', port: +port, path: '/flux', method: 'GET', agent: false, headers: { Host: `127.0.0.1:${port}`, Origin: `http://127.0.0.1:${port}`, 'X-VF-Terminal': secret, 'X-VF-Onglet': onglet } }, (res) => {
   let n = 0; res.pause();
   setTimeout(() => { res.on('data', (c) => { n += c.length; }); res.resume(); }, +pause);
-  setTimeout(() => { fs.writeFileSync(out, String(n)); process.exit(0); }, +pause + 9000);
+  setTimeout(() => { fs.writeFileSync(out, String(n)); process.exit(0); }, +pause + 60000);
 });
 r.on('error', () => process.exit(0)); r.end();
 JS
@@ -277,16 +277,18 @@ assert_eq "N5.1 — assistant qui ignore SIGTERM : SIGKILL au-delà de la borne 
 unsrv; ENG_SRV=""; GRACE_T=3000; FERM_T=""
 
 echo "=== CP — contre-pression sur la réponse : un lecteur à l'arrêt bloque la production du shell, sans perte ==="
-sonde_contrepression() { # un lecteur qui ne lit pas pendant 5 s ; le shell produit 40 Mo puis crée un drapeau ; rend « pendant=<absent|present> apres=<present|absent> »
-  local fl="$WORK/cp-drapeau-$SRVN" out="$WORK/cp-octets-$SRVN" pend=absent apres=absent
-  rm -f "$fl" "$out"; node "$AUX/lent.mjs" "$QP" "$SEC" "$ONG_A" 5000 "$out" > /dev/null 2>&1 & local lp=$!; PIDS+=($lp)
+sonde_contrepression() { # sonde_contrepression <fenetre-s> : un lecteur qui ne lit pas pendant <fenetre-s> + 1,5 s ; le shell produit 40 Mo puis crée un drapeau ; rend « pendant=<absent|present> apres=<present|absent> »
+  # Le code sain ne peut pas finir tant que le lecteur ne lit pas : une fenêtre courte suffit à l'absence. Un mutant sans contre-pression finit à la vitesse de la machine :
+  # la fenêtre du mutant est large (la sortie dès que le drapeau paraît, lecteur toujours à l'arrêt), donc sa détection ne dépend pas de la charge.
+  local fen="${1:-8}" fl="$WORK/cp-drapeau-$SRVN" out="$WORK/cp-octets-$SRVN" pend=absent apres=absent i
+  rm -f "$fl" "$out"; node "$AUX/lent.mjs" "$QP" "$SEC" "$ONG_A" $((fen*1000+1500)) "$out" > /dev/null 2>&1 & local lp=$!; PIDS+=($lp)
   attendre_python; tape "head -c 40000000 /dev/zero | tr '\\0' 'x'; touch $fl\\r" > /dev/null
-  sleep 3.5; [ -e "$fl" ] && pend=present
-  for _ in $(seq 1 100); do [ -e "$fl" ] && break; sleep 0.2; done; [ -e "$fl" ] && apres=present
+  for i in $(seq 1 $((fen*5))); do [ -e "$fl" ] && break; sleep 0.2; done; [ -e "$fl" ] && pend=present
+  if [ "$pend" = absent ]; then for i in $(seq 1 300); do [ -e "$fl" ] && break; sleep 0.2; done; [ -e "$fl" ] && apres=present; else apres=present; fi
   vf_hyg_stop "$lp"; echo "pendant=$pend apres=$apres"
 }
 srv "$OUT"
-assert_eq "CP.1 — lecteur à l'arrêt : la commande qui produit 40 Mo n'a pas fini 3,5 s après (backpressure) ; le lecteur reprend, elle finit (rien n'est perdu ni abandonné)" "$(sonde_contrepression)" "pendant=absent apres=present"
+assert_eq "CP.1 — lecteur à l'arrêt : la commande qui produit 40 Mo n'a pas fini 8 s après (backpressure) ; le lecteur reprend, elle finit (rien n'est perdu ni abandonné)" "$(sonde_contrepression 8)" "pendant=absent apres=present"
 unsrv
 
 echo "=== mutants ==="
@@ -323,7 +325,7 @@ if mutant tamponGrace vf-cockpit-terminal-session.mjs "s/ vider();/ ;/g"; then
 else assert_eq "M-TAMPON-GRACE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant contrepression vf-cockpit-terminal-session.mjs "s/if (!r.write(b) \&\& !cible.pause) {/if (!r.write(b) \&\& false) {/"; then
   srv "$MUT_OUT"
-  R="$(sonde_contrepression)"; assert_eq "M-CONTREPRESSION — le mutant (la sortie du shell n'est plus suspendue quand le client ne lit pas) rougit CP.1 : la production se termine malgré le lecteur à l'arrêt" "$([ "$R" != "pendant=absent apres=present" ] && echo rouge || echo "identique : $R")" "rouge"; unsrv
+  R="$(sonde_contrepression 90)"; assert_eq "M-CONTREPRESSION — le mutant (la sortie du shell n'est plus suspendue quand le client ne lit pas) rougit CP.1 : la production se termine malgré le lecteur à l'arrêt" "$([ "$R" != "pendant=absent apres=present" ] && echo rouge || echo "identique : $R")" "rouge"; unsrv
 else assert_eq "M-CONTREPRESSION — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 if mutant sanskill vf-cockpit-terminal-session.mjs "s/try { cible.enfant.kill('SIGKILL'); } catch {}//"; then
