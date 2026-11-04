@@ -14,9 +14,12 @@
   // porter « singulier|pluriel » (le premier `{}` est le compte, un « s » final facultatif est toléré dans la clé) et omettre
   // des `{}`, jamais en ajouter. Un gabarit au texte fixe court (< 16 caractères : « {} of {} », « {} with {} ») ne s'applique que si une variable
   // est un nombre ou se traduit elle-même : sans cela il abîmerait les données du lab (« Top of the world »).
+  // gabarits dont une variable est une liste construite par le viewer (« A, B and C ») : le « and » final y est traduit, nulle part ailleurs
+  const LISTES = ['It also relies on {}{}. They sit at the edge of the map; the lines show which parts talk to them.', 'How do {} relate?'];
   const P = [];
   const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  for (const [k, v] of Object.entries(T)) if (k.includes('{}')) { delete T[k]; P.push([new RegExp('^' + k.split('{}').map(esc).join('(.*?)') + (v.includes('|') && /[a-z]$/.test(k) ? 's?' : '') + '$'), v.split('|').map((x) => x.split('{}')), k.replace(/\{\}/g, '').length]); }
+  for (const [k, v] of Object.entries(T)) if (k.includes('{}')) { delete T[k]; P.push([new RegExp('^' + k.split('{}').map(esc).join('(.*?)') + (v.includes('|') && /[a-z]$/.test(k) ? 's?' : '') + '$'), v.split('|').map((x) => x.split('{}')), k.replace(/\{\}/g, '').length, LISTES.includes(k)]); }
+  P.sort((a, b) => b[2] - a[2]); // du plus précis au plus général : « {} and {} » ne capture plus une phrase longue qui contient « and »
   // l'onglet Code garde des fichiers ; sur l'onglet Projet, un « fichier » est un plan, une exigence, une étape
   Object.assign(T, projet()
     ? { File: 'Élément', file: 'élément', Files: 'Éléments', 'Files involved': 'Éléments concernés', 'Search files, routes, modules': 'Chercher une carte, un plan, une exigence' }
@@ -34,9 +37,23 @@
     [/^(\d+) cards?$/, (_, n) => `${n} carte${n > 1 ? 's' : ''}`], [/^(\d+) files?$/, (_, n) => `${n} ${G.meta.vfTab === 'project' ? 'élément' : 'fichier'}${n > 1 ? 's' : ''}`],
     [/^Theme: (.+)\. Press for (.+)\.$/, (_, a, b) => `Thème : ${T[a] || a}. Appuyer pour ${(T[b.replace(/\.$/, '')] || b).toLowerCase()}.`],
   ];
+    // « de » + variable : élision (« d'Anthropic »), contraction (« du CLI », « des … ») ; seulement là où la variable suit « de »
+  const lier = (x, v) => {
+    if (!/(^|[^\p{L}])de $/u.test(x)) return [x, v];
+    if (/^le /.test(v)) return [x.slice(0, -3) + 'du ', v.slice(3)];
+    if (/^les /.test(v)) return [x.slice(0, -3) + 'des ', v.slice(4)];
+    return /^[aeiouyàâéèêîôû]/i.test(v) ? [x.slice(0, -3) + "d'", v] : [x, v];
+  };
+  const enListe = (v) => v.replace(/ and (\d+) more$/, ' et $1 autres').replace(/ and (?!.* and )/, ' et ');
   const noyau = (t) => {
     let out = T[t];
-    if (out == null) for (const [re, formes, fixe] of P) { const m = re.exec(t); if (m && (fixe >= 16 || m.slice(1).some((c) => /^\d+$/.test(c.trim()) || noyau(c.trim()) != null))) { const parts = formes[formes.length > 1 && Number(m[1]) !== 1 ? 1 : 0]; out = parts.reduce((x, p, i) => x + (i ? (noyau(m[i].trim()) ?? m[i]) : '') + p, ''); break; } }
+    if (out == null) for (const [re, formes, fixe, liste] of P) {
+      const m = re.exec(t); if (!m) continue;
+      if (formes.length > 1 && !/^\d+$/.test(m[1].trim())) continue; // « singulier|pluriel » : seulement derrière un nombre (« Uses connection » n'est pas « 1 connection »)
+      if (!(fixe >= 16 || m.slice(1).some((c) => /^\d+$/.test(c.trim()) || noyau(c.trim()) != null))) continue;
+      out = formes[formes.length > 1 && Number(m[1]) !== 1 ? 1 : 0].reduce((x, p, i) => { if (!i) return x + p; const [a, b] = lier(x, liste ? enListe(noyau(m[i].trim()) ?? m[i]) : (noyau(m[i].trim()) ?? m[i])); return a + b + p; }, '');
+      break;
+    }
     if (out == null) for (const [re, f] of R) { if (re.test(t)) { out = t.replace(re, f); break; } }
     if (out == null && t.includes(' · ')) { const seg = t.split(' · ').map((x) => noyau(x)); if (seg.some((x) => x != null)) out = seg.map((x, i) => x ?? t.split(' · ')[i]).join(' · '); }
     if (out == null && /^[^:]{3,}: ./.test(t)) { const i = t.indexOf(': '); const g = noyau(t.slice(0, i)), d = noyau(t.slice(i + 2)); if (g != null || d != null) out = (g ?? t.slice(0, i)) + ' : ' + (d ?? t.slice(i + 2)); }
@@ -74,6 +91,11 @@
       :root[data-theme="light"] { ${Object.entries(C).map(([k, [l]]) => `--n-${k}: ${l};`).join(' ')} }`;
     document.head.appendChild(st);
   }
+
+  // l'en-tête de panneau : le viewer capitalise chaque mot (« Contrôle De Santé ») ; en français, seule la première lettre l'est (P70-D-04)
+  const sp = document.createElement('style');
+  sp.textContent = '.ph .kindlabel { text-transform: none; display: inline-block; } .ph .kindlabel::first-letter { text-transform: uppercase; }';
+  document.head.appendChild(sp);
 
   // la mise en page de l'en-tête (libellés français plus longs) est le travail de 01-vf-responsive.js
 
