@@ -10,7 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { planningLayout, gitCommonDir, avecEcheance } from './vf-cockpit-paths.mjs';
-import { readPlanning } from './vf-cockpit-planning.mjs';
+import { readPlanning, lireConfine } from './vf-cockpit-planning.mjs';
+import { fusionner } from './vf-cockpit-ailleurs.mjs';
 import { LIBELLES_ETAT, LIBELLES_MISSION } from './vf-cockpit-avancement.mjs';
 import { lireVerrous } from './vf-cockpit-vie.mjs';
 import { arbresGit, brancheBase, retard, phaseActive, nettoie } from './vf-cockpit-arbres.mjs';
@@ -42,12 +43,17 @@ function construire(root, tous, { home, now, scriptsDir }) {
   const layout = planningLayout(root);
   const verrous = lireVerrous(root, { scriptsDir, home }); // verrous de la racine : ceux de la sortie, et ceux de tous les arbres d'un lab partitionné (F-05)
   const P = readPlanning(root, layout, { verrous });
-  const phases = [...P.phases.values()].filter((p) => !p.archive);
   const base = brancheBase(root), common = gitCommonDir(root);
-  const arbres = tous.map((a) => {
+  const lus = tous.map((a) => {
     // F-05 : en lab partitionné le dossier des verrous est le dossier git commun, le même pour tous les arbres (lecture unique, partagée) ;
     // en lab plat le verrou est propre à chaque checkout (.planning/DRIVER.lock) : la vie d'une mission d'un arbre se lit sur le verrou de CET arbre (lecture paresseuse, faite par readPlanning à sa racine)
-    const pl = meme(a.chemin, root) ? P : readPlanning(a.chemin, planningLayout(a.chemin), verrous.plat ? { scriptsDir, home, lab: root } : { verrous, lab: root });
+    // N5 : lecture confinée à la racine réelle de l'arbre (lireConfine), sans tags
+    const pl = meme(a.chemin, root) ? P : lireConfine(a.chemin, () => readPlanning(a.chemin, planningLayout(a.chemin), { ...(verrous.plat ? { scriptsDir, home } : { verrous }), lab: root, sansTags: true }));
+    return { a, pl };
+  });
+  // les phases de la sortie : celles de l'arbre courant, reprises d'un worktree où elles sont plus avancées (règle de vf-cockpit-ailleurs.mjs) ; les lignes d'arbre, elles, gardent l'état de leur propre arbre
+  const phases = [...fusionner(P.phases, lus.filter(({ a }) => !meme(a.chemin, root)).map(({ a, pl }) => ({ chemin: a.chemin, nom: nettoie(path.basename(a.chemin), 80), branche: nettoie(a.branche, 80), pl }))).values()].filter((p) => !p.archive);
+  const arbres = lus.map(({ a, pl }) => {
     const actifs = [...pl.phases.values()].filter((p) => !p.archive);
     return {
       label: a.principal ? 'arbre principal' : nettoie(path.relative(tous[0].chemin, a.chemin) || a.chemin, 200), branche: nettoie(a.branche, 80), principal: a.principal, courant: meme(a.chemin, root),
