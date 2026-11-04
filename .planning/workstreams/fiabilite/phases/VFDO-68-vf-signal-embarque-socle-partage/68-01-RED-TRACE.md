@@ -1,0 +1,149 @@
+# 68-01 — trace du rouge de la mission vivante avant le code (VFSG-06)
+
+- Date : 2026-11-04
+- Empreinte du commit de la suite (commit A, suite seule) : `23cb1612` (`23cb16120b0eb0dfb5f2168abea435952e385e76`), base `7ad90e3f`
+- Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-vie.sh > sortie 2>&1` (rc=1 ; 5 PASS / 25 FAIL)
+- Code rejoué : aucun `vf-cockpit-vie.mjs`, `vf-cockpit-avancement.mjs` et `vf-cockpit-planning.mjs` inchangés (HEAD = base + commit A)
+
+Chaque témoin rouge est précédé de ses contrôles positifs verts (V0, V7.1). Chaque rouge a la bonne raison : le champ existant montre l'ancien
+comportement (`running` pour V1.2, `en-cours` pour V6.1) ou le champ est absent (`absent`, `undefined`) parce que le module `vf-cockpit-vie.mjs` n'existe pas ;
+jamais une erreur de fixture (V0.1 à V0.4 vérifient les faux verrous, les DAG et les clés de phase). Les copies mutées (V8, V9.3, V9.5, V9.7, V9.9, V10.3)
+rougissent par « ancre absente » : la copie ne peut pas exister avant le module qu'elle mute ; elles rougiront sur l'assertion visée une fois le module écrit.
+V5.1, V5.2 et V7.2 attendent `inconnu` (P68-D-23) ; V1 et V9 attendent `abandonnee` ; V5.3 est le témoin de P68-D-29 (sans dossier de scripts explicite,
+le conductor voisin du dépôt est trouvé).
+Le témoin VFSG-06 obtient `running` sur l'avancement de la phase (V1.2, ancien comportement) et un champ `etat` de DAG absent (V1.1) : la mission n'est pas encore jugée.
+
+## Contrôles positifs verts (avant le code)
+
+- V0.1 — fixtures lisibles (faux verrous exécutables et JSON, DAG running lisibles)
+- V0.2 — le dossier de scripts explicite vide ne contient aucun driver-lock.sh
+- V0.3 — readPlanning rend le DAG de MISSION-1 (lab plat) et deux phases
+- V0.4 — lab partitionné : deux DAG et les phases w|1 et w|2
+- V7.1 — script planté dans le lab jamais exécuté
+
+## Témoins rouges (libellé, attendu, obtenu — recopiés de la sortie)
+
+### V1.1 — DAG à nœud running sans verrou : abandonnee
+
+- attendu: [abandonnee]
+- obtenu:  [absent]
+
+### V1.2 — avancement.mission.etat de la phase 1 : abandonnee
+
+- attendu: [abandonnee]
+- obtenu:  [running]
+
+### V2.1 — verrou tenu (lab plat, objet unique), stale false : running
+
+- attendu: [running]
+- obtenu:  [absent]
+
+### V3.1 — verrou périmé mais progrès de 60 s sous un ttl de 1800 : running
+
+- attendu: [running]
+- obtenu:  [absent]
+
+### V4.1 — verrou périmé, progress_age_seconds null : abandonnee
+
+- attendu: [abandonnee]
+- obtenu:  [absent]
+
+### V5.1 — source des verrous introuvable : vie null, état inconnu
+
+- attendu: [null|inconnu]
+- obtenu:  [absent|absent]
+
+### V5.2 — JSON illisible : vie null, état inconnu
+
+- attendu: [null|inconnu]
+- obtenu:  [absent|absent]
+
+### V5.3 — témoin P68-D-29 : sans dossier de scripts explicite, le conductor voisin du dépôt est trouvé (vie non null)
+
+- attendu: [true]
+- obtenu:  [false]
+
+### V6.1 — phase 1 (mission abandonnée, aucun plan fait) : a-faire
+
+- attendu: [a-faire]
+- obtenu:  [en-cours]
+
+### V7.2 — la source plantée n'est pas lue : mission inconnu
+
+- attendu: [inconnu]
+- obtenu:  [absent]
+
+### V8.1 — copie mutée (âge pris de la date du DAG) détectée : le DAG récent rend la mission running sans verrou
+
+- attendu: [muté|running]
+- obtenu:  [ancre absente|absent]
+
+### V9.1 — deux DAG, phases différentes : seul celui sans verrou de phase est abandonnee
+
+- attendu: [MISSION-1:running,MISSION-2:abandonnee]
+- obtenu:  [MISSION-1:absent,MISSION-2:absent]
+
+### V9.2 — verrou posé sur l'autre phase : verdicts inversés
+
+- attendu: [MISSION-1:abandonnee,MISSION-2:running]
+- obtenu:  [MISSION-1:absent,MISSION-2:absent]
+
+### V9.3 — copie mutée (verrou du compartiment) détectée : les deux DAG se disent vivants
+
+- attendu: [muté|MISSION-1:running,MISSION-2:running]
+- obtenu:  [ancre absente|MISSION-1:absent,MISSION-2:absent]
+
+### V9.4 — phase 069 (chaîne) et 69 : même phase
+
+- attendu: [MISSION-69:running]
+- obtenu:  [MISSION-69:absent]
+
+### V9.4b — phase en nombre dans le JSON du verrou : écartée
+
+- attendu: [MISSION-69:abandonnee]
+- obtenu:  [MISSION-69:absent]
+
+### V9.5 — copie mutée (normPhase identité) détectée : 069 ne désigne plus 69
+
+- attendu: [muté|MISSION-69:abandonnee]
+- obtenu:  [ancre absente|MISSION-69:absent]
+
+### V9.6 — 069 périmée (listée en premier) et 69 tenue : vivante
+
+- attendu: [MISSION-69:running]
+- obtenu:  [MISSION-69:absent]
+
+### V9.7 — copie mutée (première entrée seule) détectée
+
+- attendu: [muté|MISSION-69:abandonnee]
+- obtenu:  [ancre absente|MISSION-69:absent]
+
+### V9.8 — verrou de phase périmé et compartiment tenu : abandonnee (MISSION-1)
+
+- attendu: [abandonnee]
+- obtenu:  [absent]
+
+### V9.9 — copie mutée (repli compartiment prioritaire) détectée
+
+- attendu: [muté|running]
+- obtenu:  [ancre absente|absent]
+
+### V10.1 — compartiment seul tenu : running
+
+- attendu: [running]
+- obtenu:  [absent]
+
+### V10.2 — compartiment périmé sans progrès : abandonnee
+
+- attendu: [abandonnee]
+- obtenu:  [absent]
+
+### V10.3 — copie mutée (sans repli) détectée
+
+- attendu: [muté|abandonnee]
+- obtenu:  [ancre absente|absent]
+
+### V10.4 — entrée de compartiment absente à côté : V9.1 inchangé
+
+- attendu: [MISSION-1:running,MISSION-2:abandonnee]
+- obtenu:  [MISSION-1:absent,MISSION-2:absent]
