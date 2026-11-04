@@ -42,3 +42,9 @@ Cas traités (commits `bd9c8bd4` témoins rouges, `1321569c` correction) :
 Hors de mes fichiers, NON corrigés (à décider par le manager) :
 - Sous-titre du travail récent coupé sans points de suite : `plugin/cockpit/scripts/vf-cockpit-build.mjs` écrit `title: ph.label.slice(0, 60)` (recent-work.json). Correction : `clip(ph.label, 60)` avec « … » (le `clip` de `vf-cockpit-planning.mjs` existe), ou ne pas tronquer.
 - Visite de l'onglet Code, étapes 2 et 3 coupées (« …reçoit les esca… ») : la coupure est dans `plugin/cockpit/scripts/vf-cockpit-code-vf.mjs:21`, `firstSentence(s, n = 170)` qui tronque à 170 caractères avec « … » ; P70-D-02 veut le texte entier (retirer ou relever `n`). Fichier hors de ma liste.
+
+### Textes coupés (5b et 6), corrigés avec l'accord du manager
+
+- Cas 6 : `firstSentence` de `vf-cockpit-code-vf.mjs` ne borne plus à 170 caractères ; la première phrase est rendue entière (C6.1).
+- Cas 5b : `vf-cockpit-build.mjs` garde le titre du travail récent entier jusqu'à 160 caractères, puis coupe à un espace avec « … » (C6.3). Le rendu le supporte : `#context p` passe à la ligne (aucun clamp, largeur 520 px), lu dans `viewer.html` ; non mesuré dans Chrome.
+- Non touché : `vf-cockpit-build.mjs` coupe encore `f.name.slice(0, 90)` (étiquettes de l'index inverse), hors périmètre demandé.

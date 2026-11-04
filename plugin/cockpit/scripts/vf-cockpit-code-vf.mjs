@@ -18,7 +18,7 @@ const SUB = { agents: ['Agents', 'ui', 'Les rôles incarnés ou dispatchés.'], 
   content: ['Contenu', 'config', 'Ressources installées dans le lab.'] };
 // nature d'un module : lue dans son module.json (champ type), jamais dans une liste de noms
 const kindOf = (type) => (/doc-only/.test(type) ? 'config' : /agent/.test(type) ? 'service' : 'library');
-const firstSentence = (s, n = 170) => { s = String(s || '').replace(/\s+/g, ' ').trim(); const i = s.search(/[.!?](\s|$)/); s = i > 20 ? s.slice(0, i + 1) : s; return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+const firstSentence = (s) => { s = String(s || '').replace(/\s+/g, ' ').trim(); const i = s.search(/[.!?](\s|$)/); return i > 20 ? s.slice(0, i + 1) : s; }; // la première phrase entière : un texte de visite n'est jamais coupé (P70-D-02)
 
 export function architectureVibeflow({ lab, sortie }) {
   const read = (p) => lireGarde(path.join(lab, p)); // lecture bornée : jamais un fichier non régulier
