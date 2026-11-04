@@ -751,7 +751,9 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 `.planning/missions/2026-11-04-phase-68-execution.md`). Arbitrage Samuel, AskUserQuestion session principale Claude Code,
 2026-11-04 : « Tout selon les recos (Recommandé) », avec ces trois points mis au BACKLOG et non en Phase 70 (P68-D-38).
 - **N4 :** le panneau Phase du cockpit web affiche « Ligne de ROADMAP : … » avec le markdown `**` brut (antérieur à la 68).
-- **N5 :** la vue macro de la pane vf-signal marque « à faire » des phases que leurs worktrees disent « en cours » ou
+- **N5 — CLOS (2026-11-04, cockpit v1.2.1, PR #202) :** l'onglet Projet, sa vue macro et les phases de `signal@1`
+  reprennent l'avancement d'un worktree plus avancé (« dans worktree phase-70 ») ; règle de priorité au README du cockpit ; suite `test-cockpit-ailleurs.sh`.
+  Texte d'origine : la vue macro de la pane vf-signal marque « à faire » des phases que leurs worktrees disent « en cours » ou
   « à recetter » : la macro lit le ROADMAP de l'arbre courant, les lignes de worktree l'état du worktree (R1).
   **Planifié juste après le merge de la 68**, sur une branche à part : arbitrage Samuel, AskUserQuestion session
   principale Claude Code, 2026-11-04, « Correctif juste après la 68 (Recommandé) » (constat de Samuel : l'onglet Projet

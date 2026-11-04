@@ -1,6 +1,6 @@
 # Changelog — cockpit
 
-## v1.2.1 — 2026-11-04
+## v1.2.2 — 2026-11-04
 
 Phase 70 : finitions de l'interface. Décisions : P70-D-01 à P70-D-07 et P70-D-16, arbitrages Samuel, AskUserQuestion session principale,
 2026-11-03 ; P70-D-09, P70-D-10, P70-D-13, P70-D-20 et P70-D-21, choix du manager (pas des arbitrages de Samuel) ; P70-D-19, arbitrage de
@@ -24,6 +24,21 @@ méthode de Samuel, session principale Claude Code, 2026-11-04 (recette jouée p
 - Onglets à 12 px / 2 px à 1 024 et 1 440 px (R13.4 rouge, six lignes) : arbitrage de Samuel en attente.
 - Carte Session « en attente » avec badge « En cours » (défaut de la Phase 69, au BACKLOG).
 - Tri de goût (12 questions) en attente de Samuel : `70-RECETTE-JUGES.md`.
+
+## v1.2.1 — 2026-11-04
+
+Correctif : l'onglet Projet voit les phases en cours dans des worktrees (N5 de la recette de la Phase 68). Arbitrage Samuel,
+AskUserQuestion session principale Claude Code, 2026-11-04 : « Correctif juste après la 68 (Recommandé) ». Pas de release racine.
+
+### Corrigé
+- **Phases menées dans un worktree** : la carte Projet (et la vue macro du jalon, et les phases de `signal@1`) lisait le ROADMAP et les dossiers de phase
+  de l'arbre courant seulement ; une phase en exécution dans `.claude/worktrees/phase-70` s'affichait « À faire · pas de plan ». Elle prend désormais l'avancement
+  du worktree (état, décompte de plans, reste) et la carte le dit : « dans worktree phase-70 ». Nouveau module `vf-cockpit-ailleurs.mjs`.
+- **Règle de priorité** : l'état le plus avancé gagne (à faire < en cours < à recetter) ; un état clos sur l'arbre courant reste clos ; une clôture lue
+  seulement dans un worktree vaut « à recetter » ; à égalité l'arbre courant garde la main.
+- **Rien sous le lab** (P68-D-34) : les fichiers d'un worktree sont lus, jamais exécutés, et chaque lecture est confinée à la racine réelle de son arbre
+  (`lireConfine`) : un lien symbolique sortant n'est pas suivi. Git passe par `arbresGit` (préfixe sûr, environnement assaini).
+- Suite `test-cockpit-ailleurs.sh` (témoin rouge avant, vert après ; priorités ; lien symbolique sortant, prouvé par mutation).
 
 ## v1.2.0 — 2026-11-04
 

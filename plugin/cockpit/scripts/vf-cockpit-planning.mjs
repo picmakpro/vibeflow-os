@@ -6,14 +6,18 @@
 // Aucun nom de compartiment, de jalon ou de projet codé en dur. Lecture seule.
 import fs from 'node:fs';
 import path from 'node:path';
-import { planningLayout, stateFile, GIT_SUR, shBorne } from './vf-cockpit-paths.mjs';
+import { planningLayout, stateFile, GIT_SUR, shBorne, realUnder } from './vf-cockpit-paths.mjs';
 import { avancement, rattacherMission, etatMission } from './vf-cockpit-avancement.mjs';
 import { lireVerrous, vieDe } from './vf-cockpit-vie.mjs';
 
 // jamais d'ouverture d'un fichier non régulier (un tube FIFO bloque ; un lien vers /dev/zero ne finit pas, et git versionne les liens symboliques) ni d'un fichier au-delà de MAX_LECTURE
 const MAX_LECTURE = 8 << 20;
-export const read = (f) => { try { const st = fs.statSync(f); return st.isFile() && st.size <= MAX_LECTURE ? fs.readFileSync(f, 'utf8') : ''; } catch { return ''; } };
-const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
+// confinement (lecture d'un AUTRE arbre, N5) : pendant `lireConfine(racine, fn)`, read et ls refusent tout chemin dont le realpath sort de `racine` (lien symbolique sortant)
+let CONFINE = null;
+const dedans = (p) => !CONFINE || realUnder(p, CONFINE);
+export function lireConfine(racine, fn) { const avant = CONFINE; CONFINE = fs.realpathSync(racine); try { return fn(); } finally { CONFINE = avant; } }
+export const read = (f) => { try { if (!dedans(f)) return ''; const st = fs.statSync(f); return st.isFile() && st.size <= MAX_LECTURE ? fs.readFileSync(f, 'utf8') : ''; } catch { return ''; } };
+const ls = (d) => { try { return dedans(d) ? fs.readdirSync(d) : []; } catch { return []; } };
 export const clip = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').replace(/\*\*/g, '').replace(/`/g, '').trim(); return s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s; };
 export const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/\*\*/g, '').replace(/`/g, '').trim(); const i = s.search(/[.!?](\s|$)/); return clip(i > 25 ? s.slice(0, i + 1) : s, n); };
 export const num = (s) => parseFloat(s);
@@ -103,7 +107,7 @@ export function lireDags(root, layout, phaseDirs) {
   return dags;
 }
 
-// opts : { verrous (injectable : { etat, plat, liste }), scriptsDir, home, lab (racine du LAB observé pour l'environnement borné des sous-processus, H-1 ; défaut : root) } — la vie d'une mission se lit sur le verrou de sa phase (VFSG-06) ; lecture seulement si un nœud est `running`
+// opts : { sansTags (aucun appel git pour les tags : lecture d'un autre arbre), verrous (injectable : { etat, plat, liste }), scriptsDir, home, lab (racine du LAB observé pour l'environnement borné des sous-processus, H-1 ; défaut : root) } — la vie d'une mission se lit sur le verrou de sa phase (VFSG-06) ; lecture seulement si un nœud est `running`
 export function readPlanning(root, layout, opts = {}) {
   root = path.resolve(root); layout = layout || planningLayout(root);
   const LAB = path.resolve(opts.lab || root); // un arbre git sous le lab (worktree) se lit avec cwd = l'arbre, mais le PATH est assaini par rapport au LAB (H-1)
@@ -156,7 +160,7 @@ export function readPlanning(root, layout, opts = {}) {
   const backlog = read(path.join(B, 'BACKLOG.md'));
   const seeds = ls(path.join(B, 'seeds')).filter((f) => f.endsWith('.md')).map((f) => ({ file: rel(path.join(B, 'seeds', f)), text: read(path.join(B, 'seeds', f)) }));
   let tags = [];
-  { // shBorne : même plafond, même échéance globale et même PATH assaini que les autres appels git du socle (F-06, H-1) ; sortie vide = aucun tag
+  if (!opts.sansTags) { // shBorne : même plafond, même échéance globale et même PATH assaini que les autres appels git du socle (F-06, H-1) ; sortie vide = aucun tag
     const out = shBorne('git', [...GIT_SUR, '-C', root, 'for-each-ref', '--sort=-creatordate', '--count=30', '--format=%(refname:short)\t%(creatordate:short)\t%(contents:subject)', 'refs/tags/v*'], undefined, LAB);
     tags = out.trim().split('\n').filter(Boolean).map((l) => { const [tag, date, subject] = l.split('\t'); return { tag, date, subject }; });
   }

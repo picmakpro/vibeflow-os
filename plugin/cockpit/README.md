@@ -3,7 +3,7 @@
 > Une page locale, en lecture seule, qui dit où en est le lab : jalons, phases (à faire, en cours, à recetter, faites), plans,
 > exigences, missions, et qui travaille en ce moment, en arbre. Ouverte par `/vf-cockpit`.
 
-**Type** : skill + scripts + moteur vendorisé · **Version** : v1.2.1 · **Dépend de** : aucun module (lit le verrou de `conductor` s'il est posé)
+**Type** : skill + scripts + moteur vendorisé · **Version** : v1.2.2 · **Dépend de** : aucun module (lit le verrou de `conductor` s'il est posé)
 
 ## Ce que ça donne
 
@@ -37,6 +37,12 @@ Le cockpit d'un lab écoute toujours sur le même port : un port préféré dér
   direct de la carte sans perdre le zoom. Chaque phase porte un état dérivé de ses plans : « à faire », « en cours »,
   « à recetter » (tous les plans faits, phase pas encore cochée au ROADMAP) ou « fait ». Les plans de correction sont comptés
   à part du total. Les missions sont rattachées à leur phase. Preuve : `test-cockpit-avancement.sh` (A1 à A12, A18).
+  **Phases menées dans un worktree** (même dépôt git) : la carte affiche l'avancement du worktree (état, décompte de plans, reste) avec la mention
+  « dans worktree <nom> ». Règle de priorité : l'état le plus avancé gagne (à faire < en cours < à recetter) ; un état clos
+  sur l'arbre courant reste clos, jamais rouvert par un worktree ; une clôture lue seulement dans un worktree vaut « à recetter »
+  (rien n'est clos avant d'être fusionné) ; à égalité l'arbre courant garde la main. Les fichiers du worktree sont lus, jamais exécutés,
+  et chaque lecture reste dans la racine réelle de son arbre (un lien symbolique sortant n'est pas suivi). La pane `vf-signal` applique la même
+  règle à ses phases (`signal@1`, champ `avancement.ailleurs`). Preuve : `test-cockpit-ailleurs.sh`.
 - **Équipe** : l'arbre de l'équipe, session -> manager -> workers, avec ceux qui travaillent et ceux qui ont fini depuis
   moins de 24 h (les terminés sont repliés). Chaque agent renvoie vers son nœud de mission, ou dit pourquoi il n'est pas
   rattaché. Preuve : `test-cockpit-equipe.sh` (E19 à E23, EUI) et `test-cockpit-forme-claude.sh`.
