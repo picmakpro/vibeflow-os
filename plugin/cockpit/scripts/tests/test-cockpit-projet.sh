@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # test-cockpit-projet.sh — graphe Projet du cockpit sur tout lab GSD (CKPT-06) : plat au gabarit GSD (P1),
 # partitionné (P2), sans liste de jalons avec missions (P3), contrat et absence de nom de compartiment (P4),
-# identité d'une phase = (compartiment, numéro) (P5). Fixtures écrites par la suite dans mktemp.
+# identité d'une phase = (compartiment, numéro) (P5), visite « Par où commencer » (O4 : ne revient pas d'elle-même ; O5 : étape par étape, cible, centrage, texte entier, « Passer », repère, français).
+# Fixtures écrites par la suite dans mktemp.
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -348,6 +349,27 @@ assert_eq "O4.4 — le bouton « Par où commencer » la rouvre" "$(x4 'j.bouton
 assert_eq "O4.5 — un AUTRE lab la voit à son premier chargement (le rangement est par lab, pas global)" "$(x4 'j.autreLab')" "true"
 assert_eq "O4.6 — passée jusqu'au bout (autre lab), elle ne revient pas au rechargement" "$(x4 'j.passee')" "false"
 assert_eq "O4.7 — aucun cookie posé : document.cookie vide sur chaque page chargée (témoin : au moins 6 relevés)" "$(x4 'j.cookies.filter(Boolean).length')|$(x4 'j.cookies.length>=6')" "0|true"
+# O5 (70-07, UIFN-04, P70-D-02 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : la visite « Par où commencer » parcourue étape par étape (chrome-visite-etapes.mjs), sur l'onglet Code d'un lab
+# jetable à plusieurs cartes de premier niveau, servi par le vrai lanceur, à 1 440 et 390 px. Une assertion par mesure et par largeur ; l'obtenu liste les ÉTAPES fautives (numéros, vide = aucune).
+# O5.1 chaque étape cible un élément (carte sélectionnée, centrée dans une zone libre et non couverte par la carte de visite, ou élément du chrome mis en évidence) · O5.2 texte entier (jamais « … »), carte de visite dans la fenêtre
+# O5.3 « Passer » visible à chaque étape · O5.4 repère « n sur N » juste · O5.5 aucun mot anglais témoin.
+echo "=== O5 — la visite, étape par étape : cible, centrage, texte entier, « Passer », repère, français ==="
+L5="$WORK/lab5"; mkdir -p "$L5"; mklab4 "$L5"
+for d in web api db; do mkdir -p "$L5/$d"; for i in 1 2 3; do printf "export const f%s = () => %s;\n" "$i" "$i" > "$L5/$d/m$i.js"; done; done
+git -C "$L5" add -A && git -C "$L5" -c user.email=t@t -c user.name=t commit -q -m cartes
+U5="$(adr4 "$L5")"; SRVPIDS+=("$(pid4 "$L5")")
+X5="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$U5" 1440,390)"
+[ -n "${DBG:-}" ] && echo "RAW5: $X5"
+x5() { printf '%s' "$X5" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O5.0 — témoin : la mesure a eu lieu sans erreur, au moins trois étapes à chaque largeur" "$(x5 "j.erreur||''")|$(x5 'j.l1440.n>=3&&j.l390.n>=3')" "|true"
+for W in 1440 390; do
+  f5() { x5 "j.l$W.etapes.filter((e)=>$1).map((e)=>e.i).join(',')"; }
+  assert_eq "O5.1 [$W px] — étapes sans cible, hors du centre de la zone libre, recouvertes par la carte de visite ou hors fenêtre" "$(f5 '!e.cible||!e.centre||e.couvert||!e.visible')" ""
+  assert_eq "O5.2 [$W px] — étapes dont le texte est coupé, incomplet ou dont la carte de visite sort de la fenêtre" "$(f5 'e.coupe||!e.entier||!e.tient')" ""
+  assert_eq "O5.3 [$W px] — étapes sans bouton « Passer » visible" "$(f5 '!e.passer')" ""
+  assert_eq "O5.4 [$W px] — étapes dont le repère n'est pas « n sur N » juste" "$(x5 "j.l$W.etapes.filter((e)=>e.repere!==e.i+' sur '+j.l$W.n).map((e)=>e.i).join(',')")" ""
+  assert_eq "O5.5 [$W px] — étapes qui montrent un mot anglais (liste de F11)" "$(f5 '!!e.anglais')" ""
+done
 unset VF_COCKPIT_PORT_BASE
 for L in "${LABS4[@]}"; do node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L" >/dev/null 2>&1; done; for p in "${SRVPIDS[@]}"; do vf_hyg_stop "$p"; done; SRVPIDS=()
 vf_hyg_assert
