@@ -154,6 +154,7 @@ assert_eq "R5.1 — aucune sous-commande réseau de git (emballage vu à l'œuvr
 PATH="$WORK/bin:$PATH" G_="$GIT_REEL" sh -c "git -C '$D' fetch origin >/dev/null 2>&1"
 assert_eq "R5.2 — témoin positif : un fetch délibéré est journalisé" "$(grep -cE '(^| )fetch( |$)' "$WORK/git.log")" "1"
 assert_eq "R5.3 — chaque appel git du module porte core.fsmonitor=false" "$(grep -v ' fetch ' "$WORK/git.log" | grep -vc 'core.fsmonitor=false')" "0"
+assert_eq "R5.3b — audit F-5 : chaque appel git du module porte --no-optional-locks (git status ne réécrit pas .git/index)" "$(grep -v ' fetch ' "$WORK/git.log" | grep -vc -e '--no-optional-locks')" "0"
 export VF_SONDE_OUT="$WORK/sonde.out"
 : > "$VF_SONDE_OUT"; rm -f "$VF_SONDE_OUT.charge"
 node --import "$AUX/sonde.mjs" "$AUX/temoin-sortant.mjs" >/dev/null 2>&1
@@ -167,6 +168,7 @@ ESC=$'\033'
 assert_eq "R6.1 — nettoie retire l'échappement ANSI et le retour à la ligne" "$(G "$(node "$AUX/q.mjs" "$SCRIPTS" nettoie "[\"/tmp/a\\u001b[31mrouge\\nB\",80]" 2>/dev/null)" 'j')" "/tmp/a[31mrougeB"
 assert_eq "R6.2 — nettoie borne à n caractères" "$(G "$(Q nettoie '["abcdefghij",4]')" 'j')" "abcd"
 assert_eq "R6.3 — nettoie masque un jeton" "$(G "$(Q nettoie '["x ghp_abcdefghijklmnopqrstuvwxyz0123 y",80]')" 'j')" "x [masqué] y"
+assert_eq "R6.5 — audit F-8 : nettoie retire les surcharges bidi (U+202A-202E, U+2066-2069) et les séparateurs U+2028/2029" "$(G "$(Q nettoie '["a\u202eb\u2066c\u2069d\u2028e\u2029f\u202ag",80]')" 'j')" "abcdefg"
 WE="$WORK/wt-${ESC}[31mpiege"; G_ -C "$D" worktree add -q --detach "$WE" main 2>/dev/null
 RE="$(Q arbresGit "[\"$D\"]")"
 assert_eq "R6.4 — un worktree au nom piégé est listé tel quel (le nettoyage est celui de l'émetteur)" "$(G "$RE" 'j.length')|$(G "$RE" 'j.some(a=>a.chemin.includes("\u001b"))')" "4|true"

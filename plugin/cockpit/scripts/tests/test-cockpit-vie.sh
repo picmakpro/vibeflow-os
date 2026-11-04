@@ -309,6 +309,48 @@ M142="$(mut vide vf-cockpit-vie.mjs "&& brut.trim() === ''" "" 2>&1)"
 Q "$WORK/mut-vide" "$LF" "$WORK/s-garbage" "$WORK/v142.json"
 assert_eq "V14.2 — copie mutée (repli sans condition de sortie vide) détectée : la mission redevient running" "$M142|$(ONE "$WORK/v142.json" .etat)" "muté|running"
 
+# ---------- V15 — le verrou de DÉPÔT prolonge la cascade (P68-D-33, finding F-01 de la revue) ----------
+# `acquire` sans --ws en lab partitionné pose un verrou de portée depot (scope_reason ws-absent) : la mission du compartiment w est vivante.
+echo "=== V15 — verrou de dépôt : le vrai driver-lock.sh, fixtures à la forme réelle, copie mutée ==="
+R; DLR "$LR" acquire --owner=t --step=s > "$WORK/acq15.json" 2>/dev/null
+DLR "$LR" status --all > "$WORK/st15.json" 2>/dev/null
+assert_eq "V15.0 — témoin : acquire sans --ws pose un verrou de portée depot (ws-absent), tenu, et lui seul" "$(G "$WORK/acq15.json" 'j.acquired+":"+j.scope+":"+j.scope_reason')|$(G "$WORK/st15.json" 'j.locks.filter(l=>l.present).map(l=>l.scope+":"+JSON.stringify(l.ws)+":"+l.stale).join()')" "true:depot:ws-absent|depot:\"\":false"
+Q "$SCRIPTS" "$LR" "$CND" "$WORK/v151.json"
+assert_eq "V15.1 — verrou de dépôt tenu (vrai script), lab partitionné : les deux missions de w vivent" "$(DAGS "$WORK/v151.json")" "MISSION-1:running,MISSION-2:running"
+M152="$(mut depot vf-cockpit-vie.mjs "liste.filter((e) => e.scope === 'depot'" "liste.filter((e) => !ws && e.scope === 'depot'" 2>&1)"
+Q "$WORK/mut-depot" "$LR" "$CND" "$WORK/v152.json"
+assert_eq "V15.2 — copie mutée (cran dépôt retiré pour une mission de compartiment) détectée : abandonnee" "$M152|$(DAGS "$WORK/v152.json")" "muté|MISSION-1:abandonnee,MISSION-2:abandonnee"
+DEPOT_T='{"present": true, "owner": "t", "step": "s", "age_seconds": 0, "ttl": 1800, "stale": false, "generation": "g", "session_ids": [], "lease_seconds": 0, "guard_effective": true, "progress_epoch": 1793798004, "progress_age_seconds": 0, "children_running": 0, "scope": "depot", "ws": "", "location": "git-common-dir"}'
+DEPOT_P='{"present": true, "owner": "t", "step": "s", "age_seconds": 5000, "ttl": 1800, "stale": true, "generation": "g", "session_ids": [], "lease_seconds": 0, "guard_effective": false, "progress_epoch": null, "progress_age_seconds": null, "children_running": 0, "scope": "depot", "ws": "", "location": "git-common-dir"}'
+DEPOT_L='{"present": true, "owner": "", "step": "", "age_seconds": 0, "ttl": 1800, "stale": false, "generation": "legacy", "session_ids": [], "lease_seconds": null, "guard_effective": false, "progress_epoch": null, "progress_age_seconds": null, "children_running": 0, "scope": "depot", "ws": "", "location": "checkout", "scope_reason": "legacy-fallback", "legacy_lock": true}'
+lab2() { printf '{"present": true, "scope": "lab", "location": "git-common-dir", "legacy_lock": false, "locks": [%s, %s], "children_running": 0}' "$1" "$2"; }
+lab2 "$DEPOT_T" "$COABS" | fake "$WORK/s-de-tenu"
+lab2 "$DEPOT_P" "$COABS" | fake "$WORK/s-de-peri"
+lab2 "$DEPOT_P" "$DEPOT_L" | fake "$WORK/s-de-peri-legacy"
+lab2 "$DEPOT_T" "$(co false 30 x)" | fake "$WORK/s-de-tenu-co-x"
+Q "$SCRIPTS" "$LP" "$WORK/s-de-tenu" "$WORK/v153.json"
+assert_eq "V15.3 — fixture (forme réelle), dépôt tenu, compartiment w sans verrou : les missions de w vivent" "$(DAGS "$WORK/v153.json")" "MISSION-1:running,MISSION-2:running"
+Q "$SCRIPTS" "$LP" "$WORK/s-de-peri" "$WORK/v154.json"
+assert_eq "V15.4 — fixture, dépôt périmé sans progrès : abandonnee" "$(DAGS "$WORK/v154.json")" "MISSION-1:abandonnee,MISSION-2:abandonnee"
+Q "$SCRIPTS" "$LP" "$WORK/s-de-peri-legacy" "$WORK/v155.json"
+assert_eq "V15.5 — fixture, dépôt périmé ET ancien verrou .planning/DRIVER.lock tenu (entrée depot legacy) : les missions vivent" "$(DAGS "$WORK/v155.json")" "MISSION-1:running,MISSION-2:running"
+Q "$SCRIPTS" "$LP" "$WORK/s-de-tenu-co-x" "$WORK/v156.json"
+assert_eq "V15.6 — fixture, dépôt tenu et compartiment x tenu (autre sujet) : le dépôt couvre w, les missions vivent" "$(DAGS "$WORK/v156.json")" "MISSION-1:running,MISSION-2:running"
+Q "$SCRIPTS" "$LP" "$WORK/s-co-peri" "$WORK/v157.json"
+assert_eq "V15.7 — contre-épreuve : sans verrou de dépôt, compartiment w périmé seul : abandonnee (P68-D-26 inchangée)" "$(DAGS "$WORK/v157.json")" "MISSION-1:abandonnee,MISSION-2:abandonnee"
+R
+
+# ---------- V16 — audit F-8 : un âge de progression négatif n'est pas un progrès récent ----------
+# Choix (cohérent avec P68-D-23 et « jamais un null pris pour 0 ») : la source est lisible, c'est UN champ qui est incohérent (horloge reculée, epoch dans le futur) ;
+# il est traité comme absent (null), donc non récent. La mission retombe sur tenu/stale : verrou périmé -> abandonnee, jamais vivante sur une valeur forgée.
+echo "=== V16 — progress_age_seconds négatif ==="
+flat true -5 | fake "$WORK/s-neg"
+Q "$SCRIPTS" "$LF" "$WORK/s-neg" "$WORK/v161.json"
+assert_eq "V16.1 — verrou périmé dont l'âge de progression vaut -5 : abandonnee" "$(ONE "$WORK/v161.json" .etat)" "abandonnee"
+flat false -5 | fake "$WORK/s-neg-tenu"
+Q "$SCRIPTS" "$LF" "$WORK/s-neg-tenu" "$WORK/v162.json"
+assert_eq "V16.2 — contre-épreuve : verrou tenu et non périmé, âge de progression -5 : running (le champ forgé ne tue pas un verrou sain)" "$(ONE "$WORK/v162.json" .etat)" "running"
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"

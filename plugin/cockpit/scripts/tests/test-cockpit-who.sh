@@ -499,6 +499,24 @@ rm -f "$MARK19"
 HOME="$HOME_T" node "$SCRIPTS/vf-cockpit-signal.mjs" "$L19" > "$WORK/sig19.json" 2>/dev/null
 assert_eq "W19.3 — l'émetteur entier sur ce lab : sortie signal@1 produite, script de fsmonitor jamais exécuté" "$(G "$WORK/sig19.json" 'j.schema')|$([ -e "$MARK19" ] && echo exécuté || echo intact)" "vibeflow/cockpit-signal@1|intact"
 
+# ---------- W20 — audit F-9, F-6, F-5 : DAG mal formé, `--` devant le chemin, git en lecture seule ----------
+echo "=== W20 — nœud nul dans un DAG, ls-files sans option injectable, .git/index intact ==="
+L20="$WORK/lab20"; mkdir -p "$L20/.planning/missions"; git -C "$L20" init -q
+printf -- '- [ ] **Phase 1: Un** - a\n' > "$L20/.planning/ROADMAP.md"
+printf '{"nodes":[null,3,"x",{"id":"n20","step":"s","stage":"exec","deps":[],"scope":[],"status":"running"}]}\n' > "$L20/.planning/missions/MISSION-1.dag.json"
+printf '{"nodes":[{"id":"z","step":"s","stage":"exec","deps":[],"scope":[],"status":"running"}]}\n' > "$L20/.planning/missions/-opt.dag.json"
+git -C "$L20" add -A; git -C "$L20" -c user.email=t@t -c user.name=t commit -q -m c0
+HOME="$HOME_T" node "$SCRIPTS/vf-cockpit-signal.mjs" "$L20" > "$WORK/sig20.json" 2>"$WORK/sig20.err"; RC20=$?
+assert_eq "W20.1 — F-9 : un DAG à nœuds nuls ne fait pas planter l'émetteur (exit 0, signal@1)" "$RC20|$(G "$WORK/sig20.json" 'j.schema' 2>/dev/null)" "0|vibeflow/cockpit-signal@1"
+Q who "$L20" "$HOME_T" "$NOSCRIPTS" > "$WORK/who20.json" 2>/dev/null
+assert_eq "W20.2 — F-9 : les nœuds valides du même DAG sont encore lus" "$(G "$WORK/who20.json" 'j.workers.filter(w=>w.kind==="dag-node").map(w=>w.id).sort().join(",")' 2>/dev/null)" "n20,z"
+assert_eq "W20.3 — F-6 : chaque ls-files --error-unmatch de who.mjs met -- devant le chemin" "$(grep -c "'ls-files', '--error-unmatch', '--', f" "$SCRIPTS/vf-cockpit-who.mjs")" "1"
+git -C "$L20" status >/dev/null 2>&1; touch -t 202001010000 "$L20/.git/index"; M0="$(stat -f %m "$L20/.git/index" 2>/dev/null || stat -c %Y "$L20/.git/index")"
+printf '\n' >> "$L20/.planning/ROADMAP.md"   # sale : git status voudrait rafraîchir l'index
+HOME="$HOME_T" node "$SCRIPTS/vf-cockpit-signal.mjs" "$L20" > /dev/null 2>&1
+M1="$(stat -f %m "$L20/.git/index" 2>/dev/null || stat -c %Y "$L20/.git/index")"
+assert_eq "W20.4 — F-5 : la date de modification de .git/index ne bouge pas après l'émetteur" "$M1" "$M0"
+
 vf_hyg_assert
 
 echo ""

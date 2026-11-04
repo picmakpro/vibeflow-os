@@ -426,6 +426,23 @@ assert_eq "S13.3 — échéance à 0 ms : shBorne ne lance rien (sortie vide) et
 
 vf_hyg_assert
 echo
+echo "=== S14 — le verrou de dépôt posé par le VRAI driver-lock.sh fait vivre la mission (P68-D-33, F-01) ==="
+# Lab partitionné jetable, conductor voisin = copie du vrai driver-lock.sh ; `acquire` sans --ws pose un verrou de portée depot, puis l'émetteur réel lit.
+DR="$WORK/plugin-reel"; mkdisp "$DR" aucun; mkdir -p "$DR/conductor"; cp -R "$SCRIPTS/../../conductor/scripts" "$DR/conductor/scripts"; mkdir -p "$DR/planning-core"; cp -R "$SCRIPTS/../../planning-core/scripts" "$DR/planning-core/scripts"
+L14="$WORK/lab14"; mkdir -p "$L14/.planning/workstreams/w"
+printf -- '- [ ] **Phase 1: Un** - a\n' > "$L14/.planning/workstreams/w/ROADMAP.md"
+printf '{"nodes":[{"id":"a","step":"s","stage":"exec","deps":[],"status":"running"}]}\n' > "$L14/.planning/workstreams/w/MISSION-1.dag.json"
+echo w > "$L14/.planning/active-workstream"
+G_ init -q -b main "$L14"; G_ -C "$L14" add -A; G_ -C "$L14" -c user.name=t -c user.email=t@t commit -q -m c0
+mkdir -p "$WORK/home14"
+ACQ14="$(cd "$L14" && HOME="$WORK/home14" bash "$DR/conductor/scripts/driver-lock.sh" acquire --owner=t --step=s 2>/dev/null)"
+RUN "$DR" "$WORK/home14" "$WORK/o14.json" "$L14" > /dev/null
+assert_eq "S14.1 — témoin : acquire sans --ws pose un verrou de portée depot, et l'émetteur le lit (verrous.etat lue)" "$(printf '%s' "$ACQ14" | node -e 'const j=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log(j.scope+":"+j.scope_reason)')|$(G "$WORK/o14.json" 'j.verrous.etat')" "depot:ws-absent|lue"
+assert_eq "S14.2 — lab partitionné, verrou de dépôt tenu : la mission du compartiment w est running (jamais abandonnee)" "$(G "$WORK/o14.json" 'j.missions.map(m=>m.nom+":"+m.etat).join()')" "MISSION-1:running"
+(cd "$L14" && HOME="$WORK/home14" bash "$DR/conductor/scripts/driver-lock.sh" release --depot --owner=t >/dev/null 2>&1)
+RUN "$DR" "$WORK/home14" "$WORK/o14b.json" "$L14" > /dev/null
+assert_eq "S14.3 — contre-épreuve : verrou de dépôt relâché, la même mission est abandonnee" "$(G "$WORK/o14b.json" 'j.missions.map(m=>m.nom+":"+m.etat).join()')" "MISSION-1:abandonnee"
+
 echo "=== Résultats : $PASS PASS, $FAIL FAIL ==="
 TOTAL=$((PASS+FAIL))
 if [ "$TOTAL" -eq 0 ]; then echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE — zéro assertion exécutée"; exit 1; fi
