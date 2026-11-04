@@ -141,15 +141,18 @@ test("A2c — code 2 : « cockpit : lab sans dossier de planning (code 2) », au
   await ui.unmount()
 })
 
-test("A2d — codes 3, 4, 5 et inconnu traduits ; succès sans adresse dit qu'il n'y en a pas", async ($, on) => {
-  for (const [code, dit] of [[3, /moteur absent \(code 3\)/], [4, /assemblage en échec \(code 4\)/], [5, /serveur non démarré \(code 5\)/], [64, /échec \(code 64\)/]] as const) {
-    lab(on, { exitCode: code, stdout: '' })
-    const ui = await pane($)
-    await ui.press({ key: 'ouvrir-cockpit' })
-    expect(await ui.find({ type: 'Text', text: dit })).toBeDefined()
-    await ui.unmount()
-  }
-})
+async function codeDit(on: On, $: any, code: number, dit: RegExp) {
+  lab(on, { exitCode: code, stdout: '' })
+  const ui = await pane($)
+  await ui.press({ key: 'ouvrir-cockpit' })
+  expect(await ui.find({ type: 'Text', text: dit })).toBeDefined()
+  await ui.unmount()
+}
+
+test("A2d3 — code 3 : « moteur absent (code 3) »", ($, on) => codeDit(on, $, 3, /moteur absent .*\(code 3\)/))
+test("A2d4 — code 4 : « assemblage en échec (code 4) »", ($, on) => codeDit(on, $, 4, /assemblage en échec \(code 4\)/))
+test("A2d5 — code 5 : « serveur non démarré (code 5) »", ($, on) => codeDit(on, $, 5, /serveur non démarré \(code 5\)/))
+test("A2d64 — code inconnu : « échec (code 64) »", ($, on) => codeDit(on, $, 64, /échec \(code 64\)/))
 
 test("A2e — code 0 sans adresse reconnaissable : « adresse introuvable »", async ($, on) => {
   lab(on, { stdout: 'rien d utile\n' })
