@@ -40,20 +40,58 @@ Décisions du manager : P71-D-09 à D-22, D-24 (amende D-10). Q14 (N9, N10) envo
 7. Fusion : `71-BRANCHEMENTS-MERGE.md` (17 fichiers existants touchés, conflits certains avec la 69 sur `serve.mjs`, `VENDORED.txt`, `vf-cockpit.mjs`,
    `who`, `live`, `planning`, README, CHANGELOG, VERSION, `module.json`, nombre de suites des README racine).
 8. Gate de sortie E3 (PR ouverte) : non satisfait par construction, la mission s'arrête avant la PR.
+10. Gate de sortie (rejoué sur le HEAD final) : E3 attendu (pas de PR) ; E1 compte 2 agents « running » du registre de compartiment, consignés par une autre mission (registre de phase 71 vide) ; E7 désigne une mémoire de la Phase 68 hors git ; le snapshot de budget partagé a été réécrit par une autre mission à 2026-11-04T04:38Z.
 9. Lot D (N8, N11, I-doc) : trois commits `7bbb06e7`, `6b678c46`, `54cd2b8e`, vérifiés par la non-régression complète du manager ; l'exécuteur n'a rendu ni SUMMARY ni bloc typé (relancé deux fois) — `71-FIX-D-SUMMARY.md` absent.
 
 ## Preuves E6
 
 ```json
-[
-  {"verdict": "gates", "commande": "bash .planning/milestones/fiabilite-v1.0-phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/replay-ci-jobs.sh --job gates", "exit_code": 0, "sha": "c023f54a"},
-  {"verdict": "non-regression", "commande": "for t in plugin/cockpit/scripts/tests/test-cockpit-*.sh plugin/_internal/tests/test-vibeflow-update-cockpit.sh; do bash $t; done (27 rc=0, 1 rc=1 : témoin de charge)", "exit_code": 1, "sha": "54cd2b8e"},
-  {"verdict": "temoin-contrepression", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-session.sh (10 rejeux, dont 5 sous charge ajoutée)", "exit_code": 0, "sha": "2af9c68b"},
-  {"verdict": "revue", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-pty.sh (x5, à froid, en série)", "exit_code": 0, "sha": "502b354b"},
-  {"verdict": "audit", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-lanceur.sh (sur git archive c023f54a)", "exit_code": 0, "sha": "c023f54a"},
-  {"verdict": "audit", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-pty.sh (sur git archive c023f54a)", "exit_code": 0, "sha": "c023f54a"},
-  {"verdict": "design", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh", "exit_code": 0, "sha": "227be6c5"}
-]
+{
+ "preuves": [
+  {
+   "verdict": "gates",
+   "commande": "bash .planning/milestones/fiabilite-v1.0-phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/replay-ci-jobs.sh --job gates",
+   "exit_code": 0,
+   "sha": "c023f54a"
+  },
+  {
+   "verdict": "non-regression",
+   "commande": "for t in plugin/cockpit/scripts/tests/test-cockpit-*.sh plugin/_internal/tests/test-vibeflow-update-cockpit.sh; do bash $t; done (27 rc=0, 1 rc=1 : témoin de charge)",
+   "exit_code": 1,
+   "sha": "54cd2b8e"
+  },
+  {
+   "verdict": "temoin-contrepression",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-session.sh (10 rejeux, dont 5 sous charge ajoutée)",
+   "exit_code": 0,
+   "sha": "2af9c68b"
+  },
+  {
+   "verdict": "revue",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-pty.sh (x5, à froid, en série)",
+   "exit_code": 0,
+   "sha": "502b354b"
+  },
+  {
+   "verdict": "audit",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-lanceur.sh (sur git archive c023f54a)",
+   "exit_code": 0,
+   "sha": "c023f54a"
+  },
+  {
+   "verdict": "audit",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-pty.sh (sur git archive c023f54a)",
+   "exit_code": 0,
+   "sha": "c023f54a"
+  },
+  {
+   "verdict": "design",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh",
+   "exit_code": 0,
+   "sha": "227be6c5"
+  }
+ ]
+}
 ```
 
 ## Décompte
