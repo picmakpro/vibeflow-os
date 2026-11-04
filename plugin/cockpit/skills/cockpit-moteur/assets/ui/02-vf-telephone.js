@@ -1,8 +1,8 @@
 // VibeFlow (70-04, P70-D-01 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : le téléphone (≤ 700 px). L'en-tête tient sur UNE rangée : logo, onglets, recherche, point « au travail »
 // et un bouton « ⋯ ». Les autres actions d'en-tête (thème, Santé, Travail récent, Écrans, Visite, Exporter, Parcours, Types de liens, et toute action ajoutée plus tard) vivent dans le menu du « ⋯ »,
 // avec un libellé visible ; leurs pastilles de compte sont reportées sur l'entrée et sur le « ⋯ ». Chaque entrée appelle .click() du bouton d'origine (son comportement, ses gardes, ses menus) ;
-// le libellé est relu à l'ouverture (déjà traduit par 80-vf-fr.js). Au-dessus de 700 px, rien n'est posé. Hors de l'en-tête : le zoom retourne dans la scène (sa forme finale : 70-05) et le bouton
-// Détail est masqué (le tiroir s'ouvre au tap d'une carte). Texte posé par createElement/textContent seulement ; couleurs : variables du thème.
+// le libellé est relu à l'ouverture (déjà traduit par 80-vf-fr.js). Au-dessus de 700 px, rien n'est posé. Hors de l'en-tête (70-05, P70-D-09 et P70-D-10 : choix du manager) : le zoom retourne dans la scène en pile verticale à gauche, au-dessus de la barre de question ; le bouton
+// Détail est masqué : le tiroir s'ouvre au tap d'une carte ou du titre de la vue, et porte une poignée et une croix (« Fermer le détail ») ; ils passent par #btn-panel, donc par l'état du viewer. Texte posé par createElement/textContent seulement ; couleurs : variables du thème.
 (() => {
   const hr = document.querySelector('header .hr'), stage = document.getElementById('stage'), zoom = document.getElementById('zoom');
   if (!hr) return;
@@ -11,13 +11,21 @@
   style.textContent = `
     #vf-plus { display: none; }
     #vf-plus-menu { display: none; }
+    .vf-nb { display: inline-block; max-width: 100%; word-break: break-all; } /* un mot à traits d'union tient en un bloc ; plus large que sa boîte, il se coupe n'importe où (70-05, P70-D-04) */
     @media (max-width: 700px) {
       header { display: flex; flex-wrap: nowrap; align-items: center; }
       header .hl { flex: 1 1 auto; min-width: 0; }
       header .hc { flex: 0 0 44px; }
       header .hr { flex: 0 0 auto; justify-content: flex-end; }
       header #proj-name { display: none; }
-      #stage > #zoom { left: 16px; right: auto; top: auto; bottom: 124px; } /* provisoire : hors du titre et de la barre de question ; la pile finale vient en 70-05 */
+      #stage > #zoom { left: 16px; right: auto; top: auto; bottom: calc(var(--vf-ask-h, 8px) + 8px); flex-direction: column; border-radius: 26px; } /* --vf-ask-h : hauteur relue de la barre de question + sa marge */
+      #context h1 { pointer-events: auto; width: fit-content; max-width: 100%; cursor: pointer; }
+      #context h1:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
+      .vf-sheet-bar { position: sticky; top: 0; z-index: 2; height: 36px; margin-bottom: -4px; background: var(--menu-solid); }
+      .vf-sheet-grip { position: absolute; top: 8px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 999px; background: rgba(var(--ink), .25); }
+      .vf-sheet-x { position: absolute; top: 0; right: 4px; width: 44px; height: 36px; border: 0; border-radius: 999px; background: none; color: var(--text-2); display: grid; place-items: center; cursor: pointer; }
+      .vf-sheet-x:hover { background: rgba(var(--ink), .08); color: var(--text); }
+      .vf-sheet-x:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
       header:has(#btn-up:not([hidden])) .brand { display: none; }
       .vf-tabs { margin-left: 6px; padding: 3px; } .vf-tabs a { padding: 5px 8px; font-size: 13px; }
       #hdr-ext > button:not(#vf-lock), #theme-toggle, #btn-health, #flows-btn, #filters-btn, #btn-panel { display: none !important; }
@@ -81,4 +89,51 @@
   // le viewer range le zoom dans l'en-tête sur un téléphone : il retourne dans la scène, après le geste du viewer (même requête, écouteur posé après le sien)
   const scene = () => { if (zoom && stage && phone.matches && zoom.parentNode !== stage) stage.insertBefore(zoom, document.getElementById('flowbar')); };
   phone.addEventListener('change', () => { if (!phone.matches) fermer(false); scene(); }); scene();
+
+  // pile du zoom : la barre de question change de hauteur (invite, avertissement) ; on relit sa hauteur
+  const ask = document.getElementById('ask');
+  if (ask) { const h = () => document.documentElement.style.setProperty('--vf-ask-h', ask.offsetHeight + 8 + 'px'); h(); if (window.ResizeObserver) new ResizeObserver(h).observe(ask); window.addEventListener('resize', h); }
+
+  // tiroir : #btn-panel (masqué) reste le seul chemin d'ouverture et de fermeture
+  const btn = document.getElementById('btn-panel'), panel = document.getElementById('panel'), ctx = document.getElementById('context');
+  const ouvert = () => !document.body.classList.contains('no-panel');
+  const bascule = (voulu) => { if (btn && ouvert() !== voulu) btn.click(); };
+  const barre = () => {
+    if (!panel) return;
+    const b = panel.querySelector(':scope > .vf-sheet-bar');
+    if (!phone.matches) { b?.remove(); return; }
+    if (b && panel.firstElementChild === b) return;
+    b?.remove();
+    const bar = document.createElement('div'); bar.className = 'vf-sheet-bar';
+    const g = document.createElement('div'); g.className = 'vf-sheet-grip'; g.setAttribute('aria-hidden', 'true'); bar.appendChild(g);
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'vf-sheet-x'; x.setAttribute('aria-label', 'Fermer le détail'); x.title = 'Fermer le détail';
+    const xs = document.createElementNS(NS, 'svg'); xs.setAttribute('class', 'i'); xs.setAttribute('viewBox', '0 0 24 24'); xs.setAttribute('aria-hidden', 'true');
+    const xp = document.createElementNS(NS, 'path'); xp.setAttribute('d', 'M6 6l12 12M18 6L6 18'); xs.appendChild(xp); x.appendChild(xs);
+    x.onclick = (ev) => { ev.stopPropagation(); bascule(false); };
+    bar.appendChild(x); panel.insertBefore(bar, panel.firstChild);
+  };
+  if (panel) { new MutationObserver(barre).observe(panel, { childList: true }); phone.addEventListener('change', barre); barre(); }
+
+  // titre de la vue : cliquable sur téléphone ; ses mots à traits d'union ne se coupent plus au trait d'union (aussi hors téléphone)
+  const titre = () => {
+    const h1 = ctx?.querySelector('h1'); if (!h1) return;
+    if (!h1.dataset.vfNb) {
+      h1.dataset.vfNb = '1';
+      const tw = document.createTreeWalker(h1, NodeFilter.SHOW_TEXT), noeuds = []; let t; while ((t = tw.nextNode())) noeuds.push(t);
+      for (const n of noeuds) {
+        if (!/\S-\S/.test(n.data)) continue;
+        const f = document.createDocumentFragment();
+        for (const part of n.data.split(/(\s+)/)) {
+          if (/\S-\S/.test(part)) { const sp = document.createElement('span'); sp.className = 'vf-nb'; sp.textContent = part; f.appendChild(sp); } else if (part) f.appendChild(document.createTextNode(part));
+        }
+        n.replaceWith(f);
+      }
+    }
+    if (phone.matches) { h1.setAttribute('role', 'button'); h1.tabIndex = 0; } else { h1.removeAttribute('role'); h1.removeAttribute('tabindex'); }
+  };
+  if (ctx) {
+    new MutationObserver(titre).observe(ctx, { childList: true }); phone.addEventListener('change', titre); titre();
+    ctx.addEventListener('click', (ev) => { if (phone.matches && ev.target.closest('h1')) bascule(true); });
+    ctx.addEventListener('keydown', (ev) => { if (phone.matches && ev.target.closest?.('h1') && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); bascule(true); } });
+  }
 })();
