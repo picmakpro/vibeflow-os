@@ -8,10 +8,10 @@
 //   Rend sur une ligne { l<largeur>: { n, etapes: [ { i, cible, centre, couvert, visible, entier, coupe, tient, passer, repere, anglais } ] } } ou { erreur } nommée. Une étape par entrée ; les valeurs de défaut sont :
 //   cible = ni carte sélectionnée ni élément du chrome mis en évidence (.tour-target) · centre = carte sélectionnée dont le centre n'est pas dans le tiers central d'une zone libre (au-dessus ou à droite de la carte de visite, hors en-tête, titre, panneau et barre de question)
 //   couvert = la carte de visite recouvre la cible · visible = la cible n'est pas entièrement dans la fenêtre · entier = le texte de l'étape n'a pas sa fin (FINDETEXTE) alors que sa source la porte · coupe = le texte finit par « … »
-//   tient = la carte de visite sort de la fenêtre · passer = aucun bouton « Passer » visible dans la carte · repere = texte « n sur N » lu · anglais = mots témoins anglais (liste de F11) dans le texte de la carte de visite.
+//   toutLibre = une carte du graphe sort de la zone libre à gauche du panneau, visite active (critère de R1) · dansZone = la carte ciblée sort de la zone libre de la carte (sous le panneau, l'en-tête ou la barre de question ; 70-07, grandes cartes) · tient = la carte de visite sort de la fenêtre · passer = aucun bouton « Passer » visible dans la carte · repere = texte « n sur N » lu · anglais = mots témoins anglais (liste de F11) dans le texte de la carte de visite.
 import { executer, pause } from './chrome-session.mjs';
 const [, , chrome, url, largeurs, recharge] = process.argv;
-const HAUT = { 390: 844, 1440: 900 };
+const HAUT = { 390: 844, 1024: 768, 1440: 900 };
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlowTour && !!document.getElementById('tour-btn')";
 const INIT = "!!window.__vfModele && !!window.__vfModele.modele";
 const DONNEE = `(() => { const G = window.VibeFlow.graph; const long = (n) => 'RESUME-' + n + ' Ce résumé de test est volontairement très long : il dépasse deux cent trente caractères pour que la visite le coupe, ou le montre entier. Il continue encore un peu pour être sûr de passer la limite, puis il se termine ici : FINDETEXTE';
@@ -24,17 +24,22 @@ const MESURE = `(() => {
   const cr = R(card), sel = SC.state.selected;
   const chip = typeof sel === 'string' && SC.state.chipEls ? SC.state.chipEls.get(sel) : null;
   const cible = document.querySelector('.tour-target');
-  const o = { cible: false, centre: true, couvert: false, visible: true };
+  const o = { cible: false, centre: true, couvert: false, visible: true, dansZone: true };
   if (chip) {
     const r = R(chip), s = R(document.getElementById('svg')), a = SC.freeArea();
     const free = { l: s.l + a.x, t: s.t + a.y, r: s.l + a.x + a.w, b: s.t + a.y + a.h };
     const zones = [{ l: free.l, t: free.t, r: free.r, b: Math.min(free.b, cr.t - 8) }, { l: Math.max(free.l, cr.r + 8), t: free.t, r: free.r, b: free.b }].filter((z) => z.r - z.l > 40 && z.b - z.t > 40);
     const cx = (r.l + r.r) / 2, cy = (r.t + r.b) / 2;
     o.cible = true; o.couvert = inter(r, cr); o.visible = dans(r);
+    o.dansZone = r.l >= free.l - 1 && r.t >= free.t - 1 && r.r <= free.r + 1 && r.b <= free.b + 1;
     o.centre = zones.some((z) => Math.abs(cx - (z.l + z.r) / 2) <= (z.r - z.l) / 6 && Math.abs(cy - (z.t + z.b) / 2) <= (z.b - z.t) / 6);
   } else if (cible) {
     const r = R(cible); o.cible = r.w > 0 && r.h > 0; o.couvert = inter(r, cr); o.visible = dans(r);
   }
+  // la carte entière (toutes les cartes visibles) dans la zone libre à gauche du panneau : le critère de R1 (chrome-responsive.mjs), visite active
+  const nds = [...document.querySelectorAll('#svg g.node')].map(R).filter((x) => x.w > 0 && x.h > 0), pan = document.querySelector("#panel"), prp = pan ? R(pan) : null;
+  const libreD = prp && prp.w > 0 && innerWidth >= 1000 ? prp.l : innerWidth;
+  o.toutLibre = !nds.length || (Math.max(...nds.map((x) => x.r)) <= libreD + 1 && Math.min(...nds.map((x) => x.l)) >= -1);
   const tn = card.querySelector('.tn'), note = tn ? tn.textContent : '';
   o.entier = !/RESUME-/.test(note) || /FINDETEXTE/.test(note); o.coupe = /…\\s*$/.test(note);
   o.tient = dans(cr);

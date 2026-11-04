@@ -470,6 +470,22 @@ assert_eq "O6.9 — témoin : le rechargement a été mesuré (erreur vide, quat
 for K in l390 r390 l1440 r1440; do
   assert_eq "O6.9 [$K] — Projet, page déjà vue dans le même profil : étapes sans cible, mal centrées, couvertes ou hors fenêtre" "$(x66 "j.$K.etapes.filter((e)=>!e.cible||!e.centre||e.couvert||!e.visible).map((e)=>e.i).join(',')")" ""
 done
+# O6.10 (correctif 70-07, REG-70-01 de 70-VERIFICATION.md) : visite Projet active au premier chargement sur un lab à jalon et à mission, à 1 024 et 1 920 px : la carte ciblée tient dans la zone libre ET aucune carte du graphe ne sort de la zone
+# libre à gauche du panneau (critère de R1, chrome-responsive.mjs). Cause : aim() centrait et zoomait la carte sans regarder le reste du graphe, qui débordait sous le panneau ; il ne dézoomait jamais une carte plus large que sa zone.
+L7="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mkdir -p "$L7/src" "$L7/.planning/phases/01-socle" "$L7/.planning/phases/02-suite" "$L7/.planning/missions"
+printf 'export const u = () => 1;\n' > "$L7/src/util.js"; printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n- [ ] **Phase 2: Suite** - la suite\n' > "$L7/.planning/ROADMAP.md"
+printf '<objective>Faire le socle</objective>\n' > "$L7/.planning/phases/01-socle/01-01-PLAN.md"; echo ok > "$L7/.planning/phases/01-socle/01-01-SUMMARY.md"; printf '<objective>Faire la suite</objective>\n' > "$L7/.planning/phases/02-suite/02-01-PLAN.md"
+printf '{"nodes":[{"id":"a","step":"première étape","stage":"","deps":[],"scope":["src/**"],"status":"done"},{"id":"b","step":"seconde étape","stage":"","deps":["a"],"scope":["src/**"],"status":"running"}]}\n' > "$L7/.planning/missions/demo.dag.json"
+git -C "$L7" init -q && git -C "$L7" add -A && git -C "$L7" -c user.email=t@t -c user.name=t commit -q -m init; LABS4+=("$L7")
+U7="$(adr4 "$L7")"; SRVPIDS+=("$(pid4 "$L7")"); P7="${U7%index.html}project.html"
+X7="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P7" 1024)"; X72="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P7" 1920)"
+X7="$(node -e "const a=JSON.parse(process.argv[1]),b=JSON.parse(process.argv[2]);console.log(JSON.stringify({erreur:a.erreur||b.erreur,...a,...b}))" "$X7" "$X72")"
+[ -n "${DBG:-}" ] && echo "RAW7: $X7"
+x7() { printf '%s' "$X7" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O6.10 — témoin : la mesure a eu lieu sans erreur, au moins trois étapes à chaque largeur" "$(x7 "j.erreur||''")|$(x7 'j.l1024.n>=3&&j.l1920.n>=3')" "|true"
+for W in 1024 1920; do
+  assert_eq "O6.10 [$W px] — Projet : étapes dont la carte ciblée sort de la zone libre ou dont une carte du graphe sort de la zone libre à gauche du panneau" "$(x7 "j.l$W.etapes.filter((e)=>!e.dansZone||!e.toutLibre).map((e)=>e.i).join(',')")" ""
+done
 unset VF_COCKPIT_PORT_BASE
 for L in "${LABS4[@]}"; do node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L" >/dev/null 2>&1; done; for p in "${SRVPIDS[@]}"; do vf_hyg_stop "$p"; done; SRVPIDS=()
 vf_hyg_assert
