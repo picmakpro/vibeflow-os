@@ -314,11 +314,10 @@ for cas in env point; do
 done
 retire_leurres
 # mutant M-PATH-VIDE : le PATH assaini vide est transmis tel quel (ni repli système ni clé omise : le code d'avant) -> le git du lab est exécuté, sous les deux formes
-md="$WORK/mut-pathvide"; rm -rf "$md"; mkdir -p "$md"; cp -R "$MODULE/." "$md/"; cp "$md/scripts/vf-cockpit-paths.mjs" "$md/paths.orig"; cp "$md/scripts/vf-cockpit-build.mjs" "$md/build.orig"
-sed -i.bak "s/return p || (process.platform === 'win32' ? '' : PATH_SYSTEME);/return p;/" "$md/scripts/vf-cockpit-paths.mjs"
-sed -i.bak "s/if (p) e.PATH = p; else delete e.PATH;/e.PATH = p;/" "$md/scripts/vf-cockpit-build.mjs"
-if ! cmp -s "$md/scripts/vf-cockpit-paths.mjs" "$md/paths.orig" && ! cmp -s "$md/scripts/vf-cockpit-build.mjs" "$md/build.orig"; then
-  rm -f "$md/paths.orig" "$md/build.orig" "$md/scripts/vf-cockpit-paths.mjs.bak" "$md/scripts/vf-cockpit-build.mjs.bak"; leurres_lab; MR=""
+md="$WORK/mut-pathvide"; rm -rf "$md"; mkdir -p "$md"; cp -R "$MODULE/." "$md/"; cp "$md/scripts/vf-cockpit-env.mjs" "$md/env.orig"
+sed -i.bak "s/return gardes.length ? gardes.join(path.delimiter) : PATH_REPLI;/return gardes.join(path.delimiter);/" "$md/scripts/vf-cockpit-env.mjs"
+if ! cmp -s "$md/scripts/vf-cockpit-env.mjs" "$md/env.orig"; then
+  rm -f "$md/env.orig" "$md/scripts/vf-cockpit-env.mjs.bak"; leurres_lab; MR=""
   for cas in env point; do git_du_lab "$cas" "$md/scripts/vf-cockpit.mjs" "$cas"; MR="$MR $cas:${RES%% *}"; done; retire_leurres
   assert_eq "M-PATH-VIDE — le mutant (PATH assaini vide transmis) rougit L17 : le git du lab est exécuté sous env -i comme sous PATH=." "$([[ "$MR" == *"env:git=0"* || "$MR" == *"point:git=0"* ]] && echo "identique :$MR" || echo rouge)" "rouge"
 else assert_eq "M-PATH-VIDE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
