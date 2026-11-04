@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn, execFileSync } from 'node:child_process';
+import { envEnfant } from './vf-cockpit-env.mjs';
 import { findLabRoot, engineDir, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
 import { portPrefere } from './vf-cockpit-port.mjs';
 
@@ -45,18 +46,18 @@ const adresses = (url) => `Cockpit : ${url}/ (Code) · ${url}/project.html (Proj
 
 // 67-SECURITY M3 : le lanceur n'exécute JAMAIS un script du lab (serve.mjs de la sortie compris). Arrêt par signal, sur un PID que le fichier
 // d'état du lab (donc non fiable) désigne : entier > 1, ni le nôtre, vivant, et dont la ligne de commande est le serve.mjs de CETTE sortie.
-function estNotre(pid, serve) {
+function estNotre(pid, serve, lab) {
   if (!Number.isInteger(pid) || pid <= 1 || pid === process.pid || !vivant(pid)) return false;
   if (process.platform === 'win32') return true; // pas de `ps` : le PID vient du fichier d'état, reste borné ci-dessus
   try {
-    const cmd = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 });
+    const cmd = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, env: envEnfant(lab) });
     return cmd.includes(serve) || cmd.includes(fs.realpathSync(serve));
   } catch { return false; }
 }
 function arreter(sortie) {
   const s = lireEtat(sortie);
   const serve = path.join(sortie, 'serve.mjs');
-  if (!s || !estNotre(s.pid, serve)) return false;
+  if (!s || !estNotre(s.pid, serve, path.resolve(sortie, '..', '..'))) return false;
   try { process.kill(s.pid, 'SIGTERM'); return true; } catch { return false; }
 }
 
@@ -75,7 +76,7 @@ async function demarrer(lab, sortie, o) {
   // port stable par lab (O4) : --port de l'utilisateur d'abord, sinon l'empreinte du lab ; le repli port+1 reste celui du serveur
   args.push('--port', String(o.port || portPrefere(lab)));
   // le serveur ne se fie qu'à ces deux chemins, posés ici depuis le module (jamais lus dans un .cache/ du lab)
-  const env = { ...process.env, VF_COCKPIT_ENGINE_DIR: engineDir(resolveScriptsDir(HERE)).chemin || '', VF_COCKPIT_SCRIPTS_DIR: resolveScriptsDir(HERE) };
+  const env = { ...envEnfant(lab), VF_COCKPIT_ENGINE_DIR: engineDir(resolveScriptsDir(HERE)).chemin || '', VF_COCKPIT_SCRIPTS_DIR: resolveScriptsDir(HERE) };
   const enfant = spawn(process.execPath, args, { cwd: lab, env, detached: true, stdio: ['ignore', logFd, logFd] });
   enfant.unref();
   fs.closeSync(logFd);

@@ -1,5 +1,23 @@
 # Changelog — cockpit
 
+## v1.1.2 — 2026-11-04
+
+Correctif de sécurité H-1 (héritée de la Phase 67, présente dès v2.75.0), sur arbitrage de Samuel (AskUserQuestion, session
+principale Claude Code, 2026-11-04 : « Mandat séparé maintenant (Recommandé) »). Pas de release racine.
+
+### Corrigé
+- **Outils du lab exécutés par le serveur** : le serveur et ses modules appellent des outils par leur nom (`which`, `claude`, `git`, `bash`,
+  puis `awk`, `tr`, `ps` par `driver-lock.sh`). Avec un `PATH` contenant `.`, un élément relatif ou vide (que libuv lit comme le dossier
+  courant), ou un dossier du lab, un programme piégé posé dans le lab s'exécutait à leur place.
+- Un seul utilitaire, `vf-cockpit-env.mjs` (`assainirPath`, `envEnfant`) : retire du `PATH` tout élément vide, relatif ou situé sous le lab
+  (lien symbolique résolu), avec le repli `/usr/bin:/bin:/usr/sbin:/sbin` si plus rien ne reste. Il s'applique à l'environnement de chaque enfant
+  (`git`, `bash`, `ps`, moteur de construction, serveur détaché du lanceur) et, par le patch P25 de `serve.mjs`, au processus du serveur
+  lui-même (donc à `which`, `claude --version`, l'agent et l'ouverture du navigateur). Le `PATH` du shell de l'utilisateur n'est jamais modifié.
+
+### Ajouté
+- `test-cockpit-path-enfants.sh` : l'utilitaire (U), les fonctions du module (F), le serveur (S) et le lanceur (L) lancés depuis un lab dont les
+  outils sont piégés, avec `PATH=.:…`, un `PATH` relatif, vide et absolu sous le lab. Rouge avant le correctif (outils du lab exécutés), vert après.
+
 ## v1.1.1 — 2026-11-04
 
 Correctifs de la recette de la Phase 69, sur arbitrage de Samuel (AskUserQuestion, session principale Claude Code,

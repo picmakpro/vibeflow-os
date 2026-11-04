@@ -13,6 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { envEnfant } from './vf-cockpit-env.mjs';
 import { driverLockScript, gitCommonDir, resolveScriptsDir, planningLayout } from './vf-cockpit-paths.mjs';
 import { ls, mtime, readJson, cherche, masque, MAX_MASQUE, ID_RE, premiereLigne } from './vf-cockpit-lecture.mjs';
 import { FENETRE, collecteAgents, indexDesNoeuds, rattacher } from './vf-cockpit-equipe.mjs';
@@ -20,7 +21,7 @@ import { lireDags } from './vf-cockpit-planning.mjs';
 import { reduireTranscript } from './vf-cockpit-transcript.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const sh = (cmd, args, cwd) => { try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000 }); } catch (e) { return e.stdout || ''; } }; // timeout : un git ou un bash bloqué ne gèle pas la boucle
+const sh = (cmd, args, cwd, lab) => { try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000, env: envEnfant(lab) }); } catch (e) { return e.stdout || ''; } }; // timeout : un git ou un bash bloqué ne gèle pas la boucle
 
 // les listes de clés vérifiées sur Claude Code viennent du contrat versionné, pas du code
 const IFACE = readJson(path.join(HERE, 'vf-cockpit-interface.json')) || {};
@@ -35,7 +36,7 @@ const formeOk = (d) => !!d && REQ_TR.every((k) => k in d) && ['cwd', 'type', 'ti
 // contexte de collecte des sessions et sous-agents : arbres git du lab, portée, étiquettes
 function contexte(root, { fresh, now, home }) {
   root = path.resolve(root);
-  const porcelain = sh('git', ['-C', root, 'worktree', 'list', '--porcelain'], root);
+  const porcelain = sh('git', ['-C', root, 'worktree', 'list', '--porcelain'], root, root);
   const branchOf = new Map(porcelain.split('\n\n').map((b) => [/^worktree (.*)$/m.exec(b)?.[1], /^branch refs\/heads\/(.*)$/m.exec(b)?.[1] || (b.includes('detached') ? '(détachée)' : '')]).filter(([t]) => t && fs.existsSync(t)).map(([t, br]) => [fs.realpathSync(t), br]));
   // la branche vient de `git worktree list` pour TOUT arbre connu (cwd ou activité) ; le gitBranch du transcript est celui de l'arbre de LANCEMENT : repli seulement
   const branche = (t, ...transcript) => branchOf.get(t) || transcript.find(Boolean) || '';
@@ -75,7 +76,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
   if (dl.etat === 'absent') sources.locks = { etat: 'absente' };
   else {
     const DL = dl.chemin; let st = {};
-    try { st = JSON.parse(sh('bash', [DL, 'status', '--all'], root)); } catch { sources.locks = { etat: 'erreur' }; }
+    try { st = JSON.parse(sh('bash', [DL, 'status', '--all'], root, root)); } catch { sources.locks = { etat: 'erreur' }; }
     st = { ...st, locks: Array.isArray(st?.locks) ? st.locks : st?.present ? [st] : [] }; // lab plat : `status --all` rend l'objet d'UN verrou, sans `locks`
     // ws et phase partent en argument d'un script : grammaire EXACTE de driver-lock.sh, sinon la cible est écartée (champs libres masqués et bornés par collectWho).
     // ws = vf_ws_name_valid (alphanumérique en tête, puis alphanumérique . _ -, jamais `..`) ; phase = vf_dl_phase_valid (chiffres séparés par des points : 69, 41.1, 1.2.3)
@@ -85,7 +86,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
     const cibles = [{ ws: '', ph: '' }, ...ls(path.join(common, 'vf-driver', 'ws')).map((w) => ({ ws: w, ph: '' })), ...(st.locks || []).filter((x) => x.present && x.phase && typeof x.ws === 'string').map((x) => ({ ws: x.ws, ph: String(x.phase) }))].filter((c) => ok(c.ws, c.ph));
     let reg = 0;
     for (const { ws, ph } of cibles) {
-      let o = {}; try { o = JSON.parse(sh('bash', [DL, 'orphans', ...(ws ? [`--ws=${ws}`] : []), ...(ph ? [`--phase=${ph}`] : [])], root)); } catch {}
+      let o = {}; try { o = JSON.parse(sh('bash', [DL, 'orphans', ...(ws ? [`--ws=${ws}`] : []), ...(ph ? [`--phase=${ph}`] : [])], root, root)); } catch {}
       const held = (st.locks || []).some((l) => l.present && !l.stale && (l.ws || '') === ws && String(l.phase || '') === ph);
       for (const a of Array.isArray(o.orphans) ? o.orphans : []) { if (typeof a?.agent_id !== 'string' || !ID_RE.test(a.agent_id)) continue; reg++; if (presents.has(a.agent_id)) { registre.set(a.agent_id, { noeud: a.node || '', role: a.role, ws }); continue; } workers.push({ kind: 'registered', id: a.agent_id, role: a.role, task: a.node || '', parent: a.parent || '', depth: a.depth ?? null, tree: ws ? `compartiment ${ws}${ph ? ` phase ${ph}` : ''}` : 'dépôt', ageS: a.age_seconds, stale: !held, orphan: !held, source: 'registre' }); }
     }
@@ -108,8 +109,8 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
     const fp = path.join(d, f);
     let age = Math.round((now - mtime(fp)) / 1000);
     if (age <= ttl && nodes.some((x) => x.status === 'running')) {
-      const tracked = sh('git', ['-C', d, 'ls-files', '--error-unmatch', f], d).trim(), dirty = sh('git', ['-C', d, 'status', '--porcelain', '--', f], d).trim();
-      const ct = Number(sh('git', ['-C', d, 'log', '-1', '--format=%ct', '--', f], d).trim());
+      const tracked = sh('git', ['-C', d, 'ls-files', '--error-unmatch', f], d, root).trim(), dirty = sh('git', ['-C', d, 'status', '--porcelain', '--', f], d, root).trim();
+      const ct = Number(sh('git', ['-C', d, 'log', '-1', '--format=%ct', '--', f], d, root).trim());
       if (tracked && !dirty && ct) age = Math.round(now / 1000 - ct); // contenu identique au commit : écrit au plus tard à cette date
     }
     const stale = age > ttl;
