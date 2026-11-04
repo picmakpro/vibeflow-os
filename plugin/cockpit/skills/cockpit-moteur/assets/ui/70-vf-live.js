@@ -32,8 +32,8 @@
     .vf-who span { color: var(--text-3); } .vf-who div { color: var(--text-2); margin-top: 2px; }
     .vf-who.stale { opacity: .55; }
     .vf-who button { margin-top: 6px; font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); }
-    .sec button { font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); margin: 6px 6px 0 0; transition: background .2s var(--ease), color .2s var(--ease); }
-    .sec button:hover { background: rgba(var(--ink), .07); color: var(--text); } .sec button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+    .sec button[data-vf-doing], .sec button[data-vf-transcript] { font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); margin: 6px 6px 0 0; transition: background .2s var(--ease), color .2s var(--ease); }
+    .sec button[data-vf-doing]:hover, .sec button[data-vf-transcript]:hover { background: rgba(var(--ink), .07); color: var(--text); } .sec button[data-vf-doing]:focus-visible, .sec button[data-vf-transcript]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
     a.vf-link { text-decoration: underline; text-decoration-color: rgba(var(--ink), .35); text-underline-offset: 3px; }
     a.vf-link:hover { color: var(--text); text-decoration-color: currentColor; } a.vf-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
     .vf-nr { white-space: nowrap; }

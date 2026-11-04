@@ -23,3 +23,18 @@ Mesure navigateur NON faite (régime quick, pas de chargement Chrome) : « avant
 
 ## Vérifications rejouées
 marque-blanche 30/0 · equipe 26/0 · vendor 77/0 · chrome-fr 116/0. Responsive non lancée (consigne). G-2 : aucun chemin surveillé touché (RIEN-A-JUGER).
+
+## Suite : sélecteur resserré
+
+Cause : `.sec button` (70-vf-live.js) restylait tous les boutons du panneau, ceux du viewer compris. Correctif : la règle, son survol et son focus ne visent plus que `.sec button[data-vf-doing], .sec button[data-vf-transcript]` (attributs déjà posés par VibeFlow, balisage inchangé).
+
+Mesure Chrome (panneau du fichier `src/app.js`, lab jetable, bureau, styles calculés ; base = build de 794c6dba) :
+
+| Bouton | 794c6dba | ancienne règle (reproduite) | sélecteur resserré |
+|---|---|---|---|
+| « Montrer sur la carte » (`btn soft`, l'« Open » du viewer) | rayon 999 px, bordure 0, droite 1521 | rayon 8 px, bordure 1 px, droite 1506 | rayon 999 px, bordure 0, droite 1521 |
+| « Copier » (copie du chemin) | rayon 8 px, bordure 0, droite 1682 (calé à droite) | bordure 1 px, droite 1497 (décalé) | rayon 8 px, bordure 0, droite 1682 |
+| bouton `data-vf-doing` (témoin injecté) | n/a | 8 px, 1 px | 8 px, 1 px (style voulu conservé) |
+| bouton quelconque du panneau (témoin injecté) | défaut navigateur | 8 px, 1 px | défaut navigateur |
+
+Rendu des boutons du viewer identique à 794c6dba. Rejoués : `test-cockpit-equipe.sh`, `test-cockpit-marque-blanche.sh`.
