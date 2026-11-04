@@ -378,6 +378,18 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "juge-arbitrages",
+      "step": "juge scopé des arbitrages",
+      "stage": "",
+      "deps": [
+        "arb-visite",
+        "arb-equipe",
+        "exec-70-04-t2"
+      ],
+      "scope": [],
+      "status": "running"
     }
   ]
 }
