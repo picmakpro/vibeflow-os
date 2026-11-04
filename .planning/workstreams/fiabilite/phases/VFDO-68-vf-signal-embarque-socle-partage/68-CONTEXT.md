@@ -199,6 +199,11 @@ Relayés par la session principale (SendMessage) ; réponses mot pour mot entre 
   Cas laissé ouvert par P68-D-33 au cran compartiment → dépôt. Même règle que P68-D-27 au cran précédent : un verrou
   présent, même périmé, arrête la cascade ; compartiment périmé + dépôt tenu → `abandonnee`. Témoin dans
   `test-cockpit-vie.sh`, copie mutée qui fait gagner le cran dépôt.
+- **P68-D-37 (P68-D-34 jusqu'au bout) — décision du manager, pas un arbitrage de Samuel (2026-11-04).** Issue de la
+  revue fraîche (Q4-1, Q4-4, Q4-5) : un fichier existant dont le `realPath` manque est refusé (le lanceur du plugin
+  prend le relais) ; les lancements `node`/`bash` du mod ne partent plus du lab avec le `PATH` hérité (même classe que
+  H-1, PR #201) ; « copier takeover » ne copie jamais un chemin nu quand aucun script n'est résolu. Applique la règle
+  arbitrée « Rien sous le lab » sans l'étendre.
 
 ### Points de procédure (documentés, sans arbitrage — consigne de la session principale, 2026-11-03)
 
