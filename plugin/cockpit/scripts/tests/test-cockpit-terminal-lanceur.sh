@@ -17,6 +17,7 @@
 #   L19 E4 : --terminal sans python3 : message, aucun amorçage ni Q, cockpit ouvert sans terminal, sortie 0 (M-SANS-PYTHON3)
 #   L20 E5 : serveur qui écrit son état après 15 s : attente jusqu'à 30 s, « démarrage lent » une fois, sortie 0 ; la borne reste (M-BORNE-10)
 #   L5.0 le contrôle de l'environnement du serveur est JOUÉ sous Linux (/proc/<pid>/environ) comme sous macOS (ps -Eww), jamais sauté faute de la forme BSD
+#   L16b N12 : dossier ABSOLU du lab dans le PATH (<lab>/bin) jamais exécuté (open, xdg-open, ps) ni pris pour python3 ; mutant M-PATH-BRUT
 #   L16 N2 (P71-D-29) : un lab qui porte open, xdg-open, ps et git exécutables n'en voit aucun lancé sous PATH=.:…, :…, …: et bin:… ; mutants M-OUVRE-NOMNU, M-PS-NOMNU, M-GIT-NOMNU, M-WHO-NOMNU, M-SERVE-OUVRE, M-PS-FINAL
 # Aucun vrai navigateur : `open` et `xdg-open` factices en tête du PATH. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
@@ -300,6 +301,39 @@ assert_eq "L16 — témoin : « open » sans --terminal sous PATH=.:… : le LAN
 arrete; [ -n "$S16" ] && attendre_mort "$S16"
 retire_leurres
 
+echo "=== L16b — N12 (P71-D-29, 2026-11-04) : un dossier ABSOLU du lab dans le PATH (<lab>/bin : npm run, direnv) n'est jamais exécuté non plus (open, xdg-open, ps, python3) ==="
+# les ouvreurs factices restent atteints par chemin absolu dans TOUS les cas (jamais l'ouvreur réel du poste, même sous un PATH vidé par l'assainissement)
+leurres_abs() { local n; mkdir -p "$LAB/bin"; for n in open xdg-open ps python3; do printf '#!/bin/sh\necho "$0" >> "%s-%s"\nexit 1\n' "$MARQ" "$n" > "$LAB/bin/$n"; chmod +x "$LAB/bin/$n"; done; }
+retire_abs() { local n; for n in open xdg-open ps python3; do rm -f "$LAB/bin/$n"; done; rmdir "$LAB/bin" 2>/dev/null; true; }
+marq_abs() { local t="" n; for n in open xdg-open ps python3; do t="$t $n=$(nbl "$MARQ-$n")"; done; echo "${t# }"; }
+cycle_abs() { # cycle_abs <lanceur> <PATH> -> RES = marqueurs, OUV = nombre d'ouvertures par l'ouvreur factice absolu ; mêmes gestes que L16, plus l'arrêt
+  rm -f "$MARQ"-* "$AM" "$SJ" "$OUVERT"; local l="$1" pv="$2" a
+  for a in "open --terminal --rebuild" "open --terminal" "stop" "open" "stop"; do
+    NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; (cd "$LAB" && PATH="$pv" node "$l" $a --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1)
+  done
+  S16="$(sj j.pid)"; [ -n "$S16" ] && { vf_hyg_stop "$S16"; }
+  RES="$(marq_abs)"; OUV="$([ -s "$OUVERT" ] && echo oui || echo non)"
+}
+leurres_abs
+for spec in "lab-bin-en-tete|$LAB/bin:$PBASE" "lab-bin-en-queue|$PBASE:$LAB/bin"; do
+  nv="${spec%%|*}"; v="${spec#*|}"
+  cycle_abs "$LAUNCH" "$v"
+  assert_eq "L16b — PATH « $nv » : aucun open, xdg-open, ps ni python3 du lab n'est exécuté, et le cockpit s'ouvre quand même avec l'ouvreur absolu" "$RES ouvert=$OUV" "open=0 xdg-open=0 ps=0 python3=0 ouvert=oui"
+done
+# python3 : le lanceur ne fait que le résoudre, il ne l'exécute pas ; le seul python3 est celui du lab -> il est écarté (message, cockpit sans terminal), jamais pris pour bon
+rm -f "$AM" "$SJ" "$OUVERT"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; (cd "$LAB" && PATH="$LAB/bin:$WORK/minbin:$WORK/fauxbin" node "$LAUNCH" open --terminal --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); LRC=$?; S16="$(sj j.pid)"
+assert_eq "L16b — le seul python3 est <lab>/bin/python3 : écarté (« python3 introuvable »), cockpit ouvert sans terminal, code 0" "rc=$LRC dit=$(grep -c 'python3 introuvable' "$LOUT" || true) ouvert=$([ -s "$OUVERT" ] && echo oui || echo non)" "rc=0 dit=1 ouvert=oui"
+[ -n "$S16" ] && vf_hyg_stop "$S16"
+# mutant M-PATH-BRUT : les trois lectures reviennent au PATH brut (et l'ouvreur à l'environnement hérité) -> L16b rougit
+md="$WORK/mut-pathbrut"; rm -rf "$md"; mkdir -p "$md"; cp -R "$MODULE/." "$md/"; cp "$md/scripts/vf-cockpit.mjs" "$md/l.orig"
+sed -i.bak "s/, pathSur())/)/g; s/, env: envEnfant(LABV) }/ }/" "$md/scripts/vf-cockpit.mjs"
+if ! cmp -s "$md/scripts/vf-cockpit.mjs" "$md/l.orig"; then
+  rm -f "$md/l.orig" "$md/scripts/vf-cockpit.mjs.bak"; MR=""
+  for spec in "t|$LAB/bin:$PBASE" "q|$PBASE:$LAB/bin"; do cycle_abs "$md/scripts/vf-cockpit.mjs" "${spec#*|}"; MR="$MR ${spec%%|*}:$RES"; done
+  assert_eq "M-PATH-BRUT — le mutant (PATH brut aux trois lectures) rougit L16b : un ouvreur ou un ps du lab est exécuté" "$([[ "$MR" == *"open=1"* && "$MR" == *"ps=1"* ]] && echo rouge || echo "identique :$MR")" "rouge"
+else assert_eq "M-PATH-BRUT — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+retire_abs
+
 echo "=== L17 — N8 (P71-D-29) : un PATH absent ou entièrement relatif n'est jamais transmis vide à l'assemblage (libuv le lit comme le cwd : le git du lab serait exécuté) ==="
 NODE_ABS="$(command -v node)"
 git_du_lab() { # git_du_lab <nom> <lanceur> <env|point> -> écrit « git=<n> rc=<n> » dans RES ; env = environnement vide (env -i), point = PATH=.
@@ -348,7 +382,7 @@ sans_py "$LAUNCH"
 assert_eq "L19 — témoin : minbin ne porte pas python3" "$PY_OK" "sans"
 assert_eq "L19 — sortie 0, message « Terminal indisponible : python3 introuvable » une fois avec la marche à suivre, jamais « n'a pas démarré »" "$LRC dit=$(grep -c 'Terminal indisponible : python3 introuvable' "$LOUT" || true) marche=$(grep -c 'brew install python' "$LOUT" || true) echec=$(grep -c "n'a pas démarré" "$LOUT" || true)" "0 dit=1 marche=1 echec=0"
 assert_eq "L19 — aucun amorçage posé, aucune page de Q ouverte, serveur démarré SANS terminal, le cockpit lui-même est ouvert" "amorce=$([ -e "$AM" ] && echo oui || echo non) page=$([ -e "$WORK/run/page-ouverte.html" ] && echo oui || echo non) q=${PY19:-?} ouvert=$(grep -c '^http://127.0.0.1:' "$OUVERT" 2>/dev/null || true)" "amorce=non page=non q=aucun ouvert=1"
-if mutant sanspy 's/if (o.terminal \&\& !win \&\& !resoudreBinaire(.python3.)) {/if (false) {/'; then
+if mutant sanspy 's/if (o.terminal \&\& !win \&\& !resoudreBinaire(.python3., pathSur())) {/if (false) {/'; then
   sans_py "$MUT_L"
   assert_eq "M-SANS-PYTHON3 — le mutant (aucune vérification) rougit L19 : le message n'est plus dit" "$([ "$(grep -c 'Terminal indisponible : python3 introuvable' "$LOUT" || true)" = 0 ] && echo rouge || echo identique)" "rouge"
 else assert_eq "M-SANS-PYTHON3 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
@@ -519,7 +553,7 @@ assert_eq "L22 — envDuProcessusTerminal écarte un élément absolu du PATH qu
 
 echo "=== M-OUVRE-NOMNU / M-PS-NOMNU / M-GIT-NOMNU / M-WHO-NOMNU / M-SERVE-OUVRE / M-PS-FINAL — mutants de N2 : résolution par nom nu ==="
 # nom|fichier|sed|marqueur attendu|PATH ('.' = « .: » en tête ; 'min' = PATH sans binaire du système, élément vide final)
-for spec in "ouvrenomnu|vf-cockpit.mjs|s/spawn(exe, op\[1\]/spawn(op[0], op[1]/|open|." "psnomnu|vf-cockpit.mjs|s/execFileSync(ps, /execFileSync('ps', /;s/, env: envEnfant(lab) })/ })/|ps|." "gitnomnu|vf-cockpit-planning.mjs|s/timeout: 10000, env: envEnfant(root) })/timeout: 10000 })/|git|." "whonomnu|vf-cockpit-who.mjs|s/timeout: 10000, env: envEnfant(lab) })/timeout: 10000 })/|git|." "servopen|vf-cockpit.mjs|s/^  args.push('--no-open');.*$/  if (o.avecQ) args.push('--no-open'); else if (o.noOpen) args.push('--no-open');/;s/{ \.\.\.envEnfant(lab), VF_COCKPIT_ENGINE_DIR/{ ...process.env, VF_COCKPIT_ENGINE_DIR/|open|." "psfinal|vf-cockpit.mjs|s/const ps = resoudreBinaire('ps');/const ps = 'ps';/;s/, env: envEnfant(lab) })/ })/|ps|min"; do
+for spec in "ouvrenomnu|vf-cockpit.mjs|s/spawn(exe, op\[1\]/spawn(op[0], op[1]/;s/, env: envEnfant(LABV) })/ })/|open|." "psnomnu|vf-cockpit.mjs|s/execFileSync(ps, /execFileSync('ps', /;s/, env: envEnfant(lab) })/ })/|ps|." "gitnomnu|vf-cockpit-planning.mjs|s/timeout: 10000, env: envEnfant(root) })/timeout: 10000 })/|git|." "whonomnu|vf-cockpit-who.mjs|s/timeout: 10000, env: envEnfant(lab) })/timeout: 10000 })/|git|." "servopen|vf-cockpit.mjs|s/^  args.push('--no-open');.*$/  if (o.avecQ) args.push('--no-open'); else if (o.noOpen) args.push('--no-open');/;s/{ \.\.\.envEnfant(lab), VF_COCKPIT_ENGINE_DIR/{ ...process.env, VF_COCKPIT_ENGINE_DIR/|open|." "psfinal|vf-cockpit.mjs|s/const ps = resoudreBinaire('ps', pathSur());/const ps = 'ps';/;s/, env: envEnfant(lab) })/ })/|ps|min"; do
   IFS='|' read -r mn mf msed mk mp <<< "$spec"
   md="$WORK/mut-$mn"; rm -rf "$md"; mkdir -p "$md"; cp -R "$MODULE/." "$md/"; cp "$md/scripts/$mf" "$md/scripts/$mf.orig"; sed -i.bak "$msed" "$md/scripts/$mf"
   if [ "$mn" = whonomnu ]; then sed -i.bak 's/{ \.\.\.envEnfant(lab), VF_COCKPIT_ENGINE_DIR/{ ...process.env, VF_COCKPIT_ENGINE_DIR/' "$md/scripts/vf-cockpit.mjs"; rm -f "$md/scripts/vf-cockpit.mjs.bak"; fi

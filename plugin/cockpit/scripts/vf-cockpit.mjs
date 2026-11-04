@@ -65,11 +65,15 @@ const adresses = (url) => `Cockpit : ${url}/ (Code) · ${url}/project.html (Proj
 // 67-SECURITY M3 : le lanceur n'exécute JAMAIS un script du lab (serve.mjs de la sortie compris). Arrêt par signal, sur un PID que le fichier
 // d'état du lab (donc non fiable) désigne : entier > 1, ni le nôtre, vivant, et dont la ligne de commande est le serve.mjs de CETTE sortie.
 // Dit UNE fois par processus : estNotre est rappelée à chaque tour d'attente du terminal (100 fois) et l'absence de `ps` ne change pas entre deux appels.
+// N12 (P71-D-29, 2026-11-04) : les binaires du lanceur (ps, ouvreur, python3) sont cherchés dans le PATH ASSAINI du lab (envEnfant : ni vide, ni relatif, ni dossier du lab,
+// y compris absolu : `<lab>/bin` de `npm run` ou de direnv), jamais dans le PATH brut. L'ouvreur reçoit ce même environnement (xdg-open cherche ses auxiliaires dans son PATH).
+// Le shell du terminal garde le PATH d'origine (P71-D-03) : ceci ne concerne que les processus que le lanceur exécute lui-même.
+let LABV = null; const pathSur = () => envEnfant(LABV).PATH;
 let psDit = false;
 function estNotre(pid, serve, lab) {
   if (!Number.isInteger(pid) || pid <= 1 || pid === process.pid || !vivant(pid)) return false;
   if (process.platform === 'win32') return true; // pas de `ps` : le PID vient du fichier d'état, reste borné ci-dessus
-  const ps = resoudreBinaire('ps');
+  const ps = resoudreBinaire('ps', pathSur());
   if (!ps) { if (!psDit) { psDit = true; console.error("arrêt refusé : « ps » est introuvable dans les éléments absolus du PATH, le serveur n'est pas arrêté (un PID du lab n'est jamais signalé sans vérification)."); } return false; }
   try {
     const cmd = execFileSync(ps, ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, env: envEnfant(lab) });
@@ -107,9 +111,9 @@ function ouvrir(url, marche = '', surErreur = null) {
   const op = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
   const dire = (e) => { if (surErreur) surErreur(e); else console.error(`ouverture impossible : « ${op[0]} » ne se lance pas (${(e && e.code) || (e && e.message) || 'erreur'}).${marche ? ' ' + marche : ''}`); };
   try {
-    const exe = resoudreBinaire(op[0]); // N2 : chemin absolu, jamais le nom nu (le cwd est le lab)
+    const exe = resoudreBinaire(op[0], pathSur()); // N2 : chemin absolu, jamais le nom nu (le cwd est le lab)
     if (!exe) { setImmediate(() => dire(Object.assign(new Error(`${op[0]} introuvable dans les éléments absolus du PATH`), { code: 'ENOENT' }))); return; }
-    const enfant = spawn(exe, op[1], { stdio: 'ignore', detached: true });
+    const enfant = spawn(exe, op[1], { stdio: 'ignore', detached: true, env: envEnfant(LABV) });
     enfant.on('error', dire);
     enfant.unref();
   } catch (e) { dire(e); }
@@ -202,7 +206,7 @@ async function main() {
   if (o.aide) { console.log(AIDE); return; }
   const lab = findLabRoot(o.lab || process.cwd());
   if (!lab) { console.error('aucun dossier .planning trouvé : le cockpit se construit dans un lab GSD.'); process.exit(2); }
-  const scriptsDir = resolveScriptsDir(HERE);
+  const scriptsDir = resolveScriptsDir(HERE); LABV = lab;
   const sortie = outputDir(lab);
 
   if (o.verbe === 'status') {
@@ -226,7 +230,7 @@ async function main() {
   if (win) console.error('Terminal indisponible sous Windows.');
   // E4 : le terminal exige python3 (assistant PTY). Résolu comme le fait le serveur (éléments absolus du PATH, chemin absolu) AVANT tout amorçage ou ouverture de Q.
   // Introuvable : message en français avec la marche à suivre, puis le cockpit s'ouvre SANS terminal, code 0 (le cockpit reste utile ; l'échec n'est pas muet).
-  if (o.terminal && !win && !resoudreBinaire('python3')) {
+  if (o.terminal && !win && !resoudreBinaire('python3', pathSur())) {
     console.error("Terminal indisponible : python3 introuvable dans les éléments absolus du PATH. Installez Python 3 (macOS : « xcode-select --install » ou « brew install python » ; Linux : « apt install python3 » ou l'équivalent de votre distribution), puis relancez avec --terminal. Le cockpit s'ouvre sans terminal.");
     o.terminal = false;
   }
