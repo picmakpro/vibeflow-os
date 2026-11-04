@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { masque } from './vf-cockpit-lecture.mjs';
+import { normNum } from './vf-cockpit-planning.mjs';
 
 // un `.git/config` écrit par d'autres peut déclarer un core.fsmonitor exécutable : chaque appel le neutralise (T-68-04)
 export const GIT_SUR = ['-c', 'core.fsmonitor=false'];
@@ -50,3 +51,15 @@ export function retard({ chemin, base, commonDir, now = Date.now(), sh = shDefau
 
 // toute chaîne d'arbre ou de branche qui sort du socle : contrôles retirés (C0, DEL, C1), masque des secrets, borne à n caractères
 export const nettoie = (s, n = 200) => masque(String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, '')).slice(0, n);
+
+// phase active d'un arbre (P68-PL-04), fonction pure : (1) la phase dont le numéro suit le motif fixe `phase-<n>` du nom de branche, si elle existe ;
+// (2) sinon la dernière phase (ordre de la feuille de route) portant une mission `running` ; (3) sinon la dernière phase `en-cours` ; (4) sinon null.
+// Jamais `current_phase` du STATE ni le compartiment actif. Une phase portant le même numéro dans deux compartiments : la première de la feuille de route.
+const PHASE_BRANCHE = /phase-(\d+(?:\.\d+)?)/;
+export function phaseActive({ phases, branche } = {}) {
+  const l = Array.isArray(phases) ? phases : [];
+  const dernier = (f) => l.filter(f).at(-1);
+  const m = PHASE_BRANCHE.exec(String(branche ?? ''));
+  const p = (m && l.find((x) => normNum(x?.n) === normNum(m[1]))) || dernier((x) => x?.avancement?.mission?.etat === 'running') || dernier((x) => x?.avancement?.etat === 'en-cours');
+  return p ? { key: p.key, n: p.n, nom: p.name, etat: p.avancement?.etat } : null;
+}

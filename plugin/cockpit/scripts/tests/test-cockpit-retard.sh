@@ -130,7 +130,8 @@ assert_eq "R3.5 — le dépôt non git rend le repli [root]" "$(G "$(Q arbresGit
 
 echo "=== R4 — phase active ==="
 PH='[{"key":"|1","n":"1","name":"Un","avancement":{"etat":"fait","mission":null}},{"key":"|2","n":"2","name":"Deux","avancement":{"etat":"a-faire","mission":null}},{"key":"|3","n":"3","name":"Trois","avancement":{"etat":"en-cours","mission":{"nom":"M3","etat":"running"}}},{"key":"|4","n":"4","name":"Quatre","avancement":{"etat":"en-cours","mission":null}}]'
-PA() { G "$(Q phaseActive "[{\"phases\":$1,\"branche\":\"$2\"}]")" "$3"; }
+# le JSON est assemblé dans une variable : bash 3.2 mal-analyse des guillemets imbriqués dans $( )
+PA() { local a="[{\"phases\":$1,\"branche\":\"$2\"}]"; local r; r="$(Q phaseActive "$a")"; G "$r" "$3"; }
 assert_eq "R4.1 — branche feat/phase-2-x et phase 2 connue : phase 2" "$(PA "$PH" feat/phase-2-x 'j.n+"|"+j.nom+"|"+j.etat+"|"+j.key')" "2|Deux|a-faire||2"
 assert_eq "R4.2 — branche main : la phase à mission running (3)" "$(PA "$PH" main 'j.n')" "3"
 PH2='[{"key":"|1","n":"1","name":"Un","avancement":{"etat":"fait","mission":null}},{"key":"|4","n":"4","name":"Quatre","avancement":{"etat":"en-cours","mission":{"nom":"M","etat":"abandonnee"}}}]'
@@ -139,7 +140,8 @@ PH3='[{"key":"|1","n":"1","name":"Un","avancement":{"etat":"fait","mission":null
 assert_eq "R4.4 — rien d'actif : null" "$(PA "$PH3" main 'j')" "null"
 assert_eq "R4.5 — branche phase-9 inconnue : repli sur la mission running" "$(PA "$PH" feat/phase-9-y 'j.n')" "3"
 assert_eq "R4.6 — numéro à zéro de tête (phase-02) : phase 2" "$(PA "$PH" feat/phase-02-x 'j.n')" "2"
-assert_eq "R4.7 — un STATE qui pointe une autre phase n'a aucun effet" "$(G "$(Q phaseActive "[{\"phases\":$PH,\"branche\":\"main\",\"current_phase\":\"1\",\"state\":{\"current_phase\":\"1\"}}]")" 'j.n')" "3"
+A47="[{\"phases\":$PH,\"branche\":\"main\",\"current_phase\":\"1\",\"state\":{\"current_phase\":\"1\"}}]"; R47="$(Q phaseActive "$A47")"
+assert_eq "R4.7 — un STATE qui pointe une autre phase n'a aucun effet" "$(G "$R47" 'j.n')" "3"
 assert_eq "R4.8 — le résultat ne porte que key, n, nom, etat" "$(PA "$PH" main 'Object.keys(j).join(",")')" "key,n,nom,etat"
 
 echo "=== R5 — aucun réseau ==="
