@@ -28,6 +28,15 @@ export function collectSignal(root, { home, now = Date.now(), scriptsDir } = {})
   const verrous = lireVerrous(root, { scriptsDir, home }); // une seule lecture, partagée par tous les arbres
   const P = readPlanning(root, layout, { verrous });
   const phases = [...P.phases.values()].filter((p) => !p.archive);
+  const base = brancheBase(root), common = gitCommonDir(root), tous = arbresGit(root);
+  const arbres = tous.map((a) => {
+    const pl = meme(a.chemin, root) ? P : readPlanning(a.chemin, planningLayout(a.chemin), { verrous }); // le dossier commun des verrous est le même pour tous les arbres
+    const actifs = [...pl.phases.values()].filter((p) => !p.archive);
+    return {
+      label: a.principal ? 'arbre principal' : nettoie(path.relative(tous[0].chemin, a.chemin) || a.chemin, 200), branche: nettoie(a.branche, 80), principal: a.principal, courant: meme(a.chemin, root),
+      phaseActive: phaseActive({ phases: actifs, branche: a.branche }), retard: retard({ chemin: a.chemin, base, commonDir: common, now }),
+    };
+  });
   return {
     schema: SCHEMA,
     at: new Date(now).toISOString(),
@@ -41,6 +50,8 @@ export function collectSignal(root, { home, now = Date.now(), scriptsDir } = {})
       ...(ETATS_AVEC_NOEUDS.has(d.etat) ? { noeuds: d.nodes.map(noeud) } : {}),
     })),
     verrous: { etat: verrous.etat, plat: verrous.plat, liste: verrous.liste.map(verrou) },
+    arbres,
+    equipe: collectWho(root, { home, now, scriptsDir }),
   };
 }
 

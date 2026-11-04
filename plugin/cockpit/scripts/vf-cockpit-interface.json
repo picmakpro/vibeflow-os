@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Contrat versionné des sorties JSON du socle du cockpit VibeFlow (P67-D-12) et des clés internes de Claude Code dont il dépend.",
+  "description": "Contrat versionné des sorties JSON du socle du cockpit VibeFlow (P67-D-12), lu par vf-signal par l'émetteur signal@1 (P68-D-15), et des clés internes de Claude Code dont il dépend.",
   "avancement": {
     "version": 2,
     "description": "objet posé par readPlanning sur chaque phase ; lu par vf-signal par l'émetteur signal@1 ; version 2 : état de mission abandonnee et inconnu, champ mission.vie (P68-D-16, P68-D-23)",
@@ -11,6 +11,18 @@
     "vie": { "requis": { "tenu": "boolean", "stale": "any", "progressAgeS": "any", "ttl": "any" } }
   },
   "schemas": {
+    "vibeflow/cockpit-signal@1": {
+      "requis": { "schema": "string", "at": "string", "root": "string", "projet": "string", "layout": "object", "phases": "array", "jalons": "array", "missions": "array", "verrous": "object", "arbres": "array", "equipe": "object" },
+      "phase": { "requis": ["key", "n", "ws", "nom", "fait", "avancement", "libelle"], "optionnels": [] },
+      "jalon": { "requis": ["key", "icone", "texte", "ws", "phases"], "optionnels": [] },
+      "mission": { "requis": ["nom", "fichier", "phaseKey", "ws", "etat", "libelle", "vie"], "optionnels": ["noeuds"] },
+      "noeud": { "requis": ["id", "status", "step", "stage", "deps"], "optionnels": [] },
+      "verrou": { "requis": ["ws", "scope", "phase", "tenu", "stale", "ageS", "ttl", "progressAgeS", "owner"], "optionnels": [] },
+      "arbre": { "requis": ["label", "branche", "principal", "courant", "phaseActive", "retard"], "optionnels": [] },
+      "retard": { "requis": ["base", "main", "origin", "fetchAgeS"], "optionnels": [] },
+      "etatsVerrous": ["lue", "absente", "erreur"],
+      "interdits": ["doing", "mandat", "messages", "outils"]
+    },
     "vibeflow/cockpit-who@2": {
       "requis": { "at": "string", "root": "string", "trees": "array", "fresh": "number", "fenetre": "number", "busy": "boolean", "workers": "array", "sources": "object" },
       "travailleur": {
