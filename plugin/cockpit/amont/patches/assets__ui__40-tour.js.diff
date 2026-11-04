@@ -73,8 +73,9 @@
      const ext = tops.filter((n) => n.kind === 'external');
      if (ext.length) {
        steps.push({
-         ref: ext.length === 1 ? 'n:' + ext[0].id : 'root', kicker: 'Outside services', title: ext.length === 1 ? ext[0].label : `${ext.length} outside services`,
+-        ref: ext.length === 1 ? 'n:' + ext[0].id : 'root', kicker: 'Outside services', title: ext.length === 1 ? ext[0].label : `${ext.length} outside services`,
 -        note: ext.length === 1 ? clip(ext[0].summary, 200) : `It also relies on ${listOf(ext.slice(0, 6).map((n) => n.label))}${ext.length > 6 ? ` and ${ext.length - 6} more` : ''}. They sit at the edge of the map; the lines show which parts talk to them.`,
++        ref: ext.length === 1 ? 'n:' + ext[0].id : 'root', lit: ext.length === 1 ? undefined : ext.slice(0, 6).map((n) => 'n:' + n.id), kicker: 'Outside services', title: ext.length === 1 ? ext[0].label : `${ext.length} outside services`,
 +        note: ext.length === 1 ? clip(ext[0].summary) : `It also relies on ${listOf(ext.slice(0, 6).map((n) => n.label))}${ext.length > 6 ? ` and ${ext.length - 6} more` : ''}. They sit at the edge of the map; the lines show which parts talk to them.`,
        });
      }
@@ -94,7 +95,7 @@
    }
  
    // ---------- card ----------
-@@ -87,30 +95,102 @@
+@@ -87,30 +95,104 @@
    let steps = [], at = -1;
    const active = () => at >= 0;
  
@@ -134,8 +135,9 @@
 +    const all = [...svg.querySelectorAll('g.node')].map(box).filter((x) => x.w > 0 && x.h > 0);
 +    const U = all.length ? { l: Math.min(...all.map((x) => x.l)), t: Math.min(...all.map((x) => x.t)), r: Math.max(...all.map((x) => x.r)), b: Math.max(...all.map((x) => x.b)) } : r;
 +    const cx = (r.l + r.r) / 2, cy = (r.t + r.b) / 2, zw = z.r - z.l, zh = z.b - z.t;
-+    let f = Math.max(1, Math.min(1.6, zw * 0.45 / r.w, zh * 0.45 / r.h)); // in on a small card...
-+    f = Math.min(f, Math.max(1, Math.min(F.w ? (F.r - F.l) / (U.r - U.l) : 1, (F.b - F.t) / (U.b - U.t)))); // ...not past the point where the whole map no longer fits
++    const narrow = innerWidth < 701; // on a phone the whole map is tiny: a small card is zoomed until it can be read, and the rest of the map may leave the screen
++    let f = Math.max(1, Math.min(narrow ? 4 : 1.6, zw * (narrow ? 0.6 : 0.45) / r.w, zh * (narrow ? 0.6 : 0.45) / r.h)); // in on a small card...
++    if (!narrow) f = Math.min(f, Math.max(1, Math.min(F.w ? (F.r - F.l) / (U.r - U.l) : 1, (F.b - F.t) / (U.b - U.t)))); // ...not past the point where the whole map no longer fits
 +    f = Math.min(f, 0.92 * zw / r.w, 0.92 * zh / r.h); // ...and out on a card wider than its zone: it must fit whole
 +    const wheel = (o) => svg.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaMode: 0, ...o }));
 +    // where things land after the zoom (around the card's centre) and the move that centres the card
@@ -160,7 +162,7 @@
 +    const slow = SC.state.container !== 'root' || vp.classList.contains('anim'); // the map is about to move on its own: wait for it before measuring
 +    ring(null);
 +    if (!s.ref || s.ref === 'root') {
-+      SC.go('root', { select: null });
++      SC.go('root', { select: null, after: () => { if (s.lit?.length) { document.getElementById('svg').classList.add('dim'); for (const id of s.lit) SC.state.chipEls?.get(id)?.classList.add('hl'); } } }); // a step about several cards lights them all
 +      if (at > 0) later(() => SC.fit(true), slow ? 650 : 60);
 +    } else {
 +      // nothing is selected: the details panel keeps showing the overview, the card is lit with the viewer's own highlight (hl on the card, dim on the rest)
@@ -174,7 +176,8 @@
      const s = steps[at], last = at === steps.length - 1;
 -    const tip = last ? `Replay this tour any time from <b>Start here</b> at the top.${window.FloorplanScreens ? ' <b>Screens</b> shows everything behind any page.' : ''}` : '';
 +    const tb = document.getElementById('tour-btn'); // on a phone the button sits behind the « ⋯ » menu, not at the top
-+    const tip = last ? `${tb && tb.offsetParent === null ? 'Replay this tour any time from <b>⋯ › Start here</b>.' : 'Replay this tour any time from <b>Start here</b> at the top.'}${window.FloorplanScreens ? ' <b>Screens</b> shows everything behind any page.' : ''}` : '';
++    const bl = tb && tb.querySelector('.bl'), iconOnly = bl && getComputedStyle(bl).display === 'none'; // under 1 600 px the button shows its icon only
++    const tip = last ? `${tb && tb.offsetParent === null ? 'Replay this tour any time from <b>⋯ › Start here</b>.' : iconOnly ? 'Replay this tour any time from <b>the tour button (icon)</b> at the top.' : 'Replay this tour any time from <b>Start here</b> at the top.'}${window.FloorplanScreens ? ' <b>Screens</b> shows everything behind any page.' : ''}` : '';
      card.innerHTML = `<button class="btn icon tx" data-x title="Close (Esc)">${SC.iconI('x')}</button>
 -      <div class="tk"><span>Start here</span><i></i><span>${at + 1} of ${steps.length}</span>${s.kicker ? `<i></i><span>${h(s.kicker)}</span>` : ''}</div>
 -      <div class="tt">${h(s.title)}</div>${s.note ? `<div class="tn">${h(s.note)}</div>` : ''}${tip ? `<div class="tip">${tip}</div>` : ''}
@@ -207,7 +210,7 @@
      const ask = document.getElementById('ask');
      if (ask) {
        const a = ask.getBoundingClientRect(), c = card.getBoundingClientRect();
-@@ -118,33 +198,45 @@
+@@ -118,33 +200,46 @@
        if (a.width && a.left < 16 + c.width + 12 && top < innerHeight) bottom = Math.max(bottom, innerHeight - top + 12);
      }
      card.style.bottom = Math.min(bottom, Math.max(76, innerHeight - card.offsetHeight - 80)) + 'px';
@@ -246,9 +249,8 @@
 +    if (SC.state.container === 'root') { SC.select(null); if (refit) SC.fit(true); }
 +    else if (refit) SC.go('root', { select: null, after: () => SC.fit(true) });
    }
--  function start() {
-+  function start(manual) {
-+    if (!manual && G.meta?.vfTab === 'equipe') return; // the Team tab has no tour of its own (its map is live sessions, not a codebase): it never opens by itself, whatever the timing
+   function start() {
++    if (G.meta?.vfTab === 'equipe') return; // the Team tab has no tour of its own (its map is live sessions, not a codebase): it never opens, by itself or by the button
      steps = buildSteps();
      if (steps.length < 2) { SC.toast('There is not enough on this map for a tour yet.'); return; }
      SC.store.set(SEEN, true);
@@ -256,11 +258,12 @@
    }
  
 -  const tourBtn = SC.addHeaderButton({ id: 'tour-btn', label: 'Start here', icon: 'home', title: 'A one-minute tour of this codebase', onClick: () => (active() ? end() : start()) });
-+  const tourBtn = SC.addHeaderButton({ id: 'tour-btn', label: 'Start here', icon: 'home', title: 'A one-minute tour of this codebase', onClick: () => (active() ? end() : start(true)) });
++  const tourBtn = SC.addHeaderButton({ id: 'tour-btn', label: 'Start here', icon: 'home', title: isProject() ? 'A one-minute tour of this project' : 'A one-minute tour of this codebase', onClick: () => (active() ? end() : start()) });
++  if (G.meta?.vfTab === 'equipe') { tourBtn.setAttribute('aria-disabled', 'true'); tourBtn.title = 'There is no tour for the Team tab'; tourBtn.style.opacity = '0.5'; tourBtn.style.cursor = 'default'; } // the Team tab has no tour designed: the button says so and does nothing
    const ic = tourBtn.querySelector('svg');
    if (ic) ic.innerHTML = '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8z"/>'; // compass
    window.addEventListener('keydown', (ev) => {
-@@ -154,7 +246,7 @@
+@@ -154,7 +249,7 @@
      else if (!SC.state.flow && ev.key === 'ArrowLeft') { ev.stopPropagation(); ev.preventDefault(); back(); }
    }, true);
    // a guided flow takes over the canvas: step aside
