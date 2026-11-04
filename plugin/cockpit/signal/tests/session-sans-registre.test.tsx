@@ -55,6 +55,8 @@ function lab(on: On, registre: string | null): Espion {
   on('tool.call', () => ({ result: {} }))
   on('agent.spawn', () => ({ model: 'm', agentId: 'ag1' }))
   on('command.run', () => ({ text: 'engine' }))
+  on('skill.prompt', (_, e) => ({ text: e.text }))
+  on('classic.PreToolUse', () => ({ deny: 'refus du garde' }))
   return sp
 }
 
@@ -66,6 +68,13 @@ async function tour($: any) {
   await $.agent.spawn({ tool_use_id: 'u2', prompt: 'p', description: 'd', subagentType: 'vf-coder' })
   await $.turn.complete({ answer: '', durationMs: 1000, isAborted: false, turnId: 't1', reason: 'end_turn' })
   await $.command.run({ command: 'vf-signal', args: 'brief' })
+  await skillEtGarde($)
+}
+
+/** `skill.prompt` (pose le temps de la boucle) et `classic.PreToolUse` refusé (enregistre un refus) : chacun écrit de l'état quand le mod est actif. */
+async function skillEtGarde($: any) {
+  await $.skill.prompt({ skill: 'plan-phase', text: 'x', frontmatter: {}, source: 'plugin' })
+  await $.tool.call({ tool: 'Bash', tool_use_id: 'u3', command: 'ls' }) // PreToolUse passe par $.tool.call (le garde classique refuse)
 }
 
 const PROPRIETES: [string, string, (sp: Espion) => unknown, unknown][] = [
@@ -103,3 +112,14 @@ test("FX-1d — avec cockpit= : le même tour fait travailler le mod (le témoin
   expect(sp.ecritures).toBeGreaterThan(0)
   expect(sp.agentList).toBeGreaterThan(0)
 })
+
+for (const [id, dit] of [['FX-1i', 'sans'], ['FX-1j', 'avec']] as const) {
+  test(`FX-1${id === 'FX-1i' ? 'i' : 'j'} — ${dit} cockpit= : skill.prompt et classic.PreToolUse ${dit === 'sans' ? "n'écrivent aucun état" : 'écrivent de l’état (le témoin n’est pas vide)'}`, async ($, on) => {
+    const sp = lab(on, dit === 'sans' ? 'conductor=v1.0.0\n' : 'cockpit=v1.2.0\n')
+    await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+    const avant = sp.ecritures
+    await skillEtGarde($)
+    if (dit === 'sans') expect(sp.ecritures - avant).toBe(0)
+    else expect(sp.ecritures - avant).toBeGreaterThan(1)
+  })
+}
