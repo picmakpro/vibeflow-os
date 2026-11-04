@@ -42,7 +42,7 @@ export async function pane($: EngineInterface, e: PaneInput, blink: boolean, hom
   const now = await $.clock.now()
   const width = Math.max(24, e.props.bodyColumns - 1)
   const compact = e.props.placement === 'inline' || width < 48
-  const ctx: Ctx = { ui, width, compact, now, blink, d, m, l, roster: agents, stats: agentStats, r, alert, u }
+  const ctx: Ctx = { ui, width, compact, now, blink, s: sig, d, m, l, roster: agents, stats: agentStats, r, alert, u }
   const action = attention(d, l, r, alert, u)
   const currentIndex = l.stage ? STAGES.indexOf(l.stage) : -1
   const cursor = l.isWorking ? (blink ? G.current : ' ') : G.done

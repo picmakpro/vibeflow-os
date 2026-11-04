@@ -2,7 +2,7 @@
 
 import { C } from '../ds'
 import type { UI } from '../ds'
-import type { AgentStat, Disk, Loop, Macro, Refusal, RosterAgent, Usage } from '../../types'
+import type { AgentStat, Disk, Loop, Macro, Refusal, RosterAgent, Signal, Usage } from '../../types'
 
 /** Ce qu'une vue lit. L'engine (`$`) voyage à part : il n'entre dans aucun objet. */
 export type Ctx = {
@@ -12,6 +12,8 @@ export type Ctx = {
   compact: boolean
   now: number
   blink: boolean
+  /** Ce que l'émetteur du socle a rendu ; null avant la première lecture ou après un échec. */
+  s: Signal | null
   d: Disk | null
   m: Macro | null
   l: Loop

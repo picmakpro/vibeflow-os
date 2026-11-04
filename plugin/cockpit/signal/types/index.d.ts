@@ -129,13 +129,27 @@ export type Usage = {
 }
 
 /** Miroir des champs lus de `vibeflow/cockpit-signal@1` (le schéma est celui de `cockpit/scripts/vf-cockpit-interface.json`). */
-export type SignalMission = { nom: string; etat: string; libelle: string }
+export type SignalNoeud = { id: string; status: string; step: string; stage: string; deps: string[] }
+export type SignalMission = { nom: string; etat: string; libelle: string; noeuds?: SignalNoeud[] }
 export type SignalPhase = {
   key: string
   n: string
   nom: string
+  fait: boolean
   libelle: string
-  avancement: { etat: string; mission: { nom: string; etat: string } | null }
+  avancement: { etat: string; plans: { faits: number; total: number }; mission: { nom: string; etat: string } | null }
+}
+export type SignalJalon = { key: string; icone: string; texte: string; ws: string | null; phases: string[] }
+export type SignalVerrou = {
+  ws: string | null
+  scope: string
+  phase: string | null
+  tenu: boolean
+  stale: boolean | null
+  ageS: number | null
+  ttl: number | null
+  progressAgeS: number | null
+  owner: string | null
 }
 export type SignalRetard = { base: string; main: number | null; origin: number | null; fetchAgeS: number | null }
 export type SignalArbre = {
@@ -148,10 +162,12 @@ export type SignalArbre = {
 }
 export type Signal = {
   schema: string
+  projet: string
   layout: { forme: string; actif: string | null }
   phases: SignalPhase[]
+  jalons: SignalJalon[]
   missions: SignalMission[]
-  verrous: { etat: string }
+  verrous: { etat: string; liste: SignalVerrou[] }
   arbres: SignalArbre[]
 }
 
