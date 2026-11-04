@@ -34,3 +34,21 @@ donne « no implementation for process.run » (le rejet se simule par `{ deny }`
 Pour que le rouge reste celui des tests tels que livrés, ils ont été rejoués sur l'arbre d'avant le code :
 `git archive 4c9caa26 plugin` dans le scratchpad, tests corrigés par-dessus, `claude plugin test plugin` : **8 pass, 9 fail** (K1 K2 K3 K4 K5 K6 K9 K13 K14),
 `verdict.sh … echec` = 0 pour les neuf. La retouche de `vf-signal.test.tsx` est verte avant le code comme après.
+
+## Annexe tâche 2 — rouge de l'en-tête complet (témoins commités avant le code)
+
+Arbre : `git rev-parse` du commit des témoins = tête `test(68-05): témoins du retard…`, avant `en-tete.tsx` complet. `claude plugin test plugin`
+(sortie scratchpad `68-05-t2-rouge.out`) : **18 pass, 7 fail**. Rouges pour la bonne raison (l'assertion de la ligne neuve rend `Received: undefined` ; le reste de l'en-tête de la tâche 1 est vert) :
+
+| Témoin | Assertion | Attendu | Obtenu |
+|--------|-----------|---------|--------|
+| K7 | `find Text /en retard de 3 commits sur main, dernier fetch il y a 2 h/` | defined | undefined |
+| K8 | `find Text /mission MISSION-68 · abandonnée, nœuds non refermés/` | defined | undefined |
+| K10 | `find Text /phase 68 Embarquer le mod \(en cours\) · retard 3/` (placement inline) | defined | undefined |
+| K11 | `find Text /mission MISSION-70 · état inconnu/` | defined | undefined |
+| K15 | `find Text /en retard de 1 commit sur main, … · origin\/main local : en retard de 2/` | defined | undefined |
+| K16 | `find Text /en retard de 3 commits sur main, aucun fetch connu/` | defined | undefined |
+
+`verdict.sh … echec` rend 0 pour K7 K8 K10 K11 K15 K16. K17 (arbre à jour : aucune ligne `en retard`, phase toujours là) est verte avant le code : c'est un garde, non un témoin de comportement neuf ;
+sa preuve est le mutant « la ligne de retard s'écrit toujours » (annexe mutants). Un `the file ran to its end` en échec accompagne les rouges : conséquence des panes non démontées après une assertion tombée, il disparaît au vert.
+Ajouts au plan (ids K10 à K17 hors liste K1-K9 du plan, K5, K13, K14 aussi) : compact, mission inconnue (P68-D-23), singulier/origine, absence de fetch, arbre à jour, schéma, délai, appel unique.
