@@ -90,7 +90,7 @@ export async function pane($: EngineInterface, e: PaneInput, blink: boolean, hom
         {body}
         {action ? (
           <Text color={pal['st-active']} wrap="wrap">
-            {G.human} {action}
+            {G.human} toi · {action}
           </Text>
         ) : null}
         {noteAncienMod}

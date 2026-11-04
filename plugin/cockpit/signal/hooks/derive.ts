@@ -1,7 +1,7 @@
 // Lectures dérivées : l'ordre d'exécution du DAG, le temps de la boucle, la
 // prochaine action humaine, le brief Markdown.
 
-import { STAGE_LABEL, age } from './ds'
+import { STAGE_LABEL, age, oneLine, statutNoeud, titreCourt } from './ds'
 import type { AgentStat, DagNode, Loop, Refusal, RosterAgent, Signal, SignalArbre, SignalJalon, SignalMission, SignalVerrou, Stage, Usage } from '../types'
 
 // Quel temps de la boucle un agent ou un skill signale. Premier motif qui matche.
@@ -103,6 +103,9 @@ export function jalonCourant(s: Signal | null): SignalJalon | null {
   return key ? (s!.jalons.find(j => j.phases.includes(key)) ?? null) : null
 }
 
+/** « <clé> · <titre court> » : la ligne de jalon de l'en-tête et du brief, une ligne, jamais le texte brut du ROADMAP (R6). */
+export const jalonLigne = (j: SignalJalon): string => `${oneLine(j.key)} · ${titreCourt(j.texte)}`
+
 /** Le premier verrou de driver périmé de `signal@1`, ou null. */
 export const verrouPerime = (s: Signal | null): SignalVerrou | null => s?.verrous.liste.find(k => k.stale === true) ?? null
 
@@ -120,19 +123,21 @@ export function attention(sig: Signal | null, l: Loop, r: Refusal[], alert: stri
   const mis = missionCourante(sig)
   const nodes = sansHote(mis) ? [] : (mis!.noeuds ?? [])
   const failed = nodes.find(isFailed)
-  if (failed) return `nœud ${failed.status} · ${failed.step || failed.id}`
+  if (failed) return `nœud ${statutNoeud(failed.status)} · ${failed.step || failed.id}`
   const node = humanNode(nodes)
   if (node) return `arbitrage attendu · ${node.step}`
   if (u?.percent != null && u.percent >= 85) return `contexte à ${u.percent} % · compacter ?`
   return null
 }
 
-export function brief(sig: Signal | null, l: Loop, roster: RosterAgent[], stats: Record<string, AgentStat>, r: Refusal[], u: Usage | null): string {
+export function brief(sig: Signal | null, l: Loop, roster: RosterAgent[], stats: Record<string, AgentStat>, r: Refusal[], u: Usage | null, erreur: string | null = null): string {
   const lines: string[] = ['# vf-signal — état de la boucle', '']
+  // la cause que la pane dit en tête (`erreurSocle`) : sans elle, un brief vide ne dit pas pourquoi (R4)
+  if (erreur) lines.push(`- socle : ${oneLine(erreur)}`)
   if (sig) {
     lines.push(`- projet : ${sig.projet}`)
     const jalon = jalonCourant(sig)
-    lines.push(`- compartiment : ${sig.layout.actif ?? 'racine'}${jalon ? ` · jalon : ${jalon.texte}` : ''}`)
+    lines.push(`- compartiment : ${sig.layout.actif ?? 'racine'}${jalon ? ` · jalon : ${jalonLigne(jalon)}` : ''}`)
     const active = arbreCourant(sig)?.phaseActive ?? null
     const phase = active ? sig.phases.find(p => p.key === active.key) : undefined
     lines.push(active ? `- phase ${active.n} · ${active.nom}${phase ? ` · ${phase.libelle}` : ''}` : '- aucune phase en cours')
@@ -166,7 +171,7 @@ export function brief(sig: Signal | null, l: Loop, roster: RosterAgent[], stats:
   if (sig) {
     for (const j of sig.jalons) {
       const faites = j.phases.filter(k => sig.phases.find(p => p.key === k)?.fait).length
-      lines.push(`- jalon ${j.texte} : ${faites}/${j.phases.length} phases`)
+      lines.push(`- jalon ${jalonLigne(j)} : ${faites}/${j.phases.length} phases`)
     }
   }
   return lines.join('\n')

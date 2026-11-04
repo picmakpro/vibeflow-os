@@ -4,8 +4,8 @@
 import { atom, read } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import { jalonCourant } from './derive'
-import { G, age, oneLine, type UI } from './ds'
+import { jalonCourant, jalonLigne } from './derive'
+import { G, age, libelleEtat, nomArbre, oneLine, type UI } from './ds'
 import { couleurEtat, palette } from './tokens'
 import type { Signal, SignalArbre, SignalRetard } from '../types'
 
@@ -15,17 +15,17 @@ const theme = atom({ plugin: 'vibeflow', key: 'theme' } as const, 'sombre')
 
 const courant = (s: Signal): SignalArbre | null => s.arbres.find(a => a.courant) ?? null
 
-/** « phase <n> <nom> » et son libellé d'avancement (sans parenthèses) pour un arbre, ou « aucune phase en cours ». */
-function phaseParts(s: Signal, a: SignalArbre): { debut: string; lib: string | null } {
+/** « phase <n> <nom> » et son libellé d'avancement (sans parenthèses) pour un arbre, ou « aucune phase en cours ».
+ * Libellé et couleur viennent de la même source, l'état de la phase dans CET arbre (`phaseActive.etat`), jamais du ROADMAP de l'arbre courant (R1). */
+function phaseParts(a: SignalArbre): { debut: string; lib: string | null } {
   const p = a.phaseActive
   if (!p) return { debut: 'aucune phase en cours', lib: null }
-  const lib = s.phases.find(x => x.key === p.key)?.libelle
-  return { debut: `phase ${oneLine(p.n)} ${oneLine(p.nom)}`, lib: lib ? oneLine(lib) : null }
+  return { debut: `phase ${oneLine(p.n)} ${oneLine(p.nom)}`, lib: libelleEtat(p.etat) }
 }
 
 /** « phase <n> <nom> (<libellé d'avancement>) » ou « aucune phase en cours » pour un arbre. */
-function phaseDe(s: Signal, a: SignalArbre): string {
-  const { debut, lib } = phaseParts(s, a)
+function phaseDe(a: SignalArbre): string {
+  const { debut, lib } = phaseParts(a)
   return lib ? `${debut} (${lib})` : debut
 }
 
@@ -54,7 +54,7 @@ export function resumeCompact(s: Signal | null): string {
   const a = s ? courant(s) : null
   if (!s || !a) return 'phase ?'
   const r = a.retard
-  return `${phaseDe(s, a)}${pos(r?.main) ? ` · retard ${r!.main}` : ''}`
+  return `${phaseDe(a)}${pos(r?.main) ? ` · retard ${r!.main}` : ''}`
 }
 
 /** La ligne d'erreur du socle, ou rien. */
@@ -79,13 +79,13 @@ export async function enTete($: EngineInterface, ui: UI, cursor: string): Promis
   return (
     <Box flexDirection="column">
       <Text color={p.text} wrap="wrap">{`${cursor} ${s?.layout.actif ?? 'lab'}`}</Text>
-      {jalon ? <Text color={p['text-2']} wrap="wrap">{`jalon ${oneLine(jalon.texte)}`}</Text> : null}
+      {jalon ? <Text color={p['text-2']} wrap="wrap">{`jalon ${jalonLigne(jalon)}`}</Text> : null}
       {retard ? <Text color={p['st-active']} wrap="wrap">{retard}</Text> : null}
       {(s?.arbres ?? []).map(t => {
-        const { debut, lib } = phaseParts(s!, t)
+        const { debut, lib } = phaseParts(t)
         return (
           <Text color={t.courant ? p.text : p['text-2']} wrap="wrap">
-            {`${t.courant ? G.current : G.todo} ${oneLine(t.label)} · ${oneLine(t.branche)} · ${debut}${lib ? ' ' : ''}`}
+            {`${t.courant ? G.current : G.todo} ${oneLine(nomArbre(t.label))} · ${oneLine(t.branche)} · ${debut}${lib ? ' ' : ''}`}
             {lib ? <Text color={couleurEtat(t.phaseActive?.etat, p)}>{`(${lib})`}</Text> : null}
           </Text>
         )

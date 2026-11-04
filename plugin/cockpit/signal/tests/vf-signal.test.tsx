@@ -245,7 +245,7 @@ test("R6-J1 — l'en-tête dit le jalon de la phase active de l'arbre courant (P
   moteur(on)
   await demarrer($)
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect(await ui.find({ type: 'Text', text: /jalon Jalon d essai/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /jalon v1 · Jalon d essai/ })).toBeDefined()
   await ui.unmount()
 })
 
@@ -284,7 +284,7 @@ test("R6-A1 — mission vivante avec un nœud en échec : le bandeau le dit", as
   moteur(on)
   await demarrer($)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  expect(await ui.find({ type: 'Text', text: /nœud failed · exécution/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /nœud en échec · exécution/ })).toBeDefined()
   await ui.unmount()
 })
 

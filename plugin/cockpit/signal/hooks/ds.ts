@@ -61,3 +61,29 @@ export function nettoyer<T>(v: T): T {
   if (v !== null && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, nettoyer(x)])) as T
   return v
 }
+
+/** L'avancement d'une phase, dit en français (les états de `phaseActive.etat` ; le socle les libelle de même). Inconnu : null, rien d'inventé. */
+const LIBELLE_ETAT: Record<string, string> = { 'a-faire': 'à faire', 'en-cours': 'en cours', 'a-recetter': 'à recetter', fait: 'fait' }
+export const libelleEtat = (etat: string | null | undefined): string | null => LIBELLE_ETAT[etat ?? ''] ?? null
+
+/** Le statut d'un nœud de DAG, dit en français ; un statut hors table reste tel que le DAG l'écrit. La couleur reste celle des tokens. */
+const STATUT_NOEUD: Record<string, string> = {
+  blocked: 'bloqué', failed: 'en échec', error: 'en erreur', red: 'rouge', pending: 'en attente', ready: 'prêt',
+  running: 'en cours', inprogress: 'en cours', started: 'en cours', active: 'en cours', done: 'fait', complete: 'fait', completed: 'fait', skipped: 'ignoré', skip: 'ignoré',
+}
+export const statutNoeud = (status: string): string => STATUT_NOEUD[status.trim().toLowerCase().replace(/[-_ ]+/g, '')] ?? status
+
+/** Le nom d'un arbre de travail : son chemin relatif au dépôt tel quel, le nom de son dossier s'il est hors du dépôt (`../…` ou absolu). */
+export function nomArbre(label: string): string {
+  if (!/^(\.\.(\/|$)|\/)/.test(label)) return label
+  return label.split('/').filter(Boolean).pop() ?? label
+}
+
+/** Le titre court d'un jalon : son premier segment (« — ») qui n'est pas une plage de phases, sans markdown, coupé entre deux mots. */
+export function titreCourt(texte: string, max = 40): string {
+  const segs = oneLine(texte.replace(/\*\*|__|`/g, '')).split(' — ').filter(Boolean)
+  const t = segs.find(x => !/^phases?\b/i.test(x)) ?? segs[0] ?? ''
+  if (t.length <= max) return t
+  const coupe = t.slice(0, max + 1).lastIndexOf(' ')
+  return `${t.slice(0, coupe > 0 ? coupe : max).trimEnd()}…`
+}
