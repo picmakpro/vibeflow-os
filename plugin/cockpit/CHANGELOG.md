@@ -1,5 +1,32 @@
 # Changelog — cockpit
 
+## v1.2.0 — 2026-11-04
+
+Phase 68 (vf-signal embarqué, socle partagé). Module monté seul ; le bump racine est reporté à la release groupée (P68-D-31 :
+arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04, « Module seul, racine groupée (Recommandé) »).
+Publiée dans VibeFlow vX.Y.Z (mention à compléter par le geste de release groupée). Autres décisions : P68-D-08 et P68-D-21
+(arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-03).
+
+### Ajouté
+- **Mod vf-signal embarqué** : pane terminal affichée par Claude Code, gatée (elle ne s'affiche que si `cockpit=` est posé), bouton
+  « Ouvrir le cockpit ».
+- **Émetteur `signal@1`** : état du travail publié pour la pane (mission vivante, retard sur la base, worktrees).
+- **Socle partagé** : calcul de la vie d'une mission (`mission.vie`), lecture des arbres git (`arbresGit`) et émetteur, communs au cockpit et au mod.
+- **Cascade de vie (P68-D-33)** : verrou de phase, puis verrou du compartiment, puis verrou de dépôt (et l'ancien `.planning/DRIVER.lock`),
+  sinon `abandonnee` ; une source illisible donne `inconnu`.
+- **Lanceur et repli de l'élagage (P68-D-34)** : le mod n'exécute aucun fichier dont le realpath est sous le lab ; lanceur pris dans le
+  compte (`~/.claude/scripts`) puis dans le plugin, le repli `driver-lock.sh` de l'élagage suit la même règle.
+
+### Modifié
+- **`avancement@1` devient `avancement@2`** : états de mission `abandonnee` et `inconnu` et champ `mission.vie` (vocabulaire de mission
+  fermé élargi) ; `who` lit les arbres par `arbresGit`.
+- Corrections issues de la recette de la Phase 68 (revues du socle, du mod et du web).
+
+### Retiré
+- Lecture maison du planning par le mod (remplacée par le socle partagé).
+- Couleurs « Signal » du mod.
+- Bloc backlog de la vue macro.
+
 ## v1.1.2 — 2026-11-04
 
 Correctif de sécurité H-1 (héritée de la Phase 67, présente dès v2.75.0), sur arbitrage de Samuel (AskUserQuestion, session
