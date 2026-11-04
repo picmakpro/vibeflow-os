@@ -344,7 +344,7 @@ if mutant_unit zombie "s/ and not e.startswith('Z')//"; then
   assert_eq "M-ZOMBIE — le mutant (l'état Z n'écarte plus rien) rougit T12.7d : le processus déclaré Z reste membre" "$(unit_pty "$MUT_PTY" etat-z)" "Z=True S=True"
 else sans_effet M-ZOMBIE; fi
 if mutant_unit etatproc "s/t\[i + 2:i + 3\]/t[i + 1:i + 2]/"; then
-  assert_eq "M-ETAT-PROC — le mutant (état lu un caractère trop tôt) rougit T12.7e" "$(unit_pty "$MUT_PTY" etat-proc)" "Z= absent=None"
+  assert_eq "M-ETAT-PROC — le mutant (état lu un caractère trop tôt) rougit T12.7e" "$(unit_pty "$MUT_PTY" etat-proc)" "Z=  absent=None"
 else sans_effet M-ETAT-PROC; fi
 if mutant_unit chefreape 's/if CHEF_REAPE and p == sid:/if False:/'; then
   assert_eq "M-CHEF-REAPE — le mutant (le chef réapé reste visé) rougit T12.7c" "$(unit_pty "$MUT_PTY" chef-reape)" "avant=True apres=True"
