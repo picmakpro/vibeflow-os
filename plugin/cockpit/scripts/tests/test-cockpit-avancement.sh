@@ -414,7 +414,8 @@ echo "=== A13 — jalon en cours = jalon du STATE ==="
 assert_eq "A13.0 — contrôle positif : les deux jalons sont ouverts (le premier du ROADMAP l'est aussi)" "$(NDF "$WORK/g9.json" ms-alpha .st)|$(NDF "$WORK/g9.json" ms-beta .st)" "active|active"
 assert_eq "A13.1 — le STATE nomme beta : la trajectoire et les prochaines phases sont celles de beta" "$(G "$WORK/g9.json" "$FLUX")" "Trajectoire de beta|n:ph-2"
 r="$(mut sans-state "$P_" "msList.find((m) => state.milestone && m.key === state.milestone && m.ws === (layout.actif || null) && m.st !== 'done') || " "")"; node "$AUX/q.mjs" "$WORK/mut-sans-state" project "$L9" > "$WORK/g9-mut.json" 2>/dev/null
-assert_eq "A13.2 — mutant « le STATE n'est plus lu » : la trajectoire redevient celle d'alpha, A13.1 le voit" "$r|$(G "$WORK/g9-mut.json" "$FLUX")" "muté|Trajectoire de alpha|n:ph-1"
+assert_eq "A13.2 — mutant « le STATE n'est plus lu » : la trajectoire redevient celle d'alpha, A13.1 le voit" "$r|$(G "$WORK/g9-mut.json" "$FLUX")" "muté|Trajectoire d'alpha|n:ph-1"
+assert_eq "A13.3 — élision à la source (P70-D-04) : un jalon dont la clé commence par une voyelle donne « Trajectoire d'alpha », jamais « de alpha »" "$(G "$WORK/g9-mut.json" 'j.flows[0].title')" "Trajectoire d'alpha"
 
 # ---------- A14 — aucune lecture du graphe Projet n'ouvre un fichier non régulier (famille de read(), 69-01) ----------
 # Un PLAN lié à /dev/zero ou un pointeur active-workstream lié à /dev/zero (git versionne les liens symboliques) ne doit ni bloquer ni remplir la mémoire.

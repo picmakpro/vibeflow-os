@@ -20,3 +20,19 @@ Régime P70-D-08. Départ rejoué le 2026-11-04 sur le commit `7a3ace3d` (branch
 - F12.1 — attendu `Contrôle de santé`, obtenu `Contrôle De Santé`
 - F12.2 — attendu `[]`, obtenu `["ready_to_execute","ready_to_execute"]` (appartient à 70-06)
 - C5.1 — attendu `Dossier solo : 1 fichier de code.`, obtenu `Dossier solo : 1 fichiers de code.`
+
+## Suite : recette
+
+Correction ciblée demandée par le manager d'après le juge Playwright de la recette (P70-D-04). Départ rejoué le 2026-11-04 sur `94078aab` (branche `feat/phase-70-finitions-ui`), témoins posés avant toute correction.
+
+`test-cockpit-chrome-fr.sh` : 61 PASS / 9 FAIL (F11.20 à F11.24, F13.1 à F13.4) ; `test-cockpit-avancement.sh` : 60 PASS / 2 FAIL (A13.2, A13.3).
+
+- F11.20 `Inside kpi-analyst` — non traduit (le gabarit court « Inside {} » ne s'applique qu'à un nombre)
+- F11.21 / F13.1 `Updated 3 minutes ago` — attendu `Mis à jour il y a 3 minutes`, obtenu `il y a 3 mis à jour minutes` (régression de l'ordre des gabarits : « {} minutes ago » passe avant « Updated {} »)
+- F11.22 / F13.3 `Recent work: Recent work` (fil d'Ariane) — attendu `Travail récent`, obtenu `Travail récent : Travail récent`
+- F11.23, F11.24 / F13.4 `2×click`, `right-click` — non traduits (infobulle de survol, menu du clic droit) ; `click` rendait « cliquer »
+- F13.2 `Inside kpi-analyst` / `Inside equipe-produit` — attendu `["Dans kpi-analyst","Dans equipe-produit"]`, obtenu `[null,null]`
+- A13.2, A13.3 — attendu `Trajectoire d'alpha`, obtenu `Trajectoire de alpha` (élision absente à la source, `vf-cockpit-project.mjs`)
+- Garde d'ordre (cas 3) : F11.21 juge les durées coupées par « mis à jour » ; F13.1 pose la forme exacte ; F10 reste en place.
+
+Hors de mes fichiers (cas 5 sous-titre et cas 6 visite), constatés sans correction : voir le SUMMARY.

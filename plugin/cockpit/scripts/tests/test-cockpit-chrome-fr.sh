@@ -67,15 +67,18 @@ const mauvaisGabarits = Object.entries(dico).filter(([k]) => k.includes('{}')).f
   return (obtenu ?? '').trim() === attendu.trim() ? [] : [k];
 });
 // F11 (UIFN-07) : formes RENDUES (variables remplies, pluriels composés) ; chaque sortie est jugée sur des défauts de langue précis
-const TEMOINS = /\b(and|of|the|at|top|up|here|calls?|steps?|show|changes|endpoints|uses|resolve|still|generated|names|again|worth|fixing|minor)\b/i;
-const FAUTES = [[/\bde (le|les)\b/i, '« de le » / « de les » non contracté'], [/\bde [aeiouyàâéèêîôû]/i, '« de » devant voyelle non élidé'], [/(^|[^\d])1 [a-zàâéèêîôû]+s\b/i, '« 1 » suivi d\'un pluriel'], [/Utilise liens|Appuyez sur Lecture/, 'valeur fautive connue']];
+const TEMOINS = /\b(and|of|the|at|top|up|here|calls?|steps?|show|changes|endpoints|uses|resolve|still|generated|names|again|worth|fixing|minor|inside|updated|click|recent|work)\b/i;
+const FAUTES = [[/\bde (le|les)\b/i, '« de le » / « de les » non contracté'], [/\bde [aeiouyàâéèêîôû]/i, '« de » devant voyelle non élidé'], [/(^|[^\d])1 [a-zàâéèêîôû]+s\b/i, '« 1 » suivi d\'un pluriel'], [/Utilise liens|Appuyez sur Lecture/, 'valeur fautive connue'], [/mis à jour (minutes|heures|jours|secondes)/i, 'ordre des gabarits : « mis à jour » coupe l\'expression de durée'], [/^(.+) : \1$/, 'doublon « X : X »']];
 const CORPUS = ['Calls · 3', 'up ·', '3 calls', '1 call', 'Show 2 changes', '1 step', 'Affects 2 places in here', '1 important · 1 worth fixing · 1 minor', '3 endpoints', 'Uses connection', 'Resolve on the map',
   'Claude Code and GSD', '3 files and endpoints still use generated names. Run the skill again to describe them.', 'Press Play to follow it through the code, one step at a time.',
   'It also relies on Stripe and Postgres. They sit at the edge of the map; the lines show which parts talk to them.', 'Replay this tour any time from', 'at the top.',
-  'Answers come from the Claude Code CLI on this computer, which can read the source', 'Nothing stood out. This is a quick automatic check, not a full Anthropic review.'];
+  'Answers come from the Claude Code CLI on this computer, which can read the source', 'Nothing stood out. This is a quick automatic check, not a full Anthropic review.',
+  'Inside kpi-analyst', 'Updated 3 minutes ago', 'Recent work: Recent work', '2×click', 'right-click', 'click'];
 const jugement = (e) => { const o = tr(e); if (o == null || o === e) return `non traduit : [${e}]`; const pb = [TEMOINS.test(o) && `mot anglais « ${(TEMOINS.exec(o) || [])[0]} »`, ...FAUTES.map(([re, nom]) => re.test(o) && nom)].filter(Boolean); return pb.length ? `[${e}] → [${o}] : ${pb.join(', ')}` : 'ok'; };
 const f11 = CORPUS.map(jugement);
-console.log(JSON.stringify({ mauvaisGabarits, f11, corpus: CORPUS, inventaire: inv.length, liste: inv, dict: Object.keys(dico).length, motifs: code.__vfFrTraduire.motifs, gabarits: code.__vfFrTraduire.gabarits, exclusions: excl.length,
+// recette 2026-11-04 (juge Playwright, P70-D-04) : formes exactes ; l'ordre des gabarits ne doit pas faire revenir « il y a 3 mis à jour minutes »
+const suite = [tr('Updated 3 minutes ago'), tr('Inside kpi-analyst'), tr('Inside equipe-produit'), tr('Recent work: Recent work'), tr('2×click'), tr('right-click'), tr('Top of the world'), tr('click')];
+console.log(JSON.stringify({ mauvaisGabarits, f11, suite, corpus: CORPUS, inventaire: inv.length, liste: inv, dict: Object.keys(dico).length, motifs: code.__vfFrTraduire.motifs, gabarits: code.__vfFrTraduire.gabarits, exclusions: excl.length,
   nonTraduits, sansObjet, problemesDico: controler(dico), problemesTemoin: fautive,
   f6: { etapes: [tr('Previous step'), tr('Next step')], motif: tr('Answer · 3 cards'), exact: tr('Fit to screen'), gabarit: tr('Your Claude session expired. Sign in again.'), vide: tr(''), espaces: tr('   '), inconnu: tr('Ma phrase de données'), projet: proj.__vfFrTraduire('File'), code: code.__vfFrTraduire('File'), pluriels: [proj.__vfFrTraduire('files'), code.__vfFrTraduire('files')], donnees: [tr('Top of the world'), tr('Fix with Claude Code'), tr('3 of 4'), tr('Health check: nothing urgent')],
     types: typeof code.__vfFrType === 'function' ? [code.__vfFrType('library'), code.__vfFrType('Library'), code.__vfFrType('Ma donnée'), code.__vfFrType('config'), tr('library')] : 'absent' }}));
@@ -149,10 +152,17 @@ assert_eq "F10 : aucun gabarit du dictionnaire n'est capturé par un gabarit plu
 
 echo "[F11] formes rendues : aucun mot anglais, aucune faute d'élision, de contraction ni d'accord (UIFN-07)"
 NC=$(lire "$WORK/m.json" 'j.corpus.length')
-assert_ge "F11.0 : le corpus des formes rendues est exécuté" "$NC" 19
+assert_ge "F11.0 : le corpus des formes rendues est exécuté" "$NC" 25
 for i in $(seq 0 $((NC-1))); do
   assert_eq "F11.$((i+1)) : $(lire "$WORK/m.json" "j.corpus[$i]")" "$(lire "$WORK/m.json" "j.f11[$i]")" "ok"
 done
+
+echo "[F13] recette 2026-11-04 : durée, en-tête de carte, doublon de fil d'Ariane, indications de souris (P70-D-04)"
+assert_eq "F13.1 : « Updated 3 minutes ago » → la durée n'est pas coupée (« Mis à jour il y a 3 minutes »)" "$(lire "$WORK/m.json" 'j.suite[0]')" "Mis à jour il y a 3 minutes"
+assert_eq "F13.2 : « Inside <nom du lab> » → « Dans <nom> », le nom du lab reste intact" "$(lire "$WORK/m.json" 'j.suite.slice(1,3)')" '["Dans kpi-analyst","Dans equipe-produit"]'
+assert_eq "F13.3 : « Recent work: Recent work » (fil d'Ariane) ne dit qu'une fois « Travail récent »" "$(lire "$WORK/m.json" 'j.suite[3]')" "Travail récent"
+assert_eq "F13.4 : indications de souris « 2×click », « right-click », « click » en français" "$(lire "$WORK/m.json" '[...j.suite.slice(4,6), j.suite[7]]')" '["2×clic","clic droit","clic"]'
+assert_eq "F13.5 : le gabarit libre « Inside {} » n'abîme pas une autre donnée (« Top of the world » reste intacte)" "$(lire "$WORK/m.json" 'j.suite[6]')" "null"
 
 echo "[F3] témoin du détecteur : une chaîne anglaise inventée"
 T3="$WORK/t3"; cp -R "$SORTIE" "$T3"
