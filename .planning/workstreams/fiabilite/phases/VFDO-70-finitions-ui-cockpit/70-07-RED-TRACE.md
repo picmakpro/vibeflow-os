@@ -11,3 +11,9 @@ Résultat : 61 PASS / 6 FAIL ; aucune autre suite touchée, O4 non sautée, O5.0
 - FAIL — O5.1 [390 px] : attendu `[]` ; obtenu `[1,2,3]`.
 - FAIL — O5.2 [390 px] : attendu `[]` ; obtenu `[1,2,3]`.
 - FAIL — O5.3 [390 px] : attendu `[]` ; obtenu `[2,3]`.
+
+## Vert — après le patch P25 (commits fix(70-07))
+
+`test-cockpit-projet.sh` 67 PASS / 0 FAIL (O5.0 à O5.5 aux deux largeurs). Premier rejeu : O5.5 [390 px] rouge à l'étape 3 (obtenu `[3]`, mot « Start ») : le texte de la dernière étape, sur téléphone, cite « ⋯ › Start here » ; entrée ajoutée à `79-vf-fr-dict-b.js`, puis vert.
+`test-cockpit-vendor.sh` 79/0 (V6 : amont retrouvé à l'octet, V7 : diff présent) · `test-cockpit-chrome-fr.sh` 59/0 · `test-cockpit-onglet-code.sh` 21/0 · `test-cockpit-marque-blanche.sh` et `test-cockpit-assemblage.sh` exit 0.
+`test-cockpit-responsive.sh` non rejoué ici (consigne du mandat : le manager le rejoue à l'intégration) ; la carte de visite a changé de structure (colonne flex, hauteur bornée, contour `.tour-target`), c'est la surface à surveiller.
