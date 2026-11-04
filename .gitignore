@@ -72,3 +72,7 @@ __pycache__/
 # `.planning/state.json` est la projection générée par gsd-core depuis STATE.md/ROADMAP.md.
 .gsd/
 .planning/state.json
+
+# Typings générés par l'engine des mods au chargement du plugin (68-04) : jamais versionnés,
+# régénérés à chaque chargement ; le tsconfig du mod les étend.
+plugin/.claude-plugin/types/

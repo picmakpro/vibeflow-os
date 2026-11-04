@@ -36,3 +36,41 @@ Le cache piégé (`cockpit/hooks/hooks.json` réduit à `{ "modules": [...] }`) 
 
 **Le contrôle du cache réel (I9b) n'est PAS un témoin avant l'import** : le cache n'a alors aucun `signal/` ni `.tsx` à écarter,
 il est vert à vide. Il ne devient un témoin qu'après l'import (annexe ci-dessous).
+
+## Import mécanique (commit C) — verts
+
+- `claude plugin validate --strict plugin` : rc=0 (Claude Code 2.1.318). Il déclare `state: vibeflow.disk … vibeflow.bandHiddenFor`.
+- Argument de `claude plugin test` qui découvre les tests (« Runs every *.test.ts and *.test.tsx under dir ») : le dossier du plugin.
+  Sortie : `3 pass, 0 fail, Ran 3 tests across 1 file` (rc=0), fichier `cockpit/signal/tests/vf-signal.test.tsx`.
+  `claude plugin test` n'écrit aucun typing : le dossier `plugin/.claude-plugin/types/` n'existe pas après validate ni test
+  (non mesuré : les typings sont générés au chargement du plugin dans une session ; `tsconfig.json` du mod étend ce chemin prévu).
+
+ARG_TEST=plugin
+
+- Retouche forcée par la mesure, hors des trois prévues : le test source nomme `plugin: 'vf-signal'` dans ses événements de rendu
+  (PANE, BAND) ; sous le plugin `vibeflow`, `press` ne trouvait plus les boutons (2 échecs : « no Button of vf-signal keyed … »).
+  Les deux littéraux passent à `vibeflow` ; la forme `command: 'vf-signal'` et les titres restent (c'est le nom de la commande).
+- `test-cockpit-signal-mod.sh` : 17 ok, 0 ko (M0 à M5). `test-vibeflow-update-cockpit.sh` : 13 ok, 0 ko.
+
+## Annexe — I9 : le contrôle du cache réel devient un témoin (rouge sur copie mutée)
+
+Copie jetable du dossier `plugin/` ; `copy_module_scripts` de `vibeflow-update.sh` y est muté pour poser `signal/` sous la cible
+(`cp -R "$module_dir/signal/." "$TARGET_ROOT/signal/"`). `test-vibeflow-update-cockpit.sh` joué sur la copie (rc=1, 12 ok, 2 ko) :
+
+```
+  ✓ I9a témoin rouge : un fragment réduit à modules fait échouer l'install (rc=1, fragment sans clé 'hooks')
+  ✗ I9b : fichier .ts/.tsx posé par l'engine : <tmp>/lab-reel/.claude/signal/types/index.d.ts
+  ✗ I9b : dossier signal/ posé par l'engine : <tmp>/lab-reel/.claude/signal
+== resultat : 12 ok, 2 ko ==
+rc=1
+```
+
+Pour la bonne raison : le `.d.ts` et le dossier `signal/` posés sont nommés. Copie supprimée ; `git diff --stat -- plugin/_internal/vibeflow-update.sh`
+vide (engine du dépôt intact) ; I9 vert sur le dépôt :
+
+```
+  ✓ I9a témoin rouge : un fragment réduit à modules fait échouer l'install (rc=1, fragment sans clé 'hooks')
+  ✓ I9 : cache piégé refusé (fragment sans clé 'hooks'), vrai cache installé sans .ts/.tsx ni signal/ sous la cible
+== resultat : 13 ok, 0 ko ==
+rc=0
+```
