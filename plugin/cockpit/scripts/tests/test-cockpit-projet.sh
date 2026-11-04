@@ -588,6 +588,19 @@ for W in 390 768 800 1024 1440; do
   assert_eq "O6.17t [$W px] — Projet, titre haut : étapes dont la carte de visite recouvre une surface fixe (étape:surfaces)" "$(xt2 "j.l$W.etapes.filter((e)=>e.surfaces.length).map((e)=>e.i+':'+e.surfaces.join('+')).join(' ')")" ""
   diag17 "O6.17t Projet" "$XT2" "$W"
 done
+# O6.18 passe « tangente » (CI Linux de f41cfd25 : R22 « #ask recouvre #tour » à 1 640 px ; diagnostic de la CI : placement jugé libre à 260 px de large, carte rendue 16..276, #ask à partir de 274) : la carte de visite est jugée sur sa bbox AU MOMENT du placement,
+# c'est-à-dire pendant son animation d'entrée (98 % de sa taille) ; une surface à 2 px du bord de la carte finie paraît alors à distance et la carte la recouvre une fois posée. Ici #ask, plus haute (avis), est posée à 2 px DANS le bord de la carte
+# à sa largeur d'origine, immobile avant la visite. Cinq largeurs ne sont pas utiles : la géométrie est celle de la carte ; 1 024 et 1 440 px, Code et Projet.
+XG1="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$U5" 1024,1440 tangent)"; XG2="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 1024,1440 tangent)"
+xg1() { printf '%s' "$XG1" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+xg2() { printf '%s' "$XG2" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O6.18a — témoin : mesures tangentes sans erreur, au moins deux étapes à chaque largeur" "$(xg1 "j.erreur||''")|$(xg2 "j.erreur||''")|$(xg1 '[1024,1440].every((w)=>j["l"+w].n>=2)')|$(xg2 '[1024,1440].every((w)=>j["l"+w].n>=2)')" "||true|true"
+for W in 1024 1440; do
+  assert_eq "O6.18 [$W px] — Code, #ask à 2 px dans le bord de la carte : étapes dont la carte de visite recouvre une surface fixe" "$(xg1 "j.l$W.etapes.filter((e)=>e.surfaces.length).map((e)=>e.i+':'+e.surfaces.join('+')).join(' ')")" ""
+  diag17 "O6.18 Code" "$XG1" "$W"
+  assert_eq "O6.18 [$W px] — Projet, #ask à 2 px dans le bord de la carte : étapes dont la carte de visite recouvre une surface fixe" "$(xg2 "j.l$W.etapes.filter((e)=>e.surfaces.length).map((e)=>e.i+':'+e.surfaces.join('+')).join(' ')")" ""
+  diag17 "O6.18 Projet" "$XG2" "$W"
+done
 # O6.10 (correctif 70-07, REG-70-01 de 70-VERIFICATION.md) : visite Projet active au premier chargement sur un lab à jalon et à mission, à 1 024 et 1 920 px : la carte ciblée tient dans la zone libre ET aucune carte du graphe ne sort de la zone
 # libre à gauche du panneau (critère de R1, chrome-responsive.mjs). Cause : aim() centrait et zoomait la carte sans regarder le reste du graphe, qui débordait sous le panneau ; il ne dézoomait jamais une carte plus large que sa zone.
 L7="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mkdir -p "$L7/src" "$L7/.planning/phases/01-socle" "$L7/.planning/phases/02-suite" "$L7/.planning/missions"

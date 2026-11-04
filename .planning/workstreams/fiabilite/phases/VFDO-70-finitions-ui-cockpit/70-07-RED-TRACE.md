@@ -181,3 +181,11 @@ Mode « police large » (témoin générique, à garder) : la carte de visite, l
 - Passe « titre haut » (O6.17t) : cinq largeurs, Code et Projet, aucune surface recouverte (avant : Code étape 1 `#panel` et étape 2 `#context`, Projet étape 1 `#context`, à 800 px).
 - Vert, en série : `test-cockpit-projet.sh` 153 PASS / 0 FAIL avec `VF_DEJAVU_DIR` (O6.17d, O6.17t) et 131 PASS / 0 FAIL + 1 passe sautée et dite sautée sans la variable ; `test-cockpit-vendor.sh` 79/0 ; `test-cockpit-chrome-fr.sh` 73/0 (le texte de diagnostic de `40-tour.js` est un JSON, pas une chaîne de l'interface : la première version rougissait F2) ; `test-cockpit-onglet-code.sh` 25/0 ; `test-cockpit-responsive.sh` 284 PASS / 0 FAIL ; `synchro.sh verifier` : amont retrouvé à l'octet.
 - **R22 (« #ask recouvre #tour » à 1 640 px) : non reproduit, cause inconnue.** À 1 640 px la carte est au-dessus de `#ask` avec 12 px de marge, `#ask` est un obstacle et son relevé est repris toutes les 200 ms. Le diagnostic (bbox de `#tour`, de `#ask` et de ses avis, de la fenêtre, obstacles du dernier placement) s'imprime désormais à l'échec de R22 ; la prochaine CI Linux donnera la géométrie. Non prouvé fermé.
+
+## Suite : R22 lu dans le diagnostic de la CI Linux (f41cfd25)
+
+Mesure de la CI : `#tour` 16..276 (largeur posée 260 px), `#ask` à partir de x = 274, hauteur de 898 à 1 005 ; `choice: { width: 260, side: left, bottom: 76, covered: 0 }`. Le placement a jugé le recouvrement nul sur la bbox de la carte **pendant son animation d'entrée** (`tourIn` : 98 % de la taille, 8 px de décalage) : à 98 %, 260 px font 254,8 px, soit un bord droit à 273,4 < 274. Une fois l'animation finie, la carte fait 260 px et recouvre `#ask` de 2 px. Rien à voir avec une police : tout poste le fait quand une surface tombe à moins de 2 % de la largeur du bord de la carte, et la surface ne bouge plus ensuite (le relevé de 200 ms ne la voit pas bouger).
+
+### Rouge — 3312418f, passe « tangente » (sonde `chrome-visite-etapes.mjs`, option `tangent`)
+
+`#ask` (avec un avis : plus haute) immobile, à x = 374 (2 px dans le bord de la carte de 360 px), visite ouverte par l'API : à 1 024 et 1 440 px, Code et Projet, étape 1 : `#ask` et `#ask>ask-form` recouverts. Les assertions O6.18 n'ont pas été rejouées dans la suite sur l'ancien arbre : mesure à la sonde.
