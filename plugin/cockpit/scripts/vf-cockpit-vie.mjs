@@ -7,11 +7,10 @@
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
-import { driverLockScript, resolveScriptsDir } from './vf-cockpit-paths.mjs';
+import { driverLockScript, resolveScriptsDir, shBorne } from './vf-cockpit-paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const sh = (cmd, args, cwd) => { try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000 }); } catch (e) { return e.stdout || ''; } }; // un bash bloqué ne gèle pas la boucle
+const sh = shBorne; // un bash bloqué ne gèle pas la boucle, et l'échéance globale de l'émetteur s'applique (F-06)
 const PH_RE = /^[0-9]+(\.[0-9]+)*$/; // vf_dl_phase_valid de driver-lock.sh
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const bool = (v) => (typeof v === 'boolean' ? v : null);

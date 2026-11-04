@@ -79,3 +79,6 @@ Rouge sur `6f5c8191` (scratchpad `fix-socle-f06-rouge.out`) — l'option `echean
 |---|---|---|
 | S11.2 échéance de 3 s : rend en moins de 6 s | true | false |
 | S11.3 six arbres listés, au moins un `retard.main` null, aucun 0 pour un arbre en retard | `6\|true\|false` | `6\|false\|false` (aucun null : tout est calculé, lentement) |
+
+Correctif : `avecEcheance(ms, fn)` et `shBorne` dans `vf-cockpit-paths.mjs` (seul point de lancement des sous-processus du socle, plafond de 10 s ET temps restant jusqu'à l'échéance ; passé le délai, sortie vide, donc `null` chez l'appelant) ; `arbres`, `vie`, `who`, `planning` (tags) et `gitCommonDir` l'utilisent. `collectSignal(root, { echeanceMs = 15000 })` liste les arbres (une seule commande) puis calcule tout sous l'échéance.
+Vert : `test-cockpit-signal.sh` 66 PASS / 0 FAIL (scratchpad `fix-socle-f06-vert.out`).

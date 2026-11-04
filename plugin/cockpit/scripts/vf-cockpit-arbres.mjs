@@ -7,14 +7,13 @@
 // chaînes d'arbre et de branche nettoyées avant d'être affichées. Un retard inconnu est `null`, jamais 0.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { masque } from './vf-cockpit-lecture.mjs';
 import { normNum } from './vf-cockpit-planning.mjs';
-import { GIT_SUR } from './vf-cockpit-paths.mjs';
+import { GIT_SUR, shBorne } from './vf-cockpit-paths.mjs';
 
 // GIT_SUR (défini dans vf-cockpit-paths.mjs, partagé par toute la chaîne de l'émetteur : F-03) neutralise un core.fsmonitor exécutable du .git/config (T-68-04)
 export { GIT_SUR };
-const shDefaut = (cmd, args, cwd) => { try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000 }); } catch (e) { return e.stdout || ''; } }; // timeout : un git bloqué ne gèle pas la boucle
+const shDefaut = shBorne; // timeout et échéance globale : un git bloqué ne gèle pas la boucle (F-06)
 const git = (sh, dir, ...args) => sh('git', [...GIT_SUR, '-C', dir, ...args], dir);
 const existe = (sh, dir, ref) => git(sh, dir, 'show-ref', '--verify', ref).trim() !== ''; // show-ref --verify imprime « sha ref » si la référence existe, rien sinon
 const entier = (s) => (/^\d+$/.test(String(s).trim()) ? Number(String(s).trim()) : null);

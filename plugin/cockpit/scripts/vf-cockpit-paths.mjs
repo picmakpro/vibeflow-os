@@ -122,10 +122,21 @@ export const outputDir = (labRoot) => path.join(labRoot, '.vibeflow', 'cockpit')
 // un `.git/config` écrit par d'autres peut déclarer un core.fsmonitor exécutable : chaque appel git du socle commence par ce préfixe (T-68-04, F-03)
 export const GIT_SUR = ['-c', 'core.fsmonitor=false'];
 
+// Échéance globale (F-06) : `avecEcheance(ms, fn)` pose une date butoir pour tout appel de `shBorne` exécuté pendant `fn` ; passée la date, `shBorne` ne lance plus rien et rend ''
+// (sortie vide : chaque appelant en tire sa valeur « inconnu », null, jamais 0). Chaque appel reste borné à 10 s, et au temps restant s'il est plus court.
+let FIN = null;
+export function avecEcheance(ms, fn) {
+  const avant = FIN; FIN = Date.now() + ms;
+  try { return fn(); } finally { FIN = avant; }
+}
+// Seul point de lancement des sous-processus du socle (git, bash driver-lock.sh) : un processus bloqué ne gèle pas la boucle, le total ne dépasse pas l'échéance.
+// L'environnement de l'enfant a un PATH assaini (H-1, vf-cockpit-env.mjs) : `lab` (par défaut `cwd`) est le dossier dont aucun élément ne doit rester dans le PATH.
+export function shBorne(cmd, args, cwd, lab = cwd) {
+  const reste = FIN === null ? 10000 : Math.min(10000, FIN - Date.now());
+  if (reste <= 0) return '';
+  try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: reste, env: envEnfant(lab) }); } catch (e) { return e.stdout || ''; }
+}
+
 export function gitCommonDir(root) {
-  try {
-    const out = execFileSync('git', [...GIT_SUR, '-C', root, 'rev-parse', '--path-format=absolute', '--git-common-dir'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000, env: envEnfant(root) }).trim();
-    return out || null;
-  } catch { return null; }
+  return shBorne('git', [...GIT_SUR, '-C', root, 'rev-parse', '--path-format=absolute', '--git-common-dir'], undefined, root).trim() || null;
 }

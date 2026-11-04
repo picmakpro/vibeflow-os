@@ -6,9 +6,7 @@
 // Aucun nom de compartiment, de jalon ou de projet codé en dur. Lecture seule.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
-import { envEnfant } from './vf-cockpit-env.mjs';
-import { planningLayout, stateFile, GIT_SUR } from './vf-cockpit-paths.mjs';
+import { planningLayout, stateFile, GIT_SUR, shBorne } from './vf-cockpit-paths.mjs';
 import { avancement, rattacherMission, etatMission } from './vf-cockpit-avancement.mjs';
 import { lireVerrous, vieDe } from './vf-cockpit-vie.mjs';
 
@@ -157,10 +155,10 @@ export function readPlanning(root, layout, opts = {}) {
   const backlog = read(path.join(B, 'BACKLOG.md'));
   const seeds = ls(path.join(B, 'seeds')).filter((f) => f.endsWith('.md')).map((f) => ({ file: rel(path.join(B, 'seeds', f)), text: read(path.join(B, 'seeds', f)) }));
   let tags = [];
-  try {
-    const out = execFileSync('git', [...GIT_SUR, '-C', root, 'for-each-ref', '--sort=-creatordate', '--count=30', '--format=%(refname:short)\t%(creatordate:short)\t%(contents:subject)', 'refs/tags/v*'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000, env: envEnfant(root) });
+  { // shBorne : même plafond, même échéance globale et même PATH assaini que les autres appels git du socle (F-06, H-1) ; sortie vide = aucun tag
+    const out = shBorne('git', [...GIT_SUR, '-C', root, 'for-each-ref', '--sort=-creatordate', '--count=30', '--format=%(refname:short)\t%(creatordate:short)\t%(contents:subject)', 'refs/tags/v*'], undefined, root);
     tags = out.trim().split('\n').filter(Boolean).map((l) => { const [tag, date, subject] = l.split('\t'); return { tag, date, subject }; });
-  } catch {}
+  }
   const title = /^# (.*)$/m.exec(read(path.join(B, 'PROJECT.md')))?.[1];
   const projectName = (title ? title.replace(/^(Project|Roadmap):\s*/i, '').trim() : '') || path.basename(root);
   return { phases, phaseDirs, reqs, milestones, state, dags, backlog, seeds, tags, projectName, activeKeys, rel };

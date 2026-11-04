@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // vf-cockpit-signal — l'émetteur JSON unique du socle, schéma vibeflow/cockpit-signal@1 (VFSG-03, VFSG-11 ; P68-D-02, P68-D-15). Lecture seule.
-// Exports : collectSignal(root, { home, now, scriptsDir }) -> objet signal@1 ; CLI ci-dessous.
+// Exports : collectSignal(root, { home, now, scriptsDir, echeanceMs }) -> objet signal@1 (échéance globale : F-06) ; assainir ; CLI ci-dessous.
 // Sources : readPlanning (phases + avancement@2, jalons, missions et leur vie), lireVerrous, arbresGit/brancheBase/retard/phaseActive, collectWho (équipe who@2).
 // Sérialise, ne recalcule rien ; aucune lecture réseau ; jamais de clé doing, mandat, messages, outils.
 // Toute chaîne de la sortie, quel que soit le champ, traverse `nettoie` (contrôles retirés, secrets masqués) et une borne : bornes serrées par champ connu, puis une passe finale
@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { planningLayout, gitCommonDir } from './vf-cockpit-paths.mjs';
+import { planningLayout, gitCommonDir, avecEcheance } from './vf-cockpit-paths.mjs';
 import { readPlanning } from './vf-cockpit-planning.mjs';
 import { LIBELLES_ETAT, LIBELLES_MISSION } from './vf-cockpit-avancement.mjs';
 import { lireVerrous } from './vf-cockpit-vie.mjs';
@@ -28,13 +28,22 @@ const verrou = (l) => ({ ...l, ws: chaine(l.ws, 80) ?? '', scope: chaine(l.scope
 const nomBorne = (p) => (p ? { ...p, nom: chaine(p.nom, 90) } : p);
 const meme = (a, b) => { try { return fs.realpathSync(a) === fs.realpathSync(b); } catch { return path.resolve(a) === path.resolve(b); } };
 
-export function collectSignal(root, { home, now = Date.now(), scriptsDir } = {}) {
+export const ECHEANCE_MS = 15000;
+// F-06 : tous les sous-processus (git, driver-lock.sh) partagent UNE échéance globale (15 s par défaut), indépendante du
+// nombre d'arbres ; passé ce délai plus rien n'est lancé et ce qui n'est pas calculé vaut null (retard, verrous illisibles -> missions inconnu), jamais 0. La liste des arbres, une seule commande
+// avant l'échéance, reste l'ossature de la sortie.
+export function collectSignal(root, { home, now = Date.now(), scriptsDir, echeanceMs = ECHEANCE_MS } = {}) {
   root = path.resolve(root);
+  const tous = arbresGit(root);
+  return avecEcheance(echeanceMs, () => construire(root, tous, { home, now, scriptsDir }));
+}
+
+function construire(root, tous, { home, now, scriptsDir }) {
   const layout = planningLayout(root);
   const verrous = lireVerrous(root, { scriptsDir, home }); // verrous de la racine : ceux de la sortie, et ceux de tous les arbres d'un lab partitionné (F-05)
   const P = readPlanning(root, layout, { verrous });
   const phases = [...P.phases.values()].filter((p) => !p.archive);
-  const base = brancheBase(root), common = gitCommonDir(root), tous = arbresGit(root);
+  const base = brancheBase(root), common = gitCommonDir(root);
   const arbres = tous.map((a) => {
     // F-05 : en lab partitionné le dossier des verrous est le dossier git commun, le même pour tous les arbres (lecture unique, partagée) ;
     // en lab plat le verrou est propre à chaque checkout (.planning/DRIVER.lock) : la vie d'une mission d'un arbre se lit sur le verrou de CET arbre (lecture paresseuse, faite par readPlanning à sa racine)

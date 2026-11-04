@@ -12,9 +12,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { execFileSync } from 'node:child_process';
-import { envEnfant } from './vf-cockpit-env.mjs';
-import { driverLockScript, gitCommonDir, resolveScriptsDir, planningLayout, GIT_SUR } from './vf-cockpit-paths.mjs';
+import { driverLockScript, gitCommonDir, resolveScriptsDir, planningLayout, GIT_SUR, shBorne } from './vf-cockpit-paths.mjs';
 import { ls, mtime, readJson, cherche, masque, MAX_MASQUE, ID_RE, premiereLigne } from './vf-cockpit-lecture.mjs';
 import { FENETRE, collecteAgents, indexDesNoeuds, rattacher } from './vf-cockpit-equipe.mjs';
 import { lireDags } from './vf-cockpit-planning.mjs';
@@ -22,7 +20,7 @@ import { arbresGit } from './vf-cockpit-arbres.mjs';
 import { reduireTranscript } from './vf-cockpit-transcript.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const sh = (cmd, args, cwd, lab) => { try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000, env: envEnfant(lab) }); } catch (e) { return e.stdout || ''; } }; // timeout : un git ou un bash bloqué ne gèle pas la boucle
+const sh = shBorne; // timeout, échéance globale de l'émetteur (F-06) et PATH assaini (H-1, 4e argument = le lab) : un git ou un bash bloqué ne gèle pas la boucle
 
 // les listes de clés vérifiées sur Claude Code viennent du contrat versionné, pas du code
 const IFACE = readJson(path.join(HERE, 'vf-cockpit-interface.json')) || {};
