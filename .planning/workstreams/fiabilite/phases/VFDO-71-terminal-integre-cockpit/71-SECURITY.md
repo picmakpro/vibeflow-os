@@ -226,3 +226,33 @@ un ouvreur factice ; F2 par un collage CDP, glisser-déposer non sondé ; matric
 
 Correctifs ordinaires de revue et de design lancés (lots A1, A2). Correctifs de sécurité (F1 à F6, F8) soumis à la validation de Samuel (ADR-031)
 avec trois choix (Q10 collage, Q11 amorçage hors argv, Q12 périmètre de l'arrêt) ; un re-audit ciblé suivra les correctifs.
+
+## Re-audit des correctifs (2026-11-04)
+
+Rendu par `vf-auditer`, recoupé avec `gsd-security-auditor`, le 2026-11-04 sur `502b354b` (diff `227be6c5..502b354b`, 31 fichiers sous `plugin/`).
+Deux copies extraites par `git archive` (ancien code `227be6c5` pour le témoin positif, nouveau code `502b354b`) et un mutant du nouveau code par
+point ; Chrome 156 headless par CDP, bash 3.2 et zsh, macOS. Sondes dans le dossier temporaire de la mission (`reaudit-71/probes/`). Arbre inchangé.
+Verdict : **gaps_found**, aucun bloquant, aucun majeur retenu par la grille de l'auditeur.
+
+| Point | État | Preuve (ancien → nouveau → mutant) |
+|---|---|---|
+| F1 lanceur sur lab piégé | fermé, réserve N3 | `file:`, `javascript:`, port étranger remis à l'ouvreur → code 5 ou page locale vers le vrai port seulement → mutants « adresse du lab » (7/8) et « `estNotre` vrai » rouges |
+| F6 amorçage | fermé (limite A4) | jeton lu dans `ps` en 800 ms et shell obtenu → « jamais vu dans ps » en 14 s, page 0600 supprimée à l'échange, amorce de 61 s refusée, 25 courses sans écrasement → mutant « URL en argv » rouge |
+| F2 collage | fermé, réserve N1 | `touch M\n` exécuté au collage → bandeau, Entrée tombe sur « Annuler », « Coller » exécute (témoin positif), IME, glisser-déposer, `ESC[201~` interceptés → mutant « sans confirmation » rouge |
+| F3 `python3` | fermé, réserve N2 | `<lab>/python3` exécuté avec `PATH=.:…`, `:…`, `./bin:…`, `bin:…` → jamais → mutant `spawn('python3')` rouge |
+| F4 popup | fermé | popup lance un shell sans frappe → 0 shell, « Terminal indisponible » ; amorçage en premier niveau intact |
+| F5, F8 libellés | fermés | P71-D-15 reformulée, TERM-10 précisée |
+| F7 dette de test | fermé | suites terminal à 0 échec ; mutants du recoupement rouges |
+| P71-D-28 arrêt | fermé | `&`, `disown`, sous-shell, `nohup` morts (≤ 7,5 s), `setsid` et leurre hors session vivants ; mutants « groupes figés » et « sur-tue » rouges |
+| P71-D-24 GET sans Origin | fermé | 29 OK / 0 KO ; trois mutants rouges ; tiroir réel fonctionnel |
+| Non-régression (Q1, Q2, Q4, Q5, Q6, Q7, Q10, socle 67) | fermée | CSP de P identique à `v2.75.0` sans `--terminal` (23 empreintes) ; police JetBrains Mono 2.304 identique à l'octet à la release, altération = terminal non démarré |
+
+Nouveaux findings : **N1** (mineur pour l'auditeur, majeur pour le recoupement) aperçu du collage tronqué à 200 caractères, texte hors aperçu
+exécuté après « Coller » sous bash < 5.1, bidi et caractères de format non neutralisés ; **N2** (mineur) `open`, `xdg-open` et `ps` du lanceur
+résolus par un `PATH` qui peut viser le lab — tous deux soumis à la validation de Samuel (ADR-031, question Q13, 2026-11-04) ; **N3** (info) port
+de forme valide planté dans `server.json` non rattaché au PID, `estNotre` par sous-chaîne (hérité 67) ; **N4** (info) réutilisation de PID du chef
+de session ; **N5** (info) fermeture jusqu'à 6 à 10 s sans escalade SIGKILL ; **N6** (info) exception non rattrapée sur lien planté, ENOENT
+asynchrone de l'ouvreur, collage de plus de 64 Kio perdu ; **N7** (info) `.cache` 0755 et `serveur.log` 0644. N4 à N6 partent au dernier tour de
+correction hors sécurité (avec les mineurs M1 à M6 de la re-revue). Hérité, non réouvert : M7 de la 67 (hypothèse mono-utilisateur).
+
+Limites : macOS seulement ; autre compte local non testé ; composition IME par CDP ; ni Firefox ni Safari ; réutilisation de PID non reproduite.

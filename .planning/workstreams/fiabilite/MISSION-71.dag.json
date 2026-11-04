@@ -57,7 +57,7 @@
         "craft-terminal"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-71",
@@ -67,7 +67,7 @@
         "exec-71"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "audit-71",
@@ -77,7 +77,7 @@
         "exec-71"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "critique-terminal",
@@ -87,7 +87,7 @@
         "exec-71"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "gates-71",
@@ -99,7 +99,7 @@
         "critique-terminal"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "docs",
@@ -109,7 +109,7 @@
         "exec-71"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "push-71",
@@ -140,7 +140,7 @@
         "ex-01"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "ex-03",
@@ -150,7 +150,7 @@
         "ex-01"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "ex-04",
@@ -160,7 +160,7 @@
         "ex-01"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "ex-10",
@@ -170,7 +170,7 @@
         "ex-01"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "ex-11",
@@ -180,7 +180,7 @@
         "ex-01"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "ex-05",
@@ -191,7 +191,7 @@
         "ex-11"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "ex-06",
@@ -201,7 +201,7 @@
         "ex-05"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "ex-07",
@@ -212,7 +212,7 @@
         "ex-06"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "ex-08",
@@ -225,7 +225,7 @@
         "ex-06"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "ex-09",
@@ -238,7 +238,84 @@
         "ex-11"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
+    },
+    {
+      "id": "fix-pty",
+      "step": "correction ciblée : écriture non bloquante de l'assistant PTY, borne de taille alignée",
+      "stage": "",
+      "deps": [
+        "ex-03",
+        "ex-02"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-origin",
+      "step": "correction ciblée P71-D-24 (GET sans Origin, Sec-Fetch-Site)",
+      "stage": "",
+      "deps": [
+        "fix-pty"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-a1",
+      "step": "correction lot A1 (design, police)",
+      "stage": "",
+      "deps": [
+        "revue-71",
+        "audit-71",
+        "critique-terminal"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-a2",
+      "step": "correction lot A2 (robustesse, tests)",
+      "stage": "",
+      "deps": [
+        "revue-71",
+        "audit-71",
+        "critique-terminal"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-b",
+      "step": "correction lot B sécurité (après validation Samuel, ADR-031)",
+      "stage": "",
+      "deps": [
+        "fix-a2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rejuge",
+      "step": "re-revue ciblée + re-audit des correctifs",
+      "stage": "",
+      "deps": [
+        "fix-a1",
+        "fix-a2",
+        "fix-b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-c",
+      "step": "dernier tour de mineurs hors sécurité (M1-M6, N4-N6)",
+      "stage": "",
+      "deps": [
+        "rejuge"
+      ],
+      "scope": [],
+      "status": "running"
     }
   ]
 }
