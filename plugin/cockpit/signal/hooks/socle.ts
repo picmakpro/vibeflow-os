@@ -8,7 +8,6 @@ import { oneLine } from './ds'
 import type { Signal } from '../types'
 
 const SCHEMA = 'vibeflow/cockpit-signal@1'
-const DELAI_MS = 15000
 
 export type Lecture = { signal: Signal } | { erreur: string }
 
@@ -25,7 +24,7 @@ function classer(err: unknown): string {
 async function lire($: EngineInterface, pluginRoot: string, root: string): Promise<Lecture> {
   let ran
   try {
-    ran = await $.process.run(argvEmetteur(pluginRoot, root), { cwd: pluginRoot, timeoutMs: DELAI_MS })
+    ran = await $.process.run(argvEmetteur(pluginRoot, root), { cwd: pluginRoot, timeoutMs: 15000 })
   } catch (err) {
     return { erreur: classer(err) }
   }
