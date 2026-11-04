@@ -195,6 +195,10 @@ Relayés par la session principale (SendMessage) ; réponses mot pour mot entre 
 - **P68-D-35 (tri de recette R1 à R15).** « Tout selon les recos (Recommandé) ». R1 à R13 corrigés selon les
   recommandations du manager (`.planning/missions/2026-11-04-phase-68-execution.md`), sauf R8 reporté en Phase 70 ;
   R14 sans correctif (Samuel retire l'ancien mod, geste à lui) ; R15 (VS Code, mobile) reporté après la PR.
+- **P68-D-36 (compartiment périmé, dépôt tenu) — décision du manager, pas un arbitrage de Samuel (2026-11-04).**
+  Cas laissé ouvert par P68-D-33 au cran compartiment → dépôt. Même règle que P68-D-27 au cran précédent : un verrou
+  présent, même périmé, arrête la cascade ; compartiment périmé + dépôt tenu → `abandonnee`. Témoin dans
+  `test-cockpit-vie.sh`, copie mutée qui fait gagner le cran dépôt.
 
 ### Points de procédure (documentés, sans arbitrage — consigne de la session principale, 2026-11-03)
 

@@ -468,7 +468,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "fix-mod-b",
@@ -476,7 +476,15 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "running"
+      "status": "done"
+    },
+    {
+      "id": "doc-68-10",
+      "step": "68-10 tâche 1 : documentation FR/EN",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
