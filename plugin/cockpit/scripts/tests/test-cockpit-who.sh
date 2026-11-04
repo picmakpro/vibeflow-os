@@ -95,7 +95,7 @@ echo "=== W2 — verrou via le driver-lock.sh de HOME ==="
 cat > "$HOME_T/.claude/scripts/driver-lock.sh" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
-  status) echo '{"locks":[{"present":true,"owner":"mgr-test","step":"exec","ws":"","scope":"repo","age_seconds":10,"stale":false,"children_running":0}]}' ;;
+  status) echo '{"present": true, "scope": "lab", "location": "git-common-dir", "legacy_lock": false, "locks": [{"present": true, "owner": "mgr-test", "step": "exec", "age_seconds": 10, "ttl": 1800, "stale": false, "generation": "g1", "session_ids": [], "lease_seconds": 5, "guard_effective": false, "progress_epoch": null, "progress_age_seconds": null, "children_running": 0, "scope": "depot", "ws": "", "location": "git-common-dir"}], "children_running": 0}' ;;
   orphans) echo '{"orphans":[]}' ;;
 esac
 SH
@@ -177,7 +177,7 @@ TRAP="$WORK/trap.sh"
 cat > "$TRAP" <<SH
 #!/usr/bin/env bash
 touch "$WORK/EXECUTE"
-case "\$1" in status) echo '{"locks":[{"present":true,"owner":"PIEGE","step":"x","ws":"","scope":"repo","age_seconds":1,"stale":false}]}' ;; orphans) echo '{"orphans":[]}' ;; esac
+case "\$1" in status) echo '{"present": true, "scope": "lab", "location": "git-common-dir", "legacy_lock": false, "locks": [{"present": true, "owner": "PIEGE", "step": "x", "age_seconds": 1, "ttl": 1800, "stale": false, "generation": "g1", "session_ids": [], "lease_seconds": 5, "guard_effective": false, "progress_epoch": null, "progress_age_seconds": null, "children_running": 0, "scope": "depot", "ws": "", "location": "git-common-dir"}], "children_running": 0}' ;; orphans) echo '{"orphans":[]}' ;; esac
 SH
 mkdir -p "$LAB/plugin/conductor/scripts"; cp "$TRAP" "$LAB/plugin/conductor/scripts/driver-lock.sh"
 Q who "$LAB" "$H0" "$NOSCRIPTS" > "$WORK/who-w9.json"

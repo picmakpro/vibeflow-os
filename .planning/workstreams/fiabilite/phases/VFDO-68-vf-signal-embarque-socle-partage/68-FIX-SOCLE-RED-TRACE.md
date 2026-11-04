@@ -82,3 +82,26 @@ Rouge sur `6f5c8191` (scratchpad `fix-socle-f06-rouge.out`) — l'option `echean
 
 Correctif : `avecEcheance(ms, fn)` et `shBorne` dans `vf-cockpit-paths.mjs` (seul point de lancement des sous-processus du socle, plafond de 10 s ET temps restant jusqu'à l'échéance ; passé le délai, sortie vide, donc `null` chez l'appelant) ; `arbres`, `vie`, `who`, `planning` (tags) et `gitCommonDir` l'utilisent. `collectSignal(root, { echeanceMs = 15000 })` liste les arbres (une seule commande) puis calcule tout sous l'échéance.
 Vert : `test-cockpit-signal.sh` 66 PASS / 0 FAIL (scratchpad `fix-socle-f06-vert.out`).
+
+## F-07 — fixtures de forme jamais émise, pas de témoin sur le vrai script, trois mutants de `vf-cockpit-vie.mjs` survivants
+
+**Rouge mesuré** (suite `test-cockpit-vie.sh` de `e08e3cc7`, copiée avec le conductor voisin dans le scratchpad, un mutant par copie de `vf-cockpit-vie.mjs`) : les trois mutants SURVIVENT — `35 PASS / 0 FAIL`, exit 0 chacun (scratchpad `fix-socle-f07-survie-m1.out`, `-m2.out`, `-m3.out`).
+
+| Mutant | Substitution | Suite d'avant |
+|---|---|---|
+| m1 | `vie.progressAgeS < vie.ttl` → `vie.progressAgeS < 1e9` | 35 PASS / 0 FAIL (survit) |
+| m2 | `e.scope === 'compartiment' && e.ws === ws` → `e.scope === 'compartiment'` | 35 PASS / 0 FAIL (survit) |
+| m3 | `(e.ws \|\| '') === (ws \|\| '') && ` retiré du verrou de phase | 35 PASS / 0 FAIL (survit) |
+
+(Une première mesure faite hors disposition `cockpit/scripts` + `conductor` voisin rougissait sur V5.3 seulement, pour une raison d'emplacement de la copie, pas de mutant : écartée, refaite avec le conductor voisin en lien.)
+
+**Fixtures** : `test-cockpit-vie.sh` reprend les formes de `json_status` et `vf_dl_status_all` (lab plat : objet d'UN verrou sans `scope` ni `ws` ; lab partitionné : `scope: "lab"`, entrée `depot` absente en tête, entrées `compartiment` et `phase` avec `ws`, `phase`, `location`) ; `test-cockpit-responsive.sh:40` et `test-cockpit-who.sh` (W2 et le piège de W18) quittaient `scope:"repo"` + `ws:""` : remplacés par le dépôt réel (`scope: "depot"`, enveloppe `lab`). Effet de bord assumé : l'infobulle du badge rend le libellé de portée brut, donc `repo` devient `depot` dans l'attendu R7.5.2.
+
+**Vert** (`test-cockpit-vie.sh`, section V12 = témoins discriminants, section V13 = le VRAI `driver-lock.sh` du conductor dans un lab jetable, HOME jetable, `VF_DRIVER_LOCK` retiré, dossier de scripts explicite) : 50 PASS / 0 FAIL (scratchpad `fix-socle-f07-vert.out`).
+La même suite jouée dans les trois copies mutées ROUGIT (scratchpad `fix-socle-f07-tue-m1.out`, `-m2.out`, `-m3.out`) :
+
+| Mutant | Assertions qui rougissent |
+|---|---|
+| m1 | V12.1 (verrou périmé, progrès de 5000 s > ttl 1800 s : abandonnee), V12.2 |
+| m2 | V12.3 (verrou de compartiment x : les missions de w abandonnee), V12.4, V13.4 (vrai script) |
+| m3 | V12.5 (verrou de la phase 1 de x : les missions de w abandonnee), V12.6, V13.2 (vrai script) |

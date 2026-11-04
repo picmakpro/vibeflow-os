@@ -37,7 +37,7 @@ JS
 cat > "$HOME/.claude/scripts/driver-lock.sh" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
-  status) echo '{"locks":[{"present":true,"owner":"vf-dev-manager-v2-cockpit","step":"mission","ws":"","scope":"repo","age_seconds":135,"stale":false,"children_running":1}]}' ;;
+  status) echo '{"present": true, "scope": "lab", "location": "git-common-dir", "legacy_lock": false, "locks": [{"present": true, "owner": "vf-dev-manager-v2-cockpit", "step": "mission", "age_seconds": 135, "ttl": 1800, "stale": false, "generation": "g1", "session_ids": [], "lease_seconds": 5, "guard_effective": false, "progress_epoch": null, "progress_age_seconds": null, "children_running": 1, "scope": "depot", "ws": "", "location": "git-common-dir"}], "children_running": 1}' ;;
   orphans) echo '{"orphans":[]}' ;;
 esac
 SH
@@ -320,7 +320,7 @@ XP="$(RESP_INJECT="" CDP_PRET="document.readyState === 'complete' && !!document.
 assert_eq "R7.5.0 — témoin : la mesure du lab sans agent a eu lieu sur les deux onglets" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" '(j.erreur||"")+"|"+(j.resultats||[]).length')" "|2"
 for i in 0 1; do on=$([ $i = 0 ] && echo Code || echo Projet)
   assert_eq "R7.5.1 — $on, sans agent actif : l'aria-label du badge dit « Personne au travail »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" "j.resultats[$i].valeur.aria")" "Personne au travail"
-  assert_eq "R7.5.2 — $on, sans agent actif : l'infobulle du badge dit « Personne au travail » et ne contient jamais « undefined »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" "(/^Personne au travail/.test(j.resultats[$i].valeur.titre)&&!/undefined/.test(j.resultats[$i].valeur.titre))+'|'+j.resultats[$i].valeur.titre.slice(0,60)")" "true|Personne au travail · repo : vf-dev-manager-v2-cockpit (miss"
+  assert_eq "R7.5.2 — $on, sans agent actif : l'infobulle du badge dit « Personne au travail » et ne contient jamais « undefined »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" "(/^Personne au travail/.test(j.resultats[$i].valeur.titre)&&!/undefined/.test(j.resultats[$i].valeur.titre))+'|'+j.resultats[$i].valeur.titre.slice(0,60)")" "true|Personne au travail · depot : vf-dev-manager-v2-cockpit (mis"
 done
 
 vf_hyg_assert
