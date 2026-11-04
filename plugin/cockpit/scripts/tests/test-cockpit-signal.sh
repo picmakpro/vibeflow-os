@@ -329,6 +329,11 @@ printf -- '- [ ] **Phase 1: Un** - a\n' > "$L9d/.planning/ROADMAP.md"
 RUN "$FP" "$HOME" "$WORK/o9d.json" "$L9d" > /dev/null
 FAM "S9.D" "$WORK/o9d.json" 'j.root@1024' 'j.equipe.root@1024'
 
+# copie mutée : sans la passe finale, les champs sans borne propre (clés de phase, compartiment dans les jalons) laissent passer le contrôle ; le balayage doit le voir
+MS9="$(mutant s9 'return assainir({' 'return ({')"
+RUN "$WORK/mut-s9" "$HOME" "$WORK/o9m.json" "$L9c" > /dev/null
+assert_eq "S9.M — copie mutée (sans passe finale) détectée : le balayage global rougit sur le contrôle, ce n'est pas une panne" "$MS9|$(node "$AUX/famille.mjs" "$WORK/o9m.json" | tail -1 | cut -c1-11)" "muté|*=controle:"
+
 vf_hyg_assert
 echo
 echo "=== Résultats : $PASS PASS, $FAIL FAIL ==="
