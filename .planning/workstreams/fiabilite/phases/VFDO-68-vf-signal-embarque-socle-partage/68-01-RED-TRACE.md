@@ -163,3 +163,30 @@ Même lab plat à nœud `running`, `HOME` vide, `readPlanning` rejoué sur le co
 - sans ce dossier (défaut = `plugin/cockpit/scripts` réel, conductor voisin du dépôt) : `[["abandonnee",{"tenu":false,"stale":null,"progressAgeS":null,"ttl":null}]]` — le vrai `driver-lock.sh` du dépôt est trouvé, V5.1 rougirait
 
 Épingler `HOME` ne suffit donc pas ; V5.3 de `test-cockpit-vie.sh` garde ce fait (le conductor voisin est trouvé quand aucun dossier n'est passé).
+
+## Annexe — témoins rouges de la carte Projet (tâche 3, P-VIE)
+
+- Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-projet.sh > sortie 2>&1` (rc=1 ; 57 PASS / 4 FAIL) sur le code de la tâche 2 (`vf-cockpit-project.mjs` inchangé).
+- Contrôle positif vert : P-VIE.0 (verrou tenu : la carte `dag-MISSION-1` et son plan désigné restent `active`).
+- Le dossier de scripts explicite est posé sur les seuls appels en processus de `Q` : le vrai lanceur de la section O4 en fait le dossier de scripts du module
+  (`vf-cockpit.mjs`, `VF_COCKPIT_SCRIPTS_DIR`), un export global l'a fait échouer (O4.0 à O4.7, « page prête dépassée »), corrigé avant ce rouge.
+
+### P-VIE.1 — sans verrou : la carte dag-MISSION-1 est todo et son pied dit « abandonnée, nœuds non refermés »
+
+- attendu: [todo|true]
+- obtenu:  [active|false]
+
+### P-VIE.2 — un plan désigné par un nœud running d'une mission abandonnée reste todo
+
+- attendu: [todo]
+- obtenu:  [active]
+
+### P-VIE.3 — les détails de la phase disent « Mission : MISSION-1 (abandonnée, nœuds non refermés) »
+
+- attendu: [true]
+- obtenu:  [false]
+
+### P-VIE.4 — verrous illisibles (aucun script) : la carte est todo et son pied dit « état inconnu »
+
+- attendu: [todo|true]
+- obtenu:  [active|false]
