@@ -25,7 +25,7 @@
     .vf-tabs { display: inline-flex; gap: 2px; padding: 3px; margin-left: 14px; border-radius: 12px; background: var(--raise); flex: none; }
     .vf-tabs a { padding: 5px 13px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text-3); text-decoration: none; line-height: 1.4; }
     .vf-tabs a:hover { color: var(--text); }
-    .vf-tabs a.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+    .vf-tabs a.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
     /* 69-05 : trois onglets au lieu de deux : resserrés à toute largeur pour tenir à côté de la marque, du fil d'Ariane, de la recherche et du zoom (mesuré par test-cockpit-responsive.sh) */
       .vf-tabs { margin-left: 10px; padding: 2px; } .vf-tabs a { padding: 5px 6px; font-size: 12px; }
     .vst { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
@@ -54,7 +54,7 @@
        entre le bas de la couche et ce fondu ; la couche monte donc jusqu'au haut de l'en-tête (inset relatif à --hh, jamais une valeur calée sur une largeur), DERRIÈRE lui (z-index 10), et le dégradé garde sa taille d'avant (masque en deux couches : le radial sur la hauteur d'avant, calé en bas ; au-dessus, la bande reprend son profil de bord haut, plein puis estompé vers la droite) : l'aspect autour du titre ne change pas.
        isolation: isolate garde la couche derrière le texte. #context ne capte aucun événement (pointer-events: none, hérité du viewer) : la carte reste glissable sous la zone. */
     #context { isolation: isolate; background: none; border: 0; border-radius: 0; box-shadow: none; }
-    #context::before { inset: calc(-1 * (var(--hh, 64px) + 8px)) -80px -64px -36px; background: rgba(var(--bg-rgb), .28); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6); -webkit-mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); -webkit-mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); -webkit-mask-position: 0 100%, 0 0; mask-position: 0 100%, 0 0; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; border: 0; border-radius: 0; box-shadow: none; }
+    #context::before { inset: calc(-1 * (var(--hh, 64px) + 8px)) -80px -64px -36px; background: rgba(var(--bg-rgb), .28); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6); -webkit-mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); -webkit-mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); -webkit-mask-position: 0 100%, 0 0; mask-position: 0 100%, 0 0; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; border: 0; border-radius: 0; box-shadow: none; } /* vf-couleur-ok: masque, seul l'alpha compte, jamais affiché */
     #context:empty { display: none; }
   `;
   // spike 005 : la barre de question reste visible quand serve.mjs (P7) sert l'onglet Projet
@@ -63,6 +63,8 @@
   if (TAB === 'project') style.textContent += `
     svg.lod-mid .foot, svg.lod-low .foot { flex-wrap: wrap; row-gap: 4px; } svg.lod-mid .desc { display: none; }
     svg.lod-mid .foot .meta, svg.lod-low .foot .meta { visibility: visible; font-size: 19px; line-height: 1.25; padding: 3px 10px; white-space: normal; }
+    /* UIFN-11 : le texte du pied cède devant la pastille d'état (elle gardait sa largeur et se faisait rogner : « En cour ») */
+    .foot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .foot .vst { flex: none; }
     svg.lod-mid .foot .vst, svg.lod-low .foot .vst { font-size: 17px; padding: 3px 10px; }`;
   if (TAB === 'project') style.textContent += `#btn-health${window.FLOORPLAN_SERVER ? '' : ', #ask'} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }`;
   // onglet Équipe (69-05, P69-PL-09) : ni bouton de santé ni barre de question (la question porte sur le code ou le projet)

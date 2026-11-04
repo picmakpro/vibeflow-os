@@ -32,6 +32,11 @@
     .vf-who span { color: var(--text-3); } .vf-who div { color: var(--text-2); margin-top: 2px; }
     .vf-who.stale { opacity: .55; }
     .vf-who button { margin-top: 6px; font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); }
+    .sec button { font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); margin: 6px 6px 0 0; transition: background .2s var(--ease), color .2s var(--ease); }
+    .sec button:hover { background: rgba(var(--ink), .07); color: var(--text); } .sec button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+    a.vf-link { text-decoration: underline; text-decoration-color: rgba(var(--ink), .35); text-underline-offset: 3px; }
+    a.vf-link:hover { color: var(--text); text-decoration-color: currentColor; } a.vf-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+    .vf-nr { white-space: nowrap; }
     .vf-who .vf-doing { margin-top: 6px; font-family: var(--mono, monospace); font-size: 12px; word-break: break-word; }
     .vf-whop .src { color: var(--text-4); font-size: 11px; margin-top: 14px; }
     .vf-arbre-enfants { margin-left: 14px; padding-left: 10px; border-left: 1px solid rgba(var(--ink), .12); }
