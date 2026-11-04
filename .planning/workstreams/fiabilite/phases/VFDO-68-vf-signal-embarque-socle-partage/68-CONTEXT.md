@@ -174,6 +174,17 @@ Relayés par la session principale (SendMessage) ; réponses mot pour mot entre 
   `jalons[]` dont `phases` contient cette phase) ; sans phase active ou sans jalon qui la contienne, aucun jalon n'est
   affiché, jamais un repli sur le STATE. Appliqué en 68-06 (`en-tete.tsx` ajouté à son périmètre), avec témoin rouge.
 
+### Arbitrages de Samuel pendant l'exécution (AskUserQuestion, session principale Claude Code, 2026-11-04)
+
+Relayés par la session principale (SendMessage) ; réponses mot pour mot entre guillemets.
+
+- **P68-D-31 (périmètre de 68-11, Q1).** « Module seul, racine groupée (Recommandé) ». 68-11 monte le module `cockpit`
+  de v1.1.1 à v1.2.0 avec son CHANGELOG et porte la relecture adverse SOBR-04 du diff de la phase ; aucun bump racine
+  (`VERSION`, `plugin.json`, `marketplace.json`, historique des README, CHANGELOG racine) : il part avec la release
+  groupée. VFSG-13 est reformulée en ce sens. Amende P68-D-08 sur ce seul point.
+- **P68-D-32 (porte de légitimité du paquet, Q2, 68-09 tâche 1, T-68-SC).** « Légitime, 2.1.318 (Recommandé) ».
+  `@anthropic-ai/claude-code` épinglé en `2.1.318` dans l'étape CI.
+
 ### Points de procédure (documentés, sans arbitrage — consigne de la session principale, 2026-11-03)
 
 - Version minimale de Claude Code : aucun champ de version minimale n'est documenté pour les mods ; la version
