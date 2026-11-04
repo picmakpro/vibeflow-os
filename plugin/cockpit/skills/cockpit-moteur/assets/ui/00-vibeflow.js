@@ -154,7 +154,7 @@
   // (LIBELLES_MISSION) : la pastille de CETTE carte est réécrite en « Abandonnée », avant lecture par un lecteur d'écran. Idempotent : une pastille réécrite n'est plus `vst-todo`.
   if (TAB === 'project') {
     const ABANDON = /(?:^|· )abandonnée(?:,|$)/;
-    const dire = () => { for (const f of document.querySelectorAll('.card .foot')) { const p = f.querySelector('.vst.vst-todo'), m = f.querySelector('.meta'); if (p && m && ABANDON.test(m.textContent)) { p.className = 'vst vst-abandonnee'; p.textContent = 'Abandonnée'; } } };
+    const dire = () => { for (const f of document.querySelectorAll('.card .foot')) { const p = f.querySelector('.vst.vst-todo'), m = f.querySelector('.meta'); if (p && m && ABANDON.test(m.textContent)) { p.classList.replace('vst-todo', 'vst-abandonnee'); p.textContent = 'Abandonnée'; } } };
     let tour = 0; new MutationObserver(() => { if (!tour) tour = requestAnimationFrame(() => { tour = 0; dire(); }); }).observe(document.body, { childList: true, subtree: true }); dire();
   }
   SC.on('ready', arriver);
