@@ -7,6 +7,19 @@ pour P71-D-01 à P71-D-08 et P71-D-23 ; décisions du manager (vf-dev-manager, 2
 (O1 à O11 tranchées par P71-D-20 et P71-D-21 ; P71-D-22, d'abord provisoire, est devenue définitive par P71-D-23). Les gestes de
 release racine (version, tag, release GitHub) restent humains. Numéro de version recalculé à la fusion avec les Phases 68 et 70 (P71-PL-12) : mineure suivante de la v1.2.1 de main.
 
+### Corrigé — dernier tour de mineurs de la Phase 71 (lot C)
+- **Chaque branche d'arrêt de l'assistant tue la session** (M1) : sortie du shell, SIGTERM et fin du descripteur 0 portent chacune une
+  assertion avec un `nohup` ; un relevé de processus qui ne contient pas l'assistant (`/proc` vide) vaut « impossible » et déclenche le
+  repli sur les groupes (M2) ; un zombie n'est plus un membre vivant (M3) ; le PID du chef de session n'est plus signalé une fois le chef
+  réapé (N4).
+- **Fermeture bornée** (M3, N5) : au-delà de la borne de fermeture, le serveur escalade en SIGKILL sur l'assistant et rend la place ; le
+  README dit la vraie borne (8 s au pire, la grâce de 3 s en pratique).
+- **Saisie découpée** (M4, N6c) : jamais de corps de plus de 64 Kio sur l'entrée, une grosse saisie part en tranches dans l'ordre ; un 413
+  réduit la tranche puis, à un octet, s'écrit dans le terminal, jamais silencieux.
+- **Ouverture du terminal annoncée** (M6, N6b) : l'erreur asynchrone de l'ouvreur est rattrapée ; si l'amorçage n'est pas échangé dans les
+  15 s, le lanceur le dit avec la page à ouvrir à la main ; limite Linux écrite au README (P71-D-27 inchangée).
+- **Aucune trace au lanceur** (N6a) : un lien symbolique planté sur le chemin de sortie, serveur réutilisé, sort en code 4 avec un message.
+
 ### Corrigé — audit de sécurité de la Phase 71 (lot B1 : lanceur et amorçage)
 - **Le lanceur n'ouvre plus une adresse lue dans le lab** (F1, majeur ; P71-D-25, validation de Samuel, AskUserQuestion, session
   principale Claude Code, 2026-11-04) : seuls des ports entiers sont lus dans `server.json`, l'adresse est reconstruite en
