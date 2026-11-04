@@ -3,6 +3,9 @@
 /** Les cinq temps de la boucle VibeFlow. */
 export type Stage = 'cadrer' | 'planifier' | 'executer' | 'verifier' | 'clore'
 
+/** Le thème de couleurs de la pane (VFSG-07) : sombre d'abord, clair si le thème de la personne est clair. */
+export type Theme = 'sombre' | 'clair'
+
 /** Les trois vues de la pane. */
 export type View = 'mission' | 'equipe' | 'macro'
 
@@ -129,6 +132,8 @@ declare module 'claude-code' {
       loopAlert: string | null
       usage: Usage | null
       view: View
+      /** Le thème de la personne, lu dans `$.config.list()` au démarrage de la session. */
+      theme: Theme
       bandHiddenFor: string | null
       /** Vrai si l'ancien mod `vf-signal` (hors dépôt) est présent sous HOME : risque de deux panes. */
       ancienMod: boolean

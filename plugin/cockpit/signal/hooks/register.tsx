@@ -13,6 +13,7 @@ import { brief, stageOf } from './derive'
 import { PHRASE_ANCIEN_MOD, ancienModPresent } from './ancien-mod'
 import { cockpitInstalle } from './gating'
 import { VIEWS } from './ds'
+import { themeDe } from './tokens'
 import { pane } from './pane'
 import { recordRefusal, refreshAll, refreshLive, refreshRoster, refreshSignalAuto, setStage } from './refresh'
 import type { AgentStat, View } from '../types'
@@ -28,6 +29,7 @@ const loopAlert = atom({ plugin: 'vibeflow', key: 'loopAlert' } as const, null)
 const usage = atom({ plugin: 'vibeflow', key: 'usage' } as const, null)
 const view = atom({ plugin: 'vibeflow', key: 'view' } as const, 'mission')
 const ancienMod = atom({ plugin: 'vibeflow', key: 'ancienMod' } as const, false)
+const theme = atom({ plugin: 'vibeflow', key: 'theme' } as const, 'sombre')
 
 export const register: Register = on => {
   let home: string | undefined
@@ -44,6 +46,9 @@ export const register: Register = on => {
     home = await $.env.get('HOME')
     actif = await cockpitInstalle($, await $.session.root().catch(() => undefined), home)
     if (!actif) return next(e)
+    // le thème de la personne, une fois ; toute erreur laisse le sombre (« sombre d'abord », P68-PL-10)
+    const rows = await $.config.list().catch(() => [])
+    await update($, theme, () => themeDe(rows))
     const ancien = await ancienModPresent($, home)
     await update($, ancienMod, () => ancien)
     if (ancien) $.ui.toast(PHRASE_ANCIEN_MOD)
