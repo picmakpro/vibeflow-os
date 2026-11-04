@@ -320,7 +320,26 @@ XP="$(RESP_INJECT="" CDP_PRET="document.readyState === 'complete' && !!document.
 assert_eq "R7.5.0 — témoin : la mesure du lab sans agent a eu lieu sur les deux onglets" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" '(j.erreur||"")+"|"+(j.resultats||[]).length')" "|2"
 for i in 0 1; do on=$([ $i = 0 ] && echo Code || echo Projet)
   assert_eq "R7.5.1 — $on, sans agent actif : l'aria-label du badge dit « Personne au travail »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" "j.resultats[$i].valeur.aria")" "Personne au travail"
-  assert_eq "R7.5.2 — $on, sans agent actif : l'infobulle du badge dit « Personne au travail » et ne contient jamais « undefined »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" "(/^Personne au travail/.test(j.resultats[$i].valeur.titre)&&!/undefined/.test(j.resultats[$i].valeur.titre))+'|'+j.resultats[$i].valeur.titre.slice(0,60)")" "true|Personne au travail · depot : vf-dev-manager-v2-cockpit (mis"
+  assert_eq "R7.5.2 — $on, sans agent actif : l'infobulle du badge dit « Personne au travail » et ne contient jamais « undefined »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" "(/^Personne au travail/.test(j.resultats[$i].valeur.titre)&&!/undefined/.test(j.resultats[$i].valeur.titre))+'|'+j.resultats[$i].valeur.titre.slice(0,60)")" "true|Personne au travail · dépôt : vf-dev-manager-v2-cockpit (mis"
+done
+
+# R-M (recette 68, R5 + R7 ; P68-D-35, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04 : « Tout selon les recos ») : la carte d'une mission ABANDONNÉE (nœud en cours, aucun verrou) sur l'onglet Projet.
+# R5 : la pastille dit « Abandonnée » (jamais « À faire »), du jeton gris neutre de « À faire » ; R7 : le pied de la carte passe à la ligne, la boîte du texte ET celle de la pastille tiennent dans la carte, thèmes sombre et clair.
+# Un Chrome par thème (chrome-mission.mjs). Aucun verrou n'est tenu pour ce lab (le driver-lock.sh du conductor voisin répond, comme dans l'installation : « present: false ») : la mission est abandonnée, pas vivante. Le faux driver-lock sans verrou ci-dessous sert de repli si le conductor n'est pas voisin.
+echo "=== R-M — carte d'une mission abandonnée : pastille « Abandonnée », pied dans la carte (sombre et clair) ==="
+mkdir -p "$WORK/locks-abs"; printf '#!/usr/bin/env bash\ncase "$1" in status) echo "{\\"present\\": false}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' > "$WORK/locks-abs/driver-lock.sh"; chmod +x "$WORK/locks-abs/driver-lock.sh"
+LM="$WORK/lab-mission"; mklab "$LM" sans-agent
+o="$LM/.vibeflow/cockpit"; rm -f "$o/.cache/server.json"
+( cd "$LM" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$WORK/locks-abs" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
+SRV_PID=$!; PIDS+=($SRV_PID)
+for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
+PM="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+RM="$(REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-mission.mjs" "$CHROME" "http://127.0.0.1:$PM/project.html" dag-demo ${SHOTS:+"$SHOTS/mission"})"; unsrv
+assert_eq "R-M.0 — témoin : la mesure a eu lieu dans les deux thèmes, sur la carte abandonnée (data-theme sombre puis clair)" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" '(j.erreur||"")+"|"+(j.sombre||{}).n+"|"+(j.sombre||{}).theme+"|"+(j.clair||{}).n+"|"+(j.clair||{}).theme')" "|1|dark|1|light"
+for th in sombre clair; do
+  assert_eq "R5 — $th : la pastille dit « Abandonnée » (jamais « À faire »)" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" "(j.$th||{}).pastille")" "Abandonnée"
+  assert_eq "R5 — $th : gris neutre, le jeton de « À faire » (aucune couleur en dur dans la pastille)" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" "(j.$th||{}).classe")" "vst vst-abandonnee"
+  assert_eq "R7 — $th : le texte du pied et la pastille tiennent dans la carte (droite, bas), texte non rogné" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" "(j.erreur||'')+[(j.$th||{}).dedansTexte,(j.$th||{}).dedansPastille,(j.$th||{}).rogne].join('|')")" "true|true|false"
 done
 
 vf_hyg_assert
