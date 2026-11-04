@@ -13,11 +13,12 @@
 //   Rend sur une ligne { l<largeur>: { n, etapes: [ { i, cible, centre, couvert, visible, entier, coupe, tient, passer, repere, anglais } ] } } ou { erreur } nommée. Une étape par entrée ; les valeurs de défaut sont :
 //   cible = ni carte éclairée (classe hl, la visite ne sélectionne plus : le panneau garde la vue d'ensemble) ni élément du chrome mis en évidence (.tour-target) · centre = carte sélectionnée dont le centre n'est pas dans le tiers central d'une zone libre, sauf si la centrer ferait sortir une autre carte de la zone libre (au-dessus ou à droite de la carte de visite, hors en-tête, titre, panneau et barre de question)
 //   couvert = la carte de visite recouvre la cible · visible = la cible n'est pas entièrement dans la fenêtre · entier = le texte de l'étape n'a pas sa fin (FINDETEXTE) alors que sa source la porte · coupe = le texte finit par « … »
+//   surfaces = noms des surfaces fixes (#zoom, #panel, #context, header, #ask, contour de la cible) que la carte de visite recouvre : vide à chaque étape, à toute largeur, visite ouverte d'office ou par l'API
 //   selectionne = la visite a sélectionné quelque chose (le panneau montre alors le détail d'une carte au lieu de la vue d'ensemble) · toutLibre = une carte du graphe sort de la zone libre à gauche du panneau, visite active (critère de R1) · dansZone = la carte ciblée sort de la zone libre de la carte (sous le panneau, l'en-tête ou la barre de question ; 70-07, grandes cartes) · tient = la carte de visite sort de la fenêtre · passer = aucun bouton « Passer » visible dans la carte · repere = texte « n sur N » lu · anglais = mots témoins anglais (liste de F11) dans le texte de la carte de visite.
 import { executer, pause } from './chrome-session.mjs';
 const [, , chrome, url, largeurs, options = ''] = process.argv;
 const recharge = /recharge/.test(options), passer = /passer/.test(options), panneau = /panneau/.test(options), equipe = /equipe/.test(options), echap = /echap/.test(options);
-const HAUT = { 390: 844, 1024: 768, 1440: 900 };
+const HAUT = { 390: 844, 768: 1024, 800: 600, 1024: 768, 1440: 900 };
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlowTour && !!document.getElementById('tour-btn')";
 const INIT = "!!window.__vfModele && !!window.__vfModele.modele";
 const DONNEE = `(() => { const G = window.VibeFlow.graph; const long = (n) => 'RESUME-' + n + ' Ce résumé de test est volontairement très long : il dépasse deux cent trente caractères pour que la visite le coupe, ou le montre entier. Il continue encore un peu pour être sûr de passer la limite, puis il se termine ici : FINDETEXTE';
@@ -55,6 +56,11 @@ const MESURE = `(() => {
   o.entier = !/RESUME-/.test(note) || /FINDETEXTE/.test(note); o.coupe = /…\\s*$/.test(note);
   o.selectionne = sel !== null && sel !== undefined; // la visite ne sélectionne rien : le panneau garde la vue d'ensemble (R5.3)
   o.tient = dans(cr);
+  // surfaces fixes de l'interface que la carte de visite ne doit jamais recouvrir (visibles seulement) : zoom, panneau de détail, titre, en-tête, barre de question (et ses avis), contour de la cible
+  { const vis = (e) => { const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+    const liste = [['#zoom', document.getElementById('zoom')], ['#panel', document.getElementById('panel')], ['#context', document.getElementById('context')], ['header', document.querySelector('header')], ['#ask', document.getElementById('ask')], ['cible', document.querySelector('.tour-target')]];
+    const ask = document.getElementById('ask'); if (ask) for (const c of ask.children) liste.push(['#ask>' + (c.id || c.className || c.tagName), c]);
+    o.surfaces = liste.filter(([, e]) => e && vis(e) && inter(cr, R(e))).map(([n]) => n); }
   { const pn = document.getElementById('panel'), pb = pn ? R(pn) : null; o.surPanneau = !!pb && pb.w > 0 && getComputedStyle(pn).visibility !== 'hidden' && inter(cr, pb); }
   const p = card.querySelector('.tf [data-x]'); let pr = false;
   if (p) { const r = R(p), cs = getComputedStyle(p); pr = r.w > 0 && r.h > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && dans(r) && r.b <= cr.b + 0.5 && r.t >= cr.t - 0.5 && /^(Passer|Skip)$/.test(p.textContent.trim()); }

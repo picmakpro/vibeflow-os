@@ -130,3 +130,15 @@ Q4a et Q5a (centrage borné, visite qui éclaire sans sélectionner) : ratifiés
 - Q7b : l'étape « services extérieurs » (plusieurs services) allume les cartes des services (jusqu'à six, `hl` sur chaque carte, `dim` sur le reste), en plus du contour du titre de la vue d'ensemble. Construite par `autoSteps()` de `40-tour.js` ; aucun nouveau test (réglage de contenu), O5 rejoué vert. Non vérifié visuellement : les labs de la suite n'ont pas de services extérieurs.
 - Q9b : dernier pas : « depuis le bouton de visite (icône) en haut » quand le bouton n'affiche que son icône (sous 1 600 px), « ⋯ › Par où commencer » sous 700 px, « Par où commencer » en haut sinon ; infobulle « de ce projet » sur l'onglet Projet, « de ce code » ailleurs.
 - Q13a : sur l'onglet Équipe, `start()` ne fait rien et le bouton est `aria-disabled`, atténué, avec l'infobulle « Pas de visite pour l'onglet Équipe ».
+
+## Suite : classe visite / surfaces (CI Linux de 07e75a54 : R3 « #zoom recouvre #tour » à 800 px)
+
+Quatrième instance de la même famille (`#panel` puis `#context` en R20, Échap en R15.4b, maintenant `#zoom`) : la carte de visite ne regarde que le panneau, la barre de question et sa cible, pas les autres surfaces fixes. On ferme la classe.
+
+### Rouge — 07e75a54, témoin génératif O6.17 (sonde `chrome-visite-etapes.mjs`, champ `surfaces`)
+
+Visite ouverte par l'API (aucune course de calendrier), Code et Projet, 390 / 768 / 800 / 1 024 / 1 440 px, surfaces visibles : `#zoom`, `#panel`, `#context`, en-tête, `#ask` et ses avis, contour de la cible. Mesure de la sonde sur le code d'avant correction :
+- Code, 800 px : étape 1 `#zoom` ; étape 2 `#zoom+#context`.
+- Projet, 800 px : étape 2 `#context` ; étape 4 `#zoom+#context`.
+- Toutes les autres largeurs : aucune surface recouverte (390, 768, 1 024, 1 440).
+Les assertions O6.17 de la suite n'ont pas été rejouées sur l'ancien arbre : mesure à la sonde.

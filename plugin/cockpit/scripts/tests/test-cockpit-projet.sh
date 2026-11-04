@@ -523,6 +523,17 @@ XEC="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 390 echap)
 xec() { printf '%s' "$XEC" | node "$AUX/get.mjs" /dev/stdin "$1"; }
 assert_eq "O6.15a — témoin : mesure sans erreur, tiroir ouvert par la carte avant la visite, visite démarrée" "$(xec "j.erreur||''")|$(xec 'j.t390.carteOuverte.tiroir')|$(xec 'j.t390.visiteDemarree.tour')" "|true|true"
 assert_eq "O6.15 — visite ouverte au-dessus d'un tiroir ouvert : l'ouverture de la visite ne ferme pas le tiroir ; la première Échap ferme la visite et laisse le tiroir ; la seconde ferme le tiroir (tiroir|visite après chaque temps)" "$(xec '[j.t390.visiteDemarree,j.t390.echap1,j.t390.echap2].map((x)=>x.tiroir+"/"+x.tour).join(" ")')" "true/true true/false false/false"
+# O6.17 (CI Linux de 07e75a54 : R3 « #zoom recouvre #tour » à 800 px ; quatrième instance après #panel, #context et Échap) : la CLASSE de défaut, pas un cas de plus. Visite ouverte par l'API (sans course de calendrier), sur Code et sur Projet,
+# à 390, 768, 800, 1 024 et 1 440 px : à CHAQUE étape, la carte de visite ne recouvre aucune surface fixe visible de l'interface (#zoom, #panel, #context, en-tête, #ask et ses avis, contour de la cible).
+XS1="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$U5" 390,768,800,1024,1440)"; XS2="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 390,768,800,1024,1440)"
+[ -n "${DBG:-}" ] && echo "RAWS: $XS1 $XS2"
+xs1() { printf '%s' "$XS1" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+xs2() { printf '%s' "$XS2" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O6.17a — témoin : les deux mesures ont eu lieu sans erreur, au moins deux étapes à chaque largeur" "$(xs1 "j.erreur||''")|$(xs2 "j.erreur||''")|$(xs1 '[390,768,800,1024,1440].every((w)=>j["l"+w].n>=2)')|$(xs2 '[390,768,800,1024,1440].every((w)=>j["l"+w].n>=2)')" "||true|true"
+for W in 390 768 800 1024 1440; do
+  assert_eq "O6.17 [$W px] — Code : étapes dont la carte de visite recouvre une surface fixe (étape:surfaces)" "$(xs1 "j.l$W.etapes.filter((e)=>e.surfaces.length).map((e)=>e.i+':'+e.surfaces.join('+')).join(' ')")" ""
+  assert_eq "O6.17 [$W px] — Projet : étapes dont la carte de visite recouvre une surface fixe (étape:surfaces)" "$(xs2 "j.l$W.etapes.filter((e)=>e.surfaces.length).map((e)=>e.i+':'+e.surfaces.join('+')).join(' ')")" ""
+done
 # O6.10 (correctif 70-07, REG-70-01 de 70-VERIFICATION.md) : visite Projet active au premier chargement sur un lab à jalon et à mission, à 1 024 et 1 920 px : la carte ciblée tient dans la zone libre ET aucune carte du graphe ne sort de la zone
 # libre à gauche du panneau (critère de R1, chrome-responsive.mjs). Cause : aim() centrait et zoomait la carte sans regarder le reste du graphe, qui débordait sous le panneau ; il ne dézoomait jamais une carte plus large que sa zone.
 L7="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mkdir -p "$L7/src" "$L7/.planning/phases/01-socle" "$L7/.planning/phases/02-suite" "$L7/.planning/missions"
