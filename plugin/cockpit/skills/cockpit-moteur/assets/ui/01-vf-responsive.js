@@ -54,6 +54,9 @@
       header #crumbs [data-vf-masque] { display: none; }
       header #crumbs .vf-ell { flex: none; color: var(--text-4); padding: 0 6px; cursor: default; }
     }
+    /* 70-12 (UIFN-14, P70-D-20 : choix du manager, vf-dev-manager, 2026-11-04) : l'onglet Équipe n'a pas de barre de question, donc rien ne gêne le bas de la scène ; dès 701 px le zoom y est la rangée en bas à gauche du viewer d'origine
+       (celle de 1 440 px), jamais la colonne du haut qui recouvrait les cartes. Code et Projet gardent leur position (la barre de question occupe le bas) ; sous 701 px la pile verticale du téléphone (02-vf-telephone.js) reste seule. */
+    @media (min-width: 701px) { body.vf-tab-equipe #zoom { left: 16px; right: auto; top: auto; bottom: 16px; flex-direction: row; border-radius: 999px; } }
     @media (max-width: 999px) { #ask-input { flex: 1 1 100%; } }
     @media (max-width: 700px) { header #crumbs { display: none; } }
   `;

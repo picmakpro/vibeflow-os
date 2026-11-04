@@ -64,6 +64,9 @@
   const arrivee = () => {
     if (arrive) return;
     arrive = true;
+    // 70-12 (UIFN-14, défaut E) : le rerender() de `suivre` annule le premier rendu du viewer (le jeton de rendu change), celui qui appelait fit(false) ; le rendu qui aboutit garde la
+    // transformation d'origine et la première carte reste sous l'en-tête et le titre. On cadre donc la scène ici, une fois par page, avant la révélation éventuelle d'une carte visée.
+    SC.fit?.(false); // `?.` : le faux viewer du harnais hors navigateur de test-cockpit-equipe.sh (EUI) ne porte pas fit
     const r = new URLSearchParams(location.hash.slice(1)).get('r');
     if (r && /^n:/.test(r) && SC.exists(r)) SC.reveal(r);
   };
