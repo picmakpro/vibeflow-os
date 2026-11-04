@@ -102,7 +102,7 @@ export const register: Register = on => {
   // --- le tour ---------------------------------------------------------------
 
   on('turn.start', async ($, e, next) => {
-    if (e.agentId !== undefined) return next(e)
+    if (!actif || e.agentId !== undefined) return next(e)
     recentCalls = []
     const now = await $.clock.now()
     await update($, loop, l => ({ ...l, isWorking: true, turnStartedAt: now, tools: 0 }))
@@ -116,6 +116,7 @@ export const register: Register = on => {
   })
 
   on('turn.complete', async ($, e, next) => {
+    if (!actif) return next(e)
     if (e.agentId !== undefined) {
       await refreshRoster($)
       return next(e)
@@ -134,6 +135,7 @@ export const register: Register = on => {
   // --- l'équipe --------------------------------------------------------------
 
   on('agent.spawn', async ($, e, next) => {
+    if (!actif) return next(e)
     await setStage($, e.subagentType, e.parentAgentId)
     const startedAt = await $.clock.now()
     const ran = await next(e)
@@ -147,6 +149,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   on('skill.prompt', async ($, e, next) => {
+    if (!actif) return next(e)
     await setStage($, e.skill, undefined)
     return next(e)
   })
@@ -154,6 +157,7 @@ export const register: Register = on => {
   // --- les outils : compte, boucle, refus --------------------------------------
 
   on('tool.call', async ($, e, next) => {
+    if (!actif) return next(e)
     const { tool, tool_use_id, agentId, requestMeta, ...args } = e
     void requestMeta
     const signature = `${agentId ?? 'main'}|${tool}|${JSON.stringify(args)}`
@@ -186,6 +190,7 @@ export const register: Register = on => {
   // Les gardes VibeFlow (guard-driver-lock, guard-agent-write…) sont des hooks
   // classiques : leur `permissionDecision: deny` arrive ici, avec sa raison.
   on('classic.PreToolUse', async ($, e, next) => {
+    if (!actif) return next(e)
     const ran = await next(e)
     if (ran.deny !== undefined) {
       await recordRefusal($, e.tool_use_id ?? `${e.tool}-${await $.clock.now()}`, e.tool, ran.deny)

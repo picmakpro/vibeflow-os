@@ -21,3 +21,15 @@ ROUGE (tête non corrigée, `fix-mod-st1-rouge.out`) :
 | FX-1g | `state.set` | 0 | 13 |
 | FX-1h | `[agent.list, session.usage]` | `[0, 0]` | `[2, 1]` |
 | FX-1c | `/vf-signal brief` | `{ text: 'engine' }` | vert (le gating de `command.run` existe déjà ; sa mutation est jouée plus bas) |
+
+VERT (`fix-mod-st1-vert.out`, 71 pass / 0 fail) : `register.tsx` porte `if (!actif) return next(e)` en tête de `turn.start`,
+`turn.complete`, `agent.spawn`, `skill.prompt`, `tool.call` et `classic.PreToolUse` (les autres hooks l'avaient déjà).
+
+Mutants tués (un gate retiré à la fois, suite rejouée) :
+
+| mutant | témoins rouges |
+| --- | --- |
+| gate de `command.run` retiré | FX-1a, FX-1g, FX-1h, FX-1b, FX-1c |
+| gate de `tool.call` retiré | FX-1a, FX-1g, FX-1b |
+| gate de `turn.start` retiré | FX-1e, FX-1f, FX-1g |
+| gate de `agent.spawn` retiré | FX-1g, FX-1h |
