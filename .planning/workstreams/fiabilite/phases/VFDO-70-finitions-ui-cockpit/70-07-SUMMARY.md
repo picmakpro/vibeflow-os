@@ -35,3 +35,4 @@ patch: P25
 - Preuves : `70-07-RED-TRACE.md`, sections « Suite : … ».
 - CI Linux (R20 à 768 px, `#panel` recouvre `#tour`) : la carte de visite se rétrécit plutôt que de passer sous le panneau de détail (O6.13, panneau élargi). Cause non observée sous Linux, déduite : l'émulation `pointer: none` ne la reproduit pas (R20 vert sans pointeur).
 - CI Linux, seconde cause (R20 à 768 px, `#context` recouvre `#tour`) : la visite ne s'ouvrait pas seulement sur Code et Projet ; elle s'ouvrait d'elle-même sur Équipe, qui n'a aucune visite conçue. `start()` sans argument (démarrage d'office) ne fait plus rien sur Équipe, le bouton l'ouvre toujours (O6.14).
+- CI Linux, R15.4b : la visite d'office, ouverte pendant la mesure, capte la première Échap (bon ordre) ; `INJ_ECHAP` ferme la visite avant l'Échap (section R15 de la suite responsive) ; O6.15 fixe l'ordre visite puis tiroir. `40-tour.js` inchangé.

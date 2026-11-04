@@ -96,3 +96,19 @@ Sonde `chrome-visite-etapes.mjs … 768 equipe` : `{"e768":{"cartes":2,"auto":tr
 `start(manual)` : le démarrage d'office (sans argument) ne fait rien sur l'onglet Équipe ; le bouton « Par où commencer » (`start(true)`) l'ouvre toujours (O6.14b). Cette décision n'invente aucune visite : elle retire un repli involontaire. Choix (b) non retenu (carte de visite écartée de `#context`) : sans visite sur Équipe, aucune carte à placer ; si une visite manuelle y est ouverte, le recouvrement de `#context` par une carte haute reste possible (non mesuré).
 
 `test-cockpit-projet.sh` 106 PASS / 0 FAIL (O6.14a, O6.14, O6.14b) ; `test-cockpit-vendor.sh` 79/0 ; `test-cockpit-chrome-fr.sh` 70/0 ; `test-cockpit-responsive.sh` 255 PASS / 6 FAIL (les six R13.4) ; `synchro.sh verifier` : amont retrouvé à l'octet.
+
+## Suite : CI Linux, R15.4b (03bada92)
+
+`R15.4b — Projet / 390 px : Échap ferme le tiroir` : attendu `[false]`, obtenu `[true]` sous Linux, deux fois sur le shard 6.
+
+**Hypothèses instruites (macOS, condition forcée).** (1) Une visite ouverte capte la première Échap (écouteur de capture de `40-tour.js`), le tiroir reste ouvert : vérifié. (2) L'ouverture ou la sortie de la visite touche l'état du tiroir : faux. Mesure à 390 px sur Projet, une carte ouverte dans le tiroir : visite démarrée → tiroir ouvert, visite active ; Échap 1 → visite fermée, tiroir ouvert ; Échap 2 → tiroir fermé. Les trois états sont repris par O6.15 (la visite, couche du dessus, capte la première Échap, c'est le bon ordre pour une personne ; le tiroir n'est jamais touché par la visite).
+
+Le lien avec 5e503058 est un effet de calendrier, pas de code : ce commit ne change pas l'ouverture d'office sur Projet. Sous Linux, plus lent, la visite d'office (700 ms) s'ouvre pendant la mesure ; sous macOS, l'Échap de R15.4b part avant. Non vérifié sous Linux.
+
+### Rouge — condition forcée sous macOS, tête 03bada92
+
+`chrome-responsive.mjs` avec l'injection d'`INJ_ECHAP` précédée de `window.VibeFlowTour.start()` : `tiroir = true` (attendu `false`) : R15.4b rougit.
+
+### Correction et vert
+
+Le défaut est dans la condition de mesure, pas dans la visite : `INJ_ECHAP` (section R15 de `test-cockpit-responsive.sh`, seule retouche de la suite) ferme la visite (`window.VibeFlowTour?.end()`) avant l'Échap ; la visite n'est pas marquée « vue ». Assertion R15.4b inchangée. `test-cockpit-responsive.sh` 255 PASS / 6 FAIL (les six R13.4 ; R15.4b vert) ; `test-cockpit-projet.sh` 108 PASS / 0 FAIL (O6.15a, O6.15) ; `test-cockpit-vendor.sh` 79/0 ; `test-cockpit-chrome-fr.sh` 70/0.
