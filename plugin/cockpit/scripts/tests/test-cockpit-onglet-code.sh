@@ -3,6 +3,7 @@
 #   C1 lab à modules : extracteur VibeFlow (dispatch, source, plus de liens que le même lab en brut)
 #   C4 dossier de plugin/ sans module.json : nœud infra générique + enfant tests (sans liste de noms)
 #   C2 lab neutre : architecture brute · C3 aucun assemblage n'appelle `claude` (faux binaire consignant tout appel)
+#   C5 accord de « fichier de code » dans le résumé d'un dossier : 1 fichier, 2 fichiers (UIFN-06, 70-01)
 # Labs jetables dans mktemp, isolation git, HOME jetable. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -80,6 +81,14 @@ echo "=== C2 — lab neutre : architecture brute ==="
 LN="$WORK/neutre"; mklab "$LN" neutre
 assert_eq "C2.1 — l'assemblage rend 0" "$(assembler "$LN")" "0"
 assert_eq "C2.2 — meta.vfCodeExtractor = brut" "$(donnee "$LN" 'j.meta.vfCodeExtractor')" "brut"
+
+echo "=== C5 — accord de « fichier de code » dans le résumé d'un dossier (UIFN-06, 70-01) ==="
+LA="$WORK/accord"; mklab "$LA" neutre
+mkdir -p "$LA/solo" "$LA/duo"; printf 'export const a = 1;\n' > "$LA/solo/a.js"; printf 'export const a = 1;\n' > "$LA/duo/a.js"; printf 'export const b = 2;\n' > "$LA/duo/b.js"
+git -C "$LA" add -A && git -C "$LA" -c user.email=t@t -c user.name=t commit -q -m accord
+assert_eq "C5.0 — l'assemblage du lab d'accord rend 0" "$(assembler "$LA")" "0"
+assert_eq "C5.1 — un dossier à un seul fichier de code : « 1 fichier de code » (jamais « 1 fichiers »)" "$(donnee "$LA" 'j.nodes.filter(n=>n.label==="solo").map(n=>n.summary).join("|")')" "Dossier solo : 1 fichier de code."
+assert_eq "C5.2 — un dossier à deux fichiers : « 2 fichiers de code »" "$(donnee "$LA" 'j.nodes.filter(n=>n.label==="duo").map(n=>n.summary).join("|")')" "Dossier duo : 2 fichiers de code."
 
 echo "=== C3 — aucun appel à claude pendant l'assemblage ==="
 assert_eq "C3.1 — le faux claude n'a été appelé par aucun assemblage (C1, C2 et le témoin)" "$([ -s "$VF_FAKE_LOG" ] && wc -l < "$VF_FAKE_LOG" | tr -d ' ' || echo 0)" "0"
