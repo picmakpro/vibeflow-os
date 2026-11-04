@@ -360,6 +360,34 @@ rmdir "$L5/.planning/DRIVER.lock"; mkdir -p "$W5/.planning/DRIVER.lock"
 RUN "$FD5" "$WORK/home-vide" "$WORK/o10b.json" "$L5" > /dev/null
 assert_eq "S10.2 — verrou tenu dans le worktree seulement : l'inverse" "$(PA "$WORK/o10b.json")" "main:aucune#feat/x:2"
 
+echo "=== S11 — échéance globale de l'émetteur, indépendante du nombre d'arbres (F-06) ==="
+# git est ralenti (0,5 s par appel) sur un lab à six arbres : sans échéance globale le total croît avec le nombre d'arbres ; avec echeanceMs il est borné
+# et les champs non calculés à temps sont null (jamais 0). Témoin de contrôle : avec une échéance généreuse tout est calculé, et c'est lent.
+cat > "$AUX/ech.mjs" <<'JS'
+// ech.mjs <scripts> <lab> <echeanceMs> <dossier de scripts du verrou> : collectSignal avec échéance ; durée et retard.main de chaque arbre
+import { pathToFileURL } from 'node:url';
+import path from 'node:path';
+const [, , scripts, root, ech, sd] = process.argv;
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-signal.mjs')).href);
+const t0 = Date.now();
+const s = m.collectSignal(root, { home: process.env.HOME, scriptsDir: sd, echeanceMs: Number(ech) });
+console.log(JSON.stringify({ ms: Date.now() - t0, arbres: s.arbres.length, main: s.arbres.map((a) => (a.retard && typeof a.retard.main === 'number' ? a.retard.main : null)) }));
+JS
+mkdir -p "$WORK/binslow"
+printf '#!/bin/sh\nsleep 0.5\nexec "%s" "$@"\n' "$GIT_REEL" > "$WORK/binslow/git"; chmod +x "$WORK/binslow/git"
+L6="$WORK/lab-s11"; G_ init -q -b main "$L6"; mkdir -p "$L6/.planning"
+printf -- '- [ ] **Phase 1: Un** - a\n' > "$L6/.planning/ROADMAP.md"
+G_ -C "$L6" add -A; G_ -C "$L6" commit -q -m c0
+for i in 1 2 3 4 5; do G_ -C "$L6" branch "b$i"; G_ -C "$L6" worktree add -q "$WORK/wt-s11-$i" "b$i" 2>/dev/null; done
+for i in 1 2 3; do G_ -C "$L6" commit -q --allow-empty -m "m$i"; done
+ECH() { PATH="$WORK/binslow:$PATH" node "$AUX/ech.mjs" "$SCRIPTS" "$L6" "$1" "$FP/conductor/scripts" 2>/dev/null; }   # ECH <echeanceMs>
+ECHJ() { node -e 'const j=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log(eval(process.argv[1]))' "$1"; }
+E_LARGE="$(ECH 600000)"
+assert_eq "S11.1 — témoin : échéance généreuse, six arbres, retard.main calculé partout (0 pour l'arbre principal, 3 pour les cinq autres) et lent (au moins 8 s)" "$(echo "$E_LARGE" | ECHJ 'j.arbres+"|"+j.main.join()+"|"+(j.ms>=8000)')" "6|0,3,3,3,3,3|true"
+E_COURT="$(ECH 3000)"
+assert_eq "S11.2 — échéance de 3 s : l'émetteur rend en moins de 6 s" "$(echo "$E_COURT" | ECHJ 'j.ms<6000')" "true"
+assert_eq "S11.3 — échéance de 3 s : les six arbres sont listés, au moins un retard.main non calculé à temps vaut null (jamais un 0 pour un arbre en retard)" "$(echo "$E_COURT" | ECHJ 'j.arbres+"|"+(j.main.some(x=>x===null))+"|"+(j.main.slice(1).some(x=>x===0))')" "6|true|false"
+
 vf_hyg_assert
 echo
 echo "=== Résultats : $PASS PASS, $FAIL FAIL ==="

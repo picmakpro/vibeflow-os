@@ -68,3 +68,14 @@ Témoin S10.0 (vert) : le faux script répond bien selon le dossier.
 
 Choix : lecture par arbre en lab plat (la forme la plus simple qui tienne sans restreindre l'hypothèse). `collectSignal` passe `{ scriptsDir, home }` à `readPlanning` des arbres non courants quand `verrous.plat` ; `readPlanning` lit alors paresseusement le verrou de la racine de CET arbre, seulement s'il porte un nœud running. En lab partitionné la lecture unique reste (dossier git commun = même verrou pour tous les arbres : le commentaire est désormais écrit pour ce régime seulement).
 Vert : `test-cockpit-signal.sh` 63 PASS / 0 FAIL (scratchpad `fix-socle-f05-vert.out`).
+
+## F-06 — pas d'échéance globale : le total croît avec le nombre de worktrees
+
+Témoin : section S11 de `test-cockpit-signal.sh` — lab à six arbres, `git` ralenti à 0,5 s par appel (emballage en tête du `PATH`), `collectSignal(root, { echeanceMs })` appelé en bibliothèque.
+Contrôle (vert) : S11.1, échéance généreuse (600 000 ms) — six arbres, `retard.main` = `0,3,3,3,3,3`, durée ≥ 8 s : l'emballage ralentit bien, et le calcul complet est lent.
+Rouge sur `6f5c8191` (scratchpad `fix-socle-f06-rouge.out`) — l'option `echeanceMs` est ignorée :
+
+| Assertion | Attendu | Obtenu (rouge) |
+|---|---|---|
+| S11.2 échéance de 3 s : rend en moins de 6 s | true | false |
+| S11.3 six arbres listés, au moins un `retard.main` null, aucun 0 pour un arbre en retard | `6\|true\|false` | `6\|false\|false` (aucun null : tout est calculé, lentement) |
