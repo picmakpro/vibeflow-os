@@ -1,5 +1,5 @@
 // chrome-verrou.mjs — recette 68 N2 (P68-D-38) : le tiroir « Au travail » écrit « Verrou dépôt », jamais « Verrou depot » (la valeur `tree`/`scope` du flux reste `depot`).
-// Usage : node chrome-verrou.mjs <chrome> <url http de project.html>. Rend { lignes } : les textes des lignes de verrou du tiroir.
+// Usage : node chrome-verrou.mjs <chrome> <url http de project.html>. Rend { lignes, regle } : les textes des lignes de verrou du tiroir et la ligne d'en-tête du verrou (même âge, P68-D-39).
 import { executer } from './chrome-session.mjs';
 const [, , chrome, url] = process.argv;
 const INJ = `(() => { const R = window.EventSource; window.__es = []; window.EventSource = class extends R {
@@ -11,7 +11,9 @@ await executer(chrome, async (s) => {
   await s.naviguer(url + '#sans-visite');
   await s.attendre("document.readyState === 'complete' && !!document.querySelector('#vf-lock') && window.__es.some((e) => e.url.includes('/api/vf/events'))", 'flux et badge');
   await s.ev(`window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('who', { seq: 9000, at: Date.now(), who: { workers: [{ kind: 'lock', id: 'L1', tree: 'depot', task: 'x', ageS: 1, stale: false }], sources: {} } })`);
+  // le `who` reste figé (ageS 1, whoSig exclut l'âge) pendant que le battement du verrou vieillit : le flux `lock` porte age_seconds 57 (P68-D-39)
+  await s.ev(`window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('lock', { seq: 9001, at: Date.now(), lock: { present: true, locks: [{ present: true, owner: 'L1', step: 'x', scope: 'depot', age_seconds: 57 }] } })`);
   await s.ev("document.querySelector('#vf-lock').click()");
   await s.attendre("!!document.querySelector('.vf-whop .vf-who')", 'ligne de verrou');
-  return { lignes: await s.ev("[...document.querySelectorAll('.vf-whop .vf-who')].map((e) => e.textContent.trim().slice(0, 80))") };
+  return { lignes: await s.ev("[...document.querySelectorAll('.vf-whop .vf-who')].map((e) => e.textContent.trim().slice(0, 80))"), regle: await s.ev("document.querySelector('.vf-whop .regle').textContent.trim()") };
 }, { csp: true });

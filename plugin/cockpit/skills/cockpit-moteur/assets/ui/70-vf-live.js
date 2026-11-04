@@ -57,9 +57,17 @@
   // « au travail » : un agent (session ou sous-agent) `actif` ; ni verrou, ni nœud de DAG, ni terminé, ni agent en attente (P69-D-14, P69-D-33). Même prédicat que
   // les effectifs de l'onglet Équipe (71-vf-equipe-rendu.js) : pour une même collecte, le badge égale « actifs ».
   const auTravail = (w) => window.__vfEquipeRendu.actif(w);
+  // P68-D-39 : l'âge d'un verrou est celui du flux `lock` (age_seconds, rafraîchi à chaque événement), jamais l'ageS du `who`, figé tant que la liste ne change pas (whoSig l'exclut) ;
+  // le verrou se retrouve par son propriétaire (et sa portée quand plusieurs verrous ont le même), repli sur l'ageS du `who` si le flux ne le porte pas
+  const ageDe = (w) => {
+    if (w.kind !== 'lock') return w.ageS;
+    const l = probe.lock, tenus = (Array.isArray(l?.locks) ? l.locks : l?.present ? [l] : []).filter((x) => x.present && x.owner === w.id);
+    const x = tenus.find((y) => (y.ws ? String(w.tree).includes(y.ws) : y.scope === w.tree)) || tenus[0];
+    return typeof x?.age_seconds === 'number' ? x.age_seconds : w.ageS;
+  };
   const htmlTiroir = () => {
     const ws = who?.workers || [], act = ws.filter(auTravail), reste = ws.filter((w) => !AGENT(w));
-    const row = (w) => `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.kind === 'lock' && w.tree === 'depot' ? 'dépôt' : w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${h(duree(w.ageS))}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span><div>${h(w.task || '')}</div></div>`;
+    const row = (w) => `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.kind === 'lock' && w.tree === 'depot' ? 'dépôt' : w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${h(duree(ageDe(w)))}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span><div>${h(w.task || '')}</div></div>`;
     const src = Object.entries(who?.sources || {}).map(([k, v]) => `${k} : ${v.etat}`).join(' · ');
     const arbre = window.__vfEquipeRendu.arbre(ws, h);
     return (`<div class="vf-whop"><h3>Au travail (${act.length})</h3><p class="regle">${h(lockText(probe.lock).text)}.</p><p class="regle">Règle de fraîcheur : ${FRAICHEUR}, actifs et terminés depuis moins de 24 h ; la dernière commande et le transcript ne s'affichent que sur demande.</p>${arbre || (reste.length ? '' : '<p>Personne. Sources lues : ' + h(src) + '</p>')}${reste.length ? `<h4>Verrous et nœuds</h4>${reste.map(row).join('')}` : ''}<p class="src">${h(src)}</p></div>`);
