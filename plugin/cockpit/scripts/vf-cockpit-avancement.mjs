@@ -2,7 +2,7 @@
 // Exports : ETATS, RESTE, ETATS_MISSION, LIBELLES_ETAT, LIBELLES_RESTE, LIBELLES_MISSION, decompte, trouverPhase, rattacherMission, etatMission, reste, avancement.
 // Contrat figé en version 2 (déclaré dans vf-cockpit-interface.json, clé `avancement`, lu par la Phase 68 ; VFSG-06, P68-D-16) :
 //   { version: 2, etat, plans: { faits, total }, correctifs, mission: { nom, etat, vie } | null, reste: [codes] } — ajouts de champs seulement.
-//   `vie` = { tenu, stale, progressAgeS, ttl } (verrou lu) ou null (source des verrous illisible : la mission est `inconnu`, P68-D-23).
+//   `vie` = { tenu, stale, progressAgeS, ttl } (verrou lu) ou null (source des verrous illisible : la mission est `inconnu`, P68-D-23) ; absent quand l'appelant ne lit pas les verrous.
 // Module pur : ne lit que ce qu'on lui passe (la lecture du verrou est celle de vf-cockpit-vie.mjs, en amont), aucune lecture réseau, aucun nom de lab codé en dur.
 import { estVivante } from './vf-cockpit-vie.mjs';
 
@@ -83,7 +83,7 @@ export function reste({ ph, fichiers, lire }) {
 
 // Mission désignée quand plusieurs sont rattachées : celle qui a un nœud `running`, puis la plus petite règle, puis le nom le plus petit.
 function choisir(missions) {
-  const l = missions.map((m) => ({ nom: m.nom, regle: m.regle ?? 9, etat: etatMission(m.nodes, m.vie), vie: m.vie ?? null }));
+  const l = missions.map((m) => ({ nom: m.nom, regle: m.regle ?? 9, etat: etatMission(m.nodes, m.vie), vie: m.vie }));
   l.sort((a, b) => (b.etat === 'running') - (a.etat === 'running') || a.regle - b.regle || (a.nom < b.nom ? -1 : a.nom > b.nom ? 1 : 0));
   return l.length ? { nom: l[0].nom, etat: l[0].etat, vie: l[0].vie } : null;
 }

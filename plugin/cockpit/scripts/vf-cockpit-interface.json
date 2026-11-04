@@ -2,12 +2,13 @@
   "version": 1,
   "description": "Contrat versionné des sorties JSON du socle du cockpit VibeFlow (P67-D-12) et des clés internes de Claude Code dont il dépend.",
   "avancement": {
-    "version": 1,
-    "description": "objet posé par readPlanning sur chaque phase ; lu par vf-signal (Phase 68) ; ajouts seulement en version 1",
+    "version": 2,
+    "description": "objet posé par readPlanning sur chaque phase ; lu par vf-signal par l'émetteur signal@1 ; version 2 : état de mission abandonnee et inconnu, champ mission.vie (P68-D-16, P68-D-23)",
     "requis": { "version": "number", "etat": "string", "plans": "object", "correctifs": "number", "mission": "any", "reste": "array" },
     "etats": ["a-faire", "en-cours", "a-recetter", "fait"],
     "reste": ["recette", "verification", "cloture"],
-    "missionEtats": ["running", "failed", "done", "ready"]
+    "missionEtats": ["running", "abandonnee", "inconnu", "failed", "done", "ready"],
+    "vie": { "requis": { "tenu": "boolean", "stale": "any", "progressAgeS": "any", "ttl": "any" } }
   },
   "schemas": {
     "vibeflow/cockpit-who@2": {
