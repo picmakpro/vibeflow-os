@@ -1,0 +1,192 @@
+--- a/assets/ui/40-tour.js
++++ b/assets/ui/40-tour.js
+@@ -10,15 +10,20 @@
+ 
+   const style = document.createElement('style');
+   style.textContent = `
+-#tour { position: fixed; left: 16px; bottom: 76px; width: min(360px, calc(100vw - 32px)); padding: 16px 16px 12px 20px; border-radius: var(--r-panel); z-index: 6; animation: tourIn .4s var(--ease); }
++#tour { position: fixed; left: 16px; bottom: 76px; width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 170px); display: flex; flex-direction: column; padding: 16px 16px 12px 20px; border-radius: var(--r-panel); z-index: 6; animation: tourIn .4s var(--ease); }
++#tour.right { left: auto; right: 16px; }
++#tour .tb { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
++.tour-target { outline: 2px solid var(--ring); outline-offset: 4px; border-radius: 10px; }
+ #tour[hidden] { display: none; }
+ #tour .tk { font-size: 12px; color: var(--text-3); margin-bottom: 4px; display: flex; gap: 6px; align-items: center; }
+ #tour .tk i { width: 3px; height: 3px; border-radius: 50%; background: var(--text-4); }
+ #tour .tt { font-size: 16px; font-weight: 600; letter-spacing: -.01em; line-height: 1.35; padding-right: 22px; }
+ #tour .tn { color: var(--text-2); line-height: 1.55; margin-top: 6px; font-size: 13.5px; }
+ #tour .tip { color: var(--text-3); font-size: 12px; line-height: 1.5; margin-top: 10px; }
+-#tour .tf { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+-#tour .dots { display: flex; gap: 4px; flex: 1; }
++#tour .tf { flex: none; display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
++#tour .acts { display: flex; align-items: center; gap: 8px; }
++#tour .acts [data-x] { margin-right: auto; }
++#tour .dots { display: flex; gap: 4px; }
+ #tour .dots i { width: 14px; height: 3px; border-radius: 2px; background: rgba(var(--ink), .12); transition: background .3s var(--ease); }
+ #tour .dots i.on { background: var(--on); }
+ #tour .tf .btn { height: 32px; }
+@@ -29,51 +34,54 @@
+   document.head.appendChild(style);
+ 
+   // ---------- steps ----------
+-  const clip = (s, max = 230) => {
+-    s = String(s || '').trim();
+-    if (s.length <= max) return s;
+-    const cut = s.slice(0, max);
+-    const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('; '));
+-    return end > 80 ? cut.slice(0, end + 1) : cut.replace(/\s+\S*$/, '') + '…';
+-  };
++  const clip = (s) => String(s || '').trim(); // the whole text: a step is never cut short (P70-D-02)
++  const okSel = (q) => { if (typeof q !== 'string' || !q) return false; try { return !!document.querySelector(q); } catch { return false; } }; // a selector from the data may be invalid
++  const isProject = () => G.meta?.vfTab === 'project';
+   const listOf = (names) => names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+   const tops = G.nodes.filter((n) => !n.parent && n.id !== 'unassigned');
+   const bySize = (a, b) => (b.stats?.files || 0) - (a.stats?.files || 0);
+   const screensOf = (id) => (G.screens || []).filter((s) => s.app === id).length;
+ 
+   function flowStep() {
++    if (isProject()) return null; // the Project tab has no path through the code to follow
+     const f = (G.flows || []).find((x) => !x.custom) || (G.flows || [])[0];
+     if (!f || !f.steps?.length) return null;
+-    return { ref: 'root', flow: f.id, kicker: 'One real path', title: f.title, note: `${f.description ? clip(f.description, 160) + ' ' : ''}Press Play to follow it through the code, one step at a time.` };
++    const first = f.steps[0]?.ref;
++    return { ref: first && SC.exists(first) ? first : 'root', flow: f.id, kicker: 'One real path', title: f.title, note: `${f.description ? clip(f.description) + ' ' : ''}Press Play to follow it through the code, one step at a time.` };
+   }
+   function autoSteps() {
+     const p = G.project || {};
+-    const steps = [{ ref: 'root', kicker: 'The codebase', title: p.name || 'This codebase', note: clip(p.summary) || 'A map of the main parts of this app and how they talk to each other.' }];
++    const steps = isProject()
++      ? [{ ref: 'root', kicker: 'The project', title: p.name || 'This project', note: clip(p.summary) || 'The work of this project: milestones, phases, backlog and releases.' }]
++      : [{ ref: 'root', kicker: 'The codebase', title: p.name || 'This codebase', note: clip(p.summary) || 'A map of the main parts of this app and how they talk to each other.' }];
+     const ui = tops.filter((n) => n.kind === 'ui').sort(bySize).slice(0, 2);
+     for (const n of ui) {
+       const k = screensOf(n.id);
+-      steps.push({ ref: 'n:' + n.id, kicker: 'What people use', title: n.label, note: clip(n.summary, 200) + (k > 1 ? ` It has ${k} screens.` : '') });
++      steps.push({ ref: 'n:' + n.id, kicker: 'What people use', title: n.label, note: clip(n.summary) + (k > 1 ? ` It has ${k} screens.` : '') });
+     }
+     let back = tops.filter((n) => n.kind === 'service' || n.kind === 'worker').sort(bySize);
+     if (!back.length) back = tops.filter((n) => !['ui', 'external', 'test', 'script', 'config', 'infra', 'misc'].includes(n.kind)).sort(bySize);
+-    for (const n of back.slice(0, ui.length > 1 ? 1 : 2)) steps.push({ ref: 'n:' + n.id, kicker: 'Behind the scenes', title: n.label, note: clip(n.summary, 200) });
++    for (const n of back.slice(0, ui.length > 1 ? 1 : 2)) steps.push({ ref: 'n:' + n.id, kicker: 'Behind the scenes', title: n.label, note: clip(n.summary) });
+     const data = tops.find((n) => n.kind === 'data' && !back.includes(n));
+-    if (data && steps.length < 5) steps.push({ ref: 'n:' + data.id, kicker: 'Where the data lives', title: data.label, note: clip(data.summary, 200) });
++    if (data && steps.length < 5) steps.push({ ref: 'n:' + data.id, kicker: 'Where the data lives', title: data.label, note: clip(data.summary) });
+     const ext = tops.filter((n) => n.kind === 'external');
+     if (ext.length) {
+       steps.push({
+         ref: ext.length === 1 ? 'n:' + ext[0].id : 'root', kicker: 'Outside services', title: ext.length === 1 ? ext[0].label : `${ext.length} outside services`,
+-        note: ext.length === 1 ? clip(ext[0].summary, 200) : `It also relies on ${listOf(ext.slice(0, 6).map((n) => n.label))}${ext.length > 6 ? ` and ${ext.length - 6} more` : ''}. They sit at the edge of the map; the lines show which parts talk to them.`,
++        note: ext.length === 1 ? clip(ext[0].summary) : `It also relies on ${listOf(ext.slice(0, 6).map((n) => n.label))}${ext.length > 6 ? ` and ${ext.length - 6} more` : ''}. They sit at the edge of the map; the lines show which parts talk to them.`,
+       });
+     }
+     return steps;
+   }
+   function buildSteps() {
+-    const own = (G.tour || []).filter((s) => s && s.ref && (s.ref === 'root' || SC.exists(s.ref))).map((s) => ({ ref: s.ref, title: s.title || SC.info(s.ref).name, note: s.note || SC.info(s.ref).desc || '', kicker: '' }));
++    const own = (G.tour || []).filter((s) => s && (s.ref ? (s.ref === 'root' || SC.exists(s.ref)) : okSel(s.cible))).map((s) => ({ ref: s.ref || 'root', cible: typeof s.cible === 'string' ? s.cible : '', title: s.title || (s.ref && s.ref !== 'root' ? SC.info(s.ref).name : ''), note: s.note || (s.ref && s.ref !== 'root' ? SC.info(s.ref).desc : '') || '', kicker: '' }));
+     const steps = own.length >= 2 ? own : autoSteps();
+     const fl = flowStep();
+     if (fl && !steps.some((s) => s.flow) && steps.length < 9) steps.push(fl);
+-    return steps.filter((s) => s.ref === 'root' || SC.exists(s.ref)).slice(0, 9);
++    // every step aims at something: a card, or an element of the page (the title of the overview by default); a selector that matches nothing is dropped
++    return steps.filter((s) => s.ref === 'root' || SC.exists(s.ref)).slice(0, 9)
++      .map((s) => (s.cible && !okSel(s.cible) ? { ...s, cible: '' } : s))
++      .map((s) => (s.ref === 'root' && !s.cible ? { ...s, cible: '#context' } : s));
+   }
+ 
+   // ---------- card ----------
+@@ -87,21 +95,57 @@
+   let steps = [], at = -1;
+   const active = () => at >= 0;
+ 
++  // ---------- aiming: every step points at something ----------
++  let token = 0; // a step that was left before its move was due must not move the map
++  const hit = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
++  function ring(el) { document.querySelectorAll('.tour-target').forEach((e) => e.classList.remove('tour-target')); if (el) el.classList.add('tour-target'); }
++  // the free part of the map that the tour card does not cover: above the card or beside it, whichever is larger
++  function zone() {
++    const m = document.getElementById('svg').getBoundingClientRect(), a = SC.freeArea(), c = card.getBoundingClientRect();
++    const l = m.left + a.x, t = m.top + a.y, r = l + a.w, b = t + a.h;
++    const zs = [{ l, t, r, b: Math.min(b, c.top - 8) }, { l: Math.max(l, c.right + 8), t, r, b }].filter((z) => z.r - z.l > 40 && z.b - z.t > 40);
++    return zs.sort((p, q) => (q.r - q.l) * (q.b - q.t) - (p.r - p.l) * (p.b - p.t))[0] || { l, t, r, b };
++  }
++  // zoom in on a small card and put it in the middle of that zone; the viewer's own wheel handler does the moving (pan, ctrl+wheel to zoom)
++  function aim(id) {
++    const g = SC.state.chipEls?.get(id); if (!g) return;
++    const r = g.getBoundingClientRect(), z = zone(), vp = document.getElementById('viewport'), svg = document.getElementById('svg');
++    const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
++    const f = Math.max(1, Math.min(1.6, (z.r - z.l) * 0.45 / r.width, (z.b - z.t) * 0.45 / r.height));
++    const wheel = (o) => svg.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaMode: 0, ...o }));
++    vp.classList.add('anim');
++    if (f > 1.02) wheel({ ctrlKey: true, deltaY: -Math.log(f) / 0.01, clientX: cx, clientY: cy });
++    wheel({ deltaX: (cx - (z.l + z.r) / 2) || 0.01, deltaY: cy - (z.t + z.b) / 2 }); // deltaX is never 0: a pure vertical wheel would be read as a zoom
++    setTimeout(() => vp.classList.remove('anim'), 540);
++  }
+   function go(s) {
+-    if (!s.ref || s.ref === 'root') { SC.go('root', { select: null }); return; }
+-    const parent = SC.parentOf(s.ref) || 'root';
+-    if (parent === 'root') SC.go('root', { select: s.ref }); // stay on the overview, just highlight the card
+-    else SC.reveal(s.ref);
++    const mine = ++token, vp = document.getElementById('viewport');
++    const later = (fn, ms) => setTimeout(() => { if (mine === token && active()) fn(); }, ms);
++    const slow = SC.state.container !== 'root' || vp.classList.contains('anim'); // the map is about to move on its own: wait for it before measuring
++    ring(null);
++    if (!s.ref || s.ref === 'root') {
++      SC.go('root', { select: null });
++      if (at > 0) later(() => SC.fit(true), slow ? 650 : 60);
++    } else {
++      const parent = SC.parentOf(s.ref) || 'root';
++      if (parent === 'root') SC.go('root', { select: s.ref }); // stay on the overview, just highlight the card
++      else SC.reveal(s.ref);
++      later(() => aim(s.ref), parent !== 'root' || slow ? 650 : 60);
++    }
++    if (s.cible) { try { ring(document.querySelector(s.cible)); } catch { ring(null); } }
+   }
+   function render() {
+     const s = steps[at], last = at === steps.length - 1;
+-    const tip = last ? `Replay this tour any time from <b>Start here</b> at the top.${window.FloorplanScreens ? ' <b>Screens</b> shows everything behind any page.' : ''}` : '';
++    const tb = document.getElementById('tour-btn'); // on a phone the button sits behind the « ⋯ » menu, not at the top
++    const tip = last ? `${tb && tb.offsetParent === null ? 'Replay this tour any time from <b>⋯ › Start here</b>.' : 'Replay this tour any time from <b>Start here</b> at the top.'}${window.FloorplanScreens ? ' <b>Screens</b> shows everything behind any page.' : ''}` : '';
+     card.innerHTML = `<button class="btn icon tx" data-x title="Close (Esc)">${SC.iconI('x')}</button>
+-      <div class="tk"><span>Start here</span><i></i><span>${at + 1} of ${steps.length}</span>${s.kicker ? `<i></i><span>${h(s.kicker)}</span>` : ''}</div>
+-      <div class="tt">${h(s.title)}</div>${s.note ? `<div class="tn">${h(s.note)}</div>` : ''}${tip ? `<div class="tip">${tip}</div>` : ''}
++      <div class="tb"><div class="tk"><span>Start here</span><i></i><span>${at + 1} of ${steps.length}</span>${s.kicker ? `<i></i><span>${h(s.kicker)}</span>` : ''}</div>
++      <div class="tt">${h(s.title)}</div>${s.note ? `<div class="tn">${h(s.note)}</div>` : ''}${tip ? `<div class="tip">${tip}</div>` : ''}</div>
+       <div class="tf"><div class="dots">${steps.map((_, k) => `<i class="${k <= at ? 'on' : ''}"></i>`).join('')}</div>
+-        ${at > 0 ? `<button class="btn icon soft" data-back title="Back (←)">${SC.iconI('left')}</button>` : `<button class="btn" data-x>Skip</button>`}
++        <div class="acts"><button class="btn" data-x>Skip</button>
++        ${at > 0 ? `<button class="btn icon soft" data-back title="Back (←)">${SC.iconI('left')}</button>` : ''}
+         ${s.flow ? `<button class="btn primary" data-play>${SC.iconI('right')}Play it</button>${last ? '' : '<button class="btn soft" data-next>Next</button>'}` : `<button class="btn primary" data-next>${last ? 'Done' : 'Next'}</button>`}
++        </div>
+       </div>`;
+     card.querySelectorAll('[data-x]').forEach((b) => b.onclick = end);
+     card.querySelector('[data-back]')?.addEventListener('click', back);
+@@ -118,21 +162,26 @@
+       if (a.width && a.left < 16 + c.width + 12 && top < innerHeight) bottom = Math.max(bottom, innerHeight - top + 12);
+     }
+     card.style.bottom = Math.min(bottom, Math.max(76, innerHeight - card.offsetHeight - 80)) + 'px';
++    // an element of the page that the card would cover: the card moves to the other side
++    card.classList.remove('right');
++    const t = document.querySelector('.tour-target');
++    if (t && hit(t.getBoundingClientRect(), card.getBoundingClientRect())) card.classList.add('right');
+   }
+   window.addEventListener('resize', () => { if (active()) place(); });
+   function show(i) {
+     at = i;
+     card.hidden = false;
+     render();
+-    place();
+     go(steps[at]);
+-    if (at === 0) setTimeout(() => SC.fit(true), 450);
++    place();
++    if (at === 0) setTimeout(() => { if (at === 0) SC.fit(true); }, 450);
+   }
+   function next() { if (at >= steps.length - 1) end(); else show(at + 1); }
+   function back() { if (at > 0) show(at - 1); }
+   function end() {
+     if (!active()) return;
+-    at = -1;
++    at = -1; token++;
++    ring(null);
+     card.hidden = true;
+     SC.store.set(SEEN, true);
+     if (SC.state.container === 'root') SC.select(null);
