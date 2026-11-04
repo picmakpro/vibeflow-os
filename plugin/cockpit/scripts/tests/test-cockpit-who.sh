@@ -111,7 +111,12 @@ cat > "$FLAT/.planning/ROADMAP.md" <<'MD'
 MD
 printf '%s\n' '<objective>Faire le socle</objective>' > "$FLAT/.planning/phases/01-x/01-01-PLAN.md"
 printf '%s\n' 'ok' > "$FLAT/.planning/phases/01-x/01-01-SUMMARY.md"
-Q project "$FLAT" > "$WORK/proj.json"
+# vie d'une mission (VFSG-06, P68-D-29) : le graphe Projet lit le verrou de la phase d'une mission `running` ; ce lab n'en a pas, mais l'appel est épinglé quand même
+# (HOME jetable ET dossier de scripts explicite, hors de toute disposition …/cockpit/scripts, portant un faux verrou tenu) pour ne jamais dépendre du poste.
+# Le dossier n'est posé que sur cet appel en processus : les serveurs de la suite reçoivent leur propre VF_COCKPIT_SCRIPTS_DIR.
+mkdir -p "$WORK/locks-pin"
+printf '#!/usr/bin/env bash\ncase "$1" in status) echo "{\\"present\\": true, \\"ws\\": \\"\\", \\"stale\\": false, \\"ttl\\": 1800, \\"progress_age_seconds\\": 30}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' > "$WORK/locks-pin/driver-lock.sh"; chmod +x "$WORK/locks-pin/driver-lock.sh"
+HOME="$HOME_T" VF_COCKPIT_SCRIPTS_DIR="$WORK/locks-pin" Q project "$FLAT" > "$WORK/proj.json"
 assert_eq "W3.1 — schéma Projet nommé VibeFlow" "$(G "$WORK/proj.json" 'j.schema')" "vibeflow/cockpit-project@1"
 assert_eq "W3.2 — ph-1 est fait" "$(G "$WORK/proj.json" 'j.nodes.filter(n=>n.id==="ph-1").map(n=>n.st).join(",")')" "done"
 assert_eq "W3.3 — le plan 01-01 est fait" "$(G "$WORK/proj.json" 'j.files.filter(f=>f.name.startsWith("01-01")).map(f=>f.st).join(",")')" "done"

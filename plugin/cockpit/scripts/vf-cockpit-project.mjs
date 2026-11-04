@@ -9,7 +9,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { planningLayout } from './vf-cockpit-paths.mjs';
 import { readPlanning, read, clip, sentence, num, fm, list } from './vf-cockpit-planning.mjs';
-import { trouverPhase, LIBELLES_RESTE } from './vf-cockpit-avancement.mjs';
+import { trouverPhase, LIBELLES_RESTE, LIBELLES_MISSION } from './vf-cockpit-avancement.mjs';
 import { KIND_ICONS, KIND_COLORS } from './vf-cockpit-types.mjs';
 import { detectDrift } from './vf-cockpit-drift.mjs';
 
@@ -73,10 +73,10 @@ export function buildProjectGraph(root, { layout } = {}) {
     const planFiles = ls(dir).filter((f) => /-PLAN\.md$/.test(f)).sort();
     const sums = new Set(ls(dir).filter((f) => /-SUMMARY\.md$/.test(f)).map((f) => f.replace('-SUMMARY.md', '')));
     const av = ph.avancement;
-    const enCours = P.dags.filter((d) => d.phaseKey === ph.key).flatMap((d) => d.nodes.filter((x) => x?.status === 'running')); // un plan non fait est actif si un nœud running d'une mission rattachée le désigne (P69-PL-04)
+    const enCours = P.dags.filter((d) => d.phaseKey === ph.key && d.etat === 'running').flatMap((d) => d.nodes.filter((x) => x?.status === 'running')); // un plan non fait est actif si un nœud running d'une mission rattachée le désigne (P69-PL-04) ; seule une mission vivante désigne un plan actif (VFSG-06)
     const phReqs = ownReqs(ph); const id = phId(ph);
     node({ id, parent: msId, label: `Phase ${ph.n} · ${ph.name}`, kind: 'phase', num: ph.n, ws: ph.ws, summary: sentence(ph.goal || ph.line || ph.name, 200),
-      details: [ph.goal, av.reste.length ? `Reste : ${av.reste.map((c) => LIBELLES_RESTE[c]).join(', ')}.` : '', av.mission ? `Mission : ${av.mission.nom} (${av.mission.etat}).` : '', ph.depends.length ? `Dépend de : Phase ${ph.depends.join(', ')}.` : '', ph.line ? `Ligne de ROADMAP : ${ph.line}` : '', `Source : ${ph.roadmap}${dir ? ` · dossier ${rel(dir)}` : ''}`].filter(Boolean).join('\n\n'),
+      details: [ph.goal, av.reste.length ? `Reste : ${av.reste.map((c) => LIBELLES_RESTE[c]).join(', ')}.` : '', av.mission ? `Mission : ${av.mission.nom} (${LIBELLES_MISSION[av.mission.etat] || av.mission.etat}).` : '', ph.depends.length ? `Dépend de : Phase ${ph.depends.join(', ')}.` : '', ph.line ? `Ligne de ROADMAP : ${ph.line}` : '', `Source : ${ph.roadmap}${dir ? ` · dossier ${rel(dir)}` : ''}`].filter(Boolean).join('\n\n'),
       st, foot: [av.etat === 'a-recetter' ? 'à recetter' : '', av.plans.total ? `${av.plans.faits}/${av.plans.total} plans` : '', av.correctifs ? `${av.correctifs} correctif${av.correctifs > 1 ? 's' : ''}` : '', phReqs.length ? `${phReqs.filter((r) => r.done).length}/${phReqs.length} exigences` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [] });
     for (const pf of planFiles) {
       const txt = read(path.join(dir, pf)); const meta = fm(txt); const pid = pf.replace('-PLAN.md', '');
@@ -102,7 +102,7 @@ export function buildProjectGraph(root, { layout } = {}) {
     if (!parent) { orphan ||= node({ id: 'missions', parent: null, label: 'Missions hors phase', kind: 'mission', summary: 'Plans de bataille de missions qui ne portent pas un numéro de phase.' }); parent = orphan; }
     const doneN = d.nodes.filter((x) => x.status === 'done').length;
     const mId = node({ id: 'dag-' + d.name, parent, label: `Mission ${d.name.replace(/^MISSION-/, '')}`, kind: 'mission', summary: `Plan de bataille : ${d.nodes.length} nœuds, ${doneN} fait${doneN > 1 ? 's' : ''}.`,
-      st: doneN === d.nodes.length ? 'done' : d.nodes.some((x) => x.status === 'running') ? 'active' : d.nodes.some((x) => x.status === 'failed') ? 'blocked' : 'todo', foot: `${doneN}/${d.nodes.length} nœuds`, paths: [d.file] });
+      st: doneN === d.nodes.length ? 'done' : d.etat === 'abandonnee' || d.etat === 'inconnu' ? 'todo' : d.nodes.some((x) => x.status === 'running') ? 'active' : d.nodes.some((x) => x.status === 'failed') ? 'blocked' : 'todo', foot: `${doneN}/${d.nodes.length} nœuds${d.etat === 'abandonnee' || d.etat === 'inconnu' ? ` · ${LIBELLES_MISSION[d.etat]}` : ''}`, paths: [d.file] });
     for (const x of d.nodes) file({ p: `${d.file}#${x.id}`, n: mId, name: x.id, d: sentence(x.step, 200), st: DST[x.status] || 'todo', foot: x.stage || '', note: x.scope?.length ? `Périmètre : ${x.scope.join(', ')}` : undefined, touched: x.scope });
     for (const x of d.nodes) for (const dep of x.deps || []) link(`f:${d.file}#${dep}`, `f:${d.file}#${x.id}`, 'queue', 'puis');
   }
