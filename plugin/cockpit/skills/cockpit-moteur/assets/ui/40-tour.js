@@ -123,7 +123,7 @@
   }
   // put the card in the middle of that zone, zooming in on a small card and out on one wider than the zone, but never zooming in so far that the rest of the map leaves the free area;
   // the viewer's own wheel handler does the moving (pan, ctrl+wheel to zoom)
-  function aim(id) {
+  function aim(id, retry) {
     const g = SC.state.chipEls?.get(id); if (!g) return;
     const box = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
     const r = box(g), z = zone(), vp = document.getElementById('viewport'), svg = document.getElementById('svg');
@@ -133,7 +133,9 @@
     const cx = (r.l + r.r) / 2, cy = (r.t + r.b) / 2, zw = z.r - z.l, zh = z.b - z.t;
     const narrow = innerWidth < 701; // on a phone the whole map is tiny: a small card is zoomed until it can be read, and the rest of the map may leave the screen
     let f = Math.max(1, Math.min(narrow ? 4 : 1.6, zw * (narrow ? 0.6 : 0.45) / r.w, zh * (narrow ? 0.6 : 0.45) / r.h)); // in on a small card...
-    if (!narrow) f = Math.min(f, Math.max(1, Math.min(F.w ? (F.r - F.l) / (U.r - U.l) : 1, (F.b - F.t) / (U.b - U.t)))); // ...not past the point where the whole map no longer fits
+    const fU = Math.max(1, Math.min(F.w ? (F.r - F.l) / (U.r - U.l) : 1, (F.b - F.t) / (U.b - U.t)));
+    // ...not past the point where the whole map no longer fits; on a phone only down to the size where the card can still be read (120 px wide), the rest of the map may then leave the screen
+    f = narrow ? Math.max(Math.min(f, fU), Math.min(f, 120 / r.w)) : Math.min(f, fU);
     f = Math.min(f, 0.92 * zw / r.w, 0.92 * zh / r.h); // ...and out on a card wider than its zone: it must fit whole
     const wheel = (o) => svg.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaMode: 0, ...o }));
     // where things land after the zoom (around the card's centre) and the move that centres the card
@@ -147,6 +149,8 @@
     if (Math.abs(f - 1) > 0.02) wheel({ ctrlKey: true, deltaY: -Math.log(f) / 0.01, clientX: cx, clientY: cy });
     wheel({ deltaX: -dx || -0.01, deltaY: -dy }); // deltaX is never 0: a pure vertical wheel would be read as a zoom
     setTimeout(() => vp.classList.remove('anim'), 540);
+    // the zoom is worked out on the card's size as measured now; once the move is over, measure again: a card that still sticks out of its zone (a wider font, a late layout) is aimed once more
+    if (!retry) { const mine = token; setTimeout(() => { if (!active() || mine !== token) return; const b = box(g), z2 = zone(); if (b.l < z2.l - 1 || b.r > z2.r + 1 || b.t < z2.t - 1 || b.b > z2.b + 1) aim(id, true); }, 700); }
   }
   function go(s) {
     const mine = ++token, vp = document.getElementById('viewport');
@@ -198,18 +202,24 @@
     const vis = visible;
     const obs = obstacles(vis);
     placedSig = sigOf(obs);
-    const topLimit = obs.reduce((m, o) => (o.bottom < innerHeight / 2 ? Math.max(m, o.bottom) : m), 0) + 8; // header and title block: the card is never taller than the room under them (its text scrolls)
+    const topLimit = ['context'].map((id) => document.getElementById(id)).concat(document.querySelector('header')).filter(vis).reduce((m, e) => Math.max(m, e.getBoundingClientRect().bottom), 0) + 8; // header and title block (whatever their height: a wide font makes the title taller): the card is never taller than the room under them, its text scrolls
     const w0 = Math.min(360, innerWidth - 32);
     const widths = [w0, 300, 260, 220, 200].filter((w, k, a) => w <= w0 && a.indexOf(w) === k);
     const bottoms = [76, ...obs.map((o) => Math.round(innerHeight - o.top + 12))].filter((b, k, a) => b >= 12 && b <= innerHeight - 120 && a.indexOf(b) === k).sort((a, b) => a - b);
-    const area = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    const G6 = 0; // margin counted around each surface (0: candidates above an obstacle already keep 12 px from it; a wider margin made the search pick needlessly narrow cards)
+    const area = (a, b) => Math.max(0, Math.min(a.right, b.right + G6) - Math.max(a.left, b.left - G6)) * Math.max(0, Math.min(a.bottom, b.bottom + G6) - Math.max(a.top, b.top - G6));
     let best = null;
-    for (const w of widths) for (const side of ['left', 'right']) for (const b of bottoms) {
-      card.style.width = w + 'px'; card.style.bottom = b + 'px'; card.style.maxHeight = Math.max(140, innerHeight - b - topLimit) + 'px'; card.classList.toggle('right', side === 'right');
-      const r = card.getBoundingClientRect();
-      // the cost: what it covers first (a covered pixel outweighs any move), then how far it is from the usual place (bottom left, full width)
-      const score = obs.reduce((n, o) => n + area(r, o), 0) * 1e3 + (r.top < 0 || r.left < -0.5 || r.right > innerWidth + 0.5 ? 1e12 : 0) + Math.abs(b - 76) + (side === 'right' ? 40 : 0) + (w0 - w) * 0.5;
-      if (!best || score < best.score) best = { score, w, side, b, mh: card.style.maxHeight };
+    // widths first; when nothing fits without covering a surface, the card also gets shorter (its text scrolls), down to a floor of 200 x 120 px
+    for (const [lvl, hcap] of [1e6, 240, 180, 120].entries()) {
+      for (const w of widths) for (const side of ['left', 'right']) for (const b of bottoms) {
+        card.style.width = w + 'px'; card.style.bottom = b + 'px'; card.style.maxHeight = Math.min(hcap, Math.max(120, innerHeight - b - topLimit)) + 'px'; card.classList.toggle('right', side === 'right');
+        const r = card.getBoundingClientRect();
+        // the cost: what it covers first (a covered pixel outweighs any move), then how far it is from the usual place (bottom left, full width, full height)
+        const covered = obs.reduce((n, o) => n + area(r, o), 0);
+        const score = covered * 1e3 + (r.top < 0 || r.left < -0.5 || r.right > innerWidth + 0.5 ? 1e12 : 0) + Math.abs(b - 76) + (side === 'right' ? 40 : 0) + (w0 - w) * 0.5 + lvl * 20;
+        if (!best || score < best.score) best = { score, covered, w, side, b, mh: card.style.maxHeight };
+      }
+      if (best.covered === 0) break;
     }
     card.style.width = best.w + 'px'; card.style.bottom = best.b + 'px'; card.style.maxHeight = best.mh; card.classList.toggle('right', best.side === 'right');
   }
