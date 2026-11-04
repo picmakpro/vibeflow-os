@@ -44,6 +44,8 @@ button { font: inherit; color: inherit; }
 ::selection { background: rgba(var(--ink), .2); }
 #terminal { position: fixed; inset: 0; padding: 8px 12px; background: var(--surface); }
 #terminal .xterm { height: 100%; }
+#terminal .xterm-scrollable-element > .scrollbar { opacity: 0; transition: opacity 150ms var(--ease); }
+#terminal:hover .xterm-scrollable-element > .scrollbar.visible, #terminal.vf-q-defile .xterm-scrollable-element > .scrollbar.visible { opacity: 1; }
 :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 #terminal.vf-q-cache { visibility: hidden; }
 #etat[hidden] { display: none; }

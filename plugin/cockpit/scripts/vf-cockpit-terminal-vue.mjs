@@ -18,6 +18,7 @@ export function vueTerminal(cfg) {
     refuse: { role: 'status', masque: true, titre: 'Terminal déjà ouvert', corps: ['Un terminal est déjà ouvert dans un autre onglet. Fermez-le, puis réessayez.'], bouton: 'Réessayer', d: 'M3 3h10v10H3z M6 8h4' },
     expire: { role: 'alert', titre: 'Session expirée', corps: ['Relancez ', COMMANDE, '.'], d: 'M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2z M8 5v3.5l2 1.5' },
     horscadre: { role: 'alert', titre: 'Terminal indisponible', corps: ['Ce terminal ne s’ouvre que dans le cockpit. Relancez ', COMMANDE, '.'], d: 'M3 3h10v10H3z M6 8h4' },
+    python: { role: 'alert', titre: 'Terminal indisponible', corps: ['Python 3 est introuvable sur ce poste. Installez-le, puis relancez ', COMMANDE, '.'], d: 'M3 3h10v10H3z M6 8h4' },
     arrete: { role: 'alert', titre: 'Serveur arrêté', corps: ['Le cockpit est arrêté. Relancez ', COMMANDE, '.'], d: 'M8 2v6 M4.5 4.5a5 5 0 1 0 7 0' },
   };
   const TEXTES = { fermee: 'La session a été fermée.', reconnexion: 'Reconnexion…' };

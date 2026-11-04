@@ -290,6 +290,34 @@ await executer(chrome, async (sp) => {
     return r;
   }
 
+  if (mode === 'ecran') { // E3 (hauteur utile) et G3 (barre de défilement discrète) : le cadre de Q est redimensionné, la grille et la barre sont mesurées dans la page réelle
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
+    const cadre = (w, h) => sp.ev(`document.querySelector('iframe[data-t]').style.cssText = 'position:fixed;left:0;top:0;width:${w}px;height:${h}px;border:0;z-index:99999'`);
+    r.e3 = {};
+    for (const h of [160, 208, 280, 328, 570]) {
+      await essai(`e3-${h}`, async () => {
+        await cadre(600, h); await pause(900);
+        r.e3[h] = await s.ev(`(() => { const l = document.querySelectorAll('.xterm-rows > div'), d = l[l.length - 1].getBoundingClientRect(), z = document.querySelector('.xterm-screen').getBoundingClientRect();
+          return { bas: Math.round(d.bottom * 100) / 100, visible: window.innerHeight, lignes: l.length, ecran: Math.round(z.height) }; })()`);
+      });
+    }
+    const barre = `(() => { const b = document.querySelector('.xterm-scrollable-element > .scrollbar.vertical'); return b ? getComputedStyle(b).opacity : 'absente'; })()`;
+    await essai('barre', async () => {
+      await cadre(600, 570); await pause(700);
+      await taper('clear; seq 1 300'); await att(`${TXT}.includes('300')`, '300 lignes imprimées');
+      await att(`${barre} !== 'absente'`, 'barre de défilement dans le DOM');
+      r.g3 = { fin0: await s.ev(`${TXT}.includes('300')`) };
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 900, y: 300 }); await pause(500); r.g3.dehors = await s.ev(barre); // pointeur hors du cadre
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 300, y: 300 }); await pause(500); r.g3.survol = await s.ev(barre);
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 300, y: 300, deltaX: 0, deltaY: -400 }); await pause(500);
+      r.g3.fin1 = await s.ev(`${TXT}.includes('300')`);
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 900, y: 300 }); await pause(1600); r.g3.apres = await s.ev(barre);
+      await touche({ key: 'PageUp', code: 'PageUp', windowsVirtualKeyCode: 33, modifiers: 8 }); await pause(400); r.g3.clavier = await s.ev(barre);
+      await pause(1800); r.g3.repos = await s.ev(barre);
+    });
+    return r;
+  }
+
   if (mode === 'plein') {
     await essai('plein-ecran', async () => {
       await taper(`python3 -I ${plein}`);
@@ -418,6 +446,10 @@ run_collage() { # run_collage <sortie> -> CJ ; un serveur neuf, un amorçage neu
   rm -rf "$WORK/collage"; mkdir -p "$WORK/collage"; srv "$1"
   CJ="$(navig collage "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"dossier\":\"$WORK/collage\"}")"; unsrv
 }
+run_ecran() { # run_ecran <sortie> -> EJ
+  srv "$1"
+  EJ="$(navig ecran "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\"}")"; unsrv
+}
 LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"
 
 echo "=== T13 — programme plein écran témoin dans la page Q réelle (TERM-09 navigateur) ==="
@@ -471,6 +503,19 @@ assert_eq "T21.18 — N10 : 60 lignes vides puis une commande : l'aperçu replie
 assert_eq "T21.19 — N10 : quand l'aperçu dépasse sa zone, l'avertissement explicite est affiché (le focus reste sur « Annuler »)" "$(rj "$CL" '"debord="+j.c.n10d.debord+" texte="+j.c.n10d.texte+" focus="+j.c.n10d.focus')" "debord=true texte=Le texte dépasse la zone : faites défiler avant de coller. focus=Annuler"
 assert_eq "T21.15 — le HTML collé ne crée aucun nœud dans l'aperçu" "$(rj "$CL" 'j.c.html.enfants')" "0"
 assert_eq "T21.10 — témoin positif : « Coller » envoie le texte (avec son retour chariot) et le shell l'exécute : le marqueur n'existait pas avant le clic, il existe après (la sonde sait voir l'exécution)" "$(rj "$CL" '"avant="+j.c.avantColler+" marqueur="+j.c.coller.marqueur+" bandeau="+j.c.coller.bandeau+" envoye="+j.c.coller.entree_ok')" "avant=false marqueur=true bandeau=false envoye=true"
+
+echo "=== T22 — hauteur utile de la grille et barre de défilement discrète (E3, G3 ; P71-D-34, D-35) ==="
+E3_EXPR='[160,208,280,328,570].map(h=>{const m=(j.e3||{})[h];return m?h+":"+(m.bas<=m.visible+0.01?"ok":"deborde de "+(m.bas-m.visible))+"/lignes>0="+(m.lignes>0):h+":absente"}).join(" ")'
+E3_OK="160:ok/lignes>0=true 208:ok/lignes>0=true 280:ok/lignes>0=true 328:ok/lignes>0=true 570:ok/lignes>0=true"
+run_ecran "$OUT"; EC="$EJ"
+assert_eq "T22.0 — témoin : le scénario n'a pas échoué (aucune erreur nommée), la barre a été mesurée" "$(rj "$EC" 'j.erreur||JSON.stringify(j.erreurs)')/$(rj "$EC" '(j.g3&&j.g3.survol)||"absente"')" "{}/1"
+assert_eq "E3.1 — aux hauteurs de tiroir 160, 208, 280, 328 et 570 px, le bas de la dernière ligne ne dépasse jamais la hauteur visible du cadre" "$(rj "$EC" "$E3_EXPR")" "$E3_OK"
+assert_eq "E3.2 — la hauteur utile (marge haute de 8 px déduite) donne plus d'une ligne et la grille tient dans le cadre : 570 px donne au moins 20 lignes" "$(rj "$EC" '((j.e3||{})[570]||{}).lignes>=20')" "true"
+assert_eq "G3.1 — la barre de défilement n'apparaît pas hors survol (opacité 0, pointeur hors du cadre, 300 lignes dans l'historique)" "$(rj "$EC" 'j.g3.dehors')" "0"
+assert_eq "G3.2 — elle apparaît au survol du terminal (opacité 1)" "$(rj "$EC" 'j.g3.survol')" "1"
+assert_eq "G3.3 — le défilement à la molette reste possible barre masquée ou non (la dernière ligne imprimée était à l'écran, la molette la fait sortir)" "$(rj "$EC" 'j.g3.fin0+"/"+j.g3.fin1')" "true/false"
+assert_eq "G3.4 — le pointeur parti, la barre se retire (opacité 0 après la molette)" "$(rj "$EC" 'j.g3.apres')" "0"
+assert_eq "G3.5 — au clavier (Maj+PageUp) hors survol, la barre se montre pendant le défilement (opacité 1) puis se retire (0)" "$(rj "$EC" 'j.g3.clavier+"/"+j.g3.repos')" "1/0"
 
 echo "=== M-* — mutants : chaque protection rougit sa sonde ==="
 if mutant_eng ctrlc 's/^                vers_shell += donnees$/                vers_shell += donnees.replace(b"\\x03", b"")/'; then
@@ -541,6 +586,22 @@ if mutant envoi-neutralise vf-cockpit-terminal-client.mjs 's|if (x !== null) ter
   run_collage "$MUT_OUT"
   assert_eq "M-ENVOI-NEUTRALISE — « Coller » envoie le texte privé de ses invisibles au lieu de l'original : le sha256 diffère, T21.13 rouge" "$(rouge "sha=$(rj "$CJ" 'j.c.invis.sha')" "sha=true")" "rouge"
 else sans_effet "M-ENVOI-NEUTRALISE"; fi
+if mutant sans-marge vf-cockpit-terminal-client.mjs 's|z.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)|z.clientHeight|'; then
+  run_ecran "$MUT_OUT"
+  assert_eq "M-SANS-MARGE — la hauteur utile ne déduit plus les marges (le code d'avant) : la dernière ligne déborde du cadre, E3.1 rouge" "$(rouge "$(rj "$EJ" "$E3_EXPR")" "$E3_OK")" "rouge"
+else sans_effet "M-SANS-MARGE"; fi
+if mutant barre-visible vf-cockpit-terminal-style.mjs 's|^#terminal .xterm-scrollable-element > .scrollbar { opacity: 0;.*$||'; then
+  run_ecran "$MUT_OUT"
+  assert_eq "M-BARRE-VISIBLE — la règle qui masque la barre est retirée : elle reste visible hors survol, G3.1 rouge" "$(rouge "$(rj "$EJ" 'j.g3.dehors')" "0")" "rouge"
+else sans_effet "M-BARRE-VISIBLE"; fi
+if mutant barre-jamais vf-cockpit-terminal-style.mjs 's|^#terminal:hover .xterm-scrollable-element.*$||'; then
+  run_ecran "$MUT_OUT"
+  assert_eq "M-BARRE-JAMAIS — la règle qui la montre au survol est retirée : la barre ne se montre jamais, G3.2 rouge" "$(rouge "$(rj "$EJ" 'j.g3.survol')" "1")" "rouge"
+else sans_effet "M-BARRE-JAMAIS"; fi
+if mutant barre-clavier vf-cockpit-terminal-client.mjs "s|montrerBarre();|void 0;|g"; then
+  run_ecran "$MUT_OUT"
+  assert_eq "M-BARRE-CLAVIER — la barre n'est plus montrée pendant le défilement : G3.5 rouge" "$(rouge "$(rj "$EJ" 'j.g3.clavier')" "1")" "rouge"
+else sans_effet "M-BARRE-CLAVIER"; fi
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

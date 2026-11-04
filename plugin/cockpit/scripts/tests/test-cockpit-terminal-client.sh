@@ -68,7 +68,8 @@ cat > "$AUX/queue.mjs" <<'JS'
 // on pousse un morceau VIDE puis un octet par onData et on compte les POST /entree. fetch rend la main à la boucle d'évènements (setImmediate) : une boucle sans fin ne gèle pas la mesure.
 import { pathToFileURL } from 'node:url';
 const posts = []; let onData = null, onBinary = null;
-const el = () => ({ addEventListener() {}, setAttribute() {}, style: {}, textContent: '' });
+const el = () => ({ addEventListener() {}, setAttribute() {}, querySelector: () => null, classList: { add() {}, remove() {} }, style: {}, textContent: '' });
+globalThis.getComputedStyle = () => ({ paddingTop: '0', paddingBottom: '0' });
 globalThis.window = { top: {}, opener: null, parent: { postMessage() {} }, addEventListener() {}, vfTermVue: { theme: () => ({}), carte() {}, effacer() {}, bandeau() {}, collage() {} } };
 globalThis.document = { fonts: { load: () => Promise.resolve(), ready: Promise.resolve() }, getElementById: el, addEventListener() {} };
 globalThis.location = { hash: '', pathname: '/', search: '' };
@@ -97,6 +98,45 @@ await att(300); const a = posts.length;
 onData('x'); onBinary('');        // un octet utile, puis un rapport binaire vide
 await att(300);
 console.log(`apresVide=${a} total=${posts.length} vides=${posts.filter((n) => n === 0).length} utiles=${posts.filter((n) => n > 0).length}`);
+process.exit(0);
+JS
+cat > "$AUX/etat.mjs" <<'JS'
+// etat.mjs <module-client.mjs> <scenario> : la fin du flux vue par le client de Q, sans navigateur (G2, E4). Le client est joué avec des doublures (Terminal, fetch, DOM, vue) ;
+// scénarios : arret (flux fermé puis /etat {"etat":"arret"}) · coupure (serveur injoignable : flux et /etat échouent) · python (flux 503 puis /etat indisponible/python3-absent).
+// Une ligne : cartes=<types, en ordre>@<vite si la première est venue en moins de 500 ms> bandeaux=<oui|non> flux=<appels à /flux> messages=<postMessage vers P, dans l'ordre>
+import { pathToFileURL } from 'node:url';
+const sc = process.argv[3], t0 = Date.now(), cartes = [], msgs = []; let bandeaux = 0, flux = 0, premiere = 0;
+const el = () => ({ addEventListener() {}, setAttribute() {}, querySelector: () => null, classList: { add() {}, remove() {} }, style: {}, textContent: '' });
+globalThis.getComputedStyle = () => ({ paddingTop: '0', paddingBottom: '0' });
+globalThis.window = { top: {}, opener: null, parent: { postMessage: (m) => msgs.push(m) }, addEventListener() {},
+  vfTermVue: { theme: () => ({}), carte: (t) => { if (!premiere) premiere = Date.now() - t0; cartes.push(t); }, effacer() {}, bandeau: () => { bandeaux++; }, collage() {}, invisible: () => false } };
+globalThis.document = { fonts: { load: () => Promise.resolve(), ready: Promise.resolve() }, getElementById: el, addEventListener() {} };
+globalThis.location = { hash: '', pathname: '/', search: '' };
+globalThis.history = { replaceState() {} };
+const memoire = () => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; };
+globalThis.localStorage = memoire(); globalThis.sessionStorage = memoire(); localStorage.setItem('vf.terminal.secret', 'a'.repeat(64));
+globalThis.ResizeObserver = class { observe() {} };
+globalThis.requestAnimationFrame = () => 0;
+globalThis.FitAddon = { FitAddon: class { fit() {} } };
+globalThis.Terminal = class {
+  constructor() { this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; }
+  loadAddon() {} open() {} attachCustomKeyEventHandler() {} focus() {} write() {} paste() {} reset() {} resize() {} onData() {} onBinary() {}
+};
+const rep = (status, corps) => ({ status, ok: status >= 200 && status < 300, json: async () => corps, body: { getReader: () => ({ read: async () => ({ done: true }) }) } });
+globalThis.fetch = async (u) => {
+  const url = String(u);
+  if (url === '/flux') { flux++; if (sc === 'arret') return rep(200, null); if (sc === 'python') return rep(503, null); throw new Error('injoignable'); }
+  if (url === '/etat') {
+    if (sc === 'arret') return rep(200, { etat: 'arret' });
+    if (sc === 'python') return rep(200, { etat: 'indisponible', raison: 'python3-absent' });
+    throw new Error('injoignable');
+  }
+  return rep(204, null);
+};
+const m = await import(pathToFileURL(process.argv[2]).href);
+m.clientTerminal({ origineP: 'http://127.0.0.1:1', theme: 'dark' });
+await new Promise((ok) => setTimeout(ok, sc === 'coupure' ? 2500 : 1500));
+console.log(`cartes=${cartes.join(',')}@${premiere && premiere < 500 ? 'vite' : premiere || 'jamais'} bandeaux=${bandeaux > 0 ? 'oui' : 'non'} flux=${sc === 'coupure' ? (flux >= 2 ? '>=2' : flux) : flux} messages=${[...new Set(msgs)].join(",")}`);
 process.exit(0);
 JS
 cat > "$AUX/tierce.mjs" <<'JS'
@@ -468,6 +508,20 @@ else sans_effet "M-VIDE-TOUT"; fi
 if mutant videenvoi vf-cockpit-terminal-client.mjs 's|if (!corps.length) break;||'; then
   assert_eq "M-VIDE-ENVOI — le mutant (la file vidée envoie encore un corps vide) rougit N11.1 : au moins un POST vide" "$(file_vide "$MUT_OUT" | awk '{ split($3, v, "="); print (v[2] >= 1) ? "rouge" : "identique : " $0 }')" "rouge"
 else sans_effet "M-VIDE-ENVOI"; fi
+
+echo "=== G2 / E4 — fin du flux : arrêt volontaire dit tout de suite, Python 3 absent dit en clair, vraie coupure = reconnexion (sans navigateur) ==="
+etat_fin() { node "$AUX/etat.mjs" "$1/vf-cockpit-terminal-client.mjs" "$2"; }
+assert_eq "G2.1 — /etat {\"etat\":\"arret\"} à la fin du flux : la carte « Serveur arrêté » s'affiche tout de suite (moins de 500 ms, pas de « Reconnexion… »), P reçoit etat:arrete, un seul flux" "$(etat_fin "$OUT" arret)" "cartes=arrete@vite bandeaux=non flux=1 messages=ready,etat:connecte,etat:arrete"
+assert_eq "G2.2 — témoin : une vraie coupure (serveur injoignable) garde la reconnexion : aucune carte avant 30 s, le bandeau « Reconnexion… » est posé, le flux est réessayé" "$(etat_fin "$OUT" coupure)" "cartes=@jamais bandeaux=oui flux=>=2 messages=ready,etat:reconnexion"
+assert_eq "E4.1 — /etat indisponible/python3-absent : la carte « python » s'affiche tout de suite, jamais « arrete », pas d'etat:arrete vers P, pas de boucle (un seul flux)" "$(etat_fin "$OUT" python)" "cartes=python@vite bandeaux=non flux=1 messages=ready"
+assert_has "E4.2 — la carte python dit le poste et la marche à suivre (installer Python 3, relancer la commande), sans le mot « arrêté »" "$(grep -E '^ *python: ' "$OUT/vf-cockpit-terminal-vue.mjs")" "Terminal indisponible', corps: ['Python 3 est introuvable sur ce poste. Installez-le, puis relancez ', COMMANDE"
+assert_eq "E4.3 — la carte python ne contient pas « arrêté »" "$(grep -E '^ *python: ' "$OUT/vf-cockpit-terminal-vue.mjs" | grep -c 'arrêt')" "0"
+if mutant gdeux vf-cockpit-terminal-client.mjs "s|if (e \&\& e.etat === 'arret') {|if (false) {|"; then
+  assert_eq "M-G2 — le mutant (l'arrêt n'est pas lu) rougit G2.1 : aucune carte, le bandeau « Reconnexion… » est posé" "$(etat_fin "$MUT_OUT" arret | cut -d' ' -f1-2)" "cartes=@jamais bandeaux=oui"
+else sans_effet "M-G2"; fi
+if mutant mpython vf-cockpit-terminal-client.mjs "s|e.raison === 'python3-absent'|e.raison === 'x'|"; then
+  assert_eq "M-E4 — le mutant (python3-absent non reconnu) rougit E4.1 : plus de carte, la reconnexion tourne" "$(etat_fin "$MUT_OUT" python | cut -d' ' -f1-2)" "cartes=@jamais bandeaux=oui"
+else sans_effet "M-E4"; fi
 
 if [ -n "$CHROME" ]; then
 echo "=== T6 — amorçage dans l'onglet, secret hors cookie (TERM-04 ; P71-D-12, D-13) ==="

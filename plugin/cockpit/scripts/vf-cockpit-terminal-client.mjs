@@ -96,6 +96,11 @@ export function clientTerminal(cfg) {
     }, true);
     document.addEventListener('keydown', (e) => { if (propose !== null && e.key === 'Escape') { prendre(e); abandonner(); } }, true);
     term.focus(); window.addEventListener('focus', () => term.focus());
+    // la barre de défilement n'apparaît qu'au survol (feuille) ou pendant un défilement : molette ou clavier la montrent une seconde
+    let defile = 0;
+    const montrerBarre = () => { zone.classList.add('vf-q-defile'); clearTimeout(defile); defile = setTimeout(() => zone.classList.remove('vf-q-defile'), 1000); };
+    zone.addEventListener('wheel', montrerBarre, { passive: true, capture: true });
+    document.addEventListener('keydown', (e) => { if (e.shiftKey && (e.key === 'PageUp' || e.key === 'PageDown' || e.key === 'Home' || e.key === 'End')) montrerBarre(); }, true);
 
     // entrée : une requête à la fois, dans l'ordre, jamais plus de TRANCHE octets par corps (la borne du serveur : au-delà il répond 413 et rien n'est écrit) ;
     // une grosse entrée part en tranches successives ; 429 (contre-pression) garde les octets et réessaie ; 413 réduit la tranche (une borne serveur plus basse) puis, à un octet,
@@ -135,7 +140,18 @@ export function clientTerminal(cfg) {
       derniere = t; tPost = Date.now();
       fetch('/taille', { method: 'POST', headers: entetes(), body: t, cache: 'no-store' }).catch(() => {});
     };
-    new ResizeObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; fit.fit(); taille(); }); }).observe(document.getElementById('terminal'));
+    // addon-fit mesure la hauteur du parent bordures et marges comprises et n'en retire pas les 8 px haut et bas : la dernière ligne débordait du cadre.
+    // Le nombre de lignes se recalcule donc sur la hauteur UTILE (marges internes déduites), sans jamais en ajouter
+    const ajuster = () => {
+      fit.fit();
+      const z = document.getElementById('terminal'), ecran = z.querySelector('.xterm-screen'), cs = getComputedStyle(z);
+      if (!ecran || !term.rows) return;
+      const utile = z.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom), cellule = ecran.getBoundingClientRect().height / term.rows;
+      if (!(utile > 0) || !(cellule > 0)) return;
+      const lignes = Math.max(1, Math.floor(utile / cellule + 0.001));
+      if (lignes < term.rows) term.resize(term.cols, lignes);
+    };
+    new ResizeObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; ajuster(); taille(); }); }).observe(document.getElementById('terminal'));
 
     // /flux et /etat répondent 403 (et non 401) à un secret périmé sans Origin : POST /taille, corps vide, rend 401 au secret périmé et 400 au secret valide (rien n'est redimensionné)
     const secretPerime = async () => {
@@ -180,6 +196,8 @@ export function clientTerminal(cfg) {
         if (res === 'fin') { essais = 0; perte = Date.now(); } else if (!perte) perte = Date.now();
         const e = await etat();
         if (e === 'stop') { expire(); break; }
+        if (e && e.etat === 'arret') { vue.carte('arrete'); emettre('arrete'); break; } // arrêt volontaire : le serveur le dit, aucune reconnexion à attendre
+        if (e && e.etat === 'indisponible' && e.raison === 'python3-absent') { vue.carte('python'); break; } // jamais « Serveur arrêté » : le serveur tourne, c'est le poste qui manque de Python
         if (e && e.session === 'terminee') { const d = { code: e.code, signal: e.signal }; marquerFin('termine', d); vue.bandeau('termine', d, relancer); emettre('termine'); break; }
         if (e && e.session === 'absente' && dejaVu) { marquerFin('fermee', null); vue.bandeau('fermee', null, relancer); emettre('termine'); break; }
         if (Date.now() - perte > LIMITE_MS) { vue.carte('arrete'); emettre('arrete'); break; }
@@ -188,7 +206,7 @@ export function clientTerminal(cfg) {
       }
       eteint = false;
     };
-    fit.fit(); const fin = finRetenue();
+    ajuster(); const fin = finRetenue();
     if (fin) { vue.bandeau(fin.type, fin.detail, relancer); emettre('termine'); } else boucle();
   };
   polices.then(demarrer);
