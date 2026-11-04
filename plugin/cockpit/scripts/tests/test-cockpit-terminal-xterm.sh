@@ -131,6 +131,19 @@ const monde = async (sp, etendue = 600) => {
   return trouve;
 };
 
+// R1.3 (P71-D-36) : le test ralentit le TRAITEMENT d'xterm côté page (API d'xterm exposée ici seulement, injectée avant la page, origine de Q seulement) :
+// les morceaux reçus sont retenus ; une fois le dernier arrivé (GROS-PRET), une frappe est injectée dans la page à +10 ms, puis la file est rendue à xterm à +80 ms.
+// Entre les deux, plusieurs tours de boucle passent : une autorisation « humaine » qui ne se referme pas avec son événement est encore ouverte quand xterm traite les 60000 questions.
+const RALENTI = `(() => { if (location.origin !== ${JSON.stringify(OQ)}) return; let T; const E = window.__ralenti = { retenus: 0, cle: false, libere: false, file: [], queue: '' };
+  Object.defineProperty(window, 'Terminal', { configurable: true, get() { return T; }, set(v) { T = class extends v {
+    write(d, cb) {
+      if (E.libere) return super.write(d, cb);
+      E.file.push([d, cb]); E.retenus++;
+      if (!E.armee && typeof d !== 'string') { const t = E.queue + new TextDecoder('latin1').decode(d); E.queue = t.slice(-16);
+        if (t.includes('GROS-PRET')) { E.armee = true;
+          setTimeout(() => { const ta = document.querySelector('.xterm-helper-textarea'); ta.dispatchEvent(new KeyboardEvent('keypress', { key: 'k', code: 'KeyK', keyCode: 107, charCode: 107, which: 107, bubbles: true, cancelable: true })); E.cle = true; }, 10);
+          setTimeout(() => { E.libere = true; E.file.forEach(([x, c]) => super.write(x, c)); }, 80); } }
+    } }; } }); })()`;
 const OUVERTURE = `(() => { let T; Object.defineProperty(window, 'Terminal', { configurable: true, get() { return T; }, set(v) {
   T = class extends v { open(...a) { if (location.origin !== ${JSON.stringify(OP)}) window.__ouv = { police: document.fonts.check('13px "JetBrains Mono"'), statut: document.fonts.status }; return super.open(...a); } }; } }); })()`;
 
@@ -401,13 +414,19 @@ await executer(chrome, async (sp) => {
       await s.send('Input.insertText', { text: 'g' }); await att(`${TXT}.includes('GROS-PRET')`, 'GROS-PRET');
       let tai = -1, stab = 0; const fin2 = Date.now() + 30000; while (stab < 12 && Date.now() < fin2) { const t = (await lire()).length; if (t === tai) stab++; else { stab = 0; tai = t; } await pause(100); }
       const n2 = (await lire()).length;
+      await s.send('Page.addScriptToEvaluateOnNewDocument', { source: RALENTI });
       theme = 'light'; await s.naviguer();
-      // la frappe part dès que le début du rejeu est à l'écran : le reste (60000 questions) est encore dans la file d'écriture d'xterm
-      const finT = Date.now() + 15000; while (Date.now() < finT) { try { if (await s.ev(`${TXT}.includes('GROS-DEBUT')`)) break; } catch {} }
-      for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key: 'k', code: 'KeyK', text: type === 'keyDown' ? 'k' : undefined, windowsVirtualKeyCode: 75 });
-      await pause(4000);
+      await att(`!!(window.__ralenti && window.__ralenti.libere)`, 'rejeu ralenti rendu à xterm');
+      r.rejeu.ralenti = await s.ev(`(() => { const e = window.__ralenti; return 'cle=' + e.cle + ' libere=' + e.libere + ' retenus=' + (e.retenus > 1); })()`);
+      tai = -1; stab = 0; const fin3 = Date.now() + 30000; while (stab < 12 && Date.now() < fin3) { const t = (await lire()).length; if (t === tai) stab++; else { stab = 0; tai = t; } await pause(100); }
       const gros = (await lire()).slice(n2).filter((l) => l.startsWith('I ')).map((l) => l.slice(2)).join('');
-      r.rejeu.gros = gros;
+      // la sortie du navigateur passe par un tube de 64 Ko que process.exit() tronque : un relevé de fuite (60000 réponses) est borné, jamais recopié en entier
+      r.rejeu.gros = gros.length > 400 ? gros.slice(0, 200) + '…' + gros.length / 2 + ' octets' : gros;
+      // R1.4 : une frappe RÉELLE (CDP, événement de confiance) après le rejeu arrive au shell, seule
+      const n3 = (await lire()).length;
+      for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key: 'k', code: 'KeyK', text: type === 'keyDown' ? 'k' : undefined, windowsVirtualKeyCode: 75 });
+      await pause(1500);
+      r.rejeu.reelle = (await lire()).slice(n3).filter((l) => l.startsWith('I ')).map((l) => l.slice(2)).join('');
       await s.send('Input.insertText', { text: 'x' });
     });
     return r;
@@ -479,6 +498,7 @@ JS
 
 rq() { node "$HERE_T/terminal-aux.mjs" req "$@"; }
 rj() { printf '%s\n' "$1" | node "$AUX/ev.mjs" "$2" 2>/dev/null; }
+rjs() { rj "$@" || echo ILLISIBLE; } # comme rj, mais un relevé illisible (JSON tronqué, champ absent) se dit ILLISIBLE au lieu d'une chaîne vide qui ressemble à « rien reçu »
 hx() { node "$AUX/hex.mjs" "$@"; }
 amorce_neuve() { node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"; }
 mklab() {
@@ -512,6 +532,7 @@ mutant_eng() { # mutant_eng <nom> <expression-sed> -> MUT_ENG : copie du moteur 
 }
 sans_effet() { assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; }
 rouge() { echo "     [mutant] obtenu $1, le code sain rend $2" >&2; [ "$1" != "$2" ] && echo rouge || echo "identique : $1"; }
+rougelu() { case "$1" in *ILLISIBLE*) echo "illisible : $1" ;; *) rouge "$@" ;; esac; } # rouge, mais seulement si le relevé du mutant est lisible : un relevé illisible n'est pas une preuve
 navig() { node "$AUX/chrome-xterm.mjs" "$CHROME" "$@"; } # navig <mode> <json>
 run_plein() { # run_plein <sortie> <moteur> <avecRecepteur 0|1> -> PJ ; un serveur neuf, un amorçage neuf, un Chrome neuf
   rm -f "$WORK/rec.hex"; srv "$1" "$2"
@@ -623,9 +644,11 @@ assert_eq "G5.1 — le curseur de la barre est nettement visible au survol : con
 echo "=== T23 — rejeu du tampon : xterm ne répond à aucune question restée dans le tampon (R1 ; P71-D-36) ==="
 run_rejeu "$OUT"; RJ0="$RJ"
 assert_eq "R1.0 — témoin : aucune erreur nommée, le récepteur a relevé les réponses VIVES aux questions (DA1 ESC[?…c reçue), le premier silence est marqué, cinq rechargements du cadre faits" "$(rj "$RJ0" 'j.erreur||JSON.stringify(j.erreurs)')/marqueur=$(rj "$RJ0" 'j.rejeu.marqueur')/da1=$(rj "$RJ0" '/1b5b3f/.test(j.rejeu.initial)')/recharges=$(rj "$RJ0" 'j.rejeu.recharges')" "{}/marqueur=true/da1=true/recharges=5"
-assert_eq "R1.1 — après cinq rechargements du cadre (thèmes alternés), le tampon contenant ESC[c ESC[>c ESC[6n ESC[?2004\$p ESC[5n est rejoué : le PTY ne reçoit AUCUN octet de réponse" "[$(rj "$RJ0" 'j.rejeu.avant')]" "[]"
+assert_eq "R1.1 — après cinq rechargements du cadre (thèmes alternés), le tampon contenant ESC[c ESC[>c ESC[6n ESC[?2004\$p ESC[5n est rejoué : le PTY ne reçoit AUCUN octet de réponse" "[$(rjs "$RJ0" 'j.rejeu.avant')]" "[]"
 assert_eq "R1.2 — témoin positif : une question émise APRÈS le rejeu reçoit sa réponse (frappe puis ESC[?…c) : les réponses ne sont pas coupées en général" "frappe=$(rj "$RJ0" 'j.rejeu.frappe') da1=$(rj "$RJ0" '/1b5b3f/.test(j.rejeu.apres)')" "frappe=true da1=true"
-assert_eq "R1.3 — une frappe réelle pendant un gros rejeu (60000 questions) arrive au shell et AUCUNE réponse d'xterm : le PTY reçoit exactement 6b (l'autorisation humaine ne survit pas à l'événement)" "[$(rj "$RJ0" 'j.rejeu.gros')]" "[6b]"
+assert_eq "R1.3t — témoin du ralenti : la file d'xterm est retenue (plusieurs morceaux), la frappe est injectée dans la page pendant la retenue, la file est rendue ensuite" "$(rjs "$RJ0" 'j.rejeu.ralenti')" "cle=true libere=true retenus=true"
+assert_eq "R1.3 — une frappe pendant un gros rejeu (60000 questions dans la file d'xterm, traitée 70 ms après la frappe) arrive au shell et AUCUNE réponse d'xterm : le PTY reçoit exactement 6b (l'autorisation humaine ne survit pas à son événement)" "[$(rjs "$RJ0" 'j.rejeu.gros')]" "[6b]"
+assert_eq "R1.4 — une frappe réelle (CDP, événement de confiance) après le rejeu arrive au shell, seule : 6b" "[$(rjs "$RJ0" 'j.rejeu.reelle')]" "[6b]"
 
 echo "=== M-* — mutants : chaque protection rougit sa sonde ==="
 if mutant_eng ctrlc 's/^                vers_shell += donnees$/                vers_shell += donnees.replace(b"\\x03", b"")/'; then
@@ -714,15 +737,15 @@ if mutant barre-clavier vf-cockpit-terminal-client.mjs "s|montrerBarre();|void 0
 else sans_effet "M-BARRE-CLAVIER"; fi
 if mutant rejeu-sans-garde vf-cockpit-terminal-client.mjs 's|if (rejeu \&\& !humain) return;||'; then
   run_rejeu "$MUT_OUT"
-  assert_eq "M-REJEU-SANS-GARDE — la garde du rejeu est retirée (le code d'avant) : les réponses du tampon partent dans l'entrée du PTY, R1.1 rouge" "$(rouge "[$(rj "$RJ" 'j.rejeu.avant')]" "[]")" "rouge"
+  assert_eq "M-REJEU-SANS-GARDE — la garde du rejeu est retirée (le code d'avant) : les réponses du tampon partent dans l'entrée du PTY, R1.1 rouge" "$(rougelu "[$(rjs "$RJ" 'j.rejeu.avant')]" "[]")" "rouge"
 else sans_effet "M-REJEU-SANS-GARDE"; fi
 if mutant rejeu-humain-colle vf-cockpit-terminal-client.mjs 's|finHumain = setTimeout(() => { humain = false; }, 0);|void 0;|'; then
   run_rejeu "$MUT_OUT"
-  assert_eq "M-REJEU-HUMAIN-COLLE — l'autorisation humaine n'est plus remise à faux après l'événement : des réponses d'xterm partent pendant le rejeu, R1.3 rouge" "$(rouge "[$(rj "$RJ" 'j.rejeu.gros')]" "[6b]")" "rouge"
+  assert_eq "M-REJEU-HUMAIN-COLLE — l'autorisation humaine n'est plus remise à faux après l'événement : des réponses d'xterm partent pendant le rejeu, R1.3 rouge" "$(rougelu "[$(rjs "$RJ" 'j.rejeu.gros')]" "[6b]")" "rouge"
 else sans_effet "M-REJEU-HUMAIN-COLLE"; fi
 if mutant rejeu-jamais-clos vf-cockpit-terminal-client.mjs "s|term.write('', () => { rejeu = false; });|void 0;|"; then
   run_rejeu "$MUT_OUT"
-  assert_eq "M-REJEU-JAMAIS-CLOS — le rejeu ne se clôt jamais : la question neuve ne reçoit plus sa réponse, R1.2 rouge (la garde ne coupe pas les réponses en général)" "$(rouge "da1=$(rj "$RJ" '/1b5b3f/.test(j.rejeu.apres)')" "da1=true")" "rouge"
+  assert_eq "M-REJEU-JAMAIS-CLOS — le rejeu ne se clôt jamais : la question neuve ne reçoit plus sa réponse, R1.2 rouge (la garde ne coupe pas les réponses en général)" "$(rougelu "da1=$(rjs "$RJ" '/1b5b3f/.test(j.rejeu.apres)')" "da1=true")" "rouge"
 else sans_effet "M-REJEU-JAMAIS-CLOS"; fi
 if mutant fond-noir vf-cockpit-terminal-style.mjs 's|^#terminal .xterm .xterm-viewport.*$||'; then
   run_ecran "$MUT_OUT"
