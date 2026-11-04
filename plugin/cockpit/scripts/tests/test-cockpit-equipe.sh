@@ -10,6 +10,7 @@
 #   EP  coût de collecte sur 40 sous-agents (garde de non-régression, T-69-06)
 #   E23 onglet Équipe : page /equipe.html, graphe cockpit-equipe@1, couche d'onglets, sonde de libellés (CKPT-23 ; P69-D-17)
 #   EUI rendu de l'arbre hors navigateur (vm) : imbrication, terminés repliés, liens dans les deux sens, pied (CKPT-19 à 22 ; P69-D-14 à P69-D-18)
+#   EK  clavier et témoins mineurs de l'onglet Équipe dans un vrai Chromium : focus après Entrée sur « Lire le transcript », mutants de comportement (UIFN-12, UIFN-13)
 # 69-04 ajoute E23 et EUI.
 # Exit 0 si tout passe, 1 sinon.
 
@@ -825,6 +826,58 @@ RES31="$(QB "$SCRIPTS")"; MUT31="$(QB "$MSRC31")"
 rm -f "$LAB31/.planning/missions/a.dag.json" "$LAB31/.planning/missions/b.dag.json"
 assert_eq "E31.1 — un *.dag.json en tube et un lien vers /dev/zero ne bloquent pas la collecte et le DAG régulier reste lu" "$RES31" "rendu|1"
 assert_eq "E31.2 — mutant : lecture sans contrôle du type de fichier -> la collecte est bloquée (tuée par SIGKILL), détecté" "$MUT31" "bloqué|illisible"
+
+# ---------- EK — clavier et témoins mineurs de l'onglet Équipe, dans un vrai Chromium (UIFN-12, UIFN-13 ; Phase 70, plan 70-11) ----------
+# Un vrai navigateur (socle chrome-session.mjs, son propre Chromium headless), le vrai serveur de la SORTIE assemblée, un HOME jetable. Les mutants de
+# comportement sont posés dans la page RÉELLEMENT servie (la copie assemblée project.html de la sortie, que le serveur lit à son démarrage) : un mutant sur
+# une copie que personne ne sert ne prouverait rien. Le serveur est relancé à chaque mutant, la sortie restaurée ensuite.
+echo "=== EK — clavier et témoins mineurs de l'onglet Équipe (UIFN-12, UIFN-13) ==="
+EKCHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then EKCHROME="$c"; break; fi; done
+if [ -z "$EKCHROME" ]; then
+  echo "  ⊘ EK SAUTÉ : aucun navigateur — non compté comme réussi, et non vérifié"
+else
+  HERE_EK="$(cd "$(dirname "$0")" && pwd)"
+  cat > "$AUX/ek-sub.mjs" <<'JS'
+// ek-sub.mjs <fichier> : remplace UNE fois la chaîne EK_FROM par EK_TO (variables d'environnement) ; sort 1 (« ancre absente ») si EK_FROM n'y est pas : un mutant vide ne prouve rien
+import fs from 'node:fs';
+const f = process.argv[2]; const t = fs.readFileSync(f, 'utf8');
+if (!process.env.EK_FROM || !t.includes(process.env.EK_FROM)) { console.log('ancre absente'); process.exit(1); }
+fs.writeFileSync(f, t.replace(process.env.EK_FROM, () => process.env.EK_TO)); console.log('muté');
+JS
+  LABEK="$WORK/lab-ek"; mkdir -p "$LABEK/src" "$LABEK/.planning/phases/01-x"
+  printf -- '- [x] **Phase 1: Socle** - premier jet\n' > "$LABEK/.planning/ROADMAP.md"
+  printf '<objective>Faire le socle</objective>\n' > "$LABEK/.planning/phases/01-x/01-01-PLAN.md"; echo ok > "$LABEK/.planning/phases/01-x/01-01-SUMMARY.md"
+  git -C "$LABEK" init -q && git -C "$LABEK" add -A && git -C "$LABEK" -c user.email=t@t -c user.name=t commit -q -m init
+  node "$SCRIPTS/vf-cockpit-build.mjs" "$LABEK" --quiet > "$WORK/build-ek.out" 2>&1 || cat "$WORK/build-ek.out"
+  cat > "$AUX/spec-ek.json" <<'JSON'
+{"sessionAgeS":5,"agents":[
+ {"id":"mgr1","spawnDepth":1,"ageS":5,"role":"vf-dev-manager"},
+ {"id":"a1","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"vf-coder"},
+ {"id":"a2","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"vf-coder"}]}
+JSON
+  NOW="$(node -e 'console.log(Date.now())')"
+  HEK="$(mkhome ek "$AUX/spec-ek.json" "$LABEK")"
+  OUTEK="$LABEK/.vibeflow/cockpit"; cp "$OUTEK/project.html" "$WORK/project-ek.html.orig"
+  ek_rafraichir() { touch "$HEK/.claude/projects/-lab/$SID/subagents/"agent-*.jsonl; }
+  ek_demarrer() { rm -f "$OUTEK/.cache/server.json"; ek_rafraichir
+    HOME="$HEK" node "$OUTEK/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-ek.out" 2>&1 &
+    EK_PID=$!; PIDS+=("$EK_PID")
+    for _ in $(seq 1 100); do [ -s "$OUTEK/.cache/server.json" ] && break; sleep 0.1; done
+    EK_PORT="$(G "$OUTEK/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"; }
+  # ek_muter <ancre> <remplacement> : pose le mutant dans la page assemblée (project.html de la sortie), « muté » ou « ancre absente »
+  ek_muter() { cp "$WORK/project-ek.html.orig" "$OUTEK/project.html"; EK_FROM="$1" EK_TO="$2" node "$AUX/ek-sub.mjs" "$OUTEK/project.html"; }
+  ek_restaurer() { cp "$WORK/project-ek.html.orig" "$OUTEK/project.html"; }
+  # EKC <action> <page> : une interaction, un Chromium ; la ligne JSON rendue est lue par G
+  EKC() { ek_rafraichir; VF_CDP_ECHEANCE_MS=30000 EK_ACTION="$1" node "$HERE_EK/chrome-equipe-clavier.mjs" "$EKCHROME" "http://127.0.0.1:$EK_PORT/$2" 2>/dev/null > "$WORK/ek-$1.json"; }
+  EKA1="equipe.html#r=n%3Aag-a1"
+  ek_demarrer
+  assert_eq "EK0 — contrôle positif : serveur de la sortie démarré, page Équipe servie et fixture à deux agents lisibles" "$([ "$EK_PORT" -gt 0 ] && echo serveur)|$(node "$AUX/fetchp.mjs" "$EK_PORT" /equipe.html "$WORK/ek-equipe.html")" "serveur|200"
+  # EK1 (UIFN-12) : Entrée sur « Lire le transcript » ne fait pas perdre le focus clavier
+  EKC focus-transcript "$EKA1"
+  assert_eq "EK1.0 — témoin : avant l'Entrée, l'élément actif est le bouton « Lire le transcript » de l'agent a1 (la sonde sait lire le focus)" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||(j.avant.tag+"|"+j.avant.transcript)')" "BUTTON|a1"
+  assert_eq "EK1 — après Entrée sur « Lire le transcript », le transcript s'affiche ET l'élément actif reste dans le tiroir, jamais BODY" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||("lu="+j.lu+" | actif="+(j.apres.tag==="BODY"?"BODY":(j.apres.dansTiroir?"dans le tiroir":"hors du tiroir : "+j.apres.tag)))')" "lu=true | actif=dans le tiroir"
+  vf_hyg_stop "$EK_PID"
+fi
 
 vf_hyg_assert
 
