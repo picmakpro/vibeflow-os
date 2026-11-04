@@ -112,3 +112,12 @@ Le lien avec 5e503058 est un effet de calendrier, pas de code : ce commit ne cha
 ### Correction et vert
 
 Le défaut est dans la condition de mesure, pas dans la visite : `INJ_ECHAP` (section R15 de `test-cockpit-responsive.sh`, seule retouche de la suite) ferme la visite (`window.VibeFlowTour?.end()`) avant l'Échap ; la visite n'est pas marquée « vue ». Assertion R15.4b inchangée. `test-cockpit-responsive.sh` 255 PASS / 6 FAIL (les six R13.4 ; R15.4b vert) ; `test-cockpit-projet.sh` 108 PASS / 0 FAIL (O6.15a, O6.15) ; `test-cockpit-vendor.sh` 79/0 ; `test-cockpit-chrome-fr.sh` 70/0.
+
+## Suite : tri de goût de Samuel (P70-D-23 ; « Tout selon les recos (Recommandé) », AskUserQuestion, session principale Claude Code, 2026-11-04)
+
+Q4a et Q5a (centrage borné, visite qui éclaire sans sélectionner) : ratifiés, rien à changer. Points repris ici : Q6b, Q7b, Q9b, Q13a.
+
+### Rouge — tête b0182676 + témoins
+
+- Q13a, O6.14b inversé (le bouton n'ouvre plus de visite sur Équipe, il est `aria-disabled`, son infobulle nomme l'onglet) : `test-cockpit-projet.sh` 108 PASS / 1 FAIL, attendu `[false|true|true]`, obtenu `[true|null|false]`.
+- Q6b, O6.16 (lab Projet à quatorze phases, 390 px, largeur à l'écran de chaque carte ciblée ≥ 120 px) : sonde `chrome-visite-etapes.mjs` sur ce lab, largeurs des étapes `[159, 108, 303]` px (plafond de zoom ×1,6, bornage par le graphe entier) : l'étape 2 fait 108 px. L'assertion O6.16 n'a pas été rejouée dans la suite sur l'ancien arbre : mesure à la sonde.

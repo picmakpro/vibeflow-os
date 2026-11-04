@@ -37,6 +37,7 @@ const MESURE = `(() => {
     const zones = [{ l: free.l, t: free.t, r: free.r, b: Math.min(free.b, cr.t - 8) }, { l: Math.max(free.l, cr.r + 8), t: free.t, r: free.r, b: free.b }].filter((z) => z.r - z.l > 40 && z.b - z.t > 40);
     const cx = (r.l + r.r) / 2, cy = (r.t + r.b) / 2;
     o.cible = true; o.couvert = inter(r, cr); o.visible = dans(r);
+    o.largeur = Math.round(r.w); o.hauteur = Math.round(r.h);
     o.dansZone = r.l >= free.l - 1 && r.t >= free.t - 1 && r.r <= free.r + 1 && r.b <= free.b + 1;
     // centrée dans le tiers central d'une zone, OU aussi centrée que le permet le graphe entier : la mettre au milieu de la zone ferait sortir une autre carte de la zone libre (critère de R1)
     const nds0 = [...document.querySelectorAll('#svg g.node')].map(R).filter((x) => x.w > 0 && x.h > 0);
@@ -86,7 +87,8 @@ await executer(chrome, async (s) => {
       await s.ev('window.VibeFlowTour.end()'); await s.ev('window.VibeFlowTour.start()'); await pause(1200);
       const auto = await s.ev('window.VibeFlowTour.active()'); await s.ev('window.VibeFlowTour.end()'); await pause(300);
       await s.ev("document.getElementById('tour-btn').click()"); await pause(1200);
-      sortie['e' + w] = { cartes, auto, manuel: await s.ev('window.VibeFlowTour.active()') };
+      const bouton = await s.ev("(() => { const b = document.getElementById('tour-btn'); return { aria: b.getAttribute('aria-disabled'), titre: b.title }; })()");
+      sortie['e' + w] = { cartes, auto, manuel: await s.ev('window.VibeFlowTour.active()'), bouton };
       await s.ev('window.VibeFlowTour.end()'); continue;
     }
     if (panneau) await s.ev("(() => { const p = document.getElementById('panel'); p.style.width = '440px'; })()");

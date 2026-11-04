@@ -487,6 +487,9 @@ for W in 1440 390; do
   assert_eq "O6.11 [$W px] — « Passer » à l'étape 3 (une carte) rend la vue d'ensemble d'avant la visite, celle que rend « Terminé » (zoom à 2 % près, position à 4 px près, aucune carte de moins dans la fenêtre, aucune de plus recouverte par le titre)" "$(x68 "[j.p$W].map((p)=>Math.abs(p.avant.k-p.apres.k)<=p.avant.k*0.02&&Math.abs(p.avant.x-p.apres.x)<=4&&Math.abs(p.avant.y-p.apres.y)<=4&&p.apres.visibles>=p.avant.visibles&&p.apres.recouvre<=p.avant.recouvre)[0]")" "true"
   assert_eq "O6.12 [$W px] — Projet : le contour de l'étape « au travail » est encore là après la réécriture du className de #vf-lock (étapes dont le contour a disparu)" "$(x68 "j.l$W.etapes.filter((e)=>e.anneau===true).map((e)=>e.i).join(',')")" ""
 done
+# O6.16 (Q6b, P70-D-23 : Samuel, AskUserQuestion session principale Claude Code, 2026-11-04 : « Tout selon les recos (Recommandé) ») : sous 701 px, la visite zoome une petite carte jusqu'à la rendre lisible (le juge a mesuré 46 x 31 px) : au moins 120 px de large
+# à chaque étape de carte à 390 px (le graphe entier n'y borne plus le zoom : il ne tient pas à cette taille ; au-dessus de 701 px le bornage par le graphe entier reste, O6.10).
+assert_eq "O6.16 [390 px] — Projet (lab à quatorze phases) : étapes dont la carte ciblée fait moins de 120 px de large (largeur mesurée)" "$(x68 "j.l390.etapes.filter((e)=>e.largeur!=null&&e.largeur<120).map((e)=>e.i+':'+e.largeur+'px').join(',')")" ""
 # O6.13 (correctif 70-07, CI Linux de la PR #200 : R20 « #panel recouvre #tour » à 768 px) : la carte de visite ne passe jamais sous le panneau de détail, quelle que soit la largeur de celui-ci (elle dépend des polices et de la plateforme :
 # ici le panneau est élargi à 440 px, ce qui rougit sans Linux). Cause : la carte gardait ses 360 px et son côté même quand le panneau s'avançait. L'émulation `pointer: none` de la suite (R8) ne reproduit PAS le cas : R20 reste vert sous Chrome sans pointeur.
 X69="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 768,1024 panneau)"
@@ -512,7 +515,7 @@ XEQ="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$PEQ" 768 equip
 xeq() { printf '%s' "$XEQ" | node "$AUX/get.mjs" /dev/stdin "$1"; }
 assert_eq "O6.14a — témoin : la mesure a eu lieu sans erreur, l'onglet Équipe a au moins deux cartes (une session et un sous-agent)" "$(xeq "j.erreur||''")|$(xeq 'j.e768.cartes>=2')" "|true"
 assert_eq "O6.14 — Équipe / 768 px : le démarrage d'office (start() sans argument) n'ouvre pas la visite" "$(xeq 'j.e768.auto')" "false"
-assert_eq "O6.14b — Équipe : le bouton « Par où commencer » l'ouvre toujours (démarrage voulu par la personne)" "$(xeq 'j.e768.manuel')" "true"
+assert_eq "O6.14b — Équipe : le bouton « Par où commencer » n'ouvre plus de visite (Samuel, AskUserQuestion session principale Claude Code, 2026-11-04 : « Tout selon les recos (Recommandé) », P70-D-23, Q13a), il est désactivé (aria-disabled) avec une infobulle qui le dit" "$(xeq 'j.e768.manuel')|$(xeq 'j.e768.bouton.aria')|$(xeq '/Équipe/.test(j.e768.bouton.titre)')" "false|true|true"
 # O6.15 (CI Linux de 03bada92 : R15.4b « Échap ferme le tiroir » rouge sous Linux, où la visite d'office s'ouvre pendant la mesure) : quand la visite est ouverte, elle est la couche du dessus et capte la première Échap ; le tiroir de détail
 # n'est touché ni par l'ouverture de la visite, ni par sa sortie, et la seconde Échap le ferme. Contrat de l'ordre, mesuré à 390 px sur Projet ; R15.4b mesure donc le tiroir visite fermée (test-cockpit-responsive.sh, section R15 seule).
 XEC="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 390 echap)"
