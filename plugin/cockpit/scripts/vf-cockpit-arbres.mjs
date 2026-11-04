@@ -17,6 +17,20 @@ const git = (sh, dir, ...args) => sh('git', [...GIT_SUR, '-C', dir, ...args], di
 const existe = (sh, dir, ref) => git(sh, dir, 'show-ref', '--verify', ref).trim() !== ''; // show-ref --verify imprime « sha ref » si la référence existe, rien sinon
 const entier = (s) => (/^\d+$/.test(String(s).trim()) ? Number(String(s).trim()) : null);
 
+// arbres du lab, dans l'ordre de `git worktree list` : le premier est l'arbre principal ; arbres existants seulement, chemins résolus ; repli [root] si la liste est vide.
+// Les chaînes rendues sont brutes (le chemin sert à comparer des cwd) : c'est l'émetteur qui les passe par `nettoie` avant affichage.
+export function arbresGit(root, { sh = shDefaut } = {}) {
+  root = path.resolve(root);
+  const arbres = [];
+  for (const b of git(sh, root, 'worktree', 'list', '--porcelain').split('\n\n')) {
+    const t = /^worktree (.*)$/m.exec(b)?.[1];
+    if (!t || !fs.existsSync(t)) continue;
+    const branche = /^branch refs\/heads\/(.*)$/m.exec(b)?.[1] || (b.includes('detached') ? '(détachée)' : '');
+    arbres.push({ chemin: fs.realpathSync(t), branche, principal: arbres.length === 0 });
+  }
+  return arbres.length ? arbres : [{ chemin: root, branche: '', principal: true }];
+}
+
 // branche de base : cible de refs/remotes/origin/HEAD privée de `origin/`, sinon `main` local s'il existe, sinon null (P68-PL-05)
 export function brancheBase(root, { sh = shDefaut } = {}) {
   const t = git(sh, root, 'symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD').trim();

@@ -18,6 +18,7 @@ import { driverLockScript, gitCommonDir, resolveScriptsDir, planningLayout } fro
 import { ls, mtime, readJson, cherche, masque, MAX_MASQUE, ID_RE, premiereLigne } from './vf-cockpit-lecture.mjs';
 import { FENETRE, collecteAgents, indexDesNoeuds, rattacher } from './vf-cockpit-equipe.mjs';
 import { lireDags } from './vf-cockpit-planning.mjs';
+import { arbresGit } from './vf-cockpit-arbres.mjs';
 import { reduireTranscript } from './vf-cockpit-transcript.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -36,12 +37,11 @@ const formeOk = (d) => !!d && REQ_TR.every((k) => k in d) && ['cwd', 'type', 'ti
 // contexte de collecte des sessions et sous-agents : arbres git du lab, portée, étiquettes
 function contexte(root, { fresh, now, home }) {
   root = path.resolve(root);
-  const porcelain = sh('git', ['-C', root, 'worktree', 'list', '--porcelain'], root, root);
-  const branchOf = new Map(porcelain.split('\n\n').map((b) => [/^worktree (.*)$/m.exec(b)?.[1], /^branch refs\/heads\/(.*)$/m.exec(b)?.[1] || (b.includes('detached') ? '(détachée)' : '')]).filter(([t]) => t && fs.existsSync(t)).map(([t, br]) => [fs.realpathSync(t), br]));
-  // la branche vient de `git worktree list` pour TOUT arbre connu (cwd ou activité) ; le gitBranch du transcript est celui de l'arbre de LANCEMENT : repli seulement
+  const arbres = arbresGit(root); // l'analyse de la liste des arbres git vit dans vf-cockpit-arbres.mjs
+  const branchOf = new Map(arbres.map((a) => [a.chemin, a.branche]));
+  // la branche vient de la liste des arbres git pour TOUT arbre connu (cwd ou activité) ; le gitBranch du transcript est celui de l'arbre de LANCEMENT : repli seulement
   const branche = (t, ...transcript) => branchOf.get(t) || transcript.find(Boolean) || '';
-  const trees = porcelain.split('\n').filter((l) => l.startsWith('worktree ')).map((l) => l.slice(9)).filter((t) => fs.existsSync(t)).map((t) => fs.realpathSync(t));
-  if (!trees.length) trees.push(root);
+  const trees = arbres.map((a) => a.chemin);
   const real = (p) => { try { return fs.realpathSync(p); } catch { return p; } };
   const inScope = (cwd) => { if (typeof cwd !== 'string' || !cwd) return null; const r = real(cwd); return trees.filter((t) => r === t || r.startsWith(t + path.sep)).sort((a, b) => b.length - a.length)[0] || null; };
   const label = (t) => (t === trees[0] ? 'arbre principal' : path.relative(trees[0], t) || t);
