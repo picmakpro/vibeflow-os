@@ -151,10 +151,13 @@ assert_eq "F9.2 : sous-titre et pastille en français" "$(lire "$WORK/f9.json" '
 export VF_COCKPIT_PORT_BASE=$((30000 + (RANDOM * 11) % 30000))
 U10="$(node "$SCRIPTS/vf-cockpit.mjs" open --no-open --lab "$L9" 2>/dev/null | sed -En 's#^Cockpit : (http://127\.0\.0\.1:[0-9]+)/ .*#\1/project.html#p' | head -1)"
 perl -e 'alarm 300; exec @ARGV' node "$SCRIPTS/tests/chrome-verrou.mjs" "$CHROME" "$U10" > "$WORK/f10.json" 2>/dev/null
+perl -e 'alarm 300; exec @ARGV' node "$SCRIPTS/tests/chrome-verrou-prefixe.mjs" "$CHROME" "$U10" > "$WORK/f10c.json" 2>/dev/null
 node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L9" >/dev/null 2>&1; unset VF_COCKPIT_PORT_BASE
 assert_eq "F10 : le verrou du dépôt s'affiche « dépôt » dans le tiroir « Au travail » (jamais « depot »)" "$(lire "$WORK/f10.json" '(j.erreur||String(j.lignes[0]).replace(/ · .*$/, "").replace(/^(Verrou dépôt).*/, "$1"))')" "Verrou dépôt"
 # F10b : P68-D-39 — le travailleur de type verrou et l'en-tête du tiroir affichent le même âge (le `who` figé à 1 s, le flux `lock` à 57 s)
 assert_eq "F10b : l'âge du verrou dans la ligne du tiroir égale celui de l'en-tête (57 s)" "$(lire "$WORK/f10.json" '(j.erreur||[/57 s/.test(j.regle), /1 min|57 s/.test(String(j.lignes[0])), /(^|[^0-9])1 s/.test(String(j.lignes[0]))].join())')" "true,true,false"
+# F10c : M-3 (P68-D-39) — deux verrous d'un même propriétaire dont un compartiment est préfixe de l'autre (`fiabilite`, `fiabilite-2`) : chaque ligne garde SON âge (40 s et 10 min), correspondance exacte
+assert_eq "F10c : fiabilite garde 40 s, fiabilite-2 garde 10 min (jamais l'âge du verrou voisin)" "$(lire "$WORK/f10c.json" '(j.erreur||[/fiabilite · .*40 s/.test(String(j.lignes[0])) && !/fiabilite-2/.test(String(j.lignes[0])), /fiabilite-2 · .*10 min/.test(String(j.lignes[1])) && !/40 s/.test(String(j.lignes[1]))].join())')" "true,true"
 fi
 
 echo ""

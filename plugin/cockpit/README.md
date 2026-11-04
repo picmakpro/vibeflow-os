@@ -136,9 +136,15 @@ déclencher cet affichage : le mod n'exécute rien qui s'y trouve.
 
 Une seule source : l'émetteur du socle, `node <plugin>/cockpit/scripts/vf-cockpit-signal.mjs <racine de session>`, qui publie une ligne
 de JSON au schéma `vibeflow/cockpit-signal@1` (phases avec leur `avancement@2`, jalons, missions et leur état de vie, verrous, worktrees et
-retard, équipe `who@2`). Le mod ne relit pas le planning lui-même. Il le rafraîchit toutes les 10 secondes et à chaque tour terminé ;
-un appel est borné à 15 secondes et un seul tourne à la fois. Mesure (SUMMARY de 68-03) : 3 s sur ce dépôt (14 worktrees), 108 338 octets de
-sortie, sortie 0 ; la durée varie avec le nombre de worktrees, elle n'est pas garantie ailleurs.
+retard, équipe `who@2`). Le mod ne relit pas le planning lui-même. Un appel est borné à 15 secondes et un seul tourne à la fois.
+
+**Règle de rafraîchissement (P68-D-41, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04, « Rafraîchir si pane ouverte (Recommandé) »).**
+Garantie du mod : le rafraîchissement est continu seulement quand la pane est ouverte et la session interactive. Pane fermée, il n'a lieu qu'après un tour
+terminé et au plus une fois par minute. Le mod n'attend jamais l'émetteur au démarrage de la session.
+
+**Coût mesuré** (relecture adverse de la Phase 68, `68-RELECTURE-ADVERSE.md` § S3, 2026-11-04, sonde rejouée trois fois sur ce dépôt) : environ 1,8 à 2,1 s par appel,
+8 arbres git, environ 120 Ko de sortie (120 757 octets), environ 2 s de CPU par appel, sortie 0. La durée varie avec le nombre de worktrees ; elle n'est pas garantie ailleurs.
+Ce chiffre remplace l'ancienne mesure du SUMMARY de 68-03 (3 s, 14 worktrees, 108 338 octets), périmée.
 
 **`node` doit être dans le PATH** de Claude Code. Sans lui, la pane dit « node introuvable dans le PATH » et n'affiche aucune donnée
 (plutôt que des données à moitié lues) ; il n'existe pas de réglage de chemin de `node`. Une sortie tronquée, illisible, d'un autre schéma
@@ -158,6 +164,9 @@ puis dans le compte. Deux garanties du mod : **il n'exécute jamais un fichier d
 n'est refusée que sous `<lab>/.vibeflow`), **et un fichier existant dont le chemin réel ne peut pas être établi est refusé** ; **ses lancements partent hors du lab, avec un PATH assaini**.
 Un échec de lanceur est dit en clair (code de sortie de la table de « Ouvrir »).
 
+**Cockpit installé sans `conductor`.** `cockpit/module.json` ne requiert aucun module. Sans `driver-lock.sh` trouvable (ni dans le plugin, ni dans le compte, ni dans un scope
+accepté), la source des verrous est illisible : une mission dont un nœud est en cours s'affiche « état inconnu », et non « en cours » (P68-D-23).
+
 ### Gestes réservés aux humains
 
 Élaguer un verrou périmé (`driver-lock.sh recover`), demander l'arrêt d'un agent, compacter, copier une commande, ouvrir le cockpit :
@@ -166,8 +175,7 @@ chacun est borné, derrière un bouton, jamais lancé par le mod seul.
 ### Chargement, version et CI
 
 Le mod est déclaré au niveau du plugin (`plugin/.claude-plugin/plugin.json`, clés `hooks` et `types`), sa source est sous `signal/`. Il est lu depuis le cache du
-plugin, jamais copié chez l'utilisateur. Ses clés d'état portent le nom du plugin (`vibeflow.*`). L'API des mods de Claude Code est en accès anticipé et n'annonce
-aucune version minimale : la recette de cette pane est faite avec **Claude Code 2.1.318**. La CI joue `claude plugin validate --strict plugin` et `claude plugin test plugin`
+plugin, jamais copié chez l'utilisateur. Ses clés d'état portent le nom du plugin (`vibeflow.*`). L'API des mods de Claude Code est en accès anticipé. Pane vf-signal vérifiée sous Claude Code 2.1.318 ; non chargée sous 2.1.181 (plancher exact non mesuré) (P68-D-41, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04, « L'écrire sans mesurer (Recommandé) »). La CI joue `claude plugin validate --strict plugin` et `claude plugin test plugin`
 (`@anthropic-ai/claude-code` épinglé en `2.1.318`, job `gates`) ; sous `claude plugin test`, `process.run` n'atteint jamais la machine, donc la chaîne réelle
 `node` + émetteur se prouve par `test-cockpit-signal.sh` et par un passage `claude -p --plugin-dir plugin "/vf-signal brief"` à la recette.
 

@@ -24,6 +24,10 @@ Publiée dans VibeFlow vX.Y.Z (mention à compléter par le geste de release gro
 - **`avancement@1` devient `avancement@2`** : états de mission `abandonnee` et `inconnu` et champ `mission.vie` (vocabulaire de mission
   fermé élargi) ; `who` lit les arbres par `arbresGit`.
 - Corrections issues de la recette de la Phase 68 (revues du socle, du mod et du web).
+- **Tiroir « Au travail »** : l'âge d'un verrou se retrouve par correspondance exacte sur la portée et le compartiment, plus par sous-chaîne
+  (deux compartiments dont l'un est préfixe de l'autre, `fiabilite` et `fiabilite-2`, gardent chacun leur âge).
+- **README de la pane** : règle de rafraîchissement (P68-D-41 : arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04),
+  coût remesuré, version vérifiée de Claude Code (2.1.318 ; non chargée sous 2.1.181, plancher exact non mesuré) et cockpit installé sans `conductor` (« état inconnu »).
 
 ### Retiré
 - Lecture maison du planning par le mod (remplacée par le socle partagé).

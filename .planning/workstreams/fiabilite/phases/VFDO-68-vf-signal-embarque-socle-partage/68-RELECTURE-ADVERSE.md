@@ -292,7 +292,7 @@ $ perl -e 'alarm 120; exec @ARGV' bash scripts/check-version-sync.sh | tail -1
 ## 5. Brouillon des notes de la release groupée — partie « Phase 68 »
 
 > À compléter par le geste de release : numéro racine, liste finale des commits, et la mention « publiée dans VibeFlow vX.Y.Z » du CHANGELOG
-> du module `cockpit`. Les constats AD-1 à AD-3 sont à trancher avant le merge ; les phrases entre crochets dépendent de ces décisions.
+> du module `cockpit`. AD-1 et AD-2 sont arbitrés (P68-D-41, 2026-11-04) et leurs phrases ci-dessous les reprennent ; AD-3 reste à trancher avant le merge.
 
 **Cockpit v1.2.0 — vf-signal embarqué, socle partagé (Phase 68)**
 
@@ -313,10 +313,12 @@ $ perl -e 'alarm 120; exec @ARGV' bash scripts/check-version-sync.sh | tail -1
   dans le README du module.
 - **À savoir** :
   - la pane exige `node` dans le PATH de Claude Code ;
-  - [AD-2] une version ancienne de Claude Code (mesuré : 2.1.181) journalise une erreur de chargement des hooks de VibeFlow ; recette faite
-    sous 2.1.318 ;
-  - [AD-1] le mod relance l'émetteur toutes les 10 s, mesuré à environ 2 s de CPU par appel sur un gros dépôt ;
-  - [M-6] sans `driver-lock.sh` trouvable, une mission en cours s'affiche « état inconnu ».
+  - pane vf-signal vérifiée sous Claude Code 2.1.318 ; non chargée sous 2.1.181 (plancher exact non mesuré) (P68-D-41, arbitrage Samuel,
+    AskUserQuestion session principale Claude Code, 2026-11-04, « L'écrire sans mesurer (Recommandé) ») ;
+  - le rafraîchissement du mod est continu seulement pane ouverte et session interactive ; pane fermée, après un tour et au plus une fois par
+    minute ; le mod n'attend jamais l'émetteur au démarrage (P68-D-41, « Rafraîchir si pane ouverte (Recommandé) », même canal, même date) ;
+    coût remesuré (S3, 2026-11-04) : environ 1,8 à 2,1 s et environ 2 s de CPU par appel, 8 arbres, environ 120 Ko de sortie ;
+  - cockpit installé sans `conductor` : pas de `driver-lock.sh` trouvable, donc une mission en cours s'affiche « état inconnu » (M-6, P68-D-23).
 
 Commits depuis `v2.75.1` (`git log --oneline v2.75.1..<tête>`) : 270 au total. Ils comprennent les merges des PR #195, #196, #197, #198
 et #201, déjà sur `main`, et 147 commits de la Phase 68 (`19393cc3..0d4f8ae0`, dont 85 touchent `plugin/`). Commits de code de la Phase 68,

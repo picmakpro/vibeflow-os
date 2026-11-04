@@ -62,7 +62,10 @@
   const ageDe = (w) => {
     if (w.kind !== 'lock') return w.ageS;
     const l = probe.lock, tenus = (Array.isArray(l?.locks) ? l.locks : l?.present ? [l] : []).filter((x) => x.present && x.owner === w.id);
-    const x = tenus.find((y) => (y.ws ? String(w.tree).includes(y.ws) : y.scope === w.tree)) || tenus[0];
+    // correspondance EXACTE sur la portée et le compartiment (M-3), jamais par sous-chaîne (`fiabilite` n'est pas `fiabilite-2`) : `tree` d'un compartiment se lit en mots
+    // (mot 1 = le nom, mot 3 = la phase éventuelle, comme l'écrit vf-cockpit-who.mjs), celui d'un verrou sans compartiment est sa portée ; aucun libellé n'est reconstruit ici
+    const mots = String(w.tree).split(' '), ph = (y) => /^[0-9]+(\.[0-9]+)*$/.test(String(y.phase)) ? String(y.phase) : '';
+    const x = tenus.find((y) => y.ws ? mots[1] === y.ws && (mots[3] || '') === ph(y) : y.scope === w.tree) || (tenus.length === 1 ? tenus[0] : undefined);
     return typeof x?.age_seconds === 'number' ? x.age_seconds : w.ageS;
   };
   const htmlTiroir = () => {
