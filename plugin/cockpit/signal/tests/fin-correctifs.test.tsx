@@ -19,7 +19,7 @@ type Lab = { envs: Env[]; erreurOuvrir: { v: boolean } }
 function lab(on: On, o: { stdout?: string; agents?: AgentInfo[]; refus?: string; limites?: { kind: string; percentUsed: number }[] } = {}): Lab {
   const sp: Lab = { envs: [], erreurOuvrir: { v: false } }
   mock.clock(on, { now: 1_000_000 })
-  mock.env(on, { HOME: '/home/user', VF_COCKPIT_SCRIPTS_DIR: '/lab/.claude/scripts' })
+  mock.env(on, { HOME: '/home/user', VF_COCKPIT_SCRIPTS_DIR: '/lab/.claude/scripts', NODE_OPTIONS: '--require /lab/evil.js', BASH_ENV: '/lab/evil.sh', ENV: '/lab/evil.sh' })
   on('command.register', () => ({ value: { command: 'vf-signal' } }))
   on('ui.open', () => {
     if (sp.erreurOuvrir.v) throw new Error('panne-ouverture')
@@ -135,4 +135,25 @@ test("FIN-6d — la pane et le brief disent la même fenêtre : « 7 j 35 % » /
   expect(await ui.find({ type: 'Text', text: /7 j 35 %/ })).toBeDefined()
   await ui.unmount()
   expect(await ecrire($)).toMatch(/- 7 j : 35 %/)
+})
+
+// FND-2 (68-FIX-FND ; P68-D-42, décision du manager qui applique « Rien sous le lab ») : NODE_OPTIONS, BASH_ENV et ENV sont vidées comme VF_COCKPIT_SCRIPTS_DIR.
+const VIDEES = ['VF_COCKPIT_SCRIPTS_DIR', 'NODE_OPTIONS', 'BASH_ENV', 'ENV'] as const
+
+test("FND-2a — init.env de l'émetteur : NODE_OPTIONS, BASH_ENV et ENV valent la chaîne vide même quand l'hôte les pointe vers le lab", async ($, on) => {
+  const sp = lab(on)
+  await demarrer($)
+  expect(sp.envs.length).toBeGreaterThan(0)
+  for (const env of sp.envs) for (const k of VIDEES) expect(env?.[k]).toBe('')
+})
+
+test("FND-2b — init.env du lanceur du cockpit : même règle", async ($, on) => {
+  const sp = lab(on)
+  await demarrer($)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  const avant = sp.envs.length
+  await ui.press({ key: 'ouvrir-cockpit' })
+  expect(sp.envs.length).toBeGreaterThan(avant) // témoin positif : le lanceur a bien tourné
+  for (const env of sp.envs.slice(avant)) for (const k of VIDEES) expect(env?.[k]).toBe('')
+  await ui.unmount()
 })

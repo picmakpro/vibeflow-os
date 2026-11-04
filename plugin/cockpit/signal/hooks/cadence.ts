@@ -31,10 +31,10 @@ export async function noter($: EngineInterface): Promise<void> {
   dernierLancement = await $.clock.now()
 }
 
-/** Lancement automatique de l'émetteur : libre pane ouverte, sinon au plus un par minute. */
+/** Lancement automatique de l'émetteur : libre pane ouverte, sinon au plus un par minute. Une horloge qui recule (différence négative) rend la minute échue. */
 export async function emetteurAuto($: EngineInterface): Promise<void> {
   const now = await $.clock.now()
-  if (!(await paneOuverte($)) && dernierLancement !== undefined && now - dernierLancement < MINUTE) return
+  if (!(await paneOuverte($)) && dernierLancement !== undefined && now - dernierLancement >= 0 && now - dernierLancement < MINUTE) return
   dernierLancement = now
   await refreshSignalAuto($)
 }

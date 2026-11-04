@@ -9,7 +9,7 @@ import { SIGNAL } from './fixture-signal'
 // les gestes explicites (/vf-signal, brief) rafraîchissent aussitôt. Identifiants FIN-1* (verdict.sh lit le début du titre).
 
 const PANE_ID = 'vf-signal'
-type Opts = { ouverte?: boolean; retenir?: boolean; periodes?: number[] }
+type Opts = { ouverte?: boolean; retenir?: boolean; periodes?: number[]; temps?: { v: number } }
 type Lab = { emetteur: () => number; ouverte: { v: boolean }; liberer: () => void; clk: ReturnType<typeof mock.clock> }
 
 function lab(on: On, o: Opts = {}): Lab {
@@ -18,11 +18,11 @@ function lab(on: On, o: Opts = {}): Lab {
   let porte: (() => void) | null = null
   const attente = o.retenir ? new Promise<void>(r => (porte = r)) : null
   // avec `periodes`, une horloge à espion (chaque `clock.every` est noté, aucun ne tourne) ; sinon l'horloge simulée, qui avance
-  const clk = o.periodes ? (undefined as unknown as ReturnType<typeof mock.clock>) : mock.clock(on, { now: 1_000_000 })
-  if (o.periodes) {
-    on('clock.now', () => ({ value: 1_000_000 }))
+  const clk = o.periodes || o.temps ? (undefined as unknown as ReturnType<typeof mock.clock>) : mock.clock(on, { now: 1_000_000 })
+  if (o.periodes || o.temps) {
+    on('clock.now', () => ({ value: o.temps?.v ?? 1_000_000 }))
     on('clock.every', (_, e) => {
-      o.periodes!.push(e.ms)
+      o.periodes?.push(e.ms)
       return { value: undefined }
     })
   }
@@ -51,6 +51,8 @@ function lab(on: On, o: Opts = {}): Lab {
     }
     return { value: { exitCode: 0, stdout: JSON.stringify(SIGNAL), stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
+  on('session.end', () => ({ sessionId: 's1' }))
+  on('tool.call', () => ({ result: {} }))
   on('turn.start', () => ({ turnId: 't1' }))
   on('turn.complete', () => ({ text: '' }))
   return { emetteur: () => appels, ouverte, liberer: () => porte?.(), clk }
@@ -155,4 +157,76 @@ test("FIN-1d3 — témoin positif de l'espion : en session interactive, la minut
   lab(on, { periodes: oui })
   await demarrer($)
   expect(oui.filter(ms => ms === 10000)).toEqual([10000])
+})
+
+// --- FND-1, FND-3, FND-4 (68-FIX-FND ; P68-D-41) : la propriété centrale « pane fermée, au plus un lancement automatique par minute,
+// tours, /clear et Bash combinés » pour TOUTE la durée de la session, pas seulement la première minute. ---
+
+test("FND-1a — pane fermée : après un lancement à t ≥ 61 s, un tour 5 s plus tard ne relance pas", async ($, on) => {
+  const l = lab(on)
+  await demarrer($)
+  await laisser()
+  await l.clk.advance(61000)
+  await tour($)
+  await laisser()
+  expect(l.emetteur()).toBe(2) // témoin positif : le tour de t+61 s a bien lancé
+  await l.clk.advance(5000)
+  await tour($)
+  await laisser()
+  expect(l.emetteur()).toBe(2)
+})
+
+test("FND-1b — pane fermée : un /clear suivi d'un tour dans la minute ne donne qu'un seul lancement", async ($, on) => {
+  const l = lab(on)
+  await demarrer($)
+  await laisser()
+  await l.clk.advance(61000)
+  await $.session.end({ reason: 'clear' })
+  await laisser()
+  expect(l.emetteur()).toBe(2) // témoin positif : le /clear a lancé
+  await l.clk.advance(5000)
+  await tour($)
+  await laisser()
+  expect(l.emetteur()).toBe(2)
+  await $.session.end({ reason: 'clear' }) // et un second /clear dans la minute ne relance pas non plus
+  await laisser()
+  expect(l.emetteur()).toBe(2)
+})
+
+test("FND-1c — appel Bash qualifiant (git commit, gsd) : rien pane fermée, un lancement pane ouverte", async ($, on) => {
+  const l = lab(on)
+  await demarrer($)
+  await laisser()
+  const avant = l.emetteur()
+  await $.tool.call({ tool: 'Bash', tool_use_id: 'u1', command: 'git commit -m x' })
+  await $.tool.call({ tool: 'Bash', tool_use_id: 'u2', command: 'gsd-tools roadmap analyze' })
+  await laisser()
+  expect(l.emetteur()).toBe(avant)
+  l.ouverte.v = true
+  await $.tool.call({ tool: 'Bash', tool_use_id: 'u3', command: 'git commit -m y' })
+  await laisser()
+  expect(l.emetteur()).toBe(avant + 1) // témoin positif : pane ouverte, le même geste lance
+})
+
+test("FND-3 — l'horloge recule : une différence négative est une minute échue, le tour relance", async ($, on) => {
+  const temps = { v: 1_000_000 }
+  const l = lab(on, { temps })
+  await demarrer($)
+  await laisser()
+  expect(l.emetteur()).toBe(1)
+  temps.v = 500_000
+  await tour($)
+  await laisser()
+  expect(l.emetteur()).toBe(2)
+})
+
+test("FND-4 — deux session.start : un seul minuteur de 10 s reste actif (le premier est annulé)", async ($, on) => {
+  const l = lab(on, { ouverte: true })
+  await demarrer($)
+  await demarrer($)
+  await laisser()
+  const avant = l.emetteur()
+  await l.clk.advance(10000)
+  await laisser()
+  expect(l.emetteur()).toBe(avant + 1)
 })

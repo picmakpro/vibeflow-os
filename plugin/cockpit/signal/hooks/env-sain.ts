@@ -44,9 +44,10 @@ export async function pathSain($: EngineInterface, root: string): Promise<string
 }
 
 /**
- * L'`init.env` des lancements du mod : le PATH assaini, et `VF_COCKPIT_SCRIPTS_DIR` vidée (P68-D-40). L'hôte peut la pointer vers le lab ;
- * le socle la lirait pour choisir `driver-lock.sh` et exécuterait un script planté. Vide, le socle retombe sur ses propres scripts.
+ * L'`init.env` des lancements du mod : le PATH assaini, `VF_COCKPIT_SCRIPTS_DIR` vidée (P68-D-40) et `NODE_OPTIONS`, `BASH_ENV`, `ENV` vidées (P68-D-42).
+ * L'hôte peut les pointer vers le lab ; le socle lirait la première pour choisir `driver-lock.sh` et exécuterait un script planté, `node` chargerait
+ * `--require` depuis `NODE_OPTIONS`, `bash`/`sh` sourceraient `BASH_ENV`/`ENV` au démarrage. Vides, rien sous le lab ne s'exécute.
  */
 export async function envSain($: EngineInterface, root: string): Promise<Record<string, string>> {
-  return { PATH: await pathSain($, root), VF_COCKPIT_SCRIPTS_DIR: '' }
+  return { PATH: await pathSain($, root), VF_COCKPIT_SCRIPTS_DIR: '', NODE_OPTIONS: '', BASH_ENV: '', ENV: '' }
 }

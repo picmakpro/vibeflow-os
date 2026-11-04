@@ -141,6 +141,9 @@ retard, équipe `who@2`). Le mod ne relit pas le planning lui-même. Un appel es
 **Règle de rafraîchissement (P68-D-41, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04, « Rafraîchir si pane ouverte (Recommandé) »).**
 Garantie du mod : le rafraîchissement est continu seulement quand la pane est ouverte et la session interactive. Pane fermée, il n'a lieu qu'après un tour
 terminé et au plus une fois par minute. Le mod n'attend jamais l'émetteur au démarrage de la session.
+Conséquence à connaître : pane fermée, le bandeau peut afficher un état vieux d'une minute ou plus (P68-D-41). Une horloge qui recule compte comme une minute échue.
+**Environnement des lancements (P68-D-40, P68-D-42).** Le mod vide `VF_COCKPIT_SCRIPTS_DIR`, `NODE_OPTIONS`, `BASH_ENV` et `ENV` dans l'environnement
+de ses lancements (émetteur, lanceur du cockpit, élagage), même quand ton shell les pointe vers le lab : rien sous le lab ne doit s'exécuter par leur biais.
 
 **Coût mesuré** (relecture adverse de la Phase 68, `68-RELECTURE-ADVERSE.md` § S3, 2026-11-04, sonde rejouée trois fois sur ce dépôt) : environ 1,8 à 2,1 s par appel,
 8 arbres git, environ 120 Ko de sortie (120 757 octets), environ 2 s de CPU par appel, sortie 0. La durée varie avec le nombre de worktrees ; elle n'est pas garantie ailleurs.

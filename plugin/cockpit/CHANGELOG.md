@@ -28,6 +28,10 @@ Publiée dans VibeFlow vX.Y.Z (mention à compléter par le geste de release gro
   (deux compartiments dont l'un est préfixe de l'autre, `fiabilite` et `fiabilite-2`, gardent chacun leur âge).
 - **README de la pane** : règle de rafraîchissement (P68-D-41 : arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04),
   coût remesuré, version vérifiée de Claude Code (2.1.318 ; non chargée sous 2.1.181, plancher exact non mesuré) et cockpit installé sans `conductor` (« état inconnu »).
+- **Environnement des lancements du mod (P68-D-40, P68-D-42)** : le mod vide `VF_COCKPIT_SCRIPTS_DIR`, `NODE_OPTIONS`, `BASH_ENV` et `ENV`
+  dans l'environnement de ses lancements (émetteur, lanceur du cockpit, élagage), pour que rien sous le lab ne s'exécute par leur biais.
+- **Cadence (P68-D-41)** : pane fermée, le bandeau peut afficher un état vieux d'une minute ou plus ; une horloge qui recule compte comme une minute échue
+  (FND-3), et le minuteur de 10 s est annulé avant d'être reposé (FND-4).
 
 ### Retiré
 - Lecture maison du planning par le mod (remplacée par le socle partagé).
