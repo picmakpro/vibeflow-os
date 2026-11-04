@@ -73,7 +73,7 @@ JS
 cat > "$AUX/chrome-client.mjs" <<'JS'
 // chrome-client.mjs <chrome> <mode> <json> : scénarios navigateur du client de Q ; UNE ligne JSON. Modes : t6 · cadre · tierce.
 // Chaque étape est isolée (essai) : une mesure indisponible est nommée dans `erreurs`, jamais un résultat vide. Amorçage et secret sont masqués en sortie.
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url'; import { execFileSync } from 'node:child_process';
 const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv;
 const { P, Q, amorce, tierce, secret: secretN = '', pid: pidN = 0 } = JSON.parse(brut);
@@ -84,8 +84,42 @@ const essai = async (nom, f) => { try { return await f(); } catch (e) { erreurs[
 const INVITE = `/\\$/.test((document.querySelector('.xterm-rows') || {}).textContent || '')`;
 const masquer = (o, secret) => { let t = JSON.stringify(o).split(amorce).join('<amorce>'); if (secret) t = t.split(secret).join('<secret>'); return JSON.parse(t); };
 
+// Q n'ouvre un shell que dans son cadre (F4, P71-D-25) : les scénarios qui attendent un shell jouent Q dans un cadre sandbox de P, plein viewport, comme le tiroir.
+// `q` : ev/attendre/naviguer visent le monde principal du cadre de Q (retrouvé par sondage des identifiants de contexte, qui repartent de 1 à chaque processus de rendu : le socle n'expose pas les évènements).
+const SBXQ = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox';
+let ctx = 0;
+const mondeQ = async (s, etendue = 600) => {
+  let trouve = 0;
+  for (let id = 1; id < etendue; id++) {
+    const v = await s.send('Runtime.evaluate', { contextId: id, expression: `location.origin === ${JSON.stringify(OQ)} && typeof window.vfTermVue === 'object'`, returnByValue: true }).then((x) => x && x.result && x.result.value, () => false);
+    if (v === true) trouve = id;
+  }
+  return trouve;
+};
+const facadeQ = (s) => {
+  const ev = async (expression) => { const x = await s.send('Runtime.evaluate', { expression, contextId: ctx, returnByValue: true, awaitPromise: true }); return x && x.result && x.result.value; };
+  const attendre = async (expr, nom, ms = MS) => {
+    const fin = Date.now() + ms; let v;
+    do { try { v = await ev(expr); } catch { v = false; } if (v) return v; await pause(100); } while (Date.now() < fin);
+    throw new Error(`attente de « ${nom} » dépassée (${ms} ms)`);
+  };
+  const naviguer = async () => {
+    ctx = 0;
+    await s.naviguer(`${OP}/project.html`); await s.attendre(`document.readyState === 'complete'`, 'page P', MS);
+    await s.ev(`(() => { document.querySelectorAll('iframe[data-t]').forEach((f) => f.remove()); const f = document.createElement('iframe'); f.dataset.t = '1'; f.setAttribute('sandbox', ${JSON.stringify(SBXQ)});
+      f.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;border:0;z-index:99999'; f.src = '${OQ}/?theme=dark'; document.body.appendChild(f); })()`);
+    const fin = Date.now() + MS;
+    let essais = 0;
+    while (!ctx) { ctx = await mondeQ(s, 600 * 5 ** Math.min(essais++, 3)); if (!ctx) { if (Date.now() > fin) throw new Error('contexte du cadre de Q introuvable'); await pause(150); } }
+    await attendre(`!!document.querySelector('.xterm-helper-textarea') || !!document.querySelector('#etat:not([hidden])')`, 'terminal ou carte dans le cadre');
+    await s.ev(`document.querySelector('iframe[data-t]').focus()`); await ev(`(document.querySelector('.xterm-helper-textarea') || document.body).focus()`);
+  };
+  return { ev, attendre, naviguer, send: s.send };
+};
+
 await executer(chrome, async (s) => {
   const att = (expr, nom) => s.attendre(expr, nom, MS);
+  const q = facadeQ(s);
   const poll = async (f, nom) => { const fin = Date.now() + MS; for (;;) { const v = await f().catch(() => null); if (v) return v; if (Date.now() > fin) throw new Error(`attente de « ${nom} » dépassée (${MS} ms)`); await pause(100); } };
   const r = { erreurs };
 
@@ -100,42 +134,43 @@ await executer(chrome, async (s) => {
   }
 
   // --- scénarios sur le serveur réel : secret périmé (J2), serveur arrêté (J2), « Terminé » (J12), onBinary (S5), contre-pression (S3) ---
-  if (['perime', 'arret', 'termine', 'binaire', 'pression'].includes(mode)) {
-    const texte = () => s.ev(`(document.getElementById('etat') || {}).textContent || ''`).catch(() => '');
-    const invite = () => s.ev(INVITE).catch(() => false);
-    const lignes = () => s.ev(`(document.querySelector('.xterm-rows') || {}).textContent || ''`).catch(() => '');
+  if (['perime', 'arret', 'termine', 'binaire', 'pression', 'popup'].includes(mode)) {
+    const att = (expr, nom) => q.attendre(expr, nom, MS);
+    const texte = () => q.ev(`(document.getElementById('etat') || {}).textContent || ''`).catch(() => '');
+    const invite = () => q.ev(INVITE).catch(() => false);
+    const lignes = () => q.ev(`(document.querySelector('.xterm-rows') || {}).textContent || ''`).catch(() => '');
     const taper = async (t) => {
       for (const c of t) { await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: c, text: c, unmodifiedText: c }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: c }); }
       await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
       await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
     };
-    const etatServeur = () => s.ev(`fetch('/etat', { headers: { 'X-VF-Terminal': localStorage.getItem('vf.terminal.secret'), 'X-VF-Onglet': sessionStorage.getItem('vf.terminal.onglet') }, cache: 'no-store' }).then((x) => x.json()).then((j) => j.session)`).catch(() => '?');
+    const etatServeur = () => q.ev(`fetch('/etat', { headers: { 'X-VF-Terminal': localStorage.getItem('vf.terminal.secret'), 'X-VF-Onglet': sessionStorage.getItem('vf.terminal.onglet') }, cache: 'no-store' }).then((x) => x.json()).then((j) => j.session)`).catch(() => '?');
     // le secret est posé dans le stockage de Q (premier niveau) : la page se charge ensuite comme après un amorçage réussi
     await essai('secret', async () => { await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', ${JSON.stringify(secretN)})`); });
     r.mode = mode;
     if (mode === 'perime') {
       const t0 = Date.now();
-      await essai('carte-expiree', async () => { await s.naviguer(`${OQ}/`); await att(`(document.getElementById('etat') || {}).textContent && document.getElementById('etat').textContent.includes('Session expirée')`, 'carte Session expirée (secret périmé)'); });
+      await essai('carte-expiree', async () => { await q.naviguer(); await att(`(document.getElementById('etat') || {}).textContent && document.getElementById('etat').textContent.includes('Session expirée')`, 'carte Session expirée (secret périmé)'); });
       r.duree = Date.now() - t0; r.carte = await texte();
     } else if (mode === 'arret') {
-      await essai('invite', async () => { await s.naviguer(`${OQ}/`); await att(INVITE, 'invite du shell'); });
+      await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
       try { process.kill(pidN, 'SIGTERM'); r.tue = true; } catch (e) { r.tue = false; }
-      await essai('carte-arret', async () => { await s.attendre(`(document.getElementById('etat') || {}).textContent && document.getElementById('etat').textContent.includes('Serveur arrêté')`, 'carte Serveur arrêté', 60000); });
+      await essai('carte-arret', async () => { await q.attendre(`(document.getElementById('etat') || {}).textContent && document.getElementById('etat').textContent.includes('Serveur arrêté')`, 'carte Serveur arrêté', 60000); });
       r.carte = await texte();
     } else if (mode === 'termine') {
       const BANDEAU = `((document.getElementById('etat') || {}).textContent || '').includes('terminé')`;
-      await essai('invite', async () => { await s.naviguer(`${OQ}/`); await att(INVITE, 'invite du shell'); });
+      await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
       await essai('exit', async () => { await taper('exit'); await att(BANDEAU, 'bandeau « Le shell s’est terminé »'); });
       r.avant = { bandeau: (await texte()).includes('terminé'), session: await etatServeur() };
-      await essai('rechargement', async () => { await s.naviguer(`${OQ}/`); await poll(async () => (await texte()).includes('terminé') || (await invite()), 'bandeau ou invite après rechargement'); });
+      await essai('rechargement', async () => { await q.naviguer(); await poll(async () => (await texte()).includes('terminé') || (await invite()), 'bandeau ou invite après rechargement'); });
       r.apres = { bandeau: (await texte()).includes('terminé'), session: await etatServeur() };
       await essai('relance', async () => {
-        await s.ev(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.includes('Relancer')); if (b) b.click(); return !!b; })()`);
+        await q.ev(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.includes('Relancer')); if (b) b.click(); return !!b; })()`);
         await poll(async () => (await invite()) && (await etatServeur()) === 'vivante', 'nouveau shell après « Relancer le shell »');
       });
       r.relance = { bandeau: (await texte()).includes('terminé'), session: await etatServeur() };
     } else if (mode === 'binaire') {
-      await essai('invite', async () => { await s.naviguer(`${OQ}/`); await att(INVITE, 'invite du shell'); });
+      await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
       // suivi de la souris en codage par défaut : xterm l'émet par onBinary ; le noyau renvoie l'écho des octets reçus (ESC affiché « ^[ »)
       await essai('souris', async () => {
         await taper(`printf '\\033[?1000h';cat -v`);
@@ -147,10 +182,27 @@ await executer(chrome, async (s) => {
       });
       r.rapport = (await lignes()).includes('^[[M');
     } else if (mode === 'pression') {
-      await essai('invite', async () => { await s.naviguer(`${OQ}/`); await att(INVITE, 'invite du shell'); });
-      await s.ev(`(() => { window.__e = 0; const f0 = window.fetch; window.fetch = function (u) { if (String(u) === '/entree') { window.__e++; if (window.__e <= 2) return Promise.resolve(new Response(null, { status: 429 })); } return f0.apply(this, arguments); }; })()`);
+      await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
+      await q.ev(`(() => { window.__e = 0; const f0 = window.fetch; window.fetch = function (u) { if (String(u) === '/entree') { window.__e++; if (window.__e <= 2) return Promise.resolve(new Response(null, { status: 429 })); } return f0.apply(this, arguments); }; })()`);
       await essai('saisie', async () => { await taper(`echo PRESS""ION-OK`); await poll(async () => (await lignes()).includes('PRESSION-OK'), 'sortie de la commande saisie sous contre-pression'); });
-      r.appels = await s.ev('window.__e').catch(() => -1); r.sortie = (await lignes()).includes('PRESSION-OK');
+      r.appels = await q.ev('window.__e').catch(() => -1); r.sortie = (await lignes()).includes('PRESSION-OK');
+    } else if (mode === 'popup') {
+      // F4 : Q ouverte en popup par P (window.open copie le sessionStorage, donc l'identifiant d'onglet) ne prend pas la session et ne lance aucun shell
+      const shells = () => execFileSync('ps', ['-axo', 'pid=,ppid=,args=']).toString().split('\n').filter((l) => l.trim().split(/\s+/)[1] === String(pidN) && /vf-cockpit-pty\.py/.test(l)).length;
+      const popups = async () => (await s.send('Target.getTargets')).targetInfos.filter((t) => t.type === 'page' && t.url.includes('theme=dark')).length;
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
+      const refocaliser = async () => { await s.send('Page.bringToFront'); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.ev(`document.querySelector('.xterm-helper-textarea').focus()`); };
+      await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
+      await s.ev(`window.__msgs = []; addEventListener('message', (e) => window.__msgs.push(String(e.data).slice(0, 40)))`);
+      r.avant = { shells: shells() };
+      await essai('popup1', async () => { await s.send('Runtime.evaluate', { expression: `window.open('${OQ}/?theme=dark', 'vfq1') && 1`, userGesture: true }); await pause(5000); });
+      r.popup1 = await popups();
+      r.apres = { shells: shells(), msgs: await s.ev('JSON.stringify(window.__msgs)').then((x) => JSON.parse(x || '[]')).catch(() => []), session: await etatServeur() };
+      await essai('saisie', async () => { await refocaliser(); await taper(`echo POP""UP-OK`); await poll(async () => (await lignes()).includes('POPUP-OK'), 'saisie dans le terminal légitime après le popup'); r.saisie = true; });
+      await essai('exit', async () => { await refocaliser(); await taper('exit'); await att(`((document.getElementById('etat') || {}).textContent || '').includes('terminé')`, 'bandeau « Le shell s’est terminé »'); });
+      r.finShells = shells();
+      await essai('popup2', async () => { await s.send('Runtime.evaluate', { expression: `window.open('${OQ}/?theme=dark', 'vfq2') && 1`, userGesture: true }); await pause(5000); });
+      r.popup2 = await popups(); r.apresFin = { shells: shells(), session: await etatServeur() };
     }
     return masquer(r, secretN);
   }
@@ -178,7 +230,10 @@ await executer(chrome, async (s) => {
       await s.naviguer(`${OQ}/`);
       r.secretQ = await s.ev(`localStorage.getItem('vf.terminal.secret')`);
       r.cookieQ = await s.ev('document.cookie');
-      await att(INVITE, 'invite du shell');
+      // F4 : Q en premier niveau (ni cadre ni opener) ne prend pas la session : carte « Terminal indisponible », aucun shell
+      await att(`((document.getElementById('etat') || {}).textContent || '').includes('Terminal indisponible') && !document.querySelector('.xterm')`, 'carte Terminal indisponible (Q hors cadre)');
+      r.horsCadre = { carte: await s.ev(`document.getElementById('etat').textContent`), session: await s.ev(`fetch('/etat', { headers: { 'X-VF-Terminal': localStorage.getItem('vf.terminal.secret'), 'X-VF-Onglet': sessionStorage.getItem('vf.terminal.onglet') || 'x' }, cache: 'no-store' }).then((x) => x.json()).then((j) => j.session)`) };
+      await q.naviguer(); await q.attendre(INVITE, 'invite du shell (Q dans le cadre)', MS);
       r.invite = true;
     });
     r.secretOk = /^[0-9a-f]{64}$/.test(r.secretQ || '');
@@ -258,14 +313,14 @@ await executer(chrome, async (s) => {
   // T9.7 (Q en premier niveau) + TQ.1 : saisie -> shell -> sortie
   r.invite = false; r.eco = false; r.violationsQ = [];
   const marq = `${Date.now()}`;
-  await essai('q-premier-niveau', async () => {
-    await s.naviguer(`${OQ}/`);
-    await att(INVITE, 'invite du shell (Q en premier niveau)');
+  await essai('q-cadre', async () => {
+    await q.naviguer();
+    await q.attendre(INVITE, 'invite du shell (Q dans le cadre)', MS);
     r.invite = true; r.violationsQ = [...s.violations];
     for (const c of `echo MA""RQ-${marq}`) { await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: c, text: c, unmodifiedText: c }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: c }); }
     await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
     await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
-    await att(`document.querySelector('.xterm-rows').textContent.includes('MARQ-${marq}')`, 'sortie de la commande saisie');
+    await q.attendre(`document.querySelector('.xterm-rows').textContent.includes('MARQ-${marq}')`, 'sortie de la commande saisie', MS);
     r.eco = true;
   });
   r.violationsQ = r.violationsQ.length ? r.violationsQ : [...s.violations];
@@ -273,11 +328,11 @@ await executer(chrome, async (s) => {
   // O4.2 : autre onglet = sessionStorage vide
   r.autre = '?';
   await essai('autre-onglet', async () => {
-    await s.ev(`sessionStorage.clear()`);
-    await s.naviguer(`${OQ}/`);
-    await att(`(document.getElementById('etat') || {}).textContent && document.getElementById('etat').textContent.includes('Terminal déjà ouvert')`, 'carte Terminal déjà ouvert');
+    await q.ev(`sessionStorage.clear()`);
+    await q.naviguer();
+    await q.attendre(`(document.getElementById('etat') || {}).textContent && document.getElementById('etat').textContent.includes('Terminal déjà ouvert')`, 'carte Terminal déjà ouvert', MS);
   });
-  r.autre = await s.ev(`(document.getElementById('etat') || {}).textContent || ''`).catch(() => '?');
+  r.autre = await q.ev(`(document.getElementById('etat') || {}).textContent || ''`).catch(() => '?');
   r.liste = LISTE;
   return masquer(r);
 }, { csp: true });
@@ -365,6 +420,7 @@ assert_eq "T6.1 — Q/#t=… mène à P/project.html sans fragment ni paramètre
 assert_eq "T6.1b — échange refusé : Q reste, adresse sans fragment, carte « Session expirée »" "$(rj "$J" '"hash=["+j.refus.hash+"] port="+j.refus.port+" carte="+(j.refus.carte.includes("Session expirée")?"oui":"non")')" "hash=[] port=$T6_Q carte=oui"
 SECRET_OK="$(rj "$J" 'j.secretOk?"oui":"non"')"
 assert_eq "T6.3 — le secret (64 hexadécimaux) est rangé dans le stockage de Q (Q en premier niveau), terminal vivant" "secret=$SECRET_OK invite=$(rj "$J" 'j.invite')" "secret=oui invite=true"
+assert_eq "T6.8 — F4 : Q en premier niveau (ni cadre ni opener, après l'amorçage) n'ouvre pas de terminal : carte « Terminal indisponible », aucun shell (le serveur dit absente) ; puis le cadre de P, lui, donne l'invite" "carte=$(rj "$J" '(j.horsCadre||{}).carte||"?"') session=$(rj "$J" '(j.horsCadre||{}).session||"?"') cadre=$(rj "$J" 'j.invite')" "carte=Terminal indisponibleCe terminal ne s’ouvre que dans le cockpit. Relancez /vf-cockpit --terminal. session=absente cadre=true"
 assert_eq "T6.2 — document.cookie vide sur P et sur Q (témoin : le secret existe bien, sinon le vide ne prouve rien)" "P=[$(rj "$J" 'j.cookieP')] Q=[$(rj "$J" 'j.cookieQ')] secret_connu=$SECRET_OK" "P=[] Q=[] secret_connu=oui"
 assert_eq "T6.4 — depuis P, le stockage du cadre de Q lève SecurityError (témoins : le secret est dans Q, le stockage de P est lisible)" "$(rj "$J" 'j.stockageCadre')/secret_dans_q=$SECRET_OK/stockage_p=$(rj "$J" 'j.stockageP')" "SecurityError/secret_dans_q=oui/stockage_p=lisible"
 assert_eq "T6.6 — le fichier d'amorçage est supprimé après l'échange" "$T6_FICHIER" "supprime"
@@ -375,8 +431,8 @@ srv "$OUT"; CP=$SRV_PORT; CQ=$QP; OP="http://127.0.0.1:$CP"; OQ="http://127.0.0.
 J="$(navig cadre "{\"P\":$CP,\"Q\":$CQ,\"amorce\":\"$AMORCE\"}")"; unsrv
 assert_eq "T9.0 — témoin : le scénario n'a pas échoué globalement" "$(rj "$J" 'j.erreur||"ok"')" "ok"
 assert_eq "T9.5 — cadre sandbox=\"allow-scripts allow-same-origin\" dans P : ready puis etat:connecte, tous d'origine Q" "$(rj "$J" '(function(){const m=j.msgs1||[];const a=m.findIndex(x=>x.d==="ready"),b=m.findIndex(x=>x.d==="etat:connecte");return "ordre="+(a>=0&&b>a?"ok":"ko")+" origines="+[...new Set(m.map(x=>x.o))].join(",")})()')" "ordre=ok origines=$OQ"
-assert_eq "T9.7 — 0 violation de CSP : P avec le cadre chargé et attaché, Q en premier niveau (témoins : connecté sous sandbox, invite du shell)" "$(rj "$J" '"connecte="+((j.msgs1||[]).some(x=>x.d==="etat:connecte")?"oui":"non")+" P="+(j.violationsP||["?"]).length+" Q="+(j.invite?"oui":"non")+"/"+(j.violationsQ||["?"]).length')" "connecte=oui P=0 Q=oui/0"
-assert_eq "TQ.1 — la saisie atteint le shell et sa sortie revient (POST /entree puis flux, Q en premier niveau)" "$(rj "$J" 'j.eco')" "true"
+assert_eq "T9.7 — 0 violation de CSP : P avec le cadre chargé et attaché, puis Q dans le cadre plein viewport (témoins : connecté sous sandbox, invite du shell dans le cadre)" "$(rj "$J" '"connecte="+((j.msgs1||[]).some(x=>x.d==="etat:connecte")?"oui":"non")+" P="+(j.violationsP||["?"]).length+" Q="+(j.invite?"oui":"non")+"/"+(j.violationsQ||["?"]).length')" "connecte=oui P=0 Q=oui/0"
+assert_eq "TQ.1 — la saisie atteint le shell et sa sortie revient (POST /entree puis flux, Q dans le cadre)" "$(rj "$J" 'j.eco')" "true"
 assert_eq "T17.Q4 — Ctrl+Maj+Espace dans le cadre : message toggle reçu par P, d'origine Q" "$(rj "$J" '"toggle="+((j.msgsToggle||[]).some(x=>x.d==="toggle"&&x.o==="'"$OQ"'")?"oui":"non")')" "toggle=oui"
 assert_eq "T17.Q5 — tout message reçu par P est dans la liste fermée (au moins ready, etat:connecte et toggle ont été vus)" "$(rj "$J" '(function(){const m=[...(j.msgsToggle||[]),...(j.msgs2||[])];return "hors_liste="+m.filter(x=>!j.liste.includes(x.d)).length+" vus="+["ready","etat:connecte","toggle"].every(v=>m.some(x=>x.d===v))})()')" "hors_liste=0 vus=true"
 assert_eq "O4.1 — même onglet = reprise : le second cadre se reconnecte (etat:connecte, pas etat:refuse)" "$(rj "$J" '"connecte="+((j.msgs2||[]).some(x=>x.d==="etat:connecte")?"oui":"non")+" refuse="+((j.msgs2||[]).some(x=>x.d==="etat:refuse")?"oui":"non")')" "connecte=oui refuse=non"
@@ -435,6 +491,11 @@ assert_eq "S5.1 — le rapport de souris émis par xterm (onBinary) atteint le s
 scenario "$OUT" pression
 assert_eq "S3.1 — contre-pression 429 sur /entree : le client garde ses octets et les renvoie (la commande saisie s'exécute, au moins 3 POST)" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" sortie="+j.sortie+" appels>=3="+(j.appels>=3)')" "erreurs={} sortie=true appels>=3=true"
 
+scenario "$OUT" popup
+assert_eq "F4.0 — témoin : le scénario n'a pas échoué, un popup de Q a réellement été ouvert par P (cible de navigateur), la saisie atteint encore le terminal légitime" "erreurs=$(rj "$SCJ" 'JSON.stringify(j.erreurs)') popup=$(rj "$SCJ" 'j.popup1>=1') saisie=$(rj "$SCJ" 'j.saisie')" "erreurs={} popup=true saisie=true"
+assert_eq "F4.1 — un popup de Q ouvert par P (window.open, sessionStorage copié) ne prend pas la session : un seul shell avant et après, la session légitime reste vivante, P ne reçoit ni etat:reconnexion ni etat:refuse" "avant=$(rj "$SCJ" 'j.avant.shells') apres=$(rj "$SCJ" 'j.apres.shells') session=$(rj "$SCJ" 'j.apres.session') reconnexion=$(rj "$SCJ" 'j.apres.msgs.includes("etat:reconnexion")') refuse=$(rj "$SCJ" 'j.apres.msgs.includes("etat:refuse")')" "avant=1 apres=1 session=vivante reconnexion=false refuse=false"
+assert_eq "F4.2 — le shell légitime terminé, un popup de Q ouvert par P ne lance aucun shell sans frappe de l'utilisateur : zéro shell, session = terminee" "fin=$(rj "$SCJ" 'j.finShells') popup=$(rj "$SCJ" 'j.popup2>=1') shells=$(rj "$SCJ" 'j.apresFin.shells') session=$(rj "$SCJ" 'j.apresFin.session')" "fin=0 popup=true shells=0 session=terminee"
+
 echo "=== M-J2 / M-J12 / M-S5 / M-429 — mutants du client sur le serveur réel ==="
 if mutant mj2 vf-cockpit-terminal-client.mjs "s|return r.status === 401; } catch|return false; } catch|"; then
   MS_SC=8000 scenario "$MUT_OUT" perime "$FAUX_SEC"
@@ -448,6 +509,14 @@ if mutant ms5 vf-cockpit-terminal-client.mjs "s|term.onBinary(|void (|"; then
   MS_SC=6000 scenario "$MUT_OUT" binaire
   assert_eq "M-S5 — le mutant (onBinary non relayé) rougit S5.1 : aucun écho de rapport de souris" "$(rj "$SCJ" '"rapport="+j.rapport')" "rapport=false"
 else sans_effet "M-S5"; fi
+if mutant mhc vf-cockpit-terminal-client.mjs "s|^ *if (!encadree) { vue.carte('horscadre'); return; }||"; then
+  VF_CLIENT_MS=6000 run_t6 "$MUT_OUT"
+  assert_eq "M-HORS-CADRE — le mutant (garde du cadre retirée) rougit T6.8 : Q en premier niveau ouvre un terminal et prend la session" "$(rj "$T6J" '"carte="+((j.horsCadre||{}).carte||"?")+" session="+((j.horsCadre||{}).session||"?")')" "carte=? session=?"
+else sans_effet "M-HORS-CADRE"; fi
+if mutant mpopup vf-cockpit-terminal-client.mjs "s|^ *if (!encadree) { vue.carte('horscadre'); return; }||"; then
+  MS_SC=8000 scenario "$MUT_OUT" popup
+  assert_eq "M-POPUP — le mutant (garde du cadre retirée) rougit F4.1 : le popup prend la session, P reçoit etat:reconnexion" "reconnexion=$(rj "$SCJ" 'j.apres.msgs.includes("etat:reconnexion")')" "reconnexion=true"
+else sans_effet "M-POPUP"; fi
 if mutant m429 vf-cockpit-terminal-client.mjs "s|if (r.status === 429) {|if (false) {|"; then
   MS_SC=6000 scenario "$MUT_OUT" pression
   assert_eq "M-429 — le mutant (429 ignoré, octets perdus) rougit S3.1 : la commande saisie ne s'exécute pas" "$(rj "$SCJ" '"sortie="+j.sortie')" "sortie=false"

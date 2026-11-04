@@ -101,8 +101,41 @@ const OUVERT = `(() => { const r = document.querySelector('.vf-term-tiroir'); re
 const HAUT = `Math.round(document.querySelector('.vf-term-tiroir').getBoundingClientRect().height)`;
 const MSG = (d) => `window.__msgs.some((m) => m.o === ${JSON.stringify(OQ)} && m.d === ${JSON.stringify(d)})`;
 
+// Q n'ouvre un shell que dans son cadre (F4, P71-D-25) : le mode `etats` joue la page de Q dans un cadre sandbox de P, plein viewport, comme le tiroir.
+// `q` : ev/attendre/naviguer visent le monde principal du cadre de Q (retrouvé par sondage des identifiants de contexte, qui repartent de 1 à chaque processus de rendu : le socle n'expose pas les évènements).
+const SBXQ = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox';
+let ctxQ = 0;
+const mondeQ = async (s, etendue = 600) => {
+  let trouve = 0;
+  for (let id = 1; id < etendue; id++) {
+    const v = await s.send('Runtime.evaluate', { contextId: id, expression: `location.origin === ${JSON.stringify(OQ)} && location.hash === '#cadre-test' && typeof window.vfTermVue === 'object'`, returnByValue: true }).then((x) => x && x.result && x.result.value, () => false);
+    if (v === true) trouve = id;
+  }
+  return trouve;
+};
+const facadeQ = (s) => {
+  const ev = async (expression) => { const x = await s.send('Runtime.evaluate', { expression, contextId: ctxQ, returnByValue: true, awaitPromise: true }); return x && x.result && x.result.value; };
+  const attendre = async (expr, nom, ms = MS) => {
+    const fin = Date.now() + ms; let v;
+    do { try { v = await ev(expr); } catch { v = false; } if (v) return v; await pause(100); } while (Date.now() < fin);
+    throw new Error(`attente de « ${nom} » dépassée (${ms} ms)`);
+  };
+  const naviguer = async () => {
+    ctxQ = 0;
+    await s.naviguer(`${OP}/project.html`); await s.attendre(`document.readyState === 'complete'`, 'page P', MS);
+    await s.ev(`(() => { document.querySelectorAll('iframe[data-t]').forEach((f) => f.remove()); const f = document.createElement('iframe'); f.dataset.t = '1'; f.setAttribute('sandbox', ${JSON.stringify(SBXQ)});
+      f.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;border:0;z-index:99999'; f.src = '${OQ}/?theme=dark#cadre-test'; document.body.appendChild(f); })()`);
+    const fin = Date.now() + MS;
+    let essais = 0;
+    while (!ctxQ) { ctxQ = await mondeQ(s, 600 * 5 ** Math.min(essais++, 3)); if (!ctxQ) { if (Date.now() > fin) throw new Error('contexte du cadre de Q introuvable'); await pause(150); } }
+    await attendre(`!!document.querySelector('.xterm-helper-textarea') || !!document.querySelector('#etat:not([hidden])')`, 'terminal ou carte dans le cadre');
+  };
+  return { ev, attendre, naviguer, send: s.send };
+};
+
 await executer(chrome, async (s) => {
   const att = (expr, nom, ms) => s.attendre(expr, nom, ms || MS);
+  const q = facadeQ(s);
   const prep = async () => {
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
     await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
@@ -121,11 +154,11 @@ await executer(chrome, async (s) => {
     const w = document.createTreeWalker(k, NodeFilter.SHOW_TEXT); let n, dernier = null; while ((n = w.nextNode())) dernier = n; if (!dernier || dernier.data.slice(-1) !== '.') return { sansPoint: true };
     const rg = document.createRange(); rg.setStart(dernier, dernier.data.length - 1); rg.setEnd(dernier, dernier.data.length); const p = rg.getBoundingClientRect(), rs = c.getClientRects(), d = rs[rs.length - 1];
     return { coupee: rs.length > 1, decolle: Math.abs(p.top - d.top) > d.height / 2, larg: Math.round(k.getBoundingClientRect().width) }; })()`;
-  const balayer = async (cmd, corps, largeurs) => {
+  const balayer = async (cmd, corps, largeurs, cible = s) => {
     const mal = [], vus = new Set();
     for (const W of largeurs) {
       await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: 800, deviceScaleFactor: 1, mobile: false }); await pause(150);
-      const m = await s.ev(COUPURE(cmd, corps)); if (!m || m.sansPoint) throw new Error(`carte illisible à ${W} px`);
+      const m = await cible.ev(COUPURE(cmd, corps)); if (!m || m.sansPoint) throw new Error(`carte illisible à ${W} px`);
       vus.add(m.larg); if (m.coupee || m.decolle) mal.push(`${W}:${m.coupee ? 'coupee' : ''}${m.decolle ? 'decolle' : ''}`);
     }
     return { mal, largeurs: vus.size };
@@ -161,10 +194,10 @@ await executer(chrome, async (s) => {
       await s.naviguer(`${OQ}/#t=${A.amorce}`);
       await att(`location.port === '${A.P}' && location.pathname === '/project.html' && document.readyState === 'complete'`, 'arrivée sur P');
     });
-    await essai('connecte', async () => { await s.naviguer(`${OQ}/`); await att(INVITE, 'invite du shell dans Q (la session est prise par cet onglet)'); });
+    await essai('connecte', async () => { await q.naviguer(); await q.attendre(INVITE, 'invite du shell dans le cadre de Q (la session est prise par cet onglet)'); });
     await essai('refuse-q', async () => { // J6 : un autre onglet (sessionStorage vide) ; sous la carte, ni terminal ni curseur visibles
-      await s.ev(`sessionStorage.clear()`); await s.naviguer(`${OQ}/`); await att(CARTE('Terminal déjà ouvert'), 'carte Terminal déjà ouvert');
-      r.refuse = await s.ev(`(() => { const v = (e) => !!e && e.checkVisibility({ visibilityProperty: true }); return { terminal: v(document.getElementById('terminal')), xterm: v(document.querySelector('.xterm')), curseur: [...document.querySelectorAll('.xterm-cursor, .xterm-cursor-outline, .xterm-cursor-block')].filter(v).length, xtermPresent: !!document.querySelector('.xterm'), carte: v(document.querySelector('.vf-q-carte')), titre: (document.querySelector('.vf-q-titre') || {}).textContent, bouton: document.activeElement && document.activeElement.tagName }; })()`);
+      await q.ev(`sessionStorage.clear()`); await q.naviguer(); await q.attendre(CARTE('Terminal déjà ouvert'), 'carte Terminal déjà ouvert');
+      r.refuse = await q.ev(`(() => { const v = (e) => !!e && e.checkVisibility({ visibilityProperty: true }); return { terminal: v(document.getElementById('terminal')), xterm: v(document.querySelector('.xterm')), curseur: [...document.querySelectorAll('.xterm-cursor, .xterm-cursor-outline, .xterm-cursor-block')].filter(v).length, xtermPresent: !!document.querySelector('.xterm'), carte: v(document.querySelector('.vf-q-carte')), titre: (document.querySelector('.vf-q-titre') || {}).textContent, bouton: document.activeElement && document.activeElement.tagName }; })()`);
     });
     await essai('refuse-p', async () => { // J1 : la barre dit « Déjà ouvert » (autre onglet que celui de Q ci-dessus)
       await s.naviguer(`${OP}/project.html`); await att(`!!document.querySelector('button.vf-term-pastille')`, 'pastille'); await clic('button.vf-term-pastille');
@@ -179,9 +212,9 @@ await executer(chrome, async (s) => {
     });
     await essai('expire-q', async () => { // J13 : carte d'alerte focalisée par programme ; J5 : commande et point jamais coupés
       await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-      await s.naviguer(`${OQ}/`); await att(CARTE('Session expirée'), 'carte Session expirée');
-      r.alerte = await s.ev(`(() => { const k = document.querySelector('.vf-q-carte'), c = getComputedStyle(k); return { titre: (document.querySelector('.vf-q-titre') || {}).textContent, focus: document.activeElement === k, fv: k.matches(':focus-visible'), role: k.getAttribute('role'), contour: c.outlineStyle }; })()`);
-      r.coupure = await balayer('.vf-q-commande', '.vf-q-corps', LARGEURS);
+      await q.naviguer(); await q.attendre(CARTE('Session expirée'), 'carte Session expirée');
+      r.alerte = await q.ev(`(() => { const k = document.querySelector('.vf-q-carte'), c = getComputedStyle(k); return { titre: (document.querySelector('.vf-q-titre') || {}).textContent, focus: document.activeElement === k, fv: k.matches(':focus-visible'), role: k.getAttribute('role'), contour: c.outlineStyle }; })()`);
+      r.coupure = await balayer('.vf-q-commande', '.vf-q-corps', LARGEURS, q);
     });
     return r;
   }
@@ -253,7 +286,7 @@ await executer(chrome, async (s) => {
       return { sur_poignee: document.activeElement === p, fv: p.matches(':focus-visible'), poignee: cp.outlineStyle, grip: cg.outlineStyle + '/' + cg.outlineWidth, opaque: cg.opacity, grip_larg: Math.round(b.width), poignee_larg: Math.round(q.width) }; })()`);
   });
   await essai('tu15', async () => { // J7 : sous pointer: coarse les boutons de la barre font au moins 44 px et la barre les contient ; sous pointeur fin, 28 px
-    const mesure = () => s.ev(`(() => { const bs = [...document.querySelectorAll('.vf-term-bouton')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height); }); return { coarse: matchMedia('(pointer: coarse)').matches, boutons: bs.join(','), barre: Math.round(document.querySelector('.vf-term-barre').getBoundingClientRect().height) }; })()`);
+    const mesure = () => s.ev(`(() => { const bs = [...document.querySelectorAll('.vf-term-bouton')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height); }); return { coarse: matchMedia('(pointer: coarse)').matches, boutons: bs.join(','), barre: Math.round(document.querySelector('.vf-term-barre').getBoundingClientRect().height), pastille: parseFloat(getComputedStyle(document.querySelector('button.vf-term-pastille')).height) }; })()`);
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await pause(200);
     r.tu15 = { fin: await mesure() };
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: true }); await s.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 }); await pause(400);
@@ -371,6 +404,7 @@ assert_eq "T17.5 — espion : après une commande tapée dans le shell, tout mes
 
 assert_eq "T20.4 (J4) — poignée focalisée au clavier : le contour est sur le grip (40 px, 2 px pleins, visible), jamais sur la poignée pleine largeur (témoin : :focus-visible est vrai)" "$(rj "$J" '"sur="+j.tu14.sur_poignee+" fv="+j.tu14.fv+" poignee="+j.tu14.poignee+" grip="+j.tu14.grip+" opaque="+j.tu14.opaque+" grip_larg="+j.tu14.grip_larg+" large="+(j.tu14.poignee_larg>400)')" "sur=true fv=true poignee=none grip=solid/2px opaque=1 grip_larg=40 large=true"
 assert_eq "T20.7 (J7) — pointeur fin : boutons de 28 px, barre de 36 px ; pointer: coarse (témoin : le média est vrai) : boutons d'au moins 44 px et barre qui les contient" "$(rj "$J" '"fin="+j.tu15.fin.coarse+" "+j.tu15.fin.boutons+" "+j.tu15.fin.barre+" / tactile="+j.tu15.tactile.coarse+" "+(j.tu15.tactile.boutons.split(",").every((b)=>b.split("x").every((n)=>Number(n)>=44)))+" "+(j.tu15.tactile.barre>=44)')" "fin=false 28x28,28x28 36 / tactile=true true true"
+assert_eq "T20.8 (F-A1-3) — la pastille « Terminal » fermée : 32 px au pointeur fin, au moins 44 px sous pointer: coarse (témoin : le média est vrai)" "$(rj "$J" '"fin="+j.tu15.fin.pastille+" / tactile="+j.tu15.tactile.coarse+" "+(j.tu15.tactile.pastille>=44)')" "fin=32 / tactile=true true"
 
 echo "=== TU.9 / TU.10 / TU.12 — localhost, Windows, autres pages ==="
 srv "$OUT" 1

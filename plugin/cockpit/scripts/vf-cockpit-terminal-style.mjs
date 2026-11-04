@@ -64,6 +64,13 @@ button { font: inherit; color: inherit; }
 .vf-q-erreur-texte { color: var(--err-text); }
 .vf-q-bouton { height: 32px; padding: 0 14px; border: 0; border-radius: 10px; font-size: 13px; font-weight: 500; cursor: pointer; background: var(--on); color: var(--on-text); transition: background 150ms var(--ease); }
 .vf-q-bouton:hover { background: var(--on-hover); }
+.vf-q-collage { bottom: 0; height: auto; min-height: 44px; flex-wrap: wrap; gap: 6px 10px; padding: 6px 8px 6px 14px; z-index: 2; }
+#etat:not([hidden]) ~ .vf-q-collage { bottom: 52px; }
+.vf-q-collage .vf-q-texte { flex: 1 1 180px; }
+.vf-q-apercu { flex: 1 1 120px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; color: var(--text-3); }
+.vf-q-bouton.vf-q-secondaire { background: var(--raise-2); color: var(--text); }
+.vf-q-bouton.vf-q-secondaire:hover { box-shadow: inset 0 0 0 1px var(--hair-2); background: var(--raise-2); }
+@media (pointer: coarse) { .vf-q-bouton { height: 44px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 `;
 

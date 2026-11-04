@@ -10,13 +10,14 @@ export function vueTerminal(cfg) {
     const s = document.createElementNS(NS, 'svg'); s.setAttribute('class', 'i'); s.setAttribute('viewBox', '0 0 16 16'); s.setAttribute('aria-hidden', 'true');
     const p = document.createElementNS(NS, 'path'); p.setAttribute('d', d); s.appendChild(p); return s;
   };
-  const bouton = (texte, action) => { const b = el('button', 'vf-q-bouton', texte); b.type = 'button'; b.addEventListener('click', () => action && action()); return b; };
+  const bouton = (texte, action, cls) => { const b = el('button', 'vf-q-bouton' + (cls ? ' ' + cls : ''), texte); b.type = 'button'; b.addEventListener('click', () => action && action()); return b; };
   const zone = () => document.getElementById('etat');
   const vider = () => { const z = zone(); while (z.firstChild) z.removeChild(z.firstChild); document.getElementById('terminal').classList.remove('vf-q-cache'); return z; };
   const COMMANDE = '/vf-cockpit --terminal';
   const CARTES = {
     refuse: { role: 'status', masque: true, titre: 'Terminal déjà ouvert', corps: ['Un terminal est déjà ouvert dans un autre onglet. Fermez-le, puis réessayez.'], bouton: 'Réessayer', d: 'M3 3h10v10H3z M6 8h4' },
     expire: { role: 'alert', titre: 'Session expirée', corps: ['Relancez ', COMMANDE, '.'], d: 'M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2z M8 5v3.5l2 1.5' },
+    horscadre: { role: 'alert', titre: 'Terminal indisponible', corps: ['Ce terminal ne s’ouvre que dans le cockpit. Relancez ', COMMANDE, '.'], d: 'M3 3h10v10H3z M6 8h4' },
     arrete: { role: 'alert', titre: 'Serveur arrêté', corps: ['Le cockpit est arrêté. Relancez ', COMMANDE, '.'], d: 'M8 2v6 M4.5 4.5a5 5 0 1 0 7 0' },
   };
   const TEXTES = { fermee: 'La session a été fermée.', reconnexion: 'Reconnexion…' };
@@ -62,5 +63,18 @@ export function vueTerminal(cfg) {
       z.appendChild(b); if (r) r.focus();
     },
     effacer() { const z = vider(); z.hidden = true; },
+    // collage à confirmer : le texte n'est affiché que par textContent, retours à la ligne et caractères de contrôle rendus visibles ; null retire le bandeau
+    collage(texte, coller, annuler) {
+      const ancien = document.getElementById('collage'); if (ancien) ancien.remove();
+      if (texte === null || texte === undefined) return;
+      const sauts = /[\r\n\u2028\u2029]/.test(texte);
+      const visible = String(texte).replace(/\r\n|\r|\n|\u2028|\u2029/g, '\u21b5 ').replace(/[\u0000-\u001f\u007f-\u009f]/g, (c) => (c === '\u007f' ? '\u2421' : c < ' ' ? String.fromCharCode(0x2400 + c.charCodeAt(0)) : '\ufffd'));
+      const b = el('div', 'vf-q-bandeau vf-q-collage'); b.id = 'collage'; b.setAttribute('role', 'group'); b.setAttribute('aria-label', 'Collage à confirmer');
+      b.appendChild(el('span', 'vf-q-pastille vf-q-attention'));
+      b.appendChild(el('span', 'vf-q-texte', sauts ? 'Le texte contient un retour à la ligne.' : 'Le texte contient un caractère de contrôle.'));
+      b.appendChild(el('span', 'vf-q-apercu', visible.slice(0, 200)));
+      const a = bouton('Annuler', annuler, 'vf-q-secondaire'), c = bouton('Coller', coller);
+      b.appendChild(a); b.appendChild(c); document.body.appendChild(b); a.focus();
+    },
   };
 }

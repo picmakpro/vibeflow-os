@@ -44,7 +44,7 @@ body.resizing .vf-term-zone iframe { pointer-events: none; }
 body.vf-term-ouvert #ask { bottom: calc(var(--vf-term-h, 0px) + 28px); }
 @media (max-width: 999px), (pointer: coarse) { .vf-term-tiroir { left: 8px; right: 8px; bottom: 8px; } }
 @media (max-width: 700px) { .vf-term-pastille, .vf-term-puce { bottom: 72px; } }
-@media (pointer: coarse) { .vf-term-barre { height: 52px; } .vf-term-bouton { width: 44px; height: 44px; } }
+@media (pointer: coarse) { .vf-term-barre { height: 52px; } .vf-term-bouton { width: 44px; height: 44px; } .vf-term-pastille { height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .vf-term-tiroir.vf-term-entree { animation: none; } .vf-term-grip, .vf-term-pastille, .vf-term-bouton { transition: none; } }
 html.theme-switching .vf-term-tiroir, html.theme-switching .vf-term-tiroir * { animation: none !important; transition: none !important; }
 `;
