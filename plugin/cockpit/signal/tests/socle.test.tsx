@@ -88,6 +88,8 @@ test("K14 — deux rafraîchissements simultanés n'ouvrent qu'un seul processus
   const ui = await pane($)
   const avant = lab.emetteur().length
   await Promise.all([ui.press({ key: 'rafraichir' }), ui.press({ key: 'rafraichir' })])
+  // `rafraîchir` lance sans attendre (`void refresh()`) : on laisse le vol finir avant de compter et de démonter
+  await new Promise(r => setTimeout(r, 250))
   expect(lab.emetteur().length - avant).toBe(1)
   await ui.unmount()
 })
