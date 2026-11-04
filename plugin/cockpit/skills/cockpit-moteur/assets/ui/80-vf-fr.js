@@ -16,9 +16,11 @@
   // est un nombre ou se traduit elle-même : sans cela il abîmerait les données du lab (« Top of the world »).
   // gabarits dont une variable est une liste construite par le viewer (« A, B and C ») : le « and » final y est traduit, nulle part ailleurs
   const LISTES = ['It also relies on {}{}. They sit at the edge of the map; the lines show which parts talk to them.', 'How do {} relate?'];
+  // gabarits dont la variable est un nom du lab, laissé intact : « Inside {} » (en-tête d'une carte ouverte) ; durées : la variable est un nombre ou rien
+  const LIBRES = ['Inside {}'];
   const P = [];
   const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  for (const [k, v] of Object.entries(T)) if (k.includes('{}')) { delete T[k]; P.push([new RegExp('^' + k.split('{}').map(esc).join('(.*?)') + (v.includes('|') && /[a-z]$/.test(k) ? 's?' : '') + '$'), v.split('|').map((x) => x.split('{}')), k.replace(/\{\}/g, '').length, LISTES.includes(k)]); }
+  for (const [k, v] of Object.entries(T)) if (k.includes('{}')) { delete T[k]; P.push([new RegExp('^' + k.split('{}').map(esc).join('(.*?)') + (v.includes('|') && /[a-z]$/.test(k) ? 's?' : '') + '$'), v.split('|').map((x) => x.split('{}')), k.replace(/\{\}/g, '').length, LISTES.includes(k), LIBRES.includes(k), /^\{\} \w+ ago$/.test(k)]); }
   P.sort((a, b) => b[2] - a[2]); // du plus précis au plus général : « {} and {} » ne capture plus une phrase longue qui contient « and »
   // l'onglet Code garde des fichiers ; sur l'onglet Projet, un « fichier » est un plan, une exigence, une étape
   Object.assign(T, projet()
@@ -47,16 +49,17 @@
   const enListe = (v) => v.replace(/ and (\d+) more$/, ' et $1 autres').replace(/ and (?!.* and )/, ' et ');
   const noyau = (t) => {
     let out = T[t];
-    if (out == null) for (const [re, formes, fixe, liste] of P) {
+    if (out == null) for (const [re, formes, fixe, liste, libre, duree] of P) {
       const m = re.exec(t); if (!m) continue;
+      if (duree && !/^\d+$/.test(m[1].trim())) continue; // « Updated 3 minutes ago » n'est pas « {} minutes ago » : la durée porte un nombre seul
       if (formes.length > 1 && !/^\d+$/.test(m[1].trim())) continue; // « singulier|pluriel » : seulement derrière un nombre (« Uses connection » n'est pas « 1 connection »)
-      if (!(fixe >= 16 || m.slice(1).some((c) => /^\d+$/.test(c.trim()) || noyau(c.trim()) != null))) continue;
+      if (!(fixe >= 16 || libre || m.slice(1).some((c) => /^\d+$/.test(c.trim()) || noyau(c.trim()) != null))) continue;
       out = formes[formes.length > 1 && Number(m[1]) !== 1 ? 1 : 0].reduce((x, p, i) => { if (!i) return x + p; const [a, b] = lier(x, liste ? enListe(noyau(m[i].trim()) ?? m[i]) : (noyau(m[i].trim()) ?? m[i])); return a + b + p; }, '');
       break;
     }
     if (out == null) for (const [re, f] of R) { if (re.test(t)) { out = t.replace(re, f); break; } }
     if (out == null && t.includes(' · ')) { const seg = t.split(' · ').map((x) => noyau(x)); if (seg.some((x) => x != null)) out = seg.map((x, i) => x ?? t.split(' · ')[i]).join(' · '); }
-    if (out == null && /^[^:]{3,}: ./.test(t)) { const i = t.indexOf(': '); const g = noyau(t.slice(0, i)), d = noyau(t.slice(i + 2)); if (g != null || d != null) out = (g ?? t.slice(0, i)) + ' : ' + (d ?? t.slice(i + 2)); }
+    if (out == null && /^[^:]{3,}: ./.test(t)) { const i = t.indexOf(': '); const g = noyau(t.slice(0, i)), d = noyau(t.slice(i + 2)); if (g != null || d != null) { const a = g ?? t.slice(0, i), b = d ?? t.slice(i + 2); out = a === b && t.slice(0, i) === t.slice(i + 2) ? a : a + ' : ' + b; } } // « Recent work: Recent work » (fil d'Ariane d'un tableau sans titre propre) ne le dit qu'une fois
     // pluriel composé à l'exécution (« files », « screens ») : le singulier du dictionnaire, un « s » en plus
     if (out == null && /^[A-Za-z]{3,}s$/.test(t) && T[t.slice(0, -1)] != null) out = T[t.slice(0, -1)] + 's';
     return out;

@@ -88,6 +88,8 @@ window.__vfFrDict = Object.assign(window.__vfFrDict || {}, {
   "Web requests": "Requêtes web",
   // 70-03 : libellés de type de lien et formes construites à l'exécution
   "Calls": "Appels",
+  "2×click": "2×clic",
+  "right-click": "clic droit",
   "Claude Code and GSD": "Claude Code et GSD",
   "Resolve on the map": "Résoudre sur la carte",
   "Uses connection": "Utilise une connexion",
