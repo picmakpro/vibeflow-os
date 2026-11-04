@@ -197,3 +197,26 @@ _Consignée à l'étape 11._
 ## Écarts remontés au manager
 
 _Aucun pour l'instant (aucune étape jouée)._
+
+## Retours de Samuel
+
+Consignés mot pour mot par le manager, sans cocher aucune case à sa place.
+
+1. **Session principale Claude Code, saisie texte, 2026-11-04**, sur un cockpit de test (port 4456, tête `8d6c9df9`) : « Le shell a l'air de très
+   bien marché btw ».
+2. **Session principale Claude Code, saisie texte avec capture d'écran, 2026-11-04**, même cockpit de test : « je remarque que le bouton
+   'Terminal' chevauche les boutons '- [] +' ». C'est l'écart E2, déjà relevé par les juges (étapes 1 et 14), arbitré (P71-D-34) et corrigé par le
+   lot W2 ; confirmation attendue au rejeu des juges des étapes 1 et 14, capture à l'appui.
+
+## Recette par juges (règle P71-D-32)
+
+Premier passage (2026-11-04, code `7427bec6`, trois juges frais, Chromium et WebKit par la bibliothèque playwright, Firefox téléchargé localement,
+vrai `zsh`, vrai `claude` 2.1.318) : étapes 2, 3, 4, 6, 7, 8, 10, 11, 13, 15, 17 conformes ; écarts fonctionnels E1 (gel périodique), E2 (pastille
+sur les boutons de zoom), E3 (dernière ligne coupée), E4 (python3 absent, message faux), E5 (démarrage lent pris pour un échec), arbitrés
+P71-D-33 et P71-D-34 ; points de goût G1, G2, G3 tranchés P71-D-35.
+
+Non joué, consigné (P71-D-32, P71-D-35) : le raccourci Ctrl+Maj+Espace dans Safari.app et Firefox.app réels, et un vrai clavier AZERTY avec la
+touche Option.
+
+Rejeu réduit après correctifs (levier « méthode allégée selon le risque », arbitrage Samuel, AskUserQuestion, session principale Claude Code,
+2026-11-03) : étapes 1, 5, 9, 12, 14, 16 sur `7bb14f15` — résultats ajoutés au retour des juges.
