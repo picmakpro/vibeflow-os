@@ -168,6 +168,11 @@ Relayés par la session principale (SendMessage) ; réponses mot pour mot entre 
   déjà retenue par la 69 (`cb5525dc`). S'applique à V5.1 de 68-01 (« aucun script trouvable » : dossier de scripts
   vide en plus du `HOME` vide) et à l'épinglage de la tâche 3 de 68-01 (suites `direct`, `equipe`, `responsive`,
   `who`, `projet`, `avancement`). Code de `driverLockScript` inchangé.
+- **P68-D-30 (jalon de l'en-tête) — décision du manager, pas un arbitrage de Samuel (2026-11-04).** Constat de
+  l'exécuteur de 68-05 : l'en-tête du mod n'affiche plus le jalon, qu'il lisait dans le STATE (lecture retirée,
+  P68-D-17). Règle : l'en-tête affiche le jalon de la phase active de l'arbre courant, lu dans `signal@1` (le jalon de
+  `jalons[]` dont `phases` contient cette phase) ; sans phase active ou sans jalon qui la contienne, aucun jalon n'est
+  affiché, jamais un repli sur le STATE. Appliqué en 68-06 (`en-tete.tsx` ajouté à son périmètre), avec témoin rouge.
 
 ### Points de procédure (documentés, sans arbitrage — consigne de la session principale, 2026-11-03)
 
