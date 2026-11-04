@@ -1,5 +1,30 @@
 # Changelog — cockpit
 
+## v1.1.3 — 2026-11-04
+
+Phase 70 : finitions de l'interface. Décisions : P70-D-01 à P70-D-07 et P70-D-16, arbitrages Samuel, AskUserQuestion session principale,
+2026-11-03 ; P70-D-09, P70-D-10, P70-D-13, P70-D-20 et P70-D-21, choix du manager (pas des arbitrages de Samuel) ; P70-D-19, arbitrage de
+méthode de Samuel, session principale Claude Code, 2026-11-04 (recette jouée par des juges qui prennent des captures). Pas de release racine.
+
+### Corrigé
+- **Français** : plus d'anglais résiduel ni de coquille dans le chrome (« clic droit », « Dans … », « Mis à jour il y a … », « d'equipe-… », « 1 fichier de code »),
+  fil d'Ariane sans doublon, durées et textes de la visite jamais coupés.
+- **« Où en est-on ? »** sans `STATE.md` : réponse construite des seuls champs présents, plus de statut brut (`ready_to_execute`) affiché.
+- **Couleurs de statut** du thème clair : suivent le thème, contrastes d'au moins 4,5:1 (mesurés de 6,07 à 7,01:1 en clair).
+- **Visite** : texte entier, « Passer » à chaque étape, centrage de la première étape stable au rechargement, grandes cartes cadrées, contour de l'étape sur un élément du chrome.
+- **Onglet Équipe** : badge d'état dans sa carte, « non rattaché » sur une ligne, boutons au style du tiroir (sans toucher aux boutons du viewer), champs en paragraphes,
+  lien « Nœud » distinct, titre sans recouvrement de la première carte, focus clavier gardé sur « Lire le transcript » et « Voir la dernière commande » après redessin.
+
+### Modifié
+- **Téléphone** : en-tête sur une rangée avec menu « ⋯ », zoom en pile verticale à gauche, tiroir à poignée, croix et titre cliquable, onglets à 13 px / 3 px (390 px).
+- **Visite de l'onglet Projet** : propre au projet (jalon, phase, mission, « au travail »), sans mention de code.
+- **Zoom de l'onglet Équipe** : en bas à gauche dès 701 px (P70-D-20).
+
+### Limites
+- Onglets à 12 px / 2 px à 1 024 et 1 440 px (R13.4 rouge, six lignes) : arbitrage de Samuel en attente.
+- Carte Session « en attente » avec badge « En cours » (défaut de la Phase 69, au BACKLOG).
+- Tri de goût (12 questions) en attente de Samuel : `70-RECETTE-JUGES.md`.
+
 ## v1.1.2 — 2026-11-04
 
 Correctif de sécurité H-1 (héritée de la Phase 67, présente dès v2.75.0), sur arbitrage de Samuel (AskUserQuestion, session
