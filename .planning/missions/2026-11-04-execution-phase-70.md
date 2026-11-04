@@ -64,6 +64,19 @@ thèmes, à 390, 768, 1 024 et 1 440 px. Le juge Équipe initial s'est figé (sc
 troncatures, Passer, contour, focus au redessin, badge, jeton `--n-terminés`) sont tous corrigés, avec un témoin rouge puis
 vert. Détail : `70-RECETTE-JUGES.md` et `70-CAPTURES.md`. Les captures restent hors dépôt (P70-D-17).
 
+## CI Linux de la PR #200
+
+Deux rouges vus seulement sous Linux, plus lent, quand la visite d'office s'ouvre pendant une mesure :
+- **R20 (Équipe, 768 px)** : la visite s'ouvrait d'elle-même sur Équipe, qui n'en a aucune de conçue. Elle n'y démarre plus
+  seule (5e503058, témoin O6.14). La carte de visite évite aussi le panneau (289d1ac6, O6.13). Vert en CI à 03bada92.
+- **R15.4b (Projet, 390 px)** : la visite ouverte capte la première Échap avant le tiroir, ce qui est le bon ordre. Le défaut
+  était dans la mesure : `INJ_ECHAP` ferme la visite dans la seule section R15 (982f4da9), et O6.15 fixe l'ordre visite puis
+  tiroir. Ce correctif n'est pas encore passé en CI : le push de a3cfdb86 a été refusé par GitHub (Internal Server Error,
+  incident GitHub en cours).
+
+Question 13, ajoutée au tri : le bouton « Par où commencer » ouvre encore une visite sur Équipe, avec le repli « La base de
+code ». Faut-il (a) fermer aussi le bouton sur Équipe (recommandé), ou (b) le laisser ?
+
 ## Tri envoyé à Samuel (SendMessage main, 2026-11-04), sans réponse au moment du rapport
 
 1 (bloquant) onglets à 13 px à 1 024 px ; 2 « écrit à <id> » ; 3 ajustement d'Équipe à 45 % ; 4 centrage borné ; 5 éclairer
@@ -97,7 +110,9 @@ Relayées telles que les exécutants les ont rendues :
 - 70-03 (recette) : chrome-fr 70/0, avancement 62/0, onglet-code 25/0 (sur 3c8cf298).
 - 70-09 : `check-version-sync.sh` rc 0 (149 suites), vendor 79/0, `test-vibeflow-update-cockpit.sh` 11/0 (sur bd1a6606).
 - Manager : `replay-ci-jobs.sh --job gates` → 20 rejouées, 3 sautées, 0 en échec (sur 643bc7ac). CI de la PR #200 : gates vert
-  sur c7217940 ; deux rouges `check-machine-paths` corrigés en c7217940 et 631e2e10.
+  sur c7217940 ; deux rouges `check-machine-paths` corrigés en c7217940 et 631e2e10. Shards à 03bada92 : 0 à 5 verts, 6 rouge
+  sur les six R13.4 (attendus) et sur R15.4b (corrigé en 982f4da9, rejoué deux fois avant correction).
+- 70-07 (CI Linux) : `test-cockpit-projet.sh` 108/0, vendor 79/0, chrome-fr 70/0, responsive 255/6, R15.4b vert (sur 982f4da9).
 
 ## Next step
 
