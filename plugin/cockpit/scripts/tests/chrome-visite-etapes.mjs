@@ -1,5 +1,7 @@
 // chrome-visite-etapes.mjs — la visite « Par où commencer » parcourue étape par étape, à deux largeurs (70-07, UIFN-04, P70-D-02, régime P70-D-08). Aucune dépendance.
-// Usage : node chrome-visite-etapes.mjs <chrome> <url> <largeurs>      (largeurs : « 1440,390 »)
+// Usage : node chrome-visite-etapes.mjs <chrome> <url> <largeurs> [recharge]      (largeurs : « 1440,390 »)
+//   recharge : chaque largeur est mesurée DEUX fois dans le même profil Chrome : au premier chargement (clé l<largeur>) puis à un rechargement de la même page déjà vue (clé r<largeur>) ;
+//   la visite d'une page déjà vue ne doit pas se centrer autrement que la première (70-07, correctif : le fit de la première étape défaisait le centrage d'une carte).
 //   url : l'onglet Code d'un lab jetable dont le graphe a au moins trois cartes de premier niveau (donc au moins trois étapes).
 //   Donnée de test : le résumé de chaque carte du graphe chargé, et celui du projet, est allongé au-delà de 230 caractères et se termine par FINDETEXTE.
 //   La visite est lancée par son API (le bouton d'en-tête est derrière le menu « ⋯ » sous 700 px) après avoir fermé celle qui démarre d'office.
@@ -8,7 +10,7 @@
 //   couvert = la carte de visite recouvre la cible · visible = la cible n'est pas entièrement dans la fenêtre · entier = le texte de l'étape n'a pas sa fin (FINDETEXTE) alors que sa source la porte · coupe = le texte finit par « … »
 //   tient = la carte de visite sort de la fenêtre · passer = aucun bouton « Passer » visible dans la carte · repere = texte « n sur N » lu · anglais = mots témoins anglais (liste de F11) dans le texte de la carte de visite.
 import { executer, pause } from './chrome-session.mjs';
-const [, , chrome, url, largeurs] = process.argv;
+const [, , chrome, url, largeurs, recharge] = process.argv;
 const HAUT = { 390: 844, 1440: 900 };
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlowTour && !!document.getElementById('tour-btn')";
 const INIT = "!!window.__vfModele && !!window.__vfModele.modele";
@@ -46,7 +48,7 @@ const MESURE = `(() => {
 })()`;
 await executer(chrome, async (s) => {
   const sortie = {};
-  for (const w of String(largeurs).split(',').map(Number)) {
+  for (const w of String(largeurs).split(',').map(Number)) for (const passe of recharge ? [0, 1] : [0]) {
     await s.send('Emulation.setDeviceMetricsOverride', { width: w, height: HAUT[w] || Math.round(w * 0.625), deviceScaleFactor: 1, mobile: false });
     await s.attendre(`innerWidth === ${w}`, `largeur ${w} appliquée`);
     await s.naviguer(url); await s.attendre(PRET, `page prête à ${w} px`); await s.attendre(INIT, `lab connu à ${w} px`);
@@ -64,7 +66,7 @@ await executer(chrome, async (s) => {
       await s.ev("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))");
       await pause(150);
     }
-    sortie['l' + w] = { n: etapes.length, noeuds, etapes };
+    sortie[(passe ? 'r' : 'l') + w] = { n: etapes.length, noeuds, etapes };
   }
   return sortie;
 });

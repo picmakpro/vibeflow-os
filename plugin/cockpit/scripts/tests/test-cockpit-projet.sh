@@ -414,6 +414,10 @@ for W in 1440 390; do
   assert_eq "O5.4 [$W px] — étapes dont le repère n'est pas « n sur N » juste" "$(x5 "j.l$W.etapes.filter((e)=>e.repere!==e.i+' sur '+j.l$W.n).map((e)=>e.i).join(',')")" ""
   assert_eq "O5.5 [$W px] — étapes qui montrent un mot anglais (liste de F11)" "$(f5 '!!e.anglais')" ""
 done
+# O5.6 (correctif 70-07) : même cas, onglet Code : page déjà vue dans le même profil, rechargée, aux deux largeurs
+X56="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$U5" 1440,390 recharge)"
+x56() { printf '%s' "$X56" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O5.6 — Code, page déjà vue (rechargement) : mesure sans erreur et étapes sans cible, mal centrées, couvertes ou hors fenêtre, aux deux largeurs" "$(x56 "j.erreur||''")|$(x56 '["l1440","r1440","l390","r390"].map((k)=>j[k].etapes.filter((e)=>!e.cible||!e.centre||e.couvert||!e.visible).map((e)=>k+":"+e.i).join(",")).join("")')" "|"
 # O6.5 (70-08) : la même visite parcourue dans Chrome sur l'onglet Projet (project.html) d'un lab à jalon, phase en cours, mission : les mesures O5.1 à O5.5 passent sur Projet, quatre étapes, la première est celle du jalon.
 echo "=== O6.5 — la visite Projet dans Chrome ==="
 L6="$WORK/lab6"; mkdir -p "$L6"; mklab4 "$L6"
@@ -456,6 +460,15 @@ for W in 1440 390; do
   assert_eq "O6.5e [$W px] — Projet : étapes sans « Passer » (O5.3)" "$(f6 '!e.passer')" ""
   assert_eq "O6.5f [$W px] — Projet : repère « n sur N » faux (O5.4)" "$(x6 "j.l$W.etapes.filter((e)=>e.repere!==e.i+' sur '+j.l$W.n).map((e)=>e.i).join(',')")" ""
   assert_eq "O6.5g [$W px] — Projet : mot anglais (O5.5)" "$(f6 '!!e.anglais')" ""
+done
+# O6.6 (correctif 70-07, relevé par 70-08) : la visite d'une page DÉJÀ vue dans le même profil Chrome (rechargement) se centre comme au premier chargement. Cause : le fit de 450 ms du démarrage de la visite défaisait
+# le centrage d'une première étape qui est une carte (onglet Projet) quand la carte était mesurée tôt ; un profil neuf, plus lent à se poser, masquait le cas. Ici UN Chrome pour les deux largeurs, deux passes chacune (clés l, r).
+X66="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 390,1440 recharge)"
+[ -n "${DBG:-}" ] && echo "RAW66: $X66"
+x66() { printf '%s' "$X66" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O6.9 — témoin : le rechargement a été mesuré (erreur vide, quatre étapes à chaque passe)" "$(x66 "j.erreur||''")|$(x66 '["l390","r390","l1440","r1440"].map((k)=>j[k].n).join()')" "|4,4,4,4"
+for K in l390 r390 l1440 r1440; do
+  assert_eq "O6.9 [$K] — Projet, page déjà vue dans le même profil : étapes sans cible, mal centrées, couvertes ou hors fenêtre" "$(x66 "j.$K.etapes.filter((e)=>!e.cible||!e.centre||e.couvert||!e.visible).map((e)=>e.i).join(',')")" ""
 done
 unset VF_COCKPIT_PORT_BASE
 for L in "${LABS4[@]}"; do node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L" >/dev/null 2>&1; done; for p in "${SRVPIDS[@]}"; do vf_hyg_stop "$p"; done; SRVPIDS=()
