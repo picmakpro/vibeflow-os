@@ -42,3 +42,32 @@ Trois tests d'origine réalignés (rouges avant le code, même cause : ils lisai
 `labSignal` (fixture 68-05) ne laisse pas d'espion : le moteur de test refuse un second `on('fs.exists')` (`registered twice`) ; la fixture n'est pas dans le périmètre du plan,
 `vf-signal.test.tsx` porte donc son propre `lab()` (mêmes réponses que `labSignal`, plus l'enregistrement des lectures `fs.*` et des appels `bash`, et un leurre d'ancien disque : STATE.md, `status --all`).
 `ui.toast` demande un gestionnaire (`on('ui.toast')`), sinon « dropped ».
+
+## Vert, puis mutants (annexe, après le code)
+
+Vert (scratchpad `68-06-tests2.out`) : `claude plugin test plugin` **35 pass, 0 fail**, rc=0 ; `claude plugin validate --strict plugin` rc=0 ;
+`test-cockpit-signal-mod.sh` 25 ok / 0 ko sous bash ET sous zsh ; `check-machine-paths.sh` rc=0 ;
+`verdict.sh … succes` = 0 pour R6-K5 R6-K10 R6-K10b R6-K10c R6-K11 R6-K11b R6-J1 R6-J2 R6-J3 sous bash ET sous zsh.
+Le rouge → vert de chaque témoin : R6-K11 et R6-K11b au commit `f9922469` (vérifié `OK-T1`, K5 encore rouge à ce commit), R6-K5/K10/K10b/K10c et les trois tests d'origine à `1a059b78`
+(32 pass / 1 fail : R6-J1 seul), R6-J1 à `58e89b59`, M7 à `fd4b3834`.
+
+Témoins ajoutés après le code (comportement neuf de `attention`, verts au premier jeu, prouvés par mutant) : R6-A1, R6-A2.
+
+Mutants (copies jetables de `plugin/` dans le scratchpad, une mutation chacune, `claude plugin test` dans la copie) :
+
+| Mutant | Rouge obtenu | Attendu |
+|--------|--------------|---------|
+| `actions.ts` : projet avant plugin | R6-K10 | R6-K10 |
+| `actions.ts` : candidat du compte retiré | R6-K10c | R6-K10c |
+| `actions.ts` : candidat du projet retiré | R6-K10b | R6-K10b |
+| `derive.ts` : `jalonCourant` retombe sur `jalons[0]` si aucun jalon ne contient la phase | R6-J2 | R6-J2 |
+| `derive.ts` : idem sans phase active | R6-J3 | R6-J3 |
+| `derive.ts` : nœuds d'une mission abandonnée dictent l'action | R6-A2 | R6-A2 |
+| `derive.ts` : détection du nœud en échec coupée | R6-A1 | R6-A1 |
+| `refresh.ts` : un `fs.exists` sous `/lab/.planning/` ajouté | R6-K5 | R6-K5 |
+| `derive.ts` : `missionCourante` rend null | R6-K11, R6-K11b, R6-A1 | R6-K11, R6-K11b, R6-A1 |
+| `en-tete.tsx` : jalon jamais affiché | R6-J1 | R6-J1 |
+| `derive.ts` : `verrouPerime` cherche `stale === false` | R6-K10, K10b, K10c, A1, A2 | R6-K10, K10b (K10c, A1, A2 en plus : le verrou périmé ne sort plus) |
+
+Mutants de M7 (copies, `test-cockpit-signal-mod.sh` sous bash ET zsh) : littéral `/.planning/` dans `ds.ts` -> M7.3 ; `current_phase` -> M7.4 ; un `disk.ts` recréé -> M7.2 ; `$.agent.list()` dans `derive.ts` -> M7.5.
+Chaque mutant a eu son ancre unique vérifiée avant application (`assert count == 1`).
