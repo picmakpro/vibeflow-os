@@ -309,7 +309,7 @@
         "exec-68-03"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "exec-68-13",
@@ -331,7 +331,8 @@
         "exec-68-09"
       ],
       "scope": [],
-      "status": "running"
+      "status": "blocked",
+      "review_regime": "full"
     },
     {
       "id": "recette-68",
@@ -343,7 +344,7 @@
         "revue-mod"
       ],
       "scope": [],
-      "status": "running"
+      "status": "blocked"
     },
     {
       "id": "exec-68-10",
@@ -395,7 +396,7 @@
       "scope": [
         "plugin/cockpit/scripts/"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "fix-mod",
@@ -407,7 +408,7 @@
       "scope": [
         "plugin/cockpit/signal/"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "rerevue-fix",
@@ -417,7 +418,7 @@
         "exec-68-08"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "pr-brouillon",
@@ -428,6 +429,14 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "arbitrages-samuel",
+      "step": "en attente : Q1 (68-11), Q2 (porte npm 68-09), Q3 (F-01 verrou de dépôt), Q4 (ST-2 lanceur sous le lab), tri de recette R1-R15",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "ready"
     }
   ]
 }
