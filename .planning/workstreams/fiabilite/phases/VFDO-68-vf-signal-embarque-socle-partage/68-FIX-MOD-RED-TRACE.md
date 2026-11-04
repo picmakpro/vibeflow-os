@@ -89,3 +89,41 @@ Mutants (un seul changement à la fois, suite complète rejouée, `hooks/` resta
 Non-régression : `claude plugin validate --strict plugin` ✔ (`fix-mod-validate.out`) ; `test-cockpit-signal-mod.sh` bash et zsh 40 ok / 0 ko
 (`fix-mod-static-bash.out`, `fix-mod-static-zsh.out`) ; `check-machine-paths.sh` ✓ 2481 fichiers (`fix-mod-machine-paths.out`).
 La suite statique n'a pas été touchée : pas de trailer `Gate-Touche:`.
+
+# Passe 2 (RV-1, RV-2, RV-3) — après `git merge --ff-only feat/phase-68-vf-signal` (6b76c42c)
+
+Fichiers : `tests/fixture-plat.ts` (sortie RÉELLE de l'émetteur sur un lab plat, capturée par la re-revue ; seules `root` et `equipe.root` ramenées à `/lab`,
+aucun chemin de machine), `tests/reel.test.tsx` (FX-7, FX-8), `tests/session-sans-registre.test.tsx` (FX-1i, FX-1j).
+
+## Rouge (hooks de la passe 1, `fix-mod-p2-rouge.out`, `fix-mod-p2-rouge2.out`)
+
+| témoin | assertion | attendu | obtenu |
+| --- | --- | --- | --- |
+| FX-7a | sortie réelle d'un lab plat : pas de « sortie de l'émetteur illisible », « phase 1 Un » affichée, trois vues, « sans portée » | texte illisible absent | « sortie de l'émetteur illisible » présent (`complet()` rejette `scope: null` et `retard.base: null`) |
+| FX-7b | idem : bandeau, compact, brief | pas de levée, « verrou dépôt : t · sans portée » | compact sans « phase 1 Un » |
+| FX-7c | SIGNAL de référence, `scope: null` seul | accepté | illisible |
+| FX-7d | `retard.base: null` seul | accepté, aucun « en retard » | illisible |
+| FX-7e | `scope: 7` | reste illisible | vert (la tolérance est bornée) |
+| FX-8a | `projet` avec U+2028 et U+2029 : brief `- projet : avant - faux apres`, aucune ligne forgée | idem | vert (témoin d'une entrée de `CONTROLES` qui n'en avait pas) |
+| FX-1i / FX-1j | sans `cockpit=`, `skill.prompt` + `tool.call` refusé par le garde classique : 0 écriture ; avec `cockpit=` : plus d'une | idem | vert (les gates existaient ; témoins ajoutés, mutants plus bas) |
+
+Le rouge initial de FX-7b a d'abord été « no implementation for ui.render » (le montage du bandeau demandait un moteur) : stub `ui.render` ajouté, puis rejoué.
+Note : `classic.PreToolUse` n'est pas appelable en `$.classic` ; il passe par `$.tool.call` (doc du moteur de test).
+
+## Correctifs et vert (`fix-mod-p2-vert.out`)
+
+- `socle.ts` : `scope` et `retard.base` acceptent chaîne ou null (`textOuNull`) ; tout autre type reste illisible.
+- `types/index.d.ts` : `scope: string | null`, `base: string | null`, avec leur raison.
+- `en-tete.tsx` : sans base, aucun retard n'est dit ; `mission.tsx` et `derive.ts` : un verrou sans portée s'écrit « sans portée » (jamais « null »).
+
+## Mutants (suite complète rejouée, `hooks/` restauré après chaque)
+
+| mutant | témoins rouges |
+| --- | --- |
+| gate de `skill.prompt` retiré | FX-1g, FX-1i |
+| gate de `classic.PreToolUse` retiré | FX-1g, FX-1i |
+| U+2028/U+2029 retirés de `CONTROLES` | FX-8a |
+| `scope` redevient chaîne stricte | FX-7a, FX-7b, FX-7c |
+| `retard.base` redevient chaîne stricte | FX-7a, FX-7b, FX-7d |
+| garde `base === null` de `retardDe` retirée | FX-7a, FX-7d |
+| « sans portée » retiré de `derive.ts` / de `mission.tsx` | FX-7b / FX-7a |

@@ -33,7 +33,7 @@ const pos = (n: number | null | undefined): n is number => typeof n === 'number'
 
 /** « en retard de N commit(s) sur <base>, dernier fetch il y a X [· origin/<base> local : en retard de M] », ou null. */
 function retardDe(r: SignalRetard | null): string | null {
-  if (!r) return null
+  if (!r || r.base === null) return null // ni origin/HEAD ni main : aucune base, donc aucun retard à dire (P68-PL-05)
   const base = oneLine(r.base)
   const fetch = r.fetchAgeS === null ? 'aucun fetch connu' : `dernier fetch il y a ${age(r.fetchAgeS)}`
   const local = pos(r.origin) ? `origin/${base} local : en retard de ${r.origin}` : null

@@ -54,7 +54,7 @@ export function mission(ctx: Ctx): JSX.Element {
         verrous.map(k => (
           <Text color={k.stale ? pal['st-blocked'] : pal.text} wrap="wrap">
             {G.done} {k.ws || 'dépôt'}
-            <Text color={pal['text-2']}> · {cut(k.owner ?? '?', Math.max(12, width - 20))} · {k.scope}{k.ageS != null ? ` · ${age(k.ageS)}` : ''}</Text>
+            <Text color={pal['text-2']}> · {cut(k.owner ?? '?', Math.max(12, width - 20))} · {k.scope ?? 'sans portée'}{k.ageS != null ? ` · ${age(k.ageS)}` : ''}</Text>
             {k.stale ? <Text color={pal['st-blocked']}> · périmé</Text> : null}
           </Text>
         ))

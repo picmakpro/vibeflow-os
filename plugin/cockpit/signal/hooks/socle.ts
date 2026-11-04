@@ -30,6 +30,7 @@ export function classerEchec(err: unknown, sujet: string): string {
 const obj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x)
 const tab = (x: unknown): x is unknown[] => Array.isArray(x)
 const chaines = (o: Record<string, unknown>, ...cles: string[]) => cles.every(k => typeof o[k] === 'string')
+const textOuNull = (x: unknown) => x === null || typeof x === 'string'
 const nombres = (o: Record<string, unknown>, ...cles: string[]) => cles.every(k => typeof o[k] === 'number')
 
 /** La forme que les vues lisent sans garde : un signal au bon schéma mais incomplet est « illisible », jamais un rendu qui lève. */
@@ -40,8 +41,8 @@ function complet(o: Record<string, unknown>): boolean {
     tab(phases) && phases.every(p => obj(p) && chaines(p, 'key', 'n', 'nom', 'libelle') && obj(p.avancement) && obj(p.avancement.plans) && nombres(p.avancement.plans, 'faits', 'total')) &&
     tab(jalons) && jalons.every(j => obj(j) && chaines(j, 'key', 'texte') && tab(j.phases)) &&
     tab(missions) && missions.every(m => obj(m) && chaines(m, 'nom', 'libelle') && (m.noeuds === undefined || (tab(m.noeuds) && m.noeuds.every(n => obj(n) && chaines(n, 'id', 'step', 'status') && tab(n.deps))))) &&
-    obj(verrous) && tab(verrous.liste) && verrous.liste.every(k => obj(k) && chaines(k, 'scope')) &&
-    tab(arbres) && arbres.every(a => obj(a) && chaines(a, 'label', 'branche') && (a.phaseActive === null || obj(a.phaseActive)) && (a.retard === null || (obj(a.retard) && chaines(a.retard, 'base')))) &&
+    obj(verrous) && tab(verrous.liste) && verrous.liste.every(k => obj(k) && textOuNull(k.scope)) &&
+    tab(arbres) && arbres.every(a => obj(a) && chaines(a, 'label', 'branche') && (a.phaseActive === null || obj(a.phaseActive)) && (a.retard === null || (obj(a.retard) && textOuNull(a.retard.base)))) &&
     obj(equipe) && tab(equipe.workers) && equipe.workers.every(w => obj(w) && chaines(w, 'id'))
   )
 }

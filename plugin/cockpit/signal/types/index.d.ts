@@ -76,7 +76,8 @@ export type SignalPhase = {
 export type SignalJalon = { key: string; icone: string; texte: string; ws: string | null; phases: string[] }
 export type SignalVerrou = {
   ws: string | null
-  scope: string
+  /** null pour un verrou de lab plat : l'émetteur ne lui connaît pas de portée. */
+  scope: string | null
   phase: string | null
   tenu: boolean
   stale: boolean | null
@@ -85,7 +86,8 @@ export type SignalVerrou = {
   progressAgeS: number | null
   owner: string | null
 }
-export type SignalRetard = { base: string; main: number | null; origin: number | null; fetchAgeS: number | null }
+/** `base` vaut null quand le dépôt n'a ni origin/HEAD ni main (P68-PL-05). */
+export type SignalRetard = { base: string | null; main: number | null; origin: number | null; fetchAgeS: number | null }
 export type SignalArbre = {
   label: string
   branche: string

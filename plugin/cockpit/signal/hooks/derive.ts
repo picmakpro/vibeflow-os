@@ -138,7 +138,7 @@ export function brief(sig: Signal | null, l: Loop, roster: RosterAgent[], stats:
     lines.push(active ? `- phase ${active.n} · ${active.nom}${phase ? ` · ${phase.libelle}` : ''}` : '- aucune phase en cours')
     if (phase) lines.push(`- plans : ${phase.avancement.plans.faits}/${phase.avancement.plans.total}`)
     for (const k of sig.verrous.liste) {
-      lines.push(`- verrou ${k.ws || 'dépôt'} : ${k.owner ?? '?'} · ${k.scope}${k.ageS != null ? ` · ${age(k.ageS)}` : ''}${k.stale ? ' · périmé' : ''}`)
+      lines.push(`- verrou ${k.ws || 'dépôt'} : ${k.owner ?? '?'} · ${k.scope ?? 'sans portée'}${k.ageS != null ? ` · ${age(k.ageS)}` : ''}${k.stale ? ' · périmé' : ''}`)
     }
     const mis = missionCourante(sig)
     if (mis) {
