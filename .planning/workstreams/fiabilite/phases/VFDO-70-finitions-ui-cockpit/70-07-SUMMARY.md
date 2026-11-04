@@ -33,3 +33,4 @@ patch: P25
 - REG-70-01 : centrage borné par le graphe entier, dézoom d'une grande carte, visite qui ne sélectionne plus (le panneau garde la vue d'ensemble) ; O6.10. **À arbitrer** : le centrage de P70-D-02 est borné par « toutes les cartes restent dans la zone libre » (critère de R1) ; une carte excentrée n'est donc pas toujours au milieu.
 - « Passer », Échap et la croix rendent la vue d'ensemble ajustée, comme « Terminé » (O6.11) ; le contour de l'étape sur un élément du chrome est un élément à part, indépendant du `className` de la cible (O6.12).
 - Preuves : `70-07-RED-TRACE.md`, sections « Suite : … ».
+- CI Linux (R20 à 768 px, `#panel` recouvre `#tour`) : la carte de visite se rétrécit plutôt que de passer sous le panneau de détail (O6.13, panneau élargi). Cause non observée sous Linux, déduite : l'émulation `pointer: none` ne la reproduit pas (R20 vert sans pointeur).

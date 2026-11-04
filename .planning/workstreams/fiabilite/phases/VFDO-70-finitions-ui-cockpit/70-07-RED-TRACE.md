@@ -64,3 +64,19 @@ Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-projet.sh` — 95 PAS
 - « Passer » : l'étape sur une carte d'un groupe ouvre ce groupe (`go(parent)`) ; `end()` ne rendait la vue d'ensemble que depuis la racine. Toute sortie (Passer, croix, Échap, Terminé) revient maintenant à la racine et ajuste (`go('root')` puis `fit`), sauf le lancement d'un parcours guidé, qui reprend la main.
 - Contour : posé sur la cible par un élément propre (`.tour-target`, `position: fixed`), retrouvé par son sélecteur toutes les 250 ms : il ne dépend plus du `className` de la cible, que `70-vf-live.js` réécrit. `70-vf-live.js` n'a pas été touché.
 - Vert : `test-cockpit-projet.sh` 100 PASS / 0 FAIL (O6.10, O6.11, O6.12 aux largeurs mesurées) ; `test-cockpit-vendor.sh` 79/0 ; `test-cockpit-chrome-fr.sh` 70/0 ; `test-cockpit-responsive.sh` 255 PASS / 6 FAIL, les six R13.4 connus seuls (R1, R5.3 et R9 verts) ; `synchro.sh verifier` : amont retrouvé à l'octet.
+
+## Suite : CI Linux (PR #200, 0ffd3e82, shard 6)
+
+Constat CI : `R20 — Équipe / 768 px` rouge sous Linux seulement, attendu `[aucune]`, obtenu `[surfaces : #panel recouvre #tour | en-tête et surfaces : #panel recouvre #tour]`.
+
+**Non reproduit par l'émulation de pointeur.** `CHROME_BIN` pointé sur un Chrome lancé avec `--blink-settings=primaryPointerType=1,availablePointerTypes=1,primaryHoverType=1,availableHoverTypes=1` (le procédé de R8 : `pointer: none`) : `test-cockpit-responsive.sh` 255 PASS / 6 FAIL, R20 vert aux quatre largeurs. Le pointeur n'est donc pas la cause. Sur Équipe, le lab local n'ouvre pas la visite (moins de deux cartes) ; mesure à 768 px sur Projet, avec ou sans pointeur : carte de visite 16..376, panneau 392..752, pas de recouvrement.
+
+**Cause retenue (non observée sous Linux, déduite de la géométrie).** À 768 px, la carte de visite fait 360 px de large à gauche et le panneau commence à 392 px : 16 px de marge. Toute largeur de panneau plus grande d'une quinzaine de pixels (polices et plateforme la font varier) le fait passer sous la carte. La carte ne regardait pas le panneau.
+
+### Rouge — 0ffd3e82, sonde `chrome-visite-etapes.mjs` option `panneau` (panneau élargi à 440 px, ce qui rougit sans Linux)
+
+768 px, lab Projet : `surPanneau` = `[true,true,true,true]` aux quatre étapes ; 1 024 px : `[false,…]` (le panneau y est à droite de la carte avec de la marge). Témoin O6.13 de `test-cockpit-projet.sh`, mêmes mesures : rouge à 768 px (étapes `1,2,3,4`), vert à 1 024 px.
+
+### Correction et vert
+
+`place()` rétrécit la carte de visite (au plus jusqu'à 12 px du panneau, 200 px au minimum) quand elle recouvrirait un panneau latéral, et ne la fait plus passer de l'autre côté (étape sur un élément du chrome) si ce côté recouvre le panneau. Après : `surPanneau` faux à toutes les étapes, aux deux largeurs. `test-cockpit-projet.sh` 103 PASS / 0 FAIL (O6.13 incluse) ; `test-cockpit-vendor.sh` 79/0 ; `test-cockpit-chrome-fr.sh` 70/0 ; `test-cockpit-responsive.sh` 255 PASS / 6 FAIL (les six R13.4 seuls) ; `synchro.sh verifier` : amont retrouvé à l'octet. Seule la CI Linux dira si la cause est bien celle-là.
