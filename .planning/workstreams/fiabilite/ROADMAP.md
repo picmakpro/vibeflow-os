@@ -874,19 +874,21 @@ Plans:
 4. Une mission dont un nœud est resté `running` sans verrou ni progrès depuis plus de 1 800 s s'affiche « abandonnée », sur la pane comme sur la carte Projet (VFSG-06).
 5. La pane suit Graphite, un bouton « Ouvrir le cockpit » ouvre le cockpit du lab, l'ancien mod est signalé, l'absence de `node` est dite (VFSG-07, 09, 10, 11).
 6. La CI joue `validate` et `test` du mod, avec un témoin rouge sous Linux (VFSG-08) ; recette humaine sur quatre surfaces ; release minor préparée (VFSG-12, 13).
-**Plans:** 11 plans en 9 vagues (planifiée le 2026-11-03, plan-checker interne PASSED en 2 passes ; plans PROVISOIRES : rebase sur `main` après le merge de la 69 et de la PR #196 puis checker frais, P68-D-10)
+**Plans:** 13 plans en 9 vagues (planifiée le 2026-11-03, plan-checker interne PASSED en 2 passes ; rebasée sur `main` à 794c6dba et corrigée le 2026-11-04 après un plan-checker frais : 68-04 scindé (68-12), 68-09 scindé (68-13), P68-D-27 et P68-D-28 ; P68-D-10)
 
 Plans:
 
 - [ ] 68-01-PLAN.md — règle de mission vivante dans le socle, `avancement@2` (VFSG-06) — vague 1
 - [ ] 68-02-PLAN.md — retard sur `main` et worktrees sans réseau (VFSG-05) — vague 1
-- [ ] 68-04-PLAN.md — import du mod, déclaration plugin, gating, ancien mod (VFSG-01, 02, 09) — vague 1
+- [ ] 68-04-PLAN.md — import du mod, déclaration plugin, forme de sortie de `claude plugin test` (VFSG-01) — vague 1
 - [ ] 68-03-PLAN.md — émetteur `signal@1` (VFSG-03, 11) — vague 2
+- [ ] 68-12-PLAN.md — gating par `cockpit=`, ancien mod (VFSG-02, 09) — vague 2
 - [ ] 68-05-PLAN.md — appel du socle, erreurs, en-tête (VFSG-11, 05, 06) — vague 3
+- [ ] 68-09-PLAN.md — CI `claude plugin validate/test` : porte de légitimité, sonde Linux, étape `ci.yml` (VFSG-08) — vague 3
 - [ ] 68-06-PLAN.md — retrait de `disk.ts`, vues mission/macro (VFSG-03, 06) — vague 4
 - [ ] 68-07-PLAN.md — équipe `who@2`, bouton « Ouvrir le cockpit » (VFSG-04, 10) — vague 5
 - [ ] 68-08-PLAN.md — direction Graphite (VFSG-07, 06) — vague 6
-- [ ] 68-09-PLAN.md — CI `claude plugin validate/test` sous Linux (VFSG-08) — vague 7
+- [ ] 68-13-PLAN.md — runs CI rouge puis vert sur la PR (VFSG-08) — vague 7
 - [ ] 68-10-PLAN.md — doc FR/EN, recette humaine, porte de phase (VFSG-12) — vague 8
 - [ ] 68-11-PLAN.md — release minor préparée, relecture adverse (VFSG-13) — vague 9
 

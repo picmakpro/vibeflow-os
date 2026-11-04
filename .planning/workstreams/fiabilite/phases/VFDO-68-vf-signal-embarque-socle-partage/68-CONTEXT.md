@@ -95,7 +95,7 @@ recommandations sont donc retenues :
 - **P68-D-13 (le mod n'est pas posé par l'engine).** Le mod est lu depuis le cache du plugin (`$.plugin.root`),
   jamais copié chez l'utilisateur ; aucun type de pose de l'engine ne doit prendre les `.tsx`. `driver-lock.sh`
   se résout d'abord par `${$.plugin.root}/conductor/scripts/driver-lock.sh`, puis par les scripts posés
-  (`<root>/.claude/scripts/`, `~/.claude/scripts/`).
+  (`<root>/.claude/scripts/`, `~/.claude/scripts/`). Amendée pour le socle par P68-D-28 (plus bas).
 - **P68-D-14 (node).** Le mod appelle le socle par `$.process.run(['node', <script du plugin>, ...])`. Mesuré
   (sonde 2026-11-03) : `node` est trouvé via le PATH hérité ; sans `node`, l'appel est **rejeté** (ENOENT, pas de
   code de sortie) — le mod attrape ce rejet et affiche « node introuvable dans le PATH » au lieu de planter ;
@@ -148,7 +148,17 @@ Relayés par la session principale (SendMessage) ; réponses mot pour mot entre 
   Cas laissé ouvert par P68-D-26 : le plan garde « la phase d'abord », même périmée, donc la mission sort
   `abandonnee`. Motif : le script empêche presque toujours ce cas, car le compartiment refuse l'acquire tant qu'un
   verrou de phase, même périmé, n'a pas été repris. La session principale a choisi de ne pas poser la question à
-  Samuel (consigne du 2026-11-03). Un témoin figera ce comportement ; il sera ajouté à 68-01 au nœud `revalid-68`.
+  Samuel (consigne du 2026-11-03). Un témoin figera ce comportement ; il sera ajouté à 68-01 au nœud `revalid-68`. Fait : témoin V9.8 de 68-01 (2026-11-04).
+
+- **P68-D-28 (option `pluginRoot` retirée) — décision du manager, pas un arbitrage de Samuel (2026-11-04).**
+  Retirés : l'option `pluginRoot` de `driverLockScript` et la CLI `--plugin-root` de l'émetteur. Motif : la règle
+  « conductor voisin » de la 69 (`vf-cockpit-paths.mjs`, fonction `driverLockScript`, l. 72-74 sur `main` à 794c6dba)
+  résout déjà `<plugin>/conductor/scripts/driver-lock.sh` quand le socle tourne depuis `<plugin>/cockpit/scripts`, ce qui
+  tient l'intention de P68-D-13 sans code neuf ; `driverLockScript` n'est plus modifié par la 68. Témoin positif :
+  W18.1 de `test-cockpit-who.sh` ; un script planté dans le lab n'est jamais exécuté (V7.1 de 68-01, S6.3 de 68-03).
+  Amende P68-D-13 (renvoi, texte inchangé). Ne change pas la résolution côté mod : les paramètres `pluginRoot` des
+  fonctions du mod (68-05 à 68-07 : racine du plugin, `$.plugin.root`, pour situer l'émetteur, le lanceur du cockpit et
+  `driver-lock.sh` du geste d'élagage) ne sont pas l'option retirée.
 
 ### Points de procédure (documentés, sans arbitrage — consigne de la session principale, 2026-11-03)
 
