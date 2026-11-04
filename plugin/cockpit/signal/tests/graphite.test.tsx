@@ -123,6 +123,7 @@ test("R8-G5 — vue macro : phase faite st-done, phase à recetter st-active et 
 test("R8-G5b — vue équipe : agent actif st-active, terminé st-todo, orphelin st-active (attention)", async ($, on) => {
   const ui = await monte($, on, EQUIPE, { vue: 'equipe' })
   toutes(await couleurs(ui, /role-actif/), SOMBRE.active)
+  await ui.press({ key: 'finis' }) // les terminés sont repliés derrière leur compteur (P68-D-35)
   toutes(await couleurs(ui, /role-fini/), SOMBRE.todo)
   toutes(await couleurs(ui, /role-orphelin/), SOMBRE.active)
   await ui.unmount()

@@ -31,13 +31,13 @@ export type LabFix = {
   toasts: string[]
   copies: string[]
 }
-type Opts = { root?: string; scripts?: RegExp; agents?: AgentInfo[] }
+type Opts = { root?: string; home?: string; scripts?: RegExp; agents?: AgentInfo[] }
 
 export function labFix(on: On, o: Opts = {}): LabFix {
   const lab: LabFix = { emetteur: { stdout: JSON.stringify(SIGNAL) }, bash: { stdout: '' }, lanceur: { stdout: '' }, toasts: [], copies: [] }
   const root = o.root ?? '/lab'
   mock.clock(on, { now: 1_000_000 })
-  mock.env(on, { HOME: '/home/user' })
+  mock.env(on, { HOME: o.home ?? '/home/user' })
   on('command.register', () => ({ value: { command: 'vf-signal' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.toast', (_, e) => {

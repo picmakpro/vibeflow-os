@@ -3,8 +3,8 @@ import type { On } from 'claude-code'
 
 import { SIGNAL } from './fixture-signal'
 
-// Le bouton « Ouvrir le cockpit » (68-07 ; VFSG-10, P68-D-19, P68-D-25 ; ADR-031) : le lanceur est résolu (pose projet, pose
-// compte, puis plugin), l'adresse est prise par un motif fixe, les codes sont traduits ; un appui humain seul le lance.
+// Le bouton « Ouvrir le cockpit » (68-07 ; VFSG-10, P68-D-19, P68-D-34 ; ADR-031) : le lanceur est résolu (pose compte, puis
+// plugin ; jamais sous le lab), l'adresse est prise par un motif fixe, les codes sont traduits ; un appui humain seul le lance.
 // Identifiant du témoin en tête de titre (lu par verdict.sh). `process.run` se simule : on prouve l'argv et l'analyse du stdout.
 
 const PANE = {
@@ -77,12 +77,12 @@ async function pane($: any, props: any = PANE) {
   return $.ui.mount({ ...props, surface: 'terminal' })
 }
 
-test("A1 — lanceur posé au scope projet : node <racine>/.claude/scripts/vf-cockpit.mjs open --lab <racine>, cwd = racine, délai 60 s", async ($, on) => {
+test("A1 — lanceur posé dans le lab : jamais lancé (P68-D-34) ; le lanceur du plugin le remplace, délai 60 s, cwd = racine", async ($, on) => {
   const sp = lab(on, { poses: /^\/lab\/\.claude\/scripts\/vf-cockpit\.mjs$/ })
   const ui = await pane($)
   await ui.press({ key: 'ouvrir-cockpit' })
   expect(sp.lanceur.length).toBe(1)
-  expect(sp.lanceur[0]!.argv).toEqual(['node', '/lab/.claude/scripts/vf-cockpit.mjs', 'open', '--lab', '/lab'])
+  expect(sp.lanceur[0]!.argv).toEqual(['node', `${sp.racinePlugin()}/cockpit/scripts/vf-cockpit.mjs`, 'open', '--lab', '/lab'])
   expect(sp.lanceur[0]!.cwd).toBe('/lab')
   expect(sp.lanceur[0]!.timeoutMs).toBe(60000)
   await ui.unmount()
@@ -98,7 +98,7 @@ test("A1b — aucune pose : le lanceur du plugin, <racine du plugin>/cockpit/scr
   await ui.unmount()
 })
 
-test("A1c — pose du compte seule : le lanceur de HOME ; les trois existent : celui du projet (P68-D-25)", async ($, on) => {
+test("A1c — pose du compte seule : le lanceur de HOME", async ($, on) => {
   const sp = lab(on, { poses: /^\/home\/user\/\.claude\/scripts\/vf-cockpit\.mjs$/ })
   const ui = await pane($)
   await ui.press({ key: 'ouvrir-cockpit' })
@@ -106,11 +106,11 @@ test("A1c — pose du compte seule : le lanceur de HOME ; les trois existent : c
   await ui.unmount()
 })
 
-test("A1d — projet, compte et plugin existent tous : le projet l'emporte", async ($, on) => {
+test("A1d — lab, compte et plugin existent tous : le compte l'emporte, jamais le lab (P68-D-34)", async ($, on) => {
   const sp = lab(on, { poses: LANCEUR })
   const ui = await pane($)
   await ui.press({ key: 'ouvrir-cockpit' })
-  expect(sp.lanceur.map(a => a.argv[1])).toEqual(['/lab/.claude/scripts/vf-cockpit.mjs'])
+  expect(sp.lanceur.map(a => a.argv[1])).toEqual(['/home/user/.claude/scripts/vf-cockpit.mjs'])
   await ui.unmount()
 })
 

@@ -15,6 +15,12 @@ const STOP_TEXT =
 
 type Etat = 'actif' | 'en-attente' | 'termine'
 
+// Statuts de `$.agent.list()` qui disent « fini » ; tout autre statut (running, …) est un agent vivant (P68-D-35, R2).
+const STATUTS_FINIS = new Set(['completed', 'failed', 'killed'])
+
+// Les terminés se replient derrière un compteur (P68-D-35, R3). Le choix tient au module, la pane se redessine par `invalidate`.
+let deplie = false
+
 /** L'état écrit par who@2 ; à défaut (verrou, nœud, registre) : périmé = en attente, sinon actif. */
 const etatDe = (w: SignalWorker): Etat => (w.etat === 'actif' || w.etat === 'en-attente' || w.etat === 'termine' ? w.etat : w.stale ? 'en-attente' : 'actif')
 
@@ -46,10 +52,65 @@ export function equipe($: EngineInterface, ctx: Ctx): JSX.Element {
   const { Box, Button, Text } = ui
   const workers = s?.equipe?.workers ?? []
   const session = new Map(roster.map(a => [a.id, a]))
-  const all = arbre(workers)
-  const rows = compact ? all.filter(({ w }) => etatDe(w) !== 'termine') : all
+  // vivant pour la session : présent dans `$.agent.list()` et non fini, quel que soit l'état que who@2 lui donne
+  const vivant = (w: SignalWorker) => {
+    const a = session.get(w.id)
+    return a !== undefined && !STATUTS_FINIS.has(a.status)
+  }
+  const replies = (w: SignalWorker) => etatDe(w) === 'termine' && !vivant(w)
   const finis = workers.filter(w => etatDe(w) === 'termine').length
   const live = workers.length - finis
+  const nReplies = workers.filter(replies).length
+  const rowsVifs = arbre(workers.filter(w => !replies(w)))
+  const rowsFinis = !compact && deplie ? arbre(workers.filter(replies)) : []
+  const rows = [...rowsVifs, ...rowsFinis]
+
+  const ligne = ({ w, depth }: { w: SignalWorker; depth: number }) => {
+    const etat = etatDe(w)
+    const termine = etat === 'termine'
+    const color = termine ? pal['st-todo'] : w.orphan || etat === 'actif' ? pal['st-active'] : pal['text-2']
+    const glyph = termine ? G.done : w.orphan ? G.human : etat === 'actif' ? (blink ? G.current : ' ') : G.todo
+    const mien = session.get(w.id)
+    return (
+      <Box flexDirection="column" paddingLeft={depth * 2}>
+        <Text color={color} bold={etat === 'actif'} wrap="wrap">
+          {depth > 0 ? `${G.branch} ` : ''}
+          {glyph} {w.role || w.kind}
+          <Text color={termine ? pal['text-3'] : pal['text-2']} bold={false}> · {oneLine(w.task ?? '')}</Text>
+        </Text>
+        {compact ? null : (
+          <Box paddingLeft={depth > 0 ? 4 : 2}>
+            <Text color={pal['text-3']} wrap="wrap">
+              {w.orphan ? 'orphelin (registre)' : termine ? 'terminé' : etat === 'en-attente' ? 'en attente' : 'actif'}
+              {` · ${w.tree}`}
+              {w.branch ? ` · ${w.branch}` : ''}
+              {w.ageS != null ? ` · ${age(w.ageS)}` : ''}
+            </Text>
+          </Box>
+        )}
+        {mien && !STATUTS_FINIS.has(mien.status) && !w.orphan ? (
+          <Box paddingLeft={depth > 0 ? 4 : 2} gap={1}>
+            <Button key={`voir:${w.id}`} plain dimColor onPress={() => void $.ui.view({ agentId: w.id })}>
+              voir
+            </Button>
+            <Button
+              key={`stop:${w.id}`}
+              plain
+              dimColor
+              onPress={() =>
+                void $.session
+                  .send({ to: { agentId: w.id }, text: STOP_TEXT })
+                  .then(() => $.ui.toast(`arrêt demandé à ${mien.type}`))
+                  .catch(err => $.ui.toast(`arrêt refusé : ${err instanceof Error ? err.message : String(err)}`))
+              }
+            >
+              demander l'arrêt
+            </Button>
+          </Box>
+        ) : null}
+      </Box>
+    )
+  }
 
   return (
     <Box flexDirection="column">
@@ -65,54 +126,23 @@ export function equipe($: EngineInterface, ctx: Ctx): JSX.Element {
         </Text>
       </Text>
 
-      {rows.length > 0 && !compact ? head(ui, pal, 'arbre') : null}
-      {rows.map(({ w, depth }) => {
-        const etat = etatDe(w)
-        const termine = etat === 'termine'
-        const color = termine ? pal['st-todo'] : w.orphan || etat === 'actif' ? pal['st-active'] : pal['text-2']
-        const glyph = termine ? G.done : w.orphan ? G.human : etat === 'actif' ? (blink ? G.current : ' ') : G.todo
-        const mien = session.get(w.id)
-        return (
-          <Box flexDirection="column" paddingLeft={depth * 2}>
-            <Text color={color} bold={etat === 'actif'} wrap="wrap">
-              {depth > 0 ? `${G.branch} ` : ''}
-              {glyph} {w.role || w.kind}
-              <Text color={termine ? pal['text-3'] : pal['text-2']} bold={false}> · {oneLine(w.task ?? '')}</Text>
-            </Text>
-            {compact ? null : (
-              <Box paddingLeft={depth > 0 ? 4 : 2}>
-                <Text color={pal['text-3']} wrap="wrap">
-                  {w.orphan ? 'orphelin (registre)' : termine ? 'terminé' : etat === 'en-attente' ? 'en attente' : 'actif'}
-                  {` · ${w.tree}`}
-                  {w.branch ? ` · ${w.branch}` : ''}
-                  {w.ageS != null ? ` · ${age(w.ageS)}` : ''}
-                </Text>
-              </Box>
-            )}
-            {mien && !termine && !w.orphan ? (
-              <Box paddingLeft={depth > 0 ? 4 : 2} gap={1}>
-                <Button key={`voir:${w.id}`} plain dimColor onPress={() => void $.ui.view({ agentId: w.id })}>
-                  voir
-                </Button>
-                <Button
-                  key={`stop:${w.id}`}
-                  plain
-                  dimColor
-                  onPress={() =>
-                    void $.session
-                      .send({ to: { agentId: w.id }, text: STOP_TEXT })
-                      .then(() => $.ui.toast(`arrêt demandé à ${mien.type}`))
-                      .catch(err => $.ui.toast(`arrêt refusé : ${err instanceof Error ? err.message : String(err)}`))
-                  }
-                >
-                  demander l'arrêt
-                </Button>
-              </Box>
-            ) : null}
-          </Box>
-        )
-      })}
-      {rows.length === 0 ? (
+      {(rows.length > 0 || nReplies > 0) && !compact ? head(ui, pal, 'arbre') : null}
+      {rowsVifs.map(ligne)}
+      {!compact && nReplies > 0 ? (
+        <Button
+          key="finis"
+          plain
+          dimColor
+          onPress={() => {
+            deplie = !deplie
+            $.ui.invalidate('ui.render')
+          }}
+        >
+          {`${deplie ? '▾' : '▸'} ${nReplies} terminé${nReplies > 1 ? 's' : ''}`}
+        </Button>
+      ) : null}
+      {rowsFinis.map(ligne)}
+      {rows.length === 0 && nReplies === 0 ? (
         <Box marginTop={compact ? 0 : 1}>{ghost(ui, pal, compact ? 'aucun agent en cours' : 'les agents apparaissent ici dès que le socle en voit')}</Box>
       ) : null}
       {compact ? null : (

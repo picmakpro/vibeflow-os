@@ -193,13 +193,13 @@ test("R6-K10 — le bouton d'élagage lance bash <racine du plugin>/conductor/sc
   await ui.unmount()
 })
 
-test("R6-K10b — plugin amputé : le script du scope projet, puis celui du compte", async ($, on) => {
+test("R6-K10b — plugin amputé : le script posé dans le lab n'est jamais lancé (P68-D-34), aucun bouton d'élagage", async ($, on) => {
   const sp = lab(on, { stdout: AVEC_VERROU, scripts: /^\/lab\/\.claude\/scripts\/driver-lock\.sh$/ })
   moteur(on)
   await demarrer($)
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  await ui.press({ key: 'elaguer' })
-  expect(sp.bash.filter(b => b.argv.includes('recover')).map(b => b.argv[1])).toEqual(['/lab/.claude/scripts/driver-lock.sh'])
+  expect(await ui.find({ key: 'elaguer' })).toBeUndefined()
+  expect(sp.bash.filter(b => b.argv.includes('recover'))).toEqual([])
   await ui.unmount()
 })
 

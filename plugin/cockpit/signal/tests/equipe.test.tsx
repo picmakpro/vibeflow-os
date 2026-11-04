@@ -68,6 +68,9 @@ test("Q1c — la liste de la session seule ne fait plus l'arbre : un agent de $.
 test("Q2 — un agent terminé est écrit « terminé » en dock, absent en compact", async ($, on) => {
   labSignal(on, { stdout: STDOUT, agents: AGENTS as any })
   const dock = await pane($)
+  // replié derrière « 1 terminé » (P68-D-35, R3) ; déplié, il est écrit « terminé »
+  expect(await dock.find({ type: 'Text', text: /revue finie/ })).toBeUndefined()
+  await dock.press({ key: 'finis' })
   expect(await dock.find({ type: 'Text', text: /revue finie/ })).toBeDefined()
   expect(await dock.find({ type: 'Text', text: /terminé/ })).toBeDefined()
   await dock.unmount()

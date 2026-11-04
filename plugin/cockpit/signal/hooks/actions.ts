@@ -5,18 +5,37 @@ import type { EngineInterface } from 'claude-code'
 
 import { oneLine } from './ds'
 import { classerEchec } from './socle'
+const sansSlash = (c: string) => c.replace(/\/+$/, '')
+const sous = (c: string, dir: string) => c === dir || c.startsWith(`${sansSlash(dir)}/`)
+
+/** Où le chemin atterrit (liens suivis) : `$.fs.stat(…, { resolve })`, sinon le chemin tel qu'écrit (la règle se rabat sur le chemin). */
+async function reel($: EngineInterface, chemin: string): Promise<string> {
+  const st = await $.fs.stat(chemin, { resolve: true }).catch(() => undefined)
+  return st?.realPath ?? chemin
+}
+
 /**
- * Où `driver-lock.sh` se trouve, dans l'ordre de P68-D-13 : la racine du plugin (toujours présente dans un plugin
- * installé), puis les scripts posés dans le lab, puis ceux du compte. Aucune recherche ailleurs ; null si rien n'existe.
+ * P68-D-34 (comme `realUnder` et la garde T-67-06 du socle) : un fichier du compte ou du plugin n'est pris que si ni son chemin ni
+ * son realpath ne tombent sous le lab (`dir`) ; `module` (la racine du plugin, posée par l'installation) n'est refusé que sous la
+ * sortie `<lab>/.vibeflow`. Un lien du compte qui mène dans le lab est donc refusé.
+ */
+async function admis($: EngineInterface, chemin: string, root: string, module: boolean): Promise<boolean> {
+  const dir = sansSlash(module ? `${root}/.vibeflow` : root)
+  const [cible, base] = await Promise.all([reel($, chemin), reel($, dir)])
+  return ![chemin, cible].some(c => sous(c, dir) || sous(c, base))
+}
+
+/**
+ * Où `driver-lock.sh` se trouve, dans l'ordre de P68-D-34 : la racine du plugin, puis les scripts du compte. Rien sous le lab :
+ * le repli de P68-D-13 sur `<lab>/.claude/scripts` est retiré. Null si rien n'existe ou si tout tombe sous le lab.
  */
 export async function resoudreDriverLock($: EngineInterface, pluginRoot: string, root: string, home: string | undefined): Promise<string | null> {
   const candidats = [
-    `${pluginRoot.replace(/\/+$/, '')}/conductor/scripts/driver-lock.sh`,
-    `${root}/.claude/scripts/driver-lock.sh`,
-    home ? `${home}/.claude/scripts/driver-lock.sh` : '',
-  ].filter(Boolean)
-  for (const chemin of candidats) {
-    if (await $.fs.exists(chemin).catch(() => false)) return chemin
+    { c: `${sansSlash(pluginRoot)}/conductor/scripts/driver-lock.sh`, module: true },
+    { c: home ? `${home}/.claude/scripts/driver-lock.sh` : '', module: false },
+  ].filter(x => x.c)
+  for (const { c, module } of candidats) {
+    if ((await $.fs.exists(c).catch(() => false)) && (await admis($, c, root, module))) return c
   }
   return null
 }
@@ -29,16 +48,14 @@ export async function elaguer($: EngineInterface, script: string, ws: string | n
 }
 
 /**
- * Où `vf-cockpit.mjs` se trouve, dans l'ordre du verbe `/vf-cockpit` et de P68-D-25 : le script posé dans le lab, puis celui du
- * compte, puis celui du plugin (`$.plugin.root`, toujours présent dans un plugin installé). Premier existant ; à défaut, celui du
- * plugin : la fonction rend toujours un chemin.
+ * Où `vf-cockpit.mjs` se trouve, dans l'ordre de P68-D-34 (qui amende P68-D-25) : le script du compte, puis celui du plugin
+ * (`$.plugin.root`, toujours présent dans un plugin installé). Rien sous le lab : le script posé dans le lab n'est jamais cherché.
+ * Premier existant et admis ; à défaut, celui du plugin : la fonction rend toujours un chemin.
  */
 export async function resoudreLanceur($: EngineInterface, pluginRoot: string, root: string, home: string | undefined): Promise<string> {
-  const candidats = [`${root}/.claude/scripts/vf-cockpit.mjs`, home ? `${home}/.claude/scripts/vf-cockpit.mjs` : ''].filter(Boolean)
-  for (const chemin of candidats) {
-    if (await $.fs.exists(chemin).catch(() => false)) return chemin
-  }
-  return `${pluginRoot.replace(/\/+$/, '')}/cockpit/scripts/vf-cockpit.mjs`
+  const compte = home ? `${home}/.claude/scripts/vf-cockpit.mjs` : ''
+  if (compte && (await $.fs.exists(compte).catch(() => false)) && (await admis($, compte, root, false))) return compte
+  return `${sansSlash(pluginRoot)}/cockpit/scripts/vf-cockpit.mjs`
 }
 
 // Les codes de sortie du lanceur, comme la table du README du module (le code 64 et les autres : « échec »).
