@@ -5,6 +5,8 @@
 #   I4 binaires (.woff2, .png) identiques à l'octet dans les trois scopes, témoin d'altération
 #   I4b fichiers texte (arbre du moteur + scripts) identiques à l'octet dans les trois scopes (sans --target)
 #   I5 seconde pose sans écart · I6 aucun SKILL.md du moteur, aucun nom amont dans un chemin posé
+#   I9 mod vf-signal (68-04, P68-D-11, D-13) : un fragment réduit à `modules` sous cockpit/hooks/ fait échouer l'install, le vrai cache s'installe
+#      sans aucun .ts/.tsx ni dossier signal/ sous la cible (le mod est lu depuis le cache du plugin, jamais posé)
 #   I7 vrai ~/.claude inchangé · I8 sous --target : seule la réécriture de `.claude/` a lieu, marque blanche tenue
 # Choix : sans --target l'engine copie à l'octet (texte comme binaire) ; sous --target il réécrit par conception les
 # `.claude/` des fichiers texte vers la cible, donc la preuve devient « seule cette réécriture a eu lieu » + le rendu
@@ -171,6 +173,25 @@ node "$WORK/occ.mjs" 2>&1)
 cp "$T/scripts/vf-cockpit.mjs" "$WORK/alt.mjs"; sed -i.bak 's/Cockpit : /Cockpiv : /' "$WORK/alt.mjs"
 if cmp -s <(norm_src "$SRC/scripts/vf-cockpit.mjs") <(restaure "$WORK/alt.mjs"); then ko "I8 témoin : une altération hors .claude/ passe inaperçue"; miss=1; else ok "I8 témoin rouge : une altération hors .claude/ est signalée"; fi
 [ "$miss" -eq 0 ] && ok "I8 : sous --target, seule la réécriture de .claude/ a eu lieu, binaires à l'octet, rendu sans le nom amont (0 occurrence)"
+
+# ---- I9 : le mod vf-signal n'est ni un fragment de l'engine ni posé par lui (68-04, P68-D-11, P68-D-13) ---------------
+# (a) cache piégé : un fragment réduit à `modules` sous cockpit/hooks/ est fusionné comme un fragment de hooks → l'engine meurt.
+miss=0
+PIEGE="$WORK/cache-piege"; prepare_module "$PIEGE" cockpit || { ko "I9 : cache piégé impossible"; miss=1; }
+mkdir -p "$PIEGE/cockpit/hooks"; printf '{ "modules": ["./register.tsx"] }\n' > "$PIEGE/cockpit/hooks/hooks.json"
+LX=$(mklab piege)
+(cd "$LX" && HOME="$FH" VF_SCOPE=project VIBEFLOW_CACHE="$PIEGE" bash "$INSTALLER" install cockpit >"$WORK/piege.out" 2>&1); RCX=$?
+if [ "$RCX" -ne 0 ] && grep -q "sans clé 'hooks'" "$WORK/piege.out"; then ok "I9a témoin rouge : un fragment réduit à modules fait échouer l'install (rc=$RCX, fragment sans clé 'hooks')"
+else ko "I9a : le cache piégé n'a pas fait échouer l'install comme prévu (rc=$RCX) — $(tail -2 "$WORK/piege.out")"; miss=1; fi
+# (b) vrai cache : l'install passe et la cible ne porte ni .ts/.tsx ni signal/.
+LR=$(mklab reel)
+(cd "$LR" && HOME="$FH" VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install cockpit >"$WORK/reel.out" 2>&1); RCR=$?
+[ "$RCR" -eq 0 ] || { ko "I9b : l'install du vrai cache échoue (rc=$RCR) — $(tail -2 "$WORK/reel.out")"; miss=1; }
+[ -d "$LR/.claude/scripts" ] || { ko "I9b : rien n'a été posé sous la cible (contrôle vide)"; miss=1; }
+TSX=$(find "$LR/.claude" \( -name '*.ts' -o -name '*.tsx' \) 2>/dev/null | head -3); SIGD=$(find "$LR/.claude" -type d -name signal 2>/dev/null | head -1)
+[ -z "$TSX" ] || { ko "I9b : fichier .ts/.tsx posé par l'engine : $TSX"; miss=1; }
+[ -z "$SIGD" ] || { ko "I9b : dossier signal/ posé par l'engine : $SIGD"; miss=1; }
+[ "$miss" -eq 0 ] && ok "I9 : cache piégé refusé (fragment sans clé 'hooks'), vrai cache installé sans .ts/.tsx ni signal/ sous la cible"
 
 # ---- I7 : vrai ~/.claude ------------------------------------------------------------------------
 [ "$(snapshot_home_claude)" = "$HOME_BEFORE" ] && ok "I7 : aucun fichier du cockpit posé ni retiré dans le vrai ~/.claude (empreinte $HOME_BEFORE)" || ko "I7 : le vrai ~/.claude a changé"

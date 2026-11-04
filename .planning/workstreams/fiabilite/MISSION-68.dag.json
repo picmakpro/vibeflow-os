@@ -1,0 +1,522 @@
+{
+  "nodes": [
+    {
+      "id": "rech-mod",
+      "step": "recherche: inventaire du mod vf-signal + point à cadrer (arbre en retard, worktrees, missions non refermées)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rech-socle",
+      "step": "recherche: socle partagé 67 + contrat avancement 69 + DESIGN Graphite",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rech-pack",
+      "step": "recherche: packaging mod dans plugin (hooks module, gating, validate, CI, scopes)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "arbitrages",
+      "step": "envoi groupé des zones grises à Samuel",
+      "stage": "",
+      "deps": [
+        "rech-mod",
+        "rech-socle",
+        "rech-pack"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "discuss-68",
+      "step": "CONTEXT.md + exigences VFSG + bloc ROADMAP/STATE 68",
+      "stage": "",
+      "deps": [
+        "arbitrages"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plan-68",
+      "step": "plans 68 (gsd-plan-phase via vf-coder)",
+      "stage": "",
+      "deps": [
+        "discuss-68"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-68",
+      "step": "plan-checker externe frais",
+      "stage": "",
+      "deps": [
+        "plan-68"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "sonde-node",
+      "step": "sonde: mod -> node script --json via process.run",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revalid-68",
+      "step": "après merge de la 69 et de la PR #196 : rebase sur main, plan-checker frais (W1 découpe 68-04, W2 témoin I9 après import, W3 contrats 69 relus sur main), puis exec",
+      "stage": "",
+      "deps": [
+        "plancheck-68"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revision-68",
+      "step": "révision ciblée des plans : P68-D-22..25, W2, vérif reste",
+      "stage": "",
+      "deps": [
+        "plancheck-68"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-68b",
+      "step": "plan-checker externe frais après révision",
+      "stage": "",
+      "deps": [
+        "revision-68"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-68-01",
+      "step": "2 warnings auto-fix 68-01 (normalisation phase, compte de champs)",
+      "stage": "",
+      "deps": [
+        "plancheck-68b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-68c",
+      "step": "checker frais ciblé 68-01",
+      "stage": "",
+      "deps": [
+        "fix-68-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-68-d26",
+      "step": "P68-D-26 repli compartiment + 2 warnings 68-01",
+      "stage": "",
+      "deps": [
+        "plancheck-68c"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-68d",
+      "step": "checker frais ciblé 68-01 après D-26",
+      "stage": "",
+      "deps": [
+        "fix-68-d26"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-68e",
+      "step": "plan-checker frais sur les 11 plans, confrontés à main 794c6dba (W1 découpe 68-04, W2 témoin I9, W3 contrats 69)",
+      "stage": "",
+      "deps": [
+        "plancheck-68d"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rev-68e",
+      "step": "révision des plans : témoin P68-D-27, INFO fails_when 68-01, findings du checker",
+      "stage": "",
+      "deps": [
+        "plancheck-68e"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-68-vf-signal-embarque-socle-partage/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-68f",
+      "step": "checker frais ciblé sur le diff de rev-68e",
+      "stage": "",
+      "deps": [
+        "rev-68e"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-68-01",
+      "step": "68-01 règle de mission vivante, avancement@2 (VFSG-06)",
+      "stage": "",
+      "deps": [
+        "plancheck-68f"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-vie.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-avancement.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-planning.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-project.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-interface.json"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-68-02",
+      "step": "68-02 retard sur main et worktrees (VFSG-05)",
+      "stage": "",
+      "deps": [
+        "plancheck-68e"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-arbres.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-who.mjs",
+        "plugin/cockpit/scripts/tests/test-cockpit-retard.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-68-04",
+      "step": "68-04 import du mod, déclaration plugin (VFSG-01)",
+      "stage": "",
+      "deps": [
+        "plancheck-68f"
+      ],
+      "scope": [
+        "plugin/cockpit/signal/",
+        "plugin/.claude-plugin/plugin.json"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-68-03",
+      "step": "68-03 émetteur signal@1 (VFSG-03, 11)",
+      "stage": "",
+      "deps": [
+        "exec-68-01",
+        "exec-68-02"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-signal.mjs"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-68-12",
+      "step": "68-12 gating et ancien mod (VFSG-02, 09)",
+      "stage": "",
+      "deps": [
+        "exec-68-04"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-68-05",
+      "step": "68-05 appel du socle, en-tête",
+      "stage": "",
+      "deps": [
+        "exec-68-03",
+        "exec-68-12"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-68-09",
+      "step": "68-09 porte de légitimité, sonde, étape CI",
+      "stage": "",
+      "deps": [
+        "exec-68-01",
+        "exec-68-02",
+        "exec-68-03",
+        "exec-68-04",
+        "exec-68-12"
+      ],
+      "scope": [
+        ".github/workflows/ci.yml",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-68-06",
+      "step": "68-06 retrait de disk.ts",
+      "stage": "",
+      "deps": [
+        "exec-68-05"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-68-07",
+      "step": "68-07 équipe who@2, bouton cockpit",
+      "stage": "",
+      "deps": [
+        "exec-68-06"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-68-08",
+      "step": "68-08 direction Graphite",
+      "stage": "",
+      "deps": [
+        "exec-68-07"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-socle",
+      "step": "revue + audit sécurité du socle (68-01/02/03)",
+      "stage": "",
+      "deps": [
+        "exec-68-03"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-68-13",
+      "step": "68-13 runs CI rouge puis vert",
+      "stage": "",
+      "deps": [
+        "exec-68-08",
+        "exec-68-09"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-mod",
+      "step": "revue du mod (68-04/12/05..08) + audit CI 68-09",
+      "stage": "",
+      "deps": [
+        "exec-68-08",
+        "exec-68-09"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "recette-68",
+      "step": "recette par juges Playwright + tri unique",
+      "stage": "",
+      "deps": [
+        "exec-68-13",
+        "revue-socle",
+        "revue-mod"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-68-10",
+      "step": "68-10 doc, recette consignée, porte de phase",
+      "stage": "",
+      "deps": [
+        "recette-68"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-68-11",
+      "step": "68-11 bump module (selon Q1), relecture adverse",
+      "stage": "",
+      "deps": [
+        "exec-68-10"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire",
+      "stage": "",
+      "deps": [
+        "exec-68-11"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "pr-68",
+      "step": "gates rejoués depuis ci.yml, PR suivie jusqu'au vert",
+      "stage": "",
+      "deps": [
+        "docs"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "fix-socle",
+      "step": "correction ciblée du socle : F-02..F-08 de la revue (+ audit), F-01 selon Q3",
+      "stage": "",
+      "deps": [
+        "exec-68-03"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-mod",
+      "step": "correction ciblée du mod : ST-1, ST-3..ST-6 ; ST-2 selon Q4",
+      "stage": "",
+      "deps": [
+        "exec-68-08"
+      ],
+      "scope": [
+        "plugin/cockpit/signal/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "rerevue-fix",
+      "step": "revue fraîche du diff de correction (fix-socle + fix-mod) + audit sécurité frais du plugin livré",
+      "stage": "",
+      "deps": [
+        "exec-68-08"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "pr-brouillon",
+      "step": "PR #199 brouillon ouverte, CI Linux précoce",
+      "stage": "",
+      "deps": [
+        "exec-68-08"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "arbitrages-samuel",
+      "step": "en attente : Q1 (68-11), Q2 (porte npm 68-09), Q3 (F-01 verrou de dépôt), Q4 (ST-2 lanceur sous le lab), tri de recette R1-R15",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rev-68-11",
+      "step": "68-11 réduit au module (P68-D-31), VFSG-13 reformulée",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-q3-socle",
+      "step": "corrections P68-D-33..35 (fix-q3-socle)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-web",
+      "step": "corrections P68-D-33..35 (fix-web)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-mod-a",
+      "step": "corrections P68-D-33..35 (fix-mod-a)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-mod-b",
+      "step": "corrections P68-D-33..35 (fix-mod-b)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "doc-68-10",
+      "step": "68-10 tâche 1 : documentation FR/EN",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rebase-main",
+      "step": "rebase sur main 19393cc3 (PR #201, vf-cockpit-env.mjs), adaptation des appels de binaires du socle",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-rv-mod",
+      "step": "fix-rv-mod",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-rv-web",
+      "step": "fix-rv-web",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-sc2",
+      "step": "tags H-1, âge du verrou (P68-D-39)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

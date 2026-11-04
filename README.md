@@ -62,7 +62,7 @@ on disk, so a session can die without the project losing ground. The last step i
 </picture>
 
 A green that cannot turn red proves nothing. Tests are written red first, `check-*.sh` gates run
-in CI, and the judge is never the author. The repo holds itself to the same rule: 150 suites run
+in CI, and the judge is never the author. The repo holds itself to the same rule: 154 suites run
 on every push, and a "fresh lab" job installs the baseline into an empty lab that must pass its
 own gates with zero intervention.
 
@@ -114,7 +114,9 @@ and its skills are built by `skill-creator` with an eval loop.
 19 modules, each versioned with its own `CHANGELOG.md`. `conductor` is the mandatory baseline;
 then you pick a dev lab from a preset (`dev`, `dev-mobile`, `dev-audite`, dependencies resolved
 for you) or a tailor-made domain lab. Each module's README is its full documentation, with the
-same structure everywhere.
+same structure everywhere. The `cockpit` module has two surfaces on the same read-only core: a local
+web page (`/vf-cockpit`) and a terminal pane in the Claude Code session (`/vf-signal`), shown only
+when `cockpit` is installed.
 
 → [Module catalog](./manual/en/03-modules/catalog.md) ·
 [commands](./manual/en/06-reference/commands.md) ·

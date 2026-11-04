@@ -1,5 +1,43 @@
 # Changelog — cockpit
 
+## v1.2.0 — 2026-11-04
+
+Phase 68 (vf-signal embarqué, socle partagé). Module monté seul ; le bump racine est reporté à la release groupée (P68-D-31 :
+arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04, « Module seul, racine groupée (Recommandé) »).
+Publiée dans VibeFlow vX.Y.Z (mention à compléter par le geste de release groupée). Autres décisions : P68-D-08 et P68-D-21
+(arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-03).
+
+### Ajouté
+- **Mod vf-signal embarqué** : pane terminal affichée par Claude Code, gatée (elle ne s'affiche que si `cockpit=` est posé), bouton
+  « Ouvrir le cockpit ».
+- **Émetteur `signal@1`** : état du travail publié pour la pane (mission vivante, retard sur la base, worktrees).
+- **Socle partagé** : calcul de la vie d'une mission (`mission.vie`), lecture des arbres git (`arbresGit`) et émetteur, communs au cockpit et au mod.
+- **Cascade de vie (P68-D-33)** : verrou de phase, puis verrou du compartiment, puis verrou de dépôt (et l'ancien `.planning/DRIVER.lock`) ;
+  un verrou présent, même périmé, arrête la cascade (P68-D-27, P68-D-36), et la mission est `abandonnee` s'il est périmé ou si aucun
+  verrou n'existe ; une source illisible donne `inconnu`.
+- **Lanceur et repli de l'élagage (P68-D-34)** : le mod n'exécute aucun fichier du compte ou du plugin dont le chemin ou le realpath
+  tombe sous le lab (la racine du plugin n'est refusée que sous `<lab>/.vibeflow`) ; lanceur pris dans le compte (`~/.claude/scripts`)
+  puis dans le plugin, `driver-lock.sh` de l'élagage pris dans le plugin puis dans le compte. Un fichier existant dont le realpath est
+  inconnu est refusé, et les lancements partent hors du lab avec un PATH assaini (P68-D-37).
+
+### Modifié
+- **`avancement@1` devient `avancement@2`** : états de mission `abandonnee` et `inconnu` et champ `mission.vie` (vocabulaire de mission
+  fermé élargi) ; `who` lit les arbres par `arbresGit`.
+- Corrections issues de la recette de la Phase 68 (revues du socle, du mod et du web).
+- **Tiroir « Au travail »** : l'âge d'un verrou se retrouve par correspondance exacte sur la portée et le compartiment, plus par sous-chaîne
+  (deux compartiments dont l'un est préfixe de l'autre, `fiabilite` et `fiabilite-2`, gardent chacun leur âge).
+- **README de la pane** : règle de rafraîchissement (P68-D-41 : arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04),
+  coût remesuré, version vérifiée de Claude Code (2.1.318 ; non chargée sous 2.1.181, plancher exact non mesuré) et cockpit installé sans `conductor` (« état inconnu »).
+- **Environnement des lancements du mod (P68-D-40, P68-D-42)** : le mod vide `VF_COCKPIT_SCRIPTS_DIR`, `NODE_OPTIONS`, `BASH_ENV` et `ENV`
+  dans l'environnement de ses lancements (émetteur, lanceur du cockpit, élagage), pour que rien sous le lab ne s'exécute par leur biais.
+- **Cadence (P68-D-41)** : pane fermée, le bandeau peut afficher un état vieux d'une minute ou plus ; une horloge qui recule compte comme une minute échue
+  (FND-3), et le minuteur de 10 s est annulé avant d'être reposé (FND-4).
+
+### Retiré
+- Lecture maison du planning par le mod (remplacée par le socle partagé).
+- Couleurs « Signal » du mod.
+- Bloc backlog de la vue macro.
+
 ## v1.1.2 — 2026-11-04
 
 Correctif de sécurité H-1 (héritée de la Phase 67, présente dès v2.75.0), sur arbitrage de Samuel (AskUserQuestion, session

@@ -1,0 +1,66 @@
+#!/usr/bin/env node
+// vf-cockpit-arbres — arbres git du lab, branche de base, retard sans réseau, phase active (socle du cockpit, VFSG-05 ; P68-D-04). Lecture seule.
+// Exports : GIT_SUR (préfixe d'arguments de chaque appel git), arbresGit(root, { sh }) -> [{ chemin, branche, principal }],
+//           brancheBase(root, { sh }) -> nom | null, retard({ chemin, base, commonDir, now, sh, lab }) -> { base, main, origin, fetchAgeS },
+//           phaseActive({ phases, branche }) -> { key, n, nom, etat } | null, nettoie(s, n) -> chaîne sans caractère de contrôle, masquée, bornée
+// Aucune sous-commande réseau (ni fetch, pull, ls-remote, remote) ; git sans fsmonitor ; sous-commandes qui ne lisent ni l'index ni l'arbre de travail ;
+// chaînes d'arbre et de branche nettoyées avant d'être affichées. Un retard inconnu est `null`, jamais 0.
+import fs from 'node:fs';
+import path from 'node:path';
+import { masque } from './vf-cockpit-lecture.mjs';
+import { normNum } from './vf-cockpit-planning.mjs';
+import { GIT_SUR, shBorne } from './vf-cockpit-paths.mjs';
+
+// GIT_SUR (défini dans vf-cockpit-paths.mjs, partagé par toute la chaîne de l'émetteur : F-03) neutralise un core.fsmonitor exécutable du .git/config (T-68-04)
+export { GIT_SUR };
+const shDefaut = shBorne; // timeout et échéance globale : un git bloqué ne gèle pas la boucle (F-06)
+// `lab` : racine du lab, dont aucun dossier ne doit rester dans le PATH de l'enfant (H-1, vf-cockpit-env.mjs) ; par défaut le dossier de travail de la commande
+const git = (sh, dir, lab, ...args) => sh('git', [...GIT_SUR, '-C', dir, ...args], dir, lab);
+const existe = (sh, dir, lab, ref) => git(sh, dir, lab, 'show-ref', '--verify', ref).trim() !== ''; // show-ref --verify imprime « sha ref » si la référence existe, rien sinon
+const entier = (s) => (/^\d+$/.test(String(s).trim()) ? Number(String(s).trim()) : null);
+
+// arbres du lab, dans l'ordre de `git worktree list` : le premier est l'arbre principal ; arbres existants seulement, chemins résolus ; repli [root] si la liste est vide.
+// Les chaînes rendues sont brutes (le chemin sert à comparer des cwd) : c'est l'émetteur qui les passe par `nettoie` avant affichage.
+export function arbresGit(root, { sh = shDefaut } = {}) {
+  root = path.resolve(root);
+  const arbres = [];
+  for (const b of git(sh, root, root, 'worktree', 'list', '--porcelain').split('\n\n')) {
+    const t = /^worktree (.*)$/m.exec(b)?.[1];
+    if (!t || !fs.existsSync(t)) continue;
+    const branche = /^branch refs\/heads\/(.*)$/m.exec(b)?.[1] || (b.includes('detached') ? '(détachée)' : '');
+    arbres.push({ chemin: fs.realpathSync(t), branche, principal: arbres.length === 0 });
+  }
+  return arbres.length ? arbres : [{ chemin: root, branche: '', principal: true }];
+}
+
+// branche de base : cible de refs/remotes/origin/HEAD privée de `origin/`, sinon `main` local s'il existe, sinon null (P68-PL-05)
+export function brancheBase(root, { sh = shDefaut } = {}) {
+  const t = git(sh, root, root, 'symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD').trim();
+  if (t.startsWith('origin/') && t.length > 7) return t.slice(7);
+  return existe(sh, root, root, 'refs/heads/main') ? 'main' : null;
+}
+
+// retard d'un arbre sur la base locale et sur origin/<base> LOCAL (lu, jamais rafraîchi), âge du dernier fetch (date de FETCH_HEAD du dossier git commun)
+export function retard({ chemin, base, commonDir, now = Date.now(), sh = shDefaut, lab = chemin } = {}) {
+  const compte = (ref) => entier(git(sh, chemin, lab, 'rev-list', '--count', `HEAD..${ref}`));
+  const main = base ? compte(base) : null;
+  const origin = base && existe(sh, chemin, lab, `refs/remotes/origin/${base}`) ? compte(`origin/${base}`) : null;
+  let fetchAgeS = null;
+  if (commonDir) { try { fetchAgeS = Math.max(0, Math.floor((now - fs.statSync(path.join(commonDir, 'FETCH_HEAD')).mtimeMs) / 1000)); } catch {} }
+  return { base: base ?? null, main, origin, fetchAgeS };
+}
+
+// toute chaîne d'arbre ou de branche qui sort du socle : contrôles retirés (C0, DEL, C1), masque des secrets, borne à n caractères
+export const nettoie = (s, n = 200) => masque(String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, '')).slice(0, n);
+
+// phase active d'un arbre (P68-PL-04), fonction pure : (1) la phase dont le numéro suit le motif fixe `phase-<n>` du nom de branche, si elle existe ;
+// (2) sinon la dernière phase (ordre de la feuille de route) portant une mission `running` ; (3) sinon la dernière phase `en-cours` ; (4) sinon null.
+// Jamais `current_phase` du STATE ni le compartiment actif. Une phase portant le même numéro dans deux compartiments : la première de la feuille de route.
+const PHASE_BRANCHE = /phase-(\d+(?:\.\d+)?)/;
+export function phaseActive({ phases, branche } = {}) {
+  const l = Array.isArray(phases) ? phases : [];
+  const dernier = (f) => l.filter(f).at(-1);
+  const m = PHASE_BRANCHE.exec(String(branche ?? ''));
+  const p = (m && l.find((x) => normNum(x?.n) === normNum(m[1]))) || dernier((x) => x?.avancement?.mission?.etat === 'running') || dernier((x) => x?.avancement?.etat === 'en-cours');
+  return p ? { key: p.key, n: p.n, nom: p.name, etat: p.avancement?.etat } : null;
+}
