@@ -184,6 +184,17 @@ Relayés par la session principale (SendMessage) ; réponses mot pour mot entre 
   groupée. VFSG-13 est reformulée en ce sens. Amende P68-D-08 sur ce seul point.
 - **P68-D-32 (porte de légitimité du paquet, Q2, 68-09 tâche 1, T-68-SC).** « Légitime, 2.1.318 (Recommandé) ».
   `@anthropic-ai/claude-code` épinglé en `2.1.318` dans l'étape CI.
+- **P68-D-33 (cascade de vie, Q3 — finding F-01 de la revue du socle).** « Prolonger jusqu'au dépôt (Recommandé) ».
+  Ordre : verrou de phase, puis verrou du compartiment, puis verrou de dépôt (et l'ancien `.planning/DRIVER.lock`),
+  sinon `abandonnee` ; une source illisible donne `inconnu`. Précise P68-D-26.
+- **P68-D-34 (lanceur et repli de l'élagage, Q4 — finding ST-2 de la revue du mod).** « Rien sous le lab
+  (Recommandé) ». Le mod n'exécute aucun fichier dont le realpath est sous le lab : lanceur du cockpit pris dans le
+  compte (`~/.claude/scripts`) puis le plugin (`$.plugin.root`) ; le repli `driver-lock.sh` de l'élagage suit la même
+  règle. Amende P68-D-25. Couvre AU68-1 (registre `.vibeflow-installed` planté dans le lab : il n'active plus qu'un
+  affichage).
+- **P68-D-35 (tri de recette R1 à R15).** « Tout selon les recos (Recommandé) ». R1 à R13 corrigés selon les
+  recommandations du manager (`.planning/missions/2026-11-04-phase-68-execution.md`), sauf R8 reporté en Phase 70 ;
+  R14 sans correctif (Samuel retire l'ancien mod, geste à lui) ; R15 (VS Code, mobile) reporté après la PR.
 
 ### Points de procédure (documentés, sans arbitrage — consigne de la session principale, 2026-11-03)
 
