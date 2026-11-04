@@ -1,5 +1,20 @@
 # Changelog — cockpit
 
+## v1.1.1 — 2026-11-04
+
+Correctifs de la recette de la Phase 69, sur arbitrage de Samuel (AskUserQuestion, session principale Claude Code,
+2026-11-04 : « « Dépend de » faux, Verrou « Driver libre », Contraste « En cours », Pied caché, ligne anglaise »). Pas de release racine.
+
+### Corrigé
+- **« Dépend de »** : la valeur de `Depends on` perd ses parenthèses, ses identifiants `Pnn-D-nn` et tout ce qui suit la première phrase ;
+  une phase dépendante (« La Phase 68 en dépend ») ou le 10 de `P69-D-10` ne sont plus lus comme des dépendances.
+- **Verrou « Driver libre »** : le script du conductor voisin (`…/plugin/conductor/scripts`) passe avant la copie de `~/.claude/scripts`,
+  qui peut dater d'avant les verrous par phase ; la copie installée ne sert plus que de repli.
+- **Contraste des statuts** : `--st-active` et `--st-blocked` suivent le thème (`--sev-medium`, `--sev-high`) au lieu de `#f59e0b` et `#ef4444` en dur ;
+  le texte des pastilles est teinté vers `--text` (au moins 4,5:1 dans les deux thèmes) ; `--text-1`, qui n'existait pas, devient `--text`.
+- **Pied des cartes de phase** : lisible au zoom d'ouverture d'un jalon (pied agrandi, description masquée à ce niveau).
+- **Export de l'onglet Code** : « Ce qui vient de changer, et pourquoi. » remplace la ligne anglaise.
+
 ## v1.1.0 — 2026-11-03
 
 Phase 69 : suivi du travail en cours. Décision du bump : arbitrage Samuel, AskUserQuestion session principale,

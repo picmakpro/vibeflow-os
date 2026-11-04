@@ -48,7 +48,7 @@ d'avant la phase serait réutilisé avec l'ancien code.
 
 | Retour de Samuel (mot pour mot) | Canal | Date |
 |---|---|---|
-| | | |
+| (capture d'écran, sans texte : onglet Équipe ouvert, onglets Code / Projet / Équipe visibles dans l'en-tête) | session principale Claude Code | 2026-11-04 |
 
 ## 2. Onglet Projet — avancement des phases (CKPT-13 à CKPT-18)
 
@@ -67,6 +67,10 @@ d'avant la phase serait réutilisé avec l'ancien code.
 |---|---|---|
 | | | |
 
+Verdict des juges (Playwright, 2026-11-04) : OK (67 : « 7/7 plans · 4 correctifs », mission rattachée ; 69 : « à recetter · 9/9 plans · 0/16 exigences » ; jalon « 1 clos · 1 à recetter · 4 à faire · 17 % »). Constat : « Dépend de : Phase 67, 68, 10 » faux, et pied des cartes masqué au zoom d'ouverture du jalon (corrigés dans la Phase 69, voir Tri).
+
+Verdict des juges (Playwright, 2026-11-04) : OK (adresses imprimées lues par `status`, rc 0 ; trois onglets Code / Projet / Équipe, 0 erreur console).
+
 **Étape 3 — Carte « à recetter » dans les deux thèmes (point non vérifié, 69-01).**
 - Faire : repérer une carte « à recetter » (Phase 67 ou 69). Basculer le thème sombre puis clair (commande de thème de la page), regarder la carte et le pied du jalon à chaque fois.
 - Voir : la carte « à recetter » prend la couleur de l'état « en cours » avec le mot « à recetter » en tête du pied (P69-D-25, pas de couleur propre : une distinction visuelle relève de la Phase 70). Texte lisible, contraste correct, rien de blanc sur blanc ni de noir sur noir, dans les deux thèmes.
@@ -74,6 +78,8 @@ d'avant la phase serait réutilisé avec l'ancien code.
 | Retour de Samuel (mot pour mot) | Canal | Date |
 |---|---|---|
 | | | |
+
+Verdict des juges (Playwright, 2026-11-04) : KO (thème clair : pastille « En cours » orange `#F59E0B` sur fond orange pâle, 1,9:1 ; sombre 8,2:1 ; corrigé, voir Tri).
 
 ## 3. Troisième onglet « Équipe », thèmes sombre et clair (CKPT-23)
 
@@ -86,6 +92,8 @@ d'avant la phase serait réutilisé avec l'ancien code.
 |---|---|---|
 | | | |
 
+Verdict des juges (Playwright, 2026-11-04) : OK (cartes Session et agents, logos visibles en sombre, titre et onglet actif corrects, ni barre de question ni bouton de santé).
+
 ## 4. Tiroir « Au travail » : l'arbre vivre (CKPT-19 à CKPT-22)
 
 **Étape 5 — Lancer une vraie mission pendant la recette.**
@@ -95,6 +103,8 @@ d'avant la phase serait réutilisé avec l'ancien code.
 | Retour de Samuel (mot pour mot) | Canal | Date |
 |---|---|---|
 | | | |
+
+Verdict des juges (Playwright, 2026-11-04) : OK (le badge « au travail » s'allume et son nombre suit les agents actifs : 4, 6, 5, 5 ; 6 → 5 en direct sans rechargement).
 
 **Étape 6 — Le tiroir en arbre (point non vérifié, 69-08).**
 - Faire : ouvrir le tiroir « Au travail » (badge de l'en-tête) pendant que la mission tourne.
@@ -110,6 +120,8 @@ d'avant la phase serait réutilisé avec l'ancien code.
 |---|---|---|
 | | | |
 
+Verdict des juges (Playwright, 2026-11-04) : KO (arbre, terminés repliés, marge et titre OK ; mais le verrou tenu n'apparaît pas : `status --ws=fiabilite --phase=71` dit `present: true` alors que le tiroir dit « Driver libre » — copie installée de `driver-lock.sh` d'avant les verrous par phase ; corrigé, voir Tri).
+
 **Étape 7 — Lien agent ↔ nœud de DAG (CKPT-21).**
 - Faire : sur un agent qui exécute un nœud de la mission, cliquer son lien vers le nœud ; puis, depuis l'onglet Projet, ouvrir ce nœud et chercher la section « Agents sur ce nœud ».
 - Voir : le lien mène au nœud (la page se positionne dessus) ; le nœud liste en retour l'agent qui l'exécute. Un agent dont le nœud ne se retrouve pas porte « non rattaché (raison) » : jamais un lien deviné. Noter, pour chaque agent, s'il est rattaché ou non et si c'est exact.
@@ -117,6 +129,8 @@ d'avant la phase serait réutilisé avec l'ancien code.
 | Retour de Samuel (mot pour mot) | Canal | Date |
 |---|---|---|
 | | | |
+
+Verdict des juges (Playwright, 2026-11-04) : OK (clic « Nœud exec-69 » → nœud ; le nœud liste l'agent en retour ; « non rattaché (raison) » exact sur 98 + 5 + 2 + 22). Limite : aucun agent actif rattaché, chemin positif prouvé sur des agents terminés seulement.
 
 ## 5. Panneau d'un agent et transcript (CKPT-24 à CKPT-26)
 
@@ -127,6 +141,8 @@ d'avant la phase serait réutilisé avec l'ancien code.
 | Retour de Samuel (mot pour mot) | Canal | Date |
 |---|---|---|
 | | | |
+
+Verdict des juges (Playwright, 2026-11-04) : OK (état, durée 9 h, dernière action, nœud rattaché, « Voir la dernière commande » = programme seul, aucun débordement, deux thèmes).
 
 **Étape 9 — Lire le transcript (rendu en texte, aucune sortie d'outil).**
 - Faire : cliquer « Lire le transcript » sur un manager ou un worker qui a déjà travaillé ; lire ce qui s'affiche ; passer à un autre agent et revenir.
@@ -141,6 +157,8 @@ d'avant la phase serait réutilisé avec l'ancien code.
 |---|---|---|
 | | | |
 
+Verdict des juges (Playwright, 2026-11-04) : OK (transcript absent avant le clic, mandat/messages/outils, aucune sortie d'outil, rendu en texte sans HTML, mandat tronqué avec mention, disparaît au changement d'agent).
+
 ## 6. Sécurité perçue (CKPT-25, CKPT-26, P69-D-27)
 
 **Étape 10 — Pas de transcript tant qu'on ne clique pas.**
@@ -151,6 +169,8 @@ d'avant la phase serait réutilisé avec l'ancien code.
 | Retour de Samuel (mot pour mot) | Canal | Date |
 |---|---|---|
 | | | |
+
+Verdict des juges (Playwright, 2026-11-04) : OK (0 requête transcript et 0 extrait de mandat avant le clic ; une seule requête 127.0.0.1:4455 après ; l'export de l'onglet Code n'en contient aucun).
 
 ## 7. Largeurs 390, 1 024 et 1 440 px
 
@@ -163,12 +183,16 @@ On note le rendu, sans juger la mise en page mobile (Phase 70). Redimensionner l
 |---|---|---|
 | | | |
 
+Verdict des juges (Playwright, 2026-11-04) : OK (en-tête entier, tiroir x 1064 à 1424, panneau d'agent sans rognure).
+
 **Étape 12 — 1 024 px.**
 - Voir : rien ne se superpose (onglets, recherche, zoom), tiroir et panneau lisibles. À 1 024 px l'en-tête tenait avant le troisième onglet ; il doit encore tenir.
 
 | Retour de Samuel (mot pour mot) | Canal | Date |
 |---|---|---|
 | | | |
+
+Verdict des juges (Playwright, 2026-11-04) : OK (rien ne se superpose, trois onglets entiers, tiroir lisible) ; défaut D connu de la Phase 70 : boutons de zoom au milieu du canevas.
 
 **Étape 13 — 390 px.**
 - Faire : seulement décrire ce qu'on voit : l'arbre du tiroir, le panneau d'agent, l'accès au transcript, l'en-tête.
@@ -177,6 +201,8 @@ On note le rendu, sans juger la mise en page mobile (Phase 70). Redimensionner l
 | Retour de Samuel (mot pour mot) | Canal | Date |
 |---|---|---|
 | | | |
+
+Verdict des juges (Playwright, 2026-11-04) : Constat : rien d'inutilisable (en-tête sur deux rangées, aucun bouton hors écran, tiroir et panneau en feuille défilable, « Lire le transcript » atteignable en défilant).
 
 ## 8. Fin de recette
 
@@ -187,6 +213,8 @@ On note le rendu, sans juger la mise en page mobile (Phase 70). Redimensionner l
 | Retour de Samuel (mot pour mot) | Canal | Date |
 |---|---|---|
 | | | |
+
+Verdict des juges (Playwright, 2026-11-04) : OK (arrêt joué par la session principale : « Cockpit arrêté. », rc 0).
 
 ## Retours de Samuel
 
@@ -202,4 +230,5 @@ Rempli après le déroulé complet, jamais pendant. Classer chaque retour : déf
 
 | Retour | Classement | Décision (canal, date) |
 |--------|------------|------------------------|
-| | | |
+| « Dépend de » faux, Verrou « Driver libre », Contraste « En cours », Pied caché, ligne anglaise (réponse de Samuel, mot pour mot) | quatre défauts à corriger dans la Phase 69, avant le merge (« Dépend de » ; verrou « Driver libre » ; contraste de la pastille « En cours » ; pied des cartes masqué au zoom d'ouverture et ligne anglaise de l'export) | AskUserQuestion, session principale Claude Code, 2026-11-04 |
+| « si c'est pour me demande ca ca sert a rien, lance des juge qui prenne des screenshot pour les tests, appele moi seulement si tu ne peux pas faire (gout, avis humain indispensable) » (arbitrage de méthode, mot pour mot) | méthode : la recette se joue par des juges qui prennent des captures ; Samuel n'est appelé que pour le goût ou un avis humain indispensable | session principale Claude Code, 2026-11-04 |
