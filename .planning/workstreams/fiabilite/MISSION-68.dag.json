@@ -269,7 +269,7 @@
         "README.md",
         "README.fr.md"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-68-06",
@@ -320,7 +320,7 @@
         "exec-68-09"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-mod",
@@ -331,7 +331,7 @@
         "exec-68-09"
       ],
       "scope": [],
-      "status": "blocked",
+      "status": "ready",
       "review_regime": "full"
     },
     {
@@ -437,6 +437,46 @@
       "deps": [],
       "scope": [],
       "status": "ready"
+    },
+    {
+      "id": "rev-68-11",
+      "step": "68-11 réduit au module (P68-D-31), VFSG-13 reformulée",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-q3-socle",
+      "step": "corrections P68-D-33..35 (fix-q3-socle)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "fix-web",
+      "step": "corrections P68-D-33..35 (fix-web)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "fix-mod-a",
+      "step": "corrections P68-D-33..35 (fix-mod-a)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "fix-mod-b",
+      "step": "corrections P68-D-33..35 (fix-mod-b)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "running"
     }
   ]
 }
