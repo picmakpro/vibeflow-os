@@ -532,7 +532,7 @@ assert_eq "O6.15a — témoin : mesure sans erreur, tiroir ouvert par la carte a
 assert_eq "O6.15 — visite ouverte au-dessus d'un tiroir ouvert : l'ouverture de la visite ne ferme pas le tiroir ; la première Échap ferme la visite et laisse le tiroir ; la seconde ferme le tiroir (tiroir|visite après chaque temps)" "$(xec '[j.t390.visiteDemarree,j.t390.echap1,j.t390.echap2].map((x)=>x.tiroir+"/"+x.tour).join(" ")')" "true/true true/false false/false"
 # DIAG : pour chaque étape fautive de O6.17, une ligne compacte de bbox et de polices (aucune assertion ne change ; la CI Linux nous donne ainsi la vraie géométrie)
 diag17() { # diag17 <étiquette> <json> <largeur> <clé>
-  local l; l="$(printf '%s' "$2" | node "$AUX/get.mjs" /dev/stdin "j.l$3.etapes.filter((e)=>e.surfaces.length||!e.dansZone||!e.tient).map((e)=>'étape '+e.i+' surfaces='+e.surfaces.join('+')+' '+e.diag).join('\\n')" 2>/dev/null)"
+  local l; l="$(printf '%s' "$2" | node "$AUX/get.mjs" /dev/stdin "j.l$3.etapes.filter((e)=>e.surfaces.length||!e.dansZone||!e.tient||!e.toutLibre||e.couvert).map((e)=>'étape '+e.i+' toutLibre='+e.toutLibre+' couvert='+e.couvert+' surfaces='+e.surfaces.join('+')+' '+e.diag).join('\\n')" 2>/dev/null)"
   [ -n "$l" ] && printf '%s\n' "$l" | sed "s/^/     DIAG $1 [$3 px] /"
   return 0
 }
@@ -617,15 +617,19 @@ assert_eq "O6.10 — témoin : la mesure a eu lieu sans erreur, au moins trois �
 for W in 1024 1920; do
   assert_eq "O6.10 [$W px] — Projet : étapes dont la carte ciblée sort de la zone libre, dont une carte du graphe sort de la zone libre à gauche du panneau, ou qui sélectionnent une carte (le panneau doit garder la vue d'ensemble, R5.3)" "$(x7 "j.l$W.etapes.filter((e)=>!e.dansZone||!e.toutLibre||e.selectionne).map((e)=>e.i).join(',')")" ""
 done
-# O6.19 passe « carte haute » (CI Linux de 83b13be4 : R1 « long / project / 1 024 px : carte : sort de la zone libre (245..692 / libre 0..648) », intermittent) : état STABLE, pas un transit. Une carte de visite de 300 px de haut au moins (texte long, police large)
-# ne laisse qu'une zone étroite à côté d'elle ; centrer la carte ciblée dans cette zone repoussait le reste du graphe sous le panneau. La carte ciblée doit rester visible hors de la carte de visite ET tout le graphe dans la zone libre à gauche du panneau
-# quand il y tient. Lab « nom long » (jalon, mission), Projet, 768, 1 024 et 1 440 px.
-XH="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P7" 768,1024,1440 cartehaute)"
-xh() { printf '%s' "$XH" | node "$AUX/get.mjs" /dev/stdin "$1"; }
-assert_eq "O6.19a — témoin : mesure sans erreur, au moins deux étapes à chaque largeur" "$(xh "j.erreur||''")|$(xh '[768,1024,1440].every((w)=>j["l"+w].n>=2)')" "|true"
-for W in 768 1024 1440; do
-  assert_eq "O6.19 [$W px] — Projet, carte de visite haute : étapes dont une carte du graphe sort de la zone libre à gauche du panneau, ou dont la carte ciblée est recouverte ou hors de sa zone" "$(xh "j.l$W.etapes.filter((e)=>!e.toutLibre||e.couvert||!e.dansZone).map((e)=>e.i).join(',')")" ""
-  diag17 "O6.19 Projet" "$XH" "$W"
+# O6.19 passe « carte haute » (CI Linux de 83b13be4 puis 6498ed80 : R1 « long / project / 1 024 px : carte : sort de la zone libre (245..692 / libre 0..648) », intermittent, puis O6.19 lui-même à 1 024 px) : garantie de construction, pas un cas de plus.
+# Au-dessus de 701 px un état existe toujours : réduire le zoom jusqu'à ce que tout le graphe tienne dans la zone libre (hors panneau, carte de visite, titre, en-tête, barre de question) avec la carte ciblée visible. aim() réduit donc le zoom par
+# paliers (jusqu'à 40 % du zoom qui remplit juste la zone libre) au lieu de centrer comme avant. Contraintes poussées plus loin que la CI : carte de visite de 420 px de haut au moins, seule, puis avec une police large, puis avec la vraie DejaVu Sans
+# ($VF_DEJAVU_DIR). Lab « nom long » (jalon, mission), Projet, 768, 1 024 et 1 440 px. Mutant (à la main, voir 70-07-RED-TRACE.md) : le repli « centrer comme avant » rétabli rougit à 1 024 et 1 440 px.
+for OPT in cartehaute cartehaute,police cartehaute,dejavu; do
+  case "$OPT" in *dejavu*) { [ -n "${VF_DEJAVU_DIR:-}" ] && [ -f "$VF_DEJAVU_DIR/DejaVuSans.ttf" ]; } || { echo "  ⊘ O6.19 [$OPT] SAUTÉ : VF_DEJAVU_DIR absent — la passe en police réelle n'est PAS vérifiée, non comptée comme réussie"; continue; };; esac
+  XH="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P7" 768,1024,1440 "$OPT")"
+  xh() { printf '%s' "$XH" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+  assert_eq "O6.19a [$OPT] — témoin : mesure sans erreur, au moins deux étapes à chaque largeur" "$(xh "j.erreur||''")|$(xh '[768,1024,1440].every((w)=>j["l"+w].n>=2)')" "|true"
+  for W in 768 1024 1440; do
+    assert_eq "O6.19 [$OPT, $W px] — Projet, carte de visite haute : étapes dont une carte du graphe sort de la zone libre à gauche du panneau, ou dont la carte ciblée est recouverte ou hors de sa zone" "$(xh "j.l$W.etapes.filter((e)=>!e.toutLibre||e.couvert||!e.dansZone).map((e)=>e.i).join(',')")" ""
+    diag17 "O6.19 $OPT Projet" "$XH" "$W"
+  done
 done
 unset VF_COCKPIT_PORT_BASE
 for L in "${LABS4[@]}"; do node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L" >/dev/null 2>&1; done; for p in "${SRVPIDS[@]}"; do vf_hyg_stop "$p"; done; SRVPIDS=()
