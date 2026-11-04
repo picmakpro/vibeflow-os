@@ -133,10 +133,17 @@ export function clientTerminal(cfg) {
     // répondues une seconde fois par xterm, et ces réponses atterriraient dans la saisie du shell. Pendant le rejeu, seul un octet issu d'une action de l'utilisateur part ;
     // le rejeu se clôt au premier silence du flux (borné), une fois tout ce qui a été reçu analysé : les questions nouvelles du programme sont répondues normalement
     let rejeu = false, humain = false, silence = 0, borne = 0;
-    const EVENEMENTS = ['keydown', 'keypress', 'input', 'mousedown', 'mouseup', 'mousemove', 'wheel', 'contextmenu'];
-    // R1 : l'autorisation « saisie humaine » ne dure que l'événement en cours (xterm fait stopPropagation : un listener de bulle ne s'exécuterait pas) ; bornée à un tick
+    // R1 (P71-D-36) : l'autorisation « saisie humaine » couvre EXACTEMENT les octets de l'événement, jamais les réponses qu'xterm produit en traitant le tampon.
+    // Elle est posée à la capture et refermée par un écouteur ajouté sur la cible de l'événement : il passe APRÈS celui d'xterm (même cible, même ordre d'enregistrement ; l'arrêt de
+    // propagation ne retient pas les écouteurs d'une même cible), donc la frappe a produit ses octets de façon synchrone et rien d'autre ne les suit. Le minuteur n'est qu'un filet
+    // (événement arrêté avant sa cible) : il passe après un minuteur d'xterm déjà en attente, il ne peut pas être la borne. Les gestes de souris n'ouvrent pas d'autorisation pendant
+    // le rejeu (premier silence, au plus quelques centaines de ms) : aucun écouteur de cible ne les borne exactement
+    const EVENEMENTS = ['keydown', 'keypress', 'input'];
     let finHumain = 0;
-    EVENEMENTS.forEach((t) => { window.addEventListener(t, () => { humain = true; clearTimeout(finHumain); finHumain = setTimeout(() => { humain = false; }, 0); }, true); });
+    EVENEMENTS.forEach((t) => { window.addEventListener(t, (e) => {
+      humain = true; clearTimeout(finHumain); finHumain = setTimeout(() => { humain = false; }, 0);
+      if (e.target && e.target.addEventListener) e.target.addEventListener(t, () => { humain = false; }, { once: true });
+    }, true); });
     // une frappe ferme le rejeu : tout ce qui est déjà reçu est analysé avant la clôture, ce qui vient après est du direct (un programme lancé tout de suite après l'invite n'est pas rejoué)
     ['keydown', 'keypress', 'input'].forEach((t) => window.addEventListener(t, () => { if (rejeu) clore(); }, true));
     const collage0 = term.paste.bind(term);

@@ -131,18 +131,19 @@ const monde = async (sp, etendue = 600) => {
   return trouve;
 };
 
-// R1.3 (P71-D-36) : le test ralentit le TRAITEMENT d'xterm côté page (API d'xterm exposée ici seulement, injectée avant la page, origine de Q seulement) :
-// les morceaux reçus sont retenus ; une fois le dernier arrivé (GROS-PRET), une frappe est injectée dans la page à +10 ms, puis la file est rendue à xterm à +80 ms.
-// Entre les deux, plusieurs tours de boucle passent : une autorisation « humaine » qui ne se referme pas avec son événement est encore ouverte quand xterm traite les 60000 questions.
-const RALENTI = `(() => { if (location.origin !== ${JSON.stringify(OQ)}) return; let T; const E = window.__ralenti = { retenus: 0, cle: false, libere: false, file: [], queue: '' };
+// R1.3 (P71-D-36) : le test fait tomber la frappe EXACTEMENT entre l'arrivée du rejeu et son traitement (API d'xterm exposée ici seulement, injectée avant la page, origine de Q seulement) :
+// les morceaux reçus sont retenus ; au dernier (GROS-PRET), un minuteur de frappe est posé AVANT la remise de la file à xterm, qui l'écrit aussitôt. La frappe s'exécute donc après l'écriture
+// et avant le minuteur d'xterm qui analyse les 60000 questions : un minuteur de fermeture posé par l'événement passerait APRÈS celui d'xterm et laisserait toutes les réponses partir.
+// moment relève si l'analyse était finie quand la frappe est tombée (« avant » : la fenêtre est bien celle-là)
+const RALENTI = `(() => { if (location.origin !== ${JSON.stringify(OQ)}) return; let T; const E = window.__ralenti = { retenus: 0, cle: false, libere: false, traite: false, moment: '', file: [], queue: '' };
   Object.defineProperty(window, 'Terminal', { configurable: true, get() { return T; }, set(v) { T = class extends v {
     write(d, cb) {
       if (E.libere) return super.write(d, cb);
       E.file.push([d, cb]); E.retenus++;
       if (!E.armee && typeof d !== 'string') { const t = E.queue + new TextDecoder('latin1').decode(d); E.queue = t.slice(-16);
         if (t.includes('GROS-PRET')) { E.armee = true;
-          setTimeout(() => { const ta = document.querySelector('.xterm-helper-textarea'); ta.dispatchEvent(new KeyboardEvent('keypress', { key: 'k', code: 'KeyK', keyCode: 107, charCode: 107, which: 107, bubbles: true, cancelable: true })); E.cle = true; }, 10);
-          setTimeout(() => { E.libere = true; E.file.forEach(([x, c]) => super.write(x, c)); }, 80); } }
+          setTimeout(() => { E.moment = E.traite ? 'apres' : 'avant'; const ta = document.querySelector('.xterm-helper-textarea'); ta.dispatchEvent(new KeyboardEvent('keypress', { key: 'k', code: 'KeyK', keyCode: 107, charCode: 107, which: 107, bubbles: true, cancelable: true })); E.cle = true; }, 0);
+          E.libere = true; E.file.forEach(([x, c]) => super.write(x, () => { E.traite = true; if (c) c(); })); } }
     } }; } }); })()`;
 const OUVERTURE = `(() => { let T; Object.defineProperty(window, 'Terminal', { configurable: true, get() { return T; }, set(v) {
   T = class extends v { open(...a) { if (location.origin !== ${JSON.stringify(OP)}) window.__ouv = { police: document.fonts.check('13px "JetBrains Mono"'), statut: document.fonts.status }; return super.open(...a); } }; } }); })()`;
@@ -416,8 +417,8 @@ await executer(chrome, async (sp) => {
       const n2 = (await lire()).length;
       await s.send('Page.addScriptToEvaluateOnNewDocument', { source: RALENTI });
       theme = 'light'; await s.naviguer();
-      await att(`!!(window.__ralenti && window.__ralenti.libere)`, 'rejeu ralenti rendu à xterm');
-      r.rejeu.ralenti = await s.ev(`(() => { const e = window.__ralenti; return 'cle=' + e.cle + ' libere=' + e.libere + ' retenus=' + (e.retenus > 1); })()`);
+      await att(`!!(window.__ralenti && window.__ralenti.libere && window.__ralenti.cle && window.__ralenti.traite)`, 'rejeu rendu à xterm, frappe tombée, analyse finie');
+      r.rejeu.ralenti = await s.ev(`(() => { const e = window.__ralenti; return 'cle=' + e.cle + ' libere=' + e.libere + ' moment=' + e.moment; })()`);
       tai = -1; stab = 0; const fin3 = Date.now() + 30000; while (stab < 12 && Date.now() < fin3) { const t = (await lire()).length; if (t === tai) stab++; else { stab = 0; tai = t; } await pause(100); }
       const gros = (await lire()).slice(n2).filter((l) => l.startsWith('I ')).map((l) => l.slice(2)).join('');
       // la sortie du navigateur passe par un tube de 64 Ko que process.exit() tronque : un relevé de fuite (60000 réponses) est borné, jamais recopié en entier
@@ -646,8 +647,8 @@ run_rejeu "$OUT"; RJ0="$RJ"
 assert_eq "R1.0 — témoin : aucune erreur nommée, le récepteur a relevé les réponses VIVES aux questions (DA1 ESC[?…c reçue), le premier silence est marqué, cinq rechargements du cadre faits" "$(rj "$RJ0" 'j.erreur||JSON.stringify(j.erreurs)')/marqueur=$(rj "$RJ0" 'j.rejeu.marqueur')/da1=$(rj "$RJ0" '/1b5b3f/.test(j.rejeu.initial)')/recharges=$(rj "$RJ0" 'j.rejeu.recharges')" "{}/marqueur=true/da1=true/recharges=5"
 assert_eq "R1.1 — après cinq rechargements du cadre (thèmes alternés), le tampon contenant ESC[c ESC[>c ESC[6n ESC[?2004\$p ESC[5n est rejoué : le PTY ne reçoit AUCUN octet de réponse" "[$(rjs "$RJ0" 'j.rejeu.avant')]" "[]"
 assert_eq "R1.2 — témoin positif : une question émise APRÈS le rejeu reçoit sa réponse (frappe puis ESC[?…c) : les réponses ne sont pas coupées en général" "frappe=$(rj "$RJ0" 'j.rejeu.frappe') da1=$(rj "$RJ0" '/1b5b3f/.test(j.rejeu.apres)')" "frappe=true da1=true"
-assert_eq "R1.3t — témoin du ralenti : la file d'xterm est retenue (plusieurs morceaux), la frappe est injectée dans la page pendant la retenue, la file est rendue ensuite" "$(rjs "$RJ0" 'j.rejeu.ralenti')" "cle=true libere=true retenus=true"
-assert_eq "R1.3 — une frappe pendant un gros rejeu (60000 questions dans la file d'xterm, traitée 70 ms après la frappe) arrive au shell et AUCUNE réponse d'xterm : le PTY reçoit exactement 6b (l'autorisation humaine ne survit pas à son événement)" "[$(rjs "$RJ0" 'j.rejeu.gros')]" "[6b]"
+assert_eq "R1.3t — témoin de la fenêtre : la frappe tombe dans la page APRÈS l'écriture du rejeu dans xterm et AVANT son analyse (moment=avant)" "$(rjs "$RJ0" 'j.rejeu.ralenti')" "cle=true libere=true moment=avant"
+assert_eq "R1.3 — une frappe tombée entre l'arrivée et l'analyse d'un gros rejeu (60000 questions) arrive au shell et AUCUNE réponse d'xterm : le PTY reçoit exactement 6b (l'autorisation humaine ne survit pas à son événement)" "[$(rjs "$RJ0" 'j.rejeu.gros')]" "[6b]"
 assert_eq "R1.4 — une frappe réelle (CDP, événement de confiance) après le rejeu arrive au shell, seule : 6b" "[$(rjs "$RJ0" 'j.rejeu.reelle')]" "[6b]"
 
 echo "=== M-* — mutants : chaque protection rougit sa sonde ==="
@@ -739,9 +740,9 @@ if mutant rejeu-sans-garde vf-cockpit-terminal-client.mjs 's|if (rejeu \&\& !hum
   run_rejeu "$MUT_OUT"
   assert_eq "M-REJEU-SANS-GARDE — la garde du rejeu est retirée (le code d'avant) : les réponses du tampon partent dans l'entrée du PTY, R1.1 rouge" "$(rougelu "[$(rjs "$RJ" 'j.rejeu.avant')]" "[]")" "rouge"
 else sans_effet "M-REJEU-SANS-GARDE"; fi
-if mutant rejeu-humain-colle vf-cockpit-terminal-client.mjs 's|finHumain = setTimeout(() => { humain = false; }, 0);|void 0;|'; then
+if mutant rejeu-humain-colle vf-cockpit-terminal-client.mjs 's|if (e.target \&\& e.target.addEventListener) e.target.addEventListener(t, () => { humain = false; }, { once: true });|void 0;|'; then
   run_rejeu "$MUT_OUT"
-  assert_eq "M-REJEU-HUMAIN-COLLE — l'autorisation humaine n'est plus remise à faux après l'événement : des réponses d'xterm partent pendant le rejeu, R1.3 rouge" "$(rougelu "[$(rjs "$RJ" 'j.rejeu.gros')]" "[6b]")" "rouge"
+  assert_eq "M-REJEU-HUMAIN-COLLE — l'autorisation humaine ne se referme plus avec son événement, seul reste le minuteur (le code d'avant) : des réponses d'xterm partent pendant le rejeu, R1.3 rouge" "$(rougelu "[$(rjs "$RJ" 'j.rejeu.gros')]" "[6b]")" "rouge"
 else sans_effet "M-REJEU-HUMAIN-COLLE"; fi
 if mutant rejeu-jamais-clos vf-cockpit-terminal-client.mjs "s|term.write('', () => { rejeu = false; });|void 0;|"; then
   run_rejeu "$MUT_OUT"

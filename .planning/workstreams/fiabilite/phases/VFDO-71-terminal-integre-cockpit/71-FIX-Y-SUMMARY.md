@@ -80,3 +80,26 @@ Suites complètes sur le code final : `test-cockpit-terminal-xterm.sh` 80 PASS /
   (360 047 octets). La fenêtre réelle est de quelques millisecondes et suppose un tampon énorme et une frappe qui tombe dedans, mais l'autorisation « bornée à un
   tick » ne protège pas ce cas. Pistes (à arbitrer, pas faites) : lever l'autorisation au premier octet d'`onData` issu de l'événement, ou fermer l'autorisation
   par un écouteur posé sur le textarea APRÈS celui d'xterm (l'arrêt de propagation ne retient pas les autres écouteurs de la même cible).
+
+## Fuite résiduelle fermée (lot FIX-Y2, arbitrage P71-D-36, AskUserQuestion session principale Claude Code, 2026-11-04)
+
+Propriété : l'autorisation « saisie humaine » couvre EXACTEMENT les octets de l'événement utilisateur, jamais les réponses qu'xterm produit en analysant le tampon.
+
+**Choix : la piste 2 (écouteur posé sur la cible, après celui d'xterm).** Dans l'écouteur de capture, `humain = true`, puis un écouteur `{ once: true }` est ajouté sur `e.target` : il s'exécute APRÈS celui d'xterm
+(même cible, ordre d'enregistrement ; l'arrêt de propagation d'xterm ne retient pas les écouteurs d'une même cible). La frappe a donc produit ses octets de façon synchrone, puis l'autorisation se referme avant tout
+minuteur. Pourquoi pas la piste 1 (fermeture au premier `onData`) : une touche qui ne produit aucun octet (Maj seule, par exemple) laisserait l'autorisation ouverte et toutes les réponses du morceau passeraient.
+Le `setTimeout(0)` reste un filet (événement arrêté avant sa cible), jamais la borne.
+
+**Retrait assumé** : les gestes de souris (`mousedown`, `mouseup`, `mousemove`, `wheel`, `contextmenu`) n'ouvrent plus d'autorisation pendant le rejeu (jusqu'au premier silence du flux, 150 ms, borne 3 s). Aucun écouteur de cible ne les
+borne exactement (xterm les traite sur un ancêtre) ; les rapports de souris émis dans cette fenêtre sont perdus, ceux d'après le rejeu partent normalement. Collage et glisser-déposer passent par `term.paste`, borné de façon synchrone : inchangés.
+
+**Sonde R1.3 réécrite** (témoin R1.3t : `moment=avant`). Le minuteur de frappe est posé AVANT la remise de la file à xterm, qui l'écrit aussitôt : la frappe tombe après l'écriture et avant l'analyse des 60 000 questions, la
+fenêtre mesurée. R1.3t relève que l'analyse n'était pas finie quand la frappe est tombée (retenue de plusieurs morceaux plus exigée : le tampon arrive parfois en un seul morceau).
+M-REJEU-HUMAIN-COLLE retire désormais l'écouteur de cible (retour au code d'avant, où seul le minuteur borne).
+
+| | `91a083a0` (avant) | après |
+|---|---|---|
+| R1.3 (PTY après la frappe) | rouge : `6b` + 60 000 réponses, 360 047 octets | `6b` seul |
+| R1.0, R1.1, R1.2, R1.3t, R1.4 | verts | verts |
+| M-REJEU-SANS-GARDE, M-REJEU-JAMAIS-CLOS | rouges | rouges |
+| M-REJEU-HUMAIN-COLLE | sans objet (motif absent du code d'avant) | rouge |
