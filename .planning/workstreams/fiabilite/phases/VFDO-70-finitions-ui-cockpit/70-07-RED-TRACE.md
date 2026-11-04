@@ -189,3 +189,9 @@ Mesure de la CI : `#tour` 16..276 (largeur posée 260 px), `#ask` à partir de x
 ### Rouge — 3312418f, passe « tangente » (sonde `chrome-visite-etapes.mjs`, option `tangent`)
 
 `#ask` (avec un avis : plus haute) immobile, à x = 374 (2 px dans le bord de la carte de 360 px), visite ouverte par l'API : à 1 024 et 1 440 px, Code et Projet, étape 1 : `#ask` et `#ask>ask-form` recouverts. Les assertions O6.18 n'ont pas été rejouées dans la suite sur l'ancien arbre : mesure à la sonde.
+
+### Correction et vert
+
+- Cause du placement jugé libre à tort : `place()` jugeait la carte sur `getBoundingClientRect()`, la boîte peinte, réduite à 98 % et décalée de 8 px pendant l'animation d'entrée. Elle juge maintenant la boîte de mise en page (`offsetLeft`, `offsetWidth`, `offsetTop`, `offsetHeight`), la même que la carte posée, et compte 2 px de marge autour de chaque surface (bordures et arrondis que la boîte de mise en page ne montre pas). 6 px faisaient rougir R1 et O6.10 : 2 px est la plus petite marge de l'intervalle demandé ; la boîte de mise en page est la vraie correction (sans la marge, le témoin O6.18 est déjà vert).
+- Vert, en série : `test-cockpit-projet.sh` 165 PASS / 0 FAIL avec `VF_DEJAVU_DIR` (O6.18 et toutes les passes) ; `test-cockpit-vendor.sh` 79/0 ; `test-cockpit-chrome-fr.sh` 78/0 ; `test-cockpit-onglet-code.sh` 25/0 ; `test-cockpit-responsive.sh` 291 PASS / 0 FAIL, sans et avec `RESP_POLICE=1` ; `synchro.sh verifier` : amont retrouvé à l'octet.
+- (a) Mesurer la bbox rendue après la pose : non ajouté, devenu inutile : la boîte de mise en page est celle de la carte posée ; le relevé de 200 ms replace déjà dès qu'une surface bouge. O6.17 à 800 px : diagnostic CI pas encore reçu.
