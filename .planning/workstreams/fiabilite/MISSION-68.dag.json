@@ -343,7 +343,7 @@
         "revue-mod"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "exec-68-10",
@@ -384,6 +384,40 @@
       ],
       "scope": [],
       "status": "blocked"
+    },
+    {
+      "id": "fix-socle",
+      "step": "correction ciblée du socle : F-02..F-08 de la revue (+ audit), F-01 selon Q3",
+      "stage": "",
+      "deps": [
+        "exec-68-03"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "fix-mod",
+      "step": "correction ciblée du mod : ST-1, ST-3..ST-6 ; ST-2 selon Q4",
+      "stage": "",
+      "deps": [
+        "exec-68-08"
+      ],
+      "scope": [
+        "plugin/cockpit/signal/"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "rerevue-fix",
+      "step": "revue fraîche du diff de correction (fix-socle + fix-mod) + audit sécurité frais du plugin livré",
+      "stage": "",
+      "deps": [
+        "exec-68-08"
+      ],
+      "scope": [],
+      "status": "running"
     }
   ]
 }
