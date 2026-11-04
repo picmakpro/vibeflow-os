@@ -146,15 +146,16 @@ ou incomplète est dite de la même façon, avec sa cause.
 
 **Mission vivante.** Une mission n'est « en cours » que si le verrou de driver qui la couvre est tenu et non périmé, ou si son progrès est plus récent que
 le TTL (1 800 s). Le socle cherche le verrou dans l'ordre : **phase, puis compartiment, puis dépôt** (l'ancien `.planning/DRIVER.lock` compte
-comme un verrou de dépôt) ; sans verrou vivant, la mission est « abandonnée, nœuds non refermés » (grisée, avec le bouton d'élagage humain). Si la
+comme un verrou de dépôt). Un verrou **présent**, même périmé, arrête la cascade : un verrou de phase ou de compartiment périmé n'est jamais contourné par un verrou plus large tenu, et la mission est alors « abandonnée, nœuds non refermés » (grisée, avec le bouton d'élagage humain) ; elle l'est aussi quand aucun verrou n'existe à aucun cran (P68-D-27, P68-D-36). Si la
 source des verrous est illisible, l'état est « inconnu », jamais « en cours » ni « abandonnée ». Cette règle vit dans le socle : la carte Projet
 de la page web la partage. La date de modification d'un DAG n'est jamais regardée.
 
 ### Ouvrir le cockpit
 
 Le bouton lance `node <lanceur> open --lab <racine>` et affiche l'adresse rendue (port stable par lab, voir plus haut) ; c'est un geste humain,
-aucun agent ne l'appuie. Le lanceur est cherché dans le compte (`~/.claude/scripts/vf-cockpit.mjs`), puis dans le plugin ; **le mod n'exécute jamais un fichier dont le
-chemin réel est sous le lab**. Le repli de l'élagage vers `driver-lock.sh` suit la même règle (plugin, puis compte).
+aucun agent ne l'appuie. Le lanceur est cherché dans le compte (`~/.claude/scripts/vf-cockpit.mjs`), puis dans le plugin ; `driver-lock.sh` (élagage) est cherché dans le plugin,
+puis dans le compte. Deux garanties du mod : **il n'exécute jamais un fichier du compte ou du plugin dont le chemin ou le chemin réel tombe sous le lab** (la racine du plugin
+n'est refusée que sous `<lab>/.vibeflow`), **et un fichier existant dont le chemin réel ne peut pas être établi est refusé** ; **ses lancements partent hors du lab, avec un PATH assaini**.
 Un échec de lanceur est dit en clair (code de sortie de la table de « Ouvrir »).
 
 ### Gestes réservés aux humains

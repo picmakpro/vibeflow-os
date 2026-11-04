@@ -12,10 +12,13 @@ Publiée dans VibeFlow vX.Y.Z (mention à compléter par le geste de release gro
   « Ouvrir le cockpit ».
 - **Émetteur `signal@1`** : état du travail publié pour la pane (mission vivante, retard sur la base, worktrees).
 - **Socle partagé** : calcul de la vie d'une mission (`mission.vie`), lecture des arbres git (`arbresGit`) et émetteur, communs au cockpit et au mod.
-- **Cascade de vie (P68-D-33)** : verrou de phase, puis verrou du compartiment, puis verrou de dépôt (et l'ancien `.planning/DRIVER.lock`),
-  sinon `abandonnee` ; une source illisible donne `inconnu`.
-- **Lanceur et repli de l'élagage (P68-D-34)** : le mod n'exécute aucun fichier dont le realpath est sous le lab ; lanceur pris dans le
-  compte (`~/.claude/scripts`) puis dans le plugin, le repli `driver-lock.sh` de l'élagage suit la même règle.
+- **Cascade de vie (P68-D-33)** : verrou de phase, puis verrou du compartiment, puis verrou de dépôt (et l'ancien `.planning/DRIVER.lock`) ;
+  un verrou présent, même périmé, arrête la cascade (P68-D-27, P68-D-36), et la mission est `abandonnee` s'il est périmé ou si aucun
+  verrou n'existe ; une source illisible donne `inconnu`.
+- **Lanceur et repli de l'élagage (P68-D-34)** : le mod n'exécute aucun fichier du compte ou du plugin dont le chemin ou le realpath
+  tombe sous le lab (la racine du plugin n'est refusée que sous `<lab>/.vibeflow`) ; lanceur pris dans le compte (`~/.claude/scripts`)
+  puis dans le plugin, `driver-lock.sh` de l'élagage pris dans le plugin puis dans le compte. Un fichier existant dont le realpath est
+  inconnu est refusé, et les lancements partent hors du lab avec un PATH assaini (P68-D-37).
 
 ### Modifié
 - **`avancement@1` devient `avancement@2`** : états de mission `abandonnee` et `inconnu` et champ `mission.vie` (vocabulaire de mission
