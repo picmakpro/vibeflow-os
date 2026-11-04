@@ -513,6 +513,13 @@ xeq() { printf '%s' "$XEQ" | node "$AUX/get.mjs" /dev/stdin "$1"; }
 assert_eq "O6.14a — témoin : la mesure a eu lieu sans erreur, l'onglet Équipe a au moins deux cartes (une session et un sous-agent)" "$(xeq "j.erreur||''")|$(xeq 'j.e768.cartes>=2')" "|true"
 assert_eq "O6.14 — Équipe / 768 px : le démarrage d'office (start() sans argument) n'ouvre pas la visite" "$(xeq 'j.e768.auto')" "false"
 assert_eq "O6.14b — Équipe : le bouton « Par où commencer » l'ouvre toujours (démarrage voulu par la personne)" "$(xeq 'j.e768.manuel')" "true"
+# O6.15 (CI Linux de 03bada92 : R15.4b « Échap ferme le tiroir » rouge sous Linux, où la visite d'office s'ouvre pendant la mesure) : quand la visite est ouverte, elle est la couche du dessus et capte la première Échap ; le tiroir de détail
+# n'est touché ni par l'ouverture de la visite, ni par sa sortie, et la seconde Échap le ferme. Contrat de l'ordre, mesuré à 390 px sur Projet ; R15.4b mesure donc le tiroir visite fermée (test-cockpit-responsive.sh, section R15 seule).
+XEC="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 390 echap)"
+[ -n "${DBG:-}" ] && echo "RAWEC: $XEC"
+xec() { printf '%s' "$XEC" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O6.15a — témoin : mesure sans erreur, tiroir ouvert par la carte avant la visite, visite démarrée" "$(xec "j.erreur||''")|$(xec 'j.t390.carteOuverte.tiroir')|$(xec 'j.t390.visiteDemarree.tour')" "|true|true"
+assert_eq "O6.15 — visite ouverte au-dessus d'un tiroir ouvert : l'ouverture de la visite ne ferme pas le tiroir ; la première Échap ferme la visite et laisse le tiroir ; la seconde ferme le tiroir (tiroir|visite après chaque temps)" "$(xec '[j.t390.visiteDemarree,j.t390.echap1,j.t390.echap2].map((x)=>x.tiroir+"/"+x.tour).join(" ")')" "true/true true/false false/false"
 # O6.10 (correctif 70-07, REG-70-01 de 70-VERIFICATION.md) : visite Projet active au premier chargement sur un lab à jalon et à mission, à 1 024 et 1 920 px : la carte ciblée tient dans la zone libre ET aucune carte du graphe ne sort de la zone
 # libre à gauche du panneau (critère de R1, chrome-responsive.mjs). Cause : aim() centrait et zoomait la carte sans regarder le reste du graphe, qui débordait sous le panneau ; il ne dézoomait jamais une carte plus large que sa zone.
 L7="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mkdir -p "$L7/src" "$L7/.planning/phases/01-socle" "$L7/.planning/phases/02-suite" "$L7/.planning/missions"

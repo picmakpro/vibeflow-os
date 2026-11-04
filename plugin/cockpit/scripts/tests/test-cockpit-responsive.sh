@@ -385,7 +385,8 @@ INJ_DRILL="(async () => { $J_PAUSE window.VibeFlow.reveal('n:ph-1'); for (let i 
 J_OPEN="const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0); nd?.dispatchEvent(new MouseEvent('click', { bubbles: true })); for (let i = 0; i < 60 && getComputedStyle(document.getElementById('panel')).visibility !== 'visible'; i++) await p(50); await p(300);"
 INJ_CARTE="(async () => { $J_PAUSE $J_OPEN return true; })()"
 INJ_CROIX="(async () => { $J_PAUSE $J_OPEN [...document.querySelectorAll('#panel button')].find((b) => /^Fermer/i.test(b.getAttribute('aria-label') || ''))?.click(); await p(150); return true; })()"
-INJ_ECHAP="(async () => { $J_PAUSE $J_OPEN document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await p(150); return true; })()"
+# la visite d'office (700 ms après le rendu) est la couche du dessus et capte la première Échap : sous Linux, plus lent, elle s'ouvre pendant la mesure ; R15.4b mesure le tiroir, visite fermée (70-07, O6.15 fixe l'ordre des deux)
+INJ_ECHAP="(async () => { $J_PAUSE $J_OPEN window.VibeFlowTour?.end(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await p(150); return true; })()"
 INJ_VIDE="(async () => { $J_PAUSE $J_OPEN document.getElementById('svg').dispatchEvent(new MouseEvent('click', { bubbles: true })); await p(150); return true; })()"
 INJ_TITRE="(async () => { $J_PAUSE const h = document.querySelector('#context h1'); const r = h.getBoundingClientRect(); document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.dispatchEvent(new MouseEvent('click', { bubbles: true })); for (let i = 0; i < 60 && getComputedStyle(document.getElementById('panel')).visibility !== 'visible'; i++) await p(50); await p(300); return true; })()"
 # deux vagues de Chrome en parallèle (profils jetables distincts) ; les assertions se lisent ensuite
