@@ -91,3 +91,59 @@ test("K14 — deux rafraîchissements simultanés n'ouvrent qu'un seul processus
   expect(lab.emetteur().length - avant).toBe(1)
   await ui.unmount()
 })
+
+test("K7 — retard de l'arbre courant sur sa base, âge du fetch ; une ligne par worktree avec sa branche et sa phase", async ($, on) => {
+  labSignal(on)
+  const ui = await pane($)
+  expect(await ui.find({ type: 'Text', text: /en retard de 3 commits sur main, dernier fetch il y a 2 h/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /\.claude\/worktrees\/phase-68 · feat\/phase-68 · phase 68 Embarquer le mod \(en cours\)/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /arbre principal · main · phase 69 Suivi du travail \(à recetter\)/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /worktrees\/libre · feat\/libre · aucune phase en cours/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test("K8 — mission courante abandonnée dite avec le libellé du socle ; « à recetter » en toutes lettres", async ($, on) => {
+  labSignal(on)
+  const ui = await pane($)
+  expect(await ui.find({ type: 'Text', text: /mission MISSION-68 · abandonnée, nœuds non refermés/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /à recetter/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test("K10 — compact : une ligne d'en-tête (phase, libellé, retard abrégé), sans la liste des worktrees", async ($, on) => {
+  labSignal(on)
+  await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, placement: 'inline' }, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: /phase 68 Embarquer le mod \(en cours\) · retard 3/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /arbre principal · main/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test("K11 — mission courante d'état inconnu : « état inconnu » (libellé du socle, P68-D-23)", async ($, on) => {
+  labSignal(on, { stdout: avec(s => { s.arbres.find((a: any) => a.courant).phaseActive = { key: 'fiabilite|70', n: '70', nom: 'Cockpit inconnu', etat: 'en-cours' } }) })
+  const ui = await pane($)
+  expect(await ui.find({ type: 'Text', text: /mission MISSION-70 · état inconnu/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test("K15 — un seul commit en retard (singulier) et l'origine locale en retard", async ($, on) => {
+  labSignal(on, { stdout: avec(s => { Object.assign(s.arbres.find((a: any) => a.courant).retard, { main: 1, origin: 2 }) }) })
+  const ui = await pane($)
+  expect(await ui.find({ type: 'Text', text: /en retard de 1 commit sur main, dernier fetch il y a 2 h · origin\/main local : en retard de 2/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test("K16 — aucun fetch connu, ou aucun retard : rien d'inventé", async ($, on) => {
+  labSignal(on, { stdout: avec(s => { Object.assign(s.arbres.find((a: any) => a.courant).retard, { fetchAgeS: null }) }) })
+  const ui = await pane($)
+  expect(await ui.find({ type: 'Text', text: /en retard de 3 commits sur main, aucun fetch connu/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test("K17 — arbre courant à jour : aucune ligne de retard", async ($, on) => {
+  labSignal(on, { stdout: avec(s => { Object.assign(s.arbres.find((a: any) => a.courant).retard, { main: 0, origin: null }) }) })
+  const ui = await pane($)
+  expect(await ui.find({ type: 'Text', text: /en retard/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /phase 68 Embarquer le mod/ })).toBeDefined()
+  await ui.unmount()
+})
