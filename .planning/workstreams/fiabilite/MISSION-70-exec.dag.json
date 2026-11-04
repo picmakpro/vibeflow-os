@@ -220,7 +220,7 @@
         "arb-docs"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "fix-focus-tiroir",
@@ -429,7 +429,7 @@
         "fix-classe-visite"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "fix-ci-ek13",
@@ -437,6 +437,16 @@
       "stage": "",
       "deps": [
         "fix-juge-equipe"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "merge-main-68-202",
+      "step": "fusions de main (3c73fc0c, a6912f25)",
+      "stage": "",
+      "deps": [
+        "fix-ci-polices"
       ],
       "scope": [],
       "status": "done"

@@ -1,10 +1,10 @@
 # Mission 2026-11-04 — Phase 70 : revalidation, exécution, recette par juges
 
 **Manager :** vf-dev-manager (`mgr70`), verrou de phase `--ws=fiabilite --phase=70` (génération `DRIVER.lock.gen.1793767095.1159`).
-**Branche :** `feat/phase-70-finitions-ui`, rebasée sur `origin/main` 794c6dba (merge de la 69, PR #198). PR brouillon #200.
-**Statut :** `human_needed`. Tout est exécuté et recetté, mais un arbitrage de mise en page reste ouvert (question 1 du tri), et
-il bloque le vert de la CI : six FAIL R13.4 dans `test-cockpit-responsive.sh`. S'y ajoutent onze questions de goût. Aucune
-réponse n'est arrivée de la session principale pendant la mission.
+**Branche :** `feat/phase-70-finitions-ui`, d'abord rebasée sur 794c6dba (Phase 69), puis sur 19393cc3 (PR #201), puis mise à
+jour par fusion de main à 3c73fc0c (Phase 68, PR #199) et a6912f25 (PR #202). PR #200.
+**Statut :** `passed`. Tous les arbitrages ont été reçus et appliqués. La CI de la PR #200 est verte à a15b073d (14 pass, 1 skipping
+réservé à main). La PR est sortie du brouillon. Pas de merge ni de release : c'est le coordinateur qui merge.
 
 ## Gestes d'entrée
 
@@ -94,6 +94,25 @@ recommandations sont dans `70-RECETTE-JUGES.md`.
 - **Heartbeat** : `driver-lock.sh heartbeat` rend `not-at-lab-root` s'il est lancé hors de la racine. Les `ok:false`
   intermittents de la mission venaient de là.
 
+## Arbitrages reçus et appliqués (2026-11-04)
+
+Toutes les réponses viennent de Samuel, par AskUserQuestion, en session principale Claude Code, le 2026-11-04 ; elles ont été relayées par la session principale.
+- **P70-D-22** : « Badge réduit à son point (Recommandé) ». Le choix est appliqué de 701 à 1 639 px, avec un repli mesuré au-delà. Le seuil a été
+  mesuré deux fois : O2b.6 à 1 440 px, puis le débordement de 1 600 à 1 619 px. La session principale l'a retenu comme une application du
+  choix, pas comme un nouvel arbitrage.
+- **P70-D-23** : « Tout selon les recos (Recommandé) », soit 2a 3b 4a 5a 6b 7b 8b 9b 10a 11b 12a 13a, plus l'infobulle « de ce projet ».
+- **P70-D-24** : R8 de la recette 68 est inscrit au BACKLOG, sans conflit avec la 68.
+- **Statuts au féminin** (« prête à planifier »), retenus à la fusion de la 68 : le sujet est la phase (test F9.2 de la 68).
+- **À ratifier, choix de l'exécutant de la visite** : en dernier recours, la description du titre est repliée pendant la visite (titre plus haut que prévu).
+
+## Juge scopé des arbitrages et suites de CI
+
+- Le juge (Playwright, tête 47155951) a trouvé trois défauts, tous corrigés : Q3b, qui régressait à 768 px (titre sur la 1re carte, plafond intermittent) ;
+  Q13a sur téléphone (entrée du menu « ⋯ » non désactivée) ; un débordement de 1 600 à 1 619 px.
+- La classe « visite d'office / surfaces » est fermée par le témoin génératif O6.17, avec ses passes police large, DejaVu réelle, titre haut et tangente.
+  R22 avait une cause lue dans le diagnostic de la CI : le placement jugeait la boîte animée de la carte.
+- EK13 est rendu robuste sous Linux : recadrage quand `#context` change de taille et à la fin du chargement des polices.
+
 ## Décompte
 
 Mandats émis : 2 plan-checkers, 1 éclaireur de captures, 16 mandats `vf-coder` (12 exécutions de plan, dont 70-04 reprise une
@@ -113,9 +132,10 @@ Relayées telles que les exécutants les ont rendues :
   sur c7217940 ; deux rouges `check-machine-paths` corrigés en c7217940 et 631e2e10. Shards à 03bada92 : 0 à 5 verts, 6 rouge
   sur les six R13.4 (attendus) et sur R15.4b (corrigé en 982f4da9, rejoué deux fois avant correction).
 - 70-07 (CI Linux) : `test-cockpit-projet.sh` 108/0, vendor 79/0, chrome-fr 70/0, responsive 255/6, R15.4b vert (sur 982f4da9).
+- Fusions de main : à a15b073d, 22 suites du cockpit vertes (ailleurs 17/0, equipe 157/0, projet 154/0, chrome-fr 78/0, responsive 291/0),
+  `test-vibeflow-update-cockpit.sh` 13/0, `check-version-sync.sh` vert (155 suites), `check-machine-paths.sh` vert ; CI de la PR #200 verte à a15b073d.
 
 ## Next step
 
-Dès la réponse de Samuel à la question 1 : reprendre 70-04 tâche 2 (onglets au-dessus de 700 px, borne `.hl`, R4.2). Ensuite,
-appliquer les réponses de goût retenues, faire juger le 1 024 / 1 440 px par un juge scopé, écrire le SUMMARY de 70-09, rejouer
-`gates` et la découverte complète, puis sortir la PR #200 du brouillon et la suivre jusqu'au vert. Pas de merge ni de release.
+Le merge de la PR #200 revient au coordinateur, après la décision de Samuel : « merge la 70 dès qu'elle est verte » (session principale
+Claude Code, 2026-11-04). Ensuite : la release racine, geste humain ; le tri du BACKLOG (budget dépassé) ; puis la Phase 71.
