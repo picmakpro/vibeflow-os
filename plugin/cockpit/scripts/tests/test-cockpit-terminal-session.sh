@@ -8,8 +8,9 @@
 #   T15.2 le tampon est vidé à la fin : une nouvelle session ne rejoue rien de l'ancienne
 #   Sp2   la grâce par défaut (sans override) vaut 30 000 ms ; un réglage hors plage retombe sur ce défaut
 #   S4    expiration de la grâce : une nouvelle session ne démarre qu'après la fin de l'ancienne (jamais deux assistants)
+#   N5    fermeture bornée : un assistant qui ignore SIGTERM reçoit SIGKILL et la place est rendue (réglage de test VF_COCKPIT_TERM_FERMETURE_MS)
 #   T15.3 le tampon est aussi vidé à la fin de la grâce       CP   contre-pression sur la réponse : un lecteur à l'arrêt bloque la production du shell
-#   M-*   mutants (copies de la sortie, jamais le module) : M-GRACE0, M-UNIQUE, M-PROPRIO, M-IDLE, M-TAMPON, M-JOURNAL, M-GRACE-DEFAUT, M-EXPIRATION, M-TAMPON-GRACE, M-CONTREPRESSION
+#   M-*   mutants (copies de la sortie, jamais le module) : M-GRACE0, M-UNIQUE, M-PROPRIO, M-IDLE, M-TAMPON, M-JOURNAL, M-GRACE-DEFAUT, M-EXPIRATION, M-TAMPON-GRACE, M-CONTREPRESSION, M-SANS-SIGKILL
 # Chaque témoin négatif a son contrôle positif ; un mutant sans effet est un FAIL. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
@@ -74,7 +75,7 @@ srv() { # srv <sortie> [arguments du serveur…] -> SRV_PID SRV_O SRV_OUT QP SEC
   local o="$1"; shift; local lab; lab="$(cd "$o/../.." && pwd)"
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN.out"; rm -f "$o/.cache/server.json"; mkdir -p "$o/.cache"
   local amorce; amorce="$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")"; (umask 077; printf '%s' "$amorce" > "$o/.cache/terminal-amorce"); (umask 077; printf '%s' "$amorce" > "$WORK/amorce-$SRVN")
-  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" VF_COCKPIT_TERM_GRACE_MS="$GRACE_T" TMPDIR="$WORK/tmp-serveur" exec node "$o/serve.mjs" --no-open --terminal "$@" --port "$(libre)" > "$SRV_OUT" 2>&1 ) </dev/null >/dev/null 2>&1 &
+  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="${ENG_SRV:-$ENG}" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" VF_COCKPIT_TERM_GRACE_MS="$GRACE_T" VF_COCKPIT_TERM_FERMETURE_MS="${FERM_T:-}" TMPDIR="$WORK/tmp-serveur" exec node "$o/serve.mjs" --no-open --terminal "$@" --port "$(libre)" > "$SRV_OUT" 2>&1 ) </dev/null >/dev/null 2>&1 &
   SRV_PID=$!; PIDS+=($SRV_PID)
   for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
   QP="$(sj '(j.terminal&&j.terminal.url)||""')"; QP="${QP##*:}"; SEC=""
@@ -258,6 +259,23 @@ GRACE_T=300; srv "$OUT"
 assert_eq "T15.3 — grâce écoulée puis nouvelle attache : le tampon de l'ancienne session n'est pas rejoué (témoin : le marqueur a été vu dans l'ancien flux, la nouvelle session répond)" "$(sonde_tampon_grace)" "ancien=vu nouvelle=OK rejeu=aucun"
 unsrv; GRACE_T=3000
 
+echo "=== N5 — fermeture bornée : un assistant qui n'obéit pas reçoit SIGTERM puis SIGKILL, la place est rendue ==="
+ENG_TETU="$WORK/eng-tetu"; rm -rf "$ENG_TETU"; cp -R "$ENG" "$ENG_TETU"
+printf 'import signal, time\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\ntime.sleep(300)\n' > "$ENG_TETU/terminal/vf-cockpit-pty.py"
+sonde_escalade() { # assistant factice qui ignore SIGTERM, flux fermé, grâce puis fermeture ; rend « ancien=<mort|vivant> nouvelle=<autre assistant|non> » (la fermeture est réglée à 1 s)
+  local f1="$WORK/f-esc1-$SRVN.bin" f2="$WORK/f-esc2-$SRVN.bin" ap np="" ancien nouvelle=non p
+  flux "$f1" 40000; attendre_python; ap="$(python_de)"; vf_hyg_stop "$FL"
+  morts 8 "$ap" && ancien=mort || ancien=vivant
+  if [ "$ancien" = mort ]; then
+    flux_repris "$f2" 20000; attendre_python; np="$(python_de)"; [ -n "$np" ] && [ "$np" != "$ap" ] && nouvelle="autre assistant"; vf_hyg_stop "$FL"
+  fi
+  for p in $ap $np; do case "$(ps -o args= -p "$p" 2>/dev/null)" in *vf-cockpit-pty.py*) kill -KILL "$p" 2>/dev/null ;; esac; done # assistants factices (survivants) : arrêtés par PID, ligne de commande relue
+  echo "ancien=$ancien nouvelle=$nouvelle"
+}
+ENG_SRV="$ENG_TETU"; GRACE_T=300; FERM_T=1000; srv "$OUT"
+assert_eq "N5.1 — assistant qui ignore SIGTERM : SIGKILL au-delà de la borne de fermeture, l'ancien est mort en moins de 8 s et la place est rendue (un nouvel assistant démarre)" "$(sonde_escalade)" "ancien=mort nouvelle=autre assistant"
+unsrv; ENG_SRV=""; GRACE_T=3000; FERM_T=""
+
 echo "=== CP — contre-pression sur la réponse : un lecteur à l'arrêt bloque la production du shell, sans perte ==="
 sonde_contrepression() { # un lecteur qui ne lit pas pendant 5 s ; le shell produit 40 Mo puis crée un drapeau ; rend « pendant=<absent|present> apres=<present|absent> »
   local fl="$WORK/cp-drapeau-$SRVN" out="$WORK/cp-octets-$SRVN" pend=absent apres=absent
@@ -307,6 +325,12 @@ if mutant contrepression vf-cockpit-terminal-session.mjs "s/if (!r.write(b) \&\&
   srv "$MUT_OUT"
   R="$(sonde_contrepression)"; assert_eq "M-CONTREPRESSION — le mutant (la sortie du shell n'est plus suspendue quand le client ne lit pas) rougit CP.1 : la production se termine malgré le lecteur à l'arrêt" "$([ "$R" != "pendant=absent apres=present" ] && echo rouge || echo "identique : $R")" "rouge"; unsrv
 else assert_eq "M-CONTREPRESSION — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
+if mutant sanskill vf-cockpit-terminal-session.mjs "s/try { cible.enfant.kill('SIGKILL'); } catch {}//"; then
+  ENG_SRV="$ENG_TETU"; GRACE_T=300; FERM_T=1000; srv "$MUT_OUT"
+  R="$(sonde_escalade)"; assert_eq "M-SANS-SIGKILL — le mutant (aucune escalade SIGKILL) rougit N5.1 : l'assistant qui ignore SIGTERM survit à la borne de fermeture" "$([ "$R" != "ancien=mort nouvelle=autre assistant" ] && echo rouge || echo "identique : $R")" "rouge"; unsrv
+  ENG_SRV=""; GRACE_T=3000; FERM_T=""
+else assert_eq "M-SANS-SIGKILL — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== T12.5 — inactivité : un terminal ouvert empêche l'arrêt (attente bornée jusqu'à 65 s après le lancement) ==="
 while [ $((SECONDS-IDLE_T0)) -lt 65 ]; do sleep 1; done

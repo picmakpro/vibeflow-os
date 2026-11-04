@@ -16,7 +16,9 @@ premier plan du terminal ET à chaque membre de la SESSION du terminal (le shell
 fermeture du maître, au plus 3 s d'attente (0,5 s si le shell est déjà sorti), puis SIGKILL de tous les membres de la session relevés À CE
 MOMENT-LÀ, relevé répété jusqu'à ce qu'il n'en reste aucun : nohup, disown et travaux d'arrière-plan (groupes à part) y sont compris (P71-D-28).
 Le relevé s'appuie sur getsid(2) pour chaque PID du système (/proc, sinon ps en chemin absolu) : jamais d'identifiant de groupe figé, jamais de
-motif de nom. Limite : un processus sorti de la session par setsid (ou par un double fork suivi de setsid) échappe à l'arrêt.
+motif de nom. Un zombie (état Z, lu dans /proc/<pid>/stat ou par `ps -o stat=`) n'est pas un membre vivant : sous Linux sans init il resterait
+compté et consommerait la grâce. Un relevé qui ne contient pas l'assistant lui-même est inutilisable (/proc vide d'un bac à sable) : repli sur les
+groupes. Le PID du chef de session n'est plus jamais signalé une fois le chef réapé (réutilisation de PID). Limite : un processus sorti de la session par setsid (ou par un double fork suivi de setsid) échappe à l'arrêt.
 Aucun octet du shell n'est journalisé.
 Compatible Python 3.9, aucune dépendance.
 """
@@ -110,46 +112,91 @@ def signaler(gs, sig):
                 pass
 
 
-def pids_systeme():
-    """Tous les PID du système, ou None si aucune source n'est lisible (/proc, sinon ps par chemin absolu : jamais une résolution par PATH)."""
+PROC = '/proc'
+SID_CHEF = 0  # PID du shell (chef de sa session), posé par main()
+CHEF_REAPE = False  # vrai dès que le chef de session (le shell) est réapé : son PID peut alors être réutilisé, il n'est plus jamais signalé
+
+
+def etat_proc(p):
+    """État d'un processus lu dans /proc/<pid>/stat (le caractère après la parenthèse fermante du nom), ou None s'il a disparu entre-temps."""
     try:
-        return [int(n) for n in os.listdir('/proc') if n.isdigit()]
+        with open('%s/%d/stat' % (PROC, p), 'rb') as f:
+            t = f.read()
     except OSError:
-        pass
+        return None
+    i = t.rfind(b')')
+    return t[i + 2:i + 3].decode('ascii', 'replace') if i >= 0 else None
+
+
+def releve():
+    """{pid: état} de tous les processus du système, ou None si aucune source ne rend un relevé utilisable. Un relevé qui ne contient pas l'assistant
+    lui-même est faux (/proc vide, bac à sable) : il n'est pas pris pour valide, la source suivante (ps par chemin absolu, jamais par PATH) est essayée."""
+    moi = os.getpid()
+    try:
+        noms = [int(n) for n in os.listdir(PROC) if n.isdigit()]
+    except OSError:
+        noms = []
+    r = {}
+    for p in noms:
+        e = etat_proc(p)
+        if e is not None:
+            r[p] = e
+    if moi in r:
+        return r
     for ps in ('/bin/ps', '/usr/bin/ps'):
         try:
-            r = subprocess.run([ps, '-A', '-o', 'pid='], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                               timeout=5, env={'PATH': '/usr/bin:/bin'})
-            if r.returncode == 0:
-                return [int(x) for x in r.stdout.split() if x.isdigit()]
+            sortie = subprocess.run([ps, '-A', '-o', 'pid=,stat='], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                    timeout=5, env={'PATH': '/usr/bin:/bin'})
         except (OSError, subprocess.SubprocessError):
             continue
+        if sortie.returncode != 0:
+            continue
+        r = {}
+        for ligne in sortie.stdout.decode('ascii', 'replace').splitlines():
+            mots = ligne.split()
+            if len(mots) >= 2 and mots[0].isdigit():
+                r[int(mots[0])] = mots[1]
+        if moi in r:
+            return r
     return None
+
+
+def chef_reape():
+    """Réape le chef de session sans bloquer ; vrai s'il est (ou était déjà) réapé."""
+    global CHEF_REAPE
+    try:
+        if os.waitpid(SID_CHEF, os.WNOHANG)[0]:
+            CHEF_REAPE = True
+    except ChildProcessError:
+        CHEF_REAPE = True
+    return CHEF_REAPE
+
+
+def vise(p, sid):
+    """Vrai si p est un membre vivant de la session sid : getsid par PID, jamais un zombie, jamais le chef réapé."""
+    if CHEF_REAPE and p == sid:
+        return False
+    try:
+        return os.getsid(p) == sid
+    except OSError:
+        return False
 
 
 def membres(sid):
     """Membres vivants de la session `sid` (getsid par PID : borné à cette session, rien d'autre n'est visé), ou None si le relevé est impossible."""
-    tous = pids_systeme()
-    if tous is None:
+    r = releve()
+    if r is None:
         return None
     moi = os.getpid()
-    sortie = []
-    for p in tous:
-        if p > 1 and p != moi:
-            try:
-                if os.getsid(p) == sid:
-                    sortie.append(p)
-            except OSError:
-                pass
-    return sortie
+    return [p for p, e in r.items() if p > 1 and p != moi and not e.startswith('Z') and vise(p, sid)]
 
 
 def envoyer_membres(sid, sig):
-    """Signale chaque membre de la session ; la session est relue juste avant chaque envoi (PID réutilisé entre-temps : ignoré). Rend le nombre de membres visés."""
+    """Signale chaque membre de la session ; la session est relue juste avant chaque envoi (PID réutilisé entre-temps : ignoré). Rend les membres visés."""
     ms = membres(sid)
     for p in ms or []:
         try:
-            if os.getsid(p) == sid:
+            if vise(p, sid):
                 os.kill(p, sig)
         except OSError:
             pass
@@ -175,10 +222,7 @@ def vivants(sid, gs):
 def sigkill_session(sid, gs):
     """SIGKILL de tous les membres de la session, relevés au moment de l'arrêt, répété tant qu'il en reste (un fork en cours de route est repris au tour suivant)."""
     for _ in range(40):
-        try:
-            os.waitpid(sid, os.WNOHANG)  # le chef de session, s'il vient de tomber, ne reste pas zombie dans le relevé
-        except ChildProcessError:
-            pass
+        chef_reape()  # le chef de session, s'il vient de tomber, ne reste pas zombie dans le relevé
         ms = envoyer_membres(sid, signal.SIGKILL)
         if ms is None:
             signaler(gs, signal.SIGKILL)  # relevé impossible : repli sur les groupes relevés au départ
@@ -190,6 +234,7 @@ def sigkill_session(sid, gs):
 
 def arreter(pid, maitre):
     """SIGHUP aux groupes et à la session, fermeture du maître, attente de 3 s au plus, SIGKILL de tous les membres de la session s'il en reste."""
+    global CHEF_REAPE
     sid = pid  # pty.fork() : le shell est chef de sa propre session, dont l'identifiant est son PID
     gs = groupes(pid, maitre)
     signaler(gs, signal.SIGHUP)
@@ -198,23 +243,19 @@ def arreter(pid, maitre):
         os.close(maitre)
     except OSError:
         pass
-    reape = False
     fin = time.time() + GRACE
     while time.time() < fin:
-        if not reape:
-            try:
-                reape = bool(os.waitpid(pid, os.WNOHANG)[0])
-            except ChildProcessError:
-                reape = True
+        reape = chef_reape()
         if reape and not vivants(sid, gs):
             return
         time.sleep(0.05)
     sigkill_session(sid, gs)
-    if not reape:
+    if not chef_reape():
         try:
             os.waitpid(pid, 0)
         except ChildProcessError:
             pass
+        CHEF_REAPE = True
     sigkill_session(sid, gs)  # la mort du chef peut libérer des travaux : dernier relevé
 
 
@@ -242,6 +283,7 @@ def main():
     if not (0 < lignes <= LIGNES_MAX and 0 < colonnes <= COLONNES_MAX):
         sys.stderr.write('taille hors bornes\n')
         return 64
+    global CHEF_REAPE, SID_CHEF
     signal.signal(signal.SIGTERM, sur_term)
     avec_controle = True
     try:
@@ -254,6 +296,7 @@ def main():
             os.execvp(shell, [shell, '-l'])
         finally:
             os._exit(127)
+    SID_CHEF = pid
     taille(maitre, lignes, colonnes)
     os.set_blocking(maitre, False)
     os.set_blocking(1, False)
@@ -296,6 +339,7 @@ def main():
                 pousser(1, vers_serveur)  # BrokenPipeError : le serveur est parti -> arrêt
             termine, st = os.waitpid(pid, os.WNOHANG)
             if termine:
+                CHEF_REAPE = True  # réapé : le PID du chef peut être réutilisé, envoyer_membres ne le signale plus
                 vider(maitre, vers_serveur)
                 statut(2, fin_du_shell(pid, st))
                 gs = groupes(pid, maitre)

@@ -6,9 +6,10 @@
 #   T12  serveur tué par SIGKILL : assistant, shell et travail d'arrière-plan disparaissent en moins de 5 s ; T12.5 : toute la SESSION, nohup et disown compris
 #        (setsid : limite assumée, assertion qui la documente) et un leurre hors session intact
 #   T13  programme plein écran témoin, par le flux direct : écran alterné, 256 couleurs, truecolor, SIGWINCH, SIGINT
+#   T12.6 chaque branche d'arrêt (sortie du shell, SIGTERM, fin du fd 0) tue la session nohup comprise ; T12.7 relevé : vide = impossible, zombie = mort, chef réapé jamais visé
 #   T11.9 le shell n'hérite pas du descripteur 3 (canal de contrôle)     S3  entrée en attente côté serveur bornée : au-delà, 429 explicite
 #   T15  python3 du lab jamais exécuté (PATH à élément relatif ou vide), PATH du shell intact
-#   M-*  mutants (copies de la sortie ou du moteur, jamais le module) : M-INHERIT, M-ATTENTE-NON-BORNEE, M-ENVLARGE, M-CWD, M-SI-ABSENT, M-SANS-I, M-SANS-L, M-SIGINT, M-CTRLC, M-RESIZE, M-NOEOF, M-GROUPES-FIGES, M-PYTHON3-CWD
+#   M-*  mutants (copies de la sortie ou du moteur, jamais le module) : M-INHERIT, M-ATTENTE-NON-BORNEE, M-ENVLARGE, M-CWD, M-SI-ABSENT, M-SANS-I, M-SANS-L, M-SIGINT, M-CTRLC, M-RESIZE, M-NOEOF, M-GROUPES-FIGES, M-PYTHON3-CWD, M-SORTIE-SANS-KILL, M-ARRET-SANS-KILL, M-RELEVE-VIDE, M-ZOMBIE, M-ETAT-PROC, M-CHEF-REAPE
 # Les attentes cherchent des sous-chaînes (le noyau double les fins de ligne, l'écho ^C précède la sortie). Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
@@ -254,6 +255,100 @@ tuer_si() { # tuer_si <pid> <sous-chaîne de sa ligne de commande> : arrête un 
 }
 session_entiere t12b "$OUT"
 assert_eq "T12.5 — nohup et disown dans le shell (P71-D-28) : quatre processus vivaient, aucun ne survit à l'arrêt du serveur ; le setsid survit (limite assumée, hors session) ; le leurre hors terminal survit (rien d'autre n'est visé)" "$SE_RES" "4 0 oui oui"
+
+echo "=== T12.6 — chaque branche d'arrêt de l'assistant tue la session : sortie du shell, SIGTERM, fin du descripteur 0 (M1) ==="
+nohup_fin() { # nohup_fin <nom> <exit|term|eof> [moteur] -> NF_RES : « avant=<n> survivants=<n> fin=<code de l'assistant> » ; un nohup lancé dans le shell, puis la fin choisie
+  local n="$1" fin="$2" eng="${3:-$ENG}" act p nh sl avant=0 surv=0 pp
+  case "$fin" in exit) act='w:exit\r' ;; term) act=t ;; *) act=e ;; esac
+  RUN="$WORK/run/$n"; mkdir -p "$RUN"; rm -f "$RUN/nhq.pid"
+  VFT_RUN="$RUN" node "$AUX/pilote.mjs" "$eng/terminal/vf-cockpit-pty.py" "$WORK/bin/shell-test" "$WORK/$n.1" "$WORK/$n.2" 'a:VFP> ' "w:nohup $WORK/bin/dormir 311 nhq >/dev/null 2>&1 &\\r" 's:1500' "$act" > "$WORK/$n.res" 2>&1 & pp=$!; PIDS+=($pp)
+  attendre_fichier "$RUN/nhq.pid"; sleep 0.3
+  nh="$(cat "$RUN/nhq.pid" 2>/dev/null)"; sl="$(pgrep -P "${nh:-0}" | sed -n 1p)"
+  for p in $nh $sl; do [ "$(vivant "$p")" = oui ] && avant=$((avant+1)); done
+  wait "$pp" 2>/dev/null; sleep 0.3
+  for i in $(seq 1 30); do surv=0; for p in $nh $sl; do [ "$(vivant "$p")" = oui ] && surv=$((surv+1)); done; [ "$surv" = 0 ] && break; sleep 0.1; done
+  for p in $nh $sl; do tuer_si "$p" "sleep 311"; tuer_si "$p" dormir; done
+  NF_RES="avant=$avant survivants=$surv fin=$(cat "$WORK/$n.res" 2>/dev/null)"
+}
+nohup_fin t126a exit; NFA="$NF_RES"; nohup_fin t126b term; NFB="$NF_RES"; nohup_fin t126c eof; NFC="$NF_RES"
+assert_eq "T12.6a — le shell sort de lui-même (exit) après un nohup : le travail est tué avec la session (deux processus vivaient, aucun ne survit)" "$NFA" "avant=2 survivants=0 fin=code=0 sig=null"
+assert_eq "T12.6b — SIGTERM à l'assistant après un nohup : même résultat" "$NFB" "avant=2 survivants=0 fin=code=0 sig=null"
+assert_eq "T12.6c — fin du descripteur 0 après un nohup : même résultat" "$NFC" "avant=2 survivants=0 fin=code=0 sig=null"
+
+echo "=== T12.7 — relevé de processus : vide = impossible, zombie = mort, chef réapé = jamais signalé (M2, M3, N4) ==="
+cat > "$AUX/unit-pty.py" <<'PY'
+# unit-pty.py <vf-cockpit-pty.py> <cas> : fonctions de relevé de l'assistant importées (jamais lancé)
+import importlib.util, os, subprocess, sys, time
+sys.dont_write_bytecode = True  # jamais de __pycache__ à côté de l'assistant du moteur (synchro.sh verifier)
+spec = importlib.util.spec_from_file_location('pty_assistant', sys.argv[1]); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+cas = sys.argv[2]
+if cas == 'releve-vide':
+    # /proc vide (bac à sable) et ps illisible : le relevé ne contient pas l'assistant, il vaut « impossible » et déclenche le repli sur les groupes
+    vivant = subprocess.Popen(['sleep', '30'], start_new_session=True)
+    m.os.listdir = lambda p: []
+    def boom(*a, **k): raise OSError('ps illisible')
+    m.subprocess.run = boom
+    try: print('membres=%s vivants=%s' % (m.membres(os.getsid(0)), m.vivants(99999999, {vivant.pid})))
+    finally: vivant.kill(); vivant.wait()
+elif cas == 'zombie':
+    # zombie réel : le relevé en lit l'état Z (/proc ou ps), il n'est pas un membre ; (getsid d'un zombie échoue sous macOS, réussit sous Linux : voir etat-z)
+    mort = subprocess.Popen(['true']); vivant = subprocess.Popen(['sleep', '30']); time.sleep(0.6)
+    try:
+        r = m.releve(); ms = m.membres(os.getsid(0))
+        print('etat=%s zombie=%s vivant=%s' % (r.get(mort.pid, '?')[:1], mort.pid in ms, vivant.pid in ms))
+    finally: vivant.kill(); vivant.wait(); mort.wait()
+elif cas == 'etat-z':
+    # relevé qui déclare Z un processus dont getsid réussit (le cas Linux) : il est écarté ; témoin : le même relevé le déclarant S le garde
+    vivant = subprocess.Popen(['sleep', '30'])
+    try:
+        moi = os.getpid(); sid = os.getsid(0)
+        m.releve = lambda: {vivant.pid: 'Z', moi: 'S'}; z = vivant.pid in m.membres(sid)
+        m.releve = lambda: {vivant.pid: 'S', moi: 'S'}; s_ = vivant.pid in m.membres(sid)
+        print('Z=%s S=%s' % (z, s_))
+    finally: vivant.kill(); vivant.wait()
+elif cas == 'etat-proc':
+    import tempfile
+    d = tempfile.mkdtemp(); os.mkdir(d + '/4242'); open(d + '/4242/stat', 'w').write('4242 (a) b) Z 1 4242 4242 0\n'); m.PROC = d
+    print('Z=%s absent=%s' % (m.etat_proc(4242), m.etat_proc(4243)))
+elif cas == 'chef-reape':
+    chef = subprocess.Popen(['sleep', '30'], start_new_session=True)
+    try:
+        avant = chef.pid in m.membres(chef.pid); m.CHEF_REAPE = True; apres = chef.pid in m.membres(chef.pid)
+        print('avant=%s apres=%s' % (avant, apres))
+    finally: chef.kill(); chef.wait()
+PY
+mutant_unit() { # mutant_unit <nom> <sed> -> MUT_PTY : copie de l'assistant mutée ; code 1 si la copie n'a pas changé
+  MUT_PTY="$WORK/pty-$1.py"; cp "$ENG/terminal/vf-cockpit-pty.py" "$MUT_PTY"; cp "$MUT_PTY" "$MUT_PTY.orig"; sed -i.bak "$2" "$MUT_PTY"
+  local r=0; cmp -s "$MUT_PTY" "$MUT_PTY.orig" && r=1; rm -f "$MUT_PTY.orig" "$MUT_PTY.bak"; return $r
+}
+unit_pty() { python3 -I "$AUX/unit-pty.py" "$1" "$2" 2>&1 | tail -1; }
+PTY_REEL="$ENG/terminal/vf-cockpit-pty.py"
+assert_eq "T12.7a — relevé vide (/proc vide, ps illisible) : il ne contient pas l'assistant, donc « impossible » (None) et le repli sur les groupes voit le groupe vivant" "$(unit_pty "$PTY_REEL" releve-vide)" "membres=None vivants=True"
+assert_eq "T12.7b — un zombie réel : le relevé en lit l'état Z et il n'est pas un membre ; témoin : un processus vivant de la même session l'est" "$(unit_pty "$PTY_REEL" zombie)" "etat=Z zombie=False vivant=True"
+assert_eq "T12.7d — un relevé qui déclare Z un processus dont getsid réussit (cas Linux) l'écarte ; témoin : déclaré S, il est gardé" "$(unit_pty "$PTY_REEL" etat-z)" "Z=False S=True"
+assert_eq "T12.7e — lecture de /proc/<pid>/stat : l'état suit la DERNIÈRE parenthèse fermante (nom de commande à parenthèses), processus disparu : None" "$(unit_pty "$PTY_REEL" etat-proc)" "Z=Z absent=None"
+assert_eq "T12.7c — le chef de session réapé n'est jamais visé (PID réutilisable) ; témoin : tant qu'il n'est pas réapé, il est un membre" "$(unit_pty "$PTY_REEL" chef-reape)" "avant=True apres=False"
+
+echo "=== M-* — mutants de l'arrêt et du relevé de l'assistant (M1, M2, M3, N4) ==="
+if mutant_eng sortiesanskill 's/^                sigkill_session(pid, gs)$/                pass/'; then
+  nohup_fin m15 exit "$MUT_ENG"; assert_eq "M-SORTIE-SANS-KILL — le mutant retire la mise à mort de la branche « shell sorti » : les deux processus du nohup survivent (T12.6a rouge)" "$NF_RES" "avant=2 survivants=2 fin=code=0 sig=null"
+else sans_effet M-SORTIE-SANS-KILL; fi
+if mutant_eng arretsanskill 's/^    sigkill_session(sid, gs)/    pass #/'; then
+  nohup_fin m16 term "$MUT_ENG"; R16="$NF_RES"; nohup_fin m17 eof "$MUT_ENG"
+  assert_eq "M-ARRET-SANS-KILL — le mutant retire la mise à mort de arreter() : SIGTERM et fin du descripteur 0 laissent survivre le nohup (T12.6b et T12.6c rouges)" "$R16 | $NF_RES" "avant=2 survivants=2 fin=code=0 sig=null | avant=2 survivants=2 fin=code=0 sig=null"
+else sans_effet M-ARRET-SANS-KILL; fi
+if mutant_unit relevevide 's/if moi in r:/if True:/'; then
+  assert_eq "M-RELEVE-VIDE — le mutant (un relevé sans l'assistant est pris pour valide) rougit T12.7a : membres = [] et le repli sur les groupes n'a pas lieu" "$(unit_pty "$MUT_PTY" releve-vide)" "membres=[] vivants=False"
+else sans_effet M-RELEVE-VIDE; fi
+if mutant_unit zombie "s/ and not e.startswith('Z')//"; then
+  assert_eq "M-ZOMBIE — le mutant (l'état Z n'écarte plus rien) rougit T12.7d : le processus déclaré Z reste membre" "$(unit_pty "$MUT_PTY" etat-z)" "Z=True S=True"
+else sans_effet M-ZOMBIE; fi
+if mutant_unit etatproc "s/t\[i + 2:i + 3\]/t[i + 1:i + 2]/"; then
+  assert_eq "M-ETAT-PROC — le mutant (état lu un caractère trop tôt) rougit T12.7e" "$(unit_pty "$MUT_PTY" etat-proc)" "Z= absent=None"
+else sans_effet M-ETAT-PROC; fi
+if mutant_unit chefreape 's/if CHEF_REAPE and p == sid:/if False:/'; then
+  assert_eq "M-CHEF-REAPE — le mutant (le chef réapé reste visé) rougit T12.7c" "$(unit_pty "$MUT_PTY" chef-reape)" "avant=True apres=True"
+else sans_effet M-CHEF-REAPE; fi
 
 echo "=== T15 — python3 du lab jamais exécuté par le serveur (F3 ; P71-D-25, P71-D-03 : le PATH du shell reste celui de l'utilisateur) ==="
 python3_du_lab() { # python3_du_lab <nom> <sortie> <préfixe de PATH> [moteur] -> PY_RES : « <python3 du lab exécuté> <invite arrivée> <PATH du shell conserve le préfixe> »

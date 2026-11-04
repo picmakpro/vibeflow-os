@@ -19,8 +19,13 @@ const log = (m) => console.error(`vf-cockpit (terminal) : ${m}`);
 export const TAMPON_MAX = 262144;
 export const TAILLE_MAX = { lignes: 500, colonnes: 1000 }; // l'unique borne de taille : le serveur (/flux, /taille) et l'assistant PTY (vf-cockpit-pty.py) la tiennent à l'identique
 export const ENTREE_ATTENTE_MAX = 262144;
-const FERMETURE_MAX_MS = 6000; // un assistant qui n'est pas mort 6 s après l'EOF (grâce interne 3 s + SIGKILL) reçoit SIGTERM : la place ne reste jamais prise
+// Fermeture bornée : un assistant qui n'est pas mort FERMETURE_MAX_MS (6 s : grâce interne 3 s + SIGKILL de la session) après l'EOF reçoit SIGTERM ; s'il vit encore
+// ESCALADE_MS plus tard (SIGTERM n'est qu'un drapeau chez lui, s'il est bloqué dans son arrêt), il reçoit SIGKILL ; ESCALADE_MS après, la place est rendue quoi qu'il arrive :
+// au plus FERMETURE_MAX_MS + 2 × ESCALADE_MS (8 s) après l'échéance de la grâce, jamais une place prise pour toujours.
+const ESCALADE_MS = 1000;
+const fermetureDepuis = (v) => { const n = Number(v); return Number.isInteger(n) && n >= 100 && n <= 30000 ? n : 6000; }; // réglage de test seulement (comme la grâce)
 const graceDepuis = (v) => { const n = Number(v); return Number.isInteger(n) && n >= 100 && n <= 30000 ? n : 30000; }; // réglage de test seulement (P71-PL-18)
+export const FERMETURE_MAX_MS = fermetureDepuis(process.env.VF_COCKPIT_TERM_FERMETURE_MS);
 export const GRACE_MS = graceDepuis(process.env.VF_COCKPIT_TERM_GRACE_MS);
 // Résolution de l'interpréteur par le serveur (P71-D-25, F3) : le cwd du serveur est le lab, donc un élément relatif ou vide du PATH (« . », « : » en tête ou en
 // queue) ferait exécuter un python3 du lab. On cherche python3 dans les seuls éléments ABSOLUS du PATH et on lance son chemin absolu. Le PATH du SHELL n'est pas touché (P71-D-03).
@@ -60,7 +65,15 @@ export function creerSessions({ engineDir, lab, jetons = () => [] }) {
     if (s !== cible || cible.etat !== 'detachee') return;
     cible.etat = 'fermeture'; vider();
     try { cible.enfant.stdin.end(); } catch {}
-    const garde = setTimeout(() => { if (cible.etat === 'fermeture') { try { cible.enfant.kill('SIGTERM'); } catch {} } }, FERMETURE_MAX_MS); garde.unref?.();
+    const garde = setTimeout(() => {
+      if (cible.etat !== 'fermeture') return;
+      try { cible.enfant.kill('SIGTERM'); } catch {}
+      const dur = setTimeout(() => {
+        if (cible.etat !== 'fermeture') return;
+        try { cible.enfant.kill('SIGKILL'); } catch {}
+        const rendre = setTimeout(() => { if (cible.etat === 'fermeture') { cible.sorti = true; terminer(cible); } }, ESCALADE_MS); rendre.unref?.();
+      }, ESCALADE_MS); dur.unref?.();
+    }, FERMETURE_MAX_MS); garde.unref?.();
   };
   const detacher = (cible, res) => {
     if (cible.res !== res || cible.etat !== 'vivante') return;
