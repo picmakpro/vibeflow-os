@@ -338,6 +338,12 @@ Q "$SCRIPTS" "$LP" "$WORK/s-de-tenu-co-x" "$WORK/v156.json"
 assert_eq "V15.6 — fixture, dépôt tenu et compartiment x tenu (autre sujet) : le dépôt couvre w, les missions vivent" "$(DAGS "$WORK/v156.json")" "MISSION-1:running,MISSION-2:running"
 Q "$SCRIPTS" "$LP" "$WORK/s-co-peri" "$WORK/v157.json"
 assert_eq "V15.7 — contre-épreuve : sans verrou de dépôt, compartiment w périmé seul : abandonnee (P68-D-26 inchangée)" "$(DAGS "$WORK/v157.json")" "MISSION-1:abandonnee,MISSION-2:abandonnee"
+lab2 "$DEPOT_T" "$(co true null)" | fake "$WORK/s-de-tenu-co-peri"
+Q "$SCRIPTS" "$LP" "$WORK/s-de-tenu-co-peri" "$WORK/v158.json"
+assert_eq "V15.8 — P68-D-36 : compartiment w PÉRIMÉ présent + dépôt tenu : le verrou de compartiment arrête la cascade, abandonnee (règle de P68-D-27 au cran suivant)" "$(DAGS "$WORK/v158.json")" "MISSION-1:abandonnee,MISSION-2:abandonnee"
+M159="$(mut codepot vf-cockpit-vie.mjs "if (eCo) return vieDeEntree(eCo);" "if (eCo && !liste.some((e) => e.scope === 'depot' && estVivante(vieDeEntree(e)))) return vieDeEntree(eCo);" 2>&1)"
+Q "$WORK/mut-codepot" "$LP" "$WORK/s-de-tenu-co-peri" "$WORK/v159.json"
+assert_eq "V15.9 — copie mutée (le cran dépôt l'emporte sur un compartiment périmé) détectée : les missions redeviennent running" "$M159|$(DAGS "$WORK/v159.json")" "muté|MISSION-1:running,MISSION-2:running"
 R
 
 # ---------- V16 — audit F-8 : un âge de progression négatif n'est pas un progrès récent ----------
