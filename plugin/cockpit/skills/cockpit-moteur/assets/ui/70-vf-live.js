@@ -57,7 +57,7 @@
     const held = (Array.isArray(l?.locks) ? l.locks : l?.present ? [l] : []).filter((x) => x.present); // lab plat : un seul verrou, sans `locks`
     if (!held.length) return { cls: '', text: 'Driver libre', title: 'Aucun verrou de driver tenu' };
     const x = held[0];
-    return { cls: 'held', text: `${x.owner || '?'} · ${x.step || ''} · ${x.age_seconds ?? '?'} s`, title: held.map((y) => `${[y.scope, y.ws].filter(Boolean).join(' ')}${y.scope || y.ws ? ' : ' : ''}${y.owner || '?'}${y.step ? ` (${y.step})` : ''}`).join('\n') }; // lab plat : pas de scope, jamais « undefined : … »
+    return { cls: 'held', text: `${x.owner || '?'} · ${x.step || ''} · ${x.age_seconds ?? '?'} s`, title: held.map((y) => `${[y.scope === 'depot' ? 'dépôt' : y.scope, y.ws].filter(Boolean).join(' ')}${y.scope || y.ws ? ' : ' : ''}${y.owner || '?'}${y.step ? ` (${y.step})` : ''}`).join('\n') }; // lab plat : pas de scope, jamais « undefined : … » ; recette 68 R12 (P68-D-35, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04) : la portée « depot » s'affiche « dépôt » (libellé seul, la valeur scope du JSON reste depot)
   };
   const KIND = { session: 'Session', subagent: 'Sous-agent', lock: 'Verrou', registered: 'Enregistré', 'dag-node': 'Nœud de DAG' };
   const duree = (s) => window.__vfEquipeRendu.duree(s); // le format vit dans 71-vf-equipe-rendu.js (chargé après ce fichier, appelé après)
@@ -65,9 +65,20 @@
   // « au travail » : un agent (session ou sous-agent) `actif` ; ni verrou, ni nœud de DAG, ni terminé, ni agent en attente (P69-D-14, P69-D-33). Même prédicat que
   // les effectifs de l'onglet Équipe (71-vf-equipe-rendu.js) : pour une même collecte, le badge égale « actifs ».
   const auTravail = (w) => window.__vfEquipeRendu.actif(w);
+  // P68-D-39 : l'âge d'un verrou est celui du flux `lock` (age_seconds, rafraîchi à chaque événement), jamais l'ageS du `who`, figé tant que la liste ne change pas (whoSig l'exclut) ;
+  // le verrou se retrouve par son propriétaire (et sa portée quand plusieurs verrous ont le même), repli sur l'ageS du `who` si le flux ne le porte pas
+  const ageDe = (w) => {
+    if (w.kind !== 'lock') return w.ageS;
+    const l = probe.lock, tenus = (Array.isArray(l?.locks) ? l.locks : l?.present ? [l] : []).filter((x) => x.present && x.owner === w.id);
+    // correspondance EXACTE sur la portée et le compartiment (M-3), jamais par sous-chaîne (`fiabilite` n'est pas `fiabilite-2`) : `tree` d'un compartiment se lit en mots
+    // (mot 1 = le nom, mot 3 = la phase éventuelle, comme l'écrit vf-cockpit-who.mjs), celui d'un verrou sans compartiment est sa portée ; aucun libellé n'est reconstruit ici
+    const mots = String(w.tree).split(' '), ph = (y) => /^[0-9]+(\.[0-9]+)*$/.test(String(y.phase)) ? String(y.phase) : '';
+    const x = tenus.find((y) => y.ws ? mots[1] === y.ws && (mots[3] || '') === ph(y) : y.scope === w.tree) || (tenus.length === 1 ? tenus[0] : undefined);
+    return typeof x?.age_seconds === 'number' ? x.age_seconds : w.ageS;
+  };
   const htmlTiroir = () => {
     const ws = who?.workers || [], act = ws.filter(auTravail), reste = ws.filter((w) => !AGENT(w));
-    const row = (w) => `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${h(duree(w.ageS))}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span><div>${h(w.task || '')}</div></div>`;
+    const row = (w) => `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.kind === 'lock' && w.tree === 'depot' ? 'dépôt' : w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${h(duree(ageDe(w)))}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span><div>${h(w.task || '')}</div></div>`;
     const SOURCES = { sessions: 'Sessions et sous-agents', locks: 'Verrous du dépôt', dags: 'Plans de la mission' }; // clés de la collecte, jamais affichées telles quelles (P70-D-04)
     const src = Object.entries(who?.sources || {}).map(([k, v]) => `${SOURCES[k] || k} : ${v.etat}`).join(' · ');
     const arbre = window.__vfEquipeRendu.arbre(ws, h);

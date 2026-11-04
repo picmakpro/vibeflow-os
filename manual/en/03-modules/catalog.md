@@ -93,7 +93,9 @@ own `module.json` — it's said here because it changes what you can expect from
   fix, re-test until green or until the budget runs out. It depends on `mobile-test`.
 - **`cockpit`** — the lab's local control panel, opened by typing `/vf-cockpit`. A read-only web page
   on your machine shows where the lab stands (milestones, phases, plans, requirements, missions, who
-  is working right now), lets you ask it questions, and maps the code. It makes no outgoing request
+  is working right now), lets you ask it questions, and maps the code. A second surface, the
+  `/vf-signal` pane inside your Claude Code session, shows the same state in the terminal (mission,
+  team, macro view, lag behind `main`, a button that opens the web page). It makes no outgoing request
   apart from the agent that answers your questions, and it is available to every role.
 - **`reference`** — the documentation module. It lays down neither agent nor script: it brings the
   VibeFlow methodology and its architecture patterns, to read when you want to understand *why* the

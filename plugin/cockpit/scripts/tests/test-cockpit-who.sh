@@ -95,7 +95,7 @@ echo "=== W2 — verrou via le driver-lock.sh de HOME ==="
 cat > "$HOME_T/.claude/scripts/driver-lock.sh" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
-  status) echo '{"locks":[{"present":true,"owner":"mgr-test","step":"exec","ws":"","scope":"repo","age_seconds":10,"stale":false,"children_running":0}]}' ;;
+  status) echo '{"present": true, "scope": "lab", "location": "git-common-dir", "legacy_lock": false, "locks": [{"present": true, "owner": "mgr-test", "step": "exec", "age_seconds": 10, "ttl": 1800, "stale": false, "generation": "g1", "session_ids": [], "lease_seconds": 5, "guard_effective": false, "progress_epoch": null, "progress_age_seconds": null, "children_running": 0, "scope": "depot", "ws": "", "location": "git-common-dir"}], "children_running": 0}' ;;
   orphans) echo '{"orphans":[]}' ;;
 esac
 SH
@@ -111,7 +111,12 @@ cat > "$FLAT/.planning/ROADMAP.md" <<'MD'
 MD
 printf '%s\n' '<objective>Faire le socle</objective>' > "$FLAT/.planning/phases/01-x/01-01-PLAN.md"
 printf '%s\n' 'ok' > "$FLAT/.planning/phases/01-x/01-01-SUMMARY.md"
-Q project "$FLAT" > "$WORK/proj.json"
+# vie d'une mission (VFSG-06, P68-D-29) : le graphe Projet lit le verrou de la phase d'une mission `running` ; ce lab n'en a pas, mais l'appel est épinglé quand même
+# (HOME jetable ET dossier de scripts explicite, hors de toute disposition …/cockpit/scripts, portant un faux verrou tenu) pour ne jamais dépendre du poste.
+# Le dossier n'est posé que sur cet appel en processus : les serveurs de la suite reçoivent leur propre VF_COCKPIT_SCRIPTS_DIR.
+mkdir -p "$WORK/locks-pin"
+printf '#!/usr/bin/env bash\ncase "$1" in status) echo "{\\"present\\": true, \\"ws\\": \\"\\", \\"stale\\": false, \\"ttl\\": 1800, \\"progress_age_seconds\\": 30}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' > "$WORK/locks-pin/driver-lock.sh"; chmod +x "$WORK/locks-pin/driver-lock.sh"
+HOME="$HOME_T" VF_COCKPIT_SCRIPTS_DIR="$WORK/locks-pin" Q project "$FLAT" > "$WORK/proj.json"
 assert_eq "W3.1 — schéma Projet nommé VibeFlow" "$(G "$WORK/proj.json" 'j.schema')" "vibeflow/cockpit-project@1"
 assert_eq "W3.2 — ph-1 est fait" "$(G "$WORK/proj.json" 'j.nodes.filter(n=>n.id==="ph-1").map(n=>n.st).join(",")')" "done"
 assert_eq "W3.3 — le plan 01-01 est fait" "$(G "$WORK/proj.json" 'j.files.filter(f=>f.name.startsWith("01-01")).map(f=>f.st).join(",")')" "done"
@@ -172,7 +177,7 @@ TRAP="$WORK/trap.sh"
 cat > "$TRAP" <<SH
 #!/usr/bin/env bash
 touch "$WORK/EXECUTE"
-case "\$1" in status) echo '{"locks":[{"present":true,"owner":"PIEGE","step":"x","ws":"","scope":"repo","age_seconds":1,"stale":false}]}' ;; orphans) echo '{"orphans":[]}' ;; esac
+case "\$1" in status) echo '{"present": true, "scope": "lab", "location": "git-common-dir", "legacy_lock": false, "locks": [{"present": true, "owner": "PIEGE", "step": "x", "age_seconds": 1, "ttl": 1800, "stale": false, "generation": "g1", "session_ids": [], "lease_seconds": 5, "guard_effective": false, "progress_epoch": null, "progress_age_seconds": null, "children_running": 0, "scope": "depot", "ws": "", "location": "git-common-dir"}], "children_running": 0}' ;; orphans) echo '{"orphans":[]}' ;; esac
 SH
 mkdir -p "$LAB/plugin/conductor/scripts"; cp "$TRAP" "$LAB/plugin/conductor/scripts/driver-lock.sh"
 Q who "$LAB" "$H0" "$NOSCRIPTS" > "$WORK/who-w9.json"
@@ -473,20 +478,59 @@ mkdir -p "$WORK/trap18/x/scripts" "$WORK/trap18/conductor/scripts"; cp "$TRAP" "
 Q who "$L17" "$H18" "$WORK/trap18/x/scripts" > "$WORK/who18c.json"
 assert_eq "W18.4 — un frère de n'importe quel dossier « scripts » n'est pas exécuté" "$([ -e "$WORK/EXECUTE" ] && echo oui || echo non)|$(G "$WORK/who18c.json" 'j.workers.filter(w=>w.id==="PIEGE").length')" "non|0"
 
-# ---------- W19 — la clause `..` de la grammaire ws, prouvée par le COMPORTEMENT (Phase 70, plan 70-11, UIFN-13) ----------
+# ---------- W19 — toute commande git de la chaîne de l'émetteur neutralise fsmonitor (F-03 ; T-68-04) ----------
+# Un `.git/config` écrit par d'autres peut déclarer un core.fsmonitor exécutable. Lab jetable, DAG commité (donc suivi et propre : le chemin
+# `ls-files` + `status --porcelain` + `log` est parcouru) portant un nœud running frais ; le script de fsmonitor laisse un fichier témoin s'il s'exécute.
+echo "=== W19 — un core.fsmonitor du .git/config n'est jamais exécuté par la chaîne de l'émetteur ==="
+L19="$WORK/lab19"; mkdir -p "$L19/.planning/missions"; git -C "$L19" init -q
+printf -- '- [ ] **Phase 1: Un** - a\n' > "$L19/.planning/ROADMAP.md"
+printf '{"nodes":[{"id":"n19","step":"s","stage":"exec","deps":[],"scope":[],"status":"running"}]}\n' > "$L19/.planning/missions/MISSION-1.dag.json"
+git -C "$L19" add -A; git -C "$L19" -c user.email=t@t -c user.name=t commit -q -m c0
+MARK19="$WORK/FSMONITOR-EXECUTE"
+printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$MARK19" > "$WORK/fsmon19.sh"; chmod +x "$WORK/fsmon19.sh"
+git -C "$L19" config core.fsmonitor "$WORK/fsmon19.sh"
+rm -f "$MARK19"; git -C "$L19" status --porcelain >/dev/null 2>&1
+assert_eq "W19.0 — témoin positif : le script de fsmonitor s'exécute quand git status tourne sans précaution" "$([ -e "$MARK19" ] && echo exécuté || echo muet)" "exécuté"
+rm -f "$MARK19"
+Q who "$L19" "$HOME_T" "$NOSCRIPTS" > "$WORK/who19.json"
+assert_eq "W19.1 — collectWho : le nœud running frais est lu (chemin git parcouru)" "$(G "$WORK/who19.json" 'j.workers.filter(w=>w.kind==="dag-node").map(w=>w.id).join(",")')" "n19"
+assert_eq "W19.2 — collectWho : le script de fsmonitor n'a jamais été exécuté" "$([ -e "$MARK19" ] && echo exécuté || echo intact)" "intact"
+rm -f "$MARK19"
+HOME="$HOME_T" node "$SCRIPTS/vf-cockpit-signal.mjs" "$L19" > "$WORK/sig19.json" 2>/dev/null
+assert_eq "W19.3 — l'émetteur entier sur ce lab : sortie signal@1 produite, script de fsmonitor jamais exécuté" "$(G "$WORK/sig19.json" 'j.schema')|$([ -e "$MARK19" ] && echo exécuté || echo intact)" "vibeflow/cockpit-signal@1|intact"
+
+# ---------- W20 — audit F-9, F-6, F-5 : DAG mal formé, `--` devant le chemin, git en lecture seule ----------
+echo "=== W20 — nœud nul dans un DAG, ls-files sans option injectable, .git/index intact ==="
+L20="$WORK/lab20"; mkdir -p "$L20/.planning/missions"; git -C "$L20" init -q
+printf -- '- [ ] **Phase 1: Un** - a\n' > "$L20/.planning/ROADMAP.md"
+printf '{"nodes":[null,3,"x",{"id":"n20","step":"s","stage":"exec","deps":[],"scope":[],"status":"running"}]}\n' > "$L20/.planning/missions/MISSION-1.dag.json"
+printf '{"nodes":[{"id":"z","step":"s","stage":"exec","deps":[],"scope":[],"status":"running"}]}\n' > "$L20/.planning/missions/-opt.dag.json"
+git -C "$L20" add -A; git -C "$L20" -c user.email=t@t -c user.name=t commit -q -m c0
+HOME="$HOME_T" node "$SCRIPTS/vf-cockpit-signal.mjs" "$L20" > "$WORK/sig20.json" 2>"$WORK/sig20.err"; RC20=$?
+assert_eq "W20.1 — F-9 : un DAG à nœuds nuls ne fait pas planter l'émetteur (exit 0, signal@1)" "$RC20|$(G "$WORK/sig20.json" 'j.schema' 2>/dev/null)" "0|vibeflow/cockpit-signal@1"
+Q who "$L20" "$HOME_T" "$NOSCRIPTS" > "$WORK/who20.json" 2>/dev/null
+assert_eq "W20.2 — F-9 : les nœuds valides du même DAG sont encore lus" "$(G "$WORK/who20.json" 'j.workers.filter(w=>w.kind==="dag-node").map(w=>w.id).sort().join(",")' 2>/dev/null)" "n20,z"
+assert_eq "W20.3 — F-6 : chaque ls-files --error-unmatch de who.mjs met -- devant le chemin" "$(grep -c "'ls-files', '--error-unmatch', '--', f" "$SCRIPTS/vf-cockpit-who.mjs")" "1"
+git -C "$L20" status >/dev/null 2>&1; touch -t 202001010000 "$L20/.git/index"; M0="$(stat -f %m "$L20/.git/index" 2>/dev/null || stat -c %Y "$L20/.git/index")"
+printf '\n' >> "$L20/.planning/ROADMAP.md"   # sale : git status voudrait rafraîchir l'index
+HOME="$HOME_T" node "$SCRIPTS/vf-cockpit-signal.mjs" "$L20" > /dev/null 2>&1
+M1="$(stat -f %m "$L20/.git/index" 2>/dev/null || stat -c %Y "$L20/.git/index")"
+assert_eq "W20.4 — F-5 : la date de modification de .git/index ne bouge pas après l'émetteur" "$M1" "$M0"
+
+# ---------- W21 — la clause `..` de la grammaire ws, prouvée par le COMPORTEMENT (Phase 70, plan 70-11, UIFN-13) ----------
 # La clause `!ws.includes('..')` n'était gardée que par une ancre de texte (W17.9 supprime tout le filtre). Ici un compartiment `a..b` passe la forme
 # alphanumérique de WS_RE : seule la clause `..` l'écarte. Le faux driver-lock.sh de W17 journalise ses arguments : la cible `a..b` ne doit jamais lui arriver ;
 # le mutant (clause retirée, tout le reste du filtre intact) la lui livre.
-echo "=== W19 — un ws contenant « .. » n'arrive jamais en argument de driver-lock.sh ==="
-L19="$WORK/lab-w19"; mkdir -p "$L19"; git -C "$L19" init -q
-mkdir -p "$L19/.git/vf-driver/ws/ok1" "$L19/.git/vf-driver/ws/a..b"
-run19() { : > "$LOG17"; HOSTILE_LOG="$LOG17" node "$AUX/q.mjs" "$1" who "$L19" "$HOME_T" "$HOS" > /dev/null; }
-run19 "$SCRIPTS"
-assert_eq "W19.0 — contrôle positif : le compartiment a..b existe sur disque et la cible valide ok1 a bien été interrogée" "dir:$([ -d "$L19/.git/vf-driver/ws/a..b" ] && echo oui || echo non)|ok1:$(grep -c '^orphans --ws=ok1$' "$LOG17")" "dir:oui|ok1:1"
-assert_eq "W19.1 — la cible a..b n'est jamais passée au script (grammaire : jamais « .. »)" "$(grep -c -- '--ws=a\.\.b' "$LOG17")" "0"
-M19="$(mut17 sansdoublepoint vf-cockpit-who.mjs "WS_RE.test(ws) && !ws.includes('..')" "WS_RE.test(ws)")"
-run19 "$WORK/mut17-sansdoublepoint"
-assert_eq "W19.2 — mutant (seule la clause « .. » retirée, le reste du filtre intact) : a..b arrive au script, détecté par le comportement" "$M19|$(grep -c -- '--ws=a\.\.b' "$LOG17")" "muté|1"
+echo "=== W21 — un ws contenant « .. » n'arrive jamais en argument de driver-lock.sh ==="
+L21="$WORK/lab-w19"; mkdir -p "$L21"; git -C "$L21" init -q
+mkdir -p "$L21/.git/vf-driver/ws/ok1" "$L21/.git/vf-driver/ws/a..b"
+run21() { : > "$LOG17"; HOSTILE_LOG="$LOG17" node "$AUX/q.mjs" "$1" who "$L21" "$HOME_T" "$HOS" > /dev/null; }
+run21 "$SCRIPTS"
+assert_eq "W21.0 — contrôle positif : le compartiment a..b existe sur disque et la cible valide ok1 a bien été interrogée" "dir:$([ -d "$L21/.git/vf-driver/ws/a..b" ] && echo oui || echo non)|ok1:$(grep -c '^orphans --ws=ok1$' "$LOG17")" "dir:oui|ok1:1"
+assert_eq "W21.1 — la cible a..b n'est jamais passée au script (grammaire : jamais « .. »)" "$(grep -c -- '--ws=a\.\.b' "$LOG17")" "0"
+M21="$(mut17 sansdoublepoint vf-cockpit-who.mjs "WS_RE.test(ws) && !ws.includes('..')" "WS_RE.test(ws)")"
+run21 "$WORK/mut17-sansdoublepoint"
+assert_eq "W21.2 — mutant (seule la clause « .. » retirée, le reste du filtre intact) : a..b arrive au script, détecté par le comportement" "$M21|$(grep -c -- '--ws=a\.\.b' "$LOG17")" "muté|1"
 
 vf_hyg_assert
 

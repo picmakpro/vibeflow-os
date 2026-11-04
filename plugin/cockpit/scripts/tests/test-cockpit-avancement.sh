@@ -17,7 +17,12 @@ export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
-AUX="$WORK/aux"; mkdir -p "$AUX"
+AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home" "$WORK/locks"
+# vie d'une mission (VFSG-06) : le planning lit le verrou de driver ; la suite fournit un faux verrou TENU dans un dossier de scripts explicite,
+# hors de toute disposition …/cockpit/scripts (sinon le conductor voisin du dépôt serait trouvé, P68-D-29), et un HOME jetable.
+export HOME="$WORK/home"
+printf '#!/usr/bin/env bash\ncase "$1" in status) echo "{\\"present\\": true, \\"ws\\": \\"\\", \\"stale\\": false, \\"ttl\\": 1800, \\"progress_age_seconds\\": 30}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' > "$WORK/locks/driver-lock.sh"; chmod +x "$WORK/locks/driver-lock.sh"
+export VF_COCKPIT_SCRIPTS_DIR="$WORK/locks"
 
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -79,14 +84,15 @@ const a = JSON.parse(fs.readFileSync(path.join(dir, 'vf-cockpit-interface.json')
 if (!a) { console.log('clé avancement absente du contrat'); process.exit(0); }
 const eq = (x, y) => JSON.stringify(x) === JSON.stringify(y);
 const ecarts = [];
-if (a.version !== 1) ecarts.push('version');
+if (a.version !== 2) ecarts.push('version');
 if (!eq(a.etats, m.ETATS)) ecarts.push('etats');
 if (!eq(a.reste, m.RESTE)) ecarts.push('reste');
 const echantillon = m.avancement({ ph: { done: false }, fichiers: [], missions: [] });
 if (!eq(Object.keys(a.requis || {}).sort(), Object.keys(echantillon).sort())) ecarts.push('requis');
 const typeDe = (v) => (Array.isArray(v) ? 'array' : typeof v);
 for (const [k, t] of Object.entries(a.requis || {})) if (t !== 'any' && k in echantillon && typeDe(echantillon[k]) !== t) ecarts.push('type:' + k);
-const vocab = [m.etatMission([{ status: 'running' }]), m.etatMission([{ status: 'failed' }]), m.etatMission([{ status: 'done' }]), m.etatMission([])].sort();
+const vocab = [...m.ETATS_MISSION].sort();
+if (!eq(Object.keys(a.vie?.requis || {}).sort(), ['progressAgeS', 'stale', 'tenu', 'ttl'])) ecarts.push('vie');
 if (!eq([...(a.missionEtats || [])].sort(), vocab)) ecarts.push('missionEtats');
 console.log(ecarts.length ? 'dérive : ' + ecarts.join(',') : 'ok');
 JS
@@ -281,8 +287,8 @@ assert_eq "A2.1 — phase 1 (7/7 plans, STATE sur la phase 9) : a-recetter" "$(P
 assert_eq "A2.2 — carte ph-1 : statut projeté et pied « à recetter »" "$(NDF "$WORK/gl.json" ph-1 .st)|$(G "$WORK/gl.json" 'j.nodes.find(n=>n.id==="ph-1").foot.includes("à recetter")')" "active|true"
 assert_eq "A2.3 — lab L4 : états des phases 1 à 5" "$(G "$WORK/p4.json" 'j.phases.map(p=>p.avancement?.etat).join()')" "fait,en-cours,en-cours,a-recetter,a-recetter"
 assert_eq "A2.4 — phase 2 du lab L (aucun plan) : a-faire" "$(PHF "$WORK/pl.json" '|2' etat)" "a-faire"
-assert_eq "A2.5 — clés exactes de l'objet et version 1" "$(G "$WORK/pl.json" 'Object.keys(j.phases[0].avancement||{}).sort().join()+"|"+j.phases[0].avancement?.version')" "correctifs,etat,mission,plans,reste,version|1"
-assert_eq "A2.6 — mission de la phase 1 : nom et état ; de la phase 2 : null" "$(G "$WORK/pl.json" 'JSON.stringify(j.phases[0].avancement?.mission)+"|"+JSON.stringify(j.phases[1].avancement?.mission)')" '{"nom":"2026-11-01-v-cockpit","etat":"done"}|null'
+assert_eq "A2.5 — clés exactes de l'objet et version 2" "$(G "$WORK/pl.json" 'Object.keys(j.phases[0].avancement||{}).sort().join()+"|"+j.phases[0].avancement?.version')" "correctifs,etat,mission,plans,reste,version|2"
+assert_eq "A2.6 — mission de la phase 1 : nom, état et vie ; de la phase 2 : null" "$(G "$WORK/pl.json" 'JSON.stringify(j.phases[0].avancement?.mission)+"|"+JSON.stringify(j.phases[1].avancement?.mission)')" '{"nom":"2026-11-01-v-cockpit","etat":"done","vie":null}|null'
 
 # ---------- A3 — témoin (c), CKPT-15 ----------
 echo "=== A3 — rattachement des missions (témoin c) ==="
@@ -326,8 +332,8 @@ assert_eq "A18.2 — contrôle de mutant : la copie compare au numéro courant e
 assert_eq "A18.3 — la copie mutée rend ph-2 active : l'assertion A18.1 la voit" "$(NDF "$WORK/g5-mut.json" ph-2 .st)" "active"
 
 # ---------- A7 — contrat versionné (P69-D-10) ----------
-echo "=== A7 — contrat avancement@1 ==="
-assert_eq "A7.1 — le bloc avancement du contrat égale ETATS et RESTE, version 1" "$(node "$AUX/contrat.mjs" "$SCRIPTS")" "ok"
+echo "=== A7 — contrat avancement@2 ==="
+assert_eq "A7.1 — le bloc avancement du contrat égale ETATS, RESTE et ETATS_MISSION, version 2" "$(node "$AUX/contrat.mjs" "$SCRIPTS")" "ok"
 node "$AUX/mutate.mjs" interface "$WORK/mut/vf-cockpit-interface.json" >/dev/null
 assert_has "A7.2 — copie mutée du contrat (un état retiré) : la dérive est vue" "$(node "$AUX/contrat.mjs" "$WORK/mut")" "dérive"
 

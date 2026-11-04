@@ -96,7 +96,9 @@ dans leur propre `module.json` — c'est dit ici parce que ça change ce que tu 
   corrige, re-teste jusqu'au vert ou jusqu'à épuisement du budget. Il dépend de `mobile-test`.
 - **`cockpit`** — le cockpit local du lab, ouvert en tapant `/vf-cockpit`. Une page web en lecture
   seule, sur ta machine, dit où en est le lab (jalons, phases, plans, exigences, missions, qui
-  travaille en ce moment), répond à tes questions et cartographie le code. Elle ne fait aucun appel
+  travaille en ce moment), répond à tes questions et cartographie le code. Une seconde surface, la
+  pane `/vf-signal` dans ta session Claude Code, montre le même état dans le terminal (mission,
+  équipe, vue macro, retard sur `main`, un bouton qui ouvre la page web). Elle ne fait aucun appel
   sortant hors l'agent qui répond aux questions, et tous les postes la voient.
 - **`reference`** — le module de documentation. Il ne pose ni agent ni script : il apporte la
   méthodologie VibeFlow et ses patterns d'architecture, à lire quand tu veux comprendre *pourquoi*

@@ -745,3 +745,20 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 
 **Déclencheur de reprise :** la prochaine modification de `scripts/check-machine-paths.sh`, ou un nouveau rouge CI de ce garde.
 
+## Écarts de recette de la Phase 68 reportés au BACKLOG (N4, N5, N6) — DIFFÉRÉ (2026-11-04)
+
+**Origine :** recette v2 de la Phase 68 par un juge frais (captures dans le rapport de mission
+`.planning/missions/2026-11-04-phase-68-execution.md`). Arbitrage Samuel, AskUserQuestion session principale Claude Code,
+2026-11-04 : « Tout selon les recos (Recommandé) », avec ces trois points mis au BACKLOG et non en Phase 70 (P68-D-38).
+- **N4 :** le panneau Phase du cockpit web affiche « Ligne de ROADMAP : … » avec le markdown `**` brut (antérieur à la 68).
+- **N5 :** la vue macro de la pane vf-signal marque « à faire » des phases que leurs worktrees disent « en cours » ou
+  « à recetter » : la macro lit le ROADMAP de l'arbre courant, les lignes de worktree l'état du worktree (R1).
+  **Planifié juste après le merge de la 68**, sur une branche à part : arbitrage Samuel, AskUserQuestion session
+  principale Claude Code, 2026-11-04, « Correctif juste après la 68 (Recommandé) » (constat de Samuel : l'onglet Projet
+  du cockpit montre la 70 et la 71 « À faire · pas de plan » alors qu'elles sont en exécution). Réutiliser la lecture
+  de l'état des worktrees livrée par la 68 : `plugin/cockpit/scripts/vf-cockpit-arbres.mjs` (`arbresGit`,
+  `phaseActive`), agrégée par `collectSignal` de `vf-cockpit-signal.mjs` (champ `arbres[].phaseActive` de `signal@1`).
+- **N6 :** hors d'une branche `feat/phase-N`, une mission abandonnée n'apparaît nulle part dans la pane, alors que la carte
+  Projet du cockpit web la montre.
+
+**Déclencheur de reprise :** la prochaine phase qui touche l'affichage du cockpit ou de la pane vf-signal.

@@ -12,16 +12,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { execFileSync } from 'node:child_process';
-import { envEnfant } from './vf-cockpit-env.mjs';
-import { driverLockScript, gitCommonDir, resolveScriptsDir, planningLayout } from './vf-cockpit-paths.mjs';
+import { driverLockScript, gitCommonDir, resolveScriptsDir, planningLayout, GIT_SUR, shBorne } from './vf-cockpit-paths.mjs';
 import { ls, mtime, readJson, cherche, masque, MAX_MASQUE, ID_RE, premiereLigne } from './vf-cockpit-lecture.mjs';
 import { FENETRE, collecteAgents, indexDesNoeuds, rattacher } from './vf-cockpit-equipe.mjs';
 import { lireDags } from './vf-cockpit-planning.mjs';
+import { arbresGit } from './vf-cockpit-arbres.mjs';
 import { reduireTranscript } from './vf-cockpit-transcript.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const sh = (cmd, args, cwd, lab) => { try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000, env: envEnfant(lab) }); } catch (e) { return e.stdout || ''; } }; // timeout : un git ou un bash bloqué ne gèle pas la boucle
+const sh = shBorne; // timeout, échéance globale de l'émetteur (F-06) et PATH assaini (H-1, 4e argument = le lab) : un git ou un bash bloqué ne gèle pas la boucle
 
 // les listes de clés vérifiées sur Claude Code viennent du contrat versionné, pas du code
 const IFACE = readJson(path.join(HERE, 'vf-cockpit-interface.json')) || {};
@@ -36,12 +35,11 @@ const formeOk = (d) => !!d && REQ_TR.every((k) => k in d) && ['cwd', 'type', 'ti
 // contexte de collecte des sessions et sous-agents : arbres git du lab, portée, étiquettes
 function contexte(root, { fresh, now, home }) {
   root = path.resolve(root);
-  const porcelain = sh('git', ['-C', root, 'worktree', 'list', '--porcelain'], root, root);
-  const branchOf = new Map(porcelain.split('\n\n').map((b) => [/^worktree (.*)$/m.exec(b)?.[1], /^branch refs\/heads\/(.*)$/m.exec(b)?.[1] || (b.includes('detached') ? '(détachée)' : '')]).filter(([t]) => t && fs.existsSync(t)).map(([t, br]) => [fs.realpathSync(t), br]));
-  // la branche vient de `git worktree list` pour TOUT arbre connu (cwd ou activité) ; le gitBranch du transcript est celui de l'arbre de LANCEMENT : repli seulement
+  const arbres = arbresGit(root); // l'analyse de la liste des arbres git vit dans vf-cockpit-arbres.mjs
+  const branchOf = new Map(arbres.map((a) => [a.chemin, a.branche]));
+  // la branche vient de la liste des arbres git pour TOUT arbre connu (cwd ou activité) ; le gitBranch du transcript est celui de l'arbre de LANCEMENT : repli seulement
   const branche = (t, ...transcript) => branchOf.get(t) || transcript.find(Boolean) || '';
-  const trees = porcelain.split('\n').filter((l) => l.startsWith('worktree ')).map((l) => l.slice(9)).filter((t) => fs.existsSync(t)).map((t) => fs.realpathSync(t));
-  if (!trees.length) trees.push(root);
+  const trees = arbres.map((a) => a.chemin);
   const real = (p) => { try { return fs.realpathSync(p); } catch { return p; } };
   const inScope = (cwd) => { if (typeof cwd !== 'string' || !cwd) return null; const r = real(cwd); return trees.filter((t) => r === t || r.startsWith(t + path.sep)).sort((a, b) => b.length - a.length)[0] || null; };
   const label = (t) => (t === trees[0] ? 'arbre principal' : path.relative(trees[0], t) || t);
@@ -109,13 +107,14 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
   for (const d of [...ls(path.join(common, 'vf-driver', 'ws')).map((w) => path.join(common, 'vf-driver', 'ws', w)), path.join(common, 'vf-driver', 'repo')])
     for (const f of ls(d).filter((x) => x.endsWith('.dag.json'))) { const j = readJson(path.join(d, f)); if (j) fichiers.push({ d, f, nodes: Array.isArray(j.nodes) ? j.nodes : [] }); }
   let nDags = 0, running = 0, staleNodes = 0;
-  for (const { d, f, nodes } of fichiers) {
+  for (const { d, f, nodes: brut } of fichiers) {
     nDags++;
+    const nodes = (Array.isArray(brut) ? brut : []).filter((x) => x && typeof x === 'object' && !Array.isArray(x)); // F-9 : un nœud nul ou scalaire est ignoré, le DAG reste lu
     const fp = path.join(d, f);
     let age = Math.round((now - mtime(fp)) / 1000);
     if (age <= ttl && nodes.some((x) => x.status === 'running')) {
-      const tracked = sh('git', ['-C', d, 'ls-files', '--error-unmatch', f], d, root).trim(), dirty = sh('git', ['-C', d, 'status', '--porcelain', '--', f], d, root).trim();
-      const ct = Number(sh('git', ['-C', d, 'log', '-1', '--format=%ct', '--', f], d, root).trim());
+      const tracked = sh('git', [...GIT_SUR, '-C', d, 'ls-files', '--error-unmatch', '--', f], d, root).trim(), dirty = sh('git', [...GIT_SUR, '-C', d, 'status', '--porcelain', '--', f], d, root).trim();
+      const ct = Number(sh('git', [...GIT_SUR, '-C', d, 'log', '-1', '--format=%ct', '--', f], d, root).trim());
       if (tracked && !dirty && ct) age = Math.round(now / 1000 - ct); // contenu identique au commit : écrit au plus tard à cette date
     }
     const stale = age > ttl;

@@ -9,7 +9,14 @@ set -uo pipefail
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
-AUX="$WORK/aux"; mkdir -p "$AUX"
+AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home" "$WORK/locks" "$WORK/locks-abs" "$WORK/locks-vide"
+# vie d'une mission (VFSG-06, P68-D-29) : HOME jetable ET dossier de scripts explicite hors de toute disposition …/cockpit/scripts,
+# portant un faux driver-lock.sh TENU ; sans dossier explicite le conductor voisin du dépôt serait trouvé. Le dossier n'est posé QUE sur les appels
+# en processus de Q : le vrai lanceur (vf-cockpit.mjs, section O4) en fait le dossier de scripts du MODULE, il ne doit pas le voir.
+export HOME="$WORK/home"
+printf '#!/usr/bin/env bash\ncase "$1" in status) echo "{\\"present\\": true, \\"ws\\": \\"\\", \\"stale\\": false, \\"ttl\\": 1800, \\"progress_age_seconds\\": 30}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' > "$WORK/locks/driver-lock.sh"
+printf '#!/usr/bin/env bash\ncase "$1" in status) echo "{\\"present\\": false}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' > "$WORK/locks-abs/driver-lock.sh"
+chmod +x "$WORK/locks/driver-lock.sh" "$WORK/locks-abs/driver-lock.sh"
 
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -56,7 +63,7 @@ for (const k of spec.meta?.requis || []) if (!(k in (out.meta || {}))) errs.push
 console.log(errs.length ? 'KO ' + errs.join(' | ') : 'OK');
 process.exit(errs.length ? 1 : 0);
 JS
-Q() { node "$AUX/q.mjs" "$SCRIPTS" "$@"; }
+Q() { VF_COCKPIT_SCRIPTS_DIR="${VF_PIN:-$WORK/locks}" node "$AUX/q.mjs" "$SCRIPTS" "$@"; }
 G() { node "$AUX/get.mjs" "$@"; }
 IFACE="$SCRIPTS/vf-cockpit-interface.json"
 wr() { mkdir -p "$(dirname "$1")"; cat > "$1"; }   # wr <fichier> < contenu
@@ -601,6 +608,44 @@ unset VF_COCKPIT_PORT_BASE
 for L in "${LABS4[@]}"; do node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L" >/dev/null 2>&1; done; for p in "${SRVPIDS[@]}"; do vf_hyg_stop "$p"; done; SRVPIDS=()
 vf_hyg_assert
 fi
+
+# ---------- P-VIE — la mission abandonnée ou inconnue sur la carte Projet (VFSG-06 ; P68-D-05, P68-D-23) ----------
+LV="$WORK/pvie"; B="$LV/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+- [ ] **Phase 1: Seule** - une phase
+MD
+wr "$B/phases/01-a/01-01-PLAN.md" <<'MD'
+<objective>Plan un</objective>
+MD
+wr "$B/missions/MISSION-1.dag.json" <<'JSON'
+{"nodes":[{"id":"01-01","step":"s","deps":[],"status":"running"},{"id":"b","step":"s","deps":[],"status":"ready"}]}
+JSON
+git -C "$LV" init -q
+VF_PIN="$WORK/locks-abs" graph "$LV" "$WORK/gv-abs.json"
+VF_PIN="$WORK/locks-vide" graph "$LV" "$WORK/gv-vide.json"
+graph "$LV" "$WORK/gv-tenu.json"
+echo "=== P-VIE — mission abandonnée ou inconnue ==="
+assert_eq "P-VIE.0 — témoin positif : verrou tenu, la mission reste active et son plan désigné aussi" "$(G "$WORK/gv-tenu.json" 'j.nodes.find(n=>n.id==="dag-MISSION-1").st+"|"+j.files.find(f=>/^01-01 /.test(f.name)).st')" "active|active"
+assert_eq "P-VIE.1 — sans verrou : la carte dag-MISSION-1 est todo et son pied dit « abandonnée, nœuds non refermés »" "$(G "$WORK/gv-abs.json" 'j.nodes.find(n=>n.id==="dag-MISSION-1").st+"|"+j.nodes.find(n=>n.id==="dag-MISSION-1").foot.includes("abandonnée, nœuds non refermés")')" "todo|true"
+assert_eq "P-VIE.2 — un plan désigné par un nœud running d'une mission abandonnée reste todo" "$(G "$WORK/gv-abs.json" 'j.files.find(f=>/^01-01 /.test(f.name)).st')" "todo"
+assert_eq "P-VIE.3 — les détails de la phase disent « Mission : MISSION-1 (abandonnée, nœuds non refermés) »" "$(G "$WORK/gv-abs.json" 'j.nodes.find(n=>n.id==="ph-1").details.includes("Mission : MISSION-1 (abandonnée, nœuds non refermés)")')" "true"
+assert_eq "P-VIE.4 — verrous illisibles (aucun script) : la carte est todo et son pied dit « état inconnu »" "$(G "$WORK/gv-vide.json" 'j.nodes.find(n=>n.id==="dag-MISSION-1").st+"|"+j.nodes.find(n=>n.id==="dag-MISSION-1").foot.includes("état inconnu")')" "todo|true"
+
+# P-VIE.5 — couplage socle/UI (68, passe 2) : 00-vibeflow.js réécrit la pastille d'une carte dont le pied dit « abandonnée » (const ABANDON). Le pied vient du socle (LIBELLES_MISSION) :
+# si son libellé change, la pastille retomberait sur « À faire » sans bruit. On confronte l'expression de l'UI au pied RÉEL de la sortie du socle, et aux pieds qui ne doivent PAS la déclencher.
+cat > "$AUX/abandon.mjs" <<'JS'
+// abandon.mjs <00-vibeflow.js> <graphe.json> [<libellé de remplacement du mot « abandonnée »>] : « reconnu|inconnu-ignoré|mutant-ignoré » ou « regex absente »
+import fs from 'node:fs';
+const [, , ui, g, mut] = process.argv;
+const m = /const ABANDON = (\/.*\/);/.exec(fs.readFileSync(ui, 'utf8')); if (!m) { console.log('regex absente'); process.exit(0); }
+const re = new Function('return ' + m[1])();
+const foot = JSON.parse(fs.readFileSync(g, 'utf8')).nodes.find((n) => n.id === 'dag-MISSION-1').foot;
+const f2 = mut ? foot.replace('abandonnée', mut) : foot;
+console.log(mut ? String(re.test(f2)) : [re.test(foot), !re.test('1/2 nœuds · état inconnu'), !re.test('1/2 nœuds · en cours'), !re.test('1/2 nœuds')].join('|'));
+JS
+UI68="$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js"
+assert_eq "P-VIE.5 — l'expression ABANDON de 00-vibeflow.js reconnaît le pied RÉEL d'une mission abandonnée du socle et ignore « état inconnu », « en cours » et le pied nu" "$(node "$AUX/abandon.mjs" "$UI68" "$WORK/gv-abs.json")" "true|true|true|true"
+assert_eq "P-VIE.5b — témoin : un libellé du socle changé (« délaissée ») ne serait PAS reconnu : la mesure rougirait" "$(node "$AUX/abandon.mjs" "$UI68" "$WORK/gv-abs.json" délaissée)" "false"
 
 echo ""
 echo "=================================="

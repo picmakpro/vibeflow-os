@@ -124,6 +124,7 @@ plus été interrogé dessus.
 - **P70-D-15 (version du module).** Bump **patch** du module `cockpit`, au-dessus de la version laissée par la
   69 (`v1.1.0` à P69-D-26, puis `v1.1.1` à `794c6dba` : la cible est donc `v1.1.2`) : ce sont des finitions, sans nouvelle capacité (le choix de langue est exclu). La
   release racine reste un geste humain.
+  Fusion de main 3c73fc0c (Phase 68 en v1.2.0) : cible v1.2.1.
   Mise à jour du 2026-11-04 : la PR #201 (faille H-1, mergée en `19393cc3`) a porté le module en `v1.1.2`. Après le rebase
   de la 70 sur cette tête, la règle « patch au-dessus de la base » donne `v1.1.3`. Le commit de bump de 70-09 annonce
   encore `v1.1.2` dans son message ; c'est son contenu, rebasé, qui porte `v1.1.3`.

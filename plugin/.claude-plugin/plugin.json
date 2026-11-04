@@ -17,5 +17,7 @@
     "install",
     "claude-code"
   ],
-  "skills": "./installer"
+  "skills": "./installer",
+  "hooks": "./cockpit/signal/hooks/hooks.json",
+  "types": "./cockpit/signal/types/index.d.ts"
 }

@@ -26,7 +26,10 @@
   Object.assign(T, projet()
     ? { File: 'Élément', file: 'élément', Files: 'Éléments', 'Files involved': 'Éléments concernés', 'Search files, routes, modules': 'Chercher une carte, un plan, une exigence' }
     : { File: 'Fichier', file: 'fichier', Files: 'Fichiers', 'Files involved': 'Fichiers concernés', 'Search files, routes, modules': 'Chercher un fichier, une route, un module' });
+  // sous-titre de la carte Projet (« Jalon v1 · phase 1 (Socle) · ready_to_plan. »), fabriqué par le socle avec le statut STATE brut : seul le dernier segment, un statut connu, est traduit (recette 68 R11, P68-D-35)
+  const STATUTS = { ready_to_plan: 'prête à planifier', ready_to_execute: 'prête à exécuter', milestone_complete: 'jalon terminé', executing: 'en exécution', planning: 'en planification', verifying: 'en vérification', paused: 'en pause', completed: 'terminée', complete: 'terminée', closed: 'clos' };
   const R = [
+    [/^(Jalon .+ · phase .+) · (ready_to_plan|ready_to_execute|milestone_complete|executing|planning|verifying|paused|completed|complete|closed)\.$/, (_, d, s) => `${d} · ${STATUTS[s]}.`],
     [/^(\d+) things?$/, (_, n) => `${n} point${n > 1 ? 's' : ''}`],
     [/^Answer · (\d+) cards?$/, (_, n) => `Réponse · ${n} carte${n > 1 ? 's' : ''}`],
     [/^Ask anything about (.+?)…$/, () => 'Posez une question sur ce projet…'], // le nom du projet est déjà dans l'en-tête : l'invite tient dans la barre à toute largeur

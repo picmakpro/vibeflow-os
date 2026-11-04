@@ -31,6 +31,11 @@
       /* texte teinté vers --text : le statut seul passait sous 4,5:1 sur sa pastille en thème clair (recette 69) */
       color: color-mix(in srgb, var(--c-st) 68%, var(--text)); background: color-mix(in srgb, var(--c-st) 14%, transparent); }
     .vst-done { --c-st: var(--st-done); } .vst-active { --c-st: var(--st-active); } .vst-todo { --c-st: var(--st-todo); } .vst-blocked { --c-st: var(--st-blocked); }
+    /* recette 68 R5 (P68-D-35, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04 : « Tout selon les recos ») : une mission abandonnée dit « Abandonnée », en gris neutre (le jeton du « À faire », aucune couleur en dur) */
+    .vst-abandonnee { --c-st: var(--st-todo); }
+    /* recette 68 R7 (même arbitrage) : le pied d'une carte (« 0/2 nœuds · abandonnée, nœuds non refermés ») passe à la ligne au lieu de pousser la pastille hors de la carte ; la pastille garde sa taille */
+    .foot .meta { white-space: normal; min-width: 0; border-radius: 12px; }
+    .foot .vst { flex: none; }
     .card.st-active { box-shadow: 0 0 0 1.5px var(--st-active), 0 8px 28px color-mix(in srgb, var(--st-active) 22%, transparent); }
     .card.st-blocked { box-shadow: 0 0 0 1.5px var(--st-blocked); }
     .card.st-done .desc { opacity: .78; }
@@ -82,8 +87,8 @@
   }
 
   // ---------- onglet Projet : panneau d'ensemble ----------
-  // statuts de STATE affichés en français (valeur inconnue : telle quelle)
-  const STATUT = { planning: 'en planification', ready_to_plan: 'prêt à planifier', ready_to_execute: 'prêt à exécuter', executing: 'en exécution', in_progress: 'en cours', verifying: 'en vérification', ready_for_verification: 'prêt à vérifier', paused: 'en pause', blocked: 'bloqué', complete: 'terminée', completed: 'terminée', closed: 'clos' };
+  // statuts de STATE affichés en français (valeur inconnue : omise ; recette 68 R11, P68-D-35, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04 : jamais le statut STATE brut)
+  const STATUT = { planning: 'en planification', ready_to_plan: 'prête à planifier', ready_to_execute: 'prête à exécuter', executing: 'en exécution', in_progress: 'en cours', verifying: 'en vérification', ready_for_verification: 'prête à vérifier', paused: 'en pause', blocked: 'bloqué', complete: 'terminée', completed: 'terminée', closed: 'clos', milestone_complete: 'jalon terminé' }; // recette 68 R11 (P68-D-35) : genre de la phase (« prête ») ; Phase 70 : table complète, valeur inconnue omise (jamais affichée brute)
   const statut = (x) => (Object.hasOwn(STATUT, x) ? STATUT[x] : '');
   // dérive de format de la planification (vf-cockpit-drift.mjs) : rien n'est corrigé d'ici, le panneau donne la commande
   const NIV = { bloquant: 'blocked', 'toléré': 'todo', info: 'todo' };
@@ -148,6 +153,13 @@
     const id = /^[nf]:/.test(r) ? r : 'f:' + r;
     if (SC.exists(id)) SC.reveal(id); else SC.toast(`Pas sur cette carte : ${r}`);
   };
+  // recette 68 R5 : la carte d'une mission abandonnée porte `st: todo` (le viewer n'a pas d'état « abandonnée ») et sa pastille disait « À faire ». Le socle écrit « abandonnée » dans le pied de la carte
+  // (LIBELLES_MISSION) : la pastille de CETTE carte est réécrite en « Abandonnée », avant lecture par un lecteur d'écran. Idempotent : une pastille réécrite n'est plus `vst-todo`.
+  if (TAB === 'project') {
+    const ABANDON = /(?:^|· )abandonnée(?:,|$)/;
+    const dire = () => { for (const f of document.querySelectorAll('.card .foot')) { const p = f.querySelector('.vst.vst-todo'), m = f.querySelector('.meta'); if (p && m && ABANDON.test(m.textContent)) { p.classList.replace('vst-todo', 'vst-abandonnee'); p.textContent = 'Abandonnée'; } } };
+    let tour = 0; new MutationObserver(() => { if (!tour) tour = requestAnimationFrame(() => { tour = 0; dire(); }); }).observe(document.body, { childList: true, subtree: true }); dire();
+  }
   SC.on('ready', arriver);
   window.addEventListener('hashchange', arriver);
 })();

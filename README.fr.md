@@ -64,7 +64,7 @@ projet recule. La dernière étape t'appartient.
 
 Un vert qui ne peut pas devenir rouge ne prouve rien. Les tests s'écrivent rouges d'abord, les
 gates `check-*.sh` tournent en CI, et le juge n'est jamais l'auteur. Le dépôt s'applique la même
-règle : 150 suites tournent à chaque push, et un job « lab frais » installe le socle dans un lab
+règle : 154 suites tournent à chaque push, et un job « lab frais » installe le socle dans un lab
 vierge qui doit passer ses propres gates sans intervention.
 
 → [Les gates machine](./manual/fr/07-sous-le-capot/les-gates-machine.md)
@@ -116,7 +116,9 @@ avec une boucle d'évals.
 19 modules, chacun versionné avec son `CHANGELOG.md`. `conductor` est le socle obligatoire ;
 ensuite tu choisis un lab de dev parmi des presets (`dev`, `dev-mobile`, `dev-audite`, les
 dépendances résolues pour toi) ou un lab métier sur mesure. Le README de chaque module est sa
-documentation complète, avec la même structure partout.
+documentation complète, avec la même structure partout. Le module `cockpit` a deux surfaces sur le même socle en lecture seule :
+une page web locale (`/vf-cockpit`) et une pane terminal dans la session Claude Code (`/vf-signal`),
+affichée seulement quand `cockpit` est installé.
 
 → [Catalogue des modules](./manual/fr/03-modules/catalogue.md) ·
 [commandes](./manual/fr/06-reference/commandes.md) ·
