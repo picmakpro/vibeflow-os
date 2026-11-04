@@ -99,7 +99,7 @@
         "critique-terminal"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "docs",
@@ -120,7 +120,7 @@
         "docs"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "ex-01",
