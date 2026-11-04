@@ -274,6 +274,61 @@ assert_eq "S8.0 — les deux copies ont bien été mutées (ancre unique trouvé
 assert_eq "S8.1 — copie mutée qui recalcule : détectée (S3.2 rougit, S4.2 rougit, pas une panne)" "$([ "$M1A" = running ] && echo S3.2-rouge)|$(echo "$M1B" | cut -c1-22)" "S3.2-rouge|KO mission MISSION-1 :"
 assert_eq "S8.2 — copie mutée qui recalcule l'avancement : S4.1 rougit sur une phase, pas une panne" "$(echo "$M2A" | cut -c1-9)" "KO phase "
 
+echo "=== S9 — toute chaîne issue du disque sort nettoyée et bornée, quel que soit le champ (F-02) ==="
+# Famille : pour chaque scénario, un caractère de contrôle (et une longueur démesurée) est posé dans une source écrite par d'autres ;
+# chaque champ de la liste est lu dans la sortie réelle de l'émetteur : il doit exister, sans contrôle, sous sa borne. Un balayage global
+# vérifie ensuite TOUTES les chaînes de la sortie (borne générale 1024) : un champ ajouté demain est couvert sans qu'on y pense.
+cat > "$AUX/famille.mjs" <<'JS'
+// famille.mjs <signal.json> <expr@borne>... : une ligne « expr=verdict » par champ, puis « *=verdict » pour le balayage global
+import fs from 'node:fs';
+const [, , f, ...champs] = process.argv;
+let j; try { j = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { console.log('*=illisible'); process.exit(0); }
+const CTL = /[\u0000-\u001f\u007f-\u009f]/;
+for (const c of champs) {
+  const [expr, max] = c.split('@'); let v; try { v = new Function('j', 'return (' + expr + ')')(j); } catch { v = undefined; }
+  console.log(expr + '=' + (typeof v !== 'string' || !v ? 'inaccessible' : CTL.test(v) ? 'controle' : v.length > Number(max) ? 'long:' + v.length : 'ok'));
+}
+let ctl = 0, long = 0, n = 0;
+const marche = (o) => { if (typeof o === 'string') { n++; if (CTL.test(o)) ctl++; if (o.length > 1024) long++; } else if (o && typeof o === 'object') for (const v of Object.values(o)) marche(v); };
+marche(j);
+console.log('*=' + (n < 20 ? 'vide' : ctl || long ? `controle:${ctl} long:${long}` : 'ok'));
+JS
+FAM() { # FAM <etiquette> <signal.json> <expr@borne>... : une assertion par champ + le balayage global
+  local et="$1" f="$2"; shift 2
+  local ligne
+  while IFS= read -r ligne; do
+    assert_eq "$et — ${ligne%%=*}" "${ligne#*=}" "ok"
+  done <<< "$(node "$AUX/famille.mjs" "$f" "$@")"
+}
+LONGW="$(printf 'w%.0s' $(seq 1 120))"
+# (A) phaseActive.nom : le ROADMAP d'un AUTRE worktree
+L9="$WORK/lab-s9a"; W9="$WORK/wt-s9a"
+G_ init -q -b main "$L9"; mkdir -p "$L9/.planning"
+printf -- '- [ ] **Phase 1: Un** - a\n- [ ] **Phase 2: Deux** - b\n' > "$L9/.planning/ROADMAP.md"
+G_ -C "$L9" add -A; G_ -C "$L9" commit -q -m c0; G_ -C "$L9" branch feat/phase-2-x; G_ -C "$L9" worktree add -q "$W9" feat/phase-2-x 2>/dev/null
+printf -- '- [ ] **Phase 1: Un** - a\n- [ ] **Phase 2: %s]0;pwn%s%s[31mDeux%s** - b\n' "$ESC" $'\a' "$ESC" "$(printf 'y%.0s' $(seq 1 200))" > "$W9/.planning/ROADMAP.md"
+RUN "$FP" "$HOME" "$WORK/o9a.json" "$L9" > /dev/null
+FAM "S9.A" "$WORK/o9a.json" 'j.arbres[1].phaseActive.nom@90' 'j.arbres[1].label@200'
+# (B) missions[].ws : le champ ws du JSON d'un DAG
+L9b="$WORK/lab-s9b"; G_ init -q -b main "$L9b"; mkdir -p "$L9b/.planning/missions"
+printf -- '- [ ] **Phase 1: Un** - a\n' > "$L9b/.planning/ROADMAP.md"
+printf '{"ws":"%s[31m%s","nodes":[{"id":"a","step":"s","deps":[],"status":"done"}]}\n' '\u001b' "$(printf 'a%.0s' $(seq 1 100000))" > "$L9b/.planning/missions/MISSION-1.dag.json"
+RUN "$FP" "$HOME" "$WORK/o9b.json" "$L9b" > /dev/null
+FAM "S9.B" "$WORK/o9b.json" 'j.missions[0].ws@80'
+# (C) noms de compartiment et fichier active-workstream
+NOMC="${ESC}[31m${LONGW}"
+L9c="$WORK/lab-s9c"; G_ init -q -b main "$L9c"; mkdir -p "$L9c/.planning/workstreams/$NOMC"
+printf -- '## Milestones\n\n- 🚧 **v1.0 Test** - Phases 1-1\n\n## Phases\n\n- [ ] **Phase 1: Un** - a\n' > "$L9c/.planning/workstreams/$NOMC/ROADMAP.md"
+printf '{"nodes":[{"id":"a","step":"s","deps":[],"status":"done"}]}\n' > "$L9c/.planning/workstreams/$NOMC/MISSION-1.dag.json"
+printf '%s\n' "$NOMC" > "$L9c/.planning/active-workstream"
+RUN "$FP" "$HOME" "$WORK/o9c.json" "$L9c" > /dev/null
+FAM "S9.C" "$WORK/o9c.json" 'j.phases[0].ws@80' 'j.phases[0].key@1024' 'j.jalons[0].ws@80' 'j.jalons[0].phases[0]@1024' 'j.layout.actif@80' 'j.missions[0].ws@80' 'j.missions[0].phaseKey@1024'
+# (D) racine du lab dont le nom porte un caractère de contrôle
+L9d="$WORK/lab-s9d-${ESC}[31m$(printf 'r%.0s' $(seq 1 20))"; G_ init -q -b main "$L9d"; mkdir -p "$L9d/.planning"
+printf -- '- [ ] **Phase 1: Un** - a\n' > "$L9d/.planning/ROADMAP.md"
+RUN "$FP" "$HOME" "$WORK/o9d.json" "$L9d" > /dev/null
+FAM "S9.D" "$WORK/o9d.json" 'j.root@1024' 'j.equipe.root@1024'
+
 vf_hyg_assert
 echo
 echo "=== Résultats : $PASS PASS, $FAIL FAIL ==="
