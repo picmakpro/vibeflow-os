@@ -842,6 +842,7 @@ else
 import fs from 'node:fs';
 const f = process.argv[2]; const t = fs.readFileSync(f, 'utf8');
 if (!process.env.EK_FROM || !t.includes(process.env.EK_FROM)) { console.log('ancre absente'); process.exit(1); }
+if (t.split(process.env.EK_FROM).length > 2) { console.log('ancre ambiguë'); process.exit(1); } // deux occurrences : le mutant pourrait viser le mauvais fichier (faux vert, 70-11)
 fs.writeFileSync(f, t.replace(process.env.EK_FROM, () => process.env.EK_TO)); console.log('muté');
 JS
   LABEK="$WORK/lab-ek"; mkdir -p "$LABEK/src" "$LABEK/.planning/phases/01-x"
@@ -888,6 +889,10 @@ JSON
   # EK5 (m5) : la commande demandée est rendue en texte, jamais en HTML
   EKC rendu-commande "$EKA1"
   assert_eq "EK5.1 — une commande qui porte du balisage s'affiche en texte (0 élément créé, aucun #ek-injecte, la source lisible)" "$(G "$WORK/ek-rendu-commande.json" 'j.erreur||(j.elements+"|"+j.injecte+"|"+j.texte.includes("<b id=ek-injecte>"))')" "0|false|true"
+  # EK8 (UIFN-12, bouton voisin) : Entrée sur « Voir la dernière commande » du tiroir « Au travail » ne fait pas perdre le focus clavier
+  EKC focus-doing-tiroir "project.html#t"
+  assert_eq "EK8.0 — témoin : avant l'Entrée, l'élément actif est le bouton « Voir la dernière commande » du tiroir (la sonde sait lire le focus)" "$(G "$WORK/ek-focus-doing-tiroir.json" 'j.erreur||(j.avant.tag+"|"+(j.avant.doing?"doing":"sans id")+"|"+j.avant.dansTiroir)')" "BUTTON|doing|true"
+  assert_eq "EK8 — après Entrée sur « Voir la dernière commande » du tiroir, la commande s'affiche ET l'élément actif reste ce bouton, jamais BODY" "$(G "$WORK/ek-focus-doing-tiroir.json" 'j.erreur||("lu="+j.lu+" | actif="+(j.apres.tag==="BODY"?"BODY":(j.apres.doing?"bouton « dernière commande »":"autre : "+j.apres.tag)))')" "lu=true | actif=bouton « dernière commande »"
   vf_hyg_stop "$EK_PID"
 
   # --- mutants : chacun posé dans la page servie, serveur relancé, le témoin DOIT rougir ---
@@ -900,7 +905,8 @@ JSON
   # l'ancre doit être propre à 72-vf-equipe.js : le viewer porte d'autres ev.stopPropagation(), un mutant posé sur l'un d'eux serait un faux vert
   EKANC1="ev.target.closest?.('#panel [data-vf-transcript], #panel [data-vf-doing]')) ev.stopPropagation();"
   assert_eq "EK1.2 — mutant (l'Entrée du bouton n'est plus arrêtée avant le viewer) : le viewer descend dans le nœud, le transcript n'est jamais lu et le focus tombe sur BODY, détecté" "$(ek_mutant f1 focus-transcript "$EKA1" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "$EKANC1" "${EKANC1/ev.stopPropagation();/void 0;}")" "muté|lu=false | actif=BODY"
-  assert_eq "EK1.3 — mutant (le bouton focalisé est désactivé pendant la lecture) : le transcript est lu mais le focus tombe sur BODY, détecté" "$(ek_mutant f2 focus-transcript "$EKA1" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "b.setAttribute('aria-disabled', 'true');" 'b.disabled = true;')" "muté|lu=true | actif=BODY"
+  assert_eq "EK1.3 — mutant (le bouton focalisé est désactivé pendant la lecture) : le transcript est lu mais le focus tombe sur BODY, détecté" "$(ek_mutant f2 focus-transcript "$EKA1" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "b.setAttribute('aria-disabled', 'true'); // jamais \`disabled\` : un bouton désactivé perd le focus clavier (UIFN-12)" 'b.disabled = true;')" "muté|lu=true | actif=BODY"
+  assert_eq "EK8.1 — mutant (le bouton focalisé du tiroir est désactivé pendant la lecture) : la commande est lue mais le focus tombe sur BODY, détecté" "$(ek_mutant f3 focus-doing-tiroir "project.html#t" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "b.setAttribute('aria-disabled', 'true'); // jamais \`disabled\` : un bouton focalisé désactivé perd le focus clavier (UIFN-12, même défaut" 'b.disabled = true; //')" "muté|lu=true | actif=BODY"
   # témoins de la sonde de mutation elle-même
   ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"
   assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK2.1 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "a1|null|identique"

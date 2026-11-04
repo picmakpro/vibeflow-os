@@ -7,6 +7,8 @@
 //   recharger         : (EK3, m10) lit le transcript, relève le sessionStorage entier → { entrees, texteLu, fuite }
 //   ferme-puis-who    : (EK4, m8) ouvre le tiroir « Au travail », le ferme, livre un `who` qui change l'arbre → { ouvert, ferme, rouvert }
 //   rendu-commande    : (EK5, m5) demande la dernière commande ; la réponse du serveur est remplacée par un texte qui porte du balisage → { elements, injecte, texte, zone }
+//   focus-doing-tiroir: (EK8, UIFN-12) tiroir « Au travail » : focalise « Voir la dernière commande », frappe Entrée au clavier, attend la commande, relève l'élément actif
+//                       → { avant, apres, lu, trace } (même forme que focus-transcript ; la réponse du serveur est remplacée par un texte fixe)
 // Rend une ligne JSON { ... } ou { erreur }. Socle : chrome-session.mjs (une instance de Chrome, fermée proprement).
 import { executer } from './chrome-session.mjs';
 const [, , chrome, url] = process.argv;
@@ -89,6 +91,24 @@ await executer(chrome, async (s) => {
     await s.ev("document.querySelector('#panel [data-vf-doing]').click()");
     await s.attendre("(() => { const z = document.querySelector('#panel .vf-doing'); return !!z && !z.hidden && z.textContent.length > 0; })()", 'commande affichée');
     return await s.stable(`(() => { const z = document.querySelector('#panel .vf-doing'); return { elements: z.querySelectorAll('*').length, injecte: !!document.getElementById('ek-injecte'), texte: z.textContent, zone: z.innerHTML.slice(0, 120) }; })()`, 'zone de commande stable');
+  }
+  if (ACTION === 'focus-doing-tiroir') {
+    const corps = `const flux = () => window.__es.find((e) => e.url.includes('/api/vf/events'));
+      const S = { kind: 'session', id: 'S1', etat: 'actif', tree: '.', task: 'session' }, M = { kind: 'subagent', id: 'M1', etat: 'actif', role: 'vf-dev-manager', tree: '.', parent: 'S1', task: 'manager', dureeS: 60 };`;
+    await s.attendre("!!window.__es && !!window.__es.find((e) => e.url.includes('/api/vf/events')) && !!document.querySelector('#vf-lock')", 'flux et badge');
+    await s.ev(`(() => { ${corps} flux().__emit('who', { seq: 5000, at: Date.now(), who: { workers: [S, M], sources: {} } });
+      const R = window.fetch.bind(window); window.fetch = (u, o) => String(u).includes('/api/vf/doing') ? new Promise((r) => setTimeout(() => r({ ok: true, json: async () => ({ doing: 'ls -la (témoin EK8)' }) }), 150)) : R(u, o); })()`);
+    await s.ev("document.querySelector('#vf-lock').click()");
+    await s.attendre("!!document.querySelector('.vf-whop [data-vf-doing]')", 'bouton « Voir la dernière commande » du tiroir');
+    await s.ev(`window.__b = document.querySelector('.vf-whop [data-vf-doing]'); window.__b.focus(); window.__tr = []; (() => { ${DECRIRE}
+      const rel = () => { const a = document.activeElement; return JSON.stringify([a ? a.tagName : null, !!window.__b.disabled, a === window.__b, document.contains(window.__b)]); };
+      let prec = ''; window.__iv = setInterval(() => { const r = rel(); if (r !== prec) { window.__tr.push(r); prec = r; } }, 10); })()`);
+    const avant = await s.ev(`(() => { ${DECRIRE} const e = document.activeElement; return Object.assign(dec(e), { doing: (e && e.dataset && e.dataset.vfDoing) || '' }); })()`);
+    await touche('Enter', 'Enter', 13, '\r');
+    const lu = await s.attendre("(() => { const z = document.querySelector('.vf-whop .vf-doing'); return !!z && !z.hidden && z.textContent.includes('témoin EK8'); })()", 'commande affichée', 8000).then(() => true, () => false);
+    const apres = await s.stable(`(() => { ${DECRIRE} const e = document.activeElement; return Object.assign(dec(e), { doing: (e && e.dataset && e.dataset.vfDoing) || '' }); })()`, 'élément actif stable');
+    const trace = await s.ev('(() => { clearInterval(window.__iv); return window.__tr; })()');
+    return { avant, apres, lu, trace };
   }
   return { erreur: 'EK_ACTION inconnue : ' + ACTION };
 }, { csp: false });

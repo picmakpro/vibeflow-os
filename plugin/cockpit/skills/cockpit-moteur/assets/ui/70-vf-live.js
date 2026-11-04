@@ -99,7 +99,8 @@
     const b = ev.target.closest?.('[data-vf-doing]');
     if (!b) return;
     const id = b.dataset.vfDoing;
-    b.disabled = true;
+    if (b.getAttribute('aria-disabled') === 'true') return; // lecture en cours : les clics répétés sont ignorés
+    b.setAttribute('aria-disabled', 'true'); // jamais `disabled` : un bouton focalisé désactivé perd le focus clavier (UIFN-12, même défaut que « Lire le transcript »)
     let texte;
     try {
       const r = await fetch('/api/vf/doing?id=' + encodeURIComponent(id), { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' });
@@ -109,8 +110,8 @@
     } catch { texte = 'Indisponible.'; }
     if (demandes.size >= 50) demandes.delete(demandes.keys().next().value);
     demandes.set(id, texte);
-    for (const x of document.querySelectorAll('[data-vf-doing]')) if (x.dataset.vfDoing === id) { poser(x); x.disabled = false; }
-    b.disabled = false;
+    for (const x of document.querySelectorAll('[data-vf-doing]')) if (x.dataset.vfDoing === id) { poser(x); x.removeAttribute('aria-disabled'); }
+    b.removeAttribute('aria-disabled');
   });
   const showLock = (l, off) => {
     if (l !== undefined) probe.lock = l;

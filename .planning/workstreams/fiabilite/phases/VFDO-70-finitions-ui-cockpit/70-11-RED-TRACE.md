@@ -44,3 +44,19 @@ Pour chacun : ligne mutée, assertion, attendu (code réel), obtenu (mutant).
 EK5 : le serveur ne rend jamais de balisage (la commande est résumée au verbe et à la cible, jeu de caractères sans `<`) ; la réponse de `/api/vf/doing` est donc remplacée dans la page par `{"doing":"<b id=ek-injecte>gras</b>"}` pour prouver LE RENDU de la page.
 W19 est un témoin de comportement (la cible `a..b` passe la forme alphanumérique de `WS_RE` : seule la clause `..` l'écarte) et non une ancre de texte.
 EK6 : la page restaurée après les mutants redonne le vert et reste identique octet pour octet à l'originale ; EK7 : un mutant à ancre absente est refusé (jamais un mutant vide).
+
+## Suite : bouton du tiroir Au travail (EK8, UIFN-12, bouton voisin)
+
+Même classe de défaut sur « Voir la dernière commande » du tiroir « Au travail » (`70-vf-live.js`, `b.disabled = true`). Témoin EK8 (action `focus-doing-tiroir` de `chrome-equipe-clavier.mjs`) : tiroir ouvert par le badge, bouton focalisé, Entrée réelle (CDP), attente de la commande, relevé de l'élément actif.
+
+Rouge sur 8de3fdd2 (`70-vf-live.js` inchangé) :
+- témoin EK8.0 : avant l'Entrée, élément actif = `BUTTON` portant `data-vf-doing` (PASS : la sonde lit le focus) ;
+- assertion EK8 : la commande s'affiche ET l'élément actif reste le bouton ; attendu : `lu=true | actif=bouton « dernière commande »` ; obtenu : `lu=true | actif=BODY`.
+
+Cause réelle (vérifiée, non présumée) : UN seul défaut ici, `disabled`. Le raccourci global du viewer n'est pas en cause sur ce bouton : le gestionnaire `keydown` du document de `72-vf-equipe.js` (sélecteur `#panel [data-vf-transcript], #panel [data-vf-doing]`) couvre déjà ce bouton, la commande est lue (`lu=true`) ; `72-vf-equipe.js` n'est pas touché.
+Première version du témoin faussement verte : une réponse simulée immédiate rétablit le bouton avant tout recalcul de focus ; la réponse est donc retardée de 150 ms (ordre de grandeur du réseau réel).
+
+Correctif : `aria-disabled="true"` plus garde « lecture en cours » à la place de `disabled`, retrait de l'attribut à la fin (y compris sur les boutons redessinés du même identifiant). Vert : `test-cockpit-equipe.sh` 134 PASS / 0 FAIL.
+
+Mutant EK8.1 (page servie : le bouton redevient `disabled = true`) : attendu `muté|lu=true | actif=BODY`, obtenu identique.
+Faux vert évité, deuxième fois : l'ancre de EK1.3 (`b.setAttribute('aria-disabled', 'true');`) existe désormais dans les DEUX fichiers ; le mutant visait le premier, celui de `70-vf-live.js`, et EK1.3 rougissait. Les ancres de EK1.3 et EK8.1 citent le commentaire propre à chaque fichier, et `ek-sub.mjs` refuse désormais une ancre présente plusieurs fois (« ancre ambiguë »).

@@ -17,6 +17,7 @@ Deux défauts en série dans l'onglet Équipe, tous deux dans `72-vf-equipe.js` 
 
 Correctif : arrêt de l'Entrée au document pour les boutons du tiroir, `aria-disabled` plus garde « lecture en cours » à la place de `disabled`. Mesures et mutants : `70-11-RED-TRACE.md`.
 Le bouton « Voir la dernière commande » du tiroir « Au travail » (`70-vf-live.js`, `b.disabled = true`) a le même défaut de focus : non touché (fichier de 70-02), à remonter au manager.
+CORRIGÉ ensuite (mandat de correction ciblée) : voir « Suite » ci-dessous.
 
 ## Témoins (UIFN-13)
 
@@ -27,3 +28,10 @@ Le point « écrit à <id d'agent> » est exclu (arbitrage de goût de Samuel).
 ## Mesure
 
 Une anomalie de méthode évitée : une ancre de mutant trop générique (`ev.stopPropagation();`) touchait le viewer et non `72-vf-equipe.js` ; le mutant restait vert. Les ancres sont désormais comptées (une occurrence).
+
+## Suite : bouton du tiroir Au travail (EK8)
+
+- `70-vf-live.js` : `disabled` remplacé par `aria-disabled` plus garde « lecture en cours », comme dans `72-vf-equipe.js`. Seul `disabled` était en cause sur ce bouton : l'arrêt de l'Entrée au document de `72-vf-equipe.js` couvre déjà `[data-vf-doing]` (partagé, rien à y changer).
+- Témoins : EK8.0, EK8 (rouge sur 8de3fdd2 : attendu `lu=true | actif=bouton « dernière commande »`, obtenu `lu=true | actif=BODY`), EK8.1 (mutant `disabled = true` dans la page servie). Trace : `70-11-RED-TRACE.md` § « Suite ». `ek-sub.mjs` refuse une ancre ambiguë.
+- Autres `disabled = true` dans `ui/7*-vf-*.js` : aucun (recherche `disabled = true` et `.disabled=` sur 70 à 72, `70-vf-live.js` était le dernier).
+- Mesure : `test-cockpit-equipe.sh` 134 PASS / 0 FAIL ; `test-cockpit-marque-blanche.sh` 30 PASS / 0 FAIL.
