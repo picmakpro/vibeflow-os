@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { envEnfant } from './vf-cockpit-env.mjs';
 import { planningLayout, stateFile } from './vf-cockpit-paths.mjs';
 import { avancement, rattacherMission } from './vf-cockpit-avancement.mjs';
 
@@ -149,7 +150,7 @@ export function readPlanning(root, layout) {
   const seeds = ls(path.join(B, 'seeds')).filter((f) => f.endsWith('.md')).map((f) => ({ file: rel(path.join(B, 'seeds', f)), text: read(path.join(B, 'seeds', f)) }));
   let tags = [];
   try {
-    const out = execFileSync('git', ['-C', root, 'for-each-ref', '--sort=-creatordate', '--count=30', '--format=%(refname:short)\t%(creatordate:short)\t%(contents:subject)', 'refs/tags/v*'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000 });
+    const out = execFileSync('git', ['-C', root, 'for-each-ref', '--sort=-creatordate', '--count=30', '--format=%(refname:short)\t%(creatordate:short)\t%(contents:subject)', 'refs/tags/v*'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000, env: envEnfant(root) });
     tags = out.trim().split('\n').filter(Boolean).map((l) => { const [tag, date, subject] = l.split('\t'); return { tag, date, subject }; });
   } catch {}
   const title = /^# (.*)$/m.exec(read(path.join(B, 'PROJECT.md')))?.[1];

@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { envEnfant } from './vf-cockpit-env.mjs';
 import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { collectWho } from './vf-cockpit-who.mjs';
 import { driverLockScript, gitCommonDir, resolveScriptsDir, confiner } from './vf-cockpit-paths.mjs';
@@ -57,7 +58,7 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
   const lockStatus = () => {
     const dl = driverLockScript({ scriptsDir, labRoot: root, home: os.homedir() });
     if (dl.etat === 'absent') return { available: false };
-    try { return JSON.parse(execFileSync('bash', [dl.chemin, 'status', '--all'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000 })); }
+    try { return JSON.parse(execFileSync('bash', [dl.chemin, 'status', '--all'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000, env: envEnfant(root) })); }
     catch (e) { try { return JSON.parse(e.stdout); } catch { return { error: String(e.message).slice(0, 200) }; } }
   };
   const whoNow = () => { try { return collectWho(root, { scriptsDir }); } catch (e) { return { workers: [], sources: {}, error: e.message }; } };
