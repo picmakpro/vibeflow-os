@@ -256,3 +256,26 @@ asynchrone de l'ouvreur, collage de plus de 64 Kio perdu ; **N7** (info) `.cache
 correction hors sécurité (avec les mineurs M1 à M6 de la re-revue). Hérité, non réouvert : M7 de la 67 (hypothèse mono-utilisateur).
 
 Limites : macOS seulement ; autre compte local non testé ; composition IME par CDP ; ni Firefox ni Safari ; réutilisation de PID non reproduite.
+
+## Re-audit n°2 (2026-11-04)
+
+Rendu par `vf-auditer`, recoupé avec `gsd-security-auditor` (lancé sans les conclusions de l'auditeur), sur `c023f54a` (diff `502b354b..c023f54a` :
+tour C, N1, N2). Trois copies par `git archive` (`502b354b`, `c023f54a`, `v2.75.0`), un mutant par point, tous rouges ; Chrome par CDP, bash 3.2,
+macOS ; sondes dans le dossier temporaire de la mission (`reaudit2-71/`). Verdict : **gaps_found**, aucun bloquant, aucun majeur dans le périmètre
+de la phase.
+
+Fermés : N1 (aperçu intégral, charge C12 visible avant le clic, 25 000 caractères avec borne dite, invisibles rendus `⟨U+XXXX⟩`, texte reçu
+identique octet pour octet, 280 890 octets en tranches sans perte) ; N2 côté lanceur (12 binaires piégés, aucun exécuté sous `.:…`, `:…`, `bin:…`) ;
+M1 à M4, M6, N4, N5, N6 ; F1 à F8, P71-D-24, P71-D-28 et la CSP de P sans `--terminal` rejoués.
+
+| Id | Sévérité | Constat | Suite |
+|----|----------|---------|-------|
+| N8 | mineur, régression de N2 | `pathAssaini()` vide → `PATH=''` lu comme le cwd : `<lab>/git` exécuté par l'assemblage sous `env -i` ou `PATH=.` | lot D (régression créée par la phase) |
+| N9 | mineur | une ligne avec U+202E, Tag, zéro largeur passe sans bandeau ; xterm en rendu DOM réordonne l'affichage ; l'Entrée exécute la logique réelle | question Q14 à Samuel (déclencheur de P71-D-26) |
+| N10 | mineur | aperçu défilant de 112 px : une charge après 60 lignes vides est sous le pli (compteur et barre de défilement seuls) | question Q14 à Samuel |
+| N11 | info, régression du tour C | morceau vide jamais retiré de la file : boucle de POST vides | lot D |
+| I-doc | info | README muet sur le serveur non assaini ; docstring trop fort ; message répété 101 fois sans `ps` ; ENOTDIR silencieux sans `python3` | lot D |
+| H-1 | majeur **hérité de la 67**, hors verdict de la phase | le serveur vendorisé lance par nom `which`, `claude --version` au démarrage, les outils de `driver-lock.sh`, `git` : binaires du lab exécutés sous un `PATH` relatif ou vide ; identique sur `v2.75.0` | proposé à Samuel comme mandat séparé (assainir l'environnement des enfants du serveur, sans toucher le `PATH` du shell, P71-D-03) |
+
+Limites : macOS seulement (`/proc`, zombie réel, `xdg-open` non exécutés) ; aucun autre compte ; IME et glisser-déposer par CDP ; aucun modèle d'IA
+testé (N9). M7 de la 67 : hérité, non réouvert.
