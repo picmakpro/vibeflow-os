@@ -1,8 +1,11 @@
 // chrome-visite-etapes.mjs — la visite « Par où commencer » parcourue étape par étape, à deux largeurs (70-07, UIFN-04, P70-D-02, régime P70-D-08). Aucune dépendance.
-// Usage : node chrome-visite-etapes.mjs <chrome> <url> <largeurs> [recharge,passer,panneau,equipe,echap,police]      (largeurs : « 1440,390 »)
+// Usage : node chrome-visite-etapes.mjs <chrome> <url> <largeurs> [recharge,passer,panneau,equipe,echap,police,dejavu,titrehaut]      (largeurs : « 1440,390 »)
 //   equipe : url = l'onglet Équipe d'un lab qui a une session et un sous-agent (donc au moins deux cartes) ; ne parcourt rien : rend { e<largeur>: { cartes, auto, manuel } } = cartes du graphe, la visite est ouverte par l'appel que fait le démarrage d'office (start() sans argument, 75-vf-modele.js et 40-tour.js), ouverte par le bouton « Par où commencer »
 //   echap : (largeur étroite, onglet Projet) un détail de carte est ouvert dans le tiroir, la visite est ouverte, puis Échap deux fois : clé t<largeur> { tiroir0, tour1, tiroir1, tour2, tiroir2 } = état du tiroir (ouvert vrai/faux) et de la visite après chaque temps (la visite, au-dessus, doit capter la première Échap ; le tiroir ne doit pas être touché par l'ouverture ni la sortie de la visite)
 //   police : police large imposée à la carte de visite, au titre et aux cartes du graphe (Verdana, puis DejaVu Sans ; l'en-tête et la barre de question gardent la police du poste : DejaVu est moins large que Verdana, R1 « invite tronquée » rougirait sans rapport avec la visite) : la police du poste ne décide plus de la taille des textes ; c'est la contrainte du runner Linux (DejaVu Sans, plus large que les polices de macOS)
+//   dejavu : la VRAIE police DejaVu Sans (fichiers TTF dans $VF_DEJAVU_DIR : DejaVuSans.ttf et DejaVuSans-Bold.ttf, jamais dans le dépôt) chargée par @font-face en data: et imposée à toute la page, comme le fait fontconfig sous Ubuntu ; rend { erreur } nommée si les fichiers manquent
+//   titrehaut : le bloc titre (#context) est rempli d'une description de 600 caractères avant la visite (un titre plus haut que prévu : police, nom de projet long) ; la carte de visite ne doit toujours rien recouvrir, quitte à replier la description
+//   diag (toujours) : par étape, une ligne compacte de bbox (carte de visite, titre et ses enfants visibles, cible, fenêtre), police calculée du titre, polices réellement rendues (CDP CSS.getPlatformFontsForNode) et polices chargées de la page
 //   panneau : le panneau de détail est élargi à 440 px avant la visite (ce que font d'autres polices, d'autres plateformes : sur la CI Linux, `#panel` recouvrait `#tour` à 768 px) ; champ surPanneau = la carte de visite recouvre le panneau
 //   passer : après la visite parcourue, la visite est relancée, avancée de deux étapes (une carte) puis fermée par « Passer » : clé p<largeur> { avant, apres } = { k : zoom, x, y : position, visibles : cartes entièrement dans la fenêtre, recouvre : cartes recouvertes par le titre } (la vue d'avant la visite doit revenir)
 //   anneau (étape sur un élément du chrome) = le contour a disparu quand le className du bouton #vf-lock est réécrit à l'arrivée, comme le fait la couche live (70-vf-live.js : « btn held »)
@@ -18,7 +21,8 @@
 //   selectionne = la visite a sélectionné quelque chose (le panneau montre alors le détail d'une carte au lieu de la vue d'ensemble) · toutLibre = une carte du graphe sort de la zone libre à gauche du panneau, visite active (critère de R1) · dansZone = la carte ciblée sort de la zone libre de la carte (sous le panneau, l'en-tête ou la barre de question ; 70-07, grandes cartes) · tient = la carte de visite sort de la fenêtre · passer = aucun bouton « Passer » visible dans la carte · repere = texte « n sur N » lu · anglais = mots témoins anglais (liste de F11) dans le texte de la carte de visite.
 import { executer, pause } from './chrome-session.mjs';
 const [, , chrome, url, largeurs, options = ''] = process.argv;
-const recharge = /recharge/.test(options), passer = /passer/.test(options), panneau = /panneau/.test(options), equipe = /equipe/.test(options), echap = /echap/.test(options), police = /police/.test(options);
+const recharge = /recharge/.test(options), passer = /passer/.test(options), panneau = /panneau/.test(options), equipe = /equipe/.test(options), echap = /echap/.test(options), police = /police/.test(options), dejavu = /dejavu/.test(options), titrehaut = /titrehaut/.test(options);
+const DEJAVU_DIR = process.env.VF_DEJAVU_DIR || '';
 const HAUT = { 390: 844, 768: 1024, 800: 600, 1024: 768, 1440: 900 };
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlowTour && !!document.getElementById('tour-btn')";
 const INIT = "!!window.__vfModele && !!window.__vfModele.modele";
@@ -73,6 +77,20 @@ const MESURE = `(() => {
 })()`;
 await executer(chrome, async (s) => {
   const sortie = {};
+  // diagnostic : bbox des surfaces en jeu et polices, une ligne compacte par étape (aucune assertion n'en dépend)
+  const diag = async (i, m) => {
+    try {
+      const d = await s.ev(`(() => { const R = (e) => { if (!e) return null; const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom].map(Math.round).join(','); };
+        const ctx = document.getElementById('context'); const kids = ctx ? [...ctx.querySelectorAll('*')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).map((e) => e.tagName.toLowerCase() + '[' + R(e) + ']').join(' ') : '';
+        const h1 = document.querySelector('#context h1'); const cs = h1 ? getComputedStyle(h1) : null; const T = document.getElementById('tour'), z = document.querySelector('.tour-target');
+        const chargees = [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family + ' ' + f.weight).join(';');
+        return 'fen=' + innerWidth + 'x' + innerHeight + ' tour=[' + R(T) + '] (w ' + T.style.width + ' b ' + T.style.bottom + ' mh ' + T.style.maxHeight + ' ' + T.className + ') context=[' + R(ctx) + '] enfants: ' + kids + ' cible=[' + R(z) + '] h1.font=' + (cs ? cs.fontFamily + ' ' + cs.fontSize + ' ' + cs.fontWeight : '-') + ' check(DejaVu)=' + document.fonts.check("16px 'DejaVu Sans'") + ' chargees=' + chargees; })()`);
+      let rendu = '';
+      try { await s.send('DOM.enable'); await s.send('CSS.enable'); const doc = await s.send('DOM.getDocument', { depth: 0 }); const n = await s.send('DOM.querySelector', { nodeId: doc.root.nodeId, selector: '#context h1' });
+        if (n.nodeId) { const pf = await s.send('CSS.getPlatformFontsForNode', { nodeId: n.nodeId }); rendu = (pf.fonts || []).map((f) => f.familyName + ':' + f.glyphCount).join(','); } } catch (e) { rendu = 'indisponible'; }
+      return d + ' rendu=' + rendu;
+    } catch (e) { return 'diag indisponible : ' + e.message; }
+  };
   for (const w of String(largeurs).split(',').map(Number)) for (const passe of recharge ? [0, 1] : [0]) {
     await s.send('Emulation.setDeviceMetricsOverride', { width: w, height: HAUT[w] || Math.round(w * 0.625), deviceScaleFactor: 1, mobile: false });
     await s.attendre(`innerWidth === ${w}`, `largeur ${w} appliquée`);
@@ -98,6 +116,13 @@ await executer(chrome, async (s) => {
       sortie['e' + w] = { cartes, auto, manuel: await s.ev('window.VibeFlowTour.active()'), bouton };
       await s.ev('window.VibeFlowTour.end()'); continue;
     }
+    if (dejavu) {
+      const fs = await import('node:fs'); const lire = (f) => { try { return fs.readFileSync(DEJAVU_DIR + '/' + f).toString('base64'); } catch { return null; } };
+      const r = lire('DejaVuSans.ttf'), b = lire('DejaVuSans-Bold.ttf'); if (!r || !b) throw new Error('police DejaVu Sans introuvable : VF_DEJAVU_DIR=' + DEJAVU_DIR);
+      await s.ev(`(async () => { const st = document.createElement('style'); st.id = 'vf-dejavu'; st.textContent = "@font-face { font-family: 'DejaVu Sans'; font-weight: 400; src: url(data:font/ttf;base64,${r}) format('truetype'); } @font-face { font-family: 'DejaVu Sans'; font-weight: 700; src: url(data:font/ttf;base64,${b}) format('truetype'); } *, *::before, *::after { font-family: 'DejaVu Sans', sans-serif !important; }"; document.head.appendChild(st); await document.fonts.load("16px 'DejaVu Sans'"); await document.fonts.load("700 16px 'DejaVu Sans'"); return document.fonts.check("16px 'DejaVu Sans'"); })()`);
+      await pause(500);
+    }
+    if (titrehaut) await s.ev("(() => { const p = document.querySelector('#context p'); if (p) p.textContent = 'Description volontairement très longue du projet, pour que le bloc titre occupe beaucoup de place : ' + 'mot '.repeat(120); })()");
     if (police) await s.ev("(() => { const st = document.createElement('style'); st.id = 'vf-police-large'; st.textContent = '#tour, #tour *, #context, #context *, #svg * { font-family: Verdana, \\'DejaVu Sans\\', sans-serif !important; letter-spacing: 0.06em !important; }'; document.head.appendChild(st); })()");
     if (panneau) await s.ev("(() => { const p = document.getElementById('panel'); p.style.width = '440px'; })()");
     const noeuds = await s.ev(DONNEE);
@@ -108,6 +133,7 @@ await executer(chrome, async (s) => {
       await pause(1000); // le centrage de la carte s'anime (520 ms) avant la mesure
       const m = await s.stable(MESURE, `étape ${i + 1} stable à ${w} px`, 20000);
       if (m.element) { await s.ev("(() => { const e = document.getElementById('vf-lock'); if (e) e.className = 'btn held'; })()"); await pause(1500); m.anneau = !(await s.ev("(() => { const e = document.querySelector('.tour-target'); if (!e) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; })()")); }
+      m.diag = await diag(i + 1, m);
       etapes.push({ i: i + 1, ...m });
       await s.ev("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))");
       await pause(150);

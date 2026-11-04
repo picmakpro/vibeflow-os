@@ -534,6 +534,8 @@ SRV_PID=$PID_l; unsrv; SRV_PID=$PID_c; unsrv
 for v in m21 m22 m23; do eval "[ \$M${v#m} = 0 ] && { SRV_PID=\$PID_$v; unsrv; }"; done
 assert_rouge() { case "$2" in aucune|mesure*|*témoin*) echo "  ❌ FAIL — $1"; echo "     attendu: une violation de mise en page"; echo "     obtenu:  [${2:0:600}]"; FAIL=$((FAIL+1));; *) echo "  ✅ PASS — $1"; PASS=$((PASS+1));; esac; }
 viol_() { printf '%s' "$(cat "$1")" | node "$AUX/viol.mjs" "$2"; }
+# DIAG : à l'échec d'une assertion de la visite, la ligne de diagnostic de la mesure (bbox de #tour, #ask et ses avis, fenêtre, obstacles vus au placement) ; aucune assertion ne change
+diag_visite() { local l; l="$(printf '%s' "$(cat "$1")" | node "$AUX/ev.mjs" "(j.mesures&&j.mesures[\"$2\"]&&j.mesures[\"$2\"].m.tourDiag)||'visite fermée ou diagnostic absent'" 2>/dev/null)"; echo "     DIAG $3 [$2 px] $l"; }
 # R23 : toute action désactivée du bouton d'origine l'est aussi sur l'entrée du menu ; témoin : au moins une action désactivée (Équipe : « Par où commencer »)
 EXPR23='(()=>{const m=j.mesures["390"].m,s=m.sources,e=m.menu;if(!e)return "menu absent";const p=[];if(!s.some((x)=>x.off))p.push("témoin : aucune action désactivée");s.forEach((x,i)=>{if(!x.off)return;const y=e[i];if(!y||!y.off)p.push(x.t+" : entrée non désactivée");else{if(!(y.op<1))p.push(x.t+" : entrée non atténuée (opacité "+y.op+")");if(y.ti!==x.ti||!y.ti)p.push(x.t+" : infobulle ["+(y.ti||"")+"] au lieu de ["+x.ti+"]")}});return p.join(" ; ")||"aucune"})()'
 for w in ${W21//,/ }; do
@@ -545,6 +547,8 @@ done
 for w in ${W22//,/ }; do
   assert_eq "R22 — Code (racine), « 99 au travail » et un bouton de plus / $w px : aucune violation (repli mesuré)" "$(viol_ "$WORK/r22-code.json" "$w")" "aucune"
   assert_eq "R22 — Projet (parcours), « 99 au travail » et un bouton de plus / $w px : aucune violation (repli mesuré)" "$(viol_ "$WORK/r22-projet.json" "$w")" "aucune"
+  [ "$(viol_ "$WORK/r22-code.json" "$w")" != aucune ] && diag_visite "$WORK/r22-code.json" "$w" "R22 Code"
+  [ "$(viol_ "$WORK/r22-projet.json" "$w")" != aucune ] && diag_visite "$WORK/r22-projet.json" "$w" "R22 Projet"
 done
 assert_eq "R23 — Équipe / 390 px : l'action désactivée (« Par où commencer ») l'est aussi dans le menu « ⋯ » (aria-disabled, atténuée, même infobulle)" "$(printf '%s' "$(cat "$WORK/r23.json")" | node "$AUX/ev.mjs" "$EXPR23")" "aucune"
 if [ $M22 = 0 ]; then # les mutants du repli : sans lui, chacun de ces trois relevés rougit (1 640 px racine : #btn-panel sort ; 1 640 px et 1 700 px en parcours : fil rogné)

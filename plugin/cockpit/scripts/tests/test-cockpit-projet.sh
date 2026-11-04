@@ -523,6 +523,12 @@ XEC="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 390 echap)
 xec() { printf '%s' "$XEC" | node "$AUX/get.mjs" /dev/stdin "$1"; }
 assert_eq "O6.15a — témoin : mesure sans erreur, tiroir ouvert par la carte avant la visite, visite démarrée" "$(xec "j.erreur||''")|$(xec 'j.t390.carteOuverte.tiroir')|$(xec 'j.t390.visiteDemarree.tour')" "|true|true"
 assert_eq "O6.15 — visite ouverte au-dessus d'un tiroir ouvert : l'ouverture de la visite ne ferme pas le tiroir ; la première Échap ferme la visite et laisse le tiroir ; la seconde ferme le tiroir (tiroir|visite après chaque temps)" "$(xec '[j.t390.visiteDemarree,j.t390.echap1,j.t390.echap2].map((x)=>x.tiroir+"/"+x.tour).join(" ")')" "true/true true/false false/false"
+# DIAG : pour chaque étape fautive de O6.17, une ligne compacte de bbox et de polices (aucune assertion ne change ; la CI Linux nous donne ainsi la vraie géométrie)
+diag17() { # diag17 <étiquette> <json> <largeur> <clé>
+  local l; l="$(printf '%s' "$2" | node "$AUX/get.mjs" /dev/stdin "j.l$3.etapes.filter((e)=>e.surfaces.length||!e.dansZone||!e.tient).map((e)=>'étape '+e.i+' surfaces='+e.surfaces.join('+')+' '+e.diag).join('\\n')" 2>/dev/null)"
+  [ -n "$l" ] && printf '%s\n' "$l" | sed "s/^/     DIAG $1 [$3 px] /"
+  return 0
+}
 # O6.17 (CI Linux de 07e75a54 : R3 « #zoom recouvre #tour » à 800 px ; quatrième instance après #panel, #context et Échap) : la CLASSE de défaut, pas un cas de plus. Visite ouverte par l'API (sans course de calendrier), sur Code et sur Projet,
 # à 390, 768, 800, 1 024 et 1 440 px : à CHAQUE étape, la carte de visite ne recouvre aucune surface fixe visible de l'interface (#zoom, #panel, #context, en-tête, #ask et ses avis, contour de la cible).
 XS1="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$U5" 390,768,800,1024,1440)"; XS2="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 390,768,800,1024,1440)"
@@ -532,7 +538,9 @@ xs2() { printf '%s' "$XS2" | node "$AUX/get.mjs" /dev/stdin "$1"; }
 assert_eq "O6.17a — témoin : les deux mesures ont eu lieu sans erreur, au moins deux étapes à chaque largeur" "$(xs1 "j.erreur||''")|$(xs2 "j.erreur||''")|$(xs1 '[390,768,800,1024,1440].every((w)=>j["l"+w].n>=2)')|$(xs2 '[390,768,800,1024,1440].every((w)=>j["l"+w].n>=2)')" "||true|true"
 for W in 390 768 800 1024 1440; do
   assert_eq "O6.17 [$W px] — Code : étapes dont la carte de visite recouvre une surface fixe (étape:surfaces)" "$(xs1 "j.l$W.etapes.filter((e)=>e.surfaces.length).map((e)=>e.i+':'+e.surfaces.join('+')).join(' ')")" ""
+  diag17 "O6.17 Code" "$XS1" "$W"
   assert_eq "O6.17 [$W px] — Projet : étapes dont la carte de visite recouvre une surface fixe (étape:surfaces)" "$(xs2 "j.l$W.etapes.filter((e)=>e.surfaces.length).map((e)=>e.i+':'+e.surfaces.join('+')).join(' ')")" ""
+  diag17 "O6.17 Projet" "$XS2" "$W"
 done
 # O6.17 passe « police large » (CI Linux de 63efb1e1 : O6.17 à 800 px, R22, R3 à 390 px rougissaient sous Linux, où Chrome tombe sur DejaVu Sans, plus large que les polices de macOS) : la classe de défaut doit être fermée pour TOUTE largeur de police.
 # La carte de visite, le titre et les cartes du graphe prennent Verdana puis DejaVu Sans avec un espacement de lettres (le poste ne décide plus de la taille des textes) ; mêmes cinq largeurs, Code et Projet : aucune surface recouverte,
@@ -544,7 +552,34 @@ xp2() { printf '%s' "$XP2" | node "$AUX/get.mjs" /dev/stdin "$1"; }
 assert_eq "O6.17p-a — témoin : les deux mesures en police large ont eu lieu sans erreur, au moins deux étapes à chaque largeur" "$(xp1 "j.erreur||''")|$(xp2 "j.erreur||''")|$(xp1 '[390,768,800,1024,1440].every((w)=>j["l"+w].n>=2)')|$(xp2 '[390,768,800,1024,1440].every((w)=>j["l"+w].n>=2)')" "||true|true"
 for W in 390 768 800 1024 1440; do
   assert_eq "O6.17p [$W px] — Code, police large : étapes dont la carte de visite recouvre une surface fixe, dont la carte ciblée sort de la zone libre ou dont la carte de visite sort de la fenêtre" "$(xp1 "j.l$W.etapes.filter((e)=>e.surfaces.length||!e.dansZone||!e.tient).map((e)=>e.i+':'+e.surfaces.join('+')+(e.dansZone?'':' hors-zone')+(e.tient?'':' hors-fenetre')).join(' ')")" ""
+  diag17 "O6.17p Code" "$XP1" "$W"
   assert_eq "O6.17p [$W px] — Projet, police large : étapes dont la carte de visite recouvre une surface fixe, dont la carte ciblée sort de la zone libre ou dont la carte de visite sort de la fenêtre" "$(xp2 "j.l$W.etapes.filter((e)=>e.surfaces.length||!e.dansZone||!e.tient).map((e)=>e.i+':'+e.surfaces.join('+')+(e.dansZone?'':' hors-zone')+(e.tient?'':' hors-fenetre')).join(' ')")" ""
+  diag17 "O6.17p Projet" "$XP2" "$W"
+done
+# O6.17d passe « police réelle » : la VRAIE DejaVu Sans (fichiers TTF libres hors dépôt, $VF_DEJAVU_DIR) imposée à toute la page par @font-face, comme le fait fontconfig sous Ubuntu. Sautée, et dite sautée, sans la variable.
+if [ -n "${VF_DEJAVU_DIR:-}" ] && [ -f "$VF_DEJAVU_DIR/DejaVuSans.ttf" ]; then
+  XD1="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$U5" 390,768,800,1024,1440 dejavu)"; XD2="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 390,768,800,1024,1440 dejavu)"
+  xd1() { printf '%s' "$XD1" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+  xd2() { printf '%s' "$XD2" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+  assert_eq "O6.17d-a — témoin : mesures en DejaVu Sans réelle sans erreur, polices rendues = DejaVu Sans" "$(xd1 "j.erreur||''")|$(xd2 "j.erreur||''")|$(xd2 'j.l800.etapes.every((e)=>/DejaVu Sans/.test(e.diag.split("rendu=")[1]||""))')" "||true"
+  for W in 390 768 800 1024 1440; do
+    assert_eq "O6.17d [$W px] — Code, DejaVu Sans réelle : étapes dont la carte de visite recouvre une surface fixe ou dont la carte ciblée sort de la zone libre" "$(xd1 "j.l$W.etapes.filter((e)=>e.surfaces.length||!e.dansZone||!e.tient).map((e)=>e.i+':'+e.surfaces.join('+')).join(' ')")" ""
+    diag17 "O6.17d Code" "$XD1" "$W"
+    assert_eq "O6.17d [$W px] — Projet, DejaVu Sans réelle : étapes dont la carte de visite recouvre une surface fixe ou dont la carte ciblée sort de la zone libre" "$(xd2 "j.l$W.etapes.filter((e)=>e.surfaces.length||!e.dansZone||!e.tient).map((e)=>e.i+':'+e.surfaces.join('+')).join(' ')")" ""
+    diag17 "O6.17d Projet" "$XD2" "$W"
+  done
+else echo "  ⊘ O6.17d SAUTÉ : VF_DEJAVU_DIR absent (DejaVuSans.ttf et DejaVuSans-Bold.ttf hors dépôt) — la passe en police réelle n'est PAS vérifiée, non comptée comme réussie"; fi
+# O6.17t passe « titre haut » (CI Linux de 6c75f230 : #context recouvre #tour à 800 px, introuvable avec DejaVu Sans réelle sous macOS) : le bloc titre est rempli d'une description de 600 caractères avant la visite (police, nom de projet long, ce qui en fait
+# un titre plus haut que prévu) ; la carte de visite ne doit rien recouvrir, quitte à replier la description pendant la visite. Cinq largeurs, Code et Projet. Témoin générique de géométrie, indépendant de la police du poste.
+XT1="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$U5" 390,768,800,1024,1440 titrehaut)"; XT2="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 390,768,800,1024,1440 titrehaut)"
+xt1() { printf '%s' "$XT1" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+xt2() { printf '%s' "$XT2" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O6.17t-a — témoin : mesures à titre haut sans erreur, au moins deux étapes à chaque largeur" "$(xt1 "j.erreur||''")|$(xt2 "j.erreur||''")|$(xt1 '[390,768,800,1024,1440].every((w)=>j["l"+w].n>=2)')|$(xt2 '[390,768,800,1024,1440].every((w)=>j["l"+w].n>=2)')" "||true|true"
+for W in 390 768 800 1024 1440; do
+  assert_eq "O6.17t [$W px] — Code, titre haut : étapes dont la carte de visite recouvre une surface fixe (étape:surfaces)" "$(xt1 "j.l$W.etapes.filter((e)=>e.surfaces.length).map((e)=>e.i+':'+e.surfaces.join('+')).join(' ')")" ""
+  diag17 "O6.17t Code" "$XT1" "$W"
+  assert_eq "O6.17t [$W px] — Projet, titre haut : étapes dont la carte de visite recouvre une surface fixe (étape:surfaces)" "$(xt2 "j.l$W.etapes.filter((e)=>e.surfaces.length).map((e)=>e.i+':'+e.surfaces.join('+')).join(' ')")" ""
+  diag17 "O6.17t Projet" "$XT2" "$W"
 done
 # O6.10 (correctif 70-07, REG-70-01 de 70-VERIFICATION.md) : visite Projet active au premier chargement sur un lab à jalon et à mission, à 1 024 et 1 920 px : la carte ciblée tient dans la zone libre ET aucune carte du graphe ne sort de la zone
 # libre à gauche du panneau (critère de R1, chrome-responsive.mjs). Cause : aim() centrait et zoomait la carte sans regarder le reste du graphe, qui débordait sous le panneau ; il ne dézoomait jamais une carte plus large que sa zone.

@@ -188,11 +188,12 @@
     card.querySelector('[data-play]')?.addEventListener('click', () => { const id = s.flow; end(false); SC.startFlow(id); });
   }
   // sit above the zoom controls, and above the Ask bar (and its notices) where they overlap
-  let placedSig = '', placeTimer = 0;
+  let placedSig = '', placeTimer = 0, lastPlace = null;
   const sigOf = (obs) => obs.map((o) => [o.left, o.top, o.right, o.bottom].map(Math.round).join(',')).join('|');
   function obstacles(vis) {
     const ask = document.getElementById('ask');
-    return ['zoom', 'panel', 'context', 'ask'].map((id) => document.getElementById(id)).concat(document.querySelector('header'), document.querySelector('.tour-target'), ask ? [...ask.children] : []).filter(vis).map((e) => e.getBoundingClientRect());
+    const name = (e) => e.id ? '#' + e.id : e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\s+/)[0] : '');
+    return ['zoom', 'panel', 'context', 'ask'].map((id) => document.getElementById(id)).concat(document.querySelector('header'), document.querySelector('.tour-target'), ask ? [...ask.children] : []).filter(vis).map((e) => { const r = e.getBoundingClientRect(); return { n: name(e), left: r.left, top: r.top, right: r.right, bottom: r.bottom }; });
   }
   const visible = (e) => { if (!e) return false; const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
   function place() {
@@ -202,6 +203,7 @@
     const vis = visible;
     const obs = obstacles(vis);
     placedSig = sigOf(obs);
+    lastPlace = { obs, topLimit: 0, best: null };
     const topLimit = ['context'].map((id) => document.getElementById(id)).concat(document.querySelector('header')).filter(vis).reduce((m, e) => Math.max(m, e.getBoundingClientRect().bottom), 0) + 8; // header and title block (whatever their height: a wide font makes the title taller): the card is never taller than the room under them, its text scrolls
     const w0 = Math.min(360, innerWidth - 32);
     const widths = [w0, 300, 260, 220, 200].filter((w, k, a) => w <= w0 && a.indexOf(w) === k);
@@ -221,6 +223,7 @@
       }
       if (best.covered === 0) break;
     }
+    lastPlace.best = best; lastPlace.topLimit = topLimit;
     card.style.width = best.w + 'px'; card.style.bottom = best.b + 'px'; card.style.maxHeight = best.mh; card.classList.toggle('right', best.side === 'right');
   }
   window.addEventListener('resize', () => { if (active()) place(); });
@@ -279,5 +282,7 @@
   SC.on('ready', maybeAuto);
   if (SC.state.layout) maybeAuto();
 
-  window.FloorplanTour = { start, end, active };
+  // diagnostic for the test suites (a failure on a runner we do not have prints what the placement saw): the obstacles of the last placement and the position it chose
+  const diag = () => !lastPlace ? 'aucun placement' : 'obstacles vus au dernier placement: ' + lastPlace.obs.map((o) => o.n + '[' + [o.left, o.top, o.right, o.bottom].map(Math.round).join(',') + ']').join(' ') + ' | topLimit=' + Math.round(lastPlace.topLimit) + ' choix=' + (lastPlace.best ? ['largeur ' + lastPlace.best.w, 'côté ' + lastPlace.best.side, 'bas ' + lastPlace.best.b, 'recouvre ' + Math.round(lastPlace.best.covered), 'hauteur max ' + lastPlace.best.mh].join(', ') : '-');
+  window.FloorplanTour = { start, end, active, diag };
 })();

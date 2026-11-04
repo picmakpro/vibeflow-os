@@ -87,6 +87,9 @@ const MESURE = `(() => {
   m.zoom = zm ? { entete: hd.contains(zm), vis: vis(zm), dir: getComputedStyle(zm).flexDirection, r: arr(rec(zm)), boutons: [...zm.querySelectorAll('button')].map((b) => ({ id: b.id, aria: b.getAttribute('aria-label') || '', title: b.getAttribute('title') || '' })) } : null;
   m.askRect = af && vis(af) ? arr(rec(af)) : null; m.upRect = up && vis(up) ? arr(rec(up)) : null;
   const bp = document.querySelector('#btn-panel'), pn = document.querySelector('#panel');
+  // diagnostic de la visite ouverte (lu par les suites quand une assertion rougit : bbox de la carte de visite, de #ask et de ses avis, de la fenêtre, obstacles vus au dernier placement)
+  { const T = document.getElementById('tour'), A = document.getElementById('ask'); if (T && !T.hidden) { const B = (e) => { if (!e) return '-'; const r = e.getBoundingClientRect(); return '[' + [r.left, r.top, r.right, r.bottom].map(Math.round).join(',') + ']'; };
+      m.tourDiag = 'fen=' + vw + 'x' + vh + ' tour=' + B(T) + ' (w ' + T.style.width + ' b ' + T.style.bottom + ' mh ' + T.style.maxHeight + ') ask=' + B(A) + ' enfants: ' + (A ? [...A.children].map((c) => (c.id || c.className || c.tagName) + B(c) + (vis(c) ? '' : '(caché)')).join(' ') : '') + ' | ' + (window.VibeFlowTour && window.VibeFlowTour.diag ? window.VibeFlowTour.diag() : 'sans diag'); } }
   m.btnPanel = !!(bp && vis(bp)); m.tiroir = !!(pn && vis(pn)) && !document.body.classList.contains('no-panel');
   m.poignee = !!pn && [...pn.querySelectorAll('[aria-hidden="true"]')].some((e) => vis(e) && rec(e).width >= 24 && rec(e).height <= 8 && rec(e).top - rec(pn).top < 24);
   m.croix = !!pn && [...pn.querySelectorAll('button')].some((b) => vis(b) && /^Fermer/i.test(b.getAttribute('aria-label') || ''));
