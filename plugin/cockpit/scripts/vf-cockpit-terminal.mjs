@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fork } from 'node:child_process';
 import { realUnder } from './vf-cockpit-paths.mjs';
+import { envEnfant } from './vf-cockpit-env.mjs';
 import { preparerPage } from './vf-cockpit-terminal-page.mjs';
 import { TAILLE_MAX } from './vf-cockpit-terminal-session.mjs';
 import { injectionTiroir } from './vf-cockpit-terminal-tiroir.mjs';
@@ -19,15 +20,10 @@ const json = (res, statut, objet) => { res.writeHead(statut, { 'Content-Type': '
 export { CORPS_ENTREE_MAX } from './vf-cockpit-terminal-processus.mjs';
 export { TAILLE_MAX }; // définie avec la session, qui la fait respecter aussi à l'attache du flux
 
-// L'environnement du PROCESSUS enfant (pas celui du shell, qui garde l'environnement d'origine, P71-D-03). UNE seule fonction : au rebase sur la PR H-1,
-// son corps devient `return envEnfant(lab, process.env)` (vf-cockpit-env.mjs). Copie dont le PATH est assaini : éléments vides, relatifs ou sous le lab
-// retirés, repli sur les répertoires système.
+// L'environnement du PROCESSUS enfant (pas celui du shell, qui garde l'environnement d'origine, P71-D-03) : celui de tout enfant du cockpit (H-1),
+// PATH assaini par vf-cockpit-env.mjs (éléments vides, relatifs ou sous le lab écartés, liens symboliques résolus, repli sur les répertoires système).
 export function envDuProcessusTerminal(lab) {
-  const env = { ...process.env };
-  let reel = lab; try { reel = fs.realpathSync(lab); } catch {}
-  const garde = String(env.PATH || '').split(path.delimiter).filter((d) => d && path.isAbsolute(d) && !(d === reel || d.startsWith(reel + path.sep) || d === lab || d.startsWith(lab + path.sep)));
-  env.PATH = garde.length ? garde.join(path.delimiter) : '/usr/bin:/bin:/usr/sbin:/sbin';
-  return env;
+  return envEnfant(lab, process.env);
 }
 
 export function preparerTerminal({ here, root, jetons = () => [], plateforme = process.platform } = {}) {

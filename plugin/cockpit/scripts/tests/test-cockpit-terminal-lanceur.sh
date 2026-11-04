@@ -469,6 +469,11 @@ if mutant leurreterm 's/if (vif) { if (!arreter(sortie))/if (vif) { if (o.avecQ 
   vf_hyg_stop "$LEURRE_M"; rm -f "$SJ"
 else assert_eq "M-LEURRE-TERMINAL — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
+echo "=== L22 — l'environnement du processus du terminal est celui de H-1 (envEnfant) : un élément absolu du PATH qui est un lien vers le lab est écarté ==="
+LNK22="$WORK/lien22"; ln -s "$LAB/src" "$LNK22"
+R22="$(cd "$LAB" && PATH="$LNK22:/usr/bin:/bin" "$NODE_ABS" --input-type=module -e "import { envDuProcessusTerminal } from 'file://$SCRIPTS/vf-cockpit-terminal.mjs'; console.log(envDuProcessusTerminal(process.argv[1]).PATH)" "$LAB" 2>&1)"
+assert_eq "L22 — envDuProcessusTerminal écarte un élément absolu du PATH qui résout dans le lab (lien symbolique), comme envEnfant (H-1)" "$R22" "/usr/bin:/bin"
+
 echo "=== M-OUVRE-NOMNU / M-PS-NOMNU / M-GIT-NOMNU / M-WHO-NOMNU / M-SERVE-OUVRE / M-PS-FINAL — mutants de N2 : résolution par nom nu ==="
 # nom|fichier|sed|marqueur attendu|PATH ('.' = « .: » en tête ; 'min' = PATH sans binaire du système, élément vide final)
 for spec in "ouvrenomnu|vf-cockpit.mjs|s/spawn(exe, op\[1\]/spawn(op[0], op[1]/|open|." "psnomnu|vf-cockpit.mjs|s/execFileSync(ps, /execFileSync('ps', /;s/, env: envEnfant(lab) })/ })/|ps|." "gitnomnu|vf-cockpit-planning.mjs|s/timeout: 10000, env: envEnfant(root) })/timeout: 10000 })/|git|." "whonomnu|vf-cockpit-who.mjs|s/timeout: 10000, env: envEnfant(lab) })/timeout: 10000 })/|git|." "servopen|vf-cockpit.mjs|s/^  args.push('--no-open');.*$/  if (o.avecQ) args.push('--no-open'); else if (o.noOpen) args.push('--no-open');/;s/{ \.\.\.envEnfant(lab), VF_COCKPIT_ENGINE_DIR/{ ...process.env, VF_COCKPIT_ENGINE_DIR/|open|." "psfinal|vf-cockpit.mjs|s/const ps = resoudreBinaire('ps');/const ps = 'ps';/;s/, env: envEnfant(lab) })/ })/|ps|min"; do
