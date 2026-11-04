@@ -40,3 +40,23 @@ Onglets avant le plan : police 12 px, piste 2 px / 2 px, padding d'onglet 6 px, 
 - Poignée = élément décoratif (`aria-hidden="true"`) plus large que haut (largeur ≥ 24 px, hauteur ≤ 8 px) dans les 24 px du haut de `#panel` ; croix = bouton visible de `#panel` dont l'`aria-label` commence par « Fermer ».
 - Nom accessible du zoom : non vide et ne commence pas par `Zoom out`, `Fit to screen`, `Zoom in`.
 - R14.2 : pile `column`, `x < 195` à 390 px, bas du zoom au-dessus du haut de la barre de question (quand elle est visible).
+
+## Recalcul P70-D-16 — mesures et arrêt (condition d'arrêt du plan)
+
+Essai : règle de resserrement de 69-05 retirée (onglets à 13 px, piste à 3 px, padding d'onglet 13 px, marge gauche 14 px), mesure à 1 024 px dans Chrome sur le lab « long », onglet Code avec Travail récent et Écrans (le pire en-tête). Le retrait a ensuite été défait : aucun code de mise en page n'est livré, `00-vibeflow.js` et `01-vf-responsive.js` sont inchangés.
+
+Largeurs mesurées à 1 024 px, onglet Code avec ses boutons optionnels : marque (minimum) 84 px ; marge gauche des onglets 14 px ; écart de la colonne gauche 4 px ; « Remonter » 36 px ; recherche (plancher) 200 px ; colonne de droite 496,4 px, dont le badge « au travail » **128 px** (point + « 1 au travail ») et neuf boutons de 36 px (44 px pour le thème). Largeur de la piste d'onglets : 200 px à 13 px / padding 13 px, soit 122 px de texte + 6 × le padding (170 px à 8 px, 182 px à 10 px).
+
+Place disponible : la fenêtre de 1 024 px laisse à la colonne gauche au plus 280 + 7,6 px (la colonne de droite finit à 1 016,4 px).
+
+Calcul de la borne `header .hl` (marque + écart + marge + onglets + écart + « Remonter ») = 84 + 4 + 14 + (122 + 6 p) + 4 + 36 = 264 + 6 p :
+
+| padding d'onglet p | borne avec « Remonter » | sans « Remonter » | résultat mesuré à 1 024 px, Code |
+|---|---|---|---|
+| 13 | 342 | 302 | `#btn-panel` sort de la fenêtre (1002..1038), en-tête rogné de 14 px |
+| 10 | 324 | 284 | à 284 : tient (aucune violation) ; à 324 : `#btn-panel` sort (1024..1060), en-tête rogné de 36 px |
+| 8 (plancher du plan) | 312 | 272 | à 312 : `#btn-panel` sort (1012..1048), en-tête rogné de 24 px ; à 290 : sort encore de 2 px |
+
+Conclusion mesurée : avec la police à 13 px et la piste à 3 px, l'en-tête du Code tient à 1 024 px **sans** « Remonter » (padding 10 px, borne 284 px) mais pas **avec** (même au plancher de 8 px, il manque 24 px), alors que la borne actuelle de 280 px garde de la place pour « Remonter » (essai sur l'onglet Projet, qui a un bouton de moins : à 10 px, 324 px tient, aussi en parcours). À 390 px le calcul tient : 8 + 22 + 4 + 14 + 170 (padding 8) + 4 + 44 + 4 + 44 + 4 + 44 + 8 = 370 px sur 390.
+
+Arrêt demandé par le plan (« si les trois onglets à 13 px ne tiennent pas à 1 024 px, s'arrêter et remonter ») : le passage au parcours (« Remonter ») sur l'onglet Code à 1 024 px ne tient pas. Pistes à trancher par le manager, aucune appliquée : (a) le badge « au travail » en point seul sous 1 280 px (comme à 390 px : libère 92 px, p = 13 et borne 342 tiennent) ; (b) accepter la perte de « Remonter » dans l'en-tête du Code à 1 024 px ; (c) plancher de la recherche abaissé pendant un parcours ; (d) déplacer des actions dans le « ⋯ » au-dessus de 700 px (hors P70-D-01).
