@@ -63,18 +63,34 @@ export function vueTerminal(cfg) {
       z.appendChild(b); if (r) r.focus();
     },
     effacer() { const z = vider(); z.hidden = true; },
-    // collage à confirmer : le texte n'est affiché que par textContent, retours à la ligne et caractères de contrôle rendus visibles ; null retire le bandeau
+    // collage à confirmer : ce que l'utilisateur confirme est EXACTEMENT ce qui part. Le texte intégral est montré (zone défilante, atteignable au clavier) par textContent
+    // seulement, avec ses nombres de lignes et de caractères ; seul l'AFFICHAGE est neutralisé (caractères invisibles ou de contrôle rendus ⟨U+XXXX⟩, jamais retirés ;
+    // le texte rendu à `coller` reste l'original). Au-delà de LIMITE caractères la coupure est dite (« N caractères non affichés ») et « Tout afficher » la lève ; null retire le bandeau
     collage(texte, coller, annuler) {
       const ancien = document.getElementById('collage'); if (ancien) ancien.remove();
       if (texte === null || texte === undefined) return;
-      const sauts = /[\r\n\u2028\u2029]/.test(texte);
-      const visible = String(texte).replace(/\r\n|\r|\n|\u2028|\u2029/g, '\u21b5 ').replace(/[\u0000-\u001f\u007f-\u009f]/g, (c) => (c === '\u007f' ? '\u2421' : c < ' ' ? String.fromCharCode(0x2400 + c.charCodeAt(0)) : '\ufffd'));
+      const LIMITE = 20000, brut = String(texte);
+      const SAUT = /\r\n|\r|\n|\u2028|\u2029/g;
+      const marque = (c) => '\u27e8U+' + c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0') + '\u27e9';
+      const neutre = (t) => t.replace(SAUT, '\u21b5\n').replace(/[\p{Cc}\p{Cf}\p{Cs}]/gu, (c) => (c === '\n' || c === '\t' ? c : marque(c)));
+      const nbCar = (t) => t.length - (t.match(/[\ud800-\udbff][\udc00-\udfff]/g) || []).length;
+      const sauts = (brut.match(SAUT) || []).length, lignes = Math.max(1, sauts + (/(\r\n|\r|\n|\u2028|\u2029)$/.test(brut) ? 0 : 1));
+      const total = nbCar(brut), plur = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+      let n = Math.min(brut.length, LIMITE); if (n < brut.length && /[\ud800-\udbff]/.test(brut.charAt(n - 1))) n -= 1;
       const b = el('div', 'vf-q-bandeau vf-q-collage'); b.id = 'collage'; b.setAttribute('role', 'group'); b.setAttribute('aria-label', 'Collage à confirmer');
       b.appendChild(el('span', 'vf-q-pastille vf-q-attention'));
-      b.appendChild(el('span', 'vf-q-texte', sauts ? 'Le texte contient un retour à la ligne.' : 'Le texte contient un caractère de contrôle.'));
-      b.appendChild(el('span', 'vf-q-apercu', visible.slice(0, 200)));
+      b.appendChild(el('span', 'vf-q-texte', /[\r\n\u2028\u2029]/.test(brut) ? 'Le texte contient un retour à la ligne.' : 'Le texte contient un caractère de contrôle.'));
+      b.appendChild(el('span', 'vf-q-decompte', `${plur(lignes, 'ligne')} · ${plur(total, 'caractère')}`));
       const a = bouton('Annuler', annuler, 'vf-q-secondaire'), c = bouton('Coller', coller);
-      b.appendChild(a); b.appendChild(c); document.body.appendChild(b); a.focus();
+      b.appendChild(a); b.appendChild(c);
+      const zone = el('div', 'vf-q-apercu', neutre(brut.slice(0, n))); zone.id = 'collage-apercu'; zone.tabIndex = 0; zone.setAttribute('role', 'region'); zone.setAttribute('aria-label', 'Texte à coller, intégral');
+      b.appendChild(zone);
+      if (n < brut.length) {
+        const note = el('div', 'vf-q-reste');
+        note.appendChild(el('span', 'vf-q-texte', `${plur(total - nbCar(brut.slice(0, n)), 'caractère')} non affiché${total - nbCar(brut.slice(0, n)) > 1 ? 's' : ''}.`));
+        const t = bouton('Tout afficher', () => { zone.textContent = neutre(brut); note.remove(); }, 'vf-q-secondaire'); note.appendChild(t); b.appendChild(note);
+      }
+      document.body.appendChild(b); a.focus();
     },
   };
 }

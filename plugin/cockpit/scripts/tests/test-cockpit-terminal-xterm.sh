@@ -177,8 +177,28 @@ await executer(chrome, async (sp) => {
     await essai('controle', async () => { await vide(); await coller('echo \u001b[31mx'); await pause(300); r.c.controle = { bandeau: await bandeau(), texte: await s.ev(`(document.querySelector('#collage .vf-q-texte') || {}).textContent`) }; await bouton('Annuler'); });
     await essai('html', async () => {
       await coller('<img src=x onerror=window.__pwn=1>\n'); await pause(500);
-      r.c.html = { img: await s.ev(`document.querySelectorAll('#collage img, #collage script').length`), pwn: await s.ev(`window.__pwn === undefined`), litteral: await s.ev(`document.getElementById('collage').textContent.includes('<img src=x')` ) };
+      r.c.html = { img: await s.ev(`document.querySelectorAll('#collage img, #collage script').length`), pwn: await s.ev(`window.__pwn === undefined`), litteral: await s.ev(`document.getElementById('collage').textContent.includes('<img src=x')` ), enfants: await s.ev(`document.getElementById('collage-apercu').children.length`) };
       await bouton('Annuler');
+    });
+    await essai('c12', async () => { // charge au-delà du 275e caractère : visible dans le DOM du bandeau AVANT le clic, rien d'exécuté avant le clic
+      const charge = `touch ${M('c12')}`; await coller('a'.repeat(275) + '; ' + charge + '\n'); await pause(400);
+      r.c.c12 = { visible: await s.ev(`document.getElementById('collage-apercu').textContent.includes(${JSON.stringify(charge)})`), marqueur: await existe('c12'),
+        zone: await s.ev(`(() => { const z = document.getElementById('collage-apercu'); return z.tabIndex === 0 && getComputedStyle(z).overflowY === 'auto'; })()`) };
+      await bouton('Annuler');
+    });
+    await essai('compte', async () => { await coller('ab\ncd\nef'); await pause(300); r.c.compte = await s.ev(`document.querySelector('#collage .vf-q-decompte').textContent`); await bouton('Annuler'); });
+    await essai('invisibles', async () => { // U+202E et U+200B rendus visibles à l'affichage ; le texte envoyé reste octet pour octet l'original (sha256)
+      await vide(); await s.ev(`window.__ent.length = 0`); const orig = 'echo a\u202eb\u200bc\n'; await coller(orig); await pause(300);
+      const aff = await s.ev(`document.getElementById('collage-apercu').textContent`);
+      await bouton('Coller'); await pause(800); const h = async (x) => (await import('node:crypto')).createHash('sha256').update(x, 'utf8').digest('hex');
+      r.c.invis = { u202e: aff.includes('\u27e8U+202E\u27e9'), u200b: aff.includes('\u27e8U+200B\u27e9'), brut: !aff.includes('\u202e') && !aff.includes('\u200b'),
+        sha: (await h(await ent())) === (await h(orig.replace(/\n/g, '\r'))) };
+    });
+    await essai('long', async () => { // borne d'affichage dite, et levée par « Tout afficher »
+      await coller('z'.repeat(30000) + '\n'); await pause(600);
+      const note = await s.ev(`(document.querySelector('#collage .vf-q-reste .vf-q-texte') || {}).textContent`); const avant = await s.ev(`document.getElementById('collage-apercu').textContent.length`);
+      await bouton('Tout afficher'); const apres = await s.ev(`document.getElementById('collage-apercu').textContent.length`);
+      r.c.long = { note, avant, apres, reste: await s.ev(`!!document.querySelector('#collage .vf-q-reste')`) }; await bouton('Annuler');
     });
     await essai('depot', async () => {
       const lance = (code) => s.ev(`(() => { const ta = document.querySelector('.xterm-helper-textarea'); ${code} })()`);
@@ -416,6 +436,11 @@ assert_eq "T21.6 — un collage d'une ligne pendant un bandeau abandonne l'ancie
 assert_eq "T21.7 — un caractère de contrôle (ESC) sans retour à la ligne demande aussi confirmation" "$(rj "$CL" '"bandeau="+j.c.controle.bandeau+" texte="+j.c.controle.texte')" "bandeau=true texte=Le texte contient un caractère de contrôle."
 assert_eq "T21.8 — le texte collé n'est jamais du HTML : aucune balise ni script dans le bandeau, aucune charge exécutée, la balise est lisible en texte" "$(rj "$CL" '"img="+j.c.html.img+" intacte="+j.c.html.pwn+" litteral="+j.c.html.litteral')" "img=0 intacte=true litteral=true"
 assert_eq "T21.9 — dépôt de texte dans la zone de saisie : l'évènement drop et le beforeinput insertFromDrop sont annulés (le navigateur n'insère rien), chacun ouvre le bandeau, rien n'est envoyé ni créé" "$(rj "$CL" '"drop_annule="+(j.c.depot.drop===false)+" bandeau="+j.c.depot.bandeau+" beforeinput_annule="+(j.c.depot.avant===false)+" bandeau2="+j.c.depot.bandeau2+" entre="+j.c.depot.entre+" marqueur="+j.c.depot.marqueur')" "drop_annule=true bandeau=true beforeinput_annule=true bandeau2=true entre=false marqueur=false"
+assert_eq "T21.11 — C12 : une charge placée après le 275e caractère est dans le DOM de l'aperçu AVANT le clic (aperçu défilant, atteignable au clavier), rien n'est exécuté avant" "$(rj "$CL" '"visible="+j.c.c12.visible+" marqueur="+j.c.c12.marqueur+" zone="+j.c.c12.zone')" "visible=true marqueur=false zone=true"
+assert_eq "T21.12 — le décompte de lignes et de caractères est présent et juste (ab/cd/ef : 3 lignes, 8 caractères)" "$(rj "$CL" 'j.c.compte')" "3 lignes · 8 caractères"
+assert_eq "T21.13 — U+202E et U+200B apparaissent en marqueur visible dans l'aperçu (jamais bruts), et le texte envoyé est identique octet pour octet à l'original (sha256)" "$(rj "$CL" '"u202e="+j.c.invis.u202e+" u200b="+j.c.invis.u200b+" brut="+j.c.invis.brut+" sha="+j.c.invis.sha')" "u202e=true u200b=true brut=true sha=true"
+assert_eq "T21.14 — un texte de 30 001 caractères : la borne est dite (10 001 caractères non affichés), « Tout afficher » montre tout" "$(rj "$CL" '"note="+j.c.long.note+" avant="+j.c.long.avant+" apres>=30000="+(j.c.long.apres>=30000)+" reste="+j.c.long.reste')" "note=10001 caractères non affichés. avant=20000 apres>=30000=true reste=false"
+assert_eq "T21.15 — le HTML collé ne crée aucun nœud dans l'aperçu" "$(rj "$CL" 'j.c.html.enfants')" "0"
 assert_eq "T21.10 — témoin positif : « Coller » envoie le texte (avec son retour chariot) et le shell l'exécute : le marqueur n'existait pas avant le clic, il existe après (la sonde sait voir l'exécution)" "$(rj "$CL" '"avant="+j.c.avantColler+" marqueur="+j.c.coller.marqueur+" bandeau="+j.c.coller.bandeau+" envoye="+j.c.coller.entree_ok')" "avant=false marqueur=true bandeau=false envoye=true"
 
 echo "=== M-* — mutants : chaque protection rougit sa sonde ==="
@@ -462,6 +487,18 @@ if mutant depot vf-cockpit-terminal-client.mjs "/addEventListener('drop'/d; /add
   assert_eq "M-DEPOT — écoutes de dépôt retirées : drop et beforeinput ne sont plus annulés (le navigateur insérerait le texte dans la zone de saisie), T21.9 rouge" "$(rouge "drop_annule=$(rj "$CJ" 'j.c.depot.drop===false') beforeinput_annule=$(rj "$CJ" 'j.c.depot.avant===false')" "drop_annule=true beforeinput_annule=true")" "rouge"
 else sans_effet "M-DEPOT"; fi
 
+if mutant apercu-coupe vf-cockpit-terminal-vue.mjs 's|const LIMITE = 20000|const LIMITE = 200|'; then
+  run_collage "$MUT_OUT"
+  assert_eq "M-APERCU-COUPE — retour de la coupure à 200 caractères : la charge après 275 caractères n'est plus dans le DOM, T21.11 rouge" "$(rouge "visible=$(rj "$CJ" 'j.c.c12.visible')" "visible=true")" "rouge"
+else sans_effet "M-APERCU-COUPE"; fi
+if mutant neutralisation vf-cockpit-terminal-vue.mjs "s|const neutre = (t) => .*\$|const neutre = (t) => t;|"; then
+  run_collage "$MUT_OUT"
+  assert_eq "M-NEUTRALISATION — l'aperçu affiche le texte brut : U+202E et U+200B ne sont plus des marqueurs, T21.13 rouge" "$(rouge "u202e=$(rj "$CJ" 'j.c.invis.u202e') brut=$(rj "$CJ" 'j.c.invis.brut')" "u202e=true brut=true")" "rouge"
+else sans_effet "M-NEUTRALISATION"; fi
+if mutant envoi-neutralise vf-cockpit-terminal-client.mjs 's|if (x !== null) term.paste(x);|if (x !== null) term.paste(x.replace(/[\\u202e\\u200b]/g, ""));|'; then
+  run_collage "$MUT_OUT"
+  assert_eq "M-ENVOI-NEUTRALISE — « Coller » envoie le texte privé de ses invisibles au lieu de l'original : le sha256 diffère, T21.13 rouge" "$(rouge "sha=$(rj "$CJ" 'j.c.invis.sha')" "sha=true")" "rouge"
+else sans_effet "M-ENVOI-NEUTRALISE"; fi
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

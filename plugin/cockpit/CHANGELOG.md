@@ -41,6 +41,10 @@ release racine (version, tag, release GitHub) restent humains. Numéro de versio
 - **Collage confirmé** (F2 ; P71-D-26, même canal, même date) : un collage ou un dépôt à retour à la ligne ou caractère de contrôle
   n'atteint le shell qu'après « Coller » dans un bandeau « Annuler / Coller » ; Échap annule, Tab puis Entrée valide, aucune touche de
   confirmation directe exprès ; une ligne simple passe.
+- **Collage confirmé : aperçu intégral** (correction N1 ; P71-D-29, arbitrage Samuel, AskUserQuestion session principale Claude Code,
+  2026-11-04) : le bandeau montrait 200 caractères coupés par une ellipse alors que « Coller » envoyait tout. Il montre désormais le texte
+  intégral (zone défilante, texte seulement, décompte de lignes et de caractères), les caractères invisibles ou de contrôle d'affichage en
+  marqueur ⟨U+XXXX⟩ ; le texte envoyé reste l'original ; une coupure d'affichage (au-delà de 20 000 caractères) est dite et levable.
 - **Terminal limité à son cadre** (F4 ; P71-D-25) : un popup ou une ouverture seule de la page du terminal affiche « Terminal
   indisponible » (ni secret lu, ni flux, ni shell).
 - **Police attendue au premier chargement** (2,5 s au plus) avant de mesurer la grille ; pastille du tiroir à 44 px sur écran tactile.

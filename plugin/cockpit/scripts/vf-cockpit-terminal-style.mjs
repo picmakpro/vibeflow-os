@@ -67,7 +67,9 @@ button { font: inherit; color: inherit; }
 .vf-q-collage { bottom: 0; height: auto; min-height: 44px; flex-wrap: wrap; gap: 6px 10px; padding: 6px 8px 6px 14px; z-index: 2; }
 #etat:not([hidden]) ~ .vf-q-collage { bottom: 52px; }
 .vf-q-collage .vf-q-texte { flex: 1 1 180px; }
-.vf-q-apercu { flex: 1 1 120px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; color: var(--text-3); }
+.vf-q-decompte { flex: none; font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.vf-q-apercu { flex: 1 1 100%; min-width: 0; max-height: min(40vh, 280px); overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; unicode-bidi: isolate; tab-size: 4; font-family: var(--mono); font-size: 12px; line-height: 1.5; color: var(--text-2); background: var(--surface); border-radius: 8px; border: 1px solid var(--hair-2); padding: 6px 10px; }
+.vf-q-reste { flex: 1 1 100%; display: flex; align-items: center; gap: 10px; }
 .vf-q-bouton.vf-q-secondaire { background: var(--raise-2); color: var(--text); }
 .vf-q-bouton.vf-q-secondaire:hover { box-shadow: inset 0 0 0 1px var(--hair-2); background: var(--raise-2); }
 @media (pointer: coarse) { .vf-q-bouton { height: 44px; } }
