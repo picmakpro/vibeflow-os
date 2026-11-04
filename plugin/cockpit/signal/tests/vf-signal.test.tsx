@@ -1,6 +1,8 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { AgentInfo, On } from 'claude-code'
 
+import { avec } from './fixture-signal'
+
 const PANE = {
   plugin: 'vibeflow',
   component: 'Pane',
@@ -77,7 +79,9 @@ function lab(on: On, agents: AgentInfo[] = []) {
   )
   on('process.run', (_, e) => {
     const argv = (e.argv as readonly string[]).join(' ')
-    const stdout = argv.includes('orphans') ? ORPHANS : LOCK
+    // L'en-tête lit l'émetteur du socle (68-05) : la phase active de l'arbre courant est la 59.
+    const signal = avec(s => { Object.assign(s.arbres.find((a: any) => a.courant).phaseActive, { n: '59', nom: 'Bundle produit' }) })
+    const stdout = argv.includes('vf-cockpit-signal') ? signal : argv.includes('orphans') ? ORPHANS : LOCK
     return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   // Ce que l'engine dessinerait là où le mod laisse passer.
@@ -93,8 +97,7 @@ test('la pane montre la phase, le DAG par vagues et le verrou périmé, sur chaq
 
   for (const surface of ['terminal', 'desktop', 'vscode', 'mobile'] as const) {
     const ui = await $.ui.mount({ ...PANE, surface })
-    expect(await ui.find({ type: 'Text', text: /equipe-produit-v1\.0/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /Bundle produit/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /phase 59 Bundle produit/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /plan Phase 59/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /vf-coder/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /périmé/ })).toBeDefined()
