@@ -53,7 +53,7 @@ Les corrections ultérieures aux têtes jugées n'ont pas été recapturées par
 1. **R13.4 à 1 024 et 1 440 px (bloquant)** : `test-cockpit-responsive.sh` reste à 255 PASS / 6 FAIL, les six lignes R13.4 (onglets à 12 px / 2 px au lieu de 13 px / 3 px
    à 1 024 et 1 440 px). Cause mesurée (`70-04-RED-TRACE.md`, recalcul P70-D-16) : à 1 024 px l'en-tête de Code ne tient pas avec 13 px et « Remonter » (il manque 24 px au plancher). Attend l'arbitrage de la question 1.
 2. **Carte Session « en attente » mais badge « En cours »** : dans `72-vf-equipe.js`, tout état autre que « terminé » devient actif. Défaut de la Phase 69 révélé par la 70, non corrigé ; part au BACKLOG.
-3. **`scripts/check-machine-paths.sh`** : vert sur macOS, rouge en CI Linux sur des chemins `/Users/...` écrits dans les plans. Plans corrigés en `c7217940` ; la cause du vert local n'a pas été diagnostiquée.
+3. **`scripts/check-machine-paths.sh`** : vert sur macOS, rouge en CI Linux sur des chemins `/Users/<user>/…` écrits dans les plans. Plans corrigés en `c7217940` ; la cause du vert local n'a pas été diagnostiquée.
 4. Corrections postérieures aux têtes jugées non recapturées (voir plus haut).
 
 ## Tri de goût en attente de Samuel
