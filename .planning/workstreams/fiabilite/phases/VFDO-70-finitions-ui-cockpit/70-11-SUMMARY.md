@@ -46,3 +46,7 @@ Consigné, NON corrigé (défaut de la Phase 69 révélé ici, pas créé par la
 
 Q2a (« écrit à <rôle> » / « un agent », E32), Q3b (échelle ≥ 0,75 au premier affichage, EK13), Q12a (liens alignés). Détail et rouges : `70-11-RED-TRACE.md`.
 R19 / R20 de la suite responsive (non rejouée ici) dépendent du cadrage de `arrivee()` : à rejouer par son exécutant.
+
+## Suite : juge des arbitrages
+
+Régression de Q3b corrigée (cadrage sous le bas réel de `#context`, plafond posé aussi par `ready` et surveillé jusqu'à la première action) ; EK13 étendu, EK13.3 ajouté. Détail : `70-11-RED-TRACE.md`.

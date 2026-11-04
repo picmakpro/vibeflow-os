@@ -126,3 +126,15 @@ Dépendance R19 / R20 (suite responsive, non touchée et non rejouée) : le cadr
 ### Q12a — alignement des liens (réglage visuel, sans test)
 
 `70-vf-live.js` : `.vf-who > a.vf-link, body.vf-tab-equipe .sec > a.vf-link` sans padding horizontal ; la liste « Sources lues » (00-vibeflow.js) garde le sien.
+
+## Suite : juge des arbitrages (régression de Q3b mesurée par le juge frais, base 07e75a54)
+
+EK13 étendu : 5 chargements successifs à 390 px et 2 à 768 px ; recouvrement mesuré entre `#context` ET tout ce qu'il contient (lien « Plus » compris) et la première carte, jamais contre `freeArea()` ; carte entièrement visible (x >= 0).
+
+Rouge sur 07e75a54 (EK13) : attendu `390 : k,k,k,k,k ; 768 : k,k`, obtenu `390 : k recouvre 2065 px² (x5) ; 768 : k recouvre 162 px² (x2)` : le cadrage se faisait sous `freeArea().y`, plus haut que le bas réel du titre.
+
+Deux causes, deux gestes dans `72-vf-equipe.js` :
+1. cadrage sous le bas réel de `#context` (bbox de `#context` et de ses descendants au moment du cadrage) plus 12 px, première carte à x >= 12. Mutant EK13.3 (cadrage sous `freeArea()`) : attendu `muté|recouvre`, obtenu identique ;
+2. plafond intermittent : le gestionnaire `ready` pose `arrive = true`, donc `arrivee()` (seul endroit du plafond) ne s'exécutait jamais quand `ready` passait avant le flux `who`. Constaté sur la fixture au rejeu intermédiaire : `390 : k,k=0.45,k,k,k`. Le plafond est une fonction appelée par `arrivee()` ET par `ready`, et la transformation est surveillée (MutationObserver sur le style de `#viewport`) jusqu'à la première action de l'utilisateur ou 5 s : tout `fit()` ultérieur repassant sous 0,75 est recadré. Mutant EK13.2 (garde retirée) : attendu `muté|réduit`, obtenu identique.
+
+Vert : EK13, EK13.2, EK13.3 ; `test-cockpit-equipe.sh` 155 PASS / 0 FAIL deux fois de suite ; `test-cockpit-who.sh` 90 / 0.

@@ -60,6 +60,35 @@
   };
   // arrivée par un lien `equipe.html#r=n:<carte>` : 00-vibeflow.js la traite à `ready` et à chaque changement de fragment, mais un rerender() lancé pendant le premier rendu
   // annule son `after` et `ready` n'est alors jamais émis ; on révèle la carte visée après le premier rendu qui aboutit (une seule fois par page)
+  // Q3b (voir ci-dessous) : appelée par arrivee() ET par `ready`, car l'un ou l'autre arrive en premier selon la course entre le flux `who` et le premier rendu
+  let plafonne = false;
+  const plafond = () => {
+    if (plafonne) return;
+    plafonne = true;
+    // Q3b : sur un écran étroit l'ajustement à toute la scène réduisait les cartes à ~45 % (titres vers 7 px). La réduction ne descend jamais sous 0,75 : si l'ajustement tombe plus bas,
+    // la scène est cadrée sur la première carte, sous le bas RÉEL de #context (titre, compteurs, lien « Plus » : freeArea() le sous-estime), carte entièrement visible.
+    // Le viewer peut rejouer fit() après l'arrivée (rendu en cours, ouverture du panneau) : la transformation est surveillée jusqu'à la première action de l'utilisateur
+    // (ou 5 s), et le cadrage est repris chaque fois qu'elle repasse sous 0,75.
+    const st = SC.state, vp = document.getElementById('viewport'), svg = document.getElementById('svg');
+    if (st && vp && SC.freeArea) {
+      const cadrer = () => {
+        if (!st.t || st.t.k >= 0.75) return;
+        const cartes = (st.layout?.children || []).filter((c) => /^(n:)?(se|ag)-/.test(c.id) && !c.id.includes('~')), c = cartes.sort((x, y) => x.y - y.y || x.x - y.x)[0], a = SC.freeArea();
+        if (!c || !svg) return;
+        const haut = svg.getBoundingClientRect().top; let bas = 0;
+        for (const e of [document.getElementById('context'), ...document.querySelectorAll('#context *')]) { const b = e?.getBoundingClientRect(); if (b && b.width && b.height) bas = Math.max(bas, b.bottom); }
+        const y = Math.max(a.y, bas - haut + 12);
+        st.t = { k: 0.75, x: Math.max(a.x, 12) - c.x * 0.75, y: y - c.y * 0.75 };
+        vp.style.transform = `translate(${st.t.x}px,${st.t.y}px) scale(0.75)`;
+        svg.classList.remove('lod-low', 'lod-mid');
+      };
+      cadrer();
+      const garde = new MutationObserver(cadrer), fin = () => { garde.disconnect(); for (const ev of ['pointerdown', 'wheel', 'keydown', 'touchstart']) window.removeEventListener(ev, fin, true); };
+      garde.observe(vp, { attributes: true, attributeFilter: ['style'] });
+      for (const ev of ['pointerdown', 'wheel', 'keydown', 'touchstart']) window.addEventListener(ev, fin, { capture: true, passive: true });
+      setTimeout(fin, 5000);
+    }
+  };
   let arrive = false;
   const arrivee = () => {
     if (arrive) return;
@@ -67,17 +96,7 @@
     // 70-12 (UIFN-14, défaut E) : le rerender() de `suivre` annule le premier rendu du viewer (le jeton de rendu change), celui qui appelait fit(false) ; le rendu qui aboutit garde la
     // transformation d'origine et la première carte reste sous l'en-tête et le titre. On cadre donc la scène ici, une fois par page, avant la révélation éventuelle d'une carte visée.
     SC.fit?.(false); // `?.` : le faux viewer du harnais hors navigateur de test-cockpit-equipe.sh (EUI) ne porte pas fit
-    // Q3b : sur un écran étroit l'ajustement à toute la scène réduisait les cartes à ~45 % (titres vers 7 px). La réduction ne descend jamais sous 0,75 : si l'ajustement tombe plus bas,
-    // la scène est cadrée sur la première carte (coin haut gauche de la zone libre, sous l'en-tête et le titre), le reste se rejoint en déplaçant la carte.
-    const st = SC.state, vp = document.getElementById('viewport'), svg = document.getElementById('svg');
-    if (st?.t && st.t.k < 0.75 && vp && SC.freeArea) {
-      const cartes = (st.layout?.children || []).filter((c) => /^(n:)?(se|ag)-/.test(c.id) && !c.id.includes('~')), c = cartes.sort((a, b) => a.y - b.y || a.x - b.x)[0], a = SC.freeArea();
-      if (c) {
-        st.t = { k: 0.75, x: a.x - c.x * 0.75, y: a.y - c.y * 0.75 };
-        vp.style.transform = `translate(${st.t.x}px,${st.t.y}px) scale(0.75)`;
-        svg?.classList.remove('lod-low', 'lod-mid');
-      }
-    }
+    plafond();
     const r = new URLSearchParams(location.hash.slice(1)).get('r');
     if (r && /^n:/.test(r) && SC.exists(r)) SC.reveal(r);
   };
@@ -117,7 +136,7 @@
     arrivee();
   }
   document.addEventListener('vf-who', suivre);
-  SC.on('ready', () => { arrive = true; for (const [id, w] of parCarte()) { const x = G.nodes.find((n) => n.id === id); if (x) x.foot = R().pied(w); } });
+  SC.on('ready', () => { arrive = true; plafond(); for (const [id, w] of parCarte()) { const x = G.nodes.find((n) => n.id === id); if (x) x.foot = R().pied(w); } });
 
   // panneau d'une carte d'agent ou de session
   SC.addPanelSection('item', (id) => {

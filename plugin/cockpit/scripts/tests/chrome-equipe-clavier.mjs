@@ -152,16 +152,23 @@ await executer(chrome, async (s) => {
     return r;
   }
   if (ACTION === 'echelle') {
-    const r = {};
-    for (const l of [390, 768]) {
+    // 5 chargements successifs à 390 px (le plafond était intermittent : un rendu suivant l'écrasait), puis 768 px ; recouvrement mesuré contre le bas RÉEL de #context
+    // et de tout ce qu'il contient (lien « Plus » compris), jamais contre freeArea()
+    const r = { 390: [], 768: [] };
+    for (const [l, n] of [[390, 5], [768, 2]]) {
       await s.send('Emulation.setDeviceMetricsOverride', { width: l, height: 800, deviceScaleFactor: 1, mobile: false });
-      await s.naviguer(url);
-      await s.attendre(PRET, 'viewer prêt');
-      await s.attendre("document.querySelectorAll('#svg .card').length > 0 && !!(window.__vfLive && window.__vfLive.who)", 'cartes');
-      r[l] = await s.stable(`(() => { const k = Math.round(window.VibeFlow.state.t.k * 100) / 100; const h1 = document.querySelector('#context h1'), nd = [...document.querySelectorAll('#svg .card')].filter((e) => e.getBoundingClientRect().width > 0);
-        nd.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top || a.getBoundingClientRect().left - b.getBoundingClientRect().left);
-        let aire = 0; if (h1 && nd[0]) { const a = h1.getBoundingClientRect(), b = nd[0].getBoundingClientRect(); aire = Math.round(Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top))); }
-        return { k, aire, cartes: nd.length }; })()`, 'échelle stable');
+      for (let i = 0; i < n; i++) {
+        await s.naviguer(url);
+        await s.attendre(PRET, 'viewer prêt');
+        await s.attendre("document.querySelectorAll('#svg .card').length > 0 && !!(window.__vfLive && window.__vfLive.who)", 'cartes');
+        r[l].push(await s.stable(`(() => { const k = Math.round(window.VibeFlow.state.t.k * 100) / 100; const ctx = document.getElementById('context'),
+          nd = [...document.querySelectorAll('#svg .card')].filter((e) => e.getBoundingClientRect().width > 0);
+          nd.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top || a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+          const c = nd[0] && nd[0].getBoundingClientRect(); let aire = 0, bas = 0;
+          if (ctx && c) for (const e of [ctx, ...ctx.querySelectorAll('*')]) { const a = e.getBoundingClientRect(); if (!a.width || !a.height) continue; bas = Math.max(bas, a.bottom);
+            aire += Math.round(Math.max(0, Math.min(a.right, c.right) - Math.max(a.left, c.left)) * Math.max(0, Math.min(a.bottom, c.bottom) - Math.max(a.top, c.top))); }
+          return { k, aire, gauche: c ? Math.round(c.left) : null, hautCarte: c ? Math.round(c.top) : null, basContexte: Math.round(bas), cartes: nd.length }; })()`, 'échelle stable'));
+      }
     }
     return r;
   }
