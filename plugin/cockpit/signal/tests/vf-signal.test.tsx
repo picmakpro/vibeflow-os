@@ -273,3 +273,27 @@ test("R6-J3 — arbre courant sans phase active : pas de jalon", async ($, on) =
   expect(await ui.find({ type: 'Text', text: /jalon/ })).toBeUndefined()
   await ui.unmount()
 })
+
+test("R6-A1 — mission vivante avec un nœud en échec : le bandeau le dit", async ($, on) => {
+  lab(on, {
+    stdout: avec(s => {
+      s.missions[0].etat = 'running'
+      s.missions[0].noeuds[1].status = 'failed'
+    }),
+  })
+  moteur(on)
+  await demarrer($)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: /nœud failed · exécution/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test("R6-A2 — mission abandonnée dont un nœud est resté en échec : le bandeau n'attend personne (P68-D-05)", async ($, on) => {
+  lab(on, { stdout: avec(s => { s.missions[0].noeuds[1].status = 'failed' }) })
+  moteur(on)
+  await demarrer($)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: /nœud failed/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /engine/ })).toBeDefined()
+  await ui.unmount()
+})
