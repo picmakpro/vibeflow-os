@@ -136,7 +136,13 @@ test('le bandeau porte la prochaine action humaine et se masque', async ($, on) 
 })
 
 test("la vue équipe liste les agents en arbre, avec le geste d'arrêt", async ($, on) => {
+  // Par conception (68-07 ; P68-D-03, P68-D-17) : l'arbre vient de signal@1.equipe ; $.agent.list() ne dit que les gestes.
+  const workers = [
+    { kind: 'subagent', id: 'm1', role: 'vf-dev-manager', task: 'mission 59', tree: 'arbre principal', source: 'sessions', etat: 'actif' },
+    { kind: 'subagent', id: 'c1', parent: 'm1', role: 'vf-coder', task: 'plan 59-01', tree: 'arbre principal', source: 'sessions', etat: 'actif' },
+  ]
   lab(on, {
+    stdout: avec(s => { s.equipe.workers = workers }),
     agents: [
       { id: 'm1', type: 'vf-dev-manager', description: 'mission 59', status: 'running' },
       { id: 'c1', parentId: 'm1', type: 'vf-coder', description: 'plan 59-01', status: 'running' },
