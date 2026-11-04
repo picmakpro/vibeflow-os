@@ -10,6 +10,8 @@
 #   T20   critique design 71 (lot A1) : J1 libellé de la barre = état de la carte (refusé, expiré) · J4 focus de la poignée sur le grip · J5 commande et point jamais coupés
 #         (cartes de P et de Q, balayage de largeurs) · J6 aucun terminal sous la carte « déjà ouvert » · J7 boutons de la barre >= 44 px sous pointer: coarse · J13 pas de bague
 #         de focus sur une carte d'alerte focalisée par programme
+#   T21   recette 71 (E2, G1 ; P71-D-34, P71-D-35) : zoom jamais sous la pastille, atteignable tiroir ouvert · « Ajuster » et cadrage initial au-dessus du tiroir · #ask rangée · visite fermée ;
+#         huit relevés (2 pages x 2 fenêtres x 2 thèmes) + mutants M-PASTILLE-SUR-ZOOM, M-AJUSTE-SANS-TIROIR, M-ASK-RESTE, M-VISITE-RESTE
 #   T17   T17.1 témoin (messages réels de Q) · T17.2 postMessage de P ignoré · T17.3 MessageEvent forgé ignoré · T17.5 espion : liste fermée, aucun octet du shell (M-MSG-DONNEE)
 # Mesure O8 (71-06-SUMMARY, MESURE-O8 minimal=bloque popups=ouvert opener=nul) + décision du manager : cinq jetons de sandbox, aucun autre.
 # Sans Chrome : les sections statiques tournent, la suite annonce « SUITE SAUTÉE (navigateur) ». VF_TIROIR_MS : échéance d'une attente (20000). Exit 0 si tout passe, 1 sinon.
@@ -309,6 +311,93 @@ await executer(chrome, async (s) => {
   return r;
 }, { csp: true });
 JS
+cat > "$AUX/chrome-geom.mjs" <<'JS'
+// chrome-geom.mjs <chrome> <json> : géométrie du tiroir dans les pages Projet et Code (E2, G1 ; P71-D-34, P71-D-35) ; UNE ligne JSON.
+// Entrée : { P } (port du cockpit lancé avec --terminal), optionnel { shots } (dossier de captures), { court } (2 combinaisons au lieu de 8, pour les mutants). Chaque combinaison page x fenêtre x thème a son relevé.
+// Gestes par Input.dispatchMouseEvent / Input.dispatchKeyEvent seulement : le test de recouvrement est celui du navigateur (elementFromPoint).
+import { pathToFileURL } from 'node:url'; import fs from 'node:fs';
+const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const [, , chrome, brut] = process.argv; const A = JSON.parse(brut);
+const OP = `http://127.0.0.1:${A.P}`, MS = Number(process.env.VF_TIROIR_MS) || 20000;
+const FENETRES = [[1440, 900], [1280, 720]], THEMES = ['dark', 'light'], PAGES = ['index.html', 'project.html'];
+const ZOOM = `['z-out', 'z-fit', 'z-in'].map((id) => { const e = document.getElementById(id); if (!e) return id + ':absent'; const r = e.getBoundingClientRect(); const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  const b = t && t.closest('button'); return id + ':' + (b ? b.id || b.className : 'rien'); })`;
+const TIROIR = `(() => { const r = document.querySelector('.vf-term-tiroir'); if (!r || r.hidden) return null; const b = r.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, left: b.left, right: b.right }; })()`;
+const NOEUDS = `(() => { const ns = [...document.querySelectorAll('#viewport .node')].filter((n) => n.getClientRects().length); if (!ns.length) return null; let top = 1e9, bottom = -1e9, left = 1e9, right = -1e9;
+  for (const n of ns) { const b = n.getBoundingClientRect(); top = Math.min(top, b.top); bottom = Math.max(bottom, b.bottom); left = Math.min(left, b.left); right = Math.max(right, b.right); } return { n: ns.length, top: Math.round(top), bottom: Math.round(bottom), left: Math.round(left), right: Math.round(right) }; })()`;
+const ASK = `(() => { const a = document.getElementById('ask'); if (!a) return null; const b = a.getBoundingClientRect(); return { display: getComputedStyle(a).display, bottom: Math.round(b.bottom), h: Math.round(b.height) }; })()`;
+const PAST = `(() => { const p = document.querySelector('.vf-term-pastille'); if (!p || p.hidden) return null; const b = p.getBoundingClientRect(); return { left: Math.round(b.left), top: Math.round(b.top), right: Math.round(b.right), bottom: Math.round(b.bottom) }; })()`;
+const ZRECT = `(() => { const z = document.getElementById('zoom'); const b = z.getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom), left: Math.round(b.left), right: Math.round(b.right) }; })()`;
+
+await executer(chrome, async (s) => {
+  const att = (expr, nom, ms) => s.attendre(expr, nom, ms || MS);
+  const centre = (sel) => s.ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  const souris = (type, x, y) => s.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 });
+  const clic = async (sel) => { const c = await centre(sel); if (!c) throw new Error(`élément absent : ${sel}`); await souris('mouseMoved', c.x, c.y); await souris('mousePressed', c.x, c.y); await souris('mouseReleased', c.x, c.y); };
+  const touche = async (key, code, vk) => { for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key, text: type === 'keyDown' ? key : undefined, code, windowsVirtualKeyCode: vk }); };
+  const ouvert = `(() => { const r = document.querySelector('.vf-term-tiroir'); return !!r && !r.hidden && r.getBoundingClientRect().height > 0; })()`;
+  const capture = async (nom) => { if (!A.shots) return; fs.mkdirSync(A.shots, { recursive: true }); const r = await s.send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${A.shots}/${nom}.png`, Buffer.from(r.data, 'base64')); };
+  await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  const sorties = [], erreurs = {};
+  const combos = [];
+  for (const page of PAGES) for (const [W, H] of FENETRES) for (const theme of THEMES) combos.push([page, W, H, theme]);
+  const retenues = A.court ? combos.filter(([p, W, , t]) => (p === 'index.html' && W === 1440 && t === 'dark') || (p === 'project.html' && W === 1280 && t === 'light')) : combos;
+  for (const [page, W, H, theme] of retenues) {
+    const cle = `${page}@${W}x${H}/${theme}`; const r = { cle };
+    try {
+      await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false });
+      await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
+      await s.naviguer(`${OP}/${page}`); await s.ev(`localStorage.clear(); sessionStorage.clear(); document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)})`);
+      await s.naviguer(`${OP}/${page}`); await s.ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)})`);
+      await att(`!!document.querySelector('button.vf-term-pastille') && document.querySelectorAll('#viewport .node').length > 0`, 'pastille et nœuds', MS);
+      await pause(1800);
+      r.fermeZoom = await s.ev(ZOOM); r.fermePast = await s.ev(PAST); r.fermeZ = await s.ev(ZRECT); r.fermeAsk = await s.ev(ASK);
+      // un clic sur « + » ne doit pas ouvrir le terminal
+      const k0 = await s.ev(`window.VibeFlow ? 1 : 0`); r.api = k0;
+      await clic('#z-in'); await pause(300); r.clicPlusOuvre = await s.ev(ouvert);
+      await capture(`${cle.replace(/[^a-z0-9]+/gi, '_')}-ferme`);
+      // la visite « Par où commencer » est ouverte avant l'ouverture du tiroir
+      r.visiteAvant = await s.ev(`(() => { try { if (window.VibeFlowTour && !window.VibeFlowTour.active()) window.VibeFlowTour.start(); return !!(window.VibeFlowTour && window.VibeFlowTour.active()); } catch (e) { return 'err'; } })()`);
+      await pause(500);
+      await clic('button.vf-term-pastille'); await att(ouvert, 'tiroir ouvert'); await pause(900);
+      r.tiroir = await s.ev(TIROIR); r.ouvZoom = await s.ev(ZOOM); r.ouvZ = await s.ev(ZRECT); r.ouvAsk = await s.ev(ASK);
+      r.visiteApres = await s.ev(`window.VibeFlowTour ? window.VibeFlowTour.active() : null`); r.visiteCachee = await s.ev(`(document.getElementById('tour') || { hidden: true }).hidden`);
+      // « Ajuster » : touche F (focus rendu à la page) puis bouton
+      await s.ev(`document.activeElement && document.activeElement.blur && document.activeElement.blur()`);
+      await touche('f', 'KeyF', 70); await pause(900); r.apresF = await s.ev(NOEUDS);
+      await capture(`${cle.replace(/[^a-z0-9]+/gi, '_')}-ouvert-F`);
+      await clic('#z-fit'); await pause(900); r.apresBouton = await s.ev(NOEUDS);
+      // un clic sur « + » tiroir ouvert rend la main à la page : le tiroir reste ouvert, le zoom agit (les nœuds grossissent)
+      const avant = await s.ev(NOEUDS); await clic('#z-out'); await pause(300); const apres = await s.ev(NOEUDS); r.zoomOutAgit = !!avant && !!apres && (apres.right - apres.left) < (avant.right - avant.left); r.tiroirResteOuvert = await s.ev(ouvert);
+      // fermeture : tout revient
+      await clic('.vf-term-fermer'); await pause(700); r.ferme2 = await s.ev(`!document.querySelector('.vf-term-tiroir') || document.querySelector('.vf-term-tiroir').hidden`);
+      r.finAsk = await s.ev(ASK); r.finZoom = await s.ev(ZOOM); r.finPast = await s.ev(PAST); r.finZ = await s.ev(ZRECT);
+      // reprise : tiroir mémorisé ouvert, la première mise en page tient déjà compte de lui
+      await s.ev(`localStorage.setItem('vf.terminal.open', '1')`); await s.naviguer(`${OP}/${page}`); await s.ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)})`);
+      await att(`${ouvert} && document.querySelectorAll('#viewport .node').length > 0`, 'tiroir rouvert et nœuds'); await pause(2200);
+      r.repriseTiroir = await s.ev(TIROIR); r.repriseNoeuds = await s.ev(NOEUDS);
+      await capture(`${cle.replace(/[^a-z0-9]+/gi, '_')}-reprise`);
+    } catch (e) { erreurs[cle] = String(e.message).slice(0, 160); }
+    sorties.push(r);
+  }
+  // verdicts : un groupe par propriété, la liste des relevés qui la tiennent mal (vide = tenue partout)
+  const trois = (r) => (id) => r.every((x, i) => x === ['z-out', 'z-fit', 'z-in'][i] + ':' + ['z-out', 'z-fit', 'z-in'][i]);
+  const hors = (a, b) => !!a && !!b && !(a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top);
+  const G = { E2f: [], E2o: [], G1F: [], G1ask: [], G1visite: [], G1reprise: [], fin: [], agit: [] };
+  for (const r of sorties) {
+    const t = r.tiroir, ok3 = (l) => Array.isArray(l) && trois(l)();
+    if (!(ok3(r.fermeZoom) && r.clicPlusOuvre === false && hors(r.fermePast, r.fermeZ))) G.E2f.push(r.cle);
+    if (!(t && ok3(r.ouvZoom) && r.ouvZ && r.ouvZ.bottom <= t.top)) G.E2o.push(r.cle);
+    if (!(t && r.apresF && r.apresBouton && r.apresF.bottom <= t.top && r.apresBouton.bottom <= t.top)) G.G1F.push(r.cle);
+    if (!(r.ouvAsk && r.ouvAsk.display === 'none' && r.finAsk && r.finAsk.display !== 'none' && r.finAsk.bottom === r.fermeAsk.bottom)) G.G1ask.push(r.cle);
+    if (!(r.visiteAvant === true && r.visiteApres === false && r.visiteCachee === true)) G.G1visite.push(r.cle);
+    if (!(t && r.repriseTiroir && r.repriseNoeuds && r.repriseNoeuds.bottom <= r.repriseTiroir.top)) G.G1reprise.push(r.cle);
+    if (!(ok3(r.finZoom) && JSON.stringify(r.finZ) === JSON.stringify(r.fermeZ) && r.ferme2 === true)) G.fin.push(r.cle);
+    if (!(r.zoomOutAgit === true && r.tiroirResteOuvert === true)) G.agit.push(r.cle);
+  }
+  return { erreurs, n: sorties.length, api: sorties.every((r) => r.api === 1), noeuds: sorties.every((r) => r.apresF && r.apresF.n > 0), G, sorties: A.detail ? sorties : undefined };
+});
+JS
 echo ok
 rq() { node "$TA" req "$@"; }
 rj() { printf '%s\n' "$1" | node "$AUX/ev.mjs" "$2" 2>/dev/null; }
@@ -343,6 +432,9 @@ sans_effet() { assert_eq "$1 — mutant sans effet (cible absente ou inchangée)
 navig() { node "$AUX/chrome-tiroir.mjs" "$CHROME" "$@"; } # navig <mode> <json>
 run_etats() { # run_etats <sortie> -> EJ ; un serveur neuf, un amorçage neuf, un Chrome neuf
   srv "$1" 1; EJ="$(navig etats "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\"}")"; unsrv
+}
+run_geom() { # run_geom <sortie> <court 0|1> -> GJ ; un serveur neuf, un Chrome neuf (le shell n'est pas piloté : la géométrie seule)
+  srv "$1" 1; GJ="$(node "$AUX/chrome-geom.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":$2}")"; unsrv
 }
 LISTE_JSON='["ready","etat:connecte","etat:reconnexion","etat:termine","etat:refuse","etat:expire","etat:arrete","toggle"]'
 run_flag() { # run_flag <sortie> <court 0|1> -> FJ FP FQ ; un serveur neuf, un amorçage neuf, un Chrome neuf
@@ -425,6 +517,26 @@ assert_eq "T20.2 (J1) — la barre dit le même état que la carte de Q : le lib
 assert_eq "T20.3 (J6) — sous la carte « déjà ouvert » : ni terminal, ni grille xterm, ni curseur visibles (témoin : la grille existe dans le DOM et la carte est visible)" "$(rj "$E" '"terminal="+j.refuse.terminal+" xterm="+j.refuse.xterm+" curseur="+j.refuse.curseur+" present="+j.refuse.xtermPresent+" carte="+j.refuse.carte')" "terminal=false xterm=false curseur=0 present=true carte=true"
 assert_eq "T20.6 (J13) — carte d'alerte focalisée par programme : elle a le focus et :focus-visible est vrai (témoin), mais aucune bague de focus" "$(rj "$E" '"focus="+j.alerte.focus+" fv="+j.alerte.fv+" role="+j.alerte.role+" contour="+j.alerte.contour')" "focus=true fv=true role=alert contour=none"
 assert_eq "T20.5 (J5, carte de Q) — la commande /vf-cockpit --terminal ne se coupe jamais et son point final reste collé, à huit largeurs de fenêtre (témoin : la carte a changé de largeur au moins trois fois)" "$(rj "$E" '"mal="+JSON.stringify(j.coupure.mal)+" larges="+(j.coupure.largeurs>=3)')" 'mal=[] larges=true'
+
+echo "=== T21 — géométrie du tiroir : zoom, Ajuster, barre de question, visite (recette 71, E2 et G1 ; P71-D-34, P71-D-35) ==="
+run_geom "$OUT" 0; G="$GJ"
+assert_eq "T21.0 — témoin : aucune étape en erreur, huit relevés (2 pages x 2 fenêtres x 2 thèmes), l'API du viewer est là, des nœuds sont dessinés" "$(rj "$G" '(j.erreur||JSON.stringify(j.erreurs))+" n="+j.n+" api="+j.api+" noeuds="+j.noeuds')" "{} n=8 api=true noeuds=true"
+assert_eq "T21.1 (E2) — tiroir fermé : au centre de #z-out, #z-fit, #z-in, elementFromPoint rend le bouton et non la pastille, la pastille ne recouvre pas #zoom, un clic sur « + » n'ouvre pas le terminal (1440x900 et 1280x720, thèmes sombre et clair, pages Code et Projet)" "$(rj "$G" 'JSON.stringify(j.G.E2f)')" "[]"
+assert_eq "T21.2 (E2) — tiroir ouvert : les trois boutons restent atteignables, posés au-dessus du tiroir, et « − » agit sans fermer le tiroir" "$(rj "$G" 'JSON.stringify(j.G.E2o)+JSON.stringify(j.G.agit)')" "[][]"
+assert_eq "T21.3 (G1) — « Ajuster » (touche F, puis bouton) tiroir ouvert : la boîte englobante des nœuds visibles finit au-dessus du tiroir" "$(rj "$G" 'JSON.stringify(j.G.G1F)')" "[]"
+assert_eq "T21.4 (G1) — la barre de question #ask est rangée tant que le tiroir est ouvert et revient à sa place (même bas) à la fermeture ; zoom et pastille aussi" "$(rj "$G" 'JSON.stringify(j.G.G1ask)+JSON.stringify(j.G.fin)')" "[][]"
+assert_eq "T21.5 (G1) — la visite « Par où commencer » est ouverte avant (témoin) et fermée par l'ouverture du tiroir" "$(rj "$G" 'JSON.stringify(j.G.G1visite)')" "[]"
+assert_eq "T21.6 (G1) — tiroir mémorisé ouvert, rechargement : le cadrage initial finit déjà au-dessus du tiroir" "$(rj "$G" 'JSON.stringify(j.G.G1reprise)')" "[]"
+mut_geom() { # mut_geom <nom> <fichier> <expression-sed> <groupe qui doit rougir>
+  if mutant "$1" "$2" "$3"; then
+    srv "$MUT_OUT" 1; GM="$(node "$AUX/chrome-geom.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":1}")"; unsrv
+    assert_eq "$1 — le mutant rougit T21 : le groupe $4 compte au moins un relevé en défaut (témoin : deux relevés, aucune erreur)" "$(rj "$GM" '"n="+j.n+" erreurs="+JSON.stringify(j.erreurs)+" rouge="+(j.G.'"$4"'.length>=1)')" "n=2 erreurs={} rouge=true"
+  else sans_effet "$1"; fi
+}
+mut_geom M-PASTILLE-SUR-ZOOM vf-cockpit-terminal-tiroir.mjs 's|if (recouvre) n.style.bottom|if (false) n.style.bottom|' E2f
+mut_geom M-AJUSTE-SANS-TIROIR vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #stage {|body.vf-term-ouvert #stage-absent {|' G1F
+mut_geom M-ASK-RESTE vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #ask { display: none; }|body.vf-term-ouvert #ask { }|' G1ask
+mut_geom M-VISITE-RESTE vf-cockpit-terminal-tiroir.mjs 's|window.VibeFlowTour.end();|void 0;|' G1visite
 
 echo "=== TU.11 / T8.3 — cadre injoignable, frame-src absent (mutants jouées en navigateur) ==="
 if mutant injoignable vf-cockpit-terminal.mjs "s|{ etat: 'actif', port: portQ }|{ etat: 'actif', port: 1 }|"; then

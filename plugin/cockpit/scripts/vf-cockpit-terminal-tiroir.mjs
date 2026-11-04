@@ -35,7 +35,18 @@ function scriptTiroir(cfg, accepte, construire) {
   };
   const demarrer = () => {
     const d = construire(document, T);
-    const puce = (texte) => { d.puce.textContent = texte; document.body.appendChild(d.puce); };
+    // P71-D-34 (E2) : jamais sur les boutons de zoom de la page ; si la boîte recouvre #zoom, elle se pose juste au-dessus
+    const eviter = (n) => {
+      if (!n.parentNode || n.hidden) return;
+      n.style.bottom = '';
+      const z = document.getElementById('zoom'), b = z ? z.getBoundingClientRect() : null, a = n.getBoundingClientRect();
+      const recouvre = !!b && b.width > 0 && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+      if (recouvre) n.style.bottom = Math.round(window.innerHeight - b.top + 8) + 'px';
+      if (n === d.pastille) document.body.classList.toggle('vf-term-haut', recouvre);
+    };
+    const eviterTout = () => { eviter(d.pastille); eviter(d.puce); };
+    window.addEventListener('resize', eviterTout);
+    const puce = (texte) => { d.puce.textContent = texte; document.body.appendChild(d.puce); eviter(d.puce); };
     if (cfg.indisponible) { puce(T.windows); return; }
     if (location.hostname !== '127.0.0.1') { puce(T.localhost); return; }
     const jeton = (window.VF_COCKPIT_SERVER || {}).token || '';
@@ -50,14 +61,19 @@ function scriptTiroir(cfg, accepte, construire) {
 
     const monter = (origineQ) => {
       let ouvert = false, plein = false, cadre = null, ouvreur = null, minuterie = null, session = false, chargeur = null;
-      let h = DEF;
+      let h = DEF, glisse = false, reserveVue = 0;
       const pleinMax = () => Math.max(MIN, window.innerHeight - (parseFloat(getComputedStyle(document.body).getPropertyValue('--hh')) || 64) - 12 - 16);
       const borne = (v) => Math.max(MIN, Math.min(pleinMax(), Math.round(v)));
       const theme = () => (document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
       const annoncer = (t) => { d.annonce.textContent = t; };
+      // P71-D-35 (G1) : le viewer ajuste sur la hauteur de son canevas ; la feuille la réduit (--vf-term-reserve), puis on rappelle SON ajustement (jamais pendant le glissement : au relâchement)
+      const ajuster = () => { try { if (window.VibeFlow && typeof window.VibeFlow.fit === 'function') window.VibeFlow.fit(false); } catch (e) { void e; } };
       const appliquer = () => {
         d.region.style.height = h + 'px';
+        const reserve = ouvert && !plein ? h + 28 : 0;
         document.body.style.setProperty('--vf-term-h', ouvert && !plein ? h + 'px' : '0px');
+        document.body.style.setProperty('--vf-term-reserve', reserve + 'px');
+        if (reserve !== reserveVue && !glisse) { reserveVue = reserve; ajuster(); }
         d.poignee.setAttribute('aria-valuenow', String(h)); d.poignee.setAttribute('aria-valuemax', String(pleinMax()));
       };
       const memoH = () => stock.ecrire('vf.terminal.h', h);
@@ -83,6 +99,7 @@ function scriptTiroir(cfg, accepte, construire) {
         ouvreur = document.activeElement; ouvert = true; plein = plein || window.matchMedia('(max-width: 700px)').matches;
         d.region.hidden = false; d.region.inert = false; d.pastille.hidden = true;
         d.region.classList.toggle('vf-term-plein-etat', plein); d.region.classList.add('vf-term-entree');
+        try { if (window.VibeFlowTour && window.VibeFlowTour.active()) window.VibeFlowTour.end(); } catch (e) { void e; }
         document.body.classList.add('vf-term-ouvert'); appliquer(); pastilleEtat();
         if (!cadre) creerCadre();
         stock.ecrire('vf.terminal.open', 1); annoncer(T.annonceOuvert);
@@ -91,7 +108,7 @@ function scriptTiroir(cfg, accepte, construire) {
       const fermer = () => {
         if (!ouvert) return;
         ouvert = false; d.region.hidden = true; d.region.inert = true; d.pastille.hidden = false; d.region.classList.remove('vf-term-entree');
-        document.body.classList.remove('vf-term-ouvert'); appliquer(); pastilleEtat();
+        document.body.classList.remove('vf-term-ouvert'); appliquer(); pastilleEtat(); eviter(d.pastille);
         stock.ecrire('vf.terminal.open', 0); annoncer(T.annonceFerme);
         const visible = ouvreur && ouvreur !== document.body && document.contains(ouvreur) && !ouvreur.disabled && ouvreur.getClientRects().length > 0;
         (visible ? ouvreur : d.pastille).focus();
@@ -105,6 +122,7 @@ function scriptTiroir(cfg, accepte, construire) {
       // hauteur mémorisée, bornée à la fenêtre actuelle
       h = borne(Number(stock.lire('vf.terminal.h')) || DEF);
       document.body.appendChild(d.pastille); document.body.appendChild(d.region); document.body.appendChild(d.annonce);
+      eviter(d.pastille);
       d.region.addEventListener('animationend', () => d.region.classList.remove('vf-term-entree'));
       d.pastille.addEventListener('click', () => ouvrir(true));
       d.boutonFermer.addEventListener('click', fermer);
@@ -120,10 +138,10 @@ function scriptTiroir(cfg, accepte, construire) {
       // poignée : souris (capture du pointeur, le cadre n'avale plus les mouvements) et clavier
       d.poignee.addEventListener('pointerdown', (e) => {
         if (e.button !== 0 || plein) return;
-        e.preventDefault(); const y0 = e.clientY, h0 = h; document.body.classList.add('resizing'); d.poignee.setPointerCapture(e.pointerId);
+        e.preventDefault(); const y0 = e.clientY, h0 = h; glisse = true; document.body.classList.add('resizing'); d.poignee.setPointerCapture(e.pointerId);
         const bouge = (m) => { h = borne(h0 + (y0 - m.clientY)); appliquer(); };
         const fin = () => {
-          document.body.classList.remove('resizing'); d.poignee.removeEventListener('pointermove', bouge);
+          glisse = false; document.body.classList.remove('resizing'); d.poignee.removeEventListener('pointermove', bouge); appliquer();
           d.poignee.removeEventListener('pointerup', fin); d.poignee.removeEventListener('pointercancel', fin); memoH();
         };
         d.poignee.addEventListener('pointermove', bouge); d.poignee.addEventListener('pointerup', fin); d.poignee.addEventListener('pointercancel', fin);
