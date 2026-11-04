@@ -80,3 +80,19 @@ Constat CI : `R20 — Équipe / 768 px` rouge sous Linux seulement, attendu `[au
 ### Correction et vert
 
 `place()` rétrécit la carte de visite (au plus jusqu'à 12 px du panneau, 200 px au minimum) quand elle recouvrirait un panneau latéral, et ne la fait plus passer de l'autre côté (étape sur un élément du chrome) si ce côté recouvre le panneau. Après : `surPanneau` faux à toutes les étapes, aux deux largeurs. `test-cockpit-projet.sh` 103 PASS / 0 FAIL (O6.13 incluse) ; `test-cockpit-vendor.sh` 79/0 ; `test-cockpit-chrome-fr.sh` 70/0 ; `test-cockpit-responsive.sh` 255 PASS / 6 FAIL (les six R13.4 seuls) ; `synchro.sh verifier` : amont retrouvé à l'octet. Seule la CI Linux dira si la cause est bien celle-là.
+
+## Suite : CI Linux, seconde cause (ddc487ce : `#context recouvre #tour`, R20 à 768 px)
+
+Décision entre (a) et (b) : **(a)**. Preuves : le graphe Équipe est écrit avec `tour: []` (`vf-cockpit-equipe-carte.mjs:49`) ; `70-CONTEXT.md` P70-D-02 vise Code et Projet (visite Projet propre, P70-D-13), aucune décision ne prévoit de visite sur Équipe ; le repli `autoSteps()` y raconterait « La base de code » à propos de sessions et de sous-agents. La visite s'y ouvrait pourtant : `75-vf-modele.js` (démarrage d'office, 700 ms après le rendu) et `maybeAuto()` de `40-tour.js` appellent `start()` sans condition d'onglet ; elle s'ouvre dès que le graphe a deux cartes (sous Linux, plus lent, les cartes de l'équipe sont déjà là à ces 700 ms ; en local le lab de la suite n'en a pas encore).
+
+Condition reproduite plutôt que la plateforme : lab avec une session et un sous-agent (HOME jetable), onglet Équipe à 768 px, `start()` appelé sans argument comme le démarrage d'office.
+
+### Rouge — 289d1ac6 (tête avant correction)
+
+Sonde `chrome-visite-etapes.mjs … 768 equipe` : `{"e768":{"cartes":2,"auto":true,"manuel":true}}` — la visite s'ouvre sur Équipe par l'appel d'office (`auto` vrai, attendu faux). Témoin O6.14 de `test-cockpit-projet.sh` : attendu `[false]`, obtenu `[true]` (mesure faite à la sonde avant le patch, la suite n'a pas été rejouée sur l'ancien arbre).
+
+### Correction et vert
+
+`start(manual)` : le démarrage d'office (sans argument) ne fait rien sur l'onglet Équipe ; le bouton « Par où commencer » (`start(true)`) l'ouvre toujours (O6.14b). Cette décision n'invente aucune visite : elle retire un repli involontaire. Choix (b) non retenu (carte de visite écartée de `#context`) : sans visite sur Équipe, aucune carte à placer ; si une visite manuelle y est ouverte, le recouvrement de `#context` par une carte haute reste possible (non mesuré).
+
+`test-cockpit-projet.sh` 106 PASS / 0 FAIL (O6.14a, O6.14, O6.14b) ; `test-cockpit-vendor.sh` 79/0 ; `test-cockpit-chrome-fr.sh` 70/0 ; `test-cockpit-responsive.sh` 255 PASS / 6 FAIL (les six R13.4) ; `synchro.sh verifier` : amont retrouvé à l'octet.

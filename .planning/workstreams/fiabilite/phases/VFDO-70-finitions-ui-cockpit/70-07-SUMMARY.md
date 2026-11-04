@@ -34,3 +34,4 @@ patch: P25
 - « Passer », Échap et la croix rendent la vue d'ensemble ajustée, comme « Terminé » (O6.11) ; le contour de l'étape sur un élément du chrome est un élément à part, indépendant du `className` de la cible (O6.12).
 - Preuves : `70-07-RED-TRACE.md`, sections « Suite : … ».
 - CI Linux (R20 à 768 px, `#panel` recouvre `#tour`) : la carte de visite se rétrécit plutôt que de passer sous le panneau de détail (O6.13, panneau élargi). Cause non observée sous Linux, déduite : l'émulation `pointer: none` ne la reproduit pas (R20 vert sans pointeur).
+- CI Linux, seconde cause (R20 à 768 px, `#context` recouvre `#tour`) : la visite ne s'ouvrait pas seulement sur Code et Projet ; elle s'ouvrait d'elle-même sur Équipe, qui n'a aucune visite conçue. `start()` sans argument (démarrage d'office) ne fait plus rien sur Équipe, le bouton l'ouvre toujours (O6.14).
