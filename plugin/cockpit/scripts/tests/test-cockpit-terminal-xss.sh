@@ -107,18 +107,20 @@ SORTIE="$LAB/.vibeflow/cockpit"
 # mutant <sortie> <M-ESC|M-CSP|M-ORIGINE-TERM|M-SECRET-TERM|M-ONGLET-TERM> : échoue si rien n'a changé (jamais un mutant sans effet)
 mutant() {
   local o="$1" m="$2" before after
-  before="$(cat "$o/serve.mjs" "$o/index.html" "$o/project.html" "$o/vf-cockpit-terminal.mjs" "$o/vf-cockpit-terminal-session.mjs" | cksum)"
+  before="$(cat "$o/serve.mjs" "$o/index.html" "$o/project.html" "$o/vf-cockpit-terminal-processus.mjs" "$o/vf-cockpit-terminal-session.mjs" | cksum)"
   case "$m" in
     M-ESC) for f in index.html project.html; do sed -i.bak 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' "$o/$f"; done ;;
     M-CSP) sed -i.bak "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-Mutant-Csp'#g" "$o/serve.mjs" ;;
-    M-ORIGINE-TERM) sed -i.bak "s/if (!page \&\& !navigateur) return /if (false) return /; s/else if (o !== origineQ())/else if (false)/" "$o/vf-cockpit-terminal.mjs" ;;
-    M-SECRET-TERM) sed -i.bak "s/if (!egal(req.headers\['x-vf-terminal'\], secret)) return refus(res, 401, 'secret');//" "$o/vf-cockpit-terminal.mjs" ;;
+    M-ORIGINE-TERM) sed -i.bak "s/if (!page \&\& !navigateur) return /if (false) return /; s/else if (o !== origineQ())/else if (false)/" "$o/vf-cockpit-terminal-processus.mjs" ;;
+    M-SECRET-TERM) sed -i.bak "s/if (!egal(req.headers\['x-vf-terminal'\], secret)) return refus(res, 401, 'secret');//" "$o/vf-cockpit-terminal-processus.mjs" ;;
     M-ONGLET-TERM) sed -i.bak "s/if (s.onglet !== onglet) return 409;//g" "$o/vf-cockpit-terminal-session.mjs" ;;
   esac
-  after="$(cat "$o/serve.mjs" "$o/index.html" "$o/project.html" "$o/vf-cockpit-terminal.mjs" "$o/vf-cockpit-terminal-session.mjs" | cksum)"
+  after="$(cat "$o/serve.mjs" "$o/index.html" "$o/project.html" "$o/vf-cockpit-terminal-processus.mjs" "$o/vf-cockpit-terminal-session.mjs" | cksum)"
   [ "$before" != "$after" ] || { echo "  ❌ mutant $m sans effet (motif absent de la sortie)" >&2; return 1; }
 }
-nassistants() { ps -eo pid=,ppid=,args= | awk -v p="$1" '$2 == p && /vf-cockpit-pty\.py/ { n++ } END { print n + 0 }'; }
+nassistants() { ps -eo pid=,ppid=,args= | awk -v p="$1" '$2 == p && /vf-cockpit-pty\.py/ { n++ } END { print n + 0 }'; } # assistants du serveur (ancien étage)
+# P71-D-33 : les assistants sont désormais enfants du processus du terminal, lui-même enfant du serveur
+assistants_srv() { local c n=0; for c in $(pgrep -P "$1" 2>/dev/null); do ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs' && n=$((n + $(nassistants "$c"))); done; echo $((n + $(nassistants "$1"))); }
 
 # manche <étiquette> <mutants...> : sortie copiée, mutants posés, serveur avec --terminal, session légitime, charge jouée, effets relevés
 # résultat : R_MARQUEUR R_AV R_AP R_ETAT R_XSS (JSON de la charge, ou { erreur })
@@ -136,7 +138,7 @@ manche() {
   [[ "$sec" =~ ^[0-9a-f]{64}$ ]] || { R_MARQUEUR="session-impossible"; vf_hyg_stop "$pid"; return; }
   node "$TA" flux "$q" "$sec" onglet-A "$WORK/flux-$label.bin" 120000 > "$WORK/flux-$label.log" 2>&1 & local fpid=$!; PIDS+=($fpid)
   [ "$(node "$TA" attendre "$WORK/flux-$label.bin" 'VFP> ' 15000)" = TROUVE ] || { R_MARQUEUR="pas-d-invite"; vf_hyg_stop "$fpid"; vf_hyg_stop "$pid"; return; }
-  R_AV="$(nassistants "$pid")"
+  R_AV="$(assistants_srv "$pid")"
   if [ -n "$CHROME" ]; then
     R_XSS="$(node "$AUX/xss.mjs" "$CHROME" "http://127.0.0.1:$port/project.html#v=n:ph-1")"
   else
@@ -152,7 +154,7 @@ manche() {
   local fin=$((SECONDS + 3)); [ "$label" = "temoin" ] && fin=$((SECONDS + ${VF_CDP_ECHEANCE_S:-30}))
   while [ "$SECONDS" -lt "$fin" ] && [ ! -e "$MARQUEUR" ]; do sleep 0.2; done
   R_MARQUEUR=non; [ -e "$MARQUEUR" ] && R_MARQUEUR=oui
-  R_AP="$(nassistants "$pid")"
+  R_AP="$(assistants_srv "$pid")"
   R_ETAT="$(node "$TA" etat "$q" "$sec" | sed -n 3p | node "$AUX/ev.mjs" 'j.session' 2>/dev/null)"
   echo "     [$label] mesure : marqueur-créé-par-le-shell=$R_MARQUEUR assistants=$R_AV/$R_AP session=$R_ETAT charge=${R_XSS:0:300}"
   vf_hyg_stop "$fpid"; vf_hyg_stop "$pid"

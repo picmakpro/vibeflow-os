@@ -20,6 +20,8 @@ ENG="$SCRIPTS/../skills/cockpit-moteur"; TA="$HERE_T/terminal-aux.mjs"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/bin" "$WORK/run" "$WORK/t3" "$WORK/t5"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+# P71-D-33 : Q tourne dans un processus enfant du serveur ; « les enfants du serveur » = les assistants, enfants de ce processus (pgrep -P ne voit qu'un étage)
+pgrep() { if [ "$1" = "-P" ] && [ $# -eq 2 ]; then local c; for c in $(command pgrep -P "$2"); do if ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs'; then command pgrep -P "$c"; else echo "$c"; fi; done; else command pgrep "$@"; fi; }
 PASS=0; FAIL=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
@@ -393,13 +395,13 @@ unsrv
 echo "=== TC — T-71-10 : comparaison du secret en temps constant (sonde statique sur le chemin de comparaison) ==="
 sonde_tc() { # sonde_tc <dossier de sortie> -> « egal=<n> directes=<n> condense=<oui|non> » : usages de egal() sur le secret, comparaisons directes, timingSafeEqual dans egal()
   local d="$1" e dir c
-  e="$(grep -c "egal(req.headers\['x-vf-terminal'\], secret)" "$d/vf-cockpit-terminal.mjs" || true)"
-  dir="$(grep -v '^ *//' "$d/vf-cockpit-terminal.mjs" | grep -cE "x-vf-terminal'\] *[!=]==?|[!=]==? *req\.headers\['x-vf-terminal'\]|[!=]==? *secret\b|\bsecret *[!=]==" || true)"
+  e="$(grep -c "egal(req.headers\['x-vf-terminal'\], secret)" "$d/vf-cockpit-terminal-processus.mjs" || true)"
+  dir="$(grep -v '^ *//' "$d/vf-cockpit-terminal-processus.mjs" | grep -cE "x-vf-terminal'\] *[!=]==?|[!=]==? *req\.headers\['x-vf-terminal'\]|[!=]==? *secret\b|\bsecret *[!=]==" || true)"
   c="$(grep -c 'crypto.timingSafeEqual' "$d/vf-cockpit-terminal-amorce.mjs" || true)"
   echo "egal=$e directes=$dir condense=$([ "$c" -ge 1 ] && echo oui || echo non)"
 }
 assert_eq "TC.1 — le secret est comparé par egal() (deux sites : contrôle et routage), aucune comparaison directe, et egal() s'appuie sur timingSafeEqual" "$(sonde_tc "$OUT")" "egal=2 directes=0 condense=oui"
-assert_eq "TC.0 — témoin : la sonde voit une comparaison directe dans un fichier jetable" "$(mkdir -p "$WORK/tc0"; printf "if (req.headers['x-vf-terminal'] === secret) {}\n" > "$WORK/tc0/vf-cockpit-terminal.mjs"; : > "$WORK/tc0/vf-cockpit-terminal-amorce.mjs"; sonde_tc "$WORK/tc0")" "egal=0 directes=1 condense=non"
+assert_eq "TC.0 — témoin : la sonde voit une comparaison directe dans un fichier jetable" "$(mkdir -p "$WORK/tc0"; printf "if (req.headers['x-vf-terminal'] === secret) {}\n" > "$WORK/tc0/vf-cockpit-terminal-processus.mjs"; : > "$WORK/tc0/vf-cockpit-terminal-amorce.mjs"; sonde_tc "$WORK/tc0")" "egal=0 directes=1 condense=non"
 
 echo "=== TM — moteur : assistant sous .vibeflow/ ou en lien symbolique refusé ==="
 srv_moteur() { # srv_moteur <sortie> <dossier du moteur> : le serveur démarre avec ce moteur ; rend le journal dans SRV_OUT ; attend server.json (le terminal n'y vient que s'il est actif)
@@ -421,36 +423,36 @@ assert_eq "TM.2 — assistant en lien symbolique : refusé, terminal inerte (jou
 echo "=== Mutants — chacun rougit sa sonde ==="
 rouge() { echo "     [mutant] obtenu $1, le code sain rend $2" >&2; [ "$1" != "$2" ] && echo rouge || echo "identique : $1"; }
 mut() { mutant "$1" "$2" "$3" && return 0; assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; return 1; }
-if mut origine vf-cockpit-terminal.mjs "s/else if (o !== origineQ())/else if (false)/"; then
+if mut origine vf-cockpit-terminal-processus.mjs "s/else if (o !== origineQ())/else if (false)/"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-ORIGIN — le mutant rougit T1.1 : une Origin tierce n'est plus refusée (403)" "$(rouge "$(sta "$QP" POST /entree --secret "$SECRET" --onglet o1 --origin "$EVIL" --corps x)" 403)" "rouge"; unsrv; fi
-if mut hote vf-cockpit-terminal.mjs "s/!hotes.includes(String(req.headers.host || '').toLowerCase())/!String(req.headers.host || '').endsWith(':' + portQ)/"; then
+if mut hote vf-cockpit-terminal-processus.mjs "s/!hotes.includes(String(req.headers.host || '').toLowerCase())/!String(req.headers.host || '').endsWith(':' + portQ)/"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-HOST — le mutant rougit T2.1 : un Host de rebinding n'est plus refusé (403)" "$(rouge "$(sta "$QP" POST /entree --secret "$SECRET" --onglet o1 --host "evil.example:$QP" --corps x)" 403)" "rouge"; unsrv; fi
-if mut jeton vf-cockpit-terminal.mjs "s/!egal(req.headers\['x-vf-terminal'\], secret)/(req.headers['x-vf-terminal'] !== undefined \&\& !egal(req.headers['x-vf-terminal'], secret))/"; then
+if mut jeton vf-cockpit-terminal-processus.mjs "s/!egal(req.headers\['x-vf-terminal'\], secret)/(req.headers['x-vf-terminal'] !== undefined \&\& !egal(req.headers['x-vf-terminal'], secret))/"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-JETON — le mutant rougit T3.1 : l'absence de secret est admise (≠ 401)" "$(rouge "$(sta "$QP" POST /entree --onglet o1 --corps x)" 401)" "rouge"; unsrv; fi
-if mut sansorigine vf-cockpit-terminal.mjs "s/if (!page && !navigateur) return /if (false) return /"; then
+if mut sansorigine vf-cockpit-terminal-processus.mjs "s/if (!page && !navigateur) return /if (false) return /"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-SANSORIGIN — le mutant rougit T3.4 : POST /entree sans Origin n'est plus refusé (403)" "$(rouge "$(sta "$QP" POST /entree --secret "$SECRET" --onglet o1 --sans-origin --corps x)" 403)" "rouge"; unsrv; fi
 if mut expire vf-cockpit-terminal-amorce.mjs "s/age <= DUREE_AMORCE_MS/true/"; then
   srvq "$MUT_OUT"; AM="$MUT_OUT/.cache/terminal-amorce"; vieillir "$AM" 3600
   assert_eq "M-EXPIRE — le mutant rougit T4.9 : un amorçage vieux d'une heure n'est plus refusé (403)" "$(rouge "$(node "$TA" amorcer "$QP" "$WORK/amorce.copy" | sed -n 1p)" 403)" "rouge"; unsrv; fi
-if mut retire vf-cockpit-terminal.mjs 's/^      retirerOuvrir();$/      0;/'; then
+if mut retire vf-cockpit-terminal-processus.mjs 's/^      retirerOuvrir();$/      0;/'; then
   srvq "$MUT_OUT"; PG="$MUT_OUT/.cache/terminal-ouvrir.html"; posee "$PG"; echanger
   assert_eq "M-RETIRE — le mutant rougit T4.10 : la page reste après l'échange" "$([ -f "$PG" ] && echo rouge || echo identique)" "rouge"; unsrv; fi
-if mut balai vf-cockpit-terminal.mjs 's/> DUREE_AMORCE_MS) retirerOuvrir/> 1e12) retirerOuvrir/'; then
+if mut balai vf-cockpit-terminal-processus.mjs 's/> DUREE_AMORCE_MS) retirerOuvrir/> 1e12) retirerOuvrir/'; then
   srvq "$MUT_OUT"; PG="$MUT_OUT/.cache/terminal-ouvrir.html"; posee "$PG"; vieillir "$PG" 61; sleep 6
   assert_eq "M-BALAI — le mutant rougit T4.11 : une page de plus de 60 s n'est plus balayée" "$([ -f "$PG" ] && echo rouge || echo identique)" "rouge"; unsrv; fi
 if mut rejeu vf-cockpit-terminal-amorce.mjs "s/fs\.unlinkSync(fichier)/0/"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-REJEU — le mutant rougit T4.2 : le rejeu de l'amorçage n'est plus refusé (403)" "$(rouge "$(node "$TA" amorcer "$QP" "$WORK/amorce.copy" | sed -n 1p)" 403)" "rouge"; unsrv; fi
-if mut servi vf-cockpit-terminal.mjs 's#return res.end(html);#return res.end(html + String(fs.readFileSync(fichierAmorce, "utf8")));#'; then
+if mut servi vf-cockpit-terminal-processus.mjs 's#return res.end(html);#return res.end(html + String(fs.readFileSync(fichierAmorce, "utf8")));#'; then
   srvq "$MUT_OUT"; rq "$QP" GET / --sans-origin --corps-vers "$WORK/mut-servi.html" > /dev/null
   assert_eq "M-SERVI — le mutant rougit T4.6 : la page de Q contient l'amorçage" "$(rouge "$(cherche "$AMORCE" "$WORK/mut-servi.html" | wc -l | tr -d ' ')" 0)" "rouge"; unsrv; fi
-if mut journal vf-cockpit-terminal.mjs "s/log('terminal actif (127.0.0.1 seulement).');/log('terminal actif ' + secret);/"; then
+if mut journal vf-cockpit-terminal-processus.mjs "s/log('terminal actif (127.0.0.1 seulement).');/log('terminal actif ' + secret);/"; then
   srvq "$MUT_OUT"; echanger; sleep 0.3; assert_eq "M-LOG — le mutant rougit T5.4 : le journal contient le secret" "$(rouge "$(cherche "$SECRET" "$SRV_OUT" | wc -l | tr -d ' ')" 0)" "rouge"; unsrv; fi
-if mut url vf-cockpit-terminal.mjs "s/egal(req.headers\['x-vf-terminal'\], secret)/egal(req.headers['x-vf-terminal'] ?? url.searchParams.get('s'), secret)/"; then
+if mut url vf-cockpit-terminal-processus.mjs "s/egal(req.headers\['x-vf-terminal'\], secret)/egal(req.headers['x-vf-terminal'] ?? url.searchParams.get('s'), secret)/"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-URL — le mutant rougit TD.2 : le secret en ?s= est admis (≠ 401)" "$(rouge "$(sta "$QP" GET "/etat?s=$SECRET")" 401)" "rouge"; unsrv; fi
 
 navmut() { # navmut <nom> <expression sed> <statut sain> <argument de nav>... : le mutant doit changer le statut de la requête refusée
   local nom="$1" sedx="$2" sain="$3"; shift 3
-  if mut "$nom" vf-cockpit-terminal.mjs "$sedx"; then srvq "$MUT_OUT"; echanger; P6=$SRV_PORT; local a=(); for x in "$@"; do case "$x" in @S) a+=("$SECRET") ;; @P) a+=("http://127.0.0.1:$P6") ;; *) a+=("$x") ;; esac; done # le secret et le port changent à chaque serveur : substitués ici
+  if mut "$nom" vf-cockpit-terminal-processus.mjs "$sedx"; then srvq "$MUT_OUT"; echanger; P6=$SRV_PORT; local a=(); for x in "$@"; do case "$x" in @S) a+=("$SECRET") ;; @P) a+=("http://127.0.0.1:$P6") ;; *) a+=("$x") ;; esac; done # le secret et le port changent à chaque serveur : substitués ici
     assert_eq "M-$nom — le mutant assouplit trop : la requête refusée n'est plus refusée ($sain)" "$(rouge "$(node "$AUX/nav.mjs" "$QP" "${a[@]}")" "$sain")" "rouge"; unsrv; fi
 }
 navmut NAV-SFS "s/req.headers\['sec-fetch-site'\] === 'same-origin'/req.headers['sec-fetch-site'] !== undefined/" 403 GET /etat @S same-site -
@@ -460,9 +462,9 @@ navmut NAV-POST "s/req.method === 'GET' \&\& (url.pathname === '\/flux' || url.p
 navmut NAV-ORIGIN "s/else if (o !== origineQ())/else if (o !== origineQ() \&\& !navigateur)/" 403 GET /etat @S same-origin @P
 
 echo "=== M-TD1 / M-TEMPS-CONSTANT / M-EGAL / M-MOTEUR-* — mutants de la tenue du serveur ==="
-if mut td1 vf-cockpit-terminal.mjs "s|^\(  const q = http.createServer.*\)\$|\1 q.on('upgrade', (rq2, so) => { so.end('HTTP/1.1 101 Switching Protocols\\\\r\\\\nUpgrade: websocket\\\\r\\\\n\\\\r\\\\n'); });|"; then
+if mut td1 vf-cockpit-terminal-processus.mjs "s|^\(  const q = http.createServer.*\)\$|\1 q.on('upgrade', (rq2, so) => { so.end('HTTP/1.1 101 Switching Protocols\\\\r\\\\nUpgrade: websocket\\\\r\\\\n\\\\r\\\\n'); });|"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-TD1 — le mutant (écouteur « upgrade » qui accepte la montée) rougit TD.1 : 101 au lieu de 401" "$(rouge "$(node "$AUX/upg.mjs" "$QP" /flux '' "http://127.0.0.1:$QP")" 401)" "rouge"; unsrv; fi
-if mut tc vf-cockpit-terminal.mjs "s/egal(req.headers\['x-vf-terminal'\], secret)/req.headers['x-vf-terminal'] === secret/g"; then
+if mut tc vf-cockpit-terminal-processus.mjs "s/egal(req.headers\['x-vf-terminal'\], secret)/req.headers['x-vf-terminal'] === secret/g"; then
   assert_eq "M-TEMPS-CONSTANT — le mutant (comparaison directe ===) rougit TC.1" "$(rouge "$(sonde_tc "$MUT_OUT")" "egal=2 directes=0 condense=oui")" "rouge"; fi
 if mut egal vf-cockpit-terminal-amorce.mjs "s/return crypto.timingSafeEqual(condense(a), condense(b));/return a === b;/"; then
   assert_eq "M-EGAL — le mutant (egal() sans timingSafeEqual) rougit TC.1" "$(rouge "$(sonde_tc "$MUT_OUT")" "egal=2 directes=0 condense=oui")" "rouge"; fi

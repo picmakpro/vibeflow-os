@@ -275,7 +275,8 @@ await executer(chrome, async (s) => {
       r.tr = await q.ev('JSON.stringify(window.__tr)').then((x) => JSON.parse(x || '[]')).catch(() => []);
     } else if (mode === 'popup') {
       // F4 : Q ouverte en popup par P (window.open copie le sessionStorage, donc l'identifiant d'onglet) ne prend pas la session et ne lance aucun shell
-      const shells = () => execFileSync('ps', ['-axo', 'pid=,ppid=,args=']).toString().split('\n').filter((l) => l.trim().split(/\s+/)[1] === String(pidN) && /vf-cockpit-pty\.py/.test(l)).length;
+      // P71-D-33 : les assistants sont enfants du processus du terminal (lui-même enfant du serveur) ; on compte sous les deux
+      const shells = () => { const ls = execFileSync('ps', ['-axo', 'pid=,ppid=,args=']).toString().split('\n').map((l) => l.trim().split(/\s+/)); const peres = new Set([String(pidN), ...ls.filter((c) => c[1] === String(pidN) && /vf-cockpit-terminal-processus\.mjs/.test(c.slice(2).join(' '))).map((c) => c[0])]); return ls.filter((c) => peres.has(c[1]) && /vf-cockpit-pty\.py/.test(c.slice(2).join(' '))).length; };
       const popups = async () => (await s.send('Target.getTargets')).targetInfos.filter((t) => t.type === 'page' && t.url.includes('theme=dark')).length;
       await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
       const refocaliser = async () => { await s.send('Page.bringToFront'); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.ev(`document.querySelector('.xterm-helper-textarea').focus()`); };
@@ -494,7 +495,7 @@ else sans_effet "M-ECOUTE"; fi
 if mutant clip vf-cockpit-terminal-client.mjs "s|const RACCOURCI|navigator.clipboard.writeText('x'); const RACCOURCI|"; then
   assert_eq "M-CLIP — le mutant rougit T14.S3 : un appel au presse-papiers" "$(rj "$(mut_page clip)" 'j.presse>=1')" "true"
 else sans_effet "M-CLIP"; fi
-if mutant setcookie vf-cockpit-terminal.mjs "s|res.setHeader('Referrer-Policy', 'no-referrer');|res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('Set-Cookie', 'a=b');|"; then
+if mutant setcookie vf-cockpit-terminal-processus.mjs "s|res.setHeader('Referrer-Policy', 'no-referrer');|res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('Set-Cookie', 'a=b');|"; then
   srv "$MUT_OUT"; rq "$QP" GET / > "$WORK/m-setcookie.out"
   assert_eq "M-SETCOOKIE — le mutant rougit T6.5 : set-cookie présent" "$(sed -n 2p "$WORK/m-setcookie.out" | node "$AUX/ev.mjs" 'Object.keys(j).filter(k=>k==="set-cookie").length' 2>/dev/null)" "1"; unsrv
 else sans_effet "M-SETCOOKIE"; fi

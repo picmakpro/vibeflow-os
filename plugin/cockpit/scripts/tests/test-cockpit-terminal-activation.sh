@@ -19,6 +19,10 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+# P71-D-33 : Q tourne dans un processus enfant du serveur ; « les enfants du serveur » = les assistants, enfants de ce processus (pgrep -P ne voit qu'un étage)
+pgrep() { if [ "$1" = "-P" ] && [ $# -eq 2 ]; then local c; for c in $(command pgrep -P "$2"); do if ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs'; then command pgrep -P "$c"; else echo "$c"; fi; done; else command pgrep "$@"; fi; }
+# écouteurs du serveur ET de son processus du terminal (Q y écoute, P71-D-33) ; lignes vides écartées
+ecoutes_srv() { local c; { node "$TA" ecoutes "$1"; for c in $(command pgrep -P "$1"); do ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs' && node "$TA" ecoutes "$c"; done; } | sed '/^$/d'; }
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; } # une valeur longue montre son début ET sa fin
@@ -99,7 +103,7 @@ unsrv
 
 echo "=== M-ACTIF — import du terminal sans le test du drapeau ==="
 if mutant actif serve.mjs "s/has('terminal')/true/"; then
-  srv "$MUT_OUT" 0; assert_eq "M-ACTIF — le mutant rougit T7.3 : deux écouteurs sans le drapeau" "$(nlignes "$(node "$TA" ecoutes "$SRV_PID")")" "2"; unsrv
+  srv "$MUT_OUT" 0; assert_eq "M-ACTIF — le mutant rougit T7.3 : deux écouteurs sans le drapeau" "$(nlignes "$(ecoutes_srv "$SRV_PID")")" "2"; unsrv
 else assert_eq "M-ACTIF — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== T7.7 / T7.8 / T8.1 / P5.1 — avec le drapeau ==="
@@ -107,7 +111,7 @@ srv "$OUT" 1; P1=$SRV_PORT; PID1=$SRV_PID; TOK1="$(sj j.token)"; QURL="$(sj '(j.
 QPORT=""; [[ "$QURL" =~ ^http://127\.0\.0\.1:[0-9]+$ ]] && QPORT="${QURL##*:}"
 assert_eq "T7.7 — server.json porte terminal.url de forme http://127.0.0.1:<Q>, Q différent de P" "$([ -n "$QPORT" ] && [ "$QPORT" != "$P1" ] && echo "oui" || echo "non : $QURL (P=$P1)")" "oui"
 QPORT="${QPORT:-1}"
-ECO1="$(node "$TA" ecoutes "$PID1")"
+ECO1="$(ecoutes_srv "$PID1")"
 assert_eq "T7.8 — exactement deux écouteurs, tous deux 127.0.0.1 (P et Q)" "$(printf '%s\n' "$ECO1" | sort | tr '\n' ' ')" "$(printf '127.0.0.1:%s\n127.0.0.1:%s\n' "$P1" "$QPORT" | sort | tr '\n' ' ')"
 rq "$P1" GET / --corps-vers "$WORK/page-index-t.html" > "$WORK/r-index-t.out"
 assert_eq "T8.1 — CSP de / avec le drapeau = formule de v2.75.0 + « ; frame-src http://127.0.0.1:<Q> » exact" "$(sed -n 2p "$WORK/r-index-t.out" | node "$AUX/ev.mjs" 'j["content-security-policy"]')" "$(node "$TA" csp-v275 "$WORK/page-index-t.html"); frame-src http://127.0.0.1:$QPORT"
@@ -144,8 +148,8 @@ assert_eq "E2E.6 — à l'arrêt du serveur, l'assistant et le shell disparaisse
 [ -n "$FPID" ] && { wait "$FPID" 2>/dev/null; true; }
 
 echo "=== M-ECOUTE0 / M-FRAMESRC — mutants du serveur Q ==="
-if mutant ecoute0 vf-cockpit-terminal.mjs "s/\.listen(0, '127\.0\.0\.1'/.listen(0, '0.0.0.0'/"; then
-  srv "$MUT_OUT" 1; assert_eq "M-ECOUTE0 — le mutant rougit T7.8 : Q n'écoute plus sur 127.0.0.1 seulement" "$(node "$TA" ecoutes "$SRV_PID" | grep -c -v '^127\.0\.0\.1:')" "1"; unsrv
+if mutant ecoute0 vf-cockpit-terminal-processus.mjs "s/\.listen(0, '127\.0\.0\.1'/.listen(0, '0.0.0.0'/"; then
+  srv "$MUT_OUT" 1; assert_eq "M-ECOUTE0 — le mutant rougit T7.8 : Q n'écoute plus sur 127.0.0.1 seulement" "$(ecoutes_srv "$SRV_PID" | grep -c -v '^127\.0\.0\.1:')" "1"; unsrv
 else assert_eq "M-ECOUTE0 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant framesrc vf-cockpit-terminal.mjs 's#frame-src http://127\.0\.0\.1:\${portQ}#frame-src *#'; then
   srv "$MUT_OUT" 1; MP=$SRV_PORT; rq "$MP" GET / > "$WORK/r-mut-fs.out"
@@ -210,7 +214,7 @@ cp -R "$LP/.claude/skills/cockpit-moteur" "$WORK/moteur-sans-terminal"; rm -rf "
 srv "$LP/.vibeflow/cockpit" 1 "$WORK/moteur-sans-terminal" "$LP/.claude/scripts"; P3=$SRV_PORT; TOK3="$(sj j.token)"
 assert_eq "POSE.3 — moteur sans terminal/ : /api/vf/terminal rend {\"etat\":\"arrete\"}" "$(rq "$P3" GET /api/vf/terminal --jeton "$TOK3" | sed '1,2d')" '{"etat":"arrete"}'
 assert_has "POSE.3 — le journal dit « assistant du terminal introuvable »" "$(cat "$SRV_OUT")" "assistant du terminal introuvable"
-assert_eq "POSE.3 — aucun second écouteur" "$(nlignes "$(node "$TA" ecoutes "$SRV_PID")")" "1"
+assert_eq "POSE.3 — aucun second écouteur" "$(nlignes "$(ecoutes_srv "$SRV_PID")")" "1"
 assert_eq "POSE.3 — aucun processus enfant (aucun Python lancé)" "$(pgrep -P "$SRV_PID" | grep -c .)" "0"
 unsrv
 assert_eq "POSE.4 — le vrai ~/.claude est inchangé (fichiers du cockpit)" "$(snap_home)" "$HOME_AVANT"

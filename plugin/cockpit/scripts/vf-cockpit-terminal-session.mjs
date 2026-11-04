@@ -40,7 +40,7 @@ export function resoudrePython3(pathVar = process.env.PATH) {
 }
 const actif = (c) => !!c && (c.etat === 'vivante' || c.etat === 'detachee');
 
-export function creerSessions({ engineDir, lab, jetons = () => [] }) {
+export function creerSessions({ engineDir, lab, jetons = () => [], env = process.env }) { // env : l'environnement d'ORIGINE du shell (transmis au processus du terminal par l'IPC, P71-D-03)
   let s = null; // { enfant, onglet, res, etat, code, signal, minuterie, pause }
   let tampon = [], octets = 0; // tampon de reprise : les derniers TAMPON_MAX octets de la sortie, en mémoire seulement
   const secretShell = nouveauSecret(); // jamais transmis tel quel : sert à écarter de l'environnement tout ce qui le contiendrait
@@ -83,9 +83,12 @@ export function creerSessions({ engineDir, lab, jetons = () => [] }) {
 
   function lancer(onglet, lignes, colonnes) {
     const assistant = path.join(engineDir, 'terminal', 'vf-cockpit-pty.py');
-    const enfant = spawn(resoudrePython3() || '/dev/null/python3', ['-I', assistant, String(lignes), String(colonnes), choisirShell(process.env)], {
-      cwd: fs.realpathSync(lab), env: envShell(process.env, [...jetons(), secretShell]), stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
-    });
+    let enfant; // P71-D-34 : un échec SYNCHRONE de spawn (ENOTDIR du chemin impossible) est rattrapé, jamais un 500 muet
+    try {
+      enfant = spawn(resoudrePython3(env.PATH) || '/dev/null/python3', ['-I', assistant, String(lignes), String(colonnes), choisirShell(env)], {
+        cwd: fs.realpathSync(lab), env: envShell(env, [...jetons(), secretShell]), stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+      });
+    } catch { log('python3 est introuvable ou ne se lance pas : le terminal est arrêté.'); return null; }
     const cible = { enfant, onglet, res: null, etat: 'vivante', code: null, signal: null, minuterie: null, pause: false, sorti: false };
     enfant.stdout.on('data', (b) => { // lue même sans flux attaché : le tampon se remplit pendant la grâce
       if (cible !== s || !actif(cible)) return;
@@ -117,7 +120,7 @@ export function creerSessions({ engineDir, lab, jetons = () => [] }) {
       if (!Number.isInteger(lignes) || !Number.isInteger(colonnes) || lignes < 1 || lignes > TAILLE_MAX.lignes || colonnes < 1 || colonnes > TAILLE_MAX.colonnes) return 400;
       if (s && s.etat === 'fermeture') return 503;
       if (s && s.etat !== 'terminee' && s.onglet !== onglet) return 409;
-      if (!s || s.etat === 'terminee') s = lancer(onglet, lignes, colonnes);
+      if (!s || s.etat === 'terminee') { const n = lancer(onglet, lignes, colonnes); if (!n) { s = null; return 503; } s = n; }
       const cible = s; clearTimeout(cible.minuterie);
       const ancienne = cible.res; cible.res = res; cible.etat = 'vivante'; reprendre(cible);
       if (ancienne) { try { ancienne.end(); } catch {} } // même onglet : le nouveau flux remplace l'ancien
@@ -144,7 +147,7 @@ export function creerSessions({ engineDir, lab, jetons = () => [] }) {
     occupe: () => actif(s),
     arreterTout() {
       if (!s) return;
-      const c = s; clearTimeout(c.minuterie); c.etat = 'terminee'; c.res = null; vider();
+      const c = s; clearTimeout(c.minuterie); c.etat = 'terminee'; try { c.res?.end(); } catch {} c.res = null; vider(); // les flux ouverts sont fermés (P71-D-35)
       try { c.enfant.stdin.end(); } catch {}
       try { c.enfant.kill('SIGTERM'); } catch {}
     },

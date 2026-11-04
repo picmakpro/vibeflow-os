@@ -1,45 +1,39 @@
-// vf-cockpit-terminal — serveur Q du terminal intégré du cockpit (71-01 ; P71-D-02, D-09, D-10, D-11, D-17).
+// vf-cockpit-terminal — terminal intégré du cockpit, côté serve.mjs (71-01 ; P71-D-02, D-09, D-10, D-11, D-17, D-33).
 // serve.mjs (patch vibeflow P25) l'importe seulement sous `--terminal` : AUCUN effet de bord à l'import.
 // Export : preparerTerminal({ here, root, jetons, plateforme }) -> { actif, indisponible, injection(), frameSrc(), occupe(), routeP(req, res), demarrer(portP) }.
-// Q est un second écouteur HTTP du MÊME processus, sur 127.0.0.1 seulement, d'un port éphémère : une origine distincte de la page hôte P.
-// Chaque requête passe par controle() avant tout routage : Host exact, Origin exacte de Q (GET /flux et /etat sans Origin : same-origin + secret, P71-D-24), secret de session en temps constant. Aucun
-// WebSocket, aucun `upgrade`, aucun cookie, aucun en-tête CORS, aucun secret dans une adresse. L'assistant PTY se lit dans l'arbre du moteur
-// (VF_COCKPIT_ENGINE_DIR, posé par le lanceur), jamais dans la sortie du lab. Les messages nomment des états, jamais des données.
-// Routes de Q : GET / · POST /amorce · GET /flux · POST /entree · POST /taille · GET /etat. Côté P : GET /api/vf/terminal -> { etat, port? }.
-import http from 'node:http';
+// P71-D-33 : le serveur Q (second écouteur HTTP, 127.0.0.1, port éphémère, origine distincte de la page hôte P) tourne dans un PROCESSUS ENFANT
+// (vf-cockpit-terminal-processus.mjs, child_process.fork) : le travail synchrone de la boucle de serve.mjs ne retarde plus ni frappes ni sortie.
+// Ce fichier ne garde que : les garde-fous de démarrage, le lancement et la surveillance de l'enfant, l'état `occupe` (garde d'inactivité de serve.mjs),
+// la route de P GET /api/vf/terminal -> { etat, port? }, server.json. Les contrôles Host/Origin/jeton, l'amorçage et la session vivent dans l'enfant.
+// Aucun secret dans l'argv ni l'environnement de l'enfant : jetons et environnement d'origine du shell passent par l'IPC.
 import fs from 'node:fs';
 import path from 'node:path';
+import { fork } from 'node:child_process';
 import { realUnder } from './vf-cockpit-paths.mjs';
-import { FICHIER_AMORCE, FICHIER_OUVRIR, DUREE_AMORCE_MS, nouveauSecret, egal, consommerAmorce } from './vf-cockpit-terminal-amorce.mjs';
-import { creerSessions, TAILLE_MAX } from './vf-cockpit-terminal-session.mjs';
-import { preparerPage, pageTerminal } from './vf-cockpit-terminal-page.mjs';
+import { preparerPage } from './vf-cockpit-terminal-page.mjs';
+import { TAILLE_MAX } from './vf-cockpit-terminal-session.mjs';
 import { injectionTiroir } from './vf-cockpit-terminal-tiroir.mjs';
 
 const log = (m) => console.error(`vf-cockpit (terminal) : ${m}`);
 const json = (res, statut, objet) => { res.writeHead(statut, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(objet)); };
-export const CORPS_ENTREE_MAX = 65536; // P71-D-10 : au-delà, 413 et rien n'est écrit au shell
+export { CORPS_ENTREE_MAX } from './vf-cockpit-terminal-processus.mjs';
 export { TAILLE_MAX }; // définie avec la session, qui la fait respecter aussi à l'attache du flux
-const CORPS_TAILLE_MAX = 32;
-// lit le corps par morceaux jusqu'à `max` octets ; null au-delà (le reste est écarté sans être gardé). Content-Length annoncé trop grand : null sans rien lire.
-const lireCorps = (req, max) => new Promise((resolve) => {
-  const annonce = Number(req.headers['content-length']);
-  if (Number.isFinite(annonce) && annonce > max) { req.resume(); return resolve(null); }
-  const morceaux = []; let n = 0, fini = false;
-  const clore = (v) => { if (!fini) { fini = true; resolve(v); } };
-  req.on('data', (c) => { n += c.length; if (n > max) { morceaux.length = 0; clore(null); req.resume(); } else if (!fini) morceaux.push(c); });
-  req.on('end', () => clore(Buffer.concat(morceaux)));
-  req.on('error', () => clore(null));
-});
+
+// L'environnement du PROCESSUS enfant (pas celui du shell, qui garde l'environnement d'origine, P71-D-03). UNE seule fonction : au rebase sur la PR H-1,
+// son corps devient `return envEnfant(lab, process.env)` (vf-cockpit-env.mjs). Copie dont le PATH est assaini : éléments vides, relatifs ou sous le lab
+// retirés, repli sur les répertoires système.
+export function envDuProcessusTerminal(lab) {
+  const env = { ...process.env };
+  let reel = lab; try { reel = fs.realpathSync(lab); } catch {}
+  const garde = String(env.PATH || '').split(path.delimiter).filter((d) => d && path.isAbsolute(d) && !(d === reel || d.startsWith(reel + path.sep) || d === lab || d.startsWith(lab + path.sep)));
+  env.PATH = garde.length ? garde.join(path.delimiter) : '/usr/bin:/bin:/usr/sbin:/sbin';
+  return env;
+}
 
 export function preparerTerminal({ here, root, jetons = () => [], plateforme = process.platform } = {}) {
   let etat = 'arrete'; // 'actif' | 'arrete' | 'indisponible'
-  let portQ = null, portP = null, sessions = null;
-  const secret = nouveauSecret();
-  const fichierAmorce = path.join(here || '.', '.cache', FICHIER_AMORCE);
-  const fichierOuvrir = path.join(here || '.', '.cache', FICHIER_OUVRIR);
-  // P71-D-27 : la page de redirection du lanceur disparaît dès l'échange de l'amorçage, et au plus tard DUREE_AMORCE_MS après sa création
-  const retirerOuvrir = () => { try { fs.unlinkSync(fichierOuvrir); } catch {} };
-  const balayerOuvrir = () => { try { const st = fs.lstatSync(fichierOuvrir); if (Date.now() - st.mtimeMs > DUREE_AMORCE_MS) retirerOuvrir(); } catch {} };
+  let portQ = null, enfant = null, occupe = false;
+  const origineQ = () => `http://127.0.0.1:${portQ}`;
   const inerte = (indisponible) => ({
     actif: false, indisponible, injection: () => injectionTiroir({ indisponible }), frameSrc: () => '', occupe: () => false,
     routeP: (req, res) => { json(res, 200, { etat: indisponible ? 'indisponible' : 'arrete' }); return true; }, demarrer: () => {},
@@ -51,92 +45,39 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
   const ordinaire = (f) => { try { return fs.lstatSync(f).isFile() && !realUnder(f, path.join(root, '.vibeflow')); } catch { return false; } };
   if (!assistant || !ordinaire(assistant)) { log('assistant du terminal introuvable dans le moteur du cockpit : réinstaller le module cockpit.'); return inerte(false); }
   try { preparerPage({ engineDir: moteur }); } catch (e) { log(`${e.message}`); return inerte(false); }
-  sessions = creerSessions({ engineDir: moteur, lab: root, jetons: () => [...jetons(), secret] });
 
-  const origineQ = () => `http://127.0.0.1:${portQ}`;
-  // un seul point d'entrée, appelé avant tout routage et toute lecture de corps : null si la requête est admise, sinon { statut, raison }
-  function controle(req, url) {
-    if (req.method !== 'GET' && req.method !== 'POST') return { statut: 403, raison: 'méthode' }; // aucun préflight (OPTIONS), aucune autre méthode
-    const page = req.method === 'GET' && url.pathname === '/';
-    const hotes = [`127.0.0.1:${portQ}`, ...(page ? [`localhost:${portQ}`] : [])]; // localhost : la page seule, jamais une route d'action
-    if (!hotes.includes(String(req.headers.host || '').toLowerCase())) return { statut: 403, raison: 'Host' };
-    // P71-D-24 : un fetch GET de même origine n'envoie jamais Origin (Fetch) ; GET /flux et GET /etat, SEULS, l'admettent sans Origin si
-    // Sec-Fetch-Site vaut same-origin ET le secret en en-tête est valide. Les POST gardent Origin obligatoire ; une Origin présente est toujours celle de Q.
-    const navigateur = req.method === 'GET' && (url.pathname === '/flux' || url.pathname === '/etat')
-      && req.headers['sec-fetch-site'] === 'same-origin' && egal(req.headers['x-vf-terminal'], secret);
-    const o = req.headers.origin;
-    if (o === undefined) { if (!page && !navigateur) return { statut: 403, raison: 'Origin absente' }; } else if (o !== origineQ()) return { statut: 403, raison: 'Origin' };
-    return null;
-  }
-  // toute réponse, refus compris : jamais d'en-tête CORS, de cookie ni de X-Frame-Options ; la page de Q remplace la CSP de base par la sienne
-  const entetes = (res) => {
-    res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
-  };
-  let nRefus = 0;
-  const refus = (res, statut, raison) => { // le journal nomme la raison, jamais une valeur reçue ; plafonné
-    if (raison && ++nRefus <= 50) log(`requête refusée : ${raison}.`);
-    res.writeHead(statut, statut === 413 ? { Connection: 'close' } : {}); res.end();
-  };
-  const taille = (v) => { const m = /^(\d{1,4})x(\d{1,4})$/.exec(String(v || '')); return m ? { lignes: Number(m[1]), colonnes: Number(m[2]) } : null; };
-  const tailleCorps = (b) => { // « <lignes> <colonnes> » : deux entiers décimaux dans les bornes
-    const m = /^(\d{1,4}) (\d{1,4})$/.exec(b.toString('utf8')); if (!m) return null;
-    const l = Number(m[1]), c = Number(m[2]);
-    return l >= 1 && l <= TAILLE_MAX.lignes && c >= 1 && c <= TAILLE_MAX.colonnes ? { l, c } : null;
-  };
-
-  async function traiter(req, res) {
-    entetes(res);
-    let url; try { url = new URL(req.url, origineQ()); } catch { return refus(res, 400, 'adresse'); }
-    const c = controle(req, url); if (c) return refus(res, c.statut, c.raison);
-    const { pathname: p } = url, m = req.method;
-    if (p === '/' && m === 'GET') {
-      const { html, csp } = pageTerminal({ theme: url.searchParams.get('theme') === 'light' ? 'light' : 'dark', origineP: `http://127.0.0.1:${portP}` });
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': csp }); return res.end(html);
-    }
-    if (p === '/amorce' && m === 'POST') { // l'amorçage n'est jamais lu qu'à l'échange ; il se consomme une seule fois
-      if (!consommerAmorce(fichierAmorce, req.headers['x-vf-amorce'])) return refus(res, 403, 'amorçage');
-      retirerOuvrir();
-      return json(res, 200, { secret });
-    }
-    // le secret précède le routage : une route inconnue ne se devine pas sans lui
-    if (!egal(req.headers['x-vf-terminal'], secret)) return refus(res, 401, 'secret');
-    const routes = { '/amorce': 'POST', '/flux': 'GET', '/entree': 'POST', '/taille': 'POST', '/etat': 'GET' };
-    if (!(p in routes)) return refus(res, 404);
-    if (routes[p] !== m) return refus(res, 405);
-    const onglet = req.headers['x-vf-onglet'];
-    if (p === '/etat') return json(res, 200, sessions.etat());
-    if (p === '/flux') {
-      const t = req.headers['x-vf-taille'] === undefined ? { lignes: 24, colonnes: 80 } : taille(req.headers['x-vf-taille']);
-      if (!t) return refus(res, 400);
-      const r = sessions.attacher(req, res, { onglet, ...t }); return r === 200 ? undefined : refus(res, r);
-    }
-    const corps = await lireCorps(req, p === '/entree' ? CORPS_ENTREE_MAX : CORPS_TAILLE_MAX);
-    if (p === '/entree') return corps ? refus(res, sessions.ecrire(corps, onglet)) : refus(res, 413, 'corps trop grand');
-    const t = corps ? tailleCorps(corps) : null; // /taille
-    return refus(res, t ? sessions.redimensionner(t.l, t.c, onglet) : 400);
-  }
-
-  const q = http.createServer((req, res) => { traiter(req, res).catch(() => { try { if (!res.headersSent) refus(res, 500); else res.end(); } catch {} }); });
+  const envoyer = (msg) => { try { if (enfant && enfant.connected) { enfant.send(msg); return true; } } catch {} return false; };
   return {
     get actif() { return etat === 'actif'; }, indisponible: false,
     injection: () => injectionTiroir({ indisponible: false }),
     frameSrc: () => (portQ ? `; frame-src http://127.0.0.1:${portQ}` : ''),
-    occupe: () => sessions.occupe(),
-    routeP(req, res) { json(res, 200, etat === 'actif' ? { etat: 'actif', port: portQ } : { etat: 'arrete' }); return true; },
-    demarrer(port) {
-      portP = port;
-      q.on('error', (e) => { log(`le serveur du terminal ne démarre pas (${e.code || 'erreur'}).`); etat = 'arrete'; });
-      q.listen(0, '127.0.0.1', () => {
-        portQ = q.address().port; etat = 'actif';
-        try { // server.json gagne la clé terminal { url } : jamais un secret
-          const f = path.join(here, '.cache', 'server.json'); const j = JSON.parse(fs.readFileSync(f, 'utf8'));
-          fs.writeFileSync(f, JSON.stringify({ ...j, terminal: { url: origineQ() } }, null, 2), { mode: 0o600 }); fs.chmodSync(f, 0o600);
-        } catch { log('server.json illisible : l\'adresse du terminal n\'a pas pu être publiée.'); }
-        log('terminal actif (127.0.0.1 seulement).');
+    occupe: () => occupe,
+    routeP(req, res) { envoyer({ t: 'jetons', jetons: jetons() }); json(res, 200, etat === 'actif' ? { etat: 'actif', port: portQ } : { etat: 'arrete' }); return true; },
+    demarrer(portP) {
+      const fichier = path.join(here || '.', 'vf-cockpit-terminal-processus.mjs');
+      try {
+        enfant = fork(fichier, [], { env: envDuProcessusTerminal(root), stdio: ['inherit', 'inherit', 'inherit', 'ipc'], serialization: 'json' });
+      } catch (e) { log(`le serveur du terminal ne démarre pas (${e.code || 'erreur'}).`); return; }
+      enfant.on('message', (m) => {
+        if (!m || typeof m !== 'object') return;
+        if (m.t === 'occupe') occupe = m.v === true;
+        else if (m.t === 'echec') { etat = 'arrete'; occupe = false; }
+        else if (m.t === 'pret' && Number.isInteger(m.port)) {
+          portQ = m.port; etat = 'actif';
+          try { // server.json gagne la clé terminal { url } : jamais un secret
+            const f = path.join(here, '.cache', 'server.json'); const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+            fs.writeFileSync(f, JSON.stringify({ ...j, terminal: { url: origineQ() } }, null, 2), { mode: 0o600 }); fs.chmodSync(f, 0o600);
+          } catch { log('server.json illisible : l\'adresse du terminal n\'a pas pu être publiée.'); }
+        }
       });
-      retirerOuvrir(); const balai = setInterval(balayerOuvrir, 2000); balai.unref();
-      process.on('exit', () => { sessions.arreterTout(); try { fs.unlinkSync(fichierAmorce); } catch {} retirerOuvrir(); });
+      enfant.on('error', () => { etat = 'arrete'; occupe = false; });
+      enfant.on('exit', () => { etat = 'arrete'; occupe = false; });
+      // le shell garde l'environnement d'ORIGINE (P71-D-03) : il passe par l'IPC, avec les jetons, jamais par l'argv ni l'environnement de l'enfant
+      envoyer({ t: 'init', engineDir: moteur, root, here, jetons: jetons(), portP, envOrigine: { ...process.env } });
+      // arrêt volontaire (P71-D-35) : signal ou sortie ordinaire -> l'enfant passe en « arret ». Une coupure brutale (SIGKILL) ne passe ici nulle part.
+      const prevenir = () => { envoyer({ t: 'arret' }); };
+      for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, prevenir);
+      process.on('exit', prevenir);
     },
   };
 }

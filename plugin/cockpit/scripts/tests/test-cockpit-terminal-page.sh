@@ -21,6 +21,8 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "
 export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+# écouteurs du serveur ET de son processus du terminal (Q y écoute, P71-D-33) ; lignes vides écartées
+ecoutes_srv() { local c; { node "$TA" ecoutes "$1"; for c in $(command pgrep -P "$1"); do ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs' && node "$TA" ecoutes "$c"; done; } | sed '/^$/d'; }
 PASS=0; FAIL=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
@@ -197,7 +199,7 @@ if mutant theme vf-cockpit-terminal-page.mjs "s|const attr = clair ? ' data-them
 else assert_eq "M-THEME — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-XFO — X-Frame-Options posé par Q ==="
-if mutant xfo vf-cockpit-terminal.mjs "s/'Content-Security-Policy': csp }/'Content-Security-Policy': csp, 'X-Frame-Options': 'DENY' }/"; then
+if mutant xfo vf-cockpit-terminal-processus.mjs "s/'Content-Security-Policy': csp }/'Content-Security-Policy': csp, 'X-Frame-Options': 'DENY' }/"; then
   srv "$MUT_OUT" 1; QM="$(sj '(j.terminal&&j.terminal.url)||"1"')"; QM="${QM##*:}"; rq "$QM" GET / > "$WORK/m-xfo.out"
   assert_eq "M-XFO — le mutant rougit T9.2 : x-frame-options présent" "$(entete "$WORK/m-xfo.out" 'Object.keys(j).filter(k=>k==="x-frame-options").length')" "1"; unsrv
 else assert_eq "M-XFO — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
@@ -239,7 +241,7 @@ else assert_eq "T19.5 — mutant sans effet (cible absente ou inchangée)" "sans
 echo "=== TV — intégrité du vendor au démarrage (TERM-10) ==="
 copie() { rm -rf "$WORK/moteur-$1"; cp -R "$ENG" "$WORK/moteur-$1"; } # copie du moteur, modifiable sans toucher au dépôt
 verdict() { # verdict <nom> : démarre Q sur la copie, rend « etat/écouteurs »
-  srv "$OUT" 1 "$WORK/moteur-$1"; VERD="$(etat_p | node "$AUX/ev.mjs" j.etat)/$(nlignes "$(node "$TA" ecoutes "$SRV_PID")")"; VJ="$(cat "$SRV_OUT")"; unsrv; }
+  srv "$OUT" 1 "$WORK/moteur-$1"; VERD="$(etat_p | node "$AUX/ev.mjs" j.etat)/$(nlignes "$(ecoutes_srv "$SRV_PID")")"; VJ="$(cat "$SRV_OUT")"; unsrv; }
 copie intact; verdict intact
 assert_eq "TV.0b — témoin : moteur intact -> actif, deux écouteurs" "$VERD" "actif/2"
 copie octet; node -e "const f=process.argv[1],b=require('fs').readFileSync(f);b[1000]^=1;require('fs').writeFileSync(f,b)" "$WORK/moteur-octet/assets/vendor/xterm/xterm.js"

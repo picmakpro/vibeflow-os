@@ -19,6 +19,8 @@ ENG="$(cd "$SCRIPTS/../skills/cockpit-moteur" && pwd -P)"; TA="$HERE_T/terminal-
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/bin" "$WORK/run" "$WORK/temoins" "$WORK/ailleurs"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+# P71-D-33 : Q tourne dans un processus enfant du serveur ; « les enfants du serveur » = les assistants, enfants de ce processus (pgrep -P ne voit qu'un étage)
+pgrep() { if [ "$1" = "-P" ] && [ $# -eq 2 ]; then local c; for c in $(command pgrep -P "$2"); do if ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs'; then command pgrep -P "$c"; else echo "$c"; fi; done; else command pgrep "$@"; fi; }
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
@@ -384,6 +386,9 @@ sourd() { # sourd <nom> <sortie> [moteur] -> SO_RES : « avant=<assistant> <shel
   ENVX=(SHELL="$WORK/bin/shell-sourd"); SANS_INVITE=1 sess "$1" "$2" "${3:-$ENG}"; ENVX=(); local a s st av ap
   attendre_fichier "$WORK/run/$1/sourd.pid"; a="$(pgrep -P "$S_PID" | sed -n 1p)"; s="$(cat "$WORK/run/$1/sourd.pid" 2>/dev/null)"
   st="$(ent "$(head -c 65536 /dev/zero | tr '\0' a)")"; sleep 0.5; av="$(vivant "${a:-0}") $(vivant "${s:-0}")"
+  # P71-D-33 : le processus du terminal meurt LUI AUSSI par SIGKILL (sinon il arrête l'assistant à la mort du parent et ce test ne mesurerait plus l'autonomie de l'assistant ; la mort du parent seul est mesurée par test-cockpit-terminal-session.sh)
+  local qp; qp="$(command pgrep -P "$S_PID" | while read -r c; do ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs' && echo "$c"; done | sed -n 1p)"
+  [ -n "$qp" ] && kill -KILL "$qp"
   kill -KILL "$S_PID"; wait "$S_PID" 2>/dev/null; vf_hyg_stop "$S_PID"
   attendre_mort "$a" "$s"; ap="$(vivant "${a:-0}") $(vivant "${s:-0}")"
   tuer_si "$a" vf-cockpit-pty.py; tuer_si "$s" "sleep 299"
@@ -428,7 +433,7 @@ if mutant_eng sansl "s/\[shell, .-l.\]/[shell]/"; then
   ENVX=(); sess m5 "$OUT" "$MUT_ENG"; assert_eq "M-SANS-L — le mutant lance le shell sans -l : T10.4 rouge" "$(cat "$WORK/run/m5/args.txt" 2>/dev/null)" ""; fin_sess
 else sans_effet M-SANS-L; fi
 
-if mutant python3cwd vf-cockpit-terminal-session.mjs "s#resoudrePython3() || '/dev/null/python3'#'python3'#"; then
+if mutant python3cwd vf-cockpit-terminal-session.mjs "s#resoudrePython3(env.PATH) || '/dev/null/python3'#'python3'#"; then
   python3_du_lab m14 "$MUT_OUT" ".:"; assert_eq "M-PYTHON3-CWD — le mutant lance « python3 » par le PATH (relatif) : le python3 du lab est exécuté, le terminal ne démarre pas (T15.1 rouge)" "$PY_RES" "execute non non"
 else sans_effet M-PYTHON3-CWD; fi
 

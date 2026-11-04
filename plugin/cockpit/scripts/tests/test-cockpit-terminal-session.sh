@@ -21,6 +21,8 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "
 export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+# P71-D-33 : Q tourne dans un processus enfant du serveur ; « les enfants du serveur » = les assistants, enfants de ce processus (pgrep -P ne voit qu'un étage)
+pgrep() { if [ "$1" = "-P" ] && [ $# -eq 2 ]; then local c; for c in $(command pgrep -P "$2"); do if ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs'; then command pgrep -P "$c"; else echo "$c"; fi; done; else command pgrep "$@"; fi; }
 PASS=0; FAIL=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; } # une valeur longue montre son début ET sa fin
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
@@ -75,7 +77,7 @@ srv() { # srv <sortie> [arguments du serveur…] -> SRV_PID SRV_O SRV_OUT QP SEC
   local o="$1"; shift; local lab; lab="$(cd "$o/../.." && pwd)"
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN.out"; rm -f "$o/.cache/server.json"; mkdir -p "$o/.cache"
   local amorce; amorce="$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")"; (umask 077; printf '%s' "$amorce" > "$o/.cache/terminal-amorce"); (umask 077; printf '%s' "$amorce" > "$WORK/amorce-$SRVN")
-  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="${ENG_SRV:-$ENG}" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" VF_COCKPIT_TERM_GRACE_MS="$GRACE_T" VF_COCKPIT_TERM_FERMETURE_MS="${FERM_T:-}" TMPDIR="$WORK/tmp-serveur" exec node "$o/serve.mjs" --no-open --terminal "$@" --port "$(libre)" > "$SRV_OUT" 2>&1 ) </dev/null >/dev/null 2>&1 &
+  ( cd "$lab" && PATH="${PATH_SRV:-$PATH}" VF_COCKPIT_ENGINE_DIR="${ENG_SRV:-$ENG}" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" VF_COCKPIT_TERM_GRACE_MS="$GRACE_T" VF_COCKPIT_TERM_FERMETURE_MS="${FERM_T:-}" TMPDIR="$WORK/tmp-serveur" exec node "$o/serve.mjs" --no-open --terminal "$@" --port "$(libre)" > "$SRV_OUT" 2>&1 ) </dev/null >/dev/null 2>&1 &
   SRV_PID=$!; PIDS+=($SRV_PID)
   for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
   QP="$(sj '(j.terminal&&j.terminal.url)||""')"; QP="${QP##*:}"; SEC=""
@@ -341,6 +343,74 @@ assert_eq "T12.5 — --idle-exit 0.01, session attachée, aucun onglet P : le se
 if [ -n "$IDLE_M" ]; then assert_eq "M-IDLE — le mutant rougit T12.5 : le même serveur, sans occupe(), est sorti" "$(kill -0 "$IM_PID" 2>/dev/null && echo vivant || echo sorti)" "sorti"
 else assert_eq "M-IDLE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 vf_hyg_stop "$IC_PID"; [ -n "$IDLE_M" ] && vf_hyg_stop "$IM_PID"
+
+echo "=== W1 — le terminal dans son processus (P71-D-33, D-34, D-35) ==="
+# processus du terminal = l'enfant du serveur dont la ligne de commande porte vf-cockpit-terminal-processus.mjs
+proc_q() { local c; for c in $(command pgrep -P "$1" 2>/dev/null); do ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs' && { echo "$c"; return; }; done; }
+vivant_w() { kill -0 "$1" 2>/dev/null && echo oui || echo non; }
+# E1 : la boucle du serveur est GELÉE (SIGSTOP : plus forte que 4 s de travail synchrone) pendant trois aller-retours de frappe ; Q, dans son processus, répond
+sonde_gel() { # -> « <n> échos sur 3 pendant le gel, serveur gelé=<oui|non> »
+  local f="$WORK/f-gel-$SRVN.bin" n=0 i m
+  flux "$f" 40000; attendre_python; tape "echo PRET-GEL\\r" > /dev/null; vu "$f" PRET-GEL 8000 > /dev/null
+  kill -STOP "$SRV_PID"
+  for i in 1 2 3; do m="GEL-$i-$RANDOM"; tape "echo $m\\r" > /dev/null; [ "$(vu "$f" "$m" 1500)" = TROUVE ] && n=$((n+1)); done
+  local g; g="$(ps -o stat= -p "$SRV_PID" 2>/dev/null | cut -c1)"; kill -CONT "$SRV_PID"; vf_hyg_stop "$FL"
+  echo "$n échos sur 3 pendant le gel, serveur gelé=$([ "$g" = T ] && echo oui || echo non)"
+}
+srv "$OUT"; R="$(sonde_gel)"; assert_eq "E1.1 — serveur gelé (SIGSTOP), trois frappes : les trois échos reviennent en moins de 1,5 s chacun (rouge avec Q dans le processus du serveur : aucun écho)" "$R" "3 échos sur 3 pendant le gel, serveur gelé=oui"; unsrv
+# E1 : la mort du parent par SIGKILL n'laisse ni processus du terminal, ni assistant, ni shell
+srv "$OUT"; f="$WORK/f-mort.bin"; flux "$f" 40000; attendre_python; QPID="$(proc_q "$SRV_PID")"; APID="$(command pgrep -P "$QPID" | sed -n 1p)"; SPID="$(command pgrep -P "$APID" | sed -n 1p)"
+assert_eq "E1.2 — témoin : avant la mort du parent, le processus du terminal, l'assistant et le shell vivent" "$(vivant_w "${QPID:-0}") $(vivant_w "${APID:-0}") $(vivant_w "${SPID:-0}")" "oui oui oui"
+kill -KILL "$SRV_PID"; wait "$SRV_PID" 2>/dev/null; morts 8 "$QPID" "$APID" "$SPID"; vf_hyg_stop "$FL"
+assert_eq "E1.3 — serveur tué par SIGKILL : ni processus du terminal, ni assistant, ni shell ne survivent (PID enregistrés)" "$(vivant_w "${QPID:-0}") $(vivant_w "${APID:-0}") $(vivant_w "${SPID:-0}")" "non non non"
+vf_hyg_stop "$SRV_PID"
+# E1 : le terminal ouvert est annoncé au parent (garde d'inactivité) : couvert par T12.5 ci-dessus
+# G2 : arrêt volontaire (SIGTERM du serveur) -> GET /etat rend {"etat":"arret"} pendant plus d'une seconde, flux fermés, puis Q sort
+srv "$OUT"; f="$WORK/f-arret.bin"; flux "$f" 40000; attendre_python; QPID="$(proc_q "$SRV_PID")"; APID="$(command pgrep -P "$QPID" | sed -n 1p)"
+cat > "$AUX/sonde-arret.mjs" <<'JS'
+// sonde-arret.mjs <portQ> <secret> <duree-ms> : interroge GET /etat toutes les 50 ms dans UN processus démarré avant le signal ; rend « <premier> <dernier> », époques en ms de la réponse {"etat":"arret"} (0 0 si jamais vue)
+import http from 'node:http';
+const [, , port, secret, duree] = process.argv; let premier = 0, dernier = 0;
+const un = () => { const r = http.get({ host: '127.0.0.1', port: +port, path: '/etat', agent: false, headers: { Host: `127.0.0.1:${port}`, Origin: `http://127.0.0.1:${port}`, 'X-VF-Terminal': secret } }, (res) => {
+  let b = ''; res.on('data', (c) => { b += c; }); res.on('end', () => { if (b === '{"etat":"arret"}') { dernier = Date.now(); if (!premier) premier = dernier; } });
+}); r.on('error', () => {}); r.setTimeout(500, () => r.destroy()); };
+const iv = setInterval(un, 50);
+setTimeout(() => { clearInterval(iv); console.log(`${premier} ${dernier}`); process.exit(0); }, +duree);
+JS
+node "$AUX/sonde-arret.mjs" "$QP" "$SEC" 6000 > "$WORK/arret.res" & AP=$!; PIDS+=($AP); sleep 0.5
+T0="$(python3 -c "import time;print(int(time.time()*1000))")"; kill -TERM "$SRV_PID"; wait "$SRV_PID" 2>/dev/null; wait "$AP" 2>/dev/null
+read -r A1 A2 < "$WORK/arret.res"
+assert_eq "G2.1 — SIGTERM du serveur : /etat rend {\"etat\":\"arret\"} puis, jusqu'à au moins 1 s après le signal, la même réponse" "$([ "${A1:-0}" -gt 0 ] && echo vu || echo jamais) $([ $((${A2:-0}-T0)) -ge 1000 ] && echo ">=1s" || echo "<1s ($((${A2:-0}-T0)) ms)")" "vu >=1s"
+morts 8 "$QPID" "$APID"; vf_hyg_stop "$FL"
+assert_eq "G2.2 — puis Q sort : le processus du terminal et l'assistant ont disparu, /etat ne répond plus" "$(vivant_w "${QPID:-0}") $(vivant_w "${APID:-0}") $(node "$TA" etat "$QP" "$SEC" | sed -n 1p | cut -c1-6)" "non non ERREUR"
+assert_eq "G2.3 — le flux ouvert a été fermé par Q (le client voit la fin)" "$(grep -c 'FIN-FLUX' "$f.log")" "1"
+# SIGKILL : comportement inchangé, aucun état « arret » annoncé, Q disparaît avec son parent
+srv "$OUT"; QPID="$(proc_q "$SRV_PID")"; kill -KILL "$SRV_PID"; wait "$SRV_PID" 2>/dev/null; morts 4 "$QPID"
+assert_eq "G2.4 — SIGKILL du serveur : Q n'annonce pas « arret » et sort aussitôt" "$(vivant_w "${QPID:-0}") $(node "$TA" etat "$QP" "$SEC" | sed -n 1p | cut -c1-6)" "non ERREUR"
+vf_hyg_stop "$SRV_PID"
+# E4 : python3 introuvable
+mkdir -p "$WORK/pathnopy"; ln -sf "$(command -v node)" "$WORK/pathnopy/node"
+PATH_SRV="$WORK/pathnopy"; srv "$OUT"; PATH_SRV=""
+assert_eq "E4.1 — PATH sans python3 : GET /etat rend {\"etat\":\"indisponible\",\"raison\":\"python3-absent\"}" "$(node "$TA" etat "$QP" "$SEC" | sed -n 3p)" '{"etat":"indisponible","raison":"python3-absent"}'
+assert_eq "E4.2 — l'échec est journalisé UNE fois (« python3 introuvable »)" "$(grep -c 'python3 introuvable : le terminal est indisponible' "$SRV_OUT")" "1"
+assert_eq "E4.3 — GET /flux rend 503, pas un 500 muet ni un flux" "$(rq "$QP" GET /flux --secret "$SEC" --onglet "$ONG_A" --echeance 2000 | sed -n 1p)" "503"
+unsrv
+srv "$OUT"; assert_eq "E4.4 — témoin : avec python3 dans le PATH, /etat rend l'état de session (pas « indisponible »)" "$(node "$TA" etat "$QP" "$SEC" | sed -n 3p | node "$AUX/ev.mjs" 'j.etat===undefined&&j.session!==undefined?"session":"autre"')" "session"; unsrv
+
+# mutants W1 : copies de la sortie
+if mutant parentmort vf-cockpit-terminal-processus.mjs "s/process.on('disconnect', () => { if (phase !== 'arret') sortir(); });//; s/if (process.ppid !== ppid0 \&\& phase !== 'arret') sortir();//"; then
+  srv "$MUT_OUT"; f="$WORK/f-mpm.bin"; flux "$f" 40000; attendre_python; QPID="$(proc_q "$SRV_PID")"; APID="$(command pgrep -P "$QPID" | sed -n 1p)"
+  kill -KILL "$SRV_PID"; wait "$SRV_PID" 2>/dev/null; morts 4 "$QPID"; MPM="$(vivant_w "${QPID:-0}")"; vf_hyg_stop "$FL"; [ -n "$QPID" ] && kill -KILL "$QPID" 2>/dev/null; [ -n "$APID" ] && kill -KILL "$APID" 2>/dev/null
+  assert_eq "M-PARENT-MORT — le mutant (l'enfant ignore la mort du parent) rougit E1.3 : le processus du terminal survit au SIGKILL" "$MPM" "oui"; vf_hyg_stop "$SRV_PID"
+else assert_eq "M-PARENT-MORT — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant sansarret vf-cockpit-terminal-processus.mjs "s/if (phase === 'arret') return json(res, 200, { etat: 'arret' });//"; then
+  srv "$MUT_OUT"; f="$WORK/f-msa.bin"; flux "$f" 40000; attendre_python; node "$AUX/sonde-arret.mjs" "$QP" "$SEC" 3000 > "$WORK/arret-m.res" & AP=$!; PIDS+=($AP); sleep 0.5; kill -TERM "$SRV_PID"; wait "$SRV_PID" 2>/dev/null; wait "$AP" 2>/dev/null; read -r B1 B2 < "$WORK/arret-m.res"
+  assert_eq "M-SANS-ARRET — le mutant (pas d'état « arret ») rougit G2.1 : {\"etat\":\"arret\"} n'est jamais vu" "${B1:-x}" "0"; vf_hyg_stop "$FL"; vf_hyg_stop "$SRV_PID"
+else assert_eq "M-SANS-ARRET — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant sanspython vf-cockpit-terminal-processus.mjs "s/if (pythonAbsent) return json(res, 200, { etat: 'indisponible', raison: 'python3-absent' });//"; then
+  PATH_SRV="$WORK/pathnopy"; srv "$MUT_OUT"; PATH_SRV=""
+  assert_eq "M-SANS-INDISPO — le mutant rougit E4.1 : /etat ne rend plus « indisponible »" "$(node "$TA" etat "$QP" "$SEC" | sed -n 3p | node "$AUX/ev.mjs" 'j.etat||"sans-etat"')" "sans-etat"; unsrv
+else assert_eq "M-SANS-INDISPO — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
