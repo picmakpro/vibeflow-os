@@ -7,6 +7,17 @@ pour P71-D-01 à P71-D-08 et P71-D-23 ; décisions du manager (vf-dev-manager, 2
 (O1 à O11 tranchées par P71-D-20 et P71-D-21 ; P71-D-22, d'abord provisoire, est devenue définitive par P71-D-23). Les gestes de
 release racine (version, tag, release GitHub) restent humains. Numéro de version recalculé à la fusion avec les Phases 68 et 70 (P71-PL-12) : mineure suivante de la v1.2.1 de main.
 
+### Corrigé — audit de sécurité de la Phase 71 (lot B1 : lanceur et amorçage)
+- **Le lanceur n'ouvre plus une adresse lue dans le lab** (F1, majeur ; P71-D-25, validation de Samuel, AskUserQuestion, session
+  principale Claude Code, 2026-11-04) : seuls des ports entiers sont lus dans `server.json`, l'adresse est reconstruite en
+  `http://127.0.0.1:<port>`, et seulement si le processus est le serveur de la sortie ; un `server.json` planté ne remet rien à l'ouvreur.
+- **L'amorçage n'est plus dans l'argv de l'ouvreur** (F6 ; P71-D-27, validation de Samuel, même canal, 2026-11-04) : page de redirection
+  0600 en création exclusive, dont seul le chemin est remis à l'ouvreur, supprimée à l'échange et balayée à 60 s ; l'amorçage expire
+  60 s après sa création, côté serveur. Limite résiduelle : lisible d'un processus du même compte pendant 60 s au plus.
+- **Documentation alignée** (README) : Q n'a aucun écouteur `message` propre, le vendor xterm en garde un interne (F5, P71-D-15
+  reformulée) ; réponses de format fixe d'xterm réinjectées (F8) ; `nohup` et `disown` tués à l'arrêt, `setsid` écrit comme limite
+  (P71-D-28) ; collages multi-lignes confirmés (P71-D-26) ; `python3` en chemin absolu (F3) et terminal limité à son cadre (F4).
+
 ### Ajouté — Terminal intégré (Phase 71)
 - **`--terminal`** — le lanceur ouvre un shell de votre compte dans un tiroir en bas des pages Projet et Code, dans la même
   fenêtre : `$SHELL -l` dans la racine du lab, `claude` y tourne avec son `CLAUDE.md` et ses skills (P71-D-01, D-03, D-04, D-06,
