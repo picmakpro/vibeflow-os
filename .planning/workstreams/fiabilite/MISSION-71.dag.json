@@ -367,6 +367,133 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "fix-n9-n10",
+      "step": "fix-n9-n10",
+      "stage": "",
+      "deps": [
+        "push-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recette-A",
+      "step": "recette-A",
+      "stage": "",
+      "deps": [
+        "push-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recette-B",
+      "step": "recette-B",
+      "stage": "",
+      "deps": [
+        "push-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recette-C",
+      "step": "recette-C",
+      "stage": "",
+      "deps": [
+        "push-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "reaudit-n9",
+      "step": "re-audit ciblé N9 N10",
+      "stage": "",
+      "deps": [
+        "fix-n9-n10"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "rebase-71",
+      "step": "rebase sur origin/main (69 mergée)",
+      "stage": "",
+      "deps": [
+        "reaudit-n9",
+        "recette-A",
+        "recette-B",
+        "recette-C"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "pr-71",
+      "step": "PR séparée suivie au vert, sans merge",
+      "stage": "",
+      "deps": [
+        "rebase-71"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "fix-w1",
+      "step": "fix-w1",
+      "stage": "",
+      "deps": [
+        "recette-A"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-w2",
+      "step": "fix-w2",
+      "stage": "",
+      "deps": [
+        "recette-A"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-w3",
+      "step": "fix-w3",
+      "stage": "",
+      "deps": [
+        "recette-A"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-w4",
+      "step": "W4 page Q : E3, E4 page, G2 client, G3",
+      "stage": "",
+      "deps": [
+        "fix-n9-n10",
+        "fix-w1"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs-2",
+      "step": "passe de doc finale",
+      "stage": "",
+      "deps": [
+        "fix-w1",
+        "fix-w2",
+        "fix-w3",
+        "fix-w4"
+      ],
+      "scope": [],
+      "status": "ready"
     }
   ]
 }
