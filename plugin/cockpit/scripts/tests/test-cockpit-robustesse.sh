@@ -85,9 +85,9 @@ esac
 SH
 cat > "$AUX/who.mjs" <<'JS'
 import { pathToFileURL } from 'node:url'; const [, , scripts, lab, home] = process.argv; const m = await import(pathToFileURL(scripts + '/vf-cockpit-who.mjs').href);
-const w = m.collectWho(lab, { home }); console.log(JSON.stringify({ busy: w.busy, locks: w.workers.filter((x) => x.kind === 'lock').map((x) => x.id), held: w.sources.locks.held, orphelins: w.workers.filter((x) => x.kind === 'registered').map((x) => !!x.orphan) }));
+const w = m.collectWho(lab, { home, scriptsDir: process.argv[5] }); console.log(JSON.stringify({ busy: w.busy, locks: w.workers.filter((x) => x.kind === 'lock').map((x) => x.id), held: w.sources.locks.held, orphelins: w.workers.filter((x) => x.kind === 'registered').map((x) => !!x.orphan) }));
 JS
-W3="$(node "$AUX/who.mjs" "$SCRIPTS" "$L1" "$WORK/home")"
+W3="$(node "$AUX/who.mjs" "$SCRIPTS" "$L1" "$WORK/home" "$WORK/sans-conductor")" # dossier sans conductor voisin : le faux driver-lock.sh de HOME répond (le conductor voisin passe avant, v1.1.1)
 assert_eq "S3.1 — lab plat : le verrou tenu est vu (busy, 1 verrou, owner rev)" "$(printf '%s' "$W3" | node "$AUX/ev.mjs" 'j.busy+","+j.held+","+j.locks')" "true,1,rev"
 assert_eq "S3.2 — l'agent enregistré n'est pas pris pour un orphelin quand le verrou est tenu" "$(printf '%s' "$W3" | node "$AUX/ev.mjs" 'j.orphelins')" "[false]"
 rm -f "$WORK/home/.claude/scripts/driver-lock.sh"
