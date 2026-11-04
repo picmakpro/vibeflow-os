@@ -23,3 +23,15 @@ Total : 15 FAIL, 44 PASS (sortie : scratchpad `fix-socle-f02-rouge.out`).
 Correctif : `assainir` (passe finale sur l'objet entier, borne 1024) + bornes serrées par champ connu (`ws` 80, `actif` 80, `phaseActive.nom` 90) dans `vf-cockpit-signal.mjs`.
 Vert : `test-cockpit-signal.sh` 60 PASS / 0 FAIL sous bash ET zsh (scratchpad `fix-socle-f02-vert.out`, `fix-socle-f02-vert-zsh.out`).
 Mutant S9.M (passe finale retirée, bornes serrées conservées) : le balayage global rougit (`*=controle:3`) — la passe finale est bien le filet.
+
+## F-03 — `git status --porcelain` de who sans `core.fsmonitor=false`
+
+Témoin : section W19 de `test-cockpit-who.sh` — lab jetable, `core.fsmonitor` pointant un script qui touche un fichier témoin dans son `.git/config`, DAG commité (suivi et propre) avec un nœud `running` frais.
+Rouge sur `387df78b` (scratchpad `fix-socle-f03-rouge.out`) :
+
+| Assertion | Attendu | Obtenu (rouge) |
+|---|---|---|
+| W19.2 collectWho : le script de fsmonitor n'a jamais été exécuté | intact | exécuté |
+| W19.3 émetteur entier : `signal@1` produit, script jamais exécuté | `vibeflow/cockpit-signal@1\|intact` | `vibeflow/cockpit-signal@1\|exécuté` |
+
+Témoins non rouges : W19.0 (le script s'exécute bien sur un `git status` nu : le rouge n'est pas un fichier témoin inatteignable), W19.1 (le nœud est lu : le chemin git est parcouru).

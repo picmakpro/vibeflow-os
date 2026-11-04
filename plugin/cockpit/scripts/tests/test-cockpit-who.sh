@@ -478,6 +478,27 @@ mkdir -p "$WORK/trap18/x/scripts" "$WORK/trap18/conductor/scripts"; cp "$TRAP" "
 Q who "$L17" "$H18" "$WORK/trap18/x/scripts" > "$WORK/who18c.json"
 assert_eq "W18.4 — un frère de n'importe quel dossier « scripts » n'est pas exécuté" "$([ -e "$WORK/EXECUTE" ] && echo oui || echo non)|$(G "$WORK/who18c.json" 'j.workers.filter(w=>w.id==="PIEGE").length')" "non|0"
 
+# ---------- W19 — toute commande git de la chaîne de l'émetteur neutralise fsmonitor (F-03 ; T-68-04) ----------
+# Un `.git/config` écrit par d'autres peut déclarer un core.fsmonitor exécutable. Lab jetable, DAG commité (donc suivi et propre : le chemin
+# `ls-files` + `status --porcelain` + `log` est parcouru) portant un nœud running frais ; le script de fsmonitor laisse un fichier témoin s'il s'exécute.
+echo "=== W19 — un core.fsmonitor du .git/config n'est jamais exécuté par la chaîne de l'émetteur ==="
+L19="$WORK/lab19"; mkdir -p "$L19/.planning/missions"; git -C "$L19" init -q
+printf -- '- [ ] **Phase 1: Un** - a\n' > "$L19/.planning/ROADMAP.md"
+printf '{"nodes":[{"id":"n19","step":"s","stage":"exec","deps":[],"scope":[],"status":"running"}]}\n' > "$L19/.planning/missions/MISSION-1.dag.json"
+git -C "$L19" add -A; git -C "$L19" -c user.email=t@t -c user.name=t commit -q -m c0
+MARK19="$WORK/FSMONITOR-EXECUTE"
+printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$MARK19" > "$WORK/fsmon19.sh"; chmod +x "$WORK/fsmon19.sh"
+git -C "$L19" config core.fsmonitor "$WORK/fsmon19.sh"
+rm -f "$MARK19"; git -C "$L19" status --porcelain >/dev/null 2>&1
+assert_eq "W19.0 — témoin positif : le script de fsmonitor s'exécute quand git status tourne sans précaution" "$([ -e "$MARK19" ] && echo exécuté || echo muet)" "exécuté"
+rm -f "$MARK19"
+Q who "$L19" "$HOME_T" "$NOSCRIPTS" > "$WORK/who19.json"
+assert_eq "W19.1 — collectWho : le nœud running frais est lu (chemin git parcouru)" "$(G "$WORK/who19.json" 'j.workers.filter(w=>w.kind==="dag-node").map(w=>w.id).join(",")')" "n19"
+assert_eq "W19.2 — collectWho : le script de fsmonitor n'a jamais été exécuté" "$([ -e "$MARK19" ] && echo exécuté || echo intact)" "intact"
+rm -f "$MARK19"
+HOME="$HOME_T" node "$SCRIPTS/vf-cockpit-signal.mjs" "$L19" > "$WORK/sig19.json" 2>/dev/null
+assert_eq "W19.3 — l'émetteur entier sur ce lab : sortie signal@1 produite, script de fsmonitor jamais exécuté" "$(G "$WORK/sig19.json" 'j.schema')|$([ -e "$MARK19" ] && echo exécuté || echo intact)" "vibeflow/cockpit-signal@1|intact"
+
 vf_hyg_assert
 
 echo ""
