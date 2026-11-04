@@ -1,6 +1,6 @@
 // Vue équipe : l'arborescence de TOUTE l'équipe au travail telle que le socle la voit (`signal@1.equipe`, who@2 :
 // toutes sessions, tous worktrees, 24 h) — qui tourne, sous qui, sur quoi, depuis quand (P68-D-03).
-// `$.agent.list()` ne sert plus l'arbre (P68-D-17) : il ne dit que quels agents sont ceux de CETTE session, les seuls
+// la liste de la session ne sert plus l'arbre (P68-D-17) : elle ne dit que quels agents sont ceux de CETTE session, les seuls
 // à recevoir les deux gestes humains — voir la transcription, demander l'arrêt. Aucun rapprochement par description ni par rôle.
 
 import type { EngineInterface } from 'claude-code'
