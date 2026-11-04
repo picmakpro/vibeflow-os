@@ -74,3 +74,35 @@ vide (engine du dépôt intact) ; I9 vert sur le dépôt :
 == resultat : 13 ok, 0 ko ==
 rc=0
 ```
+
+## Forme mesurée de claude plugin test
+
+Claude Code 2.1.318, 2026-11-04. Copie jetable du dossier `plugin/` portant, sous `cockpit/signal/tests/`, un fichier à deux cas
+`ZZ1 — passe` et `ZZ2 — échoue exprès` ; `claude plugin test plugin` (rc=1). Lignes brutes :
+
+```
+(pass) ZZ1 — passe [1.32ms]
+(fail) ZZ2 — échoue exprès [0.31ms]
+ 4 pass
+ 1 fail
+Ran 5 tests across 2 files. [0.37s]
+rc=1
+```
+
+Bilan : ` 4 pass`, ` 1 fail`, `Ran 5 tests across 2 files`. La sortie donne UN verdict par test : `(pass) <titre> [<durée>]` /
+`(fail) <titre> [<durée>]`. `verdict.sh` en tire deux préfixes constants (`(pass) `, `(fail) `), comparés comme chaînes.
+
+Quatre contrôles croisés de `plugin/cockpit/signal/tests/verdict.sh` sur cette sortie (attendu 0, 1, 0, 1), plus les contrôles négatifs :
+
+```
+verdict.sh <sortie> ZZ1 succes -> 0
+verdict.sh <sortie> ZZ1 echec -> 1
+verdict.sh <sortie> ZZ2 echec -> 0
+verdict.sh <sortie> ZZ2 succes -> 1
+verdict.sh <sortie> ZZ3 succes -> 1
+verdict.sh <sortie> ZZ succes -> 1
+verdict.sh <sortie> ZZ echec -> 1
+ZZ1 foo -> 2
+sortie absente -> 2
+ambiguïté (même titre en pass et en fail) -> 2 ; rejoué sous zsh : ZZ1 succes -> 0
+```
