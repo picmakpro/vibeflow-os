@@ -4,6 +4,7 @@
 # fait exécuter à leur place un programme posé dans le lab.
 #   U l'utilitaire (assainirPath, envEnfant) : vide, relatif, sous le lab, lien symbolique, repli sûr, PATH du processus intact
 #   F fonctions du module (gitCommonDir, collectWho) lancées depuis le lab avec un PATH piégé : aucun marqueur
+#   G socle vf-signal (collectSignal, arbresGit, brancheBase, retard, lireVerrous) : idem (Phase 68)
 #   S serveur lancé depuis le lab (which, claude --version, direct, verrous) avec un PATH piégé : aucun marqueur, et le serveur répond
 #   L lanceur `open` / `stop` (construction du moteur, ps, serveur détaché)
 # Chaque piège est transparent (il écrit son marqueur puis délègue à l'outil réel) : un correctif ne se paie jamais d'un faux vert par un outil cassé.
@@ -94,6 +95,25 @@ for s in "${NOMS[@]}"; do
 done
 vider; R="$(cd "$LAB" && env PATH="$REAL_PATH" "$NODE" "$WORK/f.mjs" "$SCRIPTS" "$LAB" 2>&1 | tail -1)"
 assert_eq "F-témoin — PATH sain : git trouvé, rien n'est cassé par le correctif" "$R" '{"git":true,"who":true}'
+
+echo "=== G — socle vf-signal (collectSignal : arbres git, base, retard, verrous bash, tags) depuis le lab ==="
+# phase 68 : arbresGit, brancheBase, retard, lireVerrous et la lecture des tags passent par shBorne ; chacun doit hériter du PATH assaini
+cat > "$WORK/g.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab] = process.argv, u = (f) => pathToFileURL(scripts + '/' + f).href;
+const s = await import(u('vf-cockpit-signal.mjs')), a = await import(u('vf-cockpit-arbres.mjs')), v = await import(u('vf-cockpit-vie.mjs'));
+const out = {};
+try { const r = s.collectSignal(lab, { scriptsDir: scripts, home: process.env.HOME }); out.signal = Array.isArray(r.arbres) && r.arbres.length >= 1; } catch (e) { out.signal = String(e.message).slice(0, 80); }
+out.arbres = a.arbresGit(lab).length >= 1; out.base = a.brancheBase(lab); out.retard = typeof a.retard({ chemin: lab, base: out.base, lab }) === 'object';
+out.verrous = v.lireVerrous(lab, { scriptsDir: scripts, home: process.env.HOME }).etat;
+console.log(JSON.stringify(out));
+JS
+for s in "${NOMS[@]}"; do
+  vider; R="$(cd "$LAB" && env PATH="$(chemin_de "$s")" "$NODE" "$WORK/g.mjs" "$SCRIPTS" "$LAB" 2>&1 | tail -1)"
+  assert_eq "G-$s — aucun outil du lab exécuté par le socle vf-signal (git des arbres, bash du verrou)" "[$(marqueurs)]" "[]"
+done
+vider; R="$(cd "$LAB" && env PATH="$REAL_PATH" "$NODE" "$WORK/g.mjs" "$SCRIPTS" "$LAB" 2>&1 | tail -1)"
+assert_eq "G-témoin — PATH sain : le socle rend ses arbres et lit les verrous (rien n'est cassé par l'assainissement)" "$(printf '%s' "$R" | "$NODE" -e "const j=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log([j.signal,j.arbres,j.retard,j.verrous!=='absente'].join(','))" 2>/dev/null || echo "illisible: $R")" "true,true,true,true"
 
 echo "=== S — serveur lancé depuis le lab avec un PATH piégé ==="
 "$NODE" "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"

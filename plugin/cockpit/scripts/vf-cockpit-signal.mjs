@@ -51,7 +51,7 @@ function construire(root, tous, { home, now, scriptsDir }) {
     const actifs = [...pl.phases.values()].filter((p) => !p.archive);
     return {
       label: a.principal ? 'arbre principal' : nettoie(path.relative(tous[0].chemin, a.chemin) || a.chemin, 200), branche: nettoie(a.branche, 80), principal: a.principal, courant: meme(a.chemin, root),
-      phaseActive: nomBorne(phaseActive({ phases: actifs, branche: a.branche })), retard: retard({ chemin: a.chemin, base, commonDir: common, now }),
+      phaseActive: nomBorne(phaseActive({ phases: actifs, branche: a.branche })), retard: retard({ chemin: a.chemin, base, commonDir: common, now, lab: root }),
     };
   });
   return assainir({
