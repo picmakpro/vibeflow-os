@@ -82,7 +82,7 @@
         "plancheck-68"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revision-68",
@@ -174,7 +174,7 @@
         "rev-68e"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "exec-68-01",
@@ -190,7 +190,7 @@
         "plugin/cockpit/scripts/vf-cockpit-project.mjs",
         "plugin/cockpit/scripts/vf-cockpit-interface.json"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-68-02",
@@ -204,7 +204,7 @@
         "plugin/cockpit/scripts/vf-cockpit-who.mjs",
         "plugin/cockpit/scripts/tests/test-cockpit-retard.sh"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "exec-68-04",
@@ -217,7 +217,7 @@
         "plugin/cockpit/signal/",
         "plugin/.claude-plugin/plugin.json"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-68-03",
@@ -230,7 +230,7 @@
       "scope": [
         "plugin/cockpit/scripts/vf-cockpit-signal.mjs"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-68-12",
@@ -240,7 +240,7 @@
         "exec-68-04"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-68-05",
@@ -251,7 +251,7 @@
         "exec-68-12"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "exec-68-09",
@@ -269,7 +269,7 @@
         "README.md",
         "README.fr.md"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-68-06",
@@ -309,7 +309,7 @@
         "exec-68-03"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "exec-68-13",
