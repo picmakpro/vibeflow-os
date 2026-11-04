@@ -53,3 +53,15 @@ Gardes contre la sur-réparation (vertes avant et après) : V11.3 (lab partition
 
 Correctif : `lireVerrous` retombe sur `status` quand `status --all` rend une sortie vide (refus), et n'accepte la réponse que sans `scope` ni `locks`.
 Vert : `test-cockpit-vie.sh` 35 PASS / 0 FAIL (scratchpad `fix-socle-f04-vert.out`).
+
+## F-05 — lab plat : `verrous` lu une fois depuis `root`, appliqué à tous les arbres
+
+Témoin : section S10 de `test-cockpit-signal.sh` — faux `driver-lock.sh` de forme réelle (`json_status` en lab plat : ni `scope` ni `ws`) qui répond selon le dossier courant (verrou tenu seulement là où `.planning/DRIVER.lock` existe) ; le même DAG `MISSION-2` (nœud running) est dans les deux checkouts. `phaseActive` d'un arbre sans branche `phase-N` est la dernière phase à mission running : elle dit si la mission de CET arbre est vivante. Deux sens (verrou dans l'arbre principal seulement, puis dans le worktree seulement).
+Rouge sur `371dd2cd` (scratchpad `fix-socle-f05-rouge.out`) :
+
+| Assertion | Attendu | Obtenu (rouge) |
+|---|---|---|
+| S10.1 verrou dans l'arbre principal seulement | `main:2#feat/x:aucune` | `main:2#feat/x:2` |
+| S10.2 verrou dans le worktree seulement | `main:aucune#feat/x:2` | `main:aucune#feat/x:aucune` |
+
+Témoin S10.0 (vert) : le faux script répond bien selon le dossier.

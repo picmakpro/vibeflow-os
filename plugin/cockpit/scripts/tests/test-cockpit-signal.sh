@@ -334,6 +334,32 @@ MS9="$(mutant s9 'return assainir({' 'return ({')"
 RUN "$WORK/mut-s9" "$HOME" "$WORK/o9m.json" "$L9c" > /dev/null
 assert_eq "S9.M — copie mutée (sans passe finale) détectée : le balayage global rougit sur le contrôle, ce n'est pas une panne" "$MS9|$(node "$AUX/famille.mjs" "$WORK/o9m.json" | tail -1 | cut -c1-11)" "muté|*=controle:"
 
+echo "=== S10 — lab plat : la vie d'une mission se lit sur le verrou de SON arbre (F-05) ==="
+# En lab plat le verrou est propre à chaque checkout (.planning/DRIVER.lock). Faux driver-lock.sh de forme réelle (json_status, lab plat : ni scope ni ws)
+# qui répond selon le dossier courant. Le même DAG (MISSION-2, nœud running) est dans les deux checkouts ; phaseActive d'un arbre sans branche en `phase-N`
+# est la dernière phase portant une mission running : elle dit donc si la mission de CET arbre est vivante.
+FD5="$WORK/plugin5"; mkdisp "$FD5" aucun; mkdir -p "$FD5/conductor/scripts"
+cat > "$FD5/conductor/scripts/driver-lock.sh" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  status) if [ -d .planning/DRIVER.lock ]; then echo '{"present": true, "owner": "mgr-plat", "step": "exec", "age_seconds": 10, "ttl": 1800, "stale": false, "generation": "g1", "session_ids": [], "lease_seconds": 5, "guard_effective": false, "progress_epoch": null, "progress_age_seconds": 3, "children_running": 0}'; else echo '{"present": false, "lock": ".planning/DRIVER.lock", "children_running": 0}'; fi ;;
+  orphans) echo '{"orphans":[]}' ;;
+esac
+SH
+chmod +x "$FD5/conductor/scripts/driver-lock.sh"
+L5="$WORK/lab-s10"; W5="$WORK/wt-s10"
+G_ init -q -b main "$L5"; mkdir -p "$L5/.planning/missions"
+printf -- '- [ ] **Phase 1: Un** - a\n- [ ] **Phase 2: Deux** - b\n' > "$L5/.planning/ROADMAP.md"
+printf '{"nodes":[{"id":"a","step":"s","stage":"exec","deps":[],"status":"running"}]}\n' > "$L5/.planning/missions/MISSION-2.dag.json"
+G_ -C "$L5" add -A; G_ -C "$L5" commit -q -m c0; G_ -C "$L5" branch feat/x; G_ -C "$L5" worktree add -q "$W5" feat/x 2>/dev/null
+PA() { G "$1" "j.arbres.map(a=>a.branche+\":\"+(a.phaseActive?a.phaseActive.n:\"aucune\")).join(\"#\")"; }
+assert_eq "S10.0 — témoin : le faux script répond selon le dossier (verrou tenu seulement là où .planning/DRIVER.lock existe)" "$(cd "$L5" && bash "$FD5/conductor/scripts/driver-lock.sh" status | cut -c1-17)|$(mkdir -p "$L5/.planning/DRIVER.lock"; cd "$L5" && bash "$FD5/conductor/scripts/driver-lock.sh" status | cut -c1-17)|$(cd "$W5" && bash "$FD5/conductor/scripts/driver-lock.sh" status | cut -c1-17)" '{"present": false|{"present": true,|{"present": false'
+RUN "$FD5" "$WORK/home-vide" "$WORK/o10a.json" "$L5" > /dev/null
+assert_eq "S10.1 — verrou tenu dans l'arbre principal seulement : sa mission est vivante (phase 2), celle du worktree est abandonnée (aucune phase active)" "$(PA "$WORK/o10a.json")" "main:2#feat/x:aucune"
+rmdir "$L5/.planning/DRIVER.lock"; mkdir -p "$W5/.planning/DRIVER.lock"
+RUN "$FD5" "$WORK/home-vide" "$WORK/o10b.json" "$L5" > /dev/null
+assert_eq "S10.2 — verrou tenu dans le worktree seulement : l'inverse" "$(PA "$WORK/o10b.json")" "main:aucune#feat/x:2"
+
 vf_hyg_assert
 echo
 echo "=== Résultats : $PASS PASS, $FAIL FAIL ==="
