@@ -71,22 +71,29 @@
     // (ou 5 s), et le cadrage est repris chaque fois qu'elle repasse sous 0,75.
     const st = SC.state, vp = document.getElementById('viewport'), svg = document.getElementById('svg');
     if (st && vp && SC.freeArea) {
+      let actif = true;
       const cadrer = () => {
-        if (!st.t || st.t.k >= 0.75) return;
+        if (!actif || !st.t || st.t.k > 0.75) return; // au-delà de 0,75 le viewer (ou l'utilisateur) a la main
         const cartes = (st.layout?.children || []).filter((c) => /^(n:)?(se|ag)-/.test(c.id) && !c.id.includes('~')), c = cartes.sort((x, y) => x.y - y.y || x.x - y.x)[0], a = SC.freeArea();
         if (!c || !svg) return;
         const haut = svg.getBoundingClientRect().top; let bas = 0;
         for (const e of [document.getElementById('context'), ...document.querySelectorAll('#context *')]) { const b = e?.getBoundingClientRect(); if (b && b.width && b.height) bas = Math.max(bas, b.bottom); }
-        const y = Math.max(a.y, bas - haut + 12);
-        st.t = { k: 0.75, x: Math.max(a.x, 12) - c.x * 0.75, y: y - c.y * 0.75 };
-        vp.style.transform = `translate(${st.t.x}px,${st.t.y}px) scale(0.75)`;
+        const y = Math.max(a.y, bas - haut + 12), tx = Math.max(a.x, 12) - c.x * 0.75, ty = y - c.y * 0.75;
+        window.__vfCadrage = { k: st.t.k, bas: Math.round(bas), t: Math.round(performance.now()), polices: document.fonts?.status || '?' }; // relevé de diagnostic (EK13 en CI)
+        if (st.t.k === 0.75 && Math.abs(st.t.x - tx) < 0.5 && Math.abs(st.t.y - ty) < 0.5) return; // déjà cadré : aucune écriture, donc aucune boucle de l'observateur
+        st.t = { k: 0.75, x: tx, y: ty };
+        vp.style.transform = `translate(${tx}px,${ty}px) scale(0.75)`;
         svg.classList.remove('lod-low', 'lod-mid');
       };
       cadrer();
-      const garde = new MutationObserver(cadrer), fin = () => { garde.disconnect(); for (const ev of ['pointerdown', 'wheel', 'keydown', 'touchstart']) window.removeEventListener(ev, fin, true); };
+      // le titre peut grandir après le cadrage (polices web chargées, police de repli plus large, compteurs qui changent) : il est recadré à chaque changement de sa taille et à la fin du chargement des polices
+      const ctx = document.getElementById('context'), taille = typeof ResizeObserver === 'function' && ctx ? new ResizeObserver(cadrer) : null;
+      const garde = new MutationObserver(cadrer), fin = () => { actif = false; garde.disconnect(); taille?.disconnect(); for (const ev of ['pointerdown', 'wheel', 'keydown', 'touchstart']) window.removeEventListener(ev, fin, true); };
       garde.observe(vp, { attributes: true, attributeFilter: ['style'] });
+      taille?.observe(ctx);
+      document.fonts?.ready?.then(cadrer);
       for (const ev of ['pointerdown', 'wheel', 'keydown', 'touchstart']) window.addEventListener(ev, fin, { capture: true, passive: true });
-      setTimeout(fin, 5000);
+      setTimeout(fin, 10000);
     }
   };
   let arrive = false;

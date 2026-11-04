@@ -13,6 +13,7 @@
 //   focus-tiroir      : (EK9) même mesure pour « Voir la dernière commande » du tiroir « Au travail » → { remplace, apres }
 //   badge             : (EK10) marge entre le bord droit du badge d'état et celui de sa carte, pied long, à 390 / 1024 / 1440 px → { "390": px, "1024": px, "1440": px }
 //   echelle           : (EK13, Q3b) échelle de l'ajustement au premier affichage et recouvrement titre / première carte, à 390 et 768 px → { "390": { k, aire }, "768": { k, aire } }
+//   titre-grandi      : (EK14) le titre de #context grandit après le cadrage (police plus large du runner) ; recouvrement avec la première carte une fois la page stable → { k, aire }
 //   libelles          : (EK11) ligne des sources du tiroir et infobulle de la recherche de l'onglet Équipe → { src, titre }
 // Rend une ligne JSON { ... } ou { erreur }. Socle : chrome-session.mjs (une instance de Chrome, fermée proprement).
 import { executer } from './chrome-session.mjs';
@@ -167,10 +168,24 @@ await executer(chrome, async (s) => {
           const c = nd[0] && nd[0].getBoundingClientRect(); let aire = 0, bas = 0;
           if (ctx && c) for (const e of [ctx, ...ctx.querySelectorAll('*')]) { const a = e.getBoundingClientRect(); if (!a.width || !a.height) continue; bas = Math.max(bas, a.bottom);
             aire += Math.round(Math.max(0, Math.min(a.right, c.right) - Math.max(a.left, c.left)) * Math.max(0, Math.min(a.bottom, c.bottom) - Math.max(a.top, c.top))); }
-          return { k, aire, gauche: c ? Math.round(c.left) : null, hautCarte: c ? Math.round(c.top) : null, basContexte: Math.round(bas), cartes: nd.length }; })()`, 'échelle stable'));
+          return { k, aire, gauche: c ? Math.round(c.left) : null, hautCarte: c ? Math.round(c.top) : null, basContexte: Math.round(bas), cartes: nd.length,
+            diag: 'ctx.bas=' + Math.round(bas) + ' carte.haut=' + (c ? Math.round(c.top) : '?') + ' k=' + k + ' cadrage=' + JSON.stringify(window.__vfCadrage || null) + ' polices=' + (document.fonts && document.fonts.status) }; })()`, 'échelle stable'));
       }
     }
     return r;
+  }
+  if (ACTION === 'titre-grandi') {
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 768, height: 800, deviceScaleFactor: 1, mobile: false });
+    await s.naviguer(url);
+    await s.attendre(PRET, 'viewer prêt');
+    await s.attendre("document.querySelectorAll('#svg .card').length > 0 && !!(window.__vfLive && window.__vfLive.who) && !!window.__vfCadrage", 'cadrage fait');
+    // le titre grandit APRÈS le cadrage : corps de police et deuxième ligne, comme sous une police de repli plus large
+    await s.ev("(() => { const h = document.querySelector('#context h1'); h.style.fontSize = '40px'; h.style.lineHeight = '1.3'; h.style.maxWidth = '9ch'; })()");
+    return await s.stable(`(() => { const k = Math.round(window.VibeFlow.state.t.k * 100) / 100, ctx = document.getElementById('context'),
+      nd = [...document.querySelectorAll('#svg .card')].filter((e) => e.getBoundingClientRect().width > 0); nd.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top || a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+      const c = nd[0].getBoundingClientRect(); let aire = 0; for (const e of [ctx, ...ctx.querySelectorAll('*')]) { const a = e.getBoundingClientRect(); if (!a.width || !a.height) continue;
+        aire += Math.round(Math.max(0, Math.min(a.right, c.right) - Math.max(a.left, c.left)) * Math.max(0, Math.min(a.bottom, c.bottom) - Math.max(a.top, c.top))); }
+      return { k, aire }; })()`, 'recouvrement stable');
   }
   if (ACTION === 'libelles') {
     await s.attendre("!!window.__es && !!window.__es.find((e) => e.url.includes('/api/vf/events')) && !!document.querySelector('#vf-lock')", 'flux et badge');

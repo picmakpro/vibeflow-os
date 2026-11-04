@@ -50,3 +50,7 @@ R19 / R20 de la suite responsive (non rejouée ici) dépendent du cadrage de `ar
 ## Suite : juge des arbitrages
 
 Régression de Q3b corrigée (cadrage sous le bas réel de `#context`, plafond posé aussi par `ready` et surveillé jusqu'à la première action) ; EK13 étendu, EK13.3 ajouté. Détail : `70-11-RED-TRACE.md`.
+
+## Suite : CI Linux
+
+Recadrage rejoué quand `#context` change de taille et à `document.fonts.ready` (fenêtre de 10 s, abandon à la première action de l'utilisateur) ; EK14 et son mutant reproduisent un titre qui grandit après le cadrage ; EK13 imprime un diagnostic compact quand il rougit. Détail : `70-11-RED-TRACE.md`.

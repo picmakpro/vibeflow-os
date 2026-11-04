@@ -138,3 +138,14 @@ Deux causes, deux gestes dans `72-vf-equipe.js` :
 2. plafond intermittent : le gestionnaire `ready` pose `arrive = true`, donc `arrivee()` (seul endroit du plafond) ne s'exécutait jamais quand `ready` passait avant le flux `who`. Constaté sur la fixture au rejeu intermédiaire : `390 : k,k=0.45,k,k,k`. Le plafond est une fonction appelée par `arrivee()` ET par `ready`, et la transformation est surveillée (MutationObserver sur le style de `#viewport`) jusqu'à la première action de l'utilisateur ou 5 s : tout `fit()` ultérieur repassant sous 0,75 est recadré. Mutant EK13.2 (garde retirée) : attendu `muté|réduit`, obtenu identique.
 
 Vert : EK13, EK13.2, EK13.3 ; `test-cockpit-equipe.sh` 155 PASS / 0 FAIL deux fois de suite ; `test-cockpit-who.sh` 90 / 0.
+
+## Suite : CI Linux (EK13 rouge sur un chargement à 768 px, tête 6c75f230)
+
+Constat du manager : en CI (DejaVu Sans, plus large) `768 : k,k recouvre 13888 px²` sur un chargement, vert sous macOS. L'échelle tient, le titre grandit après le cadrage.
+
+1. Diagnostic : quand EK13 échoue, une ligne `diag EK13 <largeur>#<rang> : ctx.bas=… carte.haut=… k=… cadrage={k,bas,t,polices} polices=<document.fonts.status>` est imprimée pour chaque chargement fautif (aucune assertion ne change). `72-vf-equipe.js` consigne le dernier cadrage dans `window.__vfCadrage` (échelle d'avant, bas de `#context` mesuré, instant, état des polices).
+2. Correctif (`72-vf-equipe.js`) : le recadrage est aussi rejoué quand la TAILLE de `#context` change (`ResizeObserver`) et à la fin du chargement des polices (`document.fonts.ready`), pendant la même fenêtre de surveillance, portée de 5 à 10 s. Après la première action de l'utilisateur (`pointerdown`, `wheel`, `keydown`, `touchstart`) ou la fin de la fenêtre, plus aucun recadrage (`actif = false`, observateurs déconnectés). Un cadrage déjà juste n'écrit rien, donc l'observateur du style ne boucle pas.
+3. Reproduction locale (EK14) : à 768 px, après le cadrage, le titre de `#context` passe à 40 px sur 9 caractères de large (deux lignes, comme sous une police de repli plus large). Attendu : échelle >= 0,75 et recouvrement nul ; vert avec le correctif. Mutant EK14.2 (`taille?.observe(ctx)` retiré de la page servie, donc le cadrage ne suit plus la taille du titre) : attendu `muté|recouvre`, obtenu identique, c'est le rouge de ce cas.
+
+Vert : `test-cockpit-equipe.sh` 157 PASS / 0 FAIL deux fois de suite.
+Limite : la reproduction injecte une taille de titre, pas la police DejaVu Sans elle-même ; la CI Linux reste la confirmation du cas réel.
