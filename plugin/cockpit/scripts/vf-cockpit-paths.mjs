@@ -146,7 +146,14 @@ export function shBorne(cmd, args, cwd, lab = cwd) {
 // par ComSpec / SystemRoot, les autres par les éléments absolus du PATH (.exe).
 // Pour les enfants du lanceur qui ne sont PAS le shell de l'utilisateur (le moteur d'assemblage) : même PATH sans ses éléments relatifs ou vides, afin que leurs
 // propres `git` à nom nu ne cherchent plus dans le lab. Jamais passé au shell du terminal (P71-D-03).
-export const pathAssaini = (pathVar = process.env.PATH) => String(pathVar || '').split(path.delimiter).filter((d) => d && path.isAbsolute(d)).join(path.delimiter);
+// N8 : un PATH assaini VIDE n'est jamais rendu tel quel. Node transmet alors `PATH=''` à l'enfant et libuv le lit comme le cwd, c'est-à-dire le lab : le `git` à nom nu du moteur
+// y serait exécuté (PATH absent, `env -i`, ou PATH entièrement relatif). On rend donc un PATH système ABSOLU par défaut, /usr/bin:/bin : il porte `git` sous macOS et Linux, et
+// ne désigne que des dossiers du système. Sous Windows aucun défaut POSIX ne vaut : '' signale « omettre la clé » (envMoteur, vf-cockpit-build.mjs).
+export const PATH_SYSTEME = '/usr/bin:/bin';
+export const pathAssaini = (pathVar = process.env.PATH) => {
+  const p = String(pathVar || '').split(path.delimiter).filter((d) => d && path.isAbsolute(d)).join(path.delimiter);
+  return p || (process.platform === 'win32' ? '' : PATH_SYSTEME);
+};
 export function resoudreBinaire(nom, pathVar = process.env.PATH) {
   if (process.platform === 'win32') {
     if (nom === 'cmd') {

@@ -64,11 +64,13 @@ const adresses = (url) => `Cockpit : ${url}/ (Code) · ${url}/project.html (Proj
 
 // 67-SECURITY M3 : le lanceur n'exécute JAMAIS un script du lab (serve.mjs de la sortie compris). Arrêt par signal, sur un PID que le fichier
 // d'état du lab (donc non fiable) désigne : entier > 1, ni le nôtre, vivant, et dont la ligne de commande est le serve.mjs de CETTE sortie.
+// Dit UNE fois par processus : estNotre est rappelée à chaque tour d'attente du terminal (100 fois) et l'absence de `ps` ne change pas entre deux appels.
+let psDit = false;
 function estNotre(pid, serve, lab) {
   if (!Number.isInteger(pid) || pid <= 1 || pid === process.pid || !vivant(pid)) return false;
   if (process.platform === 'win32') return true; // pas de `ps` : le PID vient du fichier d'état, reste borné ci-dessus
   const ps = resoudreBinaire('ps');
-  if (!ps) { console.error("arrêt refusé : « ps » est introuvable dans les éléments absolus du PATH, le serveur n'est pas arrêté (un PID du lab n'est jamais signalé sans vérification)."); return false; }
+  if (!ps) { if (!psDit) { psDit = true; console.error("arrêt refusé : « ps » est introuvable dans les éléments absolus du PATH, le serveur n'est pas arrêté (un PID du lab n'est jamais signalé sans vérification)."); } return false; }
   try {
     const cmd = execFileSync(ps, ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, env: envEnfant(lab) });
     return cmd.includes(serve) || cmd.includes(fs.realpathSync(serve));

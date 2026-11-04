@@ -298,6 +298,43 @@ assert_eq "L16 — témoin : « open » sans --terminal sous PATH=.:… : le LAN
 arrete; [ -n "$S16" ] && attendre_mort "$S16"
 retire_leurres
 
+echo "=== L17 — N8 (P71-D-29) : un PATH absent ou entièrement relatif n'est jamais transmis vide à l'assemblage (libuv le lit comme le cwd : le git du lab serait exécuté) ==="
+NODE_ABS="$(command -v node)"
+git_du_lab() { # git_du_lab <nom> <lanceur> <env|point> -> écrit « git=<n> rc=<n> » dans RES ; env = environnement vide (env -i), point = PATH=.
+  rm -f "$MARQ"-*; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; rm -rf "$OUT"
+  if [ "$3" = env ]; then (cd "$LAB" && env -i "$NODE_ABS" "$2" build --lab "$LAB" > "$LOUT" 2>&1); else (cd "$LAB" && env PATH=. "$NODE_ABS" "$2" build --lab "$LAB" > "$LOUT" 2>&1); fi
+  LRC=$?; RES="git=$(nbl "$MARQ-git") rc=$LRC"
+}
+leurres_lab
+for cas in env point; do
+  git_du_lab "$cas" "$LAUNCH" "$cas"
+  assert_eq "L17 — build sous « $cas » (PATH absent ou « . ») avec un git piégé dans le lab : jamais exécuté, build réussi" "$RES" "git=0 rc=0"
+done
+retire_leurres
+# mutant M-PATH-VIDE : le PATH assaini vide est transmis tel quel (ni repli système ni clé omise : le code d'avant) -> le git du lab est exécuté, sous les deux formes
+md="$WORK/mut-pathvide"; rm -rf "$md"; mkdir -p "$md"; cp -R "$MODULE/." "$md/"; cp "$md/scripts/vf-cockpit-paths.mjs" "$md/paths.orig"; cp "$md/scripts/vf-cockpit-build.mjs" "$md/build.orig"
+sed -i.bak "s/return p || (process.platform === 'win32' ? '' : PATH_SYSTEME);/return p;/" "$md/scripts/vf-cockpit-paths.mjs"
+sed -i.bak "s/if (p) e.PATH = p; else delete e.PATH;/e.PATH = p;/" "$md/scripts/vf-cockpit-build.mjs"
+if ! cmp -s "$md/scripts/vf-cockpit-paths.mjs" "$md/paths.orig" && ! cmp -s "$md/scripts/vf-cockpit-build.mjs" "$md/build.orig"; then
+  rm -f "$md/paths.orig" "$md/build.orig" "$md/scripts/vf-cockpit-paths.mjs.bak" "$md/scripts/vf-cockpit-build.mjs.bak"; leurres_lab; MR=""
+  for cas in env point; do git_du_lab "$cas" "$md/scripts/vf-cockpit.mjs" "$cas"; MR="$MR $cas:${RES%% *}"; done; retire_leurres
+  assert_eq "M-PATH-VIDE — le mutant (PATH assaini vide transmis) rougit L17 : le git du lab est exécuté sous env -i comme sous PATH=." "$([[ "$MR" == *"env:git=0"* || "$MR" == *"point:git=0"* ]] && echo "identique :$MR" || echo rouge)" "rouge"
+else assert_eq "M-PATH-VIDE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
+echo "=== L18 — sans ps dans le PATH : « arrêt refusé » est dit UNE fois, pas à chaque tour de l'attente du terminal (une centaine) ==="
+sans_ps() { # sans_ps <lanceur> -> LRC, LOUT, S18 ; PATH = node, sh, env seulement (WORK/minbin, sans ps)
+  rm -f "$AM" "$SJ"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; (cd "$LAB" && PATH="$WORK/minbin" node "$1" open --terminal --no-open --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); LRC=$?
+  S18="$(sj j.pid)"; [ -n "$S18" ] && vf_hyg_stop "$S18"; true
+}
+sans_ps "$LAUNCH"
+assert_eq "L18 — sans ps, la raison du refus est dite exactement une fois (témoin : le terminal, lui, n'est pas ouvrable sans ps : message « le terminal n'a pas démarré »)" "refus=$(grep -c 'arrêt refusé' "$LOUT" || true) terminal=$(grep -c "le terminal n'a pas démarré" "$LOUT" || true)" "refus=1 terminal=1"
+md="$WORK/mut-psrepete"; rm -rf "$md"; mkdir -p "$md"; cp -R "$MODULE/." "$md/"; cp "$md/scripts/vf-cockpit.mjs" "$md/vf.orig"
+sed -i.bak 's/if (!psDit) {/if (true) {/' "$md/scripts/vf-cockpit.mjs"
+if ! cmp -s "$md/scripts/vf-cockpit.mjs" "$md/vf.orig"; then
+  rm -f "$md/vf.orig" "$md/scripts/vf-cockpit.mjs.bak"; sans_ps "$md/scripts/vf-cockpit.mjs"
+  assert_eq "M-PS-REPETE — le mutant (le refus est redit à chaque appel) rougit L18 : plus d'une occurrence" "$([ "$(grep -c 'arrêt refusé' "$LOUT" || true)" -gt 1 ] && echo rouge || echo identique)" "rouge"
+else assert_eq "M-PS-REPETE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
 echo "=== M-MODE / M-SUIT-LIEN / M-IMPRIME / M-OUVRE-P — mutants du lanceur ==="
 if mutant mode 's/MODE_AMORCE = 0o600/MODE_AMORCE = 0o644/'; then
   lance "$MUT_L" open --terminal --no-open; MS="$(sj j.pid)"; MM="$(mode "$AM")"
