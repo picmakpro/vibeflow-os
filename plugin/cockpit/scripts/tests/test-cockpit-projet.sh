@@ -382,6 +382,22 @@ assert_eq "P-VIE.2 — un plan désigné par un nœud running d'une mission aban
 assert_eq "P-VIE.3 — les détails de la phase disent « Mission : MISSION-1 (abandonnée, nœuds non refermés) »" "$(G "$WORK/gv-abs.json" 'j.nodes.find(n=>n.id==="ph-1").details.includes("Mission : MISSION-1 (abandonnée, nœuds non refermés)")')" "true"
 assert_eq "P-VIE.4 — verrous illisibles (aucun script) : la carte est todo et son pied dit « état inconnu »" "$(G "$WORK/gv-vide.json" 'j.nodes.find(n=>n.id==="dag-MISSION-1").st+"|"+j.nodes.find(n=>n.id==="dag-MISSION-1").foot.includes("état inconnu")')" "todo|true"
 
+# P-VIE.5 — couplage socle/UI (68, passe 2) : 00-vibeflow.js réécrit la pastille d'une carte dont le pied dit « abandonnée » (const ABANDON). Le pied vient du socle (LIBELLES_MISSION) :
+# si son libellé change, la pastille retomberait sur « À faire » sans bruit. On confronte l'expression de l'UI au pied RÉEL de la sortie du socle, et aux pieds qui ne doivent PAS la déclencher.
+cat > "$AUX/abandon.mjs" <<'JS'
+// abandon.mjs <00-vibeflow.js> <graphe.json> [<libellé de remplacement du mot « abandonnée »>] : « reconnu|inconnu-ignoré|mutant-ignoré » ou « regex absente »
+import fs from 'node:fs';
+const [, , ui, g, mut] = process.argv;
+const m = /const ABANDON = (\/.*\/);/.exec(fs.readFileSync(ui, 'utf8')); if (!m) { console.log('regex absente'); process.exit(0); }
+const re = new Function('return ' + m[1])();
+const foot = JSON.parse(fs.readFileSync(g, 'utf8')).nodes.find((n) => n.id === 'dag-MISSION-1').foot;
+const f2 = mut ? foot.replace('abandonnée', mut) : foot;
+console.log(mut ? String(re.test(f2)) : [re.test(foot), !re.test('1/2 nœuds · état inconnu'), !re.test('1/2 nœuds · en cours'), !re.test('1/2 nœuds')].join('|'));
+JS
+UI68="$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js"
+assert_eq "P-VIE.5 — l'expression ABANDON de 00-vibeflow.js reconnaît le pied RÉEL d'une mission abandonnée du socle et ignore « état inconnu », « en cours » et le pied nu" "$(node "$AUX/abandon.mjs" "$UI68" "$WORK/gv-abs.json")" "true|true|true|true"
+assert_eq "P-VIE.5b — témoin : un libellé du socle changé (« délaissée ») ne serait PAS reconnu : la mesure rougirait" "$(node "$AUX/abandon.mjs" "$UI68" "$WORK/gv-abs.json" délaissée)" "false"
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
