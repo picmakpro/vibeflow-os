@@ -217,7 +217,7 @@
         "fix-recette-equipe"
       ],
       "scope": [],
-      "status": "running"
+      "status": "blocked"
     },
     {
       "id": "fix-focus-tiroir",
