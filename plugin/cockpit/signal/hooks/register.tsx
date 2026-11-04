@@ -30,6 +30,7 @@ const usage = atom({ plugin: 'vibeflow', key: 'usage' } as const, null)
 const view = atom({ plugin: 'vibeflow', key: 'view' } as const, 'mission')
 const ancienMod = atom({ plugin: 'vibeflow', key: 'ancienMod' } as const, false)
 const theme = atom({ plugin: 'vibeflow', key: 'theme' } as const, 'sombre')
+const signalErreur = atom({ plugin: 'vibeflow', key: 'signalErreur' } as const, null)
 
 export const register: Register = on => {
   let home: string | undefined
@@ -88,10 +89,10 @@ export const register: Register = on => {
     const arg = e.args.trim().toLowerCase().replace('équipe', 'equipe')
     if (arg === 'brief') {
       await refreshAll($)
-      const [sig, l, agents, agentStats, r, u] = await Promise.all([
-        read($, signal), read($, loop), read($, roster), read($, stats), read($, refusals), read($, usage),
+      const [sig, l, agents, agentStats, r, u, erreur] = await Promise.all([
+        read($, signal), read($, loop), read($, roster), read($, stats), read($, refusals), read($, usage), read($, signalErreur),
       ])
-      return { text: brief(sig, l, agents, agentStats, r, u) }
+      return { text: brief(sig, l, agents, agentStats, r, u, erreur) }
     }
     if ((VIEWS as readonly string[]).includes(arg)) await update($, view, () => arg as View)
     await refreshAll($)
