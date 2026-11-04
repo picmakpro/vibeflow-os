@@ -509,6 +509,14 @@
       "deps": [],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "fix-sc2",
+      "step": "tags H-1, âge du verrou (P68-D-39)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
