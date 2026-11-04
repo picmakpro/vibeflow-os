@@ -6,9 +6,10 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, RenderInput } from 'claude-code'
 
-import { C, G, STAGES, STAGE_LABEL, VIEWS, VIEW_LABEL, oneLine } from './ds'
+import { C, G, STAGES, STAGE_LABEL, VIEWS, VIEW_LABEL } from './ds'
 import { PHRASE_ANCIEN_MOD } from './ancien-mod'
 import { attention } from './derive'
+import { enTete, erreurSocle, resumeCompact } from './en-tete'
 import { refreshAll } from './refresh'
 import type { Ctx } from './views/common'
 import { equipe } from './views/equipe'
@@ -25,6 +26,7 @@ const loopAlert = atom({ plugin: 'vibeflow', key: 'loopAlert' } as const, null)
 const usage = atom({ plugin: 'vibeflow', key: 'usage' } as const, null)
 const view = atom({ plugin: 'vibeflow', key: 'view' } as const, 'mission')
 const ancienMod = atom({ plugin: 'vibeflow', key: 'ancienMod' } as const, false)
+const signal = atom({ plugin: 'vibeflow', key: 'signal' } as const, null)
 
 type PaneInput = Extract<RenderInput, { component: 'Pane' }>
 
@@ -32,10 +34,11 @@ export async function pane($: EngineInterface, e: PaneInput, blink: boolean, hom
   const refresh = () => refreshAll($, home)
   const ui = $.ui.resolve(e)
   const { Box, Button, Text } = ui
-  const [d, m, l, agents, agentStats, r, alert, u, current, ancien] = await Promise.all([
+  const [d, m, l, agents, agentStats, r, alert, u, current, ancien, sig] = await Promise.all([
     read($, disk), read($, macro), read($, loop), read($, roster), read($, stats),
-    read($, refusals), read($, loopAlert), read($, usage), read($, view), read($, ancienMod),
+    read($, refusals), read($, loopAlert), read($, usage), read($, view), read($, ancienMod), read($, signal),
   ])
+  const erreur = await erreurSocle($, ui)
   const now = await $.clock.now()
   const width = Math.max(24, e.props.bodyColumns - 1)
   const compact = e.props.placement === 'inline' || width < 48
@@ -123,10 +126,11 @@ export async function pane($: EngineInterface, e: PaneInput, blink: boolean, hom
       <Box flexDirection="column">
         <Text color={C.fg} wrap="wrap">
           <Text color={C.signal}>{cursor} </Text>
-          <Text bold>{d?.ws ?? 'lab'}</Text>
-          <Text color={C.fg2}> · phase {d?.phase ?? '?'} · {l.stage ? STAGE_LABEL[l.stage] : 'en attente'}</Text>
+          <Text bold>{sig?.layout.actif ?? 'lab'}</Text>
+          <Text color={C.fg2}> · {resumeCompact(sig)} · {l.stage ? STAGE_LABEL[l.stage] : 'en attente'}</Text>
           {u?.percent != null ? <Text color={u.percent >= 85 ? C.human : C.fg3}> · {u.percent} %</Text> : null}
         </Text>
+        {erreur}
         {tabs}
         {body}
         {action ? (
@@ -142,16 +146,8 @@ export async function pane($: EngineInterface, e: PaneInput, blink: boolean, hom
 
   return (
     <Box flexDirection="column">
-      {/* le disque */}
-      <Text wrap="wrap">
-        <Text color={C.signal}>{cursor} </Text>
-        <Text color={C.fg} bold>{d?.ws ?? 'lab'}</Text>
-        <Text color={C.fg2}> · {d?.milestone ?? 'sans jalon'}</Text>
-      </Text>
-      <Text color={C.fg} wrap="wrap">
-        phase {d?.phase ?? '?'} {oneLine(d?.phaseName ?? '')}
-        <Text color={C.fg2}> · {d?.status ?? '?'}</Text>
-      </Text>
+      {await enTete($, ui, cursor)}
+      {erreur}
 
       {/* le fil */}
       <Box marginTop={1} flexWrap="wrap">

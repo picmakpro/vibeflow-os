@@ -6,6 +6,7 @@ import type { EngineInterface } from 'claude-code'
 
 import { stageOf } from './derive'
 import { readDisk, readMacro } from './disk'
+import { lireSignal } from './socle'
 import type { Refusal, Usage } from '../types'
 
 const disk = atom({ plugin: 'vibeflow', key: 'disk' } as const, null)
@@ -15,10 +16,24 @@ const roster = atom({ plugin: 'vibeflow', key: 'roster' } as const, [])
 const stats = atom({ plugin: 'vibeflow', key: 'stats' } as const, {})
 const refusals = atom({ plugin: 'vibeflow', key: 'refusals' } as const, [])
 const usage = atom({ plugin: 'vibeflow', key: 'usage' } as const, null)
+const signal = atom({ plugin: 'vibeflow', key: 'signal' } as const, null)
+const signalErreur = atom({ plugin: 'vibeflow', key: 'signalErreur' } as const, null)
 
 export async function refreshDisk($: EngineInterface, home: string | undefined): Promise<void> {
   const d = await readDisk($, home)
   await update($, disk, () => d)
+}
+
+/** L'émetteur du socle ; en cas d'échec plus aucune donnée n'est gardée, l'erreur est dite à côté. */
+export async function refreshSignal($: EngineInterface, pluginRoot: string, root: string | undefined): Promise<void> {
+  const lecture = root ? await lireSignal($, pluginRoot, root) : { erreur: 'racine de session inconnue' }
+  if ('signal' in lecture) {
+    await update($, signal, () => lecture.signal)
+    await update($, signalErreur, () => null)
+  } else {
+    await update($, signal, () => null)
+    await update($, signalErreur, () => lecture.erreur)
+  }
 }
 
 export async function refreshMacro($: EngineInterface): Promise<void> {
@@ -54,12 +69,14 @@ export async function refreshUsage($: EngineInterface): Promise<void> {
 }
 
 export async function refreshAll($: EngineInterface, home: string | undefined): Promise<void> {
-  await Promise.all([refreshDisk($, home), refreshMacro($), refreshRoster($), refreshUsage($)])
+  const root = await $.session.root().catch(() => undefined)
+  await Promise.all([refreshDisk($, home), refreshMacro($), refreshRoster($), refreshUsage($), refreshSignal($, $.plugin.root, root)])
 }
 
 /** Le disque et l'équipe seuls : ce qui bouge pendant qu'un tour tourne. */
 export async function refreshLive($: EngineInterface, home: string | undefined): Promise<void> {
-  await Promise.all([refreshDisk($, home), refreshRoster($)])
+  const root = await $.session.root().catch(() => undefined)
+  await Promise.all([refreshDisk($, home), refreshRoster($), refreshSignal($, $.plugin.root, root)])
 }
 
 /** Un agent ou un skill nommé signale un temps de la boucle. */

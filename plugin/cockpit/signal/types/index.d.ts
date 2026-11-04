@@ -128,6 +128,33 @@ export type Usage = {
   limits: { kind: string; percent: number }[]
 }
 
+/** Miroir des champs lus de `vibeflow/cockpit-signal@1` (le schéma est celui de `cockpit/scripts/vf-cockpit-interface.json`). */
+export type SignalMission = { nom: string; etat: string; libelle: string }
+export type SignalPhase = {
+  key: string
+  n: string
+  nom: string
+  libelle: string
+  avancement: { etat: string; mission: { nom: string; etat: string } | null }
+}
+export type SignalRetard = { base: string; main: number | null; origin: number | null; fetchAgeS: number | null }
+export type SignalArbre = {
+  label: string
+  branche: string
+  principal: boolean
+  courant: boolean
+  phaseActive: { key: string; n: string; nom: string; etat: string } | null
+  retard: SignalRetard | null
+}
+export type Signal = {
+  schema: string
+  layout: { forme: string; actif: string | null }
+  phases: SignalPhase[]
+  missions: SignalMission[]
+  verrous: { etat: string }
+  arbres: SignalArbre[]
+}
+
 declare module 'claude-code' {
   interface PluginState {
     vibeflow: {
@@ -143,6 +170,10 @@ declare module 'claude-code' {
       bandHiddenFor: string | null
       /** Vrai si l'ancien mod `vf-signal` (hors dépôt) est présent sous HOME : risque de deux panes. */
       ancienMod: boolean
+      /** Ce que l'émetteur du socle a rendu, ou null avant la première lecture ou après un échec. */
+      signal: Signal | null
+      /** Pourquoi la dernière lecture de l'émetteur a échoué, dite en clair ; null si elle a réussi. */
+      signalErreur: string | null
     }
   }
 }
