@@ -26,3 +26,10 @@ patch: P25
 - Le centrage passe par l'événement `wheel` du viewer (déplacement ; ctrl + molette pour le zoom) : `viewer.html` est interdit à ce plan, `setT` n'est pas exposé. Si le viewer change ce gestionnaire, O5.1 rougit.
 - `test-cockpit-responsive.sh` non rejoué (consigne du mandat).
 - estimate/actuals : le PLAN ne porte pas de mesure `actuals` rendue par un moteur ; aucun nombre inventé.
+
+## Correctifs ultérieurs (patch P25 mis à jour)
+
+- Rechargement : le fit d'ouverture ne défait plus le centrage d'une première étape qui est une carte (O6.9, O5.6).
+- REG-70-01 : centrage borné par le graphe entier, dézoom d'une grande carte, visite qui ne sélectionne plus (le panneau garde la vue d'ensemble) ; O6.10. **À arbitrer** : le centrage de P70-D-02 est borné par « toutes les cartes restent dans la zone libre » (critère de R1) ; une carte excentrée n'est donc pas toujours au milieu.
+- « Passer », Échap et la croix rendent la vue d'ensemble ajustée, comme « Terminé » (O6.11) ; le contour de l'étape sur un élément du chrome est un élément à part, indépendant du `className` de la cible (O6.12).
+- Preuves : `70-07-RED-TRACE.md`, sections « Suite : … ».
