@@ -88,7 +88,7 @@ release racine (version, tag, release GitHub) restent humains. Numéro de versio
 - **xterm.js 6.0.0 et addon-fit 0.11.0 vendorisés** (MIT, sha256, licences), aucun addon presse-papiers, séquences OSC 52,
   OSC 8, DCS et DECRQSS neutralisées (P71-D-16) ; canal de la page du terminal vers la page Projet limité à une liste fermée de
   valeurs fixes (P71-D-18) ; thème par paramètre d'adresse (P71-D-19).
-- **Patch amont `P25` de `serve.mjs`** (`vibeflow P25`, diff dans `amont/patches/`), `AJOUT` des fichiers xterm et de l'assistant
+- **Patch amont `P26` de `serve.mjs`** (`vibeflow P26`, diff dans `amont/patches/`), `AJOUT` des fichiers xterm et de l'assistant
   dans `VENDORED.txt`.
 - **Suites** : `test-cockpit-terminal-activation.sh`, `-serveur.sh`, `-pty.sh`, `-session.sh`, `-page.sh`, `-client.sh`,
   `-tiroir.sh`, `-xterm.sh`, `-xss.sh`, `-lanceur.sh` (dix suites) ; `test-cockpit-chaine-xss.sh` et `test-cockpit-vendor.sh`

@@ -2,7 +2,7 @@
 # test-cockpit-vendor.sh — copie vendorisée de floorplan (CKPT-02, CKPT-03 volet code ; P67-D-03, D-07, D-11).
 #   V1 sentinelles et licence · V2 licences tierces · V3 rien que check-skills ou la CI jugeraient
 #   V4 tailles et marqueurs · V6 amont retrouvé à l'octet · V7 ajouts, patchs, retraits · V8 binaires
-#   V9 vendor xterm, police des traits de boîte (JetBrains Mono 2.304 Regular, V9.5), assistant du terminal, P25 et TAILLE de serve.mjs (Phase 71)
+#   V9 vendor xterm, police des traits de boîte (JetBrains Mono 2.304 Regular, V9.5), assistant du terminal, P26 et TAILLE de serve.mjs (Phase 71)
 # Les contrôles de patchs (V6, V7) sont sautés audiblement quand amont/ est absent (lab installé).
 # Exit 0 si tout passe, 1 sinon.
 
@@ -129,7 +129,7 @@ for n in xterm.js xterm.css addon-fit.js; do
 done
 assert_eq "V9.3 — une ligne AJOUT terminal/vf-cockpit-pty.py" "$(grep -cx 'AJOUT terminal/vf-cockpit-pty.py' "$MOTEUR/VENDORED.txt")" "1"
 assert_eq "V9.3 — l'assistant existe sous le moteur" "$([ -s "$MOTEUR/terminal/vf-cockpit-pty.py" ] && echo oui || echo non)" "oui"
-assert_eq "V9.4 — la ligne PATCH assets/serve.mjs cite P25" "$(grep '^PATCH assets/serve.mjs ' "$MOTEUR/VENDORED.txt" | awk '{print $3}' | tr ',' '\n' | grep -cx P25)" "1"
+assert_eq "V9.4 — la ligne PATCH assets/serve.mjs cite P26" "$(grep '^PATCH assets/serve.mjs ' "$MOTEUR/VENDORED.txt" | awk '{print $3}' | tr ',' '\n' | grep -cx P26)" "1"
 taille_de() { awk '$1=="TAILLE" && $2=="assets/serve.mjs"{print $3}' "$1"; }
 assert_eq "V9.4 — TAILLE assets/serve.mjs = lignes réelles" "$(taille_de "$MOTEUR/VENDORED.txt")" "$(nlines "$MOTEUR/assets/serve.mjs")"
 # témoin positif : une TAILLE décalée de 1 dans une copie est vue

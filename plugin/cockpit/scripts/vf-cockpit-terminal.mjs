@@ -1,5 +1,5 @@
 // vf-cockpit-terminal — terminal intégré du cockpit, côté serve.mjs (71-01 ; P71-D-02, D-09, D-10, D-11, D-17, D-33).
-// serve.mjs (patch vibeflow P25) l'importe seulement sous `--terminal` : AUCUN effet de bord à l'import.
+// serve.mjs (patch vibeflow P26) l'importe seulement sous `--terminal` : AUCUN effet de bord à l'import.
 // Export : preparerTerminal({ here, root, jetons, plateforme }) -> { actif, indisponible, injection(), frameSrc(), occupe(), routeP(req, res), demarrer(portP) }.
 // P71-D-33 : le serveur Q (second écouteur HTTP, 127.0.0.1, port éphémère, origine distincte de la page hôte P) tourne dans un PROCESSUS ENFANT
 // (vf-cockpit-terminal-processus.mjs, child_process.fork) : le travail synchrone de la boucle de serve.mjs ne retarde plus ni frappes ni sortie.
