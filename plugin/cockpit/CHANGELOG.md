@@ -7,6 +7,16 @@ pour P71-D-01 à P71-D-08 et P71-D-23 ; décisions du manager (vf-dev-manager, 2
 (O1 à O11 tranchées par P71-D-20 et P71-D-21 ; P71-D-22, d'abord provisoire, est devenue définitive par P71-D-23). Les gestes de
 release racine (version, tag, release GitHub) restent humains. Numéro de version recalculé à la fusion avec les Phases 68 et 70 (P71-PL-12) : mineure suivante de la v1.2.1 de main.
 
+### Corrigé — tour de correction D de la Phase 71 (N8, N11, documentation)
+- **Un `PATH` assaini vide n'est plus transmis au moteur d'assemblage** (N8, régression de N2 ; P71-D-29, arbitrage Samuel, AskUserQuestion, session
+  principale Claude Code, 2026-11-04 : « le lanceur n'exécute jamais un binaire du lab ») : sans `PATH` ou avec un `PATH` entièrement relatif
+  (`env -i`, `PATH=.`), Node posait `PATH=''` et libuv le lisait comme le dossier courant, donc le `git` du lab était exécuté (6 fois pendant
+  `build`). Le moteur reçoit désormais `/usr/bin:/bin` (sous Windows, la clé est omise).
+- **File d'entrée du terminal** (N11) : un morceau vide est retiré sans envoi ; il bouclait en POST vides (plus de 20 000 en 300 ms).
+- **Sans `ps`, le refus d'arrêt est dit une seule fois** (au lieu d'une centaine pendant l'attente du terminal).
+- **Documentation** : le README dit que le lanceur n'exécute jamais un binaire par son nom mais que le serveur vendorisé et le moteur ne sont pas assainis (H-1,
+  mandat séparé) ; le docstring de l'assistant PTY dit la vraie garantie de `killpg` après le réapage du chef.
+
 ### Corrigé — dernier tour de mineurs de la Phase 71 (lot C)
 - **Chaque branche d'arrêt de l'assistant tue la session** (M1) : sortie du shell, SIGTERM et fin du descripteur 0 portent chacune une
   assertion avec un `nohup` ; un relevé de processus qui ne contient pas l'assistant (`/proc` vide) vaut « impossible » et déclenche le

@@ -18,7 +18,10 @@ MOMENT-LÀ, relevé répété jusqu'à ce qu'il n'en reste aucun : nohup, disown
 Le relevé s'appuie sur getsid(2) pour chaque PID du système (/proc, sinon ps en chemin absolu) : jamais d'identifiant de groupe figé, jamais de
 motif de nom. Un zombie (état Z, lu dans /proc/<pid>/stat ou par `ps -o stat=`) n'est pas un membre vivant : sous Linux sans init il resterait
 compté et consommerait la grâce. Un relevé qui ne contient pas l'assistant lui-même est inutilisable (/proc vide d'un bac à sable) : repli sur les
-groupes. Le PID du chef de session n'est plus jamais signalé une fois le chef réapé (réutilisation de PID). Limite : un processus sorti de la session par setsid (ou par un double fork suivi de setsid) échappe à l'arrêt.
+groupes. Garantie après le réapage du chef (réutilisation de PID) : sur le chemin normal (relevé des membres disponible), le PID du chef n'est plus jamais
+signalé par kill(2), car chaque envoi relit d'abord la session du PID visé. Elle ne vaut PAS pour le repli (relevé impossible) : killpg(2) vise alors les groupes
+relevés au départ, dont celui du chef (identifiant = son PID), même après son réapage ; si ce PID a été réutilisé entre-temps par un autre groupe, ce groupe peut être
+signalé. Le repli ne sert que sans /proc ni `ps` utilisable, et le risque est celui d'une réutilisation de PID dans les 3 s de l'arrêt. Limite : un processus sorti de la session par setsid (ou par un double fork suivi de setsid) échappe à l'arrêt.
 Aucun octet du shell n'est journalisé.
 Compatible Python 3.9, aucune dépendance.
 """
