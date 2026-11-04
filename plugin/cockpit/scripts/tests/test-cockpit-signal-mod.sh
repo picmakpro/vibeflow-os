@@ -136,7 +136,7 @@ assert_eq "M9 — aucun hex hors de tokens.ts" "$(printf '%s\n' "$HOOKS_FILES" |
 
 echo "=== M10 — tokens.ts égal à DESIGN.md (VFSG-07) ==="
 # token:variable de DESIGN.md dont il recopie les valeurs ; un statut passe par la variable que le tableau « Statuts de travail » lui donne
-MAP10="st-done:--recent st-active:--sev-medium st-todo:--text-4 st-blocked:--sev-high text:--text text-2:--text-2 text-3:--text-3 text-4:--text-4"
+MAP10="$(printf '%s\n' st-done:--recent st-active:--sev-medium st-todo:--text-4 st-blocked:--sev-high text:--text text-2:--text-2 text-3:--text-3 text-4:--text-4)"  # un couple par ligne : zsh ne découpe pas $var
 # « <thème> <token> <hex> » pour chaque valeur de tokens.ts, hex en minuscules
 tokens_lus() { awk '/^  sombre: *\{/ {t="sombre"; next} /^  clair: *\{/ {t="clair"; next}
   t != "" && /^    \x27[a-z0-9-]+\x27: *\x27#[0-9a-fA-F]{6}\x27,?$/ { n = split($0, a, "\x27"); print t, a[2], tolower(a[4]) }' "$1"; }
@@ -147,16 +147,16 @@ design_statut() { awk -F'|' -v v="\`$2\`" 'index($3, v) > 0 { print $4 }' "$1" |
 ecarts_tokens() {
   local n=0 th tok hex var want st
   while read -r th tok hex; do
-    var=""; for m in $MAP10; do [ "${m%%:*}" = "$tok" ] && var="${m#*:}"; done
+    var=""; while IFS= read -r m; do [ "${m%%:*}" = "$tok" ] && var="${m#*:}"; done <<< "$MAP10"
     [ -n "$var" ] || { echo "token inconnu : $tok"; continue; }
     want="$(design_hex "$2" "$([ "$th" = sombre ] && echo 4 || echo 5)" "$var")"
     [ -n "$want" ] || { echo "$tok ($th) : $var absent de DESIGN.md"; continue; }
     n=$((n+1)); [ "$hex" = "$want" ] || echo "$tok ($th) : $hex au lieu de $want"
   done < <(tokens_lus "$1")
-  for m in $MAP10; do
+  while IFS= read -r m; do
     case "${m%%:*}" in st-*) st="$(design_statut "$2" "--${m%%:*}")"
       case "$st" in *"var(${m#*:})"*) : ;; *) echo "${m%%:*} : le tableau des statuts ne dit pas var(${m#*:})" ;; esac ;; esac
-  done
+  done <<< "$MAP10"
   echo "n=$n"
 }
 cat > "$WORK/d10.md" <<'MD'
