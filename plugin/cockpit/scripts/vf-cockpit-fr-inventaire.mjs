@@ -20,12 +20,17 @@ import { pathToFileURL } from 'node:url';
 const MOTS_FR = new Set(['le', 'la', 'les', 'des', 'du', 'un', 'une', 'est', 'et', 'ou', 'pour', 'sur', 'dans', 'par', 'aux', 'ce', 'cette', 'qui', 'que', 'vous', 'nous', 'votre', 'avec', 'sans', 'aucun', 'aucune', 'jamais', 'tous', 'toutes', 'où', 'au', 'cours', 'fait']);
 const AVANT_REGEX = new Set(['return', 'typeof', 'case', 'in', 'of', 'delete', 'void', 'throw', 'new', 'else', 'do', 'yield', 'await']);
 const ID = /[\w$]/;
+// P70-D-04 (UIFN-07) : mots anglais d'une ou deux lettres qui font à eux seuls un libellé (« up · » d'une aide au clavier)
+const COURTS = new Set(['up', 'of', 'at', 'in', 'on', 'to', 'by']);
+// clés d'interface : la valeur littérale est toujours inventoriée, même en un seul mot minuscule (`word: 'minor'`)
+const CLES_UI = /\b(?:word|label|group|title|hint|kicker|note|text)\s*:\s*$/;
 
 // --- littéraux d'un source JavaScript ---------------------------------------------------------------
 // Parcours récursif : commentaires et expressions régulières sautés, gabarits lus avec leurs `${…}` (les littéraux
 // imbriqués sont lus à leur tour, le gabarit hôte les écrit `{}`).
 export function litteraux(src) {
   const out = [];
+  out.cles = new Set(); // valeurs lues sous une clé d'interface (CLES_UI)
   let i = 0;
   const n = src.length;
   const motPrecedent = (k) => { let j = k; while (j > 0 && ID.test(src[j - 1])) j--; return src.slice(j, k); };
@@ -52,7 +57,7 @@ export function litteraux(src) {
       const c = src[i];
       if (c === '/' && src[i + 1] === '/') { while (i < n && src[i] !== '\n') i++; continue; }
       if (c === '/' && src[i + 1] === '*') { const e = src.indexOf('*/', i + 2); i = e < 0 ? n : e + 2; continue; }
-      if (c === '"' || c === "'") { out.push(chaine(c)); dernier = 'x'; continue; }
+      if (c === '"' || c === "'") { const avant = src.slice(Math.max(0, i - 24), i); const v = chaine(c); out.push(v); if (CLES_UI.test(avant)) out.cles.add(v); dernier = 'x'; continue; }
       if (c === '`') { gabarit(); dernier = 'x'; continue; }
       if (c === '/') {
         const regex = dernier === '' || '(,=:[!&|?{};+-*%<>~^'.includes(dernier) || AVANT_REGEX.has(motPrecedent(i - (src.slice(0, i).match(/\s*$/)[0].length)));
@@ -81,7 +86,9 @@ export function textesHtml(html) {
 // --- règle « texte anglais d'interface » -------------------------------------------------------------
 export function estAnglais(s, texte = false) {
   const t = s.replace(/\s+/g, ' ').trim();
-  if (t.length < 3 || t.length > 600 || !(/[A-Za-z]{3,}/.test(t) || /\{\}\s+[a-z]{2,}\s+\{\}/.test(t))) return false;
+  const mots = t.toLowerCase().split(/[^a-z']+/).filter(Boolean);
+  const court = mots.length > 0 && mots.every((w) => COURTS.has(w)) && (texte || /[\s·]/.test(t)); // « up · » : anglais, sans mot de 3 lettres
+  if (t.length < 2 || t.length > 600 || !(/[A-Za-z]{3,}/.test(t) || /\{\}\s+[a-z]{2,}\s+\{\}/.test(t) || court)) return false;
   if (/[À-ÿ…«»’]/.test(t) && /[À-ÿ«»]/.test(t)) return false; // accent français : pas de l'anglais
   if (/^(https?:|\/\/|\.{0,2}\/|[a-z]:\\)/i.test(t) || /^[\w.-]+\/[\w./+-]+$/.test(t)) return false; // URL, chemin, type MIME
   if (/^[#.@:[]|^--|^\*|^\$|^<|^[\[(]|^\{(?!\})/.test(t) && !/\s[A-Za-z]{3,}\s/.test(t)) return false; // sélecteur, propriété, balise
@@ -89,7 +96,7 @@ export function estAnglais(s, texte = false) {
   if (/[[\]]/.test(t) && /,/.test(t)) return false; // liste de sélecteurs
   if (/^[A-Z][A-Z0-9_]+s?$/.test(t)) return false; // sigle ou constante en majuscules (API, JSON, ORTHOGONAL) : identique dans les deux langues
   if (/\d(px|em|rem|vh|vw|ms|s)\b|rgba?\(|hsla?\(|#[0-9a-f]{3,8}\b|var\(|calc\(|translate|gradient/i.test(t)) return false;
-  if (/^[MmLlHhVvCcSsQqTtAaZz0-9 .,-]+$/.test(t)) return false; // tracé SVG
+  if (/^[MmLlHhVvCcSsQqTtAaZz0-9 .,-]+$/.test(t) && /\d/.test(t)) return false; // tracé SVG : il porte toujours un chiffre (« Calls » n'en est pas un)
   if (!texte && !/\s/.test(t) && !/^[A-Z]/.test(t)) return false; // identifiant, classe, événement, clé : un seul mot en minuscules (hors nœud de texte)
   if (!/\s/.test(t) && /[a-z][A-Z]|[_-]|\./.test(t)) return false; // camelCase, snake_case, kebab-case, point
   if (/^[\w-]+(\.\w+)+$/.test(t) || /\.(js|mjs|json|html|css|md|svg|png|txt)\b/i.test(t) && !/\s/.test(t)) return false;
@@ -104,6 +111,10 @@ function ajouter(set, brut, texte = false) {
   const x = normaliser(brut);
   if (x && estAnglais(x, texte)) set.add(x);
 }
+
+// pluriels construits à l'exécution : `plural(n, 'mot')` rend « 1 mot » ou « n mots » ; l'inventaire en note les deux formes
+const PLURIEL = /\bplural\([^'"`\n]*?,\s*'([^']+)'\s*\)/g;
+function plurielsConstruits(src) { const r = []; for (const m of src.matchAll(PLURIEL)) r.push(`{} ${m[1]}`, `{} ${m[1]}s`); return r; }
 
 // --- pages servies --------------------------------------------------------------------------------------
 // blocs jamais comptés : le dictionnaire (« // vibeflow:fr »), les extensions VibeFlow (« // VibeFlow ( », déjà en français,
@@ -140,7 +151,11 @@ export function inventaire({ html = [], serveur = '' } = {}) {
   const set = new Set();
   for (const page of html) {
     const { scripts, reste } = blocs(page);
-    for (const s of scripts) for (const l of litteraux(sansJournal(s))) ajouter(set, l);
+    for (const s of scripts) {
+      const src = sansJournal(s), L = litteraux(src);
+      for (const l of L) ajouter(set, l, L.cles.has(l));
+      for (const f of plurielsConstruits(src)) ajouter(set, f);
+    }
     for (const t of textesHtml(reste)) ajouter(set, t, true);
   }
   for (const l of litterauxServeur(serveur)) ajouter(set, l);

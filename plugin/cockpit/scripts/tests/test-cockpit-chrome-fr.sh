@@ -7,6 +7,7 @@
 #   F5 valeurs du dictionnaire : sans le nom amont, sans balise, ≠ de leur clé, sans `{}` en trop (témoin : valeurs fautives)
 #   F6 fonction pure __vfFrTraduire testée hors navigateur (vm) : dictionnaire, gabarit, motif, chaîne vide
 #   F7 les exclusions du mode plan tiennent : le graphe servi ne porte jamais meta.blueprint
+#   F9 l'inventaire voit les mots isolés, les mots courts et les pluriels construits (UIFN-07, 70-01) ; F3 et le témoin de F2 comparent aux non-traduits de base
 # L'inventaire se calcule sur le rendu SERVI (après renommage) : les clés du dictionnaire sont les phrases affichées.
 # Exit 0 si tout passe, 1 sinon.
 
@@ -56,7 +57,7 @@ const ajoute = (k, v) => v.split('|').some((f) => nb(f) > nb(k)); // une valeur 
 const controler = (d) => Object.entries(d).flatMap(([k, v]) => [AMONT.test(v) && `nom amont : ${k}`, /</.test(v) && `balise : ${k}`, v === k && !IDENTIQUES.includes(k) && `valeur = clé : ${k}`, ajoute(k, v) && `{} en trop dans la valeur : ${k}`].filter(Boolean));
 const dico = code.__vfFrDict;
 const fautive = fautif ? controler(JSON.parse(fs.readFileSync(fautif, 'utf8'))) : [];
-console.log(JSON.stringify({ inventaire: inv.length, dict: Object.keys(dico).length, motifs: code.__vfFrTraduire.motifs, gabarits: code.__vfFrTraduire.gabarits, exclusions: excl.length,
+console.log(JSON.stringify({ inventaire: inv.length, liste: inv, dict: Object.keys(dico).length, motifs: code.__vfFrTraduire.motifs, gabarits: code.__vfFrTraduire.gabarits, exclusions: excl.length,
   nonTraduits, sansObjet, problemesDico: controler(dico), problemesTemoin: fautive,
   f6: { etapes: [tr('Previous step'), tr('Next step')], motif: tr('Answer · 3 cards'), exact: tr('Fit to screen'), gabarit: tr('Your Claude session expired. Sign in again.'), vide: tr(''), espaces: tr('   '), inconnu: tr('Ma phrase de données'), projet: proj.__vfFrTraduire('File'), code: code.__vfFrTraduire('File'), pluriels: [proj.__vfFrTraduire('files'), code.__vfFrTraduire('files')], donnees: [tr('Top of the world'), tr('Fix with Claude Code'), tr('3 of 4'), tr('Health check: nothing urgent')],
     types: typeof code.__vfFrType === 'function' ? [code.__vfFrType('library'), code.__vfFrType('Library'), code.__vfFrType('Ma donnée'), code.__vfFrType('config'), tr('library')] : 'absent' }}));
@@ -75,6 +76,15 @@ const { extraireGraphe } = await import(pathToFileURL(path.join(process.argv[2],
 for (const f of ['index.html', 'project.html']) console.log(f, Object.prototype.hasOwnProperty.call(extraireGraphe(fs.readFileSync(path.join(process.argv[2], f), 'utf8')).meta, 'blueprint') ? 'blueprint' : 'sans');
 JS
 lire() { node "$AUX/lire.mjs" "$1" "$2"; }
+# nouveaux <mesure.json> : les non-traduits de la copie témoin qui n'étaient pas déjà ceux du rendu de base ($WORK/m.json) ;
+# F3 et le témoin de F2 prouvent le DÉTECTEUR, ils ne doivent pas rougir quand F2 rougit sur autre chose (70-01)
+cat > "$AUX/nouveaux.mjs" <<'JS'
+import fs from 'node:fs';
+const lire = (f) => JSON.parse(fs.readFileSync(f, 'utf8')).nonTraduits;
+const base = new Set(lire(process.argv[2]));
+console.log(JSON.stringify(lire(process.argv[3]).filter((x) => !base.has(x))));
+JS
+nouveaux() { node "$AUX/nouveaux.mjs" "$WORK/m.json" "$1"; }
 
 # lab neutre, assemblé
 LAB="$WORK/lab"; mkdir -p "$LAB/src" "$LAB/.planning/phases/01-x"
@@ -110,18 +120,24 @@ assert_eq "F6.9 : le même gabarit s'applique si une variable se traduit ou est 
 assert_eq "F6.10 : types fixes de carte (recette 2026-11-02, « Library ») : traduits par emplacement, capitale conservée, donnée inconnue intacte, JAMAIS par le dictionnaire (un dossier « library » reste « library »)" "$(lire "$WORK/m.json" 'j.f6.types')" '["bibliothèque","Bibliothèque",null,"configuration",null]'
 assert_eq "F6.11 : O6 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) — les chevrons de la Trajectoire (« Previous step », « Next step ») sont traduits en « Étape précédente » et « Étape suivante »" "$(lire "$WORK/m.json" 'j.f6.etapes')" '["Étape précédente","Étape suivante"]'
 
+echo "[F9] l'inventaire voit les formes d'anglais résiduel du cadrage (UIFN-07, P70-D-04)"
+assert_eq "F9.1 : mot isolé — le libellé de type « Calls » (UIFN-07)" "$(lire "$WORK/m.json" "j.liste.includes('Calls')")" "true"
+assert_eq "F9.2 : mots de sévérité de Santé — « important », « minor », « worth fixing » (UIFN-07)" "$(lire "$WORK/m.json" "['important', 'minor', 'worth fixing'].map((x) => j.liste.includes(x))")" "[true,true,true]"
+assert_eq "F9.3 : mot court — l'aide au clavier « ⌫ up » rend le nœud « up · » (UIFN-07)" "$(lire "$WORK/m.json" "j.liste.includes('up ·')")" "true"
+assert_eq "F9.4 : pluriel construit à l'exécution par plural(n, mot) — « {} calls », « {} steps », « {} changes » (UIFN-07)" "$(lire "$WORK/m.json" "['{} calls', '{} steps', '{} changes'].map((x) => j.liste.includes(x))")" "[true,true,true]"
+
 echo "[F3] témoin du détecteur : une chaîne anglaise inventée"
 T3="$WORK/t3"; cp -R "$SORTIE" "$T3"
 node -e 'const f=process.argv[1],fs=require("fs");let h=fs.readFileSync(f,"utf8");h=h.replace("</body>","<script>const m = \"Pending approval from the review board\";</script></body>");fs.writeFileSync(f,h)' "$T3/project.html"
 node "$AUX/calcul.mjs" "$T3" "$SCRIPTS" "$EXCL" > "$WORK/m3.json" 2>/dev/null
-assert_eq "F3 : la chaîne ajoutée est listée parmi les non-traduits" "$(lire "$WORK/m3.json" 'j.nonTraduits')" '["Pending approval from the review board"]'
+assert_eq "F3 : la chaîne ajoutée est listée parmi les non-traduits" "$(nouveaux "$WORK/m3.json")" '["Pending approval from the review board"]'
 
 echo "[F2 témoin] retrait d'une entrée du dictionnaire"
 T2="$WORK/t2"; cp -R "$SORTIE" "$T2"
 node -e 'const f=process.argv[1],fs=require("fs");let h=fs.readFileSync(f,"utf8");const n=h.split("\n").filter((l)=>!l.startsWith("  \"Copy endpoint\":")).join("\n");if(n===h)process.exit(3);fs.writeFileSync(f,n)' "$T2/project.html"; RC=$?
 assert_eq "F2 témoin : la ligne du dictionnaire a bien été retirée de la copie" "$RC" "0"
 node "$AUX/calcul.mjs" "$T2" "$SCRIPTS" "$EXCL" > "$WORK/m2.json" 2>/dev/null
-assert_eq "F2 témoin : F2 rougit en nommant l'entrée retirée" "$(lire "$WORK/m2.json" 'j.nonTraduits')" '["Copy endpoint"]'
+assert_eq "F2 témoin : F2 rougit en nommant l'entrée retirée" "$(nouveaux "$WORK/m2.json")" '["Copy endpoint"]'
 
 echo "[F4 témoin] exclusion inventée ; [F5 témoin] valeurs fautives"
 node -e 'const fs=require("fs");const e=JSON.parse(fs.readFileSync(process.argv[1]));e.exclusions.push({texte:"Une chaîne qui n existe pas dans le rendu",raison:"inventée"},{texte:"Download",raison:""});fs.writeFileSync(process.argv[2],JSON.stringify(e))' "$EXCL" "$WORK/excl-fautive.json"
