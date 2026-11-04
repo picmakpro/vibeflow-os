@@ -36,3 +36,10 @@ Correction ciblée demandée par le manager d'après le juge Playwright de la re
 - Garde d'ordre (cas 3) : F11.21 juge les durées coupées par « mis à jour » ; F13.1 pose la forme exacte ; F10 reste en place.
 
 Hors de mes fichiers (cas 5 sous-titre et cas 6 visite), constatés sans correction : voir le SUMMARY.
+
+### Textes coupés (cas 5b et 6), départ rejoué sur `c9f9538c`
+
+`test-cockpit-onglet-code.sh` : 23 PASS / 2 FAIL.
+
+- C6.1 (cas 6, `vf-cockpit-code-vf.mjs` `firstSentence`, étapes 2 et 3 de la visite Code) — attendu la première phrase entière, obtenu `Ce module reçoit … à la session principale pour …` (coupée à 170 caractères)
+- C6.3 (cas 5b, `vf-cockpit-build.mjs` titre du travail récent) — attendu `1|Phase 1 · Socle du découpage et de la validation des gabarits de la couche française`, obtenu `1|Phase 1 · Socle du découpage et de la validation des gabarit` (coupé à 60 caractères, en plein mot, sans signe)
