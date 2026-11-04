@@ -160,7 +160,7 @@
        </div>`;
      card.querySelectorAll('[data-x]').forEach((b) => b.onclick = end);
      card.querySelector('[data-back]')?.addEventListener('click', back);
-@@ -118,21 +162,26 @@
+@@ -118,21 +162,27 @@
        if (a.width && a.left < 16 + c.width + 12 && top < innerHeight) bottom = Math.max(bottom, innerHeight - top + 12);
      }
      card.style.bottom = Math.min(bottom, Math.max(76, innerHeight - card.offsetHeight - 80)) + 'px';
@@ -178,7 +178,8 @@
      go(steps[at]);
 -    if (at === 0) setTimeout(() => SC.fit(true), 450);
 +    place();
-+    if (at === 0) setTimeout(() => { if (at === 0) SC.fit(true); }, 450);
++    // the opening fit is only for a first step on the overview itself: after a card step it would undo the centring (a page already seen settles faster, so the card was measured before the fit)
++    if (at === 0 && (!steps[0].ref || steps[0].ref === 'root')) setTimeout(() => { if (at === 0) SC.fit(true); }, 450);
    }
    function next() { if (at >= steps.length - 1) end(); else show(at + 1); }
    function back() { if (at > 0) show(at - 1); }

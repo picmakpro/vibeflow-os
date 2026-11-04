@@ -12,7 +12,7 @@ PATCH scripts/lib/screens.mjs P9 marqueur de taille
 PATCH scripts/lib/extract.mjs P9 marqueur de taille
 PATCH scripts/lib/common.mjs P10 MAP_DIR = .vibeflow/cockpit ; commentaire du .gitignore de sortie
 PATCH assets/vendor/elk.bundled.js P9 marqueur de taille
-PATCH assets/ui/40-tour.js P25 visite guidée : chaque étape cible une carte (centrée, zoomée, hors de la carte de visite) ou un élément du chrome (`cible`, mis en évidence), texte jamais coupé, « Skip » à chaque étape, aucune étape de parcours sur l'onglet Projet
+PATCH assets/ui/40-tour.js P25 visite guidée : chaque étape cible une carte (centrée, zoomée, hors de la carte de visite) ou un élément du chrome (`cible`, mis en évidence), texte jamais coupé, « Skip » à chaque étape, aucune étape de parcours sur l'onglet Projet ; l'ajustement d'ouverture ne vaut que pour une première étape sur la vue d'ensemble
 RETRAIT SKILL.md
 RETRAIT assets/ui/50-cloud.js
 RETRAIT agents/openai.yaml

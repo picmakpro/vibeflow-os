@@ -174,7 +174,8 @@
     render();
     go(steps[at]);
     place();
-    if (at === 0) setTimeout(() => { if (at === 0) SC.fit(true); }, 450);
+    // the opening fit is only for a first step on the overview itself: after a card step it would undo the centring (a page already seen settles faster, so the card was measured before the fit)
+    if (at === 0 && (!steps[0].ref || steps[0].ref === 'root')) setTimeout(() => { if (at === 0) SC.fit(true); }, 450);
   }
   function next() { if (at >= steps.length - 1) end(); else show(at + 1); }
   function back() { if (at > 0) show(at - 1); }
