@@ -1,0 +1,17 @@
+// chrome-verrou.mjs — recette 68 N2 (P68-D-38) : le tiroir « Au travail » écrit « Verrou dépôt », jamais « Verrou depot » (la valeur `tree`/`scope` du flux reste `depot`).
+// Usage : node chrome-verrou.mjs <chrome> <url http de project.html>. Rend { lignes } : les textes des lignes de verrou du tiroir.
+import { executer } from './chrome-session.mjs';
+const [, , chrome, url] = process.argv;
+const INJ = `(() => { const R = window.EventSource; window.__es = []; window.EventSource = class extends R {
+  constructor(u, o) { super(u, o); this.__l = {}; window.__es.push(this); }
+  addEventListener(n, f, o) { (this.__l[n] ||= []).push(f); super.addEventListener(n, f, o); }
+  __emit(n, d) { for (const f of this.__l[n] || []) f({ data: JSON.stringify(d) }); } }; })();`;
+await executer(chrome, async (s) => {
+  await s.send('Page.addScriptToEvaluateOnNewDocument', { source: INJ });
+  await s.naviguer(url + '#sans-visite');
+  await s.attendre("document.readyState === 'complete' && !!document.querySelector('#vf-lock') && window.__es.some((e) => e.url.includes('/api/vf/events'))", 'flux et badge');
+  await s.ev(`window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('who', { seq: 9000, at: Date.now(), who: { workers: [{ kind: 'lock', id: 'L1', tree: 'depot', task: 'x', ageS: 1, stale: false }], sources: {} } })`);
+  await s.ev("document.querySelector('#vf-lock').click()");
+  await s.attendre("!!document.querySelector('.vf-whop .vf-who')", 'ligne de verrou');
+  return { lignes: await s.ev("[...document.querySelectorAll('.vf-whop .vf-who')].map((e) => e.textContent.trim().slice(0, 80))") };
+}, { csp: true });

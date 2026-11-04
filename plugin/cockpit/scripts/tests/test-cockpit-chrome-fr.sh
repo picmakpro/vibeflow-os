@@ -138,6 +138,23 @@ assert_eq "F8.1 : <sortie>/vf-cockpit-fr-inventaire.mjs absent" "$([ -e "$SORTIE
 assert_eq "F8.2 : témoin — l'outil existe bien dans les scripts du module" "$([ -f "$SCRIPTS/vf-cockpit-fr-inventaire.mjs" ] && echo existe || echo absent)" "existe"
 assert_eq "F8.3 : le rendu servi ne contient pas le nom amont (hors lignes de licence)" "$(grep -v 'vibeflow:licence-tierce' "$SORTIE/project.html" | grep -ci "$AMONT")" "0"
 
+echo "[F9] recette 68 R11 (P68-D-35) : le statut STATE brut n'est jamais affiché sur la page Projet (navigateur)"
+CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
+if [ -z "$CHROME" ]; then echo "  ⊘ F9 SAUTÉ : aucun navigateur — le statut affiché n'est PAS vérifié, non compté comme réussi"; else
+L9="$WORK/lab9"; mkdir -p "$L9/.planning"; printf -- '- [ ] **Phase 1: Socle** - premier jet\n' > "$L9/.planning/ROADMAP.md"
+printf -- '---\nmilestone: v1\nstatus: ready_to_plan\ncurrent_phase: 1\ncurrent_phase_name: Socle\n---\n' > "$L9/.planning/STATE.md"; git -C "$L9" init -q 2>/dev/null
+node "$SCRIPTS/vf-cockpit-build.mjs" "$L9" --quiet >/dev/null 2>&1 || { echo "assemblage F9 impossible"; exit 1; }
+perl -e 'alarm 300; exec @ARGV' node "$SCRIPTS/tests/chrome-statut.mjs" "$CHROME" "file://$L9/.vibeflow/cockpit/project.html" > "$WORK/f9.json" 2>/dev/null
+assert_eq "F9.1 : aucun texte visible de la page Projet ne porte « ready_to_plan »" "$(lire "$WORK/f9.json" '(j.erreur||j.visibles)')" "[]"
+assert_eq "F9.2 : sous-titre et pastille en français" "$(lire "$WORK/f9.json" '[j.sousTitre, j.pastille]')" '["Jalon v1 · phase 1 (Socle) · prête à planifier.","prête à planifier"]'
+# F10 : N2 (P68-D-38) — le tiroir « Au travail » dit « dépôt » (serveur réel, flux `who` simulé)
+export VF_COCKPIT_PORT_BASE=$((30000 + (RANDOM * 11) % 30000))
+U10="$(node "$SCRIPTS/vf-cockpit.mjs" open --no-open --lab "$L9" 2>/dev/null | sed -En 's#^Cockpit : (http://127\.0\.0\.1:[0-9]+)/ .*#\1/project.html#p' | head -1)"
+perl -e 'alarm 300; exec @ARGV' node "$SCRIPTS/tests/chrome-verrou.mjs" "$CHROME" "$U10" > "$WORK/f10.json" 2>/dev/null
+node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L9" >/dev/null 2>&1; unset VF_COCKPIT_PORT_BASE
+assert_eq "F10 : le verrou du dépôt s'affiche « dépôt » dans le tiroir « Au travail » (jamais « depot »)" "$(lire "$WORK/f10.json" '(j.erreur||String(j.lignes[0]).replace(/ · .*$/, "").replace(/^(Verrou dépôt).*/, "$1"))')" "Verrou dépôt"
+fi
+
 echo ""
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
 [ $((PASS + FAIL)) -gt 0 ] || { echo "ÉCHEC ANTI-VERT-À-VIDE : aucun cas exécuté"; exit 1; }

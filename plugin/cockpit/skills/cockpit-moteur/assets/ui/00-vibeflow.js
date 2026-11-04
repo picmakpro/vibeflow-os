@@ -85,7 +85,7 @@
 
   // ---------- onglet Projet : panneau d'ensemble ----------
   // statuts de STATE affichés en français (valeur inconnue : telle quelle)
-  const STATUT = { closed: 'clos', complete: 'terminée', completed: 'terminée', executing: 'en exécution', planning: 'en planification', paused: 'en pause', verifying: 'en vérification' };
+  const STATUT = { closed: 'clos', complete: 'terminée', completed: 'terminée', executing: 'en exécution', planning: 'en planification', paused: 'en pause', verifying: 'en vérification', ready_to_plan: 'prête à planifier', ready_to_execute: 'prête à exécuter', milestone_complete: 'jalon terminé' }; // recette 68 R11 (P68-D-35, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04) : jamais le statut STATE brut
   const statut = (x) => STATUT[x] || x || '';
   // dérive de format de la planification (vf-cockpit-drift.mjs) : rien n'est corrigé d'ici, le panneau donne la commande
   const NIV = { bloquant: 'blocked', 'toléré': 'todo', info: 'todo' };

@@ -59,7 +59,7 @@
   const auTravail = (w) => window.__vfEquipeRendu.actif(w);
   const htmlTiroir = () => {
     const ws = who?.workers || [], act = ws.filter(auTravail), reste = ws.filter((w) => !AGENT(w));
-    const row = (w) => `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${h(duree(w.ageS))}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span><div>${h(w.task || '')}</div></div>`;
+    const row = (w) => `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.kind === 'lock' && w.tree === 'depot' ? 'dépôt' : w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${h(duree(w.ageS))}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span><div>${h(w.task || '')}</div></div>`;
     const src = Object.entries(who?.sources || {}).map(([k, v]) => `${k} : ${v.etat}`).join(' · ');
     const arbre = window.__vfEquipeRendu.arbre(ws, h);
     return (`<div class="vf-whop"><h3>Au travail (${act.length})</h3><p class="regle">${h(lockText(probe.lock).text)}.</p><p class="regle">Règle de fraîcheur : ${FRAICHEUR}, actifs et terminés depuis moins de 24 h ; la dernière commande et le transcript ne s'affichent que sur demande.</p>${arbre || (reste.length ? '' : '<p>Personne. Sources lues : ' + h(src) + '</p>')}${reste.length ? `<h4>Verrous et nœuds</h4>${reste.map(row).join('')}` : ''}<p class="src">${h(src)}</p></div>`);
