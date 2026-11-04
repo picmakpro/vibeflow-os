@@ -51,6 +51,8 @@ try:
             d = os.read(fd, 4096); dernier = time.time(); noter('I ' + d.hex())
             if b'q' in d:
                 sys.stdout.write('\033[c'); sys.stdout.flush()
+            if b'g' in d:
+                sys.stdout.write('GROS-DEBUT\r\n' + '\033[6n' * 60000 + 'GROS-PRET\r\n'); sys.stdout.flush()
             if b'x' in d:
                 break
         elif not marque and time.time() - dernier > 0.6:
@@ -395,6 +397,17 @@ await executer(chrome, async (sp) => {
       await s.send('Input.insertText', { text: 'q' }); await pause(1200);
       const apres = (await lire()).slice(n1).filter((l) => l.startsWith('I ')).map((l) => l.slice(2));
       r.rejeu.apres = apres.join(''); r.rejeu.frappe = apres.join('').startsWith('71');
+      // R1 (réserve) : une frappe pendant un gros rejeu (60000 questions CPR dans le tampon) : xterm fait stopPropagation, l'autorisation « humaine » ne doit pas survivre à l'événement
+      await s.send('Input.insertText', { text: 'g' }); await att(`${TXT}.includes('GROS-PRET')`, 'GROS-PRET');
+      let tai = -1, stab = 0; const fin2 = Date.now() + 30000; while (stab < 12 && Date.now() < fin2) { const t = (await lire()).length; if (t === tai) stab++; else { stab = 0; tai = t; } await pause(100); }
+      const n2 = (await lire()).length;
+      theme = 'light'; await s.naviguer();
+      // la frappe part dès que le début du rejeu est à l'écran : le reste (60000 questions) est encore dans la file d'écriture d'xterm
+      const finT = Date.now() + 15000; while (Date.now() < finT) { try { if (await s.ev(`${TXT}.includes('GROS-DEBUT')`)) break; } catch {} }
+      for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key: 'k', code: 'KeyK', text: type === 'keyDown' ? 'k' : undefined, windowsVirtualKeyCode: 75 });
+      await pause(4000);
+      const gros = (await lire()).slice(n2).filter((l) => l.startsWith('I ')).map((l) => l.slice(2)).join('');
+      r.rejeu.gros = gros;
       await s.send('Input.insertText', { text: 'x' });
     });
     return r;
@@ -612,6 +625,7 @@ run_rejeu "$OUT"; RJ0="$RJ"
 assert_eq "R1.0 — témoin : aucune erreur nommée, le récepteur a relevé les réponses VIVES aux questions (DA1 ESC[?…c reçue), le premier silence est marqué, cinq rechargements du cadre faits" "$(rj "$RJ0" 'j.erreur||JSON.stringify(j.erreurs)')/marqueur=$(rj "$RJ0" 'j.rejeu.marqueur')/da1=$(rj "$RJ0" '/1b5b3f/.test(j.rejeu.initial)')/recharges=$(rj "$RJ0" 'j.rejeu.recharges')" "{}/marqueur=true/da1=true/recharges=5"
 assert_eq "R1.1 — après cinq rechargements du cadre (thèmes alternés), le tampon contenant ESC[c ESC[>c ESC[6n ESC[?2004\$p ESC[5n est rejoué : le PTY ne reçoit AUCUN octet de réponse" "[$(rj "$RJ0" 'j.rejeu.avant')]" "[]"
 assert_eq "R1.2 — témoin positif : une question émise APRÈS le rejeu reçoit sa réponse (frappe puis ESC[?…c) : les réponses ne sont pas coupées en général" "frappe=$(rj "$RJ0" 'j.rejeu.frappe') da1=$(rj "$RJ0" '/1b5b3f/.test(j.rejeu.apres)')" "frappe=true da1=true"
+assert_eq "R1.3 — une frappe réelle pendant un gros rejeu (60000 questions) arrive au shell et AUCUNE réponse d'xterm : le PTY reçoit exactement 6b (l'autorisation humaine ne survit pas à l'événement)" "[$(rj "$RJ0" 'j.rejeu.gros')]" "[6b]"
 
 echo "=== M-* — mutants : chaque protection rougit sa sonde ==="
 if mutant_eng ctrlc 's/^                vers_shell += donnees$/                vers_shell += donnees.replace(b"\\x03", b"")/'; then
@@ -702,6 +716,10 @@ if mutant rejeu-sans-garde vf-cockpit-terminal-client.mjs 's|if (rejeu \&\& !hum
   run_rejeu "$MUT_OUT"
   assert_eq "M-REJEU-SANS-GARDE — la garde du rejeu est retirée (le code d'avant) : les réponses du tampon partent dans l'entrée du PTY, R1.1 rouge" "$(rouge "[$(rj "$RJ" 'j.rejeu.avant')]" "[]")" "rouge"
 else sans_effet "M-REJEU-SANS-GARDE"; fi
+if mutant rejeu-humain-colle vf-cockpit-terminal-client.mjs 's|finHumain = setTimeout(() => { humain = false; }, 0);|void 0;|'; then
+  run_rejeu "$MUT_OUT"
+  assert_eq "M-REJEU-HUMAIN-COLLE — l'autorisation humaine n'est plus remise à faux après l'événement : des réponses d'xterm partent pendant le rejeu, R1.3 rouge" "$(rouge "[$(rj "$RJ" 'j.rejeu.gros')]" "[6b]")" "rouge"
+else sans_effet "M-REJEU-HUMAIN-COLLE"; fi
 if mutant rejeu-jamais-clos vf-cockpit-terminal-client.mjs "s|term.write('', () => { rejeu = false; });|void 0;|"; then
   run_rejeu "$MUT_OUT"
   assert_eq "M-REJEU-JAMAIS-CLOS — le rejeu ne se clôt jamais : la question neuve ne reçoit plus sa réponse, R1.2 rouge (la garde ne coupe pas les réponses en général)" "$(rouge "da1=$(rj "$RJ" '/1b5b3f/.test(j.rejeu.apres)')" "da1=true")" "rouge"

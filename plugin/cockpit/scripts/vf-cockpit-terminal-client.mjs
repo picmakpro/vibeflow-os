@@ -134,7 +134,9 @@ export function clientTerminal(cfg) {
     // le rejeu se clôt au premier silence du flux (borné), une fois tout ce qui a été reçu analysé : les questions nouvelles du programme sont répondues normalement
     let rejeu = false, humain = false, silence = 0, borne = 0;
     const EVENEMENTS = ['keydown', 'keypress', 'input', 'mousedown', 'mouseup', 'mousemove', 'wheel', 'contextmenu'];
-    EVENEMENTS.forEach((t) => { window.addEventListener(t, () => { humain = true; }, true); window.addEventListener(t, () => { humain = false; }, false); });
+    // R1 : l'autorisation « saisie humaine » ne dure que l'événement en cours (xterm fait stopPropagation : un listener de bulle ne s'exécuterait pas) ; bornée à un tick
+    let finHumain = 0;
+    EVENEMENTS.forEach((t) => { window.addEventListener(t, () => { humain = true; clearTimeout(finHumain); finHumain = setTimeout(() => { humain = false; }, 0); }, true); });
     // une frappe ferme le rejeu : tout ce qui est déjà reçu est analysé avant la clôture, ce qui vient après est du direct (un programme lancé tout de suite après l'invite n'est pas rejoué)
     ['keydown', 'keypress', 'input'].forEach((t) => window.addEventListener(t, () => { if (rejeu) clore(); }, true));
     const collage0 = term.paste.bind(term);
