@@ -164,6 +164,19 @@ scratchpad de la mission, rejouable ; résultats repris ci-dessous).
   `claude`) ; seuls les points de goût ou d'avis humain remontent à Samuel, en un seul tri ; les écarts fonctionnels passent par le coordinateur
   (ADR-031).
 
+### Arbitrages de Samuel sur la recette par juges (AskUserQuestion, session principale Claude Code, 2026-11-04, relayés au manager)
+
+- **P71-D-33 (E1, gel périodique ; arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-04).** « Terminal dans son processus
+  (Recommandé) ». Le serveur du terminal tourne dans un processus enfant à lui ; seuls des fichiers de la 71 changent ; la minuterie de la 69
+  (`vf-cockpit-live.mjs`) n'est pas touchée. Remplace la confirmation O9 de P71-D-21.
+- **P71-D-34 (E2 à E5 ; même canal, même date).** « Corriger E2 à E5 (Recommandé) » : la pastille et le tiroir ne recouvrent plus les boutons de
+  zoom (E2) ; la grille tient compte de la marge haute (E3) ; `python3` absent est dit en clair par le lanceur, le serveur et la page (E4) ; le
+  lanceur attend jusqu'à 30 s un démarrage lent (E5).
+- **P71-D-35 (goût ; même canal, même date).** « G1 tiroir et cadrage, G2 arrêt immédiat, G3 défilement discret » : « Ajuster » et le cadrage
+  tiennent compte du tiroir, la barre de question se replie et la visite se ferme quand le tiroir s'ouvre (G1) ; un arrêt volontaire affiche
+  « Serveur arrêté » tout de suite (G2) ; la barre de défilement du terminal n'apparaît qu'au survol (G3).
+- **Non joué (consigné, P71-D-32).** Le raccourci dans Safari.app et Firefox.app réels, et un vrai clavier AZERTY avec la touche Option.
+
 ### Contraintes héritées (Phase 67, `v2.75.0`)
 
 - Le lab observé n'est jamais une source de code : aucun script du lab exécuté par le serveur (le shell, lui, est l'usage
