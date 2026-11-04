@@ -1,7 +1,7 @@
 # Phase 70: Finitions UI du cockpit - Context
 
 **Gathered:** 2026-11-03
-**Status:** Revalidée le 2026-11-04 contre `794c6dba` (Phase 69 mergée, cockpit `v1.1.1`) : 12 plans 70-01..12 en 6 vagues (3 plans ajoutés : 70-10, 70-11, 70-12 ; 70-02, 70-04, 70-05, 70-06, 70-08, 70-09 corrigés d'après le relevé d'un plan-checker frais) — non exécutée ; la revalidation P70-D-14 est traitée
+**Status:** exécutée, arbitrages reçus (P70-D-22 à P70-D-24, 2026-11-04). Historique : revalidée le 2026-11-04 contre `794c6dba` (Phase 69 mergée, cockpit `v1.1.1`) : 12 plans 70-01..12 en 6 vagues (3 plans ajoutés : 70-10, 70-11, 70-12 ; 70-02, 70-04, 70-05, 70-06, 70-08, 70-09 corrigés d'après le relevé d'un plan-checker frais) — non exécutée ; la revalidation P70-D-14 est traitée
 
 **Exigences :** UIFN-01 à UIFN-14 (préfixe neuf, P70-D-12 ; UIFN-11 à UIFN-14 ajoutées le 2026-11-04, P70-D-21), inscrites dans `REQUIREMENTS.md` du compartiment
 et dans la ligne `Requirements` de la Phase 70 du ROADMAP.
@@ -138,6 +138,33 @@ Issus des captures « avant » mesurées sur `794c6dba` et du relevé du plan-ch
   cinq mineurs de la 69 (70-11) ; UIFN-14 zoom, titre / première carte, fil d'Ariane et matrice responsive de l'onglet
   Équipe (70-12). Le point « écrit à <id d'agent> » (`vf-cockpit-transcript.mjs:12`) est exclu : il attend un
   arbitrage de goût de Samuel.
+- **P70-D-22 (onglets à 13 px entre 701 et 1 279 px, question 1, bloquante).** Arbitrage de Samuel, mot pour mot :
+  « Badge réduit à son point (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04, réponses relayées par le manager vf-dev-manager). Conséquence : entre 701 et 1 279 px, le badge « au travail » se
+  réduit à son point et les onglets restent à 13 px / 3 px ; cela amende P70-D-16 pour cette tranche (le recalcul de
+  `70-04-RED-TRACE.md` montrait qu'à 1 024 px l'en-tête de Code ne tenait pas à 13 px avec le badge entier). R13.4
+  est tranché par cette décision.
+- **P70-D-23 (questions 2 à 13, tri de goût).** Arbitrage de Samuel, mot pour mot : « Tout selon les recos
+  (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04, réponses relayées par le manager vf-dev-manager), soit 2a 3b 4a 5a 6b 7b 8b 9b 10a 11b 12a 13a ; il demande aussi de corriger l'infobulle en
+  « de ce projet ». Options retenues :
+  - 2a : « écrit à <id d'agent> » devient le rôle, sinon « un agent ».
+  - 3b : l'ajustement d'Équipe est plafonné à 0,75, cadré sur la première carte.
+  - 4a : centrage borné de la visite conservé.
+  - 5a : la visite éclaire une carte au lieu de la sélectionner (conservé).
+  - 6b : le plafond de zoom ×1,6 sur téléphone est relevé.
+  - 7b : l'étape « 2 services extérieurs » vise les cartes des services.
+  - 8b : la pastille du « ⋯ » est un point.
+  - 9b : « le bouton de visite (icône), en haut » remplace « Par où commencer en haut » ; l'infobulle « de ce code »
+    de l'onglet Projet devient « de ce projet ».
+  - 10a : « composant » et « prioritaire » conservés.
+  - 11b : libellé du thème dans « ⋯ » : « Thème : Auto ».
+  - 12a : le lien « Nœud », décalé de 10 px, est aligné.
+  - 13a : le bouton « Par où commencer » est désactivé sur l'onglet Équipe.
+- **P70-D-24 (R8 de la recette de la Phase 68, reporté).** Samuel a passé R8 de la 68 à la 70 (P68-D-35, sur la
+  branche de la 68) : le panneau latéral web ne dit pas l'état de la mission, et un nœud en cours a le même point
+  qu'un nœud fait. Décision du manager (vf-dev-manager, 2026-11-04, pas un arbitrage de Samuel) : inscrit au BACKLOG,
+  pas traité en 70. Motif : l'état de la mission vient de la cascade de vie de la 68 (`vf-cockpit-vie.mjs`, P68-D-26
+  et P68-D-33), absente de main et de la branche de la 70 ; le point des nœuds est rendu par `vf-cockpit-project.mjs`,
+  que la branche de la 68 modifie aussi : le traiter ici ajouterait un conflit de merge.
 
 </decisions>
 

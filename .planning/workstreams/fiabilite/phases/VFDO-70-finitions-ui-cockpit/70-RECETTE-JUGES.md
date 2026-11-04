@@ -1,6 +1,6 @@
 # 70-RECETTE-JUGES — recette de la Phase 70 jouée par des juges frais (UIFN-10)
 
-Statut : recette jouée ; corrections faites ; **tri de goût en attente de Samuel** (12 questions, aucune réponse) ; un écart connu bloquant (R13.4).
+Statut : recette jouée ; corrections faites ; tri de goût **tranché par Samuel le 2026-11-04** (13 questions, réponses ci-dessous, relayées par le manager) ; R13.4 tranché par P70-D-22.
 
 ## Méthode
 
@@ -51,59 +51,64 @@ Les corrections ultérieures aux têtes jugées n'ont pas été recapturées par
 ## Écarts connus
 
 1. **R13.4 à 1 024 et 1 440 px (bloquant)** : `test-cockpit-responsive.sh` reste à 255 PASS / 6 FAIL, les six lignes R13.4 (onglets à 12 px / 2 px au lieu de 13 px / 3 px
-   à 1 024 et 1 440 px). Cause mesurée (`70-04-RED-TRACE.md`, recalcul P70-D-16) : à 1 024 px l'en-tête de Code ne tient pas avec 13 px et « Remonter » (il manque 24 px au plancher). Attend l'arbitrage de la question 1.
+   à 1 024 et 1 440 px). **Tranché par P70-D-22** (badge réduit à son point entre 701 et 1 279 px, onglets à 13 px). Cause mesurée (`70-04-RED-TRACE.md`, recalcul P70-D-16) : à 1 024 px l'en-tête de Code ne tient pas avec 13 px et « Remonter » (il manque 24 px au plancher). Le code suit P70-D-22 (plan de correction en cours).
 2. **Carte Session « en attente » mais badge « En cours »** : dans `72-vf-equipe.js`, tout état autre que « terminé » devient actif. Défaut de la Phase 69 révélé par la 70, non corrigé ; part au BACKLOG.
 3. **`scripts/check-machine-paths.sh`** : vert sur macOS, rouge en CI Linux sur des chemins `/Users/<user>/…` écrits dans les plans. Plans corrigés en `c7217940` ; la cause du vert local n'a pas été diagnostiquée.
 4. Corrections postérieures aux têtes jugées non recapturées (voir plus haut).
+5. R13.4 tranché par P70-D-22.
 
-## Tri de goût en attente de Samuel
+## Tri de goût de Samuel
 
-Les 12 questions envoyées, sans réponse. Aucun agent ne coche ni ne remplit une réponse (T-70-14). Recommandation = ce que le manager a proposé, pas un arbitrage.
+Les 13 questions envoyées. Les réponses ci-dessous sont celles de Samuel, citées mot pour mot, relayées par le manager (vf-dev-manager) ; l'agent qui écrit ce fichier ne les a pas recueillies lui-même. Canal : AskUserQuestion, session principale Claude Code, 2026-11-04. Décisions : P70-D-22 (question 1) et P70-D-23 (questions 2 à 13).
 
 ### 1. Onglets à 13 px à 1 024 px (R13.4, bloquant)
 Captures : `code-clair-1024.png`, `projet-sombre-1024.png`. Options : (a) badge « au travail » réduit à un point entre 701 et 1 279 px (recommandé) ; (b) retirer « Remonter » ; (c) garder 12 px / 2 px entre 1 000 et 1 279 px ; (d) actions dans « ⋯ ».
-Réponse de Samuel (mot pour mot, canal, date) :
+Réponse de Samuel (mot pour mot, canal, date) : « Badge réduit à son point (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04). Option 1a. Décision P70-D-22.
 
 ### 2. « écrit à <id d'agent> » (`vf-cockpit-transcript.mjs:12`, hérité de la 69)
 Capture : `equipe-clair-1024-transcript-clavier.png`. Options : (a) rôle, sinon « un agent » (recommandé) ; (b) rôle + 8 caractères ; (c) rien.
-Réponse de Samuel (mot pour mot, canal, date) :
+Réponse de Samuel (mot pour mot, canal, date) : « Tout selon les recos (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04). Option 2a. Décision P70-D-23.
 
 ### 3. Ajustement d'Équipe à 45 %
 Captures : `equipe-clair-1024-termines-ajuste.png`, `equipe-sombre-1440-termines-ajuste.png`. Options : (a) garder ; (b) plafond 0,75 cadré sur la 1re carte (recommandé) ; (c) une colonne sous 701 px.
-Réponse de Samuel (mot pour mot, canal, date) :
+Réponse de Samuel (mot pour mot, canal, date) : « Tout selon les recos (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04). Option 3b. Décision P70-D-23.
 
 ### 4. Centrage borné de la visite
 Captures : `projet-clair-1440-visite3.png`, `code-sombre-1440-visite2.png`. Options : (a) garder (recommandé) ; (b) toujours centrer.
-Réponse de Samuel (mot pour mot, canal, date) :
+Réponse de Samuel (mot pour mot, canal, date) : « Tout selon les recos (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04). Option 4a. Décision P70-D-23.
 
 ### 5. La visite éclaire au lieu de sélectionner
 Captures : `projet-clair-1440-visite1.png`, `code-sombre-390-visite1.png`. Options : (a) garder (recommandé) ; (b) sélectionner.
-Réponse de Samuel (mot pour mot, canal, date) :
+Réponse de Samuel (mot pour mot, canal, date) : « Tout selon les recos (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04). Option 5a. Décision P70-D-23.
 
 ### 6. Plafond de zoom ×1,6 sur téléphone
 Captures : `code-sombre-390-tiroir-vide.png`, `projet-clair-390.png`. Options : (a) garder ; (b) relever (recommandé).
-Réponse de Samuel (mot pour mot, canal, date) :
+Réponse de Samuel (mot pour mot, canal, date) : « Tout selon les recos (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04). Option 6b. Décision P70-D-23.
 
 ### 7. Étape « 2 services extérieurs » de la visite
 Captures : `code-sombre-1440-visite2.png`, `code-sombre-1440-visite3.png`. Options : (a) viser le titre ; (b) viser les cartes des services (recommandé).
-Réponse de Samuel (mot pour mot, canal, date) :
+Réponse de Samuel (mot pour mot, canal, date) : « Tout selon les recos (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04). Option 7b. Décision P70-D-23.
 
 ### 8. Pastille du « ⋯ »
 Captures : `code-clair-390-menu.png`, `code-sombre-390-menu.png`. Options : (a) somme ; (b) point (recommandé) ; (c) Santé seul.
-Réponse de Samuel (mot pour mot, canal, date) :
+Réponse de Samuel (mot pour mot, canal, date) : « Tout selon les recos (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04). Option 8b. Décision P70-D-23.
 
 ### 9. « Par où commencer en haut » et bouton icône
 Captures : `code-sombre-1440-fr-parcours-menu.png`, `projet-sombre-1440-fr-parcours-menu.png`. Options : (a) garder ; (b) « le bouton de visite (icône), en haut » (recommandé). Infobulle « de ce code » sur Projet : « de ce projet » sauf avis contraire.
-Réponse de Samuel (mot pour mot, canal, date) :
+Réponse de Samuel (mot pour mot, canal, date) : « Tout selon les recos (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04). Option 9b. Décision P70-D-23.
 
 ### 10. « composant » / « prioritaire »
 Captures : `code-sombre-1440-fr-sante.png`, `code-sombre-1440-fr-base.png`. Options : (a) garder (recommandé) ; (b) « module » / « important ».
-Réponse de Samuel (mot pour mot, canal, date) :
+Réponse de Samuel (mot pour mot, canal, date) : « Tout selon les recos (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04). Option 10a. Décision P70-D-23.
 
 ### 11. Libellé du thème dans « ⋯ »
 Captures : `code-clair-390-menu.png`, `code-sombre-390-menu.png`. Options : (a) garder ; (b) « Thème : Auto » (recommandé).
-Réponse de Samuel (mot pour mot, canal, date) :
+Réponse de Samuel (mot pour mot, canal, date) : « Tout selon les recos (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04). Option 11b. Décision P70-D-23.
 
 ### 12. Lien « Nœud » décalé de 10 px
 Captures : `equipe-clair-1024-lien-focus.png`, `equipe-sombre-390-lien-survol.png`. Options : (a) aligner (recommandé) ; (b) garder.
-Réponse de Samuel (mot pour mot, canal, date) :
+Réponse de Samuel (mot pour mot, canal, date) : « Tout selon les recos (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04). Option 12a. Décision P70-D-23.
+
+### 13. Bouton « Par où commencer » sur l'onglet Équipe
+Options : (a) le désactiver (recommandé) ; (b) le laisser.
+Réponse de Samuel (mot pour mot, canal, date) : « Tout selon les recos (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04). Option 13a. Décision P70-D-23.
