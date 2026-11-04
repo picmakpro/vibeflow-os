@@ -120,3 +120,9 @@ Verts avant et après (la règle est déjà vraie) : S12.1 (verrous lus : `aband
 
 Correctif : `mission.vieNulle` (+ `vieNulleDit`) dans `vf-cockpit-interface.json` (ajout de clés de documentation, aucun champ de sortie nouveau ni retiré) ; paragraphe dédié dans l'en-tête de `vf-cockpit-avancement.mjs`.
 Vert : `test-cockpit-signal.sh` 70 PASS / 0 FAIL ; `test-cockpit-avancement.sh` 61 PASS / 0 FAIL (scratchpad `fix-socle-f08-vert.out`, `fix-socle-f08-vert-avancement.out`). Le témoin S12.4 a été resserré sur la lettre du paragraphe posé (`DEUX sens` … `etat` … `vieNulle`), le rouge ci-dessus est celui du premier libellé : l'en-tête d'avant ne contenait aucune des deux formes.
+
+## Non-régression (après F-08, `82341338`)
+
+Les 24 suites `test-cockpit-*.sh` sauf `signal-mod`, une à une, bornées à 900 s (scratchpad `fix-socle-reg-<nom>.out`, résumé `fix-socle-reg-resume.txt`) : 20 vertes du premier coup. Quatre rouges — `chaine-xss`, `direct`, `projet`, `reconnexion` — ne portent QUE l'assertion `H0` (un processus Chrome `cdp-chrome-tmp.*` survit à la suite) : des suites Chrome d'autres sessions (`test-cockpit-terminal-session.sh`, `test-cockpit-projet.sh`) tournaient en même temps sur le poste. Rejouées seules, sans concurrence : les quatre vertes, 0 FAIL (`fix-socle-rejeu-*.out`).
+Replay zsh : `test-cockpit-vie.sh` (50 PASS) et `test-cockpit-signal.sh` (0 FAIL) verts sous `zsh` comme sous `bash`.
+`check-machine-paths.sh` : ✓ 2477 fichiers, aucun chemin absolu de machine. `check-gate-touche.sh` : RIEN-A-JUGER (aucun chemin de la surface surveillée touché), donc aucun trailer `Gate-Touche:` requis.
