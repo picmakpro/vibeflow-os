@@ -23,3 +23,24 @@ La première version de Q3 passait par accident (la liste de la session portait 
 | A3 | session entière sans appui : `sp.emetteur.length > 0` et `sp.lanceur.length === 0` | vert | vert (garde : aucun lanceur aujourd'hui ; le témoin positif prouve que l'espion n'est pas muet) |
 
 A3 a d'abord échoué pour une panne de harnais (pas de `on('ui.render')` pour le bandeau, et l'onglet courant n'a pas de bouton à presser), corrigée avant la trace.
+
+## Vert (après le code)
+
+`claude plugin test plugin` : 54 pass / 0 fail (sortie `68-07-test.out` du scratchpad). Q1, Q2, Q3, A1, A2, A3 lus par `verdict.sh ... succes` : tous `ok` ; A1 et Q1 lus `echec` sur la sortie d'avant le code : `ok` (rouge établi).
+Passages intermédiaires : A1b rouge au premier vert (le plugin n'est pas testé par `fs.exists` : repli sans test d'existence, voir SUMMARY) ; A2 rouge (`cockpit : {url}` en JSX scinde le texte en deux enfants, corrigé en gabarit) ; A2d en boucle refusé par le harnais (un `lab()` par test).
+
+## Mutants (chacun rougit sur l'assertion visée ; sorties `68-07-mut-*.out`)
+
+| Mutant | Rouge |
+|--------|-------|
+| M1 gestes offerts à tout travailleur non terminé (plus de test d'appartenance à la liste de la session) | Q1, Q1b |
+| M2 plus de filtre des terminés en compact | Q2 |
+| M3 enfant écrit à la profondeur du parent | Q3 |
+| M4 adresse prise par `https?://\S+` | A2b |
+| M5 ordre des candidats : compte avant projet | A1d |
+| M6 délai 15 000 ms au lieu de 60 000 | A1 |
+| M7 code 2 retiré de la table | A2c |
+| M8 `void ouvrir()` au rendu du bouton | A3 (et A1, A1b, A1c, A1d, A2) |
+| M8-statique : `void ouvrir()` dans boutons.tsx / `ouvrirCockpit(` dans pane.tsx / `$.session.send` dans pane.tsx | M8.3 / M8.1 / M8.6 de `test-cockpit-signal-mod.sh` |
+
+Un premier M3 (réécriture de la boucle des enfants) ne compilait pas : tous les tests rouges, mutant écarté et rejoué (`marche(c, depth)`).
