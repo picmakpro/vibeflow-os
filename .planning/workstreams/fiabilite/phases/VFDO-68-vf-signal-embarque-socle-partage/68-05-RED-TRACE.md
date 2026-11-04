@@ -52,3 +52,24 @@ Arbre : `git rev-parse` du commit des témoins = tête `test(68-05): témoins du
 `verdict.sh … echec` rend 0 pour K7 K8 K10 K11 K15 K16. K17 (arbre à jour : aucune ligne `en retard`, phase toujours là) est verte avant le code : c'est un garde, non un témoin de comportement neuf ;
 sa preuve est le mutant « la ligne de retard s'écrit toujours » (annexe mutants). Un `the file ran to its end` en échec accompagne les rouges : conséquence des panes non démontées après une assertion tombée, il disparaît au vert.
 Ajouts au plan (ids K10 à K17 hors liste K1-K9 du plan, K5, K13, K14 aussi) : compact, mission inconnue (P68-D-23), singulier/origine, absence de fetch, arbre à jour, schéma, délai, appel unique.
+
+## Vert, puis mutants (copies jetables du dossier `plugin/` dans le scratchpad, une mutation chacune)
+
+Vert après le code : `claude plugin test plugin` **24 pass, 0 fail** (3 rejeux consécutifs, rc=0) ; `claude plugin validate --strict plugin` rc=0 ;
+`verdict.sh … succes` = 0 pour K1 K2 K3 K4 K6 K7 K8 K9 sous bash ET sous zsh.
+Un `the file ran to its end` (rejet non traité de l'environnement 18) est apparu avec les tests de la tâche 2 : bisecté en retirant un test à la fois, le coupable est K14
+(le rafraîchissement lancé par `void refresh()` survivait au démontage) ; K14 attend maintenant 250 ms la fin du vol (commit `test(68-05)` dédié).
+
+| Mutant (copie jetable) | Tests qui rougissent | Assertion visée |
+|---|---|---|
+| `cwd: pluginRoot` -> `cwd: root` | K1 | `a.cwd` différent de `/lab` |
+| `trace.includes('ENOENT')` -> `false` | K2 | « node introuvable dans le PATH » |
+| garde `if (enVol) return enVol` neutralisée | K14 | un seul processus pour deux rafraîchissements |
+| contrôle `o.schema !== SCHEMA` neutralisé | K5 | « schéma inattendu : … » |
+| contrôle de troncature retiré | K3 | « sortie de l'émetteur tronquée » |
+| pluriel figé à `commits` | K15 | « en retard de 1 commit » |
+| ligne de retard écrite même à 0 (`r.main !== null`) | K17 | aucune ligne `en retard` |
+| `fetchAgeS === null` neutralisé | K16 | « aucun fetch connu » |
+| mission prise de la 1re phase qui en a une, pas de l'arbre courant | K11 | « mission MISSION-70 · état inconnu » |
+| segment origin neutralisé | K15 | « origin/main local : en retard de 2 » |
+| arbre courant = `arbres[0]` | K7 K8 K10 K11 K15 K16 | phase active de l'arbre courant |
