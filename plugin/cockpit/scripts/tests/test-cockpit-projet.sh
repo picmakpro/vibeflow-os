@@ -234,16 +234,18 @@ assert_eq "P6.9 — phases citées mais illisibles : niveau bloquant" "$(node "$
 # P6.10-14 — relecture adverse SOBR-04 de v2.75.1 : coupe au champ suivant, gras dans la valeur, « aucune » suivi d'un ordre,
 # correctif sur un ROADMAP sans « ## Phases » et sans saut de ligne final, statut de jalon clos
 L7="$WORK/p7"; B="$L7/.planning"; mkdir -p "$B"
-printf '%s\n' '# Roadmap' '' '- [ ] **Phase 1: Un** - a' '- [ ] **Phase 2: Deux** - b' '- [ ] **Phase 3: Trois** - c' '- [ ] **Phase 4: Quatre** - d' '- [ ] **Phase 5: Cinq** - e' '' \
+printf '%s\n' '# Roadmap' '' '- [ ] **Phase 1: Un** - a' '- [ ] **Phase 2: Deux** - b' '- [ ] **Phase 3: Trois** - c' '- [ ] **Phase 4: Quatre** - d' '- [ ] **Phase 5: Cinq** - e' '- [ ] **Phase 6: Six** - f' '- [ ] **Phase 10: Dix** - j' '' \
   '### Phase 3: Trois' '**Depends on**: Phase 1 · **Parallélisable avec**: Phase 2' '' \
   '### Phase 4: Quatre' '**Depends on**: Phase 1 **et Phase 2** (ordre)' '' \
-  '### Phase 5: Cinq' '**Depends on**: aucune dépendance de code ; après 4' > "$B/ROADMAP.md"
+  '### Phase 5: Cinq' '**Depends on**: aucune dépendance de code ; après 4' '' \
+  '### Phase 6: Six' '**Depends on:** Phase 3 (la lib de lecture). La Phase 4 en dépend et consommera l objet avancement (P69-D-10).' '### Phase 10: Dix' '**Depends on**: Nothing' > "$B/ROADMAP.md"
 printf -- '---\nstatus: milestone_complete\n---\n' > "$B/STATE.md"
 graph "$L7" "$WORK/g7.json"
 deps() { G "$WORK/g7.json" "j.links.filter(l=>l.k===\"import\"&&l.b===\"n:ph-$1\").map(l=>l.a.slice(5)).sort().join(\",\")"; }
 assert_eq "P6.10 — « Phase 1 · **Parallélisable avec**: Phase 2 » : dépend de 1 seulement" "$(deps 3)" "1"
 assert_eq "P6.11 — « Phase 1 **et Phase 2** » : le gras ne coupe pas la valeur" "$(deps 4)" "1,2"
 assert_eq "P6.12 — « aucune dépendance de code ; après 4 » garde 4" "$(deps 5)" "4"
+assert_eq "P6.12b — « Phase 3 (…). La Phase 4 en dépend (P69-D-10) » : dépend de 3 seulement, ni la dépendante 4 ni le 10 d'un identifiant de décision" "$(deps 6)" "3"
 assert_eq "P6.13 — statut milestone_complete : pas de phase-courante-absente" "$(G "$WORK/g7.json" 'j.meta.vf.drift.regles.map(r=>r.regle).join(",")')" "depends-on,jalons-absents"
 printf '%s' "$(cat "$B/ROADMAP.md")" > "$B/ROADMAP.md"   # sans saut de ligne final
 node "$DR" "$L7" --diff > "$WORK/p7.patch"

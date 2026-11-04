@@ -43,8 +43,11 @@ function parseRoadmap(txt, ws, rel, phases) {
     ph.goal = (/\*\*(?:Goal|Objectif)(?::\*\*|\*\*\s*:)\s*([\s\S]*?)(?=\n\*\*|\n\n|(?![\s\S]))/.exec(m[3])?.[1] || '').trim();
     // dépendances : la valeur s'arrête au champ suivant posé sur la même ligne (« · » ou « **Autre**: … »), jamais sur un simple gras
     const dep = (/\*\*(?:Depends on|Dépend de)(?::\*\*|\*\*\s*:)\s*(.*)/.exec(m[3])?.[1] || '').split(/\s+·\s+|\s+(?=\*\*[^*]+(?::\*\*|\*\*\s*:))/)[0];
+    // la valeur ne dit que ce dont CETTE phase dépend : on retire les parenthèses, les identifiants de décision (« P69-D-10 ») et tout ce qui suit la première phrase
+    // (« … (la lib). La Phase 68 en dépend … » nomme une dépendante, pas une dépendance). Les numéros décimaux (« 41.3 ») ne coupent pas la phrase.
+    const depVal = dep.replace(/\([^)]*\)/g, ' ').replace(/\b[A-Z][A-Z0-9]*-D-\d+\b/g, ' ').split(/\.\s+(?=[A-ZÀ-Ý])/)[0];
     // vide : « Nothing… » comme avant, ou un mot seul (« rien », « aucune », tiret) ; « aucune dépendance de code ; après 51 » garde 51
-    ph.depends = /^\s*(nothing|none)/i.test(dep) || /^\s*(rien|aucune?|—|-)\s*$/i.test(dep) ? [] : [...dep.matchAll(/\b(\d+(?:\.\d+)?)\b/g)].map((x) => normNum(x[1])).filter((x) => x !== n);
+    ph.depends = /^\s*(nothing|none)/i.test(depVal) || /^\s*(rien|aucune?|—|-)\s*$/i.test(depVal) ? [] : [...depVal.matchAll(/\b(\d+(?:\.\d+)?)\b/g)].map((x) => normNum(x[1])).filter((x) => x !== n);
   }
 }
 
