@@ -456,8 +456,10 @@ if mutant_eng resize 's/^                taille(maitre, l, c)$/                p
   ent "python3 -I $WORK/temoins/plein-ecran.py\\r" > /dev/null; wf PRET > /dev/null; tail_ 50 132 > /dev/null; R2="$(wf 'WINCH 50x132' 2500)"
   assert_eq "M-RESIZE — le mutant ignore les lignes R : ni stty size (T11.2) ni WINCH (T13.3)" "$R1 $R2" "ABSENT ABSENT"; fin_sess
 else sans_effet M-RESIZE; fi
-if mutant_eng noeof 's/^                    break$/                    entrees.remove(0)/'; then
-  orphelins m9 "$OUT" "$MUT_ENG"; assert_eq "M-NOEOF — le mutant ignore l'EOF du fd 0 : l'assistant et le shell survivent (T12.4 rouge)" "$O_RES" "5 survivants"
+# Le mutant se juge sur l'assistant SEUL (pilote, fd 1 ouvert) : serveur vivant, Q n'arrête rien, seule la fin du fd 0 peut le faire sortir. Avec un serveur tué (T12.4), Q arrête
+# la session de son côté (IPC fermée -> arreterTout, SIGTERM) et le mutant paraît inoffensif ; sur ce chemin-là un EOF ignoré ne se voit pas.
+if mutant_eng noeof 's/^                    break$/                    time.sleep(0.05)/'; then
+  nohup_fin m9 eof "$MUT_ENG"; assert_eq "M-NOEOF — le mutant ignore l'EOF du fd 0 (assistant seul, fd 1 ouvert) : l'assistant ne sort pas de lui-même, il faut le tuer (T12.6c et T14.2 rouges)" "${NF_RES##* fin=}" "vivant"
 else sans_effet M-NOEOF; fi
 
 if mutant_eng groupesfiges 's/ms = envoyer_membres(sid, signal.SIGKILL)/ms = None/'; then
