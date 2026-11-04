@@ -1,20 +1,20 @@
 ---
 gsd_state_version: "1.0"
 milestone: vibeflow-v2.0
-current_phase: 69
-current_phase_name: Suivi du travail en cours dans le cockpit
-status: ready_to_execute
-last_updated: "2026-11-03T20:00:00.000Z"
-last_activity: 2026-11-03
-last_activity_desc: Phase 69 planifiée - 9 plans en 5 vagues (69-01..09), CKPT-13..28 couvertes, plan-checker externe PASSED (b53a27f9) ; arbitrages P69-D-25..27 ; next - execute-phase 69 (nœud exec-69)
+current_phase: 68
+current_phase_name: Embarquer vf-signal sur le socle partagé
+status: ready_to_plan
+last_updated: "2026-11-04T12:00:00.000Z"
+last_activity: 2026-11-04
+last_activity_desc: Phase 69 close - 9/9 plans, vérification 16/16, recette par juges Playwright, CKPT-13..28 cochées, PR #198 à merger ; next - Phase 68
 state_head: d7bf34c4
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 16
-  completed_plans: 7
+  completed_plans: 16
 milestone_name: « le cockpit VibeFlow » — Phases 67-72 —
-stopped_at: "Phase 69 planifiée le 2026-11-03 (9 plans, plan-checker externe PASSED, branche feat/phase-69-suivi-travail) ; arrêt avant exécution"
+stopped_at: "Phase 69 close le 2026-11-04 sur feat/phase-69-suivi-travail (PR #198, merge non fait) ; prochaine phase de l'ordre du jalon : 68"
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 69 (Suivi du travail en cours dans le cockpit, jalon `vibeflow-v2.0`) — PLANIFIÉE le 2026-11-03 : 9 plans en 5 vagues (`69-01-PLAN.md` à `69-09-PLAN.md`), CKPT-13..28 couvertes ; cadrage `69-CONTEXT.md` (P69-D-01..24 ; P69-D-14..16 validées par Samuel, session principale Claude Code, 2026-11-03 ; P69-D-25..27, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) ; plan-checker externe PASSED sur `b53a27f9` après trois passes de correction. EXÉCUTÉE le 2026-11-03 (mission `mgr69exec`, rapport `.planning/missions/2026-11-03-execution-phase-69.md`) : 9/9 plans avec SUMMARY, revue et audit sécurité passés après correction ciblée, CKPT-16 étendu au jalon mis en avant (celui du STATE), P69-D-28 consignée ; CKPT-13..28 non cochées en attendant la recette ; PR #198 ouverte le 2026-11-04 (PR séparée, sans release, P69-D-29), CI verte, origin/main intégré ; recette pré-déroulée dans Playwright, défauts A, B, C et points F corrigés (P69-D-32, D-33), visuels D et E reportés en 70 (P69-D-34) ; next : recette humaine `69-RECETTE-HUMAINE.md` par Samuel AVANT le merge (P69-D-30). Jalon courant : `vibeflow-v2.0` (Phases 67-72 ; ordre 69 → 68 → 70 → 71 → 72, P69-D-13) ; 1 phase sur 6 close (67).
+Phase: 69 (Suivi du travail en cours dans le cockpit, jalon `vibeflow-v2.0`) — CLOSE le 2026-11-04 (vérification 16/16 `69-VERIFICATION.md`, recette déroulée par juges Playwright, arbitrage de méthode de Samuel, session principale Claude Code, 2026-11-04 ; 4 écarts corrigés selon le tri de Samuel, AskUserQuestion, session principale Claude Code, 2026-11-04 ; CKPT-13..28 cochées ; PR #198 à merger, sans release) ; next : Phase 68 (ordre du jalon 69 → 68 → 70 → 71 → 72). Historique : PLANIFIÉE le 2026-11-03 : 9 plans en 5 vagues (`69-01-PLAN.md` à `69-09-PLAN.md`), CKPT-13..28 couvertes ; cadrage `69-CONTEXT.md` (P69-D-01..24 ; P69-D-14..16 validées par Samuel, session principale Claude Code, 2026-11-03 ; P69-D-25..27, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) ; plan-checker externe PASSED sur `b53a27f9` après trois passes de correction. EXÉCUTÉE le 2026-11-03 (mission `mgr69exec`, rapport `.planning/missions/2026-11-03-execution-phase-69.md`) : 9/9 plans avec SUMMARY, revue et audit sécurité passés après correction ciblée, CKPT-16 étendu au jalon mis en avant (celui du STATE), P69-D-28 consignée ; CKPT-13..28 non cochées en attendant la recette ; PR #198 ouverte le 2026-11-04 (PR séparée, sans release, P69-D-29), CI verte, origin/main intégré ; recette pré-déroulée dans Playwright, défauts A, B, C et points F corrigés (P69-D-32, D-33), visuels D et E reportés en 70 (P69-D-34) ; recette close le 2026-11-04. Jalon courant : `vibeflow-v2.0` (Phases 67-72 ; ordre 69 → 68 → 70 → 71 → 72, P69-D-13) ; 2 phases sur 6 closes (67, 69).
 
 Phase 67 (Cockpit floorplan sur socle partagé, jalon `vibeflow-v2.0`) — CLOSE le 2026-11-03 : 7/7 plans, quatre tours de correction (FIX-A à FIX-D), CKPT-01..12 cochées, recette humaine validée par Samuel (`67-RECETTE-HUMAINE.md` § 8.2) ; release `v2.75.0` préparée, tag et release GitHub après le merge de la PR #187 (geste de Samuel). Suite : Phase 69 inscrite et cadrée (suivi du travail en cours dans le cockpit, option A de la note `.planning/notes/2026-11-03-cockpit-progression-en-cours.md`), puis Phase 68 (vf-signal, dépend de la 69) ; Phase 70 inscrite pour les finitions UI (refonte mobile, visite guidée, anglais résiduel) — arbitrages Samuel, AskUserQuestion session principale, 2026-11-03. Précédemment, Phase 62 CLOSE le 2026-10-29 (décision A, réexamen 2027-01-31, aucune release : ADR-073) ; les Phases 59, 60 et 61 sont livrées (`v2.73.0`, `v2.74.0`)
 Jalon précédent : `equipe-produit-v1.0` (Phases 57-66, inscrit 2026-10-08), non clos ; 6 phases sur 10 closes ou exécutées. `fiabilite-v1.0` est CLOS

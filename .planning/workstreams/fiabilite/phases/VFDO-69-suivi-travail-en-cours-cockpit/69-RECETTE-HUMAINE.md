@@ -1,6 +1,6 @@
 # 69 — Recette humaine de fin de phase (suivi du travail en cours dans le cockpit)
 
-**Statut :** À FAIRE — rédigée le 2026-11-03, non déroulée
+**Statut :** CLOSE — déroulée le 2026-11-04 par juges Playwright (arbitrage de méthode de Samuel, session principale Claude Code, 2026-11-04), 4 écarts corrigés
 
 Ce fichier prépare la recette ; il ne la remplit pas. Elle se déroule une étape à la fois. Chaque étape dit ce que Samuel
 fait, ce qu'il doit voir, et laisse une case de retour. La réponse est consignée **mot pour mot, avec son canal et sa date**
@@ -205,6 +205,8 @@ Verdict des juges (Playwright, 2026-11-04) : OK (rien ne se superpose, trois ong
 Verdict des juges (Playwright, 2026-11-04) : Constat : rien d'inutilisable (en-tête sur deux rangées, aucun bouton hors écran, tiroir et panneau en feuille défilable, « Lire le transcript » atteignable en défilant).
 
 ## 8. Fin de recette
+
+**Clôture (2026-11-04).** Recette déroulée par deux juges Playwright, selon l'arbitrage de méthode de Samuel (session principale Claude Code, 2026-11-04, consigné dans « Tri »). Les quatre écarts relevés (« Dépend de », verrou « Driver libre », contraste de « En cours », pied des cartes et ligne anglaise de l'export) sont corrigés par les commits `36acb0af`, `63b7869f`, `db8f6736`, `f66ba2f2`, `1e820393`, selon le tri de Samuel (AskUserQuestion, session principale Claude Code, 2026-11-04). Les étapes 3 et 6 portent encore leur verdict KO d'origine : leurs correctifs sont couverts par des suites vertes (vérification `69-VERIFICATION.md`, 21 suites du module à 0) mais n'ont pas été rejoués à l'œil par un juge. Le cas d'un agent actif relié à son nœud n'est couvert que par fixture (E21). Les colonnes « Retour de Samuel » restent vides : aucun avis humain n'a été dicté, aucune n'a été remplie par un agent.
 
 **Étape 14 — Arrêter.**
 - Faire : `node plugin/cockpit/scripts/vf-cockpit.mjs stop --lab .`

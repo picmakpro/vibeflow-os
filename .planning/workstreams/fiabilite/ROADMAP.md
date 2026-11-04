@@ -125,7 +125,7 @@
 - [ ] Phase 66: Grille de sévérité des juges et convergence des boucles de revue (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 - [x] Phase 67: Cockpit floorplan sur socle partagé (inscrite 2026-11-01, jalon vibeflow-v2.0) — complete 2026-11-03 : 7/7 plans et 4 tours de correction (FIX-A à FIX-D), recette humaine validée par Samuel (`67-RECETTE-HUMAINE.md` § 8.2), CKPT-01..12 cochées ; release `v2.75.0` préparée (tag et release GitHub après le merge de la PR #187, geste de Samuel)
 - [ ] Phase 68: Embarquer vf-signal sur le socle partagé (inscrite 2026-11-01, jalon vibeflow-v2.0)
-- [ ] Phase 69: Suivi du travail en cours dans le cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
+- [x] Phase 69: Suivi du travail en cours dans le cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-04 : 9/9 plans, recette déroulée par juges Playwright (arbitrage de méthode de Samuel, session principale Claude Code, 2026-11-04), 4 écarts corrigés, CKPT-13..28 cochées, vérification 16/16 (`69-VERIFICATION.md`) ; PR #198, sans release (P69-D-29)
 - [ ] Phase 70: Finitions UI du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
 - [ ] Phase 71: Terminal intégré au cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
 - [ ] Phase 72: Lancer du travail depuis les cartes du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
@@ -875,7 +875,7 @@ Plans:
 
 ### Phase 69: Suivi du travail en cours dans le cockpit
 
-> Cadrée le 2026-11-03 (`69-CONTEXT.md`, P69-D-01..11), cadrage mis à jour le même jour (P69-D-12..24 : équipe au travail) ; arbitrages de planification P69-D-25..27 ; planifiée le 2026-11-03 (9 plans, 5 vagues, plan-checker externe PASSED sur `b53a27f9`) ; exécutée le 2026-11-03 (9/9 plans, revue et audit sécurité passés après correction ciblée, P69-D-28 : onglets resserrés gardés en 69, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-03) ; recette humaine `69-RECETTE-HUMAINE.md` rédigée, non déroulée ; PR groupée avec la 68.
+> Cadrée le 2026-11-03 (`69-CONTEXT.md`, P69-D-01..11), cadrage mis à jour le même jour (P69-D-12..24 : équipe au travail) ; arbitrages de planification P69-D-25..27 ; planifiée le 2026-11-03 (9 plans, 5 vagues, plan-checker externe PASSED sur `b53a27f9`) ; exécutée le 2026-11-03 (9/9 plans, revue et audit sécurité passés après correction ciblée, P69-D-28 : onglets resserrés gardés en 69, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-03) ; recette `69-RECETTE-HUMAINE.md` close le 2026-11-04 ; PR groupée avec la 68.
 
 **Goal:** La carte Projet du cockpit dit où en est vraiment une phase : un état dérivé de traces locales (`a-faire`, `en-cours`, `a-recetter`, `fait`), un décompte des plans qui ne mêle plus les correctifs de mission, les missions rattachées à leur phase, un jalon qui n'affiche plus « 0 % à faire » quand ses plans sont exécutés ; la règle STATE → statut, seule source fausse, est retirée. Elle montre aussi l'équipe au travail : l'arbre session → manager → workers relié aux nœuds de mission, la dernière action lisible de chaque agent, un onglet « Équipe » et le transcript réduit d'un agent, lu à la demande.
 **Requirements**: CKPT-13..CKPT-28
