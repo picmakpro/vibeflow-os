@@ -223,7 +223,7 @@ mkq() { # mkq <dir> [statut] : ROADMAP à une phase ; STATE.md seulement si un s
 mkq "$WORK/q15"; H loc "$SCRIPTS" "$WORK/q15" "Où en est-on ?" > "$WORK/q15.json"
 assert_eq "Q15.1 — lab sans STATE.md : réponse locale non nulle" "$(H json "$WORK/q15.json" 'j?"oui":"non"')" "oui"
 assert_eq "Q15.2 — aucun « ? » en valeur, aucune virgule orpheline, aucun « le . »" "$(H json "$WORK/q15.json" '/\?\s*[,.]|·\s*,|le \.|: \?|phase \?/.test(j.answer.replace(/Où en est-on \?/g,""))')" "false"
-assert_eq "Q15.3 — la réponse dit qu'il n'y a pas de STATE.md" "$(H json "$WORK/q15.json" '/pas de STATE\.md/.test(j.answer)')" "true"
+assert_eq "Q15.3 — la réponse dit qu'il n'y a pas de STATE.md" "$(H json "$WORK/q15.json" '/pas de STATE\.md/i.test(j.answer)')" "true"
 assert_eq "Q15.4 — pas de titre « À finir » suivi d'une liste vide" "$(H json "$WORK/q15.json" 'j.answer.split("\n").map((l,i,a)=>/^À finir/.test(l)&&!/^- /.test(a.slice(i+1).find(x=>x.trim())||"")).some(Boolean)')" "false"
 mkq "$WORK/q16" ready_to_execute; H loc "$SCRIPTS" "$WORK/q16" "Où en est-on ?" > "$WORK/q16.json"
 assert_eq "Q16.1 — la réponse locale n'a aucun statut brut (mot à tiret bas)" "$(H json "$WORK/q16.json" '/\b[a-z]+_[a-z_]+\b/.test(j.answer)')" "false"

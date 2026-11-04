@@ -142,9 +142,15 @@ export function buildProjectGraph(root, { layout } = {}) {
   };
 }
 
+// libellés français des valeurs de `status:` que gsd-core écrit dans STATE.md ; table unique, reprise à l'identique par le navigateur (STATUT de 00-vibeflow.js, parité vérifiée par Q17)
+export const STATUTS = { planning: 'en planification', ready_to_plan: 'prêt à planifier', ready_to_execute: 'prêt à exécuter', executing: 'en exécution', in_progress: 'en cours',
+  verifying: 'en vérification', ready_for_verification: 'prêt à vérifier', paused: 'en pause', blocked: 'bloqué', complete: 'terminée', completed: 'terminée', closed: 'clos' };
+// valeur inconnue -> null : elle est omise, jamais affichée brute (P70-D-04)
+export function statutLisible(x) { return Object.hasOwn(STATUTS, String(x ?? '').trim()) ? STATUTS[String(x).trim()] : null; }
+
 // sous-titre du projet : seulement les champs connus (un lab sans STATE.md n'affiche ni « ? » ni parenthèses vides), sinon les effectifs
 function resume(state, curPhase, nbPhases, files) {
-  const seg = [state.milestone ? `Jalon ${state.milestone}` : '', curPhase ? `phase ${curPhase}${state.current_phase_name ? ` (${state.current_phase_name})` : ''}` : '', state.status || ''].filter(Boolean);
+  const seg = [state.milestone ? `Jalon ${state.milestone}` : '', curPhase ? `phase ${curPhase}${state.current_phase_name ? ` (${state.current_phase_name})` : ''}` : '', statutLisible(state.status) || ''].filter(Boolean);
   if (seg.length) return seg.join(' · ') + '.';
   const plans = files.filter((f) => f.p.endsWith('-PLAN.md')).length;
   return `${nbPhases} phase${nbPhases > 1 ? 's' : ''} · ${plans} plan${plans > 1 ? 's' : ''}.`;

@@ -82,8 +82,8 @@
 
   // ---------- onglet Projet : panneau d'ensemble ----------
   // statuts de STATE affichés en français (valeur inconnue : telle quelle)
-  const STATUT = { closed: 'clos', complete: 'terminée', completed: 'terminée', executing: 'en exécution', planning: 'en planification', paused: 'en pause', verifying: 'en vérification' };
-  const statut = (x) => STATUT[x] || x || '';
+  const STATUT = { planning: 'en planification', ready_to_plan: 'prêt à planifier', ready_to_execute: 'prêt à exécuter', executing: 'en exécution', in_progress: 'en cours', verifying: 'en vérification', ready_for_verification: 'prêt à vérifier', paused: 'en pause', blocked: 'bloqué', complete: 'terminée', completed: 'terminée', closed: 'clos' };
+  const statut = (x) => (Object.hasOwn(STATUT, x) ? STATUT[x] : '');
   // dérive de format de la planification (vf-cockpit-drift.mjs) : rien n'est corrigé d'ici, le panneau donne la commande
   const NIV = { bloquant: 'blocked', 'toléré': 'todo', info: 'todo' };
   const derive = (D) => !D || !D.regles || !D.regles.length ? '' : `<div class="sec"><h3>Format de la planification <span class="c">${D.regles.reduce((s, r) => s + (Number(r.n) || 0), 0)}</span></h3>
@@ -104,7 +104,7 @@
       // « Maintenant » : seulement les champs connus (un lab sans STATE.md n'a ni jalon, ni phase, ni statut)
       const desc = V.lastDesc || '';
       const now = V.milestone || V.phase || V.status
-        ? `<div class="vf-now" style="margin-top:12px"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${V.status ? `<span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span>` : ''}${desc ? `<div style="margin-top:6px;color:var(--text-3);font-size:12px">${h(desc.slice(0, 260))}${desc.length > 260 ? '…' : ''}</div>` : ''}</div>`
+        ? `<div class="vf-now" style="margin-top:12px"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${statut(V.status) ? `<span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span>` : ''}${desc ? `<div style="margin-top:6px;color:var(--text-3);font-size:12px">${h(desc.slice(0, 260))}${desc.length > 260 ? '…' : ''}</div>` : ''}</div>`
         : '';
       return `<div class="sec"><div class="ph"><span class="kind">Projet</span></div><h2 class="pt">${h(G.project.name)}</h2>
           ${now}
