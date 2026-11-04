@@ -87,7 +87,7 @@ Chaque rouge est tracé pour la bonne raison : clé `terminal` absente (T7.7), c
 
 ### FAIL — POSE.3 — le journal dit « assistant du terminal introuvable »
 - attendu : `[assistant du terminal introuvable]`
-- obtenu : `[VibeFlow: http://127.0.0.1:51867 / asking via Claude Code CLI 2.1.317 (Claude Code) (/Users/samuel/.local/bin/claude)]`
+- obtenu : `[VibeFlow: http://127.0.0.1:51867 / asking via Claude Code CLI 2.1.317 (Claude Code) (~/.local/bin/claude)]`
 
 ### FAIL — M-HORS-MOTEUR — mutant sans effet (assistant absent de terminal/ dans le cache)
 - attendu : `[effet]`
