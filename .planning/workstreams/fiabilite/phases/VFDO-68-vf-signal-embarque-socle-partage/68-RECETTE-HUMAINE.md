@@ -152,7 +152,7 @@ Réponse de Samuel (AskUserQuestion, session principale Claude Code, 2026-11-04)
 | # | Écart | Sort |
 |---|---|---|
 | N1 | Âges négatifs dans la vue Équipe (« -4 s ») | corrigé (v3) : bornés à 0 |
-| N2 | « depot » sans accent, âge du verrou incohérent, doublon sur la ligne de verrou | corrigé (v3) sur la ligne de verrou de la pane et le panneau web ; **reliquat dans la vue Équipe de la pane, en correction (passe finale)** |
+| N2 | « depot » sans accent, âge du verrou incohérent, doublon sur la ligne de verrou | corrigé (v3) sur la ligne de verrou de la pane et le panneau web ; reliquat de la vue Équipe de la pane **corrigé** (passe finale, commit `9aed38ea`, témoin FIN-5 de `68-FIX-FIN-RED-TRACE.md`) |
 | N3 | Types de la vue Équipe en anglais (« lock », « dag-node », « exec ») | corrigé (v3) |
 | N4 | Panneau Phase web : « Ligne de ROADMAP » avec `**` bruts (antérieur à la 68) | BACKLOG |
 | N5 | Vue macro : phases « à faire » que les worktrees disent « en cours » ou « à recetter » | BACKLOG |
@@ -166,8 +166,8 @@ Les âges d'un verrou suivent le battement partout (P68-D-39, décision du manag
 
 Le juge v3 a relevé trois reliquats, sans régression :
 
-1. **N2 dans la vue Équipe de la pane** (« depot » brut pour un verrou de dépôt) — **en correction (passe finale)**. Le manager mettra à jour ce statut après intégration.
-2. **Brief interactif** : clé brute `seven_day : 35 %` et « 1 outils » sans accord — **en correction (passe finale)**. Le manager mettra à jour ce statut après intégration.
+1. **N2 dans la vue Équipe de la pane** (« depot » brut pour un verrou de dépôt) — **corrigé** (passe finale, commit `9aed38ea`, témoin FIN-5 : « actif · dépôt · 46 s »).
+2. **Brief interactif** : clé brute `seven_day : 35 %` et « 1 outils » sans accord — **corrigé** (passe finale, commit `9aed38ea`, témoins FIN-6a et FIN-6c de `68-FIX-FIN-RED-TRACE.md` : « - 7 j : 35 % », « 1 outil »). Corrigé par le code, non rejugé par un juge navigateur.
 3. **Unités d'âge différentes dans le tiroir web** : « 223 s » dans l'en-tête et « 4 min » dans la ligne du dessous (cohérents à l'arrondi près) — **non corrigé**, affaire de goût, non remontée à Samuel.
 
 ## Après recette
