@@ -65,3 +65,6 @@ Rouge sur `371dd2cd` (scratchpad `fix-socle-f05-rouge.out`) :
 | S10.2 verrou dans le worktree seulement | `main:aucune#feat/x:2` | `main:aucune#feat/x:aucune` |
 
 Témoin S10.0 (vert) : le faux script répond bien selon le dossier.
+
+Choix : lecture par arbre en lab plat (la forme la plus simple qui tienne sans restreindre l'hypothèse). `collectSignal` passe `{ scriptsDir, home }` à `readPlanning` des arbres non courants quand `verrous.plat` ; `readPlanning` lit alors paresseusement le verrou de la racine de CET arbre, seulement s'il porte un nœud running. En lab partitionné la lecture unique reste (dossier git commun = même verrou pour tous les arbres : le commentaire est désormais écrit pour ce régime seulement).
+Vert : `test-cockpit-signal.sh` 63 PASS / 0 FAIL (scratchpad `fix-socle-f05-vert.out`).

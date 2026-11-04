@@ -31,12 +31,14 @@ const meme = (a, b) => { try { return fs.realpathSync(a) === fs.realpathSync(b);
 export function collectSignal(root, { home, now = Date.now(), scriptsDir } = {}) {
   root = path.resolve(root);
   const layout = planningLayout(root);
-  const verrous = lireVerrous(root, { scriptsDir, home }); // une seule lecture, partagée par tous les arbres
+  const verrous = lireVerrous(root, { scriptsDir, home }); // verrous de la racine : ceux de la sortie, et ceux de tous les arbres d'un lab partitionné (F-05)
   const P = readPlanning(root, layout, { verrous });
   const phases = [...P.phases.values()].filter((p) => !p.archive);
   const base = brancheBase(root), common = gitCommonDir(root), tous = arbresGit(root);
   const arbres = tous.map((a) => {
-    const pl = meme(a.chemin, root) ? P : readPlanning(a.chemin, planningLayout(a.chemin), { verrous }); // le dossier commun des verrous est le même pour tous les arbres
+    // F-05 : en lab partitionné le dossier des verrous est le dossier git commun, le même pour tous les arbres (lecture unique, partagée) ;
+    // en lab plat le verrou est propre à chaque checkout (.planning/DRIVER.lock) : la vie d'une mission d'un arbre se lit sur le verrou de CET arbre (lecture paresseuse, faite par readPlanning à sa racine)
+    const pl = meme(a.chemin, root) ? P : readPlanning(a.chemin, planningLayout(a.chemin), verrous.plat ? { scriptsDir, home } : { verrous });
     const actifs = [...pl.phases.values()].filter((p) => !p.archive);
     return {
       label: a.principal ? 'arbre principal' : nettoie(path.relative(tous[0].chemin, a.chemin) || a.chemin, 200), branche: nettoie(a.branche, 80), principal: a.principal, courant: meme(a.chemin, root),
