@@ -21,6 +21,8 @@ export function vueTerminal(cfg) {
     arrete: { role: 'alert', titre: 'Serveur arrêté', corps: ['Le cockpit est arrêté. Relancez ', COMMANDE, '.'], d: 'M8 2v6 M4.5 4.5a5 5 0 1 0 7 0' },
   };
   const TEXTES = { fermee: 'La session a été fermée.', reconnexion: 'Reconnexion…' };
+  // caractère invisible ou de contrôle d'affichage (bidi, zéro largeur, Tag, C0/C1) : UNE définition, partagée entre le déclencheur du bandeau et le marquage ⟨U+XXXX⟩ de l'aperçu
+  const INVISIBLE = /[\p{Cc}\p{Cf}\p{Cs}\u{E0000}-\u{E007F}]/u;
   const entier = (v) => String(Math.trunc(Number(v)) || 0);
   const SOMBRE = {
     background: '#191919', foreground: '#ececec', cursor: '#ececec', cursorAccent: '#0f0f0f', selectionBackground: 'rgba(255,255,255,.12)', selectionInactiveBackground: 'rgba(255,255,255,.07)',
@@ -35,6 +37,7 @@ export function vueTerminal(cfg) {
     scrollbarSliderBackground: 'rgba(0,0,0,.10)', scrollbarSliderHoverBackground: 'rgba(0,0,0,.20)', scrollbarSliderActiveBackground: 'rgba(0,0,0,.30)',
   };
   window.vfTermVue = {
+    invisible: (t) => INVISIBLE.test(String(t).replace(/\t/g, '')),
     theme: (clair) => Object.assign({}, clair ? CLAIR : SOMBRE),
     carte(type, action) {
       const c = CARTES[type]; if (!c) return;
@@ -72,25 +75,45 @@ export function vueTerminal(cfg) {
       const LIMITE = 20000, brut = String(texte);
       const SAUT = /\r\n|\r|\n|\u2028|\u2029/g;
       const marque = (c) => '\u27e8U+' + c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0') + '\u27e9';
-      const neutre = (t) => t.replace(SAUT, '\u21b5\n').replace(/[\p{Cc}\p{Cf}\p{Cs}]/gu, (c) => (c === '\n' || c === '\t' ? c : marque(c)));
+      const neutre = (t) => t.replace(SAUT, '\u21b5\n').replace(new RegExp(INVISIBLE.source, 'gu'), (c) => (c === '\n' || c === '\t' ? c : marque(c)));
+      // les suites d'au moins TROIS lignes vides (ou blanches : espaces Unicode, jamais une tabulation ni un invisible) sont repliées à l'AFFICHAGE : le texte rendu à `coller` reste l'original
+      const apercu = (t) => {
+        const lg = [], re = /\r\n|\r|\n|\u2028|\u2029/g; let i = 0, m, s = '';
+        while ((m = re.exec(t))) { lg.push([t.slice(i, m.index), true]); i = re.lastIndex; }
+        if (i < t.length) lg.push([t.slice(i), false]);
+        for (let k = 0; k < lg.length;) {
+          let e = k; while (e < lg.length && /^\p{Zs}*$/u.test(lg[e][0])) e++;
+          if (e - k >= 3) { s += `\u27e8${e - k} lignes vides\u27e9\n`; k = e; continue; }
+          s += neutre(lg[k][0]) + (lg[k][1] ? '\u21b5\n' : ''); k += 1;
+        }
+        return s;
+      };
       const nbCar = (t) => t.length - (t.match(/[\ud800-\udbff][\udc00-\udfff]/g) || []).length;
       const sauts = (brut.match(SAUT) || []).length, lignes = Math.max(1, sauts + (/(\r\n|\r|\n|\u2028|\u2029)$/.test(brut) ? 0 : 1));
       const total = nbCar(brut), plur = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
       let n = Math.min(brut.length, LIMITE); if (n < brut.length && /[\ud800-\udbff]/.test(brut.charAt(n - 1))) n -= 1;
       const b = el('div', 'vf-q-bandeau vf-q-collage'); b.id = 'collage'; b.setAttribute('role', 'group'); b.setAttribute('aria-label', 'Collage à confirmer');
       b.appendChild(el('span', 'vf-q-pastille vf-q-attention'));
-      b.appendChild(el('span', 'vf-q-texte', /[\r\n\u2028\u2029]/.test(brut) ? 'Le texte contient un retour à la ligne.' : 'Le texte contient un caractère de contrôle.'));
+      b.appendChild(el('span', 'vf-q-texte', /[\r\n\u2028\u2029]/.test(brut) ? 'Le texte contient un retour à la ligne.' : /\p{Cc}/u.test(brut.replace(/\t/g, '')) ? 'Le texte contient un caractère de contrôle.' : 'Le texte contient un caractère invisible.'));
       b.appendChild(el('span', 'vf-q-decompte', `${plur(lignes, 'ligne')} · ${plur(total, 'caractère')}`));
       const a = bouton('Annuler', annuler, 'vf-q-secondaire'), c = bouton('Coller', coller);
       b.appendChild(a); b.appendChild(c);
-      const zone = el('div', 'vf-q-apercu', neutre(brut.slice(0, n))); zone.id = 'collage-apercu'; zone.tabIndex = 0; zone.setAttribute('role', 'region'); zone.setAttribute('aria-label', 'Texte à coller, intégral');
+      const zone = el('div', 'vf-q-apercu', apercu(brut.slice(0, n))); zone.id = 'collage-apercu'; zone.tabIndex = 0; zone.setAttribute('role', 'region'); zone.setAttribute('aria-label', 'Texte à coller, intégral');
       b.appendChild(zone);
+      // ce qui est confirmé doit être vu : si l'aperçu déborde de sa zone, le dire (avant le bouton Coller dans l'ordre de lecture), et le redire si la taille change
+      const depasse = () => {
+        const ancien = b.querySelector('.vf-q-depasse'); if (ancien) ancien.remove();
+        if (zone.scrollHeight > zone.clientHeight + 1 || zone.scrollWidth > zone.clientWidth + 1) {
+          const w = el('div', 'vf-q-depasse'); w.setAttribute('role', 'status');
+          w.appendChild(el('span', 'vf-q-texte vf-q-attention-texte', 'Le texte dépasse la zone : faites défiler avant de coller.')); b.insertBefore(w, zone);
+        }
+      };
       if (n < brut.length) {
         const note = el('div', 'vf-q-reste');
         note.appendChild(el('span', 'vf-q-texte', `${plur(total - nbCar(brut.slice(0, n)), 'caractère')} non affiché${total - nbCar(brut.slice(0, n)) > 1 ? 's' : ''}.`));
-        const t = bouton('Tout afficher', () => { zone.textContent = neutre(brut); note.remove(); }, 'vf-q-secondaire'); note.appendChild(t); b.appendChild(note);
+        const t = bouton('Tout afficher', () => { zone.textContent = apercu(brut); note.remove(); depasse(); }, 'vf-q-secondaire'); note.appendChild(t); b.appendChild(note);
       }
-      document.body.appendChild(b); a.focus();
+      document.body.appendChild(b); depasse(); if (typeof ResizeObserver === 'function') new ResizeObserver(depasse).observe(zone); a.focus();
     },
   };
 }

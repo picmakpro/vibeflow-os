@@ -200,6 +200,31 @@ await executer(chrome, async (sp) => {
       await bouton('Tout afficher'); const apres = await s.ev(`document.getElementById('collage-apercu').textContent.length`);
       r.c.long = { note, avant, apres, reste: await s.ev(`!!document.querySelector('#collage .vf-q-reste')`) }; await bouton('Annuler');
     });
+    // N9 (P71-D-30) : UNE ligne portant un invisible ou un caractère de contrôle d'affichage demande confirmation ; « Coller » reste le seul chemin vers le shell
+    const entree = () => touche({ key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+    r.c.n9 = {};
+    for (const [nom, car] of [['bidi', '\u202e'], ['zwsp', '\u200b'], ['tag', '\u{E0041}']]) {
+      await essai(`n9-${nom}`, async () => {
+        await vide(); const orig = `echo hello${car}; touch ${M('n9' + nom)}; `; await coller(orig); await pause(600);
+        const sans = { bandeau: await bandeau(), marqueur: await existe('n9' + nom), entre: (await ent()) };
+        await bouton('Coller'); await pause(600); await entree(); await pause(1500);
+        r.c.n9[nom] = { ...sans, apres: await existe('n9' + nom) };
+      });
+    }
+    await essai('n9-ordinaire', async () => { await vide(); await coller('echo café àî""OK'); await pause(500); r.c.n9.ordinaire = { bandeau: await bandeau(), entre: (await ent()).includes('café') }; });
+    // N10 (P71-D-30) : ce qui est confirmé est visible sans défilement ; les suites de lignes vides sont repliées ; le dépassement est dit ; l'envoi reste l'original (sha256)
+    await essai('n10', async () => {
+      await vide(); const orig = '\n'.repeat(60) + `touch ${M('n10')}\n`; await coller(orig); await pause(600);
+      const mesure = await s.ev(`(() => { const z = document.getElementById('collage-apercu'); return { txt: z.textContent, debord: z.scrollHeight > z.clientHeight + 1, avert: !!document.querySelector('#collage .vf-q-depasse'), focus: document.activeElement.textContent }; })()`);
+      const sans = await existe('n10'); await bouton('Coller'); await pause(2500); const h = async (x) => (await import('node:crypto')).createHash('sha256').update(x, 'utf8').digest('hex');
+      r.c.n10 = { replie: mesure.txt.includes('⟨' + 60 + ' lignes vides⟩'), charge: mesure.txt.includes(`touch ${M('n10')}`), debord: mesure.debord, avert: mesure.avert, focus: mesure.focus, longueur: mesure.txt.length,
+        sans, apres: await existe('n10'), sha: (await h(await ent())) === (await h(orig.replace(/\n/g, '\r'))) };
+    });
+    await essai('n10-depasse', async () => {
+      await vide(); await coller('ligne\n'.repeat(200)); await pause(600);
+      r.c.n10d = await s.ev(`(() => { const z = document.getElementById('collage-apercu'); const w = document.querySelector('#collage .vf-q-depasse'); return { debord: z.scrollHeight > z.clientHeight + 1, texte: w ? w.textContent : '', focus: document.activeElement.textContent }; })()`);
+      await bouton('Tout afficher').catch(() => {}); await bouton('Annuler');
+    });
     await essai('depot', async () => {
       const lance = (code) => s.ev(`(() => { const ta = document.querySelector('.xterm-helper-textarea'); ${code} })()`);
       r.c.depot = { drop: await lance(`const dt = new DataTransfer(); dt.setData('text/plain', 'touch ${M('d1')}\\n'); return ta.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));`) };
@@ -440,6 +465,10 @@ assert_eq "T21.11 — C12 : une charge placée après le 275e caractère est dan
 assert_eq "T21.12 — le décompte de lignes et de caractères est présent et juste (ab/cd/ef : 3 lignes, 8 caractères)" "$(rj "$CL" 'j.c.compte')" "3 lignes · 8 caractères"
 assert_eq "T21.13 — U+202E et U+200B apparaissent en marqueur visible dans l'aperçu (jamais bruts), et le texte envoyé est identique octet pour octet à l'original (sha256)" "$(rj "$CL" '"u202e="+j.c.invis.u202e+" u200b="+j.c.invis.u200b+" brut="+j.c.invis.brut+" sha="+j.c.invis.sha')" "u202e=true u200b=true brut=true sha=true"
 assert_eq "T21.14 — un texte de 30 001 caractères : la borne est dite (10 001 caractères non affichés), « Tout afficher » montre tout" "$(rj "$CL" '"note="+j.c.long.note+" avant="+j.c.long.avant+" apres>=30000="+(j.c.long.apres>=30000)+" reste="+j.c.long.reste')" "note=10001 caractères non affichés. avant=20000 apres>=30000=true reste=false"
+assert_eq "T21.16 — N9 : une seule ligne portant U+202E, U+200B ou un caractère Tag ouvre le bandeau, rien n'est envoyé ni créé avant « Coller » ; témoin positif : après « Coller » puis Entrée le marqueur existe (la sonde sait voir l'exécution)" "$(rj "$CL" '["bidi","zwsp","tag"].map(k=>k+":"+j.c.n9[k].bandeau+"/"+j.c.n9[k].marqueur+"/["+j.c.n9[k].entre+"]/"+j.c.n9[k].apres).join(" ")')" "bidi:true/false/[]/true zwsp:true/false/[]/true tag:true/false/[]/true"
+assert_eq "T21.17 — N9 : une ligne ordinaire accentuée passe sans bandeau et part au shell" "$(rj "$CL" '"bandeau="+j.c.n9.ordinaire.bandeau+" entre="+j.c.n9.ordinaire.entre')" "bandeau=false entre=true"
+assert_eq "T21.18 — N10 : 60 lignes vides puis une commande : l'aperçu replie la suite en ⟨60 lignes vides⟩, la commande est visible SANS défilement ni avertissement, le focus reste sur « Annuler », rien n'est créé avant « Coller », et le texte envoyé est identique à l'original (sha256) et s'exécute" "$(rj "$CL" '"replie="+j.c.n10.replie+" charge="+j.c.n10.charge+" debord="+j.c.n10.debord+" avert="+j.c.n10.avert+" focus="+j.c.n10.focus+" sans="+j.c.n10.sans+" apres="+j.c.n10.apres+" sha="+j.c.n10.sha')" "replie=true charge=true debord=false avert=false focus=Annuler sans=false apres=true sha=true"
+assert_eq "T21.19 — N10 : quand l'aperçu dépasse sa zone, l'avertissement explicite est affiché (le focus reste sur « Annuler »)" "$(rj "$CL" '"debord="+j.c.n10d.debord+" texte="+j.c.n10d.texte+" focus="+j.c.n10d.focus')" "debord=true texte=Le texte dépasse la zone : faites défiler avant de coller. focus=Annuler"
 assert_eq "T21.15 — le HTML collé ne crée aucun nœud dans l'aperçu" "$(rj "$CL" 'j.c.html.enfants')" "0"
 assert_eq "T21.10 — témoin positif : « Coller » envoie le texte (avec son retour chariot) et le shell l'exécute : le marqueur n'existait pas avant le clic, il existe après (la sonde sait voir l'exécution)" "$(rj "$CL" '"avant="+j.c.avantColler+" marqueur="+j.c.coller.marqueur+" bandeau="+j.c.coller.bandeau+" envoye="+j.c.coller.entree_ok')" "avant=false marqueur=true bandeau=false envoye=true"
 
@@ -474,7 +503,7 @@ if mutant proto vf-cockpit-terminal-client.mjs 's|allowNonHttpProtocols: false|a
   assert_eq "M-PROTO — allowNonHttpProtocols ouvert : les liens javascript: et data: s'ouvrent au clic, T16.1 rouge" "$(rouge "$(rj "$LJ" 'j.ouvertures.length')" "1")" "rouge"
 else sans_effet "M-PROTO"; fi
 
-if mutant collage-sans-bandeau vf-cockpit-terminal-client.mjs 's|if (!SUR.test(t)) { term.paste(t); return; }|term.paste(t); return;|'; then
+if mutant collage-sans-bandeau vf-cockpit-terminal-client.mjs 's|if (!SUR.test(t) && !vue.invisible(t)) { term.paste(t); return; }|term.paste(t); return;|'; then
   run_collage "$MUT_OUT"
   assert_eq "M-COLLAGE-BANDEAU — le collage multi-lignes est envoyé sans confirmation : le shell reçoit le texte et crée le marqueur, T21.2 rouge" "$(rouge "entre=[$(rj "$CJ" 'j.c.multi.entre')] marqueur=$(rj "$CJ" 'j.c.multi.marqueur')" "entre=[] marqueur=false")" "rouge"
 else sans_effet "M-COLLAGE-BANDEAU"; fi
@@ -486,6 +515,19 @@ if mutant depot vf-cockpit-terminal-client.mjs "/addEventListener('drop'/d; /add
   run_collage "$MUT_OUT"
   assert_eq "M-DEPOT — écoutes de dépôt retirées : drop et beforeinput ne sont plus annulés (le navigateur insérerait le texte dans la zone de saisie), T21.9 rouge" "$(rouge "drop_annule=$(rj "$CJ" 'j.c.depot.drop===false') beforeinput_annule=$(rj "$CJ" 'j.c.depot.avant===false')" "drop_annule=true beforeinput_annule=true")" "rouge"
 else sans_effet "M-DEPOT"; fi
+
+if mutant n9-sans-cf vf-cockpit-terminal-vue.mjs 's|const INVISIBLE = /\[\\p{Cc}\\p{Cf}\\p{Cs}\\u{E0000}-\\u{E007F}\]/u;|const INVISIBLE = /[\\p{Cc}\\p{Cs}]/u;|'; then
+  run_collage "$MUT_OUT"
+  assert_eq "M-N9-SANS-CF — le déclencheur et le marquage perdent la classe Cf et les Tag : une ligne à U+202E passe sans bandeau et crée le marqueur, T21.16 rouge" "$(rouge "bidi=$(rj "$CJ" 'j.c.n9.bidi.bandeau')/$(rj "$CJ" 'j.c.n9.bidi.marqueur')" "bidi=true/false")" "rouge"
+else sans_effet "M-N9-SANS-CF"; fi
+if mutant n10-sans-repli vf-cockpit-terminal-vue.mjs 's|if (e - k >= 3) {|if (e - k >= 3 \&\& false) {|'; then
+  run_collage "$MUT_OUT"
+  assert_eq "M-N10-SANS-REPLI — les lignes vides ne sont plus repliées : la commande est hors de la zone, T21.18 rouge" "$(rouge "replie=$(rj "$CJ" 'j.c.n10.replie') charge=$(rj "$CJ" 'j.c.n10.charge') debord=$(rj "$CJ" 'j.c.n10.debord')" "replie=true charge=true debord=false")" "rouge"
+else sans_effet "M-N10-SANS-REPLI"; fi
+if mutant n10-sans-avertissement vf-cockpit-terminal-vue.mjs 's|const depasse = () => {|const depasse = () => { return;|'; then
+  run_collage "$MUT_OUT"
+  assert_eq "M-N10-SANS-AVERTISSEMENT — le dépassement n'est plus dit : T21.19 rouge" "$(rouge "texte=$(rj "$CJ" 'j.c.n10d.texte')" "texte=Le texte dépasse la zone : faites défiler avant de coller.")" "rouge"
+else sans_effet "M-N10-SANS-AVERTISSEMENT"; fi
 
 if mutant apercu-coupe vf-cockpit-terminal-vue.mjs 's|const LIMITE = 20000|const LIMITE = 200|'; then
   run_collage "$MUT_OUT"

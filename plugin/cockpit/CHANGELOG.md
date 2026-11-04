@@ -7,6 +7,14 @@ pour P71-D-01 à P71-D-08 et P71-D-23 ; décisions du manager (vf-dev-manager, 2
 (O1 à O11 tranchées par P71-D-20 et P71-D-21 ; P71-D-22, d'abord provisoire, est devenue définitive par P71-D-23). Les gestes de
 release racine (version, tag, release GitHub) restent humains. Numéro de version recalculé à la fusion avec les Phases 68 et 70 (P71-PL-12) : mineure suivante de la v1.2.1 de main.
 
+### Corrigé — tour de correction E de la Phase 71 (N9, N10)
+- **Collage d'une ligne invisible ou de contrôle d'affichage confirmé** (N9 ; P71-D-30, arbitrage Samuel, AskUserQuestion session principale
+  Claude Code, 2026-11-04 : « Corriger avant la PR (Recommandé) ») : xterm réordonnait visuellement le texte bidi, `echo hello<U+202E>; touch m; `
+  s'affichait à l'envers et Entrée exécutait `touch m`. Une ligne portant un caractère de la classe Cf (bidi, zéro largeur), un caractère Tag ou
+  un contrôle C0/C1 ouvre désormais le bandeau « Annuler / Coller », par la même définition que le marquage ⟨U+XXXX⟩ de l'aperçu.
+- **Collage confirmé : ce qui est confirmé est visible** (N10 ; même arbitrage) : les suites d'au moins trois lignes vides ou blanches sont
+  repliées à l'affichage (⟨N lignes vides⟩), un avertissement dit quand l'aperçu dépasse sa zone ; le texte envoyé reste l'original (sha256).
+
 ### Corrigé — tour de correction D de la Phase 71 (N8, N11, documentation)
 - **Un `PATH` assaini vide n'est plus transmis au moteur d'assemblage** (N8, régression de N2 ; P71-D-29, arbitrage Samuel, AskUserQuestion, session
   principale Claude Code, 2026-11-04 : « le lanceur n'exécute jamais un binaire du lab ») : sans `PATH` ou avec un `PATH` entièrement relatif

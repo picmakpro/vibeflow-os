@@ -73,14 +73,14 @@ export function clientTerminal(cfg) {
       return true;
     });
 
-    // collage et dépôt de texte : un texte à retour à la ligne ou à caractère de contrôle n'atteint le shell qu'après « Coller » (le collage entre crochets ne suffit pas : certains shells exécutent dès la réception)
+    // collage et dépôt de texte : un texte à retour à la ligne, à caractère de contrôle ou invisible (Cf, Tag, bidi) n'atteint le shell qu'après « Coller » (le collage entre crochets ne suffit pas : certains shells exécutent dès la réception)
     const SUR = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
     let propose = null;
     const abandonner = () => { if (propose !== null) { propose = null; vue.collage(null); term.focus(); } };
     const soumettre = (t) => {
       abandonner();
       if (!t) return;
-      if (!SUR.test(t)) { term.paste(t); return; }
+      if (!SUR.test(t) && !vue.invisible(t)) { term.paste(t); return; }
       propose = t;
       vue.collage(t, () => { const x = propose; propose = null; vue.collage(null); if (x !== null) term.paste(x); term.focus(); }, abandonner);
     };
@@ -92,7 +92,7 @@ export function clientTerminal(cfg) {
     zone.addEventListener('drop', (e) => { prendre(e); soumettre(texteDe(e.dataTransfer)); }, true);
     zone.addEventListener('beforeinput', (e) => {
       const t = typeof e.data === 'string' && e.data ? e.data : texteDe(e.dataTransfer);
-      if (e.inputType.indexOf('insertFrom') === 0 || (e.inputType === 'insertReplacementText') || SUR.test(t)) { prendre(e); soumettre(t); }
+      if (e.inputType.indexOf('insertFrom') === 0 || (e.inputType === 'insertReplacementText') || SUR.test(t) || vue.invisible(t)) { prendre(e); soumettre(t); }
     }, true);
     document.addEventListener('keydown', (e) => { if (propose !== null && e.key === 'Escape') { prendre(e); abandonner(); } }, true);
     term.focus(); window.addEventListener('focus', () => term.focus());
