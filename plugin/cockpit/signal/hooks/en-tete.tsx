@@ -1,9 +1,10 @@
-// L'en-tête de la pane (VFSG-05, VFSG-06 ; P68-D-04, P68-D-05) : ce que dit `signal@1`, jamais le STATE (P68-D-17).
+// L'en-tête de la pane (VFSG-05, VFSG-06 ; P68-D-04, P68-D-05, P68-D-30) : ce que dit `signal@1`, jamais le STATE (P68-D-17).
 // Chaque ligne est un seul `Text` : les libellés viennent du socle, ils ne sont pas recopiés ici.
 
 import { atom, read } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
+import { jalonCourant } from './derive'
 import { C, G, age, oneLine, type UI } from './ds'
 import type { Signal, SignalArbre, SignalRetard } from '../types'
 
@@ -64,9 +65,12 @@ export async function enTete($: EngineInterface, ui: UI, cursor: string): Promis
   const a = s ? courant(s) : null
   const retard = retardDe(a?.retard ?? null)
   const mission = s ? missionDe(s, a) : null
+  // le jalon de la phase active de l'arbre courant, lu dans signal@1 ; aucun jalon sinon, jamais un repli sur le STATE (P68-D-30)
+  const jalon = jalonCourant(s)
   return (
     <Box flexDirection="column">
       <Text color={C.fg} wrap="wrap">{`${cursor} ${s?.layout.actif ?? 'lab'}`}</Text>
+      {jalon ? <Text color={C.fg2} wrap="wrap">{`jalon ${oneLine(jalon.texte)}`}</Text> : null}
       {retard ? <Text color={C.human} wrap="wrap">{retard}</Text> : null}
       {(s?.arbres ?? []).map(t => (
         <Text color={t.courant ? C.fg : C.fg2} wrap="wrap">{`${t.courant ? G.current : G.todo} ${oneLine(t.label)} · ${oneLine(t.branche)} · ${phaseDe(s!, t)}`}</Text>
