@@ -534,6 +534,18 @@ for W in 390 768 800 1024 1440; do
   assert_eq "O6.17 [$W px] — Code : étapes dont la carte de visite recouvre une surface fixe (étape:surfaces)" "$(xs1 "j.l$W.etapes.filter((e)=>e.surfaces.length).map((e)=>e.i+':'+e.surfaces.join('+')).join(' ')")" ""
   assert_eq "O6.17 [$W px] — Projet : étapes dont la carte de visite recouvre une surface fixe (étape:surfaces)" "$(xs2 "j.l$W.etapes.filter((e)=>e.surfaces.length).map((e)=>e.i+':'+e.surfaces.join('+')).join(' ')")" ""
 done
+# O6.17 passe « police large » (CI Linux de 63efb1e1 : O6.17 à 800 px, R22, R3 à 390 px rougissaient sous Linux, où Chrome tombe sur DejaVu Sans, plus large que les polices de macOS) : la classe de défaut doit être fermée pour TOUTE largeur de police.
+# La carte de visite, le titre et les cartes du graphe prennent Verdana puis DejaVu Sans avec un espacement de lettres (le poste ne décide plus de la taille des textes) ; mêmes cinq largeurs, Code et Projet : aucune surface recouverte,
+# la carte ciblée entièrement dans la zone libre (marges comprises), la carte de visite dans la fenêtre. Témoin générique, à garder.
+XP1="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$U5" 390,768,800,1024,1440 police)"; XP2="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 390,768,800,1024,1440 police)"
+[ -n "${DBG:-}" ] && echo "RAWP: $XP1 $XP2"
+xp1() { printf '%s' "$XP1" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+xp2() { printf '%s' "$XP2" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O6.17p-a — témoin : les deux mesures en police large ont eu lieu sans erreur, au moins deux étapes à chaque largeur" "$(xp1 "j.erreur||''")|$(xp2 "j.erreur||''")|$(xp1 '[390,768,800,1024,1440].every((w)=>j["l"+w].n>=2)')|$(xp2 '[390,768,800,1024,1440].every((w)=>j["l"+w].n>=2)')" "||true|true"
+for W in 390 768 800 1024 1440; do
+  assert_eq "O6.17p [$W px] — Code, police large : étapes dont la carte de visite recouvre une surface fixe, dont la carte ciblée sort de la zone libre ou dont la carte de visite sort de la fenêtre" "$(xp1 "j.l$W.etapes.filter((e)=>e.surfaces.length||!e.dansZone||!e.tient).map((e)=>e.i+':'+e.surfaces.join('+')+(e.dansZone?'':' hors-zone')+(e.tient?'':' hors-fenetre')).join(' ')")" ""
+  assert_eq "O6.17p [$W px] — Projet, police large : étapes dont la carte de visite recouvre une surface fixe, dont la carte ciblée sort de la zone libre ou dont la carte de visite sort de la fenêtre" "$(xp2 "j.l$W.etapes.filter((e)=>e.surfaces.length||!e.dansZone||!e.tient).map((e)=>e.i+':'+e.surfaces.join('+')+(e.dansZone?'':' hors-zone')+(e.tient?'':' hors-fenetre')).join(' ')")" ""
+done
 # O6.10 (correctif 70-07, REG-70-01 de 70-VERIFICATION.md) : visite Projet active au premier chargement sur un lab à jalon et à mission, à 1 024 et 1 920 px : la carte ciblée tient dans la zone libre ET aucune carte du graphe ne sort de la zone
 # libre à gauche du panneau (critère de R1, chrome-responsive.mjs). Cause : aim() centrait et zoomait la carte sans regarder le reste du graphe, qui débordait sous le panneau ; il ne dézoomait jamais une carte plus large que sa zone.
 L7="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mkdir -p "$L7/src" "$L7/.planning/phases/01-socle" "$L7/.planning/phases/02-suite" "$L7/.planning/missions"

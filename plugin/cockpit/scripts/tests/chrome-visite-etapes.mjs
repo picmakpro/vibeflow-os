@@ -1,7 +1,8 @@
 // chrome-visite-etapes.mjs — la visite « Par où commencer » parcourue étape par étape, à deux largeurs (70-07, UIFN-04, P70-D-02, régime P70-D-08). Aucune dépendance.
-// Usage : node chrome-visite-etapes.mjs <chrome> <url> <largeurs> [recharge,passer,panneau,equipe,echap]      (largeurs : « 1440,390 »)
+// Usage : node chrome-visite-etapes.mjs <chrome> <url> <largeurs> [recharge,passer,panneau,equipe,echap,police]      (largeurs : « 1440,390 »)
 //   equipe : url = l'onglet Équipe d'un lab qui a une session et un sous-agent (donc au moins deux cartes) ; ne parcourt rien : rend { e<largeur>: { cartes, auto, manuel } } = cartes du graphe, la visite est ouverte par l'appel que fait le démarrage d'office (start() sans argument, 75-vf-modele.js et 40-tour.js), ouverte par le bouton « Par où commencer »
 //   echap : (largeur étroite, onglet Projet) un détail de carte est ouvert dans le tiroir, la visite est ouverte, puis Échap deux fois : clé t<largeur> { tiroir0, tour1, tiroir1, tour2, tiroir2 } = état du tiroir (ouvert vrai/faux) et de la visite après chaque temps (la visite, au-dessus, doit capter la première Échap ; le tiroir ne doit pas être touché par l'ouverture ni la sortie de la visite)
+//   police : police large imposée à la carte de visite, au titre et aux cartes du graphe (Verdana, puis DejaVu Sans ; l'en-tête et la barre de question gardent la police du poste : DejaVu est moins large que Verdana, R1 « invite tronquée » rougirait sans rapport avec la visite) : la police du poste ne décide plus de la taille des textes ; c'est la contrainte du runner Linux (DejaVu Sans, plus large que les polices de macOS)
 //   panneau : le panneau de détail est élargi à 440 px avant la visite (ce que font d'autres polices, d'autres plateformes : sur la CI Linux, `#panel` recouvrait `#tour` à 768 px) ; champ surPanneau = la carte de visite recouvre le panneau
 //   passer : après la visite parcourue, la visite est relancée, avancée de deux étapes (une carte) puis fermée par « Passer » : clé p<largeur> { avant, apres } = { k : zoom, x, y : position, visibles : cartes entièrement dans la fenêtre, recouvre : cartes recouvertes par le titre } (la vue d'avant la visite doit revenir)
 //   anneau (étape sur un élément du chrome) = le contour a disparu quand le className du bouton #vf-lock est réécrit à l'arrivée, comme le fait la couche live (70-vf-live.js : « btn held »)
@@ -17,7 +18,7 @@
 //   selectionne = la visite a sélectionné quelque chose (le panneau montre alors le détail d'une carte au lieu de la vue d'ensemble) · toutLibre = une carte du graphe sort de la zone libre à gauche du panneau, visite active (critère de R1) · dansZone = la carte ciblée sort de la zone libre de la carte (sous le panneau, l'en-tête ou la barre de question ; 70-07, grandes cartes) · tient = la carte de visite sort de la fenêtre · passer = aucun bouton « Passer » visible dans la carte · repere = texte « n sur N » lu · anglais = mots témoins anglais (liste de F11) dans le texte de la carte de visite.
 import { executer, pause } from './chrome-session.mjs';
 const [, , chrome, url, largeurs, options = ''] = process.argv;
-const recharge = /recharge/.test(options), passer = /passer/.test(options), panneau = /panneau/.test(options), equipe = /equipe/.test(options), echap = /echap/.test(options);
+const recharge = /recharge/.test(options), passer = /passer/.test(options), panneau = /panneau/.test(options), equipe = /equipe/.test(options), echap = /echap/.test(options), police = /police/.test(options);
 const HAUT = { 390: 844, 768: 1024, 800: 600, 1024: 768, 1440: 900 };
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlowTour && !!document.getElementById('tour-btn')";
 const INIT = "!!window.__vfModele && !!window.__vfModele.modele";
@@ -97,6 +98,7 @@ await executer(chrome, async (s) => {
       sortie['e' + w] = { cartes, auto, manuel: await s.ev('window.VibeFlowTour.active()'), bouton };
       await s.ev('window.VibeFlowTour.end()'); continue;
     }
+    if (police) await s.ev("(() => { const st = document.createElement('style'); st.id = 'vf-police-large'; st.textContent = '#tour, #tour *, #context, #context *, #svg * { font-family: Verdana, \\'DejaVu Sans\\', sans-serif !important; letter-spacing: 0.06em !important; }'; document.head.appendChild(st); })()");
     if (panneau) await s.ev("(() => { const p = document.getElementById('panel'); p.style.width = '440px'; })()");
     const noeuds = await s.ev(DONNEE);
     await s.ev('window.VibeFlowTour.start()');
