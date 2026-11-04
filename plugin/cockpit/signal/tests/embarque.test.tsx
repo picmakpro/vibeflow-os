@@ -80,7 +80,7 @@ function lab(on: On, registres: Record<string, string>, ancien = false): Appels 
 test('E1 — sans ligne cockpit= (projet puis user), ni commande, ni pane, ni bandeau', async ($, on) => {
   const appels = lab(on, { [PROJET]: 'conductor=v1.0.0\n', [USER]: 'dev-orchestrator=v2.0.0\n' })
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
-  expect(appels.commandes).toBe(1)
+  expect(appels.commandes).toBe(0)
   expect(appels.ouvertures).toBe(0)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect(await ui.find({ type: 'Text', text: /engine/ })).toBeDefined()
