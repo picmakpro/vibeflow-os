@@ -209,6 +209,11 @@ Relayés par la session principale (SendMessage) ; réponses mot pour mot entre 
   ligne de verrou sans doublon), N3 (types de la vue Équipe en français) et N8 (« bloqué » en `--sev-high`) corrigés dans
   la 68 ; N4, N5, N6 au BACKLOG (et non en Phase 70) ; N7 (badge « Personne », choix de la 69) inchangé ; R11 comme
   P68-D-35.
+- **P68-D-39 (âge du verrou, N2) — décision du manager, pas un arbitrage de Samuel (2026-11-04).** L'arbitrage
+  « âge cohérent » (P68-D-38) ne désigne pas de source ; le mandat du manager qui parlait d'« âge depuis l'acquisition »
+  était faux (mesuré : `age_seconds` est l'âge du battement, `lease_seconds` celui de l'acquisition). Lecture retenue :
+  l'âge du battement partout, contrats `who@2` et `signal@1` inchangés ; seule la fraîcheur du tiroir web est corrigée
+  (l'âge d'un verrou suit le flux `lock`).
 
 ### Points de procédure (documentés, sans arbitrage — consigne de la session principale, 2026-11-03)
 
