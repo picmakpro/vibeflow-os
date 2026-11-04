@@ -73,10 +73,10 @@ JS
 cat > "$AUX/chrome-client.mjs" <<'JS'
 // chrome-client.mjs <chrome> <mode> <json> : scénarios navigateur du client de Q ; UNE ligne JSON. Modes : t6 · cadre · tierce.
 // Chaque étape est isolée (essai) : une mesure indisponible est nommée dans `erreurs`, jamais un résultat vide. Amorçage et secret sont masqués en sortie.
-import { pathToFileURL } from 'node:url'; import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url'; import { execFileSync } from 'node:child_process'; import fs from 'node:fs';
 const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv;
-const { P, Q, amorce, tierce, secret: secretN = '', pid: pidN = 0 } = JSON.parse(brut);
+const { P, Q, amorce, tierce, secret: secretN = '', pid: pidN = 0, fichier = '', octets = 0 } = JSON.parse(brut);
 const OP = `http://127.0.0.1:${P}`, OQ = `http://127.0.0.1:${Q}`, MS = Number(process.env.VF_CLIENT_MS) || 20000;
 const LISTE = ['ready', 'etat:connecte', 'etat:reconnexion', 'etat:termine', 'etat:refuse', 'etat:expire', 'etat:arrete', 'toggle'];
 const erreurs = {};
@@ -134,7 +134,7 @@ await executer(chrome, async (s) => {
   }
 
   // --- scénarios sur le serveur réel : secret périmé (J2), serveur arrêté (J2), « Terminé » (J12), onBinary (S5), contre-pression (S3) ---
-  if (['perime', 'arret', 'termine', 'binaire', 'pression', 'popup'].includes(mode)) {
+  if (['perime', 'arret', 'termine', 'binaire', 'pression', 'popup', 'gros', 'limite'].includes(mode)) {
     const att = (expr, nom) => q.attendre(expr, nom, MS);
     const texte = () => q.ev(`(document.getElementById('etat') || {}).textContent || ''`).catch(() => '');
     const invite = () => q.ev(INVITE).catch(() => false);
@@ -186,6 +186,17 @@ await executer(chrome, async (s) => {
       await q.ev(`(() => { window.__e = 0; const f0 = window.fetch; window.fetch = function (u) { if (String(u) === '/entree') { window.__e++; if (window.__e <= 2) return Promise.resolve(new Response(null, { status: 429 })); } return f0.apply(this, arguments); }; })()`);
       await essai('saisie', async () => { await taper(`echo PRESS""ION-OK`); await poll(async () => (await lignes()).includes('PRESSION-OK'), 'sortie de la commande saisie sous contre-pression'); });
       r.appels = await q.ev('window.__e').catch(() => -1); r.sortie = (await lignes()).includes('PRESSION-OK');
+    } else if (mode === 'gros' || mode === 'limite') {
+      // M4 : une entrée de plus de 64 Kio (collage) part en tranches, dans l'ordre, sans 413 ; « limite » : un serveur qui refuse au-delà de 4 Kio (413 synthétique) -> la page découpe et rien n'est perdu
+      await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
+      await q.ev(`(() => { window.__tr = []; const f0 = window.fetch; window.fetch = function (u, o) { if (String(u) !== '/entree') return f0.apply(this, arguments);
+        const n = o.body.length; if (${mode === 'limite'} && n > 4096) { window.__tr.push([n, 413]); return Promise.resolve(new Response(null, { status: 413 })); }
+        return f0.apply(this, arguments).then((x) => { window.__tr.push([n, x.status]); return x; }); }; })()`);
+      await essai('prepare', async () => { await taper(`stty raw -echo; echo PRET-""OK; head -c ${octets} | cksum > ${fichier}`); await poll(async () => (await lignes()).includes('PRET-OK'), 'shell prêt à lire en brut'); });
+      await essai('collage', async () => { await q.ev(`(() => { const dt = new DataTransfer(); dt.setData('text/plain', 'a'.repeat(${octets})); document.getElementById('terminal').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`); });
+      await essai('cksum', async () => { await poll(async () => { try { return fs.readFileSync(fichier, 'utf8').trim(); } catch (e) { return ''; } }, 'somme de contrôle écrite par le shell'); });
+      r.cksum = (() => { try { return fs.readFileSync(fichier, 'utf8').trim(); } catch (e) { return ''; } })();
+      r.tr = await q.ev('JSON.stringify(window.__tr)').then((x) => JSON.parse(x || '[]')).catch(() => []);
     } else if (mode === 'popup') {
       // F4 : Q ouverte en popup par P (window.open copie le sessionStorage, donc l'identifiant d'onglet) ne prend pas la session et ne lance aucun shell
       const shells = () => execFileSync('ps', ['-axo', 'pid=,ppid=,args=']).toString().split('\n').filter((l) => l.trim().split(/\s+/)[1] === String(pidN) && /vf-cockpit-pty\.py/.test(l)).length;
@@ -473,7 +484,7 @@ secret_neuf() { # secret_neuf <sortie> -> SRV_* et SECRET_N : serveur neuf, amor
 }
 scenario() { # scenario <sortie> <mode> [secret imposé] -> SCJ ; sert le serveur, joue le scénario dans un Chrome neuf, arrête le serveur s'il vit encore
   secret_neuf "$1"; [ -n "${3:-}" ] && SECRET_N="$3"
-  SCJ="$(VF_CLIENT_MS="${MS_SC:-20000}" navig "$2" "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"secret\":\"$SECRET_N\",\"pid\":$SRV_PID}")"
+  SCJ="$(VF_CLIENT_MS="${MS_SC:-20000}" navig "$2" "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"secret\":\"$SECRET_N\",\"pid\":$SRV_PID${SC_EXTRA:-}}")"
   SC_SECRET="$SECRET_N"; unsrv
 }
 FAUX_SEC="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
@@ -490,6 +501,16 @@ scenario "$OUT" binaire
 assert_eq "S5.1 — le rapport de souris émis par xterm (onBinary) atteint le shell : l'écho « ^[[M » revient (témoin : mode souris enfoncé par printf, cat -v actif)" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" rapport="+j.rapport')" "erreurs={} rapport=true"
 scenario "$OUT" pression
 assert_eq "S3.1 — contre-pression 429 sur /entree : le client garde ses octets et les renvoie (la commande saisie s'exécute, au moins 3 POST)" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" sortie="+j.sortie+" appels>=3="+(j.appels>=3)')" "erreurs={} sortie=true appels>=3=true"
+
+echo "=== M4 / N6c — grosse entrée : tranches de 64 Kio au plus, dans l'ordre, jamais de 413 silencieux ==="
+OCT=150000; ATT_CK="$(head -c $OCT /dev/zero | tr '\0' a | cksum | awk '{print $1" "$2}')"
+gros() { # gros <sortie> <gros|limite> -> GR_J, GR_CK : un collage de $OCT octets, somme de contrôle relue côté shell
+  local f="$WORK/gros-$2-$RANDOM.ck"; rm -f "$f"; SC_EXTRA=",\"fichier\":\"$f\",\"octets\":$OCT" MS_SC="${MS_SC:-30000}" scenario "$1" "$2"; SC_EXTRA=""; GR_J="$SCJ"
+}
+gros "$OUT" gros
+assert_eq "M4.1 — un collage de 150 000 octets part en au moins 3 tranches de 65 536 octets au plus, sans aucun 413, et le shell reçoit tout (somme de contrôle identique)" "$(rj "$GR_J" '"erreurs="+JSON.stringify(j.erreurs)+" cksum="+(j.cksum==="'"$ATT_CK"'"?"ok":"["+j.cksum+"]")+" max<=65536="+(Math.max(0,...(j.tr||[]).map((t)=>t[0]))<=65536)+" n413="+(j.tr||[]).filter((t)=>t[1]===413).length+" tranches>=3="+((j.tr||[]).filter((t)=>t[1]===204).length>=3)')" "erreurs={} cksum=ok max<=65536=true n413=0 tranches>=3=true"
+gros "$OUT" limite
+assert_eq "M4.2 — serveur qui refuse (413) au-delà de 4 Kio : la page découpe plus petit et rien n'est perdu (somme de contrôle identique, au moins un 413 vu, aucun corps accepté au-delà de 4 Kio)" "$(rj "$GR_J" '"erreurs="+JSON.stringify(j.erreurs)+" cksum="+(j.cksum==="'"$ATT_CK"'"?"ok":"["+j.cksum+"]")+" n413>=1="+((j.tr||[]).filter((t)=>t[1]===413).length>=1)+" accepte<=4096="+(Math.max(0,...(j.tr||[]).filter((t)=>t[1]===204).map((t)=>t[0]))<=4096)')" "erreurs={} cksum=ok n413>=1=true accepte<=4096=true"
 
 scenario "$OUT" popup
 assert_eq "F4.0 — témoin : le scénario n'a pas échoué, un popup de Q a réellement été ouvert par P (cible de navigateur), la saisie atteint encore le terminal légitime" "erreurs=$(rj "$SCJ" 'JSON.stringify(j.erreurs)') popup=$(rj "$SCJ" 'j.popup1>=1') saisie=$(rj "$SCJ" 'j.saisie')" "erreurs={} popup=true saisie=true"
@@ -517,6 +538,14 @@ if mutant mpopup vf-cockpit-terminal-client.mjs "s|^ *if (!encadree) { vue.carte
   MS_SC=8000 scenario "$MUT_OUT" popup
   assert_eq "M-POPUP — le mutant (garde du cadre retirée) rougit F4.1 : le popup prend la session, P reçoit etat:reconnexion" "reconnexion=$(rj "$SCJ" 'j.apres.msgs.includes("etat:reconnexion")')" "reconnexion=true"
 else sans_effet "M-POPUP"; fi
+if mutant mtranche vf-cockpit-terminal-client.mjs "s|tranche = 65536;|tranche = 1 << 30;|"; then
+  MS_SC=8000 gros "$MUT_OUT" gros
+  assert_eq "M-TRANCHE — le mutant (aucune tranche) rougit M4.1 : un corps de plus de 64 Kio part et le serveur répond 413 (le découpage de repli sur 413 sauve ensuite les octets, mais la borne est franchie)" "$(rj "$GR_J" '"max>65536="+(Math.max(0,...(j.tr||[]).map((t)=>t[0]))>65536)+" n413>=1="+((j.tr||[]).filter((t)=>t[1]===413).length>=1)')" "max>65536=true n413>=1=true"
+else sans_effet "M-TRANCHE"; fi
+if mutant m413 vf-cockpit-terminal-client.mjs "s|if (r.status === 413) {|if (false) {|"; then
+  MS_SC=8000 gros "$MUT_OUT" limite
+  assert_eq "M-413 — le mutant (413 non traité) rougit M4.2 : la saisie est perdue sans signal" "$(rj "$GR_J" '"cksum="+(j.cksum==="'"$ATT_CK"'"?"ok":"perdu")')" "cksum=perdu"
+else sans_effet "M-413"; fi
 if mutant m429 vf-cockpit-terminal-client.mjs "s|if (r.status === 429) {|if (false) {|"; then
   MS_SC=6000 scenario "$MUT_OUT" pression
   assert_eq "M-429 — le mutant (429 ignoré, octets perdus) rougit S3.1 : la commande saisie ne s'exécute pas" "$(rj "$SCJ" '"sortie="+j.sortie')" "sortie=false"

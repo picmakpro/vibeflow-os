@@ -97,16 +97,26 @@ export function clientTerminal(cfg) {
     document.addEventListener('keydown', (e) => { if (propose !== null && e.key === 'Escape') { prendre(e); abandonner(); } }, true);
     term.focus(); window.addEventListener('focus', () => term.focus());
 
-    // entrée : une requête à la fois, dans l'ordre ; 429 (contre-pression) garde les octets et réessaie ; 409 ou 410 vide la file et fait relire l'état
-    const file = []; let envoi = false, ctrl = null;
+    // entrée : une requête à la fois, dans l'ordre, jamais plus de TRANCHE octets par corps (la borne du serveur : au-delà il répond 413 et rien n'est écrit) ;
+    // une grosse entrée part en tranches successives ; 429 (contre-pression) garde les octets et réessaie ; 413 réduit la tranche (une borne serveur plus basse) puis, à un octet,
+    // le dit dans le terminal ; 409 ou 410 vide la file et fait relire l'état
+    const file = []; let envoi = false, ctrl = null, tranche = 65536;
+    const extraire = () => {
+      const corps = new Uint8Array(Math.min(tranche, file.reduce((a, c) => a + c.length, 0))); let k = 0;
+      while (k < corps.length) { const c = file[0], m = Math.min(c.length, corps.length - k); corps.set(c.subarray(0, m), k); k += m; if (m === c.length) file.shift(); else file[0] = c.subarray(m); }
+      return corps;
+    };
     const vider = async () => {
       if (envoi) return; envoi = true;
       while (file.length) {
-        const n = file.reduce((a, c) => a + c.length, 0), corps = new Uint8Array(n); let k = 0;
-        for (const c of file.splice(0)) { corps.set(c, k); k += c.length; }
+        const corps = extraire();
         try {
           const r = await fetch('/entree', { method: 'POST', headers: entetes(), body: corps, cache: 'no-store' });
           if (r.status === 429) { file.unshift(corps); await attendre(100); continue; }
+          if (r.status === 413) {
+            if (corps.length > 1) { tranche = Math.max(1, corps.length >> 1); file.unshift(corps); continue; }
+            file.length = 0; term.write('\r\n[Saisie refusée par le serveur : trop grande (413).]\r\n'); continue;
+          }
           if (r.status === 409 || r.status === 410) { file.length = 0; if (ctrl) ctrl.abort(); }
         } catch (e) { file.length = 0; }
       }
