@@ -214,6 +214,15 @@ Relayés par la session principale (SendMessage) ; réponses mot pour mot entre 
   était faux (mesuré : `age_seconds` est l'âge du battement, `lease_seconds` celui de l'acquisition). Lecture retenue :
   l'âge du battement partout, contrats `who@2` et `signal@1` inchangés ; seule la fraîcheur du tiroir web est corrigée
   (l'âge d'un verrou suit le flux `lock`).
+- **P68-D-40 (`VF_COCKPIT_SCRIPTS_DIR` vidé par le mod).** Relecture adverse AD-3 : l'émetteur lancé par le mod héritait
+  de `VF_COCKPIT_SCRIPTS_DIR` de l'hôte ; pointée dans le lab, elle faisait exécuter un `driver-lock.sh` planté (sondé).
+  Le mod la pose à vide dans l'environnement de l'émetteur. Décision du manager appliquant « Rien sous le lab »,
+  confirmée par Samuel (« d'accord », AskUserQuestion, session principale Claude Code, 2026-11-04).
+- **P68-D-41 (coût du mod et version minimale, AD-1 et AD-2).** Arbitrages Samuel, AskUserQuestion, session principale
+  Claude Code, 2026-11-04 : AD-1 « Rafraîchir si pane ouverte (Recommandé) » — rafraîchissement continu seulement pane
+  ouverte et session interactive ; pane fermée, après un tour et au plus une fois par minute ; jamais d'attente de
+  l'émetteur au démarrage. AD-2 « L'écrire sans mesurer (Recommandé) » — README et notes de la release groupée :
+  « vérifiée sous 2.1.318, non chargée sous 2.1.181 ».
 
 ### Points de procédure (documentés, sans arbitrage — consigne de la session principale, 2026-11-03)
 
