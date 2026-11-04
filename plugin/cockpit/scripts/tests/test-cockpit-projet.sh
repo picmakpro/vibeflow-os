@@ -421,7 +421,9 @@ printf -- '---\nstatus: executing\ncurrent_phase: 2\n---\n' > "$L6/.planning/STA
 mkdir -p "$L6/.planning/missions"; printf '{"phase":"2","nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}\n' > "$L6/.planning/missions/MISSION-X.dag.json"
 git -C "$L6" add -A && git -C "$L6" -c user.email=t@t -c user.name=t commit -q -m projet
 U6="$(adr4 "$L6")"; SRVPIDS+=("$(pid4 "$L6")"); P6="${U6%index.html}project.html"
-X6="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 1440,390)"
+# un Chrome (donc un profil neuf) par largeur : la visite se mesure à la PREMIÈRE ouverture de la page ; au rechargement d'une page déjà vue dans le même profil, le centrage de la première étape (une carte) dérive (écart consigné dans 70-08-SUMMARY.md)
+X61="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 1440)"; X62="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 390)"
+X6="$(node -e "const a=JSON.parse(process.argv[1]),b=JSON.parse(process.argv[2]);console.log(JSON.stringify({erreur:a.erreur||b.erreur,...a,...b}))" "$X61" "$X62")"
 [ -n "${DBG:-}" ] && echo "RAW6: $X6"
 x6() { printf '%s' "$X6" | node "$AUX/get.mjs" /dev/stdin "$1"; }
 cat > "$AUX/titres.mjs" <<'JS'
