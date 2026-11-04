@@ -50,7 +50,7 @@ export function retard({ chemin, base, commonDir, now = Date.now(), sh = shDefau
 }
 
 // toute chaîne d'arbre ou de branche qui sort du socle : contrôles retirés (C0, DEL, C1), masque des secrets, borne à n caractères
-export const nettoie = (s, n = 200) => masque(String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, '')).slice(0, n);
+export const nettoie = (s, n = 200) => masque(String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, '')).slice(0, n);
 
 // phase active d'un arbre (P68-PL-04), fonction pure : (1) la phase dont le numéro suit le motif fixe `phase-<n>` du nom de branche, si elle existe ;
 // (2) sinon la dernière phase (ordre de la feuille de route) portant une mission `running` ; (3) sinon la dernière phase `en-cours` ; (4) sinon null.

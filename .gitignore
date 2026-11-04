@@ -76,3 +76,5 @@ __pycache__/
 # Typings générés par l'engine des mods au chargement du plugin (68-04) : jamais versionnés,
 # régénérés à chaque chargement ; le tsconfig du mod les étend.
 plugin/.claude-plugin/types/
+# tsconfig du mod, écrit par l'engine des mods quand il charge --plugin-dir (R13, P68-D-35).
+plugin/tsconfig.json

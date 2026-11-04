@@ -1,4 +1,4 @@
-// vf-cockpit-vie — la vie d'une mission : son verrou de driver est-il tenu, ou son progrès récent ? (VFSG-06 ; P68-D-05, P68-D-16, P68-D-22, P68-D-23, P68-D-26, P68-D-27)
+// vf-cockpit-vie — la vie d'une mission : son verrou de driver est-il tenu, ou son progrès récent ? (VFSG-06 ; P68-D-05, P68-D-16, P68-D-22, P68-D-23, P68-D-26, P68-D-27, P68-D-33)
 // Exports : lireVerrous(root, { scriptsDir, home, sh }) -> { etat: 'lue'|'absente'|'erreur', plat, liste: [{ ws, scope, phase, tenu, stale, ageS, ttl, progressAgeS, owner }] }
 //           vieDe({ ws, phase }, verrous) -> { tenu, stale, progressAgeS, ttl } | null (source illisible : la mission est « inconnu »)
 //           estVivante(vie) · normPhase(valeur)
@@ -13,6 +13,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const sh = shBorne; // un bash bloqué ne gèle pas la boucle, et l'échéance globale de l'émetteur s'applique (F-06)
 const PH_RE = /^[0-9]+(\.[0-9]+)*$/; // vf_dl_phase_valid de driver-lock.sh
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const age = (v) => { const n = num(v); return n !== null && n >= 0 ? n : null; }; // F-8 : un âge négatif (horloge reculée, epoch futur) est incohérent : traité comme absent, jamais comme un progrès récent
 const bool = (v) => (typeof v === 'boolean' ? v : null);
 const chaine = (v) => (typeof v === 'string' ? v : null);
 
@@ -26,10 +27,10 @@ export function normPhase(v) {
 export function estVivante(vie) {
   if (!vie || typeof vie !== 'object') return false;
   if (vie.tenu === true && vie.stale === false) return true;
-  return typeof vie.progressAgeS === 'number' && typeof vie.ttl === 'number' && vie.progressAgeS < vie.ttl;
+  return typeof vie.progressAgeS === 'number' && vie.progressAgeS >= 0 && typeof vie.ttl === 'number' && vie.progressAgeS < vie.ttl;
 }
 
-const garde = (l) => ({ ws: chaine(l.ws) ?? '', scope: chaine(l.scope), phase: chaine(l.phase), tenu: true, stale: bool(l.stale), ageS: num(l.age_seconds), ttl: num(l.ttl), progressAgeS: num(l.progress_age_seconds), owner: chaine(l.owner) });
+const garde = (l) => ({ ws: chaine(l.ws) ?? '', scope: chaine(l.scope), phase: chaine(l.phase), tenu: true, stale: bool(l.stale), ageS: num(l.age_seconds), ttl: num(l.ttl), progressAgeS: age(l.progress_age_seconds), owner: chaine(l.owner) });
 
 // lireVerrous : `status --all` ; lab plat = l'objet d'UN verrou (plat: true) ; les entrées absentes sont écartées.
 export function lireVerrous(root, { scriptsDir, home, sh: run = sh } = {}) {
@@ -51,7 +52,7 @@ export function lireVerrous(root, { scriptsDir, home, sh: run = sh } = {}) {
 const sans = { tenu: false, stale: null, progressAgeS: null, ttl: null };
 const vieDeEntree = (e) => ({ tenu: e.tenu, stale: e.stale, progressAgeS: e.progressAgeS, ttl: e.ttl });
 
-// vieDe : cascade verrou de la phase (même périmé), sinon verrou du compartiment (P68-D-26), sinon absent ; lab plat : le verrou unique.
+// vieDe : cascade verrou de la phase (même périmé), sinon verrou du compartiment (P68-D-26), sinon verrou de dépôt (P68-D-33), sinon absent ; lab plat : le verrou unique.
 // DAG hors phase (phase null) : compartiment, puis dépôt. Source illisible : null.
 export function vieDe({ ws, phase } = {}, verrous) {
   if (!verrous || verrous.etat !== 'lue') return null;
@@ -63,6 +64,7 @@ export function vieDe({ ws, phase } = {}, verrous) {
   if (ePh.length) return vieDeEntree(ePh.find(vive) || ePh[0]);
   const eCo = ws ? liste.find((e) => e.scope === 'compartiment' && e.ws === ws) : null;
   if (eCo) return vieDeEntree(eCo);
-  const eDe = !ws ? liste.find((e) => e.scope === 'depot' && e.ws === '') : null;
-  return eDe ? vieDeEntree(eDe) : sans;
+  // P68-D-33 : sans verrou de phase ni de compartiment, le verrou de dépôt couvre la mission (`acquire` sans --ws en lab partitionné le pose ; l'ancien .planning/DRIVER.lock en est une entrée aussi) ; le vivant l'emporte sur le périmé.
+  const eDe = liste.filter((e) => e.scope === 'depot' && e.ws === '');
+  return eDe.length ? vieDeEntree(eDe.find(vive) || eDe[0]) : sans;
 }

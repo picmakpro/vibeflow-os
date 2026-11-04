@@ -121,7 +121,8 @@ export function engineDir(scriptsDir) {
 export const outputDir = (labRoot) => path.join(labRoot, '.vibeflow', 'cockpit');
 
 // un `.git/config` écrit par d'autres peut déclarer un core.fsmonitor exécutable : chaque appel git du socle commence par ce préfixe (T-68-04, F-03)
-export const GIT_SUR = ['-c', 'core.fsmonitor=false'];
+// --no-optional-locks : `git status` ne réécrit pas .git/index (l'émetteur est en lecture seule, audit F-5)
+export const GIT_SUR = ['--no-optional-locks', '-c', 'core.fsmonitor=false'];
 
 // Échéance globale (F-06) : `avecEcheance(ms, fn)` pose une date butoir pour tout appel de `shBorne` exécuté pendant `fn` ; passée la date, `shBorne` ne lance plus rien et rend ''
 // (sortie vide : chaque appelant en tire sa valeur « inconnu », null, jamais 0). Chaque appel reste borné à 10 s, et au temps restant s'il est plus court.

@@ -102,12 +102,13 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
   for (const d of [...ls(path.join(common, 'vf-driver', 'ws')).map((w) => path.join(common, 'vf-driver', 'ws', w)), path.join(common, 'vf-driver', 'repo')])
     for (const f of ls(d).filter((x) => x.endsWith('.dag.json'))) { const j = readJson(path.join(d, f)); if (j) fichiers.push({ d, f, nodes: Array.isArray(j.nodes) ? j.nodes : [] }); }
   let nDags = 0, running = 0, staleNodes = 0;
-  for (const { d, f, nodes } of fichiers) {
+  for (const { d, f, nodes: brut } of fichiers) {
     nDags++;
+    const nodes = (Array.isArray(brut) ? brut : []).filter((x) => x && typeof x === 'object' && !Array.isArray(x)); // F-9 : un nœud nul ou scalaire est ignoré, le DAG reste lu
     const fp = path.join(d, f);
     let age = Math.round((now - mtime(fp)) / 1000);
     if (age <= ttl && nodes.some((x) => x.status === 'running')) {
-      const tracked = sh('git', [...GIT_SUR, '-C', d, 'ls-files', '--error-unmatch', f], d, root).trim(), dirty = sh('git', [...GIT_SUR, '-C', d, 'status', '--porcelain', '--', f], d, root).trim();
+      const tracked = sh('git', [...GIT_SUR, '-C', d, 'ls-files', '--error-unmatch', '--', f], d, root).trim(), dirty = sh('git', [...GIT_SUR, '-C', d, 'status', '--porcelain', '--', f], d, root).trim();
       const ct = Number(sh('git', [...GIT_SUR, '-C', d, 'log', '-1', '--format=%ct', '--', f], d, root).trim());
       if (tracked && !dirty && ct) age = Math.round(now / 1000 - ct); // contenu identique au commit : écrit au plus tard à cette date
     }
