@@ -496,6 +496,23 @@ assert_eq "O6.13a — témoin : la mesure a eu lieu sans erreur, au moins trois 
 for W in 768 1024; do
   assert_eq "O6.13 [$W px] — Projet, panneau élargi à 440 px : étapes dont la carte de visite recouvre le panneau" "$(x69 "j.l$W.etapes.filter((e)=>e.surPanneau).map((e)=>e.i).join(',')")" ""
 done
+# O6.14 (correctif 70-07, CI Linux de ddc487ce : R20 « #context recouvre #tour » à 768 px sur Équipe) : la visite ne s'ouvre pas d'elle-même sur l'onglet Équipe, qui n'a aucune visite conçue (P70-D-02 vise Code et Projet ; son graphe
+# a `tour: []`, le repli aurait raconté « une base de code » à propos de sessions et de sous-agents). Sous Linux le démarrage d'office l'ouvrait (le rendu y est plus lent : les cartes de l'équipe sont déjà là à ses 700 ms) ; ici on appelle
+# start() comme lui, sans argument, ce qui rougit sous macOS. Le bouton « Par où commencer » reste libre de l'ouvrir. Lab avec une session et un sous-agent, HOME jetable.
+HEQ="$WORK/home-eq"; LEQ="$WORK/lab-eq"; mkdir -p "$LEQ/src" "$LEQ/.planning/phases/01-socle" "$HEQ/.claude/projects/-lab-eq"
+printf 'export const u = () => 1;\n' > "$LEQ/src/util.js"; printf '# Roadmap\n\n## Jalon démo\n\n- [ ] **Phase 1: Socle** - jet\n' > "$LEQ/.planning/ROADMAP.md"; printf '<objective>x</objective>\n' > "$LEQ/.planning/phases/01-socle/01-01-PLAN.md"
+git -C "$LEQ" init -q && git -C "$LEQ" add -A && git -C "$LEQ" -c user.email=t@t -c user.name=t commit -q -m init; LABS4+=("$LEQ")
+SIDQ=aaaa1111-2222-3333-4444-000000000099; TSQ="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"; DQ="$HEQ/.claude/projects/-lab-eq"; mkdir -p "$DQ/$SIDQ/subagents"
+printf '{"type":"user","cwd":"%s","sessionId":"%s","gitBranch":"main","version":"2.1.317","timestamp":"%s","message":{"content":"salut"}}\n{"type":"assistant","cwd":"%s","sessionId":"%s","gitBranch":"main","version":"2.1.317","timestamp":"%s","message":{"content":[{"type":"text","text":"bonjour"}]}}\n' "$LEQ" "$SIDQ" "$TSQ" "$LEQ" "$SIDQ" "$TSQ" > "$DQ/$SIDQ.jsonl"
+printf '{"agentType":"vf-coder","isBuiltIn":false,"launchedWithDefaults":false,"description":"tâche synthétique","toolUseId":"toolu_s1","spawnDepth":1,"requestShape":"background","requestNonInteractive":true}' > "$DQ/$SIDQ/subagents/agent-s1.meta.json"
+printf '{"type":"user","isSidechain":true,"agentId":"s1","parentUuid":null,"cwd":"%s","sessionId":"%s","gitBranch":"main","version":"2.1.317","timestamp":"%s","message":{"role":"user","content":"mandat synthétique"}}\n' "$LEQ" "$SIDQ" "$TSQ" > "$DQ/$SIDQ/subagents/agent-s1.jsonl"
+UEQ="$(HOME="$HEQ" adr4 "$LEQ")"; SRVPIDS+=("$(pid4 "$LEQ")"); PEQ="${UEQ%index.html}equipe.html"
+XEQ="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$PEQ" 768 equipe)"
+[ -n "${DBG:-}" ] && echo "RAWEQ: $XEQ"
+xeq() { printf '%s' "$XEQ" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O6.14a — témoin : la mesure a eu lieu sans erreur, l'onglet Équipe a au moins deux cartes (une session et un sous-agent)" "$(xeq "j.erreur||''")|$(xeq 'j.e768.cartes>=2')" "|true"
+assert_eq "O6.14 — Équipe / 768 px : le démarrage d'office (start() sans argument) n'ouvre pas la visite" "$(xeq 'j.e768.auto')" "false"
+assert_eq "O6.14b — Équipe : le bouton « Par où commencer » l'ouvre toujours (démarrage voulu par la personne)" "$(xeq 'j.e768.manuel')" "true"
 # O6.10 (correctif 70-07, REG-70-01 de 70-VERIFICATION.md) : visite Projet active au premier chargement sur un lab à jalon et à mission, à 1 024 et 1 920 px : la carte ciblée tient dans la zone libre ET aucune carte du graphe ne sort de la zone
 # libre à gauche du panneau (critère de R1, chrome-responsive.mjs). Cause : aim() centrait et zoomait la carte sans regarder le reste du graphe, qui débordait sous le panneau ; il ne dézoomait jamais une carte plus large que sa zone.
 L7="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mkdir -p "$L7/src" "$L7/.planning/phases/01-socle" "$L7/.planning/phases/02-suite" "$L7/.planning/missions"

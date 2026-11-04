@@ -228,14 +228,15 @@
     if (SC.state.container === 'root') { SC.select(null); if (refit) SC.fit(true); }
     else if (refit) SC.go('root', { select: null, after: () => SC.fit(true) });
   }
-  function start() {
+  function start(manual) {
+    if (!manual && G.meta?.vfTab === 'equipe') return; // the Team tab has no tour of its own (its map is live sessions, not a codebase): it never opens by itself, whatever the timing
     steps = buildSteps();
     if (steps.length < 2) { SC.toast('There is not enough on this map for a tour yet.'); return; }
     SC.store.set(SEEN, true);
     show(0);
   }
 
-  const tourBtn = SC.addHeaderButton({ id: 'tour-btn', label: 'Start here', icon: 'home', title: 'A one-minute tour of this codebase', onClick: () => (active() ? end() : start()) });
+  const tourBtn = SC.addHeaderButton({ id: 'tour-btn', label: 'Start here', icon: 'home', title: 'A one-minute tour of this codebase', onClick: () => (active() ? end() : start(true)) });
   const ic = tourBtn.querySelector('svg');
   if (ic) ic.innerHTML = '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8z"/>'; // compass
   window.addEventListener('keydown', (ev) => {

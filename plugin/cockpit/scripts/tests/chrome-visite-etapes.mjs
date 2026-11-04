@@ -1,5 +1,6 @@
 // chrome-visite-etapes.mjs — la visite « Par où commencer » parcourue étape par étape, à deux largeurs (70-07, UIFN-04, P70-D-02, régime P70-D-08). Aucune dépendance.
-// Usage : node chrome-visite-etapes.mjs <chrome> <url> <largeurs> [recharge,passer,panneau]      (largeurs : « 1440,390 »)
+// Usage : node chrome-visite-etapes.mjs <chrome> <url> <largeurs> [recharge,passer,panneau,equipe]      (largeurs : « 1440,390 »)
+//   equipe : url = l'onglet Équipe d'un lab qui a une session et un sous-agent (donc au moins deux cartes) ; ne parcourt rien : rend { e<largeur>: { cartes, auto, manuel } } = cartes du graphe, la visite est ouverte par l'appel que fait le démarrage d'office (start() sans argument, 75-vf-modele.js et 40-tour.js), ouverte par le bouton « Par où commencer »
 //   panneau : le panneau de détail est élargi à 440 px avant la visite (ce que font d'autres polices, d'autres plateformes : sur la CI Linux, `#panel` recouvrait `#tour` à 768 px) ; champ surPanneau = la carte de visite recouvre le panneau
 //   passer : après la visite parcourue, la visite est relancée, avancée de deux étapes (une carte) puis fermée par « Passer » : clé p<largeur> { avant, apres } = { k : zoom, x, y : position, visibles : cartes entièrement dans la fenêtre, recouvre : cartes recouvertes par le titre } (la vue d'avant la visite doit revenir)
 //   anneau (étape sur un élément du chrome) = le contour a disparu quand le className du bouton #vf-lock est réécrit à l'arrivée, comme le fait la couche live (70-vf-live.js : « btn held »)
@@ -14,7 +15,7 @@
 //   selectionne = la visite a sélectionné quelque chose (le panneau montre alors le détail d'une carte au lieu de la vue d'ensemble) · toutLibre = une carte du graphe sort de la zone libre à gauche du panneau, visite active (critère de R1) · dansZone = la carte ciblée sort de la zone libre de la carte (sous le panneau, l'en-tête ou la barre de question ; 70-07, grandes cartes) · tient = la carte de visite sort de la fenêtre · passer = aucun bouton « Passer » visible dans la carte · repere = texte « n sur N » lu · anglais = mots témoins anglais (liste de F11) dans le texte de la carte de visite.
 import { executer, pause } from './chrome-session.mjs';
 const [, , chrome, url, largeurs, options = ''] = process.argv;
-const recharge = /recharge/.test(options), passer = /passer/.test(options), panneau = /panneau/.test(options);
+const recharge = /recharge/.test(options), passer = /passer/.test(options), panneau = /panneau/.test(options), equipe = /equipe/.test(options);
 const HAUT = { 390: 844, 1024: 768, 1440: 900 };
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlowTour && !!document.getElementById('tour-btn')";
 const INIT = "!!window.__vfModele && !!window.__vfModele.modele";
@@ -70,6 +71,14 @@ await executer(chrome, async (s) => {
     await s.attendre(`document.documentElement.lang === 'fr'`, `page en français à ${w} px`);
     await pause(1200); // le démarrage d'office attend 700 ms après le rendu
     await s.ev('window.VibeFlowTour.end()');
+    if (equipe) {
+      const cartes = await s.ev('window.VibeFlow.graph.nodes.length');
+      await s.ev('window.VibeFlowTour.end()'); await s.ev('window.VibeFlowTour.start()'); await pause(1200);
+      const auto = await s.ev('window.VibeFlowTour.active()'); await s.ev('window.VibeFlowTour.end()'); await pause(300);
+      await s.ev("document.getElementById('tour-btn').click()"); await pause(1200);
+      sortie['e' + w] = { cartes, auto, manuel: await s.ev('window.VibeFlowTour.active()') };
+      await s.ev('window.VibeFlowTour.end()'); continue;
+    }
     if (panneau) await s.ev("(() => { const p = document.getElementById('panel'); p.style.width = '440px'; })()");
     const noeuds = await s.ev(DONNEE);
     await s.ev('window.VibeFlowTour.start()');
