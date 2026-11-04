@@ -50,3 +50,6 @@ Rouge sur le code de `95050bc3` (scratchpad `fix-socle-f04-rouge.out`) :
 | V11.2 lab plat, verrou absent lu par `status` | abandonnee | inconnu |
 
 Gardes contre la sur-réparation (vertes avant et après) : V11.3 (lab partitionné, `status` au schéma de portée : jamais lu comme verrou plat, reste `inconnu`) ; V11.4 (script qui refuse tout verbe : `inconnu`). V11.0 : témoin que le faux script se comporte bien comme l'ancien.
+
+Correctif : `lireVerrous` retombe sur `status` quand `status --all` rend une sortie vide (refus), et n'accepte la réponse que sans `scope` ni `locks`.
+Vert : `test-cockpit-vie.sh` 35 PASS / 0 FAIL (scratchpad `fix-socle-f04-vert.out`).

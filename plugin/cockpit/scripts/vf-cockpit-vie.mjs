@@ -2,7 +2,7 @@
 // Exports : lireVerrous(root, { scriptsDir, home, sh }) -> { etat: 'lue'|'absente'|'erreur', plat, liste: [{ ws, scope, phase, tenu, stale, ageS, ttl, progressAgeS, owner }] }
 //           vieDe({ ws, phase }, verrous) -> { tenu, stale, progressAgeS, ttl } | null (source illisible : la mission est « inconnu »)
 //           estVivante(vie) · normPhase(valeur)
-// Lecture du verrou par shell-out borné (driver-lock.sh status --all, script résolu hors de l'arbre observé : T-67-06) ;
+// Lecture du verrou par shell-out borné (driver-lock.sh status --all, repli sur status pour un script d'avant --all, script résolu hors de l'arbre observé : T-67-06) ;
 // calcul pur dans vieDe et estVivante ; jamais la date de modification d'un DAG (le progrès vient du JSON du verrou).
 import os from 'node:os';
 import path from 'node:path';
@@ -36,8 +36,13 @@ const garde = (l) => ({ ws: chaine(l.ws) ?? '', scope: chaine(l.scope), phase: c
 export function lireVerrous(root, { scriptsDir, home, sh: run = sh } = {}) {
   const dl = driverLockScript({ scriptsDir: scriptsDir || resolveScriptsDir(HERE), labRoot: root, home: home ?? os.homedir() });
   if (dl.etat === 'absent') return { etat: 'absente', plat: false, liste: [] };
-  let st; try { st = JSON.parse(run('bash', [dl.chemin, 'status', '--all'], root)); } catch { return { etat: 'erreur', plat: false, liste: [] }; }
-  if (!st || typeof st !== 'object' || Array.isArray(st)) return { etat: 'erreur', plat: false, liste: [] };
+  const objet = (s) => { try { const o = JSON.parse(s); return o && typeof o === 'object' && !Array.isArray(o) ? o : null; } catch { return null; } };
+  const brut = run('bash', [dl.chemin, 'status', '--all'], root);
+  let st = objet(brut);
+  // F-04 : un script d'avant `--all` (avant 32438005) répond « Unknown arg: --all » sur stderr, stdout vide ; en lab plat le verbe de base `status` répond alors l'objet d'UN verrou.
+  // Repli seulement sur une sortie VIDE (un refus), et seulement si la réponse ne porte ni `scope` ni `locks` : un script qui connaît la portée aurait répondu à `--all`, son `status` nu ne dit qu'un verrou parmi d'autres.
+  if (!st && brut.trim() === '') { st = objet(run('bash', [dl.chemin, 'status'], root)); if (st && ('scope' in st || 'locks' in st)) st = null; }
+  if (!st) return { etat: 'erreur', plat: false, liste: [] };
   if (Array.isArray(st.locks)) return { etat: 'lue', plat: false, liste: st.locks.filter((l) => l && typeof l === 'object' && l.present === true).map(garde) };
   if (st.present === true) return { etat: 'lue', plat: true, liste: [garde(st)] };
   if (st.present === false) return { etat: 'lue', plat: true, liste: [] };
