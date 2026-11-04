@@ -116,7 +116,9 @@ avec une boucle d'évals.
 19 modules, chacun versionné avec son `CHANGELOG.md`. `conductor` est le socle obligatoire ;
 ensuite tu choisis un lab de dev parmi des presets (`dev`, `dev-mobile`, `dev-audite`, les
 dépendances résolues pour toi) ou un lab métier sur mesure. Le README de chaque module est sa
-documentation complète, avec la même structure partout.
+documentation complète, avec la même structure partout. Le module `cockpit` a deux surfaces sur le même socle en lecture seule :
+une page web locale (`/vf-cockpit`) et une pane terminal dans la session Claude Code (`/vf-signal`),
+affichée seulement quand `cockpit` est installé.
 
 → [Catalogue des modules](./manual/fr/03-modules/catalogue.md) ·
 [commandes](./manual/fr/06-reference/commandes.md) ·
