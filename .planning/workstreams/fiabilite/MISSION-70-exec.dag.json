@@ -189,7 +189,7 @@
         "fix-recette-equipe"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "verif-70",
@@ -217,7 +217,7 @@
         "fix-recette-equipe"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "fix-focus-tiroir",
@@ -245,7 +245,7 @@
         "plugin/cockpit/skills/cockpit-moteur/assets/ui/01-vf-responsive.js",
         "plugin/cockpit/scripts/tests/test-cockpit-responsive.sh"
       ],
-      "status": "ready"
+      "status": "blocked"
     },
     {
       "id": "fix-visite-reload",
@@ -331,6 +331,18 @@
       "scope": [
         "plugin/cockpit/skills/cockpit-moteur/assets/ui/70-vf-live.js",
         "plugin/cockpit/skills/cockpit-moteur/assets/ui/72-vf-equipe.js"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-ci-linux-r20",
+      "step": "CI Linux : #panel recouvre #tour à 768 px (R20)",
+      "stage": "",
+      "deps": [
+        "exec-70-09"
+      ],
+      "scope": [
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/40-tour.js"
       ],
       "status": "done"
     }
