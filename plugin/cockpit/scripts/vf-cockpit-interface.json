@@ -15,7 +15,7 @@
       "requis": { "schema": "string", "at": "string", "root": "string", "projet": "string", "layout": "object", "phases": "array", "jalons": "array", "missions": "array", "verrous": "object", "arbres": "array", "equipe": "object" },
       "phase": { "requis": ["key", "n", "ws", "nom", "fait", "avancement", "libelle"], "optionnels": [] },
       "jalon": { "requis": ["key", "icone", "texte", "ws", "phases"], "optionnels": [] },
-      "mission": { "requis": ["nom", "fichier", "phaseKey", "ws", "etat", "libelle", "vie"], "optionnels": ["noeuds"] },
+      "mission": { "requis": ["nom", "fichier", "phaseKey", "ws", "etat", "libelle", "vie"], "optionnels": ["noeuds"], "vieNulle": ["inconnu", "done", "ready", "failed"], "vieNulleDit": "vie vaut null seulement pour ces etats : inconnu = source des verrous illisible ; done, ready, failed = aucun noeud running, verrous non lus. running et abandonnee portent toujours une vie. Lire vie: null sur etat, jamais seul." },
       "noeud": { "requis": ["id", "status", "step", "stage", "deps"], "optionnels": [] },
       "verrou": { "requis": ["ws", "scope", "phase", "tenu", "stale", "ageS", "ttl", "progressAgeS", "owner"], "optionnels": [] },
       "arbre": { "requis": ["label", "branche", "principal", "courant", "phaseActive", "retard"], "optionnels": [] },

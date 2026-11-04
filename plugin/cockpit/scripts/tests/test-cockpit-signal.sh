@@ -403,7 +403,7 @@ assert_eq "S12.1 — verrous lus (conductor voisin, aucun verrou tenu) : la miss
 RUN "$NV" "$WORK/home-vide" "$WORK/o12b.json" "$L12" > /dev/null
 assert_eq "S12.2 — source des verrous illisible (aucun conductor) : la mission au nœud running est inconnu, vie null ; les trois autres inchangées (vie null aussi)" "$(VN "$WORK/o12b.json")" "-actif:inconnu:true,-echec:failed:true,-faite:done:true,-prete:ready:true"
 assert_eq "S12.3 — le contrat versionné déclare les états de mission dont vie vaut null (mission.vieNulle)" "$(G "$IFACE" '(j.schemas["vibeflow/cockpit-signal@1"].mission.vieNulle||["absent"]).slice().sort().join()')" "done,failed,inconnu,ready"
-assert_eq "S12.4 — l'en-tête de vf-cockpit-avancement.mjs dit ce que null veut dire (vieNulle, lu sur etat)" "$(grep -c 'vie: null.*lit sur .etat' "$SCRIPTS/vf-cockpit-avancement.mjs" | sed 's/^[1-9].*/dit/')" "dit"
+assert_eq "S12.4 — l'en-tête de vf-cockpit-avancement.mjs dit que vie: null a deux sens départagés par etat (vieNulle)" "$(grep -c 'vie: null.*DEUX sens.*etat.*vieNulle' "$SCRIPTS/vf-cockpit-avancement.mjs" | sed 's/^[1-9].*/dit/')" "dit"
 
 vf_hyg_assert
 echo

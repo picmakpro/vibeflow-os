@@ -117,3 +117,6 @@ Témoin : section S12 de `test-cockpit-signal.sh`. Rouge sur `250dcdba` (scratch
 | S12.4 l'en-tête d'avancement dit que `vie: null` se lit sur `etat` | dit | 0 (absent) |
 
 Verts avant et après (la règle est déjà vraie) : S12.1 (verrous lus : `abandonnee` porte une vie, `done`/`ready`/`failed` ont `vie` null sans être `inconnu`), S12.2 (source illisible : `inconnu` + `vie` null).
+
+Correctif : `mission.vieNulle` (+ `vieNulleDit`) dans `vf-cockpit-interface.json` (ajout de clés de documentation, aucun champ de sortie nouveau ni retiré) ; paragraphe dédié dans l'en-tête de `vf-cockpit-avancement.mjs`.
+Vert : `test-cockpit-signal.sh` 70 PASS / 0 FAIL ; `test-cockpit-avancement.sh` 61 PASS / 0 FAIL (scratchpad `fix-socle-f08-vert.out`, `fix-socle-f08-vert-avancement.out`). Le témoin S12.4 a été resserré sur la lettre du paragraphe posé (`DEUX sens` … `etat` … `vieNulle`), le rouge ci-dessus est celui du premier libellé : l'en-tête d'avant ne contenait aucune des deux formes.

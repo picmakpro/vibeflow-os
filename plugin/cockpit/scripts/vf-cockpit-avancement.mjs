@@ -2,7 +2,9 @@
 // Exports : ETATS, RESTE, ETATS_MISSION, LIBELLES_ETAT, LIBELLES_RESTE, LIBELLES_MISSION, decompte, trouverPhase, rattacherMission, etatMission, reste, avancement.
 // Contrat figé en version 2 (déclaré dans vf-cockpit-interface.json, clé `avancement`, lu par la Phase 68 ; VFSG-06, P68-D-16) :
 //   { version: 2, etat, plans: { faits, total }, correctifs, mission: { nom, etat, vie } | null, reste: [codes] } — ajouts de champs seulement.
-//   `vie` = { tenu, stale, progressAgeS, ttl } (verrou lu) ou null (source des verrous illisible : la mission est `inconnu`, P68-D-23) ; absent quand l'appelant ne lit pas les verrous.
+//   `vie` = { tenu, stale, progressAgeS, ttl } (verrou lu) ou null ; absent quand l'appelant ne lit pas les verrous.
+//   `vie: null` porte DEUX sens, que la forme ne distingue pas et que `etat` départage (F-08, `mission.vieNulle` du contrat) : `etat: inconnu` = source des verrous illisible (P68-D-23, un nœud running dont on ne sait rien) ;
+//   `etat` done, ready ou failed = aucun nœud running, les verrous ne sont pas lus. Une mission `running` ou `abandonnee` porte toujours une vie. Un consommateur lit donc `vie: null` sur `etat`, jamais seul.
 // Module pur : ne lit que ce qu'on lui passe (la lecture du verrou est celle de vf-cockpit-vie.mjs, en amont), aucune lecture réseau, aucun nom de lab codé en dur.
 import { estVivante } from './vf-cockpit-vie.mjs';
 
