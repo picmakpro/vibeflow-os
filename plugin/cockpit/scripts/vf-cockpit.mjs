@@ -11,6 +11,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { envEnfant } from './vf-cockpit-env.mjs';
 import { findLabRoot, engineDir, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
 import { portPrefere } from './vf-cockpit-port.mjs';
+import { FICHIER_OUVRIR } from './vf-cockpit-terminal-amorce.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const AIDE = `Usage : node vf-cockpit.mjs [open|build|stop|status] [--lab <dossier>] [--no-open] [--port <p>] [--rebuild] [--terminal]
@@ -43,7 +44,20 @@ function lireArgs(argv) {
 const etatFile = (sortie) => path.join(sortie, '.cache', 'server.json');
 const lireEtat = (sortie) => { try { return JSON.parse(fs.readFileSync(etatFile(sortie), 'utf8')); } catch { return null; } };
 const vivant = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
-const serveurVivant = (sortie) => { const s = lireEtat(sortie); return s && s.pid && s.url && vivant(s.pid) ? s : null; };
+// P71-D-25 (F1) : server.json est écrit dans le lab, donc non fiable. Aucune adresse n'en est jamais reprise telle quelle : seul un PORT entier
+// (^[0-9]{1,5}$, 1..65535) en est lu, et l'adresse est reconstruite en http://127.0.0.1:<port>. Un port invalide vaut « pas de serveur ».
+const portValide = (v) => { const t = typeof v === 'number' || typeof v === 'string' ? String(v) : ''; if (!/^[0-9]{1,5}$/.test(t)) return null; const n = Number(t); return n >= 1 && n <= 65535 ? n : null; };
+const portDeUrl = (u) => { const m = typeof u === 'string' ? /^http:\/\/127\.0\.0\.1:([0-9]{1,5})$/.exec(u) : null; return m ? portValide(m[1]) : null; };
+const adresseLocale = (port) => `http://127.0.0.1:${port}`;
+const serveurVivant = (sortie) => {
+  const s = lireEtat(sortie);
+  if (!s || !s.pid || !vivant(s.pid)) return null;
+  const port = portValide(s.port) ?? portDeUrl(s.url);
+  if (port === null) return null;
+  const pq = s.terminal ? portDeUrl(s.terminal.url) : null;
+  const { terminal: _t, ...reste } = s;
+  return { ...reste, port, url: adresseLocale(port), ...(pq === null ? {} : { terminal: { url: adresseLocale(pq) } }) };
+};
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const adresses = (url) => `Cockpit : ${url}/ (Code) · ${url}/project.html (Projet)`;
 
@@ -67,6 +81,7 @@ function arreter(sortie) {
 // P71-D-11, O3 : amorçage du terminal écrit AVANT le démarrage du serveur ; jamais imprimé, journalisé ni passé au serveur.
 // Suppression préalable puis création exclusive (`wx`) : un lien préplacé n'est jamais suivi ; mode 0600.
 const MODE_AMORCE = 0o600;
+const MODE_PAGE = 0o600;
 function ecrireAmorce(sortie) {
   const f = path.join(sortie, '.cache', 'terminal-amorce');
   const valeur = crypto.randomBytes(32).toString('hex');
@@ -85,13 +100,31 @@ function ouvrir(url) {
   const op = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
   try { spawn(op[0], op[1], { stdio: 'ignore', detached: true }).unref(); } catch {}
 }
-// P71-D-12 : l'onglet s'ouvre sur la page du terminal (Q), l'amorçage dans le fragment ; le serveur ne s'ouvre pas lui-même
-function ouvrirQ(s, amorce, o) { if (!o.noOpen) ouvrir(`${s.terminal.url}/#t=${amorce}`); }
+// P71-D-12, P71-D-27 (F6) : l'onglet s'ouvre sur la page du terminal (Q) ; l'amorçage n'est JAMAIS dans l'argv de l'ouvreur (lisible par `ps`).
+// Le lanceur écrit une page de redirection (0600, suppression préalable puis création exclusive : aucun lien suivi) dans .cache, l'ouvreur ne reçoit
+// que son chemin. Le serveur la supprime dès l'échange de l'amorçage, et la balaie au plus tard 60 s après sa création.
+function ecrirePageOuvrir(sortie, cible) {
+  const f = path.join(sortie, '.cache', FICHIER_OUVRIR);
+  const html = `<!doctype html>\n<meta charset="utf-8">\n<meta name="referrer" content="no-referrer">\n<meta http-equiv="refresh" content="0;url=${cible}">\n<title>Terminal</title>\n`;
+  try {
+    try { fs.unlinkSync(f); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    const fd = fs.openSync(f, 'wx', MODE_PAGE);
+    try { fs.writeSync(fd, html); } finally { fs.closeSync(fd); }
+  } catch { return null; }
+  return f;
+}
+function ouvrirQ(s, amorce, o, sortie) {
+  if (o.noOpen) return;
+  const page = ecrirePageOuvrir(sortie, `${s.terminal.url}/#t=${amorce}`);
+  if (!page) { effacerAmorce(sortie); console.error("ouverture du terminal impossible : fichier inattendu dans .cache"); return; }
+  ouvrir(page);
+}
+// F1 : une adresse de Q n'est remise à l'ouvreur que si le processus de server.json est le serveur de CETTE sortie (estNotre)
+const termOuvrable = (s, sortie) => !!(s && s.terminal && s.terminal.url) && estNotre(s.pid, path.join(sortie, 'serve.mjs'));
 async function attendreTerminal(sortie) {
-  for (let i = 0; i < 100; i++) { const s = serveurVivant(sortie); if (s && s.terminal && s.terminal.url) return s; await attendre(100); }
+  for (let i = 0; i < 100; i++) { const s = serveurVivant(sortie); if (s && termOuvrable(s, sortie)) return s; await attendre(100); }
   return null;
 }
-const termActif = (s) => !!(s && s.terminal && s.terminal.url);
 
 async function assemblerLab(lab, scriptsDir) {
   const { assembler } = await import('./vf-cockpit-build.mjs');
@@ -152,7 +185,7 @@ async function main() {
   const vif = serveurVivant(sortie);
   if (vif && !o.rebuild) {
     if (!o.avecQ) { console.log(adresses(vif.url)); return; }
-    if (termActif(vif)) { ouvrirQ(vif, amorcer(lab, sortie), o); console.log(adresses(vif.url)); return; } // O2 c : même serveur, nouvel amorçage
+    if (termOuvrable(vif, sortie)) { ouvrirQ(vif, amorcer(lab, sortie), o, sortie); console.log(adresses(vif.url)); return; } // O2 c : même serveur, nouvel amorçage
   }
   if (vif) { if (!arreter(sortie)) { console.error(`PID ${vif.pid} non reconnu comme le serveur de ce cockpit : rien n'a été arrêté.`); process.exit(5); } for (let i = 0; i < 30 && vivant(vif.pid); i++) await attendre(100); }
   if (engineDir(scriptsDir).etat !== 'trouve') { console.error('moteur du cockpit introuvable : réinstaller le module cockpit.'); process.exit(3); }
@@ -161,7 +194,7 @@ async function main() {
   let s = await demarrer(lab, sortie, o);
   if (s && o.avecQ) {
     const t = await attendreTerminal(sortie);
-    if (t) { s = t; ouvrirQ(t, amorce, o); }
+    if (t) { s = t; ouvrirQ(t, amorce, o, sortie); }
     else { effacerAmorce(sortie); console.error("le terminal n'a pas démarré (voir serveur.log) ; le cockpit est ouvert sans terminal."); if (!o.noOpen) ouvrir(s.url); }
   }
   if (!s) { console.error(`le serveur n'a pas démarré : voir ${path.join(sortie, '.cache', 'serveur.log')}`); process.exit(5); }

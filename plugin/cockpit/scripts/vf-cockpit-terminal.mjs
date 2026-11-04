@@ -10,7 +10,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { realUnder } from './vf-cockpit-paths.mjs';
-import { FICHIER_AMORCE, nouveauSecret, egal, consommerAmorce } from './vf-cockpit-terminal-amorce.mjs';
+import { FICHIER_AMORCE, FICHIER_OUVRIR, DUREE_AMORCE_MS, nouveauSecret, egal, consommerAmorce } from './vf-cockpit-terminal-amorce.mjs';
 import { creerSessions, TAILLE_MAX } from './vf-cockpit-terminal-session.mjs';
 import { preparerPage, pageTerminal } from './vf-cockpit-terminal-page.mjs';
 import { injectionTiroir } from './vf-cockpit-terminal-tiroir.mjs';
@@ -36,6 +36,10 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
   let portQ = null, portP = null, sessions = null;
   const secret = nouveauSecret();
   const fichierAmorce = path.join(here || '.', '.cache', FICHIER_AMORCE);
+  const fichierOuvrir = path.join(here || '.', '.cache', FICHIER_OUVRIR);
+  // P71-D-27 : la page de redirection du lanceur disparaît dès l'échange de l'amorçage, et au plus tard DUREE_AMORCE_MS après sa création
+  const retirerOuvrir = () => { try { fs.unlinkSync(fichierOuvrir); } catch {} };
+  const balayerOuvrir = () => { try { const st = fs.lstatSync(fichierOuvrir); if (Date.now() - st.mtimeMs > DUREE_AMORCE_MS) retirerOuvrir(); } catch {} };
   const inerte = (indisponible) => ({
     actif: false, indisponible, injection: () => injectionTiroir({ indisponible }), frameSrc: () => '', occupe: () => false,
     routeP: (req, res) => { json(res, 200, { etat: indisponible ? 'indisponible' : 'arrete' }); return true; }, demarrer: () => {},
@@ -92,6 +96,7 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
     }
     if (p === '/amorce' && m === 'POST') { // l'amorçage n'est jamais lu qu'à l'échange ; il se consomme une seule fois
       if (!consommerAmorce(fichierAmorce, req.headers['x-vf-amorce'])) return refus(res, 403, 'amorçage');
+      retirerOuvrir();
       return json(res, 200, { secret });
     }
     // le secret précède le routage : une route inconnue ne se devine pas sans lui
@@ -130,7 +135,8 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
         } catch { log('server.json illisible : l\'adresse du terminal n\'a pas pu être publiée.'); }
         log('terminal actif (127.0.0.1 seulement).');
       });
-      process.on('exit', () => { sessions.arreterTout(); try { fs.unlinkSync(fichierAmorce); } catch {} });
+      retirerOuvrir(); const balai = setInterval(balayerOuvrir, 2000); balai.unref();
+      process.on('exit', () => { sessions.arreterTout(); try { fs.unlinkSync(fichierAmorce); } catch {} retirerOuvrir(); });
     },
   };
 }

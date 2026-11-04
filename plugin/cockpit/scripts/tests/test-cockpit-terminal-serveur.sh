@@ -4,12 +4,12 @@
 #   T0 le compteur d'assistants PTY voit un PTY (témoin de toutes les assertions « 0 assistant »)
 #   T1 Origin tierce, Origin de P, Origin de Q (témoin) · T2 Host de rebinding, Host de P, localhost restreint à GET /
 #   T3 sans secret, secret d'une autre longueur, secret faux, sans Origin, OPTIONS, corps bornés, en-têtes de toute réponse
-#   T4 amorçage : usage unique, rejeu, suppression, lien symbolique, mode lâche, absent des pages · T5 aucun secret dans aucune sortie
+#   T4 amorçage : usage unique, rejeu, suppression, lien symbolique, mode lâche, expiration à 60 s (T4.9), page de redirection retirée/balayée (T4.10, T4.11), absent des pages · T5 aucun secret dans aucune sortie
 #   TD `Upgrade: websocket` jamais 101, secret en paramètre d'adresse refusé
 #   S2  lecture du mode d'un fichier : même valeur sous macOS, GNU et uutils (faux `stat` des trois familles)
 #   TC  T-71-10 : le secret se compare en temps constant (égalité condensée + timingSafeEqual, aucune comparaison directe)
 #   TM  moteur : un assistant sous .vibeflow/ ou en lien symbolique est refusé (terminal inerte, rien n'est lancé)
-#   M-* mutants (copies de la sortie) : M-ORIGIN, M-HOST, M-JETON, M-SANSORIGIN, M-REJEU, M-SERVI, M-LOG, M-URL, M-TD1, M-TEMPS-CONSTANT, M-EGAL, M-MOTEUR-VIBEFLOW, M-MOTEUR-LIEN
+#   M-* mutants (copies de la sortie) : M-ORIGIN, M-HOST, M-JETON, M-SANSORIGIN, M-EXPIRE, M-RETIRE, M-BALAI, M-REJEU, M-SERVI, M-LOG, M-URL, M-TD1, M-TEMPS-CONSTANT, M-EGAL, M-MOTEUR-VIBEFLOW, M-MOTEUR-LIEN
 # Chaque refus a son témoin positif ; « 0 assistant » = aucun enfant du serveur dont la ligne de commande contient vf-cockpit-pty.py.
 # Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
@@ -270,6 +270,34 @@ assert_eq "T4.5b — un dossier à la place de l'amorçage : refus (403)" "$(nod
 rmdir "$AM"; (umask 077; { cat "$WORK/amorce.copy"; head -c 4096 /dev/zero | tr '\0' ' '; } > "$AM")
 assert_eq "T4.5c — un fichier d'amorçage de plus de 128 octets : refus (403)" "$(node "$TA" amorcer "$QP" "$WORK/amorce.copy" | sed -n 1p)" "403"
 unsrv
+# P71-D-27 : l'amorçage expire 60 s après sa création, côté serveur (âge simulé en reculant la date du fichier : jamais un vrai sleep 60)
+vieillir() { node -e "const fs=require('fs');const t=(Date.now()-Number(process.argv[2])*1000)/1000;fs.utimesSync(process.argv[1],t,t)" "$1" "$2"; }
+srvq; AM="$OUT/.cache/terminal-amorce"; vieillir "$AM" 50
+assert_eq "T4.9 — témoin : un amorçage vieux de 50 s est accepté (200)" "$(node "$TA" amorcer "$QP" "$WORK/amorce.copy" | sed -n 1p)" "200"
+unsrv
+srvq; AM="$OUT/.cache/terminal-amorce"; vieillir "$AM" 61
+assert_eq "T4.9 — un amorçage vieux de 61 s est refusé (403)" "$(node "$TA" amorcer "$QP" "$WORK/amorce.copy" | sed -n 1p)" "403"
+assert_eq "T4.9 — le refus pour expiration n'a pas consommé de secret (aucun /etat sans secret admis : 401)" "$(sta "$QP" GET /etat)" "401"
+unsrv
+srvq; AM="$OUT/.cache/terminal-amorce"; vieillir "$AM" 3600
+assert_eq "T4.9 — un amorçage vieux d'une heure est refusé (403)" "$(node "$TA" amorcer "$QP" "$WORK/amorce.copy" | sed -n 1p)" "403"
+unsrv
+# la page de redirection du lanceur (terminal-ouvrir.html) : retirée dès l'échange, balayée par le serveur 60 s après sa création
+posee() { (umask 077; printf '<meta http-equiv="refresh" content="0;url=http://127.0.0.1:1/#t=x">\n' > "$1"); }
+disparait() { for _ in $(seq 1 "$2"); do [ -e "$1" ] || { echo oui; return; }; sleep 0.25; done; echo non; }
+srvq; PG="$OUT/.cache/terminal-ouvrir.html"; posee "$PG"
+assert_eq "T4.10 — témoin : la page existe avant l'échange" "$([ -f "$PG" ] && echo oui || echo non)" "oui"
+echanger
+assert_eq "T4.10 — l'échange réussi retire la page de redirection" "$EC_CODE $(disparait "$PG" 8)" "200 oui"
+unsrv
+srvq; PG="$OUT/.cache/terminal-ouvrir.html"; posee "$PG"
+assert_eq "T4.10 — un échange REFUSÉ ne retire pas la page" "$(printf 'faux' > "$WORK/faux.copy"; node "$TA" amorcer "$QP" "$WORK/faux.copy" | sed -n 1p) $([ -f "$PG" ] && echo reste || echo retiree)" "403 reste"
+unsrv
+srvq; PG="$OUT/.cache/terminal-ouvrir.html"; posee "$PG"; vieillir "$PG" 30; sleep 5
+assert_eq "T4.11 — balayage : une page de 30 s est conservée" "$([ -f "$PG" ] && echo oui || echo non)" "oui"
+vieillir "$PG" 61
+assert_eq "T4.11 — balayage : une page de plus de 60 s jamais lue est supprimée par le serveur (8 s au plus)" "$(disparait "$PG" 32)" "oui"
+unsrv
 
 echo "=== T5 — aucun secret dans aucune sortie (TERM-03, T-71-12) ==="
 temoin_compteur T5
@@ -401,6 +429,15 @@ if mut jeton vf-cockpit-terminal.mjs "s/!egal(req.headers\['x-vf-terminal'\], se
   srvq "$MUT_OUT"; echanger; assert_eq "M-JETON — le mutant rougit T3.1 : l'absence de secret est admise (≠ 401)" "$(rouge "$(sta "$QP" POST /entree --onglet o1 --corps x)" 401)" "rouge"; unsrv; fi
 if mut sansorigine vf-cockpit-terminal.mjs "s/if (!page && !navigateur) return /if (false) return /"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-SANSORIGIN — le mutant rougit T3.4 : POST /entree sans Origin n'est plus refusé (403)" "$(rouge "$(sta "$QP" POST /entree --secret "$SECRET" --onglet o1 --sans-origin --corps x)" 403)" "rouge"; unsrv; fi
+if mut expire vf-cockpit-terminal-amorce.mjs "s/age <= DUREE_AMORCE_MS/true/"; then
+  srvq "$MUT_OUT"; AM="$MUT_OUT/.cache/terminal-amorce"; vieillir "$AM" 3600
+  assert_eq "M-EXPIRE — le mutant rougit T4.9 : un amorçage vieux d'une heure n'est plus refusé (403)" "$(rouge "$(node "$TA" amorcer "$QP" "$WORK/amorce.copy" | sed -n 1p)" 403)" "rouge"; unsrv; fi
+if mut retire vf-cockpit-terminal.mjs 's/^      retirerOuvrir();$/      0;/'; then
+  srvq "$MUT_OUT"; PG="$MUT_OUT/.cache/terminal-ouvrir.html"; posee "$PG"; echanger
+  assert_eq "M-RETIRE — le mutant rougit T4.10 : la page reste après l'échange" "$([ -f "$PG" ] && echo rouge || echo identique)" "rouge"; unsrv; fi
+if mut balai vf-cockpit-terminal.mjs 's/> DUREE_AMORCE_MS) retirerOuvrir/> 1e12) retirerOuvrir/'; then
+  srvq "$MUT_OUT"; PG="$MUT_OUT/.cache/terminal-ouvrir.html"; posee "$PG"; vieillir "$PG" 61; sleep 6
+  assert_eq "M-BALAI — le mutant rougit T4.11 : une page de plus de 60 s n'est plus balayée" "$([ -f "$PG" ] && echo rouge || echo identique)" "rouge"; unsrv; fi
 if mut rejeu vf-cockpit-terminal-amorce.mjs "s/fs\.unlinkSync(fichier)/0/"; then
   srvq "$MUT_OUT"; echanger; assert_eq "M-REJEU — le mutant rougit T4.2 : le rejeu de l'amorçage n'est plus refusé (403)" "$(rouge "$(node "$TA" amorcer "$QP" "$WORK/amorce.copy" | sed -n 1p)" 403)" "rouge"; unsrv; fi
 if mut servi vf-cockpit-terminal.mjs 's#return res.end(html);#return res.end(html + String(fs.readFileSync(fichierAmorce, "utf8")));#'; then
