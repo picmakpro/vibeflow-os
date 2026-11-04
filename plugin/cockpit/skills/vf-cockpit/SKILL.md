@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 # vf-cockpit — le cockpit du lab
 
-Le cockpit est une page locale en lecture seule : `Projet` (où en est le lab, qui travaille en direct, questions
+Le cockpit est une page locale en lecture seule, sauf le terminal intégré que `--terminal` ouvre (un shell du compte, pas une lecture) : `Projet` (où en est le lab, qui travaille en direct, questions
 posées en français) et `Code` (carte du code). Il est servi sur `127.0.0.1` uniquement ; aucun appel sortant, hors
 l'agent `claude -p` confiné qui répond aux questions de l'onglet Projet.
 
@@ -17,7 +17,7 @@ l'agent `claude -p` confiné qui répond aux questions de l'onglet Projet.
    sinon `$HOME/.claude/scripts/vf-cockpit.mjs` (pose `user`).
 2. Exécuter `node <lanceur> <argument>` depuis la racine du lab ; l'argument vaut `open` par défaut, ou `build`
    (assemble sans serveur), `stop` (arrête le serveur), `status` (adresse et PID, ou « arrêté »). Options :
-   `--lab <dossier>`, `--no-open`, `--port <p>`, `--rebuild`, `--terminal` (ouvre aussi un terminal dans le tiroir, macOS et Linux ; le cockpit n'est alors plus en lecture seule : le terminal est un shell du compte).
+   `--lab <dossier>`, `--no-open`, `--port <p>`, `--rebuild`, `--terminal` (ouvre aussi un terminal dans le tiroir, macOS et Linux, `python3` requis ; sans lui le lanceur le dit et ouvre le cockpit sans terminal ; le cockpit n'est alors plus en lecture seule : le terminal est un shell du compte, avec le `PATH` d'origine du lanceur). Le lanceur attend le serveur jusqu'à 30 s.
 3. Relayer l'adresse imprimée : `Cockpit : <adresse>/ (Code) · <adresse>/project.html (Projet)`.
 
 Codes de sortie : 0 succès · 2 lab sans `.planning/` · 3 moteur absent (réinstaller le module) · 4 assemblage en

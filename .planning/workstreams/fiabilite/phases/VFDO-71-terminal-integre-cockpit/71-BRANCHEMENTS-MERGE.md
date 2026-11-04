@@ -99,3 +99,35 @@ Les dix nouveaux viennent des correctifs F1, F6 (lanceur), N2 (binaires résolus
 
 Règle de fusion (inchangée) : recompter (`TAILLE`, nombre de suites des README racine), jamais additionner ; rejouer `synchro.sh verifier` et
 toutes les suites `test-cockpit-*.sh` après la fusion de `serve.mjs`.
+
+## 6. Après rebase sur main 19393cc3 (2026-11-04)
+
+Branche `feat/phase-71-terminal` rebasée sur `origin/main` `19393cc3` (H-1, cockpit v1.1.2 ; la Phase 69 est déjà sur `main`). Tête de la branche à la rédaction : `2204a239`. Les
+sections 1 à 5 décrivent la base `7370d604` : où elles disent `P25`, `TAILLE 614`, « fusionner la 69 d'abord » ou « v1.1.0 », c'est la présente section qui fait foi.
+
+- **Patch du terminal : `P26`.** `P25` est celui de H-1 (ligne `process.env.PATH = assainirPath(…)` en tête de `serve.mjs`, `vibeflow P25`). Le terminal est renuméroté `P26` :
+  `serve.mjs` (marqueurs `vibeflow P26`, lignes 172-174, 220, 500, 515, 604), `amont/patches/assets__serve.mjs.diff`, et la ligne `PATCH assets/serve.mjs …,P24,P25,P26` de
+  `VENDORED.txt` (qui porte la description de chacun). Les phrases du README et du CHANGELOG qui disaient `P25` pour le terminal disent `P26`.
+- **`TAILLE assets/serve.mjs 616`** (612 sur `origin/main`, 614 sur l'ancienne base de la 71), relevé par `wc -l` de `skills/cockpit-moteur/assets/serve.mjs` ; `synchro.sh verifier`
+  doit rendre « amont v0.6.0 @ 92d6854 retrouvé à l'octet ». Si la PR #200 touche `serve.mjs` ou la ligne `TAILLE`, recompter par `wc -l`, jamais additionner.
+- **Variantes N2 abandonnées au profit de H-1.** Les résolutions en chemin absolu que N2 avait posées dans `vf-cockpit-build.mjs` (PATH assaini du moteur), `vf-cockpit-live.mjs`
+  (`bash`), `vf-cockpit-planning.mjs` (`git`) et `vf-cockpit-who.mjs` (`git`, `bash`) ne sont pas reprises : ces quatre modules sont ceux de `main`, qui passent `envEnfant`
+  de `vf-cockpit-env.mjs` (import en tête de chacun). Ce que la 71 garde de N2 : le lanceur (`vf-cockpit.mjs` : `ps`, `open`, `xdg-open`, `python3` par `resoudreBinaire`) et
+  `vf-cockpit-paths.mjs`, où `gitCommonDir` tient N2 et H-1 ensemble (`7bb14f15` : binaire cherché dans le `PATH` assaini de `envEnfant`, appelé par chemin absolu).
+  Conséquence pour le moteur d'assemblage : repli `/usr/bin:/bin:/usr/sbin:/sbin` (`PATH_REPLI`) au lieu de `/usr/bin:/bin` (N8) ; `PATH_SYSTEME` ne sert plus qu'au repli de `resoudreBinaire`.
+- **Transport du PATH d'origine.** Le lanceur pose `VF_COCKPIT_PATH_ORIGINE` (`vf-cockpit.mjs:180`) pour le serveur ; `envShell` le restitue en `PATH` du shell puis le retire
+  (`vf-cockpit-terminal-env.mjs:24-25`). Le processus de Q (`envDuProcessusTerminal`, `vf-cockpit-terminal.mjs:25-26`) reçoit `envEnfant(lab, process.env)`, donc assaini ; le shell reçoit l'environnement
+  d'origine par l'IPC (`envOrigine`). Limite à garder : un serveur lancé hors du lanceur donne au shell le `PATH` assaini. Test repointé : `87f63b7a` (M-PATH-VIDE sur `vf-cockpit-env.mjs`).
+- **Sentinelle T7.5 en `vf-term-`** (`test-cockpit-terminal-activation.sh:101`, `f89b3a54`) : la sentinelle `vf-term` se confondait avec `vf-termines` (classe de la Phase 69 présente dans les pages servies) ;
+  elle cherche `vf-term-` (avec le tiret) et `VibeFlow (71-`. Ne pas la raccourcir au merge.
+- **Compteur de suites recompté : 160** (`find plugin scripts -path '*/tests/test-*.sh'` = 160 ; `origin/main` en compte 150, la 71 en ajoute dix). `README.md` et `README.fr.md` disent 160 ;
+  `bash scripts/check-version-sync.sh` rend ✓ pour les deux. Ce compteur est à recompter, jamais à additionner, après tout merge de la #200 ou de la 68.
+- **Version : v1.2.0**, après v1.1.2 de H-1 (`VERSION`, `module.json`, en-tête du README alignés ; `check-version-sync.sh` ✓). Sections W1 à W4 et rebase ajoutées au CHANGELOG, phrases du README mises à jour (Q dans son processus,
+  arrêt et Python 3 absent dits, tiroir, PATH d'origine, H-1).
+- **Si la PR #200 (Phase 70, brouillon ouvert à la rédaction) est mergée avant** : un dernier rebase léger, et rien d'autre. La #200 touche, côté cockpit (relevé `gh pr view 200 --json files`, 2026-11-04),
+  `CHANGELOG.md`, `README.md`, `VERSION`, `module.json`, `VENDORED.txt` (nouveau patch sur `40-tour.js`, ligne `PATCH` de `assets/ui/40-tour.js`, et peut-être `TAILLE`), `vf-cockpit-build.mjs`, `vf-cockpit-who.mjs`
+  et les fichiers de `assets/ui/`. À refaire alors : (1) CHANGELOG : ordonner les deux entrées, la 71 reste v1.2.0 sauf si la #200 prend déjà v1.2.0 (alors v1.3.0, P71-PL-12), aligner `VERSION`, `module.json`
+  et l'en-tête du README (`check-version-sync.sh`) ; (2) `VENDORED.txt` : fusionner à la main, ne pas toucher à la ligne `PATCH assets/serve.mjs` (la #200 n'y touche pas), recompter `TAILLE` seulement si `serve.mjs` a bougé ;
+  (3) README : ajouter, ne pas réécrire ; (4) `vf-cockpit-build.mjs` et `-who.mjs` : prendre la version de la #200 (la 71 n'y garde rien depuis le rebase) ; (5) recompter les suites (150 + celles de la #200 + 10) ;
+  (6) rejouer les dix suites `test-cockpit-terminal-*.sh`, `test-cockpit-chrome-fr.sh`, `test-cockpit-responsive.sh`, `test-cockpit-projet.sh` et `synchro.sh verifier`. La #200 n'a aucun recoupement avec les fichiers
+  `vf-cockpit-terminal*.mjs` (neufs), ni avec le lanceur `vf-cockpit.mjs`.
