@@ -960,7 +960,7 @@ Plans:
 
 ### Phase 71: Terminal intégré au cockpit
 
-> **Cadrée le 2026-11-03** (`71-CONTEXT.md`, P71-D-01..17 ; arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-03). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Terminal intégré dans la page »).
+> **Exécutée le 2026-11-04, recette humaine à jouer** (`71-RECETTE-HUMAINE.md`) : 11 plans faits, revue et audit de sécurité complet passés avec corrections (`71-SECURITY.md`), branche `feat/phase-71-terminal` poussée, PR non ouverte. **Cadrée le 2026-11-03** (`71-CONTEXT.md`, P71-D-01..17 ; arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-03). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Terminal intégré dans la page »).
 
 **Goal:** Le cockpit ouvre un terminal dans la page (xterm.js et une PTY native), à la racine du lab, sans changer d'outil ; un audit de sécurité complet accompagne la phase, parce qu'un shell complet derrière le serveur local change le modèle de menace du cockpit.
 **Requirements**: TERM-01, TERM-02, TERM-03, TERM-04, TERM-05, TERM-06, TERM-07, TERM-08, TERM-09, TERM-10, TERM-11, TERM-12
@@ -970,17 +970,17 @@ Plans:
 
 Plans:
 
-- [ ] 71-01-PLAN.md — vague 1 : tranche traçante `--terminal` de bout en bout (patch P25 de `serve.mjs`, serveur Q, amorçage, session, assistant PTY dans l'arbre du moteur) — TERM-01, 05, 07
-- [ ] 71-02-PLAN.md — vague 2 : contrôles Host/Origin/jeton de Q, tenue des secrets — TERM-02, 03
-- [ ] 71-03-PLAN.md — vague 2 : assistant PTY complet, environnement filtré, plein écran par le flux, orphelins — TERM-06, 07, 08, 09
-- [ ] 71-04-PLAN.md — vague 2 : session unique, grâce de 30 s, tampon de 256 Kio, rien sur disque — TERM-08, 11
-- [ ] 71-10-PLAN.md — vague 2 : lanceur `--terminal` et amorçage — TERM-01, 03, 04, 07
-- [ ] 71-11-PLAN.md — vague 2 : xterm.js vendorisé (sha256, licences, `VENDORED.txt`) — TERM-10
-- [ ] 71-05-PLAN.md — vague 3 : page Q et sa CSP, thème, parité des variables — TERM-05, 10, 12
-- [ ] 71-06-PLAN.md — vague 4 : client Q, cadre sous `sandbox`, canal Q vers P, 0 violation CSP — TERM-04, 05, 10, 12
-- [ ] 71-07-PLAN.md — vague 5 : tiroir dans Projet et Code (O1 décidé : P71-D-20) — TERM-01, 05, 07, 12
-- [ ] 71-08-PLAN.md — vague 5 : bout en bout dans Chrome, séquences hostiles, chaîne XSS — TERM-09, 10, 12
-- [ ] 71-09-PLAN.md — vague 6 : recette humaine, docs, version, gates, `71-SECURITY.md` — TERM-05, 08, 09, 12
+- [x] 71-01-PLAN.md — vague 1 : tranche traçante `--terminal` de bout en bout (patch P25 de `serve.mjs`, serveur Q, amorçage, session, assistant PTY dans l'arbre du moteur) — TERM-01, 05, 07
+- [x] 71-02-PLAN.md — vague 2 : contrôles Host/Origin/jeton de Q, tenue des secrets — TERM-02, 03
+- [x] 71-03-PLAN.md — vague 2 : assistant PTY complet, environnement filtré, plein écran par le flux, orphelins — TERM-06, 07, 08, 09
+- [x] 71-04-PLAN.md — vague 2 : session unique, grâce de 30 s, tampon de 256 Kio, rien sur disque — TERM-08, 11
+- [x] 71-10-PLAN.md — vague 2 : lanceur `--terminal` et amorçage — TERM-01, 03, 04, 07
+- [x] 71-11-PLAN.md — vague 2 : xterm.js vendorisé (sha256, licences, `VENDORED.txt`) — TERM-10
+- [x] 71-05-PLAN.md — vague 3 : page Q et sa CSP, thème, parité des variables — TERM-05, 10, 12
+- [x] 71-06-PLAN.md — vague 4 : client Q, cadre sous `sandbox`, canal Q vers P, 0 violation CSP — TERM-04, 05, 10, 12
+- [x] 71-07-PLAN.md — vague 5 : tiroir dans Projet et Code (O1 décidé : P71-D-20) — TERM-01, 05, 07, 12
+- [x] 71-08-PLAN.md — vague 5 : bout en bout dans Chrome, séquences hostiles, chaîne XSS — TERM-09, 10, 12
+- [x] 71-09-PLAN.md — vague 6 : recette humaine, docs, version, gates, `71-SECURITY.md` — TERM-05, 08, 09, 12
 
 ### Phase 72: Lancer du travail depuis les cartes du cockpit
 

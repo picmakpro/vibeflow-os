@@ -99,7 +99,7 @@
         "critique-terminal"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "docs",
@@ -315,7 +315,58 @@
         "rejuge"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
+    },
+    {
+      "id": "fix-n1",
+      "step": "N1 aperçu du collage (P71-D-29)",
+      "stage": "",
+      "deps": [
+        "fix-c"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-n2",
+      "step": "N2 PATH du lanceur (P71-D-29)",
+      "stage": "",
+      "deps": [
+        "fix-c"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "reaudit-n",
+      "step": "re-audit ciblé N1 N2 + tour C",
+      "stage": "",
+      "deps": [
+        "fix-n1",
+        "fix-n2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-d",
+      "step": "régressions créées par la phase : N8, N11, I-doc",
+      "stage": "",
+      "deps": [
+        "reaudit-n"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-e",
+      "step": "témoin M-CONTREPRESSION déterministe",
+      "stage": "",
+      "deps": [
+        "fix-d"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
