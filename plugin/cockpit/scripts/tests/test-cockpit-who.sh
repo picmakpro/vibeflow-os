@@ -451,6 +451,28 @@ assert_eq "W17.12 — mutant (ws sans point, ancien ID_RE) : l'agent de ws=v1.2 
 M5="$(mut17 phaseunniveau vf-cockpit-who.mjs "PH_RE = /^[0-9]+(\\.[0-9]+)*\$/" "PH_RE = /^[0-9]{1,4}(\\.[0-9]{1,3})?\$/")"
 assert_eq "W17.13 — mutant (phase à un seul niveau décimal) : le verrou 1.2.3 perd sa phase" "$M5|$(node "$AUX/q.mjs" "$WORK/mut17-phaseunniveau" who "$L17" "$HOME_T" "$DLREEL" | node "$AUX/stdin-get.mjs" 'j.workers.filter(w=>w.id==="mgr-v").map(w=>w.tree).join("|")')" "muté|compartiment v1.2"
 
+
+# ---------- W18 — le driver-lock.sh du plugin passe avant la copie installée (recette 69, 2026-11-04 : « Driver libre » alors qu'un verrou de phase est tenu) ----------
+# La copie de ~/.claude/scripts datait d'avant les verrous par phase : son `status --all` ne les liste pas. Le module cockpit voisin du conductor
+# (…/plugin/cockpit/scripts -> …/plugin/conductor/scripts) fournit le script à jour ; la copie de HOME ne sert plus qu'en repli.
+echo "=== W18 — le script du conductor voisin prime sur la copie installée ==="
+H18="$WORK/home18"; mkdir -p "$H18/.claude/scripts"
+cat > "$H18/.claude/scripts/driver-lock.sh" <<'SH'
+#!/usr/bin/env bash
+case "$1" in status) echo '{"present": false, "locks": [], "children_running": 0}' ;; orphans) echo '{"orphans":[]}' ;; esac
+SH
+PLUG="$WORK/plug18"; mkdir -p "$PLUG/cockpit/scripts"; ln -s "$(cd "$SCRIPTS/../../conductor" && pwd)" "$PLUG/conductor"
+Q who "$L17" "$H18" "$PLUG/cockpit/scripts" > "$WORK/who18.json"
+assert_eq "W18.1 — verrous de phase tenus comptés (held >= 1) avec le conductor voisin" "$(G "$WORK/who18.json" 'j.workers.filter(w=>w.kind==="lock").length>=1')" "true"
+assert_eq "W18.2 — le verrou de phase 5 est libellé « compartiment x phase 5 »" "$(G "$WORK/who18.json" 'j.workers.filter(w=>w.kind==="lock"&&w.id==="mgr-p5").map(w=>w.tree).join("|")')" "compartiment x phase 5"
+NOPLUG="$WORK/noplug18/cockpit/scripts"; mkdir -p "$NOPLUG"
+Q who "$L17" "$H18" "$NOPLUG" > "$WORK/who18b.json"
+assert_eq "W18.3 — repli : sans conductor voisin, la copie de HOME répond (aucun verrou listé, source lue)" "$(G "$WORK/who18b.json" 'j.workers.filter(w=>w.kind==="lock").length+"/"+j.sources.locks.etat')" "0/lue"
+# le voisin n'est cherché que depuis un dossier …/cockpit/scripts : un dossier de scripts quelconque ne désigne jamais un frère piégé
+mkdir -p "$WORK/trap18/x/scripts" "$WORK/trap18/conductor/scripts"; cp "$TRAP" "$WORK/trap18/conductor/scripts/driver-lock.sh"; rm -f "$WORK/EXECUTE"
+Q who "$L17" "$H18" "$WORK/trap18/x/scripts" > "$WORK/who18c.json"
+assert_eq "W18.4 — un frère de n'importe quel dossier « scripts » n'est pas exécuté" "$([ -e "$WORK/EXECUTE" ] && echo oui || echo non)|$(G "$WORK/who18c.json" 'j.workers.filter(w=>w.id==="PIEGE").length')" "non|0"
+
 vf_hyg_assert
 
 echo ""

@@ -68,6 +68,9 @@ export function driverLockScript({ scriptsDir, labRoot, home } = {}) {
   const sortie = labRoot ? path.join(labRoot, '.vibeflow') : null;
   const cands = [];
   if (scriptsDir) cands.push({ c: path.join(scriptsDir, 'driver-lock.sh'), module: true });
+  // le conductor voisin du module (…/plugin/cockpit/scripts -> …/plugin/conductor/scripts) passe avant la copie installée, qui peut dater d'avant
+  // les verrous par phase (recette 69) ; cherché seulement depuis un dossier nommé …/cockpit/scripts, jamais depuis un dossier de scripts quelconque
+  if (scriptsDir && path.basename(scriptsDir) === 'scripts' && path.basename(path.dirname(scriptsDir)) === 'cockpit') cands.push({ c: path.join(scriptsDir, '..', '..', 'conductor', 'scripts', 'driver-lock.sh'), module: true });
   if (home) cands.push({ c: path.join(home, '.claude', 'scripts', 'driver-lock.sh'), module: false });
   for (const { c, module } of cands) {
     if (!isFile(c)) continue;
