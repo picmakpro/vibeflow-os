@@ -452,7 +452,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "fix-web",
@@ -460,7 +460,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "fix-mod-a",
@@ -485,6 +485,14 @@
       "deps": [],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "rebase-main",
+      "step": "rebase sur main 19393cc3 (PR #201, vf-cockpit-env.mjs), adaptation des appels de binaires du socle",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "running"
     }
   ]
 }
