@@ -1,16 +1,13 @@
-// Les rafraîchissements : chacun lit une source (disque, engine) et pose la
-// valeur dans `$.state`, ce qui redessine la pane.
+// Les rafraîchissements : chacun lit une source (l'émetteur du socle, l'engine) et pose la
+// valeur dans `$.state`, ce qui redessine la pane. Le mod ne lit plus le planning lui-même (P68-D-17).
 
 import { atom, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
 import { stageOf } from './derive'
-import { readDisk, readMacro } from './disk'
 import { lireSignal } from './socle'
 import type { Refusal, Usage } from '../types'
 
-const disk = atom({ plugin: 'vibeflow', key: 'disk' } as const, null)
-const macro = atom({ plugin: 'vibeflow', key: 'macro' } as const, null)
 const loop = atom({ plugin: 'vibeflow', key: 'loop' } as const, { stage: null, isWorking: false, turnStartedAt: 0, tools: 0, lastTurn: null })
 const roster = atom({ plugin: 'vibeflow', key: 'roster' } as const, [])
 const stats = atom({ plugin: 'vibeflow', key: 'stats' } as const, {})
@@ -18,11 +15,6 @@ const refusals = atom({ plugin: 'vibeflow', key: 'refusals' } as const, [])
 const usage = atom({ plugin: 'vibeflow', key: 'usage' } as const, null)
 const signal = atom({ plugin: 'vibeflow', key: 'signal' } as const, null)
 const signalErreur = atom({ plugin: 'vibeflow', key: 'signalErreur' } as const, null)
-
-export async function refreshDisk($: EngineInterface, home: string | undefined): Promise<void> {
-  const d = await readDisk($, home)
-  await update($, disk, () => d)
-}
 
 /** L'émetteur du socle ; en cas d'échec plus aucune donnée n'est gardée, l'erreur est dite à côté. */
 export async function refreshSignal($: EngineInterface, pluginRoot: string, root: string | undefined): Promise<void> {
@@ -34,11 +26,6 @@ export async function refreshSignal($: EngineInterface, pluginRoot: string, root
     await update($, signal, () => null)
     await update($, signalErreur, () => lecture.erreur)
   }
-}
-
-export async function refreshMacro($: EngineInterface): Promise<void> {
-  const m = await readMacro($)
-  await update($, macro, () => m)
 }
 
 export async function refreshRoster($: EngineInterface): Promise<void> {
