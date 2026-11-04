@@ -102,6 +102,7 @@ export function clientTerminal(cfg) {
     // le dit dans le terminal ; 409 ou 410 vide la file et fait relire l'état
     const file = []; let envoi = false, ctrl = null, tranche = 65536;
     const extraire = () => {
+      while (file.length && file[0].length === 0) file.shift(); // un morceau vide n'est jamais envoyé : sans ce retrait il resterait en tête, et la file ne se viderait plus
       const corps = new Uint8Array(Math.min(tranche, file.reduce((a, c) => a + c.length, 0))); let k = 0;
       while (k < corps.length) { const c = file[0], m = Math.min(c.length, corps.length - k); corps.set(c.subarray(0, m), k); k += m; if (m === c.length) file.shift(); else file[0] = c.subarray(m); }
       return corps;
@@ -110,6 +111,7 @@ export function clientTerminal(cfg) {
       if (envoi) return; envoi = true;
       while (file.length) {
         const corps = extraire();
+        if (!corps.length) break; // plus rien à envoyer : jamais un POST vide, et la boucle s'arrête (un `continue` tournerait à vide)
         try {
           const r = await fetch('/entree', { method: 'POST', headers: entetes(), body: corps, cache: 'no-store' });
           if (r.status === 429) { file.unshift(corps); await attendre(100); continue; }

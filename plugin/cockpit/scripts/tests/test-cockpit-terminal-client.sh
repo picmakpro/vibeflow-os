@@ -63,6 +63,42 @@ const [, , sortie, moteur, theme, out] = process.argv;
 const m = await import(pathToFileURL(`${sortie}/vf-cockpit-terminal-page.mjs`).href);
 m.preparerPage({ engineDir: moteur }); fs.writeFileSync(out, m.pageTerminal({ theme, origineP: 'http://127.0.0.1:4242' }).html);
 JS
+cat > "$AUX/queue.mjs" <<'JS'
+// queue.mjs <module-client.mjs> : file d'entrée du client de Q sans navigateur (N11). Le client est joué avec des doublures (Terminal, fetch, DOM) ;
+// on pousse un morceau VIDE puis un octet par onData et on compte les POST /entree. fetch rend la main à la boucle d'évènements (setImmediate) : une boucle sans fin ne gèle pas la mesure.
+import { pathToFileURL } from 'node:url';
+const posts = []; let onData = null, onBinary = null;
+const el = () => ({ addEventListener() {}, setAttribute() {}, style: {}, textContent: '' });
+globalThis.window = { top: {}, opener: null, parent: { postMessage() {} }, addEventListener() {}, vfTermVue: { theme: () => ({}), carte() {}, effacer() {}, bandeau() {}, collage() {} } };
+globalThis.document = { fonts: { load: () => Promise.resolve(), ready: Promise.resolve() }, getElementById: el, addEventListener() {} };
+globalThis.location = { hash: '', pathname: '/', search: '' };
+globalThis.history = { replaceState() {} };
+const memoire = () => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; };
+globalThis.localStorage = memoire(); globalThis.sessionStorage = memoire(); localStorage.setItem('vf.terminal.secret', 'a'.repeat(64));
+globalThis.ResizeObserver = class { observe() {} };
+globalThis.requestAnimationFrame = () => 0;
+globalThis.FitAddon = { FitAddon: class { fit() {} } };
+globalThis.Terminal = class {
+  constructor() { this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; }
+  loadAddon() {} open() {} attachCustomKeyEventHandler() {} focus() {} write() {} paste() {} reset() {}
+  onData(f) { onData = f; } onBinary(f) { onBinary = f; }
+};
+globalThis.fetch = (u, o = {}) => {
+  if (String(u) === '/entree') { posts.push(o.body ? o.body.length : 0); return new Promise((ok) => setImmediate(() => ok({ status: 200 }))); }
+  return new Promise(() => {}); // /flux et le reste : jamais de réponse
+};
+const m = await import(pathToFileURL(process.argv[2]).href);
+m.clientTerminal({ origineP: 'http://127.0.0.1:1', theme: 'dark' });
+const att = (ms) => new Promise((ok) => setTimeout(ok, ms));
+for (let i = 0; i < 50 && !onData; i++) await att(20);
+if (!onData) { console.log('client non démarré'); process.exit(0); }
+onData('');                       // un morceau vide : jamais un POST, jamais une boucle
+await att(300); const a = posts.length;
+onData('x'); onBinary('');        // un octet utile, puis un rapport binaire vide
+await att(300);
+console.log(`apresVide=${a} total=${posts.length} vides=${posts.filter((n) => n === 0).length} utiles=${posts.filter((n) => n > 0).length}`);
+process.exit(0);
+JS
 cat > "$AUX/tierce.mjs" <<'JS'
 // tierce.mjs <port> <urlQ> : origine tierce qui encadre Q ; consigne les messages reçus (espion posé dans la page)
 import http from 'node:http';
@@ -422,6 +458,16 @@ if mutant setcookie vf-cockpit-terminal.mjs "s|res.setHeader('Referrer-Policy', 
   srv "$MUT_OUT"; rq "$QP" GET / > "$WORK/m-setcookie.out"
   assert_eq "M-SETCOOKIE — le mutant rougit T6.5 : set-cookie présent" "$(sed -n 2p "$WORK/m-setcookie.out" | node "$AUX/ev.mjs" 'Object.keys(j).filter(k=>k==="set-cookie").length' 2>/dev/null)" "1"; unsrv
 else sans_effet "M-SETCOOKIE"; fi
+
+echo "=== N11 — file d'entrée : un morceau vide est retiré sans envoi, jamais de boucle de POST vides (sans navigateur) ==="
+file_vide() { node "$AUX/queue.mjs" "$1/vf-cockpit-terminal-client.mjs"; }
+assert_eq "N11.1 — un morceau vide (onData vide) ne part jamais : 0 POST vide, la file est vidée (l'octet utile suivant part seul, une fois)" "$(file_vide "$OUT")" "apresVide=0 total=1 vides=0 utiles=1"
+if mutant videtout vf-cockpit-terminal-client.mjs 's|while (file.length && file\[0\].length === 0) file.shift();||;s|if (!corps.length) break;||'; then
+  assert_eq "M-VIDE-TOUT — le mutant (le code d'avant : ni retrait ni garde) rougit N11.1 : boucle de POST vides (plus de 100 en 300 ms)" "$(file_vide "$MUT_OUT" | awk '{ split($3, v, "="); print (v[2] > 100) ? "rouge" : "identique : " $0 }')" "rouge"
+else sans_effet "M-VIDE-TOUT"; fi
+if mutant videenvoi vf-cockpit-terminal-client.mjs 's|if (!corps.length) break;||'; then
+  assert_eq "M-VIDE-ENVOI — le mutant (la file vidée envoie encore un corps vide) rougit N11.1 : au moins un POST vide" "$(file_vide "$MUT_OUT" | awk '{ split($3, v, "="); print (v[2] >= 1) ? "rouge" : "identique : " $0 }')" "rouge"
+else sans_effet "M-VIDE-ENVOI"; fi
 
 if [ -n "$CHROME" ]; then
 echo "=== T6 — amorçage dans l'onglet, secret hors cookie (TERM-04 ; P71-D-12, D-13) ==="
