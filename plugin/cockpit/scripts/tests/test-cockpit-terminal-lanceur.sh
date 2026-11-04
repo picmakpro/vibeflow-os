@@ -353,6 +353,29 @@ if mutant sanspy 's/if (o.terminal \&\& !win \&\& !resoudreBinaire(.python3.)) {
   assert_eq "M-SANS-PYTHON3 — le mutant (aucune vérification) rougit L19 : le message n'est plus dit" "$([ "$(grep -c 'Terminal indisponible : python3 introuvable' "$LOUT" || true)" = 0 ] && echo rouge || echo identique)" "rouge"
 else assert_eq "M-SANS-PYTHON3 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
+echo "=== L19b — R4 (P71-D-36) : serveur DÉJÀ vivant + --terminal sans python3 : le message promet « le cockpit s'ouvre sans terminal », donc il s'ouvre (jamais une promesse sans ouverture) ==="
+relance_sans_py() { # relance_sans_py <lanceur> [--no-open] -> LRC, LOUT ; le serveur vivant est conservé, PATH sans python3
+  rm -f "$OUVERT" "$WORK/run/page-ouverte.html"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"
+  (cd "$LAB" && PATH="$WORK/minbin:$WORK/fauxbin" node "$1" open --terminal "${@:2}" --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); LRC=$?
+  [ -s "$OUVERT" ] || sleep 0.5
+}
+for variante in sans-terminal avec-terminal; do
+  rm -f "$AM" "$SJ" "$OUVERT"
+  if [ "$variante" = sans-terminal ]; then lance "$LAUNCH" open --no-open; else lance "$LAUNCH" open --terminal --no-open; fi
+  S19B="$(sj j.pid)"; P19B="http://127.0.0.1:$(sj j.port)"
+  relance_sans_py "$LAUNCH"
+  assert_eq "L19b ($variante) — témoin : le serveur est le même (réutilisé), python3 absent du PATH de la relance" "$([ -n "$S19B" ] && [ "$(sj j.pid)" = "$S19B" ] && echo meme || echo "autre : $(sj j.pid)")" "meme"
+  assert_eq "L19b ($variante) — sortie 0, message python3 dit une fois, le cockpit EXISTANT est ouvert une fois (adresse de P), aucune page de Q" "$LRC dit=$(grep -c 'Terminal indisponible : python3 introuvable' "$LOUT" || true) ouvert=$(cat "$OUVERT" 2>/dev/null | grep -c -F -e "$P19B" || true) page=$([ -e "$WORK/run/page-ouverte.html" ] && echo oui || echo non)" "0 dit=1 ouvert=1 page=non"
+  relance_sans_py "$LAUNCH" --no-open
+  assert_eq "L19b ($variante) — avec --no-open : rien n'est ouvert" "$LRC ouvert=$([ -s "$OUVERT" ] && echo oui || echo non)" "0 ouvert=non"
+  vf_hyg_stop "$S19B"; rm -f "$SJ"
+done
+if mutant rquatre 's/if (demande \&\& !o.noOpen) ouvrir(vif.url/if (false) ouvrir(vif.url/'; then
+  lance "$LAUNCH" open --no-open; S19B="$(sj j.pid)"; P19B="http://127.0.0.1:$(sj j.port)"; relance_sans_py "$MUT_L"
+  assert_eq "M-R4-SANS-OUVERTURE — le mutant (plus d'ouverture) rougit L19b : l'adresse de P n'est plus ouverte" "$([ "$(cat "$OUVERT" 2>/dev/null | grep -c -F -e "$P19B" || true)" = 0 ] && echo rouge || echo identique)" "rouge"
+  vf_hyg_stop "$S19B"; rm -f "$SJ"
+else assert_eq "M-R4-SANS-OUVERTURE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
 echo "=== L20 — E5 : un serveur qui écrit son état après 15 s (machine chargée) : le lanceur attend, dit « démarrage lent » une fois, sort 0 ; la borne existe encore ==="
 # serveur factice (copie du module, jamais le module) : écrit server.json après FAKE_SRV_MS, son PID est consigné dès le départ
 mkdir -p "$WORK/mut-lent"; rm -rf "$WORK/mut-lent"; mkdir -p "$WORK/mut-lent"; cp -R "$MODULE/." "$WORK/mut-lent/"

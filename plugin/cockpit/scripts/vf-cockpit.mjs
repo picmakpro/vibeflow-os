@@ -221,6 +221,7 @@ async function main() {
   if (o.verbe === 'build') { await assemblerLab(lab, scriptsDir); return; }
 
   // open : réutiliser un serveur vivant du même lab, sauf --rebuild
+  const demande = o.terminal; // le terminal a été DEMANDÉ : s'il est écarté plus bas, le cockpit s'ouvre quand même (P71-D-36, R4)
   const win = o.terminal && process.platform === 'win32'; // P71-D-07 : pas de terminal sous Windows, le cockpit s'ouvre comme avant
   if (win) console.error('Terminal indisponible sous Windows.');
   // E4 : le terminal exige python3 (assistant PTY). Résolu comme le fait le serveur (éléments absolus du PATH, chemin absolu) AVANT tout amorçage ou ouverture de Q.
@@ -232,7 +233,9 @@ async function main() {
   o.avecQ = o.terminal && !win;
   const vif = serveurVivant(sortie);
   if (vif && !o.rebuild) {
-    if (!o.avecQ) { console.log(adresses(vif.url)); return; }
+    // R4 (P71-D-36) : --terminal écarté (python3 absent, Windows) alors que le serveur vit déjà : le message dit « le cockpit s'ouvre sans terminal », on l'ouvre (comme au cas sans serveur) ;
+    // une relance ordinaire, sans --terminal, garde son comportement : l'adresse seule.
+    if (!o.avecQ) { if (demande && !o.noOpen) ouvrir(vif.url, `Ouvrez ${vif.url} dans un navigateur.`); console.log(adresses(vif.url)); return; }
     if (termOuvrable(vif, sortie)) { const suivi = ouvrirQ(vif, amorcer(lab, sortie), o, sortie); console.log(adresses(vif.url)); await attendreOuverture(suivi, sortie); return; } // O2 c : même serveur, nouvel amorçage
   }
   if (vif) { if (!arreter(sortie)) { console.error(`PID ${vif.pid} non reconnu comme le serveur de ce cockpit : rien n'a été arrêté.`); process.exit(5); } for (let i = 0; i < 30 && vivant(vif.pid); i++) await attendre(100); }
