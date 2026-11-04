@@ -9,7 +9,8 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { envEnfant } from './vf-cockpit-env.mjs';
 import { planningLayout, stateFile } from './vf-cockpit-paths.mjs';
-import { avancement, rattacherMission } from './vf-cockpit-avancement.mjs';
+import { avancement, rattacherMission, etatMission } from './vf-cockpit-avancement.mjs';
+import { lireVerrous, vieDe } from './vf-cockpit-vie.mjs';
 
 // jamais d'ouverture d'un fichier non régulier (un tube FIFO bloque ; un lien vers /dev/zero ne finit pas, et git versionne les liens symboliques) ni d'un fichier au-delà de MAX_LECTURE
 const MAX_LECTURE = 8 << 20;
@@ -104,7 +105,8 @@ export function lireDags(root, layout, phaseDirs) {
   return dags;
 }
 
-export function readPlanning(root, layout) {
+// opts : { verrous (injectable : { etat, plat, liste }), scriptsDir, home } — la vie d'une mission se lit sur le verrou de sa phase (VFSG-06) ; lecture seulement si un nœud est `running`
+export function readPlanning(root, layout, opts = {}) {
   root = path.resolve(root); layout = layout || planningLayout(root);
   const B = path.join(root, '.planning');
   const rel = (abs) => path.relative(root, abs).split(path.sep).join('/');
@@ -137,10 +139,16 @@ export function readPlanning(root, layout) {
   if (!state.current_phase) { const b = new RegExp(`^Phase:\\s*${NUM}`, 'm').exec(sTxt)?.[1]; if (b) state.current_phase = normNum(b); }
 
   // DAG puis avancement de chaque phase : missions rattachées par rattacherMission, état calculé sur les fichiers du dossier
-  const dags = lireDags(root, layout, phaseDirs); const parPhase = new Map();
+  const dags = lireDags(root, layout, phaseDirs); const parPhase = new Map(); let verrous = null;
   for (const d of dags) {
     const r = rattacherMission(d, phases); d.phaseKey = r ? r.cle : null; d.regle = r ? r.regle : null;
-    if (r) parPhase.set(r.cle, [...(parPhase.get(r.cle) || []), { nom: d.name, regle: r.regle, nodes: d.nodes }]);
+    d.vie = null;
+    if (d.nodes.some((x) => x?.status === 'running')) {
+      verrous ||= opts.verrous || lireVerrous(root, { scriptsDir: opts.scriptsDir, home: opts.home });
+      const po = r ? phases.get(r.cle) : null; // ws et numéro viennent de l'objet de la phase rattachée (P68-D-22)
+      d.vie = vieDe(po ? { ws: po.ws, phase: po.n } : { ws: d.ws || d.wsDeclare || null, phase: null }, verrous); d.etat = etatMission(d.nodes, d.vie);
+    } else d.etat = etatMission(d.nodes);
+    if (r) parPhase.set(r.cle, [...(parPhase.get(r.cle) || []), { nom: d.name, regle: r.regle, nodes: d.nodes, vie: d.vie }]);
   }
   for (const ph of phases.values()) {
     const dir = phaseDirs.get(`${ph.ws || ''}|${ph.n}`) || phaseDirs.get(`*|${ph.n}`);

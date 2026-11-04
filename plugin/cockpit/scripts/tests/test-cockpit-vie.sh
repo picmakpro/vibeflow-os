@@ -143,9 +143,9 @@ assert_eq "V4.1 — verrou périmé, progress_age_seconds null : abandonnee" "$(
 # ---------- V5 — source illisible (P68-D-23) ----------
 echo "=== V5 — source des verrous illisible : inconnu ==="
 Q "$SCRIPTS" "$LF" "$WORK/s-vide" "$WORK/v5a.json"
-assert_eq "V5.1 — source des verrous introuvable : vie null, état inconnu" "$(ONE "$WORK/v5a.json" .vie)|$(ONE "$WORK/v5a.json" .etat)" "null|inconnu"
+assert_eq "V5.1 — source des verrous introuvable : vie null, état inconnu" "$(G "$WORK/v5a.json" 'JSON.stringify(j.dags[0].vie)+"|"+j.dags[0].etat')" "null|inconnu"
 Q "$SCRIPTS" "$LF" "$WORK/s-texte" "$WORK/v5b.json"
-assert_eq "V5.2 — JSON illisible : vie null, état inconnu" "$(ONE "$WORK/v5b.json" .vie)|$(ONE "$WORK/v5b.json" .etat)" "null|inconnu"
+assert_eq "V5.2 — JSON illisible : vie null, état inconnu" "$(G "$WORK/v5b.json" 'JSON.stringify(j.dags[0].vie)+"|"+j.dags[0].etat')" "null|inconnu"
 Q "$SCRIPTS" "$LF" "-" "$WORK/v5c.json"
 assert_eq "V5.3 — témoin P68-D-29 : sans dossier de scripts explicite, le conductor voisin du dépôt est trouvé (vie non null)" "$(G "$WORK/v5c.json" 'j.dags[0].vie !== null && j.dags[0].vie !== undefined')" "true"
 

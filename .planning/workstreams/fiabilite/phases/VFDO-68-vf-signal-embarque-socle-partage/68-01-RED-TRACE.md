@@ -147,3 +147,19 @@ Le témoin VFSG-06 obtient `running` sur l'avancement de la phase (V1.2, ancien 
 
 - attendu: [MISSION-1:running,MISSION-2:abandonnee]
 - obtenu:  [MISSION-1:absent,MISSION-2:absent]
+
+## Annexe — correction d'accesseur de V5.1 et V5.2, rouge rejoué sur la tête d'avant le code
+
+Après le premier vert, V5.1 et V5.2 lisaient `vie` par un accesseur en `?? "absent"` qui confondait `null` et champ absent : un `null` obtenu s'affichait
+`absent`. Les deux assertions lisent désormais `JSON.stringify(vie)|etat` (attendu `null|inconnu`, inchangé). Le rouge a été rejoué sur `e042e25f`
+(extrait par `git archive`, suite corrigée posée dedans) : 5 PASS / 25 FAIL, V5.1 et V5.2 obtiennent `[undefined|undefined]` (la lecture des verrous n'existe pas encore).
+Le tableau d'obtenus ci-dessus (`absent|absent`) est celui du premier jeu d'accesseurs ; la raison du rouge est la même.
+
+## Annexe — témoin de P68-D-29 (dossier de scripts explicite)
+
+Même lab plat à nœud `running`, `HOME` vide, `readPlanning` rejoué sur le code livré :
+
+- avec un dossier de scripts explicite vide (`scriptsDir`) : `[["inconnu",null]]` (V5.1 vert)
+- sans ce dossier (défaut = `plugin/cockpit/scripts` réel, conductor voisin du dépôt) : `[["abandonnee",{"tenu":false,"stale":null,"progressAgeS":null,"ttl":null}]]` — le vrai `driver-lock.sh` du dépôt est trouvé, V5.1 rougirait
+
+Épingler `HOME` ne suffit donc pas ; V5.3 de `test-cockpit-vie.sh` garde ce fait (le conductor voisin est trouvé quand aucun dossier n'est passé).
