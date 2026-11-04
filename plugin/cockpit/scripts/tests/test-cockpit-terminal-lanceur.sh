@@ -14,6 +14,8 @@
 #   L4  N6a : lien planté sur le chemin de sortie, serveur vivant : message, code 4, aucune trace
 #   M-*  mutants (copies du module, jamais le module) : M-MODE (L3), M-SUIT-LIEN (L4), M-IMPRIME (L5), M-OUVRE-P (L6), M-LEURRE-TERMINAL (L11b),
 #        M-F1-PID (L12a), M-F1-VALID (L12b), M-ARGV (L6), M-PAGE-MODE, M-PAGE-LIEN (L13), M-OUVREUR-ERREUR (L14), M-SANS-ANNONCE, M-TOUJOURS-ANNONCE (L15), M-SANS-RATTRAPAGE (L4)
+#   L19 E4 : --terminal sans python3 : message, aucun amorçage ni Q, cockpit ouvert sans terminal, sortie 0 (M-SANS-PYTHON3)
+#   L20 E5 : serveur qui écrit son état après 15 s : attente jusqu'à 30 s, « démarrage lent » une fois, sortie 0 ; la borne reste (M-BORNE-10)
 #   L5.0 le contrôle de l'environnement du serveur est JOUÉ sous Linux (/proc/<pid>/environ) comme sous macOS (ps -Eww), jamais sauté faute de la forme BSD
 #   L16 N2 (P71-D-29) : un lab qui porte open, xdg-open, ps et git exécutables n'en voit aucun lancé sous PATH=.:…, :…, …: et bin:… ; mutants M-OUVRE-NOMNU, M-PS-NOMNU, M-GIT-NOMNU, M-WHO-NOMNU, M-SERVE-OUVRE, M-PS-FINAL
 # Aucun vrai navigateur : `open` et `xdg-open` factices en tête du PATH. Exit 0 si tout passe, 1 sinon.
@@ -322,8 +324,9 @@ if ! cmp -s "$md/scripts/vf-cockpit-paths.mjs" "$md/paths.orig" && ! cmp -s "$md
 else assert_eq "M-PATH-VIDE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== L18 — sans ps dans le PATH : « arrêt refusé » est dit UNE fois, pas à chaque tour de l'attente du terminal (une centaine) ==="
+mkdir -p "$WORK/pybin"; c="$(command -v python3)"; [ -n "$c" ] && ln -sf "$c" "$WORK/pybin/python3" # E4 : L18 veut un terminal ouvrable en principe, donc python3 résoluble (mais pas ps)
 sans_ps() { # sans_ps <lanceur> -> LRC, LOUT, S18 ; PATH = node, sh, env seulement (WORK/minbin, sans ps)
-  rm -f "$AM" "$SJ"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; (cd "$LAB" && PATH="$WORK/minbin" node "$1" open --terminal --no-open --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); LRC=$?
+  rm -f "$AM" "$SJ"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; (cd "$LAB" && PATH="$WORK/minbin:$WORK/pybin" node "$1" open --terminal --no-open --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); LRC=$?
   S18="$(sj j.pid)"; [ -n "$S18" ] && vf_hyg_stop "$S18"; true
 }
 sans_ps "$LAUNCH"
@@ -334,6 +337,47 @@ if ! cmp -s "$md/scripts/vf-cockpit.mjs" "$md/vf.orig"; then
   rm -f "$md/vf.orig" "$md/scripts/vf-cockpit.mjs.bak"; sans_ps "$md/scripts/vf-cockpit.mjs"
   assert_eq "M-PS-REPETE — le mutant (le refus est redit à chaque appel) rougit L18 : plus d'une occurrence" "$([ "$(grep -c 'arrêt refusé' "$LOUT" || true)" -gt 1 ] && echo rouge || echo identique)" "rouge"
 else assert_eq "M-PS-REPETE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
+echo "=== L19 — E4 : --terminal sans python3 résoluble : message clair, aucun amorçage, aucune ouverture de Q, le cockpit s'ouvre sans terminal (sortie 0) ==="
+sans_py() { # sans_py <lanceur> -> LRC, LOUT, S19 ; PATH = node, sh, env + ouvreurs factices, jamais python3
+  rm -f "$AM" "$SJ" "$OUVERT" "$WORK/run/page-ouverte.html"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"
+  (cd "$LAB" && PATH="$WORK/minbin:$WORK/fauxbin" node "$1" open --terminal --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); LRC=$?
+  S19="$(sj j.pid)"; [ -n "$S19" ] && { PY19="$(sj '(j.terminal&&j.terminal.url)||"aucun"')"; vf_hyg_stop "$S19"; } ; true
+}
+PY_OK=sans; for d in $(echo "$WORK/minbin" | tr ':' ' '); do [ -e "$d/python3" ] && PY_OK=present; done
+sans_py "$LAUNCH"
+assert_eq "L19 — témoin : minbin ne porte pas python3" "$PY_OK" "sans"
+assert_eq "L19 — sortie 0, message « Terminal indisponible : python3 introuvable » une fois avec la marche à suivre, jamais « n'a pas démarré »" "$LRC dit=$(grep -c 'Terminal indisponible : python3 introuvable' "$LOUT" || true) marche=$(grep -c 'brew install python' "$LOUT" || true) echec=$(grep -c "n'a pas démarré" "$LOUT" || true)" "0 dit=1 marche=1 echec=0"
+assert_eq "L19 — aucun amorçage posé, aucune page de Q ouverte, serveur démarré SANS terminal, le cockpit lui-même est ouvert" "amorce=$([ -e "$AM" ] && echo oui || echo non) page=$([ -e "$WORK/run/page-ouverte.html" ] && echo oui || echo non) q=${PY19:-?} ouvert=$(grep -c '^http://127.0.0.1:' "$OUVERT" 2>/dev/null || true)" "amorce=non page=non q=aucun ouvert=1"
+if mutant sanspy 's/if (o.terminal \&\& !win \&\& !resoudreBinaire(.python3.)) {/if (false) {/'; then
+  sans_py "$MUT_L"
+  assert_eq "M-SANS-PYTHON3 — le mutant (aucune vérification) rougit L19 : le message n'est plus dit" "$([ "$(grep -c 'Terminal indisponible : python3 introuvable' "$LOUT" || true)" = 0 ] && echo rouge || echo identique)" "rouge"
+else assert_eq "M-SANS-PYTHON3 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
+echo "=== L20 — E5 : un serveur qui écrit son état après 15 s (machine chargée) : le lanceur attend, dit « démarrage lent » une fois, sort 0 ; la borne existe encore ==="
+# serveur factice (copie du module, jamais le module) : écrit server.json après FAKE_SRV_MS, son PID est consigné dès le départ
+mkdir -p "$WORK/mut-lent"; rm -rf "$WORK/mut-lent"; mkdir -p "$WORK/mut-lent"; cp -R "$MODULE/." "$WORK/mut-lent/"
+cat > "$WORK/mut-lent/skills/cockpit-moteur/assets/serve.mjs" <<'JS'
+import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
+const sortie = path.dirname(fileURLToPath(import.meta.url)); const a = process.argv; const port = Number(a[a.indexOf('--port') + 1]);
+fs.writeFileSync(process.env.FAKE_SRV_PID, String(process.pid));
+setTimeout(() => { fs.mkdirSync(path.join(sortie, '.cache'), { recursive: true });
+  fs.writeFileSync(path.join(sortie, '.cache', 'server.json'), JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}`, token: 'x', startedAt: new Date().toISOString() })); }, Number(process.env.FAKE_SRV_MS));
+process.on('SIGTERM', () => process.exit(0)); setInterval(() => {}, 1000);
+JS
+lent() { # lent <lanceur> <delai factice ms> [VF_COCKPIT_DEMARRAGE_MS] -> LRC, LOUT, DUREE
+  rm -f "$SJ" "$WORK/run/fake.pid"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; local t0=$SECONDS
+  (cd "$LAB" && FAKE_SRV_PID="$WORK/run/fake.pid" FAKE_SRV_MS="$2" env ${3:+VF_COCKPIT_DEMARRAGE_MS=$3} PATH="$WORK/fauxbin:$PATH" node "$1" open --no-open --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); LRC=$?; DUREE=$((SECONDS-t0))
+  [ -s "$WORK/run/fake.pid" ] && vf_hyg_stop "$(cat "$WORK/run/fake.pid")"; true
+}
+lent "$WORK/mut-lent/scripts/vf-cockpit.mjs" 15000
+assert_eq "L20 — serveur qui écrit son état après 15 s : sortie 0 (rc=5 « n'a pas démarré » à 10 s avant E5), « démarrage lent » dit exactement une fois" "$LRC lent=$(grep -c 'démarrage lent' "$LOUT" || true) echec=$(grep -c "n'a pas démarré" "$LOUT" || true) attente=$([ "$DUREE" -ge 14 ] && echo ok || echo courte)" "0 lent=1 echec=0 attente=ok"
+lent "$WORK/mut-lent/scripts/vf-cockpit.mjs" 8000 2000
+assert_eq "L20 — la borne existe : serveur plus lent que VF_COCKPIT_DEMARRAGE_MS (2 s) : sortie 5 « n'a pas démarré », sans trace" "$LRC echec=$(grep -c "n'a pas démarré" "$LOUT" || true) trace=$(grep -c ' at ' "$LOUT" || true)" "5 echec=1 trace=0"
+if mutant borne10 's/^const DEMARRAGE_MS = (() => {.*$/const DEMARRAGE_MS = 10000;/'; then
+  cp -R "$WORK/mut-borne10/scripts/." "$WORK/mut-lent/scripts/"; lent "$WORK/mut-lent/scripts/vf-cockpit.mjs" 15000
+  assert_eq "M-BORNE-10 — le mutant (borne ramenée à 10 s) rougit L20 : sortie 5 sur le serveur à 15 s" "$([ "$LRC" = 5 ] && echo rouge || echo "identique : $LRC")" "rouge"
+else assert_eq "M-BORNE-10 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-MODE / M-SUIT-LIEN / M-IMPRIME / M-OUVRE-P — mutants du lanceur ==="
 if mutant mode 's/MODE_AMORCE = 0o600/MODE_AMORCE = 0o644/'; then

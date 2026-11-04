@@ -2,7 +2,7 @@
 // vf-cockpit — lanceur du cockpit d'un lab (67-06 ; P67-D-05, P67-D-06).
 // Verbes : open (défaut) · build · stop · status. Options : --lab <dossier> · --no-open · --port <p> · --rebuild · --terminal · --help.
 // Écrit sous <lab>/.vibeflow/cockpit/ (ignoré par git), sert 127.0.0.1 par le serveur unique de la sortie.
-// Codes : 0 succès · 2 lab sans .planning/ · 3 moteur absent · 4 assemblage en échec (lien symbolique refusé dans la sortie compris) · 5 serveur non démarré · 64 usage.
+// Codes : 0 succès · 2 lab sans .planning/ · 3 moteur absent · 4 assemblage en échec (lien symbolique refusé dans la sortie compris) · 5 serveur non démarré (attente jusqu'à 30 s) · 64 usage.
 // Aucun échec ne sort avec une trace : le message est écrit, le code est l'un de ceux-là (main().catch en bas).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -161,6 +161,9 @@ async function assemblerLab(lab, scriptsDir) {
   catch (e) { console.error(e.message); process.exit(e.code === 2 || e.code === 3 ? e.code : 4); }
 }
 
+// E5 : borne d'attente du démarrage du serveur. 30 s par défaut (réglage de test seulement : VF_COCKPIT_DEMARRAGE_MS, 1 s à 120 s) ; le message « démarrage lent » vient après 5 s, ou à mi-borne si elle est plus courte.
+const DEMARRAGE_MS = (() => { const n = Number(process.env.VF_COCKPIT_DEMARRAGE_MS); return Number.isInteger(n) && n >= 1000 && n <= 120000 ? n : 30000; })();
+const LENT_MS = Math.min(5000, Math.floor(DEMARRAGE_MS / 2));
 async function demarrer(lab, sortie, o) {
   try { fs.unlinkSync(etatFile(sortie)); } catch {} // état d'un serveur mort : jamais pris pour un démarrage
   verifierSortie(lab, sortie);
@@ -175,12 +178,19 @@ async function demarrer(lab, sortie, o) {
   const enfant = spawn(process.execPath, args, { cwd: lab, env, detached: true, stdio: ['ignore', logFd, logFd] });
   enfant.unref();
   fs.closeSync(logFd);
-  for (let i = 0; i < 100; i++) { // borné à 10 s
+  // E5 : sous charge, le serveur met jusqu'à ~19 s à écrire son état. Tant qu'il vit, le lanceur attend jusqu'à DEMARRAGE_MS (30 s) ; passé LENT_MS il dit « démarrage lent »
+  // UNE fois. Un serveur qui s'est arrêté sans écrire d'état est un échec certain (aucune raison d'attendre la borne).
+  let fini = false; enfant.on('exit', () => { fini = true; });
+  const debut = Date.now(); let dit = false;
+  for (;;) {
     const s = serveurVivant(sortie);
     if (s) return s;
+    if (fini) return null;
+    const ecoule = Date.now() - debut;
+    if (ecoule >= DEMARRAGE_MS) return null;
+    if (!dit && ecoule >= LENT_MS) { dit = true; console.error(`démarrage lent… le serveur n'a pas encore écrit son état, attente jusqu'à ${Math.round(DEMARRAGE_MS / 1000)} s (machine chargée ?).`); }
     await attendre(100);
   }
-  return null;
 }
 
 async function main() {
@@ -210,6 +220,12 @@ async function main() {
   // open : réutiliser un serveur vivant du même lab, sauf --rebuild
   const win = o.terminal && process.platform === 'win32'; // P71-D-07 : pas de terminal sous Windows, le cockpit s'ouvre comme avant
   if (win) console.error('Terminal indisponible sous Windows.');
+  // E4 : le terminal exige python3 (assistant PTY). Résolu comme le fait le serveur (éléments absolus du PATH, chemin absolu) AVANT tout amorçage ou ouverture de Q.
+  // Introuvable : message en français avec la marche à suivre, puis le cockpit s'ouvre SANS terminal, code 0 (le cockpit reste utile ; l'échec n'est pas muet).
+  if (o.terminal && !win && !resoudreBinaire('python3')) {
+    console.error("Terminal indisponible : python3 introuvable dans les éléments absolus du PATH. Installez Python 3 (macOS : « xcode-select --install » ou « brew install python » ; Linux : « apt install python3 » ou l'équivalent de votre distribution), puis relancez avec --terminal. Le cockpit s'ouvre sans terminal.");
+    o.terminal = false;
+  }
   o.avecQ = o.terminal && !win;
   const vif = serveurVivant(sortie);
   if (vif && !o.rebuild) {
