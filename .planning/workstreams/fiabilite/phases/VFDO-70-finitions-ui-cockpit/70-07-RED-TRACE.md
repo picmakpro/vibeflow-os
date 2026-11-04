@@ -46,3 +46,14 @@ Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-projet.sh` — 93 PAS
 - FAIL — O6.10 [1920 px] : attendu `[]` ; obtenu `[1]`.
 
 Mécanisme mesuré : `aim()` centre et zoome sur la carte ciblée sans regarder le reste du graphe, qui déborde alors sous le panneau (R1 mesure l'union de toutes les cartes) ; il ne dézoome jamais, donc une carte plus large que sa zone y déborde aussi.
+
+## Suite : « Passer » et contour (juge Playwright de la recette)
+
+### Rouge — arbre de la correction O6.10 (centrage borné, sans sélection) + témoins O6.11 et O6.12
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-projet.sh` — 95 PASS / 5 FAIL. H0 rougit par un Chrome d'une autre suite lancée en même temps dans un autre worktree (bruit de concurrence, absent d'un rejeu isolé).
+
+- FAIL — O6.11 [1440 px] : attendu `[true]` ; obtenu `[false]` (lab à quatorze phases : avant la visite k 1,1, x 106, y 244, 4 cartes dans la fenêtre ; après « Passer » à l'étape 3 : k 1,1, x 315, y 296, 1 carte).
+- FAIL — O6.11 [390 px] : attendu `[true]` ; obtenu `[false]` (avant k 0,448, x 25, y 326, 4 cartes ; après k 0,852, x 33, y 260, 1 carte).
+- FAIL — O6.12 [1440 px] : attendu `[]` ; obtenu `[4]` (le contour de l'étape « au travail » disparaît quand le className de `#vf-lock` est réécrit, comme le fait `70-vf-live.js`).
+- FAIL — O6.12 [390 px] : attendu `[]` ; obtenu `[4]`.

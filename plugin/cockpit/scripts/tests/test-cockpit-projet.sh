@@ -470,6 +470,23 @@ assert_eq "O6.9 — témoin : le rechargement a été mesuré (erreur vide, quat
 for K in l390 r390 l1440 r1440; do
   assert_eq "O6.9 [$K] — Projet, page déjà vue dans le même profil : étapes sans cible, mal centrées, couvertes ou hors fenêtre" "$(x66 "j.$K.etapes.filter((e)=>!e.cible||!e.centre||e.couvert||!e.visible).map((e)=>e.i).join(',')")" ""
 done
+# O6.11 et O6.12 (correctifs 70-07, juge Playwright de la recette) : sur l'onglet Projet, UN Chrome, 1 440 puis 390 px, option `passer` : O6.11 « Passer » (ou Échap) pendant une étape de carte rend la vue d'avant la visite (même transformation, aucune carte
+# de moins dans la fenêtre, aucune carte recouverte par le titre) ; O6.12 le contour d'une étape sur un élément du chrome (« au travail », #vf-lock) survit à la réécriture du className du bouton par la couche live (70-vf-live.js).
+# lab à quatorze phases : le jalon est une grande carte, la visite la zoome et la déplace (sur un petit lab elle est déjà en place)
+L8="$WORK/lab8"; mkdir -p "$L8"; mklab4 "$L8"
+{ printf '# Roadmap\n\n## Jalon démo\n\n'; for i in $(seq 1 14); do printf -- '- [ ] **Phase %s: Étape %s** - jet %s\n' "$i" "$i" "$i"; done; } > "$L8/.planning/ROADMAP.md"
+printf -- '---\nstatus: executing\ncurrent_phase: 2\n---\n' > "$L8/.planning/STATE.md"
+mkdir -p "$L8/.planning/missions"; printf '{"phase":"2","nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}\n' > "$L8/.planning/missions/MISSION-X.dag.json"
+git -C "$L8" add -A && git -C "$L8" -c user.email=t@t -c user.name=t commit -q -m grand
+U8="$(adr4 "$L8")"; SRVPIDS+=("$(pid4 "$L8")"); P8="${U8%index.html}project.html"
+X68="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P8" 1440,390 passer)"
+[ -n "${DBG:-}" ] && echo "RAW68: $X68"
+x68() { printf '%s' "$X68" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O6.11a — témoin : la mesure a eu lieu sans erreur, avec la vue d'avant et la vue d'après « Passer » aux deux largeurs" "$(x68 "j.erreur||''")|$(x68 '!!(j.p1440&&j.p1440.avant&&j.p1440.apres&&j.p390&&j.p390.avant&&j.p390.apres)')" "|true"
+for W in 1440 390; do
+  assert_eq "O6.11 [$W px] — « Passer » à l'étape 3 (une carte) rend la vue d'avant la visite (zoom et position à 2 % / 4 px près, aucune carte de moins dans la fenêtre, aucune de plus recouverte par le titre)" "$(x68 "[j.p$W].map((p)=>Math.abs(p.avant.k-p.apres.k)<=p.avant.k*0.02&&Math.abs(p.avant.x-p.apres.x)<=4&&Math.abs(p.avant.y-p.apres.y)<=4&&p.apres.visibles>=p.avant.visibles&&p.apres.recouvre<=p.avant.recouvre)[0]")" "true"
+  assert_eq "O6.12 [$W px] — Projet : le contour de l'étape « au travail » est encore là après la réécriture du className de #vf-lock (étapes dont le contour a disparu)" "$(x68 "j.l$W.etapes.filter((e)=>e.anneau===true).map((e)=>e.i).join(',')")" ""
+done
 # O6.10 (correctif 70-07, REG-70-01 de 70-VERIFICATION.md) : visite Projet active au premier chargement sur un lab à jalon et à mission, à 1 024 et 1 920 px : la carte ciblée tient dans la zone libre ET aucune carte du graphe ne sort de la zone
 # libre à gauche du panneau (critère de R1, chrome-responsive.mjs). Cause : aim() centrait et zoomait la carte sans regarder le reste du graphe, qui débordait sous le panneau ; il ne dézoomait jamais une carte plus large que sa zone.
 L7="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mkdir -p "$L7/src" "$L7/.planning/phases/01-socle" "$L7/.planning/phases/02-suite" "$L7/.planning/missions"
@@ -484,7 +501,7 @@ X7="$(node -e "const a=JSON.parse(process.argv[1]),b=JSON.parse(process.argv[2])
 x7() { printf '%s' "$X7" | node "$AUX/get.mjs" /dev/stdin "$1"; }
 assert_eq "O6.10 — témoin : la mesure a eu lieu sans erreur, au moins trois étapes à chaque largeur" "$(x7 "j.erreur||''")|$(x7 'j.l1024.n>=3&&j.l1920.n>=3')" "|true"
 for W in 1024 1920; do
-  assert_eq "O6.10 [$W px] — Projet : étapes dont la carte ciblée sort de la zone libre ou dont une carte du graphe sort de la zone libre à gauche du panneau" "$(x7 "j.l$W.etapes.filter((e)=>!e.dansZone||!e.toutLibre).map((e)=>e.i).join(',')")" ""
+  assert_eq "O6.10 [$W px] — Projet : étapes dont la carte ciblée sort de la zone libre, dont une carte du graphe sort de la zone libre à gauche du panneau, ou qui sélectionnent une carte (le panneau doit garder la vue d'ensemble, R5.3)" "$(x7 "j.l$W.etapes.filter((e)=>!e.dansZone||!e.toutLibre||e.selectionne).map((e)=>e.i).join(',')")" ""
 done
 unset VF_COCKPIT_PORT_BASE
 for L in "${LABS4[@]}"; do node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L" >/dev/null 2>&1; done; for p in "${SRVPIDS[@]}"; do vf_hyg_stop "$p"; done; SRVPIDS=()
