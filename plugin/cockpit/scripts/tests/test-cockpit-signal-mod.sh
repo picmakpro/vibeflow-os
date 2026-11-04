@@ -11,6 +11,10 @@
 #      `current_phase` hors commentaire dans plugin/cockpit/signal/hooks/, `agent.list` seulement dans refresh.ts
 #   M8 les gestes et le lanceur ne partent que d'un appui humain (68-07, VFSG-04, VFSG-10 ; ADR-031) : `ouvrirCockpit` n'est appelé que
 #      dans boutons.tsx et seulement par la fonction que `onPress` désigne ; `$.session.send` et `$.ui.view` seulement dans views/equipe.tsx
+#   M9 aucune valeur de couleur hors de tokens.ts (68-08, VFSG-07 ; P68-D-06) : aucun motif hexadécimal dans plugin/cockpit/signal/hooks/
+#      hors de hooks/tokens.ts, commentaires compris
+#   M10 tokens.ts égal à DESIGN.md (68-08, VFSG-07 ; P68-D-06) : chaque valeur, sombre et clair, est celle de la ligne de DESIGN.md de
+#      son token ; les quatre statuts renvoient bien aux variables que le tableau « Statuts de travail » leur donne
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 TESTS="$(cd "$(dirname "$0")" && pwd)"
@@ -119,6 +123,57 @@ assert_eq "M8.3 — la fonction qui l'appelle (ouvrir) n'est référencée que p
 assert_eq "M8.4 — onPress={ouvrir} est bien là (une fois : le garde ne verdit pas à vide)" "$(occ 'onPress=\{ouvrir\}' "$SIGNAL/hooks/boutons.tsx")" "1"
 assert_eq "M8.5 — resoudreLanceur n'est appelé que depuis boutons.tsx (et défini dans actions.ts)" "$(printf '%s\n' "$HOOKS_FILES" | code_avec 'resoudreLanceur' | tr '\n' ',')" "actions.ts,boutons.tsx,"
 assert_eq "M8.6 — \$.session.send et \$.ui.view n'apparaissent que dans views/equipe.tsx" "$(printf '%s\n' "$HOOKS_FILES" | code_avec '\$\.session\.send|\$\.ui\.view' | tr '\n' ',')" "equipe.tsx,"
+
+echo "=== M9 — aucune valeur de couleur hors de tokens.ts (VFSG-07) ==="
+HEXRE='#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b'
+# fichiers (un chemin par ligne sur l'entrée) dont une ligne, commentaires compris, porte un motif hexadécimal de couleur
+avec_hex() { local f; while IFS= read -r f; do [ -n "$f" ] || continue; grep -qE "$HEXRE" "$f" && echo "${f##*/}"; done; }
+printf "const a = '#4ade80'\n" > "$WORK/m9a.ts"; printf "// teinte #abc en commentaire\n" > "$WORK/m9b.ts"; printf "const c = 'rgba(0,0,0,.5)' // PR 196, id #12\n" > "$WORK/m9c.ts"
+assert_eq "M9.0 — le motif voit #rrggbb en code et #rgb en commentaire, pas un id court ni un fichier vide" "$(printf '%s\n' "$WORK/m9a.ts" "$WORK/m9b.ts" "$WORK/m9c.ts" "$WORK/m7vide.ts" | avec_hex | tr '\n' ',')" "m9a.ts,m9b.ts,"
+NH9=$(printf '%s\n' "$HOOKS_FILES" | grep -vc '/tokens\.ts$')
+[ "$NH9" -ge 5 ] && ok "M9.1 — le balayage voit $NH9 fichiers de hooks hors tokens.ts (pas de vert à vide)" || ko "M9.1 — moins de 5 fichiers balayés ($NH9)"
+assert_eq "M9 — aucun hex hors de tokens.ts" "$(printf '%s\n' "$HOOKS_FILES" | grep -v '/tokens\.ts$' | avec_hex | tr '\n' ',')" ""
+
+echo "=== M10 — tokens.ts égal à DESIGN.md (VFSG-07) ==="
+# token:variable de DESIGN.md dont il recopie les valeurs ; un statut passe par la variable que le tableau « Statuts de travail » lui donne
+MAP10="st-done:--recent st-active:--sev-medium st-todo:--text-4 st-blocked:--sev-high text:--text text-2:--text-2 text-3:--text-3 text-4:--text-4"
+# « <thème> <token> <hex> » pour chaque valeur de tokens.ts, hex en minuscules
+tokens_lus() { awk '/^  sombre: *\{/ {t="sombre"; next} /^  clair: *\{/ {t="clair"; next}
+  t != "" && /^    \x27[a-z0-9-]+\x27: *\x27#[0-9a-fA-F]{6}\x27,?$/ { n = split($0, a, "\x27"); print t, a[2], tolower(a[4]) }' "$1"; }
+# la colonne $2 (4 sombre, 5 clair) de la ligne de la variable $3 dans le fichier $1, premier hex trouvé
+design_hex() { awk -F'|' -v v="\`$3\`" '$1 ~ /^ *$/ && index($3, v) > 0 { print $'"$2"' }' "$1" | grep -oE '#[0-9a-fA-F]{6}' | head -1 | tr 'A-F' 'a-f'; }
+design_statut() { awk -F'|' -v v="\`$2\`" 'index($3, v) > 0 { print $4 }' "$1" | head -1; }
+# écarts de $1 (tokens.ts) contre $2 (DESIGN.md) : une ligne par écart, puis « n=<valeurs comparées> »
+ecarts_tokens() {
+  local n=0 th tok hex var want st
+  while read -r th tok hex; do
+    var=""; for m in $MAP10; do [ "${m%%:*}" = "$tok" ] && var="${m#*:}"; done
+    [ -n "$var" ] || { echo "token inconnu : $tok"; continue; }
+    want="$(design_hex "$2" "$([ "$th" = sombre ] && echo 4 || echo 5)" "$var")"
+    [ -n "$want" ] || { echo "$tok ($th) : $var absent de DESIGN.md"; continue; }
+    n=$((n+1)); [ "$hex" = "$want" ] || echo "$tok ($th) : $hex au lieu de $want"
+  done < <(tokens_lus "$1")
+  for m in $MAP10; do
+    case "${m%%:*}" in st-*) st="$(design_statut "$2" "--${m%%:*}")"
+      case "$st" in *"var(${m#*:})"*) : ;; *) echo "${m%%:*} : le tableau des statuts ne dit pas var(${m#*:})" ;; esac ;; esac
+  done
+  echo "n=$n"
+}
+cat > "$WORK/d10.md" <<'MD'
+| Texte principal | `--text` | `#ECECEC` | `#161616` |
+| Récent / fait | `--recent` (texte dessus `--on-recent-text`) | `#4ade80` | `#157a3a` |
+| Fait | `--st-done` | `var(--recent)` |
+MD
+printf "export const TOKENS = {\n  sombre: {\n    'text': '#ececec',\n    'st-done': '#4ade80',\n  },\n  clair: {\n    'text': '#161616',\n    'st-done': '#157a3a',\n  },\n} as const\n" > "$WORK/t10ok.ts"
+sed "s/#157a3a/#157a3b/" "$WORK/t10ok.ts" > "$WORK/t10ko.ts"
+M10OK="$(ecarts_tokens "$WORK/t10ok.ts" "$WORK/d10.md" | tr '\n' '|')"; M10KO="$(ecarts_tokens "$WORK/t10ko.ts" "$WORK/d10.md" | tr '\n' '|')"
+assert_eq "M10.0a — fixture fidèle : quatre valeurs comparées (casse ignorée), aucun écart de valeur" "$(printf '%s' "$M10OK" | tr '|' '\n' | grep -c 'au lieu de')|$(printf '%s' "$M10OK" | tr '|' '\n' | grep -c '^n=4$')" "0|1"
+assert_eq "M10.0b — fixture dérivée d'un chiffre : exactement un écart, nommé" "$(printf '%s' "$M10KO" | tr '|' '\n' | grep -c 'st-done (clair) : #157a3b au lieu de #157a3a')" "1"
+if [ -f "$SIGNAL/hooks/tokens.ts" ]; then
+  E10="$(ecarts_tokens "$SIGNAL/hooks/tokens.ts" "$REPO/DESIGN.md")"
+  assert_eq "M10 — aucun écart entre tokens.ts et DESIGN.md" "$(printf '%s\n' "$E10" | grep -v '^n=' | tr '\n' '|')" ""
+  assert_eq "M10.1 — seize valeurs comparées (huit tokens, deux thèmes : pas de vert à vide)" "$(printf '%s\n' "$E10" | grep '^n=')" "n=16"
+else ko "M10 — hooks/tokens.ts absent"; fi
 
 echo "=== bilan : $PASS ok, $FAIL ko ==="
 [ $((PASS + FAIL)) -gt 0 ] || { echo "ÉCHEC ANTI-VERT-À-VIDE : aucun cas exécuté"; exit 1; }
