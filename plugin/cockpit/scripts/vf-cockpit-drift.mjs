@@ -9,9 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { planningLayout, stateFile } from './vf-cockpit-paths.mjs';
-import { readPlanning, fm } from './vf-cockpit-planning.mjs';
+import { readPlanning, fm, read } from './vf-cockpit-planning.mjs'; // read borné partagé : fichier régulier, plafond de taille (jamais un tube ni /dev/zero)
 
-const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };
 const ESP = '[ \\t\\u00a0\\u202f]+';
 const PHASE_ESPACE = new RegExp(`^((?:- \\[[ x]\\]\\s+(?:\\*\\*)?|#{3,4} )Phase \\d+(?:\\.\\d+)?)${ESP}:`);
 const DEP = /^(\*\*(?:Depends on|Dépend de)(?::\*\*|\*\*\s*:))\s*(.*)$/;

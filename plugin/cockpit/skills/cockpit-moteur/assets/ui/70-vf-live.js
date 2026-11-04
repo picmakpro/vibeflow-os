@@ -1,7 +1,7 @@
 // VibeFlow (67-04) : le direct, sur le port de la page. Écoute /api/vf/events (SSE, même origine, jeton de la
 // page) et applique les statuts dans la page ouverte sans la recharger : on modifie le graphe en place puis
 // Floorplan.rerender() garde le zoom, la position et la sélection. Changement de structure → rechargement (la
-// vue vit dans le hash). Badge « au travail » dans l'en-tête, sur les deux onglets. La dernière commande d'une
+// vue vit dans le hash). Badge « au travail » dans l'en-tête, sur les trois onglets. La dernière commande d'une
 // session n'est jamais dans le flux : elle se demande à l'unité (/api/vf/doing, jeton en en-tête), et reste
 // dans la ligne cliquée (ni graphe, ni localStorage, ni export). Flux coupé : un seul sondage pour les deux flux (celui-ci et le
 // rechargement du viewer), à recul — 1 s pendant 30 s, puis 5 s, puis arrêt avec un message et « Réessayer » (E-6).
@@ -19,8 +19,8 @@
   style.textContent = `
     #vf-lock { font: 500 12px/1 var(--mono, monospace); gap: 6px; }
     #vf-lock .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-4); display: inline-block; }
-    #vf-lock.held .dot { background: var(--st-active, #f59e0b); animation: vfpulse 1.6s ease-in-out infinite; }
-    #vf-lock.off .dot { background: var(--st-blocked, #ef4444); }
+    #vf-lock.held .dot { background: var(--st-active); animation: vfpulse 1.6s ease-in-out infinite; }
+    #vf-lock.off .dot { background: var(--st-blocked); }
     @keyframes vfpulse { 50% { opacity: .25; } }
     /* D2 (recette 2026-11-02) : le tiroir reprend la marge des panneaux ouverts par showPanel (.sec : 18px 20px 6px, 22 px en premier et dernier enfant) ; sur grand écran sa boîte suit son contenu (plafonnée à la fenêtre, défilement au-delà) au lieu de s'étirer jusqu'en bas.
        Sous 701 px le panneau est un tiroir du bas dont la mise en page appartient au viewer : on n'y touche pas. */
@@ -34,6 +34,12 @@
     .vf-who button { margin-top: 6px; font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); }
     .vf-who .vf-doing { margin-top: 6px; font-family: var(--mono, monospace); font-size: 12px; word-break: break-word; }
     .vf-whop .src { color: var(--text-4); font-size: 11px; margin-top: 14px; }
+    .vf-arbre-enfants { margin-left: 14px; padding-left: 10px; border-left: 1px solid rgba(var(--ink), .12); }
+    .vf-who .vf-pied { color: var(--text-3); font-size: 12px; } .vf-who .vf-link { display: inline-block; margin: 4px 10px 0 0; font-size: 12px; color: var(--text-2); }
+    .vf-termines > summary { cursor: pointer; padding: 8px 0; color: var(--text-3); font-size: 12px; }
+    .vf-transcript { max-height: 320px; overflow-y: auto; margin-top: 8px; font-size: 12px; color: var(--text-2); }
+    .vf-transcript h4 { margin: 10px 0 4px; color: var(--text-3); } .vf-transcript p, .vf-transcript li { margin: 2px 0; word-break: break-word; }
+    .vf-transcript pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var(--mono, monospace); }
     #vf-reco { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 12px 14px 12px 18px; border-radius: 20px; font-size: 13px; line-height: 1.5; color: var(--text); }
     #vf-reco button { flex: none; border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer; font: inherit; font-size: 12.5px; background: var(--on); color: var(--on-text); }`;
   document.head.appendChild(style);
@@ -46,42 +52,73 @@
     return { cls: 'held', text: `${x.owner || '?'} · ${x.step || ''} · ${x.age_seconds ?? '?'} s`, title: held.map((y) => `${[y.scope, y.ws].filter(Boolean).join(' ')}${y.scope || y.ws ? ' : ' : ''}${y.owner || '?'}${y.step ? ` (${y.step})` : ''}`).join('\n') }; // lab plat : pas de scope, jamais « undefined : … »
   };
   const KIND = { session: 'Session', subagent: 'Sous-agent', lock: 'Verrou', registered: 'Enregistré', 'dag-node': 'Nœud de DAG' };
-  const age = (s) => s == null ? '' : s < 90 ? `${s} s` : s < 5400 ? `${Math.round(s / 60)} min` : s < 172800 ? `${Math.round(s / 3600)} h` : `${Math.round(s / 86400)} j`;
-  const whoPanel = () => {
-    const ws = who?.workers || [], act = ws.filter((w) => !w.stale), old = ws.filter((w) => w.stale);
-    const row = (w) => {
-      const rev = w.kind === 'session' || w.kind === 'subagent';
-      return `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${age(w.ageS)}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span>`
-        + `<div>${h(w.task || '')}</div>${rev ? `<button type="button" data-vf-doing="${h(w.id)}">Voir la dernière commande</button><div class="vf-doing" hidden></div>` : ''}</div>`;
-    };
+  const duree = (s) => window.__vfEquipeRendu.duree(s); // le format vit dans 71-vf-equipe-rendu.js (chargé après ce fichier, appelé après)
+  const AGENT = (w) => w.kind === 'session' || w.kind === 'subagent';
+  // « au travail » : un agent (session ou sous-agent) `actif` ; ni verrou, ni nœud de DAG, ni terminé, ni agent en attente (P69-D-14, P69-D-33). Même prédicat que
+  // les effectifs de l'onglet Équipe (71-vf-equipe-rendu.js) : pour une même collecte, le badge égale « actifs ».
+  const auTravail = (w) => window.__vfEquipeRendu.actif(w);
+  const htmlTiroir = () => {
+    const ws = who?.workers || [], act = ws.filter(auTravail), reste = ws.filter((w) => !AGENT(w));
+    const row = (w) => `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${h(duree(w.ageS))}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span><div>${h(w.task || '')}</div></div>`;
     const src = Object.entries(who?.sources || {}).map(([k, v]) => `${k} : ${v.etat}`).join(' · ');
-    SC.showPanel(`<div class="vf-whop"><h3>Au travail (${act.length})</h3><p class="regle">${h(lockText(probe.lock).text)}.</p><p class="regle">Règle de fraîcheur : ${FRAICHEUR}. La dernière commande n'est affichée que sur demande.</p>${act.map(row).join('') || '<p>Personne. Sources lues : ' + h(src) + '</p>'}${old.length ? `<h4>Signaux périmés (${old.length})</h4>${old.map(row).join('')}` : ''}<p class="src">${h(src)}</p></div>`);
+    const arbre = window.__vfEquipeRendu.arbre(ws, h);
+    return (`<div class="vf-whop"><h3>Au travail (${act.length})</h3><p class="regle">${h(lockText(probe.lock).text)}.</p><p class="regle">Règle de fraîcheur : ${FRAICHEUR}, actifs et terminés depuis moins de 24 h ; la dernière commande et le transcript ne s'affichent que sur demande.</p>${arbre || (reste.length ? '' : '<p>Personne. Sources lues : ' + h(src) + '</p>')}${reste.length ? `<h4>Verrous et nœuds</h4>${reste.map(row).join('')}` : ''}<p class="src">${h(src)}</p></div>`);
   };
-  // révélation ponctuelle : la réponse reste dans la ligne cliquée
+  let dernier = '';
+  const whoPanel = () => { dernier = htmlTiroir(); SC.showPanel(dernier); };
+  // tant que le tiroir est ouvert il suit le flux : redessiné à chaque `who` qui change l'arbre, l'état ou la dernière action (pas d'image identique), en gardant le défilement
+  // et l'état replié ou déplié des « Terminés » ; les commandes demandées sont reposées par l'observateur ci-dessous
+  const cleDe = (d) => d.closest('[data-vf-agent]')?.dataset.vfAgent || ''; // le bloc « Terminés » est repéré par l'agent qui le porte (stable quand un terminé s'y ajoute)
+  const redessiner = () => {
+    if (!document.querySelector('.vf-whop') || document.body.classList.contains('no-panel')) return; // tiroir fermé ou remplacé : on ne le rouvre pas
+    const html = htmlTiroir();
+    if (html === dernier) return;
+    const p = document.getElementById('panel'), haut = p ? p.scrollTop : 0;
+    const ouverts = new Set([...document.querySelectorAll('.vf-whop details.vf-termines[open]')].map(cleDe));
+    dernier = html; SC.showPanel(html);
+    for (const d of document.querySelectorAll('.vf-whop details.vf-termines')) if (ouverts.has(cleDe(d))) d.open = true;
+    for (const e of document.querySelectorAll('#panel > *')) e.style.animation = 'none';
+    if (p) p.scrollTop = haut;
+  };
+  // révélation ponctuelle : la réponse reste affichée tant que sa ligne l'est. Elle est gardée en mémoire de la page seulement (ni graphe, ni stockage, ni export) et reposée
+  // par un observateur dès que le bouton réapparaît : le tiroir et le panneau d'un agent sont redessinés à chaque `who`, et une réponse qui arrive pendant un redessin
+  // ne doit pas tomber dans une ligne détachée (recette 2026-11-03)
+  const demandes = new Map();
+  const poser = (b) => {
+    const t = demandes.get(b.dataset.vfDoing), z = b.nextElementSibling;
+    if (t !== undefined && z && z.classList.contains('vf-doing') && z.textContent !== t) { z.textContent = t; z.hidden = false; }
+  };
+  // observé : le panneau seulement (la carte du code compte des milliers d'éléments redessinés en rafale) ; rien à reposer tant qu'aucune commande n'a été demandée
+  new MutationObserver(() => { if (demandes.size) for (const b of document.querySelectorAll('#panel [data-vf-doing]')) poser(b); }).observe(document.getElementById('panel') || document.documentElement, { childList: true, subtree: true });
   document.addEventListener('click', async (ev) => {
     const b = ev.target.closest?.('[data-vf-doing]');
     if (!b) return;
-    const zone = b.nextElementSibling;
+    const id = b.dataset.vfDoing;
     b.disabled = true;
+    let texte;
     try {
-      const r = await fetch('/api/vf/doing?id=' + encodeURIComponent(b.dataset.vfDoing), { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' });
+      const r = await fetch('/api/vf/doing?id=' + encodeURIComponent(id), { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' });
       const d = r.ok ? await r.json() : null;
       // `doing` vide : le serveur remonte à la dernière commande Bash de la session ; sans appel Bash lisible il n'y a rien à montrer, jamais un texte de l'assistant en repli (D3)
-      zone.textContent = d?.doing || (d?.erreur === 'inconnu' ? 'Plus active : rien à montrer.' : d?.erreur === 'sans-action' ? "Aucune commande Bash dans la fin du journal de cette session." : 'Indisponible.');
-    } catch { zone.textContent = 'Indisponible.'; }
-    zone.hidden = false; b.disabled = false;
+      texte = d?.doing || (d?.erreur === 'inconnu' ? 'Plus active : rien à montrer.' : d?.erreur === 'sans-action' ? "Aucune commande Bash dans la fin du journal de cette session." : 'Indisponible.');
+    } catch { texte = 'Indisponible.'; }
+    if (demandes.size >= 50) demandes.delete(demandes.keys().next().value);
+    demandes.set(id, texte);
+    for (const x of document.querySelectorAll('[data-vf-doing]')) if (x.dataset.vfDoing === id) { poser(x); x.disabled = false; }
+    b.disabled = false;
   });
   const showLock = (l, off) => {
     if (l !== undefined) probe.lock = l;
     if (!badge) badge = SC.addHeaderButton({ id: 'vf-lock', label: '…', title: 'Qui est au travail', onClick: whoPanel });
     const t = off ? { cls: 'off', text: 'Direct coupé', title: 'Le serveur du cockpit ne répond pas' } : lockText(probe.lock);
-    const n = (who?.workers || []).filter((w) => !w.stale).length;
+    const n = (who?.workers || []).filter(auTravail).length;
     badge.className = 'btn ' + (n ? 'held' : t.cls); badge.title = off ? t.title : `${n ? n + ' au travail' : 'Personne au travail'} · ${t.title}`;
     // compact : le détail (propriétaire du verrou, étape, durée) est dans l'infobulle et dans le panneau « Au travail »
     badge.setAttribute('aria-label', off ? t.text : n ? `${n} au travail` : 'Personne au travail'); // sinon figé à « … » (libellé de création)
     badge.innerHTML = `<span class="dot"></span><span class="bl">${off ? t.text : n ? `${n} au travail` : 'Personne'}</span>`;
+    redessiner();
   };
-  const setWho = (w) => { if (!w) return; who = probe.who = w; showLock(); };
+  const setWho = (w) => { if (!w) return; who = probe.who = w; showLock(); document.dispatchEvent(new CustomEvent('vf-who')); }; // 69-05 : l'onglet Équipe (72-vf-equipe.js) suit le même flux
 
   // I3 (recette 2026-11-02) : une bascule en direct redessine la carte, qui rejouait son animation d'apparition (cartes, liens, colonnes,
   // panneau). On ne l'anime plus : les éléments redessinés portent `animation: none` en ligne AVANT la première image (la suite de
@@ -98,6 +135,12 @@
     for (const e of document.querySelectorAll('#viewport .edges, #viewport .cols, #panel > *')) e.style.animation = 'none';
   };
 
+  // onglet Projet, panneau d'un nœud de mission (`f:<dag>#<noeud>`) : les agents rattachés à ce nœud, lien vers leur carte (P69-D-15)
+  if (G.meta.vfTab === 'project' && SC.addPanelSection) SC.addPanelSection('item', (id) => {
+    if (typeof id !== 'string' || !id.startsWith('f:') || !id.includes('#')) return '';
+    const l = window.__vfEquipeRendu.agentsDuNoeud(who?.workers, id, h);
+    return l ? `<div class="sec"><h3>Agents sur ce nœud</h3>${l}</div>` : '';
+  });
   const find = (ref) => ref.startsWith('n:') ? G.nodes.find((n) => n.id === ref.slice(2)) : G.files.find((f) => f.p === ref.slice(2));
   // ---------- reconnexion à recul : un seul sondage pour les deux flux ----------
   const lost = { t0: 0, timer: null, flux: new Map() };

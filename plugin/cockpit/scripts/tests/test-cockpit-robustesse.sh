@@ -85,9 +85,9 @@ esac
 SH
 cat > "$AUX/who.mjs" <<'JS'
 import { pathToFileURL } from 'node:url'; const [, , scripts, lab, home] = process.argv; const m = await import(pathToFileURL(scripts + '/vf-cockpit-who.mjs').href);
-const w = m.collectWho(lab, { home }); console.log(JSON.stringify({ busy: w.busy, locks: w.workers.filter((x) => x.kind === 'lock').map((x) => x.id), held: w.sources.locks.held, orphelins: w.workers.filter((x) => x.kind === 'registered').map((x) => !!x.orphan) }));
+const w = m.collectWho(lab, { home, scriptsDir: process.argv[5] }); console.log(JSON.stringify({ busy: w.busy, locks: w.workers.filter((x) => x.kind === 'lock').map((x) => x.id), held: w.sources.locks.held, orphelins: w.workers.filter((x) => x.kind === 'registered').map((x) => !!x.orphan) }));
 JS
-W3="$(node "$AUX/who.mjs" "$SCRIPTS" "$L1" "$WORK/home")"
+W3="$(node "$AUX/who.mjs" "$SCRIPTS" "$L1" "$WORK/home" "$WORK/sans-conductor")" # dossier sans conductor voisin : le faux driver-lock.sh de HOME répond (le conductor voisin passe avant, v1.1.1)
 assert_eq "S3.1 — lab plat : le verrou tenu est vu (busy, 1 verrou, owner rev)" "$(printf '%s' "$W3" | node "$AUX/ev.mjs" 'j.busy+","+j.held+","+j.locks')" "true,1,rev"
 assert_eq "S3.2 — l'agent enregistré n'est pas pris pour un orphelin quand le verrou est tenu" "$(printf '%s' "$W3" | node "$AUX/ev.mjs" 'j.orphelins')" "[false]"
 rm -f "$WORK/home/.claude/scripts/driver-lock.sh"
@@ -99,8 +99,8 @@ const [, , scripts, lab, home] = process.argv; const m = await import(pathToFile
 const sid = 'cccc1111-2222-3333-4444-555566667777', d = path.join(home, '.claude', 'projects', '-lab'); fs.mkdirSync(path.join(d, sid, 'subagents'), { recursive: true });
 const ligne = (type) => JSON.stringify({ type, cwd: lab + '/' + 'x'.repeat(400), sessionId: sid, timestamp: '2026-11-01T10:00:00Z', gitBranch: 'main', version: '2.1', message: { content: 'ok' } });
 fs.writeFileSync(path.join(d, sid + '.jsonl'), ligne('user') + '\n' + ligne('assistant') + '\n');
-fs.writeFileSync(path.join(d, sid, 'subagents', 'agent-a1.meta.json'), JSON.stringify({ agentType: 'vf-coder', description: 'GITHUB_TOKEN=abc123secret ' + 'y'.repeat(500) }));
-fs.writeFileSync(path.join(d, sid, 'subagents', 'agent-a1.jsonl'), ligne('assistant') + '\n');
+fs.writeFileSync(path.join(d, sid, 'subagents', 'agent-a1.meta.json'), JSON.stringify({ agentType: 'vf-coder', description: 'GITHUB_TOKEN=abc123secret ' + 'y'.repeat(500), spawnDepth: 1, toolUseId: 'toolu_a1', requestShape: 'background' }));
+fs.writeFileSync(path.join(d, sid, 'subagents', 'agent-a1.jsonl'), JSON.stringify({ ...JSON.parse(ligne('user')), isSidechain: true, agentId: 'a1' }) + '\n' + ligne('assistant') + '\n');
 const w = m.collectWho(lab, { home }); const sub = w.workers.find((x) => x.kind === 'subagent'), ses = w.workers.find((x) => x.kind === 'session');
 console.log(JSON.stringify({ taskLen: sub?.task.length, fuite: /abc123secret/.test(JSON.stringify(w)), cwdLen: ses?.cwd.length, chemin: w.sources.sessions.path.startsWith('~') }));
 JS

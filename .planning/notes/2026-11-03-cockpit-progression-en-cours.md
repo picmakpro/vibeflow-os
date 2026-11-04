@@ -1,6 +1,6 @@
 # Cockpit — suivre le travail en cours dans une phase (note de conception, 2026-11-03)
 
-**Statut :** option A retenue, à implémenter dans la phase qui suit la 67, avec la refonte mobile (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Rien d'implémenté. Demande de Samuel (session principale, 2026-11-03).
+**Statut :** option A retenue (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Elle est portée par la **Phase 69**, élargie le même jour à l'équipe au travail (`69-CONTEXT.md`, P69-D-12 à P69-D-24). La refonte mobile est partie en Phase 70, le terminal intégré en Phase 71, le lancement de travail en Phase 72. Rien d'implémenté. Demande de Samuel (session principale, 2026-11-03).
 Constat : sur la carte Projet, le jalon `vibeflow-v2.0` affiche « 0/2 phases · 0 % · à faire », et la
 Phase 67 « à faire · 11/7 plans · 0/12 exigences », alors que ses 7 plans sont exécutés et que la
 PR #187 est ouverte.

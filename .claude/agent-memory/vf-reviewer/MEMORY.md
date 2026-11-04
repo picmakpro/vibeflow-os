@@ -36,3 +36,4 @@
 - [Seuil en octets + ancres de prompt](feedback_byte-threshold-accents-and-prompt-anchor-tests.md) — revue-59 : placeholders FR accentues passent un seuil LC_ALL=C ; ancres presence-seule non discriminantes
 - [Remplacer une prescription : garder sa mitigation](feedback_replace-prescription-keep-its-mitigation.md) — #81 : heartbeat retire de l attente, TTL 1800 s non couvert
 - [Gate à lecture partielle sans effet sur le code](feedback_gate-partial-read-warning-only.md) — compteur non_reconnues sans effet + juge qui l ignore (check-prd, Phase 59) ; livrable brief seul = impasse rc 3
+- [Extraction cockpit + Chrome parallèle](feedback_cockpit-extraction-and-parallel-chrome.md) — git archive : cockpit+conductor+planning-core ; sondes Chrome seules, jamais avec les suites

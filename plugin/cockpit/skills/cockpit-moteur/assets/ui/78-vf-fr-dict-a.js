@@ -128,6 +128,7 @@ window.__vfFrDict = Object.assign(window.__vfFrDict || {}, {
   "The map’s server couldn’t export it. The details are in its output.": "Le serveur du cockpit n'a pas pu l'exporter. Le détail est dans sa sortie.",
   "The map’s server has restarted since this page opened. Reload the page and try again.": "Le serveur du cockpit a redémarré depuis l'ouverture de cette page. Rechargez la page puis réessayez.",
   "The notes shown on file cards.": "Les notes affichées sur les cartes de fichiers.",
+  "What was just changed, and why.": "Ce qui vient de changer, et pourquoi.",
   "Theme is now {}.": "Le thème est maintenant {}.",
   "There is not enough on this map for a tour yet.": "Il n'y a pas encore assez sur cette carte pour une visite.",
   "These are automatic hints from when this copy was exported.": "Ce sont des indications automatiques, relevées à l'export de cette copie.",

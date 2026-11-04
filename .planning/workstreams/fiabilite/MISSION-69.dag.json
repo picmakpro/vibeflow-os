@@ -1,0 +1,513 @@
+{
+  "nodes": [
+    {
+      "id": "cadrage-69",
+      "step": "cadrage 69 + inscription 71/72 (manager)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan-69",
+      "step": "recherche + plan-phase 69 + plan-check (vf-coder)",
+      "stage": "",
+      "deps": [
+        "cadrage-69"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-69",
+      "step": "execute-phase 69 (vf-coder)",
+      "stage": "",
+      "deps": [
+        "plan-69"
+      ],
+      "scope": [
+        "plugin/cockpit",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-69",
+      "step": "revue vf-reviewer",
+      "stage": "",
+      "deps": [
+        "exec-69"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "audit-69",
+      "step": "audit securite vf-auditer (transcripts)",
+      "stage": "",
+      "deps": [
+        "exec-69"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "gates-69",
+      "step": "gates ci.yml + non-regression complete (manager)",
+      "stage": "",
+      "deps": [
+        "revue-69",
+        "audit-69"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recette-69",
+      "step": "69-RECETTE-HUMAINE.md (vf-coder)",
+      "stage": "",
+      "deps": [
+        "exec-69"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-RECETTE-HUMAINE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire (audit read-only)",
+      "stage": "",
+      "deps": [
+        "exec-69"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "pr-69",
+      "step": "push + PR vers main + CI (manager)",
+      "stage": "",
+      "deps": [
+        "gates-69",
+        "recette-69",
+        "docs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "x69-01",
+      "step": "69-01 avancement (vf-coder)",
+      "stage": "",
+      "deps": [
+        "plan-69"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-avancement.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-planning.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-project.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-interface.json",
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/00-vibeflow.js",
+        "plugin/cockpit/scripts/tests/test-cockpit-avancement.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-projet.sh",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-01-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "x69-02",
+      "step": "69-02 temoins equipe+forme (vf-coder)",
+      "stage": "",
+      "deps": [
+        "plan-69"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/tests/test-cockpit-equipe.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-forme-claude.sh",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-02-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "x69-03",
+      "step": "69-03 mesure forme + who@2 (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-01",
+        "x69-02"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-interface.json",
+        "plugin/cockpit/scripts/vf-cockpit-lecture.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-equipe.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-who.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-live.mjs",
+        "plugin/cockpit/scripts/tests/test-cockpit-who.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-robustesse.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-securite.sh",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-03-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "x69-04",
+      "step": "69-04 temoins transcript (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-02"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/tests/test-cockpit-transcript.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-equipe.sh",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-04-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "x69-05",
+      "step": "69-05 onglet Equipe serveur+UI (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-03",
+        "x69-04"
+      ],
+      "scope": [
+        "plugin/cockpit/skills/cockpit-moteur/assets/serve.mjs",
+        "plugin/cockpit/skills/cockpit-moteur/VENDORED.txt",
+        "plugin/cockpit/amont/patches/assets__serve.mjs.diff",
+        "plugin/cockpit/scripts/vf-cockpit-server.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-equipe-carte.mjs",
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/00-vibeflow.js",
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/70-vf-live.js",
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/72-vf-equipe.js",
+        "plugin/cockpit/scripts/tests/test-cockpit-securite.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-reseau.sh",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-05-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "x69-06",
+      "step": "69-06 transcript + equipe (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-03",
+        "x69-04"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-transcript.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-equipe.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-who.mjs",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-06-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "x69-07",
+      "step": "69-07 routes serveur (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-05",
+        "x69-06"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-server.mjs",
+        "plugin/cockpit/scripts/tests/test-cockpit-serveur.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-securite.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-reseau.sh",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-07-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "x69-08",
+      "step": "69-08 rendu UI equipe (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-05",
+        "x69-06"
+      ],
+      "scope": [
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/71-vf-equipe-rendu.js",
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/70-vf-live.js",
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/72-vf-equipe.js",
+        "plugin/cockpit/skills/cockpit-moteur/VENDORED.txt",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-08-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "x69-09",
+      "step": "69-09 doc + bump v1.1.0 + validation (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-07",
+        "x69-08"
+      ],
+      "scope": [
+        "README.md",
+        "README.fr.md",
+        "plugin/cockpit/README.md",
+        "plugin/cockpit/VERSION",
+        "plugin/cockpit/module.json",
+        "plugin/cockpit/CHANGELOG.md",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-VALIDATION.md",
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-09-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-69-01",
+      "step": "revue anticipee du diff 69-01 (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "x69-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-01",
+      "step": "correction ciblee revue 69-01 : temoins manquants (vf-coder)",
+      "stage": "",
+      "deps": [
+        "revue-69-01"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/tests/test-cockpit-avancement.sh",
+        "plugin/cockpit/scripts/tests/test-cockpit-projet.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "audit-69-lecture",
+      "step": "audit anticipe couche de lecture (vf-auditer)",
+      "stage": "",
+      "deps": [
+        "x69-06"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-lecture",
+      "step": "correction ciblee audit lecture F1-F4 (vf-coder)",
+      "stage": "",
+      "deps": [
+        "audit-69-lecture"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-transcript.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-lecture.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-who.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-equipe.mjs"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "recette-69-redac",
+      "step": "redaction 69-RECETTE-HUMAINE.md, anticipee des que l UI est posee (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-08"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-69-suivi-travail-en-cours-cockpit/69-RECETTE-HUMAINE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-69-ui",
+      "step": "revue serveur+UI+suites 69-02..08 hors lecture (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "x69-07",
+        "x69-08"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-69-ui",
+      "step": "audit securite route+UI (vf-auditer)",
+      "stage": "",
+      "deps": [
+        "x69-07",
+        "x69-08"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-69-lecture",
+      "step": "revue fraiche couche de lecture + correctif audit (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "fix-69-lecture"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-jalon",
+      "step": "correction ciblee jalon en cours CKPT-16 + derive doc 3e onglet (vf-coder)",
+      "stage": "",
+      "deps": [
+        "x69-09"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-ui",
+      "step": "correction ciblee revue UI F1-F6 (vf-coder)",
+      "stage": "",
+      "deps": [
+        "revue-69-ui"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-lecture-2",
+      "step": "correction ciblee n2 revue fraiche lecture (10 mineurs) (vf-coder)",
+      "stage": "",
+      "deps": [
+        "revue-69-lecture"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-fix-69-ui",
+      "step": "verification fraiche du correctif UI (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "fix-69-ui"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-fix-69-lecture-2",
+      "step": "verification fraiche correctif lecture n2 (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "fix-69-lecture-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-mineurs",
+      "step": "derniere passe : 6 mineurs des verifications fraiches (vf-coder)",
+      "stage": "",
+      "deps": [
+        "verif-fix-69-ui",
+        "verif-fix-69-lecture-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-fix-69-mineurs",
+      "step": "verification fraiche derniere passe (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "fix-69-mineurs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-read-project",
+      "step": "fermer la famille read() dans vf-cockpit-project.mjs (vf-coder)",
+      "stage": "",
+      "deps": [
+        "fix-69-mineurs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-fix-69-read-project",
+      "step": "verification fraiche lecture bornee (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "fix-69-read-project"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "merge-main-69",
+      "step": "integration origin/main + conflits v1.0.1/v1.0.2 (vf-coder)",
+      "stage": "",
+      "deps": [
+        "gates-69"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recette-pw-69",
+      "step": "recette 69 deroulee dans Playwright, sans cocher (general-purpose)",
+      "stage": "",
+      "deps": [
+        "recette-69"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-recette",
+      "step": "correction des defauts A, B, C de la recette Playwright (vf-coder)",
+      "stage": "",
+      "deps": [
+        "recette-pw-69"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-merge-69",
+      "step": "verif-merge-69",
+      "stage": "",
+      "deps": [
+        "merge-main-69"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-merge",
+      "step": "fix-69-merge",
+      "stage": "",
+      "deps": [
+        "verif-merge-69"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-fix-69-recette",
+      "step": "verification fraiche correctifs recette+merge (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "fix-69-recette",
+        "fix-69-merge"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

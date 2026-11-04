@@ -1,0 +1,112 @@
+// vf-cockpit-transcript — dernière action lisible, citations du mandat et réducteur de transcript à liste blanche (P69-D-16, P69-D-19, P69-D-23).
+// Exports : VERBES (table fermée), etiquette(name, input, root) -> { outil, verbe, cible }, derniereAction(fichier, root) -> { verbe, cible } | null,
+//           citationsDuMandat(texte) -> [identifiant], reduireTranscript(fichier, { root }) -> { mandat, messages, outils, tronque }
+// Lecture seule, aucun réseau ; liste blanche ; aucune valeur d'entrée d'outil ne sort hors de la cible réduite (chemin du lab, hôte, type d'agent, nom de skill ou de serveur).
+import fs from 'node:fs';
+import path from 'node:path';
+import { cherche, masque, masqueCoupe, MARGE_MASQUE } from './vf-cockpit-lecture.mjs';
+
+// libellés provisoires (P69-PL-19) : à valider avant la publication
+export const VERBES = Object.freeze(Object.assign(Object.create(null), {
+  Read: 'lit', Write: 'modifie', Edit: 'modifie', MultiEdit: 'modifie', NotebookEdit: 'modifie', Grep: 'cherche dans', Glob: 'cherche dans',
+  Bash: 'lance une commande', bash: 'lance une commande', Agent: 'lance un agent', Task: 'lance un agent', SendMessage: 'écrit à',
+  WebFetch: 'consulte une page', WebSearch: 'cherche sur le web', Skill: 'utilise le skill',
+}));
+const VERBE_MCP = 'utilise', VERBE_AUTRE = 'utilise un outil', HORS = 'un fichier hors du lab';
+const BORNE_CIBLE = 120, BORNE_MANDAT = 8000, MAX_MESSAGES = 50, BORNE_MESSAGE = 2000, MAX_OUTILS = 200, TETE = 256 << 10, QUEUE = 8 << 20;
+
+// un texte coupé à la borne le dit : la mention vient APRÈS la coupe (masqueCoupe reste la seule voie de coupe, le masque passe avant), avec la borne réelle, jamais écrite en dur
+const milliers = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const coupe = (t, n) => { const r = masqueCoupe(t, n); return t.length > n ? `${r} … (tronqué, ${milliers(n)} caractères)` : r; };
+const chaine = (v) => (typeof v === 'string' ? v : '');
+const fin = (s) => masque(chaine(s).replace(/\s+/g, ' ').trim()).slice(0, BORNE_CIBLE);
+const real = (p) => { try { return fs.realpathSync(p); } catch { return null; } };
+const dedans = (p, dir) => p === dir || p.startsWith(dir.endsWith(path.sep) ? dir : dir + path.sep);
+
+// chemin relatif au lab (contrôle sur le chemin résolu, puis sur le chemin réel s'il existe), sinon « un fichier hors du lab »
+function cheminDuLab(valeur, root) {
+  const v = chaine(valeur); if (!v || !root) return v ? HORS : '';
+  const r = path.resolve(root, v), base = path.resolve(root);
+  if (!dedans(r, base)) return HORS;
+  const rr = real(r); if (rr !== null) { const rb = real(base); if (rb === null || !dedans(rr, rb)) return HORS; }
+  return path.relative(base, r).split(path.sep).join('/') || '.';
+}
+
+export function etiquette(name, input, root) {
+  const outil = fin(name) || '?'; const i = input && typeof input === 'object' ? input : {};
+  const n = chaine(name);
+  let verbe, cible = '';
+  if (n.startsWith('mcp__')) { verbe = VERBE_MCP; cible = n.split('__')[1] || ''; }
+  else if (n in VERBES) {
+    verbe = VERBES[n];
+    if (['Read', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit'].includes(n)) cible = cheminDuLab(i.file_path ?? i.notebook_path ?? i.path, root);
+    else if (n === 'Grep' || n === 'Glob') cible = cheminDuLab(i.path ?? i.file_path, root);
+    else if (n === 'Agent' || n === 'Task') cible = chaine(i.subagent_type);
+    else if (n === 'SendMessage') cible = chaine(i.to);
+    else if (n === 'Skill') cible = chaine(i.skill);
+    else if (n === 'WebFetch') { try { cible = new URL(chaine(i.url)).hostname; } catch { cible = ''; } }
+  } else verbe = VERBE_AUTRE;
+  return { outil, verbe, cible: fin(cible) };
+}
+
+// dernière action : le dernier bloc tool_use d'une ligne assistant, en remontant le transcript
+export function derniereAction(fichier, root) {
+  return cherche(fichier, (d) => {
+    const c = d.type === 'assistant' ? d.message?.content : null; if (!Array.isArray(c)) return null;
+    for (let k = c.length - 1; k >= 0; k--) if (c[k]?.type === 'tool_use' && typeof c[k].name === 'string') { const e = etiquette(c[k].name, c[k].input, root); return { verbe: e.verbe, cible: e.cible }; }
+    return null;
+  });
+}
+
+// citations du mandat : motifs fixes (jamais construits depuis le lab) ; « nœud `id` » (toute casse, deux-points facultatif) ou `--node=id`
+const CITATION = /n(?:[œŒ]|oe|OE)ud\s{0,8}:?\s{0,8}`([A-Za-z0-9][A-Za-z0-9._-]{0,63})`/gi;
+const CITATION_OPT = /--node=([A-Za-z0-9][A-Za-z0-9._-]{0,63})/g;
+export function citationsDuMandat(texte) {
+  const t = chaine(texte).slice(0, 8000), ids = new Set();
+  for (const re of [CITATION, CITATION_OPT]) { re.lastIndex = 0; let m; while ((m = re.exec(t))) ids.add(m[1]); }
+  return [...ids];
+}
+
+// lecture d'une fenêtre : { texte, coupe } ; `fin` = depuis la fin du fichier, sinon depuis le début
+function fenetre(fichier, octets, depuisLaFin) {
+  let fd = null;
+  try {
+    if (!fs.statSync(fichier).isFile()) return null; // un tube (FIFO) bloquerait l'ouverture
+    fd = fs.openSync(fichier, 'r'); const size = fs.fstatSync(fd).size, len = Math.min(size, octets), buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, depuisLaFin ? size - len : 0);
+    return { texte: buf.toString('utf8'), coupe: size > len };
+  } catch { return null; } finally { if (fd !== null) { try { fs.closeSync(fd); } catch {} } }
+}
+const json = (l) => { try { return JSON.parse(l); } catch { return null; } };
+
+// liste blanche : mandat = contenu chaîne de la première ligne `user` ; messages = blocs `text` des lignes `assistant` ; outils = nom et cible réduite des blocs `tool_use`.
+// Tout le reste (lignes user ultérieures, api-request*, attachment, blocs thinking et tool_result, champ des résultats d'outils) n'est jamais lu.
+// Le coût est borné par ce qui sort (F4) : la fenêtre n'est qu'analysée ; masque et étiquette (donc realpath) ne s'appliquent qu'aux 50 messages et 200 outils gardés.
+export function reduireTranscript(fichier, { root } = {}) {
+  try { return reduire(fichier, root); } catch { return { mandat: '', messages: [], outils: [], tronque: true }; } // aucune exception ne remonte à l'appelant
+}
+function reduire(fichier, root) {
+  let tronque = false, mandat = '';
+  const tete = fenetre(fichier, TETE, false);
+  if (tete?.coupe && !tete.texte.includes('\n')) tronque = true; // la première ligne dépasse la fenêtre de tête : le mandat est illisible
+  if (tete) { const p = json(tete.texte.split('\n')[0]); if (p?.type === 'user' && typeof p.message?.content === 'string') { const c = p.message.content; if (c.length > BORNE_MANDAT) tronque = true; mandat = coupe(c, BORNE_MANDAT); } }
+  const q = fenetre(fichier, QUEUE, true);
+  if (!q) return { mandat, messages: [], outils: [], tronque };
+  const lignes = q.texte.split('\n'); if (q.coupe) { lignes.shift(); tronque = true; } // la première ligne de la fenêtre est coupée
+  let msgs = [], outs = [];
+  for (const l of lignes) {
+    if (!l.trim() || !l.includes('"assistant"')) continue; // écarte sans analyser les lignes d'une autre sorte
+    const d = json(l); if (!d || d.type !== 'assistant') continue;
+    const c = typeof d.message?.content === 'string' ? [{ type: 'text', text: d.message.content }] : d.message?.content; if (!Array.isArray(c)) continue;
+    for (const b of c) {
+      if (b?.type === 'text' && typeof b.text === 'string' && b.text.trim()) msgs.push(b.text.slice(0, BORNE_MESSAGE + MARGE_MASQUE));
+      else if (b?.type === 'tool_use' && typeof b.name === 'string') outs.push({ n: b.name, i: b.input });
+    }
+    if (msgs.length > 2 * MAX_MESSAGES) { msgs = msgs.slice(-MAX_MESSAGES); tronque = true; }
+    if (outs.length > 2 * MAX_OUTILS) { outs = outs.slice(-MAX_OUTILS); tronque = true; }
+  }
+  if (msgs.length > MAX_MESSAGES) { msgs = msgs.slice(-MAX_MESSAGES); tronque = true; }
+  if (outs.length > MAX_OUTILS) { outs = outs.slice(-MAX_OUTILS); tronque = true; }
+  if (msgs.some((t) => t.length > BORNE_MESSAGE)) tronque = true;
+  return { mandat, messages: msgs.map((t) => coupe(t, BORNE_MESSAGE)), outils: outs.map((o) => etiquette(o.n, o.i, root)), tronque };
+}

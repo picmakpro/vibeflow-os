@@ -75,11 +75,10 @@ voiles s'écrivent `rgba(var(--ink), α)` pour suivre le thème tout seuls.
 | À faire | `--st-todo` | `var(--text-4)` |
 | Bloqué | `--st-blocked` | `var(--sev-high)` |
 
-> **Écart connu, corrigé en Phase 70** (choix de Samuel, AskUserQuestion, session principale,
-> 2026-11-03 : « Les règles dans DESIGN.md, la correction en 70 (Recommandé) »). Dans
-> `ui/00-vibeflow.js`, `--st-active` vaut aujourd'hui `#f59e0b` et `--st-blocked` vaut `#ef4444`, en dur.
-> Ces deux statuts ne s'adaptent donc pas au thème clair. Un nouveau code doit déjà utiliser les
-> valeurs de la colonne « Doit valoir ».
+> **Écart corrigé** (recette de la Phase 69, arbitrage Samuel, AskUserQuestion, session principale,
+> 2026-11-04) : dans `ui/00-vibeflow.js`, `--st-active` vaut `var(--sev-medium)` et `--st-blocked`
+> `var(--sev-high)`, comme la colonne « Doit valoir » ; le texte des pastilles est teinté vers `--text`
+> pour tenir 4,5:1 dans les deux thèmes.
 > « À recetter » garde la couleur « en cours » et s'écrit en toutes lettres (P69-D-25).
 
 ### Graphe de code (vendorisé, ne pas étendre sans besoin)

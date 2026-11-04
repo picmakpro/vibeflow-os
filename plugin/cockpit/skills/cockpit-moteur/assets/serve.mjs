@@ -565,6 +565,7 @@ function route(req, res) {
     }
     res.writeHead(404); return res.end();
   }
+  if (url.pathname === '/equipe.html') { const pe = VF?.pageEquipe?.(); if (pe) return sendPage(res, pe); } // vibeflow P24
   if (url.pathname === '/project.html' && VF?.pageProjet()) return sendPage(res, VF.pageProjet()); // vibeflow P13, P17
   if (url.pathname === '/' || url.pathname === '/index.html') return sendPage(res, page);
   let file;

@@ -27,9 +27,11 @@
   dans la ROADMAP plate **sans `gsd-new-milestone`** (même forme que `gouvernance-labs-v1.0`) ;
   **exécution après la clôture de `fiabilite-v1.0`**, en parallèle du jalon de Willy
   (compartiment `gouvernance`) — arbitrage Samuel, AskUserQuestion session principale, 2026-09-25.
-- 📋 **vibeflow-v2.0** — « le cockpit VibeFlow » — Phases 67-70 — **inscrit 2026-11-01** — le cockpit en tête :
+- 📋 **vibeflow-v2.0** — « le cockpit VibeFlow » — Phases 67-72 — **inscrit 2026-11-01** — le cockpit en tête :
   un cockpit floorplan (onglets Projet et Code) sur un socle partagé, puis `vf-signal` embarqué sur ce même socle, puis
-  le suivi du travail en cours dans le cockpit (Phase 69, inscrite 2026-11-03), puis les finitions UI du cockpit (Phase 70, inscrite 2026-11-03).
+  le suivi du travail en cours dans le cockpit (Phase 69, inscrite 2026-11-03), puis les finitions UI du cockpit (Phase 70, inscrite 2026-11-03), puis le terminal intégré (Phase 71) et
+  lancer du travail depuis les cartes (Phase 72), inscrites 2026-11-03 ; ordre 69 → 68 → 70 → 71 → 72 (arbitrage Samuel,
+  AskUserQuestion session principale, 2026-11-03).
   `equipe-produit-v1.0` reste ouvert, son sort se tranche à sa clôture (arbitrage Samuel, AskUserQuestion session
   principale, 2026-11-01). Sources : `.planning/notes/2026-11-01-cockpit-facettes.md`,
   `docs/research/2026-11-01-etude-floorplan-cockpit.md`, `.planning/spikes/WRAP-UP-SUMMARY.md`. Même forme que ECC : section
@@ -123,8 +125,10 @@
 - [ ] Phase 66: Grille de sévérité des juges et convergence des boucles de revue (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 - [x] Phase 67: Cockpit floorplan sur socle partagé (inscrite 2026-11-01, jalon vibeflow-v2.0) — complete 2026-11-03 : 7/7 plans et 4 tours de correction (FIX-A à FIX-D), recette humaine validée par Samuel (`67-RECETTE-HUMAINE.md` § 8.2), CKPT-01..12 cochées ; release `v2.75.0` préparée (tag et release GitHub après le merge de la PR #187, geste de Samuel)
 - [ ] Phase 68: Embarquer vf-signal sur le socle partagé (inscrite 2026-11-01, jalon vibeflow-v2.0)
-- [ ] Phase 69: Suivi du travail en cours dans le cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
+- [x] Phase 69: Suivi du travail en cours dans le cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-04 : 9/9 plans, recette déroulée par juges Playwright (arbitrage de méthode de Samuel, session principale Claude Code, 2026-11-04), 4 écarts corrigés, CKPT-13..28 cochées, vérification 16/16 (`69-VERIFICATION.md`) ; PR #198, sans release (P69-D-29)
 - [ ] Phase 70: Finitions UI du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
+- [ ] Phase 71: Terminal intégré au cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
+- [ ] Phase 72: Lancer du travail depuis les cartes du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
 
@@ -793,7 +797,7 @@ Plans:
 
 - [ ] TBD (run /gsd-plan-phase 66 to break down)
 
-## 📋 Milestone vibeflow-v2.0 — « le cockpit VibeFlow » (Phases 67-70)
+## 📋 Milestone vibeflow-v2.0 — « le cockpit VibeFlow » (Phases 67-72)
 
 **Milestone Goal :** un saut d'usage visible pour qui installe VibeFlow : un cockpit qui montre le projet, le code
 et qui est au travail, dans tout lab GSD, sur un socle partagé avec le panneau compact `vf-signal`. Le cockpit
@@ -809,6 +813,11 @@ La graine `SEED-004` (retrait de `vf-cockpit`) reste dormante : elle se déclenc
 
 **Phase 69 :** inscrite le 2026-11-03, option A de `.planning/notes/2026-11-03-cockpit-progression-en-cours.md`
 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 ; inscription demandée par Samuel en session principale, même date).
+Cadrage mis à jour le même jour : la 69 couvre aussi l'équipe au travail (P69-D-12..24).
+
+**Phases 71 et 72 :** inscrites le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « 69 = avancement + équipe,
+terminal en 71 (Recommandé) », puis « Oui, 69 / 71 / 72 (Recommandé) »). **Ordre du jalon :** 69 → 68 → 70 → 71 → 72 (même arbitrage :
+« 69 → 68 → 70 → 71 → 72 (Recommandé) ») ; la 72 dépend de la 71.
 
 ### Phase 67: Cockpit floorplan sur socle partagé
 
@@ -866,10 +875,10 @@ Plans:
 
 ### Phase 69: Suivi du travail en cours dans le cockpit
 
-> Cadrée le 2026-11-03 (`69-CONTEXT.md`, P69-D-01..11) ; non planifiée.
+> Cadrée le 2026-11-03 (`69-CONTEXT.md`, P69-D-01..11), cadrage mis à jour le même jour (P69-D-12..24 : équipe au travail) ; arbitrages de planification P69-D-25..27 ; planifiée le 2026-11-03 (9 plans, 5 vagues, plan-checker externe PASSED sur `b53a27f9`) ; exécutée le 2026-11-03 (9/9 plans, revue et audit sécurité passés après correction ciblée, P69-D-28 : onglets resserrés gardés en 69, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-03) ; recette `69-RECETTE-HUMAINE.md` close le 2026-11-04 ; PR groupée avec la 68.
 
-**Goal:** La carte Projet du cockpit dit où en est vraiment une phase : un état dérivé de traces locales (`a-faire`, `en-cours`, `a-recetter`, `fait`), un décompte des plans qui ne mêle plus les correctifs de mission, les missions rattachées à leur phase, un jalon qui n'affiche plus « 0 % à faire » quand ses plans sont exécutés ; la règle STATE → statut, seule source fausse, est retirée.
-**Requirements**: CKPT-13..CKPT-18
+**Goal:** La carte Projet du cockpit dit où en est vraiment une phase : un état dérivé de traces locales (`a-faire`, `en-cours`, `a-recetter`, `fait`), un décompte des plans qui ne mêle plus les correctifs de mission, les missions rattachées à leur phase, un jalon qui n'affiche plus « 0 % à faire » quand ses plans sont exécutés ; la règle STATE → statut, seule source fausse, est retirée. Elle montre aussi l'équipe au travail : l'arbre session → manager → workers relié aux nœuds de mission, la dernière action lisible de chaque agent, un onglet « Équipe » et le transcript réduit d'un agent, lu à la demande.
+**Requirements**: CKPT-13..CKPT-28
 **Depends on:** Phase 67 (le module `plugin/cockpit` et sa lib de lecture `readPlanning` existent). La Phase 68 en dépend et consommera l'objet `avancement` (P69-D-10).
 **Success criteria** (observables, à confirmer au cadrage) :
 1. Sur le lab de la 67 (7 plans faits, 4 correctifs, STATE sur une autre phase), la carte affiche « 7/7 plans · 4 correctifs » et l'état « à recetter », jamais « 11/7 » ni « à faire ».
@@ -877,13 +886,33 @@ Plans:
 3. Un jalon `📋` dont une phase est `a-recetter` ou `en-cours` s'affiche `en-cours` ; son pied lit « 0 clos · 1 à recetter · 1 à faire · 0 % », le pourcentage restant strict (phases closes seulement).
 4. Aucune lecture réseau : ni CI, ni merge, ni PR ; les étapes restantes (`reste`) viennent de traces locales seulement.
 5. Chaque règle a un témoin rouge joué avant le code (quatre fixtures de lab, rouges sur le code actuel).
-**Sources:** `.planning/notes/2026-11-03-cockpit-progression-en-cours.md` (causes C1-C5, option A) ; `plugin/cockpit/scripts/vf-cockpit-project.mjs`, `vf-cockpit-planning.mjs`.
-**Hors périmètre :** option B (pourcentage pondéré, exigence à trois états `[~]`, étapes cochées à la main) ; CI, merge, release sur la carte.
-**Plans:** 0 plans
+6. Le tiroir « Au travail » et l'onglet « Équipe » montrent l'arbre session → manager → workers, actifs et terminés depuis moins de 24 h (grisés, repliés), chaque agent avec sa dernière action lisible et relié, dans les deux sens, au nœud de mission qu'il exécute.
+7. Le transcript d'un agent (mandat, messages, liste d'outils) ne se lit qu'à la demande, par requête authentifiée ; jamais de sortie d'outil ni de contenu de fichier lu ; absent du flux SSE, des fichiers générés et de l'export ; rendu en texte, CSP inchangée.
+8. Le test de forme du format Claude Code rougit si un champ lu (`parentAgentId`, `spawnDepth`, `finished`, `toolUseId`, `requestShape`, `isSidechain`, `agentId`) disparaît.
+**Sources:** `.planning/notes/2026-11-03-cockpit-progression-en-cours.md` (causes C1-C5, option A) ; `plugin/cockpit/scripts/vf-cockpit-project.mjs`, `vf-cockpit-planning.mjs`, `vf-cockpit-who.mjs` ; `69-CONTEXT.md` P69-D-12..24.
+**Hors périmètre :** option B (pourcentage pondéré, exigence à trois états `[~]`, étapes cochées à la main) ; CI, merge, release sur la carte ; terminal intégré (Phase 71) ; lancer du travail depuis le cockpit (Phase 72).
+**Plans:** 9 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 69 to break down)
+**Wave 1**
+- [x] 69-01-PLAN.md — Avancement : témoins (a)-(d) rouges d'abord, objet `avancement@1` dans readPlanning, missions rattachées, pied du jalon, règle STATE retirée (CKPT-13..18)
+- [x] 69-02-PLAN.md — Témoins rouges de la collecte de l'équipe : arbre, 24 h, rattachement, dernière action, forme Claude Code, who@2 (CKPT-19..22, 27, 28)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 69-03-PLAN.md — Socle who@2 : contrat de l'équipe, forme mesurée, arbre et historique de 24 h, direct (CKPT-19, 20, 27, 28)
+- [x] 69-04-PLAN.md — Témoins rouges du transcript, de l'onglet Équipe et du rendu de l'arbre (CKPT-19..26)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 69-05-PLAN.md — Onglet Équipe servi en mémoire (patch P24), graphe equipe@1, direct (CKPT-23)
+- [x] 69-06-PLAN.md — Dernière action, rattachement agent -> nœud, réducteur de transcript (CKPT-21, 22, 24, 28)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 69-07-PLAN.md — Transcript servi à la demande, garde d'émission lue du contrat (CKPT-24..26, 28)
+- [x] 69-08-PLAN.md — Tiroir en arbre, liens dans les deux sens, transcript rendu en texte (CKPT-19..23, 26)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 69-09-PLAN.md — Porte de phase rejouée depuis ci.yml, suites une à une, documentation, compte de suites (CKPT-13..28)
 
 ### Phase 70: Finitions UI du cockpit
 
@@ -898,3 +927,32 @@ Plans:
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 70 to break down)
+
+### Phase 71: Terminal intégré au cockpit
+
+> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Terminal intégré dans la page »).
+
+**Goal:** Le cockpit ouvre un terminal dans la page (xterm.js et une PTY native), à la racine du lab, sans changer d'outil ; un audit de sécurité complet accompagne la phase, parce qu'un shell complet derrière le serveur local change le modèle de menace du cockpit.
+**Requirements**: TBD — posées au cadrage.
+**Depends on:** Phase 67 (serveur unique) ; ordre du jalon : après la 70 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « 69 → 68 → 70 → 71 → 72 (Recommandé) »).
+**Sources:** `69-CONTEXT.md` P69-D-19 et P69-D-20.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 71 to break down)
+
+### Phase 72: Lancer du travail depuis les cartes du cockpit
+
+> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Oui, 69 / 71 / 72 (Recommandé) »).
+
+**Goal:** Depuis une carte de phase ou de mission, ou depuis le cockpit, lancer du travail dans une session Claude Code qui tourne sur le poste, avec le contexte du projet, en anticipant les dépendances manquantes et les impossibilités avant de lancer.
+**Vision de Samuel** (AskUserQuestion session principale, 2026-11-03, mot pour mot) : « Je veux aussi anticiper à l'intégration prochaine terminale et de pouvoir travailler directement dans le cockpit, c'est-à-dire que on a déjà un chat qui est prévu enfin qui est actuellement dans l'application, ils permet de poser des questions mais pas forcément de lancer du travail, il faudrait qu'on puisse aussi lancer du travail éventuellement donc ça sera l'idée d'avoir une session Claude code qui tourne dans le code une session de terminale dans l'idéal, et ça permettrait de lancer par exemple depuis les cartes ou depuis le cockpit du travail soit en cliquant sur les cartes de phase ou de mission ou peu importe. Bien sûr, il faudrait qu'on anticipe les manque, les dépendances manquantes donc ça empêcherait l'exécution, il faudrait qu'on anticipe aussi et les impossibilité voilà qu'on qu'on fasse pas de but en blanc donc ça potentiellement le chat qui permet de poser des questions permet déjà d'avoir le contexte et puis ensuite on pourrait éventuellement lancer du travail depuis le cockpit donc c'est-à-dire avec la méthode Vilo avec le Fail système qui vit qui vit littéralement sur le PC et donc il peut travailler sur les work qui peut faire des poches qui peut écrire dans des fichiers qui s'ouvre avec déjà le contexte, projets, les skis etc. cetera » (lecture de la transcription vocale : « Vilo » = VibeFlow, « Fail système » = file system, « work » = worktrees, « poches » = PR, « skis » = skills).
+**Requirements**: TBD — posées au cadrage.
+**Depends on:** Phase 71 (terminal intégré).
+**Sources:** `69-CONTEXT.md` P69-D-19 et P69-D-21.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 72 to break down)

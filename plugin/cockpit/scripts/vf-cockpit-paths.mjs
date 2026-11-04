@@ -32,7 +32,8 @@ export function planningLayout(root) {
   if (!compartiments.length) return { forme: 'plat', actif: null, compartiments: [{ ws: null, dir: base }] };
   let actif = null;
   try {
-    const nom = fs.readFileSync(path.join(base, 'active-workstream'), 'utf8').trim();
+    const pf = path.join(base, 'active-workstream'); const st = fs.statSync(pf); // jamais un fichier non régulier ni démesuré (un lien vers /dev/zero ne finit pas)
+    const nom = st.isFile() && st.size <= 4096 ? fs.readFileSync(pf, 'utf8').trim() : '';
     if (compartiments.some((c) => c.ws === nom)) actif = nom;
   } catch {}
   if (!actif && compartiments.length === 1) actif = compartiments[0].ws;
@@ -67,6 +68,9 @@ export function driverLockScript({ scriptsDir, labRoot, home } = {}) {
   const sortie = labRoot ? path.join(labRoot, '.vibeflow') : null;
   const cands = [];
   if (scriptsDir) cands.push({ c: path.join(scriptsDir, 'driver-lock.sh'), module: true });
+  // le conductor voisin du module (…/plugin/cockpit/scripts -> …/plugin/conductor/scripts) passe avant la copie installée, qui peut dater d'avant
+  // les verrous par phase (recette 69) ; cherché seulement depuis un dossier nommé …/cockpit/scripts, jamais depuis un dossier de scripts quelconque
+  if (scriptsDir && path.basename(scriptsDir) === 'scripts' && path.basename(path.dirname(scriptsDir)) === 'cockpit') cands.push({ c: path.join(scriptsDir, '..', '..', 'conductor', 'scripts', 'driver-lock.sh'), module: true });
   if (home) cands.push({ c: path.join(home, '.claude', 'scripts', 'driver-lock.sh'), module: false });
   for (const { c, module } of cands) {
     if (!isFile(c)) continue;

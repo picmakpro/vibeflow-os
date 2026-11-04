@@ -6,6 +6,7 @@
 // CLI : node vf-cockpit-build.mjs [<lab>] [--quiet]   Codes : 0 ok · 2 pas de .planning · 3 moteur absent · 4 échec d'une étape.
 import fs from 'node:fs';
 import path from 'node:path';
+import { read as lireGarde } from './vf-cockpit-planning.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { findLabRoot, engineDir, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
@@ -65,7 +66,7 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
   const g = JSON.parse(read(path.join(sortie, 'graph.json')));
   let decrits = 0;
   for (const f of g.files) {
-    const txt = read(path.join(lab, f.p)).slice(0, 6000);
+    const txt = lireGarde(path.join(lab, f.p)).slice(0, 6000);
     const fmBlock = /^---\n([\s\S]*?)\n---/.exec(txt)?.[1];
     let d = '';
     if (fmBlock) { d = /^description:\s*"?(.*?)"?\s*$/m.exec(fmBlock)?.[1] || ''; const nm = /^name:\s*(.*)$/m.exec(fmBlock)?.[1]; if (nm) f.name = nm.trim(); }

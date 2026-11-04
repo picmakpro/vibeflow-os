@@ -80,11 +80,14 @@ mk_session() { # $1 = fichier, $2 = clé du cwd, $3 = description du dernier app
   printf '%s\n' "{\"type\":\"user\",\"$2\":\"$LAB\",\"sessionId\":\"$SID\",\"timestamp\":\"2026-11-01T10:00:00Z\",\"gitBranch\":\"main\",\"version\":\"2.1.316\",\"message\":{\"content\":\"salut\"}}" \
     "{\"type\":\"assistant\",\"$2\":\"$LAB\",\"sessionId\":\"$SID\",\"timestamp\":\"2026-11-01T10:00:05Z\",\"gitBranch\":\"main\",\"version\":\"2.1.316\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"description\":\"$3\",\"command\":\"$3\"}}]}}" > "$1"
 }
+# mk_sub <dossier> <id> <meta.json> : sous-agent à la forme réelle (meta + transcript dont la première ligne porte isSidechain et agentId)
+mk_sub() { printf '%s\n' "$3" > "$1/agent-$2.meta.json"; mk_session "$1/agent-$2.jsonl" cwd "x"; sed -i.bak '1s/^{/{"isSidechain":true,"agentId":"'"$2"'",/' "$1/agent-$2.jsonl" && rm -f "$1/agent-$2.jsonl.bak"; }
+META_REELLE='{"agentType":"vf-coder","description":"tâche","spawnDepth":1,"toolUseId":"toolu_x","requestShape":"background"}'
 mk_session "$TRD/$SID.jsonl" cwd "MARQUEUR-DERNIERE-COMMANDE"
 
 echo "=== W1 — session fraîche listée ==="
 Q who "$LAB" "$HOME_T" "$NOSCRIPTS" > "$WORK/who.json"
-assert_eq "W1.1 — schéma nommé VibeFlow" "$(G "$WORK/who.json" 'j.schema')" "vibeflow/cockpit-who@1"
+assert_eq "W1.1 — schéma nommé VibeFlow" "$(G "$WORK/who.json" 'j.schema')" "vibeflow/cockpit-who@2"
 assert_eq "W1.2 — la session fraîche est un travailleur kind=session" "$(G "$WORK/who.json" 'j.workers.filter(w=>w.kind==="session"&&w.id==="'$SID'").length')" "1"
 assert_eq "W1.3 — source sessions lue" "$(G "$WORK/who.json" 'j.sources.sessions.etat')" "lue"
 
@@ -114,10 +117,10 @@ assert_eq "W3.2 — ph-1 est fait" "$(G "$WORK/proj.json" 'j.nodes.filter(n=>n.i
 assert_eq "W3.3 — le plan 01-01 est fait" "$(G "$WORK/proj.json" 'j.files.filter(f=>f.name.startsWith("01-01")).map(f=>f.st).join(",")')" "done"
 
 echo "=== W4 — validateur du contrat versionné ==="
-assert_eq "W4.1 — sortie « au travail » conforme" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-who@1 "$WORK/who2.json")" "OK"
+assert_eq "W4.1 — sortie « au travail » conforme" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-who@2 "$WORK/who2.json")" "OK"
 assert_eq "W4.2 — graphe Projet conforme" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-project@1 "$WORK/proj.json")" "OK"
 node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));j.workers[0].doing="x";fs.writeFileSync(process.argv[2],JSON.stringify(j))' "$WORK/who2.json" "$WORK/who-doing.json"
-R=$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-who@1 "$WORK/who-doing.json"); RC=$?
+R=$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-who@2 "$WORK/who-doing.json"); RC=$?
 assert_has "W4.3 — témoin : un champ doing ajouté est refusé" "$R" "clé interdite présente : doing"
 assert_eq "W4.4 — témoin : code de sortie non nul" "$RC" "1"
 
@@ -151,12 +154,17 @@ assert_eq "W8.3 — compteur >= 1" "$(G "$WORK/who8.json" 'j.sources.sessions.fo
 H9="$WORK/home9"; mkdir -p "$H9/.claude/projects/-lab/$SID/subagents"
 mk_session "$H9/.claude/projects/-lab/$SID.jsonl" cwd "x"
 SD="$H9/.claude/projects/-lab/$SID/subagents"
-echo '{"agentType":"vf-coder","description":"tâche","spawnDepth":2}' > "$SD/agent-ok.meta.json"; mk_session "$SD/agent-ok.jsonl" cwd "x"
-echo '{"description":"sans type"}' > "$SD/agent-bad.meta.json"; mk_session "$SD/agent-bad.jsonl" cwd "x"
+mk_sub "$SD" ok "$META_REELLE"
+mk_sub "$SD" bad '{"description":"sans type"}'
 Q who "$LAB" "$H9" "$NOSCRIPTS" > "$WORK/who9.json"
 assert_eq "W8.4 — témoin : le sous-agent conforme est listé, pas l'autre" "$(G "$WORK/who9.json" 'j.workers.filter(w=>w.kind==="subagent").map(w=>w.id).join(",")')" "ok"
 assert_eq "W8.5 — le meta.json sans agentType compte en forme inconnue" "$(G "$WORK/who9.json" 'j.sources.sessions.formeInconnue')" "1"
-assert_eq "W8.6 — témoin : la fixture conforme rend lue" "$(G "$WORK/who9.json" 'j.sources.sessions.etat')" "lue"
+assert_eq "W8.6 — un meta.json hors forme rend la source forme-inconnue (change de sens par conception, CKPT-27 : plus de « lue » tant qu'un sous-agent vivant est conforme)" "$(G "$WORK/who9.json" 'j.sources.sessions.etat')" "forme-inconnue"
+H9B="$WORK/home9b"; mkdir -p "$H9B/.claude/projects/-lab/$SID/subagents"
+mk_session "$H9B/.claude/projects/-lab/$SID.jsonl" cwd "x"
+mk_sub "$H9B/.claude/projects/-lab/$SID/subagents" ok "$META_REELLE"
+Q who "$LAB" "$H9B" "$NOSCRIPTS" > "$WORK/who9b.json"
+assert_eq "W8.7 — témoin : un dossier de sous-agents tous conformes rend lue, sous-agent listé" "$(G "$WORK/who9b.json" 'j.sources.sessions.etat+"|"+j.workers.filter(w=>w.kind==="subagent").map(w=>w.id).join(",")')" "lue|ok"
 
 echo "=== W9 — jamais de script pris dans l'arbre observé ==="
 H0="$WORK/home0"; mkdir -p "$H0"
@@ -177,7 +185,7 @@ assert_eq "W9.4 — témoin positif : le même script hors de l'arbre est exécu
 
 echo "=== W10 — la CLI --json ne porte jamais la dernière commande ==="
 HOME="$HOME_T" node "$SCRIPTS/vf-cockpit-who.mjs" "$LAB" --json > "$WORK/cli.json"
-assert_eq "W10.1 — schéma dans la sortie de la CLI" "$(grep -c '"schema": "vibeflow/cockpit-who@1"' "$WORK/cli.json")" "1"
+assert_eq "W10.1 — schéma dans la sortie de la CLI" "$(grep -c '"schema": "vibeflow/cockpit-who@2"' "$WORK/cli.json")" "1"
 assert_eq "W10.2 — aucune clé doing" "$(grep -c '"doing"' "$WORK/cli.json")" "0"
 assert_eq "W10.3 — le marqueur est absent" "$(grep -c "$MARK" "$WORK/cli.json")" "0"
 
@@ -291,8 +299,8 @@ node "$AUX/mk-mot.mjs" "$H13/.claude/projects/-lab/$SID.jsonl" "$LAB" 20
 assert_has "W13.3 — témoin : le secret placé après un mot court est toujours masqué" "$(node "$AUX/temps.mjs" "$SCRIPTS" "$LAB" "$H13" "$NOSCRIPTS" "$SID")" "[masqué]"
 H14="$WORK/home14"; mkdir -p "$H14/.claude/projects/-lab/$SID/subagents"; SD14="$H14/.claude/projects/-lab/$SID/subagents"
 mk_session "$H14/.claude/projects/-lab/$SID.jsonl" cwd "x"
-echo '{"agentType":"vf-coder","description":"tâche","spawnDepth":2}' > "$SD14/agent-ok.meta.json"; mk_session "$SD14/agent-ok.jsonl" cwd "x"
-for brut in 5 '[]' '"x"' null; do echo "$brut" > "$SD14/agent-bad.meta.json"; mk_session "$SD14/agent-bad.jsonl" cwd "x"
+mk_sub "$SD14" ok "$META_REELLE"
+for brut in 5 '[]' '"x"' null; do mk_sub "$SD14" bad "$brut"
   Q who "$LAB" "$H14" "$NOSCRIPTS" > "$WORK/who14.json" 2>"$WORK/who14.err"
   assert_eq "W13.4 — meta.json « $brut » : pas d'exception, le sous-agent conforme reste listé, l'autre compte en forme inconnue" "$(G "$WORK/who14.json" '[j.workers.filter(w=>w.kind==="subagent").map(w=>w.id).join(","), j.sources.sessions.formeInconnue].join("|")' 2>&1)" "ok|1"
 done
@@ -376,6 +384,95 @@ assert_eq "W16.4 — D2 : le titre est contenu dans le tiroir et non rogné, auc
 assert_eq "W16.5 — D2 : contenu court, la hauteur du tiroir suit le contenu (< 60 % de la fenêtre)" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "$V.hauteur < $V.vh * 0.6")" "true"
 assert_eq "W16.6 — D2 : contenu long, le tiroir reste dans la fenêtre et défile" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "[$V.longBas <= $V.vh, $V.longHauteur < $V.vh, $V.overflowY, $V.longScroll]")" '[true,true,"auto",true]'
 fi
+# ---------- W17 — verrous de PHASE : libellé, registre par phase, grammaire des arguments (merge 69 / PR #197) ----------
+# Le verrou et le registre viennent du VRAI driver-lock.sh (acquire --ws --phase, register), dans un dépôt git jetable ; un faux driver-lock.sh
+# journalise ses arguments et rend un `status` hostile. Grammaire = celle de driver-lock.sh : ws = vf_ws_name_valid (alphanumérique en tête, puis
+# alphanumérique . _ -, jamais `..`), phase = vf_dl_phase_valid (chiffres séparés par des points, `1.2.3` accepté, jamais `..` ni point en tête ou en queue).
+echo "=== W17 — verrous de phase dans « qui est au travail » ==="
+cat > "$AUX/mutsub.mjs" <<'JS'
+import fs from 'node:fs';
+const f = process.argv[2]; const t = fs.readFileSync(f, 'utf8');
+if (!t.includes(process.env.FROM)) { console.log('ancre absente'); process.exit(1); }
+fs.writeFileSync(f, t.replace(process.env.FROM, () => process.env.TO)); console.log('muté');
+JS
+mut17() { local d="$WORK/mut17-$1"; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$d/"; FROM="$3" TO="$4" node "$AUX/mutsub.mjs" "$d/$2"; }
+DLREEL="$(cd "$SCRIPTS/../../conductor/scripts" && pwd)"
+L17="$WORK/lab-w17"; mkdir -p "$L17/.planning/workstreams/x" "$L17/.planning/workstreams/v1.2"; git -C "$L17" init -q
+( cd "$L17" && bash "$DLREEL/driver-lock.sh" acquire --ws=x --phase=5 --owner=mgr-p5 --step=exec >/dev/null 2>&1 \
+  && bash "$DLREEL/driver-lock.sh" register --ws=x --phase=5 --agent=ag-p5 --role=vf-coder --node=n1 --depth=2 >/dev/null 2>&1 \
+  && bash "$DLREEL/driver-lock.sh" acquire --ws=v1.2 --phase=1.2.3 --owner=mgr-v --step=exec >/dev/null 2>&1 \
+  && bash "$DLREEL/driver-lock.sh" register --ws=v1.2 --phase=1.2.3 --agent=ag-v --role=vf-coder --node=n2 --depth=2 >/dev/null 2>&1 )
+assert_eq "W17.0 — contrôle positif : les deux verrous de phase et leurs agents existent (vrai driver-lock.sh)" "$(ls "$L17/.git/vf-driver/ws/x/phases/5" "$L17/.git/vf-driver/ws/v1.2/phases/1.2.3" | grep -c 'children.jsonl')" "2"
+Q who "$L17" "$HOME_T" "$DLREEL" > "$WORK/who17.json"
+assert_eq "W17.1 — le verrou de phase est libellé « compartiment x phase 5 »" "$(G "$WORK/who17.json" 'j.workers.filter(w=>w.kind==="lock"&&w.id==="mgr-p5").map(w=>w.tree).join("|")')" "compartiment x phase 5"
+assert_eq "W17.2 — l'agent enregistré sous la phase 5 est vu, rattaché à sa phase et tenu (non orphelin)" "$(G "$WORK/who17.json" 'j.workers.filter(w=>w.id==="ag-p5").map(w=>w.tree+"/"+w.orphan).join("|")')" "compartiment x phase 5/false"
+assert_eq "W17.3 — ws « v1.2 » (point) et phase « 1.2.3 » (deux niveaux) : verrou libellé juste" "$(G "$WORK/who17.json" 'j.workers.filter(w=>w.kind==="lock"&&w.id==="mgr-v").map(w=>w.tree).join("|")')" "compartiment v1.2 phase 1.2.3"
+assert_eq "W17.4 — l'agent enregistré sous ws=v1.2 phase=1.2.3 est vu" "$(G "$WORK/who17.json" 'j.workers.filter(w=>w.id==="ag-v").map(w=>w.tree).join("|")')" "compartiment v1.2 phase 1.2.3"
+# faux driver-lock.sh : journalise ses arguments, `status` hostile (ws et phases qui n'ont rien à faire dans une ligne de commande)
+HOS="$WORK/hostile17"; mkdir -p "$HOS"; LOG17="$WORK/hostile17.log"
+cat > "$HOS/driver-lock.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$HOSTILE_LOG"
+case "$1" in
+  status) cat <<'JSON'
+{"locks":[
+{"present":true,"owner":"h1","step":"s","ws":"../x","phase":"5","scope":"phase","age_seconds":1,"stale":false},
+{"present":true,"owner":"h2","step":"s","ws":"$(id)","phase":"5","scope":"phase","age_seconds":1,"stale":false},
+{"present":true,"owner":"h3","step":"s","ws":"x","phase":"1;rm","scope":"phase","age_seconds":1,"stale":false},
+{"present":true,"owner":"h4","step":"s","ws":"x","phase":"5 --all","scope":"phase","age_seconds":1,"stale":false},
+{"present":true,"owner":"h5","step":"s","ws":"x","phase":"1..2","scope":"phase","age_seconds":1,"stale":false},
+{"present":true,"owner":"h6","step":"s","ws":"a/b","phase":".5","scope":"phase","age_seconds":1,"stale":false},
+{"present":true,"owner":"h7","step":"s","ws":"x","phase":7,"scope":"phase","age_seconds":1,"stale":false},
+{"present":true,"owner":"h8","step":"s","ws":"v1.2","phase":"1.2.3","scope":"phase","age_seconds":1,"stale":false}]}
+JSON
+  ;;
+  orphans) echo '{"orphans":[]}' ;;
+esac
+SH
+L18="$WORK/lab-w17h"; mkdir -p "$L18"; git -C "$L18" init -q
+mkdir -p "$L18/.git/vf-driver/ws/ok1" "$L18/.git/vf-driver/ws/..x" "$L18/.git/vf-driver/ws/a b" "$L18/.git/vf-driver/ws/x;y" "$L18/.git/vf-driver/ws/.caché" "$L18/.git/vf-driver/ws/v1.2"
+mkdir -p "$L18/.git/vf-driver/ws/--all"
+run18() { : > "$LOG17"; HOSTILE_LOG="$LOG17" Q who "$1" "$HOME_T" "$2" > "$WORK/who18.json"; }
+run18 "$L18" "$HOS"
+BADARGS="$(grep '^orphans' "$LOG17" | grep -cvE '^orphans( --ws=[A-Za-z0-9][A-Za-z0-9._-]*( --phase=[0-9]+(\.[0-9]+)*)?)?$')"
+assert_eq "W17.5 — aucun ws ni numéro de phase hostile n'arrive en argument de driver-lock.sh" "$BADARGS" "0"
+assert_eq "W17.6 — témoin : les cibles valides ont bien été interrogées (x phase 5 absent du status, v1.2 phase 1.2.3 et ok1 présents)" "$(grep -cE '^orphans --ws=(v1\.2 --phase=1\.2\.3|ok1|v1\.2)$' "$LOG17")" "3"
+assert_eq "W17.7 — les phases hostiles ne sont pas libellées (« 5 --all », « 1;rm », « 1..2 »)" "$(G "$WORK/who18.json" 'j.workers.filter(w=>w.kind==="lock"&&["h3","h4","h5"].includes(w.id)).map(w=>w.tree).join("|")')" "compartiment x|compartiment x|compartiment x"
+assert_eq "W17.8 — une phase numérique (7) du status est ramenée à une chaîne valide et interrogée" "$(grep -c '^orphans --ws=x --phase=7$' "$LOG17")" "1"
+M1="$(mut17 sansfiltre vf-cockpit-who.mjs "ok = (ws, ph) => (ws === '' || WS_RE.test(ws) && !ws.includes('..')) && (ph === '' || PH_RE.test(ph));" "ok = () => true;")"
+run18 "$L18" "$HOS" ; : > "$LOG17"; HOSTILE_LOG="$LOG17" node "$AUX/q.mjs" "$WORK/mut17-sansfiltre" who "$L18" "$HOME_T" "$HOS" > /dev/null
+assert_eq "W17.9 — mutant (filtre ok() supprimé, ancre présente) : des arguments hostiles arrivent au script, détecté" "$M1|$(grep '^orphans' "$LOG17" | grep -cvE '^orphans( --ws=[A-Za-z0-9][A-Za-z0-9._-]*( --phase=[0-9]+(\.[0-9]+)*)?)?$' | awk '{print ($1>0)?"rougit":"vert"}')" "muté|rougit"
+M2="$(mut17 sanslibelle vf-cockpit-who.mjs '${l.phase && PH_RE.test(String(l.phase)) ? ` phase ${l.phase}` : '"''"'}' "")"
+assert_eq "W17.10 — mutant (libellé « phase N » supprimé) : W17.1 rougit" "$M2|$(node "$AUX/q.mjs" "$WORK/mut17-sanslibelle" who "$L17" "$HOME_T" "$DLREEL" | node "$AUX/stdin-get.mjs" 'j.workers.filter(w=>w.kind==="lock"&&w.id==="mgr-p5").map(w=>w.tree).join("|")')" "muté|compartiment x"
+M3="$(mut17 sanscible vf-cockpit-who.mjs ".filter((x) => x.present && x.phase && typeof x.ws === 'string')" ".filter(() => false)")"
+assert_eq "W17.11 — mutant (cibles de phase supprimées) : l'agent enregistré sous la phase 5 disparaît" "$M3|$(node "$AUX/q.mjs" "$WORK/mut17-sanscible" who "$L17" "$HOME_T" "$DLREEL" | node "$AUX/stdin-get.mjs" 'j.workers.filter(w=>w.id==="ag-p5").length')" "muté|0"
+M4="$(mut17 grammaireetroite vf-cockpit-who.mjs "WS_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*\$/" "WS_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*\$/")"
+assert_eq "W17.12 — mutant (ws sans point, ancien ID_RE) : l'agent de ws=v1.2 disparaît" "$M4|$(node "$AUX/q.mjs" "$WORK/mut17-grammaireetroite" who "$L17" "$HOME_T" "$DLREEL" | node "$AUX/stdin-get.mjs" 'j.workers.filter(w=>w.id==="ag-v").length')" "muté|0"
+M5="$(mut17 phaseunniveau vf-cockpit-who.mjs "PH_RE = /^[0-9]+(\\.[0-9]+)*\$/" "PH_RE = /^[0-9]{1,4}(\\.[0-9]{1,3})?\$/")"
+assert_eq "W17.13 — mutant (phase à un seul niveau décimal) : le verrou 1.2.3 perd sa phase" "$M5|$(node "$AUX/q.mjs" "$WORK/mut17-phaseunniveau" who "$L17" "$HOME_T" "$DLREEL" | node "$AUX/stdin-get.mjs" 'j.workers.filter(w=>w.id==="mgr-v").map(w=>w.tree).join("|")')" "muté|compartiment v1.2"
+
+
+# ---------- W18 — le driver-lock.sh du plugin passe avant la copie installée (recette 69, 2026-11-04 : « Driver libre » alors qu'un verrou de phase est tenu) ----------
+# La copie de ~/.claude/scripts datait d'avant les verrous par phase : son `status --all` ne les liste pas. Le module cockpit voisin du conductor
+# (…/plugin/cockpit/scripts -> …/plugin/conductor/scripts) fournit le script à jour ; la copie de HOME ne sert plus qu'en repli.
+echo "=== W18 — le script du conductor voisin prime sur la copie installée ==="
+H18="$WORK/home18"; mkdir -p "$H18/.claude/scripts"
+cat > "$H18/.claude/scripts/driver-lock.sh" <<'SH'
+#!/usr/bin/env bash
+case "$1" in status) echo '{"present": false, "locks": [], "children_running": 0}' ;; orphans) echo '{"orphans":[]}' ;; esac
+SH
+PLUG="$WORK/plug18"; mkdir -p "$PLUG/cockpit/scripts"; ln -s "$(cd "$SCRIPTS/../../conductor" && pwd)" "$PLUG/conductor"
+Q who "$L17" "$H18" "$PLUG/cockpit/scripts" > "$WORK/who18.json"
+assert_eq "W18.1 — verrous de phase tenus comptés (held >= 1) avec le conductor voisin" "$(G "$WORK/who18.json" 'j.workers.filter(w=>w.kind==="lock").length>=1')" "true"
+assert_eq "W18.2 — le verrou de phase 5 est libellé « compartiment x phase 5 »" "$(G "$WORK/who18.json" 'j.workers.filter(w=>w.kind==="lock"&&w.id==="mgr-p5").map(w=>w.tree).join("|")')" "compartiment x phase 5"
+NOPLUG="$WORK/noplug18/cockpit/scripts"; mkdir -p "$NOPLUG"
+Q who "$L17" "$H18" "$NOPLUG" > "$WORK/who18b.json"
+assert_eq "W18.3 — repli : sans conductor voisin, la copie de HOME répond (aucun verrou listé, source lue)" "$(G "$WORK/who18b.json" 'j.workers.filter(w=>w.kind==="lock").length+"/"+j.sources.locks.etat')" "0/lue"
+# le voisin n'est cherché que depuis un dossier …/cockpit/scripts : un dossier de scripts quelconque ne désigne jamais un frère piégé
+mkdir -p "$WORK/trap18/x/scripts" "$WORK/trap18/conductor/scripts"; cp "$TRAP" "$WORK/trap18/conductor/scripts/driver-lock.sh"; rm -f "$WORK/EXECUTE"
+Q who "$L17" "$H18" "$WORK/trap18/x/scripts" > "$WORK/who18c.json"
+assert_eq "W18.4 — un frère de n'importe quel dossier « scripts » n'est pas exécuté" "$([ -e "$WORK/EXECUTE" ] && echo oui || echo non)|$(G "$WORK/who18c.json" 'j.workers.filter(w=>w.id==="PIEGE").length')" "non|0"
+
 vf_hyg_assert
 
 echo ""

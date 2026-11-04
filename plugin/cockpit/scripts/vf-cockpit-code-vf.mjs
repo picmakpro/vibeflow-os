@@ -6,6 +6,7 @@
 // Export : architectureVibeflow({ lab, sortie }) -> { extracteur: 'vibeflow', noeuds, liens }. Écrit <sortie>/architecture.json.
 import fs from 'node:fs';
 import path from 'node:path';
+import { read as lireGarde } from './vf-cockpit-planning.mjs';
 
 const IGNORE = ['.planning/**', 'docs/**', '.claude/**', 'manual/**', 'reports/**', '.vibeflow/**',
   '**/tests/fixtures/**', 'plugin/reference/content/examples/**', '**/CHANGELOG.md'];
@@ -20,7 +21,7 @@ const kindOf = (type) => (/doc-only/.test(type) ? 'config' : /agent/.test(type) 
 const firstSentence = (s, n = 170) => { s = String(s || '').replace(/\s+/g, ' ').trim(); const i = s.search(/[.!?](\s|$)/); s = i > 20 ? s.slice(0, i + 1) : s; return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 
 export function architectureVibeflow({ lab, sortie }) {
-  const read = (p) => { try { return fs.readFileSync(path.join(lab, p), 'utf8'); } catch { return ''; } };
+  const read = (p) => lireGarde(path.join(lab, p)); // lecture bornée : jamais un fichier non régulier
   const scan = JSON.parse(fs.readFileSync(path.join(sortie, '.cache', 'scan.json'), 'utf8'));
   const files = scan.files.filter((f) => ['code', 'docs'].includes(f.category) && !IGN.some((r) => r.test(f.path))).map((f) => f.path);
   const has = (dir) => files.some((f) => f.startsWith(dir + '/'));

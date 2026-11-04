@@ -1,4 +1,4 @@
-// VibeFlow (67-05) : sélecteur du modèle de l'agent, sur les deux onglets, près de la barre de question.
+// VibeFlow (67-05) : sélecteur du modèle de l'agent, sur les trois onglets, près de la barre de question.
 // La liste fermée, le défaut effectif (variable VF_COCKPIT_MODEL ou sonnet) et l'identifiant du lab viennent du serveur
 // (/api/vf/modeles, jeton en en-tête). Le choix est gardé dans ce navigateur seulement, sous
 // vibeflow-cockpit:modele:<lab> ; il n'est ni écrit dans un fichier généré ni exporté. Une question (POST /api/ask) ne porte

@@ -141,7 +141,6 @@
   {"texte": "it explains the choice and updates the plan once you decide", "raison": "mode plan (blueprint) inatteignable : l'assemblage ne pose jamais meta.blueprint, le test F7 le vérifie"},
   {"texte": "“Resolve on the map” puts a request in the Ask bar’s Change mode: finish or edit it, press Enter, and {} updates the plan and redraws the map. Undo puts it back.", "raison": "mode plan (blueprint) inatteignable : l'assemblage ne pose jamais meta.blueprint, le test F7 le vérifie"},
   {"texte": "Shortest chain of imports/HTTP calls from anything inside one item to anything inside another. Returns hops with ids.", "raison": "texte envoyé à l'agent (invite ou description d'outil), jamais affiché"},
-  {"texte": "What was just changed, and why.", "raison": "texte envoyé à l'agent (invite ou description d'outil), jamais affiché"},
   {"texte": "Before writing code, read these parts of plan.json, and check which of the things it relies on exist yet; if some don't, tell me and suggest what to build first. Keep the plan's file paths and names. If the plan looks wrong or incomplete for this part, tell me before changing it. When it's done, run it or its tests and tell me how to try it.", "raison": "mode plan (blueprint) inatteignable : l'assemblage ne pose jamais meta.blueprint, le test F7 le vérifie"}
  ]
 }

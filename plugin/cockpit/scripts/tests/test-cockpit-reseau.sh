@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test-cockpit-reseau.sh — aucun appel réseau sortant au chargement (CKPT-03, volet réseau ; P67-D-02, P67-D-13).
-#   R1 sonde de connexions sortantes (net, tls, dns, fetch) sous le serveur réel : page, page Projet, flux, état
+#   R1 sonde de connexions sortantes (net, tls, dns, fetch) sous le serveur réel : page, page Projet, page Équipe, flux, état, transcript d'un agent (route à la demande, 69-07)
 #   R2 toute URL des pages servies est dans une liste blanche justifiée · R3 plus de second port ni de paramètre live
 # La sonde et les pages jetables sont écrites par la suite dans mktemp. Exit 0 si tout passe, 1 sinon.
 
@@ -118,17 +118,17 @@ lancer() { # lancer <serve.mjs> -> PORT, TOK, PTOK ; le serveur tourne sous la s
   PORT=$(node "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)
   TOK=$(node "$AUX/token.mjs" "$PORT" /); PTOK=$(node "$AUX/token.mjs" "$PORT" /project.html)
 }
-charger() { node "$AUX/get.mjs" "$PORT" / > "$WORK/page-code.html"; node "$AUX/get.mjs" "$PORT" /project.html > "$WORK/page-projet.html"; node "$AUX/sse.mjs" "$PORT" "$PTOK" 3000; node "$AUX/get.mjs" "$PORT" /api/vf/etat "$TOK" > "$WORK/etat.json"; }
+charger() { node "$AUX/get.mjs" "$PORT" / > "$WORK/page-code.html"; node "$AUX/get.mjs" "$PORT" /project.html > "$WORK/page-projet.html"; node "$AUX/get.mjs" "$PORT" /equipe.html > "$WORK/page-equipe.html"; node "$AUX/get.mjs" "$PORT" "/api/vf/transcript?id=inconnu-69" "$TOK" > "$WORK/transcript.json"; node "$AUX/sse.mjs" "$PORT" "$PTOK" 3000; node "$AUX/get.mjs" "$PORT" /api/vf/etat "$TOK" > "$WORK/etat.json"; }
 lancer "$OUT/serve.mjs"; charger
 PORTS=$(node "$AUX/json.mjs" "$OUT/.cache/server.json" 'Object.keys(j).filter(k=>/port/i.test(k)).join(",")')
 assert_eq "R1.3 — la sonde était chargée dans le serveur" "$([ -s "$SONDE_OUT.charge" ] && echo oui || echo non)" "oui"
-assert_eq "R1.4 — témoin : les pages et l'état ont bien été servis" "$([ "$(wc -c < "$WORK/page-code.html")" -gt 1000 ] && [ "$(wc -c < "$WORK/page-projet.html")" -gt 1000 ] && grep -q '"mode"' "$WORK/etat.json" && echo oui || echo non)" "oui"
-assert_eq "R1.5 — page, page Projet, 3 s de flux et état : 0 connexion sortante enregistrée" "$([ -s "$SONDE_OUT" ] && wc -l < "$SONDE_OUT" | tr -d ' ' || echo 0)" "0"
+assert_eq "R1.4 — témoin : les pages et l'état ont bien été servis" "$([ "$(wc -c < "$WORK/page-code.html")" -gt 1000 ] && [ "$(wc -c < "$WORK/page-projet.html")" -gt 1000 ] && [ "$(wc -c < "$WORK/page-equipe.html")" -gt 1000 ] && grep -q '"mode"' "$WORK/etat.json" && grep -q 'inconnu' "$WORK/transcript.json" && echo oui || echo non)" "oui"
+assert_eq "R1.5 — page, page Projet, page Équipe, 3 s de flux et état : 0 connexion sortante enregistrée" "$([ -s "$SONDE_OUT" ] && wc -l < "$SONDE_OUT" | tr -d ' ' || echo 0)" "0"
 stop_srv
 
 echo "=== R2 — URL des pages servies ==="
 assert_eq "R2.0 — la liste blanche porte une raison par entrée" "$(awk -F'|' 'NF<2 || $2==""' "$AUX/blanche.txt" | grep -c .)" "0"
-for f in page-code page-projet; do
+for f in page-code page-projet page-equipe; do
   assert_eq "R2.1 — $f : aucune URL hors liste blanche, aucune préconnexion, aucun script externe" "$(bash "$AUX/audit.sh" "$WORK/$f.html" "$AUX/blanche.txt" | grep -c .)" "0"
 done
 sed 's|</body>|<script>fetch("https://api.exemple-externe.test/x")</script><link rel="preconnect" href="https://fonts.exemple-externe.test"></body>|' "$WORK/page-code.html" > "$WORK/page-temoin.html"

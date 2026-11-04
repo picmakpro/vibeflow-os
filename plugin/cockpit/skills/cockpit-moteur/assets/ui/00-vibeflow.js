@@ -1,15 +1,15 @@
-// VibeFlow (spike 002) : deux onglets sur le même viewer — Code (la carte floorplan) et Projet
-// (jalons → phases → plans, exigences, missions, backlog). Statuts sur les cartes, panneau
-// d'ensemble du projet, et pont entre les deux onglets : un plan ou un nœud de mission renvoie aux
+// VibeFlow (spike 002) : trois onglets sur le même viewer — Code (la carte floorplan), Projet
+// (jalons → phases → plans, exigences, missions, backlog) et Équipe (qui est au travail). Statuts sur les cartes, panneau
+// d'ensemble du projet, et pont entre les onglets Code et Projet : un plan ou un nœud de mission renvoie aux
 // fichiers qu'il touche, un fichier de code renvoie aux plans qui l'ont touché.
 // Ne parle au viewer que par window.Floorplan (+ patchs P1-P4, cf. VENDORED.txt).
 (() => {
   const SC = window.Floorplan;
   if (!SC) return;
   const { h, graph: G } = SC;
-  const TAB = G.meta.vfTab === 'project' ? 'project' : 'code';
-  // titre de l'onglet du navigateur : « <nom> — Code » ou « <nom> — Projet » (le viewer écrit « <nom> map », qui devenait le nom seul)
-  document.title = `${String(G.project.name || '').replace(/ — Projet$/, '')} — ${TAB === 'project' ? 'Projet' : 'Code'}`;
+  const TAB = G.meta.vfTab === 'project' ? 'project' : G.meta.vfTab === 'equipe' ? 'equipe' : 'code';
+  // titre de l'onglet du navigateur : « <nom> — Code », « <nom> — Projet » ou « Équipe · <nom> » (le viewer écrit « <nom> map », qui devenait le nom seul)
+  { const nom = String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''); document.title = TAB === 'equipe' ? `Équipe · ${nom}` : `${nom} — ${TAB === 'project' ? 'Projet' : 'Code'}`; }
   const ST = { done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' };
   // P67-D-04 : logo VibeFlow clair ou sombre selon le thème du viewer (meta.vfLogos est posé par l'assemblage)
   const LOGOS = G.meta.vfLogos;
@@ -21,13 +21,16 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    :root { --st-done: var(--recent); --st-active: #f59e0b; --st-todo: var(--text-4); --st-blocked: #ef4444; }
+    :root { --st-done: var(--recent); --st-active: var(--sev-medium); --st-todo: var(--text-4); --st-blocked: var(--sev-high); }
     .vf-tabs { display: inline-flex; gap: 2px; padding: 3px; margin-left: 14px; border-radius: 12px; background: var(--raise); flex: none; }
     .vf-tabs a { padding: 5px 13px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text-3); text-decoration: none; line-height: 1.4; }
-    .vf-tabs a:hover { color: var(--text-1, inherit); }
-    .vf-tabs a.on { background: var(--surface); color: var(--text-1, inherit); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+    .vf-tabs a:hover { color: var(--text); }
+    .vf-tabs a.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+    /* 69-05 : trois onglets au lieu de deux : resserrés à toute largeur pour tenir à côté de la marque, du fil d'Ariane, de la recherche et du zoom (mesuré par test-cockpit-responsive.sh) */
+      .vf-tabs { margin-left: 10px; padding: 2px; } .vf-tabs a { padding: 5px 6px; font-size: 12px; }
     .vst { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
-      color: var(--c-st); background: color-mix(in srgb, var(--c-st) 14%, transparent); }
+      /* texte teinté vers --text : le statut seul passait sous 4,5:1 sur sa pastille en thème clair (recette 69) */
+      color: color-mix(in srgb, var(--c-st) 68%, var(--text)); background: color-mix(in srgb, var(--c-st) 14%, transparent); }
     .vst-done { --c-st: var(--st-done); } .vst-active { --c-st: var(--st-active); } .vst-todo { --c-st: var(--st-todo); } .vst-blocked { --c-st: var(--st-blocked); }
     .card.st-active { box-shadow: 0 0 0 1.5px var(--st-active), 0 8px 28px color-mix(in srgb, var(--st-active) 22%, transparent); }
     .card.st-blocked { box-shadow: 0 0 0 1.5px var(--st-blocked); }
@@ -39,7 +42,7 @@
     .vf-ms .t { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 500; }
     .vf-ms .t span:last-child { color: var(--text-3); font-weight: 400; font-variant-numeric: tabular-nums; }
     .vf-now { padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--st-active) 8%, transparent); font-size: 13px; line-height: 1.55; }
-    .vf-now b { display: block; font-size: 11.5px; color: var(--st-active); margin-bottom: 3px; font-weight: 600; }
+    .vf-now b { display: block; font-size: 11.5px; color: color-mix(in srgb, var(--st-active) 68%, var(--text)); margin-bottom: 3px; font-weight: 600; }
     .vf-link { display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; border-radius: 10px; font-size: 12.5px; color: inherit; text-decoration: none; }
     .vf-link:hover { background: var(--surface-hover); }
     .vf-link code { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-2); word-break: break-all; }
@@ -55,7 +58,15 @@
     #context:empty { display: none; }
   `;
   // spike 005 : la barre de question reste visible quand serve.mjs (P7) sert l'onglet Projet
+  // recette 69 : au zoom d'ouverture du jalon (lod-mid, ou lod-low plus loin) le pied des cartes (« à recetter · 9/9 plans … » et la pastille d'état) était masqué ou à 5 px :
+  // on le regrandit en unités du graphe (l'échelle le ramène à ~9-10 px à l'écran), sur deux lignes si besoin, et il reste visible à lod-low
+  if (TAB === 'project') style.textContent += `
+    svg.lod-mid .foot, svg.lod-low .foot { flex-wrap: wrap; row-gap: 4px; } svg.lod-mid .desc { display: none; }
+    svg.lod-mid .foot .meta, svg.lod-low .foot .meta { visibility: visible; font-size: 19px; line-height: 1.25; padding: 3px 10px; white-space: normal; }
+    svg.lod-mid .foot .vst, svg.lod-low .foot .vst { font-size: 17px; padding: 3px 10px; }`;
   if (TAB === 'project') style.textContent += `#btn-health${window.FLOORPLAN_SERVER ? '' : ', #ask'} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }`;
+  // onglet Équipe (69-05, P69-PL-09) : ni bouton de santé ni barre de question (la question porte sur le code ou le projet)
+  if (TAB === 'equipe') style.textContent += '#btn-health, #ask { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }';
   document.head.appendChild(style);
 
   // ---------- onglets ----------
@@ -63,7 +74,7 @@
   if (brand) {
     const tabs = document.createElement('nav');
     tabs.className = 'vf-tabs';
-    tabs.innerHTML = `<a href="index.html" class="${TAB === 'code' ? 'on' : ''}">Code</a><a href="project.html" class="${TAB === 'project' ? 'on' : ''}">Projet</a>`;
+    tabs.innerHTML = `<a href="index.html" class="${TAB === 'code' ? 'on' : ''}">Code</a><a href="project.html" class="${TAB === 'project' ? 'on' : ''}">Projet</a><a href="equipe.html" class="${TAB === 'equipe' ? 'on' : ''}">Équipe</a>`;
     brand.after(tabs);
   }
 
@@ -84,7 +95,9 @@
         const pc = m.total ? Math.round((100 * m.done) / m.total) : 0;
         return `<div class="vf-ms" data-vf-go="${h(m.id)}"><div class="t"><span>${h(m.key)}</span><span>${Number(m.done) || 0}/${Number(m.total) || 0} · ${pc} %</span></div><div class="vf-bar" style="--c-st:var(--st-${h(m.st).replace(/[^\w-]/g, '')})"><i style="width:${pc}%"></i></div></div>`;
       }).join('');
-      const next = V.next.map((n) => `<a class="vf-link" data-vf-go="${h(n.id)}"><span class="vst vst-todo">À faire</span><span>${h(n.label)}</span></a>`).join('');
+      // état réel de chaque phase (avancement.etat) ; classes existantes seulement, valeur inconnue -> « À faire »
+      const ETAT_UI = { 'a-faire': ['vst-todo', 'À faire'], 'en-cours': ['vst-active', 'En cours'], 'a-recetter': ['vst-active', 'À recetter'] };
+      const next = V.next.map((n) => { const u = Object.prototype.hasOwnProperty.call(ETAT_UI, n.etat) ? ETAT_UI[n.etat] : ETAT_UI['a-faire']; return `<a class="vf-link" data-vf-go="${h(n.id)}"><span class="vst ${u[0]}">${u[1]}</span><span>${h(n.label)}</span></a>`; }).join('');
       const c = V.counts;
       // « Maintenant » : seulement les champs connus (un lab sans STATE.md n'a ni jalon, ni phase, ni statut)
       const desc = V.lastDesc || '';
@@ -114,7 +127,7 @@
       const rows = f.touched.slice(0, 40).map((p) => `<a class="vf-link" href="index.html#r=${encodeURIComponent(p)}"><span>→</span><code>${h(p)}</code></a>`).join('');
       return `<div class="sec"><h3>Fichiers touchés dans l'onglet Code <span class="c">${f.touched.length}</span></h3>${rows}</div>`;
     });
-  } else {
+  } else if (TAB === 'code') {
     const touch = G.meta.vfTouch || {};
     SC.addPanelSection('item', (id) => {
       const f = fileOf(id);
@@ -124,11 +137,14 @@
       return `<div class="sec"><h3>Touché par <span class="c">${list.length}</span></h3>${rows}</div>`;
     });
   }
-  // arrivée depuis l'autre onglet : #r=<chemin ou id> révèle la carte visée
-  SC.on('ready', () => {
+  // arrivée par `#r=<chemin ou id>` : depuis l'autre onglet (à `ready`) ET par un lien de la même page (clic sur un lien de nœud ou d'agent du tiroir ou d'un panneau :
+  // seul le fragment change, la page ne se recharge pas, `ready` n'est pas rejoué et le viewer, à `popstate`, revient à la vue d'ensemble : on révèle la cible après lui)
+  const arriver = () => {
     const r = new URLSearchParams(location.hash.slice(1)).get('r');
     if (!r) return;
     const id = /^[nf]:/.test(r) ? r : 'f:' + r;
     if (SC.exists(id)) SC.reveal(id); else SC.toast(`Pas sur cette carte : ${r}`);
-  });
+  };
+  SC.on('ready', arriver);
+  window.addEventListener('hashchange', arriver);
 })();
