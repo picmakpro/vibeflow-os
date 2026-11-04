@@ -279,3 +279,27 @@ M1 à M4, M6, N4, N5, N6 ; F1 à F8, P71-D-24, P71-D-28 et la CSP de P sans `--t
 
 Limites : macOS seulement (`/proc`, zombie réel, `xdg-open` non exécutés) ; aucun autre compte ; IME et glisser-déposer par CDP ; aucun modèle d'IA
 testé (N9). M7 de la 67 : hérité, non réouvert.
+
+## Re-audit n°3 (après rebase sur main 19393cc3) — 2026-11-04
+
+Rendu par `vf-auditer`, recoupé avec `gsd-security-auditor` (lecture seule, lancé sans les conclusions de l'auditeur, verdict SECURED), sur
+`7bb14f15` — levier « méthode allégée selon le risque » (arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-03) : un
+re-audit unique, ciblé sur le diff des correctifs et l'intégration du rebase. Quatre arbres extraits par `git archive` (`7bb14f15`, `8d6c9df9`,
+`c023f54a`, `19393cc3`), un mutant par point ; sondes dans le dossier temporaire de la mission (`reaudit3-71/`). Verdict **gaps_found**, aucun
+bloquant, aucun majeur.
+
+Fermés : W1 (Q dans son processus enfant : 127.0.0.1 seul, aucun secret en argv ni environnement, IPC par socketpair anonyme, mort du parent par
+SIGKILL = tout mort en moins de 1 s, `setsid` seul survivant) ; contrôles de Q et P71-D-24 (38 cas) ; P71-D-03 (PATH du shell égal à l'octet à
+celui du lanceur, aucune `VF_COCKPIT_*` ni `NODE_CHANNEL_*` dans le shell) ; H-1 côté serveur, enfant et assistant (29 binaires piégés, aucune
+exécution) ; N9, N10 ; G2, E4 (12 `MessageEvent` forgés par P sans effet) ; F1 à F4, F6, P71-D-28, CSP de P sans `--terminal` ; P26
+(`synchro.sh verifier` rc 0).
+
+| Id | Sévérité | Constat | Suite |
+|----|----------|---------|-------|
+| N12 | mineur, régression mesurée contre `main` | le lanceur résout `ps`, l'ouvreur et `python3` dans le PATH brut : un dossier du lab en absolu dans le PATH fait exécuter `<lab>/bin/open` et `<lab>/bin/ps` | corrigé sous P71-D-29 (« le lanceur n'exécute jamais un binaire du lab », propriété déjà validée par Samuel) ; delta re-audité |
+| H1-b | bas, **hérité de `main`** (PR #201) | `sous()` de `vf-cockpit-env.mjs` garde un dossier du lab nommé `..xxx` | remonté au coordinateur (mandat sur `main`) |
+| I1 à I5 | info | invisibles hors `Cf` sans bandeau ; remplissage non vide sous le pli (avertissement et décompte en filet) ; RTL fort réordonné ; cadre Q créé par P ; `frame-src` de P après la mort de Q | assumés |
+| I6 | doc | P71-D-03 : le shell reçoit le PATH brut, donc un login shell dans le lab exécute `./cmd` si l'utilisateur a `.` ou un élément vide dans son PATH — choix de Samuel, limite de fond | inscrit ici |
+
+Limites : macOS seulement ; Linux et `xdg-open` non exécutés ; ni Firefox ni Safari ; un seul compte. Incident de mesure : deux variantes de sonde
+(`PATH='.'`, PATH vide) ont fait lancer l'ouvreur réel du poste par repli système (un onglet a pu s'ouvrir sur le cockpit de test).
