@@ -105,3 +105,15 @@ La même suite jouée dans les trois copies mutées ROUGIT (scratchpad `fix-socl
 | m1 | V12.1 (verrou périmé, progrès de 5000 s > ttl 1800 s : abandonnee), V12.2 |
 | m2 | V12.3 (verrou de compartiment x : les missions de w abandonnee), V12.4, V13.4 (vrai script) |
 | m3 | V12.5 (verrou de la phase 1 de x : les missions de w abandonnee), V12.6, V13.2 (vrai script) |
+
+## F-08 — `mission.vie: null` veut dire « source illisible » ET « verrous non lus »
+
+Choix : on ne change PAS la forme (`avancement@2` et `signal@1` intacts, `vie` reste `null` dans les deux cas). Le sens se lit sur `mission.etat` : `vie: null` avec `etat: "inconnu"` = source des verrous illisible ; `vie: null` avec `etat` `done`/`ready`/`failed` = aucun nœud `running`, verrous non lus ; une mission `running` ou `abandonnee` porte toujours une vie. La règle est une propriété déjà vraie du code (vérifiée par S12.1 et S12.2, verts avant correctif) ; ce qui manquait, c'est qu'elle soit dite : liste `mission.vieNulle` dans le contrat versionné (ajout pur d'une clé de documentation) et phrase dans l'en-tête de `vf-cockpit-avancement.mjs`.
+Témoin : section S12 de `test-cockpit-signal.sh`. Rouge sur `250dcdba` (scratchpad `fix-socle-f08-rouge.out`) :
+
+| Assertion | Attendu | Obtenu (rouge) |
+|---|---|---|
+| S12.3 le contrat déclare `mission.vieNulle` | `done,failed,inconnu,ready` | `absent` |
+| S12.4 l'en-tête d'avancement dit que `vie: null` se lit sur `etat` | dit | 0 (absent) |
+
+Verts avant et après (la règle est déjà vraie) : S12.1 (verrous lus : `abandonnee` porte une vie, `done`/`ready`/`failed` ont `vie` null sans être `inconnu`), S12.2 (source illisible : `inconnu` + `vie` null).

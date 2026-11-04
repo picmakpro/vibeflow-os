@@ -388,6 +388,23 @@ E_COURT="$(ECH 3000)"
 assert_eq "S11.2 — échéance de 3 s : l'émetteur rend en moins de 6 s" "$(echo "$E_COURT" | ECHJ 'j.ms<6000')" "true"
 assert_eq "S11.3 — échéance de 3 s : les six arbres sont listés, au moins un retard.main non calculé à temps vaut null (jamais un 0 pour un arbre en retard)" "$(echo "$E_COURT" | ECHJ 'j.arbres+"|"+(j.main.some(x=>x===null))+"|"+(j.main.slice(1).some(x=>x===0))')" "6|true|false"
 
+echo "=== S12 — mission.vie null : le sens se lit sur mission.etat, et le contrat le dit (F-08) ==="
+# vie null = « pas de verrou lu pour cette mission » ; deux causes, distinguées par etat : `inconnu` (nœud running, source des verrous illisible)
+# ou done/ready/failed (aucun nœud running : les verrous ne sont pas lus). Une mission running/abandonnee a toujours une vie. Le contrat porte la liste (mission.vieNulle).
+L12="$WORK/lab-s12"; G_ init -q -b main "$L12"; mkdir -p "$L12/.planning/missions"
+printf -- '- [ ] **Phase 1: Un** - a\n' > "$L12/.planning/ROADMAP.md"
+printf '{"nodes":[{"id":"a","step":"s","stage":"exec","deps":[],"status":"running"}]}\n' > "$L12/.planning/missions/MISSION-A-actif.dag.json"
+printf '{"nodes":[{"id":"a","step":"s","stage":"exec","deps":[],"status":"done"}]}\n' > "$L12/.planning/missions/MISSION-B-faite.dag.json"
+printf '{"nodes":[{"id":"a","step":"s","stage":"exec","deps":[],"status":"pending"}]}\n' > "$L12/.planning/missions/MISSION-C-prete.dag.json"
+printf '{"nodes":[{"id":"a","step":"s","stage":"exec","deps":[],"status":"failed"}]}\n' > "$L12/.planning/missions/MISSION-D-echec.dag.json"
+VN() { G "$1" 'j.missions.map(m=>m.nom.slice(-6)+":"+m.etat+":"+(m.vie===null)).sort().join()'; }
+RUN "$FP" "$WORK/home-vide" "$WORK/o12a.json" "$L12" > /dev/null
+assert_eq "S12.1 — verrous lus (conductor voisin, aucun verrou tenu) : la mission au nœud running est abandonnee et porte une vie ; les trois autres ont vie null sans être inconnu" "$(VN "$WORK/o12a.json")" "-actif:abandonnee:false,-echec:failed:true,-faite:done:true,-prete:ready:true"
+RUN "$NV" "$WORK/home-vide" "$WORK/o12b.json" "$L12" > /dev/null
+assert_eq "S12.2 — source des verrous illisible (aucun conductor) : la mission au nœud running est inconnu, vie null ; les trois autres inchangées (vie null aussi)" "$(VN "$WORK/o12b.json")" "-actif:inconnu:true,-echec:failed:true,-faite:done:true,-prete:ready:true"
+assert_eq "S12.3 — le contrat versionné déclare les états de mission dont vie vaut null (mission.vieNulle)" "$(G "$IFACE" '(j.schemas["vibeflow/cockpit-signal@1"].mission.vieNulle||["absent"]).slice().sort().join()')" "done,failed,inconnu,ready"
+assert_eq "S12.4 — l'en-tête de vf-cockpit-avancement.mjs dit ce que null veut dire (vieNulle, lu sur etat)" "$(grep -c 'vie: null.*lit sur .etat' "$SCRIPTS/vf-cockpit-avancement.mjs" | sed 's/^[1-9].*/dit/')" "dit"
+
 vf_hyg_assert
 echo
 echo "=== Résultats : $PASS PASS, $FAIL FAIL ==="
