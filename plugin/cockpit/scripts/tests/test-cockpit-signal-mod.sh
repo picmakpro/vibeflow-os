@@ -9,6 +9,8 @@
 #   M6 détection de l'ancien mod hors dépôt (68-12, VFSG-09 ; P68-D-08) : le chemin `.claude/mods/vf-signal` figure dans un fichier du mod
 #   M7 la lecture maison du planning est retirée (68-06, VFSG-03 ; P68-D-17) : `disk.ts` absent, aucun littéral `.planning` ni
 #      `current_phase` hors commentaire dans plugin/cockpit/signal/hooks/, `agent.list` seulement dans refresh.ts
+#   M8 les gestes et le lanceur ne partent que d'un appui humain (68-07, VFSG-04, VFSG-10 ; ADR-031) : `ouvrirCockpit` n'est appelé que
+#      dans boutons.tsx et seulement par la fonction que `onPress` désigne ; `$.session.send` et `$.ui.view` seulement dans views/equipe.tsx
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 TESTS="$(cd "$(dirname "$0")" && pwd)"
@@ -102,6 +104,21 @@ assert_eq "M7.2 — hooks/disk.ts est supprimé" "$([ -e "$SIGNAL/hooks/disk.ts"
 assert_eq "M7.3 — aucun littéral .planning hors commentaire dans les hooks" "$(printf '%s\n' "$HOOKS_FILES" | code_avec '\.planning' | tr '\n' ',')" ""
 assert_eq "M7.4 — aucun current_phase hors commentaire dans les hooks" "$(printf '%s\n' "$HOOKS_FILES" | code_avec 'current_phase' | tr '\n' ',')" ""
 assert_eq "M7.5 — agent.list n'apparaît que dans refresh.ts" "$(printf '%s\n' "$HOOKS_FILES" | code_avec 'agent\.list' | tr '\n' ',')" "refresh.ts,"
+
+echo "=== M8 — les gestes et le lanceur ne partent que d'un appui humain (VFSG-04, VFSG-10) ==="
+printf "const a = ouvrirCockpit($, l, r)\n// ouvrirCockpit($, l, r)\nonPress={ouvrir}\nvoid ouvrir()\n" > "$WORK/m8.ts"; printf "// ouvrirCockpit(\n * ouvrir()\n" > "$WORK/m8com.ts"
+M8FX="$(printf '%s\n' "$WORK/m8.ts" "$WORK/m8com.ts" "$WORK/m7vide.ts")"
+# occurrences de code (hors commentaires) du motif ERE $1 dans le fichier $2
+occ() { grep -vE '^[[:space:]]*(//|\*|/\*)' "$2" | grep -cE "$1"; }
+assert_eq "M8.0 — le compteur voit l'appel en code (1), ni le commentaire, ni le fichier de commentaires, ni le vide" "$(occ 'ouvrirCockpit\(' "$WORK/m8.ts")|$(occ 'ouvrirCockpit\(' "$WORK/m8com.ts")|$(occ 'ouvrirCockpit\(' "$WORK/m7vide.ts")" "1|0|0"
+assert_eq "M8.0b — une utilisation de la fonction hors de onPress={ouvrir} est vue (1 sur 2 usages)" "$(grep -vE '^[[:space:]]*(//|\*|/\*)' "$WORK/m8.ts" | grep -E '\bouvrir\b' | grep -vcE 'onPress=\{ouvrir\}')" "1"
+APPELANTS="$(printf '%s\n' "$HOOKS_FILES" | code_avec 'ouvrirCockpit\(' | tr '\n' ',')"
+assert_eq "M8.1 — ouvrirCockpit( n'est appelé (ou défini) que dans actions.ts et boutons.tsx" "$APPELANTS" "actions.ts,boutons.tsx,"
+assert_eq "M8.2 — dans boutons.tsx, un seul appel de ouvrirCockpit" "$(occ 'ouvrirCockpit\(' "$SIGNAL/hooks/boutons.tsx")" "1"
+assert_eq "M8.3 — la fonction qui l'appelle (ouvrir) n'est référencée que par onPress={ouvrir} (hors sa définition)" "$(grep -vE '^[[:space:]]*(//|\*|/\*)' "$SIGNAL/hooks/boutons.tsx" | grep -E '\bouvrir\b' | grep -vE 'const ouvrir = |onPress=\{ouvrir\}' | grep -c .)" "0"
+assert_eq "M8.4 — onPress={ouvrir} est bien là (une fois : le garde ne verdit pas à vide)" "$(occ 'onPress=\{ouvrir\}' "$SIGNAL/hooks/boutons.tsx")" "1"
+assert_eq "M8.5 — resoudreLanceur n'est appelé que depuis boutons.tsx (et défini dans actions.ts)" "$(printf '%s\n' "$HOOKS_FILES" | code_avec 'resoudreLanceur' | tr '\n' ',')" "actions.ts,boutons.tsx,"
+assert_eq "M8.6 — \$.session.send et \$.ui.view n'apparaissent que dans views/equipe.tsx" "$(printf '%s\n' "$HOOKS_FILES" | code_avec '\$\.session\.send|\$\.ui\.view' | tr '\n' ',')" "equipe.tsx,"
 
 echo "=== bilan : $PASS ok, $FAIL ko ==="
 [ $((PASS + FAIL)) -gt 0 ] || { echo "ÉCHEC ANTI-VERT-À-VIDE : aucun cas exécuté"; exit 1; }
