@@ -21,7 +21,7 @@ l'agent `claude -p` confiné qui répond aux questions de l'onglet Projet.
 3. Relayer l'adresse imprimée : `Cockpit : <adresse>/ (Code) · <adresse>/project.html (Projet)`.
 
 Codes de sortie : 0 succès · 2 lab sans `.planning/` · 3 moteur absent (réinstaller le module) · 4 assemblage en
-échec · 5 serveur non démarré (le journal est dans `.vibeflow/cockpit/.cache/serveur.log`).
+échec · 5 serveur non démarré (le journal est dans `.vibeflow/cockpit/.cache/serveur.log`), ou fichier d'état `.vibeflow/cockpit/.cache/server.json` désignant un processus qui n'est pas le serveur du cockpit (vérifier le PID avec `ps`, puis supprimer ce fichier et relancer).
 
 ## Règles
 

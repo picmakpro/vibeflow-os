@@ -15,8 +15,22 @@ release racine (version, tag, release GitHub) restent humains. Numéro de versio
   0600 en création exclusive, dont seul le chemin est remis à l'ouvreur, supprimée à l'échange et balayée à 60 s ; l'amorçage expire
   60 s après sa création, côté serveur. Limite résiduelle : lisible d'un processus du même compte pendant 60 s au plus.
 - **Documentation alignée** (README) : Q n'a aucun écouteur `message` propre, le vendor xterm en garde un interne (F5, P71-D-15
-  reformulée) ; réponses de format fixe d'xterm réinjectées (F8) ; `nohup` et `disown` tués à l'arrêt, `setsid` écrit comme limite
-  (P71-D-28) ; collages multi-lignes confirmés (P71-D-26) ; `python3` en chemin absolu (F3) et terminal limité à son cadre (F4).
+  reformulée) ; réponses de format fixe d'xterm réinjectées (F8).
+- **Limite signalée (B1-1)** : un `server.json` planté qui désigne un processus vivant étranger fait sortir `open` et `stop` en code 5
+  tant qu'il n'est pas supprimé ; marche à suivre au README.
+
+### Corrigé — audit de sécurité de la Phase 71 (lots B2 et B3)
+- **Arrêt de toute la session du terminal** (S1 ; P71-D-28, validation de Samuel, AskUserQuestion, session principale Claude Code,
+  2026-11-04) : SIGHUP puis SIGKILL à chaque membre de la session relevé à l'arrêt ; `nohup`, `disown` et `&` sont tués ; un
+  processus sorti par `setsid` (ou double fork + `setsid`) survit ; repli sur les groupes si ni `/proc` ni `ps` ne sont lisibles.
+- **`python3` résolu en chemin absolu** (F3 ; P71-D-25) : seuls les éléments absolus du `PATH` sont consultés, un `python3` du lab
+  n'est jamais exécuté ; un élément absolu du `PATH` situé dans le lab reste consulté (limite). Le `PATH` du shell est inchangé.
+- **Collage confirmé** (F2 ; P71-D-26, même canal, même date) : un collage ou un dépôt à retour à la ligne ou caractère de contrôle
+  n'atteint le shell qu'après « Coller » dans un bandeau « Annuler / Coller » ; Échap annule, Tab puis Entrée valide, aucune touche de
+  confirmation directe exprès ; une ligne simple passe.
+- **Terminal limité à son cadre** (F4 ; P71-D-25) : un popup ou une ouverture seule de la page du terminal affiche « Terminal
+  indisponible » (ni secret lu, ni flux, ni shell).
+- **Police attendue au premier chargement** (2,5 s au plus) avant de mesurer la grille ; pastille du tiroir à 44 px sur écran tactile.
 
 ### Ajouté — Terminal intégré (Phase 71)
 - **`--terminal`** — le lanceur ouvre un shell de votre compte dans un tiroir en bas des pages Projet et Code, dans la même
