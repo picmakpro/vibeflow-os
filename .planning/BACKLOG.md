@@ -717,3 +717,16 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 - **Source :** `plugin/conductor/skills/vf-update/SKILL.md` et `plugin/_internal/vibeflow-update.sh`. Correctif = PR plus release patch.
 
 **Déclencheur de reprise :** juste après la planification de la Phase 69 (demande de Samuel, session principale Claude Code, 2026-11-03).
+
+## Écarts de recette de la Phase 68 reportés au BACKLOG (N4, N5, N6) — DIFFÉRÉ (2026-11-04)
+
+**Origine :** recette v2 de la Phase 68 par un juge frais (captures dans le rapport de mission
+`.planning/missions/2026-11-04-phase-68-execution.md`). Arbitrage Samuel, AskUserQuestion session principale Claude Code,
+2026-11-04 : « Tout selon les recos (Recommandé) », avec ces trois points mis au BACKLOG et non en Phase 70 (P68-D-38).
+- **N4 :** le panneau Phase du cockpit web affiche « Ligne de ROADMAP : … » avec le markdown `**` brut (antérieur à la 68).
+- **N5 :** la vue macro de la pane vf-signal marque « à faire » des phases que leurs worktrees disent « en cours » ou
+  « à recetter » : la macro lit le ROADMAP de l'arbre courant, les lignes de worktree l'état du worktree (R1).
+- **N6 :** hors d'une branche `feat/phase-N`, une mission abandonnée n'apparaît nulle part dans la pane, alors que la carte
+  Projet du cockpit web la montre.
+
+**Déclencheur de reprise :** la prochaine phase qui touche l'affichage du cockpit ou de la pane vf-signal.

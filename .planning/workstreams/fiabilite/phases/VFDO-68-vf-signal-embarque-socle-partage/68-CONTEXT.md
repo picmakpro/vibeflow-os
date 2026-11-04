@@ -204,6 +204,11 @@ Relayés par la session principale (SendMessage) ; réponses mot pour mot entre 
   prend le relais) ; les lancements `node`/`bash` du mod ne partent plus du lab avec le `PATH` hérité (même classe que
   H-1, PR #201) ; « copier takeover » ne copie jamais un chemin nu quand aucun script n'est résolu. Applique la règle
   arbitrée « Rien sous le lab » sans l'étendre.
+- **P68-D-38 (second tri de recette, N1 à N8).** « Tout selon les recos (Recommandé) » (AskUserQuestion, session
+  principale Claude Code, 2026-11-04). N1 (âges négatifs bornés à 0), N2 (« dépôt » partout, âge du verrou cohérent,
+  ligne de verrou sans doublon), N3 (types de la vue Équipe en français) et N8 (« bloqué » en `--sev-high`) corrigés dans
+  la 68 ; N4, N5, N6 au BACKLOG (et non en Phase 70) ; N7 (badge « Personne », choix de la 69) inchangé ; R11 comme
+  P68-D-35.
 
 ### Points de procédure (documentés, sans arbitrage — consigne de la session principale, 2026-11-03)
 
