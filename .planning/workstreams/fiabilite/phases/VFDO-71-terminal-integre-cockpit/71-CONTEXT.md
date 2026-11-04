@@ -153,6 +153,17 @@ scratchpad de la mission, rejouable ; résultats repris ci-dessous).
   visible les caractères invisibles et bidi — ce que l'utilisateur confirme est exactement ce qui est envoyé. N2 : le lanceur n'exécute jamais un
   binaire du lab — `open`, `xdg-open` et `ps` résolus par un `PATH` assaini au démarrage ou en chemins absolus.
 
+- **P71-D-30 (Q14, N9 et N10 du re-audit n°2 ; arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-04).** « Corriger
+  avant la PR (Recommandé) ». N9 : le bandeau de collage se déclenche aussi sur un collage d'une ligne qui contient des caractères invisibles ou de
+  contrôle d'affichage (classe `Cf`, bidi, zéro largeur). N10 : l'aperçu replie les suites de lignes vides et avertit quand il dépasse la zone visible.
+- **P71-D-31 (H-1 hérité de la 67 ; arbitrage Samuel, même canal, même date).** « Mandat séparé maintenant (Recommandé) » : traité par un autre
+  codeur sur une branche partie de `main`, hors de la Phase 71.
+- **P71-D-32 (recette ; règle de Samuel, session principale Claude Code, 2026-11-04, mot pour mot).** « si c'est pour me demande ca ca sert a rien,
+  lance des juge qui prenne des screenshot pour les tests, appele moi seulement si tu ne peux pas faire (gout, avis humain indispensable) ». Les
+  17 étapes de `71-RECETTE-HUMAINE.md` sont jouées par des juges frais (Chromium headless piloté par la bibliothèque playwright, vrai shell, vrai
+  `claude`) ; seuls les points de goût ou d'avis humain remontent à Samuel, en un seul tri ; les écarts fonctionnels passent par le coordinateur
+  (ADR-031).
+
 ### Contraintes héritées (Phase 67, `v2.75.0`)
 
 - Le lab observé n'est jamais une source de code : aucun script du lab exécuté par le serveur (le shell, lui, est l'usage
