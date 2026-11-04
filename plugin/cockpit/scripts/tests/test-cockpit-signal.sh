@@ -271,7 +271,7 @@ M2="$(mutant m2 'avancement: p.avancement, libelle' 'avancement: { ...p.avanceme
 RUN "$WORK/mut-m2" "$HOME" "$WORK/om2.json" "$L" > /dev/null
 M2A="$(node "$AUX/cmp.mjs" avancement "$WORK/om2.json" "$WORK/q.json")"
 assert_eq "S8.0 — les deux copies ont bien été mutées (ancre unique trouvée)" "$M1|$M2" "muté|muté"
-assert_eq "S8.1 — copie mutée qui recalcule : détectée (S3.2 rougit, S4.2 rougit, pas une panne)" "$([ "$M1A" = running ] && echo S3.2-rouge)|$(echo "$M1B" | cut -c1-22)" "S3.2-rouge|KO mission MISSION-1 : "
+assert_eq "S8.1 — copie mutée qui recalcule : détectée (S3.2 rougit, S4.2 rougit, pas une panne)" "$([ "$M1A" = running ] && echo S3.2-rouge)|$(echo "$M1B" | cut -c1-22)" "S3.2-rouge|KO mission MISSION-1 :"
 assert_eq "S8.2 — copie mutée qui recalcule l'avancement : S4.1 rougit sur une phase, pas une panne" "$(echo "$M2A" | cut -c1-9)" "KO phase "
 
 vf_hyg_assert
