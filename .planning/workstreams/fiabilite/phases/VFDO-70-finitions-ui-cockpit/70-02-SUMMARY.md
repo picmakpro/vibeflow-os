@@ -2,7 +2,7 @@
 phase: 70-finitions-ui-cockpit
 plan: 02
 requirements: [UIFN-09, UIFN-11]
-commits: [d51e981c, d51e981c]
+commits: [d51e981c, cfa53914, 97fa7cd5]
 ---
 # 70-02 — conformité DESIGN.md et réglages visuels de l'onglet Équipe
 
