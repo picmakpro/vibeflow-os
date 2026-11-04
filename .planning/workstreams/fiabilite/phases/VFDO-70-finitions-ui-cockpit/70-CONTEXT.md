@@ -143,6 +143,14 @@ Issus des captures « avant » mesurées sur `794c6dba` et du relevé du plan-ch
   réduit à son point et les onglets restent à 13 px / 3 px ; cela amende P70-D-16 pour cette tranche (le recalcul de
   `70-04-RED-TRACE.md` montrait qu'à 1 024 px l'en-tête de Code ne tenait pas à 13 px avec le badge entier). R13.4
   est tranché par cette décision.
+  **Application de P70-D-22 : la tranche passe de 701–1 279 à 701–1 599 px. Ce n'est pas un nouvel arbitrage.** C'est le
+  choix de Samuel, « Badge réduit à son point (Recommandé) » (AskUserQuestion, session principale Claude Code,
+  2026-11-04), appliqué à toute la tranche où il est nécessaire.
+  - Pourquoi : à 1 440 px, avec des onglets à 13 px, le fil d'Ariane restait rogné de 44 px alors que la recherche était
+    déjà à son plancher de 200 px. O2b.6 rougissait.
+  - Où s'arrête la tranche : 1 599 px est la largeur où les autres boutons de l'en-tête passent déjà en icône seule.
+  - Validation : retenue par la session principale le 2026-11-04 et signalée à Samuel, qui peut revenir dessus (commit
+    `0b72dee1`).
 - **P70-D-23 (questions 2 à 13, tri de goût).** Arbitrage de Samuel, mot pour mot : « Tout selon les recos
   (Recommandé) » (AskUserQuestion, session principale Claude Code, 2026-11-04, réponses relayées par le manager vf-dev-manager), soit 2a 3b 4a 5a 6b 7b 8b 9b 10a 11b 12a 13a ; il demande aussi de corriger l'infobulle en
   « de ce projet ». Options retenues :
