@@ -220,7 +220,7 @@
         "arb-docs"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "fix-focus-tiroir",
@@ -389,7 +389,37 @@
         "exec-70-04-t2"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
+    },
+    {
+      "id": "fix-classe-visite",
+      "step": "classe visite/surfaces : place() évite toutes les surfaces, témoin génératif",
+      "stage": "",
+      "deps": [
+        "arb-visite"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-juge-equipe",
+      "step": "correctif juge des arbitrages",
+      "stage": "",
+      "deps": [
+        "juge-arbitrages"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-juge-entete",
+      "step": "correctif juge des arbitrages",
+      "stage": "",
+      "deps": [
+        "juge-arbitrages"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
