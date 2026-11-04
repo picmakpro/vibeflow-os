@@ -42,4 +42,4 @@ l'établit, et M-APERCU-COUPE reproduit la coupure d'origine.
 
 ## Suites rejouées (une à la fois)
 
-xterm 47 PASS / 0 FAIL ; client 57 PASS / 0 FAIL ; tiroir et xss : voir le retour du mandat.
+xterm 47 PASS / 0 FAIL ; client 57 PASS / 0 FAIL ; tiroir 44 PASS / 0 FAIL ; xss 17 PASS / 0 FAIL ; check-machine-paths, check-file-size --all et check-python-isolation : rc 0.
