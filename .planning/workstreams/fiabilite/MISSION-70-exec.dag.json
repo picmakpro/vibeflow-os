@@ -429,6 +429,16 @@
         "fix-classe-visite"
       ],
       "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "fix-ci-ek13",
+      "step": "CI Linux : EK13 768 px",
+      "stage": "",
+      "deps": [
+        "fix-juge-equipe"
+      ],
+      "scope": [],
       "status": "done"
     }
   ]
