@@ -28,7 +28,7 @@ export function accepteMessage(e, origineQ, fenetreCadre, liste) {
 // script injecté : (cfg, accepte, construire) sont passés en arguments, aucun global n'est ajouté. Rien n'est créé hors des pages `/`, `/index.html` et `/project.html`.
 function scriptTiroir(cfg, accepte, construire) {
   if (['/', '/index.html', '/project.html'].indexOf(location.pathname) < 0) return;
-  const T = cfg.textes, MIN = 160, DEF = 320, ATTENTE_MS = 8000, RACCOURCI = { code: 'Space', ctrl: true, shift: true };
+  const T = cfg.textes, MIN = 160, ATTENTE_MS = 8000, RACCOURCI = { code: 'Space', ctrl: true, shift: true };
   const stock = {
     lire: (k) => { try { return window.localStorage.getItem(k); } catch (e) { return null; } },
     ecrire: (k, v) => { try { window.localStorage.setItem(k, String(v)); } catch (e) { void e; } },
@@ -61,9 +61,13 @@ function scriptTiroir(cfg, accepte, construire) {
 
     const monter = (origineQ) => {
       let ouvert = false, plein = false, cadre = null, ouvreur = null, minuterie = null, session = false, chargeur = null;
-      let h = DEF, glisse = false, reserveVue = 0;
+      let h = MIN, glisse = false, reserveVue = 0, perso = false;
       const pleinMax = () => Math.max(MIN, window.innerHeight - (parseFloat(getComputedStyle(document.body).getPropertyValue('--hh')) || 64) - 12 - 16);
       const borne = (v) => Math.max(MIN, Math.min(pleinMax(), Math.round(v)));
+      // P71-D-37 (G4) : hauteur par défaut = 36 % de la fenêtre, entre 220 px (≈ 10 lignes sous la barre de 36 px) et 380 px (au-delà, le terminal mange la carte sans gain de lecture) :
+      // 259 px en 1280x720 (la carte garde plus de la moitié de la fenêtre), 324 px en 1440x900 (320 px avant : pas de régression). Une hauteur mémorisée (ou réglée à la main) prime, plafonnée à 70 % de la fenêtre.
+      const defaut = () => borne(Math.max(220, Math.min(380, Math.round(window.innerHeight * 0.36))));
+      const plafondMemo = () => Math.max(MIN, Math.round(window.innerHeight * 0.7));
       const theme = () => (document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
       const annoncer = (t) => { d.annonce.textContent = t; };
       // P71-D-35 (G1) : le viewer ajuste sur la hauteur de son canevas ; la feuille la réduit (--vf-term-reserve), puis on rappelle SON ajustement (jamais pendant le glissement : au relâchement)
@@ -76,7 +80,7 @@ function scriptTiroir(cfg, accepte, construire) {
         if (reserve !== reserveVue && !glisse) { reserveVue = reserve; ajuster(); }
         d.poignee.setAttribute('aria-valuenow', String(h)); d.poignee.setAttribute('aria-valuemax', String(pleinMax()));
       };
-      const memoH = () => stock.ecrire('vf.terminal.h', h);
+      const memoH = () => { perso = true; stock.ecrire('vf.terminal.h', h); };
       const pastilleEtat = () => {
         d.point.hidden = !(session && !ouvert);
         d.pastille.setAttribute('aria-label', session ? T.ouvrirEnCours : T.ouvrir); d.pastille.title = d.pastille.getAttribute('aria-label');
@@ -120,7 +124,9 @@ function scriptTiroir(cfg, accepte, construire) {
       };
 
       // hauteur mémorisée, bornée à la fenêtre actuelle
-      h = borne(Number(stock.lire('vf.terminal.h')) || DEF);
+      const memo = Number(stock.lire('vf.terminal.h')) || 0;
+      perso = memo > 0; h = perso ? Math.min(borne(memo), plafondMemo()) : defaut();
+      window.addEventListener('resize', () => { const v = perso ? Math.min(borne(h), plafondMemo()) : defaut(); if (v !== h) { h = v; appliquer(); } });
       document.body.appendChild(d.pastille); document.body.appendChild(d.region); document.body.appendChild(d.annonce);
       eviter(d.pastille);
       d.region.addEventListener('animationend', () => d.region.classList.remove('vf-term-entree'));
@@ -148,10 +154,10 @@ function scriptTiroir(cfg, accepte, construire) {
       });
       d.poignee.addEventListener('keydown', (e) => {
         const pas = e.shiftKey ? 96 : 24; let v;
-        if (e.key === 'ArrowUp') v = h + pas; else if (e.key === 'ArrowDown') v = h - pas; else if (e.key === 'Home') v = MIN; else if (e.key === 'End') v = pleinMax(); else if (e.key === 'Enter') v = DEF; else return;
+        if (e.key === 'ArrowUp') v = h + pas; else if (e.key === 'ArrowDown') v = h - pas; else if (e.key === 'Home') v = MIN; else if (e.key === 'End') v = pleinMax(); else if (e.key === 'Enter') v = defaut(); else return;
         e.preventDefault(); h = borne(v); appliquer(); memoH();
       });
-      d.poignee.addEventListener('dblclick', () => { h = DEF; appliquer(); memoH(); });
+      d.poignee.addEventListener('dblclick', () => { h = defaut(); appliquer(); memoH(); });
 
       // canal Q vers P : un seul écouteur, tout passe par le filtre ; aucun message n'est envoyé au cadre
       window.addEventListener('message', (e) => {

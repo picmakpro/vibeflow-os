@@ -12,6 +12,8 @@
 #         de focus sur une carte d'alerte focalisée par programme
 #   T21   recette 71 (E2, G1 ; P71-D-34, P71-D-35) : zoom jamais sous la pastille, atteignable tiroir ouvert · « Ajuster » et cadrage initial au-dessus du tiroir · #ask rangée · visite fermée ;
 #         huit relevés (2 pages x 2 fenêtres x 2 thèmes) + mutants M-PASTILLE-SUR-ZOOM, M-AJUSTE-SANS-TIROIR, M-ASK-RESTE, M-VISITE-RESTE
+#   T22   recette 71 (G4 ; P71-D-37) : hauteur par défaut = 36 % de la fenêtre (220 à 380 px), bande de carte >= moitié de la fenêtre en 1280x720, hauteur mémorisée plafonnée à 70 %,
+#         la fenêtre qui rétrécit ; mutants M-HAUTEUR-FIXE-320, M-MEMO-NON-BORNEE
 #   T17   T17.1 témoin (messages réels de Q) · T17.2 postMessage de P ignoré · T17.3 MessageEvent forgé ignoré · T17.5 espion : liste fermée, aucun octet du shell (M-MSG-DONNEE)
 # Mesure O8 (71-06-SUMMARY, MESURE-O8 minimal=bloque popups=ouvert opener=nul) + décision du manager : cinq jetons de sandbox, aucun autre.
 # Sans Chrome : les sections statiques tournent, la suite annonce « SUITE SAUTÉE (navigateur) ». VF_TIROIR_MS : échéance d'une attente (20000). Exit 0 si tout passe, 1 sinon.
@@ -398,6 +400,33 @@ await executer(chrome, async (s) => {
   return { erreurs, n: sorties.length, api: sorties.every((r) => r.api === 1), noeuds: sorties.every((r) => r.apresF && r.apresF.n > 0), G, sorties: A.detail ? sorties : undefined };
 });
 JS
+cat > "$AUX/chrome-defaut.mjs" <<'JS'
+// chrome-defaut.mjs <chrome> <json> : hauteur du tiroir selon la fenêtre (G4 ; P71-D-37) ; UNE ligne JSON. Entrée : { P }. Page Projet, stockage vidé avant chaque relevé.
+import { pathToFileURL } from 'node:url';
+const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const [, , chrome, brut] = process.argv; const A = JSON.parse(brut);
+const OP = `http://127.0.0.1:${A.P}`, MS = Number(process.env.VF_TIROIR_MS) || 20000;
+const OUVERT = `(() => { const r = document.querySelector('.vf-term-tiroir'); return !!r && !r.hidden && r.getBoundingClientRect().height > 0; })()`;
+const MESURE = `(() => { const b = document.querySelector('.vf-term-tiroir').getBoundingClientRect(); const hh = parseFloat(getComputedStyle(document.body).getPropertyValue('--hh')) || 64; return { h: Math.round(b.height), bande: Math.round(b.top - hh), fenetre: window.innerHeight }; })()`;
+await executer(chrome, async (s) => {
+  const att = (expr, nom) => s.attendre(expr, nom, MS);
+  const fenetre = (W, H) => s.send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false });
+  const ouvrirA = async (W, H, stock) => {
+    await fenetre(W, H); await s.naviguer(`${OP}/project.html`); await s.ev(`localStorage.clear()`);
+    if (stock) await s.ev(`localStorage.setItem('vf.terminal.h', '${stock}'); localStorage.setItem('vf.terminal.open', '1')`); else await s.ev(`localStorage.setItem('vf.terminal.open', '1')`);
+    await s.naviguer(`${OP}/project.html`); await att(OUVERT, 'tiroir ouvert'); await pause(600); return s.ev(MESURE);
+  };
+  const r = { erreurs: {} };
+  try {
+    r.d720 = await ouvrirA(1280, 720); r.d900 = await ouvrirA(1440, 900); r.d1080 = await ouvrirA(1920, 1080);
+    r.m720 = await ouvrirA(1280, 720, 600); r.m900 = await ouvrirA(1440, 900, 600);
+    r.m360 = await ouvrirA(1280, 720, 360);
+    await ouvrirA(1440, 900); await fenetre(1280, 720); await pause(500); r.suit = await s.ev(MESURE);
+    await ouvrirA(1440, 900, 600); await fenetre(1280, 720); await pause(500); r.retrecit = await s.ev(MESURE);
+  } catch (e) { r.erreurs.defaut = String(e.message).slice(0, 160); }
+  return r;
+});
+JS
 echo ok
 rq() { node "$TA" req "$@"; }
 rj() { printf '%s\n' "$1" | node "$AUX/ev.mjs" "$2" 2>/dev/null; }
@@ -435,6 +464,9 @@ run_etats() { # run_etats <sortie> -> EJ ; un serveur neuf, un amorçage neuf, u
 }
 run_geom() { # run_geom <sortie> <court 0|1> -> GJ ; un serveur neuf, un Chrome neuf (le shell n'est pas piloté : la géométrie seule)
   srv "$1" 1; GJ="$(node "$AUX/chrome-geom.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":$2}")"; unsrv
+}
+run_defaut() { # run_defaut <sortie> -> DJ ; un serveur neuf, un Chrome neuf
+  srv "$1" 1; DJ="$(node "$AUX/chrome-defaut.mjs" "$CHROME" "{\"P\":$SRV_PORT}")"; unsrv
 }
 LISTE_JSON='["ready","etat:connecte","etat:reconnexion","etat:termine","etat:refuse","etat:expire","etat:arrete","toggle"]'
 run_flag() { # run_flag <sortie> <court 0|1> -> FJ FP FQ ; un serveur neuf, un amorçage neuf, un Chrome neuf
@@ -485,9 +517,9 @@ assert_eq "T8.2 — tiroir ouvert : 0 violation de CSP dans P, ready puis etat:c
 assert_eq "TU.4 — temps 1 : le raccourci ouvre (annonce « Terminal ouvert »), le focus est au cadre ; temps 2 : focus ailleurs dans P, le raccourci rend le focus au cadre sans fermer" "$(rj "$J" 'j.tu3.annonce+" / ouvert="+j.tu4b.ouvert+" actif="+j.tu4b.actif')" "Terminal ouvert / ouvert=true actif=IFRAME"
 assert_eq "TU.4 — temps 3 : dans le terminal, le raccourci ferme (message toggle de Q), annonce « Terminal fermé », tiroir inerte, focus rendu à l'ouvreur" "$(rj "$J" '"ferme="+j.tu4c.ferme+" focus="+j.tu4c.focus+" toggle="+j.tu4c.toggle+" annonce="+j.tu4c.annonce+" inert="+j.tu4c.inert')" "ferme=true focus=ouvreur toggle=true annonce=Terminal fermé inert=true"
 assert_eq "TU.4b — ouvrir, fermer, ouvrir : un seul cadre, le même shell (PID du shell inchangé)" "$(rj "$J" 'j.reouv.iframes+"/"+((j.reouv.pid===j.tu3.pid&&j.tu3.pid!=="")?"meme-shell":"autre:"+j.reouv.pid+">"+j.tu3.pid)')" "1/meme-shell"
-assert_eq "TU.5 — poignée au clavier : 320 px par défaut, deux flèches haut = +48 px, aria-valuenow suit, mémorisés (vf.terminal.h/open) ; rechargement : même hauteur, tiroir rouvert, même PID de shell" "$(rj "$J" '"h0="+j.h0+" h1="+j.tu5.h+" now="+j.tu5.now+" stock="+j.tu5.stock+" apres="+j.tu5.reload.h+"/"+j.tu5.reload.iframes+" shell="+j.tu5.pid')" "h0=320 h1=368 now=368 stock=368/1 apres=368/1 shell=identique"
-assert_eq "TU.6 — Agrandir : aria-pressed vrai et libellé « Réduire le terminal », tiroir plus haut ; second clic : retour à la hauteur d'avant" "$(rj "$J" '"pressed="+j.tu6.pressed+" aria="+j.tu6.aria+" plus_haut="+(j.tu6.h>j.h5)+" retour="+j.tu6.retour')" "pressed=true aria=Réduire le terminal plus_haut=true retour=false/368"
-assert_eq "TU.7 — glissement souris de 80 px vers le haut : cadre en pointer-events none et body.resizing pendant le geste, rendus après ; hauteur 368 + 80" "$(rj "$J" '"pendant="+j.tu7.pendant+" apres="+j.tu7.apres+" h="+j.tu7.h')" "pendant=none/true apres=auto/false h=448"
+assert_eq "TU.5 — poignée au clavier : 288 px par défaut (36 % de 800 px, P71-D-37), deux flèches haut = +48 px, aria-valuenow suit, mémorisés (vf.terminal.h/open) ; rechargement : même hauteur, tiroir rouvert, même PID de shell" "$(rj "$J" '"h0="+j.h0+" h1="+j.tu5.h+" now="+j.tu5.now+" stock="+j.tu5.stock+" apres="+j.tu5.reload.h+"/"+j.tu5.reload.iframes+" shell="+j.tu5.pid')" "h0=288 h1=336 now=336 stock=336/1 apres=336/1 shell=identique"
+assert_eq "TU.6 — Agrandir : aria-pressed vrai et libellé « Réduire le terminal », tiroir plus haut ; second clic : retour à la hauteur d'avant" "$(rj "$J" '"pressed="+j.tu6.pressed+" aria="+j.tu6.aria+" plus_haut="+(j.tu6.h>j.h5)+" retour="+j.tu6.retour')" "pressed=true aria=Réduire le terminal plus_haut=true retour=false/336"
+assert_eq "TU.7 — glissement souris de 80 px vers le haut : cadre en pointer-events none et body.resizing pendant le geste, rendus après ; hauteur 336 + 80" "$(rj "$J" '"pendant="+j.tu7.pendant+" apres="+j.tu7.apres+" h="+j.tu7.h')" "pendant=none/true apres=auto/false h=416"
 assert_eq "TU.8 — bascule de thème : l'adresse du cadre passe à ?theme=light, history.length inchangé, même PID de shell (P71-D-19)" "$(rj "$J" '"url="+j.tu8.url+" histoire="+j.tu8.histoire+" pid="+j.tu8.pid')" "url=Q/?theme=light histoire=inchangee pid=identique"
 assert_eq "T17.1 — témoin : les vrais messages de Q agissent (toggle reçu : le tiroir s'est fermé ; etat:connecte : la barre dit « Connecté »)" "$(rj "$J" '"toggle="+j.tu4c.toggle+" ferme="+j.tu4c.ferme+" barre="+j.tu3.barre')" "toggle=true ferme=true barre=Connecté"
 assert_eq "T17.2 — postMessage('toggle') émis par P vers elle-même : ignoré (tiroir ouvert avant et après)" "$(rj "$J" '"avant="+j.t17.avant+" apres="+j.t17.postMessage')" "avant=true apres=true"
@@ -537,6 +569,22 @@ mut_geom M-PASTILLE-SUR-ZOOM vf-cockpit-terminal-tiroir.mjs 's|if (recouvre) n.s
 mut_geom M-AJUSTE-SANS-TIROIR vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #stage {|body.vf-term-ouvert #stage-absent {|' G1F
 mut_geom M-ASK-RESTE vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #ask { display: none; }|body.vf-term-ouvert #ask { }|' G1ask
 mut_geom M-VISITE-RESTE vf-cockpit-terminal-tiroir.mjs 's|window.VibeFlowTour.end();|void 0;|' G1visite
+
+echo "=== T22 — hauteur par défaut proportionnelle à la fenêtre (recette 71, G4 ; P71-D-37) ==="
+run_defaut "$OUT"; D="$DJ"
+assert_eq "T22.0 — témoin : aucune étape en erreur, huit relevés mesurés (tiroir ouvert, hauteur lue sur la boîte)" "$(rj "$D" 'JSON.stringify(j.erreurs)+" "+["d720","d900","d1080","m720","m900","m360","suit","retrecit"].filter((k)=>j[k]&&j[k].h>0).length')" "{} 8"
+assert_eq "T22.1 (G4) — sans hauteur mémorisée : 36 % de la fenêtre, bornée entre 220 et 380 px (1280x720 : 259, 1440x900 : 324, 1920x1080 : 380 plafonné ; 389 non borné)" "$(rj "$D" 'j.d720.h+"/"+j.d900.h+"/"+j.d1080.h')" "259/324/380"
+assert_eq "T22.2 (G4) — 1280x720 : la bande de carte au-dessus du tiroir (haut du tiroir moins l'en-tête) fait au moins la moitié de la fenêtre (360 px ; 320 px de tiroir fixe en laissaient 320)" "$(rj "$D" 'j.d720.bande>=j.d720.fenetre/2')" "true"
+assert_eq "T22.3 (G4) — hauteur mémorisée de 600 px : plafonnée à 70 % de la fenêtre en 1280x720 (504), intacte en 1440x900 (630 de plafond) ; 360 px mémorisés restent 360" "$(rj "$D" 'j.m720.h+"/"+j.m900.h+"/"+j.m360.h')" "504/600/360"
+assert_eq "T22.4 (G4) — la fenêtre rétrécit tiroir ouvert : la hauteur par défaut suit (324 puis 259), une hauteur de 600 px est ramenée à 504" "$(rj "$D" 'j.suit.h+"/"+j.retrecit.h')" "259/504"
+mut_defaut() { # mut_defaut <nom> <fichier> <expression-sed> <relevé> <valeur saine>
+  if mutant "$1" "$2" "$3"; then
+    srv "$MUT_OUT" 1; DM="$(node "$AUX/chrome-defaut.mjs" "$CHROME" "{\"P\":$SRV_PORT}")"; unsrv
+    assert_eq "$1 — le mutant rougit T22 : le relevé $4 n'est plus $5 (témoin : aucune erreur, tiroir mesuré)" "$(rj "$DM" 'JSON.stringify(j.erreurs)+" mesure="+(j.'"$4"'&&j.'"$4"'.h>0)+" rouge="+(j.'"$4"'.h!=='"$5"')')" "{} mesure=true rouge=true"
+  else sans_effet "$1"; fi
+}
+mut_defaut M-HAUTEUR-FIXE-320 vf-cockpit-terminal-tiroir.mjs 's|const defaut = () => borne([^;]*;|const defaut = () => 320;|' d720 259
+mut_defaut M-MEMO-NON-BORNEE vf-cockpit-terminal-tiroir.mjs 's|Math.min(borne(memo), plafondMemo())|borne(memo)|' m720 504
 
 echo "=== TU.11 / T8.3 — cadre injoignable, frame-src absent (mutants jouées en navigateur) ==="
 if mutant injoignable vf-cockpit-terminal.mjs "s|{ etat: 'actif', port: portQ }|{ etat: 'actif', port: 1 }|"; then
