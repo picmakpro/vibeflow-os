@@ -223,6 +223,12 @@ Relayés par la session principale (SendMessage) ; réponses mot pour mot entre 
   ouverte et session interactive ; pane fermée, après un tour et au plus une fois par minute ; jamais d'attente de
   l'émetteur au démarrage. AD-2 « L'écrire sans mesurer (Recommandé) » — README et notes de la release groupée :
   « vérifiée sous 2.1.318, non chargée sous 2.1.181 ».
+- **P68-D-42 (chargeurs d'environnement vidés) — décision du manager, pas un arbitrage de Samuel (2026-11-04).** Revue
+  fraîche FND-2, sondée en réel : un `.claude/settings.json` de lab portant `NODE_OPTIONS=--require <lab>/evil.js` fait
+  charger un fichier du lab par le `node` de l'émetteur. C'est un fichier sous le lab exécuté : la règle arbitrée
+  « Rien sous le lab » (P68-D-34) s'applique telle quelle. Le mod vide `NODE_OPTIONS`, `BASH_ENV` et `ENV` dans
+  l'environnement de ses lancements, comme `VF_COCKPIT_SCRIPTS_DIR` (P68-D-40). Les variables `GIT_*` ne sont pas
+  touchées (git ne charge pas de script par elles hors configuration déjà neutralisée côté socle) ; consigné.
 
 ### Points de procédure (documentés, sans arbitrage — consigne de la session principale, 2026-11-03)
 
