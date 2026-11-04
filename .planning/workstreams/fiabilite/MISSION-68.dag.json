@@ -364,7 +364,7 @@
         "exec-68-10"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "docs",
@@ -492,7 +492,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "running"
+      "status": "done"
     }
   ]
 }
