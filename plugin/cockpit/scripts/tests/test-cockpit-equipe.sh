@@ -854,7 +854,8 @@ JS
 {"sessionAgeS":5,"agents":[
  {"id":"mgr1","spawnDepth":1,"ageS":5,"role":"vf-dev-manager"},
  {"id":"a1","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"vf-coder"},
- {"id":"a2","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"vf-coder"}]}
+ {"id":"a2","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"vf-coder"},
+ {"id":"a3","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"general-purpose","dureeS":130,"dernierAppel":{"name":"Agent","input":{"subagent_type":"general-purpose","description":"d","prompt":"p"}}}]}
 JSON
   NOW="$(node -e 'console.log(Date.now())')"
   HEK="$(mkhome ek "$AUX/spec-ek.json" "$LABEK")"
@@ -877,6 +878,8 @@ JSON
   EKC focus-transcript "$EKA1"
   assert_eq "EK1.0 — témoin : avant l'Entrée, l'élément actif est le bouton « Lire le transcript » de l'agent a1 (la sonde sait lire le focus)" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||(j.avant.tag+"|"+j.avant.transcript)')" "BUTTON|a1"
   assert_eq "EK1 — après Entrée sur « Lire le transcript », le transcript s'affiche ET l'élément actif reste dans le tiroir, jamais BODY" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||("lu="+j.lu+" | actif="+(j.apres.tag==="BODY"?"BODY":(j.apres.dansTiroir?"dans le tiroir":"hors du tiroir : "+j.apres.tag)))')" "lu=true | actif=dans le tiroir"
+  EKC focus-transcript "equipe.html#r=n%3Aag-mgr1"
+  assert_eq "EK1.1 — sur un manager qui porte des agents, Entrée sur « Lire le transcript » lit le transcript, garde le focus et ne fait pas descendre le viewer dans le nœud" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag+" | vue "+(j.hashAvant===j.hashApres?"inchangée":"changée"))')" "lu=true | actif=BUTTON | vue inchangée"
   # EK2 (m1) : changer d'agent efface la clé de rechargement
   EKC changer-agent "$EKA1"
   assert_eq "EK2.1 — changer d'agent efface la clé de rechargement (avant : l'identifiant a1 ; après : aucune)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')" "a1|null"
@@ -893,6 +896,18 @@ JSON
   EKC focus-doing-tiroir "project.html#t"
   assert_eq "EK8.0 — témoin : avant l'Entrée, l'élément actif est le bouton « Voir la dernière commande » du tiroir (la sonde sait lire le focus)" "$(G "$WORK/ek-focus-doing-tiroir.json" 'j.erreur||(j.avant.tag+"|"+(j.avant.doing?"doing":"sans id")+"|"+j.avant.dansTiroir)')" "BUTTON|doing|true"
   assert_eq "EK8 — après Entrée sur « Voir la dernière commande » du tiroir, la commande s'affiche ET l'élément actif reste ce bouton, jamais BODY" "$(G "$WORK/ek-focus-doing-tiroir.json" 'j.erreur||("lu="+j.lu+" | actif="+(j.apres.tag==="BODY"?"BODY":(j.apres.doing?"bouton « dernière commande »":"autre : "+j.apres.tag)))')" "lu=true | actif=bouton « dernière commande »"
+  # --- recette de la Phase 70 (juge Playwright frais) : focus au redessin, badge du pied long, libellés ---
+  EKC focus-puis-who "$EKA1"
+  assert_eq "EK8.0 — témoin : le bouton du panneau avait le focus et le événement who l'a bien remplacé (le redessin a eu lieu)" "$(G "$WORK/ek-focus-puis-who.json" 'j.erreur||(j.focalise+"|"+j.remplace)')" "true|true"
+  assert_eq "EK8 — après le redessin du panneau par un événement who, le focus est rendu au bouton « Lire le transcript » de même identifiant" "$(G "$WORK/ek-focus-puis-who.json" 'j.erreur||(j.apres.tag==="BODY"?"BODY":(j.apres.estLeBouton&&j.apres.transcript==="a1"?"le bouton":"autre : "+j.apres.tag))')" "le bouton"
+  EKC focus-tiroir "project.html#t"
+  assert_eq "EK9.0 — témoin : le bouton du tiroir avait le focus et le événement who l'a bien remplacé" "$(G "$WORK/ek-focus-tiroir.json" 'j.erreur||(j.focalise+"|"+j.remplace)')" "true|true"
+  assert_eq "EK9 — après le redessin du tiroir « Au travail » par un événement who, le focus est rendu au bouton « Voir la dernière commande » de la même ligne" "$(G "$WORK/ek-focus-tiroir.json" 'j.erreur||(j.apres.tag==="BODY"?"BODY":(j.apres.estLeBouton?"le bouton":"autre : "+j.apres.tag))')" "le bouton"
+  EKC badge "$EKA1"
+  assert_eq "EK10 — pied long (« actif · … · lance un agent general-purpose ») : le badge d'état reste entièrement dans sa carte à 390, 1024 et 1440 px (marge >= 0)" "$(G "$WORK/ek-badge.json" 'j.erreur||(["390","1024","1440"].map((l)=>typeof j[l]==="number"&&j[l]>=0?"ok":l+"="+j[l]).join(","))')" "ok,ok,ok"
+  EKC libelles "equipe.html#t"
+  assert_eq "EK11 — la ligne des sources du tiroir est en français (aucune clé « sessions », « locks », « dags » brute)" "$(G "$WORK/ek-libelles.json" 'j.erreur||(/\b(sessions|locks|dags)\b ?:/.test(j.src)?"anglais : "+j.src:"français")')" "français"
+  assert_eq "EK12 — l'infobulle de la recherche de l'onglet Équipe dit la même chose que son libellé" "$(G "$WORK/ek-libelles.json" 'j.erreur||j.titre')" "Chercher un agent ou une session"
   vf_hyg_stop "$EK_PID"
 
   # --- mutants : chacun posé dans la page servie, serveur relancé, le témoin DOIT rougir ---
@@ -904,9 +919,14 @@ JSON
   assert_eq "EK5.2 — mutant (la commande est rendue en HTML) : un élément est créé, détecté" "$(ek_mutant m5 rendu-commande "$EKA1" 'j.erreur||(j.elements+"|"+j.injecte)' "z.textContent !== t) { z.textContent = t; z.hidden = false; }" "!z.dataset.ek) { z.dataset.ek = '1'; z.innerHTML = t; z.hidden = false; }")" "muté|1|true"
   # l'ancre doit être propre à 72-vf-equipe.js : le viewer porte d'autres ev.stopPropagation(), un mutant posé sur l'un d'eux serait un faux vert
   EKANC1="ev.target.closest?.('#panel [data-vf-transcript], #panel [data-vf-doing]')) ev.stopPropagation();"
-  assert_eq "EK1.2 — mutant (l'Entrée du bouton n'est plus arrêtée avant le viewer) : le viewer descend dans le nœud, le transcript n'est jamais lu et le focus tombe sur BODY, détecté" "$(ek_mutant f1 focus-transcript "$EKA1" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "$EKANC1" "${EKANC1/ev.stopPropagation();/void 0;}")" "muté|lu=false | actif=BODY"
+  assert_eq "EK1.2 — mutant (l'Entrée du bouton n'est plus arrêtée avant le viewer) : le viewer descend dans le nœud du manager (la vue change), détecté" "$(ek_mutant f1 focus-transcript "equipe.html#r=n%3Aag-mgr1"  'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag+" | vue "+(j.hashAvant===j.hashApres?"inchangée":"changée"))' "$EKANC1" "${EKANC1/ev.stopPropagation();/void 0;}")" "muté|lu=true | actif=BUTTON | vue changée"
   assert_eq "EK1.3 — mutant (le bouton focalisé est désactivé pendant la lecture) : le transcript est lu mais le focus tombe sur BODY, détecté" "$(ek_mutant f2 focus-transcript "$EKA1" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "b.setAttribute('aria-disabled', 'true'); // jamais \`disabled\` : un bouton désactivé perd le focus clavier (UIFN-12)" 'b.disabled = true;')" "muté|lu=true | actif=BODY"
   assert_eq "EK8.1 — mutant (le bouton focalisé du tiroir est désactivé pendant la lecture) : la commande est lue mais le focus tombe sur BODY, détecté" "$(ek_mutant f3 focus-doing-tiroir "project.html#t" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "b.setAttribute('aria-disabled', 'true'); // jamais \`disabled\` : un bouton focalisé désactivé perd le focus clavier (UIFN-12, même défaut" 'b.disabled = true; //')" "muté|lu=true | actif=BODY"
+  assert_eq "EK8.2 — mutant (le focus n'est plus rendu après un redessin) : il tombe sur BODY, détecté" "$(ek_mutant r1 focus-puis-who "$EKA1" 'j.erreur||(j.apres.tag)' 'new MutationObserver(() => { rendreFocus(); ' 'new MutationObserver(() => { ')" "muté|BODY"
+  assert_eq "EK9.2 — même mutant, tiroir « Au travail » : le focus tombe sur BODY, détecté" "$(ek_mutant r2 focus-tiroir "project.html#t" 'j.erreur||(j.apres.tag)' 'new MutationObserver(() => { rendreFocus(); ' 'new MutationObserver(() => { ')" "muté|BODY"
+  assert_eq "EK10.2 — mutant (la règle du pied retirée de la page servie) : le badge sort de sa carte à 1440 px, détecté" "$(ek_mutant r3 badge "$EKA1" 'j.erreur||(j["1440"]<0?"rogné":"dans la carte")' ".foot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .foot .vst { flex: none; }" '.foot .meta { }')" "muté|rogné"
+  assert_eq "EK11.2 — mutant (les clés de la collecte affichées telles quelles) : « sessions : lue » reparaît, détecté" "$(ek_mutant r4 libelles "equipe.html#t" 'j.erreur||(/\b(sessions|locks|dags)\b ?:/.test(j.src)?"anglais":"français")' '${SOURCES[k] || k} : ${v.etat}' '${k} : ${v.etat}')" "muté|anglais"
+  assert_eq "EK12.2 — mutant (infobulle laissée au viewer) : « Chercher un fichier, une route, un module » reparaît, détecté" "$(ek_mutant r5 libelles "equipe.html#t" 'j.erreur||j.titre' "bouton.setAttribute('aria-label', LIB); bouton.title = LIB;" "bouton.setAttribute('aria-label', LIB);")" "muté|Chercher un fichier, une route, un module"
   # témoins de la sonde de mutation elle-même
   ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"
   assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK2.1 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "a1|null|identique"

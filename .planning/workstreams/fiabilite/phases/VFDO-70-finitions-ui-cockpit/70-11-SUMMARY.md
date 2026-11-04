@@ -35,3 +35,9 @@ Une anomalie de méthode évitée : une ancre de mutant trop générique (`ev.st
 - Témoins : EK8.0, EK8 (rouge sur 8de3fdd2 : attendu `lu=true | actif=bouton « dernière commande »`, obtenu `lu=true | actif=BODY`), EK8.1 (mutant `disabled = true` dans la page servie). Trace : `70-11-RED-TRACE.md` § « Suite ». `ek-sub.mjs` refuse une ancre ambiguë.
 - Autres `disabled = true` dans `ui/7*-vf-*.js` : aucun (recherche `disabled = true` et `.disabled=` sur 70 à 72, `70-vf-live.js` était le dernier).
 - Mesure : `test-cockpit-equipe.sh` 134 PASS / 0 FAIL ; `test-cockpit-marque-blanche.sh` 30 PASS / 0 FAIL.
+
+## Suite : recette (correction ciblée, base cf6983ac)
+
+Traité : focus rendu après chaque redessin (panneau et tiroir, EK8/EK9), badge d'état dans la carte à pied long (EK10), anglais de la ligne des sources et infobulle de recherche (EK11/EK12), survol et anneau des boutons du tiroir, jeton `--n-terminés`. Détail et mutants : `70-11-RED-TRACE.md`.
+
+Consigné, NON corrigé (défaut de la Phase 69 révélé ici, pas créé par la 70) : la carte « Session » affiche « en attente » dans son pied et le badge « En cours », parce que dans `72-vf-equipe.js` tout état autre que « terminé » devient actif.

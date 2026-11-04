@@ -9,6 +9,10 @@
 //   rendu-commande    : (EK5, m5) demande la dernière commande ; la réponse du serveur est remplacée par un texte qui porte du balisage → { elements, injecte, texte, zone }
 //   focus-doing-tiroir: (EK8, UIFN-12) tiroir « Au travail » : focalise « Voir la dernière commande », frappe Entrée au clavier, attend la commande, relève l'élément actif
 //                       → { avant, apres, lu, trace } (même forme que focus-transcript ; la réponse du serveur est remplacée par un texte fixe)
+//   focus-puis-who    : (EK8) focalise « Lire le transcript » du panneau d'un agent, livre un `who` (le panneau est redessiné), relève l'élément actif → { remplace, apres }
+//   focus-tiroir      : (EK9) même mesure pour « Voir la dernière commande » du tiroir « Au travail » → { remplace, apres }
+//   badge             : (EK10) marge entre le bord droit du badge d'état et celui de sa carte, pied long, à 390 / 1024 / 1440 px → { "390": px, "1024": px, "1440": px }
+//   libelles          : (EK11) ligne des sources du tiroir et infobulle de la recherche de l'onglet Équipe → { src, titre }
 // Rend une ligne JSON { ... } ou { erreur }. Socle : chrome-session.mjs (une instance de Chrome, fermée proprement).
 import { executer } from './chrome-session.mjs';
 const [, , chrome, url] = process.argv;
@@ -24,6 +28,7 @@ const LU = "(() => { const z = document.querySelector('.vf-transcript'); return 
 
 await executer(chrome, async (s) => {
   await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+  await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }); // sans cela, la page headless n'a pas le focus de fenêtre et les évènements focusin / focusout ne partent pas
   await s.send('Page.addScriptToEvaluateOnNewDocument', { source: INJ });
   await s.naviguer(url);
   await s.attendre(PRET, 'viewer prêt');
@@ -40,13 +45,14 @@ await executer(chrome, async (s) => {
       const rel = () => { const a = document.activeElement; return JSON.stringify([a ? a.tagName : null, !!window.__b.disabled, a === window.__b, document.contains(window.__b)]); };
       let prec = ''; window.__iv = setInterval(() => { const r = rel(); if (r !== prec) { window.__tr.push(r); prec = r; } }, 10); })()`);
     const avant = await s.ev(`(() => { ${DECRIRE} return dec(document.activeElement); })()`);
+    const hashAvant = await s.ev('location.hash');
     await touche('Enter', 'Enter', 13, '\r');
     // le transcript peut ne jamais s'afficher (Entrée sans effet) : on le dit (lu: false) au lieu de lever, pour garder la mesure du focus
     const lu = await s.attendre(LU, 'transcript affiché', 8000).then(() => true, () => false);
     const apres = await s.stable(`(() => { ${DECRIRE} return dec(document.activeElement); })()`, 'élément actif stable');
     const etat = await s.ev("(() => { const b = document.querySelector('#panel [data-vf-transcript]'); return { selection: window.VibeFlow.state.selected, bouton: !!b, desactive: !!(b && b.disabled), url: location.hash }; })()");
     const trace = await s.ev('(() => { clearInterval(window.__iv); return window.__tr; })()');
-    return { avant, apres, lu, etat, trace };
+    return { avant, apres, lu, etat, trace, hashAvant, hashApres: etat.url };
   }
   if (ACTION === 'changer-agent') {
     const autre = process.env.EK_AUTRE || 'n:ag-a2';
@@ -109,6 +115,47 @@ await executer(chrome, async (s) => {
     const apres = await s.stable(`(() => { ${DECRIRE} const e = document.activeElement; return Object.assign(dec(e), { doing: (e && e.dataset && e.dataset.vfDoing) || '' }); })()`, 'élément actif stable');
     const trace = await s.ev('(() => { clearInterval(window.__iv); return window.__tr; })()');
     return { avant, apres, lu, trace };
+  }
+  if (ACTION === 'focus-puis-who' || ACTION === 'focus-tiroir') {
+    const tiroir = ACTION === 'focus-tiroir';
+    const corps = `const flux = () => window.__es.find((e) => e.url.includes('/api/vf/events')); let seq = 7000;
+      const emettre = (workers) => flux().__emit('who', { seq: seq++, at: Date.now(), who: { workers, sources: {} } });
+      const S = { kind: 'session', id: 'S1', etat: 'actif', tree: '.', task: 'session' }, M = { kind: 'subagent', id: 'M1', etat: 'actif', role: 'vf-dev-manager', tree: '.', parent: 'S1', task: 'manager', dureeS: 60 };
+      const C = (task) => ({ kind: 'subagent', id: 'C1', etat: 'actif', role: 'vf-coder', tree: '.', parent: 'M1', task, dureeS: 5 });`;
+    const SEL = tiroir ? '.vf-whop [data-vf-doing]' : '#panel [data-vf-transcript]';
+    if (tiroir) {
+      await s.attendre("!!window.__es && !!window.__es.find((e) => e.url.includes('/api/vf/events')) && !!document.querySelector('#vf-lock')", 'flux et badge');
+      await s.ev(`(() => { ${corps} emettre([S, M, C('un')]); })()`);
+      await s.ev("document.querySelector('#vf-lock').click()");
+    } else await calme();
+    await s.attendre(`!!document.querySelector('${SEL}')`, 'bouton');
+    await s.ev(`window.__b = document.querySelector('${SEL}'); window.__b.focus()`);
+    const focalise = await s.ev('document.activeElement === window.__b');
+    // un `who` qui change le contenu : le panneau (ou le tiroir) est redessiné, le bouton est remplacé
+    if (tiroir) await s.ev(`(() => { ${corps} emettre([S, M, C('deux')]); })()`);
+    else await s.ev(`(() => { ${corps} emettre(window.__vfLive.who.workers.map((w) => ({ ...w, ageS: (w.ageS || 0) + 1 }))); })()`);
+    const remplace = await s.attendre(`!document.contains(window.__b) && !!document.querySelector('${SEL}')`, 'bouton remplacé par le redessin', 5000).then(() => true, () => false);
+    const apres = await s.stable(`(() => { ${DECRIRE} const a = document.activeElement; const d = dec(a); d.estLeBouton = !!a && a.matches && a.matches('${SEL}'); return d; })()`, 'élément actif stable');
+    return { focalise, remplace, apres };
+  }
+  if (ACTION === 'badge') {
+    const r = {};
+    for (const l of [390, 1024, 1440]) {
+      await s.send('Emulation.setDeviceMetricsOverride', { width: l, height: 900, deviceScaleFactor: 1, mobile: false });
+      await s.naviguer(url);
+      await s.attendre(PRET, 'viewer prêt');
+      await s.attendre("!!document.querySelector('.card .foot .vst') && !!(window.__vfLive && window.__vfLive.who)", 'cartes et pieds');
+      r[l] = await s.stable(`(() => { let min = 1e9, n = 0; for (const v of document.querySelectorAll('.card .foot .vst')) { const c = v.closest('.card'); if (!c) continue; n++;
+        min = Math.min(min, Math.round(c.getBoundingClientRect().right - v.getBoundingClientRect().right)); } return n ? min : 'aucun badge'; })()`, 'marge du badge');
+    }
+    return r;
+  }
+  if (ACTION === 'libelles') {
+    await s.attendre("!!window.__es && !!window.__es.find((e) => e.url.includes('/api/vf/events')) && !!document.querySelector('#vf-lock')", 'flux et badge');
+    await s.ev(`(() => { window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('who', { seq: 9000, at: Date.now(), who: { workers: window.__vfLive.who.workers, sources: { sessions: { etat: 'lue' }, locks: { etat: 'lue' }, dags: { etat: 'lue' } } } }); })()`);
+    await s.ev("document.querySelector('#vf-lock').click()");
+    await s.attendre("!!document.querySelector('.vf-whop .src')", 'ligne des sources').catch(async () => { throw new Error('ligne des sources absente ; panneau : ' + (await s.ev("document.getElementById('panel').innerHTML.slice(0, 300)")) + ' ; no-panel=' + (await s.ev("document.body.classList.contains('no-panel')"))); });
+    return await s.stable("({ src: document.querySelector('.vf-whop .src').textContent, titre: (document.getElementById('search-btn') || {}).title || 'absent' })", 'libellés');
   }
   return { erreur: 'EK_ACTION inconnue : ' + ACTION };
 }, { csp: false });

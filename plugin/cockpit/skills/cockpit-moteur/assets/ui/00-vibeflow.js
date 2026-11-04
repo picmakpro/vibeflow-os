@@ -64,9 +64,11 @@
   if (TAB === 'project') style.textContent += `
     svg.lod-mid .foot, svg.lod-low .foot { flex-wrap: wrap; row-gap: 4px; } svg.lod-mid .desc { display: none; }
     svg.lod-mid .foot .meta, svg.lod-low .foot .meta { visibility: visible; font-size: 19px; line-height: 1.25; padding: 3px 10px; white-space: normal; }
-    /* UIFN-11 : le texte du pied cède devant la pastille d'état (elle gardait sa largeur et se faisait rogner : « En cour ») */
-    .foot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .foot .vst { flex: none; }
     svg.lod-mid .foot .vst, svg.lod-low .foot .vst { font-size: 17px; padding: 3px 10px; }`;
+  /* UIFN-11 (+ onglet Équipe) : le texte du pied cède devant la pastille d'état (elle gardait sa largeur et se faisait rogner : « En cour », et sur un pied long elle sortait de la carte) */
+  if (TAB !== 'code') style.textContent += `.foot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .foot .vst { flex: none; }`;
+  /* UIFN-09 : la ligne « Terminés… » de « Contenu » colorait son point par var(--n-terminés), définie nulle part (point invisible) : le statut « fait » de DESIGN.md §9 */
+  if (TAB === 'equipe') style.textContent += `:root { --n-terminés: var(--st-done); }`;
   if (TAB === 'project') style.textContent += `#btn-health${window.FLOORPLAN_SERVER ? '' : ', #ask'} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }`;
   // onglet Équipe (69-05, P69-PL-09) : ni bouton de santé ni barre de question (la question porte sur le code ou le projet)
   if (TAB === 'equipe') style.textContent += '#btn-health, #ask { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }';

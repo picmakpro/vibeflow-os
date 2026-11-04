@@ -28,7 +28,7 @@
   // P69-D-33 : la recherche de cet onglet trouve des agents et des sessions (les cartes), pas des fichiers, des routes ni des modules
   const LIB = 'Chercher un agent ou une session';
   const bouton = document.getElementById('search-btn'), champ = document.getElementById('search');
-  if (bouton) { bouton.setAttribute('aria-label', LIB); const st = bouton.querySelector('.st'); if (st) st.textContent = LIB; }
+  if (bouton) { bouton.setAttribute('aria-label', LIB); bouton.title = LIB; const st = bouton.querySelector('.st'); if (st) st.textContent = LIB; }
   if (champ) champ.placeholder = 'Chercher par nom, rôle ou description';
 
   const idCarte = (w) => (w.kind === 'session' ? 'se-' : 'ag-') + w.id;

@@ -60,3 +60,43 @@ Correctif : `aria-disabled="true"` plus garde « lecture en cours » à la place
 
 Mutant EK8.1 (page servie : le bouton redevient `disabled = true`) : attendu `muté|lu=true | actif=BODY`, obtenu identique.
 Faux vert évité, deuxième fois : l'ancre de EK1.3 (`b.setAttribute('aria-disabled', 'true');`) existe désormais dans les DEUX fichiers ; le mutant visait le premier, celui de `70-vf-live.js`, et EK1.3 rougissait. Les ancres de EK1.3 et EK8.1 citent le commentaire propre à chaque fichier, et `ek-sub.mjs` refuse désormais une ancre présente plusieurs fois (« ancre ambiguë »).
+
+## Suite : recette (juge Playwright frais, correction ciblée du manager)
+
+Base : cf6983ac. Commande de rejeu : `bash plugin/cockpit/scripts/tests/test-cockpit-equipe.sh` (EK8 à EK12, mutants r1 à r5).
+
+### 1. Focus perdu à chaque redessin (UIFN-12) — EK8 (panneau d'agent), EK9 (tiroir « Au travail »)
+
+Le témoin précédent ne voyait pas le cas : aucun `who` n'arrivait pendant la mesure. Désormais un `who` est livré pendant que le bouton a le focus
+(Chromium avec `Emulation.setFocusEmulationEnabled` : sans lui, une page headless n'a pas le focus de fenêtre et `focusin` / `focusout` ne partent pas).
+
+- témoins EK8.0 / EK9.0 : le bouton avait le focus ET le redessin l'a remplacé (`true|true`) ;
+- rouge (code de cf6983ac, relevé du run avant correctif) : attendu `le bouton`, obtenu `BODY` pour EK8 et pour EK9 ;
+- correctif (`70-vf-live.js`) : retient la clé du bouton `data-vf-doing` / `data-vf-transcript` qui a le focus (`focusin`, effacée par un `focusout` d'un bouton resté dans la page) ; l'observateur du panneau la rend au bouton de même clé si le focus est tombé sur le corps de la page ;
+- mutants sur la page servie (observateur sans `rendreFocus()`) : EK8.2 et EK9.2 attendu `muté|BODY`, obtenu identique.
+
+Effet de bord sur EK1.2 : l'arrêt de l'Entrée au document (`72-vf-equipe.js`) n'est plus observable par le focus (le focus est rendu) ; son témoin devient la vue du viewer :
+sur un manager qui porte des agents, sans l'arrêt, Entrée fait descendre le viewer dans le nœud (fragment `v=` change). EK1.1 (code réel) : `lu=true | actif=BUTTON | vue inchangée` ; EK1.2 (mutant) : `lu=true | actif=BUTTON | vue changée`.
+
+### 2. Badge d'état rogné par un pied long — EK10
+
+Cause : les règles du pied (`.foot .meta` min-width 0 / overflow hidden / ellipsis, `.foot .vst` flex none) n'étaient posées que pour l'onglet Projet ; l'onglet Équipe n'avait que le `nowrap` du viewer. Posées pour tout onglet sauf Code (`00-vibeflow.js`).
+
+- fixture : un agent `a3` dont le pied est « actif · 2 min · lance un agent general-purpose » ;
+- rouge (cf6983ac) : marge bord droit de la carte moins bord droit du badge, attendu `>= 0` à 390, 1024 et 1440 px, obtenu `390=-32, 1024=-50, 1440=-50` ;
+- vert : `ok,ok,ok` ;
+- mutant EK10.2 (règle retirée de la page servie) : attendu `muté|rogné`, obtenu identique.
+
+### 4. Anglais restant (P70-D-04) — EK11, EK12
+
+- EK11 : la ligne des sources du tiroir affichait « sessions : lue · locks : lue · dags : lue » ; elle dit « Sessions et sous-agents », « Verrous du dépôt », « Plans de la mission ». Mutant EK11.2 (clés brutes) : attendu `muté|anglais`, obtenu identique ;
+- EK12 : l'infobulle du bouton de recherche de l'onglet Équipe valait « Chercher un fichier, une route, un module » ; elle vaut maintenant son libellé. Mutant EK12.2 : attendu `muté|Chercher un fichier, une route, un module`, obtenu identique.
+
+### 3 et 5 : réglages visuels, sans test neuf
+
+3. `.vf-who button` : survol et anneau `--ring` 2 px (DESIGN.md §9) comme les boutons de `.sec`. 5. `--n-terminés` définie sur le jeton « fait » `--st-done` (DESIGN.md §9, tableau des statuts) pour l'onglet Équipe.
+
+### Rejeux
+
+`test-cockpit-equipe.sh` 147 PASS / 0 FAIL ; `test-cockpit-marque-blanche.sh` 30/0 ; `test-cockpit-chrome-fr.sh` 70/0 ; `test-cockpit-transcript.sh` 99/0 ; `test-cockpit-who.sh` 90/0 ;
+`test-cockpit-responsive.sh` 255 PASS / 6 FAIL, les six étant R13.4 (1024 et 1440 px, trois onglets).
