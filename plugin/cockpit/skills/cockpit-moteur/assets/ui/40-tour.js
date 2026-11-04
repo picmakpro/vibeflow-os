@@ -13,7 +13,7 @@
 #tour { position: fixed; left: 16px; bottom: 76px; width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 170px); display: flex; flex-direction: column; padding: 16px 16px 12px 20px; border-radius: var(--r-panel); z-index: 6; animation: tourIn .4s var(--ease); }
 #tour.right { left: auto; right: 16px; }
 #tour .tb { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-.tour-target { outline: 2px solid var(--ring); outline-offset: 4px; border-radius: 10px; }
+.tour-target { position: fixed; z-index: 5; pointer-events: none; outline: 2px solid var(--ring); outline-offset: 4px; border-radius: 10px; }
 #tour[hidden] { display: none; }
 #tour .tk { font-size: 12px; color: var(--text-3); margin-bottom: 4px; display: flex; gap: 6px; align-items: center; }
 #tour .tk i { width: 3px; height: 3px; border-radius: 50%; background: var(--text-4); }
@@ -98,7 +98,22 @@
   // ---------- aiming: every step points at something ----------
   let token = 0; // a step that was left before its move was due must not move the map
   const hit = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
-  function ring(el) { document.querySelectorAll('.tour-target').forEach((e) => e.classList.remove('tour-target')); if (el) el.classList.add('tour-target'); }
+  // the outline is its own element laid over the target, found again by its selector: the page may rewrite the target's classes or replace it (the live layer does) without losing the outline
+  let ringEl = null, ringSel = '', ringTimer = 0;
+  function ringPlace() {
+    let t = null; try { t = ringSel ? document.querySelector(ringSel) : null; } catch {}
+    const b = t && t.getBoundingClientRect();
+    if (!b || !b.width || !b.height) { if (ringEl) ringEl.style.display = 'none'; return; }
+    Object.assign(ringEl.style, { display: '', left: b.left + 'px', top: b.top + 'px', width: b.width + 'px', height: b.height + 'px' });
+  }
+  function ring(sel) {
+    clearInterval(ringTimer); ringTimer = 0;
+    if (ringEl) { ringEl.remove(); ringEl = null; }
+    ringSel = '';
+    if (!sel) return;
+    ringSel = sel; ringEl = document.createElement('div'); ringEl.className = 'tour-target'; ringEl.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(ringEl); ringPlace(); ringTimer = setInterval(ringPlace, 250);
+  }
   // the free part of the map that the tour card does not cover: above the card or beside it, whichever is larger
   function zone() {
     const m = document.getElementById('svg').getBoundingClientRect(), a = SC.freeArea(), c = card.getBoundingClientRect();
@@ -106,16 +121,30 @@
     const zs = [{ l, t, r, b: Math.min(b, c.top - 8) }, { l: Math.max(l, c.right + 8), t, r, b }].filter((z) => z.r - z.l > 40 && z.b - z.t > 40);
     return zs.sort((p, q) => (q.r - q.l) * (q.b - q.t) - (p.r - p.l) * (p.b - p.t))[0] || { l, t, r, b };
   }
-  // zoom in on a small card and put it in the middle of that zone; the viewer's own wheel handler does the moving (pan, ctrl+wheel to zoom)
+  // put the card in the middle of that zone, zooming in on a small card and out on one wider than the zone, but never zooming in so far that the rest of the map leaves the free area;
+  // the viewer's own wheel handler does the moving (pan, ctrl+wheel to zoom)
   function aim(id) {
     const g = SC.state.chipEls?.get(id); if (!g) return;
-    const r = g.getBoundingClientRect(), z = zone(), vp = document.getElementById('viewport'), svg = document.getElementById('svg');
-    const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
-    const f = Math.max(1, Math.min(1.6, (z.r - z.l) * 0.45 / r.width, (z.b - z.t) * 0.45 / r.height));
+    const box = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
+    const r = box(g), z = zone(), vp = document.getElementById('viewport'), svg = document.getElementById('svg');
+    const m = svg.getBoundingClientRect(), a = SC.freeArea(), F = { l: m.left + a.x, t: m.top + a.y, r: m.left + a.x + a.w, b: m.top + a.y + a.h };
+    const all = [...svg.querySelectorAll('g.node')].map(box).filter((x) => x.w > 0 && x.h > 0);
+    const U = all.length ? { l: Math.min(...all.map((x) => x.l)), t: Math.min(...all.map((x) => x.t)), r: Math.max(...all.map((x) => x.r)), b: Math.max(...all.map((x) => x.b)) } : r;
+    const cx = (r.l + r.r) / 2, cy = (r.t + r.b) / 2, zw = z.r - z.l, zh = z.b - z.t;
+    let f = Math.max(1, Math.min(1.6, zw * 0.45 / r.w, zh * 0.45 / r.h)); // in on a small card...
+    f = Math.min(f, Math.max(1, Math.min(F.w ? (F.r - F.l) / (U.r - U.l) : 1, (F.b - F.t) / (U.b - U.t)))); // ...not past the point where the whole map no longer fits
+    f = Math.min(f, 0.92 * zw / r.w, 0.92 * zh / r.h); // ...and out on a card wider than its zone: it must fit whole
     const wheel = (o) => svg.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaMode: 0, ...o }));
+    // where things land after the zoom (around the card's centre) and the move that centres the card
+    const at = (k) => ({ l: cx + (k.l - cx) * f, r: cx + (k.r - cx) * f, t: cy + (k.t - cy) * f, b: cy + (k.b - cy) * f });
+    const c = at(r), u = at(U), dx0 = (z.l + z.r) / 2 - cx, dy0 = (z.t + z.b) / 2 - cy;
+    const clamp = (d, lo, hi) => (lo <= hi ? Math.min(hi, Math.max(lo, d)) : d);
+    const dx1 = clamp(dx0, F.l - u.l, F.r - u.r), dy1 = clamp(dy0, F.t - u.t, F.b - u.b); // keep the whole map in the free area when it fits there
+    const inZone = (dx, dy) => c.l + dx >= z.l - 1 && c.r + dx <= z.r + 1 && c.t + dy >= z.t - 1 && c.b + dy <= z.b + 1;
+    const [dx, dy] = inZone(dx1, dy1) ? [dx1, dy1] : [dx0, dy0];
     vp.classList.add('anim');
-    if (f > 1.02) wheel({ ctrlKey: true, deltaY: -Math.log(f) / 0.01, clientX: cx, clientY: cy });
-    wheel({ deltaX: (cx - (z.l + z.r) / 2) || 0.01, deltaY: cy - (z.t + z.b) / 2 }); // deltaX is never 0: a pure vertical wheel would be read as a zoom
+    if (Math.abs(f - 1) > 0.02) wheel({ ctrlKey: true, deltaY: -Math.log(f) / 0.01, clientX: cx, clientY: cy });
+    wheel({ deltaX: -dx || -0.01, deltaY: -dy }); // deltaX is never 0: a pure vertical wheel would be read as a zoom
     setTimeout(() => vp.classList.remove('anim'), 540);
   }
   function go(s) {
@@ -127,12 +156,12 @@
       SC.go('root', { select: null });
       if (at > 0) later(() => SC.fit(true), slow ? 650 : 60);
     } else {
+      // nothing is selected: the details panel keeps showing the overview, the card is lit with the viewer's own highlight (hl on the card, dim on the rest)
       const parent = SC.parentOf(s.ref) || 'root';
-      if (parent === 'root') SC.go('root', { select: s.ref }); // stay on the overview, just highlight the card
-      else SC.reveal(s.ref);
+      SC.go(parent, { select: null, after: () => { document.getElementById('svg').classList.add('dim'); SC.state.chipEls?.get(s.ref)?.classList.add('hl'); } });
       later(() => aim(s.ref), parent !== 'root' || slow ? 650 : 60);
     }
-    if (s.cible) { try { ring(document.querySelector(s.cible)); } catch { ring(null); } }
+    if (s.cible) ring(s.cible);
   }
   function render() {
     const s = steps[at], last = at === steps.length - 1;
@@ -147,10 +176,10 @@
         ${s.flow ? `<button class="btn primary" data-play>${SC.iconI('right')}Play it</button>${last ? '' : '<button class="btn soft" data-next>Next</button>'}` : `<button class="btn primary" data-next>${last ? 'Done' : 'Next'}</button>`}
         </div>
       </div>`;
-    card.querySelectorAll('[data-x]').forEach((b) => b.onclick = end);
+    card.querySelectorAll('[data-x]').forEach((b) => b.onclick = () => end());
     card.querySelector('[data-back]')?.addEventListener('click', back);
     card.querySelector('[data-next]')?.addEventListener('click', next);
-    card.querySelector('[data-play]')?.addEventListener('click', () => { const id = s.flow; end(); SC.startFlow(id); });
+    card.querySelector('[data-play]')?.addEventListener('click', () => { const id = s.flow; end(false); SC.startFlow(id); });
   }
   // sit above the zoom controls, and above the Ask bar (and its notices) where they overlap
   function place() {
@@ -179,13 +208,15 @@
   }
   function next() { if (at >= steps.length - 1) end(); else show(at + 1); }
   function back() { if (at > 0) show(at - 1); }
-  function end() {
+  function end(refit = true) {
     if (!active()) return;
     at = -1; token++;
     ring(null);
     card.hidden = true;
     SC.store.set(SEEN, true);
-    if (SC.state.container === 'root') SC.select(null);
+    // every way out gives back the overview, whole: a step on a card inside a group had opened that group, and it must not stay open at the zoom of the last card
+    if (SC.state.container === 'root') { SC.select(null); if (refit) SC.fit(true); }
+    else if (refit) SC.go('root', { select: null, after: () => SC.fit(true) });
   }
   function start() {
     steps = buildSteps();
@@ -204,7 +235,7 @@
     else if (!SC.state.flow && ev.key === 'ArrowLeft') { ev.stopPropagation(); ev.preventDefault(); back(); }
   }, true);
   // a guided flow takes over the canvas: step aside
-  SC.on('render', () => { if (active() && SC.state.flow) end(); });
+  SC.on('render', () => { if (active() && SC.state.flow) end(false); });
 
   // first visit: start on its own, unless the link points somewhere specific
   let auto = false;

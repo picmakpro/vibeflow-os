@@ -1,6 +1,6 @@
 // chrome-visite-etapes.mjs — la visite « Par où commencer » parcourue étape par étape, à deux largeurs (70-07, UIFN-04, P70-D-02, régime P70-D-08). Aucune dépendance.
 // Usage : node chrome-visite-etapes.mjs <chrome> <url> <largeurs> [recharge,passer]      (largeurs : « 1440,390 »)
-//   passer : après la visite parcourue, la visite est relancée, avancée de deux étapes (une carte) puis fermée par « Passer » : clé p<largeur> { avant, apres } = { k, x, y : transformation de la carte, visibles : cartes entièrement dans la fenêtre, recouvre : cartes recouvertes par le titre } (la vue d'avant la visite doit revenir)
+//   passer : après la visite parcourue, la visite est relancée, avancée de deux étapes (une carte) puis fermée par « Passer » : clé p<largeur> { avant, apres } = { k : zoom, x, y : position, visibles : cartes entièrement dans la fenêtre, recouvre : cartes recouvertes par le titre } (la vue d'avant la visite doit revenir)
 //   anneau (étape sur un élément du chrome) = le contour a disparu quand le className du bouton #vf-lock est réécrit à l'arrivée, comme le fait la couche live (70-vf-live.js : « btn held »)
 //   recharge : chaque largeur est mesurée DEUX fois dans le même profil Chrome : au premier chargement (clé l<largeur>) puis à un rechargement de la même page déjà vue (clé r<largeur>) ;
 //   la visite d'une page déjà vue ne doit pas se centrer autrement que la première (70-07, correctif : le fit de la première étape défaisait le centrage d'une carte).
