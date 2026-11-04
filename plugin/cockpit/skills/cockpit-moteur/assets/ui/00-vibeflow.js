@@ -58,6 +58,12 @@
     #context:empty { display: none; }
   `;
   // spike 005 : la barre de question reste visible quand serve.mjs (P7) sert l'onglet Projet
+  // recette 69 : au zoom d'ouverture du jalon (lod-mid, ou lod-low plus loin) le pied des cartes (« à recetter · 9/9 plans … » et la pastille d'état) était masqué ou à 5 px :
+  // on le regrandit en unités du graphe (l'échelle le ramène à ~9-10 px à l'écran), sur deux lignes si besoin, et il reste visible à lod-low
+  if (TAB === 'project') style.textContent += `
+    svg.lod-mid .foot, svg.lod-low .foot { flex-wrap: wrap; row-gap: 4px; } svg.lod-mid .desc { display: none; }
+    svg.lod-mid .foot .meta, svg.lod-low .foot .meta { visibility: visible; font-size: 19px; line-height: 1.25; padding: 3px 10px; white-space: normal; }
+    svg.lod-mid .foot .vst, svg.lod-low .foot .vst { font-size: 17px; padding: 3px 10px; }`;
   if (TAB === 'project') style.textContent += `#btn-health${window.FLOORPLAN_SERVER ? '' : ', #ask'} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }`;
   // onglet Équipe (69-05, P69-PL-09) : ni bouton de santé ni barre de question (la question porte sur le code ou le projet)
   if (TAB === 'equipe') style.textContent += '#btn-health, #ask { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }';
