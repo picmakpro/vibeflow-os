@@ -4,6 +4,7 @@
 #   Q4 modèle : préséance et liste fermée · Q5 question piégée inoffensive · Q6 le modèle ne laisse aucune trace
 #   Q7 seul Claude Code est lancé · Q8 syntaxe et jeton de /api/vf/modeles · Q9 CLI de requête · Q10 identité de phase
 #   Q11 ARGS_CONFINEMENT = « Combinaison retenue » de la mesure (dépôt seulement)
+#   Q15 « Où en est-on ? » sans STATE.md · Q16 statut lisible (réponse locale, sous-titre) · Q17 parité des tables de statuts
 # Faux binaires claude et codex (node) en tête du PATH ; aucun vrai appel. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -211,6 +212,33 @@ mkl "$WORK/m3" 2; sed -i.bak 's/^milestone: v9.9$/milestone: j1/' "$WORK/m3/.pla
 assert_eq "Q12.3 — témoin : jalon courant reconnu (j1 parmi deux), comportement inchangé : ce jalon seul" "$(H json "$WORK/m3.json" 'j&&j.engine+" "+j.items.map(i=>i.id).join(",")')" "local n:ms-j1,n:ph-2"
 mkdir -p "$WORK/m4/.planning"; printf '# vide\n' > "$WORK/m4/.planning/ROADMAP.md"; git -C "$WORK/m4" init -q; H loc "$SCRIPTS" "$WORK/m4" "Qu'est-ce qui reste ?" > "$WORK/m4.json"
 assert_eq "Q12.4 — aucune phase du tout : rien à calculer, la question repart à l'agent (null)" "$(cat "$WORK/m4.json")" "null"
+
+echo "=== Q15 à Q17 — UIFN-08, UIFN-06 : « Où en est-on ? » sans STATE, statuts lisibles, parité des tables (P70-D-04, P70-D-05) ==="
+mkq() { # mkq <dir> [statut] : ROADMAP à une phase ; STATE.md seulement si un statut est donné
+  local D="$1"; mkdir -p "$D/.planning/phases/01-x"; printf '# Roadmap\n\n## Milestones\n\n- 🚧 **j1** - Phases 1-2\n\n## Phases\n\n- [x] **Phase 1: Socle** - fait\n- [ ] **Phase 2: Suite** - à faire\n' > "$D/.planning/ROADMAP.md"
+  printf '<objective>x</objective>\n' > "$D/.planning/phases/01-x/01-01-PLAN.md"
+  [ -n "${2:-}" ] && printf -- '---\nmilestone: j1\nstatus: %s\ncurrent_phase: 1\nlast_activity: 2026-11-01\n---\n# State\n' "$2" > "$D/.planning/STATE.md"
+  git -C "$D" init -q && git -C "$D" add -A && git -C "$D" -c user.email=t@t -c user.name=t commit -q -m init
+}
+mkq "$WORK/q15"; H loc "$SCRIPTS" "$WORK/q15" "Où en est-on ?" > "$WORK/q15.json"
+assert_eq "Q15.1 — lab sans STATE.md : réponse locale non nulle" "$(H json "$WORK/q15.json" 'j?"oui":"non"')" "oui"
+assert_eq "Q15.2 — aucun « ? » en valeur, aucune virgule orpheline, aucun « le . »" "$(H json "$WORK/q15.json" '/\?\s*[,.]|·\s*,|le \.|: \?|phase \?/.test(j.answer.replace(/Où en est-on \?/g,""))')" "false"
+assert_eq "Q15.3 — la réponse dit qu'il n'y a pas de STATE.md" "$(H json "$WORK/q15.json" '/pas de STATE\.md/.test(j.answer)')" "true"
+assert_eq "Q15.4 — pas de titre « À finir » suivi d'une liste vide" "$(H json "$WORK/q15.json" 'j.answer.split("\n").map((l,i,a)=>/^À finir/.test(l)&&!/^- /.test(a.slice(i+1).find(x=>x.trim())||"")).some(Boolean)')" "false"
+mkq "$WORK/q16" ready_to_execute; H loc "$SCRIPTS" "$WORK/q16" "Où en est-on ?" > "$WORK/q16.json"
+assert_eq "Q16.1 — la réponse locale n'a aucun statut brut (mot à tiret bas)" "$(H json "$WORK/q16.json" '/\b[a-z]+_[a-z_]+\b/.test(j.answer)')" "false"
+assert_eq "Q16.2 — la réponse locale porte le libellé français « prêt à exécuter »" "$(H json "$WORK/q16.json" '/prêt à exécuter/.test(j.answer)')" "true"
+"$NODE" "$SCRIPTS/vf-cockpit-project.mjs" "$WORK/q16" > "$WORK/q16g.json"
+assert_eq "Q16.3 — sous-titre du graphe (CLI) : libellé français, aucun tiret bas" "$(H json "$WORK/q16g.json" '/prêt à exécuter/.test(j.project.summary)&&!/_/.test(j.project.summary)')" "true"
+mkq "$WORK/q16b" statut_inventé; "$NODE" "$SCRIPTS/vf-cockpit-project.mjs" "$WORK/q16b" > "$WORK/q16bg.json"
+assert_eq "Q16.4 — statut inconnu : omis du sous-titre, jamais affiché brut" "$(H json "$WORK/q16bg.json" '/inventé|statut_/.test(j.project.summary)')" "false"
+assert_eq "Q17.1 — mêmes clés : table serveur STATUTS et table navigateur STATUT" "$("$NODE" --input-type=module -e "
+import fs from 'fs'; import { pathToFileURL } from 'url';
+const S = (await import(pathToFileURL('$SCRIPTS/vf-cockpit-project.mjs').href)).STATUTS || {};
+const src = fs.readFileSync('$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js', 'utf8');
+const m = /const STATUT = \{([^}]*)\}/.exec(src); const B = {}; for (const e of (m?.[1] || '').matchAll(/(\w+):\s*'([^']*)'/g)) B[e[1]] = e[2];
+const a = Object.keys(S).sort().join(','), b = Object.keys(B).sort().join(',');
+console.log(a && a === b && Object.keys(S).every((k) => S[k] === B[k]) ? 'identiques' : 'divergent ' + a + ' | ' + b);")" "identiques"
 
 echo "=== Q11 — constante = mesure ==="
 if [ -n "$MESURE" ]; then
