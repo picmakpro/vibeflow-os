@@ -38,3 +38,15 @@ Témoins non rouges : W19.0 (le script s'exécute bien sur un `git status` nu : 
 
 Correctif : `GIT_SUR` déplacé dans `vf-cockpit-paths.mjs` (ré-exporté par `vf-cockpit-arbres.mjs`) et appliqué aux cinq appels git du socle (who ×3, planning `for-each-ref`, paths `rev-parse`). Plus aucun `execFileSync('git'` ni `sh('git'` sans le préfixe.
 Vert : `test-cockpit-who.sh` 91 PASS / 0 FAIL ; `test-cockpit-retard.sh` (R5.3 : chaque appel git journalisé porte `core.fsmonitor=false`) vert.
+
+## F-04 — un `driver-lock.sh` d'avant `--all` rend `inconnu` à toute mission vivante
+
+Témoin : section V11 de `test-cockpit-vie.sh`, faux script qui refuse `--all` (`Unknown arg: --all` sur stderr, exit 1, stdout vide — la forme d'avant `32438005`) et répond à `status` par l'objet plat réel d'un verrou (`json_status` de `driver-lock.sh`, sans `scope` ni `ws`).
+Rouge sur le code de `95050bc3` (scratchpad `fix-socle-f04-rouge.out`) :
+
+| Assertion | Attendu | Obtenu (rouge) |
+|---|---|---|
+| V11.1 lab plat, verrou tenu lu par `status` | running | inconnu |
+| V11.2 lab plat, verrou absent lu par `status` | abandonnee | inconnu |
+
+Gardes contre la sur-réparation (vertes avant et après) : V11.3 (lab partitionné, `status` au schéma de portée : jamais lu comme verrou plat, reste `inconnu`) ; V11.4 (script qui refuse tout verbe : `inconnu`). V11.0 : témoin que le faux script se comporte bien comme l'ancien.

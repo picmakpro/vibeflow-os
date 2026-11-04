@@ -208,6 +208,25 @@ assert_eq "V10.3 — copie mutée (sans repli) détectée" "$M103|$(G "$WORK/v10
 Q "$SCRIPTS" "$LP" "$WORK/s-p1-coabs" "$WORK/v104.json"
 assert_eq "V10.4 — entrée de compartiment absente à côté : V9.1 inchangé" "$(DAGS "$WORK/v104.json")" "MISSION-1:running,MISSION-2:abandonnee"
 
+# ---------- V11 — un driver-lock.sh antérieur à `--all` : la lecture refusée ne masque pas le verrou lisible par `status` (F-04) ----------
+# Un script d'avant `--all` répond « Unknown arg: --all » (stderr, exit 1, stdout vide) ; en lab plat, `status` seul répond l'objet d'UN verrou.
+echo "=== V11 — script d'avant --all : repli sur le verbe de base ==="
+# fakeold <dossier> : refuse --all comme driver-lock.sh avant 32438005 ; status (sans --all) cat status.json
+fakeold() { mkdir -p "$1"; cat > "$1/status.json"; printf '#!/usr/bin/env bash\nfor a in "$@"; do [ "$a" = "--all" ] && { echo "Unknown arg: $a" >&2; exit 1; }; done\ncase "$1" in status) cat "$(dirname "$0")/status.json";; orphans) echo "{\\"orphans\\":[]}";; esac\n' > "$1/driver-lock.sh"; chmod +x "$1/driver-lock.sh"; }
+printf '%s\n' '{"present": true, "owner": "mgr-ancien", "step": "exec", "age_seconds": 10, "ttl": 1800, "stale": false, "generation": "g1", "session_ids": [], "lease_seconds": 5, "guard_effective": false, "progress_epoch": null, "progress_age_seconds": 30, "children_running": 0}' | fakeold "$WORK/s-old-tenu"
+printf '%s\n' '{"present": false, "lock": ".planning/DRIVER.lock", "children_running": 0}' | fakeold "$WORK/s-old-abs"
+printf '%s\n' '{"present": true, "owner": "mgr", "step": "exec", "age_seconds": 10, "ttl": 1800, "stale": false, "scope": "compartiment", "ws": "w", "location": "common", "children_running": 0}' | fakeold "$WORK/s-old-scope"
+printf '#!/usr/bin/env bash\necho "Unknown arg: $1" >&2; exit 1\n' > "$WORK/s-old-tout-refuse.sh"; mkdir -p "$WORK/s-old-refuse"; mv "$WORK/s-old-tout-refuse.sh" "$WORK/s-old-refuse/driver-lock.sh"; chmod +x "$WORK/s-old-refuse/driver-lock.sh"
+assert_eq "V11.0 — témoin : le faux script d'avant --all refuse bien --all (stdout vide, exit 1) et répond à status" "$(bash "$WORK/s-old-tenu/driver-lock.sh" status --all 2>/dev/null | wc -c | tr -d ' ')|$(bash "$WORK/s-old-tenu/driver-lock.sh" status --all >/dev/null 2>&1; echo $?)|$(bash "$WORK/s-old-tenu/driver-lock.sh" status | cut -c1-16)" "0|1|{\"present\": true"
+Q "$SCRIPTS" "$LF" "$WORK/s-old-tenu" "$WORK/v111.json"
+assert_eq "V11.1 — lab plat, script d'avant --all, verrou tenu : running (pas inconnu)" "$(ONE "$WORK/v111.json" .etat)" "running"
+Q "$SCRIPTS" "$LF" "$WORK/s-old-abs" "$WORK/v112.json"
+assert_eq "V11.2 — lab plat, script d'avant --all, verrou absent : abandonnee (lu et libre, pas inconnu)" "$(ONE "$WORK/v112.json" .etat)" "abandonnee"
+Q "$SCRIPTS" "$LP" "$WORK/s-old-scope" "$WORK/v113.json"
+assert_eq "V11.3 — lab partitionné, --all refusé et status au schéma de portée : jamais pris pour un verrou plat (inconnu)" "$(DAGS "$WORK/v113.json")" "MISSION-1:inconnu,MISSION-2:inconnu"
+Q "$SCRIPTS" "$LF" "$WORK/s-old-refuse" "$WORK/v114.json"
+assert_eq "V11.4 — script qui refuse tout verbe : inconnu" "$(ONE "$WORK/v114.json" .etat)" "inconnu"
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
