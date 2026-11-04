@@ -115,6 +115,38 @@ done
 vider; R="$(cd "$LAB" && env PATH="$REAL_PATH" "$NODE" "$WORK/g.mjs" "$SCRIPTS" "$LAB" 2>&1 | tail -1)"
 assert_eq "G-témoin — PATH sain : le socle rend ses arbres et lit les verrous (rien n'est cassé par l'assainissement)" "$(printf '%s' "$R" | "$NODE" -e "const j=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log([j.signal,j.arbres,j.retard,j.verrous!=='absente'].join(','))" 2>/dev/null || echo "illisible: $R")" "true,true,true,true"
 
+echo "=== H — le 4e argument « lab » de shBorne est discriminé (cwd de l'enfant ≠ lab) ==="
+# Les sections F et G lancent tout avec un cwd égal au lab : sans le 4e argument, `lab` retombe sur `cwd` et le même résultat sort. Ici l'enfant tourne ailleurs que la racine :
+#   - un arbre git (worktree) posé SOUS le lab : le retard de cet arbre s'exécute avec cwd = l'arbre, et le PATH piégé (LAB2/bin, absolu, construit relativement au LAB) doit être assaini par rapport au LAB ;
+#   - un DAG « running » frais dans le dossier git commun (LAB2/.git/vf-driver/repo) : les git de collectWho s'exécutent avec cwd = ce dossier, hors de la racine du travail.
+# Une copie où `lab` n'est pas transmis (signal sans `lab: root`, who sans `root`) laisse LAB2/bin dans le PATH : le marqueur apparaît (voir la mutation dans la trace de la phase).
+LAB2="$WORK/lab2"; mkdir -p "$LAB2/.planning" "$LAB2/bin"
+cp "$LAB/.planning/ROADMAP.md" "$LAB2/.planning/ROADMAP.md"; cp "$LAB/.planning/STATE.md" "$LAB2/.planning/STATE.md"
+git -C "$LAB2" init -q -b main && git -C "$LAB2" add -A && git -C "$LAB2" -c user.email=t@t -c user.name=t commit -q -m init
+git -C "$LAB2" worktree add -q "$LAB2/wt" -b autre >/dev/null 2>&1
+mkdir -p "$LAB2/.git/vf-driver/repo"
+printf '{"nodes":[{"id":"n1","status":"running","stage":"coder","step":"x"}]}\n' > "$LAB2/.git/vf-driver/repo/m.dag.json"
+# piège journalisé : chaque exécution d'un outil de LAB2/bin écrit sa ligne de commande dans h.log (il délègue ensuite à l'outil réel)
+HLOG="$WORK/h.log"
+for n in git bash awk tr which claude ps sed date; do
+  r="$(PATH="$REAL_PATH" command -v "$n" 2>/dev/null || true)"
+  { printf '#!/bin/sh\necho "%s $*" >> "%s"\n' "$n" "$HLOG"; if [ "$n" = claude ]; then printf 'echo "9.9.9 (fake)"\n'; elif [ -n "$r" ]; then printf 'exec "%s" "$@"\n' "$r"; else printf 'exit 127\n'; fi; } > "$LAB2/bin/$n"; chmod +x "$LAB2/bin/$n"
+done
+cat > "$WORK/h.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab] = process.argv, u = (f) => pathToFileURL(scripts + '/' + f).href;
+const s = await import(u('vf-cockpit-signal.mjs')), w = await import(u('vf-cockpit-who.mjs'));
+const out = {};
+try { const r = s.collectSignal(lab, { scriptsDir: scripts, home: process.env.HOME }); out.arbres = r.arbres.length; } catch (e) { out.arbres = String(e.message).slice(0, 80); }
+try { const r = w.collectWho(lab, { scriptsDir: scripts, home: process.env.HOME }); out.dag = (r.workers || []).filter((x) => x.kind === 'dag-node').length; } catch (e) { out.dag = String(e.message).slice(0, 80); }
+console.log(JSON.stringify(out));
+JS
+# Écart connu, hors de ce correctif (socle, vf-cockpit-planning.mjs : la lecture des tags de readPlanning(<arbre>) passe lab = l'arbre lui-même) : le seul appel toléré
+# est `git … for-each-ref … refs/tags/v*`. Tout autre appel d'un outil du lab (retard : rev-list, show-ref ; DAG : ls-files, status, log) est un échec.
+: > "$HLOG"; R="$(cd "$WORK" && env PATH="$LAB2/bin:$REAL_PATH" "$NODE" "$WORK/h.mjs" "$SCRIPTS" "$LAB2" 2>&1 | tail -1)"
+assert_eq "H-lab-absolu — cwd de l'enfant ≠ lab (arbre sous le lab, DAG du dossier git commun) : aucun outil du lab exécuté (hors la lecture des tags, écart connu)" "[$(grep -v 'for-each-ref' "$HLOG" | tr '\n' '|')]" "[]"
+assert_eq "H-témoin — les deux chemins ont bien tourné (2 arbres lus, 1 nœud DAG running) : le test atteint les appels discriminés" "$R" '{"arbres":2,"dag":1}'
+
 echo "=== S — serveur lancé depuis le lab avec un PATH piégé ==="
 "$NODE" "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 OUT="$LAB/.vibeflow/cockpit"
