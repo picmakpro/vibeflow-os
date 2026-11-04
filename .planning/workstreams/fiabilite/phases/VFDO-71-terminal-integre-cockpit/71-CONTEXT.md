@@ -148,6 +148,11 @@ scratchpad de la mission, rejouable ; résultats repris ci-dessous).
 - **P71-D-15 reformulée (F5, validée par P71-D-25).** « Q n'a aucun écouteur `message` propre » : le vendor xterm.js garde un écouteur interne
   sans contrôle d'origine (planificateur `vscodeScheduleAsyncWork`), sans donnée ni commande ; le vendor épinglé n'est pas patché.
 
+- **P71-D-29 (Q13, N1 et N2 du re-audit ; arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-04).** « Valider N1 et N2
+  (Recommandé) ». N1 : le bandeau de collage montre le texte intégral (zone défilante), le nombre de lignes et de caractères, et neutralise de façon
+  visible les caractères invisibles et bidi — ce que l'utilisateur confirme est exactement ce qui est envoyé. N2 : le lanceur n'exécute jamais un
+  binaire du lab — `open`, `xdg-open` et `ps` résolus par un `PATH` assaini au démarrage ou en chemins absolus.
+
 ### Contraintes héritées (Phase 67, `v2.75.0`)
 
 - Le lab observé n'est jamais une source de code : aucun script du lab exécuté par le serveur (le shell, lui, est l'usage
