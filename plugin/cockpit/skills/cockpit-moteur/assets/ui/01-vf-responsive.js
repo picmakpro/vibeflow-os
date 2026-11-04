@@ -42,6 +42,10 @@
       #vf-lock { width: 36px; padding: 0; justify-content: center; }
       #vf-lock .bl { display: none; }
     }
+    @media (min-width: 701px) { /* repli mesuré (70-04, P70-D-22) : l'en-tête déborde malgré la tranche ci-dessus (libellé plus long, bouton en plus) -> le badge se réduit à son point */
+      #vf-lock[data-vf-point] { width: 36px; padding: 0; justify-content: center; }
+      #vf-lock[data-vf-point] .bl { display: none; }
+    }
     @media (min-width: 1000px) and (max-width: 1279px) {
       #zoom { left: auto; right: calc(var(--pw) + 16px); bottom: auto; top: calc(var(--hh, 64px) + 8px); flex-direction: column; border-radius: 26px; }
       #context { max-width: min(520px, calc(100% - var(--pw) - 104px)); }
@@ -67,8 +71,8 @@
   document.head.appendChild(style);
   // fil d'Ariane : étiquette les segments courts (moins de 12 caractères), puis masque derrière « … » les segments du milieu tant que le fil déborde (CSS : un segment long garde 64 px)
   const fil = document.getElementById('crumbs'), nomProjet = document.getElementById('proj-name'), gauche = document.querySelector('header .hl');
-  let obs = null;
-  const ajuste = () => {
+  let obs = null, replieRaf = null;
+  const ajuste0 = () => {
     if (!fil) return;
     if (obs) obs.disconnect(); // nos propres retouches du fil ne relancent pas l'ajustement
     for (const e of fil.querySelectorAll('[data-vf-masque]')) e.removeAttribute('data-vf-masque');
@@ -85,6 +89,7 @@
     }
     if (obs) { obs.takeRecords(); obs.observe(fil, { childList: true, characterData: true, subtree: true }); }
   };
+  const ajuste = () => { ajuste0(); if (replieRaf) replieRaf(); }; // chaque ajustement du fil relance, une fois par image, la mesure du badge
   if (fil) {
     obs = new MutationObserver(ajuste); ajuste();
     if (nomProjet) new MutationObserver(ajuste).observe(nomProjet, { childList: true, characterData: true, subtree: true });
@@ -95,6 +100,24 @@
   const hd = document.querySelector('header');
   const infobulles = () => { for (const b of hd.querySelectorAll('button')) { if (b.getAttribute('title')) continue; const t = b.getAttribute('aria-label') || b.querySelector('.bl')?.textContent.trim(); if (t) b.setAttribute('title', t); } };
   if (hd) { infobulles(); new MutationObserver(infobulles).observe(hd, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label', 'title'] }); }
+  // repli mesuré du badge « au travail » (70-04, P70-D-22 : « Badge réduit à son point (Recommandé) », arbitrage Samuel, AskUserQuestion session principale, 2026-11-04) : au-dessus de 700 px, si l'en-tête déborde
+  // (un bouton hors de la fenêtre, l'en-tête plus large que la fenêtre, ou le fil d'Ariane rogné malgré son masquage), le badge se réduit à son point. Filet derrière la tranche 701-1 639 px : un libellé plus long
+  // (« 99 au travail ») ou un bouton d'en-tête de plus ne dépend d'aucun seuil fixe. Rejoué comme le fil : rendu, changement du badge ou des boutons, redimensionnement, chargement, polices.
+  const colDroite = document.querySelector('header .hr'); // le badge (#vf-lock) est ajouté plus tard par 70-vf-live.js : relu à chaque mesure
+  const replie = () => {
+    const badge = document.getElementById('vf-lock'); if (!badge || !hd) return;
+    badge.removeAttribute('data-vf-point'); // on mesure avec le badge entier
+    if (!matchMedia('(min-width: 701px)').matches) return;
+    if (fil) ajuste0();
+    const dehors = [...hd.querySelectorAll('button')].some((b) => b.offsetWidth > 0 && (b.getBoundingClientRect().right > innerWidth + 0.5 || b.getBoundingClientRect().left < -0.5));
+    if (dehors || hd.scrollWidth > innerWidth + 1 || (fil && fil.offsetWidth > 0 && fil.scrollWidth > fil.clientWidth + 1)) badge.setAttribute('data-vf-point', '');
+  };
+  if (colDroite && hd) {
+    let q = 0; replieRaf = () => { if (!q) q = requestAnimationFrame(() => { q = 0; replie(); }); };
+    new MutationObserver(replieRaf).observe(colDroite, { childList: true, characterData: true, subtree: true }); // création du badge, changement de son libellé, bouton ajouté
+    window.addEventListener('resize', replieRaf); window.addEventListener('load', replieRaf); if (document.fonts?.ready) document.fonts.ready.then(replieRaf);
+    replieRaf();
+  }
   // nom accessible des boutons de zoom (z-out, z-fit, z-in), à toutes les largeurs (70-05, P70-D-09) : le title sans son raccourci « (+) », relu quand le traducteur change le title ; un aria-label posé par autrui n'est jamais écrasé
   const zm = document.getElementById('zoom');
   const nomsZoom = () => { for (const b of zm.querySelectorAll('button')) { const t = (b.getAttribute('title') || '').replace(/\s*\([^)]*\)\s*$/, '').trim(), cur = b.getAttribute('aria-label'); if (t && t !== cur && (!cur || cur === b.dataset.vfNom)) { b.setAttribute('aria-label', t); b.dataset.vfNom = t; } } };

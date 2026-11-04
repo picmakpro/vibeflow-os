@@ -99,3 +99,13 @@ Sonde à part (hors suite), lab « long », Code avec Travail récent et Écrans
 - Vert après (tranche 701-1 639 px) : aucune violation à 1 600, 1 610, 1 619, 1 634, 1 639 et 1 640 px, racine et parcours. Aucune autre règle de mise en page n'est changée.
 
 Q13a : à 390 px sur l'onglet Équipe, l'entrée « Par où commencer » du menu « ⋯ » reportait un bouton désactivé comme actif (juge : ni `aria-disabled` ni atténuée, sans effet). `02-vf-telephone.js` reporte maintenant, pour toute action, `disabled` ou `aria-disabled` sur l'entrée : `aria-disabled="true"`, opacité 0,5, infobulle du bouton d'origine (« Pas de visite pour l'onglet Équipe »), clic sans effet et menu laissé ouvert. Sonde à 390 px : Équipe, entrée désactivée (0,5, infobulle) et menu ouvert après le clic ; Projet, aucune entrée désactivée. Témoins à ajouter dans la suite responsive quand la main sera rendue.
+
+## Repli mesuré du badge (filet derrière la tranche 701-1 639 px)
+
+Demande du manager : un seuil fixe ferme un cas, pas la classe. `01-vf-responsive.js` mesure maintenant l'en-tête au-dessus de 700 px (un bouton hors de la fenêtre, l'en-tête plus large que la fenêtre, ou le fil d'Ariane rogné malgré son masquage) et réduit alors le badge « au travail » à son point (`data-vf-point`), rejoué au rendu, au changement du badge ou des boutons, au redimensionnement, au chargement et aux polices chargées.
+
+Sonde à part (lab « long », Code avec Travail récent et Écrans, racine et parcours, libellé « 99 au travail ») :
+- 99 agents seuls : vert sans le repli à 1 640, 1 700 et 1 800 px (le libellé gagne quelques pixels seulement), donc impossible à rougir par ce seul moyen.
+- 99 agents + un bouton d'en-tête de plus (« Extra », libellé visible au-dessus de 1 600 px) : rouge sans le repli (1 640 px racine : `#btn-panel` sort de 1 617..1 653 sur 1 640 ; 1 640, 1 660 et 1 700 px en parcours : fil rogné 137 pour 58, 78, 118 ; 1 660 px racine : fil rogné 64 pour 36) ; vert avec le repli à 1 640, 1 660, 1 700 et 1 800 px, racine et parcours.
+- Pas de faux positif : lab « long » seul, le badge garde son libellé à 1 700 et 1 920 px (128 px) ; à 390 px le téléphone n'est pas concerné (44 px).
+- Le badge (#vf-lock) est ajouté après coup par `70-vf-live.js` : il est relu à chaque mesure (première version, mesure jamais déclenchée, rouge reconstaté avant ce correctif).
