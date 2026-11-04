@@ -184,6 +184,13 @@
   // sit above the zoom controls, and above the Ask bar (and its notices) where they overlap
   function place() {
     let bottom = 76;
+    // a details panel beside the map: the card gets narrower rather than slide under it (the panel's width depends on fonts and platform)
+    card.style.width = '';
+    const pn = document.getElementById('panel'), pr = pn && pn.getBoundingClientRect();
+    if (pr && pr.width > 0 && getComputedStyle(pn).visibility !== 'hidden') {
+      const c0 = card.getBoundingClientRect();
+      if (pr.left > c0.left && hit(c0, pr)) card.style.width = Math.max(200, pr.left - 12 - c0.left) + 'px';
+    }
     const ask = document.getElementById('ask');
     if (ask) {
       const a = ask.getBoundingClientRect(), c = card.getBoundingClientRect();
@@ -194,7 +201,10 @@
     // an element of the page that the card would cover: the card moves to the other side
     card.classList.remove('right');
     const t = document.querySelector('.tour-target');
-    if (t && hit(t.getBoundingClientRect(), card.getBoundingClientRect())) card.classList.add('right');
+    if (t && hit(t.getBoundingClientRect(), card.getBoundingClientRect())) {
+      card.classList.add('right');
+      if (pr && pr.width > 0 && hit(card.getBoundingClientRect(), pr)) card.classList.remove('right'); // never onto the details panel
+    }
   }
   window.addEventListener('resize', () => { if (active()) place(); });
   function show(i) {

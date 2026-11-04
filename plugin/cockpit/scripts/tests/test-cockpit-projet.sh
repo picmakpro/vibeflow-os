@@ -487,6 +487,15 @@ for W in 1440 390; do
   assert_eq "O6.11 [$W px] — « Passer » à l'étape 3 (une carte) rend la vue d'ensemble d'avant la visite, celle que rend « Terminé » (zoom à 2 % près, position à 4 px près, aucune carte de moins dans la fenêtre, aucune de plus recouverte par le titre)" "$(x68 "[j.p$W].map((p)=>Math.abs(p.avant.k-p.apres.k)<=p.avant.k*0.02&&Math.abs(p.avant.x-p.apres.x)<=4&&Math.abs(p.avant.y-p.apres.y)<=4&&p.apres.visibles>=p.avant.visibles&&p.apres.recouvre<=p.avant.recouvre)[0]")" "true"
   assert_eq "O6.12 [$W px] — Projet : le contour de l'étape « au travail » est encore là après la réécriture du className de #vf-lock (étapes dont le contour a disparu)" "$(x68 "j.l$W.etapes.filter((e)=>e.anneau===true).map((e)=>e.i).join(',')")" ""
 done
+# O6.13 (correctif 70-07, CI Linux de la PR #200 : R20 « #panel recouvre #tour » à 768 px) : la carte de visite ne passe jamais sous le panneau de détail, quelle que soit la largeur de celui-ci (elle dépend des polices et de la plateforme :
+# ici le panneau est élargi à 440 px, ce qui rougit sans Linux). Cause : la carte gardait ses 360 px et son côté même quand le panneau s'avançait. L'émulation `pointer: none` de la suite (R8) ne reproduit PAS le cas : R20 reste vert sous Chrome sans pointeur.
+X69="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 768,1024 panneau)"
+[ -n "${DBG:-}" ] && echo "RAW69: $X69"
+x69() { printf '%s' "$X69" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O6.13a — témoin : la mesure a eu lieu sans erreur, au moins trois étapes à chaque largeur" "$(x69 "j.erreur||''")|$(x69 'j.l768.n>=3&&j.l1024.n>=3')" "|true"
+for W in 768 1024; do
+  assert_eq "O6.13 [$W px] — Projet, panneau élargi à 440 px : étapes dont la carte de visite recouvre le panneau" "$(x69 "j.l$W.etapes.filter((e)=>e.surPanneau).map((e)=>e.i).join(',')")" ""
+done
 # O6.10 (correctif 70-07, REG-70-01 de 70-VERIFICATION.md) : visite Projet active au premier chargement sur un lab à jalon et à mission, à 1 024 et 1 920 px : la carte ciblée tient dans la zone libre ET aucune carte du graphe ne sort de la zone
 # libre à gauche du panneau (critère de R1, chrome-responsive.mjs). Cause : aim() centrait et zoomait la carte sans regarder le reste du graphe, qui débordait sous le panneau ; il ne dézoomait jamais une carte plus large que sa zone.
 L7="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mkdir -p "$L7/src" "$L7/.planning/phases/01-socle" "$L7/.planning/phases/02-suite" "$L7/.planning/missions"
