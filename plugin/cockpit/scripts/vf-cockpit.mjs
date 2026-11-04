@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { envEnfant } from './vf-cockpit-env.mjs';
-import { findLabRoot, engineDir, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
+import { findLabRoot, engineDir, outputDir, resolveScriptsDir, verifierSortie, resoudreBinaire } from './vf-cockpit-paths.mjs';
 import { portPrefere } from './vf-cockpit-port.mjs';
 import { FICHIER_OUVRIR } from './vf-cockpit-terminal-amorce.mjs';
 
@@ -67,8 +67,10 @@ const adresses = (url) => `Cockpit : ${url}/ (Code) · ${url}/project.html (Proj
 function estNotre(pid, serve, lab) {
   if (!Number.isInteger(pid) || pid <= 1 || pid === process.pid || !vivant(pid)) return false;
   if (process.platform === 'win32') return true; // pas de `ps` : le PID vient du fichier d'état, reste borné ci-dessus
+  const ps = resoudreBinaire('ps');
+  if (!ps) { console.error("arrêt refusé : « ps » est introuvable dans les éléments absolus du PATH, le serveur n'est pas arrêté (un PID du lab n'est jamais signalé sans vérification)."); return false; }
   try {
-    const cmd = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, env: envEnfant(lab) });
+    const cmd = execFileSync(ps, ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, env: envEnfant(lab) });
     return cmd.includes(serve) || cmd.includes(fs.realpathSync(serve));
   } catch { return false; }
 }
@@ -103,7 +105,9 @@ function ouvrir(url, marche = '', surErreur = null) {
   const op = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
   const dire = (e) => { if (surErreur) surErreur(e); else console.error(`ouverture impossible : « ${op[0]} » ne se lance pas (${(e && e.code) || (e && e.message) || 'erreur'}).${marche ? ' ' + marche : ''}`); };
   try {
-    const enfant = spawn(op[0], op[1], { stdio: 'ignore', detached: true });
+    const exe = resoudreBinaire(op[0]); // N2 : chemin absolu, jamais le nom nu (le cwd est le lab)
+    if (!exe) { setImmediate(() => dire(Object.assign(new Error(`${op[0]} introuvable dans les éléments absolus du PATH`), { code: 'ENOENT' }))); return; }
+    const enfant = spawn(exe, op[1], { stdio: 'ignore', detached: true });
     enfant.on('error', dire);
     enfant.unref();
   } catch (e) { dire(e); }
@@ -160,7 +164,7 @@ async function demarrer(lab, sortie, o) {
   verifierSortie(lab, sortie);
   const logFd = fs.openSync(path.join(sortie, '.cache', 'serveur.log'), 'a');
   const args = [path.join(sortie, 'serve.mjs'), '--idle-exit', '60'];
-  if (o.noOpen || o.avecQ) args.push('--no-open');
+  args.push('--no-open'); // N2 (P71-D-29) : le serveur ne lance jamais l'ouvreur par son nom depuis le lab ; le lanceur ouvre lui-même, par chemin absolu (ouvrir)
   if (o.terminal) args.push('--terminal');
   // port stable par lab (O4) : --port de l'utilisateur d'abord, sinon l'empreinte du lab ; le repli port+1 reste celui du serveur
   args.push('--port', String(o.port || portPrefere(lab)));
@@ -221,6 +225,7 @@ async function main() {
     else { effacerAmorce(sortie); console.error("le terminal n'a pas démarré (voir serveur.log) ; le cockpit est ouvert sans terminal."); if (!o.noOpen) ouvrir(s.url, `Ouvrez ${s.url} dans un navigateur.`); }
   }
   if (!s) { console.error(`le serveur n'a pas démarré : voir ${path.join(sortie, '.cache', 'serveur.log')}`); process.exit(5); }
+  if (!o.avecQ && !o.noOpen) ouvrir(s.url, `Ouvrez ${s.url} dans un navigateur.`);
   console.log(adresses(s.url));
   await attendreOuverture(suivi, sortie);
 }

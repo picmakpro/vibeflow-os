@@ -38,6 +38,12 @@ release racine (version, tag, release GitHub) restent humains. Numéro de versio
   processus sorti par `setsid` (ou double fork + `setsid`) survit ; repli sur les groupes si ni `/proc` ni `ps` ne sont lisibles.
 - **`python3` résolu en chemin absolu** (F3 ; P71-D-25) : seuls les éléments absolus du `PATH` sont consultés, un `python3` du lab
   n'est jamais exécuté ; un élément absolu du `PATH` situé dans le lab reste consulté (limite). Le `PATH` du shell est inchangé.
+- **Le lanceur n'exécute jamais un binaire du lab** (N2 ; P71-D-29, validation de Samuel, AskUserQuestion, session principale Claude Code,
+  2026-11-04) : lancé depuis la racine du lab, sous un `PATH` à élément relatif ou vide (`.`, `:` en tête ou en queue, `bin`), il exécutait un
+  `open`, `xdg-open`, `ps` ou `git` posé dans le lab. `open`, `xdg-open`, `ps`, `git` et `bash` sont maintenant résolus en chemin absolu dans
+  les seuls éléments absolus du `PATH` ; le moteur d'assemblage reçoit un `PATH` assaini ; le serveur n'ouvre plus le navigateur lui-même
+  (le lanceur le fait, y compris sans `--terminal`). Binaire introuvable : échec dit en clair, jamais un repli sur le dossier courant. Le
+  `PATH` du shell du terminal est inchangé (P71-D-03).
 - **Collage confirmé** (F2 ; P71-D-26, même canal, même date) : un collage ou un dépôt à retour à la ligne ou caractère de contrôle
   n'atteint le shell qu'après « Coller » dans un bandeau « Annuler / Coller » ; Échap annule, Tab puis Entrée valide, aucune touche de
   confirmation directe exprès ; une ligne simple passe.

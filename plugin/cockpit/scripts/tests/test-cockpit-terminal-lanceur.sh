@@ -15,6 +15,7 @@
 #   M-*  mutants (copies du module, jamais le module) : M-MODE (L3), M-SUIT-LIEN (L4), M-IMPRIME (L5), M-OUVRE-P (L6), M-LEURRE-TERMINAL (L11b),
 #        M-F1-PID (L12a), M-F1-VALID (L12b), M-ARGV (L6), M-PAGE-MODE, M-PAGE-LIEN (L13), M-OUVREUR-ERREUR (L14), M-SANS-ANNONCE, M-TOUJOURS-ANNONCE (L15), M-SANS-RATTRAPAGE (L4)
 #   L5.0 le contrôle de l'environnement du serveur est JOUÉ sous Linux (/proc/<pid>/environ) comme sous macOS (ps -Eww), jamais sauté faute de la forme BSD
+#   L16 N2 (P71-D-29) : un lab qui porte open, xdg-open, ps et git exécutables n'en voit aucun lancé sous PATH=.:…, :…, …: et bin:… ; mutants M-OUVRE-NOMNU, M-PS-NOMNU, M-GIT-NOMNU, M-WHO-NOMNU, M-SERVE-OUVRE, M-PS-FINAL
 # Aucun vrai navigateur : `open` et `xdg-open` factices en tête du PATH. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
@@ -237,11 +238,16 @@ rm -f "$PAGE"; arrete; [ -n "$S13" ] && attendre_mort "$S13"
 
 echo "=== L14 — ouvreur absent : l'erreur asynchrone du spawn est rattrapée, la marche à suivre est dite (M6, N6b) ==="
 mkdir -p "$WORK/sansouvreur"; for t in node ps git sh env python3 sed cat; do c="$(command -v "$t")"; [ -n "$c" ] && ln -sf "$c" "$WORK/sansouvreur/$t"; done
-sans_ouvreur() { # sans_ouvreur <lanceur> -> LRC, LOUT : PATH sans open ni xdg-open
-  NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; (cd "$LAB" && PATH="$WORK/sansouvreur" node "$1" open --terminal --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); LRC=$?
+sans_ouvreur() { # sans_ouvreur <lanceur> [PATH] -> LRC, LOUT : PATH sans open ni xdg-open (ou, avec un PATH donné, un ouvreur présent mais qui ne se lance pas)
+  NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; (cd "$LAB" && PATH="${2:-$WORK/sansouvreur}" node "$1" open --terminal --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); LRC=$?
 }
 sans_ouvreur "$LAUNCH"; S14="$(sj j.pid)"
 assert_eq "L14 — aucun ouvreur dans le PATH : le lanceur sort 0 sans trace, dit que l'ouvreur ne se lance pas (ENOENT) et nomme la page à ouvrir à la main" "$LRC trace=$(grep -c -e 'node:internal' -e '^ *at ' "$LOUT" || true) ENOENT=$(grep -c 'ENOENT' "$LOUT" || true) page=$(grep -c -F "$PAGE" "$LOUT" || true) dit=$(grep -c "le terminal ne s'est pas ouvert" "$LOUT" || true)" "0 trace=0 ENOENT=1 page=1 dit=1"
+arrete; [ -n "$S14" ] && attendre_mort "$S14"
+# ouvreur PRÉSENT mais qui ne se lance pas (interpréteur inexistant) : l'événement 'error' du spawn, rattrapé (le cas « absent » ne passe plus par un spawn depuis N2)
+mkdir -p "$WORK/ouvreurcasse"; for o in open xdg-open; do printf '#!/nonexistent/interpreteur\n' > "$WORK/ouvreurcasse/$o"; chmod +x "$WORK/ouvreurcasse/$o"; done
+sans_ouvreur "$LAUNCH" "$WORK/ouvreurcasse:$WORK/sansouvreur"; S14="$(sj j.pid)"
+assert_eq "L14 — ouvreur présent qui ne se lance pas : le lanceur sort 0 sans trace, dit que l'ouvreur ne se lance pas et nomme la page à ouvrir à la main" "$LRC trace=$(grep -c -e 'node:internal' -e '^ *at ' "$LOUT" || true) dit=$(grep -c "le terminal ne s'est pas ouvert" "$LOUT" || true) page=$(grep -c -F "$PAGE" "$LOUT" || true)" "0 trace=0 dit=1 page=1"
 arrete; [ -n "$S14" ] && attendre_mort "$S14"
 
 echo "=== L15 — le navigateur ne charge pas la page : annoncé en clair, jamais un succès muet (M6, N6b) ==="
@@ -260,6 +266,37 @@ rm -f "$AM" "$SJ" "$WORK/run/conforme.log"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.
 (cd "$LAB" && VF_COCKPIT_OUVERTURE_MS=20000 PATH="$WORK/bonbin:$PATH" node "$LAUNCH" open --terminal --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); LRC=$?; S15B="$(sj j.pid)"
 assert_eq "L15 — témoin : un ouvreur conforme qui échange l'amorçage : sortie 0 sans message d'échec, rendue bien avant la borne de 20 s (l'échange a réussi : 200 dans le journal de l'ouvreur)" "$LRC dit=$(grep -c "ne s'est pas ouvert" "$LOUT" || true) rapide=$([ $((SECONDS-T0)) -lt 12 ] && echo oui || echo non) echange=$(sed -n 1p "$WORK/run/conforme.log" 2>/dev/null)" "0 dit=0 rapide=oui echange=200"
 arrete; [ -n "$S15B" ] && attendre_mort "$S15B"
+
+echo "=== L16 — N2 (P71-D-29) : le lanceur n'exécute jamais un binaire du lab (open, xdg-open, ps, git) sous un PATH à élément relatif ou vide ==="
+MARQ="$WORK/run/marq"; PBASE="$WORK/fauxbin:$PATH"
+leurres_lab() { # pose dans le lab (racine et bin/) des open, xdg-open, ps, git qui ne font qu'écrire un marqueur
+  local n d; mkdir -p "$LAB/bin"; for n in open xdg-open ps git bash; do for d in "$LAB" "$LAB/bin"; do printf '#!/bin/sh\necho "$0" >> "%s-%s"\nexit 1\n' "$MARQ" "$n" > "$d/$n"; chmod +x "$d/$n"; done; done
+}
+retire_leurres() { for n in open xdg-open ps git bash; do rm -f "$LAB/$n" "$LAB/bin/$n"; done; rmdir "$LAB/bin" 2>/dev/null; true; }
+marqueurs() { local t="" n; for n in open xdg-open ps git bash; do t="$t $n=$(nbl "$MARQ-$n")"; done; echo "${t# }"; }
+run_leurres() { # run_leurres <lanceur> <PATH> -> marqueurs ; premier lancement (assemble, ouvre), second (cockpit vivant : estNotre), arrêt (estNotre)
+  rm -f "$MARQ"-* "$AM" "$SJ"; local l="$1" pv="$2" r
+  for a in "open --terminal --rebuild" "open --terminal" "stop" "open" "stop"; do
+    NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; (cd "$LAB" && PATH="$pv" node "$l" $a --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); r=$?
+  done
+  S16="$(sj j.pid)"; [ -n "$S16" ] && { vf_hyg_stop "$S16"; }
+  RES="$(marqueurs)"
+}
+leurres_lab
+mkdir -p "$WORK/minbin"; for t in node sh env; do c="$(command -v "$t")"; [ -n "$c" ] && ln -sf "$c" "$WORK/minbin/$t"; done # sans ps, git ni bash : seul un repli sur le cwd les trouverait
+for spec in "point|.:$PBASE" "vide-tete|:$PBASE" "relatif|bin:$PBASE" "vide-final-sans-binaire|$WORK/minbin:$WORK/fauxbin:"; do
+  nv="${spec%%|*}"; v="${spec#*|}"
+  run_leurres "$LAUNCH" "$v"
+  assert_eq "L16 — PATH « $nv » : aucun open, xdg-open, ps ni git du lab n'est exécuté" "$RES" "open=0 xdg-open=0 ps=0 git=0 bash=0"
+done
+# témoin : le lanceur fonctionne bien sous ces PATH (l'ouvreur factice absolu est atteint, l'arrêt a eu lieu)
+rm -f "$OUVERT" "$AM" "$SJ"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; (cd "$LAB" && PATH=".:$PBASE" node "$LAUNCH" open --terminal --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); S16="$(sj j.pid)"; fichier_ouvert
+assert_eq "L16 — témoin : sous PATH=.:…, l'ouvreur factice ABSOLU du PATH est lancé et le serveur répond" "ouvert=$([ -s "$OUVERT" ] && echo oui || echo non) pid=$([ -n "$S16" ] && echo oui || echo non)" "ouvert=oui pid=oui"
+arrete; [ -n "$S16" ] && attendre_mort "$S16"
+rm -f "$OUVERT" "$AM" "$SJ"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; (cd "$LAB" && PATH=".:$PBASE" node "$LAUNCH" open --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); S16="$(sj j.pid)"; fichier_ouvert
+assert_eq "L16 — témoin : « open » sans --terminal sous PATH=.:… : le LANCEUR remet l'adresse du cockpit à l'ouvreur absolu (le serveur ne lance plus d'ouvreur lui-même)" "$(grep -c '^http://127.0.0.1:[0-9]*$' "$OUVERT" 2>/dev/null || true)" "1"
+arrete; [ -n "$S16" ] && attendre_mort "$S16"
+retire_leurres
 
 echo "=== M-MODE / M-SUIT-LIEN / M-IMPRIME / M-OUVRE-P — mutants du lanceur ==="
 if mutant mode 's/MODE_AMORCE = 0o600/MODE_AMORCE = 0o644/'; then
@@ -318,7 +355,7 @@ else assert_eq "M-F1-VALID — mutant sans effet (cible absente ou inchangée)" 
 
 echo "=== M-OUVREUR-ERREUR / M-SANS-ANNONCE / M-TOUJOURS-ANNONCE / M-SANS-RATTRAPAGE — mutants de M6 et N6a ==="
 if mutant ouvreurerreur "s/    enfant.on('error', dire);//"; then
-  sans_ouvreur "$MUT_L"; MS="$(sj j.pid)"
+  sans_ouvreur "$MUT_L" "$WORK/ouvreurcasse:$WORK/sansouvreur"; MS="$(sj j.pid)"
   assert_eq "M-OUVREUR-ERREUR — le mutant (aucun écouteur sur l'erreur du spawn) rougit L14 : le lanceur tombe avec la trace de l'exception" "$([ "$LRC" != 0 ] && [ "$(grep -c -e 'node:internal' -e '^ *at ' "$LOUT" || true)" != 0 ] && echo rouge || echo "identique : rc=$LRC")" "rouge"
   arrete; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-OUVREUR-ERREUR — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
@@ -350,6 +387,19 @@ if mutant leurreterm 's/if (vif) { if (!arreter(sortie))/if (vif) { if (o.avecQ 
   [ -n "$S_M" ] && [ "$S_M" != "$LEURRE_M" ] && { arrete; attendre_mort "$S_M"; }
   vf_hyg_stop "$LEURRE_M"; rm -f "$SJ"
 else assert_eq "M-LEURRE-TERMINAL — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
+echo "=== M-OUVRE-NOMNU / M-PS-NOMNU / M-GIT-NOMNU / M-WHO-NOMNU / M-SERVE-OUVRE / M-PS-FINAL — mutants de N2 : résolution par nom nu ==="
+# nom|fichier|sed|marqueur attendu|PATH ('.' = « .: » en tête ; 'min' = PATH sans binaire du système, élément vide final)
+for spec in "ouvrenomnu|vf-cockpit.mjs|s/spawn(exe, op\[1\]/spawn(op[0], op[1]/|open|." "psnomnu|vf-cockpit.mjs|s/execFileSync(ps, /execFileSync('ps', /|ps|." "gitnomnu|vf-cockpit-planning.mjs|s/execFileSync(git, /execFileSync('git', /|git|." "whonomnu|vf-cockpit-who.mjs|s/execFileSync(exe, args/execFileSync(cmd, args/|git|." "servopen|vf-cockpit.mjs|s/^  args.push('--no-open');.*$/  if (o.avecQ) args.push('--no-open'); else if (o.noOpen) args.push('--no-open');/|open|." "psfinal|vf-cockpit.mjs|s/const ps = resoudreBinaire('ps');/const ps = 'ps';/|ps|min"; do
+  IFS='|' read -r mn mf msed mk mp <<< "$spec"
+  md="$WORK/mut-$mn"; rm -rf "$md"; mkdir -p "$md"; cp -R "$MODULE/." "$md/"; cp "$md/scripts/$mf" "$md/scripts/$mf.orig"; sed -i.bak "$msed" "$md/scripts/$mf"
+  if ! cmp -s "$md/scripts/$mf" "$md/scripts/$mf.orig"; then
+    rm -f "$md/scripts/$mf.orig" "$md/scripts/$mf.bak"; leurres_lab
+    if [ "$mp" = min ]; then pm="$WORK/minbin:$WORK/fauxbin:"; else pm=".:$PBASE"; fi
+    run_leurres "$md/scripts/vf-cockpit.mjs" "$pm"; res=" $RES "; retire_leurres
+    assert_eq "$mn — le mutant (nom nu) exécute le leurre « $mk » du lab : le marqueur apparaît (rouge détecté)" "$([[ "$res" == *" ${mk}=0 "* ]] && echo "identique : $RES" || echo rouge)" "rouge"
+  else assert_eq "$mn — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+done
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
