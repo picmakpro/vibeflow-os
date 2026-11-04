@@ -161,8 +161,9 @@ export function resoudreBinaire(nom, pathVar = process.env.PATH) {
       return c && path.isAbsolute(c) ? c : null;
     }
   }
-  for (const d of String(pathVar || '').split(path.delimiter)) {
-    if (!d || !path.isAbsolute(d)) continue;
+  // Aucun élément absolu (PATH absent, vide ou entièrement relatif) : repli sur les répertoires système, comme H-1 (PATH_REPLI) et N8 ; jamais sur le cwd.
+  const absolus = String(pathVar || '').split(path.delimiter).filter((d) => d && path.isAbsolute(d));
+  for (const d of absolus.length || process.platform === 'win32' ? absolus : PATH_SYSTEME.split(':')) {
     const c = path.join(d, process.platform === 'win32' ? `${nom}.exe` : nom);
     try { if (fs.statSync(c).isFile()) { fs.accessSync(c, fs.constants.X_OK); return c; } } catch {}
   }
