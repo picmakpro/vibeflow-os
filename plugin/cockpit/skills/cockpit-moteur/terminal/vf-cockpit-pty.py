@@ -11,10 +11,13 @@ Entrées et sorties ne bloquent jamais : le maître et le descripteur 1 sont non
 conservé), vidés quand select les dit prêts. Un shell qui ne lit pas son entrée, ou un lecteur lent, laisse donc l'assistant à l'écoute de la fin
 du descripteur 0 et de SIGTERM (la lecture du descripteur 0 s'interrompt au-delà de TAMPON_MAX octets en attente : la contre-pression remonte au serveur).
 
-Arrêt : fin du descripteur 0 (le serveur est parti ou a fermé la session) ou SIGTERM -> SIGHUP au groupe du shell ET au groupe de
-premier plan du terminal (un shell interactif se met dans son propre groupe : seul ce second groupe l'atteint, et il relaie SIGHUP à ses
-travaux), fermeture du maître, au plus 3 s d'attente, SIGKILL des mêmes groupes, sortie. Limite : un processus détaché volontairement
-(nohup, setsid, disown) ou un travail d'un shell qui ne relaie pas SIGHUP peut survivre. Aucun octet du shell n'est journalisé.
+Arrêt : fin du descripteur 0 (le serveur est parti ou a fermé la session), SIGTERM ou fin du shell -> SIGHUP aux groupes du shell et du
+premier plan du terminal ET à chaque membre de la SESSION du terminal (le shell est chef de session : pty.fork() le met dans sa propre session),
+fermeture du maître, au plus 3 s d'attente (0,5 s si le shell est déjà sorti), puis SIGKILL de tous les membres de la session relevés À CE
+MOMENT-LÀ, relevé répété jusqu'à ce qu'il n'en reste aucun : nohup, disown et travaux d'arrière-plan (groupes à part) y sont compris (P71-D-28).
+Le relevé s'appuie sur getsid(2) pour chaque PID du système (/proc, sinon ps en chemin absolu) : jamais d'identifiant de groupe figé, jamais de
+motif de nom. Limite : un processus sorti de la session par setsid (ou par un double fork suivi de setsid) échappe à l'arrêt.
+Aucun octet du shell n'est journalisé.
 Compatible Python 3.9, aucune dépendance.
 """
 import fcntl
@@ -23,6 +26,7 @@ import pty
 import select
 import signal
 import struct
+import subprocess
 import sys
 import termios
 import time
@@ -106,8 +110,57 @@ def signaler(gs, sig):
                 pass
 
 
-def vivants(gs):
-    for g in gs:
+def pids_systeme():
+    """Tous les PID du système, ou None si aucune source n'est lisible (/proc, sinon ps par chemin absolu : jamais une résolution par PATH)."""
+    try:
+        return [int(n) for n in os.listdir('/proc') if n.isdigit()]
+    except OSError:
+        pass
+    for ps in ('/bin/ps', '/usr/bin/ps'):
+        try:
+            r = subprocess.run([ps, '-A', '-o', 'pid='], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               timeout=5, env={'PATH': '/usr/bin:/bin'})
+            if r.returncode == 0:
+                return [int(x) for x in r.stdout.split() if x.isdigit()]
+        except (OSError, subprocess.SubprocessError):
+            continue
+    return None
+
+
+def membres(sid):
+    """Membres vivants de la session `sid` (getsid par PID : borné à cette session, rien d'autre n'est visé), ou None si le relevé est impossible."""
+    tous = pids_systeme()
+    if tous is None:
+        return None
+    moi = os.getpid()
+    sortie = []
+    for p in tous:
+        if p > 1 and p != moi:
+            try:
+                if os.getsid(p) == sid:
+                    sortie.append(p)
+            except OSError:
+                pass
+    return sortie
+
+
+def envoyer_membres(sid, sig):
+    """Signale chaque membre de la session ; la session est relue juste avant chaque envoi (PID réutilisé entre-temps : ignoré). Rend le nombre de membres visés."""
+    ms = membres(sid)
+    for p in ms or []:
+        try:
+            if os.getsid(p) == sid:
+                os.kill(p, sig)
+        except OSError:
+            pass
+    return ms
+
+
+def vivants(sid, gs):
+    ms = membres(sid)
+    if ms is not None:
+        return bool(ms)
+    for g in gs:  # relevé impossible : repli sur les groupes relevés au départ
         if g > 1:
             try:
                 os.killpg(g, 0)
@@ -119,10 +172,28 @@ def vivants(gs):
     return False
 
 
+def sigkill_session(sid, gs):
+    """SIGKILL de tous les membres de la session, relevés au moment de l'arrêt, répété tant qu'il en reste (un fork en cours de route est repris au tour suivant)."""
+    for _ in range(40):
+        try:
+            os.waitpid(sid, os.WNOHANG)  # le chef de session, s'il vient de tomber, ne reste pas zombie dans le relevé
+        except ChildProcessError:
+            pass
+        ms = envoyer_membres(sid, signal.SIGKILL)
+        if ms is None:
+            signaler(gs, signal.SIGKILL)  # relevé impossible : repli sur les groupes relevés au départ
+            return
+        if not ms:
+            return
+        time.sleep(0.05)
+
+
 def arreter(pid, maitre):
-    """SIGHUP aux groupes, fermeture du maître, attente de 3 s au plus, SIGKILL des mêmes groupes si quelque chose reste."""
+    """SIGHUP aux groupes et à la session, fermeture du maître, attente de 3 s au plus, SIGKILL de tous les membres de la session s'il en reste."""
+    sid = pid  # pty.fork() : le shell est chef de sa propre session, dont l'identifiant est son PID
     gs = groupes(pid, maitre)
     signaler(gs, signal.SIGHUP)
+    envoyer_membres(sid, signal.SIGHUP)
     try:
         os.close(maitre)
     except OSError:
@@ -135,15 +206,16 @@ def arreter(pid, maitre):
                 reape = bool(os.waitpid(pid, os.WNOHANG)[0])
             except ChildProcessError:
                 reape = True
-        if reape and not vivants(gs):
+        if reape and not vivants(sid, gs):
             return
         time.sleep(0.05)
-    signaler(gs, signal.SIGKILL)
+    sigkill_session(sid, gs)
     if not reape:
         try:
             os.waitpid(pid, 0)
         except ChildProcessError:
             pass
+    sigkill_session(sid, gs)  # la mort du chef peut libérer des travaux : dernier relevé
 
 
 def vider(maitre, sortie):
@@ -226,7 +298,11 @@ def main():
             if termine:
                 vider(maitre, vers_serveur)
                 statut(2, fin_du_shell(pid, st))
-                signaler(groupes(pid, maitre), signal.SIGHUP)
+                gs = groupes(pid, maitre)
+                signaler(gs, signal.SIGHUP)
+                envoyer_membres(pid, signal.SIGHUP)
+                time.sleep(0.5)  # le temps de relayer SIGHUP ; ce qui reste de la session (nohup, disown) est tué
+                sigkill_session(pid, gs)
                 return 0
     except OSError:
         pass

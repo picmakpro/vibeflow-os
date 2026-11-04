@@ -22,6 +22,17 @@ export const ENTREE_ATTENTE_MAX = 262144;
 const FERMETURE_MAX_MS = 6000; // un assistant qui n'est pas mort 6 s après l'EOF (grâce interne 3 s + SIGKILL) reçoit SIGTERM : la place ne reste jamais prise
 const graceDepuis = (v) => { const n = Number(v); return Number.isInteger(n) && n >= 100 && n <= 30000 ? n : 30000; }; // réglage de test seulement (P71-PL-18)
 export const GRACE_MS = graceDepuis(process.env.VF_COCKPIT_TERM_GRACE_MS);
+// Résolution de l'interpréteur par le serveur (P71-D-25, F3) : le cwd du serveur est le lab, donc un élément relatif ou vide du PATH (« . », « : » en tête ou en
+// queue) ferait exécuter un python3 du lab. On cherche python3 dans les seuls éléments ABSOLUS du PATH et on lance son chemin absolu. Le PATH du SHELL n'est pas touché (P71-D-03).
+// Introuvable : chemin impossible (ENOTDIR) -> l'événement 'error' habituel, jamais un repli sur la résolution par le cwd.
+export function resoudrePython3(pathVar = process.env.PATH) {
+  for (const d of String(pathVar || '').split(path.delimiter)) {
+    if (!d || !path.isAbsolute(d)) continue;
+    const c = path.join(d, 'python3');
+    try { if (fs.statSync(c).isFile()) { fs.accessSync(c, fs.constants.X_OK); return c; } } catch {}
+  }
+  return null;
+}
 const actif = (c) => !!c && (c.etat === 'vivante' || c.etat === 'detachee');
 
 export function creerSessions({ engineDir, lab, jetons = () => [] }) {
@@ -59,7 +70,7 @@ export function creerSessions({ engineDir, lab, jetons = () => [] }) {
 
   function lancer(onglet, lignes, colonnes) {
     const assistant = path.join(engineDir, 'terminal', 'vf-cockpit-pty.py');
-    const enfant = spawn('python3', ['-I', assistant, String(lignes), String(colonnes), choisirShell(process.env)], {
+    const enfant = spawn(resoudrePython3() || '/dev/null/python3', ['-I', assistant, String(lignes), String(colonnes), choisirShell(process.env)], {
       cwd: fs.realpathSync(lab), env: envShell(process.env, [...jetons(), secretShell]), stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
     });
     const cible = { enfant, onglet, res: null, etat: 'vivante', code: null, signal: null, minuterie: null, pause: false, sorti: false };

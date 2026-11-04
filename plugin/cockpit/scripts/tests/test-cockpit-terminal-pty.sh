@@ -3,10 +3,12 @@
 # TERM-09 automatisé ; P71-D-03, D-04, D-06, D-14, D-22 puis D-23).
 #   T10  environnement filtré (liste noire), shell `-l` lancé dans realpath(lab), TERM/COLORTERM posés, choix du shell, NODE_OPTIONS jamais posé
 #   T11  assistant lancé en `python3 -I`, taille par le canal de contrôle (`stty size`), Ctrl-C au premier plan, état `FIN <code>` sur fd 2
-#   T12  serveur tué par SIGKILL : assistant, shell et travail d'arrière-plan disparaissent en moins de 5 s
+#   T12  serveur tué par SIGKILL : assistant, shell et travail d'arrière-plan disparaissent en moins de 5 s ; T12.5 : toute la SESSION, nohup et disown compris
+#        (setsid : limite assumée, assertion qui la documente) et un leurre hors session intact
 #   T13  programme plein écran témoin, par le flux direct : écran alterné, 256 couleurs, truecolor, SIGWINCH, SIGINT
 #   T11.9 le shell n'hérite pas du descripteur 3 (canal de contrôle)     S3  entrée en attente côté serveur bornée : au-delà, 429 explicite
-#   M-*  mutants (copies de la sortie ou du moteur, jamais le module) : M-INHERIT, M-ATTENTE-NON-BORNEE, M-ENVLARGE, M-CWD, M-SI-ABSENT, M-SANS-I, M-SANS-L, M-SIGINT, M-CTRLC, M-RESIZE, M-NOEOF
+#   T15  python3 du lab jamais exécuté (PATH à élément relatif ou vide), PATH du shell intact
+#   M-*  mutants (copies de la sortie ou du moteur, jamais le module) : M-INHERIT, M-ATTENTE-NON-BORNEE, M-ENVLARGE, M-CWD, M-SI-ABSENT, M-SANS-I, M-SANS-L, M-SIGINT, M-CTRLC, M-RESIZE, M-NOEOF, M-GROUPES-FIGES, M-PYTHON3-CWD
 # Les attentes cherchent des sous-chaînes (le noyau double les fins de ligne, l'écho ^C précède la sortie). Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
@@ -102,7 +104,12 @@ echo $$ > "$VFT_RUN/sourd.pid"
 stty raw -echo
 exec sleep 299
 SH
-chmod +x "$WORK/bin/shell-test" "$WORK/bin/dormir" "$WORK/bin/shell-sourd"; export SHELL="$WORK/bin/shell-test"
+# travail sorti de la session par setsid (limite assumée, T12.5) : écrit son PID (inchangé par l'exec) puis dort
+cat > "$WORK/bin/hors-session" <<'SH'
+#!/bin/sh
+exec python3 -I -c 'import os; os.setsid(); open(os.environ["VFT_RUN"] + "/hs.pid", "w").write(str(os.getpid())); os.execvp("sleep", ["sleep", "303"])'
+SH
+chmod +x "$WORK/bin/shell-test" "$WORK/bin/dormir" "$WORK/bin/shell-sourd" "$WORK/bin/hors-session"; export SHELL="$WORK/bin/shell-test"
 
 rq() { node "$TA" req "$@"; }
 amorce_neuve() { node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"; }
@@ -228,6 +235,40 @@ orphelins() { # orphelins <nom> <sortie> [moteur] -> O_RES : « <état avant> <s
 }
 orphelins t12 "$OUT"
 assert_eq "T12.4 — cinq processus (assistant, shell, bash, travail, sleep) vivaient ; serveur tué par SIGKILL : aucun ne survit après 5 s" "$O_RES" "5 aucun"
+session_entiere() { # session_entiere <nom> <sortie> [moteur] -> SE_RES : « <membres vivants avant> <survivants de la session> <hors-session vivant> <leurre vivant> »
+  sess "$1" "$2" "${3:-$ENG}"; local R="$WORK/run/$1"
+  ent "nohup $WORK/bin/dormir 301 nh >/dev/null 2>&1 &\\r" > /dev/null; ent "nohup $WORK/bin/dormir 302 dis >/dev/null 2>&1 & disown\\r" > /dev/null; ent "$WORK/bin/hors-session &\\r" > /dev/null
+  attendre_fichier "$R/nh.pid"; attendre_fichier "$R/dis.pid"; attendre_fichier "$R/hs.pid"; sleep 0.3
+  sleep 303 & local leurre=$!    # leurre : dans la session de la suite, pas dans celle du terminal ; son PID est enregistré
+  local nh dis hs nhz disz p avant="" surv="" i; nh="$(cat "$R/nh.pid")"; dis="$(cat "$R/dis.pid")"; hs="$(cat "$R/hs.pid")"; nhz="$(pgrep -P "${nh:-0}" | sed -n 1p)"; disz="$(pgrep -P "${dis:-0}" | sed -n 1p)"
+  for p in $nh $nhz $dis $disz; do [ "$(vivant "$p")" = oui ] && avant="$avant x"; done
+  kill -KILL "$S_PID"; wait "$S_PID" 2>/dev/null; vf_hyg_stop "$S_PID"
+  for i in $(seq 1 100); do surv=""; for p in $nh $nhz $dis $disz; do [ "$(vivant "$p")" = oui ] && surv="$surv $p"; done; [ -z "$surv" ] && break; sleep 0.1; done
+  SE_RES="$(echo $avant | wc -w | tr -d ' ') $(echo $surv | wc -w | tr -d ' ') $(vivant "${hs:-0}") $(vivant "$leurre")"
+  for p in $surv; do tuer_si "$p" "sleep 30"; tuer_si "$p" dormir; done                 # survivants (mutant) : arrêtés par PID, ligne de commande relue
+  tuer_si "$hs" "sleep 303"; kill -KILL "$leurre" 2>/dev/null; wait "$leurre" 2>/dev/null
+  [ -n "$S_FPID" ] && { wait "$S_FPID" 2>/dev/null; true; }
+}
+tuer_si() { # tuer_si <pid> <sous-chaîne de sa ligne de commande> : arrête un survivant enregistré, par PID, après avoir relu sa ligne de commande
+  [ -n "$1" ] && case "$(ps -o args= -p "$1" 2>/dev/null)" in *"$2"*) kill -KILL "$1" 2>/dev/null ;; esac; true
+}
+session_entiere t12b "$OUT"
+assert_eq "T12.5 — nohup et disown dans le shell (P71-D-28) : quatre processus vivaient, aucun ne survit à l'arrêt du serveur ; le setsid survit (limite assumée, hors session) ; le leurre hors terminal survit (rien d'autre n'est visé)" "$SE_RES" "4 0 oui oui"
+
+echo "=== T15 — python3 du lab jamais exécuté par le serveur (F3 ; P71-D-25, P71-D-03 : le PATH du shell reste celui de l'utilisateur) ==="
+python3_du_lab() { # python3_du_lab <nom> <sortie> <préfixe de PATH> [moteur] -> PY_RES : « <python3 du lab exécuté> <invite arrivée> <PATH du shell conserve le préfixe> »
+  local lab; lab="$(cd "$2/../.." && pwd)"; rm -f "$WORK/leurre-python3.marque"
+  printf '#!/bin/sh\necho execute > "%s/leurre-python3.marque"\nexit 1\n' "$WORK" > "$lab/python3"; chmod +x "$lab/python3"
+  ENVX=(PATH="$3$PATH"); local ok=oui; sess "$1" "$2" "${4:-$ENG}" || ok=non; ENVX=()
+  local pp="non"; [ "$ok" = oui ] && { ent "echo SHPATH-\"\"[\$PATH]\\r" > /dev/null; wf "SHPATH-[$3" 3000 | grep -q TROUVE && pp="oui"; }
+  PY_RES="$([ -e "$WORK/leurre-python3.marque" ] && echo execute || echo non) $ok $pp"; fin_sess; rm -f "$lab/python3"
+}
+python3_du_lab t15a "$OUT" ".:"
+assert_eq "T15.1 — PATH commençant par « . » (« .: ») : le python3 du lab n'est pas exécuté, le terminal démarre, le shell garde le PATH de l'utilisateur" "$PY_RES" "non oui oui"
+python3_du_lab t15b "$OUT" ":"
+assert_eq "T15.2 — PATH commençant par un élément vide : le python3 du lab n'est pas exécuté, le terminal démarre, le shell garde le PATH de l'utilisateur" "$PY_RES" "non oui oui"
+python3_du_lab t15c "$OUT" "relatif/../.:"
+assert_eq "T15.3 — PATH à éléments relatifs (« relatif/../. ») puis vide : idem" "$PY_RES" "non oui oui"
 
 echo "=== T13 — programme plein écran témoin par le flux direct (TERM-09 automatisé) ==="
 sess t13 "$OUT"; N1=0
@@ -243,9 +284,6 @@ assert_eq "T13.5 — après SIGINT-RECU, l'invite du shell revient" "$(node "$AU
 fin_sess
 
 echo "=== T14 — entrées en attente : l'assistant reste réactif, rien ne survit (TERM-08 ; P71-D-05) ==="
-tuer_si() { # tuer_si <pid> <sous-chaîne de sa ligne de commande> : arrête un survivant enregistré, par PID, après avoir relu sa ligne de commande
-  [ -n "$1" ] && case "$(ps -o args= -p "$1" 2>/dev/null)" in *"$2"*) kill -KILL "$1" 2>/dev/null ;; esac; true
-}
 attendre_mort() { local i p; for i in $(seq 1 60); do for p in "$@"; do [ -n "$p" ] && [ "$(vivant "$p")" = oui ] && { sleep 0.1; continue 2; }; done; return 0; done; return 1; }
 sourd() { # sourd <nom> <sortie> [moteur] -> SO_RES : « avant=<assistant> <shell> <statut POST> apres=<assistant> <shell> » ; serveur tué par SIGKILL après une entrée de 65 536 octets que le shell ne lit pas
   ENVX=(SHELL="$WORK/bin/shell-sourd"); SANS_INVITE=1 sess "$1" "$2" "${3:-$ENG}"; ENVX=(); local a s st av ap
@@ -295,6 +333,10 @@ if mutant_eng sansl "s/\[shell, .-l.\]/[shell]/"; then
   ENVX=(); sess m5 "$OUT" "$MUT_ENG"; assert_eq "M-SANS-L — le mutant lance le shell sans -l : T10.4 rouge" "$(cat "$WORK/run/m5/args.txt" 2>/dev/null)" ""; fin_sess
 else sans_effet M-SANS-L; fi
 
+if mutant python3cwd vf-cockpit-terminal-session.mjs "s#resoudrePython3() || '/dev/null/python3'#'python3'#"; then
+  python3_du_lab m14 "$MUT_OUT" ".:"; assert_eq "M-PYTHON3-CWD — le mutant lance « python3 » par le PATH (relatif) : le python3 du lab est exécuté, le terminal ne démarre pas (T15.1 rouge)" "$PY_RES" "execute non non"
+else sans_effet M-PYTHON3-CWD; fi
+
 echo "=== M-* — mutants de l'assistant (copies du moteur) ==="
 ctrlc() { # ctrlc <nom> <moteur> : lance dormir 30 au premier plan, envoie 0x03 ; rend « <dormir vivant> <shell vivant> »
   sess "$1" "$OUT" "$2"; ent "$WORK/bin/dormir 30 fg\\r" > /dev/null; attendre_fichier "$WORK/run/$1/fg.pid"
@@ -316,6 +358,10 @@ else sans_effet M-RESIZE; fi
 if mutant_eng noeof 's/^                    break$/                    entrees.remove(0)/'; then
   orphelins m9 "$OUT" "$MUT_ENG"; assert_eq "M-NOEOF — le mutant ignore l'EOF du fd 0 : l'assistant et le shell survivent (T12.4 rouge)" "$O_RES" "5 survivants"
 else sans_effet M-NOEOF; fi
+
+if mutant_eng groupesfiges 's/ms = envoyer_membres(sid, signal.SIGKILL)/ms = None/'; then
+  session_entiere m13 "$OUT" "$MUT_ENG"; assert_eq "M-GROUPES-FIGES — le mutant ne tue que les groupes relevés au départ : les travaux nohup, dans leurs propres groupes, survivent (T12.5 rouge)" "$SE_RES" "4 4 oui oui"
+else sans_effet M-GROUPES-FIGES; fi
 
 if mutant_eng bloquant 's/os.set_blocking(maitre, False)/os.set_blocking(maitre, True)/'; then
   sourd m10 "$OUT" "$MUT_ENG"; assert_eq "M-ECRITURE-BLOQUANTE — le mutant remet le maître en écriture bloquante : l'assistant et le shell survivent au serveur (T14.1 rouge)" "$SO_RES" "avant=oui oui POST=204 apres=oui oui"
