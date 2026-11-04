@@ -6,6 +6,8 @@
 # un verrou ou un nœud de DAG ne suffisent plus). R7.5 : un lab sans agent actif, badge « Personne ».
 # Mesure : getBoundingClientRect dans un Chrome headless (chrome-responsive.mjs) — recouvrement des éléments frères, scrollWidth > clientWidth,
 # recherche >= 200 px, logo >= 20x18 sans filtre, barre de question sur une ligne avec son invite entière.
+# Durée (P70-D-18, mesurée par date +%s, poste chargé, load average 15) : 256 s avant, 74 s après — mêmes 191 libellés. Les mesures indépendantes (un Chrome chacune, profil jetable distinct) partent en même temps
+# et les assertions se lisent ensuite dans l'ordre d'origine ; le fil d'Ariane (O2b) attend l'état posé de la page (géométrie identique sur deux images), plus une durée fixe de 500 ms.
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
@@ -78,13 +80,24 @@ INJ_CODE="(() => { const SC = window.VibeFlow; SC.addHeaderButton({ id: 'btn-rec
 LC="$WORK/lab-court"; mklab "$LC"
 LL="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mklab "$LL"
 echo "=== R1, R2 — chargement et redimensionnement à chaud : deux onglets, deux labs ==="
-for spec in "court:$LC" "long:$LL"; do
-  nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; P=$SRV_PORT
-  assert_eq "0 — serveur du lab « $nom » démarré" "$([ "$P" -gt 0 ] && echo oui || echo non)" "oui"
+# P70-D-18 : les deux labs sont servis d'emblée et leurs six mesures (R1/R2 : quatre, R3 : deux) partent en même temps, un Chrome chacune ; les assertions se lisent ensuite, dans l'ordre d'origine
+srv "$LC/.vibeflow/cockpit"; P_court=$SRV_PORT; PID_court=$SRV_PID
+srv "$LL/.vibeflow/cockpit"; P_long=$SRV_PORT; PID_long=$SRV_PID
+MPIDS=()
+for nom in court long; do
+  eval "P=\$P_$nom"
   for onglet in index project; do
     inj=""; [ "$onglet" = index ] && inj="$INJ_CODE"
-    R="$(RESP_INJECT="$inj" mes "http://127.0.0.1:$P/$onglet.html" "$LARGES" 1920:1024 ${SHOTS:+"$SHOTS/$nom-$onglet"})"
-    echo "$R" > "$WORK/mes-$nom-$onglet.json"
+    RESP_INJECT="$inj" mes "http://127.0.0.1:$P/$onglet.html" "$LARGES" 1920:1024 ${SHOTS:+"$SHOTS/$nom-$onglet"} > "$WORK/mes-$nom-$onglet.json" & MPIDS+=($!)
+    if [ "$nom" = court ]; then mes "http://127.0.0.1:$P/$onglet.html" 800,390 - > "$WORK/mes3-$onglet.json" & MPIDS+=($!); fi
+  done
+done
+wait "${MPIDS[@]}"
+for nom in court long; do
+  eval "P=\$P_$nom"
+  assert_eq "0 — serveur du lab « $nom » démarré" "$([ "$P" -gt 0 ] && echo oui || echo non)" "oui"
+  for onglet in index project; do
+    R="$(cat "$WORK/mes-$nom-$onglet.json")"
     for w in ${LARGES//,/ }; do assert_eq "R1 — $nom / $onglet / $w px : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w")" "aucune"; done
     assert_eq "R2 — $nom / $onglet : 1 920 -> 1 024 à chaud" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "resize:1920:1024")" "aucune"
     assert_eq "R2 — $nom / $onglet : 1 024 -> 1 920 à chaud (retour)" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "resize:1024:1920")" "aucune"
@@ -92,12 +105,12 @@ for spec in "court:$LC" "long:$LL"; do
   if [ "$nom" = court ]; then
     echo "=== R3 — en dessous de 1 024 px : rendu non cassé (800 et 390 px) ==="
     for onglet in index project; do
-      R="$(mes "http://127.0.0.1:$P/$onglet.html" 800,390 -)"
+      R="$(cat "$WORK/mes3-$onglet.json")"
       for w in 800 390; do assert_eq "R3 — $onglet / $w px : aucune superposition d'en-tête, aucun défilement horizontal" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w" bas)" "aucune"; done
     done
   fi
-  unsrv
 done
+SRV_PID=$PID_court; unsrv; SRV_PID=$PID_long; unsrv
 echo "=== R5, R6 — lab sans STATE.md : aucun champ vide ; titre de l'onglet ; traduction avant la peinture ==="
 srv "$LC/.vibeflow/cockpit"; PC=$SRV_PORT
 EXPR='({ titre: document.title, ctx: (document.getElementById("context")||{}).innerText||"", panneau: (document.getElementById("panel")||{}).innerText||"" })'
@@ -145,12 +158,16 @@ done
 cat > "$AUX/o2b.js" <<'JS'
 (async () => { const pause = (ms) => new Promise((r) => setTimeout(r, ms)), SC = window.VibeFlow;
   if (location.pathname.endsWith('index.html') && !document.getElementById('btn-recent')) { SC.addHeaderButton({ id: 'btn-recent', label: 'Recent work', icon: 'recent', title: 'What was just worked on, on one board', onClick() {} }); SC.addHeaderButton({ id: 'screens-btn', label: 'Screens', icon: 'ui', title: 'Pick a screen of the app', onClick() {} }); }
-  for (let i = 0; i < 100 && !/travail/.test((document.getElementById('vf-lock') || {}).textContent || ''); i++) await pause(50);
+  for (let i = 0; i < 100 && !/travail|Personne/.test((document.getElementById('vf-lock') || {}).textContent || ''); i++) await pause(50);
+  // pose : la mise en page est posée quand deux images consécutives donnent la même géométrie (fil, en-tête, recherche) — l'état de la page, jamais une durée fixe (P70-D-18 : remplace pause(500))
+  const sig = () => [...document.getElementById('crumbs').children].map((e) => { const r = e.getBoundingClientRect(); return e.tagName + e.textContent.length + ':' + r.left + ',' + r.width + ',' + (e.hasAttribute('data-vf-masque') ? 1 : 0); }).join('|') + '|' + document.querySelector('header').scrollWidth + '|' + document.getElementById('search-btn').getBoundingClientRect().left;
+  const image = () => new Promise((r) => requestAnimationFrame(() => r()));
+  const pose = async () => { let prec = sig(); for (let i = 0; i < 100; i++) { await image(); await image(); const c = sig(); if (c === prec) return; prec = c; } };
   const fil = document.getElementById('crumbs'), proto = fil.querySelector('button'), sep0 = fil.querySelector('.sep') || Object.assign(document.createElement('span'), { className: 'sep', textContent: '/' });
   const jeux = { s3: ["Vue d'ensemble", 'dev-orchestrator', 'design-orchestrator'], s6: ["Vue d'ensemble", 'conductor-references', 'db', 'planning-core-lib', 'src', 'dev-orchestrator-refs'], s8: ["Vue d'ensemble", 'conductor-references', 'planning-core-lib', 'dev-orchestrator-refs', 'design-orchestrator', 'cockpit-moteur-assets', 'skills-references', 'last-segment-name-long'] }, out = { W: innerWidth };
   for (const [cle, segs] of Object.entries(jeux)) {
     fil.innerHTML = ''; segs.forEach((t, i) => { if (i) fil.appendChild(sep0.cloneNode(true)); const b = proto.cloneNode(false); b.textContent = t; b.className = i === segs.length - 1 ? 'cur' : ''; b.removeAttribute('data-vf-court'); b.removeAttribute('data-vf-masque'); fil.appendChild(b); });
-    await pause(500);
+    await pose();
     const hd = document.querySelector('header'), R = (e) => e.getBoundingClientRect(), vis = (e) => R(e).width > 0;
     const bs = [...fil.querySelectorAll('button')].filter(vis), n = bs.length, hl = R(document.querySelector('header .hl')), sb = R(document.getElementById('search-btn')), cr = R(fil);
     const pn = document.getElementById('proj-name');
@@ -195,8 +212,10 @@ o2b_mesure() { # o2b_mesure <port> <largeur> -> JSON (onglet Code puis Projet)
 echo "=== O2b — budget du fil d'Ariane (revue de la recette 3, F1/F2) : fils de 3 et 6 segments longs, badge présent, 1 280 / 1 300 / 1 320 / 1 440 px, onglets Code et Projet ==="
 for spec in "court:$LC" "long:$LL"; do
   nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; PB=$SRV_PORT
+  # les cinq largeurs se mesurent en même temps (un Chrome par largeur, profils jetables distincts) ; les assertions se lisent ensuite dans l'ordre d'origine (P70-D-18)
+  OPIDS=(); for w in 1280 1300 1320 1366 1440; do o2b_mesure "$PB" "$w" > "$WORK/o2b-$nom-$w.json" & OPIDS+=($!); done; wait "${OPIDS[@]}"
   for w in 1280 1300 1320 1366 1440; do
-    XB="$(o2b_mesure "$PB" "$w")"; echo "$XB" > "$WORK/o2b-$nom-$w.json"
+    XB="$(cat "$WORK/o2b-$nom-$w.json")"
     for jeu in s3 s6; do
       E="Code $nom,Projet $nom"; fq="$jeu"
       assert_eq "O2b.1 — $nom / $jeu / $w px : aucun bouton d'en-tête hors de la fenêtre (header.scrollWidth <= innerWidth), badge présent" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" hors $jeu "$E")" "aucune"
@@ -222,13 +241,22 @@ mutant_o2b() { # mutant_o2b <nom> <nature> <ancien> <nouveau> : <ancien> doit ex
   node -e "
 const fs=require('fs');let n=0;for(const f of ['index.html','project.html']){const p='$M/.vibeflow/cockpit/'+f;const h=fs.readFileSync(p,'utf8');const o=process.argv[1],r=process.argv[2];if(!h.includes(o))continue;fs.writeFileSync(p,h.split(o).join(r));n++}
 if(!n){console.error('mutant $1 : motif introuvable');process.exit(1)}" "$3" "$4" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : motif introuvable dans la page"; return; }
-  srv "$M/.vibeflow/cockpit"; local XM; XM="$(o2b_mesure "$SRV_PORT" 1280)"; unsrv
-  assert_neq_aucune "O2b.m$1 — mutant « $5 » : la mesure « $2 » rougit à 1 280 px" "$(printf '%s' "$XM" | node "$AUX/o2b-viol.mjs" "$2" s6 "Code mutant,Projet mutant")"
+  srv "$M/.vibeflow/cockpit"; MUT_SRV+=("$SRV_PID"); MUT_ID+=("$1"); MUT_NAT+=("$2"); MUT_LIB+=("$5")
+  o2b_mesure "$SRV_PORT" 1280 > "$WORK/mut-o2b-$1.json" & MUT_PIDS+=($!) # les trois mutants se mesurent en même temps ; les verdicts tombent dans l'ordre d'origine (P70-D-18)
+}
+MUT_SRV=(); MUT_ID=(); MUT_NAT=(); MUT_LIB=(); MUT_PIDS=()
+mutants_o2b_verdicts() {
+  local i XM; [ "${#MUT_PIDS[@]}" -gt 0 ] && wait "${MUT_PIDS[@]}"
+  for i in "${!MUT_ID[@]}"; do
+    SRV_PID="${MUT_SRV[$i]}"; unsrv; XM="$(cat "$WORK/mut-o2b-${MUT_ID[$i]}.json")"
+    assert_neq_aucune "O2b.m${MUT_ID[$i]} — mutant « ${MUT_LIB[$i]} » : la mesure « ${MUT_NAT[$i]} » rougit à 1 280 px" "$(printf '%s' "$XM" | node "$AUX/o2b-viol.mjs" "${MUT_NAT[$i]}" s6 "Code mutant,Projet mutant")"
+  done
 }
 assert_neq_aucune() { if [ "$2" != "aucune" ] && [[ "$2" != "mesure absente"* ]] && [[ "$2" != *"témoin"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: une violation de la nature visée"; echo "     obtenu:  [${2:0:600}]"; FAIL=$((FAIL+1)); fi; }
 mutant_o2b 1 court 'header #crumbs button[data-vf-court] { flex: 0 0 auto; }' '' "règle des segments courts supprimée"
 mutant_o2b 2 hors '@media (max-width: 999px) { #ask-input' '@media (min-width: 1280px) { :root { --vf-crumbs: 560px; --vf-pn: 100px; } header .hl { min-width: min(calc(280px + var(--vf-crumbs, 0px) + var(--vf-pn, 0px)), 50vw); } } @media (max-width: 999px) { #ask-input' "min-width de 3a9331c8 remis"
 mutant_o2b 3 ordre 'button:not([data-vf-court]):not(:first-child):not(.cur) { flex: 0 100000 auto; }' 'button:not([data-vf-court]):not(:first-child):not(.cur) { flex: 0 1 auto; }' "milieu au même poids que les bouts"
+mutants_o2b_verdicts
 
 # I2 (recette 3, retour de Samuel, saisie texte, session principale, 2026-11-03) : « le flou sous le titre est trop dense, il faut aussi qu'il ai un radius fort en haut faible en bas, il doit etre comparable au blur iOS ».
 # Reprise (avis de Samuel, Wispr Flow, session principale, 2026-11-03 : « pas de bordure, un flou dégradé qui part du haut gauche et descend, comme le header, en mode iOS 26 ») :
@@ -278,25 +306,38 @@ assert_has "R4.2 — témoin rouge : avec la colonne gauche à 316 px, un bouton
 echo "=== R8 — aucun périphérique de pointage (pointer: none) : mêmes assertions R1 à 1 024, 1 280 et 1 440 px ==="
 CHROME_NOPTR="$AUX/chrome-sans-pointeur.sh"
 printf '#!/bin/sh\nexec "%s" --blink-settings=primaryPointerType=1,availablePointerTypes=1,primaryHoverType=1,availableHoverTypes=1 "$@"\n' "$CHROME" > "$CHROME_NOPTR"; chmod +x "$CHROME_NOPTR"
-for spec in "court:$LC" "long:$LL"; do
-  nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; P=$SRV_PORT
+srv "$LC/.vibeflow/cockpit"; P_court=$SRV_PORT; PID_court=$SRV_PID
+srv "$LL/.vibeflow/cockpit"; P_long=$SRV_PORT; PID_long=$SRV_PID
+MPIDS=()
+for nom in court long; do
+  eval "P=\$P_$nom"
   for onglet in index project; do
     inj=""; [ "$onglet" = index ] && inj="$INJ_CODE"
-    R="$(RESP_INJECT="$inj" REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-responsive.mjs" "$CHROME_NOPTR" "http://127.0.0.1:$P/$onglet.html" 1024,1280,1440 -)"
+    RESP_INJECT="$inj" REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-responsive.mjs" "$CHROME_NOPTR" "http://127.0.0.1:$P/$onglet.html" 1024,1280,1440 - > "$WORK/r8-$nom-$onglet.json" & MPIDS+=($!)
+  done
+done
+wait "${MPIDS[@]}"
+for nom in court long; do
+  for onglet in index project; do
+    R="$(cat "$WORK/r8-$nom-$onglet.json")"
     assert_eq "R8.0 — $nom / $onglet : le Chrome du témoin n'a bien aucun pointeur" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.mesures["1024"].m.pointeur')" "none"
     for w in 1024 1280 1440; do assert_eq "R8 — $nom / $onglet / $w px sans pointeur : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w")" "aucune"; done
   done
-  unsrv
 done
+SRV_PID=$PID_court; unsrv; SRV_PID=$PID_long; unsrv
 
 # R9 — témoin indépendant de la police : des métriques de texte plus larges que celles d'Inter (interlettrage +5 % sur tout l'en-tête, injecté après le chargement)
 # ne doivent faire ni recouvrir, ni rogner, ni sortir de la fenêtre un seul élément de l'en-tête à 1 024 px — la mise en page ne dépend d'aucune largeur de police calibrée.
 INJ_LARGE="(() => { const st = document.createElement('style'); st.textContent = 'header, header * { letter-spacing: 0.05em !important; }'; document.head.appendChild(st); return true; })()"
 echo "=== R9 — métriques de texte élargies (interlettrage +5 %) : mêmes assertions R1 à 1 024 px ==="
-srv "$LL/.vibeflow/cockpit"; P=$SRV_PORT
+srv "$LL/.vibeflow/cockpit"; P=$SRV_PORT; MPIDS=()
 for onglet in index project; do
   inj="$INJ_LARGE"; [ "$onglet" = index ] && inj="$INJ_CODE; $INJ_LARGE"
-  R="$(RESP_INJECT="$inj" mes "http://127.0.0.1:$P/$onglet.html" 1024 -)"
+  RESP_INJECT="$inj" mes "http://127.0.0.1:$P/$onglet.html" 1024 - > "$WORK/r9-$onglet.json" & MPIDS+=($!)
+done
+wait "${MPIDS[@]}"
+for onglet in index project; do
+  R="$(cat "$WORK/r9-$onglet.json")"
   assert_eq "R9 — long / $onglet / 1 024 px, texte élargi : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "1024")" "aucune"
 done
 unsrv
