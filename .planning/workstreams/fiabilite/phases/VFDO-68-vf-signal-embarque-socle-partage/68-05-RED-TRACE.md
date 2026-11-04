@@ -25,3 +25,12 @@ ce rouge-là est écarté, K14 a été réécrit par la pression de `rafraichir`
 
 Sur cette sortie, pour chaque K1 K2 K3 K4 K5 K6 K9 K13 K14 : `verdict.sh <sortie> Kn echec` rend **0**, `verdict.sh <sortie> Kn succes` rend **1**
 (bash ; K1 rejoué sous zsh : echec = 0).
+
+## Annexe — rouge rejoué avec les tests corrigés (commits `test(68-05)` suivants)
+
+Le premier jeu (`b512d0a9`) avait deux défauts de harnais, trouvés en écrivant le code : un gestionnaire `process.run` qui lève
+donne « no implementation for process.run » (le rejet se simule par `{ deny }`), et l'événement porte `{ argv, init: { cwd, timeoutMs } }`
+(pas `e.cwd`) ; `$.plugin.root` n'existe pas sur le `$` du test (K1 déduit la racine du plugin du script : `argv[1] === <cwd>/cockpit/scripts/vf-cockpit-signal.mjs`).
+Pour que le rouge reste celui des tests tels que livrés, ils ont été rejoués sur l'arbre d'avant le code :
+`git archive 4c9caa26 plugin` dans le scratchpad, tests corrigés par-dessus, `claude plugin test plugin` : **8 pass, 9 fail** (K1 K2 K3 K4 K5 K6 K9 K13 K14),
+`verdict.sh … echec` = 0 pour les neuf. La retouche de `vf-signal.test.tsx` est verte avant le code comme après.
