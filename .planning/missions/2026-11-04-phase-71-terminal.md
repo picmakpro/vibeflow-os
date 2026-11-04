@@ -89,6 +89,30 @@ Décisions du manager : P71-D-09 à D-22, D-24 (amende D-10). Q14 (N9, N10) envo
    "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh",
    "exit_code": 0,
    "sha": "227be6c5"
+  },
+  {
+   "verdict": "rebase-final-gates",
+   "commande": "bash .planning/milestones/fiabilite-v1.0-phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/replay-ci-jobs.sh --job gates (après rebase sur 19393cc3)",
+   "exit_code": 0,
+   "sha": "7bb14f15"
+  },
+  {
+   "verdict": "reaudit-3",
+   "commande": "bash plugin/cockpit/amont/synchro.sh verifier (arbre extrait)",
+   "exit_code": 0,
+   "sha": "1198b5b9"
+  },
+  {
+   "verdict": "recette-juges",
+   "commande": "juges playwright, étapes 9, 16, R2, G5, R3, R4 (rejuge-C)",
+   "exit_code": 0,
+   "sha": "1198b5b9"
+  },
+  {
+   "verdict": "R1-fuite",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-xterm.sh (deux rejeux)",
+   "exit_code": 0,
+   "sha": "a9493e4a"
   }
  ]
 }
@@ -99,3 +123,28 @@ Décisions du manager : P71-D-09 à D-22, D-24 (amende D-10). Q14 (N9, N10) envo
 Mandats émis par le manager : 37 Task (2 chercheurs, 1 spike, 1 crafter, 1 planificateur relancé 2 fois, 2 plan-checkers, 11 exécuteurs de plan,
 1 juge design, 1 réviseur + 1 re-réviseur, 1 auditeur + 2 re-auditeurs, 1 chercheur doc, 12 correcteurs : PTY, A1, A2, B1, B2, B3, docs, C, N1, N2, D, E ; le correcteur PTY a aussi porté P71-D-24 sur réveil). Questions à Samuel : 4 envois (Q1-Q7, Q8,
 Q9-Q12, Q13) plus Q14 en attente.
+
+## Suite de la mission (2026-11-04)
+
+Verrou de phase repris (génération `DRIVER.lock.gen.1793797926.57506`). Levier « méthode allégée selon le risque » appliqué (arbitrage Samuel,
+AskUserQuestion, session principale Claude Code, 2026-11-03) : un re-audit unique ciblé (avec deltas), une seule CI après le rebase final, juges
+réduits aux étapes touchées.
+
+- **Arbitrages de Samuel** (AskUserQuestion, session principale Claude Code, 2026-11-04) : P71-D-25 à D-28 (lot de sécurité validé, collage
+  confirmé, amorçage hors ligne de commande, `nohup`/`disown` tués), P71-D-29 (N1, N2), P71-D-30 (N9, N10), P71-D-31 (H-1 en mandat séparé, mergé
+  sur `main` par PR #201), P71-D-32 (recette par juges), P71-D-33 à D-35 (E1 terminal dans son processus, E2 à E5, G1 à G3), P71-D-36 et D-37 (R1
+  à R5, G4, G5 ; G6 écarté). Retours de Samuel sur le cockpit de test consignés dans `71-RECETTE-HUMAINE.md`.
+- **Recette par juges** : 17 étapes jouées par 3 juges frais (Chromium, WebKit, Firefox par la bibliothèque playwright, vrai `zsh`, vrai `claude`),
+  puis deux rejeux réduits. Non jouées, consignées : Safari.app et Firefox.app réels, clavier AZERTY réel avec Option.
+- **Correctifs** : N9/N10, W1 (processus enfant), W2, W3, W4, rebase final sur `19393cc3` avec P71-D-03 (PATH d'origine au shell) et `envEnfant`,
+  X1 (R1, R2, G5), X2 (R3, R4, sonde R5 = artefact), X3 (G4), N12, N13, R1 borné à l'événement, sondes R1 rendues discriminantes, fuite résiduelle de
+  R1 fermée (`a9493e4a`). Chaque correctif a son témoin rouge puis vert et un mutant (SUMMARY `71-FIX-*`).
+- **Re-audits** : n°3 sur `7bb14f15` (aucun majeur, N12), delta sur `1198b5b9` (aucun majeur, N13 et réserve R1 fermées ensuite) ; H1-b hérité de
+  `main`, hors phase.
+- **Rebases d'essai** : sur `19393cc3` (P26, v1.2.0), sur `3c73fc0c` (68, v1.3.0) et sur `a6912f25` (#202, v1.3.0, compteur 165) ; entrées rerere
+  fautives des README racine supprimées (deux autres, propres à `a6912f25`, à vider avant le rebase final). Rebase final en attente de la PR #200.
+- **Choix du manager consignés** : PATH d'origine transmis au shell seulement par le lanceur (un serveur lancé hors du lanceur donne au shell le
+  PATH assaini) ; `resoudreBinaire` replié sur `/usr/bin:/bin` sans élément absolu ; rapports de souris perdus pendant la fenêtre de rejeu (au plus
+  3 s après un rechargement).
+- **Goût résiduel** (non bloquant, pour Samuel) : en 1280×720, tiroir ouvert, le texte des cartes reste petit (échelle 0,29) ; la barre dit « Terminé »
+  face à la carte « Python 3 introuvable ».
