@@ -78,9 +78,9 @@ const MESURE = `(() => {
   m.rangees = 0; for (let i = 0, d = -1e9; i < centres.length; i++) if (centres[i] - d > 4) { m.rangees++; d = centres[i]; }
   m.actionsRangee = act.filter(vis).map((b) => b.id || b.className).join(',');
   const pl = document.querySelector('#vf-plus'); m.plus = !!(pl && vis(pl)); m.plusPastille = pl && pl.querySelector('.badge') ? 'point' : ''; // Q8 : un point de présence, sans compte
-  m.sources = act.map((b) => ({ id: b.id, t: court(b), b: pastille(b) }));
+  m.sources = act.map((b) => ({ id: b.id, t: court(b), b: pastille(b), off: b.disabled || b.getAttribute('aria-disabled') === 'true', ti: b.getAttribute('title') || '' }));
   const mn = document.querySelector('#vf-plus-menu');
-  m.menu = mn && vis(mn) ? [...mn.querySelectorAll('[role="menuitem"]')].filter(vis).map((e) => { const c = e.cloneNode(true); c.querySelector('.badge')?.remove(); return { t: c.textContent.trim(), b: pastille(e) }; }) : null;
+  m.menu = mn && vis(mn) ? [...mn.querySelectorAll('[role="menuitem"]')].filter(vis).map((e) => { const c = e.cloneNode(true); c.querySelector('.badge')?.remove(); return { t: c.textContent.trim(), b: pastille(e), off: e.getAttribute('aria-disabled') === 'true' || e.disabled, op: Number(getComputedStyle(e).opacity), ti: e.getAttribute('title') || '' }; }) : null;
   const tabs = [...hd.querySelectorAll('.vf-tabs a')], piste = hd.querySelector('.vf-tabs');
   m.onglets = piste && tabs.length ? { n: tabs.length, police: [...new Set(tabs.map((a) => getComputedStyle(a).fontSize))].join('/'), piste: getComputedStyle(piste).paddingTop + '/' + getComputedStyle(piste).paddingLeft, pad: getComputedStyle(tabs[0]).paddingLeft } : null;
   const zm = document.querySelector('#zoom'), af = document.querySelector('#ask-form'), up = document.querySelector('#btn-up');

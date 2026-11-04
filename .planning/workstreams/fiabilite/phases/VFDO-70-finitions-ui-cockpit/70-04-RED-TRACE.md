@@ -109,3 +109,17 @@ Sonde à part (lab « long », Code avec Travail récent et Écrans, racine et p
 - 99 agents + un bouton d'en-tête de plus (« Extra », libellé visible au-dessus de 1 600 px) : rouge sans le repli (1 640 px racine : `#btn-panel` sort de 1 617..1 653 sur 1 640 ; 1 640, 1 660 et 1 700 px en parcours : fil rogné 137 pour 58, 78, 118 ; 1 660 px racine : fil rogné 64 pour 36) ; vert avec le repli à 1 640, 1 660, 1 700 et 1 800 px, racine et parcours.
 - Pas de faux positif : lab « long » seul, le badge garde son libellé à 1 700 et 1 920 px (128 px) ; à 390 px le téléphone n'est pas concerné (44 px).
 - Le badge (#vf-lock) est ajouté après coup par `70-vf-live.js` : il est relu à chaque mesure (première version, mesure jamais déclenchée, rouge reconstaté avant ce correctif).
+
+## Témoins R21 à R23 (juge des arbitrages), chacun avec son mutant
+
+Dans `test-cockpit-responsive.sh`, sur une COPIE de la page servie du lab « long » (jamais le moteur) ; mutant rouge démontré, témoin vert sur le code.
+
+| Témoin | Assertion | Mutant (copie de la page) | Attendu / obtenu du mutant |
+|---|---|---|---|
+| R21 | Projet en parcours, badge « 10 au travail » entier, 1 600 à 1 639 px (7 largeurs) : aucune violation | tranche du badge réduit arrêtée à 1 599 px ET repli mesuré retiré (le repli rattrape seul un badge trop large : retirer la tranche seule ne rougit pas) | attendu `aucune` ; obtenu à 1 600 et 1 619 px `en-tête : div.brand recouvre #search-btn \| nav.vf-tabs recouvre #search-btn \| …` (rouge de 1 600 à 1 630 px ; dès 1 635 px le badge entier tient, rien à démontrer) |
+| R22 | « 99 au travail » + un bouton d'en-tête de plus, 1 640 / 1 700 / 1 800 px, Code en racine et Projet en parcours : aucune violation | le repli ne pose plus `data-vf-point` | attendu `aucune` ; obtenu Code 1 640 px `div.brand recouvre #search-btn \| nav.vf-tabs recouvre …`, Projet 1 640 et 1 700 px idem |
+| R23 | Équipe, 390 px, menu « ⋯ » : l'action désactivée du bouton d'origine l'est aussi sur l'entrée (aria-disabled, opacité < 1, même infobulle) ; témoin : au moins une action désactivée | le menu ne reporte plus `disabled` ni `aria-disabled` | attendu `aucune` ; obtenu `Par où commencer : entrée non désactivée` |
+
+`chrome-responsive.mjs` : `m.sources` et `m.menu` gardent `off`, `op` (opacité) et `ti` (infobulle) ; le mécanisme d'attente de la visite d'office est inchangé.
+
+Suite complète rejouée deux fois sur ce commit : 284 PASS / 0 FAIL les deux fois ; R19 et R20 (cadrage d'Équipe, 7362c359) verts.

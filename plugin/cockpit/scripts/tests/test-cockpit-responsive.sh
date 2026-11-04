@@ -487,6 +487,74 @@ for w in 390 768 1024 1440; do
   assert_eq "R20 — Équipe / $w px : aucune superposition d'en-tête ni de surfaces, aucun défilement horizontal" "$(printf '%s' "$(cat "$WORK/r17-equipe.json")" | node "$AUX/viol.mjs" "$w" "$mode")" "aucune"
 done
 
+# R21 à R23 (70-04, juge des arbitrages, 2026-11-04 ; P70-D-22 : « Badge réduit à son point (Recommandé) », arbitrage Samuel, AskUserQuestion session principale, 2026-11-04 ; Q13a) — chacun a son mutant, sur une COPIE de la page servie :
+#   R21 le badge « au travail » entier (« 10 au travail ») ne fait déborder ni l'en-tête ni le fil d'Ariane en parcours de 1 600 à 1 639 px (la tranche du badge réduit va jusqu'à 1 639 px, seuil mesuré 1 635 px) ; mutant : la tranche s'arrête à 1 599 px
+#   R22 le repli mesuré : « 99 au travail » et un bouton d'en-tête de plus (libellé visible au-dessus de 1 600 px) à 1 640, 1 700 et 1 800 px, racine (Code) et parcours (Projet) ; mutant : le repli ne pose plus le point
+#   R23 une action désactivée l'est aussi dans le menu « ⋯ » (Équipe, 390 px : « Par où commencer ») : aria-disabled, atténuée, même infobulle ; mutant : le menu ne reporte plus l'état désactivé
+echo "=== R21 à R23 — badge entier de 1 600 à 1 639 px, repli mesuré, action désactivée du menu « ⋯ » (chacun avec son mutant) ==="
+J_LIBELLE() { echo "for (let i = 0; i < 100 && !document.querySelector('#vf-lock .bl'); i++) await p(50); document.querySelector('#vf-lock .bl').textContent = '$1 au travail';"; }
+INJ_R21="(async () => { $J_PAUSE $INJ_CODE; $(J_LIBELLE 10) window.VibeFlow.reveal('n:ph-1'); for (let i = 0; i < 100; i++) { const u = document.getElementById('btn-up'); if (u && !u.hidden) break; await p(50); } await p(400); return true; })()"
+J_EXTRA="window.VibeFlow.addHeaderButton({ id: 'xtra1', label: 'Extra', icon: 'ui', title: 'Extra', onClick() {} });"
+INJ_R22C="(async () => { $J_PAUSE $INJ_CODE; $(J_LIBELLE 99) $J_EXTRA await p(500); return true; })()"
+INJ_R22P="(async () => { $J_PAUSE $INJ_CODE; $(J_LIBELLE 99) $J_EXTRA window.VibeFlow.reveal('n:ph-1'); for (let i = 0; i < 100; i++) { const u = document.getElementById('btn-up'); if (u && !u.hidden) break; await p(50); } await p(500); return true; })()"
+INJ_R23="(async () => { $J_PAUSE document.getElementById('vf-plus')?.click(); for (let i = 0; i < 40 && !(document.getElementById('vf-plus-menu')?.getBoundingClientRect().width > 0); i++) await p(50); await p(100); return true; })()"
+W21="1600,1610,1619,1625,1630,1635,1639"; W22="1640,1700,1800"
+mutant_suite() { # mutant_suite <dossier> <ancien> <nouveau> : seconde retouche, sur la copie déjà faite par mutant_page
+  node -e "
+const fs=require('fs');let n=0;for(const f of ['index.html','project.html','equipe.html']){const p='$WORK/mut-$1/.vibeflow/cockpit/'+f;if(!fs.existsSync(p))continue;const h=fs.readFileSync(p,'utf8');if(!h.includes(process.argv[1]))continue;fs.writeFileSync(p,h.split(process.argv[1]).join(process.argv[2]));n++}
+if(!n){console.error('mutant $1 : second motif introuvable');process.exit(1)}" "$2" "$3" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : second motif introuvable dans la page"; return 1; }
+}
+mutant_page() { # mutant_page <dossier> <ancien> <nouveau> : copie de la page du lab long, <ancien> doit exister (sinon FAIL nommé)
+  local M="$WORK/mut-$1"; mkdir -p "$M/.planning/missions" "$M/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$M/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$M/.planning/missions/"; agent_actif "$M"
+  node -e "
+const fs=require('fs');let n=0;for(const f of ['index.html','project.html','equipe.html']){const p='$M/.vibeflow/cockpit/'+f;if(!fs.existsSync(p))continue;const h=fs.readFileSync(p,'utf8');if(!h.includes(process.argv[1]))continue;fs.writeFileSync(p,h.split(process.argv[1]).join(process.argv[2]));n++}
+if(!n){console.error('mutant $1 : motif introuvable');process.exit(1)}" "$2" "$3" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : motif introuvable dans la page"; return 1; }
+}
+# R21 : le repli mesuré rattrape seul un badge trop large ; le mutant retire donc la tranche (1 599 px) ET le repli, pour que la tranche soit ce qui est éprouvée
+mutant_page r21 '@media (min-width: 701px) and (max-width: 1639px)' '@media (min-width: 701px) and (max-width: 1599px)'; M21=$?
+[ $M21 = 0 ] && { mutant_suite r21 "badge.setAttribute('data-vf-point', '');" '' || M21=1; }
+mutant_page r22 "badge.setAttribute('data-vf-point', '');" ''; M22=$?
+mutant_page r23 "src.disabled || src.getAttribute('aria-disabled') === 'true'" 'false'; M23=$?
+srv "$LL/.vibeflow/cockpit"; P_l=$SRV_PORT; PID_l=$SRV_PID
+srv "$LC/.vibeflow/cockpit"; P_c=$SRV_PORT; PID_c=$SRV_PID
+[ $M21 = 0 ] && { srv "$WORK/mut-r21/.vibeflow/cockpit"; P_m21=$SRV_PORT; PID_m21=$SRV_PID; }
+[ $M22 = 0 ] && { srv "$WORK/mut-r22/.vibeflow/cockpit"; P_m22=$SRV_PORT; PID_m22=$SRV_PID; }
+[ $M23 = 0 ] && { srv "$WORK/mut-r23/.vibeflow/cockpit"; P_m23=$SRV_PORT; PID_m23=$SRV_PID; }
+OPIDS=()
+RESP_INJECT="$INJ_R21" mes "http://127.0.0.1:$P_l/project.html" "$W21" - > "$WORK/r21.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_R22C" mes "http://127.0.0.1:$P_l/index.html" "$W22" - > "$WORK/r22-code.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_R22P" mes "http://127.0.0.1:$P_l/project.html" "$W22" - > "$WORK/r22-projet.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_R23" mes "http://127.0.0.1:$P_c/equipe.html" 390 - > "$WORK/r23.json" & OPIDS+=($!)
+wait "${OPIDS[@]}"; OPIDS=()
+[ $M21 = 0 ] && { RESP_INJECT="$INJ_R21" mes "http://127.0.0.1:$P_m21/project.html" "$W21" - > "$WORK/m21.json" & OPIDS+=($!); }
+[ $M22 = 0 ] && { RESP_INJECT="$INJ_R22C" mes "http://127.0.0.1:$P_m22/index.html" "$W22" - > "$WORK/m22-code.json" & OPIDS+=($!); RESP_INJECT="$INJ_R22P" mes "http://127.0.0.1:$P_m22/project.html" "$W22" - > "$WORK/m22-projet.json" & OPIDS+=($!); }
+[ $M23 = 0 ] && { RESP_INJECT="$INJ_R23" mes "http://127.0.0.1:$P_m23/equipe.html" 390 - > "$WORK/m23.json" & OPIDS+=($!); }
+[ "${#OPIDS[@]}" -gt 0 ] && wait "${OPIDS[@]}"
+SRV_PID=$PID_l; unsrv; SRV_PID=$PID_c; unsrv
+for v in m21 m22 m23; do eval "[ \$M${v#m} = 0 ] && { SRV_PID=\$PID_$v; unsrv; }"; done
+assert_rouge() { case "$2" in aucune|mesure*|*témoin*) echo "  ❌ FAIL — $1"; echo "     attendu: une violation de mise en page"; echo "     obtenu:  [${2:0:600}]"; FAIL=$((FAIL+1));; *) echo "  ✅ PASS — $1"; PASS=$((PASS+1));; esac; }
+viol_() { printf '%s' "$(cat "$1")" | node "$AUX/viol.mjs" "$2"; }
+# R23 : toute action désactivée du bouton d'origine l'est aussi sur l'entrée du menu ; témoin : au moins une action désactivée (Équipe : « Par où commencer »)
+EXPR23='(()=>{const m=j.mesures["390"].m,s=m.sources,e=m.menu;if(!e)return "menu absent";const p=[];if(!s.some((x)=>x.off))p.push("témoin : aucune action désactivée");s.forEach((x,i)=>{if(!x.off)return;const y=e[i];if(!y||!y.off)p.push(x.t+" : entrée non désactivée");else{if(!(y.op<1))p.push(x.t+" : entrée non atténuée (opacité "+y.op+")");if(y.ti!==x.ti||!y.ti)p.push(x.t+" : infobulle ["+(y.ti||"")+"] au lieu de ["+x.ti+"]")}});return p.join(" ; ")||"aucune"})()'
+for w in ${W21//,/ }; do
+  assert_eq "R21 — Projet, parcours, badge « 10 au travail » entier / $w px : aucun bouton hors de la fenêtre, fil d'Ariane non rogné, aucune superposition" "$(viol_ "$WORK/r21.json" "$w")" "aucune"
+done
+for w in 1600 1610 1619 1625 1630; do # sous 1 635 px le badge entier ne tient pas : le mutant doit rougir (dès 1 635 px il tient, rien à démontrer)
+  [ $M21 = 0 ] && assert_rouge "R21m — mutant « tranche du badge réduit arrêtée à 1 599 px et repli retiré » : la mesure rougit à $w px" "$(viol_ "$WORK/m21.json" "$w")"
+done
+for w in ${W22//,/ }; do
+  assert_eq "R22 — Code (racine), « 99 au travail » et un bouton de plus / $w px : aucune violation (repli mesuré)" "$(viol_ "$WORK/r22-code.json" "$w")" "aucune"
+  assert_eq "R22 — Projet (parcours), « 99 au travail » et un bouton de plus / $w px : aucune violation (repli mesuré)" "$(viol_ "$WORK/r22-projet.json" "$w")" "aucune"
+done
+assert_eq "R23 — Équipe / 390 px : l'action désactivée (« Par où commencer ») l'est aussi dans le menu « ⋯ » (aria-disabled, atténuée, même infobulle)" "$(printf '%s' "$(cat "$WORK/r23.json")" | node "$AUX/ev.mjs" "$EXPR23")" "aucune"
+if [ $M22 = 0 ]; then # les mutants du repli : sans lui, chacun de ces trois relevés rougit (1 640 px racine : #btn-panel sort ; 1 640 px et 1 700 px en parcours : fil rogné)
+  assert_rouge "R22m — mutant « le repli ne pose plus le point » : Code racine à 1 640 px rougit" "$(viol_ "$WORK/m22-code.json" 1640)"
+  assert_rouge "R22m — mutant « le repli ne pose plus le point » : Projet parcours à 1 640 px rougit" "$(viol_ "$WORK/m22-projet.json" 1640)"
+  assert_rouge "R22m — mutant « le repli ne pose plus le point » : Projet parcours à 1 700 px rougit" "$(viol_ "$WORK/m22-projet.json" 1700)"
+fi
+[ $M23 = 0 ] && assert_rouge "R23m — mutant « le menu ne reporte plus l'état désactivé » : la mesure rougit" "$(printf '%s' "$(cat "$WORK/m23.json")" | node "$AUX/ev.mjs" "$EXPR23")"
+
+
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
