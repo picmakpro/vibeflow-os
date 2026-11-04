@@ -141,6 +141,8 @@ declare module 'claude-code' {
       usage: Usage | null
       view: View
       bandHiddenFor: string | null
+      /** Vrai si l'ancien mod `vf-signal` (hors dépôt) est présent sous HOME : risque de deux panes. */
+      ancienMod: boolean
     }
   }
 }

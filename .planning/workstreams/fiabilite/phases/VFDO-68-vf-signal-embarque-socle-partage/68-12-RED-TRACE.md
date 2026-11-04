@@ -49,3 +49,8 @@ Assertion : `ui.find({ type: 'Text', text: /ancien mod vf-signal détecté/ })` 
   ✅ PASS — M6.0 — le compteur voit le chemin dans un fichier qui le porte, pas dans un vide
   ❌ FAIL — M6 — aucun fichier du mod ne porte .claude/mods/vf-signal (attendu au moins 1, obtenu 0)
 ```
+
+## Vert après `ancien-mod.ts` — E4 et M6
+
+`claude plugin test plugin` : 8 pass / 0 fail (E1 à E4, E4b, 3 tests du mod) ; `validate --strict` rc=0 ; `test-cockpit-signal-mod.sh` 19 ok / 0 ko sous bash ET zsh (M0 à M6) ;
+`test-vibeflow-update-cockpit.sh` 13 ok ; `check-machine-paths.sh` rc=0. Aucun appel d'écriture ou de processus vers l'ancien mod (`appels.ecritures` vide).

@@ -10,6 +10,7 @@ import type { Register } from 'claude-code'
 
 import { PANE, band } from './band'
 import { brief, stageOf } from './derive'
+import { PHRASE_ANCIEN_MOD, ancienModPresent } from './ancien-mod'
 import { cockpitInstalle } from './gating'
 import { VIEWS } from './ds'
 import { pane } from './pane'
@@ -27,6 +28,7 @@ const refusals = atom({ plugin: 'vibeflow', key: 'refusals' } as const, [])
 const loopAlert = atom({ plugin: 'vibeflow', key: 'loopAlert' } as const, null)
 const usage = atom({ plugin: 'vibeflow', key: 'usage' } as const, null)
 const view = atom({ plugin: 'vibeflow', key: 'view' } as const, 'mission')
+const ancienMod = atom({ plugin: 'vibeflow', key: 'ancienMod' } as const, false)
 
 export const register: Register = on => {
   let home: string | undefined
@@ -43,6 +45,9 @@ export const register: Register = on => {
     home = await $.env.get('HOME')
     actif = await cockpitInstalle($, await $.session.root().catch(() => undefined), home)
     if (!actif) return next(e)
+    const ancien = await ancienModPresent($, home)
+    await update($, ancienMod, () => ancien)
+    if (ancien) $.ui.toast(PHRASE_ANCIEN_MOD)
     await $.command.register({
       name: 'vf-signal',
       description: 'Cockpit VibeFlow : mission, équipe, macro. « /vf-signal équipe », « macro », « mission », ou « brief » pour un Markdown.',

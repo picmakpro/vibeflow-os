@@ -7,6 +7,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, RenderInput } from 'claude-code'
 
 import { C, G, STAGES, STAGE_LABEL, VIEWS, VIEW_LABEL, oneLine } from './ds'
+import { PHRASE_ANCIEN_MOD } from './ancien-mod'
 import { attention } from './derive'
 import { refreshAll } from './refresh'
 import type { Ctx } from './views/common'
@@ -23,6 +24,7 @@ const refusals = atom({ plugin: 'vibeflow', key: 'refusals' } as const, [])
 const loopAlert = atom({ plugin: 'vibeflow', key: 'loopAlert' } as const, null)
 const usage = atom({ plugin: 'vibeflow', key: 'usage' } as const, null)
 const view = atom({ plugin: 'vibeflow', key: 'view' } as const, 'mission')
+const ancienMod = atom({ plugin: 'vibeflow', key: 'ancienMod' } as const, false)
 
 type PaneInput = Extract<RenderInput, { component: 'Pane' }>
 
@@ -30,9 +32,9 @@ export async function pane($: EngineInterface, e: PaneInput, blink: boolean, hom
   const refresh = () => refreshAll($, home)
   const ui = $.ui.resolve(e)
   const { Box, Button, Text } = ui
-  const [d, m, l, agents, agentStats, r, alert, u, current] = await Promise.all([
+  const [d, m, l, agents, agentStats, r, alert, u, current, ancien] = await Promise.all([
     read($, disk), read($, macro), read($, loop), read($, roster), read($, stats),
-    read($, refusals), read($, loopAlert), read($, usage), read($, view),
+    read($, refusals), read($, loopAlert), read($, usage), read($, view), read($, ancienMod),
   ])
   const now = await $.clock.now()
   const width = Math.max(24, e.props.bodyColumns - 1)
@@ -60,6 +62,12 @@ export async function pane($: EngineInterface, e: PaneInput, blink: boolean, hom
   )
 
   const body = current === 'equipe' ? equipe($, ctx) : current === 'macro' ? macroView(ctx) : mission(ctx)
+
+  const noteAncienMod = ancien ? (
+    <Text color={C.human} wrap="wrap">
+      {G.human} {PHRASE_ANCIEN_MOD}
+    </Text>
+  ) : null
 
   const buttons = (
     <Box gap={1} flexWrap="wrap">
@@ -126,6 +134,7 @@ export async function pane($: EngineInterface, e: PaneInput, blink: boolean, hom
             {G.human} {action}
           </Text>
         ) : null}
+        {noteAncienMod}
         {buttons}
       </Box>
     )
@@ -182,6 +191,7 @@ export async function pane($: EngineInterface, e: PaneInput, blink: boolean, hom
           ))}
         </Text>
       </Box>
+      {noteAncienMod}
       {d?.error ? (
         <Text color={C.fg3} wrap="wrap">
           disque · {d.error}
