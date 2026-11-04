@@ -131,3 +131,14 @@ for (const [en, fr] of [['failed', 'en échec'], ['error', 'en erreur'], ['red',
     await b.unmount()
   })
 }
+
+// Passe 2 de R6 : la vue macro dit les jalons comme l'en-tête et le brief.
+test("MB-R6c — vue macro : jalon courant et jalons ouverts en « <clé> · <titre court> », sans markdown", async ($, on) => {
+  const autre = { key: 'autre-v1', icone: '🚧', texte: '**Gouvernance** — `Phases 40-50` — suite', ws: 'fiabilite', phases: ['fiabilite|70'] }
+  const ui = await monte($, on, avec(s => { s.jalons = [JALON, autre] }))
+  await ui.press({ key: 'onglet:macro' })
+  expect((await texte(ui, /^■ vibeflow-v2\.0 · « le cockpit VibeFlow » · 0\/2 phases$/)).length).toBe(1)
+  expect((await texte(ui, /^· autre-v1 · Gouvernance · 0\/1$/)).length).toBe(1)
+  expect(await texte(ui, /\*\*|`/)).toEqual([])
+  await ui.unmount()
+})

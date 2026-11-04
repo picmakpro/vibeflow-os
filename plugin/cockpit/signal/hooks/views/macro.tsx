@@ -3,7 +3,7 @@
 
 import { G, oneLine } from '../ds'
 import { couleurEtat } from '../tokens'
-import { arbreCourant, jalonCourant } from '../derive'
+import { arbreCourant, jalonCourant, jalonLigne } from '../derive'
 import { ghost, head } from './common'
 import type { Ctx } from './common'
 import type { SignalPhase } from '../../types'
@@ -34,7 +34,7 @@ export function macro(ctx: Ctx): JSX.Element {
       ) : null}
       {current ? (
         <Text color={pal.text} wrap="wrap">
-          {`${G.done} ${oneLine(current.texte)} · ${faites(current.phases)}/${current.phases.length} phases`}
+          {`${G.done} ${jalonLigne(current)} · ${faites(current.phases)}/${current.phases.length} phases`}
         </Text>
       ) : (
         ghost(ui, pal, 'aucun jalon ouvert')
@@ -67,7 +67,7 @@ export function macro(ctx: Ctx): JSX.Element {
             .map(j => (
               <Box paddingLeft={2}>
                 <Text color={pal['text-3']} wrap="wrap">
-                  {`${G.todo} ${oneLine(j.texte)} · ${faites(j.phases)}/${j.phases.length}`}
+                  {`${G.todo} ${jalonLigne(j)} · ${faites(j.phases)}/${j.phases.length}`}
                 </Text>
               </Box>
             ))}

@@ -37,3 +37,10 @@ Deux assertions héritées mises à jour sur place dans `vf-signal.test.tsx` (29
 | M5 « toi · » retiré en compact | MB-R10 |
 | M6 `statutNoeud` identité | MB-R11a, MB-R11b-failed/error/red, R6-A1 |
 | M7 coupe à 40 colonnes sans chercher le mot | MB-R6b — après avoir changé le titre du témoin : le premier titre tombait sur un blanc à la colonne 40, le mutant survivait |
+
+## Passe 2 — R6 dans la vue macro (demande du manager mgr68, même arbitrage P68-D-35)
+
+Témoin MB-R6c (vue macro, deux jalons) : attendu `■ vibeflow-v2.0 · « le cockpit VibeFlow » · 0/2 phases` et `· autre-v1 · Gouvernance · 0/1`, sans `**` ni backtick. Rouge sur `aa6ca957` : 0 ligne trouvée (attendu 1), sortie scratchpad `mb-p2-rouge.out`.
+Correctif : `views/macro.tsx` rend `jalonLigne` pour le jalon courant et les jalons ouverts.
+Vert : `claude plugin test plugin` 116 pass / 0 fail ; `validate --strict` passed ; `test-cockpit-signal-mod.sh` 40 ok / 0 ko sous bash et zsh.
+Mutant : jalons ouverts remis en `oneLine(j.texte)` → MB-R6c rouge (`mb-p2-mut.out`), fichier restauré.
