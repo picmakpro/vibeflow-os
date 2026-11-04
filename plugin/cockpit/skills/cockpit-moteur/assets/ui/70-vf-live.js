@@ -19,8 +19,8 @@
   style.textContent = `
     #vf-lock { font: 500 12px/1 var(--mono, monospace); gap: 6px; }
     #vf-lock .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-4); display: inline-block; }
-    #vf-lock.held .dot { background: var(--st-active, #f59e0b); animation: vfpulse 1.6s ease-in-out infinite; }
-    #vf-lock.off .dot { background: var(--st-blocked, #ef4444); }
+    #vf-lock.held .dot { background: var(--st-active); animation: vfpulse 1.6s ease-in-out infinite; }
+    #vf-lock.off .dot { background: var(--st-blocked); }
     @keyframes vfpulse { 50% { opacity: .25; } }
     /* D2 (recette 2026-11-02) : le tiroir reprend la marge des panneaux ouverts par showPanel (.sec : 18px 20px 6px, 22 px en premier et dernier enfant) ; sur grand écran sa boîte suit son contenu (plafonnée à la fenêtre, défilement au-delà) au lieu de s'étirer jusqu'en bas.
        Sous 701 px le panneau est un tiroir du bas dont la mise en page appartient au viewer : on n'y touche pas. */

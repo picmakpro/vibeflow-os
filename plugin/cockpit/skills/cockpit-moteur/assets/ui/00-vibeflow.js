@@ -21,15 +21,16 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    :root { --st-done: var(--recent); --st-active: #f59e0b; --st-todo: var(--text-4); --st-blocked: #ef4444; }
+    :root { --st-done: var(--recent); --st-active: var(--sev-medium); --st-todo: var(--text-4); --st-blocked: var(--sev-high); }
     .vf-tabs { display: inline-flex; gap: 2px; padding: 3px; margin-left: 14px; border-radius: 12px; background: var(--raise); flex: none; }
     .vf-tabs a { padding: 5px 13px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text-3); text-decoration: none; line-height: 1.4; }
-    .vf-tabs a:hover { color: var(--text-1, inherit); }
-    .vf-tabs a.on { background: var(--surface); color: var(--text-1, inherit); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+    .vf-tabs a:hover { color: var(--text); }
+    .vf-tabs a.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
     /* 69-05 : trois onglets au lieu de deux : resserrés à toute largeur pour tenir à côté de la marque, du fil d'Ariane, de la recherche et du zoom (mesuré par test-cockpit-responsive.sh) */
       .vf-tabs { margin-left: 10px; padding: 2px; } .vf-tabs a { padding: 5px 6px; font-size: 12px; }
     .vst { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
-      color: var(--c-st); background: color-mix(in srgb, var(--c-st) 14%, transparent); }
+      /* texte teinté vers --text : le statut seul passait sous 4,5:1 sur sa pastille en thème clair (recette 69) */
+      color: color-mix(in srgb, var(--c-st) 68%, var(--text)); background: color-mix(in srgb, var(--c-st) 14%, transparent); }
     .vst-done { --c-st: var(--st-done); } .vst-active { --c-st: var(--st-active); } .vst-todo { --c-st: var(--st-todo); } .vst-blocked { --c-st: var(--st-blocked); }
     .card.st-active { box-shadow: 0 0 0 1.5px var(--st-active), 0 8px 28px color-mix(in srgb, var(--st-active) 22%, transparent); }
     .card.st-blocked { box-shadow: 0 0 0 1.5px var(--st-blocked); }
@@ -41,7 +42,7 @@
     .vf-ms .t { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 500; }
     .vf-ms .t span:last-child { color: var(--text-3); font-weight: 400; font-variant-numeric: tabular-nums; }
     .vf-now { padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--st-active) 8%, transparent); font-size: 13px; line-height: 1.55; }
-    .vf-now b { display: block; font-size: 11.5px; color: var(--st-active); margin-bottom: 3px; font-weight: 600; }
+    .vf-now b { display: block; font-size: 11.5px; color: color-mix(in srgb, var(--st-active) 68%, var(--text)); margin-bottom: 3px; font-weight: 600; }
     .vf-link { display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; border-radius: 10px; font-size: 12.5px; color: inherit; text-decoration: none; }
     .vf-link:hover { background: var(--surface-hover); }
     .vf-link code { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-2); word-break: break-all; }
