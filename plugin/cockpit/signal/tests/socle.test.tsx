@@ -22,8 +22,12 @@ test("K1 — argv de l'émetteur : node, le script du plugin, la racine de sessi
   const ui = await pane($)
   expect(lab.emetteur().length).toBeGreaterThan(0)
   const a = lab.emetteur()[0]!
-  expect(a.argv).toEqual(['node', `${$.plugin.root}/cockpit/scripts/vf-cockpit-signal.mjs`, '/lab'])
-  expect(a.cwd).toBe($.plugin.root)
+  // la racine du plugin n'est pas lisible sur le `$` du test : elle se déduit du script, et le cwd doit être elle
+  expect(a.argv[0]).toBe('node')
+  expect(a.argv[2]).toBe('/lab')
+  expect(a.cwd).toBeDefined()
+  expect(a.cwd).not.toBe('/lab')
+  expect(a.argv[1]).toBe(`${a.cwd}/cockpit/scripts/vf-cockpit-signal.mjs`)
   expect(a.timeoutMs).toBe(15000)
   await ui.unmount()
 })

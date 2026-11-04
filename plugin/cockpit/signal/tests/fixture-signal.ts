@@ -90,9 +90,9 @@ export function labSignal(on: On, o: Opts = {}): LabSignal {
   on('process.run', async (_, e) => {
     const argv = e.argv as readonly string[]
     if (argv[0] !== 'node') return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
-    appels.push({ argv, cwd: e.cwd, timeoutMs: e.timeoutMs })
+    appels.push({ argv, cwd: e.init?.cwd, timeoutMs: e.init?.timeoutMs })
     if (o.delaiMs) await new Promise(r => setTimeout(r, o.delaiMs))
-    if (o.rejet) throw Object.assign(new Error(o.rejet.message), o.rejet.code ? { code: o.rejet.code } : {})
+    if (o.rejet) return { deny: `${o.rejet.code ? o.rejet.code + ': ' : ''}${o.rejet.message}` }
     return { value: { exitCode: o.exitCode ?? 0, stdout: o.stdout ?? JSON.stringify(SIGNAL), stderr: '', isStdoutTruncated: o.tronque === true, isStderrTruncated: false } }
   })
   return { appels, emetteur: () => appels }
