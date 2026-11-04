@@ -476,7 +476,38 @@
         "recette-pw-69"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
+    },
+    {
+      "id": "verif-merge-69",
+      "step": "verif-merge-69",
+      "stage": "",
+      "deps": [
+        "merge-main-69"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-69-merge",
+      "step": "fix-69-merge",
+      "stage": "",
+      "deps": [
+        "verif-merge-69"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-fix-69-recette",
+      "step": "verification fraiche correctifs recette+merge (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "fix-69-recette",
+        "fix-69-merge"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }

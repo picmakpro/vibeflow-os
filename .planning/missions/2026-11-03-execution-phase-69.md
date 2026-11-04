@@ -120,6 +120,65 @@ Rejeu complet à la tête `2177a34f` :
 - le job `gates` : 20 rejouées, 3 sautées, 0 en échec ;
 - les 21 suites du cockpit, toutes rc 0 : assemblage 40, avancement 61, chaine-xss 22, chrome-fr 26, direct 75, equipe 114, forme-claude 56, hygiene, marque-blanche 22, onglet-code 18, projet 35, questions 56, reconnexion 10, reseau 15, responsive 186, robustesse 25, securite 91, serveur 70, transcript 87, vendor 77, who 69 (chiffres en PASS, 0 FAIL).
 
+## Nœud pr-69 (2026-11-03 → 2026-11-04)
+
+Décisions : P69-D-29 à P69-D-34 (`69-CONTEXT.md`, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-03). La PR est séparée, sans release. Samuel fait la recette avant le merge. La suite responsive est acceptée. A, B, C et les points F sont corrigés dans la 69. D et E passent à la Phase 70.
+
+### Intégration de main
+
+Merge `1a62e8bf` (parents `410e73a9` et `41753d2e`). Le cockpit passe en v1.1.0 ; le CHANGELOG garde les entrées 1.0.1 et 1.0.2. La lecture des verrous par phase de la PR #197 est reprise dans le who de la 69. Le README racine compte 149 suites.
+
+Une vérification fraîche a rendu `gaps_found` avec un majeur : le `read` non borné de `vf-cockpit-drift.mjs`, venu de main. La correction est faite en 16c38d2e, 4b8a2170, 17cafb8e et 73d04fa6 :
+
+- `read` borné ;
+- témoins des verrous de phase W17 ;
+- grammaire ws et phase alignée sur `driver-lock.sh`.
+
+### Recette pré-déroulée dans Playwright, sans rien cocher (tête 410e73a9)
+
+8 étapes sur 14 passent :
+
+- 1 : lancement, trois onglets ;
+- 2 : 67 « 7/7 plans · 4 correctifs », 69 « à recetter · 9/9 », pied du jalon juste ;
+- 5 : le badge suit ;
+- 10 : aucun transcript avant le clic, aucun dans l'export ;
+- 11 : 1 440 px ;
+- 13 : 390 px, constat seulement ;
+- 14 : arrêt.
+
+6 étapes clochent :
+
+- A, étape 6 : tiroir figé ;
+- B, étape 7 : lien vers un nœud sans effet avant rechargement ;
+- C, étapes 8 et 9 : contenu demandé effacé ;
+- D et E, étapes 3, 4 et 12 : visuels, reportés en 70 ;
+- F : badge, titre, recherche, mention de troncature.
+
+### Corrections
+
+A, B, C et F1 à F4 : 960760c8, 7136db6d, 447325d1, 98b359c8, 77a17784, 89cf88cc, 08f6fa80. Chaque point a un témoin rouge dans un vrai Chrome, puis vert, et un mutant.
+
+Fixture de la suite responsive : e0680560. Le badge ne compte plus les nœuds de DAG (P69-D-33, F1), le lab de mesure reçoit donc un agent actif. Les assertions sont inchangées, et R7.5 garde la branche « Personne ».
+
+Vérification fraîche des deux passes : `passed`.
+
+### Rejeux à la tête e0680560
+
+- Job `gates` : `BILAN REJEU gates : 20 rejouee(s), 3 sautee(s), 0 en echec`.
+- Découverte complète : 149 suites (`scripts/ci-shard-suites.sh --all`, `GW_MODE=sans-mutants`, une à une), 149 jouées, 0 échec.
+- CI de la PR #198 sur e0680560 : 14 jobs `pass`, 1 `skipping` (mutants du guard de verrou, réservés à `main`).
+
+### Points ouverts ajoutés pour Samuel
+
+Ce sont des mineurs : des témoins manquent, mais le code est correct sur sonde. Aucun n'a été corrigé.
+
+1. Mutant m1, `72-vf-equipe.js:88` : effacer la clé de rechargement quand on change d'agent n'a aucun témoin.
+2. Mutant m10, T27.C2 : rien ne vérifie que seul l'identifiant est gardé en `sessionStorage`.
+3. Mutant m8, `70-vf-live.js:78` : rien ne vérifie qu'un tiroir fermé n'est pas rouvert par un `who`.
+4. Mutant m6, `vf-cockpit-who.mjs:82` : la clause `..` de la grammaire ws n'est gardée que par une ancre de texte.
+5. Mutant m5, `70-vf-live.js:~86` : le rendu `textContent` de la commande n'a pas de témoin, mais la voie est déjà réduite côté serveur.
+6. Le redessin du tiroir fait perdre le focus clavier (`activeElement` devient `BODY`). À reprendre en Phase 70.
+
 ## Preuves E6
 
 Les `preuves` sont relayées telles que les workers les ont rendues.
