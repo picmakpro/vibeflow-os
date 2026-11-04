@@ -2,6 +2,7 @@
 # test-cockpit-responsive.sh — CKPT-12 (P67-D-21) : la fenêtre du cockpit est ajustable, de 1 024 à 2 560 px, sans superposition ni rognage.
 #   R1 chargement à 1 024 / 1 280 / 1 440 / 1 920 / 2 560 px · R2 redimensionnement à chaud 1 920 -> 1 024 -> 1 920 · R3 rendu non cassé à 800 et 390 px
 #   R4 témoin rouge : le même lab sans la mise en page du cockpit rougit · R5 lab sans STATE.md : aucun champ vide dans le sous-titre ni le panneau
+#   R13 à R16 (70-04, Phase 70) : téléphone — en-tête sur une rangée avec menu « ⋯ », onglets à 13 px / piste à 3 px, zoom, tiroir, titre de la vue d'ensemble (voir le bloc en fin de suite)
 # Deux onglets (Code, Projet) × deux labs (nom court, nom de 60 caractères), badge « au travail » rempli : une session active par lab (P69-D-33 : le badge ne compte que les agents ;
 # un verrou ou un nœud de DAG ne suffisent plus). R7.5 : un lab sans agent actif, badge « Personne ».
 # Mesure : getBoundingClientRect dans un Chrome headless (chrome-responsive.mjs) — recouvrement des éléments frères, scrollWidth > clientWidth,
@@ -362,6 +363,79 @@ assert_eq "R7.5.0 — témoin : la mesure du lab sans agent a eu lieu sur les de
 for i in 0 1; do on=$([ $i = 0 ] && echo Code || echo Projet)
   assert_eq "R7.5.1 — $on, sans agent actif : l'aria-label du badge dit « Personne au travail »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" "j.resultats[$i].valeur.aria")" "Personne au travail"
   assert_eq "R7.5.2 — $on, sans agent actif : l'infobulle du badge dit « Personne au travail » et ne contient jamais « undefined »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" "(/^Personne au travail/.test(j.resultats[$i].valeur.titre)&&!/undefined/.test(j.resultats[$i].valeur.titre))+'|'+j.resultats[$i].valeur.titre.slice(0,60)")" "true|Personne au travail · repo : vf-dev-manager-v2-cockpit (miss"
+done
+
+# R13 à R16 (70-04 ; P70-D-01 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 ; P70-D-16 : même canal, même date ; P70-D-09 et P70-D-10 : choix du manager) — le téléphone (≤ 700 px) et les onglets.
+#   R13 en-tête : une seule rangée sur les trois onglets, aucune action dans la rangée, bouton « ⋯ » et son menu (une entrée par action présente, libellé visible, pastille reportée) ; onglets à 13 px, piste à 3 px à toutes les largeurs
+#   R14 zoom : hors de l'en-tête, pile verticale à gauche au-dessus de la barre de question, nom accessible français, position inchangée à 800 px, jamais sur « Remonter d'un niveau »
+#   R15 tiroir : pas de bouton Détail, ouvert par une carte ou par le titre de la vue d'ensemble, poignée et croix nommée, fermé par la croix, Échap ou le tap dans le vide
+#   R16 titre de la vue d'ensemble : un mot ne se coupe jamais sur deux lignes, sauf s'il est plus large que sa boîte (un nom de lab de 60 caractères ; un nom dont le mot à traits d'union tient dans la boîte)
+# Poignée = élément décoratif (aria-hidden) plus large que haut en tête du tiroir ; croix = bouton du tiroir dont le nom accessible commence par « Fermer » (le contrat est écrit ici, 70-05 le tient).
+echo "=== R13 à R16 — téléphone : en-tête sur une rangée, zoom, tiroir, titre ; onglets aux valeurs de DESIGN.md ==="
+LH="$WORK/Trajectoire du grand jalon pour la equipe-produit-v1.0"; mklab "$LH"
+srv "$LC/.vibeflow/cockpit"; P_c=$SRV_PORT; PID_c=$SRV_PID
+srv "$LL/.vibeflow/cockpit"; P_l=$SRV_PORT; PID_l=$SRV_PID
+srv "$LH/.vibeflow/cockpit"; P_h=$SRV_PORT; PID_h=$SRV_PID
+J_PAUSE='const p = (ms) => new Promise((r) => setTimeout(r, ms));'
+J_BADGE="const bt = document.getElementById('btn-recent'); if (bt && !bt.querySelector('.badge')) { const s = document.createElement('span'); s.className = 'badge'; s.textContent = '3'; bt.appendChild(s); }"
+INJ_MENU="(async () => { $J_PAUSE $INJ_CODE; $J_BADGE await p(300); document.getElementById('vf-plus')?.click(); for (let i = 0; i < 40 && !(document.getElementById('vf-plus-menu')?.getBoundingClientRect().width > 0); i++) await p(50); await p(100); return true; })()"
+INJ_DRILL="(async () => { $J_PAUSE window.VibeFlow.reveal('n:ph-1'); for (let i = 0; i < 100; i++) { const u = document.getElementById('btn-up'); if (u && !u.hidden) break; await p(50); } await p(300); return true; })()"
+J_OPEN="const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0); nd?.dispatchEvent(new MouseEvent('click', { bubbles: true })); for (let i = 0; i < 60 && getComputedStyle(document.getElementById('panel')).visibility !== 'visible'; i++) await p(50); await p(300);"
+INJ_CARTE="(async () => { $J_PAUSE $J_OPEN return true; })()"
+INJ_CROIX="(async () => { $J_PAUSE $J_OPEN [...document.querySelectorAll('#panel button')].find((b) => /^Fermer/i.test(b.getAttribute('aria-label') || ''))?.click(); await p(150); return true; })()"
+INJ_ECHAP="(async () => { $J_PAUSE $J_OPEN document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await p(150); return true; })()"
+INJ_VIDE="(async () => { $J_PAUSE $J_OPEN document.getElementById('svg').dispatchEvent(new MouseEvent('click', { bubbles: true })); await p(150); return true; })()"
+INJ_TITRE="(async () => { $J_PAUSE const h = document.querySelector('#context h1'); const r = h.getBoundingClientRect(); document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.dispatchEvent(new MouseEvent('click', { bubbles: true })); for (let i = 0; i < 60 && getComputedStyle(document.getElementById('panel')).visibility !== 'visible'; i++) await p(50); await p(300); return true; })()"
+# deux vagues de Chrome en parallèle (profils jetables distincts) ; les assertions se lisent ensuite
+OPIDS=()
+RESP_INJECT="$INJ_CODE" mes "http://127.0.0.1:$P_c/index.html" 390,768,800,1024,1440 - > "$WORK/r13-index.json" & OPIDS+=($!)
+mes "http://127.0.0.1:$P_c/project.html" 390,768,800,1024,1440 - > "$WORK/r13-project.json" & OPIDS+=($!)
+mes "http://127.0.0.1:$P_c/equipe.html" 390,768,800,1024,1440 - > "$WORK/r13-equipe.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_MENU" mes "http://127.0.0.1:$P_c/index.html" 390 - > "$WORK/r13-menu.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_DRILL" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r14-parcours.json" & OPIDS+=($!)
+wait "${OPIDS[@]}"; OPIDS=()
+RESP_INJECT="$INJ_CARTE" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-carte.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_CROIX" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-croix.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_ECHAP" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-echap.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_VIDE" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-vide.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_TITRE" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-titre.json" & OPIDS+=($!)
+mes "http://127.0.0.1:$P_l/project.html" 768,1440 - > "$WORK/r16-long.json" & OPIDS+=($!)
+mes "http://127.0.0.1:$P_h/project.html" 768,1440 - > "$WORK/r16-trait.json" & OPIDS+=($!)
+wait "${OPIDS[@]}"
+SRV_PID=$PID_c; unsrv; SRV_PID=$PID_l; unsrv; SRV_PID=$PID_h; unsrv
+mv_() { printf '%s' "$(cat "$1")" | node "$AUX/ev.mjs" "$2"; } # mv_ <fichier de mesures> <expression JS sur j>
+for onglet in index project equipe; do
+  F="$WORK/r13-$onglet.json"
+  assert_eq "R13.1 — $onglet / 390 px : l'en-tête tient sur une seule rangée" "$(mv_ "$F" 'j.mesures["390"].m.rangees')" "1"
+  assert_eq "R13.2 — $onglet / 390 px : aucune action dans la rangée, le bouton « ⋯ » est visible" "$(mv_ "$F" '(j.mesures["390"].m.actionsRangee||"")+"|"+j.mesures["390"].m.plus')" "|true"
+  for w in 390 1024 1440; do
+    assert_eq "R13.4 — $onglet / $w px : trois onglets à 13 px, piste à 3 px (DESIGN.md §5, P70-D-16)" "$(mv_ "$F" "(()=>{const o=j.mesures[\"$w\"].m.onglets;return o?o.n+'|'+o.police+'|'+o.piste:'onglets absents'})()")" "3|13px|3px/3px"
+  done
+done
+assert_eq "R13.3 — Code / 390 px, menu ouvert : une entrée par action présente (huit avec Travail récent et Écrans), libellé visible égal à celui du bouton d'origine, pastille reportée sur l'entrée et sur « ⋯ »" "$(mv_ "$WORK/r13-menu.json" '(()=>{const m=j.mesures["390"].m,s=m.sources,e=m.menu;if(!e)return "menu absent";const p=[];if(s.length<8)p.push("témoin : "+s.length+" actions seulement");if(!s.some((x)=>x.b))p.push("témoin : aucune pastille sur les boutons d origine");if(e.length!==s.length)p.push(e.length+" entrées pour "+s.length+" actions");s.forEach((x,i)=>{if(!e[i]||!e[i].t||e[i].t!==x.t)p.push("entrée "+i+" : ["+(e[i]&&e[i].t)+"] au lieu de ["+x.t+"]");if(e[i]&&e[i].b!==x.b)p.push("pastille de "+x.t+" : ["+(e[i]&&e[i].b)+"] au lieu de ["+x.b+"]")});if(s.some((x)=>x.b)&&!m.plusPastille)p.push("« ⋯ » sans pastille");return p.join(" ; ")||"aucune"})()')" "aucune"
+for onglet in index project equipe; do
+  F="$WORK/r13-$onglet.json"
+  assert_eq "R14.1 — $onglet / 390 px : le zoom n'est plus dans l'en-tête" "$(mv_ "$F" '(()=>{const z=j.mesures["390"].m.zoom;return z?z.entete+"|"+z.vis:"zoom absent"})()')" "false|true"
+  assert_eq "R14.2 — $onglet / 390 px : pile verticale à gauche, au-dessus de la barre de question sans la recouvrir" "$(mv_ "$F" '(()=>{const m=j.mesures["390"].m,z=m.zoom;if(!z)return "zoom absent";const p=[];if(z.dir!=="column")p.push("direction "+z.dir);if(z.r[0]>=195)p.push("à droite (x="+z.r[0]+")");if(m.askRect&&z.r[1]+z.r[3]>m.askRect[1])p.push("bas du zoom "+(z.r[1]+z.r[3])+" > haut de la question "+m.askRect[1]);return p.join(" ; ")||"ok"})()')" "ok"
+  for w in 390 768 1440; do
+    assert_eq "R14.3 — $onglet / $w px : chaque bouton de zoom a un nom accessible en français (différent de sa source anglaise)" "$(mv_ "$F" "(()=>{const z=j.mesures[\"$w\"].m.zoom;if(!z||!z.boutons.length)return 'zoom absent';return z.boutons.filter((b)=>!b.aria||/^(zoom out|fit to screen|zoom in)/i.test(b.aria)).map((b)=>b.id+' ['+b.aria+']').join(' | ')||'aucun'})()")" "aucun"
+  done
+done
+for onglet in index project; do # sur l'onglet Équipe, la position du zoom à ≥ 701 px change en 70-12 (P70-D-20) : non jugée ici
+  assert_eq "R14.4 — $onglet / 800 px : la position du zoom est celle d'avant la phase (x,y,largeur,hauteur relevés au premier passage)" "$(mv_ "$WORK/r13-$onglet.json" '(()=>{const z=j.mesures["800"].m.zoom;return z?z.r.join(","):"zoom absent"})()')" "340,108,52,144"
+done
+assert_eq "R14.5 — Projet / 390 px, pendant un parcours : le zoom et « Remonter d'un niveau » ne se recouvrent pas" "$(mv_ "$WORK/r14-parcours.json" '(()=>{const m=j.mesures["390"].m,z=m.zoom,u=m.upRect;if(!u)return "témoin : « Remonter » absent (aucun parcours)";if(!z||!z.vis)return "zoom absent";const a=z.r,b=u;const x=Math.min(a[0]+a[2],b[0]+b[2])-Math.max(a[0],b[0]),y=Math.min(a[1]+a[3],b[1]+b[3])-Math.max(a[1],b[1]);return x>1.5&&y>1.5?"recouvrement "+Math.round(x)+"x"+Math.round(y)+" px":"aucun"})()')" "aucun"
+assert_eq "R15.1 — 390 px : le bouton Détail est invisible sur les trois onglets" "$(mv_ "$WORK/r13-index.json" 'j.mesures["390"].m.btnPanel')|$(mv_ "$WORK/r13-project.json" 'j.mesures["390"].m.btnPanel')|$(mv_ "$WORK/r13-equipe.json" 'j.mesures["390"].m.btnPanel')" "false|false|false"
+assert_eq "R15.2 — Projet / 390 px : le tap d'une carte ouvre le tiroir" "$(mv_ "$WORK/r15-carte.json" 'j.mesures["390"].m.tiroir')" "true"
+assert_eq "R15.3 — Projet / 390 px, tiroir ouvert : une poignée visible et une croix visible au nom accessible français" "$(mv_ "$WORK/r15-carte.json" '(()=>{const m=j.mesures["390"].m;return m.tiroir?"poignée "+m.poignee+" · croix "+m.croix:"tiroir fermé (témoin)"})()')" "poignée true · croix true"
+assert_eq "R15.4 — Projet / 390 px : la croix ferme le tiroir" "$(mv_ "$WORK/r15-croix.json" 'j.mesures["390"].m.tiroir')" "false"
+assert_eq "R15.4b — Projet / 390 px : Échap ferme le tiroir (le viewer)" "$(mv_ "$WORK/r15-echap.json" 'j.mesures["390"].m.tiroir')" "false"
+assert_eq "R15.4c — Projet / 390 px : le tap dans le vide ferme le tiroir (le viewer)" "$(mv_ "$WORK/r15-vide.json" 'j.mesures["390"].m.tiroir')" "false"
+assert_eq "R15.5 — Projet / 390 px : le tap du titre de la vue d'ensemble ouvre le tiroir" "$(mv_ "$WORK/r15-titre.json" 'j.mesures["390"].m.tiroir')" "true"
+for spec in "long:r16-long" "trait:r16-trait"; do
+  for w in 768 1440; do
+    assert_eq "R16 — lab « ${spec%%:*} » / $w px : aucun mot du titre de la vue d'ensemble n'est coupé sur deux lignes (sauf un mot plus large que sa boîte)" "$(mv_ "$WORK/${spec#*:}.json" "(()=>{const m=j.mesures[\"$w\"].m;if(!m.titreMots||!m.titreMots.length)return 'mesure vide : titre absent';return m.titreMots.filter((w)=>w.rect>1&&!w.large).map((w)=>w.mot+' x'+w.rect+' (boîte '+m.titreBoite+' px)').join(' | ')||'aucun'})()")" "aucun"
+  done
 done
 
 vf_hyg_assert

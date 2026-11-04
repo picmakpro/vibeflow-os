@@ -5,6 +5,7 @@
 // Rend sur une ligne { mesures: { "<largeur>" | "resize:<a>:<b>" | "resize:<b>:<a>": { v: [violations], m: {chiffres} } } } ou { erreur }.
 // Une violation = deux éléments frères visibles qui se recouvrent, un texte rogné (scrollWidth > clientWidth), un élément hors de la fenêtre,
 // un bouton ou lien d'en-tête qui sort de la fenêtre (x + largeur > innerWidth), une recherche, un logo ou une barre de question sous leur taille minimale (sur plusieurs lignes tolérée sous 1 000 px : le gabarit étroit du viewer). RESP_INJECT : expression évaluée après le chargement (boutons d'en-tête optionnels de l'onglet Code, absents d'un lab de test). Le HOME réel est rendu à Chrome (REAL_HOME).
+// 70-04 : mesures neuves rangées dans `m` seulement (rangees, actionsRangee, plus, plusPastille, sources, menu, onglets, zoom, askRect, upRect, btnPanel, tiroir, poignee, croix, titreMots) ; les interactions (ouvrir le menu, taper une carte, le titre, la croix, Échap, le vide, lancer un parcours) passent par RESP_INJECT, une interaction par chargement (la mesure attend deux relevés identiques : la mise en page est posée).
 import fs from 'node:fs'; import path from 'node:path';
 import { executer } from './chrome-session.mjs';
 const [, , chrome, url, largeurs, resize, shots] = process.argv;
@@ -64,6 +65,38 @@ const MESURE = `(() => {
     const pan = document.querySelector('#panel'), libreD = pan && vis(pan) && vw >= 1000 ? rec(pan).left : vw;
     m.carte = Math.round(g.l) + '..' + Math.round(g.r) + ' / libre 0..' + Math.round(libreD);
     if (g.r > libreD + 1 || g.l < -1) v.push('carte : sort de la zone libre (' + m.carte + ')');
+  }
+  // --- 70-04 (UIFN-01 à UIFN-03, P70-D-16) : mesures neuves, rangées dans m seulement (jamais dans v : R1 à R8 gardent leur sens)
+  const lib = (b) => (b.querySelector('.bl')?.textContent || b.getAttribute('aria-label') || b.getAttribute('title') || '').trim();
+  const pastille = (b) => (b.querySelector('.badge')?.textContent || '').trim();
+  const arr = (r) => [r.left, r.top, r.width, r.height].map(Math.round);
+  const act = [...hd.querySelectorAll('.hr button')].filter((b) => !['vf-lock', 'vf-plus', 'btn-panel'].includes(b.id) && !b.hidden);
+  // rangées : éléments terminaux visibles de l'en-tête, regroupés par centre vertical (tolérance 4 px ; des éléments de hauteurs différentes d'une même rangée n'ont pas le même haut)
+  const centres = [...hd.querySelectorAll('.brand, .vf-tabs, #btn-up, #search-btn, #zoom, .hr button')].filter(vis).map((e) => rec(e).top + rec(e).height / 2).sort((a, b) => a - b);
+  m.rangees = 0; for (let i = 0, d = -1e9; i < centres.length; i++) if (centres[i] - d > 4) { m.rangees++; d = centres[i]; }
+  m.actionsRangee = act.filter(vis).map((b) => b.id || b.className).join(',');
+  const pl = document.querySelector('#vf-plus'); m.plus = !!(pl && vis(pl)); m.plusPastille = pl ? pastille(pl) : '';
+  m.sources = act.map((b) => ({ id: b.id, t: lib(b), b: pastille(b) }));
+  const mn = document.querySelector('#vf-plus-menu');
+  m.menu = mn && vis(mn) ? [...mn.querySelectorAll('[role="menuitem"]')].filter(vis).map((e) => { const c = e.cloneNode(true); c.querySelector('.badge')?.remove(); return { t: c.textContent.trim(), b: pastille(e) }; }) : null;
+  const tabs = [...hd.querySelectorAll('.vf-tabs a')], piste = hd.querySelector('.vf-tabs');
+  m.onglets = piste && tabs.length ? { n: tabs.length, police: [...new Set(tabs.map((a) => getComputedStyle(a).fontSize))].join('/'), piste: getComputedStyle(piste).paddingTop + '/' + getComputedStyle(piste).paddingLeft, pad: getComputedStyle(tabs[0]).paddingLeft } : null;
+  const zm = document.querySelector('#zoom'), af = document.querySelector('#ask-form'), up = document.querySelector('#btn-up');
+  m.zoom = zm ? { entete: hd.contains(zm), vis: vis(zm), dir: getComputedStyle(zm).flexDirection, r: arr(rec(zm)), boutons: [...zm.querySelectorAll('button')].map((b) => ({ id: b.id, aria: b.getAttribute('aria-label') || '', title: b.getAttribute('title') || '' })) } : null;
+  m.askRect = af && vis(af) ? arr(rec(af)) : null; m.upRect = up && vis(up) ? arr(rec(up)) : null;
+  const bp = document.querySelector('#btn-panel'), pn = document.querySelector('#panel');
+  m.btnPanel = !!(bp && vis(bp)); m.tiroir = !!(pn && vis(pn)) && !document.body.classList.contains('no-panel');
+  m.poignee = !!pn && [...pn.querySelectorAll('[aria-hidden="true"]')].some((e) => vis(e) && rec(e).width >= 24 && rec(e).height <= 8 && rec(e).top - rec(pn).top < 24);
+  m.croix = !!pn && [...pn.querySelectorAll('button')].some((b) => vis(b) && /^Fermer/i.test(b.getAttribute('aria-label') || ''));
+  // titre de la vue d'ensemble : un mot (suite de caractères non blancs, d'un seul tenant même si le texte est coupé en plusieurs noeuds) sur plusieurs rectangles = coupé ; exempt s'il est plus large que sa boîte
+  const h1 = document.querySelector('#context h1');
+  if (h1 && vis(h1)) {
+    const noeuds = [], tw = document.createTreeWalker(h1, NodeFilter.SHOW_TEXT); let t, txt = ''; while ((t = tw.nextNode())) { noeuds.push({ n: t, d: txt.length }); txt += t.data; }
+    const pos = (i) => { let k = noeuds.length - 1; while (k > 0 && noeuds[k].d > i) k--; return [noeuds[k].n, i - noeuds[k].d]; };
+    m.titreMots = []; for (const w of txt.matchAll(/\\S+/g)) { const rg = document.createRange(), [a, ao] = pos(w.index), [z, zo] = pos(w.index + w[0].length - 1); rg.setStart(a, ao); rg.setEnd(z, zo + 1);
+      const rs = [...rg.getClientRects()].filter((r) => r.width > 0), larg = rs.reduce((s, r) => s + r.width, 0);
+      m.titreMots.push({ mot: w[0], rect: rs.length, large: larg > h1.clientWidth }); }
+    m.titreBoite = h1.clientWidth; m.titreTexte = txt;
   }
   m.pointeur = ['none', 'coarse', 'fine'].find((p) => matchMedia('(pointer: ' + p + ')').matches) || '?';
   return { v, m };
