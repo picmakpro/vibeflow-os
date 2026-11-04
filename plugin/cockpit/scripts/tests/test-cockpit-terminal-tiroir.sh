@@ -216,8 +216,12 @@ await executer(chrome, async (s) => {
     });
     await essai('expire-q', async () => { // J13 : carte d'alerte focalisée par programme ; J5 : commande et point jamais coupés
       await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+      // refuse-p et expire-p ont laissé vf.terminal.open=1 dans le stockage de P : le rechargement de P rouvrirait le tiroir, donc un SECOND cadre Q dont carte('expire') prend aussi le focus (le dernier chargé
+      // gagne, course). Un seul cadre Q pendant la mesure : on efface la mémoire d'ouverture avant de naviguer. Le focus perdu au chargement reste rouge ; la sonde dit pageFocus, l'élément actif et les cadres de P.
+      await s.ev(`localStorage.removeItem('vf.terminal.open')`);
       await q.naviguer(); await q.attendre(CARTE('Session expirée'), 'carte Session expirée');
-      r.alerte = await q.ev(`(() => { const k = document.querySelector('.vf-q-carte'), c = getComputedStyle(k); return { titre: (document.querySelector('.vf-q-titre') || {}).textContent, focus: document.activeElement === k, fv: k.matches(':focus-visible'), role: k.getAttribute('role'), contour: c.outlineStyle }; })()`);
+      const SONDE_J13 = `(() => { const k = document.querySelector('.vf-q-carte'), c = getComputedStyle(k); return { titre: (document.querySelector('.vf-q-titre') || {}).textContent, focus: document.activeElement === k, fv: k.matches(':focus-visible'), role: k.getAttribute('role'), contour: c.outlineStyle, pageFocus: document.hasFocus(), actif: document.activeElement && document.activeElement.tagName }; })()`;
+      r.alerte = await q.ev(SONDE_J13); r.alerte.cadresP = await s.ev(`document.querySelectorAll('iframe').length`);
       r.coupure = await balayer('.vf-q-commande', '.vf-q-corps', LARGEURS, q);
     });
     return r;
@@ -548,6 +552,7 @@ assert_eq "T20.1 (J1) — barre du tiroir, état refusé (autre onglet) : libell
 assert_eq "T20.2 (J1) — la barre dit le même état que la carte de Q : le libellé de la barre est contenu dans le titre de la carte, pour refusé et expiré" "$(rj "$E" '"refuse="+j.refuse.titre.toLowerCase().includes(j.barreRefuse.texte.toLowerCase())+" expire="+j.alerte.titre.toLowerCase().includes(j.barreExpire.texte.toLowerCase())')" "refuse=true expire=true"
 assert_eq "T20.3 (J6) — sous la carte « déjà ouvert » : ni terminal, ni grille xterm, ni curseur visibles (témoin : la grille existe dans le DOM et la carte est visible)" "$(rj "$E" '"terminal="+j.refuse.terminal+" xterm="+j.refuse.xterm+" curseur="+j.refuse.curseur+" present="+j.refuse.xtermPresent+" carte="+j.refuse.carte')" "terminal=false xterm=false curseur=0 present=true carte=true"
 assert_eq "T20.6 (J13) — carte d'alerte focalisée par programme : elle a le focus et :focus-visible est vrai (témoin), mais aucune bague de focus" "$(rj "$E" '"focus="+j.alerte.focus+" fv="+j.alerte.fv+" role="+j.alerte.role+" contour="+j.alerte.contour')" "focus=true fv=true role=alert contour=none"
+[ "$(rj "$E" 'j.alerte.focus')" = "true" ] || echo "     ℹ T20.6 — focus perdu au chargement : pageFocus=$(rj "$E" 'j.alerte.pageFocus') actif=$(rj "$E" 'j.alerte.actif') cadres_de_P=$(rj "$E" 'j.alerte.cadresP')"
 assert_eq "T20.5 (J5, carte de Q) — la commande /vf-cockpit --terminal ne se coupe jamais et son point final reste collé, à huit largeurs de fenêtre (témoin : la carte a changé de largeur au moins trois fois)" "$(rj "$E" '"mal="+JSON.stringify(j.coupure.mal)+" larges="+(j.coupure.largeurs>=3)')" 'mal=[] larges=true'
 
 echo "=== T21 — géométrie du tiroir : zoom, Ajuster, barre de question, visite (recette 71, E2 et G1 ; P71-D-34, P71-D-35) ==="
