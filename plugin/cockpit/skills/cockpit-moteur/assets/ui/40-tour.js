@@ -122,7 +122,6 @@
     return zs.sort((p, q) => (q.r - q.l) * (q.b - q.t) - (p.r - p.l) * (p.b - p.t))[0] || { l, t, r, b };
   }
   // put the card in the middle of that zone, zooming in on a small card and out on one wider than the zone, but never zooming in so far that the rest of the map leaves the free area;
-  // the viewer's own wheel handler does the moving (pan, ctrl+wheel to zoom)
   function aim(id, retry) {
     const g = SC.state.chipEls?.get(id); if (!g) return;
     const box = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
@@ -133,18 +132,24 @@
     const cx = (r.l + r.r) / 2, cy = (r.t + r.b) / 2, zw = z.r - z.l, zh = z.b - z.t;
     const narrow = innerWidth < 701; // on a phone the whole map is tiny: a small card is zoomed until it can be read, and the rest of the map may leave the screen
     let f = Math.max(1, Math.min(narrow ? 4 : 1.6, zw * (narrow ? 0.6 : 0.45) / r.w, zh * (narrow ? 0.6 : 0.45) / r.h)); // in on a small card...
-    const fU = Math.max(1, Math.min(F.w ? (F.r - F.l) / (U.r - U.l) : 1, (F.b - F.t) / (U.b - U.t)));
+    const fU = Math.max(1, Math.min(F.w ? (F.r - F.l) / (U.r - U.l) : 1, (F.b - F.t) / (U.b - U.t))); // the largest zoom that keeps the whole map in the free area
     // ...not past the point where the whole map no longer fits; on a phone only down to the size where the card can still be read (120 px wide), the rest of the map may then leave the screen
     f = narrow ? Math.max(Math.min(f, fU), Math.min(f, 120 / r.w)) : Math.min(f, fU);
     f = Math.min(f, 0.92 * zw / r.w, 0.92 * zh / r.h); // ...and out on a card wider than its zone: it must fit whole
     const wheel = (o) => svg.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaMode: 0, ...o }));
-    // where things land after the zoom (around the card's centre) and the move that centres the card
     const at = (k) => ({ l: cx + (k.l - cx) * f, r: cx + (k.r - cx) * f, t: cy + (k.t - cy) * f, b: cy + (k.b - cy) * f });
     const c = at(r), u = at(U), dx0 = (z.l + z.r) / 2 - cx, dy0 = (z.t + z.b) / 2 - cy;
-    const clamp = (d, lo, hi) => (lo <= hi ? Math.min(hi, Math.max(lo, d)) : d);
-    const dx1 = clamp(dx0, F.l - u.l, F.r - u.r), dy1 = clamp(dy0, F.t - u.t, F.b - u.b); // keep the whole map in the free area when it fits there
+    const clamp = (d, lo, hi) => (lo <= hi ? Math.min(hi, Math.max(lo, d)) : d), dx1 = clamp(dx0, F.l - u.l, F.r - u.r), dy1 = clamp(dy0, F.t - u.t, F.b - u.b); // keep the whole map in the free area when it fits there
     const inZone = (dx, dy) => c.l + dx >= z.l - 1 && c.r + dx <= z.r + 1 && c.t + dy >= z.t - 1 && c.b + dy <= z.b + 1;
-    const [dx, dy] = inZone(dx1, dy1) ? [dx1, dy1] : [dx0, dy0];
+    // centred in the zone and the whole map in the free area when both hold; else the whole map in the free area if the card then stays visible and not under the tour card (a tall tour card leaves a narrow zone, and centring in it would push the rest of the map out); else just centred
+    const cr = { left: card.offsetLeft, top: card.offsetTop, right: card.offsetLeft + card.offsetWidth, bottom: card.offsetTop + card.offsetHeight };
+    const visibleAt = (dx, dy) => c.l + dx >= F.l - 1 && c.r + dx <= F.r + 1 && c.t + dy >= F.t - 1 && c.b + dy <= F.b + 1 && !(c.l + dx < cr.right && c.r + dx > cr.left && c.t + dy < cr.bottom && c.b + dy > cr.top);
+    let [dx, dy] = inZone(dx1, dy1) ? [dx1, dy1] : [dx0, dy0];
+    if (!inZone(dx1, dy1) && (u.r - u.l) <= (F.r - F.l) && (u.b - u.t) <= (F.b - F.t)) {
+      const xs = [F.l - u.l, F.r - u.r], ys = [F.t - u.t, F.b - u.b]; let best = null; // all moves that keep the whole map in the free area: take the one nearest to centring that leaves the card visible, not under the tour card
+      for (let i = 0; i <= 12; i++) for (let j = 0; j <= 12; j++) { const x = xs[0] + (xs[1] - xs[0]) * i / 12, y = ys[0] + (ys[1] - ys[0]) * j / 12, d = Math.hypot(x - dx0, y - dy0); if (visibleAt(x, y) && (!best || d < best.d)) best = { d, x, y }; }
+      if (best) [dx, dy] = [best.x, best.y];
+    }
     vp.classList.add('anim');
     if (Math.abs(f - 1) > 0.02) wheel({ ctrlKey: true, deltaY: -Math.log(f) / 0.01, clientX: cx, clientY: cy });
     wheel({ deltaX: -dx || -0.01, deltaY: -dy }); // deltaX is never 0: a pure vertical wheel would be read as a zoom
@@ -201,9 +206,8 @@
   function unfold() { const p = document.querySelector('#context p'); if (p && p.dataset.tourFold !== undefined) { p.style.display = p.dataset.tourFold; delete p.dataset.tourFold; } }
   function place(folded) {
     if (!folded) unfold();
-    // the card must not cover any fixed surface of the interface: zoom controls, details panel, title block, header, Ask bar and its notices, the outlined target (and any surface added later
-    // that shows up in this list). Every candidate (width, side, height above an obstacle) is scored by the area it covers, then by its distance from the usual place; the lowest cost wins,
-    // ties go to the first in a fixed order: the result depends on nothing but the layout (never on timing, fonts or pointer)
+    // the card must not cover any fixed surface (zoom controls, details panel, title block, header, Ask bar and notices, the outlined target). Every candidate (width, side, height above an obstacle)
+    // is scored by the area it covers, then by its distance from the usual place; lowest cost wins, ties go to the first in a fixed order: nothing but the layout decides (never timing, fonts or pointer)
     const vis = visible;
     const obs = obstacles(vis);
     placedSig = sigOf(obs);

@@ -8,7 +8,7 @@
 // 70-12 : fenetre, nCartes, carte1, titreRect, titreCarte, zoomCartes, filRect, rechercheRect, filRecherche (page Équipe, UIFN-14).
 // 70-04 : mesures neuves rangées dans `m` seulement (rangees, actionsRangee, plus, plusPastille, sources, menu, onglets, zoom, askRect, upRect, btnPanel, tiroir, poignee, croix, titreMots) ; les interactions (ouvrir le menu, taper une carte, le titre, la croix, Échap, le vide, lancer un parcours) passent par RESP_INJECT, une interaction par chargement (la mesure attend deux relevés identiques : la mise en page est posée).
 import fs from 'node:fs'; import path from 'node:path';
-import { executer } from './chrome-session.mjs';
+import { executer, pause } from './chrome-session.mjs';
 const [, , chrome, url, largeurs, resize, shots] = process.argv;
 const HAUT = { 390: 844, 800: 600, 1024: 768, 1280: 800, 1440: 900, 1920: 1080, 2560: 1300 };
 const hauteur = (w) => HAUT[w] || Math.round(w * 0.625);
@@ -126,12 +126,24 @@ await executer(chrome, async (s) => {
     mesures[cle] = await s.stable(MESURE, `mesure de la mise en page à ${cle}`);
     if (shots) { const c = await s.send('Page.captureScreenshot', { format: 'png' }); fs.mkdirSync(shots, { recursive: true }); fs.writeFileSync(path.join(shots, cle.replace(/[^\w]+/g, '-') + '.png'), Buffer.from(c.data, 'base64')); }
   };
+  // la mesure se prend quand le graphe et la carte de visite ne bougent plus : mêmes positions sur deux relevés espacés de 250 ms (plafond 5 s). Le cadrage de la visite s'anime ; sur un runner lent, la mesure tombait parfois en plein transit
+  // (R1 long / project / 1 024 px, intermittent). RESP_SANS_ATTENTE=1 retire l'attente (mutant, pour prouver que la course est vue).
+  const CALME = "(() => { const b = (e) => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom].map(Math.round); }; const n = [...document.querySelectorAll('#svg g.node')].map(b); const T = document.getElementById('tour'); const t = window.VibeFlow && window.VibeFlow.state.t; return { n: n.length ? [Math.min(...n.map((x) => x[0])), Math.min(...n.map((x) => x[1])), Math.max(...n.map((x) => x[2])), Math.max(...n.map((x) => x[3]))] : null, tour: T && !T.hidden ? b(T) : null, t: t && [t.k, t.x, t.y].map((v) => Math.round(v * 100)), anim: document.getElementById('viewport') && document.getElementById('viewport').classList.contains('anim') }; })()";
+  // calme : la même valeur sur des relevés espacés de 150 ms pendant au moins 800 ms (plus long qu'un arrêt de l'animation), sans classe « anim » ; plafond 6 s
+  const calme = async (w) => { if (process.env.RESP_SANS_ATTENTE) return; const fin = Date.now() + 6000; let prec = null, depuis = 0;
+    while (Date.now() < fin) { let c = null; try { c = JSON.stringify(await s.ev(CALME)); } catch { c = null; } const maintenant = Date.now();
+      if (c && c === prec && !/"anim":true/.test(c)) { if (maintenant - depuis >= 800) return; } else { prec = c; depuis = maintenant; }
+      await pause(150); } };
   const charger = async (w) => { await taille(w); await s.naviguer(url); await s.attendre(PRET, `page prête à ${w} px`);
     // RESP_POLICE=1 : police large imposée à la carte de visite, au titre et aux cartes du graphe (Verdana, puis DejaVu Sans ; l'en-tête et la barre de question gardent la police du poste : DejaVu est moins large que Verdana, R1 « invite tronquée » rougirait sans rapport avec la visite), la contrainte du runner Linux (DejaVu Sans, plus large que macOS) reproduite sur n'importe quel poste ; mêmes assertions
     if (process.env.RESP_POLICE) await s.ev("(() => { const st = document.createElement('style'); st.id = 'vf-police-large'; st.textContent = '#tour, #tour *, #context, #context *, #svg * { font-family: Verdana, \\'DejaVu Sans\\', sans-serif !important; letter-spacing: 0.06em !important; }'; document.head.appendChild(st); })()");
     // la visite d'office s'ouvre 700 ms après le rendu (plus tard sous une machine lente) : on attend qu'elle soit ouverte, ou qu'elle ait eu tout son temps pour l'être (onglet Équipe, lien vers un endroit précis, ou graphe trop petit : elle ne s'ouvre pas), PUIS on mesure ; jamais marquée « vue » d'avance (70-07, classe visite / surfaces)
     await s.attendre("(() => { if (document.body.classList.contains('vf-tab-equipe') || location.hash.length > 1) return true; return !!window.VibeFlowTour && window.VibeFlowTour.active(); })()", `visite d'office ouverte ou écartée à ${w} px`, 1800).catch(() => {});
-    if (process.env.RESP_INJECT) await s.ev(process.env.RESP_INJECT); };
+    // RESP_COURSE=1 : le graphe est en transit, avec un ARRÊT de 700 ms au milieu (un runner lent fige un moment l'animation : deux relevés espacés de 250 ms y sont identiques) : 400 px -> 250 px en 1,3 s, immobile 700 ms (de 1,3 s à 2 s), 250 px -> 0 en 500 ms.
+    // Sans l'attente de calme ci-dessous, la mesure prise pendant l'arrêt voit le graphe décalé (carte hors de la zone libre).
+    if (process.env.RESP_COURSE) await s.ev("(() => { const sv = document.getElementById('svg'); const t0 = performance.now(); const f = (t) => { const d = t - t0; const x = d < 1300 ? 400 - 150 * d / 1300 : d < 2000 ? 250 : d < 2500 ? 250 * (1 - (d - 2000) / 500) : 0; sv.style.transform = x ? 'translateX(' + Math.round(x) + 'px)' : ''; if (d < 2500) requestAnimationFrame(f); }; requestAnimationFrame(f); })()");
+    await calme(w);
+    if (process.env.RESP_INJECT) { await s.ev(process.env.RESP_INJECT); await calme(w); } };
   for (const w of largeurs.split(',').map(Number)) { await charger(w); await mesurer(String(w)); }
   if (resize && resize !== '-') {
     const [a, b] = resize.split(':').map(Number);

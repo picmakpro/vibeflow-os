@@ -617,6 +617,16 @@ assert_eq "O6.10 — témoin : la mesure a eu lieu sans erreur, au moins trois �
 for W in 1024 1920; do
   assert_eq "O6.10 [$W px] — Projet : étapes dont la carte ciblée sort de la zone libre, dont une carte du graphe sort de la zone libre à gauche du panneau, ou qui sélectionnent une carte (le panneau doit garder la vue d'ensemble, R5.3)" "$(x7 "j.l$W.etapes.filter((e)=>!e.dansZone||!e.toutLibre||e.selectionne).map((e)=>e.i).join(',')")" ""
 done
+# O6.19 passe « carte haute » (CI Linux de 83b13be4 : R1 « long / project / 1 024 px : carte : sort de la zone libre (245..692 / libre 0..648) », intermittent) : état STABLE, pas un transit. Une carte de visite de 300 px de haut au moins (texte long, police large)
+# ne laisse qu'une zone étroite à côté d'elle ; centrer la carte ciblée dans cette zone repoussait le reste du graphe sous le panneau. La carte ciblée doit rester visible hors de la carte de visite ET tout le graphe dans la zone libre à gauche du panneau
+# quand il y tient. Lab « nom long » (jalon, mission), Projet, 768, 1 024 et 1 440 px.
+XH="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P7" 768,1024,1440 cartehaute)"
+xh() { printf '%s' "$XH" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O6.19a — témoin : mesure sans erreur, au moins deux étapes à chaque largeur" "$(xh "j.erreur||''")|$(xh '[768,1024,1440].every((w)=>j["l"+w].n>=2)')" "|true"
+for W in 768 1024 1440; do
+  assert_eq "O6.19 [$W px] — Projet, carte de visite haute : étapes dont une carte du graphe sort de la zone libre à gauche du panneau, ou dont la carte ciblée est recouverte ou hors de sa zone" "$(xh "j.l$W.etapes.filter((e)=>!e.toutLibre||e.couvert||!e.dansZone).map((e)=>e.i).join(',')")" ""
+  diag17 "O6.19 Projet" "$XH" "$W"
+done
 unset VF_COCKPIT_PORT_BASE
 for L in "${LABS4[@]}"; do node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L" >/dev/null 2>&1; done; for p in "${SRVPIDS[@]}"; do vf_hyg_stop "$p"; done; SRVPIDS=()
 vf_hyg_assert
