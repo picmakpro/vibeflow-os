@@ -79,3 +79,23 @@ régénération est à refaire. Dans tous les cas :
 - **Manuel utilisateur** (`manual/fr/03-modules/catalogue.md`, `manual/fr/06-reference/skills.md` et leurs pages anglaises) : ils décrivent le cockpit « en lecture seule ». Aucun gate ne le
   compte ni ne le juge ; la mention de `--terminal` est à faire dans la passe de documentation qui suit les fusions des Phases 68 à 71.
 - **`check-gate-touche` / `check-ajout-retrait`** : aucun trailer requis pour 71-09 (aucun fichier de la surface de `check-gate-touche.sh`, aucun `SKILL.md` ajouté).
+
+## 5. Ajouts des tours de correction (manager, 2026-11-04)
+
+Re-dérivé par `git diff --name-status 7370d604..c023f54a -- plugin/` (statut M) : 17 fichiers existants modifiés, contre 7 au recensement initial.
+Les dix nouveaux viennent des correctifs F1, F6 (lanceur), N2 (binaires résolus en chemin absolu, P71-D-29), de la police (J3) et de la doc.
+
+| Fichier existant | Touché par | Ce que la 71 y change | Conflit attendu avec la 69 |
+|---|---|---|---|
+| `plugin/cockpit/scripts/vf-cockpit-who.mjs` | N2 | `git`, `bash` en chemin absolu | **oui** : la 69 réécrit ce module (équipe au travail) — reporter la résolution absolue sur sa version |
+| `plugin/cockpit/scripts/vf-cockpit-live.mjs` | N2 | `bash` en chemin absolu | **oui** : la 69 le modifie |
+| `plugin/cockpit/scripts/vf-cockpit-planning.mjs` | N2 | `git` en chemin absolu | **oui** : la 69 le modifie (avancement) |
+| `plugin/cockpit/scripts/vf-cockpit-paths.mjs` | N2 | `git` en chemin absolu | non prévu par la 69 |
+| `plugin/cockpit/scripts/vf-cockpit-build.mjs` | N2 | `PATH` assaini pour les enfants du moteur | non prévu par la 69 |
+| `plugin/cockpit/scripts/vf-cockpit.mjs` | 71-10, F1, F6, M6, N2 | `--terminal`, adresse de Q reconstruite, page de redirection 0600, `ps`/`open`/`xdg-open` absolus, `--no-open` toujours passé au serveur (le lanceur ouvre lui-même le navigateur, avec ou sans `--terminal`) | oui (bloc `open` de `main`) |
+| `plugin/cockpit/skills/cockpit-moteur/LICENCES-TIERCES.txt`, `VENDORED.txt` | 71-11, J3 | xterm 6.0.0, addon-fit 0.11.0, JetBrains Mono 2.304 (OFL), P25, TAILLE 614 | oui (`PATCH` et `TAILLE`) |
+| `plugin/cockpit/skills/vf-cockpit/SKILL.md` | 71-09, docs | `--terminal`, code 5 sur `server.json` planté | à vérifier |
+| `plugin/cockpit/scripts/tests/test-cockpit-chaine-xss.sh` | 71-08 | une ligne d'en-tête (renvoi) | non |
+
+Règle de fusion (inchangée) : recompter (`TAILLE`, nombre de suites des README racine), jamais additionner ; rejouer `synchro.sh verifier` et
+toutes les suites `test-cockpit-*.sh` après la fusion de `serve.mjs`.
