@@ -405,6 +405,25 @@ assert_eq "S12.2 — source des verrous illisible (aucun conductor) : la mission
 assert_eq "S12.3 — le contrat versionné déclare les états de mission dont vie vaut null (mission.vieNulle)" "$(G "$IFACE" '(j.schemas["vibeflow/cockpit-signal@1"].mission.vieNulle||["absent"]).slice().sort().join()')" "done,failed,inconnu,ready"
 assert_eq "S12.4 — l'en-tête de vf-cockpit-avancement.mjs dit que vie: null a deux sens départagés par etat (vieNulle)" "$(grep -c 'vie: null.*DEUX sens.*etat.*vieNulle' "$SCRIPTS/vf-cockpit-avancement.mjs" | sed 's/^[1-9].*/dit/')" "dit"
 
+echo "=== S13 — passe finale bornée, échéance à 0 ms (passe 2, RV-4, RV-5) ==="
+# Les entrées réelles sont déjà bornées en amont (un chemin ne dépasse pas PATH_MAX) : la borne générale se prouve sur la fonction elle-même.
+cat > "$AUX/brn.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+import path from 'node:path';
+const [, , scripts] = process.argv;
+const imp = (f) => import(pathToFileURL(path.join(scripts, f)).href);
+const s = await imp('vf-cockpit-signal.mjs'), p = await imp('vf-cockpit-paths.mjs');
+const o = s.assainir({ a: [{ b: 'x'.repeat(5000) }], c: 'y\u001b[31mz', n: 3, f: false, v: null });
+const t0 = Date.now(); const sortie = p.avecEcheance(0, () => p.shBorne('node', ['-e', 'console.log("lance")']));
+console.log(JSON.stringify({ borne: s.BORNE_GENERALE, long: o.a[0].b.length, ctl: o.c, passe: [o.n, o.f, o.v], zero: sortie, rapide: Date.now() - t0 < 1500 }));
+JS
+node "$AUX/brn.mjs" "$SCRIPTS" > "$WORK/o13.json" 2>/dev/null
+assert_eq "S13.1 — assainir : une chaîne de 5000 caractères sort à 1024, le contrôle est retiré, nombre, booléen et null passent" "$(G "$WORK/o13.json" 'j.borne+"|"+j.long+"|"+j.ctl+"|"+JSON.stringify(j.passe)')" '1024|1024|y[31mz|[3,false,null]'
+M131="$(mutant b1 'export const BORNE_GENERALE = 1024;' 'export const BORNE_GENERALE = 1000000;')"
+node "$AUX/brn.mjs" "$WORK/mut-b1/cockpit/scripts" > "$WORK/o13m.json" 2>/dev/null
+assert_eq "S13.2 — copie mutée (borne 1 000 000) détectée : la chaîne de 5000 caractères n'est plus bornée" "$M131|$(G "$WORK/o13m.json" 'j.long>1024')" "muté|true"
+assert_eq "S13.3 — échéance à 0 ms : shBorne ne lance rien (sortie vide) et rend aussitôt" "$(G "$WORK/o13.json" 'JSON.stringify(j.zero)+"|"+j.rapide')" '""|true'
+
 vf_hyg_assert
 echo
 echo "=== Résultats : $PASS PASS, $FAIL FAIL ==="

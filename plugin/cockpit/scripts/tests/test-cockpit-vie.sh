@@ -299,6 +299,16 @@ rm -rf "$LRP/.planning/DRIVER.lock" "$LRP/.git/vf-driver"
 Q "$SCRIPTS" "$LRP" "$CND" "$WORK/v137.json"
 assert_eq "V13.8 — lab plat, vrai script, verrou absent : abandonnee" "$(ONE "$WORK/v137.json" .etat)" "abandonnee"
 
+# ---------- V14 — le repli sur `status` ne vaut que pour un refus à sortie VIDE (passe 2, RV-5) ----------
+echo "=== V14 — --all qui répond du texte illisible : pas de repli, même si status répond ==="
+mkdir -p "$WORK/s-garbage"; printf '%s\n' "$J_TENU" > "$WORK/s-garbage/status.json"
+printf '#!/usr/bin/env bash\nfor a in "$@"; do [ "$a" = "--all" ] && { echo "ceci n est pas du json"; exit 1; }; done\ncase "$1" in status) cat "$(dirname "$0")/status.json";; esac\n' > "$WORK/s-garbage/driver-lock.sh"; chmod +x "$WORK/s-garbage/driver-lock.sh"
+Q "$SCRIPTS" "$LF" "$WORK/s-garbage" "$WORK/v141.json"
+assert_eq "V14.1 — --all répond du texte non vide (pas un refus) : source illisible, inconnu, status n'est pas consulté" "$(ONE "$WORK/v141.json" .etat)" "inconnu"
+M142="$(mut vide vf-cockpit-vie.mjs "&& brut.trim() === ''" "" 2>&1)"
+Q "$WORK/mut-vide" "$LF" "$WORK/s-garbage" "$WORK/v142.json"
+assert_eq "V14.2 — copie mutée (repli sans condition de sortie vide) détectée : la mission redevient running" "$M142|$(ONE "$WORK/v142.json" .etat)" "muté|running"
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"

@@ -1,6 +1,7 @@
 // vf-cockpit-paths — résolution des chemins du socle du cockpit (P67-D-12). Lecture seule.
 // Exports : findLabRoot, planningLayout, stateFile, resolveScriptsDir, trustedScriptsDir, driverLockScript,
-//           engineDir, outputDir, gitCommonDir, confiner, verifierSortie, realUnder.
+//           engineDir, outputDir, gitCommonDir, confiner, verifierSortie, realUnder,
+//           GIT_SUR (préfixe d'arguments de tout appel git), avecEcheance(ms, fn) et shBorne(cmd, args, cwd) (sous-processus bornés, échéance globale : F-06).
 // Aucun nom de compartiment, de jalon ou de projet codé en dur : tout vient du disque.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -133,8 +134,8 @@ export function avecEcheance(ms, fn) {
 // L'environnement de l'enfant a un PATH assaini (H-1, vf-cockpit-env.mjs) : `lab` (par défaut `cwd`) est le dossier dont aucun élément ne doit rester dans le PATH.
 export function shBorne(cmd, args, cwd, lab = cwd) {
   const reste = FIN === null ? 10000 : Math.min(10000, FIN - Date.now());
-  if (reste <= 0) return '';
-  try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: reste, env: envEnfant(lab) }); } catch (e) { return e.stdout || ''; }
+  if (!(reste >= 1)) return ''; // échéance atteinte (ou valeur non numérique) : rien n'est lancé ; jamais `timeout: 0`, qui voudrait dire « sans limite »
+  try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: Math.floor(reste), env: envEnfant(lab) }); } catch (e) { return e.stdout || ''; }
 }
 
 export function gitCommonDir(root) {

@@ -126,3 +126,14 @@ Vert : `test-cockpit-signal.sh` 70 PASS / 0 FAIL ; `test-cockpit-avancement.sh` 
 Les 24 suites `test-cockpit-*.sh` sauf `signal-mod`, une à une, bornées à 900 s (scratchpad `fix-socle-reg-<nom>.out`, résumé `fix-socle-reg-resume.txt`) : 20 vertes du premier coup. Quatre rouges — `chaine-xss`, `direct`, `projet`, `reconnexion` — ne portent QUE l'assertion `H0` (un processus Chrome `cdp-chrome-tmp.*` survit à la suite) : des suites Chrome d'autres sessions (`test-cockpit-terminal-session.sh`, `test-cockpit-projet.sh`) tournaient en même temps sur le poste. Rejouées seules, sans concurrence : les quatre vertes, 0 FAIL (`fix-socle-rejeu-*.out`).
 Replay zsh : `test-cockpit-vie.sh` (50 PASS) et `test-cockpit-signal.sh` (0 FAIL) verts sous `zsh` comme sous `bash`.
 `check-machine-paths.sh` : ✓ 2477 fichiers, aucun chemin absolu de machine. `check-gate-touche.sh` : RIEN-A-JUGER (aucun chemin de la surface surveillée touché), donc aucun trailer `Gate-Touche:` requis.
+
+## Passe 2 (après `git merge --ff-only feat/phase-68-vf-signal`, pointe `6b76c42c`)
+
+Format de sortie de l'émetteur inchangé (`scope` et `base` restent `null` quand ils le sont).
+
+- **RV-4** — `BORNE_GENERALE` sans témoin (1024 → 1 000 000 laissait S9 vert : toutes les entrées réelles sont bornées en amont, un chemin ne dépasse pas PATH_MAX). Témoin sur la fonction : `test-cockpit-signal.sh` S13.1 (5000 caractères → 1024, contrôle retiré, nombre/booléen/null intacts) et S13.2 (mutant borne 1 000 000 : `j.long>1024` vrai, donc détecté). Rouge = survie du mutant à la suite d'avant (mesure du reviewer) ; vert = S13.2 le tue. `assainir` était déjà exporté.
+- **RV-5a** — `brut.trim() === ''` non défendu. Témoin `test-cockpit-vie.sh` V14.1 (`--all` répond du texte non vide, `status` répondrait un verrou tenu : reste `inconnu`) et V14.2 (mutant sans la condition : `running`, détecté).
+- **RV-5b** — `shBorne` : `if (!(reste >= 1)) return ''` et `timeout: Math.floor(reste)` — jamais `timeout: 0` ; témoin S13.3 (`avecEcheance(0, …)` ne lance rien, rend aussitôt). Simple, donc posé ; vert avant comme après (la garde existait, elle est devenue explicite et sûre à NaN).
+- **RV-7** — en-tête de `vf-cockpit-paths.mjs` : `GIT_SUR`, `avecEcheance`, `shBorne` ajoutés aux exports.
+
+Vert : signal 72 PASS, vie 52 PASS, who 91 PASS, 0 FAIL (scratchpad `fix-socle-p2-*.out`), `check-machine-paths.sh` et `check-gate-touche.sh` (voir retour).
