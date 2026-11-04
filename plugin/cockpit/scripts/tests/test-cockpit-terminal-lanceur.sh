@@ -469,6 +469,27 @@ if mutant leurreterm 's/if (vif) { if (!arreter(sortie))/if (vif) { if (o.avecQ 
   vf_hyg_stop "$LEURRE_M"; rm -f "$SJ"
 else assert_eq "M-LEURRE-TERMINAL — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
+echo "=== L21 — P71-D-03 : le shell du terminal reçoit le PATH d'origine du lanceur (relatif compris) ; le serveur et ses enfants gardent le PATH assaini (H-1) ==="
+PABS21="$WORK/pabs21"; mkdir -p "$PABS21"; PO21="$PABS21:.:/usr/bin:/bin"
+shell_path() { # shell_path <lanceur> <PATH du lanceur> -> R21 = PATH vu par le shell (ou « absent ») ; S21 = PID du serveur (à arrêter)
+  rm -f "$AM" "$SJ"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"; S21=""
+  (cd "$LAB" && PATH="$2" "$NODE_ABS" "$1" open --terminal --no-open --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1)
+  S21="$(sj j.pid)"; local q sec f="$WORK/run/flux21-$NL.bin" fp v; R21=""
+  q="$(qport)"; [ -n "$q" ] || { R21=absent; return; }
+  sec="$(node "$TA" amorcer "$q" "$AM" | sed -n 2p)"; [ -n "$sec" ] || { R21=absent; return; }
+  node "$TA" flux "$q" "$sec" "$(printf 'a%.0s' $(seq 1 32))" "$f" 15000 > /dev/null 2>&1 & fp=$!
+  for _ in $(seq 1 80); do [ -s "$f" ] && break; sleep 0.1; done; sleep 1
+  node "$TA" entree "$q" "$sec" "$(printf 'a%.0s' $(seq 1 32))" "echo MQ''X=\$PATH=ZQ''X\\r" > /dev/null
+  node "$TA" attendre "$f" "=ZQX" 8000 > /dev/null; kill "$fp" 2>/dev/null; wait "$fp" 2>/dev/null
+  v="$(LC_ALL=C tr -d '\r' < "$f" | grep -a -o 'MQX=.*=ZQX' | tail -1)"; v="${v#MQX=}"; R21="${v%=ZQX}"
+}
+shell_path "$LAUNCH" "$PO21"; SP21="$S21"
+assert_eq "L21 — sous PATH=<dossier absolu>:.:/usr/bin:/bin, « echo \$PATH » dans le shell rend exactement le PATH d'origine du lanceur, « . » compris" "$R21" "$PO21"
+# le serveur, lui, garde le PATH assaini de H-1 (sans « . ») ; environnement illisible (ni /proc ni ps -Eww) : sauté, dit
+E21="$(env_du_serveur "$SP21" | tr '\0' '\n' | tr ' ' '\n' | sed -n 's/^PATH=//p' | head -1)"
+if [ -n "$E21" ]; then assert_eq "L21 — le serveur et ses enfants gardent le PATH assaini : aucun élément « . » ni vide, le dossier absolu d'origine gardé" "$([[ ":$E21:" != *":.:"* && ":$E21:" != *"::"* && ":$E21:" == *":$PABS21:"* ]] && echo oui || echo "non : $E21")" "oui"; else echo "  (L21 : environnement du serveur illisible, contrôle du PATH assaini sauté)"; fi
+[ -n "$SP21" ] && vf_hyg_stop "$SP21"
+
 echo "=== L22 — l'environnement du processus du terminal est celui de H-1 (envEnfant) : un élément absolu du PATH qui est un lien vers le lab est écarté ==="
 LNK22="$WORK/lien22"; ln -s "$LAB/src" "$LNK22"
 R22="$(cd "$LAB" && PATH="$LNK22:/usr/bin:/bin" "$NODE_ABS" --input-type=module -e "import { envDuProcessusTerminal } from 'file://$SCRIPTS/vf-cockpit-terminal.mjs'; console.log(envDuProcessusTerminal(process.argv[1]).PATH)" "$LAB" 2>&1)"

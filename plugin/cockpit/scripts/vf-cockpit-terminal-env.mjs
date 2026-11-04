@@ -1,7 +1,7 @@
 // vf-cockpit-terminal-env — environnement et choix du shell du terminal intégré (71-01 en pose l'amorce, 71-03 le filtre complet).
 // Exports : envShell(env, secrets) -> copie de l'environnement ; choisirShell(env) -> chemin absolu du shell ; AJOUTS_TOUJOURS.
 // Liste NOIRE seulement (P71-D-03, D-14) : CLAUDECODE, CLAUDE_CODE_*, VF_COCKPIT_* et toute valeur qui contient un jeton du cockpit sont retirés ;
-// le reste passe tel quel (NODE_OPTIONS compris : le cockpit ne le pose pas). Un jeton de moins de 16 caractères n'écarte rien (trop de faux positifs).
+// le PATH d'origine du lanceur est restitué (VF_COCKPIT_PATH_ORIGINE, P71-D-03) ; le reste passe tel quel (NODE_OPTIONS compris : le cockpit ne le pose pas). Un jeton de moins de 16 caractères n'écarte rien (trop de faux positifs).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,6 +19,10 @@ export function envShell(env, secrets = []) {
     if (typeof v === 'string' && interdits.some((s) => v.includes(s))) continue;
     sortie[k] = v;
   }
+  // P71-D-03 : le lanceur garde pour le shell le PATH d'origine dans VF_COCKPIT_PATH_ORIGINE (le serveur et ses enfants ont le PATH assaini de H-1). Restitué en PATH, puis retiré (le préfixe
+  // VF_COCKPIT_ l'a déjà écarté ci-dessus). Absente (serveur lancé sans le lanceur), le PATH reçu est conservé. Un jeton du cockpit dans la valeur l'écarte comme tout le reste.
+  const origine = env && env.VF_COCKPIT_PATH_ORIGINE;
+  if (typeof origine === 'string' && origine !== '' && !interdits.some((s) => origine.includes(s))) sortie.PATH = origine;
   Object.assign(sortie, AJOUTS_TOUJOURS);
   return sortie;
 }

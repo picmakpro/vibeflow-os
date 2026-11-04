@@ -175,6 +175,9 @@ async function demarrer(lab, sortie, o) {
   args.push('--port', String(o.port || portPrefere(lab)));
   // le serveur ne se fie qu'à ces deux chemins, posés ici depuis le module (jamais lus dans un .cache/ du lab)
   const env = { ...envEnfant(lab), VF_COCKPIT_ENGINE_DIR: engineDir(resolveScriptsDir(HERE)).chemin || '', VF_COCKPIT_SCRIPTS_DIR: resolveScriptsDir(HERE) };
+  // P71-D-03 (arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-03) : le shell du terminal reçoit le PATH D'ORIGINE du lanceur. Le serveur et ses enfants
+  // gardent le PATH assaini (H-1) ; le PATH d'origine voyage dans VF_COCKPIT_PATH_ORIGINE jusqu'au filtre du shell (vf-cockpit-terminal-env.mjs), qui le restitue en PATH puis le retire.
+  if (typeof process.env.PATH === 'string') env.VF_COCKPIT_PATH_ORIGINE = process.env.PATH;
   const enfant = spawn(process.execPath, args, { cwd: lab, env, detached: true, stdio: ['ignore', logFd, logFd] });
   enfant.unref();
   fs.closeSync(logFd);

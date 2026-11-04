@@ -356,7 +356,8 @@ echo "=== T15 — python3 du lab jamais exécuté par le serveur (F3 ; P71-D-25,
 python3_du_lab() { # python3_du_lab <nom> <sortie> <préfixe de PATH> [moteur] -> PY_RES : « <python3 du lab exécuté> <invite arrivée> <PATH du shell conserve le préfixe> »
   local lab; lab="$(cd "$2/../.." && pwd)"; rm -f "$WORK/leurre-python3.marque"
   printf '#!/bin/sh\necho execute > "%s/leurre-python3.marque"\nexit 1\n' "$WORK" > "$lab/python3"; chmod +x "$lab/python3"
-  ENVX=(PATH="$3$PATH"); local ok=oui; sess "$1" "$2" "${4:-$ENG}" || ok=non; ENVX=()
+  # P71-D-03 : le serveur est lancé directement ici ; le lanceur, lui, transmet le PATH d'origine dans VF_COCKPIT_PATH_ORIGINE, restitué en PATH au shell
+  ENVX=(PATH="$3$PATH" VF_COCKPIT_PATH_ORIGINE="$3$PATH"); local ok=oui; sess "$1" "$2" "${4:-$ENG}" || ok=non; ENVX=()
   local pp="non"; [ "$ok" = oui ] && { ent "echo SHPATH-\"\"[\$PATH]\\r" > /dev/null; wf "SHPATH-[$3" 3000 | grep -q TROUVE && pp="oui"; }
   PY_RES="$([ -e "$WORK/leurre-python3.marque" ] && echo execute || echo non) $ok $pp"; fin_sess; rm -f "$lab/python3"
 }
