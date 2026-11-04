@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-En Phase 71 (2026-11-04), `71-01-RED-TRACE.md` citait une sortie verbatim contenant `/Users/samuel/.local/bin/claude`.
+En Phase 71 (2026-11-04), `71-01-RED-TRACE.md` citait une sortie verbatim contenant `/Users/<compte>/.local/bin/claude`.
 `bash scripts/check-machine-paths.sh` a été vert à CHAQUE rejeu local pendant deux jours (job `gates` rejoué 4 fois par
 replay-ci-jobs.sh), puis le job `gates` de la PR #203 a rougi en 10 s sur cette ligne (« segment de compte samuel »).
 Le gate local ne voit pas le compte qui le lance ; le runner, si.
