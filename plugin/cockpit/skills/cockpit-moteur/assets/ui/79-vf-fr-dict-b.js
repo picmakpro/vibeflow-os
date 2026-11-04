@@ -86,4 +86,6 @@ window.__vfFrDict = Object.assign(window.__vfFrDict || {}, {
   "Storage bucket": "Espace de stockage",
   "Token": "Jeton",
   "Web requests": "Requêtes web",
+  // 70-03 : libellés de type de lien et formes construites à l'exécution
+  "Calls": "Appels",
 });
