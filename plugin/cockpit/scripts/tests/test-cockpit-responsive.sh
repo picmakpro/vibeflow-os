@@ -2,10 +2,14 @@
 # test-cockpit-responsive.sh — CKPT-12 (P67-D-21) : la fenêtre du cockpit est ajustable, de 1 024 à 2 560 px, sans superposition ni rognage.
 #   R1 chargement à 1 024 / 1 280 / 1 440 / 1 920 / 2 560 px · R2 redimensionnement à chaud 1 920 -> 1 024 -> 1 920 · R3 rendu non cassé à 800 et 390 px
 #   R4 témoin rouge : le même lab sans la mise en page du cockpit rougit · R5 lab sans STATE.md : aucun champ vide dans le sous-titre ni le panneau
+#   R13 à R16 (70-04, Phase 70) : téléphone — en-tête sur une rangée avec menu « ⋯ », onglets à 13 px / piste à 3 px, zoom, tiroir, titre de la vue d'ensemble (voir le bloc en fin de suite)
+#   R17 à R20 (70-12, Phase 70 ; P70-D-20) : onglet Équipe — R17 zoom en rangée en bas à gauche dès 701 px (Code et Projet inchangés), R18 fil d'Ariane / recherche, R19 titre / première carte, R20 page Équipe dans la matrice
 # Deux onglets (Code, Projet) × deux labs (nom court, nom de 60 caractères), badge « au travail » rempli : une session active par lab (P69-D-33 : le badge ne compte que les agents ;
 # un verrou ou un nœud de DAG ne suffisent plus). R7.5 : un lab sans agent actif, badge « Personne ».
 # Mesure : getBoundingClientRect dans un Chrome headless (chrome-responsive.mjs) — recouvrement des éléments frères, scrollWidth > clientWidth,
 # recherche >= 200 px, logo >= 20x18 sans filtre, barre de question sur une ligne avec son invite entière.
+# Durée (P70-D-18, mesurée par date +%s, poste chargé, load average 15) : 256 s avant, 74 s après — mêmes 191 libellés. Les mesures indépendantes (un Chrome chacune, profil jetable distinct) partent en même temps
+# et les assertions se lisent ensuite dans l'ordre d'origine ; le fil d'Ariane (O2b) attend l'état posé de la page (géométrie identique sur deux images), plus une durée fixe de 500 ms.
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
@@ -29,8 +33,9 @@ JS
 cat > "$AUX/viol.mjs" <<'JS'
 import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); const m = j.mesures?.[process.argv[2]];
 if (!m) { console.log('mesure absente : ' + (j.erreur || process.argv[2])); process.exit(0); }
-const bas = process.argv[3] === 'bas'; // sous 1 000 px le panneau est un tiroir fermé : seul l'en-tête et la barre de question sont mesurés
-const plein = m.m.enteteElements >= (bas ? 3 : 6) && (bas || /#panel/.test(m.m.surfaces || '')) && /#ask/.test(m.m.surfaces || '');
+const bas = /bas/.test(process.argv[3] || ''); // sous 1 000 px le panneau est un tiroir fermé : seul l'en-tête et la barre de question sont mesurés
+const equipe = /equipe/.test(process.argv[3] || ''); // 70-12 : l'onglet Équipe n'a pas de barre de question (« equipe » ou « equipe-bas »)
+const plein = m.m.enteteElements >= (bas ? 3 : 6) && (bas || /#panel/.test(m.m.surfaces || '')) && (equipe || /#ask/.test(m.m.surfaces || ''));
 console.log(!plein ? 'mesure vide : ' + JSON.stringify(m.m) : m.v.length ? m.v.slice(0, 4).join(' | ') : 'aucune');
 JS
 # faux verrou de driver (HOME jetable) : un propriétaire au nom long, comme en vraie mission
@@ -78,13 +83,24 @@ INJ_CODE="(() => { const SC = window.VibeFlow; SC.addHeaderButton({ id: 'btn-rec
 LC="$WORK/lab-court"; mklab "$LC"
 LL="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mklab "$LL"
 echo "=== R1, R2 — chargement et redimensionnement à chaud : deux onglets, deux labs ==="
-for spec in "court:$LC" "long:$LL"; do
-  nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; P=$SRV_PORT
-  assert_eq "0 — serveur du lab « $nom » démarré" "$([ "$P" -gt 0 ] && echo oui || echo non)" "oui"
+# P70-D-18 : les deux labs sont servis d'emblée et leurs six mesures (R1/R2 : quatre, R3 : deux) partent en même temps, un Chrome chacune ; les assertions se lisent ensuite, dans l'ordre d'origine
+srv "$LC/.vibeflow/cockpit"; P_court=$SRV_PORT; PID_court=$SRV_PID
+srv "$LL/.vibeflow/cockpit"; P_long=$SRV_PORT; PID_long=$SRV_PID
+MPIDS=()
+for nom in court long; do
+  eval "P=\$P_$nom"
   for onglet in index project; do
     inj=""; [ "$onglet" = index ] && inj="$INJ_CODE"
-    R="$(RESP_INJECT="$inj" mes "http://127.0.0.1:$P/$onglet.html" "$LARGES" 1920:1024 ${SHOTS:+"$SHOTS/$nom-$onglet"})"
-    echo "$R" > "$WORK/mes-$nom-$onglet.json"
+    RESP_INJECT="$inj" mes "http://127.0.0.1:$P/$onglet.html" "$LARGES" 1920:1024 ${SHOTS:+"$SHOTS/$nom-$onglet"} > "$WORK/mes-$nom-$onglet.json" & MPIDS+=($!)
+    if [ "$nom" = court ]; then mes "http://127.0.0.1:$P/$onglet.html" 800,390 - > "$WORK/mes3-$onglet.json" & MPIDS+=($!); fi
+  done
+done
+wait "${MPIDS[@]}"
+for nom in court long; do
+  eval "P=\$P_$nom"
+  assert_eq "0 — serveur du lab « $nom » démarré" "$([ "$P" -gt 0 ] && echo oui || echo non)" "oui"
+  for onglet in index project; do
+    R="$(cat "$WORK/mes-$nom-$onglet.json")"
     for w in ${LARGES//,/ }; do assert_eq "R1 — $nom / $onglet / $w px : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w")" "aucune"; done
     assert_eq "R2 — $nom / $onglet : 1 920 -> 1 024 à chaud" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "resize:1920:1024")" "aucune"
     assert_eq "R2 — $nom / $onglet : 1 024 -> 1 920 à chaud (retour)" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "resize:1024:1920")" "aucune"
@@ -92,12 +108,12 @@ for spec in "court:$LC" "long:$LL"; do
   if [ "$nom" = court ]; then
     echo "=== R3 — en dessous de 1 024 px : rendu non cassé (800 et 390 px) ==="
     for onglet in index project; do
-      R="$(mes "http://127.0.0.1:$P/$onglet.html" 800,390 -)"
+      R="$(cat "$WORK/mes3-$onglet.json")"
       for w in 800 390; do assert_eq "R3 — $onglet / $w px : aucune superposition d'en-tête, aucun défilement horizontal" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w" bas)" "aucune"; done
     done
   fi
-  unsrv
 done
+SRV_PID=$PID_court; unsrv; SRV_PID=$PID_long; unsrv
 echo "=== R5, R6 — lab sans STATE.md : aucun champ vide ; titre de l'onglet ; traduction avant la peinture ==="
 srv "$LC/.vibeflow/cockpit"; PC=$SRV_PORT
 EXPR='({ titre: document.title, ctx: (document.getElementById("context")||{}).innerText||"", panneau: (document.getElementById("panel")||{}).innerText||"" })'
@@ -145,12 +161,16 @@ done
 cat > "$AUX/o2b.js" <<'JS'
 (async () => { const pause = (ms) => new Promise((r) => setTimeout(r, ms)), SC = window.VibeFlow;
   if (location.pathname.endsWith('index.html') && !document.getElementById('btn-recent')) { SC.addHeaderButton({ id: 'btn-recent', label: 'Recent work', icon: 'recent', title: 'What was just worked on, on one board', onClick() {} }); SC.addHeaderButton({ id: 'screens-btn', label: 'Screens', icon: 'ui', title: 'Pick a screen of the app', onClick() {} }); }
-  for (let i = 0; i < 100 && !/travail/.test((document.getElementById('vf-lock') || {}).textContent || ''); i++) await pause(50);
+  for (let i = 0; i < 100 && !/travail|Personne/.test((document.getElementById('vf-lock') || {}).textContent || ''); i++) await pause(50);
+  // pose : la mise en page est posée quand deux images consécutives donnent la même géométrie (fil, en-tête, recherche) — l'état de la page, jamais une durée fixe (P70-D-18 : remplace pause(500))
+  const sig = () => [...document.getElementById('crumbs').children].map((e) => { const r = e.getBoundingClientRect(); return e.tagName + e.textContent.length + ':' + r.left + ',' + r.width + ',' + (e.hasAttribute('data-vf-masque') ? 1 : 0); }).join('|') + '|' + document.querySelector('header').scrollWidth + '|' + document.getElementById('search-btn').getBoundingClientRect().left;
+  const image = () => new Promise((r) => requestAnimationFrame(() => r()));
+  const pose = async () => { let prec = sig(); for (let i = 0; i < 100; i++) { await image(); await image(); const c = sig(); if (c === prec) return; prec = c; } };
   const fil = document.getElementById('crumbs'), proto = fil.querySelector('button'), sep0 = fil.querySelector('.sep') || Object.assign(document.createElement('span'), { className: 'sep', textContent: '/' });
   const jeux = { s3: ["Vue d'ensemble", 'dev-orchestrator', 'design-orchestrator'], s6: ["Vue d'ensemble", 'conductor-references', 'db', 'planning-core-lib', 'src', 'dev-orchestrator-refs'], s8: ["Vue d'ensemble", 'conductor-references', 'planning-core-lib', 'dev-orchestrator-refs', 'design-orchestrator', 'cockpit-moteur-assets', 'skills-references', 'last-segment-name-long'] }, out = { W: innerWidth };
   for (const [cle, segs] of Object.entries(jeux)) {
     fil.innerHTML = ''; segs.forEach((t, i) => { if (i) fil.appendChild(sep0.cloneNode(true)); const b = proto.cloneNode(false); b.textContent = t; b.className = i === segs.length - 1 ? 'cur' : ''; b.removeAttribute('data-vf-court'); b.removeAttribute('data-vf-masque'); fil.appendChild(b); });
-    await pause(500);
+    await pose();
     const hd = document.querySelector('header'), R = (e) => e.getBoundingClientRect(), vis = (e) => R(e).width > 0;
     const bs = [...fil.querySelectorAll('button')].filter(vis), n = bs.length, hl = R(document.querySelector('header .hl')), sb = R(document.getElementById('search-btn')), cr = R(fil);
     const pn = document.getElementById('proj-name');
@@ -195,8 +215,10 @@ o2b_mesure() { # o2b_mesure <port> <largeur> -> JSON (onglet Code puis Projet)
 echo "=== O2b — budget du fil d'Ariane (revue de la recette 3, F1/F2) : fils de 3 et 6 segments longs, badge présent, 1 280 / 1 300 / 1 320 / 1 440 px, onglets Code et Projet ==="
 for spec in "court:$LC" "long:$LL"; do
   nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; PB=$SRV_PORT
+  # les cinq largeurs se mesurent en même temps (un Chrome par largeur, profils jetables distincts) ; les assertions se lisent ensuite dans l'ordre d'origine (P70-D-18)
+  OPIDS=(); for w in 1280 1300 1320 1366 1440; do o2b_mesure "$PB" "$w" > "$WORK/o2b-$nom-$w.json" & OPIDS+=($!); done; wait "${OPIDS[@]}"
   for w in 1280 1300 1320 1366 1440; do
-    XB="$(o2b_mesure "$PB" "$w")"; echo "$XB" > "$WORK/o2b-$nom-$w.json"
+    XB="$(cat "$WORK/o2b-$nom-$w.json")"
     for jeu in s3 s6; do
       E="Code $nom,Projet $nom"; fq="$jeu"
       assert_eq "O2b.1 — $nom / $jeu / $w px : aucun bouton d'en-tête hors de la fenêtre (header.scrollWidth <= innerWidth), badge présent" "$(printf '%s' "$XB" | node "$AUX/o2b-viol.mjs" hors $jeu "$E")" "aucune"
@@ -222,13 +244,22 @@ mutant_o2b() { # mutant_o2b <nom> <nature> <ancien> <nouveau> : <ancien> doit ex
   node -e "
 const fs=require('fs');let n=0;for(const f of ['index.html','project.html']){const p='$M/.vibeflow/cockpit/'+f;const h=fs.readFileSync(p,'utf8');const o=process.argv[1],r=process.argv[2];if(!h.includes(o))continue;fs.writeFileSync(p,h.split(o).join(r));n++}
 if(!n){console.error('mutant $1 : motif introuvable');process.exit(1)}" "$3" "$4" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : motif introuvable dans la page"; return; }
-  srv "$M/.vibeflow/cockpit"; local XM; XM="$(o2b_mesure "$SRV_PORT" 1280)"; unsrv
-  assert_neq_aucune "O2b.m$1 — mutant « $5 » : la mesure « $2 » rougit à 1 280 px" "$(printf '%s' "$XM" | node "$AUX/o2b-viol.mjs" "$2" s6 "Code mutant,Projet mutant")"
+  srv "$M/.vibeflow/cockpit"; MUT_SRV+=("$SRV_PID"); MUT_ID+=("$1"); MUT_NAT+=("$2"); MUT_LIB+=("$5")
+  o2b_mesure "$SRV_PORT" 1280 > "$WORK/mut-o2b-$1.json" & MUT_PIDS+=($!) # les trois mutants se mesurent en même temps ; les verdicts tombent dans l'ordre d'origine (P70-D-18)
+}
+MUT_SRV=(); MUT_ID=(); MUT_NAT=(); MUT_LIB=(); MUT_PIDS=()
+mutants_o2b_verdicts() {
+  local i XM; [ "${#MUT_PIDS[@]}" -gt 0 ] && wait "${MUT_PIDS[@]}"
+  for i in "${!MUT_ID[@]}"; do
+    SRV_PID="${MUT_SRV[$i]}"; unsrv; XM="$(cat "$WORK/mut-o2b-${MUT_ID[$i]}.json")"
+    assert_neq_aucune "O2b.m${MUT_ID[$i]} — mutant « ${MUT_LIB[$i]} » : la mesure « ${MUT_NAT[$i]} » rougit à 1 280 px" "$(printf '%s' "$XM" | node "$AUX/o2b-viol.mjs" "${MUT_NAT[$i]}" s6 "Code mutant,Projet mutant")"
+  done
 }
 assert_neq_aucune() { if [ "$2" != "aucune" ] && [[ "$2" != "mesure absente"* ]] && [[ "$2" != *"témoin"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: une violation de la nature visée"; echo "     obtenu:  [${2:0:600}]"; FAIL=$((FAIL+1)); fi; }
 mutant_o2b 1 court 'header #crumbs button[data-vf-court] { flex: 0 0 auto; }' '' "règle des segments courts supprimée"
 mutant_o2b 2 hors '@media (max-width: 999px) { #ask-input' '@media (min-width: 1280px) { :root { --vf-crumbs: 560px; --vf-pn: 100px; } header .hl { min-width: min(calc(280px + var(--vf-crumbs, 0px) + var(--vf-pn, 0px)), 50vw); } } @media (max-width: 999px) { #ask-input' "min-width de 3a9331c8 remis"
 mutant_o2b 3 ordre 'button:not([data-vf-court]):not(:first-child):not(.cur) { flex: 0 100000 auto; }' 'button:not([data-vf-court]):not(:first-child):not(.cur) { flex: 0 1 auto; }' "milieu au même poids que les bouts"
+mutants_o2b_verdicts
 
 # I2 (recette 3, retour de Samuel, saisie texte, session principale, 2026-11-03) : « le flou sous le titre est trop dense, il faut aussi qu'il ai un radius fort en haut faible en bas, il doit etre comparable au blur iOS ».
 # Reprise (avis de Samuel, Wispr Flow, session principale, 2026-11-03 : « pas de bordure, un flou dégradé qui part du haut gauche et descend, comme le header, en mode iOS 26 ») :
@@ -263,14 +294,14 @@ const n=h.replace(/<script>\/\* ui\/01-vf-responsive\.js \*\/[\s\S]*?<\/script>/
 srv "$LM/.vibeflow/cockpit"; RM="$(mes "http://127.0.0.1:$SRV_PORT/project.html" 1440 - )"; unsrv
 assert_has "R4.1 — témoin rouge : sans 01-vf-responsive.js, l'en-tête à 1 440 px est signalé" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" 'j.mesures["1440"].v.join(" | ")')" "en-tête"
 
-# R4.2 — témoin rouge de R-1 (recalé en 69-05 : trois onglets, borne de 280 px, mutant à 280 + 36 = 316 px, même marge qu'avant : 264 -> 300) : la borne d'avant (colonne gauche de 316 px) fait sortir le dernier bouton de l'onglet Code à 1 024 px
+# R4.2 — témoin rouge de R-1 (recalculé en 70-04, P70-D-16 et P70-D-22 : borne de 342 px mesurée, badge « au travail » réduit à son point ; la place libre à 1 024 px va jusqu'à une borne de 380 px, mesurée : le mutant à 342 + 58 = 400 px reste rouge avec de la marge, alors que 342 + 36 tenait encore) : une colonne gauche de 400 px fait sortir le dernier bouton de l'onglet Code à 1 024 px
 LM2="$WORK/lab-mutant2"; mkdir -p "$LM2/.planning/missions" "$LM2/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$LM2/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$LM2/.planning/missions/"
 agent_actif "$LM2"   # sans agent actif le badge dit « Personne », plus étroit : la mesure ne verrait plus le même en-tête
 node -e "
 const fs=require('fs');const p='$LM2/.vibeflow/cockpit/index.html';const h=fs.readFileSync(p,'utf8');
-const n=h.replace('header .hl { flex: 1 1 0; min-width: 280px; }','header .hl { flex: 1 1 0; min-width: 316px; }');if(n===h){console.error('mutant : borne de 280 px introuvable');process.exit(1)}fs.writeFileSync(p,n)" || FAIL=$((FAIL+1))
+const n=h.replace('header .hl { flex: 1 1 0; min-width: 342px; }','header .hl { flex: 1 1 0; min-width: 400px; }');if(n===h){console.error('mutant : borne de 342 px introuvable');process.exit(1)}fs.writeFileSync(p,n)" || FAIL=$((FAIL+1))
 srv "$LM2/.vibeflow/cockpit"; RM2="$(RESP_INJECT="$INJ_CODE" mes "http://127.0.0.1:$SRV_PORT/index.html" 1024 - )"; unsrv
-assert_has "R4.2 — témoin rouge : avec la colonne gauche à 316 px, un bouton de l'en-tête sort de la fenêtre à 1 024 px (onglet Code)" "$(printf '%s' "$RM2" | node "$AUX/ev.mjs" 'j.mesures["1024"].v.join(" | ")')" "sort de la fenêtre"
+assert_has "R4.2 — témoin rouge : avec la colonne gauche à 400 px, un bouton de l'en-tête sort de la fenêtre à 1 024 px (onglet Code)" "$(printf '%s' "$RM2" | node "$AUX/ev.mjs" 'j.mesures["1024"].v.join(" | ")')" "sort de la fenêtre"
 
 # R8 — témoin indépendant de la police ET de la plateforme : Chrome headless sous Linux n'a aucun périphérique de pointage (`pointer: none`) ; la mise en page
 # « souris » du cockpit était écrite `(pointer: fine)` et ne s'appliquait pas là (CI, run 41370886002, 8 rouges à 1 024 px) alors que macOS (`fine`) passait. Le même
@@ -278,25 +309,38 @@ assert_has "R4.2 — témoin rouge : avec la colonne gauche à 316 px, un bouton
 echo "=== R8 — aucun périphérique de pointage (pointer: none) : mêmes assertions R1 à 1 024, 1 280 et 1 440 px ==="
 CHROME_NOPTR="$AUX/chrome-sans-pointeur.sh"
 printf '#!/bin/sh\nexec "%s" --blink-settings=primaryPointerType=1,availablePointerTypes=1,primaryHoverType=1,availableHoverTypes=1 "$@"\n' "$CHROME" > "$CHROME_NOPTR"; chmod +x "$CHROME_NOPTR"
-for spec in "court:$LC" "long:$LL"; do
-  nom="${spec%%:*}"; lab="${spec#*:}"; srv "$lab/.vibeflow/cockpit"; P=$SRV_PORT
+srv "$LC/.vibeflow/cockpit"; P_court=$SRV_PORT; PID_court=$SRV_PID
+srv "$LL/.vibeflow/cockpit"; P_long=$SRV_PORT; PID_long=$SRV_PID
+MPIDS=()
+for nom in court long; do
+  eval "P=\$P_$nom"
   for onglet in index project; do
     inj=""; [ "$onglet" = index ] && inj="$INJ_CODE"
-    R="$(RESP_INJECT="$inj" REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-responsive.mjs" "$CHROME_NOPTR" "http://127.0.0.1:$P/$onglet.html" 1024,1280,1440 -)"
+    RESP_INJECT="$inj" REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-responsive.mjs" "$CHROME_NOPTR" "http://127.0.0.1:$P/$onglet.html" 1024,1280,1440 - > "$WORK/r8-$nom-$onglet.json" & MPIDS+=($!)
+  done
+done
+wait "${MPIDS[@]}"
+for nom in court long; do
+  for onglet in index project; do
+    R="$(cat "$WORK/r8-$nom-$onglet.json")"
     assert_eq "R8.0 — $nom / $onglet : le Chrome du témoin n'a bien aucun pointeur" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.mesures["1024"].m.pointeur')" "none"
     for w in 1024 1280 1440; do assert_eq "R8 — $nom / $onglet / $w px sans pointeur : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w")" "aucune"; done
   done
-  unsrv
 done
+SRV_PID=$PID_court; unsrv; SRV_PID=$PID_long; unsrv
 
 # R9 — témoin indépendant de la police : des métriques de texte plus larges que celles d'Inter (interlettrage +5 % sur tout l'en-tête, injecté après le chargement)
 # ne doivent faire ni recouvrir, ni rogner, ni sortir de la fenêtre un seul élément de l'en-tête à 1 024 px — la mise en page ne dépend d'aucune largeur de police calibrée.
 INJ_LARGE="(() => { const st = document.createElement('style'); st.textContent = 'header, header * { letter-spacing: 0.05em !important; }'; document.head.appendChild(st); return true; })()"
 echo "=== R9 — métriques de texte élargies (interlettrage +5 %) : mêmes assertions R1 à 1 024 px ==="
-srv "$LL/.vibeflow/cockpit"; P=$SRV_PORT
+srv "$LL/.vibeflow/cockpit"; P=$SRV_PORT; MPIDS=()
 for onglet in index project; do
   inj="$INJ_LARGE"; [ "$onglet" = index ] && inj="$INJ_CODE; $INJ_LARGE"
-  R="$(RESP_INJECT="$inj" mes "http://127.0.0.1:$P/$onglet.html" 1024 -)"
+  RESP_INJECT="$inj" mes "http://127.0.0.1:$P/$onglet.html" 1024 - > "$WORK/r9-$onglet.json" & MPIDS+=($!)
+done
+wait "${MPIDS[@]}"
+for onglet in index project; do
+  R="$(cat "$WORK/r9-$onglet.json")"
   assert_eq "R9 — long / $onglet / 1 024 px, texte élargi : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "1024")" "aucune"
 done
 unsrv
@@ -341,6 +385,198 @@ for th in sombre clair; do
   assert_eq "R5 — $th : gris neutre, le jeton de « À faire » (aucune couleur en dur dans la pastille)" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" "(j.$th||{}).classe")" "vst vst-abandonnee"
   assert_eq "R7 — $th : le texte du pied et la pastille tiennent dans la carte (droite, bas), texte non rogné" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" "(j.erreur||'')+[(j.$th||{}).dedansTexte,(j.$th||{}).dedansPastille,(j.$th||{}).rogne].join('|')")" "true|true|false"
 done
+
+# R13 à R16 (70-04 ; P70-D-01 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 ; P70-D-16 : même canal, même date ; P70-D-09 et P70-D-10 : choix du manager) — le téléphone (≤ 700 px) et les onglets.
+#   R13 en-tête : une seule rangée sur les trois onglets, aucune action dans la rangée, bouton « ⋯ » et son menu (une entrée par action présente, libellé visible, pastille reportée) ; onglets à 13 px, piste à 3 px à toutes les largeurs
+#   R14 zoom : hors de l'en-tête, pile verticale à gauche au-dessus de la barre de question, nom accessible français, position inchangée à 800 px, jamais sur « Remonter d'un niveau »
+#   R15 tiroir : pas de bouton Détail, ouvert par une carte ou par le titre de la vue d'ensemble, poignée et croix nommée, fermé par la croix, Échap ou le tap dans le vide
+#   R16 titre de la vue d'ensemble : un mot ne se coupe jamais sur deux lignes, sauf s'il est plus large que sa boîte (un nom de lab de 60 caractères ; un nom dont le mot à traits d'union tient dans la boîte)
+# Poignée = élément décoratif (aria-hidden) plus large que haut en tête du tiroir ; croix = bouton du tiroir dont le nom accessible commence par « Fermer » (le contrat est écrit ici, 70-05 le tient).
+echo "=== R13 à R16 — téléphone : en-tête sur une rangée, zoom, tiroir, titre ; onglets aux valeurs de DESIGN.md ==="
+LH="$WORK/Trajectoire du grand jalon pour la equipe-produit-v1.0"; mklab "$LH"
+srv "$LC/.vibeflow/cockpit"; P_c=$SRV_PORT; PID_c=$SRV_PID
+srv "$LL/.vibeflow/cockpit"; P_l=$SRV_PORT; PID_l=$SRV_PID
+srv "$LH/.vibeflow/cockpit"; P_h=$SRV_PORT; PID_h=$SRV_PID
+J_PAUSE='const p = (ms) => new Promise((r) => setTimeout(r, ms));'
+J_BADGE="const bt = document.getElementById('btn-recent'); if (bt && !bt.querySelector('.badge')) { const s = document.createElement('span'); s.className = 'badge'; s.textContent = '3'; bt.appendChild(s); }"
+INJ_MENU="(async () => { $J_PAUSE $INJ_CODE; $J_BADGE await p(300); document.getElementById('vf-plus')?.click(); for (let i = 0; i < 40 && !(document.getElementById('vf-plus-menu')?.getBoundingClientRect().width > 0); i++) await p(50); await p(100); return true; })()"
+INJ_DRILL="(async () => { $J_PAUSE window.VibeFlow.reveal('n:ph-1'); for (let i = 0; i < 100; i++) { const u = document.getElementById('btn-up'); if (u && !u.hidden) break; await p(50); } await p(300); return true; })()"
+J_OPEN="const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0); nd?.dispatchEvent(new MouseEvent('click', { bubbles: true })); for (let i = 0; i < 60 && getComputedStyle(document.getElementById('panel')).visibility !== 'visible'; i++) await p(50); await p(300);"
+INJ_CARTE="(async () => { $J_PAUSE $J_OPEN return true; })()"
+INJ_CROIX="(async () => { $J_PAUSE $J_OPEN [...document.querySelectorAll('#panel button')].find((b) => /^Fermer/i.test(b.getAttribute('aria-label') || ''))?.click(); await p(150); return true; })()"
+# la visite d'office (700 ms après le rendu) est la couche du dessus et capte la première Échap : sous Linux, plus lent, elle s'ouvre pendant la mesure ; R15.4b mesure le tiroir, visite fermée (70-07, O6.15 fixe l'ordre des deux)
+INJ_ECHAP="(async () => { $J_PAUSE $J_OPEN window.VibeFlowTour?.end(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await p(150); return true; })()"
+INJ_VIDE="(async () => { $J_PAUSE $J_OPEN document.getElementById('svg').dispatchEvent(new MouseEvent('click', { bubbles: true })); await p(150); return true; })()"
+INJ_TITRE="(async () => { $J_PAUSE const h = document.querySelector('#context h1'); const r = h.getBoundingClientRect(); document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.dispatchEvent(new MouseEvent('click', { bubbles: true })); for (let i = 0; i < 60 && getComputedStyle(document.getElementById('panel')).visibility !== 'visible'; i++) await p(50); await p(300); return true; })()"
+# deux vagues de Chrome en parallèle (profils jetables distincts) ; les assertions se lisent ensuite
+OPIDS=()
+RESP_INJECT="$INJ_CODE" mes "http://127.0.0.1:$P_c/index.html" 390,768,800,1024,1440 - > "$WORK/r13-index.json" & OPIDS+=($!)
+mes "http://127.0.0.1:$P_c/project.html" 390,768,800,1024,1440 - > "$WORK/r13-project.json" & OPIDS+=($!)
+mes "http://127.0.0.1:$P_c/equipe.html" 390,768,800,1024,1440 - > "$WORK/r13-equipe.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_MENU" mes "http://127.0.0.1:$P_c/index.html" 390 - > "$WORK/r13-menu.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_DRILL" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r14-parcours.json" & OPIDS+=($!)
+wait "${OPIDS[@]}"; OPIDS=()
+RESP_INJECT="$INJ_CARTE" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-carte.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_CROIX" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-croix.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_ECHAP" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-echap.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_VIDE" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-vide.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_TITRE" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-titre.json" & OPIDS+=($!)
+mes "http://127.0.0.1:$P_l/project.html" 768,1440 - > "$WORK/r16-long.json" & OPIDS+=($!)
+mes "http://127.0.0.1:$P_h/project.html" 768,1440 - > "$WORK/r16-trait.json" & OPIDS+=($!)
+wait "${OPIDS[@]}"
+SRV_PID=$PID_c; unsrv; SRV_PID=$PID_l; unsrv; SRV_PID=$PID_h; unsrv
+mv_() { printf '%s' "$(cat "$1")" | node "$AUX/ev.mjs" "$2"; } # mv_ <fichier de mesures> <expression JS sur j>
+for onglet in index project equipe; do
+  F="$WORK/r13-$onglet.json"
+  assert_eq "R13.1 — $onglet / 390 px : l'en-tête tient sur une seule rangée" "$(mv_ "$F" 'j.mesures["390"].m.rangees')" "1"
+  assert_eq "R13.2 — $onglet / 390 px : aucune action dans la rangée, le bouton « ⋯ » est visible" "$(mv_ "$F" '(j.mesures["390"].m.actionsRangee||"")+"|"+j.mesures["390"].m.plus')" "|true"
+  for w in 390 1024 1440; do
+    assert_eq "R13.4 — $onglet / $w px : trois onglets à 13 px, piste à 3 px (DESIGN.md §5, P70-D-16)" "$(mv_ "$F" "(()=>{const o=j.mesures[\"$w\"].m.onglets;return o?o.n+'|'+o.police+'|'+o.piste:'onglets absents'})()")" "3|13px|3px/3px"
+  done
+done
+assert_eq "R13.3 — Code / 390 px, menu ouvert : une entrée par action présente (huit avec Travail récent et Écrans), libellé visible égal à celui du bouton d'origine, pastille reportée sur l'entrée et sur « ⋯ »" "$(mv_ "$WORK/r13-menu.json" '(()=>{const m=j.mesures["390"].m,s=m.sources,e=m.menu;if(!e)return "menu absent";const p=[];if(s.length<8)p.push("témoin : "+s.length+" actions seulement");if(!s.some((x)=>x.b))p.push("témoin : aucune pastille sur les boutons d origine");if(e.length!==s.length)p.push(e.length+" entrées pour "+s.length+" actions");s.forEach((x,i)=>{if(!e[i]||!e[i].t||e[i].t!==x.t)p.push("entrée "+i+" : ["+(e[i]&&e[i].t)+"] au lieu de ["+x.t+"]");if(e[i]&&e[i].b!==x.b)p.push("pastille de "+x.t+" : ["+(e[i]&&e[i].b)+"] au lieu de ["+x.b+"]")});if(s.some((x)=>x.b)&&!m.plusPastille)p.push("« ⋯ » sans pastille");return p.join(" ; ")||"aucune"})()')" "aucune"
+for onglet in index project equipe; do
+  F="$WORK/r13-$onglet.json"
+  assert_eq "R14.1 — $onglet / 390 px : le zoom n'est plus dans l'en-tête" "$(mv_ "$F" '(()=>{const z=j.mesures["390"].m.zoom;return z?z.entete+"|"+z.vis:"zoom absent"})()')" "false|true"
+  assert_eq "R14.2 — $onglet / 390 px : pile verticale à gauche, au-dessus de la barre de question sans la recouvrir" "$(mv_ "$F" '(()=>{const m=j.mesures["390"].m,z=m.zoom;if(!z)return "zoom absent";const p=[];if(z.dir!=="column")p.push("direction "+z.dir);if(z.r[0]>=195)p.push("à droite (x="+z.r[0]+")");if(m.askRect&&z.r[1]+z.r[3]>m.askRect[1])p.push("bas du zoom "+(z.r[1]+z.r[3])+" > haut de la question "+m.askRect[1]);return p.join(" ; ")||"ok"})()')" "ok"
+  for w in 390 768 1440; do
+    assert_eq "R14.3 — $onglet / $w px : chaque bouton de zoom a un nom accessible en français (différent de sa source anglaise)" "$(mv_ "$F" "(()=>{const z=j.mesures[\"$w\"].m.zoom;if(!z||!z.boutons.length)return 'zoom absent';return z.boutons.filter((b)=>!b.aria||/^(zoom out|fit to screen|zoom in)/i.test(b.aria)).map((b)=>b.id+' ['+b.aria+']').join(' | ')||'aucun'})()")" "aucun"
+  done
+done
+for onglet in index project; do # sur l'onglet Équipe, la position du zoom à ≥ 701 px change en 70-12 (P70-D-20) : non jugée ici
+  assert_eq "R14.4 — $onglet / 800 px : la position du zoom est celle d'avant la phase (x,y,largeur,hauteur relevés au premier passage)" "$(mv_ "$WORK/r13-$onglet.json" '(()=>{const z=j.mesures["800"].m.zoom;return z?z.r.join(","):"zoom absent"})()')" "340,108,52,144"
+done
+assert_eq "R14.5 — Projet / 390 px, pendant un parcours : le zoom et « Remonter d'un niveau » ne se recouvrent pas" "$(mv_ "$WORK/r14-parcours.json" '(()=>{const m=j.mesures["390"].m,z=m.zoom,u=m.upRect;if(!u)return "témoin : « Remonter » absent (aucun parcours)";if(!z||!z.vis)return "zoom absent";const a=z.r,b=u;const x=Math.min(a[0]+a[2],b[0]+b[2])-Math.max(a[0],b[0]),y=Math.min(a[1]+a[3],b[1]+b[3])-Math.max(a[1],b[1]);return x>1.5&&y>1.5?"recouvrement "+Math.round(x)+"x"+Math.round(y)+" px":"aucun"})()')" "aucun"
+assert_eq "R15.1 — 390 px : le bouton Détail est invisible sur les trois onglets" "$(mv_ "$WORK/r13-index.json" 'j.mesures["390"].m.btnPanel')|$(mv_ "$WORK/r13-project.json" 'j.mesures["390"].m.btnPanel')|$(mv_ "$WORK/r13-equipe.json" 'j.mesures["390"].m.btnPanel')" "false|false|false"
+assert_eq "R15.2 — Projet / 390 px : le tap d'une carte ouvre le tiroir" "$(mv_ "$WORK/r15-carte.json" 'j.mesures["390"].m.tiroir')" "true"
+assert_eq "R15.3 — Projet / 390 px, tiroir ouvert : une poignée visible et une croix visible au nom accessible français" "$(mv_ "$WORK/r15-carte.json" '(()=>{const m=j.mesures["390"].m;return m.tiroir?"poignée "+m.poignee+" · croix "+m.croix:"tiroir fermé (témoin)"})()')" "poignée true · croix true"
+assert_eq "R15.4 — Projet / 390 px : la croix ferme le tiroir" "$(mv_ "$WORK/r15-croix.json" 'j.mesures["390"].m.tiroir')" "false"
+assert_eq "R15.4b — Projet / 390 px : Échap ferme le tiroir (le viewer)" "$(mv_ "$WORK/r15-echap.json" 'j.mesures["390"].m.tiroir')" "false"
+assert_eq "R15.4c — Projet / 390 px : le tap dans le vide ferme le tiroir (le viewer)" "$(mv_ "$WORK/r15-vide.json" 'j.mesures["390"].m.tiroir')" "false"
+assert_eq "R15.5 — Projet / 390 px : le tap du titre de la vue d'ensemble ouvre le tiroir" "$(mv_ "$WORK/r15-titre.json" 'j.mesures["390"].m.tiroir')" "true"
+for spec in "long:r16-long" "trait:r16-trait"; do
+  for w in 768 1440; do
+    assert_eq "R16 — lab « ${spec%%:*} » / $w px : aucun mot du titre de la vue d'ensemble n'est coupé sur deux lignes (sauf un mot plus large que sa boîte)" "$(mv_ "$WORK/${spec#*:}.json" "(()=>{const m=j.mesures[\"$w\"].m;if(!m.titreMots||!m.titreMots.length)return 'mesure vide : titre absent';return m.titreMots.filter((w)=>w.rect>1&&!w.large).map((w)=>w.mot+' x'+w.rect+' (boîte '+m.titreBoite+' px)').join(' | ')||'aucun'})()")" "aucun"
+  done
+done
+
+# R17 à R20 (70-12 ; P70-D-20 : choix du manager, vf-dev-manager, 2026-11-04, PAS un arbitrage de Samuel) — l'onglet Équipe (UIFN-14), sur un lab STABLE : une session et un sous-agent
+# jetables (la première carte ne varie pas), nom de lab long (le fil d'Ariane et la recherche se disputent la colonne gauche de l'en-tête à 1 024 px).
+#   R17.1 zoom : à 768, 1 024 et 1 440 px (donc dès 701 px) la rangée en bas à gauche du viewer d'origine (x=16, 16 px au-dessus du bas, direction « row »), sans recouvrir une carte (R17.1b) ;
+#   R17.2 Code et Projet gardent la position du zoom de 794c6dba ; R18 fil d'Ariane et recherche ne se recouvrent pas à 1 024 px (Projet et Équipe) ;
+#   R19 le titre `#context h1` ne recouvre pas la première carte, au premier affichage (R19.1 : 390, 768, 1 024, 1 440 px) et après l'ouverture de la session (R19.2 : 390, 1 024 px) ;
+#   R20 la page Équipe entre dans la matrice : aucune superposition d'en-tête ni de surfaces, aucun défilement horizontal (R1 et R3 appliqués à `equipe.html`, 390 / 768 / 1 024 / 1 440 px).
+echo "=== R17 à R20 — onglet Équipe : zoom, titre, fil d'Ariane, matrice (UIFN-14) ==="
+sous_agent() { # sous_agent <numéro de session de agent_actif> <lab> : un sous-agent actif (forme réelle) sous la session du lab ; sa date est rafraîchie tant que la suite vit
+  local N="$1" L="$2" SID D TS; SID="aaaa1111-2222-3333-4444-$(printf '%012d' "$N")"; D="$HOME/.claude/projects/-lab-$N/$SID/subagents"; mkdir -p "$D"; TS="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+  printf '{"agentType":"vf-coder","isBuiltIn":false,"launchedWithDefaults":false,"description":"tâche synthétique","toolUseId":"toolu_s1","spawnDepth":1,"requestShape":"background","requestNonInteractive":true}' > "$D/agent-s1.meta.json"
+  printf '{"type":"user","isSidechain":true,"agentId":"s1","parentUuid":null,"cwd":"%s","sessionId":"%s","gitBranch":"main","version":"2.1.317","timestamp":"%s","message":{"role":"user","content":"mandat synthétique"}}\n{"type":"assistant","isSidechain":true,"agentId":"s1","cwd":"%s","sessionId":"%s","gitBranch":"main","version":"2.1.317","timestamp":"%s","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_x","name":"Read","input":{"file_path":"%s/README.md"}}]}}\n' "$L" "$SID" "$TS" "$L" "$SID" "$TS" "$L" > "$D/agent-s1.jsonl"
+  ( while kill -0 $$ 2>/dev/null; do touch "$D/agent-s1.jsonl"; sleep 10; done ) </dev/null >/dev/null 2>&1 &
+}
+LE="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-equipe"; mklab "$LE"; sous_agent "$NSESS" "$LE"
+srv "$LE/.vibeflow/cockpit"; P_e=$SRV_PORT; PID_e=$SRV_PID
+zoom_base() { case "$1" in 768) echo "308|108|52|144" ;; 1024) echo "574|72|42|114" ;; 1440) echo "16|842|114|42" ;; esac; } # x|y|largeur|hauteur du zoom de Code et de Projet, relevés sur 794c6dba (labs de la suite)
+J_PAUSE_E='const p = (ms) => new Promise((r) => setTimeout(r, ms));'
+INJ_SESSION="(async () => { $J_PAUSE_E const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0); nd?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); for (let i = 0; i < 60 && !/^Session/.test(document.querySelector('#context .k')?.textContent || ''); i++) await p(50); await p(400); return true; })()"
+OPIDS=()
+mes "http://127.0.0.1:$P_e/equipe.html" 390,768,1024,1440 - > "$WORK/r17-equipe.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_SESSION" mes "http://127.0.0.1:$P_e/equipe.html" 390,1024 - > "$WORK/r19-session.json" & OPIDS+=($!)
+mes "http://127.0.0.1:$P_e/project.html" 1024 - > "$WORK/r18-projet.json" & OPIDS+=($!)
+wait "${OPIDS[@]}"
+SRV_PID=$PID_e; unsrv
+assert_eq "R17.0 — témoin : la fixture de l'onglet Équipe montre au moins une carte à 1 024 px" "$(mv_ "$WORK/r17-equipe.json" 'j.mesures["1024"].m.nCartes>=1')" "true"
+for w in 768 1024 1440; do
+  assert_eq "R17.1 — Équipe / $w px : le zoom est la rangée en bas à gauche (x, écart au bas de la fenêtre, direction)" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;const z=m.zoom;if(!z)return 'zoom absent';return z.r[0]+'|'+(m.fenetre[1]-(z.r[1]+z.r[3]))+'|'+z.dir})()")" "16|16|row"
+  assert_eq "R17.1b — Équipe / $w px : le zoom ne recouvre aucune carte" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1?String(m.zoomCartes):'témoin : aucune carte'})()")" "0"
+  for onglet in index project; do
+    assert_eq "R17.2 — $onglet / $w px : la position du zoom est celle de 794c6dba (x,y,largeur,hauteur)" "$(mv_ "$WORK/r13-$onglet.json" "(()=>{const z=j.mesures[\"$w\"].m.zoom;return z?z.r.join('|'):'zoom absent'})()")" "$(zoom_base "$w")"
+  done
+done
+for spec in "Équipe:$WORK/r17-equipe.json" "Projet:$WORK/r18-projet.json"; do
+  assert_eq "R18 — ${spec%%:*} / 1 024 px, lab au nom long : le fil d'Ariane ne recouvre pas la recherche (aire en px² ; témoin : les deux sont visibles)" "$(mv_ "${spec#*:}" '(()=>{const m=j.mesures["1024"].m;return m.filRecherche===null?"témoin : fil ou recherche absents":String(m.filRecherche)})()')" "0"
+done
+for w in 390 768 1024 1440; do
+  assert_eq "R19.1 — Équipe / $w px, premier affichage : le titre ne recouvre pas la première carte (aire en px²)" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1&&m.titreRect?String(m.titreCarte):'témoin : titre ou carte absents'})()")" "0"
+done
+for w in 390 1024; do
+  assert_eq "R19.2 — Équipe / $w px, session ouverte : le titre ne recouvre pas la première carte (aire en px²)" "$(mv_ "$WORK/r19-session.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1&&m.titreRect?String(m.titreCarte):'témoin : titre ou carte absents'})()")" "0"
+done
+for w in 390 768 1024 1440; do
+  mode=equipe; [ "$w" -lt 1000 ] && mode=equipe-bas
+  assert_eq "R20 — Équipe / $w px : aucune superposition d'en-tête ni de surfaces, aucun défilement horizontal" "$(printf '%s' "$(cat "$WORK/r17-equipe.json")" | node "$AUX/viol.mjs" "$w" "$mode")" "aucune"
+done
+
+# R21 à R23 (70-04, juge des arbitrages, 2026-11-04 ; P70-D-22 : « Badge réduit à son point (Recommandé) », arbitrage Samuel, AskUserQuestion session principale, 2026-11-04 ; Q13a) — chacun a son mutant, sur une COPIE de la page servie :
+#   R21 le badge « au travail » entier (« 10 au travail ») ne fait déborder ni l'en-tête ni le fil d'Ariane en parcours de 1 600 à 1 639 px (la tranche du badge réduit va jusqu'à 1 639 px, seuil mesuré 1 635 px) ; mutant : la tranche s'arrête à 1 599 px
+#   R22 le repli mesuré : « 99 au travail » et un bouton d'en-tête de plus (libellé visible au-dessus de 1 600 px) à 1 640, 1 700 et 1 800 px, racine (Code) et parcours (Projet) ; mutant : le repli ne pose plus le point
+#   R23 une action désactivée l'est aussi dans le menu « ⋯ » (Équipe, 390 px : « Par où commencer ») : aria-disabled, atténuée, même infobulle ; mutant : le menu ne reporte plus l'état désactivé
+echo "=== R21 à R23 — badge entier de 1 600 à 1 639 px, repli mesuré, action désactivée du menu « ⋯ » (chacun avec son mutant) ==="
+J_LIBELLE() { echo "for (let i = 0; i < 100 && !document.querySelector('#vf-lock .bl'); i++) await p(50); document.querySelector('#vf-lock .bl').textContent = '$1 au travail';"; }
+INJ_R21="(async () => { $J_PAUSE $INJ_CODE; $(J_LIBELLE 10) window.VibeFlow.reveal('n:ph-1'); for (let i = 0; i < 100; i++) { const u = document.getElementById('btn-up'); if (u && !u.hidden) break; await p(50); } await p(400); return true; })()"
+J_EXTRA="window.VibeFlow.addHeaderButton({ id: 'xtra1', label: 'Extra', icon: 'ui', title: 'Extra', onClick() {} });"
+INJ_R22C="(async () => { $J_PAUSE $INJ_CODE; $(J_LIBELLE 99) $J_EXTRA await p(500); return true; })()"
+INJ_R22P="(async () => { $J_PAUSE $INJ_CODE; $(J_LIBELLE 99) $J_EXTRA window.VibeFlow.reveal('n:ph-1'); for (let i = 0; i < 100; i++) { const u = document.getElementById('btn-up'); if (u && !u.hidden) break; await p(50); } await p(500); return true; })()"
+INJ_R23="(async () => { $J_PAUSE document.getElementById('vf-plus')?.click(); for (let i = 0; i < 40 && !(document.getElementById('vf-plus-menu')?.getBoundingClientRect().width > 0); i++) await p(50); await p(100); return true; })()"
+W21="1600,1610,1619,1625,1630,1635,1639"; W22="1640,1700,1800"
+mutant_suite() { # mutant_suite <dossier> <ancien> <nouveau> : seconde retouche, sur la copie déjà faite par mutant_page
+  node -e "
+const fs=require('fs');let n=0;for(const f of ['index.html','project.html','equipe.html']){const p='$WORK/mut-$1/.vibeflow/cockpit/'+f;if(!fs.existsSync(p))continue;const h=fs.readFileSync(p,'utf8');if(!h.includes(process.argv[1]))continue;fs.writeFileSync(p,h.split(process.argv[1]).join(process.argv[2]));n++}
+if(!n){console.error('mutant $1 : second motif introuvable');process.exit(1)}" "$2" "$3" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : second motif introuvable dans la page"; return 1; }
+}
+mutant_page() { # mutant_page <dossier> <ancien> <nouveau> : copie de la page du lab long, <ancien> doit exister (sinon FAIL nommé)
+  local M="$WORK/mut-$1"; mkdir -p "$M/.planning/missions" "$M/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$M/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$M/.planning/missions/"; agent_actif "$M"
+  node -e "
+const fs=require('fs');let n=0;for(const f of ['index.html','project.html','equipe.html']){const p='$M/.vibeflow/cockpit/'+f;if(!fs.existsSync(p))continue;const h=fs.readFileSync(p,'utf8');if(!h.includes(process.argv[1]))continue;fs.writeFileSync(p,h.split(process.argv[1]).join(process.argv[2]));n++}
+if(!n){console.error('mutant $1 : motif introuvable');process.exit(1)}" "$2" "$3" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : motif introuvable dans la page"; return 1; }
+}
+# R21 : le repli mesuré rattrape seul un badge trop large ; le mutant retire donc la tranche (1 599 px) ET le repli, pour que la tranche soit ce qui est éprouvée
+mutant_page r21 '@media (min-width: 701px) and (max-width: 1639px)' '@media (min-width: 701px) and (max-width: 1599px)'; M21=$?
+[ $M21 = 0 ] && { mutant_suite r21 "badge.setAttribute('data-vf-point', '');" '' || M21=1; }
+mutant_page r22 "badge.setAttribute('data-vf-point', '');" ''; M22=$?
+mutant_page r23 "src.disabled || src.getAttribute('aria-disabled') === 'true'" 'false'; M23=$?
+srv "$LL/.vibeflow/cockpit"; P_l=$SRV_PORT; PID_l=$SRV_PID
+srv "$LC/.vibeflow/cockpit"; P_c=$SRV_PORT; PID_c=$SRV_PID
+[ $M21 = 0 ] && { srv "$WORK/mut-r21/.vibeflow/cockpit"; P_m21=$SRV_PORT; PID_m21=$SRV_PID; }
+[ $M22 = 0 ] && { srv "$WORK/mut-r22/.vibeflow/cockpit"; P_m22=$SRV_PORT; PID_m22=$SRV_PID; }
+[ $M23 = 0 ] && { srv "$WORK/mut-r23/.vibeflow/cockpit"; P_m23=$SRV_PORT; PID_m23=$SRV_PID; }
+OPIDS=()
+RESP_INJECT="$INJ_R21" mes "http://127.0.0.1:$P_l/project.html" "$W21" - > "$WORK/r21.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_R22C" mes "http://127.0.0.1:$P_l/index.html" "$W22" - > "$WORK/r22-code.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_R22P" mes "http://127.0.0.1:$P_l/project.html" "$W22" - > "$WORK/r22-projet.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_R23" mes "http://127.0.0.1:$P_c/equipe.html" 390 - > "$WORK/r23.json" & OPIDS+=($!)
+wait "${OPIDS[@]}"; OPIDS=()
+[ $M21 = 0 ] && { RESP_INJECT="$INJ_R21" mes "http://127.0.0.1:$P_m21/project.html" "$W21" - > "$WORK/m21.json" & OPIDS+=($!); }
+[ $M22 = 0 ] && { RESP_INJECT="$INJ_R22C" mes "http://127.0.0.1:$P_m22/index.html" "$W22" - > "$WORK/m22-code.json" & OPIDS+=($!); RESP_INJECT="$INJ_R22P" mes "http://127.0.0.1:$P_m22/project.html" "$W22" - > "$WORK/m22-projet.json" & OPIDS+=($!); }
+[ $M23 = 0 ] && { RESP_INJECT="$INJ_R23" mes "http://127.0.0.1:$P_m23/equipe.html" 390 - > "$WORK/m23.json" & OPIDS+=($!); }
+[ "${#OPIDS[@]}" -gt 0 ] && wait "${OPIDS[@]}"
+SRV_PID=$PID_l; unsrv; SRV_PID=$PID_c; unsrv
+for v in m21 m22 m23; do eval "[ \$M${v#m} = 0 ] && { SRV_PID=\$PID_$v; unsrv; }"; done
+assert_rouge() { case "$2" in aucune|mesure*|*témoin*) echo "  ❌ FAIL — $1"; echo "     attendu: une violation de mise en page"; echo "     obtenu:  [${2:0:600}]"; FAIL=$((FAIL+1));; *) echo "  ✅ PASS — $1"; PASS=$((PASS+1));; esac; }
+viol_() { printf '%s' "$(cat "$1")" | node "$AUX/viol.mjs" "$2"; }
+# DIAG : à l'échec d'une assertion de la visite, la ligne de diagnostic de la mesure (bbox de #tour, #ask et ses avis, fenêtre, obstacles vus au placement) ; aucune assertion ne change
+diag_visite() { local l; l="$(printf '%s' "$(cat "$1")" | node "$AUX/ev.mjs" "(j.mesures&&j.mesures[\"$2\"]&&j.mesures[\"$2\"].m.tourDiag)||'visite fermée ou diagnostic absent'" 2>/dev/null)"; echo "     DIAG $3 [$2 px] $l"; }
+# R23 : toute action désactivée du bouton d'origine l'est aussi sur l'entrée du menu ; témoin : au moins une action désactivée (Équipe : « Par où commencer »)
+EXPR23='(()=>{const m=j.mesures["390"].m,s=m.sources,e=m.menu;if(!e)return "menu absent";const p=[];if(!s.some((x)=>x.off))p.push("témoin : aucune action désactivée");s.forEach((x,i)=>{if(!x.off)return;const y=e[i];if(!y||!y.off)p.push(x.t+" : entrée non désactivée");else{if(!(y.op<1))p.push(x.t+" : entrée non atténuée (opacité "+y.op+")");if(y.ti!==x.ti||!y.ti)p.push(x.t+" : infobulle ["+(y.ti||"")+"] au lieu de ["+x.ti+"]")}});return p.join(" ; ")||"aucune"})()'
+for w in ${W21//,/ }; do
+  assert_eq "R21 — Projet, parcours, badge « 10 au travail » entier / $w px : aucun bouton hors de la fenêtre, fil d'Ariane non rogné, aucune superposition" "$(viol_ "$WORK/r21.json" "$w")" "aucune"
+done
+for w in 1600 1610 1619 1625 1630; do # sous 1 635 px le badge entier ne tient pas : le mutant doit rougir (dès 1 635 px il tient, rien à démontrer)
+  [ $M21 = 0 ] && assert_rouge "R21m — mutant « tranche du badge réduit arrêtée à 1 599 px et repli retiré » : la mesure rougit à $w px" "$(viol_ "$WORK/m21.json" "$w")"
+done
+for w in ${W22//,/ }; do
+  assert_eq "R22 — Code (racine), « 99 au travail » et un bouton de plus / $w px : aucune violation (repli mesuré)" "$(viol_ "$WORK/r22-code.json" "$w")" "aucune"
+  assert_eq "R22 — Projet (parcours), « 99 au travail » et un bouton de plus / $w px : aucune violation (repli mesuré)" "$(viol_ "$WORK/r22-projet.json" "$w")" "aucune"
+  [ "$(viol_ "$WORK/r22-code.json" "$w")" != aucune ] && diag_visite "$WORK/r22-code.json" "$w" "R22 Code"
+  [ "$(viol_ "$WORK/r22-projet.json" "$w")" != aucune ] && diag_visite "$WORK/r22-projet.json" "$w" "R22 Projet"
+done
+assert_eq "R23 — Équipe / 390 px : l'action désactivée (« Par où commencer ») l'est aussi dans le menu « ⋯ » (aria-disabled, atténuée, même infobulle)" "$(printf '%s' "$(cat "$WORK/r23.json")" | node "$AUX/ev.mjs" "$EXPR23")" "aucune"
+if [ $M22 = 0 ]; then # les mutants du repli : sans lui, chacun de ces trois relevés rougit (1 640 px racine : #btn-panel sort ; 1 640 px et 1 700 px en parcours : fil rogné)
+  assert_rouge "R22m — mutant « le repli ne pose plus le point » : Code racine à 1 640 px rougit" "$(viol_ "$WORK/m22-code.json" 1640)"
+  assert_rouge "R22m — mutant « le repli ne pose plus le point » : Projet parcours à 1 640 px rougit" "$(viol_ "$WORK/m22-projet.json" 1640)"
+  assert_rouge "R22m — mutant « le repli ne pose plus le point » : Projet parcours à 1 700 px rougit" "$(viol_ "$WORK/m22-projet.json" 1700)"
+fi
+[ $M23 = 0 ] && assert_rouge "R23m — mutant « le menu ne reporte plus l'état désactivé » : la mesure rougit" "$(printf '%s' "$(cat "$WORK/m23.json")" | node "$AUX/ev.mjs" "$EXPR23")"
+
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

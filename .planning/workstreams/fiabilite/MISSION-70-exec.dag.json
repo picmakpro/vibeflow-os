@@ -1,0 +1,455 @@
+{
+  "nodes": [
+    {
+      "id": "plancheck-reval",
+      "step": "plan-checker frais contre le code de main 794c6dba + périmètre ajouté",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-70-finitions-ui-cockpit"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "replan-70",
+      "step": "amendement des plans (vf-coder)",
+      "stage": "",
+      "deps": [
+        "plancheck-reval"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-70-finitions-ui-cockpit"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-2",
+      "step": "plan-checker frais sur le diff d'amendement",
+      "stage": "",
+      "deps": [
+        "replan-70"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-70-finitions-ui-cockpit"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "captures-avant",
+      "step": "captures avant (main 794c6dba), scratchpad",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "scratchpad/captures-70-avant"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-70-01",
+      "step": "70-01 garde du français",
+      "stage": "",
+      "deps": [
+        "plancheck-reval"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-70-02",
+      "step": "70-02 DESIGN.md + réglages visuels Équipe",
+      "stage": "",
+      "deps": [
+        "plancheck-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-70-10",
+      "step": "70-10 alléger responsive",
+      "stage": "",
+      "deps": [
+        "plancheck-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-70-11",
+      "step": "70-11 focus + témoins mineurs",
+      "stage": "",
+      "deps": [
+        "plancheck-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-70-03",
+      "step": "70-03 anglais résiduel",
+      "stage": "",
+      "deps": [
+        "exec-70-01",
+        "plancheck-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-70-04",
+      "step": "70-04 en-tête mobile",
+      "stage": "",
+      "deps": [
+        "exec-70-02",
+        "exec-70-10"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-70-05",
+      "step": "70-05 zoom + tiroir",
+      "stage": "",
+      "deps": [
+        "exec-70-04"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-70-06",
+      "step": "70-06 où en est-on sans STATE",
+      "stage": "",
+      "deps": [
+        "exec-70-01",
+        "exec-70-03"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-70-07",
+      "step": "70-07 visite corrigée",
+      "stage": "",
+      "deps": [
+        "exec-70-03",
+        "exec-70-05",
+        "exec-70-06"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-70-12",
+      "step": "70-12 défauts D/E Équipe",
+      "stage": "",
+      "deps": [
+        "exec-70-05",
+        "exec-70-10",
+        "exec-70-11"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-70-08",
+      "step": "70-08 visite Projet",
+      "stage": "",
+      "deps": [
+        "exec-70-06",
+        "exec-70-07"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-70-09",
+      "step": "70-09 captures, juges, bump",
+      "stage": "",
+      "deps": [
+        "exec-70-01",
+        "exec-70-02",
+        "exec-70-03",
+        "exec-70-04",
+        "exec-70-05",
+        "exec-70-06",
+        "exec-70-07",
+        "exec-70-08",
+        "exec-70-10",
+        "exec-70-11",
+        "exec-70-12",
+        "fix-focus-tiroir",
+        "exec-70-04-t2",
+        "fix-visite-reload",
+        "juge-A",
+        "juge-B",
+        "fix-reg-aim",
+        "fix-sec-button",
+        "fix-recette-fr",
+        "fix-recette-equipe"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-70",
+      "step": "vérificateur frais de phase",
+      "stage": "",
+      "deps": [
+        "exec-70-08",
+        "exec-70-12",
+        "exec-70-04-t2",
+        "fix-visite-reload"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gates-pr",
+      "step": "rejeu gates + PR + CI",
+      "stage": "",
+      "deps": [
+        "exec-70-09",
+        "verif-70",
+        "fix-reg-aim",
+        "fix-sec-button",
+        "fix-recette-fr",
+        "fix-recette-equipe",
+        "arb-visite",
+        "arb-equipe",
+        "arb-docs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-focus-tiroir",
+      "step": "focus clavier du bouton Voir la dernière commande (classe UIFN-12)",
+      "stage": "",
+      "deps": [
+        "exec-70-11",
+        "exec-70-02"
+      ],
+      "scope": [
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/70-vf-live.js",
+        "plugin/cockpit/scripts/tests/test-cockpit-equipe.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-70-04-t2",
+      "step": "70-04 tâche 2 : onglets 13 px au-dessus de 700 px (attend l'arbitrage Samuel 1 024 px)",
+      "stage": "",
+      "deps": [
+        "exec-70-04"
+      ],
+      "scope": [
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/00-vibeflow.js",
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/01-vf-responsive.js",
+        "plugin/cockpit/scripts/tests/test-cockpit-responsive.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-visite-reload",
+      "step": "centrage de la visite au rechargement (40-tour.js P25)",
+      "stage": "",
+      "deps": [
+        "exec-70-08"
+      ],
+      "scope": [
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/40-tour.js",
+        "plugin/cockpit/scripts/tests/test-cockpit-projet.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "juge-A",
+      "step": "juge Playwright Code+Projet",
+      "stage": "",
+      "deps": [
+        "fix-visite-reload"
+      ],
+      "scope": [
+        "scratchpad/juge-A"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "juge-B",
+      "step": "juge Playwright Équipe",
+      "stage": "",
+      "deps": [
+        "fix-visite-reload"
+      ],
+      "scope": [
+        "scratchpad/juge-B"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-reg-aim",
+      "step": "REG-70-01 : aim() fait tenir les grandes cartes",
+      "stage": "",
+      "deps": [
+        "verif-70"
+      ],
+      "scope": [
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/40-tour.js"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-sec-button",
+      "step": "sélecteur .sec button resserré",
+      "stage": "",
+      "deps": [
+        "verif-70"
+      ],
+      "scope": [
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/70-vf-live.js"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-recette-fr",
+      "step": "recette : français restant, élision, troncature (juge A)",
+      "stage": "",
+      "deps": [
+        "juge-A"
+      ],
+      "scope": [
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/78-vf-fr-dict-a.js",
+        "plugin/cockpit/scripts/vf-cockpit-project.mjs"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-recette-equipe",
+      "step": "recette Équipe : focus au redessin, badge, FR, jeton",
+      "stage": "",
+      "deps": [
+        "juge-B"
+      ],
+      "scope": [
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/70-vf-live.js",
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/72-vf-equipe.js"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-ci-linux-r20",
+      "step": "CI Linux : #panel recouvre #tour à 768 px (R20)",
+      "stage": "",
+      "deps": [
+        "exec-70-09"
+      ],
+      "scope": [
+        "plugin/cockpit/skills/cockpit-moteur/assets/ui/40-tour.js"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arb-visite",
+      "step": "Q6 Q7 Q9 Q13 visite",
+      "stage": "",
+      "deps": [
+        "juge-A"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "arb-equipe",
+      "step": "Q2 Q3 Q12 Équipe",
+      "stage": "",
+      "deps": [
+        "juge-A"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "arb-docs",
+      "step": "P70-D-22..24, recette, BACKLOG",
+      "stage": "",
+      "deps": [
+        "juge-A"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "juge-arbitrages",
+      "step": "juge scopé des arbitrages",
+      "stage": "",
+      "deps": [
+        "arb-visite",
+        "arb-equipe",
+        "exec-70-04-t2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-classe-visite",
+      "step": "classe visite/surfaces : place() évite toutes les surfaces, témoin génératif",
+      "stage": "",
+      "deps": [
+        "arb-visite"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-juge-equipe",
+      "step": "correctif juge des arbitrages",
+      "stage": "",
+      "deps": [
+        "juge-arbitrages"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-juge-entete",
+      "step": "correctif juge des arbitrages",
+      "stage": "",
+      "deps": [
+        "juge-arbitrages"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-ci-polices",
+      "step": "CI Linux : visite et polices larges (O6.17, R22, R3)",
+      "stage": "",
+      "deps": [
+        "fix-classe-visite"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-ci-ek13",
+      "step": "CI Linux : EK13 768 px",
+      "stage": "",
+      "deps": [
+        "fix-juge-equipe"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "merge-main-68-202",
+      "step": "fusions de main (3c73fc0c, a6912f25)",
+      "stage": "",
+      "deps": [
+        "fix-ci-polices"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

@@ -126,7 +126,19 @@ export function buildProjectGraph(root, { layout } = {}) {
 
   // jalon mis en avant : celui que nomme le STATE du compartiment actif tant qu'il n'est pas clos, sinon le premier en cours (CKPT-16) ; le STATE ne décide jamais de l'état d'une PHASE (P69-D-08)
   const active = msList.find((m) => state.milestone && m.key === state.milestone && m.ws === (layout.actif || null) && m.st !== 'done') || msList.find((m) => m.st === 'active') || msList.at(-1);
-  const flows = active ? [{ id: 'trajectoire', title: `Trajectoire de ${active.key}`, description: "Les phases du jalon en cours, dans l'ordre.", steps: active.ks.map((p) => ({ ref: 'n:' + phId(p), note: `${p.done ? '✓' : '○'} ${p.name}` })) }] : [];
+  const flows = active ? [{ id: 'trajectoire', title: `Trajectoire ${/^[aeiouyàâéèêîôû]/i.test(active.key) ? "d'" : 'de '}${active.key}`, description: "Les phases du jalon en cours, dans l'ordre.", steps: active.ks.map((p) => ({ ref: 'n:' + phId(p), note: `${p.done ? '✓' : '○'} ${p.name}` })) }] : [];
+  // visite « Par où commencer » propre à l'onglet Projet (70-08, UIFN-05, P70-D-02) : jalon, phase en cours, missions, au travail ; une étape sans carte est omise, jamais affichée avec « ? » ;
+  // sous deux étapes, la liste est vide et le repli du moteur s'applique. Les textes viennent des données du lab ; la `cible` est une constante, jamais une donnée (T-70-13).
+  const tour = [], has = (id) => nodes.some((n) => n.id === id);
+  if (active && has(active.id)) tour.push({ ref: 'n:' + active.id, kicker: 'Le jalon', title: `Jalon ${active.key}`, note: `Le jalon en cours. Phases faites : ${active.done} sur ${active.ks.length}.` });
+  const cur = trouverPhase(phases, curPhase, layout.actif);
+  if (cur && has(phId(cur))) tour.push({ ref: 'n:' + phId(cur), kicker: 'La phase en cours', title: `Phase ${cur.n}${cur.name ? ` · ${cur.name}` : ''}`, note: `La phase sur laquelle le projet travaille${statutLisible(state.status) ? ` : ${statutLisible(state.status)}` : ''}.` });
+  const dg = P.dags.find((d) => d.nodes.some((x) => x?.status === 'running') && has('dag-' + d.name)) || P.dags.find((d) => has('dag-' + d.name));
+  if (dg) {
+    const fait = dg.nodes.filter((x) => x?.status === 'done').length;
+    tour.push({ ref: 'n:dag-' + dg.name, kicker: 'Les missions', title: `Mission ${dg.name.replace(/^MISSION-/, '')}`, note: `${P.dags.length} mission${P.dags.length > 1 ? 's' : ''} au total ; celle-ci a ${fait} nœud${fait > 1 ? 's' : ''} fait${fait > 1 ? 's' : ''} sur ${dg.nodes.length}.` });
+  }
+  tour.push({ ref: 'root', cible: '#vf-lock', kicker: 'Au travail', title: 'Qui est au travail', note: "Ce point en haut de la page s'anime quand quelqu'un travaille sur le projet, et reste éteint sinon ; un clic ouvre la liste. L'onglet Équipe en montre le détail." });
   const ids = new Set(nodes.map((n) => 'n:' + n.id)), fids = new Set(files.map((f) => 'f:' + f.p));
   return {
     schema: 'vibeflow/cockpit-project@1',
@@ -141,13 +153,19 @@ export function buildProjectGraph(root, { layout } = {}) {
         counts: { phases: phases.size, plans: files.filter((f) => f.p.endsWith('-PLAN.md')).length, reqs: reqs.size, reqsDone: [...reqs.values()].filter((r) => r.done).length, dags: P.dags.length } },
       layout: { forme: layout.forme, actif: layout.actif } },
     project: { name: `${P.projectName} — Projet`, summary: resume(state, curPhase, phases.size, files) },
-    nodes, files, routes: [], links: links.filter((l) => [l.a, l.b].every((x) => (x.startsWith('n:') ? ids.has(x) : fids.has(x)))), flows, tour: [],
+    nodes, files, routes: [], links: links.filter((l) => [l.a, l.b].every((x) => (x.startsWith('n:') ? ids.has(x) : fids.has(x)))), flows, tour: tour.length >= 2 ? tour : [],
   };
 }
 
+// libellés français des valeurs de `status:` que gsd-core écrit dans STATE.md ; table unique, reprise à l'identique par le navigateur (STATUT de 00-vibeflow.js, parité vérifiée par Q17)
+export const STATUTS = { planning: 'en planification', ready_to_plan: 'prête à planifier', ready_to_execute: 'prête à exécuter', executing: 'en exécution', in_progress: 'en cours',
+  verifying: 'en vérification', ready_for_verification: 'prête à vérifier', paused: 'en pause', blocked: 'bloqué', complete: 'terminée', completed: 'terminée', closed: 'clos', milestone_complete: 'jalon terminé' };
+// valeur inconnue -> null : elle est omise, jamais affichée brute (P70-D-04)
+export function statutLisible(x) { return Object.hasOwn(STATUTS, String(x ?? '').trim()) ? STATUTS[String(x).trim()] : null; }
+
 // sous-titre du projet : seulement les champs connus (un lab sans STATE.md n'affiche ni « ? » ni parenthèses vides), sinon les effectifs
 function resume(state, curPhase, nbPhases, files) {
-  const seg = [state.milestone ? `Jalon ${state.milestone}` : '', curPhase ? `phase ${curPhase}${state.current_phase_name ? ` (${state.current_phase_name})` : ''}` : '', state.status || ''].filter(Boolean);
+  const seg = [state.milestone ? `Jalon ${state.milestone}` : '', curPhase ? `phase ${curPhase}${state.current_phase_name ? ` (${state.current_phase_name})` : ''}` : '', statutLisible(state.status) || ''].filter(Boolean);
   if (seg.length) return seg.join(' · ') + '.';
   const plans = files.filter((f) => f.p.endsWith('-PLAN.md')).length;
   return `${nbPhases} phase${nbPhases > 1 ? 's' : ''} · ${plans} plan${plans > 1 ? 's' : ''}.`;

@@ -718,6 +718,33 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 
 **Déclencheur de reprise :** juste après la planification de la Phase 69 (demande de Samuel, session principale Claude Code, 2026-11-03).
 
+## R8 de la recette de la Phase 68 : le panneau latéral ne dit pas l'état de la mission — DIFFÉRÉ (2026-11-04)
+
+**Origine :** Samuel a passé R8 de la recette de la Phase 68 à la Phase 70 (P68-D-35, sur la branche de la 68). Report décidé par le manager (vf-dev-manager, 2026-11-04) : P70-D-24, pas un arbitrage de Samuel.
+- **Constat :** le panneau latéral web ne dit pas l'état de la mission, et un nœud en cours a le même point qu'un nœud fait.
+- **Motif du report :** l'état de la mission vient de la cascade de vie de la 68 (`vf-cockpit-vie.mjs`, P68-D-26 et P68-D-33), absente de `main` et de la branche de la 70. Le point des nœuds est rendu par `plugin/cockpit/scripts/vf-cockpit-project.mjs`, que la branche de la 68 modifie aussi : le traiter dans la 70 ajouterait un conflit de merge.
+- **Source :** `70-CONTEXT.md` (dossier de la Phase 70), P70-D-24.
+
+**Déclencheur de reprise :** le merge de la branche de la Phase 68 sur `main`.
+
+## Carte « Session » de l'onglet Équipe : pied « en attente », badge « En cours » — DIFFÉRÉ (2026-11-04)
+
+**Origine :** recette par juges de la Phase 70 (`70-RECETTE-JUGES.md`, écarts connus). Défaut de la Phase 69 révélé par la 70, non créé par elle.
+- **Constat :** la carte « Session » affiche « en attente » dans son pied et le badge « En cours ».
+- **Cause :** dans `plugin/cockpit/skills/cockpit-moteur/assets/ui/72-vf-equipe.js`, tout état autre que « terminé » devient actif.
+- **Piste :** distinguer l'état « en attente » de l'état actif au rendu du badge ; témoin rouge : une session en attente rend le badge « En cours ».
+
+**Déclencheur de reprise :** la prochaine passe sur l'onglet Équipe.
+
+## `scripts/check-machine-paths.sh` : vert sous macOS, rouge sous Linux — DIFFÉRÉ (2026-11-04)
+
+**Origine :** Phase 70, deux fois : des chemins `/Users/<user>/…` écrits dans les plans passaient le garde en local et le rougissaient en CI Linux (plans corrigés en `c7217940`).
+- **Constat :** même dépôt, même commit, verdicts opposés selon le système ; cause non diagnostiquée.
+- **Piste :** le balayage `xargs -0 awk` s'exécute hors `LC_ALL=C` ; un comportement d'`awk` sur les octets non ASCII ou sur les lots d'arguments diffère entre macOS et Linux.
+- **Témoin à construire :** un plan contenant un chemin absolu de machine, balayé sur les deux systèmes.
+
+**Déclencheur de reprise :** la prochaine modification de `scripts/check-machine-paths.sh`, ou un nouveau rouge CI de ce garde.
+
 ## Écarts de recette de la Phase 68 reportés au BACKLOG (N4, N5, N6) — DIFFÉRÉ (2026-11-04)
 
 **Origine :** recette v2 de la Phase 68 par un juge frais (captures dans le rapport de mission

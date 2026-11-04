@@ -58,7 +58,8 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
   fs.writeFileSync(path.join(sortie, 'recent-work.json'), JSON.stringify({ updatedAt: new Date().toISOString(), tasks: recent.map((ph) => {
     const items = new Map();
     for (const f of project.files.filter((x) => x.n === ph.id && x.touched)) for (const p of f.touched) if (scanFiles.has(p) && !p.startsWith('.planning/') && !items.has(p)) items.set(p, { ref: p, change: 'changed', note: `${f.name}` });
-    return { title: ph.label.slice(0, 60), request: ph.summary, summary: ph.foot, items: [...items.values()].slice(0, 40) };
+    return { title: ph.label.length > 160 ? ph.label.slice(0, 159).replace(/\s+\S*$/, '') + '…' : ph.label, // entier jusqu'à 160 caractères (le panneau et le sous-titre passent à la ligne), au-delà coupé à un espace avec « … »
+      request: ph.summary, summary: ph.foot, items: [...items.values()].slice(0, 40) };
   }) }, null, 2));
   run(eng.chemin, 'build.mjs', lab, '--no-claude-md');
   fs.writeFileSync(path.join(sortie, '.gitignore'), GITIGNORE); // deux lignes : commentaire VibeFlow puis *

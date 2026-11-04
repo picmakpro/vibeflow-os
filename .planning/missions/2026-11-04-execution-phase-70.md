@@ -1,0 +1,141 @@
+# Mission 2026-11-04 — Phase 70 : revalidation, exécution, recette par juges
+
+**Manager :** vf-dev-manager (`mgr70`), verrou de phase `--ws=fiabilite --phase=70` (génération `DRIVER.lock.gen.1793767095.1159`).
+**Branche :** `feat/phase-70-finitions-ui`, d'abord rebasée sur 794c6dba (Phase 69), puis sur 19393cc3 (PR #201), puis mise à
+jour par fusion de main à 3c73fc0c (Phase 68, PR #199) et a6912f25 (PR #202). PR #200.
+**Statut :** `passed`. Tous les arbitrages ont été reçus et appliqués. La CI de la PR #200 est verte à a15b073d (14 pass, 1 skipping
+réservé à main). La PR est sortie du brouillon. Pas de merge ni de release : c'est le coordinateur qui merge.
+
+## Gestes d'entrée
+
+- Rebase sur `origin/main`. Un seul conflit, dans `REQUIREMENTS.md` (CKPT-13..28 « Complete » de main face à « Pending » de
+  la branche). Il est résolu par union : les lignes de main sont gardées, UIFN-01..10 ajoutées.
+- Verrou de phase acquis. Invariants SAIN (rc 3). Snapshot de budget posé.
+- Flags lus par `config-get --ws fiabilite` : `workflow._auto_chain_active` et `workflow.auto_advance` valent `false` ;
+  ils n'ont pas été réécrits.
+
+## Plan de bataille (DAG `MISSION-70-exec.dag.json`)
+
+`plancheck-reval` ∥ `captures-avant` → `replan-70` → `plancheck-2` → 12 plans en vagues (V1 : 01, 02, 10, 11 ; V2 : 03, 04 ;
+V3 : 05, 06 ; V4 : 07, 12 ; V5 : 08 ; V6 : 09). Ensuite `verif-70` ∥ `juge-A` ∥ `juge-B`, des correctifs ciblés, puis
+`gates-pr`.
+
+Parallélisme : selon la règle de Samuel (session principale Claude Code, 2026-11-03), jusqu'à quatre exécutants ont tourné en même temps. Les plans dont
+les suites chargent les mêmes fichiers d'UI ont reçu un worktree dédié (`phase-70-02`, `-03`, `-04`, `-06`, `-07`) ; les autres
+ont tourné dans le worktree de phase, avec des commits par pathspec. Les commits des worktrees dédiés ont été reportés par
+cherry-pick, puis les worktrees supprimés.
+
+## Revalidation (P70-D-14)
+
+- **Plan-checker frais, passe 1** : `issues_found`, 4 bloquants. M5.1 et M5.2 étaient déjà vertes ; P70-D-18 n'avait aucune
+  tâche ; 70-09 contredisait la recette par juges ; le périmètre ajouté n'avait pas de plan. S'ajoutaient 5 avertissements :
+  collisions R9-R12 et Q12, v1.1.2, numéros de ligne.
+- **Amendement par vf-coder** (`a20b06a7`) : 70-10, 70-11 et 70-12 créés, UIFN-11..14 ajoutées. P70-D-19 (recette par juges,
+  arbitrage de méthode de Samuel), P70-D-20 (zoom d'Équipe, choix du manager) et P70-D-21 (identifiants, choix du manager)
+  consignés.
+- **Plan-checker frais, passe 2** : `passed`, 0 bloquant, 12 plans `valid:true`.
+
+## Exécution — plans et correctifs
+
+| Nœud | Commits principaux | Verdict |
+|---|---|---|
+| 70-01 garde du français | a108cc20, 4f60e6e9 | témoins rouges posés |
+| 70-02 DESIGN.md + réglages Équipe | 5d694a56, 010bce7d ; sélecteur resserré 94078aab | passed |
+| 70-03 anglais résiduel | aaf56157, 427595db, 4f819bf9 ; recette bd9c8bd4, 1321569c, 16143669, 3c8cf298 | passed |
+| 70-04 en-tête téléphone | 7555563a, a78f6da4, b382d70e | **bloqué en partie** : 1 024 px attend la question 1 |
+| 70-05 zoom et tiroir | 0245b10b | passed |
+| 70-06 « Où en est-on ? » sans STATE | a25762e3, 5a83c7ae | passed |
+| 70-07 visite | a5f08b1b, e7e97dcb, 58edc697 ; rechargement 85f55133 ; grandes cartes, Passer et contour 42ae27cb | passed |
+| 70-08 visite Projet | e58a9e8a, b83df5c9 | passed |
+| 70-09 captures, recette, bump v1.1.2 | 930f7a52, 44a7cd91, bd1a6606 | livrables écrits ; SUMMARY « Porte de phase » à écrire après l'arbitrage |
+| 70-10 suite responsive allégée | b41c45ce | 256 s → 74 s, 191 témoins identiques |
+| 70-11 focus et témoins mineurs | 2ef9e1ea, bc29b0d1 ; bouton voisin 0f01d442 ; recette 643bc7ac | passed |
+| 70-12 défauts D et E | c555f584, c8f1d90d | passed |
+
+**Régression trouvée par le vérificateur frais (REG-70-01).** La visite Projet, combinée à `aim()`, faisait rougir R1, R5.3
+et R9. La correction est faite en 42ae27cb : centrage borné par le graphe entier, visite qui éclaire sans sélectionner. Les
+deux compromis de cette correction sont soumis au tri (questions 4 et 5).
+
+## Recette (P70-D-19)
+
+Deux juges frais ont travaillé, chacun sur son propre Chromium headless piloté par la bibliothèque `playwright`, dans les deux
+thèmes, à 390, 768, 1 024 et 1 440 px. Le juge Équipe initial s'est figé (script arrêté sur une couleur nulle, aucun tour en
+80 min). Il a été réveillé sans réponse, puis remplacé. Les défauts mesurables relevés par les juges (français, élision,
+troncatures, Passer, contour, focus au redessin, badge, jeton `--n-terminés`) sont tous corrigés, avec un témoin rouge puis
+vert. Détail : `70-RECETTE-JUGES.md` et `70-CAPTURES.md`. Les captures restent hors dépôt (P70-D-17).
+
+## CI Linux de la PR #200
+
+Deux rouges vus seulement sous Linux, plus lent, quand la visite d'office s'ouvre pendant une mesure :
+- **R20 (Équipe, 768 px)** : la visite s'ouvrait d'elle-même sur Équipe, qui n'en a aucune de conçue. Elle n'y démarre plus
+  seule (5e503058, témoin O6.14). La carte de visite évite aussi le panneau (289d1ac6, O6.13). Vert en CI à 03bada92.
+- **R15.4b (Projet, 390 px)** : la visite ouverte capte la première Échap avant le tiroir, ce qui est le bon ordre. Le défaut
+  était dans la mesure : `INJ_ECHAP` ferme la visite dans la seule section R15 (982f4da9), et O6.15 fixe l'ordre visite puis
+  tiroir. Ce correctif n'est pas encore passé en CI : le push de a3cfdb86 a été refusé par GitHub (Internal Server Error,
+  incident GitHub en cours).
+
+Question 13, ajoutée au tri : le bouton « Par où commencer » ouvre encore une visite sur Équipe, avec le repli « La base de
+code ». Faut-il (a) fermer aussi le bouton sur Équipe (recommandé), ou (b) le laisser ?
+
+## Tri envoyé à Samuel (SendMessage main, 2026-11-04), sans réponse au moment du rapport
+
+1 (bloquant) onglets à 13 px à 1 024 px ; 2 « écrit à <id> » ; 3 ajustement d'Équipe à 45 % ; 4 centrage borné ; 5 éclairer
+ou sélectionner ; 6 plafond de zoom sur téléphone ; 7 étape « services extérieurs » ; 8 pastille du « ⋯ » ; 9 texte « en
+haut » ; 10 « composant » / « prioritaire » ; 11 libellé du thème ; 12 retrait du lien « Nœud ». Les options et les
+recommandations sont dans `70-RECETTE-JUGES.md`.
+
+## Constats hors périmètre (pour le BACKLOG)
+
+- **Carte Session (Phase 69, révélé)** : le pied dit « en attente », le badge dit « En cours ».
+- **`scripts/check-machine-paths.sh`, faux vert sous macOS** : la CI Linux rougit à deux reprises sur `/Users/<user>/…` (plans,
+  puis `70-RECETTE-JUGES.md:56`), alors que le gate passe en local. Un `awk` nu sur le même fichier y trouve bien la
+  correspondance. Piste à vérifier : un `awk` de macOS qui abandonne un lot de `xargs` sur un octet multi-octet invalide
+  (le balayage n'est pas sous `LC_ALL=C`).
+- **Heartbeat** : `driver-lock.sh heartbeat` rend `not-at-lab-root` s'il est lancé hors de la racine. Les `ok:false`
+  intermittents de la mission venaient de là.
+
+## Arbitrages reçus et appliqués (2026-11-04)
+
+Toutes les réponses viennent de Samuel, par AskUserQuestion, en session principale Claude Code, le 2026-11-04 ; elles ont été relayées par la session principale.
+- **P70-D-22** : « Badge réduit à son point (Recommandé) ». Le choix est appliqué de 701 à 1 639 px, avec un repli mesuré au-delà. Le seuil a été
+  mesuré deux fois : O2b.6 à 1 440 px, puis le débordement de 1 600 à 1 619 px. La session principale l'a retenu comme une application du
+  choix, pas comme un nouvel arbitrage.
+- **P70-D-23** : « Tout selon les recos (Recommandé) », soit 2a 3b 4a 5a 6b 7b 8b 9b 10a 11b 12a 13a, plus l'infobulle « de ce projet ».
+- **P70-D-24** : R8 de la recette 68 est inscrit au BACKLOG, sans conflit avec la 68.
+- **Statuts au féminin** (« prête à planifier »), retenus à la fusion de la 68 : le sujet est la phase (test F9.2 de la 68).
+- **À ratifier, choix de l'exécutant de la visite** : en dernier recours, la description du titre est repliée pendant la visite (titre plus haut que prévu).
+
+## Juge scopé des arbitrages et suites de CI
+
+- Le juge (Playwright, tête 47155951) a trouvé trois défauts, tous corrigés : Q3b, qui régressait à 768 px (titre sur la 1re carte, plafond intermittent) ;
+  Q13a sur téléphone (entrée du menu « ⋯ » non désactivée) ; un débordement de 1 600 à 1 619 px.
+- La classe « visite d'office / surfaces » est fermée par le témoin génératif O6.17, avec ses passes police large, DejaVu réelle, titre haut et tangente.
+  R22 avait une cause lue dans le diagnostic de la CI : le placement jugeait la boîte animée de la carte.
+- EK13 est rendu robuste sous Linux : recadrage quand `#context` change de taille et à la fin du chargement des polices.
+
+## Décompte
+
+Mandats émis : 2 plan-checkers, 1 éclaireur de captures, 16 mandats `vf-coder` (12 exécutions de plan, dont 70-04 reprise une
+fois, 1 amendement de plans, 1 correctif de bouton voisin, 7 reprises ciblées par SendMessage), 1 vérificateur, 3 juges (dont
+1 figé, remplacé). Trois envois à Samuel : la question « écrit à », l'arbitrage du 1 024 px et le tri groupé.
+
+## Preuves E6
+
+Relayées telles que les exécutants les ont rendues :
+- 70-10 : `comm -3` des libellés avant/après → 0 ligne ; `test-cockpit-responsive.sh` 74 s, 191/0 (sur a108cc20).
+- 70-12 : `test-cockpit-responsive.sh` 255/6 (les six R13.4) sur c8f1d90d ; equipe, marque-blanche, vendor rc 0.
+- 70-07 (grandes cartes) : `test-cockpit-projet.sh` 100/0, vendor 79/0, chrome-fr 70/0, responsive 255/6, `synchro.sh verifier` rc 0 (sur 42ae27cb).
+- 70-11 (recette) : equipe 147/0, marque-blanche 30/0, chrome-fr 70/0, transcript 99/0, who 90/0, responsive 255/6 (sur 643bc7ac).
+- 70-03 (recette) : chrome-fr 70/0, avancement 62/0, onglet-code 25/0 (sur 3c8cf298).
+- 70-09 : `check-version-sync.sh` rc 0 (149 suites), vendor 79/0, `test-vibeflow-update-cockpit.sh` 11/0 (sur bd1a6606).
+- Manager : `replay-ci-jobs.sh --job gates` → 20 rejouées, 3 sautées, 0 en échec (sur 643bc7ac). CI de la PR #200 : gates vert
+  sur c7217940 ; deux rouges `check-machine-paths` corrigés en c7217940 et 631e2e10. Shards à 03bada92 : 0 à 5 verts, 6 rouge
+  sur les six R13.4 (attendus) et sur R15.4b (corrigé en 982f4da9, rejoué deux fois avant correction).
+- 70-07 (CI Linux) : `test-cockpit-projet.sh` 108/0, vendor 79/0, chrome-fr 70/0, responsive 255/6, R15.4b vert (sur 982f4da9).
+- Fusions de main : à a15b073d, 22 suites du cockpit vertes (ailleurs 17/0, equipe 157/0, projet 154/0, chrome-fr 78/0, responsive 291/0),
+  `test-vibeflow-update-cockpit.sh` 13/0, `check-version-sync.sh` vert (155 suites), `check-machine-paths.sh` vert ; CI de la PR #200 verte à a15b073d.
+
+## Next step
+
+Le merge de la PR #200 revient au coordinateur, après la décision de Samuel : « merge la 70 dès qu'elle est verte » (session principale
+Claude Code, 2026-11-04). Ensuite : la release racine, geste humain ; le tri du BACKLOG (budget dépassé) ; puis la Phase 71.

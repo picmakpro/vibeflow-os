@@ -10,15 +10,20 @@
 
   const style = document.createElement('style');
   style.textContent = `
-#tour { position: fixed; left: 16px; bottom: 76px; width: min(360px, calc(100vw - 32px)); padding: 16px 16px 12px 20px; border-radius: var(--r-panel); z-index: 6; animation: tourIn .4s var(--ease); }
+#tour { position: fixed; left: 16px; bottom: 76px; width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 170px); display: flex; flex-direction: column; padding: 16px 16px 12px 20px; border-radius: var(--r-panel); z-index: 6; animation: tourIn .4s var(--ease); }
+#tour.right { left: auto; right: 16px; }
+#tour .tb { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.tour-target { position: fixed; z-index: 5; pointer-events: none; outline: 2px solid var(--ring); outline-offset: 4px; border-radius: 10px; }
 #tour[hidden] { display: none; }
 #tour .tk { font-size: 12px; color: var(--text-3); margin-bottom: 4px; display: flex; gap: 6px; align-items: center; }
 #tour .tk i { width: 3px; height: 3px; border-radius: 50%; background: var(--text-4); }
 #tour .tt { font-size: 16px; font-weight: 600; letter-spacing: -.01em; line-height: 1.35; padding-right: 22px; }
 #tour .tn { color: var(--text-2); line-height: 1.55; margin-top: 6px; font-size: 13.5px; }
 #tour .tip { color: var(--text-3); font-size: 12px; line-height: 1.5; margin-top: 10px; }
-#tour .tf { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
-#tour .dots { display: flex; gap: 4px; flex: 1; }
+#tour .tf { flex: none; display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+#tour .acts { display: flex; align-items: center; gap: 8px; }
+#tour .acts [data-x] { margin-right: auto; }
+#tour .dots { display: flex; gap: 4px; }
 #tour .dots i { width: 14px; height: 3px; border-radius: 2px; background: rgba(var(--ink), .12); transition: background .3s var(--ease); }
 #tour .dots i.on { background: var(--on); }
 #tour .tf .btn { height: 32px; }
@@ -29,51 +34,54 @@
   document.head.appendChild(style);
 
   // ---------- steps ----------
-  const clip = (s, max = 230) => {
-    s = String(s || '').trim();
-    if (s.length <= max) return s;
-    const cut = s.slice(0, max);
-    const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('; '));
-    return end > 80 ? cut.slice(0, end + 1) : cut.replace(/\s+\S*$/, '') + '…';
-  };
+  const clip = (s) => String(s || '').trim(); // the whole text: a step is never cut short (P70-D-02)
+  const okSel = (q) => { if (typeof q !== 'string' || !q) return false; try { return !!document.querySelector(q); } catch { return false; } }; // a selector from the data may be invalid
+  const isProject = () => G.meta?.vfTab === 'project';
   const listOf = (names) => names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
   const tops = G.nodes.filter((n) => !n.parent && n.id !== 'unassigned');
   const bySize = (a, b) => (b.stats?.files || 0) - (a.stats?.files || 0);
   const screensOf = (id) => (G.screens || []).filter((s) => s.app === id).length;
 
   function flowStep() {
+    if (isProject()) return null; // the Project tab has no path through the code to follow
     const f = (G.flows || []).find((x) => !x.custom) || (G.flows || [])[0];
     if (!f || !f.steps?.length) return null;
-    return { ref: 'root', flow: f.id, kicker: 'One real path', title: f.title, note: `${f.description ? clip(f.description, 160) + ' ' : ''}Press Play to follow it through the code, one step at a time.` };
+    const first = f.steps[0]?.ref;
+    return { ref: first && SC.exists(first) ? first : 'root', flow: f.id, kicker: 'One real path', title: f.title, note: `${f.description ? clip(f.description) + ' ' : ''}Press Play to follow it through the code, one step at a time.` };
   }
   function autoSteps() {
     const p = G.project || {};
-    const steps = [{ ref: 'root', kicker: 'The codebase', title: p.name || 'This codebase', note: clip(p.summary) || 'A map of the main parts of this app and how they talk to each other.' }];
+    const steps = isProject()
+      ? [{ ref: 'root', kicker: 'The project', title: p.name || 'This project', note: clip(p.summary) || 'The work of this project: milestones, phases, backlog and releases.' }]
+      : [{ ref: 'root', kicker: 'The codebase', title: p.name || 'This codebase', note: clip(p.summary) || 'A map of the main parts of this app and how they talk to each other.' }];
     const ui = tops.filter((n) => n.kind === 'ui').sort(bySize).slice(0, 2);
     for (const n of ui) {
       const k = screensOf(n.id);
-      steps.push({ ref: 'n:' + n.id, kicker: 'What people use', title: n.label, note: clip(n.summary, 200) + (k > 1 ? ` It has ${k} screens.` : '') });
+      steps.push({ ref: 'n:' + n.id, kicker: 'What people use', title: n.label, note: clip(n.summary) + (k > 1 ? ` It has ${k} screens.` : '') });
     }
     let back = tops.filter((n) => n.kind === 'service' || n.kind === 'worker').sort(bySize);
     if (!back.length) back = tops.filter((n) => !['ui', 'external', 'test', 'script', 'config', 'infra', 'misc'].includes(n.kind)).sort(bySize);
-    for (const n of back.slice(0, ui.length > 1 ? 1 : 2)) steps.push({ ref: 'n:' + n.id, kicker: 'Behind the scenes', title: n.label, note: clip(n.summary, 200) });
+    for (const n of back.slice(0, ui.length > 1 ? 1 : 2)) steps.push({ ref: 'n:' + n.id, kicker: 'Behind the scenes', title: n.label, note: clip(n.summary) });
     const data = tops.find((n) => n.kind === 'data' && !back.includes(n));
-    if (data && steps.length < 5) steps.push({ ref: 'n:' + data.id, kicker: 'Where the data lives', title: data.label, note: clip(data.summary, 200) });
+    if (data && steps.length < 5) steps.push({ ref: 'n:' + data.id, kicker: 'Where the data lives', title: data.label, note: clip(data.summary) });
     const ext = tops.filter((n) => n.kind === 'external');
     if (ext.length) {
       steps.push({
-        ref: ext.length === 1 ? 'n:' + ext[0].id : 'root', kicker: 'Outside services', title: ext.length === 1 ? ext[0].label : `${ext.length} outside services`,
-        note: ext.length === 1 ? clip(ext[0].summary, 200) : `It also relies on ${listOf(ext.slice(0, 6).map((n) => n.label))}${ext.length > 6 ? ` and ${ext.length - 6} more` : ''}. They sit at the edge of the map; the lines show which parts talk to them.`,
+        ref: ext.length === 1 ? 'n:' + ext[0].id : 'root', lit: ext.length === 1 ? undefined : ext.slice(0, 6).map((n) => 'n:' + n.id), kicker: 'Outside services', title: ext.length === 1 ? ext[0].label : `${ext.length} outside services`,
+        note: ext.length === 1 ? clip(ext[0].summary) : `It also relies on ${listOf(ext.slice(0, 6).map((n) => n.label))}${ext.length > 6 ? ` and ${ext.length - 6} more` : ''}. They sit at the edge of the map; the lines show which parts talk to them.`,
       });
     }
     return steps;
   }
   function buildSteps() {
-    const own = (G.tour || []).filter((s) => s && s.ref && (s.ref === 'root' || SC.exists(s.ref))).map((s) => ({ ref: s.ref, title: s.title || SC.info(s.ref).name, note: s.note || SC.info(s.ref).desc || '', kicker: '' }));
+    const own = (G.tour || []).filter((s) => s && (s.ref ? (s.ref === 'root' || SC.exists(s.ref)) : okSel(s.cible))).map((s) => ({ ref: s.ref || 'root', cible: typeof s.cible === 'string' ? s.cible : '', title: s.title || (s.ref && s.ref !== 'root' ? SC.info(s.ref).name : ''), note: s.note || (s.ref && s.ref !== 'root' ? SC.info(s.ref).desc : '') || '', kicker: '' }));
     const steps = own.length >= 2 ? own : autoSteps();
     const fl = flowStep();
     if (fl && !steps.some((s) => s.flow) && steps.length < 9) steps.push(fl);
-    return steps.filter((s) => s.ref === 'root' || SC.exists(s.ref)).slice(0, 9);
+    // every step aims at something: a card, or an element of the page (the title of the overview by default); a selector that matches nothing is dropped
+    return steps.filter((s) => s.ref === 'root' || SC.exists(s.ref)).slice(0, 9)
+      .map((s) => (s.cible && !okSel(s.cible) ? { ...s, cible: '' } : s))
+      .map((s) => (s.ref === 'root' && !s.cible ? { ...s, cible: '#context' } : s));
   }
 
   // ---------- card ----------
@@ -87,64 +95,182 @@
   let steps = [], at = -1;
   const active = () => at >= 0;
 
+  // ---------- aiming: every step points at something ----------
+  let token = 0; // a step that was left before its move was due must not move the map
+  const hit = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
+  // the outline is its own element laid over the target, found again by its selector: the page may rewrite the target's classes or replace it (the live layer does) without losing the outline
+  let ringEl = null, ringSel = '', ringTimer = 0;
+  function ringPlace() {
+    let t = null; try { t = ringSel ? document.querySelector(ringSel) : null; } catch {}
+    const b = t && t.getBoundingClientRect();
+    if (!b || !b.width || !b.height) { if (ringEl) ringEl.style.display = 'none'; return; }
+    Object.assign(ringEl.style, { display: '', left: b.left + 'px', top: b.top + 'px', width: b.width + 'px', height: b.height + 'px' });
+  }
+  function ring(sel) {
+    clearInterval(ringTimer); ringTimer = 0;
+    if (ringEl) { ringEl.remove(); ringEl = null; }
+    ringSel = '';
+    if (!sel) return;
+    ringSel = sel; ringEl = document.createElement('div'); ringEl.className = 'tour-target'; ringEl.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(ringEl); ringPlace(); ringTimer = setInterval(ringPlace, 250);
+  }
+  // the free part of the map that the tour card does not cover: above the card or beside it, whichever is larger
+  function zone() {
+    const m = document.getElementById('svg').getBoundingClientRect(), a = SC.freeArea(), c = card.getBoundingClientRect();
+    const l = m.left + a.x, t = m.top + a.y, r = l + a.w, b = t + a.h;
+    const zs = [{ l, t, r, b: Math.min(b, c.top - 8) }, { l: Math.max(l, c.right + 8), t, r, b }].filter((z) => z.r - z.l > 40 && z.b - z.t > 40);
+    return zs.sort((p, q) => (q.r - q.l) * (q.b - q.t) - (p.r - p.l) * (p.b - p.t))[0] || { l, t, r, b };
+  }
+  // put the card in the middle of that zone, zooming in on a small card and out on one wider than the zone, but never zooming in so far that the rest of the map leaves the free area;
+  function aim(id, retry) {
+    const g = SC.state.chipEls?.get(id); if (!g) return;
+    const box = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
+    const r = box(g), z = zone(), vp = document.getElementById('viewport'), svg = document.getElementById('svg');
+    const m = svg.getBoundingClientRect(), a = SC.freeArea(), F = { l: m.left + a.x, t: m.top + a.y, r: m.left + a.x + a.w, b: m.top + a.y + a.h };
+    const all = [...svg.querySelectorAll('g.node')].map(box).filter((x) => x.w > 0 && x.h > 0);
+    const U = all.length ? { l: Math.min(...all.map((x) => x.l)), t: Math.min(...all.map((x) => x.t)), r: Math.max(...all.map((x) => x.r)), b: Math.max(...all.map((x) => x.b)) } : r;
+    const cx = (r.l + r.r) / 2, cy = (r.t + r.b) / 2, zw = z.r - z.l, zh = z.b - z.t, narrow = innerWidth < 701; // on a phone the whole map is tiny: a small card is zoomed until it can be read, and the rest of the map may leave the screen
+    let f = Math.max(1, Math.min(narrow ? 4 : 1.6, zw * (narrow ? 0.6 : 0.45) / r.w, zh * (narrow ? 0.6 : 0.45) / r.h)); // in on a small card...
+    const fit = Math.min((F.r - F.l) / (U.r - U.l), (F.b - F.t) / (U.b - U.t)); // the zoom at which the whole map exactly fills the free area; zoom in only up to it (on a phone, down to a card readable at 120 px)
+    f = narrow ? Math.max(Math.min(f, Math.max(1, fit)), Math.min(f, 120 / r.w)) : Math.min(f, Math.max(1, fit));
+    f = Math.min(f, 0.92 * zw / r.w, 0.92 * zh / r.h); // ...and out on a card wider than its zone: it must fit whole
+    const wheel = (o) => svg.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaMode: 0, ...o })), dx0 = (z.l + z.r) / 2 - cx, dy0 = (z.t + z.b) / 2 - cy, cr = { left: card.offsetLeft, top: card.offsetTop, right: card.offsetLeft + card.offsetWidth, bottom: card.offsetTop + card.offsetHeight };
+    // plan(k): the move, at zoom k (around the card's centre), nearest to centring in the zone that keeps the WHOLE map in the free area (strict: and the card visible, not under the tour card); null if none
+    const plan = (k, strict) => {
+      const sc = (b) => [cx + (b.l - cx) * k, cx + (b.r - cx) * k, cy + (b.t - cy) * k, cy + (b.b - cy) * k], [cl, cq, ct, cb] = sc(r), [ul, ur, ut, ub] = sc(U), xs = [F.l - ul, F.r - ur], ys = [F.t - ut, F.b - ub]; if (xs[0] > xs[1] + 0.5 || ys[0] > ys[1] + 0.5) return null;
+      let best = null; const cl2 = (d, [lo, hi]) => Math.min(Math.max(hi, lo), Math.max(lo, d)), pts = [[cl2(dx0, xs), cl2(dy0, ys)]];
+      for (let i = 0; i <= 12; i++) for (let j = 0; j <= 12; j++) pts.push([xs[0] + Math.max(0, xs[1] - xs[0]) * i / 12, ys[0] + Math.max(0, ys[1] - ys[0]) * j / 12]);
+      for (const [x, y] of pts) {
+        const vis = cl + x >= F.l - 1 && cq + x <= F.r + 1 && ct + y >= F.t - 1 && cb + y <= F.b + 1 && !(cl + x < cr.right && cq + x > cr.left && ct + y < cr.bottom && cb + y > cr.top);
+        if (strict && !vis) continue; const d = Math.hypot(x - dx0, y - dy0) + (cl + x >= z.l - 1 && cq + x <= z.r + 1 && ct + y >= z.t - 1 && cb + y <= z.b + 1 ? 0 : 1e4); if (!best || d < best.d) best = { d, x, y };
+      }
+      return best && { k, dx: best.x, dy: best.y };
+    };
+    // above 701 px a state always exists: zoom out (down to 40 % of the size that just fills the area) until the whole map fits the free area with the card visible; if even that fails the card may stay under the tour card: the only exception
+    const ladder = [f]; if (!narrow) { for (let k = f * 0.92; k > Math.min(f, fit) * 0.4 && ladder.length < 30; k *= 0.92) ladder.push(k); ladder.push(Math.min(f, fit)); }
+    const P = ladder.reduce((p, k) => p || plan(k, true), null) || (narrow ? null : plan(Math.min(f, fit), false)) || { k: f, dx: dx0, dy: dy0 };
+    f = P.k;
+    vp.classList.add('anim');
+    if (Math.abs(f - 1) > 0.02) wheel({ ctrlKey: true, deltaY: -Math.log(f) / 0.01, clientX: cx, clientY: cy });
+    wheel({ deltaX: -P.dx || -0.01, deltaY: -P.dy }); // deltaX is never 0: a pure vertical wheel would be read as a zoom
+    setTimeout(() => vp.classList.remove('anim'), 540);
+    // once the move is over, measure again: a card that still sticks out of its zone (a wider font, a late layout) is aimed once more
+    if (!retry) { const mine = token; setTimeout(() => { if (!active() || mine !== token) return; const b = box(g), z2 = zone(); if (b.l < z2.l - 1 || b.r > z2.r + 1 || b.t < z2.t - 1 || b.b > z2.b + 1) aim(id, true); }, 700); }
+  }
   function go(s) {
-    if (!s.ref || s.ref === 'root') { SC.go('root', { select: null }); return; }
-    const parent = SC.parentOf(s.ref) || 'root';
-    if (parent === 'root') SC.go('root', { select: s.ref }); // stay on the overview, just highlight the card
-    else SC.reveal(s.ref);
+    const mine = ++token, vp = document.getElementById('viewport');
+    const later = (fn, ms) => setTimeout(() => { if (mine === token && active()) fn(); }, ms);
+    const slow = SC.state.container !== 'root' || vp.classList.contains('anim'); // the map is about to move on its own: wait for it before measuring
+    ring(null);
+    if (!s.ref || s.ref === 'root') {
+      SC.go('root', { select: null, after: () => { if (s.lit?.length) { document.getElementById('svg').classList.add('dim'); for (const id of s.lit) SC.state.chipEls?.get(id)?.classList.add('hl'); } } }); // a step about several cards lights them all
+      if (at > 0) later(() => SC.fit(true), slow ? 650 : 60);
+    } else {
+      // nothing is selected: the details panel keeps showing the overview, the card is lit with the viewer's own highlight (hl on the card, dim on the rest)
+      const parent = SC.parentOf(s.ref) || 'root';
+      SC.go(parent, { select: null, after: () => { document.getElementById('svg').classList.add('dim'); SC.state.chipEls?.get(s.ref)?.classList.add('hl'); } });
+      later(() => aim(s.ref), parent !== 'root' || slow ? 650 : 60);
+    }
+    if (s.cible) ring(s.cible);
   }
   function render() {
     const s = steps[at], last = at === steps.length - 1;
-    const tip = last ? `Replay this tour any time from <b>Start here</b> at the top.${window.FloorplanScreens ? ' <b>Screens</b> shows everything behind any page.' : ''}` : '';
+    const tb = document.getElementById('tour-btn'); // on a phone the button sits behind the « ⋯ » menu, not at the top
+    const bl = tb && tb.querySelector('.bl'), iconOnly = bl && getComputedStyle(bl).display === 'none'; // under 1 600 px the button shows its icon only
+    const tip = last ? `${tb && tb.offsetParent === null ? 'Replay this tour any time from <b>⋯ › Start here</b>.' : iconOnly ? 'Replay this tour any time from <b>the tour button (icon)</b> at the top.' : 'Replay this tour any time from <b>Start here</b> at the top.'}${window.FloorplanScreens ? ' <b>Screens</b> shows everything behind any page.' : ''}` : '';
     card.innerHTML = `<button class="btn icon tx" data-x title="Close (Esc)">${SC.iconI('x')}</button>
-      <div class="tk"><span>Start here</span><i></i><span>${at + 1} of ${steps.length}</span>${s.kicker ? `<i></i><span>${h(s.kicker)}</span>` : ''}</div>
-      <div class="tt">${h(s.title)}</div>${s.note ? `<div class="tn">${h(s.note)}</div>` : ''}${tip ? `<div class="tip">${tip}</div>` : ''}
+      <div class="tb"><div class="tk"><span>Start here</span><i></i><span>${at + 1} of ${steps.length}</span>${s.kicker ? `<i></i><span>${h(s.kicker)}</span>` : ''}</div>
+      <div class="tt">${h(s.title)}</div>${s.note ? `<div class="tn">${h(s.note)}</div>` : ''}${tip ? `<div class="tip">${tip}</div>` : ''}</div>
       <div class="tf"><div class="dots">${steps.map((_, k) => `<i class="${k <= at ? 'on' : ''}"></i>`).join('')}</div>
-        ${at > 0 ? `<button class="btn icon soft" data-back title="Back (←)">${SC.iconI('left')}</button>` : `<button class="btn" data-x>Skip</button>`}
+        <div class="acts"><button class="btn" data-x>Skip</button>
+        ${at > 0 ? `<button class="btn icon soft" data-back title="Back (←)">${SC.iconI('left')}</button>` : ''}
         ${s.flow ? `<button class="btn primary" data-play>${SC.iconI('right')}Play it</button>${last ? '' : '<button class="btn soft" data-next>Next</button>'}` : `<button class="btn primary" data-next>${last ? 'Done' : 'Next'}</button>`}
+        </div>
       </div>`;
-    card.querySelectorAll('[data-x]').forEach((b) => b.onclick = end);
+    card.querySelectorAll('[data-x]').forEach((b) => b.onclick = () => end());
     card.querySelector('[data-back]')?.addEventListener('click', back);
     card.querySelector('[data-next]')?.addEventListener('click', next);
-    card.querySelector('[data-play]')?.addEventListener('click', () => { const id = s.flow; end(); SC.startFlow(id); });
+    card.querySelector('[data-play]')?.addEventListener('click', () => { const id = s.flow; end(false); SC.startFlow(id); });
   }
   // sit above the zoom controls, and above the Ask bar (and its notices) where they overlap
-  function place() {
-    let bottom = 76;
+  let placedSig = '', placeTimer = 0, lastPlace = null;
+  const sigOf = (obs) => obs.map((o) => [o.left, o.top, o.right, o.bottom].map(Math.round).join(',')).join('|');
+  function obstacles(vis) {
     const ask = document.getElementById('ask');
-    if (ask) {
-      const a = ask.getBoundingClientRect(), c = card.getBoundingClientRect();
-      const top = [...ask.children].filter((x) => x.offsetParent && x.getBoundingClientRect().height > 0).reduce((m, x) => Math.min(m, x.getBoundingClientRect().top), a.bottom);
-      if (a.width && a.left < 16 + c.width + 12 && top < innerHeight) bottom = Math.max(bottom, innerHeight - top + 12);
+    const name = (e) => e.id ? '#' + e.id : e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\s+/)[0] : '');
+    return ['zoom', 'panel', 'context', 'ask'].map((id) => document.getElementById(id)).concat(document.querySelector('header'), document.querySelector('.tour-target'), ask ? [...ask.children] : []).filter(vis).map((e) => { const r = e.getBoundingClientRect(); return { n: name(e), left: r.left, top: r.top, right: r.right, bottom: r.bottom }; });
+  }
+  const visible = (e) => { if (!e) return false; const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+  // last resort when a title block taller than expected leaves no room: its description is folded away while the tour is open (the title stays), and put back when the tour moves on or ends
+  function fold() { const p = document.querySelector('#context p'); if (!p || p.dataset.tourFold !== undefined || !visible(p)) return false; p.dataset.tourFold = p.style.display; p.style.display = 'none'; return true; }
+  function unfold() { const p = document.querySelector('#context p'); if (p && p.dataset.tourFold !== undefined) { p.style.display = p.dataset.tourFold; delete p.dataset.tourFold; } }
+  function place(folded) {
+    if (!folded) unfold();
+    // the card must not cover any fixed surface (zoom controls, details panel, title block, header, Ask bar and notices, the outlined target). Every candidate (width, side, height above an obstacle)
+    // is scored by the area it covers, then by its distance from the usual place; lowest cost wins, ties go to the first in a fixed order: nothing but the layout decides (never timing, fonts or pointer)
+    const vis = visible;
+    const obs = obstacles(vis);
+    placedSig = sigOf(obs);
+    lastPlace = { obs, topLimit: 0, best: null };
+    const topLimit = ['context'].map((id) => document.getElementById(id)).concat(document.querySelector('header')).filter(vis).reduce((m, e) => Math.max(m, e.getBoundingClientRect().bottom), 0) + 8; // header and title block (whatever their height: a wide font makes the title taller): the card is never taller than the room under them, its text scrolls
+    const w0 = Math.min(360, innerWidth - 32);
+    const widths = [w0, 300, 260, 220, 200].filter((w, k, a) => w <= w0 && a.indexOf(w) === k);
+    const bottoms = [76, ...obs.map((o) => Math.round(innerHeight - o.top + 12))].filter((b, k, a) => b >= 12 && b <= innerHeight - 120 && a.indexOf(b) === k).sort((a, b) => a - b);
+    const G6 = 2; // px counted around each surface: borders and rounding that the layout box does not show (6 made the search pick needlessly narrow cards and pushed the map out of the free area)
+    const area = (a, b) => Math.max(0, Math.min(a.right, b.right + G6) - Math.max(a.left, b.left - G6)) * Math.max(0, Math.min(a.bottom, b.bottom + G6) - Math.max(a.top, b.top - G6));
+    let best = null;
+    // widths first; when nothing fits without covering a surface, the card also gets shorter (its text scrolls), down to a floor of 200 x 120 px
+    for (const [lvl, hcap] of [1e6, 240, 180, 120].entries()) {
+      for (const w of widths) for (const side of ['left', 'right']) for (const b of bottoms) {
+        card.style.width = w + 'px'; card.style.bottom = b + 'px'; card.style.maxHeight = Math.min(hcap, Math.max(120, innerHeight - b - topLimit)) + 'px'; card.classList.toggle('right', side === 'right');
+        // the card's layout box, not its painted box: during its entry animation (98 % size, 8 px down) the painted box is smaller and shows a gap that the finished card does not have
+        const r = { left: card.offsetLeft, top: card.offsetTop, right: card.offsetLeft + card.offsetWidth, bottom: card.offsetTop + card.offsetHeight };
+        // the cost: what it covers first (a covered pixel outweighs any move), then how far it is from the usual place (bottom left, full width, full height)
+        const covered = obs.reduce((n, o) => n + area(r, o), 0);
+        const score = covered * 1e3 + (r.top < 0 || r.left < -0.5 || r.right > innerWidth + 0.5 ? 1e12 : 0) + Math.abs(b - 76) + (side === 'right' ? 40 : 0) + (w0 - w) * 0.5 + lvl * 20;
+        if (!best || score < best.score) best = { score, covered, w, side, b, mh: card.style.maxHeight };
+      }
+      if (best.covered === 0) break;
     }
-    card.style.bottom = Math.min(bottom, Math.max(76, innerHeight - card.offsetHeight - 80)) + 'px';
+    lastPlace.best = best; lastPlace.topLimit = topLimit;
+    card.style.width = best.w + 'px'; card.style.bottom = best.b + 'px'; card.style.maxHeight = best.mh; card.classList.toggle('right', best.side === 'right');
+    // still covering something: fold the title description and search again; kept only if that covers less, else put back
+    if (!folded && best.covered > 0 && fold()) { const before = best.covered; place(true); if (lastPlace.best.covered >= before) { unfold(); place(true); } }
   }
   window.addEventListener('resize', () => { if (active()) place(); });
   function show(i) {
     at = i;
     card.hidden = false;
     render();
-    place();
     go(steps[at]);
-    if (at === 0) setTimeout(() => SC.fit(true), 450);
+    place();
+    // the page lays itself out after the step and on its own (title block, zoom stack, Ask notices): while the tour is open, place again whenever a surface has moved
+    if (!placeTimer) placeTimer = setInterval(() => { if (active() && sigOf(obstacles(visible)) !== placedSig) place(); }, 200);
+    // the opening fit is only for a first step on the overview itself: after a card step it would undo the centring (a page already seen settles faster, so the card was measured before the fit)
+    if (at === 0 && (!steps[0].ref || steps[0].ref === 'root')) setTimeout(() => { if (at === 0) SC.fit(true); }, 450);
   }
   function next() { if (at >= steps.length - 1) end(); else show(at + 1); }
   function back() { if (at > 0) show(at - 1); }
-  function end() {
+  function end(refit = true) {
     if (!active()) return;
-    at = -1;
+    at = -1; token++; clearInterval(placeTimer); placeTimer = 0; unfold();
+    ring(null);
     card.hidden = true;
     SC.store.set(SEEN, true);
-    if (SC.state.container === 'root') SC.select(null);
+    // every way out gives back the overview, whole: a step on a card inside a group had opened that group, and it must not stay open at the zoom of the last card
+    if (SC.state.container === 'root') { SC.select(null); if (refit) SC.fit(true); }
+    else if (refit) SC.go('root', { select: null, after: () => SC.fit(true) });
   }
   function start() {
+    if (G.meta?.vfTab === 'equipe') return; // the Team tab has no tour of its own (its map is live sessions, not a codebase): it never opens, by itself or by the button
     steps = buildSteps();
     if (steps.length < 2) { SC.toast('There is not enough on this map for a tour yet.'); return; }
     SC.store.set(SEEN, true);
     show(0);
   }
 
-  const tourBtn = SC.addHeaderButton({ id: 'tour-btn', label: 'Start here', icon: 'home', title: 'A one-minute tour of this codebase', onClick: () => (active() ? end() : start()) });
+  const tourBtn = SC.addHeaderButton({ id: 'tour-btn', label: 'Start here', icon: 'home', title: isProject() ? 'A one-minute tour of this project' : 'A one-minute tour of this codebase', onClick: () => (active() ? end() : start()) });
+  if (G.meta?.vfTab === 'equipe') { tourBtn.setAttribute('aria-disabled', 'true'); tourBtn.title = 'There is no tour for the Team tab'; tourBtn.style.opacity = '0.5'; tourBtn.style.cursor = 'default'; } // the Team tab has no tour designed: the button says so and does nothing
   const ic = tourBtn.querySelector('svg');
   if (ic) ic.innerHTML = '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8z"/>'; // compass
   window.addEventListener('keydown', (ev) => {
@@ -154,7 +280,7 @@
     else if (!SC.state.flow && ev.key === 'ArrowLeft') { ev.stopPropagation(); ev.preventDefault(); back(); }
   }, true);
   // a guided flow takes over the canvas: step aside
-  SC.on('render', () => { if (active() && SC.state.flow) end(); });
+  SC.on('render', () => { if (active() && SC.state.flow) end(false); });
 
   // first visit: start on its own, unless the link points somewhere specific
   let auto = false;
@@ -167,5 +293,7 @@
   SC.on('ready', maybeAuto);
   if (SC.state.layout) maybeAuto();
 
-  window.FloorplanTour = { start, end, active };
+  // diagnostic for the test suites (a failure on a runner we do not have prints what the placement saw): the obstacles of the last placement and the position it chose
+  const diag = () => JSON.stringify(!lastPlace ? { placed: false } : { obstacles: lastPlace.obs.map((o) => o.n + '[' + [o.left, o.top, o.right, o.bottom].map(Math.round).join(',') + ']'), topLimit: Math.round(lastPlace.topLimit), choice: lastPlace.best && { width: lastPlace.best.w, side: lastPlace.best.side, bottom: lastPlace.best.b, covered: Math.round(lastPlace.best.covered), maxHeight: lastPlace.best.mh } });
+  window.FloorplanTour = { start, end, active, diag };
 })();

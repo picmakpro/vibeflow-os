@@ -10,6 +10,7 @@
 #   EP  coût de collecte sur 40 sous-agents (garde de non-régression, T-69-06)
 #   E23 onglet Équipe : page /equipe.html, graphe cockpit-equipe@1, couche d'onglets, sonde de libellés (CKPT-23 ; P69-D-17)
 #   EUI rendu de l'arbre hors navigateur (vm) : imbrication, terminés repliés, liens dans les deux sens, pied (CKPT-19 à 22 ; P69-D-14 à P69-D-18)
+#   EK  clavier et témoins mineurs de l'onglet Équipe dans un vrai Chromium : focus après Entrée sur « Lire le transcript », mutants de comportement (UIFN-12, UIFN-13)
 # 69-04 ajoute E23 et EUI.
 # Exit 0 si tout passe, 1 sinon.
 
@@ -333,6 +334,21 @@ vf_hyg_stop "$SRV"
 assert_eq "E22.10 — le leurre est toujours vivant après l'arrêt du serveur (jamais arrêté par la marque seule)" "$(ps -p "$LEURRE" >/dev/null 2>&1 && echo vivant || echo mort)" "vivant"
 vf_hyg_stop "$LEURRE"
 NOW="$(node -e 'console.log(Date.now())')"
+
+echo "=== E32 — « écrit à <rôle> », jamais un identifiant brut (Q2a ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-04) ==="
+cat > "$AUX/spec-e32.json" <<'JSON'
+{"sessionAgeS":5,"agents":[
+ {"id":"mgr1","spawnDepth":1,"ageS":5,"role":"vf-dev-manager"},
+ {"id":"w-cible","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"vf-reviewer"},
+ {"id":"w-ecrit","spawnDepth":2,"parent":"mgr1","ageS":3,"dernierAppel":{"name":"SendMessage","input":{"to":"w-cible","message":"x"}}},
+ {"id":"w-inconnu","spawnDepth":2,"parent":"mgr1","ageS":3,"dernierAppel":{"name":"SendMessage","input":{"to":"destinataire-ABSENT-32","message":"x"}}}]}
+JSON
+H32="$(mkhome e32 "$AUX/spec-e32.json" "$LAB")"
+Q who "$LAB" "$H32" "$NOSCRIPTS" "$NOW" > "$WORK/who-e32.json"
+assert_eq "E32.0 — contrôle positif : les trois agents sont listés et le destinataire connu porte son rôle dans la collecte" "$(G "$WORK/who-e32.json" 'j.workers.filter(x=>["w-cible","w-ecrit","w-inconnu"].includes(x.id)).length+"|"+j.workers.find(x=>x.id==="w-cible").role')" "3|vf-reviewer"
+assert_eq "E32.1 — rôle connu : « écrit à vf-reviewer »" "$(act "$WORK/who-e32.json" w-ecrit)" "écrit à|vf-reviewer"
+assert_eq "E32.2 — rôle inconnu : « écrit à un agent »" "$(act "$WORK/who-e32.json" w-inconnu)" "écrit à|un agent"
+assert_eq "E32.3 — aucun identifiant de destinataire brut, ni champ interne _to, dans la sortie (apparié au positif E32.1)" "$(grep -c 'destinataire-ABSENT-32\|"_to"' "$WORK/who-e32.json")" "0"
 
 echo "=== E28 — schéma vibeflow/cockpit-who@2 (P69-D-23) ==="
 cat > "$AUX/contrat-mini.json" <<'JSON'
@@ -825,6 +841,123 @@ RES31="$(QB "$SCRIPTS")"; MUT31="$(QB "$MSRC31")"
 rm -f "$LAB31/.planning/missions/a.dag.json" "$LAB31/.planning/missions/b.dag.json"
 assert_eq "E31.1 — un *.dag.json en tube et un lien vers /dev/zero ne bloquent pas la collecte et le DAG régulier reste lu" "$RES31" "rendu|1"
 assert_eq "E31.2 — mutant : lecture sans contrôle du type de fichier -> la collecte est bloquée (tuée par SIGKILL), détecté" "$MUT31" "bloqué|illisible"
+
+# ---------- EK — clavier et témoins mineurs de l'onglet Équipe, dans un vrai Chromium (UIFN-12, UIFN-13 ; Phase 70, plan 70-11) ----------
+# Un vrai navigateur (socle chrome-session.mjs, son propre Chromium headless), le vrai serveur de la SORTIE assemblée, un HOME jetable. Les mutants de
+# comportement sont posés dans la page RÉELLEMENT servie (la copie assemblée project.html de la sortie, que le serveur lit à son démarrage) : un mutant sur
+# une copie que personne ne sert ne prouverait rien. Le serveur est relancé à chaque mutant, la sortie restaurée ensuite.
+echo "=== EK — clavier et témoins mineurs de l'onglet Équipe (UIFN-12, UIFN-13) ==="
+EKCHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then EKCHROME="$c"; break; fi; done
+if [ -z "$EKCHROME" ]; then
+  echo "  ⊘ EK SAUTÉ : aucun navigateur — non compté comme réussi, et non vérifié"
+else
+  HERE_EK="$(cd "$(dirname "$0")" && pwd)"
+  cat > "$AUX/ek-sub.mjs" <<'JS'
+// ek-sub.mjs <fichier> : remplace UNE fois la chaîne EK_FROM par EK_TO (variables d'environnement) ; sort 1 (« ancre absente ») si EK_FROM n'y est pas : un mutant vide ne prouve rien
+import fs from 'node:fs';
+const f = process.argv[2]; const t = fs.readFileSync(f, 'utf8');
+if (!process.env.EK_FROM || !t.includes(process.env.EK_FROM)) { console.log('ancre absente'); process.exit(1); }
+if (t.split(process.env.EK_FROM).length > 2) { console.log('ancre ambiguë'); process.exit(1); } // deux occurrences : le mutant pourrait viser le mauvais fichier (faux vert, 70-11)
+fs.writeFileSync(f, t.replace(process.env.EK_FROM, () => process.env.EK_TO)); console.log('muté');
+JS
+  LABEK="$WORK/lab-ek"; mkdir -p "$LABEK/src" "$LABEK/.planning/phases/01-x"
+  printf -- '- [x] **Phase 1: Socle** - premier jet\n' > "$LABEK/.planning/ROADMAP.md"
+  printf '<objective>Faire le socle</objective>\n' > "$LABEK/.planning/phases/01-x/01-01-PLAN.md"; echo ok > "$LABEK/.planning/phases/01-x/01-01-SUMMARY.md"
+  git -C "$LABEK" init -q && git -C "$LABEK" add -A && git -C "$LABEK" -c user.email=t@t -c user.name=t commit -q -m init
+  node "$SCRIPTS/vf-cockpit-build.mjs" "$LABEK" --quiet > "$WORK/build-ek.out" 2>&1 || cat "$WORK/build-ek.out"
+  cat > "$AUX/spec-ek.json" <<'JSON'
+{"sessionAgeS":5,"agents":[
+ {"id":"mgr1","spawnDepth":1,"ageS":5,"role":"vf-dev-manager"},
+ {"id":"a1","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"vf-coder"},
+ {"id":"a2","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"vf-coder"},
+ {"id":"a3","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"general-purpose","dureeS":130,"dernierAppel":{"name":"Agent","input":{"subagent_type":"general-purpose","description":"d","prompt":"p"}}}]}
+JSON
+  NOW="$(node -e 'console.log(Date.now())')"
+  HEK="$(mkhome ek "$AUX/spec-ek.json" "$LABEK")"
+  # sept sessions racines en plus : la scène du premier affichage est assez large pour que l'ajustement à tout l'écran la réduise sous 0,75 sur un écran étroit
+  for n in 1 2 3 4 5 6 7; do sed "s/$SID/bbbb000$n-2222-3333-4444-555566667777/g" "$HEK/.claude/projects/-lab/$SID.jsonl" > "$HEK/.claude/projects/-lab/bbbb000$n-2222-3333-4444-555566667777.jsonl"; done
+  OUTEK="$LABEK/.vibeflow/cockpit"; cp "$OUTEK/project.html" "$WORK/project-ek.html.orig"
+  ek_rafraichir() { touch "$HEK/.claude/projects/-lab/$SID/subagents/"agent-*.jsonl "$HEK/.claude/projects/-lab/"*.jsonl; }
+  ek_demarrer() { rm -f "$OUTEK/.cache/server.json"; ek_rafraichir
+    HOME="$HEK" node "$OUTEK/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-ek.out" 2>&1 &
+    EK_PID=$!; PIDS+=("$EK_PID")
+    for _ in $(seq 1 100); do [ -s "$OUTEK/.cache/server.json" ] && break; sleep 0.1; done
+    EK_PORT="$(G "$OUTEK/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"; }
+  # ek_muter <ancre> <remplacement> : pose le mutant dans la page assemblée (project.html de la sortie), « muté » ou « ancre absente »
+  ek_muter() { cp "$WORK/project-ek.html.orig" "$OUTEK/project.html"; if [ -z "${3:-}" ]; then EK_FROM="$1" EK_TO="$2" node "$AUX/ek-sub.mjs" "$OUTEK/project.html"; else EK_FROM="$1" EK_TO="$2" node "$AUX/ek-sub.mjs" "$OUTEK/project.html" >/dev/null || return 1; EK_FROM="$3" EK_TO="$4" node "$AUX/ek-sub.mjs" "$OUTEK/project.html"; fi; }  # $3/$4 : seconde substitution (fusion de la 68 : deux règles de pied de carte)
+  ek_restaurer() { cp "$WORK/project-ek.html.orig" "$OUTEK/project.html"; }
+  # EKC <action> <page> : une interaction, un Chromium ; la ligne JSON rendue est lue par G
+  EKC() { ek_rafraichir; VF_CDP_ECHEANCE_MS=30000 EK_ACTION="$1" node "$HERE_EK/chrome-equipe-clavier.mjs" "$EKCHROME" "http://127.0.0.1:$EK_PORT/$2" 2>/dev/null > "$WORK/ek-$1.json"; }
+  EKA1="equipe.html#r=n%3Aag-a1"
+  ek_demarrer
+  assert_eq "EK0 — contrôle positif : serveur de la sortie démarré, page Équipe servie et fixture à deux agents lisibles" "$([ "$EK_PORT" -gt 0 ] && echo serveur)|$(node "$AUX/fetchp.mjs" "$EK_PORT" /equipe.html "$WORK/ek-equipe.html")" "serveur|200"
+  # EK1 (UIFN-12) : Entrée sur « Lire le transcript » ne fait pas perdre le focus clavier
+  EKC focus-transcript "$EKA1"
+  assert_eq "EK1.0 — témoin : avant l'Entrée, l'élément actif est le bouton « Lire le transcript » de l'agent a1 (la sonde sait lire le focus)" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||(j.avant.tag+"|"+j.avant.transcript)')" "BUTTON|a1"
+  assert_eq "EK1 — après Entrée sur « Lire le transcript », le transcript s'affiche ET l'élément actif reste dans le tiroir, jamais BODY" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||("lu="+j.lu+" | actif="+(j.apres.tag==="BODY"?"BODY":(j.apres.dansTiroir?"dans le tiroir":"hors du tiroir : "+j.apres.tag)))')" "lu=true | actif=dans le tiroir"
+  EKC focus-transcript "equipe.html#r=n%3Aag-mgr1"
+  assert_eq "EK1.1 — sur un manager qui porte des agents, Entrée sur « Lire le transcript » lit le transcript, garde le focus et ne fait pas descendre le viewer dans le nœud" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag+" | vue "+(j.hashAvant===j.hashApres?"inchangée":"changée"))')" "lu=true | actif=BUTTON | vue inchangée"
+  # EK2 (m1) : changer d'agent efface la clé de rechargement
+  EKC changer-agent "$EKA1"
+  assert_eq "EK2.1 — changer d'agent efface la clé de rechargement (avant : l'identifiant a1 ; après : aucune)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')" "a1|null"
+  # EK3 (m10) : le sessionStorage ne garde que l'identifiant de l'agent
+  EKC recharger "$EKA1"
+  assert_eq "EK3.1 — le sessionStorage ne contient que l'identifiant de l'agent (jamais le texte lu, qui est bien affiché)" "$(G "$WORK/ek-recharger.json" 'j.erreur||(JSON.stringify(j.entrees)+"|"+j.texteLu+"|"+j.fuite)')" '{"vf-equipe-ouvert":"a1"}|true|false'
+  # EK4 (m8) : un tiroir fermé n'est pas rouvert par un nouveau who
+  EKC ferme-puis-who "project.html#t"
+  assert_eq "EK4.1 — le tiroir « Au travail » fermé n'est pas rouvert par un who qui change l'arbre (ouvert, fermé, rouvert)" "$(G "$WORK/ek-ferme-puis-who.json" 'j.erreur||(j.ouvert+"|"+j.ferme+"|"+j.rouvert)')" "true|true|false"
+  # EK5 (m5) : la commande demandée est rendue en texte, jamais en HTML
+  EKC rendu-commande "$EKA1"
+  assert_eq "EK5.1 — une commande qui porte du balisage s'affiche en texte (0 élément créé, aucun #ek-injecte, la source lisible)" "$(G "$WORK/ek-rendu-commande.json" 'j.erreur||(j.elements+"|"+j.injecte+"|"+j.texte.includes("<b id=ek-injecte>"))')" "0|false|true"
+  # EK8 (UIFN-12, bouton voisin) : Entrée sur « Voir la dernière commande » du tiroir « Au travail » ne fait pas perdre le focus clavier
+  EKC focus-doing-tiroir "project.html#t"
+  assert_eq "EK8.0 — témoin : avant l'Entrée, l'élément actif est le bouton « Voir la dernière commande » du tiroir (la sonde sait lire le focus)" "$(G "$WORK/ek-focus-doing-tiroir.json" 'j.erreur||(j.avant.tag+"|"+(j.avant.doing?"doing":"sans id")+"|"+j.avant.dansTiroir)')" "BUTTON|doing|true"
+  assert_eq "EK8 — après Entrée sur « Voir la dernière commande » du tiroir, la commande s'affiche ET l'élément actif reste ce bouton, jamais BODY" "$(G "$WORK/ek-focus-doing-tiroir.json" 'j.erreur||("lu="+j.lu+" | actif="+(j.apres.tag==="BODY"?"BODY":(j.apres.doing?"bouton « dernière commande »":"autre : "+j.apres.tag)))')" "lu=true | actif=bouton « dernière commande »"
+  # --- recette de la Phase 70 (juge Playwright frais) : focus au redessin, badge du pied long, libellés ---
+  EKC focus-puis-who "$EKA1"
+  assert_eq "EK8.0 — témoin : le bouton du panneau avait le focus et le événement who l'a bien remplacé (le redessin a eu lieu)" "$(G "$WORK/ek-focus-puis-who.json" 'j.erreur||(j.focalise+"|"+j.remplace)')" "true|true"
+  assert_eq "EK8 — après le redessin du panneau par un événement who, le focus est rendu au bouton « Lire le transcript » de même identifiant" "$(G "$WORK/ek-focus-puis-who.json" 'j.erreur||(j.apres.tag==="BODY"?"BODY":(j.apres.estLeBouton&&j.apres.transcript==="a1"?"le bouton":"autre : "+j.apres.tag))')" "le bouton"
+  EKC focus-tiroir "project.html#t"
+  assert_eq "EK9.0 — témoin : le bouton du tiroir avait le focus et le événement who l'a bien remplacé" "$(G "$WORK/ek-focus-tiroir.json" 'j.erreur||(j.focalise+"|"+j.remplace)')" "true|true"
+  assert_eq "EK9 — après le redessin du tiroir « Au travail » par un événement who, le focus est rendu au bouton « Voir la dernière commande » de la même ligne" "$(G "$WORK/ek-focus-tiroir.json" 'j.erreur||(j.apres.tag==="BODY"?"BODY":(j.apres.estLeBouton?"le bouton":"autre : "+j.apres.tag))')" "le bouton"
+  EKC badge "$EKA1"
+  assert_eq "EK10 — pied long (« actif · … · lance un agent general-purpose ») : le badge d'état reste entièrement dans sa carte à 390, 1024 et 1440 px (marge >= 0)" "$(G "$WORK/ek-badge.json" 'j.erreur||(["390","1024","1440"].map((l)=>typeof j[l]==="number"&&j[l]>=0?"ok":l+"="+j[l]).join(","))')" "ok,ok,ok"
+  EKC echelle "equipe.html"
+  assert_eq "EK13.0 — témoin : la scène porte au moins une carte à chacun des 7 chargements (5 à 390 px, 2 à 768 px)" "$(G "$WORK/ek-echelle.json" 'j.erreur||(["390","768"].every((l)=>j[l].every((m)=>m.cartes>0))?"cartes":"aucune carte")')" "cartes"
+  assert_eq "EK13 — premier affichage, 5 chargements à 390 px et 2 à 768 px : échelle >= 0,75 à chacun, aucun recouvrement entre #context (lien « Plus » compris) et la première carte, carte entièrement visible (x >= 0)" "$(G "$WORK/ek-echelle.json" 'j.erreur||["390","768"].map((l)=>l+" : "+j[l].map((m)=>(m.k>=0.75?"k":"k="+m.k)+(m.aire===0?"":" recouvre "+m.aire+" px²")+(m.gauche>=0?"":" x="+m.gauche)).join(",")).join(" ; ")')" "390 : k,k,k,k,k ; 768 : k,k"
+  G "$WORK/ek-echelle.json" '(j.erreur?[]:["390","768"].flatMap((l)=>j[l].map((m,i)=>[l+"#"+i,m]))).filter(([,m])=>m.aire>0||m.k<0.75).map(([n,m])=>"  diag EK13 "+n+" : "+m.diag).join("\n")'
+  EKC titre-grandi "equipe.html"
+  assert_eq "EK14 — le titre grandit après le cadrage (768 px, corps 40 px sur 9 caractères de large) : aucun recouvrement avec la première carte une fois la page stable, échelle >= 0,75" "$(G "$WORK/ek-titre-grandi.json" 'j.erreur||((j.k>=0.75?"k":"k="+j.k)+" / "+(j.aire===0?"sans recouvrement":"recouvre "+j.aire+" px²"))')" "k / sans recouvrement"
+  EKC libelles "equipe.html#t"
+  assert_eq "EK11 — la ligne des sources du tiroir est en français (aucune clé « sessions », « locks », « dags » brute)" "$(G "$WORK/ek-libelles.json" 'j.erreur||(/\b(sessions|locks|dags)\b ?:/.test(j.src)?"anglais : "+j.src:"français")')" "français"
+  assert_eq "EK12 — l'infobulle de la recherche de l'onglet Équipe dit la même chose que son libellé" "$(G "$WORK/ek-libelles.json" 'j.erreur||j.titre')" "Chercher un agent ou une session"
+  vf_hyg_stop "$EK_PID"
+
+  # --- mutants : chacun posé dans la page servie, serveur relancé, le témoin DOIT rougir ---
+  ek_mutant() { # $1 nom, $2 action, $3 page, $4 expression sur la sortie, $5 ancre, $6 remplacement -> « muté|<valeur> »
+    local m; m="$(ek_muter "$5" "$6" "${7:-}" "${8:-}")"; ek_demarrer; EKC "$2" "$3"; local v; v="$(G "$WORK/ek-$2.json" "$4")"; vf_hyg_stop "$EK_PID"; ek_restaurer; echo "$m|$v"; }
+  assert_eq "EK2.2 — mutant (marque(null) retiré de la page servie) : la clé survit au changement d'agent, détecté" "$(ek_mutant m1 changer-agent "$EKA1" 'j.erreur||(j.avant+"|"+j.apres)' 'lu = null; marque(null); return;' 'lu = null; return;')" "muté|a1|a1"
+  assert_eq "EK3.2 — mutant (le sessionStorage reçoit aussi le texte lu) : la fuite est détectée" "$(ek_mutant m10 recharger "$EKA1" 'j.erreur||(j.fuite+"|"+j.texteLu)' 'sessionStorage.setItem(CLE_OUVERT, id);' "sessionStorage.setItem(CLE_OUVERT, id + ' ' + lu.noeuds.map((n) => n.textContent).join(' '));")" "muté|true|true"
+  assert_eq "EK4.2 — mutant (garde « tiroir fermé » retirée de redessiner) : le who rouvre le tiroir, détecté" "$(ek_mutant m8 ferme-puis-who "project.html#t" 'j.erreur||(j.ouvert+"|"+j.ferme+"|"+j.rouvert)' "if (!document.querySelector('.vf-whop') || document.body.classList.contains('no-panel')) return;" 'if (false) return;')" "muté|true|true|true"
+  assert_eq "EK5.2 — mutant (la commande est rendue en HTML) : un élément est créé, détecté" "$(ek_mutant m5 rendu-commande "$EKA1" 'j.erreur||(j.elements+"|"+j.injecte)' "z.textContent !== t) { z.textContent = t; z.hidden = false; }" "!z.dataset.ek) { z.dataset.ek = '1'; z.innerHTML = t; z.hidden = false; }")" "muté|1|true"
+  # l'ancre doit être propre à 72-vf-equipe.js : le viewer porte d'autres ev.stopPropagation(), un mutant posé sur l'un d'eux serait un faux vert
+  EKANC1="ev.target.closest?.('#panel [data-vf-transcript], #panel [data-vf-doing]')) ev.stopPropagation();"
+  assert_eq "EK1.2 — mutant (l'Entrée du bouton n'est plus arrêtée avant le viewer) : le viewer descend dans le nœud du manager (la vue change), détecté" "$(ek_mutant f1 focus-transcript "equipe.html#r=n%3Aag-mgr1"  'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag+" | vue "+(j.hashAvant===j.hashApres?"inchangée":"changée"))' "$EKANC1" "${EKANC1/ev.stopPropagation();/void 0;}")" "muté|lu=true | actif=BUTTON | vue changée"
+  assert_eq "EK1.3 — mutant (le bouton focalisé est désactivé pendant la lecture) : le transcript est lu mais le focus tombe sur BODY, détecté" "$(ek_mutant f2 focus-transcript "$EKA1" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "b.setAttribute('aria-disabled', 'true'); // jamais \`disabled\` : un bouton désactivé perd le focus clavier (UIFN-12)" 'b.disabled = true;')" "muté|lu=true | actif=BODY"
+  assert_eq "EK8.1 — mutant (le bouton focalisé du tiroir est désactivé pendant la lecture) : la commande est lue mais le focus tombe sur BODY, détecté" "$(ek_mutant f3 focus-doing-tiroir "project.html#t" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "b.setAttribute('aria-disabled', 'true'); // jamais \`disabled\` : un bouton focalisé désactivé perd le focus clavier (UIFN-12, même défaut" 'b.disabled = true; //')" "muté|lu=true | actif=BODY"
+  assert_eq "EK8.2 — mutant (le focus n'est plus rendu après un redessin) : il tombe sur BODY, détecté" "$(ek_mutant r1 focus-puis-who "$EKA1" 'j.erreur||(j.apres.tag)' 'new MutationObserver(() => { rendreFocus(); ' 'new MutationObserver(() => { ')" "muté|BODY"
+  assert_eq "EK9.2 — même mutant, tiroir « Au travail » : le focus tombe sur BODY, détecté" "$(ek_mutant r2 focus-tiroir "project.html#t" 'j.erreur||(j.apres.tag)' 'new MutationObserver(() => { rendreFocus(); ' 'new MutationObserver(() => { ')" "muté|BODY"
+  assert_eq "EK10.2 — mutant (la règle du pied retirée de la page servie) : le badge sort de sa carte à 1440 px, détecté" "$(ek_mutant r3 badge "$EKA1" 'j.erreur||(j["1440"]<0?"rogné":"dans la carte")' ".foot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .foot .vst { flex: none; }" '.foot .meta { }' ".foot .meta { white-space: normal; min-width: 0; border-radius: 12px; }" '.foot .meta { }')" "muté|rogné"
+  assert_eq "EK11.2 — mutant (les clés de la collecte affichées telles quelles) : « sessions : lue » reparaît, détecté" "$(ek_mutant r4 libelles "equipe.html#t" 'j.erreur||(/\b(sessions|locks|dags)\b ?:/.test(j.src)?"anglais":"français")' '${SOURCES[k] || k} : ${v.etat}' '${k} : ${v.etat}')" "muté|anglais"
+  assert_eq "EK12.2 — mutant (infobulle laissée au viewer) : « Chercher un fichier, une route, un module » reparaît, détecté" "$(ek_mutant r5 libelles "equipe.html#t" 'j.erreur||j.titre' "bouton.setAttribute('aria-label', LIB); bouton.title = LIB;" "bouton.setAttribute('aria-label', LIB);")" "muté|Chercher un fichier, une route, un module"
+  assert_eq "EK13.2 — mutant (plafond de 0,75 retiré) : la scène est réduite sous 0,75, détecté" "$(ek_mutant r6 echelle "equipe.html" 'j.erreur||(j["390"].concat(j["768"]).some((m)=>m.k<0.75)?"réduit":"plafonné")' 'if (!actif || !st.t || st.t.k > 0.75) return;' 'return;')" "muté|réduit"
+  assert_eq "EK13.3 — mutant (cadrage sous freeArea() au lieu du bas réel de #context) : le titre recouvre la première carte, détecté" "$(ek_mutant r7 echelle "equipe.html" 'j.erreur||(j["390"].concat(j["768"]).some((m)=>m.aire>0)?"recouvre":"libre")' 'const y = Math.max(a.y, bas - haut + 12)' 'const y = a.y')" "muté|recouvre"
+  assert_eq "EK14.2 — mutant (le cadrage n'écoute plus la taille du titre) : le titre qui grandit recouvre la première carte, détecté" "$(ek_mutant r8 titre-grandi "equipe.html" 'j.erreur||(j.aire>0?"recouvre":"libre")' 'taille?.observe(ctx);' '')" "muté|recouvre"
+  # témoins de la sonde de mutation elle-même
+  ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"
+  assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK2.1 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "a1|null|identique"
+  assert_eq "EK7 — témoin de la sonde : un mutant dont l'ancre n'existe pas est refusé, la page servie reste intacte" "$(ek_muter 'ANCRE-QUI-N-EXISTE-PAS-70-11' 'x')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "ancre absente|identique"
+fi
 
 vf_hyg_assert
 

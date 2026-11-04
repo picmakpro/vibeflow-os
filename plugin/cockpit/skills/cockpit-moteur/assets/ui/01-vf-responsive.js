@@ -22,7 +22,7 @@
     .brand .mark, :root[data-theme="light"] .brand .mark, :root[data-theme="light"] #madewith .mark { filter: none !important; }
     @media (min-width: 1280px), (min-width: 1000px) and (not (pointer: coarse)) {
       header { display: flex; grid-template-columns: none; }
-      header .hl { flex: 1 1 0; min-width: 280px; } /* marque 84 + onglets 143 (trois onglets resserrés sous 1 280 px, 69-05) + remonter 36 + marges : le plus étroit qui ne rogne pas ; 300 faisait sortir de 12 px le dernier bouton à 1 024 px (onglet Code avec Travail récent et Écrans) */
+      header .hl { flex: 1 1 0; min-width: 342px; } /* P70-D-16 : marque 84 + écart 4 + marge des onglets 14 + onglets 200 (13 px, piste à 3 px, padding 13 px : 122 de texte + 6 x 13) + écart 4 + remonter 36 = 342 : le plus étroit qui ne rogne ni les onglets ni « Remonter » (mesuré dans Chrome à 1 024 px, onglet Code avec Travail récent et Écrans, badge réduit à son point par P70-D-22) */
       header .hc { flex: 0 1 400px; min-width: 200px; justify-content: stretch; }
       header .hr { flex: 1 1 0; min-width: min-content; }
       header .brand { flex: 0 6 auto; min-width: 84px; }
@@ -37,6 +37,14 @@
       .hr .btn:not(.icon):not(#vf-lock) { width: 36px; padding: 0; justify-content: center; }
       .hr .btn:not(#vf-lock) .bl { display: none; }
       .hr .btn .badge { position: absolute; top: 2px; right: 0; }
+    }
+    @media (min-width: 701px) and (max-width: 1639px) { /* P70-D-22 (« Badge réduit à son point (Recommandé) », arbitrage Samuel, AskUserQuestion session principale, 2026-11-04) : le badge « au travail » se réduit à son point et libère 92 px pour les onglets à 13 px. Seuil MESURÉ : à 1 600 px (et sous 1 635 px) le fil d'Ariane en parcours est rogné avec le badge entier (« 10 au travail ») ; il tient dès 1 635 px, 1 640 px garde 5 px de marge */
+      #vf-lock { width: 36px; padding: 0; justify-content: center; }
+      #vf-lock .bl { display: none; }
+    }
+    @media (min-width: 701px) { /* repli mesuré (70-04, P70-D-22) : l'en-tête déborde malgré la tranche ci-dessus (libellé plus long, bouton en plus) -> le badge se réduit à son point */
+      #vf-lock[data-vf-point] { width: 36px; padding: 0; justify-content: center; }
+      #vf-lock[data-vf-point] .bl { display: none; }
     }
     @media (min-width: 1000px) and (max-width: 1279px) {
       #zoom { left: auto; right: calc(var(--pw) + 16px); bottom: auto; top: calc(var(--hh, 64px) + 8px); flex-direction: column; border-radius: 26px; }
@@ -54,14 +62,17 @@
       header #crumbs [data-vf-masque] { display: none; }
       header #crumbs .vf-ell { flex: none; color: var(--text-4); padding: 0 6px; cursor: default; }
     }
+    /* 70-12 (UIFN-14, P70-D-20 : choix du manager, vf-dev-manager, 2026-11-04) : l'onglet Équipe n'a pas de barre de question, donc rien ne gêne le bas de la scène ; dès 701 px le zoom y est la rangée en bas à gauche du viewer d'origine
+       (celle de 1 440 px), jamais la colonne du haut qui recouvrait les cartes. Code et Projet gardent leur position (la barre de question occupe le bas) ; sous 701 px la pile verticale du téléphone (02-vf-telephone.js) reste seule. */
+    @media (min-width: 701px) { body.vf-tab-equipe #zoom { left: 16px; right: auto; top: auto; bottom: 16px; flex-direction: row; border-radius: 999px; } }
     @media (max-width: 999px) { #ask-input { flex: 1 1 100%; } }
     @media (max-width: 700px) { header #crumbs { display: none; } }
   `;
   document.head.appendChild(style);
   // fil d'Ariane : étiquette les segments courts (moins de 12 caractères), puis masque derrière « … » les segments du milieu tant que le fil déborde (CSS : un segment long garde 64 px)
   const fil = document.getElementById('crumbs'), nomProjet = document.getElementById('proj-name'), gauche = document.querySelector('header .hl');
-  let obs = null;
-  const ajuste = () => {
+  let obs = null, replieRaf = null;
+  const ajuste0 = () => {
     if (!fil) return;
     if (obs) obs.disconnect(); // nos propres retouches du fil ne relancent pas l'ajustement
     for (const e of fil.querySelectorAll('[data-vf-masque]')) e.removeAttribute('data-vf-masque');
@@ -78,6 +89,7 @@
     }
     if (obs) { obs.takeRecords(); obs.observe(fil, { childList: true, characterData: true, subtree: true }); }
   };
+  const ajuste = () => { ajuste0(); if (replieRaf) replieRaf(); }; // chaque ajustement du fil relance, une fois par image, la mesure du badge
   if (fil) {
     obs = new MutationObserver(ajuste); ajuste();
     if (nomProjet) new MutationObserver(ajuste).observe(nomProjet, { childList: true, characterData: true, subtree: true });
@@ -88,4 +100,26 @@
   const hd = document.querySelector('header');
   const infobulles = () => { for (const b of hd.querySelectorAll('button')) { if (b.getAttribute('title')) continue; const t = b.getAttribute('aria-label') || b.querySelector('.bl')?.textContent.trim(); if (t) b.setAttribute('title', t); } };
   if (hd) { infobulles(); new MutationObserver(infobulles).observe(hd, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label', 'title'] }); }
+  // repli mesuré du badge « au travail » (70-04, P70-D-22 : « Badge réduit à son point (Recommandé) », arbitrage Samuel, AskUserQuestion session principale, 2026-11-04) : au-dessus de 700 px, si l'en-tête déborde
+  // (un bouton hors de la fenêtre, l'en-tête plus large que la fenêtre, ou le fil d'Ariane rogné malgré son masquage), le badge se réduit à son point. Filet derrière la tranche 701-1 639 px : un libellé plus long
+  // (« 99 au travail ») ou un bouton d'en-tête de plus ne dépend d'aucun seuil fixe. Rejoué comme le fil : rendu, changement du badge ou des boutons, redimensionnement, chargement, polices.
+  const colDroite = document.querySelector('header .hr'); // le badge (#vf-lock) est ajouté plus tard par 70-vf-live.js : relu à chaque mesure
+  const replie = () => {
+    const badge = document.getElementById('vf-lock'); if (!badge || !hd) return;
+    badge.removeAttribute('data-vf-point'); // on mesure avec le badge entier
+    if (!matchMedia('(min-width: 701px)').matches) return;
+    if (fil) ajuste0();
+    const dehors = [...hd.querySelectorAll('button')].some((b) => b.offsetWidth > 0 && (b.getBoundingClientRect().right > innerWidth + 0.5 || b.getBoundingClientRect().left < -0.5));
+    if (dehors || hd.scrollWidth > innerWidth + 1 || (fil && fil.offsetWidth > 0 && fil.scrollWidth > fil.clientWidth + 1)) badge.setAttribute('data-vf-point', '');
+  };
+  if (colDroite && hd) {
+    let q = 0; replieRaf = () => { if (!q) q = requestAnimationFrame(() => { q = 0; replie(); }); };
+    new MutationObserver(replieRaf).observe(colDroite, { childList: true, characterData: true, subtree: true }); // création du badge, changement de son libellé, bouton ajouté
+    window.addEventListener('resize', replieRaf); window.addEventListener('load', replieRaf); if (document.fonts?.ready) document.fonts.ready.then(replieRaf);
+    replieRaf();
+  }
+  // nom accessible des boutons de zoom (z-out, z-fit, z-in), à toutes les largeurs (70-05, P70-D-09) : le title sans son raccourci « (+) », relu quand le traducteur change le title ; un aria-label posé par autrui n'est jamais écrasé
+  const zm = document.getElementById('zoom');
+  const nomsZoom = () => { for (const b of zm.querySelectorAll('button')) { const t = (b.getAttribute('title') || '').replace(/\s*\([^)]*\)\s*$/, '').trim(), cur = b.getAttribute('aria-label'); if (t && t !== cur && (!cur || cur === b.dataset.vfNom)) { b.setAttribute('aria-label', t); b.dataset.vfNom = t; } } };
+  if (zm) { nomsZoom(); new MutationObserver(nomsZoom).observe(zm, { childList: true, subtree: true, attributes: true, attributeFilter: ['title'] }); }
 })();

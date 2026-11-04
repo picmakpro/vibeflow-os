@@ -3,6 +3,7 @@
 #   C1 lab à modules : extracteur VibeFlow (dispatch, source, plus de liens que le même lab en brut)
 #   C4 dossier de plugin/ sans module.json : nœud infra générique + enfant tests (sans liste de noms)
 #   C2 lab neutre : architecture brute · C3 aucun assemblage n'appelle `claude` (faux binaire consignant tout appel)
+#   C5 accord de « fichier de code » dans le résumé d'un dossier : 1 fichier, 2 fichiers (UIFN-06, 70-01)
 # Labs jetables dans mktemp, isolation git, HOME jetable. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -80,6 +81,31 @@ echo "=== C2 — lab neutre : architecture brute ==="
 LN="$WORK/neutre"; mklab "$LN" neutre
 assert_eq "C2.1 — l'assemblage rend 0" "$(assembler "$LN")" "0"
 assert_eq "C2.2 — meta.vfCodeExtractor = brut" "$(donnee "$LN" 'j.meta.vfCodeExtractor')" "brut"
+
+echo "=== C5 — accord de « fichier de code » dans le résumé d'un dossier (UIFN-06, 70-01) ==="
+LA="$WORK/accord"; mklab "$LA" neutre
+mkdir -p "$LA/solo" "$LA/duo"; printf 'export const a = 1;\n' > "$LA/solo/a.js"; printf 'export const a = 1;\n' > "$LA/duo/a.js"; printf 'export const b = 2;\n' > "$LA/duo/b.js"
+git -C "$LA" add -A && git -C "$LA" -c user.email=t@t -c user.name=t commit -q -m accord
+assert_eq "C5.0 — l'assemblage du lab d'accord rend 0" "$(assembler "$LA")" "0"
+assert_eq "C5.1 — un dossier à un seul fichier de code : « 1 fichier de code » (jamais « 1 fichiers »)" "$(donnee "$LA" 'j.nodes.filter(n=>n.label==="solo").map(n=>n.summary).join("|")')" "Dossier solo : 1 fichier de code."
+assert_eq "C5.2 — un dossier à deux fichiers : « 2 fichiers de code »" "$(donnee "$LA" 'j.nodes.filter(n=>n.label==="duo").map(n=>n.summary).join("|")')" "Dossier duo : 2 fichiers de code."
+
+echo "=== C6 — recette 2026-11-04 : un texte affiché n'est jamais coupé en plein mot (P70-D-02, P70-D-04) ==="
+# 6 : la première phrase de la description d'un module (texte d'une étape de la visite) est entière, même longue ; seule la 2e phrase est écartée
+LONG="Ce module reçoit les escalades des gestionnaires de mission, les trie par gravité, les confie au bon exécutant puis rend un rapport compact à la session principale pour décision humaine."
+LV="$WORK/phrase"; mklab "$LV" modules
+printf '{"name":"a","version":"1.0.0","type":"agent + skills + scripts","description":"%s Une seconde phrase."}\n' "$LONG" > "$LV/plugin/a/module.json"
+git -C "$LV" add -A && git -C "$LV" -c user.email=t@t -c user.name=t commit -q -m long
+assert_eq "C6.0 — l'assemblage rend 0" "$(assembler "$LV")" "0"
+assert_eq "C6.1 — la phrase de plus de 170 caractères reste entière, sans la seconde phrase" "$(donnee "$LV" 'j.nodes.filter(n=>n.id==="m-a").map(n=>n.summary).join("|")')" "$LONG"
+# 5b : le titre du travail récent (sous-titre du tableau) n'est pas coupé à 60 caractères en plein mot
+TITRE="Socle du découpage et de la validation des gabarits de la couche française"
+LT="$WORK/recent"; mklab "$LT" neutre
+printf -- '- [x] **Phase 1: %s** - premier jet\n' "$TITRE" > "$LT/.planning/ROADMAP.md"
+printf -- '---\nfiles_modified: [src/util.js]\n---\n<objective>Faire le socle</objective>\n' > "$LT/.planning/phases/01-x/01-01-PLAN.md"
+git -C "$LT" add -A && git -C "$LT" -c user.email=t@t -c user.name=t commit -q -m titre
+assert_eq "C6.2 — l'assemblage rend 0" "$(assembler "$LT")" "0"
+assert_eq "C6.3 — le titre du travail récent est entier (jamais coupé à 60 caractères)" "$(node -e 'const t=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).tasks;console.log(t.length+"|"+(t[0]||{}).title)' "$LT/.vibeflow/cockpit/recent-work.json")" "1|Phase 1 · $TITRE"
 
 echo "=== C3 — aucun appel à claude pendant l'assemblage ==="
 assert_eq "C3.1 — le faux claude n'a été appelé par aucun assemblage (C1, C2 et le témoin)" "$([ -s "$VF_FAKE_LOG" ] && wc -l < "$VF_FAKE_LOG" | tr -d ' ' || echo 0)" "0"

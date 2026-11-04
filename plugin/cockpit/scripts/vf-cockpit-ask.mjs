@@ -6,6 +6,7 @@
 // Identité d'une phase = (compartiment, numéro) : « phase N » se résout par le champ `num` des nœuds de phase ; si plusieurs
 // compartiments portent ce numéro, la réponse les liste avec leur compartiment et ne choisit pas au hasard.
 // Exports : projectIndex(G), answerLocally(G, question), instructions(G).
+import { statutLisible } from './vf-cockpit-project.mjs';
 const ST = { done: 'fait', active: 'en cours', todo: 'à faire', blocked: 'bloqué' };
 const fold = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
@@ -104,8 +105,17 @@ export function answerLocally(G, question) {
     const cur = curMs, p = I.N.get('ph-' + vf.phase) || G.nodes.find((n) => n.kind === 'phase' && String(n.num) === String(vf.phase));
     const nexts = cur ? I.under(cur.id).filter((x) => x.kind === 'phase' && x.st !== 'done') : [];
     const jalon = cur ? `[[${I.ref(cur)}]]${cur.foot ? ` (${cur.foot})` : ''}` : `${vf.milestone ? `« ${vf.milestone} » (aucune carte de jalon ne porte ce nom dans le ROADMAP)` : 'non reconnu'}`;
-    return answer('Où on en est', `Jalon en cours : ${jalon}. Dernière phase : ${p ? `[[${I.ref(p)}]]` : vf.phase ?? '?'} · ${vf.status || ''}, le ${vf.lastActivity || '?'}.\n\nÀ finir dans le jalon :\n${nexts.slice(0, 8).map((x) => line(I, x)).join('\n')}`,
-      [cur, p, ...nexts].filter(Boolean).map((x) => item(I, x)), ["Qu'est-ce qui bloque ?", "Qu'est-ce qui est en cours ?"]);
+    const aucunState = !vf.milestone && !vf.phase && !vf.status && !vf.lastActivity;
+    const reste = aucunState ? G.nodes.filter((n) => n.kind === 'phase' && n.st !== 'done') : nexts;
+    const st = statutLisible(vf.status);
+    const phrase = [
+      aucunState ? 'Pas de STATE.md dans ce lab : le jalon et la phase courants ne sont pas suivis.' : '',
+      !aucunState && (cur || vf.milestone) ? `Jalon en cours : ${jalon}.` : '',
+      !aucunState && (p || vf.phase) ? `Dernière phase : ${[p ? `[[${I.ref(p)}]]` : vf.phase, st].filter(Boolean).join(' · ')}${vf.lastActivity ? `, le ${vf.lastActivity}` : ''}.` : '',
+      !aucunState && !p && !vf.phase && (st || vf.lastActivity) ? `${[st, vf.lastActivity && `le ${vf.lastActivity}`].filter(Boolean).join(', ')}.` : '',
+    ].filter(Boolean).join(' ');
+    return answer('Où on en est', `${phrase}${reste.length ? `\n\n${aucunState ? 'Phases à finir (d\'après le ROADMAP)' : 'À finir dans le jalon'} :\n${reste.slice(0, 8).map((x) => line(I, x)).join('\n')}` : ''}`,
+      [cur, p, ...reste].filter(Boolean).map((x) => item(I, x)), ["Qu'est-ce qui bloque ?", "Qu'est-ce qui est en cours ?"]);
   }
   return null;
 }

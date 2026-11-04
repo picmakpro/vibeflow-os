@@ -32,7 +32,7 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos } = {}) {
     if (w.rattachement?.etat === 'rattache') lignes.push(`Nœud de mission : ${w.rattachement.noeud} (${w.rattachement.dag})`);
     nodes.push({ ...base, id: idCarte(w), parent: fini && parent ? `${parent}~termines` : parent, kind: sous ? 'agent' : 'session',
       label: sous ? clip([w.role, w.task].filter(Boolean).join(' · ') || 'Agent', 80) : `Session ${w.id.slice(0, 8)}`,
-      summary: clip(w.task || '', 200), details: lignes.join('\n'), st: ST[w.etat] || 'active', foot: '' });
+      summary: clip(w.task || '', 200), details: lignes.join('\n\n'), st: ST[w.etat] || 'active', foot: '' });
   }
   for (const [carte, n] of termines) {
     nodes.push({ ...base, id: `${carte}~termines`, parent: carte, kind: 'terminés', label: `Terminés depuis moins de 24 h (${n})`, summary: '', details: '', st: 'done', foot: '' });

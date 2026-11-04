@@ -3,7 +3,7 @@
 > Une page locale, en lecture seule, qui dit où en est le lab : jalons, phases (à faire, en cours, à recetter, faites), plans,
 > exigences, missions, et qui travaille en ce moment, en arbre. Ouverte par `/vf-cockpit`.
 
-**Type** : skill + scripts + moteur vendorisé · **Version** : v1.2.1 · **Dépend de** : aucun module (lit le verrou de `conductor` s'il est posé)
+**Type** : skill + scripts + moteur vendorisé · **Version** : v1.2.2 · **Dépend de** : aucun module (lit le verrou de `conductor` s'il est posé)
 
 ## Ce que ça donne
 
@@ -49,8 +49,19 @@ Le cockpit d'un lab écoute toujours sur le même port : un port préféré dér
 - **Code** : carte des fichiers et des liens d'appel ; extracteur VibeFlow quand le lab porte des modules (`plugin/*/module.json`),
   architecture brute sinon. Aucun modèle n'est appelé pour l'assembler.
 
-Les onglets sont resserrés pour que trois tiennent dans l'en-tête (`test-cockpit-responsive.sh`, R1 à R4) ; le retour aux
-valeurs d'origine est repris en Phase 70 (P69-D-28).
+Les onglets sont resserrés pour que trois tiennent dans l'en-tête (`test-cockpit-responsive.sh`, R1 à R4). Depuis la Phase 70,
+ils reviennent aux valeurs de `DESIGN.md` (13 px, piste de 3 px) en largeur téléphone (R13.4 à 390 px) ; à 1 024 et 1 440 px ils restent
+à 12 px / 2 px (écart connu : R13.4 y est rouge, arbitrage de Samuel en attente).
+
+## Téléphone et visite
+
+- **Téléphone (≤ 700 px)** : l'en-tête tient sur une rangée, les actions rares passent dans un menu « ⋯ » ; le zoom est une pile
+  verticale à gauche, au-dessus de la barre de question ; un tap sur une carte ou sur le titre ouvre le tiroir, qu'une poignée, une croix,
+  Échap ou un tap dans le vide referment. Preuve : `test-cockpit-responsive.sh` (R13 à R16 ; R17 à R20 pour l'onglet Équipe, dont le zoom
+  passe en bas à gauche dès 701 px).
+- **Visite « Par où commencer »** : sur Code comme sur Projet (jalon, phase, mission et « au travail » sur Projet), chaque étape vise un
+  élément, le texte est entier, « Passer » est toujours là, la visite éclaire une carte sans la sélectionner. Preuve : `test-cockpit-projet.sh`
+  (O5 pour Code, O6 pour Projet).
 
 ## Équipe au travail
 

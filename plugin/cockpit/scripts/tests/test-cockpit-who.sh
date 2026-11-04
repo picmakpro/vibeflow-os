@@ -517,6 +517,21 @@ HOME="$HOME_T" node "$SCRIPTS/vf-cockpit-signal.mjs" "$L20" > /dev/null 2>&1
 M1="$(stat -f %m "$L20/.git/index" 2>/dev/null || stat -c %Y "$L20/.git/index")"
 assert_eq "W20.4 — F-5 : la date de modification de .git/index ne bouge pas après l'émetteur" "$M1" "$M0"
 
+# ---------- W21 — la clause `..` de la grammaire ws, prouvée par le COMPORTEMENT (Phase 70, plan 70-11, UIFN-13) ----------
+# La clause `!ws.includes('..')` n'était gardée que par une ancre de texte (W17.9 supprime tout le filtre). Ici un compartiment `a..b` passe la forme
+# alphanumérique de WS_RE : seule la clause `..` l'écarte. Le faux driver-lock.sh de W17 journalise ses arguments : la cible `a..b` ne doit jamais lui arriver ;
+# le mutant (clause retirée, tout le reste du filtre intact) la lui livre.
+echo "=== W21 — un ws contenant « .. » n'arrive jamais en argument de driver-lock.sh ==="
+L21="$WORK/lab-w19"; mkdir -p "$L21"; git -C "$L21" init -q
+mkdir -p "$L21/.git/vf-driver/ws/ok1" "$L21/.git/vf-driver/ws/a..b"
+run21() { : > "$LOG17"; HOSTILE_LOG="$LOG17" node "$AUX/q.mjs" "$1" who "$L21" "$HOME_T" "$HOS" > /dev/null; }
+run21 "$SCRIPTS"
+assert_eq "W21.0 — contrôle positif : le compartiment a..b existe sur disque et la cible valide ok1 a bien été interrogée" "dir:$([ -d "$L21/.git/vf-driver/ws/a..b" ] && echo oui || echo non)|ok1:$(grep -c '^orphans --ws=ok1$' "$LOG17")" "dir:oui|ok1:1"
+assert_eq "W21.1 — la cible a..b n'est jamais passée au script (grammaire : jamais « .. »)" "$(grep -c -- '--ws=a\.\.b' "$LOG17")" "0"
+M21="$(mut17 sansdoublepoint vf-cockpit-who.mjs "WS_RE.test(ws) && !ws.includes('..')" "WS_RE.test(ws)")"
+run21 "$WORK/mut17-sansdoublepoint"
+assert_eq "W21.2 — mutant (seule la clause « .. » retirée, le reste du filtre intact) : a..b arrive au script, détecté par le comportement" "$M21|$(grep -c -- '--ws=a\.\.b' "$LOG17")" "muté|1"
+
 vf_hyg_assert
 
 echo ""

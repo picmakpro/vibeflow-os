@@ -935,17 +935,28 @@ Plans:
 
 ### Phase 70: Finitions UI du cockpit
 
-> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Phase à part »).
+> **Cadrée le 2026-11-03** (`70-CONTEXT.md`, P70-D-01..16 ; « Tout accepter (Recommandé) », arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Exécution après le merge de la Phase 69, plans revalidés d'abord (P70-D-14). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Phase à part »).
 
 **Goal:** Le cockpit tient en largeur mobile avec une information hiérarchisée, sa visite guidée est plus claire, et le chrome ne montre plus d'anglais résiduel ni de coquilles.
-**Requirements**: TBD — posées au cadrage.
-**Depends on:** Phase 67.
-**Sources:** `BACKLOG.md` § « Cockpit en largeur mobile et clarté de la visite guidée » (D4, I4, I5, I6, I1) et § « Cockpit : anglais résiduel et coquilles du chrome » (O5) ; `67-RECETTE-HUMAINE.md`.
-**Plans:** 0 plans
+**Requirements**: UIFN-01, UIFN-02, UIFN-03, UIFN-04, UIFN-05, UIFN-06, UIFN-07, UIFN-08, UIFN-09, UIFN-10, UIFN-11, UIFN-12, UIFN-13, UIFN-14
+**Depends on:** Phase 67 ; Phase 69 pour l'exécution (mêmes fichiers du cockpit, P70-D-14).
+**Sources:** `BACKLOG.md` § « Cockpit en largeur mobile et clarté de la visite guidée » (D4, I4, I5, I6, I1) et § « Cockpit : anglais résiduel et coquilles du chrome » (O5) ; § « Où en est-on ? sur un lab sans STATE » (F5, P70-D-05) ; `67-RECETTE-HUMAINE.md` ; `DESIGN.md` (direction « Graphite », PR #196, P70-D-07).
+**Plans:** 12 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 70 to break down)
+- [ ] 70-01-PLAN.md — garde du français durci, témoins rouges (UIFN-07) — vague 1
+- [ ] 70-02-PLAN.md — conformité DESIGN.md (garde M5) et cinq réglages visuels de l'onglet Équipe (UIFN-09, UIFN-11) — vague 1
+- [ ] 70-10-PLAN.md — test-cockpit-responsive.sh allégé, mêmes témoins (UIFN-01, P70-D-18) — vague 1
+- [ ] 70-11-PLAN.md — focus clavier du tiroir et témoins des mineurs de la 69 (UIFN-12, UIFN-13) — vague 1
+- [ ] 70-03-PLAN.md — anglais résiduel et coquilles du chrome, texte de la visite (UIFN-06, UIFN-04) — vague 2
+- [ ] 70-04-PLAN.md — en-tête mobile sur une rangée, menu « ⋯ », onglets à 13 px (UIFN-01, P70-D-16) — vague 2
+- [ ] 70-05-PLAN.md — zoom en pile, tiroir téléphone, titre coupé (UIFN-02, UIFN-03, UIFN-06) — vague 3
+- [ ] 70-06-PLAN.md — « Où en est-on ? » sans STATE, statuts en français (UIFN-08, UIFN-06) — vague 3
+- [ ] 70-07-PLAN.md — visite « Par où commencer » corrigée (UIFN-04) — vague 4
+- [ ] 70-12-PLAN.md — zoom, titre et fil d'Ariane de l'onglet Équipe, matrice responsive (UIFN-14) — vague 4
+- [ ] 70-08-PLAN.md — visite propre à l'onglet Projet (UIFN-05) — vague 5
+- [ ] 70-09-PLAN.md — captures avant/après, recette par juges frais, bump patch v1.1.2 (UIFN-10) — vague 6
 
 ### Phase 71: Terminal intégré au cockpit
 

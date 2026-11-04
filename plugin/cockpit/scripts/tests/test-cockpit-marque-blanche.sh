@@ -3,6 +3,7 @@
 #   M1 aucune occurrence du nom amont dans le rendu servi ni dans les messages du serveur (lab neutre)
 #   M2 logo VibeFlow en data:image/svg+xml, jamais le PNG amont · M3 la syntaxe survit au renommage
 #   M4 les données du lab ne sont jamais renommées, schéma du graphe Code réécrit
+#   M5 conformité à DESIGN.md (UIFN-09, P70-D-07) : statuts sur le thème, variable de texte inexistante, couleurs littérales justifiées ; mutants de M5.1 et M5.2
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -107,6 +108,29 @@ LABB="$WORK/lab-b"; mklab "$LABB" "Carte floor""plan du quartier"
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LABB" --quiet >/dev/null 2>&1
 assert_eq "M4.1 — la phase du lab garde son nom" "$(node "$AUX/donnees.mjs" "$LABB/.vibeflow/cockpit" "$LABB/.vibeflow/cockpit/project.html" 'j.nodes.filter(n=>n.kind==="phase").map(n=>n.label).join(",")' | grep -c 'Carte floor''plan du quartier')" "1"
 assert_eq "M4.2 — schéma du graphe Code" "$(node "$AUX/donnees.mjs" "$OUT" "$OUT/index.html" 'j.schema')" "vf-cockpit/graph@1"
+
+echo "=== M5 — conformité à DESIGN.md (UIFN-09, P70-D-07) ==="
+UIDIR="$MOTEUR/assets/ui"
+# couleur littérale : hexadécimal de 3 à 8 chiffres en fin de mot, ou rgb/rgba/hsl/hsla( suivi d'un chiffre ; lignes `//` et lignes marquées exceptées
+m5_couleurs() { grep -nE '#[0-9a-fA-F]{3,8}([^0-9a-zA-Z_-]|$)|(rgb|hsl)a?\([[:space:]]*[0-9]' "$1" | grep -vE '^[0-9]+:[[:space:]]*//' | grep -v 'vf-couleur-ok:'; }
+m5_statuts() { if [ "$(grep -c -e '--st-active: var(--sev-medium)' "$1")" = 1 ] && [ "$(grep -c -e '--st-blocked: var(--sev-high)' "$1")" = 1 ]; then echo ok; else echo ko; fi; }
+m5_inexistante() { cat "$@" | grep -c -e '--text-''1'; }
+M5FILES=$(find "$UIDIR" -maxdepth 1 -type f \( -name '00-vibeflow.js' -o -name '*vf*.js' \) | sort)
+M5N=$(printf '%s\n' "$M5FILES" | grep -c .)
+assert_ge "M5.00 — la liste des fichiers jugés est calculée et non vide ($M5N)" "$M5N" 3
+printf '    color: #ab12cd;\n' > "$WORK/m5-temoin.txt"
+printf '    color: #ab12cd; /* vf-couleur-ok: témoin de la sonde, jamais affiché */\n// couleur #ab12cd en commentaire\n    color: rgba(var(--ink), .1);\n' > "$WORK/m5-temoin-ok.txt"
+assert_eq "M5.0 — témoin : la sonde voit une couleur hexadécimale et ignore marqueur, commentaire et rgba(var(--…))" "$(m5_couleurs "$WORK/m5-temoin.txt" | wc -l | tr -d ' ')/$(m5_couleurs "$WORK/m5-temoin-ok.txt" | wc -l | tr -d ' ')" "1/0"
+assert_eq "M5.1 — --st-active sur --sev-medium et --st-blocked sur --sev-high (thème clair suivi)" "$(m5_statuts "$UIDIR/00-vibeflow.js")" "ok"
+mkdir -p "$WORK/m5"; sed 's/--st-active: var(--sev-medium)/--st-active: #f59e0b/' "$UIDIR/00-vibeflow.js" > "$WORK/m5/00-vibeflow.js"
+assert_eq "M5.1m — mutant : --st-active en hexadécimal, la sonde M5.1 rougit" "$(m5_statuts "$WORK/m5/00-vibeflow.js")" "ko"
+assert_eq "M5.2 — la variable de texte inexistante de DESIGN.md §9 n'est utilisée nulle part" "$(printf '%s\n' "$M5FILES" | xargs cat | grep -c -e '--text-''1')" "0"
+sed 's/var(--text)/var(--text-''1)/' "$UIDIR/00-vibeflow.js" > "$WORK/m5/mut2.js"
+assert_ge "M5.2m — mutant : la variable inexistante réintroduite, la sonde M5.2 rougit" "$(m5_inexistante "$WORK/m5/mut2.js")" 1
+M5C=$(for f in $M5FILES; do m5_couleurs "$f" | sed "s|^|$(basename "$f"):|"; done)
+assert_eq "M5.3 — aucune couleur littérale hors lignes marquées vf-couleur-ok:" "$M5C" ""
+bad=0; for f in $M5FILES; do while IFS= read -r l; do r=$(printf '%s' "$l" | sed -n 's/.*vf-couleur-ok:[[:space:]]*//p' | sed 's/[[:space:]]*\*\/.*$//'); [ "${#r}" -ge 10 ] || { bad=$((bad+1)); echo "     raison absente ou trop courte : $(basename "$f")"; }; done < <(grep 'vf-couleur-ok:' "$f"); done
+assert_eq "M5.4 — chaque marqueur vf-couleur-ok: porte une raison d'au moins 10 caractères" "$bad" "0"
 
 vf_hyg_assert
 echo ""

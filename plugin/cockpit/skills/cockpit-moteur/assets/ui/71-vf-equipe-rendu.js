@@ -25,7 +25,7 @@
   const versNoeud = (w, h) => {
     const n = noeud(w);
     return n ? `<a class="vf-link" href="${h(lien('project.html', n))}">Nœud ${h(w.rattachement.noeud)}</a>`
-      : w.kind === 'subagent' ? `<span>non rattaché (${h((w.rattachement && w.rattachement.raison) || 'inconnu')})</span>` : '';
+      : w.kind === 'subagent' ? `<span class="vf-nr">non rattaché (${h((w.rattachement && w.rattachement.raison) || 'inconnu')})</span>` : '';
   };
 
   const bloc = (w, enfants, tous, h) => {

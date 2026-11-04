@@ -8,6 +8,7 @@
   if (!SC) return;
   const { h, graph: G } = SC;
   const TAB = G.meta.vfTab === 'project' ? 'project' : G.meta.vfTab === 'equipe' ? 'equipe' : 'code';
+  document.body.classList.add('vf-tab-' + TAB); // 70-12 (P70-D-20) : marqueur de l'onglet sur le corps de page (`vf-tab-code`, `vf-tab-project`, `vf-tab-equipe`), pour les règles de mise en page propres à un onglet
   // titre de l'onglet du navigateur : « <nom> — Code », « <nom> — Projet » ou « Équipe · <nom> » (le viewer écrit « <nom> map », qui devenait le nom seul)
   { const nom = String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''); document.title = TAB === 'equipe' ? `Équipe · ${nom}` : `${nom} — ${TAB === 'project' ? 'Projet' : 'Code'}`; }
   const ST = { done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' };
@@ -25,9 +26,7 @@
     .vf-tabs { display: inline-flex; gap: 2px; padding: 3px; margin-left: 14px; border-radius: 12px; background: var(--raise); flex: none; }
     .vf-tabs a { padding: 5px 13px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text-3); text-decoration: none; line-height: 1.4; }
     .vf-tabs a:hover { color: var(--text); }
-    .vf-tabs a.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
-    /* 69-05 : trois onglets au lieu de deux : resserrés à toute largeur pour tenir à côté de la marque, du fil d'Ariane, de la recherche et du zoom (mesuré par test-cockpit-responsive.sh) */
-      .vf-tabs { margin-left: 10px; padding: 2px; } .vf-tabs a { padding: 5px 6px; font-size: 12px; }
+    .vf-tabs a.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
     .vst { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
       /* texte teinté vers --text : le statut seul passait sous 4,5:1 sur sa pastille en thème clair (recette 69) */
       color: color-mix(in srgb, var(--c-st) 68%, var(--text)); background: color-mix(in srgb, var(--c-st) 14%, transparent); }
@@ -59,7 +58,7 @@
        entre le bas de la couche et ce fondu ; la couche monte donc jusqu'au haut de l'en-tête (inset relatif à --hh, jamais une valeur calée sur une largeur), DERRIÈRE lui (z-index 10), et le dégradé garde sa taille d'avant (masque en deux couches : le radial sur la hauteur d'avant, calé en bas ; au-dessus, la bande reprend son profil de bord haut, plein puis estompé vers la droite) : l'aspect autour du titre ne change pas.
        isolation: isolate garde la couche derrière le texte. #context ne capte aucun événement (pointer-events: none, hérité du viewer) : la carte reste glissable sous la zone. */
     #context { isolation: isolate; background: none; border: 0; border-radius: 0; box-shadow: none; }
-    #context::before { inset: calc(-1 * (var(--hh, 64px) + 8px)) -80px -64px -36px; background: rgba(var(--bg-rgb), .28); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6); -webkit-mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); -webkit-mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); -webkit-mask-position: 0 100%, 0 0; mask-position: 0 100%, 0 0; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; border: 0; border-radius: 0; box-shadow: none; }
+    #context::before { inset: calc(-1 * (var(--hh, 64px) + 8px)) -80px -64px -36px; background: rgba(var(--bg-rgb), .28); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6); -webkit-mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); -webkit-mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); -webkit-mask-position: 0 100%, 0 0; mask-position: 0 100%, 0 0; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; border: 0; border-radius: 0; box-shadow: none; } /* vf-couleur-ok: masque, seul l'alpha compte, jamais affiché */
     #context:empty { display: none; }
   `;
   // spike 005 : la barre de question reste visible quand serve.mjs (P7) sert l'onglet Projet
@@ -69,6 +68,10 @@
     svg.lod-mid .foot, svg.lod-low .foot { flex-wrap: wrap; row-gap: 4px; } svg.lod-mid .desc { display: none; }
     svg.lod-mid .foot .meta, svg.lod-low .foot .meta { visibility: visible; font-size: 19px; line-height: 1.25; padding: 3px 10px; white-space: normal; }
     svg.lod-mid .foot .vst, svg.lod-low .foot .vst { font-size: 17px; padding: 3px 10px; }`;
+  /* UIFN-11 (+ onglet Équipe) : le texte du pied cède devant la pastille d'état (elle gardait sa largeur et se faisait rogner : « En cour », et sur un pied long elle sortait de la carte) */
+  if (TAB !== 'code') style.textContent += `.foot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .foot .vst { flex: none; }`;
+  /* UIFN-09 : la ligne « Terminés… » de « Contenu » colorait son point par var(--n-terminés), définie nulle part (point invisible) : le statut « fait » de DESIGN.md §9 */
+  if (TAB === 'equipe') style.textContent += `:root { --n-terminés: var(--st-done); }`;
   if (TAB === 'project') style.textContent += `#btn-health${window.FLOORPLAN_SERVER ? '' : ', #ask'} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }`;
   // onglet Équipe (69-05, P69-PL-09) : ni bouton de santé ni barre de question (la question porte sur le code ou le projet)
   if (TAB === 'equipe') style.textContent += '#btn-health, #ask { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }';
@@ -84,9 +87,9 @@
   }
 
   // ---------- onglet Projet : panneau d'ensemble ----------
-  // statuts de STATE affichés en français (valeur inconnue : telle quelle)
-  const STATUT = { closed: 'clos', complete: 'terminée', completed: 'terminée', executing: 'en exécution', planning: 'en planification', paused: 'en pause', verifying: 'en vérification', ready_to_plan: 'prête à planifier', ready_to_execute: 'prête à exécuter', milestone_complete: 'jalon terminé' }; // recette 68 R11 (P68-D-35, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04) : jamais le statut STATE brut
-  const statut = (x) => STATUT[x] || x || '';
+  // statuts de STATE affichés en français (valeur inconnue : omise ; recette 68 R11, P68-D-35, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04 : jamais le statut STATE brut)
+  const STATUT = { planning: 'en planification', ready_to_plan: 'prête à planifier', ready_to_execute: 'prête à exécuter', executing: 'en exécution', in_progress: 'en cours', verifying: 'en vérification', ready_for_verification: 'prête à vérifier', paused: 'en pause', blocked: 'bloqué', complete: 'terminée', completed: 'terminée', closed: 'clos', milestone_complete: 'jalon terminé' }; // recette 68 R11 (P68-D-35) : genre de la phase (« prête ») ; Phase 70 : table complète, valeur inconnue omise (jamais affichée brute)
+  const statut = (x) => (Object.hasOwn(STATUT, x) ? STATUT[x] : '');
   // dérive de format de la planification (vf-cockpit-drift.mjs) : rien n'est corrigé d'ici, le panneau donne la commande
   const NIV = { bloquant: 'blocked', 'toléré': 'todo', info: 'todo' };
   const derive = (D) => !D || !D.regles || !D.regles.length ? '' : `<div class="sec"><h3>Format de la planification <span class="c">${D.regles.reduce((s, r) => s + (Number(r.n) || 0), 0)}</span></h3>
@@ -107,7 +110,7 @@
       // « Maintenant » : seulement les champs connus (un lab sans STATE.md n'a ni jalon, ni phase, ni statut)
       const desc = V.lastDesc || '';
       const now = V.milestone || V.phase || V.status
-        ? `<div class="vf-now" style="margin-top:12px"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${V.status ? `<span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span>` : ''}${desc ? `<div style="margin-top:6px;color:var(--text-3);font-size:12px">${h(desc.slice(0, 260))}${desc.length > 260 ? '…' : ''}</div>` : ''}</div>`
+        ? `<div class="vf-now" style="margin-top:12px"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${statut(V.status) ? `<span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span>` : ''}${desc ? `<div style="margin-top:6px;color:var(--text-3);font-size:12px">${h(desc.slice(0, 260))}${desc.length > 260 ? '…' : ''}</div>` : ''}</div>`
         : '';
       return `<div class="sec"><div class="ph"><span class="kind">Projet</span></div><h2 class="pt">${h(G.project.name)}</h2>
           ${now}

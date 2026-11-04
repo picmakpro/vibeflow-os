@@ -32,6 +32,14 @@
     .vf-who span { color: var(--text-3); } .vf-who div { color: var(--text-2); margin-top: 2px; }
     .vf-who.stale { opacity: .55; }
     .vf-who button { margin-top: 6px; font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); }
+    .vf-who button:hover { background: rgba(var(--ink), .07); color: var(--text); } .vf-who button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+    .sec button[data-vf-doing], .sec button[data-vf-transcript] { font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); margin: 6px 6px 0 0; transition: background .2s var(--ease), color .2s var(--ease); }
+    .sec button[data-vf-doing]:hover, .sec button[data-vf-transcript]:hover { background: rgba(var(--ink), .07); color: var(--text); } .sec button[data-vf-doing]:focus-visible, .sec button[data-vf-transcript]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+    /* Q12a : les liens « Nœud … » et « Voir dans l'onglet Équipe » s'alignent sur la colonne de texte (le retrait de 10 px vient du padding de .vf-link, fait pour la liste « Sources lues ») */
+    .vf-who > a.vf-link, body.vf-tab-equipe .sec > a.vf-link { padding-left: 0; padding-right: 0; }
+    a.vf-link { text-decoration: underline; text-decoration-color: rgba(var(--ink), .35); text-underline-offset: 3px; }
+    a.vf-link:hover { color: var(--text); text-decoration-color: currentColor; } a.vf-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+    .vf-nr { white-space: nowrap; }
     .vf-who .vf-doing { margin-top: 6px; font-family: var(--mono, monospace); font-size: 12px; word-break: break-word; }
     .vf-whop .src { color: var(--text-4); font-size: 11px; margin-top: 14px; }
     .vf-arbre-enfants { margin-left: 14px; padding-left: 10px; border-left: 1px solid rgba(var(--ink), .12); }
@@ -71,7 +79,8 @@
   const htmlTiroir = () => {
     const ws = who?.workers || [], act = ws.filter(auTravail), reste = ws.filter((w) => !AGENT(w));
     const row = (w) => `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.kind === 'lock' && w.tree === 'depot' ? 'dépôt' : w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${h(duree(ageDe(w)))}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span><div>${h(w.task || '')}</div></div>`;
-    const src = Object.entries(who?.sources || {}).map(([k, v]) => `${k} : ${v.etat}`).join(' · ');
+    const SOURCES = { sessions: 'Sessions et sous-agents', locks: 'Verrous du dépôt', dags: 'Plans de la mission' }; // clés de la collecte, jamais affichées telles quelles (P70-D-04)
+    const src = Object.entries(who?.sources || {}).map(([k, v]) => `${SOURCES[k] || k} : ${v.etat}`).join(' · ');
     const arbre = window.__vfEquipeRendu.arbre(ws, h);
     return (`<div class="vf-whop"><h3>Au travail (${act.length})</h3><p class="regle">${h(lockText(probe.lock).text)}.</p><p class="regle">Règle de fraîcheur : ${FRAICHEUR}, actifs et terminés depuis moins de 24 h ; la dernière commande et le transcript ne s'affichent que sur demande.</p>${arbre || (reste.length ? '' : '<p>Personne. Sources lues : ' + h(src) + '</p>')}${reste.length ? `<h4>Verrous et nœuds</h4>${reste.map(row).join('')}` : ''}<p class="src">${h(src)}</p></div>`);
   };
@@ -100,12 +109,26 @@
     if (t !== undefined && z && z.classList.contains('vf-doing') && z.textContent !== t) { z.textContent = t; z.hidden = false; }
   };
   // observé : le panneau seulement (la carte du code compte des milliers d'éléments redessinés en rafale) ; rien à reposer tant qu'aucune commande n'a été demandée
-  new MutationObserver(() => { if (demandes.size) for (const b of document.querySelectorAll('#panel [data-vf-doing]')) poser(b); }).observe(document.getElementById('panel') || document.documentElement, { childList: true, subtree: true });
+  // focus clavier (UIFN-12) : chaque `who` redessine le panneau et le tiroir, le bouton focalisé est remplacé et le focus tombe sur le corps de la page.
+  // On retient la clé du bouton « Voir la dernière commande » / « Lire le transcript » qui a le focus ; après un redessin, si le focus est perdu, il revient au bouton de même clé.
+  // Un focus qui s'en va ailleurs (bouton encore dans la page) efface la clé : jamais de focus volé à quelqu'un qui est parti.
+  const BTN = '[data-vf-doing],[data-vf-transcript]', DANS_PANNEAU = '#panel [data-vf-doing],#panel [data-vf-transcript]';
+  const cleBtn = (b) => (b.dataset.vfDoing !== undefined ? 'doing:' + b.dataset.vfDoing : 'transcript:' + b.dataset.vfTranscript);
+  let cleFocus = null;
+  document.addEventListener('focusin', (ev) => { const b = ev.target.closest?.(DANS_PANNEAU); cleFocus = b ? cleBtn(b) : null; });
+  document.addEventListener('focusout', (ev) => { const b = ev.target; if (b.matches?.(BTN)) queueMicrotask(() => { if (b.isConnected && document.activeElement !== b) cleFocus = null; }); });
+  const rendreFocus = () => {
+    if (!cleFocus || (document.activeElement && document.activeElement !== document.body)) return;
+    const b = [...document.querySelectorAll(DANS_PANNEAU)].find((x) => cleBtn(x) === cleFocus);
+    if (b) b.focus({ preventScroll: true });
+  };
+  new MutationObserver(() => { rendreFocus(); if (demandes.size) for (const b of document.querySelectorAll('#panel [data-vf-doing]')) poser(b); }).observe(document.getElementById('panel') || document.documentElement, { childList: true, subtree: true });
   document.addEventListener('click', async (ev) => {
     const b = ev.target.closest?.('[data-vf-doing]');
     if (!b) return;
     const id = b.dataset.vfDoing;
-    b.disabled = true;
+    if (b.getAttribute('aria-disabled') === 'true') return; // lecture en cours : les clics répétés sont ignorés
+    b.setAttribute('aria-disabled', 'true'); // jamais `disabled` : un bouton focalisé désactivé perd le focus clavier (UIFN-12, même défaut que « Lire le transcript »)
     let texte;
     try {
       const r = await fetch('/api/vf/doing?id=' + encodeURIComponent(id), { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' });
@@ -115,8 +138,8 @@
     } catch { texte = 'Indisponible.'; }
     if (demandes.size >= 50) demandes.delete(demandes.keys().next().value);
     demandes.set(id, texte);
-    for (const x of document.querySelectorAll('[data-vf-doing]')) if (x.dataset.vfDoing === id) { poser(x); x.disabled = false; }
-    b.disabled = false;
+    for (const x of document.querySelectorAll('[data-vf-doing]')) if (x.dataset.vfDoing === id) { poser(x); x.removeAttribute('aria-disabled'); }
+    b.removeAttribute('aria-disabled');
   });
   const showLock = (l, off) => {
     if (l !== undefined) probe.lock = l;
