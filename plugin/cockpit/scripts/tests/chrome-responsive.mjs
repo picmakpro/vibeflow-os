@@ -123,7 +123,10 @@ await executer(chrome, async (s) => {
     mesures[cle] = await s.stable(MESURE, `mesure de la mise en page à ${cle}`);
     if (shots) { const c = await s.send('Page.captureScreenshot', { format: 'png' }); fs.mkdirSync(shots, { recursive: true }); fs.writeFileSync(path.join(shots, cle.replace(/[^\w]+/g, '-') + '.png'), Buffer.from(c.data, 'base64')); }
   };
-  const charger = async (w) => { await taille(w); await s.naviguer(url); await s.attendre(PRET, `page prête à ${w} px`); if (process.env.RESP_INJECT) await s.ev(process.env.RESP_INJECT); };
+  const charger = async (w) => { await taille(w); await s.naviguer(url); await s.attendre(PRET, `page prête à ${w} px`);
+    // la visite d'office s'ouvre 700 ms après le rendu (plus tard sous une machine lente) : on attend qu'elle soit ouverte, ou qu'elle ait eu tout son temps pour l'être (onglet Équipe, lien vers un endroit précis, ou graphe trop petit : elle ne s'ouvre pas), PUIS on mesure ; jamais marquée « vue » d'avance (70-07, classe visite / surfaces)
+    await s.attendre("(() => { if (document.body.classList.contains('vf-tab-equipe') || location.hash.length > 1) return true; return !!window.VibeFlowTour && window.VibeFlowTour.active(); })()", `visite d'office ouverte ou écartée à ${w} px`, 1800).catch(() => {});
+    if (process.env.RESP_INJECT) await s.ev(process.env.RESP_INJECT); };
   for (const w of largeurs.split(',').map(Number)) { await charger(w); await mesurer(String(w)); }
   if (resize && resize !== '-') {
     const [a, b] = resize.split(':').map(Number);

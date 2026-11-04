@@ -184,29 +184,34 @@
     card.querySelector('[data-play]')?.addEventListener('click', () => { const id = s.flow; end(false); SC.startFlow(id); });
   }
   // sit above the zoom controls, and above the Ask bar (and its notices) where they overlap
-  function place() {
-    let bottom = 76;
-    // a details panel beside the map: the card gets narrower rather than slide under it (the panel's width depends on fonts and platform)
-    card.style.width = '';
-    const pn = document.getElementById('panel'), pr = pn && pn.getBoundingClientRect();
-    if (pr && pr.width > 0 && getComputedStyle(pn).visibility !== 'hidden') {
-      const c0 = card.getBoundingClientRect();
-      if (pr.left > c0.left && hit(c0, pr)) card.style.width = Math.max(200, pr.left - 12 - c0.left) + 'px';
-    }
+  let placedSig = '', placeTimer = 0;
+  const sigOf = (obs) => obs.map((o) => [o.left, o.top, o.right, o.bottom].map(Math.round).join(',')).join('|');
+  function obstacles(vis) {
     const ask = document.getElementById('ask');
-    if (ask) {
-      const a = ask.getBoundingClientRect(), c = card.getBoundingClientRect();
-      const top = [...ask.children].filter((x) => x.offsetParent && x.getBoundingClientRect().height > 0).reduce((m, x) => Math.min(m, x.getBoundingClientRect().top), a.bottom);
-      if (a.width && a.left < 16 + c.width + 12 && top < innerHeight) bottom = Math.max(bottom, innerHeight - top + 12);
+    return ['zoom', 'panel', 'context', 'ask'].map((id) => document.getElementById(id)).concat(document.querySelector('header'), document.querySelector('.tour-target'), ask ? [...ask.children] : []).filter(vis).map((e) => e.getBoundingClientRect());
+  }
+  const visible = (e) => { if (!e) return false; const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+  function place() {
+    // the card must not cover any fixed surface of the interface: zoom controls, details panel, title block, header, Ask bar and its notices, the outlined target (and any surface added later
+    // that shows up in this list). Every candidate (width, side, height above an obstacle) is scored by the area it covers, then by its distance from the usual place; the lowest cost wins,
+    // ties go to the first in a fixed order: the result depends on nothing but the layout (never on timing, fonts or pointer)
+    const vis = visible;
+    const obs = obstacles(vis);
+    placedSig = sigOf(obs);
+    const topLimit = obs.reduce((m, o) => (o.bottom < innerHeight / 2 ? Math.max(m, o.bottom) : m), 0) + 8; // header and title block: the card is never taller than the room under them (its text scrolls)
+    const w0 = Math.min(360, innerWidth - 32);
+    const widths = [w0, 300, 260, 220, 200].filter((w, k, a) => w <= w0 && a.indexOf(w) === k);
+    const bottoms = [76, ...obs.map((o) => Math.round(innerHeight - o.top + 12))].filter((b, k, a) => b >= 12 && b <= innerHeight - 120 && a.indexOf(b) === k).sort((a, b) => a - b);
+    const area = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    let best = null;
+    for (const w of widths) for (const side of ['left', 'right']) for (const b of bottoms) {
+      card.style.width = w + 'px'; card.style.bottom = b + 'px'; card.style.maxHeight = Math.max(140, innerHeight - b - topLimit) + 'px'; card.classList.toggle('right', side === 'right');
+      const r = card.getBoundingClientRect();
+      // the cost: what it covers first (a covered pixel outweighs any move), then how far it is from the usual place (bottom left, full width)
+      const score = obs.reduce((n, o) => n + area(r, o), 0) * 1e3 + (r.top < 0 || r.left < -0.5 || r.right > innerWidth + 0.5 ? 1e12 : 0) + Math.abs(b - 76) + (side === 'right' ? 40 : 0) + (w0 - w) * 0.5;
+      if (!best || score < best.score) best = { score, w, side, b, mh: card.style.maxHeight };
     }
-    card.style.bottom = Math.min(bottom, Math.max(76, innerHeight - card.offsetHeight - 80)) + 'px';
-    // an element of the page that the card would cover: the card moves to the other side
-    card.classList.remove('right');
-    const t = document.querySelector('.tour-target');
-    if (t && hit(t.getBoundingClientRect(), card.getBoundingClientRect())) {
-      card.classList.add('right');
-      if (pr && pr.width > 0 && hit(card.getBoundingClientRect(), pr)) card.classList.remove('right'); // never onto the details panel
-    }
+    card.style.width = best.w + 'px'; card.style.bottom = best.b + 'px'; card.style.maxHeight = best.mh; card.classList.toggle('right', best.side === 'right');
   }
   window.addEventListener('resize', () => { if (active()) place(); });
   function show(i) {
@@ -215,6 +220,8 @@
     render();
     go(steps[at]);
     place();
+    // the page lays itself out after the step and on its own (title block, zoom stack, Ask notices): while the tour is open, place again whenever a surface has moved
+    if (!placeTimer) placeTimer = setInterval(() => { if (active() && sigOf(obstacles(visible)) !== placedSig) place(); }, 200);
     // the opening fit is only for a first step on the overview itself: after a card step it would undo the centring (a page already seen settles faster, so the card was measured before the fit)
     if (at === 0 && (!steps[0].ref || steps[0].ref === 'root')) setTimeout(() => { if (at === 0) SC.fit(true); }, 450);
   }
@@ -222,7 +229,7 @@
   function back() { if (at > 0) show(at - 1); }
   function end(refit = true) {
     if (!active()) return;
-    at = -1; token++;
+    at = -1; token++; clearInterval(placeTimer); placeTimer = 0;
     ring(null);
     card.hidden = true;
     SC.store.set(SEEN, true);
