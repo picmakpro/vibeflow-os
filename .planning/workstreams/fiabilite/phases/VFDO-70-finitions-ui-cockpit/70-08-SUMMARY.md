@@ -14,9 +14,9 @@ commits: [e58a9e8a, b83df5c9]
 - `test-cockpit-projet.sh` : section O6 (O6.1 à O6.4 et O6.6 à O6.8 en CLI, O6.5 dans Chrome sur `project.html` à 1 440 et 390 px, mesures O5.1 à O5.5 reprises). Trace : `70-08-RED-TRACE.md`.
 - Nœud « au travail » : le point est toujours cité ; l'onglet Équipe est nommé sans test d'existence (il est posé en dur par `00-vibeflow.js`).
 
-## Écart à signaler au manager
+## Écart relevé et fermé
 
-Au rechargement d'une page déjà vue dans le même profil Chrome, le centrage de la première étape (une carte) dérive de ~85 px à 390 px (`40-tour.js`, interdit à ce plan). Avant 70-08 aucune première étape n'était une carte hors racine, donc l'écart n'apparaissait pas. La suite mesure chaque largeur dans un Chrome neuf. À traiter dans un plan qui touche `40-tour.js` (candidat : 70-07 en correctif ou plan dédié).
+Au rechargement d'une page déjà vue dans le même profil Chrome, le centrage de la première étape (une carte) dérivait de ~85 px à 390 px. Cause : le `fit` d'ouverture de `40-tour.js` (450 ms) défaisait le centrage d'une première étape qui est une carte. Fermé par le correctif ciblé de 70-07 (patch P25, `70-07-RED-TRACE.md` § « Suite : rechargement ») ; témoin O6.9 (Projet) et O5.6 (Code) dans `test-cockpit-projet.sh`, O6.5 conservé.
 
 ## Vérifications
 
