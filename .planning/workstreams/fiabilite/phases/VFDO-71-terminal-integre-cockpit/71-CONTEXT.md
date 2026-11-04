@@ -177,6 +177,14 @@ scratchpad de la mission, rejouable ; résultats repris ci-dessous).
   « Serveur arrêté » tout de suite (G2) ; la barre de défilement du terminal n'apparaît qu'au survol (G3).
 - **Non joué (consigné, P71-D-32).** Le raccourci dans Safari.app et Firefox.app réels, et un vrai clavier AZERTY avec la touche Option.
 
+- **P71-D-36 (R1 à R5 du rejeu des juges ; arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-04).** « Tout, R5 après sonde
+  (Recommandé) » : R1 (réponses d'identification d'xterm réinjectées au rejeu du tampon), R2 (bande noire sous la dernière ligne), R3 (`python3`
+  disparu en cours de session), R4 (lanceur qui annonce une ouverture qui n'a pas lieu) corrigés, chacun avec témoin rouge puis vert ; R5 (« Terminal
+  déjà ouvert » qui persiste) corrigé seulement si une sonde confirme le défaut, sinon consigné comme artefact du headless.
+- **P71-D-37 (goût ; même canal, même date).** « G4 hauteur proportionnelle, G5 curseur plus visible » : la hauteur par défaut du tiroir suit la
+  fenêtre (G4), le curseur de la barre de défilement est plus visible au survol (G5). **G6 écarté par Samuel** : le cran minimal du tiroir ne garantit
+  pas 10 lignes à `claude`.
+
 ### Contraintes héritées (Phase 67, `v2.75.0`)
 
 - Le lab observé n'est jamais une source de code : aucun script du lab exécuté par le serveur (le shell, lui, est l'usage
