@@ -873,7 +873,7 @@ Plans:
 3. Sur un arbre en retard de N commits sur `main` local, l'en-tête l'écrit, avec l'âge du dernier fetch ; chaque worktree apparaît avec sa branche et sa phase active (VFSG-05).
 4. Une mission dont un nœud est resté `running` sans verrou ni progrès depuis plus de 1 800 s s'affiche « abandonnée », sur la pane comme sur la carte Projet (VFSG-06).
 5. La pane suit Graphite, un bouton « Ouvrir le cockpit » ouvre le cockpit du lab, l'ancien mod est signalé, l'absence de `node` est dite (VFSG-07, 09, 10, 11).
-6. La CI joue `validate` et `test` du mod, avec un témoin rouge sous Linux (VFSG-08) ; recette humaine sur quatre surfaces ; release minor préparée (VFSG-12, 13).
+6. La CI joue `validate` et `test` du mod, avec un témoin rouge sous Linux (VFSG-08) ; recette humaine sur quatre surfaces ; bump minor du module `cockpit` préparé et relecture adverse SOBR-04, le bump racine partant avec la release groupée (VFSG-12, 13 ; P68-D-31).
 **Plans:** 13 plans en 9 vagues (planifiée le 2026-11-03, plan-checker interne PASSED en 2 passes ; rebasée sur `main` à 794c6dba et corrigée le 2026-11-04 après un plan-checker frais : 68-04 scindé (68-12), 68-09 scindé (68-13), P68-D-27 et P68-D-28 ; P68-D-10)
 
 Plans:
@@ -890,7 +890,7 @@ Plans:
 - [ ] 68-08-PLAN.md — direction Graphite (VFSG-07, 06) — vague 6
 - [ ] 68-13-PLAN.md — runs CI rouge puis vert sur la PR (VFSG-08) — vague 7
 - [ ] 68-10-PLAN.md — doc FR/EN, recette humaine, porte de phase (VFSG-12) — vague 8
-- [ ] 68-11-PLAN.md — release minor préparée, relecture adverse (VFSG-13) — vague 9
+- [ ] 68-11-PLAN.md — bump minor du module cockpit, relecture adverse SOBR-04 ; bump racine reporté à la release groupée (VFSG-13, P68-D-31) — vague 9
 
 ### Phase 69: Suivi du travail en cours dans le cockpit
 

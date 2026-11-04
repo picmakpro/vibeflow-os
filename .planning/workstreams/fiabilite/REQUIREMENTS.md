@@ -1534,7 +1534,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **VFSG-10**: Un bouton humain « Ouvrir le cockpit » lance `vf-cockpit.mjs open` (posé, sinon depuis `$.plugin.root`) et affiche l'URL rendue ; aucun geste d'agent (ADR-031) ; test simulé qui prouve l'argv et l'analyse de la sortie (P68-D-19).
 - [ ] **VFSG-11**: Le mod appelle le socle par `$.process.run(['node', …])` ; un rejet (node absent du PATH) affiche « node introuvable dans le PATH » sans planter ; un JSON illisible est signalé ; la chaîne réelle node + émetteur est prouvée par un test de l'émetteur dans les suites du cockpit ; témoins rouges : rejet simulé et stdout tronqué (P68-D-14).
 - [ ] **VFSG-12**: Recette humaine pas à pas sur terminal plein écran, inline, VS Code et mobile, plus un passage `claude -p --plugin-dir` consigné ; doc du module et README racine FR/EN à jour ; aucun chemin de machine dans les fichiers suivis (`check-machine-paths.sh`) (P68-D-08, D-14, D-20).
-- [ ] **VFSG-13**: Release minor préparée (bump cohérent, version du module `cockpit` montée, relecture adverse SOBR-04 avec sonde exécutée) ; tag et release GitHub après merge, geste de Samuel (P68-D-08, D-21).
+- [ ] **VFSG-13**: Bump minor du module `cockpit` préparé et relecture adverse SOBR-04 du diff de la phase (sonde exécutée) ; le bump racine part avec la release groupée, tag et release GitHub gestes de Samuel hors phase (P68-D-31, D-21).
 
 ---
 *Requirements defined: 2026-06-04*
