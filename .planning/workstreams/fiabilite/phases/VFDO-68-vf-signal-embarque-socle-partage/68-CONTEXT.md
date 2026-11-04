@@ -120,7 +120,7 @@ recommandations sont donc retenues :
   ni pane, ni bandeau, ni commande.
 - **P68-D-19 (bouton « Ouvrir le cockpit »).** Lance le lanceur du cockpit (`vf-cockpit.mjs open`, posé ou
   depuis `$.plugin.root`) et affiche l'URL rendue (port stable par lab) ; geste humain, aucun agent.
-- **P68-D-20 (chemins de machine).** Le test du mod contient `HOME: '/home/samuel'`
+- **P68-D-20 (chemins de machine).** Le test du mod contient `HOME: '/home/<user>'`
   (`vf-signal.test.tsx:58`) : `check-machine-paths.sh` rougirait ; le chemin est neutralisé à l'import.
 - **P68-D-21 (version du module).** Pas de nouveau `module.json` : les compteurs de modules des README ne bougent
   pas (`check-version-sync.sh`). Le module `cockpit` monte d'une minor après la version posée par la 69.

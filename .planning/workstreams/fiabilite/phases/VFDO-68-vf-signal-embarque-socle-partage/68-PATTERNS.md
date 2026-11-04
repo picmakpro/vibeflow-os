@@ -145,7 +145,7 @@ fs.statSync(path.join(gitCommonDir(root), 'FETCH_HEAD')).mtimeMs  // âge du der
 
 ### 4. Import du mod sous `plugin/cockpit/signal/` (nom proposé : `plugin/cockpit/signal/`)
 
-**Source (lecture seule, hors dépôt) :** `/Users/samuel/.claude/mods/vf-signal/` (la source fait foi, pas le cache `vf-mods/vf-signal/0.1.0`). Structure réelle : le code est sous **`hooks/`**, pas à la racine (le prompt disait « *.ts, *.tsx » à la racine) ; `hooks/hooks.json` = `{ "modules": ["./register.tsx"] }`. Le dossier `.claude-plugin/types/` (24 000 lignes de typings générés, `claude-code*/index.d.ts`) est un artefact d'outillage : **ne pas importer** (ADR-035 / SOBR : un ajout = un retrait) ; régénérer à la demande, `.gitignore` dedans.
+**Source (lecture seule, hors dépôt) :** `~/.claude/mods/vf-signal/` (la source fait foi, pas le cache `vf-mods/vf-signal/0.1.0`). Structure réelle : le code est sous **`hooks/`**, pas à la racine (le prompt disait « *.ts, *.tsx » à la racine) ; `hooks/hooks.json` = `{ "modules": ["./register.tsx"] }`. Le dossier `.claude-plugin/types/` (24 000 lignes de typings générés, `claude-code*/index.d.ts`) est un artefact d'outillage : **ne pas importer** (ADR-035 / SOBR : un ajout = un retrait) ; régénérer à la demande, `.gitignore` dedans.
 
 | Fichier source (lignes) | Décision | Détail |
 |---|---|---|
@@ -163,7 +163,7 @@ fs.statSync(path.join(gitCommonDir(root), 'FETCH_HEAD')).mtimeMs  // âge du der
 | `hooks/derive.ts` (144) | gardé, **adapté** | `STAGE_OF` (regex d'agents), `attention(...)`, brief Markdown ; retirer ce qui lit `Disk` brut, `l.61-63` (premier nœud `running`) remplacé par `mission.etat` |
 | `hooks/band.tsx` (41) | gardé, **adapté** | `l.11-16` atoms ; gating ; `C.human` (orange) → token statut |
 | `hooks/views/mission.tsx` (131), `equipe.tsx` (94), `macro.tsx` (98), `common.tsx` (53) | gardés, **adaptés** | mission : `abandonnee` grisée + bouton d'élagage humain existant ; equipe : `who@2` ; macro : phases `avancement` ; plus aucun hex |
-| `hooks/vf-signal.test.tsx` (130) | gardé, **réécrit** | `l.58` : `mock.env(on, { HOME: '/home/samuel' })` → chemin neutre (D-20, voir groupe 7) ; témoins rouges D-14 |
+| `hooks/vf-signal.test.tsx` (130) | gardé, **réécrit** | `l.58` : `mock.env(on, { HOME: '/home/<user>' })` → chemin neutre (D-20, voir groupe 7) ; témoins rouges D-14 |
 
 **Clés `$.state`** : la forme actuelle est `atom({ plugin: 'vf-signal', key: 'disk' } as const, null)` répétée dans band/pane/refresh/register (≥ 20 occurrences). Remplacer par un module unique `atoms.ts` exportant les atoms avec `plugin: 'vibeflow'` et supprimer les doublons : c'est le « retrait » qui compense l'ajout (SOBR-01). Piège mesuré : `plugin: 'vf-signal'` laissé quelque part ⇒ 10 erreurs de validation.
 
@@ -222,11 +222,11 @@ assert_has() { ... } assert_not() { ... }
 - `claude` n'est **pas** installé en CI (aucune occurrence de `claude` en tant que CLI dans `ci.yml`, seulement des `~/.claude/gsd-core`, l.126-156) : l'étape doit installer le CLI (comme `npx -y "@opengsd/gsd-core@^1" --claude --global`, l.144) avant, ou être honnête : non prouvé sous Linux sans session authentifiée (point ouvert 68-CONTEXT). Premier geste du plan CI, avec **témoin rouge** (test cassé → job rouge) ; échec sous Linux ⇒ remontée à Samuel, pas de contournement.
 - ubuntu-latest = 26.04 (coreutils uutils) depuis 2026-10-19 : lire l'image avant de suspecter la PR.
 - gsd-core `^1` flottant : ne pas lier la nouvelle étape à `npm view` flottant.
-- `HOME` : l'étape tourne sous `HOME` du runner ; le test du mod ne doit pas dépendre de `/home/samuel`.
+- `HOME` : l'étape tourne sous `HOME` du runner ; le test du mod ne doit pas dépendre de `/home/<user>`.
 
 **Garde-fous du dépôt** (CLAUDE.md) : toucher `.github/workflows/ci.yml` exige un trailer de commit `Gate-Touche: .github/workflows/ci.yml — <raison ≥ 10 caractères non blancs>` (`scripts/check-gate-touche.sh:46`), de portée branche (un commit ultérieur peut couvrir un chemin touché plus tôt), et la revue `@picmakpro` (CODEOWNERS, ruleset posé le 2026-09-23). Toucher une suite de gate ou une fixture surveillée (`plugin/conductor/scripts/tests/fixtures/**`, `scripts/tests/fixtures/**`) exige le même trailer ; les suites du cockpit (`plugin/cockpit/scripts/tests/`) n'en font pas partie.
 
-**`check-machine-paths.sh`** : le gate rougit sur `/home/<login>/...` (`HOME: '/home/samuel'`, test source l.58). Ordre de préférence du script (en-tête, échappatoires 1 à 3) : (1) segment de compte = placeholder de la liste fermée (`user`, `username`, `utilisateur`, `you`, `me`, `moi`, `/home/runner`) ⇒ `HOME: '/home/user'` ; (2) segment non-identifiant `<user>` ; (3) marqueur `vf-allow-machine-path` sur la ligne, réservé au cas où le littéral EST le sujet. Retenir (1). Chercher aussi les autres chemins : `/Users/samuel` dans les commentaires copiés du mod.
+**`check-machine-paths.sh`** : le gate rougit sur `/home/<login>/...` (`HOME: '/home/<user>'`, test source l.58). Ordre de préférence du script (en-tête, échappatoires 1 à 3) : (1) segment de compte = placeholder de la liste fermée (`user`, `username`, `utilisateur`, `you`, `me`, `moi`, `/home/runner`) ⇒ `HOME: '/home/user'` ; (2) segment non-identifiant `<user>` ; (3) marqueur `vf-allow-machine-path` sur la ligne, réservé au cas où le littéral EST le sujet. Retenir (1). Chercher aussi les autres chemins : `/Users/<user>` dans les commentaires copiés du mod.
 
 ---
 
