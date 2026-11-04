@@ -11,6 +11,13 @@ const BAND = {
   props: { hasSurvey: false, isWorking: false, maxRows: 4, bodyColumns: 80, scroll: { offset: 0, bodyRows: 4 }, view: {} },
 } as const
 
+const PANE = {
+  plugin: 'vibeflow',
+  component: 'Pane',
+  requestId: 'vf-signal',
+  props: { title: 'vf-signal', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
+} as const
+
 const PROJET = '/lab/.claude/scripts/.vibeflow-installed'
 const USER = '/home/user/.claude/scripts/.vibeflow-installed'
 const ANCIEN = '/home/user/.claude/mods/vf-signal'
@@ -93,4 +100,22 @@ test('E3 — registre projet seul avec cockpit= : même résultat', async ($, on
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
   expect(appels.commandes).toBe(1)
   expect(appels.ouvertures).toBe(1)
+})
+
+test("E4 — l'ancien mod hors dépôt est signalé dans la pane avec le risque de deux panes, sans rien retirer", async ($, on) => {
+  const appels = lab(on, { [USER]: 'cockpit=v1.2.0\n' }, true)
+  await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: /ancien mod vf-signal détecté/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /deux panes/ })).toBeDefined()
+  await ui.unmount()
+  expect(appels.ecritures).toEqual([])
+})
+
+test("E4b — sans ancien mod, la pane ne le mentionne pas", async ($, on) => {
+  lab(on, { [USER]: 'cockpit=v1.2.0\n' }, false)
+  await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: /ancien mod vf-signal détecté/ })).toBeUndefined()
+  await ui.unmount()
 })

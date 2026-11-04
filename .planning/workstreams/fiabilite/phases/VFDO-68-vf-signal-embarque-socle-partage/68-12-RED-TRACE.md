@@ -27,3 +27,25 @@ Mutant (copie jetable de `plugin/`, `cockpitInstalle` neutralisé en `return tru
 
 Retouche forcée par la mesure, hors `files_modified` : sans elle, les 3 tests du mod importé (`vf-signal.test.tsx`) rougissaient (« no Button of vibeflow keyed … »),
 leur faux lab ne servant aucun registre. Une ligne ajoutée à `lab()` : `fs.read` d'un `.vibeflow-installed` rend `cockpit=v1.2.0`.
+
+## Annexe — rouge avant `ancien-mod.ts` : E4 et M6 (VFSG-09 ; P68-D-08)
+
+`claude plugin test plugin` (rc=1) :
+
+```
+(fail) E4 — l'ancien mod hors dépôt est signalé dans la pane avec le risque de deux panes, sans rien retirer [68.45ms]
+  AssertionError: expect(received).toBeDefined()
+  Expected: defined
+  Received: undefined
+(pass) E4b — sans ancien mod, la pane ne le mentionne pas [59.39ms]
+```
+
+Assertion : `ui.find({ type: 'Text', text: /ancien mod vf-signal détecté/ })` attendu défini, obtenu indéfini — la pane ne dit rien de l'ancien mod : la bonne raison.
+`verdict.sh … E4 echec` -> 0.
+
+`bash plugin/cockpit/scripts/tests/test-cockpit-signal-mod.sh` (rc=1, 18 ok, 1 ko) :
+
+```
+  ✅ PASS — M6.0 — le compteur voit le chemin dans un fichier qui le porte, pas dans un vide
+  ❌ FAIL — M6 — aucun fichier du mod ne porte .claude/mods/vf-signal (attendu au moins 1, obtenu 0)
+```

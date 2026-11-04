@@ -6,7 +6,7 @@
 #   M2 clés d'état : au moins une déclaration d'atome, aucune ne nomme un autre plugin que `vibeflow`, PluginState idem
 #   M3 check-machine-paths.sh vert · M4 aucun typing généré suivi par git · M5 chaque fichier du mod ≤ 300 lignes
 # Sans `claude`, sans node autre qu'un get.mjs de lecture JSON. Exit 0 si tout passe, 1 sinon, 1 si aucun cas exécuté.
-# (M6, détection de l'ancien mod hors dépôt : 68-12.)
+#   M6 détection de l'ancien mod hors dépôt (68-12, VFSG-09 ; P68-D-08) : le chemin `.claude/mods/vf-signal` figure dans un fichier du mod
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 TESTS="$(cd "$(dirname "$0")" && pwd)"
@@ -76,6 +76,12 @@ if [ "$NF" -ge 1 ]; then
   ko_l="$(printf '%s\n' "$FM" | while IFS= read -r f; do longueurs_ko "$f"; done)"
   assert_eq "M5 — aucun des $NF fichiers du mod ne dépasse 300 lignes" "${ko_l:-aucun}" "aucun"
 else ko "M5 — aucun fichier du mod : plugin/cockpit/signal/ absent ou vide"; fi
+
+echo "=== M6 — détection de l'ancien mod (VFSG-09) ==="
+printf "const x = '.claude/mods/vf-signal'\n" > "$WORK/m6.ts"; : > "$WORK/m6vide.ts"
+assert_eq "M6.0 — le compteur voit le chemin dans un fichier qui le porte, pas dans un vide" "$(grep -l '\.claude/mods/vf-signal' "$WORK/m6.ts" "$WORK/m6vide.ts" | sed "s#$WORK/##")" "m6.ts"
+NM6=$([ -d "$SIGNAL/hooks" ] && grep -l '\.claude/mods/vf-signal' "$SIGNAL"/hooks/*.ts "$SIGNAL"/hooks/*.tsx 2>/dev/null | grep -c .)
+[ "${NM6:-0}" -ge 1 ] && ok "M6 — le chemin de l'ancien mod figure dans ${NM6} fichier(s) du mod" || ko "M6 — aucun fichier du mod ne porte .claude/mods/vf-signal (attendu au moins 1, obtenu 0)"
 
 echo "=== bilan : $PASS ok, $FAIL ko ==="
 [ $((PASS + FAIL)) -gt 0 ] || { echo "ÉCHEC ANTI-VERT-À-VIDE : aucun cas exécuté"; exit 1; }
