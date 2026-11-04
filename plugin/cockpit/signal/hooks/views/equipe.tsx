@@ -5,7 +5,7 @@
 
 import type { EngineInterface } from 'claude-code'
 
-import { G, age, libelleType, oneLine } from '../ds'
+import { G, age, libellePortee, libelleType, nOutils, oneLine } from '../ds'
 import { ghost, head } from './common'
 import type { Ctx } from './common'
 import type { SignalWorker } from '../../types'
@@ -82,7 +82,7 @@ export function equipe($: EngineInterface, ctx: Ctx): JSX.Element {
           <Box paddingLeft={depth > 0 ? 4 : 2}>
             <Text color={pal['text-3']} wrap="wrap">
               {w.orphan ? 'orphelin (registre)' : termine ? 'terminé' : etat === 'en-attente' ? 'en attente' : 'actif'}
-              {` · ${w.tree}`}
+              {` · ${libellePortee(w.tree)}`}
               {w.branch ? ` · ${w.branch}` : ''}
               {w.ageS != null ? ` · ${age(w.ageS)}` : ''}
             </Text>
@@ -116,9 +116,9 @@ export function equipe($: EngineInterface, ctx: Ctx): JSX.Element {
     <Box flexDirection="column">
       <Text color={l.isWorking ? pal['st-active'] : pal['text-2']} wrap="wrap">
         {l.isWorking
-          ? `${blink ? G.current : ' '} l'équipe travaille · ${l.tools} outil${l.tools > 1 ? 's' : ''}`
+          ? `${blink ? G.current : ' '} l'équipe travaille · ${nOutils(l.tools)}`
           : l.lastTurn
-            ? `${G.done} dernier tour · ${l.lastTurn.seconds} s · ${l.lastTurn.tools} outils`
+            ? `${G.done} dernier tour · ${l.lastTurn.seconds} s · ${nOutils(l.lastTurn.tools)}`
             : `${G.done} prête`}
         <Text color={pal['text-3']}>
           {' · '}

@@ -6,7 +6,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, RenderInput } from 'claude-code'
 
-import { G, STAGES, STAGE_LABEL, VIEWS, VIEW_LABEL } from './ds'
+import { G, STAGES, STAGE_LABEL, VIEWS, VIEW_LABEL, libelleFenetre } from './ds'
 import { PHRASE_ANCIEN_MOD } from './ancien-mod'
 import { boutons } from './boutons'
 import { actionBloquee, attention, verrouPerime } from './derive'
@@ -137,7 +137,7 @@ export async function pane($: EngineInterface, e: PaneInput, blink: boolean, hom
           {(u?.limits ?? []).map(lim => (
             <Text color={lim.percent >= 80 ? pal['st-active'] : pal['text-3']}>
               {' · '}
-              {lim.kind === 'five_hour' ? '5 h' : lim.kind === 'seven_day' ? '7 j' : lim.kind} {Math.round(lim.percent)} %
+              {libelleFenetre(lim.kind)} {Math.round(lim.percent)} %
             </Text>
           ))}
         </Text>

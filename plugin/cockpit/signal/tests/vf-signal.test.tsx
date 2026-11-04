@@ -2,6 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { AgentInfo, On } from 'claude-code'
 
 import { SIGNAL, avec } from './fixture-signal'
+import { apresDemarrage } from './apres-demarrage'
 
 // Le retrait de la lecture maison du planning (68-06 ; P68-D-02, P68-D-13, P68-D-17, P68-D-24, P68-D-30) : la pane, le
 // bandeau, `/vf-signal brief` et le bouton d'élagage ne lisent que `signal@1`. Identifiant du témoin en tête de titre
@@ -105,9 +106,7 @@ function moteur(on: On) {
   })
 }
 
-async function demarrer($: any) {
-  await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
-}
+const demarrer = ($: any) => $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true }).then(apresDemarrage)
 
 test("la pane montre la phase, la mission par vagues et le verrou périmé, sur chaque surface", async ($, on) => {
   lab(on, { stdout: AVEC_VERROU })

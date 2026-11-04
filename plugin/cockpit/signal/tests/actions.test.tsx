@@ -2,6 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { SIGNAL } from './fixture-signal'
+import { apresDemarrage } from './apres-demarrage'
 
 // Le bouton « Ouvrir le cockpit » (68-07 ; VFSG-10, P68-D-19, P68-D-34 ; ADR-031) : le lanceur est résolu (pose compte, puis
 // plugin ; jamais sous le lab), l'adresse est prise par un motif fixe, les codes sont traduits ; un appui humain seul le lance.
@@ -75,6 +76,7 @@ function moteur(on: On) {
 
 async function pane($: any, props: any = PANE) {
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   return $.ui.mount({ ...props, surface: 'terminal' })
 }
 

@@ -11,11 +11,12 @@ import type { Register } from 'claude-code'
 import { PANE, band } from './band'
 import { brief, stageOf } from './derive'
 import { PHRASE_ANCIEN_MOD, ancienModPresent } from './ancien-mod'
+import { apresBash, emetteurAuto, estInteractive, noter, poserSession, pulsation } from './cadence'
 import { cockpitInstalle } from './gating'
-import { VIEWS } from './ds'
+import { VIEWS, oneLine } from './ds'
 import { themeDe } from './tokens'
 import { pane } from './pane'
-import { recordRefusal, refreshAll, refreshLive, refreshRoster, refreshSignalAuto, setStage } from './refresh'
+import { recordRefusal, refreshAll, refreshCheap, refreshRoster, refreshSignalAuto, setStage } from './refresh'
 import type { AgentStat, View } from '../types'
 
 // Les valeurs lues ici. Un atome se déclare dans le fichier qui le lit (règle
@@ -40,7 +41,6 @@ export const register: Register = on => {
   let blinkTimer: { cancel: () => void } | null = null
   let refreshTimer: { cancel: () => void } | null = null
   let recentCalls: string[] = []
-
   // --- la session ------------------------------------------------------------
 
   on('session.start', async ($, e, next) => {
@@ -57,9 +57,15 @@ export const register: Register = on => {
       name: 'vf-signal',
       description: 'Cockpit VibeFlow : mission, équipe, macro. « /vf-signal équipe », « macro », « mission », ou « brief » pour un Markdown.',
     })
-    await refreshAll($)
+    // P68-D-41 : jamais d'attente de l'émetteur au démarrage ; la liste des agents et le coût, eux, ne lancent aucun processus.
+    poserSession(e.isInteractive)
+    await noter($)
+    void refreshSignalAuto($).catch(() => undefined)
+    await refreshCheap($)
     refreshTimer?.cancel()
-    refreshTimer = $.clock.every(10000, () => void refreshLive($))
+    refreshTimer = null
+    // le minuteur n'existe qu'en session interactive, et ne rafraîchit que pane ouverte
+    if (estInteractive()) refreshTimer = $.clock.every(10000, () => void pulsation($).catch(() => undefined))
     if (e.isInteractive) void $.ui.open({ id: PANE, title: 'vf-signal', rows: 18 })
     return next(e)
   })
@@ -77,7 +83,8 @@ export const register: Register = on => {
       await update($, stats, () => ({}))
       await update($, refusals, () => [])
       await update($, loopAlert, () => null)
-      await refreshAll($)
+      await refreshCheap($)
+      await emetteurAuto($)
       return next(e)
     }
     refreshTimer?.cancel()
@@ -87,6 +94,8 @@ export const register: Register = on => {
   on('command.run', { command: 'vf-signal' }, async ($, e, next) => {
     if (!actif) return next(e)
     const arg = e.args.trim().toLowerCase().replace('équipe', 'equipe')
+    // geste explicite : rafraîchissement aussitôt, sans la limite d'une minute (le brief doit rendre des données à jour)
+    await noter($)
     if (arg === 'brief') {
       await refreshAll($)
       const [sig, l, agents, agentStats, r, u, erreur] = await Promise.all([
@@ -98,7 +107,7 @@ export const register: Register = on => {
     await refreshAll($)
     const opened = await $.ui.open({ id: PANE, title: 'vf-signal', focus: true, rows: 18 })
     return { text: opened.isPlaced ? 'vf-signal : pane ouverte.' : `vf-signal : pane en attente (${opened.reason}).` }
-  })
+  }).catch((_, e, next) => ({ text: `vf-signal : erreur — ${oneLine(next.error.message ?? 'cause inconnue').slice(0, 120)}` }))
 
   // --- le tour ---------------------------------------------------------------
 
@@ -128,7 +137,8 @@ export const register: Register = on => {
     const l = await read($, loop)
     const lastTurn = { seconds: Math.round(e.durationMs / 1000), tools: l.tools, outputTokens: e.usage?.output_tokens ?? 0 }
     await update($, loop, cur => ({ ...cur, isWorking: false, lastTurn }))
-    await refreshAll($)
+    await refreshCheap($)
+    await emetteurAuto($)
     $.ui.status(undefined)
     return next(e)
   })
@@ -183,7 +193,7 @@ export const register: Register = on => {
     if (ran.deny !== undefined) {
       await recordRefusal($, tool_use_id ?? signature, tool, ran.deny)
     } else if (tool === 'Bash' && /driver-lock|dag\.sh|git (commit|checkout|switch|merge)|gsd|vf-/.test(e.command ?? '')) {
-      void refreshSignalAuto($)
+      void apresBash($).catch(() => undefined)
     }
     return ran
   }).catch(($, e, next) => next(e))

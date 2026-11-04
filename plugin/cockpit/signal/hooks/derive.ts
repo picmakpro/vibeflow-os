@@ -1,7 +1,7 @@
 // Lectures dérivées : l'ordre d'exécution du DAG, le temps de la boucle, la
 // prochaine action humaine, le brief Markdown.
 
-import { STAGE_LABEL, age, oneLine, statutAgent, statutNoeud, titreCourt } from './ds'
+import { STAGE_LABEL, age, libelleFenetre, nOutils, oneLine, statutAgent, statutNoeud, titreCourt } from './ds'
 import type { AgentStat, DagNode, Loop, Refusal, RosterAgent, Signal, SignalArbre, SignalJalon, SignalMission, SignalVerrou, Stage, Usage } from '../types'
 
 // Quel temps de la boucle un agent ou un skill signale. Premier motif qui matche.
@@ -173,7 +173,7 @@ export function brief(sig: Signal | null, l: Loop, roster: RosterAgent[], stats:
   lines.push(`- temps de la boucle : ${l.stage ? STAGE_LABEL[l.stage] : 'inconnu'}`)
   for (const { agent, depth } of tree(roster)) {
     const s = stats[agent.id]
-    lines.push(`${'  '.repeat(depth)}- ${agent.type} · ${statutAgent(agent.status)} · ${agent.description}${s ? ` · ${s.tools} outils` : ''}`)
+    lines.push(`${'  '.repeat(depth)}- ${agent.type} · ${statutAgent(agent.status)} · ${agent.description}${s ? ` · ${nOutils(s.tools)}` : ''}`)
   }
   if (r.length) {
     lines.push(`- refus (${r.length}) :`)
@@ -181,7 +181,7 @@ export function brief(sig: Signal | null, l: Loop, roster: RosterAgent[], stats:
   }
   if (u) {
     lines.push(`- contexte : ${u.percent ?? '?'} % de ${u.window} · coût : ${u.usd != null ? u.usd.toFixed(2) + ' $' : '?'}`)
-    for (const lim of u.limits) lines.push(`- ${lim.kind} : ${lim.percent} %`)
+    for (const lim of u.limits) lines.push(`- ${libelleFenetre(lim.kind)} : ${lim.percent} %`)
   }
   if (sig) {
     for (const j of sig.jalons) {

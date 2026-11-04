@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { avec, labSignal } from './fixture-signal'
+import { apresDemarrage } from './apres-demarrage'
 
 // La vue Équipe lit `signal@1.equipe` (who@2) : toutes sessions, tous worktrees (68-07 ; P68-D-03, P68-D-17, VFSG-04).
 // Les gestes « voir » et « demander l'arrêt » ne s'offrent qu'aux agents de la session courante (`$.agent.list()`).
@@ -31,6 +32,7 @@ const AGENTS = [
 
 async function pane($: any, props: any = PANE) {
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   const ui = await $.ui.mount({ ...props, surface: 'terminal' })
   // la vue choisie reste d'un montage à l'autre : l'onglet courant n'a pas de bouton
   if (await ui.find({ key: 'onglet:equipe' })) await ui.press({ key: 'onglet:equipe' })

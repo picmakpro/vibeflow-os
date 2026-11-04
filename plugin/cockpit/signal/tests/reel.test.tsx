@@ -3,6 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import { SIGNAL_PLAT } from './fixture-plat'
 import { avec } from './fixture-signal'
 import { BAND, labFix, monter } from './lab-fix'
+import { apresDemarrage } from './apres-demarrage'
 
 // Correction ciblée RV-1 et RV-3 (68-FIX-MOD, passe 2 ; P68-PL-05) : le mod accepte ce que l'émetteur réel garantit
 // (`scope` et `retard.base` peuvent valoir null) et le dit sans lever ; U+2028 et U+2029 ne passent pas. Identifiants FX-.
@@ -32,6 +33,7 @@ test("FX-7b — sortie réelle d'un lab plat : le bandeau, le compact et le brie
   const band = await monter($, BAND)
   await band.unmount()
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   const compact = await $.ui.mount({ plugin: 'vibeflow', component: 'Pane', requestId: 'vf-signal', props: { title: 'vf-signal', isFocused: false, bodyColumns: 60, placement: 'inline', scroll: { offset: 0, bodyRows: 40 }, view: {} }, surface: 'terminal' })
   expect(await compact.find({ type: 'Text', text: /phase 1 Un/ })).toBeDefined()
   await compact.unmount()
@@ -68,6 +70,7 @@ test("FX-7e — un scope ou une base d'un autre type que chaîne/null reste illi
 test('FX-8a — U+2028 et U+2029 dans une chaîne affichée (brief) : remplacés, aucune ligne forgée', async ($, on) => {
   labFix(on).emetteur.stdout = avec((s: any) => { s.projet = 'avant\u2028- faux\u2029apres' })
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   const texte = String((await $.command.run({ command: 'vf-signal', args: 'brief' })).text)
   expect(texte).toContain('- projet : avant - faux apres')
   expect(texte).not.toMatch(/[\u2028\u2029]/)

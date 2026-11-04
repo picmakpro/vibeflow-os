@@ -45,11 +45,23 @@ export function since(now: number, at: number): string {
 // Caractères de contrôle : C0 (ESC, BEL, saut de ligne…), DEL, C1, séparateurs de ligne Unicode. L'engine refuse la pane
 // entière quand un texte en porte un : une seule valeur hostile éteindrait l'affichage.
 const CONTROLES = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g
+// Marques bidirectionnelles (U+202A–202E, U+2066–2069) : invisibles, elles inversent l'ordre d'affichage d'une ligne (M-1). Le socle
+// (`nettoie` de vf-cockpit-arbres.mjs) les retire sans les remplacer : même règle ici.
+const BIDI = /[\u202a-\u202e\u2066-\u2069]/g
 
-/** La chaîne sans caractère de contrôle (chacun devient une espace) ; ne touche ni aux espaces ni à l'indentation. */
+/** La chaîne sans caractère de contrôle (chacun devient une espace) ni marque bidirectionnelle (retirée) ; ne touche ni aux espaces ni à l'indentation. */
 export function sansControle(s: string): string {
-  return s.replace(CONTROLES, ' ')
+  return s.replace(BIDI, '').replace(CONTROLES, ' ')
 }
+
+/** Les fenêtres de rate limit, dites comme la pane les dit ; une fenêtre inconnue garde son nom. */
+export const libelleFenetre = (kind: string): string => (kind === 'five_hour' ? '5 h' : kind === 'seven_day' ? '7 j' : kind)
+
+/** « 1 outil », « 2 outils » (zéro au singulier, comme en français). */
+export const nOutils = (n: number): string => `${n} outil${n > 1 ? 's' : ''}`
+
+/** La portée d'un verrou ou d'un arbre, dite en français : la portée brute « depot » du socle s'écrit « dépôt » (P68-D-38). */
+export const libellePortee = (portee: string): string => (portee === 'depot' ? 'dépôt' : portee)
 
 /** Une ligne : sans contrôle, espaces repliées et bornées. */
 export function oneLine(s: string): string {

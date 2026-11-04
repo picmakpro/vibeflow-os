@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { SIGNAL, avec, labSignal } from './fixture-signal'
+import { apresDemarrage } from './apres-demarrage'
 
 // Appel de l'émetteur signal@1 par la pane (68-05 ; P68-D-02, P68-D-14). Sous `claude plugin test`, process.run
 // n'atteint jamais la machine : on prouve l'argv, le cwd et l'analyse du stdout. Identifiant du témoin en tête de titre.
@@ -14,6 +15,7 @@ const PANE = {
 
 async function pane($: any, surface: 'terminal' | 'desktop' = 'terminal') {
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   return $.ui.mount({ ...PANE, surface })
 }
 
@@ -115,6 +117,7 @@ test("K8 — mission courante abandonnée dite avec le libellé du socle ; « à
 test("K10 — compact : une ligne d'en-tête (phase, libellé, retard abrégé), sans la liste des worktrees", async ($, on) => {
   labSignal(on)
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, placement: 'inline' }, surface: 'terminal' })
   expect(await ui.find({ type: 'Text', text: /phase 68 Embarquer le mod \(en cours\) · retard 3/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /arbre principal · main/ })).toBeUndefined()

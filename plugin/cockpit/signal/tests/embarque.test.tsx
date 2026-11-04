@@ -1,5 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
+import { apresDemarrage } from './apres-demarrage'
 
 // Gating du mod embarqué (68-12 ; P68-D-18) : le registre `scripts/.vibeflow-installed` du scope projet
 // (`<root>/.claude/scripts/`) puis du scope user (`<HOME>/.claude/scripts/`) doit porter une ligne `cockpit=`.
@@ -80,6 +81,7 @@ function lab(on: On, registres: Record<string, string>, ancien = false): Appels 
 test('E1 — sans ligne cockpit= (projet puis user), ni commande, ni pane, ni bandeau', async ($, on) => {
   const appels = lab(on, { [PROJET]: 'conductor=v1.0.0\n', [USER]: 'dev-orchestrator=v2.0.0\n' })
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   expect(appels.commandes).toBe(0)
   expect(appels.ouvertures).toBe(0)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
@@ -91,6 +93,7 @@ test('E1 — sans ligne cockpit= (projet puis user), ni commande, ni pane, ni ba
 test('E2 — registre user avec cockpit=v1.2.0 : commande enregistrée, pane ouverte', async ($, on) => {
   const appels = lab(on, { [USER]: 'conductor=v1.0.0\ncockpit=v1.2.0\n' })
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   expect(appels.commandes).toBe(1)
   expect(appels.ouvertures).toBe(1)
 })
@@ -98,6 +101,7 @@ test('E2 — registre user avec cockpit=v1.2.0 : commande enregistrée, pane ouv
 test('E3 — registre projet seul avec cockpit= : même résultat', async ($, on) => {
   const appels = lab(on, { [PROJET]: 'cockpit=v1.2.0\n' })
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   expect(appels.commandes).toBe(1)
   expect(appels.ouvertures).toBe(1)
 })
@@ -105,6 +109,7 @@ test('E3 — registre projet seul avec cockpit= : même résultat', async ($, on
 test("E4 — l'ancien mod hors dépôt est signalé dans la pane avec le risque de deux panes, sans rien retirer", async ($, on) => {
   const appels = lab(on, { [USER]: 'cockpit=v1.2.0\n' }, true)
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect(await ui.find({ type: 'Text', text: /ancien mod vf-signal détecté/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /deux panes/ })).toBeDefined()
@@ -115,6 +120,7 @@ test("E4 — l'ancien mod hors dépôt est signalé dans la pane avec le risque 
 test("E4b — sans ancien mod, la pane ne le mentionne pas", async ($, on) => {
   lab(on, { [USER]: 'cockpit=v1.2.0\n' }, false)
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect(await ui.find({ type: 'Text', text: /ancien mod vf-signal détecté/ })).toBeUndefined()
   await ui.unmount()

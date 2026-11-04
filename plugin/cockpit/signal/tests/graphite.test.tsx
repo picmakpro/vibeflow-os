@@ -2,6 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { avec, labSignal } from './fixture-signal'
+import { apresDemarrage } from './apres-demarrage'
 
 // La direction « Graphite » dans la pane (68-08 ; VFSG-07, VFSG-06 ; P68-D-05, P68-D-06, P68-D-17, P68-PL-10) : la couleur ne
 // porte que le statut, deux thèmes. Les valeurs ci-dessous sont recopiées de `DESIGN.md` (sombre, clair) ; la suite statique
@@ -25,6 +26,7 @@ async function monte($: any, on: On, stdout: string, o: { theme?: string; vue?: 
   labSignal(on, { stdout, agents: o.agents })
   if (o.theme) on('config.list', () => ({ value: [{ key: 'theme', label: 'Theme', kind: 'choice', value: o.theme, provider: { kind: 'engine' } }] as any }))
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   if (o.vue && o.vue !== 'mission') await ui.press({ key: `onglet:${o.vue}` })
   return ui

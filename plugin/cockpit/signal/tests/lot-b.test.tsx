@@ -2,6 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { avec, labSignal } from './fixture-signal'
+import { apresDemarrage } from './apres-demarrage'
 
 // Correction ciblée du lot B (P68-D-35 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-04) : R1, R4, R6, R9,
 // R10, R11 de la recette de la Phase 68. Préfixe MB- (verdict.sh refuse un identifiant en double).
@@ -21,6 +22,7 @@ async function monte($: any, on: On, stdout: string, comp: any = PANE) {
   labSignal(on, { stdout })
   on('ui.render', ($, e) => { const { Text } = $.ui.resolve(e); return <Text>engine</Text> })
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   return $.ui.mount({ ...comp, surface: 'terminal' })
 }
 const texte = async (ui: any, re: RegExp): Promise<string[]> => (await ui.findAll({ type: 'Text', text: re })).map((f: any) => String(f.props.children ?? f.text ?? ''))
@@ -56,12 +58,14 @@ test("MB-R1b — état « à faire » du worktree : libellé « à faire », gri
 test("MB-R4a — process.run rejeté en ENOENT : le brief dit « node introuvable dans le PATH »", async ($, on) => {
   labSignal(on, { rejet: { code: 'ENOENT', message: 'spawn node ENOENT' } })
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   expect(await brief($)).toContain('node introuvable dans le PATH')
 })
 
 test("MB-R4b — émetteur qui répond : le brief ne porte aucune erreur du socle", async ($, on) => {
   labSignal(on)
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   const b = await brief($)
   expect(b).not.toContain('introuvable')
   expect(b).toContain('projet : Lab d essai')

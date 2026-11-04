@@ -2,6 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { AgentInfo, On } from 'claude-code'
 
 import { SIGNAL, avec } from './fixture-signal'
+import { apresDemarrage } from './apres-demarrage'
 
 // Correction ciblée de la revue fraîche (68-FIX-RV-MOD ; P68-D-34, P68-D-37, P68-D-35 ; ADR-031). Identifiants RV-… (lus par verdict.sh).
 //  - RV-Q41* : un fichier dont le realpath manque est refusé (le garde ne se rabat plus sur le chemin écrit).
@@ -59,6 +60,7 @@ function lab(on: On, o: Opts = {}): Lab {
 
 async function monter($: any, props: any = PANE) {
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   const ui = await $.ui.mount({ ...props, surface: 'terminal' })
   if (await ui.find({ key: 'onglet:equipe' })) await ui.press({ key: 'onglet:equipe' })
   return ui

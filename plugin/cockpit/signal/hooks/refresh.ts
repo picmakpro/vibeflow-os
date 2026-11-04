@@ -61,6 +61,11 @@ export async function refreshSignalAuto($: EngineInterface): Promise<void> {
   await refreshSignal($, $.plugin.root, await $.session.root().catch(() => undefined))
 }
 
+/** La liste des agents et le coût : aucun processus lancé. */
+export async function refreshCheap($: EngineInterface): Promise<void> {
+  await Promise.all([refreshRoster($), refreshUsage($)])
+}
+
 export async function refreshAll($: EngineInterface): Promise<void> {
   await Promise.all([refreshRoster($), refreshUsage($), refreshSignalAuto($)])
 }

@@ -2,6 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { AgentInfo, On } from 'claude-code'
 
 import { SIGNAL, avec } from './fixture-signal'
+import { apresDemarrage } from './apres-demarrage'
 
 // Correction ciblée du lot A (68-FIX-MA ; P68-D-34, P68-D-35 ; ADR-031). Identifiants MA-… (lus par verdict.sh).
 //  - MA-D34* : rien sous le lab (le lanceur « Ouvrir le cockpit » et le repli driver-lock.sh de l'élagage).
@@ -59,6 +60,7 @@ function lab(on: On, o: Opts = {}): Lab {
 
 async function pane($: any) {
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   if (await ui.find({ key: 'onglet:equipe' })) await ui.press({ key: 'onglet:equipe' })
   return ui

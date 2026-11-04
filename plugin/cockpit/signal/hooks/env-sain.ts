@@ -1,7 +1,7 @@
 // L'environnement des processus que le mod lance (classe H-1 de l'audit 67-SECURITY ; PR 201 côté socle : `scripts/vf-cockpit-env.mjs`).
 // Un PATH qui porte une entrée vide, relative ou sous le lab ferait exécuter à la place de `node`/`bash` un programme posé dans le lab.
 // Même règle que le socle : on écarte ces entrées, et on retombe sur un PATH système si plus rien ne reste. `$.process.run` pose
-// `init.env` PAR-DESSUS l'environnement du processus hôte : on ne passe donc que `PATH`, jamais le reste. Le PATH de la personne n'est pas modifié.
+// `init.env` PAR-DESSUS l'environnement du processus hôte : on ne passe donc que `PATH` et la variable vidée, jamais le reste. Le PATH de la personne n'est pas modifié.
 
 import type { EngineInterface } from 'claude-code'
 
@@ -43,7 +43,10 @@ export async function pathSain($: EngineInterface, root: string): Promise<string
   return reste.length ? reste.join(delim) : PATH_REPLI
 }
 
-/** L'`init.env` des lancements du mod : le PATH assaini, rien d'autre. */
+/**
+ * L'`init.env` des lancements du mod : le PATH assaini, et `VF_COCKPIT_SCRIPTS_DIR` vidée (P68-D-40). L'hôte peut la pointer vers le lab ;
+ * le socle la lirait pour choisir `driver-lock.sh` et exécuterait un script planté. Vide, le socle retombe sur ses propres scripts.
+ */
 export async function envSain($: EngineInterface, root: string): Promise<Record<string, string>> {
-  return { PATH: await pathSain($, root) }
+  return { PATH: await pathSain($, root), VF_COCKPIT_SCRIPTS_DIR: '' }
 }

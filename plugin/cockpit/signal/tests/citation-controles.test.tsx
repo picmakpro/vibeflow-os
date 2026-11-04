@@ -3,6 +3,7 @@ import type { On } from 'claude-code'
 
 import { avec } from './fixture-signal'
 import { BAND, CONTROLES, PANE, labFix, monter } from './lab-fix'
+import { apresDemarrage } from './apres-demarrage'
 
 // Correction ciblée ST-3, ST-4 et ST-6 (68-FIX-MOD ; ADR-031) : toute valeur interpolée dans une commande destinée à un
 // shell est citée ; toute chaîne affichée est débarrassée des caractères de contrôle, quelle qu'en soit la source ;
@@ -115,23 +116,27 @@ const SOURCES: [string, ($: any, on: On) => Promise<string>][] = [
   ['brief : agent.description', async ($, on) => {
     labFix(on, { agents: [{ id: 'a1', type: 'vf-coder', description: HOSTILE_NL, status: 'running' }] })
     await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+    await apresDemarrage()
     return brief($)
   }],
   ['brief : raison de refus d’un hook', async ($, on) => {
     labFix(on)
     refuse(on)
     await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+    await apresDemarrage()
     await $.tool.call({ tool: 'Bash', tool_use_id: 'u1', command: 'ls' })
     return brief($)
   }],
   ['brief : projet du signal', async ($, on) => {
     labFix(on).emetteur.stdout = avec(s => { s.projet = HOSTILE_NL })
     await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+    await apresDemarrage()
     return brief($)
   }],
   ['brief : propriétaire du verrou', async ($, on) => {
     labFix(on).emetteur.stdout = avecVerrou({ owner: HOSTILE_NL })
     await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+    await apresDemarrage()
     return brief($)
   }],
   ['bandeau : propriétaire du verrou périmé', async ($, on) => {

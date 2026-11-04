@@ -2,6 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { avec, labSignal } from './fixture-signal'
+import { apresDemarrage } from './apres-demarrage'
 
 // Écarts de recette N1, N2, N3, N8 (68-FIX-RV-MOD ; P68-D-38, arbitrage Samuel « Tout selon les recos (Recommandé) », AskUserQuestion,
 // session principale Claude Code, 2026-11-04, relayé par le manager). Identifiants RV-N… (lus par verdict.sh).
@@ -21,6 +22,7 @@ async function monte($: any, on: On, stdout: string, comp: any = PANE, equipe = 
   labSignal(on, { stdout })
   on('ui.render', ($, e) => { const { Text } = $.ui.resolve(e); return <Text>engine</Text> })
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   const ui = await $.ui.mount({ ...comp, surface: 'terminal' })
   if (equipe) await ui.press({ key: 'onglet:equipe' })
   return ui

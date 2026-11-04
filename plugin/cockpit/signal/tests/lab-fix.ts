@@ -2,6 +2,7 @@ import { mock } from 'claude-code/testing'
 import type { AgentInfo, On } from 'claude-code'
 
 import { SIGNAL } from './fixture-signal'
+import { apresDemarrage } from './apres-demarrage'
 
 // Faux lab des témoins de la correction ciblée (68-FIX-MOD). Contrairement à `labSignal`, il rend l'émetteur et `bash`
 // pilotables en cours de session, et espionne les toasts et les copies. La racine de session est un paramètre.
@@ -73,6 +74,7 @@ export const laisser = (ms = 200) => new Promise(r => setTimeout(r, ms))
 
 export async function monter($: any, composant: typeof PANE | typeof BAND = PANE) {
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
+  await apresDemarrage()
   return $.ui.mount({ ...composant, surface: 'terminal' })
 }
 
