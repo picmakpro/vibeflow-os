@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test-cockpit-projet.sh — graphe Projet du cockpit sur tout lab GSD (CKPT-06) : plat au gabarit GSD (P1),
 # partitionné (P2), sans liste de jalons avec missions (P3), contrat et absence de nom de compartiment (P4),
-# identité d'une phase = (compartiment, numéro) (P5), visite « Par où commencer » (O4 : ne revient pas d'elle-même ; O5 : étape par étape, cible, centrage, texte entier, « Passer », repère, français).
+# identité d'une phase = (compartiment, numéro) (P5), visite « Par où commencer » (O4 : ne revient pas d'elle-même ; O5 : étape par étape, cible, centrage, texte entier, « Passer », repère, français ; O6 : l'onglet Projet a sa propre visite, tirée de ses données).
 # Fixtures écrites par la suite dans mktemp.
 # Exit 0 si tout passe, 1 sinon.
 
@@ -298,6 +298,50 @@ printf '%s\n' "const w = 'fiabilite';" > "$WORK/temoin.mjs"
 assert_eq "P4.7 — témoin positif : le contrôle de noms voit un nom codé en dur" "$(cat "$WORK/temoin.mjs" | grep -cE 'fiabilite|gouvernance')" "1"
 assert_eq "P4.8 — aucun nom de compartiment de ce dépôt dans les sources du socle" "$(cat "$SCRIPTS"/vf-cockpit-*.mjs | grep -cE 'fiabilite|gouvernance')" "0"
 
+# O6 (70-08, UIFN-05, P70-D-02 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 ; P70-D-13 : choix du manager) : l'onglet Projet a sa propre visite (champ `tour` du graphe) —
+# le jalon, la phase en cours, les missions, au travail — au lieu du repli sur « La base de code ». O6.1 à O6.4 et O6.6 à O6.8 sans navigateur (graphe lu par la CLI) ; O6.5 dans Chrome (plus bas).
+echo "=== O6 — la visite propre à l'onglet Projet : contenu du champ tour ==="
+L8="$WORK/p8"; B="$L8/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+# Roadmap
+
+## Milestones
+
+- 🚧 **v1.0 MVP** - Phases 1-2 (in progress)
+
+## Phases
+
+- [x] **Phase 1: Socle** - premier jet
+- [ ] **Phase 2: Écran** - second jet
+
+### Phase 1: Socle
+**Goal**: Poser le socle
+
+### Phase 2: Écran
+**Goal**: Poser l'écran
+MD
+printf -- '---\nstatus: executing\ncurrent_phase: 2\ncurrent_phase_name: Écran\n---\n' | wr "$B/STATE.md"
+wr "$B/phases/01-socle/01-01-PLAN.md" <<'MD'
+<objective>Poser le socle</objective>
+MD
+echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
+wr "$B/phases/02-ecran/02-01-PLAN.md" <<'MD'
+<objective>Poser l'écran</objective>
+MD
+wr "$B/missions/MISSION-ECRAN.dag.json" <<'JSON'
+{"phase":"2","nodes":[{"id":"a","step":"s","deps":[],"status":"done"},{"id":"b","step":"s","deps":["a"],"status":"running"}]}
+JSON
+graph "$L8" "$WORK/g8.json"
+L9="$WORK/p9"; mkdir -p "$L9/.planning"; graph "$L9" "$WORK/g9.json"
+t8() { G "$WORK/g8.json" "$1"; }
+assert_eq "O6.1 — un lab GSD complet : le graphe Projet porte une visite d'au moins deux étapes (jalon, phase en cours, missions, au travail)" "$(t8 'j.tour.length>=2')|$(t8 'j.tour.length')" "true|4"
+assert_eq "O6.2 — chaque étape vise une carte du graphe (n:<id> existant) ou la racine avec une cible" "$(t8 'j.tour.filter((s)=>!((s.ref==="root"&&s.cible)||j.nodes.some((n)=>"n:"+n.id===s.ref))).map((s)=>s.title).join(",")')" ""
+assert_eq "O6.3 — aucune étape ne parle de « La base de code » ni « dans le code »" "$(t8 'j.tour.filter((s)=>/base de code|dans le code|codebase/i.test([s.kicker,s.title,s.note].join(" "))).length')" "0"
+assert_eq "O6.4 — sur un lab sans STATE.md, aucune étape avec « ? », « undefined », « null » ni champ vide" "$(G "$WORK/g3.json" 'j.tour.filter((s)=>[s.title,s.note].some((x)=>!x||/\?|undefined|null/.test(x))).length')|$(G "$WORK/g3.json" 'j.tour.length>=2')" "0|true"
+assert_eq "O6.6 — les étapes dans l'ordre : le jalon en cours, la phase 2 (statut lisible), la mission, au travail (#vf-lock)" "$(t8 'j.tour.map((s)=>s.ref+(s.cible?"+"+s.cible:"")).join(" ")')" "n:ms-v1.0-mvp n:ph-2 n:dag-MISSION-ECRAN root+#vf-lock"
+assert_eq "O6.7 — le statut de la phase est celui de statutLisible (« en exécution »), le jalon dit les phases faites (« 1 sur 2 »), l'étape « au travail » nomme l'onglet Équipe" "$(t8 '[/en exécution/.test(j.tour[1].note),/1 sur 2/.test(j.tour[0].note),/Équipe/.test(j.tour[3].note)].join(",")')" "true,true,true"
+assert_eq "O6.8 — un lab sans planning : visite vide (le repli de 70-07 s'applique, sans parler de code)" "$(G "$WORK/g9.json" 'j.tour.length')" "0"
+
 # O4 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : la visite « Par où commencer » revenait à chaque chargement et recouvrait la réponse. Cause : son « déjà vue » vivait dans le localStorage
 # de l'ORIGINE (port compris) et le port du serveur changeait à chaque lancement. Décision (même date, « C : port stable par lab ») : port stable par lab (vf-cockpit-port.mjs), « déjà vue » en localStorage seul,
 # par lab (vibeflow-cockpit:visite:<lab>, 75-vf-modele.js), aucun cookie. Serveurs lancés par le VRAI lanceur (vf-cockpit.mjs), plage de ports décalée (VF_COCKPIT_PORT_BASE : 4378 et 4379 tiennent les serveurs de recette).
@@ -369,6 +413,47 @@ for W in 1440 390; do
   assert_eq "O5.3 [$W px] — étapes sans bouton « Passer » visible" "$(f5 '!e.passer')" ""
   assert_eq "O5.4 [$W px] — étapes dont le repère n'est pas « n sur N » juste" "$(x5 "j.l$W.etapes.filter((e)=>e.repere!==e.i+' sur '+j.l$W.n).map((e)=>e.i).join(',')")" ""
   assert_eq "O5.5 [$W px] — étapes qui montrent un mot anglais (liste de F11)" "$(f5 '!!e.anglais')" ""
+done
+# O6.5 (70-08) : la même visite parcourue dans Chrome sur l'onglet Projet (project.html) d'un lab à jalon, phase en cours, mission : les mesures O5.1 à O5.5 passent sur Projet, quatre étapes, la première est celle du jalon.
+echo "=== O6.5 — la visite Projet dans Chrome ==="
+L6="$WORK/lab6"; mkdir -p "$L6"; mklab4 "$L6"
+printf -- '---\nstatus: executing\ncurrent_phase: 2\n---\n' > "$L6/.planning/STATE.md"
+mkdir -p "$L6/.planning/missions"; printf '{"phase":"2","nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}\n' > "$L6/.planning/missions/MISSION-X.dag.json"
+git -C "$L6" add -A && git -C "$L6" -c user.email=t@t -c user.name=t commit -q -m projet
+U6="$(adr4 "$L6")"; SRVPIDS+=("$(pid4 "$L6")"); P6="${U6%index.html}project.html"
+X6="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$P6" 1440,390)"
+[ -n "${DBG:-}" ] && echo "RAW6: $X6"
+x6() { printf '%s' "$X6" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+cat > "$AUX/titres.mjs" <<'JS'
+// titres.mjs <chrome> <session.mjs> <url> : titre, kicker et repère de chaque étape de la visite lancée par son API ; une ligne JSON { etapes: [ { kicker, titre, note } ] } ou { erreur }
+import { pathToFileURL } from 'node:url';
+const [, , chrome, sess, url] = process.argv;
+const { executer, pause } = await import(pathToFileURL(sess).href);
+await executer(chrome, async (s) => {
+  await s.naviguer(url); await s.attendre("document.readyState === 'complete' && !!window.VibeFlowTour && !!document.getElementById('tour-btn')", 'page prête');
+  await s.attendre("!!window.__vfModele && !!window.__vfModele.modele", 'lab connu'); await pause(1200);
+  await s.ev('window.VibeFlowTour.end()'); await s.ev('window.VibeFlowTour.start()'); await s.attendre('window.VibeFlowTour.active()', 'visite lancée', 15000);
+  const etapes = [];
+  for (let i = 0; i < 12 && (await s.ev('window.VibeFlowTour.active()')); i++) {
+    await pause(400);
+    etapes.push(await s.ev("(() => { const c = document.getElementById('tour'); const q = (x) => (c.querySelector(x) || {}).textContent || ''; return { kicker: q('.tk span:last-child'), titre: q('.tt'), note: q('.tn') }; })()"));
+    await s.ev("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))"); await pause(150);
+  }
+  return { etapes };
+});
+JS
+T6="$(node "$AUX/titres.mjs" "$CHROME" "$SCRIPTS/tests/chrome-session.mjs" "$P6")"
+[ -n "${DBG:-}" ] && echo "RAW6T: $T6"
+t6() { printf '%s' "$T6" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "O6.5a — témoin : la mesure a eu lieu sans erreur, la visite Projet compte quatre étapes à chaque largeur" "$(x6 "j.erreur||''")|$(x6 'j.l1440.n+","+j.l390.n')" "|4,4"
+assert_eq "O6.5b — la première étape est celle du jalon, la dernière « au travail » ; aucune ne dit « base de code »" "$(t6 'j.etapes.length')|$(t6 '/jalon/i.test(((j.etapes[0]||{}).kicker||"")+((j.etapes[0]||{}).titre||""))')|$(t6 '/travail/i.test(((j.etapes[3]||{}).kicker||"")+((j.etapes[3]||{}).titre||""))')|$(t6 'j.etapes.filter((e)=>/base de code|dans le code/i.test(e.kicker+e.titre+e.note)).length')" "4|true|true|0"
+for W in 1440 390; do
+  f6() { x6 "j.l$W.etapes.filter((e)=>$1).map((e)=>e.i).join(',')"; }
+  assert_eq "O6.5c [$W px] — Projet : étapes sans cible, mal centrées, couvertes ou hors fenêtre (O5.1)" "$(f6 '!e.cible||!e.centre||e.couvert||!e.visible')" ""
+  assert_eq "O6.5d [$W px] — Projet : texte coupé ou carte hors fenêtre (O5.2)" "$(f6 'e.coupe||!e.entier||!e.tient')" ""
+  assert_eq "O6.5e [$W px] — Projet : étapes sans « Passer » (O5.3)" "$(f6 '!e.passer')" ""
+  assert_eq "O6.5f [$W px] — Projet : repère « n sur N » faux (O5.4)" "$(x6 "j.l$W.etapes.filter((e)=>e.repere!==e.i+' sur '+j.l$W.n).map((e)=>e.i).join(',')")" ""
+  assert_eq "O6.5g [$W px] — Projet : mot anglais (O5.5)" "$(f6 '!!e.anglais')" ""
 done
 unset VF_COCKPIT_PORT_BASE
 for L in "${LABS4[@]}"; do node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L" >/dev/null 2>&1; done; for p in "${SRVPIDS[@]}"; do vf_hyg_stop "$p"; done; SRVPIDS=()
