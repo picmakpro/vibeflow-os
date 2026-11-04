@@ -68,15 +68,18 @@ export async function refreshUsage($: EngineInterface): Promise<void> {
   await update($, usage, () => next)
 }
 
-export async function refreshAll($: EngineInterface, home: string | undefined): Promise<void> {
-  const root = await $.session.root().catch(() => undefined)
-  await Promise.all([refreshDisk($, home), refreshMacro($), refreshRoster($), refreshUsage($), refreshSignal($, $.plugin.root, root)])
+/** L'émetteur du socle, pour la racine de la session courante. */
+export async function refreshSignalAuto($: EngineInterface): Promise<void> {
+  await refreshSignal($, $.plugin.root, await $.session.root().catch(() => undefined))
 }
 
-/** Le disque et l'équipe seuls : ce qui bouge pendant qu'un tour tourne. */
-export async function refreshLive($: EngineInterface, home: string | undefined): Promise<void> {
-  const root = await $.session.root().catch(() => undefined)
-  await Promise.all([refreshDisk($, home), refreshRoster($), refreshSignal($, $.plugin.root, root)])
+export async function refreshAll($: EngineInterface): Promise<void> {
+  await Promise.all([refreshRoster($), refreshUsage($), refreshSignalAuto($)])
+}
+
+/** Le socle et l'équipe seuls : ce qui bouge pendant qu'un tour tourne. */
+export async function refreshLive($: EngineInterface): Promise<void> {
+  await Promise.all([refreshRoster($), refreshSignalAuto($)])
 }
 
 /** Un agent ou un skill nommé signale un temps de la boucle. */

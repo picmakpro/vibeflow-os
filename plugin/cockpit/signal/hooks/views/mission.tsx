@@ -3,22 +3,15 @@
 // Mise en page fluide : une ligne par nœud, qui se replie plutôt que de se tronquer.
 
 import { C, G, age, cut, oneLine } from '../ds'
-import { currentNode, isDone, isFailed, isRunning, waves } from '../derive'
+import { currentNode, isDone, isFailed, isRunning, missionCourante, waves } from '../derive'
 import { ghost, head, row } from './common'
 import type { Ctx } from './common'
-import type { Signal, SignalMission, SignalNoeud } from '../../types'
-
-/** La mission de la phase active de l'arbre courant (provisoire : déplacée dans `derive.ts` par la tâche suivante). */
-function missionDe(s: Signal | null): SignalMission | null {
-  const key = s?.arbres.find(a => a.courant)?.phaseActive?.key
-  const nom = key ? s!.phases.find(p => p.key === key)?.avancement.mission?.nom : undefined
-  return nom ? (s!.missions.find(m => m.nom === nom) ?? null) : null
-}
+import type { SignalNoeud } from '../../types'
 
 export function mission(ctx: Ctx): JSX.Element {
   const { ui, s, l, r, alert, width, blink, compact } = ctx
   const { Box, Text } = ui
-  const mis = missionDe(s)
+  const mis = missionCourante(s)
   // une mission abandonnée ou d'état inconnu n'avance pas : ses nœuds sont grisés, jamais présentés comme vivants (P68-D-05)
   const vivante = mis !== null && mis.etat !== 'abandonnee' && mis.etat !== 'inconnu'
   const nodes = mis?.noeuds ?? []

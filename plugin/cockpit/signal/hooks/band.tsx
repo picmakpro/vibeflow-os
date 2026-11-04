@@ -8,7 +8,7 @@ import { attention } from './derive'
 
 export const PANE = 'vf-signal'
 
-const disk = atom({ plugin: 'vibeflow', key: 'disk' } as const, null)
+const signal = atom({ plugin: 'vibeflow', key: 'signal' } as const, null)
 const loop = atom({ plugin: 'vibeflow', key: 'loop' } as const, { stage: null, isWorking: false, turnStartedAt: 0, tools: 0, lastTurn: null })
 const refusals = atom({ plugin: 'vibeflow', key: 'refusals' } as const, [])
 const loopAlert = atom({ plugin: 'vibeflow', key: 'loopAlert' } as const, null)
@@ -19,10 +19,10 @@ export async function band(
   $: EngineInterface,
   e: Extract<RenderInput, { component: 'AbovePrompt' }>,
 ): Promise<JSX.Element | null> {
-  const [d, l, r, alert, u, hiddenFor] = await Promise.all([
-    read($, disk), read($, loop), read($, refusals), read($, loopAlert), read($, usage), read($, bandHiddenFor),
+  const [sig, l, r, alert, u, hiddenFor] = await Promise.all([
+    read($, signal), read($, loop), read($, refusals), read($, loopAlert), read($, usage), read($, bandHiddenFor),
   ])
-  const action = attention(d, l, r, alert, u)
+  const action = attention(sig, l, r, alert, u)
   if (e.props.hasSurvey || action === null || hiddenFor === action) return null
   const { Box, Button, Text } = $.ui.resolve(e)
   return (

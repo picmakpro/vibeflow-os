@@ -14,13 +14,12 @@ import { PHRASE_ANCIEN_MOD, ancienModPresent } from './ancien-mod'
 import { cockpitInstalle } from './gating'
 import { VIEWS } from './ds'
 import { pane } from './pane'
-import { recordRefusal, refreshAll, refreshDisk, refreshLive, refreshRoster, setStage } from './refresh'
+import { recordRefusal, refreshAll, refreshLive, refreshRoster, refreshSignalAuto, setStage } from './refresh'
 import type { AgentStat, View } from '../types'
 
 // Les valeurs lues ici. Un atome se déclare dans le fichier qui le lit (règle
 // du validateur) : la même référence désigne la même valeur partout.
-const disk = atom({ plugin: 'vibeflow', key: 'disk' } as const, null)
-const macro = atom({ plugin: 'vibeflow', key: 'macro' } as const, null)
+const signal = atom({ plugin: 'vibeflow', key: 'signal' } as const, null)
 const loop = atom({ plugin: 'vibeflow', key: 'loop' } as const, { stage: null, isWorking: false, turnStartedAt: 0, tools: 0, lastTurn: null })
 const roster = atom({ plugin: 'vibeflow', key: 'roster' } as const, [])
 const stats = atom({ plugin: 'vibeflow', key: 'stats' } as const, {})
@@ -52,9 +51,9 @@ export const register: Register = on => {
       name: 'vf-signal',
       description: 'Cockpit VibeFlow : mission, équipe, macro. « /vf-signal équipe », « macro », « mission », ou « brief » pour un Markdown.',
     })
-    await refreshAll($, home)
+    await refreshAll($)
     refreshTimer?.cancel()
-    refreshTimer = $.clock.every(10000, () => void refreshLive($, home))
+    refreshTimer = $.clock.every(10000, () => void refreshLive($))
     if (e.isInteractive) void $.ui.open({ id: PANE, title: 'vf-signal', rows: 18 })
     return next(e)
   })
@@ -72,7 +71,7 @@ export const register: Register = on => {
       await update($, stats, () => ({}))
       await update($, refusals, () => [])
       await update($, loopAlert, () => null)
-      await refreshAll($, home)
+      await refreshAll($)
       return next(e)
     }
     refreshTimer?.cancel()
@@ -83,14 +82,14 @@ export const register: Register = on => {
     if (!actif) return next(e)
     const arg = e.args.trim().toLowerCase().replace('équipe', 'equipe')
     if (arg === 'brief') {
-      await refreshAll($, home)
-      const [d, m, l, agents, agentStats, r, u] = await Promise.all([
-        read($, disk), read($, macro), read($, loop), read($, roster), read($, stats), read($, refusals), read($, usage),
+      await refreshAll($)
+      const [sig, l, agents, agentStats, r, u] = await Promise.all([
+        read($, signal), read($, loop), read($, roster), read($, stats), read($, refusals), read($, usage),
       ])
-      return { text: brief(d, m, l, agents, agentStats, r, u) }
+      return { text: brief(sig, l, agents, agentStats, r, u) }
     }
     if ((VIEWS as readonly string[]).includes(arg)) await update($, view, () => arg as View)
-    await refreshAll($, home)
+    await refreshAll($)
     const opened = await $.ui.open({ id: PANE, title: 'vf-signal', focus: true, rows: 18 })
     return { text: opened.isPlaced ? 'vf-signal : pane ouverte.' : `vf-signal : pane en attente (${opened.reason}).` }
   })
@@ -122,7 +121,7 @@ export const register: Register = on => {
     const l = await read($, loop)
     const lastTurn = { seconds: Math.round(e.durationMs / 1000), tools: l.tools, outputTokens: e.usage?.output_tokens ?? 0 }
     await update($, loop, cur => ({ ...cur, isWorking: false, lastTurn }))
-    await refreshAll($, home)
+    await refreshAll($)
     $.ui.status(undefined)
     return next(e)
   })
@@ -174,7 +173,7 @@ export const register: Register = on => {
     if (ran.deny !== undefined) {
       await recordRefusal($, tool_use_id ?? signature, tool, ran.deny)
     } else if (tool === 'Bash' && /driver-lock|dag\.sh|git (commit|checkout|switch|merge)|gsd|vf-/.test(e.command ?? '')) {
-      void refreshDisk($, home)
+      void refreshSignalAuto($)
     }
     return ran
   }).catch(($, e, next) => next(e))

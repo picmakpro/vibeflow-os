@@ -8,7 +8,8 @@ import type { EngineInterface, RenderInput } from 'claude-code'
 
 import { C, G, STAGES, STAGE_LABEL, VIEWS, VIEW_LABEL } from './ds'
 import { PHRASE_ANCIEN_MOD } from './ancien-mod'
-import { attention } from './derive'
+import { boutons } from './boutons'
+import { attention, verrouPerime } from './derive'
 import { enTete, erreurSocle, resumeCompact } from './en-tete'
 import { refreshAll } from './refresh'
 import type { Ctx } from './views/common'
@@ -16,8 +17,6 @@ import { equipe } from './views/equipe'
 import { macro as macroView } from './views/macro'
 import { mission } from './views/mission'
 
-const disk = atom({ plugin: 'vibeflow', key: 'disk' } as const, null)
-const macro = atom({ plugin: 'vibeflow', key: 'macro' } as const, null)
 const loop = atom({ plugin: 'vibeflow', key: 'loop' } as const, { stage: null, isWorking: false, turnStartedAt: 0, tools: 0, lastTurn: null })
 const roster = atom({ plugin: 'vibeflow', key: 'roster' } as const, [])
 const stats = atom({ plugin: 'vibeflow', key: 'stats' } as const, {})
@@ -31,22 +30,22 @@ const signal = atom({ plugin: 'vibeflow', key: 'signal' } as const, null)
 type PaneInput = Extract<RenderInput, { component: 'Pane' }>
 
 export async function pane($: EngineInterface, e: PaneInput, blink: boolean, home: string | undefined): Promise<JSX.Element> {
-  const refresh = () => refreshAll($, home)
+  const refresh = () => refreshAll($)
   const ui = $.ui.resolve(e)
   const { Box, Button, Text } = ui
-  const [d, m, l, agents, agentStats, r, alert, u, current, ancien, sig] = await Promise.all([
-    read($, disk), read($, macro), read($, loop), read($, roster), read($, stats),
+  const [l, agents, agentStats, r, alert, u, current, ancien, sig] = await Promise.all([
+    read($, loop), read($, roster), read($, stats),
     read($, refusals), read($, loopAlert), read($, usage), read($, view), read($, ancienMod), read($, signal),
   ])
   const erreur = await erreurSocle($, ui)
   const now = await $.clock.now()
   const width = Math.max(24, e.props.bodyColumns - 1)
   const compact = e.props.placement === 'inline' || width < 48
-  const ctx: Ctx = { ui, width, compact, now, blink, s: sig, d, m, l, roster: agents, stats: agentStats, r, alert, u }
-  const action = attention(d, l, r, alert, u)
+  const ctx: Ctx = { ui, width, compact, now, blink, s: sig, l, roster: agents, stats: agentStats, r, alert, u }
+  const action = attention(sig, l, r, alert, u)
   const currentIndex = l.stage ? STAGES.indexOf(l.stage) : -1
   const cursor = l.isWorking ? (blink ? G.current : ' ') : G.done
-  const stale = d?.locks.find(k => k.isStale) ?? null
+  const stale = verrouPerime(sig)
 
   const tabs = (
     <Box gap={1} flexWrap="wrap">
@@ -72,54 +71,7 @@ export async function pane($: EngineInterface, e: PaneInput, blink: boolean, hom
     </Text>
   ) : null
 
-  const buttons = (
-    <Box gap={1} flexWrap="wrap">
-      {stale && d?.script ? (
-        <Button
-          key="elaguer"
-          hotkey="e"
-          variant="primary"
-          onPress={async () => {
-            const argv = ['bash', d.script as string, 'recover', ...(stale.ws ? [`--ws=${stale.ws}`] : [])]
-            const ran = await $.process.run(argv, { cwd: await $.session.root(), timeoutMs: 15000 }).catch(() => undefined)
-            $.ui.toast(ran ? `recover · exit ${ran.exitCode} · ${ran.stdout.trim().slice(0, 120)}` : 'recover : driver-lock.sh ne démarre pas')
-            await refresh()
-          }}
-        >
-          élaguer le verrou périmé
-        </Button>
-      ) : null}
-      {stale ? (
-        <Button
-          key="takeover"
-          hotkey="t"
-          plain
-          dimColor
-          onPress={press =>
-            void $.ui
-              .copy({ text: `bash ${d?.script ?? 'driver-lock.sh'} takeover --owner=<id>${stale.ws ? ` --ws=${stale.ws}` : ''}`, surface: press.surface })
-              .then(() => $.ui.toast('commande takeover copiée'))
-          }
-        >
-          copier takeover
-        </Button>
-      ) : null}
-      {u?.percent != null && u.percent >= 85 && !l.isWorking ? (
-        <Button
-          key="compacter"
-          hotkey="c"
-          plain
-          dimColor
-          onPress={() => void $.session.compact().then(() => $.ui.toast('compaction lancée')).catch(() => $.ui.toast('compaction refusée (un tour tourne ?)'))}
-        >
-          compacter
-        </Button>
-      ) : null}
-      <Button key="rafraichir" hotkey="r" plain dimColor onPress={() => void refresh()}>
-        rafraîchir
-      </Button>
-    </Box>
-  )
+  const buttons = await boutons($, ui, { stale, l, u, home, refresh })
 
   if (compact) {
     return (
@@ -188,11 +140,6 @@ export async function pane($: EngineInterface, e: PaneInput, blink: boolean, hom
         </Text>
       </Box>
       {noteAncienMod}
-      {d?.error ? (
-        <Text color={C.fg3} wrap="wrap">
-          disque · {d.error}
-        </Text>
-      ) : null}
     </Box>
   )
 }

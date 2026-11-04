@@ -2,7 +2,7 @@
 // prochaine action humaine, le brief Markdown.
 
 import { STAGE_LABEL, age } from './ds'
-import type { AgentStat, DagNode, Disk, Loop, Macro, Refusal, RosterAgent, Stage, Usage } from '../types'
+import type { AgentStat, DagNode, Loop, Refusal, RosterAgent, Signal, SignalArbre, SignalJalon, SignalMission, SignalVerrou, Stage, Usage } from '../types'
 
 // Quel temps de la boucle un agent ou un skill signale. Premier motif qui matche.
 const STAGE_OF: readonly [RegExp, Stage][] = [
@@ -87,41 +87,68 @@ export function tree(roster: RosterAgent[]): { agent: RosterAgent; depth: number
   return out
 }
 
+/** L'arbre de travail de la session : celui que `signal@1` marque `courant`. */
+export const arbreCourant = (s: Signal | null): SignalArbre | null => s?.arbres.find(a => a.courant) ?? null
+
+/** La mission de la phase active de l'arbre courant (`avancement.mission` de la phase), ou null. */
+export function missionCourante(s: Signal | null): SignalMission | null {
+  const key = arbreCourant(s)?.phaseActive?.key
+  const nom = key ? s!.phases.find(p => p.key === key)?.avancement.mission?.nom : undefined
+  return nom ? (s!.missions.find(m => m.nom === nom) ?? null) : null
+}
+
+/** Le jalon de la phase active de l'arbre courant (P68-D-30) ; null sans phase active ou sans jalon qui la contienne. */
+export function jalonCourant(s: Signal | null): SignalJalon | null {
+  const key = arbreCourant(s)?.phaseActive?.key
+  return key ? (s!.jalons.find(j => j.phases.includes(key)) ?? null) : null
+}
+
+/** Le premier verrou de driver périmé de `signal@1`, ou null. */
+export const verrouPerime = (s: Signal | null): SignalVerrou | null => s?.verrous.liste.find(k => k.stale === true) ?? null
+
+// Une mission abandonnée ou d'état inconnu n'attend personne : ses nœuds ne dictent pas la prochaine action (P68-D-05, P68-D-23).
+const sansHote = (m: SignalMission | null): boolean => m === null || m.etat === 'abandonnee' || m.etat === 'inconnu'
+
 /** La prochaine action humaine, ou null quand l'équipe n'a besoin de personne. */
-export function attention(d: Disk | null, l: Loop, r: Refusal[], alert: string | null, u: Usage | null): string | null {
+export function attention(sig: Signal | null, l: Loop, r: Refusal[], alert: string | null, u: Usage | null): string | null {
   const recent = r.filter(x => x.at >= l.turnStartedAt)
   const last = recent[recent.length - 1]
   if (last) return `un garde a refusé ${last.tool} · lis la raison`
   if (alert) return `${alert} · interromps si ça tourne en rond`
-  const stale = d?.locks.find(x => x.isStale)
-  if (stale) return `verrou périmé de ${stale.owner} · élague ou reprends`
-  const failed = d?.nodes.find(isFailed)
+  const stale = verrouPerime(sig)
+  if (stale) return `verrou périmé de ${stale.owner ?? '?'} · élague ou reprends`
+  const mis = missionCourante(sig)
+  const nodes = sansHote(mis) ? [] : (mis!.noeuds ?? [])
+  const failed = nodes.find(isFailed)
   if (failed) return `nœud ${failed.status} · ${failed.step || failed.id}`
-  const node = d ? humanNode(d.nodes) : null
+  const node = humanNode(nodes)
   if (node) return `arbitrage attendu · ${node.step}`
   if (u?.percent != null && u.percent >= 85) return `contexte à ${u.percent} % · compacter ?`
   return null
 }
 
-export function brief(d: Disk | null, m: Macro | null, l: Loop, roster: RosterAgent[], stats: Record<string, AgentStat>, r: Refusal[], u: Usage | null): string {
+export function brief(sig: Signal | null, l: Loop, roster: RosterAgent[], stats: Record<string, AgentStat>, r: Refusal[], u: Usage | null): string {
   const lines: string[] = ['# vf-signal — état de la boucle', '']
-  if (m?.project) lines.push(`- projet : ${m.project}`)
-  if (d) {
-    lines.push(`- compartiment : ${d.ws ?? 'racine'} · jalon : ${d.milestone ?? '?'}`)
-    lines.push(`- phase ${d.phase ?? '?'} · ${d.phaseName ?? ''} · ${d.status ?? '?'}`)
-    if (d.plansTotal != null) lines.push(`- plans : ${d.plansDone ?? 0}/${d.plansTotal}`)
-    if (d.stoppedAt) lines.push(`- arrêt : ${d.stoppedAt}`)
-    for (const k of d.locks) {
-      lines.push(`- verrou ${k.ws || 'dépôt'} : ${k.owner} · ${k.step} · ${age(k.ageSeconds)}${k.isStale ? ' · périmé' : ''} · ${k.children} enfant(s)`)
+  if (sig) {
+    lines.push(`- projet : ${sig.projet}`)
+    const jalon = jalonCourant(sig)
+    lines.push(`- compartiment : ${sig.layout.actif ?? 'racine'}${jalon ? ` · jalon : ${jalon.texte}` : ''}`)
+    const active = arbreCourant(sig)?.phaseActive ?? null
+    const phase = active ? sig.phases.find(p => p.key === active.key) : undefined
+    lines.push(active ? `- phase ${active.n} · ${active.nom}${phase ? ` · ${phase.libelle}` : ''}` : '- aucune phase en cours')
+    if (phase) lines.push(`- plans : ${phase.avancement.plans.faits}/${phase.avancement.plans.total}`)
+    for (const k of sig.verrous.liste) {
+      lines.push(`- verrou ${k.ws || 'dépôt'} : ${k.owner ?? '?'} · ${k.scope}${k.ageS != null ? ` · ${age(k.ageS)}` : ''}${k.stale ? ' · périmé' : ''}`)
     }
-    if (d.dagName) {
-      lines.push(`- mission ${d.dagName} : ${d.nodes.filter(isDone).length}/${d.nodes.length} nœuds`)
-      waves(d.nodes).forEach((wave, i) => {
+    const mis = missionCourante(sig)
+    if (mis) {
+      const nodes = mis.noeuds ?? []
+      lines.push(`- mission ${mis.nom} · ${mis.libelle} : ${nodes.filter(isDone).length}/${nodes.length} nœuds`)
+      waves(nodes).forEach((wave, i) => {
         lines.push(`  - vague ${i + 1}`)
         for (const n of wave) lines.push(`    - [${isDone(n) ? 'x' : ' '}] ${n.id} — ${n.step}${isRunning(n) ? ' (en cours)' : ''}`)
       })
     }
-    for (const a of d.registry) lines.push(`- registre : ${a.role} sur ${a.node || '?'} · ${age(a.ageSeconds)} · profondeur ${a.depth}`)
   }
   lines.push(`- temps de la boucle : ${l.stage ? STAGE_LABEL[l.stage] : 'inconnu'}`)
   for (const { agent, depth } of tree(roster)) {
@@ -136,9 +163,11 @@ export function brief(d: Disk | null, m: Macro | null, l: Loop, roster: RosterAg
     lines.push(`- contexte : ${u.percent ?? '?'} % de ${u.window} · coût : ${u.usd != null ? u.usd.toFixed(2) + ' $' : '?'}`)
     for (const lim of u.limits) lines.push(`- ${lim.kind} : ${lim.percent} %`)
   }
-  if (m) {
-    for (const ms of m.milestones) lines.push(`- jalon ${ms.name} : ${ms.phases.filter(p => p.isDone).length}/${ms.phases.length} phases`)
-    lines.push(`- backlog : ${m.backlogCount} entrées, ${m.backlogDeferred} différées`)
+  if (sig) {
+    for (const j of sig.jalons) {
+      const faites = j.phases.filter(k => sig.phases.find(p => p.key === k)?.fait).length
+      lines.push(`- jalon ${j.texte} : ${faites}/${j.phases.length} phases`)
+    }
   }
   return lines.join('\n')
 }
