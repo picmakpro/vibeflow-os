@@ -420,6 +420,16 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "fix-ci-polices",
+      "step": "CI Linux : visite et polices larges (O6.17, R22, R3)",
+      "stage": "",
+      "deps": [
+        "fix-classe-visite"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
