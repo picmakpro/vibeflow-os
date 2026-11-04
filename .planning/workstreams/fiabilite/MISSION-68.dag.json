@@ -418,6 +418,16 @@
       ],
       "scope": [],
       "status": "running"
+    },
+    {
+      "id": "pr-brouillon",
+      "step": "PR #199 brouillon ouverte, CI Linux précoce",
+      "stage": "",
+      "deps": [
+        "exec-68-08"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
