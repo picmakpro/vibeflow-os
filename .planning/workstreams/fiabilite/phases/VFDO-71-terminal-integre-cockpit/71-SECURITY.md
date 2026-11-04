@@ -303,3 +303,18 @@ exécution) ; N9, N10 ; G2, E4 (12 `MessageEvent` forgés par P sans effet) ; F1
 
 Limites : macOS seulement ; Linux et `xdg-open` non exécutés ; ni Firefox ni Safari ; un seul compte. Incident de mesure : deux variantes de sonde
 (`PATH='.'`, PATH vide) ont fait lancer l'ouvreur réel du poste par repli système (un onglet a pu s'ouvrir sur le cockpit de test).
+
+### Delta 1198b5b9 (re-audit n°3, suite) — 2026-11-04
+
+Diff `7bb14f15..1198b5b9`, 13 fichiers sous `plugin/`, même cadre et mêmes sondes. Verdict **gaps_found**, aucun bloquant, aucun majeur.
+Fermés : N12 (matrice H-1 avec `<lab>/bin` en tête et en queue : 0 exécution, lanceur, serveur et enfant ; `7bb14f15` exécutait `<lab>/bin/open`
+et `<lab>/bin/ps`) ; R1 (après rechargement du cadre, 3 000 CPR et 41 100 octets de réponses hostiles donnent +0 octet vers le shell, contre
++18 000 et +41 100 sans la garde ; frappes réelles pendant un flux hostile toutes reçues) ; R3 (aucune voie neuve, `/etat` toujours sous secret) ;
+non-régression (contrôles de Q 38/38, SIGKILL du parent : tout mort en 0,2 s, N9, N10, P26). R2, G4, G5 : sans surface.
+
+| Id | Sévérité | Constat | Suite |
+|----|----------|---------|-------|
+| N13 | info (famille F1), créé par R4 | `ouvrir(vif.url)` sans `estNotre` : un `server.json` planté avec un PID étranger vivant fait ouvrir `http://127.0.0.1:<port>` | corrigé (`da5502ca`, sous P71-D-25) |
+| R1-réserve | info | xterm fait `stopPropagation` sur `keydown` : le drapeau « saisie humaine » pouvait rester vrai un instant | corrigé (`94e1b133`, borné à un tick) ; preuve par mutation en cours de durcissement |
+| R1-IME | info | une saisie IME pendant le rejeu peut être ignorée (disponibilité seulement) | assumé |
+| H1-b | bas, hérité de `main` | inchangé | hors phase |

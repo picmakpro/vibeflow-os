@@ -220,3 +220,16 @@ touche Option.
 
 Rejeu réduit après correctifs (levier « méthode allégée selon le risque », arbitrage Samuel, AskUserQuestion, session principale Claude Code,
 2026-11-03) : étapes 1, 5, 9, 12, 14, 16 sur `7bb14f15` — résultats ajoutés au retour des juges.
+
+### Rejeux réduits après correctifs (2026-11-04)
+
+- **Sur `7bb14f15`, étapes 1, 5, 9, 12, 14, 16 et E4, G3, P71-D-03** : E2 confirmé corrigé (pastille 8 px au-dessus du zoom, `elementFromPoint`
+  correct, clic sur « + » qui zoome sans ouvrir le terminal ; captures `e1-E2-pastille-zoom.png`, `e14-E2-zoom-focus.png`) ; E1 (248 frappes,
+  médiane 1,9 ms, maximum 6,9 ms, alors que le serveur du cockpit se bloque toujours toutes les 5 s) ; E3, G1, G2, G3, P71-D-03 conformes. Écarts
+  relevés R1 à R5, arbitrés P71-D-36 ; goût G4 à G6, arbitré P71-D-37 (G6 écarté par Samuel).
+- **Sur `1198b5b9`, étapes touchées (9, 16, R2, G5, R3, R4)** : six points conformes. R1 prouvé de bout en bout (0 « 1;2c » après 5 bascules et 2
+  rechargements ; témoin rouge sur `ed2f3be2` : 2 à 12 résidus) ; R2 (0 pixel noir) ; G5 (contraste 3,82 en sombre, 2,85 en clair) ; R3 (carte
+  « Python 3 introuvable », sans boucle) ; R4 (page P ouverte, message exact). Goût résiduel : en 1280×720, tiroir ouvert, le texte des cartes reste
+  petit (échelle 0,29) ; la barre dit « Terminé » face à la carte « Python 3 introuvable ».
+- **R5** : sonde sur une vraie fin de connexion TCP, nouvel onglet servi à 30,08 s, exactement la grâce prévue : artefact du headless, sans
+  correctif (P71-D-36).
