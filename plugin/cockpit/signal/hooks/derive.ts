@@ -1,7 +1,7 @@
 // Lectures dérivées : l'ordre d'exécution du DAG, le temps de la boucle, la
 // prochaine action humaine, le brief Markdown.
 
-import { STAGE_LABEL, age, oneLine, statutNoeud, titreCourt } from './ds'
+import { STAGE_LABEL, age, oneLine, statutAgent, statutNoeud, titreCourt } from './ds'
 import type { AgentStat, DagNode, Loop, Refusal, RosterAgent, Signal, SignalArbre, SignalJalon, SignalMission, SignalVerrou, Stage, Usage } from '../types'
 
 // Quel temps de la boucle un agent ou un skill signale. Premier motif qui matche.
@@ -130,6 +130,21 @@ export function attention(sig: Signal | null, l: Loop, r: Refusal[], alert: stri
   return null
 }
 
+/** L'étape d'un verrou : son champ `step` s'il existe, sinon la tâche du travailleur « lock » (who@2) du même propriétaire (N2). */
+export function etapeVerrou(s: Signal | null, k: SignalVerrou): string | null {
+  const dite = k.step ?? s?.equipe?.workers.find(x => x.kind === 'lock' && x.id === k.owner)?.task
+  return dite ? oneLine(dite) : null
+}
+
+/** Ce que dit un verrou après sa portée : propriétaire, phase, étape, âge. La portée (compartiment ou « dépôt ») est écrite une seule fois, par l'appelant. */
+export function detailVerrou(s: Signal | null, k: SignalVerrou, borne = 80): string[] {
+  const owner = oneLine(k.owner ?? '?')
+  return [owner.length > borne ? `${owner.slice(0, borne - 1)}…` : owner, k.phase ? `phase ${oneLine(k.phase)}` : null, etapeVerrou(s, k), k.ageS != null ? age(k.ageS) : null].filter((x): x is string => x !== null)
+}
+
+/** La prochaine action est un nœud bloqué ou en échec : elle prend la couleur « bloqué » (--st-blocked), pas celle d'« attention » (N8). */
+export const actionBloquee = (action: string | null): boolean => action !== null && /^nœud (bloqué|en échec|en erreur|rouge) ·/.test(action)
+
 export function brief(sig: Signal | null, l: Loop, roster: RosterAgent[], stats: Record<string, AgentStat>, r: Refusal[], u: Usage | null, erreur: string | null = null): string {
   const lines: string[] = ['# vf-signal — état de la boucle', '']
   // la cause que la pane dit en tête (`erreurSocle`) : sans elle, un brief vide ne dit pas pourquoi (R4)
@@ -143,7 +158,7 @@ export function brief(sig: Signal | null, l: Loop, roster: RosterAgent[], stats:
     lines.push(active ? `- phase ${active.n} · ${active.nom}${phase ? ` · ${phase.libelle}` : ''}` : '- aucune phase en cours')
     if (phase) lines.push(`- plans : ${phase.avancement.plans.faits}/${phase.avancement.plans.total}`)
     for (const k of sig.verrous.liste) {
-      lines.push(`- verrou ${k.ws || 'dépôt'} : ${k.owner ?? '?'} · ${k.scope ?? 'sans portée'}${k.ageS != null ? ` · ${age(k.ageS)}` : ''}${k.stale ? ' · périmé' : ''}`)
+      lines.push(`- verrou ${k.ws || 'dépôt'} : ${detailVerrou(sig, k).join(' · ')}${k.stale ? ' · périmé' : ''}`)
     }
     const mis = missionCourante(sig)
     if (mis) {
@@ -158,7 +173,7 @@ export function brief(sig: Signal | null, l: Loop, roster: RosterAgent[], stats:
   lines.push(`- temps de la boucle : ${l.stage ? STAGE_LABEL[l.stage] : 'inconnu'}`)
   for (const { agent, depth } of tree(roster)) {
     const s = stats[agent.id]
-    lines.push(`${'  '.repeat(depth)}- ${agent.type} · ${agent.status} · ${agent.description}${s ? ` · ${s.tools} outils` : ''}`)
+    lines.push(`${'  '.repeat(depth)}- ${agent.type} · ${statutAgent(agent.status)} · ${agent.description}${s ? ` · ${s.tools} outils` : ''}`)
   }
   if (r.length) {
     lines.push(`- refus (${r.length}) :`)

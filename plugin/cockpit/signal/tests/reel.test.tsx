@@ -14,7 +14,8 @@ test("FX-7a — sortie réelle d'un lab plat (verrou tenu, scope null, retard.ba
   const ui = await monter($)
   expect(await ui.find({ type: 'Text', text: ILLISIBLE })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /phase 1 Un/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /sans portée/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^■ dépôt · t · s · 0 s$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /sans portée/ })).toBeUndefined()
   await ui.press({ key: 'onglet:equipe' })
   await ui.press({ key: 'onglet:macro' })
   await ui.press({ key: 'onglet:mission' })
@@ -36,7 +37,7 @@ test("FX-7b — sortie réelle d'un lab plat : le bandeau, le compact et le brie
   await compact.unmount()
   const brief = String((await $.command.run({ command: 'vf-signal', args: 'brief' })).text)
   expect(brief).toMatch(/phase 1 · Un/)
-  expect(brief).toContain('verrou dépôt : t · sans portée')
+  expect(brief).toContain('verrou dépôt : t · s · 0 s')
   expect(brief).not.toMatch(/null/)
 })
 

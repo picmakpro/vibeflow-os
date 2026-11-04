@@ -5,7 +5,7 @@ import type { EngineInterface, RenderInput } from 'claude-code'
 
 import { G } from './ds'
 import { palette } from './tokens'
-import { attention } from './derive'
+import { actionBloquee, attention } from './derive'
 
 export const PANE = 'vf-signal'
 
@@ -30,7 +30,7 @@ export async function band(
   const { Box, Button, Text } = $.ui.resolve(e)
   return (
     <Box>
-      <Text color={p['st-active']}>{G.human} </Text>
+      <Text color={actionBloquee(action) ? p['st-blocked'] : p['st-active']}>{G.human} </Text>
       <Text color={p.text}>{action} </Text>
       <Button key="voir" plain dimColor onPress={() => void $.ui.open({ id: PANE, title: 'vf-signal', focus: true })}>
         voir

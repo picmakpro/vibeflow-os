@@ -30,6 +30,8 @@ export function cut(s: string, n: number): string {
 }
 
 export function age(seconds: number): string {
+  // une horloge décalée (celle du socle d'un autre processus) peut rendre un âge négatif : on n'écrit jamais « -4 s » (N1)
+  seconds = Math.max(0, seconds)
   if (seconds < 90) return `${Math.round(seconds)} s`
   if (seconds < 5400) return `${Math.round(seconds / 60)} min`
   if (seconds < 172800) return `${Math.round(seconds / 3600)} h`
@@ -72,6 +74,16 @@ const STATUT_NOEUD: Record<string, string> = {
   running: 'en cours', inprogress: 'en cours', started: 'en cours', active: 'en cours', done: 'fait', complete: 'fait', completed: 'fait', skipped: 'ignoré', skip: 'ignoré',
 }
 export const statutNoeud = (status: string): string => STATUT_NOEUD[status.trim().toLowerCase().replace(/[-_ ]+/g, '')] ?? status
+
+/** Le statut d'un agent de `$.agent.list()`, dit en français ; un statut hors table reste tel que l'engine l'écrit (R11). */
+const STATUT_AGENT: Record<string, string> = {
+  running: 'en cours', pending: 'en attente', queued: 'en attente', completed: 'terminé', failed: 'en échec', killed: 'arrêté', stopped: 'arrêté', cancelled: 'annulé', canceled: 'annulé',
+}
+export const statutAgent = (status: string): string => STATUT_AGENT[status.trim().toLowerCase()] ?? status
+
+/** Le type d'un travailleur de `who@2` (ou son rôle quand il n'en est qu'un nom de temps), dit en français ; hors table, tel que le socle l'écrit (N3). */
+const TYPE_TRAVAILLEUR: Record<string, string> = { lock: 'verrou', 'dag-node': 'nœud', exec: 'exécution', session: 'session', subagent: 'sous-agent', registered: 'enregistré' }
+export const libelleType = (type: string): string => TYPE_TRAVAILLEUR[type.trim().toLowerCase()] ?? type
 
 /** Le nom d'un arbre de travail : son chemin relatif au dépôt tel quel, le nom de son dossier s'il est hors du dépôt (`../…` ou absolu). */
 export function nomArbre(label: string): string {

@@ -2,9 +2,9 @@
 // active de l'arbre courant, avec le libellé du socle ; les refus. Tout vient de `signal@1` (P68-D-02, P68-D-05, P68-D-23).
 // Mise en page fluide : une ligne par nœud, qui se replie plutôt que de se tronquer.
 
-import { G, age, cut, oneLine } from '../ds'
+import { G, cut, oneLine } from '../ds'
 import { couleurEtat } from '../tokens'
-import { currentNode, isDone, isFailed, isRunning, missionCourante, waves } from '../derive'
+import { currentNode, detailVerrou, isDone, isFailed, isRunning, missionCourante, waves } from '../derive'
 import { ghost, head, row } from './common'
 import type { Ctx } from './common'
 import type { SignalNoeud } from '../../types'
@@ -54,7 +54,7 @@ export function mission(ctx: Ctx): JSX.Element {
         verrous.map(k => (
           <Text color={k.stale ? pal['st-blocked'] : pal.text} wrap="wrap">
             {G.done} {k.ws || 'dépôt'}
-            <Text color={pal['text-2']}> · {cut(k.owner ?? '?', Math.max(12, width - 20))} · {k.scope ?? 'sans portée'}{k.ageS != null ? ` · ${age(k.ageS)}` : ''}</Text>
+            <Text color={pal['text-2']}> · {detailVerrou(s, k, Math.max(12, width - 20)).join(' · ')}</Text>
             {k.stale ? <Text color={pal['st-blocked']}> · périmé</Text> : null}
           </Text>
         ))

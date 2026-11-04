@@ -5,7 +5,7 @@ import { SIGNAL } from './fixture-signal'
 
 // Le bouton « Ouvrir le cockpit » (68-07 ; VFSG-10, P68-D-19, P68-D-34 ; ADR-031) : le lanceur est résolu (pose compte, puis
 // plugin ; jamais sous le lab), l'adresse est prise par un motif fixe, les codes sont traduits ; un appui humain seul le lance.
-// Identifiant du témoin en tête de titre (lu par verdict.sh). `process.run` se simule : on prouve l'argv et l'analyse du stdout.
+// Le lanceur part de la racine du plugin (RV-Q45a). Identifiant du témoin en tête de titre (lu par verdict.sh). `process.run` se simule : on prouve l'argv et l'analyse du stdout.
 
 const PANE = {
   plugin: 'vibeflow',
@@ -40,6 +40,7 @@ function lab(on: On, o: Opts = {}): Lab {
   on('agent.list', () => ({ value: [] }))
   on('session.root', () => ({ value: '/lab' }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000, tokens: 50000, percent: 25 }, rateLimits: [], cost: { usd: 0.42 } } }))
+  on('fs.stat', (_, e) => ({ value: { kind: 'file', size: 1, mtimeMs: 0, isLink: false, realPath: String(e.path) } }))
   on('fs.exists', (_, e) => ({ value: o.poses?.test(String(e.path)) ?? false }))
   on('fs.read', (_, e) => {
     if (String(e.path).endsWith('.vibeflow-installed')) return { value: 'cockpit=v1.2.0\n' }
@@ -83,7 +84,8 @@ test("A1 — lanceur posé dans le lab : jamais lancé (P68-D-34) ; le lanceur d
   await ui.press({ key: 'ouvrir-cockpit' })
   expect(sp.lanceur.length).toBe(1)
   expect(sp.lanceur[0]!.argv).toEqual(['node', `${sp.racinePlugin()}/cockpit/scripts/vf-cockpit.mjs`, 'open', '--lab', '/lab'])
-  expect(sp.lanceur[0]!.cwd).toBe('/lab')
+  expect(sp.lanceur[0]!.cwd).toBe(sp.racinePlugin())
+  expect(sp.lanceur[0]!.cwd).not.toBe('/lab')
   expect(sp.lanceur[0]!.timeoutMs).toBe(60000)
   await ui.unmount()
 })

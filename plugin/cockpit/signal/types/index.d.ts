@@ -85,6 +85,8 @@ export type SignalVerrou = {
   ttl: number | null
   progressAgeS: number | null
   owner: string | null
+  /** L'étape que le verrou porte, quand l'émetteur la donne ; sinon `derive.etapeVerrou` la lit chez le travailleur « lock » du même propriétaire. */
+  step?: string | null
 }
 /** `base` vaut null quand le dépôt n'a ni origin/HEAD ni main (P68-PL-05). */
 export type SignalRetard = { base: string | null; main: number | null; origin: number | null; fetchAgeS: number | null }

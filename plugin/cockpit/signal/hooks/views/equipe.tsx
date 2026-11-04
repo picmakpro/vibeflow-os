@@ -5,7 +5,7 @@
 
 import type { EngineInterface } from 'claude-code'
 
-import { G, age, oneLine } from '../ds'
+import { G, age, libelleType, oneLine } from '../ds'
 import { ghost, head } from './common'
 import type { Ctx } from './common'
 import type { SignalWorker } from '../../types'
@@ -75,7 +75,7 @@ export function equipe($: EngineInterface, ctx: Ctx): JSX.Element {
       <Box flexDirection="column" paddingLeft={depth * 2}>
         <Text color={color} bold={etat === 'actif'} wrap="wrap">
           {depth > 0 ? `${G.branch} ` : ''}
-          {glyph} {w.role || w.kind}
+          {glyph} {libelleType(w.role || w.kind)}
           <Text color={termine ? pal['text-3'] : pal['text-2']} bold={false}> · {oneLine(w.task ?? '')}</Text>
         </Text>
         {compact ? null : (
@@ -142,7 +142,7 @@ export function equipe($: EngineInterface, ctx: Ctx): JSX.Element {
         </Button>
       ) : null}
       {rowsFinis.map(ligne)}
-      {rows.length === 0 && nReplies === 0 ? (
+      {rowsVifs.length === 0 && (compact || nReplies === 0) ? (
         <Box marginTop={compact ? 0 : 1}>{ghost(ui, pal, compact ? 'aucun agent en cours' : 'les agents apparaissent ici dès que le socle en voit')}</Box>
       ) : null}
       {compact ? null : (

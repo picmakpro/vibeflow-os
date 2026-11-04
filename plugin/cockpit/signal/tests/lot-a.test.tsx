@@ -94,12 +94,11 @@ test("MA-D34c — témoin positif : le lanceur du compte est lancé, même avec 
   await ui.unmount()
 })
 
-test("MA-D34d — sans realpath obtenable, la règle se rabat sur le chemin : rien de spellé sous <lab>/ n'est lancé", async ($, on) => {
-  const sp = lab(on, { poses: /^\/lab\/\.claude\/scripts\/vf-cockpit\.mjs$/, sansReel: true })
+test("MA-D34d — sans realpath obtenable, le fichier est refusé (P68-D-37, d.ts de $.fs.stat) : ni le lab ni le compte, le lanceur du plugin", async ($, on) => {
+  const sp = lab(on, { poses: /vf-cockpit\.mjs$/, sansReel: true })
   const ui = await pane($)
   await ui.press({ key: 'ouvrir-cockpit' })
-  expect(sp.lanceur.some(c => c.startsWith('/lab/'))).toBe(false)
-  expect(sp.lanceur.length).toBe(1)
+  expect(sp.lanceur).toEqual([`${sp.racinePlugin()}/cockpit/scripts/vf-cockpit.mjs`])
   await ui.unmount()
 })
 

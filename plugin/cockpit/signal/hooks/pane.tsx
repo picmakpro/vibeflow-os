@@ -9,7 +9,7 @@ import type { EngineInterface, RenderInput } from 'claude-code'
 import { G, STAGES, STAGE_LABEL, VIEWS, VIEW_LABEL } from './ds'
 import { PHRASE_ANCIEN_MOD } from './ancien-mod'
 import { boutons } from './boutons'
-import { attention, verrouPerime } from './derive'
+import { actionBloquee, attention, verrouPerime } from './derive'
 import { enTete, erreurSocle, resumeCompact } from './en-tete'
 import { refreshAll } from './refresh'
 import { palette } from './tokens'
@@ -89,7 +89,7 @@ export async function pane($: EngineInterface, e: PaneInput, blink: boolean, hom
         {tabs}
         {body}
         {action ? (
-          <Text color={pal['st-active']} wrap="wrap">
+          <Text color={actionBloquee(action) ? pal['st-blocked'] : pal['st-active']} wrap="wrap">
             {G.human} toi · {action}
           </Text>
         ) : null}
@@ -121,7 +121,7 @@ export async function pane($: EngineInterface, e: PaneInput, blink: boolean, hom
 
       {/* toi */}
       <Box marginTop={1} flexDirection="column">
-        <Text color={action ? pal['st-active'] : pal['text-3']} wrap="wrap">
+        <Text color={actionBloquee(action) ? pal['st-blocked'] : action ? pal['st-active'] : pal['text-3']} wrap="wrap">
           {G.human} toi · {action ?? 'rien à valider'}
         </Text>
         <Box paddingLeft={2}>{buttons}</Box>

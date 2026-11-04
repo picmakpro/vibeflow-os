@@ -52,6 +52,7 @@ export function labFix(on: On, o: Opts = {}): LabFix {
   on('agent.list', () => ({ value: o.agents ?? [] }))
   on('session.root', () => ({ value: root }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000, tokens: 50000, percent: 25 }, rateLimits: [], cost: { usd: 0.42 } } }))
+  on('fs.stat', (_, e) => ({ value: { kind: 'file', size: 1, mtimeMs: 0, isLink: false, realPath: String(e.path) } }))
   on('fs.exists', (_, e) => ({ value: o.scripts?.test(String(e.path)) ?? false }))
   on('fs.read', (_, e) => {
     if (String(e.path).endsWith('.vibeflow-installed')) return { value: 'cockpit=v1.2.0\n' }

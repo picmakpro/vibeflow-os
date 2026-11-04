@@ -1,10 +1,11 @@
 // L'appel du socle (P68-D-02, P68-D-14) : `node <plugin>/cockpit/scripts/vf-cockpit-signal.mjs <racine de session>`.
-// Aucune option, aucun chemin de node configurable ; le lancement part de la racine du plugin, jamais de la racine du lab.
+// Aucune option, aucun chemin de node configurable ; le lancement part de la racine du plugin, jamais de la racine du lab, avec un PATH assaini (env-sain.ts).
 // Toute panne devient un message en clair, jamais une donnée affichée à moitié.
 
 import type { EngineInterface } from 'claude-code'
 
 import { oneLine } from './ds'
+import { envSain } from './env-sain'
 import type { Signal } from '../types'
 
 const SCHEMA = 'vibeflow/cockpit-signal@1'
@@ -50,7 +51,7 @@ function complet(o: Record<string, unknown>): boolean {
 async function lire($: EngineInterface, pluginRoot: string, root: string): Promise<Lecture> {
   let ran
   try {
-    ran = await $.process.run(argvEmetteur(pluginRoot, root), { cwd: pluginRoot, timeoutMs: 15000 })
+    ran = await $.process.run(argvEmetteur(pluginRoot, root), { cwd: pluginRoot, env: await envSain($, root), timeoutMs: 15000 })
   } catch (err) {
     return { erreur: classerEchec(err, 'émetteur') }
   }

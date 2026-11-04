@@ -4,25 +4,28 @@
 import type { EngineInterface } from 'claude-code'
 
 import { oneLine } from './ds'
+import { envSain } from './env-sain'
 import { classerEchec } from './socle'
 const sansSlash = (c: string) => c.replace(/\/+$/, '')
 const sous = (c: string, dir: string) => c === dir || c.startsWith(`${sansSlash(dir)}/`)
 
-/** Où le chemin atterrit (liens suivis) : `$.fs.stat(…, { resolve })`, sinon le chemin tel qu'écrit (la règle se rabat sur le chemin). */
-async function reel($: EngineInterface, chemin: string): Promise<string> {
+/** Où le chemin atterrit (liens suivis) : `$.fs.stat(…, { resolve })` ; undefined quand il ne mène nulle part (le garde refuse alors, comme le dit le d.ts). */
+async function reel($: EngineInterface, chemin: string): Promise<string | undefined> {
   const st = await $.fs.stat(chemin, { resolve: true }).catch(() => undefined)
-  return st?.realPath ?? chemin
+  return st?.realPath
 }
 
 /**
  * P68-D-34 (comme `realUnder` et la garde T-67-06 du socle) : un fichier du compte ou du plugin n'est pris que si ni son chemin ni
  * son realpath ne tombent sous le lab (`dir`) ; `module` (la racine du plugin, posée par l'installation) n'est refusé que sous la
- * sortie `<lab>/.vibeflow`. Un lien du compte qui mène dans le lab est donc refusé.
+ * sortie `<lab>/.vibeflow`. Un lien du compte qui mène dans le lab est donc refusé. Un fichier dont le realpath manque est refusé aussi
+ * (P68-D-37 : la règle ne se rabat plus sur le chemin écrit) ; la racine du lab, elle, se rabat sur son écriture.
  */
 async function admis($: EngineInterface, chemin: string, root: string, module: boolean): Promise<boolean> {
   const dir = sansSlash(module ? `${root}/.vibeflow` : root)
   const [cible, base] = await Promise.all([reel($, chemin), reel($, dir)])
-  return ![chemin, cible].some(c => sous(c, dir) || sous(c, base))
+  if (cible === undefined) return false
+  return ![chemin, cible].some(c => sous(c, dir) || sous(c, base ?? dir))
 }
 
 /**
@@ -40,10 +43,11 @@ export async function resoudreDriverLock($: EngineInterface, pluginRoot: string,
   return null
 }
 
-/** `driver-lock.sh recover [--ws=<ws>]` depuis la racine de session (exigée par le verrou) ; le code de sortie est dit en toast. */
+/** `driver-lock.sh recover [--ws=<ws>]` depuis la racine de session (exigée par le verrou : le `cwd` y reste), PATH assaini ; le code de sortie est dit en toast. */
 export async function elaguer($: EngineInterface, script: string, ws: string | null, root: string): Promise<void> {
   const argv = ['bash', script, 'recover', ...(ws ? [`--ws=${ws}`] : [])]
-  const ran = await $.process.run(argv, { cwd: root, timeoutMs: 15000 }).catch(() => undefined)
+  const env = await envSain($, root)
+  const ran = await $.process.run(argv, { cwd: root, env, timeoutMs: 15000 }).catch(() => undefined)
   $.ui.toast(ran ? `recover · exit ${ran.exitCode} · ${oneLine(ran.stdout).slice(0, 120)}` : 'recover : driver-lock.sh ne démarre pas')
 }
 
@@ -67,13 +71,13 @@ const CODES: Record<number, string> = {
 }
 
 /**
- * `node <lanceur> open --lab <racine>` depuis la racine de session. Seule l'adresse `http://127.0.0.1:<port>` est prise du
+ * `node <lanceur> open --lab <racine>` depuis la racine du plugin (`--lab` suffit, jamais le lab comme `cwd`), PATH assaini. Seule l'adresse `http://127.0.0.1:<port>` est prise du
  * stdout (motif fixe) : tout le reste de la sortie n'est jamais affiché. Geste humain seulement (ADR-031).
  */
-export async function ouvrirCockpit($: EngineInterface, lanceur: string, root: string): Promise<{ url: string } | { erreur: string }> {
+export async function ouvrirCockpit($: EngineInterface, lanceur: string, root: string, pluginRoot: string): Promise<{ url: string } | { erreur: string }> {
   let ran
   try {
-    ran = await $.process.run(['node', lanceur, 'open', '--lab', root], { cwd: root, timeoutMs: 60000 })
+    ran = await $.process.run(['node', lanceur, 'open', '--lab', root], { cwd: sansSlash(pluginRoot), env: await envSain($, root), timeoutMs: 60000 })
   } catch (err) {
     return { erreur: classerEchec(err, 'lanceur') }
   }

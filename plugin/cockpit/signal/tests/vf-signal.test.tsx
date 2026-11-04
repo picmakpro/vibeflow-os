@@ -63,6 +63,7 @@ function lab(on: On, o: Opts = {}): Lab {
   on('session.root', () => ({ value: '/lab' }))
   on('ui.toast', () => ({ value: undefined }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000, tokens: 50000, percent: 25 }, rateLimits: [], cost: { usd: 0.42 } } }))
+  on('fs.stat', (_, e) => ({ value: { kind: 'file', size: 1, mtimeMs: 0, isLink: false, realPath: String(e.path) } }))
   on('fs.exists', (_, e) => {
     const p = String(e.path)
     sp.lus.push(p)

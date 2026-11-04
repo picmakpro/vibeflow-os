@@ -22,7 +22,7 @@ export async function boutons($: EngineInterface, ui: UI, { stale, l, u, home, r
   const script = stale && root ? await resoudreDriverLock($, $.plugin.root, root, home) : null
   const ws = stale?.ws ?? null
   const ouvrir = async () => {
-    const res = root ? await ouvrirCockpit($, await resoudreLanceur($, $.plugin.root, root, home), root) : { erreur: 'cockpit : racine de session inconnue' }
+    const res = root ? await ouvrirCockpit($, await resoudreLanceur($, $.plugin.root, root, home), root, $.plugin.root) : { erreur: 'cockpit : racine de session inconnue' }
     await update($, cockpitUrl, () => ('url' in res ? res.url : null))
     await update($, cockpitErreur, () => ('erreur' in res ? res.erreur : null))
     await $.ui.toast('url' in res ? `cockpit : ${res.url}` : res.erreur)
@@ -50,9 +50,11 @@ export async function boutons($: EngineInterface, ui: UI, { stale, l, u, home, r
             plain
             dimColor
             onPress={press =>
-              void $.ui
-                .copy({ text: `bash ${cite(script ?? 'driver-lock.sh')} takeover --owner=<id>${ws ? ` ${cite(`--ws=${ws}`)}` : ''}`, surface: press.surface })
-                .then(() => $.ui.toast('commande takeover copiée'))
+              script
+                ? void $.ui
+                    .copy({ text: `bash ${cite(script)} takeover --owner=<id>${ws ? ` ${cite(`--ws=${ws}`)}` : ''}`, surface: press.surface })
+                    .then(() => $.ui.toast('commande takeover copiée'))
+                : void $.ui.toast('takeover : driver-lock.sh introuvable hors du lab, rien copié')
             }
           >
             copier takeover
