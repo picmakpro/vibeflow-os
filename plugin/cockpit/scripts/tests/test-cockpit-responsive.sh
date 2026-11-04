@@ -294,14 +294,14 @@ const n=h.replace(/<script>\/\* ui\/01-vf-responsive\.js \*\/[\s\S]*?<\/script>/
 srv "$LM/.vibeflow/cockpit"; RM="$(mes "http://127.0.0.1:$SRV_PORT/project.html" 1440 - )"; unsrv
 assert_has "R4.1 — témoin rouge : sans 01-vf-responsive.js, l'en-tête à 1 440 px est signalé" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" 'j.mesures["1440"].v.join(" | ")')" "en-tête"
 
-# R4.2 — témoin rouge de R-1 (recalé en 69-05 : trois onglets, borne de 280 px, mutant à 280 + 36 = 316 px, même marge qu'avant : 264 -> 300) : la borne d'avant (colonne gauche de 316 px) fait sortir le dernier bouton de l'onglet Code à 1 024 px
+# R4.2 — témoin rouge de R-1 (recalculé en 70-04, P70-D-16 et P70-D-22 : borne de 342 px mesurée, badge « au travail » réduit à son point ; la place libre à 1 024 px va jusqu'à une borne de 380 px, mesurée : le mutant à 342 + 58 = 400 px reste rouge avec de la marge, alors que 342 + 36 tenait encore) : une colonne gauche de 400 px fait sortir le dernier bouton de l'onglet Code à 1 024 px
 LM2="$WORK/lab-mutant2"; mkdir -p "$LM2/.planning/missions" "$LM2/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$LM2/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$LM2/.planning/missions/"
 agent_actif "$LM2"   # sans agent actif le badge dit « Personne », plus étroit : la mesure ne verrait plus le même en-tête
 node -e "
 const fs=require('fs');const p='$LM2/.vibeflow/cockpit/index.html';const h=fs.readFileSync(p,'utf8');
-const n=h.replace('header .hl { flex: 1 1 0; min-width: 280px; }','header .hl { flex: 1 1 0; min-width: 316px; }');if(n===h){console.error('mutant : borne de 280 px introuvable');process.exit(1)}fs.writeFileSync(p,n)" || FAIL=$((FAIL+1))
+const n=h.replace('header .hl { flex: 1 1 0; min-width: 342px; }','header .hl { flex: 1 1 0; min-width: 400px; }');if(n===h){console.error('mutant : borne de 342 px introuvable');process.exit(1)}fs.writeFileSync(p,n)" || FAIL=$((FAIL+1))
 srv "$LM2/.vibeflow/cockpit"; RM2="$(RESP_INJECT="$INJ_CODE" mes "http://127.0.0.1:$SRV_PORT/index.html" 1024 - )"; unsrv
-assert_has "R4.2 — témoin rouge : avec la colonne gauche à 316 px, un bouton de l'en-tête sort de la fenêtre à 1 024 px (onglet Code)" "$(printf '%s' "$RM2" | node "$AUX/ev.mjs" 'j.mesures["1024"].v.join(" | ")')" "sort de la fenêtre"
+assert_has "R4.2 — témoin rouge : avec la colonne gauche à 400 px, un bouton de l'en-tête sort de la fenêtre à 1 024 px (onglet Code)" "$(printf '%s' "$RM2" | node "$AUX/ev.mjs" 'j.mesures["1024"].v.join(" | ")')" "sort de la fenêtre"
 
 # R8 — témoin indépendant de la police ET de la plateforme : Chrome headless sous Linux n'a aucun périphérique de pointage (`pointer: none`) ; la mise en page
 # « souris » du cockpit était écrite `(pointer: fine)` et ne s'appliquait pas là (CI, run 41370886002, 8 rouges à 1 024 px) alors que macOS (`fine`) passait. Le même

@@ -31,7 +31,7 @@
       #hdr-ext > button:not(#vf-lock), #theme-toggle, #btn-health, #flows-btn, #filters-btn, #btn-panel { display: none !important; }
       #vf-plus { display: inline-flex; position: relative; }
       #vf-plus .badge, .vf-pl-i .badge { min-width: 16px; height: 16px; border-radius: 999px; background: var(--on); color: var(--on-text); font-size: 10px; font-weight: 600; display: grid; place-items: center; padding: 0 4px; }
-      #vf-plus .badge { position: absolute; top: 4px; right: 2px; }
+      #vf-plus .badge { position: absolute; top: 8px; right: 8px; min-width: 0; width: 8px; height: 8px; padding: 0; }
       #vf-plus-menu { display: block; position: fixed; z-index: 40; top: calc(var(--hh, 56px) + 4px); left: 8px; right: 8px; max-height: 60vh; overflow: auto; padding: 6px; border-radius: 18px; background: var(--menu-solid); box-shadow: var(--shadow-float); }
       .vf-pl-i { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: none; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
       .vf-pl-i:hover { background: rgba(var(--ink), .07); }
@@ -41,6 +41,8 @@
   document.head.appendChild(style);
 
   const lib = (b) => (b.querySelector('.bl')?.textContent || b.getAttribute('aria-label') || b.getAttribute('title') || '').trim();
+  // Q11 (même arbitrage) : le thème dit son état seulement (« Thème : Auto »), pas l'infobulle entière (« … (suit votre appareil). Appuyer pour clair. »)
+  const court = (b) => b.id === 'theme-toggle' ? lib(b).split(/[(.]/)[0].trim() : lib(b);
   const pastille = (b) => (b.querySelector('.badge')?.textContent || '').trim();
   const actions = () => [...hr.querySelectorAll('button')].filter((b) => !['vf-lock', 'vf-plus', 'btn-panel'].includes(b.id) && !b.hidden && !b.closest('.menu'));
 
@@ -51,13 +53,11 @@
   for (const cx of [5, 12, 19]) { const c = document.createElementNS(NS, 'circle'); c.setAttribute('cx', cx); c.setAttribute('cy', 12); c.setAttribute('r', 1.6); svg.appendChild(c); }
   plus.appendChild(svg); hr.appendChild(plus);
 
-  // pastille du « ⋯ » : la somme des pastilles numériques des actions, « • » si l'une n'est pas un nombre ; absente sans pastille
+  // pastille du « ⋯ » (Q8, « Tout selon les recos (Recommandé) », AskUserQuestion session principale, 2026-11-04) : un simple point de présence, jamais une somme ; les comptes restent sur les entrées du menu
   const majPastille = () => {
-    const ps = actions().map(pastille).filter(Boolean); let badge = plus.querySelector('.badge');
-    const v = !ps.length ? '' : ps.every((p) => /^\d+$/.test(p)) ? String(ps.reduce((s, p) => s + Number(p), 0)) : '•';
-    if (!v) { badge?.remove(); return; }
-    if (!badge) { badge = document.createElement('span'); badge.className = 'badge'; plus.appendChild(badge); }
-    if (badge.textContent !== v) badge.textContent = v;
+    const a = actions().some((b) => pastille(b)); let badge = plus.querySelector('.badge');
+    if (!a) { badge?.remove(); return; }
+    if (!badge) { badge = document.createElement('span'); badge.className = 'badge'; badge.setAttribute('aria-hidden', 'true'); plus.appendChild(badge); }
   };
   new MutationObserver((ms) => { if (ms.some((m) => !plus.contains(m.target))) majPastille(); }).observe(hr, { childList: true, subtree: true, characterData: true });
   majPastille();
@@ -69,7 +69,7 @@
     menu = document.createElement('div'); menu.id = 'vf-plus-menu'; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', "Plus d'actions");
     for (const src of actions()) {
       const it = document.createElement('button'); it.type = 'button'; it.className = 'vf-pl-i'; it.setAttribute('role', 'menuitem');
-      const t = document.createElement('span'); t.className = 'vf-pl-t'; t.textContent = lib(src); it.appendChild(t);
+      const t = document.createElement('span'); t.className = 'vf-pl-t'; t.textContent = court(src); it.appendChild(t);
       const p = pastille(src); if (p) { const b = document.createElement('span'); b.className = 'badge'; b.textContent = p; it.appendChild(b); }
       it.onclick = (ev) => { ev.stopPropagation(); fermer(false); src.click(); };
       menu.appendChild(it);
@@ -90,9 +90,15 @@
   const scene = () => { if (zoom && stage && phone.matches && zoom.parentNode !== stage) stage.insertBefore(zoom, document.getElementById('flowbar')); };
   phone.addEventListener('change', () => { if (!phone.matches) fermer(false); scene(); }); scene();
 
-  // pile du zoom : la barre de question change de hauteur (invite, avertissement) ; on relit sa hauteur
+  // pile du zoom : la barre de question change de hauteur (invite, avertissement) et la visite guidée se pose au même endroit : on relit leurs hauteurs, le zoom reste au-dessus des deux
   const ask = document.getElementById('ask');
-  if (ask) { const h = () => document.documentElement.style.setProperty('--vf-ask-h', ask.offsetHeight + 8 + 'px'); h(); if (window.ResizeObserver) new ResizeObserver(h).observe(ask); window.addEventListener('resize', h); }
+  if (ask) { // la visite (#tour) est créée à la volée : on la relie quand elle entre dans la page
+    const h = () => { const v = document.getElementById('tour'); document.documentElement.style.setProperty('--vf-ask-h', ask.offsetHeight + 8 + (v && v.offsetHeight ? v.offsetHeight + 8 : 0) + 'px'); };
+    let ro = null, vu = null;
+    const lier = () => { const v = document.getElementById('tour'); if (ro && v !== vu) { vu = v; ro.disconnect(); ro.observe(ask); if (v) ro.observe(v); } h(); };
+    if (window.ResizeObserver) ro = new ResizeObserver(h);
+    new MutationObserver(lier).observe(document.body, { childList: true }); lier(); window.addEventListener('resize', h);
+  }
 
   // tiroir : #btn-panel (masqué) reste le seul chemin d'ouverture et de fermeture
   const btn = document.getElementById('btn-panel'), panel = document.getElementById('panel'), ctx = document.getElementById('context');

@@ -22,7 +22,7 @@
     .brand .mark, :root[data-theme="light"] .brand .mark, :root[data-theme="light"] #madewith .mark { filter: none !important; }
     @media (min-width: 1280px), (min-width: 1000px) and (not (pointer: coarse)) {
       header { display: flex; grid-template-columns: none; }
-      header .hl { flex: 1 1 0; min-width: 280px; } /* marque 84 + onglets 143 (trois onglets resserrés sous 1 280 px, 69-05) + remonter 36 + marges : le plus étroit qui ne rogne pas ; 300 faisait sortir de 12 px le dernier bouton à 1 024 px (onglet Code avec Travail récent et Écrans) */
+      header .hl { flex: 1 1 0; min-width: 342px; } /* P70-D-16 : marque 84 + écart 4 + marge des onglets 14 + onglets 200 (13 px, piste à 3 px, padding 13 px : 122 de texte + 6 x 13) + écart 4 + remonter 36 = 342 : le plus étroit qui ne rogne ni les onglets ni « Remonter » (mesuré dans Chrome à 1 024 px, onglet Code avec Travail récent et Écrans, badge réduit à son point par P70-D-22) */
       header .hc { flex: 0 1 400px; min-width: 200px; justify-content: stretch; }
       header .hr { flex: 1 1 0; min-width: min-content; }
       header .brand { flex: 0 6 auto; min-width: 84px; }
@@ -37,6 +37,10 @@
       .hr .btn:not(.icon):not(#vf-lock) { width: 36px; padding: 0; justify-content: center; }
       .hr .btn:not(#vf-lock) .bl { display: none; }
       .hr .btn .badge { position: absolute; top: 2px; right: 0; }
+    }
+    @media (min-width: 701px) and (max-width: 1599px) { /* P70-D-22 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-04) : le badge « au travail » se réduit à son point (arbitré de 701 à 1 279 px ; étendu jusqu'à 1 599 px, le seuil où les autres boutons passent déjà en icône : à 1 440 px les onglets à 13 px laissaient le fil d'Ariane rogné de 44 px, O2b.6) et libère 92 px pour les onglets à 13 px */
+      #vf-lock { width: 36px; padding: 0; justify-content: center; }
+      #vf-lock .bl { display: none; }
     }
     @media (min-width: 1000px) and (max-width: 1279px) {
       #zoom { left: auto; right: calc(var(--pw) + 16px); bottom: auto; top: calc(var(--hh, 64px) + 8px); flex-direction: column; border-radius: 26px; }

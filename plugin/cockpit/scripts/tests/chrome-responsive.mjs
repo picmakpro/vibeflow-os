@@ -69,6 +69,7 @@ const MESURE = `(() => {
   }
   // --- 70-04 (UIFN-01 à UIFN-03, P70-D-16) : mesures neuves, rangées dans m seulement (jamais dans v : R1 à R8 gardent leur sens)
   const lib = (b) => (b.querySelector('.bl')?.textContent || b.getAttribute('aria-label') || b.getAttribute('title') || '').trim();
+  const court = (b) => b.id === 'theme-toggle' ? lib(b).split(/[(.]/)[0].trim() : lib(b); // Q11 : le menu « ⋯ » abrège le libellé du thème à son état (« Thème : Auto »)
   const pastille = (b) => (b.querySelector('.badge')?.textContent || '').trim();
   const arr = (r) => [r.left, r.top, r.width, r.height].map(Math.round);
   const act = [...hd.querySelectorAll('.hr button')].filter((b) => !['vf-lock', 'vf-plus', 'btn-panel'].includes(b.id) && !b.hidden);
@@ -76,8 +77,8 @@ const MESURE = `(() => {
   const centres = [...hd.querySelectorAll('.brand, .vf-tabs, #btn-up, #search-btn, #zoom, .hr button')].filter(vis).map((e) => rec(e).top + rec(e).height / 2).sort((a, b) => a - b);
   m.rangees = 0; for (let i = 0, d = -1e9; i < centres.length; i++) if (centres[i] - d > 4) { m.rangees++; d = centres[i]; }
   m.actionsRangee = act.filter(vis).map((b) => b.id || b.className).join(',');
-  const pl = document.querySelector('#vf-plus'); m.plus = !!(pl && vis(pl)); m.plusPastille = pl ? pastille(pl) : '';
-  m.sources = act.map((b) => ({ id: b.id, t: lib(b), b: pastille(b) }));
+  const pl = document.querySelector('#vf-plus'); m.plus = !!(pl && vis(pl)); m.plusPastille = pl && pl.querySelector('.badge') ? 'point' : ''; // Q8 : un point de présence, sans compte
+  m.sources = act.map((b) => ({ id: b.id, t: court(b), b: pastille(b) }));
   const mn = document.querySelector('#vf-plus-menu');
   m.menu = mn && vis(mn) ? [...mn.querySelectorAll('[role="menuitem"]')].filter(vis).map((e) => { const c = e.cloneNode(true); c.querySelector('.badge')?.remove(); return { t: c.textContent.trim(), b: pastille(e) }; }) : null;
   const tabs = [...hd.querySelectorAll('.vf-tabs a')], piste = hd.querySelector('.vf-tabs');

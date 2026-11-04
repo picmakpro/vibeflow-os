@@ -70,3 +70,22 @@ Le lab de 60 caractères est un seul mot à traits d'union plus large que sa bo�
 `ui/02-vf-telephone.js` : une rangée (logo, onglets à 13 px / piste 3 px / padding 8 px, recherche, point « au travail », « ⋯ »), menu à libellés, pastilles reportées, zoom retourné dans la scène (provisoirement à gauche, au-dessus de la barre de question), bouton Détail masqué. Au-dessus de 700 px rien ne change. Dernière suite complète (avant le réglage provisoire du zoom) : 211 PASS / 25 FAIL ; R3 à 390 px et R3 à 800 px re-mesurés verts après le réglage ; `test-cockpit-vendor.sh` et `test-cockpit-marque-blanche.sh` verts ; `test-cockpit-chrome-fr.sh` 58/1, seul F12.2 rouge (70-06).
 
 Verts nouveaux : R13.1, R13.2, R13.3, R13.4 à 390 px, R14.1, R14.5, R15.1 (et R14.2 après le réglage du zoom). Encore rouges : R13.4 à 1 024 et 1 440 px (6 lignes : 12 px / 2 px, tâche 2 en attente de la piste 1 024 px) ; R14.3 (9 lignes : `aria-label` du zoom, 70-05) ; R15.3, R15.4, R15.5 (poignée, croix, tap du titre, 70-05) ; R16 « trait » (2 lignes, 70-05).
+
+## Suite : arbitrage 1 024 px
+
+Arbitrage Samuel, « Badge réduit à son point (Recommandé) », AskUserQuestion session principale, 2026-11-04 (P70-D-22) ; Q8 et Q11 : « Tout selon les recos (Recommandé) », même canal, même date.
+
+Rouge avant : R13.4 à 1 024 et 1 440 px (6 lignes, `3|12px|2px/2px`), état de HEAD `b0182676` (suite rejouée sur une copie de ce commit : 255 PASS / 6 FAIL, tous R13.4).
+
+Recalcul P70-D-16, après P70-D-22 (badge « au travail » réduit à son point : 128 px -> 36 px, colonne de droite 496,4 -> 404,4 px) :
+- borne `header .hl` = marque 84 + écart 4 + marge des onglets 14 + onglets 200 (122 de texte + 6 x 13) + écart 4 + « Remonter » 36 = **342 px** (onglets à 13 px, piste 3 px, padding d'onglet 13 px : la valeur d'avant la 69, aucun resserrement) ;
+- mesure à 1 024 px, lab « long », onglet Code avec Travail récent et Écrans : aucune violation de 342 à 380 px, `#btn-panel` sort de la fenêtre à 384 px (992..1028) et 390 px (998..1034). La place libre va donc jusqu'à 380 px ;
+- mutant R4.2 : 342 + 36 = 378 px tenait encore (la marge de 38 px vient du badge réduit) ; le mutant devient 342 + 58 = **400 px**, rouge à 1 024 px.
+
+Écart à l'arbitrage, à confirmer par le manager : le badge réduit à son point est étendu de 701-1 279 px à 701-1 599 px (le seuil où les autres boutons passent déjà en icône). À 1 440 px, avec les onglets à 13 px, O2b.6 rougissait (fil d'Ariane rogné de 44 px : « dev-orchestrator » -30, nom du projet 60>46) alors que la recherche était déjà à son plancher de 200 px ; le point libère 92 px. Padding d'onglet à 8 px ne rendait que 30 px.
+
+Vert après : R13.4 sur les trois onglets à 390, 1 024 et 1 440 px ; R4.2 (borne 342, mutant 400) ; R1 à R12 ; O2b. Dernière suite complète : 261 PASS / 0 FAIL. `test-cockpit-vendor.sh` et `test-cockpit-marque-blanche.sh` : exit 0.
+
+Q8 : la pastille du « ⋯ » est un simple point de présence (plus la somme) ; les comptes restent sur les entrées. Q11 : l'entrée du thème dit « Thème : Auto » (texte avant la première parenthèse ou le premier point). R13.3 mesure ces formes (le libellé attendu du thème est abrégé de la même façon ; le point du « ⋯ » est un point, plus un compte) : l'assertion garde sa force (une entrée par action, libellé égal, pastille reportée).
+
+Aussi : à 390 px, la visite guidée d'office (`#tour`, créée à la volée) recouvrait la pile du zoom (R3 rouge de façon intermittente sous charge : zoom sur la visite, puis carte hors de la zone libre). `02-vf-telephone.js` relit maintenant la hauteur de la visite en plus de celle de la barre de question : le zoom reste au-dessus des deux. Intermittence : sur 4 suites complètes de cette partie, R3 a rougi 3 fois (deux causes) avant ce réglage, puis une fois (carte hors de la zone libre, la visite ouverte) ; la dernière est à 0 FAIL. La copie de `b0182676` l'a passé une fois : à surveiller.
