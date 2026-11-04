@@ -114,15 +114,22 @@
       <button type="button" data-vf-doing="${h(w.id)}">Voir la dernière commande</button><div class="vf-doing" hidden></div>
       <button type="button" data-vf-transcript="${h(w.id)}">Lire le transcript</button></div>`;
   });
+  // Entrée sur un de ces boutons : le viewer l'écoute aussi sur `window` (raccourci « ouvrir le nœud sélectionné »), descend dans le nœud et redessine le panneau ;
+  // le bouton quitte le document avant que son clic ait lieu, le focus tombe sur le corps de la page (UIFN-12). L'évènement s'arrête au document, le clic du bouton reste.
+  document.addEventListener('keydown', (ev) => {
+    if (ev.keyCode === 13 && ev.target.closest?.('#panel [data-vf-transcript], #panel [data-vf-doing]')) ev.stopPropagation();
+  });
   // lecture à la demande : requête authentifiée, texte seulement (createElement + textContent dans le rendu)
   document.addEventListener('click', async (ev) => {
     const b = ev.target.closest?.('[data-vf-transcript]');
     if (!b) return;
     const id = b.dataset.vfTranscript;
-    b.disabled = true;
+    if (b.getAttribute('aria-disabled') === 'true') return; // lecture en cours : les clics répétés sont ignorés
+    b.setAttribute('aria-disabled', 'true'); // jamais `disabled` : un bouton désactivé perd le focus clavier (UIFN-12)
     let d = null;
     try { const r = SRV && SRV.token ? await fetch('/api/vf/transcript?id=' + encodeURIComponent(id), { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' }) : null; d = r && r.ok ? await r.json() : null; } catch {}
     lu = { id, noeuds: [...R().transcript(d, document).childNodes] }; marque(id);
-    for (const x of boutons()) if (x.dataset.vfTranscript === id) { zoneDe(x).replaceChildren(...lu.noeuds); x.disabled = false; }
+    for (const x of boutons()) if (x.dataset.vfTranscript === id) { zoneDe(x).replaceChildren(...lu.noeuds); x.removeAttribute('aria-disabled'); }
+    b.removeAttribute('aria-disabled');
   });
 })();

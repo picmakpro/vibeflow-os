@@ -24,3 +24,11 @@ Lecture :
 - le transcript n'est jamais lu (`lu=false`) : le clic n'a pas eu lieu, le gestionnaire de clic de `72-vf-equipe.js` n'a même pas été atteint ;
 - le fragment `v=` change : c'est le raccourci global du viewer (`window` `keydown`, touche Entrée avec un nœud sélectionné : `open(state.selected)`, moteur vendorisé) qui reçoit l'Entrée du bouton, descend dans le nœud sélectionné et redessine le panneau ;
 - ce n'est donc pas non plus le redessin de `70-vf-live.js:78` (aucun `who` n'est livré dans ce scénario) : la condition d'arrêt du plan (« ne pas modifier `70-vf-live.js` ») ne s'applique pas, la correction reste dans `72-vf-equipe.js`.
+
+### Correctif (tâche 2) : deux causes en série, deux gestes dans `72-vf-equipe.js`
+
+1. Le raccourci global du viewer : un gestionnaire `keydown` du document, qui n'agit que sur les boutons « Lire le transcript » et « Voir la dernière commande » du panneau, arrête l'évènement avant `window` ; le clic du bouton, lui, a lieu (action par défaut). Après ce seul geste : `lu=true` mais `actif=BODY`. Relevé : `["BODY", disabled=true, actif===bouton=false, bouton dans le document=true]` puis `["BODY", false, false, true]`.
+2. `b.disabled = true` (`72-vf-equipe.js:122` sur 794c6dba) : un bouton focalisé qui devient désactivé perd le focus (le navigateur le rend au corps de la page). Remplacé par `aria-disabled="true"` plus une garde « lecture en cours » qui ignore les clics répétés.
+
+Après les deux gestes : EK1 vert (`lu=true | actif=dans le tiroir`), relevé `["BUTTON", false, true, true]`.
+Corollaire : la cause du focus n'est pas le redessin de `70-vf-live.js:78`, ce fichier n'est pas touché.
