@@ -34,4 +34,28 @@ Au premier affichage de l'onglet Équipe le groupe `#viewport` garde `translate(
 
 ## Après
 
-(à compléter à la tâche 2)
+- Base : `c8f1d90d`. Un second lancement de `test-cockpit-responsive.sh` (90 s) : 255 PASS / 6 FAIL ; les 6 FAIL sont les R13.4 à 1 024 et 1 440 px sur les trois onglets (hors plan, arbitrage de Samuel en attente). R17.0, R17.1, R17.1b, R17.2, R18, R19.1, R19.2 et R20 verts.
+- Une retouche de `72-vf-equipe.js` (`SC.fit?.(false)` au lieu de `SC.fit(false)`, voir plus bas) est postérieure à ce lancement ; le comportement en navigateur est identique, vérifié en rejouant seulement la section R17 à R20 (25 PASS / 0 FAIL, hors budget des deux lancements complets).
+
+| Mesure | Avant | Après |
+|---|---|---|
+| Zoom Équipe / 768 px | colonne 52x144 à x=308, y=108 | rangée 144x52 à x=16, y=412 (écart au bas 16) |
+| Zoom Équipe / 1 024 px | colonne 42x114 à x=574, y=72 | rangée 114x42 à x=16, y=710 (écart au bas 16) |
+| Zoom Équipe / 1 440 px | rangée 114x42 à x=16, y=842 | inchangé |
+| Zoom Code et Projet / 768, 1 024, 1 440 px | `308,108,52,144` / `574,72,42,114` / `16,842,114,42` | inchangés (R17.2) |
+| Cartes recouvertes par le zoom, Équipe / 768 px | 1 | 0 |
+| Aire titre / première carte, 390 px | 22752 px² | 0 |
+| Aire titre / première carte, 768 px | 17408 px² | 0 |
+| Aire titre / première carte, 1 024 px | 26100 px² | 0 |
+| Aire titre / première carte, 1 440 px | 26100 px² | 0 |
+| Première carte à 390 px (haut) | y=32 (sous l'en-tête) | y=427 |
+
+Autres suites : `test-cockpit-marque-blanche.sh` 30/0, `test-cockpit-vendor.sh` 78/0, `test-cockpit-equipe.sh` 134/0 (après la retouche ci-dessous).
+
+## Choix de réalisation
+
+- Zoom : `body.vf-tab-equipe #zoom` (spécificité supérieure aux règles `#zoom` du viewer et de `01-vf-responsive.js`) sous `@media (min-width: 701px)`. Le marqueur `vf-tab-<onglet>` est posé sur le corps de page par `00-vibeflow.js`. Sous 701 px, rien n'est posé : la pile verticale de 70-05 reste seule.
+- Titre (défaut E) : `SC.fit(false)` dans `arrivee()` de `72-vf-equipe.js`, une fois par page, avant la révélation éventuelle d'une carte visée. Aucune marge de scène ni variable CSS : la cause est un cadrage jamais exécuté, pas une hauteur de titre ignorée (la marge aurait déplacé un décor encore sous l'en-tête).
+- `SC.fit?.(...)` : la première version appelait `SC.fit(false)` ; le faux viewer du harnais hors navigateur de `test-cockpit-equipe.sh` (EUI2.10, 2.14, 2.18c, 2.26) n'expose pas `fit` et la suite rougissait. Cette suite n'est pas dans les fichiers du plan : le correctif est resté dans le code VibeFlow.
+- Fil d'Ariane / recherche : aucun changement (R18, non reproduit).
+- `viewer.html` et `VENDORED.txt` non touchés (`git diff --name-only ca05484f..HEAD`).
