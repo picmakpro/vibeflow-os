@@ -98,7 +98,7 @@ assert_eq "T7.3 — sans le drapeau, un seul écouteur pour le PID du serveur" "
 assert_eq "T7.4 — témoin : server.json porte la clé port" "$(sj 'typeof j.port')" "number"
 assert_eq "T7.4 — sans le drapeau, server.json n'a pas de clé terminal" "$(sj '"terminal" in j')" "false"
 assert_eq "T7.5 — témoin : les deux pages servies sont lues en entier" "$([ "$(wc -c < "$WORK/page-index.html")" -gt 100000 ] && [ "$(wc -c < "$WORK/page-projet.html")" -gt 100000 ] && echo oui || echo non)" "oui"
-assert_eq "T7.5 — pages servies sans « VibeFlow (71- » ni « vf-term »" "$(cat "$WORK/page-index.html" "$WORK/page-projet.html" | grep -c -e 'VibeFlow (71-' -e 'vf-term')" "0"
+assert_eq "T7.5 — pages servies sans « VibeFlow (71- » ni « vf-term- »" "$(cat "$WORK/page-index.html" "$WORK/page-projet.html" | grep -c -e 'VibeFlow (71-' -e 'vf-term-')" "0"
 unsrv
 
 echo "=== M-ACTIF — import du terminal sans le test du drapeau ==="

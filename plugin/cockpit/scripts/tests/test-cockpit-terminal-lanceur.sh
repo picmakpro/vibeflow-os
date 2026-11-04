@@ -471,9 +471,11 @@ else assert_eq "M-LEURRE-TERMINAL — mutant sans effet (cible absente ou inchan
 
 echo "=== M-OUVRE-NOMNU / M-PS-NOMNU / M-GIT-NOMNU / M-WHO-NOMNU / M-SERVE-OUVRE / M-PS-FINAL — mutants de N2 : résolution par nom nu ==="
 # nom|fichier|sed|marqueur attendu|PATH ('.' = « .: » en tête ; 'min' = PATH sans binaire du système, élément vide final)
-for spec in "ouvrenomnu|vf-cockpit.mjs|s/spawn(exe, op\[1\]/spawn(op[0], op[1]/|open|." "psnomnu|vf-cockpit.mjs|s/execFileSync(ps, /execFileSync('ps', /|ps|." "gitnomnu|vf-cockpit-planning.mjs|s/execFileSync(git, /execFileSync('git', /|git|." "whonomnu|vf-cockpit-who.mjs|s/execFileSync(exe, args/execFileSync(cmd, args/|git|." "servopen|vf-cockpit.mjs|s/^  args.push('--no-open');.*$/  if (o.avecQ) args.push('--no-open'); else if (o.noOpen) args.push('--no-open');/|open|." "psfinal|vf-cockpit.mjs|s/const ps = resoudreBinaire('ps');/const ps = 'ps';/|ps|min"; do
+for spec in "ouvrenomnu|vf-cockpit.mjs|s/spawn(exe, op\[1\]/spawn(op[0], op[1]/|open|." "psnomnu|vf-cockpit.mjs|s/execFileSync(ps, /execFileSync('ps', /;s/, env: envEnfant(lab) })/ })/|ps|." "gitnomnu|vf-cockpit-planning.mjs|s/timeout: 10000, env: envEnfant(root) })/timeout: 10000 })/|git|." "whonomnu|vf-cockpit-who.mjs|s/timeout: 10000, env: envEnfant(lab) })/timeout: 10000 })/|git|." "servopen|vf-cockpit.mjs|s/^  args.push('--no-open');.*$/  if (o.avecQ) args.push('--no-open'); else if (o.noOpen) args.push('--no-open');/;s/{ \.\.\.envEnfant(lab), VF_COCKPIT_ENGINE_DIR/{ ...process.env, VF_COCKPIT_ENGINE_DIR/|open|." "psfinal|vf-cockpit.mjs|s/const ps = resoudreBinaire('ps');/const ps = 'ps';/;s/, env: envEnfant(lab) })/ })/|ps|min"; do
   IFS='|' read -r mn mf msed mk mp <<< "$spec"
   md="$WORK/mut-$mn"; rm -rf "$md"; mkdir -p "$md"; cp -R "$MODULE/." "$md/"; cp "$md/scripts/$mf" "$md/scripts/$mf.orig"; sed -i.bak "$msed" "$md/scripts/$mf"
+  if [ "$mn" = whonomnu ]; then sed -i.bak 's/{ \.\.\.envEnfant(lab), VF_COCKPIT_ENGINE_DIR/{ ...process.env, VF_COCKPIT_ENGINE_DIR/' "$md/scripts/vf-cockpit.mjs"; rm -f "$md/scripts/vf-cockpit.mjs.bak"; fi
+  if [ "$mn" = servopen ] || [ "$mn" = whonomnu ]; then sed -i.bak 's/process\.env\.PATH = (await import(.*assainirPath(process\.env\.PATH, root);//' "$md/skills/cockpit-moteur/assets/serve.mjs"; rm -f "$md/skills/cockpit-moteur/assets/serve.mjs.bak"; fi
   if ! cmp -s "$md/scripts/$mf" "$md/scripts/$mf.orig"; then
     rm -f "$md/scripts/$mf.orig" "$md/scripts/$mf.bak"; leurres_lab
     if [ "$mp" = min ]; then pm="$WORK/minbin:$WORK/fauxbin:"; else pm=".:$PBASE"; fi

@@ -12,7 +12,7 @@
  const here = path.dirname(fileURLToPath(import.meta.url));
 -const root = path.resolve(here, '..');
 +const root = path.resolve(here, '..', '..'); // vibeflow P10 : la sortie est sous <lab>/.vibeflow/cockpit
-+if (!fs.existsSync(path.join(here, 'vf-cockpit-env.mjs'))) { console.error('vf-cockpit : vf-cockpit-env.mjs est absent : refus de lancer des outils sans PATH assaini. Relancer « vf-cockpit build ».'); process.exit(1); } process.env.PATH = (await import(new URL('./vf-cockpit-env.mjs', import.meta.url))).assainirPath(process.env.PATH, root); // vibeflow P26 : jamais d'outil du lab (H-1) ; ce processus seul, pas le shell
++if (!fs.existsSync(path.join(here, 'vf-cockpit-env.mjs'))) { console.error('vf-cockpit : vf-cockpit-env.mjs est absent : refus de lancer des outils sans PATH assaini. Relancer « vf-cockpit build ».'); process.exit(1); } process.env.PATH = (await import(new URL('./vf-cockpit-env.mjs', import.meta.url))).assainirPath(process.env.PATH, root); // vibeflow P25 : jamais d'outil du lab (H-1) ; ce processus seul, pas le shell
  const argv = process.argv.slice(2);
  const opt = (name, dflt) => { const i = argv.indexOf('--' + name); return i < 0 ? dflt : argv[i + 1]; };
  const has = (name) => argv.includes('--' + name);
