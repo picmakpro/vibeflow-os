@@ -89,3 +89,13 @@ Vert après : R13.4 sur les trois onglets à 390, 1 024 et 1 440 px ; R4.2 (born
 Q8 : la pastille du « ⋯ » est un simple point de présence (plus la somme) ; les comptes restent sur les entrées. Q11 : l'entrée du thème dit « Thème : Auto » (texte avant la première parenthèse ou le premier point). R13.3 mesure ces formes (le libellé attendu du thème est abrégé de la même façon ; le point du « ⋯ » est un point, plus un compte) : l'assertion garde sa force (une entrée par action, libellé égal, pastille reportée).
 
 Aussi : à 390 px, la visite guidée d'office (`#tour`, créée à la volée) recouvrait la pile du zoom (R3 rouge de façon intermittente sous charge : zoom sur la visite, puis carte hors de la zone libre). `02-vf-telephone.js` relit maintenant la hauteur de la visite en plus de celle de la barre de question : le zoom reste au-dessus des deux. Intermittence : sur 4 suites complètes de cette partie, R3 a rougi 3 fois (deux causes) avant ce réglage, puis une fois (carte hors de la zone libre, la visite ouverte) ; la dernière est à 0 FAIL. La copie de `b0182676` l'a passé une fois : à surveiller.
+
+## Suite du juge : seuil du badge réduit et menu « ⋯ » (2026-11-04)
+
+Sonde à part (hors suite), lab « long », Code avec Travail récent et Écrans, badge « 10 au travail », racine puis parcours (`reveal` d'une phase, « Remonter » visible).
+
+- Rouge avant (badge réduit jusqu'à 1 599 px) : à 1 600, 1 610, 1 619, 1 625 et 1 630 px, fil d'Ariane rogné en parcours (`scrollWidth` 137 pour 105, 115, 124, 130, 135 px) ; à 1 600 px aussi à la racine (64 > 54). Le juge, avec « 9 au travail » dans un autre lab, voit en plus `#btn-panel` sortir (1 619 sur 1 600, 1 612 sur 1 610).
+- Seuil mesuré : le badge entier tient dès 1 635 px (aucune violation à 1 635, 1 640, 1 660, 1 680, 1 700, 1 720 px). La tranche du badge réduit va donc jusqu'à **1 639 px** (1 640 px garde 5 px de marge sur 1 635).
+- Vert après (tranche 701-1 639 px) : aucune violation à 1 600, 1 610, 1 619, 1 634, 1 639 et 1 640 px, racine et parcours. Aucune autre règle de mise en page n'est changée.
+
+Q13a : à 390 px sur l'onglet Équipe, l'entrée « Par où commencer » du menu « ⋯ » reportait un bouton désactivé comme actif (juge : ni `aria-disabled` ni atténuée, sans effet). `02-vf-telephone.js` reporte maintenant, pour toute action, `disabled` ou `aria-disabled` sur l'entrée : `aria-disabled="true"`, opacité 0,5, infobulle du bouton d'origine (« Pas de visite pour l'onglet Équipe »), clic sans effet et menu laissé ouvert. Sonde à 390 px : Équipe, entrée désactivée (0,5, infobulle) et menu ouvert après le clic ; Projet, aucune entrée désactivée. Témoins à ajouter dans la suite responsive quand la main sera rendue.

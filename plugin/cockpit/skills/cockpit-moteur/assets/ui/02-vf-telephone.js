@@ -36,6 +36,8 @@
       .vf-pl-i { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: none; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
       .vf-pl-i:hover { background: rgba(var(--ink), .07); }
       .vf-pl-i:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+      .vf-pl-i.vf-pl-off { opacity: .5; cursor: default; }
+      .vf-pl-i.vf-pl-off:hover { background: none; }
       .vf-pl-i .vf-pl-t { flex: 1; min-width: 0; }
     }`;
   document.head.appendChild(style);
@@ -71,7 +73,10 @@
       const it = document.createElement('button'); it.type = 'button'; it.className = 'vf-pl-i'; it.setAttribute('role', 'menuitem');
       const t = document.createElement('span'); t.className = 'vf-pl-t'; t.textContent = court(src); it.appendChild(t);
       const p = pastille(src); if (p) { const b = document.createElement('span'); b.className = 'badge'; b.textContent = p; it.appendChild(b); }
-      it.onclick = (ev) => { ev.stopPropagation(); fermer(false); src.click(); };
+      // Q13a : une action désactivée l'est aussi dans le menu (aria-disabled, atténuée, même infobulle) ; elle ne fait rien et ne ferme pas le menu
+      const off = src.disabled || src.getAttribute('aria-disabled') === 'true';
+      if (off) { it.setAttribute('aria-disabled', 'true'); it.classList.add('vf-pl-off'); if (src.title) it.title = src.title; }
+      it.onclick = (ev) => { ev.stopPropagation(); if (off) return; fermer(false); src.click(); };
       menu.appendChild(it);
     }
     document.body.appendChild(menu); plus.setAttribute('aria-expanded', 'true'); menu.querySelector('button')?.focus();

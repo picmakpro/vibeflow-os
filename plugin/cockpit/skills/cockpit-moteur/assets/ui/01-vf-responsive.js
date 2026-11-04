@@ -38,7 +38,7 @@
       .hr .btn:not(#vf-lock) .bl { display: none; }
       .hr .btn .badge { position: absolute; top: 2px; right: 0; }
     }
-    @media (min-width: 701px) and (max-width: 1599px) { /* P70-D-22 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-04) : le badge « au travail » se réduit à son point (arbitré de 701 à 1 279 px ; étendu jusqu'à 1 599 px, le seuil où les autres boutons passent déjà en icône : à 1 440 px les onglets à 13 px laissaient le fil d'Ariane rogné de 44 px, O2b.6) et libère 92 px pour les onglets à 13 px */
+    @media (min-width: 701px) and (max-width: 1639px) { /* P70-D-22 (« Badge réduit à son point (Recommandé) », arbitrage Samuel, AskUserQuestion session principale, 2026-11-04) : le badge « au travail » se réduit à son point et libère 92 px pour les onglets à 13 px. Seuil MESURÉ : à 1 600 px (et sous 1 635 px) le fil d'Ariane en parcours est rogné avec le badge entier (« 10 au travail ») ; il tient dès 1 635 px, 1 640 px garde 5 px de marge */
       #vf-lock { width: 36px; padding: 0; justify-content: center; }
       #vf-lock .bl { display: none; }
     }
