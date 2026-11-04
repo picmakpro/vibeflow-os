@@ -36,8 +36,12 @@ function demarrerQ({ engineDir, root, here, jetons: jetons0, portP, envOrigine }
   const retirerOuvrir = () => { try { fs.unlinkSync(fichierOuvrir); } catch {} };
   const balayerOuvrir = () => { try { const st = fs.lstatSync(fichierOuvrir); if (Date.now() - st.mtimeMs > DUREE_AMORCE_MS) retirerOuvrir(); } catch {} };
   preparerPage({ engineDir });
-  const pythonAbsent = !resoudrePython3(envOrigine.PATH); // P71-D-34 : journalisé une fois, annoncé par /etat
-  if (pythonAbsent) log('python3 introuvable : le terminal est indisponible.');
+  // P71-D-34 puis P71-D-36 (R3) : python3 se vérifie à CHAQUE lancement de shell (premier démarrage, « Relancer le shell », nouvelle session), jamais une fois pour toutes :
+  // il peut disparaître en cours de session. Journalisé une fois par absence (remise à zéro quand il revient), annoncé par /etat. Une session déjà vivante n'en dépend pas.
+  let refusPython = false, pythonDit = false;
+  const pythonAbsent = () => { const a = !resoudrePython3(envOrigine.PATH); if (!a) { refusPython = false; pythonDit = false; } return a; };
+  const direAbsent = () => { if (!pythonDit) { pythonDit = true; log('python3 introuvable : le terminal est indisponible.'); } };
+  if (pythonAbsent()) direAbsent();
   const sessions = creerSessions({ engineDir, lab: root, jetons: () => [...jetons, secret], env: envOrigine });
   const origineQ = () => `http://127.0.0.1:${portQ}`;
 
@@ -90,11 +94,12 @@ function demarrerQ({ engineDir, root, here, jetons: jetons0, portP, envOrigine }
     const onglet = req.headers['x-vf-onglet'];
     if (p === '/etat') { // P71-D-35 : « arret » (arrêt volontaire) ; P71-D-34 : « indisponible » (python3 absent) ; sinon l'état de la session
       if (phase === 'arret') return json(res, 200, { etat: 'arret' });
-      if (pythonAbsent) return json(res, 200, { etat: 'indisponible', raison: 'python3-absent' });
+      if (!sessions.occupe() && pythonAbsent() && (refusPython || sessions.etat().session === 'absente')) { direAbsent(); return json(res, 200, { etat: 'indisponible', raison: 'python3-absent' }); }
       return json(res, 200, sessions.etat());
     }
-    if (phase === 'arret' || pythonAbsent) return refus(res, 503);
+    if (phase === 'arret') return refus(res, 503);
     if (p === '/flux') {
+      if (!sessions.occupe() && pythonAbsent()) { refusPython = true; direAbsent(); return refus(res, 503); } // un shell à lancer sans python3 : jamais de boucle « session fermée »
       const t = req.headers['x-vf-taille'] === undefined ? { lignes: 24, colonnes: 80 } : taille(req.headers['x-vf-taille']);
       if (!t) return refus(res, 400);
       const r = sessions.attacher(req, res, { onglet, ...t }); return r === 200 ? undefined : refus(res, r);

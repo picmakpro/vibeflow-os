@@ -397,6 +397,28 @@ assert_eq "E4.3 — GET /flux rend 503, pas un 500 muet ni un flux" "$(rq "$QP" 
 unsrv
 srv "$OUT"; assert_eq "E4.4 — témoin : avec python3 dans le PATH, /etat rend l'état de session (pas « indisponible »)" "$(node "$TA" etat "$QP" "$SEC" | sed -n 3p | node "$AUX/ev.mjs" 'j.etat===undefined&&j.session!==undefined?"session":"autre"')" "session"; unsrv
 
+# R3 (P71-D-36) : python3 disparaît EN COURS de session ; la relance d'un shell le revérifie comme le premier démarrage
+mkdir -p "$WORK/pathdisp"; ln -sf "$(command -v node)" "$WORK/pathdisp/node"
+sonde_disparu() { # une session vivante, python3 retiré du PATH résolu, « exit », relance ; rend « avant=<s> apres-exit=<s> relance=<statut> etat=<etat|session> journal=<n> »
+  ln -sf "$(command -v python3)" "$WORK/pathdisp/python3"; PATH_SRV="$WORK/pathdisp"; srv "$1"; PATH_SRV=""
+  local f="$WORK/f-disp-$SRVN.bin" av ap re et
+  flux "$f" 20000; attendre_python; tape "echo VIVANT''OK\\r" > /dev/null; vu "$f" VIVANTOK 8000 > /dev/null
+  av="$(etat_s)"; rm -f "$WORK/pathdisp/python3"; tape "exit\\r" > /dev/null
+  for _ in $(seq 1 60); do [ "$(etat_s)" = terminee ] && break; sleep 0.2; done; ap="$(etat_s)"; vf_hyg_stop "$FL"
+  re="$(rq "$QP" GET /flux --secret "$SEC" --onglet "$ONG_A" --echeance 2000 | sed -n 1p)"
+  et="$(corps_etat | node "$AUX/ev.mjs" 'j.etat||j.session' 2>/dev/null)"
+  RES_R3="avant=$av apres-exit=$ap relance=$re etat=$et journal=$(grep -c 'python3 introuvable' "$SRV_OUT" || true)" # global : jamais dans un sous-shell (le serveur et le flux lancés doivent rester arrêtables)
+}
+sonde_disparu "$OUT"; R3="$RES_R3"; unsrv
+assert_eq "R3.1 — python3 disparu en cours de session : la session vivait, « exit » la termine, la relance rend 503 et /etat dit « indisponible » (jamais « absente » : pas de boucle « session fermée »), une ligne de journal" "$R3" "avant=vivante apres-exit=terminee relance=503 etat=indisponible journal=1"
+srv "$OUT"; ln -sf "$(command -v python3)" "$WORK/pathdisp/python3"
+flux "$WORK/f-disp-t.bin" 4000; attendre_python && R32=lance || R32=non
+assert_eq "R3.2 — témoin : avec python3 présent, un flux démarre une session (pas de 503)" "$R32" "lance"; vf_hyg_stop "$FL"; unsrv; rm -f "$WORK/pathdisp/python3"
+if mutant disparu vf-cockpit-terminal-processus.mjs "s/const pythonAbsent = () => { const a = !resoudrePython3(envOrigine.PATH);/const a0 = !resoudrePython3(envOrigine.PATH); const pythonAbsent = () => { const a = a0;/"; then
+  sonde_disparu "$MUT_OUT"; R3M="$RES_R3"; unsrv
+  assert_eq "M-PYTHON-FIGE — le mutant (python3 vérifié une seule fois, au démarrage) rougit R3.1 : la relance ne dit plus « indisponible »" "$([[ "$R3M" == *"etat=indisponible"* ]] && echo identique || echo rouge)" "rouge"
+else assert_eq "M-PYTHON-FIGE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
 # mutants W1 : copies de la sortie
 if mutant parentmort vf-cockpit-terminal-processus.mjs "s/process.on('disconnect', () => { if (phase !== 'arret') sortir(); });//; s/if (process.ppid !== ppid0 \&\& phase !== 'arret') sortir();//"; then
   srv "$MUT_OUT"; f="$WORK/f-mpm.bin"; flux "$f" 40000; attendre_python; QPID="$(proc_q "$SRV_PID")"; APID="$(command pgrep -P "$QPID" | sed -n 1p)"
@@ -407,7 +429,7 @@ if mutant sansarret vf-cockpit-terminal-processus.mjs "s/if (phase === 'arret') 
   srv "$MUT_OUT"; f="$WORK/f-msa.bin"; flux "$f" 40000; attendre_python; node "$AUX/sonde-arret.mjs" "$QP" "$SEC" 3000 > "$WORK/arret-m.res" & AP=$!; PIDS+=($AP); sleep 0.5; kill -TERM "$SRV_PID"; wait "$SRV_PID" 2>/dev/null; wait "$AP" 2>/dev/null; read -r B1 B2 < "$WORK/arret-m.res"
   assert_eq "M-SANS-ARRET — le mutant (pas d'état « arret ») rougit G2.1 : {\"etat\":\"arret\"} n'est jamais vu" "${B1:-x}" "0"; vf_hyg_stop "$FL"; vf_hyg_stop "$SRV_PID"
 else assert_eq "M-SANS-ARRET — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant sanspython vf-cockpit-terminal-processus.mjs "s/if (pythonAbsent) return json(res, 200, { etat: 'indisponible', raison: 'python3-absent' });//"; then
+if mutant sanspython vf-cockpit-terminal-processus.mjs "s/if (!sessions.occupe() \&\& pythonAbsent() \&\& (refusPython || sessions.etat().session === 'absente')) {.*$//"; then
   PATH_SRV="$WORK/pathnopy"; srv "$MUT_OUT"; PATH_SRV=""
   assert_eq "M-SANS-INDISPO — le mutant rougit E4.1 : /etat ne rend plus « indisponible »" "$(node "$TA" etat "$QP" "$SEC" | sed -n 3p | node "$AUX/ev.mjs" 'j.etat||"sans-etat"')" "sans-etat"; unsrv
 else assert_eq "M-SANS-INDISPO — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
