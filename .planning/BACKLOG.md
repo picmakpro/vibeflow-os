@@ -726,6 +726,11 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 - **N4 :** le panneau Phase du cockpit web affiche « Ligne de ROADMAP : … » avec le markdown `**` brut (antérieur à la 68).
 - **N5 :** la vue macro de la pane vf-signal marque « à faire » des phases que leurs worktrees disent « en cours » ou
   « à recetter » : la macro lit le ROADMAP de l'arbre courant, les lignes de worktree l'état du worktree (R1).
+  **Planifié juste après le merge de la 68**, sur une branche à part : arbitrage Samuel, AskUserQuestion session
+  principale Claude Code, 2026-11-04, « Correctif juste après la 68 (Recommandé) » (constat de Samuel : l'onglet Projet
+  du cockpit montre la 70 et la 71 « À faire · pas de plan » alors qu'elles sont en exécution). Réutiliser la lecture
+  de l'état des worktrees livrée par la 68 : `plugin/cockpit/scripts/vf-cockpit-arbres.mjs` (`arbresGit`,
+  `phaseActive`), agrégée par `collectSignal` de `vf-cockpit-signal.mjs` (champ `arbres[].phaseActive` de `signal@1`).
 - **N6 :** hors d'une branche `feat/phase-N`, une mission abandonnée n'apparaît nulle part dans la pane, alors que la carte
   Projet du cockpit web la montre.
 
