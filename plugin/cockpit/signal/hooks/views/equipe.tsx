@@ -1,23 +1,55 @@
-// Vue équipe : l'arborescence des agents et sous-agents de la session, en
-// direct — qui tourne, sous qui, sur quoi, depuis quand, avec quel outil.
-// Deux gestes humains par agent : voir sa transcription, lui demander l'arrêt.
+// Vue équipe : l'arborescence de TOUTE l'équipe au travail telle que le socle la voit (`signal@1.equipe`, who@2 :
+// toutes sessions, tous worktrees, 24 h) — qui tourne, sous qui, sur quoi, depuis quand (P68-D-03).
+// `$.agent.list()` ne sert plus l'arbre (P68-D-17) : il ne dit que quels agents sont ceux de CETTE session, les seuls
+// à recevoir les deux gestes humains — voir la transcription, demander l'arrêt. Aucun rapprochement par description ni par rôle.
 
 import type { EngineInterface } from 'claude-code'
 
-import { C, G, STAGE_LABEL, oneLine, since } from '../ds'
-import { tree } from '../derive'
+import { C, G, age, oneLine } from '../ds'
 import { ghost, head } from './common'
 import type { Ctx } from './common'
+import type { SignalWorker } from '../../types'
 
 const STOP_TEXT =
   "vf-signal (geste humain) : arrête-toi proprement. Termine l'action en cours, écris ton rapport et rends la main sans entamer d'autre étape."
 
+type Etat = 'actif' | 'en-attente' | 'termine'
+
+/** L'état écrit par who@2 ; à défaut (verrou, nœud, registre) : périmé = en attente, sinon actif. */
+const etatDe = (w: SignalWorker): Etat => (w.etat === 'actif' || w.etat === 'en-attente' || w.etat === 'termine' ? w.etat : w.stale ? 'en-attente' : 'actif')
+
+/** Racines : sans parent, ou parent absent de la liste ; un cycle ne fait jamais disparaître un travailleur. */
+function arbre(workers: SignalWorker[]): { w: SignalWorker; depth: number }[] {
+  const ids = new Set(workers.map(w => w.id))
+  const enfants = new Map<string, number[]>()
+  const racines: number[] = []
+  workers.forEach((w, i) => {
+    const p = w.parent && w.parent !== w.id && ids.has(w.parent) ? w.parent : null
+    if (p === null) racines.push(i)
+    else enfants.set(p, [...(enfants.get(p) ?? []), i])
+  })
+  const vus = new Set<number>()
+  const out: { w: SignalWorker; depth: number }[] = []
+  const marche = (i: number, depth: number) => {
+    if (vus.has(i)) return
+    vus.add(i)
+    out.push({ w: workers[i]!, depth })
+    for (const c of enfants.get(workers[i]!.id) ?? []) marche(c, depth + 1)
+  }
+  for (const i of racines) marche(i, 0)
+  workers.forEach((_, i) => marche(i, 0))
+  return out
+}
+
 export function equipe($: EngineInterface, ctx: Ctx): JSX.Element {
-  const { ui, roster, stats, l, now, blink, compact } = ctx
+  const { ui, roster, s, l, blink, compact } = ctx
   const { Box, Button, Text } = ui
-  const all = tree(roster)
-  const rows = compact ? all.filter(({ agent }) => agent.status === 'running' || agent.status === 'idle') : all
-  const live = roster.filter(a => a.status === 'running').length
+  const workers = s?.equipe?.workers ?? []
+  const session = new Map(roster.map(a => [a.id, a]))
+  const all = arbre(workers)
+  const rows = compact ? all.filter(({ w }) => etatDe(w) !== 'termine') : all
+  const finis = workers.filter(w => etatDe(w) === 'termine').length
+  const live = workers.length - finis
 
   return (
     <Box flexDirection="column">
@@ -29,46 +61,47 @@ export function equipe($: EngineInterface, ctx: Ctx): JSX.Element {
             : `${G.done} prête`}
         <Text color={C.fg3}>
           {' · '}
-          {roster.length ? `${live} agent${live > 1 ? 's' : ''} en cours, ${roster.length - live} fini${roster.length - live > 1 ? 's' : ''}` : 'aucun agent lancé'}
+          {workers.length ? `${live} en cours, ${finis} fini${finis > 1 ? 's' : ''}` : 'aucun agent vu'}
         </Text>
       </Text>
 
       {rows.length > 0 && !compact ? head(ui, 'arbre') : null}
-      {rows.map(({ agent, depth }) => {
-        const s = stats[agent.id]
-        const isLive = agent.status === 'running'
-        const color = isLive ? C.signal : agent.status === 'idle' ? C.fg2 : C.fg3
-        const glyph = isLive ? (blink ? G.current : ' ') : agent.status === 'idle' ? G.todo : G.done
+      {rows.map(({ w, depth }) => {
+        const etat = etatDe(w)
+        const termine = etat === 'termine'
+        const color = termine ? C.fg3 : w.orphan ? C.human : etat === 'actif' ? C.signal : C.fg2
+        const glyph = termine ? G.done : w.orphan ? G.human : etat === 'actif' ? (blink ? G.current : ' ') : G.todo
+        const mien = session.get(w.id)
         return (
           <Box flexDirection="column" paddingLeft={depth * 2}>
-            <Text color={color} bold={isLive} wrap="wrap">
+            <Text color={color} bold={etat === 'actif'} wrap="wrap">
               {depth > 0 ? `${G.branch} ` : ''}
-              {glyph} {agent.type}
-              <Text color={C.fg2} bold={false}> · {oneLine(agent.description)}</Text>
+              {glyph} {w.role || w.kind}
+              <Text color={termine ? C.fg3 : C.fg2} bold={false}> · {oneLine(w.task ?? '')}</Text>
             </Text>
             {compact ? null : (
               <Box paddingLeft={depth > 0 ? 4 : 2}>
                 <Text color={C.fg3} wrap="wrap">
-                  {agent.status}
-                  {s ? ` · ${since(now, s.startedAt)} · ${s.tools} outil${s.tools > 1 ? 's' : ''}` : ''}
-                  {s?.tool && isLive ? ` · ${s.tool}` : ''}
-                  {s?.stage ? ` · ${STAGE_LABEL[s.stage]}` : ''}
+                  {w.orphan ? 'orphelin (registre)' : termine ? 'terminé' : etat === 'en-attente' ? 'en attente' : 'actif'}
+                  {` · ${w.tree}`}
+                  {w.branch ? ` · ${w.branch}` : ''}
+                  {w.ageS != null ? ` · ${age(w.ageS)}` : ''}
                 </Text>
               </Box>
             )}
-            {isLive ? (
+            {mien && !termine && !w.orphan ? (
               <Box paddingLeft={depth > 0 ? 4 : 2} gap={1}>
-                <Button key={`voir:${agent.id}`} plain dimColor onPress={() => void $.ui.view({ agentId: agent.id })}>
+                <Button key={`voir:${w.id}`} plain dimColor onPress={() => void $.ui.view({ agentId: w.id })}>
                   voir
                 </Button>
                 <Button
-                  key={`stop:${agent.id}`}
+                  key={`stop:${w.id}`}
                   plain
                   dimColor
                   onPress={() =>
                     void $.session
-                      .send({ to: { agentId: agent.id }, text: STOP_TEXT })
-                      .then(() => $.ui.toast(`arrêt demandé à ${agent.type}`))
+                      .send({ to: { agentId: w.id }, text: STOP_TEXT })
+                      .then(() => $.ui.toast(`arrêt demandé à ${mien.type}`))
                       .catch(err => $.ui.toast(`arrêt refusé : ${err instanceof Error ? err.message : String(err)}`))
                   }
                 >
@@ -80,7 +113,7 @@ export function equipe($: EngineInterface, ctx: Ctx): JSX.Element {
         )
       })}
       {rows.length === 0 ? (
-        <Box marginTop={compact ? 0 : 1}>{ghost(ui, compact ? 'aucun agent en cours' : 'les agents apparaissent ici dès que la session en lance')}</Box>
+        <Box marginTop={compact ? 0 : 1}>{ghost(ui, compact ? 'aucun agent en cours' : 'les agents apparaissent ici dès que le socle en voit')}</Box>
       ) : null}
       {compact ? null : (
         <Box marginTop={1}>

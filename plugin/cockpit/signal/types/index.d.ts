@@ -91,6 +91,22 @@ export type SignalArbre = {
   phaseActive: { key: string; n: string; nom: string; etat: string } | null
   retard: SignalRetard | null
 }
+/** Un travailleur de `who@2` (`signal@1.equipe`) : un agent de n'importe quelle session ou worktree, un verrou, un nœud, un orphelin du registre. */
+export type SignalWorker = {
+  kind: string
+  id: string
+  tree: string
+  source: string
+  role?: string
+  task?: string
+  parent?: string
+  branch?: string
+  ageS?: number
+  stale?: boolean
+  orphan?: boolean
+  etat?: string
+}
+export type SignalEquipe = { busy: boolean; trees: string[]; workers: SignalWorker[] }
 export type Signal = {
   schema: string
   projet: string
@@ -100,6 +116,7 @@ export type Signal = {
   missions: SignalMission[]
   verrous: { etat: string; liste: SignalVerrou[] }
   arbres: SignalArbre[]
+  equipe: SignalEquipe
 }
 
 declare module 'claude-code' {
@@ -119,6 +136,10 @@ declare module 'claude-code' {
       signal: Signal | null
       /** Pourquoi la dernière lecture de l'émetteur a échoué, dite en clair ; null si elle a réussi. */
       signalErreur: string | null
+      /** L'adresse rendue par le lanceur du cockpit au dernier appui sur « Ouvrir le cockpit » ; null avant l'appui ou après un échec. */
+      cockpitUrl: string | null
+      /** Pourquoi le dernier lancement du cockpit a échoué, dit en clair ; null s'il a réussi ou n'a pas eu lieu. */
+      cockpitErreur: string | null
     }
   }
 }
