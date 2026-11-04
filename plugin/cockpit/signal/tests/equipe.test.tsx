@@ -32,7 +32,8 @@ const AGENTS = [
 async function pane($: any, props: any = PANE) {
   await $.session.start({ cwd: '/lab', surface: 'terminal', isInteractive: true })
   const ui = await $.ui.mount({ ...props, surface: 'terminal' })
-  await ui.press({ key: 'onglet:equipe' })
+  // la vue choisie reste d'un montage à l'autre : l'onglet courant n'a pas de bouton
+  if (await ui.find({ key: 'onglet:equipe' })) await ui.press({ key: 'onglet:equipe' })
   return ui
 }
 
