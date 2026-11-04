@@ -61,6 +61,8 @@ export function agentsConnus(root, { fresh = 180, now = Date.now(), home = os.ho
   return contexte(root, { fresh, now, home }).collecte().workers;
 }
 
+const rolesDe = (ws) => new Map(ws.filter((w) => w.kind === 'subagent' && typeof w.role === 'string' && w.role).map((w) => [w.id, w.role]));
+
 // collecte interne : les travailleurs gardent `_tr` (chemin du transcript) hors de la sortie publique
 function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 1800, now = Date.now(), home = os.homedir(), scriptsDir } = {}) {
   const cx = contexte(root, { fresh, now, home }); root = cx.root;
@@ -68,6 +70,9 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
   // 1 + 2 — sessions et sous-agents, en arbre (vf-cockpit-equipe.mjs : fenêtre de 24 h, forme Claude Code lue du contrat)
   const eq = cx.collecte();
   workers.push(...eq.workers); sources.sessions = eq.source;
+  // « écrit à <rôle> » (Q2a) : le destinataire brut (`_to`) est résolu en rôle par la collecte ; inconnu -> « un agent » ; jamais un identifiant, et `_to` ne sort pas
+  const roles = rolesDe(eq.workers);
+  for (const w of eq.workers) if (w.action && '_to' in w.action) { w.action.cible = roles.get(w.action._to) || 'un agent'; delete w.action._to; }
   const presents = new Set(eq.workers.filter((w) => w.kind === 'subagent').map((w) => w.id)); const registre = new Map(); // carte privée, jamais dans la sortie publique
 
   // 3 — verrous et registre (script résolu hors de l'arbre observé)
@@ -196,7 +201,7 @@ export function revealTranscript(root, id, opts = {}) {
 function reveler(root, id, opts, S) {
   const connus = new Map(agentsConnus(root, opts).filter((x) => (x.kind === 'session' || x.kind === 'subagent') && x._tr).map((x) => [x.id, x]));
   const w = connus.get(id);
-  return w ? { schema: S, id, ...reduireTranscript(w._tr, { root: path.resolve(root) }) } : { schema: S, id, erreur: 'inconnu' };
+  return w ? { schema: S, id, ...reduireTranscript(w._tr, { root: path.resolve(root), roles: rolesDe([...connus.values()]) }) } : { schema: S, id, erreur: 'inconnu' };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {

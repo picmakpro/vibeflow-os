@@ -100,3 +100,29 @@ Cause : les règles du pied (`.foot .meta` min-width 0 / overflow hidden / ellip
 
 `test-cockpit-equipe.sh` 147 PASS / 0 FAIL ; `test-cockpit-marque-blanche.sh` 30/0 ; `test-cockpit-chrome-fr.sh` 70/0 ; `test-cockpit-transcript.sh` 99/0 ; `test-cockpit-who.sh` 90/0 ;
 `test-cockpit-responsive.sh` 255 PASS / 6 FAIL, les six étant R13.4 (1024 et 1440 px, trois onglets).
+
+## Suite : tri de goût (arbitrage Samuel, AskUserQuestion session principale, 2026-11-04, « Tout selon les recos (Recommandé) » ; consigné P70-D-23 par le manager)
+
+Base : b0182676. Rejeu : `bash plugin/cockpit/scripts/tests/test-cockpit-equipe.sh`.
+
+### Q2a — « écrit à <rôle> », jamais un identifiant (E32)
+
+Rouge sur les scripts de b0182676 (suite neuve rejouée contre `git archive` de la tête) :
+- E32.1 rôle connu : attendu `écrit à|vf-reviewer`, obtenu `écrit à|w-cible` (identifiant brut) ;
+- E32.2 rôle inconnu : attendu `écrit à|un agent`, obtenu `écrit à|destinataire-ABSENT-32` ;
+- E32.3 aucun identifiant ni champ interne `_to` dans la sortie : attendu `0`, obtenu un décompte non nul.
+
+Correctif : `etiquette(name, input, root, roles)` rend « un agent » sans table de rôles ; `derniereAction` garde le destinataire brut dans un champ interne `_to` ; `vf-cockpit-who.mjs` le résout en rôle d'après la COLLECTE (meta.json des sous-agents de la même collecte, jamais le texte de l'entrée), puis retire `_to`. Même table passée au transcript lu à la demande (liste des outils). Reste dans la liste blanche : aucune donnée hors cible.
+Vert : E32.0 à E32.3. Un oubli de passage du paramètre `roles` jusqu'à `reduire()` (exception avalée, mandat vide) a été détecté par T24 de `test-cockpit-transcript.sh` et corrigé.
+
+### Q3b — échelle du premier affichage plafonnée à 0,75 (EK13)
+
+La fixture EK compte maintenant sept sessions racines en plus (scène assez large pour que l'ajustement réduise). `72-vf-equipe.js` `arrivee()` : si `SC.fit` laisse une échelle sous 0,75, la scène est cadrée sur la première carte (coin haut gauche de la zone libre, sous l'en-tête et le titre) à 0,75.
+- témoin EK13.0 : au moins une carte à 390 et 768 px ;
+- EK13 : échelle ≥ 0,75 ET recouvrement titre / première carte = 0 px² à 390 et 768 px ;
+- rouge : mutant EK13.2 (plafond retiré de la page servie) attendu `muté|réduit`, obtenu identique (l'ajustement seul réduit la scène sous 0,75) ; défaut E (recouvrement) toujours couvert par la même assertion.
+Dépendance R19 / R20 (suite responsive, non touchée et non rejouée) : le cadrage s'appuie sur `SC.freeArea()` (sous l'en-tête et le titre) donc le recouvrement reste nul ; R20 (superpositions, défilement horizontal) à rejouer par l'exécutant de la suite responsive.
+
+### Q12a — alignement des liens (réglage visuel, sans test)
+
+`70-vf-live.js` : `.vf-who > a.vf-link, body.vf-tab-equipe .sec > a.vf-link` sans padding horizontal ; la liste « Sources lues » (00-vibeflow.js) garde le sien.

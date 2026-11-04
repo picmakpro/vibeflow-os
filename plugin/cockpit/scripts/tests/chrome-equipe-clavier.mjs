@@ -12,6 +12,7 @@
 //   focus-puis-who    : (EK8) focalise « Lire le transcript » du panneau d'un agent, livre un `who` (le panneau est redessiné), relève l'élément actif → { remplace, apres }
 //   focus-tiroir      : (EK9) même mesure pour « Voir la dernière commande » du tiroir « Au travail » → { remplace, apres }
 //   badge             : (EK10) marge entre le bord droit du badge d'état et celui de sa carte, pied long, à 390 / 1024 / 1440 px → { "390": px, "1024": px, "1440": px }
+//   echelle           : (EK13, Q3b) échelle de l'ajustement au premier affichage et recouvrement titre / première carte, à 390 et 768 px → { "390": { k, aire }, "768": { k, aire } }
 //   libelles          : (EK11) ligne des sources du tiroir et infobulle de la recherche de l'onglet Équipe → { src, titre }
 // Rend une ligne JSON { ... } ou { erreur }. Socle : chrome-session.mjs (une instance de Chrome, fermée proprement).
 import { executer } from './chrome-session.mjs';
@@ -147,6 +148,20 @@ await executer(chrome, async (s) => {
       await s.attendre("!!document.querySelector('.card .foot .vst') && !!(window.__vfLive && window.__vfLive.who)", 'cartes et pieds');
       r[l] = await s.stable(`(() => { let min = 1e9, n = 0; for (const v of document.querySelectorAll('.card .foot .vst')) { const c = v.closest('.card'); if (!c) continue; n++;
         min = Math.min(min, Math.round(c.getBoundingClientRect().right - v.getBoundingClientRect().right)); } return n ? min : 'aucun badge'; })()`, 'marge du badge');
+    }
+    return r;
+  }
+  if (ACTION === 'echelle') {
+    const r = {};
+    for (const l of [390, 768]) {
+      await s.send('Emulation.setDeviceMetricsOverride', { width: l, height: 800, deviceScaleFactor: 1, mobile: false });
+      await s.naviguer(url);
+      await s.attendre(PRET, 'viewer prêt');
+      await s.attendre("document.querySelectorAll('#svg .card').length > 0 && !!(window.__vfLive && window.__vfLive.who)", 'cartes');
+      r[l] = await s.stable(`(() => { const k = Math.round(window.VibeFlow.state.t.k * 100) / 100; const h1 = document.querySelector('#context h1'), nd = [...document.querySelectorAll('#svg .card')].filter((e) => e.getBoundingClientRect().width > 0);
+        nd.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top || a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+        let aire = 0; if (h1 && nd[0]) { const a = h1.getBoundingClientRect(), b = nd[0].getBoundingClientRect(); aire = Math.round(Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top))); }
+        return { k, aire, cartes: nd.length }; })()`, 'échelle stable');
     }
     return r;
   }

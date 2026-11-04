@@ -67,6 +67,17 @@
     // 70-12 (UIFN-14, défaut E) : le rerender() de `suivre` annule le premier rendu du viewer (le jeton de rendu change), celui qui appelait fit(false) ; le rendu qui aboutit garde la
     // transformation d'origine et la première carte reste sous l'en-tête et le titre. On cadre donc la scène ici, une fois par page, avant la révélation éventuelle d'une carte visée.
     SC.fit?.(false); // `?.` : le faux viewer du harnais hors navigateur de test-cockpit-equipe.sh (EUI) ne porte pas fit
+    // Q3b : sur un écran étroit l'ajustement à toute la scène réduisait les cartes à ~45 % (titres vers 7 px). La réduction ne descend jamais sous 0,75 : si l'ajustement tombe plus bas,
+    // la scène est cadrée sur la première carte (coin haut gauche de la zone libre, sous l'en-tête et le titre), le reste se rejoint en déplaçant la carte.
+    const st = SC.state, vp = document.getElementById('viewport'), svg = document.getElementById('svg');
+    if (st?.t && st.t.k < 0.75 && vp && SC.freeArea) {
+      const cartes = (st.layout?.children || []).filter((c) => /^(n:)?(se|ag)-/.test(c.id) && !c.id.includes('~')), c = cartes.sort((a, b) => a.y - b.y || a.x - b.x)[0], a = SC.freeArea();
+      if (c) {
+        st.t = { k: 0.75, x: a.x - c.x * 0.75, y: a.y - c.y * 0.75 };
+        vp.style.transform = `translate(${st.t.x}px,${st.t.y}px) scale(0.75)`;
+        svg?.classList.remove('lod-low', 'lod-mid');
+      }
+    }
     const r = new URLSearchParams(location.hash.slice(1)).get('r');
     if (r && /^n:/.test(r) && SC.exists(r)) SC.reveal(r);
   };

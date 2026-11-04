@@ -335,6 +335,21 @@ assert_eq "E22.10 — le leurre est toujours vivant après l'arrêt du serveur (
 vf_hyg_stop "$LEURRE"
 NOW="$(node -e 'console.log(Date.now())')"
 
+echo "=== E32 — « écrit à <rôle> », jamais un identifiant brut (Q2a ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-04) ==="
+cat > "$AUX/spec-e32.json" <<'JSON'
+{"sessionAgeS":5,"agents":[
+ {"id":"mgr1","spawnDepth":1,"ageS":5,"role":"vf-dev-manager"},
+ {"id":"w-cible","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"vf-reviewer"},
+ {"id":"w-ecrit","spawnDepth":2,"parent":"mgr1","ageS":3,"dernierAppel":{"name":"SendMessage","input":{"to":"w-cible","message":"x"}}},
+ {"id":"w-inconnu","spawnDepth":2,"parent":"mgr1","ageS":3,"dernierAppel":{"name":"SendMessage","input":{"to":"destinataire-ABSENT-32","message":"x"}}}]}
+JSON
+H32="$(mkhome e32 "$AUX/spec-e32.json" "$LAB")"
+Q who "$LAB" "$H32" "$NOSCRIPTS" "$NOW" > "$WORK/who-e32.json"
+assert_eq "E32.0 — contrôle positif : les trois agents sont listés et le destinataire connu porte son rôle dans la collecte" "$(G "$WORK/who-e32.json" 'j.workers.filter(x=>["w-cible","w-ecrit","w-inconnu"].includes(x.id)).length+"|"+j.workers.find(x=>x.id==="w-cible").role')" "3|vf-reviewer"
+assert_eq "E32.1 — rôle connu : « écrit à vf-reviewer »" "$(act "$WORK/who-e32.json" w-ecrit)" "écrit à|vf-reviewer"
+assert_eq "E32.2 — rôle inconnu : « écrit à un agent »" "$(act "$WORK/who-e32.json" w-inconnu)" "écrit à|un agent"
+assert_eq "E32.3 — aucun identifiant de destinataire brut, ni champ interne _to, dans la sortie (apparié au positif E32.1)" "$(grep -c 'destinataire-ABSENT-32\|"_to"' "$WORK/who-e32.json")" "0"
+
 echo "=== E28 — schéma vibeflow/cockpit-who@2 (P69-D-23) ==="
 cat > "$AUX/contrat-mini.json" <<'JSON'
 {"schemas":{"vibeflow/cockpit-who@2":{"requis":{"at":"string","root":"string","trees":"array","fresh":"number","fenetre":"number","busy":"boolean","workers":"array","sources":"object"},"travailleur":{"requis":["kind","id","tree","source"],"optionnels":["role","task","parent","depth","etat"]},"interdits":["doing","mandat","messages","outils"],"kinds":["session","subagent","lock","registered","dag-node"],"etatsSource":["lue","absente","erreur","forme-inconnue"]}}}
@@ -859,8 +874,10 @@ JS
 JSON
   NOW="$(node -e 'console.log(Date.now())')"
   HEK="$(mkhome ek "$AUX/spec-ek.json" "$LABEK")"
+  # sept sessions racines en plus : la scène du premier affichage est assez large pour que l'ajustement à tout l'écran la réduise sous 0,75 sur un écran étroit
+  for n in 1 2 3 4 5 6 7; do sed "s/$SID/bbbb000$n-2222-3333-4444-555566667777/g" "$HEK/.claude/projects/-lab/$SID.jsonl" > "$HEK/.claude/projects/-lab/bbbb000$n-2222-3333-4444-555566667777.jsonl"; done
   OUTEK="$LABEK/.vibeflow/cockpit"; cp "$OUTEK/project.html" "$WORK/project-ek.html.orig"
-  ek_rafraichir() { touch "$HEK/.claude/projects/-lab/$SID/subagents/"agent-*.jsonl; }
+  ek_rafraichir() { touch "$HEK/.claude/projects/-lab/$SID/subagents/"agent-*.jsonl "$HEK/.claude/projects/-lab/"*.jsonl; }
   ek_demarrer() { rm -f "$OUTEK/.cache/server.json"; ek_rafraichir
     HOME="$HEK" node "$OUTEK/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-ek.out" 2>&1 &
     EK_PID=$!; PIDS+=("$EK_PID")
@@ -905,6 +922,9 @@ JSON
   assert_eq "EK9 — après le redessin du tiroir « Au travail » par un événement who, le focus est rendu au bouton « Voir la dernière commande » de la même ligne" "$(G "$WORK/ek-focus-tiroir.json" 'j.erreur||(j.apres.tag==="BODY"?"BODY":(j.apres.estLeBouton?"le bouton":"autre : "+j.apres.tag))')" "le bouton"
   EKC badge "$EKA1"
   assert_eq "EK10 — pied long (« actif · … · lance un agent general-purpose ») : le badge d'état reste entièrement dans sa carte à 390, 1024 et 1440 px (marge >= 0)" "$(G "$WORK/ek-badge.json" 'j.erreur||(["390","1024","1440"].map((l)=>typeof j[l]==="number"&&j[l]>=0?"ok":l+"="+j[l]).join(","))')" "ok,ok,ok"
+  EKC echelle "equipe.html"
+  assert_eq "EK13.0 — témoin : la scène porte au moins une carte à 390 et 768 px" "$(G "$WORK/ek-echelle.json" 'j.erreur||(j["390"].cartes>0&&j["768"].cartes>0?"cartes":"aucune carte")')" "cartes"
+  assert_eq "EK13 — premier affichage à 390 et 768 px : l'échelle ne descend pas sous 0,75 ET le titre ne recouvre pas la première carte (0 px²)" "$(G "$WORK/ek-echelle.json" 'j.erreur||["390","768"].map((l)=>(j[l].k>=0.75?"échelle ok":"échelle "+j[l].k)+" / "+(j[l].aire===0?"sans recouvrement":"recouvrement "+j[l].aire+" px²")).join(" ; ")')" "échelle ok / sans recouvrement ; échelle ok / sans recouvrement"
   EKC libelles "equipe.html#t"
   assert_eq "EK11 — la ligne des sources du tiroir est en français (aucune clé « sessions », « locks », « dags » brute)" "$(G "$WORK/ek-libelles.json" 'j.erreur||(/\b(sessions|locks|dags)\b ?:/.test(j.src)?"anglais : "+j.src:"français")')" "français"
   assert_eq "EK12 — l'infobulle de la recherche de l'onglet Équipe dit la même chose que son libellé" "$(G "$WORK/ek-libelles.json" 'j.erreur||j.titre')" "Chercher un agent ou une session"
@@ -927,6 +947,7 @@ JSON
   assert_eq "EK10.2 — mutant (la règle du pied retirée de la page servie) : le badge sort de sa carte à 1440 px, détecté" "$(ek_mutant r3 badge "$EKA1" 'j.erreur||(j["1440"]<0?"rogné":"dans la carte")' ".foot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .foot .vst { flex: none; }" '.foot .meta { }')" "muté|rogné"
   assert_eq "EK11.2 — mutant (les clés de la collecte affichées telles quelles) : « sessions : lue » reparaît, détecté" "$(ek_mutant r4 libelles "equipe.html#t" 'j.erreur||(/\b(sessions|locks|dags)\b ?:/.test(j.src)?"anglais":"français")' '${SOURCES[k] || k} : ${v.etat}' '${k} : ${v.etat}')" "muté|anglais"
   assert_eq "EK12.2 — mutant (infobulle laissée au viewer) : « Chercher un fichier, une route, un module » reparaît, détecté" "$(ek_mutant r5 libelles "equipe.html#t" 'j.erreur||j.titre' "bouton.setAttribute('aria-label', LIB); bouton.title = LIB;" "bouton.setAttribute('aria-label', LIB);")" "muté|Chercher un fichier, une route, un module"
+  assert_eq "EK13.2 — mutant (plafond de 0,75 retiré) : la scène est réduite sous 0,75, détecté" "$(ek_mutant r6 echelle "equipe.html" 'j.erreur||(j["390"].k<0.75||j["768"].k<0.75?"réduit":"plafonné")' 'if (st?.t && st.t.k < 0.75 && vp && SC.freeArea) {' 'if (false) {')" "muté|réduit"
   # témoins de la sonde de mutation elle-même
   ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"
   assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK2.1 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "a1|null|identique"

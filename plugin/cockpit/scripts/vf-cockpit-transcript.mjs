@@ -32,7 +32,8 @@ function cheminDuLab(valeur, root) {
   return path.relative(base, r).split(path.sep).join('/') || '.';
 }
 
-export function etiquette(name, input, root) {
+// roles : Map identifiant d'agent -> rôle, tirée de la COLLECTE (registre, meta.json) et jamais du texte de l'entrée ; sans elle (ou destinataire inconnu) la cible d'un message est « un agent »
+export function etiquette(name, input, root, roles) {
   const outil = fin(name) || '?'; const i = input && typeof input === 'object' ? input : {};
   const n = chaine(name);
   let verbe, cible = '';
@@ -42,7 +43,7 @@ export function etiquette(name, input, root) {
     if (['Read', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit'].includes(n)) cible = cheminDuLab(i.file_path ?? i.notebook_path ?? i.path, root);
     else if (n === 'Grep' || n === 'Glob') cible = cheminDuLab(i.path ?? i.file_path, root);
     else if (n === 'Agent' || n === 'Task') cible = chaine(i.subagent_type);
-    else if (n === 'SendMessage') cible = chaine(i.to);
+    else if (n === 'SendMessage') cible = roles instanceof Map && roles.has(chaine(i.to)) ? chaine(roles.get(chaine(i.to))) : 'un agent'; // jamais l'identifiant brut (Q2a)
     else if (n === 'Skill') cible = chaine(i.skill);
     else if (n === 'WebFetch') { try { cible = new URL(chaine(i.url)).hostname; } catch { cible = ''; } }
   } else verbe = VERBE_AUTRE;
@@ -53,7 +54,7 @@ export function etiquette(name, input, root) {
 export function derniereAction(fichier, root) {
   return cherche(fichier, (d) => {
     const c = d.type === 'assistant' ? d.message?.content : null; if (!Array.isArray(c)) return null;
-    for (let k = c.length - 1; k >= 0; k--) if (c[k]?.type === 'tool_use' && typeof c[k].name === 'string') { const e = etiquette(c[k].name, c[k].input, root); return { verbe: e.verbe, cible: e.cible }; }
+    for (let k = c.length - 1; k >= 0; k--) if (c[k]?.type === 'tool_use' && typeof c[k].name === 'string') { const e = etiquette(c[k].name, c[k].input, root); const a = { verbe: e.verbe, cible: e.cible }; if (c[k].name === 'SendMessage' && typeof c[k].input?.to === 'string') a._to = c[k].input.to.slice(0, 128); return a; } // _to : destinataire brut, résolu en rôle par la collecte puis retiré (jamais émis)
     return null;
   });
 }
@@ -82,10 +83,10 @@ const json = (l) => { try { return JSON.parse(l); } catch { return null; } };
 // liste blanche : mandat = contenu chaîne de la première ligne `user` ; messages = blocs `text` des lignes `assistant` ; outils = nom et cible réduite des blocs `tool_use`.
 // Tout le reste (lignes user ultérieures, api-request*, attachment, blocs thinking et tool_result, champ des résultats d'outils) n'est jamais lu.
 // Le coût est borné par ce qui sort (F4) : la fenêtre n'est qu'analysée ; masque et étiquette (donc realpath) ne s'appliquent qu'aux 50 messages et 200 outils gardés.
-export function reduireTranscript(fichier, { root } = {}) {
-  try { return reduire(fichier, root); } catch { return { mandat: '', messages: [], outils: [], tronque: true }; } // aucune exception ne remonte à l'appelant
+export function reduireTranscript(fichier, { root, roles } = {}) {
+  try { return reduire(fichier, root, roles); } catch { return { mandat: '', messages: [], outils: [], tronque: true }; } // aucune exception ne remonte à l'appelant
 }
-function reduire(fichier, root) {
+function reduire(fichier, root, roles) {
   let tronque = false, mandat = '';
   const tete = fenetre(fichier, TETE, false);
   if (tete?.coupe && !tete.texte.includes('\n')) tronque = true; // la première ligne dépasse la fenêtre de tête : le mandat est illisible
@@ -108,5 +109,5 @@ function reduire(fichier, root) {
   if (msgs.length > MAX_MESSAGES) { msgs = msgs.slice(-MAX_MESSAGES); tronque = true; }
   if (outs.length > MAX_OUTILS) { outs = outs.slice(-MAX_OUTILS); tronque = true; }
   if (msgs.some((t) => t.length > BORNE_MESSAGE)) tronque = true;
-  return { mandat, messages: msgs.map((t) => coupe(t, BORNE_MESSAGE)), outils: outs.map((o) => etiquette(o.n, o.i, root)), tronque };
+  return { mandat, messages: msgs.map((t) => coupe(t, BORNE_MESSAGE)), outils: outs.map((o) => etiquette(o.n, o.i, root, roles)), tronque };
 }

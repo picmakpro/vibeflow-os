@@ -41,3 +41,8 @@ Une anomalie de méthode évitée : une ancre de mutant trop générique (`ev.st
 Traité : focus rendu après chaque redessin (panneau et tiroir, EK8/EK9), badge d'état dans la carte à pied long (EK10), anglais de la ligne des sources et infobulle de recherche (EK11/EK12), survol et anneau des boutons du tiroir, jeton `--n-terminés`. Détail et mutants : `70-11-RED-TRACE.md`.
 
 Consigné, NON corrigé (défaut de la Phase 69 révélé ici, pas créé par la 70) : la carte « Session » affiche « en attente » dans son pied et le badge « En cours », parce que dans `72-vf-equipe.js` tout état autre que « terminé » devient actif.
+
+## Suite : tri de goût (arbitrage Samuel, AskUserQuestion session principale, 2026-11-04)
+
+Q2a (« écrit à <rôle> » / « un agent », E32), Q3b (échelle ≥ 0,75 au premier affichage, EK13), Q12a (liens alignés). Détail et rouges : `70-11-RED-TRACE.md`.
+R19 / R20 de la suite responsive (non rejouée ici) dépendent du cadrage de `arrivee()` : à rejouer par son exécutant.
