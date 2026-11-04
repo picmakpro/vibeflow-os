@@ -1,5 +1,113 @@
 # Changelog — cockpit
 
+## v1.3.0 — 2026-11-04 — non publié
+
+Phase 71 : terminal intégré. Décisions : arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-03,
+pour P71-D-01 à P71-D-08 et P71-D-23 ; décisions du manager (vf-dev-manager, 2026-11-03) pour P71-D-09 à P71-D-22 et P71-D-24
+(O1 à O11 tranchées par P71-D-20 et P71-D-21 ; P71-D-22, d'abord provisoire, est devenue définitive par P71-D-23). Les gestes de
+release racine (version, tag, release GitHub) restent humains. Numéro de version recalculé à la fusion avec les Phases 68 et 70 (P71-PL-12) : mineure suivante de la v1.2.1 de main.
+
+### Corrigé — recette par juges, lots W1 à W4, et rebase sur H-1
+Arbitrages de Samuel, AskUserQuestion session principale Claude Code, 2026-11-04 : P71-D-33 (« Terminal dans son processus (Recommandé) »), P71-D-34 (« Corriger E2 à E5 (Recommandé) »), P71-D-35 (« G1 tiroir et cadrage, G2 arrêt immédiat, G3 défilement discret »).
+- **Le serveur du terminal tourne dans son propre processus** (E1, P71-D-33) : un travail synchrone du serveur (le calcul de qui travaille sur le lab) gelait les frappes ; Q est désormais un enfant (`child_process.fork`, `vf-cockpit-terminal-processus.mjs`), l'interface exportée par `vf-cockpit-terminal.mjs` et le patch `P26` de `serve.mjs` sont inchangés. Si le serveur du cockpit meurt, même par SIGKILL, l'enfant, l'assistant et le shell s'arrêtent avec lui.
+- **Arrêt volontaire dit, Python 3 absent dit** (G2, E4, P71-D-34 et D-35) : `GET /etat` rend `{"etat":"arret"}` pendant environ 2,5 s après un arrêt volontaire et `{"etat":"indisponible","raison":"python3-absent"}` sans `python3` (autres routes 503, une ligne dans `serveur.log`). La page affiche « Serveur arrêté » aussitôt, ou une carte « Terminal indisponible » avec la marche à suivre, sans boucle de reconnexion ; une coupure inattendue garde la reconnexion pendant 30 s.
+- **Lanceur** (E4, E5) : sans `python3`, `--terminal` le dit et le cockpit s'ouvre sans terminal (code 0) ; il attend le serveur jusqu'à 30 s (au lieu de 10) et dit « démarrage lent » après 5 s ; le code 5 ne vient qu'au-delà.
+- **Tiroir** (E2, G1) : la pastille ne recouvre plus les boutons de zoom ; tiroir ouvert, la carte s'arrête au-dessus du tiroir (« Ajuster » et le cadrage en tiennent compte, ouvrir, fermer ou régler le tiroir recadre la carte), la barre de question se range, la visite guidée se ferme.
+- **Page du terminal** (E3, G3) : le nombre de lignes de la grille se calcule sur la hauteur utile du cadre, la dernière ligne ne déborde plus ; la barre de défilement n'apparaît qu'au survol ou pendant un défilement.
+- **Rebase sur H-1 (v1.1.2)** : le `PATH` assaini de `vf-cockpit-env.mjs` remplace les variantes N2 de `vf-cockpit-build.mjs`, `-live.mjs`, `-planning.mjs` et `-who.mjs` ; `gitCommonDir` tient N2 et H-1 ensemble. Le shell du terminal garde le `PATH` d'origine du lanceur, transporté par `VF_COCKPIT_PATH_ORIGINE` (limite : un serveur lancé hors du lanceur donne au shell le `PATH` assaini). Le patch du terminal est renuméroté `P26` (le `P25` est celui de H-1). Le moteur d'assemblage reçoit le repli `/usr/bin:/bin:/usr/sbin:/sbin` (et non plus `/usr/bin:/bin`) quand plus rien n'est sûr. Ceci remplace les phrases du tour D qui disaient H-1 renvoyée à un mandat séparé.
+
+### Corrigé — tour de correction E de la Phase 71 (N9, N10)
+- **Collage d'une ligne invisible ou de contrôle d'affichage confirmé** (N9 ; P71-D-30, arbitrage Samuel, AskUserQuestion session principale
+  Claude Code, 2026-11-04 : « Corriger avant la PR (Recommandé) ») : xterm réordonnait visuellement le texte bidi, `echo hello<U+202E>; touch m; `
+  s'affichait à l'envers et Entrée exécutait `touch m`. Une ligne portant un caractère de la classe Cf (bidi, zéro largeur), un caractère Tag ou
+  un contrôle C0/C1 ouvre désormais le bandeau « Annuler / Coller », par la même définition que le marquage ⟨U+XXXX⟩ de l'aperçu.
+- **Collage confirmé : ce qui est confirmé est visible** (N10 ; même arbitrage) : les suites d'au moins trois lignes vides ou blanches sont
+  repliées à l'affichage (⟨N lignes vides⟩), un avertissement dit quand l'aperçu dépasse sa zone ; le texte envoyé reste l'original (sha256).
+
+### Corrigé — tour de correction D de la Phase 71 (N8, N11, documentation)
+- **Un `PATH` assaini vide n'est plus transmis au moteur d'assemblage** (N8, régression de N2 ; P71-D-29, arbitrage Samuel, AskUserQuestion, session
+  principale Claude Code, 2026-11-04 : « le lanceur n'exécute jamais un binaire du lab ») : sans `PATH` ou avec un `PATH` entièrement relatif
+  (`env -i`, `PATH=.`), Node posait `PATH=''` et libuv le lisait comme le dossier courant, donc le `git` du lab était exécuté (6 fois pendant
+  `build`). Le moteur reçoit désormais `/usr/bin:/bin` (sous Windows, la clé est omise).
+- **File d'entrée du terminal** (N11) : un morceau vide est retiré sans envoi ; il bouclait en POST vides (plus de 20 000 en 300 ms).
+- **Sans `ps`, le refus d'arrêt est dit une seule fois** (au lieu d'une centaine pendant l'attente du terminal).
+- **Documentation** : le README dit que le lanceur n'exécute jamais un binaire par son nom mais que le serveur vendorisé et le moteur ne sont pas assainis (H-1,
+  mandat séparé) ; le docstring de l'assistant PTY dit la vraie garantie de `killpg` après le réapage du chef.
+
+### Corrigé — dernier tour de mineurs de la Phase 71 (lot C)
+- **Chaque branche d'arrêt de l'assistant tue la session** (M1) : sortie du shell, SIGTERM et fin du descripteur 0 portent chacune une
+  assertion avec un `nohup` ; un relevé de processus qui ne contient pas l'assistant (`/proc` vide) vaut « impossible » et déclenche le
+  repli sur les groupes (M2) ; un zombie n'est plus un membre vivant (M3) ; le PID du chef de session n'est plus signalé une fois le chef
+  réapé (N4).
+- **Fermeture bornée** (M3, N5) : au-delà de la borne de fermeture, le serveur escalade en SIGKILL sur l'assistant et rend la place ; le
+  README dit la vraie borne (8 s au pire, la grâce de 3 s en pratique).
+- **Saisie découpée** (M4, N6c) : jamais de corps de plus de 64 Kio sur l'entrée, une grosse saisie part en tranches dans l'ordre ; un 413
+  réduit la tranche puis, à un octet, s'écrit dans le terminal, jamais silencieux.
+- **Ouverture du terminal annoncée** (M6, N6b) : l'erreur asynchrone de l'ouvreur est rattrapée ; si l'amorçage n'est pas échangé dans les
+  15 s, le lanceur le dit avec la page à ouvrir à la main ; limite Linux écrite au README (P71-D-27 inchangée).
+- **Aucune trace au lanceur** (N6a) : un lien symbolique planté sur le chemin de sortie, serveur réutilisé, sort en code 4 avec un message.
+
+### Corrigé — audit de sécurité de la Phase 71 (lot B1 : lanceur et amorçage)
+- **Le lanceur n'ouvre plus une adresse lue dans le lab** (F1, majeur ; P71-D-25, validation de Samuel, AskUserQuestion, session
+  principale Claude Code, 2026-11-04) : seuls des ports entiers sont lus dans `server.json`, l'adresse est reconstruite en
+  `http://127.0.0.1:<port>`, et seulement si le processus est le serveur de la sortie ; un `server.json` planté ne remet rien à l'ouvreur.
+- **L'amorçage n'est plus dans l'argv de l'ouvreur** (F6 ; P71-D-27, validation de Samuel, même canal, 2026-11-04) : page de redirection
+  0600 en création exclusive, dont seul le chemin est remis à l'ouvreur, supprimée à l'échange et balayée à 60 s ; l'amorçage expire
+  60 s après sa création, côté serveur. Limite résiduelle : lisible d'un processus du même compte pendant 60 s au plus.
+- **Documentation alignée** (README) : Q n'a aucun écouteur `message` propre, le vendor xterm en garde un interne (F5, P71-D-15
+  reformulée) ; réponses de format fixe d'xterm réinjectées (F8).
+- **Limite signalée (B1-1)** : un `server.json` planté qui désigne un processus vivant étranger fait sortir `open` et `stop` en code 5
+  tant qu'il n'est pas supprimé ; marche à suivre au README.
+
+### Corrigé — audit de sécurité de la Phase 71 (lots B2 et B3)
+- **Arrêt de toute la session du terminal** (S1 ; P71-D-28, validation de Samuel, AskUserQuestion, session principale Claude Code,
+  2026-11-04) : SIGHUP puis SIGKILL à chaque membre de la session relevé à l'arrêt ; `nohup`, `disown` et `&` sont tués ; un
+  processus sorti par `setsid` (ou double fork + `setsid`) survit ; repli sur les groupes si ni `/proc` ni `ps` ne sont lisibles.
+- **`python3` résolu en chemin absolu** (F3 ; P71-D-25) : seuls les éléments absolus du `PATH` sont consultés, un `python3` du lab
+  n'est jamais exécuté ; un élément absolu du `PATH` situé dans le lab reste consulté (limite). Le `PATH` du shell est inchangé.
+- **Le lanceur n'exécute jamais un binaire du lab** (N2 ; P71-D-29, validation de Samuel, AskUserQuestion, session principale Claude Code,
+  2026-11-04) : lancé depuis la racine du lab, sous un `PATH` à élément relatif ou vide (`.`, `:` en tête ou en queue, `bin`), il exécutait un
+  `open`, `xdg-open`, `ps` ou `git` posé dans le lab. `open`, `xdg-open`, `ps`, `git` et `bash` sont maintenant résolus en chemin absolu dans
+  les seuls éléments absolus du `PATH` ; le moteur d'assemblage reçoit un `PATH` assaini ; le serveur n'ouvre plus le navigateur lui-même
+  (le lanceur le fait, y compris sans `--terminal`). Binaire introuvable : échec dit en clair, jamais un repli sur le dossier courant. Le
+  `PATH` du shell du terminal est inchangé (P71-D-03).
+- **Collage confirmé** (F2 ; P71-D-26, même canal, même date) : un collage ou un dépôt à retour à la ligne ou caractère de contrôle
+  n'atteint le shell qu'après « Coller » dans un bandeau « Annuler / Coller » ; Échap annule, Tab puis Entrée valide, aucune touche de
+  confirmation directe exprès ; une ligne simple passe.
+- **Collage confirmé : aperçu intégral** (correction N1 ; P71-D-29, arbitrage Samuel, AskUserQuestion session principale Claude Code,
+  2026-11-04) : le bandeau montrait 200 caractères coupés par une ellipse alors que « Coller » envoyait tout. Il montre désormais le texte
+  intégral (zone défilante, texte seulement, décompte de lignes et de caractères), les caractères invisibles ou de contrôle d'affichage en
+  marqueur ⟨U+XXXX⟩ ; le texte envoyé reste l'original ; une coupure d'affichage (au-delà de 20 000 caractères) est dite et levable.
+- **Terminal limité à son cadre** (F4 ; P71-D-25) : un popup ou une ouverture seule de la page du terminal affiche « Terminal
+  indisponible » (ni secret lu, ni flux, ni shell).
+- **Police attendue au premier chargement** (2,5 s au plus) avant de mesurer la grille ; pastille du tiroir à 44 px sur écran tactile.
+
+### Ajouté — Terminal intégré (Phase 71)
+- **`--terminal`** — le lanceur ouvre un shell de votre compte dans un tiroir en bas des pages Projet et Code, dans la même
+  fenêtre : `$SHELL -l` dans la racine du lab, `claude` y tourne avec son `CLAUDE.md` et ses skills (P71-D-01, D-03, D-04, D-06,
+  D-08). Désactivé par défaut : sans le drapeau, aucun port, aucune route, aucun tiroir, politique de contenu de la v1.0.x
+  (P71-D-02).
+- **Second serveur d'une autre origine** (`127.0.0.1`, port éphémère) rendu dans un cadre ; sortie par `fetch` en flux, entrées
+  par `POST`, pas de WebSocket (P71-D-09) ; `Host`, `Origin` et secret contrôlés sur chaque requête (P71-D-10, P71-D-24).
+- **Amorçage à usage unique** (fichier 0600 effacé à l'échange, fragment d'adresse effacé), secret de session dans le stockage de
+  la page du terminal, jamais de cookie (P71-D-11 à D-13).
+- **Assistant PTY en Python standard** lancé isolé (`python3 -I`), redimensionnement, Ctrl-C ; une session, grâce de 30 s,
+  tampon de reprise de 256 Kio en mémoire ; `TERM=xterm-256color` et `COLORTERM=truecolor` posés toujours (P71-D-05, D-06,
+  D-23). Windows : indisponible (P71-D-07).
+- **xterm.js 6.0.0 et addon-fit 0.11.0 vendorisés** (MIT, sha256, licences), aucun addon presse-papiers, séquences OSC 52,
+  OSC 8, DCS et DECRQSS neutralisées (P71-D-16) ; canal de la page du terminal vers la page Projet limité à une liste fermée de
+  valeurs fixes (P71-D-18) ; thème par paramètre d'adresse (P71-D-19).
+- **Patch amont `P26` de `serve.mjs`** (`vibeflow P26`, diff dans `amont/patches/`), `AJOUT` des fichiers xterm et de l'assistant
+  dans `VENDORED.txt`.
+- **Suites** : `test-cockpit-terminal-activation.sh`, `-serveur.sh`, `-pty.sh`, `-session.sh`, `-page.sh`, `-client.sh`,
+  `-tiroir.sh`, `-xterm.sh`, `-xss.sh`, `-lanceur.sh` (dix suites) ; `test-cockpit-chaine-xss.sh` et `test-cockpit-vendor.sh`
+  étendues.
+
+### Limites connues
+- Voir la section « Limites connues » du README : limite de fond (votre compte, dépôt potentiellement hostile, extensions de
+  navigateur), processus détachés, reprise du plein écran, déni de service du cadre par la page Projet, Windows, Safari et Firefox
+  non mesurés.
+
 ## v1.2.2 — 2026-11-04
 
 Phase 70 : finitions de l'interface. Décisions : P70-D-01 à P70-D-07 et P70-D-16, arbitrages Samuel, AskUserQuestion session principale,

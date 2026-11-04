@@ -1,0 +1,615 @@
+#!/usr/bin/env bash
+# test-cockpit-terminal-tiroir.sh — tiroir du terminal dans P : UI-SPEC §15, CSP de P, canal Q vers P côté P
+# (TERM-01, TERM-05, TERM-07, T17 de TERM-12 ; P71-D-07, D-08, D-18, D-19 ; P71-D-20 : O1 B ; P71-D-21 : O6, O8 ; plan 71-07).
+#   ST    statique : TU.13 (aucune adresse web écrite en entier, un seul fetch vers /api/vf/terminal, deux clés de stockage), T17.6 (aucun postMessage), T17.4 table
+#         de accepteMessage (Node) + mutants M-MSG-ORIGINE, M-MSG-SOURCE, M-MSG-LISTE, M-MSG-CONFIANCE
+#   TU    navigateur : TU.1 sans drapeau · TU.2 pastille, aucun cadre, /etat absente · TU.3 ouverture (cadre, barre, /etat vivante) · TU.4 raccourci à trois temps
+#         et retour du focus · TU.5 poignée au clavier, rechargement · TU.6 Agrandir · TU.7 glissement souris · TU.8 thème par l'adresse du cadre · TU.9 O6 localhost
+#         · TU.10 puce Windows · TU.11 injoignable après 8 s · TU.12 page hors Projet et Code
+#   T8    T8.2 tiroir ouvert : 0 violation de CSP, ready reçu · T8.3 sans frame-src : violation, aucun ready (M-FRAMESRC)
+#   T20   critique design 71 (lot A1) : J1 libellé de la barre = état de la carte (refusé, expiré) · J4 focus de la poignée sur le grip · J5 commande et point jamais coupés
+#         (cartes de P et de Q, balayage de largeurs) · J6 aucun terminal sous la carte « déjà ouvert » · J7 boutons de la barre >= 44 px sous pointer: coarse · J13 pas de bague
+#         de focus sur une carte d'alerte focalisée par programme
+#   T21   recette 71 (E2, G1 ; P71-D-34, P71-D-35) : zoom jamais sous la pastille, atteignable tiroir ouvert · « Ajuster » et cadrage initial au-dessus du tiroir · #ask rangée · visite fermée ;
+#         huit relevés (2 pages x 2 fenêtres x 2 thèmes) + mutants M-PASTILLE-SUR-ZOOM, M-AJUSTE-SANS-TIROIR, M-ASK-RESTE, M-VISITE-RESTE
+#   T22   recette 71 (G4 ; P71-D-37) : hauteur par défaut = 36 % de la fenêtre (220 à 380 px), bande de carte >= moitié de la fenêtre en 1280x720, hauteur mémorisée plafonnée à 70 %,
+#         la fenêtre qui rétrécit ; mutants M-HAUTEUR-FIXE-320, M-MEMO-NON-BORNEE
+#   T17   T17.1 témoin (messages réels de Q) · T17.2 postMessage de P ignoré · T17.3 MessageEvent forgé ignoré · T17.5 espion : liste fermée, aucun octet du shell (M-MSG-DONNEE)
+# Mesure O8 (71-06-SUMMARY, MESURE-O8 minimal=bloque popups=ouvert opener=nul) + décision du manager : cinq jetons de sandbox, aucun autre.
+# Sans Chrome : les sections statiques tournent, la suite annonce « SUITE SAUTÉE (navigateur) ». VF_TIROIR_MS : échéance d'une attente (20000). Exit 0 si tout passe, 1 sinon.
+set -uo pipefail
+libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
+ENG="$SCRIPTS/../skills/cockpit-moteur"; TA="$HERE_T/terminal-aux.mjs"
+WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts" "$WORK/bin" "$WORK/run"
+export REAL_HOME="$HOME"; export HOME="$WORK/home"
+export CHROME_SESSION="$HERE_T/chrome-session.mjs"
+PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
+. "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+PASS=0; FAIL=0
+court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
+assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
+
+CHROME=""
+for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do
+  [ -n "$c" ] || continue
+  if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi
+done
+if [ -z "$CHROME" ]; then echo "  ⊘ SUITE SAUTÉE (navigateur) : TERM-05 et TERM-07 NON vérifiés, non comptés comme réussis"; fi
+
+# shell de test (P71-PL-11) : marqué par son chemin, écrit son PID puis lance un shell interactif SANS exec (le PID reste celui du script)
+cat > "$WORK/bin/shell-test" <<SH
+#!/bin/sh
+echo \$\$ > "$WORK/run/shell.pid"
+/bin/sh -i
+SH
+chmod +x "$WORK/bin/shell-test"; export SHELL="$WORK/bin/shell-test"; export VF_COCKPIT_TERM_GRACE_MS=5000
+SANDBOX_O8="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox" # mesure O8 de 71-06 : popups ouvert, opener nul
+
+cat > "$AUX/ev.mjs" <<'JS'
+import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); const v = new Function('j', 'return (' + process.argv[2] + ')')(j); console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
+cat > "$AUX/harnais-msg.mjs" <<'JS'
+// harnais-msg.mjs <sortie> : table de accepteMessage (T17.4) ; une ligne « nom=oui|non » par cas, « ABSENT » si la fonction n'existe pas
+import { pathToFileURL } from 'node:url';
+const m = await import(pathToFileURL(`${process.argv[2]}/vf-cockpit-terminal-tiroir.mjs`).href);
+if (typeof m.accepteMessage !== 'function') { console.log('ABSENT'); process.exit(0); }
+const Q = 'http://127.0.0.1:4242', P = 'http://127.0.0.1:4141', F = {}, L = m.LISTE_MESSAGES || [];
+const base = { isTrusted: true, origin: Q, source: F, data: 'toggle' };
+const cas = [['accepte', {}], ['accepte-ready', { data: 'ready' }], ['origine-de-P', { origin: P }], ['origine-voisine', { origin: Q + '/' }], ['source-autre', { source: {} }], ['source-nulle', { source: null }],
+  ['valeur-inconnue', { data: 'fermer-tout' }], ['objet', { data: { toggle: 1 } }], ['tableau', { data: ['toggle'] }], ['chaine-10000', { data: 'x'.repeat(10000) }],
+  ['non-fiable', { isTrusted: false }], ['confiance-absente', { isTrusted: undefined }]];
+console.log(cas.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
+console.log('liste=' + [...L].sort().join(','));
+JS
+cat > "$AUX/scriptgen.mjs" <<'JS'
+// scriptgen.mjs <sortie> <indisponible 0|1> : faits statiques du script injecté (contenu du <script>) ; une ligne JSON
+import { pathToFileURL } from 'node:url';
+const m = await import(pathToFileURL(`${process.argv[2]}/vf-cockpit-terminal-tiroir.mjs`).href);
+const h = m.injectionTiroir({ indisponible: process.argv[3] === '1' }) || '';
+const s = (h.match(/<script>([\s\S]*?)<\/script>/) || [, ''])[1];
+const adr = /https?:\/\//g;
+console.log(JSON.stringify({
+  taille: s.length, style: /<style>/.test(h), premiere: s.split('\n')[0],
+  adresses: (s.match(adr) || []).length, temoin: ('x http://exemple.test y'.match(adr) || []).length,
+  fetchs: (s.match(/\bfetch\s*\(/g) || []).length, api: s.includes('/api/vf/terminal'), postmsg: (s.match(/\bpostMessage\s*\(/g) || []).length,
+  cles: [...new Set(s.match(/vf\.terminal\.[a-z]+/g) || [])].sort().join(','), cookie: (s.match(/document\s*\.\s*cookie/g) || []).length, echap: (s.match(/Escape|\bEsc\b/g) || []).length,
+  allow: (s.match(/setAttribute\(\s*['"]allow['"]/g) || []).length,
+}));
+JS
+cat > "$AUX/page-tiroir.mjs" <<'JS'
+// page-tiroir.mjs <sortie> <port> <indisponible 0|1> : serveur jetable qui sert une page portant injectionTiroir() sous n'importe quel chemin
+import http from 'node:http'; import { pathToFileURL } from 'node:url';
+const [, , sortie, port, indispo] = process.argv;
+const m = await import(pathToFileURL(`${sortie}/vf-cockpit-terminal-tiroir.mjs`).href);
+const page = `<!doctype html><html><head><meta charset="utf-8"><script>window.VF_COCKPIT_SERVER={token:"t"};</script>${m.injectionTiroir({ indisponible: indispo === '1' }) || ''}</head><body><p id="x">page</p></body></html>`;
+http.createServer((q, r) => {
+  if (q.url.startsWith('/api/')) { r.writeHead(200, { 'Content-Type': 'application/json' }); return r.end('{"etat":"arrete"}'); }
+  r.writeHead(200, { 'Content-Type': 'text/html' }); r.end(page);
+}).listen(Number(port), '127.0.0.1');
+JS
+cat > "$AUX/chrome-tiroir.mjs" <<'JS'
+// chrome-tiroir.mjs <chrome> <mode> <json> : scénarios navigateur du tiroir ; UNE ligne JSON. Modes : sans · flag · donnee · froid · localhost · page · etats.
+// Chaque étape est isolée (essai) ; en mode flag, la première étape en échec arrête le reste (les mesures absentes sont nommées dans `erreurs`).
+// Gestes par Input.dispatchMouseEvent / Input.dispatchKeyEvent seulement. Le secret de session n'apparaît jamais en sortie.
+import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import { execFileSync } from 'node:child_process';
+const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const [, , chrome, mode, brut] = process.argv;
+const A = JSON.parse(brut);
+const OP = `http://127.0.0.1:${A.P}`, OQ = A.Q ? `http://127.0.0.1:${A.Q}` : '', MS = Number(process.env.VF_TIROIR_MS) || 20000;
+const erreurs = {}; let echec = false;
+const essai = async (nom, f) => { if (echec) return undefined; try { return await f(); } catch (e) { erreurs[nom] = String(e.message).slice(0, 140); echec = true; return undefined; } };
+const ESPION = `if (window.top === window) { window.__msgs = []; addEventListener('message', (e) => window.__msgs.push({ o: e.origin, d: typeof e.data === 'string' ? e.data.slice(0, 200) : '<' + typeof e.data + '>' })); }`;
+const OUVERT = `(() => { const r = document.querySelector('.vf-term-tiroir'); return !!r && !r.hidden && r.getBoundingClientRect().height > 0; })()`;
+const HAUT = `Math.round(document.querySelector('.vf-term-tiroir').getBoundingClientRect().height)`;
+const MSG = (d) => `window.__msgs.some((m) => m.o === ${JSON.stringify(OQ)} && m.d === ${JSON.stringify(d)})`;
+
+// Q n'ouvre un shell que dans son cadre (F4, P71-D-25) : le mode `etats` joue la page de Q dans un cadre sandbox de P, plein viewport, comme le tiroir.
+// `q` : ev/attendre/naviguer visent le monde principal du cadre de Q (retrouvé par sondage des identifiants de contexte, qui repartent de 1 à chaque processus de rendu : le socle n'expose pas les évènements).
+const SBXQ = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox';
+let ctxQ = 0;
+const mondeQ = async (s, etendue = 600) => {
+  let trouve = 0;
+  for (let id = 1; id < etendue; id++) {
+    const v = await s.send('Runtime.evaluate', { contextId: id, expression: `location.origin === ${JSON.stringify(OQ)} && location.hash === '#cadre-test' && typeof window.vfTermVue === 'object'`, returnByValue: true }).then((x) => x && x.result && x.result.value, () => false);
+    if (v === true) trouve = id;
+  }
+  return trouve;
+};
+const facadeQ = (s) => {
+  const ev = async (expression) => { const x = await s.send('Runtime.evaluate', { expression, contextId: ctxQ, returnByValue: true, awaitPromise: true }); return x && x.result && x.result.value; };
+  const attendre = async (expr, nom, ms = MS) => {
+    const fin = Date.now() + ms; let v;
+    do { try { v = await ev(expr); } catch { v = false; } if (v) return v; await pause(100); } while (Date.now() < fin);
+    throw new Error(`attente de « ${nom} » dépassée (${ms} ms)`);
+  };
+  const naviguer = async () => {
+    ctxQ = 0;
+    await s.naviguer(`${OP}/project.html`); await s.attendre(`document.readyState === 'complete'`, 'page P', MS);
+    await s.ev(`(() => { document.querySelectorAll('iframe[data-t]').forEach((f) => f.remove()); const f = document.createElement('iframe'); f.dataset.t = '1'; f.setAttribute('sandbox', ${JSON.stringify(SBXQ)});
+      f.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;border:0;z-index:99999'; f.src = '${OQ}/?theme=dark#cadre-test'; document.body.appendChild(f); })()`);
+    const fin = Date.now() + MS;
+    let essais = 0;
+    while (!ctxQ) { ctxQ = await mondeQ(s, 600 * 5 ** Math.min(essais++, 3)); if (!ctxQ) { if (Date.now() > fin) throw new Error('contexte du cadre de Q introuvable'); await pause(150); } }
+    await attendre(`!!document.querySelector('.xterm-helper-textarea') || !!document.querySelector('#etat:not([hidden])')`, 'terminal ou carte dans le cadre');
+  };
+  return { ev, attendre, naviguer, send: s.send };
+};
+
+await executer(chrome, async (s) => {
+  const att = (expr, nom, ms) => s.attendre(expr, nom, ms || MS);
+  const q = facadeQ(s);
+  const prep = async () => {
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+    await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
+    await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    await s.send('Page.addScriptToEvaluateOnNewDocument', { source: ESPION });
+  };
+  const centre = (sel) => s.ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  const souris = (type, x, y) => s.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 });
+  const clic = async (sel) => { const c = await centre(sel); if (!c) throw new Error(`élément absent : ${sel}`); await souris('mouseMoved', c.x, c.y); await souris('mousePressed', c.x, c.y); await souris('mouseReleased', c.x, c.y); };
+  const touche = async (key, code, vk, modifiers = 0) => { for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, modifiers }); };
+  const raccourci = () => touche(' ', 'Space', 32, 10);
+  const texte = (sel) => s.ev(`(document.querySelector(${JSON.stringify(sel)}) || {}).textContent || ''`);
+
+  // J5 : la commande ne se coupe jamais et le point final reste sur sa ligne ; balayage de largeurs de fenêtre (le renvoi à la ligne en dépend)
+  const COUPURE = (cmd, corps) => `(() => { const c = document.querySelector(${JSON.stringify(cmd)}); const k = document.querySelector(${JSON.stringify(corps)}); if (!c || !k) return null;
+    const w = document.createTreeWalker(k, NodeFilter.SHOW_TEXT); let n, dernier = null; while ((n = w.nextNode())) dernier = n; if (!dernier || dernier.data.slice(-1) !== '.') return { sansPoint: true };
+    const rg = document.createRange(); rg.setStart(dernier, dernier.data.length - 1); rg.setEnd(dernier, dernier.data.length); const p = rg.getBoundingClientRect(), rs = c.getClientRects(), d = rs[rs.length - 1];
+    return { coupee: rs.length > 1, decolle: Math.abs(p.top - d.top) > d.height / 2, larg: Math.round(k.getBoundingClientRect().width) }; })()`;
+  const balayer = async (cmd, corps, largeurs, cible = s) => {
+    const mal = [], vus = new Set();
+    for (const W of largeurs) {
+      await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: 800, deviceScaleFactor: 1, mobile: false }); await pause(150);
+      const m = await cible.ev(COUPURE(cmd, corps)); if (!m || m.sansPoint) throw new Error(`carte illisible à ${W} px`);
+      vus.add(m.larg); if (m.coupee || m.decolle) mal.push(`${W}:${m.coupee ? 'coupee' : ''}${m.decolle ? 'decolle' : ''}`);
+    }
+    return { mal, largeurs: vus.size };
+  };
+  const LARGEURS = [260, 280, 300, 320, 340, 360, 380, 400];
+
+  if (mode === 'sans' || mode === 'localhost' || mode === 'page') {
+    const url = mode === 'sans' ? `${OP}/${A.chemin || ''}` : mode === 'localhost' ? `http://localhost:${A.P}/project.html` : `http://127.0.0.1:${A.T}${A.chemin}`;
+    await essai('page', async () => { await s.naviguer(url); await att(`document.readyState === 'complete'`, 'page chargée'); });
+    if (A.attendre) { try { await att(`!!document.querySelector(${JSON.stringify(A.attendre)})`, 'nœud attendu', Math.min(MS, 8000)); } catch (e) { erreurs.attente = String(e.message).slice(0, 100); } }
+    await pause(1200);
+    const f = await s.ev(`(() => ({ vivante: document.readyState === 'complete' && document.body.children.length > 0, noeuds: document.querySelectorAll('[class*="vf-term"]').length,
+      pastilles: document.querySelectorAll('button.vf-term-pastille').length, iframes: document.querySelectorAll('iframe').length,
+      puce: (document.querySelector('.vf-term-puce') || {}).textContent || '', role: (document.querySelector('.vf-term-puce') || { getAttribute: () => '' }).getAttribute('role'),
+      cles: Object.keys(localStorage).concat(Object.keys(sessionStorage)).filter((k) => k.indexOf('vf.terminal.') === 0).length, hote: location.hostname }))()`);
+    return { erreurs, ...f };
+  }
+
+  await prep();
+  if (mode === 'froid') {
+    await essai('ouverture', async () => { await s.naviguer(`${OP}/project.html`); await att(`!!document.querySelector('button.vf-term-pastille')`, 'pastille'); await clic('button.vf-term-pastille'); });
+    if (A.attendre === 'carte') await essai('carte', () => att(`!!document.querySelector('.vf-term-carte') && document.querySelector('.vf-term-carte').textContent.length > 0`, 'carte injoignable', 15000));
+    if (A.attendre === 'carte') await essai('coupure', async () => { A.coupure = await balayer('.vf-term-carte code', '.vf-term-carte', LARGEURS); });
+    else await essai('violation', async () => { const fin = Date.now() + MS; while (!s.violations.length && Date.now() < fin) await pause(100); await pause(2500); });
+    return { erreurs, coupure: A.coupure, carte: await texte('.vf-term-carte').catch(() => ''), violations: [...s.violations], ready: await s.ev(MSG('ready')).catch(() => false), iframes: await s.ev(`document.querySelectorAll('iframe').length`).catch(() => -1) };
+  }
+
+  if (mode === 'etats') { // les états de la carte vus par Q seul, puis par la barre du tiroir de P (J1, J5, J6, J13)
+    const r = { erreurs };
+    const INVITE = `((document.querySelector('.xterm-rows') || {}).textContent || '').trim().length > 0`;
+    const CARTE = (t) => `((document.getElementById('etat') || {}).textContent || '').includes(${JSON.stringify(t)})`;
+    await essai('amorcage', async () => {
+      await s.naviguer(`${OQ}/#t=${A.amorce}`);
+      await att(`location.port === '${A.P}' && location.pathname === '/project.html' && document.readyState === 'complete'`, 'arrivée sur P');
+    });
+    await essai('connecte', async () => { await q.naviguer(); await q.attendre(INVITE, 'invite du shell dans le cadre de Q (la session est prise par cet onglet)'); });
+    await essai('refuse-q', async () => { // J6 : un autre onglet (sessionStorage vide) ; sous la carte, ni terminal ni curseur visibles
+      await q.ev(`sessionStorage.clear()`); await q.naviguer(); await q.attendre(CARTE('Terminal déjà ouvert'), 'carte Terminal déjà ouvert');
+      r.refuse = await q.ev(`(() => { const v = (e) => !!e && e.checkVisibility({ visibilityProperty: true }); return { terminal: v(document.getElementById('terminal')), xterm: v(document.querySelector('.xterm')), curseur: [...document.querySelectorAll('.xterm-cursor, .xterm-cursor-outline, .xterm-cursor-block')].filter(v).length, xtermPresent: !!document.querySelector('.xterm'), carte: v(document.querySelector('.vf-q-carte')), titre: (document.querySelector('.vf-q-titre') || {}).textContent, bouton: document.activeElement && document.activeElement.tagName }; })()`);
+    });
+    await essai('refuse-p', async () => { // J1 : la barre dit « Déjà ouvert » (autre onglet que celui de Q ci-dessus)
+      await s.naviguer(`${OP}/project.html`); await att(`!!document.querySelector('button.vf-term-pastille')`, 'pastille'); await clic('button.vf-term-pastille');
+      await att(`(document.querySelector('.vf-term-etat') || {}).textContent && document.querySelector('.vf-term-etat').textContent !== 'Connecté'`, 'état de la barre');
+      r.barreRefuse = { texte: await texte('.vf-term-etat'), point: await s.ev(`document.querySelector('.vf-term-etat-point').getAttribute('data-etat')`), annonce: await texte('.vf-term-annonce') };
+    });
+    await essai('expire-p', async () => { // J1 : secret absent, la barre dit « Session expirée »
+      await s.naviguer(`${OQ}/`); await s.ev(`localStorage.removeItem('vf.terminal.secret')`);
+      await s.naviguer(`${OP}/project.html`); await att(`!!document.querySelector('button.vf-term-pastille')`, 'pastille'); await clic('button.vf-term-pastille');
+      await att(`(document.querySelector('.vf-term-etat') || {}).textContent`, 'état de la barre');
+      r.barreExpire = { texte: await texte('.vf-term-etat'), point: await s.ev(`document.querySelector('.vf-term-etat-point').getAttribute('data-etat')`) };
+    });
+    await essai('expire-q', async () => { // J13 : carte d'alerte focalisée par programme ; J5 : commande et point jamais coupés
+      await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+      // refuse-p et expire-p ont laissé vf.terminal.open=1 dans le stockage de P : le rechargement de P rouvrirait le tiroir, donc un SECOND cadre Q dont carte('expire') prend aussi le focus (le dernier chargé
+      // gagne, course). Un seul cadre Q pendant la mesure : on efface la mémoire d'ouverture avant de naviguer. Le focus perdu au chargement reste rouge ; la sonde dit pageFocus, l'élément actif et les cadres de P.
+      await s.ev(`localStorage.removeItem('vf.terminal.open')`);
+      await q.naviguer(); await q.attendre(CARTE('Session expirée'), 'carte Session expirée');
+      const SONDE_J13 = `(() => { const k = document.querySelector('.vf-q-carte'), c = getComputedStyle(k); return { titre: (document.querySelector('.vf-q-titre') || {}).textContent, focus: document.activeElement === k, fv: k.matches(':focus-visible'), role: k.getAttribute('role'), contour: c.outlineStyle, pageFocus: document.hasFocus(), actif: document.activeElement && document.activeElement.tagName }; })()`;
+      r.alerte = await q.ev(SONDE_J13); r.alerte.cadresP = await s.ev(`document.querySelectorAll('iframe').length`);
+      r.coupure = await balayer('.vf-q-commande', '.vf-q-corps', LARGEURS, q);
+    });
+    return r;
+  }
+
+  // --- flag / donnee : amorçage dans Chrome, secret lu sans démarrer le shell, puis P ---
+  let secret = '';
+  const r = { erreurs };
+  const pid = () => { try { return fs.readFileSync(A.fichierPid, 'utf8').trim(); } catch { return ''; } };
+  const session = () => { try { return JSON.parse(execFileSync('node', [A.TA, 'etat', String(A.Q), secret], { encoding: 'utf8' }).split('\n')[2] || '{}').session; } catch { return 'ERREUR'; } };
+  await essai('amorcage', async () => {
+    await s.naviguer(`${OQ}/#t=${A.amorce}`);
+    await att(`location.port === '${A.P}' && location.pathname === '/project.html' && document.readyState === 'complete'`, 'arrivée sur P');
+    await s.naviguer(`${OQ}/#t=${'0'.repeat(48)}`);
+    await att(`((document.getElementById('etat') || {}).textContent || '').includes('Session expirée')`, 'carte Session expirée (échange refusé)');
+    secret = await s.ev(`localStorage.getItem('vf.terminal.secret')`);
+    if (!/^[0-9a-f]{64}$/.test(secret || '')) throw new Error('secret absent du stockage de Q');
+  });
+  await essai('P', async () => { await s.naviguer(`${OP}/project.html`); await att(`!!document.querySelector('button.vf-term-pastille')`, 'pastille Terminal'); });
+  r.tu2 = await essai('tu2', async () => ({ ...(await s.ev(`(() => { const b = document.querySelector('button.vf-term-pastille'); return { n: document.querySelectorAll('button.vf-term-pastille').length, texte: b.textContent.trim(), aria: b.getAttribute('aria-label'), titre: b.title, iframes: document.querySelectorAll('iframe').length }; })()`)), etat: session() }));
+  await essai('ouvreur', () => s.ev(`(() => { const b = document.createElement('button'); b.id = 'ouvreur'; b.textContent = 'o'; b.style.cssText = 'position:fixed;left:0;top:0;width:12px;height:12px;z-index:1'; document.body.appendChild(b); b.focus(); window.__annonces = []; new MutationObserver(() => window.__annonces.push(document.querySelector('.vf-term-annonce').textContent)).observe(document.querySelector('.vf-term-annonce'), { childList: true, characterData: true, subtree: true }); return true; })()`));
+  // TU.3 / TU.4 temps 1 : le raccourci ouvre, le cadre est créé, le focus lui est donné
+  await essai('ouvrir', async () => { await raccourci(); await att(OUVERT, 'tiroir ouvert'); await att(`document.activeElement && document.activeElement.tagName === 'IFRAME'`, 'focus au cadre'); await att(`${MSG('ready')} && ${MSG('etat:connecte')}`, 'ready puis etat:connecte'); });
+  r.tu3 = await essai('tu3', async () => ({ ...(await s.ev(`(() => { const f = document.querySelector('iframe'); return { n: document.querySelectorAll('iframe').length, src: f.getAttribute('src'), title: f.title, sandbox: f.getAttribute('sandbox'), allow: f.hasAttribute('allow'),
+    barre: (document.querySelector('.vf-term-etat') || {}).textContent, region: document.querySelector('.vf-term-tiroir').getAttribute('role') + '/' + document.querySelector('.vf-term-tiroir').getAttribute('aria-label'),
+    annonce: window.__annonces[0], ready: ${MSG('ready')}, connecte: ${MSG('etat:connecte')} }; })()`)), etat: session(), violations: [...s.violations], pid: pid() }));
+  if (A.court) { /* mode donnee : pas de gestes intermédiaires */ } else {
+  await essai('tu4b', async () => { await s.ev(`document.getElementById('ouvreur').focus()`); await raccourci(); await pause(300);
+    r.tu4b = await s.ev(`({ ouvert: ${OUVERT}, actif: document.activeElement.tagName })`); });
+  await essai('tu4c', async () => { await raccourci(); await att(`!(${OUVERT})`, 'fermeture par le message toggle de Q'); await att(`document.activeElement && document.activeElement.id === 'ouvreur'`, 'focus rendu à l’ouvreur');
+    r.tu4c = await s.ev(`({ ferme: !(${OUVERT}), focus: document.activeElement.id, toggle: ${MSG('toggle')}, annonce: (document.querySelector('.vf-term-annonce') || {}).textContent, inert: document.querySelector('.vf-term-tiroir').inert })`); });
+  await essai('reouvrir', async () => { await clic('button.vf-term-pastille'); await att(OUVERT, 'tiroir rouvert au clic'); await pause(500); r.reouv = await s.ev(`({ iframes: document.querySelectorAll('iframe').length })`); r.reouv.pid = pid(); });
+  await essai('tu5', async () => {
+    r.h0 = await s.ev(HAUT); await s.ev(`document.querySelector('.vf-term-poignee').focus()`);
+    await touche('ArrowUp', 'ArrowUp', 38); await touche('ArrowUp', 'ArrowUp', 38);
+    r.tu5 = await s.ev(`({ h: ${HAUT}, now: document.querySelector('.vf-term-poignee').getAttribute('aria-valuenow'), stock: [localStorage.getItem('vf.terminal.h'), localStorage.getItem('vf.terminal.open')].join('/') })`);
+    const pid1 = pid(); await s.send('Page.reload');
+    await att(`${OUVERT} && ${MSG('etat:connecte')}`, 'tiroir rouvert et reconnecté après rechargement');
+    r.tu5.reload = await s.ev(`({ h: ${HAUT}, iframes: document.querySelectorAll('iframe').length })`); r.tu5.pid = pid1 === pid() ? 'identique' : 'change:' + pid1 + '>' + pid();
+  });
+  await essai('tu6', async () => {
+    r.h5 = await s.ev(HAUT); await clic('.vf-term-plein');
+    r.tu6 = { pressed: await s.ev(`document.querySelector('.vf-term-plein').getAttribute('aria-pressed')`), aria: await s.ev(`document.querySelector('.vf-term-plein').getAttribute('aria-label')`), h: await s.ev(HAUT) };
+    await clic('.vf-term-plein'); r.tu6.retour = await s.ev(`document.querySelector('.vf-term-plein').getAttribute('aria-pressed') + '/' + ${HAUT}`);
+  });
+  await essai('tu7', async () => {
+    const c = await centre('.vf-term-poignee'); await souris('mouseMoved', c.x, c.y); await souris('mousePressed', c.x, c.y);
+    for (let i = 1; i <= 8; i++) await souris('mouseMoved', c.x, c.y - 10 * i);
+    r.tu7 = { pendant: await s.ev(`getComputedStyle(document.querySelector('iframe')).pointerEvents + '/' + document.body.classList.contains('resizing')`) };
+    await souris('mouseReleased', c.x, c.y - 80);
+    r.tu7.apres = await s.ev(`getComputedStyle(document.querySelector('iframe')).pointerEvents + '/' + document.body.classList.contains('resizing')`); r.tu7.h = await s.ev(HAUT);
+  });
+  await essai('tu8', async () => {
+    const hist = await s.ev('history.length'), n0 = await s.ev(`window.__msgs.filter((m) => m.d === 'etat:connecte').length`), pid1 = pid();
+    await s.ev(`document.documentElement.setAttribute('data-theme', 'light')`);
+    const url = async () => { const t = (await s.send('Page.getFrameTree')).frameTree.childFrames || []; const f = t.find((c) => c.frame.url.indexOf(OQ) === 0); return f ? f.frame.url : ''; };
+    const fin = Date.now() + MS; let u = ''; while (Date.now() < fin) { u = await url(); if (u.indexOf('theme=light') >= 0) break; await pause(100); }
+    await att(`window.__msgs.filter((m) => m.d === 'etat:connecte').length > ${n0}`, 'reconnexion du cadre après la bascule');
+    r.tu8 = { url: u.replace(OQ, 'Q'), histoire: hist === (await s.ev('history.length')) ? 'inchangee' : 'changee', pid: pid1 === pid() ? 'identique' : 'change' };
+  });
+  await essai('t172', async () => {
+    r.t17 = { avant: await s.ev(OUVERT) };
+    await s.ev(`postMessage('toggle', location.origin)`); await pause(600); r.t17.postMessage = await s.ev(OUVERT);
+    await s.ev(`dispatchEvent(new MessageEvent('message', { data: 'toggle', origin: ${JSON.stringify(OQ)}, source: document.querySelector('iframe').contentWindow }))`); await pause(600); r.t17.forge = await s.ev(OUVERT);
+  });
+  }
+  await essai('tu14', async () => { // J4 : focus clavier de la poignée = bague autour du grip, pas deux bandes pleine largeur
+    await s.ev(`document.querySelector('.vf-term-plein').focus()`); await touche('Tab', 'Tab', 9, 8); await pause(200); // Maj+Tab depuis le bouton : le clavier amène le focus sur la poignée
+    r.tu14 = await s.ev(`(() => { const p = document.querySelector('.vf-term-poignee'), g = document.querySelector('.vf-term-grip'), cp = getComputedStyle(p), cg = getComputedStyle(g), b = g.getBoundingClientRect(), q = p.getBoundingClientRect();
+      return { sur_poignee: document.activeElement === p, fv: p.matches(':focus-visible'), poignee: cp.outlineStyle, grip: cg.outlineStyle + '/' + cg.outlineWidth, opaque: cg.opacity, grip_larg: Math.round(b.width), poignee_larg: Math.round(q.width) }; })()`);
+  });
+  await essai('tu15', async () => { // J7 : sous pointer: coarse les boutons de la barre font au moins 44 px et la barre les contient ; sous pointeur fin, 28 px
+    const mesure = () => s.ev(`(() => { const bs = [...document.querySelectorAll('.vf-term-bouton')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height); }); return { coarse: matchMedia('(pointer: coarse)').matches, boutons: bs.join(','), barre: Math.round(document.querySelector('.vf-term-barre').getBoundingClientRect().height), pastille: parseFloat(getComputedStyle(document.querySelector('button.vf-term-pastille')).height) }; })()`);
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await pause(200);
+    r.tu15 = { fin: await mesure() };
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: true }); await s.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 }); await pause(400);
+    r.tu15.tactile = await mesure();
+    await s.send('Emulation.setTouchEmulationEnabled', { enabled: false }); await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await pause(200);
+  });
+  // T17.5 : saisie au clavier dans le cadre, relevé de l'espion
+  await essai('t175', async () => {
+    if (!(await s.ev(OUVERT))) { await clic('button.vf-term-pastille'); await att(OUVERT, 'tiroir ouvert pour la saisie'); }
+    await s.ev(`document.querySelector('iframe').focus()`); await pause(400);
+    for (const c of `echo ${A.marqueur} > ${A.fichierM}`) { await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: c, text: c, unmodifiedText: c }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: c }); }
+    await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+    const fin = Date.now() + MS; while (!fs.existsSync(A.fichierM) && Date.now() < fin) await pause(100);
+    r.t175 = { fichier: fs.existsSync(A.fichierM) };
+    await pause(800);
+    const msgs = JSON.parse(await s.ev('JSON.stringify(window.__msgs)')), deQ = msgs.filter((m) => m.o === OQ), txt = JSON.stringify(msgs);
+    r.t175 = { ...r.t175, de_q: deQ.length, hors_liste: deQ.filter((m) => !A.liste.includes(m.d)).length, marqueur: txt.includes(A.marqueur) ? 1 : 0, secret: txt.includes(secret) ? 1 : 0, amorce: txt.includes(A.amorce) ? 1 : 0, vus: [...new Set(deQ.map((m) => m.d))].sort().join(',') };
+  });
+  r.violations = [...s.violations];
+  return r;
+}, { csp: true });
+JS
+cat > "$AUX/chrome-geom.mjs" <<'JS'
+// chrome-geom.mjs <chrome> <json> : géométrie du tiroir dans les pages Projet et Code (E2, G1 ; P71-D-34, P71-D-35) ; UNE ligne JSON.
+// Entrée : { P } (port du cockpit lancé avec --terminal), optionnel { shots } (dossier de captures), { court } (2 combinaisons au lieu de 8, pour les mutants). Chaque combinaison page x fenêtre x thème a son relevé.
+// Gestes par Input.dispatchMouseEvent / Input.dispatchKeyEvent seulement : le test de recouvrement est celui du navigateur (elementFromPoint).
+import { pathToFileURL } from 'node:url'; import fs from 'node:fs';
+const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const [, , chrome, brut] = process.argv; const A = JSON.parse(brut);
+const OP = `http://127.0.0.1:${A.P}`, MS = Number(process.env.VF_TIROIR_MS) || 20000;
+const FENETRES = [[1440, 900], [1280, 720]], THEMES = ['dark', 'light'], PAGES = ['index.html', 'project.html'];
+const ZOOM = `['z-out', 'z-fit', 'z-in'].map((id) => { const e = document.getElementById(id); if (!e) return id + ':absent'; const r = e.getBoundingClientRect(); const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  const b = t && t.closest('button'); return id + ':' + (b ? b.id || b.className : 'rien'); })`;
+const TIROIR = `(() => { const r = document.querySelector('.vf-term-tiroir'); if (!r || r.hidden) return null; const b = r.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, left: b.left, right: b.right }; })()`;
+const NOEUDS = `(() => { const ns = [...document.querySelectorAll('#viewport .node')].filter((n) => n.getClientRects().length); if (!ns.length) return null; let top = 1e9, bottom = -1e9, left = 1e9, right = -1e9;
+  for (const n of ns) { const b = n.getBoundingClientRect(); top = Math.min(top, b.top); bottom = Math.max(bottom, b.bottom); left = Math.min(left, b.left); right = Math.max(right, b.right); } return { n: ns.length, top: Math.round(top), bottom: Math.round(bottom), left: Math.round(left), right: Math.round(right) }; })()`;
+const ASK = `(() => { const a = document.getElementById('ask'); if (!a) return null; const b = a.getBoundingClientRect(); return { display: getComputedStyle(a).display, bottom: Math.round(b.bottom), h: Math.round(b.height) }; })()`;
+const PAST = `(() => { const p = document.querySelector('.vf-term-pastille'); if (!p || p.hidden) return null; const b = p.getBoundingClientRect(); return { left: Math.round(b.left), top: Math.round(b.top), right: Math.round(b.right), bottom: Math.round(b.bottom) }; })()`;
+const ZRECT = `(() => { const z = document.getElementById('zoom'); const b = z.getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom), left: Math.round(b.left), right: Math.round(b.right) }; })()`;
+
+await executer(chrome, async (s) => {
+  const att = (expr, nom, ms) => s.attendre(expr, nom, ms || MS);
+  const centre = (sel) => s.ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  const souris = (type, x, y) => s.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 });
+  const clic = async (sel) => { const c = await centre(sel); if (!c) throw new Error(`élément absent : ${sel}`); await souris('mouseMoved', c.x, c.y); await souris('mousePressed', c.x, c.y); await souris('mouseReleased', c.x, c.y); };
+  const touche = async (key, code, vk) => { for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key, text: type === 'keyDown' ? key : undefined, code, windowsVirtualKeyCode: vk }); };
+  const ouvert = `(() => { const r = document.querySelector('.vf-term-tiroir'); return !!r && !r.hidden && r.getBoundingClientRect().height > 0; })()`;
+  const capture = async (nom) => { if (!A.shots) return; fs.mkdirSync(A.shots, { recursive: true }); const r = await s.send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${A.shots}/${nom}.png`, Buffer.from(r.data, 'base64')); };
+  await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  const sorties = [], erreurs = {};
+  const combos = [];
+  for (const page of PAGES) for (const [W, H] of FENETRES) for (const theme of THEMES) combos.push([page, W, H, theme]);
+  const retenues = A.court ? combos.filter(([p, W, , t]) => (p === 'index.html' && W === 1440 && t === 'dark') || (p === 'project.html' && W === 1280 && t === 'light')) : combos;
+  for (const [page, W, H, theme] of retenues) {
+    const cle = `${page}@${W}x${H}/${theme}`; const r = { cle };
+    try {
+      await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false });
+      await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
+      await s.naviguer(`${OP}/${page}`); await s.ev(`localStorage.clear(); sessionStorage.clear(); document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)})`);
+      await s.naviguer(`${OP}/${page}`); await s.ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)})`);
+      await att(`!!document.querySelector('button.vf-term-pastille') && document.querySelectorAll('#viewport .node').length > 0`, 'pastille et nœuds', MS);
+      await pause(1800);
+      r.fermeZoom = await s.ev(ZOOM); r.fermePast = await s.ev(PAST); r.fermeZ = await s.ev(ZRECT); r.fermeAsk = await s.ev(ASK);
+      // un clic sur « + » ne doit pas ouvrir le terminal
+      const k0 = await s.ev(`window.VibeFlow ? 1 : 0`); r.api = k0;
+      await clic('#z-in'); await pause(300); r.clicPlusOuvre = await s.ev(ouvert);
+      await capture(`${cle.replace(/[^a-z0-9]+/gi, '_')}-ferme`);
+      // la visite « Par où commencer » est ouverte avant l'ouverture du tiroir
+      r.visiteAvant = await s.ev(`(() => { try { if (window.VibeFlowTour && !window.VibeFlowTour.active()) window.VibeFlowTour.start(); return !!(window.VibeFlowTour && window.VibeFlowTour.active()); } catch (e) { return 'err'; } })()`);
+      await pause(500);
+      await clic('button.vf-term-pastille'); await att(ouvert, 'tiroir ouvert'); await pause(900);
+      r.tiroir = await s.ev(TIROIR); r.ouvZoom = await s.ev(ZOOM); r.ouvZ = await s.ev(ZRECT); r.ouvAsk = await s.ev(ASK);
+      r.visiteApres = await s.ev(`window.VibeFlowTour ? window.VibeFlowTour.active() : null`); r.visiteCachee = await s.ev(`(document.getElementById('tour') || { hidden: true }).hidden`);
+      // « Ajuster » : touche F (focus rendu à la page) puis bouton
+      await s.ev(`document.activeElement && document.activeElement.blur && document.activeElement.blur()`);
+      await touche('f', 'KeyF', 70); await pause(900); r.apresF = await s.ev(NOEUDS);
+      await capture(`${cle.replace(/[^a-z0-9]+/gi, '_')}-ouvert-F`);
+      await clic('#z-fit'); await pause(900); r.apresBouton = await s.ev(NOEUDS);
+      // un clic sur « + » tiroir ouvert rend la main à la page : le tiroir reste ouvert, le zoom agit (les nœuds grossissent)
+      const avant = await s.ev(NOEUDS); await clic('#z-out'); await pause(300); const apres = await s.ev(NOEUDS); r.zoomOutAgit = !!avant && !!apres && (apres.right - apres.left) < (avant.right - avant.left); r.tiroirResteOuvert = await s.ev(ouvert);
+      // fermeture : tout revient
+      await clic('.vf-term-fermer'); await pause(700); r.ferme2 = await s.ev(`!document.querySelector('.vf-term-tiroir') || document.querySelector('.vf-term-tiroir').hidden`);
+      r.finAsk = await s.ev(ASK); r.finZoom = await s.ev(ZOOM); r.finPast = await s.ev(PAST); r.finZ = await s.ev(ZRECT);
+      // reprise : tiroir mémorisé ouvert, la première mise en page tient déjà compte de lui
+      await s.ev(`localStorage.setItem('vf.terminal.open', '1')`); await s.naviguer(`${OP}/${page}`); await s.ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)})`);
+      await att(`${ouvert} && document.querySelectorAll('#viewport .node').length > 0`, 'tiroir rouvert et nœuds'); await pause(2200);
+      r.repriseTiroir = await s.ev(TIROIR); r.repriseNoeuds = await s.ev(NOEUDS);
+      await capture(`${cle.replace(/[^a-z0-9]+/gi, '_')}-reprise`);
+    } catch (e) { erreurs[cle] = String(e.message).slice(0, 160); }
+    sorties.push(r);
+  }
+  // verdicts : un groupe par propriété, la liste des relevés qui la tiennent mal (vide = tenue partout)
+  const trois = (r) => (id) => r.every((x, i) => x === ['z-out', 'z-fit', 'z-in'][i] + ':' + ['z-out', 'z-fit', 'z-in'][i]);
+  const hors = (a, b) => !!a && !!b && !(a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top);
+  const G = { E2f: [], E2o: [], G1F: [], G1ask: [], G1visite: [], G1reprise: [], fin: [], agit: [] };
+  for (const r of sorties) {
+    const t = r.tiroir, ok3 = (l) => Array.isArray(l) && trois(l)();
+    if (!(ok3(r.fermeZoom) && r.clicPlusOuvre === false && hors(r.fermePast, r.fermeZ))) G.E2f.push(r.cle);
+    if (!(t && ok3(r.ouvZoom) && r.ouvZ && r.ouvZ.bottom <= t.top)) G.E2o.push(r.cle);
+    if (!(t && r.apresF && r.apresBouton && r.apresF.bottom <= t.top && r.apresBouton.bottom <= t.top)) G.G1F.push(r.cle);
+    if (!(r.ouvAsk && r.ouvAsk.display === 'none' && r.finAsk && r.finAsk.display !== 'none' && r.finAsk.bottom === r.fermeAsk.bottom)) G.G1ask.push(r.cle);
+    if (!(r.visiteAvant === true && r.visiteApres === false && r.visiteCachee === true)) G.G1visite.push(r.cle);
+    if (!(t && r.repriseTiroir && r.repriseNoeuds && r.repriseNoeuds.bottom <= r.repriseTiroir.top)) G.G1reprise.push(r.cle);
+    if (!(ok3(r.finZoom) && JSON.stringify(r.finZ) === JSON.stringify(r.fermeZ) && r.ferme2 === true)) G.fin.push(r.cle);
+    if (!(r.zoomOutAgit === true && r.tiroirResteOuvert === true)) G.agit.push(r.cle);
+  }
+  return { erreurs, n: sorties.length, api: sorties.every((r) => r.api === 1), noeuds: sorties.every((r) => r.apresF && r.apresF.n > 0), G, sorties: A.detail ? sorties : undefined };
+});
+JS
+cat > "$AUX/chrome-defaut.mjs" <<'JS'
+// chrome-defaut.mjs <chrome> <json> : hauteur du tiroir selon la fenêtre (G4 ; P71-D-37) ; UNE ligne JSON. Entrée : { P }. Page Projet, stockage vidé avant chaque relevé.
+import { pathToFileURL } from 'node:url';
+const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const [, , chrome, brut] = process.argv; const A = JSON.parse(brut);
+const OP = `http://127.0.0.1:${A.P}`, MS = Number(process.env.VF_TIROIR_MS) || 20000;
+const OUVERT = `(() => { const r = document.querySelector('.vf-term-tiroir'); return !!r && !r.hidden && r.getBoundingClientRect().height > 0; })()`;
+const MESURE = `(() => { const b = document.querySelector('.vf-term-tiroir').getBoundingClientRect(); const hh = parseFloat(getComputedStyle(document.body).getPropertyValue('--hh')) || 64; return { h: Math.round(b.height), bande: Math.round(b.top - hh), fenetre: window.innerHeight }; })()`;
+await executer(chrome, async (s) => {
+  const att = (expr, nom) => s.attendre(expr, nom, MS);
+  const fenetre = (W, H) => s.send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false });
+  const ouvrirA = async (W, H, stock) => {
+    await fenetre(W, H); await s.naviguer(`${OP}/project.html`); await s.ev(`localStorage.clear()`);
+    if (stock) await s.ev(`localStorage.setItem('vf.terminal.h', '${stock}'); localStorage.setItem('vf.terminal.open', '1')`); else await s.ev(`localStorage.setItem('vf.terminal.open', '1')`);
+    await s.naviguer(`${OP}/project.html`); await att(OUVERT, 'tiroir ouvert'); await pause(600); return s.ev(MESURE);
+  };
+  const r = { erreurs: {} };
+  try {
+    r.d720 = await ouvrirA(1280, 720); r.d900 = await ouvrirA(1440, 900); r.d1080 = await ouvrirA(1920, 1080);
+    r.m720 = await ouvrirA(1280, 720, 600); r.m900 = await ouvrirA(1440, 900, 600);
+    r.m360 = await ouvrirA(1280, 720, 360);
+    await ouvrirA(1440, 900); await fenetre(1280, 720); await pause(500); r.suit = await s.ev(MESURE);
+    await ouvrirA(1440, 900, 600); await fenetre(1280, 720); await pause(500); r.retrecit = await s.ev(MESURE);
+  } catch (e) { r.erreurs.defaut = String(e.message).slice(0, 160); }
+  return r;
+});
+JS
+echo ok
+rq() { node "$TA" req "$@"; }
+rj() { printf '%s\n' "$1" | node "$AUX/ev.mjs" "$2" 2>/dev/null; }
+amorce_neuve() { node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"; }
+mklab() {
+  local L="$1" B="$1/.planning"; mkdir -p "$L/src" "$B/phases/01-socle"; printf 'export const u = 1;\n' > "$L/src/u.js"
+  printf -- '## Phases\n\n- [x] **Phase 1: Socle** - premier jet\n\n### Phase 1: Socle\n**Goal**: Poser le socle\n' > "$B/ROADMAP.md"
+  printf -- '---\nstatus: executing\ncurrent_phase: 1\nmilestone: v1.0 MVP\n---\n' > "$B/STATE.md"
+  printf -- '---\nwave: 1\nfiles_modified: [src/u.js]\n---\n<objective>Poser le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"
+  git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
+  node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
+}
+SRVN=0
+srv() { # srv <sortie> <0|1 terminal> -> SRV_PORT SRV_PID SRV_O SRV_OUT QP AMORCE ; serveur lancé directement depuis la sortie, comme le lanceur
+  local o="$1" term="${2:-1}" lab flag=(); lab="$(cd "$1/../.." && pwd)"
+  SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN.out"; rm -f "$o/.cache/server.json" "$o/.cache/terminal-amorce"; mkdir -p "$o/.cache"
+  if [ "$term" = 1 ]; then flag=(--terminal); AMORCE="$(amorce_neuve)"; (umask 077; printf '%s' "$AMORCE" > "$o/.cache/terminal-amorce"); fi
+  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open ${flag[@]+"${flag[@]}"} --port "$(libre)" > "$SRV_OUT" 2>&1 ) </dev/null >/dev/null 2>&1 &
+  SRV_PID=$!; PIDS+=($SRV_PID)
+  for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
+  if [ "$term" = 1 ]; then for _ in $(seq 1 50); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done; fi
+  SRV_PORT="$(sj j.port)"; SRV_PORT="${SRV_PORT:-0}"; QP="$(sj '(j.terminal&&j.terminal.url)||"http://127.0.0.1:0"')"; QP="${QP##*:}"
+}
+sj() { node "$AUX/ev.mjs" "$1" < "$SRV_O/.cache/server.json" 2>/dev/null; }
+unsrv() { vf_hyg_stop "$SRV_PID"; }
+mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> -> MUT_OUT ; code 1 si la cible manque ou si la copie n'a pas changé
+  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
+  cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
+}
+sans_effet() { assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; }
+navig() { node "$AUX/chrome-tiroir.mjs" "$CHROME" "$@"; } # navig <mode> <json>
+run_etats() { # run_etats <sortie> -> EJ ; un serveur neuf, un amorçage neuf, un Chrome neuf
+  srv "$1" 1; EJ="$(navig etats "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\"}")"; unsrv
+}
+run_geom() { # run_geom <sortie> <court 0|1> -> GJ ; un serveur neuf, un Chrome neuf (le shell n'est pas piloté : la géométrie seule)
+  srv "$1" 1; GJ="$(node "$AUX/chrome-geom.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":$2}")"; unsrv
+}
+run_defaut() { # run_defaut <sortie> -> DJ ; un serveur neuf, un Chrome neuf
+  srv "$1" 1; DJ="$(node "$AUX/chrome-defaut.mjs" "$CHROME" "{\"P\":$SRV_PORT}")"; unsrv
+}
+LISTE_JSON='["ready","etat:connecte","etat:reconnexion","etat:termine","etat:refuse","etat:expire","etat:arrete","toggle"]'
+run_flag() { # run_flag <sortie> <court 0|1> -> FJ FP FQ ; un serveur neuf, un amorçage neuf, un Chrome neuf
+  srv "$1" 1; FP=$SRV_PORT; FQ=$QP; FMARQ="MARQUEUR-P-$RANDOM$RANDOM"; rm -f "$WORK/run/m.txt" "$WORK/run/shell.pid"
+  FJ="$(navig flag "{\"P\":$FP,\"Q\":$FQ,\"amorce\":\"$AMORCE\",\"marqueur\":\"$FMARQ\",\"fichierPid\":\"$WORK/run/shell.pid\",\"fichierM\":\"$WORK/run/m.txt\",\"TA\":\"$TA\",\"liste\":$LISTE_JSON,\"court\":$2}")"; unsrv
+}
+
+LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"
+
+echo "=== ST — script injecté (statique) : TU.13, T17.6 ==="
+node "$AUX/scriptgen.mjs" "$OUT" 0 > "$WORK/sg.out" 2>&1; SG="$(tail -n 1 "$WORK/sg.out")"
+assert_eq "TU.13.0 — témoin : le script injecté existe (taille > 500), sa première ligne est l'en-tête VibeFlow (71-07), il vient avec sa feuille" "$(rj "$SG" '(j.taille>500)+"/"+j.premiere+"/"+j.style')" "true/// VibeFlow (71-07) : tiroir du terminal/true"
+assert_eq "TU.13 — aucune adresse web écrite en entier dans le script injecté, commentaires compris (témoin : le motif trouve une adresse plantée)" "$(rj "$SG" 'j.adresses+"/"+j.temoin')" "0/1"
+assert_eq "TU.13b — un seul fetch( et il vise /api/vf/terminal ; aucun cookie ; seules clés de stockage : vf.terminal.h et vf.terminal.open" "$(rj "$SG" '(j.taille>500)+"/"+j.fetchs+"/"+j.api+"/"+j.cookie+"/"+j.cles')" "true/1/true/0/vf.terminal.h,vf.terminal.open"
+assert_eq "T17.6 — aucun postMessage( dans le script injecté (le sens P vers le cadre est fermé), aucun attribut allow posé, Échap jamais cité (le script est vivant)" "$(rj "$SG" '(j.taille>500)+"/"+j.postmsg+"/"+j.allow+"/"+j.echap')" "true/0/0/0"
+
+echo "=== T17.4 — table de accepteMessage et mutants M-MSG-* ==="
+ATT_TABLE="accepte=oui accepte-ready=oui origine-de-P=non origine-voisine=non source-autre=non source-nulle=non valeur-inconnue=non objet=non tableau=non chaine-10000=non non-fiable=non confiance-absente=non"
+node "$AUX/harnais-msg.mjs" "$OUT" > "$WORK/h.out" 2>&1
+assert_eq "T17.4 — accepté seulement : isTrusted, origine de Q exacte, source = le cadre, valeur de la liste ; refusés : origine de P ou voisine, autre source ou nulle, valeur inconnue, objet, tableau, 10 000 caractères, non fiable ou confiance absente" "$(sed -n 1p "$WORK/h.out")" "$ATT_TABLE"
+assert_eq "T17.4b — LISTE_MESSAGES : exactement les huit valeurs de l'UI-SPEC §13" "$(sed -n 2p "$WORK/h.out")" "liste=etat:arrete,etat:connecte,etat:expire,etat:reconnexion,etat:refuse,etat:termine,ready,toggle"
+mut_msg() { # mut_msg <nom> <expression-sed> <cas qui doit passer à « oui »>
+  if mutant "$1" vf-cockpit-terminal-tiroir.mjs "$2"; then
+    node "$AUX/harnais-msg.mjs" "$MUT_OUT" > "$WORK/hm-$1.out" 2>&1
+    assert_eq "$1 — le mutant rougit T17.4 : le cas « $3 » est accepté" "$(sed -n 1p "$WORK/hm-$1.out" | tr ' ' '\n' | grep "^$3=")" "$3=oui"
+  else sans_effet "$1"; fi
+}
+mut_msg M-MSG-ORIGINE 's|if (e.origin !== origineQ) return false;||' origine-de-P
+mut_msg M-MSG-SOURCE 's|if (!fenetreCadre \|\| e.source !== fenetreCadre) return false;||' source-autre
+mut_msg M-MSG-LISTE 's|typeof e.data === .string. && liste.indexOf(e.data) >= 0|typeof e.data === "string"|' valeur-inconnue
+mut_msg M-MSG-CONFIANCE 's|if (!e \|\| e.isTrusted !== true) return false;|if (!e) return false;|' non-fiable
+
+if [ -n "$CHROME" ]; then
+echo "=== TU.1 — sans --terminal : rien (UI-SPEC §15.1) ==="
+srv "$OUT" 0
+for ch in "" "project.html"; do
+  J="$(navig sans "{\"P\":$SRV_PORT,\"chemin\":\"$ch\"}")"
+  assert_eq "TU.1 — sans le drapeau, /$ch : aucun nœud vf-term, aucune clé vf.terminal.*, aucun cadre (témoin : la page est chargée et vivante)" "$(rj "$J" '"vivante="+j.vivante+" noeuds="+j.noeuds+" cles="+j.cles+" iframes="+j.iframes')" "vivante=true noeuds=0 cles=0 iframes=0"
+done
+unsrv
+
+echo "=== TU.2-TU.8 / T8.2 / T17 — avec --terminal : pastille, ouverture, raccourci, poignée, thème, canal ==="
+run_flag "$OUT" 0; J="$FJ"; QQ="http://127.0.0.1:$FQ"
+assert_eq "TU.0 — témoin : le scénario n'a pas échoué (aucune étape en erreur)" "$(rj "$J" 'j.erreur||JSON.stringify(j.erreurs)')" "{}"
+assert_eq "TU.2 — pastille « Terminal » unique, aria-label et titre « Ouvrir le terminal (Ctrl+Maj+Espace) », aucun cadre, aucun shell (/etat absente)" "$(rj "$J" '"n="+j.tu2.n+" texte="+j.tu2.texte+" aria="+j.tu2.aria+" titre="+j.tu2.titre+" iframes="+j.tu2.iframes+" etat="+j.tu2.etat')" "n=1 texte=Terminal aria=Ouvrir le terminal (Ctrl+Maj+Espace) titre=Ouvrir le terminal (Ctrl+Maj+Espace) iframes=0 etat=absente"
+assert_eq "TU.3 — ouverture : un cadre d'origine Q en ?theme=dark, title « Terminal », sandbox de la mesure O8 (cinq jetons), aucun attribut allow, région « Terminal », barre « Connecté », shell vivant" "$(rj "$J" '"n="+j.tu3.n+" src="+j.tu3.src+" title="+j.tu3.title+" sandbox="+j.tu3.sandbox+" allow="+j.tu3.allow+" region="+j.tu3.region+" barre="+j.tu3.barre+" etat="+j.tu3.etat')" "n=1 src=$QQ/?theme=dark title=Terminal sandbox=$SANDBOX_O8 allow=false region=region/Terminal barre=Connecté etat=vivante"
+assert_eq "T8.2 — tiroir ouvert : 0 violation de CSP dans P, ready puis etat:connecte reçus" "$(rj "$J" '"violations="+j.tu3.violations.length+" ready="+j.tu3.ready+" connecte="+j.tu3.connecte')" "violations=0 ready=true connecte=true"
+assert_eq "TU.4 — temps 1 : le raccourci ouvre (annonce « Terminal ouvert »), le focus est au cadre ; temps 2 : focus ailleurs dans P, le raccourci rend le focus au cadre sans fermer" "$(rj "$J" 'j.tu3.annonce+" / ouvert="+j.tu4b.ouvert+" actif="+j.tu4b.actif')" "Terminal ouvert / ouvert=true actif=IFRAME"
+assert_eq "TU.4 — temps 3 : dans le terminal, le raccourci ferme (message toggle de Q), annonce « Terminal fermé », tiroir inerte, focus rendu à l'ouvreur" "$(rj "$J" '"ferme="+j.tu4c.ferme+" focus="+j.tu4c.focus+" toggle="+j.tu4c.toggle+" annonce="+j.tu4c.annonce+" inert="+j.tu4c.inert')" "ferme=true focus=ouvreur toggle=true annonce=Terminal fermé inert=true"
+assert_eq "TU.4b — ouvrir, fermer, ouvrir : un seul cadre, le même shell (PID du shell inchangé)" "$(rj "$J" 'j.reouv.iframes+"/"+((j.reouv.pid===j.tu3.pid&&j.tu3.pid!=="")?"meme-shell":"autre:"+j.reouv.pid+">"+j.tu3.pid)')" "1/meme-shell"
+assert_eq "TU.5 — poignée au clavier : 288 px par défaut (36 % de 800 px, P71-D-37), deux flèches haut = +48 px, aria-valuenow suit, mémorisés (vf.terminal.h/open) ; rechargement : même hauteur, tiroir rouvert, même PID de shell" "$(rj "$J" '"h0="+j.h0+" h1="+j.tu5.h+" now="+j.tu5.now+" stock="+j.tu5.stock+" apres="+j.tu5.reload.h+"/"+j.tu5.reload.iframes+" shell="+j.tu5.pid')" "h0=288 h1=336 now=336 stock=336/1 apres=336/1 shell=identique"
+assert_eq "TU.6 — Agrandir : aria-pressed vrai et libellé « Réduire le terminal », tiroir plus haut ; second clic : retour à la hauteur d'avant" "$(rj "$J" '"pressed="+j.tu6.pressed+" aria="+j.tu6.aria+" plus_haut="+(j.tu6.h>j.h5)+" retour="+j.tu6.retour')" "pressed=true aria=Réduire le terminal plus_haut=true retour=false/336"
+assert_eq "TU.7 — glissement souris de 80 px vers le haut : cadre en pointer-events none et body.resizing pendant le geste, rendus après ; hauteur 336 + 80" "$(rj "$J" '"pendant="+j.tu7.pendant+" apres="+j.tu7.apres+" h="+j.tu7.h')" "pendant=none/true apres=auto/false h=416"
+assert_eq "TU.8 — bascule de thème : l'adresse du cadre passe à ?theme=light, history.length inchangé, même PID de shell (P71-D-19)" "$(rj "$J" '"url="+j.tu8.url+" histoire="+j.tu8.histoire+" pid="+j.tu8.pid')" "url=Q/?theme=light histoire=inchangee pid=identique"
+assert_eq "T17.1 — témoin : les vrais messages de Q agissent (toggle reçu : le tiroir s'est fermé ; etat:connecte : la barre dit « Connecté »)" "$(rj "$J" '"toggle="+j.tu4c.toggle+" ferme="+j.tu4c.ferme+" barre="+j.tu3.barre')" "toggle=true ferme=true barre=Connecté"
+assert_eq "T17.2 — postMessage('toggle') émis par P vers elle-même : ignoré (tiroir ouvert avant et après)" "$(rj "$J" '"avant="+j.t17.avant+" apres="+j.t17.postMessage')" "avant=true apres=true"
+assert_eq "T17.3 — MessageEvent forgé (origine de Q, source = le cadre) : ignoré, car non fiable (tiroir ouvert avant et après)" "$(rj "$J" '"avant="+j.t17.avant+" apres="+j.t17.forge')" "avant=true apres=true"
+assert_eq "T17.5 — espion : après une commande tapée dans le shell, tout message d'origine Q est dans la liste fermée ; ni le marqueur, ni le secret, ni l'amorçage n'y figurent (témoin : la commande a tourné)" "$(rj "$J" '"fichier="+j.t175.fichier+" hors_liste="+j.t175.hors_liste+" marqueur="+j.t175.marqueur+" secret="+j.t175.secret+" amorce="+j.t175.amorce+" ready_et_connecte="+(j.t175.vus.includes("ready")&&j.t175.vus.includes("etat:connecte"))')" "fichier=true hors_liste=0 marqueur=0 secret=0 amorce=0 ready_et_connecte=true"
+
+assert_eq "T20.4 (J4) — poignée focalisée au clavier : le contour est sur le grip (40 px, 2 px pleins, visible), jamais sur la poignée pleine largeur (témoin : :focus-visible est vrai)" "$(rj "$J" '"sur="+j.tu14.sur_poignee+" fv="+j.tu14.fv+" poignee="+j.tu14.poignee+" grip="+j.tu14.grip+" opaque="+j.tu14.opaque+" grip_larg="+j.tu14.grip_larg+" large="+(j.tu14.poignee_larg>400)')" "sur=true fv=true poignee=none grip=solid/2px opaque=1 grip_larg=40 large=true"
+assert_eq "T20.7 (J7) — pointeur fin : boutons de 28 px, barre de 36 px ; pointer: coarse (témoin : le média est vrai) : boutons d'au moins 44 px et barre qui les contient" "$(rj "$J" '"fin="+j.tu15.fin.coarse+" "+j.tu15.fin.boutons+" "+j.tu15.fin.barre+" / tactile="+j.tu15.tactile.coarse+" "+(j.tu15.tactile.boutons.split(",").every((b)=>b.split("x").every((n)=>Number(n)>=44)))+" "+(j.tu15.tactile.barre>=44)')" "fin=false 28x28,28x28 36 / tactile=true true true"
+assert_eq "T20.8 (F-A1-3) — la pastille « Terminal » fermée : 32 px au pointeur fin, au moins 44 px sous pointer: coarse (témoin : le média est vrai)" "$(rj "$J" '"fin="+j.tu15.fin.pastille+" / tactile="+j.tu15.tactile.coarse+" "+(j.tu15.tactile.pastille>=44)')" "fin=32 / tactile=true true"
+
+echo "=== TU.9 / TU.10 / TU.12 — localhost, Windows, autres pages ==="
+srv "$OUT" 1
+J="$(navig localhost "{\"P\":$SRV_PORT,\"attendre\":\".vf-term-puce\"}")"; unsrv
+assert_eq "TU.9 — P ouvert par localhost : le message d'O6 (P71-D-21) dans une puce, ni pastille ni cadre" "$(rj "$J" '"hote="+j.hote+" puce="+j.puce+" pastilles="+j.pastilles+" iframes="+j.iframes')" "hote=localhost puce=Ouvrez le cockpit à l'adresse 127.0.0.1 pour utiliser le terminal. pastilles=0 iframes=0"
+PORT_T="$(libre)"; node "$AUX/page-tiroir.mjs" "$OUT" "$PORT_T" 1 & PID_T=$!; PIDS+=($PID_T); sleep 1
+J="$(navig page "{\"P\":0,\"T\":$PORT_T,\"chemin\":\"/project.html\",\"attendre\":\".vf-term-puce\"}")"; vf_hyg_stop "$PID_T"
+assert_eq "TU.10 — Windows (indisponible) : puce « Terminal indisponible sous Windows. » en role status, ni pastille ni cadre" "$(rj "$J" '"puce="+j.puce+" role="+j.role+" pastilles="+j.pastilles+" iframes="+j.iframes')" "puce=Terminal indisponible sous Windows. role=status pastilles=0 iframes=0"
+PORT_T="$(libre)"; node "$AUX/page-tiroir.mjs" "$OUT" "$PORT_T" 0 & PID_T=$!; PIDS+=($PID_T); sleep 1
+J="$(navig page "{\"P\":0,\"T\":$PORT_T,\"chemin\":\"/project.html\",\"attendre\":\"[class*=vf-term]\"}")"; JA="$(navig page "{\"P\":0,\"T\":$PORT_T,\"chemin\":\"/autre.html\"}")"; vf_hyg_stop "$PID_T"
+assert_eq "TU.12 — la même injection : des nœuds sous /project.html (témoin), aucun nœud, aucune clé et aucun cadre sous /autre.html" "$(rj "$J" '"projet_noeuds>0="+(j.noeuds>0)')/$(rj "$JA" '"vivante="+j.vivante+" noeuds="+j.noeuds+" cles="+j.cles+" iframes="+j.iframes')" "projet_noeuds>0=true/vivante=true noeuds=0 cles=0 iframes=0"
+
+echo "=== T20 — états de la carte : barre de P et page de Q (critique design 71, J1, J5, J6, J13) ==="
+run_etats "$OUT"; E="$EJ"
+assert_eq "T20.0 — témoin : le scénario n'a pas échoué (aucune étape en erreur)" "$(rj "$E" 'j.erreur||JSON.stringify(j.erreurs)')" "{}"
+assert_eq "T20.1 (J1) — barre du tiroir, état refusé (autre onglet) : libellé « Déjà ouvert », pastille d'état refuse, annonce du lecteur d'écran identique ; état expiré : « Session expirée », pastille expire" "$(rj "$E" '"refuse="+j.barreRefuse.texte+"/"+j.barreRefuse.point+"/"+j.barreRefuse.annonce+" expire="+j.barreExpire.texte+"/"+j.barreExpire.point')" "refuse=Déjà ouvert/refuse/Déjà ouvert expire=Session expirée/expire"
+assert_eq "T20.2 (J1) — la barre dit le même état que la carte de Q : le libellé de la barre est contenu dans le titre de la carte, pour refusé et expiré" "$(rj "$E" '"refuse="+j.refuse.titre.toLowerCase().includes(j.barreRefuse.texte.toLowerCase())+" expire="+j.alerte.titre.toLowerCase().includes(j.barreExpire.texte.toLowerCase())')" "refuse=true expire=true"
+assert_eq "T20.3 (J6) — sous la carte « déjà ouvert » : ni terminal, ni grille xterm, ni curseur visibles (témoin : la grille existe dans le DOM et la carte est visible)" "$(rj "$E" '"terminal="+j.refuse.terminal+" xterm="+j.refuse.xterm+" curseur="+j.refuse.curseur+" present="+j.refuse.xtermPresent+" carte="+j.refuse.carte')" "terminal=false xterm=false curseur=0 present=true carte=true"
+assert_eq "T20.6 (J13) — carte d'alerte focalisée par programme : elle a le focus et :focus-visible est vrai (témoin), mais aucune bague de focus" "$(rj "$E" '"focus="+j.alerte.focus+" fv="+j.alerte.fv+" role="+j.alerte.role+" contour="+j.alerte.contour')" "focus=true fv=true role=alert contour=none"
+[ "$(rj "$E" 'j.alerte.focus')" = "true" ] || echo "     ℹ T20.6 — focus perdu au chargement : pageFocus=$(rj "$E" 'j.alerte.pageFocus') actif=$(rj "$E" 'j.alerte.actif') cadres_de_P=$(rj "$E" 'j.alerte.cadresP')"
+assert_eq "T20.5 (J5, carte de Q) — la commande /vf-cockpit --terminal ne se coupe jamais et son point final reste collé, à huit largeurs de fenêtre (témoin : la carte a changé de largeur au moins trois fois)" "$(rj "$E" '"mal="+JSON.stringify(j.coupure.mal)+" larges="+(j.coupure.largeurs>=3)')" 'mal=[] larges=true'
+
+echo "=== T21 — géométrie du tiroir : zoom, Ajuster, barre de question, visite (recette 71, E2 et G1 ; P71-D-34, P71-D-35) ==="
+run_geom "$OUT" 0; G="$GJ"
+assert_eq "T21.0 — témoin : aucune étape en erreur, huit relevés (2 pages x 2 fenêtres x 2 thèmes), l'API du viewer est là, des nœuds sont dessinés" "$(rj "$G" '(j.erreur||JSON.stringify(j.erreurs))+" n="+j.n+" api="+j.api+" noeuds="+j.noeuds')" "{} n=8 api=true noeuds=true"
+assert_eq "T21.1 (E2) — tiroir fermé : au centre de #z-out, #z-fit, #z-in, elementFromPoint rend le bouton et non la pastille, la pastille ne recouvre pas #zoom, un clic sur « + » n'ouvre pas le terminal (1440x900 et 1280x720, thèmes sombre et clair, pages Code et Projet)" "$(rj "$G" 'JSON.stringify(j.G.E2f)')" "[]"
+assert_eq "T21.2 (E2) — tiroir ouvert : les trois boutons restent atteignables, posés au-dessus du tiroir, et « − » agit sans fermer le tiroir" "$(rj "$G" 'JSON.stringify(j.G.E2o)+JSON.stringify(j.G.agit)')" "[][]"
+assert_eq "T21.3 (G1) — « Ajuster » (touche F, puis bouton) tiroir ouvert : la boîte englobante des nœuds visibles finit au-dessus du tiroir" "$(rj "$G" 'JSON.stringify(j.G.G1F)')" "[]"
+assert_eq "T21.4 (G1) — la barre de question #ask est rangée tant que le tiroir est ouvert et revient à sa place (même bas) à la fermeture ; zoom et pastille aussi" "$(rj "$G" 'JSON.stringify(j.G.G1ask)+JSON.stringify(j.G.fin)')" "[][]"
+assert_eq "T21.5 (G1) — la visite « Par où commencer » est ouverte avant (témoin) et fermée par l'ouverture du tiroir" "$(rj "$G" 'JSON.stringify(j.G.G1visite)')" "[]"
+assert_eq "T21.6 (G1) — tiroir mémorisé ouvert, rechargement : le cadrage initial finit déjà au-dessus du tiroir" "$(rj "$G" 'JSON.stringify(j.G.G1reprise)')" "[]"
+mut_geom() { # mut_geom <nom> <fichier> <expression-sed> <groupe qui doit rougir>
+  if mutant "$1" "$2" "$3"; then
+    srv "$MUT_OUT" 1; GM="$(node "$AUX/chrome-geom.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":1}")"; unsrv
+    assert_eq "$1 — le mutant rougit T21 : le groupe $4 compte au moins un relevé en défaut (témoin : deux relevés, aucune erreur)" "$(rj "$GM" '"n="+j.n+" erreurs="+JSON.stringify(j.erreurs)+" rouge="+(j.G.'"$4"'.length>=1)')" "n=2 erreurs={} rouge=true"
+  else sans_effet "$1"; fi
+}
+mut_geom M-PASTILLE-SUR-ZOOM vf-cockpit-terminal-tiroir.mjs 's|if (recouvre) n.style.bottom|if (false) n.style.bottom|' E2f
+mut_geom M-AJUSTE-SANS-TIROIR vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #stage {|body.vf-term-ouvert #stage-absent {|' G1F
+mut_geom M-ASK-RESTE vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #ask { display: none; }|body.vf-term-ouvert #ask { }|' G1ask
+mut_geom M-VISITE-RESTE vf-cockpit-terminal-tiroir.mjs 's|window.VibeFlowTour.end();|void 0;|' G1visite
+
+echo "=== T22 — hauteur par défaut proportionnelle à la fenêtre (recette 71, G4 ; P71-D-37) ==="
+run_defaut "$OUT"; D="$DJ"
+assert_eq "T22.0 — témoin : aucune étape en erreur, huit relevés mesurés (tiroir ouvert, hauteur lue sur la boîte)" "$(rj "$D" 'JSON.stringify(j.erreurs)+" "+["d720","d900","d1080","m720","m900","m360","suit","retrecit"].filter((k)=>j[k]&&j[k].h>0).length')" "{} 8"
+assert_eq "T22.1 (G4) — sans hauteur mémorisée : 36 % de la fenêtre, bornée entre 220 et 380 px (1280x720 : 259, 1440x900 : 324, 1920x1080 : 380 plafonné ; 389 non borné)" "$(rj "$D" 'j.d720.h+"/"+j.d900.h+"/"+j.d1080.h')" "259/324/380"
+assert_eq "T22.2 (G4) — 1280x720 : la bande de carte au-dessus du tiroir (haut du tiroir moins l'en-tête) fait au moins la moitié de la fenêtre (360 px ; 320 px de tiroir fixe en laissaient 320)" "$(rj "$D" 'j.d720.bande>=j.d720.fenetre/2')" "true"
+assert_eq "T22.3 (G4) — hauteur mémorisée de 600 px : plafonnée à 70 % de la fenêtre en 1280x720 (504), intacte en 1440x900 (630 de plafond) ; 360 px mémorisés restent 360" "$(rj "$D" 'j.m720.h+"/"+j.m900.h+"/"+j.m360.h')" "504/600/360"
+assert_eq "T22.4 (G4) — la fenêtre rétrécit tiroir ouvert : la hauteur par défaut suit (324 puis 259), une hauteur de 600 px est ramenée à 504" "$(rj "$D" 'j.suit.h+"/"+j.retrecit.h')" "259/504"
+mut_defaut() { # mut_defaut <nom> <fichier> <expression-sed> <relevé> <valeur saine>
+  if mutant "$1" "$2" "$3"; then
+    srv "$MUT_OUT" 1; DM="$(node "$AUX/chrome-defaut.mjs" "$CHROME" "{\"P\":$SRV_PORT}")"; unsrv
+    assert_eq "$1 — le mutant rougit T22 : le relevé $4 n'est plus $5 (témoin : aucune erreur, tiroir mesuré)" "$(rj "$DM" 'JSON.stringify(j.erreurs)+" mesure="+(j.'"$4"'&&j.'"$4"'.h>0)+" rouge="+(j.'"$4"'.h!=='"$5"')')" "{} mesure=true rouge=true"
+  else sans_effet "$1"; fi
+}
+mut_defaut M-HAUTEUR-FIXE-320 vf-cockpit-terminal-tiroir.mjs 's|const defaut = () => borne([^;]*;|const defaut = () => 320;|' d720 259
+mut_defaut M-MEMO-NON-BORNEE vf-cockpit-terminal-tiroir.mjs 's|Math.min(borne(memo), plafondMemo())|borne(memo)|' m720 504
+
+echo "=== TU.11 / T8.3 — cadre injoignable, frame-src absent (mutants jouées en navigateur) ==="
+if mutant injoignable vf-cockpit-terminal.mjs "s|{ etat: 'actif', port: portQ }|{ etat: 'actif', port: 1 }|"; then
+  srv "$MUT_OUT" 1; J="$(navig froid "{\"P\":$SRV_PORT,\"attendre\":\"carte\"}")"; unsrv
+  assert_eq "TU.11 — aucun ready : après 8 s, carte « Le terminal ne répond pas. Relancez /vf-cockpit --terminal. »" "$(rj "$J" '"carte="+j.carte+" ready="+j.ready')" "carte=Le terminal ne répond pas. Relancez /vf-cockpit --terminal. ready=false"
+  assert_eq "T20.5 (J5, carte de P) — la commande /vf-cockpit --terminal ne se coupe jamais et son point final reste collé, à huit largeurs de fenêtre (témoin : la carte a changé de largeur au moins trois fois)" "$(rj "$J" '"mal="+JSON.stringify(j.coupure&&j.coupure.mal)+" larges="+(j.coupure&&j.coupure.largeurs>=3)')" 'mal=[] larges=true'
+else sans_effet "TU.11 (injection de panne)"; fi
+if mutant framesrc vf-cockpit-terminal.mjs "s#frameSrc: () => (portQ ? \`; frame-src http://127\.0\.0\.1:\${portQ}\` : ''),#frameSrc: () => '',#"; then
+  srv "$MUT_OUT" 1; J="$(navig froid "{\"P\":$SRV_PORT,\"attendre\":\"violation\"}")"; unsrv
+  assert_eq "T8.3 / M-FRAMESRC — copie de sortie sans frame-src : une violation de CSP relevée, aucun ready reçu" "$(rj "$J" '"violation="+(j.violations.length>=1)+" ready="+j.ready')" "violation=true ready=false"
+else sans_effet "M-FRAMESRC"; fi
+
+echo "=== M-MSG-DONNEE — client de Q qui joint du texte du terminal à un message (T17.5) ==="
+if mutant donnee vf-cockpit-terminal-client.mjs 's|term.write(m.value);|term.write(m.value); window.parent.postMessage(new TextDecoder().decode(m.value), cfg.origineP);|'; then
+  run_flag "$MUT_OUT" 1; J="$FJ"
+  assert_eq "M-MSG-DONNEE — le mutant rougit T17.5 : un message hors liste ou portant le marqueur arrive à P (témoin : la commande a tourné)" "$(rj "$J" '"fichier="+j.t175.fichier+" rouge="+(j.t175.hors_liste>=1||j.t175.marqueur>=1)')" "fichier=true rouge=true"
+else sans_effet "M-MSG-DONNEE"; fi
+fi
+
+vf_hyg_assert
+echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
+[ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
+[ "$FAIL" -eq 0 ] && exit 0 || exit 1

@@ -112,3 +112,6 @@
 - [Lire l en-tête de la suite avant d y loger un test](feedback_lire-l-en-tete-de-la-suite-avant-d-y-loger-un-test.md) — le brief visait la suite plate GELÉE (P57-D-03) : preuve partitionnée = suite -ws + mutant
 - [Reprendre le correcteur par SendMessage](feedback_reprendre-le-correcteur-par-sendmessage.md) — un worker fini se reprend avec son contexte ; chaque passe de correction repasse devant un checker frais scopé au diff
 - [Bascule de verrou : registre non transféré](project_bascule-verrou-phase-registre-non-transfere.md) — compartiment → --phase : réenregistrer les agents vivants, fermer dans l'ancien ; check-mission-exit lit encore le compartiment
+- [Témoin navigateur : GET sans Origin](feedback_temoin-navigateur-get-sans-origin.md) — client Node qui pose Origin = témoin aveugle ; un fetch GET same-origin n'en envoie pas (151 PASS, 403 dans Chrome)
+- [Parallélisme sans plafond, même arbre](project_parallelisme-sans-plafond-meme-arbre.md) — règle Samuel 2026-11-03 ; 5 vf-coder par pathspec sans collision ; la charge fausse les suites Chrome
+- [check-machine-paths aveugle au compte local](project_check-machine-paths-aveugle-au-compte-local.md) — vert en local, rouge en CI sur /Users/<compte> : grep du diff avant la PR, ~ dans les traces verbatim

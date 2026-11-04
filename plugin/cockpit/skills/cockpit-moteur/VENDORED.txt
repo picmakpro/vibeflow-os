@@ -4,7 +4,7 @@ Lignes machine : PATCH <chemin> <Pn[,Pm]> <description> · AJOUT <chemin> · RET
 Licence : MIT, copyright d'origine conservé dans LICENSE ; composants tiers dans LICENCES-TIERCES.txt.
 
 PATCH assets/viewer.html P1,P2,P3,P4,P6,P8,P11,P12,P16,P21,P22,P23 libellés de liens, pied de carte et pastille de statut, classe st-<statut>, setOverview, rerender, pictogrammes fournis par le graphe ; résidu CSS de la carte Cloud retiré ; lien de crédit retiré ; favicon SVG ; pied de carte, pastille et classe de statut : tout champ du graphe est échappé par h() (XSS stockée, audit 67-SECURITY B2) ; P21 : le rechargement automatique remet un flux coupé à la page hôte (window.FLOORPLAN_STREAM_LOST) au lieu de réessayer chaque seconde sans fin (E-6) ; P22 : à la dernière étape d'un parcours le chevron « suivant » est inactif (comme « précédent » à la première), la croix de fermeture est la seule (recette 2026-11-02, D1) ; P23 : l'italique *…* et _…_ est rendu dans les réponses de l'agent (après l'échappement, hors des spans de code, bornes de mot) et les chevrons de la Trajectoire portent un nom accessible « Previous step » / « Next step » (recette 2026-11-03, O3 et O6)
-PATCH assets/serve.mjs P5,P9,P10,P11,P13,P14,P15,P17,P18,P19,P20,P24,P25 Cache-Control no-store ; serveur unique : crochet vf-cockpit-server.mjs (direct SSE /api/vf/*, onglet Projet, jeton propre) après le contrôle du Host et du jeton, segments cachés refusés ; questions : réponse locale de l'onglet Projet, confinement mesuré et modèle validé de l'agent, moteur fixé à Claude Code (P7 du spike remplacé par P13/P14) ; marqueur de taille ; racine du lab à deux niveaux ; fonction Cloud retirée (liste d'attente, e-mail du compte, réglages personnels) ; P15 : « modifier le plan » durci, seuls plan.mjs et build.mjs du MOTEUR du module (VF_COCKPIT_ENGINE_DIR, posé par le lanceur) s'exécutent, .cache/skill.json et .cache/history/ du lab sont ignorés puis supprimés ; P17 : Content-Security-Policy (empreintes des scripts en ligne, connect-src 'self', frame-ancestors 'none', form-action 'none'), X-Content-Type-Options, X-Frame-Options sur toutes les réponses ; P18 : corps JSON non objet = 400, routeur et exceptions rattrapés, .cache/server.json en 0600, --resume=<uuid> validé, échec franc sans vf-cockpit-server.mjs, --stop borné, timeouts ; P19 : le serveur statique ne sert aucun lien symbolique qui sort de son dossier ; chaque < du JSON exporté devient \u003c ; P20 : le fichier exporté se nomme <projet>-carte.html (et non -map.html) ; P24 : page Équipe servie en mémoire (même CSP à empreintes que la page Projet) ; P25 : le PATH du processus est assaini au démarrage (vf-cockpit-env.mjs : jamais d'élément vide, relatif ou du lab), donc which, claude et les enfants n'exécutent aucun outil du lab (audit H-1)
+PATCH assets/serve.mjs P5,P9,P10,P11,P13,P14,P15,P17,P18,P19,P20,P24,P25,P26 Cache-Control no-store ; serveur unique : crochet vf-cockpit-server.mjs (direct SSE /api/vf/*, onglet Projet, jeton propre) après le contrôle du Host et du jeton, segments cachés refusés ; questions : réponse locale de l'onglet Projet, confinement mesuré et modèle validé de l'agent, moteur fixé à Claude Code (P7 du spike remplacé par P13/P14) ; marqueur de taille ; racine du lab à deux niveaux ; fonction Cloud retirée (liste d'attente, e-mail du compte, réglages personnels) ; P15 : « modifier le plan » durci, seuls plan.mjs et build.mjs du MOTEUR du module (VF_COCKPIT_ENGINE_DIR, posé par le lanceur) s'exécutent, .cache/skill.json et .cache/history/ du lab sont ignorés puis supprimés ; P17 : Content-Security-Policy (empreintes des scripts en ligne, connect-src 'self', frame-ancestors 'none', form-action 'none'), X-Content-Type-Options, X-Frame-Options sur toutes les réponses ; P18 : corps JSON non objet = 400, routeur et exceptions rattrapés, .cache/server.json en 0600, --resume=<uuid> validé, échec franc sans vf-cockpit-server.mjs, --stop borné, timeouts ; P19 : le serveur statique ne sert aucun lien symbolique qui sort de son dossier ; chaque < du JSON exporté devient \u003c ; P20 : le fichier exporté se nomme <projet>-carte.html (et non -map.html) ; P24 : page Équipe servie en mémoire (même CSP à empreintes que la page Projet) ; P25 : le PATH du processus est assaini au démarrage (vf-cockpit-env.mjs : jamais d'élément vide, relatif ou du lab), donc which, claude et les enfants n'exécutent aucun outil du lab (audit H-1) ; P26 : terminal intégré (Phase 71), crochets du module vf-cockpit-terminal.mjs chargé seulement sous --terminal (frame-src, injection du tiroir, route /api/vf/terminal, garde d'inactivité, démarrage du second serveur)
 PATCH scripts/build.mjs P9,P12,P16 marqueur de taille ; logo et favicon VibeFlow (data URI SVG) ; chaque < du JSON de la page devient \u003c (ferme </script et <!--)
 PATCH scripts/scan.mjs P9,P10 marqueur de taille ; dossier de sortie à deux segments exclu du scan
 PATCH scripts/lib/health.mjs P9,P11 marqueur de taille ; littéral de liste d'attente retiré des exemples et du motif de chemins publics
@@ -28,9 +28,19 @@ AJOUT assets/ui/79-vf-fr-dict-b.js
 AJOUT assets/ui/80-vf-fr.js
 AJOUT assets/vibeflow-logo-clair.svg
 AJOUT assets/vibeflow-logo-sombre.svg
+AJOUT assets/vendor/xterm/xterm.js
+AJOUT assets/vendor/xterm/xterm.css
+AJOUT assets/vendor/xterm/addon-fit.js
+AJOUT assets/vendor/xterm/LICENSE-xterm.txt
+AJOUT assets/vendor/xterm/LICENSE-addon-fit.txt
+AJOUT assets/vendor/xterm/SHA256SUMS
+AJOUT assets/vendor/fonts/jetbrains-mono-2.304-regular.woff2
+AJOUT assets/vendor/fonts/jetbrains-mono-2.304-OFL.txt
+AJOUT assets/vendor/fonts/SHA256SUMS
+AJOUT terminal/vf-cockpit-pty.py
 AJOUT VENDORED.txt
 AJOUT LICENCES-TIERCES.txt
-TAILLE assets/serve.mjs 612
+TAILLE assets/serve.mjs 616
 TAILLE assets/vendor/elk.bundled.js 6697
 TAILLE assets/viewer.html 2390 .html, hors gate
 TAILLE scripts/build.mjs 484

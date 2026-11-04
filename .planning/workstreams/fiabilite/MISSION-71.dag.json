@@ -1,0 +1,499 @@
+{
+  "nodes": [
+    {
+      "id": "research-71",
+      "step": "panel : PTY/transport + modèle d'auth (lecture seule)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ask-71",
+      "step": "questions de cadrage à Samuel (un envoi)",
+      "stage": "",
+      "deps": [
+        "research-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "discuss-71",
+      "step": "71-CONTEXT (dossier VFDO-71)",
+      "stage": "",
+      "deps": [
+        "ask-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plan-71",
+      "step": "recherche + plans + plan-checker (dossier VFDO-71)",
+      "stage": "",
+      "deps": [
+        "discuss-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "craft-terminal",
+      "step": "spec écran Terminal sur DESIGN.md Graphite",
+      "stage": "",
+      "deps": [
+        "discuss-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-71",
+      "step": "exécution (fichiers neufs plugin/cockpit/…terminal…, branchement minimal)",
+      "stage": "",
+      "deps": [
+        "plan-71",
+        "craft-terminal"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-71",
+      "step": "revue code",
+      "stage": "",
+      "deps": [
+        "exec-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-71",
+      "step": "audit sécurité complet",
+      "stage": "",
+      "deps": [
+        "exec-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique-terminal",
+      "step": "critique design",
+      "stage": "",
+      "deps": [
+        "exec-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gates-71",
+      "step": "rejeu job gates ci.yml + suites cockpit",
+      "stage": "",
+      "deps": [
+        "revue-71",
+        "audit-71",
+        "critique-terminal"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire",
+      "stage": "",
+      "deps": [
+        "exec-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "push-71",
+      "step": "push branche, sans PR",
+      "stage": "",
+      "deps": [
+        "gates-71",
+        "docs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-01",
+      "step": "exec 71-01",
+      "stage": "",
+      "deps": [
+        "plan-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-02",
+      "step": "exec 71-02",
+      "stage": "",
+      "deps": [
+        "ex-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-03",
+      "step": "exec 71-03",
+      "stage": "",
+      "deps": [
+        "ex-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-04",
+      "step": "exec 71-04",
+      "stage": "",
+      "deps": [
+        "ex-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-10",
+      "step": "exec 71-10",
+      "stage": "",
+      "deps": [
+        "ex-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-11",
+      "step": "exec 71-11",
+      "stage": "",
+      "deps": [
+        "ex-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-05",
+      "step": "exec 71-05",
+      "stage": "",
+      "deps": [
+        "ex-01",
+        "ex-11"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-06",
+      "step": "exec 71-06",
+      "stage": "",
+      "deps": [
+        "ex-05"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-07",
+      "step": "exec 71-07",
+      "stage": "",
+      "deps": [
+        "ex-04",
+        "ex-06"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-08",
+      "step": "exec 71-08",
+      "stage": "",
+      "deps": [
+        "ex-02",
+        "ex-03",
+        "ex-04",
+        "ex-06"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-09",
+      "step": "exec 71-09 (docs, recette écrite, gates)",
+      "stage": "",
+      "deps": [
+        "ex-07",
+        "ex-08",
+        "ex-10",
+        "ex-11"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-pty",
+      "step": "correction ciblée : écriture non bloquante de l'assistant PTY, borne de taille alignée",
+      "stage": "",
+      "deps": [
+        "ex-03",
+        "ex-02"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-origin",
+      "step": "correction ciblée P71-D-24 (GET sans Origin, Sec-Fetch-Site)",
+      "stage": "",
+      "deps": [
+        "fix-pty"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-a1",
+      "step": "correction lot A1 (design, police)",
+      "stage": "",
+      "deps": [
+        "revue-71",
+        "audit-71",
+        "critique-terminal"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-a2",
+      "step": "correction lot A2 (robustesse, tests)",
+      "stage": "",
+      "deps": [
+        "revue-71",
+        "audit-71",
+        "critique-terminal"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-b",
+      "step": "correction lot B sécurité (après validation Samuel, ADR-031)",
+      "stage": "",
+      "deps": [
+        "fix-a2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rejuge",
+      "step": "re-revue ciblée + re-audit des correctifs",
+      "stage": "",
+      "deps": [
+        "fix-a1",
+        "fix-a2",
+        "fix-b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-c",
+      "step": "dernier tour de mineurs hors sécurité (M1-M6, N4-N6)",
+      "stage": "",
+      "deps": [
+        "rejuge"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-n1",
+      "step": "N1 aperçu du collage (P71-D-29)",
+      "stage": "",
+      "deps": [
+        "fix-c"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-n2",
+      "step": "N2 PATH du lanceur (P71-D-29)",
+      "stage": "",
+      "deps": [
+        "fix-c"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "reaudit-n",
+      "step": "re-audit ciblé N1 N2 + tour C",
+      "stage": "",
+      "deps": [
+        "fix-n1",
+        "fix-n2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-d",
+      "step": "régressions créées par la phase : N8, N11, I-doc",
+      "stage": "",
+      "deps": [
+        "reaudit-n"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-e",
+      "step": "témoin M-CONTREPRESSION déterministe",
+      "stage": "",
+      "deps": [
+        "fix-d"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-n9-n10",
+      "step": "fix-n9-n10",
+      "stage": "",
+      "deps": [
+        "push-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recette-A",
+      "step": "recette-A",
+      "stage": "",
+      "deps": [
+        "push-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recette-B",
+      "step": "recette-B",
+      "stage": "",
+      "deps": [
+        "push-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recette-C",
+      "step": "recette-C",
+      "stage": "",
+      "deps": [
+        "push-71"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "reaudit-n9",
+      "step": "re-audit ciblé N9 N10",
+      "stage": "",
+      "deps": [
+        "fix-n9-n10"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "rebase-71",
+      "step": "rebase sur origin/main (69 mergée)",
+      "stage": "",
+      "deps": [
+        "reaudit-n9",
+        "recette-A",
+        "recette-B",
+        "recette-C"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "pr-71",
+      "step": "PR séparée suivie au vert, sans merge",
+      "stage": "",
+      "deps": [
+        "rebase-71"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "fix-w1",
+      "step": "fix-w1",
+      "stage": "",
+      "deps": [
+        "recette-A"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-w2",
+      "step": "fix-w2",
+      "stage": "",
+      "deps": [
+        "recette-A"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-w3",
+      "step": "fix-w3",
+      "stage": "",
+      "deps": [
+        "recette-A"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-w4",
+      "step": "W4 page Q : E3, E4 page, G2 client, G3",
+      "stage": "",
+      "deps": [
+        "fix-n9-n10",
+        "fix-w1"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs-2",
+      "step": "passe de doc finale",
+      "stage": "",
+      "deps": [
+        "fix-w1",
+        "fix-w2",
+        "fix-w3",
+        "fix-w4"
+      ],
+      "scope": [],
+      "status": "ready"
+    }
+  ]
+}

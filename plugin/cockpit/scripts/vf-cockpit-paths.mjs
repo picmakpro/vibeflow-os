@@ -1,6 +1,6 @@
 // vf-cockpit-paths — résolution des chemins du socle du cockpit (P67-D-12). Lecture seule.
 // Exports : findLabRoot, planningLayout, stateFile, resolveScriptsDir, trustedScriptsDir, driverLockScript,
-//           engineDir, outputDir, gitCommonDir, confiner, verifierSortie, realUnder,
+//           engineDir, outputDir, resoudreBinaire, pathAssaini, gitCommonDir, confiner, verifierSortie, realUnder,
 //           GIT_SUR (préfixe d'arguments de tout appel git), avecEcheance(ms, fn) et shBorne(cmd, args, cwd) (sous-processus bornés, échéance globale : F-06).
 // Aucun nom de compartiment, de jalon ou de projet codé en dur : tout vient du disque.
 import fs from 'node:fs';
@@ -137,6 +137,37 @@ export function shBorne(cmd, args, cwd, lab = cwd) {
   const reste = FIN === null ? 10000 : Math.min(10000, FIN - Date.now());
   if (!(reste >= 1)) return ''; // échéance atteinte (ou valeur non numérique) : rien n'est lancé ; jamais `timeout: 0`, qui voudrait dire « sans limite »
   try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: Math.floor(reste), env: envEnfant(lab) }); } catch (e) { return e.stdout || ''; }
+}
+
+// P71-D-29 (N2) : le lanceur s'exécute depuis la racine du lab. Un binaire lancé par son NOM est cherché par le système dans le PATH, où « . », un élément
+// vide (« : » en tête ou en queue) ou relatif désigne le lab : il exécuterait un `open`, un `ps` ou un `git` posé là. Le lanceur ne lance donc jamais un nom nu :
+// il résout le binaire dans les seuls éléments ABSOLUS du PATH (sans toucher au PATH, que les enfants, shell du terminal compris, reçoivent tel quel : P71-D-03)
+// et lance son chemin absolu. Introuvable : null, jamais un repli sur la résolution par le cwd. Sous Windows, CreateProcess cherche d'abord le cwd : `cmd` est résolu
+// par ComSpec / SystemRoot, les autres par les éléments absolus du PATH (.exe).
+// Pour les enfants du lanceur qui ne sont PAS le shell de l'utilisateur (le moteur d'assemblage) : même PATH sans ses éléments relatifs ou vides, afin que leurs
+// propres `git` à nom nu ne cherchent plus dans le lab. Jamais passé au shell du terminal (P71-D-03).
+// N8 : un PATH assaini VIDE n'est jamais rendu tel quel. Node transmet alors `PATH=''` à l'enfant et libuv le lit comme le cwd, c'est-à-dire le lab : le `git` à nom nu du moteur
+// y serait exécuté (PATH absent, `env -i`, ou PATH entièrement relatif). On rend donc un PATH système ABSOLU par défaut, /usr/bin:/bin : il porte `git` sous macOS et Linux, et
+// ne désigne que des dossiers du système. Sous Windows aucun défaut POSIX ne vaut : '' signale « omettre la clé » (envMoteur, vf-cockpit-build.mjs).
+export const PATH_SYSTEME = '/usr/bin:/bin';
+export const pathAssaini = (pathVar = process.env.PATH) => {
+  const p = String(pathVar || '').split(path.delimiter).filter((d) => d && path.isAbsolute(d)).join(path.delimiter);
+  return p || (process.platform === 'win32' ? '' : PATH_SYSTEME);
+};
+export function resoudreBinaire(nom, pathVar = process.env.PATH) {
+  if (process.platform === 'win32') {
+    if (nom === 'cmd') {
+      const c = process.env.ComSpec || (process.env.SystemRoot ? path.join(process.env.SystemRoot, 'System32', 'cmd.exe') : '');
+      return c && path.isAbsolute(c) ? c : null;
+    }
+  }
+  // Aucun élément absolu (PATH absent, vide ou entièrement relatif) : repli sur les répertoires système, comme H-1 (PATH_REPLI) et N8 ; jamais sur le cwd.
+  const absolus = String(pathVar || '').split(path.delimiter).filter((d) => d && path.isAbsolute(d));
+  for (const d of absolus.length || process.platform === 'win32' ? absolus : PATH_SYSTEME.split(':')) {
+    const c = path.join(d, process.platform === 'win32' ? `${nom}.exe` : nom);
+    try { if (fs.statSync(c).isFile()) { fs.accessSync(c, fs.constants.X_OK); return c; } } catch {}
+  }
+  return null;
 }
 
 export function gitCommonDir(root) {
