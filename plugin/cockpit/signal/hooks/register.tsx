@@ -10,6 +10,7 @@ import type { Register } from 'claude-code'
 
 import { PANE, band } from './band'
 import { brief, stageOf } from './derive'
+import { cockpitInstalle } from './gating'
 import { VIEWS } from './ds'
 import { pane } from './pane'
 import { recordRefusal, refreshAll, refreshDisk, refreshLive, refreshRoster, setStage } from './refresh'
@@ -29,6 +30,8 @@ const view = atom({ plugin: 'vibeflow', key: 'view' } as const, 'mission')
 
 export const register: Register = on => {
   let home: string | undefined
+  // Posé en session.start : sans `cockpit=` au registre, le mod n'enregistre ni commande, ni pane, ni bandeau (P68-D-18).
+  let actif = false
   let blink = false
   let blinkTimer: { cancel: () => void } | null = null
   let refreshTimer: { cancel: () => void } | null = null
@@ -38,6 +41,8 @@ export const register: Register = on => {
 
   on('session.start', async ($, e, next) => {
     home = await $.env.get('HOME')
+    actif = await cockpitInstalle($, await $.session.root().catch(() => undefined), home)
+    if (!actif) return next(e)
     await $.command.register({
       name: 'vf-signal',
       description: 'Cockpit VibeFlow : mission, équipe, macro. « /vf-signal équipe », « macro », « mission », ou « brief » pour un Markdown.',
@@ -50,6 +55,7 @@ export const register: Register = on => {
   })
 
   on('session.end', async ($, e, next) => {
+    if (!actif) return next(e)
     blinkTimer?.cancel()
     blinkTimer = null
     blink = false
@@ -68,7 +74,8 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('command.run', { command: 'vf-signal' }, async ($, e) => {
+  on('command.run', { command: 'vf-signal' }, async ($, e, next) => {
+    if (!actif) return next(e)
     const arg = e.args.trim().toLowerCase().replace('équipe', 'equipe')
     if (arg === 'brief') {
       await refreshAll($, home)
@@ -180,7 +187,7 @@ export const register: Register = on => {
 
   // --- les dessins -------------------------------------------------------------
 
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => (await band($, e)) ?? next(e))
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => (actif ? (await band($, e)) ?? next(e) : next(e)))
 
-  on('ui.render', { component: 'Pane', requestId: PANE }, ($, e) => pane($, e, blink, home))
+  on('ui.render', { component: 'Pane', requestId: PANE }, ($, e, next) => (actif ? pane($, e, blink, home) : next(e)))
 }

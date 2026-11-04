@@ -65,6 +65,8 @@ function lab(on: On, agents: AgentInfo[] = []) {
   on('fs.exists', (_, e) => ({ value: /active-workstream|STATE\.md|driver-lock\.sh$/.test(String(e.path)) && !String(e.path).includes('.claude/scripts') }))
   on('fs.read', (_, e) => {
     const path = String(e.path)
+    // Le gating (68-12 ; P68-D-18) : le module cockpit est installé dans ce lab.
+    if (path.endsWith('.vibeflow-installed')) return { value: 'cockpit=v1.2.0\n' }
     if (path.endsWith('active-workstream')) return { value: 'fiabilite' }
     if (path.endsWith('STATE.md')) return { value: STATE }
     if (path.endsWith('.dag.json')) return { value: DAG }
