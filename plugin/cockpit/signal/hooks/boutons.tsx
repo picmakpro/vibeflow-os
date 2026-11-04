@@ -5,16 +5,16 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
 import { elaguer, ouvrirCockpit, resoudreDriverLock, resoudreLanceur } from './actions'
-import { C } from './ds'
 import type { UI } from './ds'
+import type { Palette } from './tokens'
 import type { Loop, SignalVerrou, Usage } from '../types'
 
 const cockpitUrl = atom({ plugin: 'vibeflow', key: 'cockpitUrl' } as const, null)
 const cockpitErreur = atom({ plugin: 'vibeflow', key: 'cockpitErreur' } as const, null)
 
-type Args = { stale: SignalVerrou | null; l: Loop; u: Usage | null; home: string | undefined; refresh: () => Promise<void> }
+type Args = { stale: SignalVerrou | null; l: Loop; u: Usage | null; home: string | undefined; refresh: () => Promise<void>; p: Palette }
 
-export async function boutons($: EngineInterface, ui: UI, { stale, l, u, home, refresh }: Args): Promise<JSX.Element> {
+export async function boutons($: EngineInterface, ui: UI, { stale, l, u, home, refresh, p }: Args): Promise<JSX.Element> {
   const { Box, Button, Text } = ui
   const [url, erreur] = await Promise.all([read($, cockpitUrl), read($, cockpitErreur)])
   const root = await $.session.root().catch(() => undefined)
@@ -75,8 +75,8 @@ export async function boutons($: EngineInterface, ui: UI, { stale, l, u, home, r
           rafraîchir
         </Button>
       </Box>
-      {url ? <Text color={C.fg2} wrap="wrap">{`cockpit : ${url}`}</Text> : null}
-      {erreur ? <Text color={C.human} wrap="wrap">{erreur}</Text> : null}
+      {url ? <Text color={p['text-2']} wrap="wrap">{`cockpit : ${url}`}</Text> : null}
+      {erreur ? <Text color={p['st-blocked']} wrap="wrap">{erreur}</Text> : null}
     </Box>
   )
 }

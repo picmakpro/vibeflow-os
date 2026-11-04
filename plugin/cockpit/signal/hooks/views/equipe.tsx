@@ -5,7 +5,7 @@
 
 import type { EngineInterface } from 'claude-code'
 
-import { C, G, age, oneLine } from '../ds'
+import { G, age, oneLine } from '../ds'
 import { ghost, head } from './common'
 import type { Ctx } from './common'
 import type { SignalWorker } from '../../types'
@@ -42,7 +42,7 @@ function arbre(workers: SignalWorker[]): { w: SignalWorker; depth: number }[] {
 }
 
 export function equipe($: EngineInterface, ctx: Ctx): JSX.Element {
-  const { ui, roster, s, l, blink, compact } = ctx
+  const { ui, pal, roster, s, l, blink, compact } = ctx
   const { Box, Button, Text } = ui
   const workers = s?.equipe?.workers ?? []
   const session = new Map(roster.map(a => [a.id, a]))
@@ -53,23 +53,23 @@ export function equipe($: EngineInterface, ctx: Ctx): JSX.Element {
 
   return (
     <Box flexDirection="column">
-      <Text color={l.isWorking ? C.signal : C.fg2} wrap="wrap">
+      <Text color={l.isWorking ? pal['st-active'] : pal['text-2']} wrap="wrap">
         {l.isWorking
           ? `${blink ? G.current : ' '} l'équipe travaille · ${l.tools} outil${l.tools > 1 ? 's' : ''}`
           : l.lastTurn
             ? `${G.done} dernier tour · ${l.lastTurn.seconds} s · ${l.lastTurn.tools} outils`
             : `${G.done} prête`}
-        <Text color={C.fg3}>
+        <Text color={pal['text-3']}>
           {' · '}
           {workers.length ? `${live} en cours, ${finis} fini${finis > 1 ? 's' : ''}` : 'aucun agent vu'}
         </Text>
       </Text>
 
-      {rows.length > 0 && !compact ? head(ui, 'arbre') : null}
+      {rows.length > 0 && !compact ? head(ui, pal, 'arbre') : null}
       {rows.map(({ w, depth }) => {
         const etat = etatDe(w)
         const termine = etat === 'termine'
-        const color = termine ? C.fg3 : w.orphan ? C.human : etat === 'actif' ? C.signal : C.fg2
+        const color = termine ? pal['st-todo'] : w.orphan || etat === 'actif' ? pal['st-active'] : pal['text-2']
         const glyph = termine ? G.done : w.orphan ? G.human : etat === 'actif' ? (blink ? G.current : ' ') : G.todo
         const mien = session.get(w.id)
         return (
@@ -77,11 +77,11 @@ export function equipe($: EngineInterface, ctx: Ctx): JSX.Element {
             <Text color={color} bold={etat === 'actif'} wrap="wrap">
               {depth > 0 ? `${G.branch} ` : ''}
               {glyph} {w.role || w.kind}
-              <Text color={termine ? C.fg3 : C.fg2} bold={false}> · {oneLine(w.task ?? '')}</Text>
+              <Text color={termine ? pal['text-3'] : pal['text-2']} bold={false}> · {oneLine(w.task ?? '')}</Text>
             </Text>
             {compact ? null : (
               <Box paddingLeft={depth > 0 ? 4 : 2}>
-                <Text color={C.fg3} wrap="wrap">
+                <Text color={pal['text-3']} wrap="wrap">
                   {w.orphan ? 'orphelin (registre)' : termine ? 'terminé' : etat === 'en-attente' ? 'en attente' : 'actif'}
                   {` · ${w.tree}`}
                   {w.branch ? ` · ${w.branch}` : ''}
@@ -113,7 +113,7 @@ export function equipe($: EngineInterface, ctx: Ctx): JSX.Element {
         )
       })}
       {rows.length === 0 ? (
-        <Box marginTop={compact ? 0 : 1}>{ghost(ui, compact ? 'aucun agent en cours' : 'les agents apparaissent ici dès que le socle en voit')}</Box>
+        <Box marginTop={compact ? 0 : 1}>{ghost(ui, pal, compact ? 'aucun agent en cours' : 'les agents apparaissent ici dès que le socle en voit')}</Box>
       ) : null}
       {compact ? null : (
         <Box marginTop={1}>

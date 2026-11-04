@@ -115,8 +115,8 @@ test("R8-G4b — vue mission : une mission abandonnée grise ses nœuds en cours
 
 test("R8-G5 — vue macro : phase faite st-done, phase à recetter st-active et écrite en toutes lettres", async ($, on) => {
   const ui = await monte($, on, PHASES, { vue: 'macro' })
-  toutes(await couleurs(ui, /68 Embarquer le mod · fait/), SOMBRE.done)
-  toutes(await couleurs(ui, /69 Suivi du travail · à recetter/), SOMBRE.active)
+  toutes(await couleurs(ui, /^\S 68 Embarquer le mod · fait/), SOMBRE.done)
+  toutes(await couleurs(ui, /^\S 69 Suivi du travail · à recetter/), SOMBRE.active)
   await ui.unmount()
 })
 

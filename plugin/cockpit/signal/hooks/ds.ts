@@ -1,19 +1,9 @@
-// Design : VibeFlow Media v2 « Signal » — un fil, un curseur, deux couleurs.
-// Cyan = la machine. Orange = l'humain. Mono, minuscules, angle droit, pas d'emoji.
+// Ce que la pane dit : glyphes, étapes, libellés, durées. Aucune couleur ici : elles vivent dans tokens.ts (P68-D-17).
+// Mono, minuscules, angle droit, pas d'emoji.
 
 import type { EngineInterface } from 'claude-code'
 
 import type { Stage, View } from '../types'
-
-/** Tokens « nuit ». Le cyan et l'orange ne servent qu'à leur sens. */
-export const C = {
-  fg: '#F4F5F6',
-  fg2: '#8E96A2',
-  fg3: '#4B525C',
-  line: '#1C1F23',
-  signal: '#3AC7FF',
-  human: '#FF9500',
-} as const
 
 /** Glyphes : le curseur bloc, le point qui avance, l'étape à venir. */
 export const G = { done: '■', current: '▶', todo: '·', human: '■', rail: '──', branch: '↳' } as const
