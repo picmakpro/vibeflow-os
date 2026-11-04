@@ -159,6 +159,15 @@ Relayés par la session principale (SendMessage) ; réponses mot pour mot entre 
   Amende P68-D-13 (renvoi, texte inchangé). Ne change pas la résolution côté mod : les paramètres `pluginRoot` des
   fonctions du mod (68-05 à 68-07 : racine du plugin, `$.plugin.root`, pour situer l'émetteur, le lanceur du cockpit et
   `driver-lock.sh` du geste d'élagage) ne sont pas l'option retirée.
+- **P68-D-29 (isolation des suites face au conductor voisin) — décision du manager, pas un arbitrage de Samuel
+  (2026-11-04).** Constat du correcteur des plans : sur `main`, un outil de test qui calcule le planning sans dossier de
+  scripts explicite tombe sur le vrai `plugin/conductor/scripts/driver-lock.sh` du dépôt par la règle « conductor
+  voisin » ; épingler `HOME` ne suffit donc plus. Règle : toute suite de la 68 qui veut un résultat indépendant du
+  poste passe au processus qui calcule un dossier de scripts explicite hors de toute disposition `…/cockpit/scripts`
+  (`VF_COCKPIT_SCRIPTS_DIR` ou option `scriptsDir`), vide ou portant son faux `driver-lock.sh` ; c'est la forme
+  déjà retenue par la 69 (`cb5525dc`). S'applique à V5.1 de 68-01 (« aucun script trouvable » : dossier de scripts
+  vide en plus du `HOME` vide) et à l'épinglage de la tâche 3 de 68-01 (suites `direct`, `equipe`, `responsive`,
+  `who`, `projet`, `avancement`). Code de `driverLockScript` inchangé.
 
 ### Points de procédure (documentés, sans arbitrage — consigne de la session principale, 2026-11-03)
 

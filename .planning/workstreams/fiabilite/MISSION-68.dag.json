@@ -82,7 +82,7 @@
         "plancheck-68"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "revision-68",
@@ -143,6 +143,247 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "plancheck-68e",
+      "step": "plan-checker frais sur les 11 plans, confrontés à main 794c6dba (W1 découpe 68-04, W2 témoin I9, W3 contrats 69)",
+      "stage": "",
+      "deps": [
+        "plancheck-68d"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rev-68e",
+      "step": "révision des plans : témoin P68-D-27, INFO fails_when 68-01, findings du checker",
+      "stage": "",
+      "deps": [
+        "plancheck-68e"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-68-vf-signal-embarque-socle-partage/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-68f",
+      "step": "checker frais ciblé sur le diff de rev-68e",
+      "stage": "",
+      "deps": [
+        "rev-68e"
+      ],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "exec-68-01",
+      "step": "68-01 règle de mission vivante, avancement@2 (VFSG-06)",
+      "stage": "",
+      "deps": [
+        "plancheck-68f"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-vie.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-avancement.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-planning.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-project.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-interface.json"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-68-02",
+      "step": "68-02 retard sur main et worktrees (VFSG-05)",
+      "stage": "",
+      "deps": [
+        "plancheck-68e"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-arbres.mjs",
+        "plugin/cockpit/scripts/vf-cockpit-who.mjs",
+        "plugin/cockpit/scripts/tests/test-cockpit-retard.sh"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "exec-68-04",
+      "step": "68-04 import du mod, déclaration plugin (VFSG-01)",
+      "stage": "",
+      "deps": [
+        "plancheck-68f"
+      ],
+      "scope": [
+        "plugin/cockpit/signal/",
+        "plugin/.claude-plugin/plugin.json"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-68-03",
+      "step": "68-03 émetteur signal@1 (VFSG-03, 11)",
+      "stage": "",
+      "deps": [
+        "exec-68-01",
+        "exec-68-02"
+      ],
+      "scope": [
+        "plugin/cockpit/scripts/vf-cockpit-signal.mjs"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-68-12",
+      "step": "68-12 gating et ancien mod (VFSG-02, 09)",
+      "stage": "",
+      "deps": [
+        "exec-68-04"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-68-05",
+      "step": "68-05 appel du socle, en-tête",
+      "stage": "",
+      "deps": [
+        "exec-68-03",
+        "exec-68-12"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-68-09",
+      "step": "68-09 porte de légitimité, sonde, étape CI",
+      "stage": "",
+      "deps": [
+        "exec-68-01",
+        "exec-68-02",
+        "exec-68-03",
+        "exec-68-04",
+        "exec-68-12"
+      ],
+      "scope": [
+        ".github/workflows/ci.yml",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-68-06",
+      "step": "68-06 retrait de disk.ts",
+      "stage": "",
+      "deps": [
+        "exec-68-05"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-68-07",
+      "step": "68-07 équipe who@2, bouton cockpit",
+      "stage": "",
+      "deps": [
+        "exec-68-06"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-68-08",
+      "step": "68-08 direction Graphite",
+      "stage": "",
+      "deps": [
+        "exec-68-07"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-socle",
+      "step": "revue + audit sécurité du socle (68-01/02/03)",
+      "stage": "",
+      "deps": [
+        "exec-68-03"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-68-13",
+      "step": "68-13 runs CI rouge puis vert",
+      "stage": "",
+      "deps": [
+        "exec-68-08",
+        "exec-68-09"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-mod",
+      "step": "revue du mod (68-04/12/05..08) + audit CI 68-09",
+      "stage": "",
+      "deps": [
+        "exec-68-08",
+        "exec-68-09"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "recette-68",
+      "step": "recette par juges Playwright + tri unique",
+      "stage": "",
+      "deps": [
+        "exec-68-13",
+        "revue-socle",
+        "revue-mod"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-68-10",
+      "step": "68-10 doc, recette consignée, porte de phase",
+      "stage": "",
+      "deps": [
+        "recette-68"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-68-11",
+      "step": "68-11 bump module (selon Q1), relecture adverse",
+      "stage": "",
+      "deps": [
+        "exec-68-10"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire",
+      "stage": "",
+      "deps": [
+        "exec-68-11"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "pr-68",
+      "step": "gates rejoués depuis ci.yml, PR suivie jusqu'au vert",
+      "stage": "",
+      "deps": [
+        "docs"
+      ],
+      "scope": [],
+      "status": "blocked"
     }
   ]
 }
