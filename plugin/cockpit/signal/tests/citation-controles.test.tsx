@@ -46,12 +46,12 @@ const WS_HOSTILE = "a b';touch /tmp/pwn;`id`$(id) #"
 
 test('FX-3b — copier takeover : chemin à espace et ws hostile donnent une commande qui n’exécute que le script attendu', async ($, on) => {
   // le script vient du compte (P68-D-34 : rien sous le lab) ; c'est le compte qui porte l'espace
-  const lab = labFix(on, { root: '/lab dir', home: '/home/mon user', scripts: /^\/home\/mon user\/\.claude\/scripts\/driver-lock\.sh$/ })
+  const lab = labFix(on, { root: '/lab dir', home: '/home/user/mon dossier', scripts: /^\/home\/user\/mon dossier\/\.claude\/scripts\/driver-lock\.sh$/ })
   lab.emetteur.stdout = avecVerrou({ ws: WS_HOSTILE })
   const ui = await monter($)
   await ui.press({ key: 'takeover' })
   expect(lab.copies.length).toBe(1)
-  expect(mots(lab.copies[0]!)).toEqual(['bash', '/home/mon user/.claude/scripts/driver-lock.sh', 'takeover', '--owner=ID', `--ws=${WS_HOSTILE}`])
+  expect(mots(lab.copies[0]!)).toEqual(['bash', '/home/user/mon dossier/.claude/scripts/driver-lock.sh', 'takeover', '--owner=ID', `--ws=${WS_HOSTILE}`])
   await ui.unmount()
 })
 
