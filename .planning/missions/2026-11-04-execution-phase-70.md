@@ -74,7 +74,7 @@ recommandations sont dans `70-RECETTE-JUGES.md`.
 ## Constats hors périmètre (pour le BACKLOG)
 
 - **Carte Session (Phase 69, révélé)** : le pied dit « en attente », le badge dit « En cours ».
-- **`scripts/check-machine-paths.sh`, faux vert sous macOS** : la CI Linux rougit à deux reprises sur `/Users/...` (plans,
+- **`scripts/check-machine-paths.sh`, faux vert sous macOS** : la CI Linux rougit à deux reprises sur `/Users/<user>/…` (plans,
   puis `70-RECETTE-JUGES.md:56`), alors que le gate passe en local. Un `awk` nu sur le même fichier y trouve bien la
   correspondance. Piste à vérifier : un `awk` de macOS qui abandonne un lot de `xargs` sur un octet multi-octet invalide
   (le balayage n'est pas sous `LC_ALL=C`).
