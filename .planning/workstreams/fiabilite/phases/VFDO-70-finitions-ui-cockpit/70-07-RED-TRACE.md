@@ -195,3 +195,26 @@ Mesure de la CI : `#tour` 16..276 (largeur posée 260 px), `#ask` à partir de x
 - Cause du placement jugé libre à tort : `place()` jugeait la carte sur `getBoundingClientRect()`, la boîte peinte, réduite à 98 % et décalée de 8 px pendant l'animation d'entrée. Elle juge maintenant la boîte de mise en page (`offsetLeft`, `offsetWidth`, `offsetTop`, `offsetHeight`), la même que la carte posée, et compte 2 px de marge autour de chaque surface (bordures et arrondis que la boîte de mise en page ne montre pas). 6 px faisaient rougir R1 et O6.10 : 2 px est la plus petite marge de l'intervalle demandé ; la boîte de mise en page est la vraie correction (sans la marge, le témoin O6.18 est déjà vert).
 - Vert, en série : `test-cockpit-projet.sh` 165 PASS / 0 FAIL avec `VF_DEJAVU_DIR` (O6.18 et toutes les passes) ; `test-cockpit-vendor.sh` 79/0 ; `test-cockpit-chrome-fr.sh` 78/0 ; `test-cockpit-onglet-code.sh` 25/0 ; `test-cockpit-responsive.sh` 291 PASS / 0 FAIL, sans et avec `RESP_POLICE=1` ; `synchro.sh verifier` : amont retrouvé à l'octet.
 - (a) Mesurer la bbox rendue après la pose : non ajouté, devenu inutile : la boîte de mise en page est celle de la carte posée ; le relevé de 200 ms replace déjà dès qu'une surface bouge. O6.17 à 800 px : diagnostic CI pas encore reçu.
+
+## Suite : R1 « long / project / 1 024 px » intermittent (CI Linux de 83b13be4, code identique à a15b073d vert)
+
+`R1 — long / project / 1024 px` : `carte : sort de la zone libre (245..692 / libre 0..648)`.
+
+### Mesure : synchronisation ou produit ?
+
+Lab « long », onglet Projet, 1 024 px, panneau ouvert, graphe relevé toutes les 15 à 100 ms après l'ouverture de la visite d'office, avec et sans ralentissement du processeur (CDP `Emulation.setCPUThrottlingRate` ×4, ×6, ×10, ×12) :
+- la transformation du graphe se stabilise entre 0,7 s et 1,2 s après l'ouverture ; à aucun instant du transit, ni à l'état stable, une carte ne sort de la zone libre (états stables relevés : 163..616, 115..616, 65..567 sur 648 selon la course de l'ouverture : `k` 0,616 ou 0,681) ;
+- `mesurer()` de `chrome-responsive.mjs` prenait déjà un relevé quand deux relevés espacés de 250 ms sont identiques : la course « mesure en plein transit » n'est possible que si l'animation se fige au moins 250 ms, ce qu'un runner lent peut faire. Elle ne se déclenche pas sur ce poste : **non reproduite, ni en transit ni à l'état stable avec la géométrie ordinaire**.
+- Le rouge CI (245..692) est à droite de tous les états stables relevés ici (163..616 au plus) : un graphe 82 px plus loin à droite. Cela ressemble à un état stable atteint par un autre chemin.
+
+### Rouge — état stable, produit (carte de visite haute)
+
+Hypothèse retenue et reproduite : la carte de visite est plus haute (texte long, police large) ; la zone « à côté » devient la plus grande et étroite ; `aim()` y centre la carte ciblée et pousse le reste du graphe sous le panneau. Sonde `chrome-visite-etapes.mjs` option `cartehaute` (carte de visite de 300 px de haut au moins), lab « nom long », Projet, 1 024 px, étape 1 : tout le graphe hors de la zone libre (`toutLibre` faux ; `{"chip":[139,226,370,365],"zone":[384,202,616,678],"free":[16,202,616,678],"all":[139,226,616,673],"chosen":[246,145]}` : centré dans la zone, graphe poussé à 862). Rouge à 300, 340, 380 et 420 px de hauteur, vert à 260.
+
+### Correction et vert
+
+- `aim()` : si le graphe entier tient dans la zone libre mais que centrer la carte ciblée dans sa zone l'en fait sortir, il cherche, parmi les déplacements qui gardent tout le graphe dans la zone libre, celui qui est le plus proche du centrage et qui laisse la carte ciblée visible et hors de la carte de visite. Sans déplacement possible (carte de visite de 440 px de haut forcée : aucun emplacement n'existe), il centre comme avant.
+- Synchronisation (`chrome-responsive.mjs`) : avant chaque mesure, après l'ouverture de la visite et après l'injection éventuelle, attente que le graphe (cadre englobant des cartes), la carte de visite et la transformation soient identiques sur des relevés espacés de 150 ms pendant au moins 800 ms, sans classe « anim » (plafond 6 s). `RESP_SANS_ATTENTE=1` retire cette attente (mutant) ; `RESP_COURSE=1` impose un transit avec un arrêt de 700 ms.
+- **Témoin de course : non démontré.** `mesurer()` met plus de temps que mon transit forcé (2,5 s) : avec ou sans l'attente, la mesure tombe après la fin du transit, rouge impossible à obtenir de façon déterministe avec ce harnais sans réécrire `mesurer()`. Les deux variables restent dans la suite comme outils de diagnostic ; je ne présente pas la synchronisation comme prouvée.
+- Taille : `40-tour.js` a dû repasser sous 300 lignes (`check-file-size.sh`, V4 de `test-cockpit-vendor.sh`) : 299 lignes, le relevé d'`aim()` exposé au diagnostic a été retiré pour cela.
+- Vert, en série : `test-cockpit-projet.sh` 169 PASS / 0 FAIL avec `VF_DEJAVU_DIR` (O6.19 aux trois largeurs incluse) ; `test-cockpit-vendor.sh` 79/0 ; `test-cockpit-chrome-fr.sh` 78/0 ; `test-cockpit-onglet-code.sh` 25/0 ; `test-cockpit-responsive.sh` **trois fois de suite** 291 PASS / 0 FAIL ; `synchro.sh verifier` : amont retrouvé à l'octet. Le rouge CI intermittent lui-même n'a pas été reproduit : la cause tenue (carte de visite haute) est une hypothèse, la correction de l'état stable est testée, l'attente de calme est une protection.
