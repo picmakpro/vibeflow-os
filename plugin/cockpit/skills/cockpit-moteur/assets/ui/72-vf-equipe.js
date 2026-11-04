@@ -115,7 +115,7 @@
       <button type="button" data-vf-transcript="${h(w.id)}">Lire le transcript</button></div>`;
   });
   // Entrée sur un de ces boutons : le viewer l'écoute aussi sur `window` (raccourci « ouvrir le nœud sélectionné »), descend dans le nœud et redessine le panneau ;
-  // le bouton quitte le document avant que son clic ait lieu, le focus tombe sur le corps de la page (UIFN-12). L'évènement s'arrête au document, le clic du bouton reste.
+  // le bouton quitte le document avant que son clic ait lieu et le transcript n'est jamais lu (UIFN-12). L'évènement s'arrête au document, le clic du bouton reste.
   document.addEventListener('keydown', (ev) => {
     if (ev.keyCode === 13 && ev.target.closest?.('#panel [data-vf-transcript], #panel [data-vf-doing]')) ev.stopPropagation();
   });

@@ -876,7 +876,35 @@ JSON
   EKC focus-transcript "$EKA1"
   assert_eq "EK1.0 — témoin : avant l'Entrée, l'élément actif est le bouton « Lire le transcript » de l'agent a1 (la sonde sait lire le focus)" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||(j.avant.tag+"|"+j.avant.transcript)')" "BUTTON|a1"
   assert_eq "EK1 — après Entrée sur « Lire le transcript », le transcript s'affiche ET l'élément actif reste dans le tiroir, jamais BODY" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||("lu="+j.lu+" | actif="+(j.apres.tag==="BODY"?"BODY":(j.apres.dansTiroir?"dans le tiroir":"hors du tiroir : "+j.apres.tag)))')" "lu=true | actif=dans le tiroir"
+  # EK2 (m1) : changer d'agent efface la clé de rechargement
+  EKC changer-agent "$EKA1"
+  assert_eq "EK2.1 — changer d'agent efface la clé de rechargement (avant : l'identifiant a1 ; après : aucune)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')" "a1|null"
+  # EK3 (m10) : le sessionStorage ne garde que l'identifiant de l'agent
+  EKC recharger "$EKA1"
+  assert_eq "EK3.1 — le sessionStorage ne contient que l'identifiant de l'agent (jamais le texte lu, qui est bien affiché)" "$(G "$WORK/ek-recharger.json" 'j.erreur||(JSON.stringify(j.entrees)+"|"+j.texteLu+"|"+j.fuite)')" '{"vf-equipe-ouvert":"a1"}|true|false'
+  # EK4 (m8) : un tiroir fermé n'est pas rouvert par un nouveau who
+  EKC ferme-puis-who "project.html#t"
+  assert_eq "EK4.1 — le tiroir « Au travail » fermé n'est pas rouvert par un who qui change l'arbre (ouvert, fermé, rouvert)" "$(G "$WORK/ek-ferme-puis-who.json" 'j.erreur||(j.ouvert+"|"+j.ferme+"|"+j.rouvert)')" "true|true|false"
+  # EK5 (m5) : la commande demandée est rendue en texte, jamais en HTML
+  EKC rendu-commande "$EKA1"
+  assert_eq "EK5.1 — une commande qui porte du balisage s'affiche en texte (0 élément créé, aucun #ek-injecte, la source lisible)" "$(G "$WORK/ek-rendu-commande.json" 'j.erreur||(j.elements+"|"+j.injecte+"|"+j.texte.includes("<b id=ek-injecte>"))')" "0|false|true"
   vf_hyg_stop "$EK_PID"
+
+  # --- mutants : chacun posé dans la page servie, serveur relancé, le témoin DOIT rougir ---
+  ek_mutant() { # $1 nom, $2 action, $3 page, $4 expression sur la sortie, $5 ancre, $6 remplacement -> « muté|<valeur> »
+    local m; m="$(ek_muter "$5" "$6")"; ek_demarrer; EKC "$2" "$3"; local v; v="$(G "$WORK/ek-$2.json" "$4")"; vf_hyg_stop "$EK_PID"; ek_restaurer; echo "$m|$v"; }
+  assert_eq "EK2.2 — mutant (marque(null) retiré de la page servie) : la clé survit au changement d'agent, détecté" "$(ek_mutant m1 changer-agent "$EKA1" 'j.erreur||(j.avant+"|"+j.apres)' 'lu = null; marque(null); return;' 'lu = null; return;')" "muté|a1|a1"
+  assert_eq "EK3.2 — mutant (le sessionStorage reçoit aussi le texte lu) : la fuite est détectée" "$(ek_mutant m10 recharger "$EKA1" 'j.erreur||(j.fuite+"|"+j.texteLu)' 'sessionStorage.setItem(CLE_OUVERT, id);' "sessionStorage.setItem(CLE_OUVERT, id + ' ' + lu.noeuds.map((n) => n.textContent).join(' '));")" "muté|true|true"
+  assert_eq "EK4.2 — mutant (garde « tiroir fermé » retirée de redessiner) : le who rouvre le tiroir, détecté" "$(ek_mutant m8 ferme-puis-who "project.html#t" 'j.erreur||(j.ouvert+"|"+j.ferme+"|"+j.rouvert)' "if (!document.querySelector('.vf-whop') || document.body.classList.contains('no-panel')) return;" 'if (false) return;')" "muté|true|true|true"
+  assert_eq "EK5.2 — mutant (la commande est rendue en HTML) : un élément est créé, détecté" "$(ek_mutant m5 rendu-commande "$EKA1" 'j.erreur||(j.elements+"|"+j.injecte)' "z.textContent !== t) { z.textContent = t; z.hidden = false; }" "!z.dataset.ek) { z.dataset.ek = '1'; z.innerHTML = t; z.hidden = false; }")" "muté|1|true"
+  # l'ancre doit être propre à 72-vf-equipe.js : le viewer porte d'autres ev.stopPropagation(), un mutant posé sur l'un d'eux serait un faux vert
+  EKANC1="ev.target.closest?.('#panel [data-vf-transcript], #panel [data-vf-doing]')) ev.stopPropagation();"
+  assert_eq "EK1.2 — mutant (l'Entrée du bouton n'est plus arrêtée avant le viewer) : le viewer descend dans le nœud, le transcript n'est jamais lu et le focus tombe sur BODY, détecté" "$(ek_mutant f1 focus-transcript "$EKA1" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "$EKANC1" "${EKANC1/ev.stopPropagation();/void 0;}")" "muté|lu=false | actif=BODY"
+  assert_eq "EK1.3 — mutant (le bouton focalisé est désactivé pendant la lecture) : le transcript est lu mais le focus tombe sur BODY, détecté" "$(ek_mutant f2 focus-transcript "$EKA1" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "b.setAttribute('aria-disabled', 'true');" 'b.disabled = true;')" "muté|lu=true | actif=BODY"
+  # témoins de la sonde de mutation elle-même
+  ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"
+  assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK2.1 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "a1|null|identique"
+  assert_eq "EK7 — témoin de la sonde : un mutant dont l'ancre n'existe pas est refusé, la page servie reste intacte" "$(ek_muter 'ANCRE-QUI-N-EXISTE-PAS-70-11' 'x')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "ancre absente|identique"
 fi
 
 vf_hyg_assert

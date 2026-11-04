@@ -473,6 +473,21 @@ mkdir -p "$WORK/trap18/x/scripts" "$WORK/trap18/conductor/scripts"; cp "$TRAP" "
 Q who "$L17" "$H18" "$WORK/trap18/x/scripts" > "$WORK/who18c.json"
 assert_eq "W18.4 — un frère de n'importe quel dossier « scripts » n'est pas exécuté" "$([ -e "$WORK/EXECUTE" ] && echo oui || echo non)|$(G "$WORK/who18c.json" 'j.workers.filter(w=>w.id==="PIEGE").length')" "non|0"
 
+# ---------- W19 — la clause `..` de la grammaire ws, prouvée par le COMPORTEMENT (Phase 70, plan 70-11, UIFN-13) ----------
+# La clause `!ws.includes('..')` n'était gardée que par une ancre de texte (W17.9 supprime tout le filtre). Ici un compartiment `a..b` passe la forme
+# alphanumérique de WS_RE : seule la clause `..` l'écarte. Le faux driver-lock.sh de W17 journalise ses arguments : la cible `a..b` ne doit jamais lui arriver ;
+# le mutant (clause retirée, tout le reste du filtre intact) la lui livre.
+echo "=== W19 — un ws contenant « .. » n'arrive jamais en argument de driver-lock.sh ==="
+L19="$WORK/lab-w19"; mkdir -p "$L19"; git -C "$L19" init -q
+mkdir -p "$L19/.git/vf-driver/ws/ok1" "$L19/.git/vf-driver/ws/a..b"
+run19() { : > "$LOG17"; HOSTILE_LOG="$LOG17" node "$AUX/q.mjs" "$1" who "$L19" "$HOME_T" "$HOS" > /dev/null; }
+run19 "$SCRIPTS"
+assert_eq "W19.0 — contrôle positif : le compartiment a..b existe sur disque et la cible valide ok1 a bien été interrogée" "dir:$([ -d "$L19/.git/vf-driver/ws/a..b" ] && echo oui || echo non)|ok1:$(grep -c '^orphans --ws=ok1$' "$LOG17")" "dir:oui|ok1:1"
+assert_eq "W19.1 — la cible a..b n'est jamais passée au script (grammaire : jamais « .. »)" "$(grep -c -- '--ws=a\.\.b' "$LOG17")" "0"
+M19="$(mut17 sansdoublepoint vf-cockpit-who.mjs "WS_RE.test(ws) && !ws.includes('..')" "WS_RE.test(ws)")"
+run19 "$WORK/mut17-sansdoublepoint"
+assert_eq "W19.2 — mutant (seule la clause « .. » retirée, le reste du filtre intact) : a..b arrive au script, détecté par le comportement" "$M19|$(grep -c -- '--ws=a\.\.b' "$LOG17")" "muté|1"
+
 vf_hyg_assert
 
 echo ""

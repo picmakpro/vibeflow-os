@@ -25,11 +25,14 @@ await executer(chrome, async (s) => {
   await s.send('Page.addScriptToEvaluateOnNewDocument', { source: INJ });
   await s.naviguer(url);
   await s.attendre(PRET, 'viewer prêt');
+  // page calme : le flux `who` est arrivé et la page ne se recharge plus (une structure d'équipe changée la recharge, et le clic serait perdu)
+  const calme = () => s.stable("performance.timeOrigin + ':' + !!(window.__vfLive && window.__vfLive.who)", 'page calme');
   const touche = async (key, code, vk, text) => {
     await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, text });
     await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
   };
   if (ACTION === 'focus-transcript') {
+    await calme();
     await s.attendre("!!document.querySelector('#panel [data-vf-transcript]')", 'bouton « Lire le transcript »');
     await s.ev(`window.__b = document.querySelector('#panel [data-vf-transcript]'); window.__b.focus(); window.__tr = []; (() => { ${DECRIRE}
       const rel = () => { const a = document.activeElement; return JSON.stringify([a ? a.tagName : null, !!window.__b.disabled, a === window.__b, document.contains(window.__b)]); };
@@ -45,6 +48,7 @@ await executer(chrome, async (s) => {
   }
   if (ACTION === 'changer-agent') {
     const autre = process.env.EK_AUTRE || 'n:ag-a2';
+    await calme();
     await s.attendre("!!document.querySelector('#panel [data-vf-transcript]')", 'bouton « Lire le transcript »');
     await s.ev("document.querySelector('#panel [data-vf-transcript]').click()");
     await s.attendre(LU, 'transcript affiché');
@@ -55,6 +59,7 @@ await executer(chrome, async (s) => {
     return { avant, apres };
   }
   if (ACTION === 'recharger') {
+    await calme();
     await s.attendre("!!document.querySelector('#panel [data-vf-transcript]')", 'bouton « Lire le transcript »');
     await s.ev("document.querySelector('#panel [data-vf-transcript]').click()");
     await s.attendre(LU, 'transcript affiché');
