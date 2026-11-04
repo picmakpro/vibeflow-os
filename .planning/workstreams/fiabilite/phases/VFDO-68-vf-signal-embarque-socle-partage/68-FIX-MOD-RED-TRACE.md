@@ -34,7 +34,7 @@ Mutants tués (un gate retiré à la fois, suite rejouée) :
 | gate de `turn.start` retiré | FX-1e, FX-1f, FX-1g |
 | gate de `agent.spawn` retiré | FX-1g, FX-1h |
 
-## ST-3, ST-4, ST-5, ST-6 — témoins rouges (tête avec le correctif ST-1, sortie `fix-mod-st346-rouge.out` : 76 pass / 19 fail, dont 0 hors FX-)
+## ST-3, ST-4, ST-5, ST-6 — témoins rouges (tête avec le correctif ST-1, sortie `fix-mod-st346-rouge.out` : 18 fail, tous des FX-, les autres suites vertes)
 
 Fichiers : `tests/lab-fix.ts` (faux lab pilotable : émetteur, bash, lanceur, toasts, copies), `tests/socle-fix.test.tsx` (ST-5, ST-6a/b),
 `tests/citation-controles.test.tsx` (ST-3, ST-4, ST-6c/d).
@@ -54,3 +54,38 @@ Fichiers : `tests/lab-fix.ts` (faux lab pilotable : émetteur, bash, lanceur, to
 | FX-4a1..a4 | brief : `agent.description`, raison de refus, `projet`, `owner` du verrou | idem | contrôles et ligne `- faux verrou` forgée dans le Markdown |
 | FX-4a5 | bandeau : `owner` du verrou périmé | idem | contrôles dans le texte |
 | FX-4a6, FX-4a7 | pane : `owner` du verrou (`cut`, sans `oneLine`), nom de phase (`oneLine` identité sur les contrôles) | pane dessinée | `$.ui.mount: vibeflow drew nothing … a text child holds a control character (an escape sequence)` : l'engine refuse la pane entière |
+
+Rectification du rouge de FX-4a2 : le témoin avait d'abord échoué pour une mauvaise raison (le refus n'était pas enregistré : le hook
+du faux engine rendait `{ result: { deny } }` au lieu de `{ deny }`). Corrigé dans le test, puis rejoué sur le code non corrigé
+(`fix-mod-st346-rouge2.out`, 77 pass / 18 fail) : FX-4a2 rougit alors sur la ligne `Expected: not /[\u0000-\u001f\u007f-\u009f]/`.
+
+## Correctifs et VERT (`fix-mod-st346-vert.out`, 95 pass / 0 fail)
+
+- ST-4 : `ds.ts` — `sansControle` (C0, DEL, C1, U+2028/2029 → espace), `oneLine` s'appuie dessus, `nettoyer` (copie profonde). Le signal
+  (`refresh.ts`), la liste des agents et les refus y passent à l'entrée ; le toast d'élagage passe par `oneLine` (`actions.ts`).
+  Le brief n'a pas besoin de sa propre passe : un mutant qui l'ajoutait ne tuait aucun témoin, il n'a pas été gardé.
+- ST-3 : `shell.ts` (`cite`), `boutons.tsx` cite le chemin du script et le mot `--ws=<ws>`. `--owner=<id>` reste un gabarit nu : collé
+  tel quel, le shell lit `<id>` comme une redirection et refuse, c'est voulu (la personne doit nommer le propriétaire).
+- ST-5 : `socle.ts` — `complet()` contrôle la forme que les vues lisent sans garde ; `classerEchec` (partagé avec le lanceur) distingue
+  node absent, vrai délai (`timed out`/`timeout`/`délai`) et « non lancé (<cause bornée à 60>) », en retirant le préfixe `<plugin>: $.process.run:`.
+- ST-6 : la propriété réelle de `refresh.ts` est « un échec remet `signal` à `null` et dit l'erreur » (FX-6b).
+- ST-7 : commentaire de `resoudreLanceur` aligné (« la fonction rend toujours un chemin »).
+
+Mutants (un seul changement à la fois, suite complète rejouée, `hooks/` restauré après chaque) :
+
+| mutant | témoins rouges |
+| --- | --- |
+| `oneLine` redevient l'identité | FX-4a0, FX-5b, FX-5c, FX-6c |
+| `sansControle` redevient l'identité | FX-4a0 à FX-4a7 |
+| `cite` redevient l'identité | FX-3b |
+| `complet()` retiré | FX-5a0 à FX-5a6 |
+| `n` n'est plus exigé en chaîne | FX-5a4 |
+| `classerEchec` rend toujours « délai dépassé » | FX-5b, FX-5c |
+| `classerEchec` ne reconnaît plus le délai | FX-6a, K13 |
+| `signal` n'est plus remis à `null` après un échec | FX-6b |
+| toast sans borne de 120 / sans code de sortie | FX-6c |
+| `nettoyer` retiré à l'entrée du signal | FX-4a5, FX-4a6 |
+
+Non-régression : `claude plugin validate --strict plugin` ✔ (`fix-mod-validate.out`) ; `test-cockpit-signal-mod.sh` bash et zsh 40 ok / 0 ko
+(`fix-mod-static-bash.out`, `fix-mod-static-zsh.out`) ; `check-machine-paths.sh` ✓ 2481 fichiers (`fix-mod-machine-paths.out`).
+La suite statique n'a pas été touchée : pas de trailer `Gate-Touche:`.

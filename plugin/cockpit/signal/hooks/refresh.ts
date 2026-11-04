@@ -5,6 +5,7 @@ import { atom, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
 import { stageOf } from './derive'
+import { nettoyer, sansControle } from './ds'
 import { lireSignal } from './socle'
 import type { Refusal, Usage } from '../types'
 
@@ -20,7 +21,7 @@ const signalErreur = atom({ plugin: 'vibeflow', key: 'signalErreur' } as const, 
 export async function refreshSignal($: EngineInterface, pluginRoot: string, root: string | undefined): Promise<void> {
   const lecture = root ? await lireSignal($, pluginRoot, root) : { erreur: 'racine de session inconnue' }
   if ('signal' in lecture) {
-    await update($, signal, () => lecture.signal)
+    await update($, signal, () => nettoyer(lecture.signal))
     await update($, signalErreur, () => null)
   } else {
     await update($, signal, () => null)
@@ -34,10 +35,10 @@ export async function refreshRoster($: EngineInterface): Promise<void> {
     list.map(a => ({
       id: a.id,
       parentId: a.parentId ?? null,
-      type: a.type,
-      description: a.description,
-      status: String(a.status),
-      name: a.name ?? null,
+      type: sansControle(a.type),
+      description: sansControle(a.description),
+      status: sansControle(String(a.status)),
+      name: a.name == null ? null : sansControle(a.name),
     })),
   )
 }
@@ -78,6 +79,6 @@ export async function setStage($: EngineInterface, name: string, agentId: string
 }
 
 export async function recordRefusal($: EngineInterface, id: string, tool: string, reason: string): Promise<void> {
-  const refusal: Refusal = { id, tool, reason, at: await $.clock.now() }
+  const refusal: Refusal = { id, tool: sansControle(tool), reason: sansControle(reason), at: await $.clock.now() }
   await update($, refusals, list => (list.some(r => r.id === id) ? list : [...list, refusal].slice(-40)))
 }

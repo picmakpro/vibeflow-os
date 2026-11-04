@@ -3,6 +3,8 @@
 
 import type { EngineInterface } from 'claude-code'
 
+import { oneLine } from './ds'
+import { classerEchec } from './socle'
 /**
  * Où `driver-lock.sh` se trouve, dans l'ordre de P68-D-13 : la racine du plugin (toujours présente dans un plugin
  * installé), puis les scripts posés dans le lab, puis ceux du compte. Aucune recherche ailleurs ; null si rien n'existe.
@@ -23,12 +25,13 @@ export async function resoudreDriverLock($: EngineInterface, pluginRoot: string,
 export async function elaguer($: EngineInterface, script: string, ws: string | null, root: string): Promise<void> {
   const argv = ['bash', script, 'recover', ...(ws ? [`--ws=${ws}`] : [])]
   const ran = await $.process.run(argv, { cwd: root, timeoutMs: 15000 }).catch(() => undefined)
-  $.ui.toast(ran ? `recover · exit ${ran.exitCode} · ${ran.stdout.trim().slice(0, 120)}` : 'recover : driver-lock.sh ne démarre pas')
+  $.ui.toast(ran ? `recover · exit ${ran.exitCode} · ${oneLine(ran.stdout).slice(0, 120)}` : 'recover : driver-lock.sh ne démarre pas')
 }
 
 /**
  * Où `vf-cockpit.mjs` se trouve, dans l'ordre du verbe `/vf-cockpit` et de P68-D-25 : le script posé dans le lab, puis celui du
- * compte, puis celui du plugin (`$.plugin.root`, toujours présent dans un plugin installé). Premier existant ; null si aucun.
+ * compte, puis celui du plugin (`$.plugin.root`, toujours présent dans un plugin installé). Premier existant ; à défaut, celui du
+ * plugin : la fonction rend toujours un chemin.
  */
 export async function resoudreLanceur($: EngineInterface, pluginRoot: string, root: string, home: string | undefined): Promise<string> {
   const candidats = [`${root}/.claude/scripts/vf-cockpit.mjs`, home ? `${home}/.claude/scripts/vf-cockpit.mjs` : ''].filter(Boolean)
@@ -55,8 +58,7 @@ export async function ouvrirCockpit($: EngineInterface, lanceur: string, root: s
   try {
     ran = await $.process.run(['node', lanceur, 'open', '--lab', root], { cwd: root, timeoutMs: 60000 })
   } catch (err) {
-    const e = err as { code?: unknown; message?: unknown } | null
-    return { erreur: `${String(e?.code ?? '')} ${String(e?.message ?? '')}`.includes('ENOENT') ? 'node introuvable dans le PATH' : 'lanceur sans réponse (délai dépassé)' }
+    return { erreur: classerEchec(err, 'lanceur') }
   }
   if (ran.exitCode !== 0) return { erreur: `cockpit : ${CODES[ran.exitCode] ?? 'échec'} (code ${ran.exitCode})` }
   const adresse = /http:\/\/127\.0\.0\.1:\d+/.exec(ran.stdout)

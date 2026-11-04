@@ -40,6 +40,24 @@ export function since(now: number, at: number): string {
   return age(Math.max(0, now - at) / 1000)
 }
 
+// Caractères de contrôle : C0 (ESC, BEL, saut de ligne…), DEL, C1, séparateurs de ligne Unicode. L'engine refuse la pane
+// entière quand un texte en porte un : une seule valeur hostile éteindrait l'affichage.
+const CONTROLES = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g
+
+/** La chaîne sans caractère de contrôle (chacun devient une espace) ; ne touche ni aux espaces ni à l'indentation. */
+export function sansControle(s: string): string {
+  return s.replace(CONTROLES, ' ')
+}
+
+/** Une ligne : sans contrôle, espaces repliées et bornées. */
 export function oneLine(s: string): string {
-  return s.replace(/\s+/g, ' ').trim()
+  return sansControle(s).replace(/\s+/g, ' ').trim()
+}
+
+/** Une copie de la valeur dont chaque chaîne, à toute profondeur, est passée par `sansControle` (le socle, la liste des agents). */
+export function nettoyer<T>(v: T): T {
+  if (typeof v === 'string') return sansControle(v) as T
+  if (Array.isArray(v)) return v.map(nettoyer) as T
+  if (v !== null && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, nettoyer(x)])) as T
+  return v
 }

@@ -98,7 +98,7 @@ async function brief($: any): Promise<string> {
   return String(r.text)
 }
 function refuse(on: On) {
-  on('tool.call', () => ({ result: { deny: HOSTILE_NL } }))
+  on('tool.call', () => ({ deny: HOSTILE_NL }))
 }
 
 const SOURCES: [string, ($: any, on: On) => Promise<string>][] = [

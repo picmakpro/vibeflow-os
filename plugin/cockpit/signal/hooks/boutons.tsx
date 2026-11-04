@@ -6,6 +6,7 @@ import type { EngineInterface } from 'claude-code'
 
 import { elaguer, ouvrirCockpit, resoudreDriverLock, resoudreLanceur } from './actions'
 import type { UI } from './ds'
+import { cite } from './shell'
 import type { Palette } from './tokens'
 import type { Loop, SignalVerrou, Usage } from '../types'
 
@@ -50,7 +51,7 @@ export async function boutons($: EngineInterface, ui: UI, { stale, l, u, home, r
             dimColor
             onPress={press =>
               void $.ui
-                .copy({ text: `bash ${script ?? 'driver-lock.sh'} takeover --owner=<id>${ws ? ` --ws=${ws}` : ''}`, surface: press.surface })
+                .copy({ text: `bash ${cite(script ?? 'driver-lock.sh')} takeover --owner=<id>${ws ? ` ${cite(`--ws=${ws}`)}` : ''}`, surface: press.surface })
                 .then(() => $.ui.toast('commande takeover copiée'))
             }
           >
