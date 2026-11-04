@@ -10,7 +10,7 @@ export function clientTerminal(cfg) {
   });
   const CLE_SECRET = 'vf.terminal.secret', CLE_ONGLET = 'vf.terminal.onglet', CLE_FIN = 'vf.terminal.fin';
   const RACCOURCI = Object.freeze({ code: 'Space', ctrl: true, shift: true });
-  const ATTENTES = [500, 1000, 2000, 4000], LIMITE_MS = 30000, POLICES_MS = 2500;
+  const ATTENTES = [500, 1000, 2000, 4000], LIMITE_MS = 30000, POLICES_MS = 2500, REJEU_SILENCE_MS = 150, REJEU_BORNE_MS = 3000;
   const vue = window.vfTermVue;
   // le terminal n'existe que dans le cadre embarqué par P : une page de premier niveau (popup ouvert par P, onglet seul) n'a ni cadre parent ni opener nul
   const encadree = window.top !== window && window.opener === null;
@@ -129,8 +129,21 @@ export function clientTerminal(cfg) {
       }
       envoi = false;
     };
-    term.onData((d) => { file.push(new TextEncoder().encode(d)); vider(); });
-    term.onBinary((d) => { const b = new Uint8Array(d.length); for (let i = 0; i < d.length; i++) b[i] = d.charCodeAt(i) & 255; file.push(b); vider(); }); // rapports de souris : octets bruts
+    // rejeu : à chaque connexion le serveur renvoie d'abord le tampon, puis le direct. Les questions restées dans ce tampon (identité, position, état, couleurs) seraient
+    // répondues une seconde fois par xterm, et ces réponses atterriraient dans la saisie du shell. Pendant le rejeu, seul un octet issu d'une action de l'utilisateur part ;
+    // le rejeu se clôt au premier silence du flux (borné), une fois tout ce qui a été reçu analysé : les questions nouvelles du programme sont répondues normalement
+    let rejeu = false, humain = false, silence = 0, borne = 0;
+    const EVENEMENTS = ['keydown', 'keypress', 'input', 'mousedown', 'mouseup', 'mousemove', 'wheel', 'contextmenu'];
+    EVENEMENTS.forEach((t) => { window.addEventListener(t, () => { humain = true; }, true); window.addEventListener(t, () => { humain = false; }, false); });
+    // une frappe ferme le rejeu : tout ce qui est déjà reçu est analysé avant la clôture, ce qui vient après est du direct (un programme lancé tout de suite après l'invite n'est pas rejoué)
+    ['keydown', 'keypress', 'input'].forEach((t) => window.addEventListener(t, () => { if (rejeu) clore(); }, true));
+    const collage0 = term.paste.bind(term);
+    term.paste = (t) => { humain = true; try { collage0(t); } finally { humain = false; } };
+    const clore = () => { clearTimeout(silence); clearTimeout(borne); term.write('', () => { rejeu = false; }); };
+    const rouvrir = () => { rejeu = true; clearTimeout(borne); borne = setTimeout(clore, REJEU_BORNE_MS); clearTimeout(silence); silence = setTimeout(clore, REJEU_SILENCE_MS); };
+    const partir = (b) => { if (rejeu && !humain) return; file.push(b); vider(); };
+    term.onData((d) => partir(new TextEncoder().encode(d)));
+    term.onBinary((d) => { const b = new Uint8Array(d.length); for (let i = 0; i < d.length; i++) b[i] = d.charCodeAt(i) & 255; partir(b); }); // rapports de souris : octets bruts
 
     // taille : regroupée par image d'animation, envoyée au plus toutes les 100 ms et seulement si elle change
     let derniere = '', tPost = 0, minut = 0, raf = 0;
@@ -169,9 +182,9 @@ export function clientTerminal(cfg) {
       if (r.status !== 200) return 'echec';
       derniere = term.rows + ' ' + term.cols;
       if (dejaVu) term.reset();
-      dejaVu = true; vue.effacer(); emettre('connecte');
+      dejaVu = true; vue.effacer(); emettre('connecte'); rouvrir();
       const lecteur = r.body.getReader();
-      try { for (;;) { const m = await lecteur.read(); if (m.done) break; term.write(m.value); } } catch (e) { void e; }
+      try { for (;;) { const m = await lecteur.read(); if (m.done) break; humain = false; if (rejeu) { clearTimeout(silence); silence = setTimeout(clore, REJEU_SILENCE_MS); } term.write(m.value); } } catch (e) { void e; }
       return 'fin';
     };
     const etat = async () => {

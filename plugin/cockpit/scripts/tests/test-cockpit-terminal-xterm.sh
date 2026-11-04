@@ -30,6 +30,34 @@ PASS=0; FAIL=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
 cp "$HERE_T/temoins/plein-ecran.py" "$WORK/temoins/plein-ecran.py"; cp "$HERE_T/temoins/hostile.py" "$WORK/temoins/hostile.py"
+# récepteur du rejeu (R1) : écrit dans le journal chaque morceau d'entrée (« I <hex> »), « M » au premier silence, répond « q » par une question neuve, « x » l'arrête
+cat > "$WORK/temoins/rejeu.py" <<'PY'
+import os, select, sys, termios, time, tty
+journal = sys.argv[1]
+fd = sys.stdin.fileno()
+ancien = termios.tcgetattr(fd)
+def noter(s):
+    with open(journal, 'a') as f:
+        f.write(s + '\n')
+try:
+    tty.setraw(fd)
+    sys.stdout.write('\033[c\033[>c\033[6n\033[?2004$p\033[5n')
+    sys.stdout.write('REJEU-PRET\r\n')
+    sys.stdout.flush()
+    dernier, marque, limite = time.time(), False, time.time() + 120
+    while time.time() < limite:
+        pret, _, _ = select.select([fd], [], [], 0.1)
+        if pret:
+            d = os.read(fd, 4096); dernier = time.time(); noter('I ' + d.hex())
+            if b'q' in d:
+                sys.stdout.write('\033[c'); sys.stdout.flush()
+            if b'x' in d:
+                break
+        elif not marque and time.time() - dernier > 0.6:
+            marque = True; noter('M')
+finally:
+    termios.tcsetattr(fd, termios.TCSADRAIN, ancien)
+PY
 
 CHROME=""
 for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do
@@ -74,7 +102,7 @@ const PHASES = [0, 0.25, 0.5, 0.75];
 const trous = (arr) => arr.reduce((n, v) => n + (v ? 0 : 1), 0);
 const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv;
-const { P, Q, amorce, plein, hostile, sortieHex, recepteurHex, avecRecepteur, densite, dossier } = JSON.parse(brut);
+const { P, Q, amorce, plein, hostile, sortieHex, recepteurHex, avecRecepteur, densite, dossier, journal, recepteurPy } = JSON.parse(brut);
 const OQ = `http://127.0.0.1:${Q}`, MS = Number(process.env.VF_XTERM_MS) || 20000;
 const erreurs = {};
 const essai = async (nom, f) => { try { return await f(); } catch (e) { erreurs[nom] = String(e.message).slice(0, 140); return undefined; } };
@@ -91,7 +119,7 @@ const ESPION = `(() => { const E = window.__esp = { clip: 0, exec: 0, confirm: 0
 // `sp` = session de P ; `s` = même interface, mais ev/attendre/naviguer visent le monde principal du cadre de Q (les espions et vfTermVue y vivent).
 // Le contexte du cadre est retrouvé par sondage des identifiants (le socle n'expose pas les évènements) : le plus récent à porter window.vfTermVue.
 const OP = `http://127.0.0.1:${P}`, SBX = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox';
-let ctx = 0;
+let ctx = 0, theme = 'dark';
 const monde = async (sp, etendue = 600) => {
   let trouve = 0;
   for (let id = 1; id < etendue; id++) {
@@ -115,7 +143,7 @@ await executer(chrome, async (sp) => {
     ctx = 0;
     await sp.naviguer(`${OP}/project.html`); await sp.attendre(`document.readyState === 'complete'`, 'page P', MS);
     await sp.ev(`(() => { document.querySelectorAll('iframe[data-t]').forEach((f) => f.remove()); const f = document.createElement('iframe'); f.dataset.t = '1'; f.setAttribute('sandbox', ${JSON.stringify(SBX)});
-      f.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;border:0;z-index:99999'; f.src = '${OQ}/?theme=dark'; document.body.appendChild(f); })()`);
+      f.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;border:0;z-index:99999'; f.src = '${OQ}/?theme=${theme}'; document.body.appendChild(f); })()`);
     const fin = Date.now() + MS;
     let essais = 0;
     while (!ctx) { ctx = await monde(sp, 600 * 5 ** Math.min(essais++, 3)); if (!ctx) { if (Date.now() > fin) throw new Error('contexte du cadre de Q introuvable'); await pause(150); } }
@@ -301,6 +329,12 @@ await executer(chrome, async (sp) => {
           return { bas: Math.round(d.bottom * 100) / 100, visible: window.innerHeight, lignes: l.length, ecran: Math.round(z.height) }; })()`);
       });
     }
+    const CURSEUR = `(() => { const sl = document.querySelector('.xterm-scrollable-element > .scrollbar.vertical > .slider'); if (!sl) return null;
+      const c = (v) => { const m = String(v).match(/[\\d.]+/g).map(Number); return { r: m[0], g: m[1], b: m[2], a: m.length > 3 ? m[3] : 1 }; };
+      const f = c(getComputedStyle(document.getElementById('terminal')).backgroundColor), k = c(getComputedStyle(sl).backgroundColor);
+      const m = (x, y) => x * k.a + y * (1 - k.a), e = { r: m(k.r, f.r), g: m(k.g, f.g), b: m(k.b, f.b) };
+      const L = (o) => { const u = [o.r, o.g, o.b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * u[0] + 0.7152 * u[1] + 0.0722 * u[2]; };
+      const a = L(e), b = L(f); return { alpha: k.a, couleur: getComputedStyle(sl).backgroundColor, contraste: Math.round((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) * 100) / 100 }; })()`;
     const barre = `(() => { const b = document.querySelector('.xterm-scrollable-element > .scrollbar.vertical'); return b ? getComputedStyle(b).opacity : 'absente'; })()`;
     await essai('barre', async () => {
       await cadre(600, 570); await pause(700);
@@ -309,11 +343,59 @@ await executer(chrome, async (sp) => {
       r.g3 = { fin0: await s.ev(`${TXT}.includes('300')`) };
       await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 900, y: 300 }); await pause(500); r.g3.dehors = await s.ev(barre); // pointeur hors du cadre
       await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 300, y: 300 }); await pause(500); r.g3.survol = await s.ev(barre);
+      r.g5 = { sombre: await s.ev(CURSEUR) };
       await s.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 300, y: 300, deltaX: 0, deltaY: -400 }); await pause(500);
       r.g3.fin1 = await s.ev(`${TXT}.includes('300')`);
       await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 900, y: 300 }); await pause(1600); r.g3.apres = await s.ev(barre);
       await touche({ key: 'PageUp', code: 'PageUp', windowsVirtualKeyCode: 33, modifiers: 8 }); await pause(400); r.g3.clavier = await s.ev(barre);
       await pause(1800); r.g3.repos = await s.ev(barre);
+    });
+    // R2 : tout l'espace du cadre suit le fond du thème (le fond de la zone de défilement de xterm est noir par défaut) — styles calculés et colonne de pixels, dans les deux thèmes
+    r.fond = {};
+    const FOND = `(() => { const t = getComputedStyle(document.getElementById('terminal')).backgroundColor, v = getComputedStyle(document.querySelector('.xterm-viewport')).backgroundColor; return { terminal: t, viewport: v }; })()`;
+    for (const th of ['dark', 'light']) {
+      if (th !== theme) { theme = th; await s.naviguer(); }
+      r.fond[th] = {};
+      for (const h of [160, 208, 280, 328, 570]) {
+        await essai(`fond-${th}-${h}`, async () => {
+          await cadre(600, h); await pause(900);
+          const st = await s.ev(FOND), shot = await s.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: 600, height: h, scale: 1 } }), im = png(Buffer.from(shot.data, 'base64'));
+          const attendu = th === 'light' ? 255 : 25; let hors = 0, bas = -1;
+          for (let y = 0; y < Math.min(h, im.h); y++) { const l = im.lum(560, y); if (Math.abs(l - attendu) > 6) hors++; bas = l; }
+          r.fond[th][h] = { ...st, hors, bas: Math.round(bas), attendu: th === 'light' ? 'rgb(255, 255, 255)' : 'rgb(25, 25, 25)' };
+        });
+      }
+    }
+    // G5 : le curseur de la barre, au survol, est nettement visible dans le thème clair aussi (le sombre est mesuré avec la barre plus haut)
+    await essai('curseur-clair', async () => {
+      await cadre(600, 570); await pause(700);
+      await taper('clear; seq 1 300'); await att(`${TXT}.includes('300')`, '300 lignes imprimées (clair)');
+      await att(`${barre} !== 'absente'`, 'barre de défilement dans le DOM (clair)');
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 300, y: 300 }); await pause(500);
+      r.g5.clair = await s.ev(CURSEUR);
+    });
+    return r;
+  }
+
+  if (mode === 'rejeu') { // R1 : le tampon rejoué à chaque rechargement du cadre ne fait répondre xterm à aucune question dans l'entrée du PTY
+    // le récepteur (recepteurPy) pose des questions, relève chaque morceau d'entrée dans le journal (une ligne « I <hex> »), écrit « M » au premier silence, et pose une question neuve sur « q »
+    r.rejeu = {};
+    const lire = async () => { try { return (await import('node:fs')).readFileSync(journal, 'utf8').split('\n').filter(Boolean); } catch { return []; } };
+    await essai('rejeu', async () => {
+      await taper(`python3 -I ${recepteurPy} ${journal}`);
+      await att(`${TXT}.includes('REJEU-PRET')`, 'REJEU-PRET');
+      const fin = Date.now() + MS; while (!(await lire()).includes('M') && Date.now() < fin) await pause(100);
+      r.rejeu.marqueur = (await lire()).includes('M');
+      r.rejeu.initial = (await lire()).filter((l) => l.startsWith('I ')).map((l) => l.slice(2)).join('');
+      const n0 = (await lire()).length;
+      for (let i = 0; i < 5; i++) { theme = i % 2 ? 'dark' : 'light'; await s.naviguer(); await att(`${TXT}.includes('REJEU-PRET')`, 'tampon rejoué'); await pause(900); }
+      r.rejeu.recharges = 5;
+      r.rejeu.avant = (await lire()).slice(n0).filter((l) => l.startsWith('I ')).map((l) => l.slice(2)).join('');
+      const n1 = (await lire()).length;
+      await s.send('Input.insertText', { text: 'q' }); await pause(1200);
+      const apres = (await lire()).slice(n1).filter((l) => l.startsWith('I ')).map((l) => l.slice(2));
+      r.rejeu.apres = apres.join(''); r.rejeu.frappe = apres.join('').startsWith('71');
+      await s.send('Input.insertText', { text: 'x' });
     });
     return r;
   }
@@ -446,6 +528,10 @@ run_collage() { # run_collage <sortie> -> CJ ; un serveur neuf, un amorçage neu
   rm -rf "$WORK/collage"; mkdir -p "$WORK/collage"; srv "$1"
   CJ="$(navig collage "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"dossier\":\"$WORK/collage\"}")"; unsrv
 }
+run_rejeu() { # run_rejeu <sortie> -> RJ ; le journal des octets reçus par le PTY est dans $WORK/rejeu.log
+  rm -f "$WORK/rejeu.log"; srv "$1"
+  RJ="$(navig rejeu "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"journal\":\"$WORK/rejeu.log\",\"recepteurPy\":\"$WORK/temoins/rejeu.py\"}")"; unsrv
+}
 run_ecran() { # run_ecran <sortie> -> EJ
   srv "$1"
   EJ="$(navig ecran "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\"}")"; unsrv
@@ -516,6 +602,16 @@ assert_eq "G3.2 — elle apparaît au survol du terminal (opacité 1)" "$(rj "$E
 assert_eq "G3.3 — le défilement à la molette reste possible barre masquée ou non (la dernière ligne imprimée était à l'écran, la molette la fait sortir)" "$(rj "$EC" 'j.g3.fin0+"/"+j.g3.fin1')" "true/false"
 assert_eq "G3.4 — le pointeur parti, la barre se retire (opacité 0 après la molette)" "$(rj "$EC" 'j.g3.apres')" "0"
 assert_eq "G3.5 — au clavier (Maj+PageUp) hors survol, la barre se montre pendant le défilement (opacité 1) puis se retire (0)" "$(rj "$EC" 'j.g3.clavier+"/"+j.g3.repos')" "1/0"
+
+assert_eq "R2.1 — tout l'espace du cadre suit le fond du thème, sombre et clair, aux hauteurs 160, 208, 280, 328 et 570 px : le fond de la zone de défilement de xterm est celui du terminal (jamais le noir de xterm.css), et aucun pixel de la colonne mesurée n'a une autre couleur" "$(rj "$EC" '["dark","light"].map(t=>[160,208,280,328,570].map(h=>{const m=((j.fond||{})[t]||{})[h];return m?(m.viewport===m.terminal&&m.terminal===m.attendu&&m.hors===0?"ok":"KO "+t+h+" "+m.viewport+"/"+m.terminal+"/hors="+m.hors):"absente"}).join(" ")).join(" ")')" "ok ok ok ok ok ok ok ok ok ok"
+assert_eq "R2.2 — le pixel le plus bas du cadre a la couleur du thème (clair : blanc, sombre : #191919), à chaque hauteur" "$(rj "$EC" '["dark","light"].map(t=>[160,208,280,328,570].map(h=>{const m=((j.fond||{})[t]||{})[h];return m&&Math.abs(m.bas-(t==="light"?255:25))<=6?"ok":"KO"}).join(" ")).join(" ")')" "ok ok ok ok ok ok ok ok ok ok"
+assert_eq "G5.1 — le curseur de la barre est nettement visible au survol : contraste >= 2 contre le fond du terminal, sombre et clair (l'ancien 10 % donnait environ 1,3)" "$(rj "$EC" '["sombre","clair"].map(t=>{const m=(j.g5||{})[t];return m&&m.contraste>=2?"ok":"KO "+(m?m.contraste:"absent")}).join(" ")')" "ok ok"
+
+echo "=== T23 — rejeu du tampon : xterm ne répond à aucune question restée dans le tampon (R1 ; P71-D-36) ==="
+run_rejeu "$OUT"; RJ0="$RJ"
+assert_eq "R1.0 — témoin : aucune erreur nommée, le récepteur a relevé les réponses VIVES aux questions (DA1 ESC[?…c reçue), le premier silence est marqué, cinq rechargements du cadre faits" "$(rj "$RJ0" 'j.erreur||JSON.stringify(j.erreurs)')/marqueur=$(rj "$RJ0" 'j.rejeu.marqueur')/da1=$(rj "$RJ0" '/1b5b3f/.test(j.rejeu.initial)')/recharges=$(rj "$RJ0" 'j.rejeu.recharges')" "{}/marqueur=true/da1=true/recharges=5"
+assert_eq "R1.1 — après cinq rechargements du cadre (thèmes alternés), le tampon contenant ESC[c ESC[>c ESC[6n ESC[?2004\$p ESC[5n est rejoué : le PTY ne reçoit AUCUN octet de réponse" "[$(rj "$RJ0" 'j.rejeu.avant')]" "[]"
+assert_eq "R1.2 — témoin positif : une question émise APRÈS le rejeu reçoit sa réponse (frappe puis ESC[?…c) : les réponses ne sont pas coupées en général" "frappe=$(rj "$RJ0" 'j.rejeu.frappe') da1=$(rj "$RJ0" '/1b5b3f/.test(j.rejeu.apres)')" "frappe=true da1=true"
 
 echo "=== M-* — mutants : chaque protection rougit sa sonde ==="
 if mutant_eng ctrlc 's/^                vers_shell += donnees$/                vers_shell += donnees.replace(b"\\x03", b"")/'; then
@@ -602,6 +698,22 @@ if mutant barre-clavier vf-cockpit-terminal-client.mjs "s|montrerBarre();|void 0
   run_ecran "$MUT_OUT"
   assert_eq "M-BARRE-CLAVIER — la barre n'est plus montrée pendant le défilement : G3.5 rouge" "$(rouge "$(rj "$EJ" 'j.g3.clavier')" "1")" "rouge"
 else sans_effet "M-BARRE-CLAVIER"; fi
+if mutant rejeu-sans-garde vf-cockpit-terminal-client.mjs 's|if (rejeu \&\& !humain) return;||'; then
+  run_rejeu "$MUT_OUT"
+  assert_eq "M-REJEU-SANS-GARDE — la garde du rejeu est retirée (le code d'avant) : les réponses du tampon partent dans l'entrée du PTY, R1.1 rouge" "$(rouge "[$(rj "$RJ" 'j.rejeu.avant')]" "[]")" "rouge"
+else sans_effet "M-REJEU-SANS-GARDE"; fi
+if mutant rejeu-jamais-clos vf-cockpit-terminal-client.mjs "s|term.write('', () => { rejeu = false; });|void 0;|"; then
+  run_rejeu "$MUT_OUT"
+  assert_eq "M-REJEU-JAMAIS-CLOS — le rejeu ne se clôt jamais : la question neuve ne reçoit plus sa réponse, R1.2 rouge (la garde ne coupe pas les réponses en général)" "$(rouge "da1=$(rj "$RJ" '/1b5b3f/.test(j.rejeu.apres)')" "da1=true")" "rouge"
+else sans_effet "M-REJEU-JAMAIS-CLOS"; fi
+if mutant fond-noir vf-cockpit-terminal-style.mjs 's|^#terminal .xterm .xterm-viewport.*$||'; then
+  run_ecran "$MUT_OUT"
+  assert_eq "M-FOND-NOIR — la règle du fond de la zone de défilement est retirée (le code d'avant) : bande noire, R2.1 rouge" "$(rouge "$(rj "$EJ" '["dark","light"].map(t=>[160,208,280,328,570].map(h=>{const m=((j.fond||{})[t]||{})[h];return m&&m.viewport===m.terminal&&m.hors===0?"ok":"KO"}).join(" ")).join(" ")')" "ok ok ok ok ok ok ok ok ok ok")" "rouge"
+else sans_effet "M-FOND-NOIR"; fi
+if mutant curseur-pale vf-cockpit-terminal-vue.mjs 's|rgba(${ink}, .4)|rgba(${ink}, .1)|'; then
+  run_ecran "$MUT_OUT"
+  assert_eq "M-CURSEUR-PALE — le curseur retrouve ses 10 % : contraste insuffisant, G5.1 rouge" "$(rouge "$(rj "$EJ" '["sombre","clair"].map(t=>{const m=(j.g5||{})[t];return m&&m.contraste>=2?"ok":"KO"}).join(" ")')" "ok ok")" "rouge"
+else sans_effet "M-CURSEUR-PALE"; fi
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

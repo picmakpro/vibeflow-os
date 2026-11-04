@@ -29,17 +29,22 @@ export function vueTerminal(cfg) {
     background: '#191919', foreground: '#ececec', cursor: '#ececec', cursorAccent: '#0f0f0f', selectionBackground: 'rgba(255,255,255,.12)', selectionInactiveBackground: 'rgba(255,255,255,.07)',
     black: '#2b2b2b', red: '#f28b8b', green: '#4ade80', yellow: '#f0c36b', blue: '#7aa7ff', magenta: '#b49cff', cyan: '#63d2b8', white: '#b4b4b4',
     brightBlack: '#8b8b8b', brightRed: '#f6a5a5', brightGreen: '#86efac', brightYellow: '#f3d79b', brightBlue: '#9dbcff', brightMagenta: '#c7b8ff', brightCyan: '#86e3cd', brightWhite: '#ececec',
-    scrollbarSliderBackground: 'rgba(255,255,255,.10)', scrollbarSliderHoverBackground: 'rgba(255,255,255,.18)', scrollbarSliderActiveBackground: 'rgba(255,255,255,.28)',
   };
   const CLAIR = {
     background: '#ffffff', foreground: '#161616', cursor: '#161616', cursorAccent: '#ffffff', selectionBackground: 'rgba(0,0,0,.08)', selectionInactiveBackground: 'rgba(0,0,0,.05)',
     black: '#161616', red: '#c94a4a', green: '#157a3a', yellow: '#946000', blue: '#1f5fd6', magenta: '#6a45d6', cyan: '#0b7f6b', white: '#3f3f3f',
     brightBlack: '#595959', brightRed: '#b42323', brightGreen: '#14603f', brightYellow: '#6b4500', brightBlue: '#1747a8', brightMagenta: '#5233b8', brightCyan: '#0a6a5a', brightWhite: '#161616',
-    scrollbarSliderBackground: 'rgba(0,0,0,.10)', scrollbarSliderHoverBackground: 'rgba(0,0,0,.20)', scrollbarSliderActiveBackground: 'rgba(0,0,0,.30)',
   };
   window.vfTermVue = {
     invisible: (t) => INVISIBLE.test(String(t).replace(/\t/g, '')),
-    theme: (clair) => Object.assign({}, clair ? CLAIR : SOMBRE),
+    // curseur de la barre de défilement : teinte de l'encre Graphite (variable --ink de la feuille), opacités plus fortes qu'avant (10 % en veille) ; repli sur la valeur de la feuille
+    theme: (clair) => {
+      const lu = typeof getComputedStyle === 'function' && typeof document === 'object' && document.documentElement ? getComputedStyle(document.documentElement).getPropertyValue('--ink') : '';
+      const ink = String(lu || '').trim() || (clair ? '0, 0, 0' : '255, 255, 255');
+      return Object.assign({}, clair ? CLAIR : SOMBRE, {
+        scrollbarSliderBackground: `rgba(${ink}, .4)`, scrollbarSliderHoverBackground: `rgba(${ink}, .55)`, scrollbarSliderActiveBackground: `rgba(${ink}, .7)`,
+      });
+    },
     carte(type, action) {
       const c = CARTES[type]; if (!c) return;
       const z = vider(); z.hidden = false;
