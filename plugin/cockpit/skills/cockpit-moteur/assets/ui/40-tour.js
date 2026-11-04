@@ -196,7 +196,11 @@
     return ['zoom', 'panel', 'context', 'ask'].map((id) => document.getElementById(id)).concat(document.querySelector('header'), document.querySelector('.tour-target'), ask ? [...ask.children] : []).filter(vis).map((e) => { const r = e.getBoundingClientRect(); return { n: name(e), left: r.left, top: r.top, right: r.right, bottom: r.bottom }; });
   }
   const visible = (e) => { if (!e) return false; const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
-  function place() {
+  // last resort when a title block taller than expected leaves no room: its description is folded away while the tour is open (the title stays), and put back when the tour moves on or ends
+  function fold() { const p = document.querySelector('#context p'); if (!p || p.dataset.tourFold !== undefined || !visible(p)) return false; p.dataset.tourFold = p.style.display; p.style.display = 'none'; return true; }
+  function unfold() { const p = document.querySelector('#context p'); if (p && p.dataset.tourFold !== undefined) { p.style.display = p.dataset.tourFold; delete p.dataset.tourFold; } }
+  function place(folded) {
+    if (!folded) unfold();
     // the card must not cover any fixed surface of the interface: zoom controls, details panel, title block, header, Ask bar and its notices, the outlined target (and any surface added later
     // that shows up in this list). Every candidate (width, side, height above an obstacle) is scored by the area it covers, then by its distance from the usual place; the lowest cost wins,
     // ties go to the first in a fixed order: the result depends on nothing but the layout (never on timing, fonts or pointer)
@@ -225,6 +229,8 @@
     }
     lastPlace.best = best; lastPlace.topLimit = topLimit;
     card.style.width = best.w + 'px'; card.style.bottom = best.b + 'px'; card.style.maxHeight = best.mh; card.classList.toggle('right', best.side === 'right');
+    // still covering something: fold the title description and search again; kept only if that covers less, else put back
+    if (!folded && best.covered > 0 && fold()) { const before = best.covered; place(true); if (lastPlace.best.covered >= before) { unfold(); place(true); } }
   }
   window.addEventListener('resize', () => { if (active()) place(); });
   function show(i) {
@@ -242,7 +248,7 @@
   function back() { if (at > 0) show(at - 1); }
   function end(refit = true) {
     if (!active()) return;
-    at = -1; token++; clearInterval(placeTimer); placeTimer = 0;
+    at = -1; token++; clearInterval(placeTimer); placeTimer = 0; unfold();
     ring(null);
     card.hidden = true;
     SC.store.set(SEEN, true);
@@ -283,6 +289,6 @@
   if (SC.state.layout) maybeAuto();
 
   // diagnostic for the test suites (a failure on a runner we do not have prints what the placement saw): the obstacles of the last placement and the position it chose
-  const diag = () => !lastPlace ? 'aucun placement' : 'obstacles vus au dernier placement: ' + lastPlace.obs.map((o) => o.n + '[' + [o.left, o.top, o.right, o.bottom].map(Math.round).join(',') + ']').join(' ') + ' | topLimit=' + Math.round(lastPlace.topLimit) + ' choix=' + (lastPlace.best ? ['largeur ' + lastPlace.best.w, 'côté ' + lastPlace.best.side, 'bas ' + lastPlace.best.b, 'recouvre ' + Math.round(lastPlace.best.covered), 'hauteur max ' + lastPlace.best.mh].join(', ') : '-');
+  const diag = () => JSON.stringify(!lastPlace ? { placed: false } : { obstacles: lastPlace.obs.map((o) => o.n + '[' + [o.left, o.top, o.right, o.bottom].map(Math.round).join(',') + ']'), topLimit: Math.round(lastPlace.topLimit), choice: lastPlace.best && { width: lastPlace.best.w, side: lastPlace.best.side, bottom: lastPlace.best.b, covered: Math.round(lastPlace.best.covered), maxHeight: lastPlace.best.mh } });
   window.FloorplanTour = { start, end, active, diag };
 })();
