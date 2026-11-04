@@ -47,7 +47,7 @@ function construire(root, tous, { home, now, scriptsDir }) {
   const arbres = tous.map((a) => {
     // F-05 : en lab partitionné le dossier des verrous est le dossier git commun, le même pour tous les arbres (lecture unique, partagée) ;
     // en lab plat le verrou est propre à chaque checkout (.planning/DRIVER.lock) : la vie d'une mission d'un arbre se lit sur le verrou de CET arbre (lecture paresseuse, faite par readPlanning à sa racine)
-    const pl = meme(a.chemin, root) ? P : readPlanning(a.chemin, planningLayout(a.chemin), verrous.plat ? { scriptsDir, home } : { verrous });
+    const pl = meme(a.chemin, root) ? P : readPlanning(a.chemin, planningLayout(a.chemin), verrous.plat ? { scriptsDir, home, lab: root } : { verrous, lab: root });
     const actifs = [...pl.phases.values()].filter((p) => !p.archive);
     return {
       label: a.principal ? 'arbre principal' : nettoie(path.relative(tous[0].chemin, a.chemin) || a.chemin, 200), branche: nettoie(a.branche, 80), principal: a.principal, courant: meme(a.chemin, root),

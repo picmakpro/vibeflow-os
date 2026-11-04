@@ -33,7 +33,8 @@ export function estVivante(vie) {
 const garde = (l) => ({ ws: chaine(l.ws) ?? '', scope: chaine(l.scope), phase: chaine(l.phase), tenu: true, stale: bool(l.stale), ageS: num(l.age_seconds), ttl: num(l.ttl), progressAgeS: age(l.progress_age_seconds), owner: chaine(l.owner) });
 
 // lireVerrous : `status --all` ; lab plat = l'objet d'UN verrou (plat: true) ; les entrées absentes sont écartées.
-export function lireVerrous(root, { scriptsDir, home, sh: run = sh } = {}) {
+export function lireVerrous(root, { scriptsDir, home, lab = root, sh: run0 = sh } = {}) {
+  const run = (cmd, args, cwd) => run0(cmd, args, cwd, lab); // `lab` : racine du LAB observé (H-1), distincte de `root` quand l'arbre lu est sous le lab
   const dl = driverLockScript({ scriptsDir: scriptsDir || resolveScriptsDir(HERE), labRoot: root, home: home ?? os.homedir() });
   if (dl.etat === 'absent') return { etat: 'absente', plat: false, liste: [] };
   const objet = (s) => { try { const o = JSON.parse(s); return o && typeof o === 'object' && !Array.isArray(o) ? o : null; } catch { return null; } };

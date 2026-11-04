@@ -141,10 +141,10 @@ try { const r = s.collectSignal(lab, { scriptsDir: scripts, home: process.env.HO
 try { const r = w.collectWho(lab, { scriptsDir: scripts, home: process.env.HOME }); out.dag = (r.workers || []).filter((x) => x.kind === 'dag-node').length; } catch (e) { out.dag = String(e.message).slice(0, 80); }
 console.log(JSON.stringify(out));
 JS
-# Écart connu, hors de ce correctif (socle, vf-cockpit-planning.mjs : la lecture des tags de readPlanning(<arbre>) passe lab = l'arbre lui-même) : le seul appel toléré
-# est `git … for-each-ref … refs/tags/v*`. Tout autre appel d'un outil du lab (retard : rev-list, show-ref ; DAG : ls-files, status, log) est un échec.
+# Aucune tolérance : le `lab` passé à shBorne est toujours la racine du LAB observé, jamais celle d'un sous-arbre. La lecture des tags d'un arbre sous le lab
+# (`git … for-each-ref … refs/tags/v*`, readPlanning(<arbre>)) ne doit pas laisser LAB2/bin dans son PATH : tout appel d'un outil du lab est un échec.
 : > "$HLOG"; R="$(cd "$WORK" && env PATH="$LAB2/bin:$REAL_PATH" "$NODE" "$WORK/h.mjs" "$SCRIPTS" "$LAB2" 2>&1 | tail -1)"
-assert_eq "H-lab-absolu — cwd de l'enfant ≠ lab (arbre sous le lab, DAG du dossier git commun) : aucun outil du lab exécuté (hors la lecture des tags, écart connu)" "[$(grep -v 'for-each-ref' "$HLOG" | tr '\n' '|')]" "[]"
+assert_eq "H-lab-absolu — cwd de l'enfant ≠ lab (arbre sous le lab, DAG du dossier git commun) : aucun outil du lab exécuté (lecture des tags de l'arbre sous le lab comprise)" "[$(tr '\n' '|' < "$HLOG")]" "[]"
 assert_eq "H-témoin — les deux chemins ont bien tourné (2 arbres lus, 1 nœud DAG running) : le test atteint les appels discriminés" "$R" '{"arbres":2,"dag":1}'
 
 echo "=== S — serveur lancé depuis le lab avec un PATH piégé ==="

@@ -103,9 +103,10 @@ export function lireDags(root, layout, phaseDirs) {
   return dags;
 }
 
-// opts : { verrous (injectable : { etat, plat, liste }), scriptsDir, home } — la vie d'une mission se lit sur le verrou de sa phase (VFSG-06) ; lecture seulement si un nœud est `running`
+// opts : { verrous (injectable : { etat, plat, liste }), scriptsDir, home, lab (racine du LAB observé pour l'environnement borné des sous-processus, H-1 ; défaut : root) } — la vie d'une mission se lit sur le verrou de sa phase (VFSG-06) ; lecture seulement si un nœud est `running`
 export function readPlanning(root, layout, opts = {}) {
   root = path.resolve(root); layout = layout || planningLayout(root);
+  const LAB = path.resolve(opts.lab || root); // un arbre git sous le lab (worktree) se lit avec cwd = l'arbre, mais le PATH est assaini par rapport au LAB (H-1)
   const B = path.join(root, '.planning');
   const rel = (abs) => path.relative(root, abs).split(path.sep).join('/');
   const archives = ls(path.join(B, 'milestones'));
@@ -142,7 +143,7 @@ export function readPlanning(root, layout, opts = {}) {
     const r = rattacherMission(d, phases); d.phaseKey = r ? r.cle : null; d.regle = r ? r.regle : null;
     d.vie = null;
     if (d.nodes.some((x) => x?.status === 'running')) {
-      verrous ||= opts.verrous || lireVerrous(root, { scriptsDir: opts.scriptsDir, home: opts.home });
+      verrous ||= opts.verrous || lireVerrous(root, { scriptsDir: opts.scriptsDir, home: opts.home, lab: LAB });
       const po = r ? phases.get(r.cle) : null; // ws et numéro viennent de l'objet de la phase rattachée (P68-D-22)
       d.vie = vieDe(po ? { ws: po.ws, phase: po.n } : { ws: d.ws || d.wsDeclare || null, phase: null }, verrous); d.etat = etatMission(d.nodes, d.vie);
     } else d.etat = etatMission(d.nodes);
@@ -156,7 +157,7 @@ export function readPlanning(root, layout, opts = {}) {
   const seeds = ls(path.join(B, 'seeds')).filter((f) => f.endsWith('.md')).map((f) => ({ file: rel(path.join(B, 'seeds', f)), text: read(path.join(B, 'seeds', f)) }));
   let tags = [];
   { // shBorne : même plafond, même échéance globale et même PATH assaini que les autres appels git du socle (F-06, H-1) ; sortie vide = aucun tag
-    const out = shBorne('git', [...GIT_SUR, '-C', root, 'for-each-ref', '--sort=-creatordate', '--count=30', '--format=%(refname:short)\t%(creatordate:short)\t%(contents:subject)', 'refs/tags/v*'], undefined, root);
+    const out = shBorne('git', [...GIT_SUR, '-C', root, 'for-each-ref', '--sort=-creatordate', '--count=30', '--format=%(refname:short)\t%(creatordate:short)\t%(contents:subject)', 'refs/tags/v*'], undefined, LAB);
     tags = out.trim().split('\n').filter(Boolean).map((l) => { const [tag, date, subject] = l.split('\t'); return { tag, date, subject }; });
   }
   const title = /^# (.*)$/m.exec(read(path.join(B, 'PROJECT.md')))?.[1];
