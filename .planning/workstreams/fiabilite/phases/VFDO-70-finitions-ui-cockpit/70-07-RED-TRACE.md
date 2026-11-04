@@ -121,3 +121,12 @@ Q4a et Q5a (centrage borné, visite qui éclaire sans sélectionner) : ratifiés
 
 - Q13a, O6.14b inversé (le bouton n'ouvre plus de visite sur Équipe, il est `aria-disabled`, son infobulle nomme l'onglet) : `test-cockpit-projet.sh` 108 PASS / 1 FAIL, attendu `[false|true|true]`, obtenu `[true|null|false]`.
 - Q6b, O6.16 (lab Projet à quatorze phases, 390 px, largeur à l'écran de chaque carte ciblée ≥ 120 px) : sonde `chrome-visite-etapes.mjs` sur ce lab, largeurs des étapes `[159, 108, 303]` px (plafond de zoom ×1,6, bornage par le graphe entier) : l'étape 2 fait 108 px. L'assertion O6.16 n'a pas été rejouée dans la suite sur l'ancien arbre : mesure à la sonde.
+
+### Vert
+
+`test-cockpit-projet.sh` 109 PASS / 0 FAIL (O6.14b inversé et O6.16 verts, O5 et O6.10 verts) ; `test-cockpit-onglet-code.sh` 25/0 ; `test-cockpit-chrome-fr.sh` 73/0 (trois chaînes ajoutées au corpus F11) ; `test-cockpit-vendor.sh` 79/0 ; `synchro.sh verifier` : amont retrouvé à l'octet. Suite responsive non rejouée (consigne).
+
+- Q6b : sous 701 px le plafond de zoom passe de ×1,6 à ×4, l'objectif d'une carte est 60 % de la zone libre, et le bornage par le graphe entier ne s'applique plus (il ne tient pas à cette taille) ; au-dessus de 701 px il reste (O6.10 vert). Largeurs à 390 px sur le lab à quatorze phases : `[215, 215, 303]` (avant `[159, 108, 303]`), toutes ≥ 120 px. **Risque à rejouer** : à 390 px la visite d'office zoomée laisse le reste du graphe hors de l'écran ; les mesures de la suite responsive qui comptent « une carte sort de la zone libre » à 390 px avec la visite ouverte pourraient rougir.
+- Q7b : l'étape « services extérieurs » (plusieurs services) allume les cartes des services (jusqu'à six, `hl` sur chaque carte, `dim` sur le reste), en plus du contour du titre de la vue d'ensemble. Construite par `autoSteps()` de `40-tour.js` ; aucun nouveau test (réglage de contenu), O5 rejoué vert. Non vérifié visuellement : les labs de la suite n'ont pas de services extérieurs.
+- Q9b : dernier pas : « depuis le bouton de visite (icône) en haut » quand le bouton n'affiche que son icône (sous 1 600 px), « ⋯ › Par où commencer » sous 700 px, « Par où commencer » en haut sinon ; infobulle « de ce projet » sur l'onglet Projet, « de ce code » ailleurs.
+- Q13a : sur l'onglet Équipe, `start()` ne fait rien et le bouton est `aria-disabled`, atténué, avec l'infobulle « Pas de visite pour l'onglet Équipe ».
