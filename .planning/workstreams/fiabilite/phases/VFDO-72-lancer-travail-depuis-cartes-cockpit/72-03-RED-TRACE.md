@@ -40,3 +40,20 @@ Les dix mutants sont rouges en tant que SUITE (FAIL « mutant sans effet ») : l
 M-ID-SANS-WS, M-PRINCIPAL-FIXE, M-HORS-MOTIF-FUITE, M-FAIT-LANCABLE, M-TERMINAL-ARRETE-OUBLIE, M-MISSION-HORS-PHASE-OK, M-AVERT-BLOQUE, M-DEP-IGNORE, M-RECENCE-INFINIE, M-NONCOMMITE-ACTIF
   - attendu `effet`
   - obtenu `sans effet`
+
+## Corrections de la suite avant le code (aucune assertion affaiblie)
+
+Trois attendus erronés, constatés avant que le module existe (commits `6e9f5f94` et `6ae76755`) : **Q3** et **P1 (cartes)** joignaient `null` par `join`, qui le rend en chaîne vide, si bien que l'attendu `null` ne pouvait jamais être atteint ; **C5** cherchait le texte hostile dans tout l'objet, identifiant compris, alors que l'identifiant garde le numéro du ROADMAP (parité PAR.1). Les trois restaient rouges sur la base (module absent) ; le contrôle de C5 porte maintenant sur les champs autres que `id`.
+Un `verdict` minimal est livré avec la Tâche 2 : C0 exige les huit noms exportés, et la commande `cibles` doit être verte.
+
+## Mutants rouges des cibles (Tâche 2, HEAD `fdb6de06`)
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-lancer-cibles.sh cibles` -> `Résultats : 21 PASS / 0 FAIL`, rc=0 (bash puis `zsh -c "bash …"`). Le module livré : 94 lignes à ce stade.
+
+| Mutant | Rouge sur (obtenu) | Sondes exigées | Ligne qui le tue |
+|--------|--------------------|----------------|------------------|
+| M-ID-SANS-WS (suffixe `@<ws>` retiré) | C1 C2 PAR.1 PAR.3 | C1 PAR.1 | C1 : obtenu `ph-73` deux fois au lieu de `ph-73@fiabilite` et `ph-73@gouvernance` ; PAR.1 : `absente:ph-73@fiabilite` |
+| M-PRINCIPAL-FIXE (`executer` sauf `fait`) | P1 P2 PAR.3 | P1 | P1 : premier cas obtenu `executer` au lieu de `cadrer` |
+| M-HORS-MOTIF-FUITE (`listePourQ` rend tout) | PAR.2 Q1 Q2 Q3 | Q1 Q2 Q3 | Q2 : neuf identifiants rendus au lieu de `["ph-72"]` ; Q1 : clés `principal`, `bloquants`, `titre` présentes |
+
+Les sondes rouges en plus des sondes exigées (C2, PAR.3, P2, PAR.2) sont légitimes : elles lisent aussi les identifiants, les principaux ou la projection.
