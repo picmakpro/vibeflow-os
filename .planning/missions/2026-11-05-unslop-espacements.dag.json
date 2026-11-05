@@ -6,7 +6,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "direction:a",
@@ -16,7 +16,7 @@
         "audit"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "direction:b",
@@ -26,7 +26,7 @@
         "audit"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "direction:c",
@@ -36,7 +36,7 @@
         "audit"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "propositions",
@@ -46,7 +46,7 @@
         "audit"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "critique:directions",
@@ -59,7 +59,7 @@
         "propositions"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "gout",
@@ -99,7 +99,7 @@
         "audit"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "critique:shell",
@@ -119,7 +119,7 @@
         "audit"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "critique:code",
@@ -139,7 +139,7 @@
         "audit"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "critique:projet",
@@ -159,7 +159,7 @@
         "audit"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "critique:equipe",
@@ -179,7 +179,7 @@
         "audit"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "critique:tiroir",
@@ -279,6 +279,34 @@
       ],
       "scope": [],
       "status": "blocked"
+    },
+    {
+      "id": "au-travail",
+      "step": "refonte de la partie Au travail (demande directe Samuel), 2 options en maquette",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recherche-grille",
+      "step": "recherche grille d'espacement (demande Samuel Q1)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:au-travail",
+      "step": "juge frais options Au travail",
+      "stage": "",
+      "deps": [
+        "au-travail"
+      ],
+      "scope": [],
+      "status": "ready"
     }
   ]
 }
