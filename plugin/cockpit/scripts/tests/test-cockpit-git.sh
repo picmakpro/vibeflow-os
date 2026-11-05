@@ -134,6 +134,16 @@ if (!t.includes(de)) { console.log('absent'); process.exit(0); }
 fs.writeFileSync(f, t.replace(de, () => vers)); console.log('applique');
 JS
 
+# dur.mjs <scripts> <lab> : « état|rangées|ms » (durée de lireGit, citée, jamais assertée)
+cat > "$AUX/dur.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+import path from 'node:path';
+const [, , scripts, lab] = process.argv;
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href);
+const t0 = performance.now(); const j = m.lireGit(lab);
+console.log(`${j.etat}|${(j.rangees || []).length}|${Math.round(performance.now() - t0)}`);
+JS
+
 # --- dépôts fabriqués ---
 T=0
 tick() { T=$((T+1)); export GIT_AUTHOR_DATE="@$((1700000000+T*60)) +0000" GIT_COMMITTER_DATE="@$((1700000000+T*60)) +0000"; }
@@ -226,7 +236,7 @@ assert_eq "S2.4a — mergées : f, g1, g2, other, sans origin/main" "$(J "$WORK/
 assert_eq "S2.4b — commande de suppression de « f » (forme de 78-03)" "$(J "$WORK/lab.json" 'j.mergees.find(m=>m.nom==="f").commande')" "git branch -d --end-of-options 'f'"
 assert_eq "S2.4c — aucune étiquette sur le graphe pour une mergée repliée" "$(J "$WORK/lab.json" 'j.rangees.flatMap(r=>r.refs).filter(e=>["f","g1","g2","other"].includes(e.nom)).length')" "0"
 assert_eq "S2.4d — non mergées présentes : u1, origin/u1, wtb ont leur étiquette" "$(J "$WORK/lab.json" 'j.rangees.flatMap(r=>r.refs).map(e=>e.nom).filter(n=>["u1","origin/u1","wtb"].includes(n)).sort().join(",")')" "origin/u1,u1,wtb"
-assert_eq "S2.4e — origin/HEAD (symbolique) exclu des étiquettes" "$(J "$WORK/lab.json" 'j.rangees.flatMap(r=>r.refs).filter(e=>/HEAD/.test(e.nom)&&e.type==="distante").length')" "0"
+assert_eq "S2.4e — origin/HEAD (symbolique) exclu des étiquettes ET de la liste des mergées" "$(J "$WORK/lab.json" 'j.rangees.flatMap(r=>r.refs).map(e=>e.nom).concat(j.mergees.map(m=>m.nom)).filter(n=>n==="origin/HEAD").length')" "0"
 assert_eq "S2.4f — worktrees : principal, branche wtb (cd), détaché ; « ici » = le lab" "$(J "$WORK/lab.json" 'j.worktrees.map(w=>[w.nom,String(w.branche),w.detache,w.ici,w.principal,w.commande===null].join(":")).join(",")')" "lab:main:false:true:true:true,wt-b:wtb:false:false:false:false,wt-det:null:true:false:false:false"
 # S2.5 : refs hostiles
 newrepo "$WORK/r-host"; R="$WORK/r-host"
@@ -272,6 +282,82 @@ assert_eq "S2.6f — lireGit : sonde chargée, 0 connexion sortante, résultat c
 assert_eq "S2.7a — aucune clé de la liste commune « interdits » du contrat, ni verrous, arbitrages, watchdog, orphelins, hotspots (à toute profondeur)" "$(J "$WORK/lab.json" '(function f(o,ban){ if(!o||typeof o!=="object") return 0; return Object.entries(o).reduce((n,[k,v])=>n+(ban.includes(k)?1:0)+f(v,ban),0); })(j,["doing","mandat","messages","outils","verrous","arbitrages","watchdog","orphelins","hotspots"])')" "0"
 assert_eq "S2.7b — le contrat porte les deux schémas et une liste « interdits »" "$(node "$AUX/j.mjs" "$SCRIPTS/vf-cockpit-interface.json" '(()=>{const s=j.schemas["vibeflow/cockpit-git@1"];return !!s&&Array.isArray(s.interdits)&&s.interdits.length>0&&!!j.schemas["vibeflow/cockpit-git-entete@1"]})()')" "true"
 
+echo "=== S3 — tags, stash, auteurs, en-tête servi, contrat ==="
+H7() { "$GIT_REEL" -C "$LAB" rev-parse --short=7 "$1"; }
+assert_eq "S3.1a — tags annoté et léger : deux entrées, triées par date décroissante (ann puis light)" "$(J "$WORK/lab.json" 'j.tags.map(t=>t.nom).join(",")')" "ann,light"
+assert_eq "S3.1b — le h7 de l'annoté est celui du COMMIT (cible peelée), celui du léger aussi" "$(J "$WORK/lab.json" 'j.tags.map(t=>t.h7).join(",")')" "$(H7 'main~2^{commit}'),$(H7 'main~4')"
+assert_eq "S3.1c — la date des tags est un entier" "$(J "$WORK/lab.json" 'j.tags.every(t=>Number.isInteger(t.at))')" "true"
+assert_eq "S3.2a — deux stash : stash@{0} et stash@{1}, branche main" "$(J "$WORK/lab.json" 'j.stash.map(x=>x.ref+":"+x.branche).join(",")')" "stash@{0}:main,stash@{1}:main"
+assert_eq "S3.2b — commande de stash@{0}" "$(J "$WORK/lab.json" 'j.stash[0].commande')" "git stash show --stat 'stash@{0}'"
+assert_eq "S3.2c — le message hostile est servi tel quel (le rendu est en textContent)" "$(J "$WORK/lab.json" 'j.stash[1].message')" "On main: wip <b>hostile</b>"
+assert_eq "S3.2d — h7 et date du stash" "$(J "$WORK/lab.json" 'j.stash.every(x=>/^[0-9a-f]{7}$/.test(x.h7)&&Number.isInteger(x.at))')" "true"
+# S3.3 : auteurs agrégés en JS, jamais shortlog
+newrepo "$WORK/r-aut"; R="$WORK/r-aut"
+a1=$(ct "$R" refs/heads/main 1700000000 c1); a2=$(ct "$R" refs/heads/main 1700000100 c2 "$a1"); a3=$(ct "$R" refs/heads/main 1700000200 c3 "$a2")
+a4=$(GIT_AUTHOR_NAME='<img src=x onerror=1>' ct "$R" refs/heads/main 1700000300 c4 "$a3")
+AUT="$("$GIT_REEL" -C "$R" log -1 --format=%an "$a4")"
+export VF_GITLOG="$WORK/git-aut.log"; : > "$VF_GITLOG"
+PATH="$WORK/bin:$PATH" node "$AUX/lire.mjs" "$SCRIPTS" "$R" > "$WORK/aut.json" 2>/dev/null; unset VF_GITLOG
+assert_eq "S3.3a — auteurs : Alice 3 commits (dernier c3), l'autre 1 (dernier c4), comptes exacts" "$(J "$WORK/aut.json" 'j.auteurs.map(a=>a.nom+":"+a.commits+":"+a.dernier).join(",")')" "Alice:3:1700000200,$AUT:1:1700000300"
+assert_eq "S3.3b — aucun appel shortlog dans l'argv (emballage vu à l'œuvre : au moins 5 appels)" "$(grep -c shortlog "$WORK/git-aut.log")|$([ "$(grep -c . "$WORK/git-aut.log")" -ge 5 ] && echo vu || echo aveugle)" "0|vu"
+assert_eq "S3.3c — activité par branche : main, avance 0 sur la base, dernier = pointe" "$(J "$WORK/aut.json" 'j.parBranche.map(b=>b.nom+":"+b.avance+":"+b.dernier).join(",")')" "main:0:1700000300"
+assert_eq "S3.4 — GET /api/vf/git/entete : schéma, état ok, dépôt et branche" "$(GET /api/vf/git/entete | sed -n '2,$p' > "$WORK/ent.json"; J "$WORK/ent.json" '[j.schema,j.etat,j.depot,j.branche].join("|")')" "vibeflow/cockpit-git-entete@1|ok|lab|main"
+node "$AUX/j.mjs" "$SCRIPTS/vf-cockpit-interface.json" 'JSON.stringify(j.schemas["vibeflow/cockpit-git@1"])' > "$WORK/contrat.json"
+assert_eq "S3.5a — contrat : chaque clé requise est présente avec son type dans la réponse réelle (lab.json)" "$(node -e 'const c=JSON.parse(process.argv[1]);const j=JSON.parse(require("fs").readFileSync(process.argv[2],"utf8"));const t=(v)=>Array.isArray(v)?"array":typeof v;console.log(Object.entries(c.requis).filter(([k,ty])=>t(j[k])!==ty).map(([k])=>k).join(",")||"conforme")' "$(cat "$WORK/contrat.json")" "$WORK/lab.json")" "conforme"
+assert_eq "S3.5b — contrat : chaque rangée porte toutes les clés de rangee.requis" "$(node -e 'const c=JSON.parse(process.argv[1]);const j=JSON.parse(require("fs").readFileSync(process.argv[2],"utf8"));console.log(j.rangees.filter(r=>c.rangee.requis.some(k=>!(k in r))).length)' "$(cat "$WORK/contrat.json")" "$WORK/lab.json")" "0"
+assert_eq "S3.5c — contrat : l'état de la réponse est dans la liste des états" "$(node -e 'const c=JSON.parse(process.argv[1]);const j=JSON.parse(require("fs").readFileSync(process.argv[2],"utf8"));console.log(c.etats.includes(j.etat))' "$(cat "$WORK/contrat.json")" "$WORK/lab.json")" "true"
+# S3.6 : repli quand git refuse %(ahead-behind:…) (version ancienne) — un emballage le refuse
+mkdir -p "$WORK/bin2"; cat > "$WORK/bin2/git" <<EOS
+#!/bin/sh
+case "\$*" in *ahead-behind*) echo "fatal: unknown field name: ahead-behind" >&2; exit 129 ;; esac
+exec "$GIT_REEL" "\$@"
+EOS
+chmod +x "$WORK/bin2/git"
+PATH="$WORK/bin2:$PATH" node "$AUX/lire.mjs" "$SCRIPTS" "$WORK/r-dist" > "$WORK/dist-repli.json" 2>/dev/null
+PATH="$WORK/bin2:$PATH" node "$AUX/lire.mjs" "$SCRIPTS" "$LAB" > "$WORK/lab-repli.json" 2>/dev/null
+assert_eq "S3.6a — sans ahead-behind (emballage vu : il refuse bien le champ), le dépôt divergent donne les mêmes comptes" "$(PATH="$WORK/bin2:$PATH" git -C "$LAB" for-each-ref '--format=%(ahead-behind:main)' refs/heads/main > /dev/null 2>&1; echo "refus=$?")|$(J "$WORK/dist-repli.json" 'JSON.stringify([j.etat,j.base.locale,j.base.distante,j.base.divergent])')" 'refus=129|["ok",1,1,true]'
+assert_eq "S3.6b — sans ahead-behind, le lab principal replie les mêmes mergées et garde les mêmes non mergées" "$(J "$WORK/lab-repli.json" 'j.mergees.map(m=>m.nom).sort().join(",")+"|"+j.rangees.flatMap(r=>r.refs).map(e=>e.nom).filter(n=>["u1","origin/u1","wtb"].includes(n)).sort().join(",")')" "f,g1,g2,other|origin/u1,u1,wtb"
+
+echo "=== S4 — états absent, indisponible, vide ==="
+mkdir -p "$WORK/hors-depot"; LIRE "$WORK/hors-depot" > "$WORK/absent.json"
+assert_eq "S4.1 — lab hors dépôt : état absent" "$(J "$WORK/absent.json" 'j.schema+"|"+j.etat')" "vibeflow/cockpit-git@1|absent"
+newrepo "$WORK/r-casse"; R="$WORK/r-casse"; k1=$(ct "$R" refs/heads/main 1700000000 c1); ct "$R" refs/heads/main 1700000060 c2 "$k1" > /dev/null
+assert_eq "S4.2a — témoin : avant la casse, le dépôt est lu (ok)" "$(LIRE "$R" | node "$AUX/j.mjs" - 'j.etat')" "ok"
+OBJ="$("$GIT_REEL" -C "$R" rev-parse refs/heads/main)"; mv "$R/.git/objects/${OBJ:0:2}/${OBJ:2}" "$WORK/objet-retire"; LIRE "$R" > "$WORK/casse.json"; ROUTE="$(node "$AUX/route.mjs" "$SCRIPTS" GET /api/vf/git "$R")"; mv "$WORK/objet-retire" "$R/.git/objects/${OBJ:0:2}/${OBJ:2}"
+assert_eq "S4.2b — objet de la pointe manquant (git échoue, le dépôt reste reconnu) : état indisponible, sans aucun chemin absolu ni trace dans la réponse" "$(J "$WORK/casse.json" 'j.etat')|$(grep -c "$WORK" "$WORK/casse.json")|$(grep -ci 'fatal\|error\|stack' "$WORK/casse.json")" "indisponible|0|0"
+assert_eq "S4.2c — la route répond 200 (jamais un 500) sur ce dépôt" "$ROUTE" "true|200"
+newrepo "$WORK/r-vide"; LIRE "$WORK/r-vide" > "$WORK/vide.json"
+assert_eq "S4.3 — dépôt sans commit : état vide, commande du premier commit" "$(J "$WORK/vide.json" 'j.etat+"|"+j.commandes.vide')" 'vide|git commit -m "premier commit"'
+assert_eq "S4.4 — chaque état porte le schéma" "$(J "$WORK/vide.json" 'j.schema')|$(J "$WORK/casse.json" 'j.schema')" "vibeflow/cockpit-git@1|vibeflow/cockpit-git@1"
+
+echo "=== S5 — dépôt piégé : aucun programme du dépôt n'est lancé ==="
+MARQ="$WORK/marques"; PROGS="$WORK/progs"; mkdir -p "$MARQ" "$PROGS"
+mk_prog() { printf '#!/bin/sh\necho "$0 $*" >> "%s/%s"\n%s\n' "$MARQ" "$1" "${2:-exit 0}" > "$PROGS/$1.sh"; chmod +x "$PROGS/$1.sh"; }
+mk_prog PROC "exit 1"; mk_prog CLEAN 'cat'; mk_prog TEXTCONV 'cat "$1"'; mk_prog FSM "exit 1"
+marque() { if [ -s "$MARQ/$1" ]; then echo posé; else echo absent; fi; }
+raz() { rm -f "$MARQ"/*; }
+P="$WORK/piege"; "$GIT_REEL" init -q -b main "$P"; P="$(cd "$P" && pwd -P)"
+printf 'f.txt filter=f\n*.bin diff=bin\n' > "$P/.gitattributes"; printf 'contenu\n' > "$P/f.txt"; printf 'a\0b\n' > "$P/a.bin"
+"$GIT_REEL" -C "$P" add -A && "$GIT_REEL" -C "$P" commit -q -m "premier"; printf 'a\0c\n' > "$P/a.bin"; "$GIT_REEL" -C "$P" commit -q -am "SUJET-REEL"
+"$GIT_REEL" -C "$P" config filter.f.clean "$PROGS/CLEAN.sh"; "$GIT_REEL" -C "$P" config filter.f.process "$PROGS/PROC.sh"
+"$GIT_REEL" -C "$P" config diff.bin.textconv "$PROGS/TEXTCONV.sh"; "$GIT_REEL" -C "$P" config core.fsmonitor "$PROGS/FSM.sh"
+touch -t "$(date -v-1M +%Y%m%d%H%M 2>/dev/null || date -d '1 minute ago' +%Y%m%d%H%M)" "$P/f.txt"
+L="$WORK/leurre"; "$GIT_REEL" init -q -b main "$L"; "$GIT_REEL" -C "$L" commit -q --allow-empty -m LEURRE; L="$(cd "$L" && pwd -P)"
+raz
+"$GIT_REEL" -C "$P" log -p -1 > /dev/null 2>&1
+assert_eq "S5.0a — témoin positif : git log -p brut lance le textconv du dépôt piégé" "$(marque TEXTCONV)" "posé"; raz
+"$GIT_REEL" --no-optional-locks -c core.fsmonitor=false -C "$P" status --porcelain=v2 > /dev/null 2>&1
+assert_eq "S5.0b — témoin positif : status brut (GIT_SUR seul) sur un fichier stat-dirty lance le filtre du dépôt" "$(marque PROC)" "posé"; raz
+LIRE "$P" > "$WORK/piege.json"
+assert_eq "S5.1a — lireGit sur le dépôt piégé : lu (état ok, sujet réel), aucun marqueur" "$(J "$WORK/piege.json" 'j.etat+"|"+j.rangees[0].s')|$(marque TEXTCONV)|$(marque PROC)|$(marque FSM)|$(marque CLEAN)" "ok|SUJET-REEL|absent|absent|absent|absent"; raz
+GIT_DIR="$L/.git" LIRE "$P" > "$WORK/piege-env.json"
+assert_eq "S5.1b — GIT_DIR=<leurre> hérité : c'est bien le dépôt piégé qui est lu (le sujet leurre n'apparaît pas), aucun marqueur" "$(J "$WORK/piege-env.json" 'j.rangees.map(r=>r.s).join(",")')|$(marque TEXTCONV)|$(marque PROC)" "SUJET-REEL,premier|absent|absent"
+
+echo "=== S6 — durées (citées, jamais assertées) ==="
+D1="$(node "$AUX/dur.mjs" "$SCRIPTS" "$LAB")"; TOP="$("$GIT_REEL" -C "$SCRIPTS" rev-parse --show-toplevel)"; D2="$(node "$AUX/dur.mjs" "$SCRIPTS" "$TOP")"
+echo "  ℹ S6.1 — fixture : $D1 (état|rangées|ms) ; ce dépôt ($TOP) : $D2"
+assert_eq "S6.1 — les deux lectures aboutissent (état ok)" "$(echo "$D1" | cut -d'|' -f1)|$(echo "$D2" | cut -d'|' -f1)" "ok|ok"
+
 echo "=== S7 — mutants (copies des scripts, jamais le module) ==="
 mutant() { # nom, de, vers : copie les scripts, applique la mutation ; rend « applique » ou « absent » ; la copie est jugée « avec effet » si le module diffère
   rm -rf "$WORK/mut/$1"; mkdir -p "$WORK/mut/$1"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$WORK/mut/$1/"
@@ -289,8 +375,13 @@ assert_eq "M-EOO-LOG.0 — mutant avec effet (--not placé avant les refs)" "$(m
 LIREM eoo "$WORK/r-trente" > "$WORK/m-eoo.json"
 assert_eq "M-EOO-LOG — --not avant les refs : aucune des 30 pointes n'a de rangée (S2.2 rougit pour sa raison, état ok)" "$(J "$WORK/m-eoo.json" 'j.etat+"|"+j.rangees.flatMap(r=>r.refs).filter(e=>/^b\d+$/.test(e.nom)).length')" "ok|0"
 assert_eq "M-NETTOIE.0 — mutant avec effet (la porte « le nom serait masqué » est retirée)" "$(mutant nettoie 'noms.every((n) => masque(n) === n)' 'true')" "effet"
-LIREM nettoie "$R" > "$WORK/m-nettoie.json"
+LIREM nettoie "$WORK/r-host" > "$WORK/m-nettoie.json"
 assert_eq "M-NETTOIE — sans la porte, le nom-jeton reçoit une commande (S2.5f rougit pour sa raison : la commande existe et porte le vrai nom)" "$(J "$WORK/m-nettoie.json" 'j.etat+"|"+j.rangees.flatMap(r=>r.refs).filter(e=>e.nom===String.fromCharCode(91)+"masqué]").map(e=>e.commande===null?"null":e.commande.includes("ghp_")?"fuite":"autre").join(",")')" "ok|fuite"
+
+assert_eq "M-HEAD.0 — témoin : la ref symbolique refs/remotes/origin/HEAD existe bien dans le lab" "$("$GIT_REEL" -C "$LAB" for-each-ref refs/remotes/origin/HEAD | grep -c HEAD)" "1"
+assert_eq "M-HEAD.1 — mutant avec effet (le filtre des refs symboliques est retiré)" "$(mutant head 'refs.filter((r) => !/^refs\/remotes\/[^/]+\/HEAD$/.test(r.ref))' 'refs.filter(() => true)')" "effet"
+LIREM head "$LAB" > "$WORK/m-head.json"
+assert_eq "M-HEAD — sans le filtre, « origin/HEAD » réapparaît (dans les mergées : même commit qu'origin/main) : S2.4e et S2.4a rougissent pour leur raison" "$(J "$WORK/m-head.json" 'j.etat+"|"+j.rangees.flatMap(r=>r.refs).map(e=>e.nom).concat(j.mergees.map(m=>m.nom)).filter(n=>n==="origin/HEAD").length')" "ok|1"
 
 stop_srv
 vf_hyg_assert

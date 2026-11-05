@@ -54,3 +54,24 @@ Suite finale avec les mutants : 52 PASS / 0 FAIL. Chaque mutant a une assertion 
 
 Aucun mutant n'a rougi pour une autre raison : chacun garde `etat: ok` (sauf M-COURT, dont l'`indisponible` est la conséquence directe de `-x` lu comme une option, avec témoin `ok` sur un lab sans nom hostile).
 Écart au plan : M-NETTOIE du plan retirait « la comparaison à `nettoie` » ; la décision P78-D-27 du manager interdit que `commande` passe par `nettoie` ou `masque`, la porte est donc `masque(nom) === nom` sur les NOMS qui composent la commande.
+
+## Tâche 3 — tags, stash, auteurs, en-tête, dégradations, dépôt piégé (avant le code de la tâche 3)
+
+Tête : `cbc3adc7`. Suite jouée : 72 PASS / 10 FAIL. Rouges (attendu -> obtenu) :
+
+| Assertion | Attendu | Obtenu |
+|---|---|---|
+| S3.1a tags `ann,light` (date décroissante) | `ann,light` | `illisible` (pas de champ `tags`) |
+| S3.1b h7 peelé de l'annoté et du léger | `90ecec9,6442f38` | `illisible` |
+| S3.1c date des tags entière | true | `illisible` |
+| S3.2a stash `stash@{0}:main,stash@{1}:main` | idem | `illisible` |
+| S3.2b commande de stash@{0} | `git stash show --stat 'stash@{0}'` | `illisible` |
+| S3.2c message hostile tel quel | `On main: wip <b>hostile</b>` | `illisible` |
+| S3.2d h7 et date du stash | true | `illisible` |
+| S3.3a auteurs `Alice:3:…,<autre>:1:…` | comptes exacts | `illisible` |
+| S3.3c activité par branche | `main:0:1700000300` | `illisible` |
+| S3.5a contrat vs réponse réelle | `conforme` | `tags,stash,auteurs,parBranche` (les quatre clés requises absentes) |
+
+Verts d'avance (aucun code de tâche 3 nécessaire, acquis de la tâche 2) : S3.3b (aucun `shortlog`), S3.4 (route entête, tâche 1), S3.5b/c, S3.6 (repli `rev-list` quand git refuse `%(ahead-behind)` : l'emballage `bin2/git` refuse bien le champ, assertion `refus=129`), S4.1 à S4.4 (états absent, indisponible, vide), S5 (piégé : témoins positifs `log -p` et `status` posent leurs marqueurs, `lireGit` aucun), S6.1.
+Corrections de la SUITE entre deux jeux : (a) S4.2 : `chmod 000 .git/objects` rendait `absent`, pas `indisponible` (git ne reconnaît plus le dépôt : `rev-parse` échoue dans `enteteGit`) ; remplacé par le retrait de l'objet de la pointe (le dépôt reste reconnu, `for-each-ref` échoue), l'objet est remis après la lecture ; (b) S2.4e et M-HEAD : une ref `origin/HEAD` non filtrée apparaît dans les mergées (même commit qu'origin/main), pas dans les étiquettes ; l'assertion compte étiquettes ET mergées, et ne confond pas avec l'étiquette `HEAD` du commit courant.
+S6.1 (durées, à citer au SUMMARY) : fixture 13 rangées, 164 ms ; ce dépôt (904 rangées), 274 ms.
