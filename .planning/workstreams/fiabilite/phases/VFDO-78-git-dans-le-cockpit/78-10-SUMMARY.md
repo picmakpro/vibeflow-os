@@ -77,3 +77,5 @@ Captures (1440 px, scratchpad, pour le juge de design) :
 
 Pastilles d'état des worktrees : plus de fond (`background: none`), texte `--text-2` pour toutes ; l'état est porté par un glyphe en `::before` (texte, hérite la couleur neutre, hors `textContent`) : `✓` propre, `◐` modifié, `○` non suivi. `--warn-text`/`--ok-text` retirés des pastilles. La déviation 3 ci-dessus est remplacée par cette décision. Padding `2px 8px` inchangé (jeton futur : `--inset-pill`). Assertion D8.2 renforcée (style rendu, rouge avant / vert après). Captures `78-10-worktrees-{clair,sombre}-1440.png` refaites (scratchpad). Suites : tiroir 98/0/0, vendor, git-env, git, git-details, serveur rc 0.
 Le finding « route worktrees bloquante » (P78-D-32) n'est PAS traité ici : voir 78-08-SUMMARY, correction ciblée.
+
+P78-D-32 traitée côté route/exécuteur (voir 78-08-SUMMARY) ; la page n'a pas changé, D9.1 (une relecture des worktrees par rafale) reste vert (git-tiroir rc 0).

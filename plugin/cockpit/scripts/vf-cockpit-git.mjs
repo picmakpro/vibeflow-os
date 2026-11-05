@@ -167,7 +167,7 @@ export function routeGit(req, res, url, { root, json }) {
     if (p === '/api/vf/git') json(res, 200, lireGit(root));
     else if (p === '/api/vf/git/entete') json(res, 200, { schema: SCHEMA_ENTETE, ...enteteGit(root) });
     else if (p === '/api/vf/git/commit') { const r = detailCommit(root, url.searchParams.get('sha')); json(res, r.code, r.corps); }
-    else if (p === '/api/vf/git/worktrees') json(res, 200, etatWorktrees(root));
+    else if (p === '/api/vf/git/worktrees') etatWorktrees(root).then((c) => json(res, 200, c), () => json(res, 200, { schema: SCHEMAS_ROUTES[p] || SCHEMA, etat: 'indisponible' })); // P78-D-32 : asynchrone, la boucle reste libre
     else { res.writeHead(404); res.end(); }
   } catch { json(res, 200, { schema: SCHEMAS_ROUTES[p] || SCHEMA, etat: 'indisponible' }); }
   return true;

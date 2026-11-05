@@ -4,7 +4,7 @@
 //   GET /api/vf/git/worktrees             vibeflow/cockpit-git-worktrees@1 (jamais dans le filet de 5 s : le status touche l'arbre de travail)
 // Seul point de lancement : lancerGit (environnement durci, --no-ext-diff --no-textconv, filtres du dépôt vidés pour status). Ni diff, ni e-mail, ni écriture.
 import path from 'node:path';
-import { lancerGit, filtresDeclares, avecEcheance } from './vf-cockpit-paths.mjs';
+import { lancerGit, lancerGitAsync, filtresDeclaresAsync, finDans } from './vf-cockpit-paths.mjs';
 import { nettoie, brancheBase } from './vf-cockpit-arbres.mjs';
 import { masque } from './vf-cockpit-lecture.mjs';
 import { MOTIF_SHA, lireWorktrees } from './vf-cockpit-git-graphe.mjs';
@@ -86,36 +86,37 @@ export function detailCommit(lab, sha) {
     fichiers: ns.fichiers, total: ns.total, commandes: { show: cmdShowStat(h7), detacher: cmdDetacher(h7) } } };
 }
 
-const compteLR = (lab, base, oid) => { // [avance, retard] de `oid` sur `base` ; null si inconnu
-  const r = lancerGit(lab, ['rev-list', '--left-right', '--count', '--end-of-options', `${base}...${oid}`]);
+const compteLR = async (lab, base, oid, fin) => { // [avance, retard] de `oid` sur `base` ; null si inconnu
+  const r = await lancerGitAsync(lab, ['rev-list', '--left-right', '--count', '--end-of-options', `${base}...${oid}`], { fin });
   const m = /^(\d+)\t(\d+)\n$/.exec(r.sortie);
   return r.ok && m ? [Number(m[2]), Number(m[1])] : null;
 };
-const sha = (lab, ref) => { const r = lancerGit(lab, ['rev-parse', '--verify', '--quiet', '--end-of-options', `${ref}^{commit}`]); const s = r.sortie.trim(); return r.ok && MOTIF_SHA.test(s) ? s : null; };
+const sha = async (lab, ref, fin) => { const r = await lancerGitAsync(lab, ['rev-parse', '--verify', '--quiet', '--end-of-options', `${ref}^{commit}`], { fin }); const s = r.sortie.trim(); return r.ok && MOTIF_SHA.test(s) ? s : null; };
 
-export function etatWorktrees(lab) {
+// P78-D-32 : asynchrone — tous les git de la lecture passent par `lancerGitAsync` (même point unique, mêmes options), la boucle du serveur reste libre. `brancheBase` (2 lectures de refs, quelques ms) reste synchrone.
+export async function etatWorktrees(lab) {
   const ind = (etat) => ({ schema: SCHEMA_WT, etat });
   try {
-    return avecEcheance(BORNES_DETAILS.echeanceMs, () => {
-      const wl = lancerGit(lab, ['worktree', 'list', '--porcelain', '-z']);
-      const lw = wl.ok ? lireWorktrees(wl.sortie) : ko('worktree list');
-      if (!lw.ok) return ind('indisponible');
-      const approximatif = filtresDeclares(lab).length > 0;
-      const nomBase = brancheBase(lab);
-      const locale = nomBase ? sha(lab, `refs/heads/${nomBase}`) : null, distante = nomBase ? sha(lab, `refs/remotes/origin/${nomBase}`) : null;
-      const refBase = locale ? `refs/heads/${nomBase}` : distante ? `refs/remotes/origin/${nomBase}` : null;
-      const refOrigine = locale && distante && locale !== distante ? `refs/remotes/origin/${nomBase}` : null; // distante seulement quand elle diverge de la locale
-      const worktrees = lw.worktrees.slice(0, BORNES_DETAILS.worktrees).map((w) => {
-        const st = lancerGit(w.chemin, ['status', '--porcelain=v2', '--branch', '-z', '-unormal'], { lab, maxBuffer: 1 << 20 });
-        const s = st.ok || st.tronque ? lireStatusV2(st.sortie) : ko('status');
-        const oid = s.ok && MOTIF_SHA.test(s.oid ?? '') ? s.oid : MOTIF_SHA.test(w.head) ? w.head : null;
-        const base = oid && refBase ? compteLR(lab, refBase, oid) : null, orig = oid && refOrigine ? compteLR(lab, refOrigine, oid) : null;
-        const cd = cmdCd(w.chemin);
-        return { chemin: net(w.chemin), nom: net(path.basename(w.chemin)), modifies: s.ok ? s.modifies + s.conflits : null, nonSuivis: s.ok ? s.nonSuivis : null, plus: s.ok ? s.plus : false,
-          propre: s.ok ? s.modifies + s.conflits + s.nonSuivis === 0 : null, avance: base?.[0] ?? null, retard: base?.[1] ?? null, avanceOrigin: orig?.[0] ?? null, retardOrigin: orig?.[1] ?? null,
-          commande: cd !== null && masque(w.chemin) === w.chemin ? cd : null }; // P78-D-27 : la commande n'est servie que si l'écran dirait la même chose
-      });
-      return { schema: SCHEMA_WT, etat: 'ok', approximatif, mention: approximatif ? MENTION_APPROX : null, tronque: lw.worktrees.length > BORNES_DETAILS.worktrees, worktrees };
-    });
+    const fin = finDans(BORNES_DETAILS.echeanceMs);
+    const wl = await lancerGitAsync(lab, ['worktree', 'list', '--porcelain', '-z'], { fin });
+    const lw = wl.ok ? lireWorktrees(wl.sortie) : ko('worktree list');
+    if (!lw.ok) return ind('indisponible');
+    const approximatif = (await filtresDeclaresAsync(lab, lab, fin)).length > 0;
+    const nomBase = brancheBase(lab);
+    const locale = nomBase ? await sha(lab, `refs/heads/${nomBase}`, fin) : null, distante = nomBase ? await sha(lab, `refs/remotes/origin/${nomBase}`, fin) : null;
+    const refBase = locale ? `refs/heads/${nomBase}` : distante ? `refs/remotes/origin/${nomBase}` : null;
+    const refOrigine = locale && distante && locale !== distante ? `refs/remotes/origin/${nomBase}` : null; // distante seulement quand elle diverge de la locale
+    const worktrees = [];
+    for (const w of lw.worktrees.slice(0, BORNES_DETAILS.worktrees)) {
+      const st = await lancerGitAsync(w.chemin, ['status', '--porcelain=v2', '--branch', '-z', '-unormal'], { lab, maxBuffer: 1 << 20, fin });
+      const s = st.ok || st.tronque ? lireStatusV2(st.sortie) : ko('status');
+      const oid = s.ok && MOTIF_SHA.test(s.oid ?? '') ? s.oid : MOTIF_SHA.test(w.head) ? w.head : null;
+      const base = oid && refBase ? await compteLR(lab, refBase, oid, fin) : null, orig = oid && refOrigine ? await compteLR(lab, refOrigine, oid, fin) : null;
+      const cd = cmdCd(w.chemin);
+      worktrees.push({ chemin: net(w.chemin), nom: net(path.basename(w.chemin)), modifies: s.ok ? s.modifies + s.conflits : null, nonSuivis: s.ok ? s.nonSuivis : null, plus: s.ok ? s.plus : false,
+        propre: s.ok ? s.modifies + s.conflits + s.nonSuivis === 0 : null, avance: base?.[0] ?? null, retard: base?.[1] ?? null, avanceOrigin: orig?.[0] ?? null, retardOrigin: orig?.[1] ?? null,
+        commande: cd !== null && masque(w.chemin) === w.chemin ? cd : null }); // P78-D-27 : la commande n'est servie que si l'écran dirait la même chose
+    }
+    return { schema: SCHEMA_WT, etat: 'ok', approximatif, mention: approximatif ? MENTION_APPROX : null, tronque: lw.worktrees.length > BORNES_DETAILS.worktrees, worktrees };
   } catch { return ind('indisponible'); }
 }

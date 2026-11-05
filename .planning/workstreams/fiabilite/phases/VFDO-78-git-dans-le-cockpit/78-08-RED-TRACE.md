@@ -46,3 +46,9 @@ Chaque mutant : (1) `mut.mjs` rend « applique » (la cible existe), (2) la sond
 
 Aucun mutant ne rougit pour une autre raison : chacun est précédé de l'assertion « cible présente » (`applique`) et de la sonde verte sur l'original, et la sonde exige un module chargeable (un `module absent` ou `illisible` ferait FAIL).
 Vert final : `Résultats : 82 PASS / 0 FAIL` (`78-08-vert2.log`).
+
+## Correction ciblée — P78-D-32 (2026-11-06)
+
+- Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-git-details.sh`, assertion X6.1 (requête légère servie avant la fin de la lecture des worktrees).
+- Attendu `true|ok|true`. Obtenu AVANT le code : `false|ok|true` (la lecture aboutit, elle est lente, la requête légère n'est servie qu'après : la boucle était bloquée). Log : scratchpad `78-fix-rouge-details.log`.
+- Après : X6.1 vert ; M-SYNC rouge `false|ok|true` pour la même raison (X6.2 vert). Suite 85/0 (`78-fix2-git-details.log`) ; garde E6.5 et suite env 86/0.

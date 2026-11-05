@@ -6,7 +6,7 @@
 // Aucun nom de compartiment, de jalon ou de projet codé en dur : tout vient du disque.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execFile } from 'node:child_process';
 import { envEnfant } from './vf-cockpit-env.mjs';
 
 const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
@@ -164,6 +164,27 @@ function lancer(cmd, args, cwd, env, maxBuffer) {
   try { return { sortie: execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: Math.floor(reste), env, maxBuffer }), code: 0, tronque: false, absent: false, echeance: false }; }
   catch (e) { return { sortie: e.stdout || '', code: typeof e.status === 'number' ? e.status : null, tronque: e.code === 'ENOBUFS', absent: e.code === 'ENOENT', echeance: false }; }
 }
+// Variante ASYNCHRONE de l'exécuteur (P78-D-32) : mêmes options, même environnement, même sémantique de résultat que `lancer`, mais la boucle du serveur reste libre pendant que git travaille.
+// L'échéance globale `FIN` est une variable de portée synchrone : elle ne survit pas à un `await`. L'appelant asynchrone passe donc sa date butoir (`fin`, en ms epoch) à chaque appel.
+export const finDans = (ms) => Date.now() + ms;
+function lancerAsync(cmd, args, cwd, env, maxBuffer, fin) {
+  const reste = Math.min(10000, (fin ?? Date.now() + 10000) - Date.now());
+  if (!(reste >= 1)) return Promise.resolve({ sortie: '', code: null, tronque: false, absent: false, echeance: true });
+  return new Promise((resolve) => {
+    let enfant;
+    try {
+      enfant = execFile(cmd, args, { cwd, encoding: 'utf8', timeout: Math.floor(reste), env, maxBuffer }, (e, sortie) => {
+        if (!e) return resolve({ sortie, code: 0, tronque: false, absent: false, echeance: false });
+        resolve({ sortie: sortie || '', code: typeof e.code === 'number' ? e.code : null, tronque: e.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' || e.code === 'ENOBUFS', absent: e.code === 'ENOENT', echeance: false });
+      });
+      enfant.stdin?.end(); // l'exécuteur synchrone ferme l'entrée standard (stdio 'ignore')
+    } catch { resolve({ sortie: '', code: null, tronque: false, absent: true, echeance: false }); }
+  });
+}
+export async function filtresDeclaresAsync(dir, lab = dir, fin) {
+  const r = await lancerAsync('git', [...GIT_SUR, '-C', dir, 'config', '--name-only', '--get-regexp', '^filter\\.'], dir, envGit(lab), 1 << 20, fin);
+  return [...new Set(r.sortie.split('\n').map((l) => /^filter\.(.+)\.[^.]+$/.exec(l.trim())?.[1]).filter(Boolean))].slice(0, 64);
+}
 // pilotes de filtre déclarés par le dépôt (et la config de l'utilisateur) : `filter.<x>.<clé>`, x = tout ce qui sépare le premier `filter.` de la dernière `.clé` ; au plus 64
 export function filtresDeclares(dir, lab = dir) {
   const r = lancer('git', [...GIT_SUR, '-C', dir, 'config', '--name-only', '--get-regexp', '^filter\\.'], dir, envGit(lab), 1 << 20);
@@ -188,6 +209,15 @@ export function lancerGit(dir, args, { lab = dir, maxBuffer = 4 << 20, binaire =
   const { argv, sous } = argsGit([...GIT_SUR, '-C', dir, ...args]);
   const config = SOUS_COMMANDES_FILTRANTES.includes(sous) ? configFiltres(filtresDeclares(dir, lab)) : [];
   const r = lancer(binaire, argv, dir, envGit(lab, { config }), maxBuffer);
+  return { ok: r.code === 0 && !r.tronque && !r.echeance, sortie: r.sortie, code: r.code, tronque: r.tronque, absent: r.absent };
+}
+
+// Même contrat et mêmes arguments que `lancerGit`, rendu en promesse ; `fin` : date butoir de l'appelant (voir `finDans`).
+export async function lancerGitAsync(dir, args, { lab = dir, maxBuffer = 4 << 20, binaire = 'git', fin } = {}) {
+  if (!isDir(dir)) return { ok: false, sortie: '', code: null, tronque: false, absent: false };
+  const { argv, sous } = argsGit([...GIT_SUR, '-C', dir, ...args]);
+  const config = SOUS_COMMANDES_FILTRANTES.includes(sous) ? configFiltres(await filtresDeclaresAsync(dir, lab, fin)) : [];
+  const r = await lancerAsync(binaire, argv, dir, envGit(lab, { config }), maxBuffer, fin);
   return { ok: r.code === 0 && !r.tronque && !r.echeance, sortie: r.sortie, code: r.code, tronque: r.tronque, absent: r.absent };
 }
 

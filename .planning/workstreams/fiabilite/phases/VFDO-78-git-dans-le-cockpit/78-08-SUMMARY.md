@@ -89,6 +89,12 @@ Sur ce dépôt (10 worktrees, git 2.50.1) : `detailCommit` 178 ms ; `etatWorktre
 
 `test-cockpit-git-details.sh` 82/0 · `git` 82/0 · `git-env` 70/0 · `serveur` 70/0 · `git-graphe` 50/0 · `forme-claude` 56/0 · `assemblage` 40/0 · `signal` 76/0 · `avancement` 62/0. `test-cockpit-git-commandes.sh` (78-03, ne lit aucun fichier de ce plan) : non rejouée en entier, interrompue à C2.1a (lente sous charge). `check-file-size.sh` : exit 0.
 
-## Correction ciblée — P78-D-32 : NON FAITE (gaps_found, 2026-11-06)
+## Correction ciblée — P78-D-32 : FAITE (2026-11-06)
 
-Cause : rendre `etatWorktrees` asynchrone change son contrat de retour ; son seul appelant, `routeGit` dans `plugin/cockpit/scripts/vf-cockpit-git.mjs` (`json(res, 200, etatWorktrees(root))`, ligne ~170), n'est pas dans les fichiers autorisés du mandat et doit attendre la promesse. Aucun contournement posé. Correctif prévu une fois ce fichier autorisé : variante asynchrone de `lancer`/`lancerGit` dans `vf-cockpit-paths.mjs` (mêmes `envGit`, options, garde ; `execFile` est déjà couvert par la regex de la garde E6), `etatWorktrees` en `async`, route en `.then`/`await`, témoin rouge (requête légère pendant une lecture lente), mutant « retour au synchrone ».
+`GET /api/vf/git/worktrees` ne bloque plus la boucle. Périmètre élargi par le manager de reprise (message direct) à `vf-cockpit-git.mjs` (route) et `vf-cockpit-paths.mjs` (exécuteur).
+- `vf-cockpit-paths.mjs` : `lancerAsync` (execFile, mêmes options, `timeout` = temps restant, même sémantique `{sortie, code, tronque, absent, echeance}`), `lancerGitAsync` et `filtresDeclaresAsync` à côté de `lancerGit` : même `envGit`, mêmes `argsGit`/`GIT_SUR`, mêmes filtres vidés. `FIN` (portée synchrone) ne survit pas à un `await` : l'appelant passe sa date butoir (`finDans(ms)` → `fin`).
+- `etatWorktrees` est `async` (git séquentiels, un worktree après l'autre) ; `routeGit` attend la promesse (`.then`), repli `indisponible` sur rejet. `brancheBase` (2 lectures de refs, quelques ms) reste synchrone, hors des fichiers autorisés.
+- Témoin X6.1 (test-cockpit-git-details.sh) : git emballé (`status` dort 0,4 s, 5 worktrees, lecture > 1,5 s), vrai `routeGit` dans un serveur en processus ; une requête légère émise 150 ms après est servie avant la fin de la lecture.
+- Mutant M-SYNC (X6.2) : `lancerGitAsync` redevient `async (...a) => lancerGit(...a)` : rougit X6.1 pour la bonne raison (légère avant lourde = false, lecture ok, lente).
+- Garde E6 : E6.5 (test-cockpit-git-env.sh) : `execFile(cmd` n'existe que dans `paths.mjs`, le vrai jeu de scripts passe la garde, un `execFile('git', …)` planté dans `git-details.mjs` la rougit à la bonne ligne. Limite connue : une forme `promisify(execFile)('git', …)` n'est pas vue par la regex (déjà vrai avant).
+- Adaptations de la suite : `det.mjs` attend la promesse (`await`), ancre du mutant M-FILTRES-STATUS réécrite sur la forme asynchrone.

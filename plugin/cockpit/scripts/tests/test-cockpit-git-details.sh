@@ -52,7 +52,7 @@ const [, , scripts, fn, lab, arg] = process.argv;
 let m, g;
 try { m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git-details.mjs')).href); } catch { console.log(JSON.stringify({ erreur: 'module absent' })); process.exit(0); }
 if (fn === 'commit') console.log(JSON.stringify(m.detailCommit(lab, arg)));
-else if (fn === 'wt') console.log(JSON.stringify(m.etatWorktrees(lab)));
+else if (fn === 'wt') console.log(JSON.stringify(await m.etatWorktrees(lab)));
 else if (fn === 'git') { g = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href); console.log(JSON.stringify(g.lireGit(lab))); }
 else if (fn === 'status') console.log(JSON.stringify(m.lireStatusV2(arg, { max: 200 })));
 JS
@@ -300,13 +300,50 @@ A="$(muter "$D/vf-cockpit-git-details.mjs" "if (fichiers.length < max)" "if (tru
 assert_eq "X4 M-BORNE-FICHIERS — borne de 500 retirée (cible présente)" "$A" "applique"
 verifie "M-BORNE-FICHIERS" sonde_borne 500 "$D"
 D="$(mutant_dir filtres)"
-A="$(muter "$D/vf-cockpit-git-details.mjs" "const st = lancerGit(w.chemin, ['status', '--porcelain=v2', '--branch', '-z', '-unormal'], { lab, maxBuffer: 1 << 20 });" "const st = (() => { try { return { ok: true, sortie: process.getBuiltinModule('node:child_process').execFileSync('git', ['--no-optional-locks', '-c', 'core.fsmonitor=false', '-C', w.chemin, 'status', '--porcelain=v2', '--branch', '-z', '-unormal'], { encoding: 'utf8' }) }; } catch { return { ok: false, sortie: '' }; } })();")"
+A="$(muter "$D/vf-cockpit-git-details.mjs" "const st = await lancerGitAsync(w.chemin, ['status', '--porcelain=v2', '--branch', '-z', '-unormal'], { lab, maxBuffer: 1 << 20, fin });" "const st = (() => { try { return { ok: true, sortie: process.getBuiltinModule('node:child_process').execFileSync('git', ['--no-optional-locks', '-c', 'core.fsmonitor=false', '-C', w.chemin, 'status', '--porcelain=v2', '--branch', '-z', '-unormal'], { encoding: 'utf8' }) }; } catch { return { ok: false, sortie: '' }; } })();")"
 assert_eq "X4 M-FILTRES-STATUS — status lancé hors lancerGit, GIT_SUR seul (cible présente)" "$A" "applique"
 verifie "M-FILTRES-STATUS" sonde_filtres "absent|absent|absent" "$D"
 D="$(mutant_dir ignorees)"
 A="$(muter "$D/vf-cockpit-git.mjs" "f[3] === ''" "false")"
 assert_eq "X4 M-IGNOREES — les refs sans date ne sont plus écartées (cible présente)" "$A" "applique"
 verifie "M-IGNOREES" sonde_ignorees "ok|3" "$D"
+
+echo "=== X6 — P78-D-32 : la lecture des worktrees ne bloque pas la boucle du serveur ==="
+# git emballé : `status` dort 0,4 s (5 worktrees : lecture de plus de 1,5 s), tout le reste passe tel quel ; le PATH absolu du wrapper est conservé par l'environnement assaini
+WRAP="$WORK/wrap-git"; mkdir -p "$WRAP"
+printf '#!/bin/sh\nfor a in "$@"; do [ "$a" = status ] && sleep 0.4; done\nexec "%s" "$@"\n' "$GIT_REEL" > "$WRAP/git"; chmod +x "$WRAP/git"
+# lat.mjs <scripts> <lab> : serveur http en processus avec le VRAI routeGit des <scripts> ; la lecture des worktrees part, 150 ms plus tard une requête légère ; rend « légère terminée avant la lourde | état | lourde lente »
+cat > "$AUX/lat.mjs" <<'JS'
+import http from 'node:http';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab] = process.argv;
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href);
+const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
+const srv = http.createServer((req, res) => {
+  const url = new URL(req.url, 'http://x');
+  if (url.pathname === '/legere') { res.end('ok'); return; }
+  if (!m.routeGit(req, res, url, { root: lab, json })) { res.writeHead(404); res.end(); }
+}).listen(0, '127.0.0.1', async () => {
+  const port = srv.address().port, t0 = Date.now();
+  const get = (p) => new Promise((ok) => http.get({ host: '127.0.0.1', port, path: p }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => ok({ ms: Date.now() - t0, b })); }));
+  const lourde = get('/api/vf/git/worktrees');
+  await new Promise((r) => setTimeout(r, 150));
+  const legere = await get('/legere');
+  const l = await lourde;
+  let etat = 'illisible'; try { etat = JSON.parse(l.b).etat; } catch {}
+  console.log(`${legere.ms < l.ms}|${etat}|${l.ms >= 1500}`);
+  srv.close(); process.exit(0);
+});
+JS
+LAT() { PATH="$WRAP:$PATH" node "$AUX/lat.mjs" "$1" "$LAB" 2>&1 | tail -1; }
+assert_eq "X6.1 — pendant une lecture lente des worktrees (git emballé : > 1,5 s), une requête légère est servie AVANT la fin de la lecture ; la lecture aboutit (état ok)" "$(LAT "$SCRIPTS")" "true|ok|true"
+D="$(mutant_dir sync)"
+A1="$(muter "$D/vf-cockpit-git-details.mjs" "lancerGitAsync, " "")"
+A2="$(muter "$D/vf-cockpit-git-details.mjs" "export const BORNES_DETAILS" "const lancerGitAsync = async (...a) => lancerGit(...a); // MUTANT : appel git synchrone
+export const BORNES_DETAILS")"
+assert_eq "X6.2 — M-SYNC : le git de la lecture des worktrees redevient synchrone (cibles présentes)" "$A1|$A2" "applique|applique"
+assert_eq "X6.2 — M-SYNC : la requête légère n'est servie qu'APRÈS la lecture (légère avant lourde : false), la lecture aboutit et elle est lente (le rouge vient de l'ordre, pas d'un module cassé)" "$(LAT "$D")" "false|ok|true"
 
 # --- FIN ---
 stop_srv

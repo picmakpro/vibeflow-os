@@ -220,6 +220,14 @@ assert_eq "E6.3 — témoin : un appel dont le premier argument est l'identifian
 PL="$WORK/plante-paths"; mkdir -p "$PL"; printf "import cp from 'node:child_process';\ncp.execFileSync('git', ['status']);\n" > "$PL/vf-cockpit-paths.mjs"
 assert_eq "E6.4 — l'exemption est celle de vf-cockpit-paths.mjs et d'aucun autre fichier (le point d'injection)" "$(node "$AUX/garde.mjs" "$PL")" ""
 
+# E6.5 (P78-D-32) : la variante asynchrone de vf-cockpit-paths.mjs est EXEMPTE (elle est le point unique) ; un appel git asynchrone posé dans un autre module du vrai jeu de scripts rougit la garde
+assert_eq "E6.5a — témoin : l'exécuteur asynchrone vit bien dans vf-cockpit-paths.mjs (execFile y est appelé : l'exemption est exercée)" "$(grep -c 'execFile(cmd' "$SCRIPTS/vf-cockpit-paths.mjs" | tr -d ' ')" "1"
+PL="$WORK/plante-async"; rm -rf "$PL"; mkdir -p "$PL"; cp "$SCRIPTS"/*.mjs "$PL/"
+assert_eq "E6.5b — le vrai jeu de scripts, variante asynchrone comprise, passe la garde" "$(node "$AUX/garde.mjs" "$PL")" ""
+printf "\nimport { execFile } from 'node:child_process';\nexecFile('git', ['status'], () => {});\n" >> "$PL/vf-cockpit-git-details.mjs"
+NL="$(wc -l < "$PL/vf-cockpit-git-details.mjs" | tr -d ' ')"
+assert_eq "E6.5c — un execFile('git', …) asynchrone planté dans vf-cockpit-git-details.mjs rend la garde rouge, à la bonne ligne" "$(node "$AUX/garde.mjs" "$PL")" "vf-cockpit-git-details.mjs:$NL"
+
 echo "=== E7 — mutants : chacun rougit SA sonde, pour la bonne raison ==="
 cat > "$AUX/mutsub.mjs" <<'JS'
 import fs from 'node:fs';
