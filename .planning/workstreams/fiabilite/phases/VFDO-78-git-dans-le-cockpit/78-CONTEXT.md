@@ -157,6 +157,13 @@ verrous de driver, arbitrages en attente, watchdog et serveurs orphelins (Phase 
   Samuel (SendMessage session principale, 2026-11-06), réversible sur son avis.
 - **P78-D-35 (HEAD détaché dans l'en-tête).** Texte neutre, comme dans le tiroir : règle 71.5 « glyphe + mot en texte
   neutre » (arbitrages Samuel, AskUserQuestion session principale, 2026-11-05).
+- **P78-D-34 ratifiée.** « Valider le seuil (Recommandé) » (arbitrage Samuel, AskUserQuestion session principale,
+  2026-11-06) : seconde ligne masquée sous 1280 px, icône 44 px de 701 à 1279 px, pas de retour en arrière.
+- **P78-D-36 (troncature de la seconde ligne).** « Garder le plafond (Recommandé) » (arbitrage Samuel, AskUserQuestion
+  session principale, 2026-11-06) : plafond de 220 px conservé ; le texte complet reste dans l'infobulle, le titre de
+  l'onglet Code et le tiroir.
+- **P78-D-37 (découvrabilité au repos).** « Garder tel quel (Recommandé) » (arbitrage Samuel, AskUserQuestion session
+  principale, 2026-11-06) : ligne sobre au repos, le « g » se découvre au survol ou au focus (P78-D-10).
 
 ### Claude's Discretion
 
