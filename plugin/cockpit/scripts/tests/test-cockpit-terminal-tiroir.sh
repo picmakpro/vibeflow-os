@@ -397,7 +397,7 @@ await executer(chrome, async (s) => {
   const G = { E2f: [], E2o: [], G1F: [], G1ask: [], G1visite: [], G1reprise: [], fin: [], agit: [] };
   for (const r of sorties) {
     const t = r.tiroir, ok3 = (l) => Array.isArray(l) && trois(l)();
-    if (!(ok3(r.fermeZoom) && r.clicPlusOuvre === false && hors(r.fermePast, r.fermeZ))) G.E2f.push(r.cle);
+    if (!(ok3(r.fermeZoom) && r.clicPlusOuvre === false && hors(r.fermePast, r.fermeZ) && (r.fermePast.left >= r.fermeZ.right || r.fermePast.right <= r.fermeZ.left || r.fermePast.top >= r.fermeZ.bottom))) G.E2f.push(r.cle);
     if (!(t && ok3(r.ouvZoom) && r.ouvZ && r.ouvZ.bottom <= t.top)) G.E2o.push(r.cle);
     if (!(t && r.apresF && r.apresBouton && r.apresF.bottom <= t.top && r.apresBouton.bottom <= t.top)) G.G1F.push(r.cle);
     if (!(r.ouvAsk && r.ouvAsk.display === 'none' && r.finAsk && r.finAsk.display !== 'none' && r.finAsk.bottom === r.fermeAsk.bottom)) G.G1ask.push(r.cle);
@@ -575,7 +575,7 @@ mut_geom() { # mut_geom <nom> <fichier> <expression-sed> <groupe qui doit rougir
     assert_eq "$1 — le mutant rougit T21 : le groupe $4 compte au moins un relevé en défaut (témoin : deux relevés, aucune erreur)" "$(rj "$GM" '"n="+j.n+" erreurs="+JSON.stringify(j.erreurs)+" rouge="+(j.G.'"$4"'.length>=1)')" "n=2 erreurs={} rouge=true"
   else sans_effet "$1"; fi
 }
-mut_geom M-PASTILLE-SUR-ZOOM vf-cockpit-terminal-tiroir.mjs 's|if (recouvre) n.style.bottom|if (false) n.style.bottom|' E2f
+mut_geom M-PASTILLE-SUR-ZOOM vf-cockpit-terminal-tiroir.mjs 's|if (recouvre) z.style.bottom|if (false) z.style.bottom|' E2f
 mut_geom M-AJUSTE-SANS-TIROIR vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #stage {|body.vf-term-ouvert #stage-absent {|' G1F
 mut_geom M-ASK-RESTE vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #ask { display: none; }|body.vf-term-ouvert #ask { }|' G1ask
 mut_geom M-VISITE-RESTE vf-cockpit-terminal-tiroir.mjs 's|window.VibeFlowTour.end();|void 0;|' G1visite

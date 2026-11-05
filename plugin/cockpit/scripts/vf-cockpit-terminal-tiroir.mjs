@@ -43,14 +43,25 @@ function scriptTiroir(cfg, accepte, construire) {
   };
   const demarrer = () => {
     const d = construire(document, T);
-    // P71-D-34 (E2) : jamais sur les boutons de zoom de la page ; si la boîte recouvre #zoom, elle se pose juste au-dessus
+    // P71-D-34 (E2), inversé en v1.3.3 : jamais sur les boutons de zoom. Tiroir fermé, la pastille garde sa place au plus bas ; si elle recouvre #zoom, c'est #zoom qui remonte juste au-dessus d'elle.
+    // La puce (message d'indisponibilité) garde l'ancienne règle : elle se pose au-dessus du zoom.
     const eviter = (n) => {
+      const z = document.getElementById('zoom'), b = z ? z.getBoundingClientRect() : null;
+      if (n === d.pastille) {
+        if (z) z.style.bottom = '';
+        document.body.classList.remove('vf-term-haut');
+        if (!n.parentNode || n.hidden || !z) return;
+        const a = n.getBoundingClientRect(), s = document.getElementById('stage'), fond = s ? s.getBoundingClientRect().bottom : window.innerHeight, zb = z.getBoundingClientRect();
+        const recouvre = zb.width > 0 && a.left < zb.right && a.right > zb.left && a.top < zb.bottom && a.bottom > zb.top;
+        if (recouvre) z.style.bottom = Math.round(fond - a.top + 8) + 'px';
+        document.body.classList.toggle('vf-term-haut', recouvre);
+        return;
+      }
       if (!n.parentNode || n.hidden) return;
       n.style.bottom = '';
-      const z = document.getElementById('zoom'), b = z ? z.getBoundingClientRect() : null, a = n.getBoundingClientRect();
+      const a = n.getBoundingClientRect();
       const recouvre = !!b && b.width > 0 && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
       if (recouvre) n.style.bottom = Math.round(window.innerHeight - b.top + 8) + 'px';
-      if (n === d.pastille) document.body.classList.toggle('vf-term-haut', recouvre);
     };
     const eviterTout = () => { eviter(d.pastille); eviter(d.puce); };
     window.addEventListener('resize', eviterTout);
@@ -115,7 +126,7 @@ function scriptTiroir(cfg, accepte, construire) {
         d.region.hidden = false; d.region.inert = false; d.pastille.hidden = true;
         d.region.classList.toggle('vf-term-plein-etat', plein); d.region.classList.add('vf-term-entree');
         try { if (window.VibeFlowTour && window.VibeFlowTour.active()) window.VibeFlowTour.end(); } catch (e) { void e; }
-        document.body.classList.add('vf-term-ouvert'); appliquer(); pastilleEtat();
+        document.body.classList.add('vf-term-ouvert'); appliquer(); pastilleEtat(); eviter(d.pastille);
         if (!cadre) creerCadre();
         stock.ecrire('vf.terminal.open', 1); annoncer(T.annonceOuvert);
         if (avecFocus) cadre.focus();

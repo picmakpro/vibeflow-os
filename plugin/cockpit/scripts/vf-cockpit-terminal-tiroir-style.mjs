@@ -44,7 +44,7 @@ body.resizing .vf-term-zone iframe { pointer-events: none; }
 /* P71-D-35 (G1) : tiroir ouvert, le canevas s'arrête au-dessus de lui (le viewer mesure alors la bonne aire), la barre de question se range, les contrôles de zoom (dans le canevas) montent avec lui */
 body.vf-term-ouvert #stage { bottom: var(--vf-term-reserve, 0px); }
 body.vf-term-ouvert #ask { display: none; }
-/* P71-D-34 (E2) : la pastille posée au-dessus du zoom (placée par le script) laisse sa place à la visite « Par où commencer » */
+/* P71-D-34 (E2) : la pastille posée sous le zoom (le script remonte #zoom au-dessus d'elle) laisse sa place à la visite « Par où commencer » */
 body.vf-term-haut #tour { margin-bottom: 44px; }
 @media (max-width: 999px), (pointer: coarse) { .vf-term-tiroir { left: 8px; right: 8px; bottom: 8px; } }
 @media (max-width: 700px) { .vf-term-pastille, .vf-term-puce { bottom: 72px; } }

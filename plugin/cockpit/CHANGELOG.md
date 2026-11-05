@@ -1,5 +1,11 @@
 # Changelog — cockpit
 
+## v1.3.3 — 2026-11-05 — non publié
+
+Réglage visuel (demande de Samuel, session principale, 2026-11-05) : tiroir fermé, la pastille « Terminal » se place sous les boutons de zoom (− ▢ +), au plus bas à gauche, et les boutons de zoom remontent au-dessus d'elle ; plus de chevauchement. Tiroir ouvert, rien ne change. Vaut pour les pages Projet et Code.
+- **Placement** : `vf-cockpit-terminal-tiroir.mjs` ne remonte plus la pastille ; si elle recouvre `#zoom`, c'est `#zoom` qui reçoit un `bottom` en ligne juste au-dessus d'elle (retiré à l'ouverture du tiroir, à chaque recalcul). La puce « Terminal indisponible » garde l'ancienne règle.
+- **Suite** : `test-cockpit-terminal-tiroir.sh` (T21.1) exige désormais, quand la pastille et le zoom se partagent la même colonne, la pastille sous le zoom, en plus du non-chevauchement ; le mutant `M-PASTILLE-SUR-ZOOM` vise la nouvelle ligne.
+
 ## v1.3.2 — 2026-11-05 — non publié
 
 Correctif hors phase (jalon vibeflow-v2.0, compartiment fiabilité) : le terminal intégré fonctionne sous Safari. Arbitrages : arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 (SAF-1 « connexion dans le cadre », SAF-2 « les deux preuves »).
