@@ -48,8 +48,8 @@
 # Codes de sortie :
 #   0 = aucun chemin de machine versionné
 #   1 = au moins un chemin de machine versionné (liste sur stderr)
-#   2 = NON VÉRIFIABLE — pas un dépôt git, ou univers vide. Jamais un vert : un gate qui n'a pas pu
-#       regarder ne se replie pas sur « rien trouvé ».
+#   2 = NON VÉRIFIABLE — pas un dépôt git, univers vide, ou balayage en échec (awk a échoué : stderr
+#       montré). Jamais un vert : un gate qui n'a pas pu regarder ne se replie pas sur « rien trouvé ».
 #   64 = erreur d'usage
 set -uo pipefail
 
@@ -105,7 +105,8 @@ fi
 
 TMP_LIST="$(mktemp)"
 TMP_HITS="$(mktemp)"
-trap 'rm -f "$TMP_LIST" "$TMP_HITS"' EXIT
+TMP_ERR="$(mktemp)"
+trap 'rm -f "$TMP_LIST" "$TMP_HITS" "$TMP_ERR"' EXIT
 
 git -C "$ROOT" ls-files -z > "$TMP_LIST" 2>/dev/null || true
 # Comptage de l'univers AVANT tout verdict : un `ls-files` vide (dépôt fraîchement initialisé,
@@ -119,10 +120,13 @@ if [ "${UNIVERS:-0}" -eq 0 ]; then
   exit 2
 fi
 
-# Balayage. `xargs -0` (liste NUL-séparée, donc insensible aux espaces et aux retours à la ligne
-# dans les noms) et `awk` qui ouvre les fichiers lui-même : FILENAME et FNR sont exacts, et xargs
-# découpe les lots tout seul si l'univers dépasse la limite d'arguments.
-( cd "$ROOT" && xargs -0 awk \
+# Balayage, sous `LC_ALL=C` : sous une locale UTF-8, l'awk de macOS meurt au premier octet invalide
+# (`towc: multibyte conversion failure`) et le balayage s'arrête là, en silence (BACKLOG n°38).
+# Le préfixe est posé AVANT `xargs` (il se propage à awk) ; placé entre `xargs` et `awk`, il serait
+# pris pour la commande à lancer. `xargs -0` (liste NUL-séparée, donc insensible aux espaces et aux
+# retours à la ligne dans les noms) et `awk` qui ouvre les fichiers lui-même : FILENAME et FNR sont
+# exacts, et xargs découpe les lots tout seul si l'univers dépasse la limite d'arguments.
+( cd "$ROOT" && LC_ALL=C xargs -0 awk \
   -v HATCH="$HATCH" -v ALLOW="$ALLOW" '
   index($0, HATCH) > 0 { next }
   {
@@ -149,7 +153,17 @@ fi
       }
     }
   }
-' ) < "$TMP_LIST" > "$TMP_HITS" 2>/dev/null
+' ) < "$TMP_LIST" > "$TMP_HITS" 2> "$TMP_ERR"
+SWEEP_RC=$?
+
+# Un balayage en échec n'a PAS tout lu : conclure « aucun chemin » serait un vert à vide. xargs rend
+# un code non nul dès qu'un awk échoue (123 chez GNU, 1 chez BSD/macOS) : tout code non nul compte.
+# Le stderr d'awk est montré, jamais jeté.
+if [ "$SWEEP_RC" -ne 0 ]; then
+  echo "[check-machine-paths] le balayage a ÉCHOUÉ (rc=$SWEEP_RC) — fichiers non tous lus, NON VÉRIFIABLE (jamais un vert)" >&2
+  LC_ALL=C awk '{ print "  awk: " $0 }' "$TMP_ERR" >&2
+  exit 2
+fi
 
 NHITS="$(LC_ALL=C awk 'END { print NR+0 }' "$TMP_HITS")"
 
