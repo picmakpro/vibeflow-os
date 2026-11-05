@@ -94,8 +94,9 @@ function rq(o0) {
 const refusDe = (r) => { try { const j = JSON.parse(r.corps); return typeof j.refus === 'string' ? j.refus : '-'; } catch { return '-'; } };
 const corsDe = (r) => (Object.keys(r.headers || {}).some((k) => k.startsWith('access-control-')) ? 'oui' : 'non');
 function cas(id, r, extra = '', taille = false) {
-  const st = (taille && (r.reset || r.statut === 413)) ? 'refus-taille' : (r.reset ? 'reset' : r.statut);
-  dire(`CAS ${id} statut=${st} refus=${r.reset ? '-' : refusDe(r)} appels=${appels} cors=${r.reset ? 'non' : corsDe(r)}${extra}`);
+  const court = taille && (r.reset || (r.statut === 413 && refusDe(r) === 'taille')); // refus de taille : 413 `taille` OU coupure de connexion
+  const st = court ? 'refus-taille' : (r.reset ? 'reset' : r.statut);
+  dire(`CAS ${id} statut=${st} refus=${court || r.reset ? '-' : refusDe(r)} appels=${appels} cors=${r.reset ? 'non' : corsDe(r)}${extra}`);
 }
 const canon = (o) => JSON.stringify(Object.fromEntries(Object.entries(o).sort()));
 const pad = (n, cible = 'c1') => { const a = `{"cible":"${cible}","verbe":"v1"`; return a + ' '.repeat(n - Buffer.byteLength(a) - 1) + '}'; };
@@ -321,7 +322,7 @@ echo "=== TC — T-72-84 : le jeton se compare en temps constant (sonde statique
 sonde_tc() { # sonde_tc <dossier> -> « egal=<n> directes=<n> » : emplois de egal(entete, j) et comparaisons directes de l'en-tête de jeton, hors commentaires
   local f="$1/vf-cockpit-lancer-post.mjs" e dir
   e="$(grep -v '^ *//' "$f" 2>/dev/null | grep -c 'egal(entete, j)' || true)"
-  dir="$(grep -v '^ *//' "$f" 2>/dev/null | grep -cE "\bentete *[!=]==? *j\b|\bj *[!=]==? *entete\b|ENTETE_JETON\] *[!=]==|[!=]==? *req\.headers\[ENTETE_JETON\]|(includes|indexOf)\(entete\)" || true)"
+  dir="$(grep -v '^ *//' "$f" 2>/dev/null | grep -cE "\bentete *[!=]==? *j\b|\bj *[!=]==? *entete\b|ENTETE_JETON\] *[!=]==? *(j|jeton)\b|\b(j|jeton) *[!=]==? *req\.headers\[ENTETE_JETON\]|(includes|indexOf)\(entete\)" || true)"
   echo "egal=$e directes=$dir"
 }
 sonde_ts() { [ "$(grep -c 'crypto.timingSafeEqual' "$1/vf-cockpit-terminal-amorce.mjs" 2>/dev/null || true)" -ge 1 ] && echo oui || echo non; }
@@ -354,13 +355,13 @@ mut_env M-HOTE-QUELCONQUE controleHote 'return null;' && verdict M-HOTE-QUELCONQ
 mut_env M-ORIGINE-ABSENTE-OK controleOrigine 'return a[0].headers.origin === undefined ? null : controleOrigine_orig(...a);' && verdict M-ORIGINE-ABSENTE-OK "W1"
 mut_env M-ORIGINE-QUELCONQUE controleOrigine 'return a[0].headers.origin !== undefined ? null : controleOrigine_orig(...a);' && verdict M-ORIGINE-QUELCONQUE "W1 W14"
 mut_sed M-JETON-COMPARAISON-SIMPLE 's/egal(entete, j)/entete === j/' && verdict M-JETON-COMPARAISON-SIMPLE "TC"
-mut_env M-JETON-ABSENT-OK controleJeton 'return a[0].headers["x-floorplan-token"] === undefined ? null : controleJeton_orig(...a);' && verdict M-JETON-ABSENT-OK "W2"
+mut_env M-JETON-ABSENT-OK controleJeton 'return a[0].headers[ENTETE_JETON] === undefined ? null : controleJeton_orig(...a);' && verdict M-JETON-ABSENT-OK "W13 W2"
 mut_sed M-CORPS-NON-BORNE 's|^export const CORPS_MAX = .*$|export const CORPS_MAX = 1e9;|' && verdict M-CORPS-NON-BORNE "W3"
 mut_env M-SCHEMA-OUVERT controleSchema 'return null;' && verdict M-SCHEMA-OUVERT "W4"
 mut_env M-CT-IGNORE controleType 'return null;' && verdict M-CT-IGNORE "W14 W5"
 mut_env M-METHODE-OUVERTE controleMethode 'return null;' && verdict M-METHODE-OUVERTE "W7"
 mut_sed M-ECHO-CORPS 's|^    return envoyer(res, r.statut, r.corps);$|    return envoyer(res, r.statut, { ...r.corps, echo: brut });|' && verdict M-ECHO-CORPS "W10 W11"
-mut_sed M-JOURNAL-FUITE 's|^    journal(code);$|    journal(code, res.req.headers["x-floorplan-token"]);|' && verdict M-JOURNAL-FUITE "W11"
+mut_sed M-JOURNAL-FUITE 's|^    journal(code);$|    journal(code, res.req.headers[ENTETE_JETON]);|' && verdict M-JOURNAL-FUITE "W11"
 mut_sed M-ROUTE-OUVERTE 's|^    const route = Object.hasOwn(routes, url.pathname) ? routes\[url.pathname\] : null;$|    const cle = Object.keys(routes).find((k) => url.pathname.startsWith(k)); const route = cle === undefined ? null : routes[cle];|' && verdict M-ROUTE-OUVERTE "W9"
 
 vf_hyg_assert
