@@ -23,3 +23,18 @@ Résumé : rc=1, 4 PASS / 33 FAIL. Verts sur la base, comme prévu : LE.0 (copie
 ## Mutants (sur la base)
 
 Les onze sont « mutant sans effet : cible absente ou module d'avant » : M-FORME-LIBRE, M-AT-DU-MESSAGE, M-SANS-BORNE, M-RECENCE-INFINIE, M-ATTENTE-ILLIMITEE, M-TTL-IGNORE, M-RATTACHE-PAR-NOM, M-TERMINEE-PERDUE (module du suivi absent), M-LANCEES-HORS-SESSION, M-LIGNE-SANS-VALIDATION, M-LIGNE-VIDE-TOUJOURS (marqueur de garde absent de la carte d'avant).
+
+## Mutants rejoués sur le code livré (suivi)
+
+Suite : LS1 à LS4 vertes (rc des sections LS : 0 FAIL, sous bash et sous zsh).
+
+| Mutant | Sonde rougie | Obtenu (muté) |
+|--------|--------------|---------------|
+| M-FORME-LIBRE | LS1.2 | `accepte,accepte,…` (plus aucun refus) |
+| M-AT-DU-MESSAGE | LS2.2 | `false,true,true` (l'entrée de `at:5` est oubliée, `at` n'est plus l'horloge de P) |
+| M-SANS-BORNE | LS1.4 | `205\|true,true,true,true` |
+| M-RECENCE-INFINIE | LS2.1 | `false,true,true,false,true` (vrai à `RECENCE_MS`) |
+| M-ATTENTE-ILLIMITEE | LS3.5 | `1,true,1\|vue,terminee,vue` |
+| M-TTL-IGNORE | LS3.6 | `1,1,1` |
+| M-RATTACHE-PAR-NOM | LS3.4 | `vue,terminee,attendue,vue` (l'imposteur de même tâche est rattaché) |
+| M-TERMINEE-PERDUE | LS3.3 | `vue` |
