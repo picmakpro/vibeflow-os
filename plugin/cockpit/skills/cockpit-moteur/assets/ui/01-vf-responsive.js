@@ -36,7 +36,7 @@
       .hr .btn { position: relative; }
       .hr .btn:not(.icon):not(#vf-lock) { width: 36px; padding: 0; justify-content: center; }
       .hr .btn:not(#vf-lock) .bl { display: none; }
-      .hr .btn .badge { position: absolute; top: 2px; right: 0; }
+      .hr .btn .badge { position: absolute; top: var(--sp-2); right: 0; }
     }
     @media (min-width: 701px) and (max-width: 1639px) { /* P70-D-22 (« Badge réduit à son point (Recommandé) », arbitrage Samuel, AskUserQuestion session principale, 2026-11-04) : le badge « au travail » se réduit à son point et libère 92 px pour les onglets à 13 px. Seuil MESURÉ : à 1 600 px (et sous 1 635 px) le fil d'Ariane en parcours est rogné avec le badge entier (« 10 au travail ») ; il tient dès 1 635 px, 1 640 px garde 5 px de marge */
       #vf-lock { width: 36px; padding: 0; justify-content: center; }
@@ -47,7 +47,7 @@
       #vf-lock[data-vf-point] .bl { display: none; }
     }
     @media (min-width: 1000px) and (max-width: 1279px) {
-      #zoom { left: auto; right: calc(var(--pw) + 16px); bottom: auto; top: calc(var(--hh, 64px) + 8px); flex-direction: column; border-radius: 26px; }
+      #zoom { left: auto; right: calc(var(--pw) + var(--edge)); bottom: auto; top: calc(var(--hh, 64px) + var(--sp-8)); flex-direction: column; border-radius: 26px; }
       #context { max-width: min(520px, calc(100% - var(--pw) - 104px)); }
       #ask { width: min(700px, calc(100% - var(--pw) - 48px)); }
     }
@@ -60,11 +60,11 @@
       header #crumbs button:not([data-vf-court]):not(:first-child):not(.cur) { flex: 0 100000 auto; }
       header #crumbs button[data-vf-court] { flex: 0 0 auto; } /* un segment court n'est jamais rogné */
       header #crumbs [data-vf-masque] { display: none; }
-      header #crumbs .vf-ell { flex: none; color: var(--text-4); padding: 0 6px; cursor: default; }
+      header #crumbs .vf-ell { flex: none; color: var(--text-4); padding: 0 var(--sp-6); cursor: default; }
     }
     /* 70-12 (UIFN-14, P70-D-20 : choix du manager, vf-dev-manager, 2026-11-04) : l'onglet Équipe n'a pas de barre de question, donc rien ne gêne le bas de la scène ; dès 701 px le zoom y est la rangée en bas à gauche du viewer d'origine
        (celle de 1 440 px), jamais la colonne du haut qui recouvrait les cartes. Code et Projet gardent leur position (la barre de question occupe le bas) ; sous 701 px la pile verticale du téléphone (02-vf-telephone.js) reste seule. */
-    @media (min-width: 701px) { body.vf-tab-equipe #zoom { left: 16px; right: auto; top: auto; bottom: 16px; flex-direction: row; border-radius: 999px; } }
+    @media (min-width: 701px) { body.vf-tab-equipe #zoom { left: var(--edge); right: auto; top: auto; bottom: var(--edge); flex-direction: row; border-radius: 999px; } }
     @media (max-width: 999px) { #ask-input { flex: 1 1 100%; } }
     @media (max-width: 700px) { header #crumbs { display: none; } }
   `;

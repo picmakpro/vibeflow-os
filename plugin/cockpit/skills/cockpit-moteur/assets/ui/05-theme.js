@@ -19,7 +19,7 @@
   style.textContent = `
     /* a 44 px target; the round hover shape stays 36 px like the buttons beside it */
     #theme-toggle { position: relative; flex: none; width: 44px; height: 44px; padding: 0; background: none; }
-    #theme-toggle::before { content: ""; position: absolute; inset: 4px; border-radius: 999px; transition: background .2s var(--ease); }
+    #theme-toggle::before { content: ""; position: absolute; inset: var(--sp-4); border-radius: 999px; transition: background .2s var(--ease); }
     #theme-toggle:hover { background: none; }
     #theme-toggle:hover::before { background: rgba(var(--ink), .07); }
     #theme-toggle svg { position: relative; width: 18px; height: 18px; }
