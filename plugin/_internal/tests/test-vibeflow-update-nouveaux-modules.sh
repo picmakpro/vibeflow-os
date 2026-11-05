@@ -14,8 +14,11 @@
 #   N9  mark-offered n'inscrit que les modules présentés (union), pas le catalogue ; sans argument rien n'est écrit
 #   N10 bout en bout vf-update-run.sh + VRAI engine : cockpit listé, registre inchangé, rien posé ; offer sans module →
 #       registre inchangé, cockpit inscrit ; offer cockpit → cockpit au registre
+#   N11 jamais en double : un module posé dans un scope n'est pas proposé dans l'autre ; absent des deux → listé dans chacun
+#   N12 /vibeflow-install inscrit ce qu'il laisse non posé : lab neuf → new-modules ne dit rien (witness + skill)
+#   N10f les dépendances non posées sont nommées (deps=…) dans NOUVEAU_MODULE
 # VF_NM_TEST_ENGINE : engine de substitution (mutant). VF_NM_TEST_RUN : vf-update-run.sh de substitution (N10).
-# Exit 1 au premier KO compté ; aucun cas exécuté → exit 1.
+# Exit 1 dès qu'un KO est compté ; aucun cas exécuté → exit 1.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -150,7 +153,7 @@ catalogue | grep -vx -e cockpit -e product-team-bundle | while IFS= read -r m; d
 E2E_REG="$E2E/.claude/scripts/.vibeflow-installed"; REG_SUM="$(cksum < "$E2E_REG")"
 run_e2e() { (cd "$E2E" && HOME="$EH" XDG_CACHE_HOME="$WORK/xdg" VF_CACHE_BASE="$BASE" bash "$V/conductor/scripts/vf-update-run-sous-test.sh" "$@" 2>&1); }
 out="$(run_e2e --scope project)"
-if printf '%s\n' "$out" | grep -qx "\[vf-update-run\] NOUVEAU_MODULE scope=project cockpit=$(cat "$REPO/cockpit/VERSION")" \
+if printf '%s\n' "$out" | grep -qx "\[vf-update-run\] NOUVEAU_MODULE scope=project cockpit=$(cat "$REPO/cockpit/VERSION") deps=-" \
    && ! printf '%s\n' "$out" | grep -q 'NOUVEAU_MODULE.*product-team-bundle'; then ok "N10a : cockpit listé en NOUVEAU_MODULE (le bundle non proposable ne l'est pas)"; else ko "N10a : NOUVEAU_MODULE cockpit absent : [$(printf '%s' "$out" | grep NOUVEAU | head -2 | tr '\n' ' ' | cut -c1-90)]"; fi
 if [ "$(cksum < "$E2E_REG")" = "$REG_SUM" ] && ! grep -q '^cockpit=' "$E2E_REG" && [ ! -e "$E2E/.claude/scripts/.vibeflow-offered" ]; then ok "N10b : registre inchangé, aucun module posé, rien d'inscrit à la liste"; else ko "N10b : registre modifié ou module posé / offered écrit (listing seul)"; fi
 out="$(run_e2e offer project)"
@@ -162,6 +165,51 @@ if grep -q '^cockpit=' "$E2E_REG" && grep -qx cockpit "$E2E/.claude/scripts/.vib
 (cd "$E2E" && HOME="$EH" VIBEFLOW_CACHE="$V" bash "$V/_internal/vibeflow-update.sh" --scope project uninstall cockpit >/dev/null 2>&1)
 lst="$(cd "$E2E" && HOME="$EH" VIBEFLOW_CACHE="$V" bash "$V/_internal/vibeflow-update.sh" --scope project new-modules 2>/dev/null)"; lrc=$?
 if ! grep -q '^cockpit=' "$E2E_REG" && [ "$lrc" -eq 0 ] && ! printf '%s\n' "$lst" | grep -q '^cockpit='; then ok "N10e : accepté puis désinstallé, cockpit n'est pas reproposé"; else ko "N10e : cockpit reproposé après désinstallation (rc=$lrc) [$(printf '%s' "$lst" | head -1 | cut -c1-60)]"; fi
+
+# N10f : Q3, les dépendances non posées sont nommées dans NOUVEAU_MODULE (format stable `deps=<a,b|->`)
+grep -vx -e 'mobile-test-team=.*' -e 'mobile-test=.*' "$E2E_REG" > "$WORK/reg.tmp" && cp "$WORK/reg.tmp" "$E2E_REG"
+out="$(run_e2e --scope project)"
+if printf '%s\n' "$out" | grep -qx "\[vf-update-run\] NOUVEAU_MODULE scope=project mobile-test-team=$(cat "$REPO/mobile-test-team/VERSION") deps=mobile-test"; then ok "N10f : mobile-test-team annonce « deps=mobile-test » (format stable)"; else ko "N10f : ligne mobile-test-team sans deps=mobile-test : [$(printf '%s' "$out" | grep 'NOUVEAU.*mobile-test-team' | head -1 | cut -c1-110)]"; fi
+
+# ---- N11 : jamais en double entre user et project (Q2) ----------------------------------------------------
+engs() { # <scope> <cache> <verbe…> : mêmes HOME/lab que eng, scope au choix
+  local sc="$1" cache="$2"; shift 2
+  ENG_OUT="$(cd "$LAB" && HOME="$FH" VIBEFLOW_CACHE="$cache" bash "$ENGINE" --scope "$sc" "$@" 2>"$WORK/eng.err")"; ENG_RC=$?
+}
+UREG="$FH/.claude/scripts/.vibeflow-installed"; mkdir -p "$FH/.claude/scripts"
+CACHE6="$WORK/cache6"; mkcache "$CACHE6"; mkmod "$CACHE6" duo v1.0.0
+rm -f "$OFFERED" "$FH/.claude/scripts/.vibeflow-offered"
+printf 'conductor=v1.0.0\nduo=v1.0.0\n' > "$UREG"; printf 'conductor=v1.0.0\n' > "$REG"
+engs project "$CACHE6" new-modules
+if lignes_ok && [ -z "$ENG_OUT" ]; then ok "N11a : posé en user → non proposé en project"; else ko "N11a : duo (posé en user) proposé en project : rc=$ENG_RC [$(aff)]"; fi
+printf 'conductor=v1.0.0\n' > "$UREG"; printf 'conductor=v1.0.0\nduo=v1.0.0\n' > "$REG"
+engs user "$CACHE6" new-modules
+if lignes_ok && [ -z "$ENG_OUT" ]; then ok "N11b : posé en project → non proposé en user"; else ko "N11b : duo (posé en project) proposé en user : rc=$ENG_RC [$(aff)]"; fi
+printf 'conductor=v1.0.0\n' > "$REG"
+engs user "$CACHE6" new-modules; ru="$ENG_OUT"; cu=$ENG_RC
+engs project "$CACHE6" new-modules
+if [ "$cu" -eq 0 ] && [ "$ru" = "duo=v1.0.0" ] && lignes_ok && [ "$ENG_OUT" = "duo=v1.0.0" ]; then ok "N11c : absent des deux scopes → listé dans les deux"; else ko "N11c : attendu duo dans user et project, reçu user=[$ru] project=[$(aff)]"; fi
+rm -f "$UREG"
+
+# ---- N12 : l'installeur inscrit ce qu'il laisse non posé (Q1-bis) ------------------------------------------------
+# Chemin d'install réel (engine install --with-deps), puis l'inscription que prescrit installer/SKILL.md.
+CACHE7="$WORK/cache7"; mkcache "$CACHE7"; mkmod "$CACHE7" ecarte v1.0.0
+INSTALLER_SKILL="$REPO/installer/SKILL.md"
+# La pose passe toujours par le VRAI engine (un mutant d'engine vit hors du dépôt, sans ses bibliothèques voisines) ;
+# l'inscription et la liste, elles, passent par l'engine sous test.
+fresh() {
+  rm -rf "$LAB/.claude"; mkdir -p "$LAB/.claude"
+  ENG_OUT="$(cd "$LAB" && HOME="$FH" VIBEFLOW_CACHE="$CACHE7" bash "$INTERNAL_DIR/vibeflow-update.sh" --scope project install --with-deps conductor 2>"$WORK/eng.err")"; ENG_RC=$?
+}
+fresh
+if [ "$ENG_RC" -eq 0 ] && [ -f "$REG" ]; then
+  engs project "$CACHE7" new-modules
+  [ "$ENG_OUT" = "ecarte=v1.0.0" ] && ok "N12a : sans inscription, un lab neuf reverrait le module écarté (témoin du défaut)" || ko "N12a : attendu 'ecarte=v1.0.0' avant inscription, reçu rc=$ENG_RC [$(aff)]"
+  if grep -q 'mark-offered --pending' "$INSTALLER_SKILL"; then
+    engs project "$CACHE7" mark-offered --pending; engs project "$CACHE7" new-modules
+    if lignes_ok && [ -z "$ENG_OUT" ]; then ok "N12b : après l'inscription de l'installeur, new-modules ne dit rien"; else ko "N12b : module écarté reproposé après l'inscription : rc=$ENG_RC [$(aff)]"; fi
+  else ko "N12b : installer/SKILL.md ne prescrit pas « mark-offered --pending » (inscription retirée)"; fi
+else ko "N12 : install --with-deps en échec (rc=$ENG_RC) : $(head -1 "$WORK/eng.err" | cut -c1-80)"; fi
 
 echo "== $pass ok, $fail ko =="
 [ "$fail" -eq 0 ] && [ $((pass+fail)) -gt 0 ]

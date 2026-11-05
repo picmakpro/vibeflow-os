@@ -102,9 +102,15 @@ mkdir -p "$NM_BASE/3.0.0/_internal" "$NM_BASE/3.0.0/conductor/scripts" "$NM_HOME
 printf 'conductor=v1.0.0\n' > "$NM_HOME/.claude/scripts/.vibeflow-installed"
 printf '#!/usr/bin/env bash\necho "$*" >> "%s"\n[ "${3:-}" = "new-modules" ] && echo "cockpit=v1.0.1"\nexit 0\n' "$NM_LOG" > "$NM_BASE/3.0.0/_internal/vibeflow-update.sh"
 printf '#!/usr/bin/env bash\nexit 1\n' > "$NM_BASE/3.0.0/conductor/scripts/check-plugin-update.sh"
+# fermeture des requires : le vrai résolveur, cockpit exige conductor (posé) et helper (non posé)
+cp "$DIR/../../_internal/resolve-deps.sh" "$NM_BASE/3.0.0/_internal/resolve-deps.sh"
+mkdir -p "$NM_BASE/3.0.0/cockpit" "$NM_BASE/3.0.0/helper" "$NM_BASE/3.0.0/conductor"
+printf '{ "name": "cockpit", "requires": ["conductor", "helper"] }\n' > "$NM_BASE/3.0.0/cockpit/module.json"
+printf '{ "name": "helper", "requires": [] }\n' > "$NM_BASE/3.0.0/helper/module.json"
+printf '{ "name": "conductor", "requires": [] }\n' > "$NM_BASE/3.0.0/conductor/module.json"
 : > "$NM_LOG"
 out="$(cd "$TMP/work" && HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" 2>&1)"
-ok "nouveau : le module du catalogue absent du registre est listé" "$(echo "$out" | grep -qx '\[vf-update-run\] NOUVEAU_MODULE scope=user cockpit=v1.0.1' && echo true || echo false)"
+ok "nouveau : le module absent du registre est listé, avec ses dépendances non posées (format stable)" "$(echo "$out" | grep -qx '\[vf-update-run\] NOUVEAU_MODULE scope=user cockpit=v1.0.1 deps=helper' && echo true || echo false)"
 ok "nouveau : rien n'est posé d'office (aucun install)"            "$(grep -q 'install' "$NM_LOG" && echo false || echo true)"
 : > "$NM_LOG"
 HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user cockpit >/dev/null 2>&1

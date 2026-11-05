@@ -136,12 +136,19 @@ c. **Couche moteur** (seulement si la ligne moteur de l'étape 3 a été accept�
    l'installeur amont directement : il route vers `ensure-deps.sh`, point de vérité unique du scope
    et du plafond de version (Iron Law 2, `plugin/conductor/AGENT.md:114`).
 
-d. **Modules nouveaux** (hors `--check`) : le résumé de 4b liste, par scope, les modules du catalogue
-   posé absents du registre et jamais proposés (`NOUVEAU_MODULE scope=<s> <module>=<version>`). S'il y
-   en a, pose une AskUserQuestion cochable par scope, description lue dans le `module.json` du module,
-   indépendante des autres confirmations : jamais posés d'office (ADR-031). Dès la réponse, lance
-   `bash <S>/vf-update-run.sh offer <scope> <modules cochés>` (sans module si tout est refusé) : il pose
-   les cochés et inscrit le catalogue comme proposé, donc un module refusé ou retiré exprès n'est jamais reproposé.
+d. **Modules nouveaux** (hors `--check`) : le résumé de 4b liste les modules du catalogue posé absents du
+   registre et jamais proposés : `NOUVEAU_MODULE scope=<s> <module>=<version> deps=<a,b|->` (`deps=?` :
+   dépendances non calculées, dis-le). Un module posé dans un scope n'est jamais listé dans l'autre ;
+   absent des deux, il apparaît une fois par scope. Jamais posés d'office (ADR-031), confirmation
+   indépendante des autres. Pose **une question par module** (description lue dans son `module.json`),
+   4 questions au plus par appel AskUserQuestion, appels successifs au-delà (10 modules = 3 appels).
+   Options, sans aucune présélectionnée : **une par scope listé** (`user`, `project`) dont la
+   description dit « pose aussi : <deps> » (omise si `deps=-`), puis « Pas maintenant » (le module ne
+   sera plus proposé). Deux scopes cochés pour un module : repose la question, jamais de double pose.
+   Dès les réponses, pour **chaque** scope listé (même sans coche) :
+   `bash <S>/vf-update-run.sh offer <scope> <modules cochés pour ce scope>`. Il calcule les modules
+   présentés avant la pose, pose les cochés (`--with-deps`) et inscrit les présentés : refusé ou retiré
+   plus tard, un module n'est jamais reproposé.
 
 ### 5 — Rappel de redémarrage
 

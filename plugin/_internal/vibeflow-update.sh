@@ -3931,6 +3931,7 @@ uninstall_module() {
 #   new-modules                  (lecture seule) un `module=version` par ligne : dans le catalogue, absent du
 #                                registre, jamais déjà proposé, proposable (pas `proposable:false`) et visible
 #                                du poste du lab. Registre absent = lab non posé : rien à proposer.
+#   mark-offered --pending       inscrit ce que new-modules listerait (appelé par /vibeflow-install en fin de pose).
 #   mark-offered <module>...     inscrit, dans scripts/.vibeflow-offered, les modules EFFECTIVEMENT présentés à
 #                                l'humain (union avec l'existant), jamais le catalogue entier : un module que
 #                                personne n'a vu n'est pas « déjà proposé ». Sans argument : rien n'est écrit.
@@ -3965,13 +3966,27 @@ resolve_lab_role() {
   VF_ROLE="$out"
 }
 
+# other_scope_registry — registre de l'AUTRE scope posé (user <-> project/local), vide s'il n'existe pas.
+# Ne sert qu'à new-modules (Q2) : install/update/uninstall restent mono-scope.
+other_scope_registry() {
+  local f
+  case "$VF_SCOPE" in
+    user) f="./.claude/scripts/.vibeflow-installed" ;;
+    *)    f="$HOME/.claude/scripts/.vibeflow-installed" ;;
+  esac
+  if [ -f "$f" ] && ! [ "$f" -ef "$INSTALLED_REGISTRY" ]; then echo "$f"; fi
+}
+
 list_new_modules() {
   require_cache
   [ -f "$INSTALLED_REGISTRY" ] || return 0
   resolve_lab_role
-  local mod offered="$TARGET_ROOT/$VF_OFFERED_RELPATH"
+  local mod offered="$TARGET_ROOT/$VF_OFFERED_RELPATH" other
+  other="$(other_scope_registry)"
   for mod in $(list_available_modules); do
     [ "$(module_version_installed "$mod")" = "—" ] || continue
+    # Jamais en double : un module posé dans l'autre scope (user <-> project) n'est pas reproposé ici.
+    if [ -n "$other" ] && grep -q "^${mod}=" "$other"; then continue; fi
     if [ -f "$offered" ] && grep -qx "$mod" "$offered"; then continue; fi
     module_is_proposable "$mod" || continue
     role_visible "$mod" || continue
@@ -3983,6 +3998,12 @@ mark_offered() {
   require_cache
   [ -f "$INSTALLED_REGISTRY" ] || { log "lab non posé (pas de registre) : rien à inscrire"; return 0; }
   local offered="$TARGET_ROOT/$VF_OFFERED_RELPATH" mod avail
+  # --pending : l'installeur (/vibeflow-install) inscrit ce qu'il laisse non posé et visible du poste, soit
+  # exactement ce que new-modules listerait : un lab neuf ne revoit pas au premier /vf-update ce qu'il a écarté.
+  if [ "${1:-}" = "--pending" ]; then
+    [ "$#" -eq 1 ] || err "mark-offered --pending ne prend aucun module"
+    set -- $(list_new_modules | cut -d= -f1)
+  fi
   [ "$#" -gt 0 ] || { log "aucun module présenté : rien à inscrire"; return 0; }
   avail="$(list_available_modules)"
   for mod in "$@"; do

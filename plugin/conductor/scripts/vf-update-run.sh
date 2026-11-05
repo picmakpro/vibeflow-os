@@ -49,13 +49,26 @@ if [ "${1:-}" = "offer" ]; then
 fi
 
 run_scope() {
-  local scope="$1" root="$2" l
+  local scope="$1" root="$2" l m d deps closure
   [ -f "$root/scripts/.vibeflow-installed" ] || return 1
   echo "[vf-update-run] scope $scope → update --all ($root)"
   VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" update --all
   # Modules du catalogue absents du registre et jamais proposés : listés, JAMAIS posés d'office (ADR-031).
+  # Format stable : `NOUVEAU_MODULE scope=<s> <module>=<version> deps=<a,b|->` ; deps = fermeture des `requires`
+  # moins le module et moins ce que le registre de CE scope porte déjà (ce que `install --with-deps` posera aussi).
+  # `deps=?` si la fermeture n'est pas calculable : jamais un `-` qui dirait « rien de plus ».
   VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" new-modules | while IFS= read -r l; do
-    [[ "$l" =~ ^[a-z0-9-]+=[A-Za-z0-9._+-]+$ ]] && echo "[vf-update-run] NOUVEAU_MODULE scope=$scope $l"
+    [[ "$l" =~ ^([a-z0-9-]+)=[A-Za-z0-9._+-]+$ ]] || continue
+    m="${BASH_REMATCH[1]}"; deps=""
+    if closure="$(VF_MODULES_ROOT="$NEW" bash "$NEW/_internal/resolve-deps.sh" "$m" 2>/dev/null)"; then
+      while IFS= read -r d; do
+        [ -n "$d" ] && [ "$d" != "$m" ] && ! grep -q "^${d}=" "$root/scripts/.vibeflow-installed" && deps="${deps:+$deps,}$d"
+      done <<< "$closure"
+      [ -n "$deps" ] || deps="-"
+    else
+      deps="?"
+    fi
+    echo "[vf-update-run] NOUVEAU_MODULE scope=$scope $l deps=$deps"
   done
   return 0
 }
