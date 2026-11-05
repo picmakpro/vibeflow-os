@@ -65,26 +65,30 @@ const T = ['a', 'b', 'x', '-', '--', '.', '_', '/', '$', '(', ')', ';', '`', '|'
   '-x', '--all', '$HOME', '${IFS}', 'HEAD', 'refs/heads/y', '1234567', 'ghp_abcdefghijklmnopqrstuvwxyz0123',
   `$(touch\${IFS}${marques}/g1)`, `\`touch\${IFS}${marques}/g2\``, `;touch\${IFS}${marques}/g3;`, `';touch\${IFS}${marques}/g4;'`, `|touch\${IFS}${marques}/g5|`, `&touch\${IFS}${marques}/g6&`];
 const vus = new Set(); const noms = [];
+const FIXES = ["-", "@", "HEAD", "FETCH_HEAD", "ORIG_HEAD", "MERGE_HEAD", "refs/heads/y", "1234567", "0000000000000000000000000000000000000000", "--", "-x", "--all"];
 const valide = (n) => spawnSync('git', ['check-ref-format', 'refs/heads/' + n]).status === 0;
 let essais = 0;
+for (const n of FIXES) if (valide(n) && !vus.has(n)) { vus.add(n); noms.push(n); }
 while (noms.length < Number(nStr) && essais++ < 20000) {
   let n = ''; for (let k = 1 + rnd(6); k > 0; k--) n += T[rnd(T.length)];
   if (!vus.has(n) && valide(n)) { vus.add(n); noms.push(n); }
 }
 const sorties = [];
 for (const sh of shells.split(',')) {
-  const r = { shell: sh, n: noms.length, nuls: 0, executes: 0, armes: 0, passes: 0, ignores: 0, echecs: [] };
+  const r = { shell: sh, n: noms.length, nuls: 0, executes: 0, armes: 0, ignores: 0, echecs: [] };
   let i = 0;
   for (const nom of noms) {
     i++;
-    const attendNul = refuse(nom);
+    const attendNul = refuse(nom) || nom.length > 200;
     const run = (cmd, extra = '') => spawnSync(sh, ['-c', cmd + extra], { cwd: repo, encoding: 'utf8' });
     const marquesVides = () => { const l = fs.readdirSync(marques); for (const f of l) fs.rmSync(path.join(marques, f), { recursive: true, force: true }); return l.length === 0; };
     const retour = () => git('symbolic-ref', 'HEAD', 'refs/heads/main');
     const echec = (quoi, nom_) => r.echecs.push(`${quoi}:${JSON.stringify(nom_)}`);
     // switch
     const c1 = m.cmdSwitch(nom), c2 = m.cmdBranchSupprimer(nom);
+    const sansSwitch = nom === '-' || nom === '@'; // raccourcis de git switch : pas de commande de bascule
     if (attendNul) { r.nuls++; if (c1 !== null || c2 !== null) echec('devait-etre-null', nom); }
+    else if (sansSwitch) { r.nuls++; if (c1 !== null) echec('switch-devait-etre-null', nom); }
     else if (typeof c1 !== 'string' || typeof c2 !== 'string') echec('null-inattendu', nom);
     else {
       retour(); git('update-ref', 'refs/heads/' + nom, 'HEAD');
@@ -97,7 +101,6 @@ for (const sh of shells.split(',')) {
       const q = run(c2);
       if (q.status !== 0 || git('show-ref', '--verify', 'refs/heads/' + nom).status === 0) { echec('branch-d', nom); git('update-ref', '-d', 'refs/heads/' + nom); }
       if (!marquesVides()) echec('branch-d-marqueur', nom);
-      if (echec.length === 0) r.passes++;
     }
     // cd vers un dossier portant le nom
     const dir = path.join(dirs, String(i), nom);
@@ -149,17 +152,18 @@ else
   echo "  ⏭️  SKIP — C1.2 (zsh absent : non compté)"
 fi
 
-# C1.3 : cd vers un dossier au nom piégé
-HOSTILE="$DIRS/w'\$(touch $M/cd)'x"; mkdir -p "$HOSTILE" "$DIRS/-rel"
-ECH=""
+# C1.3 : cd vers un dossier au nom piégé. Le nom ne contient aucun « / » (marqueur RELATIF `touch cdm`, la commande est lancée depuis $M : une injection y laisserait `cdm`) : le dossier est créé tel quel
+NOMDIR='w'"'"'$(touch cdm)'"'"'x'; HOSTILE="$DIRS/$NOMDIR"; mkdir "$HOSTILE" "$DIRS/-rel"
+ECH=""; [ -d "$HOSTILE" ] && [ "$(ls "$DIRS" | grep -c "touch cdm")" = "1" ] || ECH="$ECH[dossier-pas-tel-quel]"
 for sh in bash zsh; do
   command -v "$sh" >/dev/null 2>&1 || continue
-  CMD cmdCd "$HOSTILE"; OBT="$(cd "$WORK" && "$sh" -c "$CMD_OUT && pwd" 2>/dev/null)"
+  CMD cmdCd "$HOSTILE"; OBT="$(cd "$M" && "$sh" -c "$CMD_OUT && pwd" 2>/dev/null)"
   [ "$OBT" = "$(cd "$HOSTILE" && pwd)" ] && marques_vides || ECH="$ECH[$sh:piege]"
   CMD cmdCd "-rel"; OBT="$(cd "$DIRS" && "$sh" -c "$CMD_OUT && pwd" 2>/dev/null)"
   [ "$OBT" = "$(cd "$DIRS/-rel" && pwd)" ] || ECH="$ECH[$sh:tiret]"
 done
-assert_eq "C1.3 — cmdCd d'un dossier w'\$(touch …)'x puis d'un chemin en « - » : pwd juste, aucun marqueur" "$ECH" ""
+assert_eq "C1.3 — cmdCd d'un dossier w'\$(touch cdm)'x (créé tel quel) puis d'un chemin en « - » : pwd juste, aucun marqueur" "$ECH" ""
+
 
 # C1.4 : citer rejoué à l'octet
 echecs_citer() {
@@ -207,6 +211,83 @@ assert_eq "C1.6b — témoin de portée : ≥ 100 branches exécutées, ≥ 10 n
 
 # C1.7 : parité avec l'affichage
 assert_eq "C1.7 — AFFICHAGE_REFUSE = exactement les points de code que nettoie retire (76, aucun écart, U+0000 à U+10FFFF)" "$(node "$AUX/parite.mjs" "$SCRIPTS" 2>/dev/null)" "76|0"
+
+
+# C1.8 : « - » et « @ » existent comme branches mais git switch les lit en raccourcis : pas de commande de bascule ; branch -d, lui, les vise bien
+for n in '-' '@'; do git -C "$REPO" update-ref "refs/heads/$n" HEAD; done
+CMD cmdSwitch '-'; R1=$CMD_RC; CMD cmdSwitch '@'; R2=$CMD_RC
+assert_eq "C1.8a — cmdSwitch('-') et cmdSwitch('@') -> null (git switch les lit en raccourcis)" "$R1|$R2" "3|3"
+ECH=""
+for n in '-' '@'; do
+  git -C "$REPO" symbolic-ref HEAD refs/heads/main; CMD cmdBranchSupprimer "$n"
+  (cd "$REPO" && bash -c "$CMD_OUT" >/dev/null 2>&1); RC=$?
+  git -C "$REPO" show-ref --verify "refs/heads/$n" >/dev/null 2>&1 && ECH="$ECH[$n:encore-la]"; [ "$RC" -eq 0 ] || ECH="$ECH[$n:rc$RC]"
+done
+assert_eq "C1.8b — cmdBranchSupprimer('-') et ('@') exécutées : branches supprimées" "$ECH" ""
+
+echo "=== C2 — formes de --end-of-options sondées sur git réel ==="
+git -C "$REPO" symbolic-ref HEAD refs/heads/main      # la boucle C1 a pu laisser HEAD sur un nom hostile : la branche courante n'est jamais -x
+git -C "$REPO" update-ref refs/heads/-x HEAD 2>/dev/null
+SANS="$(cd "$REPO" && bash -c "git branch -d '-x'" 2>&1)"; RCS=$?
+assert_eq "C2.1a — témoin : git branch -d '-x' SANS --end-of-options échoue et la branche reste" "$([ "$RCS" -ne 0 ] && echo echec)|$(git -C "$REPO" show-ref --verify refs/heads/-x >/dev/null 2>&1 && echo reste)" "echec|reste"
+CMD cmdBranchSupprimer '-x'; (cd "$REPO" && bash -c "$CMD_OUT" >/dev/null 2>&1); RC=$?
+assert_eq "C2.1b — cmdBranchSupprimer('-x') exécutée (branche mergée, HEAD ailleurs) : rc 0, branche supprimée" "$RC|$(git -C "$REPO" show-ref --verify refs/heads/-x >/dev/null 2>&1 && echo reste || echo supprimee)" "0|supprimee"
+git -C "$REPO" symbolic-ref HEAD refs/heads/main
+PREM="$(git -C "$REPO" rev-parse --short=7 HEAD~1)"
+CMD cmdShowStat "$SHA7"; SORTIE="$(cd "$REPO" && bash -c "$CMD_OUT" 2>&1)"; RC=$?
+assert_eq "C2.2a — cmdShowStat(sha7) exécutée : rc 0 et le commit « deux » est montré" "$RC|$([[ "$SORTIE" == *deux* ]] && echo montre)" "0|montre"
+CMD cmdDetacher "$PREM"; (cd "$REPO" && bash -c "$CMD_OUT" >/dev/null 2>&1); RC=$?
+assert_eq "C2.2b — cmdDetacher(sha7) exécutée : rc 0, HEAD détaché sur ce commit" "$RC|$(git -C "$REPO" symbolic-ref -q HEAD >/dev/null 2>&1 && echo branche || echo detache)|$(git -C "$REPO" rev-parse --short=7 HEAD)" "0|detache|$PREM"
+git -C "$REPO" symbolic-ref HEAD refs/heads/main
+ECH=""
+for fn in cmdDetacher cmdShowStat; do for v in '--all' 'HEAD' 'ABCDEF1' 'abcdef' "$(printf 'a%.0s' $(seq 1 65))" 'abcdef1;id' ''; do CMD $fn "$v"; [ "$CMD_RC" -eq 3 ] || ECH="$ECH[$fn:$v]"; done
+  for v in 'abcdef1' "$(printf 'a%.0s' $(seq 1 64))"; do CMD $fn "$v"; [ "$CMD_RC" -eq 0 ] || ECH="$ECH[$fn:ok:$v]"; done; done
+assert_eq "C2.2c — sha : --all, HEAD, majuscules, 6 car., 65 car., injection -> null ; 7 et 64 car. hexa -> commande" "$ECH" ""
+SREPO="$WORK/srepo"; git init -q -b main "$SREPO"; git -C "$SREPO" commit -q --allow-empty -m base; echo x > "$SREPO/f"; git -C "$SREPO" add f; git -C "$SREPO" stash push -q
+CMD cmdStashShow 'stash@{0}'; SORTIE="$(cd "$SREPO" && bash -c "$CMD_OUT" 2>&1)"; RC=$?
+assert_eq "C2.3a — cmdStashShow('stash@{0}') exécutée après un stash push : rc 0, fichier f listé" "$RC|$([[ "$SORTIE" == *" f "* || "$SORTIE" == f* ]] && echo liste)" "0|liste"
+ECH=""; for v in 'stash@{0};id' 'stash@{}' 'stash@{12345}' 'stash@{0} x' '--all' ''; do CMD cmdStashShow "$v"; [ "$CMD_RC" -eq 3 ] || ECH="$ECH[$v]"; done
+assert_eq "C2.3b — ref de stash hors motif -> null" "$ECH" ""
+echo x > "$SREPO/g"; git -C "$SREPO" add g; CMD cmdCommitInitial; (cd "$SREPO" && bash -c "$CMD_OUT" >/dev/null 2>&1); RC=$?
+assert_eq "C2.4a — cmdCommitInitial exécutée : rc 0, sujet « premier commit »" "$RC|$(git -C "$SREPO" log -1 --format=%s)" "0|premier commit"
+CMD cmdStatus; (cd "$SREPO" && bash -c "$CMD_OUT" >/dev/null 2>&1); RC=$?
+assert_eq "C2.4b — cmdStatus exécutée : « git status », rc 0" "$CMD_OUT|$RC" "git status|0"
+
+echo "=== C3 — mutants (copies du module), chacun avec la trace de SON rouge ==="
+for n in "${NOMS[@]}"; do git -C "$REPO" update-ref "refs/heads/$n" HEAD; done   # C2 a supprimé -x : les sondes de C1 repartent de noms tous présents
+cat > "$AUX/mutate.mjs" <<'JS2'
+import fs from 'node:fs';
+const [, , src, dst, kind, de, vers] = process.argv;
+let s = fs.readFileSync(src, 'utf8');
+const ligne = (debut, f) => { const l = s.split('\n'); const k = l.findIndex((x) => x.startsWith(debut)); if (k < 0) process.exit(5); l[k] = f(l[k]); s = l.join('\n'); };
+if (kind === 'M-CITE') { const a = s.indexOf(".replace(/'/g"); const b = s.indexOf('+ "\'"', a); if (a < 0 || b < 0) process.exit(5); s = s.slice(0, a) + ' ' + s.slice(b); }
+else if (kind === 'M-EOO') ligne('export const cmdSwitch', (x) => { if (!x.includes('--end-of-options ')) process.exit(5); return x.replace('--end-of-options ', ''); });
+else if (kind === 'M-BIDI') ligne('export const AFFICHAGE_REFUSE', () => 'export const AFFICHAGE_REFUSE = /(?!)/;');
+else if (kind === 'PLAGE') ligne('export const AFFICHAGE_REFUSE', (x) => { if (x.split(de).length !== 2) process.exit(5); return x.replace(de, vers); });
+else process.exit(6);
+if (s === fs.readFileSync(src, 'utf8')) process.exit(5);
+fs.writeFileSync(dst, s);
+JS2
+# mutant <nom> <kind> [de vers] : produit la copie, vérifie qu'elle charge, puis rend « sw|ci|nu » (R = la sonde rougit, V = propre)
+sonde_mutant() {
+  local nom="$1"; shift; local p="$MUT/$nom.mjs"
+  node "$AUX/mutate.mjs" "$MOD_REEL" "$p" "$@" 2>/dev/null || { printf 'mutation-impossible'; return; }
+  VF_MOD="$p" CMD cmdStatus; [ "$CMD_OUT" = "git status" ] || { printf 'mutant-ne-charge-pas'; return; }
+  local sw ci nu
+  sw="$(VF_MOD="$p" echecs_switch bash)"; ci="$(VF_MOD="$p" echecs_citer bash)"; nu="$(VF_MOD="$p" echecs_nuls)"
+  git -C "$REPO" symbolic-ref HEAD refs/heads/main
+  printf '%s|%s|%s' "$([ -n "$sw" ] && echo R || echo V)$([[ "$sw" == *"[-x]"* ]] && echo -x)" "$([ -n "$ci" ] && echo R || echo V)" "$([ -n "$nu" ] && echo R || echo V)"
+}
+assert_eq "C3.1 — M-CITE (échappement de ' retiré) rougit C1.1 ET C1.4, pas C1.5" "$(sonde_mutant M-CITE M-CITE)" "R|R|V"
+assert_eq "C3.2 — M-EOO (--end-of-options retiré de cmdSwitch) rougit C1.1 sur -x, pas C1.4 ni C1.5" "$(sonde_mutant M-EOO M-EOO)" "R-x|V|V"
+assert_eq "C3.3 — M-BIDI (AFFICHAGE_REFUSE vidé) rougit C1.5, pas C1.1 ni C1.4" "$(sonde_mutant M-BIDI M-BIDI)" "V|V|R"
+U='\u'
+i=0
+for pl in "${U}0000-${U}001f=>" "${U}007f-${U}009f=>" "${U}2028=>" "${U}2029=>" "${U}202a-${U}202e=>" "${U}2066-${U}2069=>" \
+          "${U}202a-${U}202e=>${U}202b-${U}202e" "${U}202a-${U}202e=>${U}202a-${U}202d" "${U}2066-${U}2069=>${U}2067-${U}2069" "${U}2066-${U}2069=>${U}2066-${U}2068"; do
+  i=$((i+1)); DE="${pl%%=>*}"; VERS="${pl#*=>}"
+  assert_eq "C3.4.$i — M-BIDI plage ${DE} -> [${VERS}] rougit C1.5 seul" "$(sonde_mutant "M-BIDI-$i" PLAGE "$DE" "$VERS")" "V|V|R"
+done
 
 echo
 echo "=== Résultats : $PASS PASS, $FAIL FAIL ==="
