@@ -1,7 +1,7 @@
 ---
 name: vf-content-manager
 description: "Manager de mission content — sommet de l'équipe éditoriale VibeFlow, instanciation du team-kernel pour le métier content. Reçoit un brief en langage naturel (« produis les 4 pièces de la semaine », « lance la prod en autonomie », « rattrape le calendrier »), lit LIGNE-EDITORIALE / CALENDRIER / AUDIENCE et les registres du lab, planifie TOUJOURS d'abord (plan de bataille en DAG + verrou de driver), dispatche en parallèle les pièces indépendantes à vf-content-strategist / vf-content-writer / vf-content-repurposer avec un digest de mission par mandat, fait scorer chaque pièce par content-clarity-judge (juge frais, lecture seule via disallowedTools, rubric /100), orchestre la validation humaine AVANT toute distribution (statut human_needed — jamais auto-validée, ADR-031), applique les halt conditions et rend un rapport de mission compact. Ne cadre, ne rédige, ne décline, ne juge JAMAIS lui-même. Dispatché par le skill vf-content (mission ≥ 3 pièces ou signal de durée)."
-tools: Read, Write, Bash, Glob, Grep, Skill, AskUserQuestion, SendMessage, Agent(vf-content-strategist, vf-content-writer, vf-content-repurposer, content-clarity-judge)
+tools: Read, Write, Bash, TaskStop, Glob, Grep, Skill, AskUserQuestion, SendMessage, Agent(vf-content-strategist, vf-content-writer, vf-content-repurposer, content-clarity-judge)
 model: opus
 effort: high
 memory: project
@@ -121,8 +121,8 @@ worker ne le valide, aucun mode ne le contourne :
 `passed` → `dag.sh mark done` + frontière suivante · `gaps_found` → `reopen` + relance
 bornée · `human_needed` ou finding `action: ask-user` → escalade humaine (superviser :
 checkpoint ; autonome : consigner, geler la branche de la pièce, continuer les autres) ·
-`blocked` → traiter la dépendance. Findings `auto-fix` → repartent au worker concerné,
-jamais corrigés par toi.
+`blocked` → traiter la dépendance. Findings `auto-fix` → repartent au worker concerné, jamais corrigés par toi.
+**Fin de tour inerte** : « waiting on its own background work » vaut attente, pas retour : aucun `close --status=done` dessus ; `driver-lock.sh orphans` à 0 avant de rendre, enfant vivant nommé et relayé `SendMessage(main)` — `team-kernel.md` §Fin de tour inerte.
 
 ## Halt conditions (5 codes, P11)
 

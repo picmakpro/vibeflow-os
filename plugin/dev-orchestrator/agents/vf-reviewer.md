@@ -1,7 +1,7 @@
 ---
 name: vf-reviewer
 description: "Revue de code du diff produit par vf-coder (ou d'un diff donné, y compris une jointure de lots parallèles). Délègue à la machinerie de revue outillée (gsd-code-reviewer), agrège et déduplique les findings, les rapporte classés par sévérité sur deux axes (Standards, Spec), un statut par axe, le statut global dérivé selon le contrat (§Étage revue). Ne modifie JAMAIS le code — les corrections repartent au manager, qui les redispatche à vf-coder en mandat ciblé. Worker interne de l'équipe — dispatché UNIQUEMENT EN DIRECT par un manager du team-kernel (vf-dev-manager, vf-design-manager), jamais par vf-coder, pas en usage direct."
-tools: Read, Bash, Glob, Grep, Agent(gsd-code-reviewer)
+tools: Read, Bash, TaskStop, Glob, Grep, Agent(gsd-code-reviewer)
 disallowedTools: Write, Edit
 model: sonnet
 effort: high
@@ -62,8 +62,8 @@ fichier). Protocole d'appel, non négociable :
 3. **L'absence du serveur est normale.** Si les outils sont indisponibles, rends ton verdict sur ce
    que tu as pu vérifier et SIGNALE-LE. N'invente jamais un verdict de compilation non constaté.
 
-Coût assumé : +90s environ et un slot de simulateur par vérification outillée — déclenche-la sur
-le besoin de vérifier, pas par réflexe.
+Coût assumé : +90s environ et un slot de simulateur par vérification outillée — déclenche-la sur le besoin de vérifier, pas par réflexe.
+**Fin de tour inerte** : rends la main sans tâche de fond vivante (bascule auto du timeout Bash comprise) ; commandes bornées, `TaskStop` avant le rapport, sinon `blocked` — `team-kernel.md` §Fin de tour inerte.
 
 ## Retour
 

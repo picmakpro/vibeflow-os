@@ -1,5 +1,9 @@
 # Changelog — product-team-bundle
 
+## [v1.1.1] — 2026-11-05 (fin de tour inerte) — non publiée
+
+**Patch.** Correctif des workers orphelins des 3-5 novembre : un agent qui rend la main pendant qu'une commande Bash tourne en fond (bascule automatique du timeout comprise) reste vivant sans que personne ne l'arrête. `TaskStop` ajouté au champ `tools:` et une ligne de règle ajoutée, avec renvoi vers `conductor/references/team-kernel.md` § Fin de tour inerte (source unique) : vf-product-manager, prd-gate. Arbitrages Samuel, AskUserQuestion session principale, 2026-11-05 : « Mandat maintenant » (correctif) ; hook `SubagentStop` « Plus tard, en spike » (`.planning/BACKLOG.md`).
+
 ## [v1.1.0] — 2026-10-29 (worker architecte) — publiée dans v2.74.0
 
 **Minor.**

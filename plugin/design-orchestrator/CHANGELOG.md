@@ -1,5 +1,9 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.17] — 2026-11-05 (fin de tour inerte) — non publiée
+
+**Patch.** Correctif des workers orphelins des 3-5 novembre : un agent qui rend la main pendant qu'une commande Bash tourne en fond (bascule automatique du timeout comprise) reste vivant sans que personne ne l'arrête. `TaskStop` ajouté au champ `tools:` et une ligne de règle ajoutée, avec renvoi vers `conductor/references/team-kernel.md` § Fin de tour inerte (source unique) : vf-design-manager, vf-crafter, vf-design-judge. Arbitrages Samuel, AskUserQuestion session principale, 2026-11-05 : « Mandat maintenant » (correctif) ; hook `SubagentStop` « Plus tard, en spike » (`.planning/BACKLOG.md`).
+
 ## [v1.5.16] — 2026-10-29 (exclusion persistante de la chaîne design) — publiée dans v2.72.0
 
 **Patch** (#166 volets 2, 10, 11) :

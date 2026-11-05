@@ -1,5 +1,9 @@
 # Changelog — mobile-test-team
 
+## [v1.4.9] — 2026-11-05 (fin de tour inerte) — non publiée
+
+**Patch.** Correctif des workers orphelins des 3-5 novembre : un agent qui rend la main pendant qu'une commande Bash tourne en fond (bascule automatique du timeout comprise) reste vivant sans que personne ne l'arrête. `TaskStop` ajouté au champ `tools:` et une ligne de règle ajoutée, avec renvoi vers `conductor/references/team-kernel.md` § Fin de tour inerte (source unique) : vf-test-orchestrator, vf-test-runner, vf-app-fixer. Arbitrages Samuel, AskUserQuestion session principale, 2026-11-05 : « Mandat maintenant » (correctif) ; hook `SubagentStop` « Plus tard, en spike » (`.planning/BACKLOG.md`).
+
 ## [v1.4.8] — 2026-10-29 (références mortes à `vibeflow-update.sh`) — publiée dans v2.72.0
 
 **Patch** (documentation seule) — références mortes à `vibeflow-update.sh` remplacées par `/vibeflow-install` / `/vf-update` dans le README (#166).

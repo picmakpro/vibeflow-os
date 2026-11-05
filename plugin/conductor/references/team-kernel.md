@@ -270,6 +270,31 @@ Doctrine détaillée côté dev (le protocole complet de mission) :
 des étages croisés (quand les insérer, forme DAG, budgets, invariants) :
 `dev-orchestrator-references/mission-cross-team.md`.
 
+## Fin de tour inerte
+
+Source unique (ADR-030) ; les agents y renvoient. Mesuré le 2026-11-05 :
+- **F1.** Un worker qui rend la main pendant qu'une commande Bash tourne en fond reçoit le statut
+  « waiting on its own background work » (`completed`, résultat « may be interim ») et reste vivant.
+  Dans les 5 orphelins des 3-5 novembre, la commande avait été basculée AUTOMATIQUEMENT en fond par
+  le timeout Bash (120/600 s), jamais lancée en `run_in_background` : boucle `pgrep -f` qui se
+  trouve elle-même, serveur jamais arrêté, suite qui ne rend pas la main, mutant qui boucle.
+- **F2.** `TaskStop` arrête la PROPRE tâche de fond de l'agent qui l'a ; sans lui : `No such tool available`.
+- **F3.** Un parent ne peut pas arrêter son enfant (`Task <enfant> is owned by <enfant>`) : seuls l'agent
+  lui-même ou la session principale le peuvent. `ListAgents` est absent des sous-agents de fond (un `TaskStop`
+  sur identifiant inconnu liste les « Running background agents »).
+- **F4.** 4 des 5 orphelins furent fermés `close --status=done` sur ce résultat intermédiaire : 0 enfant, il tournait.
+
+**Worker.** Jamais de main rendue avec une tâche de fond vivante, bascule automatique comprise.
+Commandes bornées (itérations max, jamais de `pgrep -f` qui se trouve lui-même, serveur lancé =
+serveur arrêté) ; toute commande passée en fond est attendue ou arrêtée par `TaskStop` avant le
+rapport ; ce qui ne s'arrête pas → `blocked`, identifiant de tâche en finding.
+
+**Manager.** « waiting on its own background work » n'est pas un retour : jamais `close --status=done`
+ni `dag.sh mark done` dessus ; `SendMessage` au worker pour qu'il arrête sa tâche (`TaskStop`), puis
+attente de la notification « finished ». Avant de rendre, arrêt de budget ou handoff compris :
+`driver-lock.sh orphans` à 0 ; tout enfant vivant est nommé (`agentId`) au rapport et relayé par
+`SendMessage(main)`, seule à pouvoir l'arrêter (F3) ; `close --status=stopped` après sa confirmation.
+
 ## Verrou par compartiment (lab partitionné)
 
 Un dépôt est partitionné quand `.planning/workstreams/` existe. Le verrou se nomme alors par compartiment :

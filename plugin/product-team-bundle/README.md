@@ -4,7 +4,7 @@
 > brief, PRD, critères d'acceptation — **sans jamais rien déclarer prêt tout seul** : un juge frais
 > note le résultat, l'humain tranche, et le dev ne reçoit la main qu'au-dessus du seuil.
 
-**Type** : `agents + skill + scripts` · **Version** : v1.1.0 · **Dépend de** : `conductor`,
+**Type** : `agents + skill + scripts` · **Version** : v1.1.1 · **Dépend de** : `conductor`,
 `planning-core`, `consolidator`, `audit-architecture`, `software-architecture`.
 
 ---

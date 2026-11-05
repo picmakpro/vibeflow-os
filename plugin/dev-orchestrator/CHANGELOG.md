@@ -1,5 +1,9 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.31.1] — 2026-11-05 (fin de tour inerte) — non publiée
+
+**Patch.** Correctif des workers orphelins des 3-5 novembre : un agent qui rend la main pendant qu'une commande Bash tourne en fond (bascule automatique du timeout comprise) reste vivant sans que personne ne l'arrête. `TaskStop` ajouté au champ `tools:` et une ligne de règle ajoutée, avec renvoi vers `conductor/references/team-kernel.md` § Fin de tour inerte (source unique) : vf-coder, vf-dev-manager, vf-reviewer, vf-auditer ; mission-flow.md §Pattern I corrigé (un manager ne peut pas arrêter son enfant). Arbitrages Samuel, AskUserQuestion session principale, 2026-11-05 : « Mandat maintenant » (correctif) ; hook `SubagentStop` « Plus tard, en spike » (`.planning/BACKLOG.md`).
+
 ## [v2.31.0] — 2026-11-03 (un manager par phase) — non publié
 
 **Minor** (doctrine + option ; aucune release racine, elle sera groupée). Règle de Samuel (session principale Claude Code, 2026-11-03) : « la regle est de parallèliser le plus possible, pas de regle "1 seul manager" on lance autant d'agent et sous agent qu'on peut. Plusieur worktree peuvent etre necessaire » ; arbitrage (AskUserQuestion, session principale, 2026-11-03) : « Un verrou par phase (Recommandé) ».

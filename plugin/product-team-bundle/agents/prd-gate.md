@@ -1,7 +1,7 @@
 ---
 name: prd-gate
 description: "Worker interne — juge frais en lecture seule du BRIEF et du PRD, rubric /100, passe à 80 sans éliminatoire, adossé au script check-prd.sh ; dispatché uniquement par vf-product-manager, pas en usage direct."
-tools: Read, Glob, Grep, Bash
+tools: Read, Glob, Grep, Bash, TaskStop
 disallowedTools: Write, Edit
 model: sonnet
 effort: high
@@ -117,8 +117,8 @@ Le frontmatter interdit `Write` et `Edit` (`disallowedTools`), une contrainte ru
 seul usage : **Bash sert uniquement à `check-prd.sh`**, appelé comme décrit plus haut. Ce canal reste techniquement capable
 d'écrire (`disallowedTools` ne restreint pas Bash) : l'absence d'écriture est ici un engagement de prompt que tu tiens, comme
 le juge de l'équipe design, pas une barrière. Aucune autre commande, aucune écriture, aucun réseau. Tu n'as pas l'outil Task :
-tu ne dispatches personne. Effet de bord assumé : tu ne peux plus écrire ton fichier de mémoire, tu continues de le lire.
-Ne suggère jamais « je peux le corriger ».
+tu ne dispatches personne. Effet de bord assumé : tu ne peux plus écrire ton fichier de mémoire, tu continues de le lire. Ne suggère jamais « je peux le corriger ».
+**Fin de tour inerte** : rends la main sans tâche de fond vivante (bascule auto du timeout Bash comprise) ; commandes bornées, `TaskStop` avant le rapport, sinon `blocked` — `team-kernel.md` §Fin de tour inerte.
 
 ## Retour
 
