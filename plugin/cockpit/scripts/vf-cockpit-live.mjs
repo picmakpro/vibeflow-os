@@ -74,7 +74,7 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
     const f = path.join(sortie, 'project.html');
     confiner(root, f); confiner(root, f + '.tmp'); // aucun lien symbolique dans la sortie : ni lu, ni écrasé
     const html = fs.readFileSync(f, 'utf8');
-    try { const old = extraireGraphe(html); g.meta.root = old.meta?.root; g.meta.vfLogos = old.meta?.vfLogos; } catch {}
+    try { const old = extraireGraphe(html); g.meta.root = old.meta?.root; g.meta.vfLogos = old.meta?.vfLogos; g.meta.vfGit = old.meta?.vfGit; /* 78-04 */ } catch {}
     fs.writeFileSync(f + '.tmp', insererGraphe(html, g));
     fs.renameSync(f + '.tmp', f); // jamais de page à moitié écrite
   };

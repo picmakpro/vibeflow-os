@@ -21,7 +21,7 @@ import { revealDoing, revealTranscript } from './vf-cockpit-who.mjs';
 import { resolveScriptsDir } from './vf-cockpit-paths.mjs';
 import { ID_RE } from './vf-cockpit-lecture.mjs';
 import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
-import { buildEquipeGraph } from './vf-cockpit-equipe-carte.mjs';
+import { buildEquipeGraph, missionsEnCours } from './vf-cockpit-equipe-carte.mjs';
 import { answerLocally, instructions } from './vf-cockpit-ask.mjs';
 import { MODELES, resoudreModele, argsAgent as argsConfines } from './vf-cockpit-agent.mjs';
 
@@ -129,7 +129,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
       const who = live ? live.snapshot().who : null;
       if (!INTERDITS.length || (who && porteInterdit(who))) { log('error', 'page Équipe refusée : contrat illisible ou contenu interdit'); return null; } // même garde que le flux, fermée par défaut
       // `nom` : celui que la page Projet affiche (P69-D-33), jamais le nom du dossier
-      const g = buildEquipeGraph(who, { nom: String(GP?.project?.name || '').replace(/ — Projet$/, '') || GP?.meta?.rootName || path.basename(root), racine: GP?.meta?.root, logos: GP?.meta?.vfLogos });
+      const g = buildEquipeGraph(who, { nom: String(GP?.project?.name || '').replace(/ — Projet$/, '') || GP?.meta?.rootName || path.basename(root), racine: GP?.meta?.root, logos: GP?.meta?.vfLogos, git: GP?.meta?.vfGit, missions: missionsEnCours(GP) }); // 78-04 : en-tête Git et bloc de vue
       return insererGraphe(gabarit, g).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Équipe</title>').replace('</head>', () => inject + '</head>');
     },
     jetonValide: (j) => typeof j === 'string' && j === ptoken,
