@@ -5,6 +5,7 @@
 #   E2 shBorne durci (filtres, GIT_* hérités, options de lecture, journal d'argv) · E3 les lectures réelles du socle (who, arbres, planning, gitCommonDir)
 #   E4 lancerGit (ok, tronqué, hors dépôt, git absent, échéance) · E5 lancerGit sur le dépôt piégé (status ET log -p, GIT_DIR hérité)
 #   E6 garde « aucun appel git hors de vf-cockpit-paths.mjs » et son témoin · E7 mutants (copies du dossier des scripts, jamais le module)
+#   E8 le moteur vendorisé (envGit passé par l'assemblage, git() fermé par défaut sans le marqueur) et ses mutants M-GARDE, M-ENV-MOTEUR
 # Fixtures construites dans mktemp. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -258,6 +259,56 @@ assert_eq "M-TRONQUE.0 — l'ancre du mutant existe" "$(mutant tronque "tronque:
 MD="$WORK/mut-tronque"
 RM="$(node "$AUX/lg.mjs" "$MD" "$P" '{"maxBuffer":64}' log --format=%H%n%H%n%H 2>/dev/null)"
 assert_eq "M-TRONQUE — rougit E4.2 : la troncature n'est plus signalée (tronque=false)" "$(G "$RM" 'j.tronque')" "false"
+
+echo "=== E8 — le moteur vendorisé : environnement durci passé par l'assemblage, git fermé par défaut (GITC-13, P78-D-25) ==="
+MOTEUR="$(cd "$SCRIPTS/.." && pwd)/skills/cockpit-moteur"
+BUILD="$SCRIPTS/vf-cockpit-build.mjs"
+LAB8="$WORK/lab8"; cp -R "$P" "$LAB8"
+cat > "$AUX/tete.mjs" <<'JS'
+import fs from 'node:fs';
+const j = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const r = (j.meta && j.meta.repos) || j.repos || [];
+console.log(r.length && r[0].head ? r[0].head : 'aucun');
+JS
+nfich() { node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((j.files||[]).length)' "$1"; }
+HEAD_LAB="$("$GIT_REEL" -C "$LAB8" rev-parse HEAD)"; HEAD_LEURRE="$("$GIT_REEL" -C "$L" rev-parse HEAD)"
+assert_eq "E8.0 — témoin : le HEAD du lab et celui du leurre diffèrent" "$([ "$HEAD_LAB" != "$HEAD_LEURRE" ] && echo oui || echo non)" "oui"
+# copie du moteur dont la garde de git() est retirée (témoin positif et mutant M-GARDE)
+sans_garde() { FROM="  if (process.env.VF_COCKPIT_GIT_DURCI !== '1') return null;
+" TO="" node "$AUX/mutsub.mjs" "$1/scripts/lib/common.mjs" 2>&1; }
+# E8.1 — témoin positif : un moteur SANS garde, sous GIT_DIR hérité, lit le leurre
+SG8="$WORK/moteur-sans-garde"; rm -rf "$SG8"; cp -R "$MOTEUR" "$SG8"; sans_garde "$SG8" >/dev/null
+GIT_DIR="$L/.git" node "$SG8/scripts/scan.mjs" "$LAB8" --out="$WORK/o81/.cache/scan.json" >/dev/null 2>&1
+assert_eq "E8.1 — témoin : le moteur sans garde, sous GIT_DIR hérité, écrit le HEAD du leurre" "$(node "$AUX/tete.mjs" "$WORK/o81/.cache/scan.json" 2>/dev/null || echo illisible)" "$HEAD_LEURRE"
+# E8.2 — l'assemblage sous GIT_DIR hérité lit le vrai dépôt et ne lance aucun programme du dépôt piégé
+raz; rm -rf "$LAB8/.vibeflow"
+GIT_DIR="$L/.git" node "$BUILD" "$LAB8" --quiet >/dev/null 2>&1
+assert_eq "E8.2 — l'assemblage sous GIT_DIR hérité : meta.repos[0].head = HEAD réel du lab" "$(node "$AUX/tete.mjs" "$LAB8/.vibeflow/cockpit/graph.json" 2>/dev/null || echo illisible)" "$HEAD_LAB"
+assert_eq "E8.2a — aucun programme du dépôt piégé lancé pendant l'assemblage (filtre, textconv, fsmonitor)" "$(for m in PROC CLEAN TEXTCONV FSM; do marque $m; done | sort -u | tr '\n' ' ')" "absent "
+assert_eq "E8.2b — la carte Code porte des fichiers (au moins un)" "$([ "$(nfich "$LAB8/.vibeflow/cockpit/graph.json" 2>/dev/null || echo 0)" -ge 1 ] && echo oui || echo non)" "oui"
+# E8.3 — sans le marqueur, le moteur ne lance aucun git
+: > "$WORK/git.log"; rm -rf "$WORK/o83"
+env -u VF_COCKPIT_GIT_DURCI PATH="$WORK/bin:$PATH" GIT_DIR="$L/.git" node "$MOTEUR/scripts/scan.mjs" "$LAB8" --out="$WORK/o83/.cache/scan.json" >/dev/null 2>&1
+assert_eq "E8.3 — sans VF_COCKPIT_GIT_DURCI : aucun appel git (journal de l'emballage vide)" "$(wc -c < "$WORK/git.log" | tr -d ' ')" "0"
+assert_eq "E8.3a — le scan a bien tourné sans marqueur et n'écrit aucun HEAD" "$(node "$AUX/tete.mjs" "$WORK/o83/.cache/scan.json" 2>/dev/null || echo illisible)" "aucun"
+: > "$WORK/git.log"; rm -rf "$WORK/o83b"
+VF_COCKPIT_GIT_DURCI=1 PATH="$WORK/bin:$PATH" node "$MOTEUR/scripts/scan.mjs" "$LAB8" --out="$WORK/o83b/.cache/scan.json" >/dev/null 2>&1
+assert_has "E8.3b — témoin : avec le marqueur, l'emballage journalise des appels git (le journal vide de E8.3 prouve donc quelque chose)" "$(cat "$WORK/git.log")" "ARGV"
+# E8.4 — le numéro du patch est dans VENDORED.txt ET dans le commentaire de common.mjs
+NUMP="$(grep -o '// vibeflow P[0-9]*' "$MOTEUR/scripts/lib/common.mjs" | grep -o 'P[0-9]*' | sort -u | tr '\n' ' ')"
+LIGNEP="$(grep '^PATCH scripts/lib/common.mjs' "$MOTEUR/VENDORED.txt")"
+OKP=non; for n in $NUMP; do [[ "$LIGNEP" == *"$n"* ]] && [[ "$LIGNEP" == *VF_COCKPIT_GIT_DURCI* ]] && OKP=oui; done
+assert_eq "E8.4 — la ligne PATCH de common.mjs nomme un numéro présent dans le commentaire du fichier et décrit la garde" "$OKP" "oui"
+# mutants du moteur
+rm -rf "$WORK/mut-garde"; cp -R "$MOTEUR" "$WORK/mut-garde"
+assert_eq "M-GARDE.0 — l'ancre du mutant existe (garde présente dans le moteur)" "$(sans_garde "$WORK/mut-garde")" "muté"
+: > "$WORK/git.log"; rm -rf "$WORK/o8m"
+env -u VF_COCKPIT_GIT_DURCI PATH="$WORK/bin:$PATH" GIT_DIR="$L/.git" node "$WORK/mut-garde/scripts/scan.mjs" "$LAB8" --out="$WORK/o8m/.cache/scan.json" >/dev/null 2>&1
+assert_has "M-GARDE — rougit E8.3 : sans la garde le moteur lance git (journal non vide)" "$(cat "$WORK/git.log")" "ARGV"
+MT="$WORK/mut-env-moteur"; rm -rf "$MT"; mkdir -p "$MT/scripts" "$MT/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$MT/scripts/"; cp -R "$MOTEUR" "$MT/skills/cockpit-moteur"
+assert_eq "M-ENV-MOTEUR.0 — l'ancre du mutant existe dans vf-cockpit-build.mjs" "$(FROM="env: envGit(lab, { config: configFiltres(filtresDeclares(lab, lab)) })" TO="env: envEnfant(lab)" node "$AUX/mutsub.mjs" "$MT/scripts/vf-cockpit-build.mjs" 2>&1)" "muté"
+rm -rf "$LAB8/.vibeflow"; GIT_DIR="$L/.git" node "$MT/scripts/vf-cockpit-build.mjs" "$LAB8" --quiet >/dev/null 2>&1
+assert_eq "M-ENV-MOTEUR — rougit E8.2 : run() sans envGit, le moteur (marqueur absent ou GIT_DIR hérité) ne rend plus le HEAD réel" "$([ "$(node "$AUX/tete.mjs" "$LAB8/.vibeflow/cockpit/graph.json" 2>/dev/null || echo illisible)" != "$HEAD_LAB" ] && echo rouge || echo vert)" "rouge"
 
 vf_hyg_assert
 
