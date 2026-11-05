@@ -25,8 +25,8 @@
     .vf-git-d-plus { color: var(--ok-text); } .vf-git-d-moins { color: var(--err-text); }
     .vf-git-d-chemin { min-width: 0; font-family: var(--mono); color: var(--text-2); overflow-wrap: anywhere; }
     .vf-git-etat-wt { display: flex; flex-wrap: wrap; gap: 4px; }
-    .vf-git-pastille { padding: 2px 8px; border-radius: 999px; background: rgba(var(--ink), .06); font-size: 11px; font-weight: 500; color: var(--text-2); }
-    .vf-git-p-warn { color: var(--warn-text); } .vf-git-p-ok { color: var(--ok-text); } .vf-git-p-mono { font-family: var(--mono); }
+    .vf-git-pastille { padding: 2px 8px; border-radius: 999px; background: none; font-size: 11px; font-weight: 500; color: var(--text-2); }
+    .vf-git-p-ok::before { content: '✓ '; } .vf-git-p-warn::before { content: '◐ '; } .vf-git-p-nonsuivi::before { content: '○ '; } .vf-git-p-mono { font-family: var(--mono); }
     .vf-git-mention { margin-top: 8px; }
     @media (max-width: 999px), (pointer: coarse) { .vf-git-det .btn { min-height: 44px; } }
   `;
@@ -112,7 +112,7 @@
     if (p.propre === null || p.modifies == null) return [['état illisible', '']];
     if (p.propre) l.push(['propre', 'vf-git-p-ok']);
     if (p.modifies > 0) l.push([pl(p.modifies, 'modifié'), 'vf-git-p-warn']);
-    if (p.nonSuivis > 0) l.push([(p.plus ? p.nonSuivis + '+ ' : p.nonSuivis + ' ') + (p.nonSuivis > 1 || p.plus ? 'non suivis' : 'non suivi'), '']);
+    if (p.nonSuivis > 0) l.push([(p.plus ? p.nonSuivis + '+ ' : p.nonSuivis + ' ') + (p.nonSuivis > 1 || p.plus ? 'non suivis' : 'non suivi'), 'vf-git-p-nonsuivi']);
     if (p.avance > 0 || p.retard > 0) l.push([`↑${p.avance || 0} ↓${p.retard || 0}`, 'vf-git-p-mono']);
     return l;
   };

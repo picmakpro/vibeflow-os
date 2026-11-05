@@ -88,3 +88,7 @@ Sur ce dépôt (10 worktrees, git 2.50.1) : `detailCommit` 178 ms ; `etatWorktre
 ## Suites rejouées
 
 `test-cockpit-git-details.sh` 82/0 · `git` 82/0 · `git-env` 70/0 · `serveur` 70/0 · `git-graphe` 50/0 · `forme-claude` 56/0 · `assemblage` 40/0 · `signal` 76/0 · `avancement` 62/0. `test-cockpit-git-commandes.sh` (78-03, ne lit aucun fichier de ce plan) : non rejouée en entier, interrompue à C2.1a (lente sous charge). `check-file-size.sh` : exit 0.
+
+## Correction ciblée — P78-D-32 : NON FAITE (gaps_found, 2026-11-06)
+
+Cause : rendre `etatWorktrees` asynchrone change son contrat de retour ; son seul appelant, `routeGit` dans `plugin/cockpit/scripts/vf-cockpit-git.mjs` (`json(res, 200, etatWorktrees(root))`, ligne ~170), n'est pas dans les fichiers autorisés du mandat et doit attendre la promesse. Aucun contournement posé. Correctif prévu une fois ce fichier autorisé : variante asynchrone de `lancer`/`lancerGit` dans `vf-cockpit-paths.mjs` (mêmes `envGit`, options, garde ; `execFile` est déjà couvert par la regex de la garde E6), `etatWorktrees` en `async`, route en `.then`/`await`, témoin rouge (requête légère pendant une lecture lente), mutant « retour au synchrone ».

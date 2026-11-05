@@ -18,3 +18,9 @@ Résultat : **60 réussis (D1 à D3 de 78-06, témoin de non-régression), 35 é
 | D9.2 à D9.4 | détail replié si sha disparue ; aucune requête fermé, rattrapage à la réouverture ; 375 px | voir la suite | vide |
 
 Pourquoi ces rouges valent quelque chose : D1 à D3 (même serveur, mêmes fixtures, même navigateur) restent verts, donc la page, le tiroir et les routes simulées fonctionnent ; seul le comportement neuf manque. Le premier rejeu attendait les pastilles des worktrees dès l'ouverture, ce qui rendait D7 et D9 rouges pour une cause de D8 : `ouvrirTiroir` n'attend désormais les états des worktrees que pour D8, et le rouge ci-dessus est le second rejeu.
+
+## Correction ciblée — P78-D-33 (pastilles neutres, 2026-11-06)
+
+- Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-git-tiroir.sh` (assertion D8.2 « P78-D-33 », style rendu des pastilles : couleur = `--text-2`, fond transparent, glyphe ✓/◐).
+- Attendu : `true|true|true|true|true`. Obtenu AVANT le code (CSS `--warn-text`/`--ok-text` sur fond `rgba(var(--ink), .06)`) : `true|false|false|false|false` (97 réussis, 1 échoué). Log : scratchpad `78-fix-rouge-tiroir.log`.
+- Après : 98 réussis, 0 échoué (`78-fix-vert-tiroir.log`).

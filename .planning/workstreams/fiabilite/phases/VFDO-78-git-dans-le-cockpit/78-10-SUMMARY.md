@@ -72,3 +72,8 @@ Captures (1440 px, scratchpad, pour le juge de design) :
 ## Suites rejouées
 
 `test-cockpit-git-tiroir.sh` 98/0/0 · `test-cockpit-vendor.sh` rc 0 · `test-cockpit-git-entete.sh` rc 0 · `test-cockpit-chrome-fr.sh` rc 0 · `css-jetons.mjs` rc 0.
+
+## Correction ciblée — P78-D-33 (2026-11-06)
+
+Pastilles d'état des worktrees : plus de fond (`background: none`), texte `--text-2` pour toutes ; l'état est porté par un glyphe en `::before` (texte, hérite la couleur neutre, hors `textContent`) : `✓` propre, `◐` modifié, `○` non suivi. `--warn-text`/`--ok-text` retirés des pastilles. La déviation 3 ci-dessus est remplacée par cette décision. Padding `2px 8px` inchangé (jeton futur : `--inset-pill`). Assertion D8.2 renforcée (style rendu, rouge avant / vert après). Captures `78-10-worktrees-{clair,sombre}-1440.png` refaites (scratchpad). Suites : tiroir 98/0/0, vendor, git-env, git, git-details, serveur rc 0.
+Le finding « route worktrees bloquante » (P78-D-32) n'est PAS traité ici : voir 78-08-SUMMARY, correction ciblée.
