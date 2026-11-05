@@ -39,3 +39,18 @@ Tête : `a8fbdd2a` (tâche 1 : un seul `log`, pas de non mergées, pas de base, 
 
 Déjà verts avant le code de la tâche (cohérent : acquis de la tâche 1 ou témoins) : S2.1a/b (fenêtre de 500 de la tâche 1 ; c'est M-BORNE qui prouve la borne), S2.4e, S2.5a, S2.5g (vide tant qu'aucune commande n'est servie ; la preuve de P78-D-27 est S2.5f et son mutant), S2.6a/b/c/e/f (témoins et lecture seule).
 Incident de suite corrigé avant ce rouge : `bash -n` rendait « unexpected EOF » (une citation `'` dans un `$(…)` de la suite, repérée à `bash -n` par dichotomie) ; la suite n'a jamais tourné cassée.
+
+### Tâche 2 — vert, puis mutants (copies de `plugin/cockpit/scripts/*.mjs|json`, une mutation par copie, motif exact, garde « mutant avec effet » `cmp -s`)
+
+Vert après le code : 44 PASS / 0 FAIL (une assertion de la suite corrigée : `join` rendait la chaîne vide pour `branche: null`, attendu aligné par `String(w.branche)` : bug du témoin, pas du module).
+Suite finale avec les mutants : 52 PASS / 0 FAIL. Chaque mutant a une assertion `.0` (le mutant s'applique et diffère) et une assertion de rouge sur SA sonde, avec la valeur obtenue :
+
+| Mutant | Sonde (assertion de la suite rougie) | Obtenu avec le mutant | Obtenu sans |
+|---|---|---|---|
+| M-BORNE : `'-n', String(BORNES.base), ` retiré du `log` de base | S2.1a sur `r-big` (600 commits) | `ok\|600` rangées | `500` |
+| M-COURT : `refLog` passe les noms courts à `log` | S2.5a sur `r-host` | `indisponible` (git refuse `-x`) ; le lab sans ref hostile reste `ok` | `ok` |
+| M-EOO-LOG : `--not <base>` placé AVANT les refs | S2.2 sur `r-trente` | `ok\|0` pointes avec rangée | `30` |
+| M-NETTOIE (P78-D-27) : porte `masque(nom) === nom` remplacée par `true` | S2.5f sur `r-host` | commande présente et portant `ghp_…` (`fuite`) | `null` |
+
+Aucun mutant n'a rougi pour une autre raison : chacun garde `etat: ok` (sauf M-COURT, dont l'`indisponible` est la conséquence directe de `-x` lu comme une option, avec témoin `ok` sur un lab sans nom hostile).
+Écart au plan : M-NETTOIE du plan retirait « la comparaison à `nettoie` » ; la décision P78-D-27 du manager interdit que `commande` passe par `nettoie` ou `masque`, la porte est donc `masque(nom) === nom` sur les NOMS qui composent la commande.

@@ -11,8 +11,8 @@ import { lancerGit, avecEcheance } from './vf-cockpit-paths.mjs';
 import { nettoie, brancheBase } from './vf-cockpit-arbres.mjs';
 import { masque } from './vf-cockpit-lecture.mjs';
 import { enteteGit } from './vf-cockpit-git-entete.mjs';
-import { FORMAT_JOURNAL, lireJournal, lireRefs, lireWorktrees, ordonner, placer, etiquettes, teinte } from './vf-cockpit-git-graphe.mjs';
-import { cmdCd, cmdSwitch } from './vf-cockpit-git-commandes.mjs';
+import { FORMAT_JOURNAL, CHAMPS_REFS, lireJournal, lireRefs, lireWorktrees, ordonner, placer, etiquettes, teinte } from './vf-cockpit-git-graphe.mjs';
+import { cmdCd, cmdSwitch, cmdBranchSupprimer, cmdCommitInitial, cmdStatus } from './vf-cockpit-git-commandes.mjs';
 
 export const BORNES = { base: 500, nonMergees: 500, tags: 200, stash: 50, refs: 2000, nom: 200, echeanceMs: 5000 };
 const SCHEMA = 'vibeflow/cockpit-git@1', SCHEMA_ENTETE = 'vibeflow/cockpit-git-entete@1';
@@ -26,41 +26,75 @@ export function lireGit(lab) {
   try { return avecEcheance(BORNES.echeanceMs, () => assembler(lab)); } catch { return { schema: SCHEMA, etat: 'indisponible' }; }
 }
 
+const refLog = (r) => r.ref; // REF-QUALIFIEE : jamais un nom court (« -x » serait lu comme une option)
+const court = (ref) => ref.replace(/^refs\/(heads|remotes)\//, '');
+const compte = (s) => { const m = /^(\d+) (\d+)$/.exec(s ?? ''); return m ? { avance: Number(m[1]), retard: Number(m[2]) } : null; };
+const sansFormat = (r) => !!r && !/[%)]/.test(r); // un nom de ref ne s'insère dans %(ahead-behind:…) que s'il ne peut pas casser le format
+
 function assembler(lab) {
   const entete = enteteGit(lab);
+  const commandes = (vide = null) => ({ vide, diagnostic: cmdStatus() });
   if (entete.etat === 'absent') return { schema: SCHEMA, etat: 'absent', entete };
-  const ko = () => ({ schema: SCHEMA, etat: 'indisponible', entete });
+  const ko = () => ({ schema: SCHEMA, etat: 'indisponible', entete, commandes: commandes() });
   const git = (...a) => lancerGit(lab, a);
   const nomBase = brancheBase(lab);
-  const refsBase = git('for-each-ref', '--format=%(refname)', ...(nomBase ? [`refs/heads/${nomBase}`, `refs/remotes/origin/${nomBase}`] : []));
-  const presentes = new Set(nomBase && refsBase.ok ? refsBase.sortie.split('\n') : []);
-  const refBase = presentes.has(`refs/heads/${nomBase}`) ? `refs/heads/${nomBase}` : presentes.has(`refs/remotes/origin/${nomBase}`) ? `refs/remotes/origin/${nomBase}` : null;
+  const rb = git('for-each-ref', '--format=%(refname)', ...(nomBase ? [`refs/heads/${nomBase}`, `refs/remotes/origin/${nomBase}`] : []));
+  const presentes = new Set(nomBase && rb.ok ? rb.sortie.split('\n') : []);
+  const locale = `refs/heads/${nomBase}`, distante = `refs/remotes/origin/${nomBase}`;
+  const refBase = presentes.has(locale) ? locale : presentes.has(distante) ? distante : null;
+  const refOrigine = presentes.has(locale) && presentes.has(distante) ? distante : null;
 
-  const fer = git('for-each-ref', '--format=%(refname)%00%(objectname)%00%(*objectname)%00%(creatordate:unix)', 'refs/heads', 'refs/remotes', 'refs/tags');
-  const lr = fer.ok ? lireRefs(fer.sortie) : { ok: false };
+  // un seul for-each-ref : refs, cible peelée, date, et le retard sur la base locale (puis sur origin/<base> quand elle existe) ; refusé par git (version, tag vers un arbre) : repli rev-list
+  const avecAB = sansFormat(refBase) && (!refOrigine || sansFormat(refOrigine));
+  const champs = [...CHAMPS_REFS, ...(avecAB ? ['ab', ...(refOrigine ? ['ab2'] : [])] : [])];
+  const fmt = (ab) => '%(refname)%00%(objectname)%00%(*objectname)%00%(creatordate:unix)' + (ab ? `%00%(ahead-behind:${refBase})` + (refOrigine ? `%00%(ahead-behind:${refOrigine})` : '') : '');
+  const motifs = ['refs/heads', 'refs/remotes', 'refs/tags'];
+  let fer = git('for-each-ref', `--format=${fmt(avecAB)}`, ...motifs), repli = false;
+  if (!fer.ok && avecAB) { repli = true; fer = git('for-each-ref', `--format=${fmt(false)}`, ...motifs); }
+  const lr = fer.ok ? lireRefs(fer.sortie, { champs: repli || !avecAB ? CHAMPS_REFS : champs }) : { ok: false };
   const wl = git('worktree', 'list', '--porcelain', '-z');
   const lw = wl.ok ? lireWorktrees(wl.sortie) : { ok: false };
   if (!lr.ok || !lw.ok) return ko();
-  const refs = lr.refs.filter((r) => !/^refs\/remotes\/[^/]+\/HEAD$/.test(r.ref)).slice(0, BORNES.refs);
+  const refs = lr.refs.filter((r) => !/^refs\/remotes\/[^/]+\/HEAD$/.test(r.ref));
+  const tronqueRefs = refs.length > BORNES.refs; refs.length = Math.min(refs.length, BORNES.refs);
   const worktrees = lw.worktrees;
+  const branches = refs.filter((r) => r.ref.startsWith('refs/heads/') || r.ref.startsWith('refs/remotes/'));
+  const estBase = (r) => r.ref === refBase;
+  if (repli && refBase) { // au plus 50 branches comptées, les autres sans compte (traitées comme non mergées)
+    for (const r of branches.filter((x) => !estBase(x)).slice(0, 50)) {
+      const c = /^(\d+)\t(\d+)\n$/.exec(git('rev-list', '--left-right', '--count', '--end-of-options', `${refBase}...${r.ref}`).sortie);
+      if (c) r.ab = `${c[2]} ${c[1]}`;
+    }
+    if (refOrigine) { const c = /^(\d+)\t(\d+)\n$/.exec(git('rev-list', '--left-right', '--count', '--end-of-options', `${refBase}...${refOrigine}`).sortie); const b = refs.find(estBase); if (c && b) b.ab2 = `${c[1]} ${c[2]}`; }
+  }
+  const avance = (r) => compte(r.ab)?.avance ?? null;
 
   // worktree « ici » : celui dont le chemin est le plus long préfixe du lab
   const labReel = reel(lab);
   const sous = (c) => labReel === reel(c) || labReel.startsWith(reel(c) + path.sep);
   const ici = worktrees.filter((w) => sous(w.chemin)).sort((a, b) => b.chemin.length - a.chemin.length)[0] || null;
   const head = ici ? (ici.branche || ici.head) : null;
+  const enWorktree = new Set(worktrees.map((w) => w.branche).filter(Boolean));
   const shaRef = (r) => refs.find((x) => x.ref === r)?.sha ?? null;
   const tetes = [...new Set(worktrees.map((w) => w.head).filter((h) => h && !NUL.test(h)))];
   const racineLog = refBase || tetes[0] || null;
-  if (!racineLog) return { schema: SCHEMA, etat: 'vide', entete, commandes: { vide: null, diagnostic: null } };
+  if (!racineLog) return { schema: SCHEMA, etat: 'vide', entete, commandes: commandes(cmdCommitInitial()) };
+
+  // non mergées : avance > 0 sur la base (origin/<base> comprise) ; mergées : avance 0, repliées en liste (ni étiquette ni rangée propre)
+  const nonMergees = branches.filter((r) => !estBase(r) && (refBase ? (avance(r) ?? 1) > 0 : true));
+  const mergees = refBase ? branches.filter((r) => !estBase(r) && r.ref !== refOrigine && avance(r) === 0 && !enWorktree.has(r.ref)) : [];
+  const repliees = new Set(mergees);
+  const aGarder = refs.filter((r) => !repliees.has(r));
 
   const log1 = git('log', '--topo-order', '-z', `--format=${FORMAT_JOURNAL}`, '-n', String(BORNES.base), racineLog, ...tetes);
   const j1 = log1.ok ? lireJournal(log1.sortie) : { ok: false };
-  if (!j1.ok) return ko();
-  const commits = ordonner([j1.commits]);
+  const log2 = nonMergees.length ? git('log', '--topo-order', '-z', `--format=${FORMAT_JOURNAL}`, '-n', String(BORNES.nonMergees), ...nonMergees.map(refLog), '--not', refBase) : { ok: true, sortie: '' }; // LOG2
+  const j2 = log2.ok ? lireJournal(log2.sortie) : { ok: false };
+  if (!j1.ok || !j2.ok) return ko();
+  const commits = ordonner([j1.commits, j2.commits]);
   const pl = placer(commits);
   const parSha = new Map(commits.map((c) => [c.h, c]));
-  const etiq = etiquettes(refs, { head, worktrees });
+  const etiq = etiquettes(aGarder, { head, worktrees });
   const chaine = new Set();
   for (let c = parSha.get(shaRef(refBase) ?? tetes[0]); c && !chaine.has(c.h); c = parSha.get(c.p[0])) chaine.add(c.h);
   const couleur = new Map();
@@ -74,7 +108,16 @@ function assembler(lab) {
     return { h: r.h, h7: r.h.slice(0, 7), p: c.p, at: c.at, an: net(c.an), s: net(c.s), col: r.col, entrants: r.entrants, sortants: r.sortants, largeur: r.largeur,
       ouvertBas: r.ouvertBas, fusion: r.fusion, racine: r.racine, teinte: t, refs: liste.slice(0, 12), refsPlus: Math.max(0, liste.length - 12) };
   });
-  return { schema: SCHEMA, etat: 'ok', entete, rangees, couloirsMax: pl.couloirsMax, replies: pl.replies, bornes: { base: BORNES.base, nonMergees: BORNES.nonMergees, tronque: commits.length >= BORNES.base } };
+  const cb = refOrigine ? compte(refs.find(estBase)?.ab2) : null;
+  const base = { nom: refBase ? net(court(refBase)) : null, locale: cb?.avance ?? null, distante: cb?.retard ?? null, divergent: !!cb && cb.avance > 0 && cb.retard > 0 };
+  return { schema: SCHEMA, etat: 'ok', entete, base,
+    worktrees: worktrees.map((w, i) => ({ nom: net(path.basename(w.chemin)), chemin: net(w.chemin), branche: w.branche ? net(court(w.branche)) : null, detache: w.detache, ici: w === ici, principal: i === 0,
+      commande: w === ici ? null : commande(cmdCd(w.chemin), w.chemin) })),
+    rangees, couloirsMax: pl.couloirsMax, replies: pl.replies,
+    horsFenetre: nonMergees.filter((r) => !parSha.has(r.pelee || r.sha)).map((r) => ({ nom: net(court(r.ref)), h7: (r.pelee || r.sha).slice(0, 7), avance: avance(r), retard: compte(r.ab)?.retard ?? null })),
+    mergees: mergees.slice(0, 200).map((r) => ({ nom: net(court(r.ref)), commande: r.ref.startsWith('refs/heads/') ? commande(cmdBranchSupprimer(court(r.ref)), court(r.ref)) : null })),
+    bornes: { base: BORNES.base, nonMergees: BORNES.nonMergees, tronque: tronqueRefs || j1.commits.length >= BORNES.base || j2.commits.length >= BORNES.nonMergees },
+    commandes: commandes() };
 }
 
 export function routeGit(req, res, url, { root, json }) {

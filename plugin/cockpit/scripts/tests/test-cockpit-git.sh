@@ -125,6 +125,15 @@ exec "$GIT_REEL" "\$@"
 EOS
 chmod +x "$WORK/bin/git"
 
+# mut.mjs <fichier> <de> <vers> : remplace UNE occurrence exacte (rend « absent » si le motif n'existe plus : un mutant sans cible ne compte pas)
+cat > "$AUX/mut.mjs" <<'JS'
+import fs from 'node:fs';
+const [, , f, de, vers] = process.argv;
+const t = fs.readFileSync(f, 'utf8');
+if (!t.includes(de)) { console.log('absent'); process.exit(0); }
+fs.writeFileSync(f, t.replace(de, () => vers)); console.log('applique');
+JS
+
 # --- dépôts fabriqués ---
 T=0
 tick() { T=$((T+1)); export GIT_AUTHOR_DATE="@$((1700000000+T*60)) +0000" GIT_COMMITTER_DATE="@$((1700000000+T*60)) +0000"; }
@@ -218,7 +227,7 @@ assert_eq "S2.4b — commande de suppression de « f » (forme de 78-03)" "$(J "
 assert_eq "S2.4c — aucune étiquette sur le graphe pour une mergée repliée" "$(J "$WORK/lab.json" 'j.rangees.flatMap(r=>r.refs).filter(e=>["f","g1","g2","other"].includes(e.nom)).length')" "0"
 assert_eq "S2.4d — non mergées présentes : u1, origin/u1, wtb ont leur étiquette" "$(J "$WORK/lab.json" 'j.rangees.flatMap(r=>r.refs).map(e=>e.nom).filter(n=>["u1","origin/u1","wtb"].includes(n)).sort().join(",")')" "origin/u1,u1,wtb"
 assert_eq "S2.4e — origin/HEAD (symbolique) exclu des étiquettes" "$(J "$WORK/lab.json" 'j.rangees.flatMap(r=>r.refs).filter(e=>/HEAD/.test(e.nom)&&e.type==="distante").length')" "0"
-assert_eq "S2.4f — worktrees : principal, branche wtb (cd), détaché ; « ici » = le lab" "$(J "$WORK/lab.json" 'j.worktrees.map(w=>[w.nom,w.branche,w.detache,w.ici,w.principal,w.commande===null].join(":")).join(",")')" "lab:main:false:true:true:true,wt-b:wtb:false:false:false:false,wt-det:null:true:false:false:false"
+assert_eq "S2.4f — worktrees : principal, branche wtb (cd), détaché ; « ici » = le lab" "$(J "$WORK/lab.json" 'j.worktrees.map(w=>[w.nom,String(w.branche),w.detache,w.ici,w.principal,w.commande===null].join(":")).join(",")')" "lab:main:false:true:true:true,wt-b:wtb:false:false:false:false,wt-det:null:true:false:false:false"
 # S2.5 : refs hostiles
 newrepo "$WORK/r-host"; R="$WORK/r-host"
 h1=$(ct "$R" refs/heads/main 1700000000 c1); h3=$(ct "$R" refs/heads/main 1700000060 c2 "$h1"); t=1700001000
@@ -262,6 +271,26 @@ assert_eq "S2.6f — lireGit : sonde chargée, 0 connexion sortante, résultat c
 # S2.7 : ce que la réponse ne porte jamais
 assert_eq "S2.7a — aucune clé de la liste commune « interdits » du contrat, ni verrous, arbitrages, watchdog, orphelins, hotspots (à toute profondeur)" "$(J "$WORK/lab.json" '(function f(o,ban){ if(!o||typeof o!=="object") return 0; return Object.entries(o).reduce((n,[k,v])=>n+(ban.includes(k)?1:0)+f(v,ban),0); })(j,["doing","mandat","messages","outils","verrous","arbitrages","watchdog","orphelins","hotspots"])')" "0"
 assert_eq "S2.7b — le contrat porte les deux schémas et une liste « interdits »" "$(node "$AUX/j.mjs" "$SCRIPTS/vf-cockpit-interface.json" '(()=>{const s=j.schemas["vibeflow/cockpit-git@1"];return !!s&&Array.isArray(s.interdits)&&s.interdits.length>0&&!!j.schemas["vibeflow/cockpit-git-entete@1"]})()')" "true"
+
+echo "=== S7 — mutants (copies des scripts, jamais le module) ==="
+mutant() { # nom, de, vers : copie les scripts, applique la mutation ; rend « applique » ou « absent » ; la copie est jugée « avec effet » si le module diffère
+  rm -rf "$WORK/mut/$1"; mkdir -p "$WORK/mut/$1"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$WORK/mut/$1/"
+  local r; r="$(node "$AUX/mut.mjs" "$WORK/mut/$1/vf-cockpit-git.mjs" "$2" "$3")"
+  [ "$r" = applique ] && ! cmp -s "$SCRIPTS/vf-cockpit-git.mjs" "$WORK/mut/$1/vf-cockpit-git.mjs" && echo effet || echo sans-effet
+}
+LIREM() { node "$AUX/lire.mjs" "$WORK/mut/$1" "$2" 2>/dev/null; }
+assert_eq "M-BORNE.0 — mutant avec effet (le -n de la ligne de base est retiré)" "$(mutant borne "'-n', String(BORNES.base), " "")" "effet"
+LIREM borne "$WORK/r-big" > "$WORK/m-borne.json"
+assert_eq "M-BORNE — sans -n, 600 rangées au lieu de 500 : S2.1a rougit pour sa raison (état ok, fenêtre dépassée)" "$(J "$WORK/m-borne.json" 'j.etat+"|"+j.rangees.length')" "ok|600"
+assert_eq "M-COURT.0 — mutant avec effet (noms courts passés à log)" "$(mutant court 'const refLog = (r) => r.ref;' 'const refLog = (r) => r.ref.replace(/^refs\/(heads|remotes)\//, "");')" "effet"
+LIREM court "$WORK/r-host" > "$WORK/m-court-host.json"; LIREM court "$LAB" > "$WORK/m-court-lab.json"
+assert_eq "M-COURT — noms courts : le dépôt aux refs hostiles n'est plus lu (S2.5a rougit), alors que le lab sans nom hostile reste lu (le mutant ne casse que la raison visée)" "$(J "$WORK/m-court-host.json" 'j.etat')|$(J "$WORK/m-court-lab.json" 'j.etat')" "indisponible|ok"
+assert_eq "M-EOO-LOG.0 — mutant avec effet (--not placé avant les refs)" "$(mutant eoo "...nonMergees.map(refLog), '--not', refBase)" "'--not', refBase, ...nonMergees.map(refLog))")" "effet"
+LIREM eoo "$WORK/r-trente" > "$WORK/m-eoo.json"
+assert_eq "M-EOO-LOG — --not avant les refs : aucune des 30 pointes n'a de rangée (S2.2 rougit pour sa raison, état ok)" "$(J "$WORK/m-eoo.json" 'j.etat+"|"+j.rangees.flatMap(r=>r.refs).filter(e=>/^b\d+$/.test(e.nom)).length')" "ok|0"
+assert_eq "M-NETTOIE.0 — mutant avec effet (la porte « le nom serait masqué » est retirée)" "$(mutant nettoie 'noms.every((n) => masque(n) === n)' 'true')" "effet"
+LIREM nettoie "$R" > "$WORK/m-nettoie.json"
+assert_eq "M-NETTOIE — sans la porte, le nom-jeton reçoit une commande (S2.5f rougit pour sa raison : la commande existe et porte le vrai nom)" "$(J "$WORK/m-nettoie.json" 'j.etat+"|"+j.rangees.flatMap(r=>r.refs).filter(e=>e.nom===String.fromCharCode(91)+"masqué]").map(e=>e.commande===null?"null":e.commande.includes("ghp_")?"fuite":"autre").join(",")')" "ok|fuite"
 
 stop_srv
 vf_hyg_assert

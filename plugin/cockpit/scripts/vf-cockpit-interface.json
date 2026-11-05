@@ -60,6 +60,18 @@
     },
     "vibeflow/cockpit-doing@1": {
       "requis": { "schema": "string", "id": "string", "doing": "any" }
+    },
+    "vibeflow/cockpit-git@1": {
+      "description": "topologie Git du lab pour le tiroir (78-05, GET /api/vf/git) : requis vaut pour etat ok ; les autres etats ne portent que schema, etat, entete (sauf absent : schema, etat, entete) et commandes",
+      "requis": { "schema": "string", "etat": "string", "entete": "object", "base": "object", "worktrees": "array", "rangees": "array", "couloirsMax": "number", "replies": "number", "horsFenetre": "array", "mergees": "array", "tags": "array", "stash": "array", "auteurs": "array", "parBranche": "array", "bornes": "object", "commandes": "object" },
+      "etats": ["ok", "vide", "indisponible", "absent"],
+      "rangee": { "requis": ["h", "h7", "p", "at", "an", "s", "col", "entrants", "sortants", "largeur", "ouvertBas", "fusion", "racine", "teinte", "refs", "refsPlus"] },
+      "interdits": ["doing", "mandat", "messages", "outils"]
+    },
+    "vibeflow/cockpit-git-entete@1": {
+      "requis": { "schema": "string", "etat": "string", "depot": "string" },
+      "optionnels": ["branche", "worktree", "detache", "sha7"],
+      "etats": ["ok", "indisponible", "absent"]
     }
   },
   "claudeCode": {
