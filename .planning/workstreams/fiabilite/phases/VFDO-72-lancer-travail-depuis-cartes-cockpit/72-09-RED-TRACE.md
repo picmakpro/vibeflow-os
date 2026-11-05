@@ -38,3 +38,22 @@ S0 (200 sous le jeton Projet), S1 et S2 (témoin d'erreur puis égalité avec la
 3. Un point d'entrée `lancer.sourceWho(fn)` fournit le `who` au suivi : une ligne de B1 en plus du plan (le plan n'a pas de voie pour `who`).
 4. Corps des refus du gestionnaire : clé `refus` (comme le mécanisme de 72-04 et comme la carte de 72-06 la lit), non `erreur`.
 5. Piège de poste : sous bash 3.2, une chaîne `"{\"a\":…}"` imbriquée dans `"$( … )"` subit l'expansion d'accolades ; les corps JSON passent par une variable (A2B, C1B). Premier jet de A2 et C1 : verts à vide sur la base (arguments scindés), corrigés avant le commit.
+
+## Ancres des mutants (tâche 2 et 3 : une occurrence chacune, relevé par `grep -c`)
+
+- `vf-cockpit-lancer.mjs` : `const servi = () => canal() !== null;` (l.30) ; `const cible = liste.find((x) => x.id === demande.cible);` (l.72) ; `const msgProposition = { t: 'proposition', cible: cible.id, verbe: demande.verbe, bloquants: cible.bloquants, avertissements: cible.avertissements };` (l.79, `t: 'proposition',` une seule fois) ; `let dernier = null;` (l.27) ; `if (!lanceeValide(m)) return;` (l.60) ; `if (chat) msgProposition.chat = chat;` (l.80).
+- `vf-cockpit-server.mjs` : `const lancer = creerLancer({ root, here, ptoken, log });` (l.44) ; `lancees: lancer.lancees()` (page Équipe).
+
+## Vert sur le code livré
+
+Suite `test-cockpit-lancer-serveur.sh` rejouée sur le code livré : 73 PASS / 0 FAIL, aucune sonde « NON vérifiée ». U1, U2, L1 à L4, E1 à E3, C1, C2 verts ; les quatre mutants rougissent pour la bonne raison : M-SANS-DRAPEAU (S1 et S2 : routes servies sans drapeau), M-LISTE-PAGE (R11 : proposition +1 au lieu de 0), M-TOKEN-CODE (A2 et R5 : jeton Projet refusé, jeton Code admis), M-LANCEE-LIBRE (L2 : message mal formé enregistré). Aucune assertion de la suite n'a été modifiée ni affaiblie.
+
+## Écarts de nom
+
+Aucun nom de la vague 1 n'a changé : `calculerCibles`, `listePourQ`, `creerPost`, `creerSuivi` (`noter`, `lancements`, `etats`, `lancees`), `injectionLancer`, et les constantes du gabarit (dont `MOTIF_UUID_V4`) sont câblés tels que livrés. Écarts de forme déjà consignés plus haut (n° 2 à 4) : `lancee` riche, `sourceWho`, clé `refus`.
+
+## Preuves d'invariance
+
+- `serve.mjs` : `git hash-object` = `b68a2486643faed351f095fcaee16698564db1c9`, identique au blob de HEAD et au blob du commit des témoins (9c84608e).
+- `git diff --quiet 9c84608e HEAD` sur le moteur vendoré, `amont/`, le build, le contrat d'interface, `vf-cockpit-equipe-carte.mjs` et les cinq modules de la vague 1 : silencieux (OK-INTACT).
+- `check-file-size.sh` sur les quatre fichiers de code : exit 0 ; `check-machine-paths.sh` : exit 0.
