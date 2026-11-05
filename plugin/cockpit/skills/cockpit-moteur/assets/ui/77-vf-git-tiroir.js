@@ -119,6 +119,7 @@
   const montrer = (j) => {
     donnees = j;
     corps.replaceChildren();
+    if (j && j.entete && typeof j.entete === 'object') emettre('vf-git:entete', j.entete); // l'en-tête suit la lecture, même indisponible
     if (!j || (j.etat !== 'ok' && j.etat !== 'vide')) { corps.append(R.etatIndisponible(j && j.commandes ? j.commandes.diagnostic : 'git status', recharger, annoncer)); return; }
     if (j.etat === 'vide') { corps.append(R.etatVide(j.commandes.vide, annoncer)); return; }
     const g = R.el('div'), pied = j.bornes && j.bornes.tronque ? 'Historique tronqué : seuls les commits les plus récents sont lus.' : `${j.rangees.length} commits affichés.`;
@@ -126,7 +127,6 @@
     if (j.replies > 0) g.append(R.el('p', 'vf-git-plus', '+' + j.replies, { title: `${j.replies} rangées au-delà de ${j.couloirsMax} couloirs, repliées sur le dernier` }));
     g.append(R.mergees(j.mergees, annoncer), R.el('p', 'vf-git-note', pied));
     corps.append(...[R.sectionWorktrees(j.worktrees, annoncer), R.section('Graphe', null, g, true, 'vf-git-s-graphe'), R.sectionTags(j.tags), R.sectionStash(j.stash, annoncer), R.sectionAuteurs(j.auteurs, j.parBranche)].filter(Boolean));
-    if (j.entete && typeof j.entete === 'object') emettre('vf-git:entete', j.entete);
     crochet('rendu', corps, j);
   };
   function recharger() { // GET de même origine ; au-delà de 150 ms, rangées fantômes ; une réponse périmée est ignorée

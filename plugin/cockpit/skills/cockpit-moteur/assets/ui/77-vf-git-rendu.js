@@ -81,7 +81,7 @@
     const refs = refsDe(r), vus = refs.slice(0, 2), reste = refs.slice(2), plus = reste.length + (r.refsPlus || 0);
     const txt = el('div', 'vf-git-txt'), l1 = el('div', 'vf-git-l1'), l2 = el('div', 'vf-git-l2');
     for (const e of vus) l1.appendChild(etiquette(e));
-    if (plus) l1.appendChild(el('span', 'meta', '+' + plus, { title: reste.map((e) => e.nom).join(', ') }));
+    if (plus) l1.appendChild(el('span', 'meta', '+' + plus, { title: reste.map((e) => e.nom).join(', ') + (r.refsPlus ? `, et ${r.refsPlus} autres` : '') }));
     l1.appendChild(el('span', 'vf-git-msg', r.s));
     l2.append(el('span', 'vf-git-sha', r.h7), ` · ${r.an} · ${relatif(r.at)}`);
     txt.append(l1, l2);
