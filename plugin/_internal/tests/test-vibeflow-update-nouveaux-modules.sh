@@ -17,7 +17,7 @@
 #   N11 jamais en double : un module posé dans un scope n'est pas proposé dans l'autre ; absent des deux → listé dans chacun
 #   N12 /vibeflow-install inscrit ce qu'il laisse non posé : lab neuf → new-modules ne dit rien (witness + skill)
 #   N14 mark_installed durci (BL35-A4) ; N15 unmark-offered sûr (BL35-A1) ; N16 offer de bout en bout : pose en échec dé-marquée,
-#       .gitignore (A2), rc≠0 (A3) ; N16f pose VIDE (dépendance inconnue, moteur réel, rc 0 sans rien poser) → échec (A3)
+#       .gitignore (A2), rc≠0 (A3) ; N17 mark_uninstalled durci + primitive commune, M-1/m-1/m-2 (BL35-A5) ; N16f pose VIDE (dépendance inconnue, moteur réel, rc 0 sans rien poser) → échec (A3)
 #   N10f les dépendances non posées sont nommées (deps=…) dans NOUVEAU_MODULE
 # VF_NM_TEST_ENGINE : engine de substitution (mutant). VF_NM_TEST_RUN : vf-update-run.sh de substitution (N10, N16f).
 # Exit 1 dès qu'un KO est compté ; aucun cas exécuté → exit 1.
@@ -320,6 +320,45 @@ O5="$E5/.claude/scripts/.vibeflow-offered"
 (cd "$E5" && HOME="$H5" XDG_CACHE_HOME="$WORK/xdg" VF_CACHE_BASE="$B5" bash "$V5/conductor/scripts/vf-update-run-sous-test.sh" offer project orph >"$WORK/e5.out" 2>&1); orc=$?
 l5="$(cd "$E5" && HOME="$H5" VIBEFLOW_CACHE="$V5" bash "$V5/_internal/vibeflow-update.sh" --scope project new-modules 2>/dev/null)"
 if [ "$orc" -ne 0 ] && ! grep -qx orph "$O5" 2>/dev/null && ! grep -q '^orph=' "$E5/.claude/scripts/.vibeflow-installed" && printf '%s\n' "$l5" | grep -qx 'orph=v1.0.0'; then ok "N16f : pose vide (dépendance inconnue) → rc≠0, orph non inscrit, reproposé au new-modules suivant"; else ko "N16f : rc=$orc (attendu ≠0) offered=[$(tr '\n' ' ' < "$O5" 2>/dev/null)] (attendu sans orph) new-modules=[$(printf '%s' "$l5" | tr '\n' ' ')]"; fi
+
+# ---- N17 : mark_uninstalled durci + primitive commune (BL35-A5, arbitrage Samuel, AskUserQuestion session principale,
+# 2026-11-05 : « Corriger dans la même PR (Recommandé) » ; M-1 mark_uninstalled sans contrôle de lien, m-1 registre
+# illisible, m-2 registre = répertoire). Chemins réels : `uninstall conductor` et `update --all` (cleanup_retired_modules).
+RC9="$WORK/cache9"; mkcache "$RC9"; printf 'retire:.claude/artefact-retire\n' > "$RC9/_internal/retired-modules.txt"
+unin() { ENG_OUT="$(cd "$LAB" && HOME="$FH" VIBEFLOW_CACHE="$IC" bash "$ENGINE" --scope project uninstall conductor 2>"$WORK/eng.err")"; ENG_RC=$?; }
+updall() { ENG_OUT="$(cd "$LAB" && HOME="$FH" VIBEFLOW_CACHE="$RC9" bash "$ENGINE" --scope project update --all 2>"$WORK/eng.err")"; ENG_RC=$?; }
+# a : nominal — uninstall retire la ligne nommée, conserve les autres, aucun .tmp
+fresh_reg; printf 'alpha=v1.0.0\nconductor=v1.0.0\nzed=INCONSISTENT:install:v2.0.0\n' > "$REG"; unin
+if [ "$ENG_RC" -eq 0 ] && [ "$(cat "$REG")" = "$(printf 'alpha=v1.0.0\nzed=INCONSISTENT:install:v2.0.0')" ] && regtmp_absent; then ok "N17a : uninstall retire la seule ligne nommée, conserve les autres, aucun .tmp"; else ko "N17a : attendu alpha+zed, reçu rc=$ENG_RC [$(tr '\n' '|' < "$REG" 2>/dev/null | cut -c1-80)]"; fi
+# b : uninstall, temporaire = lien vers un fichier de l'humain
+fresh_reg; printf 'SENTINELLE\n' > "$VICTIM"; printf 'alpha=v1.0.0\nconductor=v1.0.0\n' > "$REG"; ln -s "$VICTIM" "${REG}.tmp"; unin
+if [ "$ENG_RC" -ne 0 ] && [ "$(cat "$VICTIM")" = SENTINELLE ] && [ ! -L "$REG" ] && [ "$(cat "$REG")" = "$(printf 'alpha=v1.0.0\nconductor=v1.0.0')" ]; then ok "N17b : uninstall, .tmp = lien → refus (rc≠0), fichier de l'humain intact, registre intact et non lien"; else ko "N17b : victime=[$(head -1 "$VICTIM" | cut -c1-40)] registre-lien=$( [ -L "$REG" ] && echo oui || echo non) rc=$ENG_RC"; fi
+# c : uninstall, registre = lien
+fresh_reg; printf 'SENTINELLE\n' > "$VICTIM"; ln -s "$VICTIM" "$REG"; unin
+if [ "$ENG_RC" -ne 0 ] && [ "$(cat "$VICTIM")" = SENTINELLE ] && [ -L "$REG" ] && regtmp_absent; then ok "N17c : uninstall, registre = lien → refus (rc≠0), cible intacte, lien conservé, pas de .tmp"; else ko "N17c : rc=$ENG_RC lien=$( [ -L "$REG" ] && echo conservé || echo remplacé) victime=[$(head -1 "$VICTIM" | cut -c1-40)]"; fi
+# d : update --all (cleanup_retired_modules), temporaire = lien
+fresh_reg; printf 'SENTINELLE\n' > "$VICTIM"; printf 'alpha=v1.0.0\nretire=v1.0.0\n' > "$REG"; ln -s "$VICTIM" "${REG}.tmp"; updall
+if [ "$ENG_RC" -ne 0 ] && [ "$(cat "$VICTIM")" = SENTINELLE ] && [ ! -L "$REG" ] && grep -qx 'retire=v1.0.0' "$REG"; then ok "N17d : update --all, .tmp = lien → refus (rc≠0), fichier de l'humain intact, registre non lien"; else ko "N17d : victime=[$(head -1 "$VICTIM" | cut -c1-40)] registre-lien=$( [ -L "$REG" ] && echo oui || echo non) rc=$ENG_RC"; fi
+# e : update --all, registre = lien
+fresh_reg; printf 'SENTINELLE\n' > "$VICTIM"; printf 'retire=v1.0.0\n' > "$VICTIM.reg"; ln -s "$VICTIM.reg" "$REG"; updall
+if [ "$ENG_RC" -ne 0 ] && [ -L "$REG" ] && [ "$(cat "$VICTIM.reg")" = 'retire=v1.0.0' ] && regtmp_absent; then ok "N17e : update --all, registre = lien → refus (rc≠0), cible et lien intacts"; else ko "N17e : rc=$ENG_RC lien=$( [ -L "$REG" ] && echo conservé || echo remplacé) cible=[$(head -1 "$VICTIM.reg" | cut -c1-40)]"; fi
+rm -f "$VICTIM.reg"
+# f : m-1 — registre illisible : refus, contenu préservé (sauté si root : chmod 000 n'y interdit rien)
+if [ "$(id -u)" -eq 0 ]; then ok "N17f : (sauté, exécuté en root : chmod 000 sans effet)"; else
+  for verbe in unin inst; do
+    fresh_reg; printf 'alpha=v1.0.0\nbeta=v2.0.0\nconductor=v1.0.0\n' > "$REG"; chmod 000 "$REG"; "$verbe"; chmod 600 "$REG"
+    if [ "$ENG_RC" -ne 0 ] && [ "$(cat "$REG")" = "$(printf 'alpha=v1.0.0\nbeta=v2.0.0\nconductor=v1.0.0')" ] && regtmp_absent; then ok "N17f($verbe) : registre illisible → refus (rc≠0), contenu préservé"; else ko "N17f($verbe) : rc=$ENG_RC registre=[$(tr '\n' '|' < "$REG" | cut -c1-70)]"; fi
+  done
+fi
+# g : m-2 — registre = répertoire, pour mark_installed (inst) ET mark_uninstalled (unin)
+for verbe in inst unin; do
+  fresh_reg; mkdir "$REG"; "$verbe"
+  if [ "$ENG_RC" -ne 0 ] && [ -d "$REG" ] && [ -z "$(ls -A "$REG")" ] && regtmp_absent; then ok "N17g($verbe) : registre = répertoire → refus (rc≠0), rien rangé dedans"; else ko "N17g($verbe) : rc=$ENG_RC contenu=[$(ls -A "$REG" | tr '\n' ' ')]"; fi
+done
+# h : uninstall sur registre absent : rc inchangé, le registre n'est pas créé
+fresh_reg; unin
+if [ ! -e "$REG" ] && regtmp_absent; then ok "N17h : uninstall sans registre → registre non créé, aucun .tmp"; else ko "N17h : registre créé ou .tmp laissé (rc=$ENG_RC)"; fi
+rm -rf "$LAB/.claude" "$VICTIM"
 
 echo "== $pass ok, $fail ko =="
 [ "$fail" -eq 0 ] && [ $((pass+fail)) -gt 0 ]

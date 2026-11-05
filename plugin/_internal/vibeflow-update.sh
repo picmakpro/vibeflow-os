@@ -521,26 +521,45 @@ mark_installed() {
     vf_declare_write "$verb" "$INSTALLED_REGISTRY" "$mod=$version"
     return 0
   fi
-  # BL35-A4 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Corriger dans la même
-  # PR »), famille HIGH de CONCERNS.md:144 : même durcissement que mark_offered. Aucune écriture ne suit
-  # un lien symbolique, ni le registre ni son temporaire (un lien posé par un dépôt jugé ferait écraser un
-  # fichier de l'humain) ; l'ancien contenu n'est recopié que pour les lignes au format du registre
-  # `<module>=<version>` (module [a-z0-9-]+, version sans `=` ni blanc : celle que lisent `cut -d= -f2` et
-  # role_notice). `INCONSISTENT:<étape>:<version>` du rollback a ce format et survit au filtre.
+  _registry_rewrite "mark-installed" "$mod" "$version"
+}
+
+# _registry_rewrite <appelant> <module> [version] — primitive UNIQUE d'écriture du registre, partagée par
+# mark_installed (version donnée : la ligne est (ré)inscrite) et mark_uninstalled (version vide : la ligne est
+# retirée, un registre absent n'est pas créé).
+# BL35-A4 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Corriger dans la même PR »),
+# famille HIGH de CONCERNS.md:144 : même durcissement que mark_offered. Aucune écriture ne suit un lien
+# symbolique, ni le registre ni son temporaire (un lien posé par un dépôt jugé ferait écraser un fichier de
+# l'humain) ; l'ancien contenu n'est recopié que pour les lignes au format du registre `<module>=<version>`
+# (module [a-z0-9-]+, version sans `=` ni blanc : celle que lisent `cut -d= -f2` et role_notice).
+# `INCONSISTENT:<étape>:<version>` du rollback a ce format et survit au filtre.
+# BL35-A5 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Corriger dans la même PR
+# (Recommandé) ») : M-1 (mark_uninstalled n'avait aucun contrôle de lien), m-1 (registre illisible : les autres
+# modules étaient effacés en silence), m-2 (registre = répertoire : le mv rangeait le temporaire DANS le
+# répertoire, rc 0 sans inscription) → tout registre existant qui n'est pas un fichier régulier lisible est refusé.
+_registry_rewrite() {
+  local who="$1" mod="$2" version="${3:-}"
   local reg="$INSTALLED_REGISTRY" tmp="${INSTALLED_REGISTRY}.tmp"
-  [ ! -L "$reg" ] || err "mark-installed : $VF_REGISTRY_RELPATH est un lien symbolique — refus, rien n'est écrit"
-  [ ! -L "$tmp" ] || err "mark-installed : ${VF_REGISTRY_RELPATH}.tmp est un lien symbolique — refus, rien n'est écrit"
-  mkdir -p "$(dirname "$reg")"
-  [ -e "$reg" ] || : > "$reg"
+  [ ! -L "$reg" ] || err "$who : $VF_REGISTRY_RELPATH est un lien symbolique — refus, rien n'est écrit"
+  [ ! -L "$tmp" ] || err "$who : ${VF_REGISTRY_RELPATH}.tmp est un lien symbolique — refus, rien n'est écrit"
+  if [ -e "$reg" ]; then
+    [ -f "$reg" ] || err "$who : $VF_REGISTRY_RELPATH n'est pas un fichier régulier — refus, rien n'est écrit"
+    [ -r "$reg" ] || err "$who : $VF_REGISTRY_RELPATH illisible — refus, registre inchangé"
+  elif [ -z "$version" ]; then
+    return 0   # retrait sur un registre absent : rien à faire, et on ne le crée pas
+  else
+    mkdir -p "$(dirname "$reg")"
+    : > "$reg"
+  fi
   rm -f "$tmp"
   # Création exclusive (noclobber) : un lien apparu entre le contrôle et l'écriture n'est pas suivi.
   if ! ( set -C
          { grep -E '^[a-z0-9-]+=[^=[:space:]]+$' "$reg" 2>/dev/null | grep -v "^$mod=" || true
-           echo "$mod=$version"
+           [ -z "$version" ] || echo "$mod=$version"
          } > "$tmp" ) 2>/dev/null; then
-    rm -f "$tmp"; err "mark-installed : écriture de ${VF_REGISTRY_RELPATH}.tmp impossible — registre inchangé"
+    rm -f "$tmp"; err "$who : écriture de ${VF_REGISTRY_RELPATH}.tmp impossible — registre inchangé"
   fi
-  mv "$tmp" "$reg" || { rm -f "$tmp"; err "mark-installed : remplacement de $VF_REGISTRY_RELPATH impossible"; }
+  mv "$tmp" "$reg" || { rm -f "$tmp"; err "$who : remplacement de $VF_REGISTRY_RELPATH impossible"; }
 }
 
 mark_uninstalled() {
@@ -553,10 +572,7 @@ mark_uninstalled() {
   # ici — les deux appelants annoncent déjà eux-mêmes (verbe -, no-op manifeste par construction,
   # D-31-02), une 2e annonce depuis ce site dupliquerait la ligne.
   vf_dry_run && return 0
-  if [ -f "$INSTALLED_REGISTRY" ]; then
-    grep -v "^$mod=" "$INSTALLED_REGISTRY" > "${INSTALLED_REGISTRY}.tmp" || true
-    mv "${INSTALLED_REGISTRY}.tmp" "$INSTALLED_REGISTRY"
-  fi
+  _registry_rewrite "mark-uninstalled" "$mod"
 }
 
 # ---------- Manifeste de pose (D-31-01/02/03, Phase 31 vague TRACER) ----------
