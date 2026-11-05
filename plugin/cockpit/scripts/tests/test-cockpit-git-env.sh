@@ -263,7 +263,7 @@ assert_eq "M-TRONQUE — rougit E4.2 : la troncature n'est plus signalée (tronq
 echo "=== E8 — le moteur vendorisé : environnement durci passé par l'assemblage, git fermé par défaut (GITC-13, P78-D-25) ==="
 MOTEUR="$(cd "$SCRIPTS/.." && pwd)/skills/cockpit-moteur"
 BUILD="$SCRIPTS/vf-cockpit-build.mjs"
-LAB8="$WORK/lab8"; cp -R "$P" "$LAB8"
+LAB8="$WORK/lab8"; cp -R "$P" "$LAB8"; printf "export const un = 1;\n" > "$LAB8/m.js"   # un fichier de code, suivi par git (non ignoré)
 cat > "$AUX/tete.mjs" <<'JS'
 import fs from 'node:fs';
 const j = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));

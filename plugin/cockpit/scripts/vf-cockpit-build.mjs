@@ -9,8 +9,7 @@ import path from 'node:path';
 import { read as lireGarde } from './vf-cockpit-planning.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { envEnfant } from './vf-cockpit-env.mjs';
-import { findLabRoot, engineDir, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
+import { findLabRoot, engineDir, envGit, configFiltres, filtresDeclares, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
 import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { enteteGit } from './vf-cockpit-git-entete.mjs';
 import { ecrireArchitecture } from './vf-cockpit-code.mjs';
@@ -28,7 +27,7 @@ const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return 
 const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/[`*]/g, '').trim(); const i = s.search(/[.!?](\s|$)/); s = i > 25 ? s.slice(0, i + 1) : s; return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 // la cause remonte (lignes d'erreur du moteur, jusqu'à 4), pas seulement sa dernière ligne ; timeout : un moteur bloqué ne gèle pas le lanceur
 const run = (engine, script, lab, ...a) => {
-  try { return execFileSync(process.execPath, [path.join(engine, 'scripts', script), lab, ...a], { encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'pipe'], timeout: 600000, env: envEnfant(lab) }); }
+  try { return execFileSync(process.execPath, [path.join(engine, 'scripts', script), lab, ...a], { encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'pipe'], timeout: 600000, env: envGit(lab, { config: configFiltres(filtresDeclares(lab, lab)) }) }); }
   catch (e) {
     const lines = String(e.stderr || e.stdout || e.message).split('\n').map((l) => l.trim()).filter(Boolean);
     const cause = (lines.filter((l) => /^(✗|-|error|Error)/.test(l)).slice(0, 4).join(' · ') || lines.slice(-1)[0] || 'cause inconnue').slice(0, 400);

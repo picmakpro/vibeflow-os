@@ -155,6 +155,8 @@ export function classify(relPath, bytes) {
 // ---------- git ----------
 
 export function git(cwd, args) {
+  // vibeflow P27 : git ne tourne que sous l'environnement durci posé par l'assemblage (envGit) ; sans ce marqueur, « hors dépôt » (P78-D-25)
+  if (process.env.VF_COCKPIT_GIT_DURCI !== '1') return null;
   try {
     return execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }).trimEnd();
   } catch {
