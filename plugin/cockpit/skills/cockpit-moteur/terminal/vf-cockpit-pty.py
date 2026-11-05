@@ -1,10 +1,11 @@
-"""Assistant PTY du terminal intégré du cockpit VibeFlow (71-01, complété par 71-03).
+# vibeflow:allow-large-file — dette de taille tracée (72-02) : fichier lancé en `python3 -I` (dossier absent de sys.path, décision de sécurité T-71-16), donc non découpable en modules frères sans changer ce sys.path isolé.
+"""Assistant PTY du terminal intégré du cockpit VibeFlow (71-01, complété par 71-03 puis 72-02).
 
 Usage : python3 -I vf-cockpit-pty.py <lignes> <colonnes> <shell>
 
 Lance <shell> -l dans un pseudo-terminal et sert de pont : le descripteur 0 est l'entrée du shell, le 1 sa sortie,
 le 2 reçoit l'état (une ligne « FIN <code> » quand le shell sort, « SIG <n> » s'il est tué par un signal),
-le 3 reçoit le contrôle (lignes « R <lignes> <colonnes> » : nouvelle taille du terminal).
+le 3 reçoit le contrôle (lignes « R <lignes> <colonnes> » : nouvelle taille du terminal ; lignes « L <hex> » : écrire une ligne de commande au shell, voir plus bas).
 Le dossier courant et l'environnement sont ceux du processus : le serveur les pose, cet assistant n'invente rien.
 
 Entrées et sorties ne bloquent jamais : le maître et le descripteur 1 sont non bloquants, les octets en attente vont dans deux tampons (ordre
@@ -34,12 +35,20 @@ Limites signalées en revue (aucune n'est corrigée ici, elles sont connues) : (
 getsid, relu avant chaque envoi, sans le garde-fou « chef réapé » de l'assistant (CHEF_REAPE) ; (2) la borne « au plus GRACE + environ 2 s » suppose un `ps` qui répond vite : chaque relevé lance
 `ps` (5 s de délai au plus par appel, sans /proc), la durée réelle de l'arrêt dépend donc de lui ; (3) la fenêtre entre pty.fork() et l'écriture de « SID » n'est pas couverte : un assistant qui meurt dans cet intervalle
 laisse un gardien qui voit la fin du tube sans « SID » et ne ramasse rien, le shell déjà né reste alors sans gardien.
-Aucun octet du shell n'est journalisé.
+Lancement d'une ligne (72-02 ; P72-D-01, D-13, D-14) : « L <hex> » porte les octets d'une ligne de commande en hexadécimal (2 à 800 caractères, pairs). L'assistant la REVALIDE seul, sans faire
+confiance à ce qui l'a envoyée : alphabet fermé [A-Za-z0-9 ._:/'-] en correspondance TOTALE (fullmatch : l'ancre de fin de ligne de Python tolère un saut de ligne final), au plus LIGNE_MAX octets, préfixe
+« claude --session-id ' » et apostrophe finale. Puis, SEULEMENT si le shell est au premier plan du terminal (tcgetpgrp(maître) == pid du shell) et qu'aucune entrée n'attend déjà d'être écrite, il ajoute Ctrl-C PUIS la
+ligne, SANS retour chariot, au tampon vers le shell et tente l'écriture tout de suite : la ligne attend à l'invite, seul un retour chariot humain (descripteur 0) l'exécute. Sinon il n'écrit RIEN (jamais de Ctrl-C
+dans un programme de l'utilisateur). Chaque ligne « L » reçoit EXACTEMENT une réponse sur le descripteur 2 : « LANCE ok », « LANCE premier-plan », « LANCE alphabet » ou « LANCE invalide » (le nombre de mots différent
+de deux est « invalide »). Limite : une ligne de plus de 1024 octets est abandonnée sans réponse (le reste de tampon est borné) ; la session n'en produit jamais (803 octets au plus). Un shell qui n'est pas le fils direct du
+terminal (un $SHELL qui en lance un autre en sous-processus) n'est jamais « au repos » ici : refus sûr.
+Aucun octet du shell et aucune ligne lancée ne sont journalisés.
 Compatible Python 3.9, aucune dépendance.
 """
 import fcntl
 import os
 import pty
+import re
 import select
 import signal
 import struct
@@ -53,6 +62,11 @@ LIGNES_MAX = 500  # bornes de taille : les mêmes que TAILLE_MAX du serveur (vf-
 COLONNES_MAX = 1000
 TAMPON_MAX = 1 << 20
 MORCEAU = 65536
+LIGNE_MAX = 400  # octets d'une ligne lancée : la même borne que LIGNE_MAX de vf-cockpit-terminal-session.mjs
+PREFIXE_LIGNE = b"claude --session-id '"
+ALPHABET_LIGNE = re.compile(rb"[A-Za-z0-9 ._:/'-]+")
+HEX_LIGNE = re.compile(rb"(?:[0-9A-Fa-f]{2})+")
+CTRL_C = bytes([3])
 arret = False
 
 
@@ -96,8 +110,56 @@ def fin_du_shell(pid, st):
     return 'FIN %d' % os.WEXITSTATUS(st)
 
 
-def lire_controle(tampon, maitre):
-    """Applique les lignes « R <lignes> <colonnes> » complètes du tampon, rend le reste."""
+def decoder_ligne(hexa):
+    """Décode l'hexadécimal d'une ligne « L » : (code, octets). Plus de 2 * LIGNE_MAX caractères, impair, vide ou non hexadécimal : « invalide »."""
+    if len(hexa) > 2 * LIGNE_MAX:
+        return 'invalide', b''
+    if not HEX_LIGNE.fullmatch(hexa):
+        return 'invalide', b''
+    return 'ok', bytes.fromhex(hexa.decode('ascii'))
+
+
+def valider_ligne(ligne):
+    """Revalidation indépendante de la ligne : « alphabet » (jugé d'abord, correspondance totale), « invalide » (préfixe, apostrophe finale) ou « ok »."""
+    if not ALPHABET_LIGNE.fullmatch(ligne):
+        return 'alphabet'
+    if len(ligne) <= len(PREFIXE_LIGNE):
+        return 'invalide'
+    if not (ligne.startswith(PREFIXE_LIGNE) and ligne.endswith(b"'")):
+        return 'invalide'
+    return 'ok'
+
+
+def premier_plan_libre(maitre, pid):
+    """Vrai si le shell lui-même occupe le premier plan du terminal (au repos, à l'invite) ; toute erreur du système vaut faux."""
+    try:
+        return os.tcgetpgrp(maitre) == pid
+    except OSError:
+        return False
+
+
+def lancer_ligne(hexa, maitre, pid, vers_shell):
+    """Écrit Ctrl-C puis la ligne (sans retour chariot) au shell s'il est au repos ; rend « ok », « premier-plan », « alphabet » ou « invalide »."""
+    code, ligne = decoder_ligne(hexa)
+    if code != 'ok':
+        return code
+    code = valider_ligne(ligne)
+    if code != 'ok':
+        return code
+    if vers_shell:
+        return 'premier-plan'  # une entrée déjà en attente d'écriture n'est pas un shell au repos : la file ne grossit pas devant un shell sourd
+    if not premier_plan_libre(maitre, pid):
+        return 'premier-plan'
+    vers_shell += CTRL_C + ligne
+    try:
+        pousser(maitre, vers_shell)  # même passe de boucle ; le reste part au prochain select
+    except OSError:
+        pass
+    return 'ok'
+
+
+def lire_controle(tampon, maitre, pid=None, vers_shell=None):
+    """Applique les lignes « R <lignes> <colonnes> » et « L <hex> » complètes du tampon (une réponse « LANCE … » par ligne L sur le descripteur 2), rend le reste."""
     while b'\n' in tampon:
         ligne, tampon = tampon.split(b'\n', 1)
         mots = ligne.split()
@@ -105,7 +167,10 @@ def lire_controle(tampon, maitre):
             l, c = int(mots[1]), int(mots[2])
             if 0 < l <= LIGNES_MAX and 0 < c <= COLONNES_MAX:
                 taille(maitre, l, c)
-    return tampon[-256:]
+        elif mots and mots[0] == b'L':
+            code = lancer_ligne(mots[1], maitre, pid, vers_shell) if len(mots) == 2 and vers_shell is not None else 'invalide'
+            statut(2, 'LANCE ' + code)
+    return tampon[-1024:]
 
 
 def groupes(pid, maitre):
@@ -429,7 +494,7 @@ def main():
             if avec_controle and 3 in pret:
                 donnees = os.read(3, 4096)
                 if donnees:
-                    controle = lire_controle(controle + donnees, maitre)
+                    controle = lire_controle(controle + donnees, maitre, pid, vers_shell)
                 else:
                     avec_controle = False
             if maitre in pret_e:
