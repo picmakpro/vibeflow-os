@@ -736,13 +736,14 @@ de s'y fier.
 
 ### 5. Règle pour les workers
 
-Un worker ne termine jamais son tour avec un enfant en cours sans l'avoir consigné (§2). Le
-transcript de l'agent n'est pas un registre : personne ne le relit à la reprise. La règle
-du worker (rien de vivant à la fin du tour) est dans `team-kernel.md` §Fin de tour inerte ; un
-enfant qui ne s'arrête pas se déclare `blocked` avec son identifiant en finding. À la clôture d'une mission, un `release` avec `children_running` non nul
-relâche quand même (geste RAII) mais garde le registre et le signale ; le gate de sortie
-(`check-mission-exit.sh`, E1) le lit comme un manque : une mission terminée avec un enfant ouvert
-n'est pas une mission inerte.
+La règle du worker (rien de vivant à la fin du tour) et celle du manager sont dans `team-kernel.md`
+§Fin de tour inerte. Le transcript de l'agent n'est pas un registre : personne ne le relit à la
+reprise, d'où la consignation du §2. Un enfant qui ne s'arrête pas se déclare `blocked`, identifiant
+en finding.
+
+À la clôture d'une mission, un `release` avec `children_running` non nul relâche quand même (geste
+RAII) mais garde le registre et le signale ; le gate de sortie (`check-mission-exit.sh`, E1) le lit
+comme un manque : une mission terminée avec un enfant ouvert n'est pas une mission inerte.
 
 ## Budgets de méthode : ce que la mission laisse derrière elle (v2.67.0)
 

@@ -645,8 +645,10 @@ journal_event() {
 # survit donc a la reprise ; il n'est supprime que par un `release` sans enfant `running`.
 #
 # STATUT CONSIGNE, pas statut runtime : le registre dit ce que les agents ont DECLARE. La verite
-# de vie d'un agent reste `ListAgents` cote Claude Code ; `orphans` liste ce qu'il faut ALLER
-# verifier, et `close --status=stopped` se pose apres la verification, jamais avant.
+# de vie d'un agent se lit dans la liste « Running background agents » (ListAgents est absent des
+# sous-agents) ; `orphans` liste ce qu'il faut ALLER verifier, et `close --status=stopped` se pose
+# apres la confirmation de la session principale, qui seule arrete un enfant (team-kernel.md
+# § Fin de tour inerte), jamais avant.
 # ---------------------------------------------------------------------------------------------
 if [ "$PARTITIONED" = 1 ]; then
   REG="$LOCK_PARENT/${LOCK_BASE}.children.jsonl"   # frere du verrou resolu ; VF_DRIVER_CHILDREN ignoree (P57-D-31)
@@ -1179,7 +1181,7 @@ case "$ACTION" in
     # orphans (issue #82) : un reclaim est le geste d'une reprise de session, donc le manager qui
     # revient (ou son remplacant, meme owner) voit d'un coup ce qui tourne encore en son nom.
     _orph="$(orphans_count)"
-    [ "$_orph" -gt 0 ] && log "registre : $_orph agent(s) consigne(s) encore running sous ce lock. Verifier ListAgents, arreter feuille -> racine, puis close --status=stopped"
+    [ "$_orph" -gt 0 ] && log "registre : $_orph agent(s) consigne(s) encore running sous ce lock. Les relayer a la session principale (SendMessage(main)), seule a pouvoir les arreter : team-kernel.md, Fin de tour inerte ; close --status=stopped apres sa confirmation"
     printf '{"reclaimed": true, "owner": "%s", "session_id": "%s", "session_ids": %s, "generation": "%s", "lease_seconds": %s, "orphans_count": %s, "orphans": %s%s}\n' \
       "$OWNER" "$sid" "$(json_session_ids "$(lock_session_ids)")" "$(lock_gen)" "$_lease" "$_orph" "$(orphans_ids_json)" "$SCOPE_JSON"
     exit 0
@@ -1321,7 +1323,7 @@ case "$ACTION" in
 
   close)
     # Ferme une entree par APPEND (jamais une reecriture du registre) : `done`/`failed` au retour
-    # normal d'un agent, `stopped` apres un arret verifie par ListAgents (jamais sur la seule
+    # normal d'un agent, `stopped` apres la confirmation de la session principale (jamais sur la seule
     # reponse de TaskStop, qui peut etre sans effet immediat).
     AGENT="$(sanitize_session_id "$AGENT")"
     [ -n "$AGENT" ] || { log "--agent requis pour 'close'"; printf '{"closed": false, "reason": "agent-required"%s}\n' "$SCOPE_JSON"; exit 1; }

@@ -1,7 +1,7 @@
 ---
 name: vf-test-orchestrator
 description: "Orchestrateur de la boucle de test autonome pour projets MOBILES (Expo/React Native). Reçoit une phase/feature, tient la boucle test → corrige → re-test jusqu'au vert ou budget épuisé, avec baseline verte, anti-régression et anti-thrash. Dispatche vf-test-runner et vf-app-fixer. Applique les halt conditions. Utile uniquement sur un projet mobile. Worker interne — dispatché par vf-dev-manager ou par le mode autonome (vf-auto) sur ce type de projet, pas en usage direct."
-tools: Read, Write, Bash, TaskStop, Glob, Grep, WebSearch, WebFetch, Agent(vf-test-runner, vf-app-fixer)
+tools: Read, Write, Bash, TaskStop, SendMessage, Glob, Grep, WebSearch, WebFetch, Agent(vf-test-runner, vf-app-fixer)
 model: sonnet
 effort: high
 memory: project

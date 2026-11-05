@@ -2,7 +2,7 @@
 
 ## [v2.0.18] — 2026-11-05 (fin de tour inerte) — non publiée
 
-**Patch.** Correctif des workers orphelins des 3-5 novembre : un agent qui rend la main pendant qu'une commande Bash tourne en fond (bascule automatique du timeout comprise) reste vivant sans que personne ne l'arrête. `TaskStop` ajouté au champ `tools:` et une ligne de règle ajoutée, avec renvoi vers `conductor/references/team-kernel.md` § Fin de tour inerte (source unique) : vf-content-manager. Arbitrages Samuel, AskUserQuestion session principale, 2026-11-05 : « Mandat maintenant » (correctif) ; hook `SubagentStop` « Plus tard, en spike » (`.planning/BACKLOG.md`).
+**Patch.** Correctif des workers orphelins des 3-5 novembre : un agent qui rend la main pendant qu'une commande Bash tourne en fond (bascule automatique du timeout comprise) reste vivant sans que personne ne l'arrête. `TaskStop` ajouté au champ `tools:` et une ligne de règle ajoutée, avec renvoi vers `conductor/references/team-kernel.md` § Fin de tour inerte (source unique) : vf-content-manager. Arbitrages Samuel, AskUserQuestion session principale, 2026-11-05 : « Mandat maintenant » (correctif) ; hook `SubagentStop` « Plus tard, en spike » (`.planning/BACKLOG.md`).  Suite de tests : l'ancrage de la recherche de `Task`/`Agent` dans `tools:` est un mot entier (`TaskStop` ne rougit plus à tort).
 
 ## [v2.0.17] — 2026-10-29 (références mortes à `vibeflow-update.sh`) — publiée dans v2.72.0
 

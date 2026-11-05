@@ -812,12 +812,16 @@ description: Agent de test declarant une allowlist Agent totalement vide.
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Agent()
+tools: Read, Agent(), TaskStop
 ---
 corps
 EOF
-RC=0; run_check >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 1 ] && ok "T27 Agent() vide → exit 1" || ko "T27 (rc=$RC)"
+RC=0; OUT="$(run_check 2>&1)" || RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "allowlist vide"; then
+  ok "T27 Agent() vide → exit 1 (message « allowlist vide »)"
+else
+  ko "T27 (rc=$RC) : $OUT"
+fi
 rm -f "$AG/vide.md"
 
 # T28 — outil hors set connu (Reed) : warning en defaut, ERREUR en --strict ; Read reste vert

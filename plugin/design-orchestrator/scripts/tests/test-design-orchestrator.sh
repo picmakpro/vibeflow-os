@@ -173,13 +173,13 @@ if [ -z "$jt" ]; then
   ko "T4 cloisonnement : vf-design-judge sans ligne tools: (hériterait de TOUT — Write inclus)"; t4_ok=0
 else
   echo "$jt" | "$GREP" -qE '(Write|Edit)' && { ko "T4 cloisonnement : le juge a Write/Edit (il ne doit JAMAIS corriger)"; t4_ok=0; }
-  echo "$jt" | "$GREP" -qE '(Agent|Task)' && { ko "T4 cloisonnement : le juge a Agent/Task (il ne dispatche personne)"; t4_ok=0; }
+  echo "$jt" | "$GREP" -qE '(^|[^A-Za-z])(Agent|Task)([^A-Za-z]|$)' && { ko "T4 cloisonnement : le juge a Agent/Task (il ne dispatche personne)"; t4_ok=0; }
 fi
 ct="$(tools_line "$CRAFTER")"
 if [ -z "$ct" ]; then
   ko "T4 cloisonnement : vf-crafter sans ligne tools: (hériterait de Task)"; t4_ok=0
 else
-  echo "$ct" | "$GREP" -qE '(Agent|Task)' && { ko "T4 cloisonnement : le crafter a Agent/Task (worker sans dispatch)"; t4_ok=0; }
+  echo "$ct" | "$GREP" -qE '(^|[^A-Za-z])(Agent|Task)([^A-Za-z]|$)' && { ko "T4 cloisonnement : le crafter a Agent/Task (worker sans dispatch)"; t4_ok=0; }
   echo "$ct" | "$GREP" -qE 'Write' || { ko "T4 cloisonnement : le crafter sans Write (il doit produire)"; t4_ok=0; }
 fi
 mt="$(tools_line "$MANAGER")"
