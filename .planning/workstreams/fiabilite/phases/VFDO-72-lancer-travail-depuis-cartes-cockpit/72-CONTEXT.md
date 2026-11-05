@@ -111,10 +111,22 @@ seule).
   un court délai d'affichage (valeur au plan). Il écrit la ligne au shell SANS retour chariot : l'utilisateur la voit à
   l'invite et appuie lui-même sur Entrée. Une ligne en attente à l'invite est vidée seulement si le premier plan est le
   shell.
-- **P72-D-15 (forme du prompt, PROVISOIRE jusqu'à la sonde de vague 0).** Intention en français, construite par le
+- **P72-D-15 (forme du prompt, PROVISOIRE jusqu'à la sonde de vague 0 — tranchée par P72-D-19).** Intention en français, construite par le
   gabarit (par exemple « Cadre la Phase 72 du compartiment fiabilite »), passée au head par la forme que la sonde prouve
   (`'/vf-dev <intention>'` en prompt initial, ou `--agent`, ou intention nue). Jamais une commande `gsd-*` dans le
   prompt (doctrine du head). Lancement à la racine du lab ; VibeFlow crée son propre worktree selon sa doctrine.
+- **P72-D-19 (forme du prompt, DÉFINITIVE ; décision du manager, vf-dev-manager, 2026-11-05, sur la sonde de vague 0).**
+  Mesures (Claude Code 2.1.318, projet témoin, PTY) : un skill passé en prompt initial interactif se déclenche
+  (`claude --permission-mode acceptEdits '/temoin72'`, marqueur en 7,9 s) et reçoit ses arguments par `$ARGUMENTS`
+  (`'/temoin72 phase 72 cadrer'`) ; `--agent <nom>` incarne aussi un agent ; `--session-id <uuid4>` écrit
+  `~/.claude/projects/<slug>/<uuid>.jsonl` SEULEMENT si `CLAUDE_CODE_CHILD_SESSION` est absent de l'environnement ;
+  `--append-system-prompt-file` est accepté en interactif (absent de `--help`, cité seulement sous `--bare`) ; une chaîne
+  passée par variable entre guillemets doubles n'est pas développée. Retenu : `claude --session-id '<uuid>' -n '<nom>'
+  [--permission-mode '<mode>'] '/vf-dev <intention>'`, le nom exact du skill tel qu'exposé par l'installation (nu ou
+  préfixé du plugin) étant une constante du gabarit, vérifiée par une suite. Obligations qui en découlent : l'environnement
+  du shell est déjà privé de `CLAUDE_CODE_*` (P71-D-03) — un témoin le vérifie, sans quoi le suivi P72-D-16 est muet ;
+  la boîte « faire confiance à ce dossier » d'un lab jamais ouvert apparaît dans le terminal et reste à l'utilisateur
+  (écrit au README). Artefacts de la sonde : scratchpad de la mission, `sonde72/` (hors dépôt).
 - **P72-D-16 (suivi).** `--session-id <uuid>` et `-n` construit des seuls identifiants ; la carte montre « lancée » et
   se rattache à la session de l'onglet Équipe (`vf-cockpit-who.mjs`, P69-D-22) ; un second lancement de la même cible
   dans la fenêtre de récence est averti (P72-D-06).
