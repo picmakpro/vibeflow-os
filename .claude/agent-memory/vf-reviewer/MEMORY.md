@@ -37,3 +37,6 @@
 - [Remplacer une prescription : garder sa mitigation](feedback_replace-prescription-keep-its-mitigation.md) — #81 : heartbeat retire de l attente, TTL 1800 s non couvert
 - [Gate à lecture partielle sans effet sur le code](feedback_gate-partial-read-warning-only.md) — compteur non_reconnues sans effet + juge qui l ignore (check-prd, Phase 59) ; livrable brief seul = impasse rc 3
 - [Extraction cockpit + Chrome parallèle](feedback_cockpit-extraction-and-parallel-chrome.md) — git archive : cockpit+conductor+planning-core ; sondes Chrome seules, jamais avec les suites
+- [Argument de portee non discrimine (cwd == lab)](feedback_scope-arg-cwd-equals-lab-nondiscriminant.md) — 68-11 : retirer lab:root ne rougit pas path-enfants ; exiger un cas cwd != lab
+- [Env hérité du lab, sonde réelle](feedback_env-herite-lab-settings-sonde-reelle.md) — NODE_OPTIONS via settings.json env charge un fichier du lab ; attribuer le marqueur par PPID (Phase 68)
+- [Nouvel enfant décale les sondes pgrep -P](feedback_new-child-process-shifts-pgrep-first-child-probes.md) — gardien PTY = 1er enfant, session.sh sonde le gardien ; sess= vaut 0 sous macOS
