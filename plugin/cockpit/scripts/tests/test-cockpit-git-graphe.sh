@@ -248,7 +248,7 @@ assert_eq "G5.2b teinte dans 1..5 et non constante" "$(echo "$T1" | tr ' ' '\n' 
 echo "━━ Mutants (chaque mutant : copie du module, motif fixe, FAIL si le motif manque ou si la sonde reste verte)"
 mutant() { # nom, motif fixe, remplacement
   mkdir -p "$WORK/mut/$1"
-  node -e 'const fs=require("fs");const [,, src, dst, de, vers]=process.argv;const s=fs.readFileSync(src,"utf8");const n=s.split(de).length-1;if(n!==1){console.error("motif trouvé "+n+" fois");process.exit(1)}fs.writeFileSync(dst,s.split(de).join(vers))' "$MOD" "$WORK/mut/$1/vf-cockpit-git-graphe.mjs" "$2" "$3"
+  node -e 'const fs=require("fs");const [, src, dst, de, vers]=process.argv;const s=fs.readFileSync(src,"utf8");const n=s.split(de).length-1;if(n!==1){console.error("motif trouvé "+n+" fois");process.exit(1)}fs.writeFileSync(dst,s.split(de).join(vers))' "$MOD" "$WORK/mut/$1/vf-cockpit-git-graphe.mjs" "$2" "$3"
   local rc=$?; assert_eq "$1 : le motif fixe «$2» existe exactement une fois" "$rc" "0"
 }
 rouge() { # libellé, obtenu, vert attendu
@@ -266,7 +266,7 @@ rouge "M-PAQUET (compte de champs et NUL final retirés) rougit G1.2" "$(echo "$
 assert_eq "M-PAQUET : G1.3 reste vert sur le mutant (pas de rouge pour une autre raison)" "$(Q g13 "$(MM M-PAQUET)")" "ko ko ko ok"
 mutant M-OCTOPUS 'for (let i = 1; i < c.p.length; i++) {' 'for (let i = 1; i < Math.min(c.p.length, 2); i++) {'
 rouge "M-OCTOPUS (seul p[1] traité) rougit G4.2" "$(Q g42 "$(MM M-OCTOPUS)")" "n=1 s=2 distincts=true fusion=true suite=true"
-assert_eq "M-OCTOPUS : G4.1 sans octopus de fixture reste exécutable (mutant chargé)" "$(Q g11 "$(MM M-OCTOPUS)")" "ok 25"
+assert_eq "M-OCTOPUS : G1.1 reste vert sur le mutant (mutant chargé)" "$(Q g11 "$(MM M-OCTOPUS)")" "ok 25"
 mutant M-RACINE 'lanes[col] = null; /* LIBERE-RACINE */' 'lanes[col] = c.h; /* mutant */'
 rouge "M-RACINE (couloir non libéré à une racine) rougit G4.1" "$(Q g41 "$(MM M-RACINE)")" "viol=0 ouverts=0 racines=2 rangees=$(G rev-list --count refs/heads/main)"
 assert_eq "M-RACINE : l'octopus reste placé (mutant chargé)" "$(Q g42 "$(MM M-RACINE)")" "n=1 s=2 distincts=true fusion=true suite=true"
