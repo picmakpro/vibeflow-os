@@ -59,7 +59,17 @@
   --n-test: #f19ac7; --n-script: #f5a66b; --n-infra: #f28b8b; --n-external: #e3a6f0; --n-misc: #8b8b8b; --n-dir: #a3a3a3; --n-file: #a3a3a3;
   --n-module: #a3a3a3; --n-symbol: #c7b8ff; --n-route: #7aa7ff; --n-connector: #8b8b8b;
   --m-GET: #6fd7a8; --m-POST: #7aa7ff; --m-PUT: #f0c36b; --m-PATCH: #c7a3ff; --m-DELETE: #f28b8b; --m-CALL: #6fcfd9; --m-ANY: #a3a3a3;
-  --panel-w: 360px; --pw: calc(var(--panel-w) + 32px); --gutter: 28px;
+  --panel-w: 360px; --pw: calc(var(--panel-w) + 2 * var(--sp-16)); --gutter: 28px;
+  /* Espacement (71.5, P71.5-D-01) : grille fermée 2 4 6 8 12 16 20 24 32. Un primitif ne change JAMAIS de valeur. */
+  --sp-2: 2px; --sp-4: 4px; --sp-6: 6px; --sp-8: 8px; --sp-12: 12px;
+  --sp-16: 16px; --sp-20: 20px; --sp-24: 24px; --sp-32: 32px;
+  --edge: var(--sp-16);                         /* tout ce qui touche un bord de fenêtre */
+  --inset-panel: var(--sp-20);                  /* bord d'un conteneur flottant (D-02) */
+  --gap-section: var(--sp-24);                  /* entre deux sections d'un panneau */
+  --inset-card: var(--sp-16);                   /* cartes (D-03) */
+  --inset-box: var(--sp-12);                    /* boîtes d'information */
+  --inset-row: var(--sp-8) var(--sp-12);        /* lignes de liste, items de menu */
+  --inset-pill: var(--sp-2) var(--sp-8);        /* pastilles, tags ; code en ligne : --sp-2 --sp-6 */
   color-scheme: dark;
 }
 /* ---------- light theme: same variables, new values. Chosen by the Theme button (see ui/05-theme.js) ---------- */
