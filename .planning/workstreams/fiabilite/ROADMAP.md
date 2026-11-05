@@ -490,8 +490,18 @@ Plans:
 **Demande de Samuel** (session principale Claude Code, 2026-11-05, mot pour mot) : « dernier point, je remarque que le titre dans le header a droite du logo vibeflow change en fonction de si c'est Code Projet Equipe. Il faut reprend la version Code qui montre le nom du dossier, mais on doit aussi pouvoir voir le nom de la branche/worktree, mais plus habilement. Je pense qu'on revoit la partie "Vue d'ensemble / Titre / Sous titre" et le nom du projet a cote du logo. Ensuite on réflechi a une feature pour afficher un graph facon "gitgraph" pour voir ou on en est exactement dans les wt/branch. On reflechira aussi a afficher des actions et data Git du projet. Facon GitKraken. On laisse de côté la review de diff compelte pour le moment. »
 **Requirements**: GITC-01, GITC-02, GITC-03, GITC-04, GITC-05, GITC-06, GITC-07, GITC-08, GITC-09, GITC-10, GITC-11, GITC-12, GITC-13, GITC-14
 **Depends on:** Phase 67 (serveur et onglets du cockpit) ; Phase 71 (modèle de menace des routes qui agissent sur le poste). En parallèle de la 72. Recoupements à trancher au cadrage : Phase 73 (worktrees, branches et travail non commité, idée 13) et Phase 75 (données tirées de `git log`), toutes deux sur `docs/jalon-v2-phases-73-77` ; Phase 71.5 (jetons d'espacement et paddings, qu'elle possède).
-**Plans:** 0 plans
+**Plans:** 11 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 78 to break down)
+- [ ] 78-01-PLAN.md — Environnement git durci (shBorne, lancerGit) et attribution des sous-agents (vague 1)
+- [ ] 78-02-PLAN.md — Parseurs alignés et placement des couloirs (JS pur) (vague 1)
+- [ ] 78-03-PLAN.md — Citation shell et commandes à copier (vague 1)
+- [ ] 78-04-PLAN.md — En-tête, bloc de vue, retrait de « Repositories » (vague 1)
+- [ ] 78-05-PLAN.md — Routes GET /api/vf/git et /entete (vague 2)
+- [ ] 78-06-PLAN.md — Tiroir : coquille, graphe, listes, commandes, coexistence, mobile (vague 2)
+- [ ] 78-07-PLAN.md — Moteur vendorisé durci (patch P27) (vague 3)
+- [ ] 78-08-PLAN.md — Détail de commit et état des worktrees (routes) (vague 3)
+- [ ] 78-09-PLAN.md — Signature Git dans le filet de 5 s, relais SSE (vague 3)
+- [ ] 78-10-PLAN.md — Tiroir : détail, états des worktrees, clavier, rafraîchissement (vague 3)
+- [ ] 78-11-PLAN.md — Bout en bout réel, chaîne XSS git, toutes les suites, bump du module (vague 4)
