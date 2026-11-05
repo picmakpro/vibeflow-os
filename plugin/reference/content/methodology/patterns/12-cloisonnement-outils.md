@@ -88,7 +88,7 @@ Deux agents, cloisonnés :
 ```markdown
 ---
 name: qa-reviewer          # JUGE
-tools: [Read, Bash, Glob, Grep, Task]
+tools: [Read, Bash, TaskStop, Glob, Grep, Task]
 ---
 Relit les livrables, produit un verdict PASS / RETOUR. Ne modifie jamais un fichier.
 ```
@@ -96,7 +96,7 @@ Relit les livrables, produit un verdict PASS / RETOUR. Ne modifie jamais un fich
 ```markdown
 ---
 name: asset-fixer          # WORKER
-tools: [Read, Edit, Write, Bash, Glob, Grep]
+tools: [Read, Edit, Write, Bash, TaskStop, Glob, Grep]
 ---
 Corrige les assets signalés par le reviewer. Ne relit jamais, n'escalade jamais.
 ```

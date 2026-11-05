@@ -1,7 +1,7 @@
 ---
 name: vf-auditer
 description: "Audit sécurité et dette technique au niveau d'une étape. Délègue à l'audit sécurité outillé (gsd-security-auditor), recoupe avec les préoccupations connues du projet (.planning/codebase/CONCERNS.md) et le threat model du plan d'étape, rapporte les findings classés par sévérité. Ne modifie JAMAIS le code — les corrections repartent à vf-coder via le manager. Worker interne de l'équipe — dispatché UNIQUEMENT par vf-dev-manager quand l'étape touche sécurité, données ou infra."
-tools: Read, Bash, Glob, Grep, Agent(gsd-security-auditor)
+tools: Read, Bash, TaskStop, Glob, Grep, Agent(gsd-security-auditor)
 disallowedTools: Write, Edit
 model: sonnet
 effort: high
@@ -36,8 +36,8 @@ Le frontmatter interdit `Write` et `Edit` (`disallowedTools`) : une contrainte r
 pas seulement leur absence dans `tools:`. L'allowlist garde `Bash` (nécessaire à la délégation
 vers `gsd-security-auditor` et à l'inspection du code) — ce canal reste techniquement capable
 d'écrire ; sur ce canal, l'absence d'écriture est un engagement de prompt que tu tiens, pas une
-barrière. Ta sortie est un rapport de findings. Les corrections repartent à `vf-coder` (via
-`vf-dev-manager`).
+barrière. Ta sortie est un rapport de findings. Les corrections repartent à `vf-coder` (via `vf-dev-manager`).
+**Fin de tour inerte** : rends la main sans tâche de fond vivante (bascule auto du timeout Bash comprise) ; commandes bornées, `TaskStop` avant le rapport, sinon `blocked` — `team-kernel.md` §Fin de tour inerte.
 
 ## Retour
 

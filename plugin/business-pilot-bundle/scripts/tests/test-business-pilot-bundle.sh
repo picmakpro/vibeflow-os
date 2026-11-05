@@ -114,7 +114,7 @@ if [ -f "$GATE" ]; then
   jtools=$("$GREP" '^tools:' "$GATE")
   echo "$jtools" | "$GREP" -qw 'Write' && { ko "T4 gate : Write présent dans tools"; t4_ok=0; }
   echo "$jtools" | "$GREP" -qw 'Edit'  && { ko "T4 gate : Edit présent dans tools"; t4_ok=0; }
-  echo "$jtools" | "$GREP" -qE 'Task|Agent' && { ko "T4 gate : Task/Agent présent dans tools"; t4_ok=0; }
+  echo "$jtools" | "$GREP" -qE '(^|[^A-Za-z])(Task|Agent)([^A-Za-z]|$)' && { ko "T4 gate : Task/Agent présent dans tools"; t4_ok=0; }
   "$GREP" -q '^vf-internal: true' "$GATE" || { ko "T4 gate : vf-internal manquant"; t4_ok=0; }
   "$GREP" -qi 'ne modifie' "$GATE" || { ko "T4 gate : consigne read-only absente du corps"; t4_ok=0; }
 else
@@ -131,7 +131,7 @@ for w in $WORKERS; do
   [ -f "$f" ] || { ko "T5 workers : $w.md introuvable"; t5_ok=0; continue; }
   "$GREP" -q '^vf-internal: true' "$f" || { ko "T5 workers : vf-internal manquant sur $w"; t5_ok=0; }
   wtools=$("$GREP" '^tools:' "$f")
-  echo "$wtools" | "$GREP" -qE 'Task|Agent|Skill' && { ko "T5 workers : $w a Task/Agent/Skill dans tools (doit rester cloisonné)"; t5_ok=0; }
+  echo "$wtools" | "$GREP" -qE '(^|[^A-Za-z])(Task|Agent|Skill)([^A-Za-z]|$)' && { ko "T5 workers : $w a Task/Agent/Skill dans tools (doit rester cloisonné)"; t5_ok=0; }
 done
 if [ -f "$MANAGER" ]; then
   "$GREP" -q '^vf-internal:' "$MANAGER" && { ko "T5 manager : déclaré vf-internal (doit rester exposé)"; t5_ok=0; }

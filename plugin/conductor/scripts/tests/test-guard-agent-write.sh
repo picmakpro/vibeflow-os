@@ -54,7 +54,7 @@ description: Agent de test conforme utilise par test-guard-agent-write pour prou
 model: sonnet
 effort: medium
 memory: project
-tools: [Read, Write, Edit, Bash, Glob, Grep]
+tools: [Read, Write, Edit, Bash, Glob, Grep, TaskStop]
 ---
 
 Corps de test.
@@ -64,8 +64,9 @@ NON_CONFORME_MEMOIRE_TOOLS='---
 name: test-agent-non-conforme
 description: Agent de test fabrique pour prouver le refus --strict du guard (memory + tools sans Write/Edit, sans disallowedTools).
 model: sonnet
+effort: medium
 memory: project
-tools: [Read, Bash, Glob, Grep]
+tools: [Read, Bash, Glob, Grep, TaskStop]
 ---
 
 Corps de test.
@@ -76,7 +77,7 @@ name: test-agent-skill-fantome
 description: Agent de test avec skill fictif pour prouver que --strict promeut aussi skill declare introuvable en erreur.
 model: sonnet
 memory: project
-tools: [Read, Write, Edit, Bash]
+tools: [Read, Write, Edit, Bash, TaskStop]
 skills: [ghost-skill-inexistant]
 ---
 
