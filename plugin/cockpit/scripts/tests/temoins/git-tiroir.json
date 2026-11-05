@@ -1,0 +1,1196 @@
+{
+ "schema": "vibeflow/cockpit-git@1",
+ "etat": "ok",
+ "entete": {
+  "etat": "ok",
+  "depot": "depot",
+  "worktree": null,
+  "branche": "main",
+  "detache": false,
+  "sha7": null
+ },
+ "base": {
+  "nom": "main",
+  "locale": null,
+  "distante": null,
+  "divergent": false
+ },
+ "worktrees": [
+  {
+   "nom": "depot",
+   "chemin": "/tmp/depot",
+   "branche": "main",
+   "detache": false,
+   "ici": true,
+   "principal": true,
+   "commande": null
+  },
+  {
+   "nom": "wt-b",
+   "chemin": "/tmp/wt-b",
+   "branche": "feat/deux",
+   "detache": false,
+   "ici": false,
+   "principal": false,
+   "commande": "cd -- '/tmp/wt-b'"
+  },
+  {
+   "nom": "<iframe src=x>",
+   "chemin": "/tmp/wt-c",
+   "branche": null,
+   "detache": true,
+   "ici": false,
+   "principal": false,
+   "commande": "cd -- '/tmp/wt-c'"
+  }
+ ],
+ "rangees": [
+  {
+   "h": "2828282828282828282828282828282828282828",
+   "col": 0,
+   "entrants": [],
+   "sortants": [],
+   "largeur": 1,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "2828282",
+   "p": [
+    "2727272727272727272727272727272727272727"
+   ],
+   "at": 1794044000,
+   "an": "Alice",
+   "s": "Fusion M22",
+   "teinte": 0,
+   "refs": [
+    {
+     "type": "head",
+     "nom": "HEAD",
+     "courante": true,
+     "worktree": null,
+     "commande": null
+    },
+    {
+     "type": "locale",
+     "nom": "main",
+     "courante": true,
+     "worktree": null,
+     "commande": null
+    },
+    {
+     "type": "distante",
+     "nom": "origin/main",
+     "courante": false,
+     "worktree": null,
+     "commande": null
+    }
+   ],
+   "refsPlus": 0
+  },
+  {
+   "h": "2727272727272727272727272727272727272727",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [
+    {
+     "de": 0,
+     "vers": 1,
+     "parent": "1414141414141414141414141414141414141414"
+    }
+   ],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": true,
+   "racine": false,
+   "suite": true,
+   "h7": "2727272",
+   "p": [
+    "2626262626262626262626262626262626262626",
+    "1414141414141414141414141414141414141414"
+   ],
+   "at": 1794040400,
+   "an": "<b>x</b>",
+   "s": "Fusion M21",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "2626262626262626262626262626262626262626",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "2626262",
+   "p": [
+    "2525252525252525252525252525252525252525"
+   ],
+   "at": 1794036800,
+   "an": "Chloé",
+   "s": "Commit M17",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "2525252525252525252525252525252525252525",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "2525252",
+   "p": [
+    "2424242424242424242424242424242424242424"
+   ],
+   "at": 1794033200,
+   "an": "Alice",
+   "s": "Commit M16",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "2424242424242424242424242424242424242424",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "2424242",
+   "p": [
+    "2323232323232323232323232323232323232323"
+   ],
+   "at": 1794029600,
+   "an": "<b>x</b>",
+   "s": "Commit M15",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "2323232323232323232323232323232323232323",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "2323232",
+   "p": [
+    "2222222222222222222222222222222222222222"
+   ],
+   "at": 1794026000,
+   "an": "Chloé",
+   "s": "Commit M14",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "2222222222222222222222222222222222222222",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "2222222",
+   "p": [
+    "2121212121212121212121212121212121212121"
+   ],
+   "at": 1794022400,
+   "an": "Alice",
+   "s": "Commit M13",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "2121212121212121212121212121212121212121",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "2121212",
+   "p": [
+    "2020202020202020202020202020202020202020"
+   ],
+   "at": 1794018800,
+   "an": "<b>x</b>",
+   "s": "Commit M12",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "2020202020202020202020202020202020202020",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "2020202",
+   "p": [
+    "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f"
+   ],
+   "at": 1794015200,
+   "an": "Chloé",
+   "s": "Commit M11",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "1f1f1f1",
+   "p": [
+    "1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e"
+   ],
+   "at": 1794011600,
+   "an": "Alice",
+   "s": "Commit M10",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "1e1e1e1",
+   "p": [
+    "1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d"
+   ],
+   "at": 1794008000,
+   "an": "<b>x</b>",
+   "s": "Commit M9",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "1d1d1d1",
+   "p": [
+    "1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c"
+   ],
+   "at": 1794004400,
+   "an": "Chloé",
+   "s": "Commit M8",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "1c1c1c1",
+   "p": [
+    "1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b"
+   ],
+   "at": 1794000800,
+   "an": "Alice",
+   "s": "Commit M7",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "1b1b1b1",
+   "p": [
+    "1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a"
+   ],
+   "at": 1793997200,
+   "an": "<b>x</b>",
+   "s": "Commit M6",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "1a1a1a1",
+   "p": [
+    "1919191919191919191919191919191919191919"
+   ],
+   "at": 1793993600,
+   "an": "Chloé",
+   "s": "Commit M5",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "1919191919191919191919191919191919191919",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 2,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "1919191",
+   "p": [
+    "1616161616161616161616161616161616161616"
+   ],
+   "at": 1793990000,
+   "an": "Alice",
+   "s": "Commit M4",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "1818181818181818181818181818181818181818",
+   "col": 2,
+   "entrants": [],
+   "sortants": [],
+   "largeur": 3,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "1818181",
+   "p": [
+    "1010101010101010101010101010101010101010"
+   ],
+   "at": 1793986400,
+   "an": "<b>x</b>",
+   "s": "<img src=x onerror=alert(2)>",
+   "teinte": 3,
+   "refs": [
+    {
+     "type": "locale",
+     "nom": "<svg/onload=alert(1)>",
+     "courante": false,
+     "worktree": null,
+     "commande": "git switch --end-of-options 'x;y|z`w'"
+    },
+    {
+     "type": "locale",
+     "nom": "feat/deux",
+     "courante": false,
+     "worktree": "/tmp/wt-b",
+     "commande": "cd -- '/tmp/wt-b'"
+    },
+    {
+     "type": "tag",
+     "nom": "v0.9",
+     "courante": false,
+     "worktree": null,
+     "commande": null
+    },
+    {
+     "type": "locale",
+     "nom": "feat/quatre",
+     "courante": false,
+     "worktree": null,
+     "commande": "git switch --end-of-options 'feat/quatre'"
+    }
+   ],
+   "refsPlus": 2
+  },
+  {
+   "h": "1717171717171717171717171717171717171717",
+   "col": 3,
+   "entrants": [],
+   "sortants": [],
+   "largeur": 4,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "1717171",
+   "p": [
+    "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+   ],
+   "at": 1793982800,
+   "an": "Chloé",
+   "s": "Commit f6c",
+   "teinte": 2,
+   "refs": [
+    {
+     "type": "distante",
+     "nom": "origin/f6",
+     "courante": false,
+     "worktree": null,
+     "commande": null
+    }
+   ],
+   "refsPlus": 0
+  },
+  {
+   "h": "1616161616161616161616161616161616161616",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 4,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "1616161",
+   "p": [
+    "1313131313131313131313131313131313131313"
+   ],
+   "at": 1793979200,
+   "an": "Alice",
+   "s": "Commit M3",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "1515151515151515151515151515151515151515",
+   "col": 4,
+   "entrants": [],
+   "sortants": [],
+   "largeur": 5,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "1515151",
+   "p": [
+    "0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e"
+   ],
+   "at": 1793975600,
+   "an": "<b>x</b>",
+   "s": "Commit f5c",
+   "teinte": 1,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "1414141414141414141414141414141414141414",
+   "col": 1,
+   "entrants": [
+    1
+   ],
+   "sortants": [],
+   "largeur": 5,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "1414141",
+   "p": [
+    "0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d"
+   ],
+   "at": 1793972000,
+   "an": "Chloé",
+   "s": "Commit f4c",
+   "teinte": 5,
+   "refs": [
+    {
+     "type": "locale",
+     "nom": "feat/f4",
+     "courante": false,
+     "worktree": null,
+     "commande": "git switch --end-of-options 'feat/f4'"
+    }
+   ],
+   "refsPlus": 0
+  },
+  {
+   "h": "1313131313131313131313131313131313131313",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [
+    {
+     "de": 0,
+     "vers": 5,
+     "parent": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+    },
+    {
+     "de": 0,
+     "vers": 5,
+     "parent": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
+    }
+   ],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": true,
+   "racine": false,
+   "suite": true,
+   "h7": "1313131",
+   "p": [
+    "1212121212121212121212121212121212121212",
+    "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+    "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
+   ],
+   "at": 1793968400,
+   "an": "Alice",
+   "s": "Fusion octopus de trois branches",
+   "teinte": 0,
+   "refs": [
+    {
+     "type": "tag",
+     "nom": "v1.0",
+     "courante": false,
+     "worktree": null,
+     "commande": null
+    }
+   ],
+   "refsPlus": 0
+  },
+  {
+   "h": "1212121212121212121212121212121212121212",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [
+    {
+     "de": 0,
+     "vers": 5,
+     "parent": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
+    }
+   ],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": true,
+   "racine": false,
+   "suite": true,
+   "h7": "1212121",
+   "p": [
+    "1111111111111111111111111111111111111111",
+    "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
+   ],
+   "at": 1793964800,
+   "an": "<b>x</b>",
+   "s": "Fusion mf1",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "1111111111111111111111111111111111111111",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "1111111",
+   "p": [
+    "0202020202020202020202020202020202020202"
+   ],
+   "at": 1793961200,
+   "an": "Chloé",
+   "s": "Fusion M2",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "1010101010101010101010101010101010101010",
+   "col": 2,
+   "entrants": [
+    2
+   ],
+   "sortants": [],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "1010101",
+   "p": [
+    "0909090909090909090909090909090909090909"
+   ],
+   "at": 1793957600,
+   "an": "Alice",
+   "s": "Commit f7b",
+   "teinte": 3,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+   "col": 3,
+   "entrants": [
+    3
+   ],
+   "sortants": [],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "0f0f0f0",
+   "p": [
+    "0808080808080808080808080808080808080808"
+   ],
+   "at": 1793954000,
+   "an": "<b>x</b>",
+   "s": "Commit f6b",
+   "teinte": 2,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e",
+   "col": 4,
+   "entrants": [
+    4
+   ],
+   "sortants": [],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "0e0e0e0",
+   "p": [
+    "0707070707070707070707070707070707070707"
+   ],
+   "at": 1793950400,
+   "an": "Chloé",
+   "s": "Commit f5b",
+   "teinte": 1,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d",
+   "col": 1,
+   "entrants": [
+    1
+   ],
+   "sortants": [],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "0d0d0d0",
+   "p": [
+    "0606060606060606060606060606060606060606"
+   ],
+   "at": 1793946800,
+   "an": "Alice",
+   "s": "Commit f4b",
+   "teinte": 5,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c",
+   "col": 5,
+   "entrants": [
+    5
+   ],
+   "sortants": [],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "0c0c0c0",
+   "p": [
+    "0505050505050505050505050505050505050505"
+   ],
+   "at": 1793943200,
+   "an": "<b>x</b>",
+   "s": "Commit f3b",
+   "teinte": 4,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+   "col": 5,
+   "entrants": [
+    5
+   ],
+   "sortants": [],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "0b0b0b0",
+   "p": [
+    "0404040404040404040404040404040404040404"
+   ],
+   "at": 1793939600,
+   "an": "Chloé",
+   "s": "Commit f2b",
+   "teinte": 3,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+   "col": 5,
+   "entrants": [
+    5
+   ],
+   "sortants": [],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "0a0a0a0",
+   "p": [
+    "0303030303030303030303030303030303030303"
+   ],
+   "at": 1793936000,
+   "an": "Alice",
+   "s": "Commit f1b",
+   "teinte": 2,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0909090909090909090909090909090909090909",
+   "col": 2,
+   "entrants": [
+    2
+   ],
+   "sortants": [
+    {
+     "de": 2,
+     "vers": 0,
+     "parent": "0202020202020202020202020202020202020202"
+    }
+   ],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": false,
+   "h7": "0909090",
+   "p": [
+    "0202020202020202020202020202020202020202"
+   ],
+   "at": 1793932400,
+   "an": "<b>x</b>",
+   "s": "Commit f7a",
+   "teinte": 3,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0808080808080808080808080808080808080808",
+   "col": 3,
+   "entrants": [
+    3
+   ],
+   "sortants": [
+    {
+     "de": 3,
+     "vers": 0,
+     "parent": "0202020202020202020202020202020202020202"
+    }
+   ],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": false,
+   "h7": "0808080",
+   "p": [
+    "0202020202020202020202020202020202020202"
+   ],
+   "at": 1793928800,
+   "an": "Chloé",
+   "s": "Commit f6a",
+   "teinte": 2,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0707070707070707070707070707070707070707",
+   "col": 4,
+   "entrants": [
+    4
+   ],
+   "sortants": [
+    {
+     "de": 4,
+     "vers": 0,
+     "parent": "0202020202020202020202020202020202020202"
+    }
+   ],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": false,
+   "h7": "0707070",
+   "p": [
+    "0202020202020202020202020202020202020202"
+   ],
+   "at": 1793925200,
+   "an": "Alice",
+   "s": "Commit f5a",
+   "teinte": 1,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0606060606060606060606060606060606060606",
+   "col": 1,
+   "entrants": [
+    1
+   ],
+   "sortants": [
+    {
+     "de": 1,
+     "vers": 0,
+     "parent": "0202020202020202020202020202020202020202"
+    }
+   ],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": false,
+   "h7": "0606060",
+   "p": [
+    "0202020202020202020202020202020202020202"
+   ],
+   "at": 1793921600,
+   "an": "<b>x</b>",
+   "s": "Commit f4a",
+   "teinte": 5,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0505050505050505050505050505050505050505",
+   "col": 5,
+   "entrants": [
+    5
+   ],
+   "sortants": [
+    {
+     "de": 5,
+     "vers": 0,
+     "parent": "0202020202020202020202020202020202020202"
+    }
+   ],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": false,
+   "h7": "0505050",
+   "p": [
+    "0202020202020202020202020202020202020202"
+   ],
+   "at": 1793918000,
+   "an": "Chloé",
+   "s": "Commit f3a",
+   "teinte": 4,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0404040404040404040404040404040404040404",
+   "col": 5,
+   "entrants": [
+    5
+   ],
+   "sortants": [
+    {
+     "de": 5,
+     "vers": 0,
+     "parent": "0202020202020202020202020202020202020202"
+    }
+   ],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": false,
+   "h7": "0404040",
+   "p": [
+    "0202020202020202020202020202020202020202"
+   ],
+   "at": 1793914400,
+   "an": "Alice",
+   "s": "Commit f2a",
+   "teinte": 3,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0303030303030303030303030303030303030303",
+   "col": 5,
+   "entrants": [
+    5
+   ],
+   "sortants": [
+    {
+     "de": 5,
+     "vers": 0,
+     "parent": "0202020202020202020202020202020202020202"
+    }
+   ],
+   "largeur": 6,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": false,
+   "h7": "0303030",
+   "p": [
+    "0202020202020202020202020202020202020202"
+   ],
+   "at": 1793910800,
+   "an": "<b>x</b>",
+   "s": "Commit f1a",
+   "teinte": 2,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0202020202020202020202020202020202020202",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 1,
+   "ouvertBas": [],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "0202020",
+   "p": [
+    "0101010101010101010101010101010101010101"
+   ],
+   "at": 1793907200,
+   "an": "Chloé",
+   "s": "Commit M1",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  },
+  {
+   "h": "0101010101010101010101010101010101010101",
+   "col": 0,
+   "entrants": [
+    0
+   ],
+   "sortants": [],
+   "largeur": 1,
+   "ouvertBas": [
+    0
+   ],
+   "fusion": false,
+   "racine": false,
+   "suite": true,
+   "h7": "0101010",
+   "p": [
+    "abababababababababababababababababababab"
+   ],
+   "at": 1793903600,
+   "an": "Alice",
+   "s": "Commit M0",
+   "teinte": 0,
+   "refs": [],
+   "refsPlus": 0
+  }
+ ],
+ "couloirsMax": 6,
+ "replies": 17,
+ "horsFenetre": [],
+ "mergees": [
+  {
+   "nom": "old-1",
+   "commande": "git branch -d --end-of-options 'old-1'"
+  },
+  {
+   "nom": "old-2",
+   "commande": "git branch -d --end-of-options 'old-2'"
+  },
+  {
+   "nom": "<b>vieille</b>",
+   "commande": "git branch -d --end-of-options '<b>vieille</b>'"
+  },
+  {
+   "nom": "origin/old-3",
+   "commande": null
+  }
+ ],
+ "tags": [
+  {
+   "nom": "v1.0",
+   "h7": "1313131",
+   "at": 1793968400
+  },
+  {
+   "nom": "<script>alert(3)</script>",
+   "h7": "0505050",
+   "at": 1793900000
+  }
+ ],
+ "stash": [
+  {
+   "ref": "stash@{0}",
+   "h7": "0909090",
+   "at": 1793900100,
+   "message": "WIP <u>essai</u>",
+   "branche": "main",
+   "commande": "git stash show --stat 'stash@{0}'"
+  },
+  {
+   "ref": "stash@{1}",
+   "h7": "0808080",
+   "at": 1793900050,
+   "message": "autre",
+   "branche": "feat/deux",
+   "commande": "git stash show --stat 'stash@{1}'"
+  }
+ ],
+ "auteurs": [
+  {
+   "nom": "Alice",
+   "commits": 14,
+   "dernier": 1793999999
+  },
+  {
+   "nom": "<b>x</b>",
+   "commits": 13,
+   "dernier": 1793905000
+  },
+  {
+   "nom": "Chloé",
+   "commits": 13,
+   "dernier": 1793903000
+  }
+ ],
+ "parBranche": [
+  {
+   "nom": "main",
+   "avance": 0,
+   "dernier": 1793999999
+  },
+  {
+   "nom": "feat/f4",
+   "avance": 3,
+   "dernier": 1793904000
+  }
+ ],
+ "bornes": {
+  "base": 500,
+  "nonMergees": 500,
+  "tronque": false
+ },
+ "commandes": {
+  "vide": null,
+  "diagnostic": "git status"
+ }
+}
