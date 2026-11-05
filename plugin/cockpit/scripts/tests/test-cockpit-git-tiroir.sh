@@ -250,12 +250,185 @@ JS
   assert_eq "D2.6 — vide : « Aucun commit pour l'instant », commande git commit -m \"premier commit\", aucune rangée" "$(jq_ "$R2B" '[j.vide.code.join(","), j.vide.rangees].join("|")' 2>/dev/null)" 'git commit -m "premier commit"|0'
   assert_eq "D2.6 — chargement : rien à 60 ms ; à 260 ms aria-busy, 3 rangées fantômes, « Lecture du dépôt », sans animation ; réponse reçue : plus rien" "$(jq_ "$R2B" 'JSON.stringify([j.avant150.busy, j.avant150.fantomes, j.pendant.busy, j.pendant.fantomes, j.pendant.texte, j.pendant.anim, j.apres.busy, j.apres.fantomes])' 2>/dev/null)" '[false,0,"true",3,true,"none",null,0]'
   assert_eq "D2.x — aucune erreur de page (états)" "$(jq_ "$R2B" 'j.errs.length' 2>/dev/null)" "0"
+  echo "=== D3 — clavier, focus, coexistence, mobile ==="
+  cat > "$AUX/touche.js" <<'JS'
+// aide partagée des scénarios D3 (recopiée en tête de chaque corps) : une vraie frappe CDP, avec ses modificateurs
+const VK = { Escape: 27, '/': 191, '=': 187, '-': 189 }, CODE = { Escape: 'Escape', '/': 'Slash', '=': 'Equal', '-': 'Minus' };
+const touche = async (key, o = {}) => {
+  for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key, code: CODE[key] || 'Key' + key.toUpperCase(), windowsVirtualKeyCode: VK[key] || key.toUpperCase().charCodeAt(0), modifiers: o.modifiers || 0, ...(type === 'keyDown' && key.length === 1 && !o.modifiers ? { text: key } : {}) });
+};
+const fenetre = (w, h = 900) => s.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false });
+const pret = () => s.attendre(`document.readyState === 'complete' && !!document.querySelector('#vf-git-ligne') && !!window.VibeFlow`, 'page prête');
+const OUVERT = `(() => { const t = document.querySelector('#vf-git-tiroir'); return !!t && !t.hidden; })()`;
+JS
+  cat > "$AUX/d3a.js" <<'JS'
+const [base] = ARGS;
+await fenetre(1440); await s.naviguer(base + '/'); await pret();
+await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
+const out = {}, fermer = () => s.ev(`window.VFGitTiroir.fermer()`);
+await s.ev(`document.activeElement && document.activeElement.blur()`);
+// D3.1 : g ouvre puis ferme ; ignorée dans un champ, avec modificateur, palette ouverte
+await touche('g'); out.g1 = await s.ev(OUVERT); await touche('g'); out.g2 = await s.ev(OUVERT);
+for (const [nom, html] of [['input', '<input id="t-champ">'], ['textarea', '<textarea id="t-champ"></textarea>'], ['edit', '<div id="t-champ" contenteditable="true" tabindex="0">x</div>']]) {
+  await s.ev(`document.body.insertAdjacentHTML('beforeend', ${JSON.stringify(html)}); document.querySelector('#t-champ').focus()`);
+  await touche('g');
+  out['champ_' + nom] = await s.ev(`({ ouvert: ${OUVERT}, valeur: document.querySelector('#t-champ').value ?? document.querySelector('#t-champ').textContent })`);
+  await s.ev(`document.querySelector('#t-champ').remove()`); await fermer();
+}
+out.modif = [];
+for (const m of [2, 1, 4]) { await s.ev(`document.activeElement && document.activeElement.blur()`); await touche('g', { modifiers: m }); out.modif.push(await s.ev(OUVERT)); await fermer(); }
+await s.ev(`document.activeElement && document.activeElement.blur(); document.querySelector('#palette').classList.add('open')`);
+await touche('g'); out.palette = await s.ev(OUVERT); await s.ev(`document.querySelector('#palette').classList.remove('open')`); await fermer();
+// D3.7 : animation d'entrée (témoin positif), puis aucune sous mouvement réduit
+const anim = `(() => { window.VFGitTiroir.ouvrir(); const n = document.querySelector('#vf-git-tiroir').getAnimations().length; window.VFGitTiroir.fermer(); return n; })()`;
+out.anim = await s.ev(anim);
+await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+out.animReduit = await s.ev(anim);
+await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: '' }] });
+// D3.2 : Échap ferme le tiroir (focus dans le tiroir ou sur l'ouvreur) sans toucher la sélection du viewer ; il ne l'avale pas tiroir fermé
+await s.ev(`window.__id = VibeFlow.graph.nodes[0].id; VibeFlow.select(window.__id)`);
+const etat = `({ ouvert: ${OUVERT}, focus: (document.activeElement || {}).id || '', titre: !!document.activeElement && document.activeElement.classList.contains('vf-git-titre-t'), selection: VibeFlow.state.selected === window.__id, vue: VibeFlow.state.container })`;
+out.sel0 = await s.ev(`VibeFlow.state.selected === window.__id`);
+await touche('g'); out.ouverture = await s.ev(etat);
+await touche('Escape'); out.echapTiroir = await s.ev(etat);
+await touche('g'); await s.ev(`document.querySelector('#vf-git-ligne').focus()`); await touche('Escape'); out.echapLigne = await s.ev(etat);
+await s.ev(`document.querySelector('#vf-git-ligne').focus()`); await touche('Escape'); out.echapFerme = await s.ev(etat);
+await s.ev(`VibeFlow.select(window.__id)`); await touche('g'); await touche('/'); await s.attendre(`!!document.activeElement && document.activeElement.id === 'search'`, 'focus dans la palette'); out.palette1 = await s.ev(`({ palette: document.querySelector('#palette').classList.contains('open'), ouvert: ${OUVERT} })`);
+await touche('Escape'); out.palette2 = await s.ev(`({ palette: document.querySelector('#palette').classList.contains('open'), ouvert: ${OUVERT} })`);
+// D3.3 : #context masqué tiroir ouvert, f p + - vivants
+await s.attendre(`${OUVERT}`, 'tiroir rouvert');
+await s.attendre(`getComputedStyle(document.querySelector('#context')).opacity === '0'`, '#context masqué');
+out.ctxOuvert = await s.ev(`document.body.classList.contains('vf-git-ouvert')`);
+const k = () => s.ev(`VibeFlow.state.t.k`), panneau = () => s.ev(`document.body.classList.contains('no-panel')`);
+const p0 = await panneau(); await s.ev(`document.querySelector('#vf-git-tiroir .vf-git-titre-t').focus()`); await touche('p'); out.p = [p0, await panneau()];
+const k0 = await k(); await touche('='); const k1 = await k(); await touche('-'); const k2 = await k(); await touche('f'); await s.ev(`new Promise((r) => setTimeout(r, 700))`); const k3 = await k();
+out.zoom = { plus: k1 > k0, moins: k2 < k1, fit: k3 !== k2 };
+await fermer();
+await s.attendre(`getComputedStyle(document.querySelector('#context')).opacity === '1'`, '#context rendu');
+out.ctxFerme = await s.ev(`!document.body.classList.contains('vf-git-ouvert')`);
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/d3a.js"; } > "$AUX/d3a-complet.js"
+  R3="$(cdp "$AUX/d3a-complet.js" "$BASE")"
+  assert_eq "D3.1 — touche g ouvre puis ferme" "$(jq_ "$R3" '[j.g1, j.g2].join("|")' 2>/dev/null)" "true|false"
+  assert_eq "D3.1 — g ignorée dans INPUT, TEXTAREA, contenteditable (la lettre est tapée)" "$(jq_ "$R3" '[j.champ_input, j.champ_textarea, j.champ_edit].map((c) => c.ouvert + ":" + c.valeur.includes("g")).join("|")' 2>/dev/null)" "false:true|false:true|false:true"
+  assert_eq "D3.1 — g ignorée avec Ctrl, Alt, Meta et palette ouverte" "$(jq_ "$R3" '[...j.modif, j.palette].join("|")' 2>/dev/null)" "false|false|false|false"
+  assert_eq "D3.7 — animation d'entrée présente (témoin) ; aucune sous prefers-reduced-motion: reduce" "$(jq_ "$R3" '[j.anim > 0, j.animReduit].join("|")' 2>/dev/null)" "true|0"
+  assert_eq "D3.2 — ouvrir porte le focus sur le titre du tiroir" "$(jq_ "$R3" '[j.sel0, j.ouverture.ouvert, j.ouverture.titre].join("|")' 2>/dev/null)" "true|true|true"
+  assert_eq "D3.2 — Échap (focus dans le tiroir) : fermé, focus rendu à la seconde ligne, sélection et vue inchangées" "$(jq_ "$R3" '[j.echapTiroir.ouvert, j.echapTiroir.focus, j.echapTiroir.selection, j.echapTiroir.vue].join("|")' 2>/dev/null)" "false|vf-git-ligne|true|root"
+  assert_eq "D3.2 — Échap (focus sur la seconde ligne) : fermé, sélection inchangée" "$(jq_ "$R3" '[j.echapLigne.ouvert, j.echapLigne.selection].join("|")' 2>/dev/null)" "false|true"
+  assert_eq "D3.2 — tiroir fermé, Échap sur la seconde ligne : le viewer garde son comportement (sélection levée)" "$(jq_ "$R3" '[j.echapFerme.ouvert, j.echapFerme.selection].join("|")' 2>/dev/null)" "false|false"
+  assert_eq "D3.2 — palette ouverte au-dessus du tiroir : Échap ferme la palette, le tiroir reste" "$(jq_ "$R3" '[j.palette1.palette, j.palette1.ouvert, j.palette2.palette, j.palette2.ouvert].join("|")' 2>/dev/null)" "true|true|false|true"
+  assert_eq "D3.3 — body.vf-git-ouvert, #context transparent puis rendu à la fermeture" "$(jq_ "$R3" '[j.ctxOuvert, j.ctxFerme].join("|")' 2>/dev/null)" "true|true"
+  assert_eq "D3.3 — p, +, -, f marchent tiroir ouvert (panneau basculé, zoom + puis -, ajustement)" "$(jq_ "$R3" '[j.p[0] !== j.p[1], j.zoom.plus, j.zoom.moins, j.zoom.fit].join("|")' 2>/dev/null)" "true|true|true|true"
+  assert_eq "D3.x — aucune erreur de page (clavier)" "$(jq_ "$R3" 'j.errs.length' 2>/dev/null)" "0"
+
+  cat > "$AUX/d3b.js" <<'JS'
+const [base, mode] = ARGS;
+const out = {}, rect = (sel) => `(() => { const e = document.querySelector('${sel}'); if (!e) return null; const r = e.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }; })()`;
+if (mode === 'bureau') {
+  for (const w of [1000, 1440]) {
+    await fenetre(w, 800); await s.naviguer(base + '/'); await pret();
+    await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne');
+    await s.ev(`if (document.body.classList.contains('no-panel')) document.querySelector('#btn-panel').click(); document.querySelector('#vf-git-ligne').click()`);
+    await s.attendre(`${OUVERT} && !document.body.classList.contains('no-panel')`, 'tiroir et panneau ouverts');
+    out[w] = await s.stable(`({ tiroir: ${rect('#vf-git-tiroir')}, panel: ${rect('#panel')} })`, 'mesure ' + w);
+  }
+} else {
+  for (const w of [375, 700, 768]) {
+    await fenetre(w, 800); await s.naviguer(base + '/'); await pret();
+    const visible = await s.ev(`(() => { const e = document.querySelector('#vf-git-ouvreur'); return !!e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0; })()`);
+    if (visible) await s.ev(`document.querySelector('#vf-git-ouvreur').click()`);
+    else {
+      await s.attendre(`!!document.querySelector('#vf-plus') && getComputedStyle(document.querySelector('#vf-plus')).display !== 'none'`, 'bouton ⋯');
+      await s.ev(`document.querySelector('#vf-plus').click()`);
+      await s.attendre(`!![...document.querySelectorAll('#vf-plus-menu [role="menuitem"]')].find((e) => e.textContent.trim() === 'Historique Git')`, 'entrée du menu');
+      await s.ev(`[...document.querySelectorAll('#vf-plus-menu [role="menuitem"]')].find((e) => e.textContent.trim() === 'Historique Git').click()`);
+    }
+    await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-tiroir li[role=option]').length === 40`, 'tiroir ouvert');
+    await s.ev(`[...document.querySelectorAll('#vf-git-tiroir .vf-git-sec-t, #vf-git-tiroir .vf-git-merg-b')].forEach((b) => { if (b.getAttribute('aria-expanded') !== 'true') b.click(); })`);
+    out[w] = Object.assign({ via: visible ? 'ouvreur' : 'menu' }, await s.stable(`(() => { const T = document.querySelector('#vf-git-tiroir'), vis = (e) => e.getClientRects().length > 0, r = T.getBoundingClientRect();
+      const bt = [...T.querySelectorAll('button')].filter(vis).map((b) => Math.round(b.getBoundingClientRect().height)), li = [...T.querySelectorAll('li[role=option]')].map((l) => Math.round(l.getBoundingClientRect().height));
+      return { debord: document.documentElement.scrollWidth > innerWidth, ask: getComputedStyle(document.querySelector('#ask')).display, minBouton: Math.min(...bt), minRangee: Math.min(...li), gauche: r.left, droite: innerWidth - r.right, bas: innerHeight - r.bottom, boutons: bt.length }; })()`, 'mesure ' + w));
+  }
+}
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/d3b.js"; } > "$AUX/d3b-complet.js"
+  R3B="$(cdp "$AUX/d3b-complet.js" "$BASE" bureau)"
+  assert_eq "D3.5 — 1000 px, panneau de détails ouvert : au moins 280 px de plan entre le tiroir et #panel (mesuré)" "$(jq_ "$R3B" 'j[1000].panel.left - j[1000].tiroir.right >= 280 && j[1000].panel.width > 0' 2>/dev/null)" "true"
+  assert_eq "D3.5 — 1440 px : le tiroir garde ses 360 px, bord gauche à 16 px" "$(jq_ "$R3B" '[j[1440].tiroir.width, j[1440].tiroir.left].join("|")' 2>/dev/null)" "360|16"
+  R3C="$(cdp "$AUX/d3b-complet.js" "$BASE" mobile)"
+  for w in 375 700 768; do
+    assert_eq "D3.6 — ${w} px : ouvert par l'ouvreur (menu ⋯ sous 701 px), aucun défilement horizontal, #ask masqué, tiroir à 8 px des bords" "$(jq_ "$R3C" "[j['$w'].via, j['$w'].debord, j['$w'].ask, j['$w'].gauche, j['$w'].droite, j['$w'].bas].join('|')" 2>/dev/null)" "$([ "$w" = 768 ] && echo ouvreur || echo menu)|false|none|8|8|8"
+    assert_eq "D3.6 — ${w} px : rangées et boutons (nombre mesuré > 5) d'au moins 44 px de haut" "$(jq_ "$R3C" "[j['$w'].minBouton >= 44, j['$w'].minRangee >= 44, j['$w'].boutons > 5].join('|')" 2>/dev/null)" "true|true|true"
+  done
+  assert_eq "D3.x — aucune erreur de page (mise en page)" "$(jq_ "$R3C" 'j.errs.length' 2>/dev/null)" "0"
+  stop_srv
+  # D3.1 hors dépôt : aucun ouvreur, g ne crée aucun tiroir
+  NOGIT="$WORK/hors-depot"; mk_lab "$NOGIT"; build_serve "$NOGIT"
+  cat > "$AUX/d3n.js" <<'JS'
+const [base] = ARGS;
+await fenetre(1440); await s.naviguer(base + '/');
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow`, 'page prête');
+await s.ev(`document.activeElement && document.activeElement.blur()`);
+await touche('g');
+return await s.ev(`({ tiroir: !!document.querySelector('#vf-git-tiroir'), ligne: !!document.querySelector('#vf-git-ligne'), api: typeof window.VFGitTiroir, corps: document.body.classList.contains('vf-git-ouvert') })`);
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/d3n.js"; } > "$AUX/d3n-complet.js"
+  R3N="$(cdp "$AUX/d3n-complet.js" "http://127.0.0.1:$PORT")"; stop_srv
+  assert_eq "D3.1 — lab hors dépôt : ni ouvreur, ni tiroir, ni API, g ne crée rien" "$(jq_ "$R3N" '[j.tiroir, j.ligne, j.api, j.corps].join("|")' 2>/dev/null)" "false|false|undefined|false"
+  # D3.4 : coexistence avec le Terminal réel (serveur lancé avec --terminal) : fermé, ouvert, plein, réduit, refermé
+  TL="$WORK/lab-term"; mk_lab "$TL"; $GIT -C "$TL" init -q -b main && $GIT -C "$TL" add -A && $GIT -C "$TL" commit -q -m init
+  "$NODE" "${TIROIR_SCRIPTS:-$SCRIPTS}/vf-cockpit-build.mjs" "$TL" --quiet > "$WORK/build-term.out" 2>&1 || cat "$WORK/build-term.out"
+  OUT_T="$TL/.vibeflow/cockpit"; mkdir -p "$OUT_T/.cache"; rm -f "$OUT_T/.cache/server.json"
+  (umask 077; node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" | tr -d '\n' > "$OUT_T/.cache/terminal-amorce")
+  ( cd "$TL" && SHELL=/bin/sh VF_COCKPIT_TERM_GRACE_MS=5000 VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="${TIROIR_SCRIPTS:-$SCRIPTS}" exec "$NODE" "$OUT_T/serve.mjs" --no-open --terminal --port "$(libre)" > "$WORK/serve-term.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
+  SRV=$!
+  for _ in $(seq 1 100); do grep -q '"terminal"' "$OUT_T/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
+  PORT_T="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT_T/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  cat > "$AUX/d3t.js" <<'JS'
+const [base] = ARGS;
+await fenetre(1440, 900); await s.naviguer(base + '/'); await pret();
+try { await s.attendre(`!!document.querySelector('.vf-term-pastille') && !document.querySelector('.vf-term-pastille').hidden`, 'pastille Terminal', 15000); } catch (e) { return { sautee: String(e.message) }; }
+const out = {};
+const mesure = `(() => { const r = (sel) => { const e = document.querySelector(sel); if (!e || e.hidden || !e.getClientRects().length) return null; const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom }; };
+  const g = r('#vf-git-tiroir'), autres = { zoom: r('#zoom'), pastille: r('.vf-term-pastille'), puce: r('.vf-term-puce'), terminal: r('.vf-term-tiroir') };
+  const rec = (a, b) => !!a && !!b && a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+  return { recouvre: Object.keys(autres).filter((k) => rec(g, autres[k])), presents: Object.keys(autres).filter((k) => autres[k]), git: !!g, g, autres }; })()`;
+const dessus = `(() => { const T = document.querySelector('#vf-git-tiroir'), b = T.getBoundingClientRect(), e = document.elementFromPoint((b.left + b.right) / 2, (b.top + b.bottom) / 2), l = document.querySelector('#vf-git-ligne').getBoundingClientRect(), h = document.elementFromPoint((l.left + l.right) / 2, (l.top + l.bottom) / 2);
+  return { git: !!e && T.contains(e), terminal: !!e && !!e.closest('.vf-term-tiroir'), ligne: !!h && (h.id === 'vf-git-ligne' || !!h.closest('#vf-git-ligne')) }; })()`;
+await s.ev(`document.querySelector('#vf-git-ligne').click()`); await s.attendre(OUVERT, 'tiroir Git ouvert');
+out.ferme = await s.stable(mesure, 'Terminal fermé');
+await s.ev(`document.querySelector('.vf-term-pastille').click()`); await s.attendre(`document.body.classList.contains('vf-term-ouvert') && !!document.querySelector('.vf-term-tiroir') && !document.querySelector('.vf-term-tiroir').hidden`, 'Terminal ouvert');
+out.ouvert = await s.stable(mesure, 'Terminal ouvert');
+await s.ev(`document.querySelector('.vf-term-tiroir button[aria-label^="Agrandir"]').click()`); await s.attendre(`!!document.querySelector('.vf-term-tiroir.vf-term-plein-etat')`, 'Terminal plein');
+out.plein = await s.stable(dessus, 'Terminal plein');
+await s.ev(`document.querySelector('.vf-term-tiroir button[aria-label^="Réduire"]').click()`); await s.attendre(`!document.querySelector('.vf-term-tiroir.vf-term-plein-etat')`, 'Terminal réduit');
+out.reduit = await s.stable(`({ m: ${mesure}, d: ${dessus} })`, 'Terminal réduit');
+await s.ev(`document.querySelector('.vf-term-tiroir button[aria-label^="Fermer"]').click()`); await s.attendre(`!document.body.classList.contains('vf-term-ouvert')`, 'Terminal refermé');
+out.refermé = await s.stable(mesure, 'Terminal refermé');
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/d3t.js"; } > "$AUX/d3t-complet.js"
+  R3T="$(cdp "$AUX/d3t-complet.js" "http://127.0.0.1:$PORT_T")"; stop_srv; [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$R3T" > "$TIROIR_TRACE-terminal.json"
+  if [ -n "$(jq_ "$R3T" 'j.sautee || ""' 2>/dev/null)" ]; then skip "D3.4 (coexistence avec le Terminal)" "terminal non lancé : $(jq_ "$R3T" 'j.sautee')"; else
+    assert_eq "D3.4 — Terminal fermé : le tiroir Git ne recouvre ni le zoom ni la pastille (témoins : les deux sont présents)" "$(jq_ "$R3T" '[j.ferme.recouvre.length, j.ferme.presents.includes("zoom"), j.ferme.presents.includes("pastille")].join("|")' 2>/dev/null)" "0|true|true"
+    assert_eq "D3.4 — Terminal ouvert : aucun recouvrement avec le zoom ni avec le tiroir Terminal (témoin : il est présent)" "$(jq_ "$R3T" '[j.ouvert.recouvre.length, j.ouvert.presents.includes("terminal"), j.ouvert.presents.includes("zoom")].join("|")' 2>/dev/null)" "0|true|true"
+    assert_eq "D3.4 — Terminal plein : il recouvre le tiroir Git (z-index) mais la seconde ligne reste atteignable" "$(jq_ "$R3T" '[j.plein.terminal, j.plein.git, j.plein.ligne].join("|")' 2>/dev/null)" "true|false|true"
+    assert_eq "D3.4 — sortie du plein : le tiroir Git réapparaît au-dessus, sans recouvrement" "$(jq_ "$R3T" '[j.reduit.d.git, j.reduit.m.recouvre.length, j.reduit.m.presents.includes("terminal")].join("|")' 2>/dev/null)" "true|0|true"
+    assert_eq "D3.4 — Terminal refermé : la pastille revient, sans recouvrement" "$(jq_ "$R3T" '[j.refermé.recouvre.length, j.refermé.presents.includes("pastille")].join("|")' 2>/dev/null)" "0|true"
+    assert_eq "D3.4 — aucune erreur de page (Terminal)" "$(jq_ "$R3T" 'j.errs.length' 2>/dev/null)" "0"
+  fi
   stop_srv
   # --- copies privées du module pour les mutants (build lit assets/ui/*.js) : chaque mutant a son propre lab et son propre serveur ---
   mkmod() { local d="$WORK/mod-$1"; mkdir -p "$d/scripts" "$d/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$d/skills/cockpit-moteur"; echo "$d/scripts"; }
-  mutlab() { local L="$WORK/lab-$1"; mk_lab "$L"; $GIT -C "$L" init -q -b main && $GIT -C "$L" add -A && $GIT -C "$L" commit -q -m init; echo "$L"; }
-  mutant() { # mutant <nom> <fichier ui> <ancien> <nouveau> <scénario> -> RM (une ligne JSON) ; une mutation impossible compte comme un échec
-    local M L; M="$(mkmod "$1")"; L="$(mutlab "$1")"
+  mutlab() { local L="$WORK/lab-$1"; mk_lab "$L"; [ "${2:-}" = nogit ] || { $GIT -C "$L" init -q -b main && $GIT -C "$L" add -A && $GIT -C "$L" commit -q -m init; }; echo "$L"; }
+  mutant() { # mutant <nom> <fichier ui> <ancien> <nouveau> <scénario> [nogit] -> RM (une ligne JSON) ; une mutation impossible compte comme un échec
+    local M L; M="$(mkmod "$1")"; L="$(mutlab "$1" "${6:-}")"
     if ! mutate "$M/../skills/cockpit-moteur/assets/ui/$2" "$3" "$4"; then echo "  ❌ FAIL — $1 : mutation impossible"; FAIL=$((FAIL+1)); RM="{}"; return; fi
     build_serve "$L" "$M"; RM="$(cdp "$AUX/$5" "http://127.0.0.1:$PORT")"; stop_srv
     [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$RM" > "$TIROIR_TRACE-$1.json"
@@ -264,6 +437,10 @@ JS
   assert_eq "M-HTML — rougit D2.5 (un message rendu en HTML fait naître un <img>) alors que les 40 rangées sont là (pas une panne d'un autre ordre)" "$(jq_ "$RM" '[j.xss.img > 0, j.xss.lit.includes("false"), j.ouvert.rangees].join("|")' 2>/dev/null)" "true|true|40"
   mutant M-COPIE 77-vf-git-rendu.js "writeText(code.textContent)" "writeText(code.textContent.slice(0, -1))" d2.js
   assert_eq "M-COPIE — rougit D2.4 (le texte reçu par l'API n'est plus celui du <code>) alors que la copie a bien eu lieu" "$(jq_ "$RM" '[j.copie.spy === j.copie.affiche, typeof j.copie.spy, j.copie.retour].join("|")' 2>/dev/null)" "false|string|Copiée"
+  mutant M-GLOBAL-G 77-vf-git-tiroir.js "if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(t.tagName) >= 0)) return;" "if (false) return;" d3a-complet.js
+  assert_eq "M-GLOBAL-G — rougit D3.1 (g ouvre le tiroir depuis un champ de saisie) alors que g hors champ marche toujours" "$(jq_ "$RM" '[j.champ_input.ouvert, j.g1, j.g2].join("|")' 2>/dev/null)" "true|true|false"
+  mutant M-HORS-DEPOT 77-vf-git-tiroir.js "if (!V || V.etat === 'absent' || !V.depot) return; // sans dépôt" "if (false) return; // sans dépôt" d3n-complet.js nogit
+  assert_eq "M-HORS-DEPOT — rougit D3.1 hors dépôt (le tiroir existe alors qu'aucun ouvreur n'existe) alors que la page est rendue" "$(jq_ "$RM" '[j.tiroir, j.ligne].join("|")' 2>/dev/null)" "true|false"
 fi
 
 vf_hyg_assert
