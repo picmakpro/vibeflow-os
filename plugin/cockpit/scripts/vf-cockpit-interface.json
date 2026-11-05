@@ -62,8 +62,8 @@
       "requis": { "schema": "string", "id": "string", "doing": "any" }
     },
     "vibeflow/cockpit-git@1": {
-      "description": "topologie Git du lab pour le tiroir (78-05, GET /api/vf/git) : requis vaut pour etat ok ; les autres etats ne portent que schema, etat, entete (sauf absent : schema, etat, entete) et commandes",
-      "requis": { "schema": "string", "etat": "string", "entete": "object", "base": "object", "worktrees": "array", "rangees": "array", "couloirsMax": "number", "replies": "number", "horsFenetre": "array", "mergees": "array", "tags": "array", "stash": "array", "auteurs": "array", "parBranche": "array", "bornes": "object", "commandes": "object" },
+      "description": "topologie Git du lab pour le tiroir (78-05, GET /api/vf/git) : requis vaut pour etat ok ; les autres etats ne portent que schema, etat, entete (sauf absent : schema, etat, entete) et commandes. auteurs : agrégés sur la fenêtre de commits lue (500 de la base et des branches non mergées), pas sur tout l'historique : l'écran ne doit pas dire « tous les auteurs ». refsIgnorees : nombre de refs sans date (tag vers un blob ou un arbre) écartées, le reste du graphe est lu",
+      "requis": { "schema": "string", "etat": "string", "entete": "object", "base": "object", "worktrees": "array", "rangees": "array", "couloirsMax": "number", "replies": "number", "refsIgnorees": "number", "horsFenetre": "array", "mergees": "array", "tags": "array", "stash": "array", "auteurs": "array", "parBranche": "array", "bornes": "object", "commandes": "object" },
       "etats": ["ok", "vide", "indisponible", "absent"],
       "rangee": { "requis": ["h", "h7", "p", "at", "an", "s", "col", "entrants", "sortants", "largeur", "ouvertBas", "fusion", "racine", "teinte", "refs", "refsPlus"] },
       "interdits": ["doing", "mandat", "messages", "outils"]
@@ -73,6 +73,13 @@
       "requis": { "schema": "string", "etat": "string", "h": "string", "h7": "string", "p": "array", "auteur": "string", "date": "string", "committer": "string", "dateCommit": "string", "message": "string", "tronque": "boolean", "fichiers": "array", "total": "number", "commandes": "object" },
       "fichier": { "requis": ["chemin", "ancien", "plus", "moins", "binaire"] },
       "etats": ["ok", "sha-invalide", "commit-inconnu", "indisponible"],
+      "interdits": ["email", "diff", "patch"]
+    },
+    "vibeflow/cockpit-git-worktrees@1": {
+      "description": "état de chaque worktree, à la demande (78-08, GET /api/vf/git/worktrees ; jamais dans le filet de 5 s) : modifies et nonSuivis bornés à 200 entrées lues (plus vrai au-delà) ; avance et retard sur la base locale, avanceOrigin et retardOrigin sur origin/<base> seulement quand elle diverge de la locale (sinon null) ; approximatif vrai (mention « approximatif : filtres du dépôt non exécutés ») quand le dépôt déclare un filtre ; nom d'un worktree jamais une clé unique : le chemin l'est",
+      "requis": { "schema": "string", "etat": "string", "approximatif": "boolean", "mention": "string", "tronque": "boolean", "worktrees": "array" },
+      "worktree": { "requis": ["chemin", "nom", "modifies", "nonSuivis", "plus", "propre", "avance", "retard", "avanceOrigin", "retardOrigin", "commande"] },
+      "etats": ["ok", "indisponible"],
       "interdits": ["email", "diff", "patch"]
     },
     "vibeflow/cockpit-git-entete@1": {

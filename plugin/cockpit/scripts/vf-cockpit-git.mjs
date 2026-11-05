@@ -1,6 +1,6 @@
 // vf-cockpit-git — topologie Git du lab pour le tiroir (78-05 ; GITC-05, 06, 08, 09, 10 ; P78-D-05, D-07, D-13, D-14, D-23). LECTURE SEULE.
 // Exports : BORNES, lireGit(lab) -> objet vibeflow/cockpit-git@1, routeGit(req, res, url, { root, json }) -> true si la route est traitée.
-//   GET /api/vf/git         graphe placé en couloirs, worktrees, mergées repliées, tags, stash, auteurs
+//   GET /api/vf/git         graphe placé en couloirs, worktrees, mergées repliées, tags, stash, auteurs (ceux de la fenêtre lue), refsIgnorees (refs sans date écartées)
 //   GET /api/vf/git/entete  { schema: 'vibeflow/cockpit-git-entete@1', ...enteteGit }
 //   GET /api/vf/git/commit?sha=<40 hexa>  détail d'un commit sans diff (78-08, vf-cockpit-git-details.mjs) ; GET /api/vf/git/worktrees  état de chaque worktree, à la demande
 // Seul point de lancement de git : lancerGit (vf-cockpit-paths.mjs : environnement durci, sortie tronquée signalée). Aucune sous-commande réseau ni d'écriture.
@@ -48,6 +48,17 @@ function lireStash(sortie) {
   return { ok: true, stash };
 }
 
+// `for-each-ref` : une ligne par ref, 4e champ = date. Une date vide (tag vers un blob ou un arbre) écarte la ligne ; une ligne désalignée reste, `lireRefs` la refuse comme avant.
+function sansDate(sortie) {
+  const gardees = []; let ignorees = 0;
+  for (const l of sortie.split('\n')) {
+    if (l === '') continue;
+    const f = l.split('\0');
+    if (f.length >= 4 && f[0].startsWith('refs/') && f[3] === '') ignorees++; else gardees.push(l);
+  }
+  return { sortie: gardees.length ? gardees.join('\n') + '\n' : '', ignorees };
+}
+
 function assembler(lab) {
   const entete = enteteGit(lab);
   const commandes = (vide = null) => ({ vide, diagnostic: cmdStatus() });
@@ -68,7 +79,8 @@ function assembler(lab) {
   const motifs = ['refs/heads', 'refs/remotes', 'refs/tags'];
   let fer = git('for-each-ref', `--format=${fmt(avecAB)}`, ...motifs), repli = false;
   if (!fer.ok && avecAB) { repli = true; fer = git('for-each-ref', `--format=${fmt(false)}`, ...motifs); }
-  const lr = fer.ok ? lireRefs(fer.sortie, { champs: repli || !avecAB ? CHAMPS_REFS : champs }) : { ok: false };
+  const sd = fer.ok ? sansDate(fer.sortie) : { sortie: '', ignorees: 0 }; // P78-D-31 : une ref sans date (blob, arbre) est écartée et comptée, le reste du graphe est lu
+  const lr = fer.ok ? lireRefs(sd.sortie, { champs: repli || !avecAB ? CHAMPS_REFS : champs }) : { ok: false };
   const wl = git('worktree', 'list', '--porcelain', '-z');
   const lw = wl.ok ? lireWorktrees(wl.sortie) : { ok: false };
   if (!lr.ok || !lw.ok) return ko();
@@ -134,7 +146,7 @@ function assembler(lab) {
   return { schema: SCHEMA, etat: 'ok', entete, base,
     worktrees: worktrees.map((w, i) => ({ nom: net(path.basename(w.chemin)), chemin: net(w.chemin), branche: w.branche ? net(court(w.branche)) : null, detache: w.detache, ici: w === ici, principal: i === 0,
       commande: w === ici ? null : commande(cmdCd(w.chemin), w.chemin) })),
-    rangees, couloirsMax: pl.couloirsMax, replies: pl.replies,
+    rangees, couloirsMax: pl.couloirsMax, replies: pl.replies, refsIgnorees: sd.ignorees,
     horsFenetre: nonMergees.filter((r) => !parSha.has(r.pelee || r.sha)).map((r) => ({ nom: net(court(r.ref)), h7: (r.pelee || r.sha).slice(0, 7), avance: avance(r), retard: compte(r.ab)?.retard ?? null })),
     mergees: mergees.slice(0, 200).map((r) => ({ nom: net(court(r.ref)), commande: r.ref.startsWith('refs/heads/') ? commande(cmdBranchSupprimer(court(r.ref)), court(r.ref)) : null })),
     bornes: { base: BORNES.base, nonMergees: BORNES.nonMergees, tronque: tronqueRefs || j1.commits.length >= BORNES.base || j2.commits.length >= BORNES.nonMergees },
