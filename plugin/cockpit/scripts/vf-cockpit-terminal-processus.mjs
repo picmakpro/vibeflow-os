@@ -87,7 +87,7 @@ function demarrerQ({ engineDir, root, here, jetons: jetons0, portP, envOrigine }
     const hotes = [`127.0.0.1:${portQ}`, ...(page ? [`localhost:${portQ}`] : [])];
     if (!hotes.includes(String(req.headers.host || '').toLowerCase())) return { statut: 403, raison: 'Host' };
     // P71-D-24 : GET /flux et GET /etat, SEULS, admettent l'absence d'Origin si Sec-Fetch-Site vaut same-origin ET le secret en en-tête est valide.
-    const navigateur = req.method === 'GET' && (url.pathname === '/flux' || url.pathname === '/etat' || url.pathname === '/proposition')
+    const navigateur = req.method === 'GET' && (url.pathname === '/flux' || url.pathname === '/etat')
       && req.headers['sec-fetch-site'] === 'same-origin' && egal(req.headers['x-vf-terminal'], secret);
     const o = req.headers.origin;
     if (o === undefined) { if (!page && !navigateur) return { statut: 403, raison: 'Origin absente' }; } else if (o !== origineQ()) return { statut: 403, raison: 'Origin' };
@@ -112,7 +112,8 @@ function demarrerQ({ engineDir, root, here, jetons: jetons0, portP, envOrigine }
   async function traiter(req, res) {
     entetes(res);
     let url; try { url = new URL(req.url, origineQ()); } catch { return refus(res, 400, 'adresse'); }
-    const c = controle(req, url); if (c) return refus(res, c.statut, c.raison);
+    // GET /proposition passe par EXACTEMENT les contrôles de GET /etat (Host, Origin ou Sec-Fetch-Site same-origin + secret) : un seul code, aucune ligne de contrôle dupliquée ni reformulée
+    const c = controle(req, url.pathname === '/proposition' ? new URL('/etat', origineQ()) : url); if (c) return refus(res, c.statut, c.raison);
     const { pathname: p } = url, m = req.method;
     if (p === '/' && m === 'GET') {
       const { html, csp } = pageTerminal({ theme: url.searchParams.get('theme') === 'light' ? 'light' : 'dark', origineP: `http://127.0.0.1:${portP}` });
