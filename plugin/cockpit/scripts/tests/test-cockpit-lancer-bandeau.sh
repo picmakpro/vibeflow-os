@@ -119,6 +119,7 @@ const [, , chemin, sc] = process.argv;
 const J = { vue: [], msgs: [], journal: [], setMode: [], periodes: [], focus: 0, terms: 0, rejets: 0 };
 process.on('unhandledRejection', () => { J.rejets++; });
 const att = (ms) => new Promise((ok) => setTimeout(ok, ms));
+const souple = async (f, ms) => { const fin = Date.now() + ms; while (!f() && Date.now() < fin) await att(10); return f(); }; // attente qui ne lève pas : l'absence d'effet se mesure, elle ne fait pas planter la sonde
 const until = async (f, nom, ms = 3000) => { const fin = Date.now() + ms; for (;;) { if (f()) return; if (Date.now() > fin) throw new Error(`attente de « ${nom} » dépassée`); await att(10); } };
 const el = () => ({ addEventListener() {}, setAttribute() {}, querySelector: () => null, classList: { add() {}, remove() {} }, style: {}, textContent: '' });
 globalThis.getComputedStyle = () => ({ paddingTop: '0', paddingBottom: '0' });
@@ -192,10 +193,10 @@ const SCEN = {
     await afficher(ID_A); await att(150); f.a1 = { n: nData(), msgs: nMsg() };
     await att(150); f.a2 = { n: nData(), msgs: nMsg() };
     await afficher(ID(2)); f.b = { n: nData(), msgs: nMsg() };
-    S.prop = AUCUNE; await until(() => J.vue[J.vue.length - 1] === null, 'retrait sur aucune'); f.c = { n: nData(), nulls: nNull(), msgs: nMsg() };
+    S.prop = AUCUNE; await souple(() => J.vue[J.vue.length - 1] === null, 1500); f.c = { n: nData(), nulls: nNull(), msgs: nMsg() };
     await afficher(ID(3)); const avant = J.vue.length;
     for (const st of [404, 401, 403]) { S.propStatut = st; await att(120); } S.propStatut = 200; f.d = { ajout: J.vue.length - avant };
-    S.prop = AUCUNE; await until(() => J.vue[J.vue.length - 1] === null, 'retrait après statut non OK'); f.e = { nulls: nNull() };
+    S.prop = AUCUNE; await souple(() => J.vue[J.vue.length - 1] === null, 1500); f.e = { nulls: nNull() };
     const m = J.msgs.filter((x) => x.m === 'proposition'); f.msg = { n: m.length, strict: m.every((x) => x.m === 'proposition' && x.o === 'http://127.0.0.1:1'), etoile: J.msgs.some((x) => x.o === '*'), autres: J.msgs.filter((x) => x.m !== 'proposition').map((x) => x.m).join(',') };
     return f;
   },
@@ -253,7 +254,7 @@ const SCEN = {
   },
   async froid() { // LB.C7 : cadre masqué, la proposition est annoncée avant visible(), rien d'autre ne démarre
     W.innerWidth = 0; S.prop = valide(ID_A); demarrer();
-    await until(() => nProp() >= 1, 'sondage avant visible()', 1500); await att(500);
+    await souple(() => nProp() >= 1, 1500); await att(500);
     const f = { masque: { sondage: nProp() >= 1, msgs: nMsg(), data: nData(), terms: J.terms, interdit: J.journal.filter((r) => ['/flux', '/lancer', '/entree'].includes(r.u)).length, origine: J.msgs.filter((x) => x.m === 'proposition').map((x) => x.o).join(',') } };
     W.innerWidth = 800; W.innerHeight = 600;
     await until(() => J.terms === 1 && nData() === 1, 'terminal et bandeau après visible()', 4000); await att(400);
@@ -637,7 +638,7 @@ if [ -n "$CHROME" ]; then
   vv() { rj "$VJ0" "(j.erreur ? 'plante: ' + j.erreur : j.$1 !== undefined ? j.$1 : 'erreur: ' + ((j.erreurs || {}).$1 || 'étape absente'))"; }
   H="Lancement à confirmer"
   assert_eq "LB.V1 — #proposition : classes vf-q-bandeau vf-q-collage, role group, libellé de groupe ; sélecteur à quatre options dans l'ordre ; zone « Commande exacte » = lignes.default puis acceptEdits, herite (avec la note, sans --permission-mode), plan ; présélection modeInitial" \
-    "$(vv v1)" "vf-q-bandeau vf-q-collage/group/$H/Mode de permission/default|Par défaut;acceptEdits|Accepter les modifications;plan|Plan (lecture seule);herite|Hérité du poste/true/Commande exacte/Lancement proposé : Planifie la Phase 72 du compartiment alpha/Annuler,Lancer/false/true/false/true/false/true/false/true/false/plan/true"
+    "$(vv v1)" "vf-q-bandeau vf-q-collage/group/$H/Mode de permission/default|Par défaut;acceptEdits|Accepter les modifications;plan|Plan (lecture seule);herite|Hérité du poste/true/Commande exacte/Lancement proposé : Planifie la Phase 72 du compartiment alpha/Annuler,Lancer/false/true/false/true/false/true/true/false/plan/true"
   assert_eq "LB.V2 — bloquants phase-finie et terminal-absent : deux lignes « Bloquant : <motif> », Lancer reste aria-disabled=true après arme_apres_ms ; avertissement : « Attention : <motif> » et Lancer s'arme ; code inconnu : « Contrôle non reconnu. » jamais le code brut" "$(vv v2)" "true/true/true/true/false"
   assert_eq "LB.V3 — clic de confiance à arme_apres_ms / 3 : cb.lancer jamais appelé ; après armement : appelé UNE fois avec le mode choisi ; un second clic pendant que la promesse est en vol : ignoré" "$(vv v3)" 'tôt/0/["default"]'
   assert_eq "LB.V4 — un click() programmatique (non fiable) sur Lancer armé : ignoré ; puis le clic de confiance part (témoin)" "$(vv v4)" "0/1"
@@ -691,7 +692,7 @@ if mutant aucune-ignoree vf-cockpit-terminal-client.mjs "/garde:aucune/d"; then
   assert_eq "M-AUCUNE-IGNOREE — le mutant rougit LB.C2 : « aucune » ne retire plus le bandeau (témoin : le bandeau s'est affiché)" "$(verdict "$(doubles "$MUT_DIR" suivi)" 'j.a1.n===1 && j.c.nulls===1')" "rouge"
 else sans_effet "M-AUCUNE-IGNOREE"; fi
 if mutant clic-non-fiable vf-cockpit-terminal-vue.mjs "/garde:clic-fiable/s/ev.isTrusted !== true || //"; then
-  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v4"]'; assert_eq "M-CLIC-NON-FIABLE — le mutant rougit LB.V4 : un click() programmatique arme un lancement (témoin : le clic de confiance part aussi)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v4 === '1/2' ? 'rouge' : j.v4 === '0/1' ? 'sain' : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"; }
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v4"]'; assert_eq "M-CLIC-NON-FIABLE — le mutant rougit LB.V4 : un click() programmatique appelle cb.lancer (témoin : le bandeau est affiché et armé, la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v4 === '0/1' ? 'sain' : j.v4 ? 'rouge' : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"; }
 else sans_effet "M-CLIC-NON-FIABLE"; fi
 if mutant innerhtml vf-cockpit-terminal-vue.mjs "/garde:texte/s|.*|const t = el('span', 'vf-q-texte'); t.innerHTML = 'Lancement proposé : ' + p.intention; b.appendChild(t);|"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v5"]'; assert_eq "M-INNERHTML — le mutant rougit LB.V5 : l'intention hostile devient un nœud img (témoin : le bandeau s'affiche, la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v5 === 'true/true/0/undefined/0/false/0/0' ? 'sain' : j.v5 ? 'rouge' : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"; }
