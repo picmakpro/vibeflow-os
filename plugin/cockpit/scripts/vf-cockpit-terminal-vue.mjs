@@ -1,5 +1,6 @@
 // vf-cockpit-terminal-vue — vue du terminal dans la page de Q : thème xterm, cartes d'état, bandeau (71-05 pour l'amorce, 71-06 pour le contenu).
-// Export : vueTerminal(cfg) -> rien ; pose window.vfTermVue = { theme(clair), carte(type, action), bandeau(type, detail, action), effacer() }.
+// Export : vueTerminal(cfg) -> rien ; pose window.vfTermVue = { theme(clair), carte(type, action), bandeau(type, detail, action), effacer(), collage(...), proposition(p, cb) }.
+// proposition (72-08) : bandeau de proposition de lancement, qui réutilise les classes vf-q-bandeau et vf-q-collage ; aucune écriture au terminal depuis la vue : tout passe par cb.lancer.
 // cfg = { origineP, theme }. Sérialisé par .toString() dans un <script> sans attribut, donc autonome : aucune référence à un identifiant du module.
 // Textes de l'UI-SPEC §12, posés par textContent ; le seul nombre rendu (code ou signal) est converti en entier. Aucun innerHTML.
 export function vueTerminal(cfg) {
@@ -35,6 +36,22 @@ export function vueTerminal(cfg) {
     black: '#161616', red: '#c94a4a', green: '#157a3a', yellow: '#946000', blue: '#1f5fd6', magenta: '#6a45d6', cyan: '#0b7f6b', white: '#3f3f3f',
     brightBlack: '#595959', brightRed: '#b42323', brightGreen: '#14603f', brightYellow: '#6b4500', brightBlue: '#1747a8', brightMagenta: '#5233b8', brightCyan: '#0a6a5a', brightWhite: '#161616',
   };
+  // bandeau de proposition (72-08) : modes, note du mode hérité, motifs des pré-vols (mêmes codes et mêmes textes que la carte, une page par origine), messages par statut de lancement
+  const MODES_UI = [{ mode: 'default', libelle: 'Par défaut' }, { mode: 'acceptEdits', libelle: 'Accepter les modifications' }, { mode: 'plan', libelle: 'Plan (lecture seule)' }, { mode: 'herite', libelle: 'Hérité du poste' }];
+  const NOTE_HERITE = "Aucun mode n'est imposé : le réglage de votre poste s'applique, y compris « tout autoriser » s'il est configuré.";
+  const MOTIFS = Object.assign(Object.create(null), {
+    'phase-finie': 'La phase est terminée.', 'terminal-absent': 'Le terminal est indisponible sur ce poste.', 'terminal-arrete': 'Le terminal est arrêté. Relancez /vf-cockpit --terminal.',
+    'premier-plan-occupe': 'Un programme occupe déjà le terminal.', 'claude-introuvable': 'La commande claude est introuvable.', 'python3-absent': 'Python 3 est introuvable sur ce poste.',
+    'phase-hors-motif': "Le numéro de phase n'est pas lançable.", 'compartiment-hors-motif': "Le nom du compartiment n'est pas lançable.", 'mission-hors-phase': 'Une mission hors phase ne se lance pas depuis sa carte.',
+    'dependance-non-close': "Une phase dont celle-ci dépend n'est pas close (lecture de la prose du ROADMAP, indicative).", 'mission-vivante': 'Une mission vivante travaille déjà sur cette phase.',
+    'phase-plus-avancee-ailleurs': 'La phase est plus avancée dans un autre arbre de travail.', 'lancement-recent': 'Cette cible a déjà été lancée récemment.', 'travail-non-commite': "Du travail non commité existe dans l'arbre de travail.",
+  });
+  const MESSAGES_LANCEMENT = Object.assign(Object.create(null), {
+    occupe: "Un programme occupe le terminal : quittez-le, puis cliquez sur Lancer. Rien n'a été écrit.", attendre: 'Patientez un instant, puis cliquez de nouveau sur Lancer.',
+    'sans-session': "Aucune session de terminal n'est ouverte : relancez le shell, puis réessayez.", refus: 'Le lancement a été refusé.', reseau: 'Le terminal ne répond pas.',
+  });
+  let courant = null, minuterie = 0; // identifiant du bandeau affiché ; minuterie d'armement
+  const retirerProposition = () => { clearTimeout(minuterie); minuterie = 0; const a = document.getElementById('proposition'); if (a) a.remove(); courant = null; };
   window.vfTermVue = {
     invisible: (t) => INVISIBLE.test(String(t).replace(/\t/g, '')),
     // curseur de la barre de défilement : teinte de l'encre Graphite (variable --ink de la feuille), opacités plus fortes qu'avant (10 % en veille) ; repli sur la valeur de la feuille
@@ -72,6 +89,50 @@ export function vueTerminal(cfg) {
       z.appendChild(b); if (r) r.focus();
     },
     effacer() { const z = vider(); z.hidden = true; },
+    // proposition : p = { id, intention, lignes, bloquants, avertissements, arme_apres_ms, modeInitial } (revalidée par le client), cb = { lancer(mode) -> Promise<statut>, annuler() } ; null retire.
+    // « Lancer » n'est armé qu'après arme_apres_ms, jamais en présence d'un bloquant, et ne répond qu'à un clic de confiance ; la ligne montrée est celle du mode choisi, posée par textContent
+    proposition(p, cb) {
+      if (p === null || p === undefined) { retirerProposition(); return; }
+      const premier = courant !== p.id; retirerProposition();
+      const bloquants = p.bloquants || [], avertissements = p.avertissements || [];
+      const b = el('div', 'vf-q-bandeau vf-q-collage'); b.id = 'proposition'; b.setAttribute('data-id', p.id); b.setAttribute('role', 'group'); b.setAttribute('aria-label', 'Lancement à confirmer');
+      b.appendChild(el('span', 'vf-q-pastille vf-q-attention'));
+      const t = el('span', 'vf-q-texte', 'Lancement proposé : ' + p.intention); b.appendChild(t); // garde:texte
+      const sel = el('select'); sel.id = 'proposition-mode'; sel.setAttribute('aria-label', 'Mode de permission');
+      MODES_UI.forEach((m) => { const o = el('option', '', m.libelle); o.value = m.mode; sel.appendChild(o); });
+      sel.value = MODES_UI.some((m) => m.mode === p.modeInitial) ? p.modeInitial : 'default'; b.appendChild(sel);
+      const annuler = bouton('Annuler', () => { cb.annuler(); retirerProposition(); }, 'vf-q-secondaire'); b.appendChild(annuler);
+      const lancer = el('button', 'vf-q-bouton', 'Lancer'); lancer.type = 'button'; lancer.id = 'proposition-lancer';
+      lancer.setAttribute('aria-disabled', 'true'); // garde:armement
+      b.appendChild(lancer);
+      const prevol = (cls, prefixe, code) => { const d = el('div', 'vf-q-reste'); d.appendChild(el('span', 'vf-q-texte ' + cls, prefixe + (MOTIFS[code] || 'Contrôle non reconnu.'))); b.appendChild(d); };
+      bloquants.forEach((c) => prevol('vf-q-erreur-texte', 'Bloquant : ', c)); avertissements.forEach((c) => prevol('vf-q-attention-texte', 'Attention : ', c));
+      const ligne = el('div', 'vf-q-apercu', p.lignes[sel.value]); ligne.id = 'proposition-ligne'; ligne.tabIndex = 0; ligne.setAttribute('role', 'region'); ligne.setAttribute('aria-label', 'Commande exacte'); b.appendChild(ligne);
+      const msg = el('div', 'vf-q-reste'); msg.id = 'proposition-message'; msg.setAttribute('role', 'status'); b.appendChild(msg);
+      let note = null;
+      const majMode = () => {
+        ligne.textContent = p.lignes[sel.value];
+        if (sel.value === 'herite' && !note) { note = el('div', 'vf-q-reste'); note.appendChild(el('span', 'vf-q-texte', NOTE_HERITE)); b.insertBefore(note, msg); }
+        if (sel.value !== 'herite' && note) { note.remove(); note = null; }
+      };
+      sel.addEventListener('change', majMode); majMode();
+      const armer = () => { clearTimeout(minuterie); if (bloquants.length === 0) minuterie = setTimeout(() => lancer.setAttribute('aria-disabled', 'false'), p.arme_apres_ms); };
+      armer();
+      const fin = (st) => {
+        if (document.getElementById('proposition') !== b) return; // le bandeau a été remplacé ou retiré entre-temps
+        if (st === 'ok' || st === 'absente') { retirerProposition(); return; } // garde:retrait-usage
+        msg.textContent = MESSAGES_LANCEMENT[st] || MESSAGES_LANCEMENT.refus;
+        if (st === 'attendre') armer(); else if (bloquants.length === 0) lancer.setAttribute('aria-disabled', 'false');
+      };
+      lancer.addEventListener('click', (ev) => {
+        if (ev.isTrusted !== true || lancer.getAttribute('aria-disabled') === 'true') return; // garde:clic-fiable
+        lancer.setAttribute('aria-disabled', 'true'); msg.textContent = '';
+        Promise.resolve().then(() => cb.lancer(sel.value)).then(fin).catch(() => fin('reseau'));
+      });
+      const c = document.getElementById('collage');
+      if (c) document.body.insertBefore(b, c); else document.body.appendChild(b); // garde:collage-dessus
+      courant = p.id; if (premier) annuler.focus();
+    },
     // collage à confirmer : ce que l'utilisateur confirme est EXACTEMENT ce qui part. Le texte intégral est montré (zone défilante, atteignable au clavier) par textContent
     // seulement, avec ses nombres de lignes et de caractères ; seul l'AFFICHAGE est neutralisé (caractères invisibles ou de contrôle rendus ⟨U+XXXX⟩, jamais retirés ;
     // le texte rendu à `coller` reste l'original). Au-delà de LIMITE caractères la coupure est dite (« N caractères non affichés ») et « Tout afficher » la lève ; null retire le bandeau
