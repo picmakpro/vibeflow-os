@@ -117,6 +117,7 @@
 - [x] Phase 70: Finitions UI du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-04 : 12/12 plans, recette par juges frais jouée et triée par Samuel (`70-RECETTE-JUGES.md`), PR #200 mergée le 2026-11-04T21:02:38Z (`503aa657`), sans release ; au ledger, UIFN-04, 06 et 07 cochées, les onze autres exigences restent décochées (REQUIREMENTS.md)
 - [x] Phase 71: Terminal intégré au cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-05 : PR #203 (`d4171ded`) et correctif Safari PR #209, recette humaine jouée par Samuel le 2026-11-05 (Arc, Firefox, Safari, clavier AZERTY, `71-RECETTE-HUMAINE.md`), TERM-01..12 cochées, sans release
 - [ ] Phase 72: Lancer du travail depuis les cartes du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
+- [ ] Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git (inscrite 2026-11-05, jalon vibeflow-v2.0)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
 
@@ -480,3 +481,17 @@ terminal en 71 (Recommandé) », puis « Oui, 69 / 71 / 72 (Recommandé) »). **
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 72 to break down)
+
+### Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git
+
+> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-05 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Nouvelle Phase 73 « Git », en parallèle de la 72 (Recommandé) », libellé de l'option : « La numérotation se cale sur ce qu'il a déjà pris »). Les numéros 73 à 77 étant déjà réservés par la branche `docs/jalon-v2-phases-73-77` (non mergée), la phase prend le numéro 78. Exécutée en parallèle de la 72 (demande de Samuel, session principale, 2026-11-05 : « Ensuite on enchaîne […] avec un maximum de parallélisation. On enlève la restriction d'un seul manager »).
+
+**Goal:** L'en-tête du cockpit garde, sur les trois onglets, le nom du dossier du projet et montre la branche et le worktree courants sans encombrer ; un graphe façon « gitgraph » situe les worktrees et les branches du lab ; le cockpit montre des données Git du projet façon GitKraken, et les actions Git éventuelles suivent le périmètre arbitré au cadrage. La revue de diff complète est hors périmètre.
+**Demande de Samuel** (session principale Claude Code, 2026-11-05, mot pour mot) : « dernier point, je remarque que le titre dans le header a droite du logo vibeflow change en fonction de si c'est Code Projet Equipe. Il faut reprend la version Code qui montre le nom du dossier, mais on doit aussi pouvoir voir le nom de la branche/worktree, mais plus habilement. Je pense qu'on revoit la partie "Vue d'ensemble / Titre / Sous titre" et le nom du projet a cote du logo. Ensuite on réflechi a une feature pour afficher un graph facon "gitgraph" pour voir ou on en est exactement dans les wt/branch. On reflechira aussi a afficher des actions et data Git du projet. Facon GitKraken. On laisse de côté la review de diff compelte pour le moment. »
+**Requirements**: TBD — posées au cadrage.
+**Depends on:** Phase 67 (serveur et onglets du cockpit) ; Phase 71 (modèle de menace des routes qui agissent sur le poste). En parallèle de la 72. Recoupements à trancher au cadrage : Phase 73 (worktrees, branches et travail non commité, idée 13) et Phase 75 (données tirées de `git log`), toutes deux sur `docs/jalon-v2-phases-73-77` ; Phase 71.5 (jetons d'espacement et paddings, qu'elle possède).
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 78 to break down)
