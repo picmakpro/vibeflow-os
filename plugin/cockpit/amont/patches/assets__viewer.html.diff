@@ -14,7 +14,7 @@
    --n-module: #a3a3a3; --n-symbol: #c7b8ff; --n-route: #7aa7ff; --n-connector: #8b8b8b;
    --m-GET: #6fd7a8; --m-POST: #7aa7ff; --m-PUT: #f0c36b; --m-PATCH: #c7a3ff; --m-DELETE: #f28b8b; --m-CALL: #6fcfd9; --m-ANY: #a3a3a3;
 -  --panel-w: 360px; --pw: calc(var(--panel-w) + 32px); --gutter: 28px;
-+  --panel-w: 360px; --pw: calc(var(--panel-w) + 2 * var(--sp-16)); --gutter: 28px;
++  --panel-w: 360px; --pw: calc(var(--panel-w) + 2 * var(--sp-16)); --gutter: 24px;
 +  /* Espacement (71.5, P71.5-D-01) : grille fermée 2 4 6 8 12 16 20 24 32. Un primitif ne change JAMAIS de valeur. */
 +  --sp-2: 2px; --sp-4: 4px; --sp-6: 6px; --sp-8: 8px; --sp-12: 12px;
 +  --sp-16: 16px; --sp-20: 20px; --sp-24: 24px; --sp-32: 32px;
@@ -90,6 +90,66 @@
  #context p { margin: 0; color: var(--text-2); line-height: 1.55; font-size: 14px; }
  .ctx-more { display: none; } /* the More / Less toggle under the description is for phones */
  #ask-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@@ -157,7 +167,7 @@ body.in-flow #context { opacity: 0; }
+ .node foreignObject { pointer-events: none; overflow: visible; }
+ .node .card { pointer-events: auto; cursor: pointer; }
+ .fo-pad { width: 100%; height: 100%; padding: var(--gutter); }
+-.card { width: 100%; height: 100%; border-radius: var(--r-card); background: var(--surface); padding: 16px 18px; display: flex; flex-direction: column; gap: 7px; overflow: hidden; position: relative;
++.card { width: 100%; height: 100%; border-radius: var(--r-card); background: var(--surface); padding: var(--inset-card); display: flex; flex-direction: column; gap: var(--sp-8); overflow: hidden; position: relative;
+   box-shadow: var(--shadow-card); transition: background .25s var(--ease), box-shadow .25s var(--ease), transform .3s var(--ease);
+   animation: cardIn .55s var(--ease) both; animation-delay: var(--d, 0ms); }
+ @keyframes cardIn { from { opacity: 0; transform: translateY(8px) scale(.985); } }
+@@ -168,21 +178,21 @@ body.in-flow #context { opacity: 0; }
+ .node.sel .card.external { box-shadow: inset 0 0 0 1.5px rgba(var(--ink), .1), 0 0 0 1.5px rgba(var(--ink), .5), 0 0 0 6px rgba(var(--ink), .05); }
+ .node.flash .card { animation: flash 1.2s var(--ease) 2; }
+ @keyframes flash { 50% { box-shadow: 0 0 0 1.5px rgba(var(--ink), .6), 0 0 0 10px rgba(var(--ink), .08); } }
+-.head { display: flex; align-items: center; gap: 10px; min-width: 0; }
++.head { display: flex; align-items: center; gap: var(--sp-8); min-width: 0; }
+ .ico { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; flex: none; color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); }
+ .ico svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+ .title { font-size: 15px; font-weight: 600; letter-spacing: -.015em; line-height: 1.3; overflow: hidden; min-width: 0; flex: 1; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+ .card > .title { flex: none; } /* an endpoint's name, on its own row under the method and path */
+ /* footer: size on the left, recent-work pill on the right, pinned to the bottom of the card */
+-.foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 23px; }
++.foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); min-height: var(--sp-20); }
+ .foot .meta { align-self: center; }
+ svg.lod-low .foot .meta { visibility: hidden; }
+ .title.mono { font-family: var(--mono); font-size: 13px; font-weight: 500; }
+-.meta { font-size: 11.5px; color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; background: rgba(var(--ink), .05); border-radius: 999px; padding: 2px 8px; }
++.meta { font-size: 11.5px; color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; background: rgba(var(--ink), .05); border-radius: 999px; padding: var(--inset-pill); line-height: 16px; }
+ .desc { color: var(--text-2); font-size: 13px; line-height: 19px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--lines, 2); overflow: hidden; max-height: calc(var(--lines, 2) * 19px); }
+ .desc[style*="--lines:1"] { -webkit-line-clamp: 1; } .desc[style*="--lines:2"] { -webkit-line-clamp: 2; } .desc[style*="--lines:3"] { -webkit-line-clamp: 3; }
+ .desc.empty { color: var(--text-4); }
+-.method { font-family: var(--mono); font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 8px; color: var(--m); background: color-mix(in srgb, var(--m) 14%, transparent); letter-spacing: .02em; flex: none; }
++.method { font-family: var(--mono); font-size: 10.5px; font-weight: 600; padding: var(--inset-pill); line-height: 16px; border-radius: 8px; color: var(--m); background: color-mix(in srgb, var(--m) 14%, transparent); letter-spacing: .02em; flex: none; }
+ .rpath { font-family: var(--mono); font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+ .card.external { background: transparent; box-shadow: inset 0 0 0 1.5px rgba(var(--ink), .1); }
+ .node:hover .card.external { background: rgba(var(--ink), .03); }
+@@ -192,19 +202,19 @@ svg.lod-low .foot .meta { visibility: hidden; }
+ .card.recent { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--recent) 62%, transparent), var(--shadow-card); }
+ .node:hover .card.recent { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--recent) 85%, transparent), var(--shadow-lift); }
+ .card.recent-in { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--recent) 30%, transparent), var(--shadow-card); }
+-.rw { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; line-height: 1; color: var(--recent); background: color-mix(in srgb, var(--recent) 13%, transparent); border-radius: 999px; padding: 4px 8px 4px 7px; white-space: nowrap; }
++.rw { flex: none; display: inline-flex; align-items: center; gap: var(--sp-6); font-size: 11px; font-weight: 600; line-height: 16px; color: var(--recent); background: color-mix(in srgb, var(--recent) 13%, transparent); border-radius: 999px; padding: var(--inset-pill); white-space: nowrap; }
+ .rw::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+ .rw.soft { font-weight: 500; }
+ body.no-recent .rw { display: none; }
+ body.no-recent .card.recent, body.no-recent .card.recent-in { box-shadow: var(--shadow-card); }
+-svg.lod-low .rw { font-size: 18px; padding: 6px 12px; }
+-.card.has-note .title::after { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--sev-medium); margin-left: 8px; vertical-align: middle; }
+-.card.connector { flex-direction: row; align-items: center; gap: 10px; padding: 0 14px 0 10px; border-radius: var(--r-card); background: var(--raise); }
++svg.lod-low .rw { font-size: 18px; padding: var(--sp-4) var(--sp-12); line-height: 20px; } /* dérivé : pastille du zoom d'éloignement, hauteur 28 en unités du graphe */
++.card.has-note .title::after { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--sev-medium); margin-left: var(--sp-8); vertical-align: middle; }
++.card.connector { flex-direction: row; align-items: center; gap: var(--sp-8); padding: 0 var(--sp-12) 0 var(--sp-8); border-radius: var(--r-card); background: var(--raise); } /* optique : icône à fond teinté à gauche (8), glyphe nu à droite (12) */
+ .card.connector .ico { width: 26px; height: 26px; border-radius: 9px; }
+ .card.connector .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); font-weight: 500; font-size: 13px; flex: 1; }
+ .card.connector .dir-ico { color: var(--text-4); display: grid; }
+ .card.connector .dir-ico svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+-.anote { margin-top: 4px; display: flex; gap: 9px; align-items: flex-start; padding: 9px 11px; border-radius: 14px; background: rgba(var(--ink), .05); font-size: 12.5px; line-height: 1.45; color: var(--text); }
++.anote { display: flex; gap: var(--sp-8); align-items: flex-start; padding: var(--sp-8) var(--sp-12); border-radius: 14px; background: rgba(var(--ink), .05); font-size: 12.5px; line-height: 1.45; color: var(--text); }
+ .anote b { flex: none; width: 19px; height: 19px; border-radius: 999px; background: var(--on); color: var(--on-text); display: grid; place-items: center; font-size: 10.5px; font-weight: 700; }
+ .anote span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+ svg.lod-mid .desc { -webkit-line-clamp: 1 !important; max-height: 19px; }
 @@ -238,35 +248,35 @@ svg.dim .edge:not(.hl) { opacity: .1; }
  .flowlink { fill: none; stroke: var(--on); stroke-opacity: .7; stroke-width: 2; stroke-dasharray: 5 7; animation: flow 1.1s linear infinite; }
  
@@ -518,7 +578,21 @@
  const icon = (k) => `<svg viewBox="0 0 24 24">${P[k] || P.file}</svg>`;
  const iconI = (k) => `<svg class="i" viewBox="0 0 24 24">${P[k] || P.file}</svg>`;
  const symIcon = (kind) => (['class', 'interface', 'struct', 'type', 'enum', 'record', 'trait', 'object'].includes(kind) ? 'class' : 'function');
-@@ -924,9 +939,11 @@ function cardFoot(item) {
+@@ -912,10 +927,10 @@ function buildView(container) {
+ // sizes live in the hover tooltip and the details panel.
+ // [width, min height]
+ const SIZES = { node: [300, 128], dir: [272, 110], file: [284, 110], module: [284, 110], route: [300, 128], symbol: [260, 100] };
+-const NOTE_H = 64;
+-const FOOT_H = 30;   // the footer row: size on the left, recent-work pill on the right
++const NOTE_H = 60;   // .anote : 2 x 18,1 de texte + 2 x 8 de padding + 8 de gap de carte
++const FOOT_H = 28;   // the footer row: size on the left, recent-work pill on the right (min-height 20 + gap 8)
+ const TITLE2_H = 10; // a title that wraps onto a second line
+-const GUTTER = 28; // room around each card for its shadow, selection ring and hover lift (matches --gutter)
++const GUTTER = 24; // room around each card for its shadow, selection ring and hover lift (matches --gutter, 24 : P71.5-D-09)
+ /** Footer pieces: the card's size (modules / files / endpoints) and its recent-work pill. Empty when neither applies. */
+ function cardFoot(item) {
+   const i = info(item);
+@@ -924,16 +939,18 @@ function cardFoot(item) {
    else if (i.type === 'dir') size = plural(statsOf(item).files, 'file');
    else if (i.type === 'module') size = 'this file';
    else if (i.type === 'file') { const nr = (routesByFile.get(i.f.p) || []).length; size = nr ? plural(nr, 'endpoint') : ''; }
@@ -532,6 +606,14 @@
  }
  /** Extra height a card needs beyond its base size: a footer, and a title long enough to wrap. */
  function cardExtraH(item) {
+   const i = info(item);
+   const [w] = SIZES[i.type] || SIZES.file;
+   const name = i.type === 'route' ? i.r.name : i.type === 'symbol' ? i.s[0] : i.name;
+-  const room = w - 36 - (i.type === 'route' ? 0 : 40); // padding, and the icon beside the title
++  const room = w - 32 - (i.type === 'route' ? 0 : 38); // padding (2 x 16), and the icon beside the title (30 + gap 8)
+   return (cardFoot(item) ? FOOT_H : 0) + (textW(name, 15, 600) > room ? TITLE2_H : 0);
+ }
+ function cardHTML(item) {
 @@ -964,6 +981,7 @@ function cardHTML(item) {
    }
    const note = answerNote(item);
@@ -540,6 +622,15 @@
    if (recentOf(item)) cls += ' recent';
    else if (recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item)) cls += ' recent-in';
    return `<div class="card ${cls}" style="--c:${colorOf(i)}"><div class="head">${head}</div>${title}${desc}${noteHTML}${cardFoot(item)}</div>`;
+@@ -1015,7 +1033,7 @@ async function layout(view) {
+     children.push({ id: item, width: w, height: Math.max(hh + cardExtraH(item) + (answerNote(item) ? NOTE_H : 0), (deg.get(item) || 0) * 7 + 28), ...(ext ? { layoutOptions: { 'elk.layered.layering.layerConstraint': 'LAST' } } : {}) });
+   }
+   for (const c of view.connectors) {
+-    children.push({ id: c.id, width: clamp(textW(info(c.entity).name, 13) + 84, 150, 320), height: Math.max(42, (deg.get(c.id) || 0) * 7 + 14),
++    children.push({ id: c.id, width: clamp(textW(info(c.entity).name, 13) + 76, 150, 320), height: Math.max(42, (deg.get(c.id) || 0) * 7 + 14),
+       layoutOptions: { 'elk.layered.layering.layerConstraint': c.side === 'in' ? 'FIRST_SEPARATE' : 'LAST_SEPARATE' } });
+   }
+   return elk.layout({
 @@ -1437,7 +1455,7 @@ function renderContext() {
    const i = info(state.container);
    const kind = state.container === 'root' ? 'Overview' : i.type === 'node' ? i.kind.charAt(0).toUpperCase() + i.kind.slice(1) : i.type === 'dir' ? 'Folder' : i.type === 'file' ? 'File' : i.type;

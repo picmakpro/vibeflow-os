@@ -27,7 +27,7 @@
     .vf-tabs a { padding: 5px 13px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text-3); text-decoration: none; line-height: 1.4; }
     .vf-tabs a:hover { color: var(--text); }
     .vf-tabs a.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
-    .vst { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+    .vst { font-size: 11px; font-weight: 600; padding: var(--inset-pill); line-height: 16px; border-radius: 999px; white-space: nowrap;
       /* texte teinté vers --text : le statut seul passait sous 4,5:1 sur sa pastille en thème clair (recette 69) */
       color: color-mix(in srgb, var(--c-st) 68%, var(--text)); background: color-mix(in srgb, var(--c-st) 14%, transparent); }
     .vst-done { --c-st: var(--st-done); } .vst-active { --c-st: var(--st-active); } .vst-todo { --c-st: var(--st-todo); } .vst-blocked { --c-st: var(--st-blocked); }
@@ -65,9 +65,9 @@
   // recette 69 : au zoom d'ouverture du jalon (lod-mid, ou lod-low plus loin) le pied des cartes (« à recetter · 9/9 plans … » et la pastille d'état) était masqué ou à 5 px :
   // on le regrandit en unités du graphe (l'échelle le ramène à ~9-10 px à l'écran), sur deux lignes si besoin, et il reste visible à lod-low
   if (TAB === 'project') style.textContent += `
-    svg.lod-mid .foot, svg.lod-low .foot { flex-wrap: wrap; row-gap: 4px; } svg.lod-mid .desc { display: none; }
-    svg.lod-mid .foot .meta, svg.lod-low .foot .meta { visibility: visible; font-size: 19px; line-height: 1.25; padding: 3px 10px; white-space: normal; }
-    svg.lod-mid .foot .vst, svg.lod-low .foot .vst { font-size: 17px; padding: 3px 10px; }`;
+    svg.lod-mid .foot, svg.lod-low .foot { flex-wrap: wrap; row-gap: var(--sp-4); } svg.lod-mid .desc { display: none; }
+    svg.lod-mid .foot .meta, svg.lod-low .foot .meta { visibility: visible; font-size: 19px; line-height: 20px; padding: var(--sp-4) var(--sp-12); white-space: normal; }
+    svg.lod-mid .foot .vst, svg.lod-low .foot .vst { font-size: 17px; padding: var(--sp-4) var(--sp-12); line-height: 20px; }`;
   /* UIFN-11 (+ onglet Équipe) : le texte du pied cède devant la pastille d'état (elle gardait sa largeur et se faisait rogner : « En cour », et sur un pied long elle sortait de la carte) */
   if (TAB !== 'code') style.textContent += `.foot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .foot .vst { flex: none; }`;
   /* UIFN-09 : la ligne « Terminés… » de « Contenu » colorait son point par var(--n-terminés), définie nulle part (point invisible) : le statut « fait » de DESIGN.md §9 */

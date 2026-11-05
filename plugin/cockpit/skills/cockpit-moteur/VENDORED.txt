@@ -16,6 +16,9 @@ PATCH assets/ui/40-tour.js P25,P27 visite guidée : chaque étape cible une cart
 PATCH assets/ui/05-theme.js P27 espacements : jetons de la grille 71.5
 PATCH assets/ui/10-glossary.js P27 espacements : boîte d'information (--inset-box)
 PATCH assets/ui/60-export.js P27 espacements : grille 71.5, plancher tactile de .xp-opt
+PATCH assets/ui/20-health.js P27 espacements : boîtes de santé sur --inset-box, retrait unique de 16
+PATCH assets/ui/25-recent.js P27 espacements : tâches récentes sur --inset-box, note 8 x 12, marqueur de 8
+PATCH assets/ui/30-screens.js P27 espacements : menu des écrans sur la grille (--inset-row)
 RETRAIT SKILL.md
 RETRAIT assets/ui/50-cloud.js
 RETRAIT agents/openai.yaml
@@ -45,7 +48,7 @@ AJOUT VENDORED.txt
 AJOUT LICENCES-TIERCES.txt
 TAILLE assets/serve.mjs 616
 TAILLE assets/vendor/elk.bundled.js 6697
-TAILLE assets/viewer.html 2390 .html, hors gate
+TAILLE assets/viewer.html 2406 .html, hors gate
 TAILLE scripts/build.mjs 484
 TAILLE scripts/lib/extract.mjs 599
 TAILLE scripts/lib/health.mjs 1199
