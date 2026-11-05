@@ -30,6 +30,10 @@ Fin du tube SANS « OK » après un « SID » : l'assistant est mort. Le gardien
 sigkill_session, getsid relu avant chaque envoi) ; il ne réape pas le shell (il n'est pas son parent) et sort dès que la session est vide, au plus GRACE + environ 2 s.
 Limites du gardien : un gardien tué lui-même (SIGKILL avant ou pendant le ménage) laisse les survivants, comme avant ; un processus sorti de la session par setsid échappe au
 gardien comme à arreter() ; sans relevé possible (ni /proc ni ps) il ne fait rien ; le fork du gardien échoue-t-il, l'assistant tourne sans lui.
+Limites signalées en revue (aucune n'est corrigée ici, elles sont connues) : (1) le gardien n'est pas le parent du shell, donc il ne le réape jamais : le chef de la session n'est visé que par le contrôle
+getsid, relu avant chaque envoi, sans le garde-fou « chef réapé » de l'assistant (CHEF_REAPE) ; (2) la borne « au plus GRACE + environ 2 s » suppose un `ps` qui répond vite : chaque relevé lance
+`ps` (5 s de délai au plus par appel, sans /proc), la durée réelle de l'arrêt dépend donc de lui ; (3) la fenêtre entre pty.fork() et l'écriture de « SID » n'est pas couverte : un assistant qui meurt dans cet intervalle
+laisse un gardien qui voit la fin du tube sans « SID » et ne ramasse rien, le shell déjà né reste alors sans gardien.
 Aucun octet du shell n'est journalisé.
 Compatible Python 3.9, aucune dépendance.
 """
