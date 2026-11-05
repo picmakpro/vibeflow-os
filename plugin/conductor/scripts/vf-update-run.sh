@@ -32,6 +32,8 @@ echo "[vf-update-run] cache le plus récent : $(basename "$NEW")"
 # Exception (BL35-A1, arbitrage Samuel, AskUserQuestion session principale, 2026-11-05) : un module dont la pose
 # échoue est dé-marqué (`unmark-offered`) et revient au prochain /vf-update. Code de sortie non nul (BL35-A3,
 # même arbitrage) sur nom refusé, module non présenté, pose en échec, inscription ou dé-marquage en échec.
+# Pose vide (BL35-A3, « Échec dans les deux cas », Samuel, AskUserQuestion session principale, 2026-11-05) : un
+# `install --with-deps` en rc 0 qui n'a pas inscrit le module au registre du scope est un échec (dé-marqué, rc≠0).
 if [ "${1:-}" = "offer" ]; then
   scope="${2:-}"
   case "$scope" in user|project) ;; *) echo "usage : vf-update-run.sh offer <user|project> [module ...]" >&2; exit 64 ;; esac
@@ -44,6 +46,7 @@ if [ "${1:-}" = "offer" ]; then
     [[ "$l" =~ ^([a-z0-9-]+)=[A-Za-z0-9._+-]+$ ]] && presented+=("${BASH_REMATCH[1]}")
   done <<< "$listed"
   rc=0; failed=()
+  if [ "$scope" = user ]; then regroot="$HOME/.claude"; else regroot="./.claude"; fi
   for m in "$@"; do
     case "$m" in ''|*[!a-z0-9-]*) echo "[vf-update-run] nom de module refusé : $m" >&2; rc=1; continue ;; esac
     # Seuls les modules PRÉSENTÉS (calculés en tête de mode) se posent : un module hors de cet ensemble
@@ -51,6 +54,9 @@ if [ "${1:-}" = "offer" ]; then
     case " ${presented[*]-} " in *" $m "*) ;; *) echo "[vf-update-run] module non présenté, refusé (rien posé) : $m" >&2; rc=1; continue ;; esac
     if ! VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" install --with-deps "$m"; then
       echo "[vf-update-run] pose en échec : $m (scope $scope)" >&2; rc=1; failed+=("$m")
+    elif ! grep -q "^$m=" "$regroot/scripts/.vibeflow-installed" 2>/dev/null; then
+      # `install --with-deps` rend rc=0 sur une dépendance inconnue sans rien poser : pose vide = échec.
+      echo "[vf-update-run] pose vide : $m absent du registre $scope après install (dépendance inconnue ?)" >&2; rc=1; failed+=("$m")
     fi
   done
   VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" mark-offered ${presented[@]+"${presented[@]}"} || rc=1

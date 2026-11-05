@@ -106,6 +106,8 @@ cat > "$NM_BASE/3.0.0/_internal/vibeflow-update.sh" <<STUB
 echo "\$*" >> "$NM_LOG"
 if [ "\${3:-}" = "new-modules" ]; then [ -z "\${NM_FAIL_LIST:-}" ] || exit 1; echo "cockpit=v1.0.1"; fi
 if [ "\${3:-}" = "install" ] && [ -n "\${NM_FAIL_INSTALL:-}" ]; then exit 1; fi
+# Pose réussie = module inscrit au registre du scope (le runner l'exige : une pose vide est un échec, BL35-A3).
+if [ "\${3:-}" = "install" ]; then printf '%s=v1.0.1\\n' "\${5:-}" >> "\$HOME/.claude/scripts/.vibeflow-installed"; fi
 exit 0
 STUB
 printf '#!/usr/bin/env bash\nexit 1\n' > "$NM_BASE/3.0.0/conductor/scripts/check-plugin-update.sh"

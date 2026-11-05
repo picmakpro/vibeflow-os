@@ -17,9 +17,9 @@
 #   N11 jamais en double : un module posé dans un scope n'est pas proposé dans l'autre ; absent des deux → listé dans chacun
 #   N12 /vibeflow-install inscrit ce qu'il laisse non posé : lab neuf → new-modules ne dit rien (witness + skill)
 #   N14 mark_installed durci (BL35-A4) ; N15 unmark-offered sûr (BL35-A1) ; N16 offer de bout en bout : pose en échec dé-marquée,
-#       .gitignore (A2), rc≠0 (A3)
+#       .gitignore (A2), rc≠0 (A3) ; N16f pose VIDE (dépendance inconnue, moteur réel, rc 0 sans rien poser) → échec (A3)
 #   N10f les dépendances non posées sont nommées (deps=…) dans NOUVEAU_MODULE
-# VF_NM_TEST_ENGINE : engine de substitution (mutant). VF_NM_TEST_RUN : vf-update-run.sh de substitution (N10).
+# VF_NM_TEST_ENGINE : engine de substitution (mutant). VF_NM_TEST_RUN : vf-update-run.sh de substitution (N10, N16f).
 # Exit 1 dès qu'un KO est compté ; aucun cas exécuté → exit 1.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -309,6 +309,17 @@ if [ "$r1" -ne 0 ] && [ "$r2" -ne 0 ]; then ok "N16d : offer rend rc≠0 sur un 
 E4="$WORK/e4"; H4="$WORK/e4-home"; rm -rf "$E4" "$H4"; mkdir -p "$E4" "$H4/.claude/scripts"; printf 'conductor=v1.0.0\n' > "$H4/.claude/scripts/.vibeflow-installed"
 (cd "$E4" && HOME="$H4" XDG_CACHE_HOME="$WORK/xdg" VF_CACHE_BASE="$B2" bash "$V2/conductor/scripts/vf-update-run-sous-test.sh" offer user bon >/dev/null 2>&1)
 if [ ! -e "$E4/.gitignore" ] && [ ! -e "$H4/.gitignore" ] && grep -qx bon "$H4/.claude/scripts/.vibeflow-offered" 2>/dev/null; then ok "N16e : scope user inchangé (aucun .gitignore écrit), inscription faite"; else ko "N16e : scope user : .gitignore posé ou inscription absente"; fi
+
+# N16f : pose VIDE sur le chemin réel (BL35-A3) : `orph` déclare une dépendance inconnue ; le moteur réel rend rc=0 sans
+# rien poser. Cache jetable, moteur et runner réels, aucun enrobage. (Le libellé N16e du cas « scope user » existe déjà.)
+B5="$WORK/base5"; V5="$B5/9.9.9"; mkdir -p "$V5"; cp -R "$REPO/_internal" "$V5/_internal"; mkcache "$V5"; cp "$RUNNER" "$V5/conductor/scripts/vf-update-run-sous-test.sh"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$V5/conductor/scripts/check-plugin-update.sh"
+mkmod "$V5" orph v1.0.0; printf '{ "name": "orph", "version": "v1.0.0", "type": "doc-only", "description": "fixture", "requires": ["fantome"] }\n' > "$V5/orph/module.json"
+E5="$WORK/e5"; H5="$WORK/e5-home"; rm -rf "$E5" "$H5"; mkdir -p "$E5/.claude/scripts" "$H5"; printf 'conductor=v1.0.0\n' > "$E5/.claude/scripts/.vibeflow-installed"
+O5="$E5/.claude/scripts/.vibeflow-offered"
+(cd "$E5" && HOME="$H5" XDG_CACHE_HOME="$WORK/xdg" VF_CACHE_BASE="$B5" bash "$V5/conductor/scripts/vf-update-run-sous-test.sh" offer project orph >"$WORK/e5.out" 2>&1); orc=$?
+l5="$(cd "$E5" && HOME="$H5" VIBEFLOW_CACHE="$V5" bash "$V5/_internal/vibeflow-update.sh" --scope project new-modules 2>/dev/null)"
+if [ "$orc" -ne 0 ] && ! grep -qx orph "$O5" 2>/dev/null && ! grep -q '^orph=' "$E5/.claude/scripts/.vibeflow-installed" && printf '%s\n' "$l5" | grep -qx 'orph=v1.0.0'; then ok "N16f : pose vide (dépendance inconnue) → rc≠0, orph non inscrit, reproposé au new-modules suivant"; else ko "N16f : rc=$orc (attendu ≠0) offered=[$(tr '\n' ' ' < "$O5" 2>/dev/null)] (attendu sans orph) new-modules=[$(printf '%s' "$l5" | tr '\n' ' ')]"; fi
 
 echo "== $pass ok, $fail ko =="
 [ "$fail" -eq 0 ] && [ $((pass+fail)) -gt 0 ]
