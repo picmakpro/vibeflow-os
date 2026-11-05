@@ -97,3 +97,11 @@ Deux suites en défaut, aucune ne vient d'un comportement cassé :
    Aucune autre phase de 78 ne liste ce fichier. Le manager l'applique (ou me le redispatche en correction ciblée).
 2. **`test-cockpit-securite.sh` : 90 PASS / 1 FAIL (`FB3.5`, « moins de 10 s »)**, deux fois (11,4 s sous charge 7, 28,4 s sous charge 28 au rejeu isolé). Le cas génératif ne mesure que
    `commandeAffichee` (masque, aucun git, aucun des fichiers modifiés par ce plan que cette fonction n'utilise) : plafond d'horloge sur machine chargée, pas une régression. À rejouer machine au repos.
+
+## Correction ciblée du lanceur (demandée par mgr78) : mutants `gitnomnu` et `whonomnu`
+
+`test-cockpit-terminal-lanceur.sh` l. 571, deux littéraux de `sed` réalignés sur `shBorne` durci ; reste de la suite intact.
+- Avant : `109 PASS / 2 FAIL` — assertions `gitnomnu — mutant sans effet (cible absente ou inchangée)` et `whonomnu — …` : attendu `effet`, obtenu `sans effet` (motif disparu, `cmp -s` identique).
+- Après : `111 PASS / 0 FAIL`.
+- Trace du rouge de chaque mutant (assertion « le mutant (nom nu) exécute le leurre « git » du lab : le marqueur apparaît ») : attendu `rouge`, obtenu `rouge` (PASS) — le `sed` retire `env` de l'exécuteur, le `git` du lab est lancé par nom nu et pose son marqueur ; un mutant qui n'aurait pas tué donnerait `identique : <RES>`.
+- Garde « motif absent » : elle existe (branche `else` de la boucle, `assert_eq … "sans effet" "effet"`) ; c'est elle qui a rougi à l'état précédent, preuve qu'un motif sans correspondance fait FAIL la suite.
