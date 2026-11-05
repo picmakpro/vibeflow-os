@@ -1026,6 +1026,8 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | GITC-10 | Phase 78 | Pending — 2026-11-05 (cadrage) |
 | GITC-11 | Phase 78 | Pending — 2026-11-05 (cadrage) |
 | GITC-12 | Phase 78 | Pending — 2026-11-05 (cadrage) |
+| GITC-13 | Phase 78 | Pending — 2026-11-05 (cadrage) |
+| GITC-14 | Phase 78 | Pending — 2026-11-05 (cadrage) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1608,7 +1610,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **TERM-12**: Non-régression et chaîne XSS : toutes les suites du cockpit restent vertes ; la chaîne de `test-cockpit-chaine-xss.sh` étendue — une charge exécutée dans P qui tente `window.open` vers Q, `postMessage`, `fetch`/POST vers Q avec le jeton de page, la lecture du stockage de Q — ne crée aucun fichier marqueur par le shell.
 
 ### Git dans le cockpit (Phase 78 — posées au cadrage, 2026-11-05)
-> Dérivent de P78-D-01..19 (`78-CONTEXT.md` ; arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-05, relayés au manager , second tour pour P78-D-10 ; décisions techniques du manager sur mesures). Famille neuve `GITC` (vérifiée libre le 2026-11-05 sur `origin/main`, `feat/phase-72-lancer-depuis-cartes` et `docs/jalon-v2-phases-73-77`). Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code.
+> Dérivent de P78-D-01..26 (`78-CONTEXT.md` ; arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-05, relayés au manager , second tour pour P78-D-10 ; décisions techniques du manager sur mesures). Famille neuve `GITC` (vérifiée libre le 2026-11-05 sur `origin/main`, `feat/phase-72-lancer-depuis-cartes` et `docs/jalon-v2-phases-73-77`). Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code.
 
 - [ ] **GITC-01**: En-tête : sur Code, Projet et Équipe, le titre à droite du logo est le nom du dossier du dépôt principal, identique sur les trois onglets, y compris depuis un worktree ; les suffixes « — Projet » et « — Équipe » disparaissent (P78-D-01, P78-D-09).
 - [ ] **GITC-02**: Seconde ligne de l'en-tête : branche courante, et worktree seulement hors de l'arbre principal, en petit sous le nom ; branche détachée lisible comme telle ; noms longs tronqués avec le nom complet au survol (P78-D-02, P78-D-19).
@@ -1622,6 +1624,8 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **GITC-10**: Commandes à copier : construites par une fonction unique, refs et chemins cités pour le shell ; un nom de branche hostile ne produit jamais une commande différente de celle affichée ; copie par le presse-papiers de la page seule ; texte venu de git rendu en `textContent` (P78-D-14).
 - [ ] **GITC-11**: Rafraîchissement par le flux existant sur une signature bon marché (HEAD et refs des worktrees), sans relancer `git log` à chaque tick ; aucune variable CSS ni valeur d'espacement en dur, aucune valeur de padding existante modifiée (P78-D-12, P78-D-15).
 - [ ] **GITC-12**: Retrait et non-régression : liste « Repositories » de l'onglet Code retirée ; toutes les suites du cockpit vertes ; chaîne XSS étendue aux données git (nom de branche, message de commit, auteur hostiles) ; bump du module au-dessus de `main` (P78-D-09, P78-D-17, P78-D-18).
+- [ ] **GITC-13**: Lectures git existantes durcies : `vf-cockpit-who.mjs`, `vf-cockpit-arbres.mjs`, `vf-cockpit-planning.mjs`, `vf-cockpit-paths.mjs` et le moteur passent par un environnement git unique (variables `GIT_*` héritées retirées, filtres du dépôt neutralisés) ; témoin : dépôt piégé (`filter.<x>.process`, `GIT_DIR` hérité) qui déclenche sans la parade et plus avec (P78-D-25).
+- [ ] **GITC-14**: Attribution worktree des sous-agents : l'onglet Équipe montre le dernier worktree cité sur l'ensemble des appels de l'agent, pas le `cwd` de la session parente ; témoin : transcript dont le dernier appel ne cite aucun chemin (P78-D-26).
 
 ---
 *Requirements defined: 2026-06-04*

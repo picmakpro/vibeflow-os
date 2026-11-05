@@ -9,7 +9,7 @@ Phases 72, 71.5 et de la PR de clôture de la 71. Sources : demande de Samuel re
 `71-SECURITY.md` (modèle de menace des routes qui agissent sur le poste) ; `DESIGN.md` direction « Graphite » ;
 `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idée 13, Phase 73, branche `docs/jalon-v2-phases-73-77`).
 
-**Exigences :** GITC-01 à GITC-12. Préfixe neuf, vérifié libre le 2026-11-05 sur `origin/main`,
+**Exigences :** GITC-01 à GITC-14. Préfixe neuf, vérifié libre le 2026-11-05 sur `origin/main`,
 `feat/phase-72-lancer-depuis-cartes` et `docs/jalon-v2-phases-73-77`.
 
 <domain>
@@ -108,13 +108,27 @@ verrous de driver, arbitrages en attente, watchdog et serveurs orphelins (Phase 
   `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_CONFIG*` et voisines de l'environnement hérité ; préfixe
   `GIT_LECTURE = [...GIT_SUR, '--no-ext-diff', '--no-textconv']` là où il s'applique ; `maxBuffer` explicite et parseur qui
   vérifie l'alignement (une sortie tronquée rend « indisponible », jamais un graphe faux). Le vecteur identique de
-  `vf-cockpit-who.mjs:116` est consigné, hors périmètre.
+  `vf-cockpit-who.mjs:116` est corrigé dans la phase (P78-D-25).
 - **P78-D-23 (bornes et extraction).** Trois appels : `for-each-ref` (avance/retard, repli `rev-list --count` si
   `%(ahead-behind:)` est absent de la version de git), `log` de la ligne de base `-n 500`, `log` des non mergées
   `--not <base> -n 500` ; refs entièrement qualifiées ou `--end-of-options`. Base du retard : même règle que `retard()`
   (les deux comptes quand `main` local et `origin/main` divergent). Placement des couloirs maison en JS pur, rendu SVG,
   ELK écarté. `status` par worktree à l'ouverture du tiroir seulement ; signature de rafraîchissement dans le filet de 5 s.
 - **P78-D-24 (auteurs).** Agrégés en JS sur `log --format=%an%x00%at`, jamais `shortlog` sans révision.
+
+### Arbitrages de Samuel, troisième tour (AskUserQuestion, session principale Claude Code, 2026-11-05, relayés mot pour mot)
+
+- **P78-D-25 (faille préexistante).** « Corriger avant la release (Recommandé) ». La protection de P78-D-21 et P78-D-22
+  s'étend au code existant : `vf-cockpit-who.mjs` (l. 116 : `status --porcelain` qui exécute un filtre déclaré par le dépôt)
+  et toute lecture git du cockpit (`vf-cockpit-arbres.mjs`, `vf-cockpit-planning.mjs`, `vf-cockpit-paths.mjs`, moteur
+  `scripts/lib/common.mjs` via son patch amont) : filtres neutralisés et variables `GIT_*` héritées retirées, en un seul point
+  (`shBorne` ou un environnement git unique) ; témoin rouge puis vert, mutant, audit, dans la PR de la 78.
+- **P78-D-20 et P78-D-21 ratifiées.** « Les deux me vont (Recommandé) ».
+- **P78-D-26 (attribution worktree des sous-agents).** Décision d'ordonnancement de la session principale, 2026-11-05 : prise
+  dans la PR de la 78 en tâche courte, puisque `vf-cockpit-who.mjs` est modifié pour P78-D-25. `byActivity`
+  (`vf-cockpit-who.mjs:46-50`) ne lit que la dernière ligne du transcript et retombe sur le `cwd` du lancement (session
+  parente) : il retient désormais le dernier worktree cité sur l'ensemble des appels de l'agent. Témoin rouge : transcript de
+  sous-agent dont le dernier appel ne cite aucun chemin.
 
 ### Claude's Discretion
 
