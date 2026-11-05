@@ -138,6 +138,12 @@ verrous de driver, arbitrages en attente, watchdog et serveurs orphelins (Phase 
 - **P78-D-29 (`-` et `@`).** `git switch` lit `-` et `@` comme des raccourcis même après `--end-of-options` : pas de
   commande de bascule pour ces noms (trouvé par l'échantillon généré de 78-03).
 
+- **P78-D-30 (ouvreur du téléphone).** Sous 700 px, l'ouvreur est une entrée « Historique Git » du menu « ⋯ » (l'en-tête
+  téléphone y range toutes ses actions, P70-D-01, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) ;
+  l'icône de 44 px de P78-D-20 vaut de 701 à 999 px. À confirmer par le juge de design.
+- **P78-D-31 (refs sans date).** Une ref qui vise un objet sans date (blob, arbre) est écartée et comptée, sans rendre
+  toute la lecture indisponible (finding de 78-05).
+
 ### Claude's Discretion
 
 Algorithme de placement des couloirs, format d'échange serveur → page, découpage en fichiers sous `plugin/cockpit/`.
