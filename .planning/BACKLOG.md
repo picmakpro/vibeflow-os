@@ -347,3 +347,13 @@ ou de `vf-new-lab`.
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-11-05.md — ## Carte « Session » de l'onglet Équipe : pied « en attente », badge « En cours » — DIFFÉRÉ (2026-11-04) — CLOS (2026-11-05, fusionné dans Cockpit mineurs d'affichage et sécurité basse) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-11-05.md — ## `scripts/check-machine-paths.sh` : vert sous macOS, rouge sous Linux — DIFFÉRÉ (2026-11-04) — CLOS (2026-11-05, fusionné dans Classe gate qui conclut sans juger) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-11-05.md — ## Écarts de recette de la Phase 68 reportés au BACKLOG (N4, N5, N6) — DIFFÉRÉ (2026-11-04) — CLOS (2026-11-05, fusionné dans Cockpit mineurs d'affichage et sécurité basse) -->
+
+## Cockpit : plusieurs terminaux — DIFFÉRÉ (2026-11-05)
+
+**Priorité : non fixée.** Entrée non cadrée, à cadrer avec la Phase 72 ou après.
+
+**Origine :** demande de Samuel, session principale Claude Code, 2026-11-05, mot pour mot : « Je pense que pour le soucis "un seul terminal" devrait etre améliorer, pour l'instant c'est bien mais il faudrait pouvoir en ouvrir plusieurs ».
+- **Constat :** aujourd'hui, il n'y a qu'une session de terminal par serveur du cockpit ; une seconde est refusée (`plugin/cockpit/README.md`, § terminal). Le secret de session reste lié à l'onglet qui a échangé le jeton d'amorçage (même README, § jeton d'amorçage) : un second onglet n'a aucun moyen de s'y rattacher.
+- **Piste :** aucune arrêtée. Le cadrage devra dire comment plusieurs sessions coexistent (une par onglet, ou plusieurs dans le même tiroir), et ce que devient le modèle d'amorçage à usage unique et de secret par onglet.
+
+**Déclencheur de reprise :** le cadrage de la Phase 72, ou la prochaine passe sur le terminal du cockpit.
