@@ -15,7 +15,7 @@ key-files:
     - plugin/cockpit/scripts/vf-cockpit-server.mjs
     - plugin/cockpit/scripts/vf-cockpit-equipe-carte.mjs
     - plugin/cockpit/skills/cockpit-moteur/VENDORED.txt
-commits: [7c404697, acf0fc84, d077cbff, 3e1cc33e, a8dcd9bb, 24f69cfc]
+commits: [7c404697, acf0fc84, d077cbff, 3e1cc33e, a8dcd9bb, 24f69cfc, 6884b590, e8a21ce6]
 ---
 
 # Phase 78 Plan 04 : en-tête Git du cockpit — Summary
