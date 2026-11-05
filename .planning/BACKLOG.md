@@ -1,10 +1,15 @@
+# Backlog — idées différées (hors milestone courant)
+
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-16.md — ## Template d'agent installable s'appuyant sur dev-orchestrator — CLOS (2026-10-16) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-16.md — ## Ligne d'index absente pour ADR-071 dans `docs/ADR.md` — DIFFÉRÉ (2026-09-18) — CLOS (2026-10-16) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-16.md — ## `test-scaffold-docs.sh` cas 22 fige en dur le nombre de références d'un module — DIFFÉRÉ — CLOS (2026-10-16) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Combler les gaps de couverture inspirés du catalogue `agency-agents` — CLOS (2026-10-12) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-08.md — ## Un gate câblé sur un seul compartiment de workstream laisse les autres sans garde — DIFFÉRÉ (2026-09-23) — CLOS (2026-10-08) -->
 
-## Emprunts qualité de code à Ponytail, pstack et thermo-nuclear review — INVESTIGUÉ 2026-10-10
+## Emprunts qualité de code à Ponytail, pstack et thermo-nuclear review — INVESTIGUÉ 2026-10-10 — CLOS (2026-11-05, recherche tierce renvoyée à l'index de recherche)
+
+**Clos le 2026-11-05 :** recherche tierce déjà investiguée, rien d'engagé ; renvoyée à l'index `.planning/research/INDEX.md`, qui garde le rapport et ce qui reste à arbitrer (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Recherches tierces à l'index »). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
+
 **Capturé :** 2026-10-10 (demande de Samuel, session principale : « rapport complet des frameworks,
 puis l'appliquer à VibeFlow, au backlog avec un audit poussé des bénéfices ») · **Investigué :**
 2026-10-10 (7 agents : 3 lecteurs à la source, 1 inventaire VibeFlow, 1 chasse aux défaillances
@@ -67,7 +72,18 @@ de TOUS les modules à plat dans un seul `.claude/scripts/` : un même nom de `.
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## Traçabilité des arbitrages humains dans les messages de commit — ADOPTÉE 2026-09-10 -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-08.md — ## Choisir la partition du planning AU DÉMARRAGE, pas après coup — demandé 2026-09-23 — CLOS (2026-10-08) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Convergence de contenu à l'update de module (manifeste par module) — CLOS (2026-10-12) -->
-## Les juges d'un artefact de planning ne gardent pas ce qu'on croit — mesuré 2026-09-23
+## Classe « un gate conclut sans avoir jugé » (juges d'artefact de planning, nettoyage auto-déclaré, énumération de compartiments, `check-machine-paths.sh`) — DIFFÉRÉ (2026-11-05)
+
+**Fusion du 2026-11-05** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F4). Même famille (« une preuve incapable de rendre rouge ») ; le dernier cas est neuf et prouvé. Texte intégral des sujets absorbés : `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`, aux titres cités. Priorité P2 pour le cas de `check-machine-paths.sh`, P3 pour le reste.
+
+- **`scripts/check-machine-paths.sh` : vert sous macOS, rouge sous Linux — en cours de correction, mandat séparé, 2026-11-05** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Corriger maintenant (Recommandé) » ; il reste ouvert jusqu'au merge du correctif). Origine : Phase 70, deux fois, des chemins `/Users/<user>/…` dans les plans passaient en local et rougissaient en CI Linux (plans corrigés en `c7217940`). **Cause démontrée le 2026-11-05** sur un dépôt jetable : l'awk de macOS (20200816), en locale UTF-8, s'arrête au premier octet non UTF-8 (`towc: multibyte conversion failure`, rc 2) ; la ligne 125 lance `xargs -0 awk` sans `LC_ALL=C`, avec `2>/dev/null` et sans contrôle du rc, donc les fichiers suivants du lot passent non balayés (1 chemin sur 3 vu en `C.UTF-8`, 3 sur 3 en `LC_ALL=C`). L'hypothèse d'origine (lots d'arguments, octets non ASCII) est précisée, celle d'un « compte local invisible » n'est pas ce que montre la sonde. Correctif : `LC_ALL=C`, rc d'awk contrôlé, témoin rouge.
+- **Juges d'un artefact de planning** (absorbé : « Les juges d'un artefact de planning ne gardent pas ce qu'on croit », mesuré 2026-09-23). Instance du point 1 FERMÉE (`7ba80d1f`, Phase 41.1 : `check-state-integrity.sh:118-121`, rc 64 sur chemin absolu), classe OUVERTE : balayer les autres gates qui sautent un invariant en silence. Points 2 à 5 non re-mesurés depuis le 2026-09-23 : `check-dev-bootstrap.sh` est un routeur (0 y est le MAUVAIS état) ; `status` exigé par aucun juge ; `REQUIREMENTS.md` d'un compartiment lu par aucun juge (dette à nommer, jamais un champ à supprimer, décision de la session principale du 2026-09-23) ; aucune commande unique du moteur ne produit un compartiment conforme. La matrice des cinq états est dans l'archive du 2026-10-12.
+- **Gate de nettoyage auto-déclaré** (absorbé : « `check-agents.sh` ne couvre que les chemins auto-déclarés par un protocole de spike, pas l'état réel du disque », 2026-09-15). Le gate du spike SKIL-01 (`34-02-PLAN.md:237`, `34-VALIDATION.md:55`) est passé vert avec trois résidus sur disque. Forme attendue : recherche élargie de l'état réel (cache plugins, `~/.claude.json`, registres), jamais une liste auto-déclarée, avec mutation rouge prouvée. Absorbé là : un bloc `<verify><automated>` qui écrase un script réel sans `trap` (`25-02-PLAN.md:154`) se durcit par `trap ... EXIT INT TERM`. Déclencheur : le prochain plan qui pose un gate de nettoyage.
+- **`vf_ws_enumerate`** (absorbé : « Pour Samuel : `vf_ws_enumerate` ne restitue pas fidèlement un compartiment à saut de ligne », 2026-09-28, propriétaire Samuel). `plugin/planning-core/scripts/workstream-policy.sh:305-306` : `printf '%s\n' "$(cd …)"` puis `found=1` sans condition ; un compartiment à saut de ligne, ou sans bit `x`, devient invisible sans diagnostic et `detect-gsd-engine.sh` (priorité 2bis) rend 3 « terrain libre ». Même trou dans `check-planning-state.sh` (~L136-141, compteur gonflé). Piste : délimiteur NUL des deux côtés, ou rc de `cd` testé avant d'émettre. Déclencheur : la prochaine évolution de ces deux fichiers.
+
+## Les juges d'un artefact de planning ne gardent pas ce qu'on croit — mesuré 2026-09-23 — CLOS (2026-11-05, fusionné dans Classe gate qui conclut sans juger)
+
+**Clos le 2026-11-05 : fusionné** dans « Classe « un gate conclut sans avoir jugé » (juges d'artefact de planning, nettoyage auto-déclaré, énumération de compartiments, `check-machine-paths.sh`) — DIFFÉRÉ (2026-11-05) » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F4). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
 
 **Statut (re-mesuré le 2026-10-12) : instance du point 1 FERMÉE, classe OUVERTE, points 2 à 5 non traités.**
 Matrice établie sur fixtures jetables pendant la mission « généraliser le remède de partition »
@@ -103,8 +119,6 @@ Phase 41.1, au plus petit (rejet en 64, jamais de conversion ni de repli), prouv
 en silence » reste à balayer sur les autres gates du dépôt. C'est cette classe, et non l'instance,
 qui justifie cette entrée au backlog.
 
-# Backlog — idées différées (hors milestone courant)
-
 ## Formats de sortie hétérogènes entre les 12 suites de `dev-orchestrator` — DIFFÉRÉ
 
 **Capturé :** 2026-08-18, hygiène documentaire de clôture de la Phase 18 (mandat vf-coder). Hors
@@ -122,9 +136,7 @@ Toutes vertes à l'exécution directe (2026-08-18). Un collecteur calé sur UN m
 libellé humain existant, cf. `feedback_libelles-ok-geles.md` : les libellés `ok` gelés s'ajoutent,
 ne se réécrivent jamais). Un collecteur se cale alors sur ce contrat unique, jamais sur la prose.
 
-**Absorbé : `test-scaffold-docs.sh` cas 22 fige en dur le nombre de références d'un module (consigné 2026-09-15, Phase 40).** Le cas 22 de
-`plugin/conductor/scripts/tests/test-scaffold-docs.sh` compare à un littéral (corrigé 11 → 12 en Phase 40) et cassera à chaque renvoi ajouté. Piste : borne basse, ou N dérivé à l'exécution.
-Même principe que ci-dessus : un nombre transmis se re-dérive, il ne se fige pas dans le test qui le vérifie. Déclencheur : prochain cas cassé par un ajout légitime.
+**Absorbé, LIVRÉ : `test-scaffold-docs.sh` cas 22** (consigné 2026-09-15, Phase 40). L'attendu est dérivé du dossier au lieu d'un littéral, `8f22fa61` (`plugin/conductor/scripts/tests/test-scaffold-docs.sh:275-277`). Texte d'origine : `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`, § « Détail historique des entrées réécrites ».
 
 **Absorbé : faux rouge local de `plugin/_internal/tests/test-vibeflow-update.sh` (constaté 2026-09-28, Phase 44).** Le garde-fou « `~/.claude` intact » compte
 `~/.claude/skills/synced/`, que le runtime réécrit pendant le test (`.last-complete-round`, `manifest.json`) : 1510/1509 puis 1509/1510 sur HEAD `72eb408`, vert sur un export figé à `424cb23`.
@@ -132,31 +144,19 @@ Même classe : un verdict de suite lu sur un signal instable. Propriétaire : Sa
 
 Texte intégral : `.planning/archives/backlog/racine-BACKLOG-2026-10-16.md` § Détail historique des entrées condensées.
 
-## `save()` de `dag.sh` sans verrou ni écriture atomique — lost update silencieux — DIFFÉRÉ
+## `save()` de `dag.sh` : lost update entre deux `mark` concurrents et trois findings voisins — DIFFÉRÉ
 
-**Capturé :** 2026-08-17, demande explicite de Samuel après le rapport d'exécution de la
-Phase 33 (finding pré-existant remonté par la revue de mission, provenance vérifiée commit
-par commit — hors périmètre 33, non corrigé).
+**Capturé :** 2026-08-17, demande explicite de Samuel après le rapport d'exécution de la Phase 33 (finding pré-existant de la revue de mission, hors périmètre 33). Réécrit le 2026-11-05 sur ce qui reste ; texte d'origine : `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`, § « Détail historique des entrées réécrites ».
 
-**Le défaut :** `save()` dans `dag.sh` réécrit le fichier de DAG sans verrou ni écriture
-atomique (pas de write-to-temp + rename, pas de lock). Deux writers concurrents produisent un
-**lost update silencieux** : le dernier écrase le premier sans erreur ni trace. C'est le
-finding pré-existant le plus sérieux de la revue Phase 33, précisément parce que `dag.sh` est
-conçu pour le **dispatch parallèle** — les managers marquent des nœuds pendant que des vagues
-tournent, et depuis la Phase 33 `mark` écrit aussi `progress_epoch` (D-33-A), ce qui multiplie
-les écritures concurrentes sur le même fichier.
+**Livré :** l'écriture atomique de `save()` (fichier temporaire, fsync, `os.replace`) par `5d535143` (plan 67-01, PR #187, v2.75.0), et l'écriture de la cible d'un DAG lien symbolique par `0a2c8329` (`plugin/conductor/scripts/dag.sh:149-171`).
 
-**Piste de fix :** écriture atomique (temp + `mv` sur le même filesystem) au minimum ;
-verrouillage type mutex du driver-lock (mécanisme déjà éprouvé en Phase 32, `ln_atomic`) si la
-mesure montre des collisions réelles. La preuve devra être un cas de concurrence réel rouge
-sous mutation, pas un test d'API — même exigence que T46 (Phase 32).
+**Reste (a), le lost update :** `save()` réécrit le fichier de DAG sans verrou ; deux `mark` concurrents font une lecture-modification-écriture et le dernier écrase le premier, sans erreur ni trace. `dag.sh` sert le dispatch parallèle, et `mark` écrit aussi `progress_epoch` (D-33-A). La piste conditionnait le verrou (type mutex du driver-lock, `ln_atomic`, Phase 32) à une mesure de collisions réelles, jamais faite. La preuve devra être un cas de concurrence réel rouge sous mutation, pas un test d'API (même exigence que T46, Phase 32).
 
-**Findings voisins de la même revue, à considérer dans le même lot :** `sanitize_field()`
-incomplet sur les caractères de contrôle · `vf_guard_unavailable()` sans validation d'argument
-· TOCTOU sur le `takeover` legacy (tous tracés au rapport
-`.planning/missions/2026-08-17-phase-33-watchdog-notifications.md`, §findings pré-existants).
+**Reste (b), les findings voisins de la revue de la Phase 33, non re-sondés :** `sanitize_field()` incomplet sur les caractères de contrôle ; `vf_guard_unavailable()` sans validation d'argument ; TOCTOU sur le `takeover` legacy (`.planning/missions/2026-08-17-phase-33-watchdog-notifications.md`, § findings pré-existants). Priorité P3.
 
-## Gate machine sur l'observance de `mission-flow.md` (Phase 33, S1 option (c)) — DIFFÉRÉ
+## Gate machine sur l'observance de `mission-flow.md` (Phase 33, S1 option (c)) — DIFFÉRÉ — CLOS (2026-11-05, abandonné)
+
+**Clos le 2026-11-05 : abandonné** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Abandonner 7, 12 et 31 »). Option écartée en Phase 33 ; aucun déclencheur (régression D-33-E) constaté depuis le 2026-08-17.
 
 **Capturé :** 2026-08-17, pendant la correction de coordination de la Phase 33 (mandat vf-coder,
 2ᵉ plancheck externe). Décision Samuel : l'option (b) — financer une preuve de protocole réel
@@ -181,7 +181,10 @@ qui mérite son propre cadrage plutôt qu'un geste improvisé en fin de mandat.
 suivi en pratique (heartbeat toujours émis au même tour que `mark`, malgré la doctrine), ou une
 décision explicite d'investir dans l'observabilité comportementale des managers.
 
-## Alignement « AI Agents in Depth » (Bojie Li) — milestone candidat — INVESTIGUÉ
+## Alignement « AI Agents in Depth » (Bojie Li) — milestone candidat — INVESTIGUÉ — CLOS (2026-11-05, recherche tierce renvoyée à l'index de recherche)
+
+**Clos le 2026-11-05 :** recherche tierce déjà investiguée, rien d'engagé ; renvoyée à l'index `.planning/research/INDEX.md`, qui garde le rapport et ce qui reste à arbitrer (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Recherches tierces à l'index »). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
+
 **Capturé :** 2026-08-15 · **Investigué :** 2026-08-15 (5 agents : 4 lecteurs couvrant les 10
 chapitres + 1 inventaire VibeFlow) → **rapport : `reports/research/2026-08-15-ai-agent-book-alignement.md`**
 
@@ -202,7 +205,10 @@ vision → calibration → doctrine augmentée ; spike juge hétérogène) — d
 
 **Déclencheur de resurgence :** clôture ou jalon de fiabilite-v1.0, ou décision explicite.
 
-## Investiguer ICM (Interpretable Context Methodology) — « folder structure as agent architecture » — INVESTIGUÉ
+## Investiguer ICM (Interpretable Context Methodology) — « folder structure as agent architecture » — INVESTIGUÉ — CLOS (2026-11-05, recherche tierce renvoyée à l'index de recherche)
+
+**Clos le 2026-11-05 :** recherche tierce déjà investiguée, rien d'engagé ; renvoyée à l'index `.planning/research/INDEX.md`, qui garde le rapport et ce qui reste à arbitrer (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Recherches tierces à l'index »). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
+
 **Capturé :** 2026-08-15 · **Investigué :** 2026-08-15 (deep-search 4 agents) →
 **rapport : `reports/research/2026-08-15-icm-deep-search.md`**
 
@@ -242,7 +248,9 @@ du team-kernel ou de la chaîne validator.
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## Notifications de progression des agents managers — CLOS -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## check-agents : périmètre des agents tiers (gsd-*, autres chaînes) — CLOS -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## Skill-installer global (multi-agents) — CLOS -->
-## AGTS-02 — sortie d'expérimental de `mobile-test`(-team) : REPORTÉE avec trace
+## AGTS-02 — sortie d'expérimental de `mobile-test`(-team) : REPORTÉE avec trace — CLOS (2026-11-05, tracé par le ledger seul)
+
+**Sort du BACKLOG le 2026-11-05** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Clore 14 et sortir 10 »). Trace conservée par la case décochée AGTS-02 du ledger (`.planning/workstreams/fiabilite/REQUIREMENTS.md`, qui porte désormais le déclencheur de reprise) et par les README de `plugin/mobile-test/` et `plugin/mobile-test-team/` § Limites.
 
 **Capturé :** 2026-09-15 (Phase 34, run réel piloté par l'équipe, `34-RUN-MOBILE.md`) ·
 **À explorer :** dès que le déclencheur de reprise ci-dessous est levé
@@ -274,7 +282,10 @@ de sortie d'expérimental (`plugin/mobile-test/README.md` § Limites,
 `plugin/mobile-test-team/README.md` § Limites) et la doctrine « prérequis manquant = arrêt
 propre, jamais d'installation à la volée » (34-CONTEXT D-05) restent inchangés.
 
-## check-agents.sh ne couvre que les chemins auto-déclarés par un protocole de spike, pas l'état réel du disque
+## check-agents.sh ne couvre que les chemins auto-déclarés par un protocole de spike, pas l'état réel du disque — CLOS (2026-11-05, fusionné dans Classe gate qui conclut sans juger)
+
+**Clos le 2026-11-05 : fusionné** dans « Classe « un gate conclut sans avoir jugé » (juges d'artefact de planning, nettoyage auto-déclaré, énumération de compartiments, `check-machine-paths.sh`) — DIFFÉRÉ (2026-11-05) » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F4). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
+
 **Capturé :** 2026-09-15 (audit de la mission Phase 34, arbitrage Samuel, AskUserQuestion session
 principale, 2026-09-15) · **À explorer :** prochain durcissement de gate touchant au nettoyage
 d'un protocole jetable (spike, sonde, plugin de mesure)
@@ -313,7 +324,9 @@ Déclencheur : prochaine révision de scripts de vérification de plan écrasant
 Texte intégral : `.planning/archives/backlog/racine-BACKLOG-2026-10-16.md` § Détail historique des entrées condensées.
 
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Budget des SKILL.md et du bootstrap — sans enforcement machine (différé de la Phase 25, 2026-09-15) — CLOS (2026-10-12) -->
-## Évasion de mesure du budget d'instructions par bloc de code fenced — DIFFÉRÉ (2026-09-15)
+## Évasion de mesure du budget d'instructions par bloc de code fenced — DIFFÉRÉ (2026-09-15) — CLOS (2026-11-05, abandonné)
+
+**Clos le 2026-11-05 : abandonné** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Abandonner 7, 12 et 31 »). Design assumé et documenté (`plugin/conductor/scripts/check-instruction-budget.sh:312-315`) ; aucun incident constaté depuis le 2026-09-15.
 
 **Capturé :** 2026-09-15, audit de la mission d'exécution du plan 25-03 (mandat vf-coder), au-delà
 du périmètre de ce plan (déviation déclarée minimale, non corrigée ici).
@@ -360,7 +373,9 @@ tôt si quelqu'un ajoute `shell: bash` à une étape du job `gates`.
 (`## ADR-075` : l.3028) : après la ligne ADR-070 (l.41) vient ADR-072 (l.42), et après ADR-074 (l.44) vient ADR-076 (l.45). Hors périmètre des phases qui les ont posées.
 Déclencheur : prochain passage sur `docs/ADR.md`.
 
-## Protection de `main` côté GitHub — DIFFÉRÉ, en attente d'un accès admin (2026-09-17)
+## Protection de `main` côté GitHub — DIFFÉRÉ, en attente d'un accès admin (2026-09-17) — CLOS (2026-11-05, écart accepté)
+
+**Clos le 2026-11-05 : écart accepté** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Clore 14 et sortir 10 »). PROT-01 est clos (rulesets 23892920 et 23892922 posés le 2026-09-23). Reste l'écart `require_extra_approval_for_unattributed_changes` : 0 occurrence dans `.github/rulesets/*.json`, défaut posé par GitHub, sans effet observé ; accepté tel quel.
 
 **Statut (re-mesuré le 2026-10-12) : rulesets POSÉS, PROT-01 clos ; reste un écart source↔serveur.** Le
 titre garde sa forme d'origine (des documents historiques le citent) ; l'attente d'admin est levée.
@@ -446,7 +461,18 @@ Impact actuel nul (`ensure-deps.sh` l'appelle fichier par fichier) ; la règle 4
 Déclencheur : prochaine évolution de `inject-mcp-tools.sh` ou de `check-capability-activation.sh`.
 
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## ADPT-06 — canal `hooks`/`plugins` du dépôt jugé jamais répété — RÉSORBÉ (2026-09-24) -->
-## Écart D-08(b) — digest du manager sans interdits du lab sur le chemin vf-dev-manager → vf-design-judge — DIFFÉRÉ (2026-09-25)
+## Juges et digests D-08 : interdits du lab absents du digest, critère RGPD absent des grilles — DIFFÉRÉ (2026-11-05)
+
+**Fusion du 2026-11-05** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F6). Même origine (Phase 42, condition de Samuel sur D-08, 2026-09-25). Texte intégral des deux sujets absorbés : `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`, aux titres cités. Priorité P3. Rien n'est tranché pour `gouvernance` (« Non pour l'instant (Recommandé) », même date).
+
+- **Écart D-08(b)** (absorbé : « Écart D-08(b) : digest du manager sans interdits du lab sur le chemin vf-dev-manager → vf-design-judge », 2026-09-25). La condition (b) est remplie côté `vf-design-manager` → `vf-design-judge`. En étage implémentation croisée (`livrable: specs+implementation`), c'est `plugin/dev-orchestrator/agents/vf-dev-manager.md` qui compose le digest : 0 occurrence de « interdits » dans ce fichier (constat du 2026-11-05). Module de la polarité de Samuel (D-12). Pistes : `vf-dev-manager` porte la même consigne (commit dev-orchestrator, mandat séparé) ; ou digest composé par délégation à `vf-design-manager` ; ou écart jugé sans conséquence par Samuel. Détail : `42-05-SUMMARY.md` § Écart non résolu, `.planning/workstreams/gouvernance/STATE.md` § Dette.
+- **Critère RGPD** (absorbé : « Revue de fond des grilles de quality-gate-client et content-clarity-judge (motif 3, D-08) », 2026-09-25). RGPD n'apparaît qu'à l'étape « lis le CLAUDE.md » (l.49 de `quality-gate-client`, l.46 de `content-clarity-judge`), dans aucun tableau de rubrique, contrairement à `growth-quality-judge` (critère 2, éliminatoire). Piste : critère RGPD explicite, avec pondération et statut éliminatoire le cas échéant, sur le modèle de ce critère 2.
+
+**Déclencheur de reprise :** la revue code owner de Samuel sur `design-orchestrator` (D-12), la prochaine mission dev qui exerce l'étage implémentation croisée avec `vf-design-judge`, la prochaine revue de fond des grilles des juges business et content, ou un manquement RGPD qui n'a pas fait baisser le score d'un livrable jugé.
+
+## Écart D-08(b) — digest du manager sans interdits du lab sur le chemin vf-dev-manager → vf-design-judge — DIFFÉRÉ (2026-09-25) — CLOS (2026-11-05, fusionné dans Juges et digests D-08)
+
+**Clos le 2026-11-05 : fusionné** dans « Juges et digests D-08 : interdits du lab absents du digest, critère RGPD absent des grilles — DIFFÉRÉ (2026-11-05) » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F6). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
 
 **Capturé :** 2026-09-25, nœud `fix-42-condition-samuel` (Phase 42, exécution de la condition
 posée par Samuel en ratifiant D-08, `42-D19-MESURE.md` § Arbitrage D-08).
@@ -473,7 +499,9 @@ requise par D-12), ou la prochaine mission dev qui exerce réellement l'étage i
 croisée avec `vf-design-judge`.
 
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-16.md — ## A2 — collision de nom entre scripts de modules non détectée à l'installation — DIFFÉRÉ (2026-09-25) — CLOS (2026-10-16) -->
-## Revue de fond des grilles de quality-gate-client et content-clarity-judge (motif 3, D-08) — DIFFÉRÉ (2026-09-25)
+## Revue de fond des grilles de quality-gate-client et content-clarity-judge (motif 3, D-08) — DIFFÉRÉ (2026-09-25) — CLOS (2026-11-05, fusionné dans Juges et digests D-08)
+
+**Clos le 2026-11-05 : fusionné** dans « Juges et digests D-08 : interdits du lab absents du digest, critère RGPD absent des grilles — DIFFÉRÉ (2026-11-05) » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F6). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
 
 **Capturé :** 2026-09-25, audit final de la Phase 42.
 
@@ -558,7 +586,10 @@ verrous sous `git rev-parse --git-common-dir`, partagés par les worktrees du cl
 P57-D-08). **Labs plats :** reste ouverte, aucun changement de comportement (P57-D-03) ;
 déclencheur de reprise inchangé.
 
-## Pour Samuel — `vf_ws_enumerate` ne restitue pas fidèlement un compartiment à saut de ligne
+## Pour Samuel — `vf_ws_enumerate` ne restitue pas fidèlement un compartiment à saut de ligne — CLOS (2026-11-05, fusionné dans Classe gate qui conclut sans juger)
+
+**Clos le 2026-11-05 : fusionné** dans « Classe « un gate conclut sans avoir jugé » (juges d'artefact de planning, nettoyage auto-déclaré, énumération de compartiments, `check-machine-paths.sh`) — DIFFÉRÉ (2026-11-05) » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F4). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
+
 (constaté 2026-09-28)
 
 **Capturé :** 2026-09-28, pendant l'audit de la Phase 44 (worktree `gouvernance-44`), reproduit
@@ -592,7 +623,28 @@ Même cause racine (énumération non fidèle, silence total), même fichier, m�
 Piste : tester le code de retour de `cd` avant d'émettre, ne poser `found` que sur succès, code de sortie distinct. Détail et limites du lot 8 (volume, TOCTOU) : archive du 2026-10-12, § « Détail historique ».
 
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-16.md — ## Pour Samuel — `vf_ws_enumerate` pose `found=1` même quand `cd` échoue (constaté 2026-09-28) — CLOS (2026-10-16) -->
-## Résidus de la Phase 41.3 (revue finale, tour 3) — DIFFÉRÉ (2026-09-30)
+## Garde de fin de geste : objet antérieur imputé à la session et résidus de la Phase 41.3 — DIFFÉRÉ (2026-11-05)
+
+**Fusion du 2026-11-05** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F2). Texte intégral des sujets absorbés : `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`, aux titres cités. Priorité P2 : chaque blocage à tort coûte un tour de session.
+
+**Imputation d'un objet antérieur** (absorbé : « `guard-fin-de-geste.sh` impute à la session un objet antérieur qui change d'état », 2026-11-03, demande de Samuel).
+- **Cause, mesurée :** l'attribution (M3) compare des lignes de verdict de `check-method-budget.sh` (`comm -23 "$NOW" "$SNAP"`, sortie filtrée par `jetons()`), pas l'existence des objets. Une branche intégrée pendant la session fait apparaître une ligne `RANGEABLE … déjà intégrée dans origin/main`, imputée à la session.
+- **Conséquence :** le Stop bloque sur des objets que la session ne doit pas supprimer (worktrees `v2-cockpit` et `etude-floorplan`, d'autres sessions) ; le coupe-circuit à 3 blocages borne le coût.
+- **Piste :** que le snapshot enregistre l'identité des objets (chemins de worktrees, noms de branches locales, SHA de stashes, chemins de mémoires) et n'impute un verdict `RANGEABLE` que si son objet n'existait pas au démarrage. Témoin rouge : un worktree présent au snapshot dont la branche est intégrée pendant la session, aucun blocage ; il rougit aujourd'hui.
+- **Source :** `plugin/conductor/scripts/guard-fin-de-geste.sh` (copie posée dans `~/.claude/scripts/`). Correctif = PR plus release patch. Aucun commit sur ce fichier depuis le 2026-11-03 (constat du 2026-11-05).
+
+**Résidus de la Phase 41.3** (absorbé : « Résidus de la Phase 41.3 (revue finale, tour 3) », 2026-09-30, décision du manager). Lignes à re-mesurer avant correction.
+- (1) Snapshot de mission unique par dépôt, écrasé par une mission concurrente (`check-mission-exit.sh:184`) : E7 rend SAIN sur le snapshot d'une autre mission quand le verrou est relâché.
+- (2) Avis d'archivage perdu si la session s'arrête après un Stop bloquant, ou si l'écriture de `.now` échoue après archivage (`guard-fin-de-geste.sh:142`).
+- (3) Snapshot de session pris sans `--auto --dry-run` (`guard-fin-de-geste.sh:126`) : un refus préexistant est rapporté comme neuf.
+
+**Ce qui tombe de l'ancienne entrée :** (4) LIVRÉ, entrées CHANGELOG `conductor` `[v1.46.0]` et `dev-orchestrator` `[v2.26.0]`, toutes deux « Phase 41.3 » ; (5) le tri du BACKLOG et du ROADMAP `fiabilite` se fait au tri du 2026-11-05, et `check-method-budget.sh` le constate par machine ; (6) STATE `gouvernance` à 21 Ko, compartiment de Willy, constat machine aussi. Aucun des trois n'a plus besoin d'une entrée.
+
+**Déclencheur de reprise :** la prochaine reprise de la garde de fin de geste, ou un nouveau blocage à tort.
+
+## Résidus de la Phase 41.3 (revue finale, tour 3) — DIFFÉRÉ (2026-09-30) — CLOS (2026-11-05, fusionné dans Garde de fin de geste)
+
+**Clos le 2026-11-05 : fusionné** dans « Garde de fin de geste : objet antérieur imputé à la session et résidus de la Phase 41.3 — DIFFÉRÉ (2026-11-05) » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F2). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
 
 Tracés, non corrigés (décision du manager, 2026-09-30) : (1) snapshot de mission unique par dépôt, écrasé par une mission concurrente (`check-mission-exit.sh:184`) — E7 rend SAIN sur le snapshot d'une autre mission quand le verrou est relâché ; (2) avis d'archivage perdu si la session s'arrête après un Stop bloquant, ou si l'écriture de `.now` échoue après archivage (`guard-fin-de-geste.sh:142`) ; (3) snapshot de session pris sans `--auto --dry-run` (`:126`) : un refus préexistant est rapporté comme neuf ; (4) entrées CHANGELOG `conductor` et `dev-orchestrator` à écrire à la prochaine release fonctionnelle (aucun bump en 41.3) ; (5) tri humain : BACKLOG racine à 35 sujets ouverts pour 20, ROADMAP `fiabilite` à 143 Ko pour 64 ; (6) STATE `gouvernance` à 21 Ko (Willy).
 **Déclencheur de reprise :** la prochaine release fonctionnelle (4), la clôture du jalon `fiabilite-v1.0` (5), une reprise de la garde de fin de geste (1 à 3).
@@ -611,7 +663,33 @@ AskUserQuestion n'est pas disponible. Consigner le résultat dans `41.2-VERIFICA
 **Déclencheur de reprise :** la prochaine initialisation réelle d'un lab de code, ou une évolution de `vf-split-planning`
 ou de `vf-new-lab`.
 
-## Mineurs laissés par les juges de la release v2.73.0 — `check-prd.sh` (bundle produit) — DIFFÉRÉ (2026-10-29)
+## Mineurs des juges des releases v2.73.0 et v2.74.0 (`check-prd.sh`, `check-phase-validation.sh`, `vf-validation.sh`, `check-architecture.sh`, `vf-divergence-hook.sh`) — DIFFÉRÉ (2026-11-05)
+
+**Fusion du 2026-11-05** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F3). Même origine (juges frais des Phases 59, 60, 61), même déclencheur « prochaine évolution du fichier ». Mineurs, non bloquants, tracés, non corrigés ; aucun commit sur ces fichiers après `9d59a2d8` (constat du 2026-11-05). Texte intégral des trois sujets absorbés : `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`, aux titres « Mineurs laissés par les juges de la release v2.73.0 — `check-prd.sh` (bundle produit) », « … v2.74.0 — `check-phase-validation.sh`, `vf-validation.sh`, `check-architecture.sh` » et « … v2.74.0 — `vf-divergence-hook.sh` ». Lignes à re-mesurer avant correction.
+
+**`plugin/product-team-bundle/scripts/check-prd.sh` (v2.73.0, Phase 59)**
+- Faux rouge quand le texte du gabarit sert d'amorce à une vraie réponse : `tmplword` cherche une sous-chaîne (`index(t, T[i])`, `:190-192`).
+- Titre de rubrique BRIEF apparié par préfixe : « Problématique de stockage » compte comme Problème (`index(lab, "probl") == 1`, `:421`).
+- `--requirements` passé deux fois : la dernière valeur gagne en silence (`:111-115`, sans garde comme `check-architecture.sh:77`).
+- Sous-puce `  - **REQ-03** dépend de lui` rend le code 3 : faux rouge sur une liste de dépendances (`:50-58`).
+
+**`plugin/conductor/scripts/` : `check-phase-validation.sh`, `vf-validation.sh`, `check-architecture.sh` (v2.74.0, Phases 60 et 61)**
+- Suffixe collé après un id décimal ou à lettre (`60.1x`) : « introuvable » alors que gsd résout, contre la promesse du README (`check-phase-validation.sh:121-135` et `:456-472`).
+- Faux rouge conservateur `60-1`, `AUTH-2` : 64 au lieu de 3 (`check-phase-validation.sh:460`).
+- Tolérance au préfixe (`phase-60`, `ZZ-60` lus comme 60) non vérifiée contre `project_code` (`idkey`, `:132-135`).
+- Marqueur `**Validation:**` jamais commité, invisible depuis un worktree : inerte tant qu'ADR-059 tient (`vf-validation.sh:461-463`).
+- `check-architecture.sh` : faux rouge sur une rubrique dont le corps commence par `[` (`isbody`, `:119`).
+
+**`plugin/conductor/scripts/vf-divergence-hook.sh` (v2.74.0, Phase 61)**
+- Refus global au premier hook tiers : un `post-commit` tiers empêche l'armement des deux autres, et `update --all` ne réarme pas (`REFUS hook-tiers`, `:634`).
+- Bruit `NON VERIFIABLE` à chaque `commit --amend` quand le cache est purgé (`:306-307`), et ligne manuelle muette jusqu'à `update --all` (même repli).
+- Le désarmement lit le dossier résolu par `core.hooksPath`, pas `.git/hooks` (`:241`, `do_disarm` `:671-682`) ; commentaire d'en-tête inexact sur `cherry-pick` (`:130`).
+
+**Déclencheur de reprise :** la prochaine évolution de `check-prd.sh` ou la Phase 63 (`TBD:` admis dans la section des questions ouvertes) ; du marqueur de phase ou de la porte `check-phase-validation` ; du filet de divergence, ou un incident de hook tiers sur un clone réel.
+
+## Mineurs laissés par les juges de la release v2.73.0 — `check-prd.sh` (bundle produit) — DIFFÉRÉ (2026-10-29) — CLOS (2026-11-05, fusionné dans Mineurs des juges v2.73 et v2.74)
+
+**Clos le 2026-11-05 : fusionné** dans « Mineurs des juges des releases v2.73.0 et v2.74.0 (`check-prd.sh`, `check-phase-validation.sh`, `vf-validation.sh`, `check-architecture.sh`, `vf-divergence-hook.sh`) — DIFFÉRÉ (2026-11-05) » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F3). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
 
 **Origine :** juges frais de la Phase 59 (heuristique `check-prd.sh`), release v2.73.0 ; classés mineurs
 (pas de sonde à conséquence sans filet : le juge LLM `prd-gate` rattrape ou le contournement existe). Tracés,
@@ -623,7 +701,9 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 
 **Déclencheur de reprise :** la prochaine évolution de `check-prd.sh` ou la Phase 63 (`TBD:` admis dans la section des questions ouvertes).
 
-## Mineurs laissés par les juges de la release v2.74.0 — `check-phase-validation.sh`, `vf-validation.sh`, `check-architecture.sh` — DIFFÉRÉ (2026-10-29)
+## Mineurs laissés par les juges de la release v2.74.0 — `check-phase-validation.sh`, `vf-validation.sh`, `check-architecture.sh` — DIFFÉRÉ (2026-10-29) — CLOS (2026-11-05, fusionné dans Mineurs des juges v2.73 et v2.74)
+
+**Clos le 2026-11-05 : fusionné** dans « Mineurs des juges des releases v2.73.0 et v2.74.0 (`check-prd.sh`, `check-phase-validation.sh`, `vf-validation.sh`, `check-architecture.sh`, `vf-divergence-hook.sh`) — DIFFÉRÉ (2026-11-05) » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F3). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
 
 **Origine :** juges des Phases 60 et 61 (grille de sévérité), release v2.74.0 ; mineurs, non bloquants pour le merge. Fichiers sous `plugin/conductor/scripts/`.
 - **Suffixe collé après un id décimal ou à lettre (`60.1x`) : « introuvable », alors que gsd résout** ; le README promet « tout argument qui désigne une phase existante rend 64 » (`check-phase-validation.sh:121-135` et `:456-472`).
@@ -634,7 +714,9 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 
 **Déclencheur de reprise :** la prochaine évolution du marqueur de phase ou de la porte `check-phase-validation`.
 
-## Mineurs laissés par les juges de la release v2.74.0 — `vf-divergence-hook.sh` — DIFFÉRÉ (2026-10-29)
+## Mineurs laissés par les juges de la release v2.74.0 — `vf-divergence-hook.sh` — DIFFÉRÉ (2026-10-29) — CLOS (2026-11-05, fusionné dans Mineurs des juges v2.73 et v2.74)
+
+**Clos le 2026-11-05 : fusionné** dans « Mineurs des juges des releases v2.73.0 et v2.74.0 (`check-prd.sh`, `check-phase-validation.sh`, `vf-validation.sh`, `check-architecture.sh`, `vf-divergence-hook.sh`) — DIFFÉRÉ (2026-11-05) » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F3). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
 
 **Origine :** juges de la Phase 61 (filet de divergence armé), release v2.74.0 ; mineurs. Fichier `plugin/conductor/scripts/vf-divergence-hook.sh`.
 - **Refus global au premier hook tiers** : un `post-commit` tiers empêche l'armement des deux autres hooks, et `update --all` ne réarme pas (`REFUS hook-tiers`, `:634`).
@@ -645,7 +727,9 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 
 **Déclencheur de reprise :** la prochaine évolution du filet de divergence ou un incident de hook tiers sur un clone réel.
 
-## Réexamen approche C (plateforme collaborative) — 2027-01-31 — DIFFÉRÉ (2026-10-29)
+## Réexamen approche C (plateforme collaborative) — 2027-01-31 — DIFFÉRÉ (2026-10-29) — CLOS (2026-11-05, échéance reportée au STATE)
+
+**Sort du BACKLOG le 2026-11-05** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Transformer 28 et 29 »). Devient une échéance du STATE `fiabilite` au 2027-01-31 (`.planning/workstreams/fiabilite/STATE.md`, § Échéances).
 
 **Origine :** Phase 62, décision A (approche C différée), décision déléguée par Samuel, message session principale, 2026-10-29. Échéance humaine, **sans veille automatique** (P62-D-05).
 - **À la date :** relire C1/C2 (`62-DECISION-plateforme.md` §6) et constater leur état ; si un fait manque, repousser par un nouvel arbitrage, jamais en silence.
@@ -653,7 +737,9 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 
 **Déclencheur de reprise :** le 2027-01-31, ou plus tôt si C1 et C2 sont établis.
 
-## Choix de la langue de l'interface du cockpit (français / anglais) — DIFFÉRÉ (2026-11-01)
+## Choix de la langue de l'interface du cockpit (français / anglais) — DIFFÉRÉ (2026-11-01) — CLOS (2026-11-05, devenu SEED-005)
+
+**Sort du BACKLOG le 2026-11-05** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Transformer 28 et 29 »). Devient `.planning/seeds/SEED-005-langue-interface-cockpit.md` : c'est une fonctionnalité, pas un défaut.
 
 **Origine :** Phase 67, réponse E1 de Samuel (AskUserQuestion session principale, 2026-11-01) : « on pourrait avoir des gens qui utilise l'anglais, donc en soit l'anglais n'est pas dérangeant et peut etre un des langues autorisées » (`67-CONTEXT.md` P67-D-20). L'interface du cockpit est en français par défaut ; les textes du moteur (Santé, couverture de l'onglet Code) restent en anglais (CKPT-09 reformulé).
 - **À faire :** un choix de langue (français / anglais) dans l'interface, gardé dans le navigateur ; l'anglais devient une langue autorisée et non plus un défaut à masquer. Le paramètre `?lang=en` existe déjà (80-vf-fr.js : désactive la traduction), c'est le point d'appui.
@@ -664,7 +750,9 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-11-02.md — ## Installeur et tests `plugin/_internal` sans module dans la carte — DIFFÉRÉ (2026-11-02) — CLOS (2026-11-02) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-11-02.md — ## `dev-orchestrator` : 26 500 lignes et responsabilités mêlées — DIFFÉRÉ (2026-11-02) — CLOS (2026-11-02) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-11-02.md — ## Gates de `dev-orchestrator` à rejouer sur témoin rouge — DIFFÉRÉ (2026-11-02) — CLOS (2026-11-02) -->
-## Cockpit en largeur mobile et clarté de la visite guidée — DIFFÉRÉ (2026-11-02)
+## Cockpit en largeur mobile et clarté de la visite guidée — DIFFÉRÉ (2026-11-02) — CLOS (2026-11-05, livré PR #200)
+
+**Clos le 2026-11-05 : livré** (constat du tri, pas un arbitrage). PR #200 mergée le 2026-11-04 (`503aa657`) : UIFN-01 (D4, I6), UIFN-02 (I4), UIFN-03 (I5), UIFN-04 et UIFN-05 (I1).
 
 **Origine :** recette humaine de la Phase 67, étapes 1 et 7 (`67-RECETTE-HUMAINE.md` § 3, Samuel, Wispr Flow et saisie texte, session principale, 2026-11-02). Reporté hors de la PR #187 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-02).
 - **D4** : en largeur mobile, tous les boutons passent en une rangée de petites icônes sans libellé ; hiérarchie de l'information jugée « atroce ».
@@ -675,21 +763,27 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 
 **Déclencheur de reprise :** Phase 70 « Finitions UI du cockpit » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
 
-## Commande `/vf-recette` — recette humaine pas à pas — DIFFÉRÉ (2026-11-02)
+## Commande `/vf-recette` — recette humaine pas à pas — DIFFÉRÉ (2026-11-02) — CLOS (2026-11-05, abandonné)
+
+**Clos le 2026-11-05 : abandonné** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Abandonner 7, 12 et 31 »). Prémisse dépassée : la recette se fait maintenant par juges Playwright frais, Samuel ne garde que les points de goût (P70-D-19, 2026-11-04, appliqué en Phases 70 et 71).
 
 **Origine :** recette de la Phase 67 menée en session principale le 2026-11-02 : une étape à la fois, retour dicté (Wispr Flow) ou tapé, relevé verdict / défauts / idées validé par Samuel, consignation mot pour mot avec canal et date, tri final en AskUserQuestion. Mise au backlog par arbitrage Samuel (AskUserQuestion session principale, 2026-11-02). Le serveur MCP en lecture seule sur l'historique local de Wispr Flow n'est pas retenu (base non documentée, fragile).
 - **À faire :** outiller ce va-et-vient à partir d'un fichier `*-RECETTE-HUMAINE.md` existant, sans jamais remplir une réponse à la place de l'humain.
 
 **Déclencheur de reprise :** la prochaine recette humaine de fin de phase.
 
-## Cockpit : « Où en est-on ? » sur un lab sans STATE rend des champs vides — DIFFÉRÉ (2026-11-03)
+## Cockpit : « Où en est-on ? » sur un lab sans STATE rend des champs vides — DIFFÉRÉ (2026-11-03) — CLOS (2026-11-05, livré PR #200)
+
+**Clos le 2026-11-05 : livré** (constat du tri, pas un arbitrage). `2e6f7057` fix(70-06), PR #200 ; `plugin/cockpit/scripts/vf-cockpit-ask.mjs:107-115` (`aucunState`, « Pas de STATE.md dans ce lab »).
 
 **Origine :** relecture adverse SOBR-04 de la release v2.75.0 (finding F5), reportée par arbitrage Samuel (« Corriger maintenant (Recommandé) » pour F1 à F4, F5 au BACKLOG ; AskUserQuestion session principale, 2026-11-03).
 - Sur un lab sans `STATE.md`, la voie locale répond « Jalon en cours : non reconnu. Dernière phase :  · , le ?. » : les champs absents sont rendus vides au lieu d'être omis ou nommés. `plugin/cockpit/scripts/vf-cockpit-ask.mjs:107`. Cosmétique, pas de crash.
 
 **Déclencheur de reprise :** la phase qui suit la 67 sur le cockpit.
 
-## Cockpit : anglais résiduel et coquilles du chrome — DIFFÉRÉ (2026-11-03)
+## Cockpit : anglais résiduel et coquilles du chrome — DIFFÉRÉ (2026-11-03) — CLOS (2026-11-05, livré PR #200)
+
+**Clos le 2026-11-05 : livré** (constat du tri, pas un arbitrage). PR #200 : `8f011d9c` (« Calls » traduit), `4f3eda52` (élision, contraction, O5) ; « de le CLI » et « 1 fichiers de code » sont absents du code servi.
 
 **Origine :** vérification Playwright des correctifs de la Phase 67 (`67-RECETTE-HUMAINE.md` § 6), laissée hors de la PR #187 par arbitrage Samuel (AskUserQuestion session principale, 2026-11-03).
 - Anglais dans le chrome : « Calls · 27 » dans le panneau, « ⌫ up » dans l'aide des raccourcis, « 1 minor » dans Santé.
@@ -698,7 +792,9 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 
 **Déclencheur de reprise :** Phase 70 « Finitions UI du cockpit » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
 
-## `guard-fin-de-geste.sh` impute à la session un objet antérieur qui change d'état — DIFFÉRÉ (2026-11-03)
+## `guard-fin-de-geste.sh` impute à la session un objet antérieur qui change d'état — DIFFÉRÉ (2026-11-03) — CLOS (2026-11-05, fusionné dans Garde de fin de geste)
+
+**Clos le 2026-11-05 : fusionné** dans « Garde de fin de geste : objet antérieur imputé à la session et résidus de la Phase 41.3 — DIFFÉRÉ (2026-11-05) » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F2). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
 
 **Origine :** session principale du 2026-11-03 (release v2.75.0). Le Stop a bloqué 3 fois sur deux worktrees créés par d'autres sessions : `.claude/worktrees/v2-cockpit` (le 2026-11-01) et `.claude/worktrees/etude-floorplan`. Samuel a demandé de l'inscrire ici (session principale, 2026-11-03).
 - **Cause, mesurée :** l'attribution (M3) compare des **lignes de verdict** de `check-method-budget.sh`, pas l'existence des objets : `comm -23 "$NOW" "$SNAP"` sur la sortie filtrée par `jetons()`. Au démarrage, les deux worktrees existaient mais leurs branches n'étaient pas intégrées, donc il n'y avait aucune ligne `RANGEABLE`. On le vérifie dans le snapshot `…/vibeflow-fin-de-geste-501/1261415488-af7b6da6-….snap`. Le merge de la PR #187 a intégré `feat/v2-cockpit` et `docs/etude-floorplan` (dont les commits étaient dans la PR). Deux lignes `RANGEABLE … déjà intégrée dans origin/main` sont apparues et ont été imputées à la session.
@@ -710,6 +806,8 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 
 ## `/vf-update` ne propose pas un module apparu dans une release — DIFFÉRÉ (2026-11-03)
 
+**Priorité : P1** (relevée le 2026-11-05 au tri du planning, constat de l'inventaire, sans arbitrage). La prochaine release groupée publiera tout le travail cockpit des Phases 68 à 71 à des postes qui n'ont pas le module ; même famille que l'issue #188 (volet 1) : « `/vf-update` ne voit pas un retard ou une nouveauté de module ». À traiter avant la release groupée. Aucun commit sur `plugin/conductor/skills/vf-update/SKILL.md` ni sur `plugin/_internal/vibeflow-update.sh` depuis le 2026-11-03.
+
 **Origine :** session principale du 2026-11-03. Après avoir mis VibeFlow en v2.75.0, Samuel n'a pas `/vf-cockpit`. Inscription demandée par Samuel, avec un correctif après la planification de la Phase 69 (session principale Claude Code, 2026-11-03).
 - **Constat, mesuré :** le plugin 2.75.0 est bien dans le cache (`~/.claude/plugins/cache/vibeflow-os/vibeflow/2.75.0/`), mais le registre `~/.claude/scripts/.vibeflow-installed` liste 13 modules sans `cockpit`. `/vf-update` ne met à jour que les modules déjà inscrits au registre et ne dit rien des modules du catalogue qui n'y sont pas.
 - **Conséquence :** un module livré dans une release reste invisible pour les utilisateurs existants. Il n'arrive que par un `/vibeflow-install` qu'ils n'ont aucune raison de relancer.
@@ -718,7 +816,24 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 
 **Déclencheur de reprise :** juste après la planification de la Phase 69 (demande de Samuel, session principale Claude Code, 2026-11-03).
 
-## R8 de la recette de la Phase 68 : le panneau latéral ne dit pas l'état de la mission — DIFFÉRÉ (2026-11-04)
+## Cockpit : mineurs d'affichage et sécurité basse (R8, carte Session, N4, N6, goût de la 71, H1-b) — DIFFÉRÉ (2026-11-05)
+
+**Fusion du 2026-11-05** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F1). Texte intégral des sujets absorbés : `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`, au titre cité. Rien n'est corrigé ici ; chaque ligne garde sa preuve (re-mesurée le 2026-11-05) et son déclencheur. Priorité P2.
+
+- **R8 de la recette de la Phase 68** (absorbé : « R8 de la recette de la Phase 68 : le panneau latéral ne dit pas l'état de la mission », 2026-11-04, P70-D-24). Le panneau ne dit pas l'état de la mission ; un nœud en cours a le même point qu'un nœud fait. Déclencheur du report rempli (PR #199 mergée le 2026-11-04), aucun commit R8 depuis. Preuve : `plugin/cockpit/scripts/vf-cockpit-project.mjs:107` (le résumé dit seulement « N nœuds, M faits »).
+- **Carte « Session » de l'onglet Équipe** (absorbé : « Carte « Session » de l'onglet Équipe : pied « en attente », badge « En cours » », 2026-11-04, `70-RECETTE-JUGES.md`). Défaut de la 69 révélé par la 70. Preuve : `plugin/cockpit/skills/cockpit-moteur/assets/ui/72-vf-equipe.js:140`, `x.st = w.etat === 'termine' ? 'done' : 'active'` : tout état autre que « terminé » devient actif. Témoin rouge : une session en attente rend le badge « En cours ».
+- **N4** (absorbé : « Écarts de recette de la Phase 68 reportés au BACKLOG (N4, N5, N6) », 2026-11-04, P68-D-38). Le panneau Phase affiche « Ligne de ROADMAP : … » avec le markdown `**` brut. Preuve : `plugin/cockpit/scripts/vf-cockpit-planning.mjs:39` garde `line: m[3]` brut. N5 est LIVRÉ (PR #202, `a6912f25`, cockpit v1.2.1) : il sort d'ici.
+- **N6** (même entrée). Hors d'une branche `feat/phase-N`, une mission abandonnée n'apparaît nulle part dans la pane vf-signal, alors que la carte Projet du cockpit web la montre. Non re-sondé le 2026-11-05.
+- **Goût résiduel de la 71** (non tracé au BACKLOG jusqu'ici ; `71-RECETTE-HUMAINE.md:232-233`, PR #203 « Goût résiduel »). Cartes à 0,29 en 1280×720 tiroir ouvert ; « Terminé » face à « Python 3 introuvable » (`plugin/cockpit/scripts/vf-cockpit-terminal-tiroir.mjs:17`, `termine: 'Terminé'`). Aucun commit de rendu après `d4171ded` ; sans capture, pas de preuve visuelle ; point de goût à faire confirmer.
+- **`shell_sous` sans attente bornée** (mineur de la PR #204, « tracé, non corrigé »). `plugin/cockpit/scripts/tests/test-cockpit-terminal-session.sh:101` : une seule passe `pgrep`, pas de boucle.
+- **Libellé « écrit à un agent »** (arbitré P70-D-23, option 2a, `70-RECETTE-JUGES.md:67-70` ; livré conforme, `vf-cockpit-who.mjs:71-73`). Résidu possible : le rôle ne se résout que parmi les sous-agents (`rolesDe`), donc un message vers la session principale s'affiche « un agent ». Point de goût à faire confirmer.
+- **H1-b, sécurité basse** (hérité de `main`, mandat H-1, `71-SECURITY.md:300,320`). `sous()` de `plugin/cockpit/scripts/vf-cockpit-env.mjs:12` laisse passer un dossier nommé `..xxx` : `!r.startsWith('..')` traite `<lab>/..xxx` comme hors du lab.
+
+**Déclencheur de reprise :** la prochaine passe sur l'affichage du cockpit ou de la pane vf-signal ; H1-b, la prochaine modification de `vf-cockpit-env.mjs`.
+
+## R8 de la recette de la Phase 68 : le panneau latéral ne dit pas l'état de la mission — DIFFÉRÉ (2026-11-04) — CLOS (2026-11-05, fusionné dans Cockpit mineurs d'affichage et sécurité basse)
+
+**Clos le 2026-11-05 : fusionné** dans « Cockpit : mineurs d'affichage et sécurité basse (R8, carte Session, N4, N6, goût de la 71, H1-b) — DIFFÉRÉ (2026-11-05) » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F1). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
 
 **Origine :** Samuel a passé R8 de la recette de la Phase 68 à la Phase 70 (P68-D-35, sur la branche de la 68). Report décidé par le manager (vf-dev-manager, 2026-11-04) : P70-D-24, pas un arbitrage de Samuel.
 - **Constat :** le panneau latéral web ne dit pas l'état de la mission, et un nœud en cours a le même point qu'un nœud fait.
@@ -727,7 +842,9 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 
 **Déclencheur de reprise :** le merge de la branche de la Phase 68 sur `main`.
 
-## Carte « Session » de l'onglet Équipe : pied « en attente », badge « En cours » — DIFFÉRÉ (2026-11-04)
+## Carte « Session » de l'onglet Équipe : pied « en attente », badge « En cours » — DIFFÉRÉ (2026-11-04) — CLOS (2026-11-05, fusionné dans Cockpit mineurs d'affichage et sécurité basse)
+
+**Clos le 2026-11-05 : fusionné** dans « Cockpit : mineurs d'affichage et sécurité basse (R8, carte Session, N4, N6, goût de la 71, H1-b) — DIFFÉRÉ (2026-11-05) » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F1). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
 
 **Origine :** recette par juges de la Phase 70 (`70-RECETTE-JUGES.md`, écarts connus). Défaut de la Phase 69 révélé par la 70, non créé par elle.
 - **Constat :** la carte « Session » affiche « en attente » dans son pied et le badge « En cours ».
@@ -736,7 +853,9 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 
 **Déclencheur de reprise :** la prochaine passe sur l'onglet Équipe.
 
-## `scripts/check-machine-paths.sh` : vert sous macOS, rouge sous Linux — DIFFÉRÉ (2026-11-04)
+## `scripts/check-machine-paths.sh` : vert sous macOS, rouge sous Linux — DIFFÉRÉ (2026-11-04) — CLOS (2026-11-05, fusionné dans Classe gate qui conclut sans juger)
+
+**Clos le 2026-11-05 : fusionné** dans « Classe « un gate conclut sans avoir jugé » (juges d'artefact de planning, nettoyage auto-déclaré, énumération de compartiments, `check-machine-paths.sh`) — DIFFÉRÉ (2026-11-05) » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F4). **En cours de correction, mandat séparé, 2026-11-05** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Corriger maintenant (Recommandé) ») : le sujet reste ouvert dans l'entrée hôte jusqu'au merge du correctif. Cause démontrée : voir l'entrée hôte. Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
 
 **Origine :** Phase 70, deux fois : des chemins `/Users/<user>/…` écrits dans les plans passaient le garde en local et le rougissaient en CI Linux (plans corrigés en `c7217940`).
 - **Constat :** même dépôt, même commit, verdicts opposés selon le système ; cause non diagnostiquée.
@@ -745,7 +864,9 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
 
 **Déclencheur de reprise :** la prochaine modification de `scripts/check-machine-paths.sh`, ou un nouveau rouge CI de ce garde.
 
-## Écarts de recette de la Phase 68 reportés au BACKLOG (N4, N5, N6) — DIFFÉRÉ (2026-11-04)
+## Écarts de recette de la Phase 68 reportés au BACKLOG (N4, N5, N6) — DIFFÉRÉ (2026-11-04) — CLOS (2026-11-05, fusionné dans Cockpit mineurs d'affichage et sécurité basse)
+
+**Clos le 2026-11-05 : fusionné** dans « Cockpit : mineurs d'affichage et sécurité basse (R8, carte Session, N4, N6, goût de la 71, H1-b) — DIFFÉRÉ (2026-11-05) » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Les 6 fusions (Recommandé) », F1). Texte intégral : ce bloc, archivé dans `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
 
 **Origine :** recette v2 de la Phase 68 par un juge frais (captures dans le rapport de mission
 `.planning/missions/2026-11-04-phase-68-execution.md`). Arbitrage Samuel, AskUserQuestion session principale Claude Code,
