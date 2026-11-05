@@ -42,3 +42,27 @@ Le tactile à 1000 px n'est pas émulable avec `chrome-session.mjs` (aucune ému
 | M-DEPOT | `racine` pris de `rev-parse --show-toplevel` dans une copie du module | H1.1 : `depot` = `wt-a` ; H2.2 : `#proj-name` = `wt-m` (cockpit construit avec la copie) |
 | M-TEXTE | `spBranche.innerHTML = texteBranche` dans une copie de 76, branche `<svg/onload=alert(1)>` | `svgEntete > 0` et texte de la ligne différent de la branche (un `svg` neuf dans l'en-tête) |
 | M-ABSENT | `V.etat === 'absent' \|\|` retiré dans une copie de 76, lab hors dépôt | `.vf-git-ligne` et `.vf-nom` présents sans git |
+
+## Tâche 3
+
+Rouge joué sur la base de la tâche 2 (bloc de vue du viewer inchangé, `css-jetons.mjs` absent) : sections H6 seules, copie temporaire de la suite (effacée ensuite) ; 5 réussis, 17 échoués (`78-04-rouge3.log` du scratchpad).
+
+| Témoin | Assertion | Attendu | Obtenu sur la base (rouge) | Vert après |
+|---|---|---|---|---|
+| H6.1 Code | surtitre, titre, sous-titre | `Code`, `Le code, branche feat/x`, `N … lus dans le dépôt.` | `Vue d'ensemble`, `wt-a` (nom du projet du moteur), « Carte du code construite sans modèle… » | oui |
+| H6.3 Code | titre sans nom du projet ni `depot`, classe `vf-ctx-titre` | `false\|false\|true` | `true\|false\|false` (titre = nom du projet, pas de classe) | oui |
+| H6.2 Projet | surtitre, titre, sous-titre = résumé | `Projet\|Jalon vibeflow-test\|true` | `Vue d'ensemble`, `wt-a — Projet`, résumé | oui |
+| H6.3 Projet | titre sans nom du projet, classe | `false\|true` | `true\|false` | oui |
+| H6.2 Équipe | sans mission, une mission, deux missions | `Aucune mission en cours` + `L'équipe est au repos.` ; `Mission : x` ; `2 missions en cours` | `Vue d'ensemble`, `wt-a — Équipe`, « 0 actifs · 0 en attente… » | oui |
+| H6.4 retour | après `go(nœud)` puis `go('root')` : bloc réécrit | `Projet\|true\|true` | bloc d'origine (`Vue d'ensemble\|true\|false`) | oui |
+| H6.1 sans git | « Le code du projet », « … lus dans le dossier. » | `Code\|Le code du projet\|true` | `Vue d'ensemble`, `hors-depot` (nom du moteur), description du moteur | oui |
+| H6.6 | `css-jetons.mjs` sur 76 ; cinq copies fautives (`padding: 5px`, `#123456`, `border-radius: 50%`, `rgba(1, 2, 3, .5)`, `margin-left: -7px`) | `0` ; `1 1` chacune | `node` ne trouve pas `css-jetons.mjs` : code 1, `1 0` (aucun écart nommé) | oui |
+
+Vert d'emblée (la tâche 1 avait déjà posé `repos: []` dans la page d'index) : H6.5 (aucun titre « Repositories » / « Dépôts », aucune ligne `branche @ sha`) et H6.4 (dans un nœud, le bloc reste celui du viewer).
+Ces deux témoins ne sont pas aveugles : leurs témoins positifs sont joués (`graph.json` garde `meta.repos`, le panneau d'ensemble est rendu), et le mutant M-REPOS ci-dessous les fait rougir.
+
+### Mutant (tâche 3)
+
+| Mutant | Altération | Rouge obtenu |
+|---|---|---|
+| M-REPOS | `insererGraphe(html, g)` au lieu de `{ ...g, meta: { ...g.meta, repos: [] } }` dans une copie du build | H6.5 : le panneau de l'index liste de nouveau les dépôts (titre « Dépôts » ou lignes `.rp`) |

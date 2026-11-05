@@ -11,6 +11,46 @@
   if (!nom) return;
   const SUFFIXE = / — (Projet|Équipe)$/;
   nom.textContent = String(V && V.depot ? V.depot : nom.textContent).replace(SUFFIXE, ''); // GITC-01 : même nom sur les trois onglets, aucun suffixe
+
+  // ---------- bloc de vue racine (P78-D-03) : dit ce que montre la vue, jamais le nom du projet — même sans git ----------
+  const TAB = G.meta.vfTab === 'project' ? 'project' : G.meta.vfTab === 'equipe' ? 'equipe' : 'code';
+  const pl = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+  const texteVue = () => {
+    const VF = G.meta.vf || {}, depot = V && (V.etat === 'ok' || V.etat === 'indisponible'); // un dépôt détecté ; sinon « dossier »
+    if (TAB === 'code') {
+      const b = V && V.etat === 'ok' ? (V.detache ? 'HEAD détaché' : V.branche ? `branche ${V.branche}` : '') : '';
+      return { k: 'Code', h1: b ? `Le code, ${b}` : 'Le code du projet',
+        p: `${pl((G.files || []).length, 'fichier')} et ${pl((G.routes || []).length, 'route')} lus dans le ${depot ? 'dépôt' : 'dossier'}.` };
+    }
+    if (TAB === 'project') return { k: 'Projet', h1: VF.milestone ? `Jalon ${VF.milestone}` : 'Le projet', p: G.project.summary || '' };
+    const M = Array.isArray(VF.missions) ? VF.missions : [], c = VF.compte || {};
+    const repos = !M.length && !c.actif && !c.enAttente; // aucune mission et personne au travail
+    return { k: 'Équipe', h1: M.length === 1 ? `Mission : ${M[0]}` : M.length > 1 ? `${M.length} missions en cours` : 'Aucune mission en cours', p: repos ? "L'équipe est au repos." : G.project.summary || '' };
+  };
+  const ecrireVue = () => { // réécrit le bloc que renderContext vient de poser ; sous-vues et réponses (q:answer) inchangées
+    const ctx = document.querySelector('#context'), k = ctx && ctx.querySelector('.k'), h1 = ctx && ctx.querySelector('h1');
+    if (!k || !h1) return;
+    const t = texteVue();
+    k.textContent = t.k; h1.textContent = t.h1; h1.classList.add('vf-ctx-titre');
+    let d = ctx.querySelector('.cd');
+    if (!d) { d = document.createElement('p'); d.className = 'cd'; d.id = 'ctx-desc'; h1.after(d); }
+    d.textContent = t.p;
+    const more = ctx.querySelector('.ctx-more'); // même pliage que foldContext du viewer, relu sur le texte neuf
+    if (more) {
+      const ouvert = more.getAttribute('aria-expanded') === 'true';
+      ctx.classList.add('folded');
+      const long = d.scrollHeight > d.clientHeight + 1 || !!ctx.querySelector('.cx');
+      ctx.classList.toggle('folded', !ouvert);
+      more.hidden = !long;
+    }
+  };
+  const styleVue = document.createElement('style');
+  styleVue.textContent = '.vf-ctx-titre { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }';
+  document.head.appendChild(styleVue);
+  // le premier rendu peut précéder ce fichier (l'analyseur rend la main entre deux scripts) : on réécrit aussi à l'arrivée du fichier, puis à « ready »
+  SC.on('render', (e) => { if (e && e.container === 'root') ecrireVue(); });
+  SC.on('ready', () => { if (SC.state && SC.state.container === 'root') ecrireVue(); });
+  if (SC.state && SC.state.container === 'root') ecrireVue();
   if (!V || V.etat === 'absent' || !V.depot) return; // P78-D-11 : rien d'autre dans le DOM
   nom.title = nom.textContent; // nom entier, la troncature est visuelle
 
