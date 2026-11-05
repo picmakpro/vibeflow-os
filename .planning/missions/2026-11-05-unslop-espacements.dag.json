@@ -2,13 +2,94 @@
   "nodes": [
     {
       "id": "audit",
-      "step": "audit espacements + captures avant + echelle proposee",
+      "step": "audit existant : espacements, couleurs, icones, hierarchie, infos + captures avant",
       "stage": "",
       "deps": [],
-      "scope": [
-        ".planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit"
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "direction:a",
+      "step": "direction de palette a en maquette sur Projet/Code/Equipe, AA mesure 2 themes",
+      "stage": "",
+      "deps": [
+        "audit"
       ],
-      "status": "ready"
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "direction:b",
+      "step": "direction de palette b en maquette sur Projet/Code/Equipe, AA mesure 2 themes",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "direction:c",
+      "step": "direction de palette c en maquette sur Projet/Code/Equipe, AA mesure 2 themes",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "propositions",
+      "step": "choix icones, hierarchie des vues, informations utiles",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "critique:directions",
+      "step": "juge frais : 3 directions + propositions",
+      "stage": "",
+      "deps": [
+        "direction:a",
+        "direction:b",
+        "direction:c",
+        "propositions"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "gout",
+      "step": "arbitrage Samuel (via coordinateur)",
+      "stage": "",
+      "deps": [
+        "critique:directions"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "design-md",
+      "step": "DESIGN.md + jetons couleur figes (spec crafter)",
+      "stage": "",
+      "deps": [
+        "gout"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "critique:design-md",
+      "step": "juge frais sur la spec de jetons",
+      "stage": "",
+      "deps": [
+        "design-md"
+      ],
+      "scope": [],
+      "status": "blocked"
     },
     {
       "id": "craft:shell",
@@ -111,8 +192,8 @@
       "status": "blocked"
     },
     {
-      "id": "impl",
-      "step": "vf-coder : jetons + application des 5 specs + suites de mise en page",
+      "id": "impl:espacements",
+      "step": "vf-coder : jetons espacement + 5 specs + suites",
       "stage": "",
       "deps": [
         "critique:shell",
@@ -121,9 +202,18 @@
         "critique:equipe",
         "critique:tiroir"
       ],
-      "scope": [
-        "plugin/cockpit"
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "impl:couleurs",
+      "step": "vf-coder : jetons couleur + DESIGN.md + application",
+      "stage": "",
+      "deps": [
+        "critique:design-md",
+        "impl:espacements"
       ],
+      "scope": [],
       "status": "blocked"
     },
     {
@@ -131,7 +221,7 @@
       "step": "juge frais sur le rendu shell",
       "stage": "",
       "deps": [
-        "impl"
+        "impl:couleurs"
       ],
       "scope": [],
       "status": "blocked"
@@ -141,7 +231,7 @@
       "step": "juge frais sur le rendu code",
       "stage": "",
       "deps": [
-        "impl"
+        "impl:couleurs"
       ],
       "scope": [],
       "status": "blocked"
@@ -151,7 +241,7 @@
       "step": "juge frais sur le rendu projet",
       "stage": "",
       "deps": [
-        "impl"
+        "impl:couleurs"
       ],
       "scope": [],
       "status": "blocked"
@@ -161,7 +251,7 @@
       "step": "juge frais sur le rendu equipe",
       "stage": "",
       "deps": [
-        "impl"
+        "impl:couleurs"
       ],
       "scope": [],
       "status": "blocked"
@@ -171,14 +261,14 @@
       "step": "juge frais sur le rendu tiroir",
       "stage": "",
       "deps": [
-        "impl"
+        "impl:couleurs"
       ],
       "scope": [],
       "status": "blocked"
     },
     {
       "id": "livraison",
-      "step": "captures apres, rebase, bump patch cockpit, CHANGELOG, PR, CI",
+      "step": "captures apres, rebase, bump patch, CHANGELOG, PR, CI",
       "stage": "",
       "deps": [
         "rendu:shell",
