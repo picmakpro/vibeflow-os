@@ -14,3 +14,7 @@ date	type	source	archive	ref	motif
 2026-11-01	state	.planning/workstreams/fiabilite/STATE.md	.planning/archives/state/fiabilite-STATE-2026-11-01.md	1913f2b2a0f1724a91c5e2f2549905c3e5499646	budget 8 Ko (SOBR-02)
 2026-11-02	state	.planning/workstreams/fiabilite/STATE.md	.planning/archives/state/fiabilite-STATE-2026-11-02.md	a58ea55148bf8ad607a39cd11b3f212c61b9d3ad	budget 8 Ko (SOBR-02)
 2026-11-02	backlog	.planning/BACKLOG.md	.planning/archives/backlog/racine-BACKLOG-2026-11-02.md	8920506a1f1e977c00e892965c12375ddab2c104	sujets clos (SOBR-06)
+2026-11-05	backlog	.planning/BACKLOG.md	.planning/archives/backlog/racine-BACKLOG-2026-11-05.md	349c6cbd20f46aa96bbf7df1092a3b31c7807bd1	sujets clos (SOBR-06)
+2026-11-05	backlog	.planning/BACKLOG.md	.planning/archives/backlog/racine-BACKLOG-2026-11-05.md	bd0228eca7aef47d286f9fa890a1956a749a3190	entrées réécrites, détail historique (SOBR-06)
+2026-11-05	roadmap	.planning/workstreams/fiabilite/ROADMAP.md	.planning/archives/roadmap/fiabilite-ROADMAP-2026-11-05.md	f909d1d5ef98e47201be57d7319230fa1909799f	budget 64 Ko, corps de phases closes condensés, jalon ecc-inspiration archivé (SOBR-06)
+2026-11-05	state	.planning/workstreams/fiabilite/STATE.md	.planning/archives/state/fiabilite-STATE-2026-11-05.md	d8dcc11e1d3ddff154ac8973c278243f90415a17	budget 8 Ko (SOBR-02), position réécrite
