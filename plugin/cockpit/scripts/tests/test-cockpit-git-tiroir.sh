@@ -197,7 +197,7 @@ out.csp = s.violations.length;
 out.errs = await s.ev(`window.__errs`);
 // D2.2 (suite) : 768 px -> rangées et colonnes de 44 px
 await s.send('Emulation.setDeviceMetricsOverride', { width: 768, height: 900, deviceScaleFactor: 1, mobile: false });
-await s.attendre(`Math.round(document.querySelector('#vf-git-tiroir li[role=option]').getBoundingClientRect().height) === 44`, 'rangée de 44 px');
+await s.attendre(`Math.round(document.querySelector('#vf-git-tiroir li[role=option]').getBoundingClientRect().height) === 44 && Math.round(document.querySelector('#vf-git-tiroir svg.vf-git-gcol').getBoundingClientRect().height) === 44`, 'rangée et colonne de 44 px (le rendu suit le changement de requête media)');
 out.mobile = await s.ev(`({ li: Math.round(document.querySelector('#vf-git-tiroir li[role=option]').getBoundingClientRect().height), svg: Math.round(document.querySelector('#vf-git-tiroir svg.vf-git-gcol').getBoundingClientRect().height) })`);
 return out;
 JS

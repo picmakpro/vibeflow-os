@@ -25,15 +25,15 @@
     .vf-git-tiroir[hidden] { display: none; }
     .vf-git-tiroir.vf-git-entree { animation: vf-git-entree 250ms var(--ease) both; }
     @keyframes vf-git-entree { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
-    .vf-git-barre { flex: none; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px 0 14px; background: var(--raise); border-bottom: 1px solid var(--hair); }
+    .vf-git-barre { flex: none; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px 0 16px; background: var(--raise); border-bottom: 1px solid var(--hair); }
     .vf-git-titre-t { margin: 0; font: 500 13px var(--sans); color: var(--text); }
     .vf-git-titre-t:focus { outline: none; }
     .vf-git-fermer { margin-left: auto; }
     .vf-git-fermer, .vf-git-btn { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: var(--text-2); cursor: pointer; }
     .vf-git-fermer:hover, .vf-git-btn:hover { background: var(--raise-2); color: var(--text); }
     .vf-git-tiroir button:focus-visible, .vf-git-rangee:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
-    .vf-git-aide { margin: 0; padding: 8px 14px; font-size: 12px; color: var(--text-3); }
-    .vf-git-corps { flex: 1; min-height: 0; overflow-y: auto; padding: 0 14px 16px; font-family: var(--sans); }
+    .vf-git-aide { margin: 0; padding: 8px 16px; font-size: 12px; color: var(--text-3); }
+    .vf-git-corps { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 16px; font-family: var(--sans); overflow-x: hidden; }
     .vf-git-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     body.vf-git-ouvert #context { opacity: 0; }
     .vf-git-sec { margin-top: 12px; }
@@ -51,25 +51,26 @@
     .vf-git-t0 { color: var(--text-3); } .vf-git-t1 { color: var(--k-http); } .vf-git-t2 { color: var(--k-call); } .vf-git-t3 { color: var(--k-data); } .vf-git-t4 { color: var(--k-event); } .vf-git-t5 { color: var(--k-queue); }
     .vf-git-noeud { fill: currentColor; stroke: currentColor; } .vf-git-creux { fill: var(--surface); } .vf-git-tete { fill: var(--text); } .vf-git-anneau { stroke: var(--ring); }
     .vf-git-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
-    .vf-git-l1 { display: flex; align-items: center; gap: 4px; min-width: 0; font-size: 12.5px; color: var(--text); }
+    .vf-git-l1 { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; font-size: 12.5px; color: var(--text); }
     .vf-git-l2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--text-3); }
+    .vf-git-msg { flex: 1 1 auto; }
     .vf-git-msg, .vf-git-mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     .vf-git-sha, .vf-git-mono, .vf-git-ref, .vf-git-cmd code { font-family: var(--mono); }
     .vf-git-mono { font-size: 11.5px; }
-    .vf-git-ref { flex: none; max-width: 140px; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; background: rgba(var(--ink), .06); color: var(--text-2); }
+    .vf-git-ref { flex: 0 1 auto; min-width: 0; max-width: 140px; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; background: rgba(var(--ink), .06); color: var(--text-2); }
     .vf-git-ref svg { width: 12px; height: 12px; }
     .vf-git-ref-cur { background: var(--on); color: var(--on-text); } .vf-git-ref-tag { background: var(--raise); }
     .vf-git-ref-distante { background: none; border: 1px solid var(--hair-2); color: var(--text-3); }
     .vf-git-plus { margin: 2px 0 0; font: 10.5px var(--mono); color: var(--text-4); }
     .vf-git-liste { display: flex; flex-direction: column; gap: 4px; }
-    .vf-git-wt-l, .vf-git-st, .vf-git-aut { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: var(--r-ctl); background: var(--raise); }
-    .vf-git-ligne-d { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 10px; border-radius: var(--r-ctl); font-size: 12px; color: var(--text-3); }
+    .vf-git-wt-l, .vf-git-st, .vf-git-aut { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-radius: var(--r-ctl); background: var(--raise); }
+    .vf-git-ligne-d { white-space: nowrap; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 12px; border-radius: var(--r-ctl); font-size: 12px; color: var(--text-3); }
     .vf-git-liste > .vf-git-ligne-d:hover { background: rgba(var(--ink), .06); }
     .vf-git-wt-l .vf-git-ligne-d, .vf-git-st .vf-git-ligne-d, .vf-git-aut .vf-git-ligne-d { padding: 0; }
     .vf-git-gras { font-size: 12.5px; font-weight: 500; color: var(--text); }
     .vf-git-ici { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: var(--on); color: var(--on-text); font-size: 10.5px; font-weight: 600; }
     .vf-git-ligne-d .meta { margin-left: auto; } .vf-git-sous { margin-top: 8px; font-size: 11.5px; color: var(--text-3); }
-    .vf-git-cmd { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 28px; padding: 4px 4px 4px 10px; border-radius: var(--r-ctl); background: var(--well); }
+    .vf-git-cmd { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 28px; padding: 4px 4px 4px 12px; border-radius: var(--r-ctl); background: var(--well); }
     .vf-git-cmd code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--text-2); user-select: text; }
     .vf-git-retour { flex: none; font-size: 11.5px; color: var(--text-2); } .vf-git-retour:not(:empty) { order: 3; flex: 1 0 100%; }
     .vf-git-sans { font-size: 11.5px; color: var(--text-4); }
@@ -77,7 +78,7 @@
     .vf-git-fantome { height: 40px; border-radius: var(--r-ctl); background: var(--raise); }
     .vf-git-titre { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }
     .vf-git-note { margin: 0; font-size: 12.5px; color: var(--text-3); }
-    .vf-git-carte { align-items: flex-start; padding: 10px 12px; border-radius: var(--r-ctl); background: var(--raise); } .vf-git-carte .vf-git-titre { font-size: 13px; }
+    .vf-git-carte { align-items: flex-start; padding: 12px; border-radius: var(--r-ctl); background: var(--raise); } .vf-git-carte .vf-git-titre { font-size: 13px; }
     @media (max-width: 999px), (pointer: coarse) {
       .vf-git-tiroir, body:not(.no-panel) .vf-git-tiroir { left: 8px; right: 8px; width: auto; bottom: 8px; }
       body.vf-git-ouvert #ask { display: none; }
