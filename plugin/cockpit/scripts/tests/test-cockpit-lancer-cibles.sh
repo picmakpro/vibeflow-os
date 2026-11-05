@@ -114,7 +114,7 @@ const P = () => {
     ['cadrer', 'planifier', 'executer', 'executer', 'verifier', null]);
   chk('P1 — au niveau des cartes : archivée et cochée avec avancement a-faire = aucune action', () => {
     const r = calc(pl([ph('77', null, 'a-faire', { ph: { archive: true } }), ph('78', 'fiabilite', 'a-faire', { ph: { done: true } }), ph('79', 'fiabilite', 'fait')]));
-    return r.cibles.map((c) => [c.id, c.principal, c.bloquants.join('+')].join(':'));
+    return r.cibles.map((c) => `${c.id}:${c.principal}:${c.bloquants.join('+')}`);
   }, ['ph-77:null:phase-finie', 'ph-78:null:phase-finie', 'ph-79:null:phase-finie']);
   chk('P2 — verbes : le principal en tête puis les autres dans l\'ordre de la liste fermée', () => { const r = calc(pl([ph('1', 'fiabilite', 'en-cours'), ph('2', 'fiabilite', 'a-recetter')])); return r.cibles.map((c) => c.verbes.join(',')); },
     ['executer,cadrer,planifier,verifier,reprendre', 'verifier,cadrer,planifier,executer,reprendre']);
@@ -275,7 +275,7 @@ mutant_fn() { # mutant_fn <nom> <fonction> <enveloppe JS> : l'original est renom
 sans_effet() { assert_eq "$1 — mutant sans effet (ancre absente ou copie inchangée)" "sans effet" "effet"; }
 tue() { # tue <nom> <mode> <sondes requises, séparées par des espaces> <description> : le mutant doit rougir TOUTES les sondes requises
   lire_silencieux "$MUT_D" "$2"; local r="" x; for x in $3; do case " $CAS_FAILS" in *" $x "*) r="$r $x";; esac; done
-  assert_eq "$1 — $4 ; rouge sur$CAS_FAILS" "${r# }" "$3"
+  assert_eq "$1 — $4 ; rouge sur :$CAS_FAILS" "${r# }" "$3"
 }
 filtre() { echo "export function calculerCibles(l) { const r = calculerCibles_orig(l); return { ...r, cibles: r.cibles.map((c) => ({ ...c, $1 })) }; }"; }
 if [ "$ARG" != previols ]; then
