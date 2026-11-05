@@ -57,3 +57,24 @@ Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-lancer-cibles.sh cibl
 | M-HORS-MOTIF-FUITE (`listePourQ` rend tout) | PAR.2 Q1 Q2 Q3 | Q1 Q2 Q3 | Q2 : neuf identifiants rendus au lieu de `["ph-72"]` ; Q1 : clés `principal`, `bloquants`, `titre` présentes |
 
 Les sondes rouges en plus des sondes exigées (C2, PAR.3, P2, PAR.2) sont légitimes : elles lisent aussi les identifiants, les principaux ou la projection.
+
+## Mutants rouges des pré-vols et verts finaux (Tâche 3, HEAD `46930e1c`)
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-lancer-cibles.sh` -> `Résultats : 51 PASS / 0 FAIL`, rc=0 ; sous zsh (`zsh -c "bash …"`) : `51 PASS / 0 FAIL` ; `cibles` seul : `21 PASS / 0 FAIL` ; `previols` seul : `30 PASS / 0 FAIL`. Module : 117 lignes. Les mutants sont rejoués en mode `tout` pour relever aussi les sondes rouges en plus des exigées.
+
+| Mutant | Sondes exigées | Rouge en mode `tout` | Obtenu (ligne qui le tue) |
+|--------|----------------|----------------------|----------------------------|
+| M-FAIT-LANCABLE | B2 B3 | P1 P3 B2 B3 | B2 phase finie : obtenu `[[],true]`, attendu `[["phase-finie"],false]` ; B3 : `ensemblesOk` 72 sur 120 |
+| M-TERMINAL-ARRETE-OUBLIE | B2 B3 | B2 B3 | B2 terminal arrêté : obtenu `[[],true]` ; B3 : `ensemblesOk` 80, `lancableOk` 118 |
+| M-MISSION-HORS-PHASE-OK | B2 B3 | C4 B2 B3 | C4 : obtenu `[[],null,null]` ; B3 : `ensemblesOk` 108 |
+| M-AVERT-BLOQUE | A1 A5 | A1 A5 | A1 : `lancable` faux pour les cinq cas isolés ; A5 : `[["dependance-non-close",…],false]` |
+| M-DEP-IGNORE | A1 A5 | A1 A5 | A1 : premier cas obtenu `[[],true]` au lieu de `[["dependance-non-close"],true]` ; A5 : trois codes au lieu de quatre |
+| M-RECENCE-INFINIE | A3 | A3 | A3 : `RECENCE_MS` obtenu `null` (Infinity sérialisé) et un lancement à 900001 ms avertit encore |
+| M-NONCOMMITE-ACTIF | R1 | R1 | R1 : obtenu `{"appels":1,"emis":true}` au lieu de `{"appels":0,"emis":false}` |
+
+Les dix mutants du plan sont donc rouges, ceux de la section des cibles consignés plus haut.
+
+## Écart et points de jugement
+
+- Compartiment hostile `Fiabilite` : remplacé par `Alpha` dans le lab partitionné (même dossier que `fiabilite` sur APFS). Le motif reste testé avec `Fiabilite` en lecteur littéral (C5).
+- `listePourQ` exclut aussi toute carte dont les bloquants portent `phase-hors-motif` ou `compartiment-hors-motif`. Sans cela une carte au compartiment hostile porte `ws: null`, indiscernable d'un lab plat, et Q la proposerait sans compartiment (PAR.2, Q2 : sonde `q90`).
