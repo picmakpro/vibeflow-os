@@ -57,3 +57,15 @@ valeur obtenue ASSERTÉE (pas seulement « différent ») : un mutant qui rougir
 | M-TRONQUE | `tronque: e.code === 'ENOBUFS'` -> `false && …` | E4.2 | `tronque=false` (attendu `true`) |
 
 Voisines : `test-cockpit-retard.sh` 40 PASS / 0 FAIL, `test-cockpit-path-enfants.sh` 37 PASS / 0 FAIL, `test-cockpit-who.sh` 98 PASS / 0 FAIL.
+
+## Tâche 3 — attribution worktree des sous-agents (W22, GITC-14, P78-D-26)
+
+Tête : `079c235f`. Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-who.sh` (bilan avant le code : `103 PASS / 2 FAIL`).
+
+| Sonde | Assertion | Attendu | Obtenu |
+|---|---|---|---|
+| W22.1 | sous-agent lancé depuis l'arbre principal, un appel antérieur `cd <worktree a> && ls`, dernier appel `ls` : `treeBy\|tree\|branch` | `activité\|../lab22-a\|feat/a` | `cwd\|arbre principal\|principale` |
+| M-DERNIERE.0 | l'ancre `dernierArbre(…)` du mutant existe dans who.mjs | `muté` | `ancre absente` (la fonction n'existe pas encore : le mutant n'est pas jouable avant le code) |
+
+Verts de contrôle : W22.0 (sous-agent listé), W22.2 (le plus récent l'emporte, comportement déjà présent), W22.3 (aucun worktree cité : `cwd`), W22.4 (vert avant le code : la
+dernière ligne citant un worktree est lue directement ; il ne garde l'invalidation du mémo qu'une fois le mémo posé).
