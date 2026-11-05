@@ -2,6 +2,7 @@
 # test-cockpit-terminal-pty-plantage.sh — l'assistant PTY qui PLANTE (SIGKILL, exception non rattrapée) ne laisse aucun survivant (TERM-08 orphelins ; P71-D-05, D-28).
 #   T12.8a  assistant tué par SIGKILL : le shell et ses travaux (arrière-plan, nohup + disown, trap '' HUP), chacun dans un groupe à part, disparaissent en moins de 5 s
 #   T12.8b  assistant qui plante sur une exception Python non rattrapée (COPIE de l'assistant sous le scratch, jamais le module) : même résultat
+#   M-GARDIEN-ABSENT, M-GARDIEN-SANS-SID  mutants (copies de l'assistant sous le scratch) : sans gardien, ou gardien jamais prévenu du PID de la session, T12.8a rougit (survivants nohup et trap)
 #   T12.8c  témoin de la sonde : fin du descripteur 0 puis SIGTERM (arrêt propre par arreter()) : zéro survivant, la sonde sait donc verdir
 # Suite autonome, séparée de test-cockpit-terminal-pty.sh : elle ne partage ni son serveur ni son hygiène, ne modifie aucune de ses assertions, et se rejoue seule.
 # Les survivants se relèvent par les PID que la sonde a elle-même notés (jamais par motif de nom) ; chacun est tué par PID, ligne de commande relue, avant la sortie.
@@ -113,6 +114,21 @@ lancer "$PTYPY" kill t128a;     KILL_RES="$SONDE_RES"
 assert_eq "T12.8a — assistant tué par SIGKILL : quatre processus vivaient dans quatre groupes et une session, aucun ne survit après 5 s" "$KILL_RES" "avant=4 groupes=4 dans-session=4 survivants=0 fin=code=-9"
 lancer "$WORK/assistant-plante.py" crash t128b; CRASH_RES="$SONDE_RES"
 assert_eq "T12.8b — assistant planté par une exception Python non rattrapée (copie sous le scratch, traceback vu) : aucun survivant après 5 s" "$CRASH_RES" "avant=4 groupes=4 dans-session=4 survivants=0 fin=code=1 traceback=oui"
+
+echo "=== M-* — mutants du gardien (copies de l'assistant : le module n'est jamais modifié) ==="
+mutant_ast() { # mutant_ast <nom> <expression-sed> -> MUT_AST ; code 1 si la copie n'a pas changé
+  MUT_AST="$WORK/assistant-$1.py"; cp "$PTYPY" "$MUT_AST"; cp "$MUT_AST" "$MUT_AST.orig"; sed -i.bak "$2" "$MUT_AST"
+  local r=0; cmp -s "$MUT_AST" "$MUT_AST.orig" && r=1; rm -f "$MUT_AST.orig" "$MUT_AST.bak"; return $r
+}
+sans_effet() { assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; }
+if mutant_ast gardien-absent 's/^    garde = lancer_gardien()$/    garde = None/'; then
+  lancer "$MUT_AST" kill m128a
+  assert_eq "M-GARDIEN-ABSENT — le mutant (aucun gardien) rougit T12.8a : nohup et trap '' HUP survivent au SIGKILL de l'assistant" "$SONDE_RES" "avant=4 groupes=4 dans-session=4 survivants=2 fin=code=-9"
+else sans_effet "M-GARDIEN-ABSENT"; fi
+if mutant_ast gardien-sans-sid 's/^    dire(garde, b.SID .*$/    dire(garde, b"")/'; then
+  lancer "$MUT_AST" kill m128b
+  assert_eq "M-GARDIEN-SANS-SID — le mutant (le gardien ne reçoit jamais le PID de la session) rougit T12.8a : mêmes survivants" "$SONDE_RES" "avant=4 groupes=4 dans-session=4 survivants=2 fin=code=-9"
+else sans_effet "M-GARDIEN-SANS-SID"; fi
 
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
