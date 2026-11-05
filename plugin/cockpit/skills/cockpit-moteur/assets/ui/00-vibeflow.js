@@ -39,16 +39,17 @@
     .card.st-active { box-shadow: 0 0 0 1.5px var(--st-active), 0 8px 28px color-mix(in srgb, var(--st-active) 22%, transparent); }
     .card.st-blocked { box-shadow: 0 0 0 1.5px var(--st-blocked); }
     .card.st-done .desc { opacity: .78; }
-    .vf-bar { height: 6px; border-radius: 99px; background: var(--raise-2); overflow: hidden; margin-top: 6px; }
+    .vf-bar { height: 6px; border-radius: 99px; background: var(--raise-2); overflow: hidden; margin-top: var(--sp-6); }
     .vf-bar i { display: block; height: 100%; border-radius: 99px; background: var(--c-st, var(--st-done)); }
-    .vf-ms { padding: 9px 12px; border-radius: 14px; cursor: pointer; margin-bottom: 4px; }
+    .vf-ms { padding: var(--inset-row); border-radius: 14px; cursor: pointer; margin-bottom: var(--sp-2); margin-inline: calc(-1 * var(--sp-12)); }
     .vf-ms:hover { background: var(--surface-hover); }
-    .vf-ms .t { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 500; }
+    .vf-ms .t { display: flex; justify-content: space-between; gap: var(--sp-8); font-size: 13px; font-weight: 500; }
     .vf-ms .t span:last-child { color: var(--text-3); font-weight: 400; font-variant-numeric: tabular-nums; }
-    .vf-now { padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--st-active) 8%, transparent); font-size: 13px; line-height: 1.55; }
-    .vf-now b { display: block; font-size: 11.5px; color: color-mix(in srgb, var(--st-active) 68%, var(--text)); margin-bottom: 3px; font-weight: 600; }
-    .vf-link { display: flex; gap: 8px; align-items: baseline; padding: 6px 10px; border-radius: 10px; font-size: 12.5px; color: inherit; text-decoration: none; }
+    .vf-now { padding: var(--inset-box); border-radius: 16px; background: color-mix(in srgb, var(--st-active) 8%, transparent); font-size: 13px; line-height: 1.55; }
+    .vf-now b { display: block; font-size: 11.5px; color: color-mix(in srgb, var(--st-active) 68%, var(--text)); margin-bottom: var(--sp-4); font-weight: 600; }
+    .vf-link { display: flex; gap: var(--sp-8); align-items: baseline; padding: var(--inset-row); margin-inline: calc(-1 * var(--sp-12)); border-radius: 10px; font-size: 12.5px; color: inherit; text-decoration: none; }
     .vf-link:hover { background: var(--surface-hover); }
+    .sec > .vf-link + .vf-link { margin-top: var(--sp-2); } /* lignes de liste : 2 */
     .vf-link code { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-2); word-break: break-all; }
     /* I2 (recette 2026-11-02, reprise 2026-11-03, avis de Samuel, Wispr Flow, session principale, 2026-11-03 : « pas de bordure, un flou dégradé qui part du haut gauche et descend, comme le header, en mode iOS 26 ») :
        le titre et le sous-titre de la vue d'ensemble se mélangeaient aux graphes que l'on fait glisser dessous. Plus de carte : #context n'a ni fond, ni bordure, ni rayon, ni ombre.
@@ -58,7 +59,7 @@
        entre le bas de la couche et ce fondu ; la couche monte donc jusqu'au haut de l'en-tête (inset relatif à --hh, jamais une valeur calée sur une largeur), DERRIÈRE lui (z-index 10), et le dégradé garde sa taille d'avant (masque en deux couches : le radial sur la hauteur d'avant, calé en bas ; au-dessus, la bande reprend son profil de bord haut, plein puis estompé vers la droite) : l'aspect autour du titre ne change pas.
        isolation: isolate garde la couche derrière le texte. #context ne capte aucun événement (pointer-events: none, hérité du viewer) : la carte reste glissable sous la zone. */
     #context { isolation: isolate; background: none; border: 0; border-radius: 0; box-shadow: none; }
-    #context::before { inset: calc(-1 * (var(--hh, 64px) + 8px)) -80px -64px -36px; background: rgba(var(--bg-rgb), .28); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6); -webkit-mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); -webkit-mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); -webkit-mask-position: 0 100%, 0 0; mask-position: 0 100%, 0 0; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; border: 0; border-radius: 0; box-shadow: none; } /* vf-couleur-ok: masque, seul l'alpha compte, jamais affiché */
+    #context::before { inset: calc(-1 * (var(--hh, 64px) + 8px)) -80px -64px -36px; /* dérivé : halo, déborde du bloc */ background: rgba(var(--bg-rgb), .28); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6); -webkit-mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); -webkit-mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); -webkit-mask-position: 0 100%, 0 0; mask-position: 0 100%, 0 0; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; border: 0; border-radius: 0; box-shadow: none; } /* vf-couleur-ok: masque, seul l'alpha compte, jamais affiché */
     #context:empty { display: none; }
   `;
   // spike 005 : la barre de question reste visible quand serve.mjs (P7) sert l'onglet Projet
@@ -94,7 +95,7 @@
   const NIV = { bloquant: 'blocked', 'toléré': 'todo', info: 'todo' };
   const derive = (D) => !D || !D.regles || !D.regles.length ? '' : `<div class="sec"><h3>Format de la planification <span class="c">${D.regles.reduce((s, r) => s + (Number(r.n) || 0), 0)}</span></h3>
       ${D.regles.map((r) => `<div class="vf-link"><span class="vst vst-${NIV[r.niveau] || 'todo'}">${h(r.niveau)}</span><span>${h(r.message)} <span style="color:var(--text-3)">(${Number(r.n) || 0} · ${h(r.fichier)})</span></span></div>`).join('')}
-      ${D.corrigeable ? `<p class="pd" style="margin-top:8px">Correctif proposé, jamais appliqué d'ici : <code>node vf-cockpit-drift.mjs &lt;lab&gt; --diff</code>, à relire puis appliquer avec <code>git apply</code>.</p>` : ''}</div>`;
+      ${D.corrigeable ? `<p class="pd" style="margin-top:var(--sp-12)">Correctif proposé, jamais appliqué d'ici : <code>node vf-cockpit-drift.mjs &lt;lab&gt; --diff</code>, à relire puis appliquer avec <code>git apply</code>.</p>` : ''}</div>`;
   const V = G.meta.vf;
   if (TAB === 'project' && V) {
     SC.setOverview(() => {
@@ -110,11 +111,11 @@
       // « Maintenant » : seulement les champs connus (un lab sans STATE.md n'a ni jalon, ni phase, ni statut)
       const desc = V.lastDesc || '';
       const now = V.milestone || V.phase || V.status
-        ? `<div class="vf-now" style="margin-top:12px"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${statut(V.status) ? `<span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span>` : ''}${desc ? `<div style="margin-top:6px;color:var(--text-3);font-size:12px">${h(desc.slice(0, 260))}${desc.length > 260 ? '…' : ''}</div>` : ''}</div>`
+        ? `<div class="vf-now" style="margin-top:var(--sp-12)"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${statut(V.status) ? `<span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span>` : ''}${desc ? `<div style="margin-top:var(--sp-6);color:var(--text-3);font-size:12px">${h(desc.slice(0, 260))}${desc.length > 260 ? '…' : ''}</div>` : ''}</div>`
         : '';
       return `<div class="sec"><div class="ph"><span class="kind">Projet</span></div><h2 class="pt">${h(G.project.name)}</h2>
           ${now}
-          <div class="stats vf-stats" style="margin-top:14px"><div><b>${Number(c.phases) || 0}</b><span>phases</span></div><div><b>${Number(c.plans) || 0}</b><span>plans</span></div><div><b>${Number(c.reqsDone) || 0}/${Number(c.reqs) || 0}</b><span>exigences</span></div></div></div>
+          <div class="stats vf-stats" style="margin-top:var(--sp-12)"><div><b>${Number(c.phases) || 0}</b><span>phases</span></div><div><b>${Number(c.plans) || 0}</b><span>plans</span></div><div><b>${Number(c.reqsDone) || 0}/${Number(c.reqs) || 0}</b><span>exigences</span></div></div></div>
         <div class="sec"><h3>Prochaines phases <span class="c">${V.next.length}</span></h3>${next || '<p class="pd">Rien en attente dans le jalon en cours.</p>'}</div>
         <div class="sec"><h3>Jalons <span class="c">${V.milestones.length}</span></h3>${ms}</div>
         ${derive(V.drift)}

@@ -17,7 +17,7 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    #vf-lock { font: 500 12px/1 var(--mono, monospace); gap: 6px; }
+    #vf-lock { font: 500 12px/1 var(--mono, monospace); gap: var(--sp-6); }
     #vf-lock .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-4); display: inline-block; }
     #vf-lock.held .dot { background: var(--st-active); animation: vfpulse 1.6s ease-in-out infinite; }
     #vf-lock.off .dot { background: var(--st-blocked); }
@@ -33,10 +33,11 @@
     .vf-who.stale { opacity: .55; }
     .vf-who button { margin-top: 6px; font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); }
     .vf-who button:hover { background: rgba(var(--ink), .07); color: var(--text); } .vf-who button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-    .sec button[data-vf-doing], .sec button[data-vf-transcript] { font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); margin: 6px 6px 0 0; transition: background .2s var(--ease), color .2s var(--ease); }
+    .sec button[data-vf-doing], .sec button[data-vf-transcript] { font: inherit; font-size: 12px; cursor: pointer; padding: var(--sp-4) var(--sp-12); border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); margin: var(--sp-6) var(--sp-6) 0 0; transition: background .2s var(--ease), color .2s var(--ease); }
     .sec button[data-vf-doing]:hover, .sec button[data-vf-transcript]:hover { background: rgba(var(--ink), .07); color: var(--text); } .sec button[data-vf-doing]:focus-visible, .sec button[data-vf-transcript]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-    /* Q12a : les liens « Nœud … » et « Voir dans l'onglet Équipe » s'alignent sur la colonne de texte (le retrait de 10 px vient du padding de .vf-link, fait pour la liste « Sources lues ») */
-    .vf-who > a.vf-link, body.vf-tab-equipe .sec > a.vf-link { padding-left: 0; padding-right: 0; }
+    /* Q12a : les liens « Nœud … » et « Voir dans l'onglet Équipe » s'alignent sur la colonne de texte (le retrait de 12 px vient du padding de .vf-link, fait pour la liste « Sources lues ») */
+    .vf-who > a.vf-link, body.vf-tab-equipe .sec > a.vf-link { padding: var(--sp-6) 0; }
+    body.vf-tab-equipe .sec > a.vf-link { margin-inline: 0; }
     a.vf-link { text-decoration: underline; text-decoration-color: rgba(var(--ink), .35); text-underline-offset: 3px; }
     a.vf-link:hover { color: var(--text); text-decoration-color: currentColor; } a.vf-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
     .vf-nr { white-space: nowrap; }
@@ -45,11 +46,12 @@
     .vf-arbre-enfants { margin-left: 14px; padding-left: 10px; border-left: 1px solid rgba(var(--ink), .12); }
     .vf-who .vf-pied { color: var(--text-3); font-size: 12px; } .vf-who .vf-link { display: inline-block; margin: 4px 10px 0 0; font-size: 12px; color: var(--text-2); }
     .vf-termines > summary { cursor: pointer; padding: 8px 0; color: var(--text-3); font-size: 12px; }
-    .vf-transcript { max-height: 320px; overflow-y: auto; margin-top: 8px; font-size: 12px; color: var(--text-2); }
-    .vf-transcript h4 { margin: 10px 0 4px; color: var(--text-3); } .vf-transcript p, .vf-transcript li { margin: 2px 0; word-break: break-word; }
+    .vf-transcript { max-height: 320px; overflow-y: auto; margin-top: var(--sp-8); font-size: 12px; color: var(--text-2); }
+    .vf-transcript h4 { margin: var(--sp-12) 0 var(--sp-4); color: var(--text-3); } .vf-transcript > h4:first-child { margin-top: 0; } .vf-transcript p, .vf-transcript li { margin: var(--sp-2) 0; word-break: break-word; }
+    .vf-transcript ul { margin: var(--sp-4) 0 0; padding-left: var(--sp-16); }
     .vf-transcript pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var(--mono, monospace); }
-    #vf-reco { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 12px 14px 12px 18px; border-radius: 20px; font-size: 13px; line-height: 1.5; color: var(--text); }
-    #vf-reco button { flex: none; border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer; font: inherit; font-size: 12.5px; background: var(--on); color: var(--on-text); }`;
+    #vf-reco { position: fixed; left: 50%; bottom: 96px; /* dérivé : au-dessus de la barre de question */ transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: var(--sp-12); max-width: calc(100vw - 2 * var(--edge)); padding: var(--inset-box) var(--inset-box) var(--inset-box) var(--sp-16); border-radius: 20px; font-size: 13px; line-height: 1.5; color: var(--text); }
+    #vf-reco button { flex: none; border: 0; border-radius: 999px; padding: var(--sp-8) var(--sp-16); cursor: pointer; font: inherit; font-size: 12.5px; background: var(--on); color: var(--on-text); }`;
   document.head.appendChild(style);
 
   let badge = null, who = null;

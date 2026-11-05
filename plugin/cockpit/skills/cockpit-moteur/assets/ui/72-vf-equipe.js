@@ -20,8 +20,8 @@
     const n = (v) => Number(v) || 0;
     const src = Object.entries(G.meta.vf?.sources || {}).map(([k, s]) => `<div class="vf-link"><span>${h(Object.prototype.hasOwnProperty.call(SOURCES, k) ? SOURCES[k] : k)}</span><span class="vst vst-${s?.etat === 'lue' ? 'done' : 'todo'}">${h(Object.prototype.hasOwnProperty.call(ETATS, s?.etat) ? ETATS[s.etat] : 'absente')}</span></div>`).join('');
     return `<div class="sec"><div class="ph"><span class="kind">Équipe</span></div><h2 class="pt">${h(G.project.name)}</h2>
-        <div class="stats vf-stats" style="margin-top:14px"><div><b>${n(c.actif)}</b><span>actifs</span></div><div><b>${n(c.enAttente)}</b><span>en attente</span></div><div><b>${n(c.termine)}</b><span>terminés depuis moins de 24 h</span></div></div>
-        <p class="pd" style="margin-top:12px">Actifs et terminés depuis moins de 24 h ; le transcript d'un agent ne se lit qu'à la demande.</p></div>
+        <div class="stats vf-stats" style="margin-top:var(--sp-12)"><div><b>${n(c.actif)}</b><span>actifs</span></div><div><b>${n(c.enAttente)}</b><span>en attente</span></div><div><b>${n(c.termine)}</b><span>terminés depuis moins de 24 h</span></div></div>
+        <p class="pd" style="margin-top:var(--sp-12)">Actifs et terminés depuis moins de 24 h ; le transcript d'un agent ne se lit qu'à la demande.</p></div>
       <div class="sec"><h3>Sources lues <span class="c">${Object.keys(G.meta.vf?.sources || {}).length}</span></h3>${src || '<p class="pd">Aucune source lue.</p>'}</div>`;
   });
 
