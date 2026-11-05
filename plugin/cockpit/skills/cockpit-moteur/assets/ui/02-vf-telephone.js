@@ -27,7 +27,7 @@
       .vf-sheet-x:hover { background: rgba(var(--ink), .08); color: var(--text); }
       .vf-sheet-x:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
       header:has(#btn-up:not([hidden])) .brand { display: none; }
-      .vf-tabs { margin-left: 6px; padding: 3px; } .vf-tabs a { padding: 5px 8px; font-size: 13px; }
+      .vf-tabs { margin-left: var(--sp-6); padding: var(--sp-4); } .vf-tabs a { padding: var(--sp-4) var(--sp-8); font-size: 13px; }
       #hdr-ext > button:not(#vf-lock), #theme-toggle, #btn-health, #flows-btn, #filters-btn, #btn-panel { display: none !important; }
       #vf-plus { display: inline-flex; position: relative; }
       #vf-plus .badge, .vf-pl-i .badge { min-width: 16px; height: 16px; border-radius: 999px; background: var(--on); color: var(--on-text); font-size: 10px; font-weight: 600; display: grid; place-items: center; padding: 0 var(--sp-4); }

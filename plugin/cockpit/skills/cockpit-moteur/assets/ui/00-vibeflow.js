@@ -23,8 +23,8 @@
   const style = document.createElement('style');
   style.textContent = `
     :root { --st-done: var(--recent); --st-active: var(--sev-medium); --st-todo: var(--text-4); --st-blocked: var(--sev-high); }
-    .vf-tabs { display: inline-flex; gap: 2px; padding: 3px; margin-left: 14px; border-radius: 12px; background: var(--raise); flex: none; }
-    .vf-tabs a { padding: 5px 13px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text-3); text-decoration: none; line-height: 1.4; }
+    .vf-tabs { display: inline-flex; gap: var(--sp-2); padding: var(--sp-4); margin-left: var(--sp-12); border-radius: 12px; background: var(--raise); flex: none; }
+    .vf-tabs a { padding: var(--sp-4) var(--sp-12); border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text-3); text-decoration: none; line-height: 1.4; }
     .vf-tabs a:hover { color: var(--text); }
     .vf-tabs a.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
     .vst { font-size: 11px; font-weight: 600; padding: var(--inset-pill); line-height: 16px; border-radius: 999px; white-space: nowrap;

@@ -2,7 +2,7 @@
 # test-cockpit-responsive.sh — CKPT-12 (P67-D-21) : la fenêtre du cockpit est ajustable, de 1 024 à 2 560 px, sans superposition ni rognage.
 #   R1 chargement à 1 024 / 1 280 / 1 440 / 1 920 / 2 560 px · R2 redimensionnement à chaud 1 920 -> 1 024 -> 1 920 · R3 rendu non cassé à 800 et 390 px
 #   R4 témoin rouge : le même lab sans la mise en page du cockpit rougit · R5 lab sans STATE.md : aucun champ vide dans le sous-titre ni le panneau
-#   R13 à R16 (70-04, Phase 70) : téléphone — en-tête sur une rangée avec menu « ⋯ », onglets à 13 px / piste à 3 px, zoom, tiroir, titre de la vue d'ensemble (voir le bloc en fin de suite)
+#   R13 à R16 (70-04, Phase 70) : téléphone — en-tête sur une rangée avec menu « ⋯ », onglets à 13 px / rail à 4 px, zoom, tiroir, titre de la vue d'ensemble (voir le bloc en fin de suite)
 #   R17 à R20 (70-12, Phase 70 ; P70-D-20) : onglet Équipe — R17 zoom en rangée en bas à gauche dès 701 px (Code et Projet inchangés), R18 fil d'Ariane / recherche, R19 titre / première carte, R20 page Équipe dans la matrice
 # Deux onglets (Code, Projet) × deux labs (nom court, nom de 60 caractères), badge « au travail » rempli : une session active par lab (P69-D-33 : le badge ne compte que les agents ;
 # un verrou ou un nœud de DAG ne suffisent plus). R7.5 : un lab sans agent actif, badge « Personne ».
@@ -387,7 +387,7 @@ for th in sombre clair; do
 done
 
 # R13 à R16 (70-04 ; P70-D-01 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 ; P70-D-16 : même canal, même date ; P70-D-09 et P70-D-10 : choix du manager) — le téléphone (≤ 700 px) et les onglets.
-#   R13 en-tête : une seule rangée sur les trois onglets, aucune action dans la rangée, bouton « ⋯ » et son menu (une entrée par action présente, libellé visible, pastille reportée) ; onglets à 13 px, piste à 3 px à toutes les largeurs
+#   R13 en-tête : une seule rangée sur les trois onglets, aucune action dans la rangée, bouton « ⋯ » et son menu (une entrée par action présente, libellé visible, pastille reportée) ; onglets à 13 px, rail à 4 px à toutes les largeurs
 #   R14 zoom : hors de l'en-tête, pile verticale à gauche au-dessus de la barre de question, nom accessible français, position inchangée à 800 px, jamais sur « Remonter d'un niveau »
 #   R15 tiroir : pas de bouton Détail, ouvert par une carte ou par le titre de la vue d'ensemble, poignée et croix nommée, fermé par la croix, Échap ou le tap dans le vide
 #   R16 titre de la vue d'ensemble : un mot ne se coupe jamais sur deux lignes, sauf s'il est plus large que sa boîte (un nom de lab de 60 caractères ; un nom dont le mot à traits d'union tient dans la boîte)
@@ -431,7 +431,7 @@ for onglet in index project equipe; do
   assert_eq "R13.1 — $onglet / 390 px : l'en-tête tient sur une seule rangée" "$(mv_ "$F" 'j.mesures["390"].m.rangees')" "1"
   assert_eq "R13.2 — $onglet / 390 px : aucune action dans la rangée, le bouton « ⋯ » est visible" "$(mv_ "$F" '(j.mesures["390"].m.actionsRangee||"")+"|"+j.mesures["390"].m.plus')" "|true"
   for w in 390 1024 1440; do
-    assert_eq "R13.4 — $onglet / $w px : trois onglets à 13 px, piste à 3 px (DESIGN.md §5, P70-D-16)" "$(mv_ "$F" "(()=>{const o=j.mesures[\"$w\"].m.onglets;return o?o.n+'|'+o.police+'|'+o.piste:'onglets absents'})()")" "3|13px|3px/3px"
+    assert_eq "R13.4 — $onglet / $w px : trois onglets à 13 px, rail à 4 px (DESIGN.md §5, P70-D-16, P71.5-D-05)" "$(mv_ "$F" "(()=>{const o=j.mesures[\"$w\"].m.onglets;return o?o.n+'|'+o.police+'|'+o.piste:'onglets absents'})()")" "3|13px|4px/4px"
   done
 done
 assert_eq "R13.3 — Code / 390 px, menu ouvert : une entrée par action présente (huit avec Travail récent et Écrans), libellé visible égal à celui du bouton d'origine, pastille reportée sur l'entrée et sur « ⋯ »" "$(mv_ "$WORK/r13-menu.json" '(()=>{const m=j.mesures["390"].m,s=m.sources,e=m.menu;if(!e)return "menu absent";const p=[];if(s.length<8)p.push("témoin : "+s.length+" actions seulement");if(!s.some((x)=>x.b))p.push("témoin : aucune pastille sur les boutons d origine");if(e.length!==s.length)p.push(e.length+" entrées pour "+s.length+" actions");s.forEach((x,i)=>{if(!e[i]||!e[i].t||e[i].t!==x.t)p.push("entrée "+i+" : ["+(e[i]&&e[i].t)+"] au lieu de ["+x.t+"]");if(e[i]&&e[i].b!==x.b)p.push("pastille de "+x.t+" : ["+(e[i]&&e[i].b)+"] au lieu de ["+x.b+"]")});if(s.some((x)=>x.b)&&!m.plusPastille)p.push("« ⋯ » sans pastille");return p.join(" ; ")||"aucune"})()')" "aucune"

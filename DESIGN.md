@@ -114,10 +114,24 @@ Seules deux graisses servent vraiment, 500 et 600. Le 700 est réservé à un ca
 
 ## 4. Spacing & Layout
 
-- **Pas de base** : 2 px, et on compte surtout en multiples de 2 (2, 4, 6, 8, 10, 12, 14, 16, 22).
-  Les plus fréquents sont 6, 8 et 10 px.
-- **Gouttière de page** : `--gutter` 28 px. **Panneau latéral** : `--panel-w` 360 px (+ 32 px de marge, `--pw`).
-- **Carte** : padding 16 × 18 px, gap 7 px entre ses lignes.
+- **Pas de base** : grille fermée de 8 avec demi-pas : 2, 4, 6, 8, 12, 16, 20, 24, 32 (ni 10, ni 14, ni 22).
+  Jetons primitifs `--sp-2` à `--sp-32` (un primitif ne change jamais de valeur) et sept jetons
+  sémantiques : `--edge` 16 (tout ce qui touche un bord de fenêtre), `--inset-panel` 20 (bord d'un
+  conteneur flottant : panneau, feuille, visite, modale), `--gap-section` 24 (entre deux sections),
+  `--inset-card` 16, `--inset-box` 12 (boîtes d'information), `--inset-row` 8 × 12 (lignes de liste,
+  items de menu), `--inset-pill` 2 × 8 (pastilles, tags). Règle : intérieur ≤ extérieur (ligne 8,
+  boîte 12, panneau 20), un seul écart entre deux frères (jamais deux marges qui s'additionnent).
+  Les plus fréquents sont 6, 8 et 12 px.
+- **Règle : aucune valeur d'espacement hors jeton.** `padding`, `margin`, `gap`, `top/right/bottom/left`
+  s'écrivent `var(--sp-N)`, un jeton sémantique, un `calc()` de jetons, `0` ou `auto`. Exceptions
+  écrites, en liste fermée : les filets et bordures (1 et 1,5 px), l'alignement optique écrit
+  `calc(var(--sp-N) + 1px) /* optique : … */`, les géométries dérivées commentées `/* dérivé : … */`
+  (un bas de 96 px posé au-dessus de la barre de question, le décalage du halo du titre), les
+  hauteurs et tailles de contrôle (24, 28, 32, 36, 44 px) et les barres d'une seule ligne, qui sont des
+  contrôles et gardent 12 en haut, en bas et côté bouton (barre du tiroir, `#flowbar`, `#ask-warn`).
+- **Gouttière de carte** : `--gutter` 24 px (réserve d'ombre, égale à la constante `GUTTER` du
+  viewer). **Panneau latéral** : `--panel-w` 360 px (+ 32 px de marge, `--pw`).
+- **Carte** : padding 16 sur les quatre côtés (`--inset-card`), gap 8 px entre ses lignes.
 - **Rayons** :
 
 | Élément | Variable / valeur |
@@ -128,6 +142,9 @@ Seules deux graisses servent vraiment, 500 et 600. Le 700 est réservé à un ca
 | Onglet dans son groupe | 9 px |
 | Petit bouton, icône carrée | 8-10 px |
 | Pastille, chip, barre de progression | 999 px (pilule) |
+
+Le rayon de 9 px de l'onglet est une exception écrite : le rayon concentrique avec un rail de 4 px
+serait 8, mais les rayons ne font pas partie de la grille d'espacement.
 
 - **Points de rupture** : ≤ 700 px (téléphone), ≤ 999 px (tablette, ou tout écran tactile),
   ≤ 1 279 px en tactile. Le tactile (`pointer: coarse`) est traité comme un écran plus étroit.
@@ -140,7 +157,7 @@ Seules deux graisses servent vraiment, 500 et 600. Le 700 est réservé à un ca
   - `module` : fond `--raise` ;
   - `external` : contour seul, fond transparent ;
   - `has-note` : point ambre de 6 px après le titre.
-- **Groupe d'onglets** (`.vf-tabs`) : piste `--raise`, rayon 12 px, 3 px de padding. L'onglet actif
+- **Groupe d'onglets** (`.vf-tabs`) : piste `--raise`, rayon 12 px, 4 px de padding (onglet 4 × 12). L'onglet actif
   prend `--surface` et une ombre de 1 px. Un nouvel onglet (par exemple « Équipe », P69-D-17) suit
   exactement ce modèle.
 - **Barre de progression** (`.vf-bar`) : 6 px de haut, piste `--raise-2`, remplissage par la couleur
@@ -189,6 +206,8 @@ design, ce sont les variables CSS de `viewer.html`.
 **Toujours**
 - Passer par les variables du thème : une couleur, une ombre ou un rayon écrits en dur dans un
   composant sont un défaut.
+- Passer par les jetons d'espacement : aucune valeur d'espacement hors jeton (`--sp-*`, `--edge`,
+  `--inset-*`, §4), sauf les exceptions écrites.
 - Vérifier chaque écran dans les deux thèmes, sombre et clair.
 - Ajouter le style VibeFlow dans les fichiers `ui/*vf*` et le tracer dans `VENDORED.txt` dès qu'on
   touche un fichier du moteur.
