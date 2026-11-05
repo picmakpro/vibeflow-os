@@ -68,6 +68,13 @@
       "rangee": { "requis": ["h", "h7", "p", "at", "an", "s", "col", "entrants", "sortants", "largeur", "ouvertBas", "fusion", "racine", "teinte", "refs", "refsPlus"] },
       "interdits": ["doing", "mandat", "messages", "outils"]
     },
+    "vibeflow/cockpit-git-commit@1": {
+      "description": "détail d'un commit sans diff (78-08, GET /api/vf/git/commit?sha=) : requis vaut pour etat ok ; sha-invalide (400) et commit-inconnu (404) ne portent que schema et etat ; indisponible (200) aussi",
+      "requis": { "schema": "string", "etat": "string", "h": "string", "h7": "string", "p": "array", "auteur": "string", "date": "string", "committer": "string", "dateCommit": "string", "message": "string", "tronque": "boolean", "fichiers": "array", "total": "number", "commandes": "object" },
+      "fichier": { "requis": ["chemin", "ancien", "plus", "moins", "binaire"] },
+      "etats": ["ok", "sha-invalide", "commit-inconnu", "indisponible"],
+      "interdits": ["email", "diff", "patch"]
+    },
     "vibeflow/cockpit-git-entete@1": {
       "requis": { "schema": "string", "etat": "string", "depot": "string" },
       "optionnels": ["branche", "worktree", "detache", "sha7"],

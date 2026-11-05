@@ -2,6 +2,7 @@
 // Exports : BORNES, lireGit(lab) -> objet vibeflow/cockpit-git@1, routeGit(req, res, url, { root, json }) -> true si la route est traitée.
 //   GET /api/vf/git         graphe placé en couloirs, worktrees, mergées repliées, tags, stash, auteurs
 //   GET /api/vf/git/entete  { schema: 'vibeflow/cockpit-git-entete@1', ...enteteGit }
+//   GET /api/vf/git/commit?sha=<40 hexa>  détail d'un commit sans diff (78-08, vf-cockpit-git-details.mjs) ; GET /api/vf/git/worktrees  état de chaque worktree, à la demande
 // Seul point de lancement de git : lancerGit (vf-cockpit-paths.mjs : environnement durci, sortie tronquée signalée). Aucune sous-commande réseau ni d'écriture.
 // Toute chaîne servie passe par nettoie ; une COMMANDE à copier n'y passe jamais (P78-D-27) : elle est servie telle quelle, ou null si un nom
 // ressemble à un secret (masque(nom) !== nom). Refs passées à `log` : entièrement qualifiées (refs/…) ou sha de 40 caractères, jamais --all.
@@ -11,11 +12,13 @@ import { lancerGit, avecEcheance } from './vf-cockpit-paths.mjs';
 import { nettoie, brancheBase } from './vf-cockpit-arbres.mjs';
 import { masque } from './vf-cockpit-lecture.mjs';
 import { enteteGit } from './vf-cockpit-git-entete.mjs';
+import { detailCommit, etatWorktrees } from './vf-cockpit-git-details.mjs';
 import { FORMAT_JOURNAL, CHAMPS_REFS, MOTIF_SHA, lireJournal, lireRefs, lireWorktrees, ordonner, placer, etiquettes, teinte } from './vf-cockpit-git-graphe.mjs';
 import { cmdCd, cmdSwitch, cmdBranchSupprimer, cmdStashShow, cmdCommitInitial, cmdStatus } from './vf-cockpit-git-commandes.mjs';
 
 export const BORNES = { base: 500, nonMergees: 500, tags: 200, stash: 50, refs: 2000, nom: 200, echeanceMs: 5000 };
 const SCHEMA = 'vibeflow/cockpit-git@1', SCHEMA_ENTETE = 'vibeflow/cockpit-git-entete@1';
+const SCHEMAS_ROUTES = { '/api/vf/git/entete': SCHEMA_ENTETE, '/api/vf/git/commit': 'vibeflow/cockpit-git-commit@1', '/api/vf/git/worktrees': 'vibeflow/cockpit-git-worktrees@1' };
 const NUL = /^0+$/;
 const net = (s) => nettoie(s, BORNES.nom);
 const reel = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
@@ -151,7 +154,9 @@ export function routeGit(req, res, url, { root, json }) {
   try {
     if (p === '/api/vf/git') json(res, 200, lireGit(root));
     else if (p === '/api/vf/git/entete') json(res, 200, { schema: SCHEMA_ENTETE, ...enteteGit(root) });
+    else if (p === '/api/vf/git/commit') { const r = detailCommit(root, url.searchParams.get('sha')); json(res, r.code, r.corps); }
+    else if (p === '/api/vf/git/worktrees') json(res, 200, etatWorktrees(root));
     else { res.writeHead(404); res.end(); }
-  } catch { json(res, 200, { schema: p === '/api/vf/git/entete' ? SCHEMA_ENTETE : SCHEMA, etat: 'indisponible' }); }
+  } catch { json(res, 200, { schema: SCHEMAS_ROUTES[p] || SCHEMA, etat: 'indisponible' }); }
   return true;
 }

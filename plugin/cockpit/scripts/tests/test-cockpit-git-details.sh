@@ -129,7 +129,7 @@ S="$(CM "$C1")"
 assert_eq "X1.1a — commit ordinaire : 200, schéma, état, sha, h7" "$S|$(J "$WORK/cm.json" 'j.schema+"|"+j.etat+"|"+(j.h==="'"$C1"'")+"|"+(j.h7==="'"${C1:0:7}"'")')" "200|vibeflow/cockpit-git-commit@1|ok|true|true"
 assert_eq "X1.1b — auteur, date ISO, message entier, un parent" "$(J "$WORK/cm.json" 'j.auteur+"|"+/^\d{4}-\d\d-\d\dT/.test(j.date)+"|"+JSON.stringify(j.message)+"|"+j.p.length')" 'Alice|true|"sujet\n\ncorps ligne 2"|1'
 assert_eq "X1.1c — fichiers touchés avec + et − exacts" "$(J "$WORK/cm.json" 'JSON.stringify(j.fichiers.map(f=>[f.chemin,f.ancien,f.plus,f.moins,f.binaire]))')" '[["a.txt",null,3,1,false],["new.txt",null,1,0,false]]'
-assert_eq "X1.1d — total, pas tronqué, aucun e-mail ni diff" "$(J "$WORK/cm.json" 'j.total+"|"+j.tronque+"|"+/a@t\.test|@/.test(JSON.stringify(j))+"|"+/^[-+]{3} |^@@/m.test(JSON.stringify(j))')" "2|false|false|false"
+assert_eq "X1.1d — total, pas tronqué, aucun e-mail ni diff" "$(J "$WORK/cm.json" 'j.total+"|"+j.tronque+"|"+/a@t\.test|[^\s"]@[^\s"]/.test(JSON.stringify({...j,schema:""}))+"|"+/^[-+]{3} |^@@/m.test(JSON.stringify(j))')" "2|false|false|false"
 assert_eq "X1.1e — commandes à copier (P78-D-14 : formes de 78-03)" "$(J "$WORK/cm.json" 'j.commandes.show+"|"+j.commandes.detacher')" "git show --stat --end-of-options ${C1:0:7}|git switch --detach --end-of-options ${C1:0:7}"
 
 echo "=== X1.2 — le sha : motif strict puis rev-parse --verify ==="
@@ -166,6 +166,11 @@ CM "$CMSG" > /dev/null
 assert_eq "X1.5a — message de 10 Kio : tronque vrai, au plus 8192 octets, début conservé" "$(J "$WORK/cm.json" 'j.tronque+"|"+(Buffer.byteLength(j.message)<=8192)+"|"+(Buffer.byteLength(j.message)>8000)+"|"+j.message.startsWith("sujet long")')" "true|true|true|true"
 CM "$CMANY" > /dev/null
 assert_eq "X1.5b — 600 fichiers : 500 lus, total 600" "$(J "$WORK/cm.json" 'j.fichiers.length+"|"+j.total')" "500|600"
+
+echo "=== X1.6 — le contrat du schéma tient contre la réponse réelle ==="
+CM "$C2" > /dev/null
+CONTRAT_C="$(node "$AUX/j.mjs" "$SCRIPTS/vf-cockpit-interface.json" 'JSON.stringify(j.schemas["vibeflow/cockpit-git-commit@1"])')"
+assert_eq "X1.6a — chaque clé « requis » du schéma commit existe dans la réponse avec le bon type, chaque fichier porte ses clés" "$(J "$WORK/cm.json" '(()=>{const c='"$CONTRAT_C"';const ty=(v)=>Array.isArray(v)?"array":v===null?"null":typeof v;const ko=Object.entries(c.requis).filter(([k,t])=>ty(j[k])!==t);const kf=j.fichiers.filter(f=>!c.fichier.requis.every(k=>k in f));return JSON.stringify([ko,kf.length,c.interdits.filter(k=>k in j)])})()')" '[[],0,[]]'
 
 # --- FIN ---
 stop_srv
