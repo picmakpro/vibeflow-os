@@ -12,6 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { envEnfant } from './vf-cockpit-env.mjs';
 import { findLabRoot, engineDir, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
 import { buildProjectGraph } from './vf-cockpit-project.mjs';
+import { enteteGit } from './vf-cockpit-git-entete.mjs';
 import { ecrireArchitecture } from './vf-cockpit-code.mjs';
 import { insererGraphe } from './vf-cockpit-embed.mjs';
 import { renommerHtml, renommerTexte, MARQUEUR_LICENCE } from './vf-cockpit-rename.mjs';
@@ -80,14 +81,14 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
   for (const f of project.files) for (const p of f.touched || []) (touch[p] ||= []).push({ ref: 'f:' + f.p, label: f.name.slice(0, 90), st: f.st });
   const logo = (n) => 'data:image/svg+xml;base64,' + fs.readFileSync(path.join(eng.chemin, 'assets', n)).toString('base64');
   const vfLogos = { clair: logo('vibeflow-logo-clair.svg'), sombre: logo('vibeflow-logo-sombre.svg') };
-  g.meta.vfTab = 'code'; g.meta.vfTouch = touch; g.meta.vfCodeExtractor = arch.extracteur; g.meta.vfLogos = vfLogos;
+  g.meta.vfTab = 'code'; g.meta.vfTouch = touch; g.meta.vfCodeExtractor = arch.extracteur; g.meta.vfLogos = vfLogos; g.meta.vfGit = enteteGit(lab); // 78-04 : nom du dépôt, branche, worktree
   g.schema = 'vf-cockpit/graph@1'; // seul champ de données amont qui porte le nom du produit
   fs.writeFileSync(path.join(sortie, 'graph.json'), JSON.stringify(g));
 
   // les deux pages : même viewer, données différentes
   const html = read(path.join(sortie, 'index.html'));
-  fs.writeFileSync(path.join(sortie, 'index.html'), insererGraphe(html, g).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Code</title>'));
-  project.meta.root = g.meta.root; project.meta.vfLogos = vfLogos;
+  fs.writeFileSync(path.join(sortie, 'index.html'), insererGraphe(html, { ...g, meta: { ...g.meta, repos: [] } }).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Code</title>'));
+  project.meta.root = g.meta.root; project.meta.vfLogos = vfLogos; project.meta.vfGit = g.meta.vfGit;
   fs.writeFileSync(path.join(sortie, 'project.html'), insererGraphe(html, project).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Projet</title>'));
 
   // code d'exécution du socle, licences, pointeur de dossier de scripts (jamais de modèle ni de dernière commande)
