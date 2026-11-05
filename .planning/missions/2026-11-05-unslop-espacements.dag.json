@@ -59,37 +59,37 @@
         "propositions"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "gout",
-      "step": "arbitrage Samuel (via coordinateur)",
+      "step": "arbitrage Samuel (via coordinateur) — SOLDÉ : lot G1-G12 tranché par Samuel, AskUserQuestion session principale, 2026-11-05 (P71.5-D-18..28)",
       "stage": "",
       "deps": [
         "critique:directions"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "design-md",
-      "step": "DESIGN.md + jetons couleur figes (spec crafter)",
+      "step": "DESIGN.md + jetons couleur figes (spec crafter) — ABSORBÉ par spec-couleurs (reprise 2026-11-05)",
       "stage": "",
       "deps": [
         "gout"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "critique:design-md",
-      "step": "juge frais sur la spec de jetons",
+      "step": "juge frais sur la spec de jetons — ABSORBÉ par critique:spec-couleurs, 82/100 (reprise 2026-11-05)",
       "stage": "",
       "deps": [
         "design-md"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "craft:shell",
@@ -99,7 +99,7 @@
         "audit"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "critique:shell",
@@ -109,7 +109,7 @@
         "craft:shell"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "craft:code",
@@ -119,7 +119,7 @@
         "audit"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "critique:code",
@@ -129,7 +129,7 @@
         "craft:code"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "craft:projet",
@@ -139,7 +139,7 @@
         "audit"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "critique:projet",
@@ -149,7 +149,7 @@
         "craft:projet"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "craft:equipe",
@@ -159,7 +159,7 @@
         "audit"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "critique:equipe",
@@ -169,7 +169,7 @@
         "craft:equipe"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "craft:tiroir",
@@ -179,7 +179,7 @@
         "audit"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "critique:tiroir",
@@ -189,7 +189,7 @@
         "craft:tiroir"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "impl:espacements",
@@ -203,15 +203,17 @@
         "critique:tiroir"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "impl:couleurs",
-      "step": "vf-coder : jetons couleur + DESIGN.md + application",
+      "step": "intégration : couleurs + au-travail fusionnés sur feat/phase-71-5-unslop-espacements, rebase origin/main, toutes suites, captures avant (main) et après 390/768/1280/1440 sombre+clair",
       "stage": "",
       "deps": [
-        "critique:design-md",
-        "impl:espacements"
+        "impl:espacements",
+        "impl:couleurs-antislop",
+        "impl:au-travail",
+        "critique:design-md"
       ],
       "scope": [],
       "status": "blocked"
@@ -275,7 +277,8 @@
         "rendu:code",
         "rendu:projet",
         "rendu:equipe",
-        "rendu:tiroir"
+        "rendu:tiroir",
+        "docs"
       ],
       "scope": [],
       "status": "blocked"
@@ -300,13 +303,129 @@
     },
     {
       "id": "critique:au-travail",
-      "step": "juge frais options Au travail",
+      "step": "juge frais options Au travail — SOLDÉ : démo présentée à Samuel, lot G1-G12 tranché (critique Au travail 84/100)",
       "stage": "",
       "deps": [
         "au-travail"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
+    },
+    {
+      "id": "sources-anti-slop",
+      "step": "lecture des sources publiques anti-slop",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "anti-slop",
+      "step": "audit des motifs slop existants + alternatives (fragment demo)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "graphite-corrige",
+      "step": "Graphite corrige AA + a recetter + glyphes M1 (fragment demo)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "demo",
+      "step": "page demo locale assemblee, zoomable — SOLDÉ : démo présentée à Samuel, lot G1-G12 tranché (critique Au travail 84/100)",
+      "stage": "",
+      "deps": [
+        "anti-slop",
+        "graphite-corrige",
+        "au-travail"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:demo",
+      "step": "juge frais fragments demo — SOLDÉ : démo présentée à Samuel, lot G1-G12 tranché (critique Au travail 84/100)",
+      "stage": "",
+      "deps": [
+        "anti-slop",
+        "graphite-corrige",
+        "au-travail"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "teintes-etat",
+      "step": "4 jeux alternatifs vert/rouge/orange (demande directe Samuel)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:teintes",
+      "step": "juge frais 4 jeux de teintes",
+      "stage": "",
+      "deps": [
+        "teintes-etat"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "spec-couleurs",
+      "step": "jetons de couleur figes + regles anti-slop + DESIGN.md (spec)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:spec-couleurs",
+      "step": "juge frais spec couleurs",
+      "stage": "",
+      "deps": [
+        "spec-couleurs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "impl:au-travail",
+      "step": "vf-coder : refonte Au travail (A3 fils)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "impl:couleurs-antislop",
+      "step": "vf-coder : jetons couleur + regles anti-slop + DESIGN.md",
+      "stage": "",
+      "deps": [
+        "critique:spec-couleurs"
+      ],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire (audit read-only, constat au rapport)",
+      "stage": "",
+      "deps": [
+        "rendu:shell",
+        "rendu:code",
+        "rendu:projet",
+        "rendu:equipe",
+        "rendu:tiroir"
+      ],
+      "scope": [],
+      "status": "blocked"
     }
   ]
 }
