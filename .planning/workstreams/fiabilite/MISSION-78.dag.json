@@ -1,0 +1,31 @@
+{
+  "nodes": [
+    {
+      "id": "research",
+      "step": "78 recherche technique",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "craft-git",
+      "step": "craft en-tête + tiroir Git (vf-crafter)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "plan",
+      "step": "plan 78 + plan-checker",
+      "stage": "",
+      "deps": [
+        "research",
+        "craft-git"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}

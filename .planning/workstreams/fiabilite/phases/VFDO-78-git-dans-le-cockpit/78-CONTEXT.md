@@ -1,7 +1,7 @@
 # Phase 78: Git dans le cockpit - Context
 
 **Gathered:** 2026-11-05
-**Status:** Cadrée (2026-11-05) — une question de goût en attente (P78-D-10, hypothèse retenue marquée)
+**Status:** Cadrée (2026-11-05) — frontière de questions vide
 
 Cadrage par le manager de la mission Phase 78 (`vf-dev-manager`, worktree `.claude/worktrees/phase-78`, branche
 `feat/phase-78-git-cockpit`, base `aff9f260`). Jalon `vibeflow-v2.0`, compartiment `fiabilite`. Exécutée en parallèle des
@@ -60,20 +60,21 @@ verrous de driver, arbitrages en attente, watchdog et serveurs orphelins (Phase 
   touche pas.
 - **P78-D-09 (E2, retrait SOBR).** « Liste Repositories + suffixes du titre (Recommandé) ». La liste « Repositories » de
   l'onglet Code (« branche @ head7 ») et les suffixes « — Projet » / « — Équipe » du titre sont retirés.
-- **P78-D-10 (G1, ouverture du tiroir) — EN ATTENTE, hypothèse retenue.** Question de goût posée le 2026-11-05 (SendMessage
-  vers la session principale). Hypothèse de travail (recommandation du manager, non arbitrée) : clic sur la seconde ligne de
-  l'en-tête, plus le raccourci clavier « g ». Une seule tâche du plan en dépend ; elle se réécrit si la réponse diffère.
+- **P78-D-10 (G1, ouverture du tiroir).** « Clic sur la ligne branche + touche g (Recommandé) » (arbitrage Samuel,
+  AskUserQuestion session principale, 2026-11-05, second tour). La seconde ligne de l'en-tête ouvre le tiroir au clic, avec
+  un aspect cliquable au survol ; la touche « g » l'ouvre et le ferme. La sous-question de dégradation (P78-D-11) figurait
+  dans l'énoncé de la question et n'a pas été contestée : elle est retenue.
 
 ### Décisions du manager (techniques, sur mesures ; aucune ne vaut arbitrage humain)
 
-- **P78-D-11 (dégradation).** Git introuvable sur le PATH assaini, ou lab hors dépôt : la seconde ligne de l'en-tête et
+- **P78-D-11 (dégradation, retenue avec P78-D-10).** Git introuvable sur le PATH assaini, ou lab hors dépôt : la seconde ligne de l'en-tête et
   l'ouvreur du tiroir sont absents, aucune erreur dans le chrome, le reste du cockpit est identique à aujourd'hui (témoin).
   Une erreur ou un dépassement de borne d'une commande git rend un état « indisponible » local au tiroir, jamais une page
   cassée.
 - **P78-D-12 (coexistence 71.5).** Uniquement des variables CSS existantes, aucune valeur de couleur, d'espacement ou de
   rayon en dur ; aucune valeur de padding ou de marge existante modifiée. La 71.5 refait la palette : elle doit s'appliquer
   d'elle-même au tiroir.
-- **P78-D-13 (surface serveur).** Routes neuves en GET seul sous `/api/vf/`, derrière les contrôles existants (Host,
+- **P78-D-13 (surface serveur).** Routes neuves en GET seul sous `/api/vf/` (la Phase 72 ajoute de son côté une route POST de lancement ; la 78 n'en ajoute aucune), derrière les contrôles existants (Host,
   Origin, jeton). Aucune route POST, aucune écriture dans le dépôt ni dans `.git`. Commandes git par `shBorne` avec
   `GIT_SUR`, options de neutralisation des programmes externes (diff externe, textconv, pager) selon `78-RESEARCH.md`,
   arguments validés (SHA par motif strict puis `rev-parse --verify`, jamais d'argument commençant par `-`), sorties
