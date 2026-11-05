@@ -227,6 +227,18 @@
 #   MUT-I2, MUT-I3 — `errors.extend(invariant_i2(` (puis `invariant_i3(`) remplacé par `pass` →
 #         fixture T100 (puis T101) : rc_original=1, rc_mutant=0
 #
+# TaskStop exigé (workers orphelins, arbitrage Samuel AskUserQuestion session principale 2026-11-05, A1) :
+#   T121 — tools: liste explicite avec Bash (nu ou à spécifieur) ou Agent/Task (nu ou à allowlist) sans
+#          TaskStop → rc=1 « invariant TaskStop » nommant l'agent et la raison (a, c, f, h) ; avec
+#          TaskStop → rc=0 (b, c-jumeau) ; tools: absent ou * → exempt (d, e) ; ni Bash ni Agent → non
+#          exigé (g)
+#   MUT-TS — `errors.extend(invariant_taskstop(` → `pass` sur la fixture T121a : rc_original=1, rc_mutant=0
+#   Fixtures préexistantes remises en conformité (un TaskStop ajouté à leur tools:, rc/assertions
+#         inchangés) : T25, T28, T28b, T29, T30b, T31, T33-T36, T53, T69-T71, T89, T92, T93, T94, T99,
+#         T101, T108, T116-T120, MUT-I4, MUT-I6 — rien d'affaibli. Les cas qui lisent l'ARBRE RÉEL
+#         (T91, T94, T95, T96, T102, T108) restent rouges tant que les 15 agents distribués avec Bash
+#         ou Agent(...) ne déclarent pas TaskStop : c'est le gate qui fait son travail.
+#
 # Manifeste étendu à sept listes (Phase 43, FABR-06/09, 43-01) — check-skills.sh (nouveau gate)
 # lit désormais le MÊME manifeste daté, étendu d'une septième liste champs_frontmatter_skills ;
 # check-agents.sh doit refuser tout autant qu'avant un manifeste qui ne porte pas exactement ce
@@ -764,7 +776,7 @@ description: Agent de test avec allowlist mixte native, tierce et cross-module, 
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Write, SendMessage, Agent(vf-coder, vf-reviewer, general-purpose, gsd-planner)
+tools: Read, Write, SendMessage, Agent(vf-coder, vf-reviewer, general-purpose, gsd-planner), TaskStop
 ---
 corps
 EOF
@@ -816,7 +828,7 @@ description: Agent de test declarant l'outil Reed (typo) au lieu de Read.
 model: sonnet
 effort: medium
 memory: project
-tools: Reed, SendMessage, Agent(vf-coder)
+tools: Reed, SendMessage, Agent(vf-coder), TaskStop
 ---
 corps
 EOF
@@ -835,7 +847,7 @@ description: Agent de test avec l'outil Read correctement orthographie, non-regr
 model: sonnet
 effort: medium
 memory: project
-tools: Read, SendMessage, Agent(vf-coder)
+tools: Read, SendMessage, Agent(vf-coder), TaskStop
 disallowedTools: Write, Edit
 ---
 corps
@@ -854,7 +866,7 @@ description: Agent de test declarant un nom d'agent mal orthographie dans son al
 model: sonnet
 effort: medium
 memory: project
-tools: Read, SendMessage, Agent(vf-codeur)
+tools: Read, SendMessage, Agent(vf-codeur), TaskStop
 disallowedTools: Write, Edit
 ---
 corps
@@ -883,7 +895,7 @@ description: Agent de test avec un nom d'agent correctement resolu via le regist
 model: sonnet
 effort: medium
 memory: project
-tools: Read, SendMessage, Agent(vf-coder)
+tools: Read, SendMessage, Agent(vf-coder), TaskStop
 ---
 corps
 EOF
@@ -899,7 +911,7 @@ description: Agent de test declarant son allowlist en flow list YAML entre croch
 model: sonnet
 effort: medium
 memory: project
-tools: [Read, SendMessage, Agent(x, y), Bash(git:*)]
+tools: [Read, SendMessage, Agent(x, y), Bash(git:*), TaskStop]
 disallowedTools: Write, Edit
 ---
 corps
@@ -944,7 +956,7 @@ description: Agent de test utilisant l'alias legacy Task au lieu d'Agent dans to
 model: sonnet
 effort: medium
 memory: project
-tools: Read, SendMessage, Task(vf-coder)
+tools: Read, SendMessage, Task(vf-coder), TaskStop
 disallowedTools: Write, Edit
 ---
 corps
@@ -961,7 +973,7 @@ description: Agent de test declarant Agent sans aucune allowlist parenthesee.
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Agent
+tools: Read, Agent, TaskStop
 ---
 corps
 EOF
@@ -986,7 +998,7 @@ description: Agent de test avec un champ tools entierement quote entre guillemet
 model: sonnet
 effort: medium
 memory: project
-tools: "Read, Write, SendMessage, Agent(vf-coder)"
+tools: "Read, Write, SendMessage, Agent(vf-coder), TaskStop"
 ---
 corps
 EOF
@@ -1013,6 +1025,7 @@ tools:
   - SendMessage
 
   - Agent(vf-inexistant-improvise)
+  - TaskStop
 ---
 corps
 EOF
@@ -1360,7 +1373,7 @@ description: Agent de test dont l'allowlist reference un agent tiers jamais mate
 model: sonnet
 effort: medium
 memory: project
-tools: Read, SendMessage, Agent(gsd-jamais-cree)
+tools: Read, SendMessage, Agent(gsd-jamais-cree), TaskStop
 ---
 corps
 EOF
@@ -1621,7 +1634,7 @@ description: Agent de test qui omet Write/Edit de tools sans les fermer via disa
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Bash
+tools: Read, Bash, TaskStop
 ---
 corps
 EOF
@@ -1642,7 +1655,7 @@ description: Agent de test qui ferme explicitement Write/Edit via disallowedTool
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Bash
+tools: Read, Bash, TaskStop
 disallowedTools: Write, Edit
 omitClaudeMd: true
 ---
@@ -1664,7 +1677,7 @@ description: Agent de test dont tools inclut deja Write, pour verifier l'absence
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Write, Edit, Bash
+tools: Read, Write, Edit, Bash, TaskStop
 ---
 corps
 EOF
@@ -2172,7 +2185,7 @@ cat > "$T89_AG/agent-t89.md" <<'EOF'
 ---
 name: agent-t89
 description: Agent qui declare une allowlist non resolue, pour prouver la retrogradation D-05 sous --resolve-agents=strict.
-tools: Read, SendMessage, Agent(vf-codeur)
+tools: Read, SendMessage, Agent(vf-codeur), TaskStop
 disallowedTools: Write, Edit
 model: sonnet
 memory: project
@@ -2472,7 +2485,7 @@ description: Agent de test qui restreint disallowedTools avec un specifieur au l
 model: sonnet
 effort: low
 memory: project
-tools: Read, Write, Edit, Bash
+tools: Read, Write, Edit, Bash, TaskStop
 disallowedTools: Bash(rm:*)
 ---
 corps
@@ -2492,7 +2505,7 @@ description: Agent de test dont disallowedTools retire l outil entier, sans spec
 model: sonnet
 effort: low
 memory: project
-tools: Read, Write, Edit, Bash
+tools: Read, Write, Edit, Bash, TaskStop
 disallowedTools: Bash
 ---
 corps
@@ -2616,7 +2629,7 @@ description: Agent de test dont disallowedTools porte un specifieur, fixture de 
 model: sonnet
 effort: low
 memory: project
-tools: Read, Write, Edit, Bash
+tools: Read, Write, Edit, Bash, TaskStop
 disallowedTools: Bash(rm:*)
 ---
 corps
@@ -2664,7 +2677,7 @@ description: Agent de test manager (allowlist non vide) sans SendMessage dans to
 model: sonnet
 effort: high
 memory: project
-tools: Read, Write, Agent(worker-a, worker-b)
+tools: Read, Write, Agent(worker-a, worker-b), TaskStop
 ---
 corps
 EOF
@@ -2683,7 +2696,7 @@ description: Agent de test manager (allowlist non vide) avec SendMessage dans to
 model: sonnet
 effort: high
 memory: project
-tools: Read, Write, SendMessage, Agent(worker-a, worker-b)
+tools: Read, Write, SendMessage, Agent(worker-a, worker-b), TaskStop
 ---
 corps
 EOF
@@ -2702,7 +2715,7 @@ description: Agent de test. Worker interne, dispatche uniquement par un manager 
 model: sonnet
 effort: high
 memory: project
-tools: Read, Write, Agent(worker-a, worker-b)
+tools: Read, Write, Agent(worker-a, worker-b), TaskStop
 vf-internal: true
 ---
 corps
@@ -2722,7 +2735,7 @@ description: Agent de test declarant Agent sans aucune allowlist parenthesee (di
 model: sonnet
 effort: high
 memory: project
-tools: Read, Agent
+tools: Read, Agent, TaskStop
 ---
 corps
 EOF
@@ -2761,7 +2774,7 @@ description: Agent de test manager sans SendMessage, fixture de mutation MUT-I6.
 model: sonnet
 effort: high
 memory: project
-tools: Read, Write, Agent(worker-a, worker-b)
+tools: Read, Write, Agent(worker-a, worker-b), TaskStop
 ---
 corps
 EOF
@@ -2845,7 +2858,7 @@ description: Agent de test. Worker interne, forme vf-reviewer (allowlist Agent n
 model: sonnet
 effort: high
 memory: project
-tools: Read, Bash, Glob, Grep, Agent(outil-tiers)
+tools: Read, Bash, Glob, Grep, Agent(outil-tiers), TaskStop
 disallowedTools: Write, Edit
 vf-internal: true
 ---
@@ -3012,7 +3025,7 @@ description: Agent de test racine qui dispatche un sous-agent via la meme decouv
 model: sonnet
 effort: high
 memory: project
-tools: Read, SendMessage, Agent(sous-agent)
+tools: Read, SendMessage, Agent(sous-agent), TaskStop
 disallowedTools: Write, Edit
 ---
 corps
@@ -3130,7 +3143,7 @@ description: Agent de test manager qui dispatche worker-orphelin, registre du mo
 model: sonnet
 effort: high
 memory: project
-tools: Read, SendMessage, Agent(worker-orphelin)
+tools: Read, SendMessage, Agent(worker-orphelin), TaskStop
 ---
 corps
 EOF
@@ -3161,7 +3174,7 @@ description: Agent de test manager qui dispatche worker-expose par erreur, regis
 model: sonnet
 effort: high
 memory: project
-tools: Read, SendMessage, Agent(worker-expose)
+tools: Read, SendMessage, Agent(worker-expose), TaskStop
 ---
 corps
 EOF
@@ -3239,7 +3252,7 @@ description: Agent de test manager qui dispatche agent-muti3, fixture de mutatio
 model: sonnet
 effort: high
 memory: project
-tools: Read, SendMessage, Agent(agent-muti3)
+tools: Read, SendMessage, Agent(agent-muti3), TaskStop
 ---
 corps
 EOF
@@ -3374,7 +3387,7 @@ description: Agent qui dispatche reviewer depuis le registre B (fixture T103, de
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Agent(reviewer)
+tools: Read, Agent(reviewer), TaskStop
 ---
 corps du dispatcher
 EOF
@@ -3938,7 +3951,7 @@ rm -f "$AG"/*.md
 mk_t116() { # <fichier> <ligne-optionnelle-ou-vide> [allowlist]
   {
     printf -- '---\nname: %s\ndescription: Manager de test. Dispatche un agent d un module optionnel.\n' "$(basename "$1" .md)"
-    printf -- 'tools: Read, SendMessage, %s\ndisallowedTools: Write, Edit\nmodel: sonnet\neffort: high\nmemory: project\n' "${3:-Agent(vf-test-orchestrator)}"
+    printf -- 'tools: Read, SendMessage, %s, TaskStop\ndisallowedTools: Write, Edit\nmodel: sonnet\neffort: high\nmemory: project\n' "${3:-Agent(vf-test-orchestrator)}"
     [ -n "$2" ] && printf -- '%s\n' "$2"
     printf -- '---\ncorps\n'
   } > "$1"
@@ -4048,6 +4061,96 @@ if [ "$MUT_M1_CALL_RC" -eq 0 ]; then
   fi
 else
   cat "$WORK/mut-M1.chemin"
+fi
+
+# ---------- T121 — TaskStop exige (workers orphelins, arbitrage Samuel AskUserQuestion session ----
+# principale 2026-11-05, A1) : tools: liste explicite avec Bash ou Agent/Task SANS TaskStop = rouge
+# (fin de tour avec tache de fond impossible a arreter) ; tools: absent ou * = exempt ; aucun agent
+# n'est exempte par son nom. Chaque cas monte son propre dossier jetable.
+mk_ts() { # <dossier> <nom> <ligne-tools-ou-vide>
+  mkdir -p "$1"
+  {
+    printf -- '---\nname: %s\ndescription: Agent de test TaskStop, assez long pour ne rien avertir de la description.\n' "$2"
+    printf -- 'model: sonnet\neffort: low\nmemory: project\nskills:\n  - petit-skill\n'
+    [ -n "$3" ] && printf -- '%s\n' "$3"
+    printf -- '---\ncorps\n'
+  } > "$1/$2.md"
+}
+ts_rc() { # <dossier> -> rc dans TS_RC, sortie dans TS_OUT
+  TS_OUT="$(bash "$CHECK" --agents-dir="$1" --skills-dir="$SK" 2>&1)"; TS_RC=$?
+}
+mk_ts "$WORK/ts-rouge" "ts-bash" "tools: Read, Bash"
+ts_rc "$WORK/ts-rouge"
+if [ "$TS_RC" -eq 1 ] && echo "$TS_OUT" | grep -q "ts-bash.md : invariant TaskStop" && echo "$TS_OUT" | grep -q "tache de fond impossible a arreter"; then
+  ok "T121a tools: Read, Bash sans TaskStop → rc=1, message nommant l'agent et la raison"
+else
+  ko "T121a (rc=$TS_RC, attendu 1 + 'ts-bash.md : invariant TaskStop') : $TS_OUT"
+fi
+mk_ts "$WORK/ts-vert" "ts-bash" "tools: Read, Bash, TaskStop"
+ts_rc "$WORK/ts-vert"
+if [ "$TS_RC" -eq 0 ] && ! echo "$TS_OUT" | grep -q "TaskStop"; then
+  ok "T121b même agent avec TaskStop → rc=0, aucune mention TaskStop"
+else
+  ko "T121b (rc=$TS_RC, attendu 0) : $TS_OUT"
+fi
+mk_ts "$WORK/ts-agent" "ts-agent" "tools: Read, SendMessage, Agent(general-purpose)"
+ts_rc "$WORK/ts-agent"
+if [ "$TS_RC" -eq 1 ] && echo "$TS_OUT" | grep -q "ts-agent.md : invariant TaskStop" && ! echo "$TS_OUT" | grep -q "declare Agent/Bash"; then
+  ok "T121c Agent(...) sans Bash sans TaskStop → rc=1 (Agent seul suffit)"
+else
+  ko "T121c (rc=$TS_RC, attendu 1 + 'ts-agent.md : invariant TaskStop', sans Bash) : $TS_OUT"
+fi
+mk_ts "$WORK/ts-agent-ok" "ts-agent" "tools: Read, SendMessage, Agent(general-purpose), TaskStop"
+ts_rc "$WORK/ts-agent-ok"
+[ "$TS_RC" -eq 0 ] && ok "T121c-jumeau Agent(...) avec TaskStop → rc=0" || ko "T121c-jumeau (rc=$TS_RC) : $TS_OUT"
+mk_ts "$WORK/ts-notools" "ts-notools" ""
+ts_rc "$WORK/ts-notools"
+if [ "$TS_RC" -eq 0 ] && ! echo "$TS_OUT" | grep -q "invariant TaskStop"; then
+  ok "T121d agent sans tools: (hérite de tout) → rc=0, exempt"
+else
+  ko "T121d (rc=$TS_RC, attendu 0 sans 'invariant TaskStop') : $TS_OUT"
+fi
+mk_ts "$WORK/ts-star" "ts-star" "tools: *"
+ts_rc "$WORK/ts-star"
+if echo "$TS_OUT" | grep -q "invariant TaskStop"; then
+  ko "T121e tools: * doit être exempt (rc=$TS_RC) : $TS_OUT"
+else
+  ok "T121e tools: * → exempt"
+fi
+mk_ts "$WORK/ts-spec" "ts-spec" "tools: Read, Bash(git:*)"
+ts_rc "$WORK/ts-spec"
+if [ "$TS_RC" -eq 1 ] && echo "$TS_OUT" | grep -q "ts-spec.md : invariant TaskStop"; then
+  ok "T121f Bash(git:*) (spécifieur) sans TaskStop → rc=1"
+else
+  ko "T121f (rc=$TS_RC, attendu 1) : $TS_OUT"
+fi
+mk_ts "$WORK/ts-lecture" "ts-lecture" "tools: Read, Grep, Glob"
+ts_rc "$WORK/ts-lecture"
+[ "$TS_RC" -eq 0 ] && ok "T121g tools: Read, Grep, Glob (ni Bash ni Agent) → rc=0, TaskStop non exigé" || ko "T121g (rc=$TS_RC) : $TS_OUT"
+mk_ts "$WORK/ts-bloc" "ts-bloc" "tools:
+  - Read
+  - Task(general-purpose)"
+sed -i.bak 's/^model: sonnet$/model: sonnet\nvf-internal: true/;s/^description: \(.*\)$/description: \1 Worker interne./' "$WORK/ts-bloc/ts-bloc.md"; rm -f "$WORK/ts-bloc/ts-bloc.md.bak"
+ts_rc "$WORK/ts-bloc"
+if [ "$TS_RC" -eq 1 ] && echo "$TS_OUT" | grep -q "ts-bloc.md : invariant TaskStop"; then
+  ok "T121h forme liste bloc avec Task(...) (alias Agent) sans TaskStop → rc=1"
+else
+  ko "T121h (rc=$TS_RC, attendu 1) : $TS_OUT"
+fi
+
+# MUT-TS : `errors.extend(invariant_taskstop(` → `pass` ; fixture T121a rouge : rc_original=1, rc_mutant=0
+make_gate_mutant TS 0 'errors.extend(invariant_taskstop(' 'pass' > "$WORK/mut-TS.chemin"
+MUT_TS_RC=$?
+if [ "$MUT_TS_RC" -eq 0 ]; then
+  MUT_TS_DIR="$(cat "$WORK/mut-TS.chemin")"
+  MUT_TS_ORIG_DIR="$(mk_gate_dir "$WORK/mut-TS-orig" 0)"
+  RC_ORIG=0; bash "$MUT_TS_ORIG_DIR/check-agents.sh" --agents-dir="$WORK/ts-rouge" --skills-dir="$SK" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_TS_DIR/check-agents.sh" --agents-dir="$WORK/ts-rouge" --skills-dir="$SK" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut TS "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut TS "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
 fi
 
 # ---------- MUT-M1-REFUS-COMPTE (garde du harnais, même patron que MUT-REFUS-COMPTE de 43-01) ---

@@ -1,5 +1,13 @@
 # Changelog — conductor
 
+## [v1.53.2] — 2026-11-05 (non publié : garde machine « workers orphelins »)
+
+**Patch** (aucune release racine : elle sera groupée) : un worker (`vf-coder` en tête) rendait la main pendant qu'une commande Bash tournait en fond (souvent basculée automatiquement par le timeout Bash), et ni lui ni son manager ne pouvaient l'arrêter : leur allowlist `tools:` ne déclarait pas `TaskStop` (mesuré : `No such tool available: TaskStop`). Le lot doctrine/agents ajoute `TaskStop` aux agents ; ce patch pose la garde qui empêche la régression (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05, A1).
+
+- **`check-agents.sh`** : nouvelle règle BLOQUANTE (même palier que les invariants de forme, tous modes, ligne d'appel unique `errors.extend(invariant_taskstop(`) : un agent distribué dont `tools:` est une liste explicite contenant `Bash` (nu ou à spécifieur) ou `Agent`/`Task` (nu ou à allowlist) DOIT déclarer `TaskStop`. Message nommant l'agent et la raison (fin de tour avec tâche de fond impossible à arrêter). Exempts : `tools:` absent ou `tools: *` / `All tools` (héritage de tout) ; aucune exception par nom d'agent. Mêmes tokenizer et analyse pure que les autres invariants (`extract_raw_field`, `tokenize_field`, `parse_token`).
+- **`tests/test-check-agents.sh`** : cas T121a-h (rouge `Read, Bash`, vert avec `TaskStop`, `Agent(...)` sans Bash, `Bash(git:*)`, liste bloc `Task(...)`, exemptions `tools:` absent/`*`, ni Bash ni Agent) et mutant MUT-TS (ligne d'appel neutralisée : rc 1 → 0). Les fixtures préexistantes qui portaient Bash ou Agent(...) reçoivent `TaskStop` (rc et assertions inchangés). Les cas qui lisent l'arbre réel (T91, T94, T95, T96, T102, T108) rougissent tant que les 15 agents distribués avec Bash ou Agent(...) ne déclarent pas `TaskStop` : c'est le gate qui travaille, ils reverdissent avec le lot agents.
+- **`references/team-kernel.md`** : règle de fin de tour inerte — un worker ne rend jamais la main avec une tâche de fond vivante, un manager arrête ses enfants avant de rendre ; voir le lot doctrine.
+
 ## [v1.53.1] — 2026-11-05 (non publié : /vf-update propose les modules nouveaux du catalogue)
 
 **Patch** (aucune release racine : elle sera groupée) : `/vf-update` ne mettait à jour que les modules du registre et ne disait rien d'un module apparu dans une release — `cockpit` (v2.75.0) manquait ainsi chez tout utilisateur mis à jour en v2.75.x.
