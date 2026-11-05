@@ -66,3 +66,17 @@ Ces deux témoins ne sont pas aveugles : leurs témoins positifs sont joués (`g
 | Mutant | Altération | Rouge obtenu |
 |---|---|---|
 | M-REPOS | `insererGraphe(html, g)` au lieu de `{ ...g, meta: { ...g.meta, repos: [] } }` dans une copie du build | H6.5 : le panneau de l'index liste de nouveau les dépôts (titre « Dépôts » ou lignes `.rp`) |
+
+## Non-régression : `test-cockpit-responsive.sh` (rouge puis vert, après la tâche 3)
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-responsive.sh` sur le code des tâches 1 à 3 (l'ouvreur 44 × 44 visible sous 1000 px, y compris à 390 px).
+Obtenu (rouge, 285 PASS / 6 FAIL, `78-04-responsive-rouge.log` du scratchpad) :
+
+| Assertion | Attendu | Obtenu |
+|---|---|---|
+| R3 index / 390 px, R3 project / 390 px, R20 Équipe / 390 px (aucune superposition d'en-tête) | `aucune` | `nav.vf-tabs recouvre #search-btn` |
+| R13.2 index / project / equipe à 390 px (aucune action dans la rangée, « ⋯ » visible) | `\|true` | `vf-git-ouvreur\|true` |
+
+Cause : le téléphone (≤ 700 px, `02-vf-telephone.js`, P70-D-01) tient l'en-tête sur une rangée et range toute action de `.hr` dans le menu « ⋯ » ; le bouton de 44 px s'y ajoutait.
+Correction : sous 700 px le bouton est masqué (`display: none !important`) ; le menu « ⋯ » le reprend sous le libellé « Historique Git » (span `.bl`), son clic relaie `vf-git:basculer` ; entre 701 et 999 px il reste l'icône de 44 px en tête de `.hr`.
+Vert : `test-cockpit-responsive.sh` rc 0 ; H4.1 réécrit (768 et 999 px : ouvreur visible ; 375 et 700 px : absent de la rangée ; entrée « Historique Git » du menu, clic -> `vf-git:basculer` source `ouvreur`) : 74 réussis, 0 échoué.

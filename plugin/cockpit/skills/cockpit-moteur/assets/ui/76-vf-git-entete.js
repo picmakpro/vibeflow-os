@@ -78,6 +78,9 @@
       .vf-nom { display: none; }
       #vf-git-ouvreur { display: inline-flex; width: 44px; height: 44px; }
     }
+    /* téléphone (≤ 700 px, 02-vf-telephone.js, P70-D-01) : l'en-tête tient sur une rangée et les actions vivent dans le menu « ⋯ », qui reprend ce bouton (libellé .bl, clic relayé) */
+    @media (max-width: 700px) { #vf-git-ouvreur { display: none !important; } }
+    #vf-git-ouvreur .bl { display: none; }
   `;
   document.head.appendChild(style);
 
@@ -104,6 +107,7 @@
     for (const [t, a] of [['circle', { cx: 6, cy: 6, r: 2 }], ['circle', { cx: 6, cy: 18, r: 2 }], ['circle', { cx: 18, cy: 8, r: 2 }], ['path', { d: 'M6 8v8M18 10c0 4-6 3-12 6' }]]) {
       const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, String(a[k])); svg.appendChild(e); }
     ouvreur.appendChild(svg); }
+  { const bl = document.createElement('span'); bl.className = 'bl'; bl.textContent = 'Historique Git'; ouvreur.appendChild(bl); } // libellé court lu par le menu « ⋯ » du téléphone
   const hr = document.querySelector('header .hr');
   if (hr) hr.insertBefore(ouvreur, hr.firstChild);
 
