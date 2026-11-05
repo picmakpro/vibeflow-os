@@ -67,3 +67,38 @@ Les onze mutants du module attendent le code : leur ancre (`export const <NOM> =
 - Compartiment `Fiabilite` : un système de fichiers insensible à la casse (macOS) confond `fiabilite` et `Fiabilite` dans un même lab. Le lab fixture est donc en deux : `lab1` (fiabilite, gouvernance, `a$(id)`) et `lab2` (le seul `Fiabilite`). G7.2 couvre les deux.
 - « Chacun doit rougir EXACTEMENT les sondes listées » : un mutant rougit aussi des sondes voisines (par exemple M-HERITE-FLAG fait aussi rougir G5 et G8 quand leurs entrées tirent `herite`). La suite exige que le mutant rougisse, par rapport à la base, AU MOINS les groupes de la carte ; les groupes obtenus sont imprimés dans le libellé de chaque mutant.
 - Les mutants sont fabriqués par un petit programme Node (`mut.mjs`, remplacement de la ligne d'ancre) et non par `sed` : mêmes ancres (`^export const <NOM> = `, `^export function <nom>(`), même exigence « ancre absente = FAIL », sans le piège de l'échappement des remplacements.
+
+# Tâche 2 — suite verte sur le module livré (`d668a6f7`), puis mutants
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-lancer-gabarit.sh` : `Résultats : 51 PASS / 0 FAIL`, rc=0, 22,8 s au repos (40 s sous charge de voisins), sous bash et sous zsh (commande de vérification).
+Aucune assertion de la Tâche 1 n'a été modifiée pour passer au vert.
+
+## Verts sur la base, confirmés verts sur le code livré
+
+G7.0, G8.0, G12.2, G12.4, G12.5, G13.0, G13.1, G13.2 : verts sur la base, toujours verts. G14.1 : `88` lignes, aucun import ni accès système.
+
+## Mutants rouges obtenus
+
+Mutant, groupes de la carte rougis (par rapport à la base verte), sonde et obtenu. Les groupes rougis en plus sont les voisins naturels (`G0.3` pour les enveloppes qui ajoutent `composerLigne_orig`, `G10` quand `lignesParModes` appelle la fonction mutée…).
+
+| Mutant | Groupes rougis | Sonde qui le tue, obtenu |
+|--------|----------------|--------------------------|
+| M-INTERPOLE | G5 G7 G8 (+G0) | G7.1 `1@fiabilite` : la ligne contient le titre du lab ; G8.1 `sh` : argv différent de l'oracle ; G5.1 4 695 écarts |
+| M-MOTIF-WS | G4 G5 G7 (+G6 G10) | G4.1 `{"ws":"a$(id)"}` obtenu `motif forme` attendu `compartiment` ; G5.5 `MOTIF_COMPARTIMENT` = `^.{1,40}$` |
+| M-MOTIF-PHASE | G4 G5 (+G2 G10) | G4.1 `{"phase":"72;touch M"}` obtenu `forme` attendu `phase` ; G5.5 `MOTIF_PHASE` = `^\d` |
+| M-NETTOIE | G4 G5 G7 (+G0 G10) | G4.1 `{"phase":"72;touch M"}` obtenu une ligne `vf-phase-72-fiabilite` ; G7.2 `a$(id)` obtenu `vf-phase-1-aid` |
+| M-ALPHABET-LARGE | G5 G6 | G5.5 `ALPHABET` obtenu `^[ -~]+$` ; G6.1 `;` en tête de ligne : `forme` au lieu de `alphabet` |
+| M-MODE-BYPASS | G4 G11 (+G5 G10) | G4.1 `{"mode":"bypassPermissions"}` obtenu `forme` attendu `mode` ; G11.1 `MODES` porte `bypassPermissions` |
+| M-HERITE-FLAG | G1 (+G5 G6 G8 G9 G10 G0) | G1.1 `cadrer/herite` obtenu `--permission-mode 'default'` ; G1.2 un drapeau là où il n'y en a aucun |
+| M-SANS-GUILLEMETS | G1 G6 G8 (+G2 G5 G7 G9 G10 G0) | G1.1 ligne sans apostrophe ; G6.1 ligne de base différente de l'oracle ; G8.1 argv découpé |
+| M-CHAT-IGNORE | G4 G9 (+G5 G10 G0) | G4.1 chat `ABCDEF12-…` obtenu une ligne sans chat ; G9.3 chat `x` : `ok:true` |
+| M-SESSION-LIBRE | G4 (+G5 G6 G10) | G4.1 session v1 `0a1b2c3d-4e5f-1a6b-…` obtenu une ligne ; G10.2 session `x` acceptée |
+| M-SKILL-PREFIXE | G12 (+G1 G2 G5 G6 G7 G8 G9 G10) | G12.1 `NOM_SKILL` = `vibeflow:vf-dev` ; G12.3 `.claude/skills/vibeflow:vf-dev/SKILL.md` absent |
+| M-ENV-CLAUDE-CODE | G13 | G13.1 cinq clés `CLAUDE_CODE_*` laissées passer ; G13.2 le vrai enfant voit `CLAUDE_CODE_ENTRYPOINT=cli` et quatre autres |
+
+Aucun mutant « sans effet » : les douze rougissent leurs groupes de la carte. Rejeu de la commande de vérification du plan : `OK-GABARIT`, `OK-MODULE-PUR`, `OK-GATES-HORS-BASELINE` sous bash et sous zsh.
+
+## Constats
+
+- `check-version-sync.sh` : `167 suites ≠ réel=175` sur `README.md` et `README.fr.md` (rouge attendu, jusqu'au plan 72-15 ; les suites des plans voisins y contribuent aussi). Aucune autre ligne rouge. `check-machine-paths.sh` : vert.
+- Aucun mutant ne fait rougir toutes ses sondes voisines à l'identique de la carte : l'assertion est « au moins les groupes de la carte », les groupes obtenus sont imprimés par la suite.
