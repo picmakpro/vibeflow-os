@@ -96,6 +96,10 @@ verrous de driver, arbitrages en attente, watchdog et serveurs orphelins (Phase 
 - **P78-D-19 (largeur mobile).** Le tiroir et la seconde ligne tiennent en largeur mobile (héritage UIFN) ; la règle de
   masquage du nom sous 1000 px s'applique aussi à la seconde ligne, sauf avis contraire du juge de design.
 
+- **P78-D-20 (ouvreur mobile).** Sous 1000 px, la seconde ligne est masquée (P78-D-19) ; un bouton icône 44×44 dans `.hr`
+  devient l'ouvreur tactile (proposé par le craft, `78-UI-SPEC.md` §5, retenu par le manager, à confirmer par le juge de
+  design) ; absent sans Git comme les autres ouvreurs (P78-D-11).
+
 ### Claude's Discretion
 
 Algorithme de placement des couloirs, format d'échange serveur → page, découpage en fichiers sous `plugin/cockpit/`.
