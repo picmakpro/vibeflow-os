@@ -1,0 +1,194 @@
+{
+  "nodes": [
+    {
+      "id": "audit",
+      "step": "audit espacements + captures avant + echelle proposee",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "craft:shell",
+      "step": "spec espacements shell",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "critique:shell",
+      "step": "critique spec shell",
+      "stage": "",
+      "deps": [
+        "craft:shell"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "craft:code",
+      "step": "spec espacements code",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "critique:code",
+      "step": "critique spec code",
+      "stage": "",
+      "deps": [
+        "craft:code"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "craft:projet",
+      "step": "spec espacements projet",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "critique:projet",
+      "step": "critique spec projet",
+      "stage": "",
+      "deps": [
+        "craft:projet"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "craft:equipe",
+      "step": "spec espacements equipe",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "critique:equipe",
+      "step": "critique spec equipe",
+      "stage": "",
+      "deps": [
+        "craft:equipe"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "craft:tiroir",
+      "step": "spec espacements tiroir",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "critique:tiroir",
+      "step": "critique spec tiroir",
+      "stage": "",
+      "deps": [
+        "craft:tiroir"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "impl",
+      "step": "vf-coder : jetons + application des 5 specs + suites de mise en page",
+      "stage": "",
+      "deps": [
+        "critique:shell",
+        "critique:code",
+        "critique:projet",
+        "critique:equipe",
+        "critique:tiroir"
+      ],
+      "scope": [
+        "plugin/cockpit"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "rendu:shell",
+      "step": "juge frais sur le rendu shell",
+      "stage": "",
+      "deps": [
+        "impl"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "rendu:code",
+      "step": "juge frais sur le rendu code",
+      "stage": "",
+      "deps": [
+        "impl"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "rendu:projet",
+      "step": "juge frais sur le rendu projet",
+      "stage": "",
+      "deps": [
+        "impl"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "rendu:equipe",
+      "step": "juge frais sur le rendu equipe",
+      "stage": "",
+      "deps": [
+        "impl"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "rendu:tiroir",
+      "step": "juge frais sur le rendu tiroir",
+      "stage": "",
+      "deps": [
+        "impl"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "livraison",
+      "step": "captures apres, rebase, bump patch cockpit, CHANGELOG, PR, CI",
+      "stage": "",
+      "deps": [
+        "rendu:shell",
+        "rendu:code",
+        "rendu:projet",
+        "rendu:equipe",
+        "rendu:tiroir"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}
