@@ -2,7 +2,8 @@
 # test-cockpit-git-tiroir.sh — tiroir Git de la page (78-06 ; GITC-04, 05, 06, 08, 10, 11 ; P78-D-04, 10, 11, 12, 14, 19).
 #   D1 ouverture depuis la seconde ligne, graphe servi, schéma vérifié · D2 sections, graphe complet, commandes à copier, états, XSS
 #   D3 clavier, focus, coexistence avec le Terminal et le zoom, mobile
-#   Mutants : M-HTML, M-COPIE, M-GLOBAL-G. La réponse `/api/vf/git` est figée (temoins/git-tiroir.json) et servie par un `fetch` remplacé dans la page.
+#   D7 détail d'un commit sous sa rangée · D8 clavier du graphe, état des worktrees · D9 rafraîchissement par vf-git:signal (78-10)
+#   Mutants : M-HTML, M-COPIE, M-GLOBAL-G, M-HORS-DEPOT, M-DETAIL-HTML, M-SELECTION, M-RAFALE. La réponse `/api/vf/git` est figée (temoins/git-tiroir.json) et servie par un `fetch` remplacé dans la page.
 #   Chrome headless en CDP (SAUTÉ, jamais compté réussi, sans navigateur), ports éphémères. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -12,6 +13,7 @@ HERE_T="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS="$(cd "$HERE_T/.." && pwd)"
 UI="$(cd "$SCRIPTS/.." && pwd)/skills/cockpit-moteur/assets/ui"
 TEMOIN="$HERE_T/temoins/git-tiroir.json"
+DETAILS="$HERE_T/temoins/git-tiroir-details.json"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
 REAL_HOME="$HOME"; export HOME="$WORK/home"
 SRV=""
@@ -96,6 +98,18 @@ window.__alerte = 0; window.alert = () => { window.__alerte++; };
       window.__vfReqs.push({ url, methode: (i && i.method) || 'GET', headers: (i && i.headers) || {} });
       return new Promise((ok) => setTimeout(() => ok(new Response(JSON.stringify(window.__vfGit.reponse), { status: 200, headers: { 'content-type': 'application/json' } })), window.__vfGit.delai || 0)); }
     return f0(u, i); }; }
+JS
+{ printf 'window.__vfDet = '; cat "$DETAILS"; printf ';\n'; cat <<'JS'; } >> "$AUX/pre.js"
+window.__vfDet.erreurs = {}; window.__vfDetReqs = [];
+{ const f1 = window.fetch.bind(window);
+  window.fetch = (u, i) => { const url = typeof u === 'string' ? u : u.url, rep = (st, o) => Promise.resolve(new Response(JSON.stringify(o), { status: st, headers: { 'content-type': 'application/json' } }));
+    const m = /^\/api\/vf\/git\/(commit|worktrees)(\?|$)/.exec(url);
+    if (!m) return f1(u, i);
+    window.__vfDetReqs.push({ url, route: m[1], methode: (i && i.method) || 'GET', headers: (i && i.headers) || {} });
+    if (m[1] === 'worktrees') return rep(200, window.__vfDet.worktrees);
+    const sha = decodeURIComponent((/sha=([^&]*)/.exec(url) || [])[1] || '');
+    if (window.__vfDet.erreurs[sha]) return rep(window.__vfDet.erreurs[sha], { erreur: 'commit-inconnu' });
+    return rep(200, Object.assign({}, window.__vfDet.commit, { h: sha, h7: sha.slice(0, 7), commandes: { show: 'git show --stat --end-of-options ' + sha.slice(0, 7), detacher: 'git switch --detach --end-of-options ' + sha.slice(0, 7) } })); }; }
 JS
 export VF_PRE="$AUX/pre.js"
 
@@ -423,6 +437,183 @@ JS
     assert_eq "D3.4 — Terminal refermé : la pastille revient, sans recouvrement" "$(jq_ "$R3T" '[j.refermé.recouvre.length, j.refermé.presents.includes("pastille")].join("|")' 2>/dev/null)" "0|true"
     assert_eq "D3.4 — aucune erreur de page (Terminal)" "$(jq_ "$R3T" 'j.errs.length' 2>/dev/null)" "0"
   fi
+  stop_srv
+  echo "=== D7 à D9 — détail d'un commit, clavier du graphe, état des worktrees, rafraîchissement par le signal (78-10) ==="
+  cat > "$AUX/clavier.js" <<'JS'
+// aide D7 à D9 : frappes CDP des touches de navigation (Entrée et Espace portent leur texte pour activer un bouton natif) et pause côté Node
+const KV = { ArrowDown: [40, 'ArrowDown'], ArrowUp: [38, 'ArrowUp'], Home: [36, 'Home'], End: [35, 'End'], Enter: [13, 'Enter', '\r'], ' ': [32, 'Space', ' '], Escape: [27, 'Escape'] };
+const clavier = async (key) => { const [vk, code, text] = KV[key]; for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, ...(type === 'keyDown' && text ? { text } : {}) }); };
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+const LIGNES = `[...document.querySelectorAll('#vf-git-tiroir li[role=option]')]`;
+const ouvrirTiroir = async (base, avecEtats) => {
+  await fenetre(1440, 900); await s.naviguer(base + '/'); await pret();
+  await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne');
+  await s.ev(`document.querySelector('#vf-git-ligne').click()`);
+  await s.attendre(`${OUVERT} && ${LIGNES}.length >= 40`, 'tiroir ouvert et rangées');
+  if (avecEtats) await s.attendre(`!!document.querySelector('#vf-git-s-wt .vf-git-wt-l .vf-git-etat-wt')`, 'états des worktrees');
+};
+JS
+  cat > "$AUX/d7.js" <<'JS'
+const [base] = ARGS; const out = {};
+await ouvrirTiroir(base);
+out.sha = await s.ev(`${LIGNES}[2].dataset.h`);
+out.avant = await s.ev(`document.querySelectorAll('.vf-git-detail').length`);
+await s.ev(`${LIGNES}[2].click()`);
+await s.attendre(`!!document.querySelector('.vf-git-detail .vf-git-d-fichiers')`, 'détail ouvert');
+out.reqs = await s.ev(`window.__vfDetReqs.filter((r) => r.route === 'commit').map((r) => r.methode + ' ' + r.url)`);
+out.jeton = await s.ev(`window.__vfDetReqs.filter((r) => r.route === 'commit').every((r) => 'x-floorplan-token' in r.headers)`);
+out.ouvert = await s.ev(`(() => { const d = document.querySelector('.vf-git-detail'), L = ${LIGNES}[2], q = (x) => d.querySelector(x), fl = [...d.querySelectorAll('.vf-git-d-fichiers > li')], reste = fl.filter((l) => l.classList.contains('vf-git-d-reste')), vrais = fl.filter((l) => !l.classList.contains('vf-git-d-reste'));
+  const f1 = vrais[1], bin = vrais.find((l) => /binaire/.test(l.textContent)), ren = vrais.find((l) => /ancien-nom/.test(l.textContent));
+  return { apresRangee: L.nextElementSibling === d, nb: document.querySelectorAll('.vf-git-detail').length, sujet: q('.vf-git-d-sujet').textContent, msg: q('.vf-git-d-msg').textContent, ws: getComputedStyle(q('.vf-git-d-msg')).whiteSpace, poids: getComputedStyle(q('.vf-git-d-sujet')).fontWeight,
+    meta: q('.vf-git-d-meta').textContent, sha: q('.vf-git-d-sha code').textContent, sel: getComputedStyle(q('.vf-git-d-sha code')).userSelect, titre: q('.vf-git-d-fichiers-t').textContent, nVrais: vrais.length, reste: reste.map((l) => l.textContent),
+    plus: f1.querySelector('.vf-git-d-plus').textContent, moins: f1.querySelector('.vf-git-d-moins').textContent, cPlus: getComputedStyle(f1.querySelector('.vf-git-d-plus')).color, cMoins: getComputedStyle(f1.querySelector('.vf-git-d-moins')).color, attPlus: window.__couleur('--ok-text'), attMoins: window.__couleur('--err-text'),
+    bin: !!bin, ren: ren ? ren.textContent : '', cmds: [...d.querySelectorAll('.vf-git-cmd code')].map((c) => c.textContent), region: q('[role=region]').getAttribute('aria-label'), diff: /^@@|^diff --git/m.test(d.textContent) }; })()`);
+out.hostile = await s.ev(`(() => { const d = document.querySelector('.vf-git-detail'); return { balises: d.querySelectorAll('b, img, script, iframe, [onerror], [onload]').length, svgFichiers: d.querySelectorAll('.vf-git-d-fichiers svg').length, alertes: window.__alerte, auteur: d.textContent.includes('<img src=x onerror=alert(3)>'), chemin: d.textContent.includes('a/<svg onload=1>.txt'), msgLit: d.textContent.includes('<b>gras</b>') && d.textContent.includes('<script>alert(4)</script>') }; })()`);
+await s.ev(`${LIGNES}[2].click()`);
+await s.attendre(`document.querySelectorAll('.vf-git-detail').length === 0`, 'détail replié au second clic');
+out.replie = await s.ev(`document.querySelectorAll('.vf-git-detail').length`);
+// D7.3 : 404 -> « Indisponible » local, le reste du tiroir intact ; Réessayer relit
+const sha4 = await s.ev(`${LIGNES}[4].dataset.h`);
+await s.ev(`window.__vfDet.erreurs['${sha4}'] = 404; ${LIGNES}[4].click()`);
+await s.attendre(`!!document.querySelector('.vf-git-detail') && /Indisponible/.test(document.querySelector('.vf-git-detail').textContent)`, 'détail indisponible');
+out.indispo = await s.ev(`({ reessayer: [...document.querySelectorAll('.vf-git-detail button')].some((b) => b.textContent.trim() === 'Réessayer'), rangees: ${LIGNES}.length, sections: document.querySelectorAll('#vf-git-tiroir .vf-git-sec').length, carteGlobale: /Git est indisponible/.test(document.querySelector('#vf-git-tiroir').textContent) })`);
+await s.ev(`delete window.__vfDet.erreurs['${sha4}']; [...document.querySelectorAll('.vf-git-detail button')].find((b) => b.textContent.trim() === 'Réessayer').click()`);
+await s.attendre(`!!document.querySelector('.vf-git-detail .vf-git-d-fichiers')`, 'Réessayer relit');
+out.retry = await s.ev(`document.querySelectorAll('.vf-git-detail').length`);
+// sha refusé par la page avant toute requête
+await s.ev(`window.__vfGit.reponse = JSON.parse(JSON.stringify(window.__TEMOIN_REF)); window.__vfGit.reponse.rangees[1].h = '../etc/passwd'; window.__vfDetReqs.length = 0; window.VFGitTiroir.recharger()`);
+await s.attendre(`${LIGNES}.length === 40 && ${LIGNES}[1].dataset.h === '../etc/passwd'`, 'réponse à sha invalide rendue');
+await s.ev(`${LIGNES}[1].click()`);
+await s.attendre(`!!document.querySelector('.vf-git-detail') && /Indisponible/.test(document.querySelector('.vf-git-detail').textContent)`, 'sha refusé : indisponible local');
+out.shaRefuse = await s.ev(`({ reqs: window.__vfDetReqs.filter((r) => r.route === 'commit').length })`);
+out.csp = s.violations.length;
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d7.js"; } > "$AUX/d7-complet.js"
+  cat > "$AUX/d8.js" <<'JS'
+const [base] = ARGS; const out = {};
+await ouvrirTiroir(base, true);
+out.tabulables = await s.ev(`${LIGNES}.filter((l) => l.getAttribute('tabindex') === '0').length`);
+await s.ev(`${LIGNES}[0].focus()`);
+const etat = `({ i: ${LIGNES}.findIndex((l) => l === document.activeElement), sel: ${LIGNES}.map((l, i) => l.getAttribute('aria-selected') === 'true' ? i : -1).filter((i) => i >= 0), tab: ${LIGNES}.map((l, i) => l.getAttribute('tabindex') === '0' ? i : -1).filter((i) => i >= 0), details: document.querySelectorAll('.vf-git-detail').length })`;
+await clavier('ArrowDown'); await clavier('ArrowDown'); await clavier('ArrowUp'); out.bas2haut1 = await s.ev(etat);
+await clavier('End'); out.fin = await s.ev(etat);
+await clavier('Home'); out.debut = await s.ev(etat);
+await clavier('ArrowDown'); await clavier('Enter');
+await s.attendre(`document.querySelectorAll('.vf-git-detail').length === 1`, 'Entrée ouvre le détail');
+out.entree = await s.ev(etat);
+await clavier('Escape'); out.echap = await s.ev(`Object.assign(${etat}, { tiroir: ${OUVERT}, focusLigne: !!document.activeElement && document.activeElement.getAttribute('role') === 'option' })`);
+await clavier(' ');
+await s.attendre(`document.querySelectorAll('.vf-git-detail').length === 1`, 'Espace ouvre le détail');
+out.espace = await s.ev(etat);
+// un seul détail à la fois : un clic sur une autre rangée déplace le détail
+await s.ev(`${LIGNES}[3].click()`);
+await s.attendre(`document.querySelectorAll('.vf-git-detail').length >= 1 && ${LIGNES}[3].nextElementSibling.classList.contains('vf-git-detail')`, 'détail sous la rangée 3');
+await pause(150);
+out.unSeul = await s.ev(`({ details: document.querySelectorAll('.vf-git-detail').length, sous3: ${LIGNES}[3].nextElementSibling.classList.contains('vf-git-detail') })`);
+await s.ev(`${LIGNES}[3].click()`); await s.attendre(`document.querySelectorAll('.vf-git-detail').length === 0`, 'tout replié');
+out.libelle = await s.ev(`(() => { const r = window.VFGitTiroir.donnees().rangees[0], L = ${LIGNES}[0]; return { label: L.getAttribute('aria-label'), h7: r.h7, s: r.s }; })()`);
+// D8.2 : états des worktrees
+out.wtReqs = await s.ev(`window.__vfDetReqs.filter((r) => r.route === 'worktrees').length`);
+out.wt = await s.ev(`[...document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l')].map((w) => ({ txt: [...w.querySelectorAll('.vf-git-etat-wt .vf-git-pastille')].map((p) => p.textContent), vide: [...w.querySelectorAll('.vf-git-pastille')].some((p) => !p.textContent.trim()), mono: [...w.querySelectorAll('.vf-git-pastille')].filter((p) => /↑/.test(p.textContent)).map((p) => getComputedStyle(p).fontFamily.includes('mono') || /mono|Mono|Menlo|monospace/i.test(getComputedStyle(p).fontFamily)) }))`);
+out.mention = await s.ev(`document.querySelector('#vf-git-s-wt').textContent.includes('approximatif : filtres du dépôt non exécutés')`);
+out.couleurs = await s.ev(`(() => { const P = [...document.querySelectorAll('#vf-git-s-wt .vf-git-pastille')], mod = P.find((p) => /modifiés/.test(p.textContent)), pro = P.find((p) => p.textContent === 'propre'); return { mod: getComputedStyle(mod).color === window.__couleur('--warn-text'), pro: getComputedStyle(pro).color === window.__couleur('--ok-text') }; })()`);
+// D8.3 : sections au clavier
+await s.ev(`document.querySelector('#vf-git-s-tags') || 0; document.querySelectorAll('#vf-git-tiroir .vf-git-sec-t')[2].focus()`);
+const sec = `(() => { const b = document.activeElement; return { exp: b.getAttribute('aria-expanded'), nom: document.getElementById(b.getAttribute('aria-controls')).getAttribute('aria-label'), role: document.getElementById(b.getAttribute('aria-controls')).getAttribute('role') }; })()`;
+out.secAvant = await s.ev(sec);
+await clavier('Enter'); out.secEntree = await s.ev(sec);
+await clavier(' '); out.secEspace = await s.ev(sec);
+out.csp = s.violations.length;
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d8.js"; } > "$AUX/d8-complet.js"
+  cat > "$AUX/d9.js" <<'JS'
+const [base] = ARGS; const out = {};
+await ouvrirTiroir(base);
+const sha = await s.ev(`${LIGNES}[2].dataset.h`);
+await s.ev(`${LIGNES}[2].click()`);
+await s.attendre(`!!document.querySelector('.vf-git-detail .vf-git-d-fichiers')`, 'détail ouvert avant la rafale');
+await s.ev(`document.querySelector('#vf-git-tiroir .vf-git-corps').scrollTop = 200`); await pause(100);
+const pos = `(() => { const c = document.querySelector('#vf-git-tiroir .vf-git-corps'), l = ${LIGNES}.find((x) => x.dataset.h === '${sha}'); return l ? Math.round(l.getBoundingClientRect().top - c.getBoundingClientRect().top) : null; })()`;
+const cpt = `({ git: window.__vfReqs.length, wt: window.__vfDetReqs.filter((r) => r.route === 'worktrees').length, commit: window.__vfDetReqs.filter((r) => r.route === 'commit').length })`;
+const c0 = await s.ev(cpt); const p0 = await s.ev(pos);
+await s.ev(`window.__vfGit.reponse = window.__vfDet.apres; document.querySelector('#vf-git-tiroir .vf-git-live') && 0`);
+for (let i = 0; i < 3; i++) { await s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'sig${i}' } }))`); await pause(35); }
+await s.attendre(`${LIGNES}.length === 41`, 'rafraîchi : une rangée de plus');
+await pause(700);
+const c1 = await s.ev(cpt);
+out.deltas = { git: c1.git - c0.git, wt: c1.wt - c0.wt, commit: c1.commit - c0.commit };
+out.selection = await s.ev(`({ sel: ${LIGNES}.filter((l) => l.getAttribute('aria-selected') === 'true').map((l) => l.dataset.h), attendu: '${sha}', detailSous: !!document.querySelector('.vf-git-detail') && document.querySelector('.vf-git-detail').previousElementSibling.dataset.h === '${sha}', premiere: ${LIGNES}[0].dataset.h, live: [...document.querySelectorAll('#vf-git-tiroir [aria-live]')].map((e) => e.textContent).join('|') })`);
+out.ecartPos = Math.abs((await s.ev(pos)) - p0);
+// D9.2 : la sha sélectionnée disparaît
+await s.ev(`window.__vfGit.reponse = JSON.parse(JSON.stringify(window.__vfDet.apres)); window.__vfGit.reponse.rangees = window.__vfGit.reponse.rangees.filter((r) => r.h !== '${sha}'); document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'x' } }))`);
+await s.attendre(`${LIGNES}.length === 40 && !${LIGNES}.some((l) => l.dataset.h === '${sha}')`, 'sha disparue');
+await pause(200);
+out.disparue = await s.ev(`({ details: document.querySelectorAll('.vf-git-detail').length, sel: ${LIGNES}.filter((l) => l.getAttribute('aria-selected') === 'true').length, tab: ${LIGNES}.filter((l) => l.getAttribute('tabindex') === '0').length, carte: /Git est indisponible/.test(document.querySelector('#vf-git-tiroir').textContent) })`);
+// D9.3 : tiroir fermé, aucune requête
+await s.ev(`window.VFGitTiroir.fermer()`); await pause(100);
+const f0 = await s.ev(cpt);
+await s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'ferme' } }))`); await pause(700);
+const f1 = await s.ev(cpt);
+out.ferme = { git: f1.git - f0.git, wt: f1.wt - f0.wt, commit: f1.commit - f0.commit };
+// à la réouverture, le signal manqué est rattrapé
+await s.ev(`window.VFGitTiroir.ouvrir()`); await pause(700);
+const f2 = await s.ev(cpt);
+out.reouverture = { git: f2.git - f1.git, wt: f2.wt - f1.wt };
+// D9.4 : 375 px
+await fenetre(375, 800); await s.naviguer(base + '/'); await pret();
+await s.ev(`window.__vfGit.reponse = JSON.parse(JSON.stringify(window.__TEMOIN_REF)); window.VFGitTiroir.ouvrir()`);
+await s.attendre(`${LIGNES}.length === 40`, 'mobile : rangées');
+await s.ev(`${LIGNES}[2].click()`);
+await s.attendre(`!!document.querySelector('.vf-git-detail .vf-git-d-fichiers')`, 'mobile : détail');
+out.mobile = await s.stable(`(() => { const T = document.querySelector('#vf-git-tiroir'), c = T.querySelector('.vf-git-corps'), d = document.querySelector('.vf-git-detail'); d.scrollIntoView({ block: 'nearest' }); const t = T.getBoundingClientRect(), r = d.getBoundingClientRect();
+  return { debord: document.documentElement.scrollWidth > innerWidth, corpsDebord: c.scrollWidth > c.clientWidth + 1, defile: c.scrollHeight > c.clientHeight, dansTiroir: r.left >= t.left - 1 && r.right <= t.right + 1, pageDefile: document.documentElement.scrollHeight > innerHeight + 1 }; })()`, 'mesure mobile');
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d9.js"; } > "$AUX/d9-complet.js"
+  build_serve "$DEPOT"; BASE="http://127.0.0.1:$PORT"
+  R7="$(cdp "$AUX/d7-complet.js" "$BASE")"
+  assert_eq "D7.0 — témoin : aucun détail avant le clic" "$(jq_ "$R7" 'j.avant' 2>/dev/null)" "0"
+  assert_eq "D7.1 — clic sur la 3e rangée : un GET /api/vf/git/commit?sha=<sha complet de la rangée>, avec le jeton de la page" "$(jq_ "$R7" 'j.reqs.join(",") === "GET /api/vf/git/commit?sha=" + j.sha && /^[0-9a-f]{40}$/.test(j.sha) && j.jeton' 2>/dev/null)" "true"
+  assert_eq "D7.1 — détail déplié juste sous la rangée, un seul" "$(jq_ "$R7" '[j.ouvert.apresRangee, j.ouvert.nb].join("|")' 2>/dev/null)" "true|1"
+  assert_eq "D7.1 — message entier (3 paragraphes), pre-wrap, sujet en 600" "$(jq_ "$R7" '[j.ouvert.sujet, j.ouvert.msg.includes("Second paragraphe."), j.ouvert.msg.includes("Premier paragraphe du corps"), j.ouvert.ws, j.ouvert.poids].join("|")' 2>/dev/null)" "Sujet du commit <b>gras</b>|true|true|pre-wrap|600"
+  assert_eq "D7.1 — auteur et date longue « 5 nov. 2026, 14 h 32 », sha complet sélectionnable" "$(jq_ "$R7" '[/\d{1,2} \S+ 2026, \d{1,2} h \d{2}/.test(j.ouvert.meta), j.ouvert.meta.includes("<img src=x"), j.ouvert.sha === j.sha, j.ouvert.sel].join("|")' 2>/dev/null)" "true|true|true|text"
+  assert_eq "D7.1 — « Fichiers (45) », 30 lignes puis « et 15 autres »" "$(jq_ "$R7" '[j.ouvert.titre, j.ouvert.nVrais, j.ouvert.reste.join("/")].join("|")' 2>/dev/null)" "Fichiers (45)|30|et 15 autres"
+  assert_eq "D7.1 — « +n » en --ok-text et « −n » en --err-text, signe dans le texte" "$(jq_ "$R7" '[j.ouvert.plus, j.ouvert.moins, j.ouvert.cPlus === j.ouvert.attPlus, j.ouvert.cMoins === j.ouvert.attMoins, j.ouvert.cPlus !== j.ouvert.cMoins].join("|")' 2>/dev/null)" "+2|−1|true|true|true"
+  assert_eq "D7.1 — binaire dit « binaire », renommage dit l'ancien et le nouveau chemin, deux commandes à copier, région nommée, aucun diff" "$(jq_ "$R7" '[j.ouvert.bin, /ancien-nom.*nouveau-nom|nouveau-nom.*ancien-nom/.test(j.ouvert.ren), j.ouvert.cmds.join(" ; "), /Détail du commit/.test(j.ouvert.region), j.ouvert.diff].join("|")' 2>/dev/null)" "true|true|git show --stat --end-of-options 2626262 ; git switch --detach --end-of-options 2626262|true|false"
+  assert_eq "D7.1 — second clic : détail replié" "$(jq_ "$R7" 'j.replie' 2>/dev/null)" "0"
+  assert_eq "D7.2 — chaînes hostiles lues telles quelles : 0 b/img/script/svg injecté dans le détail, auteur, chemin et message littéraux, 0 alert" "$(jq_ "$R7" '[j.hostile.balises, j.hostile.svgFichiers, j.hostile.alertes, j.hostile.auteur, j.hostile.chemin, j.hostile.msgLit].join("|")' 2>/dev/null)" "0|0|0|true|true|true"
+  assert_eq "D7.3 — réponse 404 : « Indisponible » et « Réessayer » dans le détail seul, 40 rangées et sections intactes, pas de carte globale" "$(jq_ "$R7" '[j.indispo.reessayer, j.indispo.rangees, j.indispo.sections > 0, j.indispo.carteGlobale].join("|")' 2>/dev/null)" "true|40|true|false"
+  assert_eq "D7.3 — Réessayer relit et affiche le détail" "$(jq_ "$R7" 'j.retry' 2>/dev/null)" "1"
+  assert_eq "D7.3 — sha hors motif : refusé par la page avant toute requête, « Indisponible » local" "$(jq_ "$R7" 'j.shaRefuse.reqs' 2>/dev/null)" "0"
+  assert_eq "D7.x — 0 violation CSP, 0 erreur de page" "$(jq_ "$R7" '[j.csp, j.errs.length].join("|")' 2>/dev/null)" "0|0"
+  R8="$(cdp "$AUX/d8-complet.js" "$BASE")"
+  assert_eq "D8.1 — une seule rangée tabulable (tabindex 0)" "$(jq_ "$R8" 'j.tabulables' 2>/dev/null)" "1"
+  assert_eq "D8.1 — ↓ ↓ ↑ : 2e rangée focalisée, sélectionnée et seule tabulable" "$(jq_ "$R8" '[j.bas2haut1.i, j.bas2haut1.sel.join(), j.bas2haut1.tab.join(), j.bas2haut1.details].join("|")' 2>/dev/null)" "1|1|1|0"
+  assert_eq "D8.1 — Fin : dernière rangée ; Début : première" "$(jq_ "$R8" '[j.fin.i, j.fin.sel.join(), j.debut.i, j.debut.sel.join()].join("|")' 2>/dev/null)" "39|39|0|0"
+  assert_eq "D8.1 — Entrée ouvre le détail de la rangée sélectionnée ; Échap le replie, le tiroir reste ouvert, le focus reste sur la rangée" "$(jq_ "$R8" '[j.entree.i, j.entree.details, j.echap.details, j.echap.tiroir, j.echap.focusLigne, j.echap.i].join("|")' 2>/dev/null)" "1|1|0|true|true|1"
+  assert_eq "D8.1 — Espace ouvre aussi le détail" "$(jq_ "$R8" 'j.espace.details' 2>/dev/null)" "1"
+  assert_eq "D8.1 — un seul détail ouvert : le clic sur une autre rangée déplace le détail" "$(jq_ "$R8" '[j.unSeul.details, j.unSeul.sous3].join("|")' 2>/dev/null)" "1|true"
+  assert_eq "D8.1 — aria-label « <sha7>, <message>, branche <b>, il y a <t> »" "$(jq_ "$R8" '(new RegExp("^" + j.libelle.h7 + ", " + j.libelle.s + ", branche main, (il y a .+|à l.instant)$")).test(j.libelle.label)' 2>/dev/null)" "true"
+  assert_eq "D8.2 — ouverture du tiroir : une seule requête /api/vf/git/worktrees" "$(jq_ "$R8" 'j.wtReqs' 2>/dev/null)" "1"
+  assert_eq "D8.2 — pastilles : « 3 modifiés », « 2 non suivis », « ↑2 ↓1 » ; « propre » ; « 1 modifié »" "$(jq_ "$R8" 'j.wt.map((w) => w.txt.join("/")).join(" | ")' 2>/dev/null)" "3 modifiés/2 non suivis/↑2 ↓1 | propre | 1 modifié"
+  assert_eq "D8.2 — aucune pastille vide, « ↑a ↓r » en police mono" "$(jq_ "$R8" '[j.wt.some((w) => w.vide), j.wt[0].mono.join()].join("|")' 2>/dev/null)" "false|true"
+  assert_eq "D8.2 — « approximatif : filtres du dépôt non exécutés » ; modifiés en --warn-text, propre en --ok-text" "$(jq_ "$R8" '[j.mention, j.couleurs.mod, j.couleurs.pro].join("|")' 2>/dev/null)" "true|true|true"
+  assert_eq "D8.3 — section au clavier : Entrée la déplie, Espace la replie, la région porte un nom et un rôle" "$(jq_ "$R8" '[j.secAvant.exp, j.secEntree.exp, j.secEspace.exp, j.secAvant.role, j.secAvant.nom.length > 0].join("|")' 2>/dev/null)" "false|true|false|region|true"
+  assert_eq "D8.x — 0 violation CSP, 0 erreur de page" "$(jq_ "$R8" '[j.csp, j.errs.length].join("|")' 2>/dev/null)" "0|0"
+  R9="$(cdp "$AUX/d9-complet.js" "$BASE")"
+  assert_eq "D9.1 — trois signaux en ~100 ms : une relecture de /api/vf/git, une de worktrees, aucune requête de détail (cache par sha)" "$(jq_ "$R9" '[j.deltas.git, j.deltas.wt, j.deltas.commit].join("|")' 2>/dev/null)" "1|1|0"
+  assert_eq "D9.1 — la même sha reste sélectionnée, son détail dessous, la nouvelle rangée est en tête" "$(jq_ "$R9" '[j.selection.sel.join() === j.selection.attendu, j.selection.detailSous, j.selection.premiere].join("|")' 2>/dev/null)" "true|true|2929292929292929292929292929292929292929"
+  assert_eq "D9.1 — position à l'écran inchangée à ± 2 px, annonce « Historique mis à jour »" "$(jq_ "$R9" '[j.ecartPos <= 2, j.selection.live.includes("Historique mis à jour")].join("|")' 2>/dev/null)" "true|true"
+  assert_eq "D9.2 — sha sélectionnée disparue : détail replié, aucune sélection, une rangée tabulable, aucune carte d'erreur" "$(jq_ "$R9" '[j.disparue.details, j.disparue.sel, j.disparue.tab, j.disparue.carte].join("|")' 2>/dev/null)" "0|0|1|false"
+  assert_eq "D9.3 — tiroir fermé : un signal ne déclenche aucune requête" "$(jq_ "$R9" '[j.ferme.git, j.ferme.wt, j.ferme.commit].join("|")' 2>/dev/null)" "0|0|0"
+  assert_eq "D9.3 — à la réouverture, le signal manqué est rattrapé (une relecture de chaque)" "$(jq_ "$R9" '[j.reouverture.git, j.reouverture.wt].join("|")' 2>/dev/null)" "1|1"
+  assert_eq "D9.4 — 375 px : le détail se déplie dans le tiroir, la page ne défile pas horizontalement, le tiroir défile seul" "$(jq_ "$R9" '[j.mobile.debord, j.mobile.corpsDebord, j.mobile.defile, j.mobile.dansTiroir, j.mobile.pageDefile].join("|")' 2>/dev/null)" "false|false|true|true|false"
+  assert_eq "D9.x — aucune erreur de page" "$(jq_ "$R9" 'j.errs.length' 2>/dev/null)" "0"
   stop_srv
   # --- copies privées du module pour les mutants (build lit assets/ui/*.js) : chaque mutant a son propre lab et son propre serveur ---
   mkmod() { local d="$WORK/mod-$1"; mkdir -p "$d/scripts" "$d/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$d/skills/cockpit-moteur"; echo "$d/scripts"; }
