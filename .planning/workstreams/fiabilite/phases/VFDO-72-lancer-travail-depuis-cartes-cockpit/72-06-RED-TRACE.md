@@ -54,3 +54,27 @@ qui est justement l'étape en échec ; aucune n'est verte sur la base.
 | M-JETON-ABSENT | LU.3 | sans effet : module absent |
 | M-HORS-PROJET | LU.11 | sans effet : module absent |
 | M-CIBLE-LIBRE | LU.2 | sans effet : module absent |
+
+# Vert sur le code livré
+
+Module livré en `2328ab50` (144 lignes, seuil `check-file-size` : OK). `bash plugin/cockpit/scripts/tests/test-cockpit-lancer-ui.sh` : `Résultats : 45 PASS / 0 FAIL`, rc=0, 0 « mutant sans effet »,
+0 « SUITE SAUTÉE », hygiène verte. Rejouée une seconde fois lancée depuis zsh (`zsh -c 'bash …'`) : 45 PASS / 0 FAIL. Commandes `OK-LU`, `OK-TAILLE`, `OK-GARDES` rejouées sous bash et sous zsh.
+
+## Mutants rejoués sur le code livré
+
+Chaque mutant est la copie du module livré passée au `sed` de la carte des gardes, jouée sur la page factice : la ligne marquée « garde:<nom> » est la ligne qui le tue.
+Relevés ci-dessous refaits à la main (mêmes scripts que la suite) pour tracer le « obtenu » ; la suite en tient les assertions « rouge=true ».
+
+| mutant (ligne `garde:`) | sonde rougie | obtenu (mutant) | sain |
+|-------------------------|--------------|-----------------|------|
+| M-INNERHTML (`garde:titre`, `.textContent =` -> `.innerHTML =`) | LU.8 | `imgs=1`, `hors=["GET /x"]`, `violations=1` | `imgs=0`, `hors=[]`, `violations=0` |
+| M-ENTREE-VIEWER (`garde:entree` supprimée) | LU.9 | `posts=0 redessine=1` | `posts=1 redessine=0` |
+| M-BLOQUANT-IGNORE (`garde:bloquants` supprimée) | LU.5 | `dis=0/3`, un POST part | `dis=3/3 posts=0` |
+| M-CHAT-ENVOYE (`garde:corps`, ajout de `chat: null`) | LU.3 | clés `cible,verbe,chat`, corps `{"cible":"ph-72","verbe":"planifier","chat":null}` | `cible,verbe` |
+| M-VERBE-LIBRE (`garde:verbes`, filtre -> `true`) | LU.14, LU.8 | LU.14 : `nb=3`, boutons `Planifier,,Exécuter` ; LU.8 : boutons `Planifier,` | `nb=2` ; `Planifier` |
+| M-DOUBLE-ENVOI (`garde:envol` supprimée) | LU.3 | `posts=2` | `posts=1` |
+| M-JETON-ABSENT (`garde:jeton`, deux lignes) | LU.3 | `getsKo=1` (403 du faux serveur, aucune section : `attente de « section de n:ph-72 » dépassée`) | `getsKo=0 postsKo=0` |
+| M-HORS-PROJET (`garde:chemin` supprimée) | LU.11 | `/index.html` et `/autre.html` : `zones=1 reqs=1` ; `localhost` reste muet (garde d'hôte distincte) | `0/0` partout |
+| M-CIBLE-LIBRE (`garde:cible` supprimée) | LU.2 | `x:ph-72` et `f:dag-m1` ouvrent une section (`1,1`) ; les quatre autres `0` | `0,0,0,0,0,0` |
+
+Les cibles `x:ph-72` et `f:dag-m1` de LU.2 existent pour cela : sans elles, la suppression de la garde de préfixe resterait verte (`slice(2)` de `f:src/x.js` ou `ph-72` ne tombe sur aucun identifiant listé).
