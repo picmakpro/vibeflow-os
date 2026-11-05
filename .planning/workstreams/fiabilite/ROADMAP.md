@@ -124,10 +124,10 @@
 - [ ] Phase 65: Révision des règles qui brident l'efficacité des agents (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 - [ ] Phase 66: Grille de sévérité des juges et convergence des boucles de revue (inscrite 2026-10-29, jalon equipe-produit-v1.0)
 - [x] Phase 67: Cockpit floorplan sur socle partagé (inscrite 2026-11-01, jalon vibeflow-v2.0) — complete 2026-11-03 : 7/7 plans et 4 tours de correction (FIX-A à FIX-D), recette humaine validée par Samuel (`67-RECETTE-HUMAINE.md` § 8.2), CKPT-01..12 cochées ; release `v2.75.0` préparée (tag et release GitHub après le merge de la PR #187, geste de Samuel)
-- [ ] Phase 68: Embarquer vf-signal sur le socle partagé (inscrite 2026-11-01, jalon vibeflow-v2.0)
+- [x] Phase 68: Embarquer vf-signal sur le socle partagé (inscrite 2026-11-01, jalon vibeflow-v2.0) — complete 2026-11-04 : 13/13 plans, VFSG-01..13 cochées, PR #199 mergée le 2026-11-04T17:18:25Z (`3c73fc0c`), sans release (module `cockpit` v1.2.0, bump racine reporté à la release groupée, P68-D-31)
 - [x] Phase 69: Suivi du travail en cours dans le cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-04 : 9/9 plans, recette déroulée par juges Playwright (arbitrage de méthode de Samuel, session principale Claude Code, 2026-11-04), 4 écarts corrigés, CKPT-13..28 cochées, vérification 16/16 (`69-VERIFICATION.md`) ; PR #198, sans release (P69-D-29)
-- [ ] Phase 70: Finitions UI du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
-- [ ] Phase 71: Terminal intégré au cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
+- [x] Phase 70: Finitions UI du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-04 : 12/12 plans, recette par juges frais jouée et triée par Samuel (`70-RECETTE-JUGES.md`), PR #200 mergée le 2026-11-04T21:02:38Z (`503aa657`), sans release ; au ledger, UIFN-04, 06 et 07 cochées, les onze autres exigences restent décochées (REQUIREMENTS.md)
+- [ ] Phase 71: Terminal intégré au cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0) — mergée (PR #203, `d4171ded`, 2026-11-04), à recetter : Safari, Firefox et clavier AZERTY réels (`71-RECETTE-HUMAINE.md`) ; TERM-01..12 décochées
 - [ ] Phase 72: Lancer du travail depuis les cartes du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
@@ -945,22 +945,22 @@ Plans:
 
 Plans:
 
-- [ ] 70-01-PLAN.md — garde du français durci, témoins rouges (UIFN-07) — vague 1
-- [ ] 70-02-PLAN.md — conformité DESIGN.md (garde M5) et cinq réglages visuels de l'onglet Équipe (UIFN-09, UIFN-11) — vague 1
-- [ ] 70-10-PLAN.md — test-cockpit-responsive.sh allégé, mêmes témoins (UIFN-01, P70-D-18) — vague 1
-- [ ] 70-11-PLAN.md — focus clavier du tiroir et témoins des mineurs de la 69 (UIFN-12, UIFN-13) — vague 1
-- [ ] 70-03-PLAN.md — anglais résiduel et coquilles du chrome, texte de la visite (UIFN-06, UIFN-04) — vague 2
-- [ ] 70-04-PLAN.md — en-tête mobile sur une rangée, menu « ⋯ », onglets à 13 px (UIFN-01, P70-D-16) — vague 2
-- [ ] 70-05-PLAN.md — zoom en pile, tiroir téléphone, titre coupé (UIFN-02, UIFN-03, UIFN-06) — vague 3
-- [ ] 70-06-PLAN.md — « Où en est-on ? » sans STATE, statuts en français (UIFN-08, UIFN-06) — vague 3
-- [ ] 70-07-PLAN.md — visite « Par où commencer » corrigée (UIFN-04) — vague 4
-- [ ] 70-12-PLAN.md — zoom, titre et fil d'Ariane de l'onglet Équipe, matrice responsive (UIFN-14) — vague 4
-- [ ] 70-08-PLAN.md — visite propre à l'onglet Projet (UIFN-05) — vague 5
-- [ ] 70-09-PLAN.md — captures avant/après, recette par juges frais, bump patch v1.1.2 (UIFN-10) — vague 6
+- [x] 70-01-PLAN.md — garde du français durci, témoins rouges (UIFN-07) — vague 1
+- [x] 70-02-PLAN.md — conformité DESIGN.md (garde M5) et cinq réglages visuels de l'onglet Équipe (UIFN-09, UIFN-11) — vague 1
+- [x] 70-10-PLAN.md — test-cockpit-responsive.sh allégé, mêmes témoins (UIFN-01, P70-D-18) — vague 1
+- [x] 70-11-PLAN.md — focus clavier du tiroir et témoins des mineurs de la 69 (UIFN-12, UIFN-13) — vague 1
+- [x] 70-03-PLAN.md — anglais résiduel et coquilles du chrome, texte de la visite (UIFN-06, UIFN-04) — vague 2
+- [x] 70-04-PLAN.md — en-tête mobile sur une rangée, menu « ⋯ », onglets à 13 px (UIFN-01, P70-D-16) — vague 2
+- [x] 70-05-PLAN.md — zoom en pile, tiroir téléphone, titre coupé (UIFN-02, UIFN-03, UIFN-06) — vague 3
+- [x] 70-06-PLAN.md — « Où en est-on ? » sans STATE, statuts en français (UIFN-08, UIFN-06) — vague 3
+- [x] 70-07-PLAN.md — visite « Par où commencer » corrigée (UIFN-04) — vague 4
+- [x] 70-12-PLAN.md — zoom, titre et fil d'Ariane de l'onglet Équipe, matrice responsive (UIFN-14) — vague 4
+- [x] 70-08-PLAN.md — visite propre à l'onglet Projet (UIFN-05) — vague 5
+- [x] 70-09-PLAN.md — captures avant/après, recette par juges frais, bump patch v1.1.2 (UIFN-10) — vague 6
 
 ### Phase 71: Terminal intégré au cockpit
 
-> **Exécutée le 2026-11-04, recette humaine à jouer** (`71-RECETTE-HUMAINE.md`) : 11 plans faits, revue et audit de sécurité complet passés avec corrections (`71-SECURITY.md`), branche `feat/phase-71-terminal` poussée, PR non ouverte. **Cadrée le 2026-11-03** (`71-CONTEXT.md`, P71-D-01..17 ; arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-03). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Terminal intégré dans la page »).
+> **Exécutée le 2026-11-04, mergée (PR #203, `d4171ded`, 2026-11-04T23:52:41Z), à recetter** (`71-RECETTE-HUMAINE.md`) : 11 plans faits, revue et audit de sécurité complet passés avec corrections (`71-SECURITY.md`). La recette par juges a été jouée (P71-D-32) ; restent Safari, Firefox et le clavier AZERTY réels, à jouer par Samuel. **Cadrée le 2026-11-03** (`71-CONTEXT.md`, P71-D-01..17 ; arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-03). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Terminal intégré dans la page »).
 
 **Goal:** Le cockpit ouvre un terminal dans la page (xterm.js et une PTY native), à la racine du lab, sans changer d'outil ; un audit de sécurité complet accompagne la phase, parce qu'un shell complet derrière le serveur local change le modèle de menace du cockpit.
 **Requirements**: TERM-01, TERM-02, TERM-03, TERM-04, TERM-05, TERM-06, TERM-07, TERM-08, TERM-09, TERM-10, TERM-11, TERM-12
