@@ -4,6 +4,47 @@
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Combler les gaps de couverture inspirés du catalogue `agency-agents` — CLOS (2026-10-12) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-08.md — ## Un gate câblé sur un seul compartiment de workstream laisse les autres sans garde — DIFFÉRÉ (2026-09-23) — CLOS (2026-10-08) -->
 
+## ub-mode (Uncle Bob) — trois outils de mesure, suite de l'étude pstack — INVESTIGUÉ 2026-10-31
+**Capturé :** 2026-10-31 (demande de Samuel, session principale : « fais une recherche sur le skill et
+le repo GitHub d'Uncle Bob », puis « regarde en quoi ça peut améliorer VibeFlow et sa gouvernance ») ·
+**Investigué :** 2026-10-31, session principale (SKILL.md et README lus via `gh api`, doctrine
+VibeFlow relue à la source) → **note : `docs/research/2026-11-01-ub-mode-uncle-bob.md`**.
+
+**Sources** : [unclebob/ub-mode](https://github.com/unclebob/ub-mode) (skill de 152 lignes, créé le
+2026-10-25, 4 commits, ~5 650 étoiles, **sans licence**, réduction de pstack — déjà lu, annexe A2 de
+l'étude du 2026-10-10) ; [crapper](https://github.com/unclebob/crapper), [dryer](https://github.com/unclebob/dryer),
+[mutator](https://github.com/unclebob/mutator) (CRAP par fonction, duplication structurelle, mutation ;
+Clojure, Java, Go, TS, Rust, Python — ni Swift, ni Kotlin, ni Bash ; tous écrivent `.metrics/`) ;
+[swarm-forge](https://github.com/unclebob/swarm-forge) (coordination multi-agents, rien au-delà du team-kernel).
+
+**Verdict** : la prose est couverte (fiches QCT) ; swarm-forge n'apporte rien ; le **seul apport neuf
+est l'exécution** : les trois outils produisent le fait « code que la mutation ne couvre pas » que
+`mission-flow.md` Pattern E §3 nomme sans qu'aucun outil ne le mesure, et le complément d'exécution
+que QCT-04 (test qui passerait à vide) déclare hors de portée de la lecture. Portée ADR-074 :
+**consultatif** — la qualité du code est un jugement métier, le script constate, le manager ou
+l'humain refuse ; `guard-file-size.sh` ne fait pas précédent (étude du 2026-10-10 §4).
+
+**Axes (note § « Ce qu'on retient »)** : 1 `check-code-metrics.sh` dans `software-architecture`,
+consultatif, outils tiers détectés jamais embarqués, lancé par l'exécuteur (le juge lit seul
+`.metrics/*.edn`), né avec sa mutation rouge (QUAL-01) · 2 verdicts `gate:crap|dry|mutation` dans
+les preuves E6 · 3 déclencheur (c) de la gradation de revue lu dans `.metrics/mutate/` au lieu d'un
+jugement · 4 une ligne dans la référence « Hygiène » du lot A (CRAP ≥ 10 → finding majeur à
+`fichier:ligne`) · **Réserve** : 5 deux règles de Tier 2 (Subtract Before You Add, Redesign From
+First Principles), 6 « Attack the Premise » avant le 3e tour de correction — aucune défaillance
+observée datée (POCK-08).
+
+**Spike (fusionné avec la sonde QCT-09 (b))** : un lab Expo réel — temps de `crapper`/`mutator`
+(complet et `--changed`), bruit de `dryer` sur du JSX, fidélité du fait mutation vs jugement du
+manager sur trois étapes passées, codes de sortie réels, lecture seule du juge de bout en bout.
+
+**Collisions** : Phase 46 (format des verdicts, Willy) pour les axes 2 et 4 ; lot A (G-1, marge 0
+sur `vf-reviewer`) pour l'axe 4 ; QCT-09 (a)/(b) pour l'axe 3 et le spike. **Ce qu'on ne fait pas** :
+embarquer (pas de licence), installer le skill (un seul catalogue tiers, 2026-08-28), hook bloquant
+(ADR-074), rouvrir pstack.
+**Reste ouvert** : l'arbitrage du spike et de l'axe 1 ; rien n'est engagé.
+**Déclencheur de resurgence** : arbitrage du lot A de l'étude du 2026-10-10, prochaine retouche de
+`software-architecture` ou de Pattern E §3, ou un lab TS qui installe les outils.
+
 ## Emprunts qualité de code à Ponytail, pstack et thermo-nuclear review — INVESTIGUÉ 2026-10-10
 **Capturé :** 2026-10-10 (demande de Samuel, session principale : « rapport complet des frameworks,
 puis l'appliquer à VibeFlow, au backlog avec un audit poussé des bénéfices ») · **Investigué :**
