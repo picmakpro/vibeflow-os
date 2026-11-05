@@ -195,6 +195,76 @@ out="$(out_of "$D")"
 n13=0; case "$out" in *"3 fichier(s)"*) n13=1 ;; esac
 [ "$n13" -eq 1 ] && ok "T13 compteur d'univers exact (3 fichiers suivis)" || ko "T13 compteur d'univers" "sortie=$out"
 
+# --- T14 : un octet NON UTF-8 AVANT un chemin de machine ne l'aveugle pas (BACKLOG n°38) ----------
+# Défaut mesuré : sous une locale UTF-8, l'awk de macOS s'arrête au premier octet invalide
+# (`towc: multibyte conversion failure`, rc 2) ; le gate jetait ce stderr, ne lisait aucun code de
+# retour, et concluait « 0 » sans avoir tout lu — alors que la CI Linux, elle, voyait les chemins.
+# La suite impose donc la locale UTF-8 au gate (`LANG=C.UTF-8`, `LC_ALL` retiré) : c'est la
+# condition qui rendait le gate aveugle. Attendu : rc 1, chemin listé avec fichier:ligne.
+rc_u8() { # <repo> — rc du gate sous locale UTF-8
+  env -u LC_ALL LANG=C.UTF-8 bash "$SCRIPT" --path "$1" >/dev/null 2>&1
+  echo $?
+}
+out_u8() { # <repo>
+  env -u LC_ALL LANG=C.UTF-8 bash "$SCRIPT" --path "$1" 2>&1
+}
+D="$(mk_repo t14)"
+printf 'ok\n\377\nbase : %s/alice/x\n' "$U" > "$D/binaire.md"
+track "$D"
+rc="$(rc_u8 "$D")"; out="$(out_u8 "$D")"
+n14=0; case "$out" in *"binaire.md:3"*) n14=1 ;; esac
+n14b=0; case "$out" in *"alice"*) n14b=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$n14" -eq 1 ] && [ "$n14b" -eq 1 ]; then
+  ok "T14 octet non UTF-8 avant un chemin de machine → 1, binaire.md:3 et segment nommés"
+else
+  ko "T14 octet non UTF-8 avant un chemin" "attendu rc=1 + binaire.md:3 + alice ; obtenu rc=$rc fichier:ligne=$n14 segment=$n14b"
+fi
+
+# --- T14b : même contrat, indépendant de l'awk de la plateforme ---------------------------------
+# Un awk qui tolère l'octet invalide (Linux) ne distingue pas la présence de `LC_ALL=C`. Un awk
+# FACTICE, posé en tête du PATH, meurt exactement comme celui de macOS sur le balayage SI la locale
+# n'est pas `C` ; sinon il délègue au vrai. Il rend le contrat « le balayage tourne sous LC_ALL=C »
+# vérifiable partout, et c'est lui que MUT-LC fait rougir.
+REAL_AWK="$(command -v awk)"
+SHIM="$TMP/shim"; mkdir -p "$SHIM"
+cat > "$SHIM/awk" <<SHIM_EOF
+#!/bin/sh
+if [ "\${LC_ALL:-}" != "C" ]; then
+  for a in "\$@"; do
+    case "\$a" in HATCH=*) echo "awk: towc: multibyte conversion failure on: '?'" >&2; exit 2 ;; esac
+  done
+fi
+exec "$REAL_AWK" "\$@"
+SHIM_EOF
+chmod +x "$SHIM/awk"
+rc_shim() { # <repo> — rc du gate sous awk factice, LC_ALL hérité retiré
+  env -u LC_ALL PATH="$SHIM:$PATH" bash "$SCRIPT" --path "$1" >/dev/null 2>&1
+  echo $?
+}
+D="$(mk_repo t14b)"
+printf 'ok\nbase : %s/alice/x\n' "$U" > "$D/clair.md"
+track "$D"
+rc="$(rc_shim "$D")"
+[ "$rc" -eq 1 ] && ok "T14b balayage sous LC_ALL=C (awk factice sensible à la locale) → 1" \
+                || ko "T14b balayage sous LC_ALL=C" "attendu rc=1 ; obtenu rc=$rc"
+
+# --- T15 : un balayage qui échoue n'est JAMAIS un vert → 2, avec le stderr d'awk montré -----------
+# Déterministe et sans octet invalide : un fichier SUIVI puis supprimé de l'arbre de travail
+# (`ls-files` le liste, awk ne peut pas l'ouvrir). Attendu : rc 2 (NON VÉRIFIABLE) et le message
+# d'awk visible, au lieu d'être jeté.
+D="$(mk_repo t15)"
+printf 'propre\n' > "$D/a.md"; printf 'propre\n' > "$D/b.md"
+track "$D"
+rm -f "$D/b.md"
+rc="$(rc_of "$D")"; out="$(out_of "$D")"
+n15=0; case "$out" in *"b.md"*) n15=1 ;; esac
+n15b=0; case "$out" in *"NON VÉRIFIABLE"*) n15b=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$n15" -eq 1 ] && [ "$n15b" -eq 1 ]; then
+  ok "T15 balayage en échec (fichier suivi illisible) → 2, NON VÉRIFIABLE, stderr d'awk montré"
+else
+  ko "T15 balayage en échec" "attendu rc=2 + NON VÉRIFIABLE + b.md dans la sortie ; obtenu rc=$rc non_verifiable=$n15b b.md=$n15"
+fi
+
 # ================================================================================================
 # == MUTATIONS — le gate sait-il rougir, et chacun de ses trois organes est-il vraiment lu ?
 # ================================================================================================
@@ -272,6 +342,51 @@ else
   fi
 fi
 
+
+# --- MUT-LC : `LC_ALL=C` retiré du balayage → T14b doit ROUGIR, pour la bonne raison -------------
+# Le mutant ne remet PAS le vert d'avant : avec le contrôle du rc en place, l'awk qui meurt sur la
+# locale rend 2 (NON VÉRIFIABLE) avec son message. Le rouge est donc attribuable à la locale, et à
+# elle seule : la fixture T15 (échec de lecture, sans rapport avec la locale) doit rester à 2.
+D="$(mk_repo mlc)"
+printf 'ok\nbase : %s/alice/x\n' "$U" > "$D/clair.md"
+track "$D"
+cp "$SCRIPT" "$TMP/mlc.orig"
+if ! mutate "$TMP/mlc.orig" "$MUT" '{ sub(/LC_ALL=C xargs/, "xargs"); print }'; then
+  ko "MUT-LC locale" "le programme de mutation a ÉCHOUÉ — mutant NON CONSTRUIT"
+elif cmp -s "$MUT" "$TMP/mlc.orig"; then
+  ko "MUT-LC locale" "la mutation n'a RIEN changé (motif introuvable) — mutant NON OPPOSABLE"
+else
+  rc_mut="$(env -u LC_ALL PATH="$SHIM:$PATH" bash "$MUT" --path "$D" 2>"$TMP/mlc.err" >/dev/null; echo $?)"
+  rc_back="$(env -u LC_ALL PATH="$SHIM:$PATH" bash "$TMP/mlc.orig" --path "$D" >/dev/null 2>&1; echo $?)"
+  raison=0; case "$(cat "$TMP/mlc.err")" in *"multibyte conversion failure"*) raison=1 ;; esac
+  D2="$TMP/t15"
+  rc_cf="$(bash "$MUT" --path "$D2" >/dev/null 2>&1; echo $?)"
+  if [ "$rc_mut" -eq 2 ] && [ "$rc_back" -eq 1 ] && [ "$raison" -eq 1 ] && [ "$rc_cf" -eq 2 ]; then
+    ok "MUT-LC sans LC_ALL=C → 2 avec l'échec d'awk affiché (original : 1) ; T15 inchangé (2). Le rouge vient de la locale."
+  else
+    ko "MUT-LC locale" "mutant rc=$rc_mut (attendu 2), original rc=$rc_back (attendu 1), échec d'awk affiché=$raison (attendu 1), T15 sous mutant rc=$rc_cf (attendu 2)"
+  fi
+fi
+
+# --- MUT-RC : contrôle du rc retiré → T15 doit ROUGIR (vert 0 à tort), pour la bonne raison ------
+# Confinement : la fixture T14b (balayage sain sous LC_ALL=C) doit rester à 1 sous ce mutant — le
+# rouge de T15 vient du seul contrôle du code de retour, pas d'un effet de bord sur la détection.
+D="$TMP/t15"
+cp "$SCRIPT" "$TMP/mrc.orig"
+if ! mutate "$TMP/mrc.orig" "$MUT" '{ sub(/"\$SWEEP_RC" -ne 0/, "0 -ne 0"); print }'; then
+  ko "MUT-RC rc du balayage" "le programme de mutation a ÉCHOUÉ — mutant NON CONSTRUIT"
+elif cmp -s "$MUT" "$TMP/mrc.orig"; then
+  ko "MUT-RC rc du balayage" "la mutation n'a RIEN changé (motif introuvable) — mutant NON OPPOSABLE"
+else
+  rc_mut="$(bash "$MUT" --path "$D" >/dev/null 2>&1; echo $?)"
+  rc_back="$(bash "$TMP/mrc.orig" --path "$D" >/dev/null 2>&1; echo $?)"
+  rc_det="$(env -u LC_ALL PATH="$SHIM:$PATH" bash "$MUT" --path "$TMP/t14b" >/dev/null 2>&1; echo $?)"
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_back" -eq 2 ] && [ "$rc_det" -eq 1 ]; then
+    ok "MUT-RC rc non contrôlé → vert (0) à tort ; original → 2 ; T14b inchangé (1). Le rouge vient du contrôle du rc."
+  else
+    ko "MUT-RC rc du balayage" "mutant rc=$rc_mut (attendu 0), original rc=$rc_back (attendu 2), T14b sous mutant rc=$rc_det (attendu 1)"
+  fi
+fi
 # ================================================================================================
 # == CONTRÔLE FINAL sur l'arbre RÉEL — explicitement NON discriminant.
 # ================================================================================================

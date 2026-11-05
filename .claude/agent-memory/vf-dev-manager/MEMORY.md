@@ -115,3 +115,4 @@
 - [Témoin navigateur : GET sans Origin](feedback_temoin-navigateur-get-sans-origin.md) — client Node qui pose Origin = témoin aveugle ; un fetch GET same-origin n'en envoie pas (151 PASS, 403 dans Chrome)
 - [Parallélisme sans plafond, même arbre](project_parallelisme-sans-plafond-meme-arbre.md) — règle Samuel 2026-11-03 ; 5 vf-coder par pathspec sans collision ; la charge fausse les suites Chrome
 - [check-machine-paths aveugle au compte local](project_check-machine-paths-aveugle-au-compte-local.md) — vert en local, rouge en CI sur /Users/<compte> : grep du diff avant la PR, ~ dans les traces verbatim
+- [cwd des workers = celui du manager](project_cwd-des-workers-herite-du-manager.md) — un worker part du cwd du manager, pas du worktree du mandat : imposer `cd <abs> &&`, vérifier `branch --contains`
