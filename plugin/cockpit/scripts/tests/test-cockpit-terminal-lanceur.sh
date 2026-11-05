@@ -4,7 +4,7 @@
 #   L0  témoin : build et status répondent        L1  `open --terminal --no-open` sort 0 (sans drapeau : 64 « argument inconnu »)
 #   L2  server.json porte terminal.url            L3  amorçage en mode 600
 #   L4  lien préplacé : jamais suivi (O3)         L5  l'amorçage n'est ni dans la sortie, ni dans le journal, ni dans server.json, ni dans ps
-#   L6  l'ouvreur reçoit le CHEMIN d'une page de redirection (0600) vers http://127.0.0.1:<Q>/#t=<64 hex>, une seule fois ; l'amorçage n'est jamais dans son argv (D-12, D-27)
+#   L6  l'ouvreur reçoit le CHEMIN d'une page de redirection (0600) vers la page Projet http://127.0.0.1:<P>/project.html#t=<64 hex> (SAF-1 : l'échange se fait dans le cadre de Q, jamais au premier niveau), une seule fois ; l'amorçage n'est jamais dans son argv (D-12, D-27)
 #   L7  O2 a : serveur vivant sans terminal -> relancé    L8 O2 c : serveur vivant avec terminal -> même PID, nouvel amorçage, l'ancien refusé
 #   L9  échange, flux, commande, puis `stop` : serveur, assistant et shell disparus   L10 win32 simulé : message, ni amorçage ni ouverture
 #   L11 server.json qui désigne un PID leurre : le leurre reste vivant, sortie 5
@@ -120,7 +120,7 @@ assert_eq "L6 — une seule ouverture" "$(nbl "$OUVERT")" "1"
 ADR="$(sed -n 1p "$OUVERT" 2>/dev/null)"; VB="$(cat "$AM" 2>/dev/null)"; PAGE="$OUT/.cache/terminal-ouvrir.html"
 assert_eq "L6 — l'ouvreur reçoit le chemin de la page de redirection, rien d'autre (D-27)" "$([ "$ADR" = "$PAGE" ] && echo oui || echo "non : [$ADR]")" "oui"
 assert_eq "L6 — l'argv de l'ouvreur ne porte pas l'amorçage (témoin : amorçage de 64 hexadécimaux)" "$([[ "$VB" =~ ^[0-9a-f]{64}$ ]] && ! grep -q -F -e "$VB" "$OUVERT" && echo oui || echo "non : $(court "$(cat "$OUVERT")")")" "oui"
-assert_eq "L6 — la page de redirection mène à http://127.0.0.1:<Q>/#t=<amorçage du fichier>, Q ≠ P" "$([ -n "$QB" ] && [ "$QB" != "$PB" ] && grep -q -F "url=http://127.0.0.1:$QB/#t=$VB\"" "$WORK/run/page-ouverte.html" && echo oui || echo "non : Q=$QB P=$PB $(court "$(cat "$WORK/run/page-ouverte.html" 2>/dev/null)")")" "oui"
+assert_eq "L6 — SAF-1 : la page de redirection mène à la page Projet http://127.0.0.1:<P>/project.html#t=<amorçage du fichier>, jamais à Q (Q ≠ P)" "$([ -n "$QB" ] && [ -n "$PB" ] && [ "$QB" != "$PB" ] && grep -q -F "url=http://127.0.0.1:$PB/project.html#t=$VB\"" "$WORK/run/page-ouverte.html" && ! grep -q -F ":$QB/" "$WORK/run/page-ouverte.html" && echo oui || echo "non : Q=$QB P=$PB $(court "$(cat "$WORK/run/page-ouverte.html" 2>/dev/null)")")" "oui"
 assert_eq "L13 — la page de redirection est en mode 600 (jamais lisible d'un autre compte)" "$(mode "$PAGE")" "600"
 arrete; attendre_mort "$SPID"
 
@@ -208,13 +208,13 @@ planter "$PLANT_HTTP"; rm -f "$OUVERT" "$AM"; lance "$LAUNCH" open --terminal; s
 assert_eq "L12a — PID étranger même avec une adresse http vraisemblable : rien n'est ouvert (le processus n'est pas le serveur de ce cockpit), aucun amorçage posé" "$LRC $([ -s "$OUVERT" ] && echo ouvert || echo rien) $([ -e "$AM" ] && echo amorce || echo sans-amorce)" "5 rien sans-amorce"
 rm -f "$SJ"
 lance "$LAUNCH" open --terminal --no-open; S12="$(sj j.pid)"; Q12="$(qport)"
-node -e "const fs=require('fs');const f=process.argv[1];const j=JSON.parse(fs.readFileSync(f,'utf8'));j.terminal={url:'file:///System/Applications/Calculator.app'};fs.writeFileSync(f,JSON.stringify(j))" "$SJ"
+node -e "const fs=require('fs');const f=process.argv[1];const j=JSON.parse(fs.readFileSync(f,'utf8'));j.terminal={url:'file:///System/Applications/Calculator.app'};j.url='file:///System/Applications/Calculator.app';fs.writeFileSync(f,JSON.stringify(j))" "$SJ"
 rm -f "$OUVERT" "$WORK/run/page-ouverte.html"; lance "$LAUNCH" open --terminal; fichier_ouvert; sleep 0.5; S12B="$(sj j.pid)"; Q12B="$(qport)"
-assert_eq "L12b — serveur à nous, terminal.url remplacé par file:///… : ni l'argv ni la page ne portent file:, la page mène à http://127.0.0.1:<Q réel>" "$(grep -c 'file:' "$OUVERT" 2>/dev/null || true) $(grep -c 'file:' "$WORK/run/page-ouverte.html" 2>/dev/null || true) $(grep -c -F "url=http://127.0.0.1:$Q12B/#t=" "$WORK/run/page-ouverte.html" 2>/dev/null || true)" "0 0 1"
+assert_eq "L12b — serveur à nous, terminal.url remplacé par file:///… : ni l'argv ni la page ne portent file:, la page mène à http://127.0.0.1:<P réel>/project.html" "$(grep -c 'file:' "$OUVERT" 2>/dev/null || true) $(grep -c 'file:' "$WORK/run/page-ouverte.html" 2>/dev/null || true) $(grep -c -F "url=http://127.0.0.1:$(sj j.port)/project.html#t=" "$WORK/run/page-ouverte.html" 2>/dev/null || true)" "0 0 1"
 for v in 'http://127.0.0.1:80@evil.example' 'http://127.0.0.1:99999' 'http://127.0.0.1:1235/x' 'http://evil.example:1235' 'http://127.0.0.1:0x10'; do
   node -e "const fs=require('fs');const f=process.argv[1];const j=JSON.parse(fs.readFileSync(f,'utf8'));j.terminal={url:process.argv[2]};fs.writeFileSync(f,JSON.stringify(j))" "$SJ" "$v"
-  rm -f "$OUVERT" "$WORK/run/page-ouverte.html"; lance "$LAUNCH" open --terminal; fichier_ouvert; sleep 0.3; Q12C="$(qport)"
-  assert_eq "L12c — terminal.url « $v » : l'ouvreur ne reçoit que la page, qui mène à http://127.0.0.1:<Q réel>" "$(grep -c -F "$v" "$OUVERT" "$WORK/run/page-ouverte.html" 2>/dev/null | tr '\n' ' ') $(grep -c -F "url=http://127.0.0.1:$Q12C/#t=" "$WORK/run/page-ouverte.html" 2>/dev/null || true)" "$OUVERT:0 $WORK/run/page-ouverte.html:0  1"
+  rm -f "$OUVERT" "$WORK/run/page-ouverte.html"; lance "$LAUNCH" open --terminal; fichier_ouvert; sleep 0.3; P12C="$(sj j.port)"
+  assert_eq "L12c — terminal.url « $v » : l'ouvreur ne reçoit que la page, qui mène à http://127.0.0.1:<P réel>/project.html" "$(grep -c -F "$v" "$OUVERT" "$WORK/run/page-ouverte.html" 2>/dev/null | tr '\n' ' ') $(grep -c -F "url=http://127.0.0.1:$P12C/project.html#t=" "$WORK/run/page-ouverte.html" 2>/dev/null || true)" "$OUVERT:0 $WORK/run/page-ouverte.html:0  1"
 done
 arrete; [ -n "$(sj j.pid)" ] && attendre_mort "$(sj j.pid)"
 
@@ -261,7 +261,7 @@ arrete; [ -n "$S15" ] && attendre_mort "$S15"
 mkdir -p "$WORK/bonbin"
 for o in open xdg-open; do cat > "$WORK/bonbin/$o" <<SH
 #!/bin/sh
-u="\$(sed -n 's/.*url=\\(http[^"]*\\)".*/\\1/p' "\$1")"; q="\${u#http://127.0.0.1:}"; q="\${q%%/*}"; a="\${u##*#t=}"
+u="\$(sed -n 's/.*url=\\(http[^"]*\\)".*/\\1/p' "\$1")"; q="\$(node -e "console.log(new URL(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).terminal.url).port)" "$SJ")"; a="\${u##*#t=}"
 printf '%s' "\$a" > "$WORK/run/amorce-conforme"; node "$TA" amorcer "\$q" "$WORK/run/amorce-conforme" >> "$WORK/run/conforme.log" 2>&1
 SH
 chmod +x "$WORK/bonbin/$o"; done
@@ -466,11 +466,11 @@ if mutant imprime 's|^function ouvrirQ(s, amorce, o, sortie) {|& console.log(amo
   assert_eq "M-IMPRIME — le mutant rougit L5 (valeur dans la sortie du lanceur)" "$([ -n "$V" ] && [ "$(cherche "$LOUT")" != 0 ] && echo rouge || echo "identique")" "rouge"
   arrete; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-IMPRIME — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant ouvrep 's|s\.terminal\.url}/#t=|s.url}/#t=|'; then
-  rm -f "$OUVERT" "$AM"; lance "$MUT_L" open --terminal; fichier_ouvert; sleep 0.5; MS="$(sj j.pid)"; MQ="$(qport)"
-  assert_eq "M-OUVRE-P — le mutant rougit L6 (l'adresse ouverte n'est plus celle de Q)" "$([[ "$(sed -n 1p "$OUVERT" 2>/dev/null)" != "http://127.0.0.1:$MQ/#t="* ]] && echo rouge || echo "identique")" "rouge"
+if mutant ouvrep 's|s\.url}/project\.html#t=|s.terminal.url}/#t=|'; then
+  rm -f "$OUVERT" "$WORK/run/page-ouverte.html" "$AM"; lance "$MUT_L" open --terminal; fichier_ouvert; sleep 0.5; MS="$(sj j.pid)"; MQ="$(qport)"
+  assert_eq "M-OUVRE-Q — le mutant (SAF-1 défait : le lanceur vise de nouveau Q) rougit L6 : la page de redirection mène à Q, plus à la page Projet" "$(grep -q -F "url=http://127.0.0.1:$MQ/#t=" "$WORK/run/page-ouverte.html" 2>/dev/null && echo rouge || echo "identique")" "rouge"
   arrete; [ -n "$MS" ] && attendre_mort "$MS"
-else assert_eq "M-OUVRE-P — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+else assert_eq "M-OUVRE-Q — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-ARGV / M-PAGE-MODE / M-PAGE-LIEN / M-F1-PID / M-F1-VALID — mutants de F1 et F6 ==="
 if mutant argv 's|^  ouvrir(page, |  ouvrir(`${s.terminal.url}/#t=${amorce}`, |'; then
@@ -495,9 +495,9 @@ if mutant f1pid "s/&& estNotre(s\.pid, path\.join(sortie, 'serve\.mjs'))/\&\& tr
   assert_eq "M-F1-PID — le mutant (processus non vérifié) rougit L12a : l'ouvreur reçoit une adresse tirée d'un lab dont le PID n'est pas le nôtre" "$([ -s "$OUVERT" ] && echo rouge || echo identique)" "rouge"
   rm -f "$SJ" "$AM" "$PAGE"
 else assert_eq "M-F1-PID — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant f1valid -e 's/^const portDeUrl = .*$/const portDeUrl = (u) => (typeof u === "string" ? 1 : null);/' -e 's/terminal: { url: adresseLocale(pq) }/terminal: { url: s.terminal.url }/'; then
+if mutant f1valid -e 's/^const portDeUrl = .*$/const portDeUrl = (u) => (typeof u === "string" ? 1 : null);/' -e 's/terminal: { url: adresseLocale(pq) }/terminal: { url: s.terminal.url }/' -e 's/url: adresseLocale(port), \.\.\./url: s.url, .../'; then
   rm -f "$SJ" "$AM"; lance "$LAUNCH" open --terminal --no-open; MS="$(sj j.pid)"
-  node -e "const fs=require('fs');const f=process.argv[1];const j=JSON.parse(fs.readFileSync(f,'utf8'));j.terminal={url:'file:///System/Applications/Calculator.app'};fs.writeFileSync(f,JSON.stringify(j))" "$SJ"
+  node -e "const fs=require('fs');const f=process.argv[1];const j=JSON.parse(fs.readFileSync(f,'utf8'));j.terminal={url:'file:///System/Applications/Calculator.app'};j.url='file:///System/Applications/Calculator.app';fs.writeFileSync(f,JSON.stringify(j))" "$SJ"
   rm -f "$OUVERT" "$WORK/run/page-ouverte.html"; lance "$MUT_L" open --terminal; fichier_ouvert; sleep 0.5; MS2="$(sj j.pid)"
   assert_eq "M-F1-VALID — le mutant (sans validation ni reconstruction du port) rougit L12b : la page mène à file:///…" "$(grep -q 'file:' "$WORK/run/page-ouverte.html" 2>/dev/null && echo rouge || echo identique)" "rouge"
   rm -f "$AM" "$PAGE"; arrete; { [ -n "$MS" ] && attendre_mort "$MS"; [ -n "$MS2" ] && attendre_mort "$MS2"; } 2>/dev/null; true

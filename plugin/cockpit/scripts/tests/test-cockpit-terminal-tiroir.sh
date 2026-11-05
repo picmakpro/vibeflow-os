@@ -146,6 +146,11 @@ await executer(chrome, async (s) => {
     await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
     await s.send('Page.addScriptToEvaluateOnNewDocument', { source: ESPION });
   };
+  // SAF-1 : l'amorçage passe par la page Projet, qui monte le cadre de Q ; l'échange se fait dans le cadre (prêt = message ready de Q, après son rechargement sans fragment)
+  const amorcerParP = async () => {
+    await s.naviguer(`${OP}/project.html#t=${A.amorce}`);
+    await att(`window.__msgs.some((m) => m.o === ${JSON.stringify(OQ)} && m.d === 'ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)');
+  };
   const centre = (sel) => s.ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
   const souris = (type, x, y) => s.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 });
   const clic = async (sel) => { const c = await centre(sel); if (!c) throw new Error(`élément absent : ${sel}`); await souris('mouseMoved', c.x, c.y); await souris('mousePressed', c.x, c.y); await souris('mouseReleased', c.x, c.y); };
@@ -195,8 +200,7 @@ await executer(chrome, async (s) => {
     const INVITE = `((document.querySelector('.xterm-rows') || {}).textContent || '').trim().length > 0`;
     const CARTE = (t) => `((document.getElementById('etat') || {}).textContent || '').includes(${JSON.stringify(t)})`;
     await essai('amorcage', async () => {
-      await s.naviguer(`${OQ}/#t=${A.amorce}`);
-      await att(`location.port === '${A.P}' && location.pathname === '/project.html' && document.readyState === 'complete'`, 'arrivée sur P');
+      await amorcerParP();
     });
     await essai('connecte', async () => { await q.naviguer(); await q.attendre(INVITE, 'invite du shell dans le cadre de Q (la session est prise par cet onglet)'); });
     await essai('refuse-q', async () => { // J6 : un autre onglet (sessionStorage vide) ; sous la carte, ni terminal ni curseur visibles
@@ -233,10 +237,11 @@ await executer(chrome, async (s) => {
   const pid = () => { try { return fs.readFileSync(A.fichierPid, 'utf8').trim(); } catch { return ''; } };
   const session = () => { try { return JSON.parse(execFileSync('node', [A.TA, 'etat', String(A.Q), secret], { encoding: 'utf8' }).split('\n')[2] || '{}').session; } catch { return 'ERREUR'; } };
   await essai('amorcage', async () => {
-    await s.naviguer(`${OQ}/#t=${A.amorce}`);
-    await att(`location.port === '${A.P}' && location.pathname === '/project.html' && document.readyState === 'complete'`, 'arrivée sur P');
-    await s.naviguer(`${OQ}/#t=${'0'.repeat(48)}`);
-    await att(`((document.getElementById('etat') || {}).textContent || '').includes('Session expirée')`, 'carte Session expirée (échange refusé)');
+    await amorcerParP();
+    // échange refusé (amorçage de bon format, jamais posé) : le cadre de Q dit « Session expirée » à P (message etat:expire) ; le secret déjà rangé reste intact
+    await s.naviguer(`${OP}/project.html#t=${'0'.repeat(64)}`);
+    await att(`window.__msgs.some((m) => m.o === ${JSON.stringify(OQ)} && m.d === 'etat:expire')`, 'etat:expire du cadre de Q (échange refusé)');
+    await s.naviguer(`${OQ}/`);
     secret = await s.ev(`localStorage.getItem('vf.terminal.secret')`);
     if (!/^[0-9a-f]{64}$/.test(secret || '')) throw new Error('secret absent du stockage de Q');
   });
@@ -434,7 +439,7 @@ JS
 echo ok
 rq() { node "$TA" req "$@"; }
 rj() { printf '%s\n' "$1" | node "$AUX/ev.mjs" "$2" 2>/dev/null; }
-amorce_neuve() { node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"; }
+amorce_neuve() { node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"; }
 mklab() {
   local L="$1" B="$1/.planning"; mkdir -p "$L/src" "$B/phases/01-socle"; printf 'export const u = 1;\n' > "$L/src/u.js"
   printf -- '## Phases\n\n- [x] **Phase 1: Socle** - premier jet\n\n### Phase 1: Socle\n**Goal**: Poser le socle\n' > "$B/ROADMAP.md"

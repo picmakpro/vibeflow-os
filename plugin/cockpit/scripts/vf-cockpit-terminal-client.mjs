@@ -2,7 +2,7 @@
 // Export : clientTerminal(cfg) -> rien. cfg = { origineP, theme } : configuration non sensible, posée par pageTerminal.
 // Sérialisé par .toString() dans un <script> sans attribut : aucune référence à un identifiant du module, tout est local à la fonction.
 // Les commentaires placés DANS la fonction sont servis tels quels : ils ne citent aucun motif que la suite de test cherche. Rien d'autre ici n'est servi.
-// Flux : amorçage (fragment effacé avant l'échange, secret dans le stockage de Q, redirection vers P) ou terminal (flux fetch, POST d'entrée et de taille).
+// Flux : amorçage (dans le cadre : fragment effacé avant l'échange, secret dans le stockage du cadre, rechargement sans fragment) ou terminal (flux fetch, POST d'entrée et de taille).
 export function clientTerminal(cfg) {
   const MESSAGES = Object.freeze({
     ready: 'ready', connecte: 'etat:connecte', reconnexion: 'etat:reconnexion', termine: 'etat:termine',
@@ -25,10 +25,12 @@ export function clientTerminal(cfg) {
     return o;
   };
 
-  // 1. amorçage : le fragment est lu puis effacé AVANT tout échange ; le secret ne vit que dans le stockage de Q
+  // 1. amorçage (SAF-1) : l'échange n'a lieu que dans le cadre embarqué par P, jamais au premier niveau ; le fragment est lu puis effacé AVANT tout échange ;
+  // le secret ne vit que dans le stockage de ce cadre, puis le cadre se recharge sans fragment pour ouvrir le terminal (il ne navigue jamais vers P)
   if (location.hash.indexOf('#t=') === 0) {
     const amorce = location.hash.slice(3);
     history.replaceState(null, '', location.pathname + location.search);
+    if (!encadree) { vue.carte('horscadre'); return; }
     sessionStorage.removeItem(CLE_FIN);
     fetch('/amorce', { method: 'POST', headers: { 'X-VF-Amorce': amorce }, cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('refus'))))
@@ -37,7 +39,7 @@ export function clientTerminal(cfg) {
         if (!/^[0-9a-f]{64}$/.test(secret)) throw new Error('secret');
         localStorage.setItem(CLE_SECRET, secret);
         onglet();
-        location.replace(cfg.origineP + '/project.html');
+        location.replace(location.pathname + location.search);
       })
       .catch(expire);
     return;
@@ -231,5 +233,7 @@ export function clientTerminal(cfg) {
     ajuster(); const fin = finRetenue();
     if (fin) { vue.bandeau(fin.type, fin.detail, relancer); emettre('termine'); } else boucle();
   };
-  polices.then(demarrer);
+  // SAF-1 : le cadre peut être monté dès le chargement de P, tiroir caché (taille nulle) : le shell ne démarre qu'à l'ouverture du tiroir
+  const visible = () => new Promise((ok) => { const t = () => (window.innerWidth === 0 || window.innerHeight === 0 ? setTimeout(t, 200) : ok()); t(); });
+  Promise.all([polices, visible()]).then(demarrer);
 }
