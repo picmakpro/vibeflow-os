@@ -28,6 +28,14 @@ export function accepteMessage(e, origineQ, fenetreCadre, liste) {
 // script injecté : (cfg, accepte, construire) sont passés en arguments, aucun global n'est ajouté. Rien n'est créé hors des pages `/`, `/index.html` et `/project.html`.
 function scriptTiroir(cfg, accepte, construire) {
   if (['/', '/index.html', '/project.html'].indexOf(location.pathname) < 0) return;
+  // SAF-1 : l'amorçage du terminal arrive dans le fragment de l'adresse (page de redirection du lanceur) ; il est lu AVANT tout autre traitement, effacé aussitôt de l'adresse,
+  // et retenu seulement s'il a le format exact de l'amorçage (64 chiffres hexadécimaux). Il ne sert qu'une fois : il part dans l'adresse du cadre de Q, qui fait elle-même l'échange.
+  let amorce = '';
+  if (location.hash.indexOf('#t=') === 0) {
+    const brut = location.hash;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { void e; }
+    if (/^#t=[0-9a-f]{64}$/.test(brut)) amorce = brut.slice(3);
+  }
   const T = cfg.textes, MIN = 160, ATTENTE_MS = 8000, RACCOURCI = { code: 'Space', ctrl: true, shift: true };
   const stock = {
     lire: (k) => { try { return window.localStorage.getItem(k); } catch (e) { return null; } },
@@ -93,8 +101,11 @@ function scriptTiroir(cfg, accepte, construire) {
       const injoignable = () => { minuterie = null; d.carteInjoignable.style.position = ''; d.emplacementCadre.appendChild(d.carteInjoignable); etat('arrete'); };
       const creerCadre = () => {
         const f = document.createElement('iframe');
-        f.title = T.titre; f.setAttribute('sandbox', cfg.sandbox); f.setAttribute('src', origineQ + '/?theme=' + theme());
-        d.emplacementCadre.appendChild(f); cadre = f;
+        f.title = T.titre; f.setAttribute('sandbox', cfg.sandbox);
+        const adresse = origineQ + '/?theme=' + theme();
+        // SAF-1 : avec un amorçage, le cadre est navigué par programme et son attribut src n'est jamais posé : l'amorçage ne figure ainsi dans aucun nœud de la page
+        if (amorce) { d.emplacementCadre.appendChild(f); f.contentWindow.location.replace(adresse + '#t=' + amorce); amorce = ''; } else { f.setAttribute('src', adresse); d.emplacementCadre.appendChild(f); }
+        cadre = f;
         minuterie = setTimeout(injoignable, ATTENTE_MS);
         chargeur = setTimeout(() => { d.charge.hidden = false; }, 400);
       };
@@ -178,6 +189,8 @@ function scriptTiroir(cfg, accepte, construire) {
       }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
       appliquer(); pastilleEtat();
+      // SAF-1 : avec un amorçage, le cadre est monté dès le chargement, tiroir fermé : l'échange se fait dans le cadre, qui ne démarre le shell qu'à l'ouverture
+      if (amorce) creerCadre();
       if (stock.lire('vf.terminal.open') === '1') ouvrir(false);
     };
   };

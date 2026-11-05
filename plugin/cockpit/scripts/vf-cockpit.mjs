@@ -118,7 +118,8 @@ function ouvrir(url, marche = '', surErreur = null) {
     enfant.unref();
   } catch (e) { dire(e); }
 }
-// P71-D-12, P71-D-27 (F6) : l'onglet s'ouvre sur la page du terminal (Q) ; l'amorçage n'est JAMAIS dans l'argv de l'ouvreur (lisible par `ps`).
+// P71-D-12, P71-D-27 (F6), SAF-1 : l'onglet s'ouvre sur la page Projet (P), qui monte le cadre de Q et lui passe l'amorçage ; l'échange se fait DANS le cadre (Safari découpe
+// le stockage d'un cadre par origine de premier niveau, port compris : un secret posé par Q au premier niveau serait illisible depuis le cadre de P). L'amorçage n'est JAMAIS dans l'argv de l'ouvreur (lisible par `ps`).
 // Le lanceur écrit une page de redirection (0600, suppression préalable puis création exclusive : aucun lien suivi) dans .cache, l'ouvreur ne reçoit
 // que son chemin. Le serveur la supprime dès l'échange de l'amorçage, et la balaie au plus tard 60 s après sa création.
 function ecrirePageOuvrir(sortie, cible) {
@@ -134,7 +135,7 @@ function ecrirePageOuvrir(sortie, cible) {
 // Rend { page, echec } : `echec` reçoit l'erreur asynchrone de l'ouvreur (lue par attendreOuverture), null si l'ouverture n'est pas tentée.
 function ouvrirQ(s, amorce, o, sortie) {
   if (o.noOpen) return null;
-  const page = ecrirePageOuvrir(sortie, `${s.terminal.url}/#t=${amorce}`);
+  const page = ecrirePageOuvrir(sortie, `${s.url}/project.html#t=${amorce}`);
   if (!page) { effacerAmorce(sortie); console.error("ouverture du terminal impossible : fichier inattendu dans .cache"); return null; }
   const suivi = { page, echec: null };
   ouvrir(page, '', (e) => { suivi.echec = e; });

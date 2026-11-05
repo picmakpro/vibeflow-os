@@ -1,5 +1,16 @@
 # Changelog — cockpit
 
+## v1.3.2 — 2026-11-05 — non publié
+
+Correctif hors phase (jalon vibeflow-v2.0, compartiment fiabilité) : le terminal intégré fonctionne sous Safari. Arbitrages : arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 (SAF-1 « connexion dans le cadre », SAF-2 « les deux preuves »).
+
+### Corrigé — « Session expirée » sous Safari (SAF-1)
+- **Cause** : Safari découpe le `localStorage` d'un cadre par origine de premier niveau, port compris (Chrome et Firefox par site, port ignoré). Le terminal échangeait l'amorçage au premier niveau et y rangeait le secret ; le cadre du terminal sous la page Projet (autre port) lisait un stockage vide.
+- **L'échange se fait dans le cadre** : la page de redirection du lanceur mène à `http://127.0.0.1:<port>/project.html#t=<amorçage>`. La page Projet lit le fragment avant tout autre traitement, l'efface, n'en retient que le format exact (64 chiffres hexadécimaux), monte le cadre du terminal au chargement (tiroir fermé) avec l'amorçage dans le fragment de son adresse (jamais dans un attribut `src`). Le cadre efface son fragment, fait `POST /amorce`, range le secret dans son stockage et se recharge sans fragment ; il ne navigue plus vers la page Projet. Le shell ne démarre qu'à l'ouverture du tiroir (le cadre attend une taille non nulle).
+- **Renforcé** : une adresse du terminal ouverte seule avec un amorçage n'échange plus rien (« Terminal indisponible »). Propriétés inchangées : pas de cookie, secret jamais dans une adresse ni lisible par la page Projet, usage unique, 60 s, `Origin` exacte.
+- **Limites écrites au README** : le script de la page Projet voit passer l'amorçage (jamais le secret) moins de 60 s ; sous Safari le stockage du cadre est effacé à la fermeture du navigateur (relancer `/vf-cockpit --terminal`).
+- **Suites** : `test-cockpit-terminal-lanceur.sh` (L6, L12b, L12c, L15, M-OUVRE-Q), `-client.sh` (T6.1, T6.1b, T6.1c, T6.3, T6.9, mutants M-STOCKAGE, M-PREMIER-NIVEAU, M-SANS-AMORCE), `-tiroir.sh` et `-xterm.sh` (amorçage par la page Projet) jouent le nouveau contrat.
+
 ## v1.3.1 — 2026-11-05 — non publié
 
 Correctif hors phase (jalon vibeflow-v2.0, compartiment fiabilité) : le terminal intégré ne laisse plus de survivants quand son assistant PTY plante.
