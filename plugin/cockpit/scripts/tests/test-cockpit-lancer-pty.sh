@@ -22,7 +22,7 @@ PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 sans_effet() { assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; }
-rougit() { assert_eq "$1" "$([ "$2" != "$3" ] && echo rouge || echo "identique : $2")" "rouge"; } # rougit <libellé> <obtenu sous le mutant> <attendu sain>
+rougit() { assert_eq "$1" "$([ "$2" != "$3" ] && echo rouge || echo "identique : $2")" "rouge"; echo "     obtenu sous le mutant : [$(court "$2")]"; } # rougit <libellé> <obtenu sous le mutant> <attendu sain>
 
 # Le moteur est copié sous $WORK : l'assistant porte alors la marque de la suite (hygiène : un survivant est vu et nommé).
 ENGC="$WORK/eng-ref"; cp -R "$ENG0" "$ENGC"; ASSIST="$ENGC/terminal/vf-cockpit-pty.py"
