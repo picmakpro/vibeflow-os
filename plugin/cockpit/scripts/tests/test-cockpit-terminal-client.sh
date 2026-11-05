@@ -2,13 +2,13 @@
 # test-cockpit-terminal-client.sh — client de la page du terminal (Q) : amorçage dans l'onglet, secret hors cookie, cadre sous sandbox, canal
 # Q vers P, options xterm (TERM-04, TERM-05, TERM-10 statique, T17 côté Q ; P71-D-12, D-13, D-15, D-16, D-18 ; O4, O8 ; plan 71-06).
 #   ST   statique (page servie par Q, scripts propres = vue et client) : T14.S1-S4 (options xterm sûres), T17.Q1-Q3 (canal sortant), T6.5 (aucun set-cookie)
-#   T6   navigateur : amorçage Q/#t=… -> P/project.html, fragment effacé AVANT l'échange, aucun cookie, stockage de Q illisible depuis P, fichier consommé
+#   T6   navigateur : amorçage P/project.html#t=… (SAF-1 : l'échange se fait dans le cadre de Q, jamais au premier niveau), fragment effacé AVANT l'échange, aucun cookie, stockage de Q illisible depuis P, fichier consommé
 #   T9   navigateur : T9.5 cadre sandbox="allow-scripts allow-same-origin" (ready puis etat:connecte d'origine Q), T9.6 origine tierce bloquée par
 #        frame-ancestors, T9.7 0 violation de CSP (Q en premier niveau, P avec le cadre attaché), TQ.1 saisie -> shell -> sortie (transport)
 #   T17  T17.Q4 Ctrl+Maj+Espace dans le cadre -> message toggle reçu par P, T17.Q5 tout message reçu est dans la liste fermée
 #   O4   O4.1 même onglet = reprise (le second cadre se reconnecte) · O4.2 autre onglet (sessionStorage vide) = carte « Terminal déjà ouvert »
 #   O8   MESURE-O8 : liens (window.open) bloqués ou ouverts sous le sandbox minimal puis avec allow-popups, opener nul (mesure, non comptée)
-#   M-*  mutants (copies de la sortie, « mutant sans effet » = FAIL) : M-COOKIE, M-FRAGMENT, M-STOCKAGE, M-ETOILE, M-ECOUTE + M-CLIP, M-ANCETRES, M-SETCOOKIE
+#   M-*  mutants (copies de la sortie, « mutant sans effet » = FAIL) : M-COOKIE, M-FRAGMENT, M-STOCKAGE, M-PREMIER-NIVEAU, M-SANS-AMORCE, M-ETOILE, M-ECOUTE + M-CLIP, M-ANCETRES, M-SETCOOKIE
 # Sans Chrome : les sections statiques tournent, la suite annonce « SUITE SAUTÉE (navigateur) » et ne compte rien d'invérifié comme réussi.
 # Variables : VF_CLIENT_MS (échéance d'une attente navigateur, 20000 par défaut). Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
@@ -295,23 +295,35 @@ await executer(chrome, async (s) => {
     return masquer(r, secretN);
   }
 
-  // --- S1 : amorçage dans l'onglet ---
-  r.adresse1 = '?'; r.histoireFrag = -1;
-  await essai('amorcage', async () => {
+  // --- S0 (SAF-1) : une adresse de Q avec un amorçage, ouverte seule (premier niveau), n'échange rien : carte « Terminal indisponible », aucun secret rangé, amorçage intact (S1 le consomme ensuite) ---
+  r.q1 = { carte: '?', hash: '?', secret: '?' };
+  if (mode === 't6') await essai('q-seul', async () => {
     await s.naviguer(`${OQ}/#t=${amorce}`);
-    await att(`location.port === '${P}' && location.pathname === '/project.html' && document.readyState === 'complete'`, 'arrivée sur P');
+    await att(`((document.getElementById('etat') || {}).textContent || '').includes('Terminal indisponible')`, 'carte Terminal indisponible (Q ouvert seul avec un amorçage)');
+    await pause(1500);
+    r.q1 = await s.ev(`({ carte: (document.getElementById('etat') || {}).textContent || '', hash: location.hash, secret: localStorage.getItem('vf.terminal.secret') === null ? 'aucun' : 'range' })`);
   });
+  // --- S1 : amorçage par la page Projet (SAF-1) : P monte le cadre de Q, l'échange se fait DANS le cadre, qui se recharge sans fragment (message ready) ---
+  // adresse (url + fragment) du cadre de Q dans l'arbre des cadres de la page
+  const cadreQ = async () => { const f = ((await s.send('Page.getFrameTree')).frameTree.childFrames || []).find((c) => c.frame.url.startsWith(OQ)); return f ? { url: f.frame.url, fragment: f.frame.urlFragment || '' } : null; };
+  r.adresse1 = '?'; r.histoireFrag = -1; r.cadre1 = null;
+  await essai('amorcage', async () => {
+    await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `if (window.top === window) { window.__prets = []; addEventListener('message', (e) => { if (typeof e.data === 'string') window.__prets.push(e.data); }); }` });
+    await s.naviguer(`${OP}/project.html#t=${amorce}`);
+    await att(`window.__prets.includes('ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)');
+  });
+  r.cadre1 = await cadreQ().catch(() => null);
   r.adresse1 = await s.ev('location.href').catch(() => '?');
   r.histoireFrag = await s.send('Page.getNavigationHistory').then((h) => h.entries.filter((e) => /#t=/.test(e.url)).length).catch(() => -1);
 
   if (mode === 't6') {
-    // --- S2 : échange refusé (amorçage déjà consommé) : Q reste, sans fragment, carte « Session expirée » ---
+    // --- S2 : échange refusé (amorçage déjà consommé) dans le cadre de Q : son adresse reste sans fragment, carte « Session expirée » (P reçoit etat:expire, la barre le dit) ---
     r.refus = { hash: '?', port: '?', carte: '' };
     await essai('refus', async () => {
-      await s.naviguer(`${OQ}/#t=${amorce}`);
-      await att(`(document.getElementById('etat') || {}).textContent && document.getElementById('etat').textContent.includes('Session expirée')`, 'carte Session expirée');
+      await s.naviguer(`${OP}/project.html#t=${amorce}`);
+      await att(`window.__prets.includes('etat:expire') && !location.hash`, 'etat:expire (échange refusé dans le cadre)');
     });
-    r.refus = await s.ev(`({ hash: location.hash, port: location.port, carte: (document.getElementById('etat') || {}).textContent || '' })`).catch(() => r.refus);
+    r.refus = await cadreQ().then(async (c) => ({ hash: c.fragment, port: new URL(c.url).port, carte: await s.ev(`(document.querySelector('.vf-term-etat') || {}).textContent || ''`) })).catch(() => r.refus);
     // --- S3 : Q en premier niveau : secret dans son stockage, aucun cookie, terminal vivant ---
     r.secretQ = null; r.cookieQ = '?'; r.invite = false;
     await essai('q-premier-niveau', async () => {
@@ -428,7 +440,7 @@ JS
 
 rq() { node "$TA" req "$@"; }
 rj() { printf '%s\n' "$1" | node "$AUX/ev.mjs" "$2" 2>/dev/null; }
-amorce_neuve() { node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"; }
+amorce_neuve() { node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"; }
 mklab() {
   local L="$1" B="$1/.planning"; mkdir -p "$L/src" "$B/phases/01-socle"; printf 'export const u = 1;\n' > "$L/src/u.js"
   printf -- '## Phases\n\n- [x] **Phase 1: Socle** - premier jet\n\n### Phase 1: Socle\n**Goal**: Poser le socle\n' > "$B/ROADMAP.md"
@@ -528,10 +540,12 @@ if [ -n "$CHROME" ]; then
 echo "=== T6 — amorçage dans l'onglet, secret hors cookie (TERM-04 ; P71-D-12, D-13) ==="
 run_t6 "$OUT"; J="$T6J"; OP="http://127.0.0.1:$T6_P"
 assert_eq "T6.0 — témoin : le scénario n'a pas échoué globalement" "$(rj "$J" 'j.erreur||"ok"')" "ok"
-assert_eq "T6.1 — Q/#t=… mène à P/project.html sans fragment ni paramètre ; aucune entrée d'historique ne porte #t=" "$(rj "$J" '"adresse="+j.adresse1+" historique_avec_fragment="+j.histoireFrag')" "adresse=$OP/project.html historique_avec_fragment=0"
-assert_eq "T6.1b — échange refusé : Q reste, adresse sans fragment, carte « Session expirée »" "$(rj "$J" '"hash=["+j.refus.hash+"] port="+j.refus.port+" carte="+(j.refus.carte.includes("Session expirée")?"oui":"non")')" "hash=[] port=$T6_Q carte=oui"
+assert_eq "T6.1 — SAF-1 : P/project.html#t=… efface le fragment de son adresse avant tout autre traitement ; aucune entrée d'historique ne porte #t=" "$(rj "$J" '"adresse="+j.adresse1+" historique_avec_fragment="+j.histoireFrag')" "adresse=$OP/project.html historique_avec_fragment=0"
+assert_eq "T6.1b — SAF-1 : échange refusé dans le cadre de Q : son adresse sans fragment, carte « Session expirée » (dite à P)" "$(rj "$J" '"hash=["+j.refus.hash+"] port="+j.refus.port+" carte="+(j.refus.carte.includes("Session expirée")?"oui":"non")')" "hash=[] port=$T6_Q carte=oui"
+assert_eq "T6.9 — SAF-1 : Q ouvert seul avec un amorçage (premier niveau) n'échange rien : carte « Terminal indisponible », fragment effacé, aucun secret rangé ; l'amorçage reste intact (T6.1 le consomme ensuite par P)" "carte=$(rj "$J" '((j.q1||{}).carte||"?").includes("Terminal indisponible")?"oui":"non"') hash=[$(rj "$J" '(j.q1||{}).hash')] secret=$(rj "$J" '(j.q1||{}).secret')" "carte=oui hash=[] secret=aucun"
+assert_eq "T6.1c — SAF-1 : après l'échange fait dans le cadre, l'adresse du cadre de Q ne porte ni fragment ni autre paramètre que theme (le cadre se recharge sans l'amorçage ni le secret)" "$(rj "$J" '"url="+((j.cadre1||{}).url||"?").replace(/theme=(dark|light)$/,"theme=<t>")+" fragment=["+((j.cadre1||{}).fragment||"")+"]"')" "url=http://127.0.0.1:$T6_Q/?theme=<t> fragment=[]"
 SECRET_OK="$(rj "$J" 'j.secretOk?"oui":"non"')"
-assert_eq "T6.3 — le secret (64 hexadécimaux) est rangé dans le stockage de Q (Q en premier niveau), terminal vivant" "secret=$SECRET_OK invite=$(rj "$J" 'j.invite')" "secret=oui invite=true"
+assert_eq "T6.3 — le secret (64 hexadécimaux), posé par le cadre de Q, est lisible dans le stockage de Q (relu en premier niveau : Chrome ne partitionne pas deux origines d'un même site), terminal vivant" "secret=$SECRET_OK invite=$(rj "$J" 'j.invite')" "secret=oui invite=true"
 assert_eq "T6.8 — F4 : Q en premier niveau (ni cadre ni opener, après l'amorçage) n'ouvre pas de terminal : carte « Terminal indisponible », aucun shell (le serveur dit absente) ; puis le cadre de P, lui, donne l'invite" "carte=$(rj "$J" '(j.horsCadre||{}).carte||"?"') session=$(rj "$J" '(j.horsCadre||{}).session||"?"') cadre=$(rj "$J" 'j.invite')" "carte=Terminal indisponibleCe terminal ne s’ouvre que dans le cockpit. Relancez /vf-cockpit --terminal. session=absente cadre=true"
 assert_eq "T6.2 — document.cookie vide sur P et sur Q (témoin : le secret existe bien, sinon le vide ne prouve rien)" "P=[$(rj "$J" 'j.cookieP')] Q=[$(rj "$J" 'j.cookieQ')] secret_connu=$SECRET_OK" "P=[] Q=[] secret_connu=oui"
 assert_eq "T6.4 — depuis P, le stockage du cadre de Q lève SecurityError (témoins : le secret est dans Q, le stockage de P est lisible)" "$(rj "$J" 'j.stockageCadre')/secret_dans_q=$SECRET_OK/stockage_p=$(rj "$J" 'j.stockageP')" "SecurityError/secret_dans_q=oui/stockage_p=lisible"
@@ -558,7 +572,7 @@ for _ in $(seq 1 50); do rq "$TP" GET / --host "127.0.0.1:$TP" --sans-origin 2>/
 J="$(navig tierce "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"tierce\":\"http://127.0.0.1:$TP/\"}")"; vf_hyg_stop "$TIERCE_PID"; unsrv
 assert_eq "T9.6 — page tierce (autre port) qui encadre Q : une violation frame-ancestors, aucun message reçu (témoin : la violation est relevée)" "$(rj "$J" '"violation="+((j.violations||[]).some(v=>/frame-ancestors/.test(v))?"oui":"non")+" messages="+(j.msgs||["?"]).length')" "violation=oui messages=0"
 
-echo "=== M-COOKIE / M-FRAGMENT / M-STOCKAGE / M-ANCETRES — mutants jouées en navigateur ==="
+echo "=== M-COOKIE / M-FRAGMENT / M-STOCKAGE / M-PREMIER-NIVEAU / M-SANS-AMORCE / M-ANCETRES — mutants jouées en navigateur ==="
 if mutant cookie vf-cockpit-terminal-client.mjs "s|localStorage.setItem(CLE_SECRET, secret);|localStorage.setItem(CLE_SECRET, secret); document.cookie = 'vfs=' + secret + '; path=/';|"; then
   run_t6 "$MUT_OUT"
   assert_has "M-COOKIE — le mutant rougit T6.2 : un cookie existe" "$(rj "$T6J" 'j.cookieQ')" "vfs="
@@ -567,9 +581,17 @@ if mutant fragment vf-cockpit-terminal-client.mjs "s|history.replaceState(null, 
   run_t6 "$MUT_OUT"
   assert_eq "M-FRAGMENT — le mutant rougit T6.1b : l'échange refusé laisse #t= dans l'adresse de Q" "$(rj "$T6J" 'j.refus.hash.slice(0,3)')" "#t="
 else sans_effet "M-FRAGMENT"; fi
-if mutant stockage vf-cockpit-terminal-client.mjs "s|'/project.html')|'/project.html?s=' + secret)|"; then
+if mutant premier vf-cockpit-terminal-client.mjs "s|^    if (!encadree) { vue.carte('horscadre'); return; }||"; then
   run_t6 "$MUT_OUT"
-  assert_has "M-STOCKAGE — le mutant rougit T6.1 : le secret figure dans l'adresse de P" "$(rj "$T6J" 'j.adresse1')" "?s="
+  assert_eq "M-PREMIER-NIVEAU — le mutant (SAF-1 défait : l'échange refait au premier niveau de Q) rougit T6.9 : un secret est rangé par Q ouvert seul" "$(rj "$T6J" '(j.q1||{}).secret')" "range"
+else sans_effet "M-PREMIER-NIVEAU"; fi
+if mutant sansamorce vf-cockpit-terminal-tiroir.mjs "s|adresse + '#t=' + amorce|adresse|"; then
+  run_t6 "$MUT_OUT"
+  assert_eq "M-SANS-AMORCE — le mutant (l'amorçage n'est plus passé dans l'adresse du cadre de Q) rougit T6.3 : le cadre n'échange rien, aucun secret n'est rangé" "$(rj "$T6J" 'j.secretOk?"oui":"non"')" "non"
+else sans_effet "M-SANS-AMORCE"; fi
+if mutant stockage vf-cockpit-terminal-client.mjs "s|location.replace(location.pathname + location.search)|location.replace(location.pathname + '?s=' + secret)|"; then
+  run_t6 "$MUT_OUT"
+  assert_has "M-STOCKAGE — le mutant rougit T6.1c : le secret figure dans l'adresse du cadre de Q" "$(rj "$T6J" '(j.cadre1||{}).url')" "?s="
 else sans_effet "M-STOCKAGE"; fi
 if mutant ancetres vf-cockpit-terminal-page.mjs 's|frame-ancestors \${origineP}|frame-ancestors *|'; then
   srv "$MUT_OUT"; TP="$(libre)"; node "$AUX/tierce.mjs" "$TP" "http://127.0.0.1:$QP" & TIERCE_PID=$!; PIDS+=($TIERCE_PID)

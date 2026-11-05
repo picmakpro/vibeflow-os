@@ -180,8 +180,10 @@ await executer(chrome, async (sp) => {
 
   // amorçage dans l'onglet puis Q dans son cadre jusqu'à l'invite du shell
   await essai('amorcage', async () => {
-    await sp.naviguer(`${OQ}/#t=${amorce}`);
-    await sp.attendre(`location.port === '${P}' && location.pathname === '/project.html' && document.readyState === 'complete'`, 'arrivée sur P', MS);
+    // SAF-1 : l'amorçage passe par la page Projet, qui monte le cadre de Q ; l'échange se fait dans le cadre (prêt = message ready de Q, après son rechargement sans fragment)
+    await sp.send('Page.addScriptToEvaluateOnNewDocument', { source: `if (window.top === window) { window.__prets = []; addEventListener('message', (e) => { if (typeof e.data === 'string') window.__prets.push(e.data); }); }` });
+    await sp.naviguer(`http://127.0.0.1:${P}/project.html#t=${amorce}`);
+    await sp.attendre(`window.__prets.includes('ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)', MS);
   });
   await essai('invite', async () => { await s.naviguer(); await att(`${TXT}.includes('VFP>')`, 'invite du shell'); r.invite = true; });
   if (!r.invite) return r;
@@ -501,7 +503,7 @@ rq() { node "$HERE_T/terminal-aux.mjs" req "$@"; }
 rj() { printf '%s\n' "$1" | node "$AUX/ev.mjs" "$2" 2>/dev/null; }
 rjs() { rj "$@" || echo ILLISIBLE; } # comme rj, mais un relevé illisible (JSON tronqué, champ absent) se dit ILLISIBLE au lieu d'une chaîne vide qui ressemble à « rien reçu »
 hx() { node "$AUX/hex.mjs" "$@"; }
-amorce_neuve() { node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"; }
+amorce_neuve() { node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"; }
 mklab() {
   local L="$1" B="$1/.planning"; mkdir -p "$L/src" "$B/phases/01-socle"; printf 'export const u = 1;\n' > "$L/src/u.js"
   printf -- '## Phases\n\n- [x] **Phase 1: Socle** - premier jet\n\n### Phase 1: Socle\n**Goal**: Poser le socle\n' > "$B/ROADMAP.md"
