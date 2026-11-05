@@ -28,7 +28,7 @@
 # Poste (Phase 58, P58-D-01, P58-D-16, P58-D-18) :
 #   --role <solo|product|dev> | env VF_ROLE → sur `install` seulement, pose le poste de l'humain dans
 #   `<cible>/vibeflow-role` (une ligne, fichier LOCAL non versionné). --role l'emporte sur VF_ROLE ; un
-#   VF_ROLE hérité est ignoré par les autres verbes. La règle d'ignorance `.claude/vibeflow-role` est
+#   VF_ROLE hérité est ignoré par les autres verbes, sauf `new-modules` et `mark-offered --pending` qui le lisent (à défaut, ils lisent le poste du lab). La règle d'ignorance `.claude/vibeflow-role` est
 #   posée dans ./.gitignore AVANT le fichier, dans tous les scopes où un poste est posé (project compris),
 #   et la ligne est ajoutée à ./.worktreeinclude. Sans poste, rien de tout cela n'a lieu. Refus à la pose
 #   si le poste est hors de la liste `vf_roles` du projet ; l'engine n'écrit jamais `.planning/config.json`.
@@ -3967,7 +3967,7 @@ resolve_lab_role() {
 }
 
 # other_scope_registry — registre de l'AUTRE scope posé (user <-> project/local), vide s'il n'existe pas.
-# Ne sert qu'à new-modules (Q2) : install/update/uninstall restent mono-scope.
+# Ne sert qu'à new-modules (BL35-Q2) : install/update/uninstall restent mono-scope.
 other_scope_registry() {
   local f
   case "$VF_SCOPE" in
@@ -3997,23 +3997,42 @@ list_new_modules() {
 mark_offered() {
   require_cache
   [ -f "$INSTALLED_REGISTRY" ] || { log "lab non posé (pas de registre) : rien à inscrire"; return 0; }
-  local offered="$TARGET_ROOT/$VF_OFFERED_RELPATH" mod avail
+  local offered="$TARGET_ROOT/$VF_OFFERED_RELPATH" mod avail old pending
+  local tmp="${TARGET_ROOT}/${VF_OFFERED_RELPATH}.tmp"
   # --pending : l'installeur (/vibeflow-install) inscrit ce qu'il laisse non posé et visible du poste, soit
   # exactement ce que new-modules listerait : un lab neuf ne revoit pas au premier /vf-update ce qu'il a écarté.
+  # Le calcul est capturé SANS pipeline : un échec (poste illisible…) est une erreur, jamais « rien à proposer ».
   if [ "${1:-}" = "--pending" ]; then
     [ "$#" -eq 1 ] || err "mark-offered --pending ne prend aucun module"
-    set -- $(list_new_modules | cut -d= -f1)
+    pending="$(list_new_modules)" || err "mark-offered --pending : calcul des modules nouveaux en échec — rien n'est inscrit"
+    set --
+    while IFS= read -r mod; do [ -z "$mod" ] || set -- "$@" "${mod%%=*}"; done <<< "$pending"
   fi
   [ "$#" -gt 0 ] || { log "aucun module présenté : rien à inscrire"; return 0; }
-  avail="$(list_available_modules)"
   for mod in "$@"; do
     case "$mod" in ''|*[!a-z0-9-]*) err "mark-offered : nom de module refusé" ;; esac
   done
-  {
-    [ ! -f "$offered" ] || cat "$offered"
-    for mod in "$@"; do printf '%s\n' "$avail" | grep -qx "$mod" && echo "$mod"; done
-  } | LC_ALL=C sort -u > "${offered}.tmp"
-  mv "${offered}.tmp" "$offered"
+  # Aucune écriture ne suit un lien symbolique : ni l'état ni son temporaire (un lien posé par un dépôt jugé
+  # ferait écraser un fichier de l'humain). Refus bruyant, rien d'écrit.
+  [ ! -L "$offered" ] || err "mark-offered : $VF_OFFERED_RELPATH est un lien symbolique — refus, rien n'est écrit"
+  [ ! -L "$tmp" ] || err "mark-offered : ${VF_OFFERED_RELPATH}.tmp est un lien symbolique — refus, rien n'est écrit"
+  avail="$(list_available_modules)"
+  old=""
+  if [ -e "$offered" ]; then
+    [ -f "$offered" ] && [ -r "$offered" ] || err "mark-offered : $VF_OFFERED_RELPATH illisible — rien n'est écrit"
+    # L'ancien état n'est recopié que pour les lignes qui sont des noms de module valides.
+    old="$(grep -E '^[a-z0-9-]+$' "$offered" || true)"
+  fi
+  rm -f "$tmp"
+  # Un nom syntaxiquement valide mais hors catalogue est écarté, quelle que soit sa position dans la liste.
+  # Création exclusive (noclobber) : un lien apparu entre le contrôle et l'écriture n'est pas suivi.
+  if ! ( set -C
+         { printf '%s\n' "$old"
+           for mod in "$@"; do if printf '%s\n' "$avail" | grep -qx "$mod"; then echo "$mod"; fi; done
+         } | grep -v '^$' | LC_ALL=C sort -u > "$tmp" ) 2>/dev/null; then
+    rm -f "$tmp"; err "mark-offered : écriture de ${VF_OFFERED_RELPATH}.tmp impossible — rien n'est inscrit"
+  fi
+  mv "$tmp" "$offered" || { rm -f "$tmp"; err "mark-offered : remplacement de $VF_OFFERED_RELPATH impossible"; }
   log "modules inscrits comme proposés : $* ($offered)"
 }
 

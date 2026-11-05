@@ -149,6 +149,10 @@ d. **Modules nouveaux** (hors `--check`) : le résumé de 4b liste les modules d
    `bash <S>/vf-update-run.sh offer <scope> <modules cochés pour ce scope>`. Il calcule les modules
    présentés avant la pose, pose les cochés (`--with-deps`) et inscrit les présentés : refusé ou retiré
    plus tard, un module n'est jamais reproposé.
+   Si le résumé de 4b porte `NOUVEAUX_MODULES_ERREUR scope=<s>`, le calcul des modules nouveaux de ce
+   scope a échoué : dis-le à l'humain (la mise à jour, elle, est faite), ne pose rien et n'appelle pas
+   `offer` pour ce scope. `offer` sort non nul si une pose échoue ou si un module demandé n'était pas
+   présenté : relaie son message.
 
 ### 5 — Rappel de redémarrage
 

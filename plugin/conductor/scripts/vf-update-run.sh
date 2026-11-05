@@ -40,16 +40,22 @@ if [ "${1:-}" = "offer" ]; then
   while IFS= read -r l; do
     [[ "$l" =~ ^([a-z0-9-]+)=[A-Za-z0-9._+-]+$ ]] && presented+=("${BASH_REMATCH[1]}")
   done <<< "$listed"
+  rc=0
   for m in "$@"; do
     case "$m" in ''|*[!a-z0-9-]*) echo "[vf-update-run] nom de module refusé : $m" >&2; continue ;; esac
-    VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" install --with-deps "$m"
+    # Seuls les modules PRÉSENTÉS (calculés en tête de mode) se posent : un module hors de cet ensemble
+    # (non proposable, déjà posé, écarté du poste…) est refusé, jamais installé.
+    case " ${presented[*]-} " in *" $m "*) ;; *) echo "[vf-update-run] module non présenté, refusé (rien posé) : $m" >&2; continue ;; esac
+    if ! VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" install --with-deps "$m"; then
+      echo "[vf-update-run] pose en échec : $m (scope $scope)" >&2; rc=1
+    fi
   done
-  VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" mark-offered ${presented[@]+"${presented[@]}"}
-  exit 0
+  VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" mark-offered ${presented[@]+"${presented[@]}"} || rc=1
+  exit "$rc"
 fi
 
 run_scope() {
-  local scope="$1" root="$2" l m d deps closure
+  local scope="$1" root="$2" l m d deps closure listed
   [ -f "$root/scripts/.vibeflow-installed" ] || return 1
   echo "[vf-update-run] scope $scope → update --all ($root)"
   VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" update --all
@@ -57,7 +63,13 @@ run_scope() {
   # Format stable : `NOUVEAU_MODULE scope=<s> <module>=<version> deps=<a,b|->` ; deps = fermeture des `requires`
   # moins le module et moins ce que le registre de CE scope porte déjà (ce que `install --with-deps` posera aussi).
   # `deps=?` si la fermeture n'est pas calculable : jamais un `-` qui dirait « rien de plus ».
-  VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" new-modules | while IFS= read -r l; do
+  # Un échec du calcul se DISTINGUE de « rien à proposer » : ligne stable NOUVEAUX_MODULES_ERREUR, la mise à jour
+  # déjà faite n'est pas remise en cause (la skill le signale à l'humain).
+  if ! listed="$(VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" new-modules)"; then
+    echo "[vf-update-run] NOUVEAUX_MODULES_ERREUR scope=$scope"
+    return 0
+  fi
+  while IFS= read -r l; do
     [[ "$l" =~ ^([a-z0-9-]+)=[A-Za-z0-9._+-]+$ ]] || continue
     m="${BASH_REMATCH[1]}"; deps=""
     if closure="$(VF_MODULES_ROOT="$NEW" bash "$NEW/_internal/resolve-deps.sh" "$m" 2>/dev/null)"; then
@@ -69,7 +81,7 @@ run_scope() {
       deps="?"
     fi
     echo "[vf-update-run] NOUVEAU_MODULE scope=$scope $l deps=$deps"
-  done
+  done <<< "$listed"
   return 0
 }
 

