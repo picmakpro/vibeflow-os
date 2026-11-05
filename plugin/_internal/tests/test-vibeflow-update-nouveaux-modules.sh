@@ -358,6 +358,11 @@ done
 # h : uninstall sur registre absent : rc inchangé, le registre n'est pas créé
 fresh_reg; unin
 if [ ! -e "$REG" ] && regtmp_absent; then ok "N17h : uninstall sans registre → registre non créé, aucun .tmp"; else ko "N17h : registre créé ou .tmp laissé (rc=$ENG_RC)"; fi
+# i : BL35-R5-S1 — VERSION vide du module : install refuse (rc≠0), le registre garde ses lignes
+IE="$WORK/cache-vide"; mkcache "$IE"; : > "$IE/conductor/VERSION"
+fresh_reg; printf 'alpha=v1.0.0\n' > "$REG"
+ENG_OUT="$(cd "$LAB" && HOME="$FH" VIBEFLOW_CACHE="$IE" bash "$ENGINE" --scope project install --with-deps conductor 2>"$WORK/eng.err")"; ENG_RC=$?
+if [ "$ENG_RC" -ne 0 ] && [ "$(cat "$REG")" = 'alpha=v1.0.0' ] && regtmp_absent; then ok "N17i : VERSION vide → install refuse (rc≠0), registre intact"; else ko "N17i : rc=$ENG_RC registre=[$(tr '\n' '|' < "$REG" | cut -c1-70)]"; fi
 rm -rf "$LAB/.claude" "$VICTIM"
 
 echo "== $pass ok, $fail ko =="

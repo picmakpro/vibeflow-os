@@ -316,7 +316,9 @@ ou de `vf-new-lab`.
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-11-05.md — ## Cockpit : « Où en est-on ? » sur un lab sans STATE rend des champs vides — DIFFÉRÉ (2026-11-03) — CLOS (2026-11-05, livré PR #200) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-11-05.md — ## Cockpit : anglais résiduel et coquilles du chrome — DIFFÉRÉ (2026-11-03) — CLOS (2026-11-05, livré PR #200) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-11-05.md — ## `guard-fin-de-geste.sh` impute à la session un objet antérieur qui change d'état — DIFFÉRÉ (2026-11-03) — CLOS (2026-11-05, fusionné dans Garde de fin de geste) -->
-## `/vf-update` ne propose pas un module apparu dans une release — DIFFÉRÉ (2026-11-03)
+## `/vf-update` ne propose pas un module apparu dans une release — CORRECTIF EN PR (2026-11-05)
+
+**État (2026-11-05) :** correctif en PR, branche `fix/vf-update-nouveaux-modules` (arbitrages BL35-Q1..Q3, BL35-A1..A5, BL35-R5-S1, BL35-R5-S4 : Samuel, AskUserQuestion session principale, 2026-11-05). À clore au merge.
 
 **Priorité : P1** (relevée le 2026-11-05 au tri du planning, constat de l'inventaire, sans arbitrage). La prochaine release groupée publiera tout le travail cockpit des Phases 68 à 71 à des postes qui n'ont pas le module ; même famille que l'issue #188 (volet 1) : « `/vf-update` ne voit pas un retard ou une nouveauté de module ». À traiter avant la release groupée. Aucun commit sur `plugin/conductor/skills/vf-update/SKILL.md` ni sur `plugin/_internal/vibeflow-update.sh` depuis le 2026-11-03.
 

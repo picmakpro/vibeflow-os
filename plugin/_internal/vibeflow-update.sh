@@ -510,6 +510,10 @@ module_version_installed() {
 mark_installed() {
   local mod="$1"
   local version="$2"
+  # BL35-R5-S1 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05, « Refuser une version
+  # vide (Recommandé) ») : une version vide vaudrait un retrait dans _registry_rewrite — « installé »
+  # rc 0 sans ligne au registre. Refus explicite, rien ne passe en silence.
+  [ -n "$version" ] || err "mark-installed : version vide pour $mod (VERSION vide ?) — refus, registre inchangé"
   if vf_dry_run; then
     # F-04 (correction ciblée 31-04) : verbe selon l'existence RÉELLE de la cible (D-31-05, + crée
     # / ~ modifie) — sur un lab vierge, $INSTALLED_REGISTRY n'existe pas encore : c'est une
