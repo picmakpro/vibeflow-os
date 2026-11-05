@@ -38,3 +38,13 @@ Suite : LS1 à LS4 vertes (rc des sections LS : 0 FAIL, sous bash et sous zsh).
 | M-TTL-IGNORE | LS3.6 | `1,1,1` |
 | M-RATTACHE-PAR-NOM | LS3.4 | `vue,terminee,attendue,vue` (l'imposteur de même tâche est rattaché) |
 | M-TERMINEE-PERDUE | LS3.3 | `vue` |
+
+## Mutants rejoués sur le code livré (carte Équipe)
+
+Suite complète : 37 PASS / 0 FAIL (bash et zsh). sha256 de la copie figée, inchangé : `cd40e07b3202a10a122c929c892d2459278efec2f3ba145941d0b9b68aa46f47` (LE.0 vert).
+
+| Mutant | Sonde rougie | Obtenu (muté) |
+|--------|--------------|---------------|
+| M-LANCEES-HORS-SESSION | LE.5 | `diff:se-2222…,ag-agent-1` (le sous-agent clé de la Map reçoit la ligne) |
+| M-LIGNE-SANS-VALIDATION | LE.4 | `exc:1` (la valeur à `toString` piégé est lue sans validation : l'exception rougit la sonde ; la raison est réelle mais masque les autres fuites de la même Map) |
+| M-LIGNE-VIDE-TOUJOURS | LE.1 | `63\|36\|complete/absent,…` (une ligne vide s'insère sur toute carte sans lancement) |
