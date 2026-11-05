@@ -32,6 +32,27 @@ const tail = (f) => cherche(f, (d) => (d.type === 'user' || d.type === 'assistan
 // forme typée (F3) : un cwd, un type, un horodatage ou un identifiant de session qui n'est pas une chaîne est une ligne hors forme
 const formeOk = (d) => !!d && REQ_TR.every((k) => k in d) && ['cwd', 'type', 'timestamp', 'sessionId'].every((k) => typeof d[k] === 'string');
 
+// dernier arbre cité par une ligne user/assistant d'un transcript (P78-D-26) : première lecture par `cherche` (fenêtres bornées), puis mémo par fichier ; un fichier qui a grossi ne relit que les octets
+// ajoutés (8 Mio au plus). Seul un chemin d'arbre connu est retenu, jamais une ligne du transcript ; le mémo est borné (la plus ancienne entrée part) et invalidé si la liste des arbres change.
+const MEMO_ARBRES = new Map(), MEMO_MAX = 512, AJOUT_MAX = 8 << 20;
+function dernierArbre(fichier, trees, cite) {
+  const sig = trees.join('\0'); let st; try { st = fs.statSync(fichier); } catch { return null; }
+  if (!st.isFile()) return null; // un tube (FIFO) bloquerait l'ouverture
+  const m = MEMO_ARBRES.get(fichier); let arbre;
+  if (m && m.sig === sig && m.taille === st.size) return m.arbre;
+  const accepte = (d) => (d.type === 'user' || d.type === 'assistant' ? cite(d) : null);
+  if (m && m.sig === sig && st.size > m.taille && st.size - m.taille <= AJOUT_MAX) {
+    arbre = m.arbre; let fd = null;
+    try {
+      fd = fs.openSync(fichier, 'r'); const len = st.size - m.taille, buf = Buffer.alloc(len); fs.readSync(fd, buf, 0, len, m.taille);
+      for (const l of buf.toString('utf8').split('\n')) { if (!l.trim()) continue; let d; try { d = JSON.parse(l); } catch { continue; } arbre = (d && accepte(d)) || arbre; }
+    } catch { arbre = cherche(fichier, accepte); } finally { if (fd !== null) { try { fs.closeSync(fd); } catch {} } }
+  } else arbre = cherche(fichier, accepte);
+  MEMO_ARBRES.delete(fichier); MEMO_ARBRES.set(fichier, { sig, taille: st.size, arbre: arbre || null });
+  if (MEMO_ARBRES.size > MEMO_MAX) MEMO_ARBRES.delete(MEMO_ARBRES.keys().next().value);
+  return arbre || null;
+}
+
 // contexte de collecte des sessions et sous-agents : arbres git du lab, portée, étiquettes
 function contexte(root, { fresh, now, home }) {
   root = path.resolve(root);
@@ -43,10 +64,13 @@ function contexte(root, { fresh, now, home }) {
   const real = (p) => { try { return fs.realpathSync(p); } catch { return p; } };
   const inScope = (cwd) => { if (typeof cwd !== 'string' || !cwd) return null; const r = real(cwd); return trees.filter((t) => r === t || r.startsWith(t + path.sep)).sort((a, b) => b.length - a.length)[0] || null; };
   const label = (t) => (t === trees[0] ? 'arbre principal' : path.relative(trees[0], t) || t);
-  // le cwd d'un transcript reste celui du lancement : on préfère l'arbre le plus profond cité par le dernier appel
-  const byActivity = (d, fallback) => {
+  // le cwd d'un transcript reste celui du lancement : on préfère l'arbre le plus profond cité par le dernier appel, sinon (P78-D-26) le dernier arbre cité sur l'ensemble du transcript
+  const cite = (d) => {
     const txt = JSON.stringify(d?.message?.content || '');
-    const hit = trees.filter((t) => t !== trees[0] && txt.includes(t)).sort((a, b) => b.length - a.length)[0];
+    return trees.filter((t) => t !== trees[0] && txt.includes(t)).sort((a, b) => b.length - a.length)[0] || null;
+  };
+  const byActivity = (d, fallback, fichier) => {
+    const hit = cite(d) || (fichier ? dernierArbre(fichier, trees, cite) : null);
     return hit ? { tree: hit, how: 'activité' } : { tree: fallback, how: 'cwd' };
   };
 

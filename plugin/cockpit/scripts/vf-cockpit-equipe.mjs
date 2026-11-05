@@ -81,14 +81,14 @@ export function collecteAgents(ctx) {
       if (!tree) continue;
       if (age <= fresh) live++;
       if (age <= fresh || inclus.size) {
-        const at = byActivity(last, tree);
+        const at = byActivity(last, tree, file);
         const desc = [...inclus.values()].some((x) => x.etat !== 'termine');
         workers.push(action({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, last.gitBranch), cwd: last.cwd, ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', etat: age <= fresh ? 'actif' : desc ? 'en-attente' : 'termine', _tr: file }));
       }
       for (const { c, etat } of inclus.values()) {
         const sl = tail(c.tr); if (sl && !ctx.formeOk(sl)) { inconnuSub++; continue; } // dernière ligne hors forme : l'agent est exclu
         subLive++;
-        const at = byActivity(sl, inScope(sl?.cwd) || tree);
+        const at = byActivity(sl, inScope(sl?.cwd) || tree, c.tr);
         const parent = c.forme === 'complete' && c.meta.spawnDepth >= seuil ? c.meta.parentAgentId : id;
         const t0 = Date.parse(c.premiere?.timestamp), fin = etat === 'termine' ? mtime(c.tr) : null;
         const w = { kind: 'subagent', id: c.id, parent, role: c.meta.agentType, task: c.meta.description || '', ...(c.forme === 'complete' ? { depth: c.meta.spawnDepth, background: c.meta.requestShape === 'background' } : {}),

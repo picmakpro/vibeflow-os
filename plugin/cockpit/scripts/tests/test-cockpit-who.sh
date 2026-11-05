@@ -562,15 +562,20 @@ const [, , scripts, lab, home, tr, cite] = process.argv;
 const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-who.mjs')).href);
 const vue = () => m.collectWho(lab, { home, scriptsDir: path.join(home, 'x') }).workers.filter((w) => w.kind === 'subagent').map((w) => w.treeBy + '|' + w.tree).join(',');
 const avant = vue();
-fs.appendFileSync(tr, JSON.stringify({ cwd: lab, sessionId: 'aaaa1111-2222-3333-4444-555566667777', gitBranch: 'principale', version: '2.1.316', timestamp: '2026-11-01T10:09:00Z', type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'cd ' + cite + ' && ls' } }] } }) + '\n');
+const ligne = (commande, t) => JSON.stringify({ cwd: lab, sessionId: 'aaaa1111-2222-3333-4444-555566667777', gitBranch: 'principale', version: '2.1.316', timestamp: t, type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: commande } }] } }) + '\n';
+fs.appendFileSync(tr, ligne('cd ' + cite + ' && ls', '2026-11-01T10:09:00Z') + ligne('ls', '2026-11-01T10:09:05Z')); // la ligne ajoutée en dernier ne cite rien : seule la lecture de l'ensemble (mémo, octets ajoutés) voit le worktree
 console.log(avant + '#' + vue());
 JS
 node "$AUX/mk-sub-act.mjs" "$SD22/agent-sa.jsonl" "$L22" sa "-"
-assert_eq "W22.4 — le transcript grossit d'une ligne qui cite le worktree a : la collecte suivante, dans le même processus, le voit (mémo invalidé par la taille)" "$(node "$AUX/w22-grow.mjs" "$SCRIPTS" "$L22" "$H22" "$SD22/agent-sa.jsonl" "$WA")" "cwd|arbre principal#activité|../lab22-a"
+assert_eq "W22.4 — le transcript grossit de deux lignes (la première cite le worktree a, la dernière non) : la collecte suivante, dans le même processus, le voit (mémo invalidé par la taille)" "$(node "$AUX/w22-grow.mjs" "$SCRIPTS" "$L22" "$H22" "$SD22/agent-sa.jsonl" "$WA")" "cwd|arbre principal#activité|../lab22-a"
 node "$AUX/mk-sub-act.mjs" "$SD22/agent-sa.jsonl" "$L22" sa "$WA" "-"
-M22="$(mut17 derniere vf-cockpit-who.mjs 'const a = fichier ? dernierArbre(fichier, trees, cite) : null;' 'const a = null;')"
+M22="$(mut17 derniere vf-cockpit-who.mjs '|| (fichier ? dernierArbre(fichier, trees, cite) : null)' '|| null')"
 assert_eq "M-DERNIERE.0 — l'ancre du mutant existe" "$M22" "muté"
 assert_eq "M-DERNIERE — rougit W22.1 : byActivity ne lit que la dernière ligne, le sous-agent retombe sur cwd, arbre principal" "$(arbre22 "$WORK/mut17-derniere")" "cwd|arbre principal|principale"
+node "$AUX/mk-sub-act.mjs" "$SD22/agent-sa.jsonl" "$L22" sa "-"
+M22B="$(mut17 memo vf-cockpit-who.mjs 'm.taille === st.size) return m.arbre;' 'true) return m.arbre;')"
+assert_eq "M-MEMO.0 — l'ancre du mutant existe" "$M22B" "muté"
+assert_eq "M-MEMO — rougit W22.4 : un mémo jamais invalidé par la taille ne voit pas la ligne ajoutée" "$(node "$AUX/w22-grow.mjs" "$WORK/mut17-memo" "$L22" "$H22" "$SD22/agent-sa.jsonl" "$WA")" "cwd|arbre principal#cwd|arbre principal"
 
 vf_hyg_assert
 
