@@ -21,7 +21,19 @@ compté et consommerait la grâce. Un relevé qui ne contient pas l'assistant lu
 groupes. Garantie après le réapage du chef (réutilisation de PID) : sur le chemin normal (relevé des membres disponible), le PID du chef n'est plus jamais
 signalé par kill(2), car chaque envoi relit d'abord la session du PID visé. Elle ne vaut PAS pour le repli (relevé impossible) : killpg(2) vise alors les groupes
 relevés au départ, dont celui du chef (identifiant = son PID), même après son réapage ; si ce PID a été réutilisé entre-temps par un autre groupe, ce groupe peut être
-signalé. Le repli ne sert que sans /proc ni `ps` utilisable, et le risque est celui d'une réutilisation de PID dans les 3 s de l'arrêt. Limite : un processus sorti de la session par setsid (ou par un double fork suivi de setsid) échappe à l'arrêt.
+signalé. Le repli ne sert que sans /proc ni `ps` utilisable, et le risque est celui d'une réutilisation de PID dans les 3 s de l'arrêt. Limite : un processus sorti de la session par setsid (ou par un double fork suivi de setsid) échappe à l'arrêt, y compris à celui du gardien.
+Gardien (plantage de l'assistant : SIGKILL, SIGSEGV, exception Python non rattrapée, où arreter() ne s'exécute pas) : main() forke, AVANT pty.fork() (il ne détient
+donc jamais le maître, ce qui supprimerait le SIGHUP noyau à la mort de l'assistant), un petit processus gardien relié par un tube. Le gardien sort de la session et du
+groupe de l'assistant (setsid), a ses descripteurs 0, 1 et 2 sur /dev/null et ne garde que l'extrémité de lecture du tube (sinon la fin du serveur Node attendrait le gardien).
+Protocole : l'assistant écrit « SID <pid> » après pty.fork(), puis « OK » après un arrêt propre (arreter() et la branche « shell sorti ») : le gardien sort alors sans rien faire.
+Fin du tube SANS « OK » après un « SID » : l'assistant est mort. Le gardien rejoue SIGHUP aux membres de la session, la grâce, puis le SIGKILL répété (membres, envoyer_membres,
+sigkill_session, getsid relu avant chaque envoi) ; il ne réape pas le shell (il n'est pas son parent) et sort dès que la session est vide, au plus GRACE + environ 2 s.
+Limites du gardien : un gardien tué lui-même (SIGKILL avant ou pendant le ménage) laisse les survivants, comme avant ; un processus sorti de la session par setsid échappe au
+gardien comme à arreter() ; sans relevé possible (ni /proc ni ps) il ne fait rien ; le fork du gardien échoue-t-il, l'assistant tourne sans lui.
+Limites signalées en revue (aucune n'est corrigée ici, elles sont connues) : (1) le gardien n'est pas le parent du shell, donc il ne le réape jamais : le chef de la session n'est visé que par le contrôle
+getsid, relu avant chaque envoi, sans le garde-fou « chef réapé » de l'assistant (CHEF_REAPE) ; (2) la borne « au plus GRACE + environ 2 s » suppose un `ps` qui répond vite : chaque relevé lance
+`ps` (5 s de délai au plus par appel, sans /proc), la durée réelle de l'arrêt dépend donc de lui ; (3) la fenêtre entre pty.fork() et l'écriture de « SID » n'est pas couverte : un assistant qui meurt dans cet intervalle
+laisse un gardien qui voit la fin du tube sans « SID » et ne ramasse rien, le shell déjà né reste alors sans gardien.
 Aucun octet du shell n'est journalisé.
 Compatible Python 3.9, aucune dépendance.
 """
@@ -116,6 +128,7 @@ def signaler(gs, sig):
 
 
 PROC = '/proc'
+GARDIEN = False  # vrai dans le processus gardien (voir gardien())
 SID_CHEF = 0  # PID du shell (chef de sa session), posé par main()
 CHEF_REAPE = False  # vrai dès que le chef de session (le shell) est réapé : son PID peut alors être réutilisé, il n'est plus jamais signalé
 
@@ -167,6 +180,8 @@ def releve():
 def chef_reape():
     """Réape le chef de session sans bloquer ; vrai s'il est (ou était déjà) réapé."""
     global CHEF_REAPE
+    if GARDIEN:
+        return CHEF_REAPE  # le gardien n'est pas le parent du shell : jamais de waitpid, le contrôle getsid suffit
     try:
         if os.waitpid(SID_CHEF, os.WNOHANG)[0]:
             CHEF_REAPE = True
@@ -262,6 +277,88 @@ def arreter(pid, maitre):
     sigkill_session(sid, gs)  # la mort du chef peut libérer des travaux : dernier relevé
 
 
+def ramasser(sid):
+    """Ménage du gardien : SIGHUP aux membres de la session, grâce, puis SIGKILL répété. Sort dès que la session est vide."""
+    envoyer_membres(sid, signal.SIGHUP)
+    fin = time.time() + GRACE
+    while time.time() < fin:
+        if not membres(sid):  # vide, ou relevé impossible (rien à faire)
+            return
+        time.sleep(0.05)
+    sigkill_session(sid, set())
+
+
+def gardien(r):
+    """Processus gardien : lit le tube jusqu'à sa fin ; sans « OK » après un « SID <pid> », l'assistant est mort : ramasse la session."""
+    global GARDIEN
+    GARDIEN = True
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    os.setsid()
+    r = fcntl.fcntl(r, fcntl.F_DUPFD, 10)  # hors de 0-2 et du bas de la table, que le ménage ci-dessous referme
+    nul = os.open(os.devnull, os.O_RDWR)
+    for fd in (0, 1, 2):
+        os.dup2(nul, fd)
+    os.closerange(3, r)
+    try:
+        maxfd = min(os.sysconf('SC_OPEN_MAX'), 65536)
+    except (ValueError, OSError):
+        maxfd = 4096
+    os.closerange(r + 1, maxfd)
+    sid = None
+    tampon = b''
+    while True:
+        try:
+            donnees = os.read(r, 256)
+        except OSError:
+            break
+        if not donnees:
+            break
+        tampon += donnees
+        while b'\n' in tampon:
+            ligne, tampon = tampon.split(b'\n', 1)
+            if ligne == b'OK':
+                return
+            mots = ligne.split()
+            if len(mots) == 2 and mots[0] == b'SID' and mots[1].isdigit():
+                sid = int(mots[1])
+    if sid is not None and sid > 1:
+        ramasser(sid)
+
+
+def lancer_gardien():
+    """Forke le gardien AVANT pty.fork() ; rend l'extrémité d'écriture du tube (non héritable : le shell ne la garde pas), ou None si le fork échoue."""
+    try:
+        r, w = os.pipe()
+    except OSError:
+        return None
+    try:
+        g = os.fork()
+    except OSError:
+        os.close(r)
+        os.close(w)
+        return None
+    if g == 0:
+        try:
+            os.close(w)
+            gardien(r)
+        finally:
+            os._exit(0)
+    os.close(r)
+    return w
+
+
+def dire(w, ligne):
+    """Écrit une ligne au gardien (sans effet s'il n'y en a pas)."""
+    if w is None:
+        return
+    try:
+        os.write(w, ligne)
+    except OSError:
+        pass
+
+
 def vider(maitre, sortie):
     """Sortie restante du maître après la fin du shell, poussée vers le descripteur 1 (2 s au plus)."""
     for _ in range(64):
@@ -293,6 +390,7 @@ def main():
         os.set_inheritable(3, False)  # le shell et ses travaux ne gardent pas le canal de contrôle
     except OSError:
         avec_controle = False  # lancé sans canal de contrôle : la taille initiale reste la seule
+    garde = lancer_gardien()
     pid, maitre = pty.fork()
     if pid == 0:
         try:
@@ -300,6 +398,7 @@ def main():
         finally:
             os._exit(127)
     SID_CHEF = pid
+    dire(garde, b'SID %d\n' % pid)
     taille(maitre, lignes, colonnes)
     os.set_blocking(maitre, False)
     os.set_blocking(1, False)
@@ -350,10 +449,12 @@ def main():
                 envoyer_membres(pid, signal.SIGHUP)
                 time.sleep(0.5)  # le temps de relayer SIGHUP ; ce qui reste de la session (nohup, disown) est tué
                 sigkill_session(pid, gs)
+                dire(garde, b'OK\n')
                 return 0
     except OSError:
         pass
     arreter(pid, maitre)
+    dire(garde, b'OK\n')
     return 0
 
 

@@ -1,5 +1,13 @@
 # Changelog — cockpit
 
+## v1.3.1 — 2026-11-05 — non publié
+
+Correctif hors phase (jalon vibeflow-v2.0, compartiment fiabilité) : le terminal intégré ne laisse plus de survivants quand son assistant PTY plante.
+
+### Corrigé — survivants après le plantage de l'assistant PTY
+- **Un gardien ramasse la session** : si l'assistant `vf-cockpit-pty.py` meurt sans passer par `arreter()` (SIGKILL, SIGSEGV, exception Python non rattrapée), les travaux qui ignorent le SIGHUP du noyau (`nohup … & disown`, `(trap '' HUP; exec sleep) &`) restaient rattachés à `ppid=1`. Un petit processus gardien, forké avant le pseudo-terminal (il ne détient jamais le maître), sorti de la session par `setsid`, détecte la fin du tube sans le mot `OK` de l'arrêt propre, puis rejoue SIGHUP, la grâce de 3 s et le SIGKILL répété sur les membres de la session (getsid relu avant chaque envoi). Il sort dès que la session est vide. Limites écrites dans l'en-tête du module : un gardien tué lui-même laisse les survivants, un processus sorti de la session par `setsid` y échappe.
+- **Suite `test-cockpit-terminal-pty-plantage.sh`** : T12.8a (SIGKILL) et T12.8b (exception injectée dans une copie) au vert, témoins T12.8c sains, deux mutants (`M-GARDIEN-ABSENT`, `M-GARDIEN-SANS-SID`) qui rougissent T12.8a avec les survivants `nohup` et `trap`. Aucun changement de comportement hors de ce ramassage.
+
 ## v1.3.0 — 2026-11-04 — non publié
 
 Phase 71 : terminal intégré. Décisions : arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-03,

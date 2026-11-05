@@ -3,7 +3,7 @@
 > Une page locale, en lecture seule (sauf le terminal intégré, si on le demande), qui dit où en est le lab : jalons, phases (à faire, en cours, à recetter, faites), plans,
 > exigences, missions, et qui travaille en ce moment, en arbre. Ouverte par `/vf-cockpit`.
 
-**Type** : skill + scripts + moteur vendorisé · **Version** : v1.3.0 · **Dépend de** : aucun module (lit le verrou de `conductor` s'il est posé)
+**Type** : skill + scripts + moteur vendorisé · **Version** : v1.3.1 · **Dépend de** : aucun module (lit le verrou de `conductor` s'il est posé)
 
 ## Ce que ça donne
 

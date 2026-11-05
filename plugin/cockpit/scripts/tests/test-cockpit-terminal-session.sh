@@ -96,7 +96,14 @@ flux() { # flux <fichier> <ms> [onglet] -> FL
 tape() { node "$TA" entree "$QP" "$SEC" "${2:-$ONG_A}" "$1"; }
 vu() { node "$TA" attendre "$1" "$2" "$3"; }
 python_de() { pgrep -P "$SRV_PID" | sed -n 1p; }
-shell_de() { local a; a="$(python_de)"; [ -n "$a" ] && pgrep -P "$a" | sed -n 1p; }
+# Le shell est l'enfant de l'assistant qui porte le terminal du pty (ps -o tt= : un tty). L'autre enfant, le GARDIEN (forké avant pty.fork, donc au PID le plus bas),
+# est sorti de la session par setsid : sans terminal de contrôle (tt= vaut ? sous Linux, ?? sous macOS). Aucune désignation par l'ordre des PID.
+shell_sous() { local c; for c in $(pgrep -P "$1"); do [ -n "$(tt_de "$c")" ] && { echo "$c"; return 0; }; done; return 1; }
+designation() { # designation <assistant> <shell> : « shell=tty|sans-terminal » puis « autres=<n> sans-terminal=<n> » (les enfants de l'assistant autres que le shell)
+  local t c n=0 g=0; t="$(tt_de "${2:-0}")"; [ -n "$t" ] && echo "shell=tty" || echo "shell=sans-terminal"
+  for c in $(pgrep -P "${1:-0}"); do [ "$c" = "$2" ] && continue; n=$((n+1)); [ -z "$(tt_de "$c")" ] && g=$((g+1)); done; echo "autres=$n sans-terminal=$g"; }
+tt_de() { local t; t="$(ps -o tt= -p "$1" 2>/dev/null | tr -d ' ')"; case "$t" in ''|'?'|'??') ;; *) echo "$t" ;; esac; } # terminal de contrôle du PID, vide s'il n'en a pas
+shell_de() { local a; a="$(python_de)"; [ -n "$a" ] && shell_sous "$a"; }
 attendre_python() { for _ in $(seq 1 80); do [ -n "$(python_de)" ] && return 0; sleep 0.1; done; return 1; }
 corps_etat() { node "$TA" etat "$QP" "$SEC" | sed -n 3p; }
 etat_s() { corps_etat | node "$AUX/ev.mjs" 'j.session' 2>/dev/null; }
@@ -189,6 +196,7 @@ assert_eq "T12.2 — A revient après 1 s : même shell, /etat vivante, le marqu
 flux "$WORK/f-g3.bin" 40000; for _ in $(seq 1 30); do [ "$(etat_s)" = vivante ] && break; sleep 0.1; done
 AP3="$(python_de)"; SH3="$(shell_de)"
 assert_eq "T12.3 — témoin : un assistant et un shell vivent avant la fermeture du flux" "$([ -n "$AP3" ] && [ -n "$SH3" ] && kill -0 "$AP3" 2>/dev/null && kill -0 "$SH3" 2>/dev/null && echo oui || echo "non (assistant=${AP3:-aucun} shell=${SH3:-aucun})")" "oui"
+assert_eq "T12.3 — témoin de désignation : shell_de() rend l'enfant qui porte le terminal du pty (tt= : un tty), pas le gardien ; l'autre enfant de l'assistant, le gardien, n'a pas de terminal" "$(designation "$AP3" "$SH3")" "$(printf 'shell=tty\nautres=1 sans-terminal=1')"
 vf_hyg_stop "$FL"; sleep 1
 assert_eq "T12.3 — témoin : 1 s après la fermeture, la session est détachée mais l'assistant vit encore" "$(etat_s) $(kill -0 "$AP3" 2>/dev/null && echo vivant || echo mort)" "detachee vivant"
 sleep $((GRACE_T/1000+1))
@@ -359,7 +367,7 @@ sonde_gel() { # -> « <n> échos sur 3 pendant le gel, serveur gelé=<oui|non> �
 }
 srv "$OUT"; R="$(sonde_gel)"; assert_eq "E1.1 — serveur gelé (SIGSTOP), trois frappes : les trois échos reviennent en moins de 1,5 s chacun (rouge avec Q dans le processus du serveur : aucun écho)" "$R" "3 échos sur 3 pendant le gel, serveur gelé=oui"; unsrv
 # E1 : la mort du parent par SIGKILL n'laisse ni processus du terminal, ni assistant, ni shell
-srv "$OUT"; f="$WORK/f-mort.bin"; flux "$f" 40000; attendre_python; QPID="$(proc_q "$SRV_PID")"; APID="$(command pgrep -P "$QPID" | sed -n 1p)"; SPID="$(command pgrep -P "$APID" | sed -n 1p)"
+srv "$OUT"; f="$WORK/f-mort.bin"; flux "$f" 40000; attendre_python; QPID="$(proc_q "$SRV_PID")"; APID="$(command pgrep -P "$QPID" | sed -n 1p)"; SPID="$(shell_sous "$APID")"
 assert_eq "E1.2 — témoin : avant la mort du parent, le processus du terminal, l'assistant et le shell vivent" "$(vivant_w "${QPID:-0}") $(vivant_w "${APID:-0}") $(vivant_w "${SPID:-0}")" "oui oui oui"
 kill -KILL "$SRV_PID"; wait "$SRV_PID" 2>/dev/null; morts 8 "$QPID" "$APID" "$SPID"; vf_hyg_stop "$FL"
 assert_eq "E1.3 — serveur tué par SIGKILL : ni processus du terminal, ni assistant, ni shell ne survivent (PID enregistrés)" "$(vivant_w "${QPID:-0}") $(vivant_w "${APID:-0}") $(vivant_w "${SPID:-0}")" "non non non"
