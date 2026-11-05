@@ -84,6 +84,17 @@ E1 heurte ADR-057 et ADR-058 ; E2 heurte ADR-058 ; seule E3 heurte le reste de l
   du jalon, pas un préalable.
 - Le compartiment `gouvernance` (Willy) utilise aussi GSD : la sortie le concerne.
 
+## Constats rattachés
+
+- **Le cockpit (`vf-cockpit`) exige un lab GSD** (constaté le 2026-11-05, demande de Samuel relayée
+  par la session `cra-facture-7a`). Lancé dans `~/Documents/CRA+Facture` (projet sans `.planning/`),
+  `/vf-cockpit` s'arrête en code 2 : « aucun dossier .planning trouvé : le cockpit se construit
+  dans un lab GSD. » (`plugin/cockpit/scripts/vf-cockpit.mjs:209`,
+  `plugin/cockpit/scripts/vf-cockpit-build.mjs:41`). Piste : l'onglet Code (carte du code) n'a
+  pas besoin du planning et pourrait fonctionner seul ; l'onglet Projet pourrait se dégrader
+  proprement (git, sessions en direct) au lieu de bloquer tout le cockpit. Indépendant d'E3 :
+  traitable avant, comme une dégradation et non comme une réécriture.
+
 ## Questions ouvertes pour le cadrage
 
 | # | Question |
