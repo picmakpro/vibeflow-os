@@ -108,10 +108,10 @@ ok "nouveau : le module du catalogue absent du registre est listé" "$(echo "$ou
 ok "nouveau : rien n'est posé d'office (aucun install)"            "$(grep -q 'install' "$NM_LOG" && echo false || echo true)"
 : > "$NM_LOG"
 HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user cockpit >/dev/null 2>&1
-ok "offer : module accepté posé avec ses dépendances, puis catalogue inscrit" "$([ "$(cat "$NM_LOG")" = "$(printf -- '--scope user install --with-deps cockpit\n--scope user mark-offered')" ] && echo true || echo false)"
+ok "offer : présentés calculés AVANT la pose, accepté posé avec ses dépendances, seuls les présentés inscrits" "$([ "$(cat "$NM_LOG")" = "$(printf -- '--scope user new-modules\n--scope user install --with-deps cockpit\n--scope user mark-offered cockpit')" ] && echo true || echo false)"
 : > "$NM_LOG"
 HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user >/dev/null 2>&1
-ok "offer sans module (refus) : seule l'inscription a lieu"        "$([ "$(cat "$NM_LOG")" = '--scope user mark-offered' ] && echo true || echo false)"
+ok "offer sans module (refus) : seule l'inscription des présentés a lieu" "$([ "$(cat "$NM_LOG")" = "$(printf -- '--scope user new-modules\n--scope user mark-offered cockpit')" ] && echo true || echo false)"
 : > "$NM_LOG"
 HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user '../x' >/dev/null 2>&1
 ok "offer : un nom de module douteux n'atteint jamais l'engine"    "$(grep -q 'install' "$NM_LOG" && echo false || echo true)"

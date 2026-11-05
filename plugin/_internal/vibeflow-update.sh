@@ -3928,22 +3928,52 @@ uninstall_module() {
 # ---------- Modules nouveaux du catalogue (lab déjà posé) ----------
 # `update --all` ne suit que le registre : un module apparu dans une release (cockpit en v2.75.0) n'y
 # entre jamais et n'est signalé à personne. Deux verbes, sobres, pour que /vf-update le PROPOSE :
-#   new-modules   (lecture seule) un `module=version` par ligne : dans le catalogue, absent du registre,
-#                 jamais déjà proposé, visible du poste. Registre absent = lab non posé : rien à proposer.
-#   mark-offered  inscrit TOUT le catalogue courant dans scripts/.vibeflow-offered. Appelé une fois la
-#                 réponse reçue (accord ou refus) : un module refusé ou retiré exprès n'est jamais reproposé.
+#   new-modules                  (lecture seule) un `module=version` par ligne : dans le catalogue, absent du
+#                                registre, jamais déjà proposé, proposable (pas `proposable:false`) et visible
+#                                du poste du lab. Registre absent = lab non posé : rien à proposer.
+#   mark-offered <module>...     inscrit, dans scripts/.vibeflow-offered, les modules EFFECTIVEMENT présentés à
+#                                l'humain (union avec l'existant), jamais le catalogue entier : un module que
+#                                personne n'a vu n'est pas « déjà proposé ». Sans argument : rien n'est écrit.
 # Le moteur ne traçait pas les retraits (uninstall retire juste la ligne du registre) ; ce fichier est la
 # trace minimale, sans toucher à uninstall. Premier passage sans fichier : tout module non posé est proposé
 # une fois (un retrait antérieur n'a pas laissé de trace), puis le fichier existe.
 VF_OFFERED_RELPATH="scripts/.vibeflow-offered"
 
+# module_is_proposable <mod> — faux si le manifeste porte `"proposable": false` (module WIP, caché du
+# catalogue de l'installeur : build-module-catalog.sh, INST-02bis). Défaut vrai. Même lecture textuelle que
+# module_is_mandatory (l'engine n'exige pas jq) ; manifeste absent = non proposable (jamais « par défaut »).
+module_is_proposable() {
+  local mj="$CACHE_DIR/$1/module.json"
+  [ -f "$mj" ] || return 1
+  ! grep -Eq '"proposable"[[:space:]]*:[[:space:]]*false' "$mj"
+}
+
+# resolve_lab_role — pose VF_ROLE depuis le poste du lab quand l'environnement n'en porte pas. Lecteur
+# unique vf-role.sh (cache du plugin, jamais le dépôt jugé : audit M-2), sur le fichier que role_write_file
+# écrit (<cible>/vibeflow-role). Pas de fichier = solo, sans lecteur. Fichier présent mais illisible ou
+# lecteur absent : ERREUR, jamais « visible » (un filtre de poste ne se replie pas). Réservé à new-modules :
+# install/update/uninstall gardent leur règle (VF_ROLE explicite seulement).
+resolve_lab_role() {
+  [ -z "${VF_ROLE:-}" ] || return 0
+  local file="$TARGET_ROOT/vibeflow-role" reader root out rc=0
+  [ -e "$file" ] || [ -L "$file" ] || return 0
+  reader="$CACHE_DIR/conductor/scripts/vf-role.sh"
+  [ -f "$reader" ] || err "poste : vf-role.sh absent du cache du plugin (conductor) — un poste posé ne se lit jamais à la main"
+  root="$(cd "$TARGET_ROOT" 2>/dev/null && cd .. && pwd -P)" || err "poste : racine du lab illisible"
+  out="$(env -u VF_ROLE bash "$reader" get --path "$root" 2>/dev/null)" || rc=$?
+  [ "$rc" -eq 0 ] || err "poste : fichier de poste du lab illisible ou invalide (code $rc) — nouveaux modules non calculés"
+  VF_ROLE="$out"
+}
+
 list_new_modules() {
   require_cache
   [ -f "$INSTALLED_REGISTRY" ] || return 0
+  resolve_lab_role
   local mod offered="$TARGET_ROOT/$VF_OFFERED_RELPATH"
   for mod in $(list_available_modules); do
     [ "$(module_version_installed "$mod")" = "—" ] || continue
     if [ -f "$offered" ] && grep -qx "$mod" "$offered"; then continue; fi
+    module_is_proposable "$mod" || continue
     role_visible "$mod" || continue
     echo "$mod=$(module_version_available "$mod")"
   done
@@ -3952,10 +3982,18 @@ list_new_modules() {
 mark_offered() {
   require_cache
   [ -f "$INSTALLED_REGISTRY" ] || { log "lab non posé (pas de registre) : rien à inscrire"; return 0; }
-  local offered="$TARGET_ROOT/$VF_OFFERED_RELPATH"
-  list_available_modules | LC_ALL=C sort > "${offered}.tmp"
+  local offered="$TARGET_ROOT/$VF_OFFERED_RELPATH" mod avail
+  [ "$#" -gt 0 ] || { log "aucun module présenté : rien à inscrire"; return 0; }
+  avail="$(list_available_modules)"
+  for mod in "$@"; do
+    case "$mod" in ''|*[!a-z0-9-]*) err "mark-offered : nom de module refusé" ;; esac
+  done
+  {
+    [ ! -f "$offered" ] || cat "$offered"
+    for mod in "$@"; do printf '%s\n' "$avail" | grep -qx "$mod" && echo "$mod"; done
+  } | LC_ALL=C sort -u > "${offered}.tmp"
   mv "${offered}.tmp" "$offered"
-  log "catalogue inscrit comme proposé : $offered"
+  log "modules inscrits comme proposés : $* ($offered)"
 }
 
 # ---------- Status ----------
@@ -4353,7 +4391,8 @@ case "$cmd" in
     list_new_modules
     ;;
   mark-offered)
-    mark_offered
+    shift
+    mark_offered "$@"
     ;;
   sync)
     # No-op explicite (SCOPE-02) : la source est le cache fourni, plus de sync git.

@@ -25,17 +25,26 @@ ENGINE="$NEW/_internal/vibeflow-update.sh"
 echo "[vf-update-run] cache le plus récent : $(basename "$NEW")"
 
 # Mode `offer <user|project> [module ...]` : suite de la proposition des modules nouveaux (étape 4d du
-# skill). Pose les modules ACCEPTÉS (fermeture de dépendances), puis inscrit tout le catalogue comme
-# proposé — accord ou refus, un module n'est proposé qu'une fois. Sans module : tout est refusé.
+# skill). Ordre fixe : (1) calcule l'ensemble PRÉSENTÉ à l'humain (= `new-modules`, avant toute pose, sinon
+# le registre a déjà bougé), (2) pose les modules ACCEPTÉS (fermeture de dépendances), (3) inscrit les seuls
+# modules présentés — accord ou refus, un module présenté n'est proposé qu'une fois ; un module accepté puis
+# désinstallé ne revient pas. Sans module : tout est refusé. `new-modules` en échec = rien n'est posé ni inscrit.
 if [ "${1:-}" = "offer" ]; then
   scope="${2:-}"
   case "$scope" in user|project) ;; *) echo "usage : vf-update-run.sh offer <user|project> [module ...]" >&2; exit 64 ;; esac
   shift 2
+  presented=()
+  if ! listed="$(VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" new-modules)"; then
+    echo "[vf-update-run] modules nouveaux illisibles (scope $scope) : rien n'est posé ni inscrit" >&2; exit 1
+  fi
+  while IFS= read -r l; do
+    [[ "$l" =~ ^([a-z0-9-]+)=[A-Za-z0-9._+-]+$ ]] && presented+=("${BASH_REMATCH[1]}")
+  done <<< "$listed"
   for m in "$@"; do
     case "$m" in ''|*[!a-z0-9-]*) echo "[vf-update-run] nom de module refusé : $m" >&2; continue ;; esac
     VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" install --with-deps "$m"
   done
-  VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" mark-offered
+  VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" mark-offered ${presented[@]+"${presented[@]}"}
   exit 0
 fi
 
@@ -45,8 +54,8 @@ run_scope() {
   echo "[vf-update-run] scope $scope → update --all ($root)"
   VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" update --all
   # Modules du catalogue absents du registre et jamais proposés : listés, JAMAIS posés d'office (ADR-031).
-  VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" new-modules 2>/dev/null | while IFS= read -r l; do
-    [ -n "$l" ] && echo "[vf-update-run] NOUVEAU_MODULE scope=$scope $l"
+  VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" new-modules | while IFS= read -r l; do
+    [[ "$l" =~ ^[a-z0-9-]+=[A-Za-z0-9._+-]+$ ]] && echo "[vf-update-run] NOUVEAU_MODULE scope=$scope $l"
   done
   return 0
 }
