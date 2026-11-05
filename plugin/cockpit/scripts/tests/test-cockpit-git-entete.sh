@@ -69,11 +69,16 @@ mk_lab() { # $1 = dossier : lab GSD minimal, un commit
 build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; $ENVX = préfixe d'environnement ; pose OUT, PORT ; démarre le serveur (SRV)
   env $ENVX "$NODE" "${2:-$SCRIPTS}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"
-  env $ENVX "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
+  env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
   SRV=$!; PIDS+=("$SRV")
   for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
   PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
 }
+
+# faux driver-lock.sh TENU (comme test-cockpit-projet.sh) : une mission dont un nœud est running n'est « en cours » que si son verrou est vivant (P68-D-05) ;
+# VF_COCKPIT_SCRIPTS_DIR n'est posé que pour le SERVEUR (ENVS), jamais pour le build
+mkdir -p "$WORK/locks"
+printf '#!/usr/bin/env bash\ncase "$1" in status) echo "{\\"present\\": true, \\"ws\\": \\"\\", \\"stale\\": false, \\"ttl\\": 1800, \\"progress_age_seconds\\": 30}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' > "$WORK/locks/driver-lock.sh"; chmod +x "$WORK/locks/driver-lock.sh"
 
 # --- dépôt jetable : `depot` (principal) et le worktree `wt-a` sur feat/x ---
 DEPOT="$WORK/depot"; WT="$WORK/wt-a"
@@ -292,6 +297,58 @@ JS
   assert_eq "H5.2 — témoin positif : la branche hostile est bien lue par git" "$(jq_ "$RH" 'j.texteLigne' 2>/dev/null)" "$HOST"
   assert_eq "H5.2 — aucun svg ni script neuf dans l'en-tête, aucune alerte" "$(jq_ "$RH" 'JSON.stringify([j.svgEntete, j.scripts, j.alerte])' 2>/dev/null)" "$(jq_ "$RB" 'JSON.stringify([j.svgEntete, j.scripts, j.alerte])' 2>/dev/null)"
 
+  echo "=== H6 — bloc de vue racine, retrait de « Repositories » ==="
+  cat > "$AUX/h6.js" <<'JS'
+const [base, page] = ARGS;
+await s.naviguer(base + page);
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#context h1') && !!window.VibeFlow`, 'bloc de vue rendu');
+await s.ev(`new Promise((r) => setTimeout(r, 700))`);
+return await s.ev(`(() => { const c = document.querySelector('#context'), G = window.VibeFlow.graph;
+  return { k: c.querySelector('.k').textContent, h1: c.querySelector('h1').textContent, p: (c.querySelector('p') || {}).textContent || '', cls: c.querySelector('h1').className,
+    nomProjet: String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''), resume: G.project.summary,
+    sections: [...document.querySelectorAll('#panel h3')].map((h) => h.textContent), depots: document.querySelectorAll('#panel .rp').length }; })()`);
+JS
+  ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WT"; BASE="http://127.0.0.1:$PORT"
+  R="$(cdp "$AUX/h6.js" "$BASE" / 2>&1 | tail -1)"
+  assert_eq "H6.1 — Code : surtitre = Code" "$(jq_ "$R" 'j.k' 2>/dev/null)" "Code"
+  assert_eq "H6.1 — Code : titre = Le code, branche feat/x" "$(jq_ "$R" 'j.h1' 2>/dev/null)" "Le code, branche feat/x"
+  assert_eq "H6.1 — Code : sous-titre = nombre, puis « lus dans le dépôt. »" "$(jq_ "$R" '/^[0-9]+ .*lus dans le dépôt\.$/.test(j.p) ? "ok" : j.p' 2>/dev/null)" "ok"
+  assert_eq "H6.3 — Code : le titre ne répète ni le nom du projet ni celui du dépôt, classe vf-ctx-titre" "$(jq_ "$R" '[j.h1.includes(j.nomProjet), j.h1.includes("depot"), /vf-ctx-titre/.test(j.cls)].join("|")' 2>/dev/null)" "false|false|true"
+  assert_eq "H6.5 — témoin positif : graph.json garde la donnée repos" "$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/graph.json','utf8')).meta.repos.length > 0)")" "true"
+  assert_eq "H6.5 — témoin positif : le panneau d'ensemble est rendu (des sections)" "$(jq_ "$R" 'j.sections.length > 0' 2>/dev/null)" "true"
+  assert_eq "H6.5 — aucun titre « Repositories » ni « Dépôts » dans le panneau, aucune ligne « branche @ sha »" "$(jq_ "$R" '[j.sections.filter((t) => /^(Repositories|Dépôts)/.test(t)).length, j.depots].join("|")' 2>/dev/null)" "0|0"
+  R="$(cdp "$AUX/h6.js" "$BASE" /project.html 2>&1 | tail -1)"
+  assert_eq "H6.2 — Projet : surtitre, titre « Jalon <jalon> », sous-titre = résumé du projet" "$(jq_ "$R" '[j.k, j.h1, j.p === j.resume].join("|")' 2>/dev/null)" "Projet|Jalon vibeflow-test|true"
+  assert_eq "H6.3 — Projet : le titre ne répète pas le nom du projet" "$(jq_ "$R" '[j.h1.includes(j.nomProjet), /vf-ctx-titre/.test(j.cls)].join("|")' 2>/dev/null)" "false|true"
+  R="$(cdp "$AUX/h6.js" "$BASE" /equipe.html 2>&1 | tail -1)"
+  assert_eq "H6.2 — Équipe sans mission : « Aucune mission en cours », « L'équipe est au repos. »" "$(jq_ "$R" '[j.k, j.h1, j.p].join("|")' 2>/dev/null)" "Équipe|Aucune mission en cours|L'équipe est au repos."
+  mkdir -p "$WT/.planning/missions"; printf '{"nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}\n' > "$WT/.planning/missions/MISSION-x.dag.json"
+  for _ in $(seq 1 40); do R="$(cdp "$AUX/h6.js" "$BASE" /equipe.html 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "Mission : x" ] && break; sleep 0.5; done
+  assert_eq "H6.2 — Équipe avec une mission en cours : « Mission : x »" "$(jq_ "$R" 'j.h1' 2>/dev/null)" "Mission : x"
+  printf '{"nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}\n' > "$WT/.planning/missions/MISSION-y.dag.json"
+  for _ in $(seq 1 40); do R="$(cdp "$AUX/h6.js" "$BASE" /equipe.html 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "2 missions en cours" ] && break; sleep 0.5; done
+  assert_eq "H6.2 — Équipe avec deux missions : « 2 missions en cours »" "$(jq_ "$R" 'j.h1' 2>/dev/null)" "2 missions en cours"
+  cat > "$AUX/h64.js" <<'JS'
+const [base] = ARGS;
+await s.naviguer(base + '/project.html');
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#context h1') && !!window.VibeFlow`, 'page Projet');
+await s.ev(`new Promise((r) => setTimeout(r, 700))`);
+const lire = () => s.ev(`(() => ({ k: document.querySelector('#context .k').textContent, h1: document.querySelector('#context h1').textContent, cls: document.querySelector('#context h1').className }))()`);
+const racine = await lire();
+const noeud = await s.ev(`(() => { const n = window.VibeFlow.graph.nodes.find((x) => x.kind === 'phase') || window.VibeFlow.graph.nodes[0]; window.VibeFlow.go('n:' + n.id); return { id: n.id, label: n.label }; })()`);
+await s.attendre(`document.querySelector('#context h1').textContent === ${JSON.stringify(noeud.label)}`, 'sous-vue du nœud');
+const dedans = await lire();
+await s.ev(`window.VibeFlow.go('root')`);
+await s.attendre(`document.querySelector('#context h1').textContent === ${JSON.stringify(racine.h1)}`, 'retour à la racine');
+return { racine, noeud, dedans, retour: await lire() };
+JS
+  R="$(cdp "$AUX/h64.js" "$BASE" 2>&1 | tail -1)"
+  assert_eq "H6.4 — dans un nœud : le bloc est celui du viewer (nom du nœud, sans classe vf-ctx-titre)" "$(jq_ "$R" '[j.dedans.h1 === j.noeud.label, /vf-ctx-titre/.test(j.dedans.cls), j.dedans.k !== "Projet"].join("|")' 2>/dev/null)" "true|false|true"
+  assert_eq "H6.4 — retour à la racine : le bloc réécrit" "$(jq_ "$R" '[j.retour.k, j.retour.h1 === j.racine.h1, /vf-ctx-titre/.test(j.retour.cls)].join("|")' 2>/dev/null)" "Projet|true|true"
+  stop_srv
+  build_serve "$NOGIT"; R="$(cdp "$AUX/h6.js" "http://127.0.0.1:$PORT" / 2>&1 | tail -1)"; stop_srv
+  assert_eq "H6.1 — Code sans git : « Le code du projet », « … lus dans le dossier. »" "$(jq_ "$R" '[j.k, j.h1, /^[0-9]+ .*lus dans le dossier\.$/.test(j.p)].join("|")' 2>/dev/null)" "Code|Le code du projet|true"
+
   echo "=== Mutants ==="
   # M-DEPOT : le nom du dépôt pris de --show-toplevel (le worktree) -> H1.1 et H2.2 rougissent
   MD="$(mkmod mdepot)"
@@ -313,7 +370,25 @@ JS
   NOGIT_M="$WORK/hors-depot-mutant"; mk_lab "$NOGIT_M"
   build_serve "$NOGIT_M" "$MA"; RMA="$(cdp "$AUX/struct.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
   assert_eq "M-ABSENT — rougit H5.1 (la ligne et le bloc existent sans git)" "$(jq_ "$RMA" '[j.ligne, j.bloc].join("|")' 2>/dev/null)" "true|true"
+  # M-REPOS : l'index garde la liste des dépôts (retrait annulé dans une copie du build) -> H6.5 rougit
+  MR="$(mkmod mrepos)"
+  mutate "$MR/vf-cockpit-build.mjs" "insererGraphe(html, { ...g, meta: { ...g.meta, repos: [] } })" "insererGraphe(html, g)" || echo "  ❌ FAIL — M-REPOS : mutation impossible" >&2
+  REPOS="$WORK/depot-repos"; mk_lab "$REPOS"; $GIT -C "$REPOS" init -q -b main && $GIT -C "$REPOS" add -A && $GIT -C "$REPOS" commit -q -m init
+  build_serve "$REPOS" "$MR"; RMR="$(cdp "$AUX/h6.js" "http://127.0.0.1:$PORT" / 2>&1 | tail -1)"; stop_srv
+  assert_eq "M-REPOS — rougit H6.5 (la liste « Dépôts » ou ses lignes réapparaissent)" "$(jq_ "$RMR" '(j.sections.filter((t) => /^(Repositories|Dépôts)/.test(t)).length + j.depots) > 0 ? "rouge" : "vert"' 2>/dev/null)" "rouge"
 fi
+
+echo "=== H6.6 — la feuille de 76 n'emploie que des variables et des valeurs existantes (P78-D-12) ==="
+JET="$HERE_T/css-jetons.mjs"
+node "$JET" "$UI/76-vf-git-entete.js" > "$WORK/jetons.out" 2>&1; RCJ=$?
+assert_eq "H6.6 — la feuille de 76 : aucune valeur en dur (couleur, espacement, rayon)" "$RCJ $(cat "$WORK/jetons.out" | head -3)" "0 "
+# témoins : chaque famille de valeur fautive est refusée, nommée, sur une copie de 76 (jamais le fichier lui-même)
+for cas in "padding: 2px 6px;|padding: 5px 6px;|5px" "cursor: pointer;|cursor: pointer; color: #123456;|#123456" "border-radius: 999px;|border-radius: 50%;|50%" "background: transparent;|background: rgba(1, 2, 3, .5);|rgba(" "margin-left: -6px;|margin-left: -7px;|-7px"; do
+  ANC="${cas%%|*}"; RESTE="${cas#*|}"; NOUV="${RESTE%%|*}"; NOM="${RESTE#*|}"
+  cp "$UI/76-vf-git-entete.js" "$WORK/76-fautif.js"; mutate "$WORK/76-fautif.js" "$ANC" "$NOUV" || echo "  ❌ FAIL — H6.6 : mutation impossible ($ANC)" >&2
+  node "$JET" "$WORK/76-fautif.js" > "$WORK/jetons-fautif.out" 2>&1; RCF=$?
+  assert_eq "H6.6 — témoin « $NOM » : refusé (code 1) et nommé" "$RCF $(grep -cF -- "$NOM" "$WORK/jetons-fautif.out")" "1 1"
+done
 
 vf_hyg_assert
 echo; echo "Résultats : $PASS réussis, $FAIL échoués, $SKIP sautés"
