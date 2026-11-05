@@ -66,7 +66,7 @@ Aucune release depuis `v2.75.1` : release groupée (bump racine, tag, release Gi
 
 ### Échéances
 
-- **2027-01-31 : réexamen de l'approche C (plateforme collaborative).** Décision A de la Phase 62 (approche C différée, P62-D-05), échéance humaine sans veille automatique. À la date : relire C1 et C2 (`62-DECISION-plateforme.md` §6) et constater leur état ; si un fait manque, repousser par un nouvel arbitrage, jamais en silence. C1 : compte rendu de la recette de la Phase 61 sur lab réel (COLB-08). C2 : besoin non-dev sans terminal documenté (option B possible, à la discrétion de Samuel). Entrée d'origine du BACKLOG, archivée le 2026-11-05 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Transformer 28 et 29 ») : `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`, § « Réexamen approche C (plateforme collaborative) — 2027-01-31 ».
+- **2027-01-31, ou plus tôt si C1 et C2 sont établis : réexamen de l'approche C (plateforme collaborative).** Décision A de la Phase 62 (approche C différée, P62-D-05), échéance humaine sans veille automatique. À la date : relire C1 et C2 (`62-DECISION-plateforme.md` §6) et constater leur état ; si un fait manque, repousser par un nouvel arbitrage, jamais en silence. C1 : compte rendu de la recette de la Phase 61 sur lab réel (COLB-08). C2 : besoin non-dev sans terminal documenté (option B possible, à la discrétion de Samuel). Entrée d'origine du BACKLOG, archivée le 2026-11-05 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Transformer 28 et 29 ») : `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`, § « Réexamen approche C (plateforme collaborative) — 2027-01-31 ».
 
 ### Blockers/Concerns
 
