@@ -235,7 +235,7 @@ Gate de phase : rejouer les commandes du job CI `gates` de `.github/workflows/ci
 
 | Dépendance | Disponible | Version | Repli |
 |---|---|---|---|
-| `claude` | ✓ `/Users/samuel/.local/bin/claude` | 2.1.318 | Copier la commande |
+| `claude` | ✓ `~/.local/bin/claude` | 2.1.318 | Copier la commande |
 | `python3` | ✓ | 3.14.6 | terminal indisponible (déjà géré) |
 | `node` | ✓ | v26.5.0 | — |
 | Chrome (suites navigateur) | ✓ | — | mode simulé des suites |

@@ -468,15 +468,36 @@ terminal en 71 (Recommandé) », puis « Oui, 69 / 71 / 72 (Recommandé) »). **
 
 ### Phase 72: Lancer du travail depuis les cartes du cockpit
 
-> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Oui, 69 / 71 / 72 (Recommandé) »).
+> **Cadrée le 2026-11-05 (`72-CONTEXT.md`, P72-D-01..19, arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-05) et planifiée le 2026-11-05** : 15 plans en 4 vagues, `files_modified` disjoints deux à deux dans chaque vague, contrats inter-plans dans `72-CONTRATS.md`, branchements dans `72-BRANCHEMENTS-MERGE.md`. Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Oui, 69 / 71 / 72 (Recommandé) »).
 
 **Goal:** Depuis une carte de phase ou de mission, ou depuis le cockpit, lancer du travail dans une session Claude Code qui tourne sur le poste, avec le contexte du projet, en anticipant les dépendances manquantes et les impossibilités avant de lancer.
 **Vision de Samuel** (AskUserQuestion session principale, 2026-11-03, mot pour mot) : « Je veux aussi anticiper à l'intégration prochaine terminale et de pouvoir travailler directement dans le cockpit, c'est-à-dire que on a déjà un chat qui est prévu enfin qui est actuellement dans l'application, ils permet de poser des questions mais pas forcément de lancer du travail, il faudrait qu'on puisse aussi lancer du travail éventuellement donc ça sera l'idée d'avoir une session Claude code qui tourne dans le code une session de terminale dans l'idéal, et ça permettrait de lancer par exemple depuis les cartes ou depuis le cockpit du travail soit en cliquant sur les cartes de phase ou de mission ou peu importe. Bien sûr, il faudrait qu'on anticipe les manque, les dépendances manquantes donc ça empêcherait l'exécution, il faudrait qu'on anticipe aussi et les impossibilité voilà qu'on qu'on fasse pas de but en blanc donc ça potentiellement le chat qui permet de poser des questions permet déjà d'avoir le contexte et puis ensuite on pourrait éventuellement lancer du travail depuis le cockpit donc c'est-à-dire avec la méthode Vilo avec le Fail système qui vit qui vit littéralement sur le PC et donc il peut travailler sur les work qui peut faire des poches qui peut écrire dans des fichiers qui s'ouvre avec déjà le contexte, projets, les skis etc. cetera » (lecture de la transcription vocale : « Vilo » = VibeFlow, « Fail système » = file system, « work » = worktrees, « poches » = PR, « skis » = skills).
-**Requirements**: TBD — posées au cadrage.
-**Depends on:** Phase 71 (terminal intégré).
+**Requirements**: LANC-01, LANC-02, LANC-03, LANC-04, LANC-05, LANC-06, LANC-07, LANC-08, LANC-09, LANC-10, LANC-11, LANC-12
+**Depends on:** Phase 71 (terminal intégré ; clôture mergée, cockpit v1.3.3).
 **Sources:** `69-CONTEXT.md` P69-D-19 et P69-D-21.
-**Plans:** 0 plans
+**Plans:** 0/15 plans exécutés
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 72 to break down)
+**Vague 1** (parallèle, aucun fichier commun)
+- [ ] 72-01-PLAN.md — Gabarit de commande, alphabet fermé, motifs, forme du prompt (LANC-05, LANC-09)
+- [ ] 72-02-PLAN.md — Assistant PTY : premier plan, revalidation de la ligne, écriture sans retour chariot (LANC-06, LANC-07)
+- [ ] 72-03-PLAN.md — Cibles lançables et pré-vols (LANC-04, LANC-08)
+- [ ] 72-04-PLAN.md — Mécanisme POST de P : Host, Origin exacte, jeton, schéma fermé (LANC-03)
+- [ ] 72-05-PLAN.md — État de Q : liste fermée, proposition unique, armement, consommation (LANC-04, LANC-07, LANC-10)
+- [ ] 72-06-PLAN.md — Interface des cartes servie à la volée avec `--terminal` (LANC-01, LANC-02)
+- [ ] 72-07-PLAN.md — Registre de suivi et rattachement à l'onglet Équipe (LANC-10)
+- [ ] 72-08-PLAN.md — Bandeau de proposition dans la page Q, mode retenu dans le stockage de Q (LANC-07, LANC-09)
+
+**Vague 2**
+- [ ] 72-09-PLAN.md — Assemblage côté P : canal, orchestration, branchements serveur et terminal (LANC-01..04, LANC-08, LANC-10)
+- [ ] 72-10-PLAN.md — Assemblage côté Q : routes `/proposition`, `/lancer`, `/annuler`, IPC (LANC-04..07, LANC-09, LANC-10)
+
+**Vague 3**
+- [ ] 72-11-PLAN.md — Chaîne XSS étendue jusqu'au lancement (LANC-04, LANC-05, LANC-07, LANC-09)
+- [ ] 72-12-PLAN.md — Bout en bout avec faux `claude` dans Chromium (LANC-05, LANC-09, LANC-10, LANC-12)
+- [ ] 72-13-PLAN.md — « Continuer le chat » : porte de décision sur la sonde A5, puis option (LANC-11)
+- [ ] 72-14-PLAN.md — Tiroir : ouvrir à l'arrivée d'une proposition (LANC-01, LANC-07)
+
+**Vague 4**
+- [ ] 72-15-PLAN.md — Documentation et bump unique du module cockpit (LANC-12)

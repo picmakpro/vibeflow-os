@@ -1014,6 +1014,18 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | TERM-10 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
 | TERM-11 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
 | TERM-12 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
+| LANC-01 | Phase 72 | Pending — 2026-11-05 (planification) |
+| LANC-02 | Phase 72 | Pending — 2026-11-05 (planification) |
+| LANC-03 | Phase 72 | Pending — 2026-11-05 (planification) |
+| LANC-04 | Phase 72 | Pending — 2026-11-05 (planification) |
+| LANC-05 | Phase 72 | Pending — 2026-11-05 (planification) |
+| LANC-06 | Phase 72 | Pending — 2026-11-05 (planification) |
+| LANC-07 | Phase 72 | Pending — 2026-11-05 (planification) |
+| LANC-08 | Phase 72 | Pending — 2026-11-05 (planification) |
+| LANC-09 | Phase 72 | Pending — 2026-11-05 (planification) |
+| LANC-10 | Phase 72 | Pending — 2026-11-05 (planification) |
+| LANC-11 | Phase 72 | Pending — 2026-11-05 (planification) |
+| LANC-12 | Phase 72 | Pending — 2026-11-05 (planification) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1594,6 +1606,21 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **TERM-10**: xterm.js vendorisé avec sha256 et licence ; aucun addon presse-papiers ; séquences OSC 52, OSC 8, DCS, CSI 21t, DECRQSS dans la sortie : presse-papiers inchangé, aucun octet choisi par la sortie réinjecté dans l'entrée du PTY (seules les réponses de format fixe d'xterm — DA1, DA2, DSR, CPR, DECRQM, couleurs OSC — le sont, F8 de l'audit, P71-D-25) (P71-D-16).
 - [x] **TERM-11**: Aucune frappe ni sortie du terminal sur disque ni dans les flux du cockpit (journal, SSE, export) ; le tampon de reprise est vidé à la fin de la session.
 - [x] **TERM-12**: Non-régression et chaîne XSS : toutes les suites du cockpit restent vertes ; la chaîne de `test-cockpit-chaine-xss.sh` étendue — une charge exécutée dans P qui tente `window.open` vers Q, `postMessage`, `fetch`/POST vers Q avec le jeton de page, la lecture du stockage de Q — ne crée aucun fichier marqueur par le shell.
+
+### Lancer du travail depuis les cartes du cockpit (Phase 72 — posées à la planification, 2026-11-05)
+
+- [ ] **LANC-01**: Cartes : avec `--terminal`, les cartes de phase et de mission de l'onglet Projet portent une action principale selon l'état et un menu des autres verbes de la liste fermée (P72-D-04, P72-D-05).
+- [ ] **LANC-02**: Sans `--terminal` : CSP de page identique octet pour octet, aucun bouton, aucune route POST (P72-D-17, TERM-01).
+- [ ] **LANC-03**: Route POST de P : Host, Origin exacte, jeton en temps constant, `Content-Type`, corps borné, schéma fermé ; témoins : Origin tierce, Origin absente, Origin de Q, mauvais jeton, corps trop long, champ inconnu → refus et 0 proposition (P72-D-11).
+- [ ] **LANC-04**: Liste fermée : une cible malformée (`72;touch M`, `$(touch M)`) ou bien formée mais absente de la liste du serveur → aucun bandeau, 0 octet au PTY, aucun marqueur (P72-D-12).
+- [ ] **LANC-05**: Gabarit : avec un lab de test dont le titre de phase vaut `"; touch M #` et `<img src=x onerror=…>`, la ligne écrite est exactement le gabarit, dans l'alphabet fermé ; titre affiché par `textContent` ; 0 violation CSP, 0 marqueur ; mutant qui interpole le titre → rouge (P72-D-13).
+- [ ] **LANC-06**: Premier plan : programme témoin au premier plan, confirmation → 0 octet reçu par le programme et message clair ; mutant sans contrôle → rouge (P72-D-01).
+- [ ] **LANC-07**: Double geste : aucune écriture sans clic dans Q ; clic avant le délai d'armement ignoré ; ligne écrite sans `\r` ; la charge XSS de `test-cockpit-terminal-xss.sh` (proposition, `iframe.click()`, `postMessage`, popup) ne crée aucun marqueur (P72-D-14, TERM-12).
+- [ ] **LANC-08**: Pré-vols : chaque bloquant de P72-D-06 empêche le lancement avec son motif ; chaque avertissement s'affiche sans bloquer ; emplacement « travail non commité » prévu, inactif (P72-D-06, P72-D-07).
+- [ ] **LANC-09**: Mode de permission : le bandeau propose `default`, `acceptEdits`, `plan` et « hérité » ; « hérité » = aucun drapeau ; présélection = dernier mode choisi, retenu dans le stockage de l'origine Q, `default` au premier lancement ou si la valeur retenue est hors liste ; témoins : P ne peut ni lire ni écrire ce choix (`SecurityError` mesuré), une valeur forgée dans le stockage de Q retombe sur `default` (P72-D-02, P72-D-02bis).
+- [ ] **LANC-10**: Suivi : `--session-id` généré, la carte montre « lancée » et rattache la session de l'onglet Équipe ; proposition consommée une seule fois (un rechargement ou une bascule de thème ne la fait pas revenir) (P72-D-16, P72-D-10).
+- [ ] **LANC-11**: Continuer le chat : option offerte seulement si une conversation existe et si la sonde de P72-D-03 est verte ; identifiant validé UUID (P72-D-03).
+- [ ] **LANC-12**: Usage réel et non-régression : de bout en bout dans Chromium avec un faux `claude` dans le PATH (suites), puis avec le vrai `claude` (recette par juges, captures) ; toutes les suites du cockpit vertes sous macOS et Linux.
 
 ---
 *Requirements defined: 2026-06-04*
