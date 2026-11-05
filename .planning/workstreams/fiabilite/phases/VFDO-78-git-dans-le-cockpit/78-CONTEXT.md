@@ -151,6 +151,12 @@ verrous de driver, arbitrages en attente, watchdog et serveurs orphelins (Phase 
 - **P78-D-33 (pastilles d'état des worktrees).** Glyphe + mot en texte neutre, sans fond teinté ni couleur de texte
   d'état : application des jetons figés de la 71.5 (arbitrages Samuel, AskUserQuestion session principale, 2026-11-05),
   qui priment sur `--warn-bg`/`--ok-bg` du plan 78-10.
+- **P78-D-34 (seuil de la seconde ligne, avis contraire du juge).** Sur la délégation de P78-D-19 (« sauf avis contraire du
+  juge de design »), la critique fraîche du 2026-11-06 mesure la seconde ligne illisible de 1000 à 1279 px (~16 px de
+  branche visibles) : elle est masquée sous 1280 px et l'icône 44 px de P78-D-20 la remplace de 701 à 1279 px. Signalé à
+  Samuel (SendMessage session principale, 2026-11-06), réversible sur son avis.
+- **P78-D-35 (HEAD détaché dans l'en-tête).** Texte neutre, comme dans le tiroir : règle 71.5 « glyphe + mot en texte
+  neutre » (arbitrages Samuel, AskUserQuestion session principale, 2026-11-05).
 
 ### Claude's Discretion
 
