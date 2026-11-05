@@ -20,33 +20,50 @@
     sync(); window.addEventListener('floorplan-theme-change', sync);
   }
 
+  // 71.5 (P71.5-D-18, D-20) : le glyphe d'une pastille est un masque SVG teinté par --c-st (seule couleur de la pastille). encodeURIComponent : jamais de `#` littéral dans la source (M5.3)
+  const GLYPHE = (corps) => 'url("data:image/svg+xml,' + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'>" + corps + '</svg>') + '")';
+  const ANNEAU = "<circle cx='8' cy='8' r='6' fill='none' stroke='black' stroke-width='1.75'/>";
+  const G_ST = {
+    done: GLYPHE("<path d='M3.5 8.5l3 3 6-7' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/>"),
+    active: GLYPHE(ANNEAU + "<path d='M8 4a4 4 0 0 1 0 8z' fill='black'/>"),
+    recette: GLYPHE(ANNEAU + "<circle cx='8' cy='8' r='2.2' fill='black'/>"),
+    todo: GLYPHE(ANNEAU),
+    blocked: GLYPHE(ANNEAU + "<path d='M4.5 8h7' stroke='black' stroke-width='1.75' stroke-linecap='round'/>"),
+    abandonnee: GLYPHE(ANNEAU + "<path d='M4.2 11.8L11.8 4.2' stroke='black' stroke-width='1.75' stroke-linecap='round'/>"),
+  };
   const style = document.createElement('style');
   style.textContent = `
-    :root { --st-done: var(--recent); --st-active: var(--sev-medium); --st-todo: var(--text-4); --st-blocked: var(--sev-high); }
+    :root { --st-done: var(--recent); --st-active: var(--sev-medium); --st-todo: var(--text-4); --st-blocked: var(--sev-high); --st-recette: var(--st-active); }
     .vf-tabs { display: inline-flex; gap: var(--sp-2); padding: var(--sp-4); margin-left: var(--sp-12); border-radius: 12px; background: var(--raise); flex: none; }
     .vf-tabs a { padding: var(--sp-4) var(--sp-12); border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text-3); text-decoration: none; line-height: 1.4; }
     .vf-tabs a:hover { color: var(--text); }
     .vf-tabs a.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
-    .vst { font-size: 11px; font-weight: 600; padding: var(--inset-pill); line-height: 16px; border-radius: 999px; white-space: nowrap;
-      /* texte teinté vers --text : le statut seul passait sous 4,5:1 sur sa pastille en thème clair (recette 69) */
-      color: color-mix(in srgb, var(--c-st) 68%, var(--text)); background: color-mix(in srgb, var(--c-st) 14%, transparent); }
-    .vst-done { --c-st: var(--st-done); } .vst-active { --c-st: var(--st-active); } .vst-todo { --c-st: var(--st-todo); } .vst-blocked { --c-st: var(--st-blocked); }
-    /* recette 68 R5 (P68-D-35, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04 : « Tout selon les recos ») : une mission abandonnée dit « Abandonnée », en gris neutre (le jeton du « À faire », aucune couleur en dur) */
-    .vst-abandonnee { --c-st: var(--st-todo); }
+    /* 71.5 (P71.5-D-18, N1) : pastille sans fond : un glyphe coloré (--c-st) puis le mot en --text-2. Hauteur 20 = 16 + 2 x 2, jamais de height ; padding horizontal nul hors paliers lod, pour que le bord visible s'aligne sur le titre */
+    .vst { display: inline-flex; align-items: center; gap: var(--sp-4); font-size: 11px; font-weight: 500; padding: var(--sp-2) 0; line-height: 16px; border-radius: 999px; white-space: nowrap; color: var(--text-2); background: none; }
+    .vst::before { content: ""; width: .9em; height: .9em; flex: none; background: var(--c-st); -webkit-mask: var(--g-st) center / contain no-repeat; mask: var(--g-st) center / contain no-repeat; }
+    .vst-done { --c-st: var(--st-done); --g-st: ${G_ST.done}; } .vst-active { --c-st: var(--st-active); --g-st: ${G_ST.active}; } .vst-todo { --c-st: var(--st-todo); --g-st: ${G_ST.todo}; } .vst-blocked { --c-st: var(--st-blocked); --g-st: ${G_ST.blocked}; }
+    .vst-recette { --c-st: var(--st-recette); --g-st: ${G_ST.recette}; }
+    /* recette 68 R5 (P68-D-35, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04 : « Tout selon les recos ») : une mission abandonnée dit « Abandonnée » ; 71.5 : gris neutre (--text-3), anneau barré d'une diagonale (distinct de « bloqué » et de « à faire ») */
+    .vst-abandonnee { --c-st: var(--text-3); --g-st: ${G_ST.abandonnee}; }
     /* recette 68 R7 (même arbitrage) : le pied d'une carte (« 0/2 nœuds · abandonnée, nœuds non refermés ») passe à la ligne au lieu de pousser la pastille hors de la carte ; la pastille garde sa taille */
     .foot .meta { white-space: normal; min-width: 0; border-radius: 12px; }
     .foot .vst { flex: none; }
-    .card.st-active { box-shadow: 0 0 0 1.5px var(--st-active), 0 8px 28px color-mix(in srgb, var(--st-active) 22%, transparent); }
-    .card.st-blocked { box-shadow: 0 0 0 1.5px var(--st-blocked); }
-    .card.st-done .desc { opacity: .78; }
+    /* 71.5 (P71.5-D-18, D-28, N2) : ni anneau ni halo, une seule élévation ; l'état se lit dans le pied (glyphe + mot) et la graisse du titre. « En cours » : palier neutre plus marqué (--raise allégé), car --surface-hover ne se voit pas en clair */
+    .card.st-active, .node:hover .card.st-active { background: color-mix(in srgb, var(--raise) 70%, var(--surface)); }
+    .card.st-active, .card.st-blocked { box-shadow: var(--shadow-card); }
+    .card.st-active .title, .card.st-blocked .title { font-weight: 600; color: var(--text); }
+    .card.st-done .title, .card.st-todo .title { font-weight: 500; color: var(--text-2); }
+    .card.st-done .desc { color: var(--text-3); }
+    /* piste --raise-2, remplissage neutre ; seule la barre « en cours » prend --warn-text (une teinte d'état ne se pose pas sur --raise-2 en clair, 71.5 §1.2) */
     .vf-bar { height: 6px; border-radius: 99px; background: var(--raise-2); overflow: hidden; margin-top: var(--sp-6); }
-    .vf-bar i { display: block; height: 100%; border-radius: 99px; background: var(--c-st, var(--st-done)); }
+    .vf-bar i { display: block; height: 100%; border-radius: 99px; background: var(--text-3); }
+    .vf-bar.st-active i { background: var(--warn-text); }
     .vf-ms { padding: var(--inset-row); border-radius: 14px; cursor: pointer; margin-bottom: var(--sp-2); margin-inline: calc(-1 * var(--sp-12)); }
     .vf-ms:hover { background: var(--surface-hover); }
     .vf-ms .t { display: flex; justify-content: space-between; gap: var(--sp-8); font-size: 13px; font-weight: 500; }
     .vf-ms .t span:last-child { color: var(--text-3); font-weight: 400; font-variant-numeric: tabular-nums; }
-    .vf-now { padding: var(--inset-box); border-radius: 16px; background: color-mix(in srgb, var(--st-active) 8%, transparent); font-size: 13px; line-height: 1.55; }
-    .vf-now b { display: block; font-size: 11.5px; color: color-mix(in srgb, var(--st-active) 68%, var(--text)); margin-bottom: var(--sp-4); font-weight: 600; }
+    .vf-now { padding: var(--sp-12) 0 0; border-top: 1px solid var(--hair); background: none; font-size: 13px; line-height: 1.55; }
+    .vf-now b { display: block; font-size: 12px; color: var(--text-3); margin-bottom: var(--sp-4); font-weight: 500; }
     .vf-link { display: flex; gap: var(--sp-8); align-items: baseline; padding: var(--inset-row); margin-inline: calc(-1 * var(--sp-12)); border-radius: 10px; font-size: 12.5px; color: inherit; text-decoration: none; }
     .vf-link:hover { background: var(--surface-hover); }
     .sec > .vf-link + .vf-link { margin-top: var(--sp-2); } /* lignes de liste : 2 */
@@ -61,6 +78,8 @@
     #context { isolation: isolate; background: none; border: 0; border-radius: 0; box-shadow: none; }
     #context::before { inset: calc(-1 * (var(--hh, 64px) + 8px)) -80px -64px -36px; /* dérivé : halo, déborde du bloc */ background: rgba(var(--bg-rgb), .28); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6); -webkit-mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); -webkit-mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); -webkit-mask-position: 0 100%, 0 0; mask-position: 0 100%, 0 0; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; border: 0; border-radius: 0; box-shadow: none; } /* vf-couleur-ok: masque, seul l'alpha compte, jamais affiché */
     #context:empty { display: none; }
+    /* 71.5 (N5) : au survol, le trait vert/neutre des boutons passe en --text-2 (le trait d'état tombe à 2,68:1 sur le fond de survol en clair) */
+    #btn-recent:hover svg.i, #btn-health.calm:hover svg.i { color: var(--text-2); }
   `;
   // spike 005 : la barre de question reste visible quand serve.mjs (P7) sert l'onglet Projet
   // recette 69 : au zoom d'ouverture du jalon (lod-mid, ou lod-low plus loin) le pied des cartes (« à recetter · 9/9 plans … » et la pastille d'état) était masqué ou à 5 px :
@@ -70,7 +89,7 @@
     svg.lod-mid .foot .meta, svg.lod-low .foot .meta { visibility: visible; font-size: 19px; line-height: 20px; padding: var(--sp-4) var(--sp-12); white-space: normal; }
     svg.lod-mid .foot .vst, svg.lod-low .foot .vst { font-size: 17px; padding: var(--sp-4) var(--sp-12); line-height: 20px; }`;
   /* UIFN-11 (+ onglet Équipe) : le texte du pied cède devant la pastille d'état (elle gardait sa largeur et se faisait rogner : « En cour », et sur un pied long elle sortait de la carte) */
-  if (TAB !== 'code') style.textContent += `.foot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .foot .vst { flex: none; }`;
+  if (TAB !== 'code') style.textContent += `.foot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .foot .vst { flex: none; } .ico { --c: var(--text-2) !important; }`; // 71.5 : hors de l'onglet Code, icône nue de la couleur de son texte
   /* UIFN-09 : la ligne « Terminés… » de « Contenu » colorait son point par var(--n-terminés), définie nulle part (point invisible) : le statut « fait » de DESIGN.md §9 */
   if (TAB === 'equipe') style.textContent += `:root { --n-terminés: var(--st-done); }`;
   if (TAB === 'project') style.textContent += `#btn-health${window.FLOORPLAN_SERVER ? '' : ', #ask'} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }`;
@@ -102,10 +121,10 @@
       const V = G.meta.vf; // relu à chaque rendu : le direct (70-vf-live.js) remplace G.meta.vf sur un patch
       const ms = V.milestones.map((m) => {
         const pc = m.total ? Math.round((100 * m.done) / m.total) : 0;
-        return `<div class="vf-ms" data-vf-go="${h(m.id)}"><div class="t"><span>${h(m.key)}</span><span>${Number(m.done) || 0}/${Number(m.total) || 0} · ${pc} %</span></div><div class="vf-bar" style="--c-st:var(--st-${h(m.st).replace(/[^\w-]/g, '')})"><i style="width:${pc}%"></i></div></div>`;
+        return `<div class="vf-ms" data-vf-go="${h(m.id)}"><div class="t"><span>${h(m.key)}</span><span>${Number(m.done) || 0}/${Number(m.total) || 0} · ${pc} %</span></div><div class="vf-bar st-${h(m.st).replace(/[^\w-]/g, '')}"><i style="width:${pc}%"></i></div></div>`;
       }).join('');
       // état réel de chaque phase (avancement.etat) ; classes existantes seulement, valeur inconnue -> « À faire »
-      const ETAT_UI = { 'a-faire': ['vst-todo', 'À faire'], 'en-cours': ['vst-active', 'En cours'], 'a-recetter': ['vst-active', 'À recetter'] };
+      const ETAT_UI = { 'a-faire': ['vst-todo', 'À faire'], 'en-cours': ['vst-active', 'En cours'], 'a-recetter': ['vst-recette', 'À recetter'] };
       const next = V.next.map((n) => { const u = Object.prototype.hasOwnProperty.call(ETAT_UI, n.etat) ? ETAT_UI[n.etat] : ETAT_UI['a-faire']; return `<a class="vf-link" data-vf-go="${h(n.id)}"><span class="vst ${u[0]}">${u[1]}</span><span>${h(n.label)}</span></a>`; }).join('');
       const c = V.counts;
       // « Maintenant » : seulement les champs connus (un lab sans STATE.md n'a ni jalon, ni phase, ni statut)
@@ -113,7 +132,7 @@
       const now = V.milestone || V.phase || V.status
         ? `<div class="vf-now" style="margin-top:var(--sp-12)"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${statut(V.status) ? `<span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span>` : ''}${desc ? `<div style="margin-top:var(--sp-6);color:var(--text-3);font-size:12px">${h(desc.slice(0, 260))}${desc.length > 260 ? '…' : ''}</div>` : ''}</div>`
         : '';
-      return `<div class="sec"><div class="ph"><span class="kind">Projet</span></div><h2 class="pt">${h(G.project.name)}</h2>
+      return `<div class="sec"><h2 class="pt">${h(G.project.name)}</h2>
           ${now}
           <div class="stats vf-stats" style="margin-top:var(--sp-12)"><div><b>${Number(c.phases) || 0}</b><span>phases</span></div><div><b>${Number(c.plans) || 0}</b><span>plans</span></div><div><b>${Number(c.reqsDone) || 0}/${Number(c.reqs) || 0}</b><span>exigences</span></div></div></div>
         <div class="sec"><h3>Prochaines phases <span class="c">${V.next.length}</span></h3>${next || '<p class="pd">Rien en attente dans le jalon en cours.</p>'}</div>

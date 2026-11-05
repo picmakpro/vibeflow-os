@@ -17,7 +17,7 @@
   style.textContent = `
     #btn-recent svg.i { color: var(--recent); }
     #btn-recent .badge { background: var(--recent); color: var(--on-recent-text); }
-    .rw-task { padding: var(--inset-box); border-radius: 16px; background: color-mix(in srgb, var(--recent) 6%, transparent); margin-bottom: var(--sp-12); }
+    .rw-task { padding: var(--inset-box); border-radius: 16px; background: var(--note-bg); color: var(--text); margin-bottom: var(--sp-12); }
     .rw-task:last-child { margin-bottom: 0; }
     .rw-tt { display: flex; gap: var(--sp-8); align-items: center; font-weight: 600; line-height: 1.4; }
     .rw-tt::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--recent); flex: none; }
@@ -26,8 +26,8 @@
     .rw-s { color: var(--text-2); font-size: 12.5px; line-height: 1.55; margin: var(--sp-6) 0 0 var(--sp-16); }
     .rw-a { display: flex; gap: var(--sp-6); margin: var(--sp-12) 0 0 var(--sp-16); }
     .rw-a .btn { height: 30px; padding: 0 var(--sp-12); font-size: 12.5px; gap: var(--sp-6); }
-    .rw-note { margin-top: var(--sp-12); padding: var(--sp-8) var(--sp-12); border-radius: 14px; background: color-mix(in srgb, var(--recent) 9%, transparent); font-size: 13px; line-height: 1.55; }
-    .rw-note .rw-h { color: var(--recent); font-size: 11.5px; font-weight: 600; margin-bottom: var(--sp-4); }
+    .rw-note { margin-top: var(--sp-12); padding: var(--sp-8) var(--sp-12); border-radius: 14px; background: var(--note-bg); color: var(--text); font-size: 13px; line-height: 1.55; }
+    .rw-note .rw-h { color: var(--text-2); font-size: 11.5px; font-weight: 600; margin-bottom: var(--sp-4); }
     .rw-when { color: var(--text-3); font-size: 12px; margin-top: var(--sp-4); }
   `;
   document.head.appendChild(style);
