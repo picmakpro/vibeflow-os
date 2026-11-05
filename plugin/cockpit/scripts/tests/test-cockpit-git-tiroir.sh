@@ -461,7 +461,7 @@ out.avant = await s.ev(`document.querySelectorAll('.vf-git-detail').length`);
 await s.ev(`${LIGNES}[2].click()`);
 await s.attendre(`!!document.querySelector('.vf-git-detail .vf-git-d-fichiers')`, 'détail ouvert');
 out.reqs = await s.ev(`window.__vfDetReqs.filter((r) => r.route === 'commit').map((r) => r.methode + ' ' + r.url)`);
-out.jeton = await s.ev(`window.__vfDetReqs.filter((r) => r.route === 'commit').every((r) => 'x-floorplan-token' in r.headers)`);
+out.jeton = await s.ev(`window.__vfDetReqs.filter((r) => r.route === 'commit').every((r) => r.headers['x-vf-cockpit-token'] === window.VF_COCKPIT_SERVER.token && !!window.VF_COCKPIT_SERVER.token)`);
 out.ouvert = await s.ev(`(() => { const d = document.querySelector('.vf-git-detail'), L = ${LIGNES}[2], q = (x) => d.querySelector(x), fl = [...d.querySelectorAll('.vf-git-d-fichiers > li')], reste = fl.filter((l) => l.classList.contains('vf-git-d-reste')), vrais = fl.filter((l) => !l.classList.contains('vf-git-d-reste'));
   const f1 = vrais[1], bin = vrais.find((l) => /binaire/.test(l.textContent)), ren = vrais.find((l) => /ancien-nom/.test(l.textContent));
   return { apresRangee: L.nextElementSibling === d, nb: document.querySelectorAll('.vf-git-detail').length, sujet: q('.vf-git-d-sujet').textContent, msg: q('.vf-git-d-msg').textContent, ws: getComputedStyle(q('.vf-git-d-msg')).whiteSpace, poids: getComputedStyle(q('.vf-git-d-sujet')).fontWeight,
@@ -632,6 +632,12 @@ JS
   assert_eq "M-GLOBAL-G — rougit D3.1 (g ouvre le tiroir depuis un champ de saisie) alors que g hors champ marche toujours" "$(jq_ "$RM" '[j.champ_input.ouvert, j.g1, j.g2].join("|")' 2>/dev/null)" "true|true|false"
   mutant M-HORS-DEPOT 77-vf-git-tiroir.js "if (!V || V.etat === 'absent' || !V.depot) return; // sans dépôt" "if (false) return; // sans dépôt" d3n-complet.js nogit
   assert_eq "M-HORS-DEPOT — rougit D3.1 hors dépôt (le tiroir existe alors qu'aucun ouvreur n'existe) alors que la page est rendue" "$(jq_ "$RM" '[j.tiroir, j.ligne].join("|")' 2>/dev/null)" "true|false"
+  mutant M-DETAIL-HTML 77-vf-git-vue-detail.js "corpsMsg.textContent = m.length > 1 ? '\n' + m.slice(1).join('\n') : '';" "corpsMsg.innerHTML = m.length > 1 ? '\n' + m.slice(1).join('\n') : '';" d7-complet.js
+  assert_eq "M-DETAIL-HTML — rougit D7.2 (un message rendu en HTML fait naître un <script> dans le détail) alors que le détail et ses 30 fichiers sont là" "$(jq_ "$RM" '[j.hostile.balises > 0, j.hostile.msgLit, j.ouvert.nb, j.ouvert.nVrais].join("|")' 2>/dev/null)" "true|false|1|30"
+  mutant M-SELECTION 77-vf-git-vue-detail.js "fermerDetail(); // un seul détail à la fois" "/* mutant : le détail précédent reste ouvert */" d8-complet.js
+  assert_eq "M-SELECTION — rougit D8.1 (deux détails ouverts) alors que le clavier du graphe marche (↓ ↓ ↑ -> 2e rangée)" "$(jq_ "$RM" '[j.unSeul.details > 1, j.bas2haut1.i, j.entree.details].join("|")' 2>/dev/null)" "true|1|1"
+  mutant M-RAFALE 77-vf-git-vue-detail.js "clearTimeout(minuterie); minuterie = setTimeout(rafraichir, RAFALE);" "rafraichir();" d9-complet.js
+  assert_eq "M-RAFALE — rougit D9.1 (une relecture par signal : 3 et 3 au lieu de 1 et 1) alors que la sélection est conservée" "$(jq_ "$RM" '[j.deltas.git, j.deltas.wt, j.selection.sel.join() === j.selection.attendu].join("|")' 2>/dev/null)" "3|3|true"
 fi
 
 vf_hyg_assert
