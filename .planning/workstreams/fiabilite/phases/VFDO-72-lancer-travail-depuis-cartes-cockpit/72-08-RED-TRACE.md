@@ -64,3 +64,32 @@ M-ENTREE-AUTO, M-ARMEMENT-IGNORE, M-TEXTE-AU-SERVEUR, M-MODE-NON-RELU, M-MESSAGE
 M-CLIC-NON-FIABLE, M-INNERHTML, M-PROP-AU-DESSUS, M-PARAM-URL, M-SONDAGE-APRES-VISIBLE, M-RETARD-REAFFICHE.
 
 Commande de contrôle (jouée sous bash et sous zsh) : `OK-ROUGE-ATTENDU`.
+
+## Mutants rejoués sur le code livré (vue)
+
+Chaque mutant est joué sur une copie des sources ; l'assertion de la suite attend « rouge » (la sonde s'exécute, le bandeau s'affiche, et la valeur saine a disparu).
+
+| mutant | sonde rougie | obtenu | tué |
+|--------|--------------|--------|-----|
+| M-ARMEMENT-IGNORE (`'true'` → `'false'` sur `garde:armement`) | LB.V3 | un clic avant l'armement appelle `cb.lancer` (avant ≠ 0) | oui |
+| M-CLIC-NON-FIABLE (`ev.isTrusted !== true \|\|` retiré, `garde:clic-fiable`) | LB.V4 | un `click()` programmatique appelle `cb.lancer` (`1/1` au lieu de `0/1`) | oui |
+| M-INNERHTML (`garde:texte` → `innerHTML`) | LB.V5 | l'intention hostile devient un nœud `img` | oui |
+| M-USAGE-RESTE (`st === 'ok' \|\|` retiré, `garde:retrait-usage`) | LB.V7 | `ok=KO` : le bandeau reste après un lancement accepté | oui |
+| M-PROP-AU-DESSUS (`garde:collage-dessus` → `appendChild`) | LB.V6 | l'élément au centre de « Coller » n'est plus dans `#collage` | oui |
+
+## Mutants rejoués sur le code livré (client)
+
+| mutant | sonde rougie | obtenu | tué |
+|--------|--------------|--------|-----|
+| M-ENTREE-AUTO (`garde:apres-usage`) | LB.C5 | un octet part à `/entree` après le 204 | oui |
+| M-TEXTE-AU-SERVEUR (`garde:corps-lancer`) | LB.C3 | le corps n'est plus `{id,mode}` | oui |
+| M-MODE-NON-RELU (`garde:mode-relu`) | LB.C4 | `bypassPermissions` devient la présélection | oui |
+| M-MESSAGE-AVEC-DONNEES (`garde:emission`) | LB.C2 et LB.S2 | message `proposition:<id>` ; deux `postMessage(` | oui |
+| M-MESSAGE-REPETE (`if (nouveau)` retiré) | LB.C2 | un message à chaque sondage | oui |
+| M-AUCUNE-IGNOREE (`garde:aucune` supprimée) | LB.C2 | `vue.proposition(null)` jamais appelée | oui |
+| M-PARAM-URL (`garde:mode-lecture`) | LB.S1 | `URLSearchParams` = 1 | oui |
+| M-SONDAGE-APRES-VISIBLE (`garde:sondage-precoce` supprimée, `lire` déplacée dans `garde:pret`) | LB.C7 | aucun message pendant la phase masquée | oui |
+| M-RETARD-REAFFICHE (`garde:fermee` supprimée) | LB.C2 | un sondage en retard remonte la proposition consommée | oui |
+
+État final : suite 56 PASS / 0 FAIL sous bash et sous zsh (zéro « mutant sans effet », zéro « SUITE SAUTÉE »). Lignes finales : client 279, vue 186.
+Premier jeu de mutants rejoué : deux mutants (M-AUCUNE-IGNOREE, M-SONDAGE-APRES-VISIBLE) faisaient « planter » la sonde au lieu de rougir ; les attentes sont devenues souples (commit test(72-08) a347dc0f), puis les deux rougissent.
