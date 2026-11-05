@@ -22,3 +22,21 @@ Défaut trouvé au premier jeu : R1.2c passait à vide (aucun événement : late
 
 `vf-cockpit-git-signature.mjs` (neuf, 28 lignes) + accroche dans le filet de `vf-cockpit-live.mjs` : 7 PASS / 0 FAIL (R1.0, R1.0b, R1.1, R1.2a, R1.2b, R1.2c, H0).
 `grep setInterval` et `grep 'log'|'status'|'diff'` sur le module : aucune ligne.
+
+## Tâche 2 — rouge avant l'écouteur de la page (reprise après crash)
+
+`70-vf-live.js` non touché ; sections R2 à R4 et mutants ajoutés à la suite. Premier jeu (écouteur posé, suite écrite) : 23 PASS / 4 FAIL, tous défauts de TEST, corrigés :
+- R2.2a et R2.2c : l'argv journalisé commence par `--no-optional-locks -c core.fsmonitor=false` ; extracteur `sous_cmds` qui écarte les options globales.
+- R3.1 (page `/`) : `server.json` lu à moitié écrit, port 0 (ECONNREFUSED 127.0.0.1:80) ; `build_serve` relit jusqu'à un port et un jeton valides.
+
+## Tâche 2 — vert : 27 PASS / 0 FAIL / 0 SAUTÉ
+
+Mutants (copie du module par `mkmod`, mutation d'UNE occurrence, la suite refuse un motif absent ou multiple) :
+
+| Mutant | Mutation | Sonde rougie | Preuve |
+|---|---|---|---|
+| M-POLL | `if (gs && gs !== gitSig) {` -> `if (gs) {` | R1.1 | hello reçu (témoin) puis événements git > 0 sans changement |
+| M-LOG | `for-each-ref` -> `log -1 --all --format=%H` | R2.2b | journal d'argv non vide (témoin) puis `log` vu > 0 |
+| M-RELAIS | `addEventListener('git'` -> `'git-retire'` | R3.1 | `atteint=false`, `signaux=0`, alors que la page réelle reçoit le signal sur la même procédure |
+
+Non-régression : `test-cockpit-reconnexion.sh`, `-vie.sh`, `-who.sh`, `-reseau.sh` : rc 0.

@@ -65,6 +65,22 @@ const req = http.get({ host: '127.0.0.1', port: Number(port), path: '/api/vf/eve
 req.on('error', () => process.exit(0));
 setTimeout(() => process.exit(0), Number(maxMs));
 JS
+cat > "$AUX/cdp-run.mjs" <<'JS'
+// cdp-run.mjs <chrome> <scenario.js> [args…] : joue le corps asynchrone du scénario avec (s, ARGS) ; une ligne JSON
+import fs from 'node:fs';
+const { executer } = await import(process.env.VF_CS);
+const [, , chrome, fichier, ...ARGS] = process.argv;
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+const corps = new AsyncFunction('s', 'ARGS', fs.readFileSync(fichier, 'utf8'));
+await executer(chrome, async (s) => corps(s, ARGS), { csp: true });
+JS
+export VF_CS="$HERE_T/chrome-session.mjs"
+cat > "$AUX/jqs.mjs" <<'JS'
+// jqs.mjs '<json>' '<expression sur j>' : évalue l'expression sur la ligne JSON donnée
+const j = JSON.parse(process.argv[2]);
+console.log(String(new Function('j', 'return (' + process.argv[3] + ')')(j)));
+JS
+jq_() { node "$AUX/jqs.mjs" "$1" "$2"; }
 cat > "$AUX/mut.mjs" <<'JS'
 // mut.mjs <fichier> <ancien> <nouveau> : remplace UNE occurrence ; échoue (code 1) si l'ancien texte est absent (un mutant mort ne prouve rien)
 import fs from 'node:fs';
@@ -99,8 +115,12 @@ build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; pose
   PATH="$WORK/bin:$PATH" "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
   SRV=$!; PIDS+=("$SRV")
   for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT="$("$NODE" "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
-  TOK="$("$NODE" "$AUX/token.mjs" "$PORT" /)"
+  PORT=0; TOK=""
+  for _ in $(seq 1 50); do # le fichier peut être lu à moitié écrit : on relit jusqu'à un port valide et un jeton
+    PORT="$("$NODE" "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
+    [ "${PORT:-0}" != 0 ] && TOK="$("$NODE" "$AUX/token.mjs" "$PORT" / 2>/dev/null)"
+    [ -n "$TOK" ] && break; sleep 0.2
+  done
 }
 ecouter() { # $1 = durée ms, $2 = fichier de sortie : lance le client SSE en fond (PID dans CLI)
   "$NODE" "$AUX/sse.mjs" "$PORT" "$TOK" "$1" "$2" & CLI=$!; PIDS+=("$CLI")
@@ -132,6 +152,87 @@ assert_eq "R1.2b — la charge ne porte que seq, at, sig (sig de 16 hexadécimau
 LAT="$(node -e "console.log(Number(process.argv[1].split('\t')[0])-Number(process.argv[2]))" "$L1" "$T1" 2>/dev/null)"
 assert_eq "R1.2c — l'événement arrive en moins de 8 s après le commit" "$([ -n "$L1" ] && [ "$LAT" -ge 0 ] 2>/dev/null && [ "$LAT" -lt 8000 ] && echo oui || echo non)" "oui"
 stop_srv
+
+# --- aides des sections R2 à R4 ---
+# fenetre <durée ms> <fichier> [commande…] : écoute le flux, joue la commande une fois branché, rend la main à la fin de la fenêtre
+fenetre() { local d="$1" o="$2"; shift 2; ecouter "$d" "$o"; [ "$#" -gt 0 ] && "$@"; wait "$CLI" 2>/dev/null; }
+cat > "$AUX/r31.js" <<'JS'
+// r31.js <base> <page> <lab> : compte les vf-git:signal de la page ; un commit dans le lab ; attend un signal (échéance 10 s) ; la page ne s'est pas rechargée
+const [base, page, lab] = ARGS;
+await s.naviguer(base + page);
+await s.attendre(`document.readyState === 'complete' && !!window.VibeFlow`, 'page rendue');
+await s.ev(`(() => { window.__sig = 0; window.__marque = 1; document.addEventListener('vf-git:signal', () => { window.__sig++; }); })()`);
+const { execFileSync } = await import('node:child_process');
+execFileSync('git', ['-C', lab, 'commit', '-q', '--allow-empty', '-m', 'commit de R3.1'], { stdio: 'ignore' });
+let atteint = true;
+try { await s.attendre(`window.__sig >= 1`, 'vf-git:signal reçu', 10000); } catch { atteint = false; }
+return await s.ev(`({ signaux: window.__sig, marque: window.__marque, atteint: ${atteint} })`);
+JS
+cdp31() { node "$AUX/cdp-run.mjs" "$CHROME" "$AUX/r31.js" "$@"; }
+temps_sig() { # temps_sig <lab> : médiane de 7 appels de signatureGit (ms), 2 décimales
+  node -e "import(process.argv[1]).then(({signatureGit})=>{const t=[];let ok=true;for(let i=0;i<8;i++){const a=process.hrtime.bigint();const s=signatureGit(process.argv[2]);const b=process.hrtime.bigint();if(!s)ok=false;if(i)t.push(Number(b-a)/1e6)}t.sort((x,y)=>x-y);console.log((ok?'':'NULL ')+t[3].toFixed(2))})" "$SCRIPTS/vf-cockpit-git-signature.mjs" "$1"
+}
+
+# sous_cmds <journal> : la sous-commande de chaque ligne d'argv, options globales (--no-optional-locks, -c <v>, -C <dir>) écartées
+sous_cmds() { awk '{ i=1; while (i<=NF) { if ($i=="-c"||$i=="-C") i+=2; else if ($i ~ /^--/ && $i!="") i++; else break } print $i }' "$1"; }
+echo "=== R2 — worktrees, index, argv journalisé, coût ==="
+build_serve "$DEPOT"
+fenetre 10000 "$WORK/w2a.sse" G_ -C "$WT" switch -q -c autre
+assert_eq "R2.1a — git switch -c dans un worktree du lab : un événement git" "$([ "$(nb_git "$WORK/w2a.sse")" -ge 1 ] && echo oui || echo non)" "oui"
+printf 'neuf\n' > "$DEPOT/src/neuf.js"
+fenetre 11000 "$WORK/w2b.sse" true
+assert_eq "R2.1b — témoin : un fichier neuf non ajouté ne produit aucun événement" "$(nb_git "$WORK/w2b.sse")" "0"
+fenetre 10000 "$WORK/w2c.sse" G_ -C "$DEPOT" add src/neuf.js
+assert_eq "R2.1c — git add dans l'arbre principal : un événement git" "$([ "$(nb_git "$WORK/w2c.sse")" -ge 1 ] && echo oui || echo non)" "oui"
+printf 'export const util = () => 2;\n' > "$DEPOT/src/util.js"
+fenetre 11000 "$WORK/w2d.sse" true
+assert_eq "R2.1d — un fichier suivi modifié sans add : aucun événement (limite assumée)" "$(nb_git "$WORK/w2d.sse")" "0"
+: > "$WORK/git.log"
+fenetre 11000 "$WORK/w2e.sse" true
+assert_eq "R2.2a — témoin : le journal d'argv voit les appels de la signature (for-each-ref)" "$([ "$(sous_cmds "$WORK/git.log" | grep -c '^for-each-ref$')" -ge 1 ] && echo oui || echo non)" "oui"
+assert_eq "R2.2b — 11 s sans changement : aucune sous-commande log, status ni diff" "$(sous_cmds "$WORK/git.log" | grep -cE '^(log|status|diff)$')" "0"
+assert_eq "R2.2c — sous-commandes vues : seulement for-each-ref, worktree, show-ref, symbolic-ref, rev-list, rev-parse" "$(sous_cmds "$WORK/git.log" | sort -u | grep -vxE 'for-each-ref|worktree|show-ref|symbolic-ref|rev-list|rev-parse' | tr '\n' ' ')" ""
+stop_srv
+TF="$(temps_sig "$DEPOT")"; TR="$(temps_sig "$REAL_HOME/Documents/dev/vibeflow-os")"
+echo "  coût mesuré de signatureGit (médiane de 7) : fixture ${TF} ms · ce dépôt ${TR} ms"
+assert_eq "R2.3 — le coût de la signature reste sous 50 ms (fixture et ce dépôt)" "$(node -e "const f=parseFloat(process.argv[1]),r=parseFloat(process.argv[2]);console.log(/NULL/.test(process.argv[1]+process.argv[2])?'nul':(f<50&&r<50?'oui':'non'))" "$TF" "$TR")" "oui"
+
+echo "=== R3 — relais vers la page (vf-git:signal) ==="
+if [ -z "$CHROME" ]; then skip "R3.1" "pas de navigateur"; else
+  for pg in / /project.html; do
+    build_serve "$DEPOT"; R="$(cdp31 "http://127.0.0.1:$PORT" "$pg" "$DEPOT" 2>&1 | tail -1)"; stop_srv
+    assert_eq "R3.1 — $pg : un commit dans le lab donne au moins un vf-git:signal en moins de 10 s" "$(jq_ "$R" 'j.atteint && j.signaux >= 1 ? "oui" : "non"' 2>/dev/null)" "oui"
+    assert_eq "R3.1 — $pg : la page ne s'est pas rechargée sur l'événement git" "$(jq_ "$R" 'j.marque' 2>/dev/null)" "1"
+  done
+fi
+
+echo "=== R4 — lab hors dépôt ==="
+HORS="$WORK/hors-depot"; mk_lab "$HORS"
+build_serve "$HORS"
+fenetre 11000 "$WORK/w4.sse" true
+assert_eq "R4.0 — témoin : le client hors dépôt reçoit le hello" "$(grep -c "	hello	" "$WORK/w4.sse")" "1"
+assert_eq "R4.1a — hors dépôt : aucun événement git" "$(nb_git "$WORK/w4.sse")" "0"
+assert_eq "R4.1b — hors dépôt : aucune erreur dans la sortie du serveur" "$(grep -ciE 'error|erreur|TypeError|Unhandled' "$WORK/serve.out")" "0"
+stop_srv
+
+echo "=== Mutants ==="
+# M-POLL : émission à chaque tick -> R1.1 rougit
+MP="$(mkmod poll)"; mutate "$MP/vf-cockpit-live.mjs" "if (gs && gs !== gitSig) {" "if (gs) {" || echo "  ❌ mutation M-POLL impossible"
+build_serve "$DEPOT" "$MP"; fenetre 11000 "$WORK/wmp.sse" true; stop_srv
+NMP="$(nb_git "$WORK/wmp.sse")"
+assert_eq "M-POLL — témoin : le mutant reçoit le hello (le test n'est pas vide)" "$(grep -c "	hello	" "$WORK/wmp.sse")" "1"
+assert_eq "M-POLL — l'émission à chaque tick rougit R1.1 (événements git sans changement > 0)" "$([ "$NMP" -gt 0 ] && echo rouge || echo vert)" "rouge"
+# M-LOG : signature faite d'un log -1 --all -> R2.2b rougit
+ML="$(mkmod log)"; mutate "$ML/vf-cockpit-git-signature.mjs" "['for-each-ref', '--format=%(objectname) %(refname)']" "['log', '-1', '--all', '--format=%H']" || echo "  ❌ mutation M-LOG impossible"
+build_serve "$DEPOT" "$ML"; : > "$WORK/git.log"; fenetre 11000 "$WORK/wml.sse" true; stop_srv
+assert_eq "M-LOG — témoin : le mutant a bien tourné (journal d'argv non vide)" "$([ -s "$WORK/git.log" ] && echo oui || echo non)" "oui"
+assert_eq "M-LOG — un log dans la signature rougit R2.2b (log vus > 0)" "$([ "$(sous_cmds "$WORK/git.log" | grep -c '^log$')" -gt 0 ] && echo rouge || echo vert)" "rouge"
+# M-RELAIS : écouteur git retiré de la page -> R3.1 rougit
+if [ -z "$CHROME" ]; then skip "M-RELAIS" "pas de navigateur"; else
+  MR="$(mkmod relais)"; mutate "$(dirname "$MR")/skills/cockpit-moteur/assets/ui/70-vf-live.js" "es.addEventListener('git'," "es.addEventListener('git-retire'," || echo "  ❌ mutation M-RELAIS impossible"
+  build_serve "$DEPOT" "$MR"; R="$(cdp31 "http://127.0.0.1:$PORT" / "$DEPOT" 2>&1 | tail -1)"; stop_srv
+  assert_eq "M-RELAIS — l'écouteur retiré rougit R3.1 (aucun vf-git:signal reçu)" "$(jq_ "$R" 'j.atteint === false && j.signaux === 0 ? "rouge" : "vert"' 2>/dev/null)" "rouge"
+fi
 
 vf_hyg_assert
 echo ""
