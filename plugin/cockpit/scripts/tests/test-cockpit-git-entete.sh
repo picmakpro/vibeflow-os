@@ -44,18 +44,20 @@ const m = await import(process.argv[2]);
 console.log(JSON.stringify(m.enteteGit(process.argv[3])));
 JS
 cat > "$AUX/cdp-run.mjs" <<'JS'
-// cdp-run.mjs <chrome> <scenario.js> [args…] : joue le corps asynchrone du scénario avec (s, ARGS), une ligne JSON
+// cdp-run.mjs <chrome> <scenario.js> [args…] : joue le corps asynchrone du scénario avec (s, ARGS) après avoir posé les crochets de pre.js (VF_PRE) ; une ligne JSON
 import fs from 'node:fs';
 const { executer } = await import(process.env.VF_CS);
 const [, , chrome, fichier, ...ARGS] = process.argv;
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const corps = new AsyncFunction('s', 'ARGS', fs.readFileSync(fichier, 'utf8'));
-await executer(chrome, (s) => corps(s, ARGS), { csp: true });
+const PRE = process.env.VF_PRE ? fs.readFileSync(process.env.VF_PRE, 'utf8') : '';
+await executer(chrome, async (s) => { if (PRE) await s.send('Page.addScriptToEvaluateOnNewDocument', { source: PRE }); return corps(s, ARGS); }, { csp: true });
 JS
 export VF_CS="$HERE_T/chrome-session.mjs"
 cdp() { node "$AUX/cdp-run.mjs" "$CHROME" "$@"; } # cdp <scenario.js> [args…]
 jq_() { node "$AUX/json.mjs" "$1" "$2"; }
 
+NODE="$(command -v node)"; ENVX=""
 GIT="git -c user.email=t@t -c user.name=t"
 mk_lab() { # $1 = dossier : lab GSD minimal, un commit
   mkdir -p "$1/src" "$1/.planning/phases/01-x"
@@ -64,10 +66,10 @@ mk_lab() { # $1 = dossier : lab GSD minimal, un commit
   printf -- '---\nstatus: executing\nmilestone: vibeflow-test\n---\n# State\n' > "$1/.planning/STATE.md"
   printf '<objective>Faire le socle</objective>\n' > "$1/.planning/phases/01-x/01-01-PLAN.md"; echo ok > "$1/.planning/phases/01-x/01-01-SUMMARY.md"
 }
-build_serve() { # $1 = lab ; pose OUT, PORT ; démarre le serveur (SRV)
-  node "$SCRIPTS/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
+build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; $ENVX = préfixe d'environnement ; pose OUT, PORT ; démarre le serveur (SRV)
+  env $ENVX "$NODE" "${2:-$SCRIPTS}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"
-  node "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
+  env $ENVX "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
   SRV=$!; PIDS+=("$SRV")
   for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
   PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
@@ -86,20 +88,231 @@ H1D="$(node "$AUX/entete.mjs" "$MOD" "$DEPOT" 2>&1 | tail -1)"
 assert_eq "H1.1 — depuis le worktree : dépôt principal, branche, worktree" "$(jq_ "$H1W" '[j.etat,j.depot,j.branche,j.worktree,j.detache].join("|")' 2>/dev/null)" "ok|depot|feat/x|wt-a|false"
 assert_eq "H1.1b — depuis l'arbre principal : pas de worktree" "$(jq_ "$H1D" '[j.etat,j.depot,j.branche,String(j.worktree)].join("|")' 2>/dev/null)" "ok|depot|main|null"
 
-echo "=== H2 — nom du dépôt sur l'onglet Code ==="
-if [ -z "$CHROME" ]; then skip "H2.1" "pas de navigateur"; else
-  build_serve "$WT"
-  cat > "$AUX/h21.js" <<'JS'
+# H1.2 : git répond pour le dossier commun mais rien d'autre -> « indisponible », jamais une exception (sh injecté)
+cat > "$AUX/indispo.mjs" <<'JS'
+const { enteteGit } = await import(process.argv[2]);
+const sh = (cmd, args) => (args.includes('--git-common-dir') ? '/x/depot/.git\n' : '');
+console.log(JSON.stringify(enteteGit('/x/depot', { sh })));
+JS
+H12="$(node "$AUX/indispo.mjs" "$MOD" 2>&1 | tail -1)"
+assert_eq "H3.2a — dépôt vu mais HEAD illisible : indisponible, nom du dépôt gardé" "$(jq_ "$H12" '[j.etat,j.depot,j.branche,j.detache].join("|")' 2>/dev/null)" "indisponible|depot||false"
+
+# --- aides navigateur : crochets posés avant la page (erreurs, alert, fetch d'en-tête) ---
+cat > "$AUX/pre.js" <<'JS'
+window.__errs = [];
+addEventListener('error', (e) => window.__errs.push(String(e.message)));
+addEventListener('unhandledrejection', (e) => window.__errs.push('rejet ' + String(e.reason)));
+{ const ce = console.error; console.error = (...a) => { window.__errs.push(a.map(String).join(' ')); ce.apply(console, a); }; }
+window.__alerte = 0; window.alert = () => { window.__alerte++; };
+window.__vfFetch = { reponse: null, appels: [] };
+{ const f0 = window.fetch.bind(window);
+  window.fetch = (u, i) => { const url = typeof u === 'string' ? u : u.url;
+    if (/\/api\/vf\/git\/entete/.test(url) && window.__vfFetch.reponse) { window.__vfFetch.appels.push({ url, headers: (i && i.headers) || {} });
+      return Promise.resolve(new Response(JSON.stringify(window.__vfFetch.reponse), { status: 200, headers: { 'content-type': 'application/json' } })); }
+    return f0(u, i); }; }
+JS
+export VF_PRE="$AUX/pre.js"
+PRET="document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow"
+
+# --- copies privées du module pour les mutants et le témoin (VENDORED non nécessaire : le build lit assets/ui/*.js) ---
+mkmod() { # $1 = nom ; rend le dossier des scripts de la copie (frère : skills/cockpit-moteur)
+  local d="$WORK/mod-$1"; mkdir -p "$d/scripts" "$d/skills"
+  cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$d/skills/cockpit-moteur"
+  echo "$d/scripts"
+}
+cat > "$AUX/mut.mjs" <<'JS'
+// mut.mjs <fichier> <ancien> <nouveau> : remplace UNE occurrence ; échoue (code 1) si l'ancien texte est absent (un mutant mort ne prouve rien)
+import fs from 'node:fs';
+const [, , f, a, b] = process.argv; const t = fs.readFileSync(f, 'utf8');
+if (!t.includes(a) || t.split(a).length !== 2) { console.error('mutation impossible : motif absent ou multiple : ' + a); process.exit(1); }
+fs.writeFileSync(f, t.replace(a, () => b));
+JS
+mutate() { node "$AUX/mut.mjs" "$@"; }
+
+echo "=== H2 — nom du dépôt sur les trois onglets ==="
+if [ -z "$CHROME" ]; then skip "H2, H3, H4, H5" "pas de navigateur"; else
+  build_serve "$WT"; BASE="http://127.0.0.1:$PORT"
+  cat > "$AUX/h2.js" <<'JS'
+const [base, page] = ARGS;
+await s.naviguer(base + page);
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow`, 'page rendue');
+return await s.ev(`(() => ({ nom: document.querySelector('#proj-name').textContent, entete: document.querySelector('header').textContent,
+  titre: document.title, attendu: String(window.VibeFlow.graph.project.name || '').replace(/ — (Projet|Équipe)$/, ''),
+  ligne: (document.querySelector('.vf-git-ligne') || {}).textContent || null }))()`);
+JS
+  for pg in / /project.html /equipe.html; do
+    R="$(cdp "$AUX/h2.js" "$BASE" "$pg" 2>&1 | tail -1)"
+    assert_eq "H2.2 — $pg : #proj-name = depot" "$(jq_ "$R" 'j.nom' 2>/dev/null)" "depot"
+    assert_eq "H2.2 — $pg : aucun suffixe « — Projet » ni « — Équipe » dans l'en-tête" "$(jq_ "$R" '/ — (Projet|Équipe)/.test(j.entete) ? "suffixe" : "propre"' 2>/dev/null)" "propre"
+    assert_eq "H2.2 — $pg : la seconde ligne dit la branche" "$(jq_ "$R" '/feat\/x/.test(j.ligne||"") ? "oui" : "non"' 2>/dev/null)" "oui"
+    case "$pg" in /project.html) assert_eq "H2.2 — titre de l'onglet du navigateur inchangé (R6.1)" "$(jq_ "$R" 'j.titre === j.attendu + " — Projet" ? "inchangé" : j.titre' 2>/dev/null)" "inchangé";; esac
+  done
+  # H2.3 : une réécriture de project.html par le direct garde le nom du dépôt
+  printf '<objective>Second plan ajouté par le test H2.3</objective>\n' > "$WT/.planning/phases/01-x/01-02-PLAN.md" # un plan neuf change la structure : le direct réécrit project.html
+  for _ in $(seq 1 150); do grep -q 'Second plan ajouté par le test H2.3' "$OUT/project.html" 2>/dev/null && break; sleep 0.2; done
+  assert_eq "H2.3a — témoin : project.html a bien été réécrit par le direct" "$(grep -c 'Second plan ajouté par le test H2.3' "$OUT/project.html")" "1"
+  assert_eq "H2.3b — la page réécrite porte toujours meta.vfGit" "$(grep -c '"vfGit":{"etat":"ok"' "$OUT/project.html")" "1"
+  R="$(cdp "$AUX/h2.js" "$BASE" /project.html 2>&1 | tail -1)"
+  assert_eq "H2.3c — après réécriture, #proj-name = depot" "$(jq_ "$R" 'j.nom' 2>/dev/null)" "depot"
+
+  echo "=== H3 — seconde ligne, événements, ouvreur ==="
+  cat > "$AUX/h3.js" <<'JS'
 const [base] = ARGS;
 await s.naviguer(base + '/');
-await s.attendre("document.readyState === 'complete' && !!window.VibeFlow && !!document.querySelector('#proj-name')", 'page Code rendue');
-await s.attendre("!!document.querySelector('.vf-git-ligne') || true", 'laisse la main au rendu');
-return await s.ev(`(() => ({ nom: document.querySelector('#proj-name').textContent, ligne: (document.querySelector('.vf-git-ligne') || {}).textContent || null }))()`);
+await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }); // la fenêtre headless par défaut est sous 1000 px : la seconde ligne y est masquée
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne') && getComputedStyle(document.querySelector('.vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
+const out = {};
+const ligne = () => `document.querySelector('.vf-git-ligne')`;
+const evt = (nom, d) => s.ev(`window.dispatchEvent(new CustomEvent('${nom}', { detail: ${JSON.stringify(d)} }))`);
+// H3.3 : noms longs
+const longB = 'feature/' + 'b'.repeat(112), longW = 'w'.repeat(60);
+await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: longB, worktree: longW, detache: false });
+out.longs = await s.ev(`(() => { const l = ${ligne()}, b = l.querySelector('.vf-git-branche'), w = l.querySelector('.vf-git-wt');
+  return { ellipseB: b.scrollWidth > b.clientWidth, ellipseW: w.scrollWidth > w.clientWidth, titre: l.title, largeur: l.getBoundingClientRect().width }; })()`);
+out.longs.complet = out.longs.titre.includes(longB) && out.longs.titre.includes(longW);
+// H3.4 : l'événement met la ligne à jour
+await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: 'autre' });
+out.evt = await s.ev(`(() => ({ texte: ${ligne()}.querySelector('.vf-git-branche').textContent, wt: ${ligne()}.querySelector('.vf-git-wt').textContent }))()`);
+// H3.4b : signal -> relecture de /api/vf/git/entete avec le jeton ; réponse hors schéma refusée
+await s.ev(`window.__vfFetch.reponse = { schema: 'vibeflow/cockpit-git-entete@1', etat: 'ok', depot: 'depot', branche: 'via-signal', worktree: null, detache: false }`);
+await evt('vf-git:signal', {});
+await s.attendre(`${ligne()}.textContent.includes('via-signal')`, 'relecture sur signal');
+out.signal = await s.ev(`(() => ({ appels: window.__vfFetch.appels.length, jeton: window.__vfFetch.appels[0].headers['x-vf-cockpit-token'] === window.VF_COCKPIT_SERVER.token && !!window.VF_COCKPIT_SERVER.token }))()`);
+await s.ev(`window.__vfFetch.reponse = { schema: 'autre@1', etat: 'ok', depot: 'depot', branche: 'pirate' }`);
+await evt('vf-git:signal', {});
+await s.attendre(`window.__vfFetch.appels.length === 2`, 'second appel');
+await s.ev(`new Promise((r) => setTimeout(r, 400))`);
+out.horsSchema = await s.ev(`${ligne()}.querySelector('.vf-git-branche').textContent`);
+// H3.2b : état indisponible -> texte et ouvreur présent
+await evt('vf-git:entete', { etat: 'indisponible', depot: 'depot' });
+out.indispo = await s.ev(`(() => ({ texte: ${ligne()}.querySelector('.vf-git-branche').textContent, ouvreur: !!document.querySelector('#vf-git-ouvreur') }))()`);
+// H3.5 : clic -> basculer ; etat -> aria-expanded
+await s.ev(`window.__bas = []; window.addEventListener('vf-git:basculer', (e) => window.__bas.push(e.detail && e.detail.source))`);
+await s.ev(`${ligne()}.click(); (document.querySelector('#vf-git-ouvreur') || { click() {} }).click()`);
+out.basculer = await s.ev(`window.__bas`);
+await evt('vf-git:etat', { ouvert: true });
+out.ouvert = await s.ev(`[${ligne()}.getAttribute('aria-expanded'), (document.querySelector('#vf-git-ouvreur') || { getAttribute() { return null; } }).getAttribute('aria-expanded')]`);
+await evt('vf-git:etat', { ouvert: false });
+out.ferme = await s.ev(`${ligne()}.getAttribute('aria-expanded')`);
+out.aria = await s.ev(`[${ligne()}.getAttribute('aria-controls'), (document.querySelector('#vf-git-ouvreur') || { getAttribute() { return null; } }).getAttribute('aria-controls')]`);
+out.errs = await s.ev(`window.__errs`);
+return out;
 JS
-  R="$(cdp "$AUX/h21.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"
-  assert_eq "H2.1 — #proj-name = depot" "$(jq_ "$R" 'j.nom' 2>/dev/null)" "depot"
-  assert_eq "H2.1b — la seconde ligne dit la branche et le worktree" "$(jq_ "$R" '/feat\/x/.test(j.ligne||"") && /wt-a/.test(j.ligne||"") ? "oui" : "non"' 2>/dev/null)" "oui"
+  R="$(cdp "$AUX/h3.js" "$BASE" 2>&1 | tail -1)"
+  assert_eq "H3.3 — noms longs : branche tronquée par ellipse" "$(jq_ "$R" 'j.longs.ellipseB' 2>/dev/null)" "true"
+  assert_eq "H3.3 — noms longs : worktree tronqué par ellipse" "$(jq_ "$R" 'j.longs.ellipseW' 2>/dev/null)" "true"
+  assert_eq "H3.3 — noms longs : texte complet dans title" "$(jq_ "$R" 'j.longs.complet' 2>/dev/null)" "true"
+  assert_eq "H3.3 — noms longs : la ligne tient dans 220 px" "$(jq_ "$R" 'j.longs.largeur <= 221' 2>/dev/null)" "true"
+  assert_eq "H3.4 — vf-git:entete met la ligne à jour (sans worktree)" "$(jq_ "$R" '[j.evt.texte, j.evt.wt].join("|")' 2>/dev/null)" "autre|"
+  assert_eq "H3.4 — vf-git:signal relit l'en-tête avec le jeton" "$(jq_ "$R" '[j.signal.appels, j.signal.jeton].join("|")' 2>/dev/null)" "1|true"
+  assert_eq "H3.4 — une réponse hors schéma est refusée" "$(jq_ "$R" 'j.horsSchema' 2>/dev/null)" "via-signal"
+  assert_eq "H3.2b — indisponible : « Branche indisponible », ouvreur présent" "$(jq_ "$R" '[j.indispo.texte, j.indispo.ouvreur].join("|")' 2>/dev/null)" "Branche indisponible|true"
+  assert_eq "H3.5 — clic sur la ligne et sur l'ouvreur : vf-git:basculer" "$(jq_ "$R" 'j.basculer.join(",")' 2>/dev/null)" "ligne,ouvreur"
+  assert_eq "H3.5 — vf-git:etat ouvert : aria-expanded sur les deux" "$(jq_ "$R" 'j.ouvert.join(",")' 2>/dev/null)" "true,true"
+  assert_eq "H3.5 — vf-git:etat fermé : aria-expanded false" "$(jq_ "$R" 'j.ferme' 2>/dev/null)" "false"
+  assert_eq "H3.5 — aria-controls = vf-git-tiroir (ligne et ouvreur)" "$(jq_ "$R" 'j.aria.join(",")' 2>/dev/null)" "vf-git-tiroir,vf-git-tiroir"
+  assert_eq "H3.x — aucune erreur de page pendant ces scénarios" "$(jq_ "$R" 'j.errs.length' 2>/dev/null)" "0"
+
+  echo "=== H4 — ouvreur mobile et masquage de la seconde ligne ==="
+  cat > "$AUX/h4.js" <<'JS'
+const [base] = ARGS;
+await s.naviguer(base + '/');
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne')`, 'seconde ligne');
+const res = {};
+for (const w of [375, 700, 768, 999, 1000, 1440]) {
+  await s.send('Emulation.setDeviceMetricsOverride', { width: w, height: 800, deviceScaleFactor: 1, mobile: false });
+  res[w] = await s.stable(`(() => { const l = document.querySelector('.vf-git-ligne'), o = document.querySelector('#vf-git-ouvreur'), h = document.querySelector('header');
+    const r = o ? o.getBoundingClientRect() : { width: 0, height: 0 };
+    return { ligneVisible: getComputedStyle(l).display !== 'none' && l.getBoundingClientRect().width > 0, ouvreurVisible: !!o && getComputedStyle(o).display !== 'none' && r.width > 0,
+      w: Math.round(r.width), h: Math.round(r.height), debord: h.scrollWidth > h.clientWidth + 1, premier: o ? o.parentElement.firstElementChild === o && o.parentElement.classList.contains('hr') : false }; })()`, 'mesure à ' + w);
+}
+return res;
+JS
+  R="$(cdp "$AUX/h4.js" "$BASE" 2>&1 | tail -1)"
+  for w in 375 700 768 999; do
+    assert_eq "H4.1 — ${w} px : ligne masquée, ouvreur 44 × 44 en tête de .hr" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible, j['$w'].w, j['$w'].h, j['$w'].premier].join('|')" 2>/dev/null)" "false|true|44|44|true"
+  done
+  for w in 1000 1440; do
+    assert_eq "H4.1 — ${w} px : ligne visible, ouvreur caché" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible].join('|')" 2>/dev/null)" "true|false"
+  done
+  assert_eq "H4.1 — aucun débordement horizontal de l'en-tête (6 largeurs)" "$(jq_ "$R" 'Object.values(j).filter((m) => m.debord).length' 2>/dev/null)" "0"
   stop_srv
+
+  echo "=== H3.1 — branche détachée ==="
+  WTD="$WORK/wt-d"; $GIT -C "$DEPOT" worktree add -q --detach "$WTD" >/dev/null 2>&1
+  SHA7="$($GIT -C "$WTD" rev-parse --short=7 HEAD)"
+  build_serve "$WTD"; BASE="http://127.0.0.1:$PORT"
+  cat > "$AUX/h31.js" <<'JS'
+const [base] = ARGS;
+await s.naviguer(base + '/');
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne')`, 'seconde ligne');
+return await s.ev(`(() => { const l = document.querySelector('.vf-git-ligne'); return { texte: l.querySelector('.vf-git-branche').textContent + l.querySelector('.vf-git-wt').textContent, detache: l.classList.contains('vf-git-detache'), couleur: getComputedStyle(l).color, aria: l.getAttribute('aria-label') }; })()`);
+JS
+  R="$(cdp "$AUX/h31.js" "$BASE" 2>&1 | tail -1)"
+  assert_eq "H3.1 — la ligne dit « HEAD détaché · <sha7> »" "$(jq_ "$R" 'j.texte.replace(/ · worktree .*/, "")' 2>/dev/null)" "HEAD détaché · $SHA7"
+  assert_eq "H3.1 — marquée détachée (couleur d'avertissement)" "$(jq_ "$R" 'j.detache' 2>/dev/null)" "true"
+  stop_srv
+
+  echo "=== H5 — dégradation sans git, texte venu de git rendu en texte ==="
+  cat > "$AUX/struct.js" <<'JS'
+const [base] = ARGS;
+await s.naviguer(base + '/');
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow`, 'page rendue');
+await s.ev(`new Promise((r) => setTimeout(r, 600))`);
+return await s.ev(`(() => ({ struct: [...document.querySelectorAll('header, header *')].map((e) => e.tagName + '#' + e.id + '.' + (typeof e.className === 'string' ? e.className : '')).join('\\n'),
+  nom: document.querySelector('#proj-name').textContent, ligne: !!document.querySelector('.vf-git-ligne'), ouvreur: !!document.querySelector('#vf-git-ouvreur'), bloc: !!document.querySelector('.vf-nom'),
+  errs: window.__errs, texteLigne: document.querySelector('.vf-git-ligne') ? document.querySelector('.vf-git-ligne .vf-git-branche').textContent + document.querySelector('.vf-git-ligne .vf-git-wt').textContent : null,
+  svgEntete: document.querySelectorAll('header svg').length, scripts: document.querySelectorAll('header script').length, alerte: window.__alerte }))()`);
+JS
+  # témoin : le même lab construit avec une copie du module privée de ui/76-vf-git-entete.js
+  M76="$(mkmod sans76)"; rm -f "$M76/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js"
+  NOGIT="$WORK/hors-depot"; mk_lab "$NOGIT"
+  NOGIT_T="$WORK/hors-depot-temoin"; mk_lab "$NOGIT_T"
+  build_serve "$NOGIT_T" "$M76"; RT="$(cdp "$AUX/struct.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
+  build_serve "$NOGIT"; RN="$(cdp "$AUX/struct.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
+  assert_eq "H5.1 — témoin positif : le témoin est construit sans le fichier 76" "$(ls "$M76/../skills/cockpit-moteur/assets/ui/" | grep -c '^76-')" "0"
+  assert_eq "H5.1 — lab hors dépôt : ni .vf-git-ligne, ni #vf-git-ouvreur, ni .vf-nom" "$(jq_ "$RN" '[j.ligne, j.ouvreur, j.bloc].join("|")' 2>/dev/null)" "false|false|false"
+  assert_eq "H5.1 — 0 erreur console" "$(jq_ "$RN" 'j.errs.length' 2>/dev/null)" "0"
+  jq_ "$RN" 'j.struct' > "$WORK/struct-nogit.txt" 2>/dev/null; jq_ "$RT" 'j.struct' > "$WORK/struct-temoin.txt" 2>/dev/null
+  assert_eq "H5.1 — structure de l'en-tête identique au témoin sans le fichier 76 (cmp)" "$(cmp -s "$WORK/struct-nogit.txt" "$WORK/struct-temoin.txt" && [ -s "$WORK/struct-temoin.txt" ] && echo identique || echo différente)" "identique"
+  assert_eq "H5.1 — le nom est celui du dossier du lab (à défaut de dépôt)" "$(jq_ "$RN" 'j.nom' 2>/dev/null)" "hors-depot"
+
+  # git introuvable : DEVELOPER_DIR invalide fait échouer le shim de /usr/bin/git (macOS) ; ailleurs le cas n'est pas masquable
+  if ! env PATH=/nonexistent DEVELOPER_DIR=/nonexistent /usr/bin/git --version >/dev/null 2>&1; then
+    NOPATH="$WORK/depot-sans-git"; mk_lab "$NOPATH"; $GIT -C "$NOPATH" init -q -b main && $GIT -C "$NOPATH" add -A && $GIT -C "$NOPATH" commit -q -m init
+    ENVX="PATH=/nonexistent DEVELOPER_DIR=/nonexistent" build_serve "$NOPATH"; RP="$(cdp "$AUX/struct.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
+    assert_eq "H5.1b — PATH sans git : ni ligne, ni ouvreur, ni .vf-nom, 0 erreur" "$(jq_ "$RP" '[j.ligne, j.ouvreur, j.bloc, j.errs.length].join("|")' 2>/dev/null)" "false|false|false|0"
+  else skip "H5.1b" "git ne peut pas être masqué sur ce poste"; fi
+
+  # H5.2 : nom de branche hostile, vrai dépôt
+  HOST='<svg/onload=alert(1)>'
+  HX="$WORK/depot-hostile"; mk_lab "$HX"; $GIT -C "$HX" init -q -b "$HOST" && $GIT -C "$HX" add -A && $GIT -C "$HX" commit -q -m init
+  build_serve "$HX"; RH="$(cdp "$AUX/struct.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
+  build_serve "$DEPOT"; RB="$(cdp "$AUX/struct.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
+  assert_eq "H5.2 — témoin positif : la branche hostile est bien lue par git" "$(jq_ "$RH" 'j.texteLigne' 2>/dev/null)" "$HOST"
+  assert_eq "H5.2 — aucun svg ni script neuf dans l'en-tête, aucune alerte" "$(jq_ "$RH" 'JSON.stringify([j.svgEntete, j.scripts, j.alerte])' 2>/dev/null)" "$(jq_ "$RB" 'JSON.stringify([j.svgEntete, j.scripts, j.alerte])' 2>/dev/null)"
+
+  echo "=== Mutants ==="
+  # M-DEPOT : le nom du dépôt pris de --show-toplevel (le worktree) -> H1.1 et H2.2 rougissent
+  MD="$(mkmod mdepot)"
+  mutate "$MD/vf-cockpit-git-entete.mjs" "const racine = path.basename(commun) === '.git' ? path.dirname(commun) : commun.replace(/[\\\\/]+\$/, '').replace(/\\.git\$/, '');" "const racine = git('rev-parse', '--show-toplevel') || commun;" || echo "  ❌ FAIL — M-DEPOT : mutation impossible" >&2
+  RM="$(node "$AUX/entete.mjs" "$MD/vf-cockpit-git-entete.mjs" "$WT" 2>&1 | tail -1)"
+  assert_eq "M-DEPOT — rougit H1.1 (le dépôt devient le worktree)" "$(jq_ "$RM" 'j.depot' 2>/dev/null)" "wt-a"
+  WTM="$WORK/wt-m"; $GIT -C "$DEPOT" worktree add -q -b feat/m "$WTM" >/dev/null 2>&1
+  build_serve "$WTM" "$MD"; RM2="$(cdp "$AUX/h2.js" "http://127.0.0.1:$PORT" / 2>&1 | tail -1)"; stop_srv
+  assert_eq "M-DEPOT — rougit H2.2 (#proj-name = le worktree)" "$(jq_ "$RM2" 'j.nom' 2>/dev/null)" "wt-m"
+  # M-TEXTE : seconde ligne écrite par innerHTML -> H5.2 rougit (un svg neuf apparaît, l'alerte part)
+  MT="$(mkmod mtexte)"
+  mutate "$MT/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "spBranche.textContent = texteBranche;" "spBranche.innerHTML = texteBranche;" || echo "  ❌ FAIL — M-TEXTE : mutation impossible" >&2
+  HX2="$WORK/depot-hostile2"; mk_lab "$HX2"; $GIT -C "$HX2" init -q -b "$HOST" && $GIT -C "$HX2" add -A && $GIT -C "$HX2" commit -q -m init
+  build_serve "$HX2" "$MT"; RMT="$(cdp "$AUX/struct.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
+  assert_eq "M-TEXTE — rougit H5.2 (le mutant fabrique un svg dans l'en-tête)" "$(jq_ "$RMT" 'j.svgEntete > 0 && j.texteLigne !== "'"$HOST"'" ? "rouge" : "vert"' 2>/dev/null)" "rouge"
+  # M-ABSENT : la ligne est créée même en « absent » -> H5.1 rougit
+  MA="$(mkmod mabsent)"
+  mutate "$MA/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "if (!V || V.etat === 'absent' || !V.depot) return;" "if (!V || !V.depot) return;" || echo "  ❌ FAIL — M-ABSENT : mutation impossible" >&2
+  NOGIT_M="$WORK/hors-depot-mutant"; mk_lab "$NOGIT_M"
+  build_serve "$NOGIT_M" "$MA"; RMA="$(cdp "$AUX/struct.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
+  assert_eq "M-ABSENT — rougit H5.1 (la ligne et le bloc existent sans git)" "$(jq_ "$RMA" '[j.ligne, j.bloc].join("|")' 2>/dev/null)" "true|true"
 fi
 
 vf_hyg_assert
