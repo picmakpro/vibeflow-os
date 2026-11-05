@@ -88,7 +88,7 @@
         "exec-04"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "exec-07",
@@ -100,7 +100,7 @@
         "exec-06"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-08",
@@ -113,7 +113,7 @@
         "exec-05"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "exec-09",
@@ -124,7 +124,7 @@
         "exec-04"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "exec-10",
@@ -134,7 +134,7 @@
         "exec-06"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-11",
@@ -153,7 +153,7 @@
         "exec-10"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue",
