@@ -43,3 +43,17 @@ Témoins (E1.1 à E1.8, E3.4a) verts sur la base : le piège se déclenche git b
 Rouge sur la TÊTE `76b5a426` (lancerGit absent) : E4.1 à E4.5, E5.1, E5.2a, E5.3, M-ENV (volet E5.2a), M-FILTRES (volet E5.1), M-LECTURE (volet E5.2), M-TRONQUE :
 obtenu `illisible` (l'export `lancerGit` n'existe pas) ; bilan tête : `57 PASS / 13 FAIL`.
 Note : E5.2 (textconv `absent`) est vert à vide quand `lancerGit` manque ; c'est E5.2a (sujet réel présent dans la sortie) qui rougit pour la même cause, d'où sa présence.
+
+### Vert après `lancerGit` (commit `feat(78-01): lancerGit…`) : `70 PASS / 0 FAIL`, exit 0
+
+Mutants (copies de `plugin/cockpit/scripts` dans le scratchpad, une ligne remplacée par `mutsub.mjs`, ancre vérifiée : « ancre absente » = FAIL). Chacun est rejoué avec la
+valeur obtenue ASSERTÉE (pas seulement « différent ») : un mutant qui rougirait pour une autre raison ne passerait pas l'assertion.
+
+| Mutant | Ligne mutée | Sonde rougie | Valeur obtenue sur le mutant (= le rouge assertée) |
+|---|---|---|---|
+| M-ENV | `if (!GIT_HERITE.test(k)) e[k] = v;` -> `e[k] = v;` | E2.2, E2.3a, E5.2a | sujet `LEURRE` ; toplevel = arbre leurre ; log lancerGit = `LEURRE` |
+| M-FILTRES | `configFiltres` = `[] \|\| …` | E2.1, E5.1 | marqueur `PROC` posé (shBorne ET lancerGit) |
+| M-LECTURE | `ins = OPTIONS_LECTURE[sous] \|\| [];` -> `ins = [];` | E2.4, E5.2, E2.4b | marqueur `TEXTCONV` posé (shBorne ET lancerGit) ; sortie `SORTIE-GPG-FACTICE` dans le hash |
+| M-TRONQUE | `tronque: e.code === 'ENOBUFS'` -> `false && …` | E4.2 | `tronque=false` (attendu `true`) |
+
+Voisines : `test-cockpit-retard.sh` 40 PASS / 0 FAIL, `test-cockpit-path-enfants.sh` 37 PASS / 0 FAIL, `test-cockpit-who.sh` 98 PASS / 0 FAIL.

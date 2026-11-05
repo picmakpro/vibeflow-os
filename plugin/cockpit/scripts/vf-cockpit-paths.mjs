@@ -1,7 +1,8 @@
 // vf-cockpit-paths — résolution des chemins du socle du cockpit (P67-D-12). Lecture seule.
 // Exports : findLabRoot, planningLayout, stateFile, resolveScriptsDir, trustedScriptsDir, driverLockScript,
 //           engineDir, outputDir, resoudreBinaire, pathAssaini, gitCommonDir, confiner, verifierSortie, realUnder,
-//           GIT_SUR (préfixe d'arguments de tout appel git), avecEcheance(ms, fn) et shBorne(cmd, args, cwd) (sous-processus bornés, échéance globale : F-06).
+//           GIT_SUR (préfixe d'arguments de tout appel git), avecEcheance(ms, fn) et shBorne(cmd, args, cwd) (sous-processus bornés, échéance globale : F-06),
+//           envGit / lancerGit / filtresDeclares / configFiltres / argsGit / OPTIONS_LECTURE / SOUS_COMMANDES_FILTRANTES / GIT_HERITE (environnement git unique, P78-D-25).
 // Aucun nom de compartiment, de jalon ou de projet codé en dur : tout vient du disque.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -178,6 +179,16 @@ export function shBorne(cmd, args, cwd, lab = cwd) {
   const { argv, sous, dir } = argsGit(args), base = dir ? path.resolve(cwd || '.', dir) : cwd || process.cwd();
   const config = SOUS_COMMANDES_FILTRANTES.includes(sous) ? configFiltres(filtresDeclares(base, lab)) : [];
   return lancer('git', argv, cwd, envGit(lab, { config }), 1 << 20).sortie;
+}
+
+// lecture git bornée pour les modules du socle (tiroir Git, plans 78-05 et 78-08) : GIT_SUR et `-C dir` posés ici, même exécuteur et même échéance que shBorne.
+// { ok (code 0 sans sortie tronquée, sans échéance), sortie, code, tronque (ENOBUFS : sortie partielle, jamais présentée comme complète), absent (ENOENT) } ; `binaire` ne sert qu'aux tests, jamais lu d'une variable d'environnement.
+export function lancerGit(dir, args, { lab = dir, maxBuffer = 4 << 20, binaire = 'git' } = {}) {
+  if (!isDir(dir)) return { ok: false, sortie: '', code: null, tronque: false, absent: false };
+  const { argv, sous } = argsGit([...GIT_SUR, '-C', dir, ...args]);
+  const config = SOUS_COMMANDES_FILTRANTES.includes(sous) ? configFiltres(filtresDeclares(dir, lab)) : [];
+  const r = lancer(binaire, argv, dir, envGit(lab, { config }), maxBuffer);
+  return { ok: r.code === 0 && !r.tronque && !r.echeance, sortie: r.sortie, code: r.code, tronque: r.tronque, absent: r.absent };
 }
 
 // P71-D-29 (N2) : le lanceur s'exécute depuis la racine du lab. Un binaire lancé par son NOM est cherché par le système dans le PATH, où « . », un élément
