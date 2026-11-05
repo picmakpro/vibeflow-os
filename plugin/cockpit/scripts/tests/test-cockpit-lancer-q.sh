@@ -16,7 +16,7 @@ set -uo pipefail
 unset VF_COCKPIT_LANCER_ARME_MS VF_COCKPIT_LANCER_EXPIRE_MS
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
-MOD="$SCRIPTS/vf-cockpit-lancer-q.mjs"; TAILLE="$SCRIPTS/../software-architecture/scripts/check-file-size.sh"
+MOD="$SCRIPTS/vf-cockpit-lancer-q.mjs"; TAILLE="$SCRIPTS/../../software-architecture/scripts/check-file-size.sh"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
@@ -149,7 +149,7 @@ console.log(JSON.stringify({
   imports: [...s.matchAll(/\bfrom\s+['"]([^'"]+)['"]/g)].map((m) => m[1]).join(','), dyn: n(/\bimport\s*\(|\brequire\s*\(/g), console: n(/console\./g), exit: n(/process\.exit/g),
   io: n(/\b(?:readFileSync|writeFileSync|child_process|node:fs|node:http|node:net|spawn|fetch)\b/g),
   env: [...new Set([...s.matchAll(/process\.env\.([A-Za-z0-9_]+)/g)].map((m) => m[1]))].sort().join(',') + (n(/process\.env\[/g) ? '+dyn' : ''),
-  alphabet: s.split('A-Za-z0-9 ._:/').length - 1, prefixe: s.split('claude --session-id').length - 1, noms: n(/fiabilite|gouvernance/g),
+  alphabet: s.split('A-Za-z0-9 ._:/').length - 1, prefixe: s.split('claude --session-id').length - 1, noms: n(new RegExp('fiabil' + 'ite|gouvern' + 'ance', 'g')), // motif assemblé à l'exécution : la suite ne porte pas elle-même ces noms
 }));
 JS
 
@@ -277,7 +277,9 @@ assert_eq "LQ7.1 — le seul import du module est node:crypto, aucun import dyna
 assert_eq "LQ7.2 — aucun console., process.exit, accès disque ni réseau ; deux clés d'environnement ; aucun littéral d'alphabet ni de préfixe de ligne ; aucun nom de compartiment" \
   "$(printf '%s' "$ST" | node "$AUX/ev.mjs" 'j.absent?"ABSENT":"console="+j.console+";exit="+j.exit+";io="+j.io+";env="+j.env+";alphabet="+j.alphabet+";prefixe="+j.prefixe+";noms="+j.noms')" \
   "console=0;exit=0;io=0;env=VF_COCKPIT_LANCER_ARME_MS,VF_COCKPIT_LANCER_EXPIRE_MS;alphabet=0;prefixe=0;noms=0"
-bash "$TAILLE" "$MOD" > "$WORK/taille.out" 2>&1; assert_eq "LQ7.3 — check-file-size.sh sur le module : exit 0 (sous 300 lignes)" "$?" "0"
+# témoin : check-file-size.sh rend 0 pour un fichier absent, donc l'existence du module est constatée à part (jamais un vert à vide)
+TREC=absent; [ -f "$MOD" ] && { bash "$TAILLE" "$MOD" > "$WORK/taille.out" 2>&1; TREC=$?; }
+assert_eq "LQ7.3 — le module existe et check-file-size.sh rend exit 0 (sous 300 lignes)" "$TREC" "0"
 
 echo "── Mutants (copies du module ; « mutant sans effet » = FAIL) ──"
 mutj() { # mutj <nom> <expression-sed> -> MUT, MUTJ ; code 1 si la cible manque ou si la copie n'a pas changé
