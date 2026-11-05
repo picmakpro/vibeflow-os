@@ -76,3 +76,10 @@ Suite `test-cockpit-lancer-pty.sh pty` sur l'assistant complété : `45 PASS / 0
 - **M-FILE-NON-BORNEE** (`    if vers_shell:` -> `    if False:`) : tué par **L9.1**, obtenu `non(0) 60 vivant code=0 sig=null` : soixante réponses mais aucun `premier-plan` devant le shell sourd.
 
 Verts finaux de l'assistant (le plan demande qu'aucune assertion ne soit affaiblie : aucune ne l'a été entre le rouge et le vert) : L0.1, L1.1 à L1.3, L2.1, L2.w, L3.1, L3.w, L4.1, L5.1 à L5.3, L6.1, L7.1, L8.1, L8.2 sous bash et sous zsh, L9.1 une fois ; H0.
+
+## Mutants rouges de la session
+
+Suite `test-cockpit-lancer-pty.sh session` sur la session complétée : `15 PASS / 0 FAIL`, rc=0 (J1 à J7, deux assertions de mutants), rejouée après reprise sur crash (2026-11-05).
+
+- **M-JS-SANS-ATTENTE** (`        c.attentes.push(entree);` -> `... entree.finir({ ok: true });`) : tué par **J3.1**, attendu `{"ok":false,"motif":"premier-plan"}`, obtenu `[{"ok":true}]` : sans attendre l'assistant, un lecteur au premier plan n'est plus refusé.
+- **M-FIFO** (rappel du délai retirant d'abord l'entrée de `c.attentes`) : tué par **J5.2**, attendu premier `delai` et second `alphabet`, obtenu `{"premier":{"ok":false,"motif":"delai"},"second":{"ok":true}}` : la réponse tardive du premier appel est attribuée au second.
