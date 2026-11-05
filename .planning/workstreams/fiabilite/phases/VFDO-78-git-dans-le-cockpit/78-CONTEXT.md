@@ -130,6 +130,14 @@ verrous de driver, arbitrages en attente, watchdog et serveurs orphelins (Phase 
   parente) : il retient désormais le dernier worktree cité sur l'ensemble des appels de l'agent. Témoin rouge : transcript de
   sous-agent dont le dernier appel ne cite aucun chemin.
 
+### Décisions du manager pendant l'exécution (2026-11-05)
+
+- **P78-D-27 (commande et masquage).** Le champ `commande` ne passe jamais par `nettoie` ou `masque` ; si `masque(nom) !== nom`,
+  `commande = null` (aucune commande copiée ne diffère du nom réel ni de ce qui est affiché). Né du finding de 78-03.
+- **P78-D-28 (refs symboliques).** `refs/remotes/*/HEAD` est exclu des étiquettes du graphe (finding de 78-02).
+- **P78-D-29 (`-` et `@`).** `git switch` lit `-` et `@` comme des raccourcis même après `--end-of-options` : pas de
+  commande de bascule pour ces noms (trouvé par l'échantillon généré de 78-03).
+
 ### Claude's Discretion
 
 Algorithme de placement des couloirs, format d'échange serveur → page, découpage en fichiers sous `plugin/cockpit/`.
