@@ -1014,6 +1014,18 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | TERM-10 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
 | TERM-11 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
 | TERM-12 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
+| GITC-01 | Phase 78 | Pending — 2026-11-05 (cadrage) |
+| GITC-02 | Phase 78 | Pending — 2026-11-05 (cadrage) |
+| GITC-03 | Phase 78 | Pending — 2026-11-05 (cadrage) |
+| GITC-04 | Phase 78 | Pending — 2026-11-05 (cadrage) |
+| GITC-05 | Phase 78 | Pending — 2026-11-05 (cadrage) |
+| GITC-06 | Phase 78 | Pending — 2026-11-05 (cadrage) |
+| GITC-07 | Phase 78 | Pending — 2026-11-05 (cadrage) |
+| GITC-08 | Phase 78 | Pending — 2026-11-05 (cadrage) |
+| GITC-09 | Phase 78 | Pending — 2026-11-05 (cadrage) |
+| GITC-10 | Phase 78 | Pending — 2026-11-05 (cadrage) |
+| GITC-11 | Phase 78 | Pending — 2026-11-05 (cadrage) |
+| GITC-12 | Phase 78 | Pending — 2026-11-05 (cadrage) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1594,6 +1606,22 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **TERM-10**: xterm.js vendorisé avec sha256 et licence ; aucun addon presse-papiers ; séquences OSC 52, OSC 8, DCS, CSI 21t, DECRQSS dans la sortie : presse-papiers inchangé, aucun octet choisi par la sortie réinjecté dans l'entrée du PTY (seules les réponses de format fixe d'xterm — DA1, DA2, DSR, CPR, DECRQM, couleurs OSC — le sont, F8 de l'audit, P71-D-25) (P71-D-16).
 - [x] **TERM-11**: Aucune frappe ni sortie du terminal sur disque ni dans les flux du cockpit (journal, SSE, export) ; le tampon de reprise est vidé à la fin de la session.
 - [x] **TERM-12**: Non-régression et chaîne XSS : toutes les suites du cockpit restent vertes ; la chaîne de `test-cockpit-chaine-xss.sh` étendue — une charge exécutée dans P qui tente `window.open` vers Q, `postMessage`, `fetch`/POST vers Q avec le jeton de page, la lecture du stockage de Q — ne crée aucun fichier marqueur par le shell.
+
+### Git dans le cockpit (Phase 78 — posées au cadrage, 2026-11-05)
+> Dérivent de P78-D-01..19 (`78-CONTEXT.md` ; arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-05, relayés au manager ; P78-D-10 en attente, hypothèse marquée ; décisions techniques du manager sur mesures). Famille neuve `GITC` (vérifiée libre le 2026-11-05 sur `origin/main`, `feat/phase-72-lancer-depuis-cartes` et `docs/jalon-v2-phases-73-77`). Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code.
+
+- [ ] **GITC-01**: En-tête : sur Code, Projet et Équipe, le titre à droite du logo est le nom du dossier du dépôt principal, identique sur les trois onglets, y compris depuis un worktree ; les suffixes « — Projet » et « — Équipe » disparaissent (P78-D-01, P78-D-09).
+- [ ] **GITC-02**: Seconde ligne de l'en-tête : branche courante, et worktree seulement hors de l'arbre principal, en petit sous le nom ; branche détachée lisible comme telle ; noms longs tronqués avec le nom complet au survol (P78-D-02, P78-D-19).
+- [ ] **GITC-03**: Bloc de vue à la racine : surtitre = nom de l'onglet, titre = ce que montre la vue (jalon en cours, dépôt et branche, mission en cours), sous-titre court ; plus aucune répétition du nom du projet ; sous-vues inchangées (P78-D-03).
+- [ ] **GITC-04**: Tiroir Git vertical à gauche, sans 4ᵉ onglet, ouvert selon P78-D-10 ; il coexiste avec le tiroir Terminal et les boutons du bas à gauche sans chevauchement, et tient en largeur mobile (P78-D-04, P78-D-10, P78-D-19).
+- [ ] **GITC-05**: Dégradation : Git absent du PATH ou lab hors dépôt : seconde ligne et ouvreur absents, aucune erreur dans le chrome, le reste du cockpit identique ; une commande git en échec ou hors borne rend « indisponible » dans le tiroir seulement (P78-D-11).
+- [ ] **GITC-06**: Graphe façon gitgraph : branches locales, worktrees et branches distantes déjà présentes sur le disque, N derniers commits bornés, branches mergées repliées, placement en couloirs déterministe ; aucun `fetch` ni lecture réseau (P78-D-05).
+- [ ] **GITC-07**: Détail d'un commit : auteur, date, message complet, fichiers touchés avec +/− (binaires et renommages compris), sans diff ; SHA validé par motif strict puis `rev-parse --verify` (P78-D-06, P78-D-13).
+- [ ] **GITC-08**: État de chaque worktree (modifiés, non suivis, avance et retard sur la base), tags, liste des stash, auteurs et activité récente par branche (P78-D-06).
+- [ ] **GITC-09**: Lecture seule : routes neuves en GET seul sous `/api/vf/`, derrière Host, Origin et jeton ; aucune écriture dans le dépôt ni dans `.git` ; programmes externes de git neutralisés ; sorties bornées (P78-D-07, P78-D-13).
+- [ ] **GITC-10**: Commandes à copier : construites par une fonction unique, refs et chemins cités pour le shell ; un nom de branche hostile ne produit jamais une commande différente de celle affichée ; copie par le presse-papiers de la page seule ; texte venu de git rendu en `textContent` (P78-D-14).
+- [ ] **GITC-11**: Rafraîchissement par le flux existant sur une signature bon marché (HEAD et refs des worktrees), sans relancer `git log` à chaque tick ; aucune variable CSS ni valeur d'espacement en dur, aucune valeur de padding existante modifiée (P78-D-12, P78-D-15).
+- [ ] **GITC-12**: Retrait et non-régression : liste « Repositories » de l'onglet Code retirée ; toutes les suites du cockpit vertes ; chaîne XSS étendue aux données git (nom de branche, message de commit, auteur hostiles) ; bump du module au-dessus de `main` (P78-D-09, P78-D-17, P78-D-18).
 
 ---
 *Requirements defined: 2026-06-04*
