@@ -14,3 +14,5 @@
 - [Phase 71 re-audit des correctifs, 2026-11-04](project-phase71-reaudit-correctifs.md) — F1-F8 fermés avec témoins rouges ; 1 mineur (aperçu du collage tronqué à 200 car.) ; pièges de sonde (Q hors tiroir, ouvreur asynchrone)
 - [Phase 71 re-audit n°2, c023f54a](project-phase71-reaudit2-n1-n2-tourc.md) — N1/N2/tour C fermés avec mutants rouges ; 3 mineurs (PATH assaini vide = cwd, Cf d'une ligne, bourrage) ; serveur vendu exécute des binaires du lab (hérité 67)
 - [Phase 71 re-audit n°3, 7bb14f15](project-phase71-reaudit3-rebase-w1.md) — W1/D-03/H-1/N9/N10 fermes ; N12 regression H-1 lanceur (PATH absolu vers le lab) ; pieges enfantsDe, ps eww
+- [Phase 68 socle signal@1, audit 2026-11-04](project-phase68-socle-signal-audit.md) — fsmonitor ouvert via who.mjs, chaines non nettoyees (22 champs), lock plante ferme
+- [Phase 68 re-audit partiel 2026-11-04](project-phase68-reaudit-partiel.md) — interrompu : 2 sondes faites, gating par registre du lab = famille ST-2
