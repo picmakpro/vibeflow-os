@@ -117,3 +117,4 @@
 - [check-machine-paths aveugle au compte local](project_check-machine-paths-aveugle-au-compte-local.md) — vert en local, rouge en CI sur /Users/<compte> : grep du diff avant la PR, ~ dans les traces verbatim
 - [cwd des workers = celui du manager](project_cwd-des-workers-herite-du-manager.md) — un worker part du cwd du manager, pas du worktree du mandat : imposer `cd <abs> &&`, vérifier `branch --contains`
 - [Coût d'une correction ciblée prouvée](project_cout-correction-ciblee-vf-coder.md) — 4 arbitrages + témoins + mutants = 203k tokens ; un budget de 300k ne loge pas aussi la revue
+- [TaskStop : propriétaire seul](project_taskstop-proprietaire-seul.md) — un parent ne stoppe pas son enfant ; « waiting on its own background work » ≠ retour, jamais close done dessus
