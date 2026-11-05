@@ -6,7 +6,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "craft-git",
@@ -25,7 +25,7 @@
         "craft-git"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     }
   ]
 }

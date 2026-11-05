@@ -100,6 +100,22 @@ verrous de driver, arbitrages en attente, watchdog et serveurs orphelins (Phase 
   devient l'ouvreur tactile (proposé par le craft, `78-UI-SPEC.md` §5, retenu par le manager, à confirmer par le juge de
   design) ; absent sans Git comme les autres ouvreurs (P78-D-11).
 
+- **P78-D-21 (filtres du dépôt, question ouverte 1 de `78-RESEARCH.md`).** Sûreté d'abord : aucun filtre déclaré par le
+  dépôt n'est exécuté (`-c filter.<x>.<clé>=` pour chaque filtre listé) ; `git diff` contre l'arbre de travail est proscrit.
+  Quand un filtre est déclaré, le compte de fichiers modifiés du worktree porte la mention « approximatif : filtres du dépôt
+  non exécutés ». Choix d'affichage du manager, révisable par Samuel.
+- **P78-D-22 (environnement git).** Les appels git du tiroir retirent `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`,
+  `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_CONFIG*` et voisines de l'environnement hérité ; préfixe
+  `GIT_LECTURE = [...GIT_SUR, '--no-ext-diff', '--no-textconv']` là où il s'applique ; `maxBuffer` explicite et parseur qui
+  vérifie l'alignement (une sortie tronquée rend « indisponible », jamais un graphe faux). Le vecteur identique de
+  `vf-cockpit-who.mjs:116` est consigné, hors périmètre.
+- **P78-D-23 (bornes et extraction).** Trois appels : `for-each-ref` (avance/retard, repli `rev-list --count` si
+  `%(ahead-behind:)` est absent de la version de git), `log` de la ligne de base `-n 500`, `log` des non mergées
+  `--not <base> -n 500` ; refs entièrement qualifiées ou `--end-of-options`. Base du retard : même règle que `retard()`
+  (les deux comptes quand `main` local et `origin/main` divergent). Placement des couloirs maison en JS pur, rendu SVG,
+  ELK écarté. `status` par worktree à l'ouverture du tiroir seulement ; signature de rafraîchissement dans le filet de 5 s.
+- **P78-D-24 (auteurs).** Agrégés en JS sur `log --format=%an%x00%at`, jamais `shortlog` sans révision.
+
 ### Claude's Discretion
 
 Algorithme de placement des couloirs, format d'échange serveur → page, découpage en fichiers sous `plugin/cockpit/`.
