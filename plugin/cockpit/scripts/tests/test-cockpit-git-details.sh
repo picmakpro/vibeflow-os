@@ -172,6 +172,142 @@ CM "$C2" > /dev/null
 CONTRAT_C="$(node "$AUX/j.mjs" "$SCRIPTS/vf-cockpit-interface.json" 'JSON.stringify(j.schemas["vibeflow/cockpit-git-commit@1"])')"
 assert_eq "X1.6a — chaque clé « requis » du schéma commit existe dans la réponse avec le bon type, chaque fichier porte ses clés" "$(J "$WORK/cm.json" '(()=>{const c='"$CONTRAT_C"';const ty=(v)=>Array.isArray(v)?"array":v===null?"null":typeof v;const ko=Object.entries(c.requis).filter(([k,t])=>ty(j[k])!==t);const kf=j.fichiers.filter(f=>!c.fichier.requis.every(k=>k in f));return JSON.stringify([ko,kf.length,c.interdits.filter(k=>k in j)])})()')" '[[],0,[]]'
 
+echo "=== X1.7 — dépôt sha256 : le motif suit le format d'objets ==="
+S256="$WORK/s256"; "$GIT_REEL" init -q -b main --object-format=sha256 "$S256" 2>/dev/null; S256="$(cd "$S256" && pwd -P)"
+tick; "$GIT_REEL" -C "$S256" commit -q --allow-empty -m "c256"; H256="$("$GIT_REEL" -C "$S256" rev-parse HEAD)"
+assert_eq "X1.7a — dépôt sha256 : le sha de 64 caractères d'un commit rend 200 ok" "$(node "$AUX/det.mjs" "$SCRIPTS" commit "$S256" "$H256" | node "$AUX/j.mjs" - 'j.code+"|"+j.corps.etat+"|"+(j.corps.h.length)')" "200|ok|64"
+assert_eq "X1.7b — dépôt sha1 : un sha de 64 caractères est invalide (400), le motif ne se contente pas de la longueur" "$(node "$AUX/det.mjs" "$SCRIPTS" commit "$LAB" "$H256" | node "$AUX/j.mjs" - 'j.code+"|"+j.corps.etat')" "400|sha-invalide"
+assert_eq "X1.7c — dépôt sha256 : un sha de 40 caractères est invalide (400)" "$(node "$AUX/det.mjs" "$SCRIPTS" commit "$S256" "${H256:0:40}" | node "$AUX/j.mjs" - 'j.code+"|"+j.corps.etat')" "400|sha-invalide"
+
+echo "=== X2 — état des worktrees à la demande ==="
+GETWT() { GET /api/vf/git/worktrees > "$WORK/wt.out"; sed -n '2,$p' "$WORK/wt.out" > "$WORK/wt.json"; sed -n 1p "$WORK/wt.out"; }
+WTS="$WORK/wt-sale"; WTP="$WORK/wt-propre"; WTD="$WORK/wt-det"; WTM="$WORK/wt-many"
+G worktree add -q -b ws "$WTS" "$C1"; G worktree add -q -b wp "$WTP" "$C1"; G worktree add -q --detach "$WTD" "$C2"; G worktree add -q -b wm "$WTM" "$C1"
+G update-ref refs/remotes/origin/main "$MG" # main local en avance de 2 (le message de 10 Kio, les 600 fichiers) sur origin/main
+for f in a.txt old.txt new.txt; do printf 'modif\n' >> "$WTS/$f"; done; printf 'u\n' > "$WTS/u1.txt"; printf 'u\n' > "$WTS/u2.txt"
+for i in $(seq 1 250); do printf 'u\n' > "$WTM/nonsuivi$i.txt"; done
+oracle() { local oid; oid="$(G rev-parse "$1")"; echo "$(G rev-list --count "refs/heads/main..$oid")|$(G rev-list --count "$oid..refs/heads/main")|$(G rev-list --count "refs/remotes/origin/main..$oid")|$(G rev-list --count "$oid..refs/remotes/origin/main")"; }
+WT() { J "$WORK/wt.json" '(()=>{const w=j.worktrees.find(w=>w.nom==="'"$1"'");return w?('"$2"'):"absent"})()'; }
+S="$(GETWT)"
+assert_eq "X2.1a — GET : 200, schéma, état ok, sans filtre : approximatif faux et aucune mention ; 5 worktrees" "$S|$(J "$WORK/wt.json" 'j.schema+"|"+j.etat+"|"+j.approximatif+"|"+j.mention+"|"+j.worktrees.length')" "200|vibeflow/cockpit-git-worktrees@1|ok|false|null|5"
+assert_eq "X2.1b — 3 fichiers modifiés et 2 non suivis : modifies 3, nonSuivis 2, propre faux" "$(WT wt-sale 'w.modifies+"|"+w.nonSuivis+"|"+w.propre+"|"+w.plus')" "3|2|false|false"
+assert_eq "X2.1c — worktree propre : 0, 0, propre vrai ; le lab (arbre principal) aussi" "$(WT wt-propre 'w.modifies+"|"+w.nonSuivis+"|"+w.propre')|$(WT lab 'w.propre')" "0|0|true|true"
+assert_eq "X2.1d — worktree détaché : présent, avance et retard calculés sur son oid (sur main puis sur origin/main)" "$(WT wt-det 'w.avance+"|"+w.retard+"|"+w.avanceOrigin+"|"+w.retardOrigin')" "$(oracle "$C2")"
+assert_eq "X2.2a — arbre principal sur main : 0|0 sur la locale, 2 d'avance sur origin/main (distincts)" "$(WT lab 'w.avance+"|"+w.retard+"|"+w.avanceOrigin+"|"+w.retardOrigin')" "0|0|2|0"
+assert_eq "X2.2b — branche ws (en retard de la base) : comptes conformes à rev-list ; retard sur origin/main de 2 de moins que sur main" "$(WT wt-sale 'w.avance+"|"+w.retard+"|"+w.avanceOrigin+"|"+w.retardOrigin+"|"+(w.retard-w.retardOrigin)')" "$(oracle ws)|2"
+assert_eq "X2.3 — 250 fichiers non suivis : borne de 200 entrées lues, plus vrai, propre faux, aucun modifié" "$(WT wt-many 'w.nonSuivis+"|"+w.plus+"|"+w.propre+"|"+w.modifies')" "200|true|false|0"
+assert_eq "X2.4 — commande à copier : cd cité pour chaque worktree ; aucun diff ni e-mail dans la réponse" "$(WT wt-sale 'w.commande')|$(J "$WORK/wt.json" '/a@t\.test|^[-+]{3} |^@@/m.test(JSON.stringify(j))')" "cd -- '$WTS'|false"
+CONTRAT_W="$(node "$AUX/j.mjs" "$SCRIPTS/vf-cockpit-interface.json" 'JSON.stringify(j.schemas["vibeflow/cockpit-git-worktrees@1"]||null)')"
+assert_eq "X2.5 — le contrat du schéma worktrees tient contre la réponse réelle (clés, types, clés de chaque worktree)" "$(J "$WORK/wt.json" '(()=>{const c='"$CONTRAT_W"';if(!c)return "schéma absent";const ty=(v)=>Array.isArray(v)?"array":v===null?"null":typeof v;const ko=Object.entries(c.requis).filter(([k,t])=>t!=="any"&&ty(j[k])!==t&&!(t==="string"&&j[k]===null));const kw=j.worktrees.filter(w=>!c.worktree.requis.every(k=>k in w));return JSON.stringify([ko,kw.length])})()')" '[[],0]'
+
+echo "=== X3 — dépôt piégé, lecture seule, GET seul ==="
+MARQ="$WORK/marques"; PROGS="$WORK/progs"; mkdir -p "$MARQ" "$PROGS"
+raz() { rm -f "$MARQ"/*; }
+marque() { if [ -s "$MARQ/$1" ]; then echo posé; else echo absent; fi; }
+mk_prog() { printf '#!/bin/sh\necho "$0 $*" >> "%s/%s"\n%s\n' "$MARQ" "$1" "${2:-exit 0}" > "$PROGS/$1.sh"; chmod +x "$PROGS/$1.sh"; }
+mk_prog PROC "exit 1"; mk_prog CLEAN 'cat'; mk_prog TEXTCONV 'cat "$1"'; mk_prog FSM "exit 1"
+P="$WORK/piege"; "$GIT_REEL" init -q -b main "$P"; P="$(cd "$P" && pwd -P)"
+printf 'f.txt filter=f\n*.bin diff=bin\n' > "$P/.gitattributes"; printf 'contenu\n' > "$P/f.txt"; printf 'a\0b\n' > "$P/a.bin"
+"$GIT_REEL" -C "$P" add -A && "$GIT_REEL" -C "$P" commit -q -m "premier"
+printf 'a\0c\n' > "$P/a.bin"; "$GIT_REEL" -C "$P" commit -q -am "SUJET-REEL"; HP="$("$GIT_REEL" -C "$P" rev-parse HEAD)"
+"$GIT_REEL" -C "$P" config filter.f.clean "$PROGS/CLEAN.sh"; "$GIT_REEL" -C "$P" config filter.f.process "$PROGS/PROC.sh"
+"$GIT_REEL" -C "$P" config diff.bin.textconv "$PROGS/TEXTCONV.sh"; "$GIT_REEL" -C "$P" config core.fsmonitor "$PROGS/FSM.sh"
+UNE_MIN="$(date -v-1M +%Y%m%d%H%M 2>/dev/null || date -d '1 minute ago' +%Y%m%d%H%M)"; touch -t "$UNE_MIN" "$P/f.txt"
+raz
+"$GIT_REEL" --no-optional-locks -c core.fsmonitor=false -C "$P" status --porcelain=v2 >/dev/null 2>&1
+assert_eq "X3.0a — TÉMOIN POSITIF : git brut avec GIT_SUR seul lance filter.f.process sur le fichier stat-dirty du dépôt piégé" "$(marque PROC)" "posé"; raz
+"$GIT_REEL" -C "$P" log -p -1 >/dev/null 2>&1
+assert_eq "X3.0b — TÉMOIN POSITIF : git log -p brut lance le textconv déclaré" "$(marque TEXTCONV)" "posé"; raz
+# sonde : status des worktrees du dépôt piégé via le module ; rend les marqueurs, puis approximatif et la mention
+sonde_filtres() { raz; node "$AUX/det.mjs" "$1" wt "$P" > "$WORK/piege-wt.json"; echo "$(marque PROC)|$(marque CLEAN)|$(marque FSM)"; raz; }
+assert_eq "X3.1a — dépôt piégé : GET worktrees ne lance aucun filtre (process, clean) ni fsmonitor" "$(sonde_filtres "$SCRIPTS")" "absent|absent|absent"
+assert_eq "X3.1b — dépôt piégé : approximatif vrai et la mention « approximatif : filtres du dépôt non exécutés »" "$(J "$WORK/piege-wt.json" 'j.etat+"|"+j.approximatif+"|"+j.mention')" "ok|true|approximatif : filtres du dépôt non exécutés"
+raz; node "$AUX/det.mjs" "$SCRIPTS" commit "$P" "$HP" > "$WORK/piege-commit.json"
+assert_eq "X3.3 — détail d'un commit du dépôt piégé (binaire sous textconv déclaré) : 200, le binaire est lu, aucun textconv lancé" "$(J "$WORK/piege-commit.json" 'j.code+"|"+JSON.stringify(j.corps.fichiers.map(f=>[f.chemin,f.binaire]))')|$(marque TEXTCONV)" '200|[["a.bin",true]]|absent'
+raz
+
+echo "=== X3.2 — .git intact, GET seul ==="
+EMP() { node "$AUX/empreinte.mjs" "$LAB/.git" > "$1"; }
+GET "/api/vf/git/worktrees" > /dev/null; GET "/api/vf/git/commit?sha=$C1" > /dev/null
+EMP "$WORK/emp-avant"
+for _ in 1 2 3 4 5 6 7 8 9 10; do GET "/api/vf/git/worktrees" > /dev/null; GET "/api/vf/git/commit?sha=$CMANY" > /dev/null; done
+EMP "$WORK/emp-apres"
+assert_eq "X3.2a — empreinte de .git (chemin, taille, date) identique après dix GET de chaque route (cmp -s)" "$(cmp -s "$WORK/emp-avant" "$WORK/emp-apres" && echo identique || echo different)" "identique"
+G update-ref refs/heads/temoin-ecriture "$C1"; EMP "$WORK/emp-ecrit"
+assert_eq "X3.2b — témoin : une écriture délibérée (update-ref) CHANGE l'empreinte" "$(cmp -s "$WORK/emp-avant" "$WORK/emp-ecrit" && echo identique || echo different)" "different"
+G update-ref -d refs/heads/temoin-ecriture
+for R in "/api/vf/git/commit?sha=$C1" "/api/vf/git/worktrees"; do
+  N="${R%%\?*}"
+  assert_eq "X3.2c — $N : POST -> 405" "$(node "$AUX/req.mjs" "$PORT" POST "$R" "$TOK" - | sed -n 1p)" "405"
+  assert_eq "X3.2d — $N : Origin tierce -> 403, Origin de la page -> 200 (témoin)" "$(node "$AUX/req.mjs" "$PORT" GET "$R" "$TOK" http://evil.example | sed -n 1p)|$(node "$AUX/req.mjs" "$PORT" GET "$R" "$TOK" "http://127.0.0.1:$PORT" | sed -n 1p)" "403|200"
+  assert_eq "X3.2e — $N : sans jeton -> 403" "$(node "$AUX/req.mjs" "$PORT" GET "$R" - - | sed -n 1p)" "403"
+done
+assert_eq "X3.2f — le code ne contient aucune route POST ni sous-commande d'écriture ni diff contre l'arbre" "$(grep -c "POST\|'add'\|'commit'\|'checkout'\|'reset'\|'-p'\|'--patch'\|%ae\|%ce" "$SCRIPTS/vf-cockpit-git-details.mjs" | tr -d ' ')" "0"
+
+echo "=== X5 — refs sans date (P78-D-31) et auteurs de la fenêtre ==="
+RB="$WORK/refs-sans-date"; "$GIT_REEL" init -q -b main "$RB"; RB="$(cd "$RB" && pwd -P)"
+RG() { "$GIT_REEL" -C "$RB" "$@"; }
+printf 'a\n' > "$RB/a.txt"; RG add -A; tick; RG commit -q -m "r0"; tick; RG checkout -q -b b; printf 'b\n' > "$RB/b.txt"; RG add -A; RG commit -q -m "r1 sur b"; RG checkout -q main
+BL="$(echo blob | RG hash-object -w --stdin)"; TR="$(RG rev-parse 'main^{tree}')"
+RG tag tblob "$BL"; RG tag ttree "$TR"; RG update-ref refs/remotes/origin/bizarre "$BL"
+assert_eq "X5.0 — TÉMOIN POSITIF : for-each-ref rend 3 refs à date vide (tag vers un blob, tag vers un arbre, distante vers un blob)" "$(RG for-each-ref --format='%(creatordate:unix)|%(refname)' | grep -c '^|')" "3"
+assert_eq "X5.1a — dépôt avec refs sans date : la lecture reste ok (pas indisponible), refsIgnorees 3" "$(node "$AUX/det.mjs" "$SCRIPTS" git "$RB" | node "$AUX/j.mjs" - 'j.etat+"|"+j.refsIgnorees')" "ok|3"
+assert_eq "X5.1b — le reste du graphe est gardé : 2 rangées, la branche b figure dans parBranche et la non mergée dans horsFenetre ou le graphe, aucun tag servi" "$(node "$AUX/det.mjs" "$SCRIPTS" git "$RB" | node "$AUX/j.mjs" - 'j.rangees.length+"|"+j.parBranche.map(x=>x.nom).sort().join(",")+"|"+j.tags.length')" "2|b,main|0"
+assert_eq "X5.1c — un dépôt sans ref sans date : refsIgnorees 0" "$(node "$AUX/det.mjs" "$SCRIPTS" git "$LAB" | node "$AUX/j.mjs" - 'j.etat+"|"+j.refsIgnorees')" "ok|0"
+# auteurs : agrégés sur la fenêtre lue (500 commits de la base), pas sur tout l'historique
+AU="$WORK/auteurs"; "$GIT_REEL" init -q -b main "$AU"; AU="$(cd "$AU" && pwd -P)"
+node -e '
+let s = "";
+const au = (nom, t, n) => { s += "commit refs/heads/main\nauthor " + nom + " <" + nom + "@t.test> " + t + " +0000\ncommitter " + nom + " <" + nom + "@t.test> " + t + " +0000\ndata 3\nmsg\n"; if (n === 0) s += "M 644 inline f.txt\ndata 1\nx\n"; s += "\n"; };
+au("Ancien", 1700000000, 0);
+for (let i = 1; i <= 510; i++) au("Recent", 1700000000 + i * 60, i);
+process.stdout.write(s);
+' | "$GIT_REEL" -C "$AU" fast-import --quiet
+assert_eq "X5.2a — fixture : 511 commits, 2 auteurs dans tout l'historique" "$("$GIT_REEL" -C "$AU" rev-list --count main)|$("$GIT_REEL" -C "$AU" log --format=%an | sort -u | tr '\n' ',')" "511|Ancien,Recent,"
+assert_eq "X5.2b — auteurs = ceux de la FENÊTRE lue (500 commits) : Ancien (hors fenêtre) n'y est pas, Recent y est avec 500 ; bornes.tronque vrai" "$(node "$AUX/det.mjs" "$SCRIPTS" git "$AU" | node "$AUX/j.mjs" - 'JSON.stringify(j.auteurs.map(a=>[a.nom,a.commits]))+"|"+j.bornes.tronque')" '[["Recent",500]]|true'
+assert_eq "X5.2c — le contrat le dit : la description du schéma précise que les auteurs sont ceux de la fenêtre lue, pas de tout l'historique" "$(node "$AUX/j.mjs" "$SCRIPTS/vf-cockpit-interface.json" '/auteurs[^.]*fenêtre[^.]*pas[^.]*historique/.test(j.schemas["vibeflow/cockpit-git@1"].description)')" "true"
+
+echo "=== X4 — mutants (copies des scripts, jamais le module) ==="
+mutant_dir() { local d="$WORK/m-$1"; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/"; echo "$d"; }
+muter() { node "$AUX/mut.mjs" "$@"; }
+sonde_motif()    { node "$AUX/det.mjs" "$1" commit "$LAB" "${C1:0:12}" | node "$AUX/j.mjs" - 'j.code ?? j.erreur'; }
+sonde_motif64()  { node "$AUX/det.mjs" "$1" commit "$LAB" "$H256" | node "$AUX/j.mjs" - 'j.code ?? j.erreur'; }
+sonde_verify()   { node "$AUX/det.mjs" "$1" commit "$LAB" "$TREE" | node "$AUX/j.mjs" - 'j.code ?? j.erreur'; }
+sonde_pp()       { node "$AUX/det.mjs" "$1" commit "$LAB" "$MG" | node "$AUX/j.mjs" - 'j.corps ? JSON.stringify(j.corps.fichiers.map(f=>f.chemin)) : j.erreur'; }
+sonde_borne()    { node "$AUX/det.mjs" "$1" commit "$LAB" "$CMANY" | node "$AUX/j.mjs" - 'j.corps ? j.corps.fichiers.length : j.erreur'; }
+sonde_ignorees() { node "$AUX/det.mjs" "$1" git "$RB" | node "$AUX/j.mjs" - 'j.etat+"|"+j.refsIgnorees'; }
+verifie() { # nom, sonde, attendu réel, dossier du mutant : la sonde est verte sur l'original, ROUGE sur le mutant, et le mutant se charge (un module cassé ne compte pas)
+  local nom="$1" sonde="$2" att="$3" d="$4" obt; obt="$($sonde "$d")"
+  assert_eq "X4 $nom — la sonde est verte sur l'original" "$($sonde "$SCRIPTS")" "$att"
+  if [ "$obt" != "$att" ] && [ "$obt" != "module absent" ] && [ "$obt" != "illisible" ]; then assert_eq "X4 $nom — rouge sur le mutant (obtenu : $obt)" "rouge" "rouge"; else assert_eq "X4 $nom — rouge sur le mutant (obtenu : $obt)" "$obt" "différent de [$att] et chargeable"; fi
+}
+D="$(mutant_dir motif)"; DET="$D/vf-cockpit-git-details.mjs"
+A1="$(muter "$DET" "if (typeof sha !== 'string' || !motifLong(sha)) return invalide;" "if (typeof sha !== 'string') return invalide;")"
+A2="$(muter "$DET" "if (!MOTIF(fmt.sortie.trim() === 'sha256' ? 64 : 40).test(sha)) return invalide;" "")"
+assert_eq "X4 M-MOTIF — le motif est retiré des deux endroits (cibles présentes)" "$A1|$A2" "applique|applique"
+verifie "M-MOTIF (sha court)" sonde_motif 400 "$D"
+verifie "M-MOTIF (64 caractères dans un dépôt sha1)" sonde_motif64 400 "$D"
+D="$(mutant_dir verify)"
+A="$(muter "$D/vf-cockpit-git-details.mjs" "if (v.sortie.trim() !== sha) return { code: 404, corps: { schema: SCHEMA_COMMIT, etat: 'commit-inconnu' } };" "")"
+assert_eq "X4 M-VERIFY — rev-parse --verify retiré (cible présente)" "$A" "applique"
+verifie "M-VERIFY (sha d'un arbre)" sonde_verify 404 "$D"
+D="$(mutant_dir pp)"
+A="$(muter "$D/vf-cockpit-git-details.mjs" '[`${sha}^1`, sha]' "['-m', sha]")"
+assert_eq "X4 M-PREMIER-PARENT — « -m » au lieu de « <sha>^1 » (cible présente)" "$A" "applique"
+verifie "M-PREMIER-PARENT" sonde_pp '["f.txt"]' "$D"
+D="$(mutant_dir borne)"
+A="$(muter "$D/vf-cockpit-git-details.mjs" "if (fichiers.length < max)" "if (true)")"
+assert_eq "X4 M-BORNE-FICHIERS — borne de 500 retirée (cible présente)" "$A" "applique"
+verifie "M-BORNE-FICHIERS" sonde_borne 500 "$D"
+D="$(mutant_dir filtres)"
+A="$(muter "$D/vf-cockpit-git-details.mjs" "const st = lancerGit(w.chemin, ['status', '--porcelain=v2', '--branch', '-z', '-unormal'], { lab, maxBuffer: 1 << 20 });" "const st = (() => { try { return { ok: true, sortie: process.getBuiltinModule('node:child_process').execFileSync('git', ['--no-optional-locks', '-c', 'core.fsmonitor=false', '-C', w.chemin, 'status', '--porcelain=v2', '--branch', '-z', '-unormal'], { encoding: 'utf8' }) }; } catch { return { ok: false, sortie: '' }; } })();")"
+assert_eq "X4 M-FILTRES-STATUS — status lancé hors lancerGit, GIT_SUR seul (cible présente)" "$A" "applique"
+verifie "M-FILTRES-STATUS" sonde_filtres "absent|absent|absent" "$D"
+D="$(mutant_dir ignorees)"
+A="$(muter "$D/vf-cockpit-git.mjs" "f[3] === ''" "false")"
+assert_eq "X4 M-IGNOREES — les refs sans date ne sont plus écartées (cible présente)" "$A" "applique"
+verifie "M-IGNOREES" sonde_ignorees "ok|3" "$D"
+
 # --- FIN ---
 stop_srv
 vf_hyg_assert
