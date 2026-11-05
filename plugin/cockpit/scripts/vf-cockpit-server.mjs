@@ -9,6 +9,8 @@
 //   GET /api/vf/doing?id=  dernière commande d'UNE session, à la demande (schéma vibeflow/cockpit-doing@1)
 //   GET /api/vf/transcript?id=  transcript réduit d'UN agent connu (mandat, messages, outils), à la demande (schéma vibeflow/cockpit-transcript@1)
 //   GET /api/vf/modeles    { modeles, defaut, lab } : liste fermée des modèles, défaut effectif, identifiant du lab
+//   GET /api/vf/git        topologie Git du lab (schéma vibeflow/cockpit-git@1), lecture seule (78-05)
+//   GET /api/vf/git/entete dépôt, branche, worktree (schéma vibeflow/cockpit-git-entete@1)
 // La dernière commande et le transcript ne figurent jamais dans le flux ni dans un fichier : la garde d'émission refuse tout
 // objet qui porte une clé de la liste `interdits` du contrat (vf-cockpit-interface.json, à côté), à n'importe quelle profondeur.
 // Contrat illisible ou liste vide : rien n'est émis (fermé par défaut).
@@ -24,6 +26,7 @@ import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
 import { buildEquipeGraph, missionsEnCours } from './vf-cockpit-equipe-carte.mjs';
 import { answerLocally, instructions } from './vf-cockpit-ask.mjs';
 import { MODELES, resoudreModele, argsAgent as argsConfines } from './vf-cockpit-agent.mjs';
+import { routeGit } from './vf-cockpit-git.mjs';
 
 let INTERDITS = []; // une seule source : le contrat, lu une fois au chargement
 try { const l = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json'), 'utf8')).schemas?.['vibeflow/cockpit-who@2']?.interdits; if (Array.isArray(l)) INTERDITS = l.filter((k) => typeof k === 'string' && k); } catch { INTERDITS = []; }
@@ -100,6 +103,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
       json(res, 200, { modeles: MODELES, defaut: dep.modele, lab: crypto.createHash('sha256').update(reel).digest('hex').slice(0, 12) });
       return true;
     }
+    if (routeGit(req, res, url, { root, json })) return true; // 78-05 : topologie Git, GET seul
     res.writeHead(404); res.end(); return true;
   }
 
