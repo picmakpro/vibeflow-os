@@ -1,7 +1,7 @@
 ---
 phase: 71
 plan: 09
-status: human_needed
+status: passed
 requirements: [TERM-05, TERM-08, TERM-09, TERM-12]
 commits:
   recette: 35a2ca1b
@@ -66,7 +66,7 @@ l'étape 11 de la recette ne fait que le relever. P71-D-24 : documentée (README
 
 ## Findings
 
-- **F1 (human_needed)** : recette humaine non jouée (17 étapes dans `71-RECETTE-HUMAINE.md`, y compris Ctrl+Maj+Espace sur Safari et Firefox, F5 de l'UI-SPEC, et la marge basse F-07-3).
+- **F1 (clos, passed — 2026-11-05)** : recette humaine jouée par Samuel le 2026-11-05 (session principale), conforme sur Arc, Firefox, Safari (après PR #209) et clavier AZERTY réel, voir `71-RECETTE-HUMAINE.md`. Ancien libellé : recette humaine non jouée (17 étapes dans `71-RECETTE-HUMAINE.md`, y compris Ctrl+Maj+Espace sur Safari et Firefox, F5 de l'UI-SPEC, et la marge basse F-07-3).
 - **F2 (no-op, consultatif)** : `check-ajout-retrait` avertit d'un ajout sans trailer `Ajout-Retrait` : `.claude/agent-memory/vf-dev-manager/feedback_reprendre-le-correcteur-par-sendmessage.md`, fichier hors du plan 71-09 (mémoire d'agent du manager), non corrigé ici.
 - **F3 (info)** : branche en retard sur `origin/main` pour le module cockpit (v1.0.0 contre v1.0.2) : `CHANGELOG`, `README`, `VERSION`, `module.json` conflicteront deux fois (avec main et avec la 69), voir `71-BRANCHEMENTS-MERGE.md` § 3.
 - **F4 (info)** : manuel utilisateur (`manual/fr/03-modules/catalogue.md`, `manual/fr/06-reference/skills.md` et pages anglaises) décrit toujours le cockpit « en lecture seule » ; mention de `--terminal` à faire dans la passe de documentation qui suit les fusions des Phases 68 à 71.
