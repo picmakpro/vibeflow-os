@@ -306,7 +306,7 @@ for P in "index.html" "project.html"; do
     assert_eq "D7.7 ($P, $TH) — I2 : backdrop-filter derrière le titre et le sous-titre" "$(printf '%s' "$XI2" | node "$AUX/jg.mjs" "/blur\\(/.test($V.$TH.filtre)")" "true"
     assert_eq "D7.8 ($P, $TH) — I2 : fond translucide (0 < alpha < 1)" "$(printf '%s' "$XI2" | node "$AUX/jg.mjs" "$V.$TH.alpha>0&&$V.$TH.alpha<1")" "true"
     assert_eq "D7.9 ($P, $TH) — I2 : la zone ne capte aucun événement de la carte et reste au texte (pas plus large que le bloc de titre)" "$(printf '%s' "$XI2" | node "$AUX/jg.mjs" "[$V.$TH.evenements,$V.$TH.largeur<=600]")" '["none",true]'
-    assert_eq "D7.9b ($P, $TH) — I2 : le texte reste à sa place (marge gauche du titre = 24 px, comme avant le flou)" "$(printf '%s' "$XI2" | node "$AUX/jg.mjs" "$V.$TH.gauche")" "24"
+    assert_eq "D7.9b ($P, $TH) — I2 : le texte reste à sa place (marge gauche du titre = 16 px (P71.5-D-04 : titre de vue à 16, ancien 24))" "$(printf '%s' "$XI2" | node "$AUX/jg.mjs" "$V.$TH.gauche")" "16"
   done
 done
 
