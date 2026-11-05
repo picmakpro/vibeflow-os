@@ -83,7 +83,7 @@ Ligne 1 : nom du dossier (mono 12,5 px, 500, `--text`, ellipsis) ; pilule « ici
 Ligne 2 : branche (mono 11,5 px, `--text-3`) puis pastilles d'état, pilule 11 px/500 `padding: 2px 8px` :
 « 3 modifiés » `--warn-text` sur `--warn-bg` ; « 2 non suivis » `--text-2` sur `rgba(var(--ink), .06)` ; « ↑2 ↓1 » mono `--text-2`
 (avance, retard sur la base) ; « propre » `--ok-text` sur `--ok-bg`. Jamais la couleur seule : le texte dit l'état.
-Bouton de commande `cd '<chemin>'` sous la ligne 2 (§ commandes).
+Bouton de commande `cd -- '<chemin>'` sous la ligne 2 (§ commandes).
 
 **Graphe** (rangée = un commit, `<ol role="listbox" aria-label="Commits">`, `<li role="option">`).
 - Géométrie : colonne graphe en SVG `aria-hidden`, une rangée = 40 px (44 px en `pointer: coarse`, valeur de `header .btn` tactile),
@@ -112,7 +112,7 @@ pas de saut de mise en page : le défilement garde la rangée en haut). Bloc `--
 Contenu : message complet (13 px, `--text`, `white-space: pre-wrap`, sujet en 600) ; auteur + date longue (« 5 nov. 2026, 14 h 32 »,
 12 px, `--text-3`) ; sha complet (mono 11,5 px, sélectionnable) ; « Fichiers (7) » puis liste (mono 11,5 px, chemin en ellipsis à gauche
 du compteur) avec `+12` en `--ok-text` et `−3` en `--err-text` (le signe est dans le texte, tabular-nums) ; bornée à 30 fichiers
-puis « et 14 autres ». Pas de diff. Commandes : `git show a1b2c3d --stat`, `git switch --detach a1b2c3d`. Un second clic ou Échap
+puis « et 14 autres ». Pas de diff. Commandes : `git show --stat --end-of-options <sha>`, `git switch --detach --end-of-options <sha>` (texte exact : celui produit par `vf-cockpit-git-commandes.mjs`, 78-03). Un second clic ou Échap
 (focus dans la rangée) replie ; un seul détail ouvert à la fois.
 
 **Tags / Stash / Auteurs.** Lignes denses (`padding: 6px 10px`, rayon `--r-ctl`, survol `.06`) : tag = nom mono + sha court + date ;
@@ -122,7 +122,7 @@ nombre de commits, barre `.vf-bar` (6 px, piste `--raise-2`, remplissage `--text
 
 **Commandes à copier.** Rangée `.vf-git-cmd` : `--well` en fond, `--r-ctl`, `padding: 4px 4px 4px 10px`, `gap: 6px`, `min-height: 28px`
 (44 px tactile). `<code>` mono 11,5 px `--text-2`, 1 ligne, ellipsis, `title` = commande complète, sélectionnable ; à droite un bouton
-28×28 (`.vf-term-bouton`, rayon 8, icône copie, `aria-label` « Copier la commande : git switch 'feat/x' »). Retour : l'icône devient une
+28×28 (`.vf-term-bouton`, rayon 8, icône copie, `aria-label` « Copier la commande : git switch --end-of-options 'feat/x' »). Retour : l'icône devient une
 coche `--ok` pendant 1,6 s, la rangée affiche « Copiée » en place du bouton-texte (11,5 px, `--ok-text`), annonce
 `aria-live="polite"` « Commande copiée ». Échec de l'API presse-papiers : le `<code>` est sélectionné et la rangée dit « Copie
 impossible, commande sélectionnée » en `--warn-text`. Jamais d'exécution, jamais de lien actif, jamais de HTML injecté.
@@ -248,3 +248,5 @@ Rien d'existant n'est modifié, hors les trois accroches de §9.
 - **Accroches dans le moteur (3, à tracer dans `VENDORED.txt`)** : (a) `renderContext` : surtitre, titre, sous-titre par onglet ;
   (b) `.brand` : bloc `.vf-nom` autour de `#proj-name` (`viewer.html:584`, `2198`, `2206`) ; (c) `keydown` : touche `g` et priorité d'Échap.
   Tout le reste vit dans des fichiers `vf-git-*` / `ui/*vf*`.
+
+> **Note du manager (2026-11-05).** Le texte des commandes à copier fait foi tel que le produit `vf-cockpit-git-commandes.mjs` (78-03, P78-D-14 : `--end-of-options`, citation shell) ; les exemples ci-dessus y ont été alignés.
