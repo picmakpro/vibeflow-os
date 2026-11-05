@@ -49,7 +49,7 @@ Aucun relevé supposé : les cinq viennent de l'essai 2, d'après les fichiers e
 
 ### Essai 1 (écarté, sortie du PTY perdue)
 
-L'essai 1 date du 2026-11-05T21:17:12+0100 (aléa `9A9BB67B`). Le pilote s'est arrêté après S4 sans écrire la sortie du PTY, et le nettoyage n'a pas tourné : il a été fait à la main ensuite.
+L'essai 1 date du 2026-11-05T21:17:12+0100 (aléa `9A9BB67B`). Le pilote est resté bloqué dans `os.waitpid` après S4. Un échantillon `sample` du processus le montre dans `__wait4`. Il n'a donc écrit ni la sortie du PTY ni le nettoyage. Le nettoyage (serveur, lab, deux transcripts) a été fait à la main, puis le pilote bloqué a été tué par `kill -9`.
 R-HISTORIQUE et R-REGLAGE n'ont donc pas de preuve de sortie pour cet essai. Le transcript du fork (copie `essai1-fork.jsonl`) montre pourtant :
 - le Write réussi, puis la ligne `mot=SESAME-A5-9A9BB67B ; lab=MOT-LAB-A5-9A9BB67B` ;
 - un faux positif de R-COPIE évité. Le transcript du chat a grandi de 831 octets après l'évènement `answer`. Ces entrées `last-prompt` et `cost-state` sont écrites par le processus `claude -p` du chat à sa sortie (`lastPrompt` = la question du chat), et non par le fork.
