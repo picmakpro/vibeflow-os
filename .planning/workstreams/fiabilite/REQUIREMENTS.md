@@ -1002,18 +1002,18 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | VFSG-11 | Phase 68 | Complete — 2026-11-04 (Phase 68, PR #199 ouverte, sans release ; preuves : plugin/cockpit/signal/tests/socle.test.tsx ; test-cockpit-signal.sh ; 68-03-SUMMARY.md, 68-05-SUMMARY.md) |
 | VFSG-12 | Phase 68 | Complete — 2026-11-04 (Phase 68, PR #199 ouverte, sans release ; preuves : recette par juges 68-RECETTE-HUMAINE.md (étapes 4 et 5 reportées après la PR, P68-D-35) ; check-machine-paths.sh ; 68-10-SUMMARY.md) |
 | VFSG-13 | Phase 68 | Complete — 2026-11-04 (Phase 68, PR #199 ouverte, sans release ; preuves : plugin/cockpit/VERSION v1.2.0 ; 68-RELECTURE-ADVERSE.md ; 68-11-SUMMARY.md ; bump racine, tag et release groupés hors phase (P68-D-31)) |
-| TERM-01 | Phase 71 | Pending — 2026-11-03 (cadrage) |
-| TERM-02 | Phase 71 | Pending — 2026-11-03 (cadrage) |
-| TERM-03 | Phase 71 | Pending — 2026-11-03 (cadrage) |
-| TERM-04 | Phase 71 | Pending — 2026-11-03 (cadrage) |
-| TERM-05 | Phase 71 | Pending — 2026-11-03 (cadrage) |
-| TERM-06 | Phase 71 | Pending — 2026-11-03 (cadrage) |
-| TERM-07 | Phase 71 | Pending — 2026-11-03 (cadrage) |
-| TERM-08 | Phase 71 | Pending — 2026-11-03 (cadrage) |
-| TERM-09 | Phase 71 | Pending — 2026-11-03 (cadrage) |
-| TERM-10 | Phase 71 | Pending — 2026-11-03 (cadrage) |
-| TERM-11 | Phase 71 | Pending — 2026-11-03 (cadrage) |
-| TERM-12 | Phase 71 | Pending — 2026-11-03 (cadrage) |
+| TERM-01 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
+| TERM-02 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
+| TERM-03 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
+| TERM-04 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
+| TERM-05 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
+| TERM-06 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
+| TERM-07 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
+| TERM-08 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
+| TERM-09 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
+| TERM-10 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
+| TERM-11 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
+| TERM-12 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1582,18 +1582,18 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 ### Terminal intégré au cockpit (Phase 71 — posées au cadrage, 2026-11-03)
 > Dérivent de P71-D-01..17 (`71-CONTEXT.md` ; arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-03, relayés au manager ; décisions techniques du manager sur mesures). Famille neuve `TERM` (vérifiée libre sur `origin/main` et les branches des Phases 68, 69, 70 le 2026-11-03 : un CKPT-29+ entrerait en collision). Jalon `vibeflow-v2.0`.
 
-- [ ] **TERM-01**: Activation : sans `--terminal`, aucun second écouteur, aucune route ni tiroir terminal, la CSP de page est octet pour octet celle de `v2.75.0` ; avec, un second serveur sur `127.0.0.1` seulement, port distinct (P71-D-02).
-- [ ] **TERM-02**: Contrôles du second serveur : Host, Origin et jeton sur chaque requête, aucun shell avant authentification (P71-D-10). Témoins : Origin tierce, Origin `127.0.0.1:P`, Host de rebinding, sans jeton, mauvais jeton, jeton d'amorçage rejoué → refus et 0 PTY lancé.
-- [ ] **TERM-03**: Jetons jamais servis ni journalisés : 0 occurrence dans toute réponse HTTP de P et de Q, le SSE, `serveur.log`, l'export, `.vibeflow/cockpit/` (P71-D-11).
-- [ ] **TERM-04**: Amorçage dans la même fenêtre : fragment effacé, historique sans jeton, secret jamais en cookie, inaccessible depuis P (P71-D-12, P71-D-13).
-- [ ] **TERM-05**: Tiroir dans les pages Projet et Code, en cadre d'origine Q ; CSP de P = celle de `v2.75.0` + `frame-src` exact ; CSP de Q stricte (scripts par empreintes, `connect-src 'self'`, `frame-ancestors` = origines de P) ; 0 violation au fonctionnement normal (P71-D-08, P71-D-16).
-- [ ] **TERM-06**: Shell : `$SHELL -l`, `cwd` = `realpath(lab)`, environnement complet moins `CLAUDECODE`, `CLAUDE_CODE_*`, `VF_COCKPIT_*` et toute valeur de jeton (P71-D-03, P71-D-04, P71-D-14).
-- [ ] **TERM-07**: PTY : assistant Python stdlib, lancé isolé (`-I`), redimensionnement, Ctrl-C (SIGINT au groupe de premier plan), macOS et Linux ; sous Windows, message « indisponible » et aucun second serveur (P71-D-06, P71-D-07).
-- [ ] **TERM-08**: Session : une seule, la deuxième est refusée ; survie au rechargement (30 s de grâce, tampon de 256 Ko en mémoire) ; SIGHUP au groupe après la grâce ; aucun processus de la session du terminal survivant à l'arrêt du serveur, `nohup` et `disown` compris (un processus sorti de la session par `setsid` est une limite écrite, P71-D-28) ; le terminal ouvert empêche l'arrêt sur inactivité (P71-D-05).
-- [ ] **TERM-09**: Usage réel : un programme plein écran (alternate screen, couleurs 256/truecolor, SIGWINCH, SIGINT) se comporte normalement dans le terminal (test automatisé avec un programme témoin) ; `claude` démarre à la racine du lab et y voit son `CLAUDE.md` et ses skills, et une commande VibeFlow tourne (recette humaine, macOS ; Linux par la CI pour la partie automatisée) (P71-D-01, P71-D-06).
-- [ ] **TERM-10**: xterm.js vendorisé avec sha256 et licence ; aucun addon presse-papiers ; séquences OSC 52, OSC 8, DCS, CSI 21t, DECRQSS dans la sortie : presse-papiers inchangé, aucun octet choisi par la sortie réinjecté dans l'entrée du PTY (seules les réponses de format fixe d'xterm — DA1, DA2, DSR, CPR, DECRQM, couleurs OSC — le sont, F8 de l'audit, P71-D-25) (P71-D-16).
-- [ ] **TERM-11**: Aucune frappe ni sortie du terminal sur disque ni dans les flux du cockpit (journal, SSE, export) ; le tampon de reprise est vidé à la fin de la session.
-- [ ] **TERM-12**: Non-régression et chaîne XSS : toutes les suites du cockpit restent vertes ; la chaîne de `test-cockpit-chaine-xss.sh` étendue — une charge exécutée dans P qui tente `window.open` vers Q, `postMessage`, `fetch`/POST vers Q avec le jeton de page, la lecture du stockage de Q — ne crée aucun fichier marqueur par le shell.
+- [x] **TERM-01**: Activation : sans `--terminal`, aucun second écouteur, aucune route ni tiroir terminal, la CSP de page est octet pour octet celle de `v2.75.0` ; avec, un second serveur sur `127.0.0.1` seulement, port distinct (P71-D-02).
+- [x] **TERM-02**: Contrôles du second serveur : Host, Origin et jeton sur chaque requête, aucun shell avant authentification (P71-D-10). Témoins : Origin tierce, Origin `127.0.0.1:P`, Host de rebinding, sans jeton, mauvais jeton, jeton d'amorçage rejoué → refus et 0 PTY lancé.
+- [x] **TERM-03**: Jetons jamais servis ni journalisés : 0 occurrence dans toute réponse HTTP de P et de Q, le SSE, `serveur.log`, l'export, `.vibeflow/cockpit/` (P71-D-11).
+- [x] **TERM-04**: Amorçage dans la même fenêtre : fragment effacé, historique sans jeton, secret jamais en cookie, inaccessible depuis P (P71-D-12, P71-D-13).
+- [x] **TERM-05**: Tiroir dans les pages Projet et Code, en cadre d'origine Q ; CSP de P = celle de `v2.75.0` + `frame-src` exact ; CSP de Q stricte (scripts par empreintes, `connect-src 'self'`, `frame-ancestors` = origines de P) ; 0 violation au fonctionnement normal (P71-D-08, P71-D-16).
+- [x] **TERM-06**: Shell : `$SHELL -l`, `cwd` = `realpath(lab)`, environnement complet moins `CLAUDECODE`, `CLAUDE_CODE_*`, `VF_COCKPIT_*` et toute valeur de jeton (P71-D-03, P71-D-04, P71-D-14).
+- [x] **TERM-07**: PTY : assistant Python stdlib, lancé isolé (`-I`), redimensionnement, Ctrl-C (SIGINT au groupe de premier plan), macOS et Linux ; sous Windows, message « indisponible » et aucun second serveur (P71-D-06, P71-D-07).
+- [x] **TERM-08**: Session : une seule, la deuxième est refusée ; survie au rechargement (30 s de grâce, tampon de 256 Ko en mémoire) ; SIGHUP au groupe après la grâce ; aucun processus de la session du terminal survivant à l'arrêt du serveur, `nohup` et `disown` compris (un processus sorti de la session par `setsid` est une limite écrite, P71-D-28) ; le terminal ouvert empêche l'arrêt sur inactivité (P71-D-05).
+- [x] **TERM-09**: Usage réel : un programme plein écran (alternate screen, couleurs 256/truecolor, SIGWINCH, SIGINT) se comporte normalement dans le terminal (test automatisé avec un programme témoin) ; `claude` démarre à la racine du lab et y voit son `CLAUDE.md` et ses skills, et une commande VibeFlow tourne (recette humaine, macOS ; Linux par la CI pour la partie automatisée) (P71-D-01, P71-D-06).
+- [x] **TERM-10**: xterm.js vendorisé avec sha256 et licence ; aucun addon presse-papiers ; séquences OSC 52, OSC 8, DCS, CSI 21t, DECRQSS dans la sortie : presse-papiers inchangé, aucun octet choisi par la sortie réinjecté dans l'entrée du PTY (seules les réponses de format fixe d'xterm — DA1, DA2, DSR, CPR, DECRQM, couleurs OSC — le sont, F8 de l'audit, P71-D-25) (P71-D-16).
+- [x] **TERM-11**: Aucune frappe ni sortie du terminal sur disque ni dans les flux du cockpit (journal, SSE, export) ; le tampon de reprise est vidé à la fin de la session.
+- [x] **TERM-12**: Non-régression et chaîne XSS : toutes les suites du cockpit restent vertes ; la chaîne de `test-cockpit-chaine-xss.sh` étendue — une charge exécutée dans P qui tente `window.open` vers Q, `postMessage`, `fetch`/POST vers Q avec le jeton de page, la lecture du stockage de Q — ne crée aucun fichier marqueur par le shell.
 
 ---
 *Requirements defined: 2026-06-04*

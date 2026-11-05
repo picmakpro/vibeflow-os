@@ -1,4 +1,23 @@
-**Statut : À JOUER — écrite le 2026-11-03 par l'exécuteur de 71-09 ; à jouer par Samuel en session principale (macOS). Aucune étape n'a été jouée.**
+**Statut : FAITE — 2026-11-05**
+
+## Recette jouée par Samuel le 2026-11-05 (session principale)
+
+Recette jouée par Samuel en session principale, le 2026-11-05, sur les navigateurs réels et le clavier réel. Les réponses sont
+consignées mot pour mot ; les 17 étapes ci-dessous restent le protocole, la recette par juges (P71-D-32) ayant déjà couvert le reste.
+
+| Cible | Réponse de Samuel | Verdict |
+|-------|-------------------|---------|
+| Arc (Chromium), étapes de la recette | « 1. Oui 2. Oui 3. Oui 4. Oui 5 Oui » | conforme |
+| Firefox | « tout marche » | conforme |
+| Safari, première passe | « Session expirée » à l'ouverture | **écart** |
+| Safari, après correctif (PR #209, SAF-1 et SAF-2, cockpit v1.3.2) | « Connecté, tout marche » | conforme |
+| Clavier AZERTY réel (étape 3, Option) | conforme | conforme |
+
+- **Écart Safari** : « Session expirée » à l'ouverture. Corrigé par la PR #209 (SAF-1 et SAF-2, cockpit v1.3.2), puis recette rejouée
+  sur Safari : « Connecté, tout marche ». L'écart est clos.
+- **Constat de Samuel** : « il faudrait pouvoir en ouvrir plusieurs » (plusieurs terminaux). Hors périmètre de la Phase 71 (une seule
+  session, P71-D-01) ; inscrit au BACKLOG par la PR #208.
+- **Conclusion** : TERM-09 et UI-SPEC §15 recettés sur Arc, Firefox, Safari et clavier AZERTY réels. La Phase 71 est close.
 
 # 71-RECETTE-HUMAINE — recette de TERM-09 et de UI-SPEC §15
 
