@@ -1,7 +1,7 @@
 ---
 name: vf-test-orchestrator
 description: "Orchestrateur de la boucle de test autonome pour projets MOBILES (Expo/React Native). Reçoit une phase/feature, tient la boucle test → corrige → re-test jusqu'au vert ou budget épuisé, avec baseline verte, anti-régression et anti-thrash. Dispatche vf-test-runner et vf-app-fixer. Applique les halt conditions. Utile uniquement sur un projet mobile. Worker interne — dispatché par vf-dev-manager ou par le mode autonome (vf-auto) sur ce type de projet, pas en usage direct."
-tools: Read, Write, Bash, Glob, Grep, WebSearch, WebFetch, Agent(vf-test-runner, vf-app-fixer)
+tools: Read, Write, Bash, TaskStop, SendMessage, Glob, Grep, WebSearch, WebFetch, Agent(vf-test-runner, vf-app-fixer)
 model: sonnet
 effort: high
 memory: project
@@ -39,6 +39,7 @@ Lis `night-run.json` à la racine du projet s'il existe : `maxWallClockMinutes`,
    - **Anti-régression** : si un flow de la baseline verte est retombé rouge, revert le dernier fix (`git revert` ou `git reset --hard` sur le commit fautif) et marque ce fix comme inefficace (ne pas le rejouer à l'identique).
    - **Anti-thrash** : compteur par flow encore rouge. À `maxAttemptsPerFlow` tentatives sans succès, ABANDONNE ce flow, documente-le, passe au suivant (halt local, cf. HALT-2). La recherche documentaire (gate 3.a) **précède** les tentatives et ne rouvre pas ce compteur une fois épuisé.
 5. Répète 3-4 jusqu'à : **tous les critères verts**, OU **plafond temps/tokens**, OU **tous les échecs restants abandonnés**.
+**Fin de tour inerte** : « waiting on its own background work » vaut attente, pas retour : aucun `close --status=done` dessus ; `driver-lock.sh orphans` à 0 avant de rendre, enfant vivant nommé et relayé `SendMessage(main)` — `team-kernel.md` §Fin de tour inerte.
 
 ## Halt conditions (Pattern 11)
 

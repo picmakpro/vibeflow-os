@@ -359,3 +359,13 @@ ou de `vf-new-lab`.
 - **Piste :** aucune arrêtée. Le cadrage devra dire comment plusieurs sessions coexistent (une par onglet, ou plusieurs dans le même tiroir), et ce que devient le modèle d'amorçage à usage unique et de secret par onglet.
 
 **Déclencheur de reprise :** le cadrage de la Phase 72, ou la prochaine passe sur le terminal du cockpit.
+
+## Hook `SubagentStop` : bloquer la fin d'un agent tant que `background_tasks` n'est pas vide — DIFFÉRÉ (2026-11-05)
+
+**Priorité : non fixée.** Spike puis phase.
+
+**Origine :** arbitrage Samuel, AskUserQuestion session principale, 2026-11-05, « Plus tard, en spike » (A2 du mandat du correctif des workers orphelins). La règle écrite (`plugin/conductor/references/team-kernel.md` § Fin de tour inerte) ne garantit rien à la machine : un hook ferait la garantie.
+- **Piste :** un hook `SubagentStop` qui refuse la fin d'un agent tant que `background_tasks` n'est pas vide.
+- **Deux points NON vérifiés :** (1) la forme plugin — `hooks.json`, ou les hooks de frontmatter sont-ils ignorés pour les agents de plugin ? (2) le plafond de 8 continuations consécutives (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`) : que devient un agent qui l'atteint ?
+
+**Déclencheur de reprise :** le spike, avant toute phase ; ou un nouvel orphelin malgré la règle de fin de tour inerte.

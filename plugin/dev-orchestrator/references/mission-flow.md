@@ -665,14 +665,15 @@ geste, avec la profondeur explicite et le nœud reçu au digest :
 ```
 `--parent=<agentId du worker>` s'ajoute quand le worker connaît son propre identifiant ; sinon
 `--depth=2` suffit à l'ordre feuille vers racine. Le worker ferme l'entrée de son enfant à son
-retour (`close --status=done|failed`) ; un enfant que le worker laisse tourner en terminant son
-tour reste `running` au registre, et c'est voulu : c'est exactement ce que le manager, ou son
-remplaçant, doit pouvoir retrouver.
+retour (`close --status=done|failed`). Un worker ne rend pas la main avec un enfant ou une tâche de
+fond vivants (`team-kernel.md` §Fin de tour inerte) ; si l'un survit, il reste `running` au registre,
+et le manager ou son remplaçant doit pouvoir le retrouver.
 
 `register` refuse bruyamment (exit 1, `registry-unwritable`) si le fichier ne s'écrit pas : un
 dispatch non consigné est l'orphelin introuvable que le registre existe pour empêcher. Le statut
-consigné est déclaratif : la vérité de vie d'un agent reste `ListAgents`, et `close
---status=stopped` se pose après cette vérification, jamais avant.
+consigné est déclaratif : la vérité de vie d'un agent se lit dans la liste « Running background
+agents » que rend un `TaskStop` sur identifiant inconnu (`ListAgents` est absent des sous-agents de
+fond), et `close --status=stopped` se pose après cette vérification, jamais avant.
 
 ### 3. Reprise après arrêt sur chien de garde
 
@@ -693,17 +694,17 @@ orphelins à arrêter, pas à réveiller. Ordre imposé, dans cet ordre exact :
    "$S"/driver-lock.sh orphans
    ```
    Le lecteur de statut du verrou (`status`) porte aussi `children_running`, verrou présent ou non.
-3. **Arrêter les orphelins de la feuille vers la racine, en relistant après chaque arrêt, avant
-   tout nouveau dispatch.** Pour chaque identifiant, dans l'ordre rendu : `TaskStop`, puis
-   `ListAgents` pour constater l'arrêt réel (§4 : la réponse de `TaskStop` ne suffit pas), puis
-   seulement :
+3. **Faire arrêter les orphelins, de la feuille vers la racine, avant tout nouveau dispatch.** Un
+   manager NE PEUT PAS arrêter un agent enfant : `TaskStop` rend « owned by <enfant> ». L'arrêt passe
+   par la session principale (`SendMessage(main)` avec les `agentId`, dans l'ordre rendu) ou par
+   l'agent propriétaire réveillé par `SendMessage` pour qu'il arrête sa propre tâche. Constat de l'arrêt
+   réel (§4) : la liste « Running background agents » d'un `TaskStop` sur identifiant inconnu. Puis :
    ```bash
    "$S"/driver-lock.sh close --agent="<agentId>" --status=stopped
    "$S"/driver-lock.sh orphans     # relister : la liste peut avoir changé
    ```
-   Un agent qui n'apparaît plus dans `ListAgents` (déjà fini) se ferme de la même façon. Un parent
-   `completed` qui repasse `running` après l'arrêt de son enfant (§4) est un orphelin de plus : il
-   s'arrête à son tour, puis on reliste.
+   Un agent absent de cette liste (déjà fini) se ferme de la même façon. Un parent `completed` qui
+   repasse `running` après l'arrêt de son enfant (§4) est un orphelin de plus : même circuit.
 4. **Supprimer les worktrees jetables restants.** `git worktree list` : tout arbre de travail d'un
    mandat mort (`agent-<id>`, `worktree-agent-<id>`, ou le dossier posé par `isolation: worktree`)
    est supprimé après vérification qu'il ne porte rien de non commité à récupérer :
@@ -718,16 +719,16 @@ même dépôt, c'est le scénario mesuré de l'issue.
 
 ### 4. Deux comportements de Claude Code à connaître, que le plugin ne peut que contourner
 
-- **`TaskStop` peut répondre `Successfully stopped` sans effet immédiat.** Mesuré : un
-  `ListAgents` juste après montrait le planner encore `running` ; le second `TaskStop` l'a passé
-  `killed`. Conséquence : ne consigner `stopped` et ne redispatcher qu'après relecture de
-  `ListAgents`, réitérée si besoin, jamais sur la seule réponse de `TaskStop`.
+- **`TaskStop` peut répondre `Successfully stopped` sans effet immédiat.** Mesuré : le planner était
+  encore `running` juste après ; le second `TaskStop` l'a passé `killed`. Conséquence : ne consigner
+  `stopped` et ne redispatcher qu'après relecture de la liste des agents vivants, réitérée si besoin,
+  jamais sur la seule réponse de `TaskStop`.
 - **La fin d'un enfant réveille un parent `completed`.** Mesuré : la notification de fin du
   planner tué a repassé son parent `vf-coder` (fini depuis 43 minutes) en `running`, et il a
   repris le mandat du manager mort dans l'arbre du nouveau manager. Conséquence : arrêter de la
   feuille vers la racine ne suffit pas, il faut RELISTER après chaque arrêt et traiter le parent
-  réveillé comme un orphelin de plus ; côté rapport, un `completed` assorti de « background work of
-  its own still running » n'est pas inerte tant que ses enfants consignés ne sont pas fermés.
+  réveillé comme un orphelin de plus ; un `completed` assorti de « waiting on its own background
+  work » n'est pas un retour (`team-kernel.md` §Fin de tour inerte, règle du manager).
 
 Ces deux points sont des limites observées du runtime, non documentées par Anthropic, qui peuvent
 changer avec une version de Claude Code ; la discipline ci-dessus les rend inoffensives plutôt que
@@ -735,14 +736,14 @@ de s'y fier.
 
 ### 5. Règle pour les workers
 
-Un worker ne termine jamais son tour avec un enfant en cours sans l'avoir consigné (§2). Le
-transcript de l'agent n'est pas un registre : personne ne le relit à la reprise. Un worker qui
-rend son rapport pendant que son enfant tourne encore le dit dans le bloc typé (`findings`,
-`severity: mineur`, `action: no-op`, `ref: registre <agentId>`), pour que le manager sache qu'un
-`close` reste à poser. À la clôture d'une mission, un `release` avec `children_running` non nul
-relâche quand même (geste RAII) mais garde le registre et le signale ; le gate de sortie
-(`check-mission-exit.sh`, E1) le lit comme un manque : une mission terminée avec un enfant ouvert
-n'est pas une mission inerte.
+La règle du worker (rien de vivant à la fin du tour) et celle du manager sont dans `team-kernel.md`
+§Fin de tour inerte. Le transcript de l'agent n'est pas un registre : personne ne le relit à la
+reprise, d'où la consignation du §2. Un enfant qui ne s'arrête pas se déclare `blocked`, identifiant
+en finding.
+
+À la clôture d'une mission, un `release` avec `children_running` non nul relâche quand même (geste
+RAII) mais garde le registre et le signale ; le gate de sortie (`check-mission-exit.sh`, E1) le lit
+comme un manque : une mission terminée avec un enfant ouvert n'est pas une mission inerte.
 
 ## Budgets de méthode : ce que la mission laisse derrière elle (v2.67.0)
 

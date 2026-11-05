@@ -15,7 +15,7 @@
 
 | Brique | Script / contrat | Garantie |
 |---|---|---|
-| **Verrou de driver** | `driver-lock.sh` (acquire / heartbeat / release / status / recover / takeover / reclaim, TTL ; register / close / orphans pour le registre des agents dispatchés) | une seule mission pilote par compartiment dans un lab partitionné (un seul verrou dans un lab plat), un seul geste de dépôt à la fois ; la reprise d'un lock périmé est un geste EXPLICITE et tracé (`takeover`), jamais un effet de bord d'une acquisition ordinaire (`acquire` refuse et nomme la marche à suivre) ; `reclaim` re-rattache une session légitime sans jamais prolonger la fraîcheur du lock (Phase 32) ; chaque dispatch (manager ET worker) est consigné à côté du verrou (`<lock>.children.jsonl`, append-only), `reclaim`/`takeover` rendent l'inventaire des agents encore `running` (feuille vers racine) et un manager de remplacement les arrête avant tout dispatch (issue #82, doctrine `dev-orchestrator-references/mission-flow.md` §Pattern I) |
+| **Verrou de driver** | `driver-lock.sh` (acquire / heartbeat / release / status / recover / takeover / reclaim, TTL ; register / close / orphans pour le registre des agents dispatchés) | une seule mission pilote par compartiment dans un lab partitionné (un seul verrou dans un lab plat), un seul geste de dépôt à la fois ; la reprise d'un lock périmé est un geste EXPLICITE et tracé (`takeover`), jamais un effet de bord d'une acquisition ordinaire (`acquire` refuse et nomme la marche à suivre) ; `reclaim` re-rattache une session légitime sans jamais prolonger la fraîcheur du lock (Phase 32) ; chaque dispatch (manager ET worker) est consigné à côté du verrou (`<lock>.children.jsonl`, append-only), `reclaim`/`takeover` rendent l'inventaire des agents encore `running` (feuille vers racine) et un manager de remplacement les fait arrêter par la session principale avant tout dispatch (issue #82, doctrine `dev-orchestrator-references/mission-flow.md` §Pattern I) |
 | **Plan de bataille** | `dag.sh` (init / add --deps **--scope** / ready / mark / reopen / status) | contrôle de flux déterministe ; la frontière `ready` est une **liste à dispatcher en parallèle** quand les périmètres sont disjoints ; `reopen` force `review_regime=full` sur tout nœud de revue/jointure rouvert — aucun allègement ne s'applique jamais à un diff de comblement (D-14, Phase 20) |
 | **Rapports typés** (Pattern C) | `{ statut: passed\|gaps_found\|human_needed\|blocked, findings[{severity, action: auto-fix\|no-op\|ask-user, ref, confiance?}], noeuds_debloques[], confiance? }` | fin de l'interprétation de prose ; escalade humaine impérative sur `ask-user` ; `confiance` (0–1, optionnel, 2026-09-24) ne qualifie qu'un **jugement** — jamais une preuve machine — et un `passed` de jugement sous `SEUIL_CONFIANCE` est requalifié `gaps_found` + `ask-user` par le manager (doctrine et seuil : `dev-orchestrator-references/mission-contracts.md` §Confiance d'un jugement, implémentation de référence) |
 | **Halt conditions** | 5 codes (P11) : boucle sans progrès · action destructive · ressource manquante · budget épuisé · drift de scope | l'humain arbitre en 30 s sur un message structuré |
@@ -269,6 +269,31 @@ Doctrine détaillée côté dev (le protocole complet de mission) :
 `dev-orchestrator-references/mission-flow.md` — c'est la référence d'usage du kernel. Doctrine
 des étages croisés (quand les insérer, forme DAG, budgets, invariants) :
 `dev-orchestrator-references/mission-cross-team.md`.
+
+## Fin de tour inerte
+
+Source unique (ADR-030) ; les agents y renvoient. Mesuré le 2026-11-05 :
+- **F1.** Un worker qui rend la main pendant qu'une commande Bash tourne en fond reçoit le statut
+  « waiting on its own background work » (`completed`, résultat « may be interim ») et reste vivant.
+  Dans les 5 orphelins des 3-5 novembre, la commande avait été basculée AUTOMATIQUEMENT en fond par
+  le timeout Bash (120/600 s), jamais lancée en `run_in_background` : boucle `pgrep -f` qui se
+  trouve elle-même, serveur jamais arrêté, suite qui ne rend pas la main, mutant qui boucle.
+- **F2.** `TaskStop` arrête la PROPRE tâche de fond de l'agent qui l'a ; sans lui : `No such tool available`.
+- **F3.** Un parent ne peut pas arrêter son enfant (`Task <enfant> is owned by <enfant>`) : seuls l'agent
+  lui-même ou la session principale le peuvent. `ListAgents` est absent des sous-agents de fond (un `TaskStop`
+  sur identifiant inconnu liste les « Running background agents »).
+- **F4.** 4 des 5 orphelins furent fermés `close --status=done` sur ce résultat intermédiaire : 0 enfant, il tournait.
+
+**Worker.** Jamais de main rendue avec une tâche de fond vivante, bascule automatique comprise.
+Commandes bornées (itérations max, jamais de `pgrep -f` qui se trouve lui-même, serveur lancé =
+serveur arrêté) ; toute commande passée en fond est attendue ou arrêtée par `TaskStop` avant le
+rapport ; ce qui ne s'arrête pas → `blocked`, identifiant de tâche en finding.
+
+**Manager.** « waiting on its own background work » n'est pas un retour : jamais `close --status=done`
+ni `dag.sh mark done` dessus ; `SendMessage` au worker pour qu'il arrête sa tâche (`TaskStop`), puis
+attente de la notification « finished ». Avant de rendre, arrêt de budget ou handoff compris :
+`driver-lock.sh orphans` à 0 ; tout enfant vivant est nommé (`agentId`) au rapport et relayé par
+`SendMessage(main)`, seule à pouvoir l'arrêter (F3) ; `close --status=stopped` après sa confirmation.
 
 ## Verrou par compartiment (lab partitionné)
 

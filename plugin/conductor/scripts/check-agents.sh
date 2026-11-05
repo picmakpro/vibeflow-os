@@ -78,7 +78,9 @@
 #   allowlist Agent(...)/Task(...)/Bash(...)/etc malformée (parenthèse non fermée, allowlist
 #   vide, entrée vide, espace avant la parenthèse, token hors charset) ·
 #   vf-mcp-tools malformée (Phase 43, FABR-10 a, D-Q3 — grammaire <serveur>:<outil1>,<outil2>,...,
-#   même règle d'extraction que named_request de inject-mcp-tools.sh, valider_mcp_tools).
+#   même règle d'extraction que named_request de inject-mcp-tools.sh, valider_mcp_tools) ·
+#   tools: liste explicite avec Bash ou Agent/Task sans TaskStop (workers orphelins, 2026-11-05 : fin de
+#   tour avec tâche de fond impossible à arrêter ; tools: absent ou * exempt, aucune exception par nom).
 # WARNING : skills absent · skill déclaré introuvable (ERROR en --strict) · description < 30c ·
 #   tools absent (hérite tout) · champ inconnu · name ≠ nom de fichier · outil hors du set
 #   fermé documenté (ERROR en --strict) · nom d'agent non résolu dans une allowlist Agent(...)
@@ -1031,6 +1033,34 @@ def invariant_i3(base, fm, dispatched_by):
     dispatcheurs = \", \".join(sorted(dispatched_by[nom]))
     return [f\"{base} : invariant I3 — dispatche par {dispatcheurs} sans vf-internal : worker expose par erreur (monde ferme, D-09)\"]
 
+def invariant_taskstop(base, fmlines):
+    \"\"\"TaskStop (correctif workers orphelins, arbitrage Samuel AskUserQuestion session principale
+    2026-11-05, A1) : un agent distribue dont tools: est une liste EXPLICITE contenant Bash (nu ou
+    a specifieur) ou un Agent/Task (nu ou a allowlist) DOIT declarer TaskStop — sans lui, un tour
+    qui se termine avec une tache de fond vivante (commande Bash basculee en fond par le timeout,
+    enfant lance) ne peut ni etre arrete par l'agent ni par son manager (mesure : No such tool
+    available: TaskStop). Exempts : tools: absent, tools: * et All tools (heritage de tout). Aucune
+    exception par nom d'agent. Jetons via extract_raw_field + tokenize_field + parse_token (memes
+    fonctions que le lint principal, jamais un second tokenizer) ; profondeur de parentheses non
+    nulle : liste vide, l'erreur de syntaxe est deja levee par lint_tool_field.\"\"\"
+    mode, raw = extract_raw_field(fmlines, \"tools\")
+    if mode is None:
+        return []
+    tokens, depth = tokenize_field(mode, raw)
+    if depth != 0:
+        return []
+    if any(t.strip().lower() in (\"*\", \"all tools\") for t in tokens):
+        return []
+    noms = set()
+    for raw_tok in tokens:
+        nom, _agents, _message = parse_token(raw_tok, \"tools\", \"\")
+        if nom is not None:
+            noms.add(nom)
+    porteur = sorted(n for n in noms if n == \"Bash\" or n in AGENT_TOOL_NAMES)
+    if porteur and \"TaskStop\" not in noms:
+        return [f\"{base} : invariant TaskStop — tools: declare {'/'.join(porteur)} sans TaskStop : fin de tour avec tache de fond impossible a arreter (ajouter TaskStop a tools:)\"]
+    return []
+
 def check_file(path):
     base = os.path.basename(path)
     try:
@@ -1175,6 +1205,8 @@ def check_file(path):
     dispatch = allowlist_agents(fmlines)
     errors.extend(invariant_i6(base, fm, fmlines, dispatch))
     errors.extend(invariant_i5(base, fm, fmlines, dispatch))
+    # TaskStop (workers orphelins, A1 2026-11-05) : BLOQUANT dans tous les modes, ligne d appel UNIQUE, cible du mutant MUT-TS.
+    errors.extend(invariant_taskstop(base, fmlines))
 
     # Regle anti-regression (Phase 20) : memory: reinjecte SILENCIEUSEMENT Write+Edit au
     # runtime par-dessus l'allowlist tools: (contrat Claude Code confirme par sonde). Un agent

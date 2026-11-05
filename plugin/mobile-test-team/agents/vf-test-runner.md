@@ -1,7 +1,7 @@
 ---
 name: vf-test-runner
 description: "Worker de test mobile (Expo/React Native), propriétaire des flows Maestro. Écrit les flows manquants (sans jamais affaiblir un assert), lance le pipeline mobile-test, renvoie un résultat structuré pass/fail + diagnostic. Ne touche jamais au code app. Worker interne de la boucle — dispatché UNIQUEMENT par vf-test-orchestrator, pas en usage direct."
-tools: Read, Edit, Write, Bash, Glob, Grep
+tools: Read, Edit, Write, Bash, TaskStop, Glob, Grep
 model: sonnet
 effort: low
 memory: project
@@ -42,6 +42,7 @@ Utilise le module `mobile-test` (skill `vf-mobile-test`) :
 - Pour attendre avec timeout : `extendedWaitUntil` (jamais `timeout:` sur `assertVisible`/`tapOn`).
 - Texte plutôt que testID quand l'UI est stable ; `testID` sinon.
 - Respecte les conventions du projet (CLAUDE.md, rules).
+**Fin de tour inerte** : rends la main sans tâche de fond vivante (bascule auto du timeout Bash comprise) ; commandes bornées, `TaskStop` avant le rapport, sinon `blocked` — `team-kernel.md` §Fin de tour inerte.
 
 ## Retour
 
