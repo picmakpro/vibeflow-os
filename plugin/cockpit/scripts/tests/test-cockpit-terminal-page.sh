@@ -77,8 +77,9 @@ JS
 cat > "$AUX/palette.mjs" <<'JS'
 // palette.mjs <viewer.html> <vue.mjs> : la palette xterm de vue.mjs contre les variables Graphite de viewer.html, par thème. Seules les couleurs que l'UI-SPEC §4.2
 // donne comme venant d'une variable (colonne « Origine ») sont comparées ; les autres (éclaircies, voiles) n'ont pas de variable d'origine.
+// 71.5 : une origine `[sombre, clair]` est sensible au thème (l'ANSI clair est du TEXTE : red, green, yellow lisent les variantes --*-text, 4,5:1 ; le contrôle reste, il compare une autre variable).
 import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const ORIGINE = { background: '--surface', foreground: '--text', cursor: '--on', cursorAccent: '--on-text', red: '--sev-high', green: '--recent', yellow: '--sev-medium',
+const ORIGINE = { background: '--surface', foreground: '--text', cursor: '--on', cursorAccent: '--on-text', red: ['--sev-high', '--err-text'], green: ['--recent', '--recent-text'], yellow: ['--sev-medium', '--warn-text'],
   blue: '--k-http', magenta: '--k-call', cyan: '--k-data', white: '--text-2', brightBlack: '--text-3', brightRed: '--err-text', brightYellow: '--warn-text', brightWhite: '--text' };
 const norm = (v) => { v = String(v).trim().toLowerCase().replace(/\s+/g, ' '); const m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(v); return m ? `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}` : v; };
 const decl = (css, sel) => Object.fromEntries([...(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*{([^}]*)}').exec(css)?.[1] || '').matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], norm(m[2])]));
@@ -87,7 +88,8 @@ globalThis.window = {}; const m = await import(pathToFileURL(process.argv[3]).hr
 const n = { sombre: 0, clair: 0 };
 for (const theme of ['sombre', 'clair']) {
   const pal = window.vfTermVue.theme(theme === 'clair');
-  for (const [cle, nom] of Object.entries(ORIGINE)) {
+  for (const [cle, orig] of Object.entries(ORIGINE)) {
+    const nom = Array.isArray(orig) ? orig[theme === 'clair' ? 1 : 0] : orig;
     const v = theme === 'clair' && nom in V.c ? V.c[nom] : V.s[nom], q = pal[cle] === undefined ? undefined : norm(pal[cle]);
     if (v === undefined) { console.log(`ABSENTE ${nom} viewer.html ${theme}`); continue; }
     if (q === undefined) { console.log(`ABSENTE ${cle} palette ${theme}`); continue; }
@@ -214,10 +216,10 @@ if mutant paritebis vf-cockpit-terminal-style.mjs 's/--ring:[^;]*;//g'; then
   node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pb.html"
   assert_has "T18.4 — (b) --ring retiré de Q" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pb.html")" "ABSENTE --ring Q sombre"
 else assert_eq "T18.4 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-sed 's/--text-2: #b4b4b4/--text-2: #b4b4b5/' "$VIEWER" > "$WORK/viewer-mut.html"
+sed 's/--text-2: #c6c6c6/--text-2: #c6c6c7/' "$VIEWER" > "$WORK/viewer-mut.html"
 if ! cmp -s "$VIEWER" "$WORK/viewer-mut.html"; then
   node "$AUX/pagegen.mjs" "$OUT" "$ENG" dark "$WORK/m-pc.html"
-  assert_has "T18.5 — (c) --text-2 sombre de viewer.html changé (l'amont dérive)" "$(node "$AUX/parite.mjs" "$WORK/viewer-mut.html" "$WORK/m-pc.html")" "variable --text-2 (sombre) : viewer.html=#b4b4b5, Q=#b4b4b4"
+  assert_has "T18.5 — (c) --text-2 sombre de viewer.html changé (l'amont dérive)" "$(node "$AUX/parite.mjs" "$WORK/viewer-mut.html" "$WORK/m-pc.html")" "variable --text-2 (sombre) : viewer.html=#c6c6c7, Q=#c6c6c6"
 else assert_eq "T18.5 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant pariteter vf-cockpit-terminal-style.mjs 's/--text: #161616/--text: #161617/'; then
   node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pd.html"
@@ -233,15 +235,15 @@ if mutant pariteca vf-cockpit-terminal-style.mjs 's/--inset-card: var(--sp-16)/-
 else assert_eq "T18.7 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-PALETTE — quatre variantes (J10) ==="
-if mutant paletta vf-cockpit-terminal-vue.mjs "s/green: '#4ade80'/green: '#4ade81'/"; then
-  assert_has "T19.2 — (a) vert sombre de la palette changé" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_OUT/vf-cockpit-terminal-vue.mjs")" "couleur green (sombre) : viewer.html --recent=#4ade80, palette=#4ade81"
+if mutant paletta vf-cockpit-terminal-vue.mjs "s/green: '#9ece6a'/green: '#9ece6b'/"; then
+  assert_has "T19.2 — (a) vert sombre de la palette changé" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_OUT/vf-cockpit-terminal-vue.mjs")" "couleur green (sombre) : viewer.html --recent=#9ece6a, palette=#9ece6b"
 else assert_eq "T19.2 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant palettb vf-cockpit-terminal-vue.mjs "s/brightRed: '#b42323',//"; then
+if mutant palettb vf-cockpit-terminal-vue.mjs "s/brightRed: '#da1637',//"; then
   assert_has "T19.3 — (b) brightRed retiré de la palette claire" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_OUT/vf-cockpit-terminal-vue.mjs")" "ABSENTE brightRed palette clair"
 else assert_eq "T19.3 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-sed 's/--recent: #4ade80;/--recent: #4ade7f;/' "$VIEWER" > "$WORK/viewer-pal.html"
+sed 's/--recent: #9ece6a;/--recent: #9ece69;/' "$VIEWER" > "$WORK/viewer-pal.html"
 if ! cmp -s "$VIEWER" "$WORK/viewer-pal.html"; then
-  assert_has "T19.4 — (c) --recent sombre de viewer.html changé (l'amont dérive)" "$(node "$AUX/palette.mjs" "$WORK/viewer-pal.html" "$OUT/vf-cockpit-terminal-vue.mjs")" "couleur green (sombre) : viewer.html --recent=#4ade7f, palette=#4ade80"
+  assert_has "T19.4 — (c) --recent sombre de viewer.html changé (l'amont dérive)" "$(node "$AUX/palette.mjs" "$WORK/viewer-pal.html" "$OUT/vf-cockpit-terminal-vue.mjs")" "couleur green (sombre) : viewer.html --recent=#9ece69, palette=#9ece6a"
 else assert_eq "T19.4 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant palettd vf-cockpit-terminal-vue.mjs "s/cursorAccent: '#ffffff'/cursorAccent: '#fffffe'/"; then
   assert_has "T19.5 — (d) cursorAccent clair seul changé (#fff de viewer.html contre #fffffe)" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_OUT/vf-cockpit-terminal-vue.mjs")" "couleur cursorAccent (clair) : viewer.html --on-text=#ffffff, palette=#fffffe"

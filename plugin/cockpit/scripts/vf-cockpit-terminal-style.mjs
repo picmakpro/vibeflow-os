@@ -16,11 +16,11 @@ const SOMBRE = `:root {
   --ink: 255, 255, 255;
   --surface: #191919; --raise: #232323; --raise-2: #2b2b2b;
   --hair: rgba(var(--ink), .06); --hair-2: rgba(var(--ink), .1);
-  --text: #ececec; --text-2: #b4b4b4; --text-3: #8b8b8b; --text-4: #5c5c5c;
-  --recent: #4ade80;
+  --text: #ececec; --text-2: #c6c6c6; --text-3: #a8a8a8; --text-4: #828282;
+  --recent: #9ece6a;
   --on: #ececec; --on-hover: #fff; --on-text: #0f0f0f;
-  --sev-high: #f28b8b; --sev-medium: #f0c36b;
-  --warn-bg: rgba(240, 195, 107, .08); --warn-text: #f3d79b; --err-text: #f6a5a5;
+  --sev-high: #ff9aa8; --sev-medium: #ffe08a;
+  --warn-bg: rgba(var(--ink), .05); --warn-text: #ffe9a8; --err-text: #ffb3bc;
   --ring: rgba(var(--ink), .88);
   --r-card: 20px; --r-ctl: 12px;
   --ease: cubic-bezier(.16, 1, .3, 1);
@@ -35,10 +35,10 @@ const CLAIR = `:root[data-theme="light"] {
   --surface: #ffffff; --raise: #ebebe8; --raise-2: #e0e0dc;
   --hair: rgba(0, 0, 0, .09); --hair-2: rgba(0, 0, 0, .15);
   --text: #161616; --text-2: #3f3f3f; --text-3: #595959; --text-4: #666666;
-  --recent: #157a3a;
+  --recent: #009e5a;
   --on: #161616; --on-hover: #000; --on-text: #fff;
-  --sev-high: #c94a4a; --sev-medium: #946000;
-  --warn-bg: rgba(217, 160, 40, .16); --warn-text: #6b4500; --err-text: #b42323;
+  --sev-high: #f2384a; --sev-medium: #b88100;
+  --warn-bg: rgba(var(--ink), .05); --warn-text: #986300; --err-text: #da1637;
   --ring: rgba(0, 0, 0, .85);
 }`;
 
