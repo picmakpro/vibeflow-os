@@ -143,6 +143,14 @@ verrous de driver, arbitrages en attente, watchdog et serveurs orphelins (Phase 
   l'icône de 44 px de P78-D-20 vaut de 701 à 999 px. À confirmer par le juge de design.
 - **P78-D-31 (refs sans date).** Une ref qui vise un objet sans date (blob, arbre) est écartée et comptée, sans rendre
   toute la lecture indisponible (finding de 78-05).
+- **P78-D-32 (lecture des worktrees non bloquante).** `GET /api/vf/git/worktrees` ne bloque plus la boucle du serveur :
+  ses appels git passent en asynchrone, toujours par le point unique (`envGit`, filtres non exécutés), et le tiroir le
+  relit au plus une fois par rafale de signal, tiroir ouvert seulement. Motif : ~1,2 s synchrones mesurées sur ce dépôt
+  (finding de 78-08 et 78-10) gelaient le flux SSE et le terminal. Décision du manager de reprise (zone grise technique,
+  hors exceptions à remonter), 2026-11-06.
+- **P78-D-33 (pastilles d'état des worktrees).** Glyphe + mot en texte neutre, sans fond teinté ni couleur de texte
+  d'état : application des jetons figés de la 71.5 (arbitrages Samuel, AskUserQuestion session principale, 2026-11-05),
+  qui priment sur `--warn-bg`/`--ok-bg` du plan 78-10.
 
 ### Claude's Discretion
 
