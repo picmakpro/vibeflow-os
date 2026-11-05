@@ -198,7 +198,7 @@
   function obstacles(vis) {
     const ask = document.getElementById('ask');
     const name = (e) => e.id ? '#' + e.id : e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\s+/)[0] : '');
-    return ['zoom', 'panel', 'context', 'ask'].map((id) => document.getElementById(id)).concat(document.querySelector('header'), document.querySelector('.tour-target'), ask ? [...ask.children] : []).filter(vis).map((e) => { const r = e.getBoundingClientRect(); return { n: name(e), left: r.left, top: r.top, right: r.right, bottom: r.bottom }; });
+    return ['zoom', 'panel', 'context', 'ask'].map((id) => document.getElementById(id)).concat(document.querySelector('header'), document.querySelector('.tour-target'), document.querySelector('.vf-term-pastille'), ask ? [...ask.children] : []).filter(vis).map((e) => { const r = e.getBoundingClientRect(); return { n: name(e), left: r.left, top: r.top, right: r.right, bottom: r.bottom }; }); // 71.5 : la pastille du terminal (seulement avec --terminal ; absente ou masquée = ignorée par vis) est un obstacle comme le zoom, sans marge fixe
   }
   const visible = (e) => { if (!e) return false; const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
   // last resort when a title block taller than expected leaves no room: its description is folded away while the tour is open (the title stays), and put back when the tour moves on or ends

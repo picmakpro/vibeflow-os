@@ -1,20 +1,21 @@
 // vf-cockpit-terminal-tiroir-style — feuille du tiroir du terminal (71-07 ; UI-SPEC §2, §3, §8, §9, §11).
 // Export : STYLE_TIROIR -> texte CSS posé dans un <style> de la page hôte, seulement avec --terminal. Variables Graphite existantes et classes `vf-term-*` uniquement.
+// Espacements (71.5) : jetons de viewer.html (--sp-*, --edge, --inset-*), lus tels quels (la feuille vit dans la page hôte). Posés AVANT cette feuille : un var() inconnu ferait tomber la déclaration entière.
 export const STYLE_TIROIR = `
-.vf-term-pastille, .vf-term-puce { position: fixed; left: 16px; bottom: 16px; z-index: 6; border-radius: 999px; background: var(--raise); border: 1px solid var(--hair-2); font: 500 13px var(--sans); }
-.vf-term-pastille { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; color: var(--text-2); cursor: pointer; box-shadow: var(--shadow-card); transition: background .15s, color .15s; }
+.vf-term-pastille, .vf-term-puce { position: fixed; left: var(--edge); bottom: var(--edge); z-index: 6; border-radius: 999px; background: var(--raise); border: 1px solid var(--hair-2); font: 500 13px var(--sans); }
+.vf-term-pastille { height: 32px; display: inline-flex; align-items: center; gap: var(--sp-6); padding: 0 var(--sp-12) 0 var(--sp-8); color: var(--text-2); cursor: pointer; box-shadow: var(--shadow-card); transition: background .15s, color .15s; }
 .vf-term-pastille:hover { background: var(--raise-2); color: var(--text); }
 .vf-term-pastille[hidden], .vf-term-point[hidden] { display: none; }
 .vf-term-pastille svg, .vf-term-bouton svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .vf-term-point { width: 6px; height: 6px; border-radius: 50%; background: var(--recent); }
-.vf-term-puce { min-height: 32px; max-width: calc(100vw - 32px); display: inline-flex; align-items: center; padding: 6px 12px; color: var(--text-3); font-weight: 400; line-height: 1.4; }
-.vf-term-tiroir { position: fixed; left: 16px; bottom: 16px; right: max(16px, var(--pw, 0px)); height: 320px; z-index: 8; border-radius: var(--r-panel); background: var(--surface); box-shadow: var(--shadow-float); }
+.vf-term-puce { min-height: 32px; max-width: calc(100vw - 2 * var(--edge)); display: inline-flex; align-items: center; padding: var(--sp-6) var(--sp-12); color: var(--text-3); font-weight: 400; line-height: 1.4; }
+.vf-term-tiroir { position: fixed; left: var(--edge); bottom: var(--edge); right: max(var(--edge), var(--pw, 0px)); height: 320px; z-index: 8; border-radius: var(--r-panel); background: var(--surface); box-shadow: var(--shadow-float); }
 .vf-term-tiroir[hidden] { display: none; }
 .vf-term-tiroir.vf-term-entree { animation: vf-term-entree 250ms var(--ease) both; }
-.vf-term-tiroir.vf-term-plein-etat { top: calc(var(--hh, 64px) + 12px); height: auto !important; }
-@keyframes vf-term-entree { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+.vf-term-tiroir.vf-term-plein-etat { top: calc(var(--hh, 64px) + var(--sp-4)); /* aligné sur le haut du panneau (viewer.html #panel) ; couplé à pleinMax du script */ height: auto !important; }
+@keyframes vf-term-entree { from { opacity: 0; transform: translateY(var(--sp-16)); } to { opacity: 1; transform: none; } }
 .vf-term-corps { display: flex; flex-direction: column; height: 100%; border-radius: var(--r-panel); overflow: hidden; background: var(--surface); }
-.vf-term-barre { flex: none; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px 0 14px; background: var(--raise); border-bottom: 1px solid var(--hair); }
+.vf-term-barre { flex: none; display: flex; align-items: center; gap: var(--sp-8); height: 36px; padding: 0 var(--sp-8) 0 var(--sp-12); /* contrôle d'une ligne : 12 côté texte (exception E3, comme #flowbar) */ background: var(--raise); border-bottom: 1px solid var(--hair); }
 .vf-term-etat-point { width: 8px; height: 8px; border-radius: 50%; background: var(--text-4); }
 .vf-term-etat-point[data-etat="connecte"] { background: var(--recent); }
 .vf-term-etat-point[data-etat="reconnexion"], .vf-term-etat-point[data-etat="refuse"] { background: var(--sev-medium); }
@@ -37,17 +38,17 @@ export const STYLE_TIROIR = `
 .vf-term-poignee:hover .vf-term-grip, .vf-term-poignee:focus-visible .vf-term-grip, body.resizing .vf-term-grip { opacity: 1; }
 body.resizing { user-select: none; }
 body.resizing .vf-term-zone iframe { pointer-events: none; }
-.vf-term-carte { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100% - 32px)); padding: 16px 18px; border-radius: var(--r-card); background: var(--raise); border: 1px solid var(--hair-2); font: 400 12.5px/1.5 var(--sans); color: var(--text-2); }
+.vf-term-carte { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100% - 2 * var(--sp-16))); padding: var(--inset-card); border-radius: var(--r-card); background: var(--raise); border: 1px solid var(--hair-2); font: 400 12.5px/1.5 var(--sans); color: var(--text-2); }
 .vf-term-insecable { white-space: nowrap; }
-.vf-term-carte code { font: 400 12px var(--mono); padding: 1px 6px; border-radius: 8px; background: var(--raise-2); color: var(--text); }
+.vf-term-carte code { font: 400 12px var(--mono); padding: var(--sp-2) var(--sp-6); border-radius: 8px; background: var(--raise-2); color: var(--text); }
 .vf-term-annonce { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* P71-D-35 (G1) : tiroir ouvert, le canevas s'arrête au-dessus de lui (le viewer mesure alors la bonne aire), la barre de question se range, les contrôles de zoom (dans le canevas) montent avec lui */
 body.vf-term-ouvert #stage { bottom: var(--vf-term-reserve, 0px); }
 body.vf-term-ouvert #ask { display: none; }
-/* P71-D-34 (E2) : la pastille posée sous le zoom (le script remonte #zoom au-dessus d'elle) laisse sa place à la visite « Par où commencer » */
-body.vf-term-haut #tour { margin-bottom: 44px; }
-@media (max-width: 999px), (pointer: coarse) { .vf-term-tiroir { left: 8px; right: 8px; bottom: 8px; } }
-@media (max-width: 700px) { .vf-term-pastille, .vf-term-puce { bottom: 72px; } }
+/* P71-D-34 (E2), 71.5 : la visite « Par où commencer » traite la pastille comme un obstacle (ui/40, obstacles()) : elle se pose au-dessus d'elle, quelle que soit sa hauteur (32, ou 44 au toucher) et sa position (relevée au-dessus du zoom ou de la barre de question), sans marge fixe. */
+@media (max-width: 999px), (pointer: coarse) { .vf-term-tiroir { left: var(--sp-8); right: var(--sp-8); bottom: var(--sp-8); } }
+/* feuille de détail ouverte (<= 700 px) : la pastille se pose au-dessus d'elle, 8 d'écart. dérivé : min(56vh, 480px) est la hauteur max du #panel de viewer.html (règle #panel du @media (max-width: 700px), l.548) : à tenir ensemble. !important : eviter() pose un bottom en ligne. */
+@media (max-width: 700px) { body:not(.no-panel) .vf-term-pastille, body:not(.no-panel) .vf-term-puce { bottom: calc(var(--sp-8) + min(56vh, 480px) + var(--sp-8)) !important; } }
 @media (pointer: coarse) { .vf-term-barre { height: 52px; } .vf-term-bouton { width: 44px; height: 44px; } .vf-term-pastille { height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .vf-term-tiroir.vf-term-entree { animation: none; } .vf-term-grip, .vf-term-pastille, .vf-term-bouton { transition: none; } }
 html.theme-switching .vf-term-tiroir, html.theme-switching .vf-term-tiroir * { animation: none !important; transition: none !important; }

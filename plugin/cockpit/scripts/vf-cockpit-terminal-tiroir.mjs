@@ -44,27 +44,35 @@ function scriptTiroir(cfg, accepte, construire) {
   const demarrer = () => {
     const d = construire(document, T);
     // P71-D-34 (E2), inversé en v1.3.3 : jamais sur les boutons de zoom. Tiroir fermé, la pastille garde sa place au plus bas ; si elle recouvre #zoom, c'est #zoom qui remonte juste au-dessus d'elle.
-    // La puce (message d'indisponibilité) garde l'ancienne règle : elle se pose au-dessus du zoom.
+    // 71.5 (P71.5-D-06) : la barre de question #ask est un obstacle de plus, lue comme le zoom avec la même marge de 8 : la pastille se pose 8 au-dessus d'elle quand elle la recouvre (#zoom remonte ensuite
+    // au-dessus de la pastille). La visite « Par où commencer » traite la pastille comme un obstacle de son côté (ui/40, obstacles()) : aucune marge fixe ici. La puce (message d'indisponibilité) se pose au-dessus du plus haut des deux.
     const eviter = (n) => {
       const z = document.getElementById('zoom'), b = z ? z.getBoundingClientRect() : null;
+      const k = document.getElementById('ask'), kb = k ? k.getBoundingClientRect() : null;
+      const sur = (a, o) => !!o && o.width > 0 && a.left < o.right && a.right > o.left && a.top < o.bottom && a.bottom > o.top;
       if (n === d.pastille) {
         if (z) z.style.bottom = '';
-        document.body.classList.remove('vf-term-haut');
-        if (!n.parentNode || n.hidden || !z) return;
+        n.style.bottom = '';
+        if (!n.parentNode || n.hidden) return;
+        if (sur(n.getBoundingClientRect(), kb)) n.style.bottom = Math.round(window.innerHeight - kb.top + 8) + 'px';
+        if (!z) return;
         const a = n.getBoundingClientRect(), s = document.getElementById('stage'), fond = s ? s.getBoundingClientRect().bottom : window.innerHeight, zb = z.getBoundingClientRect();
         const recouvre = zb.width > 0 && a.left < zb.right && a.right > zb.left && a.top < zb.bottom && a.bottom > zb.top;
         if (recouvre) z.style.bottom = Math.round(fond - a.top + 8) + 'px';
-        document.body.classList.toggle('vf-term-haut', recouvre);
         return;
       }
       if (!n.parentNode || n.hidden) return;
       n.style.bottom = '';
       const a = n.getBoundingClientRect();
-      const recouvre = !!b && b.width > 0 && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-      if (recouvre) n.style.bottom = Math.round(window.innerHeight - b.top + 8) + 'px';
+      const haut = Math.min(sur(a, b) ? b.top : Infinity, sur(a, kb) ? kb.top : Infinity);
+      if (haut < Infinity) n.style.bottom = Math.round(window.innerHeight - haut + 8) + 'px';
     };
     const eviterTout = () => { eviter(d.pastille); eviter(d.puce); };
     window.addEventListener('resize', eviterTout);
+    // la barre de question apparaît, disparaît ou change de largeur sans que la fenêtre bouge (panneau ouvert ou fermé) : ResizeObserver, puis transitionend de la barre elle-même
+    // (left et width transitionnent 450 ms : le dernier rappel de l'observateur tombe avant la fin de left). Filtré sur la barre : un enfant qui finit sa transition ne relance rien.
+    { const ask = document.getElementById('ask');
+      if (ask) { if (window.ResizeObserver) new ResizeObserver(eviterTout).observe(ask); const surTransition = (e) => { if (e.target === ask) eviterTout(); }; ask.addEventListener('transitionend', surTransition); } }
     const puce = (texte) => { d.puce.textContent = texte; document.body.appendChild(d.puce); eviter(d.puce); };
     if (cfg.indisponible) { puce(T.windows); return; }
     if (location.hostname !== '127.0.0.1') { puce(T.localhost); return; }
@@ -81,7 +89,7 @@ function scriptTiroir(cfg, accepte, construire) {
     const monter = (origineQ) => {
       let ouvert = false, plein = false, cadre = null, ouvreur = null, minuterie = null, session = false, chargeur = null;
       let h = MIN, glisse = false, reserveVue = 0, perso = false;
-      const pleinMax = () => Math.max(MIN, window.innerHeight - (parseFloat(getComputedStyle(document.body).getPropertyValue('--hh')) || 64) - 12 - 16);
+      const pleinMax = () => Math.max(MIN, window.innerHeight - (parseFloat(getComputedStyle(document.body).getPropertyValue('--hh')) || 64) - 4 - 16); // haut = en-tête + 4 (comme #panel, viewer.html), bas = 16 (--edge) : couplé à plein-etat de la feuille
       const borne = (v) => Math.max(MIN, Math.min(pleinMax(), Math.round(v)));
       // P71-D-37 (G4) : hauteur par défaut = 36 % de la fenêtre, entre 220 px (≈ 10 lignes sous la barre de 36 px) et 380 px (au-delà, le terminal mange la carte sans gain de lecture) :
       // 259 px en 1280x720 (la carte garde plus de la moitié de la fenêtre), 324 px en 1440x900 (320 px avant : pas de régression). Une hauteur mémorisée (ou réglée à la main) prime, plafonnée à 70 % de la fenêtre.
@@ -93,7 +101,7 @@ function scriptTiroir(cfg, accepte, construire) {
       const ajuster = () => { try { if (window.VibeFlow && typeof window.VibeFlow.fit === 'function') window.VibeFlow.fit(false); } catch (e) { void e; } };
       const appliquer = () => {
         d.region.style.height = h + 'px';
-        const reserve = ouvert && !plein ? h + 28 : 0;
+        const reserve = ouvert && !plein ? h + 28 : 0; // dérivé : bas 16 + respiration 12
         document.body.style.setProperty('--vf-term-h', ouvert && !plein ? h + 'px' : '0px');
         document.body.style.setProperty('--vf-term-reserve', reserve + 'px');
         if (reserve !== reserveVue && !glisse) { reserveVue = reserve; ajuster(); }

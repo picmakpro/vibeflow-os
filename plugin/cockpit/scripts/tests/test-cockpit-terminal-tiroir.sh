@@ -11,7 +11,9 @@
 #         (cartes de P et de Q, balayage de largeurs) · J6 aucun terminal sous la carte « déjà ouvert » · J7 boutons de la barre >= 44 px sous pointer: coarse · J13 pas de bague
 #         de focus sur une carte d'alerte focalisée par programme
 #   T21   recette 71 (E2, G1 ; P71-D-34, P71-D-35) : zoom jamais sous la pastille, atteignable tiroir ouvert · « Ajuster » et cadrage initial au-dessus du tiroir · #ask rangée · visite fermée ;
-#         huit relevés (2 pages x 2 fenêtres x 2 thèmes) + mutants M-PASTILLE-SUR-ZOOM, M-AJUSTE-SANS-TIROIR, M-ASK-RESTE, M-VISITE-RESTE
+#         huit relevés (2 pages x 2 fenêtres x 2 thèmes) + mutants M-PASTILLE-SUR-ZOOM, M-AJUSTE-SANS-TIROIR, M-ASK-RESTE, M-VISITE-RESTE ;
+#         T21.7/T21.8 (71.5, P71.5-D-06) : la pastille fermée ne recouvre ni la barre de question, ni la feuille de détail, ni le zoom, ni la visite (de 390 à 1280 px, panneau ouvert,
+#         fermé, rouvert, visite affichée, état tactile) + témoin d'atteinte ; mutants M-PASTILLE-SUR-ASK et M-PASTILLE-SANS-RAPPEL
 #   T22   recette 71 (G4 ; P71-D-37) : hauteur par défaut = 36 % de la fenêtre (220 à 380 px), bande de carte >= moitié de la fenêtre en 1280x720, hauteur mémorisée plafonnée à 70 %,
 #         la fenêtre qui rétrécit ; mutants M-HAUTEUR-FIXE-320, M-MEMO-NON-BORNEE
 #   T17   T17.1 témoin (messages réels de Q) · T17.2 postMessage de P ignoré · T17.3 MessageEvent forgé ignoré · T17.5 espion : liste fermée, aucun octet du shell (M-MSG-DONNEE)
@@ -409,6 +411,64 @@ await executer(chrome, async (s) => {
   return { erreurs, n: sorties.length, api: sorties.every((r) => r.api === 1), noeuds: sorties.every((r) => r.apresF && r.apresF.n > 0), G, sorties: A.detail ? sorties : undefined };
 });
 JS
+cat > "$AUX/chrome-pastille.mjs" <<'JS'
+// chrome-pastille.mjs <chrome> <json> : T21.7 (71.5, P71.5-D-06) — la pastille fermée ne recouvre ni #ask (affichée), ni #panel (ouvert), ni #zoom, ni #tour (affichée) ; UNE ligne JSON.
+// Entrée : { P, court }. Les relevés ne dépendent pas de chrome-geom (son « court » ne règle que ses propres huit combinaisons). Par largeur : panneau dans son état initial, puis bascule, puis bascule
+// retour (le cas « refermé » est celui qu'un rappel périmé laisse faux). Puis : la visite affichée, panneau ouvert, aux cinq largeurs qui comptent ; puis deux états tactiles (pointer: coarse).
+import { pathToFileURL } from 'node:url';
+const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const [, , chrome, brut] = process.argv; const A = JSON.parse(brut);
+const OP = `http://127.0.0.1:${A.P}`, MS = Number(process.env.VF_TIROIR_MS) || 20000;
+const TOUTES = [[390, 844], [600, 900], [700, 900], [701, 900], [768, 1024], [900, 900], [1000, 800], [1024, 768], [1100, 800], [1200, 800], [1260, 800], [1280, 800]];
+const COURTES = [[390, 844], [768, 1024], [1024, 768], [1200, 800]];
+const AVEC_VISITE = new Set([390, 600, 700, 768, 1024]);
+const MESURE = `(() => {
+  const r = (e) => { if (!e) return null; const b = e.getBoundingClientRect(), cs = getComputedStyle(e); if (!(b.width > 0 && b.height > 0) || cs.display === 'none' || cs.visibility === 'hidden') return null; return { left: b.left, top: b.top, right: b.right, bottom: b.bottom }; };
+  const p = r(document.querySelector('.vf-term-pastille')); const ouvert = !document.body.classList.contains('no-panel');
+  const ask = r(document.getElementById('ask')), panel = ouvert ? r(document.getElementById('panel')) : null, zoom = r(document.getElementById('zoom')), tour = r(document.getElementById('tour'));
+  const sur = (a, o) => !!a && !!o && a.left < o.right && a.right > o.left && a.top < o.bottom && a.bottom > o.top;
+  return { pastille: !!p, ask: !!ask, panneau: ouvert, tour: !!tour, mal: [['ask', ask], ['panel', panel], ['zoom', zoom], ['tour', tour]].filter(([, o]) => sur(p, o)).map(([n]) => n) };
+})()`;
+await executer(chrome, async (s) => {
+  const releves = [], erreurs = {};
+  const mesurer = async (cle, extra) => { try { const m = await s.ev(MESURE); releves.push({ cle, ...m, ...(extra || {}) }); } catch (e) { erreurs[cle] = String(e.message).slice(0, 160); } };
+  const basculer = async () => { await s.ev(`document.getElementById('btn-panel').click()`); await pause(900); };
+  const charger = async (W, H, tactile) => {
+    await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: !!tactile });
+    await s.send('Emulation.setTouchEmulationEnabled', { enabled: !!tactile });
+    await s.naviguer(`${OP}/index.html`); await s.ev(`localStorage.clear(); sessionStorage.clear()`);
+    await s.naviguer(`${OP}/index.html`);
+    await s.attendre(`!!document.querySelector('button.vf-term-pastille') && document.querySelectorAll('#viewport .node').length > 0`, 'pastille et nœuds', MS);
+    await pause(1800);
+  };
+  await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  for (const [W, H] of (A.court ? COURTES : TOUTES)) {
+    const cle = `${W}x${H}`;
+    try {
+      await charger(W, H, false);
+      await mesurer(`${cle}/initial`);
+      await basculer(); await mesurer(`${cle}/bascule`);
+      await basculer(); await mesurer(`${cle}/retour`);
+      if (AVEC_VISITE.has(W)) { // visite affichée, panneau ouvert
+        if (await s.ev(`document.body.classList.contains('no-panel')`)) await basculer();
+        await s.ev(`window.VibeFlowTour && !window.VibeFlowTour.active() && window.VibeFlowTour.start()`); await pause(1400);
+        await mesurer(`${cle}/visite`); await s.ev(`window.VibeFlowTour && window.VibeFlowTour.active() && window.VibeFlowTour.end()`);
+      }
+    } catch (e) { erreurs[cle] = String(e.message).slice(0, 160); }
+  }
+  if (!A.court) for (const [W, H] of [[390, 844], [768, 1024]]) { // état tactile : pointer: coarse (pastille de 44 px)
+    const cle = `tactile-${W}x${H}`;
+    try {
+      await charger(W, H, true);
+      const coarse = await s.ev(`matchMedia('(pointer: coarse)').matches`);
+      await mesurer(`${cle}/initial`, { coarse });
+      await basculer(); await mesurer(`${cle}/bascule`, { coarse }); await basculer(); await mesurer(`${cle}/retour`, { coarse });
+    } catch (e) { erreurs[cle] = String(e.message).slice(0, 160); }
+  }
+  const mauvais = releves.filter((x) => !x.pastille || x.mal.length).map((x) => x.cle + ':' + (x.pastille ? x.mal.join('+') : 'sans-pastille'));
+  return { erreurs, n: releves.length, mauvais, avecAskOuvert: releves.filter((x) => x.ask && x.panneau).length, avecVisite: releves.filter((x) => x.tour).length, tactile: releves.filter((x) => x.coarse === true).length };
+});
+JS
 cat > "$AUX/chrome-defaut.mjs" <<'JS'
 // chrome-defaut.mjs <chrome> <json> : hauteur du tiroir selon la fenêtre (G4 ; P71-D-37) ; UNE ligne JSON. Entrée : { P }. Page Projet, stockage vidé avant chaque relevé.
 import { pathToFileURL } from 'node:url';
@@ -473,6 +533,9 @@ run_etats() { # run_etats <sortie> -> EJ ; un serveur neuf, un amorçage neuf, u
 }
 run_geom() { # run_geom <sortie> <court 0|1> -> GJ ; un serveur neuf, un Chrome neuf (le shell n'est pas piloté : la géométrie seule)
   srv "$1" 1; GJ="$(node "$AUX/chrome-geom.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":$2}")"; unsrv
+}
+run_pastille() { # run_pastille <sortie> <court 0|1> -> PJ ; un serveur neuf, un Chrome neuf (T21.7)
+  srv "$1" 1; PJ="$(node "$AUX/chrome-pastille.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":$2}")"; unsrv
 }
 run_defaut() { # run_defaut <sortie> -> DJ ; un serveur neuf, un Chrome neuf
   srv "$1" 1; DJ="$(node "$AUX/chrome-defaut.mjs" "$CHROME" "{\"P\":$SRV_PORT}")"; unsrv
@@ -579,6 +642,17 @@ mut_geom M-PASTILLE-SUR-ZOOM vf-cockpit-terminal-tiroir.mjs 's|if (recouvre) z.s
 mut_geom M-AJUSTE-SANS-TIROIR vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #stage {|body.vf-term-ouvert #stage-absent {|' G1F
 mut_geom M-ASK-RESTE vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #ask { display: none; }|body.vf-term-ouvert #ask { }|' G1ask
 mut_geom M-VISITE-RESTE vf-cockpit-terminal-tiroir.mjs 's|window.VibeFlowTour.end();|void 0;|' G1visite
+run_pastille "$OUT" 0; PA="$PJ"
+assert_eq "T21.7 (D-06) — tiroir fermé : la pastille ne recouvre ni la barre de question, ni la feuille de détail, ni le zoom, ni la visite, de 390 à 1280 px, panneau dans son état initial, basculé, rebasculé, visite affichée, et en état tactile" "$(rj "$PA" '(j.erreur||JSON.stringify(j.erreurs))+" "+JSON.stringify(j.mauvais)')" "{} []"
+assert_eq "T21.8 — témoin de T21.7 : au moins 36 relevés pris, au moins 6 avec #ask affiché ET panneau ouvert, au moins 5 avec la visite affichée, au moins 3 en état tactile (sinon T21.7 est vert à vide)" "$(rj "$PA" '(j.n>=36&&j.avecAskOuvert>=6&&j.avecVisite>=5&&j.tactile>=3)?"ok":"n="+j.n+" ask="+j.avecAskOuvert+" visite="+j.avecVisite+" tactile="+j.tactile')" "ok"
+mut_pastille() { # mut_pastille <nom> <expression-sed> : le mutant doit laisser au moins un relevé en défaut (témoin : au moins 8 relevés, aucune erreur)
+  if mutant "$1" vf-cockpit-terminal-tiroir.mjs "$2"; then
+    srv "$MUT_OUT" 1; PM="$(node "$AUX/chrome-pastille.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":1}")"; unsrv
+    assert_eq "$1 — le mutant rougit T21.7 : au moins un relevé en défaut (témoin : au moins 8 relevés, aucune erreur)" "$(rj "$PM" '(j.n>=8)+" "+JSON.stringify(j.erreurs)+" rouge="+(j.mauvais.length>=1)')" "true {} rouge=true"
+  else sans_effet "$1"; fi
+}
+mut_pastille M-PASTILLE-SUR-ASK 's|if (sur(n.getBoundingClientRect(), kb)) n.style.bottom|if (false) n.style.bottom|'
+mut_pastille M-PASTILLE-SANS-RAPPEL "s|ask.addEventListener('transitionend', surTransition);||"
 
 echo "=== T22 — hauteur par défaut proportionnelle à la fenêtre (recette 71, G4 ; P71-D-37) ==="
 run_defaut "$OUT"; D="$DJ"

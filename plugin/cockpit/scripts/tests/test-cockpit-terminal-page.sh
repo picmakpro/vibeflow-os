@@ -7,10 +7,10 @@
 #   TH  thème par ?theme= à liste fermée, valeur jamais reflétée, aucun autre paramètre ne change la page
 #   TF  JetBrains Mono embarquée en data:font/woff2 (latin, latin-ext, traits de boîte 2.304), octets égaux aux fichiers vendorisés
 #   TV  un octet du vendor (ou SHA256SUMS) altéré : le terminal refuse de démarrer
-#   T18 parité des 25 variables Graphite avec viewer.html, sombre et clair, jamais sur un ensemble vide
+#   T18 parité des 41 variables (25 Graphite + 16 d'espacement 71.5) avec viewer.html, sombre et clair, jamais sur un ensemble vide
 #   T19 parité de la palette xterm de vue.mjs avec viewer.html (J10 de la critique 71 : les 15 couleurs de l'UI-SPEC §4.2 qui ont une variable Graphite
 #       d'origine, par thème, jamais sur un ensemble vide)
-#   M-* mutants (copies de la sortie) : M-ANCETRES, M-XFO, M-EMPREINTE, M-THEME, M-PARITE (a à d), M-PALETTE (a à d)
+#   M-* mutants (copies de la sortie) : M-ANCETRES, M-XFO, M-EMPREINTE, M-THEME, M-PARITE (a à f), M-PALETTE (a à d)
 # Aucun navigateur : serveur lancé directement avec --terminal, pages lues par terminal-aux.mjs. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
@@ -58,9 +58,10 @@ if (cmd === 'carte') { // CSP -> « directive: valeurs triées », une par ligne
 } else { process.exit(64); }
 JS
 cat > "$AUX/parite.mjs" <<'JS'
-// parite.mjs <viewer.html> <page.html> : valeur effective des 25 variables recopiées, par thème (sombre = :root, clair = :root puis la redéclaration)
+// parite.mjs <viewer.html> <page.html> : valeur effective des 41 variables recopiées, par thème (sombre = :root, clair = :root puis la redéclaration)
 import fs from 'node:fs';
-const NOMS = ['--ink', '--surface', '--raise', '--raise-2', '--hair', '--hair-2', '--text', '--text-2', '--text-3', '--text-4', '--on', '--on-hover', '--on-text', '--ring', '--recent', '--sev-medium', '--sev-high', '--warn-bg', '--warn-text', '--err-text', '--r-card', '--r-ctl', '--sans', '--mono', '--ease'];
+const NOMS = ['--ink', '--surface', '--raise', '--raise-2', '--hair', '--hair-2', '--text', '--text-2', '--text-3', '--text-4', '--on', '--on-hover', '--on-text', '--ring', '--recent', '--sev-medium', '--sev-high', '--warn-bg', '--warn-text', '--err-text', '--r-card', '--r-ctl', '--sans', '--mono', '--ease',
+  '--sp-2', '--sp-4', '--sp-6', '--sp-8', '--sp-12', '--sp-16', '--sp-20', '--sp-24', '--sp-32', '--edge', '--inset-panel', '--gap-section', '--inset-card', '--inset-box', '--inset-row', '--inset-pill'];
 const decl = (css, sel) => Object.fromEntries([...(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*{([^}]*)}').exec(css)?.[1] || '').matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim().toLowerCase().replace(/\s+/g, ' ')]));
 const lire = (f) => { const css = fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''); return { s: decl(css, ':root'), c: decl(css, ':root[data-theme="light"]') }; };
 const V = lire(process.argv[2]), Q = lire(process.argv[3]);
@@ -174,7 +175,7 @@ V1="$ENG/assets/vendor/fonts/jetbrains-mono-latin-wght-normal.woff2"; V2="$ENG/a
 assert_eq "TF.2 — octets décodés = fichiers vendorisés latin, latin-ext et traits de boîte 2.304 (sha256)" "$(printf '%s\n' "$POL" | sed 1d | grep . | tr '\n' ' ')" "$(printf '%s\n%s\n%s\n' "$(node "$AUX/csp.mjs" sha "$V1")" "$(node "$AUX/csp.mjs" sha "$V2")" "$(node "$AUX/csp.mjs" sha "$V3")" | sort | tr '\n' ' ')"
 assert_eq "TF.3 — la face des traits de boîte couvre U+2500-259F, avec la plage de poids 100 900 des faces latines (un poids exact change la police primaire de xterm : cellule de 15 px au lieu de 17)" "$(grep -o '@font-face{[^}]*unicode-range:U+2500-259F[^}]*}' "$PG/dark.html" | sed 's/src:url([^)]*)/src:URL/')" '@font-face{font-family:"JetBrains Mono";font-style:normal;font-display:block;font-weight:100 900;unicode-range:U+2500-259F;src:URL format("woff2")}'
 PAR="$(node "$AUX/parite.mjs" "$VIEWER" "$PG/dark.html")"
-assert_eq "T18.0 — les 25 noms sont présents dans les deux sources, par thème (anti-vide)" "$(printf '%s\n' "$PAR" | grep '^PARITE ')" "PARITE 25/25"
+assert_eq "T18.0 — les 41 noms sont présents dans les deux sources, par thème (anti-vide)" "$(printf '%s\n' "$PAR" | grep '^PARITE ')" "PARITE 41/41"
 echo "  mesure : $(printf '%s\n' "$PAR" | grep '^PARITE ') (viewer.html contre la page servie)"
 assert_eq "T18.1 — parité sombre : aucun écart ni variable absente" "$(printf '%s\n' "$PAR" | grep -E '\(sombre\)| sombre$' || true)" ""
 assert_eq "T18.2 — parité claire (valeur effective) : aucun écart ni variable absente" "$(printf '%s\n' "$PAR" | grep -E '\(clair\)| clair$' || true)" ""
@@ -204,7 +205,7 @@ if mutant xfo vf-cockpit-terminal-processus.mjs "s/'Content-Security-Policy': cs
   assert_eq "M-XFO — le mutant rougit T9.2 : x-frame-options présent" "$(entete "$WORK/m-xfo.out" 'Object.keys(j).filter(k=>k==="x-frame-options").length')" "1"; unsrv
 else assert_eq "M-XFO — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
-echo "=== M-PARITE — quatre variantes ==="
+echo "=== M-PARITE — six variantes ==="
 if mutant paritea vf-cockpit-terminal-style.mjs 's/--surface: #191919/--surface: #191918/'; then
   node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pa.html"
   assert_has "T18.3 — (a) --surface sombre de Q changé" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pa.html")" "variable --surface (sombre) : viewer.html=#191919, Q=#191918"
@@ -222,6 +223,14 @@ if mutant pariteter vf-cockpit-terminal-style.mjs 's/--text: #161616/--text: #16
   node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pd.html"
   assert_has "T18.6 — (d) --text clair de Q seul changé" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pd.html")" "variable --text (clair) : viewer.html=#161616, Q=#161617"
 else assert_eq "T18.6 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant paritesp vf-cockpit-terminal-style.mjs 's/--sp-8: 8px/--sp-8: 9px/'; then
+  node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pe.html"
+  assert_has "T18.7 — (e) --sp-8 de Q seul changé (espacement 71.5)" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pe.html")" "variable --sp-8 (sombre) : viewer.html=8px, Q=9px"
+else assert_eq "T18.7 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant pariteca vf-cockpit-terminal-style.mjs 's/--inset-card: var(--sp-16)/--inset-card: var(--sp-12)/'; then
+  node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pf.html"
+  assert_has "T18.7 — (f) --inset-card de Q seul changé (jeton sémantique)" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pf.html")" "variable --inset-card (sombre) : viewer.html=var(--sp-16), Q=var(--sp-12)"
+else assert_eq "T18.7 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-PALETTE — quatre variantes (J10) ==="
 if mutant paletta vf-cockpit-terminal-vue.mjs "s/green: '#4ade80'/green: '#4ade81'/"; then
