@@ -28,7 +28,7 @@
 # Poste (Phase 58, P58-D-01, P58-D-16, P58-D-18) :
 #   --role <solo|product|dev> | env VF_ROLE → sur `install` seulement, pose le poste de l'humain dans
 #   `<cible>/vibeflow-role` (une ligne, fichier LOCAL non versionné). --role l'emporte sur VF_ROLE ; un
-#   VF_ROLE hérité est ignoré par les autres verbes. La règle d'ignorance `.claude/vibeflow-role` est
+#   VF_ROLE hérité est ignoré par les autres verbes, sauf `new-modules` et `mark-offered --pending` qui le lisent (à défaut, ils lisent le poste du lab). La règle d'ignorance `.claude/vibeflow-role` est
 #   posée dans ./.gitignore AVANT le fichier, dans tous les scopes où un poste est posé (project compris),
 #   et la ligne est ajoutée à ./.worktreeinclude. Sans poste, rien de tout cela n'a lieu. Refus à la pose
 #   si le poste est hors de la liste `vf_roles` du projet ; l'engine n'écrit jamais `.planning/config.json`.
@@ -510,6 +510,10 @@ module_version_installed() {
 mark_installed() {
   local mod="$1"
   local version="$2"
+  # BL35-R5-S1 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05, « Refuser une version
+  # vide (Recommandé) ») : une version vide vaudrait un retrait dans _registry_rewrite — « installé »
+  # rc 0 sans ligne au registre. Refus explicite, rien ne passe en silence.
+  [ -n "$version" ] || err "mark-installed : version vide pour $mod (VERSION vide ?) — refus, registre inchangé"
   if vf_dry_run; then
     # F-04 (correction ciblée 31-04) : verbe selon l'existence RÉELLE de la cible (D-31-05, + crée
     # / ~ modifie) — sur un lab vierge, $INSTALLED_REGISTRY n'existe pas encore : c'est une
@@ -521,12 +525,45 @@ mark_installed() {
     vf_declare_write "$verb" "$INSTALLED_REGISTRY" "$mod=$version"
     return 0
   fi
-  mkdir -p "$(dirname "$INSTALLED_REGISTRY")"
-  touch "$INSTALLED_REGISTRY"
-  # Remove old entry if exists
-  grep -v "^$mod=" "$INSTALLED_REGISTRY" > "${INSTALLED_REGISTRY}.tmp" 2>/dev/null || true
-  echo "$mod=$version" >> "${INSTALLED_REGISTRY}.tmp"
-  mv "${INSTALLED_REGISTRY}.tmp" "$INSTALLED_REGISTRY"
+  _registry_rewrite "mark-installed" "$mod" "$version"
+}
+
+# _registry_rewrite <appelant> <module> [version] — primitive UNIQUE d'écriture du registre, partagée par
+# mark_installed (version donnée : la ligne est (ré)inscrite) et mark_uninstalled (version vide : la ligne est
+# retirée, un registre absent n'est pas créé).
+# BL35-A4 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Corriger dans la même PR »),
+# famille HIGH de CONCERNS.md:144 : même durcissement que mark_offered. Aucune écriture ne suit un lien
+# symbolique, ni le registre ni son temporaire (un lien posé par un dépôt jugé ferait écraser un fichier de
+# l'humain) ; l'ancien contenu n'est recopié que pour les lignes au format du registre `<module>=<version>`
+# (module [a-z0-9-]+, version sans `=` ni blanc : celle que lisent `cut -d= -f2` et role_notice).
+# `INCONSISTENT:<étape>:<version>` du rollback a ce format et survit au filtre.
+# BL35-A5 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Corriger dans la même PR
+# (Recommandé) ») : M-1 (mark_uninstalled n'avait aucun contrôle de lien), m-1 (registre illisible : les autres
+# modules étaient effacés en silence), m-2 (registre = répertoire : le mv rangeait le temporaire DANS le
+# répertoire, rc 0 sans inscription) → tout registre existant qui n'est pas un fichier régulier lisible est refusé.
+_registry_rewrite() {
+  local who="$1" mod="$2" version="${3:-}"
+  local reg="$INSTALLED_REGISTRY" tmp="${INSTALLED_REGISTRY}.tmp"
+  [ ! -L "$reg" ] || err "$who : $VF_REGISTRY_RELPATH est un lien symbolique — refus, rien n'est écrit"
+  [ ! -L "$tmp" ] || err "$who : ${VF_REGISTRY_RELPATH}.tmp est un lien symbolique — refus, rien n'est écrit"
+  if [ -e "$reg" ]; then
+    [ -f "$reg" ] || err "$who : $VF_REGISTRY_RELPATH n'est pas un fichier régulier — refus, rien n'est écrit"
+    [ -r "$reg" ] || err "$who : $VF_REGISTRY_RELPATH illisible — refus, registre inchangé"
+  elif [ -z "$version" ]; then
+    return 0   # retrait sur un registre absent : rien à faire, et on ne le crée pas
+  else
+    mkdir -p "$(dirname "$reg")"
+    : > "$reg"
+  fi
+  rm -f "$tmp"
+  # Création exclusive (noclobber) : un lien apparu entre le contrôle et l'écriture n'est pas suivi.
+  if ! ( set -C
+         { grep -E '^[a-z0-9-]+=[^=[:space:]]+$' "$reg" 2>/dev/null | grep -v "^$mod=" || true
+           [ -z "$version" ] || echo "$mod=$version"
+         } > "$tmp" ) 2>/dev/null; then
+    rm -f "$tmp"; err "$who : écriture de ${VF_REGISTRY_RELPATH}.tmp impossible — registre inchangé"
+  fi
+  mv "$tmp" "$reg" || { rm -f "$tmp"; err "$who : remplacement de $VF_REGISTRY_RELPATH impossible"; }
 }
 
 mark_uninstalled() {
@@ -539,10 +576,7 @@ mark_uninstalled() {
   # ici — les deux appelants annoncent déjà eux-mêmes (verbe -, no-op manifeste par construction,
   # D-31-02), une 2e annonce depuis ce site dupliquerait la ligne.
   vf_dry_run && return 0
-  if [ -f "$INSTALLED_REGISTRY" ]; then
-    grep -v "^$mod=" "$INSTALLED_REGISTRY" > "${INSTALLED_REGISTRY}.tmp" || true
-    mv "${INSTALLED_REGISTRY}.tmp" "$INSTALLED_REGISTRY"
-  fi
+  _registry_rewrite "mark-uninstalled" "$mod"
 }
 
 # ---------- Manifeste de pose (D-31-01/02/03, Phase 31 vague TRACER) ----------
@@ -566,6 +600,7 @@ vf_manifest_excluded() {
     vibeflow-role)                return 0 ;;  # idem (role_write_file, P58-D-01) — poste du lab, fichier local engine-owned
     memory/*)                     return 0 ;;  # contenu vivant du lab semé par seed-registres.sh, pas un artefact de pose
     scripts/.vibeflow-installed)  return 0 ;;  # état du moteur, pas contenu de module
+    scripts/.vibeflow-offered)    return 0 ;;  # idem : modules déjà proposés par /vf-update, état du moteur
     scripts/.vibeflow-manifest-*) return 0 ;;  # le manifeste ne se consigne jamais lui-même (boucle de convergence)
     scripts/.vibeflow-sha256-*)   return 0 ;;  # empreintes de pose (#166), nom HORS du motif du manifeste : jamais découvert par glob
     .backups/*)                   return 0 ;;  # filet de sécurité, jamais candidat à suppression automatique
@@ -908,8 +943,11 @@ trap 'vf_lp_report || :' EXIT
 # fichier d'empreintes est un état propre à la machine, il ne se commite pas. Règle unique dans
 # ./.gitignore (scope project compris, comme le fichier de poste), posée AVANT le fichier. Rien en
 # scope user ni sous --target. Best-effort : un .gitignore inutilisable est dit, jamais fatal.
-vf_lp_ignore_rule() {
-  local rule=".claude/scripts/.vibeflow-sha256-*" f="./.gitignore" cr eol=""
+vf_lp_ignore_rule() { vf_local_ignore_rule ".claude/scripts/.vibeflow-sha256-*" "local-patches"; }
+
+# vf_local_ignore_rule <règle> <étiquette> — corps partagé : une règle d'ignorance d'un état local de la machine.
+vf_local_ignore_rule() {
+  local rule="$1" label="$2" f="./.gitignore" cr eol=""
   case "$VF_SCOPE" in project|local) ;; *) return 0 ;; esac
   if [ -n "$VF_TARGET_OVERRIDE" ]; then return 0; fi
   cr="$(printf '\r')"
@@ -919,20 +957,20 @@ vf_lp_ignore_rule() {
     return 0
   fi
   if [ -L "$f" ] || { [ -e "$f" ] && [ ! -f "$f" ]; }; then
-    log "  [local-patches] ./.gitignore inutilisable (lien ou non régulier) — règle $rule non écrite"
+    log "  [$label] ./.gitignore inutilisable (lien ou non régulier) — règle $rule non écrite"
     return 0
   fi
   if [ -f "$f" ]; then
     if grep -qxF -e "$rule" -e "$rule$cr" "$f"; then return 0; fi
     if LC_ALL=C grep -q "$cr" "$f"; then eol="$cr"; fi
     if [ -s "$f" ] && [ "$(tail -c 1 "$f" | wc -l | tr -d ' ')" -eq 0 ]; then
-      printf '%s\n' "$eol" >> "$f" 2>/dev/null || { log "  [local-patches] écriture de ./.gitignore échouée"; return 0; }
+      printf '%s\n' "$eol" >> "$f" 2>/dev/null || { log "  [$label] écriture de ./.gitignore échouée"; return 0; }
     fi
   fi
   if printf '%s%s\n' "$rule" "$eol" >> "$f" 2>/dev/null; then
     log "  gitignore += $rule"
   else
-    log "  [local-patches] écriture de ./.gitignore échouée — règle $rule non écrite"
+    log "  [$label] écriture de ./.gitignore échouée — règle $rule non écrite"
   fi
   return 0
 }
@@ -3924,6 +3962,152 @@ uninstall_module() {
   log "✓ $mod désinstallé"
 }
 
+# ---------- Modules nouveaux du catalogue (lab déjà posé) ----------
+# `update --all` ne suit que le registre : un module apparu dans une release (cockpit en v2.75.0) n'y
+# entre jamais et n'est signalé à personne. Deux verbes, sobres, pour que /vf-update le PROPOSE :
+#   new-modules                  (lecture seule) un `module=version` par ligne : dans le catalogue, absent du
+#                                registre, jamais déjà proposé, proposable (pas `proposable:false`) et visible
+#                                du poste du lab. Registre absent = lab non posé : rien à proposer.
+#   mark-offered --pending       inscrit ce que new-modules listerait (appelé par /vibeflow-install en fin de pose).
+#   mark-offered <module>...     inscrit, dans scripts/.vibeflow-offered, les modules EFFECTIVEMENT présentés à
+#                                l'humain (union avec l'existant), jamais le catalogue entier : un module que
+#                                personne n'a vu n'est pas « déjà proposé ». Sans argument : rien n'est écrit.
+# Le moteur ne traçait pas les retraits (uninstall retire juste la ligne du registre) ; ce fichier est la
+# trace minimale, sans toucher à uninstall. Premier passage sans fichier : tout module non posé est proposé
+# une fois (un retrait antérieur n'a pas laissé de trace), puis le fichier existe.
+VF_OFFERED_RELPATH="scripts/.vibeflow-offered"
+
+# module_is_proposable <mod> — faux si le manifeste porte `"proposable": false` (module WIP, caché du
+# catalogue de l'installeur : build-module-catalog.sh, INST-02bis). Défaut vrai. Même lecture textuelle que
+# module_is_mandatory (l'engine n'exige pas jq) ; manifeste absent = non proposable (jamais « par défaut »).
+module_is_proposable() {
+  local mj="$CACHE_DIR/$1/module.json"
+  [ -f "$mj" ] || return 1
+  ! grep -Eq '"proposable"[[:space:]]*:[[:space:]]*false' "$mj"
+}
+
+# resolve_lab_role — pose VF_ROLE depuis le poste du lab quand l'environnement n'en porte pas. Lecteur
+# unique vf-role.sh (cache du plugin, jamais le dépôt jugé : audit M-2), sur le fichier que role_write_file
+# écrit (<cible>/vibeflow-role). Pas de fichier = solo, sans lecteur. Fichier présent mais illisible ou
+# lecteur absent : ERREUR, jamais « visible » (un filtre de poste ne se replie pas). Réservé à new-modules :
+# install/update/uninstall gardent leur règle (VF_ROLE explicite seulement).
+resolve_lab_role() {
+  [ -z "${VF_ROLE:-}" ] || return 0
+  local file="$TARGET_ROOT/vibeflow-role" reader root out rc=0
+  [ -e "$file" ] || [ -L "$file" ] || return 0
+  reader="$CACHE_DIR/conductor/scripts/vf-role.sh"
+  [ -f "$reader" ] || err "poste : vf-role.sh absent du cache du plugin (conductor) — un poste posé ne se lit jamais à la main"
+  root="$(cd "$TARGET_ROOT" 2>/dev/null && cd .. && pwd -P)" || err "poste : racine du lab illisible"
+  out="$(env -u VF_ROLE bash "$reader" get --path "$root" 2>/dev/null)" || rc=$?
+  [ "$rc" -eq 0 ] || err "poste : fichier de poste du lab illisible ou invalide (code $rc) — nouveaux modules non calculés"
+  VF_ROLE="$out"
+}
+
+# other_scope_registry — registre de l'AUTRE scope posé (user <-> project/local), vide s'il n'existe pas.
+# Ne sert qu'à new-modules (BL35-Q2) : install/update/uninstall restent mono-scope.
+other_scope_registry() {
+  local f
+  case "$VF_SCOPE" in
+    user) f="./.claude/scripts/.vibeflow-installed" ;;
+    *)    f="$HOME/.claude/scripts/.vibeflow-installed" ;;
+  esac
+  if [ -f "$f" ] && ! [ "$f" -ef "$INSTALLED_REGISTRY" ]; then echo "$f"; fi
+}
+
+list_new_modules() {
+  require_cache
+  [ -f "$INSTALLED_REGISTRY" ] || return 0
+  resolve_lab_role
+  local mod offered="$TARGET_ROOT/$VF_OFFERED_RELPATH" other
+  other="$(other_scope_registry)"
+  for mod in $(list_available_modules); do
+    [ "$(module_version_installed "$mod")" = "—" ] || continue
+    # Jamais en double : un module posé dans l'autre scope (user <-> project) n'est pas reproposé ici.
+    if [ -n "$other" ] && grep -q "^${mod}=" "$other"; then continue; fi
+    if [ -f "$offered" ] && grep -qx "$mod" "$offered"; then continue; fi
+    module_is_proposable "$mod" || continue
+    role_visible "$mod" || continue
+    echo "$mod=$(module_version_available "$mod")"
+  done
+}
+
+mark_offered() {
+  require_cache
+  [ -f "$INSTALLED_REGISTRY" ] || { log "lab non posé (pas de registre) : rien à inscrire"; return 0; }
+  local offered="$TARGET_ROOT/$VF_OFFERED_RELPATH" mod avail old pending
+  local tmp="${TARGET_ROOT}/${VF_OFFERED_RELPATH}.tmp"
+  # --pending : l'installeur (/vibeflow-install) inscrit ce qu'il laisse non posé et visible du poste, soit
+  # exactement ce que new-modules listerait : un lab neuf ne revoit pas au premier /vf-update ce qu'il a écarté.
+  # Le calcul est capturé SANS pipeline : un échec (poste illisible…) est une erreur, jamais « rien à proposer ».
+  if [ "${1:-}" = "--pending" ]; then
+    [ "$#" -eq 1 ] || err "mark-offered --pending ne prend aucun module"
+    pending="$(list_new_modules)" || err "mark-offered --pending : calcul des modules nouveaux en échec — rien n'est inscrit"
+    set --
+    while IFS= read -r mod; do [ -z "$mod" ] || set -- "$@" "${mod%%=*}"; done <<< "$pending"
+  fi
+  [ "$#" -gt 0 ] || { log "aucun module présenté : rien à inscrire"; return 0; }
+  for mod in "$@"; do
+    case "$mod" in ''|*[!a-z0-9-]*) err "mark-offered : nom de module refusé" ;; esac
+  done
+  # Aucune écriture ne suit un lien symbolique : ni l'état ni son temporaire (un lien posé par un dépôt jugé
+  # ferait écraser un fichier de l'humain). Refus bruyant, rien d'écrit.
+  [ ! -L "$offered" ] || err "mark-offered : $VF_OFFERED_RELPATH est un lien symbolique — refus, rien n'est écrit"
+  [ ! -L "$tmp" ] || err "mark-offered : ${VF_OFFERED_RELPATH}.tmp est un lien symbolique — refus, rien n'est écrit"
+  avail="$(list_available_modules)"
+  old=""
+  if [ -e "$offered" ]; then
+    [ -f "$offered" ] && [ -r "$offered" ] || err "mark-offered : $VF_OFFERED_RELPATH illisible — rien n'est écrit"
+    # L'ancien état n'est recopié que pour les lignes qui sont des noms de module valides.
+    old="$(grep -E '^[a-z0-9-]+$' "$offered" || true)"
+  fi
+  rm -f "$tmp"
+  # BL35-A2 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Local, ignoré par git ») :
+  # en scope project, l'état « proposé » est propre au poste de l'humain, même régime que vibeflow-role —
+  # règle d'ignorance posée AVANT le fichier. Scope user inchangé (hors dépôt).
+  vf_local_ignore_rule ".claude/$VF_OFFERED_RELPATH" "offered"
+  # Un nom syntaxiquement valide mais hors catalogue est écarté, quelle que soit sa position dans la liste.
+  # Création exclusive (noclobber) : un lien apparu entre le contrôle et l'écriture n'est pas suivi.
+  if ! ( set -C
+         { printf '%s\n' "$old"
+           for mod in "$@"; do if printf '%s\n' "$avail" | grep -qx "$mod"; then echo "$mod"; fi; done
+         } | grep -v '^$' | LC_ALL=C sort -u > "$tmp" ) 2>/dev/null; then
+    rm -f "$tmp"; err "mark-offered : écriture de ${VF_OFFERED_RELPATH}.tmp impossible — rien n'est inscrit"
+  fi
+  mv "$tmp" "$offered" || { rm -f "$tmp"; err "mark-offered : remplacement de $VF_OFFERED_RELPATH impossible"; }
+  log "modules inscrits comme proposés : $* ($offered)"
+}
+
+# unmark_offered <module>... — retire la marque « proposé » des modules nommés (BL35-A1, arbitrage Samuel,
+# AskUserQuestion session principale, 2026-11-05 : « Le reproposer ») : une pose en échec dans `offer` ne doit
+# pas valoir « déjà proposé », le module revient au prochain /vf-update. Même primitive sûre que mark_offered :
+# lien symbolique refusé (état ET temporaire), lignes filtrées sur le format d'un nom de module, création
+# exclusive, aucun .tmp résiduel. Fichier absent : rien à retirer. Un nom absent du fichier est sans effet.
+unmark_offered() {
+  local offered="$TARGET_ROOT/$VF_OFFERED_RELPATH" tmp="${TARGET_ROOT}/${VF_OFFERED_RELPATH}.tmp" mod l skip old
+  [ "$#" -gt 0 ] || { log "aucun module à dé-marquer"; return 0; }
+  for mod in "$@"; do
+    case "$mod" in ''|*[!a-z0-9-]*) err "unmark-offered : nom de module refusé" ;; esac
+  done
+  [ ! -L "$offered" ] || err "unmark-offered : $VF_OFFERED_RELPATH est un lien symbolique — refus, rien n'est écrit"
+  [ ! -L "$tmp" ] || err "unmark-offered : ${VF_OFFERED_RELPATH}.tmp est un lien symbolique — refus, rien n'est écrit"
+  [ -e "$offered" ] || { log "$VF_OFFERED_RELPATH absent : rien à retirer"; return 0; }
+  [ -f "$offered" ] && [ -r "$offered" ] || err "unmark-offered : $VF_OFFERED_RELPATH illisible — rien n'est écrit"
+  old="$(grep -E '^[a-z0-9-]+$' "$offered" || true)"
+  rm -f "$tmp"
+  if ! ( set -C
+         { while IFS= read -r l; do
+             [ -n "$l" ] || continue
+             skip=0
+             for mod in "$@"; do [ "$l" = "$mod" ] && skip=1; done
+             [ "$skip" = 1 ] || echo "$l"
+           done <<< "$old"
+         } | LC_ALL=C sort -u > "$tmp" ) 2>/dev/null; then
+    rm -f "$tmp"; err "unmark-offered : écriture de ${VF_OFFERED_RELPATH}.tmp impossible — rien n'est retiré"
+  fi
+  mv "$tmp" "$offered" || { rm -f "$tmp"; err "unmark-offered : remplacement de $VF_OFFERED_RELPATH impossible"; }
+  log "marque « proposé » retirée : $*"
+}
+
 # ---------- Status ----------
 show_status() {
   require_cache
@@ -4314,6 +4498,17 @@ case "$cmd" in
     ;;
   status)
     show_status
+    ;;
+  new-modules)
+    list_new_modules
+    ;;
+  mark-offered)
+    shift
+    mark_offered "$@"
+    ;;
+  unmark-offered)
+    shift
+    unmark_offered "$@"
     ;;
   sync)
     # No-op explicite (SCOPE-02) : la source est le cache fourni, plus de sync git.

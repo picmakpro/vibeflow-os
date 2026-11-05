@@ -389,6 +389,7 @@ T5B_RESULT="$(
   check_excluded "scripts/vf-portable.sh" 0
   check_excluded "memory/foo.md" 0
   check_excluded "scripts/.vibeflow-installed" 0
+  check_excluded "scripts/.vibeflow-offered" 0            # BL35 : modules déjà proposés par /vf-update, état du moteur
   check_excluded "scripts/.vibeflow-manifest-conductor" 0
   check_excluded ".backups/conductor-20260101/skills/x" 0
   check_excluded "scripts/.vibeflow-sha256-conductor" 0   # #166 : empreintes de pose, hors motif du manifeste
@@ -396,6 +397,7 @@ T5B_RESULT="$(
   check_excluded "scripts/vf-portable2.sh" 1
   check_excluded "skills/memory/SKILL.md" 1
   check_excluded "scripts/.vibeflow-installedx" 1
+  check_excluded "scripts/.vibeflow-offeredx" 1
   check_excluded "scripts/vibeflow-manifest-conductor" 1
   check_excluded "scripts/vibeflow-sha256-conductor" 1
   check_excluded "notbackups/conductor/x" 1

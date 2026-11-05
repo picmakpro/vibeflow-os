@@ -96,5 +96,79 @@ ok "baseline : hook du module mandatory mergé"         "$(grep -q 'cond-banner.
 ok "resync : hook d'un module à jour re-mergé"         "$(grep -q 'other-hook.sh' "$SET" && echo true || echo false)"
 ok "placeholder {{VF_SCRIPTS}} résolu dans settings"   "$(grep -q '{{VF_SCRIPTS}}' "$SET" && echo false || echo true)"
 
+echo "== vf-update-run.sh (modules nouveaux du catalogue : proposés, jamais posés d'office) =="
+NM_BASE="$TMP/nm-base"; NM_HOME="$TMP/nm-home"; NM_LOG="$TMP/nm.log"
+mkdir -p "$NM_BASE/3.0.0/_internal" "$NM_BASE/3.0.0/conductor/scripts" "$NM_HOME/.claude/scripts"
+printf 'conductor=v1.0.0\n' > "$NM_HOME/.claude/scripts/.vibeflow-installed"
+# Stub de l'engine : journalise ses arguments ; NM_FAIL_LIST=1 fait échouer new-modules, NM_FAIL_INSTALL=1 fait échouer install.
+cat > "$NM_BASE/3.0.0/_internal/vibeflow-update.sh" <<STUB
+#!/usr/bin/env bash
+echo "\$*" >> "$NM_LOG"
+if [ "\${3:-}" = "new-modules" ]; then [ -z "\${NM_FAIL_LIST:-}" ] || exit 1; echo "cockpit=v1.0.1"; fi
+if [ "\${3:-}" = "install" ] && [ -n "\${NM_FAIL_INSTALL:-}" ]; then exit 1; fi
+# Pose réussie = module inscrit au registre du scope (le runner l'exige : une pose vide est un échec, BL35-A3).
+if [ "\${3:-}" = "install" ]; then printf '%s=v1.0.1\\n' "\${5:-}" >> "\$HOME/.claude/scripts/.vibeflow-installed"; fi
+exit 0
+STUB
+printf '#!/usr/bin/env bash\nexit 1\n' > "$NM_BASE/3.0.0/conductor/scripts/check-plugin-update.sh"
+# fermeture des requires : le vrai résolveur, cockpit exige conductor (posé) et helper (non posé)
+cp "$DIR/../../_internal/resolve-deps.sh" "$NM_BASE/3.0.0/_internal/resolve-deps.sh"
+mkdir -p "$NM_BASE/3.0.0/cockpit" "$NM_BASE/3.0.0/helper" "$NM_BASE/3.0.0/conductor"
+printf '{ "name": "cockpit", "requires": ["conductor", "helper"] }\n' > "$NM_BASE/3.0.0/cockpit/module.json"
+printf '{ "name": "helper", "requires": [] }\n' > "$NM_BASE/3.0.0/helper/module.json"
+printf '{ "name": "conductor", "requires": [] }\n' > "$NM_BASE/3.0.0/conductor/module.json"
+: > "$NM_LOG"
+out="$(cd "$TMP/work" && HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" 2>&1)"
+ok "nouveau : le module absent du registre est listé, avec ses dépendances non posées (format stable)" "$(echo "$out" | grep -qx '\[vf-update-run\] NOUVEAU_MODULE scope=user cockpit=v1.0.1 deps=helper' && echo true || echo false)"
+ok "nouveau : rien n'est posé d'office (aucun install)"            "$(grep -q 'install' "$NM_LOG" && echo false || echo true)"
+: > "$NM_LOG"
+HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user cockpit >/dev/null 2>&1
+ok "offer : présentés calculés AVANT la pose, accepté posé avec ses dépendances, seuls les présentés inscrits" "$([ "$(cat "$NM_LOG")" = "$(printf -- '--scope user new-modules\n--scope user install --with-deps cockpit\n--scope user mark-offered cockpit')" ] && echo true || echo false)"
+: > "$NM_LOG"
+HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user >/dev/null 2>&1
+ok "offer sans module (refus) : seule l'inscription des présentés a lieu" "$([ "$(cat "$NM_LOG")" = "$(printf -- '--scope user new-modules\n--scope user mark-offered cockpit')" ] && echo true || echo false)"
+: > "$NM_LOG"
+HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user '../x' >/dev/null 2>&1
+ok "offer : un nom de module douteux n'atteint jamais l'engine"    "$(grep -q 'install' "$NM_LOG" && echo false || echo true)"
+HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer local >/dev/null 2>&1
+ok "offer : scope inconnu refusé (exit 64)"                         "$([ $? -eq 64 ] && echo true || echo false)"
+# --- Témoins de correction ciblée (BL35) ---
+# deps=? : fermeture incalculable (cockpit exige un module sans manifeste) → jamais « - »
+cp "$NM_BASE/3.0.0/cockpit/module.json" "$TMP/cockpit.module.json.bak"
+printf '{ "name": "cockpit", "requires": ["conductor", "fantome"] }\n' > "$NM_BASE/3.0.0/cockpit/module.json"
+out="$(cd "$TMP/work" && HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" 2>&1)"
+ok "nouveau : fermeture de dépendances incalculable → deps=? (jamais deps=-)" "$(echo "$out" | grep -qx '\[vf-update-run\] NOUVEAU_MODULE scope=user cockpit=v1.0.1 deps=?' && echo true || echo false)"
+cp "$TMP/cockpit.module.json.bak" "$NM_BASE/3.0.0/cockpit/module.json"
+# calcul de new-modules en échec : ligne d'erreur stable, distincte de « rien à proposer », mise à jour non remise en cause
+: > "$NM_LOG"
+out="$(cd "$TMP/work" && NM_FAIL_LIST=1 HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" 2>&1)"; nrc=$?
+ok "nouveau : calcul en échec → NOUVEAUX_MODULES_ERREUR scope=user, aucun NOUVEAU_MODULE, rc=0" "$(echo "$out" | grep -qx '\[vf-update-run\] NOUVEAUX_MODULES_ERREUR scope=user' && ! echo "$out" | grep -q 'NOUVEAU_MODULE ' && [ "$nrc" -eq 0 ] && grep -q 'update --all' "$NM_LOG" && echo true || echo false)"
+out="$(cd "$TMP/work" && HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" 2>&1)"
+ok "nouveau : calcul réussi → pas de NOUVEAUX_MODULES_ERREUR" "$(echo "$out" | grep -q 'NOUVEAUX_MODULES_ERREUR' && echo false || echo true)"
+# offer : new-modules en échec → rien posé, rien inscrit, rc≠0
+: > "$NM_LOG"
+NM_FAIL_LIST=1 HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user cockpit >/dev/null 2>&1; orc=$?
+ok "offer : new-modules en échec → rien posé, rien inscrit, rc≠0" "$([ "$orc" -ne 0 ] && ! grep -q 'install\|mark-offered' "$NM_LOG" && echo true || echo false)"
+# offer : un module hors de l'ensemble présenté est refusé avec message, jamais posé
+: > "$NM_LOG"
+out="$(HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user helper 2>&1)"
+ok "offer : module hors des présentés refusé avec message, jamais posé" "$(echo "$out" | grep -q 'non présenté.*helper' && ! grep -q 'install' "$NM_LOG" && echo true || echo false)"
+# offer : la pose d'un accepté échoue → rc≠0, message nommant le module ; l'inscription des présentés reste inchangée
+: > "$NM_LOG"
+out="$(NM_FAIL_INSTALL=1 HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user cockpit 2>&1)"; orc=$?
+ok "offer : pose en échec → rc≠0 et message nommant cockpit" "$([ "$orc" -ne 0 ] && echo "$out" | grep -q 'pose en échec : cockpit' && echo true || echo false)"
+ok "offer : pose en échec → inscription des présentés inchangée (arbitrage en attente)" "$(grep -qx -- '--scope user mark-offered cockpit' "$NM_LOG" && echo true || echo false)"
+# BL35-A1 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05) : le module dont la pose a échoué est dé-marqué, APRÈS l'inscription
+ok "offer : pose en échec → dé-marquage du module en échec, après l'inscription (BL35-A1)" "$([ "$(cat "$NM_LOG")" = "$(printf -- '--scope user new-modules\n--scope user install --with-deps cockpit\n--scope user mark-offered cockpit\n--scope user unmark-offered cockpit')" ] && echo true || echo false)"
+: > "$NM_LOG"
+HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user cockpit >/dev/null 2>&1
+ok "offer : pose réussie → aucun dé-marquage" "$(grep -q 'unmark-offered' "$NM_LOG" && echo false || echo true)"
+# BL35-A3 : rc≠0 sur nom invalide ET sur module non présenté (rien posé dans les deux cas)
+: > "$NM_LOG"
+HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user '../x' >/dev/null 2>&1; orc=$?
+ok "offer : nom de module invalide → rc≠0 (BL35-A3)" "$([ "$orc" -ne 0 ] && echo true || echo false)"
+HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user helper >/dev/null 2>&1; orc=$?
+ok "offer : module non présenté → rc≠0 (BL35-A3)" "$([ "$orc" -ne 0 ] && echo true || echo false)"
+
 echo; echo "== Résultat : $PASS OK · $FAIL KO =="
 [ "$FAIL" -eq 0 ]

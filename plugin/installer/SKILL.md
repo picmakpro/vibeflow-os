@@ -147,6 +147,10 @@ bug d'install vécu sur le terrain, ADR-054) :
      **PASSER TOUJOURS un VF_SCOPE explicite** = `<s>` (cohérence **ID4**).
    - **Refus de l'engine** (poste hors de la liste `vf_roles` du projet, ou liste illisible) : montrer
      son message tel quel et s'arrêter.
+   - **Inscription des modules laissés non posés (BL35-Q1-bis)** → une fois la pose terminée, dans le même
+     scope : `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" --scope <s> mark-offered --pending`.
+     Il inscrit ce que le catalogue présenté (filtré par le poste) laisse non posé : `/vf-update` ne
+     le reproposera pas à un lab qui l'a déjà écarté ici. N'écrit rien si rien n'est en attente.
    - Scope `local` → le `.gitignore` est géré **par l'engine** (SCOPE-04, déjà fait) : ne pas le
      réimplémenter, juste le mentionner à l'utilisateur (« rien ne sera committé »).
 

@@ -24,11 +24,79 @@ ENGINE="$NEW/_internal/vibeflow-update.sh"
 [ -f "$ENGINE" ] || { echo "[vf-update-run] engine introuvable : $ENGINE" >&2; exit 1; }
 echo "[vf-update-run] cache le plus récent : $(basename "$NEW")"
 
+# Mode `offer <user|project> [module ...]` : suite de la proposition des modules nouveaux (étape 4d du
+# skill). Ordre fixe : (1) calcule l'ensemble PRÉSENTÉ à l'humain (= `new-modules`, avant toute pose, sinon
+# le registre a déjà bougé), (2) pose les modules ACCEPTÉS (fermeture de dépendances), (3) inscrit les seuls
+# modules présentés — accord ou refus, un module présenté n'est proposé qu'une fois ; un module accepté puis
+# désinstallé ne revient pas. Sans module : tout est refusé. `new-modules` en échec = rien n'est posé ni inscrit.
+# Exception (BL35-A1, arbitrage Samuel, AskUserQuestion session principale, 2026-11-05) : un module dont la pose
+# échoue est dé-marqué (`unmark-offered`) et revient au prochain /vf-update. Code de sortie non nul (BL35-A3,
+# même arbitrage) sur nom refusé, module non présenté, pose en échec, inscription ou dé-marquage en échec.
+# Pose vide (BL35-A3, « Échec dans les deux cas », Samuel, AskUserQuestion session principale, 2026-11-05) : un
+# `install --with-deps` en rc 0 qui n'a pas inscrit le module au registre du scope est un échec (dé-marqué, rc≠0).
+if [ "${1:-}" = "offer" ]; then
+  scope="${2:-}"
+  case "$scope" in user|project) ;; *) echo "usage : vf-update-run.sh offer <user|project> [module ...]" >&2; exit 64 ;; esac
+  shift 2
+  presented=()
+  if ! listed="$(VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" new-modules)"; then
+    echo "[vf-update-run] modules nouveaux illisibles (scope $scope) : rien n'est posé ni inscrit" >&2; exit 1
+  fi
+  while IFS= read -r l; do
+    [[ "$l" =~ ^([a-z0-9-]+)=[A-Za-z0-9._+-]+$ ]] && presented+=("${BASH_REMATCH[1]}")
+  done <<< "$listed"
+  rc=0; failed=()
+  if [ "$scope" = user ]; then regroot="$HOME/.claude"; else regroot="./.claude"; fi
+  for m in "$@"; do
+    case "$m" in ''|*[!a-z0-9-]*) echo "[vf-update-run] nom de module refusé : $m" >&2; rc=1; continue ;; esac
+    # Seuls les modules PRÉSENTÉS (calculés en tête de mode) se posent : un module hors de cet ensemble
+    # (non proposable, déjà posé, écarté du poste…) est refusé, jamais installé.
+    case " ${presented[*]-} " in *" $m "*) ;; *) echo "[vf-update-run] module non présenté, refusé (rien posé) : $m" >&2; rc=1; continue ;; esac
+    if ! VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" install --with-deps "$m"; then
+      echo "[vf-update-run] pose en échec : $m (scope $scope)" >&2; rc=1; failed+=("$m")
+    elif ! grep -q "^$m=" "$regroot/scripts/.vibeflow-installed" 2>/dev/null; then
+      # `install --with-deps` rend rc=0 sur une dépendance inconnue sans rien poser : pose vide = échec.
+      echo "[vf-update-run] pose vide : $m absent du registre $scope après install (dépendance inconnue ?)" >&2; rc=1; failed+=("$m")
+    fi
+  done
+  VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" mark-offered ${presented[@]+"${presented[@]}"} || rc=1
+  # BL35-A1 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Le reproposer ») : un module
+  # dont la pose a échoué n'est pas « déjà proposé » — sa marque est retirée, il revient au prochain /vf-update.
+  # BL35-A3 : le code de sortie reste non nul (pose en échec, mark-offered ou dé-marquage en échec).
+  if [ "${#failed[@]}" -gt 0 ]; then
+    VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" unmark-offered "${failed[@]}" || rc=1
+  fi
+  exit "$rc"
+fi
+
 run_scope() {
-  local scope="$1" root="$2"
+  local scope="$1" root="$2" l m d deps closure listed
   [ -f "$root/scripts/.vibeflow-installed" ] || return 1
   echo "[vf-update-run] scope $scope → update --all ($root)"
   VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" update --all
+  # Modules du catalogue absents du registre et jamais proposés : listés, JAMAIS posés d'office (ADR-031).
+  # Format stable : `NOUVEAU_MODULE scope=<s> <module>=<version> deps=<a,b|->` ; deps = fermeture des `requires`
+  # moins le module et moins ce que le registre de CE scope porte déjà (ce que `install --with-deps` posera aussi).
+  # `deps=?` si la fermeture n'est pas calculable : jamais un `-` qui dirait « rien de plus ».
+  # Un échec du calcul se DISTINGUE de « rien à proposer » : ligne stable NOUVEAUX_MODULES_ERREUR, la mise à jour
+  # déjà faite n'est pas remise en cause (la skill le signale à l'humain).
+  if ! listed="$(VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" new-modules)"; then
+    echo "[vf-update-run] NOUVEAUX_MODULES_ERREUR scope=$scope"
+    return 0
+  fi
+  while IFS= read -r l; do
+    [[ "$l" =~ ^([a-z0-9-]+)=[A-Za-z0-9._+-]+$ ]] || continue
+    m="${BASH_REMATCH[1]}"; deps=""
+    if closure="$(VF_MODULES_ROOT="$NEW" bash "$NEW/_internal/resolve-deps.sh" "$m" 2>/dev/null)"; then
+      while IFS= read -r d; do
+        [ -n "$d" ] && [ "$d" != "$m" ] && ! grep -q "^${d}=" "$root/scripts/.vibeflow-installed" && deps="${deps:+$deps,}$d"
+      done <<< "$closure"
+      [ -n "$deps" ] || deps="-"
+    else
+      deps="?"
+    fi
+    echo "[vf-update-run] NOUVEAU_MODULE scope=$scope $l deps=$deps"
+  done <<< "$listed"
   return 0
 }
 
