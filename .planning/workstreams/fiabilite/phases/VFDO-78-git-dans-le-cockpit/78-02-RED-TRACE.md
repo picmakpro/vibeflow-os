@@ -19,3 +19,22 @@ Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-git-graphe.sh` (rc=1,
 | G3.1 / G3.2 | ordre topologique stable, égalité de date, horloge décalée | `33 33 viol=0 stable=true` / `ties=37abce egal=fa skew=312` | `charge-ko` |
 
 `charge-ko` = l'import du module échoue (fichier absent). Journal complet : scratchpad `78-02-rouge-t1.log`.
+
+## Tâche 2 — G4, G5 et mutants sur la base (module de la tâche 1 : parseurs et `ordonner`, sans `placer`/`etiquettes`/`teinte`)
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-git-graphe.sh` (rc=1, 23 passés, 27 échoués). Les 17 assertions G0-G3 restent vertes.
+
+| Témoin | Assertion | Attendu | Obtenu |
+|---|---|---|---|
+| G4.1 | arêtes vers la colonne du parent, aucun couloir ouvert, 2 racines | `viol=0 ouverts=0 racines=2 rangees=33` | `sonde-ko M.placer is not a function` |
+| G4.2 | octopus : 2 arêtes distinctes | `n=1 s=2 distincts=true fusion=true suite=true` | `sonde-ko M.placer is not a function` |
+| G4.3 / G4.3b | fenêtre -n 10, couloirs ouverts | `egal=true listes=true racines=0 tort=0` | `sonde-ko …` / vide |
+| G4.4f | témoin de déterminisme non vide | > 3000 octets | vide |
+| G4.5 | 4 couloirs, `couloirsMax` 2 | `vus=4 max=3 replies0=0 \| max2=1 largeur2=2 replies2=true` | `sonde-ko …` |
+| G4.6 / G4.7 | densité et perf ; branche mergée repliée | `rangees=1000 dense=true rapide=true` / `repli=true etiquette=locale:f` | `sonde-ko …` |
+| G5.1 / G5.1b | ordre des étiquettes | `ordre=HEAD,a,b,origin/a,v1 …` | `sonde-ko M.etiquettes is not a function` |
+| G5.2b | teinte 1..5 non constante | `dans varie` | `hors varie` (`teinte` absente) |
+| Mutants M-ALIGN, M-PAQUET, M-OCTOPUS, M-RACINE, M-ORDRE | motif fixe présent une fois, sonde rougie | PASS | FAIL : motifs absents du module de base (ou `teinte`/`placer` absents) |
+
+Note : G4.4b-e (cmp de deux sorties identiques) passent à vide sur deux sorties d'erreur identiques ; c'est G4.4f (taille > 3000 octets) qui garde contre ce vert à vide, et il est rouge ici.
+Journal complet : scratchpad `78-02-rouge-t2.log`.
