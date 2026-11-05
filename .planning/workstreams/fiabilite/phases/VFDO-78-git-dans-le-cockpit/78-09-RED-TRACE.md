@@ -17,3 +17,8 @@ Tête : sans `vf-cockpit-git-signature.mjs`, `vf-cockpit-live.mjs` inchangé.
 
 Résultat : 4 PASS / 3 FAIL. Rouge sur R1.2, comme annoncé par le plan.
 Défaut trouvé au premier jeu : R1.2c passait à vide (aucun événement : latence négative < 8000). Garde ajoutée (événement présent ET latence >= 0).
+
+## Tâche 1 — vert
+
+`vf-cockpit-git-signature.mjs` (neuf, 28 lignes) + accroche dans le filet de `vf-cockpit-live.mjs` : 7 PASS / 0 FAIL (R1.0, R1.0b, R1.1, R1.2a, R1.2b, R1.2c, H0).
+`grep setInterval` et `grep 'log'|'status'|'diff'` sur le module : aucune ligne.

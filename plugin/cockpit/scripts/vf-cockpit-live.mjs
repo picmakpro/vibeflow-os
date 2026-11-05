@@ -5,7 +5,7 @@
 // Export : startLive({ root, sortie, onEvent, log, mode }) -> { etat(), snapshot(), stop() }.
 //   mode : 'auto' (fs.watch récursif, repli par scrutation des mtimes si l'appel lève ou si le watcher échoue),
 //          'poll' (scrutation d'emblée) ; défaut = VF_COCKPIT_WATCH. etat().mode vaut 'watch' ou 'poll'.
-// Événements : patch { seq, at, patch, vf? } · structural { seq, at } · who { seq, at, who } · lock { seq, at, lock }.
+// Événements : patch { seq, at, patch, vf? } · structural { seq, at } · who { seq, at, who } · lock { seq, at, lock } · git { seq, at, sig } (78-09 : signal sans contenu, la page relit ses routes).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,6 +15,7 @@ import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { collectWho } from './vf-cockpit-who.mjs';
 import { driverLockScript, gitCommonDir, resolveScriptsDir, confiner } from './vf-cockpit-paths.mjs';
 import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
+import { signatureGit } from './vf-cockpit-git-signature.mjs';
 
 const IGNORE = /(^|\/)\.git(\/|$)|\.tmp$|~$|\.swp$/;
 const POLL_MS = 2000, DEBOUNCE_MS = 300, HOLD_MS = 600, NET_MS = 5000;
@@ -65,7 +66,7 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
   // « qui » : poussé seulement quand la liste change (pas à chaque seconde d'âge qui passe)
   const whoSig = (w) => JSON.stringify((w.workers || []).map((x) => [x.kind, x.id, x.tree, x.branch || '', !!x.stale, x.task || '', x.parent || '', x.etat || '', x.action ? `${x.action.verbe} ${x.action.cible}` : '', x.rattachement ? [x.rattachement.etat, x.rattachement.dag, x.rattachement.noeud, x.rattachement.raison].join('|') : '']));
 
-  let graph = buildProjectGraph(root), idx = index(graph), lock = lockStatus(), who = whoNow();
+  let graph = buildProjectGraph(root), idx = index(graph), lock = lockStatus(), who = whoNow(), gitSig = signatureGit(root, { commun: common }); // 78-09
   const snapshot = () => ({ seq: state.seq, lock, who });
   const emit = (nom, data) => { try { onEvent(nom, data); } catch (e) { log('error', `onEvent(${nom}) : ${e.message}`); } };
 
@@ -140,6 +141,8 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
     if (whoSig(nw) !== whoSig(who)) { who = nw; emit('who', { seq: ++state.seq, at: Date.now(), who }); }
     const n = lockStatus();
     if (JSON.stringify(n) !== JSON.stringify(lock)) { lock = n; emit('lock', { seq: ++state.seq, at: Date.now(), lock }); }
+    const gs = signatureGit(root, { commun: common }); // 78-09 : refs, worktrees, index ; un événement sans charge au seul changement
+    if (gs && gs !== gitSig) { gitSig = gs; emit('git', { seq: ++state.seq, at: Date.now(), sig: gs.slice(0, 16) }); }
   } catch (e) { log('error', `filet : ${e.message}`); } }, NET_MS);
   filet.unref?.(); timers.add(filet);
 
