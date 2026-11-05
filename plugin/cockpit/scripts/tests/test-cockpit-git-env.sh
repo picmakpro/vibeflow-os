@@ -87,6 +87,7 @@ echo "=== E1 — témoins : sans la parade, le piège se déclenche (sinon les s
 assert_eq "E1.1 — git brut avec GIT_SUR seul : status sur un fichier stat-dirty lance filter.f.process" "$(marque PROC)" "posé"; raz
 
 echo "=== E2 — shBorne durci ==="
+assert_eq "E2.0 — témoin : le module se charge et shBorne rend le sujet réel (jamais un vert à vide sur un module cassé)" "$(node "$AUX/sh.mjs" "$SCRIPTS" "$P" "$P" log -1 --format=%s 2>/dev/null | tr -d '\n')" "SUJET-REEL"
 S2="$(node "$AUX/sh.mjs" "$SCRIPTS" "$P" "$P" status --porcelain -- f.txt 2>/dev/null)"
 assert_eq "E2.1 — shBorne + status sur le même cas : aucun filtre lancé" "$(marque PROC)" "absent"
 assert_eq "E2.1b — la sortie de status reste conforme (rien de modifié, le contenu est identique)" "$S2" ""; raz

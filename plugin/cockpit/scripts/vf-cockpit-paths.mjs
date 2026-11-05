@@ -124,6 +124,31 @@ export const outputDir = (labRoot) => path.join(labRoot, '.vibeflow', 'cockpit')
 // --no-optional-locks : `git status` ne réécrit pas .git/index (l'émetteur est en lecture seule, audit F-5)
 export const GIT_SUR = ['--no-optional-locks', '-c', 'core.fsmonitor=false'];
 
+// ---- Environnement git unique (GITC-13, P78-D-21, D-22, D-25) : tout git du socle passe par `shBorne` ou `lancerGit`, donc par ce seul point ----
+// Un enfant git ne reçoit AUCUNE variable GIT_* héritée (GIT_DIR l'emporte sur `-C` : un dépôt leurre détourne la lecture) ; fsmonitor et verrous optionnels sont réglés par
+// l'environnement (GIT_CONFIG_COUNT), ce qui couvre aussi un enfant qui ne reçoit pas nos arguments (le moteur d'assemblage). GIT_SUR reste en arguments (défense en profondeur).
+export const GIT_HERITE = /^GIT_/i;
+export function envGit(lab, { env = process.env, config = [] } = {}) {
+  const e = {};
+  for (const [k, v] of Object.entries(envEnfant(lab, env))) if (!GIT_HERITE.test(k)) e[k] = v;
+  const paires = [['core.fsmonitor', 'false'], ...config];
+  e.GIT_OPTIONAL_LOCKS = '0'; e.GIT_CONFIG_COUNT = String(paires.length);
+  paires.forEach(([k, v], i) => { e[`GIT_CONFIG_KEY_${i}`] = k; e[`GIT_CONFIG_VALUE_${i}`] = v; });
+  e.VF_COCKPIT_GIT_DURCI = '1'; // lu par la garde du moteur (plan 78-07)
+  return e;
+}
+// `--no-ext-diff --no-textconv` se placent APRÈS la sous-commande (options de la sous-commande, pas de git : `git --no-ext-diff log` rend 129). L'environnement retire GIT_CONFIG_GLOBAL, la
+// config de l'utilisateur s'applique : `log.showSignature=true` ajouterait la sortie gpg et désalignerait les parseurs, d'où `--no-show-signature` (que `diff-tree` refuse).
+export const OPTIONS_LECTURE = { log: ['--no-ext-diff', '--no-textconv', '--no-show-signature'], show: ['--no-ext-diff', '--no-textconv', '--no-show-signature'], 'diff-tree': ['--no-ext-diff', '--no-textconv'], diff: ['--no-ext-diff', '--no-textconv'] };
+export const SOUS_COMMANDES_FILTRANTES = ['status', 'diff', 'ls-files', 'stash']; // sous-commandes qui relisent le contenu d'un fichier suivi (filtres clean/process du dépôt)
+// repère la sous-commande après les options globales (--no-optional-locks, -c <v>, -C <dir>) et y insère les options de lecture
+export function argsGit(args) {
+  let i = 0, dir = null;
+  while (i < args.length && String(args[i]).startsWith('-')) { if (args[i] === '-C') dir = args[i + 1]; i += args[i] === '-c' || args[i] === '-C' ? 2 : 1; }
+  const sous = args[i], ins = OPTIONS_LECTURE[sous] || [];
+  return { argv: [...args.slice(0, i + 1), ...ins, ...args.slice(i + 1)], sous, dir };
+}
+
 // Échéance globale (F-06) : `avecEcheance(ms, fn)` pose une date butoir pour tout appel de `shBorne` exécuté pendant `fn` ; passée la date, `shBorne` ne lance plus rien et rend ''
 // (sortie vide : chaque appelant en tire sa valeur « inconnu », null, jamais 0). Chaque appel reste borné à 10 s, et au temps restant s'il est plus court.
 let FIN = null;
@@ -131,12 +156,28 @@ export function avecEcheance(ms, fn) {
   const avant = FIN; FIN = Date.now() + ms;
   try { return fn(); } finally { FIN = avant; }
 }
+// exécuteur interne unique (shBorne, lancerGit, filtresDeclares) : échéance respectée, jamais `timeout: 0` ; rend { sortie, code, tronque (ENOBUFS), absent (ENOENT), echeance }
+function lancer(cmd, args, cwd, env, maxBuffer) {
+  const reste = FIN === null ? 10000 : Math.min(10000, FIN - Date.now());
+  if (!(reste >= 1)) return { sortie: '', code: null, tronque: false, absent: false, echeance: true }; // échéance atteinte (ou valeur non numérique) : rien n'est lancé
+  try { return { sortie: execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: Math.floor(reste), env, maxBuffer }), code: 0, tronque: false, absent: false, echeance: false }; }
+  catch (e) { return { sortie: e.stdout || '', code: typeof e.status === 'number' ? e.status : null, tronque: e.code === 'ENOBUFS', absent: e.code === 'ENOENT', echeance: false }; }
+}
+// pilotes de filtre déclarés par le dépôt (et la config de l'utilisateur) : `filter.<x>.<clé>`, x = tout ce qui sépare le premier `filter.` de la dernière `.clé` ; au plus 64
+export function filtresDeclares(dir, lab = dir) {
+  const r = lancer('git', [...GIT_SUR, '-C', dir, 'config', '--name-only', '--get-regexp', '^filter\\.'], dir, envGit(lab), 1 << 20);
+  return [...new Set(r.sortie.split('\n').map((l) => /^filter\.(.+)\.[^.]+$/.exec(l.trim())?.[1]).filter(Boolean))].slice(0, 64);
+}
+// chaque pilote vidé, par paires clé/valeur de GIT_CONFIG_* : clean, smudge, process vides et required=false (status rend 0 et n'exécute rien, mesuré)
+export const configFiltres = (noms) => noms.flatMap((x) => [['clean', ''], ['smudge', ''], ['process', ''], ['required', 'false']].map(([k, v]) => [`filter.${x}.${k}`, v]));
 // Seul point de lancement des sous-processus du socle (git, bash driver-lock.sh) : un processus bloqué ne gèle pas la boucle, le total ne dépasse pas l'échéance.
 // L'environnement de l'enfant a un PATH assaini (H-1, vf-cockpit-env.mjs) : `lab` (par défaut `cwd`) est le dossier dont aucun élément ne doit rester dans le PATH.
+// Pour `git` : envGit (GIT_* retirés), options de lecture insérées, filtres du dépôt vidés pour les sous-commandes filtrantes.
 export function shBorne(cmd, args, cwd, lab = cwd) {
-  const reste = FIN === null ? 10000 : Math.min(10000, FIN - Date.now());
-  if (!(reste >= 1)) return ''; // échéance atteinte (ou valeur non numérique) : rien n'est lancé ; jamais `timeout: 0`, qui voudrait dire « sans limite »
-  try { return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: Math.floor(reste), env: envEnfant(lab) }); } catch (e) { return e.stdout || ''; }
+  if (cmd !== 'git') return lancer(cmd, args, cwd, envEnfant(lab), 1 << 20).sortie;
+  const { argv, sous, dir } = argsGit(args), base = dir ? path.resolve(cwd || '.', dir) : cwd || process.cwd();
+  const config = SOUS_COMMANDES_FILTRANTES.includes(sous) ? configFiltres(filtresDeclares(base, lab)) : [];
+  return lancer('git', argv, cwd, envGit(lab, { config }), 1 << 20).sortie;
 }
 
 // P71-D-29 (N2) : le lanceur s'exécute depuis la racine du lab. Un binaire lancé par son NOM est cherché par le système dans le PATH, où « . », un élément
