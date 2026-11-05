@@ -169,7 +169,7 @@ assert_eq "Q0 — le PID enregistré est celui du shell lui-même (exec), premie
 
 echo "=== Q1 — GET /proposition sans proposition ==="
 assert_eq "Q1 — sans proposition : 200 et {\"etat\":\"aucune\"}" "$(pget | sed -n 1p) $(pbody)" '200 {"etat":"aucune"}'
-assert_eq "Q1 — témoin positif (200 ci-dessus) puis : sans secret 401 ; Host localhost 403" "$(pget | sed -n 1p) $(rq "$QP" GET /proposition --sans-origin --entete 'sec-fetch-site:same-origin' --onglet A | sed -n 1p) $(pget --host "localhost:$QP" | sed -n 1p)" "200 401 403"
+assert_eq "Q1 — témoin positif (200 ci-dessus) puis : Origin de Q sans secret 401 ; Host localhost 403" "$(pget | sed -n 1p) $(rq "$QP" GET /proposition --onglet A | sed -n 1p) $(pget --host "localhost:$QP" | sed -n 1p)" "200 401 403"
 assert_eq "Q1 — avec l'Origin de Q et le secret, sans Sec-Fetch-Site : 200 (comme GET /etat)" "$(rq "$QP" GET /proposition --secret "$SECRET" --onglet A | sed -n 1p)" "200"
 assert_eq "Q1 — sans Origin ni Sec-Fetch-Site : 403" "$(rq "$QP" GET /proposition --sans-origin --secret "$SECRET" --onglet A | sed -n 1p)" "403"
 
@@ -178,7 +178,7 @@ SZ="$(tflux)"; envoyer "$CIBLES" > /dev/null
 R3=""; for cv in '72;touch M|cadrer' 'ph-9999|cadrer' 'ph-1|verifier' 'ph-9|cadrer'; do envoyer "$(prop "${cv%%|*}" "${cv##*|}")" > /dev/null; R3="$R3 $(pbody)"; done
 assert_eq "Q3 — quatre propositions hors liste (cible 72;touch M, cible absente, verbe hors verbes, compartiment a\$(touch M)) : GET reste aucune" "$R3" ' {"etat":"aucune"} {"etat":"aucune"} {"etat":"aucune"} {"etat":"aucune"}'
 assert_eq "Q3 — le flux du terminal n'a reçu aucun octet" "$(inchange "$SZ")" "inchange"
-envoyer "$(prop ph-1 cadrer ',"ligne":"claude --session-id 'x' ; touch M","intention":"$(touch M)"')" > /dev/null
+envoyer "$(prop ph-1 cadrer ',"ligne":"claude --session-id \u0027x\u0027 ; touch M","intention":"$(touch M)"')" > /dev/null
 assert_eq "Q2 — une clé en trop dans la proposition (ligne, intention hostiles) : refusée ou sans le texte injecté dans les lignes" "$(pbody | evj 'j.etat === "aucune" || (j.etat === "en-attente" && !/touch|\$\(/.test(JSON.stringify(j.lignes)))')" "true"
 
 echo "=== Q2 / Q4 — proposition valide, puis POST /lancer avant armement ==="
@@ -196,7 +196,7 @@ echo "=== Q7 / Q8 — Origin de P et refus, sur la proposition armée ==="
 SZ="$(tflux)"
 assert_eq "Q7 — Origin de P (secret, onglet A, id valides, armée) : 403, la proposition reste en attente, le flux est inchangé" "$(pl "$(lj "$ID" herite)" --origin "http://127.0.0.1:$PP") $(pbody | evj 'j.etat') $(inchange "$SZ")" "403 en-attente inchange"
 SZ="$(tflux)"
-R8="$(plx "$(printf 'f%.0s' $(seq 1 64))" A "$(lj "$ID" herite)" | sed -n 1p) $(plx "$SECRET" B "$(lj "$ID" herite)" | sed -n 1p) $(pl "$(lj "$ID" herite)" --host "localhost:$QP") $(pl "$(lj "$ID" herite)" --sans-origin) $(pl "$(lj inconnu herite)") $(pl "$(lj "$ID" bypassPermissions)") $(pl "$(lj "$ID" herite ',"ligne":"claude --session-id 'x' -n 'y' 'HOSTILEZ9'"')") $(pl "$(lj "$ID" herite)" --corps-octets 600)"
+R8="$(plx "$(printf 'f%.0s' $(seq 1 64))" A "$(lj "$ID" herite)" | sed -n 1p) $(plx "$SECRET" B "$(lj "$ID" herite)" | sed -n 1p) $(pl "$(lj "$ID" herite)" --host "localhost:$QP") $(pl "$(lj "$ID" herite)" --sans-origin) $(pl "$(lj inconnu herite)") $(pl "$(lj "$ID" bypassPermissions)") $(pl "$(lj "$ID" herite ',"ligne":"claude --session-id \u0027x\u0027 -n \u0027y\u0027 \u0027HOSTILEZ9\u0027"')") $(pl "$(lj "$ID" herite)" --corps-octets 600)"
 assert_eq "Q8 — secret erroné 401 · autre onglet 409 · Host localhost 403 · sans Origin 403 · id inconnu 404 · mode hors liste 400 · champ ligne 400 · corps de 600 octets 413" "$R8" "401 409 403 403 404 400 400 413"
 assert_eq "Q8 — aucun octet au PTY et la proposition armée reste en attente (le témoin positif suit : Q5)" "$(inchange "$SZ") $(pbody | evj 'j.etat + " " + (j.id === "'"$ID"'")')" "inchange en-attente true"
 assert_eq "Q11 — aucun message « lancee » sur Q4, Q7, Q8" "$(nlancee)" "0"
@@ -269,7 +269,7 @@ if mutant idlibre "s#const idDemande = demande.id;#const idDemande = lireProposi
 else assert_eq "M-ID-LIBRE — mutant sans effet (ancre absente ou inchangée)" "sans effet" "effet"; fi
 echo "=== M-TEXTE-LIGNE — le client fournit la ligne (Q8) ==="
 if mutant texte "s#Object.keys(o).every((k) => cles.includes(k))#true#" "s#const ligneQ = r.ligne;#const ligneQ = demande.ligne || r.ligne;#"; then
-  mut_manche "$MUT_OUT"; R="$(pl "$(lj "$ID_M" herite ',"ligne":"claude --session-id 'x' -n 'y' 'HOSTILEZ9'"')")"
+  mut_manche "$MUT_OUT"; R="$(pl "$(lj "$ID_M" herite ',"ligne":"claude --session-id \u0027x\u0027 -n \u0027y\u0027 \u0027HOSTILEZ9\u0027"')")"
   assert_eq "M-TEXTE-LIGNE — sous le mutant, le champ ligne est accepté (204) et le texte du client arrive à l'invite : Q8 rougit" "$R $(node "$TA" attendre "$FLUX" HOSTILEZ9 6000)" "204 TROUVE"; manche_fin
 else assert_eq "M-TEXTE-LIGNE — mutant sans effet (ancre absente ou inchangée)" "sans effet" "effet"; fi
 echo "=== M-RETOUR-CHARIOT — la ligne part avec un retour chariot (Q5) ==="
