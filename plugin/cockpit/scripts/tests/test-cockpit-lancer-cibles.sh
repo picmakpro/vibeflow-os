@@ -104,7 +104,7 @@ const C = () => {
   chk('C4 — mission hors phase : bloquant mission-hors-phase, phase et ws null', () => { const c = par(calc(HP), 'dag-LIBRE'); return [c.bloquants, c.phase, c.ws]; }, [['mission-hors-phase'], null, null]);
   chk('C5 — phase hors motif ou compartiment hors motif : phase ou ws null, jamais le texte brut', () => {
     const r = calc(pl([ph('72;touch M', 'fiabilite', 'a-faire'), ph('73', 'a$(id)', 'a-faire'), ph('74', 'Fiabilite', 'a-faire')]));
-    return { cibles: r.cibles.map((c) => [c.phase, c.ws, c.bloquants.join('+')].join('|')), brut: JSON.stringify(r).includes('touch') || JSON.stringify(r).includes('$(id)') || JSON.stringify(r).includes('Fiabilite') };
+    return { cibles: r.cibles.map((c) => [c.phase, c.ws, c.bloquants.join('+')].join('|')), brut: ['touch', '$(id)', 'Fiabilite'].some((m) => JSON.stringify(r.cibles.map(({ id, ...x }) => x)).includes(m)) }; // hors `id` : l'identifiant garde le numéro du ROADMAP (parité avec le graphe, PAR.1) ; un numéro réel est toujours numérique
   }, { cibles: ['|fiabilite|phase-hors-motif', '73||compartiment-hors-motif', '74||compartiment-hors-motif'], brut: false });
 };
 
@@ -128,7 +128,7 @@ const Q = () => {
   chk('Q2 — exclut identifiant, phase ou compartiment hors motif, mission hors phase, phase sans principal, identifiant incohérent, carte déjà marquée hors motif', () => M.listePourQ([
     { ...bonne, ws: 'a$(id)' }, { ...bonne, phase: '72;touch M', id: 'ph-72;touch M' }, { ...miss, id: 'dag-a$(id)' }, { ...miss, id: 'dag-X', phase: null, ws: null }, { ...bonne, principal: null },
     { ...bonne, phase: '73' }, { ...bonne, id: 'ph-90', phase: '90', ws: null, bloquants: ['compartiment-hors-motif'] }, { ...bonne, id: 'ph-91', phase: null, ws: 'fiabilite', bloquants: ['phase-hors-motif'] }, bonne], GAB).map((x) => x.id), ['ph-72']);
-  chk('Q3 — cas sains inclus (phase, mission, lab plat), verbe = principal', () => M.listePourQ([bonne, miss, { ...bonne, id: 'ph-1', phase: '1', ws: null, principal: 'cadrer' }], GAB).map((x) => [x.id, x.verbe, x.ws].join(':')), ['ph-72:planifier:fiabilite', 'dag-MISSION-72:reprendre:fiabilite', 'ph-1:cadrer:null']);
+  chk('Q3 — cas sains inclus (phase, mission, lab plat), verbe = principal', () => M.listePourQ([bonne, miss, { ...bonne, id: 'ph-1', phase: '1', ws: null, principal: 'cadrer' }], GAB).map((x) => `${x.id}:${x.verbe}:${x.ws}`), ['ph-72:planifier:fiabilite', 'dag-MISSION-72:reprendre:fiabilite', 'ph-1:cadrer:null']);
 };
 
 const PAR = () => {
