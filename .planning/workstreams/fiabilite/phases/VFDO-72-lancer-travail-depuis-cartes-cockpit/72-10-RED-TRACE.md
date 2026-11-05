@@ -103,3 +103,39 @@ Résultat : exit 1, `Résultats : 12 PASS, 30 FAIL`. Q0 : 4 PASS, 0 FAIL (le par
 - M-RETOUR-CHARIOT — mutant sans effet (ancre absente ou inchangée)
   - attendu: [effet]
   - obtenu : [sans effet]
+## Correction de la suite avant le code (commit `bea79843`)
+
+Deux défauts de FIXTURE trouvés en jouant le code (aucun assertion affaiblie) : (1) les apostrophes du champ `ligne` hostile (Q2 clé en trop, Q8 champ `ligne`, M-TEXTE-LIGNE) fermaient la chaîne shell entre guillemets simples : le corps JSON envoyé n'était pas celui voulu, M-TEXTE-LIGNE donnait 400/ABSENT au lieu de 204/TROUVE ; les apostrophes sont désormais transmises en `'` (JSON valide), la ligne du client commence bien par `claude --session-id '` et ne se distingue de la bonne que par son texte. (2) Q1 « sans secret » : sans Origin ni secret valide, la route rend 403 comme `GET /etat` (même contrôle) ; la sonde « sans secret » passe désormais avec l'Origin de Q et rend 401.
+
+## Vert sur le code livré
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-lancer-processus.sh`, HEAD `549d3bcc` : exit 0, `Résultats : 42 PASS, 0 FAIL` (Q0 à Q13, Q11 en trois mesures, quatre mutants, H0). Chaque mutant a son résultat fautif exact asserté :
+
+- M-ORIGINE-LANCER : 204 (au lieu de 403 de Q7)
+- M-ID-LIBRE : 204 (au lieu de 404 de Q8)
+- M-TEXTE-LIGNE : 204 et la ligne hostile du client à l'invite (au lieu de 400 de Q8)
+- M-RETOUR-CHARIOT : 400 et la ligne absente de l'invite (au lieu de 204 et ligne présente de Q5)
+
+Suites voisines, HEAD `549d3bcc` : `test-cockpit-terminal-{activation 40, client 71, lanceur 111, page 49, pty-plantage 21, pty 63, serveur 208, session 58, tiroir 75, xss 17, xterm 80}.sh` : toutes exit 0, 0 FAIL.
+
+Un défaut réel a été trouvé et corrigé ICI (commit `549d3bcc`) : la première version admettait `/proposition` dans la ligne `const navigateur = …`, ce qui cassait le mutant NAV-POST de `test-cockpit-terminal-serveur.sh` (« mutant sans effet », 207 PASS / 1 FAIL) ; `controle()` est maintenant inchangé et `traiter` fait passer `GET /proposition` par `controle(req, <url de /etat>)` : exactement les contrôles de `GET /etat`, sans ligne dupliquée (le compteur `egal=2` de la sonde TC reste exact).
+
+## Écarts de nom
+
+Aucun : `creerEtatLancer({ gabarit })`, `definirCibles`, `proposer`, `lire`, `consommer`, `confirmer`, `rendre`, `annuler` (72-05), l'espace de noms du gabarit (72-01) et `sessions.lancer(ligne, onglet)` (72-02) existent sous ces noms. Le message `proposition` est passé tel quel avec sa clé `t` : l'état de Q l'accepte (`formeOk` ne ferme pas les clés), aucun retrait de `t` n'a été nécessaire. Statuts : tableau `motif` -> statut du `72-05-SUMMARY.md` repris à l'identique ; `STATUT_LANCER` : premier-plan 409, absente 410, alphabet 400, invalide 400, delai 504.
+
+## Ancres (texte réel)
+
+Fichier `plugin/cockpit/scripts/vf-cockpit-terminal-processus.mjs` (198 lignes avant le correctif de contrôle, 199 après), une occurrence chacune :
+
+- contrôle Origin (existante, NON touchée) : `    if (o === undefined) { if (!page && !navigateur) return { statut: 403, raison: 'Origin absente' }; } else if (o !== origineQ()) return { statut: 403, raison: 'Origin' };` (l. 93)
+- onglet : `    if (onglet !== proprietaire) return 409;` (première instruction de `lancer()` après son test de session) ; `/annuler` : `      if (onglet !== proprietaire) return refus(res, 409);`
+- identifiant : `    const idDemande = demande.id;`
+- schéma fermé : `  if (!o || typeof o !== 'object' || Array.isArray(o) || !Object.keys(o).every((k) => cles.includes(k))) return null;` (dans `lireDemande(brut, cles, requises)`)
+- source de la ligne : `    const ligneQ = r.ligne;`
+- écriture : `    const w = await sessions.lancer(ligneQ, onglet);`
+- réception : `  const recevoirCibles = (l) => lq.definirCibles(l);` · `  const recevoirProposition = (m) => lq.proposer(m);` · `  const lireProposition = () => lq.lire();`
+- gabarit : `  const gabaritQ = gabarit;` puis `  const lq = creerEtatLancer({ gabarit: gabaritQ });` (avec `import * as gabarit from './vf-cockpit-lancer-gabarit.mjs';`)
+- propriétaire : `  let proprietaire = null;` et, dans la branche `/flux`, `      if (r === 200) proprietaire = onglet;`
+- écrivain : `  async function lancer(demande, onglet) {` (rend un statut entier ; seule fonction qui appelle `sessions.lancer`)
+- contrôle des nouvelles routes : `    const c = controle(req, url.pathname === '/proposition' ? new URL('/etat', origineQ()) : url); if (c) return refus(res, c.statut, c.raison);`
