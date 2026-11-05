@@ -156,6 +156,17 @@ ok "offer : module hors des présentés refusé avec message, jamais posé" "$(e
 out="$(NM_FAIL_INSTALL=1 HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user cockpit 2>&1)"; orc=$?
 ok "offer : pose en échec → rc≠0 et message nommant cockpit" "$([ "$orc" -ne 0 ] && echo "$out" | grep -q 'pose en échec : cockpit' && echo true || echo false)"
 ok "offer : pose en échec → inscription des présentés inchangée (arbitrage en attente)" "$(grep -qx -- '--scope user mark-offered cockpit' "$NM_LOG" && echo true || echo false)"
+# BL35-A1 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05) : le module dont la pose a échoué est dé-marqué, APRÈS l'inscription
+ok "offer : pose en échec → dé-marquage du module en échec, après l'inscription (BL35-A1)" "$([ "$(cat "$NM_LOG")" = "$(printf -- '--scope user new-modules\n--scope user install --with-deps cockpit\n--scope user mark-offered cockpit\n--scope user unmark-offered cockpit')" ] && echo true || echo false)"
+: > "$NM_LOG"
+HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user cockpit >/dev/null 2>&1
+ok "offer : pose réussie → aucun dé-marquage" "$(grep -q 'unmark-offered' "$NM_LOG" && echo false || echo true)"
+# BL35-A3 : rc≠0 sur nom invalide ET sur module non présenté (rien posé dans les deux cas)
+: > "$NM_LOG"
+HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user '../x' >/dev/null 2>&1; orc=$?
+ok "offer : nom de module invalide → rc≠0 (BL35-A3)" "$([ "$orc" -ne 0 ] && echo true || echo false)"
+HOME="$NM_HOME" VF_CACHE_BASE="$NM_BASE" bash "$DIR/vf-update-run.sh" offer user helper >/dev/null 2>&1; orc=$?
+ok "offer : module non présenté → rc≠0 (BL35-A3)" "$([ "$orc" -ne 0 ] && echo true || echo false)"
 
 echo; echo "== Résultat : $PASS OK · $FAIL KO =="
 [ "$FAIL" -eq 0 ]

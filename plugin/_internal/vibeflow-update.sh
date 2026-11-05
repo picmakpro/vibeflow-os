@@ -521,12 +521,26 @@ mark_installed() {
     vf_declare_write "$verb" "$INSTALLED_REGISTRY" "$mod=$version"
     return 0
   fi
-  mkdir -p "$(dirname "$INSTALLED_REGISTRY")"
-  touch "$INSTALLED_REGISTRY"
-  # Remove old entry if exists
-  grep -v "^$mod=" "$INSTALLED_REGISTRY" > "${INSTALLED_REGISTRY}.tmp" 2>/dev/null || true
-  echo "$mod=$version" >> "${INSTALLED_REGISTRY}.tmp"
-  mv "${INSTALLED_REGISTRY}.tmp" "$INSTALLED_REGISTRY"
+  # BL35-A4 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Corriger dans la même
+  # PR »), famille HIGH de CONCERNS.md:144 : même durcissement que mark_offered. Aucune écriture ne suit
+  # un lien symbolique, ni le registre ni son temporaire (un lien posé par un dépôt jugé ferait écraser un
+  # fichier de l'humain) ; l'ancien contenu n'est recopié que pour les lignes au format du registre
+  # `<module>=<version>` (module [a-z0-9-]+, version sans `=` ni blanc : celle que lisent `cut -d= -f2` et
+  # role_notice). `INCONSISTENT:<étape>:<version>` du rollback a ce format et survit au filtre.
+  local reg="$INSTALLED_REGISTRY" tmp="${INSTALLED_REGISTRY}.tmp"
+  [ ! -L "$reg" ] || err "mark-installed : $VF_REGISTRY_RELPATH est un lien symbolique — refus, rien n'est écrit"
+  [ ! -L "$tmp" ] || err "mark-installed : ${VF_REGISTRY_RELPATH}.tmp est un lien symbolique — refus, rien n'est écrit"
+  mkdir -p "$(dirname "$reg")"
+  [ -e "$reg" ] || : > "$reg"
+  rm -f "$tmp"
+  # Création exclusive (noclobber) : un lien apparu entre le contrôle et l'écriture n'est pas suivi.
+  if ! ( set -C
+         { grep -E '^[a-z0-9-]+=[^=[:space:]]+$' "$reg" 2>/dev/null | grep -v "^$mod=" || true
+           echo "$mod=$version"
+         } > "$tmp" ) 2>/dev/null; then
+    rm -f "$tmp"; err "mark-installed : écriture de ${VF_REGISTRY_RELPATH}.tmp impossible — registre inchangé"
+  fi
+  mv "$tmp" "$reg" || { rm -f "$tmp"; err "mark-installed : remplacement de $VF_REGISTRY_RELPATH impossible"; }
 }
 
 mark_uninstalled() {
@@ -909,8 +923,11 @@ trap 'vf_lp_report || :' EXIT
 # fichier d'empreintes est un état propre à la machine, il ne se commite pas. Règle unique dans
 # ./.gitignore (scope project compris, comme le fichier de poste), posée AVANT le fichier. Rien en
 # scope user ni sous --target. Best-effort : un .gitignore inutilisable est dit, jamais fatal.
-vf_lp_ignore_rule() {
-  local rule=".claude/scripts/.vibeflow-sha256-*" f="./.gitignore" cr eol=""
+vf_lp_ignore_rule() { vf_local_ignore_rule ".claude/scripts/.vibeflow-sha256-*" "local-patches"; }
+
+# vf_local_ignore_rule <règle> <étiquette> — corps partagé : une règle d'ignorance d'un état local de la machine.
+vf_local_ignore_rule() {
+  local rule="$1" label="$2" f="./.gitignore" cr eol=""
   case "$VF_SCOPE" in project|local) ;; *) return 0 ;; esac
   if [ -n "$VF_TARGET_OVERRIDE" ]; then return 0; fi
   cr="$(printf '\r')"
@@ -920,20 +937,20 @@ vf_lp_ignore_rule() {
     return 0
   fi
   if [ -L "$f" ] || { [ -e "$f" ] && [ ! -f "$f" ]; }; then
-    log "  [local-patches] ./.gitignore inutilisable (lien ou non régulier) — règle $rule non écrite"
+    log "  [$label] ./.gitignore inutilisable (lien ou non régulier) — règle $rule non écrite"
     return 0
   fi
   if [ -f "$f" ]; then
     if grep -qxF -e "$rule" -e "$rule$cr" "$f"; then return 0; fi
     if LC_ALL=C grep -q "$cr" "$f"; then eol="$cr"; fi
     if [ -s "$f" ] && [ "$(tail -c 1 "$f" | wc -l | tr -d ' ')" -eq 0 ]; then
-      printf '%s\n' "$eol" >> "$f" 2>/dev/null || { log "  [local-patches] écriture de ./.gitignore échouée"; return 0; }
+      printf '%s\n' "$eol" >> "$f" 2>/dev/null || { log "  [$label] écriture de ./.gitignore échouée"; return 0; }
     fi
   fi
   if printf '%s%s\n' "$rule" "$eol" >> "$f" 2>/dev/null; then
     log "  gitignore += $rule"
   else
-    log "  [local-patches] écriture de ./.gitignore échouée — règle $rule non écrite"
+    log "  [$label] écriture de ./.gitignore échouée — règle $rule non écrite"
   fi
   return 0
 }
@@ -4024,6 +4041,10 @@ mark_offered() {
     old="$(grep -E '^[a-z0-9-]+$' "$offered" || true)"
   fi
   rm -f "$tmp"
+  # BL35-A2 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Local, ignoré par git ») :
+  # en scope project, l'état « proposé » est propre au poste de l'humain, même régime que vibeflow-role —
+  # règle d'ignorance posée AVANT le fichier. Scope user inchangé (hors dépôt).
+  vf_local_ignore_rule ".claude/$VF_OFFERED_RELPATH" "offered"
   # Un nom syntaxiquement valide mais hors catalogue est écarté, quelle que soit sa position dans la liste.
   # Création exclusive (noclobber) : un lien apparu entre le contrôle et l'écriture n'est pas suivi.
   if ! ( set -C
@@ -4034,6 +4055,37 @@ mark_offered() {
   fi
   mv "$tmp" "$offered" || { rm -f "$tmp"; err "mark-offered : remplacement de $VF_OFFERED_RELPATH impossible"; }
   log "modules inscrits comme proposés : $* ($offered)"
+}
+
+# unmark_offered <module>... — retire la marque « proposé » des modules nommés (BL35-A1, arbitrage Samuel,
+# AskUserQuestion session principale, 2026-11-05 : « Le reproposer ») : une pose en échec dans `offer` ne doit
+# pas valoir « déjà proposé », le module revient au prochain /vf-update. Même primitive sûre que mark_offered :
+# lien symbolique refusé (état ET temporaire), lignes filtrées sur le format d'un nom de module, création
+# exclusive, aucun .tmp résiduel. Fichier absent : rien à retirer. Un nom absent du fichier est sans effet.
+unmark_offered() {
+  local offered="$TARGET_ROOT/$VF_OFFERED_RELPATH" tmp="${TARGET_ROOT}/${VF_OFFERED_RELPATH}.tmp" mod l skip old
+  [ "$#" -gt 0 ] || { log "aucun module à dé-marquer"; return 0; }
+  for mod in "$@"; do
+    case "$mod" in ''|*[!a-z0-9-]*) err "unmark-offered : nom de module refusé" ;; esac
+  done
+  [ ! -L "$offered" ] || err "unmark-offered : $VF_OFFERED_RELPATH est un lien symbolique — refus, rien n'est écrit"
+  [ ! -L "$tmp" ] || err "unmark-offered : ${VF_OFFERED_RELPATH}.tmp est un lien symbolique — refus, rien n'est écrit"
+  [ -e "$offered" ] || { log "$VF_OFFERED_RELPATH absent : rien à retirer"; return 0; }
+  [ -f "$offered" ] && [ -r "$offered" ] || err "unmark-offered : $VF_OFFERED_RELPATH illisible — rien n'est écrit"
+  old="$(grep -E '^[a-z0-9-]+$' "$offered" || true)"
+  rm -f "$tmp"
+  if ! ( set -C
+         { while IFS= read -r l; do
+             [ -n "$l" ] || continue
+             skip=0
+             for mod in "$@"; do [ "$l" = "$mod" ] && skip=1; done
+             [ "$skip" = 1 ] || echo "$l"
+           done <<< "$old"
+         } | LC_ALL=C sort -u > "$tmp" ) 2>/dev/null; then
+    rm -f "$tmp"; err "unmark-offered : écriture de ${VF_OFFERED_RELPATH}.tmp impossible — rien n'est retiré"
+  fi
+  mv "$tmp" "$offered" || { rm -f "$tmp"; err "unmark-offered : remplacement de $VF_OFFERED_RELPATH impossible"; }
+  log "marque « proposé » retirée : $*"
 }
 
 # ---------- Status ----------
@@ -4433,6 +4485,10 @@ case "$cmd" in
   mark-offered)
     shift
     mark_offered "$@"
+    ;;
+  unmark-offered)
+    shift
+    unmark_offered "$@"
     ;;
   sync)
     # No-op explicite (SCOPE-02) : la source est le cache fourni, plus de sync git.

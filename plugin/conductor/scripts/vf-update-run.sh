@@ -29,6 +29,9 @@ echo "[vf-update-run] cache le plus récent : $(basename "$NEW")"
 # le registre a déjà bougé), (2) pose les modules ACCEPTÉS (fermeture de dépendances), (3) inscrit les seuls
 # modules présentés — accord ou refus, un module présenté n'est proposé qu'une fois ; un module accepté puis
 # désinstallé ne revient pas. Sans module : tout est refusé. `new-modules` en échec = rien n'est posé ni inscrit.
+# Exception (BL35-A1, arbitrage Samuel, AskUserQuestion session principale, 2026-11-05) : un module dont la pose
+# échoue est dé-marqué (`unmark-offered`) et revient au prochain /vf-update. Code de sortie non nul (BL35-A3,
+# même arbitrage) sur nom refusé, module non présenté, pose en échec, inscription ou dé-marquage en échec.
 if [ "${1:-}" = "offer" ]; then
   scope="${2:-}"
   case "$scope" in user|project) ;; *) echo "usage : vf-update-run.sh offer <user|project> [module ...]" >&2; exit 64 ;; esac
@@ -40,17 +43,23 @@ if [ "${1:-}" = "offer" ]; then
   while IFS= read -r l; do
     [[ "$l" =~ ^([a-z0-9-]+)=[A-Za-z0-9._+-]+$ ]] && presented+=("${BASH_REMATCH[1]}")
   done <<< "$listed"
-  rc=0
+  rc=0; failed=()
   for m in "$@"; do
-    case "$m" in ''|*[!a-z0-9-]*) echo "[vf-update-run] nom de module refusé : $m" >&2; continue ;; esac
+    case "$m" in ''|*[!a-z0-9-]*) echo "[vf-update-run] nom de module refusé : $m" >&2; rc=1; continue ;; esac
     # Seuls les modules PRÉSENTÉS (calculés en tête de mode) se posent : un module hors de cet ensemble
     # (non proposable, déjà posé, écarté du poste…) est refusé, jamais installé.
-    case " ${presented[*]-} " in *" $m "*) ;; *) echo "[vf-update-run] module non présenté, refusé (rien posé) : $m" >&2; continue ;; esac
+    case " ${presented[*]-} " in *" $m "*) ;; *) echo "[vf-update-run] module non présenté, refusé (rien posé) : $m" >&2; rc=1; continue ;; esac
     if ! VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" install --with-deps "$m"; then
-      echo "[vf-update-run] pose en échec : $m (scope $scope)" >&2; rc=1
+      echo "[vf-update-run] pose en échec : $m (scope $scope)" >&2; rc=1; failed+=("$m")
     fi
   done
   VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" mark-offered ${presented[@]+"${presented[@]}"} || rc=1
+  # BL35-A1 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Le reproposer ») : un module
+  # dont la pose a échoué n'est pas « déjà proposé » — sa marque est retirée, il revient au prochain /vf-update.
+  # BL35-A3 : le code de sortie reste non nul (pose en échec, mark-offered ou dé-marquage en échec).
+  if [ "${#failed[@]}" -gt 0 ]; then
+    VIBEFLOW_CACHE="$NEW" bash "$ENGINE" --scope "$scope" unmark-offered "${failed[@]}" || rc=1
+  fi
   exit "$rc"
 fi
 
