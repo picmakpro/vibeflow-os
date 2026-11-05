@@ -231,12 +231,23 @@ for (const w of [375, 700, 768, 999, 1000, 1440]) {
     return { ligneVisible: getComputedStyle(l).display !== 'none' && l.getBoundingClientRect().width > 0, ouvreurVisible: !!o && getComputedStyle(o).display !== 'none' && r.width > 0,
       w: Math.round(r.width), h: Math.round(r.height), debord: h.scrollWidth > h.clientWidth + 1, premier: o ? o.parentElement.firstElementChild === o && o.parentElement.classList.contains('hr') : false }; })()`, 'mesure à ' + w);
 }
+// téléphone (≤ 700 px) : l'ouvreur quitte la rangée et vit dans le menu « ⋯ » (02-vf-telephone.js, P70-D-01) ; l'entrée relaie le clic
+await s.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 800, deviceScaleFactor: 1, mobile: false });
+await s.attendre(`!!document.querySelector('#vf-plus') && getComputedStyle(document.querySelector('#vf-plus')).display !== 'none'`, 'bouton ⋯');
+await s.ev(`window.__bas = []; window.addEventListener('vf-git:basculer', (e) => window.__bas.push(e.detail && e.detail.source)); document.querySelector('#vf-plus').click()`);
+res.menu = await s.stable(`(() => ({ entrees: [...document.querySelectorAll('#vf-plus-menu [role="menuitem"]')].map((e) => e.textContent.trim()) }))()`, 'menu ouvert');
+await s.ev(`[...document.querySelectorAll('#vf-plus-menu [role="menuitem"]')].find((e) => e.textContent.trim() === 'Historique Git').click()`);
+res.menu.basculer = await s.ev(`window.__bas`);
 return res;
 JS
   R="$(cdp "$AUX/h4.js" "$BASE" 2>&1 | tail -1)"
-  for w in 375 700 768 999; do
+  for w in 768 999; do
     assert_eq "H4.1 — ${w} px : ligne masquée, ouvreur 44 × 44 en tête de .hr" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible, j['$w'].w, j['$w'].h, j['$w'].premier].join('|')" 2>/dev/null)" "false|true|44|44|true"
   done
+  for w in 375 700; do
+    assert_eq "H4.1 — ${w} px (téléphone) : ligne masquée, ouvreur absent de la rangée" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible].join('|')" 2>/dev/null)" "false|false"
+  done
+  assert_eq "H4.1 — téléphone : l'ouvreur est une entrée du menu « ⋯ » et son clic émet vf-git:basculer" "$(jq_ "$R" '[j.menu.entrees.includes("Historique Git"), j.menu.basculer.join(",")].join("|")' 2>/dev/null)" "true|ouvreur"
   for w in 1000 1440; do
     assert_eq "H4.1 — ${w} px : ligne visible, ouvreur caché" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible].join('|')" 2>/dev/null)" "true|false"
   done
