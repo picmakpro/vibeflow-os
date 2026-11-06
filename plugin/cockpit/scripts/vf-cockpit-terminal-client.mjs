@@ -2,7 +2,7 @@
 // Export : clientTerminal(cfg) -> rien. cfg = { origineP, theme } : configuration non sensible, posée par pageTerminal.
 // Sérialisé par .toString() dans un <script> sans attribut : aucune référence à un identifiant du module, tout est local à la fonction.
 // Les commentaires placés DANS la fonction sont servis tels quels : ils ne citent aucun motif que la suite de test cherche. Rien d'autre ici n'est servi.
-// Flux : amorçage (dans le cadre : fragment effacé avant l'échange, secret dans le stockage du cadre, rechargement sans fragment) ou terminal (flux fetch, POST d'entrée et de taille). 72-08 : sondage de GET /proposition dès l'initialisation (avant visible()), écriture par POST /lancer { id, mode } sans le texte de la ligne ni octet au terminal, mode lancé retenu dans le stockage de Q, message fixe proposition vers P.
+// Flux : amorçage (dans le cadre : fragment effacé avant l'échange, secret dans le stockage du cadre, rechargement sans fragment) ou terminal (flux fetch, POST d'entrée et de taille). 72-08 : sondage de GET /proposition dès l'initialisation (avant visible()), écriture par POST /lancer { id, mode[, chat:true] } (72-13 : chat seulement si la case est cochée) sans le texte de la ligne ni octet au terminal, mode lancé retenu dans le stockage de Q, message fixe proposition vers P.
 export function clientTerminal(cfg) {
   const MESSAGES = Object.freeze({
     ready: 'ready', connecte: 'etat:connecte', reconnexion: 'etat:reconnexion', termine: 'etat:termine',
@@ -60,7 +60,10 @@ export function clientTerminal(cfg) {
     const s = (v, max) => typeof v === 'string' && v.length <= max, ent = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi, liste = (v) => Array.isArray(v) && v.length <= 20 && v.every((c) => s(c, 40));
     if (!j || typeof j !== 'object' || j.etat !== 'en-attente' || typeof j.id !== 'string' || !/^[A-Za-z0-9_-]{8,64}$/.test(j.id) || !s(j.verbe, 40) || !s(j.intention, 200) || !s(j.phase, 20) || !(j.ws === null || s(j.ws, 40))) return null;
     if (!j.lignes || typeof j.lignes !== 'object' || MODES.some((m) => typeof j.lignes[m] !== 'string' || !/^[\x20-\x7e]{1,400}$/.test(j.lignes[m])) || !liste(j.bloquants) || !liste(j.avertissements) || !ent(j.arme_apres_ms, 0, 10000) || !ent(j.expire_ms, 1, 600000)) return null;
-    return { id: j.id, verbe: j.verbe, intention: j.intention, phase: j.phase, ws: j.ws, lignes: Object.fromEntries(MODES.map((m) => [m, j.lignes[m]])), bloquants: j.bloquants.slice(), avertissements: j.avertissements.slice(), arme_apres_ms: j.arme_apres_ms, expire_ms: j.expire_ms }; };
+    // 72-13 : `chat` (booléen vrai) et `lignes_chat` (mêmes quatre lignes, mêmes contrôles) vont ensemble ; l'un sans l'autre, ou une autre forme, vaut « aucune »
+    const reprise = j.chat !== undefined || j.lignes_chat !== undefined;
+    if (reprise && (j.chat !== true || !j.lignes_chat || typeof j.lignes_chat !== 'object' || MODES.some((m) => typeof j.lignes_chat[m] !== 'string' || !/^[\x20-\x7e]{1,400}$/.test(j.lignes_chat[m])))) return null;
+    return { chat: reprise ? true : undefined, lignesChat: reprise ? Object.fromEntries(MODES.map((m) => [m, j.lignes_chat[m]])) : undefined, id: j.id, verbe: j.verbe, intention: j.intention, phase: j.phase, ws: j.ws, lignes: Object.fromEntries(MODES.map((m) => [m, j.lignes[m]])), bloquants: j.bloquants.slice(), avertissements: j.avertissements.slice(), arme_apres_ms: j.arme_apres_ms, expire_ms: j.expire_ms }; };
   let attente = null, courante = null, fermee = null, pret = false, terminal = null, enVol = false;
   const afficher = () => { if (!pret || attente === null || courante === attente.id) return; courante = attente.id; vue.proposition(Object.assign({}, attente, { modeInitial: modeRetenu() }), { lancer, annuler }); };
   const lire = async () => {
@@ -73,10 +76,10 @@ export function clientTerminal(cfg) {
       if (nouveau) emettre('proposition'); // garde:emission
       afficher(); } catch (e) { void e; } finally { enVol = false; }
   };
-  const lancer = async (mode) => {
+  const lancer = async (mode, avecChat) => {
     if (courante === null) return 'absente'; if (MODES.indexOf(mode) < 0) return 'refus';
     const id = courante; let r; try { r = await fetch('/lancer', { method: 'POST', headers: Object.assign(entetes(), { 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ id: courante, mode }), cache: 'no-store' }); } catch (e) { return 'reseau'; } // garde:corps-lancer
+      body: JSON.stringify(Object.assign({ id: courante, mode }, avecChat === true ? { chat: true } : {})), cache: 'no-store' }); } catch (e) { return 'reseau'; } // garde:corps-lancer
     if (r.status === 204 || r.status === 404) { fermee = id; if (courante === id) { courante = null; attente = null; } }
     if (r.status !== 204) return r.status === 404 ? 'absente' : { 409: 'occupe', 425: 'attendre', 410: 'sans-session' }[r.status] || 'refus';
     try { localStorage.setItem(CLE_MODE, mode); } catch (e) { void e; }

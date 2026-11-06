@@ -5,6 +5,7 @@
 // Textes de l'UI-SPEC §12, posés par textContent ; le seul nombre rendu (code ou signal) est converti en entier. Aucun innerHTML.
 export function vueTerminal(cfg) {
   void cfg;
+  const CHAT_LIVRE = true; // option « continuer le chat » (72-13) : même valeur que dans le script de P ; la fonction est sérialisée, aucune référence au module
   const NS = 'http://www.w3.org/2000/svg';
   const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; };
   const picto = (d) => {
@@ -89,7 +90,7 @@ export function vueTerminal(cfg) {
       z.appendChild(b); if (r) r.focus();
     },
     effacer() { const z = vider(); z.hidden = true; },
-    // proposition : p = { id, intention, lignes, bloquants, avertissements, arme_apres_ms, modeInitial } (revalidée par le client), cb = { lancer(mode) -> Promise<statut>, annuler() } ; null retire.
+    // proposition : p = { id, intention, lignes, bloquants, avertissements, arme_apres_ms, modeInitial } (revalidée par le client), cb = { lancer(mode, avecChat) -> Promise<statut>, annuler() } ; p.chat === true et p.lignesChat (72-13) : case « Continuer la conversation du chat » ; null retire.
     // « Lancer » n'est armé qu'après arme_apres_ms, jamais en présence d'un bloquant, et ne répond qu'à un clic de confiance ; la ligne montrée est celle du mode choisi, posée par textContent
     proposition(p, cb) {
       if (p === null || p === undefined) { retirerProposition(); return; }
@@ -107,15 +108,22 @@ export function vueTerminal(cfg) {
       b.appendChild(lancer);
       const prevol = (cls, prefixe, code) => { const d = el('div', 'vf-q-reste'); d.appendChild(el('span', 'vf-q-texte ' + cls, prefixe + (MOTIFS[code] || 'Contrôle non reconnu.'))); b.appendChild(d); };
       bloquants.forEach((c) => prevol('vf-q-erreur-texte', 'Bloquant : ', c)); avertissements.forEach((c) => prevol('vf-q-attention-texte', 'Attention : ', c));
-      const ligne = el('div', 'vf-q-apercu', p.lignes[sel.value]); ligne.id = 'proposition-ligne'; ligne.tabIndex = 0; ligne.setAttribute('role', 'region'); ligne.setAttribute('aria-label', 'Commande exacte'); b.appendChild(ligne);
+      const avecChat = CHAT_LIVRE && p.chat === true && !!p.lignesChat && typeof p.lignesChat === 'object'; // garde:chat-offre
+      let caseChat = null;
+      if (avecChat) {
+        const d = el('div', 'vf-q-reste'), lab = el('label', 'vf-q-texte'); caseChat = el('input'); caseChat.type = 'checkbox'; caseChat.id = 'proposition-chat';
+        lab.appendChild(caseChat); lab.appendChild(el('span', '', 'Continuer la conversation du chat')); d.appendChild(lab); b.appendChild(d);
+      }
+      const lignes = () => (caseChat && caseChat.checked ? p.lignesChat : p.lignes)[sel.value];
+      const ligne = el('div', 'vf-q-apercu', lignes()); ligne.id = 'proposition-ligne'; ligne.tabIndex = 0; ligne.setAttribute('role', 'region'); ligne.setAttribute('aria-label', 'Commande exacte'); b.appendChild(ligne);
       const msg = el('div', 'vf-q-reste'); msg.id = 'proposition-message'; msg.setAttribute('role', 'status'); b.appendChild(msg);
       let note = null;
       const majMode = () => {
-        ligne.textContent = p.lignes[sel.value];
+        ligne.textContent = lignes();
         if (sel.value === 'herite' && !note) { note = el('div', 'vf-q-reste'); note.appendChild(el('span', 'vf-q-texte', NOTE_HERITE)); b.insertBefore(note, msg); }
         if (sel.value !== 'herite' && note) { note.remove(); note = null; }
       };
-      sel.addEventListener('change', majMode); majMode();
+      sel.addEventListener('change', majMode); if (caseChat) caseChat.addEventListener('change', majMode); majMode();
       const armer = () => { clearTimeout(minuterie); if (bloquants.length === 0) minuterie = setTimeout(() => lancer.setAttribute('aria-disabled', 'false'), p.arme_apres_ms); };
       armer();
       const fin = (st) => {
@@ -127,7 +135,7 @@ export function vueTerminal(cfg) {
       lancer.addEventListener('click', (ev) => {
         if (ev.isTrusted !== true || lancer.getAttribute('aria-disabled') === 'true') return; // garde:clic-fiable
         lancer.setAttribute('aria-disabled', 'true'); msg.textContent = '';
-        Promise.resolve().then(() => cb.lancer(sel.value)).then(fin).catch(() => fin('reseau'));
+        Promise.resolve().then(() => cb.lancer(sel.value, !!(caseChat && caseChat.checked))).then(fin).catch(() => fin('reseau'));
       });
       const c = document.getElementById('collage');
       if (c) document.body.insertBefore(b, c); else document.body.appendChild(b); // garde:collage-dessus

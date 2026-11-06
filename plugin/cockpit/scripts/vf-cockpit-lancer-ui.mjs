@@ -4,7 +4,7 @@
 // la CSP sans drapeau est celle de v2.75.0, octet pour octet. Le script s'enregistre par window.VibeFlow.addPanelSection : le viewer vendoré n'est pas touché.
 // Contrat lu (72-CONTRATS.md §4) : GET /api/vf/lancer/cibles -> { actif:true, cibles:[{ id, kind, principal, verbes, bloquants, avertissements, lancee }] } ;
 //   lancee : le booléen true (forme projetée par 72-09) ou la forme riche { etat, verbe } de 72-07 (etat : attendue, vue, terminee) ; toute autre forme n'affiche rien.
-//   POST /api/vf/lancer, corps EXACTEMENT { cible, verbe } -> 202 ; un refus porte { refus: <code> } (72-04), `bloque` (409) vient de 72-09.
+//   POST /api/vf/lancer, corps EXACTEMENT { cible, verbe } (plus `chat` seulement après une conversation du chat observée, 72-13) -> 202 ; un refus porte { refus: <code> } (72-04), `bloque` (409) vient de 72-09.
 // Un clic ne lance RIEN : il PROPOSE un couple { cible, verbe } au serveur (« la page propose, le terminal dispose ») ; le serveur reste juge, la page n'est jamais la garde.
 // Gardes (une instruction par ligne, marquée « garde:<nom> », mutants de la suite) : titre, entree, bloquants, corps, verbes, envol, jeton (deux lignes), chemin, cible.
 // Le script est la fonction scriptLancer sérialisée par .toString() : ses commentaires sont servis tels quels, ils ne citent ni adresse web ni nom d'appel interdit.
@@ -37,9 +37,57 @@ const TEXTES = {
   lancee: 'Lancée depuis la carte.', lanceeVerbe: 'Lancée : ', etats: { attendue: 'en attente de la session.', vue: 'session en cours.', terminee: 'session terminée.' },
 };
 
-function scriptLancer(cfg) {
+// Option « continuer le chat » (72-13 ; LANC-11, P72-D-03). Livrée parce que la sonde A5 est VERTE (2026-11-05, claude 2.1.318, 72-13-RED-TRACE.md) ; la vue de Q porte la même valeur.
+export const CHAT_LIVRE = true;
+
+// Ces trois fonctions sont sérialisées par .toString() dans le script injecté : chacune est autonome (aucune référence au module, motif d'UUID recopié).
+// Lit le texte d'un flux d'évènements de la réponse du chat et rend l'UUID de l'évènement `answer` (le dernier valide), sinon null. Entrée bornée.
+export function extraireSessionChat(texte) {
+  if (typeof texte !== 'string') return null;
+  let session = null;
+  texte.slice(0, 262144).split('\n\n').forEach((bloc) => {
+    const ev = /^event: (.*)$/m.exec(bloc), dt = /^data: (.*)$/m.exec(bloc);
+    if (!ev || ev[1] !== 'answer' || !dt) return;
+    try { const d = JSON.parse(dt[1]); if (d && typeof d.session === 'string' && /^[0-9a-f-]{36}$/i.test(d.session)) session = d.session; } catch (e) { void e; } // bloc illisible : ignoré
+  });
+  return session;
+}
+
+// Enveloppe de la fonction de requête de la fenêtre : la requête d'origine part TOUJOURS et sa promesse est rendue telle quelle ; seule une question au chat (POST sur le chemin du chat, mode ask ou absent)
+// est observée, sur un CLONE de la réponse, en lecture seule et bornée ; seul l'UUID est transmis à `rappel`, rien d'autre n'est retenu ni écrit ; toute exception est avalée.
+export function installerObservateurChat(fenetre, rappel, extraire = extraireSessionChat) {
+  const natif = fenetre.fetch;
+  if (typeof natif !== 'function') return;
+  const lire = async (copie) => {
+    const lecteur = copie.body.getReader(), dec = new TextDecoder(); let texte = '';
+    for (;;) { const m = await lecteur.read(); if (m.done) break; texte += dec.decode(m.value, { stream: true }); if (texte.length > 262144) { lecteur.cancel(); break; } }
+    return texte;
+  };
+  fenetre.fetch = function (entree, init) {
+    const promesse = natif.apply(fenetre, arguments);
+    try {
+      const url = typeof entree === 'string' ? entree : (entree && entree.url) || '';
+      const corps = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
+      if (init && String(init.method).toUpperCase() === 'POST' && new URL(url, fenetre.location.href).pathname === '/api/ask' && corps && typeof corps === 'object' && (corps.mode === undefined || corps.mode === 'ask')) {
+        Promise.resolve(promesse).then((reponse) => { try { return lire(reponse.clone()).then((t) => { const id = extraire(t); if (id) rappel(id); }, () => {}); } catch (e) { return undefined; } }, () => {});
+      }
+    } catch (e) { void e; } // une enveloppe qui échoue laisse passer la requête telle quelle
+    return promesse;
+  };
+}
+
+// Corps du POST de lancement : { cible, verbe } et, seulement si l'option est livrée ET l'identifiant du chat passe le motif, `chat` ; jamais d'autre clé.
+export function corpsProposition({ cible, verbe, chat, livre }) {
+  const corps = { cible, verbe };
+  if (livre === true && typeof chat === 'string' && /^[0-9a-f-]{36}$/i.test(chat)) corps.chat = chat;
+  return corps;
+}
+
+function scriptLancer(cfg, extraire, installer, corpsProp) {
   if (location.pathname !== '/project.html') return; // garde:chemin
   if (location.hostname !== '127.0.0.1') return;
+  let chat = null; // identifiant de la conversation du chat : variable de fermeture, jamais écrite ailleurs (ni stockage, ni page, ni adresse, ni message)
+  if (cfg.chatLivre === true) installer(window, (id) => { chat = id; }, extraire);
   const T = cfg.textes, jeton = (window.VF_COCKPIT_SERVER || {}).token || '';
   const entetesGet = { 'x-vf-cockpit-token': jeton }; // garde:jeton
   const entetesPost = { 'x-vf-cockpit-token': jeton, 'Content-Type': 'application/json' }; // garde:jeton
@@ -63,7 +111,8 @@ function scriptLancer(cfg) {
     const tous = [].slice.call(zone.querySelectorAll('button'));
     tous.forEach((x) => x.setAttribute('aria-disabled', 'true')); // garde:envol
     const pt = document.querySelector('#panel .pt'), titre = pt ? (pt.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80) : '';
-    const corps = JSON.stringify({ cible: id, verbe }); // garde:corps
+    const sup = corpsProp({ cible: id, verbe, chat, livre: cfg.chatLivre === true });
+    const corps = JSON.stringify(Object.assign({ cible: id, verbe }, sup.chat === undefined ? {} : { chat: sup.chat })); // garde:corps
     const dit = (st, d) => (st === 202 ? T.envoi[0] + cfg.libelles[verbe] + (titre ? ' — ' + titre : '') + T.envoi[1] : d && d.refus === 'bloque' ? T.bloquant : st === 404 ? T.absent : T.refuse);
     fetch('/api/vf/lancer', { method: 'POST', headers: entetesPost, cache: 'no-store', body: corps })
       .then((r) => (r.status === 202 ? dit(202) : r.json().then((d) => dit(r.status, d), () => dit(r.status))))
@@ -139,6 +188,6 @@ function scriptLancer(cfg) {
 
 export function injectionLancer({ indisponible = false } = {}) {
   if (indisponible) return '';
-  const cfg = JSON.stringify({ verbes: ORDRE, libelles: LIBELLES_VERBES, motifs: MOTIFS, textes: TEXTES }).replace(/</g, '\\u003c');
-  return `<script>// VibeFlow (72-06) : lancer du travail depuis les cartes\n(${scriptLancer.toString()})(${cfg});\n</script>`;
+  const cfg = JSON.stringify({ verbes: ORDRE, libelles: LIBELLES_VERBES, motifs: MOTIFS, textes: TEXTES, chatLivre: CHAT_LIVRE }).replace(/</g, '\\u003c');
+  return `<script>// VibeFlow (72-06) : lancer du travail depuis les cartes\n(${scriptLancer.toString()})(${cfg}, ${extraireSessionChat.toString()}, ${installerObservateurChat.toString()}, ${corpsProposition.toString()});\n</script>`;
 }

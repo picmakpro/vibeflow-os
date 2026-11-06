@@ -81,15 +81,15 @@ const rejets = []; process.on('unhandledRejection', (e) => rejets.push(String(e)
 const SSE = `event: start\ndata: {}\n\nevent: progress\ndata: {"text":"Write"}\n\nevent: answer\ndata: ${JSON.stringify({ title: 'OK', answer: 'OK', items: [], session: U })}\n\n`;
 const POST = (o) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(o) });
 const sc = async (nom, entree, init, attendu, fabrique = () => new Response(SSE, { status: 200 })) => {
-  const retenus = [], appels = []; let rendue;
-  const fenetre = { location: { href: 'http://127.0.0.1:1/project.html' }, fetch: (a, b) => { appels.push([a, b]); rendue = fabrique(); return rendue; } };
+  const retenus = [], appels = []; const ref = await fabrique().text();
+  const fenetre = { location: { href: 'http://127.0.0.1:1/project.html' }, fetch: (a, b) => { appels.push([a, b]); return Promise.resolve(fabrique()); } };
   const cles0 = Object.keys(fenetre).sort().join(',');
   m.installerObservateurChat(fenetre, (...x) => retenus.push(x));
   let corps = null, erreur = null;
   try { const rep = await fenetre.fetch(entree, init); corps = typeof rep.text === 'function' ? await rep.text() : 'sans-texte'; } catch (e) { erreur = String(e).slice(0, 80); }
   await att(80);
   const bon = JSON.stringify(retenus) === JSON.stringify(attendu.map((u) => [u])) && appels.length === 1 && appels[0][0] === entree && appels[0][1] === init && Object.keys(fenetre).sort().join(',') === cles0;
-  return [nom, bon && erreur === null && corps === SSE, `retenus=${JSON.stringify(retenus)} corps_intact=${corps === SSE} erreur=${erreur}`];
+  return [nom, bon && erreur === null && corps === ref, `retenus=${JSON.stringify(retenus)} corps_intact=${corps === ref} erreur=${erreur}`];
 };
 const r = [
   await sc('POST /api/ask en mode ask retient l\'UUID', '/api/ask', POST({ question: 'q', mode: 'ask', session: undefined }), [U]),
@@ -334,7 +334,7 @@ await executer(chrome, async (s) => {
     });
     await essai('t2', async () => { // sans chat (absent, faux, ou sans lignesChat) : aucune case
       const nb = async (over) => { await monter(Object.assign({ id: 'c2aaaaaa22' }, over)); return ev(`document.querySelectorAll('#proposition input').length`); };
-      r.t2 = [await nb({ chat: undefined, lignesChat: undefined }), await nb({ chat: false }), await nb({ chat: true, lignesChat: undefined }), await nb({ chat: 'oui' })].join('|');
+      r.t2 = [await nb({ chat: null, lignesChat: null }), await nb({ chat: false }), await nb({ chat: true, lignesChat: null }), await nb({ chat: 'oui' })].join('|');
     });
     await essai('t3', async () => { // la zone « Commande exacte » suit la case et le mode, pour les quatre modes
       await monter({ id: 'c3aaaaaa33' }); const ok = [];
@@ -468,16 +468,16 @@ if mutant qvalid vf-cockpit-lancer-q.mjs 's/UUID_RE\.test(m\.chat)/true/'; then
   assert_eq "M-CHAT-NON-VALIDE-Q — Q sans son propre test d'UUID : la proposition forgée reste ignorée (défense en profondeur : le gabarit refuse l'identifiant), aucun octet" "$(v5 forge_aucune)/$(v5 forge_capture)" "${#FORGES[@]}/0"
 else sans_effet "M-CHAT-NON-VALIDE-Q"; fi
 if mutant consomme vf-cockpit-lancer-ui.mjs 's/reponse\.clone()/reponse/'; then
-  assert_eq "M-ENVELOPPE-CONSOMME — le mutant (lecture de la réponse d'origine) rougit TC.2 : le viewer ne peut plus lire sa réponse" "$(node "$AUX/harnais-fetch.mjs" "$MUT_OUT" 2>&1 | tail -1 | sed 's/^ECHECS.*/rouge/;s/^ok$/vert/')" "rouge"
+  assert_eq "M-ENVELOPPE-CONSOMME — le mutant (lecture de la réponse d'origine) rougit TC.2 : le viewer ne peut plus lire sa réponse" "$(node "$AUX/harnais-fetch.mjs" "$MUT_OUT" 2>&1 | tail -1 | awk '/^ECHECS.*corps_intact=false/ {print "rouge"; next} {print "autre : " substr($0, 1, 120)}')" "rouge"
 else sans_effet "M-ENVELOPPE-CONSOMME"; fi
 if [ -n "$CHROME" ]; then
   if mutant toujours vf-cockpit-terminal-vue.mjs '/garde:chat-offre/s/CHAT_LIVRE && p\.chat === true && [^;]*;/true;/'; then
     run_vue "$MUT_OUT"
-    assert_eq "M-CASE-TOUJOURS — le mutant (case offerte sans chat) rougit TC.6 : une case existe sans conversation" "$(rj "$VJ" '(j.erreur ? "plante" : j.t2 === "0|0|0|0" ? "vert" : "rouge")')" "rouge"
+    assert_eq "M-CASE-TOUJOURS — le mutant (case offerte sans chat) rougit TC.6 : une case existe sans conversation" "$(rj "$VJ" '(j.erreur ? "plante" : (/^[0-9]\|[0-9]\|[0-9]\|[0-9]$/.test(j.t2 || "") && j.t2 !== "0|0|0|0") ? "rouge" : "autre : " + j.t2)')" "rouge"
   else sans_effet "M-CASE-TOUJOURS"; fi
   if mutant force vf-cockpit-terminal-client.mjs '/garde:corps-lancer/s/avecChat === true ? { chat: true } : {}/{ chat: true }/'; then
     run_e2e "$MUT_OUT"
-    assert_eq "M-CLIENT-CHAT-FORCE — le mutant (chat:true même case décochée) rougit TC.7 non cochée : la ligne de reprise part alors que la ligne standard était affichée" "$(rj "$EJ" '(j.erreur ? "plante" : (j.e2 && j.e2.cocheApres === false && j.e2.capture === "\u0003" + j.e2.affichee && !j.e2.capture.includes(" -r ")) ? "vert" : "rouge")')" "rouge"
+    assert_eq "M-CLIENT-CHAT-FORCE — le mutant (chat:true même case décochée) rougit TC.7 non cochée : la ligne de reprise part alors que la ligne standard était affichée" "$(rj "$EJ" '(j.erreur ? "plante" : (j.e2 && j.e2.cocheApres === false && typeof j.e2.capture === "string" && j.e2.capture.includes(" -r ") && j.e2.capture !== "\u0003" + j.e2.affichee) ? "rouge" : "autre : " + JSON.stringify(j.e2 || j.erreurs))')" "rouge"
   else sans_effet "M-CLIENT-CHAT-FORCE"; fi
 fi
 
