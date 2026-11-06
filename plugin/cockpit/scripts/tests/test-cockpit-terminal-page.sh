@@ -77,10 +77,11 @@ JS
 cat > "$AUX/palette.mjs" <<'JS'
 // palette.mjs <viewer.html> <vue.mjs> : la palette xterm de vue.mjs contre les variables Graphite de viewer.html, par thème. Seules les couleurs que l'UI-SPEC §4.2
 // donne comme venant d'une variable (colonne « Origine ») sont comparées ; les autres (éclaircies, voiles) n'ont pas de variable d'origine.
+// 71.5 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 : « Adoucir le terminal seul ») : en SOMBRE, yellow (#f0d17c, 11,8:1 sur --surface) et brightYellow (#e3df78, 12,6:1) ne sont plus liés à --sev-medium / --warn-text : une origine `=#rrggbb` est une valeur attendue littérale, comparée telle quelle ; le jeton de l'interface garde #ffe08a.
 // 71.5 : une origine `[sombre, clair]` est sensible au thème (l'ANSI clair est du TEXTE : red, green, yellow lisent les variantes --*-text, 4,5:1 ; le contrôle reste, il compare une autre variable).
 import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const ORIGINE = { background: '--surface', foreground: '--text', cursor: '--on', cursorAccent: '--on-text', red: ['--sev-high', '--err-text'], green: ['--recent', '--recent-text'], yellow: ['--sev-medium', '--warn-text'],
-  blue: '--k-http', magenta: '--k-call', cyan: '--k-data', white: '--text-2', brightBlack: '--text-3', brightRed: '--err-text', brightYellow: '--warn-text', brightWhite: '--text' };
+const ORIGINE = { background: '--surface', foreground: '--text', cursor: '--on', cursorAccent: '--on-text', red: ['--sev-high', '--err-text'], green: ['--recent', '--recent-text'], yellow: ['=#f0d17c', '--warn-text'],
+  blue: '--k-http', magenta: '--k-call', cyan: '--k-data', white: '--text-2', brightBlack: '--text-3', brightRed: '--err-text', brightYellow: ['=#e3df78', '--warn-text'], brightWhite: '--text' };
 const norm = (v) => { v = String(v).trim().toLowerCase().replace(/\s+/g, ' '); const m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(v); return m ? `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}` : v; };
 const decl = (css, sel) => Object.fromEntries([...(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*{([^}]*)}').exec(css)?.[1] || '').matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], norm(m[2])]));
 const css = fs.readFileSync(process.argv[2], 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''); const V = { s: decl(css, ':root'), c: decl(css, ':root[data-theme="light"]') };
@@ -90,7 +91,7 @@ for (const theme of ['sombre', 'clair']) {
   const pal = window.vfTermVue.theme(theme === 'clair');
   for (const [cle, orig] of Object.entries(ORIGINE)) {
     const nom = Array.isArray(orig) ? orig[theme === 'clair' ? 1 : 0] : orig;
-    const v = theme === 'clair' && nom in V.c ? V.c[nom] : V.s[nom], q = pal[cle] === undefined ? undefined : norm(pal[cle]);
+    const v = nom.startsWith('=') ? norm(nom.slice(1)) : theme === 'clair' && nom in V.c ? V.c[nom] : V.s[nom], q = pal[cle] === undefined ? undefined : norm(pal[cle]);
     if (v === undefined) { console.log(`ABSENTE ${nom} viewer.html ${theme}`); continue; }
     if (q === undefined) { console.log(`ABSENTE ${cle} palette ${theme}`); continue; }
     n[theme]++; if (v !== q) console.log(`couleur ${cle} (${theme}) : viewer.html ${nom}=${v}, palette=${q}`);

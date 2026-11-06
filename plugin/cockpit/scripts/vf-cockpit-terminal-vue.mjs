@@ -27,8 +27,8 @@ export function vueTerminal(cfg) {
   const entier = (v) => String(Math.trunc(Number(v)) || 0);
   const SOMBRE = {
     background: '#191919', foreground: '#ececec', cursor: '#ececec', cursorAccent: '#0f0f0f', selectionBackground: 'rgba(255,255,255,.12)', selectionInactiveBackground: 'rgba(255,255,255,.07)',
-    black: '#2b2b2b', red: '#ff9aa8', green: '#9ece6a', yellow: '#ffe08a', blue: '#7aa7ff', magenta: '#b49cff', cyan: '#63d2b8', white: '#c6c6c6',
-    brightBlack: '#a8a8a8', brightRed: '#ffb3bc', brightGreen: '#b9e08e', brightYellow: '#ffe9a8', brightBlue: '#9dbcff', brightMagenta: '#c7b8ff', brightCyan: '#86e3cd', brightWhite: '#ececec',
+    black: '#2b2b2b', red: '#ff9aa8', green: '#9ece6a', yellow: '#f0d17c', blue: '#7aa7ff', magenta: '#b49cff', cyan: '#63d2b8', white: '#c6c6c6',
+    brightBlack: '#a8a8a8', brightRed: '#ffb3bc', brightGreen: '#b9e08e', brightYellow: '#e3df78', brightBlue: '#9dbcff', brightMagenta: '#c7b8ff', brightCyan: '#86e3cd', brightWhite: '#ececec',
   };
   const CLAIR = {
     background: '#ffffff', foreground: '#161616', cursor: '#161616', cursorAccent: '#ffffff', selectionBackground: 'rgba(0,0,0,.08)', selectionInactiveBackground: 'rgba(0,0,0,.05)',
