@@ -107,3 +107,15 @@ Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-git-entete.sh` ; labs
 Lecture : F1 (H7.1, trois onglets) — le panneau disait `wt-a`, `wt-a — Projet`, `wt-a — Équipe` pendant que l'en-tête disait `depot` ; F3 (H4.1 à 1000, 1100, 1279 px) — seconde ligne visible et ouvreur absent ; F5 (H7.5) — l'en-tête repasse sur une rangée à 940 px avec git contre 870 px sans (la base flex de `.hc` fait le saut de ligne, pas la largeur de la recherche : une première tentative sur `#search-btn` laissait le seuil à 940, constaté en injectant le CSS dans la page avant d'écrire le correctif) ; F6 (H7.6) — contraste sous 4,5:1 ; F8 (H7.8) — l'anneau de focus (décalage +2 px) recouvre 279,7 px² du nom ; F9 (H7.9, H6.2) — le sous-titre répétait le titre ; F11 (H7.11) — couleur d'avertissement ; F13 (H7.13) — coupure `k|p`, `i|t` en plein mot.
 Témoins verts d'emblée, preuves que la mesure n'est pas vide : H7.5 « deux régimes » (le lab sans git passe bien de deux rangées à une) et H7.13 « le titre passe sur deux lignes » ; H7.8 pose `:focus-visible` vrai et contour `solid`.
 Vert : H4 (1000, 1100, 1279 px : icône 44 × 44 en tête de `.hr` ; 1280 et 1440 px : seconde ligne, ouvreur caché ; une rangée, aucun bouton hors fenêtre ni superposé), H6.2, H7.1 à H7.13, toutes PASS.
+
+## Debug O6.11 (mgr78-reprise, 2026-11-06)
+
+Symptôme : `test-cockpit-projet.sh` O6.11 rouge à 1440 et 390 px depuis `c743e356` (y 244 après « Passer », 218 avant).
+
+Constat : rejoué sur `c743e356` : rouge (`p1440` avant y 218, après y 244 ; `p390` avant y 314, après y 326). Rejoué sur `git archive de53d8b5` (copie hors worktree) : vert (244 / 244).
+
+Cause (sondée par un crochet sur `state.t`, `freeArea()` et la hauteur de `#context` à chaque `setT`) : le rendu du viewer (`render`) cadre la vue avec le bloc de titre NATIF (`#context` = 142 px, donc `freeArea().y` = 202 : plafond de 130), puis émet `render` en microtâche ; `ecrireVue` (76) raccourcit alors le bloc à 77 px (`freeArea().y` = 149) SANS recadrer. Une fermeture de visite depuis un groupe (`SC.go('root')` : « Passer ») laisse donc la vue cadrée pour l'ancien bloc ; une fermeture depuis la racine (`SC.fit` seul, bloc déjà court) la cadre pour le nouveau : 26,5 px d'écart (53 / 2). Avant `c743e356`, le sous-titre long (résumé du projet) gardait le bloc au-dessus du plafond de 130 px dans les deux cas : l'écart était masqué. Ce n'est ni 40-tour.js ni le viewer qui changent : le défaut est le recadrage manquant après la réécriture du bloc.
+
+Expérience 1 (rouge) : `c743e356`, sonde `78-debug-probe.mjs` : `fits` montre le fit de `render` à `ctx` 142 (`a.y` 202, y 244,2) puis le fit de fermeture depuis la racine à `ctx` 77 (`a.y` 149, y 217,7).
+Expérience 2 (cause seule changée) : `c743e356`, aucune modification de code, seulement `#context{min-height:142px}` injecté (la hauteur du bloc ne change plus à la réécriture) : O6.11 vert, y 244 / 244.
+Correctif (76) : `ecrireEtRecadrer` — si la vue était exactement le cadrage de l'ancienne zone libre et que le haut de la zone libre bouge, `SC.fit(false)`. Vert : y 218 / 218 à 1440 px, 314 / 314 à 390 px.

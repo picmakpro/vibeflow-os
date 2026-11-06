@@ -54,13 +54,17 @@
       more.hidden = !long;
     }
   };
+  // Le rendu du viewer cadre la vue (fit) avec le bloc NATIF, puis émet « render » en microtâche : ecrireVue raccourcit alors le bloc, et le haut de la zone libre (freeArea) bouge sous une vue cadrée pour l'ancien.
+  // Une vue qui était exactement le cadrage de l'ancienne zone est recadrée sur la nouvelle ; toute autre vue (déplacée, zoomée par la personne) reste où elle est.
+  const cadrage = () => { const b = SC.state && SC.state.bounds, T = SC.state && SC.state.t; if (!b || !T) return null; const a = SC.freeArea(), k = Math.min(a.w / (b.w + 40), a.h / (b.h + 20), 1.1); return { y: a.y, cadree: Math.abs(T.k - k) <= k * 0.005 && Math.abs(T.x - (a.x + (a.w - b.w * k) / 2 - b.x * k)) <= 1 && Math.abs(T.y - (a.y + Math.max(0, (a.h - b.h * k) / 2) - b.y * k)) <= 1 }; };
+  const ecrireEtRecadrer = () => { const avant = cadrage(); ecrireVue(); const apres = avant && avant.cadree ? cadrage() : null; if (apres && apres.y !== avant.y) SC.fit(false); };
   const styleVue = document.createElement('style');
   styleVue.textContent = '.vf-ctx-titre { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }';
   document.head.appendChild(styleVue);
   // le premier rendu peut précéder ce fichier (l'analyseur rend la main entre deux scripts) : on réécrit aussi à l'arrivée du fichier, puis à « ready »
-  SC.on('render', (e) => { if (e && e.container === 'root') ecrireVue(); });
-  SC.on('ready', () => { if (SC.state && SC.state.container === 'root') ecrireVue(); });
-  if (SC.state && SC.state.container === 'root') ecrireVue();
+  SC.on('render', (e) => { if (e && e.container === 'root') ecrireEtRecadrer(); });
+  SC.on('ready', () => { if (SC.state && SC.state.container === 'root') ecrireEtRecadrer(); });
+  if (SC.state && SC.state.container === 'root') ecrireEtRecadrer();
   if (!V || V.etat === 'absent' || !V.depot) return; // P78-D-11 : rien d'autre dans le DOM
   nom.title = nom.textContent; // nom entier, la troncature est visuelle
 
