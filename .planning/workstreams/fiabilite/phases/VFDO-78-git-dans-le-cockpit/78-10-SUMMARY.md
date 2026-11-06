@@ -116,3 +116,7 @@ Traces : section « Correction revue page » de `78-10-RED-TRACE.md`.
 - Déviation : les témoins D12 et D14 lisent `.vf-git-live` (l'annonce de la vue détaillée n'a plus de région propre).
 - F7 et F8 : classés `no-op` (hors mandat).
 - Suites rejouées sur l'état final (rc) : git-tiroir 0, git-entete 0, git-e2e 0, responsive 0, git 0, git-details 0, git-commandes 0, git-signature 0, serveur 0, projet 0, chrome-fr 0, css-jetons.mjs sur 76 et 77 : 0, check-version-sync 0, check-machine-paths 0.
+
+## Correction CI Linux
+
+Le mutant M-CONTRASTE-SANS ne rougissait pas sous Linux : D15 mesurait « sombre » sans poser le thème, or le thème « auto » suit `prefers-color-scheme` (clair sous Chrome headless Linux). Hypothèse `pointer: none` écartée par mesure. Correction de la suite : thème posé explicitement, témoin D15.2a, crochet `TIROIR_MEDIA` pour émuler les media features. Produit intact. Preuves : 78-10-RED-TRACE.md, section « Correction CI Linux ». Suite : 154 réussis / 0 échoué (macOS et Linux simulé).

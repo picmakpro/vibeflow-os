@@ -106,3 +106,15 @@ Journaux dans `/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/1
 **G6 — une région vive, coche.** D15.4 : une seule région `aria-live` dans le tiroir, une annonce « Commande copiée » par copie (deux copies : `1|2|1`) ; D15.5 : l'icône passe à la coche le temps du « Copiée » puis revient. Mutants : M-LIVE-DOUBLE (région `.vf-git-live-det` recréée) rougit D15.4 : `2|2|2` ; M-COCHE (`dire('Copiée')` sans coche) rougit D15.5 : `true|Copiée`.
 
 **Valeurs posées (échange mécanique après rebase de la 71.5)** : aucune valeur d'espacement, de couleur ou de rayon nouvelle ; couleurs par variables existantes (`--text-2`, `--text-3`) ; `css-jetons.mjs` rc 0 sur 76 et 77.
+
+## Correction CI Linux (run 42172207362, M-CONTRASTE-SANS)
+
+**Hypothèse `pointer: none` : fausse.** Suite entière rejouée sous `pointer/any-pointer/hover/any-hover = none` émulés par CDP (`TIROIR_MEDIA='pointer=none,any-pointer=none,hover=none,any-hover=none'`, nouveau crochet de `cdp-run.mjs`, `Emulation.setEmulatedMedia`) : 153 réussis, 0 échoué, M-CONTRASTE-SANS vert (log `/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/13e1f1c3-f616-4fb2-9ff3-f349e3c3e010/scratchpad/78-10-mac-pointer-none.log`).
+
+**Cause prouvée** : le thème de la page est « auto » et suit `prefers-color-scheme` (viewer.html : `mq.matches ? 'light' : 'dark'`). Chrome headless sous Linux est en clair par défaut. D15 mesurait « sombre » SANS poser le thème : sous Linux, deux mesures claires. Avec `--text-4` (#666 en clair, 4,81:1) le mutant « contraste retiré » reste au-dessus de 4,5:1 ; sous macOS sombre (#5c5c5c sur fond sombre), 2,35:1. Au passage, D15.2 ne mesurait jamais le sombre sous Linux.
+
+**Rouge reproduit (macOS)** : `TIROIR_MEDIA='prefers-color-scheme=light,pointer=none,any-pointer=none,hover=none,any-hover=none' TIROIR_TRACE=… bash plugin/cockpit/scripts/tests/test-cockpit-git-tiroir.sh` sur la suite d'avant correction → 152 réussis, 1 échoué : M-CONTRASTE-SANS attendu `true|true|true`, obtenu `false|true|true` ; trace D15 : `sombre` = `clair` (sans 8,82 des deux côtés), log `/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/13e1f1c3-f616-4fb2-9ff3-f349e3c3e010/scratchpad/78-10-red-linux.log`. Produit non touché.
+
+**Correction (suite seule)** : la mesure « sombre » pose `data-theme="dark"` avant de mesurer ; nouveau témoin D15.2a (thèmes `dark/light`, les deux jeux de rapports diffèrent, donc l'élément est trouvé et mesuré dans chaque thème).
+
+**Vert** : mêmes conditions Linux simulées (thème clair par défaut, pointeur none) → 154 réussis, 0 échoué, rc 0 (`/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/13e1f1c3-f616-4fb2-9ff3-f349e3c3e010/scratchpad/78-10-linux-vert.log`) ; macOS → 154 réussis, 0 échoué, rc 0 (`/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/13e1f1c3-f616-4fb2-9ff3-f349e3c3e010/scratchpad/78-10-mac.log`).

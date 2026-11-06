@@ -13,6 +13,9 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"
 AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
 export HOME="$WORK/home"
 GIT_REEL="$(command -v git)"
+# Le serveur retire tout GIT_* hérité (envGit) : `GIT_CONFIG_NOSYSTEM` / `GIT_CONFIG_GLOBAL` posés plus haut n'arrivent donc jamais à git. Un poste dont /etc/gitconfig déclare un filtre (git-lfs sur ubuntu-latest)
+# rendrait « approximatif » légitimement. Le git « sans filtre » des témoins est donc un emballage en tête du PATH qui reposte l'isolation APRÈS le nettoyage (78-08, correction CI Linux).
+mkdir -p "$WORK/wrap-iso"; printf '#!/bin/sh\nGIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null exec "%s" "$@"\n' "$GIT_REEL" > "$WORK/wrap-iso/git"; chmod +x "$WORK/wrap-iso/git"; export PATH="$WORK/wrap-iso:$PATH"
 SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || { chmod -R u+rwx "$WORK" 2>/dev/null; rm -rf "$WORK"; }' EXIT
@@ -570,6 +573,20 @@ D="$(mutant_dir cfmsg)"
 A="$(muter "$D/vf-cockpit-git-details.mjs" '\u2029\p{Cf}]/u; // la classe' '\u2029\u202a-\u202e\u2066-\u2069]/u; // la classe')"
 assert_eq "X7 M-ILLISIBLE — la classe du message revient au seul bidi (cible présente)" "$A" "applique"
 assert_eq "X7 M-ILLISIBLE — rouge sur X7.11 : U+200B, U+FEFF et U+2060 restent dans le message" "$(node "$AUX/det.mjs" "$D" commit "$CF" "$HCF" | node "$AUX/j.mjs" - '/\p{Cf}/u.test(j.corps.message)')" "true"
+
+echo "=== X8 — config système ou globale qui déclare un filtre : approximatif (correction CI Linux, 78-08) ==="
+# poste simulé : /etc/gitconfig déclarant filter.lfs (git-lfs). L'emballage lit ce fichier tant que GIT_CONFIG_NOSYSTEM est absent, ce que le serveur garantit (envGit retire les GIT_*).
+printf '[filter "lfs"]\n\tclean = cat\n\tsmudge = cat\n\trequired = false\n' > "$WORK/sys.gitconfig"
+mkdir -p "$WORK/wrap-sys"; printf '#!/bin/sh\n[ -n "$GIT_CONFIG_NOSYSTEM" ] || export GIT_CONFIG_SYSTEM="%s"\nexec "%s" "$@"\n' "$WORK/sys.gitconfig" "$GIT_REEL" > "$WORK/wrap-sys/git"; chmod +x "$WORK/wrap-sys/git"
+MENT='approximatif : filtres du dépôt non exécutés'
+WTSYS() { PATH="$WORK/wrap-sys:$PATH" node "$AUX/det.mjs" "$1" wt "$LAB" | node "$AUX/j.mjs" - 'j.etat+"|"+j.approximatif+"|"+j.mention'; }
+SYSF() { env -u GIT_CONFIG_NOSYSTEM GIT_CONFIG_SYSTEM="$WORK/sys.gitconfig" "$@" config --name-only --get-regexp '^filter\.'; } # sans --system : `git config --system` ignore GIT_CONFIG_NOSYSTEM, la séquence de lecture réelle, non
+assert_eq "X8.0 — témoin : le fichier système simulé déclare un filtre que git lit (git réel), et l'emballage d'isolation de la suite l'écarte (même variables, git du PATH de la suite)" "$(SYSF "$GIT_REEL" | head -1)|$(SYSF git | wc -c | tr -d ' ')" "filter.lfs.clean|0"
+assert_eq "X8.1 — filtre déclaré dans la config SYSTÈME : état ok, approximatif vrai, mention posée (le refus d'exécuter les filtres est le comportement juste du produit)" "$(WTSYS "$SCRIPTS")" "ok|true|$MENT"
+D="$(mutant_dir approx)"
+A="$(muter "$D/vf-cockpit-git-details.mjs" 'const approximatif = (await filtresDeclaresAsync(lab, lab, fin)).length > 0;' 'const approximatif = false;')"
+assert_eq "X8 M-APPROX-FAUX — l'approximation forcée à faux (cible présente)" "$A" "applique"
+assert_eq "X8 M-APPROX-FAUX — rouge sur X8.1 : filtre système déclaré, réponse « exacte » et sans mention" "$(WTSYS "$D")" "ok|false|null"
 
 # --- FIN ---
 stop_srv

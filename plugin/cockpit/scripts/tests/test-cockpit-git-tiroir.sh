@@ -50,6 +50,8 @@ const PRE = process.env.VF_PRE ? fs.readFileSync(process.env.VF_PRE, 'utf8') : '
 await executer(chrome, async (s) => {
   await s.send('Browser.grantPermissions', { permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] }).catch(() => {});
   if (PRE) await s.send('Page.addScriptToEvaluateOnNewDocument', { source: PRE });
+  // VF_MEDIA (posé par TIROIR_MEDIA="nom=valeur,nom=valeur", ex. prefers-color-scheme=light,pointer=none,hover=none) : émule les media features de Chrome headless sous Linux (thème clair, `pointer: none`) sur un poste macOS. Absent : le poste réel.
+  if (process.env.VF_MEDIA) await s.send('Emulation.setEmulatedMedia', { features: process.env.VF_MEDIA.split(',').map((x) => { const [name, value] = x.split('='); return { name, value }; }) });
   return corps(s, ARGS);
 }, { csp: true });
 JS
@@ -60,7 +62,7 @@ const [, , f, a, b] = process.argv; const t = fs.readFileSync(f, 'utf8');
 if (!t.includes(a) || t.split(a).length !== 2) { console.error('mutation impossible : motif absent ou multiple : ' + a); process.exit(1); }
 fs.writeFileSync(f, t.replace(a, () => b));
 JS
-export VF_CS="$HERE_T/chrome-session.mjs"; export VF_CDP_ECHEANCE_MS="${VF_CDP_ECHEANCE_MS:-25000}" VF_CDP_TAG=git-tiroir
+export VF_MEDIA="${TIROIR_MEDIA:-}"; export VF_CS="$HERE_T/chrome-session.mjs"; export VF_CDP_ECHEANCE_MS="${VF_CDP_ECHEANCE_MS:-25000}" VF_CDP_TAG=git-tiroir
 cdp() { local r; r="$(node "$AUX/cdp-run.mjs" "$CHROME" "$@" 2>&1 | tail -1)"; case "$r" in *'"erreur"'*) echo "     (scénario interrompu : $r)" >&2;; esac; printf '%s\n' "$r"; }
 jq_() { node "$AUX/json.mjs" "$1" "$2"; }
 mutate() { node "$AUX/mut.mjs" "$@"; }
@@ -757,8 +759,12 @@ const mesure = `(() => { const num = (c) => (c.match(/[\\d.]+/g) || []).map(Numb
   const ratio = (e) => { const b = fond(e), t = num(getComputedStyle(e).color), c = over(t, b), x = lum(c), y = lum(b), h = Math.max(x, y), l = Math.min(x, y); return Math.round(((h + 0.05) / (l + 0.05)) * 100) / 100; };
   const min = (sel) => { const L = [...document.querySelectorAll(sel)]; return L.length ? Math.min(...L.map(ratio)) : -1; };
   return { sans: min('#vf-git-tiroir .vf-git-sans'), meta: min('#vf-git-tiroir .meta'), kbd: min('.vf-git-ligne .kbd'), pastille: min('#vf-git-tiroir .vf-git-pastille') }; })()`;
+// le thème « auto » suit prefers-color-scheme (Chrome headless sous Linux : clair) : la mesure « sombre » le pose elle-même, sinon elle mesurerait le clair deux fois (78-10, correction CI Linux)
+await s.ev(`document.documentElement.setAttribute('data-theme', 'dark')`); await pause(300);
+out.themes = [await s.ev(`document.documentElement.getAttribute('data-theme')`)];
 out.sombre = await s.ev(mesure);
 await s.ev(`document.documentElement.setAttribute('data-theme', 'light')`); await pause(300);
+out.themes.push(await s.ev(`document.documentElement.getAttribute('data-theme')`));
 out.clair = await s.ev(mesure);
 await s.ev(`document.documentElement.setAttribute('data-theme', 'dark')`);
 // G6 : une seule région vive, une annonce par copie, coche le temps du « Copiée »
@@ -784,6 +790,7 @@ JS
   [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$R15" > "$TIROIR_TRACE-d15.json"
   assert_eq "D15.1 — barres d'activité : remplissage en texte neutre (--text-3), jamais le vert d'état ; la même classe hors du tiroir garde son fond" "$(jq_ "$R15" '[j.barre.dans === j.barre.neutre, j.barre.hors !== j.barre.neutre].join("|")' 2>/dev/null)" "true|true"
   assert_eq "D15.2 — contraste >= 4,5:1 en sombre : « Aucune commande proposée », pilules .meta, kbd « g », pastilles" "$(jq_ "$R15" 'Object.values(j.sombre).every((v) => v >= 4.5) ? "ok" : JSON.stringify(j.sombre)' 2>/dev/null)" "ok"
+  assert_eq "D15.2a — témoin : la mesure « sombre » est faite en thème sombre et la mesure « clair » en thème clair (le thème n'est jamais laissé à prefers-color-scheme du poste), les deux jeux de rapports diffèrent" "$(jq_ "$R15" '[j.themes.join("/"), JSON.stringify(j.sombre) !== JSON.stringify(j.clair)].join("|")' 2>/dev/null)" "dark/light|true"
   assert_eq "D15.3 — contraste >= 4,5:1 en clair : mêmes éléments" "$(jq_ "$R15" 'Object.values(j.clair).every((v) => v >= 4.5) ? "ok" : JSON.stringify(j.clair)' 2>/dev/null)" "ok"
   assert_eq "D15.4 — une seule région aria-live dans le tiroir, une annonce « Commande copiée » par copie (deux copies : deux annonces), toutes de la même région" "$(jq_ "$R15" '[j.regions, j.copies.length, new Set(j.copies.map((c) => c[0])).size].join("|")' 2>/dev/null)" "1|2|1"
   assert_eq "D15.5 — icône de copie : coche le temps du « Copiée », puis de nouveau l'icône de copie" "$(jq_ "$R15" '[j.iconeAvant, j.iconeCoche, j.retour, j.iconeApres === j.iconeAvant].join("|")' 2>/dev/null)" "M9 9h10v10H9zM5 15V5h10|M5 13l4 4L19 7|Copiée|true"
