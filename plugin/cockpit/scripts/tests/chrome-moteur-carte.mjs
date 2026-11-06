@@ -2,7 +2,7 @@
 // Usage : node chrome-moteur-carte.mjs <chrome> <racine-du-serveur> <identifiant-de-session-équipe>
 //   UN Chrome, plusieurs pages (en anglais : ?lang=en, pour que les libellés du moteur soient lus tels qu'il les écrit, sans le dictionnaire).
 //   Chaque mesure est interrogée dans la page (jamais une durée fixe pour décider d'un état). Rend une ligne JSON { <clé>: valeur } ou { erreur }.
-//   Clés : panneau · modale · noms · stats · document · encart · echap · rangees · feuille · retour · jalon · pastille · info · bague · halo · equipe
+//   Clés : modale · noms · stats · document · encart · echap · rangees · feuille · retour · jalon · pastille · info · bague · halo · equipe
 import { executer, pause } from './chrome-session.mjs';
 const [, , chrome, racine, equipeSession] = process.argv;
 const U = (page) => `${racine}/${page}?lang=en`;
@@ -121,10 +121,6 @@ await executer(chrome, async (s) => {
     await s.attendre("!document.querySelector('#tooltip').hidden && document.querySelector('#tooltip').innerText.length > 0", 'infobulle de carte');
   }
   o.info = { texte: await s.ev("(document.querySelector('#tooltip') || { innerText: '' }).innerText"), pastille: await s.ev("!!document.querySelector('#tooltip .vst')") };
-
-  // ---------- panneau de détail par défaut : fermé à 768 px, ouvert à 1 024 px (PU-G-045) ----------
-  const ouvertA = async (w, h) => { await vue(w, h); await charger('index.html'); return s.ev("!document.body.classList.contains('no-panel') && document.querySelector('#btn-panel').getAttribute('aria-expanded') === 'true'"); };
-  o.panneau = { a768: await ouvertA(768, 1024), a1024: await ouvertA(1024, 768) };
 
   // ---------- onglet Équipe à 390 px : une seule colonne (PU-G-176) ----------
   await vue(390, 844, true); await charger('equipe.html');

@@ -8,7 +8,6 @@
 #   K6 lignes du panneau atteignables au Tab (PU-G-174) · K7 Échap hors du canevas ne remonte pas d'un niveau (PU-G-175)
 #   K8 anneau de focus de l'en-tête à toutes les largeurs (PU-G-013) · K9 repérage sans halo, 700 ms au plus
 #   K10 bulle de réponse : hauteur limitée, refermée au changement de vue (PU-G-149) · K11 « Retour » revient à la carte d'où partait la question (PU-G-148)
-#   K14 panneau de détail fermé par défaut à 768 px, ouvert à 1 024 px (PU-G-045)
 #   K12 nœud d'une mission : état réel en glyphe et mot, plus de « 0 » ni de « 0 lines » (PU-G-105) · K13 onglet Équipe à 390 px : une seule colonne (PU-G-176)
 # Un chargement de page unique (chrome-moteur-carte.mjs, un Chrome, profil jetable) ; les assertions se lisent ensuite sur sa sortie JSON. Lab construit par la suite, dans mktemp.
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
@@ -113,9 +112,6 @@ echo "=== K12 — état réel d'un nœud de mission ==="
 assert_eq "K12.1 — chaque ligne de la mission porte une pastille d'état" "$(E 'j.pastille.pastilles > 0 && j.pastille.pastilles === j.pastille.lignes.length')" "true"
 assert_eq "K12.2 — plus aucun « 0 » à droite des éléments" "$(E "j.pastille.lignes.length > 0 && !j.pastille.lignes.some((x) => x === '0' || /lines/i.test(x))")" "true"
 assert_eq "K12.3 — l'infobulle d'une carte dit l'état, plus « 0 lines »" "$(E "j.info.pastille && !/lines/i.test(j.info.texte)")" "true"
-echo "=== K14 — panneau de détail par défaut ==="
-assert_eq "K14.1 — à 768 px le panneau de détail est fermé par défaut" "$(E 'j.panneau.a768')" "false"
-assert_eq "K14.2 — contrôle positif : à 1 024 px il est ouvert par défaut" "$(E 'j.panneau.a1024')" "true"
 echo "=== K13 — onglet Équipe à 390 px ==="
 assert_eq "K13.1 — contrôle positif : la session porte une grille d'au moins 3 cartes" "$(E 'j.equipe.cartes >= 3')" "true"
 assert_eq "K13.2 — une seule colonne de cartes" "$(E 'j.equipe.colonnes')" "1"

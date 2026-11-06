@@ -2402,8 +2402,7 @@ const setPanel = (on) => {
     else if (!on && sheetReturn) { if (panel.contains(document.activeElement) || document.activeElement === document.body) sheetReturn.focus?.({ preventScroll: true }); sheetReturn = null; }
   }
 };
-// with no choice of the user's on record, the details panel opens only where it leaves room for the map: from 1 000 px, so a tablet in portrait (768 px) starts with the map in full (PU-G-045, Q11)
-document.body.classList.toggle('no-panel', isPhone() || !store.get('panel', innerWidth >= 1000));
+document.body.classList.toggle('no-panel', isPhone() || !store.get('panel', true));
 $('#btn-panel').setAttribute('aria-expanded', String(!document.body.classList.contains('no-panel')));
 // the top bar can be one or two rows tall: everything under it follows its real height
 const headerEl = document.querySelector('header');

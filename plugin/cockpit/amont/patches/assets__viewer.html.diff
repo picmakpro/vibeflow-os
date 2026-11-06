@@ -1366,17 +1366,7 @@
  }
  document.title = `${G.project.name} map`;
  $('#btn-up').onclick = up;
-@@ -2262,7 +2402,8 @@ const setPanel = (on) => {
-     else if (!on && sheetReturn) { if (panel.contains(document.activeElement) || document.activeElement === document.body) sheetReturn.focus?.({ preventScroll: true }); sheetReturn = null; }
-   }
- };
--document.body.classList.toggle('no-panel', isPhone() || !store.get('panel', true));
-+// with no choice of the user's on record, the details panel opens only where it leaves room for the map: from 1 000 px, so a tablet in portrait (768 px) starts with the map in full (PU-G-045, Q11)
-+document.body.classList.toggle('no-panel', isPhone() || !store.get('panel', innerWidth >= 1000));
- $('#btn-panel').setAttribute('aria-expanded', String(!document.body.classList.contains('no-panel')));
- // the top bar can be one or two rows tall: everything under it follows its real height
- const headerEl = document.querySelector('header');
-@@ -2281,7 +2422,9 @@ window.addEventListener('keydown', (ev) => {
+@@ -2281,7 +2421,9 @@ window.addEventListener('keydown', (ev) => {
    else if (ev.key === 'Escape') {
      if (!ctxEl.hidden || fm.classList.contains('open') || legendEl.classList.contains('open')) { closeMenu(); fm.classList.remove('open'); legendEl.classList.remove('open'); }
      else if (isPhone() && !document.body.classList.contains('no-panel')) closeSheet(); // on a phone the first Escape puts the details sheet away
@@ -1387,7 +1377,7 @@
    }
    else if (ev.key === 'f' || ev.key === 'F') fit(true);
    else if (ev.key === 'p' || ev.key === 'P') $('#btn-panel').click();
-@@ -2300,14 +2443,27 @@ function setTechnical(on) {
+@@ -2300,14 +2442,27 @@ function setTechnical(on) {
    render({ keepTransform: true, after: renderPanel });
    emit('technical', technicalFlag);
  }
@@ -1417,7 +1407,7 @@
    return { close, el: box };
  }
  let toastTimer = null;
-@@ -2316,6 +2472,7 @@ function showBoard({ title, question = '', answer = '', items = [], steps = [],
+@@ -2316,6 +2471,7 @@ function showBoard({ title, question = '', answer = '', items = [], steps = [],
    const clean = (arr) => (arr || []).map((x) => typeof x === 'string' ? { id: x, note: '' } : x).filter((x) => x && Q.exists(String(x.id))).map((x) => ({ id: String(x.id), note: String(x.note || '') }));
    const a = { title: title || 'Board', question, answer, items: clean(items).slice(0, 24), steps: clean(steps), followups: [], ...(kind ? { kind } : {}), ...(ic ? { icon: ic } : {}) };
    if (!a.items.length) { toast('Nothing on the map matches that.'); return; }
@@ -1425,7 +1415,7 @@
    state.answer = a; askState.last = a;
    go('q:answer', { force: true });
  }
-@@ -2372,6 +2529,8 @@ window.Floorplan = Object.freeze({
+@@ -2372,6 +2528,8 @@ window.Floorplan = Object.freeze({
    technical, setTechnical,
    store,
    on(event, fn) { (ext.listeners[event] ||= []).push(fn); },
