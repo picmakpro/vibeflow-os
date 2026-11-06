@@ -130,19 +130,23 @@
         return `<div class="vf-ms" data-vf-go="${h(m.id)}"><div class="t"><span>${h(m.key)}</span><span>${Number(m.done) || 0}/${Number(m.total) || 0} · ${pc} %</span></div><div class="vf-bar st-${h(m.st).replace(/[^\w-]/g, '')}"><i style="width:${pc}%"></i></div></div>`;
       }).join('');
       // état réel de chaque phase (avancement.etat) ; classes existantes seulement, valeur inconnue -> « À faire »
-      const ETAT_UI = { 'a-faire': ['vst-todo', 'À faire'], 'en-cours': ['vst-active', 'En cours'], 'a-recetter': ['vst-recette', 'À recetter'] };
+      const ETAT_UI = { 'a-faire': ['vst-todo', 'À faire'], 'en-cours': ['vst-active', 'En cours'], 'a-recetter': ['vst-recette', 'À recetter'], fait: ['vst-done', 'Fait'] };
       const next = V.next.map((n) => { const u = Object.prototype.hasOwnProperty.call(ETAT_UI, n.etat) ? ETAT_UI[n.etat] : ETAT_UI['a-faire']; return `<a class="vf-link" data-vf-go="${h(n.id)}"><span class="vst ${u[0]}">${u[1]}</span><span>${h(n.label)}</span></a>`; }).join('');
       const c = V.counts;
       // « Maintenant » : seulement les champs connus (un lab sans STATE.md n'a ni jalon, ni phase, ni statut)
       const desc = V.lastDesc || '';
+      // PU-G-093 : l'état de la phase courante est celui de sa carte (V.phaseEtat, calculé sur les fichiers de la phase) ; STATE.md ne sert que de repli quand la phase est introuvable, et le bloc dit quand il s'en écarte
+      const eu = V.phaseEtat && Object.prototype.hasOwnProperty.call(ETAT_UI, V.phaseEtat) ? ETAT_UI[V.phaseEtat] : null;
+      const pastille = eu ? `<span class="vst ${eu[0]}">${eu[1]}</span>` : statut(V.status) ? `<span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span>` : '';
+      const perime = eu && V.stateStale && statut(V.status) ? `<div style="margin-top:var(--sp-6);color:var(--text-3);font-size:12px">STATE.md semble périmé : il dit « ${h(statut(V.status))} ».</div>` : '';
       const now = V.milestone || V.phase || V.status
-        ? `<div class="vf-now" style="margin-top:var(--sp-12)"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${statut(V.status) ? `<span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span>` : ''}${desc ? `<div style="margin-top:var(--sp-6);color:var(--text-3);font-size:12px">${h(desc.slice(0, 260))}${desc.length > 260 ? '…' : ''}</div>` : ''}</div>`
+        ? `<div class="vf-now" style="margin-top:var(--sp-12)"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${pastille}${perime}${desc ? `<div style="margin-top:var(--sp-6);color:var(--text-3);font-size:12px">${h(desc.slice(0, 260))}${desc.length > 260 ? '…' : ''}</div>` : ''}</div>`
         : '';
       return `<div class="sec"><h2 class="pt">${h(G.project.name)}</h2>
           ${now}
           <div class="stats vf-stats" style="margin-top:var(--sp-12)"><div><b>${Number(c.phases) || 0}</b><span>phases</span></div><div><b>${Number(c.plans) || 0}</b><span>plans</span></div><div><b>${Number(c.reqsDone) || 0}/${Number(c.reqs) || 0}</b><span>exigences</span></div></div></div>
         <div class="sec"><h3>Prochaines phases <span class="c">${V.next.length}</span></h3>${next || '<p class="pd">Rien en attente dans le jalon en cours.</p>'}</div>
-        <div class="sec"><h3>Jalons <span class="c">${V.milestones.length}</span></h3>${ms}</div>
+        <div class="sec"><h3>Jalons <span class="c">${V.milestones.length}</span></h3><p class="pd">Dans l'ordre de la feuille de route.</p>${ms}</div>
         ${derive(V.drift)}${nonComprises(V.drift)}
         <div class="sec" style="color:var(--text-3);line-height:1.7;font-size:12px">Double-clic sur une carte pour plonger · <span class="kbd">⌫</span> remonter · <span class="kbd">/</span> chercher</div>`;
     });

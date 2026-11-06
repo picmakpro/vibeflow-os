@@ -346,8 +346,83 @@ assert_eq "O6.2 — chaque étape vise une carte du graphe (n:<id> existant) ou 
 assert_eq "O6.3 — aucune étape ne parle de « La base de code » ni « dans le code »" "$(t8 'j.tour.filter((s)=>/base de code|dans le code|codebase/i.test([s.kicker,s.title,s.note].join(" "))).length')" "0"
 assert_eq "O6.4 — sur un lab sans STATE.md, aucune étape avec « ? », « undefined », « null » ni champ vide" "$(G "$WORK/g3.json" 'j.tour.filter((s)=>[s.title,s.note].some((x)=>!x||/\?|undefined|null/.test(x))).length')|$(G "$WORK/g3.json" 'j.tour.length>=2')" "0|true"
 assert_eq "O6.6 — les étapes dans l'ordre : le jalon en cours, la phase 2 (statut lisible), la mission, au travail (#vf-lock)" "$(t8 'j.tour.map((s)=>s.ref+(s.cible?"+"+s.cible:"")).join(" ")')" "n:ms-v1.0-mvp n:ph-2 n:dag-MISSION-ECRAN root+#vf-lock"
-assert_eq "O6.7 — le statut de la phase est celui de statutLisible (« en exécution »), le jalon dit les phases faites (« 1 sur 2 »), l'étape « au travail » nomme l'onglet Équipe" "$(t8 '[/en exécution/.test(j.tour[1].note),/1 sur 2/.test(j.tour[0].note),/Équipe/.test(j.tour[3].note)].join(",")')" "true,true,true"
+assert_eq "O6.7 — l'état de la phase est celui de sa CARTE (« en cours » : un plan non fait, une mission vivante ; PU-G-093, ce n'est plus le « en exécution » de STATE.md), sans « périmé » quand STATE.md s'accorde, le jalon dit les phases faites (« 1 sur 2 »), l'étape « au travail » nomme l'onglet Équipe" "$(t8 '[/en cours/.test(j.tour[1].note),!/périmé|en exécution/.test(j.tour[1].note),/1 sur 2/.test(j.tour[0].note),/Équipe/.test(j.tour[3].note)].join(",")')" "true,true,true,true"
 assert_eq "O6.8 — un lab sans planning : visite vide (le repli de 70-07 s'applique, sans parler de code)" "$(G "$WORK/g9.json" 'j.tour.length')" "0"
+
+# R1 (lot 6 « Projet », étape PR1 « vérité des états », 2026-11-06 ; arbitrage Samuel, message direct en session principale, 2026-11-06 : toutes les propositions du panel) : PU-G-093, 097, 099, DG-10. Sans navigateur.
+echo "=== R1 — vérité des états : une phase dit l'état de sa carte, jalon « Hors jalon », exigences non cochées, exigences sans doublon ==="
+# PU-G-093 : STATE.md « ready_to_plan » alors que tous les plans de la phase 2 sont faits (carte « à recetter »)
+LR="$WORK/r1"; B="$LR/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+## Milestones
+
+- 🚧 **v1.0 MVP** - Phases 1-2 (in progress)
+
+## Phases
+
+- [x] **Phase 1: Socle** - premier jet
+- [ ] **Phase 2: Écran** - second jet
+MD
+printf -- '---\nmilestone: v1.0 MVP\nstatus: ready_to_plan\ncurrent_phase: 2\ncurrent_phase_name: Écran\n---\n' | wr "$B/STATE.md"
+wr "$B/phases/01-socle/01-01-PLAN.md" <<'MD'
+<objective>Socle</objective>
+MD
+echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
+wr "$B/phases/02-ecran/02-01-PLAN.md" <<'MD'
+<objective>Écran</objective>
+MD
+echo ok > "$B/phases/02-ecran/02-01-SUMMARY.md"
+graph "$LR" "$WORK/gr1.json"
+assert_eq "R1.1 — PU-G-093 : meta.vf.phaseEtat est l'état de la carte (a-recetter) et STATE.md est dit périmé (ready_to_plan contredit)" "$(G "$WORK/gr1.json" 'j.meta.vf.phaseEtat+"|"+j.meta.vf.stateStale+"|"+j.nodes.find(n=>n.id==="ph-2").st')" "a-recetter|true|recette"
+assert_eq "R1.2 — PU-G-093 : la visite (étape 2) et le sous-titre disent « à recetter », jamais « prête à planifier » ; la visite signale STATE.md périmé" "$(G "$WORK/gr1.json" '[/à recetter/.test(j.tour[1].note),/STATE\.md semble périmé/.test(j.tour[1].note),/prête/.test(j.tour[1].note+j.project.summary),/phase 2 \(Écran\) · à recetter\./.test(j.project.summary)].join(",")')" "true,true,false,true"
+# repli : phase courante introuvable -> le statut de STATE.md, sans accusation de péremption
+printf -- '---\nmilestone: v1.0 MVP\nstatus: executing\ncurrent_phase: 9\n---\n' | wr "$B/STATE.md"
+graph "$LR" "$WORK/gr1b.json"
+assert_eq "R1.3 — PU-G-093 : phase courante introuvable : phaseEtat null, repli sur le statut de STATE.md (« en exécution »), jamais périmé" "$(G "$WORK/gr1b.json" '[j.meta.vf.phaseEtat,j.meta.vf.stateStale,/en exécution/.test(j.project.summary)].join(",")')" ",false,true"
+printf -- '---\nmilestone: v1.0 MVP\nstatus: ready_to_plan\ncurrent_phase: 2\ncurrent_phase_name: Écran\n---\n' | wr "$B/STATE.md"
+UIV="$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js"
+assert_eq "R1.4 — PU-G-093 / DG-13 : 00-vibeflow.js lit V.phaseEtat pour le bloc « Maintenant », dit STATE.md périmé, et écrit « Dans l'ordre de la feuille de route. » sous « Jalons »" "$(grep -c 'V\.phaseEtat' "$UIV" | awk '{print ($1>=2)?"ok":"ko"}')|$(grep -c 'STATE.md semble périmé' "$UIV")|$(grep -c "Dans l'ordre de la feuille de route\." "$UIV")" "ok|1|1"
+# PU-G-099 : un vrai jalon (clos) et deux phases hors jalon, faites
+LJ="$WORK/r1j"; B="$LJ/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+## Milestones
+
+- ✅ **v1.0 MVP** — Phase 1 (livré)
+
+## Phases
+
+- [x] **Phase 1: Socle** - premier jet
+- [x] **Phase 2: Annexe** - hors jalon
+- [ ] **Phase 3: Suite** - hors jalon
+MD
+wr "$B/phases/01-socle/01-01-PLAN.md" <<'MD'
+<objective>Socle</objective>
+MD
+echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
+graph "$LJ" "$WORK/gj.json"
+assert_eq "R1.5 — PU-G-099 : avec un vrai jalon, le groupe des phases sans jalon s'appelle « Hors jalon » (id ms-hors-jalon), plus « Phases »" "$(G "$WORK/gj.json" 'j.nodes.filter(n=>n.kind==="jalon").map(n=>n.id+"="+n.label).sort().join(",")')" "ms-hors-jalon=Hors jalon,ms-v1.0-mvp=v1.0 MVP"
+assert_eq "R1.6 — PU-G-099 : « Hors jalon » n'est ni dans meta.vf.milestones, ni dans « Historique » (1 jalon clos, 1 phase), ni jalon mis en avant, ni chaîne « puis »" "$(G "$WORK/gj.json" '[j.meta.vf.milestones.map(m=>m.key).join("+"),j.nodes.find(n=>n.id==="history").foot,j.nodes.find(n=>n.id==="ms-hors-jalon").parent,j.flows[0].title,j.links.filter(l=>l.k==="event"&&(l.a==="n:ms-hors-jalon"||l.b==="n:ms-hors-jalon")).length].join("|")')" "v1.0 MVP|1 jalons · 1 phases||Trajectoire de v1.0 MVP|0"
+assert_eq "R1.7 — PU-G-099 : sans aucun jalon, le groupe garde « Phases » (lab P3)" "$(G "$WORK/g3.json" 'j.nodes.filter(n=>n.kind==="jalon").map(n=>n.label).join(",")')|$(G "$WORK/g3.json" 'j.meta.vf.milestones.map(m=>m.key).join(",")')" "Phases|Phases"
+# PU-G-097 : phase faite dont des exigences ne sont pas cochées, et phase non faite (inchangée)
+LX="$WORK/r1x"; B="$LX/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+- [x] **Phase 1: Faite** - a
+- [ ] **Phase 2: Ouverte** - b
+MD
+printf -- '- [x] **A-01**: un\n- [ ] **A-02**: deux\n- [ ] **A-03**: trois\n- [x] **B-01**: un\n- [ ] **B-02**: deux\n\n| A-01 | Phase 1 | Complete |\n| A-02 | Phase 1 | Pending |\n| A-03 | Phase 1 | Pending |\n| B-01 | Phase 2 | Complete |\n| B-02 | Phase 2 | Pending |\n' | wr "$B/REQUIREMENTS.md"
+graph "$LX" "$WORK/gx.json"
+assert_eq "R1.8 — PU-G-097 : phase faite, 2 exigences sur 3 non cochées : « 2 exigences non cochées » (texte neutre), plus « 1/3 exigences » ; phase non faite : « 1/2 exigences » inchangé" "$(G "$WORK/gx.json" '["ph-1","ph-2"].map(i=>j.nodes.find(n=>n.id===i).foot).join("|")')" "2 exigences non cochées|1/2 exigences"
+# DG-10 (PU-G-052) : même exigence dans le fichier vivant du compartiment ET dans l'archive de jalon, même phase par la traçabilité
+LD="$WORK/r1d"; B="$LD/.planning"
+wr "$B/workstreams/alpha/ROADMAP.md" <<'MD'
+- [x] **Phase 1: Un** - a
+- [ ] **Phase 2: Deux** - b
+MD
+echo alpha > "$B/active-workstream"
+printf -- '- [x] **RND-02**: recherche\n- [ ] **NEW-01**: neuf\n\n| RND-02 | Phase 1 | Complete |\n| NEW-01 | Phase 2 | Pending |\n' | wr "$B/workstreams/alpha/REQUIREMENTS.md"
+printf -- '- [x] **RND-02**: recherche\n- [x] **OLD-09**: autre phase\n\n| RND-02 | Phase 1 | Complete |\n| OLD-09 | Phase 5 | Complete |\n' | wr "$B/milestones/v0-REQUIREMENTS.md"
+graph "$LD" "$WORK/gd.json"
+assert_eq "R1.9 — DG-10 : RND-02 (vivant + archive, même phase) n'est lue qu'UNE fois (RND-02 sous ph-1, jamais en double) ; l'exigence propre à l'archive (OLD-09, phase 5 sans carte) reste comptée : 3 exigences dont 2 cochées" "$(G "$WORK/gd.json" 'j.files.filter(f=>f.p.startsWith("req/")).map(f=>f.name).sort().join(",")')|$(G "$WORK/gd.json" 'j.meta.vf.counts.reqs+"/"+j.meta.vf.counts.reqsDone')" "NEW-01,RND-02|3/2"
 
 # O4 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : la visite « Par où commencer » revenait à chaque chargement et recouvrait la réponse. Cause : son « déjà vue » vivait dans le localStorage
 # de l'ORIGINE (port compris) et le port du serveur changeait à chaque lancement. Décision (même date, « C : port stable par lab ») : port stable par lab (vf-cockpit-port.mjs), « déjà vue » en localStorage seul,
