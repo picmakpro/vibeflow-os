@@ -45,10 +45,20 @@
   word.className = 'theme-word';
   btn.appendChild(word);
 
+  // Le mot n'est montré que si l'en-tête a la place : il ne doit ni rogner l'en-tête ni rétrécir la recherche (sinon l'icône seule ; l'état reste dit par title et aria-label).
+  const fit = () => {
+    const h = document.querySelector('header'), hc = document.querySelector('.hc'); if (!h || !hc) return;
+    word.style.display = ''; const avec = hc.getBoundingClientRect().width, deborde = h.scrollWidth > h.clientWidth;
+    word.style.display = 'none'; const sans = hc.getBoundingClientRect().width;
+    word.style.display = !deborde && avec >= sans - 0.5 ? '' : 'none';
+  };
+  let attente = 0; const refit = () => { if (!attente) attente = requestAnimationFrame(() => { attente = 0; fit(); }); };
+
   const show = () => {
     const c = T.get();
     btn.querySelector('svg').innerHTML = ICON[c];
-    word.textContent = WORD[c]; // l'état courant en texte, à côté de l'icône (PU-G-009)
+    word.textContent = WORD[c]; // l'état courant en texte, à côté de l'icône, quand l'en-tête a la place (PU-G-009)
+    refit();
     const text = `Theme: ${NAME[c]}. Press for ${WORD[NEXT[c]]}.`;
     btn.title = text;
     btn.setAttribute('aria-label', text);
@@ -57,4 +67,7 @@
   btn.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') ev.stopPropagation(); });
   window.addEventListener('floorplan-theme-change', show);
   show();
+  window.addEventListener('resize', refit);
+  const ext = document.getElementById('hdr-ext'); if (ext) new MutationObserver(refit).observe(ext, { childList: true, subtree: true, characterData: true });
+  refit();
 })();
