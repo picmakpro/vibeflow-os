@@ -3,7 +3,7 @@
 // Espacements (71.5) : jetons de viewer.html (--sp-*, --edge, --inset-*), lus tels quels (la feuille vit dans la page hôte). Posés AVANT cette feuille : un var() inconnu ferait tomber la déclaration entière.
 export const STYLE_TIROIR = `
 .vf-term-pastille, .vf-term-puce { position: fixed; left: var(--edge); bottom: var(--edge); z-index: 6; border-radius: 999px; background: var(--raise); border: 1px solid var(--hair-2); font: 500 13px var(--sans); }
-.vf-term-pastille { height: 32px; display: inline-flex; align-items: center; gap: var(--sp-6); padding: 0 var(--sp-12) 0 var(--sp-8); color: var(--text-2); cursor: pointer; box-shadow: var(--shadow-card); transition: background .15s, color .15s; }
+.vf-term-pastille { height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-6); padding: 0 var(--sp-12); color: var(--text-2); cursor: pointer; box-shadow: var(--shadow-card); transition: background .15s, color .15s; }
 .vf-term-pastille:hover { background: var(--raise-2); color: var(--text); }
 .vf-term-pastille[hidden], .vf-term-point[hidden] { display: none; }
 .vf-term-pastille svg, .vf-term-bouton svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }

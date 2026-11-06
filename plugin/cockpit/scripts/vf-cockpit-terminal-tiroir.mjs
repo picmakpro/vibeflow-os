@@ -54,6 +54,8 @@ function scriptTiroir(cfg, accepte, construire) {
         if (z) z.style.bottom = '';
         n.style.bottom = '';
         if (!n.parentNode || n.hidden) return;
+        // 72.1 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06, « Pastille large comme le zoom ») : la pastille prend la largeur du groupe de zoom, lue sur lui (une seule règle, aucun nombre recopié) ; min-width ne fait que l'élargir : en colonne (téléphone, 701-1 279 px) le zoom est plus étroit qu'elle et rien ne change.
+        n.style.minWidth = b && b.width > 0 ? b.width + 'px' : '';
         if (sur(n.getBoundingClientRect(), kb)) n.style.bottom = Math.round(window.innerHeight - kb.top + 8) + 'px';
         if (!z) return;
         const a = n.getBoundingClientRect(), s = document.getElementById('stage'), fond = s ? s.getBoundingClientRect().bottom : window.innerHeight, zb = z.getBoundingClientRect();
