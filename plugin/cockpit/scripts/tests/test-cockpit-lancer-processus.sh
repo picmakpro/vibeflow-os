@@ -225,6 +225,8 @@ assert_eq "Q12 — GET montre la seconde (verbe executer, autre id) ; l'ancien i
 echo "=== Q10 — POST /annuler ==="
 ann() { rq "$QP" POST /annuler --secret "$SECRET" --onglet A --corps "{\"id\":\"$1\"}" "${@:2}" | sed -n 1p; }
 assert_eq "Q10 — Origin de P : 403 et la proposition reste en attente ; id inconnu : 404 (témoin : la proposition existe)" "$(ann "$ID2" --origin "http://127.0.0.1:$PP") $(pbody | evj 'j.etat') $(ann inconnu)" "403 en-attente 404"
+annB() { rq "$QP" POST /annuler --secret "$SECRET" --onglet B --corps "{\"id\":\"$1\"}" | sed -n 1p; }
+assert_eq "Q10b — un autre onglet (B), même muni du secret, ne peut pas annuler la proposition de l'onglet propriétaire (A) : 409 et elle reste en attente (même id)" "$(annB "$ID2") $(pbody | evj 'j.etat') $(pbody | evj 'j.id === "'"$ID2"'"')" "409 en-attente true"
 assert_eq "Q10 — POST /annuler {id} : 204, puis GET rend aucune, puis le même id rend 404" "$(ann "$ID2") $(pbody) $(ann "$ID2")" '204 {"etat":"aucune"} 404'
 
 echo "=== Q6 — programme au premier plan : 409, aucun octet, proposition conservée ==="
@@ -277,6 +279,12 @@ if mutant cr "s#sessions.lancer(ligneQ, onglet)#sessions.lancer(ligneQ + '\\\\r'
   mut_manche "$MUT_OUT"; R="$(pl "$(lj "$ID_M" herite)")"
   assert_eq "M-RETOUR-CHARIOT — sous le mutant, l'assistant refuse la ligne (400) et elle n'arrive pas à l'invite : Q5 rougit" "$R $(node "$TA" attendre "$FLUX" "$LH_M" 3000)" "400 ABSENT"; manche_fin
 else assert_eq "M-RETOUR-CHARIOT — mutant sans effet (ancre absente ou inchangée)" "sans effet" "effet"; fi
+
+echo "=== M-ANNULER-PROPRIETAIRE — la garde du propriétaire de POST /annuler est retirée (Q10b) ==="
+if mutant annprop "s#if (onglet !== proprietaire) return refus(res, 409);##"; then
+  mut_manche "$MUT_OUT"; R="$(annB "$ID_M")"
+  assert_eq "M-ANNULER-PROPRIETAIRE — sous le mutant, l'onglet B annule la proposition de l'onglet A (204 au lieu de 409) : Q10b rougit" "$R" "204"; manche_fin
+else assert_eq "M-ANNULER-PROPRIETAIRE — mutant sans effet (ancre absente ou inchangée)" "sans effet" "effet"; fi
 
 vf_hyg_assert
 echo "Résultats : $PASS PASS, $FAIL FAIL"
