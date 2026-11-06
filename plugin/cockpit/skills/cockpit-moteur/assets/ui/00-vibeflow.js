@@ -91,7 +91,7 @@
   const STATUT = { planning: 'en planification', ready_to_plan: 'prête à planifier', ready_to_execute: 'prête à exécuter', executing: 'en exécution', in_progress: 'en cours', verifying: 'en vérification', ready_for_verification: 'prête à vérifier', paused: 'en pause', blocked: 'bloqué', complete: 'terminée', completed: 'terminée', closed: 'clos', milestone_complete: 'jalon terminé' }; // recette 68 R11 (P68-D-35) : genre de la phase (« prête ») ; Phase 70 : table complète, valeur inconnue omise (jamais affichée brute)
   const statut = (x) => (Object.hasOwn(STATUT, x) ? STATUT[x] : '');
   // lignes non comprises du planning (drift.nonComprises, règle ligne-non-comprise) : fichier:ligne + extrait, jamais corrigées d'ici
-  const nonComprises = (D) => !D || !D.nonComprises || !D.nonComprises.length ? '' : `<div class="sec"><h3>Lignes non comprises <span class="c">${Number(D.nonComprisesN) || D.nonComprises.length}</span></h3>
+  const nonComprises = (D) => !D || !D.nonComprises || !D.nonComprises.length ? '' : `<div class="sec"><h3>Lignes du planning non comprises <span class="c">${Number(D.nonComprisesN) || D.nonComprises.length}</span></h3>
       ${D.nonComprises.map((x) => `<div class="vf-link"><code>${h(x.fichier)}:${Number(x.ligne) || 0}</code><span style="color:var(--text-3)">${h(x.extrait)}</span></div>`).join('')}
       ${(Number(D.nonComprisesN) || 0) > D.nonComprises.length ? `<p class="pd">${(Number(D.nonComprisesN) || 0) - D.nonComprises.length} autre(s) non listée(s).</p>` : ''}</div>`;
   // dérive de format de la planification (vf-cockpit-drift.mjs) : rien n'est corrigé d'ici, le panneau donne la commande
