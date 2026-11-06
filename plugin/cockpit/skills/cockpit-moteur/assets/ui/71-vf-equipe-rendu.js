@@ -46,7 +46,7 @@
     bloque: '<path d="M8 2.5l6 10.5H2z"/><path d="M8 6.6v3M8 11.4v.1"/>',
     orphelin: '<circle cx="8" cy="8" r="5.5" stroke-dasharray="2 2.4"/>',
     repli: '<path d="M6 4l4 4-4 4"/>',
-    commande: '<path d="M3 4.5l4 3.5-4 3.5"/><path d="M9 12h4"/>',
+    commande: '<path d="M1.5 8s2.3-4.5 6.5-4.5S14.5 8 14.5 8s-2.3 4.5-6.5 4.5S1.5 8 1.5 8z"/><circle cx="8" cy="8" r="1.8"/>', // un œil : « voir », jamais l'invite d'un terminal (PU-G-187)
   };
   const glyphe = (nom, cls) => `<svg class="aw-g${cls ? ' ' + cls : ''}" viewBox="0 0 16 16" aria-hidden="true" focusable="false">${GLYPHE[nom]}</svg>`;
   const GLYPHE_ETAT = { actif: 'actif', 'en-attente': 'attente', termine: 'termine', bloque: 'bloque' };
@@ -57,6 +57,16 @@
   const court = (w) => String(w.branch || tpath(w.tree));
   const calme = (w) => w.etat === 'actif' && typeof w.ageS === 'number' && w.ageS >= CALME_S;
   const verbe = (w) => { const a = w.action || {}; if (!a.verbe || a.verbe === GENERIQUE) return ''; return [a.verbe, a.cible].filter((x) => typeof x === 'string' && x).join(' '); };
+  // PU-G-186 : le titre d'une session passe par ce seul point (le titre `custom-title` s'y branchera) ; plusieurs sessions de même titre se distinguent par leur arbre, puis par leur identifiant court
+  const titreDe = () => 'Session principale';
+  const lieu = (w) => (tpath(w.tree) === 'arbre principal' || tpath(w.tree) === '.' ? 'main' : tpath(w.tree) || court(w));
+  const nommer = (workers) => {
+    const ss = (Array.isArray(workers) ? workers : []).filter((w) => w && w.kind === 'session' && typeof w.id === 'string'), noms = new Map();
+    for (const s of ss) { const g = ss.filter((x) => titreDe(x) === titreDe(s)); noms.set(s.id, g.length < 2 ? titreDe(s) : `${titreDe(s)} · ${lieu(s)}${g.filter((x) => lieu(x) === lieu(s)).length > 1 ? ' · ' + s.id.slice(0, 8) : ''}`); }
+    return noms;
+  };
+  let noms = new Map();
+  const SILENCE_PARENT_S = 1800; // PU-G-182 : une session parente en attente ou muette depuis plus de 30 min (le TTL de driver-lock.sh)
   const aVivant = (w, enfants) => w.etat !== 'termine' || (enfants.get(w.id) || []).some((k) => aVivant(k, enfants));
 
   // la durée dit de quoi elle parle : tenue d'un sous-agent en cours, ancienneté de la dernière écriture d'une session, durée d'un terminé
@@ -68,19 +78,21 @@
 
   const ligne = (w, parent, enfants, tous, h) => {
     const sess = w.kind === 'session', fini = w.etat === 'termine', ks = (tous.get(w.id) || []).filter((k) => aVivant(k, tous)).sort((a, b) => (b.dureeS || 0) - (a.dureeS || 0));
-    const nom = w.orphan ? 'orphelin' : GLYPHE_ETAT[w.etat] || 'actif';
-    const tache = sess ? 'Session principale' : w.task || '';
+    // PU-G-182 : « orphelin ? » (le registre dit « jamais fermé », pas « processus mort ») ; un enfant actif dont la session parente se tait depuis plus de 30 min l'est aussi
+    const orphe = !!w.orphan || (w.kind === 'subagent' && w.etat === 'actif' && !!parent && parent.kind === 'session' && parent.etat !== 'termine' && parent.ageS > SILENCE_PARENT_S);
+    const nom = orphe ? 'orphelin' : GLYPHE_ETAT[w.etat] || 'actif';
+    const tache = sess ? noms.get(w.id) || titreDe(w) : w.task || (fini ? `${w.role || 'Agent'} · ${String(w.id).slice(0, 8)}` : ''); // PU-G-184 : un agent terminé sans titre se nomme par son rôle et son identifiant court
     const raison = w.rattachement && w.rattachement.raison;
     const hors = w.kind === 'subagent' && !noeud(w) && !fini;
-    const sr = ` <span class="sr">(${MOT[w.etat] || 'actif'}${w.orphan ? ', orphelin' : ''}${w.stale ? ', donnée ancienne' : ''}${hors ? ', non rattaché : ' + h(raison || 'inconnu') : ''})</span>`;
+    const sr = ` <span class="sr">(${MOT[w.etat] || 'actif'}${orphe ? ', orphelin ?' : ''}${w.stale ? ', donnée ancienne' : ''}${hors ? ', non rattaché : ' + h(raison || 'inconnu') : ''})</span>`;
     // branche et arbre : une fois sur la session, puis en puce seulement quand ils diffèrent du parent (frontière Phase 78)
-    const puce = !sess && (!parent || court(parent) !== court(w)) ? `<span class="r-chip" title="${h(court(w))}">${h(tpath(w.tree) === 'arbre principal' || tpath(w.tree) === '.' ? 'main' : tpath(w.tree) || court(w))}</span>` : '';
-    const marques = (w.orphan ? '<span class="r-flag">orphelin</span>' : '') + (w.stale ? '<span class="r-flag">donnée ancienne</span>' : '') + (hors && raison === 'ambigu' ? '<span class="r-flag">non rattaché (ambigu)</span>' : '');
+    const puce = !sess && (!parent || court(parent) !== court(w)) ? `<span class="r-chip" title="${h(court(w))}">${h(lieu(w))}</span>` : '';
+    const marques = (orphe ? '<span class="r-flag">orphelin ?</span>' : '') + (w.stale ? '<span class="r-flag">donnée ancienne</span>' : '') + (hors && raison === 'ambigu' ? '<span class="r-flag">non rattaché (ambigu)</span>' : '');
     const v = verbe(w);
     const meta = sess ? `${h(tpath(w.tree))}${w.branch ? ' · ' + h(w.branch) : ''}${marques}`
       : `<b>${h(w.role || 'Agent')}</b>${calme(w) ? ' · sans nouvelle depuis ' + h(duree(w.ageS)) : ''}${w.etat === 'en-attente' ? ' · en attente' : w.etat === 'bloque' ? ' · bloqué' : ''}${!calme(w) && v ? ' · ' + h(v) : ''}${puce}${marques}`;
     const corps = `<span class="r-top"><span class="r-task">${h(tache)}${sr}</span>${temps(w, h)}</span>${fini ? '' : `<span class="r-meta">${meta}</span>`}`;
-    const rang = `<a class="r-row" href="${h(lien('equipe.html', carte(w)))}" title="${h(sess ? 'Session principale' : tache)} — voir dans l'onglet Équipe">${glyphe(nom, (w.etat === 'actif' && !w.orphan ? 'aw-pulse ' : '') + 'aw-s-' + nom)}<span class="r-main">${corps}</span></a>`;
+    const rang = `<a class="r-row" href="${h(lien('equipe.html', carte(w)))}" title="${h(tache)} — voir dans l'onglet Équipe">${glyphe(nom, (w.etat === 'actif' && !orphe ? 'aw-pulse ' : '') + 'aw-s-' + nom)}<span class="r-main">${corps}</span></a>`;
     const repli = ks.length ? `<button type="button" class="r-tog" data-vf-repli="${h(w.id)}" aria-expanded="true" aria-controls="k-${h(w.id)}" aria-label="Sous-agents de ${h(w.role || 'la session')}, ${ks.length}">${glyphe('repli', 'r-caret')}</button>` : '';
     const doing = !fini ? `<button type="button" class="r-doing" data-vf-doing="${h(w.id)}" aria-label="Voir la dernière commande de ${h(tache)}" title="Voir la dernière commande">${glyphe('commande')}</button><div class="vf-doing" hidden></div>` : '';
     const n = noeud(w);
@@ -91,6 +103,7 @@
   };
 
   const arbre = (workers, h) => {
+    noms = nommer(workers);
     const tous = (Array.isArray(workers) ? workers : []).filter(dedans);
     const connus = new Map(tous.map((w) => [w.id, w]));
     const racines = [], enfants = new Map();
@@ -126,7 +139,7 @@
     for (const m of Array.isArray(d.messages) ? d.messages : []) f.appendChild(el('p', m));
     f.appendChild(el('h4', 'Outils'));
     const ul = el('ul');
-    for (const o of Array.isArray(d.outils) ? d.outils : []) ul.appendChild(el('li', `${o.verbe || ''} ${o.cible || ''} (${o.outil || ''})`.replace(/\s+/g, ' ')));
+    for (const o of Array.isArray(d.outils) ? d.outils : []) ul.appendChild(el('li', `${o.verbe || ''} ${o.cible || ''} (${o.outil || ''})${Number.isInteger(o.n) && o.n > 1 ? ' × ' + o.n : ''}`.replace(/\s+/g, ' '))); // PU-G-170 : les répétitions consécutives sont regroupées par le réducteur
     f.appendChild(ul);
     return f;
   };
@@ -182,9 +195,10 @@
     .r-more { display: flex; align-items: center; min-height: 44px; padding-left: var(--sp-24); font-size: 12px; color: var(--text-2); text-decoration: underline; text-decoration-color: rgba(var(--ink), .35); text-underline-offset: 4px; }
     .aw-sec2 { display: flex; justify-content: space-between; margin: var(--sp-16) 0 var(--sp-4); font-size: 12px; color: var(--text-3); font-weight: 500; }
     .r-verr { display: grid; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--text-3); }
+    .r-verr .aw-g { display: inline-block; vertical-align: -3px; margin-right: var(--sp-6); } .aw-aide { margin: 0 0 var(--sp-4); font-size: 12px; color: var(--text-3); }
     .r-verr li { display: flex; justify-content: space-between; gap: var(--sp-12); padding: var(--sp-4) 0; } .r-verr b { color: var(--text-2); font-weight: 500; } .r-verr .n { font: 500 11.5px var(--mono, monospace); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .aw-foot { margin: var(--sp-12) 0 0; color: var(--text-3); font-size: 12px; line-height: 20px; }
   `;
 
-  window.__vfEquipeRendu = { arbre, agentsDuNoeud, transcript, pied, piedCarte, st, duree, versNoeud, actif, css: CSS };
+  window.__vfEquipeRendu = { glyphe, nomDeSession: (workers, id) => nommer(workers).get(id) || null, arbre, agentsDuNoeud, transcript, pied, piedCarte, st, duree, versNoeud, actif, css: CSS };
 })();
