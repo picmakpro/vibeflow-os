@@ -42,7 +42,7 @@ export function brancheBase(root, { sh = shDefaut } = {}) {
 
 // retard d'un arbre sur la base locale et sur origin/<base> LOCAL (lu, jamais rafraîchi), âge du dernier fetch (date de FETCH_HEAD du dossier git commun)
 export function retard({ chemin, base, commonDir, now = Date.now(), sh = shDefaut, lab = chemin } = {}) {
-  const compte = (ref) => entier(git(sh, chemin, lab, 'rev-list', '--count', `HEAD..${ref}`));
+  const compte = (ref) => entier(git(sh, chemin, lab, 'rev-list', '--count', `HEAD..${ref}`, '--'));
   const main = base ? compte(base) : null;
   const origin = base && existe(sh, chemin, lab, `refs/remotes/origin/${base}`) ? compte(`origin/${base}`) : null;
   let fetchAgeS = null;
@@ -51,7 +51,8 @@ export function retard({ chemin, base, commonDir, now = Date.now(), sh = shDefau
 }
 
 // toute chaîne d'arbre ou de branche qui sort du socle : contrôles retirés (C0, DEL, C1), masque des secrets, borne à n caractères
-export const nettoie = (s, n = 200) => masque(String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, '')).slice(0, n);
+// A8 : tout caractère de catégorie Unicode Cf (format : bidi U+202A-202E et U+2066-2069, espaces de largeur nulle U+200B-200F, U+2060, U+FEFF, U+061C…) est retiré, avec les contrôles et U+2028/2029
+export const nettoie = (s, n = 200) => masque(String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/gu, '')).slice(0, n);
 
 // phase active d'un arbre (P68-PL-04), fonction pure : (1) la phase dont le numéro suit le motif fixe `phase-<n>` du nom de branche, si elle existe ;
 // (2) sinon la dernière phase (ordre de la feuille de route) portant une mission `running` ; (3) sinon la dernière phase `en-cours` ; (4) sinon null.

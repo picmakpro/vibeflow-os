@@ -60,8 +60,8 @@ if (!m) { console.log(JSON.stringify({ erreur: 'module absent' })); process.exit
 const git = (...a) => spawnSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
 let s = Number(seed0) >>> 0; const rnd = (n) => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s % n; };
 // oracle indépendant du module : ce que l'affichage retirerait
-const refuse = (t) => [...t].some((c) => { const p = c.codePointAt(0); return p <= 0x1f || (p >= 0x7f && p <= 0x9f) || p === 0x2028 || p === 0x2029 || (p >= 0x202a && p <= 0x202e) || (p >= 0x2066 && p <= 0x2069); });
-const T = ['a', 'b', 'x', '-', '--', '.', '_', '/', '$', '(', ')', ';', '`', '|', '&', "'", '"', '<', '>', '*', '\\', '{', '}', ',', '!', '#', '%', '=', '+', '@', 'é', '🙂', '‮', '\u0007', '⁦', '\u0085',
+const refuse = (t) => [...t].some((c) => { const p = c.codePointAt(0); return p <= 0x1f || (p >= 0x7f && p <= 0x9f) || p === 0x2028 || p === 0x2029 || /\p{Cf}/u.test(c); }); // A8 : tout caractère de catégorie Cf (bidi U+202A-202E et U+2066-2069 compris)
+const T = ['a', 'b', 'x', '-', '--', '.', '_', '/', '$', '(', ')', ';', '`', '|', '&', "'", '"', '<', '>', '*', '\\', '{', '}', ',', '!', '#', '%', '=', '+', '@', 'é', '🙂', '‮', '\u0007', '⁦', '\u0085', '\u200b', '\ufeff',
   '-x', '--all', '$HOME', '${IFS}', 'HEAD', 'refs/heads/y', '1234567', 'ghp_abcdefghijklmnopqrstuvwxyz0123',
   `$(touch\${IFS}${marques}/g1)`, `\`touch\${IFS}${marques}/g2\``, `;touch\${IFS}${marques}/g3;`, `';touch\${IFS}${marques}/g4;'`, `|touch\${IFS}${marques}/g5|`, `&touch\${IFS}${marques}/g6&`];
 const vus = new Set(); const noms = [];
@@ -195,6 +195,22 @@ echecs_nuls() {
 }
 assert_eq "C1.5 — U+202E, U+0007, U+0085, DEL, U+2028/9, U+202A, U+2066, U+2069, \\n, ESC, vide, 201 car., non-chaîne -> null ; 200 car., U+00A0, U+202F, U+2065, U+2027 -> commande" "$(echecs_nuls)" ""
 
+# C1.9 (A8, audit 2026-11-06) : TOUT caractère de catégorie Unicode Cf (format : largeur nulle U+200B-U+200F, U+2060-U+2064, U+FEFF, U+061C, U+00AD, bidi) n'a pas de commande, sur les trois constructeurs ;
+# les noms légitimes accentués ou non latins en ont une (les combinants Mn et les emoji simples ne sont pas des Cf)
+echecs_cf() {
+  local out="" fn v
+  for fn in cmdCd cmdSwitch cmdBranchSupprimer; do
+    for v in $'a\xe2\x80\x8bb' $'a\xe2\x80\x8cb' $'a\xe2\x80\x8db' $'a\xe2\x80\x8eb' $'a\xe2\x80\x8fb' $'a\xe2\x81\xa0b' $'a\xe2\x81\xa1b' $'a\xef\xbb\xbfb' $'a\xd8\x9cb' $'a\xc2\xadb' $'\xef\xbb\xbfmain'; do
+      CMD "$fn" "$v"; [ "$CMD_RC" -eq 3 ] || out="$out[$fn:cf-null-attendu:$(printf '%s' "$v" | od -An -c | tr -d ' \n' | cut -c1-24)]"
+    done
+    for v in 'café' 'Ünïcödé' 'ñandú' '日本語' $'e\xcc\x81' 'feat/été' 'é🙂'; do
+      CMD "$fn" "$v"; [ "$CMD_RC" -eq 0 ] || out="$out[$fn:legitime-attendu:$v]"
+    done
+  done
+  printf '%s' "$out"
+}
+assert_eq "C1.9 — U+200B à U+200F, U+2060, U+2061, U+FEFF (en tête aussi), U+061C, U+00AD -> null sur cmdCd, cmdSwitch et cmdBranchSupprimer ; café, Ünïcödé, ñandú, 日本語, e + combinant, feat/été, é🙂 -> commande" "$(echecs_cf)" ""
+
 # C1.6 : échantillon généré, chaque commande exécutée par chaque shell
 SHELLS="bash"; command -v zsh >/dev/null 2>&1 && SHELLS="bash,zsh"; SHELLS="$SHELLS,sh"
 GREPO="$WORK/grepo"; git init -q -b main "$GREPO"; git -C "$GREPO" commit -q --allow-empty -m un; git -C "$GREPO" commit -q --allow-empty -m deux
@@ -210,7 +226,7 @@ assert_eq "C1.6 — échantillon généré : aucun échec ni marqueur sous $SHEL
 assert_eq "C1.6b — témoin de portée : ≥ 100 branches exécutées, ≥ 10 noms armés (touch), ≥ 5 noms refusés, par shell" "$(awk '{ split($4,nul,"="); split($5,exe,"="); split($6,arm,"="); if (exe[2] >= 100 && arm[2] >= 10 && nul[2] >= 5) ok++ } END { print ok+0 }' "$WORK/gen.res")" "$NSH"
 
 # C1.7 : parité avec l'affichage
-assert_eq "C1.7 — AFFICHAGE_REFUSE = exactement les points de code que nettoie retire (76, aucun écart, U+0000 à U+10FFFF)" "$(node "$AUX/parite.mjs" "$SCRIPTS" 2>/dev/null)" "76|0"
+assert_eq "C1.7 — AFFICHAGE_REFUSE = exactement les points de code que nettoie retire (au moins les 76 de l'ancienne classe, aucun écart, U+0000 à U+10FFFF ; A8 : la classe Cf s'y ajoute des deux côtés)" "$(node "$AUX/parite.mjs" "$SCRIPTS" 2>/dev/null | awk -F'|' '{ print ($1 >= 76 ? "76+" : "moins") "|" $2 }')" "76+|0"
 
 
 # C1.8 : « - » et « @ » existent comme branches mais git switch les lit en raccourcis : pas de commande de bascule ; branch -d, lui, les vise bien
@@ -274,7 +290,7 @@ sonde_mutant() {
   node "$AUX/mutate.mjs" "$MOD_REEL" "$p" "$@" 2>/dev/null || { printf 'mutation-impossible'; return; }
   VF_MOD="$p" CMD cmdStatus; [ "$CMD_OUT" = "git status" ] || { printf 'mutant-ne-charge-pas'; return; }
   local sw ci nu
-  sw="$(VF_MOD="$p" echecs_switch bash)"; ci="$(VF_MOD="$p" echecs_citer bash)"; nu="$(VF_MOD="$p" echecs_nuls)"
+  sw="$(VF_MOD="$p" echecs_switch bash)"; ci="$(VF_MOD="$p" echecs_citer bash)"; nu="$(VF_MOD="$p" echecs_nuls)$(VF_MOD="$p" echecs_cf)"
   git -C "$REPO" symbolic-ref HEAD refs/heads/main
   printf '%s|%s|%s' "$([ -n "$sw" ] && echo R || echo V)$([[ "$sw" == *"[-x]"* ]] && echo -x)" "$([ -n "$ci" ] && echo R || echo V)" "$([ -n "$nu" ] && echo R || echo V)"
 }
@@ -283,11 +299,18 @@ assert_eq "C3.2 — M-EOO (--end-of-options retiré de cmdSwitch) rougit C1.1 su
 assert_eq "C3.3 — M-BIDI (AFFICHAGE_REFUSE vidé) rougit C1.5, pas C1.1 ni C1.4" "$(sonde_mutant M-BIDI M-BIDI)" "V|V|R"
 U='\u'
 i=0
-for pl in "${U}0000-${U}001f=>" "${U}007f-${U}009f=>" "${U}2028=>" "${U}2029=>" "${U}202a-${U}202e=>" "${U}2066-${U}2069=>" \
-          "${U}202a-${U}202e=>${U}202b-${U}202e" "${U}202a-${U}202e=>${U}202a-${U}202d" "${U}2066-${U}2069=>${U}2067-${U}2069" "${U}2066-${U}2069=>${U}2066-${U}2068"; do
+for pl in "${U}0000-${U}001f=>" "${U}007f-${U}009f=>" "${U}2028=>" "${U}2029=>" \
+          '\p{Cf}=>' '\p{Cf}=>\u202a-\u202e\u2066-\u2069' '\p{Cf}=>\u200b-\u200f\u2060\ufeff\u061c' '\p{Cf}=>\u202a-\u202e\u2066-\u2069\u200b-\u200f' \
+          '\p{Cf}=>\u202b-\u202e\u2066-\u2069\u200b-\u200f\u2060\ufeff\u061c' '\p{Cf}=>\u202a-\u202e\u2067-\u2069\u200b-\u200f\u2060\ufeff\u061c'; do
   i=$((i+1)); DE="${pl%%=>*}"; VERS="${pl#*=>}"
-  assert_eq "C3.4.$i — M-BIDI plage ${DE} -> [${VERS}] rougit C1.5 seul" "$(sonde_mutant "M-BIDI-$i" PLAGE "$DE" "$VERS")" "V|V|R"
+  assert_eq "C3.4.$i — M-BIDI plage ${DE} -> [${VERS}] rougit C1.5 ou C1.9 seul" "$(sonde_mutant "M-BIDI-$i" PLAGE "$DE" "$VERS")" "V|V|R"
 done
+
+
+# M-NETTOIE : `nettoie` (vf-cockpit-arbres.mjs) retrouve l'ancienne classe (sans Cf) : la parité C1.7 rougit (écarts), l'affichage et la commande divergent
+MN="$WORK/mut-nettoie"; rm -rf "$MN"; mkdir -p "$MN"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$MN/"
+node -e 'const fs=require("fs"),f=process.argv[1];let s=fs.readFileSync(f,"utf8");const a="\\u2029\\p{Cf}]/gu";if(!s.includes(a)){console.log("ancre absente");process.exit(1)}fs.writeFileSync(f,s.replace(a,"\\u2029\\u202a-\\u202e\\u2066-\\u2069]/g"));console.log("muté")' "$MN/vf-cockpit-arbres.mjs"
+assert_eq "C3.5 — M-NETTOIE : nettoie revient à l'ancienne classe (sans Cf) ; la parité C1.7 rougit (au moins un écart, ex. U+200B retenu par nettoie mais refusé par AFFICHAGE_REFUSE)" "$(node "$AUX/parite.mjs" "$MN" 2>/dev/null | awk -F'|' '{ print ($2 > 0 ? "ecarts" : "aucun") }')" "ecarts"
 
 echo
 echo "=== Résultats : $PASS PASS, $FAIL FAIL ==="

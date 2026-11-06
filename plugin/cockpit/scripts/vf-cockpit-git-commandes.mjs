@@ -9,8 +9,8 @@
 // la citation : entre guillemets simples, chaque guillemet simple devient '\'' (identique sous bash, zsh et sh)
 export const citer = (s) => "'" + s.replace(/'/g, "'\\''") + "'";
 
-// classe de `nettoie` (vf-cockpit-arbres.mjs) : C0, DEL et C1, U+2028/2029, bidi U+202A-202E et U+2066-2069 ; écrite en échappements, jamais en caractères
-export const AFFICHAGE_REFUSE = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/;
+// classe de `nettoie` (vf-cockpit-arbres.mjs) : C0, DEL et C1, U+2028/2029 et tout caractère de catégorie Cf (A8 : bidi, largeur nulle, U+FEFF, U+061C…) ; écrite en échappements, jamais en caractères
+export const AFFICHAGE_REFUSE = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/u;
 
 const MAX = 200;
 const texte = (s) => (typeof s === 'string' && s.length > 0 && s.length <= MAX && !AFFICHAGE_REFUSE.test(s) ? s : null);
