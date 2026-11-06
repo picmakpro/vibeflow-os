@@ -55,6 +55,7 @@ button { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 #terminal.vf-q-cache { visibility: hidden; }
 #etat[hidden] { display: none; }
+.vf-q-sr { position: absolute; width: 1em; height: 1em; margin: -1em; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .vf-q-carte:focus-visible { outline: none; }
 .vf-q-voile { position: fixed; inset: 0; background: rgba(var(--ink), .06); }
 .vf-q-carte { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100% - 2 * var(--sp-16))); display: flex; flex-direction: column; gap: var(--sp-8); padding: var(--inset-card); background: var(--raise); border-radius: var(--r-card); box-shadow: 0 0 0 1px var(--hair-2); }

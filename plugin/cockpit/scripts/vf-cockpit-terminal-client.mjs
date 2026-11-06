@@ -62,13 +62,18 @@ export function clientTerminal(cfg) {
     if (!j.lignes || typeof j.lignes !== 'object' || MODES.some((m) => typeof j.lignes[m] !== 'string' || !/^[\x20-\x7e]{1,400}$/.test(j.lignes[m])) || !liste(j.bloquants) || !liste(j.avertissements) || !ent(j.arme_apres_ms, 0, 10000) || !ent(j.expire_ms, 1, 600000)) return null;
     if ((j.chat !== undefined || j.lignes_chat !== undefined) && (j.chat !== true || !j.lignes_chat || typeof j.lignes_chat !== 'object' || MODES.some((m) => typeof j.lignes_chat[m] !== 'string' || !/^[\x20-\x7e]{1,400}$/.test(j.lignes_chat[m])))) return null; // 72-13 : chat (vrai) et lignes_chat vont ensemble, sinon « aucune »
     return { chat: j.chat === true ? true : undefined, lignesChat: j.chat === true ? Object.fromEntries(MODES.map((m) => [m, j.lignes_chat[m]])) : undefined, id: j.id, verbe: j.verbe, intention: j.intention, phase: j.phase, ws: j.ws, lignes: Object.fromEntries(MODES.map((m) => [m, j.lignes[m]])), bloquants: j.bloquants.slice(), avertissements: j.avertissements.slice(), arme_apres_ms: j.arme_apres_ms, expire_ms: j.expire_ms }; };
-  let attente = null, courante = null, fermee = null, pret = false, terminal = null, enVol = false;
-  const afficher = () => { if (!pret || attente === null || courante === attente.id) return; courante = attente.id; vue.proposition(Object.assign({}, attente), { lancer, annuler }); };
+  let attente = null, courante = null, fermee = null, pret = false, terminal = null, enVol = false, premiere = true, ancienne = null;
+  // LB2 (Q7, PU-G-118 et PU-G-119) : une proposition d'une visite précédente (cadre neuf, déjà plus vieille que VISITE_MS) est effacée au premier sondage, jamais montrée puis remplacée sous le clic ;
+  // le cadre qui se recharge dans la MÊME visite (thème) garde son nom de fenêtre et retrouve sa proposition tant qu'elle n'a pas expiré ; un bandeau manipulé n'est pas remplacé (la vue rend false : on réessaie au sondage suivant)
+  const EXPIRE_REF = 120000, VISITE_MS = 30000, memeVisite = window.name === 'vf-q-visite'; window.name = 'vf-q-visite';
+  const afficher = () => { if (!pret || attente === null || courante === attente.id) return; const p = attente; if (vue.proposition(Object.assign({}, p), { lancer, annuler }) === false) return; courante = p.id; };
   const lire = async () => {
     if (enVol) return; enVol = true; try {
       const r = await fetch('/proposition', { headers: entetes(), cache: 'no-store' }); if (!r.ok) return;
-      const j = await r.json().catch(() => null), p = forme(j);
+      const j = await r.json().catch(() => null), p = forme(j), debut = premiere; premiere = false;
       if (!p) { attente = null; if (courante !== null) { courante = null; vue.proposition(null); } return; } // garde:aucune
+      if (debut && !memeVisite && EXPIRE_REF - p.expire_ms > VISITE_MS) ancienne = p.id; // garde:visite
+      if (p.id === ancienne) { fermee = p.id; if (pret) fetch('/annuler', { method: 'POST', headers: Object.assign(entetes(), { 'Content-Type': 'application/json' }), body: JSON.stringify({ id: p.id }), cache: 'no-store' }).catch(() => {}); return; } // jamais montrée ; effacée dans Q dès que cet onglet est le propriétaire du terminal (avant, Q répond 409 : on réessaie au sondage suivant), sans prise de focus
       if (p.id === fermee) return; // garde:fermee
       const nouveau = attente === null || p.id !== attente.id; attente = Object.assign(p, { modeInitial: modeServi(j) });
       if (nouveau) emettre('proposition'); // garde:emission

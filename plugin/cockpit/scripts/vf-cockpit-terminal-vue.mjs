@@ -38,7 +38,28 @@ export function vueTerminal(cfg) {
     brightBlack: '#595959', brightRed: '#da1637', brightGreen: '#007f3d', brightYellow: '#986300', brightBlue: '#1747a8', brightMagenta: '#5233b8', brightCyan: '#0a6a5a', brightWhite: '#161616',
   };
   // bandeau de proposition (72-08) : modes, note du mode hérité, motifs des pré-vols (mêmes codes et mêmes textes que la carte, une page par origine), messages par statut de lancement
-  const MODES_UI = [{ mode: 'default', libelle: 'Par défaut' }, { mode: 'acceptEdits', libelle: 'Accepter les modifications' }, { mode: 'plan', libelle: 'Plan (lecture seule)' }, { mode: 'herite', libelle: 'Hérité du poste' }];
+  // une ligne d'explication par mode (72 LB2, PU-G-121) ; `risque` : glyphe de forme distincte + mot neutre « Risqué », jamais une teinte (Q9)
+  const MODES_UI = [
+    { mode: 'default', libelle: 'Par défaut', aide: 'Claude Code demande votre accord avant de modifier un fichier ou de lancer une commande.' },
+    { mode: 'acceptEdits', libelle: 'Accepter les modifications', aide: 'Les modifications de fichiers sont acceptées sans vous demander ; relisez le résultat avant de le garder.', risque: true },
+    { mode: 'plan', libelle: 'Plan (lecture seule)', aide: 'Claude lit le projet et propose un plan, sans rien modifier.' },
+    { mode: 'herite', libelle: 'Hérité du poste', aide: 'Aucun réglage imposé : ceux de votre poste ou du projet s’appliquent.' },
+  ];
+  // verbe -> [impératif de la ligne (ASCII), impératif affiché, infinitif, ce que fait l'assistant] (72 LB2, PU-G-120 et PU-G-124) : la ligne de commande reste en ASCII, seul l'affichage reçoit les accents
+  const VERBES_UI = {
+    cadrer: ['Cadre', 'Cadre', 'cadrer', 'échanger avec vous pour fixer ce que la phase doit livrer'],
+    planifier: ['Planifie', 'Planifie', 'planifier', 'découper la phase en plans à exécuter'],
+    executer: ['Execute', 'Exécute', 'exécuter', 'réaliser les plans prévus'],
+    verifier: ['Verifie', 'Vérifie', 'vérifier', 'contrôler que la phase livre ce qui était promis'],
+    reprendre: ['Reprends', 'Reprends', 'reprendre', 'relancer la mission interrompue là où elle s’était arrêtée'],
+  };
+  const EXPIRE_PROCHE_MS = 3000; // sous ce reste, la disparition annoncée par Q vaut expiration : le bandeau le dit au lieu de s'effacer en silence
+  const BOUTON_PREPARER = 'Préparer dans le terminal', BOUTON_EN_COURS = 'Préparation…';
+  const PHRASE_ENTREE = 'Appuyez sur Entrée dans le terminal pour démarrer.';
+  const AIDE_CHAT = 'Reprend le fil de votre conversation avec le chat du cockpit dans la session lancée, sur une copie : la conversation d’origine n’est pas modifiée.';
+  const RISQUE_CHAT = 'la session lancée relit toute cette conversation, y compris ce qui n’a pas de rapport avec cette carte.';
+  const TEXTE_EXPIREE = 'Proposition expirée — la renvoyer.';
+  const ANNONCE_PREPAREE = 'Commande préparée dans le terminal. ' + PHRASE_ENTREE;
   const NOTE_HERITE = "Aucun mode n'est imposé : Claude Code suit les réglages de votre poste ou du projet ; un projet ne peut imposer ni « tout autoriser » ni auto (Claude Code 2.1.257 et plus).";
   const MOTIFS = Object.assign(Object.create(null), {
     'phase-finie': 'La phase est terminée.', 'terminal-absent': 'Le terminal est indisponible sur ce poste.', 'terminal-arrete': 'Le terminal est arrêté. Relancez /vf-cockpit --terminal.',
@@ -48,17 +69,46 @@ export function vueTerminal(cfg) {
     'phase-plus-avancee-ailleurs': "Une version plus récente de ce travail existe à part (autre arbre de travail). Le lancement part du dossier principal, qui n'a pas cette avance : consultez cette version avant de lancer.", 'phase-sans-plan': "Aucun plan à exécuter pour cette phase : cadrez puis planifiez d'abord.", 'lancement-recent': 'Cette cible a déjà été lancée récemment.', 'travail-non-commite': "Du travail non commité existe dans l'arbre de travail.",
   });
   const MESSAGES_LANCEMENT = Object.assign(Object.create(null), {
-    occupe: "Le terminal n'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n'a été écrit ; vérifiez, puis cliquez sur Lancer.", attendre: 'Patientez un instant, puis cliquez de nouveau sur Lancer.',
+    occupe: "Le terminal n'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n'a été écrit ; vérifiez, puis cliquez sur Préparer dans le terminal.", attendre: 'Patientez un instant, puis cliquez de nouveau sur Préparer dans le terminal.',
     'sans-session': "Aucune session de terminal n'est ouverte : relancez le shell, puis réessayez.", refus: 'Le lancement a été refusé.', reseau: 'Le terminal ne répond pas.',
   });
-  // feuille des contrôles du bandeau de proposition (72, réglages du 2026-11-06) : variables de Q seulement, identifiants du bandeau, texte neutre ; posée une fois, la CSP de Q autorise le style en ligne
+  // feuille des contrôles du bandeau de proposition (72, réglages du 2026-11-06 ; LB2) : variables de Q seulement, identifiants du bandeau, texte neutre ; posée une fois, la CSP de Q autorise le style en ligne
   const STYLE_PROPOSITION = '#proposition-mode { border: thin solid var(--hair-2); border-radius: var(--r-ctl); background: var(--raise-2); color: var(--text); color-scheme: inherit; font: inherit; }'
     + '#proposition input[type="checkbox"] { accent-color: var(--on); color-scheme: inherit; }'
     + '#proposition-lancer[aria-disabled="true"], #proposition-lancer[aria-disabled="true"]:hover { cursor: not-allowed; background: var(--raise-2); color: var(--text-3); }'
-    + '.vf-lancer-armement { display: none; } #proposition:has(#proposition-lancer[aria-disabled="true"]) .vf-lancer-armement { display: inline; }';
+    + '.vf-lancer-armement { display: none; } #proposition:has(#proposition-lancer[aria-disabled="true"]) .vf-lancer-armement { display: inline; }'
+    + '#proposition { max-height: calc(100% - var(--sp-16)); overflow-y: auto; }'
+    + '#proposition-message:empty { display: none; }'
+    + '#proposition .vf-q-aide { font-size: .92em; font-weight: 400; line-height: 1.5; color: var(--text-2); }'
+    + '#proposition ul.vf-q-modes { flex: 1 1 100%; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); }'
+    + '#proposition ul.vf-q-modes li { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-8); font-size: .92em; line-height: 1.5; color: var(--text-2); }'
+    + '#proposition ul.vf-q-modes .vf-q-mode-nom { font-weight: 500; color: var(--text); }'
+    + '#proposition .vf-q-risque { display: inline-flex; align-items: center; gap: var(--sp-4); font-weight: 500; color: var(--text); }'
+    + '#proposition svg.i { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }';
   const poserStyleProposition = () => { if (document.getElementById('vf-lancer-style')) return; const st = document.createElement('style'); st.id = 'vf-lancer-style'; st.textContent = STYLE_PROPOSITION; document.head.appendChild(st); };
-  let courant = null, minuterie = 0; // identifiant du bandeau affiché ; minuterie d'armement
-  const retirerProposition = () => { clearTimeout(minuterie); minuterie = 0; const a = document.getElementById('proposition'); if (a) a.remove(); courant = null; };
+  const PICTO_RISQUE = 'M8 2L14.5 13.5H1.5Z M8 6.5V9.5 M8 11.6V11.7'; // triangle : forme distincte des pastilles rondes, sans teinte
+  const duree = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)), m = Math.floor(s / 60); return m > 0 ? m + ' min ' + String(s % 60).padStart(2, '0') + ' s' : s + ' s'; };
+  const annoncer = (txt) => { const r = document.getElementById('annonce'); if (r) r.textContent = txt; }; // région live polie de la page (aucun focus pris)
+  const affichee = (intention, verbe) => { const v = VERBES_UI[verbe]; return v && typeof intention === 'string' && intention.indexOf(v[0]) === 0 ? v[1] + intention.slice(v[0].length) : intention; };
+  let courant = null, minuterie = 0, compte = 0, echeance = 0, appui = false; // identifiant du bandeau affiché ; minuterie d'armement ; compte à rebours et son échéance ; geste de souris en cours dans le bandeau
+  const retirerProposition = () => { clearTimeout(minuterie); minuterie = 0; clearInterval(compte); compte = 0; echeance = 0; const a = document.getElementById('proposition'); if (a) a.remove(); courant = null; };
+  // « manipulé » : un bouton de souris est enfoncé dans le bandeau, ou le cadre a le focus sur le sélecteur de mode ou la case du chat ; un bandeau manipulé n'est jamais remplacé sous la main (PU-G-119)
+  const manipule = () => {
+    const a = document.getElementById('proposition'); if (!a) return false;
+    if (appui) return true;
+    const f = document.activeElement; return document.hasFocus() && !!f && f !== document.body && a.contains(f) && (f.tagName === 'SELECT' || f.type === 'checkbox');
+  };
+  document.addEventListener('pointerdown', (ev) => { appui = !!(ev.target && ev.target.closest && ev.target.closest('#proposition')); }, true);
+  ['pointerup', 'pointercancel'].forEach((n) => document.addEventListener(n, () => { appui = false; }, true));
+  // bandeau d'une proposition arrivée à échéance : dit en clair ce qui s'est passé, ne propose plus rien (« Fermer » seulement)
+  const montrerExpiree = () => {
+    retirerProposition();
+    const b = el('div', 'vf-q-bandeau vf-q-collage'); b.id = 'proposition'; b.setAttribute('data-etat', 'expiree'); b.setAttribute('role', 'status');
+    b.appendChild(el('span', 'vf-q-pastille')); b.appendChild(el('span', 'vf-q-texte', TEXTE_EXPIREE));
+    b.appendChild(bouton('Fermer', () => retirerProposition(), 'vf-q-secondaire'));
+    const t = document.getElementById('terminal'); if (t) document.body.insertBefore(b, t); else document.body.appendChild(b);
+    annoncer(TEXTE_EXPIREE);
+  };
   window.vfTermVue = {
     invisible: (t) => INVISIBLE.test(String(t).replace(/\t/g, '')),
     // curseur de la barre de défilement : teinte de l'encre Graphite (variable --ink de la feuille), opacités plus fortes qu'avant (10 % en veille) ; repli sur la valeur de la feuille
@@ -96,59 +146,90 @@ export function vueTerminal(cfg) {
       z.appendChild(b); if (r && document.hasFocus()) r.focus(); // L2 : jamais de focus pris à la page
     },
     effacer() { const z = vider(); z.hidden = true; },
-    // proposition : p = { id, intention, lignes, bloquants, avertissements, arme_apres_ms, modeInitial } (revalidée par le client), cb = { lancer(mode, avecChat) -> Promise<statut>, annuler() } ; p.chat === true et p.lignesChat (72-13) : case « Continuer la conversation du chat » ; null retire.
-    // « Lancer » n'est armé qu'après arme_apres_ms, jamais en présence d'un bloquant, et ne répond qu'à un clic de confiance ; la ligne montrée est celle du mode choisi, posée par textContent
+    // proposition : p = { id, verbe, intention, phase, ws, lignes, bloquants, avertissements, arme_apres_ms, expire_ms, modeInitial } (revalidée par le client), cb = { lancer(mode, avecChat) -> Promise<statut>, annuler() } ; p.chat === true et p.lignesChat (72-13) : case « Continuer la conversation du chat » ; null retire.
+    // « Préparer dans le terminal » n'est armé qu'après arme_apres_ms, jamais en présence d'un bloquant, et ne répond qu'à un clic de confiance ; la ligne montrée est celle du mode choisi, posée par textContent.
+    // LB2 : phrase en clair avant la commande, une ligne par mode, explication et risque de la case du chat, compte à rebours (expire_ms), bandeau placé avant la saisie dans l'ordre de la page et annoncé (jamais de focus pris) ;
+    // un bandeau manipulé n'est pas remplacé (rend false : l'appelant réessaie), une proposition arrivée à échéance le dit au lieu de disparaître.
     proposition(p, cb) {
-      if (p === null || p === undefined) { retirerProposition(); return; }
+      if (p === null || p === undefined) {
+        const a = document.getElementById('proposition');
+        if (a && a.getAttribute('data-etat') === 'expiree') return; // le message d'expiration reste jusqu'à « Fermer » ou une nouvelle proposition
+        if (a && echeance && echeance - Date.now() < EXPIRE_PROCHE_MS) { montrerExpiree(); return; }
+        retirerProposition(); return;
+      }
+      if (courant !== p.id && manipule()) return false; // garde:manipule
       const premier = courant !== p.id; retirerProposition();
       const bloquants = p.bloquants || [], avertissements = p.avertissements || [];
       const b = el('div', 'vf-q-bandeau vf-q-collage'); b.id = 'proposition'; b.setAttribute('data-id', p.id); b.setAttribute('role', 'group'); b.setAttribute('aria-label', 'Lancement à confirmer');
       b.appendChild(el('span', 'vf-q-pastille vf-q-attention'));
-      const t = el('span', 'vf-q-texte', 'Lancement proposé : ' + p.intention); b.appendChild(t); // garde:texte
-      const sel = el('select'); sel.id = 'proposition-mode'; sel.setAttribute('aria-label', 'Mode de permission');
+      const t = el('span', 'vf-q-texte', 'Lancement proposé : ' + affichee(p.intention, p.verbe)); b.appendChild(t); // garde:texte
+      const sel = el('select'); sel.id = 'proposition-mode'; sel.setAttribute('aria-label', 'Mode de permission'); sel.setAttribute('aria-describedby', 'proposition-modes');
       MODES_UI.forEach((m) => { const o = el('option', '', m.libelle); o.value = m.mode; sel.appendChild(o); });
       sel.value = MODES_UI.some((m) => m.mode === p.modeInitial) ? p.modeInitial : 'default'; b.appendChild(sel);
       poserStyleProposition();
       const armement = el('span', 'vf-q-decompte vf-lancer-armement', bloquants.length ? 'Lancement bloqué' : 'Prêt dans un instant'); armement.id = 'proposition-armement'; b.appendChild(armement); // l'état « pas encore armé » se dit en texte neutre ; masqué dès que le bouton est armé
+      const reste = Number.isFinite(p.expire_ms) && p.expire_ms > 0 ? p.expire_ms : 0;
+      let delai = null; if (reste) { delai = el('span', 'vf-q-decompte', 'Expire dans ' + duree(reste)); delai.id = 'proposition-expire'; delai.setAttribute('role', 'timer'); b.appendChild(delai); } // compte à rebours : jamais annoncé à chaque seconde
       const annuler = bouton('Annuler', () => { cb.annuler(); retirerProposition(); }, 'vf-q-secondaire'); b.appendChild(annuler);
-      const lancer = el('button', 'vf-q-bouton', 'Lancer'); lancer.type = 'button'; lancer.id = 'proposition-lancer';
+      const lancer = el('button', 'vf-q-bouton', BOUTON_PREPARER); lancer.type = 'button'; lancer.id = 'proposition-lancer';
       lancer.setAttribute('aria-disabled', 'true'); // garde:armement
       lancer.setAttribute('aria-describedby', 'proposition-armement');
       b.appendChild(lancer);
+      const phrase = el('div', 'vf-q-reste'); const v = VERBES_UI[p.verbe]; // phrase en clair, avant la commande : ce que l'assistant va faire (la commande exacte reste montrée plus bas)
+      const quoi = v ? 'L’assistant va ' + v[2] + ' la phase ' + p.phase + (p.ws ? ' du compartiment ' + p.ws : '') + ' : ' + v[3] + '.' : 'L’assistant va lancer ce travail dans une session Claude Code.';
+      const phraseTxt = el('span', 'vf-q-texte vf-q-aide', quoi); phraseTxt.id = 'proposition-phrase'; phrase.appendChild(phraseTxt); b.appendChild(phrase);
       const prevol = (cls, prefixe, code) => { const d = el('div', 'vf-q-reste'); d.appendChild(el('span', 'vf-q-texte ' + cls, prefixe + (MOTIFS[code] || 'Contrôle non reconnu.'))); b.appendChild(d); };
       bloquants.forEach((c) => prevol('vf-q-erreur-texte', 'Bloquant : ', c)); avertissements.forEach((c) => prevol('vf-q-attention-texte', 'Attention : ', c));
-      const avecChat = CHAT_LIVRE && p.chat === true && !!p.lignesChat && typeof p.lignesChat === 'object'; // garde:chat-offre
-      let caseChat = null;
-      if (avecChat) {
-        const d = el('div', 'vf-q-reste'), lab = el('label', 'vf-q-texte'); caseChat = el('input'); caseChat.type = 'checkbox'; caseChat.id = 'proposition-chat';
-        lab.appendChild(caseChat); lab.appendChild(el('span', '', 'Continuer la conversation du chat')); d.appendChild(lab); b.appendChild(d);
-      }
+      let caseChat = null; // la case est construite plus bas ; la commande exacte la lit à chaque rendu
       const lignes = () => (caseChat && caseChat.checked ? p.lignesChat : p.lignes)[sel.value];
       const ligne = el('div', 'vf-q-apercu', lignes()); ligne.id = 'proposition-ligne'; ligne.tabIndex = 0; ligne.setAttribute('role', 'region'); ligne.setAttribute('aria-label', 'Commande exacte'); b.appendChild(ligne);
+      const entree = el('div', 'vf-q-reste'); const et = el('span', 'vf-q-texte vf-q-aide', 'Le bouton écrit cette ligne dans le terminal sans la lancer. ' + PHRASE_ENTREE); et.id = 'proposition-entree'; entree.appendChild(et); b.appendChild(entree); lancer.setAttribute('aria-describedby', 'proposition-armement proposition-entree');
       const msg = el('div', 'vf-q-reste'); msg.id = 'proposition-message'; msg.setAttribute('role', 'status'); b.appendChild(msg);
+      const retenu = MODES_UI.some((m) => m.mode === p.modeInitial) && p.modeInitial !== 'default' ? p.modeInitial : null; // un mode autre que « Par défaut » ne vient que d'un choix précédent
+      const modes = el('ul', 'vf-q-modes'); modes.id = 'proposition-modes';
+      MODES_UI.forEach((m) => {
+        const li = el('li'); li.setAttribute('data-mode', m.mode);
+        li.appendChild(el('span', 'vf-q-mode-nom', m.libelle + (retenu === m.mode ? ' — votre dernier choix' : '')));
+        if (m.risque) { const r = el('span', 'vf-q-risque'); r.appendChild(picto(PICTO_RISQUE)); r.appendChild(document.createTextNode('Risqué')); li.appendChild(r); }
+        li.appendChild(document.createTextNode(m.aide)); modes.appendChild(li);
+      });
+      b.appendChild(modes);
+      const avecChat = CHAT_LIVRE && p.chat === true && !!p.lignesChat && typeof p.lignesChat === 'object'; // garde:chat-offre
+      if (avecChat) {
+        const d = el('div', 'vf-q-reste'), lab = el('label', 'vf-q-texte'); caseChat = el('input'); caseChat.type = 'checkbox'; caseChat.id = 'proposition-chat'; caseChat.setAttribute('aria-describedby', 'proposition-chat-aide');
+        lab.appendChild(caseChat); lab.appendChild(el('span', '', 'Continuer la conversation du chat')); d.appendChild(lab); b.appendChild(d);
+        const e = el('div', 'vf-q-reste'), at = el('span', 'vf-q-texte vf-q-aide'); at.id = 'proposition-chat-aide'; // décochée par défaut ; l'explication et le risque sont écrits, jamais repliés
+        at.appendChild(document.createTextNode(AIDE_CHAT + ' '));
+        const r = el('span', 'vf-q-risque'); r.appendChild(picto(PICTO_RISQUE)); r.appendChild(document.createTextNode('Risque')); at.appendChild(r); at.appendChild(document.createTextNode(' : ' + RISQUE_CHAT)); e.appendChild(at); b.appendChild(e);
+      }
       let note = null;
       const majMode = () => {
         ligne.textContent = lignes();
-        if (sel.value === 'herite' && !note) { note = el('div', 'vf-q-reste'); note.appendChild(el('span', 'vf-q-texte', NOTE_HERITE)); b.insertBefore(note, msg); }
+        if (sel.value === 'herite' && !note) { note = el('div', 'vf-q-reste'); note.appendChild(el('span', 'vf-q-texte', NOTE_HERITE)); b.insertBefore(note, modes); }
         if (sel.value !== 'herite' && note) { note.remove(); note = null; }
       };
       sel.addEventListener('change', majMode); if (caseChat) caseChat.addEventListener('change', majMode); majMode();
       const armer = () => { clearTimeout(minuterie); if (bloquants.length === 0) minuterie = setTimeout(() => lancer.setAttribute('aria-disabled', 'false'), p.arme_apres_ms); };
       armer();
+      if (reste) { // compte à rebours : l'échéance est celle que Q a servie ; à zéro, le bandeau dit l'expiration (le panneau le dit de son côté)
+        echeance = Date.now() + reste;
+        compte = setInterval(() => { const r = echeance - Date.now(); if (r <= 0) { if (document.getElementById('proposition') === b) montrerExpiree(); return; } delai.textContent = 'Expire dans ' + duree(r); }, 1000);
+      }
       const fin = (st) => {
         if (document.getElementById('proposition') !== b) return; // le bandeau a été remplacé ou retiré entre-temps
-        if (st === 'ok' || st === 'absente') { retirerProposition(); return; } // garde:retrait-usage
+        if (st === 'ok' || st === 'absente') { retirerProposition(); if (st === 'ok') annoncer(ANNONCE_PREPAREE); return; } // garde:retrait-usage
+        lancer.textContent = BOUTON_PREPARER;
         msg.textContent = MESSAGES_LANCEMENT[st] || MESSAGES_LANCEMENT.refus;
         if (st === 'attendre') armer(); else if (bloquants.length === 0) lancer.setAttribute('aria-disabled', 'false');
       };
       lancer.addEventListener('click', (ev) => {
         if (ev.isTrusted !== true || lancer.getAttribute('aria-disabled') === 'true') return; // garde:clic-fiable
-        lancer.setAttribute('aria-disabled', 'true'); msg.textContent = '';
+        lancer.setAttribute('aria-disabled', 'true'); msg.textContent = ''; lancer.textContent = BOUTON_EN_COURS;
         Promise.resolve().then(() => cb.lancer(sel.value, !!(caseChat && caseChat.checked))).then(fin).catch(() => fin('reseau'));
       });
-      const c = document.getElementById('collage');
-      if (c) document.body.insertBefore(b, c); else document.body.appendChild(b); // garde:collage-dessus
-      courant = p.id; if (premier && document.hasFocus()) annuler.focus(); // F1 : jamais de focus pris à la page ; Annuler (inoffensif) seulement si ce cadre l'a déjà
+      const c = document.getElementById('collage'), tq = document.getElementById('terminal');
+      if (tq) document.body.insertBefore(b, tq); else if (c) document.body.insertBefore(b, c); else document.body.appendChild(b); // garde:collage-dessus : avant la saisie dans l'ordre de la page, donc atteignable au Tab sans la parcourir ; le collage, inséré après, reste au-dessus
+      courant = p.id; annoncer('Lancement proposé : ' + affichee(p.intention, p.verbe) + (reste ? '. Expire dans ' + duree(reste) + '.' : '.')); if (premier && document.hasFocus()) annuler.focus(); // F1 : jamais de focus pris à la page ; Annuler (inoffensif) seulement si ce cadre l'a déjà
     },
     // collage à confirmer : ce que l'utilisateur confirme est EXACTEMENT ce qui part. Le texte intégral est montré (zone défilante, atteignable au clavier) par textContent
     // seulement, avec ses nombres de lignes et de caractères ; seul l'AFFICHAGE est neutralisé (caractères invisibles ou de contrôle rendus ⟨U+XXXX⟩, jamais retirés ;

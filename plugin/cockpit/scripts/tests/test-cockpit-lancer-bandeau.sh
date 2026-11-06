@@ -10,7 +10,7 @@
 #   LB.E  client réel + serveur factice du contrat §4 + faux P sous Chrome (E1 à E7, puis E8 cadre masqué)
 #   LB.F  F1 (focus) : faux P à champ de saisie, frappes abc, fenêtre focalisée puis non focalisée ; SP-1 : clic Lancer, tiroir fermé, le bandeau apparaît dans Q
 #   LB.P  le serveur factice écoute un port >= 4600 et différent de 4456
-#   M-*   vingt-trois mutants (copies des sources, « mutant sans effet » = FAIL)
+#   M-*   vingt-six mutants (copies des sources, « mutant sans effet » = FAIL)
 # Sans Chrome : les sections statiques et les doublures tournent, la suite annonce SUITE SAUTÉE (navigateur) pour V et E.
 # Variables : VF_CLIENT_MS (échéance d'une attente navigateur, 20000 par défaut) · VF_LB_PORTS=bas-haut (plage de ports du serveur factice ; sinon ports libres du système).
 # Exit 0 si tout passe, 1 sinon.
@@ -72,7 +72,7 @@ export const MOTIFS = {
 };
 export const INCONNU = 'Contrôle non reconnu.';
 export const MSG = {
-  occupe: 'Le terminal n\'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n\'a été écrit ; vérifiez, puis cliquez sur Lancer.', attendre: 'Patientez un instant, puis cliquez de nouveau sur Lancer.',
+  occupe: 'Le terminal n\'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n\'a été écrit ; vérifiez, puis cliquez sur Préparer dans le terminal.', attendre: 'Patientez un instant, puis cliquez de nouveau sur Préparer dans le terminal.',
   'sans-session': 'Aucune session de terminal n\'est ouverte : relancez le shell, puis réessayez.', refus: 'Le lancement a été refusé.', reseau: 'Le terminal ne répond pas.',
 };
 JS
@@ -457,7 +457,7 @@ await executer(chrome, async (s) => {
       await monter({ id: ID(51), intention, lignes: { default: hostile, acceptEdits: hostile + ' a', plan: hostile + ' b', herite: hostile + ' c' }, bloquants: ['<b>x</b>'], avertissements: ['<i>y</i>'] });
       await pause(400);
       const f = await q.ev(`(() => { const b = document.getElementById('proposition'); return { lit: b.textContent.includes(${JSON.stringify(intention)}), ligne: document.getElementById('proposition-ligne').textContent, img: b.querySelectorAll('img').length, m72: typeof window.__M72,
-        styles: b.querySelectorAll('[style]').length + (b.hasAttribute('style') ? 1 : 0), brut: b.textContent.includes('<b>x</b>') || b.textContent.includes('<i>y</i>'), noeuds: b.querySelectorAll('b, i, script, a, svg').length }; })()`);
+        styles: b.querySelectorAll('[style]').length + (b.hasAttribute('style') ? 1 : 0), brut: b.textContent.includes('<b>x</b>') || b.textContent.includes('<i>y</i>'), noeuds: b.querySelectorAll('b, i, script, a').length + [...b.querySelectorAll('svg')].filter((x) => !x.closest('.vf-q-risque')).length }; })()`); // LB2 : le seul svg admis est le glyphe du risque (LB.V11 le dénombre), jamais un nœud sorti d'un texte hostile
       r.v5 = [f.lit, f.ligne === hostile, f.img, f.m72, f.styles, f.brut, f.noeuds, s.violations.length].join('/');
       await raz();
     });
@@ -501,6 +501,72 @@ await executer(chrome, async (s) => {
         if (t === '' || t.includes(INCONNU)) sans.push(c);
       }
       r.v9 = codes.length + '/' + sans.join(','); await raz();
+    });
+    await essai('v10', async () => { // LB2 (PU-G-112, 120, 124) : accents à l'AFFICHAGE seulement, phrase en clair avant la commande, bouton « Préparer dans le terminal », phrase d'Entrée
+      const sortie = [];
+      for (const [verbe, affiche, intention, inf] of [['cadrer', 'Cadre', 'Cadre', 'cadrer'], ['planifier', 'Planifie', 'Planifie', 'planifier'], ['executer', 'Exécute', 'Execute', 'exécuter'], ['verifier', 'Vérifie', 'Verifie', 'vérifier'], ['reprendre', 'Reprends', 'Reprends', 'reprendre']]) {
+        await raz(); await monter({ id: ID(100), verbe, intention: `${intention} la Phase 72 du compartiment alpha` });
+        const f = await q.ev(`(() => { const b = document.getElementById('proposition'), ph = document.getElementById('proposition-phrase'), l = document.getElementById('proposition-ligne');
+          return { texte: b.querySelector('.vf-q-texte').textContent, phrase: ph.textContent, avant: !!(ph.compareDocumentPosition(l) & Node.DOCUMENT_POSITION_FOLLOWING), bouton: document.getElementById('proposition-lancer').textContent,
+            entree: document.getElementById('proposition-entree').textContent, ascii: /^[\\x20-\\x7e]+$/.test(l.textContent) }; })()`);
+        sortie.push([f.texte === `Lancement proposé : ${affiche} la Phase 72 du compartiment alpha`, f.phrase.startsWith(`L’assistant va ${inf} la phase 72 du compartiment alpha : `), f.avant, f.bouton, f.entree.includes('Appuyez sur Entrée dans le terminal pour démarrer.'), f.ascii].join('.'));
+      }
+      r.v10 = sortie.join(';'); await raz();
+    });
+    await essai('v11', async () => { // LB2 (PU-G-121, 122 ; Q9) : une ligne par mode, « Risqué » (glyphe + mot, couleur neutre) sur « Accepter les modifications » seulement, « votre dernier choix » seulement pour un mode retenu autre que « Par défaut »
+      await raz(); await monter({ id: ID(110), modeInitial: 'default' });
+      const a = await q.ev(`(() => { const li = [...document.querySelectorAll('#proposition-modes li')], cs = (e) => getComputedStyle(e), nom = (x) => x.querySelector('.vf-q-mode-nom').textContent, risque = document.querySelector('.vf-q-risque');
+        return { modes: li.map((x) => x.dataset.mode).join('|'), noms: li.map(nom).join('|'), aides: li.every((x) => x.textContent.length > nom(x).length + 20),
+          risques: li.filter((x) => x.querySelector('.vf-q-risque')).map((x) => x.dataset.mode + ':' + x.querySelector('.vf-q-risque').textContent + ':' + x.querySelectorAll('.vf-q-risque svg').length).join('|'),
+          neutre: !!risque && cs(risque).color === cs(document.querySelector('.vf-q-mode-nom')).color && cs(risque.querySelector('svg')).stroke === cs(risque).color,
+          decrit: document.getElementById('proposition-mode').getAttribute('aria-describedby') === 'proposition-modes', dernier: document.getElementById('proposition-modes').textContent.includes('dernier choix') }; })()`);
+      await monter({ id: ID(111), modeInitial: 'plan' });
+      const b = await q.ev(`document.querySelector('#proposition-modes li[data-mode="plan"] .vf-q-mode-nom').textContent + '/' + document.getElementById('proposition-modes').textContent.split('dernier choix').length`);
+      r.v11 = [a.modes, a.noms, a.aides, a.risques, a.neutre, a.decrit, a.dernier, b].join('/'); await raz();
+    });
+    await essai('v12', async () => { // LB2 (PU-G-123 ; Q6) : case du chat décochée par défaut, ce que fait la reprise et son risque écrits SANS exposer « -r … --fork-session » dans la phrase ; la commande, elle, change à la coche
+      const lc = (m) => ligne(m) + " -r '0b8c7d6e-1111-4222-8333-444455556666' --fork-session";
+      await raz(); await monter({ id: ID(120), chat: true, lignesChat: { default: lc('default'), acceptEdits: lc('acceptEdits'), plan: lc('plan'), herite: lc('') } });
+      const f = await q.ev(`(() => { const c = document.getElementById('proposition-chat'), a = document.getElementById('proposition-chat-aide'); return { coche: c.checked, desc: c.getAttribute('aria-describedby'), aide: a.textContent, ligne0: document.getElementById('proposition-ligne').textContent }; })()`);
+      await q.ev(`(() => { const c = document.getElementById('proposition-chat'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+      const l1 = await q.ev(`document.getElementById('proposition-ligne').textContent`);
+      r.v12 = [f.coche, f.desc, f.aide.includes('Reprend le fil de votre conversation'), f.aide.includes('Risque : la session lancée relit toute cette conversation'), !/--fork-session|-r '/.test(f.aide), !f.ligne0.includes('--fork-session'), l1.includes('--fork-session') && l1.includes("-r '0b8c7d6e")].join('/'); await raz();
+    });
+    await essai('v13', async () => { // LB2 (PU-G-114) : compte à rebours depuis expire_ms ; à l'échéance « Proposition expirée — la renvoyer. » (annoncé, seul « Fermer » reste) ; proposition(null) ne l'efface pas ; une disparition annoncée à moins de 3 s de l'échéance vaut expiration, pas à 100 s
+      await raz(); await monter({ id: ID(130), expire_ms: 90000 });
+      const c0 = await q.ev(`(() => { const e = document.getElementById('proposition-expire'), a = document.getElementById('annonce'); return e.textContent + '|' + e.getAttribute('role') + '|' + a.getAttribute('aria-live') + '|' + a.textContent; })()`);
+      await monter({ id: ID(131), expire_ms: 2500, arme_apres_ms: 400 });
+      await q.attendre(`(document.getElementById('proposition') || {}).getAttribute && document.getElementById('proposition').getAttribute('data-etat') === 'expiree'`, 'bandeau expiré', 8000);
+      const e1 = await q.ev(`(() => { const b = document.getElementById('proposition'); return b.querySelector('.vf-q-texte').textContent + '|' + [...b.querySelectorAll('button')].map((x) => x.textContent).join(',') + '|' + !!document.getElementById('proposition-lancer') + '|' + document.getElementById('annonce').textContent; })()`);
+      await q.ev(`(() => { vfTermVue.proposition(null); return true; })()`); await pause(200);
+      const reste = await q.ev(`!!document.getElementById('proposition')`);
+      await clic(`[...document.querySelectorAll('#proposition button')].find((b) => b.textContent === 'Fermer')`); await pause(200);
+      const ferme = await q.ev(`!document.getElementById('proposition')`);
+      await monter({ id: ID(132), expire_ms: 2000 }); await q.ev(`(() => { vfTermVue.proposition(null); return true; })()`);
+      const proche = await q.ev(`(document.getElementById('proposition') || { getAttribute: () => 'absent' }).getAttribute('data-etat')`);
+      await raz(); await monter({ id: ID(133), expire_ms: 100000 }); await q.ev(`(() => { vfTermVue.proposition(null); return true; })()`);
+      const loin = await q.ev(`!document.getElementById('proposition')`);
+      r.v13 = [c0, e1, reste, ferme, proche, loin].join('/'); await raz();
+    });
+    await essai('v14', async () => { // LB2 (PU-G-117 ; Q5) : le bandeau est avant la saisie dans l'ordre de la page, après la région annoncée (live, polie) qui le dit
+      await raz(); await monter({ id: ID(140) });
+      r.v14 = await q.ev(`(() => { const b = document.getElementById('proposition'), t = document.getElementById('terminal'), a = document.getElementById('annonce'), F = Node.DOCUMENT_POSITION_FOLLOWING;
+        return [!!(b.compareDocumentPosition(t) & F), !!(a.compareDocumentPosition(b) & F), a.getAttribute('role'), a.getAttribute('aria-live'), a.textContent.startsWith('Lancement proposé')].join('/'); })()`); await raz();
+    });
+    await essai('v15', async () => { // LB2 (PU-G-119) : un bandeau manipulé (sélecteur focalisé, ou bouton de souris enfoncé dans le bandeau) n'est jamais remplacé ; libre, il l'est
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }); await s.ev(`document.querySelector('iframe[data-t]').focus()`);
+      await raz(); await monter({ id: ID(150) });
+      const nouvelle = (id) => q.ev(`(() => { const x = vfTermVue.proposition(Object.assign({}, __base, { id: ${JSON.stringify(id)}, modeInitial: 'default' }), __cb); return String(x) + ':' + document.getElementById('proposition').dataset.id; })()`);
+      await q.ev(`(() => { ${SEL}.focus(); return true; })()`);
+      const a = await nouvelle(ID(151));
+      await q.ev(`(() => { document.activeElement.blur(); return true; })()`);
+      const b = await nouvelle(ID(151));
+      const c0 = await centre(`document.querySelector('#proposition .vf-q-texte')`);
+      await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: c0.x, y: c0.y, button: 'left', clickCount: 1 });
+      const c = await nouvelle(ID(152));
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c0.x, y: c0.y, button: 'left', clickCount: 1 });
+      const d = await nouvelle(ID(152));
+      r.v15 = [a === `false:${ID(150)}`, b === `undefined:${ID(151)}`, c === `false:${ID(151)}`, d === `undefined:${ID(152)}`].join('/'); await raz();
     });
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
@@ -561,6 +627,16 @@ await executer(chrome, async (s) => {
       await q.recharger(`${OQ}/?theme=dark&mode=acceptEdits&lancer=1&id=zzz`);
       await q.attendre(`!!document.getElementById('proposition')`, 'bandeau après rechargement', 5000); await pause(800);
       r.e6 = [await q.ev(`${SEL}.value`), (await journal()).filter((x) => x.u === '/lancer').length - n0].join('/');
+    });
+    await essai('e9', async () => { // LB2 (Q7 ; PU-G-118 et PU-G-119) : une proposition d'une visite précédente (cadre NEUF, 115 s d'âge) n'est jamais montrée ni annoncée et est effacée dans Q ; le MÊME cadre rechargé dans la même visite la retrouve
+      await scenario({ prop: valide(ID(91), { expire_ms: 5000, arme_apres_ms: 600 }), lancers: [] });
+      const n0 = (await journal()).filter((x) => x.u === '/annuler').length;
+      await q.naviguer(); await pause(3500);
+      const msgs = JSON.parse(await s.ev('JSON.stringify(window.__msgs)')).filter((m) => m.d === 'proposition').length;
+      const annule = (await journal()).filter((x) => x.u === '/annuler').length - n0, nul = await q.ev(`document.querySelectorAll('#proposition').length`);
+      await scenario({ prop: valide(ID(92), { expire_ms: 5000, arme_apres_ms: 600 }), lancers: [] });
+      await q.recharger(`${OQ}/?theme=light`); const garde = await q.attendre(`!!document.getElementById('proposition')`, 'proposition gardée', 5000).then(() => true, () => false);
+      r.e9 = [nul, msgs, annule >= 1, garde].join('/');
     });
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
@@ -695,7 +771,7 @@ assert_eq "LB.S1 — aucune écriture innerHTML, outerHTML ni insertAdjacentHTML
 assert_eq "LB.S1 — lignes de littéral de couleur : vue 6 / client 0 ; .style : 0 / 0 ; cssText : 0 / 0 ; rgb( ou hsl( : vue 3 / client 0 ; <chiffre>px : vue 0 / client 1" \
   "$(rj "$LV" 'j.couleur+"/"+j.style+"/"+j.css+"/"+j.rgb+"/"+j.px')|$(rj "$LC" 'j.couleur+"/"+j.style+"/"+j.css+"/"+j.rgb+"/"+j.px')" "6/0/0/3/0|0/0/0/0/1"
 assert_eq "LB.S2 — la table MESSAGES a exactement neuf clés dont proposition ; l'unique postMessage( vise cfg.origineP" "$(rj "$ST" 'j.cles+"/"+j.proposition+"/"+j.cible')" "9/true/true"
-assert_eq "LB.S3 — client <= 280 lignes, vue <= 215 lignes (le chiffre mesuré : client $(rj "$LC" j.lignes), vue $(rj "$LV" j.lignes))" "$(rj "$LC" 'j.lignes<=280')/$(rj "$LV" 'j.lignes<=215')" "true/true"
+assert_eq "LB.S3 — client <= 290 lignes, vue <= 290 lignes (le chiffre mesuré : client $(rj "$LC" j.lignes), vue $(rj "$LV" j.lignes)) ; le plafond a été relevé de 280/215 par le lot 8 (LB2), qui ajoute à la vue les phrases en clair, une explication par mode et pour la case du chat, le compte à rebours et le bandeau expiré" "$(rj "$LC" 'j.lignes<=290')/$(rj "$LV" 'j.lignes<=290')" "true/true"
 assert_eq "LB.S4 — aucun fiabilite ni gouvernance dans la vue ni le client ; aucun appel confirm(" "$(rj "$LV" 'j.compartiments+"/"+j.confirm')|$(rj "$LC" 'j.compartiments+"/"+j.confirm')" "0/0|0/0"
 assert_eq "LB.S4 — aucune valeur de style ajoutée : le fichier de style, la page et le tiroir ne sont pas modifiés (git, chemins du plan)" "$(git -C "$SCRIPTS" status --porcelain -- vf-cockpit-terminal-style.mjs vf-cockpit-terminal-page.mjs vf-cockpit-terminal-tiroir.mjs | wc -l | tr -d ' ')" "0"
 
@@ -746,7 +822,7 @@ if [ -n "$CHROME" ]; then
   vv() { rj "$VJ0" "(j.erreur ? 'plante: ' + j.erreur : j.$1 !== undefined ? j.$1 : 'erreur: ' + ((j.erreurs || {}).$1 || 'étape absente'))"; }
   H="Lancement à confirmer"
   assert_eq "LB.V1 — #proposition : classes vf-q-bandeau vf-q-collage, role group, libellé de groupe ; sélecteur à quatre options dans l'ordre ; zone « Commande exacte » = lignes.default puis acceptEdits, herite (avec la note, sans --permission-mode), plan ; présélection modeInitial" \
-    "$(vv v1)" "vf-q-bandeau vf-q-collage/group/$H/Mode de permission/default|Par défaut;acceptEdits|Accepter les modifications;plan|Plan (lecture seule);herite|Hérité du poste/true/Commande exacte/Lancement proposé : Planifie la Phase 72 du compartiment alpha/Annuler,Lancer/false/true/false/true/false/true/true/false/plan/true"
+    "$(vv v1)" "vf-q-bandeau vf-q-collage/group/$H/Mode de permission/default|Par défaut;acceptEdits|Accepter les modifications;plan|Plan (lecture seule);herite|Hérité du poste/true/Commande exacte/Lancement proposé : Planifie la Phase 72 du compartiment alpha/Annuler,Préparer dans le terminal/false/true/false/true/false/true/true/false/plan/true"
   assert_eq "LB.V2 — bloquants phase-finie et terminal-absent : deux lignes « Bloquant : <motif> », Lancer reste aria-disabled=true après arme_apres_ms ; avertissement : « Attention : <motif> » et Lancer s'arme ; code inconnu : « Contrôle non reconnu. » jamais le code brut" "$(vv v2)" "true/true/true/true/false"
   assert_eq "LB.V3 — clic de confiance à arme_apres_ms / 3 : cb.lancer jamais appelé ; après armement : appelé UNE fois avec le mode choisi ; un second clic pendant que la promesse est en vol : ignoré" "$(vv v3)" 'tôt/0/["default"]'
   assert_eq "LB.V4 — un click() programmatique (non fiable) sur Lancer armé : ignoré ; puis le clic de confiance part (témoin)" "$(vv v4)" "0/1"
@@ -756,6 +832,12 @@ if [ -n "$CHROME" ]; then
     "$(vv v7)" "ok=ok;attendre=ok;occupe=ok;sans-session=ok;refus=ok;reseau=ok;absente=ok"
   assert_eq "LB.V8 — proposition(null) retire sans exception tardive (minuterie arrêtée) ; un identifiant nouveau remplace (un seul #proposition) ; le focus va à Annuler au premier affichage seulement" "$(vv v8)" "false/true/0/1/true/Annuler/true"
   assert_eq "LB.V9 — ST-2 : la liste des codes de pré-vol est DÉRIVÉE du module de cibles (non vide : $NCODES codes) et chaque code a un texte dans la vue (aucun « Contrôle non reconnu. »)" "$([ "$NCODES" -ge 14 ] && echo "$(vv v9)" || echo "liste trop courte: $NCODES")" "$NCODES/"
+  assert_eq "LB.V10 — LB2 (PU-G-112, 120, 124) : pour chacun des cinq verbes, l'intention AFFICHÉE porte les accents (Exécute, Vérifie) alors que la ligne de commande reste en ASCII ; la phrase en clair « L’assistant va <infinitif> la phase 72 du compartiment alpha : … » précède la commande ; le bouton s'appelle « Préparer dans le terminal » ; la phrase « Appuyez sur Entrée dans le terminal pour démarrer. » est écrite" "$(vv v10)" "true.true.true.Préparer dans le terminal.true.true;true.true.true.Préparer dans le terminal.true.true;true.true.true.Préparer dans le terminal.true.true;true.true.true.Préparer dans le terminal.true.true;true.true.true.Préparer dans le terminal.true.true"
+  assert_eq "LB.V11 — LB2 (PU-G-121, 122 ; Q9) : une ligne d'explication par mode, dans l'ordre ; « Risqué » (glyphe svg + mot, couleur identique au texte neutre, trait en currentColor) sur « Accepter les modifications » seulement ; aucun « dernier choix » pour « Par défaut » ; « Plan (lecture seule) — votre dernier choix » exactement une fois pour un mode retenu" "$(vv v11)" "default|acceptEdits|plan|herite/Par défaut|Accepter les modifications|Plan (lecture seule)|Hérité du poste/true/acceptEdits:Risqué:1/true/true/false/Plan (lecture seule) — votre dernier choix/2"
+  assert_eq "LB.V12 — LB2 (PU-G-123 ; Q6) : case du chat décochée par défaut, liée à sa phrase ; la phrase dit ce que fait la reprise et écrit « Risque : la session lancée relit toute cette conversation » sans « -r » ni « --fork-session » ; la commande exacte reste sans reprise tant que la case est décochée, puis porte « -r … --fork-session »" "$(vv v12)" "false/proposition-chat-aide/true/true/true/true/true"
+  assert_eq "LB.V13 — LB2 (PU-G-114) : compte à rebours « Expire dans 1 min 30 s » (role timer) et annonce polie ; à l'échéance « Proposition expirée — la renvoyer. » (seul bouton : Fermer, plus de bouton de lancement) ; proposition(null) ne l'efface pas, « Fermer » oui ; une disparition annoncée à 2 s de l'échéance vaut expiration, à 100 s elle retire" "$(vv v13)" "Expire dans 1 min 30 s|timer|polite|Lancement proposé : Planifie la Phase 72 du compartiment alpha. Expire dans 1 min 30 s./Proposition expirée — la renvoyer.|Fermer|false|Proposition expirée — la renvoyer./true/true/expiree/true"
+  assert_eq "LB.V14 — LB2 (PU-G-117 ; Q5) : le bandeau précède #terminal dans l'ordre de la page, la région #annonce (role status, aria-live polite) le précède et annonce « Lancement proposé… »" "$(vv v14)" "true/true/status/polite/true"
+  assert_eq "LB.V15 — LB2 (PU-G-119) : proposition() rend false et garde le bandeau tant que le sélecteur de mode est focalisé ou qu'un bouton de souris est enfoncé dans le bandeau ; libre, il est remplacé" "$(vv v15)" "true/true/true/true"
 
   echo "=== LB.E — client réel, serveur factice du contrat §4, faux P ==="
   faux "$SCRIPTS"; FQ0="$FQ"; FP0="$FP"; EJ="$(navig client)"; unfaux
@@ -767,6 +849,7 @@ if [ -n "$CHROME" ]; then
   assert_eq "LB.E5 — depuis P, iframe.contentWindow.localStorage lève SecurityError (témoin : le stockage de Q porte le secret) ; le serveur factice sert acceptEdits : présélection acceptEdits (témoin) ; il sert bypassPermissions (forgé) : présélection default" "$(ev_ e5)" "SecurityError/secret/acceptEdits/default"
   assert_eq "LB.E6 — cadre chargé avec ?theme=dark&mode=acceptEdits&lancer=1&id=zzz, le serveur factice servant plan : présélection plan (un paramètre d'adresse lu donnerait acceptEdits), aucune requête /lancer" "$(ev_ e6)" "plan/0"
   assert_eq "LB.E7 — postMessage('proposition', '*') puis postMessage({ id: 'zzz' }, '*') du faux P vers le cadre : aucun nouveau bandeau, aucun POST /lancer" "$(ev_ e7)" "true/0/0"
+  assert_eq "LB.E9 — LB2 (Q7) : proposition d'une visite précédente (cadre neuf, 115 s d'âge) : aucun bandeau, aucun message proposition, POST /annuler parti ; le même cadre rechargé dans la même visite retrouve sa proposition" "$(ev_ e9)" "0/0/true/true"
   faux "$SCRIPTS"; FJ="$(navig froid)"; unfaux
   assert_eq "LB.E8 — cadre masqué : UN message proposition d'origine Q en moins de 4 s, aucun .xterm ni #proposition, aucune requête /flux, /lancer, /entree ; cadre agrandi : bandeau, /flux demandé, TOUJOURS UN seul message" \
     "$(rj "$FJ" "(j.erreur ? 'plante: ' + j.erreur : j.e8 !== undefined ? j.e8 : 'erreur: ' + ((j.erreurs || {}).e8 || 'étape absente'))")" "1/true/0/0/0/true|true|1"
@@ -790,7 +873,7 @@ if [ -n "$CHROME" ]; then
 fi
 
 # --- mutants ---------------------------------------------------------------------------------------------------------------------------------------------
-echo "=== M-* — vingt-trois mutants (copies des sources) ==="
+echo "=== M-* — vingt-six mutants (copies des sources) ==="
 if mutant entree-auto vf-cockpit-terminal-client.mjs "/garde:apres-usage/s#.*#if (terminal) terminal.focus(); fetch('/entree', { method: 'POST', headers: entetes(), body: new Uint8Array([13]) });#"; then
   assert_eq "M-ENTREE-AUTO — le mutant rougit LB.C5 : un octet part à /entree après le 204 (témoin : le scénario s'exécute, le lancement est accepté)" "$(verdict "$(doubles "$MUT_DIR" focus)" 'j.st==="ok" && j.entrees===0')" "rouge"
 else sans_effet "M-ENTREE-AUTO"; fi
@@ -837,6 +920,15 @@ if mutant retard-reaffiche vf-cockpit-terminal-client.mjs "/garde:fermee/d"; the
   assert_eq "M-RETARD-REAFFICHE — le mutant rougit LB.C2 : un sondage en retard remonte la proposition consommée (témoin : le lancement est accepté)" "$(verdict "$(doubles "$MUT_DIR" retard)" 'j.ok.st==="ok" && j.ok.dv===0 && j.ok.dm===0')" "rouge"
 else sans_effet "M-RETARD-REAFFICHE"; fi
 
+if mutant visite-ignoree vf-cockpit-terminal-client.mjs "/garde:visite/d"; then
+  [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e9"]')"; unfaux; assert_eq "M-VISITE-IGNOREE — le mutant rougit LB.E9 : la proposition d'une visite précédente est montrée puis remplacée (témoin : la sonde s'exécute et le même cadre rechargé la retrouve)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e9 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e9 === '0/0/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-VISITE-IGNOREE"; fi
+if mutant manipule-ignore vf-cockpit-terminal-vue.mjs "/garde:manipule/d"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v15"]'; assert_eq "M-MANIPULE-IGNORE — le mutant rougit LB.V15 : un bandeau manipulé est remplacé sous la main (témoin : le bandeau s'affiche et la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v15 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v15 === 'true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-MANIPULE-IGNORE"; fi
+if mutant expiration-silencieuse vf-cockpit-terminal-vue.mjs "s/const EXPIRE_PROCHE_MS = 3000;/const EXPIRE_PROCHE_MS = -1;/"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v13"]'; assert_eq "M-EXPIRATION-SILENCIEUSE — le mutant rougit LB.V13 : une disparition annoncée à 2 s de l'échéance efface le bandeau sans le dire (témoin : le compte à rebours et le message d'expiration existent)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v13 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : /^Expire dans 1 min 30 s\|timer/.test(j.v13) && /expiree\/true$/.test(j.v13) ? 'sain' : /^Expire dans 1 min 30 s\|timer/.test(j.v13) ? 'rouge' : 'plante: ' + j.v13)")" "rouge"; }
+else sans_effet "M-EXPIRATION-SILENCIEUSE"; fi
 mutant_inj() { # mutant_inj <nom> <fichier> <expression-sed> -> MUT_DIR ; copie du tiroir et de l'interface de lancement ; code 1 si la cible manque ou n'a pas changé
   local d="$WORK/mut-$1" f x; rm -rf "$d"; mkdir -p "$d"
   for x in terminal-tiroir terminal-tiroir-ui terminal-tiroir-style lancer-ui lancer-style; do cp "$SCRIPTS/vf-cockpit-$x.mjs" "$d/"; done
@@ -876,7 +968,7 @@ if [ -n "$CHROME" ]; then
     run_vue "$MUT_DIR" '"only":["v1"]'
     assert_eq "M-NOTE-ANCIENNE — le mutant rougit LB.V1 : l'ancienne note du mode hérité (faux pour le mode venu du projet) n'est plus celle attendue (témoin : le bandeau s'affiche, la sonde s'exécute)" "$(m1="$(rj "$VJ" 'j.v1')"; if [ -z "$m1" ] || [ "$m1" = "undefined" ]; then echo plante; elif [ "$m1" = "$(vv v1)" ]; then echo sain; else echo rouge; fi)" "rouge"
   else sans_effet "M-NOTE-ANCIENNE"; fi
-  if mutant occupe-ancien vf-cockpit-terminal-vue.mjs "s/occupe: \"Le terminal n'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n'a été écrit ; vérifiez, puis cliquez sur Lancer.\"/occupe: \"Un programme occupe le terminal : quittez-le, puis cliquez sur Lancer. Rien n'a été écrit.\"/"; then
+  if mutant occupe-ancien vf-cockpit-terminal-vue.mjs "s/occupe: \"Le terminal n'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n'a été écrit ; vérifiez, puis cliquez sur Préparer dans le terminal.\"/occupe: \"Un programme occupe le terminal : quittez-le, puis cliquez sur Préparer dans le terminal. Rien n'a été écrit.\"/"; then
     run_vue "$MUT_DIR" '"only":["v7"]'
     assert_eq "M-OCCUPE-ANCIEN — le mutant rougit LB.V7 : l'ancien texte du 409, qui nomme une cause unique, n'est plus celui attendu (témoin : les autres statuts s'exécutent)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : /;sans-session=ok;/.test(j.v7 || '') ? (/occupe=ok;/.test(j.v7) ? 'sain' : 'rouge') : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"
   else sans_effet "M-OCCUPE-ANCIEN"; fi
