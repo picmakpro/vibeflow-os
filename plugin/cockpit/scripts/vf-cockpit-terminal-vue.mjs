@@ -82,7 +82,7 @@ export function vueTerminal(cfg) {
       });
       k.appendChild(corps);
       const b = c.bouton ? bouton(c.bouton, action) : null; if (b) k.appendChild(b);
-      z.appendChild(k); if (c.masque) document.getElementById('terminal').classList.add('vf-q-cache'); (b || k).focus(); // masque : sous la carte « déjà ouvert » aucun terminal vide ni curseur
+      z.appendChild(k); if (c.masque) document.getElementById('terminal').classList.add('vf-q-cache'); if (document.hasFocus()) (b || k).focus(); // L2 : jamais de focus pris à la page ; masque : sous la carte « déjà ouvert » aucun terminal vide ni curseur
     },
     bandeau(type, detail, action) {
       const z = vider(); z.hidden = false;
@@ -93,7 +93,7 @@ export function vueTerminal(cfg) {
       b.appendChild(el('span', 'vf-q-pastille' + (type === 'reconnexion' ? ' vf-q-attention' : '')));
       b.appendChild(el('span', 'vf-q-texte', texte));
       const r = type === 'reconnexion' ? null : bouton('Relancer le shell', action); if (r) b.appendChild(r);
-      z.appendChild(b); if (r) r.focus();
+      z.appendChild(b); if (r && document.hasFocus()) r.focus(); // L2 : jamais de focus pris à la page
     },
     effacer() { const z = vider(); z.hidden = true; },
     // proposition : p = { id, intention, lignes, bloquants, avertissements, arme_apres_ms, modeInitial } (revalidée par le client), cb = { lancer(mode, avecChat) -> Promise<statut>, annuler() } ; p.chat === true et p.lignesChat (72-13) : case « Continuer la conversation du chat » ; null retire.

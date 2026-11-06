@@ -10,7 +10,7 @@
 #   LB.E  client réel + serveur factice du contrat §4 + faux P sous Chrome (E1 à E7, puis E8 cadre masqué)
 #   LB.F  F1 (focus) : faux P à champ de saisie, frappes abc, fenêtre focalisée puis non focalisée ; SP-1 : clic Lancer, tiroir fermé, le bandeau apparaît dans Q
 #   LB.P  le serveur factice écoute un port >= 4600 et différent de 4456
-#   M-*   vingt et un mutants (copies des sources, « mutant sans effet » = FAIL)
+#   M-*   vingt-trois mutants (copies des sources, « mutant sans effet » = FAIL)
 # Sans Chrome : les sections statiques et les doublures tournent, la suite annonce SUITE SAUTÉE (navigateur) pour V et E.
 # Variables : VF_CLIENT_MS (échéance d'une attente navigateur, 20000 par défaut) · VF_LB_PORTS=bas-haut (plage de ports du serveur factice ; sinon ports libres du système).
 # Exit 0 si tout passe, 1 sinon.
@@ -586,6 +586,34 @@ await executer(chrome, async (s) => {
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
 
+  if (mode === 'focusvue') {
+    // L2 (audit du lot 3) : carte « refuse » et bandeau « termine » montés par la vue dans le cadre de Q, sans geste, pendant qu'un champ de P est focalisé : les frappes abc puis Entrée vont au champ de P,
+    // aucun bouton du cadre ne s'active. cadre:true (témoin positif) : P donne d'abord le focus au cadre, la vue prend alors le focus de son bouton (comportement de la Phase 71).
+    const { quoi = 'carte', cadre = false } = JSON.parse(brut);
+    await scenario({ prop: null });
+    if (emu) await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', ${JSON.stringify(secret)})`);
+    await s.naviguer(`${OP}/project.html`); await s.attendre(`document.readyState === 'complete'`, 'page P', MS);
+    await s.ev(`(() => { const i = document.createElement('input'); i.id = 'champP'; i.style.cssText = 'position:fixed;left:0;top:0'; document.body.appendChild(i); i.focus();
+      const f = document.createElement('iframe'); f.dataset.t = '1'; f.setAttribute('sandbox', ${JSON.stringify(SBXQ)}); f.style.cssText = 'position:fixed;left:0;bottom:0;width:100vw;height:300px;border:0'; f.src = ${JSON.stringify(OQ + '/?theme=dark')}; document.body.appendChild(f); return true; })()`);
+    await essai('l2', async () => {
+      await s.attendre(`window.__msgs.some((m) => m.d === 'ready')`, 'cadre de Q prêt', MS);
+      const fin = Date.now() + MS; while (Date.now() < fin && !(await journal()).some((x) => x.u === '/flux')) await pause(100);
+      await pause(600); await trouverCtx(s);
+      if (cadre) await s.ev(`document.querySelector('iframe[data-t]').focus()`); else await s.ev(`document.getElementById('champP').focus()`);
+      await pause(300);
+      await q.ev(`window.__act = 0; window.vfTermVue.${quoi === 'carte' ? "carte('refuse'" : "bandeau('termine'"}, ${quoi === 'carte' ? '' : '{ code: 0 }, '}() => { window.__act++; }); true`);
+      await pause(500);
+      for (const ch of 'abc') { await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ch, text: ch, code: 'Key' + ch.toUpperCase() }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ch, code: 'Key' + ch.toUpperCase() }); }
+      await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+      await pause(800);
+      const champ = await s.ev(`document.getElementById('champP').value`), actif = await s.ev(`document.activeElement.id || document.activeElement.tagName`);
+      const bouton = await q.ev(`document.activeElement.tagName === 'BUTTON'`), act = await q.ev(`window.__act`), montee = await q.ev(`!!document.querySelector('#zone-etat button, .vf-q-carte button, .vf-q-bandeau button')`);
+      r.l2 = [champ, actif, bouton, act, montee].join('/');
+    });
+    return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
+  }
+
   if (mode === 'sp1') {
     // SP-1 : rechargement sans fragment, tiroir fermé (aucun cadre de Q), clic « Lancer » sur une carte : le POST rend 202, le tiroir s'ouvre, le bandeau apparaît dans Q, sans prendre le focus de P.
     await scenario({ prop: null, apres: valide(ID_A) });
@@ -744,6 +772,13 @@ if [ -n "$CHROME" ]; then
   faux "$SCRIPTS"; FJ2="$(navig focus '"emu":false')"; unfaux
   assert_eq "LB.F2 — F1, fenêtre NON focalisée (sans émulation) : même scénario, mêmes attentes" \
     "$(rj "$FJ2" "(j.erreur ? 'plante: ' + j.erreur : j.f1 !== undefined ? j.f1 : 'erreur: ' + ((j.erreurs || {}).f1 || 'étape absente'))")" "abc/champP/0"
+  l2() { faux "${3:-$SCRIPTS}"; LJ="$(navig focusvue "\"emu\":$1,\"quoi\":\"$2\"${4:+,$4}")"; unfaux; rj "$LJ" "(j.erreur ? 'plante: ' + j.erreur : j.l2 !== undefined ? j.l2 : 'erreur: ' + JSON.stringify(j.erreurs))"; } # l2 <emu> <carte|bandeau> [dossier] [json] ; abc/champP/<bouton focalisé>/<activations>/<montée>
+  verdict_l2() { case "$1" in abc/champP/false/0/true) echo sain ;; */true) echo rouge ;; *) echo "plante: $1" ;; esac; } # rouge seulement si l'élément est monté (dernier champ true) ET que la forme saine est perdue
+  assert_eq "LB.F4 — L2, carte « refuse » (bouton « Réessayer ») montée sans geste, fenêtre FOCALISÉE (émulation) : les frappes abc et Entrée vont au champ de P, le focus reste au champ de P, aucun bouton du cadre focalisé ni activé (témoin : la carte est montée)" "$(l2 true carte)" "abc/champP/false/0/true"
+  assert_eq "LB.F5 — L2, carte « refuse », fenêtre NON focalisée : mêmes attentes" "$(l2 false carte)" "abc/champP/false/0/true"
+  assert_eq "LB.F6 — L2, bandeau « termine » (Relancer le shell) monté sans geste, fenêtre focalisée : mêmes attentes" "$(l2 true bandeau)" "abc/champP/false/0/true"
+  assert_eq "LB.F7 — L2, bandeau « termine », fenêtre non focalisée : mêmes attentes" "$(l2 false bandeau)" "abc/champP/false/0/true"
+  assert_eq "LB.F8 — L2, témoin positif : le cadre a le focus (P le lui a donné) : la vue focalise le bouton de la carte (comportement de la Phase 71 inchangé), le champ de P ne reçoit rien (la touche Entrée synthétique du harnais ne déclenche pas le clic : activations 0)" "$(l2 true carte "$SCRIPTS" '"cadre":true')" "/IFRAME/true/0/true"
   FAUX_INJ="$SCRIPTS" faux "$SCRIPTS"; SJ1="$(navig sp1 '"emu":true')"; unfaux
   assert_eq "LB.F3 — SP-1 : page rechargée sans fragment, tiroir fermé (aucun cadre avant), clic Lancer sur une carte : 202, cadre de Q monté, bandeau dans Q, le focus de P n'est pas pris par le cadre" \
     "$(rj "$SJ1" "(j.erreur ? 'plante: ' + j.erreur : j.sp1 !== undefined ? j.sp1 : 'erreur: ' + ((j.erreurs || {}).sp1 || 'étape absente'))")" "0/true/true/true"
@@ -751,7 +786,7 @@ if [ -n "$CHROME" ]; then
 fi
 
 # --- mutants ---------------------------------------------------------------------------------------------------------------------------------------------
-echo "=== M-* — vingt et un mutants (copies des sources) ==="
+echo "=== M-* — vingt-trois mutants (copies des sources) ==="
 if mutant entree-auto vf-cockpit-terminal-client.mjs "/garde:apres-usage/s#.*#if (terminal) terminal.focus(); fetch('/entree', { method: 'POST', headers: entetes(), body: new Uint8Array([13]) });#"; then
   assert_eq "M-ENTREE-AUTO — le mutant rougit LB.C5 : un octet part à /entree après le 204 (témoin : le scénario s'exécute, le lancement est accepté)" "$(verdict "$(doubles "$MUT_DIR" focus)" 'j.st==="ok" && j.entrees===0')" "rouge"
 else sans_effet "M-ENTREE-AUTO"; fi
@@ -815,6 +850,12 @@ if [ -n "$CHROME" ]; then
     faux "$MUT_DIR"; MJ="$(navig focus '"emu":true')"; unfaux
     assert_eq "M-FOCUS-VUE — le mutant rougit LB.F1 : Annuler prend le focus au champ de P à l'arrivée d'une proposition (témoin : le scénario s'exécute jusqu'aux frappes)" "$(rouge_f1 "$MJ")" "rouge"
   else sans_effet "M-FOCUS-VUE"; fi
+  if mutant focus-carte vf-cockpit-terminal-vue.mjs "s/if (document.hasFocus()) (b || k).focus();/(b || k).focus();/"; then
+    assert_eq "M-FOCUS-CARTE — le mutant rougit LB.F5 : la carte prend le focus de P, les frappes ne vont plus au champ de P (témoin : la carte est montée, le scénario va jusqu'aux frappes)" "$(verdict_l2 "$(l2 false carte "$MUT_DIR")")" "rouge"
+  else sans_effet "M-FOCUS-CARTE"; fi
+  if mutant focus-bandeau-vue vf-cockpit-terminal-vue.mjs "s/if (r \&\& document.hasFocus()) r.focus();/if (r) r.focus();/"; then
+    assert_eq "M-FOCUS-BANDEAU — le mutant rougit LB.F7 : le bandeau prend le focus de P, les frappes ne vont plus au champ de P (témoin : le bandeau est monté, le scénario va jusqu'aux frappes)" "$(verdict_l2 "$(l2 false bandeau "$MUT_DIR")")" "rouge"
+  else sans_effet "M-FOCUS-BANDEAU"; fi
   if mutant_inj sp1-signal vf-cockpit-lancer-ui.mjs '/garde:propose/d'; then
     FAUX_INJ="$MUT_DIR" faux "$SCRIPTS"; MJ="$(navig sp1 '"emu":true')"; unfaux
     assert_eq "M-SP1-SIGNAL — le mutant rougit LB.F3 : le 202 ne signale rien au tiroir, aucun cadre de Q, aucun bandeau (témoin : la carte a affiché « Confirmez-la dans le terminal »)" "$(rouge_sp1 "$MJ")" "rouge"

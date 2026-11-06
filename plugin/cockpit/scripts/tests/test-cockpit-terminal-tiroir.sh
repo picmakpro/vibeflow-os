@@ -242,6 +242,8 @@ await executer(chrome, async (s) => {
       // gagne, course). Un seul cadre Q pendant la mesure : on efface la mémoire d'ouverture avant de naviguer. Le focus perdu au chargement reste rouge ; la sonde dit pageFocus, l'élément actif et les cadres de P.
       await s.ev(`localStorage.removeItem('vf.terminal.open')`);
       await q.naviguer(); await q.attendre(CARTE('Session expirée'), 'carte Session expirée');
+      // L2 : la vue ne prend le focus que si le cadre l'a déjà ; P donne le focus au cadre de Q, puis la carte est montée de nouveau (même contenu), comme à la perte de session dans un cadre actif
+      await s.ev(`(() => { const f = document.querySelector('iframe'); if (f) f.focus(); return true; })()`); await q.ev(`window.vfTermVue.carte('expire')`);
       const SONDE_J13 = `(() => { const k = document.querySelector('.vf-q-carte'), c = getComputedStyle(k); return { titre: (document.querySelector('.vf-q-titre') || {}).textContent, focus: document.activeElement === k, fv: k.matches(':focus-visible'), role: k.getAttribute('role'), contour: c.outlineStyle, pageFocus: document.hasFocus(), actif: document.activeElement && document.activeElement.tagName }; })()`;
       r.alerte = await q.ev(SONDE_J13); r.alerte.cadresP = await s.ev(`document.querySelectorAll('iframe').length`);
       r.coupure = await balayer('.vf-q-commande', '.vf-q-corps', LARGEURS, q);
