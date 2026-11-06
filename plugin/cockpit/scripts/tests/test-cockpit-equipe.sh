@@ -940,6 +940,19 @@ JSON
   assert_eq "EK15 — Échap, focus dans le tiroir : le tiroir se ferme seul, la sélection et la vue ne bougent pas, le focus revient au bouton « N au travail », aria-expanded repasse à false (PU-G-189)" "$(G "$WORK/ek-echap-panneau.json" 'j.erreur||["ferme="+j.ferme,"selection "+(j.apres.selection===j.avant.selection?"gardée":"perdue ("+j.avant.selection+" -> "+j.apres.selection+")"),"vue "+(j.apres.hash===j.avant.hash?"gardée":"changée"),"focus="+j.apres.actif,"expanded="+j.apres.expanded].join(" | ")')" "ferme=true | selection gardée | vue gardée | focus=vf-lock | expanded=false"
   EK15 bouton
   assert_eq "EK15.2 — Échap, focus sur le bouton « N au travail » lui-même : même résultat (PU-G-189)" "$(G "$WORK/ek-echap-bouton.json" 'j.erreur||["ferme="+j.ferme,"selection "+(j.apres.selection===j.avant.selection?"gardée":"perdue"),"vue "+(j.apres.hash===j.avant.hash?"gardée":"changée"),"focus="+j.apres.actif,"expanded="+j.apres.expanded].join(" | ")')" "ferme=true | selection gardée | vue gardée | focus=vf-lock | expanded=false"
+  # EK16 (Q12, PU-G-203) : sous 1280 px un seul tiroir latéral (Git à gauche, « Au travail » à droite) ; l'état se lit « G » (Git ouvert) « T » (Au travail ouvert) puis le focus
+  EK16() { EK_LARGEUR="$1" EK_ORDRE="$2" EKC un-lateral "project.html#t"; mv "$WORK/ek-un-lateral.json" "$WORK/ek-lat-$1-$2.json"; }
+  EK16V='j.erreur||["premier","second","large"].map((k)=>{const e=j.etapes[k];return (e.git?"G":"-")+(e.travail?"T":"-")+":"+e.focus}).join(" ")'
+  EK16 1024 git-puis-travail
+  assert_eq "EK16.0 — 1024 px, Git puis « Au travail » : Git est replié, le focus va au bouton « N au travail » ; élargi à 1440 px, Git ne se rouvre pas (Q12, PU-G-203)" "$(G "$WORK/ek-lat-1024-git-puis-travail.json" "$EK16V")" "G-:git -T:bouton-travail -T:bouton-travail"
+  EK16 1024 travail-puis-git
+  assert_eq "EK16.1 — 1024 px, « Au travail » puis Git : « Au travail » est replié, le focus est dans Git ; élargi à 1440 px, « Au travail » ne se rouvre pas" "$(G "$WORK/ek-lat-1024-travail-puis-git.json" "$EK16V")" "-T:BODY G-:git G-:git"
+  EK16 1279 travail-puis-git
+  assert_eq "EK16.2 — 1279 px (sous 1280) : un seul tiroir latéral" "$(G "$WORK/ek-lat-1279-travail-puis-git.json" 'j.erreur||(j.etapes.second.git?"G":"-")+(j.etapes.second.travail?"T":"-")')" "G-"
+  EK16 1280 travail-puis-git
+  assert_eq "EK16.3 — 1280 px : les deux tiroirs coexistent" "$(G "$WORK/ek-lat-1280-travail-puis-git.json" 'j.erreur||(j.etapes.second.git?"G":"-")+(j.etapes.second.travail?"T":"-")')" "GT"
+  EK16 1440 git-puis-travail
+  assert_eq "EK16.4 — 1440 px, Git puis « Au travail » : les deux restent ouverts" "$(G "$WORK/ek-lat-1440-git-puis-travail.json" 'j.erreur||(j.etapes.second.git?"G":"-")+(j.etapes.second.travail?"T":"-")')" "GT"
   vf_hyg_stop "$EK_PID"
 
   # --- mutants : chacun posé dans la page servie, serveur relancé, le témoin DOIT rougir ---
@@ -968,8 +981,12 @@ JSON
   assert_eq "EK15.4 — mutant (aucun écouteur d'Échap pour le bouton) : focus sur le bouton, le viewer désélectionne la carte, détecté" "$(EK15M bouton "document.addEventListener('keydown', (e) => { if (e.target === bouton()) echap(e); }, true);" "" "$EK15V")" "muté|ouvert | sélection perdue"
   assert_eq "EK15.5 — mutant (l'Échap du tiroir ne s'arrête pas avant le viewer) : le tiroir se ferme MAIS le viewer désélectionne la carte, détecté" "$(EK15M panneau "e.stopPropagation(); e.preventDefault(); // le viewer" "e.preventDefault(); // le viewer" "$EK15V")" "muté|fermé | sélection perdue"
   assert_eq "EK15.6 — mutant (le focus n'est plus rendu au bouton) : il reste sur le bouton du tiroir (BUTTON) au lieu de revenir sur #vf-lock, détecté" "$(EK15M panneau "bouton()?.focus({ preventScroll: true });" "" 'j.erreur||j.apres.actif')" "muté|BUTTON"
-  assert_eq "EK15.7 — mutant (aria-expanded figé à false) : le tiroir ouvert n'est pas dit ouvert, détecté" "$(EK15M panneau "String(ouvert())" "'false'" 'j.erreur||j.ouvert.expanded')" "muté|false"
+  assert_eq "EK15.7 — mutant (aria-expanded figé à false) : le tiroir ouvert n'est pas dit ouvert, détecté" "$(EK15M panneau "b.setAttribute('aria-controls', 'panel'); b.setAttribute('aria-expanded', String(o));" "b.setAttribute('aria-controls', 'panel'); b.setAttribute('aria-expanded', 'false');" 'j.erreur||j.ouvert.expanded')" "muté|false"
   assert_eq "EK15.8 — mutant (aria-controls retiré) : le bouton ne dit plus ce qu'il ouvre, détecté" "$(EK15M panneau "b.setAttribute('aria-controls', 'panel'); " "" 'j.erreur||String(j.ouvert.controls)')" "muté|null"
+  EK16M() { local m; m="$(ek_muter "$3" "$4")"; ek_demarrer; EK_LARGEUR="$1" EK_ORDRE="$2" EKC un-lateral "project.html#t"; local v; v="$(G "$WORK/ek-un-lateral.json" "$EK16V")"; vf_hyg_stop "$EK_PID"; ek_restaurer; echo "$m|$v"; }
+  assert_eq "EK16.5 — mutant (la règle Q12 retirée : seuil à 0 px) : à 1024 px les deux tiroirs restent ouverts, détecté" "$(EK16M 1024 git-puis-travail "window.matchMedia('(max-width: 1279px)')" "window.matchMedia('(max-width: 0px)')")" "muté|G-:git GT:git GT:git"
+  assert_eq "EK16.6 — mutant (seuil à 1500 px) : à 1440 px le second tiroir replie le premier, détecté" "$(EK16M 1440 git-puis-travail "window.matchMedia('(max-width: 1279px)')" "window.matchMedia('(max-width: 1500px)')")" "muté|G-:git -T:bouton-travail -T:bouton-travail"
+  assert_eq "EK16.7 — mutant (le focus n'est plus posé sur le bouton après le repli de Git) : il ne va plus au tiroir qui s'ouvre, détecté" "$(EK16M 1024 git-puis-travail "if (!panneau.contains(document.activeElement)) b.focus({ preventScroll: true });" "")" "muté|G-:git -T:BODY -T:BODY"
   # témoins de la sonde de mutation elle-même
   ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"
   assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK2.1 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "a1|null|identique"

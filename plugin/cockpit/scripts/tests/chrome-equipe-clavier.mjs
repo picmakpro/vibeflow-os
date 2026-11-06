@@ -15,6 +15,7 @@
 //   echelle           : (EK13, Q3b) échelle de l'ajustement au premier affichage et recouvrement titre / première carte, à 390 et 768 px → { "390": { k, aire }, "768": { k, aire } }
 //   titre-grandi      : (EK14) le titre de #context grandit après le cadrage (police plus large du runner) ; recouvrement avec la première carte une fois la page stable → { k, aire }
 //   echap-tiroir      : (EK15) sélectionne une carte, ouvre le tiroir « Au travail », focalise le tiroir ou le bouton (EK_FOCUS), frappe Échap → { ferme0, ouvert, avant, place, ferme, apres } (attributs aria du bouton, sélection et vue avant/après)
+//   un-lateral        : (EK16, Q12, PU-G-203) largeur EK_LARGEUR, ordre EK_ORDRE (git-puis-travail | travail-puis-git) : ouvre Git (touche g) puis « Au travail » (ou l'inverse), relève l'état et le focus à chaque pas, puis élargit à 1440 px → { etapes: { premier, second, large }, ... }
 //   libelles          : (EK11) ligne des sources du tiroir et infobulle de la recherche de l'onglet Équipe → { src, titre }
 // Rend une ligne JSON { ... } ou { erreur }. Socle : chrome-session.mjs (une instance de Chrome, fermée proprement).
 import { executer } from './chrome-session.mjs';
@@ -217,6 +218,21 @@ await executer(chrome, async (s) => {
     const ferme = await s.attendre("document.body.classList.contains('no-panel')", 'tiroir fermé par Échap', 4000).then(() => true, () => false);
     const apres = await s.stable("(() => { const a = document.activeElement, b = document.querySelector('#vf-lock'); return { selection: window.VibeFlow.state.selected, hash: location.hash, actif: a ? a.id || a.tagName : null, expanded: b.getAttribute('aria-expanded'), ferme: document.body.classList.contains('no-panel') }; })()", 'état après Échap');
     return { ferme0, ouvert, avant, place, ferme, apres };
+  }
+  if (ACTION === 'un-lateral') { // (EK16, PU-G-203) un seul tiroir latéral sous 1280 px ; les deux à 1280 px et au-delà
+    await s.send('Emulation.setDeviceMetricsOverride', { width: +process.env.EK_LARGEUR, height: 800, deviceScaleFactor: 1, mobile: false });
+    await s.attendre("!!window.__es && !!window.__es.find((e) => e.url.includes('/api/vf/events')) && !!document.querySelector('#vf-lock') && !!window.VFGitTiroir", 'flux, badge et tiroir Git');
+    await s.ev("(() => { const S = { kind: 'session', id: 'S1', etat: 'actif', tree: '.', task: 'session' }; window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('who', { seq: 5000, at: Date.now(), who: { workers: [S], sources: {} } }); })()");
+    await calme();
+    const etat = () => s.stable(`(() => { const a = document.activeElement, g = document.querySelector('#vf-git-tiroir'), b = document.body.classList; return { git: window.VFGitTiroir.ouvert(), travail: !!document.querySelector('#panel > .vf-whop') && !b.contains('no-panel'), focus: !a ? null : g && g.contains(a) ? 'git' : a.closest('#panel') ? 'travail' : a.id === 'vf-lock' ? 'bouton-travail' : a.tagName }; })()`, 'état des tiroirs');
+    const ouvrirGit = async () => { await s.ev('document.activeElement && document.activeElement.blur()'); await touche('g', 'KeyG', 71, 'g'); await s.attendre('window.VFGitTiroir.ouvert()', 'tiroir Git ouvert'); };
+    const ouvrirTravail = async () => { await s.ev("document.querySelector('#vf-lock').click()"); await s.attendre("!!document.querySelector('#panel > .vf-whop') && !document.body.classList.contains('no-panel')", 'tiroir « Au travail » ouvert'); };
+    const etapes = {};
+    if (process.env.EK_ORDRE === 'travail-puis-git') { await ouvrirTravail(); etapes.premier = await etat(); await ouvrirGit(); etapes.second = await etat(); }
+    else { await ouvrirGit(); etapes.premier = await etat(); await ouvrirTravail(); etapes.second = await etat(); }
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 800, deviceScaleFactor: 1, mobile: false });
+    etapes.large = await etat();
+    return { largeur: +process.env.EK_LARGEUR, etapes };
   }
   return { erreur: 'EK_ACTION inconnue : ' + ACTION };
 }, { csp: false });

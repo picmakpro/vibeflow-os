@@ -163,12 +163,12 @@
     eviter(); titre.focus({ preventScroll: true });
     emettre('vf-git:etat', { ouvert: true }); crochet('etat', true);
   };
-  const fermer = () => {
+  const fermer = (sansFocus) => { // sansFocus === true : un autre tiroir latéral s'ouvre (73-vf-tiroir-travail.js) et prend le focus
     if (!ouvert) return;
     ouvert = false; seq++; corps.removeAttribute('aria-busy');
     tiroir.hidden = true; tiroir.classList.remove('vf-git-entree'); document.body.classList.remove('vf-git-ouvert');
     const cible = [ligne(), ouvreur(), plus()].find(visible) || (avant && document.contains(avant) && visible(avant) ? avant : null);
-    if (cible) cible.focus({ preventScroll: true });
+    if (cible && sansFocus !== true) cible.focus({ preventScroll: true });
     emettre('vf-git:etat', { ouvert: false }); crochet('etat', false);
   };
   const basculer = () => (ouvert ? fermer() : ouvrir());
