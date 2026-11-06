@@ -369,7 +369,9 @@ body.no-panel #panel-resize { opacity: 0; pointer-events: none; }
 .pt { margin: 0 0 var(--sp-6); font-size: 20px; font-weight: 600; letter-spacing: -.02em; line-height: 1.3; word-break: break-word; }
 .pd { margin: 0; color: var(--text-2); line-height: 1.6; }
 .pd.empty { color: var(--text-4); }
-.pp { display: flex; align-items: center; gap: var(--sp-6); margin-top: var(--sp-12); font-family: var(--mono); font-size: 11.5px; color: var(--text-3); background: rgba(var(--ink), .04); border-radius: 12px; padding: var(--sp-8) var(--sp-8) var(--sp-8) var(--sp-12); word-break: break-all; }
+.pp { display: flex; align-items: center; gap: var(--sp-6); margin-top: var(--sp-12); font-family: var(--mono); font-size: 11.5px; color: var(--text-3); background: rgba(var(--ink), .04); border-radius: 12px; padding: var(--sp-8) var(--sp-8) var(--sp-8) var(--sp-12); overflow-wrap: anywhere; }
+.pp > span { min-width: 0; } /* the path breaks after a "/" (see pathBox): each part stays whole, and only one longer than the box is cut mid-word (PU-G-043) */
+.pp .sg { display: inline-block; max-width: 100%; }
 .pp button { margin-left: auto; background: none; border: 0; color: var(--text-3); cursor: pointer; padding: var(--sp-4); display: grid; border-radius: 8px; transition: background .2s var(--ease), color .2s var(--ease); }
 .pp button:hover { color: var(--text); background: rgba(var(--ink), .08); }
 .actions { display: flex; gap: var(--sp-6); margin-top: var(--sp-12); flex-wrap: wrap; }
@@ -1574,7 +1576,7 @@ const routeRow = (ri, extra = '') => {
   return `<a class="row" data-go="r:${ri}"><span class="method" style="--m:${methodVar(r.m)};margin-top:var(--sp-2)">${h(r.m)}</span><span class="rt"><div class="rn">${h(r.name)}</div>${r.d ? `<div class="rd">${h(r.d)}</div>` : ''}<div class="rp">${h(r.p)}</div></span>${extra ? `<span class="rc">${extra}</span>` : ''}</a>`;
 };
 const listSec = (title, rows, count, max = 30) => rows.length ? `<div class="sec"><h3>${h(title)} <span class="c">${count ?? rows.length}</span></h3><div class="list">${rows.slice(0, max).join('')}${rows.length > max ? `<div class="more">+${rows.length - max} more</div>` : ''}</div></div>` : '';
-const pathBox = (p) => `<div class="pp"><span>${h(p)}</span><button data-copy="${h(p)}" title="Copy">${iconI('copy')}</button></div>`;
+const pathBox = (p) => `<div class="pp"><span>${h(p).split('/').map((x) => `<span class="sg">${x}</span>`).join('/<wbr>')}</span><button data-copy="${h(p)}" title="Copy">${iconI('copy')}</button></div>`;
 function header(i) {
   const kind = i.type === 'node' ? i.kind : i.type === 'symbol' ? i.symKind : i.type === 'route' ? 'Endpoint' : i.type === 'module' ? 'file' : i.type;
   return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(kind)}</span></div>
