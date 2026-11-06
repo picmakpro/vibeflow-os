@@ -364,6 +364,46 @@ if [ -n "$CHROME" ]; then
   assert_eq "TIT.2b — CSP retirée (M-CSP) mais échappement en place : window.__titre3 reste indéfini, le titre est inerte" "$(rj "$R_XSS" 'j.erreur||j.titre3+"/"+j.affiche')" "undefined/true"
 else nonverif "TIT.0-TIT.3 (titres hostiles rendus par la page, violations CSP)"; fi
 
+echo "=== ACT — F-1 : la reprise du chat ne retient que l'UUID d'une question envoyée par un VRAI geste (P72-D-21) ==="
+# Page hôte jetable (le vrai /api/ask exige claude) : elle installe installerObservateurChat de la SORTIE sur la vraie fenêtre ; un FAUX /api/ask (SSE, un UUID neuf par requête, documenté ici) tient la place du chat.
+# La charge de P est jouée sans geste (script, puis click() programmatique) ; le témoin positif est un clic de confiance (Input.dispatchMouseEvent), qui produit une activation réelle.
+cat > "$AUX/hote.mjs" <<'JS'
+// hote.mjs <dossier-sortie> <port> : sert /hote.html, /ui.mjs (vf-cockpit-lancer-ui.mjs de la sortie) et un FAUX POST /api/ask (SSE, événement answer, UUID neuf par requête)
+import http from 'node:http'; import fs from 'node:fs'; import crypto from 'node:crypto';
+const [, , dossier, port] = process.argv;
+const PAGE = `<!doctype html><meta charset="utf-8"><body><button id="envoi" style="position:fixed;left:10px;top:10px;width:90px;height:40px">envoi</button><script type="module">
+import { installerObservateurChat } from '/ui.mjs'; window.__retenu = []; installerObservateurChat(window, (id) => window.__retenu.push(id));
+document.getElementById('envoi').addEventListener('click', () => { fetch('/api/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: 'question humaine', mode: 'ask' }) }); });
+window.__pret = true;</script>`;
+http.createServer((req, res) => {
+  const u = new URL(req.url, 'http://x');
+  if (req.method === 'GET' && u.pathname === '/hote.html') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(PAGE); return; }
+  if (req.method === 'GET' && u.pathname === '/ui.mjs') { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(fs.readFileSync(dossier + '/vf-cockpit-lancer-ui.mjs')); return; }
+  if (req.method === 'POST' && u.pathname === '/api/ask') { req.resume(); req.on('end', () => { res.writeHead(200, { 'content-type': 'text/event-stream' }); res.end(`event: answer\ndata: ${JSON.stringify({ title: 'OK', answer: 'OK', items: [], session: crypto.randomUUID() })}\n\n`); }); return; }
+  res.writeHead(404); res.end();
+}).listen(Number(port), '127.0.0.1');
+JS
+if [ -n "$CHROME" ]; then
+  act() { # act <dossier-sortie> -> UNE ligne JSON
+    local hp hpid res; hp="$(libre)"; node "$AUX/hote.mjs" "$1" "$hp" & hpid=$!; PIDS+=($hpid)
+    for _ in $(seq 1 50); do curl -s -o /dev/null "http://127.0.0.1:$hp/hote.html" && break; sleep 0.1; done
+    res="$(node "$HERE_T/temoins/lancer-xss.mjs" "$CHROME" "{\"mode\":\"activation\",\"url\":\"http://127.0.0.1:$hp/hote.html\"}")"; vf_hyg_stop "$hpid"; printf '%s' "$res"
+  }
+  RACT="$(act "$SORTIE")"
+  assert_eq "ACT.0 — témoin : avant tout geste la page n'a AUCUNE activation (sans lui, l'absence de reprise forgée ne prouverait rien)" "$(rj "$RACT" 'j.erreur||j.actif0')" "false"
+  assert_eq "ACT.1 — la charge poste sa propre question (script, puis click() programmatique) : aucun UUID retenu, donc aucune reprise forgée à proposer" "$(rj "$RACT" 'j.erreur||j.forge+"/"+j.forgeClic')" "0/0"
+  assert_eq "ACT.2 — témoin positif : un VRAI clic (Input.dispatchMouseEvent) sur l'envoi retient l'UUID de cette conversation, une activation est active" "$(rj "$RACT" 'j.erreur||j.humain+"/"+j.actifApresClic+"/"+/^[0-9a-f-]{36}$/.test(j.premier)')" "1/true/true"
+  assert_eq "ACT.3 — activation expirée : une nouvelle requête de la charge n'efface ni ne remplace l'UUID retenu par le geste humain (rien n'est retenu de plus)" "$(rj "$RACT" 'j.erreur||j.inchange+"/"+j.apres')" "true/$(rj "$RACT" 'j.humain+j.residuel')"
+  echo "  ℹ résiduel accepté (P72-D-21, Samuel, 2026-11-06) : pendant l'activation laissée par un geste réel, une requête de la charge est retenue — mesuré : $(rj "$RACT" 'j.residuel') UUID de plus"
+  rm -rf "$WORK/sortie-act"; cp -R "$SORTIE" "$WORK/sortie-act"; cp "$WORK/sortie-act/vf-cockpit-lancer-ui.mjs" "$WORK/ui.orig"
+  sed -i.bak 's/const humain = actif();/const humain = true;/' "$WORK/sortie-act/vf-cockpit-lancer-ui.mjs"
+  if cmp -s "$WORK/ui.orig" "$WORK/sortie-act/vf-cockpit-lancer-ui.mjs"; then assert_eq "M-ACTIVATION-RETIREE — mutant sans effet (ancre absente)" "sans effet" "effet"
+  else
+    RMUT="$(act "$WORK/sortie-act")"
+    assert_eq "M-ACTIVATION-RETIREE — garde d'activation retirée : la charge fait retenir l'UUID de SA conversation (ACT.1 rougit : retenu au lieu de 0/0)" "$(rj "$RMUT" 'j.erreur||(j.forge>0)+"/"+(j.forgeClic>0)')" "true/true"
+  fi
+else nonverif "ACT.0-ACT.3 et M-ACTIVATION-RETIREE (activation utilisateur réelle sous navigateur)"; fi
+
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL ($NONVERIF non vérifiées sans navigateur)"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE — zéro assertion exécutée"; exit 1; }

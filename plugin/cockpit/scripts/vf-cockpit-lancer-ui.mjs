@@ -6,7 +6,7 @@
 //   lancee : le booléen true (forme projetée par 72-09) ou la forme riche { etat, verbe } de 72-07 (etat : attendue, vue, terminee) ; toute autre forme n'affiche rien.
 //   POST /api/vf/lancer, corps EXACTEMENT { cible, verbe } (plus `chat` seulement après une conversation du chat observée, 72-13) -> 202 ; un refus porte { refus: <code> } (72-04), `bloque` (409) vient de 72-09.
 // Un clic ne lance RIEN : il PROPOSE un couple { cible, verbe } au serveur (« la page propose, le terminal dispose ») ; le serveur reste juge, la page n'est jamais la garde.
-// Gardes (une instruction par ligne, marquée « garde:<nom> », mutants de la suite) : titre, entree, bloquants, corps, verbes, envol, jeton (deux lignes), chemin, cible, propose.
+// Gardes (une instruction par ligne, marquée « garde:<nom> », mutants de la suite) : titre, entree, bloquants, corps, verbes, envol, jeton (deux lignes), chemin, cible, propose, activation (72-13 F-1).
 // Le script est la fonction scriptLancer sérialisée par .toString() : ses commentaires sont servis tels quels, ils ne citent ni adresse web ni nom d'appel interdit.
 
 export const LIBELLES_VERBES = Object.freeze({ cadrer: 'Cadrer', planifier: 'Planifier', executer: 'Exécuter', verifier: 'Vérifier', reprendre: 'Reprendre' });
@@ -40,7 +40,7 @@ const TEXTES = {
 // Option « continuer le chat » (72-13 ; LANC-11, P72-D-03). Livrée parce que la sonde A5 est VERTE (2026-11-05, claude 2.1.318, 72-13-RED-TRACE.md) ; la vue de Q porte la même valeur.
 export const CHAT_LIVRE = true;
 
-// Ces trois fonctions sont sérialisées par .toString() dans le script injecté : chacune est autonome (aucune référence au module, motif d'UUID recopié).
+// Ces trois fonctions sont sérialisées par .toString() dans le script injecté : chacune est autonome (aucune référence au module, motif d'UUID recopié ; forme stricte minuscule, celle que le gabarit accepte : S3).
 // Lit le texte d'un flux d'évènements de la réponse du chat et rend l'UUID de l'évènement `answer` (le dernier valide), sinon null. Entrée bornée.
 export function extraireSessionChat(texte) {
   if (typeof texte !== 'string') return null;
@@ -48,13 +48,13 @@ export function extraireSessionChat(texte) {
   texte.slice(0, 262144).split('\n\n').forEach((bloc) => {
     const ev = /^event: (.*)$/m.exec(bloc), dt = /^data: (.*)$/m.exec(bloc);
     if (!ev || ev[1] !== 'answer' || !dt) return;
-    try { const d = JSON.parse(dt[1]); if (d && typeof d.session === 'string' && /^[0-9a-f-]{36}$/i.test(d.session)) session = d.session; } catch (e) { void e; } // bloc illisible : ignoré
+    try { const d = JSON.parse(dt[1]); if (d && typeof d.session === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(d.session)) session = d.session; } catch (e) { void e; } // bloc illisible : ignoré
   });
   return session;
 }
 
 // Enveloppe de la fonction de requête de la fenêtre : la requête d'origine part TOUJOURS et sa promesse est rendue telle quelle ; seule une question au chat (POST sur le chemin du chat, mode ask ou absent)
-// est observée, sur un CLONE de la réponse, en lecture seule et bornée ; seul l'UUID est transmis à `rappel`, rien d'autre n'est retenu ni écrit ; toute exception est avalée.
+// est observée, SEULEMENT si elle part pendant une activation utilisateur réelle de la page (P72-D-21), sur un CLONE de la réponse, en lecture seule et bornée ; seul l'UUID est transmis à `rappel`, rien d'autre n'est retenu ni écrit ; toute exception est avalée.
 export function installerObservateurChat(fenetre, rappel, extraire = extraireSessionChat) {
   const natif = fenetre.fetch;
   if (typeof natif !== 'function') return;
@@ -63,12 +63,17 @@ export function installerObservateurChat(fenetre, rappel, extraire = extraireSes
     for (;;) { const m = await lecteur.read(); if (m.done) break; texte += dec.decode(m.value, { stream: true }); if (texte.length > 262144) { lecteur.cancel(); break; } }
     return texte;
   };
+  // activation utilisateur réelle (F-1, P72-D-21) : lue AU MOMENT de l'appel (jamais à la réponse) par les accesseurs natifs saisis à l'installation ; absente ou illisible : faux (échec fermé)
+  const acc = (o, k) => { try { const d = o && Object.getOwnPropertyDescriptor(o, k); return d && typeof d.get === 'function' ? d.get : null; } catch (e) { return null; } };
+  const gNav = acc(fenetre.Navigator && fenetre.Navigator.prototype, 'userActivation'), gAct = acc(fenetre.UserActivation && fenetre.UserActivation.prototype, 'isActive');
+  const actif = () => { try { const ua = gNav ? gNav.call(fenetre.navigator) : fenetre.navigator.userActivation; return (gAct ? gAct.call(ua) : ua.isActive) === true; } catch (e) { return false; } };
   fenetre.fetch = function (entree, init) {
+    const humain = actif(); // garde:activation
     const promesse = natif.apply(fenetre, arguments);
     try {
       const url = typeof entree === 'string' ? entree : (entree && entree.url) || '';
       const corps = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
-      if (init && String(init.method).toUpperCase() === 'POST' && new URL(url, fenetre.location.href).pathname === '/api/ask' && corps && typeof corps === 'object' && (corps.mode === undefined || corps.mode === 'ask')) {
+      if (humain && init && String(init.method).toUpperCase() === 'POST' && new URL(url, fenetre.location.href).pathname === '/api/ask' && corps && typeof corps === 'object' && (corps.mode === undefined || corps.mode === 'ask')) {
         Promise.resolve(promesse).then((reponse) => { try { return lire(reponse.clone()).then((t) => { const id = extraire(t); if (id) rappel(id); }, () => {}); } catch (e) { return undefined; } }, () => {});
       }
     } catch (e) { void e; } // une enveloppe qui échoue laisse passer la requête telle quelle
@@ -79,7 +84,7 @@ export function installerObservateurChat(fenetre, rappel, extraire = extraireSes
 // Corps du POST de lancement : { cible, verbe } et, seulement si l'option est livrée ET l'identifiant du chat passe le motif, `chat` ; jamais d'autre clé.
 export function corpsProposition({ cible, verbe, chat, livre }) {
   const corps = { cible, verbe };
-  if (livre === true && typeof chat === 'string' && /^[0-9a-f-]{36}$/i.test(chat)) corps.chat = chat;
+  if (livre === true && typeof chat === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(chat)) corps.chat = chat;
   return corps;
 }
 

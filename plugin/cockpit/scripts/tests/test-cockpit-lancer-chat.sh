@@ -45,7 +45,9 @@ const cles = (o) => Object.keys(o).join(',');
 if (cas === 'tc1') {
   const ex = requis('extraireSessionChat'), t = (f) => { try { return f(); } catch (e) { return 'EXCEPTION'; } };
   rendre([
-    ['UUID minuscule', ex(bloc('answer', { session: U })) === U], ['UUID majuscule', ex(bloc('answer', { session: U.toUpperCase() })) === U.toUpperCase()],
+    ['UUID minuscule', ex(bloc('answer', { session: U })) === U], ['UUID majuscule : écarté (forme stricte minuscule du gabarit, S3)', ex(bloc('answer', { session: U.toUpperCase() })) === null],
+    ['36 caractères qui ne sont pas un UUID (a x36, tirets x36, tirets mal placés) : écartés (S3)', ['a'.repeat(36), '-'.repeat(36), U.replace(/-/g, '').padEnd(35, 'a') + '-', '7c7d741-20a15-4407-939b-eacb01a8e345'].every((v) => ex(bloc('answer', { session: v })) === null)],
+    ['un identifiant rejeté après un valide ne remplace pas le valide (les lancements suivants gardent la reprise)', ex(bloc('answer', { session: U }) + bloc('answer', { session: 'a'.repeat(36) })) === U],
     ['answer précédé d\'un progress', ex(bloc('progress', { text: 'Write' }) + bloc('answer', { title: 'OK', session: U })) === U],
     ['session absente', ex(bloc('answer', { title: 'x' })) === null], ['x;touch M', ex(bloc('answer', { session: 'x;touch M' })) === null],
     ['$(touch M)', ex(bloc('answer', { session: '$(touch M)' })) === null], ['hexadécimal de 16 caractères (Codex)', ex(bloc('answer', { session: '0123456789abcdef' })) === null],
@@ -62,7 +64,7 @@ if (cas === 'tc1') {
   rendre([
     ['livre faux : jamais de clé chat', cles(c({ chat: U, livre: false })) === 'cible,verbe'], ['livre non booléen : jamais de clé chat', cles(c({ chat: U, livre: 'true' })) === 'cible,verbe' && cles(c({ chat: U, livre: undefined })) === 'cible,verbe'],
     ['livre vrai et UUID valide', cles(c({ chat: U })) === 'cible,verbe,chat' && c({ chat: U }).chat === U],
-    ['identifiants forgés écartés (x;touch M, $(touch M), 37 caractères, vide, nombre, tableau, null, absent)', ['x;touch M', '$(touch M)', U + 'a', '', 5, [U], null, undefined].every((v) => cles(c({ chat: v })) === 'cible,verbe')],
+    ['identifiants forgés écartés (x;touch M, $(touch M), 37 caractères, 36 non-UUID, majuscules, vide, nombre, tableau, null, absent)', ['x;touch M', '$(touch M)', U + 'a', 'a'.repeat(36), U.toUpperCase(), '', 5, [U], null, undefined].every((v) => cles(c({ chat: v })) === 'cible,verbe')],
     ['aucune autre clé (ligne, intention ignorées)', cles(c({ chat: U, ligne: 'claude x', intention: 'y' })) === 'cible,verbe,chat' && cles(c({ ligne: 'claude x' })) === 'cible,verbe'],
     ['cible et verbe repris tels quels', c({ chat: U }).cible === 'ph-1' && c({ chat: U }).verbe === 'cadrer'],
   ]);
@@ -80,9 +82,11 @@ const U = '7c7d7412-0a15-4407-939b-eacb01a8e345', att = (ms) => new Promise((ok)
 const rejets = []; process.on('unhandledRejection', (e) => rejets.push(String(e)));
 const SSE = `event: start\ndata: {}\n\nevent: progress\ndata: {"text":"Write"}\n\nevent: answer\ndata: ${JSON.stringify({ title: 'OK', answer: 'OK', items: [], session: U })}\n\n`;
 const POST = (o) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(o) });
-const sc = async (nom, entree, init, attendu, fabrique = () => new Response(SSE, { status: 200 })) => {
+// F-1 (P72-D-21) : la fenêtre factice porte une activation utilisateur ; `act` la règle (true par défaut ; null = API absente ; 'sans-ua' = navigator sans userActivation)
+const nav = (act) => (act === null ? undefined : act === 'sans-ua' ? {} : { userActivation: { isActive: act } });
+const sc = async (nom, entree, init, attendu, fabrique = () => new Response(SSE, { status: 200 }), act = true) => {
   const retenus = [], appels = []; const ref = await fabrique().text();
-  const fenetre = { location: { href: 'http://127.0.0.1:1/project.html' }, fetch: (a, b) => { appels.push([a, b]); return Promise.resolve(fabrique()); } };
+  const fenetre = { location: { href: 'http://127.0.0.1:1/project.html' }, navigator: nav(act), fetch: (a, b) => { appels.push([a, b]); return Promise.resolve(fabrique()); } };
   const cles0 = Object.keys(fenetre).sort().join(',');
   m.installerObservateurChat(fenetre, (...x) => retenus.push(x));
   let corps = null, erreur = null;
@@ -100,14 +104,31 @@ const r = [
   await sc('corps non JSON : rien', '/api/ask', { method: 'POST', body: 'pas du json' }, []), await sc('sans init : rien', '/api/ask', undefined, []),
   await sc('réponse sans session : rien', '/api/ask', POST({ mode: 'ask' }), [], () => new Response('event: answer\ndata: {"title":"x"}\n\n')),
   await sc('session forgée : rien', '/api/ask', POST({ mode: 'ask' }), [], () => new Response('event: answer\ndata: {"session":"x;touch M"}\n\n')),
+  // F-1 : sans activation utilisateur réelle au moment de l'appel, rien n'est retenu ; la requête d'origine part et sa réponse est rendue intacte (sc le vérifie)
+  await sc('activation absente (isActive faux) : rien', '/api/ask', POST({ mode: 'ask' }), [], undefined, false),
+  await sc('API navigator absente : rien (échec fermé)', '/api/ask', POST({ mode: 'ask' }), [], undefined, null),
+  await sc('navigator sans userActivation : rien (échec fermé)', '/api/ask', POST({ mode: 'ask' }), [], undefined, 'sans-ua'),
+  await sc('isActive non booléen (truthy) : rien', '/api/ask', POST({ mode: 'ask' }), [], undefined, 'oui'),
 ];
+// l'activation compte AU MOMENT DE L'APPEL : active à l'appel puis éteinte avant la réponse = retenu ; éteinte à l'appel puis active à la réponse = rien
+{ const lecture = async (aAppel, aReponse) => { const ua = { isActive: aAppel }, retenus = [];
+    const f = { location: { href: 'http://127.0.0.1:1/project.html' }, navigator: { userActivation: ua }, fetch: () => new Promise((ok) => setTimeout(() => { ua.isActive = aReponse; ok(new Response(SSE)); }, 30)) };
+    m.installerObservateurChat(f, (x) => retenus.push(x)); await f.fetch('/api/ask', POST({ mode: 'ask' })); await att(80); return JSON.stringify(retenus); };
+  r.push(['active à l\'appel, éteinte à la réponse : retenu', await lecture(true, false) === JSON.stringify([U]), '']);
+  r.push(['éteinte à l\'appel, active à la réponse : rien', await lecture(false, true) === '[]', '']); }
+// une requête sans activation n'efface ni ne remplace l'UUID déjà retenu par un geste humain (le rappel n'est jamais appelé avec autre chose qu'un UUID retenu)
+{ const ua = { isActive: true }, retenus = [], V = '11111111-2222-3333-4444-555555555555'; let n = 0;
+  const f = { location: { href: 'http://127.0.0.1:1/project.html' }, navigator: { userActivation: ua }, fetch: () => Promise.resolve(new Response(`event: answer\ndata: ${JSON.stringify({ session: n++ === 0 ? U : V })}\n\n`)) };
+  m.installerObservateurChat(f, (x) => retenus.push(x)); await f.fetch('/api/ask', POST({ mode: 'ask' })); await att(60);
+  ua.isActive = false; await f.fetch('/api/ask', POST({ mode: 'ask' })); await att(60);
+  r.push(['requête sans activation après un geste humain : l\'UUID retenu reste (ni effacé ni remplacé, aucun rappel de plus)', JSON.stringify(retenus) === JSON.stringify([U]), JSON.stringify(retenus)]); }
 // un clone qui lève ne casse pas la promesse d'origine : l'appelant reçoit l'objet réponse lui-même, aucun rejet non rattrapé
 { const retenus = [], rep = { ok: true, clone() { throw new Error('clone'); }, text: async () => SSE };
-  const f = { location: { href: 'http://127.0.0.1:1/project.html' }, fetch: () => Promise.resolve(rep) }; m.installerObservateurChat(f, (x) => retenus.push(x));
+  const f = { location: { href: 'http://127.0.0.1:1/project.html' }, navigator: nav(true), fetch: () => Promise.resolve(rep) }; m.installerObservateurChat(f, (x) => retenus.push(x));
   const v = await f.fetch('/api/ask', POST({ mode: 'ask' })); await att(60);
   r.push(['clone qui lève : la promesse d\'origine rend la même réponse, rien retenu', v === rep && retenus.length === 0, `meme=${v === rep}`]); }
 // un fetch natif qui rejette : le rejet arrive tel quel à l'appelant, l'enveloppe n'en crée aucun autre
-{ const f = { location: { href: 'http://127.0.0.1:1/project.html' }, fetch: () => Promise.reject(new Error('reseau')) }; m.installerObservateurChat(f, () => {});
+{ const f = { location: { href: 'http://127.0.0.1:1/project.html' }, navigator: nav(true), fetch: () => Promise.reject(new Error('reseau')) }; m.installerObservateurChat(f, () => {});
   let e = null; try { await f.fetch('/api/ask', POST({ mode: 'ask' })); } catch (x) { e = String(x.message); } await att(60);
   r.push(['rejet réseau transmis tel quel, sans rejet supplémentaire', e === 'reseau' && rejets.length === 0, `e=${e} rejets=${rejets.length}`]); }
 const x = r.filter((c) => !c[1]).map((c) => c[0] + ' (' + c[2] + ')');
@@ -456,10 +477,13 @@ assert_eq "TC.7 — chat valide : 202 (témoin) ; x;touch M, \$(touch M), 37 car
 
 # ---- mutants ----
 echo "=== Mutants (copies de la sortie) ==="
-if mutant uivalid vf-cockpit-lancer-ui.mjs 's/\^\[0-9a-f-\]{36}\$/^.+$/g'; then
+if mutant uivalid vf-cockpit-lancer-ui.mjs 's/\^\[0-9a-f\]{8}-\[0-9a-f\]{4}-\[0-9a-f\]{4}-\[0-9a-f\]{4}-\[0-9a-f\]{12}\$/^.+$/g'; then
   assert_eq "M-CHAT-NON-VALIDE-UI — le mutant (extracteur et constructeur sans le test d'UUID) rougit TC.1 : x;touch M passe" "$(pur "$MUT_OUT" tc1 | sed 's/^ECHECS.*/rouge/;s/^ok$/vert/')" "rouge"
   assert_eq "M-CHAT-NON-VALIDE-UI — le mutant rougit TC.3 : un identifiant forgé entre dans le corps" "$(pur "$MUT_OUT" tc3 | sed 's/^ECHECS.*/rouge/;s/^ok$/vert/')" "rouge"
 else sans_effet "M-CHAT-NON-VALIDE-UI"; fi
+if mutant motiflache vf-cockpit-lancer-ui.mjs 's#/\^\[0-9a-f\]{8}-\[0-9a-f\]{4}-\[0-9a-f\]{4}-\[0-9a-f\]{4}-\[0-9a-f\]{12}\$/#/^[0-9a-f-]{36}$/i#g'; then
+  assert_eq "M-MOTIF-LACHE (S3) — l'ancien motif /^[0-9a-f-]{36}$/i remis rougit TC.1 ET TC.3 : un 36 caractères non-UUID ou des majuscules sont de nouveau retenus" "$(pur "$MUT_OUT" tc1 | sed 's/^ECHECS.*/rouge/;s/^ok$/vert/')/$(pur "$MUT_OUT" tc3 | sed 's/^ECHECS.*/rouge/;s/^ok$/vert/')" "rouge/rouge"
+else sans_effet "M-MOTIF-LACHE"; fi
 if mutant pvalid vf-cockpit-lancer.mjs 's/if (chat !== undefined && !UUID.test(chat))/if (false)/'; then
   assert_eq "M-CHAT-NON-VALIDE-P — le mutant rougit TC.7 : la route de P accepte un identifiant forgé (le témoin positif rend 202, le nombre de refus tombe sous 4)" "$(tc7p "$MUT_OUT" | tr ' ' '\n' | awk 'NR==1{t=$0; next} {if ($0 ~ /^4[0-9][0-9]$/) n++} END{print t "/" (n<4 ? "rouge" : "vert")}')" "202/rouge"
 else sans_effet "M-CHAT-NON-VALIDE-P"; fi
@@ -470,6 +494,9 @@ else sans_effet "M-CHAT-NON-VALIDE-Q"; fi
 if mutant consomme vf-cockpit-lancer-ui.mjs 's/reponse\.clone()/reponse/'; then
   assert_eq "M-ENVELOPPE-CONSOMME — le mutant (lecture de la réponse d'origine) rougit TC.2 : le viewer ne peut plus lire sa réponse" "$(node "$AUX/harnais-fetch.mjs" "$MUT_OUT" 2>&1 | tail -1 | awk '/^ECHECS.*corps_intact=false/ {print "rouge"; next} {print "autre : " substr($0, 1, 120)}')" "rouge"
 else sans_effet "M-ENVELOPPE-CONSOMME"; fi
+if mutant activation vf-cockpit-lancer-ui.mjs 's/const humain = actif();/const humain = true;/'; then
+  assert_eq "M-ACTIVATION-RETIREE — le mutant (garde d'activation retirée) rougit TC.2 : une requête sans activation retient de nouveau l'UUID" "$(node "$AUX/harnais-fetch.mjs" "$MUT_OUT" 2>&1 | tail -1 | awk '/^ECHECS.*(activation absente|navigator|isActive|éteinte)/ {print "rouge"; next} {print "autre : " substr($0, 1, 160)}')" "rouge"
+else sans_effet "M-ACTIVATION-RETIREE"; fi
 if [ -n "$CHROME" ]; then
   if mutant toujours vf-cockpit-terminal-vue.mjs '/garde:chat-offre/s/CHAT_LIVRE && p\.chat === true && [^;]*;/true;/'; then
     run_vue "$MUT_OUT"

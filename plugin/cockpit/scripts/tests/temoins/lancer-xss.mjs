@@ -3,6 +3,8 @@
 //   charge : { mode, url, q, secret, onglet, cle } — joue la page P piégée ; attend window.__xss.etape1 (la proposition est née, l'isolement de Q est mesuré) ; fait, en CLIENT LÉGITIME
 //            (Node : secret et onglet de Q), lire la proposition (GET /proposition, ce qui la rend visible) puis attend son armement (arme_apres_ms lu dans la réponse, plus une marge) ;
 //            pose window.__go (la charge tente alors de confirmer) ; attend window.__xss.fin ; rejoue window.open AVEC geste ; rend window.__xss + { geste, titre3, arme }.
+//   activation : { mode, url } — F-1 (P72-D-21) : page hôte jetable qui installe l'observateur de chat de la SORTIE ; une charge (script sans geste) poste sa propre question au faux /api/ask : rien ne doit être retenu ;
+//            puis un VRAI clic (Input.dispatchMouseEvent) sur le bouton d'envoi : l'UUID est retenu ; enfin, activation expirée, une nouvelle requête de la charge ne l'efface ni ne le remplace.
 //   titres : { mode, url } — page P NON compromise, CSP en place : violations comptées, window.__titre3 indéfini, témoin de la mesure (une balise insérée par la suite est comptée).
 import { pathToFileURL } from 'node:url';
 import http from 'node:http';
@@ -20,6 +22,27 @@ const lire = (q, secret, onglet) => new Promise((resolve) => {
 });
 
 await executer(chrome, async (s) => {
+  if (a.mode === 'activation') {
+    const souris = (type, x, y) => s.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 });
+    await s.naviguer(a.url);
+    await s.attendre('window.__pret === true', "la page hôte a installé l'observateur (window.__pret)", 25000);
+    const FORGE = `(async () => { const r = await fetch('/api/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: 'question de la charge', mode: 'ask' }) }); await r.text(); await new Promise((o) => setTimeout(o, 400)); return window.__retenu.length; })()`;
+    const res = { actif0: await s.ev('navigator.userActivation.isActive') };
+    res.forge = await s.ev(FORGE);
+    res.forgeClic = await s.ev(`(async () => { document.getElementById('envoi').click(); await new Promise((o) => setTimeout(o, 500)); return window.__retenu.length; })()`);
+    res.actifApresForge = await s.ev('navigator.userActivation.isActive');
+    const c = await s.ev(`(() => { const b = document.getElementById('envoi').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+    await souris('mouseMoved', c.x, c.y); await souris('mousePressed', c.x, c.y); await souris('mouseReleased', c.x, c.y);
+    for (let i = 0; i < 30 && (await s.ev('window.__retenu.length')) === res.forgeClic; i++) await pause(100);
+    res.humain = await s.ev('window.__retenu.length'); res.actifApresClic = await s.ev('navigator.userActivation.isActive');
+    res.premier = await s.ev('window.__retenu[0] || null');
+    // résiduel accepté (P72-D-21) : pendant l'activation laissée par le geste réel, une requête de la charge est retenue ; mesuré, non asserté comme défaut
+    res.residuel = (await s.ev(FORGE)) - res.humain;
+    await s.attendre('navigator.userActivation.isActive === false', "l'activation transitoire expire", 15000);
+    const avant = await s.ev('JSON.stringify(window.__retenu)');
+    res.apres = await s.ev(FORGE); res.inchange = (await s.ev('JSON.stringify(window.__retenu)')) === avant;
+    return res;
+  }
   if (a.mode === 'titres') {
     await s.naviguer(a.url);
     await s.attendre("document.body && document.body.innerText.includes('__titre3')", 'les titres hostiles sont affichés (en texte)', 25000);
