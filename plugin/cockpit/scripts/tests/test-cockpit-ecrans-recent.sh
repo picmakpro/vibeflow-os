@@ -3,6 +3,7 @@
 #   E1 une route citée dans un commentaire n'est pas une route (// et /* */), la vraie route reste lue (témoin positif)
 #   E2 la marque de taille n'est pas le résumé d'un écran (buildScreens)
 #   E3 aucun écran : le bouton reste et dit « No screen detected in this repository. » ; avec un écran, pas de message vide
+#   E4 la marque de taille n'est pas la description d'une carte de fichier (extract.mjs)
 #   R1 le badge de Travail récent compte des cartes (un fichier touché par deux tâches = une carte)
 #   R2 le panneau d'une partie compte les mêmes cartes que la carte (viewer.html : une par carte)
 # Variable ECRANS_MOTEUR : un autre arbre de moteur (le témoin rouge se rejoue sur la base cb499810).
@@ -62,6 +63,21 @@ assert_eq "R1.1 badge : 3 cartes (4 entrées, a.js touché par deux tâches)" "$
 assert_eq "R1.2 panneau d'ensemble : même nombre que le badge" "$(q "$JR" "/Recent work <span class=\"c\">(\\d+)<\\/span>/.exec(j.sections.find((s)=>s.where==='overview').html)[1]")" "3"
 assert_eq "R2.1 panneau d'une partie : 3 modifiés à l'intérieur, comme la carte" "$(q "$JR" "/Recent work inside <span class=\"c\">(\\d+)<\\/span>/.exec(j.sections.find((s)=>s.where==='item').html)[1]")" "3"
 assert_eq "R2.2 panneau d'une partie : une ligne par carte" "$(q "$JR" "(j.sections.find((s)=>s.where==='item').html.match(/data-go=/g)||[]).length")" "3"
+
+echo "== E4 marque de taille dans la description d'une carte =="
+cat > "$WORK/doc.mjs" <<'JS'
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const { extract } = await import(pathToFileURL(path.join(process.argv[2], 'scripts/lib/extract.mjs')).href);
+const d = (src, lang, p) => (extract(src, lang, p).doc || '').replace(/\s+/g, ' ').trim();
+console.log([
+  d('// vibeflow:allow-large-file (code vendorisé, VENDORED.txt)\n// Le vrai résumé.\nexport const a = 1;\n', 'javascript', 'a.mjs'),
+  d('// Un résumé sans marque.\nexport const a = 1;\n', 'javascript', 'b.mjs'),
+  d('# vibeflow:allow-large-file (x)\n# Résumé hash.\nA=1\n', 'shell', 'c.sh'),
+  d('// vibeflow:allow-large-file (x)\nexport const a = 1;\n', 'javascript', 'd.mjs'),
+].join('|'));
+JS
+assert_eq "E4.1 marque retirée, résumé voisin gardé, fichier sans marque intact, marque seule = vide" "$(node "$WORK/doc.mjs" "$MOTEUR" 2>&1)" "Le vrai résumé.|Un résumé sans marque.|Résumé hash.|"
 
 echo; echo "Résultat : $PASS réussis, $FAIL échecs"
 [ "$FAIL" -eq 0 ]
