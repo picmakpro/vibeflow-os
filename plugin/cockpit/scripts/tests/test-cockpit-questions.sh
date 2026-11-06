@@ -229,11 +229,16 @@ assert_eq "Q15.3 — la réponse dit qu'il n'y a pas de STATE.md" "$(H json "$WO
 assert_eq "Q15.4 — pas de titre « À finir » suivi d'une liste vide" "$(H json "$WORK/q15.json" 'j.answer.split("\n").map((l,i,a)=>/^À finir/.test(l)&&!/^- /.test(a.slice(i+1).find(x=>x.trim())||"")).some(Boolean)')" "false"
 mkq "$WORK/q16" ready_to_execute; H loc "$SCRIPTS" "$WORK/q16" "Où en est-on ?" > "$WORK/q16.json"
 assert_eq "Q16.1 — la réponse locale n'a aucun statut brut (mot à tiret bas)" "$(H json "$WORK/q16.json" '/\b[a-z]+_[a-z_]+\b/.test(j.answer)')" "false"
-assert_eq "Q16.2 — la réponse locale porte le libellé français « prête à exécuter »" "$(H json "$WORK/q16.json" '/prête à exécuter/.test(j.answer)')" "true"
+assert_eq "Q16.2 — la réponse locale dit l'état de la CARTE (« fait »), cite le statut de STATE.md en français à part (« prête à exécuter »), et signale qu'ils divergent (« STATE.md semble périmé »), comme le panneau" "$(H json "$WORK/q16.json" '/Dernière phase : \[\[n:ph-1\]\] · fait/.test(j.answer)&&/Statut noté dans STATE\.md : prête à exécuter/.test(j.answer)&&/STATE\.md semble périmé/.test(j.answer)')" "true"
 "$NODE" "$SCRIPTS/vf-cockpit-project.mjs" "$WORK/q16" > "$WORK/q16g.json"
-assert_eq "Q16.3 — sous-titre du graphe (CLI) : libellé français, aucun tiret bas" "$(H json "$WORK/q16g.json" '/prête à exécuter/.test(j.project.summary)&&!/_/.test(j.project.summary)')" "true"
+assert_eq "Q16.3 — sous-titre du graphe (CLI) : état de la carte de la phase courante (PU-G-093, P69-D-08), libellé français, aucun tiret bas, jamais le statut brut de STATE.md" "$(H json "$WORK/q16g.json" '/phase 1 · fait\./.test(j.project.summary)&&!/_|prête à exécuter/.test(j.project.summary)')" "true"
+mkq "$WORK/q16c" ready_to_execute; sed -i.bak 's/^- \[x\] \*\*Phase 1/- [ ] **Phase 1/' "$WORK/q16c/.planning/ROADMAP.md"; H loc "$SCRIPTS" "$WORK/q16c" "Où en est-on ?" > "$WORK/q16c.json"
+assert_eq "Q16.5 — témoin d'accord : carte et STATE.md concordent, la réponse ne crie pas « périmé »" "$(H json "$WORK/q16c.json" '/Statut noté dans STATE\.md : prête à exécuter/.test(j.answer)&&!/semble périmé/.test(j.answer)')" "true"
 mkq "$WORK/q16b" statut_inventé; "$NODE" "$SCRIPTS/vf-cockpit-project.mjs" "$WORK/q16b" > "$WORK/q16bg.json"
 assert_eq "Q16.4 — statut inconnu : omis du sous-titre, jamais affiché brut" "$(H json "$WORK/q16bg.json" '/inventé|statut_/.test(j.project.summary)')" "false"
+mkdir -p "$WORK/q16d/.planning/phases/01-x"; printf -- '# Roadmap\n\n## Phases\n\n- [x] **Phase 1 : Socle** - fait\n- [ ] **Phase 2: Suite** - à faire\n\n### Phase 2: Suite\n**Goal** ok\n**Depends on** Phase 1 et plus\n' > "$WORK/q16d/.planning/ROADMAP.md"; printf -- '---\nstatus: executing\n---\n' > "$WORK/q16d/.planning/STATE.md"
+H loc "$SCRIPTS" "$WORK/q16d" "Que veut dire lignes non comprises ?" > "$WORK/q16d.json"
+assert_eq "Q16.6 — jointure lot 6 / lot 7 : sur un VRAI graphe (dérive mesurée par le panneau, champs ajoutés au lot 6), la réponse « lignes non comprises » donne le bon nombre (1), le bon fichier:ligne (ROADMAP.md:10) et le compte des autres écarts (3)" "$(H json "$WORK/q16d.json" '/\n1 ligne dans ce projet/.test(j.answer)&&/`\.planning\/ROADMAP\.md:10`/.test(j.answer)&&/3 lignes sont lues malgré/.test(j.answer)')" "true"
 assert_eq "Q17.1 — mêmes clés : table serveur STATUTS et table navigateur STATUT" "$("$NODE" --input-type=module -e "
 import fs from 'fs'; import { pathToFileURL } from 'url';
 const S = (await import(pathToFileURL('$SCRIPTS/vf-cockpit-project.mjs').href)).STATUTS || {};

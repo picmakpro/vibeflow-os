@@ -142,7 +142,7 @@ export function answerLocally(G, question) {
       aucunState ? 'Pas de STATE.md dans ce lab : le jalon et la phase courants ne sont pas suivis.' : '',
       !aucunState && (cur || vf.milestone) ? `Jalon en cours : ${jalon}.` : '',
       // une phase connue du graphe porte SON état (celui de sa carte) ; le statut de STATE.md est dit à part, comme celui du projet
-      !aucunState && p ? `Dernière phase : [[${I.ref(p)}]]${p.st ? ` · ${etat(p)}` : ''}${vf.lastActivity ? `, le ${vf.lastActivity}` : ''}.${st ? ` Statut noté dans STATE.md : ${st}.` : ''}` : '',
+      !aucunState && p ? `Dernière phase : [[${I.ref(p)}]]${p.st ? ` · ${etat(p)}` : ''}${vf.lastActivity ? `, le ${vf.lastActivity}` : ''}.${st ? ` Statut noté dans STATE.md : ${st}${vf.stateStale ? ' (STATE.md semble périmé)' : ''}.` : ''}` : '',
       !aucunState && !p && vf.phase ? `Dernière phase : ${[vf.phase, st].filter(Boolean).join(' · ')}${vf.lastActivity ? `, le ${vf.lastActivity}` : ''}.` : '',
       !aucunState && autresJalons.length ? `Autres jalons en cours : ${autresJalons.map((m) => `[[${I.ref(m)}]]${m.foot ? ` (${m.foot})` : ''}`).join(', ')}.` : '',
       !aucunState && !p && !vf.phase && (st || vf.lastActivity) ? `${[st, vf.lastActivity && `le ${vf.lastActivity}`].filter(Boolean).join(', ')}.` : '',
