@@ -4,6 +4,7 @@
 #   Q4 modèle : préséance et liste fermée · Q5 question piégée inoffensive · Q6 le modèle ne laisse aucune trace
 #   Q7 seul Claude Code est lancé · Q8 syntaxe et jeton de /api/vf/modeles · Q9 CLI de requête · Q10 identité de phase
 #   Q11 ARGS_CONFINEMENT = « Combinaison retenue » de la mesure (dépôt seulement)
+#   Q18 retours panel lot 7 (PU-G-096 un état par phase · PU-G-147 coupe au mot · PU-G-150 lignes non comprises)
 #   Q15 « Où en est-on ? » sans STATE.md · Q16 statut lisible (réponse locale, sous-titre) · Q17 parité des tables de statuts
 # Faux binaires claude et codex (node) en tête du PATH ; aucun vrai appel. Exit 0 si tout passe, 1 sinon.
 
@@ -45,6 +46,7 @@ else if (cmd === 'tok') http.get({ host: '127.0.0.1', port: Number(a[0]), path: 
 else if (cmd === 'get') http.get({ host: '127.0.0.1', port: Number(a[0]), path: a[1], headers: { Host: `127.0.0.1:${a[0]}`, ...(a[2] ? { 'x-vf-cockpit-token': a[2] } : {}) } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => { console.log(r.statusCode); process.stdout.write(b); }); });
 else if (cmd === 'json') console.log(String(new Function('j', 'return (' + a[1] + ')')(J(a[0]))));
 else if (cmd === 'loc') { const g = (await import(pathToFileURL(path.join(a[0], 'vf-cockpit-project.mjs')).href)).buildProjectGraph(a[1]); console.log(JSON.stringify((await import(pathToFileURL(path.join(a[0], 'vf-cockpit-ask.mjs')).href)).answerLocally(g, a[2]))); }
+else if (cmd === 'locg') console.log(JSON.stringify((await import(pathToFileURL(path.join(a[0], 'vf-cockpit-ask.mjs')).href)).answerLocally(J(a[1]), a[2]))); // locg <scripts> <graphe.json> <question> : réponse locale sur un graphe fabriqué
 else if (cmd === 'cst') console.log((await import(pathToFileURL(path.join(a[0], 'vf-cockpit-agent.mjs')).href)).ARGS_CONFINEMENT.join('\n'));
 else if (cmd === 'sub') { // sub <call.json> <liste-attendue> : la liste est-elle une sous-suite contiguë, dans l'ordre, de l'argv ?
   const argv = J(a[0]).argv, want = fs.readFileSync(a[1], 'utf8').split('\n'); if (want.at(-1) === '') want.pop(); // un élément vide est légitime (--setting-sources "") : seul le saut de ligne final disparaît
@@ -248,6 +250,49 @@ if [ -n "$MESURE" ]; then
   assert_eq "Q11.3 — témoin rouge : la même comparaison contre la liste amputée de son dernier élément signale l'écart" "$(cmp -s "$WORK/const.txt" "$WORK/amputee.txt" && echo identique || echo different)" "different"
   assert_eq "Q11.4 — la comparaison a porté sur une constante non vide et un fichier attendu non vide" "$([ -s "$WORK/const.txt" ] && [ -s "$WORK/attendu.txt" ] && echo oui || echo non)" "oui"
 else echo "  ⊘ Q11 sauté : mesure absente du dépôt installé (non comptée comme réussie)"; fi
+
+echo "=== Q18 — retours panel lot 7 : un état par phase, coupe au mot, lignes non comprises (PU-G-096, 147, 150) ==="
+"$NODE" --input-type=module -e "
+import fs from 'fs';
+const nd = (id, o) => ({ id, label: id, kind: 'phase', st: 'todo', parent: null, ...o });
+const foot72 = '16/16 plans · ' + 'mot '.repeat(15) + 'interminément long';
+const G = { nodes: [
+  nd('ms-v2', { kind: 'milestone', label: 'v2', st: 'active', foot: '5 clos · 1 à recetter · 0 à faire · 83 %' }),
+  nd('ms-v3', { kind: 'milestone', label: 'v3', st: 'active', foot: '1 clos · 3 à faire · 25 %' }),
+  nd('ph-1', { label: 'Phase 1 · Fondations', num: '1', st: 'done', parent: 'ms-v2', foot: '2/2 plans' }),
+  nd('ph-72', { label: 'Phase 72 · Lancer le travail', num: '72', st: 'recette', parent: 'ms-v2', foot: 'à recetter · ' + foot72 }),
+  nd('ph-1.req', { kind: 'exigences', label: 'Exigences', st: 'active', parent: 'ph-1', foot: '1/2' }),
+], files: [
+  { p: 'req/AA-01', n: 'ph-1.req', name: 'AA-01', st: 'active', d: 'mot '.repeat(15) + 'centralisation de la suite' },
+], links: [], meta: { vf: { milestone: 'v2', phase: '72', status: 'ready_to_plan', lastActivity: '2026-11-05', milestones: [{ key: 'v2', id: 'n:ms-v2' }, { key: 'v3', id: 'n:ms-v3' }], drift: { nonComprisesN: 4, corrigeable: true, regles: [{ regle: 'ligne-non-comprise', n: 4 }, { regle: 'autre', n: 2 }], nonComprises: [{ fichier: '.planning/ROADMAP.md', ligne: 486, extrait: 'Une ligne qui ressemble à un champ mais qui n est pas lisible ' + 'x'.repeat(30) + 'gauche ensuite' }, { fichier: '.planning/REQUIREMENTS.md', ligne: 12, extrait: 'court' }] } } } };
+fs.writeFileSync('$WORK/q18g.json', JSON.stringify(G));
+const H = JSON.parse(JSON.stringify(G)); H.meta.vf.drift = { nonComprisesN: 0, regles: [], nonComprises: [] }; fs.writeFileSync('$WORK/q18h.json', JSON.stringify(H));
+"
+assert_eq "Q18.0 — témoin vivant : le pied de la phase dépasse 90 caractères et la coupe tombe dans un mot" "$(H json "$WORK/q18g.json" "(() => { const f = j.nodes.find((n) => n.id === 'ph-72').foot; return f.length > 90 && /[a-z]/.test(f[89]) && /[a-z]/.test(f[90]) })()")" "true"
+H locg "$SCRIPTS" "$WORK/q18g.json" "Où en est le jalon ?" > "$WORK/q18a.json"
+assert_eq "Q18.1 — « Où en est le jalon ? » : aucun « sans statut », ni dans le texte ni dans les notes" "$(H json "$WORK/q18a.json" '/sans statut/.test(j.answer + j.items.map((i) => i.note).join())')" "false"
+assert_eq "Q18.2 — la Phase 72 n'est citée qu'une fois dans le texte" "$(H json "$WORK/q18a.json" "j.answer.split('[[n:ph-72]]').length - 1")" "1"
+assert_eq "Q18.3 — chaque carte n'est listée qu'une fois dans le tableau" "$(H json "$WORK/q18a.json" 'j.items.length === new Set(j.items.map((i) => i.id)).size')" "true"
+assert_eq "Q18.4 — les autres jalons en cours sont cités et listés" "$(H json "$WORK/q18a.json" "j.answer.includes('[[n:ms-v3]]') && j.items.some((i) => i.id === 'n:ms-v3')")" "true"
+assert_eq "Q18.5 — la phase en recette ne répète pas « à recetter » dans sa propre ligne" "$(H json "$WORK/q18a.json" "!/recetter · à recetter/.test(j.answer + j.items.map((i) => i.note).join('|'))")" "true"
+H locg "$SCRIPTS" "$WORK/q18g.json" "Que contient la phase 72 ?" > "$WORK/q18p.json"
+assert_eq "Q18.6 — la carte d'une phase en recette : « à recetter » une fois, pas « sans statut »" "$(H json "$WORK/q18p.json" "!/sans statut|recetter · à recetter/.test(j.answer)")" "true"
+H locg "$SCRIPTS" "$WORK/q18g.json" "Qu'est-ce qui est en cours ?" > "$WORK/q18c.json"
+assert_eq "Q18.7 — « en cours » : aucune exigence d'une phase faite" "$(H json "$WORK/q18c.json" "!j.answer.includes('ph-1.req') && !j.items.some((i) => i.id.includes('ph-1.req') || i.id.includes('req/AA-01'))")" "true"
+assert_eq "Q18.8 — « en cours » : les jalons en cours restent listés" "$(H json "$WORK/q18c.json" "j.answer.includes('[[n:ms-v3]]') && j.answer.includes('[[n:ms-v2]]')")" "true"
+H locg "$SCRIPTS" "$WORK/q18g.json" "Quelles sont les exigences de la phase 1 ?" > "$WORK/q18r.json"
+assert_eq "Q18.9 — témoin rouge/vert PU-G-147 : la coupe à 70 caractères ne laisse pas de mot tronqué (« centr »)" "$(H json "$WORK/q18r.json" '!/centr/.test(j.answer)')" "true"
+assert_eq "Q18.10 — la coupe à 90 caractères d'une note s'arrête sur un mot entier (« … mot… », jamais « … in… »)" "$(H json "$WORK/q18a.json" "(() => { const n = j.items.find((i) => i.id === 'n:ph-72').note; return n.endsWith(' mot…') })()")" "true"
+assert_eq "Q18.11 — une note coupée reste sous 90 caractères" "$(H json "$WORK/q18a.json" 'j.items.every((i) => i.note.length <= 90)')" "true"
+for fq in "qu'est-ce que ça veut dire, « lignes du planning non comprises » ?" "Pourquoi des lignes non comprises dans le planning ?" "C'est quoi les lignes non comprises ?"; do
+  H locg "$SCRIPTS" "$WORK/q18g.json" "$fq" > "$WORK/q18f.json"
+  assert_eq "Q18.12 — réponse locale à « $fq »" "$(H json "$WORK/q18f.json" 'j !== null && j.engine === "local"')" "true"
+done
+assert_eq "Q18.13 — la réponse donne le nombre, un fichier:ligne et dit que rien n'est modifié" "$(H json "$WORK/q18f.json" "/4 ligne/.test(j.answer) && j.answer.includes('.planning/ROADMAP.md:486') && /rien n.est modifi/i.test(j.answer)")" "true"
+assert_eq "Q18.14 — l'extrait long est coupé au mot (le mot trop long est retiré, jamais tronqué en « xxxx »)" "$(H json "$WORK/q18f.json" '!/xxx/.test(j.answer)')" "true"
+assert_eq "Q18.15 — aucun mot de l'intérieur du panneau (clé de règle, « null », « undefined ») dans la réponse" "$(H json "$WORK/q18f.json" '!/ligne-non-comprise|null|undefined/.test(j.answer)')" "true"
+H locg "$SCRIPTS" "$WORK/q18h.json" "lignes du planning non comprises ?" > "$WORK/q18z.json"
+assert_eq "Q18.16 — aucune ligne non comprise : la réponse le dit, sans liste vide" "$(H json "$WORK/q18z.json" "/aucune ligne/i.test(j.answer) && !/Lignes? concern/.test(j.answer)")" "true"
 
 vf_hyg_assert
 echo ""
