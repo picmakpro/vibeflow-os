@@ -2,8 +2,10 @@
 // Export : buildEquipeGraph(who, { nom, racine, logos, git, missions, lancees }) -> graphe vibeflow/cockpit-equipe@1 ; missionsEnCours(gp) -> libellés des missions actives (78-04).
 // `lancees` (optionnel) : Map session -> { phase, ws, verbe } produite par le registre de vf-cockpit-lancer-suivi.mjs (72-07) ; elle ajoute
 // la ligne « Lancée depuis la carte : … » sur la carte de SESSION concernée, valeurs revalidées. Absente ou invalide : sortie inchangée.
-// Un nom de session `-n` n'est jamais une donnée du lab : aucune carte ne le lit.
-// Module pur ; schéma vibeflow/cockpit-equipe@1 ; aucun champ de transcript : seuls les champs de la collecte `who`
+// Titre d'une carte de SESSION (PU-G-162, arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : `w.titre`, le `custom-title` du transcript (nom donné avec /rename, lu, nettoyé,
+// masqué et borné à 80 caractères par la collecte `who`), sinon « Session principale · <branche> ». L'`ai-title` (texte du modèle), le dernier prompt et le premier message ne sont jamais lus ;
+// l'identifiant de session passe dans le détail. Amendement de la liste blanche P69-D-19/P69-D-23 pour ce seul champ.
+// Module pur ; schéma vibeflow/cockpit-equipe@1 ; aucune lecture de transcript ici : seuls les champs de la collecte `who`
 // (déjà bornés et masqués par collectWho) entrent dans une carte. Les sortes de carte (session, agent, terminés) n'ont
 // ni pictogramme ni couleur : le viewer prend son repli. Aucun fichier (`files` vide), aucun lien.
 import { LIBELLES_VERBES, entreeLanceeValide } from './vf-cockpit-lancer-suivi.mjs';
@@ -47,6 +49,7 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, miss
     const lignes = [];
     if (w.role) lignes.push(`Rôle : ${w.role}`);
     lignes.push(`État : ${ETAT[w.etat] || 'actif'}`);
+    if (!sous) lignes.push(`Identifiant : ${w.id.slice(0, 8)}`);
     const l = lancees instanceof Map && w.kind === 'session' ? lancees.get(w.id) : undefined; // garde:lancees
     const t = l && entreeLanceeValide(l) ? `Lancée depuis la carte : Phase ${l.phase}${l.ws ? ` · ${l.ws}` : ''} · ${LIBELLES_VERBES[l.verbe]}` : ''; // garde:ligne-valide
     if (t) lignes.push(t); // garde:ligne-insert
@@ -59,7 +62,7 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, miss
     const lieu = !sous ? [w.branch ? `Branche ${w.branch}` : '', arbre].filter(Boolean).join(' · ') : '';
     const resume = [t ? `Depuis Phase ${l.phase}` : '', w.task || act, lieu].filter(Boolean).join(' · ');
     nodes.push({ ...base, id: idCarte(w), parent: fini && parent ? `${parent}~termines` : parent, kind: sous ? 'agent' : 'session',
-      label: sous ? clip([w.role, w.task].filter(Boolean).join(' · ') || 'Agent', 80) : `Session ${w.id.slice(0, 8)}`,
+      label: sous ? clip([w.role, w.task].filter(Boolean).join(' · ') || 'Agent', 80) : clip(typeof w.titre === 'string' && w.titre.trim() ? w.titre : ['Session principale', w.branch].filter(Boolean).join(' · '), 80),
       summary: clip(resume, 200), details: lignes.join('\n\n'), st: Object.hasOwn(ST, w.etat) ? ST[w.etat] : 'active', foot: '' });
   }
   for (const [carte, n] of termines) {
