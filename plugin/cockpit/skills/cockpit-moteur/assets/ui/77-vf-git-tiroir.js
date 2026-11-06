@@ -27,7 +27,8 @@
     @keyframes vf-git-entree { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
     .vf-git-barre { flex: none; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px 0 16px; background: var(--raise); border-bottom: 1px solid var(--hair); }
     .vf-git-titre-t { margin: 0; font: 600 13px var(--sans); color: var(--text); }
-    .vf-git-titre-t:focus { outline: none; }
+    .vf-git-titre-t:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; } /* 198 : le titre reçoit le focus à l'ouverture ; l'anneau se voit au clavier (DESIGN.md §9), jamais à la souris */
+    .vf-git-titre-t:focus:not(:focus-visible) { outline: none; }
     .vf-git-fermer { margin-left: auto; }
     .vf-git-fermer, .vf-git-btn { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: var(--text-2); cursor: pointer; }
     .vf-git-fermer:hover, .vf-git-btn:hover { background: var(--raise-2); color: var(--text); }
@@ -108,7 +109,7 @@
   let ouvert = false, donnees = null, seq = 0, avant = null;
   const annoncer = (t) => { live.textContent = t; };
   const visible = (e) => !!e && !e.hidden && e.getClientRects().length > 0;
-  const ligne = () => document.querySelector('#vf-git-ligne'), ouvreur = () => document.querySelector('#vf-git-ouvreur');
+  const ligne = () => document.querySelector('#vf-git-ligne'), ouvreur = () => document.querySelector('#vf-git-ouvreur'), plus = () => document.querySelector('#vf-plus'); // plus : « Plus d'actions » du téléphone, qui porte l'ouvreur sous 700 px
   const emettre = (nom, detail) => window.dispatchEvent(new CustomEvent(nom, { detail }));
 
   const eviter = () => { // sans nommer personne : le tiroir se cale sur le bas de la scène (qui rétrécit quand un panneau bas s'ouvre) puis monte au-dessus de tout petit élément posé dans le coin bas-gauche (zoom, pastilles, puces) ; en mobile, aucun évitement
@@ -164,7 +165,7 @@
     if (!ouvert) return;
     ouvert = false; seq++; corps.removeAttribute('aria-busy');
     tiroir.hidden = true; tiroir.classList.remove('vf-git-entree'); document.body.classList.remove('vf-git-ouvert');
-    const cible = [ligne(), ouvreur()].find(visible) || (avant && document.contains(avant) && visible(avant) ? avant : null);
+    const cible = [ligne(), ouvreur(), plus()].find(visible) || (avant && document.contains(avant) && visible(avant) ? avant : null);
     if (cible) cible.focus({ preventScroll: true });
     emettre('vf-git:etat', { ouvert: false }); crochet('etat', false);
   };
@@ -173,10 +174,10 @@
   fermerB.addEventListener('click', fermer);
   window.addEventListener('vf-git:basculer', basculer);
 
-  const surcouche = () => !!document.querySelector('#palette.open, #flowmenu.open, #legend.open, #ctxmenu:not([hidden]), [role="dialog"]:not([hidden]), [aria-modal="true"]');
+  const surcouche = () => !!document.querySelector('#palette.open, #flowmenu.open, #legend.open, #ctxmenu:not([hidden])') || [...document.querySelectorAll('[role="dialog"]:not([hidden]), [aria-modal="true"]')].some((d) => getComputedStyle(d).visibility !== 'hidden'); // 201 : le panneau fermé d'un téléphone reste un role=dialog (visibility: hidden), il ne couvre rien
   const echap = (e) => { if (ouvert && e.key === 'Escape' && !e.defaultPrevented && !surcouche()) { e.stopPropagation(); e.preventDefault(); fermer(); } };
   tiroir.addEventListener('keydown', echap);
-  document.addEventListener('keydown', (e) => { const l = ligne(), o = ouvreur(); if ((l && l === e.target) || (o && o === e.target)) echap(e); }, true);
+  document.addEventListener('keydown', (e) => { const l = ligne(), o = ouvreur(), p = plus(); if ((l && l === e.target) || (o && o === e.target) || (p && p === e.target)) echap(e); }, true);
   window.addEventListener('keydown', (e) => { // touche g : ni dans un champ, ni palette ouverte, ni avec Ctrl, Alt ou Meta, ni sans ouvreur
     if ((e.key !== 'g' && e.key !== 'G') || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.isComposing) return;
     const t = e.target;

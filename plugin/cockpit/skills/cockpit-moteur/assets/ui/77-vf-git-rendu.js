@@ -32,10 +32,11 @@
   const complet = (at) => new Date(at * 1000).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' });
 
   // ---------- commande à copier : le texte copié est le textContent du <code> affiché, jamais une copie transformée (T-78-24) ----------
-  const commande = (texte, annonce) => {
+  // `nom` (200) : ce que fait la commande, court (« cd vers bisect-ci ») ; il n'entre que dans l'aria-label, par setAttribute, jamais en HTML ni dans la commande copiée
+  const commande = (texte, annonce, nom) => {
     if (texte == null) return el('div', 'vf-git-sans', 'Aucune commande proposée');
     const ligne = el('div', 'vf-git-cmd'), code = el('code', null, texte, { title: texte }), retour = el('span', 'vf-git-retour');
-    const b = el('button', 'vf-git-btn', null, { type: 'button', 'aria-label': `Copier la commande : ${texte}` });
+    const b = el('button', 'vf-git-btn', null, { type: 'button', 'aria-label': 'Copier la commande' + (nom ? ' ' + nom : '') });
     b.appendChild(ico(COPIE));
     ligne.append(code, retour, b);
     let minuterie = null;
@@ -43,7 +44,7 @@
     const refus = () => { // API presse-papiers refusée : la commande est sélectionnée, la rangée le dit
       const r = document.createRange(); r.selectNodeContents(code);
       const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
-      dire('Copie impossible, commande sélectionnée');
+      dire('Copie impossible, commande sélectionnée'); if (annonce) annonce('Copie impossible, commande sélectionnée');
     };
     b.addEventListener('click', () => {
       try { navigator.clipboard.writeText(code.textContent).then(() => { dire('Copiée', true); if (annonce) annonce('Commande copiée'); }, refus); } catch (e) { refus(); }
@@ -127,14 +128,14 @@
       const d = el('div', 'vf-git-wt-l'), t = ligne(mono(w.nom, 'vf-git-gras'));
       if (w.ici) t.appendChild(el('span', 'vf-git-ici', 'ici'));
       d.append(t, ligne(mono(w.detache ? 'HEAD détaché' : w.branche || '—')));
-      if (!w.ici) d.appendChild(commande(w.commande, annonce));
+      if (!w.ici) d.appendChild(commande(w.commande, annonce, 'cd vers ' + w.nom));
       return d;
     })), true, 'vf-git-s-wt');
   };
   const sectionTags = (l) => !l || !l.length ? null : section('Tags', l.length, liste(l.map((t) => ligne(mono(t.nom, 'vf-git-gras'), mono(t.h7), el('span', null, relatif(t.at))))), false, 'vf-git-s-tags');
   const sectionStash = (l, annonce) => {
     if (!l || !l.length) return null;
-    return section('Stash', l.length, liste(l.map((s) => { const d = el('div', 'vf-git-st'); d.append(ligne(mono(s.ref, 'vf-git-gras vf-git-entier'), el('span', 'vf-git-msg', s.message), mono(s.branche || ''), el('span', null, relatif(s.at))), commande(s.commande, annonce)); return d; })), false, 'vf-git-s-stash');
+    return section('Stash', l.length, liste(l.map((s) => { const d = el('div', 'vf-git-st'); d.append(ligne(mono(s.ref, 'vf-git-gras vf-git-entier'), el('span', 'vf-git-msg', s.message), mono(s.branche || ''), el('span', null, relatif(s.at))), commande(s.commande, annonce, 'pour voir le stash ' + s.ref)); return d; })), false, 'vf-git-s-stash');
   };
   const sectionAuteurs = (auteurs, parBranche) => {
     if (!auteurs || !auteurs.length) return null;
@@ -154,7 +155,7 @@
     if (!l || !l.length) return d;
     const b = el('button', 'vf-git-merg-b', pl(l.length, 'branche mergée', 'branches mergées'), { type: 'button', 'aria-expanded': 'false' }), c = el('div', 'vf-git-liste');
     c.hidden = true;
-    for (const m of l) { const w = el('div', 'vf-git-wt-l'); w.append(ligne(mono(m.nom)), commande(m.commande, annonce)); c.appendChild(w); }
+    for (const m of l) { const w = el('div', 'vf-git-wt-l'); w.append(ligne(mono(m.nom)), commande(m.commande, annonce, 'de suppression de la branche ' + m.nom)); c.appendChild(w); }
     b.addEventListener('click', () => { const o = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(o)); c.hidden = !o; });
     d.append(b, c);
     return d;
@@ -162,11 +163,11 @@
 
   // ---------- états : chargement, vide, indisponible ----------
   const etatChargement = () => { const d = el('div', 'vf-git-etat'); d.append(el('div', 'vf-git-fantome'), el('div', 'vf-git-fantome'), el('div', 'vf-git-fantome'), el('p', 'vf-git-note', 'Lecture du dépôt')); return d; };
-  const etatVide = (cmd, annonce) => { const d = el('div', 'vf-git-etat'); d.append(el('h3', 'vf-git-titre', 'Aucun commit pour l\'instant'), el('p', 'vf-git-note', 'Le dépôt existe mais son historique est vide.'), commande(cmd, annonce)); return d; };
+  const etatVide = (cmd, annonce) => { const d = el('div', 'vf-git-etat'); d.append(el('h3', 'vf-git-titre', 'Aucun commit pour l\'instant'), el('p', 'vf-git-note', 'Le dépôt existe mais son historique est vide.'), commande(cmd, annonce, 'du premier commit')); return d; };
   const etatIndisponible = (cmd, reessayer, annonce) => {
     const d = el('div', 'vf-git-etat vf-git-carte'), b = el('button', 'btn soft', 'Réessayer', { type: 'button' });
     b.addEventListener('click', () => { if (reessayer) reessayer(); });
-    d.append(el('h3', 'vf-git-titre', 'Git est indisponible'), el('p', 'vf-git-note', 'La lecture du dépôt a échoué ou dépassé le délai.'), b, commande(cmd, annonce));
+    d.append(el('h3', 'vf-git-titre', 'Git est indisponible'), el('p', 'vf-git-note', 'La lecture du dépôt a échoué ou dépassé le délai.'), b, commande(cmd, annonce, 'de diagnostic'));
     return d;
   };
   window.VFGitRendu = Object.freeze({ graphe, rangee, sectionWorktrees, sectionTags, sectionStash, sectionAuteurs, mergees, commande, etatChargement, etatVide, etatIndisponible, relatif, section, ico, el });

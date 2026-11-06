@@ -69,7 +69,7 @@
     b.addEventListener('click', () => { cache.delete(sha); charger(zone, sha); });
     zone.replaceChildren(el('p', 'vf-git-d-fichiers-t', 'Indisponible'), el('p', 'vf-git-note', "Le détail de ce commit n'a pas pu être lu."), b);
   };
-  const cmds = (titre, cmd, cls) => { const g = el('div', 'vf-git-d-cmds' + (cls || '')); g.append(el('p', 'vf-git-d-fichiers-t', titre), R.commande(cmd, annoncer)); return g; }; // lecture et changement ne partagent plus un même bloc : le second dit ce qu'il fait
+  const cmds = (titre, cmd, cls, nom) => { const g = el('div', 'vf-git-d-cmds' + (cls || '')); g.append(el('p', 'vf-git-d-fichiers-t', titre), R.commande(cmd, annoncer, nom)); return g; }; // lecture et changement ne partagent plus un même bloc : le second dit ce qu'il fait
   const remplir = (zone, j) => {
     const m = j.message.split('\n'), msg = el('div', 'vf-git-d-msg'), corpsMsg = el('span', 'vf-git-d-corps');
     corpsMsg.textContent = m.length > 1 ? '\n' + m.slice(1).join('\n') : '';
@@ -83,7 +83,7 @@
       fl.appendChild(li);
     }
     if (autres > 0) fl.appendChild(el('li', 'vf-git-d-reste', `et ${autres} ${autres > 1 ? 'autres' : 'autre'}`));
-    zone.replaceChildren(msg, el('div', 'vf-git-d-meta', `${j.auteur} · ${dateLongue(j.date)}`), sha, el('p', 'vf-git-d-fichiers-t', `Fichiers (${total})`), fl, cmds('Pour lire ce commit', j.commandes.show), cmds('Change votre copie de travail', j.commandes.detacher, ' vf-git-d-change'));
+    zone.replaceChildren(msg, el('div', 'vf-git-d-meta', `${j.auteur} · ${dateLongue(j.date)}`), sha, el('p', 'vf-git-d-fichiers-t', `Fichiers (${total})`), fl, cmds('Pour lire ce commit', j.commandes.show, '', 'pour lire le commit ' + j.h.slice(0, 7)), cmds('Change votre copie de travail', j.commandes.detacher, ' vf-git-d-change', 'pour détacher HEAD sur le commit ' + j.h.slice(0, 7)));
   };
   function charger(zone, sha) {
     if (!SHA.test(sha)) { indisponible(zone, sha); return; } // jamais de requête sur un sha que la page refuse
@@ -94,15 +94,26 @@
       if (commitOk(j, sha)) { cache.set(sha, j); remplir(zone, j); } else indisponible(zone, sha);
     });
   }
-  const fermerDetail = () => { ouvertSha = null; for (const d of document.querySelectorAll('#vf-git-tiroir .vf-git-detail')) d.remove(); };
+  // 199 : la région du détail n'est plus un enfant de la liste « Commits » (un listbox ne contient que des options) : la liste est coupée sous la rangée ouverte, le détail s'intercale, la suite des rangées forme une seconde liste ; à la fermeture elle est recollée
+  const fermerDetail = () => {
+    ouvertSha = null;
+    for (const d of document.querySelectorAll('#vf-git-tiroir .vf-git-detail')) {
+      const suite = d.nextElementSibling, ol = d.previousElementSibling;
+      if (suite && suite.classList.contains('vf-git-suite') && ol) { ol.append(...suite.children); suite.remove(); }
+      d.remove();
+    }
+    for (const l of lignes()) l.removeAttribute('aria-controls');
+  };
   const ouvrirDetail = (sha) => {
     fermerDetail(); // un seul détail à la fois
     selectionner(sha);
     const ligne = lignes().find((l) => l.dataset.h === sha);
     if (!ligne) return;
     ouvertSha = sha;
-    const li = el('li', 'vf-git-detail', null, { role: 'none' }), zone = el('div', 'vf-git-det', null, { role: 'region', 'aria-label': 'Détail du commit ' + sha.slice(0, 7) });
-    li.appendChild(zone); ligne.after(li);
+    const ol = ligne.parentNode, reste = []; for (let n = ligne.nextElementSibling; n; n = n.nextElementSibling) reste.push(n);
+    const li = el('div', 'vf-git-detail'), zone = el('div', 'vf-git-det', null, { role: 'region', id: 'vf-git-detail-' + sha.slice(0, 7), 'aria-label': 'Détail du commit ' + sha.slice(0, 7) });
+    li.appendChild(zone); ol.after(li); ligne.setAttribute('aria-controls', zone.id);
+    if (reste.length) { const suite = el('ol', ol.className + ' vf-git-suite', null, { role: 'listbox', 'aria-label': 'Commits, suite' }); suite.append(...reste); li.after(suite); }
     li.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fermerDetail(); ligne.focus(); } });
     charger(zone, sha);
   };
