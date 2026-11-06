@@ -227,7 +227,7 @@ svg.lod-low .meta, svg.lod-low .anote { visibility: hidden; }
 svg.lod-low .desc { display: none; }
 svg.lod-low .title { font-size: 22px; white-space: normal; }
 svg.dim .node:not(.hl) .card { box-shadow: none; }
-svg.dim .node:not(.hl) .card > * { opacity: .28; transition: opacity .3s var(--ease); }
+svg.dim .node:not(.hl) .card > * { opacity: .55; transition: opacity .3s var(--ease); }
 
 /* ---------- edges ---------- */
 .edges { animation: fadeIn .7s var(--ease) .12s both; }
@@ -237,12 +237,12 @@ svg.dim .node:not(.hl) .card > * { opacity: .28; transition: opacity .3s var(--e
 .cols text { fill: var(--text-3); font: 500 13px Inter, system-ui, sans-serif; letter-spacing: -.005em; dominant-baseline: central; text-anchor: middle; }
 @keyframes fadeIn { from { opacity: 0; } }
 .edge { color: var(--k-import); }
-.edge .trace { fill: none; stroke: currentColor; stroke-opacity: .5; stroke-linecap: round; stroke-linejoin: round; transition: stroke-opacity .25s var(--ease), stroke-width .25s var(--ease); }
+.edge .trace { fill: none; stroke: currentColor; stroke-opacity: .2; stroke-linecap: round; stroke-linejoin: round; transition: stroke-opacity .25s var(--ease), stroke-width .25s var(--ease); }
 .edge .flow { fill: none; stroke: currentColor; stroke-width: 2; stroke-dasharray: 2 10; stroke-linecap: round; opacity: 0; transition: opacity .25s var(--ease); }
 .edge .hit { fill: none; stroke: transparent; stroke-width: 16; cursor: pointer; }
 .edge .port { fill: var(--bg); stroke: currentColor; stroke-width: 1.5; transition: opacity .25s var(--ease); }
 .edge.k-config .trace { stroke-dasharray: 5 5; }
-.edge.k-contains .trace { stroke-dasharray: 2 6; stroke-opacity: .9; }
+.edge.k-contains .trace { stroke-dasharray: 2 6; stroke-opacity: .35; }
 .edge:hover .trace, .edge.hl .trace { stroke-opacity: 1; }
 .edge:hover .flow, .edge.hl .flow { opacity: .95; animation: flow 1.1s linear infinite; }
 @keyframes flow { to { stroke-dashoffset: -24; } }
@@ -572,6 +572,22 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
 </head>
 <body>
 <script>if (matchMedia('(max-width: 700px)').matches && !/[#&]s=/.test(location.hash)) document.body.classList.add('no-panel'); // a phone starts with the details closed, so the panel doesn't flash open and shut</script>
+<header>
+  <div class="hl">
+    <div class="brand"><img class="mark" src="__FLOORPLAN_LOGO__" alt="Floorplan" title="Floorplan"><span id="proj-name"></span></div>
+    <button class="btn icon" id="btn-up" title="Up one level (Backspace)" aria-label="Up one level" hidden><svg class="i" viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></svg></button>
+    <nav id="crumbs"></nav>
+  </div>
+  <div class="hc">
+    <button class="btn" id="search-btn" aria-label="Search files, routes, modules"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="st">Search files, routes, modules</span><span class="kbd">/</span></button>
+  </div>
+  <div class="hr">
+    <div id="hdr-ext" class="hr-ext"></div>
+    <div class="rel"><button class="btn" id="flows-btn" aria-label="Flows"><svg class="i" viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></svg><span class="bl">Flows</span></button><div id="flowmenu" class="menu glass"></div></div>
+    <div class="rel"><button class="btn icon" id="filters-btn" title="Connection types" aria-label="Connection types"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg></button><div id="legend" class="menu glass"></div></div>
+    <button class="btn icon" id="btn-panel" title="Toggle details (P)" aria-label="Toggle details" aria-expanded="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
+  </div>
+</header>
 <div id="stage">
   <svg id="svg" xmlns="http://www.w3.org/2000/svg"><g id="viewport"></g></svg>
   <div id="context"></div>
@@ -596,22 +612,6 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
   <div id="loading" class="glass">Laying out…</div>
   <div id="empty" hidden></div>
 </div>
-<header>
-  <div class="hl">
-    <div class="brand"><img class="mark" src="__FLOORPLAN_LOGO__" alt="Floorplan" title="Floorplan"><span id="proj-name"></span></div>
-    <button class="btn icon" id="btn-up" title="Up one level (Backspace)" aria-label="Up one level" hidden><svg class="i" viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></svg></button>
-    <nav id="crumbs"></nav>
-  </div>
-  <div class="hc">
-    <button class="btn" id="search-btn" aria-label="Search files, routes, modules"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="st">Search files, routes, modules</span><span class="kbd">/</span></button>
-  </div>
-  <div class="hr">
-    <div id="hdr-ext" class="hr-ext"></div>
-    <div class="rel"><button class="btn" id="flows-btn" aria-label="Flows"><svg class="i" viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></svg><span class="bl">Flows</span></button><div id="flowmenu" class="menu glass"></div></div>
-    <div class="rel"><button class="btn icon" id="filters-btn" title="Connection types" aria-label="Connection types"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg></button><div id="legend" class="menu glass"></div></div>
-    <button class="btn icon" id="btn-panel" title="Toggle details (P)" aria-label="Toggle details" aria-expanded="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
-  </div>
-</header>
 <aside id="panel"></aside>
 <div id="panel-resize" title="Drag to resize"></div>
 <div id="ctxmenu" class="menu glass" hidden></div>
@@ -1130,6 +1130,10 @@ function draw(view, res) {
     const fo = el('foreignObject', { x: -GUTTER, y: -GUTTER, width: c.width + GUTTER * 2, height: c.height + GUTTER * 2 }, g);
     fo.innerHTML = `<div class="fo-pad">${c.id.startsWith('x:') ? connectorHTML(view.connectors.find((x) => x.id === c.id)) : cardHTML(c.id)}</div>`;
     fo.querySelector('.card')?.style.setProperty('--d', `${delay.get(c.id)}ms`);
+    if (matchMedia('(pointer: coarse)').matches || isPhone()) { // touch: a bigger target around the card, which also wins over the link line that passes next to it
+      const pad = el('rect', { class: 'touch-pad', x: -12, y: -12, width: c.width + 24, height: c.height + 24, fill: 'transparent' }, g);
+      g.insertBefore(pad, fo);
+    }
     g.addEventListener('click', (ev) => { ev.stopPropagation(); select(c.id); });
     g.addEventListener('dblclick', (ev) => { ev.stopPropagation(); if (ev.button !== 0) return; hideTip(); open(c.id); });
     g.addEventListener('contextmenu', (ev) => { ev.preventDefault(); ev.stopPropagation(); hideTip(); openMenu(ev, itemMenu(c.id)); });
@@ -1283,8 +1287,13 @@ function freeArea() {
 function fit(animate) {
   const b = state.bounds; if (!b) return;
   const a = freeArea();
-  const k = Math.min(a.w / (b.w + 40), a.h / (b.h + 20), 1.1);
-  setT({ k, x: a.x + (a.w - b.w * k) / 2 - b.x * k, y: a.y + Math.max(0, (a.h - b.h * k) / 2) - b.y * k }, animate);
+  // floor, Code tab only: card names stay at 11 px or more (13 px connector labels are the smallest names), even if that means not showing everything.
+  // The Project tab keeps its own zoom steps (ui/00-vibeflow.js) and the responsive suite wants its cards inside the free area.
+  const kFit = Math.min(a.w / (b.w + 40), a.h / (b.h + 20), 1.1), k = /\/(index\.html)?$/.test(location.pathname) ? Math.max(kFit, 11 / 13) : kFit;
+  // what does not fit is cropped on the right and at the bottom: the top-left corner (where a view starts) stays in sight
+  const x = b.w * k + 40 * k > a.w ? a.x - (b.x - 20) * k : a.x + (a.w - b.w * k) / 2 - b.x * k;
+  const y = b.h * k + 20 * k > a.h ? a.y - (b.y - 10) * k : a.y + Math.max(0, (a.h - b.h * k) / 2) - b.y * k;
+  setT({ k, x, y }, animate);
 }
 function zoomBy(f, cx, cy) {
   const r = stageRect();
@@ -1292,13 +1301,12 @@ function zoomBy(f, cx, cy) {
   const k = clamp(state.t.k * f, 0.08, 2.5);
   setT({ k, x: cx - (cx - state.t.x) * (k / state.t.k), y: cy - (cy - state.t.y) * (k / state.t.k) }, false);
 }
-// wheel/pinch zooms around the cursor; two-finger trackpad scroll pans
+// Ctrl + wheel (and the trackpad pinch, which sends ctrlKey) zooms around the cursor; a plain wheel or two-finger scroll pans
 svg.addEventListener('wheel', (ev) => {
   ev.preventDefault();
   const r = stageRect();
-  const trackpadPan = !ev.ctrlKey && ev.deltaMode === 0 && (Math.abs(ev.deltaX) > 0 || Math.abs(ev.deltaY) < 40);
-  if (trackpadPan) setT({ ...state.t, x: state.t.x - ev.deltaX, y: state.t.y - ev.deltaY }, false);
-  else zoomBy(Math.exp(-ev.deltaY * (ev.ctrlKey ? 0.01 : 0.0018)), ev.clientX - r.left, ev.clientY - r.top);
+  if (ev.ctrlKey) zoomBy(Math.exp(-ev.deltaY * 0.01), ev.clientX - r.left, ev.clientY - r.top);
+  else { const u = ev.deltaMode === 1 ? 16 : 1; setT({ ...state.t, x: state.t.x - ev.deltaX * u, y: state.t.y - ev.deltaY * u }, false); }
 }, { passive: false });
 let drag = null;
 const fingers = new Map(); let pinch = null; // touch only: the fingers on the map, and the pinch they make
