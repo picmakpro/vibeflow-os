@@ -6,29 +6,33 @@ de `git diff --name-status <base>..<tête> -- plugin/` (statut M, relevé via `r
 branchement dans des fichiers existants sont minimaux et listés ici. Base de planification : `aff9f260` ; main porte depuis la clôture de la 71
 (`1e4d1ecd`, cockpit v1.3.3) : le manager rebase la branche avant l'exécution.
 
-## 1. Fichiers existants touchés sous `plugin/cockpit/` (statut M attendu)
+## 1. Fichiers existants touchés sous `plugin/` (statut M) — re-dérivé à la clôture
 
-| # | Fichier existant | Plan | Changement prévu | Conflit possible |
-|---|------------------|------|------------------|------------------|
-| B1 | `skills/cockpit-moteur/terminal/vf-cockpit-pty.py` | 72-02 | marqueur `vibeflow:allow-large-file` en ligne 1 (dette tracée, 464 lignes) ; ligne de contrôle fd 3 `L <hex>`, réponse fd 2 `LANCE …` ; ajouts seulement | faible (la 71.5 ne le touche pas) |
+Relevé : `rtk proxy git diff --name-status origin/main HEAD -- plugin/` (HEAD `b05d3001`) : **15 fichiers de statut M**, tous sous `plugin/cockpit/`. Le détail des changements vient des plans ; les fichiers eux-mêmes sont ceux du relevé, pas ceux du plan.
+
+| # | Fichier existant (statut M) | Plan | Changement | Conflit possible |
+|---|------------------|------|------------|------------------|
+| B1 | `skills/cockpit-moteur/terminal/vf-cockpit-pty.py` | 72-02 | marqueur `vibeflow:allow-large-file` en ligne 1 (dette tracée) ; ligne de contrôle fd 3 `L <hex>`, réponse fd 2 `LANCE …` ; ajouts seulement | faible (la 71.5 ne le touche pas) |
 | B2 | `scripts/vf-cockpit-terminal-session.mjs` | 72-02 | `sessions.lancer(ligne, onglet)` ; le parseur d'état accepte les lignes `LANCE …` ; ajouts seulement | faible |
 | B3 | `scripts/vf-cockpit-equipe-carte.mjs` | 72-07 | paramètre optionnel `lancees` de `buildEquipeGraph` ; sortie octet pour octet identique quand il est absent | faible |
-| B4 | `scripts/vf-cockpit-terminal-vue.mjs`, `scripts/vf-cockpit-terminal-client.mjs` | 72-08, puis 72-13 | bandeau de proposition (classes `vf-q-bandeau`/`vf-q-collage` réutilisées), sondage de `GET /proposition`, émission de la valeur fixe `proposition` vers P, mode retenu dans le stockage de l'origine Q ; 72-13 : case « continuer le chat » | **possible** avec la 71.5 si elle touche les classes du bandeau ; aucun style n'est ajouté ici |
-| B5 | `scripts/vf-cockpit-server.mjs` | 72-09 | relevé réel (`rtk proxy git diff 1e4d1ecd..HEAD`, 7 hunks, 5 lignes ajoutées et 2 lignes modifiées, (5) et (7)) : (1) en-tête, ligne de commentaire des routes `GET /api/vf/lancer/cibles` · `POST /api/vf/lancer` ; (2) `import { creerLancer }` ; (3) `const lancer = creerLancer({ root, here, ptoken, log })` après `load()` ; (4) `lancer.sourceWho(() => live ? live.snapshot().who : null)` après `startLive` ; (5) branche non-GET de `route` : `lancer.reconnait(url)` puis `lancer.traiter(req, res, url)` avant le 405 ; (6) `if (lancer.get(req, res, url)) return true;` avant le 404 final ; (7) `pageEquipe` : `lancees: lancer.lancees()` dans les options de `buildEquipeGraph` | **possible** avec la 78 (routes et lecture Git) : hunks distincts, ne jamais écraser |
+| B4 | `scripts/vf-cockpit-terminal-vue.mjs`, `scripts/vf-cockpit-terminal-client.mjs` | 72-08, 72-13, 72-16, correctifs F1 et L2 | bandeau de proposition (classes `vf-q-bandeau`/`vf-q-collage` réutilisées), sondage de `GET /proposition`, émission de la valeur fixe `proposition` vers P, mode servi par Q (72-16), case « continuer le chat » (72-13) ; gardes `document.hasFocus()` (F1, L2) ; client à 279 lignes, plafond LB.S3 280 jamais relevé | **possible** avec la 71.5 : feuille `<style id="vf-lancer-style">` (voir §6), classes du bandeau |
+| B5 | `scripts/vf-cockpit-server.mjs` | 72-09 | sept hunks (en-tête de routes, `import { creerLancer }`, `const lancer = creerLancer(…)` après `load()`, branchements `lancer.*` dans le routeur) ; ajouts presque exclusivement | **certain** avec la 78 : fusionner les hunks, jamais l'un par l'autre |
 | B6 | `scripts/vf-cockpit-terminal.mjs` | 72-09 | `injection()` concatène `injectionLancer` ; renseigne le canal de lancement ; relais des messages IPC `cibles`, `proposition`, `lancee` | faible |
-| B7 | `scripts/vf-cockpit-terminal-processus.mjs` | 72-10 | routes `GET /proposition`, `POST /lancer`, `POST /annuler` dans la table fermée, messages IPC ; `GET /proposition` passe par `controle(req, <url de /etat>)` dans `traiter` (commit 549d3bcc), et NON par la ligne `navigateur` de la 71, laissée intacte | faible |
-| B8 | `scripts/vf-cockpit-terminal-tiroir.mjs`, `scripts/vf-cockpit-terminal-tiroir-style.mjs`, `scripts/tests/test-cockpit-terminal-tiroir.sh` | 72-14 | valeur fixe `proposition` ajoutée à `LISTE_MESSAGES`, ouverture du tiroir sans prise de focus ; assertions existantes inchangées, ajouts seulement | **certain** avec la 71.5 (style du tiroir) : relire la base `origin/main` avant d'éditer |
-| B9 | `VERSION`, `module.json`, `CHANGELOG.md`, `README.md`, `skills/vf-cockpit/SKILL.md` | 72-15 | bump unique au-dessus de v1.3.3 (calculé à l'exécution), usage de « Lancer », limites (mode hérité, boîte « faire confiance », un seul terminal, travail non commité reporté à la 78) | **certain** avec la 78 et la 71.5 : ajouter, ne pas réécrire |
-| B10 | `README.md`, `README.fr.md` (racine) | 72-15 | le seul nombre de la phrase « N suites » | **certain** : recompter après fusion, jamais additionner |
+| B7 | `scripts/vf-cockpit-terminal-processus.mjs` | 72-10, 72-16 | routes `GET /proposition`, `POST /lancer`, `POST /annuler` dans la table fermée, messages IPC ; `GET /proposition` passe par `controle(req, <url de /etat>)` (commit `549d3bcc`), la ligne `navigateur` de la 71 reste intacte ; 72-16 : mémoire du mode, `mode_retenu` servi, écriture après `w.ok` | faible |
+| B8 | `scripts/vf-cockpit-terminal-tiroir.mjs`, `scripts/tests/test-cockpit-terminal-tiroir.sh` | 72-14 | valeur fixe `proposition` ajoutée à `LISTE_MESSAGES`, ouverture du tiroir sans prise de focus ; assertions existantes inchangées, ajouts seulement. `vf-cockpit-terminal-tiroir-style.mjs` n'est PAS touché (le plan le prévoyait) | moyen avec la 71.5 : relire la base avant de fusionner |
+| B9 | `VERSION`, `module.json`, `CHANGELOG.md`, `README.md`, `skills/vf-cockpit/SKILL.md` (tous sous `plugin/cockpit/`) | 72-15, 72-16 | bump unique au-dessus de v1.3.3, usage de « Lancer », limites (mode hérité, boîte « faire confiance », un seul terminal, travail non commité reporté à la 78) ; paragraphe du mode retenu | **certain** avec la 78 et la 71.5 : ajouter, ne pas réécrire |
 
-Non touchés : `skills/cockpit-moteur/assets/serve.mjs` (vendoré ; patchs tracés dans `VENDORED.txt` et `amont/patches/`), `scripts/vf-cockpit-build.mjs`
-(le build copie `vf-cockpit-lancer*.mjs` par le motif `^vf-cockpit-.*\.mjs$`), `scripts/vf-cockpit-interface.json`, `scripts/tests/terminal-aux.mjs`,
-`scripts/tests/test-cockpit-terminal-xss.sh`, `scripts/vf-cockpit-terminal-style.mjs`, tout `assets/ui/` (CSP de page identique sans `--terminal`).
+Hors du relevé `plugin/` : `README.md` et `README.fr.md` (racine), le seul nombre de la phrase « N suites » — **certain** : recompter après fusion, jamais additionner (non couvert par le diff `-- plugin/`, à contrôler à part).
 
-## 2. Fichiers neufs (aucun conflit possible)
+Non touchés (vérifié : absents du relevé) : `skills/cockpit-moteur/assets/serve.mjs` (vendoré), `scripts/vf-cockpit-build.mjs` (le build copie `vf-cockpit-lancer*.mjs` par le motif `^vf-cockpit-.*\.mjs$`), `scripts/vf-cockpit-interface.json`, `scripts/tests/terminal-aux.mjs`, `scripts/tests/test-cockpit-terminal-xss.sh`, `scripts/vf-cockpit-terminal-style.mjs`, `scripts/vf-cockpit-terminal-tiroir-style.mjs`, tout `assets/ui/`.
 
-Modules `scripts/vf-cockpit-lancer-{gabarit,cibles,post,q,ui,suivi,canal}.mjs` et `scripts/vf-cockpit-lancer.mjs` ; suites `scripts/tests/test-cockpit-lancer-*.sh`
-(onze) ; témoins `scripts/tests/temoins/lancer-*`, `temoins/fauxbin-claude/`, `scripts/tests/chrome-lancer.mjs`.
+## 2. Fichiers neufs (statut A, aucun conflit possible) — re-dérivé à la clôture
+
+**30 fichiers de statut A** sous `plugin/cockpit/` :
+
+- modules `scripts/vf-cockpit-lancer.mjs` et `scripts/vf-cockpit-lancer-{canal,cibles,gabarit,mode,post,q,style,suivi,ui}.mjs` (dix) ;
+- suites `scripts/tests/test-cockpit-lancer-{bandeau,bout-en-bout,chat,cibles,gabarit,mode,post,processus,pty,q,serveur,suivi,ui,xss}.sh` (quatorze) ;
+- aide et témoins : `scripts/tests/chrome-lancer.mjs`, `scripts/tests/temoins/lancer-charge.js`, `scripts/tests/temoins/lancer-xss.mjs`, `scripts/tests/temoins/lancer-fauxbin/{claude,claude-ask}`, `scripts/tests/temoins/fauxbin-claude/claude` (six).
 
 ## 3. Couplages de lecture à contrôler au merge
 
@@ -59,3 +63,10 @@ Relevé réel sur `git diff --numstat 2b9e23b9..HEAD` (insertions / suppressions
 
 Fichiers neufs de 72-16 : `scripts/vf-cockpit-lancer-mode.mjs` (57 lignes) et `scripts/tests/test-cockpit-lancer-mode.sh`. Hors `files_modified`, dits : `72-CONTRATS.md` §4 (clé `mode_retenu`).
 Rappel au manager : 72-15 (bump de version, README, CHANGELOG) doit dépendre de 72-16.
+
+## 6. Points de fusion connus avec la 71.5 (relevé de clôture)
+
+- **`<style id="vf-lancer-style">`** : feuille posée à l'exécution par `vf-cockpit-terminal-vue.mjs` (`poserStyleProposition`) pour le bandeau de proposition. À fondre dans `vf-cockpit-terminal-style.mjs` à la fusion de la 71.5, puis la constante et sa pose sont à retirer de la vue.
+- **`var(--sp-8, 8px)` et repères voisins** de `vf-cockpit-lancer-style.mjs` (fichier neuf) : chaque `var(--sp-N, <px>)` porte un repli. Le repli est à retirer quand les jetons d'espacement de la 71.5 sont sur main.
+- **Classe `vf-q-attention` (ambre)** : appartient à la 71.5 ; la 72 ne la touche pas (elle l'utilise seulement là où la 71 la posait, dans la vue). Ne pas la redéfinir côté 72 à la fusion.
+- **Note sur §5** : les fichiers `test-cockpit-lancer-bandeau.sh` et `test-cockpit-lancer-processus.sh` (ligne B11) sont de statut A dans le relevé final (suites neuves de la 72), non des fichiers existants.

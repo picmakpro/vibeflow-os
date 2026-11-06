@@ -21,7 +21,7 @@ Revue : `passed`, 11 mineurs (ST-1 à ST-5, SP-1 à SP-6), fusionnés avec l'aud
 | F1 | une proposition déplace le focus clavier : fenêtre non focalisée, les frappes de la page Projet partent vers le shell (mesuré : trois octets à l'entrée du shell) | corrigé côté Q (`2cf478f4`) : un cadre sans focus ne le prend jamais ; témoins LB.F1 et LB.F2, mutants M-FOCUS-CLIENT et M-FOCUS-VUE rouges (`72-CORRECTIFS-B.md`) |
 | F2 | « au repos » = le PID du shell au premier plan, sans détection d'invite | limite documentée au README du module, pas de détection d'invite (décision du manager, technique) |
 | F3 | garde du propriétaire de `POST /annuler` et code `terminal-indisponible` sans témoin | témoins Q10b et E2b ajoutés, mutants M-ANNULER-PROPRIETAIRE, M-CODE-INDISPONIBLE, M-GARDE-ACTIF rouges (`72-CORRECTIFS-A.md`) |
-| F4 | finding de gravité basse du rapport de l'auditeur | non reproduit dans le rapport du manager ; aucune suite ne lui est attribuée ici, à rapprocher du rapport de l'auditeur du lot 1 |
+| F4 | finding de gravité basse du rapport de l'auditeur | info, no-op : la revalidation indépendante côté Python (`vf-cockpit-pty.py`) ne tient que l'alphabet fermé, le préfixe et l'apostrophe finale ; `claude --session-id 'x' --dangerously-skip-permissions '/x'` y obtient `LANCE ok` ; la grammaire complète n'est tenue que par le gabarit JS ; pas d'écart d'autorité, Q a déjà `/entree` ; documenté en T-72-08 (commit `94bdb6e2`) |
 | F5 | un `504` de `POST /lancer` peut être suivi d'une ligne tardive | documenté au contrat §4 (décision du manager) |
 | F6 | portée réelle du mode « hérité du poste » | tranché par recherche documentaire (voir « Arbitrages et décisions » et « Limites mesurées de version ») ; texte `NOTE_HERITE` corrigé (`2cf478f4`, `90237961`), limite de version au README |
 
@@ -46,9 +46,9 @@ Verdict **SECURED**, aucune décision humaine nouvelle ; P72-D-20 tient (le doss
 
 | Id | Sévérité | Constat | Suite |
 |---|---|---|---|
-| L1 | bas | un lien symbolique sur `.cache` redirige l'écriture du fichier du mode | **en correction** (nœud `fix-mineurs-c`) |
-| I2 | info | un BOM en tête du fichier du mode est toléré | **en correction** (nœud `fix-mineurs-c`) |
-| L2 | bas | trois `.focus()` de la vue de Q sans garde `hasFocus` (code de la Phase 71) | **en correction** (nœud `fix-l2`, après les réglages visuels) |
+| L1 | bas | un lien symbolique sur `.cache` redirige l'écriture du fichier du mode | **clos** par `38eeeb3a` (`lstat` du dossier support avant écriture, lien refusé ; la course `lstat`/ouverture est consignée, non fermée) |
+| I2 | info | un BOM en tête du fichier du mode est toléré | **clos** par `38eeeb3a` (BOM refusé à la lecture) |
+| L2 | bas | trois `.focus()` de la vue de Q sans garde `hasFocus` (code de la Phase 71) | **clos** par `a5dc9180` (garde `document.hasFocus()` sur la carte et le bandeau ; témoins LB.F4 à LB.F8, mutants M-FOCUS-CARTE et M-FOCUS-BANDEAU rouges, `72-CORRECTIFS-D.md`) ; le collage n'est atteignable que par un geste dans le cadre, laissé tel quel |
 | L3 | doc | limite à écrire au README | tenu par 72-15 |
 | I3 | info | l'agent du chat (`/api/ask`, `Read(./**)`) lit le fichier du mode, non sensible | consigné au plan 72-16 (T-72-128), lecture seule |
 
@@ -94,4 +94,4 @@ Aucun vrai `claude` n'a été lancé par l'audit (faux binaire dans le PATH du s
 
 ## Statut des findings au moment de l'écriture
 
-Fermés : F1, F3, F5, F6, F-1 (par P72-D-22), F-2, F-3, F-4, ST-1 à ST-5, SP-1, S1 à S3, P-1, S-1. Ouverts, « en correction » (le manager met ce statut à jour) : L1 et I2 (`fix-mineurs-c`), L2 (`fix-l2`). Sans suite : S-3. À rapprocher du rapport de l'auditeur : F4.
+Fermés : F1, F3, F5, F6, F-1 (par P72-D-22), F-2, F-3, F-4, ST-1 à ST-5, SP-1, S1 à S3, P-1, S-1 (ces deux derniers par `084e221d`), L1 et I2 (par `38eeeb3a`), L2 (par `a5dc9180`). Info, no-op : F4 (documenté en T-72-08, `94bdb6e2`). Sans suite : S-3. Réglages visuels de la recette : `b05d3001`. Aucun finding ouvert.
