@@ -100,6 +100,7 @@ C['LQ2.5'] = () => { const { e, g } = mk(); e.definirCibles(LISTE); const a = e.
 C['LQ2.6a'] = () => [{ bloquants: 'x' }, { bloquants: ['<img>'] }, { bloquants: Array.from({ length: 21 }, (_, i) => 'c' + i) }, { chat: 'x;touch M' }, { chat: '$(touch M)' }, { chat: CHAT + 'a' }, { chat: '' }, { chat: 5 },
   { chat: ['a'] }, { cible: 5 }, { avertissements: 'x' }].map((x) => { const { e } = mk(); e.definirCibles(LISTE); return motif(dire(() => e.proposer(prop('ph-72', 'cadrer', x)))); }).join(',');
 C['LQ2.6b'] = () => { const { e } = mk(); e.definirCibles(LISTE); return motif(e.proposer(prop('ph-72', 'cadrer', { chat: CHAT }))); };
+C['LQ2.6c'] = () => { const HEX = 'abcdefab-abcd-4bcd-8bcd-abcdefabcdef'; return [HEX.toUpperCase(), 'ABCDEFAB' + HEX.slice(8), HEX.slice(0, -1) + 'F'].map((c) => { const { e } = mk(); e.definirCibles(LISTE); return motif(e.proposer(prop('ph-72', 'cadrer', { chat: c }))); }).join(','); };
 C['LQ3.1'] = () => { const { e } = mk(); e.definirCibles(LISTE); const a = e.proposer(prop()); const b = e.proposer(prop('ph-73')); const l = e.lire(); return `nouveau=${l.id === b.id};ancien=${motif(e.consommer(a.id, 'default'))}`; };
 C['LQ3.2'] = () => { const s = pret(); const m = (x) => motif(s.e.consommer(s.id, 'default')); const avant = m(); s.e.lire(); const apres = m(); s.h.avance(ARME - 1); const limite = m(); s.h.avance(1); return `avant=${avant};apres=${apres};limite=${limite};arme=${m()}`; };
 C['LQ3.3'] = () => { const s = pret(); s.h.avance(5000); s.e.lire(); s.h.avance(ARME - 1); const a = motif(s.e.consommer(s.id, 'default')); s.h.avance(1); return `${a},${motif(s.e.consommer(s.id, 'default'))}`; };
@@ -179,6 +180,7 @@ attendu() { # valeur saine de chaque cas (une seule source, partagée par les so
     LQ2.5) printf 'true,true;id=true;session=true' ;;
     LQ2.6a) rep forme 11 ;;
     LQ2.6b) printf 'ok' ;;
+    LQ2.6c) rep forme 3 ;;
     LQ3.1) printf 'nouveau=true;ancien=remplacee' ;;
     LQ3.2) printf 'avant=pas-arme;apres=pas-arme;limite=pas-arme;arme=ok' ;;
     LQ3.3) printf 'pas-arme,ok' ;;
@@ -229,6 +231,7 @@ chk LQ2.4c "ligne de 400 caractères conforme : acceptée"
 chk LQ2.5 "identifiant de 32 hexadécimaux, différent à chaque proposition ; session différente à chaque proposition"
 chk LQ2.6a "message hors forme (bloquants non tableau, code <img>, 21 codes, chat ;, \$(, 37 caractères, vide, 5, tableau, cible non chaîne, avertissements non tableau) : forme"
 chk LQ2.6b "un chat UUID valide est accepté"
+chk LQ2.6c "un chat aux majuscules (tout, un segment, un seul chiffre hexadécimal) : forme — même forme que le gabarit, minuscules 8-4-4-4-12"
 
 echo "── LQ3 remplacement, armement (LANC-07 ; P72-D-10, D-14) ──"
 chk LQ3.1 "une seconde proposition remplace la première : nouvel id, l'ancien est refusé (remplacee)"
@@ -305,6 +308,7 @@ mut M-LISTE-OUVERTE '/garde:liste-proposer/d' "une cible hors liste produit une 
 mut M-LISTE-PERIMEE '/garde:liste-consommer/d' "consommer ne revérifie plus la liste courante" LQ1.7b
 mut M-LISTE-LIRE '/garde:liste-lire/d' "lire() montre une proposition dont la cible a quitté la liste" LQ1.7a
 mut M-ENTREE-NON-VALIDEE '/garde:entree-forme/d' "une entrée hors forme entre dans la liste" LQ1.3
+mut M-UUID-MAJUSCULES '/^const UUID_RE/s/0-9a-f/0-9a-fA-F/g' "le motif d'UUID de Q accepte les majuscules que le gabarit refuse" LQ2.6c
 mut M-FORME-LIBRE '/garde:forme/d' "un message hors forme est accepté" LQ2.6a
 mut M-COMPOSE-IGNOREE '/garde:compose/d' "un refus ou une composition incomplète du gabarit est ignoré" LQ2.3
 mut M-LIGNE-NON-VALIDEE '/garde:alphabet/d' "une ligne que validerLigne refuse est retenue" LQ2.4a

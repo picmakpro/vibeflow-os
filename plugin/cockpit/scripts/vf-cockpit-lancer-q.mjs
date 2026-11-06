@@ -25,7 +25,7 @@ export const EXPIRE_MS = coherent ? expire0 : EXPIRE_DEF;
 
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._@:-]{0,127}$/;
 const CODE_RE = /^[a-z][a-z0-9-]{0,39}$/;
-const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/; // minuscules, comme le gabarit (MOTIF_UUID)
 const LISTE_MAX = 500; const CODES_MAX = 20; const FERMEES_MAX = 16;
 
 const refus = (motif) => ({ ok: false, motif });

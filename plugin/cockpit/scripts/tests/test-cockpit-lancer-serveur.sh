@@ -302,6 +302,11 @@ UC='11111111-2222-4333-8444-555555555555'; n0="$(nprop)"
 C1B="{\"cible\":\"ph-1\",\"verbe\":\"executer\",\"chat\":\"$UC\"}"; C1S="$(sta "$P1" POST /api/vf/lancer --jeton "$PTOK" --entete "$JSONH" --corps "$C1B")"; attend_n $((n0+1)); C1C="$(node "$AUX/jl.mjs" "$STUB_LOG" 'L.filter(x=>x.t==="proposition").pop().chat' 2>/dev/null)"
 assert_eq "C1 — chat valide (UUID) : 202 et la proposition porte chat" "$C1S ${C1C:-aucune proposition}" "202 $UC"
 refuse "C2 — chat non UUID" --jeton "$PTOK" --entete "$JSONH" --corps '{"cible":"ph-1","verbe":"executer","chat":"pas-un-uuid"}'
+# C3 : un UUID aux majuscules est refusé par P (même forme que le gabarit : minuscules, 8-4-4-4-12), sinon P répondrait 202 pour une proposition que Q ou le gabarit refuse. Résiduel P72-D-22 inchangé : un POST direct reste possible.
+UCM='ABCDEFAB-ABCD-4BCD-8BCD-ABCDEFABCDEF'; CMB="{\"cible\":\"ph-1\",\"verbe\":\"executer\",\"chat\":\"$UCM\"}"
+refuse "C3 — chat UUID aux majuscules" --jeton "$PTOK" --entete "$JSONH" --corps "$CMB"
+C3R="$(rq "$SRV_PORT" POST /api/vf/lancer --jeton "$PTOK" --entete "$JSONH" --corps "$CMB")"
+assert_eq "C3 — chat aux majuscules : 422 et refus chat-invalide (jamais 202)" "$(printf '%s\n' "$C3R" | sed -n 1p) $(printf '%s\n' "$C3R" | sed '1,2d' | node "$AUX/ev.mjs" 'j.refus' 2>/dev/null)" "422 chat-invalide"
 
 echo "=== F — fuites : flux SSE, journal, journal du serveur, server.json ==="
 rq "$P1" GET /api/vf/journal --jeton "$PTOK" | sed '1,2d' > "$WORK/journal.json"; vf_hyg_stop "$SSEPID"; sleep 0.3
@@ -371,6 +376,11 @@ if mutant lancee-libre vf-cockpit-lancer.mjs 's|if (!lanceeValide(m)) return;|if
   for _ in $(seq 1 30); do grep -q '"envoye"' "$STUB_LOG" && break; sleep 0.1; done; sleep 0.4
   assert_eq "M-LANCEE-LIBRE — le mutant rougit L2 : un message mal formé est enregistré (la carte n'est plus false)" "$([ "$(lancee_de)" != false ] && echo L2-rouge || echo L2-vert)" "L2-rouge"; unsrv
 else assert_eq "M-LANCEE-LIBRE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
+if mutant uuid-maj vf-cockpit-lancer.mjs '/^const UUID = /s/0-9a-f/0-9a-fA-F/g'; then
+  srv_stub "$MUT_OUT" defaut; MC3="$(rq "$SRV_PORT" POST /api/vf/lancer --jeton "$PTOK" --entete "$JSONH" --corps "$CMB" | sed -n 1p)"
+  assert_eq "M-UUID-MAJUSCULES — le mutant rougit C3 : le motif de P accepte les majuscules, 202 au lieu de 422" "$MC3" "202"; unsrv
+else assert_eq "M-UUID-MAJUSCULES — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 if mutant code-indispo vf-cockpit-lancer.mjs "s#refus: etat === 'indisponible' ? 'terminal-indisponible' : 'terminal-arrete'#refus: 'terminal-arrete'#"; then
   assert_eq "M-CODE-INDISPONIBLE — le mutant rend toujours terminal-arrete : E2b rougit" "$(node "$AUX/harnais.mjs" e4 "$MUT_OUT" "$LAB")" "indisponible:503:terminal-arrete arrete:503:terminal-arrete actif:202:"

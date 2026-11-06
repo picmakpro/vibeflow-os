@@ -81,6 +81,9 @@ R.u1 = [lire(pose('plan')), lire(path.join(frais(), 'terminal-mode')), lire(pose
 const forges = ['bypassPermissions', 'Plan', 'PLAN', 'plan plan', 'plan\nplan', 'plan\0', '', '\n', '{"mode":"plan"}', '["plan"]', '__proto__', 'constructor', 'toString', 'a'.repeat(33), 'a'.repeat(4096), 'plan\n' + 'x'.repeat(28), Buffer.from([0x70, 0x6c, 0xff, 0xfe])];
 R.u2 = forges.map((v) => lire(pose(v)));
 R.u2n = forges.length;
+// mots valides entourés de blancs : seule la forme « mot » ou « mot + UN \n » est lue (un trim() les accepterait)
+R.u2blancs = [' plan', 'plan ', 'plan \n', 'plan\n\n', 'plan\r\n', '\nplan'].map((v) => lire(pose(v)));
+R.u2fin = [lire(pose('plan\n')), lire(pose('plan'))];
 // borne de taille : un fichier DONT LE FSTAT annonce plus de 32 octets ne doit déclencher aucune lecture
 const tracer = (extra = {}) => { const appels = []; const o = { ...fs }; for (const k of Object.keys(fs)) if (typeof fs[k] === 'function') o[k] = (...a) => { appels.push([k, ...a.map((x) => (typeof x === 'number' || typeof x === 'string' || typeof x === 'boolean' ? x : typeof x === 'object' && x !== null ? '{}' : typeof x))]); return fs[k](...a); }; Object.assign(o, extra); return { fs: o, appels }; };
 { const f = pose('plan'); const t = tracer({ fstatSync: (fd) => { const st = fs.fstatSync(fd); return { isFile: () => st.isFile(), uid: st.uid, mode: st.mode, size: 4096 }; } });
@@ -260,6 +263,7 @@ echo "=== LM.U — le module (node pur, doublures de fs) ==="
 UF="$(facts_u "$SCRIPTS")"
 assert_eq "LM.U1 — témoin : fichier valide « plan » -> plan ; fichier absent -> default ; « plan » + un retour à la ligne -> plan" "$(uq "$UF" 'j.u1.join(",")')" "plan,default,plan"
 assert_eq "LM.U2 — dix-sept contenus forgés (bypassPermissions, Plan, PLAN, plan plan, plan\\nplan, plan\\0, vide, un retour à la ligne, JSON, tableau JSON, __proto__, constructor, toString, 33 octets, 4096 octets, plan+28 octets, non UTF-8) : tous default, aucune exception" "$(uq "$UF" 'j.u2.length + ":" + j.u2.filter((x) => x === "default").length')" "17:17"
+assert_eq "LM.U2 — mot valide entouré de blancs (' plan', 'plan ', 'plan \\n', 'plan\\n\\n', 'plan\\r\\n', '\\nplan') : tous default ; 'plan\\n' et 'plan' : plan" "$(uq "$UF" 'j.u2blancs.join(",") + "|" + j.u2fin.join(",")')" "default,default,default,default,default,default|plan,plan"
 assert_eq "LM.U2 — borne de taille avant toute lecture : un fstat annonçant 4096 octets rend default SANS aucun readSync (témoin : la même doublure sur la taille réelle lit une fois et rend plan)" "$(uq "$UF" 'j.u2taille.join(",")')" "default,0,plan,1"
 assert_eq "LM.U3 — fichier d'un autre propriétaire (fstat simulé, la vraie situation exige un privilège : non jouable sans lui) -> default ; le vrai propriétaire -> plan" "$(uq "$UF" 'j.u3uid.join(",")')" "default,plan"
 assert_eq "LM.U3 — lien symbolique vers un fichier plan valide -> default ; répertoire -> default" "$(uq "$UF" 'j.u3lien + "," + j.u3dossier')" "default,default"
@@ -480,6 +484,10 @@ if mutant sans-reval "$MODF" 's#return modes.indexOf(mot) >= 0 ? mot : DEFAUT; /
   assert_eq "M-SANS-REVALIDATION — sous le mutant LM.U2 rougit (les dix-sept contenus forgés ne valent plus tous default)" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.u2.filter((x) => x === "default").length < 17')" "true"
   assert_eq "M-SANS-REVALIDATION — sous le mutant LM.Q5 rougit : un fichier bypassPermissions est servi tel quel" "$(mut_forge "$MUT_OUT" $'bypassPermissions\n')" "bypassPermissions"
 else sans_effet "M-SANS-REVALIDATION"; fi
+echo "=== M-TRIM — la lecture tolère les blancs au lieu d'un seul retour final (LM.U2) ==="
+if mutant trim "$MODF" "s#const mot = txt.endsWith('\\\\n') ? txt.slice(0, -1) : txt;#const mot = txt.trim();#"; then
+  assert_eq "M-TRIM — sous le mutant LM.U2 rougit : les mots entourés de blancs sont lus comme plan" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.u2blancs.join(",")')" "plan,plan,plan,plan,plan,plan"
+else sans_effet "M-TRIM"; fi
 echo "=== M-SUIT-LIEN — O_NOFOLLOW retiré (LM.U3, LM.Q5) ==="
 if mutant suit-lien "$MODF" 's#const noFollow = c.O_NOFOLLOW || 0;#const noFollow = 0;#'; then
   assert_eq "M-SUIT-LIEN — sous le mutant LM.U3 rougit : le lien symbolique est suivi (plan au lieu de default)" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.u3lien')" "plan"

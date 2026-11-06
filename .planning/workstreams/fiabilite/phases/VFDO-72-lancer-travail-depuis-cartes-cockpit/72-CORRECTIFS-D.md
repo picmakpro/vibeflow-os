@@ -54,3 +54,9 @@ Sonde RES.4 et assertions de mutants : chacune exige aussi la charge faite (`fal
 - Contrat : motif `ecriture` ajouté à `72-CONTRATS.md` §4 (HTTP 410, proposition restituée) et §5 (réponse `LANCE ecriture`, motifs de `sessions.lancer`).
 - `vf-cockpit-pty.py` : commentaires seulement. `ok` = ligne mise en file, écriture tentée ; sur `BlockingIOError` la ligne reste en file et la réponse est `ok` ; `ecriture` ajouté à la liste des réponses.
 - Preuves : `test-cockpit-lancer-xss.sh` 76 PASS / 0 FAIL (rc 0) ; `test-cockpit-lancer-pty.sh` 63 PASS / 0 FAIL (rc 0).
+
+## Correction ciblée G (lot 3 : mutant `trim()` et parité des motifs d'UUID)
+
+- S-1 : `vf-cockpit-lancer-mode.mjs` est inchangé (la lecture tolère un seul `\n` final, égalité exacte avec l'un des quatre mots). Témoin ajouté à `test-cockpit-lancer-mode.sh` : `' plan'`, `'plan '`, `'plan \n'`, `'plan\n\n'`, `'plan\r\n'`, `'\nplan'` donnent `default` ; `'plan\n'` et `'plan'` donnent `plan`. Mutant `M-TRIM` (`txt.trim()`) : les six formes rendent `plan`, le témoin rougit. Avant le témoin, ce mutant laissait la suite verte (72 PASS).
+- P-1 : les motifs d'UUID de `vf-cockpit-lancer.mjs` (`UUID`) et `vf-cockpit-lancer-q.mjs` (`UUID_RE`) passent en minuscules seules, comme `MOTIF_UUID` du gabarit (inchangé). Témoins : `test-cockpit-lancer-serveur.sh` C3 (POST `chat` en majuscules : 422 `chat-invalide`) et `test-cockpit-lancer-q.sh` LQ2.6c (trois formes à majuscules : `forme`). Mutants `M-UUID-MAJUSCULES` (remettre `A-F` dans le motif) : C3 rend 202, LQ2.6c n'est plus `forme`, les deux rougissent.
+- Portée : ce correctif rend seulement vrai le message « confirmez dans le terminal » pour un identifiant en majuscules. Le POST direct depuis P reste un résiduel ACCEPTÉ (P72-D-22) : il n'est pas fermé.

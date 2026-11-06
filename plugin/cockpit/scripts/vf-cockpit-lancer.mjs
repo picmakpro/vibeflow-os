@@ -18,7 +18,7 @@ import { creerSuivi } from './vf-cockpit-lancer-suivi.mjs';
 import { canal } from './vf-cockpit-lancer-canal.mjs';
 
 const ROUTE_GET = '/api/vf/lancer/cibles', ROUTE_POST = '/api/vf/lancer';
-const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/; // minuscules, comme le gabarit (MOTIF_UUID)
 const CLES_LANCEE = 'at,cible,session,t,verbe';
 const sur = (fn, repli) => { try { return fn(); } catch { return repli; } };
 
