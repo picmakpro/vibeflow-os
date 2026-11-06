@@ -18,7 +18,7 @@ const SCHEMA_COMMIT = 'vibeflow/cockpit-git-commit@1', SCHEMA_WT = 'vibeflow/coc
 export const MENTION_APPROX = 'approximatif : filtres du dépôt non exécutés';
 const MOTIF = (n) => new RegExp(`^[0-9a-f]{${n}}$`); // SHA-MOTIF : 40 (sha1) ou 64 (sha256), minuscules, rien d'autre
 const net = (s) => nettoie(s, 200);
-const ILLISIBLE = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/gu; // la classe de `nettoie` (A8 : tout caractère de catégorie Cf), moins la fin de ligne : un message en garde
+export const ILLISIBLE = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/gu; // la classe de `nettoie` (A8 : tout caractère de catégorie Cf), moins la fin de ligne : un message en garde
 const ko = (raison) => ({ ok: false, raison });
 const motifLong = (s) => /^[0-9a-f]{40}$|^[0-9a-f]{64}$/.test(s);
 

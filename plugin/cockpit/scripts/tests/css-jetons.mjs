@@ -1,12 +1,13 @@
 // css-jetons.mjs — garde de la feuille d'un fichier ui du cockpit (78-04, P78-D-12), aide de test partagée (78-06, 78-10, 78-11).
 // Usage : node css-jetons.mjs <fichier…>. Lit le texte de chaque fichier ; rend 1 et nomme chaque valeur fautive, 0 sinon.
 //   couleur     : littéral #rgb / #rrggbb en valeur de propriété, ou rgb( rgba( hsl( hsla( dont l'argument ne commence pas par var(
-//   espacement  : toute valeur en px de padding, margin ou gap (signe compris) hors {2, 4, 6, 8, 10, 12, 14, 16}
+//   espacement  : toute valeur en px de padding, margin ou gap (signe compris) hors {2, 4, 6, 8, 12, 16, 20, 24, 32}
 //   rayon       : toute valeur de border-radius hors {999px, 8px} ou var(--r-…)
 // Aucune dépendance. Sortie : une ligne `fichier:ligne : <règle> <valeur>` par écart.
 import fs from 'node:fs';
 
-const ESPACEMENTS = new Set([2, 4, 6, 8, 10, 12, 14, 16]);
+// grille d'espacement figée par la Phase 71.5 (arbitrages Samuel, AskUserQuestion session principale, 2026-11-05) : 2-4-6-8-12-16-20-24-32 ; 10 et 14 n'en font plus partie (R5, revue serveur 2026-11-06)
+const ESPACEMENTS = new Set([2, 4, 6, 8, 12, 16, 20, 24, 32]);
 const RAYONS = new Set(['999px', '8px']);
 const lignes = (txt, idx) => txt.slice(0, idx).split('\n').length;
 

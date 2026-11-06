@@ -312,6 +312,56 @@ MN="$WORK/mut-nettoie"; rm -rf "$MN"; mkdir -p "$MN"; cp "$SCRIPTS"/*.mjs "$SCRI
 node -e 'const fs=require("fs"),f=process.argv[1];let s=fs.readFileSync(f,"utf8");const a="\\u2029\\p{Cf}]/gu";if(!s.includes(a)){console.log("ancre absente");process.exit(1)}fs.writeFileSync(f,s.replace(a,"\\u2029\\u202a-\\u202e\\u2066-\\u2069]/g"));console.log("muté")' "$MN/vf-cockpit-arbres.mjs"
 assert_eq "C3.5 — M-NETTOIE : nettoie revient à l'ancienne classe (sans Cf) ; la parité C1.7 rougit (au moins un écart, ex. U+200B retenu par nettoie mais refusé par AFFICHAGE_REFUSE)" "$(node "$AUX/parite.mjs" "$MN" 2>/dev/null | awk -F'|' '{ print ($2 > 0 ? "ecarts" : "aucun") }')" "ecarts"
 
+echo "=== R4 / R5 — revue serveur 2026-11-06 : la classe d'affichage a quatre copies de parité testée ; la grille d'espacement de css-jetons est celle de la 71.5 ==="
+# R4 (S6) : quatre copies de la classe d'affichage — AFFICHAGE_REFUSE (commandes), nettoie (arbres, C1.7), ILLISIBLE (détail d'un commit : même classe moins tabulation et fin de ligne, qu'un message garde),
+# missionsEnCours (carte Équipe : tout point de code refusé disparaît du libellé, sans espace laissé). Parité sur U+0000 à U+10FFFF ; la sortie nomme les premiers écarts.
+cat > "$AUX/parite-quatre.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+import path from 'node:path';
+const [, , scripts] = process.argv;
+const imp = (f) => import(pathToFileURL(path.join(scripts, f)).href).catch(() => null);
+const c = await imp('vf-cockpit-git-commandes.mjs'), d = await imp('vf-cockpit-git-details.mjs'), e = await imp('vf-cockpit-equipe-carte.mjs');
+if (!c || !d || !e || !(d.ILLISIBLE instanceof RegExp)) { console.log('module ou export absent'); process.exit(0); }
+const illisible = new RegExp(d.ILLISIBLE.source, 'u'); // sans l'état `lastIndex` du drapeau g
+let refuses = 0; const detail = [], equipe = [];
+for (let cp = 0; cp <= 0x10ffff; cp++) {
+  if (cp >= 0xd800 && cp <= 0xdfff) continue;
+  const ch = String.fromCodePoint(cp), r = c.AFFICHAGE_REFUSE.test(ch);
+  if (r) refuses++;
+  if (illisible.test(ch) !== (r && cp !== 0x09 && cp !== 0x0a)) detail.push(cp.toString(16));
+  if (r && e.missionsEnCours({ nodes: [{ kind: 'mission', st: 'active', label: 'a' + ch + 'b' }] })[0] !== 'ab') equipe.push(cp.toString(16));
+}
+console.log(`${refuses > 100}|détail:${detail.length}${detail.length ? ' ' + detail.slice(0, 3).join(',') : ''}|équipe:${equipe.length}${equipe.length ? ' ' + equipe.slice(0, 3).join(',') : ''}`);
+JS
+cat > "$AUX/mutq.mjs" <<'JS'
+import fs from 'node:fs';
+const [, , f, de, vers] = process.argv;
+const t = fs.readFileSync(f, 'utf8');
+if (!t.includes(de)) { console.log('absent'); process.exit(0); }
+fs.writeFileSync(f, t.replace(de, () => vers)); console.log('applique');
+JS
+assert_eq "R4.1 — la classe est la même dans les quatre copies : détail d'un commit = AFFICHAGE_REFUSE sauf U+0009 et U+000A ; carte Équipe : tout point refusé disparaît du libellé (aucun écart sur U+0000-U+10FFFF)" "$(node "$AUX/parite-quatre.mjs" "$SCRIPTS")" "true|détail:0|équipe:0"
+MQE="$WORK/mut-classe-equipe"; rm -rf "$MQE"; mkdir -p "$MQE"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$MQE/"
+assert_eq "M-CLASSE-EQUIPE.0 — mutant avec effet (la carte Équipe retrouve l'ancienne classe, bidi seul, sans Cf)" "$(node "$AUX/mutq.mjs" "$MQE/vf-cockpit-equipe-carte.mjs" '\u2029\p{Cf}]/gu' '\u2029\u202a-\u202e\u2066-\u2069]/g')" "applique"
+assert_eq "M-CLASSE-EQUIPE — rougit R4.1 sur la carte Équipe seule (écarts : U+200B et les autres Cf hors bidi), pas sur le détail" "$(node "$AUX/parite-quatre.mjs" "$MQE" | sed -E 's/équipe:[1-9][0-9]*.*/équipe:>0/')" "true|détail:0|équipe:>0"
+MQD="$WORK/mut-classe-detail"; rm -rf "$MQD"; mkdir -p "$MQD"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$MQD/"
+assert_eq "M-CLASSE-DETAIL.0 — mutant avec effet (ILLISIBLE du détail perd \\p{Cf})" "$(node "$AUX/mutq.mjs" "$MQD/vf-cockpit-git-details.mjs" '\u2028\u2029\p{Cf}]/gu' '\u2028\u2029]/gu')" "applique"
+assert_eq "M-CLASSE-DETAIL — rougit R4.1 sur le détail seul (des points Cf ne sont plus retirés), pas sur la carte Équipe" "$(node "$AUX/parite-quatre.mjs" "$MQD" | sed -E 's/détail:[1-9][0-9]*[^|]*/détail:>0/')" "true|détail:>0|équipe:0"
+
+# R5 (S8) : la grille d'espacement de css-jetons.mjs est celle figée par la 71.5 {2, 4, 6, 8, 12, 16, 20, 24, 32} : 10 px et 14 px sont refusés, 20 px passe
+JETONS="$SCRIPTS/tests/css-jetons.mjs"
+for cas in "10px|1" "14px|1" "20px|0" "24px|0" "32px|0" "12px|0" "5px|1"; do
+  V="${cas%%|*}"; ATT="${cas#*|}"
+  printf '.a { padding: %s; }\n' "$V" > "$WORK/css-$V.txt"
+  node "$JETONS" "$WORK/css-$V.txt" > /dev/null 2>&1; RC=$?
+  assert_eq "R5.$V — css-jetons : padding $V attendu rc $ATT" "$RC" "$ATT"
+done
+# M-GRILLE : css-jetons.mjs retrouve l'ancienne grille {2,4,6,8,10,12,14,16} : 10 px repasse (R5.10px rougit) et 20 px est refusé (R5.20px rougit), chacun pour sa raison
+MG="$WORK/mut-grille"; rm -rf "$MG"; mkdir -p "$MG"; cp "$JETONS" "$MG/css-jetons.mjs"
+assert_eq "M-GRILLE.0 — mutant avec effet (l'ancienne grille est remise)" "$(node "$AUX/mutq.mjs" "$MG/css-jetons.mjs" 'new Set([2, 4, 6, 8, 12, 16, 20, 24, 32])' 'new Set([2, 4, 6, 8, 10, 12, 14, 16])')" "applique"
+node "$MG/css-jetons.mjs" "$WORK/css-10px.txt" > /dev/null 2>&1; RC10=$?; node "$MG/css-jetons.mjs" "$WORK/css-20px.txt" > /dev/null 2>&1; RC20=$?
+assert_eq "M-GRILLE — avec l'ancienne grille : 10 px accepté (rc 0, R5.10px rougit) et 20 px refusé (rc 1, R5.20px rougit)" "$RC10|$RC20" "0|1"
+
 echo
 echo "=== Résultats : $PASS PASS, $FAIL FAIL ==="
 [ "$FAIL" -eq 0 ]

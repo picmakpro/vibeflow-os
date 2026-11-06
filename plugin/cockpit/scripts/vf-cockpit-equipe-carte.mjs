@@ -14,7 +14,8 @@ export function missionsEnCours(gp) {
   for (const n of Array.isArray(gp?.nodes) ? gp.nodes : []) {
     if (out.length >= 10) break;
     if (n && n.kind === 'mission' && n.st === 'active' && typeof n.label === 'string') {
-      const l = clip(n.label.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, '').replace(/^Mission\s+/, ''), 120);
+      // S6 (revue 2026-11-06) : même classe que `nettoie` (A8) — tout caractère de catégorie Cf, pas la seule plage bidi ; parité testée sur les quatre copies (test-cockpit-git-commandes.sh, R4.1)
+      const l = clip(n.label.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/gu, '').replace(/^Mission\s+/, ''), 120);
       if (l) out.push(l);
     }
   }
