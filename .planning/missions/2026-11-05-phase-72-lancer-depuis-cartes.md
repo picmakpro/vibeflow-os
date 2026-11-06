@@ -4,7 +4,7 @@ Manager : vf-dev-manager, reprise après crash (owner `mgr72-reprise`, verrou de
 
 ## Plan de bataille (DAG)
 
-`.planning/workstreams/fiabilite/MISSION-72.dag.json` (non suivi). Nœuds repris : ex-02, ex-09, ex-14 (interrompus par le crash), puis ex-10, vague 3 (ex-11, ex-12, ex-13) en parallèle, ex-16 (plan neuf, P72-D-20), ex-15 (bump). Pipelining des juges : revue et audit par lot à SHA figé (lot 1 84501819, lot 2 b5efcc40 / 9b63d963 rebasé, lot 3 4fa5fe95) pendant que l'exécution avançait ; recette par juge Playwright au SHA 4fa5fe95 ; correctifs ciblés (A, B, C, D, F, G, H, réglages visuels) ; nœud docs en deux parties ; non-régression complète.
+`.planning/missions/dag-phase72-exec.json` (déplacé depuis `.planning/workstreams/fiabilite/MISSION-72.dag.json` à la clôture). Nœuds repris : ex-02, ex-09, ex-14 (interrompus par le crash), puis ex-10, vague 3 (ex-11, ex-12, ex-13) en parallèle, ex-16 (plan neuf, P72-D-20), ex-15 (bump). Pipelining des juges : revue et audit par lot à SHA figé (lot 1 84501819, lot 2 b5efcc40 / 9b63d963 rebasé, lot 3 4fa5fe95) pendant que l'exécution avançait ; recette par juge Playwright au SHA 4fa5fe95 ; correctifs ciblés (A, B, C, D, F, G, H, réglages visuels) ; nœud docs en deux parties ; non-régression complète.
 
 ## Résultat
 
@@ -101,28 +101,140 @@ Intentions en ASCII sans accent (alphabet fermé de la ligne, voulu) ; bouton pr
 Relayées verbatim des blocs typés des workers (SHA au rejeu ; commandes depuis la racine du worktree).
 
 ```json
-[
-  {"verdict": "suite", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-pty.sh pty", "exit_code": 0, "sha": "9ac5e282"},
-  {"verdict": "suite", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-session.sh", "exit_code": 0, "sha": "9ac5e282"},
-  {"verdict": "suite-72-09", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-serveur.sh", "exit_code": 0, "sha": "6fde1538905f8b753f2f24cc86a599a9db9849c3"},
-  {"verdict": "suite du processus de Q", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-processus.sh", "exit_code": 0, "sha": "549d3bcc"},
-  {"verdict": "suite tiroir", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh", "exit_code": 0, "sha": "f9607584 + arbre à 11ba668f"},
-  {"verdict": "recette", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-bout-en-bout.sh", "exit_code": 0, "sha": "84501819f472a58d54350be109d8b57ab10b1224"},
-  {"verdict": "revue", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-{gabarit,cibles,post,q,suivi,pty,processus,serveur,ui,bandeau}.sh (extraction git archive 84501819)", "exit_code": 0, "sha": "84501819f472a58d54350be109d8b57ab10b1224"},
-  {"verdict": "audit", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-processus.sh (extraction 84501819)", "exit_code": 0, "sha": "84501819f472a58d54350be109d8b57ab10b1224"},
-  {"verdict": "revue", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-bout-en-bout.sh (extraction de b5efcc40)", "exit_code": 1, "sha": "b5efcc40c9983ee0332937c69ee6fe2ae6d01e4a"},
-  {"verdict": "correctif F-3", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-bout-en-bout.sh (export b5efcc40 + correctif)", "exit_code": 0, "sha": "acb032e1"},
-  {"verdict": "revue", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-mode.sh (extraction git archive 4fa5fe95)", "exit_code": 0, "sha": "4fa5fe958fa085b4141ce04fb150fc3d351dad34"},
-  {"verdict": "audit", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-mode.sh", "exit_code": 0, "sha": "4fa5fe95"},
-  {"verdict": "gates", "commande": "bash scripts/check-version-sync.sh", "exit_code": 0, "sha": "68ded1c5"},
-  {"verdict": "suite", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-xss.sh", "exit_code": 0, "sha": "87552b91"},
-  {"verdict": "suite", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-mode.sh (export 38eeeb3a)", "exit_code": 0, "sha": "38eeeb3a"},
-  {"verdict": "suite", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-bandeau.sh", "exit_code": 0, "sha": "a5dc9180"},
-  {"verdict": "suite", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh", "exit_code": 0, "sha": "a5dc9180"},
-  {"verdict": "gate", "commande": "bash scripts/check-machine-paths.sh", "exit_code": 0, "sha": "9dd54e92"},
-  {"verdict": "debug", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-processus.sh (ubuntu 26.04, docker --init)", "exit_code": 0, "sha": "ac8cacb7"},
-  {"verdict": "revue", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-pty.sh (extraction git archive 61da7f5f, macOS)", "exit_code": 0, "sha": "61da7f5ff94a1b203415931b5ed3dc6bbeb26fd8"},
-  {"verdict": "suite", "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-pty.sh", "exit_code": 0, "sha": "0f111ce1"},
-  {"verdict": "gates", "commande": "replay-ci-jobs.sh --job gates", "exit_code": 0, "sha": "de9b1d18"}
-]
+{
+ "preuves": [
+  {
+   "verdict": "suite",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-pty.sh pty",
+   "exit_code": 0,
+   "sha": "9ac5e282"
+  },
+  {
+   "verdict": "suite",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-session.sh",
+   "exit_code": 0,
+   "sha": "9ac5e282"
+  },
+  {
+   "verdict": "suite-72-09",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-serveur.sh",
+   "exit_code": 0,
+   "sha": "6fde1538905f8b753f2f24cc86a599a9db9849c3"
+  },
+  {
+   "verdict": "suite du processus de Q",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-processus.sh",
+   "exit_code": 0,
+   "sha": "549d3bcc"
+  },
+  {
+   "verdict": "suite tiroir",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh",
+   "exit_code": 0,
+   "sha": "f9607584 + arbre à 11ba668f"
+  },
+  {
+   "verdict": "recette",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-bout-en-bout.sh",
+   "exit_code": 0,
+   "sha": "84501819f472a58d54350be109d8b57ab10b1224"
+  },
+  {
+   "verdict": "revue",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-{gabarit,cibles,post,q,suivi,pty,processus,serveur,ui,bandeau}.sh (extraction git archive 84501819)",
+   "exit_code": 0,
+   "sha": "84501819f472a58d54350be109d8b57ab10b1224"
+  },
+  {
+   "verdict": "audit",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-processus.sh (extraction 84501819)",
+   "exit_code": 0,
+   "sha": "84501819f472a58d54350be109d8b57ab10b1224"
+  },
+  {
+   "verdict": "revue",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-bout-en-bout.sh (extraction de b5efcc40)",
+   "exit_code": 1,
+   "sha": "b5efcc40c9983ee0332937c69ee6fe2ae6d01e4a"
+  },
+  {
+   "verdict": "correctif F-3",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-bout-en-bout.sh (export b5efcc40 + correctif)",
+   "exit_code": 0,
+   "sha": "acb032e1"
+  },
+  {
+   "verdict": "revue",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-mode.sh (extraction git archive 4fa5fe95)",
+   "exit_code": 0,
+   "sha": "4fa5fe958fa085b4141ce04fb150fc3d351dad34"
+  },
+  {
+   "verdict": "audit",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-mode.sh",
+   "exit_code": 0,
+   "sha": "4fa5fe95"
+  },
+  {
+   "verdict": "gates",
+   "commande": "bash scripts/check-version-sync.sh",
+   "exit_code": 0,
+   "sha": "68ded1c5"
+  },
+  {
+   "verdict": "suite",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-xss.sh",
+   "exit_code": 0,
+   "sha": "87552b91"
+  },
+  {
+   "verdict": "suite",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-mode.sh (export 38eeeb3a)",
+   "exit_code": 0,
+   "sha": "38eeeb3a"
+  },
+  {
+   "verdict": "suite",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-bandeau.sh",
+   "exit_code": 0,
+   "sha": "a5dc9180"
+  },
+  {
+   "verdict": "suite",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh",
+   "exit_code": 0,
+   "sha": "a5dc9180"
+  },
+  {
+   "verdict": "gate",
+   "commande": "bash scripts/check-machine-paths.sh",
+   "exit_code": 0,
+   "sha": "9dd54e92"
+  },
+  {
+   "verdict": "debug",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-processus.sh (ubuntu 26.04, docker --init)",
+   "exit_code": 0,
+   "sha": "ac8cacb7"
+  },
+  {
+   "verdict": "revue",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-pty.sh (extraction git archive 61da7f5f, macOS)",
+   "exit_code": 0,
+   "sha": "61da7f5ff94a1b203415931b5ed3dc6bbeb26fd8"
+  },
+  {
+   "verdict": "suite",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-lancer-pty.sh",
+   "exit_code": 0,
+   "sha": "0f111ce1"
+  },
+  {
+   "verdict": "gates",
+   "commande": "replay-ci-jobs.sh --job gates",
+   "exit_code": 0,
+   "sha": "de9b1d18"
+  }
+ ]
+}
 ```
