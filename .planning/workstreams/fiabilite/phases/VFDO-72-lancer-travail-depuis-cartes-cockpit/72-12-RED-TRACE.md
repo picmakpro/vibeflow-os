@@ -69,7 +69,7 @@ Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-lancer-bout-en-bout.s
 
 ## Défaut constaté
 
-Aucun défaut du code livré. Aucune assertion n'a été affaiblie ni retirée. Observation hors périmètre (no-op) : au démarrage, `serve.mjs` sonde le vrai `claude` du PATH du serveur (`asking via Claude Code CLI … (/Users/samuel/.local/bin/claude)`) ; c'est la détection du moteur de questions du cockpit, antérieure à la Phase 72, jamais le shell du terminal : dans la suite le shell du terminal ne voit que le faux `claude` (B0 : `command -v claude` imprime le faux).
+Aucun défaut du code livré. Aucune assertion n'a été affaiblie ni retirée. Observation hors périmètre (no-op) : au démarrage, `serve.mjs` sonde le vrai `claude` du PATH du serveur (`asking via Claude Code CLI … (~/.local/bin/claude)`) ; c'est la détection du moteur de questions du cockpit, antérieure à la Phase 72, jamais le shell du terminal : dans la suite le shell du terminal ne voit que le faux `claude` (B0 : `command -v claude` imprime le faux).
 
 ## Ce qui n'est pas vérifié ici
 
