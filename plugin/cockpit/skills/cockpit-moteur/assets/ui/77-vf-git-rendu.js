@@ -108,8 +108,9 @@
   };
 
   // ---------- sections repliables et listes ----------
-  const section = (titre, n, corps, ouvert, id) => {
+  const section = (titre, n, corps, ouvert, id, aide) => { // aide : définition en texte constant (title au survol, aria-description au focus), jamais une donnée lue de git
     const s = el('section', 'vf-git-sec'), b = el('button', 'vf-git-sec-t', null, { type: 'button', 'aria-expanded': String(!!ouvert), 'aria-controls': id });
+    if (aide) { b.setAttribute('title', aide); b.setAttribute('aria-description', aide); }
     b.append(el('span', 'vf-git-sec-n', titre));
     if (n != null) b.appendChild(el('span', 'meta', n));
     b.appendChild(ico('M9 6l6 6-6 6'));
@@ -122,15 +123,18 @@
   const liste = (lignes) => { const d = el('div', 'vf-git-liste'); d.append(...lignes); return d; };
   const ligne = (...enfants) => { const d = el('div', 'vf-git-ligne-d'); d.append(...enfants); return d; };
   const mono = (t, cls) => el('span', 'vf-git-mono' + (cls ? ' ' + cls : ''), t, { title: t });
+  const AIDE_DETACHE = "HEAD détaché : ce dossier n'est sur aucune branche, il est posé sur un commit précis.";
   const sectionWorktrees = (l, annonce) => {
     if (!l || !l.length) return null;
     return section('Worktrees', l.length, liste(l.map((w) => {
       const d = el('div', 'vf-git-wt-l'), t = ligne(mono(w.nom, 'vf-git-gras'));
       if (w.ici) t.appendChild(el('span', 'vf-git-ici', 'ici'));
-      d.append(t, ligne(mono(w.detache ? 'HEAD détaché' : w.branche || '—')));
+      const br = mono(w.detache ? 'HEAD détaché' : w.branche || '—');
+      if (w.detache) br.setAttribute('title', AIDE_DETACHE); // PU-G-193 : le terme reste, sa définition au survol
+      d.append(t, ligne(br));
       if (!w.ici) d.appendChild(commande(w.commande, annonce, 'cd vers ' + w.nom));
       return d;
-    })), true, 'vf-git-s-wt');
+    })), true, 'vf-git-s-wt', "Worktrees : copies de travail du dépôt, chacune dans son propre dossier et sur sa propre branche. " + AIDE_DETACHE);
   };
   const sectionTags = (l) => !l || !l.length ? null : section('Tags', l.length, liste(l.map((t) => ligne(mono(t.nom, 'vf-git-gras'), mono(t.h7), el('span', null, relatif(t.at))))), false, 'vf-git-s-tags');
   const sectionStash = (l, annonce) => {

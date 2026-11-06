@@ -209,6 +209,7 @@ await s.ev(`new Promise((r) => setTimeout(r, 400))`);
 out.xss = await s.ev(`(() => { const T = ${T}, tx = T.textContent;
   return { img: T.querySelectorAll('img, script, b, u, iframe, style').length, svgEtrangers: [...T.querySelectorAll('svg')].filter((s) => !s.classList.contains('vf-git-gcol') && !s.classList.contains('i')).length, surveillants: T.querySelectorAll('[onload], [onerror]').length,
     lit: ['<svg/onload=alert(1)>', '<img src=x onerror=alert(2)>', '<b>x</b>', '<script>alert(3)</script>', '<iframe src=x>', 'WIP <u>essai</u>', '<b>vieille</b>'].map((t) => tx.includes(t)).join(',') }; })()`);
+out.aide = await s.ev(`(() => { const b = [...${T}.querySelectorAll('.vf-git-sec-t')].find((x) => /^Worktrees/.test(x.textContent)); return { title: b.getAttribute('title'), desc: b.getAttribute('aria-description'), detache: [...${T}.querySelectorAll('.vf-git-wt-l .vf-git-mono')].filter((m) => m.textContent === 'HEAD détaché').map((m) => m.getAttribute('title')) }; })()`); // PU-G-193 : le terme Git reste, sa définition au survol (title) et au focus (aria-description)
 out.alerte = await s.ev(`window.__alerte`);
 out.csp = s.violations.length;
 out.errs = await s.ev(`window.__errs`);
@@ -220,6 +221,7 @@ return out;
 JS
   R2="$(cdp "$AUX/d2.js" "$BASE")"
   assert_eq "D2.1 — ordre des sections et état initial : Worktrees et Graphe ouvertes, Tags, Stash, Auteurs fermées avec compteur" "$(jq_ "$R2" 'j.sections.join("|")' 2>/dev/null)" "Worktrees:true:3|Graphe:true:|Tags:false:2|Stash:false:2|Auteurs et activité:false:3"
+  assert_eq "D2.1 — PU-G-193 : « Worktrees » reste, avec sa définition constante au survol (title) et au focus (aria-description), identiques ; chaque « HEAD détaché » porte la sienne" "$(jq_ "$R2" '[/^Worktrees : copies de travail du dépôt/.test(j.aide.title), j.aide.title === j.aide.desc, /[<>]/.test(j.aide.title), j.aide.detache.length > 0 && j.aide.detache.every((t) => /^HEAD détaché : ce dossier/.test(t))].join("|")' 2>/dev/null)" "true|true|false|true"
   assert_eq "D2.1 — section sans donnée masquée (Tags, Stash), Graphe gardée même sans rangée" "$(jq_ "$R2" '[j.sansDonnee.join(","), j.grapheVide].join("|")' 2>/dev/null)" "Worktrees,Graphe,Auteurs et activité|true"
   assert_eq "D2.2 — 6 couloirs au plus (colonne de 96 px, nœud le plus à droite à 88) et « +17 » servi" "$(jq_ "$R2" '[j.graphe.largeurs.join(","), j.graphe.maxCx, j.graphe.plus].join("|")' 2>/dev/null)" "96|88|+17"
   assert_eq "D2.2 — nœud r=4, trait 1,75, quart de cercle de rayon 16 (arc A16 16), colonne aria-hidden" "$(jq_ "$R2" '[j.graphe.r, j.graphe.trait, j.graphe.arcs > 0, j.graphe.ariaHidden].join("|")' 2>/dev/null)" "4|1.75|true|true"

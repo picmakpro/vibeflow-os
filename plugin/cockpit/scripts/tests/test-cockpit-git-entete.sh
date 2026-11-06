@@ -349,6 +349,7 @@ JS
   printf '{"nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}\n' > "$WT/.planning/missions/MISSION-y.dag.json"
   for _ in $(seq 1 40); do R="$(cdp "$AUX/h6.js" "$BASE" /equipe.html 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "2 missions en cours" ] && break; sleep 0.5; done
   assert_eq "H6.2 — Équipe avec deux missions : « 2 missions en cours »" "$(jq_ "$R" 'j.h1' 2>/dev/null)" "2 missions en cours"
+  assert_eq "H6.2 — PU-G-166 : sous le titre des missions, les agents sont nommés et comptés à part (« Agents : … actif · … en attente · … terminé »), jamais « actifs » seul" "$(jq_ "$R" 'j.p' 2>/dev/null)" "Agents : 0 actif · 0 en attente · 0 terminé depuis moins de 24 h."
   cat > "$AUX/h64.js" <<'JS'
 const [base] = ARGS;
 await s.naviguer(base + '/project.html');
@@ -461,6 +462,30 @@ JS
   stop_srv; build_serve "$WTL"; R="$(cdp "$AUX/h7-coupure.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
   assert_eq "H7.13 — témoin : le titre du bloc de vue Code passe bien sur deux lignes à 768 px (au moins une coupure mesurée)" "$(jq_ "$R" 'j.lignes >= 2 && j.coupes.length >= 1 ? "oui" : "non : " + j.lignes + " ligne(s)"' 2>/dev/null)" "oui"
   assert_eq "H7.13 — aucune coupure en plein mot dans le titre du bloc de vue (coupures hors « / », « - », espace)" "$(jq_ "$R" 'j.enPleinMot.join(",")' 2>/dev/null)" ""
+  # PU-G-042 : à 390 px, « integration/cockpit-final » se coupe sur « / », jamais sur le trait d'union ; PU-G-193 : le titre porte une définition constante (title), jamais le nom de branche
+  DI="$WORK/depot-int"; mk_lab "$DI"; $GIT -C "$DI" init -q -b "integration/cockpit-final" && $GIT -C "$DI" add -A && $GIT -C "$DI" commit -q -m init
+  cat > "$AUX/h7-coupure390.js" <<'JS'
+const [base, largeur] = ARGS;
+await s.send('Emulation.setDeviceMetricsOverride', { width: Number(largeur), height: 900, deviceScaleFactor: 1, mobile: false });
+await s.naviguer(base + '/');
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#context h1') && /integration|svg/.test(document.querySelector('#context h1').textContent)`, 'bloc de vue Code');
+await s.ev(`new Promise((r) => setTimeout(r, 500))`);
+return await s.ev(`(() => { const h = document.querySelector('#context h1'), box = h.getBoundingClientRect(), w = document.createTreeWalker(h, NodeFilter.SHOW_TEXT), coupes = []; let prev = null, tout = '';
+  for (let n = w.nextNode(); n; n = w.nextNode()) for (let i = 0; i < n.data.length; i++) {
+    const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 1); const b = r.getBoundingClientRect(); tout += n.data[i];
+    if (!b.height || b.top >= box.bottom - 1) { prev = null; continue; }
+    if (prev !== null && b.top > prev.top + 2) coupes.push(tout[tout.length - 2]);
+    prev = { top: b.top }; }
+  return { texte: h.textContent, coupes, enfants: [...new Set([...h.children].map((e) => e.tagName))].sort().join(','), svg: h.querySelector('svg') !== null, title: h.getAttribute('title') }; })()`);
+JS
+  stop_srv; build_serve "$DI"; RI="$(cdp "$AUX/h7-coupure390.js" "http://127.0.0.1:$PORT" 390 2>&1 | tail -1)"; stop_srv
+  assert_eq "H7.14 — PU-G-042 : à 390 px le titre « Le code, branche integration/cockpit-final » passe sur deux lignes, coupé sur « / » et jamais sur « - »" "$(jq_ "$RI" '[j.texte, [...new Set(j.coupes)].join("")].join("|")' 2>/dev/null)" "Le code, branche integration/cockpit-final|/"
+  MCO="$(mkmod mcoupure)"
+  mutate "$MCO/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "display: inline-block;" "display: inline;" || echo "  ❌ FAIL — M-COUPURE : mutation impossible" >&2
+  build_serve "$DI" "$MCO"; RMC="$(cdp "$AUX/h7-coupure390.js" "http://127.0.0.1:$PORT" 390 2>&1 | tail -1)"; stop_srv
+  assert_eq "M-COUPURE — rougit H7.14 (sans bloc insécable, le titre se recoupe sur le trait d'union comme avant)" "$(jq_ "$RMC" '[...new Set(j.coupes)].join("") === "/" ? "vert" : "rouge"' 2>/dev/null)" "rouge"
+  stop_srv; build_serve "$HX"; RHX="$(cdp "$AUX/h7-coupure390.js" "http://127.0.0.1:$PORT" 1440 2>&1 | tail -1)"; stop_srv
+  assert_eq "H7.15 — branche hostile : le titre l'écrit en texte (aucun svg, seulement des WBR) et son title est la définition constante, sans le nom" "$(jq_ "$RHX" '[j.texte.includes("<svg/onload=alert(1)>"), j.svg, j.enfants, j.title.includes("svg"), j.title.startsWith("Branche : une ligne de travail")].join("|")' 2>/dev/null)" "true|false|WBR|false|true"
   # F9 : bloc de vue Projet, sous-titre qui résume la vue sans répéter le titre
   P97="$WORK/depot-f9"; mk_lab "$P97"; printf -- '---\nstatus: executing\nmilestone: vibeflow-test\ncurrent_phase: 2\n---\n# State\n' > "$P97/.planning/STATE.md"
   $GIT -C "$P97" init -q -b main && $GIT -C "$P97" add -A && $GIT -C "$P97" commit -q -m init

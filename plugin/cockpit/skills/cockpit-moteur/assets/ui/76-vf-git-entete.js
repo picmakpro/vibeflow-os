@@ -19,11 +19,13 @@
   // ---------- bloc de vue racine (P78-D-03) : dit ce que montre la vue, jamais le nom du projet — même sans git ----------
   const TAB = G.meta.vfTab === 'project' ? 'project' : G.meta.vfTab === 'equipe' ? 'equipe' : 'code';
   const pl = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+  const AIDE_BRANCHE = "Branche : une ligne de travail du dépôt. HEAD détaché : le dossier n'est sur aucune branche, il est posé sur un commit précis.";
+  const AIDE_MISSIONS = "Missions : les plans de bataille en cours dans .planning/missions. Les agents (sessions et sous-agents) sont comptés à part, dans la ligne du dessous et sur les cartes.";
   const texteVue = () => {
     const VF = G.meta.vf || {}, depot = V && (V.etat === 'ok' || V.etat === 'indisponible'); // un dépôt détecté ; sinon « dossier »
     if (TAB === 'code') {
       const b = V && V.etat === 'ok' ? (V.detache ? 'HEAD détaché' : V.branche ? `branche ${V.branche}` : '') : '';
-      return { k: 'Code', h1: b ? `Le code, ${b}` : 'Le code du projet',
+      return { k: 'Code', h1: b ? `Le code, ${b}` : 'Le code du projet', aide: b ? AIDE_BRANCHE : '', // PU-G-193 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06, Q3) : les termes Git restent, définis au survol
         p: `${pl((G.files || []).length, 'fichier')} et ${pl((G.routes || []).length, 'route')} lus dans le ${depot ? 'dépôt' : 'dossier'}.` };
     }
     if (TAB === 'project') { // P78-D-03 : le sous-titre résume la vue (phase en cours, phases faites sur le total du jalon), il ne redit jamais le titre
@@ -34,15 +36,24 @@
     }
     const M = Array.isArray(VF.missions) ? VF.missions : [], c = VF.compte || {};
     const repos = !M.length && !c.actif && !c.enAttente; // aucune mission et personne au travail
-    return { k: 'Équipe', h1: M.length === 1 ? `Mission : ${M[0]}` : M.length > 1 ? `${M.length} missions en cours` : 'Aucune mission en cours', p: repos ? "L'équipe est au repos." : G.project.summary || '' };
+    // PU-G-166 : le titre compte les MISSIONS (nœuds `mission` actifs du graphe Projet, un plan = une mission) ; « actifs » compte les AGENTS (sessions et sous-agents actifs de l'écoute des sessions) : la ligne le dit
+    const agents = typeof c.actif === 'number' ? `Agents : ${c.actif} ${c.actif > 1 ? 'actifs' : 'actif'} · ${c.enAttente || 0} en attente · ${c.termine || 0} ${c.termine > 1 ? 'terminés' : 'terminé'} depuis moins de 24 h.` : G.project.summary || '';
+    return { k: 'Équipe', h1: M.length === 1 ? `Mission : ${M[0]}` : M.length > 1 ? `${M.length} missions en cours` : 'Aucune mission en cours', aide: AIDE_MISSIONS, p: repos ? "L'équipe est au repos." : agents };
   };
   const ecrireVue = () => { // réécrit le bloc que renderContext vient de poser ; sous-vues et réponses (q:answer) inchangées
     const ctx = document.querySelector('#context'), k = ctx && ctx.querySelector('.k'), h1 = ctx && ctx.querySelector('h1');
     if (!k || !h1) return;
     const t = texteVue();
     k.textContent = t.k; h1.classList.add('vf-ctx-titre');
-    h1.replaceChildren(); // F13 : le titre ne se coupe qu'après « / » ou « - » : un <wbr> (élément DOM, jamais de HTML) suit chaque séparateur ; textContent reste le texte exact
-    t.h1.split(/(?<=[/-])/).forEach((morceau, i) => { if (i) h1.appendChild(document.createElement('wbr')); h1.appendChild(document.createTextNode(morceau)); });
+    if (t.aide) h1.setAttribute('title', t.aide); else h1.removeAttribute('title'); // aide en texte constant, jamais le nom de la branche
+    h1.replaceChildren(); // F13, PU-G-042 : le titre se coupe d'abord après « / » (un <wbr>, élément DOM, jamais de HTML) ; un morceau à traits d'union (.vf-ctx-seg, inline-block) reste d'un bloc tant qu'il tient, et ne se coupe après un trait d'union que s'il dépasse seul la ligne ; textContent reste le texte exact
+    t.h1.split(/(?<=[ /])/).forEach((m, i, a) => {
+      const [, mot, esp] = /^([^ ]*)( *)$/.exec(m) || [, m, ''];
+      if (i && a[i - 1].endsWith('/')) h1.appendChild(document.createElement('wbr'));
+      if (mot.includes('-')) { const sg = document.createElement('span'); sg.className = 'vf-ctx-seg'; // bloc insécable : le trait d'union ne coupe que si le morceau seul dépasse la ligne
+        mot.split(/(?<=-)/).forEach((x, j) => { if (j) sg.appendChild(document.createElement('wbr')); sg.appendChild(document.createTextNode(x)); }); h1.appendChild(sg); } else h1.appendChild(document.createTextNode(mot));
+      if (esp) h1.appendChild(document.createTextNode(esp));
+    });
     let d = ctx.querySelector('.cd');
     if (!d) { d = document.createElement('p'); d.className = 'cd'; d.id = 'ctx-desc'; h1.after(d); }
     d.textContent = t.p;
@@ -60,7 +71,7 @@
   const cadrage = () => { const b = SC.state && SC.state.bounds, T = SC.state && SC.state.t; if (!b || !T) return null; const a = SC.freeArea(), k = Math.min(a.w / (b.w + 40), a.h / (b.h + 20), 1.1); return { y: a.y, cadree: Math.abs(T.k - k) <= k * 0.005 && Math.abs(T.x - (a.x + (a.w - b.w * k) / 2 - b.x * k)) <= 1 && Math.abs(T.y - (a.y + Math.max(0, (a.h - b.h * k) / 2) - b.y * k)) <= 1 }; };
   const ecrireEtRecadrer = () => { const avant = cadrage(); ecrireVue(); const apres = avant && avant.cadree ? cadrage() : null; if (apres && apres.y !== avant.y) SC.fit(false); };
   const styleVue = document.createElement('style');
-  styleVue.textContent = '.vf-ctx-titre { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }';
+  styleVue.textContent = '.vf-ctx-titre { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }\n.vf-ctx-seg { display: inline-block; max-width: 100%; vertical-align: top; overflow-wrap: anywhere; }';
   document.head.appendChild(styleVue);
   // le premier rendu peut précéder ce fichier (l'analyseur rend la main entre deux scripts) : on réécrit aussi à l'arrivée du fichier, puis à « ready »
   SC.on('render', (e) => { if (e && e.container === 'root') ecrireEtRecadrer(); });
