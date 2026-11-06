@@ -66,6 +66,16 @@
        (celle de 1 440 px), jamais la colonne du haut qui recouvrait les cartes. Code et Projet gardent leur position (la barre de question occupe le bas) ; sous 701 px la pile verticale du téléphone (02-vf-telephone.js) reste seule. */
     @media (min-width: 701px) { body.vf-tab-equipe #zoom { left: var(--edge); right: auto; top: auto; bottom: var(--edge); flex-direction: row; border-radius: 999px; } }
     @media (max-width: 999px) { #ask-input { flex: 1 1 100%; } }
+    /* 72.1 (réglage du 2026-11-06, demande de Samuel) : la pastille « Terminal » et la barre de question se centrent sur le même axe horizontal, à la même marge du bord (--edge) ; le zoom (R17.2 en fixe la position et la taille) reste empilé 8 au-dessus de la pastille, au même bord gauche.
+       Souris (>= 1 000 px, hors tactile) : la barre passe de 54 à 40 = 4 + 32 + 4 (invite et envoi de 32) et la pastille, qui garde ses 32 (T20.8), se pose à 16 + 4 = 20 du bas : (40 - 32) / 2 = 4, axe commun exact (cy identiques).
+       Tactile ou < 1 000 px : les cibles font 44, donc 52 = 4 + 44 + 4 comme le zoom (barre : rembourrage de 4 autour de la ligne de 44 d'ask-mode ; pastille : 52). Le rembourrage gauche de la barre reste celui du viewer. Une barre sur deux lignes (< 1 000 px) garde sa face basse sur la ligne de base. */
+    @media (min-width: 1000px) and (not (pointer: coarse)) {
+      #ask-form { padding-top: var(--sp-4); padding-bottom: var(--sp-4); padding-right: var(--sp-4); }
+      #ask-input, #ask-send { height: 32px; } #ask-send { width: 32px; }
+    }
+    @media (max-width: 999px), (pointer: coarse) {
+      #ask-form { padding-top: var(--sp-4); padding-bottom: var(--sp-4); padding-right: var(--sp-4); }
+    }
     @media (max-width: 700px) { header #crumbs { display: none; } }
   `;
   document.head.appendChild(style);

@@ -53,7 +53,12 @@ body.vf-term-ouvert #ask { display: none; }
 @media (max-width: 999px), (pointer: coarse) { .vf-term-tiroir { left: var(--sp-8); right: var(--sp-8); bottom: var(--sp-8); } }
 /* feuille de détail ouverte (<= 700 px) : la pastille se pose au-dessus d'elle, 8 d'écart. dérivé : min(56vh, 480px) est la hauteur max du #panel de viewer.html (règle #panel du @media (max-width: 700px), l.548) : à tenir ensemble. !important : eviter() pose un bottom en ligne. */
 @media (max-width: 700px) { body:not(.no-panel) .vf-term-pastille, body:not(.no-panel) .vf-term-puce { bottom: calc(var(--sp-8) + min(56vh, 480px) + var(--sp-8)) !important; } }
-@media (pointer: coarse) { .vf-term-barre { height: 52px; } .vf-term-bouton { width: 44px; height: 44px; } .vf-term-pastille { height: 44px; } }
+@media (pointer: coarse) { .vf-term-barre { height: 52px; } .vf-term-bouton { width: 44px; height: 44px; } }
+/* 72.1 : souris (>= 1 000 px, hors tactile) : la pastille garde ses 32 (T20.8) et se centre sur l'axe de la barre de question (40, ui/01-vf-responsive.js) : 16 + (40 - 32) / 2 = 16 + 4 au-dessus du bas. */
+@media (min-width: 1000px) and (not (pointer: coarse)) { .vf-term-pastille { bottom: calc(var(--edge) + var(--sp-4)); } }
+/* 72.1 : cibles de 44 (tactile ou < 1 000 px, comme le zoom du viewer) : la pastille égale le groupe de zoom (4 + 44 + 4) et la barre de question (52). Téléphone : zoom, pastille et barre au même bord gauche et à la même marge (8, comme le tiroir et la barre). */
+@media (max-width: 999px), (pointer: coarse) { .vf-term-pastille { height: 52px; } }
+@media (max-width: 700px) { .vf-term-pastille, .vf-term-puce { left: var(--sp-8); bottom: var(--sp-8); } }
 @media (prefers-reduced-motion: reduce) { .vf-term-tiroir.vf-term-entree { animation: none; } .vf-term-grip, .vf-term-pastille, .vf-term-bouton { transition: none; } }
 html.theme-switching .vf-term-tiroir, html.theme-switching .vf-term-tiroir * { animation: none !important; transition: none !important; }
 `;
