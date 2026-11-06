@@ -113,3 +113,7 @@ Mutants (un `--` retiré à la fois, chaque sonde donne `sans-tirets\|graphe\|d�
 ### A8 (message du détail) — X7.11
 
 Message `co<U+200B>rps<U+202E> fin<U+FEFF><U+2060> café` : le détail le sert sans aucun caractère `Cf` (`"sujet\n\ncorps fin café"`) ; avant la classe de `ILLISIBLE` ne retirait que le bidi. Mutant M-ILLISIBLE (classe revenue au bidi) : `Cf` retenus dans le message.
+
+### Non-régression (lot final, tête après correction ; rc 0 partout sauf mention)
+
+`git-env` 124/0 · `git-details` 125/0 · `git-signature` 43/0 · `git` 82/0 (rejeu après l'adaptation de S2.6d et de M-EOO-LOG : le premier passage du lot, antérieur à cette adaptation, rendait 79/3 sur S2.6d et M-EOO-LOG) · `git-commandes` 35/0 · `git-graphe` 50/0 · `serveur` 70/0 · `vendor` 118/0 · `who` 107/0 · `securite` 91/0 · `assemblage` 40/0 · `avancement` 62/0 · `forme-claude` 56/0 · `git-entete` 98/0 · `path-enfants` 37/0 · `retard` 40/0 · `signal` 76/0 · `transcript` 99/0 · `vie` 64/0 · `direct` 75/0 · `git-tiroir` 117/0 · `git-e2e` 34/0 · `chaine-xss` 34/0 · `projet` 162/0 · `equipe` rc 0. `terminal-lanceur` : 110/1 au passage du lot (`servopen`, mutant « nom nu » de `serve.mjs`, fichier non touché), 111/0 au rejeu ISOLÉ : concurrence de la machine, pas la correction. Liste des suites dérivée par grep des suites qui importent (ou lancent un serveur qui charge) `paths`, `git`, `git-details`, `git-signature`, `live`, `git-commandes`, `arbres` ou `interface.json`.
