@@ -1432,6 +1432,15 @@
  }
  document.title = `${G.project.name} map`;
  $('#btn-up').onclick = up;
+@@ -2262,7 +2417,7 @@ const setPanel = (on) => {
+     else if (!on && sheetReturn) { if (panel.contains(document.activeElement) || document.activeElement === document.body) sheetReturn.focus?.({ preventScroll: true }); sheetReturn = null; }
+   }
+ };
+-document.body.classList.toggle('no-panel', isPhone() || !store.get('panel', true));
++document.body.classList.toggle('no-panel', isPhone() || !store.get('panel', innerWidth >= 1000));
+ $('#btn-panel').setAttribute('aria-expanded', String(!document.body.classList.contains('no-panel')));
+ // the top bar can be one or two rows tall: everything under it follows its real height
+ const headerEl = document.querySelector('header');
 @@ -2281,7 +2436,9 @@ window.addEventListener('keydown', (ev) => {
    else if (ev.key === 'Escape') {
      if (!ctxEl.hidden || fm.classList.contains('open') || legendEl.classList.contains('open')) { closeMenu(); fm.classList.remove('open'); legendEl.classList.remove('open'); }

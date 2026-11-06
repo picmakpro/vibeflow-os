@@ -123,6 +123,10 @@ await executer(chrome, async (s) => {
   }
   o.info = { texte: await s.ev("(document.querySelector('#tooltip') || { innerText: '' }).innerText"), pastille: await s.ev("!!document.querySelector('#tooltip .vst')") };
 
+  // ---------- panneau de détail par défaut : fermé à 768 px, ouvert à 1 024 px (PU-G-045) ----------
+  const ouvertA = async (w, h) => { await vue(w, h); await charger('index.html'); return s.ev("!document.body.classList.contains('no-panel') && document.querySelector('#btn-panel').getAttribute('aria-expanded') === 'true'"); };
+  o.panneau = { a768: await ouvertA(768, 1024), a1024: await ouvertA(1024, 768) };
+
   // ---------- onglet Équipe à 390 px : une seule colonne (PU-G-176) ----------
   await vue(390, 844, true); await charger('equipe.html');
   await aller('n:ag-' + equipeSession);
