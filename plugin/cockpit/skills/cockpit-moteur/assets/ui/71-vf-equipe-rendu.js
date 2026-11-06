@@ -157,7 +157,7 @@
   // CSS du tiroir « Au travail » (posé par 70-vf-live.js au premier dessin : ce fichier ne touche jamais au DOM au chargement)
   const CSS = `
     /* PU-G-188 : le titre reste en haut au défilement (collant, fond --surface du tiroir, aucune teinte) ; il reprend la marge du tiroir pour garder sa place au repos. Le bouton de fermeture du tiroir est celui de l'en-tête de la page (#btn-panel), hors du défilement */
-    .vf-whop .aw-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-12); margin: calc(-1 * var(--inset-panel)) calc(-1 * var(--inset-panel)) 0; padding: var(--inset-panel) var(--inset-panel) var(--sp-4); background: var(--surface); }
+    .vf-whop .aw-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-12); margin: calc(-1 * var(--inset-panel)) calc(-1 * var(--inset-panel)) 0; padding: var(--inset-panel) var(--inset-panel) var(--sp-8); background: var(--surface); }
     .aw-surv { display: flex; align-items: flex-start; gap: var(--sp-8); margin: var(--sp-8) 0 0; font-size: 12px; line-height: 16px; color: var(--text-2); } .aw-surv b { font-weight: 500; color: var(--text); }
     .aw-count { font-size: 12px; color: var(--text-3); } .aw-count b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
     .aw-driver { display: flex; align-items: center; gap: var(--sp-8); margin: var(--sp-8) 0 var(--sp-12); font-size: 12px; color: var(--text-3); }
@@ -208,7 +208,7 @@
     .aw-sec2 { display: flex; justify-content: space-between; margin: var(--sp-16) 0 var(--sp-4); font-size: 12px; color: var(--text-3); font-weight: 500; }
     .r-verr { display: grid; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--text-3); }
     .r-verr .aw-g { display: inline-block; vertical-align: -3px; margin-right: var(--sp-6); } .aw-aide { margin: 0 0 var(--sp-4); font-size: 12px; color: var(--text-3); }
-    .r-verr li { display: flex; justify-content: space-between; gap: var(--sp-12); padding: var(--sp-4) 0; } .r-verr b { color: var(--text-2); font-weight: 500; } .r-verr .n { font: 500 11.5px var(--mono, monospace); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .r-verr li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-4) var(--sp-12); padding: var(--sp-4) 0; } .r-verr li .n { margin-left: auto; } .r-verr b { color: var(--text-2); font-weight: 500; } .r-verr .n { font: 500 11.5px var(--mono, monospace); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .aw-foot { margin: var(--sp-12) 0 0; color: var(--text-3); font-size: 12px; line-height: 20px; }
   `;
 
