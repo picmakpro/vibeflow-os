@@ -75,3 +75,25 @@ Tête : `cbc3adc7`. Suite jouée : 72 PASS / 10 FAIL. Rouges (attendu -> obtenu)
 Verts d'avance (aucun code de tâche 3 nécessaire, acquis de la tâche 2) : S3.3b (aucun `shortlog`), S3.4 (route entête, tâche 1), S3.5b/c, S3.6 (repli `rev-list` quand git refuse `%(ahead-behind)` : l'emballage `bin2/git` refuse bien le champ, assertion `refus=129`), S4.1 à S4.4 (états absent, indisponible, vide), S5 (piégé : témoins positifs `log -p` et `status` posent leurs marqueurs, `lireGit` aucun), S6.1.
 Corrections de la SUITE entre deux jeux : (a) S4.2 : `chmod 000 .git/objects` rendait `absent`, pas `indisponible` (git ne reconnaît plus le dépôt : `rev-parse` échoue dans `enteteGit`) ; remplacé par le retrait de l'objet de la pointe (le dépôt reste reconnu, `for-each-ref` échoue), l'objet est remis après la lecture ; (b) S2.4e et M-HEAD : une ref `origin/HEAD` non filtrée apparaît dans les mergées (même commit qu'origin/main), pas dans les étiquettes ; l'assertion compte étiquettes ET mergées, et ne confond pas avec l'étiquette `HEAD` du commit courant.
 S6.1 (durées, à citer au SUMMARY) : fixture 13 rangées, 164 ms ; ce dépôt (904 rangées), 274 ms.
+
+## Correction revue serveur (2026-11-06, mandat mgr78-reprise) — graphe
+
+### R1 / P78-D-42 — dépôt sans branche de base (S1)
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-git.sh` (section S8, dépôts `r-master` : `master` seul ; `r-develop` : `develop` + `feat` sans distant, un worktree, un tag). Rouge AVANT le code (`vf-cockpit-git.mjs` : `'--not', refBase` avec `refBase === null`) : 83 PASS / 7 FAIL.
+
+| Assertion | Attendu | Obtenu avant |
+|---|---|---|
+| S8.1a master seul : état, rangées, base | `ok\|3\|null` | `indisponible\|0\|undefined` |
+| S8.1b tag, comptes d'avance | `v-m\|master:null\|null` | `\|\|undefined` |
+| S8.1c worktree courant | `1\|master` | `0\|` |
+| S8.2a develop + feat : état, rangées, worktrees | `ok\|3\|2` | `indisponible\|0\|0` |
+| S8.2b tag, avances nulles | `v-d\|develop:null,feat:null` | `\|` |
+| S8.2c feat reste étiquetée | `develop,feat` | (vide) |
+| S8.3 argv : jetons null/undefined, `--not` | `0\|0\|vu` | `2\|2\|vu` (le `log` reçoit `--not null`, git : `fatal: bad revision 'null'`) |
+
+Témoin positif S8.4 vert avant et après (le lab avec base émet bien `--not`). Vert APRÈS : 90 PASS / 0 FAIL (puis 92 avec le mutant).
+
+Mutant M-NOBASE (`...(refBase ? ['--not', refBase] : [])` → `'--not', refBase`) : M-NOBASE.0 `effet` ; M-NOBASE : `indisponible|indisponible|ok` — S8.1a et S8.2a rougissent pour leur raison, le lab avec base reste lu. Le mutant M-EOO-LOG existant a été réaligné sur la nouvelle forme (même rouge : S2.2).
+
+Dérive par lecture des autres argv des modules Git (aucune autre construction à risque) : `vf-cockpit-git-details.mjs` `compteLR` n'est appelé que sous `oid && refBase` / `oid && refOrigine` ; `brancheBase` : `for-each-ref` ne reçoit les refs de base que sous `nomBase ?` ; `gaucheDroite(refBase, …)` sous `repli && refBase`, `refOrigine && b` ; `racineLog` gardé (`etat: 'vide'` sinon) ; `vf-cockpit-arbres.mjs` `retard` : `base ? compte(base) : null`. Aucune valeur nullable ne parvient à un argv hors le `log` corrigé.

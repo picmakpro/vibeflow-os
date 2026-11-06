@@ -52,7 +52,7 @@ import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 const [, , scripts, lab] = process.argv;
 let m; try { m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href); } catch (e) { console.log(JSON.stringify({ erreur: 'module absent' })); process.exit(0); }
-console.log(JSON.stringify(m.lireGit(lab)));
+console.log(JSON.stringify(await m.lireGit(lab))); // P78-D-41 : lireGit est asynchrone
 JS
 LIRE() { node "$AUX/lire.mjs" "$SCRIPTS" "$1" 2>/dev/null; }
 # empreinte.mjs <dossier> : une ligne par fichier (chemin, taille, date), triée — lue en Node, jamais par stat ou find (uutils et GNU divergent en CI)
@@ -72,8 +72,10 @@ import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 const [, , scripts, methode, p, lab] = process.argv;
 let m; try { m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href); } catch { console.log('module absent'); process.exit(0); }
-let statut = null; const res = { writeHead: (c) => { statut = c; }, end: () => {} };
-const traite = m.routeGit({ method: methode }, res, new URL('http://x' + p), { root: lab, json: (r, c) => { statut = c; } });
+let statut = null, fini; const attente = new Promise((r) => { fini = r; });
+const res = { writeHead: (c) => { statut = c; fini(); }, end: () => {} };
+const traite = m.routeGit({ method: methode }, res, new URL('http://x' + p), { root: lab, json: (r, c) => { statut = c; fini(); } });
+if (traite) await Promise.race([attente, new Promise((r) => setTimeout(r, 8000))]); // P78-D-41 : GET /api/vf/git répond après la promesse
 console.log(traite + '|' + statut);
 JS
 # argv.mjs <git.log> : sur les lignes `log` de l'emballage, rend « lignes|sans -n|refs hors forme » (refs : refs/… ou sha de 40 caractères)
@@ -142,7 +144,7 @@ import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 const [, , scripts, lab] = process.argv;
 const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href);
-const t0 = performance.now(); const j = m.lireGit(lab);
+const t0 = performance.now(); const j = await m.lireGit(lab);
 console.log(`${j.etat}|${(j.rangees || []).length}|${Math.round(performance.now() - t0)}`);
 JS
 
@@ -373,7 +375,7 @@ assert_eq "M-BORNE — sans -n, 600 rangées au lieu de 500 : S2.1a rougit pour 
 assert_eq "M-COURT.0 — mutant avec effet (noms courts passés à log)" "$(mutant court 'const refLog = (r) => r.ref;' 'const refLog = (r) => r.ref.replace(/^refs\/(heads|remotes)\//, "");')" "effet"
 LIREM court "$WORK/r-host" > "$WORK/m-court-host.json"; LIREM court "$LAB" > "$WORK/m-court-lab.json"
 assert_eq "M-COURT — noms courts : le dépôt aux refs hostiles n'est plus lu (S2.5a rougit), alors que le lab sans nom hostile reste lu (le mutant ne casse que la raison visée)" "$(J "$WORK/m-court-host.json" 'j.etat')|$(J "$WORK/m-court-lab.json" 'j.etat')" "indisponible|ok"
-assert_eq "M-EOO-LOG.0 — mutant avec effet (--not placé avant les refs)" "$(mutant eoo "...nonMergees.map(refLog), '--not', refBase, '--')" "'--not', refBase, ...nonMergees.map(refLog), '--')")" "effet"
+assert_eq "M-EOO-LOG.0 — mutant avec effet (--not placé avant les refs)" "$(mutant eoo "...nonMergees.map(refLog), ...(refBase ? ['--not', refBase] : []), '--')" "...(refBase ? ['--not', refBase] : []), ...nonMergees.map(refLog), '--')")" "effet"
 LIREM eoo "$WORK/r-trente" > "$WORK/m-eoo.json"
 assert_eq "M-EOO-LOG — --not avant les refs : aucune des 30 pointes n'a de rangée (S2.2 rougit pour sa raison, état ok)" "$(J "$WORK/m-eoo.json" 'j.etat+"|"+j.rangees.flatMap(r=>r.refs).filter(e=>/^b\d+$/.test(e.nom)).length')" "ok|0"
 assert_eq "M-NETTOIE.0 — mutant avec effet (la porte « le nom serait masqué » est retirée)" "$(mutant nettoie 'noms.every((n) => masque(n) === n)' 'true')" "effet"
@@ -384,6 +386,29 @@ assert_eq "M-HEAD.0 — témoin : la ref symbolique refs/remotes/origin/HEAD exi
 assert_eq "M-HEAD.1 — mutant avec effet (le filtre des refs symboliques est retiré)" "$(mutant head 'refs.filter((r) => !/^refs\/remotes\/[^/]+\/HEAD$/.test(r.ref))' 'refs.filter(() => true)')" "effet"
 LIREM head "$LAB" > "$WORK/m-head.json"
 assert_eq "M-HEAD — sans le filtre, « origin/HEAD » réapparaît (dans les mergées : même commit qu'origin/main) : S2.4e et S2.4a rougissent pour leur raison" "$(J "$WORK/m-head.json" 'j.etat+"|"+j.rangees.flatMap(r=>r.refs).map(e=>e.nom).concat(j.mergees.map(m=>m.nom)).filter(n=>n==="origin/HEAD").length')" "ok|1"
+
+echo "=== S8 — revue serveur 2026-11-06, R1 (P78-D-42) : dépôt sans branche de base, le graphe est rendu sans comptes d'avance ==="
+# dépôt `master` seul (ni main ni origin/HEAD) ; dépôt `develop` + `feat` sans distant, avec un worktree sur feat et un tag
+newrepo "$WORK/r-master"; R="$WORK/r-master"; "$GIT_REEL" -C "$R" symbolic-ref HEAD refs/heads/master
+m1=$(ct "$R" refs/heads/master 1700000000 m1); m2=$(ct "$R" refs/heads/master 1700000060 m2 "$m1"); ct "$R" refs/heads/master 1700000120 m3 "$m2" > /dev/null; "$GIT_REEL" -C "$R" tag v-m "$m2"
+newrepo "$WORK/r-develop"; R="$WORK/r-develop"; "$GIT_REEL" -C "$R" symbolic-ref HEAD refs/heads/develop
+d1=$(ct "$R" refs/heads/develop 1700000000 d1); d2=$(ct "$R" refs/heads/develop 1700000060 d2 "$d1"); ct "$R" refs/heads/feat 1700000120 f1 "$d2" > /dev/null; "$GIT_REEL" -C "$R" tag v-d "$d1"
+"$GIT_REEL" -C "$R" worktree add -q "$WORK/wt-feat" feat
+export VF_GITLOG="$WORK/git-base.log"; : > "$VF_GITLOG"
+PATH="$WORK/bin:$PATH" node "$AUX/lire.mjs" "$SCRIPTS" "$WORK/r-master" > "$WORK/master.json" 2>/dev/null
+PATH="$WORK/bin:$PATH" node "$AUX/lire.mjs" "$SCRIPTS" "$WORK/r-develop" > "$WORK/develop.json" 2>/dev/null; unset VF_GITLOG
+assert_eq "S8.1a — dépôt master seul : état ok (jamais indisponible), 3 rangées, pas de base nommée" "$(J "$WORK/master.json" 'j.etat+"|"+(j.rangees||[]).length+"|"+j.base?.nom')" "ok|3|null"
+assert_eq "S8.1b — dépôt master seul : le tag est rendu, aucun compte d'avance (parBranche.avance null, base.locale null)" "$(J "$WORK/master.json" '(j.tags||[]).map(t=>t.nom).join(",")+"|"+(j.parBranche||[]).map(b=>b.nom+":"+b.avance).join(",")+"|"+j.base?.locale')" "v-m|master:null|null"
+assert_eq "S8.1c — dépôt master seul : le worktree courant est listé" "$(J "$WORK/master.json" '(j.worktrees||[]).length+"|"+(j.worktrees||[]).filter(w=>w.ici).map(w=>w.branche).join(",")')" "1|master"
+assert_eq "S8.2a — dépôt develop + feat sans distant : état ok, 3 rangées, deux worktrees" "$(J "$WORK/develop.json" 'j.etat+"|"+(j.rangees||[]).length+"|"+(j.worktrees||[]).length')" "ok|3|2"
+assert_eq "S8.2b — dépôt develop + feat : tag rendu, comptes d'avance nuls partout (jamais un chiffre inventé)" "$(J "$WORK/develop.json" '(j.tags||[]).map(t=>t.nom).join(",")+"|"+(j.parBranche||[]).map(b=>b.nom+":"+b.avance).sort().join(",")')" "v-d|develop:null,feat:null"
+assert_eq "S8.2c — dépôt develop + feat : feat reste étiquetée sur le graphe (non repliée faute de base)" "$(J "$WORK/develop.json" '(j.rangees||[]).flatMap(r=>r.refs).map(e=>e.nom).filter(n=>n==="feat"||n==="develop").sort().join(",")')" "develop,feat"
+# aucune construction d'argv qui reçoive null ou undefined : aucun jeton « null » ni « undefined » dans un seul des argv git lancés, et l'emballage est vu à l'œuvre
+assert_eq "S8.3 — argv git des deux lectures : aucun jeton null/undefined, ni --not sans révision (emballage vu : au moins 10 appels)" "$(grep -cE '(^| )(null|undefined)( |$)' "$WORK/git-base.log")|$(grep -c -- '--not' "$WORK/git-base.log")|$([ "$(grep -c . "$WORK/git-base.log")" -ge 10 ] && echo vu || echo aveugle)" "0|0|vu"
+assert_eq "S8.4 — témoin positif : un dépôt AVEC base (lab principal) émet bien --not (le zéro de S8.3 vient de l'absence de base, pas d'un argv jamais sondé)" "$(export VF_GITLOG="$WORK/git-lab.log"; : > "$VF_GITLOG"; PATH="$WORK/bin:$PATH" node "$AUX/lire.mjs" "$SCRIPTS" "$LAB" > /dev/null 2>&1; grep -c -- '--not' "$VF_GITLOG" | tr -d ' ' | awk '{print ($1>0)?"oui":"non"}')" "oui"
+assert_eq "M-NOBASE.0 — mutant avec effet (le défaut revient : --not est émis même sans base)" "$(mutant nobase "...(refBase ? ['--not', refBase] : [])" "'--not', refBase")" "effet"
+LIREM nobase "$WORK/r-master" > "$WORK/m-nobase-m.json"; LIREM nobase "$WORK/r-develop" > "$WORK/m-nobase-d.json"; LIREM nobase "$LAB" > "$WORK/m-nobase-lab.json"
+assert_eq "M-NOBASE — le défaut revient : les deux dépôts sans base redeviennent indisponibles (S8.1a et S8.2a rougissent pour leur raison), le lab AVEC base reste lu (le mutant ne casse que la raison visée)" "$(J "$WORK/m-nobase-m.json" 'j.etat')|$(J "$WORK/m-nobase-d.json" 'j.etat')|$(J "$WORK/m-nobase-lab.json" 'j.etat')" "indisponible|indisponible|ok"
 
 stop_srv
 vf_hyg_assert

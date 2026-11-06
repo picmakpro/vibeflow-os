@@ -123,7 +123,7 @@ function assembler(lab) {
 
   const log1 = git('log', '--topo-order', '-z', `--format=${FORMAT_JOURNAL}`, '-n', String(BORNES.base), racineLog, ...tetes, '--'); // `--` : une révision n'est jamais prise pour un fichier de l'arbre (A6)
   const j1 = log1.ok ? lireJournal(log1.sortie) : { ok: false };
-  const log2 = nonMergees.length ? git('log', '--topo-order', '-z', `--format=${FORMAT_JOURNAL}`, '-n', String(BORNES.nonMergees), ...nonMergees.map(refLog), '--not', refBase, '--') : { ok: true, sortie: '' }; // LOG2
+  const log2 = nonMergees.length ? git('log', '--topo-order', '-z', `--format=${FORMAT_JOURNAL}`, '-n', String(BORNES.nonMergees), ...nonMergees.map(refLog), ...(refBase ? ['--not', refBase] : []), '--') : { ok: true, sortie: '' }; // LOG2 ; P78-D-42 : sans base (master, develop, trunk sans distant) `--not` n'est pas émis, jamais `--not null`
   const j2 = log2.ok ? lireJournal(log2.sortie) : { ok: false };
   if (!j1.ok || !j2.ok) return ko();
   const commits = ordonner([j1.commits, j2.commits]);
