@@ -10,7 +10,7 @@ Statut : exécuté. Trace du rouge : `72-14-RED-TRACE.md`.
 
 ## Relevés de la tâche 0
 - Clé `K` = `proposition`, table `MESSAGES` du client de Q (ligne 10), émission `emettre('proposition')` ligne 73.
-- Cas froid : le sondage de proposition est posé (ligne 91) AVANT `Promise.all([polices, visible()])` (ligne 278) : le message peut partir même cadre de taille nulle. Aucune remontée bloquante au manager.
+- Cas froid : le sondage de proposition est posé (ligne 91) AVANT `Promise.all([polices, visible()])` (ligne 278) : le message peut partir même cadre de taille nulle. Cas remonté au manager (voir `72-14-RED-TRACE.md`, § Contrôle d'entrée) : cadre de Q absent après un rechargement sans fragment `#t=`, donc proposition invisible. Il sera corrigé par un mandat ciblé du manager (décision du manager du 2026-11-06 : un POST accepté rend la proposition visible).
 
 ## Réalisé
 - `LISTE_MESSAGES` : neuf valeurs, `proposition` en neuvième ; `TEXTES.annonceProposition` ; fonction `proposer` (`ouvrir(false)` puis annonce) ; branche `e.data === 'proposition'` avant la branche des états.
