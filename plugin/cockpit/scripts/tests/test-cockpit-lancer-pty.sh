@@ -357,11 +357,38 @@ v = bytearray(); r = amorcer(v); m.DIFFEREE['humain'] = True; m.liberer_ligne(v,
 res.append('f:%s:%s:%s:%d' % (r, ','.join(sorties), ecr == [b'\x03'], len(v)))
 v = bytearray(); r = amorcer(v); v += b'x'; m.liberer_ligne(v, -1, 1, time.time() + 1)  # (g) une entrée attend encore d'être poussée au shell : la ligne ne se colle pas derrière
 res.append('g:%s:%s:%s:%d' % (r, ','.join(sorties), ecr == [b'\x03'], len(v)))
+v = bytearray(); r = amorcer(v); m.liberer_ligne(v, -1, 1, time.time() + 1)  # (h) après (f) : le drapeau a été remis à zéro, un lancement suivant n'est PAS refusé (sinon un sur deux le serait jusqu'au redémarrage)
+res.append('h:%s:%s:%s:%d' % (r, ','.join(sorties), ecr == [b'\x03', lig], len(v)))
 print(' '.join(res))
 PY
-L11_ATT="a:ok:LANCE ecriture,LANCE premier-plan:True:0 b:ok:LANCE premier-plan:True:0 c:(1, 0):(1, 0):True:LANCE ok d:True:LANCE ok e:premier-plan:True:True:1 f:ok:LANCE premier-plan:True:0 g:ok:LANCE premier-plan:True:1"
+L11_ATT="a:ok:LANCE ecriture,LANCE premier-plan:True:0 b:ok:LANCE premier-plan:True:0 c:(1, 0):(1, 0):True:LANCE ok d:True:LANCE ok e:premier-plan:True:True:1 f:ok:LANCE premier-plan:True:0 g:ok:LANCE premier-plan:True:1 h:ok:LANCE ok:True:0"
 dif() { python3 -I "$AUX/differe.py" "$1" "$REF" 2>&1 | tail -1; }
-assert_eq "L11.1 — fonctions seules, horloge explicite : (a) échec d'écriture de la ligne DIFFÉRÉE -> « LANCE ecriture » puis la demande en file, jamais « ok » ; (b) premier plan perdu pendant l'attente -> « LANCE premier-plan » et seul Ctrl-C est écrit ; (c) ni sortie ni 0,3 s -> rien, sortie sans 30 ms de calme -> rien, calme -> la ligne dans une écriture distincte de Ctrl-C ; (d) sans sortie, 0,31 s suffit ; (e) entrée déjà en attente -> refus sans rien mettre en file" "$(dif "$ASSIST")" "$L11_ATT"
+assert_eq "L11.1 — fonctions seules, horloge explicite : (a) échec d'écriture de la ligne DIFFÉRÉE -> « LANCE ecriture » puis la demande en file, jamais « ok » ; (b) premier plan perdu pendant l'attente -> « LANCE premier-plan » et seul Ctrl-C est écrit ; (c) ni sortie ni 0,3 s -> rien, sortie sans 30 ms de calme -> rien, calme -> la ligne dans une écriture distincte de Ctrl-C ; (d) sans sortie, 0,31 s suffit ; (e) entrée déjà en attente -> refus sans rien mettre en file ; (h) après une annulation par frappe (f), le drapeau est remis à zéro : le lancement suivant part (LANCE ok, la ligne écrite)" "$(dif "$ASSIST")" "$L11_ATT"
+cat > "$AUX/reponses.py" <<'PY'
+# reponses.py <assistant> : entree_humaine() seule, liste fermée des réponses de terminal reconnues (xterm.js) ; tout le reste est une entrée humaine
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location('assist', sys.argv[1]); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+formes = [b'\x1b[12;40R', b'\x1b[?1;2c', b'\x1b[?62;4;22c', b'\x1b[>0;276;0c', b'\x1b[I', b'\x1b[O', b'\x1b]11;rgb:1e1e/1e1e/1e1e\x07', b'\x1b]10;rgb:ffff/ffff/ffff\x1b\\']
+seules = ''.join('H' if m.entree_humaine(f) else 'n' for f in formes)
+doubles = 'H' if m.entree_humaine(formes[0] + formes[4] + formes[6]) else 'n'
+suivies = ''.join('H' if m.entree_humaine(f + b'a') else 'n' for f in formes)
+precedees = ''.join('H' if m.entree_humaine(b'a' + f) else 'n' for f in formes)
+autres = ''.join('H' if m.entree_humaine(x) else 'n' for x in (b'\x1b', b'\x1b[2J', b'\x1b[12;R', b'\x1b]52;c;eA==\x07', b'\x1b[?c1', b'a', b'\r', b'\x03'))
+print(seules, doubles, suivies, precedees, autres)
+PY
+rep() { python3 -I "$AUX/reponses.py" "$1" 2>&1 | tail -1; }
+REP_ATT="nnnnnnnn n HHHHHHHH HHHHHHHH HHHHHHHH"
+assert_eq "L11.3 — fonction seule : les réponses de terminal que xterm.js renvoie par fd 0 (CPR, attributs primaire et secondaire, focus I/O, OSC 10-19 en BEL ou ST) ne posent pas le drapeau, seules ou enchaînées ; une forme suivie ou précédée d'un « a » le pose ; ESC seul, ESC [ 2 J, un CPR incomplet, un OSC 52, un octet ordinaire, Entrée et Ctrl-C le posent" "$(rep "$ASSIST")" "$REP_ATT"
+t_l15() { # t_l15 <octets envoyés 50 ms après le L, sur le shell brut horodateur> -> « LANCE… ligne|sans-ligne » (la boucle réelle, fd 0 réel)
+  pil "$WORK/bin/shell-horodate" 'f:@RUN@/horo.pid' 's:200' "F:$ref_l" 's:50' "w:$1" 'N:1' 's:300' 'w:Q' 's:200' 'e'
+  L15_RES="$(tr -d '\r' < "$P_O2" | head -1) $(node -e "
+const fs = require('fs'); const s = Buffer.concat(fs.readFileSync(process.argv[1] + '/horo.log', 'utf8').split('\n').filter(Boolean).map((l) => Buffer.from(l.split(' ')[1], 'hex')));
+console.log(s.indexOf(process.env.VFT_REF) < 0 ? 'sans-ligne' : 'ligne');
+" "$RUN" 2>&1)"
+}
+t_l15 '\x1b[12;40R'; L15_A="$L15_RES"; t_l15 '\x1b[I\x1b]11;rgb:1e1e/1e1e/1e1e\x07'; L15_B="$L15_RES"
+t_l15 '\x1b[12;40Ra'; L15_C="$L15_RES"; t_l15 '\x1b[2J'; L15_D="$L15_RES"
+assert_eq "L11.4 — boucle réelle, shell brut horodateur : une réponse de terminal seule (CPR), ou deux enchaînées (focus + OSC), arrivée pendant l'attente : « LANCE ok » et la ligne est écrite ; le même CPR suivi d'un « a », ou une séquence CSI arbitraire (ESC [ 2 J) : « LANCE premier-plan » et la ligne n'est jamais écrite" "$L15_A / $L15_B / $L15_C / $L15_D" "LANCE ok ligne / LANCE ok ligne / LANCE premier-plan sans-ligne / LANCE premier-plan sans-ligne"
 for SH in $SHELLS; do
   B="$(basename "$SH")"; t_l11 "$SH"
   assert_eq "L11.2 [$B] — un programme (lecteur brut) lancé 5 ms après le L prend le premier plan pendant l'attente : « LANCE premier-plan », 0 octet reçu par le programme (ni la ligne), lecteur vivant" "$L11_RES" "LANCE premier-plan| 0 oui"
@@ -455,6 +482,16 @@ SED
 cat > "$WORK/sed/humain.sed" <<'SED'
 s|DIFFEREE\['humain'\] = True|pass|
 SED
+cat > "$WORK/sed/jamaisrazero.sed" <<'SED'
+s|^\(    DIFFEREE.update(ligne=ligne, t0=time.time(), vu=0.0, suite=\[\], \)humain=False)|\1)|
+s|^    DIFFEREE\['humain'\] = False$|    pass|
+SED
+cat > "$WORK/sed/sansreco.sed" <<'SED'
+s|^    return REPONSE_TERMINAL.fullmatch(donnees) is None$|    return True|
+SED
+cat > "$WORK/sed/permissive.sed" <<'SED'
+s|^    return REPONSE_TERMINAL.fullmatch(donnees) is None$|    return not donnees.startswith(bytes([27]))|
+SED
 cat > "$WORK/sed/humainfile.sed" <<'SED'
 s|DIFFEREE\['humain'\] = True|pass|
 s|^    libre = not DIFFEREE\['humain'\] and not vers_shell and |    libre = |
@@ -485,6 +522,19 @@ if mut_pty humain "$WORK/sed/humain.sed"; then
   ASSIST="$MUT_ASSIST"; t_l14 1; ASSIST="$ASSIST0"
   rougit "M-SANS-DRAPEAU-HUMAIN — le mutant ne note plus l'entrée humaine pendant l'attente (la clause « entrée en file » et le retest du premier plan restent) : sur un shell qui n'écho rien, la ligne part derrière la frappe déjà poussée (L14.1 rouge ; avec bash ou zsh la clause « entrée en file » et l'écho qui prolonge l'attente suffisent presque toujours, d'où ce shell)" "$L14_BAD ${L14_FIRST:-aucun}" "0 aucun"
 else sans_effet M-SANS-DRAPEAU-HUMAIN; fi
+if mut_pty jamaisrazero "$WORK/sed/jamaisrazero.sed"; then
+  rougit "M-HUMAIN-JAMAIS-REMIS — le mutant ne remet jamais le drapeau d'entrée humaine à zéro (ni à l'armement ni au relâchement) : le lancement qui suit une annulation par frappe est refusé (L11.1(h) rouge)" "$(dif "$MUT_ASSIST")" "$L11_ATT"
+else sans_effet M-HUMAIN-JAMAIS-REMIS; fi
+if mut_pty sansreco "$WORK/sed/sansreco.sed"; then
+  rougit "M-SANS-RECONNAISSANCE — le mutant tient toute entrée de fd 0 pour humaine, réponses de terminal comprises (L11.3 rouge : une forme seule pose le drapeau)" "$(rep "$MUT_ASSIST")" "$REP_ATT"
+  ASSIST="$MUT_ASSIST"; t_l15 '\x1b[12;40R'; ASSIST="$ASSIST0"
+  rougit "M-SANS-RECONNAISSANCE — même mutant, boucle réelle : un CPR pendant l'attente annule le lancement (L11.4 rouge)" "$L15_RES" "LANCE ok ligne"
+else sans_effet M-SANS-RECONNAISSANCE; fi
+if mut_pty permissive "$WORK/sed/permissive.sed"; then
+  rougit "M-RECONNAISSANCE-PERMISSIVE — le mutant accepte tout morceau commençant par ESC : les cas mixtes (forme + « a ») et ESC [ 2 J ne sont plus annulés (L11.3 rouge)" "$(rep "$MUT_ASSIST")" "$REP_ATT"
+  ASSIST="$MUT_ASSIST"; t_l15 '\x1b[2J'; ASSIST="$ASSIST0"
+  rougit "M-RECONNAISSANCE-PERMISSIVE — même mutant, boucle réelle : ESC [ 2 J tapé pendant l'attente laisse partir la ligne (L11.4 rouge)" "$L15_RES" "LANCE premier-plan sans-ligne"
+else sans_effet M-RECONNAISSANCE-PERMISSIVE; fi
 if mut_pty humainfile "$WORK/sed/humainfile.sed"; then
   ASSIST="$MUT_ASSIST"; t_l13 "$MSH" 1; X13="$L13_BAD ${L13_FIRST:-aucun}"; t_l14 1; ASSIST="$ASSIST0"
   rougit "M-SANS-DRAPEAU-NI-FILE — même mutant, shell horodateur (L14.1 rouge)" "$L14_BAD ${L14_FIRST:-aucun}" "0 aucun"

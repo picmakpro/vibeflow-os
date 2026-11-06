@@ -147,6 +147,15 @@ def premier_plan_libre(maitre, pid):
         return False
 
 
+# Réponses que xterm.js renvoie seul par fd 0 (liste fermée) : position du curseur, attributs primaire/secondaire, focus, couleurs OSC 10-19. Dans le doute : pas reconnu, donc entrée humaine.
+REPONSE_TERMINAL = re.compile(rb'(?:\x1b\[\d+;\d+R|\x1b\[\?[\d;]*c|\x1b\[>[\d;]*c|\x1b\[[IO]|\x1b\]1\d;rgb:[0-9a-fA-F/]+(?:\x07|\x1b\\))+')
+
+
+def entree_humaine(donnees):
+    """Faux seulement si le morceau lu sur fd 0 est ENTIÈREMENT composé de réponses de terminal reconnues (ses octets vont quand même au shell)."""
+    return REPONSE_TERMINAL.fullmatch(donnees) is None
+
+
 def lancer_ligne(hexa, maitre, pid, vers_shell):
     """Écrit Ctrl-C SEUL au shell s'il est au repos et met la ligne en attente (DIFFEREE) : elle part dans liberer_ligne(), qui retient aussi la réponse « ok ». Rend « ok » (Ctrl-C écrit,
     ligne différée : la réponse à la demande est alors celle de liberer_ligne), « premier-plan », « alphabet », « invalide » ou « ecriture » (l'écriture de Ctrl-C au PTY a échoué)."""
@@ -173,7 +182,7 @@ def lancer_ligne(hexa, maitre, pid, vers_shell):
 
 def liberer_ligne(vers_shell, maitre, pid, maintenant):
     """Quand le shell a réagi à Ctrl-C (sortie vue, puis calme) ou après ATTENTE_MAX_CTRLC sans réaction : retest du premier plan, puis écriture de la ligne différée.
-    Répond « ok » (ligne mise en file), « premier-plan » (RIEN n'est écrit : une entrée humaine est arrivée pendant l'attente, ou une entrée attend encore d'être poussée,
+    Répond « ok » (ligne mise en file), « premier-plan » (la ligne n'est pas écrite, Ctrl-C l'a déjà été : une entrée humaine, hors réponses de terminal reconnues, est arrivée pendant l'attente, ou une entrée attend encore d'être poussée,
     ou un programme a pris le terminal) ou « ecriture » (l'écriture a échoué), suivi des réponses de `suite` (les demandes arrivées pendant l'attente) dans l'ordre des demandes.
     Toute frappe pendant l'attente (au plus ~0,5 s) annule le lancement : l'entrée déjà poussée au shell mais pas encore consommée n'est pas visible par tcgetpgrp, seul ce drapeau la ferme."""
     ligne = DIFFEREE['ligne']
@@ -532,7 +541,7 @@ def main():
                 if not donnees:
                     break
                 vers_shell += donnees
-                if DIFFEREE['ligne'] is not None:
+                if DIFFEREE['ligne'] is not None and entree_humaine(donnees):
                     DIFFEREE['humain'] = True
             if maitre in pret:
                 try:
