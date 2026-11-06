@@ -31,20 +31,23 @@ export const DEP_TETE = new RegExp(`^(${ESP}*${BULLE}(?:${DEP.gras}|${DEP.nu}))$
 const valeur = (m) => (m ? (m[1] ?? m[2] ?? '') : '');
 export const lireGoal = (corps) => valeur(BUT_RE.exec(corps)).trim();
 // la valeur s'arrête au champ suivant posé sur la même ligne (« · » ou « **Autre**: … »), jamais sur un simple gras
-const COUPE = new RegExp(`(?<!\\s)(?:\\s+·\\s+|\\s+(?=\\*\\*[^*]+(?:${COLON}\\*\\*|\\*\\*${COLON})))`); // (?<!\s) : une coupe ne démarre qu'au début d'une suite d'espaces (sinon coût quadratique)
+const COUPE = new RegExp(`(?<!\\s)(?:\\s+·\\s+|\\s+(?=\\*\\*[^*]+(?::\\*\\*|\\*\\*${COLON})))`); // `[^*]+` absorbe déjà les espaces avant « : » ; (?<!\s) : une coupe ne démarre qu'au début d'une suite d'espaces (sinon coût quadratique)
 // la valeur ne dit que ce dont CETTE phase dépend : on retire les parenthèses, les identifiants de décision (« P69-D-10 ») et tout ce qui suit la première phrase
 // (« … (la lib). La Phase 68 en dépend … » nomme une dépendante, pas une dépendance). Les numéros décimaux (« 41.3 ») ne coupent pas la phrase.
 // Valeur vide sur la ligne : les puces qui la suivent la portent (« **Depends on:** » puis « - Phase 1 »).
+// « ( … ) » retiré : de la première « ( » à la première « ) » qui la suit, sans chevauchement (même sémantique que /\([^)]*\)/g) ; un seul indexOf par « ( »
+// puis arrêt dès qu'aucune « ) » ne suit : jamais de rebalayage de la fin du texte pour chaque « ( » non fermée.
+const PARENTHESES = { [Symbol.replace](s, rempl) { let out = '', i = 0; for (;;) { const o = s.indexOf('(', i); if (o < 0) break; const c = s.indexOf(')', o + 1); if (c < 0) break; out += s.slice(i, o) + rempl; i = c + 1; } return out + s.slice(i); } };
 export function lireDependances(corps, n) {
   const m = DEP_RE.exec(corps); if (!m) return [];
   let brut = valeur(m);
   if (!brut.trim()) {
     const suite = corps.slice(m.index + m[0].length).split('\n').slice(1); const puces = [];
-    while (suite.length && !suite[0].trim()) suite.shift(); // une ligne vide entre l'en-tête et ses puces ne change rien
-    for (const l of suite) { const b = new RegExp(`^${ESP}*[-*+]${ESP}+(.*)$`).exec(l); if (!b) break; puces.push(b[1]); }
+    let k = 0; while (k < suite.length && !suite[k].trim()) k++; // une ligne vide entre l'en-tête et ses puces ne change rien (indice, pas de shift : coût linéaire)
+    for (const l of suite.slice(k)) { const b = new RegExp(`^${ESP}*[-*+]${ESP}+(.*)$`).exec(l); if (!b) break; puces.push(b[1]); }
     brut = puces.join(' ');
   }
-  const depVal = brut.split(COUPE)[0].replace(/\([^)]*\)/g, ' ').replace(/\b[A-Z][A-Z0-9]*-D-\d+\b/g, ' ').split(/\.\s+(?=[A-ZÀ-Ý])/)[0];
+  const depVal = brut.split(COUPE)[0].replace(PARENTHESES, ' ').replace(/\b[A-Z][A-Z0-9]*-D-\d+\b/g, ' ').split(/\.\s+(?=[A-ZÀ-Ý])/)[0];
   return /^\s*(nothing|none)/i.test(depVal) || /^\s*(rien|aucune?|—|-)\s*$/i.test(depVal) ? [] : [...depVal.matchAll(/\b(\d+(?:\.\d+)?)\b/g)].map((x) => normNum(x[1])).filter((x) => x !== n).filter((x, i, a) => a.indexOf(x) === i);
 }
 
@@ -52,7 +55,7 @@ export function lireDependances(corps, n) {
 // Section : « ## », « ### » ou « #### » + « Phase N: nom », « Phase N : nom » ou « Phase N — nom » (tiret cadratin, demi-cadratin, ou tiret entouré d'espaces), gras facultatif.
 const SEP = `(?:${COLON}|${ESP}*[—–]+|${ESP}+-+(?=${ESP}))`;
 export const TITRE_CASE = `^[-*+] \\[([ xX])\\]\\s+(?:\\*\\*)?Phase${ESP}+${NUM}${SEP}\\s*(.*)$`;
-export const TITRE_SECTION = `^#{2,4}${ESP}+(?:${GRAS}${ESP}*)?Phase${ESP}+${NUM}${SEP}${ESP}*(.*)\\n([\\s\\S]*?)(?=^#{2,4} |(?![\\s\\S]))`;
+export const TITRE_SECTION = `^#{2,4}${ESP}+(?:${GRAS}${ESP}*)?Phase${ESP}+${NUM}${SEP}${ESP}*(.*)(?:\\n|(?![\\s\\S]))([\\s\\S]*?)(?=^#{2,4} |(?![\\s\\S]))`; // la queue ne peut pas échouer (dernière ligne sans saut final : sinon retours arrière quadratiques)
 const TITRE_SECTION_LIGNE = new RegExp(`^#{2,4}${ESP}+(?:${GRAS}${ESP}*)?Phase${ESP}+${NUM}${SEP}`, 'i');
 const TITRE_CASE_LIGNE = new RegExp(TITRE_CASE, 'i');
 export const reTitreCase = () => new RegExp(TITRE_CASE, 'gmi');

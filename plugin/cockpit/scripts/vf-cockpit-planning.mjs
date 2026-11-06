@@ -61,7 +61,7 @@ function parseMilestones(txt, ws, phases, out) {
     const range = (/Phases? ([^—(]*)/.exec(text)?.[1] || '').replace(/Phases?|\*\*/g, '');
     const set = new Set();
     for (const part of range.split(/,|\+|\bet\b/)) {
-      const r = new RegExp(`${NUM}\\s*(?:-|→)\\s*${NUM}`).exec(part);
+      const r = new RegExp(`(?<![\\d.])${NUM}\\s*(?:-|→)\\s*${NUM}`).exec(part);
       if (r) { for (const ph of phases.values()) if (ph.ws === (ws || null) && num(ph.n) >= num(r[1]) && Math.floor(num(ph.n)) <= num(r[2])) set.add(ph.key); }
       else for (const x of part.matchAll(/\d+(?:\.\d+)?/g)) { const k = `${ws || ''}|${normNum(x[0])}`; if (phases.has(k)) set.add(k); }
     }
