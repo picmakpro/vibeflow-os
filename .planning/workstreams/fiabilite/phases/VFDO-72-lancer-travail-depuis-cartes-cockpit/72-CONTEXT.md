@@ -51,6 +51,7 @@ seule).
   (délai d'armement, Entrée au clavier) restent dues dans tous les cas. La mémorisation vit dans le stockage de
   l'origine Q seulement (comme le secret, P71-D-13) : jamais lisible ni écrivable par la page P, ni transmise par l'IPC,
   ni dans un cookie ; valeur relue contre la liste fermée (valeur inconnue = `default`). Point d'audit obligatoire.
+  *Précisé par P72-D-20 (support de la mémorisation : un fichier du lab tenu par le processus de Q, non plus le stockage du navigateur).*
 - **P72-D-03 (Q3, contexte du chat ; arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-05).**
   « Option « continuer le chat » ». Le bandeau offre, quand une conversation du chat existe, de la poursuivre dans la
   session lancée (`claude -r <id> --fork-session`). Livrée SEULEMENT après une sonde qui prouve qu'une session du chat
@@ -137,6 +138,14 @@ seule).
   suites `test-cockpit-lancer-*.sh`) ; les points de branchement dans des fichiers existants sont listés et minimaux
   (serveur P : route POST ; tiroir : ouvrir et afficher l'état ; processus/client/vue de Q : proposition et bandeau ;
   assistant PTY : premier plan et revalidation). Recensés dans `72-BRANCHEMENTS-MERGE.md`.
+- **P72-D-20 (support du mode retenu ; arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-06 ; précise
+  P72-D-02bis).** Mot pour mot : « Fichier du lab (Recommandé) ». Option présentée : le processus du terminal garde le dernier
+  mode dans un petit fichier du lab, non suivi par git ; il ne le sert qu'à l'origine du terminal, jamais à la page Projet ; il
+  revalide la valeur contre la liste fermée (`default` si elle est inconnue) ; le mode survit aux relances du cockpit. Coût
+  accepté : un petit plan de plus, avec témoins et audit (plan 72-16). Motif : Q écoute sur un port tiré au hasard
+  (`q.listen(0, …)`, `vf-cockpit-terminal-processus.mjs`), donc le stockage du navigateur de l'origine Q est perdu à chaque
+  démarrage du cockpit, et P72-D-02bis (« le dernier mode choisi ») n'était pas tenu d'une relance à l'autre. La règle de
+  P72-D-02bis « jamais lisible ni écrivable par la page P » reste entière.
 
 ### Contraintes héritées (Phases 67 et 71)
 
