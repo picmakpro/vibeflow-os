@@ -107,7 +107,7 @@ function scriptTiroir(cfg, accepte, construire) {
         document.body.style.setProperty('--vf-term-h', ouvert && !plein ? h + 'px' : '0px');
         document.body.style.setProperty('--vf-term-reserve', reserve + 'px');
         if (reserve !== reserveVue && !glisse) { reserveVue = reserve; ajuster(); }
-        d.poignee.setAttribute('aria-valuenow', String(h)); d.poignee.setAttribute('aria-valuemax', String(pleinMax()));
+        d.poignee.setAttribute('aria-valuenow', String(h)); d.poignee.setAttribute('aria-valuetext', h + ' px'); d.poignee.setAttribute('aria-valuemax', String(pleinMax())); // PU-G-142 : la valeur se lit avec son unité (« 324 px »)
       };
       const memoH = () => { perso = true; stock.ecrire('vf.terminal.h', h); };
       const pastilleEtat = () => {
