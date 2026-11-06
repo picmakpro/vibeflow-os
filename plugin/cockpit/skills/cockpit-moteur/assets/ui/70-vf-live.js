@@ -250,6 +250,7 @@
     });
     es.addEventListener('who', (e) => setWho(vu(JSON.parse(e.data)).who));
     es.addEventListener('lock', (e) => showLock(vu(JSON.parse(e.data)).lock));
+    es.addEventListener('git', (e) => { const d = vu(JSON.parse(e.data)); document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: d.sig } })); }); // 78-09 : signal sans contenu, l'en-tête et le tiroir relisent leurs routes
     es.addEventListener('patch', (e) => {
       const d = vu(JSON.parse(e.data));
       probe.patches++;

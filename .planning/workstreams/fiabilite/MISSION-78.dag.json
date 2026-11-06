@@ -1,0 +1,211 @@
+{
+  "nodes": [
+    {
+      "id": "research",
+      "step": "78 recherche technique",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "craft-git",
+      "step": "craft en-tête + tiroir Git (vf-crafter)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plan",
+      "step": "plan 78 + plan-checker",
+      "stage": "",
+      "deps": [
+        "research",
+        "craft-git"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-01",
+      "step": "78-01 env git unique + byActivity",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-02",
+      "step": "78-02 couloirs du graphe",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-03",
+      "step": "78-03 commandes à copier",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-04",
+      "step": "78-04 en-tête et bloc de vue",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-05",
+      "step": "78-05 module serveur git + routes GET",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02",
+        "exec-03",
+        "exec-04"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-06",
+      "step": "78-06 tiroir Git (UI)",
+      "stage": "",
+      "deps": [
+        "exec-04"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-07",
+      "step": "78-07 durcissement moteur",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-04",
+        "exec-06"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-08",
+      "step": "78-08 détail commit, stash, auteurs",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02",
+        "exec-03",
+        "exec-05"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-09",
+      "step": "78-09 signature de rafraîchissement",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-04"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-10",
+      "step": "78-10 tiroir : détail et commandes",
+      "stage": "",
+      "deps": [
+        "exec-06"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-11",
+      "step": "78-11 e2e, XSS, bump",
+      "stage": "",
+      "deps": [
+        "exec-01",
+        "exec-02",
+        "exec-03",
+        "exec-04",
+        "exec-05",
+        "exec-06",
+        "exec-07",
+        "exec-08",
+        "exec-09",
+        "exec-10"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue",
+      "step": "revue de code de la phase",
+      "stage": "",
+      "deps": [
+        "exec-11"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit",
+      "step": "audit sécurité lecture",
+      "stage": "",
+      "deps": [
+        "exec-11"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique-git",
+      "step": "critique design en-tête + tiroir",
+      "stage": "",
+      "deps": [
+        "exec-11"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recette",
+      "step": "recette par juges CDP + captures",
+      "stage": "",
+      "deps": [
+        "revue",
+        "audit",
+        "critique-git"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire",
+      "stage": "",
+      "deps": [
+        "recette"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

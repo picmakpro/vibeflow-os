@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // vf-cockpit-arbres — arbres git du lab, branche de base, retard sans réseau, phase active (socle du cockpit, VFSG-05 ; P68-D-04). Lecture seule.
 // Exports : GIT_SUR (préfixe d'arguments de chaque appel git), arbresGit(root, { sh }) -> [{ chemin, branche, principal }],
-//           brancheBase(root, { sh }) -> nom | null, retard({ chemin, base, commonDir, now, sh, lab }) -> { base, main, origin, fetchAgeS },
+//           brancheBase(root, { sh }) -> nom | null, brancheBaseAsync(root, { fin }) -> Promise<nom | null>, retard({ chemin, base, commonDir, now, sh, lab }) -> { base, main, origin, fetchAgeS },
 //           phaseActive({ phases, branche }) -> { key, n, nom, etat } | null, nettoie(s, n) -> chaîne sans caractère de contrôle, masquée, bornée
 // Aucune sous-commande réseau (ni fetch, pull, ls-remote, remote) ; git sans fsmonitor ; sous-commandes qui ne lisent ni l'index ni l'arbre de travail ;
 // chaînes d'arbre et de branche nettoyées avant d'être affichées. Un retard inconnu est `null`, jamais 0.
@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { masque } from './vf-cockpit-lecture.mjs';
 import { normNum } from './vf-cockpit-planning.mjs';
-import { GIT_SUR, shBorne } from './vf-cockpit-paths.mjs';
+import { GIT_SUR, shBorne, lancerGitAsync } from './vf-cockpit-paths.mjs';
 
 // GIT_SUR (défini dans vf-cockpit-paths.mjs, partagé par toute la chaîne de l'émetteur : F-03) neutralise un core.fsmonitor exécutable du .git/config (T-68-04)
 export { GIT_SUR };
@@ -40,9 +40,17 @@ export function brancheBase(root, { sh = shDefaut } = {}) {
   return existe(sh, root, root, 'refs/heads/main') ? 'main' : null;
 }
 
+// Variante ASYNCHRONE (P78-D-41) : mêmes deux lectures, par `lancerGitAsync` (la boucle du serveur reste libre), échéance `fin` de l'appelant ; sortie vide si git ne répond pas (null, jamais une base inventée).
+export async function brancheBaseAsync(root, { fin } = {}) {
+  const r = path.resolve(root);
+  const t = (await lancerGitAsync(r, ['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD'], { fin })).sortie.trim();
+  if (t.startsWith('origin/') && t.length > 7) return t.slice(7);
+  return (await lancerGitAsync(r, ['show-ref', '--verify', 'refs/heads/main'], { fin })).sortie.trim() !== '' ? 'main' : null;
+}
+
 // retard d'un arbre sur la base locale et sur origin/<base> LOCAL (lu, jamais rafraîchi), âge du dernier fetch (date de FETCH_HEAD du dossier git commun)
 export function retard({ chemin, base, commonDir, now = Date.now(), sh = shDefaut, lab = chemin } = {}) {
-  const compte = (ref) => entier(git(sh, chemin, lab, 'rev-list', '--count', `HEAD..${ref}`));
+  const compte = (ref) => entier(git(sh, chemin, lab, 'rev-list', '--count', `HEAD..${ref}`, '--'));
   const main = base ? compte(base) : null;
   const origin = base && existe(sh, chemin, lab, `refs/remotes/origin/${base}`) ? compte(`origin/${base}`) : null;
   let fetchAgeS = null;
@@ -51,7 +59,8 @@ export function retard({ chemin, base, commonDir, now = Date.now(), sh = shDefau
 }
 
 // toute chaîne d'arbre ou de branche qui sort du socle : contrôles retirés (C0, DEL, C1), masque des secrets, borne à n caractères
-export const nettoie = (s, n = 200) => masque(String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, '')).slice(0, n);
+// A8 : tout caractère de catégorie Unicode Cf (format : bidi U+202A-202E et U+2066-2069, espaces de largeur nulle U+200B-200F, U+2060, U+FEFF, U+061C…) est retiré, avec les contrôles et U+2028/2029
+export const nettoie = (s, n = 200) => masque(String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/gu, '')).slice(0, n);
 
 // phase active d'un arbre (P68-PL-04), fonction pure : (1) la phase dont le numéro suit le motif fixe `phase-<n>` du nom de branche, si elle existe ;
 // (2) sinon la dernière phase (ordre de la feuille de route) portant une mission `running` ; (3) sinon la dernière phase `en-cours` ; (4) sinon null.

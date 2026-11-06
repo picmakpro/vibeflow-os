@@ -1,5 +1,5 @@
 // vf-cockpit-equipe-carte — le graphe de l'onglet Équipe (69-05, P69-D-17), au format du viewer.
-// Export : buildEquipeGraph(who, { nom, racine, logos }) -> graphe vibeflow/cockpit-equipe@1.
+// Export : buildEquipeGraph(who, { nom, racine, logos, git, missions }) -> graphe vibeflow/cockpit-equipe@1 ; missionsEnCours(gp) -> libellés des missions actives (78-04).
 // Module pur ; schéma vibeflow/cockpit-equipe@1 ; aucun champ de transcript : seuls les champs de la collecte `who`
 // (déjà bornés et masqués par collectWho) entrent dans une carte. Les sortes de carte (session, agent, terminés) n'ont
 // ni pictogramme ni couleur : le viewer prend son repli. Aucun fichier (`files` vide), aucun lien.
@@ -8,7 +8,21 @@ const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); 
 const ST = { actif: 'active', 'en-attente': 'active', termine: 'done' };
 const ETAT = { actif: 'actif', 'en-attente': 'en attente', termine: 'terminé' };
 
-export function buildEquipeGraph(who, { nom = 'Projet', racine, logos } = {}) {
+// 78-04 : libellés des missions en cours (nœuds `mission` d'état `active` du graphe Projet), au plus 10, sans contrôle ni préfixe « Mission »
+export function missionsEnCours(gp) {
+  const out = [];
+  for (const n of Array.isArray(gp?.nodes) ? gp.nodes : []) {
+    if (out.length >= 10) break;
+    if (n && n.kind === 'mission' && n.st === 'active' && typeof n.label === 'string') {
+      // S6 (revue 2026-11-06) : même classe que `nettoie` (A8) — tout caractère de catégorie Cf, pas la seule plage bidi ; parité testée sur les quatre copies (test-cockpit-git-commandes.sh, R4.1)
+      const l = clip(n.label.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/gu, '').replace(/^Mission\s+/, ''), 120);
+      if (l) out.push(l);
+    }
+  }
+  return out;
+}
+
+export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, missions } = {}) {
   const travailleurs = (Array.isArray(who?.workers) ? who.workers : []).filter((w) => w && SORTES.has(w.kind) && typeof w.id === 'string');
   const idCarte = (w) => (w.kind === 'session' ? 'se-' : 'ag-') + w.id;
   const parId = new Map(); // identifiant de travailleur -> carte (Map : jamais un objet indexé par une valeur lue sur disque, T-69-09)
@@ -44,7 +58,7 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos } = {}) {
     schema: 'vibeflow/cockpit-equipe@1',
     meta: { generatedAt: new Date().toISOString(), rootName: nom, root: racine, vfLogos: logos, audience: 'everyone', agent: 'claude', repos: [], counts: { files: 0, loc: 0 }, vfTab: 'equipe',
       kindLabels: { import: 'Dépend de', event: 'Enchaînement', data: 'Couvre', queue: 'Étape suivante', call: 'Dispatche', contains: 'Contient' },
-      vf: { compte, fenetre: who?.fenetre ?? null, sources } },
+      vf: { compte, fenetre: who?.fenetre ?? null, sources, missions: Array.isArray(missions) ? missions : [] }, ...(git ? { vfGit: git } : {}) },
     project: { name: `${nom} — Équipe`, summary: `${compte.actif} actifs · ${compte.enAttente} en attente · ${compte.termine} terminés depuis moins de 24 h.` },
     nodes, files: [], links: [], flows: [], routes: [], tour: [],
   };

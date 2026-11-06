@@ -60,6 +60,33 @@
     },
     "vibeflow/cockpit-doing@1": {
       "requis": { "schema": "string", "id": "string", "doing": "any" }
+    },
+    "vibeflow/cockpit-git@1": {
+      "description": "topologie Git du lab pour le tiroir (78-05, GET /api/vf/git) : requis vaut pour etat ok ; les autres etats ne portent que schema, etat, entete (sauf absent : schema, etat, entete) et commandes. auteurs : agrégés sur la fenêtre de commits lue (500 de la base et des branches non mergées), pas sur tout l'historique : l'écran ne doit pas dire « tous les auteurs ». refsIgnorees : nombre de refs sans date (tag vers un blob ou un arbre) écartées, le reste du graphe est lu",
+      "requis": { "schema": "string", "etat": "string", "entete": "object", "base": "object", "worktrees": "array", "rangees": "array", "couloirsMax": "number", "replies": "number", "refsIgnorees": "number", "horsFenetre": "array", "mergees": "array", "tags": "array", "stash": "array", "auteurs": "array", "parBranche": "array", "bornes": "object", "commandes": "object" },
+      "etats": ["ok", "vide", "indisponible", "absent"],
+      "rangee": { "requis": ["h", "h7", "p", "at", "an", "s", "col", "entrants", "sortants", "largeur", "ouvertBas", "fusion", "racine", "teinte", "refs", "refsPlus"] },
+      "interdits": ["doing", "mandat", "messages", "outils"]
+    },
+    "vibeflow/cockpit-git-commit@1": {
+      "description": "détail d'un commit sans diff (78-08, GET /api/vf/git/commit?sha=) : requis vaut pour etat ok ; sha-invalide (400) et commit-inconnu (404) ne portent que schema et etat ; indisponible (200) aussi",
+      "requis": { "schema": "string", "etat": "string", "h": "string", "h7": "string", "p": "array", "auteur": "string", "date": "string", "committer": "string", "dateCommit": "string", "message": "string", "tronque": "boolean", "fichiers": "array", "total": "number", "commandes": "object" },
+      "fichier": { "requis": ["chemin", "ancien", "plus", "moins", "binaire"] },
+      "etats": ["ok", "sha-invalide", "commit-inconnu", "indisponible"],
+      "interdits": ["email", "diff", "patch"]
+    },
+    "vibeflow/cockpit-git-worktrees@1": {
+      "description": "état de chaque worktree, à la demande (78-08, GET /api/vf/git/worktrees ; jamais dans le filet de 5 s) : modifies et nonSuivis bornés à 200 entrées lues (plus vrai au-delà) ; avance et retard sur la base locale, avanceOrigin et retardOrigin sur origin/<base> seulement quand elle diverge de la locale (sinon null) ; approximatif vrai (mention « approximatif : filtres du dépôt non exécutés » ; mention vaut null quand approximatif est faux) quand le dépôt déclare un filtre ; nom d'un worktree jamais une clé unique : le chemin l'est ; verifie (boolean, P78-D-38) : faux quand `<chemin>/.git` ne désigne pas `<commun>/worktrees/<id>` du dépôt lu (lien `gitdir` forgé) : le worktree est alors « non vérifié », jamais lu (status non lancé), modifies, nonSuivis, propre, avance, retard, avanceOrigin, retardOrigin et commande valent null et plus faux — la page doit afficher « non vérifié » quand verifie === false (même champ verifie sur chaque entrée worktrees de vibeflow/cockpit-git@1, dont la commande cd est alors null)",
+      "requis": { "schema": "string", "etat": "string", "approximatif": "boolean", "mention": "string|null", "tronque": "boolean", "worktrees": "array" },
+      "worktree": { "requis": ["chemin", "nom", "verifie", "modifies", "nonSuivis", "plus", "propre", "avance", "retard", "avanceOrigin", "retardOrigin", "commande"],
+        "types": { "chemin": "string", "nom": "string", "verifie": "boolean", "modifies": "number|null", "nonSuivis": "number|null", "plus": "boolean", "propre": "boolean|null", "avance": "number|null", "retard": "number|null", "avanceOrigin": "number|null", "retardOrigin": "number|null", "commande": "string|null" } },
+      "etats": ["ok", "indisponible"],
+      "interdits": ["email", "diff", "patch"]
+    },
+    "vibeflow/cockpit-git-entete@1": {
+      "requis": { "schema": "string", "etat": "string", "depot": "string" },
+      "optionnels": ["branche", "worktree", "detache", "sha7"],
+      "etats": ["ok", "indisponible", "absent"]
     }
   },
   "claudeCode": {
