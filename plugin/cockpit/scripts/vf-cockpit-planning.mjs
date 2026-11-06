@@ -9,6 +9,8 @@ import path from 'node:path';
 import { planningLayout, stateFile, GIT_SUR, shBorne, realUnder } from './vf-cockpit-paths.mjs';
 import { avancement, rattacherMission, etatMission } from './vf-cockpit-avancement.mjs';
 import { lireVerrous, vieDe } from './vf-cockpit-vie.mjs';
+import { COLON, NUM, normNum, texte, lireGoal, lireDependances, reTitreCase, reTitreSection, reExigences, idExigence, texteExigence, reTraceabilite, normStatut, phaseCourante } from './vf-cockpit-formats.mjs';
+export { COLON, normNum };
 
 // jamais d'ouverture d'un fichier non régulier (un tube FIFO bloque ; un lien vers /dev/zero ne finit pas, et git versionne les liens symboliques) ni d'un fichier au-delà de MAX_LECTURE
 const MAX_LECTURE = 8 << 20;
@@ -21,37 +23,28 @@ const ls = (d) => { try { return dedans(d) ? fs.readdirSync(d) : []; } catch { r
 export const clip = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').replace(/\*\*/g, '').replace(/`/g, '').trim(); return s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s; };
 export const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/\*\*/g, '').replace(/`/g, '').trim(); const i = s.search(/[.!?](\s|$)/); return clip(i > 25 ? s.slice(0, i + 1) : s, n); };
 export const num = (s) => parseFloat(s);
-export const normNum = (s) => { const [a, b] = String(s).split('.'); return `${Number(a)}${b !== undefined ? '.' + b : ''}`; }; // 01 -> 1, 02.1 -> 2.1
 export const fm = (txt) => { const m = /^---\n([\s\S]*?)\n---/.exec(txt); const o = {}; if (!m) return o; for (const l of m[1].split('\n')) { const k = /^([\w-]+):\s*(.*)$/.exec(l); if (k) o[k[1]] = k[2].trim(); } return o; };
 export const list = (v) => (v || '').replace(/^\[|\]$/g, '').split(',').map((s) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
-const NUM = '(\\d+(?:\\.\\d+)?)';
-// deux-points après le numéro : collé (gabarit GSD) ou précédé d'une espace, insécable comprise (typographie française)
-export const COLON = '[ \\t\\u00a0\\u202f]*:';
+// motifs des champs lus (titres, Goal, dépendances, exigences, statut) : vf-cockpit-formats.mjs, partagés avec le diagnostic de vf-cockpit-drift.mjs
 const STATUS_SUFFIX = /\s*\((inscrite|completed|INSERTED|exécutée|cadrée|complete|clôturée|clos|CLOSE).*$/i;
 
 function parseRoadmap(txt, ws, rel, phases) {
-  // cases de phase : avec ou sans gras autour de « Phase N: nom » (ou « Phase N : nom »), suffixe « - … » ou « — … » retiré
-  for (const m of txt.matchAll(new RegExp(`^- \\[([ x])\\]\\s+(?:\\*\\*)?Phase ${NUM}${COLON}\\s*(.*)$`, 'gm'))) {
+  // cases de phase : avec ou sans gras autour de « Phase N: nom » (ou « Phase N : nom »), suffixe « - … » ou « — … » retiré ; texte normalisé (CRLF, BOM) par l'appelant
+  for (const m of txt.matchAll(reTitreCase())) {
     const n = normNum(m[2]); const key = `${ws || ''}|${n}`;
     if (phases.has(key)) continue;
     let name = m[3].includes('**') ? m[3].split('**')[0] : m[3].replace(/\s+[-—]\s.*$/, '');
     name = name.replace(STATUS_SUFFIX, '').replace(/\s+—\s+(complete|clôturée|CLOSE).*$/, '').replace(/^\[|\]$/g, '');
-    phases.set(key, { key, n, ws: ws || null, name: clip(name, 90), done: m[1] === 'x', line: m[3], roadmap: rel, goal: '', depends: [] });
+    phases.set(key, { key, n, ws: ws || null, name: clip(name, 90), done: m[1].toLowerCase() === 'x', line: m[3], roadmap: rel, goal: '', depends: [] });
   }
-  // sections « ### Phase N: nom » ou « #### … » : corps jusqu'au prochain en-tête de niveau 2 à 4
-  for (const m of txt.matchAll(new RegExp(`^#{3,4} Phase ${NUM}${COLON}\\s*(.*)\\n([\\s\\S]*?)(?=^#{2,4} |(?![\\s\\S]))`, 'gm'))) {
+  // sections « ## », « ### » ou « #### » + « Phase N: nom » (ou « — nom ») : corps jusqu'au prochain en-tête de niveau 2 à 4
+  for (const m of txt.matchAll(reTitreSection())) {
     const n = normNum(m[1]); const key = `${ws || ''}|${n}`;
     let ph = phases.get(key);
     if (!ph) { ph = { key, n, ws: ws || null, name: clip(m[2].replace(/^\[|\]$/g, ''), 90), done: false, line: '', roadmap: rel, goal: '', depends: [] }; phases.set(key, ph); }
     if (ph.goal) continue;
-    ph.goal = (/\*\*(?:Goal|Objectif)(?::\*\*|\*\*\s*:)\s*([\s\S]*?)(?=\n\*\*|\n\n|(?![\s\S]))/.exec(m[3])?.[1] || '').trim();
-    // dépendances : la valeur s'arrête au champ suivant posé sur la même ligne (« · » ou « **Autre**: … »), jamais sur un simple gras
-    const dep = (/\*\*(?:Depends on|Dépend de)(?::\*\*|\*\*\s*:)\s*(.*)/.exec(m[3])?.[1] || '').split(/\s+·\s+|\s+(?=\*\*[^*]+(?::\*\*|\*\*\s*:))/)[0];
-    // la valeur ne dit que ce dont CETTE phase dépend : on retire les parenthèses, les identifiants de décision (« P69-D-10 ») et tout ce qui suit la première phrase
-    // (« … (la lib). La Phase 68 en dépend … » nomme une dépendante, pas une dépendance). Les numéros décimaux (« 41.3 ») ne coupent pas la phrase.
-    const depVal = dep.replace(/\([^)]*\)/g, ' ').replace(/\b[A-Z][A-Z0-9]*-D-\d+\b/g, ' ').split(/\.\s+(?=[A-ZÀ-Ý])/)[0];
-    // vide : « Nothing… » comme avant, ou un mot seul (« rien », « aucune », tiret) ; « aucune dépendance de code ; après 51 » garde 51
-    ph.depends = /^\s*(nothing|none)/i.test(depVal) || /^\s*(rien|aucune?|—|-)\s*$/i.test(depVal) ? [] : [...depVal.matchAll(/\b(\d+(?:\.\d+)?)\b/g)].map((x) => normNum(x[1])).filter((x) => x !== n);
+    ph.goal = lireGoal(m[3]);
+    ph.depends = lireDependances(m[3], n);
   }
 }
 
@@ -117,13 +110,13 @@ export function readPlanning(root, layout, opts = {}) {
   const phases = new Map(), reqs = new Map(), milestones = [];
   const comps = layout.compartiments.length ? layout.compartiments : [];
 
-  for (const c of comps) parseRoadmap(read(path.join(c.dir, 'ROADMAP.md')), c.ws, rel(path.join(c.dir, 'ROADMAP.md')), phases);
+  for (const c of comps) parseRoadmap(texte(read(path.join(c.dir, 'ROADMAP.md'))), c.ws, rel(path.join(c.dir, 'ROADMAP.md')), phases);
   const activeKeys = new Set(phases.keys());
   for (const f of archives.filter((x) => x.endsWith('-ROADMAP.md'))) {
-    const tmp = new Map(); parseRoadmap(read(path.join(B, 'milestones', f)), null, rel(path.join(B, 'milestones', f)), tmp);
+    const tmp = new Map(); parseRoadmap(texte(read(path.join(B, 'milestones', f))), null, rel(path.join(B, 'milestones', f)), tmp);
     for (const ph of tmp.values()) if (![...phases.values()].some((p) => p.n === ph.n)) phases.set(ph.key, { ...ph, archive: true });
   }
-  for (const c of comps) parseMilestones(read(path.join(c.dir, 'ROADMAP.md')), c.ws, phases, milestones);
+  for (const c of comps) parseMilestones(texte(read(path.join(c.dir, 'ROADMAP.md'))), c.ws, phases, milestones);
   for (const ms of milestones) for (const k of [...ms.phases]) if (!phases.has(k)) ms.phases.delete(k);
 
   const phaseDirs = dossiersDePhase(B, comps);
@@ -131,14 +124,16 @@ export function readPlanning(root, layout, opts = {}) {
   // exigences : cases à cocher et table de traçabilité, rattachées dans le compartiment du fichier porteur
   const reqFiles = [...comps.map((c) => [c.ws || '', path.join(c.dir, 'REQUIREMENTS.md')]), ...archives.filter((f) => f.endsWith('-REQUIREMENTS.md')).map((f) => ['*', path.join(B, 'milestones', f)])];
   for (const [ws, f] of reqFiles) {
-    const txt = read(f);
-    for (const m of txt.matchAll(/^- \[([ x])\] \*\*([A-Z][A-Z0-9]*-\d+[a-z]?)\*\*:?\s*(.*)$/gm)) if (!reqs.has(`${ws}|${m[2]}`)) reqs.set(`${ws}|${m[2]}`, { id: m[2], ws: ws || null, wsKey: ws, done: m[1] === 'x', text: m[3], file: rel(f) });
-    for (const m of txt.matchAll(new RegExp(`^\\|\\s*([A-Z][A-Z0-9]*-\\d+[a-z]?)\\s*\\|\\s*Phase ${NUM}`, 'gm'))) { const r = reqs.get(`${ws}|${m[1]}`); if (r && !r.phase) r.phase = normNum(m[2]); }
+    const txt = texte(read(f));
+    for (const m of txt.matchAll(reExigences())) { const id = idExigence(m); if (!reqs.has(`${ws}|${id}`)) reqs.set(`${ws}|${id}`, { id, ws: ws || null, wsKey: ws, done: m[1].toLowerCase() === 'x', text: texteExigence(m), file: rel(f) }); }
+    for (const m of txt.matchAll(reTraceabilite())) { const r = reqs.get(`${ws}|${m[1]}`); if (r && !r.phase) r.phase = normNum(m[2]); }
   }
 
   // état : frontmatter du STATE du compartiment actif, repli sur la ligne de corps « Phase: N »
-  const sf = stateFile(root, layout); const sTxt = sf ? read(sf) : '';
+  const sf = stateFile(root, layout); const sTxt = sf ? texte(read(sf)) : '';
   const state = fm(sTxt);
+  if (state.status) state.status = normStatut(state.status); // « In Progress », « "executing" » -> in_progress, executing
+  if (state.current_phase) { const c = phaseCourante(state.current_phase); if (c !== null) state.current_phase = c; } // « "02" », « Phase 2 » -> 02, 2
   if (!state.current_phase) { const b = new RegExp(`^Phase:\\s*${NUM}`, 'm').exec(sTxt)?.[1]; if (b) state.current_phase = normNum(b); }
 
   // DAG puis avancement de chaque phase : missions rattachées par rattacherMission, état calculé sur les fichiers du dossier
@@ -164,7 +159,7 @@ export function readPlanning(root, layout, opts = {}) {
     const out = shBorne('git', [...GIT_SUR, '-C', root, 'for-each-ref', '--sort=-creatordate', '--count=30', '--format=%(refname:short)\t%(creatordate:short)\t%(contents:subject)', 'refs/tags/v*'], undefined, LAB);
     tags = out.trim().split('\n').filter(Boolean).map((l) => { const [tag, date, subject] = l.split('\t'); return { tag, date, subject }; });
   }
-  const title = /^# (.*)$/m.exec(read(path.join(B, 'PROJECT.md')))?.[1];
+  const title = /^# (.*)$/m.exec(texte(read(path.join(B, 'PROJECT.md'))))?.[1];
   const projectName = (title ? title.replace(/^(Project|Roadmap):\s*/i, '').trim() : '') || path.basename(root);
   return { phases, phaseDirs, reqs, milestones, state, dags, backlog, seeds, tags, projectName, activeKeys, rel };
 }
