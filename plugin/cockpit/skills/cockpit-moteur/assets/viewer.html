@@ -1448,6 +1448,8 @@ function readHash() {
 window.addEventListener('popstate', () => { const { v, s } = readHash(); go(v, { select: s, push: false }); });
 
 async function go(container, { select: sel = null, push = true, zoomFrom = null, after, force = false } = {}) {
+  if (container === 'q:answer' && !state.answer?.items) return; // no answer on a board to show (the last one had no cards): nothing to open, no error (PU-G-144)
+  if (sel === 'q:answer' && container !== 'q:answer') sel = null; // leaving the answer board: its details do not follow to the map (PU-G-059)
   hideTip();
   custom.panel = null;
   const changed = container !== state.container;
@@ -2116,7 +2118,7 @@ let keepSheet = false; // the answer's own links move around the map without put
 function sheetShell(question, body) {
   sheet.hidden = false;
   sheet.innerHTML = `<div class="sh"><span class="q" title="${h(question)}">${h(question)}</span>
-    ${askState.last && state.container !== 'q:answer' ? '<button class="btn soft" data-act="board">Show answer board</button>' : ''}
+    ${askState.last?.items?.length && state.container !== 'q:answer' ? '<button class="btn soft" data-act="board">Show answer board</button>' : ''}
     ${state.container === 'q:answer' ? '<button class="btn soft" data-act="map">Back to map</button>' : ''}
     <button class="btn icon" data-act="close" title="Close">${iconI('x')}</button></div><div class="sb">${body}</div>`;
   sheet.querySelector('[data-act="close"]').onclick = () => { if (askState.busy) cancelAsk(); sheet.hidden = true; if (state.container === 'q:answer') backToAsker(); else fit(true); };
@@ -2150,7 +2152,12 @@ function showAnswer(raw, question) {
   const a = { title: String(raw.title || 'Answer'), answer: String(raw.answer || ''), items: items.slice(0, 18), steps, followups: (raw.followups || []).map(String), question };
   askState.last = a;
   if (a.items.length) { state.answer = a; go('q:answer', { force: true, after: () => renderAnswer(a) }); }
-  else renderAnswer(a);
+  else {
+    // an answer with no card has no board: the one behind belonged to the previous question, so it goes (PU-G-143, PU-G-144)
+    const wasBoard = state.container === 'q:answer';
+    state.answer = null;
+    if (wasBoard) backToAsker(true); else renderAnswer(a);
+  }
 }
 function showFailure(question, code, message, partial) {
   if (code === 'not_logged_in' || code === 'not_granted') setWarning(code);
@@ -2309,6 +2316,7 @@ async function submitAsk() {
   if (askState.mode === 'change') return requestChange(ctxIds.length ? `${question}\n\nThis is about: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.` : question);
   const shown = question;
   noteAskOrigin();
+  askState.last = null; // the previous answer is not this question's: no « Show answer board » for it while this one is pending (PU-G-143)
   // what Claude sees: the question plus the pinned items, by id, so it starts from them
   if (ctxIds.length) question += `\n\nFocus on these map items: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.`;
   setBusy(true);
