@@ -10,6 +10,8 @@
 #   C2l à C5l   un seul contrôle gardé (Origin, secret, onglet, identifiant) : chacun, seul, casse la chaîne
 #   DORIG dégradée : secret, onglet et identifiant connus, Origin de P : 403 ; puis M-ORIGINE-LANCER : 204 (l'Origin de /lancer tient seule)
 #   M-SANS-CONFIRM (Q écrit sans POST /lancer) · M-ENTREE-AUTO (retour chariot ajouté) · M-INTERPOLE (le titre de la carte traverse le canal) : chacun rougit sa sonde
+#   RES   RÉSIDUEL ACCEPTÉ (P72-D-22), CARACTÉRISATION, jamais une protection : un script de P sans geste pose sa question au chat, POSTe /api/vf/lancer avec l'UUID lu : 202, case DÉCOCHÉE dans Q, aucun octet au shell, aucun argv ;
+#         mutants M-CASE-COCHEE, M-SANS-CONFIRM, M-SANS-CONFIRM + M-ENTREE-AUTO : chacun rougit sa sonde
 #   TIT   titres hostiles : 0 violation CSP, window.__titre3 indéfini (CSP en place, puis CSP retirée), témoin de la mesure
 # Mutants de la 71 recopiés tels quels de test-cockpit-terminal-xss.sh (M-ESC, M-CSP, M-ORIGINE-TERM, M-SECRET-TERM, M-ONGLET-TERM) ; ceux de la 72 viennent des ancres de 72-09 et 72-10 ;
 # M-ONGLET-SESSION (contrôle d'onglet propre de sessions.lancer, 72-02) s'y ajoute chaque fois que l'onglet est retiré. Un mutant sans effet est un FAIL nommé.
@@ -139,7 +141,7 @@ SED
 cat > "$AUX/entree-auto.sed" <<'SED'
 s|^    vers_shell += CTRL_C + ligne$|    vers_shell += CTRL_C + ligne + bytes([13])|
 SED
-MUTFILES=(serve.mjs index.html project.html vf-cockpit-terminal-processus.mjs vf-cockpit-terminal-session.mjs vf-cockpit-lancer.mjs)
+MUTFILES=(serve.mjs index.html project.html vf-cockpit-terminal-processus.mjs vf-cockpit-terminal-session.mjs vf-cockpit-lancer.mjs vf-cockpit-terminal-vue.mjs)
 empreinte() { local f; for f in "${MUTFILES[@]}"; do cat "$1/$f"; done | cksum; } # chaque fichier ; une pièce d'un mutant qui touche deux fichiers se contrôle à part
 # mutant <sortie> <nom> : 0 si le texte a changé ; 1 sinon (message sur stderr)
 mutant() {
@@ -156,6 +158,7 @@ mutant() {
     M-ONGLET-SESSION) sed -i.bak "s#if (!actif(c) || c.onglet !== onglet) return non('absente');#if (!actif(c)) return non('absente');#" "$s" ;;
     M-ORIGINE-LANCER) sed -i.bak "s#else if (o !== origineQ())#else if (o !== origineQ() \\&\\& !(url.pathname === '/lancer' \\&\\& o === 'http://127.0.0.1:' + portP))#" "$p" ;;
     M-SANS-CONFIRM) sed -i.bak -E -f "$AUX/sans-confirm.sed" "$p" ;;
+    M-CASE-COCHEE) sed -i.bak "s#caseChat.type = 'checkbox';#caseChat.type = 'checkbox'; caseChat.checked = true;#" "$o/vf-cockpit-terminal-vue.mjs" ;;
     M-INTERPOLE)
       # trois remplacements, un seul mutant : chacun doit avoir un effet
       a2="$(cksum < "$l")"; sed -i.bak -E -f "$AUX/interp-p.sed" "$l"; [ "$a2" != "$(cksum < "$l")" ] || { echo "  ❌ mutant M-INTERPOLE (P) sans effet : ancre absente (t: 'proposition',)" >&2; return 1; }
@@ -403,6 +406,56 @@ if [ -n "$CHROME" ]; then
     assert_eq "M-ACTIVATION-RETIREE — garde d'activation retirée : la charge fait retenir l'UUID de SA conversation (ACT.1 rougit : retenu au lieu de 0/0)" "$(rj "$RMUT" 'j.erreur||(j.forge>0)+"/"+(j.forgeClic>0)')" "true/true"
   fi
 else nonverif "ACT.0-ACT.3 et M-ACTIVATION-RETIREE (activation utilisateur réelle sous navigateur)"; fi
+
+echo "=== RES — RÉSIDUEL ACCEPTÉ P72-D-22 (caractérisation) : ce n'est PAS une protection ==="
+# Un script qui s'exécute dans la page Projet, SANS aucune activation, pose sa question au chat (faux `claude -p` dans le PATH du SERVEUR : la vraie route /api/ask), lit l'UUID de la réponse,
+# puis POSTe lui-même /api/vf/lancer {cible, verbe, chat:<uuid>} avec le jeton de la page. Comportement ACCEPTÉ (arbitrage Samuel, AskUserQuestion, session principale, 2026-11-06) : 202, la case « continuer le chat »
+# apparaît dans Q, DÉCOCHÉE ; la seule barrière réelle est le clic et l'Entrée dans le terminal. Les sondes d'absence (case décochée, aucun octet, aucun argv) ont chacune leur mutant.
+UUID_RES='5a5a5a5a-1111-4222-8333-444455556666'
+mkdir -p "$WORK/askbin"; cp "$HERE_T/temoins/lancer-fauxbin/claude-ask" "$WORK/askbin/claude"; chmod +x "$WORK/askbin/claude"
+# manche_res <étiquette> <mutants...> -> R_ERR R_RES R_ARGV ; serveur --terminal réel, AUCUN client node : le seul client de Q est Chrome
+manche_res() {
+  local label="$1"; shift
+  R_ERR=""; R_RES=""; R_ARGV=non
+  local L="$WORK/lab-$label" ENG_USE="$ENG" m o; rm -rf "$L"; cp -R "$LAB" "$L"; o="$L/.vibeflow/cockpit"
+  RUN="$WORK/run-$label"; rm -rf "$RUN"; mkdir -p "$RUN"; export FAUX_CLAUDE_SORTIE="$RUN" FAUX_ASK_SESSION="$UUID_RES"
+  for m in "$@"; do
+    if [ "$m" = M-ENTREE-AUTO ]; then
+      ENG_USE="$WORK/eng-$label"; rm -rf "$ENG_USE"; cp -R "$ENG" "$ENG_USE"; local f="$ENG_USE/terminal/vf-cockpit-pty.py"; cp "$f" "$f.orig"; sed -i.bak -f "$AUX/entree-auto.sed" "$f"
+      cmp -s "$f" "$f.orig" && { R_ERR="mutant M-ENTREE-AUTO sans effet"; echo "  ❌ mutant M-ENTREE-AUTO sans effet (expression absente de vf-cockpit-pty.py)" >&2; break; }; rm -f "$f.orig" "$f.bak"
+    else mutant "$o" "$m" || { R_ERR="mutant $m sans effet"; break; }; fi
+  done
+  assert_eq "[$label] — la manche se joue : tous les mutants posés ont un effet" "$R_ERR" ""
+  [ -z "$R_ERR" ] || return 0
+  rm -f "$o/.cache/server.json"; mkdir -p "$o/.cache"
+  local amorce; amorce="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"; (umask 077; printf '%s' "$amorce" > "$o/.cache/terminal-amorce")
+  ( cd "$L" && PATH="$WORK/askbin:$PATH" VF_COCKPIT_ENGINE_DIR="$ENG_USE" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --terminal --port "$(libre)" > "$WORK/serve-$label.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
+  local pid=$!; PIDS+=($pid)
+  for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
+  local rport rq; rport="$(node "$AUX/ev.mjs" j.port < "$o/.cache/server.json")"; rq="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json")"; rq="${rq##*:}"
+  R_RES="$(node "$HERE_T/temoins/lancer-xss.mjs" "$CHROME" "{\"mode\":\"residuel\",\"P\":$rport,\"Q\":$rq,\"amorce\":\"$amorce\",\"cible\":\"ph-4\"}")"
+  sleep 2; [ -e "$RUN/argv" ] && R_ARGV=oui
+  echo "     [$label] mesure : argv=$R_ARGV charge=${R_RES:0:900}"
+  vf_hyg_stop "$pid"
+}
+res_charge() { rj "$R_RES" '(j.erreur ? "plante: "+j.erreur : (j.erreurs&&Object.keys(j.erreurs).length ? "erreurs: "+JSON.stringify(j.erreurs) : j.actifAvant+"/"+(j.charge&&j.charge.actif)+"/"+(j.charge&&j.charge.ask)+"/"+(j.charge&&j.charge.session)+"/"+(j.charge&&j.charge.lancer)))'; }
+RES_CHARGE_ATTENDU="false/false/200/$UUID_RES/202"
+if [ -n "$CHROME" ]; then
+  manche_res RES
+  assert_eq "RES.0 — témoin : la charge s'exécute SANS activation (avant et pendant), le chat répond (200, UUID de sa conversation), POST /api/vf/lancer avec ce chat : 202 (comportement accepté)" "$(res_charge)" "$RES_CHARGE_ATTENDU"
+  assert_eq "RES.1 — [RÉSIDUEL ACCEPTÉ P72-D-22] la case « continuer le chat » apparaît dans le bandeau de Q, DÉCOCHÉE" "$(rj "$R_RES" 'JSON.stringify(j.case)')" '{"type":"checkbox","coche":false,"texte":"Continuer la conversation du chat"}'
+  assert_eq "RES.2 — la ligne affichée (case décochée) est la ligne standard : ni -r, ni --fork-session, ni l'identifiant du chat de la charge" "$(rj "$R_RES" '(typeof j.ligne==="string"&&j.ligne.startsWith("claude --session-id ")&&!j.ligne.includes(" -r ")&&!j.ligne.includes("--fork-session")&&!j.ligne.includes("'"$UUID_RES"'"))')" "true"
+  assert_eq "RES.2b — l'identifiant est affiché : une fois la case cochée (par script, dans Q seulement : geste humain simulé), la ligne porte -r '<identifiant>' --fork-session ; rien n'est envoyé" "$(rj "$R_RES" '(j.ligneCochee&&j.ligneCochee.coche===true&&j.ligneCochee.ligne.includes(" -r '"'$UUID_RES'"' --fork-session"))')" "true"
+  assert_eq "RES.3 — aucun octet n'atteint le shell : le terminal de Q (invite lue, témoin) ne montre ni claude, ni --session-id, ni l'identifiant, après l'armement et une marge" "$(rj "$R_RES" '(typeof j.terminal==="string"&&/VFP>/.test(j.terminal)&&!/claude|--session-id|'"$UUID_RES"'/.test(j.terminal))')" "true"
+  assert_eq "RES.4 — aucun argv : le faux claude du shell n'a rien reçu, faute de clic « Lancer » et d'Entrée dans Q (la charge a bien eu lieu : l'absence n'est pas une absence de tentative)" "$(res_charge)/$R_ARGV" "$RES_CHARGE_ATTENDU/non"
+  manche_res RES-CASE M-CASE-COCHEE
+  assert_eq "RES.1 / M-CASE-COCHEE — le mutant rougit la sonde : la case est COCHÉE par défaut et la ligne affichée porte l'identifiant" "$(rj "$R_RES" '(j.case&&j.case.coche)+"/"+(typeof j.ligne==="string"&&j.ligne.includes(" -r '"'$UUID_RES'"' --fork-session"))')" "true/true"
+  manche_res RES-SANSCONF M-SANS-CONFIRM
+  assert_eq "RES.3 / M-SANS-CONFIRM — le mutant rougit la sonde d'octets : Q écrit la ligne au shell sans POST /lancer (le terminal montre claude --session-id) ; la charge a bien fait naître la proposition" "$(res_charge)/$(rj "$R_RES" '(typeof j.terminal==="string"&&j.terminal.includes("claude --session-id"))')" "$RES_CHARGE_ATTENDU/true"
+  assert_eq "RES.4 / M-SANS-CONFIRM — sans Entrée, l'argv reste ABSENT : la sonde d'argv ne rougit que si une Entrée existe (témoin de séparation des deux sondes)" "$(res_charge)/$R_ARGV" "$RES_CHARGE_ATTENDU/non"
+  manche_res RES-ENTREE M-SANS-CONFIRM M-ENTREE-AUTO
+  assert_eq "RES.4 / M-SANS-CONFIRM + M-ENTREE-AUTO — le mutant rougit la sonde d'argv : le faux claude du shell a reçu son argv sans clic ni Entrée dans Q (la charge a eu lieu, la ligne est au terminal)" "$(res_charge)/$R_ARGV/$(rj "$R_RES" '(typeof j.terminal==="string"&&j.terminal.includes("claude --session-id"))')" "$RES_CHARGE_ATTENDU/oui/true"
+else nonverif "RES (résiduel accepté P72-D-22 : script de P, POST direct, case de Q, octets au shell)"; fi
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL ($NONVERIF non vérifiées sans navigateur)"; echo "=================================="

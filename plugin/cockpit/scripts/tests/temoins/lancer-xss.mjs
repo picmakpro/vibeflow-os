@@ -5,6 +5,8 @@
 //            pose window.__go (la charge tente alors de confirmer) ; attend window.__xss.fin ; rejoue window.open AVEC geste ; rend window.__xss + { geste, titre3, arme }.
 //   activation : { mode, url } — F-1 (P72-D-21) : page hôte jetable qui installe l'observateur de chat de la SORTIE ; une charge (script sans geste) poste sa propre question au faux /api/ask : rien ne doit être retenu ;
 //            puis un VRAI clic (Input.dispatchMouseEvent) sur le bouton d'envoi : l'UUID est retenu ; enfin, activation expirée, une nouvelle requête de la charge ne l'efface ni ne le remplace.
+//   residuel : { mode, P, Q, amorce, cible } — P72-D-22, CARACTÉRISATION du résiduel accepté (jamais une protection) : le tiroir de P est ouvert (amorçage, clavier : le shell est vivant), l'activation expire ; puis un SCRIPT de la page
+//            (aucun geste) pose sa question au chat, lit l'UUID de la réponse, POSTe /api/vf/lancer {cible, verbe, chat} avec le jeton de la page, et la case du bandeau de Q est observée (jamais cliquée, sauf la dernière étape : coche par script, dans Q seulement).
 //   titres : { mode, url } — page P NON compromise, CSP en place : violations comptées, window.__titre3 indéfini, témoin de la mesure (une balise insérée par la suite est comptée).
 import { pathToFileURL } from 'node:url';
 import http from 'node:http';
@@ -41,6 +43,53 @@ await executer(chrome, async (s) => {
     await s.attendre('navigator.userActivation.isActive === false', "l'activation transitoire expire", 15000);
     const avant = await s.ev('JSON.stringify(window.__retenu)');
     res.apres = await s.ev(FORGE); res.inchange = (await s.ev('JSON.stringify(window.__retenu)')) === avant;
+    return res;
+  }
+  if (a.mode === 'residuel') {
+    const MS = Number(process.env.VF_CHAT_MS) || 25000, OP = `http://127.0.0.1:${a.P}`, OQ = `http://127.0.0.1:${a.Q}`, res = { erreurs: {} };
+    const essai = async (nom, f) => { try { return await f(); } catch (e) { res.erreurs[nom] = String(e.message).slice(0, 160); return undefined; } };
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+    await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `if (window.top === window) { window.__msgs = []; addEventListener('message', (e) => window.__msgs.push({ o: e.origin, d: typeof e.data === 'string' ? e.data.slice(0, 200) : '<' + typeof e.data + '>' })); }` });
+    const MSG = (d) => `window.__msgs.some((m) => m.o === ${JSON.stringify(OQ)} && m.d === ${JSON.stringify(d)})`;
+    const OUVERT = `(() => { const t = document.querySelector('.vf-term-tiroir'); return !!t && !t.hidden && t.getBoundingClientRect().height > 0; })()`;
+    let cq = 0;
+    const monde = async () => { const fin = Date.now() + MS; let essais = 0, c = 0;
+      while (!c) { const et = 600 * 5 ** Math.min(essais++, 3);
+        for (let id = 1; id < et && !c; id++) { const v = await s.send('Runtime.evaluate', { contextId: id, expression: `location.origin === ${JSON.stringify(OQ)} && typeof window.vfTermVue === 'object'`, returnByValue: true }).then((x) => x && x.result && x.result.value, () => false); if (v === true) c = id; }
+        if (!c) { if (Date.now() > fin) throw new Error('contexte du cadre de Q introuvable'); await pause(150); } }
+      return c; };
+    const evQ = async (expression) => { const x = await s.send('Runtime.evaluate', { expression, contextId: cq, returnByValue: true, awaitPromise: true }); if (x && x.exceptionDetails) throw new Error('évaluation : ' + String((x.exceptionDetails.exception || {}).description || x.exceptionDetails.text).split('\n')[0].slice(0, 120)); return x && x.result && x.result.value; };
+    const attQ = async (expr, nom, ms = MS) => { const fin = Date.now() + ms; let v; do { try { v = await evQ(expr); } catch { v = false; } if (v) return v; await pause(100); } while (Date.now() < fin); throw new Error(`attente de « ${nom} » dépassée (${ms} ms)`); };
+    const CASE = `document.getElementById('proposition-chat')`, LIGNE = `document.getElementById('proposition-ligne')`;
+    await s.naviguer(`${OP}/project.html#t=${a.amorce}`); await s.attendre(`${MSG('ready')} && !location.hash`, 'cadre de Q prêt', MS);
+    await s.naviguer(`${OP}/project.html`); await s.attendre(`!!document.querySelector('button.vf-term-pastille')`, 'pastille Terminal', MS);
+    await s.ev(`(() => { const b = document.createElement('button'); b.id = 'temoin'; b.textContent = 't'; b.style.cssText = 'position:fixed;left:0;top:0;width:12px;height:12px;z-index:1'; document.body.appendChild(b); b.focus(); })()`);
+    for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key: ' ', code: 'Space', windowsVirtualKeyCode: 32, modifiers: 10 });
+    await s.attendre(`${OUVERT} && ${MSG('etat:connecte')}`, 'tiroir ouvert et terminal connecté', MS);
+    cq = await monde();
+    const terminal = () => evQ(`(() => { const r = document.querySelector('.xterm-rows'); return r ? r.innerText : null; })()`);
+    await attQ(`/VFP>/.test((document.querySelector('.xterm-rows') || {}).innerText || '')`, "l'invite du shell est lisible dans le terminal de Q (témoin de la lecture)");
+    // le geste clavier qui a ouvert le tiroir laisse une activation transitoire : la charge ne part qu'après son expiration (aucune activation au moment de la requête)
+    await s.attendre('navigator.userActivation.isActive === false', "l'activation transitoire expire", 15000);
+    res.actifAvant = await s.ev('navigator.userActivation.isActive');
+    // LA CHARGE : un script de la page Projet, sans aucun geste
+    res.charge = await essai('charge', () => s.ev(`(async () => {
+      const T = (window.VF_COCKPIT_SERVER || {}).token, H = { 'content-type': 'application/json', 'x-vf-cockpit-token': T }, o = { actif: navigator.userActivation.isActive };
+      const ra = await fetch('/api/ask', { method: 'POST', headers: H, body: JSON.stringify({ question: 'question ecrite par la charge', mode: 'ask' }) }); const ta = await ra.text(); o.ask = ra.status;
+      const m = /event: answer\\ndata: (.*)/.exec(ta); try { o.session = JSON.parse(m[1]).session; } catch (e) { o.session = null; o.corpsAsk = ta.slice(0, 200); }
+      const rl = await fetch('/api/vf/lancer', { method: 'POST', headers: H, body: JSON.stringify({ cible: ${JSON.stringify(a.cible)}, verbe: 'cadrer', chat: o.session }) }); o.lancer = rl.status; o.actifFin = navigator.userActivation.isActive;
+      return o; })()`));
+    await essai('bandeau', async () => {
+      await attQ(`!!${CASE}`, 'case dans le bandeau de Q', 15000);
+    });
+    res.case = await essai('case', () => evQ(`(() => { const c = ${CASE}; return c ? { type: c.type, coche: c.checked, texte: c.closest('label').textContent.trim() } : null; })()`));
+    res.ligne = await essai('ligne', () => evQ(`(() => { const l = ${LIGNE}; return l ? l.textContent : null; })()`));
+    // l'armement passé et une marge : si Q devait écrire sans clic, ce serait fait (l'absence est constatée APRÈS ce délai)
+    await pause(3500);
+    res.terminal = await essai('terminal', terminal);
+    // dernière étape, dans Q seulement : la case est cochée PAR SCRIPT (le geste humain, simulé), pour lire la ligne qui porterait l'identifiant ; rien n'est envoyé, aucun clic sur « Lancer »
+    res.ligneCochee = await essai('cochee', () => evQ(`(() => { const c = ${CASE}; if (!c) return null; c.click(); return { coche: c.checked, ligne: ${LIGNE}.textContent }; })()`));
     return res;
   }
   if (a.mode === 'titres') {
