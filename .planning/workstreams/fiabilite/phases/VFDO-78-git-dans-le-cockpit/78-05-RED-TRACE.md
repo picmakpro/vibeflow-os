@@ -97,3 +97,32 @@ Témoin positif S8.4 vert avant et après (le lab avec base émet bien `--not`).
 Mutant M-NOBASE (`...(refBase ? ['--not', refBase] : [])` → `'--not', refBase`) : M-NOBASE.0 `effet` ; M-NOBASE : `indisponible|indisponible|ok` — S8.1a et S8.2a rougissent pour leur raison, le lab avec base reste lu. Le mutant M-EOO-LOG existant a été réaligné sur la nouvelle forme (même rouge : S2.2).
 
 Dérive par lecture des autres argv des modules Git (aucune autre construction à risque) : `vf-cockpit-git-details.mjs` `compteLR` n'est appelé que sous `oid && refBase` / `oid && refOrigine` ; `brancheBase` : `for-each-ref` ne reçoit les refs de base que sous `nomBase ?` ; `gaucheDroite(refBase, …)` sous `repli && refBase`, `refOrigine && b` ; `racineLog` gardé (`etat: 'vide'` sinon) ; `vf-cockpit-arbres.mjs` `retard` : `base ? compte(base) : null`. Aucune valeur nullable ne parvient à un argv hors le `log` corrigé.
+
+### R3 / P78-D-41 — `GET /api/vf/git` ne bloque plus la boucle (S4)
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-git.sh`, section S9 (git emballé : `log` pose un marqueur puis dort 0,5 s ; la requête légère part quand le marqueur existe, donc pendant le premier `log`). Rouge AVANT le code : la suite rejouée sur une copie `git archive` de la tête 8c1857e1 (lecture synchrone), log `78-revue-srv-r3-rouge.log`.
+
+| Assertion | Attendu | Obtenu avant |
+|---|---|---|
+| S9.1 requête légère servie avant la fin de la lecture lente (> 1 s) ; la lecture aboutit | `true\|ok\|true` | `false\|ok\|true` (la légère n'est servie qu'après la lecture : boucle gelée) |
+
+(Les autres rouges de ce jeu — S6.1, M-SYNC-GRAPHE.0/.1, M-ENTETE.0 — viennent de la copie hors dépôt et de l'absence des ancres dans l'ancien code : sans valeur de preuve.) Vert APRÈS : S9.1 `true|ok|true`, S9.2 parité de l'en-tête asynchrone avec `enteteGit` sur six dépôts (`egal` × 6).
+
+Mutants : M-SYNC-GRAPHE (le `git` du graphe redevient `lancerGit` synchrone) : `false|ok|true`, S9.1 rougit pour sa raison (l'ordre, la lecture aboutit et reste lente). M-ENTETE (le miroir asynchrone ne détecte plus le worktree) : la parité rougit sur `wt-b` et `wt-det` seuls (`egal|DIFF|DIFF|egal|egal|egal`). Première version du mutant M-SYNC-GRAPHE (requête légère à 150 ms) non retenue : elle restait verte (`true|ok|true`) parce que la phase d'avant le premier `log` est asynchrone ; le marqueur rend l'ordre déterministe.
+
+### R4 (S6) — classe d'affichage, quatre copies
+
+`test-cockpit-git-commandes.sh` R4.1 (parité sur U+0000–U+10FFFF : détail d'un commit = `AFFICHAGE_REFUSE` sauf U+0009 et U+000A ; carte Équipe : tout point refusé disparaît du libellé). Rouge AVANT (ancienne classe de `missionsEnCours`) : attendu `true|détail:0|équipe:0`, obtenu `true|détail:0|équipe:161 ad,600,601` (161 points Cf conservés : U+00AD, U+0600…). Vert APRÈS : `true|détail:0|équipe:0`. Choix : parité testée, pas de définition unique (la carte Équipe est copiée dans la sortie et reste sans import ; `commandes` reste pur). `ILLISIBLE` du détail est maintenant exporté (lecture par le test).
+Mutants : M-CLASSE-EQUIPE (ancienne classe remise) → `true|détail:0|équipe:>0` ; M-CLASSE-DETAIL (`\p{Cf}` retiré d'`ILLISIBLE`) → `true|détail:>0|équipe:0` ; chacun rougit sa seule copie.
+
+### R5 (S8) — grille de `css-jetons.mjs`
+
+R5.* de `test-cockpit-git-commandes.sh`. Rouge AVANT (grille {2…16}) : `R5.10px` attendu rc 1 obtenu 0 ; `R5.14px` idem ; `R5.20px`, `R5.24px`, `R5.32px` attendu rc 0 obtenu 1. Vert APRÈS (grille {2,4,6,8,12,16,20,24,32}). Mutant M-GRILLE (ancienne grille) : 10 px accepté, 20 px refusé (`0|1`). Rejeu sur 76 et les trois 77 (`76-vf-git-entete.js`, `77-vf-git-rendu.js`, `77-vf-git-tiroir.js`, `77-vf-git-vue-detail.js`, état du disque au rejeu) : rc 0 sur les quatre, aucune valeur à signaler (log `78-revue-srv-r5-rejeu-ui.log`).
+
+### R6 (S9) — filtres du moteur d'assemblage
+
+`test-cockpit-git-env.sh` E10 (lab dérivé du dépôt piégé, git emballé `bin-cfg` qui refuse `config --get-regexp`, puis 301 filtres). Rouge AVANT (`env: envGit(lab, { config: configFiltres(filtresDeclares(lab, lab)) })`) : E10.1 attendu `absent |aucun|carte` obtenu `absent |fe000b10…|carte` (le moteur lit git, head réel, alors que la liste est illisible) ; E10.2 attendu 1 obtenu 0 (rien n'est dit) ; E10.3 attendu `absent |aucun|1` obtenu `absent |fe000b10…|0`. Aucun marqueur de programme n'est posé avant le code non plus (le moteur ne lance pas de `status` sur ce lab) : le rouge est la lecture de git par le moteur, non l'exécution observée d'un filtre. Vert APRÈS : 130 PASS / 0 FAIL. Mutant M-S9 (`if (!f.refus)` → `if (true)`) : le moteur lit git (head réel, aucune mention) : E10.1 et E10.3 rougissent. M-ENV-MOTEUR réaligné sur `env: etatMoteur(lab).env`.
+
+### R7 (S11) — contrat `mention` et types nullables
+
+`test-cockpit-git-details.sh` X2.5 et X7.1b (`conf.mjs` : un type s'écrit `string|null`, `null` n'est admis que s'il est listé ; l'ancienne tolérance « une chaîne peut valoir null » est retirée). Rouge AVANT : attendu `[[],[],0]`, obtenu `[["mention"],[],0]` (X2.5 et X7.1b). Vert APRÈS : `mention` est `string|null`, et `worktree.types` déclare les champs nullables des entrées (`modifies`, `nonSuivis`, `propre`, `avance`, `retard`, `avanceOrigin`, `retardOrigin`, `commande`) ; la réponse aux quatre worktrees non vérifiés est conforme. Mutants : M-CONTRAT-MENTION → `[["mention"],[],0]` ; M-CONTRAT-PROPRE → rouge sur les quatre faux seuls (`dossier,victime,vw,w4|propre`).

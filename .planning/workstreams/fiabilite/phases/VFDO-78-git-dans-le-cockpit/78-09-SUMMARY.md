@@ -33,3 +33,7 @@ Un fichier suivi modifié sans `git add` ne change aucun élément de la signatu
 
 ## Valeurs d'espacement
 Aucune posée (pas de CSS).
+
+## Correction revue serveur (2026-11-06, mandat mgr78-reprise) — R2 (S3)
+
+`test-cockpit-git-signature.sh` : R2.3 ne mesure plus `$REAL_HOME/Documents/dev/vibeflow-os` (chemin d'un poste) mais le dépôt de la suite (`git rev-parse --show-toplevel` depuis le dossier du script) ; hors dépôt, R2.3b est SAUTÉE avec un message explicite, comptée dans `SAUTÉ`, jamais un PASS. Le plafond dur de 50 ms (48 à 55 ms mesurés sous charge) devient 250 ms sur la médiane de 7 appels (R2.3a fixture, R2.3b dépôt de la suite) ; la mesure normale est de l'ordre de 22 à 24 ms. Le temps ne discrimine pas un `git log` dans la signature (il coûte un git comme un `for-each-ref`) : le mutant M-LOG existant rougit toujours par l'argv journalisé (R2.2b), et un nouveau M-SIG-LENTE (400 ms d'attente) rougit le plafond pour son coût. `R5.6` attend `lireGit` (désormais asynchrone, P78-D-41). Trace : `78-09-RED-TRACE.md`. Suite complète rejouée : 45 PASS / 0 FAIL / 0 SAUTÉ (Chrome inclus).

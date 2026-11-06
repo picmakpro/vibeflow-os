@@ -40,3 +40,10 @@ Mutants (copie du module par `mkmod`, mutation d'UNE occurrence, la suite refuse
 | M-RELAIS | `addEventListener('git'` -> `'git-retire'` | R3.1 | `atteint=false`, `signaux=0`, alors que la page réelle reçoit le signal sur la même procédure |
 
 Non-régression : `test-cockpit-reconnexion.sh`, `-vie.sh`, `-who.sh`, `-reseau.sh` : rc 0.
+
+## Correction revue serveur (2026-11-06, mandat mgr78-reprise) — R2 (S3) coût de la signature
+
+Défauts : (a) R2.3 mesurait `$REAL_HOME/Documents/dev/vibeflow-os`, un chemin de poste ; (b) plafond dur de 50 ms sur trois git (48 à 55 ms mesurés sous charge par la revue). Rouge AVANT : la suite d'avant (copie `78-revue-srv-signature-avant.sh`) rejouée avec un `HOME` sans dépôt, `SIGNAL_SANS_NAVIGATEUR=1` (log `78-revue-srv-r2-rouge.log`) : `coût mesuré … ce dépôt NULL 0.01 ms`, R2.3 attendu `oui` obtenu `nul`. Le rouge vient du chemin codé en dur.
+Après : la mesure vise le dépôt de la suite (`git rev-parse --show-toplevel` depuis le dossier du script) ; hors dépôt R2.3b est SAUTÉE et comptée (`${SKIP}`), jamais un PASS ; le plafond est de 250 ms sur la médiane de 7 appels (R2.3a fixture, R2.3b dépôt de la suite). Vert APRÈS : voir SUMMARY (suite complète, Chrome inclus).
+Mutants : M-LOG existant (un `log -1 --all` dans la signature) rougit toujours, par l'argv journalisé (R2.2b), le temps d'un `log` n'étant pas discriminant (un git comme un autre). Nouveau M-SIG-LENTE (400 ms d'attente avant l'échéance du tick) : la mesure dépasse le plafond, R2.3a rougit pour son coût ; la fixture saine reste sous le plafond.
+Aussi : `R5.6` attend `lireGit` (désormais asynchrone, P78-D-41).

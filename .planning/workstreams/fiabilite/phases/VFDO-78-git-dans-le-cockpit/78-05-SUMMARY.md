@@ -99,3 +99,25 @@ M-BORNE (`-n` retiré : 600 rangées au lieu de 500), M-COURT (noms courts : le 
 ## Suites rejouées
 
 `test-cockpit-git.sh` 82/0 · `git-env` 70/0 (garde E6 : une première version du module, `/…/.exec(git(…))`, faisait un faux positif de la garde de 78-01 ; réécrit sans motif `exec(git`) · `serveur` 70/0 · `reseau` 15/0 · `git-graphe` 50/0 · `git-commandes` 33/0 · `signal` 76/0 · `forme-claude` 56/0 · `assemblage` 40/0 · `avancement` 62/0 · `equipe` 157/0 · `securite` 90/1 (FB3.5, plafond d'horloge connu).
+
+## Correction revue serveur (2026-11-06, mandat mgr78-reprise, une passe)
+
+Findings serveur de la revue de code de la Phase 78 corrigés, chacun avec son témoin rouge avant / vert après et son mutant (traces : `78-05-RED-TRACE.md` § « Correction revue serveur »).
+
+- **R1 / P78-D-42 (S1)** : `vf-cockpit-git.mjs` n'émet plus `'--not', refBase` quand `refBase` vaut null (dépôt `master`, `develop`, `trunk` sans distant) : le graphe est rendu (rangées, worktrees, tags) sans comptes d'avance. Dérive par lecture des constructions d'argv des modules Git (liste) : `log1` (racineLog gardé, `tetes` filtrées), `log2` (corrigé), `for-each-ref` de la base (sous `nomBase ?`), `gaucheDroite` (sous `repli && refBase` et `refOrigine && b`), `compteLR` de `vf-cockpit-git-details.mjs` (sous `oid && refBase`/`refOrigine`), `retard` d'`arbres.mjs` (`base ? … : null`), signature (aucune ref de base) : aucune autre construction n'accepte null.
+- **R3 / P78-D-41 (S4)** : `lireGit` est asynchrone (`await assembler(lab, finDans(5000))`), tout git par `lancerGitAsync`, échéance globale = une date passée à chaque appel ; `brancheBaseAsync` (nouveau, `vf-cockpit-arbres.mjs`) ; l'en-tête est lu par un miroir asynchrone de `enteteGit` (`vf-cockpit-git-entete.mjs` n'est pas dans le périmètre : parité testée S9.2). La route `GET /api/vf/git` attend la promesse ; contrat de retour inchangé (`ok|vide|indisponible|absent`). `vf-cockpit-server.mjs` n'avait rien à changer (il délègue à `routeGit`). Les assistants de test qui appelaient `lireGit` ou `routeGit` de façon synchrone (`lire.mjs`, `dur.mjs`, `route.mjs`, `det.mjs`, `lire-muet.mjs`) attendent la promesse. Ce qui reste synchrone : fs seul (realpath, lien retour des worktrees) ; l'en-tête `/api/vf/git/entete` (route distincte, 4 lectures rapides) n'est pas dans la demande.
+- **R4 (S6)** : `missionsEnCours` passe à `\p{Cf}` (drapeau `u`). Parité testée sur les quatre copies de la classe (U+0000–U+10FFFF), pas de définition unique (la carte Équipe est copiée dans la sortie sans import ; `commandes` reste pur). `ILLISIBLE` (détail d'un commit) est exporté pour le test.
+- **R5 (S8)** : `css-jetons.mjs` aligné sur la grille 71.5 {2,4,6,8,12,16,20,24,32} ; rejoué sur 76 et les trois 77 : rc 0 partout, rien à signaler (l'UI n'est pas touchée).
+- **R6 (S9)** : `vf-cockpit-build.mjs` : nouvelle `etatMoteur(lab)` sur `filtresEtat` (`vf-cockpit-paths.mjs`, mêmes règles qu'A1 : liste illisible, hors délai ou au-delà de `MAX_FILTRES`). Dans ce cas le marqueur `VF_COCKPIT_GIT_DURCI` n'est pas posé : `git()` du moteur reste fermé (carte sans fichiers suivis ni head), l'état est dit dans le résumé (`git du moteur fermé (cause)`) et rendu par `assembler` (`gitFerme`). Décision : fermer le git du moteur plutôt que faire échouer l'assemblage (la carte reste utilisable ; le patch P27 prévoit déjà ce mode).
+- **R7 (S11)** : `vf-cockpit-interface.json` : `mention` est `string|null` ; `worktree.types` déclare les types, nullables compris, de chaque entrée ; la conformité (`conf.mjs`) n'admet `null` que déclaré et couvre aussi la réponse aux worktrees « non vérifiés ». Les autres champs du schéma git@1 (corps) sont tous non nuls en état ok : vérifié contre la réponse réelle (S3.5a).
+
+Valeurs de CSS posées : aucune (l'UI n'est pas touchée).
+
+### No-op (consigne du mandat, rien n'a été fait)
+
+S7 (helpers `realpath` et `gaucheDroite`/`compteLR` dupliqués), S10 (bash de `driver-lock.sh`, déjà classé par l'audit), S12 (`dernierArbre`), champs `horsFenetre` et `refsIgnorees` non rendus par l'UI.
+
+### Écarts de méthode
+
+- R3 : le code a été écrit avant la trace rouge ; le rouge est établi après coup sur une copie `git archive` de la tête d'avant (8c1857e1), ce qui reste un rouge dû au défaut. Première forme du mutant M-SYNC-GRAPHE (requête à 150 ms) non retenue : verte, remplacée par un marqueur de lancement.
+- Un outil d'entrée a transformé des séquences d'échappement Unicode saisies dans des commandes en caractères réels dans `test-cockpit-git-commandes.sh` ; repéré et remplacé par les séquences littérales (aucun caractère Cf ni U+2028/9 ne reste dans la suite, vérifié par balayage de catégorie).
