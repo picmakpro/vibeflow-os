@@ -171,7 +171,7 @@ return await s.ev(`({ signaux: window.__sig, marque: window.__marque, atteint: $
 JS
 cdp31() { node "$AUX/cdp-run.mjs" "$CHROME" "$AUX/r31.js" "$@"; }
 temps_sig() { # temps_sig <lab> : médiane de 7 appels de signatureGit (ms), 2 décimales
-  node -e "import(process.argv[1]).then(async ({signatureGit})=>{const t=[];let ok=true;for(let i=0;i<8;i++){const a=process.hrtime.bigint();const s=await signatureGit(process.argv[2]);const b=process.hrtime.bigint();if(!s)ok=false;if(i)t.push(Number(b-a)/1e6)}t.sort((x,y)=>x-y);console.log((ok?'':'NULL ')+t[3].toFixed(2))})" "$SCRIPTS/vf-cockpit-git-signature.mjs" "$1"
+  node -e "import(process.argv[1]).then(async ({signatureGit})=>{const t=[];let ok=true;for(let i=0;i<8;i++){const a=process.hrtime.bigint();const s=await signatureGit(process.argv[2]);const b=process.hrtime.bigint();if(!s)ok=false;if(i)t.push(Number(b-a)/1e6)}t.sort((x,y)=>x-y);console.log((ok?'':'NULL ')+t[3].toFixed(2))})" "${2:-$SCRIPTS/vf-cockpit-git-signature.mjs}" "$1"
 }
 
 # sous_cmds <journal> : la sous-commande de chaque ligne d'argv, options globales (--no-optional-locks, -c <v>, -C <dir>) écartées
@@ -194,9 +194,21 @@ assert_eq "R2.2a — témoin : le journal d'argv voit les appels de la signature
 assert_eq "R2.2b — 11 s sans changement : aucune sous-commande log, status ni diff" "$(sous_cmds "$WORK/git.log" | grep -cE '^(log|status|diff)$')" "0"
 assert_eq "R2.2c — sous-commandes vues : seulement for-each-ref, worktree, show-ref, symbolic-ref, rev-list, rev-parse" "$(sous_cmds "$WORK/git.log" | sort -u | grep -vxE 'for-each-ref|worktree|show-ref|symbolic-ref|rev-list|rev-parse' | tr '\n' ' ')" ""
 stop_srv
-TF="$(temps_sig "$DEPOT")"; TR="$(temps_sig "$REAL_HOME/Documents/dev/vibeflow-os")"
-echo "  coût mesuré de signatureGit (médiane de 7) : fixture ${TF} ms · ce dépôt ${TR} ms"
-assert_eq "R2.3 — le coût de la signature reste sous 50 ms (fixture et ce dépôt)" "$(node -e "const f=parseFloat(process.argv[1]),r=parseFloat(process.argv[2]);console.log(/NULL/.test(process.argv[1]+process.argv[2])?'nul':(f<50&&r<50?'oui':'non'))" "$TF" "$TR")" "oui"
+# R2 (revue serveur 2026-11-06, S3) : la mesure vise le dépôt de CETTE suite (celui qui contient le dossier du script), jamais un chemin de poste ; hors dépôt : SAUTÉ, jamais un PASS.
+# Le plafond est large (250 ms sur la médiane de 7 appels, 3 git par appel) : il garde contre un coût démesuré, pas contre la charge de la machine (48 à 55 ms mesurés sous charge contre un plafond de 50).
+# Ce qui rougit sur un `git log` dans la signature n'est pas le temps (un log coûte un git comme un for-each-ref) mais l'argv journalisé : R2.2b et M-LOG.
+TF="$(temps_sig "$DEPOT")"
+TOP_DEPOT="$("$GIT_REEL" -C "$SCRIPTS" rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -n "$TOP_DEPOT" ] && [ -d "$TOP_DEPOT" ]; then TR="$(temps_sig "$TOP_DEPOT")"; else TR=""; fi
+echo "  coût mesuré de signatureGit (médiane de 7) : fixture ${TF} ms · dépôt de la suite ${TR:-sans objet} ms"
+PLAFOND_SIG_MS=250
+assert_eq "R2.3a — le coût de la signature sur la fixture reste sous ${PLAFOND_SIG_MS} ms" "$(node -e "const f=parseFloat(process.argv[1]);console.log(/NULL/.test(process.argv[1])?'nul':(f<${PLAFOND_SIG_MS}?'oui':'non'))" "$TF")" "oui"
+if [ -z "$TR" ]; then skip "R2.3b" "la suite ne s'exécute pas dans un dépôt git : coût mesuré sur le dépôt de la suite sans objet"
+else assert_eq "R2.3b — le coût de la signature sur le dépôt de la suite reste sous ${PLAFOND_SIG_MS} ms" "$(node -e "const r=parseFloat(process.argv[1]);console.log(/NULL/.test(process.argv[1])?'nul':(r<${PLAFOND_SIG_MS}?'oui':'non'))" "$TR")" "oui"; fi
+# M-SIG-LENTE : une signature qui attend 400 ms (un coût démesuré, quel qu'en soit l'auteur) rougit le plafond de R2.3a ; la fixture seule suffit, et la mesure normale reste sous le plafond (témoin R2.3a)
+MSL="$(mkmod lente)"; mutate "$MSL/vf-cockpit-git-signature.mjs" "const fin = finDans(echeanceMs);" "await new Promise((r) => setTimeout(r, 400)); const fin = finDans(echeanceMs);" || echo "  ❌ mutation M-SIG-LENTE impossible"
+TL="$(temps_sig "$DEPOT" "$MSL/vf-cockpit-git-signature.mjs")"
+assert_eq "M-SIG-LENTE — le plafond de ${PLAFOND_SIG_MS} ms rougit sur une signature de plus de 400 ms (mesure : ${TL} ms) : R2.3a rouge pour sa raison (coût), la fixture saine reste verte (${TF} ms)" "$(node -e "const l=parseFloat(process.argv[1]),f=parseFloat(process.argv[2]);console.log((l>=${PLAFOND_SIG_MS})+'|'+(f<${PLAFOND_SIG_MS}))" "$TL" "$TF")" "true|true"
 
 echo "=== R3 — relais vers la page (vf-git:signal) ==="
 if [ -z "$CHROME" ]; then skip "R3.1" "pas de navigateur"; else
@@ -259,7 +271,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 const [, , scripts, muet, hors] = process.argv;
 const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href);
-const t = Date.now(); const a = m.lireGit(muet).etat; const ms = Date.now() - t; const b = m.lireGit(hors).etat;
+const t = Date.now(); const a = (await m.lireGit(muet)).etat; const ms = Date.now() - t; const b = (await m.lireGit(hors)).etat;
 console.log(JSON.stringify({ muet: a, hors: b, borne: ms < 9000 }));
 JS
 mkdir -p "$WORK/sans-depot"
