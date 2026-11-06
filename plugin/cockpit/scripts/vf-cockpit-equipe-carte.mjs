@@ -1,8 +1,12 @@
 // vf-cockpit-equipe-carte — le graphe de l'onglet Équipe (69-05, P69-D-17), au format du viewer.
-// Export : buildEquipeGraph(who, { nom, racine, logos, git, missions }) -> graphe vibeflow/cockpit-equipe@1 ; missionsEnCours(gp) -> libellés des missions actives (78-04).
+// Export : buildEquipeGraph(who, { nom, racine, logos, git, missions, lancees }) -> graphe vibeflow/cockpit-equipe@1 ; missionsEnCours(gp) -> libellés des missions actives (78-04).
+// `lancees` (optionnel) : Map session -> { phase, ws, verbe } produite par le registre de vf-cockpit-lancer-suivi.mjs (72-07) ; elle ajoute
+// la ligne « Lancée depuis la carte : … » sur la carte de SESSION concernée, valeurs revalidées. Absente ou invalide : sortie inchangée.
+// Un nom de session `-n` n'est jamais une donnée du lab : aucune carte ne le lit.
 // Module pur ; schéma vibeflow/cockpit-equipe@1 ; aucun champ de transcript : seuls les champs de la collecte `who`
 // (déjà bornés et masqués par collectWho) entrent dans une carte. Les sortes de carte (session, agent, terminés) n'ont
 // ni pictogramme ni couleur : le viewer prend son repli. Aucun fichier (`files` vide), aucun lien.
+import { LIBELLES_VERBES, entreeLanceeValide } from './vf-cockpit-lancer-suivi.mjs';
 const SORTES = new Set(['session', 'subagent']);
 const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
 const ST = { actif: 'active', 'en-attente': 'active', termine: 'done' };
@@ -22,7 +26,7 @@ export function missionsEnCours(gp) {
   return out;
 }
 
-export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, missions } = {}) {
+export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, missions, lancees } = {}) {
   const travailleurs = (Array.isArray(who?.workers) ? who.workers : []).filter((w) => w && SORTES.has(w.kind) && typeof w.id === 'string');
   const idCarte = (w) => (w.kind === 'session' ? 'se-' : 'ag-') + w.id;
   const parId = new Map(); // identifiant de travailleur -> carte (Map : jamais un objet indexé par une valeur lue sur disque, T-69-09)
@@ -41,6 +45,9 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, miss
     const lignes = [];
     if (w.role) lignes.push(`Rôle : ${w.role}`);
     lignes.push(`État : ${ETAT[w.etat] || 'actif'}`);
+    const l = lancees instanceof Map && w.kind === 'session' ? lancees.get(w.id) : undefined; // garde:lancees
+    const t = l && entreeLanceeValide(l) ? `Lancée depuis la carte : Phase ${l.phase}${l.ws ? ` · ${l.ws}` : ''} · ${LIBELLES_VERBES[l.verbe]}` : ''; // garde:ligne-valide
+    if (t) lignes.push(t); // garde:ligne-insert
     if (w.branch) lignes.push(`Branche : ${w.branch}`);
     if (w.tree) lignes.push(`Arbre : ${w.tree}`);
     if (w.rattachement?.etat === 'rattache') lignes.push(`Nœud de mission : ${w.rattachement.noeud} (${w.rattachement.dag})`);

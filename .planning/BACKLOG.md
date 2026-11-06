@@ -369,3 +369,34 @@ ou de `vf-new-lab`.
 - **Deux points NON vérifiés :** (1) la forme plugin — `hooks.json`, ou les hooks de frontmatter sont-ils ignorés pour les agents de plugin ? (2) le plafond de 8 continuations consécutives (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`) : que devient un agent qui l'atteint ?
 
 **Déclencheur de reprise :** le spike, avant toute phase ; ou un nouvel orphelin malgré la règle de fin de tour inerte.
+
+## Cockpit : un script de la page Projet peut piloter le chat (`POST /api/ask`) — SURFACE DES PHASES 69-70, HORS PHASE 72 (2026-11-06)
+
+**Priorité : non fixée.** À vérifier avant toute décision.
+
+**Origine :** signalé par la Phase 72 (audit F-1) ; décision de ne pas le traiter dans la phase, sur ordonnancement de la session principale du 2026-11-06.
+- **Observé (lecture du code, sondes d'audit du lot 2 de la Phase 72) :** un script qui s'exécute dans la page Projet peut piloter le chat du cockpit : `POST /api/ask` est accepté avec le jeton de la page (`plugin/cockpit/scripts/vf-cockpit-server.mjs`, vers la l.113). Ce chat tourne en `dontAsk`, avec `--tools Read,Grep,Glob,Bash` et une liste blanche `--allowedTools` (`plugin/cockpit/scripts/vf-cockpit-agent.mjs`, vers les l.14-16).
+- **NON vérifié :** le contenu exact de la liste blanche Bash et ce qu'elle permet ; l'exécution réelle d'une commande par un chat piloté par script ; l'existence d'autres gardes.
+
+**Déclencheur de reprise :** une passe de sécurité sur le chat du cockpit, ou toute phase qui touche `POST /api/ask`.
+
+## Cockpit : le `claude` lancé depuis le terminal reçoit `CLAUDE_EFFORT` et `CLAUDE_PID` de la session parente — NON VÉRIFIÉ (2026-11-06)
+
+**Priorité : non fixée.** À vérifier avec le vrai binaire avant toute décision.
+
+**Origine :** recette par juge de la Phase 72, 2026-11-06.
+- **Observé :** le `claude` lancé depuis le terminal du cockpit reçoit `CLAUDE_EFFORT` et `CLAUDE_PID`, ceux de la session Claude Code qui a démarré le serveur du cockpit. Le filtre de `plugin/cockpit/scripts/vf-cockpit-terminal-env.mjs` (vers la l.18, Phase 71) retire `CLAUDE_CODE_*` et `CLAUDECODE`, mais pas ces deux variables.
+- **NON vérifié :** que `CLAUDE_EFFORT` impose bien au `claude` lancé l'effort du parent (avec le vrai binaire).
+- **Attention :** retirer tout `CLAUDE_*` enlèverait aussi des réglages voulus, comme `CLAUDE_CONFIG_DIR` ; le filtre doit rester nominatif.
+
+**Déclencheur de reprise :** une passe sur l'environnement du shell du terminal, ou un lancement dont l'effort surprend.
+
+## Cockpit : une proposition qui ouvre le tiroir pendant que le focus est dans la barre de question range la barre (`#ask-input`) — UX MINEURE (2026-11-06)
+
+**Priorité : non fixée.** Aucune fuite.
+
+**Origine :** recette par juge de la Phase 72, 2026-11-06.
+- **Observé :** quand le tiroir s'ouvre automatiquement sur une proposition alors que le focus est dans la barre de question (`#ask-input`), la barre se range (comportement de la Phase 71). Le focus tombe sur `BODY` et les frappes sont perdues, sans aller au cadre ni au shell.
+- **NON vérifié :** les autres éléments de la page qui se rangent à l'ouverture du tiroir.
+
+**Déclencheur de reprise :** une passe sur l'ouverture automatique du tiroir.

@@ -63,7 +63,25 @@ const cas = [['accepte', {}], ['accepte-ready', { data: 'ready' }], ['origine-de
   ['valeur-inconnue', { data: 'fermer-tout' }], ['objet', { data: { toggle: 1 } }], ['tableau', { data: ['toggle'] }], ['chaine-10000', { data: 'x'.repeat(10000) }],
   ['non-fiable', { isTrusted: false }], ['confiance-absente', { isTrusted: undefined }]];
 console.log(cas.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
-console.log('liste=' + [...L].sort().join(','));
+// 72-14 : la phase 71 garde ses huit valeurs (ligne 2), la phase 72 ajoute des valeurs FIXES, déclarées ici (ligne 3), avec leur table de cas (ligne 4)
+const AJOUTS_72 = ['proposition'];
+console.log('liste=' + [...L].filter((v) => !AJOUTS_72.includes(v)).sort().join(','));
+console.log('ajouts72=' + AJOUTS_72.filter((v) => L.includes(v)).sort().join(','));
+const casP = [['prop', {}], ['prop-suffixe', { data: 'proposition:ouvre' }], ['prop-majuscule', { data: 'Proposition' }], ['prop-espace', { data: 'proposition ' }],
+  ['prop-10000', { data: 'proposition' + 'x'.repeat(9989) }], ['prop-origine-de-P', { origin: P }], ['prop-source-autre', { source: {} }], ['prop-non-fiable', { isTrusted: false }]];
+console.log(casP.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, data: 'proposition', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
+JS
+cat > "$AUX/harnais-liste-q.mjs" <<'JS'
+// harnais-liste-q.mjs <sortie> : la liste fermée de P égale l'ensemble des valeurs de la table MESSAGES du client de Q (72-14, contrat §8) ; une ligne JSON
+import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
+const m = await import(pathToFileURL(`${process.argv[2]}/vf-cockpit-terminal-tiroir.mjs`).href);
+const src = fs.readFileSync(`${process.argv[2]}/vf-cockpit-terminal-client.mjs`, 'utf8');
+const bloc = (src.match(/const MESSAGES = Object\.freeze\(\{([\s\S]*?)\}\)/) || [, ''])[1];
+const paires = [...bloc.matchAll(/([A-Za-z]+):\s*'([^']+)'/g)].map((x) => [x[1], x[2]]);
+const Qv = paires.map((x) => x[1]).sort(), Pv = [...(m.LISTE_MESSAGES || [])].sort();
+const cle = (paires.find((x) => x[1] === 'proposition') || [, ''])[1];
+const appel = !!cle && new RegExp("emettre\\('" + cle + "'\\)").test(src);
+console.log(JSON.stringify({ q: Qv.length, p: Pv.length, egal: Qv.join(',') === Pv.join(','), cle, appel }));
 JS
 cat > "$AUX/scriptgen.mjs" <<'JS'
 // scriptgen.mjs <sortie> <indisponible 0|1> : faits statiques du script injecté (contenu du <script>) ; une ligne JSON
@@ -92,7 +110,7 @@ http.createServer((q, r) => {
 }).listen(Number(port), '127.0.0.1');
 JS
 cat > "$AUX/chrome-tiroir.mjs" <<'JS'
-// chrome-tiroir.mjs <chrome> <mode> <json> : scénarios navigateur du tiroir ; UNE ligne JSON. Modes : sans · flag · donnee · froid · localhost · page · etats.
+// chrome-tiroir.mjs <chrome> <mode> <json> : scénarios navigateur du tiroir ; UNE ligne JSON. Modes : sans · flag · donnee · froid · localhost · page · etats · proposition.
 // Chaque étape est isolée (essai) ; en mode flag, la première étape en échec arrête le reste (les mesures absentes sont nommées dans `erreurs`).
 // Gestes par Input.dispatchMouseEvent / Input.dispatchKeyEvent seulement. Le secret de session n'apparaît jamais en sortie.
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import { execFileSync } from 'node:child_process';
@@ -226,10 +244,81 @@ await executer(chrome, async (s) => {
       // gagne, course). Un seul cadre Q pendant la mesure : on efface la mémoire d'ouverture avant de naviguer. Le focus perdu au chargement reste rouge ; la sonde dit pageFocus, l'élément actif et les cadres de P.
       await s.ev(`localStorage.removeItem('vf.terminal.open')`);
       await q.naviguer(); await q.attendre(CARTE('Session expirée'), 'carte Session expirée');
+      // L2 : la vue ne prend le focus que si le cadre l'a déjà ; P donne le focus au cadre de Q, puis la carte est montée de nouveau (même contenu), comme à la perte de session dans un cadre actif
+      await s.ev(`(() => { const f = document.querySelector('iframe'); if (f) f.focus(); return true; })()`); await q.ev(`window.vfTermVue.carte('expire')`);
       const SONDE_J13 = `(() => { const k = document.querySelector('.vf-q-carte'), c = getComputedStyle(k); return { titre: (document.querySelector('.vf-q-titre') || {}).textContent, focus: document.activeElement === k, fv: k.matches(':focus-visible'), role: k.getAttribute('role'), contour: c.outlineStyle, pageFocus: document.hasFocus(), actif: document.activeElement && document.activeElement.tagName }; })()`;
       r.alerte = await q.ev(SONDE_J13); r.alerte.cadresP = await s.ev(`document.querySelectorAll('iframe').length`);
       r.coupure = await balayer('.vf-q-commande', '.vf-q-corps', LARGEURS, q);
     });
+    return r;
+  }
+
+  if (mode === 'proposition') { // 72-14 : la valeur fixe `proposition` émise par Q ouvre le tiroir de P, sans focus, sans canal de P vers Q (contrat §8 ; P72-D-09)
+    const r = { erreurs };
+    const pid = () => { try { return fs.readFileSync(A.fichierPid, 'utf8').trim(); } catch { return ''; } };
+    const RECT = (sel) => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const b = e.getBoundingClientRect(); return { l: Math.round(b.left), t: Math.round(b.top), r: Math.round(b.right), b: Math.round(b.bottom) }; })()`;
+    const RELEVE = `({ ouvert: ${OUVERT}, focus: document.activeElement ? (document.activeElement.id || document.activeElement.tagName) : '', annonce: (document.querySelector('.vf-term-annonce') || {}).textContent || '',
+      cadres: document.querySelectorAll('iframe').length, barre: (document.querySelector('.vf-term-etat') || {}).textContent || '', etiquette: (document.querySelector('button.vf-term-pastille') || { getAttribute: () => '' }).getAttribute('aria-label'),
+      h: document.querySelector('.vf-term-tiroir') ? Math.round(document.querySelector('.vf-term-tiroir').getBoundingClientRect().height) : -1 })`;
+    // attente tolérante : sur la base ou sous un mutant le tiroir ne s'ouvre pas ; la mesure continue, c'est l'assertion qui rougit (pas une erreur de scénario)
+    const attOuvre = async (ms = 6000) => { const fin = Date.now() + ms; while (Date.now() < fin) { if (await s.ev(OUVERT)) return true; await pause(100); } return false; };
+    const monde = async () => { // le monde du cadre de Q DANS le tiroir de P : origine de Q et window.vfTermVue, sans condition de fragment
+      const fin = Date.now() + MS; let essais = 0, c = 0;
+      while (!c) {
+        const et = 600 * 5 ** Math.min(essais++, 3);
+        for (let id = 1; id < et && !c; id++) {
+          const v = await s.send('Runtime.evaluate', { contextId: id, expression: `location.origin === ${JSON.stringify(OQ)} && typeof window.vfTermVue === 'object'`, returnByValue: true }).then((x) => x && x.result && x.result.value, () => false);
+          if (v === true) c = id;
+        }
+        if (!c) { if (Date.now() > fin) throw new Error('contexte du cadre de Q introuvable'); await pause(150); }
+      }
+      return c;
+    };
+    let cq = 0;
+    const deQ = (valeur) => s.send('Runtime.evaluate', { contextId: cq, expression: `window.parent.postMessage(${JSON.stringify(valeur)}, ${JSON.stringify(OP)})`, returnByValue: true });
+    await essai('amorcage', () => amorcerParP());
+    await essai('P', async () => { await s.naviguer(`${OP}/project.html`); await att(`!!document.querySelector('button.vf-term-pastille')`, 'pastille Terminal'); });
+    await essai('ouvrir', async () => {
+      await s.ev(`(() => { const b = document.createElement('button'); b.id = 'temoin'; b.textContent = 't'; b.style.cssText = 'position:fixed;left:0;top:0;width:12px;height:12px;z-index:1'; document.body.appendChild(b); b.focus(); })()`);
+      await raccourci(); await att(OUVERT, 'tiroir ouvert'); await att(`${MSG('ready')} && ${MSG('etat:connecte')}`, 'ready puis etat:connecte');
+      r.pid0 = pid(); cq = await monde();
+    });
+    await essai('fermer', async () => {
+      await clic('.vf-term-fermer'); await att(`!(${OUVERT})`, 'tiroir fermé par le bouton');
+      await s.ev(`document.getElementById('temoin').focus()`); await pause(300);
+      r.avant = await s.ev(RELEVE); r.avant.pastille = await s.ev(RECT('button.vf-term-pastille')); r.avant.zoom = await s.ev(RECT('#zoom'));
+    });
+    await essai('proposition-1', async () => { // TP.4 : tiroir fermé, la valeur fixe arrive de Q
+      await deQ('proposition'); await attOuvre(); await pause(300);
+      r.ouvre1 = await s.ev(RELEVE); r.ouvre1.pid = pid(); r.ouvre1.recu = await s.ev(MSG('proposition'));
+    });
+    await essai('proposition-2', async () => { // TP.5 : tiroir déjà ouvert ; l'annonce est effacée avant, elle seule doit revenir
+      await s.ev(`document.querySelector('.vf-term-annonce').textContent = ''`);
+      await deQ('proposition'); await pause(500);
+      r.ouvre2 = await s.ev(RELEVE); r.ouvre2.pid = pid();
+    });
+    await essai('cycle', async () => { // TP.7 et TP.8 : fermeture au bouton après l'ouverture par proposition
+      if (!(await s.ev(OUVERT))) { r.cycleSansOuverture = true; return; }
+      await clic('.vf-term-fermer'); await att(`!(${OUVERT})`, 'tiroir refermé'); await pause(300);
+      r.apres = await s.ev(RELEVE); r.apres.pastille = await s.ev(RECT('button.vf-term-pastille')); r.apres.zoom = await s.ev(RECT('#zoom'));
+    });
+    await essai('espion', async () => { // TP.8 : tout message d'origine Q vu par P est dans la liste (relevé AVANT les envois hostiles de TP.6)
+      const msgs = JSON.parse(await s.ev('JSON.stringify(window.__msgs)')), q = msgs.filter((m) => m.o === OQ);
+      r.espion = { de_q: q.length, hors_liste: q.filter((m) => !A.liste.includes(m.d)).length, proposition: q.filter((m) => m.d === 'proposition').length };
+    });
+    await essai('hostiles', async () => { // TP.6 : tiroir fermé, tout ce qui n'est pas la valeur fixe de Q laisse le tiroir fermé
+      if (await s.ev(OUVERT)) { await clic('.vf-term-fermer'); await att(`!(${OUVERT})`, 'tiroir fermé avant les envois hostiles'); }
+      const clos = async () => { await pause(600); return !(await s.ev(OUVERT)); };
+      r.hostile = {};
+      await s.ev(`postMessage('proposition', location.origin)`); r.hostile.deP = await clos();
+      await s.ev(`dispatchEvent(new MessageEvent('message', { data: 'proposition', origin: ${JSON.stringify(OQ)}, source: document.querySelector('iframe').contentWindow }))`); r.hostile.forge = await clos();
+      await deQ('proposition:ouvre'); r.hostile.suffixe = await clos();
+      await deQ('Proposition'); r.hostile.majuscule = await clos();
+      await deQ('proposition '); r.hostile.espace = await clos();
+      await deQ('proposition' + 'x'.repeat(9989)); r.hostile.long = await clos();
+      await deQ('proposition'); r.hostile.vivant = await attOuvre(); // témoin positif : le canal de Q vit, les refus ci-dessus ne sont pas un harnais mort
+    });
+    r.violations = [...s.violations];
     return r;
   }
 
@@ -540,10 +629,15 @@ run_pastille() { # run_pastille <sortie> <court 0|1> -> PJ ; un serveur neuf, un
 run_defaut() { # run_defaut <sortie> -> DJ ; un serveur neuf, un Chrome neuf
   srv "$1" 1; DJ="$(node "$AUX/chrome-defaut.mjs" "$CHROME" "{\"P\":$SRV_PORT}")"; unsrv
 }
-LISTE_JSON='["ready","etat:connecte","etat:reconnexion","etat:termine","etat:refuse","etat:expire","etat:arrete","toggle"]'
+LISTE_JSON='["ready","etat:connecte","etat:reconnexion","etat:termine","etat:refuse","etat:expire","etat:arrete","toggle","proposition"]'
 run_flag() { # run_flag <sortie> <court 0|1> -> FJ FP FQ ; un serveur neuf, un amorçage neuf, un Chrome neuf
   srv "$1" 1; FP=$SRV_PORT; FQ=$QP; FMARQ="MARQUEUR-P-$RANDOM$RANDOM"; rm -f "$WORK/run/m.txt" "$WORK/run/shell.pid"
   FJ="$(navig flag "{\"P\":$FP,\"Q\":$FQ,\"amorce\":\"$AMORCE\",\"marqueur\":\"$FMARQ\",\"fichierPid\":\"$WORK/run/shell.pid\",\"fichierM\":\"$WORK/run/m.txt\",\"TA\":\"$TA\",\"liste\":$LISTE_JSON,\"court\":$2}")"; unsrv
+}
+
+run_prop() { # run_prop <sortie> -> PJ ; un serveur neuf, un amorçage neuf, un Chrome neuf (72-14 : valeur fixe proposition)
+  srv "$1" 1; rm -f "$WORK/run/shell.pid"
+  PJ="$(navig proposition "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"fichierPid\":\"$WORK/run/shell.pid\",\"liste\":$LISTE_JSON}")"; unsrv
 }
 
 LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"
@@ -637,6 +731,19 @@ mut_msg M-MSG-ORIGINE 's|if (e.origin !== origineQ) return false;||' origine-de-
 mut_msg M-MSG-SOURCE 's|if (!fenetreCadre \|\| e.source !== fenetreCadre) return false;||' source-autre
 mut_msg M-MSG-LISTE 's|typeof e.data === .string. && liste.indexOf(e.data) >= 0|typeof e.data === "string"|' valeur-inconnue
 mut_msg M-MSG-CONFIANCE 's|if (!e \|\| e.isTrusted !== true) return false;|if (!e) return false;|' non-fiable
+
+echo "=== TP — valeur fixe « proposition » de Q vers P (72-14 ; P72-D-09, P71-D-18 ; contrat §8) ==="
+assert_eq "TP.1 — la liste de la phase 71 garde ses huit valeurs (ligne 2 du harnais), la phase 72 ajoute exactement une valeur fixe (ligne 3)" "$(sed -n 2p "$WORK/h.out") $(sed -n 3p "$WORK/h.out")" "liste=etat:arrete,etat:connecte,etat:expire,etat:reconnexion,etat:refuse,etat:termine,ready,toggle ajouts72=proposition"
+assert_eq "TP.2 — accepteMessage : « proposition » seule passe ; refusés : suffixe, majuscule, espace final, 10 000 caractères, origine de P, autre source, non fiable" "$(sed -n 4p "$WORK/h.out")" "prop=oui prop-suffixe=non prop-majuscule=non prop-espace=non prop-10000=non prop-origine-de-P=non prop-source-autre=non prop-non-fiable=non"
+node "$AUX/harnais-liste-q.mjs" "$OUT" > "$WORK/hq.out" 2>&1
+assert_eq "TP.3 — câblage : LISTE_MESSAGES de P = ensemble des valeurs de la table MESSAGES du client de Q (neuf valeurs), et le client appelle emettre sur la clé de « proposition »" "$(tail -n 1 "$WORK/hq.out" | node "$AUX/ev.mjs" '"q="+j.q+" p="+j.p+" egal="+j.egal+" cle="+j.cle+" appel="+j.appel')" "q=9 p=9 egal=true cle=proposition appel=true"
+mut_prop() { # mut_prop <libellé> <nom> <expression-sed> <cas qui doit passer à « oui » dans la ligne 4>
+  if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
+    node "$AUX/harnais-msg.mjs" "$MUT_OUT" > "$WORK/hm-$2.out" 2>&1
+    assert_eq "$1 $2 — le mutant rougit TP.2 : le cas « $4 » est accepté" "$(sed -n 4p "$WORK/hm-$2.out" | tr ' ' '\n' | grep "^$4=")" "$4=oui"
+  else sans_effet "$1 $2"; fi
+}
+mut_prop TP.9 M-MESSAGE-LIBRE 's|liste.indexOf(e.data) >= 0|(liste.indexOf(e.data) >= 0 \|\| e.data.indexOf("proposition") === 0)|' prop-suffixe
 
 if [ -n "$CHROME" ]; then
 echo "=== TU.1 — sans --terminal : rien (UI-SPEC §15.1) ==="
@@ -753,6 +860,25 @@ if mutant donnee vf-cockpit-terminal-client.mjs 's|term.write(m.value);|term.wri
   run_flag "$MUT_OUT" 1; J="$FJ"
   assert_eq "M-MSG-DONNEE — le mutant rougit T17.5 : un message hors liste ou portant le marqueur arrive à P (témoin : la commande a tourné)" "$(rj "$J" '"fichier="+j.t175.fichier+" rouge="+(j.t175.hors_liste>=1||j.t175.marqueur>=1)')" "fichier=true rouge=true"
 else sans_effet "M-MSG-DONNEE"; fi
+
+echo "=== TP.4-TP.8 — le tiroir s'ouvre sur « proposition » : sans focus, sans canal vers Q, pastille de la clôture 71 intacte ==="
+run_prop "$OUT"; PJ0="$PJ"
+PA="Proposition de lancement dans le terminal."
+assert_eq "TP.0 — témoin : le scénario n'a pas échoué (aucune étape en erreur), le tiroir était fermé et la valeur fixe de Q est parvenue à P" "$(rj "$PJ0" '(j.erreur||JSON.stringify(j.erreurs))+" ferme="+(j.avant&&!j.avant.ouvert)+" recu="+(j.ouvre1&&j.ouvre1.recu)')" "{} ferme=true recu=true"
+assert_eq "TP.4 — tiroir fermé, « proposition » de Q : il s'ouvre, le focus reste sur l'élément de P, un seul cadre, même shell, annonce « $PA »" "$(rj "$PJ0" '"ouvre="+(j.ouvre1&&j.ouvre1.ouvert)+" focus="+(j.ouvre1&&j.ouvre1.focus)+" cadres="+(j.ouvre1&&j.ouvre1.cadres)+" shell="+(j.ouvre1&&j.pid0&&j.ouvre1.pid===j.pid0?"meme":"autre")+" annonce="+(j.ouvre1&&j.ouvre1.annonce)')" "ouvre=true focus=temoin cadres=1 shell=meme annonce=$PA"
+assert_eq "TP.5 — tiroir déjà ouvert : même hauteur, même focus, aucun cadre de plus, l'annonce seule est redite (effacée avant)" "$(rj "$PJ0" '"ouvert="+(j.ouvre2&&j.ouvre2.ouvert)+" h="+(j.ouvre2&&j.ouvre1&&j.ouvre2.h===j.ouvre1.h&&j.ouvre1.h>0)+" focus="+(j.ouvre2&&j.ouvre2.focus)+" cadres="+(j.ouvre2&&j.ouvre2.cadres)+" annonce="+(j.ouvre2&&j.ouvre2.annonce)')" "ouvert=true h=true focus=temoin cadres=1 annonce=$PA"
+assert_eq "TP.7 — après ouverture par proposition puis fermeture au bouton : la pastille est sous #zoom (haut >= bas du zoom), ne le recouvre pas et reprend son rectangle d'avant le cycle" "$(rj "$PJ0" '(()=>{const a=j.apres,v=j.avant;if(!a||!v||!a.pastille||!a.zoom||!v.pastille)return "cycle="+!!a;const p=a.pastille,z=a.zoom,inter=p.l<z.r&&p.r>z.l&&p.t<z.b&&p.b>z.t;return "cycle=true sous="+(p.t>=z.b)+" libre="+(!inter)+" meme="+(JSON.stringify(p)===JSON.stringify(v.pastille)&&JSON.stringify(z)===JSON.stringify(v.zoom))})()')" "cycle=true sous=true libre=true meme=true"
+assert_eq "TP.8 — la proposition ne passe pas par la branche des états : barre « Connecté », pastille « session en cours », 0 violation de CSP, espion : que des valeurs de la liste étendue (la valeur fixe y figure)" "$(rj "$PJ0" '"ouvre="+(j.ouvre1&&j.ouvre1.ouvert)+" barre="+(j.apres&&j.apres.barre)+" etiquette="+(j.apres&&j.apres.etiquette)+" violations="+(j.violations&&j.violations.length)+" hors_liste="+(j.espion&&j.espion.hors_liste)+" prop="+(j.espion&&j.espion.proposition>=1)')" "ouvre=true barre=Connecté etiquette=Ouvrir le terminal, une session est en cours violations=0 hors_liste=0 prop=true"
+assert_eq "TP.6 — tiroir fermé : postMessage de P, MessageEvent forgé, « proposition:ouvre », « Proposition », « proposition » + espace, 10 000 caractères depuis Q : il reste fermé ; témoin : la vraie valeur de Q l'ouvre ensuite" "$(rj "$PJ0" 'JSON.stringify(j.hostile)')" '{"deP":true,"forge":true,"suffixe":true,"majuscule":true,"espace":true,"long":true,"vivant":true}'
+mut_prop_nav() { # mut_prop_nav <libellé> <nom> <expression-sed> <expression de rougissement sur le relevé du mutant>
+  if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
+    run_prop "$MUT_OUT"
+    assert_eq "$1 $2 — le mutant rougit : $5 (témoin : aucune erreur de scénario)" "$(rj "$PJ" '(j.erreur||JSON.stringify(j.erreurs))+" rouge="+('"$4"')')" "{} rouge=true"
+  else sans_effet "$1 $2"; fi
+}
+mut_prop_nav TP.10 M-LISTE-SANS-PROPOSITION "s|, 'proposition'\]);|]);|" '!(j.ouvre1&&j.ouvre1.ouvert)' "le tiroir ne s'ouvre plus (liste sans la valeur)"
+mut_prop_nav TP.11 M-PROPOSITION-COMME-ETAT 's|else if (e.data === .proposition.) proposer();||' '!(j.ouvre1&&j.ouvre1.barre==="Connecté")' "la barre perd son libellé « Connecté »"
+mut_prop_nav TP.12 M-FOCUS-VOLE 's|const proposer = () => { ouvrir(false);|const proposer = () => { ouvrir(true);|' '!(j.ouvre1&&j.ouvre1.focus==="temoin")' "le focus passe au cadre"
 fi
 
 vf_hyg_assert

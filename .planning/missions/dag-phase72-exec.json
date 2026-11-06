@@ -1,0 +1,632 @@
+{
+  "nodes": [
+    {
+      "id": "research-72",
+      "step": "carte du code + recherche",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "panel-canal",
+      "step": "panel canal P->Q",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ask-72",
+      "step": "arbitrages Samuel",
+      "stage": "",
+      "deps": [
+        "research-72",
+        "panel-canal"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "discuss-72",
+      "step": "CONTEXT 72",
+      "stage": "",
+      "deps": [
+        "ask-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plan-72",
+      "step": "plans + plan-checker",
+      "stage": "",
+      "deps": [
+        "discuss-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-72",
+      "step": "execution par vagues",
+      "stage": "",
+      "deps": [
+        "plan-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-72",
+      "step": "revue",
+      "stage": "",
+      "deps": [
+        "exec-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-72",
+      "step": "audit securite",
+      "stage": "",
+      "deps": [
+        "exec-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recette-72",
+      "step": "juges playwright",
+      "stage": "",
+      "deps": [
+        "exec-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire",
+      "stage": "",
+      "deps": [
+        "exec-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "pr-72",
+      "step": "rebase + CI + PR",
+      "stage": "",
+      "deps": [
+        "revue-72",
+        "audit-72",
+        "recette-72",
+        "docs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "sonde-prompt",
+      "step": "sonde A1/A2 prompt initial",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-01",
+      "step": "plan 72-01",
+      "stage": "",
+      "deps": [
+        "plan-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-02",
+      "step": "plan 72-02",
+      "stage": "",
+      "deps": [
+        "plan-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-03",
+      "step": "plan 72-03",
+      "stage": "",
+      "deps": [
+        "plan-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-04",
+      "step": "plan 72-04",
+      "stage": "",
+      "deps": [
+        "plan-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-05",
+      "step": "plan 72-05",
+      "stage": "",
+      "deps": [
+        "plan-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-06",
+      "step": "plan 72-06",
+      "stage": "",
+      "deps": [
+        "plan-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-07",
+      "step": "plan 72-07",
+      "stage": "",
+      "deps": [
+        "plan-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-08",
+      "step": "plan 72-08",
+      "stage": "",
+      "deps": [
+        "plan-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "sonde-a5",
+      "step": "sonde A5 continuer le chat",
+      "stage": "",
+      "deps": [
+        "plan-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-09",
+      "step": "plan 72-09",
+      "stage": "",
+      "deps": [
+        "ex-01",
+        "ex-03",
+        "ex-04",
+        "ex-06",
+        "ex-07"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-10",
+      "step": "plan 72-10",
+      "stage": "",
+      "deps": [
+        "ex-01",
+        "ex-02",
+        "ex-05"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-11",
+      "step": "plan 72-11",
+      "stage": "",
+      "deps": [
+        "ex-08",
+        "ex-09",
+        "ex-10"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-12",
+      "step": "plan 72-12",
+      "stage": "",
+      "deps": [
+        "ex-08",
+        "ex-09",
+        "ex-10"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-13",
+      "step": "plan 72-13",
+      "stage": "",
+      "deps": [
+        "ex-06",
+        "ex-08",
+        "ex-09",
+        "ex-10",
+        "sonde-a5"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-14",
+      "step": "plan 72-14",
+      "stage": "",
+      "deps": [
+        "ex-08"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-15",
+      "step": "plan 72-15",
+      "stage": "",
+      "deps": [
+        "ex-11",
+        "ex-12",
+        "ex-13",
+        "ex-14",
+        "ex-16",
+        "fix-ui-a",
+        "fix-srv-a",
+        "fix-f1",
+        "fix-c",
+        "sonde-f2",
+        "ask-f1bis",
+        "res-f1"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-a",
+      "step": "revue lot 1 (01-10,14) au SHA 84501819",
+      "stage": "",
+      "deps": [
+        "ex-10",
+        "ex-14",
+        "ex-09"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-a",
+      "step": "audit sécurité lot 1 au SHA 84501819",
+      "stage": "",
+      "deps": [
+        "ex-10",
+        "ex-14",
+        "ex-09"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-doc-a",
+      "step": "correctifs documentaires lot 1",
+      "stage": "",
+      "deps": [
+        "revue-a",
+        "audit-a"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-srv-a",
+      "step": "correctifs serveur/PTY lot 1 (F3, ST-1, ST-3, ST-4)",
+      "stage": "",
+      "deps": [
+        "revue-a",
+        "audit-a"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plan-16",
+      "step": "plan 72-16 mode persisté (P72-D-20)",
+      "stage": "",
+      "deps": [
+        "plan-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ex-16",
+      "step": "plan 72-16",
+      "stage": "",
+      "deps": [
+        "plan-16",
+        "ex-13",
+        "fix-srv-a",
+        "check-16",
+        "fix-ui-a",
+        "fix-c"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-ui-a",
+      "step": "correctifs côté Q lot 1 (F1, ST-2, ST-5, SP-1, NOTE_HERITE)",
+      "stage": "",
+      "deps": [
+        "ex-13",
+        "revue-a",
+        "audit-a"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "check-16",
+      "step": "re-vérification plan 72-16",
+      "stage": "",
+      "deps": [
+        "plan-16"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-b",
+      "step": "revue-b lot 2 au SHA b5efcc40",
+      "stage": "",
+      "deps": [
+        "ex-11",
+        "ex-12",
+        "ex-13",
+        "fix-srv-a"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-b",
+      "step": "audit-b lot 2 au SHA b5efcc40",
+      "stage": "",
+      "deps": [
+        "ex-11",
+        "ex-12",
+        "ex-13",
+        "fix-srv-a"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-c",
+      "step": "fix-c",
+      "stage": "",
+      "deps": [
+        "audit-b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "sonde-f2",
+      "step": "sonde-f2",
+      "stage": "",
+      "deps": [
+        "audit-b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ask-f1",
+      "step": "arbitrage Samuel F-1 (reprise de chat forgée)",
+      "stage": "",
+      "deps": [
+        "audit-b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-f1",
+      "step": "F-1 : UUID du chat retenu seulement sur geste humain (P72-D-21)",
+      "stage": "",
+      "deps": [
+        "ask-f1",
+        "fix-ui-a"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ask-f1bis",
+      "step": "re-arbitrage F-1 (prémisse corrigée)",
+      "stage": "",
+      "deps": [
+        "fix-f1"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "res-f1",
+      "step": "témoin du résiduel P72-D-22 + BACKLOG",
+      "stage": "",
+      "deps": [
+        "ask-f1bis"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-final",
+      "step": "xss C1l.4a, contrat ecriture, docstring pty",
+      "stage": "",
+      "deps": [
+        "ex-16"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-c",
+      "step": "revue-c lot 3 au SHA 4fa5fe95",
+      "stage": "",
+      "deps": [
+        "ex-16",
+        "fix-f1",
+        "res-f1"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-c",
+      "step": "audit-c lot 3 au SHA 4fa5fe95",
+      "stage": "",
+      "deps": [
+        "ex-16",
+        "fix-f1",
+        "res-f1"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "ui-recette",
+      "step": "réglages visuels de la recette",
+      "stage": "",
+      "deps": [
+        "recette-72"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-mineurs-c",
+      "step": "S-1 et P-1 de la revue lot 3",
+      "stage": "",
+      "deps": [
+        "revue-c"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-l2",
+      "step": "L2 focus non gardé dans la vue (carte, bandeau, collage) + texte ℹ de la suite xss",
+      "stage": "",
+      "deps": [
+        "ui-recette",
+        "audit-c"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "nr-complete",
+      "step": "non-régression complète 181 suites + gates",
+      "stage": "",
+      "deps": [
+        "fix-l2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "dbg-ci-linux",
+      "step": "debug rouges CI Linux (Q5, B2/B3/B5, LB.E2, R1)",
+      "stage": "",
+      "deps": [
+        "nr-complete"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-d",
+      "step": "revue ciblée 9f40408b (PTY Linux)",
+      "stage": "",
+      "deps": [
+        "dbg-ci-linux"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-d",
+      "step": "retest du premier plan avant la ligne différée + témoins (revue 9f40408b)",
+      "stage": "",
+      "deps": [
+        "revue-d"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-e",
+      "step": "revue fraîche ac8cacb7",
+      "stage": "",
+      "deps": [
+        "fix-d"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-e",
+      "step": "point fixe : toute frappe humaine pendant l'attente annule la ligne + preuve générative",
+      "stage": "",
+      "deps": [
+        "revue-e"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-f",
+      "step": "revue fraîche 61da7f5f",
+      "stage": "",
+      "deps": [
+        "fix-e"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-f",
+      "step": "reset du drapeau témoigné, réponses de terminal ignorées, textes",
+      "stage": "",
+      "deps": [
+        "revue-f"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

@@ -1,9 +1,11 @@
 // vf-cockpit-terminal-vue — vue du terminal dans la page de Q : thème xterm, cartes d'état, bandeau (71-05 pour l'amorce, 71-06 pour le contenu).
-// Export : vueTerminal(cfg) -> rien ; pose window.vfTermVue = { theme(clair), carte(type, action), bandeau(type, detail, action), effacer() }.
+// Export : vueTerminal(cfg) -> rien ; pose window.vfTermVue = { theme(clair), carte(type, action), bandeau(type, detail, action), effacer(), collage(...), proposition(p, cb) }.
+// proposition (72-08) : bandeau de proposition de lancement, qui réutilise les classes vf-q-bandeau et vf-q-collage ; aucune écriture au terminal depuis la vue : tout passe par cb.lancer.
 // cfg = { origineP, theme }. Sérialisé par .toString() dans un <script> sans attribut, donc autonome : aucune référence à un identifiant du module.
 // Textes de l'UI-SPEC §12, posés par textContent ; le seul nombre rendu (code ou signal) est converti en entier. Aucun innerHTML.
 export function vueTerminal(cfg) {
   void cfg;
+  const CHAT_LIVRE = true; // option « continuer le chat » (72-13) : même valeur que dans le script de P ; la fonction est sérialisée, aucune référence au module
   const NS = 'http://www.w3.org/2000/svg';
   const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; };
   const picto = (d) => {
@@ -35,6 +37,28 @@ export function vueTerminal(cfg) {
     black: '#161616', red: '#da1637', green: '#007f3d', yellow: '#986300', blue: '#1f5fd6', magenta: '#6a45d6', cyan: '#0b7f6b', white: '#3f3f3f',
     brightBlack: '#595959', brightRed: '#da1637', brightGreen: '#007f3d', brightYellow: '#986300', brightBlue: '#1747a8', brightMagenta: '#5233b8', brightCyan: '#0a6a5a', brightWhite: '#161616',
   };
+  // bandeau de proposition (72-08) : modes, note du mode hérité, motifs des pré-vols (mêmes codes et mêmes textes que la carte, une page par origine), messages par statut de lancement
+  const MODES_UI = [{ mode: 'default', libelle: 'Par défaut' }, { mode: 'acceptEdits', libelle: 'Accepter les modifications' }, { mode: 'plan', libelle: 'Plan (lecture seule)' }, { mode: 'herite', libelle: 'Hérité du poste' }];
+  const NOTE_HERITE = "Aucun mode n'est imposé : Claude Code suit les réglages de votre poste ou du projet ; un projet ne peut imposer ni « tout autoriser » ni auto (Claude Code 2.1.257 et plus).";
+  const MOTIFS = Object.assign(Object.create(null), {
+    'phase-finie': 'La phase est terminée.', 'terminal-absent': 'Le terminal est indisponible sur ce poste.', 'terminal-arrete': 'Le terminal est arrêté. Relancez /vf-cockpit --terminal.',
+    'premier-plan-occupe': 'Un programme occupe déjà le terminal.', 'claude-introuvable': 'La commande claude est introuvable.', 'python3-absent': 'Python 3 est introuvable sur ce poste.',
+    'phase-hors-motif': "Le numéro de phase n'est pas lançable.", 'compartiment-hors-motif': "Le nom du compartiment n'est pas lançable.", 'mission-hors-phase': 'Une mission hors phase ne se lance pas depuis sa carte.',
+    'dependance-non-close': "Une phase dont celle-ci dépend n'est pas close (lecture de la prose du ROADMAP, indicative).", 'mission-vivante': 'Une mission vivante travaille déjà sur cette phase.',
+    'phase-plus-avancee-ailleurs': 'La phase est plus avancée dans un autre arbre de travail.', 'lancement-recent': 'Cette cible a déjà été lancée récemment.', 'travail-non-commite': "Du travail non commité existe dans l'arbre de travail.",
+  });
+  const MESSAGES_LANCEMENT = Object.assign(Object.create(null), {
+    occupe: "Le terminal n'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n'a été écrit ; vérifiez, puis cliquez sur Lancer.", attendre: 'Patientez un instant, puis cliquez de nouveau sur Lancer.',
+    'sans-session': "Aucune session de terminal n'est ouverte : relancez le shell, puis réessayez.", refus: 'Le lancement a été refusé.', reseau: 'Le terminal ne répond pas.',
+  });
+  // feuille des contrôles du bandeau de proposition (72, réglages du 2026-11-06) : variables de Q seulement, identifiants du bandeau, texte neutre ; posée une fois, la CSP de Q autorise le style en ligne
+  const STYLE_PROPOSITION = '#proposition-mode { border: thin solid var(--hair-2); border-radius: var(--r-ctl); background: var(--raise-2); color: var(--text); color-scheme: inherit; font: inherit; }'
+    + '#proposition input[type="checkbox"] { accent-color: var(--on); color-scheme: inherit; }'
+    + '#proposition-lancer[aria-disabled="true"], #proposition-lancer[aria-disabled="true"]:hover { cursor: not-allowed; background: var(--raise-2); color: var(--text-3); }'
+    + '.vf-lancer-armement { display: none; } #proposition:has(#proposition-lancer[aria-disabled="true"]) .vf-lancer-armement { display: inline; }';
+  const poserStyleProposition = () => { if (document.getElementById('vf-lancer-style')) return; const st = document.createElement('style'); st.id = 'vf-lancer-style'; st.textContent = STYLE_PROPOSITION; document.head.appendChild(st); };
+  let courant = null, minuterie = 0; // identifiant du bandeau affiché ; minuterie d'armement
+  const retirerProposition = () => { clearTimeout(minuterie); minuterie = 0; const a = document.getElementById('proposition'); if (a) a.remove(); courant = null; };
   window.vfTermVue = {
     invisible: (t) => INVISIBLE.test(String(t).replace(/\t/g, '')),
     // curseur de la barre de défilement : teinte de l'encre Graphite (variable --ink de la feuille), opacités plus fortes qu'avant (10 % en veille) ; repli sur la valeur de la feuille
@@ -58,7 +82,7 @@ export function vueTerminal(cfg) {
       });
       k.appendChild(corps);
       const b = c.bouton ? bouton(c.bouton, action) : null; if (b) k.appendChild(b);
-      z.appendChild(k); if (c.masque) document.getElementById('terminal').classList.add('vf-q-cache'); (b || k).focus(); // masque : sous la carte « déjà ouvert » aucun terminal vide ni curseur
+      z.appendChild(k); if (c.masque) document.getElementById('terminal').classList.add('vf-q-cache'); if (document.hasFocus()) (b || k).focus(); // L2 : jamais de focus pris à la page ; masque : sous la carte « déjà ouvert » aucun terminal vide ni curseur
     },
     bandeau(type, detail, action) {
       const z = vider(); z.hidden = false;
@@ -69,9 +93,63 @@ export function vueTerminal(cfg) {
       b.appendChild(el('span', 'vf-q-pastille' + (type === 'reconnexion' ? ' vf-q-attention' : '')));
       b.appendChild(el('span', 'vf-q-texte', texte));
       const r = type === 'reconnexion' ? null : bouton('Relancer le shell', action); if (r) b.appendChild(r);
-      z.appendChild(b); if (r) r.focus();
+      z.appendChild(b); if (r && document.hasFocus()) r.focus(); // L2 : jamais de focus pris à la page
     },
     effacer() { const z = vider(); z.hidden = true; },
+    // proposition : p = { id, intention, lignes, bloquants, avertissements, arme_apres_ms, modeInitial } (revalidée par le client), cb = { lancer(mode, avecChat) -> Promise<statut>, annuler() } ; p.chat === true et p.lignesChat (72-13) : case « Continuer la conversation du chat » ; null retire.
+    // « Lancer » n'est armé qu'après arme_apres_ms, jamais en présence d'un bloquant, et ne répond qu'à un clic de confiance ; la ligne montrée est celle du mode choisi, posée par textContent
+    proposition(p, cb) {
+      if (p === null || p === undefined) { retirerProposition(); return; }
+      const premier = courant !== p.id; retirerProposition();
+      const bloquants = p.bloquants || [], avertissements = p.avertissements || [];
+      const b = el('div', 'vf-q-bandeau vf-q-collage'); b.id = 'proposition'; b.setAttribute('data-id', p.id); b.setAttribute('role', 'group'); b.setAttribute('aria-label', 'Lancement à confirmer');
+      b.appendChild(el('span', 'vf-q-pastille vf-q-attention'));
+      const t = el('span', 'vf-q-texte', 'Lancement proposé : ' + p.intention); b.appendChild(t); // garde:texte
+      const sel = el('select'); sel.id = 'proposition-mode'; sel.setAttribute('aria-label', 'Mode de permission');
+      MODES_UI.forEach((m) => { const o = el('option', '', m.libelle); o.value = m.mode; sel.appendChild(o); });
+      sel.value = MODES_UI.some((m) => m.mode === p.modeInitial) ? p.modeInitial : 'default'; b.appendChild(sel);
+      poserStyleProposition();
+      const armement = el('span', 'vf-q-decompte vf-lancer-armement', bloquants.length ? 'Lancement bloqué' : 'Prêt dans un instant'); armement.id = 'proposition-armement'; b.appendChild(armement); // l'état « pas encore armé » se dit en texte neutre ; masqué dès que le bouton est armé
+      const annuler = bouton('Annuler', () => { cb.annuler(); retirerProposition(); }, 'vf-q-secondaire'); b.appendChild(annuler);
+      const lancer = el('button', 'vf-q-bouton', 'Lancer'); lancer.type = 'button'; lancer.id = 'proposition-lancer';
+      lancer.setAttribute('aria-disabled', 'true'); // garde:armement
+      lancer.setAttribute('aria-describedby', 'proposition-armement');
+      b.appendChild(lancer);
+      const prevol = (cls, prefixe, code) => { const d = el('div', 'vf-q-reste'); d.appendChild(el('span', 'vf-q-texte ' + cls, prefixe + (MOTIFS[code] || 'Contrôle non reconnu.'))); b.appendChild(d); };
+      bloquants.forEach((c) => prevol('vf-q-erreur-texte', 'Bloquant : ', c)); avertissements.forEach((c) => prevol('vf-q-attention-texte', 'Attention : ', c));
+      const avecChat = CHAT_LIVRE && p.chat === true && !!p.lignesChat && typeof p.lignesChat === 'object'; // garde:chat-offre
+      let caseChat = null;
+      if (avecChat) {
+        const d = el('div', 'vf-q-reste'), lab = el('label', 'vf-q-texte'); caseChat = el('input'); caseChat.type = 'checkbox'; caseChat.id = 'proposition-chat';
+        lab.appendChild(caseChat); lab.appendChild(el('span', '', 'Continuer la conversation du chat')); d.appendChild(lab); b.appendChild(d);
+      }
+      const lignes = () => (caseChat && caseChat.checked ? p.lignesChat : p.lignes)[sel.value];
+      const ligne = el('div', 'vf-q-apercu', lignes()); ligne.id = 'proposition-ligne'; ligne.tabIndex = 0; ligne.setAttribute('role', 'region'); ligne.setAttribute('aria-label', 'Commande exacte'); b.appendChild(ligne);
+      const msg = el('div', 'vf-q-reste'); msg.id = 'proposition-message'; msg.setAttribute('role', 'status'); b.appendChild(msg);
+      let note = null;
+      const majMode = () => {
+        ligne.textContent = lignes();
+        if (sel.value === 'herite' && !note) { note = el('div', 'vf-q-reste'); note.appendChild(el('span', 'vf-q-texte', NOTE_HERITE)); b.insertBefore(note, msg); }
+        if (sel.value !== 'herite' && note) { note.remove(); note = null; }
+      };
+      sel.addEventListener('change', majMode); if (caseChat) caseChat.addEventListener('change', majMode); majMode();
+      const armer = () => { clearTimeout(minuterie); if (bloquants.length === 0) minuterie = setTimeout(() => lancer.setAttribute('aria-disabled', 'false'), p.arme_apres_ms); };
+      armer();
+      const fin = (st) => {
+        if (document.getElementById('proposition') !== b) return; // le bandeau a été remplacé ou retiré entre-temps
+        if (st === 'ok' || st === 'absente') { retirerProposition(); return; } // garde:retrait-usage
+        msg.textContent = MESSAGES_LANCEMENT[st] || MESSAGES_LANCEMENT.refus;
+        if (st === 'attendre') armer(); else if (bloquants.length === 0) lancer.setAttribute('aria-disabled', 'false');
+      };
+      lancer.addEventListener('click', (ev) => {
+        if (ev.isTrusted !== true || lancer.getAttribute('aria-disabled') === 'true') return; // garde:clic-fiable
+        lancer.setAttribute('aria-disabled', 'true'); msg.textContent = '';
+        Promise.resolve().then(() => cb.lancer(sel.value, !!(caseChat && caseChat.checked))).then(fin).catch(() => fin('reseau'));
+      });
+      const c = document.getElementById('collage');
+      if (c) document.body.insertBefore(b, c); else document.body.appendChild(b); // garde:collage-dessus
+      courant = p.id; if (premier && document.hasFocus()) annuler.focus(); // F1 : jamais de focus pris à la page ; Annuler (inoffensif) seulement si ce cadre l'a déjà
+    },
     // collage à confirmer : ce que l'utilisateur confirme est EXACTEMENT ce qui part. Le texte intégral est montré (zone défilante, atteignable au clavier) par textContent
     // seulement, avec ses nombres de lignes et de caractères ; seul l'AFFICHAGE est neutralisé (caractères invisibles ou de contrôle rendus ⟨U+XXXX⟩, jamais retirés ;
     // le texte rendu à `coller` reste l'original). Au-delà de LIMITE caractères la coupure est dite (« N caractères non affichés ») et « Tout afficher » la lève ; null retire le bandeau
