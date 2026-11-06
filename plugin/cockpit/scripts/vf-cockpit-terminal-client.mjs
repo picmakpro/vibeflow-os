@@ -50,7 +50,7 @@ export function clientTerminal(cfg) {
   // 2. terminal
   if (!encadree) { vue.carte('horscadre'); return; }
   emettre('ready');
-  if (!localStorage.getItem(CLE_SECRET)) { vue.carte('sansamorce'); emettre('expire'); return; } // aucun secret : le terminal n'a jamais été ouvert dans cet onglet, ce n'est pas une expiration (PU-G-132)
+  if (!localStorage.getItem(CLE_SECRET)) { vue.carte('sansamorce'); return; } // aucun secret : le terminal n'a jamais été ouvert dans cet onglet, ce n'est pas une expiration (PU-G-132) ; rien n'est dit à P, la barre du tiroir ne prétend pas non plus qu'une session a expiré
   const entetes = () => ({ 'X-VF-Terminal': localStorage.getItem(CLE_SECRET) || '', 'X-VF-Onglet': onglet() });
   const modeServi = (p) => { // la présélection vient de Q (valeur servie), relue contre la liste fermée ; rien n'est gardé dans le navigateur
     const v = p.mode_retenu; // garde:mode-lecture

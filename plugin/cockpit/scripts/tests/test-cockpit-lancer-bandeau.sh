@@ -594,6 +594,7 @@ await executer(chrome, async (s) => {
     await essai('v18', async () => { // LB3 (PU-G-140) : accueil de la première ouverture : effaçable, jamais d'octet au shell ni de focus pris ; une proposition ou une carte le remplace ; « Compris » le range pour de bon
       await q.ev(`(() => { localStorage.removeItem('vf.terminal.accueil'); vfTermVue.proposition(null); return true; })()`);
       const foc = () => q.ev(`document.activeElement ? document.activeElement.tagName + '#' + document.activeElement.id : ''`);
+      await q.ev(`(() => { const x = document.getElementById('accueil'); if (x) x.remove(); document.querySelector('.xterm-helper-textarea').focus(); return true; })()`); // état connu : pas d'accueil, le focus sur la saisie du terminal
       const foc0 = await foc(), n0 = entrees();
       await q.ev(`(() => { vfTermVue.effacer(); return true; })()`);
       const a = await q.ev(`(() => { const e = document.getElementById('accueil'); return e ? [e.getAttribute('role'), e.textContent.includes('Vous n’en avez pas besoin pour suivre le travail dans le cockpit'), [...e.querySelectorAll('button')].map((x) => x.textContent).join(',')].join('|') : 'absent'; })()`);

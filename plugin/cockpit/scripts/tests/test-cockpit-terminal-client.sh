@@ -231,7 +231,9 @@ await executer(chrome, async (s) => {
       r.duree = Date.now() - t0; r.carte = await texte();
     } else if (mode === 'sansamorce') {
       // PU-G-132 : aucun secret dans le stockage de Q (onglet où le terminal n'a jamais été ouvert) : la carte le dit juste, elle ne prétend pas qu'une session a expiré
+      await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `if (window.top === window) { window.__msgs = []; addEventListener('message', (e) => { if (typeof e.data === 'string') window.__msgs.push(e.data); }); }` });
       await essai('carte-sans-amorce', async () => { await q.naviguer(); await att(`((document.getElementById('etat') || {}).textContent || '').length > 0`, 'une carte dans le cadre (secret absent)'); });
+      await pause(800); r.msgs = await s.ev('JSON.stringify(window.__msgs || [])').then((x) => JSON.parse(x || '[]')).catch(() => ['?']); // ce que P a reçu : la barre du tiroir ne doit pas dire « Session expirée »
       r.carte = await texte();
     } else if (mode === 'reprise') {
       // DG-08 : un cadre qui se reconnecte à un shell déjà ouvert, à une AUTRE taille, dit sa taille : le terminal la reprend (stty size) ; sinon le shell dessine pour une grille que l'écran n'a pas
@@ -633,7 +635,7 @@ scenario "$OUT" perime "$FAUX_SEC"
 assert_eq "J2.0 — témoin : le scénario n'a pas échoué globalement" "$(rj "$SCJ" 'j.erreur||"ok"')" "ok"
 assert_eq "J2.1 — secret périmé (serveur relancé) : la carte « Session expirée » s'affiche en moins de 10 s, jamais « Serveur arrêté »" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" expiree="+(j.carte||"").includes("Session expirée")+" arrete="+(j.carte||"").includes("Serveur arrêté")+" rapide="+(j.duree<10000)')" "erreurs={} expiree=true arrete=false rapide=true"
 scenario "$OUT" sansamorce ""
-assert_eq "J2.3 — PU-G-132 : aucun secret (terminal jamais ouvert dans cet onglet) : la carte dit « Terminal non disponible dans cet onglet » et la commande, jamais « Session expirée »" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" juste="+(j.carte||"").includes("Terminal non disponible dans cet onglet")+" commande="+(j.carte||"").includes("/vf-cockpit --terminal")+" expiree="+(j.carte||"").includes("Session expirée")')" "erreurs={} juste=true commande=true expiree=false"
+assert_eq "J2.3 — PU-G-132 : aucun secret (terminal jamais ouvert dans cet onglet) : la carte dit « Terminal non disponible dans cet onglet » et la commande, jamais « Session expirée », et P ne reçoit que « ready » (jamais etat:expire : la barre du tiroir ne ment pas non plus)" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" juste="+(j.carte||"").includes("Terminal non disponible dans cet onglet")+" commande="+(j.carte||"").includes("/vf-cockpit --terminal")+" expiree="+(j.carte||"").includes("Session expirée")+" msgs="+JSON.stringify(j.msgs)')" "erreurs={} juste=true commande=true expiree=false msgs=[\"ready\"]"
 MS_SC=60000 scenario "$OUT" arret
 assert_eq "J2.2 — serveur réellement arrêté en cours de session : « Serveur arrêté », jamais « Session expirée » (témoin : le PID enregistré a reçu le signal)" "$(rj "$SCJ" '"tue="+j.tue+" erreurs="+JSON.stringify(j.erreurs)+" arrete="+((j.carte||"").includes("Serveur arrêté"))+" expiree="+((j.carte||"").includes("Session expirée"))')" "tue=true erreurs={} arrete=true expiree=false"
 scenario "$OUT" reprise

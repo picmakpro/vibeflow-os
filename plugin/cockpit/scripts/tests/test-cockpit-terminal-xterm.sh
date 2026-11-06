@@ -370,6 +370,7 @@ await executer(chrome, async (sp) => {
     });
     // R2 : tout l'espace du cadre suit le fond du thème (le fond de la zone de défilement de xterm est noir par défaut) — styles calculés et colonne de pixels, dans les deux thèmes
     r.fond = {};
+    await essai('accueil-range', async () => { await s.ev(`(() => { const b = [...document.querySelectorAll('#accueil button')].find((x) => x.textContent === 'Compris'); if (b) b.click(); return true; })()`); await pause(300); }); // LB3 (PU-G-140) : la phrase d'accueil de la première ouverture se pose sur le bas du cadre ; R2 mesure le fond du cadre une fois rangée, comme le fait un utilisateur
     const FOND = `(() => { const t = getComputedStyle(document.getElementById('terminal')).backgroundColor, v = getComputedStyle(document.querySelector('.xterm-viewport')).backgroundColor; return { terminal: t, viewport: v }; })()`;
     for (const th of ['dark', 'light']) {
       if (th !== theme) { theme = th; await s.naviguer(); }
