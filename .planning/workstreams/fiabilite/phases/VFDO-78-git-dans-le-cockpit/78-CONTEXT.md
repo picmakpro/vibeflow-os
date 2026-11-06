@@ -168,6 +168,12 @@ verrous de driver, arbitrages en attente, watchdog et serveurs orphelins (Phase 
   `<common>/worktrees/<id>` du dépôt lu n'est jamais lu (`status` non lancé) : il s'affiche « non vérifié », sans comptes
   ni commande `cd` (finding F3 de l'audit du 2026-11-06 : `gitdir` forgé = lecture d'un dossier arbitraire du poste).
   Décision du manager de reprise (durcissement de la lecture seule, aucun nouveau comportement visible hors ce cas).
+- **P78-D-39 (plancher de la recherche, amende P70-D-16).** « Recherche à 152 px (Recommandé) » (arbitrage Samuel,
+  AskUserQuestion session principale, 2026-11-06) : de 1000 à 1279 px et seulement quand Git est présent, le plancher de la
+  recherche de l'en-tête descend de 200 à 152 px, avec un texte d'invite plus court ; 200 px restent exigés partout
+  ailleurs et sans Git. Amende P70-D-16 (`70-CONTEXT.md`, arbitrage Samuel, AskUserQuestion session principale,
+  2026-11-03) sur cette seule plage et à cette seule condition. Options écartées : icône de 28 px, masquer « Écrans »,
+  revenir sur P78-D-34.
 
 ### Claude's Discretion
 
