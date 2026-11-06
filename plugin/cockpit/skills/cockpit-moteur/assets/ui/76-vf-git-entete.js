@@ -45,7 +45,7 @@
     if (!k || !h1) return;
     const t = texteVue();
     k.textContent = t.k; h1.classList.add('vf-ctx-titre');
-    if (t.aide) h1.setAttribute('title', t.aide); else h1.removeAttribute('title'); // aide en texte constant, jamais le nom de la branche
+    if (t.aide) { h1.setAttribute('title', t.aide); h1.setAttribute('aria-description', t.aide); } else { h1.removeAttribute('title'); h1.removeAttribute('aria-description'); } // aide en texte constant, jamais le nom de la branche
     h1.replaceChildren(); // F13, PU-G-042 : le titre se coupe d'abord après « / » (un <wbr>, élément DOM, jamais de HTML) ; un morceau à traits d'union (.vf-ctx-seg, inline-block) reste d'un bloc tant qu'il tient, et ne se coupe après un trait d'union que s'il dépasse seul la ligne ; textContent reste le texte exact
     t.h1.split(/(?<=[ /])/).forEach((m, i, a) => {
       const [, mot, esp] = /^([^ ]*)( *)$/.exec(m) || [, m, ''];
