@@ -216,7 +216,7 @@
         "critique:design-md"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "rendu:shell",
@@ -226,7 +226,7 @@
         "impl:couleurs"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "rendu:code",
@@ -236,7 +236,7 @@
         "impl:couleurs"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "rendu:projet",
@@ -246,7 +246,7 @@
         "impl:couleurs"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "rendu:equipe",
@@ -256,7 +256,7 @@
         "impl:couleurs"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "rendu:tiroir",
@@ -266,7 +266,7 @@
         "impl:couleurs"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "livraison",
@@ -278,7 +278,8 @@
         "rendu:projet",
         "rendu:equipe",
         "rendu:tiroir",
-        "docs"
+        "docs",
+        "finitions"
       ],
       "scope": [],
       "status": "blocked"
@@ -422,10 +423,25 @@
         "rendu:code",
         "rendu:projet",
         "rendu:equipe",
+        "rendu:tiroir",
+        "finitions"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "finitions",
+      "step": "vf-coder : findings auto-fix des juges de rendu (Au travail M1-M4, Projet à recetter + soulignement, pastille claire, #ask 701 px)",
+      "stage": "",
+      "deps": [
+        "rendu:shell",
+        "rendu:code",
+        "rendu:projet",
+        "rendu:equipe",
         "rendu:tiroir"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     }
   ]
 }
