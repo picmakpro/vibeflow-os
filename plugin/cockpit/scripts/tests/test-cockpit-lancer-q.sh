@@ -88,6 +88,10 @@ C['LQ2.1a'] = () => { const s = pret(); const l = s.e.lire(); const a = s.g.args
 C['LQ2.1b'] = () => { const s = pret(undefined, { chat: CHAT }); const l = s.e.lire(); const [a, b] = s.g.args; return `appels=${s.g.appels};a=${cles(a)};b=${cles(b)};meme=${a.session === b.session};chatB=${b.chat === CHAT};lc=${S(l.lignes_chat) === S(s.g.rendus[1].lignes)}`; };
 C['LQ2.2a'] = () => cles(pret().e.lire());
 C['LQ2.2b'] = () => { const l = pret(undefined, { chat: CHAT }).e.lire(); return `${cles(l)}|chat=${l.chat}|lc=${Object.keys(l.lignes_chat).join(',')}|fuite=${S({ ...l, lignes_chat: undefined }).includes(CHAT)}`; };
+C['LQ2.2d'] = () => { // LB1 PU-G-125 : Exécuter sur une phase sans plan (principal cadrer ou planifier) ajoute phase-sans-plan ; jamais pour le principal Exécuter ni pour un autre verbe
+  const av = (principal, verbe, a = []) => { const s = mk(); s.e.definirCibles([entree('ph-72', principal, ['cadrer', 'planifier', 'executer', 'verifier'])]); s.e.proposer(prop('ph-72', verbe, { avertissements: a })); return S(s.e.lire().avertissements); };
+  return [av('cadrer', 'executer'), av('planifier', 'executer'), av('executer', 'executer'), av('cadrer', 'planifier'), av('cadrer', 'executer', ['phase-sans-plan']), av('cadrer', 'executer', ['mission-vivante'])].join('|');
+};
 C['LQ2.2c'] = () => { const l = pret().e.lire(); return `etat=${l.etat};verbe=${l.verbe};phase=${l.phase};ws=${l.ws};intention=${l.intention};bloquants=${S(l.bloquants)};avertissements=${S(l.avertissements)}`; };
 C['LQ2.3'] = () => [{ refus: true }, { leve: true }, { post: (r) => { delete r.lignes.plan; return r; } }, { post: (r) => { r.lignes.plan = 42; return r; } }, { post: (r) => { r.intention = 7; return r; } },
   { chat: true, post: (r, a) => { if (a.chat) r.intention += ' (autre)'; return r; } }].map((v) => { const s = mk(v); s.e.definirCibles(LISTE); const r = dire(() => s.e.proposer(prop('ph-72', 'cadrer', v.chat ? { chat: CHAT } : {}))); return motif(r) + '/' + S(dire(() => s.e.lire())); }).join(',');
@@ -172,6 +176,7 @@ attendu() { # valeur saine de chaque cas (une seule source, partagée par les so
     LQ2.1b) printf 'appels=2;a=phase,session,verbe,ws;b=chat,phase,session,verbe,ws;meme=true;chatB=true;lc=true' ;;
     LQ2.2a) printf 'arme_apres_ms,avertissements,bloquants,etat,expire_ms,id,intention,lignes,phase,verbe,ws' ;;
     LQ2.2b) printf 'arme_apres_ms,avertissements,bloquants,chat,etat,expire_ms,id,intention,lignes,lignes_chat,phase,verbe,ws|chat=true|lc=default,acceptEdits,plan,herite|fuite=false' ;;
+    LQ2.2d) printf '["phase-sans-plan"]|["phase-sans-plan"]|[]|[]|["phase-sans-plan"]|["mission-vivante","phase-sans-plan"]' ;;
     LQ2.2c) printf 'etat=en-attente;verbe=cadrer;phase=72;ws=alpha;intention=Cadre la Phase 72 du compartiment alpha;bloquants=[];avertissements=[]' ;;
     LQ2.3) rep "compose/$AUC" 6 ;;
     LQ2.4a) rep compose 9 ;;
@@ -223,6 +228,7 @@ chk LQ2.1a "sans chat : UN appel du gabarit, champs session,verbe,phase,ws seuls
 chk LQ2.1b "avec chat : DEUX appels, le premier SANS clé chat, le second AVEC, la MÊME session, lignes_chat = celles du second appel"
 chk LQ2.2a "sans chat : lire() expose exactement les onze clés du contrat §4"
 chk LQ2.2b "avec chat : les onze clés plus chat (true) et lignes_chat (quatre clés) ; l'UUID du chat absent de tout le reste"
+chk LQ2.2d "Exécuter sur une phase sans plan (principal cadrer ou planifier) : avertissement phase-sans-plan ajouté une fois ; aucun pour le principal Exécuter ni pour un autre verbe (LB1, PU-G-125)"
 chk LQ2.2c "valeurs de lire() : état, verbe, phase, ws, intention du gabarit, bloquants, avertissements"
 chk LQ2.3 "gabarit qui refuse, lève, rend des lignes incomplètes, une ligne non chaîne, une intention non chaîne ou divergente : compose, rien en attente"
 chk LQ2.4a "validerLigne refuse (;, \$(, accent grave, retour chariot, 401 caractères, hors préfixe, sans apostrophe finale, vide, non chaîne) : compose"

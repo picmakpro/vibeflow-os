@@ -65,9 +65,9 @@ export const MOTIFS = {
   'phase-finie': 'La phase est terminée.', 'terminal-absent': 'Le terminal est indisponible sur ce poste.', 'terminal-arrete': 'Le terminal est arrêté. Relancez /vf-cockpit --terminal.',
   'premier-plan-occupe': 'Un programme occupe déjà le terminal.', 'claude-introuvable': 'La commande claude est introuvable.', 'python3-absent': 'Python 3 est introuvable sur ce poste.',
   'phase-hors-motif': "Le numéro de phase n'est pas lançable.", 'compartiment-hors-motif': "Le nom du compartiment n'est pas lançable.",
-  'mission-hors-phase': 'Une mission hors phase ne se lance pas depuis sa carte.',
+  'mission-hors-phase': "Cette mission n'est rattachée à aucune phase : le lancement depuis une carte ne part que d'un numéro de phase. Pour la reprendre, ouvrez une session Claude Code dans le terminal, tapez /vf-dev et nommez la mission.",
   'dependance-non-close': 'Une phase dont celle-ci dépend n\'est pas close (lecture de la prose du ROADMAP, indicative).', 'mission-vivante': 'Une mission vivante travaille déjà sur cette phase.',
-  'phase-plus-avancee-ailleurs': 'La phase est plus avancée dans un autre arbre de travail.', 'lancement-recent': 'Cette cible a déjà été lancée récemment.',
+  'phase-plus-avancee-ailleurs': "Une version plus récente de ce travail existe à part (autre arbre de travail). Le lancement part du dossier principal, qui n'a pas cette avance : consultez cette version avant de lancer.", 'phase-sans-plan': "Aucun plan à exécuter pour cette phase : cadrez puis planifiez d'abord.", 'lancement-recent': 'Cette cible a déjà été lancée récemment.',
   'travail-non-commite': "Du travail non commité existe dans l'arbre de travail.",
 };
 export const INCONNU = 'Contrôle non reconnu.';
