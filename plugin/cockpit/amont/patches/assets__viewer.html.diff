@@ -1109,7 +1109,14 @@
  }
  /** Moves the map just far enough that a box isn't hidden behind the top bar or the sheet; the zoom and everything else stay as they are. */
  function bringIntoView(item) {
-@@ -1437,7 +1547,7 @@ function renderContext() {
+@@ -1431,13 +1541,13 @@ function applySelection() {
+ // ======================= chrome: context, crumbs, legend =======================
+ function renderContext() {
+   if (state.container === 'q:answer') {
+-    $('#context').innerHTML = `<div class="k"><span class="ico" style="--c:var(--on)">${icon(state.answer.icon || 'spark')}</span>${h(state.answer.kind || 'Answer')} · ${plural(state.answer.items.length, 'card')}</div><h1>${h(state.answer.title)}</h1><p>${h(state.answer.question)}</p>`;
++    $('#context').innerHTML = `<div class="k"><span class="ico" style="--c:var(--on)">${icon(state.answer.icon || 'spark')}</span>${h(state.answer.kind || 'Answer')} · ${state.answer.total > state.answer.items.length ? `${state.answer.items.length} of ${state.answer.total} cards` : plural(state.answer.items.length, 'card')}</div><h1>${h(state.answer.title)}</h1><p>${h(state.answer.question)}</p>`;
+     return;
+   }
    const i = info(state.container);
    const kind = state.container === 'root' ? 'Overview' : i.type === 'node' ? i.kind.charAt(0).toUpperCase() + i.kind.slice(1) : i.type === 'dir' ? 'Folder' : i.type === 'file' ? 'File' : i.type;
    const badge = state.container === 'root' ? '' : `<span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span>`;
@@ -1446,7 +1453,7 @@
    }
    else if (ev.key === 'f' || ev.key === 'F') fit(true);
    else if (ev.key === 'p' || ev.key === 'P') $('#btn-panel').click();
-@@ -2300,14 +2458,27 @@ function setTechnical(on) {
+@@ -2300,22 +2458,37 @@ function setTechnical(on) {
    render({ keepTransform: true, after: renderPanel });
    emit('technical', technicalFlag);
  }
@@ -1476,15 +1483,18 @@
    return { close, el: box };
  }
  let toastTimer = null;
-@@ -2316,6 +2487,7 @@ function showBoard({ title, question = '', answer = '', items = [], steps = [],
+ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 2200); }
+ function showBoard({ title, question = '', answer = '', items = [], steps = [], kind = '', icon: ic = '' }) {
    const clean = (arr) => (arr || []).map((x) => typeof x === 'string' ? { id: x, note: '' } : x).filter((x) => x && Q.exists(String(x.id))).map((x) => ({ id: String(x.id), note: String(x.note || '') }));
-   const a = { title: title || 'Board', question, answer, items: clean(items).slice(0, 24), steps: clean(steps), followups: [], ...(kind ? { kind } : {}), ...(ic ? { icon: ic } : {}) };
+-  const a = { title: title || 'Board', question, answer, items: clean(items).slice(0, 24), steps: clean(steps), followups: [], ...(kind ? { kind } : {}), ...(ic ? { icon: ic } : {}) };
++  const all = clean(items); // the board holds 24 cards at most; when it is cut, its title says so (PU-G-054)
++  const a = { title: title || 'Board', question, answer, items: all.slice(0, 24), ...(all.length > 24 ? { total: all.length } : {}), steps: clean(steps), followups: [], ...(kind ? { kind } : {}), ...(ic ? { icon: ic } : {}) };
    if (!a.items.length) { toast('Nothing on the map matches that.'); return; }
 +  noteAskOrigin();
    state.answer = a; askState.last = a;
    go('q:answer', { force: true });
  }
-@@ -2372,6 +2544,8 @@ window.Floorplan = Object.freeze({
+@@ -2372,6 +2545,8 @@ window.Floorplan = Object.freeze({
    technical, setTechnical,
    store,
    on(event, fn) { (ext.listeners[event] ||= []).push(fn); },
