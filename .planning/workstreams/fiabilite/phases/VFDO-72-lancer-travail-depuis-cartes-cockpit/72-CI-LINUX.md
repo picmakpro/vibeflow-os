@@ -70,7 +70,7 @@ Le retest de `premier_plan_libre` à l'écriture ne suffisait pas : la boucle li
 Mon cas à 4 ms passait ; il ne couvrait qu'un point d'une famille continue. Ni un cas de plus ni la clause `not vers_shell` seule ne ferment la course résiduelle (entrée déjà poussée, pas encore consommée).
 
 Décision du manager (2026-11-06, « terminal au repos seulement », P72-D-01) : propriété en point fixe — TOUTE entrée humaine (fd 0) reçue entre l'arrivée de `L` et l'écriture de la ligne l'ANNULE
-(rien d'écrit, `LANCE premier-plan`, puis `suite`). Correctif : drapeau `DIFFEREE['humain']`, posé par la boucle à chaque lecture de fd 0 pendant l'attente, lu et remis à zéro par `liberer_ligne` ;
+(la ligne n'est pas écrite (le Ctrl-C l'a déjà été), `LANCE premier-plan`, puis `suite`). Correctif : drapeau `DIFFEREE['humain']`, posé par la boucle à chaque lecture de fd 0 pendant l'attente, lu et remis à zéro par `liberer_ligne` ;
 le retest du premier plan et la clause `not vers_shell` restent en défense en profondeur.
 
 Preuve générative (pas une liste de cas) :
@@ -83,3 +83,9 @@ Preuve générative (pas une liste de cas) :
 - Aveu : avec bash ou zsh, retirer le drapeau seul ne fait pas rougir L13 (clause `not vers_shell` et écho). Seul L14 le voit.
 
 Limite ajoutée : une frappe pendant l'attente (au plus ~0,5 s après le clic) ANNULE le lancement ; l'humain clique de nouveau. README du cockpit, 72-CONTRATS.md §5 et docstrings le disent.
+
+## Correction ciblée 3 (revue fraîche de 61da7f5f, verdict passed, trois mineurs)
+
+1. Trou de test : rien n'éprouvait la remise à zéro de `DIFFEREE['humain']`. Cas L11.1(h) : après l'annulation (f), un lancement suivant rend `LANCE ok` et écrit la ligne. Mutant M-HUMAIN-JAMAIS-REMIS (ni armement ni relâchement ne remettent le drapeau à zéro) : rouge sur (h).
+2. Disponibilité : xterm.js répond seul aux requêtes du terminal par fd 0 (position du curseur, attributs primaire et secondaire, focus, couleurs OSC 10-19), et une invite comme powerlevel10k ou starship en provoque pendant l'attente. `entree_humaine()` ne pose plus le drapeau pour un morceau ENTIÈREMENT composé de ces réponses (expression régulière ancrée, liste fermée) ; leurs octets vont toujours au shell. Tout autre octet pose le drapeau, y compris dans un morceau mixte ; dans le doute, annulation. Preuves : L11.3 (fonction : formes seules, enchaînées, suivies et précédées d'un `a`, ESC seul, ESC [ 2 J, CPR incomplet, OSC 52) et L11.4 (boucle réelle sur le shell brut horodateur). Mutants : M-SANS-RECONNAISSANCE rouge sur L11.3 et L11.4, M-RECONNAISSANCE-PERMISSIVE (tout ce qui commence par ESC) rouge sur L11.3 et L11.4.
+3. Textes : pour une annulation par frappe, le Ctrl-C a déjà été écrit, seule la ligne ne l'est pas. README du cockpit, 72-CONTRATS.md et la section précédente le disent désormais ; pour le refus « programme au premier plan », « aucun octet écrit » reste vrai.
