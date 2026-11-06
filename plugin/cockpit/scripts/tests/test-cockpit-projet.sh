@@ -424,6 +424,75 @@ printf -- '- [x] **RND-02**: recherche\n- [x] **OLD-09**: autre phase\n\n| RND-0
 graph "$LD" "$WORK/gd.json"
 assert_eq "R1.9 — DG-10 : RND-02 (vivant + archive, même phase) n'est lue qu'UNE fois (RND-02 sous ph-1, jamais en double) ; l'exigence propre à l'archive (OLD-09, phase 5 sans carte) reste comptée : 3 exigences dont 2 cochées" "$(G "$WORK/gd.json" 'j.files.filter(f=>f.p.startsWith("req/")).map(f=>f.name).sort().join(",")')|$(G "$WORK/gd.json" 'j.meta.vf.counts.reqs+"/"+j.meta.vf.counts.reqsDone')" "NEW-01,RND-02|3/2"
 
+# R2 (lot 6 « Projet », étape PR2 « panneau de phase et visite », 2026-11-06 ; arbitrage Samuel, message direct en session principale, 2026-11-06 : toutes les propositions du panel) : PU-G-091, 092, 102, 103, 106, 107 (+ 104 côté moteur). Sans navigateur.
+echo "=== R2 — panneau de phase et visite : visite expliquée, mission vivante du jalon, texte propre, aucune répétition, exigence lisible ==="
+LK="$WORK/r2"; B="$LK/.planning"
+GOAL_LONG="Depuis une carte de phase ou de mission, ou depuis le cockpit, lancer du travail dans une session Claude Code qui tourne sur le poste, avec le contexte du projet, en anticipant les dépendances manquantes et les impossibilités avant de lancer, puis garder la main sur chaque étape du lancement jusqu'à la fin de la session, sans jamais écrire ni exécuter à la place de l'utilisateur sans son accord explicite."
+wr "$B/ROADMAP.md" <<MD
+## Milestones
+
+- ✅ **v0 Ancien** - Phase 1 (livré)
+- 🚧 **v1.0 MVP** - Phases 2-3 — **inscrit 2026-11-01** — le cockpit avec \`vf-signal\` <!-- vf-archive: .planning/archives/roadmap/x.md --> fin du jalon <!-- jamais fermé
+
+## Phases
+
+- [x] **Phase 1: Socle** - a
+- [ ] **Phase 2: Écran** - b
+- [ ] **Phase 3: Suite** - c
+
+### Phase 1: Socle
+**Goal**: Poser le socle
+
+### Phase 2: Écran
+**Goal**: Poser **l'écran** avec \`vf-signal\`
+
+### Phase 3: Suite
+**Goal**: $GOAL_LONG
+MD
+printf -- '---\nmilestone: v1.0 MVP\nstatus: executing\ncurrent_phase: 3\n---\n' | wr "$B/STATE.md"
+printf -- '- [ ] **UIFN-01**: À 700 px, l'"'"'en-tête tient sur une rangée.\n- [ ] **UIFN-02**: Le panneau garde une aide.\n\n| UIFN-01 | Phase 2 | Pending |\n| UIFN-02 | Phase 2 | Pending |\n' | wr "$B/REQUIREMENTS.md"
+wr "$B/phases/01-socle/01-01-PLAN.md" <<'MD'
+<objective>Socle</objective>
+MD
+echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
+wr "$B/phases/03-suite/03-01-PLAN.md" <<'MD'
+<objective>Suite</objective>
+MD
+# trois missions : une abandonnée d'un jalon CLOS (phase 1, la première du dossier), une terminée du jalon en cours (phase 2), une vivante du jalon en cours (phase 3)
+wr "$B/missions/MISSION-1.dag.json" <<'JSON'
+{"phase":"1","nodes":[{"id":"a","step":"s","deps":[],"status":"done"},{"id":"b","step":"s","deps":["a"],"status":"running"}]}
+JSON
+wr "$B/missions/MISSION-2.dag.json" <<'JSON'
+{"phase":"2","nodes":[{"id":"a","step":"s","deps":[],"status":"done"}]}
+JSON
+wr "$B/missions/MISSION-3.dag.json" <<'JSON'
+{"phase":"3","nodes":[{"id":"a","step":"s","deps":[],"status":"done"},{"id":"b","step":"s","deps":["a"],"status":"ready"},{"id":"c","step":"s","deps":["b"],"status":"ready"}]}
+JSON
+VF_PIN="$WORK/locks-abs" graph "$LK" "$WORK/gk.json"
+assert_eq "R2.1 — PU-G-091 : l'étape 1 de la visite dit ce que fait VibeFlow, puis « Jalon = … ; phase = … ; mission = … », et garde « Phases faites » (jalon en cours)" "$(G "$WORK/gk.json" '[/VibeFlow fait avancer/.test(j.tour[0].note),/Jalon = [^;]+ ; phase = [^;]+ ; mission = /.test(j.tour[0].note),/Phases faites : \d+ sur \d+/.test(j.tour[0].note)].join(",")')" "true,true,true"
+assert_eq "R2.2 — PU-G-092 : l'étape « missions » montre la mission VIVANTE du jalon en cours (MISSION-3), pas l'abandonnée d'un jalon clos (MISSION-1, la première du dossier)" "$(G "$WORK/gk.json" 'j.tour.find(s=>s.kicker==="Les missions").ref')" "n:dag-MISSION-3"
+assert_eq "R2.3 — PU-G-092 : les comptes sont ceux du jalon (2 missions : MISSION-2 et MISSION-3, pas les 3 du lab), le mot est « étapes » et jamais « nœuds »" "$(G "$WORK/gk.json" 'j.tour.find(s=>s.kicker==="Les missions").note')" "Ce jalon compte 2 missions ; celle-ci a 1 étape faite sur 3."
+# aucune mission vivante dans le jalon en cours : on retire MISSION-2 et MISSION-3, il ne reste que l'abandonnée du jalon clos
+cp -R "$LK" "$WORK/r2b"; rm -f "$WORK/r2b/.planning/missions/MISSION-2.dag.json" "$WORK/r2b/.planning/missions/MISSION-3.dag.json"
+VF_PIN="$WORK/locks-abs" graph "$WORK/r2b" "$WORK/gk2.json"
+assert_eq "R2.4 — PU-G-092 : aucune mission vivante dans le jalon en cours -> l'étape « missions » est omise (jamais l'abandonnée d'un jalon clos montrée) ; témoin : MISSION-1 est bien dans le graphe, abandonnée" "$(G "$WORK/gk2.json" 'j.tour.filter(s=>s.kicker==="Les missions").length+"|"+j.nodes.find(n=>n.id==="dag-MISSION-1").foot.includes("abandonnée")')" "0|true"
+# PU-G-102 : le jalon et la phase sans balisage brut ni commentaire d'archive
+assert_eq "R2.5 — PU-G-102 : le texte du jalon (résumé et détail) ne porte ni « ** », ni accent grave, ni « <!-- », ni « vf-archive » ; le sens reste (« inscrit 2026-11-01 », « fin du jalon »)" "$(G "$WORK/gk.json" '(()=>{const m=j.nodes.find(n=>n.id==="ms-v1.0-mvp");return [/\*\*|`|<!--|vf-archive/.test(m.summary+m.details),m.details.includes("inscrit 2026-11-01"),m.details.includes("fin du jalon")].join(",")})()')" "false,true,true"
+assert_eq "R2.6 — PU-G-102 : le but d'une phase est rendu sans gras ni accents graves, et aucune carte du graphe (résumé, détail) ne montre de balisage brut" "$(G "$WORK/gk.json" '[j.nodes.find(n=>n.id==="ph-2").summary,j.nodes.filter(n=>/\*\*|`|<!--/.test(n.summary+n.details)).length].join("|")')" "Poser l'écran avec vf-signal|0"
+# PU-G-103 : le résumé et le détail ne disent pas deux fois la même chose
+assert_eq "R2.7 — PU-G-103 : but court (tient dans le résumé) : le détail ne le reprend pas ; il garde « Reste : … » en tête" "$(G "$WORK/gk.json" '(()=>{const n=j.nodes.find(n=>n.id==="ph-2");return [n.details.includes("avec"),n.summary.includes("avec")].join(",")})()')" "false,true"
+assert_eq "R2.8 — PU-G-103 : but long (> 400 signes) : le résumé en porte le début, le détail la SUITE seulement ; mis bout à bout ils redisent le but une fois (ni répétition du début, ni perte)" "$(GOAL="$GOAL_LONG" node -e "
+const j=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')), n=j.nodes.find(x=>x.id==='ph-3'), d=n.details.split('\\n\\n')[0];
+const a=n.summary.replace(/…\$/,''), b=d.replace(/^…/,''), g=process.env.GOAL.replace(/\\s+/g,' ').trim();
+console.log([n.summary.length<=401, b.length>0, (a+' '+b).replace(/\\s+/g,' ').trim()===g||(a+b).replace(/\\s+/g,' ').trim()===g, !d.startsWith(a.slice(0,40))].join(','))" "$WORK/gk.json")" "true,true,true,true"
+# PU-G-106 : l'exigence se lit sur sa carte
+assert_eq "R2.9 — PU-G-106 : le pied d'une carte d'exigence est la phrase de l'exigence, plus « REQUIREMENTS.md »" "$(G "$WORK/gk.json" 'j.files.filter(f=>f.n==="ph-2.req").map(f=>f.foot).join("|")')" "À 700 px, l'en-tête tient sur une rangée.|Le panneau garde une aide."
+UIK="$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js"
+assert_eq "R2.10 — PU-G-107 / PU-G-104 / PU-G-106 : 00-vibeflow.js pose l'aide de navigation AVANT « Maintenant », construit le repli « Détails techniques » à l'ouverture du panneau et marque les cartes dont le pied répète la description" "$(node -e "
+const s=require('fs').readFileSync(process.argv[1],'utf8');
+const aide=s.indexOf('Double-clic sur une carte pour plonger'), now=s.indexOf('\${now}');
+console.log([aide>0&&aide<now,(s.match(/Double-clic sur une carte pour plonger/g)||[]).length===1,/SC\.on\('panel'/.test(s)&&/Détails techniques/.test(s),/vf-meme/.test(s)].join(','))" "$UIK")" "true,true,true,true"
+
 # O4 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : la visite « Par où commencer » revenait à chaque chargement et recouvrait la réponse. Cause : son « déjà vue » vivait dans le localStorage
 # de l'ORIGINE (port compris) et le port du serveur changeait à chaque lancement. Décision (même date, « C : port stable par lab ») : port stable par lab (vf-cockpit-port.mjs), « déjà vue » en localStorage seul,
 # par lab (vibeflow-cockpit:visite:<lab>, 75-vf-modele.js), aucun cookie. Serveurs lancés par le VRAI lanceur (vf-cockpit.mjs), plage de ports décalée (VF_COCKPIT_PORT_BASE : 4378 et 4379 tiennent les serveurs de recette).

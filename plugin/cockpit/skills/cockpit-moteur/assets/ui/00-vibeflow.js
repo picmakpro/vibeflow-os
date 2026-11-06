@@ -94,6 +94,13 @@
   if (TAB !== 'code') style.textContent += `.foot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .foot .vst { flex: none; } .ico { --c: var(--text-2) !important; }`; // 71.5 : hors de l'onglet Code, icône nue de la couleur de son texte
   /* UIFN-09 : la ligne « Terminés… » de « Contenu » colorait son point par var(--n-terminés), définie nulle part (point invisible) : le statut « fait » de DESIGN.md §9 */
   if (TAB === 'equipe') style.textContent += `:root { --n-terminés: var(--st-done); }`;
+  // PU-G-104 : repli « Détails techniques » du panneau d'une carte du Projet (source, ligne de ROADMAP, chemins, worktree et branche) ; construit à l'ouverture du panneau (plus bas), fermé par défaut
+  if (TAB === 'project') style.textContent += `#panel details.vf-tech { margin-top: var(--sp-12); }
+    #panel details.vf-tech > summary { cursor: pointer; padding: var(--sp-4) 0; font-size: 12px; font-weight: 500; color: var(--text-3); }
+    #panel details.vf-tech > summary:hover { color: var(--text); }
+    #panel details.vf-tech[open] > summary { margin-bottom: var(--sp-8); }
+    /* PU-G-106 : une carte dont le pied dit déjà la même phrase que sa description (l'exigence) ne la répète pas de près ; au zoom d'ouverture le pied est seul à rester */
+    svg:not(.lod-mid):not(.lod-low) .card.vf-meme .foot .meta { visibility: hidden; }`;
   if (TAB === 'project') style.textContent += `#btn-health${window.FLOORPLAN_SERVER ? '' : ', #ask'} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }`;
   // onglet Équipe (69-05, P69-PL-09) : ni bouton de santé ni barre de question (la question porte sur le code ou le projet)
   if (TAB === 'equipe') style.textContent += '#btn-health, #ask { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }';
@@ -142,13 +149,15 @@
       const now = V.milestone || V.phase || V.status
         ? `<div class="vf-now" style="margin-top:var(--sp-12)"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${pastille}${perime}${desc ? `<div style="margin-top:var(--sp-6);color:var(--text-3);font-size:12px">${h(desc.slice(0, 260))}${desc.length > 260 ? '…' : ''}</div>` : ''}</div>`
         : '';
+      // PU-G-107 : l'aide de navigation est en haut du panneau, sous le titre (elle était tout en bas, sous les jalons, hors de vue)
       return `<div class="sec"><h2 class="pt">${h(G.project.name)}</h2>
+          <div class="vf-aide" style="margin-top:var(--sp-4);color:var(--text-3);line-height:1.7;font-size:12px">Double-clic sur une carte pour plonger · <span class="kbd">⌫</span> remonter · <span class="kbd">/</span> chercher</div>
           ${now}
           <div class="stats vf-stats" style="margin-top:var(--sp-12)"><div><b>${Number(c.phases) || 0}</b><span>phases</span></div><div><b>${Number(c.plans) || 0}</b><span>plans</span></div><div><b>${Number(c.reqsDone) || 0}/${Number(c.reqs) || 0}</b><span>exigences</span></div></div></div>
         <div class="sec"><h3>Prochaines phases <span class="c">${V.next.length}</span></h3>${next || '<p class="pd">Rien en attente dans le jalon en cours.</p>'}</div>
         <div class="sec"><h3>Jalons <span class="c">${V.milestones.length}</span></h3><p class="pd">Dans l'ordre de la feuille de route.</p>${ms}</div>
         ${derive(V.drift)}${nonComprises(V.drift)}
-        <div class="sec" style="color:var(--text-3);line-height:1.7;font-size:12px">Double-clic sur une carte pour plonger · <span class="kbd">⌫</span> remonter · <span class="kbd">/</span> chercher</div>`;
+`;
     });
   }
   document.addEventListener('click', (ev) => {
@@ -175,6 +184,17 @@
       return `<div class="sec"><h3>Touché par <span class="c">${list.length}</span></h3>${rows}</div>`;
     });
   }
+  if (TAB === 'project') {
+    const TECH = /^(Source :|Ligne de ROADMAP :|Avancement lu dans le worktree)/;
+    SC.on('panel', () => {
+      const sec = document.querySelector('#panel > .sec'); if (!sec || sec.querySelector('details.vf-tech')) return;
+      const tech = [...sec.querySelectorAll(':scope > p.pd')].filter((x) => TECH.test(x.textContent.trim())), chemin = sec.querySelector(':scope > .pp');
+      if (!tech.length && !chemin) return;
+      const d = document.createElement('details'), sm = document.createElement('summary'), actions = sec.querySelector(':scope > .actions');
+      d.className = 'vf-tech'; sm.textContent = 'Détails techniques'; d.append(sm, ...tech, ...(chemin ? [chemin] : []));
+      if (actions) sec.insertBefore(d, actions); else sec.append(d);
+    });
+  }
   // arrivée par `#r=<chemin ou id>` : depuis l'autre onglet (à `ready`) ET par un lien de la même page (clic sur un lien de nœud ou d'agent du tiroir ou d'un panneau :
   // seul le fragment change, la page ne se recharge pas, `ready` n'est pas rejoué et le viewer, à `popstate`, revient à la vue d'ensemble : on révèle la cible après lui)
   const arriver = () => {
@@ -187,7 +207,8 @@
   // (LIBELLES_MISSION) : la pastille de CETTE carte est réécrite en « Abandonnée », avant lecture par un lecteur d'écran. Idempotent : une pastille réécrite n'est plus `vst-todo`.
   if (TAB === 'project') {
     const ABANDON = /(?:^|· )abandonnée(?:,|$)/;
-    const dire = () => { for (const f of document.querySelectorAll('.card .foot')) { const p = f.querySelector('.vst.vst-todo'), m = f.querySelector('.meta'); if (p && m && ABANDON.test(m.textContent)) { p.classList.replace('vst-todo', 'vst-abandonnee'); p.textContent = 'Abandonnée'; } } };
+    const dire = () => { for (const f of document.querySelectorAll('.card .foot')) { const p = f.querySelector('.vst.vst-todo'), m = f.querySelector('.meta'); if (p && m && ABANDON.test(m.textContent)) { p.classList.replace('vst-todo', 'vst-abandonnee'); p.textContent = 'Abandonnée'; }
+      const d = m && f.parentElement.querySelector(':scope > .desc'), t = m ? m.textContent.replace(/…$/, '').trim() : ''; if (d && t.length > 12 && d.textContent.trim().startsWith(t)) f.parentElement.classList.add('vf-meme'); } }; // PU-G-106 : pied = début de la description -> classe vf-meme
     let tour = 0; new MutationObserver(() => { if (!tour) tour = requestAnimationFrame(() => { tour = 0; dire(); }); }).observe(document.body, { childList: true, subtree: true }); dire();
   }
   SC.on('ready', arriver);

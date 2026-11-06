@@ -29,6 +29,20 @@ function piedJalon(ks) {
 // contenu de la première balise <objective> (indexOf : une balise sans fermeture ne fait pas rebalayer le texte pour chaque ouverture)
 const objectif = (t) => { const a = t.indexOf('<objective>'); if (a < 0) return undefined; const b = t.indexOf('</objective>', a + 11); return b < 0 ? undefined : t.slice(a + 11, b).replace(/^\s+/, ''); };
 
+// PU-G-102 : le texte d'un jalon ou d'une phase vient du ROADMAP en markdown : commentaires d'archive (`<!-- vf-archive … -->`, fermés ou non), gras, accents graves et liens sont retirés à la SOURCE,
+// le panneau n'affiche jamais de balisage brut. Un commentaire jamais fermé court jusqu'à la fin du texte (un seul passage : coût linéaire).
+const propre = (t) => String(t ?? '').replace(/<!--[\s\S]*?(?:-->|$)/g, '').replace(/\*\*/g, '').replace(/`/g, '').replace(/\[([^\]\n]+)\]\([^)\n]*\)/g, '$1').replace(/[ \t]+\n/g, '\n').replace(/[ \t]{2,}/g, ' ').trim();
+// PU-G-103 : le résumé (carte, haut du panneau) et le détail ne répètent plus le même texte. Le résumé porte tout le texte jusqu'à `max` caractères ; au-delà, il s'arrête à la dernière fin de phrase
+// (sinon au dernier mot, avec « … ») et le détail ne reprend que la SUITE, jamais le début.
+function scinder(t, max) {
+  const s = String(t ?? '').replace(/\s+/g, ' ').trim();
+  if (s.length <= max) return { resume: s, reste: '' };
+  let cut = -1; for (const m of s.matchAll(/[.!?](?=\s)/g)) { if (m.index + 1 > max) break; cut = m.index + 1; }
+  if (cut > 25) return { resume: s.slice(0, cut), reste: s.slice(cut).trim() };
+  const sp = s.lastIndexOf(' ', max - 1), c = sp > 25 ? sp : max - 1;
+  return { resume: s.slice(0, c).trimEnd() + '…', reste: '…' + s.slice(c).trim() };
+}
+
 // pied d'une carte de phase, part des exigences (PU-G-097, Q9 option A : mot en texte neutre, aucun glyphe ajouté — le pied n'a pas d'emplacement de pastille) :
 // une phase faite dont des exigences ne sont pas cochées dit « N exigence(s) non cochée(s) » (la pastille voisine dit « Fait ») au lieu de « 3/14 exigences », qui se lisait comme un travail à moitié fait
 function piedExigences(etat, reqs) {
@@ -86,7 +100,8 @@ export function buildProjectGraph(root, { layout } = {}) {
   const prev = new Map(); // enchaînement « puis » limité à un même compartiment
   for (const ms of msList) {
     const wk = ms.ws || '';
-    const msId = node({ id: ms.id, parent: ms.st === 'done' && !ms.horsJalon ? hist : null, label: ms.key, kind: 'jalon', summary: sentence(ms.text.replace(/^[^—]*—\s*/, ''), 180) || ms.text, details: ms.text, st: ms.st,
+    const mt = propre(ms.text);
+    const msId = node({ id: ms.id, parent: ms.st === 'done' && !ms.horsJalon ? hist : null, label: ms.key, kind: 'jalon', summary: sentence(mt.replace(/^[^—]*—\s*/, ''), 180) || mt, details: mt, st: ms.st,
       foot: piedJalon(ms.ks), tags: [ms.ws ? 'compartiment ' + ms.ws : ''].filter(Boolean) });
     const pv = ms.horsJalon ? null : prev.get(wk);
     if (ms.horsJalon) { /* pas d'enchaînement : le groupe n'est pas un jalon de la chaîne */ }
@@ -102,8 +117,9 @@ export function buildProjectGraph(root, { layout } = {}) {
     const av = ph.avancement;
     const enCours = P.dags.filter((d) => d.phaseKey === ph.key && d.etat === 'running').flatMap((d) => d.nodes.filter((x) => x?.status === 'running')); // un plan non fait est actif si un nœud running d'une mission rattachée le désigne (P69-PL-04) ; seule une mission vivante désigne un plan actif (VFSG-06)
     const phReqs = ownReqs(ph); const id = phId(ph);
-    node({ id, parent: msId, label: `Phase ${ph.n} · ${ph.name}`, kind: 'phase', num: ph.n, ws: ph.ws, summary: sentence(ph.goal || ph.line || ph.name, 200),
-      details: [ph.goal, av.reste.length ? `Reste : ${av.reste.map((c) => LIBELLES_RESTE[c]).join(', ')}.` : '', av.ailleurs ? `Avancement lu dans le worktree ${av.ailleurs.arbre}${av.ailleurs.branche ? ` (branche ${av.ailleurs.branche})` : ''} : plus avancé que celui de l'arbre courant.` : '', av.mission ? `Mission : ${av.mission.nom} (${LIBELLES_MISSION[av.mission.etat] || av.mission.etat}).` : '', ph.depends.length ? `Dépend de : Phase ${ph.depends.join(', ')}.` : '', ph.line ? `Ligne de ROADMAP : ${ph.line}` : '', `Source : ${ph.roadmap}${dir ? ` · dossier ${rel(dir)}` : ''}`].filter(Boolean).join('\n\n'),
+    const but = propre(ph.goal), ligne = propre(ph.line), { resume, reste: suite } = but ? scinder(but, 400) : { resume: sentence(ligne || ph.name, 200), reste: '' };
+    node({ id, parent: msId, label: `Phase ${ph.n} · ${ph.name}`, kind: 'phase', num: ph.n, ws: ph.ws, summary: resume,
+      details: [suite, av.reste.length ? `Reste : ${av.reste.map((c) => LIBELLES_RESTE[c]).join(', ')}.` : '', av.ailleurs ? `Avancement lu dans le worktree ${av.ailleurs.arbre}${av.ailleurs.branche ? ` (branche ${av.ailleurs.branche})` : ''} : plus avancé que celui de l'arbre courant.` : '', av.mission ? `Mission : ${av.mission.nom} (${LIBELLES_MISSION[av.mission.etat] || av.mission.etat}).` : '', ph.depends.length ? `Dépend de : Phase ${ph.depends.join(', ')}.` : '', ligne ? `Ligne de ROADMAP : ${ligne}` : '', `Source : ${ph.roadmap}${dir ? ` · dossier ${rel(dir)}` : ''}`].filter(Boolean).join('\n\n'),
       st, foot: [av.etat === 'a-recetter' ? 'à recetter' : '', av.plans.total ? `${av.plans.faits}/${av.plans.total} plans` : '', av.correctifs ? `${av.correctifs} correctif${av.correctifs > 1 ? 's' : ''}` : '', piedExigences(av.etat, phReqs), av.ailleurs ? `dans worktree ${av.ailleurs.arbre}` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [] });
     for (const pf of planFiles) {
       const txt = texte(read(path.join(dir, pf))); const meta = fm(txt); const pid = pf.replace('-PLAN.md', '');
@@ -116,7 +132,7 @@ export function buildProjectGraph(root, { layout } = {}) {
     }
     if (phReqs.length) {
       const rId = node({ id: `${id}.req`, parent: id, label: 'Exigences', kind: 'exigences', summary: `${phReqs.filter((r) => r.done).length} cochées sur ${phReqs.length}.`, foot: `${phReqs.filter((r) => r.done).length}/${phReqs.length}`, st: phReqs.every((r) => r.done) ? 'done' : phReqs.some((r) => r.done) ? 'active' : 'todo' });
-      for (const r of phReqs) file({ p: reqPath(r), n: rId, name: r.id, d: sentence(r.text, 220), st: r.done ? 'done' : 'todo', foot: r.file.split('/').pop() });
+      for (const r of phReqs) file({ p: reqPath(r), n: rId, name: r.id, d: sentence(r.text, 220), st: r.done ? 'done' : 'todo', foot: sentence(propre(r.text), 120) || r.file.split('/').pop() }); // PU-G-106 : le pied dit l'exigence elle-même, plus « REQUIREMENTS.md »
     }
   }
   // PU-G-100 (mis de côté) : le sens dépendance -> dépendant est celui que le viewer lit pour ranger les cartes (les entrants à gauche, « Utilisé par » ; les sortants à droite) : l'inverser corrige le panneau mais retourne l'ordre des cartes (mesuré en navigateur) ; le libellé « Utilisé par » est du viewer vendorisé, hors périmètre
@@ -155,14 +171,18 @@ export function buildProjectGraph(root, { layout } = {}) {
   // visite « Par où commencer » propre à l'onglet Projet (70-08, UIFN-05, P70-D-02) : jalon, phase en cours, missions, au travail ; une étape sans carte est omise, jamais affichée avec « ? » ;
   // sous deux étapes, la liste est vide et le repli du moteur s'applique. Les textes viennent des données du lab ; la `cible` est une constante, jamais une donnée (T-70-13).
   const tour = [], has = (id) => nodes.some((n) => n.id === id);
-  if (active && has(active.id)) tour.push({ ref: 'n:' + active.id, kicker: 'Le jalon', title: `Jalon ${active.key}`, note: `Le jalon en cours. Phases faites : ${active.done} sur ${active.ks.length}.` });
+  if (active && has(active.id)) tour.push({ ref: 'n:' + active.id, kicker: 'Le jalon', title: `Jalon ${active.key}`, note: `VibeFlow fait avancer votre projet par grandes étapes, avec Claude au travail. Jalon = une grande étape du projet ; phase = un morceau d'un jalon ; mission = le travail mené, étape par étape, pour réaliser une phase. Voici le jalon en cours. Phases faites : ${active.done} sur ${active.ks.length}.` }); // PU-G-091
   const cur = trouverPhase(phases, curPhase, layout.actif);
   const phaseEtat = cur ? cur.avancement.etat : null, perime = etatPerime(state.status, phaseEtat);
   if (cur && has(phId(cur))) tour.push({ ref: 'n:' + phId(cur), kicker: 'La phase en cours', title: `Phase ${cur.n}${cur.name ? ` · ${cur.name}` : ''}`, note: `La phase sur laquelle le projet travaille : ${LIBELLES_ETAT[cur.avancement.etat]}${perime ? ' (STATE.md semble périmé)' : ''}.` });
-  const dg = P.dags.find((d) => d.nodes.some((x) => x?.status === 'running') && has('dag-' + d.name)) || P.dags.find((d) => has('dag-' + d.name));
+  // PU-G-092 : la mission montrée est une mission VIVANTE du jalon en cours (jamais une abandonnée d'un autre jalon) : celle qui travaille, sinon la première non terminée d'une phase pas faite, sinon la première non terminée, sinon la première vivante ; aucune -> l'étape est omise.
+  // Les comptes sont ceux du jalon (les missions rattachées à ses phases), pas ceux du lab entier : ils s'accordent avec ce que la carte du jalon montre. Le mot du panneau est « étapes », jamais « nœuds ».
+  const clesJalon = new Set(active ? active.ks.map((p) => p.key) : []);
+  const duJalon = P.dags.filter((d) => clesJalon.has(d.phaseKey) && has('dag-' + d.name)), vivante = (d) => d.etat !== 'abandonnee' && d.etat !== 'inconnu';
+  const dg = duJalon.find((d) => d.nodes.some((x) => x?.status === 'running')) || duJalon.find((d) => vivante(d) && d.nodes.some((x) => x?.status !== 'done') && phases.get(d.phaseKey)?.avancement.etat !== 'fait') || duJalon.find((d) => vivante(d) && d.nodes.some((x) => x?.status !== 'done')) || duJalon.find(vivante);
   if (dg) {
-    const fait = dg.nodes.filter((x) => x?.status === 'done').length;
-    tour.push({ ref: 'n:dag-' + dg.name, kicker: 'Les missions', title: `Mission ${dg.name.replace(/^MISSION-/, '')}`, note: `${P.dags.length} mission${P.dags.length > 1 ? 's' : ''} au total ; celle-ci a ${fait} nœud${fait > 1 ? 's' : ''} fait${fait > 1 ? 's' : ''} sur ${dg.nodes.length}.` });
+    const fait = dg.nodes.filter((x) => x?.status === 'done').length, enCoursN = duJalon.filter((d) => vivante(d) && d.nodes.some((x) => x?.status === 'running')).length;
+    tour.push({ ref: 'n:dag-' + dg.name, kicker: 'Les missions', title: `Mission ${dg.name.replace(/^MISSION-/, '')}`, note: `Ce jalon compte ${duJalon.length} mission${duJalon.length > 1 ? 's' : ''}${enCoursN ? `, dont ${enCoursN} en cours` : ''} ; celle-ci a ${fait} étape${fait > 1 ? 's' : ''} faite${fait > 1 ? 's' : ''} sur ${dg.nodes.length}.` });
   }
   tour.push({ ref: 'root', cible: '#vf-lock', kicker: 'Au travail', title: 'Qui est au travail', note: "Ce point en haut de la page s'anime quand quelqu'un travaille sur le projet, et reste éteint sinon ; un clic ouvre la liste. L'onglet Équipe en montre le détail." });
   const ids = new Set(nodes.map((n) => 'n:' + n.id)), fids = new Set(files.map((f) => 'f:' + f.p));
