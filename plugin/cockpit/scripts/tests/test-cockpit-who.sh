@@ -618,6 +618,7 @@ const ecris = (f, t) => fs.writeFileSync(f, JSON.stringify({ type: 'custom-title
 const T0 = new Date(Date.now() - 60000), T1 = new Date(Date.now() + 10000), ecrisA = (t, d) => { ecris(mf, t); fs.utimesSync(mf, d, d); };
 ecrisA('AAAAAA', T0); const m1 = L.titreSession(mf); ecrisA('BBBBBBB', T0); const m2 = L.titreSession(mf); ecrisA('CCCCCCC', T1); const m3 = L.titreSession(mf); // m2 : même date, taille différente ; m3 : même taille, date différente
 ecris(uf, 'ZZ'); fs.chmodSync(uf, 0); const u1 = L.titreSession(uf); fs.chmodSync(uf, 0o644); const u2 = L.titreSession(uf);
+const { whoSig } = await imp('vf-cockpit-live.mjs'), deux = JSON.parse(JSON.stringify(who)); deux.workers.find((x) => x.id === 's1').titre = 'Autre nom';
 const iface = JSON.parse(fs.readFileSync(path.join(S, 'vf-cockpit-interface.json'), 'utf8')).schemas['vibeflow/cockpit-who@2'].travailleur;
 const permis = new Set([...iface.requis, ...iface.optionnels]), nonDeclares = [...new Set(who.workers.flatMap((x) => Object.keys(x)).filter((k) => !permis.has(k)))];
 console.log(JSON.stringify({ t1a: n('s1')?.label, t1b: n('s5')?.label, t1c: !!n('s1')?.details.includes('Identifiant : s1'), t2a: n('s2')?.label, t2b: json.includes('TITRE-IA-SECRET-MODELE'),
@@ -626,7 +627,7 @@ console.log(JSON.stringify({ t1a: n('s1')?.label, t1b: n('s5')?.label, t1c: !!n(
   t6: [(n('s6')?.label || '').includes('ghp_'), (n('s6')?.label || '').length <= 80, (n('s6')?.label || '').length],
   t7: [n('s7')?.label.isWellFormed(), String(w('s7')?.titre).isWellFormed(), n('s7')?.label.length],
   t8: [n('s9', graph2)?.label, n('s9', graph2)?.details.includes('Branche : feat/evilx'), CF.test(JSON.stringify(graph2))],
-  t10: [n('s10')?.label, n('s11')?.label, n('s12')?.label], t11: [m1, m2, m3], t12: [u1, u2], t13: nonDeclares }));
+  t10: [n('s10')?.label, n('s11')?.label, n('s12')?.label], t11: [m1, m2, m3], t12: [u1, u2], t13: nonDeclares, t14: [whoSig(who) !== whoSig(deux), whoSig(who) === whoSig(JSON.parse(JSON.stringify(who)))] }));
 JS
 w23() { node "$AUX/w23-titre.mjs" "$1" "$2" > "$2.json" 2>"$2.err"; }
 g23() { node "$AUX/get.mjs" "$1.json" "$2"; }
@@ -646,12 +647,13 @@ assert_eq "W23.11 — le titre le plus récent l'emporte, même vide ou blanc (l
 assert_eq "W23.12 — le mémo est invalidé par la taille (même date) ET par la date (même taille)" "$(g23 "$WORK/w23a" 'j.t11.join("|")')" "AAAAAA|BBBBBBB|CCCCCCC"
 assert_eq "W23.13 — un fichier illisible n'est pas mémorisé comme « pas de titre » : chmod 000 puis 644 relit" "$(g23 "$WORK/w23a" 'j.t12.join("|")')" "|ZZ"
 assert_eq "W23.14 — toute clé d'un travailleur est déclarée au contrat vf-cockpit-interface.json (requis ∪ optionnels), titre compris" "$(g23 "$WORK/w23a" 'j.t13.join(",")')" ""
-assert_eq "W23.15 — `titre` est dans la signature whoSig de live.mjs, et LIBRES.titre vaut 80 dans who.mjs (gardes statiques, chacune rougit par mutant)" "$(grep -c "x.titre || ''" "$SCRIPTS/vf-cockpit-live.mjs")|$(grep -c "LIBRES = { titre: 80," "$SCRIPTS/vf-cockpit-who.mjs")" "1|1"
+assert_eq "W23.15 — un /rename seul change la signature whoSig : deux collectes qui ne diffèrent que par `titre` donnent deux signatures, une collecte identique en donne une seule" "$(g23 "$WORK/w23a" 'j.t14.join(",")')" "true,true"
+assert_eq "W23.16 — LIBRES.titre vaut 80 dans who.mjs (garde statique : le titre est déjà borné à 80 en amont, aucune sortie ne le distingue)" "$(grep -c "LIBRES = { titre: 80," "$SCRIPTS/vf-cockpit-who.mjs")" "1"
 mut23() { mut17 "w23-$1" "$2" "$3" "$4" >/dev/null; mkdir -p "$WORK/w23-$1-b"; w23 "$WORK/mut17-w23-$1" "$WORK/w23-$1-b"; }
 L23="vf-cockpit-lecture.mjs"
-mut23 controles $L23 "replace(CLASSE_AFFICHAGE, ' ').replace(/ {2,}/g" "replace(/zzzzzz/gu, ' ').replace(/ {2,}/g"
+mut23 controles $L23 "replace(CLASSE_GLOBALE, ' ').replace(/ {2,}/g" "replace(/zzzzzz/gu, ' ').replace(/ {2,}/g"
 assert_eq "M-W23-CONTROLES — mutant (nettoyage des contrôles retiré) : W23.4 rougit" "$(g23 "$WORK/w23-controles-b" 'j.t3a.join(",")')" "true,true,true,false,true"
-mut23 cf $L23 '\u2029\p{Cf}]/gu' '\u2029]/gu'
+mut23 cf $L23 '\p{Cf}]/u;' ']/u;'
 assert_eq "M-W23-CF — mutant (classe sans \\p{Cf}) : W23.7 rougit" "$(g23 "$WORK/w23-cf-b" 'j.t3cf.join(",")')" "true,true"
 mut23 aititle $L23 "d.type === 'custom-title' && typeof d.customTitle === 'string' ? { t: d.customTitle } : null" "(d.type === 'ai-title' && typeof d.aiTitle === 'string' ? { t: d.aiTitle } : null) || (d.type === 'custom-title' && typeof d.customTitle === 'string' ? { t: d.customTitle } : null)"
 assert_eq "M-W23-AITITLE — mutant (ai-title lu) : W23.3 rougit" "$(g23 "$WORK/w23-aititle-b" '[j.t2a,j.t2b].join("|")')" "TITRE-IA-SECRET-MODELE|true"
@@ -678,8 +680,10 @@ mut23 branchedet vf-cockpit-equipe-carte.mjs "const branche = retireAffichage(w.
 assert_eq "M-W23-BRANCHE-DETAIL — mutant (branche brute dans le détail et le résumé) : W23.10 rougit sur le détail" "$(g23 "$WORK/w23-branchedet-b" 'j.t8[1]')" "false"
 mut23 iface vf-cockpit-interface.json '"task", "titre",' '"task",'
 assert_eq "M-W23-IFACE — mutant (contrat sans `titre`) : W23.14 rougit" "$(g23 "$WORK/w23-iface-b" 'j.t13.join(",")')" "titre"
-mut17 w23-sig vf-cockpit-live.mjs "x.titre || '', " "" >/dev/null; mut17 w23-lib vf-cockpit-who.mjs "LIBRES = { titre: 80," "LIBRES = {" >/dev/null
-assert_eq "M-W23-STATIQUES — mutants (titre retiré de whoSig, de LIBRES) : W23.15 rougit" "$(grep -c "x.titre || ''" "$WORK/mut17-w23-sig/vf-cockpit-live.mjs")|$(grep -c "LIBRES = { titre: 80," "$WORK/mut17-w23-lib/vf-cockpit-who.mjs")" "0|0"
+mut23 sig vf-cockpit-live.mjs "x.titre || ''" "0 && x.titre || ''"
+assert_eq "M-W23-SIG — mutant du juge (titre neutralisé dans whoSig par « 0 && x.titre || '' », un grep resterait vert) : W23.15 rougit" "$(g23 "$WORK/w23-sig-b" 'j.t14.join(",")')" "false,true"
+mut17 w23-lib vf-cockpit-who.mjs "LIBRES = { titre: 80," "LIBRES = {" >/dev/null
+assert_eq "M-W23-LIBRES — mutant (titre retiré de LIBRES) : W23.16 rougit" "$(grep -c "LIBRES = { titre: 80," "$WORK/mut17-w23-lib/vf-cockpit-who.mjs")" "0"
 
 vf_hyg_assert
 

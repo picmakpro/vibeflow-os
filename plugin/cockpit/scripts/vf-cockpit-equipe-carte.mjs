@@ -5,8 +5,8 @@
 // Titre d'une carte de SESSION (PU-G-162, arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : `w.titre`, le `custom-title` du transcript (nom donné avec /rename, lu, nettoyé,
 // masqué et borné à 80 caractères par la collecte `who`), sinon « Session principale · <branche> ». L'`ai-title` (texte du modèle), le dernier prompt et le premier message ne sont jamais lus ;
 // l'identifiant de session passe dans le détail. Amendement de la liste blanche P69-D-19/P69-D-23 pour ce seul champ.
-// Module pur ; schéma vibeflow/cockpit-equipe@1 ; aucune lecture de transcript ici : seuls les champs de la collecte `who`
-// (déjà bornés et masqués par collectWho) entrent dans une carte. Les sortes de carte (session, agent, terminés) n'ont
+// Module pur (aucun fichier lu, aucun transcript ouvert) ; schéma vibeflow/cockpit-equipe@1 : seuls les champs de la collecte `who`
+// (le titre de session et le reste, déjà nettoyés, bornés et masqués par collectWho) entrent dans une carte ; la branche repasse par `retireAffichage`. Les sortes de carte (session, agent, terminés) n'ont
 // ni pictogramme ni couleur : le viewer prend son repli. Aucun fichier (`files` vide), aucun lien.
 import { LIBELLES_VERBES, entreeLanceeValide } from './vf-cockpit-lancer-suivi.mjs';
 import { retireAffichage, nettoieTitre } from './vf-cockpit-lecture.mjs';

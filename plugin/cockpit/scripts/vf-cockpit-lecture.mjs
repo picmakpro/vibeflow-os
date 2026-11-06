@@ -71,12 +71,14 @@ export const masqueCoupe = (t, n) => {
 // (C0, C1, U+2028/U+2029, catégorie Cf), masque des secrets AVANT la coupe, 80 caractères au plus APRÈS nettoyage ; la page ne l'affiche qu'en `textContent`.
 export const BORNE_TITRE = 80;
 // la classe d'affichage (C0, C1, U+2028/2029, catégorie Cf) : copie n°5, mesurée par la parité R4.1 de test-cockpit-git-commandes.sh ; `retireAffichage` la retire sans rien laisser, `nettoieTitre` met une espace à la place
-export const CLASSE_AFFICHAGE = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/gu;
-export const retireAffichage = (t) => (typeof t === 'string' ? t.replace(CLASSE_AFFICHAGE, '') : '');
+// exportée SANS drapeau g (un `.test` d'appelant n'alterne pas par lastIndex, cf. R4.2) ; les remplacements utilisent la copie globale privée
+export const CLASSE_AFFICHAGE = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/u;
+const CLASSE_GLOBALE = new RegExp(CLASSE_AFFICHAGE.source, 'gu');
+export const retireAffichage = (t) => (typeof t === 'string' ? t.replace(CLASSE_GLOBALE, '') : '');
 export const nettoieTitre = (t) => {
   if (typeof t !== 'string') return '';
   const entree = t.slice(0, MAX_MASQUE), d = entree.charCodeAt(entree.length - 1); // la borne d'entrée ne coupe pas non plus une paire de substitution
-  const propre = (d >= 0xd800 && d <= 0xdbff ? entree.slice(0, -1) : entree).replace(CLASSE_AFFICHAGE, ' ').replace(/ {2,}/g, ' ').trim();
+  const propre = (d >= 0xd800 && d <= 0xdbff ? entree.slice(0, -1) : entree).replace(CLASSE_GLOBALE, ' ').replace(/ {2,}/g, ' ').trim();
   return masqueCoupe(propre, BORNE_TITRE).trim();
 };
 const CACHE_TITRES = new Map();
