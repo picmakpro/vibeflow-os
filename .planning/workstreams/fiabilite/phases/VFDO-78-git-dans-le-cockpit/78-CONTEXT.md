@@ -181,9 +181,15 @@ verrous de driver, arbitrages en attente, watchdog et serveurs orphelins (Phase 
 - **P78-D-41 (lecture du graphe non bloquante, étend P78-D-32).** `GET /api/vf/git` (`lireGit`) passe en asynchrone sur le
   point unique, comme les worktrees et le détail : 362 ms de boucle gelée mesurés sur ce dépôt, jusqu'à 5 s sur un git
   muet, à chaque rafale de signal tiroir ouvert (revue du 2026-11-06). Décision du manager de reprise.
+  Étendue le même jour (revue de delta) à `GET /api/vf/git/entete` (`enteteAsync`) et à la lecture de la base dans
+  `etatWorktrees` (`brancheBaseAsync`) : aucune route du tiroir Git ne lance de git synchrone. Hors périmètre, assumé :
+  le filet de 5 s (`whoNow`, `vf-cockpit-signal.mjs`) garde ses lectures synchrones existantes.
 - **P78-D-42 (dépôt sans branche de base).** Sans `main` ni `origin/HEAD` (dépôt `master`, `develop`, `trunk` sans
   distant), le graphe est rendu sans comptes d'avance au lieu de « indisponible » : précise P78-D-11 et P78-D-23 (revue du
   2026-11-06).
+- **P78-D-43 (branche réelle au chargement).** Au chargement de chacun des trois onglets, l'en-tête et le bloc de vue
+  Code relisent une fois `GET /api/vf/git/entete` : la branche affichée est la branche courante, jamais celle de
+  l'assemblage (constat de la recette par juge navigateur du 2026-11-06). Décision du manager de reprise.
 
 ### Claude's Discretion
 
