@@ -212,6 +212,41 @@ t_l11() { # un programme prend le premier plan PENDANT l'attente qui suit Ctrl-C
   pil "$1" 'a:VFP> ' "F:$ref_l" 's:5' "w:$PYR\\r" 'N:1' 'a:LECTEUR-PRET' 's:500' 'z:@RUN@/lecteur.recu=R0' 'p:@RUN@/lecteur.pid=V0' 'w:Q' 's:300' 'e'
   L11_RES="$(fd2) $(rv R0) $(rv V0)"
 }
+t_l13() { # balayage GÉNÉRATIF de l'injection humaine : t_l13 <shell> <1 = s'arrête au premier rouge> ; pour chaque délai de 0 à 400 ms (pas de 20), deux essais, `lecteur brut + Entrée` tapé <délai> après le L
+  L13_TOT=0; L13_BAD=0; L13_PP=0; L13_OK=0; L13_FIRST=""; local d e v r
+  for d in $(seq 0 20 400); do for e in 1 2; do
+    pil "$1" 'a:VFP> ' "F:$ref_l" "s:$d" "w:$PYR\\r" 'N:1' 's:600' 'z:@RUN@/lecteur.recu=R0' 'w:Q' 's:200' 'e'
+    v="$(tr -d '\r' < "$P_O2" | head -1)"; r="$(rv R0)"; L13_TOT=$((L13_TOT+1))
+    case "$v|$r" in
+      'LANCE premier-plan|0') L13_PP=$((L13_PP+1)) ;;  # frappe pendant l'attente : annulé, le lecteur n'a reçu aucun octet
+      'LANCE ok|absent') L13_OK=$((L13_OK+1)) ;;       # frappe après l'écriture : la ligne précède la commande tapée, le lecteur n'a jamais été lancé
+      *) L13_BAD=$((L13_BAD+1)); [ -z "$L13_FIRST" ] && L13_FIRST="${d}ms:$v|$r"; [ "${2:-0}" = 1 ] && return 0 ;;
+    esac
+  done; done
+  return 0
+}
+t_l14() { # même balayage, shell brut horodateur (aucun écho, aucun fork : une entrée poussée au shell n'est visible NULLE PART sauf par le drapeau d'entrée humaine) : t_l14 <1 = s'arrête au premier rouge>
+  L14_TOT=0; L14_BAD=0; L14_PP=0; L14_OK=0; L14_FIRST=""; local d e v r
+  for d in $(seq 0 20 400); do for e in 1 2; do
+    pil "$WORK/bin/shell-horodate" 'f:@RUN@/horo.pid' 's:200' "F:$ref_l" "s:$d" 'w:h' 'N:1' 's:300' 'w:Q' 's:200' 'e'
+    v="$(tr -d '\r' < "$P_O2" | head -1)"
+    r="$(node -e "
+const fs = require('fs'); const s = Buffer.concat(fs.readFileSync(process.argv[1] + '/horo.log', 'utf8').split('\n').filter(Boolean).map((l) => Buffer.from(l.split(' ')[1], 'hex')));
+const iR = s.indexOf(process.env.VFT_REF), iH = s.indexOf('h'); console.log(iR < 0 ? (iH >= 0 ? 'sans-ligne' : 'sans-frappe') : (iH > iR ? 'ligne-avant-frappe' : 'LIGNE-APRES-FRAPPE'));
+" "$RUN" 2>&1)"
+    L14_TOT=$((L14_TOT+1))
+    case "$v|$r" in
+      'LANCE premier-plan|sans-ligne') L14_PP=$((L14_PP+1)) ;;       # frappe pendant l'attente : annulé, la ligne n'a jamais été écrite
+      'LANCE ok|ligne-avant-frappe') L14_OK=$((L14_OK+1)) ;;          # frappe après l'écriture
+      *) L14_BAD=$((L14_BAD+1)); [ -z "$L14_FIRST" ] && L14_FIRST="${d}ms:$v|$r"; [ "${1:-0}" = 1 ] && return 0 ;;
+    esac
+  done; done
+  return 0
+}
+t_l13p() { # témoin positif de la même manche : aucune frappe -> « LANCE ok » et la ligne est à l'invite
+  pil "$1" 'a:VFP> ' "F:$ref_l" 'N:1' 's:600' 'e'
+  L13_POS="$(tr -d '\r' < "$P_O2" | head -1) $([ "$(cnt "$P_O1" "$UUID")" -ge 1 ] && echo vue || echo non)"
+}
 t_l12() { # shell brut horodateur : Ctrl-C SEUL, puis la ligne dans une écriture distincte, au moins 0,2 s plus tard (le shell ne produit aucune sortie : attente maximale)
   pil "$WORK/bin/shell-horodate" 'f:@RUN@/horo.pid' 's:300' "F:$ref_l" 'N:1' 's:300' 'w:Q' 's:300' 'e'
   L12_RES="$(fd2) $(node -e "
@@ -318,15 +353,27 @@ res.append('d:%s:%s' % (ecr == [b'\x03', lig], ','.join(sorties)))
 v = bytearray(b'x'); m.DIFFEREE.update(ligne=None, suite=[], vu=0.0); del ecr[:]; m.pousser = trace  # (e) une entrée déjà en attente d'écriture : refus, rien de plus en file
 r = m.lancer_ligne(hexa, -1, 1, v)
 res.append('e:%s:%s:%s:%d' % (r, m.DIFFEREE['ligne'] is None, ecr == [], len(v)))
+v = bytearray(); r = amorcer(v); m.DIFFEREE['humain'] = True; m.liberer_ligne(v, -1, 1, time.time() + 1)  # (f) une entrée humaine est arrivée pendant l'attente : la ligne est annulée
+res.append('f:%s:%s:%s:%d' % (r, ','.join(sorties), ecr == [b'\x03'], len(v)))
+v = bytearray(); r = amorcer(v); v += b'x'; m.liberer_ligne(v, -1, 1, time.time() + 1)  # (g) une entrée attend encore d'être poussée au shell : la ligne ne se colle pas derrière
+res.append('g:%s:%s:%s:%d' % (r, ','.join(sorties), ecr == [b'\x03'], len(v)))
 print(' '.join(res))
 PY
-L11_ATT="a:ok:LANCE ecriture,LANCE premier-plan:True:0 b:ok:LANCE premier-plan:True:0 c:(1, 0):(1, 0):True:LANCE ok d:True:LANCE ok e:premier-plan:True:True:1"
+L11_ATT="a:ok:LANCE ecriture,LANCE premier-plan:True:0 b:ok:LANCE premier-plan:True:0 c:(1, 0):(1, 0):True:LANCE ok d:True:LANCE ok e:premier-plan:True:True:1 f:ok:LANCE premier-plan:True:0 g:ok:LANCE premier-plan:True:1"
 dif() { python3 -I "$AUX/differe.py" "$1" "$REF" 2>&1 | tail -1; }
 assert_eq "L11.1 — fonctions seules, horloge explicite : (a) échec d'écriture de la ligne DIFFÉRÉE -> « LANCE ecriture » puis la demande en file, jamais « ok » ; (b) premier plan perdu pendant l'attente -> « LANCE premier-plan » et seul Ctrl-C est écrit ; (c) ni sortie ni 0,3 s -> rien, sortie sans 30 ms de calme -> rien, calme -> la ligne dans une écriture distincte de Ctrl-C ; (d) sans sortie, 0,31 s suffit ; (e) entrée déjà en attente -> refus sans rien mettre en file" "$(dif "$ASSIST")" "$L11_ATT"
 for SH in $SHELLS; do
   B="$(basename "$SH")"; t_l11 "$SH"
   assert_eq "L11.2 [$B] — un programme (lecteur brut) lancé 5 ms après le L prend le premier plan pendant l'attente : « LANCE premier-plan », 0 octet reçu par le programme (ni la ligne), lecteur vivant" "$L11_RES" "LANCE premier-plan| 0 oui"
+  t_l13p "$SH"
+  assert_eq "L13.0 [$B] — témoin positif du balayage : sans aucune frappe, « LANCE ok » et la ligne est à l'invite" "$L13_POS" "LANCE ok vue"
+  t_l13 "$SH"
+  assert_eq "L13.1 [$B] — balayage de l'injection humaine (21 délais de 0 à 400 ms, 2 essais chacun) : 42 essais, 0 rouge ; chaque essai est « LANCE premier-plan » avec 0 octet reçu par le lecteur, ou « LANCE ok » avec le lecteur jamais lancé (la ligne précédait la frappe), jamais la ligne dans le programme au premier plan" "$L13_TOT $L13_BAD ${L13_FIRST:-aucun}" "42 0 aucun"
+  assert_eq "L13.2 [$B] — le balayage atteint la zone qu'il doit couvrir (anti-vert-à-vide) : au moins 10 essais annulés par la frappe, et leur nombre + celui des lancements acceptés = 42" "$([ "$L13_PP" -ge 10 ] && echo oui || echo "non($L13_PP)") $((L13_PP+L13_OK))" "oui 42"
 done
+t_l14
+assert_eq "L14.1 — balayage de l'injection humaine sur le shell brut horodateur (21 délais de 0 à 400 ms, 2 essais chacun) : 42 essais, 0 rouge ; chaque essai est « LANCE premier-plan » et la ligne n'a JAMAIS été écrite, ou « LANCE ok » et la ligne précède la frappe" "$L14_TOT $L14_BAD ${L14_FIRST:-aucun}" "42 0 aucun"
+assert_eq "L14.2 — le balayage atteint la zone qu'il doit couvrir (anti-vert-à-vide) : au moins 10 essais annulés par la frappe, et leur nombre + celui des lancements acceptés = 42" "$([ "$L14_PP" -ge 10 ] && echo oui || echo "non($L14_PP)") $((L14_PP+L14_OK))" "oui 42"
 t_l12
 assert_eq "L12.1 — shell brut horodateur : « LANCE ok », deux lectures du terminal seulement, la première est Ctrl-C (03) SEULE, la seconde est exactement la ligne, au moins 0,2 s plus tard" "$L12_RES" "LANCE ok|FIN 0| 2 03 true true"
 
@@ -397,13 +444,23 @@ cat > "$WORK/sed/ecrdiff.sed" <<'SED'
 s|^            reponse = 'ecriture'$|            reponse = 'ok'|
 SED
 cat > "$WORK/sed/retest.sed" <<'SED'
-s|^    libre = premier_plan_libre(maitre, pid)|    libre = True|
+s|^\(    libre = .* and \)premier_plan_libre(maitre, pid)|\1True|
 SED
 cat > "$WORK/sed/attente.sed" <<'SED'
 s|^    if not (calme or maintenant - DIFFEREE\['t0'\] >= ATTENTE_MAX_CTRLC):$|    if False:|
 SED
 cat > "$WORK/sed/uneecr.sed" <<'SED'
 s|^    vers_shell += CTRL_C$|    vers_shell += CTRL_C + ligne|
+SED
+cat > "$WORK/sed/humain.sed" <<'SED'
+s|DIFFEREE\['humain'\] = True|pass|
+SED
+cat > "$WORK/sed/humainfile.sed" <<'SED'
+s|DIFFEREE\['humain'\] = True|pass|
+s|^    libre = not DIFFEREE\['humain'\] and not vers_shell and |    libre = |
+SED
+cat > "$WORK/sed/filelib.sed" <<'SED'
+s|^    libre = not DIFFEREE\['humain'\] and not vers_shell and |    libre = not DIFFEREE['humain'] and |
 SED
 cat > "$WORK/sed/vsh.sed" <<'SED'
 s|^    if vers_shell or DIFFEREE\['ligne'\] is not None:$|    if DIFFEREE['ligne'] is not None:|
@@ -412,9 +469,7 @@ if mut_pty ecrdiff "$WORK/sed/ecrdiff.sed"; then
   rougit "M-ECRITURE-DIFFEREE — le mutant répond ok quand l'écriture de la ligne différée échoue (L11.1 rouge)" "$(dif "$MUT_ASSIST")" "$L11_ATT"
 else sans_effet M-ECRITURE-DIFFEREE; fi
 if mut_pty retest "$WORK/sed/retest.sed"; then
-  rougit "M-RETEST-PREMIER-PLAN — le mutant ne reteste plus le premier plan au moment d'écrire la ligne différée (L11.1 rouge)" "$(dif "$MUT_ASSIST")" "$L11_ATT"
-  ASSIST="$MUT_ASSIST"; t_l11 "$MSH"; ASSIST="$ASSIST0"
-  rougit "M-RETEST-PREMIER-PLAN — même mutant, vrai shell : la ligne est écrite dans le programme au premier plan (L11.2 rouge)" "$L11_RES" "LANCE premier-plan| 0 oui"
+  rougit "M-RETEST-PREMIER-PLAN — le mutant ne reteste plus le premier plan au moment d'écrire la ligne différée (L11.1(b) rouge ; avec un vrai shell le drapeau d'entrée humaine ferme déjà le cas L11.2 : le retest est défense en profondeur)" "$(dif "$MUT_ASSIST")" "$L11_ATT"
 else sans_effet M-RETEST-PREMIER-PLAN; fi
 if mut_pty sansattente "$WORK/sed/attente.sed"; then
   rougit "M-SANS-ATTENTE — le mutant écrit la ligne sans attendre la réaction du shell (L11.1 rouge)" "$(dif "$MUT_ASSIST")" "$L11_ATT"
@@ -426,6 +481,18 @@ if mut_pty uneecriture "$WORK/sed/uneecr.sed"; then
   ASSIST="$MUT_ASSIST"; t_l12; ASSIST="$ASSIST0"
   rougit "M-UNE-ECRITURE — même mutant, shell horodateur : la première lecture porte déjà la ligne (L12.1 rouge)" "$L12_RES" "LANCE ok|FIN 0| 2 03 true true"
 else sans_effet M-UNE-ECRITURE; fi
+if mut_pty humain "$WORK/sed/humain.sed"; then
+  ASSIST="$MUT_ASSIST"; t_l14 1; ASSIST="$ASSIST0"
+  rougit "M-SANS-DRAPEAU-HUMAIN — le mutant ne note plus l'entrée humaine pendant l'attente (la clause « entrée en file » et le retest du premier plan restent) : sur un shell qui n'écho rien, la ligne part derrière la frappe déjà poussée (L14.1 rouge ; avec bash ou zsh la clause « entrée en file » et l'écho qui prolonge l'attente suffisent presque toujours, d'où ce shell)" "$L14_BAD ${L14_FIRST:-aucun}" "0 aucun"
+else sans_effet M-SANS-DRAPEAU-HUMAIN; fi
+if mut_pty humainfile "$WORK/sed/humainfile.sed"; then
+  ASSIST="$MUT_ASSIST"; t_l13 "$MSH" 1; X13="$L13_BAD ${L13_FIRST:-aucun}"; t_l14 1; ASSIST="$ASSIST0"
+  rougit "M-SANS-DRAPEAU-NI-FILE — même mutant, shell horodateur (L14.1 rouge)" "$L14_BAD ${L14_FIRST:-aucun}" "0 aucun"
+  rougit "M-SANS-DRAPEAU-NI-FILE — le mutant retire le drapeau ET la clause « entrée en file » (seul le retest du premier plan reste) : avec un vrai shell, la ligne entre dans le lecteur tapé pendant l'attente (L13.1 rouge)" "$X13" "0 aucun"
+else sans_effet M-SANS-DRAPEAU-NI-FILE; fi
+if mut_pty filelib "$WORK/sed/filelib.sed"; then
+  rougit "M-SANS-CLAUSE-FILE — le mutant retire la clause « entrée en file » du relâchement (L11.1(g) rouge ; le drapeau reste : le balayage ne la voit pas, elle est défense en profondeur)" "$(dif "$MUT_ASSIST")" "$L11_ATT"
+else sans_effet M-SANS-CLAUSE-FILE; fi
 if mut_pty filedemie "$WORK/sed/vsh.sed"; then
   rougit "M-FILE-ENTREE-EN-ATTENTE — le mutant ne refuse plus une entrée déjà en attente d'écriture, seule la ligne différée garde (L11.1 rouge ; L9.1 reste vert : un shell sourd ne remplit jamais le tampon avec une ligne à la fois)" "$(dif "$MUT_ASSIST")" "$L11_ATT"
 else sans_effet M-FILE-ENTREE-EN-ATTENTE; fi

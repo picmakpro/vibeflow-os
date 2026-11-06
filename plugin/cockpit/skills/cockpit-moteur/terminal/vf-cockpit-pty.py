@@ -74,7 +74,8 @@ CALME_APRES_CTRLC = 0.03  # la boucle se réveille au plus tard toutes les 0,2 s
 ATTENTE_MAX_CTRLC = 0.3  # sans aucune sortie du shell : 0,3 s puis un réveil de 0,2 s au plus, soit 0,5 s au plus après Ctrl-C
 # 'ligne' : en attente de la réaction du shell à Ctrl-C ; 'vu' : dernière sortie du shell depuis Ctrl-C ; 'suite' : réponses « LANCE … » des lignes L arrivées pendant l'attente.
 # La réponse « LANCE ok » ne part qu'avec la ligne (204 = la ligne est à l'invite) ; les réponses se suivent dans l'ordre des demandes (le serveur les apparie en FIFO).
-DIFFEREE = {'ligne': None, 't0': 0.0, 'vu': 0.0, 'suite': []}
+# 'humain' : vrai dès qu'une entrée humaine (descripteur 0) arrive pendant l'attente — la ligne est alors ANNULÉE (« terminal au repos seulement » : un terminal où l'humain tape n'est pas au repos).
+DIFFEREE = {'ligne': None, 't0': 0.0, 'vu': 0.0, 'suite': [], 'humain': False}
 arret = False
 
 
@@ -160,7 +161,7 @@ def lancer_ligne(hexa, maitre, pid, vers_shell):
     if not premier_plan_libre(maitre, pid):
         return 'premier-plan'
     vers_shell += CTRL_C
-    DIFFEREE.update(ligne=ligne, t0=time.time(), vu=0.0, suite=[])  # la ligne part dans liberer_ligne(), pas dans la même écriture que Ctrl-C
+    DIFFEREE.update(ligne=ligne, t0=time.time(), vu=0.0, suite=[], humain=False)  # la ligne part dans liberer_ligne(), pas dans la même écriture que Ctrl-C
     try:
         pousser(maitre, vers_shell)  # une seule tentative ; sur BlockingIOError Ctrl-C reste en file et part au prochain select (la ligne, elle, ne rejoint la file qu'à liberer_ligne)
     except OSError:
@@ -172,8 +173,9 @@ def lancer_ligne(hexa, maitre, pid, vers_shell):
 
 def liberer_ligne(vers_shell, maitre, pid, maintenant):
     """Quand le shell a réagi à Ctrl-C (sortie vue, puis calme) ou après ATTENTE_MAX_CTRLC sans réaction : retest du premier plan, puis écriture de la ligne différée.
-    Répond « ok » (ligne mise en file), « premier-plan » (un programme a pris le terminal pendant l'attente : RIEN n'est écrit) ou « ecriture » (l'écriture a échoué),
-    suivi des réponses de `suite` (les demandes arrivées pendant l'attente) dans l'ordre des demandes."""
+    Répond « ok » (ligne mise en file), « premier-plan » (RIEN n'est écrit : une entrée humaine est arrivée pendant l'attente, ou une entrée attend encore d'être poussée,
+    ou un programme a pris le terminal) ou « ecriture » (l'écriture a échoué), suivi des réponses de `suite` (les demandes arrivées pendant l'attente) dans l'ordre des demandes.
+    Toute frappe pendant l'attente (au plus ~0,5 s) annule le lancement : l'entrée déjà poussée au shell mais pas encore consommée n'est pas visible par tcgetpgrp, seul ce drapeau la ferme."""
     ligne = DIFFEREE['ligne']
     if ligne is None:
         return
@@ -182,7 +184,9 @@ def liberer_ligne(vers_shell, maitre, pid, maintenant):
         return
     suite = DIFFEREE['suite']
     DIFFEREE.update(ligne=None, suite=[])
-    libre = premier_plan_libre(maitre, pid)  # l'entrée humaine continue d'arriver pendant l'attente : le test de lancer_ligne ne vaut plus au moment d'écrire
+    # Trois gardes, chacune sa propre défense : le drapeau (frappe pendant l'attente, y compris déjà poussée au shell), la file (entrée pas encore poussée), le premier plan (programme déjà lancé).
+    libre = not DIFFEREE['humain'] and not vers_shell and premier_plan_libre(maitre, pid)
+    DIFFEREE['humain'] = False
     if not libre:
         reponse = 'premier-plan'
     else:
@@ -528,6 +532,8 @@ def main():
                 if not donnees:
                     break
                 vers_shell += donnees
+                if DIFFEREE['ligne'] is not None:
+                    DIFFEREE['humain'] = True
             if maitre in pret:
                 try:
                     donnees = os.read(maitre, 65536)

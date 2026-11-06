@@ -51,7 +51,7 @@ et R1 court/index, court/project. Taux comparables avec et sans la 72 (3/5 contr
    séparés par l'attente, sans jamais remplir le tampon du PTY) ; un témoin propre existe donc : L11.1(e) + mutant M-FILE-ENTREE-EN-ATTENTE rouge.
 4. **Textes** : docstrings de `lancer_ligne` et `liberer_ligne`, commentaires (réponse `ok`, 0,25 s -> calme de 30 ms plus un réveil, 0,5 s au plus sans sortie), 72-CONTRATS.md §5.
 
-### Limites connues (non corrigées)
+### Limites connues de la première correction (voir la section suivante pour le point 1)
 - Le drapeau `vu` peut être posé par l'écho d'une frappe humaine arrivée après Ctrl-C : l'attente se prolonge de la même manière (version probabiliste, jamais l'écriture avant la réaction du shell
   puisque le calme court depuis la dernière sortie) ; non corrigé, aucune preuve d'un tort.
 - Si l'écriture de Ctrl-C est retenue par `BlockingIOError` (tampon du PTY plein) et que la ligne rejoint la file derrière lui, Ctrl-C et ligne partent dans la même écriture : le défaut d'origine,
@@ -62,3 +62,24 @@ et R1 court/index, court/project. Taux comparables avec et sans la 72 (3/5 contr
 Linux ubuntu 26.04 (node 24, compte non root, Chromium) et macOS : lancer-pty (Linux 58/0 bash seul ; macOS 75/0 bash et zsh), lancer-processus 46/0 et 46/0, lancer-xss 76/0 et 76/0,
 lancer-bout-en-bout 54/0 et 54/0, terminal-session (Linux 58/0 avec `docker run --init` ; macOS 58/0), terminal-pty-plantage 21/0 et 21/0.
 Correction de mon rapport précédent : les rouges de terminal-pty / terminal-session sous Linux venaient de l'absence d'init dans le conteneur (zombies) ; avec `--init` : terminal-pty 63/0, terminal-session 58/0.
+
+## Seconde correction du majeur (revue de ac8cacb7) — le point 1 de la section précédente était annoncé FERMÉ À TORT
+
+Le retest de `premier_plan_libre` à l'écriture ne suffisait pas : la boucle lit stdin, appelle `liberer_ligne`, et seulement ensuite pousse l'entrée au PTY. Une frappe humaine arrivée dans la même passe
+(entre 20 et 160 ms après le `L`, mesurée par la revue : 11 fois sur 12) laissait `tcgetpgrp` vrai (le programme tapé n'était pas encore lancé), et la ligne partait collée derrière `cat\r`.
+Mon cas à 4 ms passait ; il ne couvrait qu'un point d'une famille continue. Ni un cas de plus ni la clause `not vers_shell` seule ne ferment la course résiduelle (entrée déjà poussée, pas encore consommée).
+
+Décision du manager (2026-11-06, « terminal au repos seulement », P72-D-01) : propriété en point fixe — TOUTE entrée humaine (fd 0) reçue entre l'arrivée de `L` et l'écriture de la ligne l'ANNULE
+(rien d'écrit, `LANCE premier-plan`, puis `suite`). Correctif : drapeau `DIFFEREE['humain']`, posé par la boucle à chaque lecture de fd 0 pendant l'attente, lu et remis à zéro par `liberer_ligne` ;
+le retest du premier plan et la clause `not vers_shell` restent en défense en profondeur.
+
+Preuve générative (pas une liste de cas) :
+- L13 : bash et zsh, `lecteur brut + Entrée` tapé 0, 20, …, 400 ms après le `L`, 2 essais par délai (42 essais) ; chaque essai est `LANCE premier-plan` avec 0 octet reçu par le lecteur, ou `LANCE ok` avec le lecteur jamais lancé
+  (la ligne précédait la commande tapée) ; au moins 10 essais annulés (anti-vert-à-vide) ; témoin positif sans frappe (`LANCE ok`, ligne à l'invite).
+- L14 : même balayage sur un shell brut horodateur. Ce shell n'écho rien et ne lance rien : une entrée poussée n'y est visible que par le drapeau. C'est le seul témoin qui isole le drapeau de la clause `not vers_shell`
+  (avec bash ou zsh, l'écho de la frappe prolonge l'attente et la clause suffit presque toujours, ce qui rendait le drapeau indiscernable).
+- Mutants : M-SANS-DRAPEAU-HUMAIN (drapeau retiré, clause et retest présents) rouge sur L14 (`0ms:LANCE ok|LIGNE-APRES-FRAPPE`) ; M-SANS-DRAPEAU-NI-FILE (drapeau et clause retirés) rouge sur L13 et L14 (`40ms:LANCE ok|0`) ;
+  M-SANS-CLAUSE-FILE rouge sur L11.1(g). M-RETEST-PREMIER-PLAN reste rouge sur L11.1(b) seulement : avec un vrai shell, le drapeau ferme désormais le cas L11.2 avant le retest, qui n'est plus que défense en profondeur.
+- Aveu : avec bash ou zsh, retirer le drapeau seul ne fait pas rougir L13 (clause `not vers_shell` et écho). Seul L14 le voit.
+
+Limite ajoutée : une frappe pendant l'attente (au plus ~0,5 s après le clic) ANNULE le lancement ; l'humain clique de nouveau. README du cockpit, 72-CONTRATS.md §5 et docstrings le disent.
