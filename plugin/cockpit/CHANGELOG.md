@@ -1,5 +1,29 @@
 # Changelog — cockpit
 
+## v1.4.0 — 2026-11-06 — non publié
+
+Phase 78 « Git dans le cockpit » (jalon vibeflow-v2.0, compartiment fiabilité) : nouvelle capacité, version mineure. Arbitrages de Samuel : P78-D-01 à P78-D-10 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 ; P78-D-10 au second tour, même canal et même date), P78-D-20, P78-D-21 et P78-D-25 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05, troisième tour). Les décisions techniques du manager portent leur propre préfixe.
+
+### Ajouté
+- **En-tête Git** (P78-D-01, P78-D-02, P78-D-03) : le titre est le nom du dossier du dépôt principal sur Code, Projet et Équipe (dans un worktree, « vibeflow-os », pas « phase-78 ») ; une seconde ligne dit la branche et, hors de l'arbre principal, le worktree ; le bloc de vue dit ce que montre la vue au lieu de répéter le nom du projet. Branche détachée en texte neutre (P78-D-35, jetons figés de la 71.5 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-05).
+- **Tiroir Git en lecture seule** (P78-D-04, P78-D-05, P78-D-06, P78-D-10) : tiroir vertical à gauche, ouvert au clic sur la seconde ligne et par la touche `g` ; graphe en couloirs des branches locales, des branches distantes déjà connues et des worktrees (jamais de `fetch`), détail d'un commit sans diff, état de chaque worktree, tags, stash, auteurs et activité ; commandes exactes à copier (P78-D-07, P78-D-14), jamais exécutées par le cockpit. Ouvreur : seconde ligne, icône de 44 px de 701 à 1279 px (P78-D-20, P78-D-34), entrée « Historique Git » du menu « ⋯ » sous 700 px (P78-D-30).
+- **Routes GET** (P78-D-13) : `/api/vf/git`, `/api/vf/git/entete`, `/api/vf/git/commit?sha=`, `/api/vf/git/worktrees`, derrière les contrôles Host, Origin et jeton existants ; aucune route non GET ajoutée par la phase (405 sinon). Schémas `vibeflow/cockpit-git@1`, `-entete@1`, `-commit@1`, `-worktrees@1` dans `vf-cockpit-interface.json`.
+- **Signal** (P78-D-15, P78-D-23) : événement `git` sur le flux en direct, calculé dans le filet de 5 s sur une signature bon marché (refs, worktrees, index) ; le tiroir ouvert relit une fois par rafale, sans polling.
+- **Lecture des worktrees non bloquante** (P78-D-32 : décision du manager de reprise, 2026-11-06) : `GET /api/vf/git/worktrees` passe en asynchrone, le flux SSE et le terminal ne gèlent plus (~1,2 s synchrones mesurées sur ce dépôt).
+- **Pastilles d'état des worktrees en texte neutre** (P78-D-33) : glyphe et mot, sans fond teinté ni couleur d'état (jetons figés de la 71.5, arbitrage Samuel, AskUserQuestion session principale, 2026-11-05).
+- **Seconde ligne masquée sous 1280 px** (P78-D-34) : sur la délégation de P78-D-19 (« sauf avis contraire du juge de design »), la critique du 2026-11-06 la mesure illisible de 1000 à 1279 px ; l'icône de 44 px la remplace de 701 à 1279 px. Signalé à Samuel (SendMessage session principale, 2026-11-06), réversible sur son avis.
+- **Suites** : `test-cockpit-git-e2e.sh` (serveur réel, page en Chrome CDP : B1 à B5, mutants de jonction M-ROUTE, M-SIGNAL, M-OUVREUR, captures pour le juge de design), volet git C0g à C4g de `test-cockpit-chaine-xss.sh`.
+
+### Sécurité
+- **Environnement git unique** (P78-D-21, P78-D-22, P78-D-25) : tous les appels git du socle passent par `envGit` / `shBorne` : variables `GIT_*` héritées retirées, `core.fsmonitor=false`, `GIT_OPTIONAL_LOCKS=0`, `--no-ext-diff --no-textconv --no-show-signature`, aucun filtre déclaré par le dépôt exécuté (la mention « approximatif : filtres du dépôt non exécutés » le dit). Corrige la faille préexistante de `vf-cockpit-who.mjs` (`status --porcelain` qui exécutait un filtre du dépôt) et étend la protection à `vf-cockpit-arbres.mjs`, `vf-cockpit-planning.mjs` et `vf-cockpit-paths.mjs` (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05, « Corriger avant la release »).
+- **Moteur vendorisé fermé par défaut** (P78-D-25) : patch P27 de `scripts/lib/common.mjs` : `git()` ne lit rien sans `VF_COCKPIT_GIT_DURCI=1`. Un moteur lancé à la main hors de l'assemblage n'a donc plus de liste git (documenté au README).
+- **Commandes à copier** (P78-D-14, P78-D-27, P78-D-29) : un nom de branche hostile ne produit jamais une commande qui fait autre chose que celle affichée ; aucune commande si le nom est masqué, ni pour `-` et `@`.
+- **Chaîne XSS étendue aux données git** (P78-D-17) : un nom de branche, un message de commit, un auteur ou un stash hostiles n'aboutissent à rien ; chaque maillon (rendu en `textContent`, CSP, garde du moteur) casse la chaîne seul.
+
+### Modifié
+- **Attribution des sous-agents au worktree** (P78-D-26 : décision d'ordonnancement de la session principale, 2026-11-05) : `byActivity` de `vf-cockpit-who.mjs` retient le dernier worktree cité sur l'ensemble des appels de l'agent, au lieu de la seule dernière ligne du transcript.
+- **Retiré** (P78-D-09) : la liste « Repositories » de l'onglet Code et les suffixes « — Projet » / « — Équipe » du titre.
+
 ## v1.3.3 — 2026-11-05 — non publié
 
 Réglage visuel (demande de Samuel, session principale, 2026-11-05) : tiroir fermé, la pastille « Terminal » se place sous les boutons de zoom (− ▢ +), au plus bas à gauche, et les boutons de zoom remontent au-dessus d'elle ; plus de chevauchement. Tiroir ouvert, rien ne change. Vaut pour les pages Projet et Code.

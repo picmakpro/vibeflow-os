@@ -373,8 +373,11 @@ for (const theme of ['clair', 'sombre']) {
     await png(`${theme}-${w}-1-ferme`); out.faites.push(`${theme}-${w}-ferme`);
     await s.ev(`window.VFGitTiroir.ouvrir()`);
     await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-tiroir li[role=option]').length > 0`, `tiroir ouvert ${w}`);
+    // le tiroir rouvre sur la sélection précédente : on replie le détail pour la vue « ouvert », puis on le redéplie pour la vue « détail »
+    await s.ev(`(() => { const sel = document.querySelector('#vf-git-tiroir li[role=option][aria-selected=true]'); if (sel && document.querySelector('#vf-git-tiroir [role=region][aria-label^="Détail du commit"]')) sel.click(); })()`);
+    await s.attendre(`!document.querySelector('#vf-git-tiroir [role=region][aria-label^="Détail du commit"]')`, `détail replié ${w}`);
     await pause(900); await png(`${theme}-${w}-2-ouvert`); out.faites.push(`${theme}-${w}-ouvert`);
-    await s.ev(`(() => { const l = document.querySelector('#vf-git-tiroir li[role=option]'); if (l && l.getAttribute('aria-selected') !== 'true') l.click(); })()`);
+    await s.ev(`document.querySelector('#vf-git-tiroir li[role=option]').click()`);
     await s.attendre(`(() => { const r = document.querySelector('#vf-git-tiroir [role=region][aria-label^="Détail du commit"]'); return !!r && r.textContent.length > 0 && !/Lecture du détail/.test(r.textContent); })()`, `détail déplié ${w}`);
     await pause(500); await png(`${theme}-${w}-3-detail`); out.faites.push(`${theme}-${w}-detail`);
   }

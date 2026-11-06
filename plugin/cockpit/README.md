@@ -3,7 +3,7 @@
 > Une page locale, en lecture seule (sauf le terminal intégré, si on le demande), qui dit où en est le lab : jalons, phases (à faire, en cours, à recetter, faites), plans,
 > exigences, missions, et qui travaille en ce moment, en arbre. Ouverte par `/vf-cockpit`.
 
-**Type** : skill + scripts + moteur vendorisé · **Version** : v1.3.3 · **Dépend de** : aucun module (lit le verrou de `conductor` s'il est posé)
+**Type** : skill + scripts + moteur vendorisé · **Version** : v1.4.0 · **Dépend de** : aucun module (lit le verrou de `conductor` s'il est posé)
 
 ## Ce que ça donne
 
@@ -56,6 +56,62 @@ Sans `--terminal`, rien de ce qui suit n'existe : aucun second écouteur, aucune
 Les onglets sont resserrés pour que trois tiennent dans l'en-tête (`test-cockpit-responsive.sh`, R1 à R4). Depuis la Phase 70,
 ils reviennent aux valeurs de `DESIGN.md` (13 px, piste de 3 px) en largeur téléphone (R13.4 à 390 px) ; à 1 024 et 1 440 px ils restent
 à 12 px / 2 px (écart connu : R13.4 y est rouge, arbitrage de Samuel en attente).
+
+## Git dans le cockpit
+
+Le titre de l'en-tête (identique sur Projet, Équipe et Code) est le **nom du dossier du dépôt principal** : dans un worktree, c'est « vibeflow-os »,
+pas « phase-78 » (P78-D-01). Dessous, en petit, une **seconde ligne** dit la branche et, hors de l'arbre principal, le worktree ; une branche détachée
+se lit comme telle, en texte neutre (P78-D-02, P78-D-35). Le bloc de vue ne répète plus le nom du projet : il dit ce que montre la vue (P78-D-03).
+Les suffixes « — Projet » / « — Équipe » du titre et la liste « Repositories » de l'onglet Code sont retirés (P78-D-09).
+
+**Ouvrir le tiroir** (P78-D-10) : clic sur la seconde ligne, ou touche `g` (ouvre et ferme ; sans effet dans un champ de saisie). Quand la seconde ligne est
+masquée faute de largeur, une icône de 44 px dans l'en-tête la remplace, et sur téléphone une entrée « Historique Git » du menu « ⋯ » (P78-D-20, P78-D-30, P78-D-34).
+Le tiroir est vertical, à gauche, et coexiste avec le tiroir Terminal (en bas) et les boutons de zoom.
+
+**Ce qu'il montre** (tout est lu sur le disque, jamais de `fetch`, jamais de lecture réseau) :
+
+- le **graphe** en couloirs des branches locales, des branches distantes déjà connues (`refs/remotes/*`) et des worktrees (P78-D-05) ; au plus 500 commits de la
+  branche de base et 500 des branches non mergées, les branches mergées repliées ; « Historique tronqué » quand une fenêtre est pleine ;
+- le **détail d'un commit** sous sa rangée : auteur, date, message complet, fichiers touchés avec +/− (30 d'abord, puis « et k autres »), **sans diff** ;
+- l'**état de chaque worktree** : modifiés, non suivis, avance et retard sur la base ; lu à l'ouverture du tiroir et après un signal, en asynchrone pour ne pas
+  geler le serveur (P78-D-32) ;
+- les **tags**, les **stash**, les **auteurs et l'activité** (agrégés sur les commits lus, pas sur tout l'historique : jamais « tous les auteurs »).
+
+**Lecture seule, commandes à copier** (P78-D-07, P78-D-13) : le cockpit n'écrit ni dans le dépôt lu ni dans `.git`, et **n'ajoute aucune route qui agit** : les routes
+ci-dessous répondent en `GET` seulement (autre méthode : 405), derrière les contrôles existants (Host, Origin, jeton). Chaque action est proposée comme la
+**commande exacte à copier** ; vous la lancez vous-même (terminal intégré ou autre). La commande est construite par une fonction unique, noms de branches et chemins cités
+pour le shell (P78-D-14) ; une commande qui différerait du nom affiché n'est jamais proposée (nom masqué : P78-D-27 ; `-` et `@`, que `git switch` lit comme
+des raccourcis : P78-D-29). La copie passe par l'API presse-papiers de la page Projet seule, tout texte venu de git est rendu en `textContent`.
+
+| Route (GET) | Rend |
+|---|---|
+| `/api/vf/git` | `vibeflow/cockpit-git@1` : rangées du graphe, étiquettes, worktrees, tags, stash, auteurs, bornes |
+| `/api/vf/git/entete` | `vibeflow/cockpit-git-entete@1` : dépôt, branche, worktree, HEAD détaché |
+| `/api/vf/git/commit?sha=<40 hexadécimaux>` | `vibeflow/cockpit-git-commit@1` : détail d'un commit (sha validé par motif strict puis `rev-parse --verify`) |
+| `/api/vf/git/worktrees` | `vibeflow/cockpit-git-worktrees@1` : état de chaque worktree, à la demande |
+
+**Sans git, ou hors dépôt** (P78-D-11) : la seconde ligne et l'ouvreur sont absents, le reste du cockpit est identique ; une commande git en échec ou qui dépasse sa
+borne rend un état « indisponible » local au tiroir, jamais une page cassée.
+
+**Rafraîchissement** (P78-D-15, P78-D-23) : le serveur calcule une signature bon marché (refs, liste des worktrees, date et taille des index) dans le filet de 5 s déjà
+là et émet un événement `git` sur le flux en direct au seul changement ; le tiroir ouvert relit alors une fois par rafale de 300 ms, sans polling et sans `git log` à chaque tick.
+
+**Environnement git durci** (P78-D-21, P78-D-22, P78-D-25). Tous les appels git du socle passent par un point unique (`envGit`, `shBorne`) : variables `GIT_*` héritées retirées
+(un `GIT_DIR` ou `GIT_WORK_TREE` d'un parent ne détourne pas la lecture), `core.fsmonitor=false`, `GIT_OPTIONAL_LOCKS=0`, `--no-ext-diff --no-textconv --no-show-signature`, et **aucun
+filtre déclaré par le dépôt n'est exécuté** (`filter.<x>.clean`, `smudge` et `process` vidés, `required=false` ; jamais de `git diff` contre l'arbre de travail). Quand le dépôt déclare un filtre, le
+compte de fichiers modifiés d'un worktree porte la mention « approximatif : filtres du dépôt non exécutés ». Le marqueur `VF_COCKPIT_GIT_DURCI=1`, posé par ce point unique, est la
+condition de la lecture git du moteur vendorisé (patch P27 de `scripts/lib/common.mjs`). Cette protection couvre aussi `vf-cockpit-who.mjs` (le `status` qui exécutait un filtre du dépôt) et
+`vf-cockpit-arbres.mjs`, `vf-cockpit-planning.mjs`, `vf-cockpit-paths.mjs`. Preuves : `test-cockpit-git-env.sh`, `test-cockpit-git-e2e.sh` (B5 : dépôt piégé, `GIT_DIR` leurre exporté, aucun programme du dépôt lancé, `.git` identique avant et après)
+et `test-cockpit-chaine-xss.sh` (volet git C0g à C4g : un nom de branche, un message, un auteur hostiles n'aboutissent à rien).
+
+**Limites connues du tiroir Git** :
+
+- **Moteur vendorisé lancé à la main, hors assemblage** : sans `VF_COCKPIT_GIT_DURCI=1`, `git()` de `scripts/lib/common.mjs` ne lit plus rien (fermé par défaut, P78-D-25) : carte sans fichiers suivis ni head.
+  Retour arrière : retirer la garde du patch P27. L'assemblage (`vf-cockpit-build.mjs`) pose la variable pour le moteur ; les lancements du moteur par le serveur (`plan`, `build`) ne la posent pas, et la carte qu'ils écrivent n'a alors pas de liste git.
+- Le `status` de chaque worktree est relu **à l'ouverture du tiroir et au signal** seulement ; une **modification d'un fichier suivi sans `git add`**, ou un fichier neuf non ajouté, ne change ni les refs, ni la
+  liste des worktrees, ni les index : aucun signal, le tiroir ne se met à jour qu'à sa prochaine lecture.
+- Le graphe est borné (500 + 500 commits, 2 000 refs, 50 worktrees, 200 tags, 50 stash) ; au-delà, « tronqué », jamais un graphe faux (une sortie tronquée ou désalignée rend « indisponible »).
+- Un dépôt aux refs pointant un objet sans date (blob, arbre) est lu sans ces refs, comptées à part (P78-D-31).
 
 ## Téléphone et visite
 

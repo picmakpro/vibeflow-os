@@ -29,3 +29,15 @@ Mutants (copies de la sortie, posés DANS le lab pour que la racine soit le dép
 | C4g (garde seule) | M-GIT-TEXTE M-CSP | `charges=8 violations=0 marqueur=non` | charge dans le DOM, CSP absente, aucun marqueur (moteur désigné par `.cache` ignoré) | vert |
 
 Chaque maillon casse la chaîne seul : C2g (rendu), C3g (CSP), C4g (garde). Volet existant C0 à C5 : vert (inchangé). Résultat : 34 PASS / 0 FAIL / 0 SAUTÉ.
+
+## Tâche 3 — version et gardes finales
+
+Rouge de OK-VERSION joué AVANT l'écriture de la version (commande du plan, `main` lu par `git show origin/main:plugin/cockpit/VERSION`, base d'origin/main ; le `main` local pointe au même commit) :
+
+| Assertion | Attendu | Obtenu |
+|---|---|---|
+| `VERSION` du module = mineure suivante de celle d'origin/main (x.(y+1).0) | `v1.4.0` | `V=v1.3.3 M=v1.3.3`, code de sortie 1 : la version de la branche est celle de la base, pas la mineure suivante |
+
+Vert après (VERSION, module.json, CHANGELOG.md, README.md du module portent `v1.4.0`) : `OK-VERSION`. `OK-GARDES` (garde, vert attendu, son témoin négatif est celui de `css-jetons.mjs` en 78-04, H6.6) : vert, `VERSION` racine (v2.75.1), `plugin.json`, `marketplace.json`, `viewer.html` et `00-vibeflow.js` identiques à la base de la branche, `css-jetons.mjs` rend 0 sur 76 et les trois 77.
+
+Gate de version, rouge puis vert : `bash scripts/check-version-sync.sh` rendait 1 (« README.md : '167 suites' ≠ réel=176 », idem README.fr.md : les neuf suites de la phase, dont `test-cockpit-git-e2e.sh`, portent le décompte de 167 à 176) ; les deux phrases du README racine sont recalées à 176 : rend 0.
