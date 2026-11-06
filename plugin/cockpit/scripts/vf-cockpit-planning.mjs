@@ -33,7 +33,8 @@ function parseRoadmap(txt, ws, rel, phases) {
   for (const m of txt.matchAll(reTitreCase())) {
     const n = normNum(m[2]); const key = `${ws || ''}|${n}`;
     if (phases.has(key)) continue;
-    let name = m[3].includes('**') ? m[3].split('**')[0] : m[3].replace(/\s+[-—]\s.*$/, '');
+    const reste = m[3].replace(/\s{2,}/g, ' '); // suites d'espaces repliées avant les motifs à \s+ (coût linéaire)
+    let name = reste.includes('**') ? reste.split('**')[0] : reste.replace(/\s+[-—]\s.*$/, '');
     name = name.replace(STATUS_SUFFIX, '').replace(/\s+—\s+(complete|clôturée|CLOSE).*$/, '').replace(/^\[|\]$/g, '');
     phases.set(key, { key, n, ws: ws || null, name: clip(name, 90), done: m[1].toLowerCase() === 'x', line: m[3], roadmap: rel, goal: '', depends: [] });
   }

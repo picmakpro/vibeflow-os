@@ -35,7 +35,7 @@ export function detectDrift(root, layout) {
       const d = DEP.exec(l);
       if (d) {
         // seul l'enchaînement de champs fausse la lecture (« rien · **Parallélisable avec**: Phase 4 » donnait une dépendance à 4)
-        const [val, ...autres] = d[2].split(/\s+·\s+(?=\*\*)/);
+        const [val, ...autres] = d[2].split(/(?<!\s)\s+·\s+(?=\*\*)/);
         if (autres.length) constats.push({ regle: 'depends-on', niveau: 'toléré', fichier, ligne: i + 1,
           message: 'Plusieurs champs sur la ligne « Depends on » : un champ par ligne, « Nothing » si aucune dépendance.',
           avant: l, apres: [`${d[1]} ${/^\s*(rien|aucune?)\s*$/i.test(val) ? 'Nothing' : val}`, ...autres].join('\n') });
@@ -46,7 +46,7 @@ export function detectDrift(root, layout) {
     if (!nb && /(^|\n)(- \[[ x]\]|#{2,4}).*Phase\s*\d/.test(txt)) constats.push({ regle: 'phases-illisibles', niveau: 'bloquant', fichier, ligne: 0,
       message: 'Le ROADMAP cite des phases mais aucune n\'a la forme « - [ ] **Phase N: nom** » ni « ### Phase N: nom » : le cockpit n\'en affiche aucune.' });
     if (nb && !/^## (?:Milestones|Jalons)$/m.test(txt)) {
-      const st = fm(read(stateFile(root, layout) || ''));
+      const st = fm(texte(read(stateFile(root, layout) || '')));
       const nums = [...P.phases.values()].filter((p) => !p.archive && (p.ws || null) === (c.ws || null) && parseFloat(p.n) < 999).map((p) => parseFloat(p.n)).sort((a, b) => a - b);
       const cle = (st.milestone || 'Jalon en cours').replace(/\*/g, '');
       const nom = (st.milestone_name || '').replace(/^["']|["']$/g, '');
