@@ -203,7 +203,7 @@
         "critique:tiroir"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "impl:couleurs",
@@ -216,7 +216,7 @@
         "critique:design-md"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "rendu:shell",
@@ -401,7 +401,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "impl:couleurs-antislop",
@@ -411,7 +411,7 @@
         "critique:spec-couleurs"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "docs",
