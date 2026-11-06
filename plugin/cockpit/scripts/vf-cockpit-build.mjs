@@ -9,7 +9,7 @@ import path from 'node:path';
 import { read as lireGarde } from './vf-cockpit-planning.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { findLabRoot, engineDir, envGit, configFiltres, filtresDeclares, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
+import { findLabRoot, engineDir, envGit, configFiltres, filtresEtat, MAX_FILTRES, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
 import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { enteteGit } from './vf-cockpit-git-entete.mjs';
 import { ecrireArchitecture } from './vf-cockpit-code.mjs';
@@ -25,9 +25,17 @@ const GITIGNORE = '# Sortie générée par le cockpit VibeFlow : ignorée par gi
 const fin = (code, msg) => { const e = new Error(msg); e.code = code; return e; };
 const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };
 const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/[`*]/g, '').trim(); const i = s.search(/[.!?](\s|$)/); s = i > 25 ? s.slice(0, i + 1) : s; return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+// R6 : environnement du moteur. Liste des filtres lue et bornée : filtres vidés, marqueur VF_COCKPIT_GIT_DURCI posé (le moteur lit git). Liste illisible ou au-delà de MAX_FILTRES : le marqueur n'est PAS posé, git() du
+// moteur reste fermé (patch P27 de common.mjs : carte sans fichiers suivis ni head) ; `ferme` dit pourquoi. Même règle fail-closed que lancerGit : un filtre inconnu n'est pas un filtre absent.
+export function etatMoteur(lab) {
+  const f = filtresEtat(lab, lab);
+  if (!f.refus) return { env: envGit(lab, { config: configFiltres(f.noms) }), ferme: null };
+  const env = envGit(lab); delete env.VF_COCKPIT_GIT_DURCI;
+  return { env, ferme: f.fiable ? `plus de ${MAX_FILTRES} filtres déclarés par le dépôt` : 'liste des filtres déclarés par le dépôt illisible' };
+}
 // la cause remonte (lignes d'erreur du moteur, jusqu'à 4), pas seulement sa dernière ligne ; timeout : un moteur bloqué ne gèle pas le lanceur
 const run = (engine, script, lab, ...a) => {
-  try { return execFileSync(process.execPath, [path.join(engine, 'scripts', script), lab, ...a], { encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'pipe'], timeout: 600000, env: envGit(lab, { config: configFiltres(filtresDeclares(lab, lab)) }) }); }
+  try { return execFileSync(process.execPath, [path.join(engine, 'scripts', script), lab, ...a], { encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'pipe'], timeout: 600000, env: etatMoteur(lab).env }); }
   catch (e) {
     const lines = String(e.stderr || e.stdout || e.message).split('\n').map((l) => l.trim()).filter(Boolean);
     const cause = (lines.filter((l) => /^(✗|-|error|Error)/.test(l)).slice(0, 4).join(' · ') || lines.slice(-1)[0] || 'cause inconnue').slice(0, 400);
@@ -47,6 +55,7 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
   fs.mkdirSync(sortie, { recursive: true });
   verifierSortie(lab, sortie);
 
+  const ferme = etatMoteur(lab).ferme; // R6 : dit dans le résumé quand git du moteur reste fermé
   run(eng.chemin, 'scan.mjs', lab); // le moteur refuse un dossier de sortie non vide qui n'est pas encore une carte : .gitignore après
   const arch = ecrireArchitecture({ lab, sortie });
   const project = buildProjectGraph(lab);
@@ -103,9 +112,9 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
   fs.mkdirSync(path.join(sortie, '.cache'), { recursive: true });
   fs.writeFileSync(path.join(sortie, '.cache', 'vf-cockpit.json'), JSON.stringify({ scriptsDir, engineDir: eng.chemin, builtAt: new Date().toISOString() }, null, 2));
 
-  const resume = `Cockpit assemblé : Code ${g.files.length} fichiers (${decrits} décrits sans modèle), Projet ${project.nodes.length} cartes · ${((Date.now() - t0) / 1000).toFixed(1)} s · ${sortie}`;
+  const resume = `Cockpit assemblé : Code ${g.files.length} fichiers (${decrits} décrits sans modèle), Projet ${project.nodes.length} cartes · ${((Date.now() - t0) / 1000).toFixed(1)} s · ${sortie}${ferme ? ` · git du moteur fermé (${ferme}) : carte sans fichiers suivis ni head` : ''}`;
   if (!quiet) console.log(resume);
-  return { lab, sortie, fichiersCode: g.files.length, cartesProjet: project.nodes.length, resume };
+  return { lab, sortie, fichiersCode: g.files.length, cartesProjet: project.nodes.length, gitFerme: ferme, resume };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {

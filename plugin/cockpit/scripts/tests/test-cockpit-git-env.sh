@@ -435,7 +435,7 @@ assert_eq "M-GARDE.0 — l'ancre du mutant existe (garde présente dans le moteu
 env -u VF_COCKPIT_GIT_DURCI PATH="$WORK/bin:$PATH" GIT_DIR="$L/.git" node "$WORK/mut-garde/scripts/scan.mjs" "$LAB8" --out="$WORK/o8m/.cache/scan.json" >/dev/null 2>&1
 assert_has "M-GARDE — rougit E8.3 : sans la garde le moteur lance git (journal non vide)" "$(cat "$WORK/git.log")" "ARGV"
 MT="$WORK/mut-env-moteur"; rm -rf "$MT"; mkdir -p "$MT/scripts" "$MT/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$MT/scripts/"; cp -R "$MOTEUR" "$MT/skills/cockpit-moteur"
-assert_eq "M-ENV-MOTEUR.0 — l'ancre du mutant existe dans vf-cockpit-build.mjs" "$(FROM="env: envGit(lab, { config: configFiltres(filtresDeclares(lab, lab)) })" TO="env: envEnfant(lab)" node "$AUX/mutsub.mjs" "$MT/scripts/vf-cockpit-build.mjs" 2>&1)" "muté"
+assert_eq "M-ENV-MOTEUR.0 — l'ancre du mutant existe dans vf-cockpit-build.mjs" "$(FROM="env: etatMoteur(lab).env" TO="env: envEnfant(lab)" node "$AUX/mutsub.mjs" "$MT/scripts/vf-cockpit-build.mjs" 2>&1)" "muté"
 rm -rf "$LAB8/.vibeflow"; GIT_DIR="$L/.git" node "$MT/scripts/vf-cockpit-build.mjs" "$LAB8" --quiet >/dev/null 2>&1
 assert_eq "M-ENV-MOTEUR — rougit E8.2 : run() sans envGit, le moteur (marqueur absent ou GIT_DIR hérité) ne rend plus le HEAD réel" "$([ "$(node "$AUX/tete.mjs" "$LAB8/.vibeflow/cockpit/graph.json" 2>/dev/null || echo illisible)" != "$HEAD_LAB" ] && echo rouge || echo vert)" "rouge"
 
@@ -534,6 +534,28 @@ node "$AUX/lg.mjs" "$MD" "$SM/repo" '{}' status --porcelain=v2 --branch -z -unor
 assert_eq "M-SOUS-MODULES — rougit E9.8 : le status du mutant relance le filtre du sous-module" "$(marque SUBCLEAN)" "posé"; raz
 : > "$WORK/git.log"; PATH="$WORK/bin:$PATH" node "$AUX/lg.mjs" "$MD" "$SM/repo" '{}' status --porcelain >/dev/null 2>&1; PATH="$WORK/bin:$PATH" node "$AUX/lga.mjs" "$MD" "$SM/repo" '{}' status -s >/dev/null 2>&1
 assert_eq "M-SOUS-MODULES — rougit aussi E9.12 : les status du mutant ne portent plus l'option (2 lancements, 2 sans option)" "$(grep '^ARGV ' "$WORK/git.log" | grep -E ' status( |$)' | grep -vc -e '--ignore-submodules=all')" "2"
+
+echo "=== E10 — revue serveur 2026-11-06 (R6, S9) : le moteur d'assemblage ne lit pas git quand la liste des filtres est illisible ou au-delà de la borne ==="
+# même règle fail-closed que A1 (lancerGit, shBorne) : l'environnement du moteur ne reçoit le marqueur VF_COCKPIT_GIT_DURCI que si la liste est lisible et bornée ; sinon git du moteur reste fermé
+# (carte sans fichiers suivis ni head, mention explicite dans le résumé), jamais « les filtres inconnus ne sont pas vidés ».
+LAB10="$WORK/lab10"; cp -R "$P" "$LAB10"; printf "export const un = 1;\n" > "$LAB10/m.js"; "$GIT_REEL" -C "$LAB10" add m.js; "$GIT_REEL" -C "$LAB10" commit -q -m m
+HEAD10="$("$GIT_REEL" -C "$LAB10" rev-parse HEAD)"; touch -t "$UNE_MIN" "$LAB10/f.txt"
+b10() { rm -rf "$LAB10/.vibeflow"; raz; "$@" node "$BUILD" "$LAB10" > "$WORK/b10.out" 2>&1; }
+marques10() { for m in PROC CLEAN; do marque $m; done | sort -u | tr '\n' ' '; }
+b10 env; TETE="$(node "$AUX/tete.mjs" "$LAB10/.vibeflow/cockpit/graph.json" 2>/dev/null || echo illisible)"
+assert_eq "E10.0 — témoin : liste lisible (1 filtre) : le moteur lit git (head réel), aucun programme du dépôt lancé, aucune mention de git fermé" "$TETE|$(marques10)|$(grep -c 'git du moteur fermé' "$WORK/b10.out")" "$HEAD10|absent |0"
+b10 env PATH="$WORK/bin-cfg:$PATH"; TETE="$(node "$AUX/tete.mjs" "$LAB10/.vibeflow/cockpit/graph.json" 2>/dev/null || echo illisible)"
+assert_eq "E10.1 — liste des filtres illisible (git config --get-regexp rend 2) : aucun programme du dépôt lancé par le moteur, git du moteur fermé (aucun head), la carte est écrite" "$(marques10)|$TETE|$([ -s "$LAB10/.vibeflow/cockpit/graph.json" ] && echo carte || echo sans-carte)" "absent |aucun|carte"
+assert_eq "E10.2 — l'état dégradé est dit : le résumé de l'assemblage nomme git du moteur fermé et la cause (liste illisible)" "$(grep -c 'git du moteur fermé.*illisible' "$WORK/b10.out")" "1"
+# plus de MAX_FILTRES (256) filtres déclarés : même fermeture, sans emballage
+{ for i in $(seq 1 300); do printf '[filter "g%s"]\n\tclean = cat\n' "$i"; done; } >> "$LAB10/.git/config"
+b10 env; TETE="$(node "$AUX/tete.mjs" "$LAB10/.vibeflow/cockpit/graph.json" 2>/dev/null || echo illisible)"
+assert_eq "E10.3 — 301 filtres déclarés (au-delà de 256) : git du moteur fermé (aucun head), aucun programme lancé, la cause nomme la borne" "$(marques10)|$TETE|$(grep -c 'git du moteur fermé.*256' "$WORK/b10.out")" "absent |aucun|1"
+# mutant : la fermeture est retirée (le moteur reçoit toujours le marqueur) — E10.1 et E10.3 rougissent pour leur raison
+MS9="$WORK/mut-s9"; rm -rf "$MS9"; mkdir -p "$MS9/scripts" "$MS9/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$MS9/scripts/"; cp -R "$MOTEUR" "$MS9/skills/cockpit-moteur"
+assert_eq "M-S9.0 — l'ancre du mutant existe dans vf-cockpit-build.mjs (la fermeture du moteur est retirée)" "$(FROM="if (!f.refus)" TO="if (true)" node "$AUX/mutsub.mjs" "$MS9/scripts/vf-cockpit-build.mjs" 2>&1)" "muté"
+rm -rf "$LAB10/.vibeflow"; raz; PATH="$WORK/bin-cfg:$PATH" node "$MS9/scripts/vf-cockpit-build.mjs" "$LAB10" > "$WORK/b10m.out" 2>&1; TETEM="$(node "$AUX/tete.mjs" "$LAB10/.vibeflow/cockpit/graph.json" 2>/dev/null || echo illisible)"
+assert_eq "M-S9 — sans la fermeture, E10.1 et E10.3 rougissent : le moteur lit git (head réel) alors que la liste est illisible ou trop longue" "$TETEM|$(grep -c 'git du moteur fermé' "$WORK/b10m.out")" "$HEAD10|0"
 
 vf_hyg_assert
 

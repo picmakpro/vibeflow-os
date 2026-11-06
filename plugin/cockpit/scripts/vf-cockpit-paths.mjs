@@ -198,6 +198,12 @@ const refus = (noms, fiable) => !fiable || noms.length > MAX_FILTRES;
 export async function filtresDeclaresAsync(dir, lab = dir, fin) {
   return lireFiltres(await lancerAsync('git', argsFiltres(dir), dir, envGit(lab), 1 << 20, fin)).noms;
 }
+// R6 (revue serveur 2026-11-06, S9) : l'état des filtres pour un lancement qui ne passe pas par lancerGit (le moteur d'assemblage, vf-cockpit-build.mjs) : mêmes règles que A1.
+// { noms, fiable (liste lue), refus (liste illisible ou au-delà de MAX_FILTRES : rien de ce qui pourrait exécuter un filtre ne se lance) }
+export function filtresEtat(dir, lab = dir) {
+  const f = lireFiltres(lancer('git', argsFiltres(dir), dir, envGit(lab), 1 << 20));
+  return { noms: f.noms, fiable: f.fiable, refus: refus(f.noms, f.fiable) };
+}
 // pilotes de filtre déclarés par le dépôt (et la config de l'utilisateur) : `filter.<x>.<clé>`, x = tout ce qui sépare le premier `filter.` de la dernière `.clé`
 export function filtresDeclares(dir, lab = dir) {
   return lireFiltres(lancer('git', argsFiltres(dir), dir, envGit(lab), 1 << 20)).noms;
