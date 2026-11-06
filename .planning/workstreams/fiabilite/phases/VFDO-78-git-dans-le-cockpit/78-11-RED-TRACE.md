@@ -13,3 +13,19 @@ Commande de base : `E2E_SECTIONS="MJ" bash plugin/cockpit/scripts/tests/test-coc
 Sortie des trois assertions de mutants : 3 PASS (la suite affirme que chaque mutant rougit sa section pour la raison nommée). Une première version du témoin B2/B5 a lu le détail pendant l'état « Lecture du détail » (assertion B2.3 et B5.1 rouges : `200|false|false|true|false`) : défaut de la suite, corrigé en attendant le contenu chargé, pas du code livré.
 
 Vert après : suite complète, 34 réussis, 0 échoué, 0 sauté (B0, B1 x3 onglets, B2.1-2.5, B3.1-3.4, B4.1-4.3, B5.0-5.5, CAPT.1-2, trois mutants, H0).
+
+## Tâche 2 — chaîne XSS étendue aux données git
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-chaine-xss.sh` (Chrome headless, ports éphémères). Dépôt hostile fabriqué par la suite : branche `<svg/onload=eval(atob('…'))>`, commit de tête dont le message est `<img src=x onerror=eval(atob('…'))>` (sujet et corps), auteur `x"/onfocus=…/autofocus/a="` (git retire les `<` `>` d'un nom d'auteur : seule la forme en attribut est possible), message de stash identique. La charge décodée est `fetch('/api/plan/undo',{method:'POST',headers:{'x-vf-cockpit-token':VF_COCKPIT_SERVER.token}})` (un nom de branche refuse `:` et espace, d'où `eval(atob(…))`). Le faux moteur du lab piégé pose `MARQUEUR-SCRIPT-DU-LAB` quand `/api/plan/undo` l'exécute.
+
+Mutants (copies de la sortie, posés DANS le lab pour que la racine soit le dépôt) : M-GIT-TEXTE (`if (txt != null) e.textContent = String(txt);` -> `e.innerHTML = …` dans 77-vf-git-rendu.js et `corpsMsg.textContent` -> `innerHTML` dans 77-vf-git-vue-detail.js, chacun vérifié présent une seule fois par page) ; M-CSP et M-GARDE comme le volet existant.
+
+| Manche | Mutants posés | Mesure obtenue | Attendu | Verdict |
+|---|---|---|---|---|
+| C0g (témoin, joué AVANT C1g à C4g) | M-GIT-TEXTE M-CSP M-GARDE | `charge-dans-le-DOM=8 rangées=2 violations=0 script-du-lab-exécuté=oui` | la chaîne ABOUTIT (sinon le volet est aveugle) | aboutie : marqueur créé |
+| C1g (code livré) | aucun | `charges=0 rangées=2 violations=0 marqueur=non` | rien n'aboutit, le tiroir fonctionne sous la CSP | vert |
+| C2g (textContent seul) | M-CSP M-GARDE | `charges=0 rangées=2 marqueur=non` | 0 charge dans le DOM | vert |
+| C3g (CSP seule) | M-GIT-TEXTE M-GARDE | `charges=8 violations=8 marqueur=non` (« Executing inline event handler violates … script-src ») | charge dans le DOM, aucun marqueur | vert |
+| C4g (garde seule) | M-GIT-TEXTE M-CSP | `charges=8 violations=0 marqueur=non` | charge dans le DOM, CSP absente, aucun marqueur (moteur désigné par `.cache` ignoré) | vert |
+
+Chaque maillon casse la chaîne seul : C2g (rendu), C3g (CSP), C4g (garde). Volet existant C0 à C5 : vert (inchangé). Résultat : 34 PASS / 0 FAIL / 0 SAUTÉ.
