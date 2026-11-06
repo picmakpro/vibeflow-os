@@ -15,7 +15,7 @@ import { detailCommit, etatWorktrees, worktreeVerifie } from './vf-cockpit-git-d
 import { FORMAT_JOURNAL, CHAMPS_REFS, MOTIF_SHA, lireJournal, lireRefs, lireWorktrees, ordonner, placer, etiquettes, teinte } from './vf-cockpit-git-graphe.mjs';
 import { cmdCd, cmdSwitch, cmdBranchSupprimer, cmdStashShow, cmdCommitInitial, cmdStatus } from './vf-cockpit-git-commandes.mjs';
 
-export const BORNES = { base: 500, nonMergees: 500, tags: 200, stash: 50, refs: 2000, nom: 200, echeanceMs: 5000 };
+export const BORNES = { base: 500, nonMergees: 500, tags: 200, stash: 50, refs: 2000, nom: 200, echeanceMs: 15000 };
 const SCHEMA = 'vibeflow/cockpit-git@1', SCHEMA_ENTETE = 'vibeflow/cockpit-git-entete@1';
 const SCHEMAS_ROUTES = { '/api/vf/git/entete': SCHEMA_ENTETE, '/api/vf/git/commit': 'vibeflow/cockpit-git-commit@1', '/api/vf/git/worktrees': 'vibeflow/cockpit-git-worktrees@1' };
 const NUL = /^0+$/;
@@ -26,26 +26,41 @@ const commande = (cmd, ...noms) => (cmd !== null && noms.every((n) => masque(n) 
 
 // P78-D-41 : lecture ASYNCHRONE (la boucle du serveur reste libre pendant que git travaille : 362 ms mesurés sur ce dépôt, 5 s sur un git muet). Tout git passe par `lancerGitAsync` (même point unique,
 // mêmes options) ; l'échéance globale est une DATE (`fin`) passée à chaque appel, passée elle plus rien n'est lancé. Contrat de retour inchangé : états ok | vide | indisponible | absent.
-export async function lireGit(lab) {
-  try { return await assembler(lab, finDans(BORNES.echeanceMs)); } catch { return { schema: SCHEMA, etat: 'indisponible' }; }
+// REG-D-01 (décision du manager de la mission « retours Équipe-Git », elle étend P78-D-41 ; PU-G-191) : l'échéance globale passe de 5 à 15 s. Une lecture lance 12 à 13 git en série ; sous la charge
+// permanente du poste, 0,1 à 0,45 s d'attente d'ordonnancement par lancement faisaient sauter 5 s (mesuré, d10) ; chaque lancement reste borné à 10 s (vf-cockpit-paths.mjs), le nombre de lancements ne change pas.
+// MONO-VOL : une échéance plus longue ne doit pas empiler les lectures (le tiroir relit à chaque rafale de signal, filet de 5 s). Une lecture en cours pour un lab n'est jamais doublée : tout appel qui arrive
+// pendant qu'elle tourne partage UNE seule lecture suivante, lancée à sa fin (jamais deux en même temps, et jamais l'état d'avant un `git switch` rendu à un appel d'après).
+const EN_VOL = new Map();
+function monoVol(cle, lire) {
+  const v = EN_VOL.get(cle);
+  if (v) return v.suivante ??= v.cour.then(() => monoVol(cle, lire), () => monoVol(cle, lire));
+  const cour = lire().finally(() => EN_VOL.delete(cle));
+  EN_VOL.set(cle, { cour, suivante: null });
+  return cour;
+}
+export function lireGit(lab) {
+  return monoVol(lab, async () => { try { return await assembler(lab, finDans(BORNES.echeanceMs)); } catch { return { schema: SCHEMA, etat: 'indisponible' }; } });
 }
 
 // Miroir asynchrone de `enteteGit` (vf-cockpit-git-entete.mjs, synchrone, ne sert plus qu'à l'assemblage, vf-cockpit-build.mjs ; la route /api/vf/git/entete sert cette version asynchrone) : mêmes lectures, même résultat (parité testée, R3.3).
-async function enteteAsync(lab, fin) {
-  const git = async (...a) => { try { return String((await lancerGitAsync(lab, a, { fin })).sortie ?? '').trim(); } catch { return ''; } };
+// PU-G-003 : un git MUET (délai ou échéance dépassés) rend « indisponible », jamais « absent » ; « absent » ne dit plus que « pas un dépôt git » (A5). `muet` sort à côté de l'objet pour que l'assemblage s'arrête.
+async function enteteDetail(lab, fin) {
+  let muet = false;
+  const git = async (...a) => { try { const r = await lancerGitAsync(lab, a, { fin }); if (r.delai) muet = true; return String(r.sortie ?? '').trim(); } catch { return ''; } };
   const vide = (etat, depot) => ({ etat, depot: nettoie(depot, 200), branche: null, worktree: null, detache: false, sha7: null });
   const commun = await git('rev-parse', '--path-format=absolute', '--git-common-dir');
-  if (!commun) return vide('absent', path.basename(path.resolve(lab)));
+  if (!commun) return { entete: vide(muet ? 'indisponible' : 'absent', path.basename(path.resolve(lab))), muet };
   const racine = path.basename(commun) === '.git' ? path.dirname(commun) : commun.replace(/[\\/]+$/, '').replace(/\.git$/, '');
   const haut = await git('rev-parse', '--show-toplevel');
   const worktree = haut && reel(haut) !== reel(racine) ? path.basename(haut) : null;
   const branche = await git('symbolic-ref', '--quiet', '--short', 'HEAD');
-  const sha7 = branche ? '' : await git('rev-parse', '--short=7', 'HEAD');
+  const sha7 = branche || muet ? '' : await git('rev-parse', '--short=7', 'HEAD'); // git muet : « HEAD détaché » ne se déduit pas d'une sortie vide due à un délai
   const base = { depot: nettoie(path.basename(racine), 200), worktree: worktree && nettoie(worktree, 200) };
-  if (branche) return { etat: 'ok', ...base, branche: nettoie(branche, 200), detache: false, sha7: null };
-  if (sha7) return { etat: 'ok', ...base, branche: null, detache: true, sha7: nettoie(sha7, 40) };
-  return { etat: 'indisponible', ...base, branche: null, detache: false, sha7: null };
+  if (branche && !muet) return { entete: { etat: 'ok', ...base, branche: nettoie(branche, 200), detache: false, sha7: null }, muet };
+  if (sha7 && !muet) return { entete: { etat: 'ok', ...base, branche: null, detache: true, sha7: nettoie(sha7, 40) }, muet };
+  return { entete: { etat: 'indisponible', ...base, branche: null, detache: false, sha7: null }, muet };
 }
+const enteteAsync = async (lab, fin) => (await enteteDetail(lab, fin)).entete;
 
 const refLog = (r) => r.ref; // REF-QUALIFIEE : jamais un nom court (« -x » serait lu comme une option)
 const court = (ref) => ref.replace(/^refs\/(heads|remotes)\//, '');
@@ -78,12 +93,13 @@ function sansDate(sortie) {
 }
 
 async function assembler(lab, fin) {
-  const entete = await enteteAsync(lab, fin);
+  const { entete, muet } = await enteteDetail(lab, fin);
   const commandes = (vide = null) => ({ vide, diagnostic: cmdStatus() });
+  if (muet) return { schema: SCHEMA, etat: 'indisponible', entete, commandes: commandes() }; // PU-G-003 : git muet, les dix autres lancements ne se font pas ; l'en-tête reste « indisponible », jamais « absent »
   if (entete.etat === 'absent') {
-    // A5 : l'en-tête rend « absent » aussi pour un git qui ne répond pas (sortie vide après délai). Un git muet n'est pas un dépôt absent : état distinct « indisponible ».
+    // A5 : « absent » ne dit que « pas un dépôt git ». Un git muet (la sonde dépasse le délai) n'est pas un dépôt absent : « indisponible », dans le graphe ET dans l'en-tête qu'il porte.
     const sonde = await lancerGitAsync(lab, ['rev-parse', '--git-dir'], { fin });
-    if (sonde.delai) return { schema: SCHEMA, etat: 'indisponible', entete, commandes: commandes() };
+    if (sonde.delai) return { schema: SCHEMA, etat: 'indisponible', entete: { ...entete, etat: 'indisponible' }, commandes: commandes() };
     return { schema: SCHEMA, etat: 'absent', entete };
   }
   const ko = () => ({ schema: SCHEMA, etat: 'indisponible', entete, commandes: commandes() });
