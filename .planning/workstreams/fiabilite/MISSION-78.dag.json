@@ -153,7 +153,7 @@
         "exec-10"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "revue",
@@ -163,7 +163,7 @@
         "exec-11"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "audit",
@@ -173,7 +173,7 @@
         "exec-11"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "critique-git",
@@ -183,7 +183,7 @@
         "exec-11"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "recette",
@@ -195,7 +195,7 @@
         "critique-git"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "docs",
@@ -205,7 +205,7 @@
         "recette"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     }
   ]
 }
