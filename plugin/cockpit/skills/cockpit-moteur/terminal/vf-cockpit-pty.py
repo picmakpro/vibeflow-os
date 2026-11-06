@@ -39,8 +39,9 @@ Lancement d'une ligne (72-02 ; P72-D-01, D-13, D-14) : « L <hex> » porte les o
 confiance à ce qui l'a envoyée : alphabet fermé [A-Za-z0-9 ._:/'-] en correspondance TOTALE (fullmatch : l'ancre de fin de ligne de Python tolère un saut de ligne final), au plus LIGNE_MAX octets, préfixe
 « claude --session-id ' » et apostrophe finale. Puis, SEULEMENT si le shell est au premier plan du terminal (tcgetpgrp(maître) == pid du shell) et qu'aucune entrée n'attend déjà d'être écrite, il ajoute Ctrl-C PUIS la
 ligne, SANS retour chariot, au tampon vers le shell et tente l'écriture tout de suite : la ligne attend à l'invite, seul un retour chariot humain (descripteur 0) l'exécute. Sinon il n'écrit RIEN (jamais de Ctrl-C
-dans un programme de l'utilisateur). Chaque ligne « L » reçoit EXACTEMENT une réponse sur le descripteur 2 : « LANCE ok », « LANCE premier-plan », « LANCE alphabet » ou « LANCE invalide » (le nombre de mots différent
-de deux est « invalide »). Limite : une ligne de plus de 1024 octets est abandonnée sans réponse (le reste de tampon est borné) ; la session n'en produit jamais (803 octets au plus). Un shell qui n'est pas le fils direct du
+dans un programme de l'utilisateur). Chaque ligne « L » reçoit EXACTEMENT une réponse sur le descripteur 2 : « LANCE ok », « LANCE premier-plan », « LANCE alphabet », « LANCE invalide » ou « LANCE ecriture » (écriture au PTY échouée ; le nombre de mots différent
+de deux est « invalide »). « ok » veut dire : ligne MISE EN FILE et écriture tentée, pas ligne effectivement poussée : sur BlockingIOError la ligne reste en file (le reste part au prochain select) et la réponse est quand même « ok » ;
+une erreur ultérieure de la boucle vide la file sans autre réponse. Limite : une ligne de plus de 1024 octets est abandonnée sans réponse (le reste de tampon est borné) ; la session n'en produit jamais (803 octets au plus). Un shell qui n'est pas le fils direct du
 terminal (un $SHELL qui en lance un autre en sous-processus) n'est jamais « au repos » ici : refus sûr.
 Aucun octet du shell et aucune ligne lancée ne sont journalisés.
 Compatible Python 3.9, aucune dépendance.
@@ -139,7 +140,7 @@ def premier_plan_libre(maitre, pid):
 
 
 def lancer_ligne(hexa, maitre, pid, vers_shell):
-    """Écrit Ctrl-C puis la ligne (sans retour chariot) au shell s'il est au repos ; rend « ok », « premier-plan », « alphabet », « invalide » ou « ecriture » (écriture au PTY échouée)."""
+    """Écrit Ctrl-C puis la ligne (sans retour chariot) au shell s'il est au repos ; rend « ok » (ligne mise en file, écriture tentée : pas forcément poussée en entier), « premier-plan », « alphabet », « invalide » ou « ecriture » (écriture au PTY échouée)."""
     code, ligne = decoder_ligne(hexa)
     if code != 'ok':
         return code
@@ -152,7 +153,7 @@ def lancer_ligne(hexa, maitre, pid, vers_shell):
         return 'premier-plan'
     vers_shell += CTRL_C + ligne
     try:
-        pousser(maitre, vers_shell)  # même passe de boucle ; le reste part au prochain select
+        pousser(maitre, vers_shell)  # même passe de boucle ; sur BlockingIOError rien ne part ici, la ligne reste en file (réponse « ok » quand même), le reste part au prochain select
     except OSError:
         del vers_shell[:]  # la ligne n'est pas partie : rien ne reste en file pour un shell qui ne l'a pas reçue
         return 'ecriture'

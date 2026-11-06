@@ -1,7 +1,7 @@
 // lancer-charge.js — la charge exécutée dans la page P COMPROMISE (Phase 72, plan 72-11 ; TERM-12 prolongée, LANC-04, LANC-07, LANC-09 ; P72-D-09 à P72-D-14).
 // Hypothèse : l'échappement et la CSP de P sont retirés (mutants M-ESC et M-CSP), la charge s'exécute. Elle FAIT NAÎTRE une proposition (P a ce droit : POST /api/vf/lancer
 // avec le jeton de la page), mesure l'isolement de Q (cadre, fenêtre, stockage, messages), attend le signal du pilote (window.__go : l'armement est passé), puis tente de CONFIRMER
-// et d'ÉCRIRE (/lancer, /entree) vers Q. Constantes remplacées par la suite : __CIBLE__ (identifiant de la cible), __CLE_MODE__ (clé de stockage du mode retenu), __ID1__, __ID2__ (identifiants devinés).
+// et d'ÉCRIRE (/lancer, /entree) vers Q. Constantes remplacées par la suite : __CIBLE__ (identifiant de la cible), __CLE_STOCK__ (clé de stockage de Q (le secret de session)), __ID1__, __ID2__ (identifiants devinés).
 // Chaque tentative note « envoye » ou le nom de l'exception (X.<tentative>), la fin est X.fin = true. Aucune attente à durée fixe hors l'attente bornée du signal.
 (async () => {
   const X = window.__xss = { debut: true };
@@ -20,14 +20,14 @@
     await new Promise((ok) => { f.onload = ok; document.body.appendChild(f); setTimeout(ok, 8000); });
     await essai('clicCadre', () => { f.click(); return 'envoye'; });
     await essai('contenu', () => String(f.contentDocument));
-    await essai('stockageLecture', () => { f.contentWindow.localStorage.getItem('__CLE_MODE__'); return 'lisible'; });
-    await essai('stockageEcriture', () => { f.contentWindow.localStorage.setItem('__CLE_MODE__', 'bypassPermissions'); return 'inscrit'; });
+    await essai('stockageLecture', () => { f.contentWindow.localStorage.getItem('__CLE_STOCK__'); return 'lisible'; });
+    await essai('stockageEcriture', () => { f.contentWindow.localStorage.setItem('__CLE_STOCK__', 'bypassPermissions'); return 'inscrit'; });
     await essai('stockageP', () => { localStorage.setItem('vf.temoin', '1'); return localStorage.getItem('vf.temoin') === '1' ? 'lisible' : 'illisible'; });
     await essai('postMessage', () => {
       f.contentWindow.postMessage('toggle', '*'); f.contentWindow.postMessage('lancer', '*'); f.contentWindow.postMessage({ id: '__ID1__', mode: 'herite' }, '*'); return 'envoye';
     });
     const w = window.open(Q + '/', '_blank'); X.open = w ? 'ouvert' : 'bloque';
-    if (w) { await att(1500); await essai('stockageFenetre', () => { w.localStorage.getItem('__CLE_MODE__'); return 'lisible'; }); try { w.postMessage('lancer', '*'); } catch (x) { void x; } }
+    if (w) { await att(1500); await essai('stockageFenetre', () => { w.localStorage.getItem('__CLE_STOCK__'); return 'lisible'; }); try { w.postMessage('lancer', '*'); } catch (x) { void x; } }
     X.etape1 = true;
     // signal du pilote : la proposition a été lue, l'armement est passé (attente bornée, 60 s)
     for (let i = 0; i < 600 && !window.__go; i++) await att(100);

@@ -46,3 +46,11 @@ Sonde RES.4 et assertions de mutants : chacune exige aussi la charge faite (`fal
 ### Preuves
 - Rejeu complet de `test-cockpit-lancer-xss.sh` sur export `git archive` de HEAD 86d6a4b9 (fichiers du plan 72-16 non commités dans l'arbre) : `76 PASS / 0 FAIL`, code de sortie 0.
 - `bash scripts/check-machine-paths.sh` : ✓.
+
+## Correction ciblée F (suite XSS rouge depuis 72-16, contrat `ecriture`, docstring du PTY)
+
+- Suite XSS : 72-16 a retiré la constante `CLE_MODE` du client de Q ; la suite relevait cette clé et rendait « clé du mode introuvable » (75 PASS / 1 FAIL). Le littéral `vf.terminal.mode` n'étant plus lu ni écrit par Q, une sonde sur cette seule clé testerait une clé morte (elle resterait verte même si P lisait le stockage de Q). La charge sonde maintenant `CLE_SECRET` (`vf.terminal.secret`), clé VIVANTE de `localStorage` de Q et la plus sensible, relevée dans le client par la même méthode. Variable renommée `CLE_STOCK`, constante de la charge `__CLE_STOCK__`. Le mode n'est plus dans le stockage : il n'y a rien d'autre à sonder de ce côté.
+- Mutant (posé sur `temoins/lancer-charge.js`, puis restauré) : le cadre de Q devient `f.srcdoc` (même origine que P). ROUGE : C1l.4a `obtenu [lisible/inscrit/lisible]` au lieu de `SecurityError/SecurityError/lisible`, et C1l.4b ; 74 PASS / 2 FAIL. Un premier mutant (`f.src` vers l'origine de P) restait vert : la page P refuse le cadrage, le mutant n'en était pas un.
+- Contrat : motif `ecriture` ajouté à `72-CONTRATS.md` §4 (HTTP 410, proposition restituée) et §5 (réponse `LANCE ecriture`, motifs de `sessions.lancer`).
+- `vf-cockpit-pty.py` : commentaires seulement. `ok` = ligne mise en file, écriture tentée ; sur `BlockingIOError` la ligne reste en file et la réponse est `ok` ; `ecriture` ajouté à la liste des réponses.
+- Preuves : `test-cockpit-lancer-xss.sh` 76 PASS / 0 FAIL (rc 0) ; `test-cockpit-lancer-pty.sh` 63 PASS / 0 FAIL (rc 0).

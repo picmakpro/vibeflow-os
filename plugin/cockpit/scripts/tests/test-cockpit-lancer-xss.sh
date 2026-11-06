@@ -42,9 +42,10 @@ done
 echo "navigateur : ${CHROME:-aucun (simulation fidèle de la partie HTTP)}"
 command -v python3 >/dev/null 2>&1 || { echo "  ❌ python3 introuvable : le terminal est indisponible" >&2; exit 1; }
 
-# clé de stockage du mode retenu (PL-11.8, LANC-09) : relevée dans le client de 72-08, jamais écrite ici
-CLE_MODE="$(sed -n "s/^.*CLE_MODE = '\\([^']*\\)'.*\$/\\1/p" "$SCRIPTS/vf-cockpit-terminal-client.mjs" | head -1)"
-assert_eq "clé du mode retenue relevée dans vf-cockpit-terminal-client.mjs (constante CLE_MODE) : clé du mode introuvable sinon" "$CLE_MODE" "vf.terminal.mode"
+# clé de stockage de Q sondée par la charge de P (LANC-09) : relevée dans le client de Q, jamais écrite ici.
+# 72-16 a retiré la constante CLE_MODE (le mode est servi par Q et persisté dans un fichier du lab, P72-D-20) : on sonde donc une clé VIVANTE, le secret de session de Q.
+CLE_STOCK="$(sed -n "s/^.*CLE_SECRET = '\\([^']*\\)'.*\$/\\1/p" "$SCRIPTS/vf-cockpit-terminal-client.mjs" | head -1)"
+assert_eq "clé de stockage de Q sondée relevée dans vf-cockpit-terminal-client.mjs (constante CLE_SECRET, clé vivante) : clé introuvable sinon" "$CLE_STOCK" "vf.terminal.secret"
 
 # faux claude (témoin neuf), shell de test (PL-11.4 : echo $$ puis exec bash, invite VFP> ), PATH d'ORIGINE du shell seulement (PL-11.3)
 cp "$HERE_T/temoins/lancer-fauxbin/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude"
@@ -68,7 +69,7 @@ cat > "$AUX/payload.mjs" <<'JS'
 // payload.mjs <charge.js> <cible> <cle> <id1> <id2> : la balise <img onerror=eval(atob('…'))> (commentaires de ligne retirés, constantes posées, base64 sans remplissage)
 import fs from 'node:fs';
 const [, , f, cible, cle, id1, id2] = process.argv;
-let js = fs.readFileSync(f, 'utf8').split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n').replace(/__CIBLE__/g, cible).replace(/__CLE_MODE__/g, cle).replace(/__ID1__/g, id1).replace(/__ID2__/g, id2);
+let js = fs.readFileSync(f, 'utf8').split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n').replace(/__CIBLE__/g, cible).replace(/__CLE_STOCK__/g, cle).replace(/__ID1__/g, id1).replace(/__ID2__/g, id2);
 js = js.replace(/\s*\n\s*/g, ' ').trim(); while (Buffer.byteLength(js) % 3) js += ' ';
 console.log(`<img src=x onerror=eval(atob('${Buffer.from(js).toString('base64')}'))>`);
 JS
@@ -96,7 +97,7 @@ JS
 
 # --- lab piégé PARTITIONNÉ (PL-11.1) : phase 1 porte la charge dans `wave:` ; titres hostiles aux phases 2 à 4 ; phase 4 lançable ---
 ID1=0123456789abcdef0123456789abcdef; ID2=fedcba9876543210fedcba9876543210
-PAYLOAD="$(node "$AUX/payload.mjs" "$HERE_T/temoins/lancer-charge.js" ph-1 "$CLE_MODE" "$ID1" "$ID2")"
+PAYLOAD="$(node "$AUX/payload.mjs" "$HERE_T/temoins/lancer-charge.js" ph-1 "$CLE_STOCK" "$ID1" "$ID2")"
 LAB="$WORK/lab"; B="$LAB/.planning/workstreams/fiabilite"; mkdir -p "$LAB/src" "$B/phases/01-x" "$B/phases/04-y"
 printf 'export const util = () => 1;\n' > "$LAB/src/util.js"; printf 'fiabilite\n' > "$LAB/.planning/active-workstream"
 cat > "$B/ROADMAP.md" <<'RM'
@@ -218,7 +219,7 @@ sc_titres() { # TIT : page P non compromise, CSP en place (ou retirée par le mu
 sc_charge() { # la charge de P compromise (Chrome), ou la partie HTTP rejouée par un client node
   local tok
   if [ -n "$CHROME" ]; then
-    R_XSS="$(node "$HERE_T/temoins/lancer-xss.mjs" "$CHROME" "{\"mode\":\"charge\",\"url\":\"http://127.0.0.1:$port/project.html#v=n:ph-1\",\"q\":\"$q\",\"secret\":\"$sec\",\"onglet\":\"onglet-A\",\"cle\":\"$CLE_MODE\"}")"
+    R_XSS="$(node "$HERE_T/temoins/lancer-xss.mjs" "$CHROME" "{\"mode\":\"charge\",\"url\":\"http://127.0.0.1:$port/project.html#v=n:ph-1\",\"q\":\"$q\",\"secret\":\"$sec\",\"onglet\":\"onglet-A\",\"cle\":\"$CLE_STOCK\"}")"
   else
     local a b c d e lj1 lj2 pr arm; tok="$(ptok "$port")"; pr="$(proposer "$port" "$tok" ph-1)"
     arm="$(node "$AUX/legit.mjs" armer "$q" "$sec" onglet-A 15000)"
@@ -312,7 +313,7 @@ assert_eq "C1l.1 — argv ABSENT et aucune ligne claude --session-id à l'invite
 assert_eq "C1l.2 — aucun marqueur MARQ-TITRE, assistants 1/1, session vivante" "$R_MARQ/$R_AV/$R_AP/$R_SESS" "non/1/1/vivante"
 assert_eq "C1l.3 — la charge a fait naître la proposition (ph-1) et ne l'a ni consommée ni remplacée : toujours en attente" "$R_PROP" "en-attente phase=1 ws=fiabilite"
 if [ -n "$CHROME" ]; then
-  assert_eq "C1l.4a — LANC-09 : depuis P, le stockage du cadre de Q lève SecurityError en lecture ET en écriture de la clé du mode (témoin : le stockage de P lui-même est lisible)" "$(rj "$R_XSS" 'j.stockageLecture+"/"+j.stockageEcriture+"/"+j.stockageP')" "SecurityError/SecurityError/lisible"
+  assert_eq "C1l.4a — LANC-09 : depuis P, le stockage du cadre de Q lève SecurityError en lecture ET en écriture de la clé du secret de Q (témoin : le stockage de P lui-même est lisible)" "$(rj "$R_XSS" 'j.stockageLecture+"/"+j.stockageEcriture+"/"+j.stockageP')" "SecurityError/SecurityError/lisible"
   assert_eq "C1l.4b — le contenu du cadre de Q est illisible depuis P (null ou SecurityError)" "$(rj "$R_XSS" '(j.contenu==="null"||j.contenu==="SecurityError")')" "true"
   assert_eq "C1l.5 — iframe.click() et postMessage (chaîne, objet {id, mode}) : envoyés, sans effet (aucune ligne, proposition intacte)" "$(rj "$R_XSS" 'j.clicCadre+"/"+j.postMessage')/$R_LIGNE/$R_PROP" "envoye/envoye/non/en-attente phase=1 ws=fiabilite"
   assert_eq "C1l.5b — les tentatives de confirmation ont bien été faites (no-cors deux fois, jeton de page, lecture, écriture) : l'absence d'effet n'est pas une absence de tentative" "$(rj "$R_XSS" 'j.lancerNoCors1+"/"+j.lancerNoCors2+"/"+j.entree+"/"+(j.lancerJeton!==undefined)+"/"+(j.proposition!==undefined)')" "envoye/envoye/envoye/true/true"
