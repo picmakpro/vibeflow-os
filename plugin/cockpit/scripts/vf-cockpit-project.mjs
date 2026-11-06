@@ -149,7 +149,10 @@ export function buildProjectGraph(root, { layout } = {}) {
         milestones: msList.map((m) => ({ key: m.key, st: m.st, done: m.done, total: m.ks.length, id: 'n:' + m.id })),
         next: active ? active.ks.filter((p) => !p.done).map((p) => ({ id: 'n:' + phId(p), label: `Phase ${p.n} · ${p.name}`, etat: p.avancement.etat })) : [],
         drift: { resume: drift.resume, regles: Object.values(drift.constats.reduce((o, c) => { (o[c.regle] ||= { regle: c.regle, niveau: c.niveau, message: c.message, fichier: c.fichier, n: 0 }).n++; return o; }, {})),
-          corrigeable: drift.constats.some((c) => c.apres !== undefined) },
+          corrigeable: drift.constats.some((c) => c.apres !== undefined),
+          // lignes non comprises (fichier:ligne + extrait), au plus 20 : le total est dans `nonComprisesN` (diagnostic du premier assemblage, P-PARS)
+          nonComprisesN: drift.constats.filter((c) => c.regle === 'ligne-non-comprise').length,
+          nonComprises: drift.constats.filter((c) => c.regle === 'ligne-non-comprise').slice(0, 20).map((c) => ({ fichier: c.fichier, ligne: c.ligne, extrait: c.avant })) },
         counts: { phases: phases.size, plans: files.filter((f) => f.p.endsWith('-PLAN.md')).length, reqs: reqs.size, reqsDone: [...reqs.values()].filter((r) => r.done).length, dags: P.dags.length } },
       layout: { forme: layout.forme, actif: layout.actif } },
     project: { name: `${P.projectName} — Projet`, summary: resume(state, curPhase, phases.size, files) },

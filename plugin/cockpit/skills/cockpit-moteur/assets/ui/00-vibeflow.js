@@ -90,6 +90,10 @@
   // statuts de STATE affichés en français (valeur inconnue : omise ; recette 68 R11, P68-D-35, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04 : jamais le statut STATE brut)
   const STATUT = { planning: 'en planification', ready_to_plan: 'prête à planifier', ready_to_execute: 'prête à exécuter', executing: 'en exécution', in_progress: 'en cours', verifying: 'en vérification', ready_for_verification: 'prête à vérifier', paused: 'en pause', blocked: 'bloqué', complete: 'terminée', completed: 'terminée', closed: 'clos', milestone_complete: 'jalon terminé' }; // recette 68 R11 (P68-D-35) : genre de la phase (« prête ») ; Phase 70 : table complète, valeur inconnue omise (jamais affichée brute)
   const statut = (x) => (Object.hasOwn(STATUT, x) ? STATUT[x] : '');
+  // lignes non comprises du planning (drift.nonComprises, règle ligne-non-comprise) : fichier:ligne + extrait, jamais corrigées d'ici
+  const nonComprises = (D) => !D || !D.nonComprises || !D.nonComprises.length ? '' : `<div class="sec"><h3>Lignes non comprises <span class="c">${Number(D.nonComprisesN) || D.nonComprises.length}</span></h3>
+      ${D.nonComprises.map((x) => `<div class="vf-link"><code>${h(x.fichier)}:${Number(x.ligne) || 0}</code><span style="color:var(--text-3)">${h(x.extrait)}</span></div>`).join('')}
+      ${(Number(D.nonComprisesN) || 0) > D.nonComprises.length ? `<p class="pd">${(Number(D.nonComprisesN) || 0) - D.nonComprises.length} autre(s) non listée(s).</p>` : ''}</div>`;
   // dérive de format de la planification (vf-cockpit-drift.mjs) : rien n'est corrigé d'ici, le panneau donne la commande
   const NIV = { bloquant: 'blocked', 'toléré': 'todo', info: 'todo' };
   const derive = (D) => !D || !D.regles || !D.regles.length ? '' : `<div class="sec"><h3>Format de la planification <span class="c">${D.regles.reduce((s, r) => s + (Number(r.n) || 0), 0)}</span></h3>
@@ -117,7 +121,7 @@
           <div class="stats vf-stats" style="margin-top:14px"><div><b>${Number(c.phases) || 0}</b><span>phases</span></div><div><b>${Number(c.plans) || 0}</b><span>plans</span></div><div><b>${Number(c.reqsDone) || 0}/${Number(c.reqs) || 0}</b><span>exigences</span></div></div></div>
         <div class="sec"><h3>Prochaines phases <span class="c">${V.next.length}</span></h3>${next || '<p class="pd">Rien en attente dans le jalon en cours.</p>'}</div>
         <div class="sec"><h3>Jalons <span class="c">${V.milestones.length}</span></h3>${ms}</div>
-        ${derive(V.drift)}
+        ${derive(V.drift)}${nonComprises(V.drift)}
         <div class="sec" style="color:var(--text-3);line-height:1.7;font-size:12px">Double-clic sur une carte pour plonger · <span class="kbd">⌫</span> remonter · <span class="kbd">/</span> chercher</div>`;
     });
   }

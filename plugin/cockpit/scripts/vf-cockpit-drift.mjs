@@ -3,17 +3,22 @@
 // Export : detectDrift(root, layout) -> { constats: [{ regle, niveau, fichier, ligne, message, avant?, apres? }], resume }
 //          patchDrift(root, constats) -> correctif au format unifié (git apply), JAMAIS écrit sur disque.
 // Niveaux : « bloquant » (le cockpit ne voit rien), « toléré » (lu quand même, forme non canonique),
-//           « info » (lu, mais affiché en moins bien). Le format canonique est celui du gabarit GSD.
+//           « info » (lu, mais affiché en moins bien), « ignoré » (ligne qui ressemble à un champ lu, mais qu'aucun lecteur ne reconnaît : règle `ligne-non-comprise`, une par ligne). Le format canonique est celui du gabarit GSD.
 // CLI : node vf-cockpit-drift.mjs <lab> [--diff | --json]. Lecture seule : la correction reste un geste humain (ADR-031).
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { planningLayout, stateFile } from './vf-cockpit-paths.mjs';
 import { readPlanning, fm, read } from './vf-cockpit-planning.mjs'; // read borné partagé : fichier régulier, plafond de taille (jamais un tube ni /dev/zero)
+import { DEP_TETE, texte, lignesNonComprises } from './vf-cockpit-formats.mjs'; // mêmes motifs que la lecture : « compris » = consommé par planning
 
 const ESP = '[ \\t\\u00a0\\u202f]+';
 const PHASE_ESPACE = new RegExp(`^((?:- \\[[ x]\\]\\s+(?:\\*\\*)?|#{3,4} )Phase \\d+(?:\\.\\d+)?)${ESP}:`);
-const DEP = /^(\*\*(?:Depends on|Dépend de)(?::\*\*|\*\*\s*:))\s*(.*)$/;
+const DEP = DEP_TETE; // tolérant (espace avant « : », deux-points dedans ou dehors, gras ou non, synonymes) ; groupe 1 = tête, groupe 2 = valeur
+
+// une ligne non comprise : `avant` porte l'extrait, jamais de `apres` (le détecteur ne devine pas ce que l'auteur voulait dire)
+const nonComprise = (fichier, x) => ({ regle: 'ligne-non-comprise', niveau: 'ignoré', fichier, ligne: x.ligne,
+  message: 'Ligne qui ressemble à un champ lu par le cockpit (titre de phase, Goal, Depends on, exigence, current_phase) mais qu\'aucun lecteur ne reconnaît : elle est ignorée.', avant: x.extrait });
 
 export function detectDrift(root, layout) {
   root = path.resolve(root); layout = layout || planningLayout(root);
@@ -23,7 +28,7 @@ export function detectDrift(root, layout) {
   for (const c of layout.compartiments || []) {
     const f = path.join(c.dir, 'ROADMAP.md'); const txt = read(f);
     if (!txt) continue;
-    const lignes = txt.split('\n'); const fichier = rel(f);
+    const lignes = texte(txt).split('\n'); const fichier = rel(f);
     lignes.forEach((l, i) => {
       if (PHASE_ESPACE.test(l)) constats.push({ regle: 'phase-deux-points', niveau: 'toléré', fichier, ligne: i + 1,
         message: 'Espace avant les deux-points après le numéro de phase : le gabarit GSD écrit « Phase N: ».', avant: l, apres: l.replace(PHASE_ESPACE, '$1:') });
@@ -36,6 +41,7 @@ export function detectDrift(root, layout) {
           avant: l, apres: [`${d[1]} ${/^\s*(rien|aucune?)\s*$/i.test(val) ? 'Nothing' : val}`, ...autres].join('\n') });
       }
     });
+    for (const x of lignesNonComprises(txt, 'roadmap')) constats.push(nonComprise(fichier, x));
     const nb = [...P.phases.values()].filter((p) => !p.archive && (p.ws || null) === (c.ws || null)).length;
     if (!nb && /(^|\n)(- \[[ x]\]|#{2,4}).*Phase\s*\d/.test(txt)) constats.push({ regle: 'phases-illisibles', niveau: 'bloquant', fichier, ligne: 0,
       message: 'Le ROADMAP cite des phases mais aucune n\'a la forme « - [ ] **Phase N: nom** » ni « ### Phase N: nom » : le cockpit n\'en affiche aucune.' });
@@ -55,15 +61,17 @@ export function detectDrift(root, layout) {
         avant: lignes[ancre], apres: [...section, lignes[ancre]].join('\n') });
     }
   }
+  for (const c of layout.compartiments || []) { const f = path.join(c.dir, 'REQUIREMENTS.md'); for (const x of lignesNonComprises(read(f), 'exigences')) constats.push(nonComprise(rel(f), x)); }
   const sf = stateFile(root, layout);
   if (sf) {
-    const st = fm(read(sf));
+    for (const x of lignesNonComprises(read(sf), 'state')) constats.push(nonComprise(rel(sf), x));
+    const st = fm(texte(read(sf)));
     if (st.status && !/closed|complete|archived|shipped/i.test(st.status) && !st.current_phase && !new RegExp('^Phase:\\s*\\d', 'm').test(read(sf)))
       constats.push({ regle: 'phase-courante-absente', niveau: 'info', fichier: rel(sf), ligne: 0,
         message: 'STATE.md sans « current_phase » : le cockpit ne sait pas quelle phase est en cours. À compléter à la main, la phase ne se devine pas.' });
   }
   const n = (x) => constats.filter((c) => c.niveau === x).length;
-  return { constats, resume: constats.length ? `${constats.length} écart(s) de format : ${n('bloquant')} bloquant(s), ${n('toléré')} toléré(s), ${n('info')} info.` : 'Format de la planification conforme.' };
+  return { constats, resume: constats.length ? `${constats.length} écart(s) de format : ${n('bloquant')} bloquant(s), ${n('toléré')} toléré(s), ${n('info')} info${n('ignoré') ? `, ${n('ignoré')} ligne(s) non comprise(s)` : ''}.` : 'Format de la planification conforme.' };
 }
 
 // correctif unifié, 3 lignes de contexte ; seuls les constats qui portent une proposition (« apres ») y entrent
