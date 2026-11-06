@@ -164,7 +164,19 @@ body.in-flow #context { opacity: 0; }
 #context::before { content: ""; position: absolute; inset: -28px -60px -28px -40px; background: radial-gradient(closest-side, rgba(var(--bg-rgb), .9), rgba(var(--bg-rgb), 0)); z-index: -1; } /* dérivé : halo, déborde du bloc de 28 / 60 / 40 */
 #context h1 { margin: var(--sp-6) 0 var(--sp-4); font-size: 24px; font-weight: 600; letter-spacing: -.025em; }
 #context p { margin: 0; color: var(--text-2); line-height: 1.55; font-size: 14px; }
-.ctx-more { display: none; } /* the More / Less toggle under the description is for phones */
+.ctx-more { display: none; } /* the Read more / Show less toggle under the description: shown only when there is more to read */
+/* the description stays short, 3 lines (1 on a phone), and the toggle is a real button: outlined pill, same look and same focus ring everywhere (PU-G-038, PU-G-039) */
+#context.folded .cd { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+#context.folded .cx { display: none; }
+#context .ctx-more:not([hidden]) { position: relative; display: inline-flex; align-items: center; min-height: 32px; margin: var(--sp-4) 0 0; padding: 0 var(--sp-12); border: 0; border-radius: 999px; background: none; color: var(--text); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; pointer-events: auto; }
+#context .ctx-more::before { content: ""; position: absolute; inset: 0; border: 1px solid var(--hair-2); border-radius: 999px; pointer-events: none; }
+#context .ctx-more:hover::before { border-color: var(--text-4); }
+#context .ctx-more:focus-visible { outline: none; }
+#context .ctx-more:focus-visible::before { border: 2px solid var(--ring); }
+@media (max-width: 700px), (pointer: coarse) { /* a 44 px touch target around the 32 px pill */
+  #context .ctx-more:not([hidden]) { min-height: 44px; margin: calc(-1 * var(--sp-4)) 0 calc(-1 * var(--sp-6)); }
+  #context .ctx-more::before { inset: var(--sp-6) 0; }
+}
 #ask-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* ---------- cards ---------- */
@@ -541,11 +553,8 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
   #crumbs button:not(.cur), #crumbs .sep { display: none; } /* only where you are; the Up arrow goes back */
   #context { left: var(--edge); right: var(--edge); max-width: none; }
   #context h1 { font-size: 20px; }
-  /* the description folds to one line with a More / Less toggle, so it doesn't fill the screen */
-  #context.folded .cd { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
-  #context.folded .cx { display: none; }
-  #context .ctx-more:not([hidden]) { display: inline-flex; align-items: center; min-height: 44px; margin: calc(-1 * var(--sp-8)) 0 calc(-1 * var(--sp-12)) calc(-1 * var(--sp-12)); padding: 0 var(--sp-12); border: 0; border-radius: 999px; background: none; color: var(--text); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; pointer-events: auto; }
-  #context .ctx-more:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+  /* on a phone the description folds to one line, so it doesn't fill the screen */
+  #context.folded .cd { -webkit-line-clamp: 1; }
   /* the warning about connecting an AI tool shows only while someone is using the ask bar */
   #ask:not(.asking) #ask-warn { display: none; }
   /* the details panel becomes a sheet at the bottom: closed until a box is tapped */
@@ -1497,11 +1506,22 @@ function foldContext() {
   const long = desc.scrollHeight > desc.clientHeight + 1 || !!ctx.querySelector('.cx');
   ctx.classList.toggle('folded', !open);
   more.hidden = !long;
-  desc.inert = isPhone() && long && !open; // folded on a phone: links on the hidden lines can't be tabbed to; More opens it
-  more.textContent = open ? 'Less' : 'More';
+  ctxTabs();
+  more.textContent = open ? 'Show less' : 'Read more';
   more.setAttribute('aria-expanded', String(open));
   more.onclick = () => { store.set('contextOpen', !open); foldContext(); };
 }
+/** Folded, the description's links and terms leave the tab order (the hidden lines can't be tabbed to) but stay tappable: a word on the visible line still opens its definition (PU-G-041). The Team header rewrites the text and the toggle after render, so this follows them. */
+function ctxTabs() {
+  const ctx = $('#context'), more = ctx.querySelector('.ctx-more'), desc = ctx.querySelector('.cd');
+  if (!desc) return;
+  const folded = !!more && !more.hidden && ctx.classList.contains('folded');
+  for (const x of desc.querySelectorAll('a[href], button, [tabindex]')) {
+    if (folded) { if (!('tabOld' in x.dataset)) x.dataset.tabOld = x.getAttribute('tabindex') ?? ''; x.tabIndex = -1; }
+    else if ('tabOld' in x.dataset) { if (x.dataset.tabOld === '') x.removeAttribute('tabindex'); else x.tabIndex = +x.dataset.tabOld; delete x.dataset.tabOld; }
+  }
+}
+new MutationObserver(ctxTabs).observe($('#context'), { subtree: true, childList: true, attributes: true, attributeFilter: ['hidden', 'class'] });
 function renderCrumbs() {
   const c = $('#crumbs'); c.innerHTML = '';
   const path = chain(state.container).slice().reverse();
