@@ -145,7 +145,7 @@ assert_eq "K17.1 — le titre du tableau dit le nombre du badge" "$(E 'j.recent.
 assert_eq "K17.2 — contrôle positif : le lab a plus de 24 fichiers à mettre sur un tableau" "$(E 'j.recent.coupe.fichiers > 24')" "true"
 assert_eq "K17.3 — un tableau coupé à 24 cartes dit l'écart dans son titre" "$(E 'j.recent.coupe.titre')" "Recent work · 24 of $(E 'j.recent.coupe.fichiers') cards"
 assert_eq "K17.4 — contrôle positif : le panneau d'une partie liste deux modifications dedans" "$(E 'j.dedoublon.section && j.dedoublon.noms.length')" "2"
-assert_eq "K17.5 — les deux README s'y distinguent par leur dossier parent" "$(E "j.dedoublon.noms.every((x) => /^README · \\S+/.test(x)) && new Set(j.dedoublon.noms).size === 2")" "true"
+assert_eq "K17.5 — les deux README s'y distinguent par leur dossier parent" "$(E "j.dedoublon.noms.every((x) => /^Readme · \\S+/.test(x)) && new Set(j.dedoublon.noms).size === 2")" "true"
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
