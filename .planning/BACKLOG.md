@@ -423,3 +423,13 @@ ou de `vf-new-lab`.
 - **Versions mixtes :** un `driver-lock.sh` de v2.75.1 ignore les verrous de phase et accorde le verrou de compartiment pendant qu'une phase est tenue. Ne vaut que si deux sessions d'un même dépôt n'ont pas la même version du plugin.
 
 **Déclencheur de reprise :** la prochaine phase qui touche `driver-lock.sh` ou `guard-driver-lock.sh`.
+
+## Mod vf-signal : version minimale de Claude Code pour ses hooks — NON MESURÉ (2026-11-06)
+
+**Priorité : basse.** Arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 (relayé par la session principale) : « Noter et reporter » — la release v2.76.0 dit seulement « mesuré sur Claude Code 2.1.319 ».
+
+**Origine :** relecture adverse SOBR-04 de la release v2.76.0 (volet cockpit, SHA `f0bbcf4c`).
+- **Observé :** `plugin/.claude-plugin/plugin.json` déclare `hooks: ./cockpit/signal/hooks/hooks.json`, au format `{modules:[...]}` ; `claude plugin validate plugin` passe sur Claude Code 2.1.319.
+- **NON mesuré :** le comportement d'un Claude Code plus ancien (fichier de hooks refusé, plugin entier refusé, ou hooks seuls ignorés) ; aucune version minimale n'est écrite pour le mod.
+
+**Déclencheur de reprise :** un utilisateur sur une version ancienne de Claude Code, ou la prochaine phase qui touche le mod vf-signal. Mesure dans un `HOME` jetable avec une version ancienne installée à part.

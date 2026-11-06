@@ -195,7 +195,7 @@ refuse tout objet si le contrat est illisible (fermée par défaut) (`test-cockp
 l'agent qui répond aux questions. Le lab observé n'est jamais une source de code : aucun de ses scripts n'est exécuté (le mode
 « modifier le plan » n'exécute que le moteur du module), aucun lien symbolique de la sortie n'est suivi, et la page porte une
 Content-Security-Policy (scripts en ligne par empreintes, `connect-src 'self'`). Hypothèse assumée : une machine à un seul utilisateur
-(le jeton est servi à tout processus local, `.cache/server.json` est en 0600).
+(le jeton est servi à tout processus local, `.cache/server.json` est en 0600). Conséquence : un autre processus du même poste peut lire ce jeton par `GET /project.html`, interroger l'agent par `POST /api/ask` et, avec `--terminal`, déposer une proposition dans le tiroir par `POST /api/vf/lancer` ; rien ne part au shell sans le geste humain dans le terminal (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06).
 
 **Avec `--terminal`**, ce qui circule et ce qui ne circule pas :
 
