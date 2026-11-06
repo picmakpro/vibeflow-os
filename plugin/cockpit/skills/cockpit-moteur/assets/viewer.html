@@ -185,14 +185,15 @@ body.in-flow #context { opacity: 0; }
 .fo-pad { width: 100%; height: 100%; padding: var(--gutter); }
 .card { width: 100%; height: 100%; border-radius: var(--r-card); background: var(--surface); padding: var(--inset-card); display: flex; flex-direction: column; gap: var(--sp-8); overflow: hidden; position: relative;
   box-shadow: var(--shadow-card); transition: background .25s var(--ease), box-shadow .25s var(--ease), transform .3s var(--ease);
-  animation: cardIn .55s var(--ease) both; animation-delay: var(--d, 0ms); }
+  animation: cardIn .4s var(--ease) both; animation-delay: var(--d, 0ms); }
 @keyframes cardIn { from { opacity: 0; transform: translateY(8px) scale(.985); } }
 .card > * { flex-shrink: 0; }
 .node:hover .card { background: var(--surface-hover); transform: translateY(-2px); box-shadow: 0 1px 0 rgba(var(--ink), .05) inset, var(--shadow-lift); }
 /* selected: a soft ring that follows the card's radius, plus a faint halo */
 .node.sel .card { background: var(--surface-hover); box-shadow: 0 0 0 1.5px rgba(var(--ink), .5), var(--shadow-lift); }
 .node.sel .card.external { box-shadow: inset 0 0 0 1.5px rgba(var(--ink), .1), 0 0 0 1.5px rgba(var(--ink), .5); }
-.node.flash .card { animation: flash 1.2s var(--ease) 2; }
+.node.flash .card { animation: flash .6s var(--ease) 1; } /* one short pulse: DESIGN.md §6, 700 ms at most (PU-G-047) */
+.node:focus { outline: none; } /* a card the search sent the focus to: the selection already shows it */
 @keyframes flash { 50% { box-shadow: 0 0 0 1.5px rgba(var(--ink), .6), 0 0 0 10px rgba(var(--ink), .08); } }
 .head { display: flex; align-items: center; gap: var(--sp-8); min-width: 0; }
 .ico { display: grid; place-items: center; flex: none; color: var(--c); } /* 71.5 : icône nue, sans tuile ni fond coloré */
@@ -414,7 +415,15 @@ body.no-panel #panel-resize { opacity: 0; pointer-events: none; }
 #results .r .rdr { font-size: 12px; color: var(--text-4); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: right; } /* the folder: when it is too long, its end (the part that differs) stays */
 #results .r .rk { font-size: 12px; color: var(--text-4); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
 #results .empty { padding: var(--sp-24); color: var(--text-3); text-align: center; }
+#palette .pal-x { display: none; }
 #palette .hint { display: flex; gap: var(--sp-16); padding: var(--sp-12) var(--inset-panel); color: var(--text-4); font-size: 12px; background: rgba(var(--ink), .02); }
+@media (pointer: coarse) { /* a finger has no ↑↓ ↵ esc: the foot of the search is a 44 px Close cross instead (PU-G-048) */
+  #palette .hint { justify-content: flex-end; padding: var(--sp-4) var(--sp-8); }
+  #palette .hint > span { display: none; }
+  #palette .pal-x { display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 999px; background: none; color: var(--text-2); cursor: pointer; }
+  #palette .pal-x:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+  #palette .pal-x svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+}
 
 /* ---------- ask ---------- */
 #ask { position: absolute; left: calc((100% - var(--pw)) / 2); bottom: var(--edge); transform: translateX(-50%); width: min(700px, calc(100% - var(--pw) - 320px)); min-width: 320px; z-index: 4; display: flex; flex-direction: column; gap: var(--sp-12); transition: left .45s var(--ease), width .45s var(--ease); }
@@ -632,7 +641,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
 <div id="palette"><div class="box glass">
   <div class="in"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="search" placeholder="Search by name, description, path or route…" autocomplete="off" spellcheck="false"></div>
   <div id="results"></div>
-  <div class="hint"><span><span class="kbd">↑↓</span> navigate</span><span><span class="kbd">↵</span> open</span><span><span class="kbd">esc</span> close</span></div>
+  <div class="hint"><span><span class="kbd">↑↓</span> navigate</span><span><span class="kbd">↵</span> open</span><span><span class="kbd">esc</span> close</span><button type="button" id="pal-x" class="pal-x" aria-label="Close" title="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
 </div></div>
 <!--__ELK_SCRIPT__-->
 <script>if (/AppleWebKit/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|OPR/.test(navigator.userAgent)) document.documentElement.classList.add('wk');</script>
@@ -1157,7 +1166,7 @@ function draw(view, res) {
   }
   // cards rise in left-to-right, a few ms apart
   const order = res.children.slice().sort((a, b) => a.x - b.x || a.y - b.y);
-  const delay = new Map(order.map((c, i) => [c.id, Math.min(i * 18, 360)]));
+  const delay = new Map(order.map((c, i) => [c.id, Math.min(i * 12, 240)])); // the last card is in by 640 ms (DESIGN.md §6)
   for (const c of res.children) {
     const g = el('g', { class: 'node', transform: `translate(${c.x},${c.y})` }, gNodes);
     const fo = el('foreignObject', { x: -GUTTER, y: -GUTTER, width: c.width + GUTTER * 2, height: c.height + GUTTER * 2 }, g);
@@ -1458,10 +1467,16 @@ function open(item) {
   go(item, { zoomFrom: item });
 }
 function up() { if (state.container === 'root') return; closeSheet(); const from = state.container; go(parentOf.get(from) || 'root', { select: from }); }
-function reveal(item) {
+function reveal(item, { focus = false } = {}) {
   if (item === 'root') return go('root');
   const container = parentOf.get(item) || 'root';
-  go(container, { select: item, after: () => { const g = state.chipEls.get(item); if (g) { g.classList.remove('flash'); void g.getBBox(); g.classList.add('flash'); centerOn(item); } } });
+  go(container, { select: item, after: () => {
+    const g = state.chipEls.get(item); if (!g) return;
+    // on a phone the details sheet opens right after the framing (PU-G-047): the sheet first, so the card is centred in what it leaves free
+    if (isPhone() && document.body.classList.contains('no-panel')) setPanel(true);
+    g.classList.remove('flash'); void g.getBBox(); g.classList.add('flash'); centerOn(item);
+    if (focus) { g.setAttribute('tabindex', '-1'); g.setAttribute('role', 'button'); g.setAttribute('aria-label', shownName(item)); g.focus({ preventScroll: true }); } // not in the tab order: a place for the focus to land
+  } });
 }
 /** Moves the map just far enough that a box isn't hidden behind the top bar or the sheet; the zoom and everything else stay as they are. */
 function bringIntoView(item) {
@@ -1790,8 +1805,14 @@ const index = [
 ];
 const pal = $('#palette'), sInput = $('#search'), sRes = $('#results');
 let sActive = 0, sItems = [];
-function openPalette() { pal.classList.add('open'); sInput.value = ''; runSearch(); setTimeout(() => sInput.focus(), 0); }
-function closePalette() { pal.classList.remove('open'); }
+let palOrigin = null; // where the focus was before the search opened
+function openPalette() { palOrigin = document.activeElement; pal.classList.add('open'); sInput.value = ''; runSearch(); setTimeout(() => sInput.focus(), 0); }
+/** Closing without choosing (Esc, a click outside, the Close button) gives the focus back to where it was; choosing sends it to the opened card (PU-G-019). */
+function closePalette(restore) {
+  pal.classList.remove('open');
+  if (restore && palOrigin && palOrigin !== document.body && palOrigin.isConnected) palOrigin.focus?.({ preventScroll: true });
+  palOrigin = null;
+}
 function runSearch() {
   const terms = sInput.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   let scored = [];
@@ -1820,14 +1841,15 @@ function runSearch() {
   sRes.querySelectorAll('.r').forEach((r) => { r.addEventListener('mousedown', (ev) => { ev.preventDefault(); pick(+r.dataset.i); }); r.addEventListener('mousemove', () => setActive(+r.dataset.i)); });
 }
 function setActive(i) { sActive = i; sRes.querySelectorAll('.r').forEach((r, k) => r.classList.toggle('active', k === i)); sRes.children[i]?.scrollIntoView({ block: 'nearest' }); }
-function pick(i) { const it = sItems[i]; if (!it) return; closePalette(); reveal(it.id); }
+function pick(i) { const it = sItems[i]; if (!it) return; closePalette(); reveal(it.id, { focus: true }); }
 sInput.addEventListener('input', runSearch);
 sInput.addEventListener('keydown', (ev) => {
   if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') { ev.preventDefault(); setActive(clamp(sActive + (ev.key === 'ArrowDown' ? 1 : -1), 0, sItems.length - 1)); }
   else if (ev.key === 'Enter') pick(sActive);
-  else if (ev.key === 'Escape') closePalette();
+  else if (ev.key === 'Escape') closePalette(true);
 });
-pal.addEventListener('mousedown', (ev) => { if (ev.target === pal) closePalette(); });
+pal.addEventListener('mousedown', (ev) => { if (ev.target === pal) { ev.preventDefault(); closePalette(true); } }); // preventDefault: the click would otherwise move the focus to the page after we gave it back
+$('#pal-x').onclick = () => closePalette(true);
 $('#search-btn').onclick = openPalette;
 
 // ======================= flows =======================
