@@ -240,9 +240,10 @@ await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, d
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#vf-git-ligne') && getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
 const out = {}, T = `document.querySelector('#vf-git-tiroir')`, attente = (ms) => s.ev(`new Promise((r) => setTimeout(r, ${ms}))`);
 // D2.6 : indisponible, puis « Réessayer » (nouveau GET) avec le témoin rétabli
+out.brancheAvant = await s.ev(`document.querySelector('.vf-git-branche').textContent`); // la lecture du chargement a réussi : une branche est connue
 await s.ev(`window.__vfGit.reponse = { schema: 'vibeflow/cockpit-git@1', etat: 'indisponible', entete: { etat: 'indisponible', depot: 'depot' }, commandes: { vide: null, diagnostic: 'git status' } }; document.querySelector('#vf-git-ligne').click()`);
 await s.attendre(`/Git est indisponible/.test(${T}.textContent)`, 'carte indisponible');
-out.indispo = await s.ev(`({ code: [...${T}.querySelectorAll('.vf-git-cmd code')].map((c) => c.textContent), bouton: [...${T}.querySelectorAll('button')].some((b) => b.textContent === 'Réessayer'), ligne: document.querySelector('#vf-git-ligne').textContent, reqs: window.__vfReqs.length })`);
+out.indispo = await s.ev(`({ code: [...${T}.querySelectorAll('.vf-git-cmd code')].map((c) => c.textContent), bouton: [...${T}.querySelectorAll('button')].some((b) => b.textContent === 'Réessayer'), ligne: document.querySelector('#vf-git-ligne').textContent, brancheLue: document.querySelector('.vf-git-branche').textContent, etat: document.querySelector('.vf-git-etat').textContent, reqs: window.__vfReqs.length })`);
 await s.ev(`window.__vfGit.reponse = JSON.parse(JSON.stringify(window.__TEMOIN_REF)); [...${T}.querySelectorAll('button')].find((b) => b.textContent === 'Réessayer').click()`);
 await s.attendre(`document.querySelectorAll('#vf-git-tiroir li[role=option]').length === 40`, 'rangées après Réessayer');
 out.reessai = await s.ev(`({ reqs: window.__vfReqs.length, page: !!document.querySelector('#proj-name') })`);
@@ -262,7 +263,8 @@ out.errs = await s.ev(`window.__errs`);
 return out;
 JS
   R2B="$(cdp "$AUX/d2b.js" "$BASE")"
-  assert_eq "D2.6 — indisponible : carte « Git est indisponible », « Réessayer », commande git status, l'en-tête dit « Branche indisponible »" "$(jq_ "$R2B" '[j.indispo.code.join(","), j.indispo.bouton, /Branche indisponible/.test(j.indispo.ligne)].join("|")' 2>/dev/null)" "git status|true|true"
+  assert_eq "D2.6 — indisponible : carte « Git est indisponible », « Réessayer », commande git status" "$(jq_ "$R2B" '[j.indispo.code.join(","), j.indispo.bouton].join("|")' 2>/dev/null)" "git status|true"
+  assert_eq "D2.6 — l'en-tête, déjà lu une fois, garde la dernière branche (« ○ <branche> », « non confirmée ») et ne dit pas « Branche indisponible » (PU-G-003 ; « Branche indisponible » reste réservé à la première lecture sans valeur connue, H9.1)" "$(jq_ "$R2B" '[j.brancheAvant.length > 0, j.indispo.brancheLue === "○ " + j.brancheAvant, /non confirmée/.test(j.indispo.etat), /non confirmée/.test(j.indispo.ligne), /Branche indisponible/.test(j.indispo.ligne)].join("|")' 2>/dev/null)" "true|true|true|true|false"
   assert_eq "D2.6 — « Réessayer » relance un GET (3 requêtes en tout : la lecture, sa relance automatique unique, puis le clic), la page continue, 40 rangées" "$(jq_ "$R2B" '[j.reessai.reqs, j.reessai.page].join("|")' 2>/dev/null)" "3|true"
   assert_eq "D2.6 — vide : « Aucun commit pour l'instant », commande git commit -m \"premier commit\", aucune rangée" "$(jq_ "$R2B" '[j.vide.code.join(","), j.vide.rangees].join("|")' 2>/dev/null)" 'git commit -m "premier commit"|0'
   assert_eq "D2.6 — chargement : rien à 60 ms ; à 260 ms aria-busy, 3 rangées fantômes, « Lecture du dépôt », sans animation ; réponse reçue : plus rien" "$(jq_ "$R2B" 'JSON.stringify([j.avant150.busy, j.avant150.fantomes, j.pendant.busy, j.pendant.fantomes, j.pendant.texte, j.pendant.anim, j.apres.busy, j.apres.fantomes])' 2>/dev/null)" '[false,0,"true",3,true,"none",null,0]'
