@@ -411,6 +411,7 @@ body.no-panel #panel-resize { opacity: 0; pointer-events: none; }
 #results .r .rt { flex: 1; min-width: 0; }
 #results .r .rn { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #results .r .rd { color: var(--text-3); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#results .r .rdr { font-size: 12px; color: var(--text-4); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: right; } /* the folder: when it is too long, its end (the part that differs) stays */
 #results .r .rk { font-size: 12px; color: var(--text-4); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
 #results .empty { padding: var(--sp-24); color: var(--text-3); text-align: center; }
 #palette .hint { display: flex; gap: var(--sp-16); padding: var(--sp-12) var(--inset-panel); color: var(--text-4); font-size: 12px; background: rgba(var(--ink), .02); }
@@ -802,6 +803,24 @@ function info(item) {
 }
 const connEntity = (id) => id.replace(/^x:(in|out):/, '');
 const nameOf = (item) => info(item.startsWith('x:') ? connEntity(item) : item).name;
+// Homonyms (PU-G-049): several files can carry the same name (a README per folder). Where the name is the only label (a card, a row of a list), the parent folder joins it.
+const parentDir = (p) => { const k = p.lastIndexOf('/'); return k < 0 ? '' : p.slice(0, k); };
+const baseName = (p) => p.slice(p.lastIndexOf('/') + 1);
+const sharing = (key) => { const m = new Map(); for (const f of G.files) { const k = key(f); (m.get(k) || m.set(k, []).get(k)).push(f.p); } return m; };
+const sameName = sharing((f) => f.name), sameBase = sharing((f) => baseName(f.p));
+/** The shortest tail of the parent folder that tells this file from the others sharing its name; '' when it is alone with that name (or sits at the root). */
+function dirTag(p, group) {
+  if (!group || group.length < 2) return '';
+  const mine = parentDir(p).split('/').filter(Boolean), others = group.filter((q) => q !== p).map((q) => parentDir(q).split('/').filter(Boolean));
+  for (let n = 1; n <= mine.length; n++) { const t = mine.slice(-n).join('/'); if (others.every((o) => o.slice(-n).join('/') !== t)) return t; }
+  return mine.join('/');
+}
+/** The name a file shows: its own, plus " · folder" when another file has the same name. */
+const shownName = (item) => {
+  const t = item.slice(0, 2); if (t !== 'f:' && t !== 'm:') return info(item).name;
+  const f = files.get(item.slice(2)), tag = dirTag(f.p, sameName.get(f.name));
+  return tag ? `${f.name} · ${tag}` : f.name;
+};
 // in plain mode a file opens only when it has endpoints to show (its exports are developer detail)
 const visibleKids = (item) => (kids.get(item) || []).filter((k) => technical() || !k.startsWith('s:'));
 const drillable = (item) => /^(n:|d:|f:)/.test(item) && visibleKids(item).length > 0;
@@ -964,7 +983,7 @@ function cardFoot(item) {
 function cardExtraH(item) {
   const i = info(item);
   const [w] = SIZES[i.type] || SIZES.file;
-  const name = i.type === 'route' ? i.r.name : i.type === 'symbol' ? i.s[0] : i.name;
+  const name = i.type === 'route' ? i.r.name : i.type === 'symbol' ? i.s[0] : shownName(item);
   const room = w - 32 - (i.type === 'route' ? 0 : 38); // padding (2 x 16), and the icon beside the title (30 + gap 8)
   return (cardFoot(item) ? FOOT_H : 0) + (textW(name, 15, 600) > room ? TITLE2_H : 0);
 }
@@ -983,7 +1002,7 @@ function cardHTML(item) {
   } else if (i.type === 'file' || i.type === 'module') {
     const f = i.f;
     if (f.note) cls += ' has-note';
-    head = `<span class="ico">${icon(i.type)}</span><div class="title">${h(f.name)}</div>`;
+    head = `<span class="ico">${icon(i.type)}</span><div class="title">${h(shownName(item))}</div>`;
     desc = dsc(f.d, 2);
   } else if (i.type === 'route') {
     const r = i.r;
@@ -1569,7 +1588,7 @@ function renderLegend(view) {
 const editorUrl = (p, line = 1) => G.meta.root && !PLAN ? `vscode://file/${encodeURI(G.meta.root.replace(/\\/g, '/'))}/${encodeURI(p)}:${line}` : null;
 const rowFor = (item, extra = '', dotColor) => {
   const i = info(item);
-  return `<a class="row" data-go="${h(item)}" title="${h(i.path || '')}"><span class="dot" style="background:${dotColor || colorOf(i)}"></span><span class="rt"><div class="rn">${h(i.name)}</div>${i.desc ? `<div class="rd">${h(i.desc)}</div>` : ''}</span>${extra ? `<span class="rc">${extra}</span>` : ''}</a>`;
+  return `<a class="row" data-go="${h(item)}" title="${h(i.path || '')}"><span class="dot" style="background:${dotColor || colorOf(i)}"></span><span class="rt"><div class="rn">${h(shownName(item))}</div>${i.desc ? `<div class="rd">${h(i.desc)}</div>` : ''}</span>${extra ? `<span class="rc">${extra}</span>` : ''}</a>`;
 };
 const routeRow = (ri, extra = '') => {
   const r = routes[ri];
@@ -1793,7 +1812,10 @@ function runSearch() {
   sRes.innerHTML = sItems.map((it, i) => {
     const ii = info(it.id);
     const ic = it.kind === 'route' ? `<span class="method" style="--m:${methodVar(ii.r.m)}">${h(ii.r.m)}</span>` : `<span class="ico" style="--c:${colorOf(ii)}">${icon(iconKey(ii))}</span>`;
-    return `<div class="r${i === 0 ? ' active' : ''}" data-i="${i}">${ic}<span class="rt"><div class="rn">${h(it.name)}</div><div class="rd">${h(it.desc || it.path)}</div></span><span class="rk">${h(it.kind === 'route' ? ii.r.p : it.kind)}</span></div>`;
+    // a file shows its real file name and, on the right, its folder instead of the word "file" (PU-G-050); when another result has the same file name, its whole folder also sits under the name (PU-G-049)
+    const file = it.kind === 'file', dir = file ? parentDir(it.path) : '', twin = file && (sameBase.get(baseName(it.path)) || []).length > 1;
+    const right = file ? dirTag(it.path, sameBase.get(baseName(it.path))) || dir.split('/').slice(-2).join('/') || '/' : it.kind === 'route' ? ii.r.p : it.kind;
+    return `<div class="r${i === 0 ? ' active' : ''}" data-i="${i}">${ic}<span class="rt"><div class="rn">${h(file ? baseName(it.path) : it.name)}</div><div class="rd">${h(twin && dir ? `${dir} · ${it.desc || ''}` : it.desc || it.path)}</div></span>${file ? `<span class="rdr rp" title="${h(dir || '/')}">${h(right)}</span>` : `<span class="rk">${h(right)}</span>`}</div>`;
   }).join('') || '<div class="empty">No matches</div>';
   sRes.querySelectorAll('.r').forEach((r) => { r.addEventListener('mousedown', (ev) => { ev.preventDefault(); pick(+r.dataset.i); }); r.addEventListener('mousemove', () => setActive(+r.dataset.i)); });
 }
