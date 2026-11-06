@@ -1,0 +1,49 @@
+--- a/assets/ui/25-recent.js
++++ b/assets/ui/25-recent.js
+@@ -17,18 +17,18 @@
+   style.textContent = `
+     #btn-recent svg.i { color: var(--recent); }
+     #btn-recent .badge { background: var(--recent); color: var(--on-recent-text); }
+-    .rw-task { padding: 12px 14px; border-radius: 16px; background: color-mix(in srgb, var(--recent) 6%, transparent); margin-bottom: 8px; }
++    .rw-task { padding: var(--inset-box); border-radius: 16px; background: var(--note-bg); color: var(--text); margin-bottom: var(--sp-12); }
+     .rw-task:last-child { margin-bottom: 0; }
+-    .rw-tt { display: flex; gap: 9px; align-items: center; font-weight: 600; line-height: 1.4; }
+-    .rw-tt::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--recent); flex: none; }
+-    .rw-q { color: var(--text-3); font-size: 12.5px; line-height: 1.5; margin: 6px 0 0 16px; }
++    .rw-tt { display: flex; gap: var(--sp-8); align-items: center; font-weight: 600; line-height: 1.4; }
++    .rw-tt::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--recent); flex: none; }
++    .rw-q { color: var(--text-3); font-size: 12.5px; line-height: 1.5; margin: var(--sp-6) 0 0 var(--sp-16); }
+     .rw-q b { color: var(--text-2); font-weight: 500; }
+-    .rw-s { color: var(--text-2); font-size: 12.5px; line-height: 1.55; margin: 6px 0 0 16px; }
+-    .rw-a { display: flex; gap: 6px; margin: 10px 0 0 16px; }
+-    .rw-a .btn { height: 30px; padding: 0 12px; font-size: 12.5px; gap: 6px; }
+-    .rw-note { margin-top: 10px; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, var(--recent) 9%, transparent); font-size: 13px; line-height: 1.55; }
+-    .rw-note .rw-h { color: var(--recent); font-size: 11.5px; font-weight: 600; margin-bottom: 3px; }
+-    .rw-when { color: var(--text-3); font-size: 12px; margin-top: 4px; }
++    .rw-s { color: var(--text-2); font-size: 12.5px; line-height: 1.55; margin: var(--sp-6) 0 0 var(--sp-16); }
++    .rw-a { display: flex; gap: var(--sp-6); margin: var(--sp-12) 0 0 var(--sp-16); }
++    .rw-a .btn { height: 30px; padding: 0 var(--sp-12); font-size: 12.5px; gap: var(--sp-6); }
++    .rw-note { margin-top: var(--sp-12); padding: var(--sp-8) var(--sp-12); border-radius: 14px; background: var(--note-bg); color: var(--text); font-size: 13px; line-height: 1.55; }
++    .rw-note .rw-h { color: var(--text-2); font-size: 11.5px; font-weight: 600; margin-bottom: var(--sp-4); }
++    .rw-when { color: var(--text-3); font-size: 12px; margin-top: var(--sp-4); }
+   `;
+   document.head.appendChild(style);
+ 
+@@ -60,7 +60,7 @@
+   // codebase panel: each task, what was asked, what was done, and a way to see its cards
+   SC.addPanelSection('overview', () => ({
+     top: true,
+-    html: `<div class="sec"><h3>Recent work <span class="c">${items.length}</span></h3>${R.updatedAt ? `<div class="rw-when">Updated ${h(ago(R.updatedAt))}</div>` : ''}<div style="margin-top:10px">${tasks.map((t, i) => itemsOf(i).length ? `
++    html: `<div class="sec"><h3>Recent work <span class="c">${items.length}</span></h3>${R.updatedAt ? `<div class="rw-when">Updated ${h(ago(R.updatedAt))}</div>` : ''}<div style="margin-top:var(--sp-12)">${tasks.map((t, i) => itemsOf(i).length ? `
+       <div class="rw-task"><div class="rw-tt">${h(t.title)}</div>
+         ${t.request ? `<div class="rw-q"><b>You asked:</b> ${h(t.request)}</div>` : ''}
+         ${t.summary ? `<div class="rw-s">${h(t.summary)}</div>` : ''}
+@@ -81,7 +81,7 @@
+     }).join('')}</div></div>` };
+     return { top: true, html: `<div class="sec">${mine.map((it) => {
+       const t = tasks[it.task] || {};
+-      return `<div class="rw-note"><div class="rw-h">${it.change === 'new' ? 'New' : 'Changed'} · ${h(t.title || 'Recent work')}</div>${h(it.note || '')}${t.request ? `<div class="rw-q" style="margin:6px 0 0"><b>You asked:</b> ${h(t.request)}</div>` : ''}</div>`;
++      return `<div class="rw-note"><div class="rw-h">${it.change === 'new' ? 'New' : 'Changed'} · ${h(t.title || 'Recent work')}</div>${h(it.note || '')}${t.request ? `<div class="rw-q" style="margin:var(--sp-6) 0 0"><b>You asked:</b> ${h(t.request)}</div>` : ''}</div>`;
+     }).join('')}</div>` };
+   });
+ 

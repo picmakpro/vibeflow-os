@@ -7,7 +7,7 @@ import { apresDemarrage } from './apres-demarrage'
 // Écarts de recette N1, N2, N3, N8 (68-FIX-RV-MOD ; P68-D-38, arbitrage Samuel « Tout selon les recos (Recommandé) », AskUserQuestion,
 // session principale Claude Code, 2026-11-04, relayé par le manager). Identifiants RV-N… (lus par verdict.sh).
 
-const SOMBRE = { active: '#f0c36b', blocked: '#f28b8b' }
+const SOMBRE = { active: '#ffe08a', blocked: '#ff9aa8' }
 const PANE = {
   plugin: 'vibeflow', component: 'Pane', requestId: 'vf-signal',
   props: { title: 'vf-signal', isFocused: false, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },

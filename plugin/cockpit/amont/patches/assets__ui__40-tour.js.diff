@@ -1,30 +1,38 @@
 --- a/assets/ui/40-tour.js
 +++ b/assets/ui/40-tour.js
-@@ -10,15 +10,20 @@
+@@ -10,70 +10,78 @@
  
    const style = document.createElement('style');
    style.textContent = `
 -#tour { position: fixed; left: 16px; bottom: 76px; width: min(360px, calc(100vw - 32px)); padding: 16px 16px 12px 20px; border-radius: var(--r-panel); z-index: 6; animation: tourIn .4s var(--ease); }
-+#tour { position: fixed; left: 16px; bottom: 76px; width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 170px); display: flex; flex-direction: column; padding: 16px 16px 12px 20px; border-radius: var(--r-panel); z-index: 6; animation: tourIn .4s var(--ease); }
-+#tour.right { left: auto; right: 16px; }
++#tour { position: fixed; left: var(--edge); bottom: 76px; /* dérivé : 16 + 42 de zoom + 18 ; la visite se place en JS (repli) */ width: min(360px, calc(100vw - 2 * var(--edge))); max-height: calc(100vh - 170px); display: flex; flex-direction: column; padding: var(--inset-panel); border-radius: var(--r-panel); z-index: 6; animation: tourIn .4s var(--ease); }
++#tour.right { left: auto; right: var(--edge); }
 +#tour .tb { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 +.tour-target { position: fixed; z-index: 5; pointer-events: none; outline: 2px solid var(--ring); outline-offset: 4px; border-radius: 10px; }
  #tour[hidden] { display: none; }
- #tour .tk { font-size: 12px; color: var(--text-3); margin-bottom: 4px; display: flex; gap: 6px; align-items: center; }
+-#tour .tk { font-size: 12px; color: var(--text-3); margin-bottom: 4px; display: flex; gap: 6px; align-items: center; }
++#tour .tk { font-size: 12px; color: var(--text-3); margin-bottom: var(--sp-4); display: flex; gap: var(--sp-6); align-items: center; }
  #tour .tk i { width: 3px; height: 3px; border-radius: 50%; background: var(--text-4); }
- #tour .tt { font-size: 16px; font-weight: 600; letter-spacing: -.01em; line-height: 1.35; padding-right: 22px; }
- #tour .tn { color: var(--text-2); line-height: 1.55; margin-top: 6px; font-size: 13.5px; }
- #tour .tip { color: var(--text-3); font-size: 12px; line-height: 1.5; margin-top: 10px; }
+-#tour .tt { font-size: 16px; font-weight: 600; letter-spacing: -.01em; line-height: 1.35; padding-right: 22px; }
+-#tour .tn { color: var(--text-2); line-height: 1.55; margin-top: 6px; font-size: 13.5px; }
+-#tour .tip { color: var(--text-3); font-size: 12px; line-height: 1.5; margin-top: 10px; }
 -#tour .tf { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
 -#tour .dots { display: flex; gap: 4px; flex: 1; }
-+#tour .tf { flex: none; display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
-+#tour .acts { display: flex; align-items: center; gap: 8px; }
++#tour .tt { font-size: 16px; font-weight: 600; letter-spacing: -.01em; line-height: 1.35; padding-right: var(--sp-20); }
++#tour .tn { color: var(--text-2); line-height: 1.55; margin-top: var(--sp-6); font-size: 13.5px; }
++#tour .tip { color: var(--text-3); font-size: 12px; line-height: 1.5; margin-top: var(--sp-8); }
++#tour .tf { flex: none; display: flex; flex-direction: column; gap: var(--sp-8); margin-top: var(--sp-12); }
++#tour .acts { display: flex; align-items: center; gap: var(--sp-8); }
 +#tour .acts [data-x] { margin-right: auto; }
-+#tour .dots { display: flex; gap: 4px; }
++#tour .dots { display: flex; gap: var(--sp-4); }
  #tour .dots i { width: 14px; height: 3px; border-radius: 2px; background: rgba(var(--ink), .12); transition: background .3s var(--ease); }
  #tour .dots i.on { background: var(--on); }
  #tour .tf .btn { height: 32px; }
-@@ -29,51 +34,54 @@
+ #tour .tf .btn.icon { width: 32px; }
+-#tour .tx { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; }
++#tour .tx { position: absolute; top: var(--sp-12); right: var(--sp-12); width: 28px; height: 28px; }
+ @keyframes tourIn { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+ `;
    document.head.appendChild(style);
  
    // ---------- steps ----------
@@ -218,12 +226,12 @@
 -      const top = [...ask.children].filter((x) => x.offsetParent && x.getBoundingClientRect().height > 0).reduce((m, x) => Math.min(m, x.getBoundingClientRect().top), a.bottom);
 -      if (a.width && a.left < 16 + c.width + 12 && top < innerHeight) bottom = Math.max(bottom, innerHeight - top + 12);
 +    const name = (e) => e.id ? '#' + e.id : e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\s+/)[0] : '');
-+    return ['zoom', 'panel', 'context', 'ask'].map((id) => document.getElementById(id)).concat(document.querySelector('header'), document.querySelector('.tour-target'), ask ? [...ask.children] : []).filter(vis).map((e) => { const r = e.getBoundingClientRect(); return { n: name(e), left: r.left, top: r.top, right: r.right, bottom: r.bottom }; });
++    return ['zoom', 'panel', 'context', 'ask'].map((id) => document.getElementById(id)).concat(document.querySelector('header'), document.querySelector('.tour-target'), document.querySelector('.vf-' + 'term-pastille'), ask ? [...ask.children] : []).filter(vis).map((e) => { const r = e.getBoundingClientRect(); return { n: name(e), left: r.left, top: r.top, right: r.right, bottom: r.bottom }; }); // 71.5 : le sélecteur est assemblé (la page servie sans --terminal ne contient jamais le préfixe du terminal, T7.5) ; la pastille du terminal (seulement avec --terminal ; absente ou masquée = ignorée par vis) est un obstacle comme le zoom, sans marge fixe
 +  }
 +  const visible = (e) => { if (!e) return false; const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
 +  // last resort when a title block taller than expected leaves no room: its description is folded away while the tour is open (the title stays), and put back when the tour moves on or ends
-+  function fold() { const p = document.querySelector('#context p'); if (!p || p.dataset.tourFold !== undefined || !visible(p)) return false; p.dataset.tourFold = p.style.display; p.style.display = 'none'; return true; }
-+  function unfold() { const p = document.querySelector('#context p'); if (p && p.dataset.tourFold !== undefined) { p.style.display = p.dataset.tourFold; delete p.dataset.tourFold; } }
++  function fold() { const p = document.querySelector('#context p'); if (!p || p.dataset.tourFold !== undefined || !visible(p)) return false; p.dataset.tourFold = p.style.display; p.style.display = 'none'; ringPlace(); return true; }
++  function unfold() { const p = document.querySelector('#context p'); if (p && p.dataset.tourFold !== undefined) { p.style.display = p.dataset.tourFold; delete p.dataset.tourFold; ringPlace(); } }
 +  function place(folded) {
 +    if (!folded) unfold();
 +    // the card must not cover any fixed surface (zoom controls, details panel, title block, header, Ask bar and notices, the outlined target). Every candidate (width, side, height above an obstacle)

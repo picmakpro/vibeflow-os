@@ -27,13 +27,13 @@ export function vueTerminal(cfg) {
   const entier = (v) => String(Math.trunc(Number(v)) || 0);
   const SOMBRE = {
     background: '#191919', foreground: '#ececec', cursor: '#ececec', cursorAccent: '#0f0f0f', selectionBackground: 'rgba(255,255,255,.12)', selectionInactiveBackground: 'rgba(255,255,255,.07)',
-    black: '#2b2b2b', red: '#f28b8b', green: '#4ade80', yellow: '#f0c36b', blue: '#7aa7ff', magenta: '#b49cff', cyan: '#63d2b8', white: '#b4b4b4',
-    brightBlack: '#8b8b8b', brightRed: '#f6a5a5', brightGreen: '#86efac', brightYellow: '#f3d79b', brightBlue: '#9dbcff', brightMagenta: '#c7b8ff', brightCyan: '#86e3cd', brightWhite: '#ececec',
+    black: '#2b2b2b', red: '#ff9aa8', green: '#9ece6a', yellow: '#f0d17c', blue: '#7aa7ff', magenta: '#b49cff', cyan: '#63d2b8', white: '#c6c6c6',
+    brightBlack: '#a8a8a8', brightRed: '#ffb3bc', brightGreen: '#b9e08e', brightYellow: '#e3df78', brightBlue: '#9dbcff', brightMagenta: '#c7b8ff', brightCyan: '#86e3cd', brightWhite: '#ececec',
   };
   const CLAIR = {
     background: '#ffffff', foreground: '#161616', cursor: '#161616', cursorAccent: '#ffffff', selectionBackground: 'rgba(0,0,0,.08)', selectionInactiveBackground: 'rgba(0,0,0,.05)',
-    black: '#161616', red: '#c94a4a', green: '#157a3a', yellow: '#946000', blue: '#1f5fd6', magenta: '#6a45d6', cyan: '#0b7f6b', white: '#3f3f3f',
-    brightBlack: '#595959', brightRed: '#b42323', brightGreen: '#14603f', brightYellow: '#6b4500', brightBlue: '#1747a8', brightMagenta: '#5233b8', brightCyan: '#0a6a5a', brightWhite: '#161616',
+    black: '#161616', red: '#da1637', green: '#007f3d', yellow: '#986300', blue: '#1f5fd6', magenta: '#6a45d6', cyan: '#0b7f6b', white: '#3f3f3f',
+    brightBlack: '#595959', brightRed: '#da1637', brightGreen: '#007f3d', brightYellow: '#986300', brightBlue: '#1747a8', brightMagenta: '#5233b8', brightCyan: '#0a6a5a', brightWhite: '#161616',
   };
   window.vfTermVue = {
     invisible: (t) => INVISIBLE.test(String(t).replace(/\t/g, '')),

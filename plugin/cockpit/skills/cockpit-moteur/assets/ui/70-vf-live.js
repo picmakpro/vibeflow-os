@@ -13,43 +13,40 @@
   const TAB = G.meta.vfTab === 'project' ? 'project' : 'code';
   const probe = (window.__vfLive = { connected: false, patches: 0, applied: 0, lastLatencyMs: null, lock: null, structural: 0, who: null, sondages: 0, abandon: false,
     reco: { vite: 1000, lent: 5000, bascule: 30000, fin: 300000 } }); // reco : en ms, modifiable par un test
-  const FRAICHEUR = 'sessions écrites depuis moins de 3 min';
+  const FRAICHEUR = 'Sessions écrites depuis moins de 3 min';
+  const NB = '\u00a0';
 
   const style = document.createElement('style');
   style.textContent = `
-    #vf-lock { font: 500 12px/1 var(--mono, monospace); gap: 6px; }
+    #vf-lock { font: 500 12px/1 var(--mono, monospace); gap: var(--sp-6); }
     #vf-lock .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-4); display: inline-block; }
     #vf-lock.held .dot { background: var(--st-active); animation: vfpulse 1.6s ease-in-out infinite; }
     #vf-lock.off .dot { background: var(--st-blocked); }
     @keyframes vfpulse { 50% { opacity: .25; } }
     /* D2 (recette 2026-11-02) : le tiroir reprend la marge des panneaux ouverts par showPanel (.sec : 18px 20px 6px, 22 px en premier et dernier enfant) ; sur grand écran sa boîte suit son contenu (plafonnée à la fenêtre, défilement au-delà) au lieu de s'étirer jusqu'en bas.
        Sous 701 px le panneau est un tiroir du bas dont la mise en page appartient au viewer : on n'y touche pas. */
-    .vf-whop { padding: 22px 20px; }
+    .vf-whop { --fil: rgba(var(--ink), .2); padding: var(--inset-panel); }
     @media (min-width: 701px) { #panel:has(> .vf-whop) { bottom: auto; max-height: calc(100vh - var(--hh, 64px) - 20px); overflow: auto; } }
-    .vf-whop h3 { margin: 0 0 4px; } .vf-whop h4 { margin: 16px 0 6px; color: var(--text-3); }
-    .vf-whop .regle { color: var(--text-3); font-size: 12px; margin: 0 0 10px; }
-    .vf-who { padding: 8px 0; border-top: 1px solid rgba(var(--ink), .08); font-size: 13px; }
-    .vf-who span { color: var(--text-3); } .vf-who div { color: var(--text-2); margin-top: 2px; }
-    .vf-who.stale { opacity: .55; }
-    .vf-who button { margin-top: 6px; font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); }
-    .vf-who button:hover { background: rgba(var(--ink), .07); color: var(--text); } .vf-who button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-    .sec button[data-vf-doing], .sec button[data-vf-transcript] { font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); margin: 6px 6px 0 0; transition: background .2s var(--ease), color .2s var(--ease); }
+    .vf-whop h3 { margin: 0; } .vf-whop h4 { margin: var(--sp-16) 0 var(--sp-6); color: var(--text-3); }
+    .vf-whop .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .sec button[data-vf-doing], .sec button[data-vf-transcript] { font: inherit; font-size: 12px; cursor: pointer; padding: var(--sp-4) var(--sp-12); border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); margin: var(--sp-6) var(--sp-6) 0 0; transition: background .2s var(--ease), color .2s var(--ease); }
     .sec button[data-vf-doing]:hover, .sec button[data-vf-transcript]:hover { background: rgba(var(--ink), .07); color: var(--text); } .sec button[data-vf-doing]:focus-visible, .sec button[data-vf-transcript]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-    /* Q12a : les liens « Nœud … » et « Voir dans l'onglet Équipe » s'alignent sur la colonne de texte (le retrait de 10 px vient du padding de .vf-link, fait pour la liste « Sources lues ») */
-    .vf-who > a.vf-link, body.vf-tab-equipe .sec > a.vf-link { padding-left: 0; padding-right: 0; }
+    /* Q12a : les liens « Nœud … » et « Voir dans l'onglet Équipe » s'alignent sur la colonne de texte (le retrait de 12 px vient du padding de .vf-link, fait pour la liste « Sources lues ») */
+    body.vf-tab-equipe .sec > a.vf-link { padding: var(--sp-6) 0; margin-inline: 0; }
+    .vf-whop .src { color: var(--text-4); font-size: 11px; margin-top: var(--sp-16); }
     a.vf-link { text-decoration: underline; text-decoration-color: rgba(var(--ink), .35); text-underline-offset: 3px; }
+    /* 71.5 (juge de rendu, 2026-11-06) : la pastille d'état (glyphe + mot) d'un lien n'est jamais soulignée ; seul le libellé qui l'accompagne l'est */
+    a.vf-link:has(> .vst) { text-decoration: none; }
+    a.vf-link:has(> .vst) > :not(.vst) { text-decoration: underline; text-decoration-color: rgba(var(--ink), .35); text-underline-offset: 3px; }
+    a.vf-link:has(> .vst):hover > :not(.vst) { text-decoration-color: currentColor; }
     a.vf-link:hover { color: var(--text); text-decoration-color: currentColor; } a.vf-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
     .vf-nr { white-space: nowrap; }
-    .vf-who .vf-doing { margin-top: 6px; font-family: var(--mono, monospace); font-size: 12px; word-break: break-word; }
-    .vf-whop .src { color: var(--text-4); font-size: 11px; margin-top: 14px; }
-    .vf-arbre-enfants { margin-left: 14px; padding-left: 10px; border-left: 1px solid rgba(var(--ink), .12); }
-    .vf-who .vf-pied { color: var(--text-3); font-size: 12px; } .vf-who .vf-link { display: inline-block; margin: 4px 10px 0 0; font-size: 12px; color: var(--text-2); }
-    .vf-termines > summary { cursor: pointer; padding: 8px 0; color: var(--text-3); font-size: 12px; }
-    .vf-transcript { max-height: 320px; overflow-y: auto; margin-top: 8px; font-size: 12px; color: var(--text-2); }
-    .vf-transcript h4 { margin: 10px 0 4px; color: var(--text-3); } .vf-transcript p, .vf-transcript li { margin: 2px 0; word-break: break-word; }
+    .vf-transcript { max-height: 320px; overflow-y: auto; margin-top: var(--sp-8); font-size: 12px; color: var(--text-2); }
+    .vf-transcript h4 { margin: var(--sp-12) 0 var(--sp-4); color: var(--text-3); } .vf-transcript > h4:first-child { margin-top: 0; } .vf-transcript p, .vf-transcript li { margin: var(--sp-2) 0; word-break: break-word; }
+    .vf-transcript ul { margin: var(--sp-4) 0 0; padding-left: var(--sp-16); }
     .vf-transcript pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var(--mono, monospace); }
-    #vf-reco { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 12px 14px 12px 18px; border-radius: 20px; font-size: 13px; line-height: 1.5; color: var(--text); }
-    #vf-reco button { flex: none; border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer; font: inherit; font-size: 12.5px; background: var(--on); color: var(--on-text); }`;
+    #vf-reco { position: fixed; left: 50%; bottom: 96px; /* dérivé : au-dessus de la barre de question */ transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: var(--sp-12); max-width: calc(100vw - 2 * var(--edge)); padding: var(--inset-box) var(--inset-box) var(--inset-box) var(--sp-16); border-radius: 20px; font-size: 13px; line-height: 1.5; color: var(--text); }
+    #vf-reco button { flex: none; border: 0; border-radius: 999px; padding: var(--sp-8) var(--sp-16); cursor: pointer; font: inherit; font-size: 12.5px; background: var(--on); color: var(--on-text); }`;
   document.head.appendChild(style);
 
   let badge = null, who = null;
@@ -76,16 +73,43 @@
     const x = tenus.find((y) => y.ws ? mots[1] === y.ws && (mots[3] || '') === ph(y) : y.scope === w.tree) || (tenus.length === 1 ? tenus[0] : undefined);
     return typeof x?.age_seconds === 'number' ? x.age_seconds : w.ageS;
   };
+  // verrous et nœuds : un verrou dit « tenu depuis … » (durée au sens explicite) ; un nœud de DAG périmé n'est plus montré (P71.5-D-14), un nœud récent reste (aucun agent ne le porte forcément)
+  const ligneVerrou = (w) => `<li><span><b>${h(w.kind === 'lock' && w.tree === 'depot' ? 'dépôt' : String(w.tree || '').replace(/^compartiment /, ''))}</b>${w.id ? ' · ' + h(w.id) : ''}</span><span class="n">tenu depuis${NB}${h(duree(ageDe(w)))}</span></li>`;
+  const ligneNoeud = (w) => `<li><span><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b>${w.task ? ' · ' + h(w.task) : ''}</span><span class="n">${h(duree(ageDe(w)))}</span></li>`;
+  const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
+  const driverLigne = () => {
+    const l = probe.lock, tenus = (Array.isArray(l?.locks) ? l.locks : l?.present ? [l] : []).filter((x) => x.present);
+    if (!tenus.length) return '<p class="aw-driver"><span class="t">Driver libre</span></p>';
+    const x = tenus[0];
+    return `<p class="aw-driver"><span class="d"></span><span class="t">Driver ${h(x.owner || '?')}${x.step ? ' · ' + h(x.step) : ''}</span><span class="n">tenu depuis${NB}${h(duree(x.age_seconds))}</span></p>`;
+  };
+  // le CSS du tiroir vit avec ses rendus (71-vf-equipe-rendu.js, chargé après ce fichier) : posé une fois, au premier dessin
+  let cssPose = false;
+  const poserCss = () => { if (cssPose) return; cssPose = true; const st = document.createElement('style'); st.textContent = window.__vfEquipeRendu.css; document.head.appendChild(st); };
   const htmlTiroir = () => {
+    poserCss();
     const ws = who?.workers || [], act = ws.filter(auTravail), reste = ws.filter((w) => !AGENT(w));
-    const row = (w) => `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.kind === 'lock' && w.tree === 'depot' ? 'dépôt' : w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${h(duree(ageDe(w)))}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span><div>${h(w.task || '')}</div></div>`;
+    const finis = ws.filter((w) => AGENT(w) && w.etat === 'termine').length;
+    const verrous = reste.filter((w) => w.kind === 'lock'), autres = reste.filter((w) => w.kind !== 'lock' && !w.stale && !(w.kind === 'dag-node' && act.length)); // un nœud en cours est déjà porté par l'agent qui le travaille
     const SOURCES = { sessions: 'Sessions et sous-agents', locks: 'Verrous du dépôt', dags: 'Plans de la mission' }; // clés de la collecte, jamais affichées telles quelles (P70-D-04)
     const src = Object.entries(who?.sources || {}).map(([k, v]) => `${SOURCES[k] || k} : ${v.etat}`).join(' · ');
     const arbre = window.__vfEquipeRendu.arbre(ws, h);
-    return (`<div class="vf-whop"><h3>Au travail (${act.length})</h3><p class="regle">${h(lockText(probe.lock).text)}.</p><p class="regle">Règle de fraîcheur : ${FRAICHEUR}, actifs et terminés depuis moins de 24 h ; la dernière commande et le transcript ne s'affichent que sur demande.</p>${arbre || (reste.length ? '' : '<p>Personne. Sources lues : ' + h(src) + '</p>')}${reste.length ? `<h4>Verrous et nœuds</h4>${reste.map(row).join('')}` : ''}<p class="src">${h(src)}</p></div>`);
+    return (`<div class="vf-whop"><div class="aw-head"><h3>Au travail</h3><span class="aw-count"><b>${act.length}</b> ${act.length > 1 ? 'actifs' : 'actif'} · ${pluriel(finis, 'terminé', 'terminés')}</span></div>${driverLigne()}`
+      + `${arbre || (reste.length ? '' : '<p>Personne. Sources lues : ' + h(src) + '</p>')}`
+      + `${verrous.length ? `<div class="aw-sec2"><span>Verrous tenus</span><span>${verrous.length}</span></div><ul class="r-verr">${verrous.map(ligneVerrou).join('')}</ul>` : ''}`
+      + `${autres.length ? `<div class="aw-sec2"><span>Nœuds du plan</span><span>${autres.length}</span></div><ul class="r-verr">${autres.map(ligneNoeud).join('')}</ul>` : ''}`
+      + `<p class="aw-foot">${h(FRAICHEUR)}, terminés depuis moins de 24${NB}h. Transcript${NB}: dans l'onglet Équipe.</p><p class="src">${h(src)}</p></div>`);
+  };
+  // replis : l'ensemble des parents repliés vit dans la mémoire de la page (ni graphe, ni stockage, ni export) ; reposé après chaque dessin du tiroir
+  const replies = new Set();
+  const appliquerReplis = () => {
+    for (const b of document.querySelectorAll('.vf-whop [data-vf-repli]')) {
+      const clos = replies.has(b.dataset.vfRepli), ul = document.getElementById(b.getAttribute('aria-controls'));
+      b.setAttribute('aria-expanded', String(!clos)); if (ul) ul.hidden = clos; b.closest('li')?.classList.toggle('closed', clos);
+    }
   };
   let dernier = '';
-  const whoPanel = () => { dernier = htmlTiroir(); SC.showPanel(dernier); };
+  const whoPanel = () => { dernier = htmlTiroir(); SC.showPanel(dernier); appliquerReplis(); };
   // tant que le tiroir est ouvert il suit le flux : redessiné à chaque `who` qui change l'arbre, l'état ou la dernière action (pas d'image identique), en gardant le défilement
   // et l'état replié ou déplié des « Terminés » ; les commandes demandées sont reposées par l'observateur ci-dessous
   const cleDe = (d) => d.closest('[data-vf-agent]')?.dataset.vfAgent || ''; // le bloc « Terminés » est repéré par l'agent qui le porte (stable quand un terminé s'y ajoute)
@@ -95,7 +119,7 @@
     if (html === dernier) return;
     const p = document.getElementById('panel'), haut = p ? p.scrollTop : 0;
     const ouverts = new Set([...document.querySelectorAll('.vf-whop details.vf-termines[open]')].map(cleDe));
-    dernier = html; SC.showPanel(html);
+    dernier = html; SC.showPanel(html); appliquerReplis();
     for (const d of document.querySelectorAll('.vf-whop details.vf-termines')) if (ouverts.has(cleDe(d))) d.open = true;
     for (const e of document.querySelectorAll('#panel > *')) e.style.animation = 'none';
     if (p) p.scrollTop = haut;
@@ -112,8 +136,8 @@
   // focus clavier (UIFN-12) : chaque `who` redessine le panneau et le tiroir, le bouton focalisé est remplacé et le focus tombe sur le corps de la page.
   // On retient la clé du bouton « Voir la dernière commande » / « Lire le transcript » qui a le focus ; après un redessin, si le focus est perdu, il revient au bouton de même clé.
   // Un focus qui s'en va ailleurs (bouton encore dans la page) efface la clé : jamais de focus volé à quelqu'un qui est parti.
-  const BTN = '[data-vf-doing],[data-vf-transcript]', DANS_PANNEAU = '#panel [data-vf-doing],#panel [data-vf-transcript]';
-  const cleBtn = (b) => (b.dataset.vfDoing !== undefined ? 'doing:' + b.dataset.vfDoing : 'transcript:' + b.dataset.vfTranscript);
+  const BTN = '[data-vf-doing],[data-vf-transcript],[data-vf-repli]', DANS_PANNEAU = '#panel [data-vf-doing],#panel [data-vf-transcript],#panel [data-vf-repli]';
+  const cleBtn = (b) => (b.dataset.vfDoing !== undefined ? 'doing:' + b.dataset.vfDoing : b.dataset.vfRepli !== undefined ? 'repli:' + b.dataset.vfRepli : 'transcript:' + b.dataset.vfTranscript);
   let cleFocus = null;
   document.addEventListener('focusin', (ev) => { const b = ev.target.closest?.(DANS_PANNEAU); cleFocus = b ? cleBtn(b) : null; });
   document.addEventListener('focusout', (ev) => { const b = ev.target; if (b.matches?.(BTN)) queueMicrotask(() => { if (b.isConnected && document.activeElement !== b) cleFocus = null; }); });
@@ -123,6 +147,12 @@
     if (b) b.focus({ preventScroll: true });
   };
   new MutationObserver(() => { rendreFocus(); if (demandes.size) for (const b of document.querySelectorAll('#panel [data-vf-doing]')) poser(b); }).observe(document.getElementById('panel') || document.documentElement, { childList: true, subtree: true });
+  document.addEventListener('click', (ev) => {
+    const r = ev.target.closest?.('.vf-whop [data-vf-repli]');
+    if (!r) return;
+    const id = r.dataset.vfRepli; if (replies.has(id)) replies.delete(id); else replies.add(id);
+    appliquerReplis();
+  });
   document.addEventListener('click', async (ev) => {
     const b = ev.target.closest?.('[data-vf-doing]');
     if (!b) return;

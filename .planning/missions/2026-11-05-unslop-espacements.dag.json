@@ -1,0 +1,447 @@
+{
+  "nodes": [
+    {
+      "id": "audit",
+      "step": "audit existant : espacements, couleurs, icones, hierarchie, infos + captures avant",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "direction:a",
+      "step": "direction de palette a en maquette sur Projet/Code/Equipe, AA mesure 2 themes",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "direction:b",
+      "step": "direction de palette b en maquette sur Projet/Code/Equipe, AA mesure 2 themes",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "direction:c",
+      "step": "direction de palette c en maquette sur Projet/Code/Equipe, AA mesure 2 themes",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "propositions",
+      "step": "choix icones, hierarchie des vues, informations utiles",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:directions",
+      "step": "juge frais : 3 directions + propositions",
+      "stage": "",
+      "deps": [
+        "direction:a",
+        "direction:b",
+        "direction:c",
+        "propositions"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gout",
+      "step": "arbitrage Samuel (via coordinateur) — SOLDÉ : lot G1-G12 tranché par Samuel, AskUserQuestion session principale, 2026-11-05 (P71.5-D-18..28)",
+      "stage": "",
+      "deps": [
+        "critique:directions"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "design-md",
+      "step": "DESIGN.md + jetons couleur figes (spec crafter) — ABSORBÉ par spec-couleurs (reprise 2026-11-05)",
+      "stage": "",
+      "deps": [
+        "gout"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:design-md",
+      "step": "juge frais sur la spec de jetons — ABSORBÉ par critique:spec-couleurs, 82/100 (reprise 2026-11-05)",
+      "stage": "",
+      "deps": [
+        "design-md"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "craft:shell",
+      "step": "spec espacements shell",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:shell",
+      "step": "critique spec shell",
+      "stage": "",
+      "deps": [
+        "craft:shell"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "craft:code",
+      "step": "spec espacements code",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:code",
+      "step": "critique spec code",
+      "stage": "",
+      "deps": [
+        "craft:code"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "craft:projet",
+      "step": "spec espacements projet",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:projet",
+      "step": "critique spec projet",
+      "stage": "",
+      "deps": [
+        "craft:projet"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "craft:equipe",
+      "step": "spec espacements equipe",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:equipe",
+      "step": "critique spec equipe",
+      "stage": "",
+      "deps": [
+        "craft:equipe"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "craft:tiroir",
+      "step": "spec espacements tiroir",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:tiroir",
+      "step": "critique spec tiroir",
+      "stage": "",
+      "deps": [
+        "craft:tiroir"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "impl:espacements",
+      "step": "vf-coder : jetons espacement + 5 specs + suites",
+      "stage": "",
+      "deps": [
+        "critique:shell",
+        "critique:code",
+        "critique:projet",
+        "critique:equipe",
+        "critique:tiroir"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "impl:couleurs",
+      "step": "intégration : couleurs + au-travail fusionnés sur feat/phase-71-5-unslop-espacements, rebase origin/main, toutes suites, captures avant (main) et après 390/768/1280/1440 sombre+clair",
+      "stage": "",
+      "deps": [
+        "impl:espacements",
+        "impl:couleurs-antislop",
+        "impl:au-travail",
+        "critique:design-md"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rendu:shell",
+      "step": "juge frais sur le rendu shell",
+      "stage": "",
+      "deps": [
+        "impl:couleurs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rendu:code",
+      "step": "juge frais sur le rendu code",
+      "stage": "",
+      "deps": [
+        "impl:couleurs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rendu:projet",
+      "step": "juge frais sur le rendu projet",
+      "stage": "",
+      "deps": [
+        "impl:couleurs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rendu:equipe",
+      "step": "juge frais sur le rendu equipe",
+      "stage": "",
+      "deps": [
+        "impl:couleurs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rendu:tiroir",
+      "step": "juge frais sur le rendu tiroir",
+      "stage": "",
+      "deps": [
+        "impl:couleurs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "livraison",
+      "step": "captures apres, rebase, bump patch, CHANGELOG, PR, CI",
+      "stage": "",
+      "deps": [
+        "rendu:shell",
+        "rendu:code",
+        "rendu:projet",
+        "rendu:equipe",
+        "rendu:tiroir",
+        "docs",
+        "finitions"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "au-travail",
+      "step": "refonte de la partie Au travail (demande directe Samuel), 2 options en maquette",
+      "stage": "",
+      "deps": [
+        "audit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recherche-grille",
+      "step": "recherche grille d'espacement (demande Samuel Q1)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:au-travail",
+      "step": "juge frais options Au travail — SOLDÉ : démo présentée à Samuel, lot G1-G12 tranché (critique Au travail 84/100)",
+      "stage": "",
+      "deps": [
+        "au-travail"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "sources-anti-slop",
+      "step": "lecture des sources publiques anti-slop",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "anti-slop",
+      "step": "audit des motifs slop existants + alternatives (fragment demo)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "graphite-corrige",
+      "step": "Graphite corrige AA + a recetter + glyphes M1 (fragment demo)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "demo",
+      "step": "page demo locale assemblee, zoomable — SOLDÉ : démo présentée à Samuel, lot G1-G12 tranché (critique Au travail 84/100)",
+      "stage": "",
+      "deps": [
+        "anti-slop",
+        "graphite-corrige",
+        "au-travail"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:demo",
+      "step": "juge frais fragments demo — SOLDÉ : démo présentée à Samuel, lot G1-G12 tranché (critique Au travail 84/100)",
+      "stage": "",
+      "deps": [
+        "anti-slop",
+        "graphite-corrige",
+        "au-travail"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "teintes-etat",
+      "step": "4 jeux alternatifs vert/rouge/orange (demande directe Samuel)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:teintes",
+      "step": "juge frais 4 jeux de teintes",
+      "stage": "",
+      "deps": [
+        "teintes-etat"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "spec-couleurs",
+      "step": "jetons de couleur figes + regles anti-slop + DESIGN.md (spec)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "critique:spec-couleurs",
+      "step": "juge frais spec couleurs",
+      "stage": "",
+      "deps": [
+        "spec-couleurs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "impl:au-travail",
+      "step": "vf-coder : refonte Au travail (A3 fils)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "impl:couleurs-antislop",
+      "step": "vf-coder : jetons couleur + regles anti-slop + DESIGN.md",
+      "stage": "",
+      "deps": [
+        "critique:spec-couleurs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire (audit read-only, constat au rapport)",
+      "stage": "",
+      "deps": [
+        "rendu:shell",
+        "rendu:code",
+        "rendu:projet",
+        "rendu:equipe",
+        "rendu:tiroir",
+        "finitions"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "finitions",
+      "step": "vf-coder : findings auto-fix des juges de rendu (Au travail M1-M4, Projet à recetter + soulignement, pastille claire, #ask 701 px)",
+      "stage": "",
+      "deps": [
+        "rendu:shell",
+        "rendu:code",
+        "rendu:projet",
+        "rendu:equipe",
+        "rendu:tiroir"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

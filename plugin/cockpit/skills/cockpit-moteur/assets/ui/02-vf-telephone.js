@@ -18,22 +18,22 @@
       header .hc { flex: 0 0 44px; }
       header .hr { flex: 0 0 auto; justify-content: flex-end; }
       header #proj-name { display: none; }
-      #stage > #zoom { left: 16px; right: auto; top: auto; bottom: calc(var(--vf-ask-h, 8px) + 8px); flex-direction: column; border-radius: 26px; } /* --vf-ask-h : hauteur relue de la barre de question + sa marge */
+      #stage > #zoom { left: var(--edge); right: auto; top: auto; bottom: calc(var(--vf-ask-h, var(--sp-8)) + var(--sp-8)); flex-direction: column; border-radius: 26px; } /* --vf-ask-h : hauteur relue de la barre de question + sa marge */
       #context h1 { pointer-events: auto; width: fit-content; max-width: 100%; cursor: pointer; }
       #context h1:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
-      .vf-sheet-bar { position: sticky; top: 0; z-index: 2; height: 36px; margin-bottom: -4px; background: var(--menu-solid); }
-      .vf-sheet-grip { position: absolute; top: 8px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 999px; background: rgba(var(--ink), .25); }
-      .vf-sheet-x { position: absolute; top: 0; right: 4px; width: 44px; height: 36px; border: 0; border-radius: 999px; background: none; color: var(--text-2); display: grid; place-items: center; cursor: pointer; }
+      .vf-sheet-bar { position: sticky; top: 0; z-index: 2; height: 36px; margin-bottom: calc(-1 * var(--sp-4)); background: var(--menu-solid); }
+      .vf-sheet-grip { position: absolute; top: var(--sp-8); left: 50%; width: 36px; height: 5px; transform: translateX(-50%); border-radius: 999px; background: rgba(var(--ink), .25); }
+      .vf-sheet-x { position: absolute; top: 0; right: var(--sp-4); width: 44px; height: 36px; border: 0; border-radius: 999px; background: none; color: var(--text-2); display: grid; place-items: center; cursor: pointer; }
       .vf-sheet-x:hover { background: rgba(var(--ink), .08); color: var(--text); }
       .vf-sheet-x:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
       header:has(#btn-up:not([hidden])) .brand { display: none; }
-      .vf-tabs { margin-left: 6px; padding: 3px; } .vf-tabs a { padding: 5px 8px; font-size: 13px; }
+      .vf-tabs { margin-left: var(--sp-6); padding: var(--sp-4); } .vf-tabs a { padding: var(--sp-4) var(--sp-8); font-size: 13px; }
       #hdr-ext > button:not(#vf-lock), #theme-toggle, #btn-health, #flows-btn, #filters-btn, #btn-panel { display: none !important; }
       #vf-plus { display: inline-flex; position: relative; }
-      #vf-plus .badge, .vf-pl-i .badge { min-width: 16px; height: 16px; border-radius: 999px; background: var(--on); color: var(--on-text); font-size: 10px; font-weight: 600; display: grid; place-items: center; padding: 0 4px; }
-      #vf-plus .badge { position: absolute; top: 8px; right: 8px; min-width: 0; width: 8px; height: 8px; padding: 0; }
-      #vf-plus-menu { display: block; position: fixed; z-index: 40; top: calc(var(--hh, 56px) + 4px); left: 8px; right: 8px; max-height: 60vh; overflow: auto; padding: 6px; border-radius: 18px; background: var(--menu-solid); box-shadow: var(--shadow-float); }
-      .vf-pl-i { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: none; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+      #vf-plus .badge, .vf-pl-i .badge { min-width: 16px; height: 16px; border-radius: 999px; background: var(--on); color: var(--on-text); font-size: 10px; font-weight: 600; display: grid; place-items: center; padding: 0 var(--sp-4); }
+      #vf-plus .badge { position: absolute; top: var(--sp-8); right: var(--sp-8); min-width: 0; width: 8px; height: 8px; padding: 0; }
+      #vf-plus-menu { display: block; position: fixed; z-index: 40; top: calc(var(--hh, 56px) + var(--sp-4)); left: var(--sp-8); right: var(--sp-8); max-height: 60vh; overflow: auto; padding: var(--sp-6); border-radius: 18px; background: var(--menu-solid); box-shadow: var(--shadow-float); }
+      .vf-pl-i { display: flex; align-items: center; gap: var(--sp-8); width: 100%; min-height: 44px; padding: 0 var(--sp-12); border: 0; border-radius: 12px; background: none; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
       .vf-pl-i:hover { background: rgba(var(--ink), .07); }
       .vf-pl-i:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
       .vf-pl-i.vf-pl-off { opacity: .5; cursor: default; }

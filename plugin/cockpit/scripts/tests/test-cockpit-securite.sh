@@ -20,10 +20,11 @@ CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/
 
 cat > "$AUX/req.mjs" <<'JS'
 // req.mjs <port> <méthode> <chemin> [jeton] [corps] : ligne 1 statut, ligne 2 en-têtes JSON, puis le corps ; ERR si la connexion échoue
+// setEncoding : sans lui, un caractère multi-octets coupé entre deux paquets devenait U+FFFD et H5 rougissait selon la taille de la page (71.5, finitions).
 import http from 'node:http';
 const [, , port, method, p, token, body] = process.argv;
 const headers = { Host: `127.0.0.1:${port}`, ...(token ? { 'x-vf-cockpit-token': token } : {}) };
-const r = http.request({ host: '127.0.0.1', port: Number(port), path: p, method, headers }, (res) => { let b = ''; res.on('data', (c) => (b += c)); res.on('end', () => { console.log(res.statusCode); console.log(JSON.stringify(res.headers)); process.stdout.write(b); }); });
+const r = http.request({ host: '127.0.0.1', port: Number(port), path: p, method, headers }, (res) => { let b = ''; res.setEncoding('utf8'); res.on('data', (c) => (b += c)); res.on('end', () => { console.log(res.statusCode); console.log(JSON.stringify(res.headers)); process.stdout.write(b); }); });
 r.on('error', (e) => console.log('ERR ' + e.code)); if (body !== undefined) r.write(body); r.end();
 JS
 cat > "$AUX/ev.mjs" <<'JS'

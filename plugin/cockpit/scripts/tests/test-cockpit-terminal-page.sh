@@ -7,10 +7,10 @@
 #   TH  thème par ?theme= à liste fermée, valeur jamais reflétée, aucun autre paramètre ne change la page
 #   TF  JetBrains Mono embarquée en data:font/woff2 (latin, latin-ext, traits de boîte 2.304), octets égaux aux fichiers vendorisés
 #   TV  un octet du vendor (ou SHA256SUMS) altéré : le terminal refuse de démarrer
-#   T18 parité des 25 variables Graphite avec viewer.html, sombre et clair, jamais sur un ensemble vide
+#   T18 parité des 41 variables (25 Graphite + 16 d'espacement 71.5) avec viewer.html, sombre et clair, jamais sur un ensemble vide
 #   T19 parité de la palette xterm de vue.mjs avec viewer.html (J10 de la critique 71 : les 15 couleurs de l'UI-SPEC §4.2 qui ont une variable Graphite
 #       d'origine, par thème, jamais sur un ensemble vide)
-#   M-* mutants (copies de la sortie) : M-ANCETRES, M-XFO, M-EMPREINTE, M-THEME, M-PARITE (a à d), M-PALETTE (a à d)
+#   M-* mutants (copies de la sortie) : M-ANCETRES, M-XFO, M-EMPREINTE, M-THEME, M-PARITE (a à f), M-PALETTE (a à d)
 # Aucun navigateur : serveur lancé directement avec --terminal, pages lues par terminal-aux.mjs. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
@@ -58,9 +58,10 @@ if (cmd === 'carte') { // CSP -> « directive: valeurs triées », une par ligne
 } else { process.exit(64); }
 JS
 cat > "$AUX/parite.mjs" <<'JS'
-// parite.mjs <viewer.html> <page.html> : valeur effective des 25 variables recopiées, par thème (sombre = :root, clair = :root puis la redéclaration)
+// parite.mjs <viewer.html> <page.html> : valeur effective des 41 variables recopiées, par thème (sombre = :root, clair = :root puis la redéclaration)
 import fs from 'node:fs';
-const NOMS = ['--ink', '--surface', '--raise', '--raise-2', '--hair', '--hair-2', '--text', '--text-2', '--text-3', '--text-4', '--on', '--on-hover', '--on-text', '--ring', '--recent', '--sev-medium', '--sev-high', '--warn-bg', '--warn-text', '--err-text', '--r-card', '--r-ctl', '--sans', '--mono', '--ease'];
+const NOMS = ['--ink', '--surface', '--raise', '--raise-2', '--hair', '--hair-2', '--text', '--text-2', '--text-3', '--text-4', '--on', '--on-hover', '--on-text', '--ring', '--recent', '--sev-medium', '--sev-high', '--warn-bg', '--warn-text', '--err-text', '--r-card', '--r-ctl', '--sans', '--mono', '--ease',
+  '--sp-2', '--sp-4', '--sp-6', '--sp-8', '--sp-12', '--sp-16', '--sp-20', '--sp-24', '--sp-32', '--edge', '--inset-panel', '--gap-section', '--inset-card', '--inset-box', '--inset-row', '--inset-pill'];
 const decl = (css, sel) => Object.fromEntries([...(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*{([^}]*)}').exec(css)?.[1] || '').matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim().toLowerCase().replace(/\s+/g, ' ')]));
 const lire = (f) => { const css = fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''); return { s: decl(css, ':root'), c: decl(css, ':root[data-theme="light"]') }; };
 const V = lire(process.argv[2]), Q = lire(process.argv[3]);
@@ -76,9 +77,11 @@ JS
 cat > "$AUX/palette.mjs" <<'JS'
 // palette.mjs <viewer.html> <vue.mjs> : la palette xterm de vue.mjs contre les variables Graphite de viewer.html, par thème. Seules les couleurs que l'UI-SPEC §4.2
 // donne comme venant d'une variable (colonne « Origine ») sont comparées ; les autres (éclaircies, voiles) n'ont pas de variable d'origine.
+// 71.5 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 : « Adoucir le terminal seul ») : en SOMBRE, yellow (#f0d17c, 11,8:1 sur --surface) et brightYellow (#e3df78, 12,6:1) ne sont plus liés à --sev-medium / --warn-text : une origine `=#rrggbb` est une valeur attendue littérale, comparée telle quelle ; le jeton de l'interface garde #ffe08a.
+// 71.5 : une origine `[sombre, clair]` est sensible au thème (l'ANSI clair est du TEXTE : red, green, yellow lisent les variantes --*-text, 4,5:1 ; le contrôle reste, il compare une autre variable).
 import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const ORIGINE = { background: '--surface', foreground: '--text', cursor: '--on', cursorAccent: '--on-text', red: '--sev-high', green: '--recent', yellow: '--sev-medium',
-  blue: '--k-http', magenta: '--k-call', cyan: '--k-data', white: '--text-2', brightBlack: '--text-3', brightRed: '--err-text', brightYellow: '--warn-text', brightWhite: '--text' };
+const ORIGINE = { background: '--surface', foreground: '--text', cursor: '--on', cursorAccent: '--on-text', red: ['--sev-high', '--err-text'], green: ['--recent', '--recent-text'], yellow: ['=#f0d17c', '--warn-text'],
+  blue: '--k-http', magenta: '--k-call', cyan: '--k-data', white: '--text-2', brightBlack: '--text-3', brightRed: '--err-text', brightYellow: ['=#e3df78', '--warn-text'], brightWhite: '--text' };
 const norm = (v) => { v = String(v).trim().toLowerCase().replace(/\s+/g, ' '); const m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(v); return m ? `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}` : v; };
 const decl = (css, sel) => Object.fromEntries([...(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*{([^}]*)}').exec(css)?.[1] || '').matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], norm(m[2])]));
 const css = fs.readFileSync(process.argv[2], 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''); const V = { s: decl(css, ':root'), c: decl(css, ':root[data-theme="light"]') };
@@ -86,8 +89,9 @@ globalThis.window = {}; const m = await import(pathToFileURL(process.argv[3]).hr
 const n = { sombre: 0, clair: 0 };
 for (const theme of ['sombre', 'clair']) {
   const pal = window.vfTermVue.theme(theme === 'clair');
-  for (const [cle, nom] of Object.entries(ORIGINE)) {
-    const v = theme === 'clair' && nom in V.c ? V.c[nom] : V.s[nom], q = pal[cle] === undefined ? undefined : norm(pal[cle]);
+  for (const [cle, orig] of Object.entries(ORIGINE)) {
+    const nom = Array.isArray(orig) ? orig[theme === 'clair' ? 1 : 0] : orig;
+    const v = nom.startsWith('=') ? norm(nom.slice(1)) : theme === 'clair' && nom in V.c ? V.c[nom] : V.s[nom], q = pal[cle] === undefined ? undefined : norm(pal[cle]);
     if (v === undefined) { console.log(`ABSENTE ${nom} viewer.html ${theme}`); continue; }
     if (q === undefined) { console.log(`ABSENTE ${cle} palette ${theme}`); continue; }
     n[theme]++; if (v !== q) console.log(`couleur ${cle} (${theme}) : viewer.html ${nom}=${v}, palette=${q}`);
@@ -174,7 +178,7 @@ V1="$ENG/assets/vendor/fonts/jetbrains-mono-latin-wght-normal.woff2"; V2="$ENG/a
 assert_eq "TF.2 — octets décodés = fichiers vendorisés latin, latin-ext et traits de boîte 2.304 (sha256)" "$(printf '%s\n' "$POL" | sed 1d | grep . | tr '\n' ' ')" "$(printf '%s\n%s\n%s\n' "$(node "$AUX/csp.mjs" sha "$V1")" "$(node "$AUX/csp.mjs" sha "$V2")" "$(node "$AUX/csp.mjs" sha "$V3")" | sort | tr '\n' ' ')"
 assert_eq "TF.3 — la face des traits de boîte couvre U+2500-259F, avec la plage de poids 100 900 des faces latines (un poids exact change la police primaire de xterm : cellule de 15 px au lieu de 17)" "$(grep -o '@font-face{[^}]*unicode-range:U+2500-259F[^}]*}' "$PG/dark.html" | sed 's/src:url([^)]*)/src:URL/')" '@font-face{font-family:"JetBrains Mono";font-style:normal;font-display:block;font-weight:100 900;unicode-range:U+2500-259F;src:URL format("woff2")}'
 PAR="$(node "$AUX/parite.mjs" "$VIEWER" "$PG/dark.html")"
-assert_eq "T18.0 — les 25 noms sont présents dans les deux sources, par thème (anti-vide)" "$(printf '%s\n' "$PAR" | grep '^PARITE ')" "PARITE 25/25"
+assert_eq "T18.0 — les 41 noms sont présents dans les deux sources, par thème (anti-vide)" "$(printf '%s\n' "$PAR" | grep '^PARITE ')" "PARITE 41/41"
 echo "  mesure : $(printf '%s\n' "$PAR" | grep '^PARITE ') (viewer.html contre la page servie)"
 assert_eq "T18.1 — parité sombre : aucun écart ni variable absente" "$(printf '%s\n' "$PAR" | grep -E '\(sombre\)| sombre$' || true)" ""
 assert_eq "T18.2 — parité claire (valeur effective) : aucun écart ni variable absente" "$(printf '%s\n' "$PAR" | grep -E '\(clair\)| clair$' || true)" ""
@@ -204,7 +208,7 @@ if mutant xfo vf-cockpit-terminal-processus.mjs "s/'Content-Security-Policy': cs
   assert_eq "M-XFO — le mutant rougit T9.2 : x-frame-options présent" "$(entete "$WORK/m-xfo.out" 'Object.keys(j).filter(k=>k==="x-frame-options").length')" "1"; unsrv
 else assert_eq "M-XFO — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
-echo "=== M-PARITE — quatre variantes ==="
+echo "=== M-PARITE — six variantes ==="
 if mutant paritea vf-cockpit-terminal-style.mjs 's/--surface: #191919/--surface: #191918/'; then
   node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pa.html"
   assert_has "T18.3 — (a) --surface sombre de Q changé" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pa.html")" "variable --surface (sombre) : viewer.html=#191919, Q=#191918"
@@ -213,26 +217,34 @@ if mutant paritebis vf-cockpit-terminal-style.mjs 's/--ring:[^;]*;//g'; then
   node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pb.html"
   assert_has "T18.4 — (b) --ring retiré de Q" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pb.html")" "ABSENTE --ring Q sombre"
 else assert_eq "T18.4 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-sed 's/--text-2: #b4b4b4/--text-2: #b4b4b5/' "$VIEWER" > "$WORK/viewer-mut.html"
+sed 's/--text-2: #c6c6c6/--text-2: #c6c6c7/' "$VIEWER" > "$WORK/viewer-mut.html"
 if ! cmp -s "$VIEWER" "$WORK/viewer-mut.html"; then
   node "$AUX/pagegen.mjs" "$OUT" "$ENG" dark "$WORK/m-pc.html"
-  assert_has "T18.5 — (c) --text-2 sombre de viewer.html changé (l'amont dérive)" "$(node "$AUX/parite.mjs" "$WORK/viewer-mut.html" "$WORK/m-pc.html")" "variable --text-2 (sombre) : viewer.html=#b4b4b5, Q=#b4b4b4"
+  assert_has "T18.5 — (c) --text-2 sombre de viewer.html changé (l'amont dérive)" "$(node "$AUX/parite.mjs" "$WORK/viewer-mut.html" "$WORK/m-pc.html")" "variable --text-2 (sombre) : viewer.html=#c6c6c7, Q=#c6c6c6"
 else assert_eq "T18.5 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant pariteter vf-cockpit-terminal-style.mjs 's/--text: #161616/--text: #161617/'; then
   node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pd.html"
   assert_has "T18.6 — (d) --text clair de Q seul changé" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pd.html")" "variable --text (clair) : viewer.html=#161616, Q=#161617"
 else assert_eq "T18.6 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant paritesp vf-cockpit-terminal-style.mjs 's/--sp-8: 8px/--sp-8: 9px/'; then
+  node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pe.html"
+  assert_has "T18.7 — (e) --sp-8 de Q seul changé (espacement 71.5)" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pe.html")" "variable --sp-8 (sombre) : viewer.html=8px, Q=9px"
+else assert_eq "T18.7 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant pariteca vf-cockpit-terminal-style.mjs 's/--inset-card: var(--sp-16)/--inset-card: var(--sp-12)/'; then
+  node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pf.html"
+  assert_has "T18.7 — (f) --inset-card de Q seul changé (jeton sémantique)" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pf.html")" "variable --inset-card (sombre) : viewer.html=var(--sp-16), Q=var(--sp-12)"
+else assert_eq "T18.7 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-PALETTE — quatre variantes (J10) ==="
-if mutant paletta vf-cockpit-terminal-vue.mjs "s/green: '#4ade80'/green: '#4ade81'/"; then
-  assert_has "T19.2 — (a) vert sombre de la palette changé" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_OUT/vf-cockpit-terminal-vue.mjs")" "couleur green (sombre) : viewer.html --recent=#4ade80, palette=#4ade81"
+if mutant paletta vf-cockpit-terminal-vue.mjs "s/green: '#9ece6a'/green: '#9ece6b'/"; then
+  assert_has "T19.2 — (a) vert sombre de la palette changé" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_OUT/vf-cockpit-terminal-vue.mjs")" "couleur green (sombre) : viewer.html --recent=#9ece6a, palette=#9ece6b"
 else assert_eq "T19.2 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant palettb vf-cockpit-terminal-vue.mjs "s/brightRed: '#b42323',//"; then
+if mutant palettb vf-cockpit-terminal-vue.mjs "s/brightRed: '#da1637',//"; then
   assert_has "T19.3 — (b) brightRed retiré de la palette claire" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_OUT/vf-cockpit-terminal-vue.mjs")" "ABSENTE brightRed palette clair"
 else assert_eq "T19.3 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-sed 's/--recent: #4ade80;/--recent: #4ade7f;/' "$VIEWER" > "$WORK/viewer-pal.html"
+sed 's/--recent: #9ece6a;/--recent: #9ece69;/' "$VIEWER" > "$WORK/viewer-pal.html"
 if ! cmp -s "$VIEWER" "$WORK/viewer-pal.html"; then
-  assert_has "T19.4 — (c) --recent sombre de viewer.html changé (l'amont dérive)" "$(node "$AUX/palette.mjs" "$WORK/viewer-pal.html" "$OUT/vf-cockpit-terminal-vue.mjs")" "couleur green (sombre) : viewer.html --recent=#4ade7f, palette=#4ade80"
+  assert_has "T19.4 — (c) --recent sombre de viewer.html changé (l'amont dérive)" "$(node "$AUX/palette.mjs" "$WORK/viewer-pal.html" "$OUT/vf-cockpit-terminal-vue.mjs")" "couleur green (sombre) : viewer.html --recent=#9ece69, palette=#9ece6a"
 else assert_eq "T19.4 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant palettd vf-cockpit-terminal-vue.mjs "s/cursorAccent: '#ffffff'/cursorAccent: '#fffffe'/"; then
   assert_has "T19.5 — (d) cursorAccent clair seul changé (#fff de viewer.html contre #fffffe)" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_OUT/vf-cockpit-terminal-vue.mjs")" "couleur cursorAccent (clair) : viewer.html --on-text=#ffffff, palette=#fffffe"

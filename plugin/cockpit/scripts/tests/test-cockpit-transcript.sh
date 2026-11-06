@@ -456,7 +456,7 @@ JS
   if (!await attendre(() => flux() && document.querySelector('#vf-lock'))) return 'badge absent';
   emettre([S, M, C, F]); await sleep(200);
   document.querySelector('#vf-lock').click();
-  const titre = () => (document.querySelector('.vf-whop h3') || {}).textContent || 'tiroir absent';
+  const titre = () => { const h3 = document.querySelector('.vf-whop h3'); return h3 ? h3.textContent + '|' + ((document.querySelector('.vf-whop .aw-count') || {}).textContent || 'effectif absent') : 'tiroir absent'; };
   const avant = titre();
   const d = document.querySelector('.vf-whop details.vf-termines'); if (d) d.open = true;
   emettre([S, M, { ...C, etat: 'termine', dureeS: 45 }, F]); await sleep(300);
@@ -523,7 +523,7 @@ JS
 JS
   CI() { VF_CDP_ECHEANCE_MS=30000 node "$AUX/chrome-inj.mjs" "$CHROME" "$AUX/$1" "${@:2}" 2>/dev/null | G /dev/stdin 'j.erreur||j.resultats.map((r)=>r.valeur).join(" ;; ")'; }
   rafraichir
-  assert_eq "T27.A — recette : le tiroir « Au travail » ouvert suit le flux (titre, bloc « Terminés » replié et resté ouvert, nouvel agent visible) sur trois événements who" "$(CI sc-a.js "http://127.0.0.1:$PORT/project.html#t")" "Au travail (3) | Au travail (2) | C1 replié=true | Terminés resté ouvert=true | N1 visible=true"
+  assert_eq "T27.A — recette : le tiroir « Au travail » ouvert suit le flux (titre, bloc « Terminés » replié et resté ouvert, nouvel agent visible) sur trois événements who" "$(CI sc-a.js "http://127.0.0.1:$PORT/project.html#t")" "Au travail|3 actifs · 1 terminé | Au travail|2 actifs · 2 terminés | C1 replié=true | Terminés resté ouvert=true | N1 visible=true"
   assert_eq "T27.B1 — recette : cliquer le lien d'un nœud de mission sur project.html le sélectionne sans rechargement" "$(CI sc-b.js "http://127.0.0.1:$PORT/project.html#t")" "sélection=f:.planning/missions/m1.dag.json#revue-p3 | sans rechargement=true"
   assert_eq "T27.B2 — recette : cliquer le lien d'une carte d'agent sur equipe.html la sélectionne sans rechargement" "$(CI sc-b.js "http://127.0.0.1:$PORT/equipe.html#t")" "sélection=n:ag-ag1 | sans rechargement=true"
   rafraichir

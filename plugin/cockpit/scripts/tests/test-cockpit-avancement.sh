@@ -284,7 +284,11 @@ assert_eq "A1.3 — avancement.plans et correctifs de la phase 1" "$(G "$WORK/pl
 # ---------- A2 — témoin (b), CKPT-13 ----------
 echo "=== A2 — états d'avancement (témoin b) ==="
 assert_eq "A2.1 — phase 1 (7/7 plans, STATE sur la phase 9) : a-recetter" "$(PHF "$WORK/pl.json" '|1' etat)" "a-recetter"
-assert_eq "A2.2 — carte ph-1 : statut projeté et pied « à recetter »" "$(NDF "$WORK/gl.json" ph-1 .st)|$(G "$WORK/gl.json" 'j.nodes.find(n=>n.id==="ph-1").foot.includes("à recetter")')" "active|true"
+assert_eq "A2.2 — carte ph-1 : statut « recette » (teinte « en cours », glyphe et mot « À recetter », P71.5-D-20) et pied « à recetter »" "$(NDF "$WORK/gl.json" ph-1 .st)|$(G "$WORK/gl.json" 'j.nodes.find(n=>n.id==="ph-1").foot.includes("à recetter")')" "recette|true"
+r="$(mut recette-actif "vf-cockpit-project.mjs" "'a-recetter': 'recette'" "'a-recetter': 'active'")"; node "$AUX/q.mjs" "$WORK/mut-recette-actif" project "$L" > "$WORK/gl-recette.json" 2>/dev/null
+assert_eq "A2.2m — témoin rouge : l'ancienne projection (« à recetter » -> active, mot « En cours » sur la carte) fait lire autre chose que A2.2 veut" "$r|$(NDF "$WORK/gl-recette.json" ph-1 .st)" "muté|active"
+VIEWER="$SCRIPTS/../skills/cockpit-moteur/assets/viewer.html"; UIV="$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js"
+assert_eq "A2.2b — le viewer écrit « À recetter » pour le statut recette, et la carte recette garde la teinte de la carte en cours" "$(grep -c "recette: 'À recetter'" "$VIEWER")|$(grep -c '\.card\.st-recette' "$UIV" | awk '{print ($1>=3)?"ok":"ko"}')" "1|ok"
 assert_eq "A2.3 — lab L4 : états des phases 1 à 5" "$(G "$WORK/p4.json" 'j.phases.map(p=>p.avancement?.etat).join()')" "fait,en-cours,en-cours,a-recetter,a-recetter"
 assert_eq "A2.4 — phase 2 du lab L (aucun plan) : a-faire" "$(PHF "$WORK/pl.json" '|2' etat)" "a-faire"
 assert_eq "A2.5 — clés exactes de l'objet et version 2" "$(G "$WORK/pl.json" 'Object.keys(j.phases[0].avancement||{}).sort().join()+"|"+j.phases[0].avancement?.version')" "correctifs,etat,mission,plans,reste,version|2"

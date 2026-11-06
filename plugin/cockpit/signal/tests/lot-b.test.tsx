@@ -7,7 +7,7 @@ import { apresDemarrage } from './apres-demarrage'
 // Correction ciblée du lot B (P68-D-35 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-04) : R1, R4, R6, R9,
 // R10, R11 de la recette de la Phase 68. Préfixe MB- (verdict.sh refuse un identifiant en double).
 
-const SOMBRE = { active: '#f0c36b', todo: '#5c5c5c', blocked: '#f28b8b' }
+const SOMBRE = { active: '#ffe08a', todo: '#828282', blocked: '#ff9aa8' }
 const PANE = {
   plugin: 'vibeflow', component: 'Pane', requestId: 'vf-signal',
   props: { title: 'vf-signal', isFocused: false, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
