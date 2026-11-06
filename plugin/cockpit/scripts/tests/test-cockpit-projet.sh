@@ -674,6 +674,106 @@ UI68="$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js"
 assert_eq "P-VIE.5 — l'expression ABANDON de 00-vibeflow.js reconnaît le pied RÉEL d'une mission abandonnée du socle et ignore « état inconnu », « en cours » et le pied nu" "$(node "$AUX/abandon.mjs" "$UI68" "$WORK/gv-abs.json")" "true|true|true|true"
 assert_eq "P-VIE.5b — témoin : un libellé du socle changé (« délaissée ») ne serait PAS reconnu : la mesure rougirait" "$(node "$AUX/abandon.mjs" "$UI68" "$WORK/gv-abs.json" délaissée)" "false"
 
+# ---------- P8 — parseurs tolérants (matrice générée) et diagnostic « lignes non comprises » ----------
+# Une seule planification porte une phase par variante (produit : gras × deux-points dedans/dehors × espace normal/U+00A0/U+202F/aucune × noms FR/EN/synonymes × casse × puce).
+# Preuves : la matrice est rouge sur un mutant qui rétablit l'ancienne regex (et sur le code de 57e7957f) ; le diagnostic est muet sur le gabarit GSD et rouge sur un mutant qui le coupe.
+echo "=== P8 — parseurs tolérants et diagnostic ==="
+cat > "$AUX/matrice.mjs" <<'JS'
+// matrice.mjs <scripts> <travail> : écrit UNE planification plate (une phase par variante), la lit par readPlanning, rend { total, echecs, traces } en JSON
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, work] = process.argv;
+const { readPlanning } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-planning.mjs')).href);
+const NBSP = ' ', NNBSP = ' ';
+const ESPACES = ['', ' ', NBSP, NNBSP];
+const CASSES = [(s) => s, (s) => s.toUpperCase(), (s) => s.toLowerCase()];
+const FORMES = [(nom, sp) => `**${nom}${sp}:**`, (nom, sp) => `**${nom}**${sp}:`, (nom, sp) => `${nom}${sp}:`];
+const PUCES = ['', '- '];
+const road = ['# Roadmap', '', '### Phase 1: Racine', '**Goal**: racine', '**Depends on**: Nothing', ''];
+const attendus = []; // { id, ok(phases) -> [attendu, obtenu] }
+let i = 0;
+const ajoute = (id, bloc, verif) => { road.push(...bloc, ''); attendus.push({ id, verif }); };
+// dépendances : 3 formes × 4 espaces × 6 noms × 3 casses × 2 puces = 432
+for (const nom of ['Depends on', 'Dépend de', 'Dépendances', 'Dépendance', 'Dependencies', 'Depends']) for (const c of CASSES) for (const f of FORMES) for (const sp of ESPACES) for (const p of PUCES) {
+  const n = 100 + i++, tete = `${p}${f(c(nom), sp)}`;
+  ajoute(`dep ${JSON.stringify(tete)}`, [`### Phase ${n}: Dep${n}`, `${tete} Phase 01 (contexte).`], (ph) => [['1'], ph.get(`|${n}`)?.depends]);
+}
+// titres : 3 niveaux × 3 formes de numéro × 9 séparateurs × gras ou non = 162
+for (const lvl of ['##', '###', '####']) for (const fmt of ['plain', 'pad', 'dec']) for (const sep of [': ', ' : ', ' :', `${NBSP}: `, `${NNBSP}: `, ' — ', ' – ', '—', ' - ']) for (const g of ['', '**']) {
+  const n = 1000 + i++, num = fmt === 'plain' ? String(n) : fmt === 'pad' ? String(n).padStart(6, '0') : `${n}.5`, cle = fmt === 'dec' ? `${n}.5` : String(n);
+  const ligne = `${lvl} ${g}Phase ${num}${sep}Titre${n}${g}`;
+  ajoute(`titre ${JSON.stringify(ligne)}`, [ligne, `**Goal**: but${n}`], (ph) => [`Titre${n}|but${n}`, ph.has(`|${cle}`) ? `${ph.get(`|${cle}`).name}|${ph.get(`|${cle}`).goal}` : 'phase absente']);
+}
+// Goal / Objectif : 3 noms × 3 formes × 4 espaces × 3 casses × 2 puces = 216
+for (const nom of ['Goal', 'Objectif', 'Objective']) for (const c of CASSES) for (const f of FORMES) for (const sp of ESPACES) for (const p of PUCES) {
+  const n = 3000 + i++, tete = `${p}${f(c(nom), sp)}`;
+  ajoute(`goal ${JSON.stringify(tete)}`, [`### Phase ${n}: But${n}`, `${tete} Livrer ${n}`], (ph) => [`Livrer ${n}`, ph.get(`|${n}`)?.goal]);
+}
+// cases de phase : 3 cases × 3 puces × gras ou non × 4 espaces × 2 numéros = 144 (le roadmap ci-dessus est écrit dans une section distincte pour ne pas mêler titres et cases)
+const cases = [];
+for (const box of ['[ ]', '[x]', '[X]']) for (const b of ['-', '*', '+']) for (const g of ['', '**']) for (const sp of ESPACES) for (const z of ['', '0']) {
+  const n = 5000 + i++, ligne = `${b} ${box} ${g}Phase ${z}${n}${sp}: Case${n}${g} - description`;
+  cases.push(ligne); attendus.push({ id: `case ${JSON.stringify(ligne)}`, verif: (ph) => [`Case${n}|${box !== '[ ]'}`, ph.has(`|${n}`) ? `${ph.get(`|${n}`).name}|${ph.get(`|${n}`).done}` : 'phase absente'] });
+}
+const dir = path.join(work, '.planning'); fs.mkdirSync(dir, { recursive: true });
+fs.writeFileSync(path.join(dir, 'ROADMAP.md'), ['# Roadmap', '', '## Phases', ...cases, '', ...road.slice(2)].join('\n') + '\n');
+// exigences : 4 formes × 3 cases × 2 puces = 24
+const reqs = ['# Exigences', '']; let r = 0;
+for (const [forme, nom] of [[(id) => `**${id}**:`, 'gras-puis-deux-points'], [(id) => `**${id}:**`, 'deux-points-dans-le-gras'], [(id) => `${id}:`, 'nu'], [(id) => `${id} :`, 'nu-espace']]) for (const box of ['[ ]', '[x]', '[X]']) for (const b of ['-', '*']) {
+  const id = `TST-${++r}`; reqs.push(`${b} ${box} ${forme(id)} texte ${id}`);
+  attendus.push({ id: `req ${nom} ${box} ${b}`, verif: (ph, rq) => [`texte ${id}|${box !== '[ ]'}`, rq.has(`|${id}`) ? `${rq.get(`|${id}`).text}|${rq.get(`|${id}`).done}` : 'exigence absente'] });
+}
+fs.writeFileSync(path.join(dir, 'REQUIREMENTS.md'), reqs.join('\n') + '\n');
+// statut et phase courante : valeurs entre guillemets, casse, tirets
+fs.writeFileSync(path.join(dir, 'STATE.md'), '---\nstatus: "In Progress"\ncurrent_phase: "02"\n---\n');
+const P = readPlanning(work, undefined, { sansTags: true });
+attendus.push({ id: 'statut « In Progress »', verif: (ph, rq, st) => ['in_progress', st.status] });
+attendus.push({ id: 'current_phase « "02" »', verif: (ph, rq, st) => ['02', st.current_phase] });
+const echecs = []; for (const a of attendus) { const [att, obt] = a.verif(P.phases, P.reqs, P.state); if (JSON.stringify(att) !== JSON.stringify(obt)) echecs.push(`${a.id} : attendu ${JSON.stringify(att)}, obtenu ${JSON.stringify(obt)}`); }
+console.log(JSON.stringify({ total: attendus.length, echecs: echecs.length, traces: echecs.slice(0, 4) }));
+JS
+node "$AUX/matrice.mjs" "$SCRIPTS" "$WORK/p8m" > "$WORK/mat.json"
+assert_eq "P8.1 — matrice : 980 variantes de dépendances, titres, Goal, cases, exigences, statut (anti-vert-à-vide)" "$(G "$WORK/mat.json" 'j.total')" "980"
+assert_eq "P8.2 — matrice : toutes lues comme attendu ($(G "$WORK/mat.json" 'j.traces.join(" ; ")'))" "$(G "$WORK/mat.json" 'j.echecs')" "0"
+mut7 anciennedep vf-cockpit-formats.mjs "const m = DEP_RE.exec(corps); if (!m) return [];" "const m = /\\*\\*(?:Depends on|Dépend de)(?::\\*\\*|\\*\\*\\s*:)\\s*(.*)/.exec(corps); if (!m) return [];" > "$WORK/ancre-dep.txt"
+node "$AUX/matrice.mjs" "$WORK/mut-anciennedep" "$WORK/p8mut" > "$WORK/mat-mut.json"
+assert_eq "P8.3 — mutant (ancienne regex « Depends on » rétablie, ancre présente) : la matrice rougit sur les dépendances seules" "$(cat "$WORK/ancre-dep.txt")|$(G "$WORK/mat-mut.json" 'j.echecs>0&&j.echecs<=432&&j.traces.every(t=>t.startsWith("dep "))')" "muté|true"
+
+# cas réel du portfolio (« **Depends on :** Phase 02 (…) ») et « Phase 01 » = « Phase 1 » pour les liens
+L8="$WORK/p8-portfolio"; mkdir -p "$L8/.planning"
+printf '%s\n' '# Roadmap' '' '- [x] **Phase 01: Fondations** - a' '- [x] **Phase 02: Contenu** - b' '- [ ] **Phase 03: Credibilite** - c' '' \
+  '### Phase 01: Fondations' '**Goal :** corriger les findings' '' '### Phase 02: Contenu' '**Goal :** rendre le portfolio utilisable en mobile' '**Depends on :** Phase 1' '' \
+  '### Phase 03: Credibilite' '**Goal :** éliminer les placeholders' '**Depends on :** Phase 02 (mobile UX fixes complète).' > "$L8/.planning/ROADMAP.md"
+git -C "$L8" init -q; graph "$L8" "$WORK/g8.json"
+assert_eq "P8.4 — portfolio : « **Depends on :** Phase 02 (…) » et « Phase 1 » donnent les liens 1>2 et 2>3 (clé de phase et cible concordent)" "$(G "$WORK/g8.json" 'j.links.filter(l=>l.k==="import").map(l=>l.a+">"+l.b).sort().join(",")')" "n:ph-1>n:ph-2,n:ph-2>n:ph-3"
+assert_eq "P8.5 — portfolio : ids de phase normalisés ph-1, ph-2, ph-3 (01 = 1)" "$(G "$WORK/g8.json" 'j.nodes.filter(n=>n.kind==="phase").map(n=>n.id).sort().join(",")')" "ph-1,ph-2,ph-3"
+
+# diagnostic : gabarit GSD riche = zéro ligne non comprise ; fixture illisible = lignes nommées fichier:ligne
+L9="$WORK/p8-gsd"; B9="$L9/.planning"; mkdir -p "$B9"
+printf '%s\n' '# Roadmap: Demo' '' '## Milestones' '' '- 🚧 **v1.0 MVP** - Phases 1-2 (en cours)' '' '## Phases' '' '- [ ] **Phase 1: Fondations** - socle' '- [ ] **Phase 1.1: Urgent (INSERTED)** - correctif' '- [ ] **Phase 2: Contenu** - pages' '' '## Phase Details' '' \
+  '### Phase 1: Fondations' '**Goal**: Poser le socle. La Phase 2 en dépend.' '**Depends on**: Nothing' '**Requirements**: AUTH-01, AUTH-02' '**Success Criteria** (what must be TRUE):' '  1. Un utilisateur peut se connecter' '  2. Le build passe' '**Plans**: 2 plans' '' 'Plans:' '- [ ] 01-01-PLAN.md — socle' '- [ ] 01-02-PLAN.md — tests' '' \
+  '### Phase 1.1: Urgent (INSERTED)' '**Goal**: Corriger' '**Depends on**: Phase 1' '' '### Phase 2: Contenu' '**Goal**: Pages' '**Depends on**: Phase 1 · **Parallélisable avec**: Phase 1.1' '' '## Progress' '' '| Phase | Plans Complete | Status | Completed |' '|-------|----------------|--------|-----------|' '| 1. Fondations | 0/2 | Not started | - |' > "$B9/ROADMAP.md"
+printf '%s\n' '# Requirements' '' '## v1 Requirements' '' '- [ ] **AUTH-01**: Connexion' '- [x] **AUTH-02**: Déconnexion' '' '## v2 Requirements' '' '- [ ] **PERF-01**: Cache' '- [ ] Idée libre à trier 2 fois' '' '## Traceability' '' '| Requirement | Phase | Status |' '|---|---|---|' '| AUTH-01 | Phase 1 | Pending |' > "$B9/REQUIREMENTS.md"
+printf -- '---\nstatus: executing\ncurrent_phase: 1\nmilestone: v1.0\n---\n\nPhase: 1 of 2\n' > "$B9/STATE.md"
+git -C "$L9" init -q; graph "$L9" "$WORK/g9.json"
+assert_eq "P8.6 — gabarit GSD riche (jalons, décimale, critères, plans, table, exigences) : zéro ligne non comprise (pas de faux positif)" "$(G "$WORK/g9.json" 'j.meta.vf.drift.nonComprisesN+"|"+j.meta.vf.drift.regles.filter(r=>r.regle==="ligne-non-comprise").length')" "0|0"
+LA="$WORK/p8-illisible"; BA="$LA/.planning"; mkdir -p "$BA"
+printf '%s\n' '# Roadmap' '' '## Phases' '- [ ] **Phase 1: Un** - a' '- [ ] **Phase 2 — Deux** - b' '' '### Phase 1: Un' '**Goal**: g1' '**Depends on**: Nothing' '' '### Phase 2: Deux' '**Goal** — g2' 'Dépends sur : Phase 1' '' '##### Phase 3: Trois' 'Phase 3 est la plus grosse, voir Goal: aucun.' '' '```' '### Phase 9: dans un bloc de code' '```' > "$BA/ROADMAP.md"
+printf '%s\n' '# R' '- [ ] **AUTH-01**: ok' '- [ ] **Req_02** illisible' '- [ ] Faire un truc 2 fois' > "$BA/REQUIREMENTS.md"
+printf -- '---\nstatus: executing\ncurrent_phase: deux\n---\n' > "$BA/STATE.md"
+git -C "$LA" init -q; graph "$LA" "$WORK/gA.json"
+assert_eq "P8.7 — fixture illisible : 6 lignes non comprises, nommées fichier:ligne (prose, tableau et bloc de code jamais signalés)" "$(G "$WORK/gA.json" 'j.meta.vf.drift.nonComprisesN+"|"+j.meta.vf.drift.nonComprises.map(x=>x.fichier+":"+x.ligne).join(",")')" "6|.planning/ROADMAP.md:5,.planning/ROADMAP.md:12,.planning/ROADMAP.md:13,.planning/ROADMAP.md:15,.planning/REQUIREMENTS.md:3,.planning/STATE.md:3"
+assert_eq "P8.8 — la règle ligne-non-comprise est dans les règles du panneau (niveau ignoré) et le résumé le dit" "$(G "$WORK/gA.json" 'j.meta.vf.drift.regles.filter(r=>r.regle==="ligne-non-comprise").map(r=>r.niveau+":"+r.n).join(",")+"|"+/6 ligne\(s\) non comprise\(s\)/.test(j.meta.vf.drift.resume)')" "ignoré:6|true"
+DRA="$(node "$DR" "$LA")"
+assert_eq "P8.9 — CLI du détecteur : une ligne par ligne non comprise avec fichier:ligne" "$(printf '%s\n' "$DRA" | grep -c '\[ignoré\] \.planning/ROADMAP\.md:12 ')" "1"
+AVANT="$(find "$BA" -type f -exec cksum {} + | sort)"; node "$DR" "$LA" --json > "$WORK/dra.json"; node "$DR" "$LA" --diff > /dev/null
+assert_eq "P8.10 — le détecteur n'écrit rien dans .planning (cksum avant/après) et ne propose aucun correctif (« apres ») pour une ligne non comprise" "$([ "$AVANT" = "$(find "$BA" -type f -exec cksum {} + | sort)" ] && echo identique)|$(G "$WORK/dra.json" '(l=>l.length===6&&l.every(c=>c.apres===undefined))(j.constats.filter(c=>c.regle==="ligne-non-comprise"))')" "identique|true"
+mut7 sansdiag vf-cockpit-drift.mjs "for (const x of lignesNonComprises(txt, 'roadmap')) constats.push(nonComprise(fichier, x));" "" > "$WORK/ancre-diag.txt"
+node "$AUX/q.mjs" "$WORK/mut-sansdiag" project "$LA" > "$WORK/gA-mut.json"
+assert_eq "P8.11 — mutant (diagnostic du ROADMAP coupé, ancre présente) : le test P8.7 rougit (2 lignes du ROADMAP en moins : 2 restent, exigences et STATE)" "$(cat "$WORK/ancre-diag.txt")|$(G "$WORK/gA-mut.json" 'j.meta.vf.drift.nonComprisesN')" "muté|2"
+assert_eq "P8.12 — l'interface porte le panneau (« Lignes non comprises », échappé par h, jeton --text-3, aucun px brut ajouté)" "$(grep -c 'const nonComprises = ' "$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js")|$(grep -c 'derive(V.drift)}${nonComprises(V.drift)}' "$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js")|$(grep -A3 'const nonComprises = ' "$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js" | grep -c 'px')" "1|1|0"
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
