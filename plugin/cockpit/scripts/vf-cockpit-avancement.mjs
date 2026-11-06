@@ -9,9 +9,9 @@
 import { estVivante } from './vf-cockpit-vie.mjs';
 
 export const ETATS = ['a-faire', 'en-cours', 'a-recetter', 'fait'];
-export const RESTE = ['recette', 'verification', 'cloture'];
+export const RESTE = ['cadrage', 'plan', 'execution', 'recette', 'verification', 'cloture'];
 export const LIBELLES_ETAT = { 'a-faire': 'à faire', 'en-cours': 'en cours', 'a-recetter': 'à recetter', fait: 'fait' };
-export const LIBELLES_RESTE = { recette: 'recette humaine', verification: 'vérification', cloture: 'clôture' };
+export const LIBELLES_RESTE = { cadrage: 'cadrage', plan: 'plan', execution: 'exécution', recette: 'recette humaine', verification: 'vérification', cloture: 'clôture' };
 export const ETATS_MISSION = ['running', 'abandonnee', 'inconnu', 'failed', 'done', 'ready'];
 export const LIBELLES_MISSION = { running: 'en cours', abandonnee: 'abandonnée, nœuds non refermés', inconnu: 'état inconnu', failed: 'en échec', done: 'faite', ready: 'prête' };
 
@@ -70,9 +70,11 @@ export function etatMission(nodes, vie) {
 
 // Étapes restantes (P69-D-07, P69-PL-07) : seulement ce que disent les fichiers du dossier de phase et la case de ROADMAP.
 // `lire(nom)` rend le texte d'un fichier du dossier. Vide pour une phase `fait`.
-export function reste({ ph, fichiers, lire }) {
+// PU-G-098 : une phase sans aucun *-PLAN.md et sans mission vivante (`vivante`) n'a rien commencé : « cadrage » (absent si un *-CONTEXT.md existe), « plan », « exécution » précèdent le reste.
+export function reste({ ph, fichiers, lire, vivante }) {
   if (ph?.done) return [];
   const fs = fichiers || [], r = [];
+  if (!vivante && !fs.some((f) => f.endsWith('-PLAN.md'))) { if (!fs.some((f) => f.endsWith('-CONTEXT.md'))) r.push('cadrage'); r.push('plan', 'execution'); }
   const rec = fs.filter((f) => f.endsWith('-RECETTE-HUMAINE.md')).sort()[0];
   if (rec) {
     const ligne = String((lire && lire(rec)) || '').split('\n').find((l) => l.startsWith('**Statut :')) || '';
@@ -98,5 +100,5 @@ export function avancement({ ph, fichiers, missions, lire } = {}) {
   const { faits, total, correctifs } = decompte(fichiers);
   const lance = ms.some((m) => etatMission(m.nodes, m.vie) === 'running'); // ni une mission abandonnée ni une mission inconnue ne gardent la phase en cours
   const etat = ph?.done ? 'fait' : total > 0 && faits === total ? 'a-recetter' : faits > 0 || lance ? 'en-cours' : 'a-faire';
-  return { version: 2, etat, plans: { faits, total }, correctifs, mission: choisir(ms), reste: reste({ ph, fichiers, lire }) };
+  return { version: 2, etat, plans: { faits, total }, correctifs, mission: choisir(ms), reste: reste({ ph, fichiers, lire, vivante: lance }) };
 }
