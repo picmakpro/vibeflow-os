@@ -312,26 +312,27 @@ MN="$WORK/mut-nettoie"; rm -rf "$MN"; mkdir -p "$MN"; cp "$SCRIPTS"/*.mjs "$SCRI
 node -e 'const fs=require("fs"),f=process.argv[1];let s=fs.readFileSync(f,"utf8");const a="\\u2029\\p{Cf}]/gu";if(!s.includes(a)){console.log("ancre absente");process.exit(1)}fs.writeFileSync(f,s.replace(a,"\\u2029\\u202a-\\u202e\\u2066-\\u2069]/g"));console.log("muté")' "$MN/vf-cockpit-arbres.mjs"
 assert_eq "C3.5 — M-NETTOIE : nettoie revient à l'ancienne classe (sans Cf) ; la parité C1.7 rougit (au moins un écart, ex. U+200B retenu par nettoie mais refusé par AFFICHAGE_REFUSE)" "$(node "$AUX/parite.mjs" "$MN" 2>/dev/null | awk -F'|' '{ print ($2 > 0 ? "ecarts" : "aucun") }')" "ecarts"
 
-echo "=== R4 / R5 — revue serveur 2026-11-06 : la classe d'affichage a quatre copies de parité testée ; la grille d'espacement de css-jetons est celle de la 71.5 ==="
-# R4 (S6) : quatre copies de la classe d'affichage — AFFICHAGE_REFUSE (commandes), nettoie (arbres, C1.7), ILLISIBLE (détail d'un commit : même classe moins tabulation et fin de ligne, qu'un message garde),
-# missionsEnCours (carte Équipe : tout point de code refusé disparaît du libellé, sans espace laissé). Parité sur U+0000 à U+10FFFF ; la sortie nomme les premiers écarts.
-cat > "$AUX/parite-quatre.mjs" <<'JS'
+echo "=== R4 / R5 — revue serveur 2026-11-06 : la classe d'affichage a cinq copies de parité testée ; la grille d'espacement de css-jetons est celle de la 71.5 ==="
+# R4 (S6) : cinq copies de la classe d'affichage — AFFICHAGE_REFUSE (commandes), nettoie (arbres, C1.7), ILLISIBLE (détail d'un commit : même classe moins tabulation et fin de ligne, qu'un message garde),
+# missionsEnCours (carte Équipe : tout point de code refusé disparaît du libellé, sans espace laissé), nettoieTitre (titre d'une carte de session, PU-G-162 : tout point refusé devient une espace). Parité sur U+0000 à U+10FFFF ; la sortie nomme les premiers écarts.
+cat > "$AUX/parite-copies.mjs" <<'JS'
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 const [, , scripts] = process.argv;
 const imp = (f) => import(pathToFileURL(path.join(scripts, f)).href).catch(() => null);
-const c = await imp('vf-cockpit-git-commandes.mjs'), d = await imp('vf-cockpit-git-details.mjs'), e = await imp('vf-cockpit-equipe-carte.mjs');
-if (!c || !d || !e || !(d.ILLISIBLE instanceof RegExp)) { console.log('module ou export absent'); process.exit(0); }
+const c = await imp('vf-cockpit-git-commandes.mjs'), d = await imp('vf-cockpit-git-details.mjs'), e = await imp('vf-cockpit-equipe-carte.mjs'), l = await imp('vf-cockpit-lecture.mjs');
+if (!c || !d || !e || !l || !(d.ILLISIBLE instanceof RegExp)) { console.log('module ou export absent'); process.exit(0); }
 const illisible = new RegExp(d.ILLISIBLE.source, 'u'); // sans l'état `lastIndex` du drapeau g
-let refuses = 0; const detail = [], equipe = [];
+let refuses = 0; const detail = [], equipe = [], titre = [];
 for (let cp = 0; cp <= 0x10ffff; cp++) {
   if (cp >= 0xd800 && cp <= 0xdfff) continue;
   const ch = String.fromCodePoint(cp), r = c.AFFICHAGE_REFUSE.test(ch);
   if (r) refuses++;
   if (illisible.test(ch) !== (r && cp !== 0x09 && cp !== 0x0a)) detail.push(cp.toString(16));
   if (r && e.missionsEnCours({ nodes: [{ kind: 'mission', st: 'active', label: 'a' + ch + 'b' }] })[0] !== 'ab') equipe.push(cp.toString(16));
+  if (r && l.nettoieTitre('a' + ch + 'b') !== 'a b') titre.push(cp.toString(16)); // cinquième copie (PU-G-162) : le titre d'une carte de session met une espace à la place
 }
-console.log(`${refuses > 100}|détail:${detail.length}${detail.length ? ' ' + detail.slice(0, 3).join(',') : ''}|équipe:${equipe.length}${equipe.length ? ' ' + equipe.slice(0, 3).join(',') : ''}`);
+console.log(`${refuses > 100}|détail:${detail.length}${detail.length ? ' ' + detail.slice(0, 3).join(',') : ''}|équipe:${equipe.length}${equipe.length ? ' ' + equipe.slice(0, 3).join(',') : ''}|titre:${titre.length}${titre.length ? ' ' + titre.slice(0, 3).join(',') : ''}`);
 JS
 cat > "$AUX/mutq.mjs" <<'JS'
 import fs from 'node:fs';
@@ -340,7 +341,7 @@ const t = fs.readFileSync(f, 'utf8');
 if (!t.includes(de)) { console.log('absent'); process.exit(0); }
 fs.writeFileSync(f, t.replace(de, () => vers)); console.log('applique');
 JS
-assert_eq "R4.1 — la classe est la même dans les quatre copies : détail d'un commit = AFFICHAGE_REFUSE sauf U+0009 et U+000A ; carte Équipe : tout point refusé disparaît du libellé (aucun écart sur U+0000-U+10FFFF)" "$(node "$AUX/parite-quatre.mjs" "$SCRIPTS")" "true|détail:0|équipe:0"
+assert_eq "R4.1 — la classe est la même dans les cinq copies : détail d'un commit = AFFICHAGE_REFUSE sauf U+0009 et U+000A ; carte Équipe : tout point refusé disparaît du libellé ; titre de session : tout point refusé devient une espace (aucun écart sur U+0000-U+10FFFF)" "$(node "$AUX/parite-copies.mjs" "$SCRIPTS")" "true|détail:0|équipe:0|titre:0"
 # R4.2 (78-08, revue de delta F5) : l'export ILLISIBLE est utilisable tel quel par un appelant : sans drapeau g, `.test` rend le même résultat à chaque appel (avec g, `lastIndex` fait alterner les résultats).
 cat > "$AUX/illisible-etat.mjs" <<'JS'
 import { pathToFileURL } from 'node:url';
@@ -352,13 +353,26 @@ JS
 assert_eq "R4.2 — ILLISIBLE exporté sans drapeau g : quatre .test successifs sur le même texte rendent tous true (pas d'alternance par lastIndex)" "$(node "$AUX/illisible-etat.mjs" "$SCRIPTS")" "false|true,true,true,true"
 MQG="$WORK/mut-illisible-g"; rm -rf "$MQG"; mkdir -p "$MQG"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$MQG/"
 assert_eq "M-ILLISIBLE-G.0 — mutant avec effet (l'export retrouve le drapeau g)" "$(node "$AUX/mutq.mjs" "$MQG/vf-cockpit-git-details.mjs" '\p{Cf}]/u; // la classe de' '\p{Cf}]/gu; // la classe de')" "applique"
-assert_eq "M-ILLISIBLE-G — rougit R4.2 (le drapeau g est de retour, .test alterne) alors que la parité R4.1 tient" "$(node "$AUX/illisible-etat.mjs" "$MQG")|$(node "$AUX/parite-quatre.mjs" "$MQG")" "true|true,false,true,false|true|détail:0|équipe:0"
+assert_eq "M-ILLISIBLE-G — rougit R4.2 (le drapeau g est de retour, .test alterne) alors que la parité R4.1 tient" "$(node "$AUX/illisible-etat.mjs" "$MQG")|$(node "$AUX/parite-copies.mjs" "$MQG")" "true|true,false,true,false|true|détail:0|équipe:0|titre:0"
 MQE="$WORK/mut-classe-equipe"; rm -rf "$MQE"; mkdir -p "$MQE"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$MQE/"
 assert_eq "M-CLASSE-EQUIPE.0 — mutant avec effet (la carte Équipe retrouve l'ancienne classe, bidi seul, sans Cf)" "$(node "$AUX/mutq.mjs" "$MQE/vf-cockpit-equipe-carte.mjs" '\u2029\p{Cf}]/gu' '\u2029\u202a-\u202e\u2066-\u2069]/g')" "applique"
-assert_eq "M-CLASSE-EQUIPE — rougit R4.1 sur la carte Équipe seule (écarts : U+200B et les autres Cf hors bidi), pas sur le détail" "$(node "$AUX/parite-quatre.mjs" "$MQE" | sed -E 's/équipe:[1-9][0-9]*.*/équipe:>0/')" "true|détail:0|équipe:>0"
+assert_eq "M-CLASSE-EQUIPE — rougit R4.1 sur la carte Équipe seule (écarts : U+200B et les autres Cf hors bidi), pas sur le détail" "$(node "$AUX/parite-copies.mjs" "$MQE" | sed -E 's/équipe:[1-9][0-9]*.*/équipe:>0/')" "true|détail:0|équipe:>0"
 MQD="$WORK/mut-classe-detail"; rm -rf "$MQD"; mkdir -p "$MQD"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$MQD/"
 assert_eq "M-CLASSE-DETAIL.0 — mutant avec effet (ILLISIBLE du détail perd \\p{Cf})" "$(node "$AUX/mutq.mjs" "$MQD/vf-cockpit-git-details.mjs" '\u2028\u2029\p{Cf}]/u' '\u2028\u2029]/u')" "applique"
-assert_eq "M-CLASSE-DETAIL — rougit R4.1 sur le détail seul (des points Cf ne sont plus retirés), pas sur la carte Équipe" "$(node "$AUX/parite-quatre.mjs" "$MQD" | sed -E 's/détail:[1-9][0-9]*[^|]*/détail:>0/')" "true|détail:>0|équipe:0"
+assert_eq "M-CLASSE-DETAIL — rougit R4.1 sur le détail seul (des points Cf ne sont plus retirés), pas sur la carte Équipe" "$(node "$AUX/parite-copies.mjs" "$MQD" | sed -E 's/détail:[1-9][0-9]*[^|]*/détail:>0/')" "true|détail:>0|équipe:0|titre:0"
+MQT="$WORK/mut-classe-titre"; rm -rf "$MQT"; mkdir -p "$MQT"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$MQT/"
+assert_eq "M-CLASSE-TITRE.0 — mutant avec effet (la classe du titre de session perd \\p{Cf})" "$(node "$AUX/mutq.mjs" "$MQT/vf-cockpit-lecture.mjs" '\p{Cf}]/u;' ']/u;')" "applique"
+assert_eq "M-CLASSE-TITRE — rougit R4.1 sur le titre de session seul (des points Cf ne deviennent plus des espaces), pas sur la carte ni le détail" "$(node "$AUX/parite-copies.mjs" "$MQT" | sed -E 's/titre:[1-9][0-9]*.*/titre:>0/')" "true|détail:0|équipe:0|titre:>0"
+cat > "$AUX/classe-titre-etat.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+import path from 'node:path';
+const l = await import(pathToFileURL(path.join(process.argv[2], 'vf-cockpit-lecture.mjs')).href);
+console.log(`${l.CLASSE_AFFICHAGE.global}|${[1, 2, 3, 4].map(() => l.CLASSE_AFFICHAGE.test('a' + String.fromCodePoint(0x200b) + 'b')).join(',')}`);
+JS
+assert_eq "R4.3 — CLASSE_AFFICHAGE (lecture.mjs) exportée sans drapeau g : quatre .test successifs rendent tous true (même défaut que R4.2)" "$(node "$AUX/classe-titre-etat.mjs" "$SCRIPTS")" "false|true,true,true,true"
+MQTG="$WORK/mut-classe-titre-g"; rm -rf "$MQTG"; mkdir -p "$MQTG"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$MQTG/"
+assert_eq "M-CLASSE-TITRE-G.0 — mutant avec effet (l'export retrouve le drapeau g)" "$(node "$AUX/mutq.mjs" "$MQTG/vf-cockpit-lecture.mjs" '\p{Cf}]/u;' '\p{Cf}]/gu;')" "applique"
+assert_eq "M-CLASSE-TITRE-G — rougit R4.3 (le drapeau g est de retour, .test alterne)" "$(node "$AUX/classe-titre-etat.mjs" "$MQTG")" "true|true,false,true,false"
 
 # R5 (S8) : la grille d'espacement de css-jetons.mjs est celle figée par la 71.5 {2, 4, 6, 8, 12, 16, 20, 24, 32} : 10 px et 14 px sont refusés, 20 px passe
 JETONS="$SCRIPTS/tests/css-jetons.mjs"

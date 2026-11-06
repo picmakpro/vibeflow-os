@@ -5,12 +5,13 @@
 // Titre d'une carte de SESSION (PU-G-162, arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : `w.titre`, le `custom-title` du transcript (nom donné avec /rename, lu, nettoyé,
 // masqué et borné à 80 caractères par la collecte `who`), sinon « Session principale · <branche> ». L'`ai-title` (texte du modèle), le dernier prompt et le premier message ne sont jamais lus ;
 // l'identifiant de session passe dans le détail. Amendement de la liste blanche P69-D-19/P69-D-23 pour ce seul champ.
-// Module pur ; schéma vibeflow/cockpit-equipe@1 ; aucune lecture de transcript ici : seuls les champs de la collecte `who`
-// (déjà bornés et masqués par collectWho) entrent dans une carte. Les sortes de carte (session, agent, terminés) n'ont
+// Module pur (aucun fichier lu, aucun transcript ouvert) ; schéma vibeflow/cockpit-equipe@1 : seuls les champs de la collecte `who`
+// (le titre de session et le reste, déjà nettoyés, bornés et masqués par collectWho) entrent dans une carte ; la branche repasse par `retireAffichage`. Les sortes de carte (session, agent, terminés) n'ont
 // ni pictogramme ni couleur : le viewer prend son repli. Aucun fichier (`files` vide), aucun lien.
 import { LIBELLES_VERBES, entreeLanceeValide } from './vf-cockpit-lancer-suivi.mjs';
+import { retireAffichage, nettoieTitre } from './vf-cockpit-lecture.mjs';
 const SORTES = new Set(['session', 'subagent']);
-const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); if (t.length <= n) return t; const c = t.charCodeAt(n - 2); return t.slice(0, c >= 0xd800 && c <= 0xdbff ? n - 2 : n - 1) + '…'; }; // jamais une moitié de paire de substitution
 // PU-G-165 : un seul état par carte — « en attente » n'a pas de pastille (le pied le dit), il n'est jamais projeté sur « En cours » ; ui/71 (`st`) tient la même table
 const ST = { actif: 'active', 'en-attente': undefined, termine: 'done', bloque: 'blocked' };
 const GENERIQUE = 'lance une commande'; // l'action de presque tous : elle n'informe pas (même seuil que ui/71)
@@ -46,6 +47,7 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, miss
     const parent = sous ? parId.get(w.parent) ?? null : null;
     const fini = w.etat === 'termine';
     if (fini && parent) termines.set(parent, (termines.get(parent) || 0) + 1);
+    const branche = retireAffichage(w.branch); // S6 : la branche passe par la même classe d'affichage que le titre (contrôles, Cf, bidi)
     const lignes = [];
     if (w.role) lignes.push(`Rôle : ${w.role}`);
     lignes.push(`État : ${ETAT[w.etat] || 'actif'}`);
@@ -53,16 +55,16 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, miss
     const l = lancees instanceof Map && w.kind === 'session' ? lancees.get(w.id) : undefined; // garde:lancees
     const t = l && entreeLanceeValide(l) ? `Lancée depuis la carte : Phase ${l.phase}${l.ws ? ` · ${l.ws}` : ''} · ${LIBELLES_VERBES[l.verbe]}` : ''; // garde:ligne-valide
     if (t) lignes.push(t); // garde:ligne-insert
-    if (w.branch) lignes.push(`Branche : ${w.branch}`);
+    if (branche) lignes.push(`Branche : ${branche}`);
     if (w.tree) lignes.push(`Arbre : ${w.tree}`);
     if (w.rattachement?.etat === 'rattache') lignes.push(`Nœud de mission : ${w.rattachement.noeud} (${w.rattachement.dag})`);
     // PU-G-134/163/164 : la description d'une carte n'est plus vide — étiquette de lancement, tâche (à défaut la dernière action si elle informe), puis branche et arbre d'une session
     const a = w.action || {}, act = a.verbe && a.verbe !== GENERIQUE ? [a.verbe, a.cible].filter((x) => typeof x === 'string' && x).join(' ') : '';
     const arbre = !sous && w.tree ? (w.tree === 'arbre principal' ? w.tree : `arbre ${String(w.tree).replace(/^\.claude\/worktrees\//, '')}`) : '';
-    const lieu = !sous ? [w.branch ? `Branche ${w.branch}` : '', arbre].filter(Boolean).join(' · ') : '';
+    const lieu = !sous ? [branche ? `Branche ${branche}` : '', arbre].filter(Boolean).join(' · ') : '';
     const resume = [t ? `Depuis Phase ${l.phase}` : '', w.task || act, lieu].filter(Boolean).join(' · ');
     nodes.push({ ...base, id: idCarte(w), parent: fini && parent ? `${parent}~termines` : parent, kind: sous ? 'agent' : 'session',
-      label: sous ? clip([w.role, w.task].filter(Boolean).join(' · ') || 'Agent', 80) : clip(typeof w.titre === 'string' && w.titre.trim() ? w.titre : ['Session principale', w.branch].filter(Boolean).join(' · '), 80),
+      label: sous ? clip([w.role, w.task].filter(Boolean).join(' · ') || 'Agent', 80) : clip(typeof w.titre === 'string' && w.titre.trim() ? w.titre : ['Session principale', nettoieTitre(branche)].filter(Boolean).join(' · '), 80),
       summary: clip(resume, 200), details: lignes.join('\n\n'), st: Object.hasOwn(ST, w.etat) ? ST[w.etat] : 'active', foot: '' });
   }
   for (const [carte, n] of termines) {
