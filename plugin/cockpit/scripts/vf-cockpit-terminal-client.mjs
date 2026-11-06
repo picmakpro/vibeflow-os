@@ -50,7 +50,7 @@ export function clientTerminal(cfg) {
   // 2. terminal
   if (!encadree) { vue.carte('horscadre'); return; }
   emettre('ready');
-  if (!localStorage.getItem(CLE_SECRET)) { expire(); return; }
+  if (!localStorage.getItem(CLE_SECRET)) { vue.carte('sansamorce'); emettre('expire'); return; } // aucun secret : le terminal n'a jamais été ouvert dans cet onglet, ce n'est pas une expiration (PU-G-132)
   const entetes = () => ({ 'X-VF-Terminal': localStorage.getItem(CLE_SECRET) || '', 'X-VF-Onglet': onglet() });
   const modeServi = (p) => { // la présélection vient de Q (valeur servie), relue contre la liste fermée ; rien n'est gardé dans le navigateur
     const v = p.mode_retenu; // garde:mode-lecture
@@ -235,7 +235,7 @@ export function clientTerminal(cfg) {
       if (r.status === 403) { if (await secretPerime()) { expire(); return 'stop'; } return 'echec'; } // 403 sans Origin : secret périmé ou serveur d'ailleurs, la sonde départage
       if (r.status === 409) { vue.carte('refuse', () => { vue.effacer(); boucle(); }); emettre('refuse'); return 'stop'; }
       if (r.status !== 200) return 'echec';
-      derniere = term.rows + ' ' + term.cols;
+      derniere = ''; taille(); // DG-08 : le terminal a peut-être été créé à une autre taille (cadre rechargé, tiroir agrandi entre-temps) : la taille de CE cadre lui est redite à chaque connexion
       if (dejaVu) term.reset();
       dejaVu = true; vue.effacer(); emettre('connecte'); rouvrir();
       const lecteur = r.body.getReader();

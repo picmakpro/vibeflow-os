@@ -210,7 +210,7 @@ await executer(chrome, async (s) => {
   }
 
   // --- scénarios sur le serveur réel : secret périmé (J2), serveur arrêté (J2), « Terminé » (J12), onBinary (S5), contre-pression (S3) ---
-  if (['perime', 'arret', 'termine', 'binaire', 'pression', 'popup', 'gros', 'limite'].includes(mode)) {
+  if (['perime', 'arret', 'termine', 'binaire', 'pression', 'popup', 'gros', 'limite', 'sansamorce', 'reprise'].includes(mode)) {
     const att = (expr, nom) => q.attendre(expr, nom, MS);
     const texte = () => q.ev(`(document.getElementById('etat') || {}).textContent || ''`).catch(() => '');
     const invite = () => q.ev(INVITE).catch(() => false);
@@ -222,12 +222,26 @@ await executer(chrome, async (s) => {
     };
     const etatServeur = () => q.ev(`fetch('/etat', { headers: { 'X-VF-Terminal': localStorage.getItem('vf.terminal.secret'), 'X-VF-Onglet': sessionStorage.getItem('vf.terminal.onglet') }, cache: 'no-store' }).then((x) => x.json()).then((j) => j.session)`).catch(() => '?');
     // le secret est posé dans le stockage de Q (premier niveau) : la page se charge ensuite comme après un amorçage réussi
-    await essai('secret', async () => { await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', ${JSON.stringify(secretN)})`); });
+    if (mode !== 'sansamorce') await essai('secret', async () => { await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', ${JSON.stringify(secretN)})`); }); // sansamorce : aucun secret rangé, comme dans un onglet où le terminal n'a jamais été ouvert
     r.mode = mode;
     if (mode === 'perime') {
       const t0 = Date.now();
       await essai('carte-expiree', async () => { await q.naviguer(); await att(`(document.getElementById('etat') || {}).textContent && document.getElementById('etat').textContent.includes('Session expirée')`, 'carte Session expirée (secret périmé)'); });
       r.duree = Date.now() - t0; r.carte = await texte();
+    } else if (mode === 'sansamorce') {
+      // PU-G-132 : aucun secret dans le stockage de Q (onglet où le terminal n'a jamais été ouvert) : la carte le dit juste, elle ne prétend pas qu'une session a expiré
+      await essai('carte-sans-amorce', async () => { await q.naviguer(); await att(`((document.getElementById('etat') || {}).textContent || '').length > 0`, 'une carte dans le cadre (secret absent)'); });
+      r.carte = await texte();
+    } else if (mode === 'reprise') {
+      // DG-08 : un cadre qui se reconnecte à un shell déjà ouvert, à une AUTRE taille, dit sa taille : le terminal la reprend (stty size) ; sinon le shell dessine pour une grille que l'écran n'a pas
+      await s.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
+      await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
+      await q.ev(`(() => { const f0 = window.fetch; window.fetch = function (u) { if (String(u) === '/taille') return Promise.resolve(new Response(null, { status: 204 })); return f0.apply(this, arguments); }; })()`); // le premier cadre ne dit plus sa taille : le terminal garde celle de sa création
+      await s.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 400, deviceScaleFactor: 1, mobile: false });
+      await essai('reconnexion', async () => { await q.naviguer(); await att(INVITE, 'invite après la reconnexion'); });
+      await essai('taille', async () => { await taper('echo TAI""LLE=$(stty size)x'); await poll(async () => /TAILLE=\d+ \d+x/.test(await lignes()), 'sortie de stty size'); });
+      const m = /TAILLE=(\d+) (\d+)x/.exec(await lignes()); r.pty = m ? Number(m[1]) : -1;
+      r.ecran = await q.ev(`document.querySelectorAll('.xterm-rows > div').length`).catch(() => -2);
     } else if (mode === 'arret') {
       await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
       try { process.kill(pidN, 'SIGTERM'); r.tue = true; } catch (e) { r.tue = false; }
@@ -614,8 +628,12 @@ FAUX_SEC="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex
 scenario "$OUT" perime "$FAUX_SEC"
 assert_eq "J2.0 — témoin : le scénario n'a pas échoué globalement" "$(rj "$SCJ" 'j.erreur||"ok"')" "ok"
 assert_eq "J2.1 — secret périmé (serveur relancé) : la carte « Session expirée » s'affiche en moins de 10 s, jamais « Serveur arrêté »" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" expiree="+(j.carte||"").includes("Session expirée")+" arrete="+(j.carte||"").includes("Serveur arrêté")+" rapide="+(j.duree<10000)')" "erreurs={} expiree=true arrete=false rapide=true"
+scenario "$OUT" sansamorce ""
+assert_eq "J2.3 — PU-G-132 : aucun secret (terminal jamais ouvert dans cet onglet) : la carte dit « Terminal non disponible dans cet onglet » et la commande, jamais « Session expirée »" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" juste="+(j.carte||"").includes("Terminal non disponible dans cet onglet")+" commande="+(j.carte||"").includes("/vf-cockpit --terminal")+" expiree="+(j.carte||"").includes("Session expirée")')" "erreurs={} juste=true commande=true expiree=false"
 MS_SC=60000 scenario "$OUT" arret
 assert_eq "J2.2 — serveur réellement arrêté en cours de session : « Serveur arrêté », jamais « Session expirée » (témoin : le PID enregistré a reçu le signal)" "$(rj "$SCJ" '"tue="+j.tue+" erreurs="+JSON.stringify(j.erreurs)+" arrete="+((j.carte||"").includes("Serveur arrêté"))+" expiree="+((j.carte||"").includes("Session expirée"))')" "tue=true erreurs={} arrete=true expiree=false"
+scenario "$OUT" reprise
+assert_eq "DG08.1 — reconnexion à un shell déjà ouvert, cadre d'une autre taille : le terminal a la taille de l'écran (stty size rend les lignes de la grille ; le premier cadre, privé de /taille, avait créé le terminal plus haut)" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" pty="+j.pty+" ecran="+j.ecran+" egal="+(j.pty===j.ecran&&j.ecran>0)')" "erreurs={} pty=$(rj "$SCJ" 'j.ecran') ecran=$(rj "$SCJ" 'j.ecran') egal=true"
 scenario "$OUT" termine
 assert_eq "J12.1 — témoin : « exit » dans le shell affiche « Le shell s'est terminé », le serveur dit terminee" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" bandeau="+(j.avant&&j.avant.bandeau)+" session="+(j.avant&&j.avant.session)')" "erreurs={} bandeau=true session=terminee"
 assert_eq "J12.2 — rechargement du cadre dans le même onglet après « Terminé » : le bandeau est toujours là et aucun nouveau shell ne démarre (session = terminee)" "$(rj "$SCJ" '"bandeau="+(j.apres&&j.apres.bandeau)+" session="+(j.apres&&j.apres.session)')" "bandeau=true session=terminee"
@@ -649,6 +667,14 @@ if mutant mj12 vf-cockpit-terminal-client.mjs "s|sessionStorage.setItem(CLE_FIN,
   scenario "$MUT_OUT" termine
   assert_eq "M-J12 — le mutant (l'état « Terminé » n'est pas retenu) rougit J12.2 : un nouveau shell démarre au rechargement" "$(rj "$SCJ" '"bandeau="+(j.apres&&j.apres.bandeau)+" session="+(j.apres&&j.apres.session)')" "bandeau=false session=vivante"
 else sans_effet "M-J12"; fi
+if mutant msa vf-cockpit-terminal-client.mjs "s|vue.carte('sansamorce'); emettre('expire'); return;|expire(); return;|"; then
+  MS_SC=8000 scenario "$MUT_OUT" sansamorce ""
+  assert_eq "M-SANS-AMORCE-CARTE — le mutant (secret absent traité de nouveau comme une expiration) rougit J2.3 : « Session expirée » sans session préalable" "$(rj "$SCJ" '"expiree="+(j.carte||"").includes("Session expirée")')" "expiree=true"
+else sans_effet "M-SANS-AMORCE-CARTE"; fi
+if mutant mrep vf-cockpit-terminal-client.mjs "s|derniere = ''; taille();|derniere = term.rows + ' ' + term.cols;|"; then
+  MS_SC=8000 scenario "$MUT_OUT" reprise
+  assert_eq "M-REPRISE-TAILLE — le mutant (la taille n'est plus redite à la connexion) rougit DG08.1 : le terminal garde la taille du premier cadre" "$(rj "$SCJ" '"egal="+(j.pty===j.ecran)')" "egal=false"
+else sans_effet "M-REPRISE-TAILLE"; fi
 if mutant ms5 vf-cockpit-terminal-client.mjs "s|term.onBinary(|void (|"; then
   MS_SC=6000 scenario "$MUT_OUT" binaire
   assert_eq "M-S5 — le mutant (onBinary non relayé) rougit S5.1 : aucun écho de rapport de souris" "$(rj "$SCJ" '"rapport="+j.rapport')" "rapport=false"
