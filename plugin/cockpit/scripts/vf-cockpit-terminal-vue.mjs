@@ -14,7 +14,7 @@ export function vueTerminal(cfg) {
   };
   const bouton = (texte, action, cls) => { const b = el('button', 'vf-q-bouton' + (cls ? ' ' + cls : ''), texte); b.type = 'button'; b.addEventListener('click', () => action && action()); return b; };
   const zone = () => document.getElementById('etat');
-  const vider = () => { const z = zone(); while (z.firstChild) z.removeChild(z.firstChild); document.getElementById('terminal').classList.remove('vf-q-cache'); return z; };
+  const vider = () => { const z = zone(); while (z.firstChild) z.removeChild(z.firstChild); document.getElementById('terminal').classList.remove('vf-q-cache'); retirerAccueil(); return z; };
   const COMMANDE = '/vf-cockpit --terminal';
   const CARTES = {
     refuse: { role: 'status', masque: true, titre: 'Terminal déjà ouvert', corps: ['Un terminal est déjà ouvert dans un autre onglet. Fermez-le, puis réessayez.'], bouton: 'Réessayer', d: 'M3 3h10v10H3z M6 8h4' },
@@ -77,6 +77,13 @@ export function vueTerminal(cfg) {
   const PICTO_RISQUE = 'M8 2L14.5 13.5H1.5Z M8 6.5V9.5 M8 11.6V11.7'; // triangle : forme distincte des pastilles rondes, sans teinte
   const duree = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)), m = Math.floor(s / 60); return m > 0 ? m + ' min ' + String(s % 60).padStart(2, '0') + ' s' : s + ' s'; };
   const annoncer = (txt) => { const r = document.getElementById('annonce'); if (r) r.textContent = txt; }; // région live polie de la page (aucun focus pris)
+  const ACCUEIL = 'Ce terminal est un shell de votre poste, ouvert dans le dossier du projet. Vous n’en avez pas besoin pour suivre le travail dans le cockpit : il sert à lancer ou reprendre une session Claude Code.', CLE_ACCUEIL = 'vf.terminal.accueil'; // PU-G-140 : accueil posé une seule fois par navigateur, effaçable, sans écriture au shell ni focus pris ; une carte, un bandeau ou une proposition le remplace
+  const retirerAccueil = () => { const a = document.getElementById('accueil'); if (a) a.remove(); };
+  const accueil = () => {
+    let vu = true; try { vu = !!localStorage.getItem(CLE_ACCUEIL); } catch (e) { void e; } if (vu || document.getElementById('accueil') || document.getElementById('proposition')) return;
+    const b = el('div', 'vf-q-bandeau vf-q-collage'); b.id = 'accueil'; b.setAttribute('role', 'status'); b.appendChild(el('span', 'vf-q-pastille')); b.appendChild(el('span', 'vf-q-texte', ACCUEIL));
+    b.appendChild(bouton('Compris', () => { try { localStorage.setItem(CLE_ACCUEIL, '1'); } catch (e) { void e; } b.remove(); }, 'vf-q-secondaire')); document.body.appendChild(b);
+  };
   const copier = (k, cp) => { // Q14 : « Copier la commande » pour la commande de relance du cockpit, JAMAIS pour un lancement de session ; le texte copié est celui de la carte (sélection de l'élément affiché) ; un seul appel au presse-papiers
     const r = document.createRange(), s = window.getSelection(); r.selectNodeContents(k.querySelector('.vf-q-commande')); s.removeAllRanges(); s.addRange(r);
     let ok = false; try { ok = document.execCommand('copy'); } catch (e) { void e; }
@@ -143,7 +150,7 @@ export function vueTerminal(cfg) {
       const r = type === 'reconnexion' ? null : bouton('Relancer le shell', action); if (r) b.appendChild(r);
       z.appendChild(b); if (r && document.hasFocus()) r.focus(); // L2 : jamais de focus pris à la page
     },
-    effacer() { const z = vider(); z.hidden = true; },
+    effacer() { const z = vider(); z.hidden = true; accueil(); },
     // proposition : p = { id, verbe, intention, phase, ws, lignes, bloquants, avertissements, arme_apres_ms, expire_ms, modeInitial } (revalidée par le client), cb = { lancer(mode, avecChat) -> Promise<statut>, annuler() } ; p.chat === true et p.lignesChat (72-13) : case « Continuer la conversation du chat » ; null retire.
     // « Préparer dans le terminal » n'est armé qu'après arme_apres_ms, jamais en présence d'un bloquant, et ne répond qu'à un clic de confiance ; la ligne montrée est celle du mode choisi, posée par textContent.
     // LB2 : phrase en clair avant la commande, une ligne par mode, explication et risque de la case du chat, compte à rebours (expire_ms), bandeau placé avant la saisie dans l'ordre de la page et annoncé (jamais de focus pris) ;
@@ -156,7 +163,7 @@ export function vueTerminal(cfg) {
         retirerProposition(); return;
       }
       if (courant !== p.id && manipule()) return false; // garde:manipule
-      const premier = courant !== p.id; retirerProposition();
+      const premier = courant !== p.id; retirerProposition(); retirerAccueil();
       const bloquants = p.bloquants || [], avertissements = p.avertissements || [];
       const b = el('div', 'vf-q-bandeau vf-q-collage'); b.id = 'proposition'; b.setAttribute('data-id', p.id); b.setAttribute('role', 'group'); b.setAttribute('aria-label', 'Lancement à confirmer');
       b.appendChild(el('span', 'vf-q-pastille vf-q-attention'));

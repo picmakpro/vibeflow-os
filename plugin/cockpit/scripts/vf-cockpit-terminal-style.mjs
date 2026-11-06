@@ -96,6 +96,9 @@ button { font: inherit; color: inherit; }
 body:has(#proposition) { display: flex; flex-direction: column; }
 body:has(#proposition) #terminal { position: relative; inset: auto; flex: 1 1 0; min-height: 0; order: 1; }
 body #proposition { position: static; flex: none; order: 2; z-index: 1; max-height: 60%; overflow-y: auto; }
+/* PU-G-140 : accueil de la première ouverture, posé sur le bas du terminal sans le déplacer */
+#accueil { max-height: 60%; overflow-y: auto; }
+#accueil .vf-q-texte { font-weight: 400; color: var(--text-2); }
 /* PU-G-141 : la carte reste entière dans le cadre ; sur un cadre bas elle s'élargit et se tasse */
 .vf-q-carte { max-height: calc(100% - var(--sp-16)); overflow-y: auto; }
 @media (max-height: 240px) { .vf-q-carte { width: min(560px, calc(100% - 2 * var(--sp-16))); padding: var(--sp-8) var(--sp-12); gap: var(--sp-4); } .vf-q-carte svg.i { display: none; } }

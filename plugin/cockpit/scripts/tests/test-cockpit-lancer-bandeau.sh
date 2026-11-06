@@ -591,6 +591,22 @@ await executer(chrome, async (s) => {
       r.v17 = [geo, ap.copie === ap.affichee && ap.affichee === '/vf-cockpit --terminal', ap.bouton, ap.annonce, sansCopie].join('|');
       await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
     });
+    await essai('v18', async () => { // LB3 (PU-G-140) : accueil de la première ouverture : effaçable, jamais d'octet au shell ni de focus pris ; une proposition ou une carte le remplace ; « Compris » le range pour de bon
+      await q.ev(`(() => { localStorage.removeItem('vf.terminal.accueil'); vfTermVue.proposition(null); return true; })()`);
+      const foc = () => q.ev(`document.activeElement ? document.activeElement.tagName + '#' + document.activeElement.id : ''`);
+      const foc0 = await foc(), n0 = entrees();
+      await q.ev(`(() => { vfTermVue.effacer(); return true; })()`);
+      const a = await q.ev(`(() => { const e = document.getElementById('accueil'); return e ? [e.getAttribute('role'), e.textContent.includes('Vous n’en avez pas besoin pour suivre le travail dans le cockpit'), [...e.querySelectorAll('button')].map((x) => x.textContent).join(',')].join('|') : 'absent'; })()`);
+      const foc1 = await foc(); await pause(300); const n1 = entrees();
+      await monter({ id: ID(180) }); const remplace = await q.ev(`!document.getElementById('accueil')`); await raz();
+      await q.ev(`(() => { vfTermVue.effacer(); return true; })()`); const revient = await q.ev(`!!document.getElementById('accueil')`);
+      await q.ev(`(() => { vfTermVue.carte('refuse'); return true; })()`); const carte = await q.ev(`!document.getElementById('accueil')`);
+      await q.ev(`(() => { vfTermVue.effacer(); return true; })()`);
+      await clic(`[...document.querySelectorAll('#accueil button')].find((x) => x.textContent === 'Compris')`); await pause(200);
+      const ferme = await q.ev(`!document.getElementById('accueil') && localStorage.getItem('vf.terminal.accueil') === '1'`);
+      await q.ev(`(() => { vfTermVue.effacer(); return true; })()`); const nonRevenu = await q.ev(`!document.getElementById('accueil')`);
+      r.v18 = [a === 'status|true|Compris', foc0 === foc1, n0 === n1, remplace, revient, carte, ferme, nonRevenu].join('/');
+    });
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
 
@@ -863,6 +879,7 @@ if [ -n "$CHROME" ]; then
   assert_eq "LB.V15 — LB2 (PU-G-119) : proposition() rend false et garde le bandeau tant qu'une touche vient d'être tapée dans le sélecteur de mode focalisé ou qu'un bouton de souris est enfoncé dans le bandeau ; un focus sans geste, ou un bandeau libre, est remplacé" "$(vv v15)" "true/true/true/true/true"
   assert_eq "LB.V16 — LB3 (PU-G-136) : dans un cadre de 124 px (le plus petit tiroir), la proposition prend sa place sous le terminal (terminal d'au moins 24 px, son bas au-dessus du haut du bandeau, bandeau d'au plus 60 % du cadre, dans le cadre) ; retirée, le terminal reprend au moins 120 px" "$(vv v16)" "124/true/true/true/true/true"
   assert_eq "LB.V17 — LB3 (PU-G-141 ; Q14) : la carte « Serveur arrêté » reste entière dans un cadre de 124 px (marge de 8 px en haut et en bas, sans défilement) ; « Copier la commande » copie EXACTEMENT /vf-cockpit --terminal (la sélection au moment de la copie est le texte affiché), le bouton dit « Copiée » et la région polie annonce « Commande copiée. » ; aucun bouton de copie sur une proposition de lancement" "$(vv v17)" "true/true/true|true|Copiée|Commande copiée.|true"
+  assert_eq "LB.V18 — LB3 (PU-G-140) : accueil à la première ouverture (role status, phrase « pas besoin pour suivre le travail », bouton Compris), aucun focus pris, aucun octet au terminal ; une proposition puis une carte le remplacent ; il revient tant qu'il n'est pas rangé ; « Compris » le range pour de bon (clé du stockage de Q posée, plus de retour)" "$(vv v18)" "true/true/true/true/true/true/true/true"
 
   echo "=== LB.E — client réel, serveur factice du contrat §4, faux P ==="
   faux "$SCRIPTS"; FQ0="$FQ"; FP0="$FP"; EJ="$(navig client)"; unfaux
@@ -954,6 +971,9 @@ else sans_effet "M-BANDEAU-FIXE"; fi
 if mutant copie-autre-texte vf-cockpit-terminal-vue.mjs "s|r.selectNodeContents(k.querySelector('.vf-q-commande'))|r.selectNodeContents(k.querySelector('.vf-q-titre'))|"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v17"]'; assert_eq "M-COPIE-AUTRE-TEXTE — le mutant (le bouton copie un autre texte que la commande affichée) rougit LB.V17 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v17 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v17 === 'true/true/true|true|Copiée|Commande copiée.|true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-COPIE-AUTRE-TEXTE"; fi
+if mutant accueil-focus vf-cockpit-terminal-vue.mjs "s|'vf-q-secondaire')); document.body.appendChild(b);|'vf-q-secondaire')); document.body.appendChild(b); b.querySelector('button').focus();|"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v18"]'; assert_eq "M-ACCUEIL-FOCUS — le mutant (l'accueil prend le focus) rougit LB.V18 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v18 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v18 === 'true/true/true/true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-ACCUEIL-FOCUS"; fi
 if mutant manipule-ignore vf-cockpit-terminal-vue.mjs "/garde:manipule/d"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v15"]'; assert_eq "M-MANIPULE-IGNORE — le mutant rougit LB.V15 : un bandeau manipulé est remplacé sous la main (témoin : le bandeau s'affiche et la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v15 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v15 === 'true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-MANIPULE-IGNORE"; fi
