@@ -1,0 +1,8 @@
+#!/bin/sh
+# faux `claude` — témoin de LANC-05 et de LANC-07 (Phase 72, plan 72-11).
+# Écrit son argv, un argument par enregistrement terminé par NUL, dans $FAUX_CLAUDE_SORTIE/argv (création atomique : argv.tmp puis mv), puis sort 0.
+# FAUX_CLAUDE_SORTIE est obligatoire : sans lui il sort 64 sans rien écrire. La suite le copie dans son dossier de travail et le rend exécutable (chmod +x),
+# jamais par le mode du fichier versionné.
+[ -n "${FAUX_CLAUDE_SORTIE:-}" ] || { echo "FAUX_CLAUDE_SORTIE absent" >&2; exit 64; }
+printf '%s\0' "$@" > "$FAUX_CLAUDE_SORTIE/argv.tmp" && mv "$FAUX_CLAUDE_SORTIE/argv.tmp" "$FAUX_CLAUDE_SORTIE/argv"
+exit 0
