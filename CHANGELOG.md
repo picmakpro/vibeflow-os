@@ -13,6 +13,12 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.76.0] — 2026-11-06
+
+**Minor** (module `cockpit`, nouvelle capacité de diagnostic) :
+
+- **`cockpit` v1.4.0** : l'onglet Projet lit un planning écrit dans des formats variés (nouveau `vf-cockpit-formats.mjs`, grammaire partagée) — dépendances `**Depends on :**` (espace ou insécable avant « : », deux-points dans le gras ou dehors, gras ou non, puce, `Dépendance(s)`), titres `Phase N — nom` et `##`, cases `[X]`, Goal/Objectif, exigences, statut, CRLF — et signale ce qu'il n'a pas reconnu : « N ligne(s) non comprise(s) du planning : fichier:ligne … » au build et dans le panneau d'ensemble. Le lab portfolio n'avait aucun lien de dépendance (constaté le 2026-11-05). Arbitrage : Samuel, AskUserQuestion en session principale, 2026-11-05.
+
 ## [v2.75.1] — 2026-11-03
 
 **Patch** (correctif du module `cockpit`) :
