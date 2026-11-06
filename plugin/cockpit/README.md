@@ -65,7 +65,7 @@ se lit comme telle, en texte neutre (P78-D-02, P78-D-35). Le bloc de vue ne rép
 Les suffixes « — Projet » / « — Équipe » du titre et la liste « Repositories » de l'onglet Code sont retirés (P78-D-09).
 
 **Ouvrir le tiroir** (P78-D-10) : clic sur la seconde ligne, ou touche `g` (ouvre et ferme ; sans effet dans un champ de saisie). Quand la seconde ligne est
-masquée faute de largeur (seuil de 1280 px, ratifié par Samuel le 2026-11-06), une icône de 44 px dans l'en-tête la remplace, et sur téléphone une entrée « Historique Git » du menu « ⋯ » (P78-D-20, P78-D-30, P78-D-34).
+masquée faute de largeur (seuil de 1280 px, ratifié par Samuel, AskUserQuestion session principale, 2026-11-06), une icône de 44 px dans l'en-tête la remplace, et sur téléphone une entrée « Historique Git » du menu « ⋯ » (P78-D-20, P78-D-30, P78-D-34).
 Le tiroir est vertical, à gauche, et coexiste avec le tiroir Terminal (en bas) et les boutons de zoom.
 
 **Ce qu'il montre** (tout est lu sur le disque, jamais de `fetch`, jamais de lecture réseau) :
@@ -108,6 +108,7 @@ et `test-cockpit-chaine-xss.sh` (volet git C0g à C4g : un nom de branche, un me
 
 **Limites connues du tiroir Git** :
 
+- **Moteur fermé sur filtres illisibles** : quand la liste des filtres déclarés par le dépôt est illisible ou dépasse 256 filtres, l'assemblage lance le moteur vendorisé sans `VF_COCKPIT_GIT_DURCI` (fermé, aucun git), le résumé dit « git du moteur fermé (cause) » et le résultat porte `gitFerme` ; la carte est alors sans fichiers suivis ni head, et les routes du tiroir lisent comme d'habitude.
 - **Moteur vendorisé lancé à la main, hors assemblage** : sans `VF_COCKPIT_GIT_DURCI=1`, `git()` de `scripts/lib/common.mjs` ne lit plus rien (fermé par défaut, P78-D-25) : carte sans fichiers suivis ni head.
   Retour arrière : retirer la garde du patch P27. L'assemblage (`vf-cockpit-build.mjs`) pose la variable pour le moteur ; les lancements du moteur par le serveur (`plan`, `build`) ne la posent pas, et la carte qu'ils écrivent n'a alors pas de liste git.
 - Le `status` de chaque worktree est relu **à l'ouverture du tiroir et au signal** seulement ; une **modification d'un fichier suivi sans `git add`**, ou un fichier neuf non ajouté, ne change ni les refs, ni la

@@ -105,3 +105,14 @@ Traces : section « Correction revue page » de `78-10-RED-TRACE.md`.
 - **S5** : garde de séquence sur `chargerWt` (seule la dernière réponse est rendue) ; `recharger` (77-vf-git-tiroir.js, 187 lignes) et `chargerWt` rendent `{ ok, change }` ; l'annonce « Historique mis à jour » n'a lieu qu'après une relecture réussie qui a changé quelque chose, un échec s'annonce une seule fois (« Historique indisponible, la relecture a échoué »). `77-vf-git-vue-detail.js` : 197 lignes (plafond 220).
 - **Tests** : bloc D12 et mutants M-SEQ-WT, M-ANNONCE dans `test-cockpit-git-tiroir.sh` ; `TIROIR_TRACE` écrit aussi la réponse de D12.
 - Valeurs posées : aucune. Déviations : `77-vf-git-tiroir.js` modifié (autorisé « si nécessaire ») pour que `recharger` dise ce qui s'est passé.
+
+
+## Correction delta et recette (mgr78-reprise, 2026-11-06) — page
+
+- F1 (majeur) : `avance` null s'affiche « — » (libellé « avance inconnue »), jamais « 0 commit » ; même règle sur la pastille des worktrees (`↑— ↓1`). Relevé des compteurs nullables des fichiers 77 : un seul autre site (`pastilles`), corrigé ; les autres champs nullables ne sont pas rendus en chiffre.
+- F4b : témoin D14 (échec, succès, échec : le second échec est annoncé) ; mutant M-ECHEC-DIT.
+- G4 : barres d'activité des auteurs en `--text-3`, règle scopée au tiroir. G5 : `.vf-git-sans`, `.meta` du tiroir et kbd « g » en `--text-2` (>= 4,5:1 dans les deux thèmes). G6 : une seule région vive (celle du tiroir, la vue détaillée y écrit), icône de copie en coche le temps du « Copiée ».
+- Fichiers 77 : rendu 173, tiroir 189, vue-detail 197 lignes (plafond 220). Aucune valeur de couleur, d'espacement ou de rayon nouvelle ; échange mécanique après rebase : aucun.
+- Déviation : les témoins D12 et D14 lisent `.vf-git-live` (l'annonce de la vue détaillée n'a plus de région propre).
+- F7 et F8 : classés `no-op` (hors mandat).
+- Suites rejouées sur l'état final (rc) : git-tiroir 0, git-entete 0, git-e2e 0, responsive 0, git 0, git-details 0, git-commandes 0, git-signature 0, serveur 0, projet 0, chrome-fr 0, css-jetons.mjs sur 76 et 77 : 0, check-version-sync 0, check-machine-paths 0.

@@ -455,6 +455,39 @@ console.log(out.join('|'));
 JS
 PARITE="egal|egal|egal|egal|egal|egal"
 assert_eq "S9.2 — enteteGit et son miroir asynchrone rendent le même objet (lab, worktree, détaché, hors dépôt, sans commit, sans base)" "$(node "$AUX/parite-entete.mjs" "$SCRIPTS" "$LAB" "$WORK/wt-b" "$WORK/wt-det" "$WORK/hors-depot" "$WORK/r-vide" "$WORK/r-master" 2>&1 | tail -1)" "$PARITE"
+# S9.3 (78-05, revue de delta F2, P78-D-41 étendue) : GET /api/vf/git/entete ne lance pas non plus de git synchrone sur la boucle. git emballé : `rev-parse --git-common-dir` dort 1,2 s ;
+# même forme que X6 : légère servie AVANT la fin de la lecture de l'en-tête, qui aboutit (état ok) et qui est lente.
+WRAPE="$WORK/wrap-entete"; mkdir -p "$WRAPE"
+printf '#!/bin/sh\nfor a in "$@"; do [ "$a" = --git-common-dir ] && sleep 1.2; done\nexec "%s" "$@"\n' "$GIT_REEL" > "$WRAPE/git"; chmod +x "$WRAPE/git"
+cat > "$AUX/lat-entete.mjs" <<'JS'
+import http from 'node:http';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab] = process.argv;
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href);
+const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
+const srv = http.createServer((req, res) => {
+  const url = new URL(req.url, 'http://x');
+  if (url.pathname === '/legere') { res.end('ok'); return; }
+  if (!m.routeGit(req, res, url, { root: lab, json })) { res.writeHead(404); res.end(); }
+}).listen(0, '127.0.0.1', async () => {
+  const port = srv.address().port, t0 = Date.now();
+  const get = (p) => new Promise((ok) => http.get({ host: '127.0.0.1', port, path: p }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => ok({ ms: Date.now() - t0, b })); }));
+  const lourde = get('/api/vf/git/entete');
+  await new Promise((r) => setTimeout(r, 150));
+  const legere = await get('/legere');
+  const l = await lourde;
+  let etat = 'illisible'; try { etat = JSON.parse(l.b).etat; } catch {}
+  console.log(`${legere.ms < l.ms}|${etat}|${l.ms >= 1000}`);
+  srv.close(); process.exit(0);
+});
+JS
+LATE() { PATH="$WRAPE:$PATH" node "$AUX/lat-entete.mjs" "$1" "$LAB" 2>&1 | tail -1; }
+assert_eq "S9.3 — pendant une lecture lente de l'en-tête (git emballé : > 1 s), une requête légère est servie AVANT la fin de la lecture ; la lecture aboutit (état ok)" "$(LATE "$SCRIPTS")" "true|ok|true"
+assert_eq "M-SYNC-ENTETE.0 — mutant avec effet (la route de l'en-tête redevient synchrone : enteteGit)" "$(mutant syncent "enteteAsync(root, finDans(BORNES.echeanceMs)).then((e) => json(res, 200, { schema: SCHEMA_ENTETE, ...e }), () => json(res, 200, { schema: SCHEMA_ENTETE, etat: 'indisponible', depot: '' }));" "json(res, 200, { schema: SCHEMA_ENTETE, ...enteteGit(root) }); // MUTANT : appel git synchrone")" "effet"
+A3="$(node "$AUX/mut.mjs" "$WORK/mut/syncent/vf-cockpit-git.mjs" "import { masque } from './vf-cockpit-lecture.mjs';" $'import { masque } from \'./vf-cockpit-lecture.mjs\';\nimport { enteteGit } from \'./vf-cockpit-git-entete.mjs\'; // MUTANT : import ajouté')"
+assert_eq "M-SYNC-ENTETE.1 — import ajouté (cible présente)" "$A3" "applique"
+assert_eq "M-SYNC-ENTETE — la requête légère n'est servie qu'APRÈS la lecture (légère avant lourde : false), la lecture aboutit et elle est lente (le rouge vient de l'ordre, pas d'un module cassé)" "$(LATE "$WORK/mut/syncent")" "false|ok|true"
 assert_eq "M-SYNC-GRAPHE.0 — mutant avec effet (le git du graphe redevient synchrone : lancerGit)" "$(mutant syncg "const git = (...a) => lancerGitAsync(lab, a, { fin });" "const git = async (...a) => lancerGit(lab, a); // MUTANT : appel git synchrone")" "effet"
 A2="$(node "$AUX/mut.mjs" "$WORK/mut/syncg/vf-cockpit-git.mjs" "import { lancerGitAsync, finDans }" "import { lancerGit, lancerGitAsync, finDans }")"
 assert_eq "M-SYNC-GRAPHE.1 — import ajouté (cible présente)" "$A2" "applique"

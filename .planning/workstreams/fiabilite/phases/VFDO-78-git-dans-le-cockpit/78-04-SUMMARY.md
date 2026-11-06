@@ -110,3 +110,12 @@ Traces : section « Correction revue page » de `78-04-RED-TRACE.md`.
 - **S2 (GITC-11, P78-D-15)** : `76-vf-git-entete.js` écoute `vf-git:signal` sur `document` (là où `70-vf-live.js` l'émet, sans bubbles) ; 70 inchangé. `test-cockpit-git-entete.sh` H3.4b émet maintenant comme 70 ; `test-cockpit-git-e2e.sh` B3b (tiroir fermé, flux réel, `git switch -c` : la seconde ligne change en moins de 10 s) et mutant M-ECOUTEUR.
 - **P78-D-40** : « Par branche — avance sur la base » (`77-vf-git-rendu.js`), `78-UI-SPEC.md` §121 ; assertion D10.5 dans `test-cockpit-git-tiroir.sh`.
 - Valeurs posées : aucune valeur de padding, marge, écart, couleur ou rayon. Déviations : aucune.
+
+
+## Correction delta et recette (mgr78-reprise, 2026-11-06) — en-tête
+
+- G1 (majeur) : l'en-tête relit `/api/vf/git/entete` une fois au chargement de chaque onglet, la valeur lue remplace la donnée de l'assemblage ; une seule lecture par chargement (Projet : le signal de chargement et la lecture se confondent). G2 : le bloc de vue Code cite la branche de cette même lecture et se réécrit au signal. G3 : écart visible autour du point médian par `white-space: pre` sur `.vf-git-wt` (texte du DOM inchangé, aucune marge nouvelle). Kbd « g » en `--text-2` (G5, clair 4,43 -> au moins 4,5).
+- F6a : témoin D39.7 (retour à `absent` : 200 px et invite d'origine) ; mutant D39m3.
+- Conséquence assumée : le témoin D39m2 copie un lab : la copie doit rester un dépôt (la page relit l'en-tête, « absent » retirerait le drapeau).
+- Hors mandat strict : `test-cockpit-git-e2e.sh` rejoué sans modification ; la forme `document.addEventListener('vf-git:signal', () => { // relecture de l'en-tête` est conservée dans 76 pour que le mutant M-ECOUTEUR de l'e2e reste applicable.
+- Suites rejouées sur l'état final (rc) : git-tiroir 0, git-entete 0, git-e2e 0, responsive 0, git 0, git-details 0, git-commandes 0, git-signature 0, serveur 0, projet 0, chrome-fr 0, css-jetons.mjs sur 76 et 77 : 0, check-version-sync 0, check-machine-paths 0.

@@ -341,11 +341,23 @@ if (!t.includes(de)) { console.log('absent'); process.exit(0); }
 fs.writeFileSync(f, t.replace(de, () => vers)); console.log('applique');
 JS
 assert_eq "R4.1 — la classe est la même dans les quatre copies : détail d'un commit = AFFICHAGE_REFUSE sauf U+0009 et U+000A ; carte Équipe : tout point refusé disparaît du libellé (aucun écart sur U+0000-U+10FFFF)" "$(node "$AUX/parite-quatre.mjs" "$SCRIPTS")" "true|détail:0|équipe:0"
+# R4.2 (78-08, revue de delta F5) : l'export ILLISIBLE est utilisable tel quel par un appelant : sans drapeau g, `.test` rend le même résultat à chaque appel (avec g, `lastIndex` fait alterner les résultats).
+cat > "$AUX/illisible-etat.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+import path from 'node:path';
+const d = await import(pathToFileURL(path.join(process.argv[2], 'vf-cockpit-git-details.mjs')).href);
+const r = [1, 2, 3, 4].map(() => d.ILLISIBLE.test('a' + String.fromCodePoint(0x200b) + 'b'));
+console.log(`${d.ILLISIBLE.global}|${r.join(',')}`);
+JS
+assert_eq "R4.2 — ILLISIBLE exporté sans drapeau g : quatre .test successifs sur le même texte rendent tous true (pas d'alternance par lastIndex)" "$(node "$AUX/illisible-etat.mjs" "$SCRIPTS")" "false|true,true,true,true"
+MQG="$WORK/mut-illisible-g"; rm -rf "$MQG"; mkdir -p "$MQG"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$MQG/"
+assert_eq "M-ILLISIBLE-G.0 — mutant avec effet (l'export retrouve le drapeau g)" "$(node "$AUX/mutq.mjs" "$MQG/vf-cockpit-git-details.mjs" '\p{Cf}]/u; // la classe de' '\p{Cf}]/gu; // la classe de')" "applique"
+assert_eq "M-ILLISIBLE-G — rougit R4.2 (le drapeau g est de retour, .test alterne) alors que la parité R4.1 tient" "$(node "$AUX/illisible-etat.mjs" "$MQG")|$(node "$AUX/parite-quatre.mjs" "$MQG")" "true|true,false,true,false|true|détail:0|équipe:0"
 MQE="$WORK/mut-classe-equipe"; rm -rf "$MQE"; mkdir -p "$MQE"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$MQE/"
 assert_eq "M-CLASSE-EQUIPE.0 — mutant avec effet (la carte Équipe retrouve l'ancienne classe, bidi seul, sans Cf)" "$(node "$AUX/mutq.mjs" "$MQE/vf-cockpit-equipe-carte.mjs" '\u2029\p{Cf}]/gu' '\u2029\u202a-\u202e\u2066-\u2069]/g')" "applique"
 assert_eq "M-CLASSE-EQUIPE — rougit R4.1 sur la carte Équipe seule (écarts : U+200B et les autres Cf hors bidi), pas sur le détail" "$(node "$AUX/parite-quatre.mjs" "$MQE" | sed -E 's/équipe:[1-9][0-9]*.*/équipe:>0/')" "true|détail:0|équipe:>0"
 MQD="$WORK/mut-classe-detail"; rm -rf "$MQD"; mkdir -p "$MQD"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$MQD/"
-assert_eq "M-CLASSE-DETAIL.0 — mutant avec effet (ILLISIBLE du détail perd \\p{Cf})" "$(node "$AUX/mutq.mjs" "$MQD/vf-cockpit-git-details.mjs" '\u2028\u2029\p{Cf}]/gu' '\u2028\u2029]/gu')" "applique"
+assert_eq "M-CLASSE-DETAIL.0 — mutant avec effet (ILLISIBLE du détail perd \\p{Cf})" "$(node "$AUX/mutq.mjs" "$MQD/vf-cockpit-git-details.mjs" '\u2028\u2029\p{Cf}]/u' '\u2028\u2029]/u')" "applique"
 assert_eq "M-CLASSE-DETAIL — rougit R4.1 sur le détail seul (des points Cf ne sont plus retirés), pas sur la carte Équipe" "$(node "$AUX/parite-quatre.mjs" "$MQD" | sed -E 's/détail:[1-9][0-9]*[^|]*/détail:>0/')" "true|détail:>0|équipe:0"
 
 # R5 (S8) : la grille d'espacement de css-jetons.mjs est celle figée par la 71.5 {2, 4, 6, 8, 12, 16, 20, 24, 32} : 10 px et 14 px sont refusés, 20 px passe

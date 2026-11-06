@@ -125,3 +125,12 @@ S7 (helpers `realpath` et `gaucheDroite`/`compteLR` dupliqués), S10 (bash de `d
 ### Suites rejouées (correction revue serveur, après les six commits de code)
 
 `test-cockpit-git.sh` 99/0 · `git-details` 129/0 · `git-signature` 45/0/0 sauté · `git-commandes` 49/0 · `git-env` 130/0 · `equipe` 157/0 · `serveur` 70/0 · `vendor` 118/0 · `who` 107/0 · `securite` 91/0 · `assemblage` 40/0 · `git-graphe` 50/0 · importeurs des fichiers modifiés (grep) : `path-enfants` 37/0, `retard` 40/0, `avancement` 62/0, `signal` 76/0, `forme-claude` 56/0, `projet` 162/0, `vie` 64/0, `terminal-lanceur` 111/0. Toutes rc 0. Non rejouées (interdites, autre worker) : `git-entete`, `git-tiroir`, `git-e2e`, `responsive`, qui importent `vf-cockpit-build.mjs` et la route `/api/vf/git` : à rejouer par le manager après la jonction.
+
+
+## Correction delta (mgr78-reprise, 2026-11-06) — serveur
+
+- F2 : `/api/vf/git/entete` passe par `enteteAsync` (miroir asynchrone, parité S9.2 verte) et `etatWorktrees` par `brancheBaseAsync` : aucune route Git du cockpit ne lance de git synchrone sur la boucle (P78-D-41 étendue). Témoins S9.3 (requête légère servie avant la fin) et X6.3 (retard maximal d'une horloge de 20 ms : la forme « requête légère » de X6 ne voyait pas un git synchrone parti après plusieurs `await`). Mutants M-SYNC-ENTETE et M-SYNC-BASE rougissent leur témoin.
+- F5 : `ILLISIBLE` exporté sans drapeau `g` (usage interne `ILLISIBLE_G`) ; R4.2 + mutant M-ILLISIBLE-G ; parité R4.1 intacte. En-têtes de module corrigés (`vf-cockpit-git.mjs:2`, `vf-cockpit-git-details.mjs`).
+- F3 et F4 : documentation (CHANGELOG 1.4.0 : fermeture du moteur `gitFerme`, contrat `worktrees` nullable, classe `\p{Cf}` étendue à la carte Équipe, canal « arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 » sur P78-D-36, D-37 et D-39 ; README : fermeture du moteur, canal de la ratification de P78-D-34).
+- F7, F8 : `no-op` (hors mandat).
+- Suites rejouées sur l'état final (rc) : git-tiroir 0, git-entete 0, git-e2e 0, responsive 0, git 0, git-details 0, git-commandes 0, git-signature 0, serveur 0, projet 0, chrome-fr 0, css-jetons.mjs sur 76 et 77 : 0, check-version-sync 0, check-machine-paths 0.

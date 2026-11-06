@@ -3,7 +3,7 @@
 // Les couleurs passent par des classes `vf-git-t0..t5` (feuille dans 77-vf-git-tiroir.js) ; le comportement (ouverture, GET, clavier) est dans ce fichier-là.
 // Exposé : window.VFGitRendu (+ `section`, utilisé par le tiroir pour le Graphe). Point d'extension paresseux (78-10, détail d'un commit) : si window.VFGitExt existe à l'appel, ses crochets `rangee(li, r)` sont appelés ; jamais requis, aucun ordre de chargement imposé.
 (() => {
-  const NS = 'http://www.w3.org/2000/svg', LARG = 16, NOEUD = 4, TRAIT = 1.75, RAYON = 16;
+  const COPIE = 'M9 9h10v10H9zM5 15V5h10', COCHE = 'M5 13l4 4L19 7', NS = 'http://www.w3.org/2000/svg', LARG = 16, NOEUD = 4, TRAIT = 1.75, RAYON = 16;
   const el = (tag, cls, txt, at) => {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -20,6 +20,7 @@
   const crochet = (nom, ...a) => { const E = window.VFGitExt; if (E && typeof E[nom] === 'function') { try { E[nom](...a); } catch (e) { void e; } } };
   const ico = (d) => { const s = sv('svg', { class: 'i', viewBox: '0 0 24 24', 'aria-hidden': 'true' }); sv('path', { d }, s); return s; };
   const pl = (n, mot, plur) => `${n} ${n > 1 ? plur || mot + 's' : mot}`;
+  const avance = (a) => a == null ? el('span', 'meta', '—', { role: 'img', 'aria-label': 'avance inconnue', title: 'avance inconnue' }) : el('span', 'meta', pl(a, 'commit')); // null = inconnu (dépôt sans base, au-delà de la limite) : jamais « 0 commit »
   const relatif = (at, maintenant) => {
     const s = Math.max(0, Math.floor(((maintenant == null ? Date.now() : maintenant) - at * 1000) / 1000)), m = Math.floor(s / 60), h = Math.floor(m / 60), j = Math.floor(h / 24);
     if (s < 60) return "à l'instant";
@@ -35,17 +36,17 @@
     if (texte == null) return el('div', 'vf-git-sans', 'Aucune commande proposée');
     const ligne = el('div', 'vf-git-cmd'), code = el('code', null, texte, { title: texte }), retour = el('span', 'vf-git-retour');
     const b = el('button', 'vf-git-btn', null, { type: 'button', 'aria-label': `Copier la commande : ${texte}` });
-    b.appendChild(ico('M9 9h10v10H9zM5 15V5h10'));
+    b.appendChild(ico(COPIE));
     ligne.append(code, retour, b);
     let minuterie = null;
-    const dire = (t) => { retour.textContent = t; clearTimeout(minuterie); minuterie = setTimeout(() => { retour.textContent = ''; }, 1600); };
+    const dire = (t, coche) => { retour.textContent = t; b.replaceChildren(ico(coche ? COCHE : COPIE)); clearTimeout(minuterie); minuterie = setTimeout(() => { retour.textContent = ''; b.replaceChildren(ico(COPIE)); }, 1600); }; // coche le temps du « Copiée »
     const refus = () => { // API presse-papiers refusée : la commande est sélectionnée, la rangée le dit
       const r = document.createRange(); r.selectNodeContents(code);
       const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
       dire('Copie impossible, commande sélectionnée');
     };
     b.addEventListener('click', () => {
-      try { navigator.clipboard.writeText(code.textContent).then(() => { dire('Copiée'); if (annonce) annonce('Commande copiée'); }, refus); } catch (e) { refus(); }
+      try { navigator.clipboard.writeText(code.textContent).then(() => { dire('Copiée', true); if (annonce) annonce('Commande copiée'); }, refus); } catch (e) { refus(); }
     });
     return ligne;
   };
@@ -144,7 +145,7 @@
     }
     if (parBranche && parBranche.length) {
       d.appendChild(el('div', 'vf-git-sous', 'Par branche — avance sur la base'));
-      for (const p of parBranche) d.appendChild(ligne(mono(p.nom), el('span', 'meta', pl(p.avance || 0, 'commit')), el('span', null, p.dernier ? relatif(p.dernier) : '')));
+      for (const p of parBranche) d.appendChild(ligne(mono(p.nom), avance(p.avance), el('span', null, p.dernier ? relatif(p.dernier) : '')));
     }
     return section('Auteurs et activité', auteurs.length, d, false, 'vf-git-s-aut');
   };

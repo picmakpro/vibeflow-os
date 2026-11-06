@@ -654,7 +654,7 @@ const [base] = ARGS; const out = {};
 await ouvrirTiroir(base, true);
 const sig = () => s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'x' } }))`);
 await s.ev(`(() => { window.__ann = []; const t = document.querySelector('#vf-git-tiroir');
-  new MutationObserver((ms) => { for (const m of ms) { const e = m.target.nodeType === 1 ? m.target : m.target.parentElement; if (e && e.closest('.vf-git-live-det') && m.addedNodes.length) window.__ann.push([...m.addedNodes].map((n) => n.textContent).join('')); } }).observe(t, { subtree: true, childList: true, characterData: true }); })()`);
+  new MutationObserver((ms) => { for (const m of ms) { const e = m.target.nodeType === 1 ? m.target : m.target.parentElement; if (e && e.closest('.vf-git-live') && m.addedNodes.length) window.__ann.push([...m.addedNodes].map((n) => n.textContent).join('')); } }).observe(t, { subtree: true, childList: true, characterData: true }); })()`);
 // b) 1 : rien ne change
 await sig(); await pause(900);
 out.inchange = await s.ev(`window.__ann.splice(0)`);
@@ -690,6 +690,104 @@ JS
   assert_eq "D12.4 — deux relectures des worktrees en vol : les deux demandes sont parties (témoin)" "$(jq_ "$R12" 'j.demandes' 2>/dev/null)" "2"
   assert_eq "D12.4 — réponses rendues dans le désordre (la récente d'abord) : seule la dernière demande reste affichée (9 modifiés, pas 3)" "$(jq_ "$R12" '[/9 modifiés/.test(j.pastilles), /3 modifiés/.test(j.pastilles)].join("|")' 2>/dev/null)" "true|false"
   assert_eq "D12.x — aucune erreur de page" "$(jq_ "$R12" 'j.errs.length' 2>/dev/null)" "0"
+  # D13 (78-10, revue de delta F1, P78-D-42) : un compteur nullable ne s'affiche jamais « 0 ». Réponse figée : une branche sans base (avance: null), la base elle-même (avance: 0), une branche à 3 ; un worktree dont avance est null et retard 1.
+  cat > "$AUX/d13.js" <<'JS'
+const [base] = ARGS; const out = {};
+await fenetre(1440, 900); await s.naviguer(base + '/'); await pret();
+await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne');
+await s.ev(`(() => { window.__vfGit.reponse.parBranche = [{ nom: 'main', avance: 0, dernier: 1793999999 }, { nom: 'feat/inconnue', avance: null, dernier: 1793904000 }, { nom: 'feat/f4', avance: 3, dernier: 1793904000 }];
+  window.__vfDet.worktrees.worktrees[0].avance = null; window.__vfDet.worktrees.worktrees[0].retard = 1; })()`);
+await s.ev(`document.querySelector('#vf-git-ligne').click()`);
+await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l .vf-git-etat-wt').length === 3`, 'tiroir ouvert, états des worktrees');
+await s.ev(`document.querySelector('.vf-git-sec-t[aria-controls="vf-git-s-aut"]').click()`);
+out.branches = await s.ev(`(() => { const l = []; let e = document.querySelector('#vf-git-s-aut .vf-git-sous'); e = e && e.nextElementSibling;
+  for (; e; e = e.nextElementSibling) { const m = e.querySelector('.meta'); l.push({ nom: e.querySelector('.vf-git-mono').textContent, txt: m.textContent, label: m.getAttribute('aria-label'), chiffre: /[0-9]/.test(m.textContent) }); } return l; })()`);
+out.wt = await s.ev(`[...document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l')][0].querySelector('.vf-git-p-mono')?.textContent ?? null`);
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d13.js"; } > "$AUX/d13-complet.js"
+  R13="$(cdp "$AUX/d13-complet.js" "$BASE")"
+  [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$R13" > "$TIROIR_TRACE-d13.json"
+  assert_eq "D13.1 — avance null : « — » sans chiffre et libellé accessible « avance inconnue », jamais « 0 commit »" "$(jq_ "$R13" '(j.branches.find((b) => b.nom === "feat/inconnue") || {}).txt + "|" + (j.branches.find((b) => b.nom === "feat/inconnue") || {}).chiffre + "|" + (j.branches.find((b) => b.nom === "feat/inconnue") || {}).label' 2>/dev/null)" "—|false|avance inconnue"
+  assert_eq "D13.2 — témoins positifs : la base (avance 0) dit « 0 commit », la branche à 3 dit « 3 commits », sans libellé inconnu" "$(jq_ "$R13" 'j.branches.filter((b) => b.nom !== "feat/inconnue").map((b) => b.txt + ":" + b.label).join("|")' 2>/dev/null)" "0 commit:null|3 commits:null"
+  assert_eq "D13.3 — pastille d'un worktree dont l'avance est inconnue : « ↑— ↓1 », jamais « ↑0 »" "$(jq_ "$R13" 'j.wt' 2>/dev/null)" "↑— ↓1"
+  assert_eq "D13.x — aucune erreur de page" "$(jq_ "$R13" 'j.errs.length' 2>/dev/null)" "0"
+  # D14 (78-10, revue de delta F6b) : la région vive annonce un échec, puis rien sur un succès sans changement, puis annonce de nouveau le second échec (le drapeau « déjà dit » retombe au succès).
+  cat > "$AUX/d14.js" <<'JS'
+const [base] = ARGS; const out = {};
+await ouvrirTiroir(base, true);
+const sig = () => s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'x' } }))`);
+await s.ev(`(() => { window.__ann = []; const t = document.querySelector('#vf-git-tiroir');
+  new MutationObserver((ms) => { for (const m of ms) { const e = m.target.nodeType === 1 ? m.target : m.target.parentElement; if (e && e.closest('.vf-git-live') && m.addedNodes.length) window.__ann.push([...m.addedNodes].map((n) => n.textContent).join('')); } }).observe(t, { subtree: true, childList: true, characterData: true }); })()`);
+await s.ev(`window.__vfGit.reponse = { schema: 'autre@1', etat: 'ok', rangees: [] }`);
+await sig(); await pause(900);
+out.echec1 = await s.ev(`window.__ann.splice(0)`);
+await s.ev(`window.__vfGit.reponse = JSON.parse(JSON.stringify(window.__TEMOIN_REF))`);
+await sig(); await pause(900);
+out.succes = await s.ev(`window.__ann.splice(0)`);
+await s.ev(`window.__vfGit.reponse = { schema: 'autre@1', etat: 'ok', rangees: [] }`);
+await sig(); await pause(900);
+out.echec2 = await s.ev(`window.__ann.splice(0)`);
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d14.js"; } > "$AUX/d14-complet.js"
+  R14="$(cdp "$AUX/d14-complet.js" "$BASE")"
+  [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$R14" > "$TIROIR_TRACE-d14.json"
+  assert_eq "D14.1 — échec, succès, échec : le premier échec est annoncé, le succès ne dit jamais « indisponible »" "$(jq_ "$R14" '[j.echec1.length, /indisponible/.test(j.echec1[0] || ""), j.succes.some((x) => /indisponible/.test(x))].join("|")' 2>/dev/null)" "1|true|false"
+  assert_eq "D14.2 — le second échec, après un succès, est annoncé de nouveau (une fois)" "$(jq_ "$R14" '[j.echec2.length, /indisponible/.test(j.echec2[0] || "")].join("|")' 2>/dev/null)" "1|true"
+  assert_eq "D14.x — aucune erreur de page" "$(jq_ "$R14" 'j.errs.length' 2>/dev/null)" "0"
+  # D15 (78-10, recette G4 à G6) : remplissage neutre des barres d'activité, contrastes >= 4,5:1 dans les deux thèmes, une seule région vive, coche le temps du « Copiée ».
+  cat > "$AUX/d15.js" <<'JS'
+const [base] = ARGS; const out = {};
+await fenetre(1440, 900); await s.naviguer(base + '/'); await pret();
+await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne');
+await s.ev(`(() => { const w = window.__vfGit.reponse.worktrees.find((x) => !x.ici); if (w) w.commande = null; })()`); // une rangée « Aucune commande proposée »
+await s.ev(`document.querySelector('#vf-git-ligne').click()`);
+await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l .vf-git-etat-wt').length === 3`, 'tiroir ouvert, états des worktrees');
+await s.ev(`document.querySelector('.vf-git-sec-t[aria-controls="vf-git-s-aut"]').click()`);
+// G4 : remplissage de barre = texte neutre ; la même classe hors du tiroir reste telle quelle
+out.barre = await s.ev(`(() => { const i = document.querySelector('#vf-git-s-aut .vf-bar i'), p = document.createElement('div'); p.className = 'vf-bar'; p.appendChild(document.createElement('i')); document.body.appendChild(p);
+  const hors = getComputedStyle(p.firstChild).backgroundColor; p.remove(); return { dans: getComputedStyle(i).backgroundColor, neutre: window.__couleur('--text-3'), hors }; })()`);
+// G5 : contrastes (composition alpha des fonds jusqu'au premier fond opaque), deux thèmes
+const mesure = `(() => { const num = (c) => (c.match(/[\\d.]+/g) || []).map(Number), over = (f, b) => { const a = f[3] == null ? 1 : f[3]; return [0, 1, 2].map((k) => f[k] * a + b[k] * (1 - a)).concat(1); };
+  const fond = (e) => { const L = []; for (let n = e; n; n = n.parentElement) { const c = num(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c[3] == null || c[3] > 0)) { L.push(c); if (c[3] == null || c[3] === 1) break; } } let b = [255, 255, 255, 1]; if (L.length && (L[L.length - 1][3] == null || L[L.length - 1][3] === 1)) b = L.pop().slice(0, 3).concat(1); while (L.length) b = over(L.pop(), b); return b; };
+  const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const ratio = (e) => { const b = fond(e), t = num(getComputedStyle(e).color), c = over(t, b), x = lum(c), y = lum(b), h = Math.max(x, y), l = Math.min(x, y); return Math.round(((h + 0.05) / (l + 0.05)) * 100) / 100; };
+  const min = (sel) => { const L = [...document.querySelectorAll(sel)]; return L.length ? Math.min(...L.map(ratio)) : -1; };
+  return { sans: min('#vf-git-tiroir .vf-git-sans'), meta: min('#vf-git-tiroir .meta'), kbd: min('.vf-git-ligne .kbd'), pastille: min('#vf-git-tiroir .vf-git-pastille') }; })()`;
+out.sombre = await s.ev(mesure);
+await s.ev(`document.documentElement.setAttribute('data-theme', 'light')`); await pause(300);
+out.clair = await s.ev(mesure);
+await s.ev(`document.documentElement.setAttribute('data-theme', 'dark')`);
+// G6 : une seule région vive, une annonce par copie, coche le temps du « Copiée »
+await s.ev(`(() => { navigator.clipboard.writeText = () => Promise.resolve(); window.__ann = []; const t = document.querySelector('#vf-git-tiroir');
+  new MutationObserver((ms) => { for (const m of ms) { const r = m.target.nodeType === 1 ? m.target.closest('[aria-live]') : m.target.parentElement && m.target.parentElement.closest('[aria-live]'); if (r && m.addedNodes.length) window.__ann.push([r.className, [...m.addedNodes].map((n) => n.textContent).join('')]); } }).observe(t, { subtree: true, childList: true, characterData: true }); })()`);
+const bouton = `document.querySelector('#vf-git-s-wt .vf-git-cmd .vf-git-btn')`;
+out.iconeAvant = await s.ev(`${bouton}.querySelector('path').getAttribute('d')`);
+await s.ev(`${bouton}.click()`); await pause(250);
+out.iconeCoche = await s.ev(`${bouton}.querySelector('path').getAttribute('d')`);
+out.retour = await s.ev(`${bouton}.parentElement.querySelector('.vf-git-retour').textContent`);
+await s.ev(`${LIGNES}[2].click()`);
+await s.attendre(`!!document.querySelector('.vf-git-detail .vf-git-d-fichiers')`, 'détail ouvert');
+await s.ev(`document.querySelector('.vf-git-det .vf-git-cmd .vf-git-btn').click()`); await pause(250);
+await pause(1700);
+out.iconeApres = await s.ev(`${bouton}.querySelector('path').getAttribute('d')`);
+out.regions = await s.ev(`document.querySelectorAll('#vf-git-tiroir [aria-live]').length`);
+out.copies = await s.ev(`window.__ann.filter((a) => /Commande copiée/.test(a[1]))`);
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d15.js"; } > "$AUX/d15-complet.js"
+  R15="$(cdp "$AUX/d15-complet.js" "$BASE")"
+  [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$R15" > "$TIROIR_TRACE-d15.json"
+  assert_eq "D15.1 — barres d'activité : remplissage en texte neutre (--text-3), jamais le vert d'état ; la même classe hors du tiroir garde son fond" "$(jq_ "$R15" '[j.barre.dans === j.barre.neutre, j.barre.hors !== j.barre.neutre].join("|")' 2>/dev/null)" "true|true"
+  assert_eq "D15.2 — contraste >= 4,5:1 en sombre : « Aucune commande proposée », pilules .meta, kbd « g », pastilles" "$(jq_ "$R15" 'Object.values(j.sombre).every((v) => v >= 4.5) ? "ok" : JSON.stringify(j.sombre)' 2>/dev/null)" "ok"
+  assert_eq "D15.3 — contraste >= 4,5:1 en clair : mêmes éléments" "$(jq_ "$R15" 'Object.values(j.clair).every((v) => v >= 4.5) ? "ok" : JSON.stringify(j.clair)' 2>/dev/null)" "ok"
+  assert_eq "D15.4 — une seule région aria-live dans le tiroir, une annonce « Commande copiée » par copie (deux copies : deux annonces), toutes de la même région" "$(jq_ "$R15" '[j.regions, j.copies.length, new Set(j.copies.map((c) => c[0])).size].join("|")' 2>/dev/null)" "1|2|1"
+  assert_eq "D15.5 — icône de copie : coche le temps du « Copiée », puis de nouveau l'icône de copie" "$(jq_ "$R15" '[j.iconeAvant, j.iconeCoche, j.retour, j.iconeApres === j.iconeAvant].join("|")' 2>/dev/null)" "M9 9h10v10H9zM5 15V5h10|M5 13l4 4L19 7|Copiée|true"
+  assert_eq "D15.x — aucune erreur de page" "$(jq_ "$R15" 'j.errs.length' 2>/dev/null)" "0"
   stop_srv
   # --- copies privées du module pour les mutants (build lit assets/ui/*.js) : chaque mutant a son propre lab et son propre serveur ---
   mkmod() { local d="$WORK/mod-$1"; mkdir -p "$d/scripts" "$d/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$d/skills/cockpit-moteur"; echo "$d/scripts"; }
@@ -720,6 +818,20 @@ JS
   assert_eq "M-SEQ-WT — rougit D12.4 (la réponse la plus ancienne écrase la plus récente : 3 modifiés) alors que les deux demandes sont parties" "$(jq_ "$RM" '[j.demandes, /9 modifiés/.test(j.pastilles), /3 modifiés/.test(j.pastilles)].join("|")' 2>/dev/null)" "2|false|true"
   mutant M-ANNONCE 77-vf-git-vue-detail.js "if (g.change || w.change) annoncer('Historique mis à jour');" "annoncer('Historique mis à jour');" d12-complet.js
   assert_eq "M-ANNONCE — rougit D12.1 (une relecture sans changement annonce quand même) alors que l'annonce d'un vrai changement (D12.2) est là" "$(jq_ "$RM" '[j.inchange.length > 0, j.change.length >= 1].join("|")' 2>/dev/null)" "true|true"
+  mutant M-AVANCE-ZERO 77-vf-git-rendu.js "const avance = (a) => a == null ?" "const avance = (a) => (a = a || 0) == null ?" d13-complet.js
+  assert_eq "M-AVANCE-ZERO — rougit D13.1 (le retour à « avance || 0 » affiche « 0 commit » pour un avance null) alors que les témoins positifs D13.2 tiennent" "$(jq_ "$RM" '[(j.branches.find((b) => b.nom === "feat/inconnue") || {}).txt, j.branches.map((b) => b.txt).join("/")].join("|")' 2>/dev/null)" "0 commit|0 commit/0 commit/3 commits"
+  mutant M-AVANCE-WT 77-vf-git-vue-detail.js "const nb = (n) => (n == null ? '—' : n);" "const nb = (n) => (n || 0);" d13-complet.js
+  assert_eq "M-AVANCE-WT — rougit D13.3 (la pastille d'un worktree à avance inconnue redit « ↑0 ») alors que les branches D13.1 tiennent" "$(jq_ "$RM" '[j.wt, (j.branches.find((b) => b.nom === "feat/inconnue") || {}).txt].join("|")' 2>/dev/null)" "↑0 ↓1|—"
+  mutant M-ECHEC-DIT 77-vf-git-vue-detail.js $'echecDit = false;\n      if (g.change || w.change)' $'if (g.change || w.change)' d14-complet.js
+  assert_eq "M-ECHEC-DIT — rougit D14.2 (le drapeau ne retombe plus au succès : le second échec n'est pas annoncé) alors que le premier échec (D14.1) l'est" "$(jq_ "$RM" '[j.echec1.length, j.succes.some((x) => /indisponible/.test(x)), j.echec2.length].join("|")' 2>/dev/null)" "1|false|0"
+  mutant M-BARRE-VERT 77-vf-git-tiroir.js "#vf-git-tiroir .vf-bar i { background: var(--text-3); }" "" d15-complet.js
+  assert_eq "M-BARRE-VERT — rougit D15.1 (la barre retrouve le vert d'état de .vf-bar) alors que la barre existe et que la même classe hors du tiroir est intacte" "$(jq_ "$RM" '[j.barre.dans === j.barre.neutre, j.barre.hors !== j.barre.neutre].join("|")' 2>/dev/null)" "false|true"
+  mutant M-CONTRASTE-SANS 77-vf-git-tiroir.js ".vf-git-sans { font-size: 11.5px; color: var(--text-2); }" ".vf-git-sans { font-size: 11.5px; color: var(--text-4); }" d15-complet.js
+  assert_eq "M-CONTRASTE-SANS — rougit D15.2 sur « Aucune commande proposée » seule (sous 4,5:1) alors que les pilules et le kbd tiennent" "$(jq_ "$RM" '[j.sombre.sans < 4.5, j.sombre.meta >= 4.5, j.sombre.kbd >= 4.5].join("|")' 2>/dev/null)" "true|true|true"
+  mutant M-LIVE-DOUBLE 77-vf-git-vue-detail.js "let l = tiroir && tiroir.querySelector('.vf-git-live');" "let l = tiroir && tiroir.querySelector('.vf-git-live-det'); if (!l && tiroir) { l = el('div', 'vf-git-live vf-git-live-det', null, { 'aria-live': 'polite' }); tiroir.appendChild(l); }" d15-complet.js
+  assert_eq "M-LIVE-DOUBLE — rougit D15.4 (deux régions vives, deux régions distinctes pour les deux annonces) alors que chaque copie est annoncée" "$(jq_ "$RM" '[j.regions, j.copies.length, new Set(j.copies.map((c) => c[0])).size].join("|")' 2>/dev/null)" "2|2|2"
+  mutant M-COCHE 77-vf-git-rendu.js "dire('Copiée', true);" "dire('Copiée');" d15-complet.js
+  assert_eq "M-COCHE — rougit D15.5 (l'icône reste celle de la copie pendant le « Copiée ») alors que le retour textuel est là" "$(jq_ "$RM" '[j.iconeCoche === j.iconeAvant, j.retour].join("|")' 2>/dev/null)" "true|Copiée"
 fi
 
 echo "=== D10 — correction design de la critique fraîche (78-10 : F2, F12, F14, F15) ==="

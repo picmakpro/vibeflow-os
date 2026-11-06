@@ -154,3 +154,21 @@ Finding S2 / P1 de la revue de code (SHA jugé `8edb0bf7`, GITC-11, P78-D-15) : 
 ## Correction revue page — P78-D-40 : libellé « Par branche — avance sur la base »
 
 Rouge avant : `D10.5` de `test-cockpit-git-tiroir.sh` (1440 et 390 px), attendu `Par branche — avance sur la base`, obtenu `Par branche (30 jours)` (`78-rv-rouge2-git-tiroir.log`). Vert après : `78-rv-dbg-git-tiroir.log`, rc 0. `78-UI-SPEC.md` ligne 121 mise à jour (référence P78-D-40).
+
+
+## Correction delta et recette (mgr78-reprise, 2026-11-06) — F6a, G1, G2, G3 (en-tête)
+
+Journaux dans `/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/13e1f1c3-f616-4fb2-9ff3-f349e3c3e010/scratchpad/` : rouge `78-delta-fix-r-git-entete.log`, vert `78-delta-fix-m-git-entete.log`.
+
+**G1 (MAJEUR) — branche périmée à chaque chargement.** Témoin H8 (`test-cockpit-git-entete.sh`) : lab jetable avec un vrai worktree, assemblé sur `feat/x`, puis `git switch -c feat/y` SANS réassemblage ; chaque onglet est chargé.
+- Rouge avant : H8.1 `/` attendu `feat/y`, obtenu `feat/x` ; lectures de `/api/vf/git/entete` attendu 1, obtenu 0 ; idem `/equipe.html`. (`/project.html` était vert d'emblée : le signal émis au chargement relisait déjà l'en-tête.)
+- Correction : `76-vf-git-entete.js` relit l'en-tête une fois au chargement (`relire()`), et `V` est remplacé par chaque lecture.
+- Vert après : trois onglets, `feat/y` en moins de 2 s, exactement une lecture par chargement (y compris sur Projet, où le signal de chargement et la lecture se confondent en une seule).
+- Mutant M-CHARGEMENT (appel `relire()` du chargement retiré) : H8.1 rougit `feat/x|0|true` (l'écart du point médian, lui, reste bon).
+
+**G2 — bloc de vue Code.** H8.2 : rouge avant `Le code, branche feat/x` (attendu `feat/y`) ; au signal, `Le code, branche feat/x|feat/z` (attendu `Le code, branche feat/z|feat/z`). Correction : `lire()` réécrit le bloc de vue Code quand la lecture change. Vert après. Mutant M-BLOC-VUE (réécriture retirée) : `feat/y|Le code, branche feat/x`.
+
+**G3 — écart avant le point médian.** H8.3 (bord droit de `.vf-git-branche`, point et mot suivant mesurés par `Range`) : rouge avant `false|false` sur les trois onglets. Correction : `white-space: pre` sur `.vf-git-wt` (l'espace de tête n'est plus effondré ; le texte du DOM est inchangé, aucune marge nouvelle). Vert après. Mutant M-ECART (règle retirée) : `false|feat/y`.
+
+**F6a — retour à `absent`.** `test-cockpit-responsive.sh` D39.7 : à 1 024 px, Git présent (drapeau, 152 px, invite « Chercher… »), puis un signal dont la relecture de l'en-tête rend `absent` : drapeau retiré, 200 px, invite d'origine, ouvreur et seconde ligne cachés. Comportement déjà correct, témoin ajouté. Mutant D39m3 (`setAttribute` inconditionnel) rougit D39.7b : `true|152px|true|152px|true`.
+Conséquence sur le témoin D39m2 : la page relisant l'en-tête au chargement, la copie du lab du mutant doit rester un dépôt (`git init`), sinon « absent » retire le drapeau avant la mesure (le défaut vient du lab de la copie, plus du mutant).

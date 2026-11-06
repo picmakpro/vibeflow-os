@@ -83,3 +83,26 @@ Finding S5 de la revue de code : `chargerWt` sans garde de séquence ; `rafraich
 - M-ANNONCE (`if (g.change || w.change) annoncer(...)` remplacé par l'annonce inconditionnelle) : D12.1 rougit (`true|true` : annonce sans changement ET l'annonce d'un vrai changement toujours présente).
 
 **Contrat.** `77-vf-git-tiroir.js` : `recharger()` rend `{ ok, change }` (`null` si une relecture plus récente a pris la main) ; `chargerWt()` aussi ; `rafraichir` n'annonce qu'une relecture réussie qui a changé quelque chose, l'échec une seule fois par série d'échecs (réarmé au premier succès).
+
+
+## Correction delta (mgr78-reprise, 2026-11-06) — F1, F4b, F5 (page) et recette G4 à G6 (tiroir)
+
+Journaux dans `/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/13e1f1c3-f616-4fb2-9ff3-f349e3c3e010/scratchpad/` : rouge `78-delta-fix-rouge-tiroir.log` (D13, D14) et `78-delta-fix-m-tiroir-ancien.log` (suite complète contre le module de `a5ca8852`, `TIROIR_SCRIPTS`), vert `78-delta-fix-m-git-tiroir.log`.
+
+**F1 (MAJEUR) — `avance: null` affiché « 0 commit ».** Témoin D13 (`test-cockpit-git-tiroir.sh`, réponse figée modifiée dans la page : une branche `avance: null`, la base `avance: 0`, une branche à 3 ; un worktree `avance: null, retard: 1`).
+- Rouge avant : D13.1 attendu `—|false|avance inconnue`, obtenu `0 commit|true|null` ; D13.3 attendu `↑— ↓1`, obtenu `↑0 ↓1`. D13.2 (témoins positifs : base `0 commit`, branche `3 commits`) verte d'emblée.
+- Vert après : D13.1 à D13.3 verts (`78-delta-fix-m-git-tiroir.log`).
+- Mutants : M-AVANCE-ZERO (`const avance = (a) => a == null ?` remplacé par `(a = a || 0) == null ?`, le retour à `|| 0`) rougit D13.1 (`0 commit|0 commit/0 commit/3 commits`) ; M-AVANCE-WT (`nb` remplacé par `n || 0`) rougit D13.3 (`↑0 ↓1|—`).
+- Relevé des autres compteurs nullables des fichiers 77 (`grep` de `|| 0` et des `null` du schéma `vibeflow/cockpit-git-worktrees@1`) : seul autre site, `pastilles` de `77-vf-git-vue-detail.js` (`↑${p.avance || 0} ↓${p.retard || 0}`) : corrigé par `nb`. `modifies`/`nonSuivis`/`propre` null sont déjà rendus « état illisible » ; `avanceOrigin`/`retardOrigin`/`commande` ne sont pas rendus en chiffre.
+
+**F4b — annonce du second échec (D14).** Comportement déjà correct, témoin manquant ajouté : échec, succès, échec ; le premier et le second échec sont annoncés, le succès ne dit jamais « indisponible ». Mutant M-ECHEC-DIT (retrait de `echecDit = false;`) rougit D14.2 : `1|false|0` (le second échec n'est pas annoncé alors que le premier l'a été).
+
+**F5 (page : annonces).** Les témoins D12 et D14 lisent désormais l'unique région `.vf-git-live`.
+
+**G4 — barres d'activité en vert d'état.** D15.1 : remplissage = `--text-3`, la même classe hors du tiroir garde son fond. Mutant M-BARRE-VERT (règle `#vf-git-tiroir .vf-bar i` retirée) rougit D15.1 : `false|true`.
+
+**G5 — contrastes.** D15.2 (sombre) et D15.3 (clair) : « Aucune commande proposée », `.meta`, kbd « g », pastilles >= 4,5:1 (composition alpha des fonds). Rouge avant (module de `a5ca8852`, `78-delta-fix-m-tiroir-ancien.log`) : sombre `{"sans":2.35,"meta":3.99,"kbd":3.66,"pastille":7.58}` ; clair `{"sans":4.81,"meta":5.26,"kbd":4.43,"pastille":8.82}`. Rouge avant aussi : D15.1 `false|true` (barre verte), D15.4 `2|2|2` (deux régions), D15.5 icône inchangée pendant « Copiée ». Mutant M-CONTRASTE-SANS (`.vf-git-sans` retour à `--text-4`) rougit D15.2 sur « Aucune commande proposée » seule : `true|true|true`.
+
+**G6 — une région vive, coche.** D15.4 : une seule région `aria-live` dans le tiroir, une annonce « Commande copiée » par copie (deux copies : `1|2|1`) ; D15.5 : l'icône passe à la coche le temps du « Copiée » puis revient. Mutants : M-LIVE-DOUBLE (région `.vf-git-live-det` recréée) rougit D15.4 : `2|2|2` ; M-COCHE (`dire('Copiée')` sans coche) rougit D15.5 : `true|Copiée`.
+
+**Valeurs posées (échange mécanique après rebase de la 71.5)** : aucune valeur d'espacement, de couleur ou de rayon nouvelle ; couleurs par variables existantes (`--text-2`, `--text-3`) ; `css-jetons.mjs` rc 0 sur 76 et 77.

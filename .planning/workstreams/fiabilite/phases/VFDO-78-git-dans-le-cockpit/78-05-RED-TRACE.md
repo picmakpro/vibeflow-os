@@ -126,3 +126,15 @@ R5.* de `test-cockpit-git-commandes.sh`. Rouge AVANT (grille {2…16}) : `R5.10p
 ### R7 (S11) — contrat `mention` et types nullables
 
 `test-cockpit-git-details.sh` X2.5 et X7.1b (`conf.mjs` : un type s'écrit `string|null`, `null` n'est admis que s'il est listé ; l'ancienne tolérance « une chaîne peut valoir null » est retirée). Rouge AVANT : attendu `[[],[],0]`, obtenu `[["mention"],[],0]` (X2.5 et X7.1b). Vert APRÈS : `mention` est `string|null`, et `worktree.types` déclare les champs nullables des entrées (`modifies`, `nonSuivis`, `propre`, `avance`, `retard`, `avanceOrigin`, `retardOrigin`, `commande`) ; la réponse aux quatre worktrees non vérifiés est conforme. Mutants : M-CONTRAT-MENTION → `[["mention"],[],0]` ; M-CONTRAT-PROPRE → rouge sur les quatre faux seuls (`dossier,victime,vw,w4|propre`).
+
+
+## Correction delta (mgr78-reprise, 2026-11-06) — F2, F3, F5 (serveur)
+
+Journaux dans `/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/13e1f1c3-f616-4fb2-9ff3-f349e3c3e010/scratchpad/` : rouge `78-delta-fix-r-git.log`, `78-delta-fix-r-git-commandes.log` et `78-delta-fix-x63/` (X6.3 rejoué à la main), vert `78-delta-fix-v-*.log`.
+
+**F2 — plus aucun git synchrone sur la boucle.**
+- Route `/api/vf/git/entete` : S9.3 (git emballé, `rev-parse --git-common-dir` dort 1,2 s, requête légère à 150 ms). Rouge avant : attendu `true|ok|true`, obtenu `false|ok|true`. Vert après : `true|ok|true`. Parité de l'en-tête S9.2 verte (six dépôts). Mutant M-SYNC-ENTETE (retour à `enteteGit(root)` synchrone) : `false|ok|true`.
+- `etatWorktrees` : `brancheBase` remplacé par `brancheBaseAsync`. Le témoin de forme « requête légère » ne voyait pas le git synchrone (parti après plusieurs `await`, la légère était déjà servie) : X6.3 mesure donc le retard maximal d'une horloge de 20 ms de la boucle (`symbolic-ref` dort 1,8 s). Rouge avant (rejeu à la main, `78-delta-fix-x63/lat-base.mjs`) : attendu `true|ok|true`, obtenu `false|ok|true`. Vert après : `true|ok|true`. Mutant M-SYNC-BASE (retour à `brancheBase(lab)`) : `false|ok|true`.
+
+**F5 — `ILLISIBLE` sans état.** R4.2 (`test-cockpit-git-commandes.sh`) : quatre `.test` successifs. Rouge avant : attendu `false|true,true,true,true`, obtenu `true|true,false,true,false`. Correction : export sans drapeau `g`, usage interne par `ILLISIBLE_G = new RegExp(ILLISIBLE.source, 'gu')`. Vert après ; la parité R4.1 tient. Mutant M-ILLISIBLE-G (le drapeau `g` revient sur l'export) : `true|true,false,true,false` et R4.1 verte (`true|détail:0|équipe:0`). Les mutants M-CLASSE-DETAIL et X7 M-ILLISIBLE ont suivi la nouvelle forme du littéral (`/u`).
+En-têtes de module corrigés : `vf-cockpit-git.mjs:2` (`lireGit` rend une promesse, seuls points de lancement `lancerGit` / `lancerGitAsync`), `vf-cockpit-git-details.mjs` (:5 et :123).

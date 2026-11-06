@@ -2,11 +2,11 @@
 // Exports : detailCommit(lab, sha) -> { code, corps } · etatWorktrees(lab) -> corps · lireNumstat(sortie, { max }) · lireStatusV2(sortie, { max }) · BORNES_DETAILS
 //   GET /api/vf/git/commit?sha=<40 hexa>  vibeflow/cockpit-git-commit@1   (le sha est la seule donnée de la page qui entre dans une ligne de commande git)
 //   GET /api/vf/git/worktrees             vibeflow/cockpit-git-worktrees@1 (jamais dans le filet de 5 s : le status touche l'arbre de travail)
-// Seul point de lancement : lancerGit (environnement durci, --no-ext-diff --no-textconv, filtres du dépôt vidés pour status). Ni diff, ni e-mail, ni écriture.
+// Seul point de lancement : lancerGitAsync (environnement durci, --no-ext-diff --no-textconv, filtres du dépôt vidés pour status). Ni diff, ni e-mail, ni écriture.
 import fs from 'node:fs';
 import path from 'node:path';
 import { lancerGitAsync, filtresDeclaresAsync, finDans } from './vf-cockpit-paths.mjs';
-import { nettoie, brancheBase } from './vf-cockpit-arbres.mjs';
+import { nettoie, brancheBaseAsync } from './vf-cockpit-arbres.mjs';
 import { masque } from './vf-cockpit-lecture.mjs';
 import { MOTIF_SHA, lireWorktrees } from './vf-cockpit-git-graphe.mjs';
 import { cmdCd, cmdShowStat, cmdDetacher } from './vf-cockpit-git-commandes.mjs';
@@ -18,7 +18,8 @@ const SCHEMA_COMMIT = 'vibeflow/cockpit-git-commit@1', SCHEMA_WT = 'vibeflow/coc
 export const MENTION_APPROX = 'approximatif : filtres du dépôt non exécutés';
 const MOTIF = (n) => new RegExp(`^[0-9a-f]{${n}}$`); // SHA-MOTIF : 40 (sha1) ou 64 (sha256), minuscules, rien d'autre
 const net = (s) => nettoie(s, 200);
-export const ILLISIBLE = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/gu; // la classe de `nettoie` (A8 : tout caractère de catégorie Cf), moins la fin de ligne : un message en garde
+export const ILLISIBLE = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/u; // la classe de `nettoie` (A8 : tout caractère de catégorie Cf), moins la fin de ligne : un message en garde
+const ILLISIBLE_G = new RegExp(ILLISIBLE.source, 'gu'); // usage interne : `replace` a besoin de g ; l'export, lui, n'a pas d'état (lastIndex)
 const ko = (raison) => ({ ok: false, raison });
 const motifLong = (s) => /^[0-9a-f]{40}$|^[0-9a-f]{64}$/.test(s);
 
@@ -82,7 +83,7 @@ export async function detailCommit(lab, sha) {
     const p = c[1] === '' ? [] : c[1].split(' ');
     if (!p.every(motifLong)) return ko200;
     const brut = c.slice(6).join('\0').replace(/\0$/, '').replace(/\s+$/, '');
-    const m = tronqueOctets(masque(brut.replace(ILLISIBLE, ''), BORNES_DETAILS.message * 2), BORNES_DETAILS.message);
+    const m = tronqueOctets(masque(brut.replace(ILLISIBLE_G, ''), BORNES_DETAILS.message * 2), BORNES_DETAILS.message);
     const dt = await git(['diff-tree', '-r', '-z', '--numstat', '-M', `-l${BORNES_DETAILS.renommages}`, '--no-commit-id', ...(p.length ? [`${sha}^1`, sha] : ['--root', sha]), '--'], { maxBuffer: BORNES_DETAILS.octetsNumstat }); // merge : contre le PREMIER parent seulement ; racine : --root
     const ns = dt.ok ? lireNumstat(dt.sortie) : ko('diff-tree');
     if (!ns.ok) return ko200;
@@ -120,7 +121,7 @@ export function worktreeVerifie(communReel, chemin) {
   } catch { return false; }
 }
 
-// P78-D-32 : asynchrone — tous les git de la lecture passent par `lancerGitAsync` (même point unique, mêmes options), la boucle du serveur reste libre. `brancheBase` (2 lectures de refs, quelques ms) reste synchrone.
+// P78-D-32 : asynchrone — tous les git de la lecture passent par `lancerGitAsync` (même point unique, mêmes options), la boucle du serveur reste libre.
 export async function etatWorktrees(lab) {
   const ind = (etat) => ({ schema: SCHEMA_WT, etat });
   try {
@@ -132,7 +133,7 @@ export async function etatWorktrees(lab) {
     const commun = cm.ok ? reelOuNull(cm.sortie.trim()) : null;
     if (!commun) return ind('indisponible');
     const approximatif = (await filtresDeclaresAsync(lab, lab, fin)).length > 0;
-    const nomBase = brancheBase(lab);
+    const nomBase = await brancheBaseAsync(lab, { fin });
     const locale = nomBase ? await sha(lab, `refs/heads/${nomBase}`, fin) : null, distante = nomBase ? await sha(lab, `refs/remotes/origin/${nomBase}`, fin) : null;
     const refBase = locale ? `refs/heads/${nomBase}` : distante ? `refs/remotes/origin/${nomBase}` : null;
     const refOrigine = locale && distante && locale !== distante ? `refs/remotes/origin/${nomBase}` : null; // distante seulement quand elle diverge de la locale

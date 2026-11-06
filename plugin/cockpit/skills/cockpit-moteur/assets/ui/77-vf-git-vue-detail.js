@@ -35,10 +35,9 @@
   const lire = (url) => fetch(url, { method: 'GET', headers: { 'x-floorplan-token': (window.FLOORPLAN_SERVER || {}).token || '' }, cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   const lignes = () => [...document.querySelectorAll('#vf-git-tiroir li[role=option]')];
   const corps = () => document.querySelector('#vf-git-tiroir .vf-git-corps');
-  const annoncer = (t) => { // région vive propre à cette vue, créée à la première annonce
+  const annoncer = (t) => { // l'unique région vive du tiroir (celle de 77-vf-git-tiroir.js) : une annonce, une région
     const tiroir = document.querySelector('#vf-git-tiroir');
-    let l = tiroir && tiroir.querySelector('.vf-git-live-det');
-    if (!l && tiroir) { l = el('div', 'vf-git-live vf-git-live-det', null, { 'aria-live': 'polite' }); tiroir.appendChild(l); }
+    let l = tiroir && tiroir.querySelector('.vf-git-live');
     if (l) l.textContent = t;
   };
   const pl = (n, mot, plur) => `${n} ${n > 1 ? plur || mot + 's' : mot}`;
@@ -107,13 +106,14 @@
 
   // ---------- état de chaque worktree ----------
   const wtOk = (j) => !!j && j.schema === 'vibeflow/cockpit-git-worktrees@1' && (j.etat !== 'ok' || (Array.isArray(j.worktrees) && j.worktrees.every((w) => !!w && typeof w.chemin === 'string')));
+  const nb = (n) => (n == null ? '—' : n); // un compte inconnu (null) ne s'écrit jamais 0
   const pastilles = (p) => {
     const l = [];
     if (p.propre === null || p.modifies == null) return [['état illisible', '']];
     if (p.propre) l.push(['propre', 'vf-git-p-ok']);
     if (p.modifies > 0) l.push([pl(p.modifies, 'modifié'), 'vf-git-p-warn']);
     if (p.nonSuivis > 0) l.push([(p.plus ? p.nonSuivis + '+ ' : p.nonSuivis + ' ') + (p.nonSuivis > 1 || p.plus ? 'non suivis' : 'non suivi'), 'vf-git-p-nonsuivi']);
-    if (p.avance > 0 || p.retard > 0) l.push([`↑${p.avance || 0} ↓${p.retard || 0}`, 'vf-git-p-mono']);
+    if (p.avance > 0 || p.retard > 0) l.push([`↑${nb(p.avance)} ↓${nb(p.retard)}`, 'vf-git-p-mono']);
     return l;
   };
   const appliquerWt = () => {

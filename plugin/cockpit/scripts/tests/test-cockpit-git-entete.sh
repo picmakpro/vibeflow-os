@@ -495,6 +495,68 @@ JS
   REPOS="$WORK/depot-repos"; mk_lab "$REPOS"; $GIT -C "$REPOS" init -q -b main && $GIT -C "$REPOS" add -A && $GIT -C "$REPOS" commit -q -m init
   build_serve "$REPOS" "$MR"; RMR="$(cdp "$AUX/h6.js" "http://127.0.0.1:$PORT" / 2>&1 | tail -1)"; stop_srv
   assert_eq "M-REPOS — rougit H6.5 (la liste « Dépôts » ou ses lignes réapparaissent)" "$(jq_ "$RMR" '(j.sections.filter((t) => /^(Repositories|Dépôts)/.test(t)).length + j.depots) > 0 ? "rouge" : "vert"' 2>/dev/null)" "rouge"
+  # H8 (78-04, recette G1 à G3) : la page rendue après un `git switch` dit la branche RÉELLE au chargement (une seule lecture de /api/vf/git/entete, jamais une par tick), le bloc de vue Code la cite,
+  # le signal les met à jour, et un écart visible et symétrique entoure le point médian de la seconde ligne. Lab jetable avec un vrai worktree : assemblé sur feat/x, puis basculé sur feat/y SANS réassembler.
+  DEP8="$WORK/depot8"; WT8="$WORK/wt8"; mk_lab "$DEP8"
+  $GIT -C "$DEP8" init -q -b main && $GIT -C "$DEP8" add -A && $GIT -C "$DEP8" commit -q -m init
+  $GIT -C "$DEP8" worktree add -q -b feat/x "$WT8" >/dev/null 2>&1
+  cat > "$AUX/h8.js" <<'JS'
+const [base, page, branche] = ARGS; const out = {};
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+await s.naviguer(base + page);
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne') && getComputedStyle(document.querySelector('.vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
+const lue = () => s.ev(`document.querySelector('.vf-git-branche').textContent`);
+const t0 = Date.now(); let txt = await lue();
+while (txt !== branche && Date.now() - t0 < 2000) { await pause(100); txt = await lue(); }
+out.ligne = txt;
+await pause(500);
+out.lectures = await s.ev(`performance.getEntriesByType('resource').filter((e) => e.name.includes('/api/vf/git/entete')).length`);
+out.h1 = await s.ev(`(document.querySelector('#context h1') || {}).textContent || null`);
+out.ecart = await s.ev(`(() => { const b = document.querySelector('.vf-git-branche'), w = document.querySelector('.vf-git-wt'), n = w.firstChild, r = document.createRange();
+  const rect = (a, z) => { r.setStart(n, a); r.setEnd(n, z); return r.getBoundingClientRect(); }, txt = n.textContent, i = txt.indexOf('worktree');
+  const point = rect(txt.indexOf('·'), txt.indexOf('·') + 1), mot = rect(i, i + 1), B = b.getBoundingClientRect();
+  return { texte: txt, avant: Math.round((point.left - B.right) * 10) / 10, apres: Math.round((mot.left - point.right) * 10) / 10 }; })()`);
+if (page === '/' && process.env.H8_SIGNAL) {
+  (await import('node:child_process')).execFileSync('git', ['-C', process.env.H8_LAB, 'switch', '-q', '-c', process.env.H8_SIGNAL], { stdio: 'ignore' }); // la branche change APRÈS le chargement de la page
+  await s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'x' } }))`);
+  const t1 = Date.now(); let h = await s.ev(`document.querySelector('#context h1').textContent`);
+  while (!h.includes(process.env.H8_SIGNAL) && Date.now() - t1 < 2000) { await pause(100); h = await s.ev(`document.querySelector('#context h1').textContent`); }
+  out.h1Signal = h; out.ligneSignal = await lue();
+}
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  build_serve "$WT8"; B8="http://127.0.0.1:$PORT"
+  $GIT -C "$WT8" switch -q -c feat/y
+  for pg in / /project.html /equipe.html; do
+    R8="$(cdp "$AUX/h8.js" "$B8" "$pg" feat/y 2>&1 | tail -1)"
+    assert_eq "H8.1 — $pg : après un switch sans réassemblage, la seconde ligne dit la branche réelle (feat/y) en moins de 2 s" "$(jq_ "$R8" 'j.ligne' 2>/dev/null)" "feat/y"
+    assert_eq "H8.1 — $pg : une seule lecture de /api/vf/git/entete au chargement" "$(jq_ "$R8" 'j.lectures' 2>/dev/null)" "1"
+    assert_eq "H8.3 — $pg : écart visible et symétrique autour du point médian (>= 4 px, écart de côté à côté <= 2 px)" "$(jq_ "$R8" '[j.ecart.avant >= 4, Math.abs(j.ecart.avant - j.ecart.apres) <= 2].join("|")' 2>/dev/null)" "true|true"
+    case "$pg" in /) assert_eq "H8.2 — Code : le bloc de vue cite la branche réelle (« Le code, branche feat/y »)" "$(jq_ "$R8" 'j.h1' 2>/dev/null)" "Le code, branche feat/y";; esac
+  done
+  R8="$(H8_LAB="$WT8" H8_SIGNAL=feat/z cdp "$AUX/h8.js" "$B8" / feat/y 2>&1 | tail -1)"
+  assert_eq "H8.2 — Code : au signal, le bloc de vue et la seconde ligne suivent la branche (feat/z)" "$(jq_ "$R8" '[j.h1Signal, j.ligneSignal].join("|")' 2>/dev/null)" "Le code, branche feat/z|feat/z"
+  assert_eq "H8.x — aucune erreur de page" "$(jq_ "$R8" 'j.errs.length' 2>/dev/null)" "0"
+  stop_srv
+  # mutants H8 : copie du module mutée, lab neuf assemblé sur feat/x puis basculé sur feat/y (le défaut de chaque mutant ne rougit que SON témoin)
+  h8mut() { # h8mut <nom> <ancien> <nouveau> : rend la ligne JSON de h8.js sur / (« {} » si la mutation est impossible)
+    local M D W; M="$(mkmod "$1")"; D="$WORK/depot-$1"; W="$WORK/wt-$1"; mk_lab "$D"
+    $GIT -C "$D" init -q -b main && $GIT -C "$D" add -A && $GIT -C "$D" commit -q -m init
+    $GIT -C "$D" worktree add -q -b feat/x "$W" >/dev/null 2>&1
+    mutate "$M/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "$2" "$3" || { echo "  ❌ FAIL — $1 : mutation impossible" >&2; echo '{}'; return; }
+    build_serve "$W" "$M"; $GIT -C "$W" switch -q -c feat/y
+    cdp "$AUX/h8.js" "http://127.0.0.1:$PORT" / feat/y 2>&1 | tail -1; stop_srv
+  }
+  RM="$(h8mut m-chargement "  relire(); // chargement : la page assemblée peut dater d'avant un \`git switch\`, une seule lecture par chargement
+" "")"
+  assert_eq "M-CHARGEMENT — rougit H8.1 (sans la lecture au chargement, la seconde ligne garde feat/x et aucune lecture ne part) alors que l'écart du point médian est là" "$(jq_ "$RM" '[j.ligne, j.lectures, j.ecart.avant >= 4].join("|")' 2>/dev/null)" "feat/x|0|true"
+  RM="$(h8mut m-bloc "    if (change && TAB === 'code') ecrireEtRecadrer(); // le bloc de vue Code cite la branche de la même lecture que la seconde ligne
+" "")"
+  assert_eq "M-BLOC-VUE — rougit H8.2 (le bloc de vue garde feat/x alors que la seconde ligne dit feat/y)" "$(jq_ "$RM" '[j.ligne, j.h1].join("|")' 2>/dev/null)" "feat/y|Le code, branche feat/x"
+  RM="$(h8mut m-ecart "flex: 0 2 auto; white-space: pre; }" "flex: 0 2 auto; }")"
+  assert_eq "M-ECART — rougit H8.3 (plus d'écart avant le point médian) alors que la branche est à jour" "$(jq_ "$RM" '[j.ecart.avant >= 4, j.ligne].join("|")' 2>/dev/null)" "false|feat/y"
 fi
 
 echo "=== H6.6 — la feuille de 76 n'emploie que des variables et des valeurs existantes (P78-D-12) ==="

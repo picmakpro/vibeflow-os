@@ -6,7 +6,8 @@
 (() => {
   const SC = window.Floorplan;
   if (!SC) return;
-  const G = SC.graph, V = G.meta && G.meta.vfGit;
+  const G = SC.graph;
+  let V = G.meta && G.meta.vfGit; // lu à l'assemblage, puis remplacé par chaque lecture réelle (chargement, signal, tiroir) : la branche d'un `git switch` n'attend pas le signal suivant
   const nom = document.querySelector('#proj-name');
   if (!nom) return;
   const SUFFIXE = / — (Projet|Équipe)$/;
@@ -79,7 +80,8 @@
     .vf-git-ligne:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; } /* anneau DANS la pastille : à l'extérieur il mordait sur le nom juste au-dessus */
     .vf-git-branche, .vf-git-wt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .vf-git-branche { flex: 0 1 auto; }
-    .vf-git-wt { flex: 0 2 auto; }
+    .vf-git-wt { flex: 0 2 auto; white-space: pre; } /* l'espace avant le point médian est le premier caractère de l'élément : sans white-space: pre il s'effondre en tête d'élément flex */
+    .vf-git-ligne .kbd { color: var(--text-2); }
     .vf-git-ligne .kbd { margin-left: 6px; opacity: 0; transition: opacity 150ms var(--ease); flex: none; }
     .vf-git-ligne:hover .kbd, .vf-git-ligne:focus-visible .kbd { opacity: 1; }
     .vf-git-ligne[hidden], #vf-git-ouvreur[hidden] { display: none !important; }
@@ -138,7 +140,10 @@
 
   const entete = document.querySelector('header'), recherche = document.querySelector('#search-btn');
   if (recherche) recherche.setAttribute('data-vf-invite', 'Chercher…'); // P78-D-39 : libellé court, lu par la requête de 1000 à 1279 px (voir le style) ; inerte ailleurs
+  const sans = (o) => { const c = Object.assign({}, o); delete c.schema; return JSON.stringify(c); };
   const lire = (d) => {
+    const change = sans(V) !== sans(d); V = d;
+    if (change && TAB === 'code') ecrireEtRecadrer(); // le bloc de vue Code cite la branche de la même lecture que la seconde ligne
     if (entete) entete.toggleAttribute('data-vf-git', d.etat !== 'absent'); // l'ouvreur est posé : le plancher et l'invite courts s'appliquent
     if (d.etat === 'absent') { ligne.hidden = true; ouvreur.hidden = true; return; } // le dépôt a disparu en cours de route : tout se tait
     ligne.hidden = false; ouvreur.hidden = false;
@@ -161,10 +166,14 @@
   window.addEventListener('vf-git:etat', (e) => { const o = String(!!(e.detail && e.detail.ouvert)); ligne.setAttribute('aria-expanded', o); ouvreur.setAttribute('aria-expanded', o); });
   const valide = (d) => d && typeof d === 'object' && (d.etat === 'ok' || d.etat === 'indisponible' || d.etat === 'absent');
   window.addEventListener('vf-git:entete', (e) => { if (valide(e.detail)) lire(e.detail); });
-  document.addEventListener('vf-git:signal', () => { // relecture de l'en-tête (le serveur vérifie le jeton) ; réponse hors schéma : ignorée
+  const relire = () => { // GET /api/vf/git/entete avec le jeton ; réponse hors schéma : ignorée
     const SRV = window.FLOORPLAN_SERVER;
     if (!SRV || !SRV.token) return;
     fetch('/api/vf/git/entete', { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && j.schema === 'vibeflow/cockpit-git-entete@1' && valide(j)) lire(j); }).catch(() => {});
+  };
+  document.addEventListener('vf-git:signal', () => { // relecture de l'en-tête (le serveur vérifie le jeton) ; réponse hors schéma : ignorée
+    relire();
   });
+  relire(); // chargement : la page assemblée peut dater d'avant un `git switch`, une seule lecture par chargement
 })();

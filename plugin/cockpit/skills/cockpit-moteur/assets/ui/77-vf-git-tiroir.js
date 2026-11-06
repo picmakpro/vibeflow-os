@@ -76,7 +76,9 @@
     .vf-git-cmd { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 28px; padding: 4px 4px 4px 12px; border-radius: var(--r-ctl); background: var(--well); }
     .vf-git-cmd code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--text-2); user-select: text; }
     .vf-git-retour { flex: none; font-size: 11.5px; color: var(--text-2); } .vf-git-retour:not(:empty) { order: 3; flex: 1 0 100%; }
-    .vf-git-sans { font-size: 11.5px; color: var(--text-4); }
+    .vf-git-sans { font-size: 11.5px; color: var(--text-2); }
+    #vf-git-tiroir .meta { color: var(--text-2); }
+    #vf-git-tiroir .vf-bar i { background: var(--text-3); } /* activité des auteurs : remplissage neutre, jamais le vert d'état de .vf-bar (jetons figés de la 71.5) */
     .vf-git-etat { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; }
     .vf-git-fantome { height: 40px; border-radius: var(--r-ctl); background: var(--raise); }
     .vf-git-titre { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }

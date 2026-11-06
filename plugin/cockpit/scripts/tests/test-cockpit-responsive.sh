@@ -384,6 +384,26 @@ for onglet in index project; do
   for w in 1024 1280; do assert_eq "D39.6 — lab SANS Git / $onglet / $w px : aucune superposition, aucun rognage, recherche >= 200 px (aucun drapeau : borne d'origine)" "$(printf '%s' "$(cat "$WORK/d39-sg-$onglet.json")" | node "$AUX/viol.mjs" "$w")" "aucune"; done
 done
 SRV_PID=$PID39g; unsrv; SRV_PID=$PID39s; unsrv
+# D39.7 (78-10, revue de delta F6a) : Git présent (152 px, invite courte), puis un signal dont la relecture de l'en-tête rend « absent » : le drapeau tombe, le plancher de 200 px et l'invite d'origine reviennent.
+cat > "$AUX/d39-absent.mjs" <<JS
+import { executer, pause } from '$HERE_T/chrome-session.mjs';
+const [, , chrome, url] = process.argv;
+const PRET = "document.readyState === 'complete' && !!document.querySelector('header .brand .mark') && document.querySelector('header .brand .mark').naturalWidth > 0 && !!document.querySelector('#vf-git-ouvreur')";
+await executer(chrome, async (s) => {
+  await s.send('Emulation.setDeviceMetricsOverride', { width: 1024, height: 800, deviceScaleFactor: 1, mobile: false });
+  await s.naviguer(url); await s.attendre(PRET, 'page prête avec Git'); await pause(300);
+  const mes = () => s.ev("(() => { const hc = document.querySelector('header .hc'), sb = document.querySelector('#search-btn'); return { drapeau: document.querySelector('header').hasAttribute('data-vf-git'), plancher: getComputedStyle(hc).minWidth, invite: getComputedStyle(sb, '::after').content, stVisible: getComputedStyle(sb.querySelector('.st')).display !== 'none' }; })()");
+  const out = { avant: await mes() };
+  await s.ev("(() => { const f0 = window.fetch.bind(window); window.fetch = (u, i) => /\\\\/api\\\\/vf\\\\/git\\\\/entete/.test(typeof u === 'string' ? u : u.url) ? Promise.resolve(new Response(JSON.stringify({ schema: 'vibeflow/cockpit-git-entete@1', etat: 'absent', depot: 'x', branche: null, worktree: null, detache: false, sha7: null }), { status: 200, headers: { 'content-type': 'application/json' } })) : f0(u, i); document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'x' } })); })()");
+  await pause(600);
+  out.apres = await mes();
+  out.ouvreurCache = await s.ev("document.querySelector('#vf-git-ouvreur').hidden && document.querySelector('#vf-git-ligne').hidden");
+  return out;
+}, { csp: true });
+JS
+srv "$LC/.vibeflow/cockpit"; X="$(node "$AUX/d39-absent.mjs" "$CHROME" "http://127.0.0.1:$SRV_PORT/index.html" 2>&1 | tail -1)"; unsrv
+assert_eq "D39.7a — Git présent à 1 024 px : drapeau posé, plancher 152 px, invite courte « Chercher… » (témoin positif de l'état de départ)" "$(printf '%s' "$X" | node "$AUX/ev.mjs" '[j.avant.drapeau, j.avant.plancher, j.avant.invite, j.avant.stVisible].join("|")')" 'true|152px|"Chercher…"|false'
+assert_eq "D39.7b — la relecture de l'en-tête rend « absent » : drapeau retiré, plancher 200 px, invite d'origine rendue, ouvreur et seconde ligne cachés" "$(printf '%s' "$X" | node "$AUX/ev.mjs" '[j.apres.drapeau, j.apres.plancher, j.apres.invite, j.apres.stVisible, j.ouvreurCache].join("|")')" "false|200px|none|true|true"
 # mutants : chacun doit rougir un témoin de SA propre règle (copie du lab construit, une chaîne remplacée, échec si la chaîne est introuvable)
 mut39() { # mut39 <labSource> <dest> <ancien> <nouveau>
   mkdir -p "$2/.planning/missions" "$2/.vibeflow"; cp -R "$1/.vibeflow/cockpit" "$2/.vibeflow/cockpit"; cp "$1/.planning/missions/demo.dag.json" "$2/.planning/missions/"; agent_actif "$2"
@@ -401,10 +421,17 @@ else FAIL=$((FAIL+1)); echo "  ❌ FAIL — D39m1 : mutant non construit"; fi
 if mut39 "$LC" "$WORK/lab-mut39b" '(max-width: 1279px) and (not (pointer: coarse)) {
       header[data-vf-git] .hc' '(max-width: 1280px) and (not (pointer: coarse)) {
       header[data-vf-git] .hc'; then
+  git -C "$WORK/lab-mut39b" init -q -b main # la page relit l'en-tête au chargement : la copie du lab doit rester un dépôt, sinon « absent » retire le drapeau avant la mesure
   srv "$WORK/lab-mut39b/.vibeflow/cockpit"; X="$(mes39 $SRV_PORT 1280)"; unsrv
   assert_eq "D39m2a — mutant « plancher de 152 px aussi à 1 280 px » : le plancher mesuré à 1 280 px est 152 px" "$(v39 "$X" 'j.resultats[0].valeur.plancher')" "152px"
   assert_eq "D39m2 — le même mutant : le témoin D39.4 (avec Git, 1 280 px) rougit" "$([ "$(v39 "$X" 'j.resultats[0].valeur.plancher + "/" + j.resultats[0].valeur.invite + "/" + j.resultats[0].valeur.stVisible')" != "200px/none/true" ] && echo rouge || echo vert)" "rouge"
 else FAIL=$((FAIL+1)); echo "  ❌ FAIL — D39m2 : mutant non construit"; fi
+# mutant 3 (F6a) : le drapeau est posé sans condition, même quand la relecture rend « absent »
+if mut39 "$LC" "$WORK/lab-mut39c" "if (entete) entete.toggleAttribute('data-vf-git', d.etat !== 'absent');" "if (entete) entete.setAttribute('data-vf-git', '');"; then
+  git -C "$WORK/lab-mut39c" init -q -b main
+  srv "$WORK/lab-mut39c/.vibeflow/cockpit"; X="$(node "$AUX/d39-absent.mjs" "$CHROME" "http://127.0.0.1:$SRV_PORT/index.html" 2>&1 | tail -1)"; unsrv
+  assert_eq "D39m3 — mutant « setAttribute inconditionnel » : rougit D39.7b (drapeau et plancher de 152 px restent après « absent ») alors que l'état de départ (D39.7a) est le bon" "$(printf '%s' "$X" | node "$AUX/ev.mjs" '[j.avant.drapeau, j.avant.plancher, j.apres.drapeau, j.apres.plancher, j.ouvreurCache].join("|")')" "true|152px|true|152px|true"
+else FAIL=$((FAIL+1)); echo "  ❌ FAIL — D39m3 : mutant non construit"; fi
 
 echo "=== R7 — chaque bouton d'en-tête a un nom accessible et une infobulle ; badge « au travail » ==="
 srv "$LC/.vibeflow/cockpit"; PC7=$SRV_PORT

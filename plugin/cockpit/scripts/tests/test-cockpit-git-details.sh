@@ -361,6 +361,41 @@ export const BORNES_DETAILS")"
 assert_eq "X6.2 — M-SYNC : le git de la lecture des worktrees redevient synchrone (cibles présentes)" "$A1|$A2" "applique|applique"
 assert_eq "X6.2 — M-SYNC : la requête légère n'est servie qu'APRÈS la lecture (légère avant lourde : false), la lecture aboutit et elle est lente (le rouge vient de l'ordre, pas d'un module cassé)" "$(LAT "$D")" "false|ok|true"
 
+# X6.3 (78-08, revue de delta F2, P78-D-41 étendue) : la lecture de la branche de base ne lance pas non plus de git synchrone. git emballé : `symbolic-ref` (seule sous-commande de brancheBase
+# dans cette lecture) dort 1,8 s ; même forme que X6.1 : légère servie AVANT la fin de la lecture des worktrees, qui aboutit et qui est lente.
+WRAPB="$WORK/wrap-base"; mkdir -p "$WRAPB"
+printf '#!/bin/sh\nfor a in "$@"; do [ "$a" = symbolic-ref ] && sleep 1.8; done\nexec "%s" "$@"\n' "$GIT_REEL" > "$WRAPB/git"; chmod +x "$WRAPB/git"
+# lat-base.mjs <scripts> <lab> : le git synchrone de brancheBase part APRÈS plusieurs await (la requête légère de lat.mjs serait déjà servie) ; on mesure donc le retard maximal d'une horloge de 20 ms de la boucle
+# pendant la lecture : rend « boucle jamais gelée (retard < 500 ms) | état | lecture lente »
+cat > "$AUX/lat-base.mjs" <<'JS'
+import http from 'node:http';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab] = process.argv;
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href);
+const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
+const srv = http.createServer((req, res) => {
+  const url = new URL(req.url, 'http://x');
+  if (!m.routeGit(req, res, url, { root: lab, json })) { res.writeHead(404); res.end(); }
+}).listen(0, '127.0.0.1', async () => {
+  const port = srv.address().port, t0 = Date.now();
+  let dernier = Date.now(), retard = 0;
+  const horloge = setInterval(() => { const n = Date.now(); retard = Math.max(retard, n - dernier - 20); dernier = n; }, 20);
+  const l = await new Promise((ok) => http.get({ host: '127.0.0.1', port, path: '/api/vf/git/worktrees' }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => ok({ ms: Date.now() - t0, b })); }));
+  clearInterval(horloge);
+  let etat = 'illisible'; try { etat = JSON.parse(l.b).etat; } catch {}
+  console.log(`${retard < 500}|${etat}|${l.ms >= 1500}`);
+  srv.close(); process.exit(0);
+});
+JS
+LATB() { PATH="$WRAPB:$PATH" node "$AUX/lat-base.mjs" "$1" "$LAB" 2>&1 | tail -1; }
+assert_eq "X6.3 — pendant la lecture lente de la branche de base (git emballé : symbolic-ref dort 1,8 s), la boucle du serveur n'est jamais gelée (retard d'une horloge de 20 ms < 500 ms) ; la lecture aboutit (état ok)" "$(LATB "$SCRIPTS")" "true|ok|true"
+D="$(mutant_dir syncbase)"
+A1="$(muter "$D/vf-cockpit-git-details.mjs" "nettoie, brancheBaseAsync }" "nettoie, brancheBase, brancheBaseAsync }")"
+A2="$(muter "$D/vf-cockpit-git-details.mjs" "await brancheBaseAsync(lab, { fin })" "brancheBase(lab)")"
+assert_eq "X6.3 M-SYNC-BASE — la branche de base redevient une lecture synchrone (cibles présentes)" "$A1|$A2" "applique|applique"
+assert_eq "X6.3 M-SYNC-BASE — rouge sur X6.3 : la boucle est gelée plus de 500 ms (jamais gelée : false), la lecture aboutit et elle est lente (le rouge vient de l'ordre, pas d'un module cassé)" "$(LATB "$D")" "false|ok|true"
+
 echo "=== X7 — audit 2026-11-06 : A3 (worktree au lien retour non vérifié, P78-D-38), A4 (détail d'un commit non bloquant et borné), A6 (révision séparée des chemins) ==="
 # --- A3 : un worktree dont le lien retour n'est pas vérifié n'est JAMAIS lu ---
 mkdir -p "$WORK/wrap-j"; printf '#!/bin/sh\nprintf "ARGV %%s\\n" "$*" >> "%s/argv.log"\nexec "%s" "$@"\n' "$WORK" "$GIT_REEL" > "$WORK/wrap-j/git"; chmod +x "$WORK/wrap-j/git"
@@ -532,7 +567,7 @@ tick; "$GIT_REEL" -C "$CF" commit -q -m "$(printf 'sujet\n\nco\xe2\x80\x8brps\xe
 assert_eq "X7.11a — témoin : git conserve bien U+200B, U+202E, U+FEFF et U+2060 dans le message (la sonde n'est pas aveugle)" "$("$GIT_REEL" -C "$CF" log -1 --format=%B | LC_ALL=C grep -c $'\xe2\x80\x8b')" "1"
 assert_eq "X7.11 — A8 : le message servi n'a plus aucun caractère Cf (largeur nulle, bidi, U+FEFF, U+2060) et garde le texte accentué : « corps fin café »" "$(node "$AUX/det.mjs" "$SCRIPTS" commit "$CF" "$HCF" | node "$AUX/j.mjs" - 'JSON.stringify(j.corps.message)+"|"+/\p{Cf}/u.test(j.corps.message)')" '"sujet\n\ncorps fin café"|false'
 D="$(mutant_dir cfmsg)"
-A="$(muter "$D/vf-cockpit-git-details.mjs" '\u2029\p{Cf}]/gu; // la classe' '\u2029\u202a-\u202e\u2066-\u2069]/g; // la classe')"
+A="$(muter "$D/vf-cockpit-git-details.mjs" '\u2029\p{Cf}]/u; // la classe' '\u2029\u202a-\u202e\u2066-\u2069]/u; // la classe')"
 assert_eq "X7 M-ILLISIBLE — la classe du message revient au seul bidi (cible présente)" "$A" "applique"
 assert_eq "X7 M-ILLISIBLE — rouge sur X7.11 : U+200B, U+FEFF et U+2060 restent dans le message" "$(node "$AUX/det.mjs" "$D" commit "$CF" "$HCF" | node "$AUX/j.mjs" - '/\p{Cf}/u.test(j.corps.message)')" "true"
 
