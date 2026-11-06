@@ -105,9 +105,7 @@
     for (const r of rings) { let t = null; try { t = document.querySelector(r.sel); } catch {} const b = t && t.getBoundingClientRect(); if (!b || !b.width || !b.height) { r.el.style.display = 'none'; continue; } Object.assign(r.el.style, { display: '', left: b.left + 'px', top: b.top + 'px', width: b.width + 'px', height: b.height + 'px' }); }
   }
   function ring(sel, lits = []) {
-    clearInterval(ringTimer); ringTimer = 0;
-    for (const r of rings) r.el.remove();
-    rings = [];
+    clearInterval(ringTimer); ringTimer = 0; for (const r of rings) r.el.remove(); rings = [];
     for (const [k, q] of [sel, ...lits].entries()) if (q) { const el = document.createElement('div'); el.className = 'tour-target' + (k > 0 || /^#(vf-lock|tour-btn|screens-btn|vf-plus)$/.test(sel) ? ' lit' : ''); el.setAttribute('aria-hidden', 'true'); document.body.appendChild(el); rings.push({ el, sel: q }); }
     if (rings.length) { ringPlace(); ringTimer = setInterval(ringPlace, 250); }
   }

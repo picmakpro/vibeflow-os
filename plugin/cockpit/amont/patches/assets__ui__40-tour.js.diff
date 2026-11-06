@@ -104,7 +104,7 @@
    }
  
    // ---------- card ----------
-@@ -87,64 +96,182 @@
+@@ -87,64 +96,180 @@
    let steps = [], at = -1;
    const active = () => at >= 0;
  
@@ -117,9 +117,7 @@
 +    for (const r of rings) { let t = null; try { t = document.querySelector(r.sel); } catch {} const b = t && t.getBoundingClientRect(); if (!b || !b.width || !b.height) { r.el.style.display = 'none'; continue; } Object.assign(r.el.style, { display: '', left: b.left + 'px', top: b.top + 'px', width: b.width + 'px', height: b.height + 'px' }); }
 +  }
 +  function ring(sel, lits = []) {
-+    clearInterval(ringTimer); ringTimer = 0;
-+    for (const r of rings) r.el.remove();
-+    rings = [];
++    clearInterval(ringTimer); ringTimer = 0; for (const r of rings) r.el.remove(); rings = [];
 +    for (const [k, q] of [sel, ...lits].entries()) if (q) { const el = document.createElement('div'); el.className = 'tour-target' + (k > 0 || /^#(vf-lock|tour-btn|screens-btn|vf-plus)$/.test(sel) ? ' lit' : ''); el.setAttribute('aria-hidden', 'true'); document.body.appendChild(el); rings.push({ el, sel: q }); }
 +    if (rings.length) { ringPlace(); ringTimer = setInterval(ringPlace, 250); }
 +  }
@@ -311,7 +309,7 @@
    const ic = tourBtn.querySelector('svg');
    if (ic) ic.innerHTML = '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8z"/>'; // compass
    window.addEventListener('keydown', (ev) => {
-@@ -154,7 +281,7 @@
+@@ -154,7 +279,7 @@
      else if (!SC.state.flow && ev.key === 'ArrowLeft') { ev.stopPropagation(); ev.preventDefault(); back(); }
    }, true);
    // a guided flow takes over the canvas: step aside
@@ -320,7 +318,7 @@
  
    // first visit: start on its own, unless the link points somewhere specific
    let auto = false;
-@@ -167,5 +294,7 @@
+@@ -167,5 +292,7 @@
    SC.on('ready', maybeAuto);
    if (SC.state.layout) maybeAuto();
  
