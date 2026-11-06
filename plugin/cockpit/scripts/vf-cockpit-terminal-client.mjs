@@ -2,7 +2,7 @@
 // Export : clientTerminal(cfg) -> rien. cfg = { origineP, theme } : configuration non sensible, posée par pageTerminal.
 // Sérialisé par .toString() dans un <script> sans attribut : aucune référence à un identifiant du module, tout est local à la fonction.
 // Les commentaires placés DANS la fonction sont servis tels quels : ils ne citent aucun motif que la suite de test cherche. Rien d'autre ici n'est servi.
-// Flux : amorçage (dans le cadre : fragment effacé avant l'échange, secret dans le stockage du cadre, rechargement sans fragment) ou terminal (flux fetch, POST d'entrée et de taille). 72-08 : sondage de GET /proposition dès l'initialisation (avant visible()), écriture par POST /lancer { id, mode[, chat:true] } (72-13 : chat seulement si la case est cochée) sans le texte de la ligne ni octet au terminal, mode lancé retenu dans le stockage de Q, message fixe proposition vers P.
+// Flux : amorçage (dans le cadre : fragment effacé avant l'échange, secret dans le stockage du cadre, rechargement sans fragment) ou terminal (flux fetch, POST d'entrée et de taille). 72-08 : sondage de GET /proposition dès l'initialisation (avant visible()), écriture par POST /lancer { id, mode[, chat:true] } (72-13 : chat seulement si la case est cochée) sans le texte de la ligne ni octet au terminal, message fixe proposition vers P. 72-16 (P72-D-20) : le mode présélectionné est celui que Q sert dans la proposition (mode_retenu) ; le stockage du navigateur ne porte plus le mode.
 export function clientTerminal(cfg) {
   const MESSAGES = Object.freeze({
     ready: 'ready', connecte: 'etat:connecte', reconnexion: 'etat:reconnexion', termine: 'etat:termine',
@@ -10,7 +10,7 @@ export function clientTerminal(cfg) {
     proposition: 'proposition',
   });
   const CLE_SECRET = 'vf.terminal.secret', CLE_ONGLET = 'vf.terminal.onglet', CLE_FIN = 'vf.terminal.fin';
-  const CLE_MODE = 'vf.terminal.mode', MODES = Object.freeze(['default', 'acceptEdits', 'plan', 'herite']), PROPOSITION_MS = 1000;
+  const MODES = Object.freeze(['default', 'acceptEdits', 'plan', 'herite']), PROPOSITION_MS = 1000;
   const RACCOURCI = Object.freeze({ code: 'Space', ctrl: true, shift: true });
   const ATTENTES = [500, 1000, 2000, 4000], LIMITE_MS = 30000, POLICES_MS = 2500, REJEU_SILENCE_MS = 150, REJEU_BORNE_MS = 3000;
   const vue = window.vfTermVue;
@@ -52,10 +52,10 @@ export function clientTerminal(cfg) {
   emettre('ready');
   if (!localStorage.getItem(CLE_SECRET)) { expire(); return; }
   const entetes = () => ({ 'X-VF-Terminal': localStorage.getItem(CLE_SECRET) || '', 'X-VF-Onglet': onglet() });
-  const modeRetenu = () => { try {
-    const v = localStorage.getItem(CLE_MODE); // garde:mode-lecture
+  const modeServi = (p) => { // la présélection vient de Q (valeur servie), relue contre la liste fermée ; rien n'est gardé dans le navigateur
+    const v = p.mode_retenu; // garde:mode-lecture
     return MODES.indexOf(v) >= 0 ? v : 'default'; // garde:mode-relu
-  } catch (e) { return 'default'; } };
+  };
   const forme = (j) => {
     const s = (v, max) => typeof v === 'string' && v.length <= max, ent = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi, liste = (v) => Array.isArray(v) && v.length <= 20 && v.every((c) => s(c, 40));
     if (!j || typeof j !== 'object' || j.etat !== 'en-attente' || typeof j.id !== 'string' || !/^[A-Za-z0-9_-]{8,64}$/.test(j.id) || !s(j.verbe, 40) || !s(j.intention, 200) || !s(j.phase, 20) || !(j.ws === null || s(j.ws, 40))) return null;
@@ -63,14 +63,14 @@ export function clientTerminal(cfg) {
     if ((j.chat !== undefined || j.lignes_chat !== undefined) && (j.chat !== true || !j.lignes_chat || typeof j.lignes_chat !== 'object' || MODES.some((m) => typeof j.lignes_chat[m] !== 'string' || !/^[\x20-\x7e]{1,400}$/.test(j.lignes_chat[m])))) return null; // 72-13 : chat (vrai) et lignes_chat vont ensemble, sinon « aucune »
     return { chat: j.chat === true ? true : undefined, lignesChat: j.chat === true ? Object.fromEntries(MODES.map((m) => [m, j.lignes_chat[m]])) : undefined, id: j.id, verbe: j.verbe, intention: j.intention, phase: j.phase, ws: j.ws, lignes: Object.fromEntries(MODES.map((m) => [m, j.lignes[m]])), bloquants: j.bloquants.slice(), avertissements: j.avertissements.slice(), arme_apres_ms: j.arme_apres_ms, expire_ms: j.expire_ms }; };
   let attente = null, courante = null, fermee = null, pret = false, terminal = null, enVol = false;
-  const afficher = () => { if (!pret || attente === null || courante === attente.id) return; courante = attente.id; vue.proposition(Object.assign({}, attente, { modeInitial: modeRetenu() }), { lancer, annuler }); };
+  const afficher = () => { if (!pret || attente === null || courante === attente.id) return; courante = attente.id; vue.proposition(Object.assign({}, attente), { lancer, annuler }); };
   const lire = async () => {
     if (enVol) return; enVol = true; try {
       const r = await fetch('/proposition', { headers: entetes(), cache: 'no-store' }); if (!r.ok) return;
-      const p = forme(await r.json().catch(() => null));
+      const j = await r.json().catch(() => null), p = forme(j);
       if (!p) { attente = null; if (courante !== null) { courante = null; vue.proposition(null); } return; } // garde:aucune
       if (p.id === fermee) return; // garde:fermee
-      const nouveau = attente === null || p.id !== attente.id; attente = p;
+      const nouveau = attente === null || p.id !== attente.id; attente = Object.assign(p, { modeInitial: modeServi(j) });
       if (nouveau) emettre('proposition'); // garde:emission
       afficher(); } catch (e) { void e; } finally { enVol = false; }
   };
@@ -80,7 +80,6 @@ export function clientTerminal(cfg) {
       body: JSON.stringify(Object.assign({ id: courante, mode }, avecChat === true ? { chat: true } : {})), cache: 'no-store' }); } catch (e) { return 'reseau'; } // garde:corps-lancer
     if (r.status === 204 || r.status === 404) { fermee = id; if (courante === id) { courante = null; attente = null; } }
     if (r.status !== 204) return r.status === 404 ? 'absente' : { 409: 'occupe', 425: 'attendre', 410: 'sans-session' }[r.status] || 'refus';
-    try { localStorage.setItem(CLE_MODE, mode); } catch (e) { void e; }
     if (terminal) terminal.focus(); // garde:apres-usage
     return 'ok';
   };
