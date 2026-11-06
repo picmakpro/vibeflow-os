@@ -81,8 +81,7 @@
     .vf-git-branche, .vf-git-wt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .vf-git-branche { flex: 0 1 auto; }
     .vf-git-wt { flex: 0 2 auto; white-space: pre; } /* l'espace avant le point médian est le premier caractère de l'élément : sans white-space: pre il s'effondre en tête d'élément flex */
-    .vf-git-ligne .kbd { color: var(--text-2); }
-    .vf-git-ligne .kbd { margin-left: 6px; opacity: 0; transition: opacity 150ms var(--ease); flex: none; }
+    .vf-git-ligne .kbd { color: var(--text-2); margin-left: 6px; opacity: 0; transition: opacity 150ms var(--ease); flex: none; }
     .vf-git-ligne:hover .kbd, .vf-git-ligne:focus-visible .kbd { opacity: 1; }
     .vf-git-ligne[hidden], #vf-git-ouvreur[hidden] { display: none !important; }
     #vf-git-ouvreur { display: none; }

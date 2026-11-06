@@ -30,7 +30,7 @@ export async function lireGit(lab) {
   try { return await assembler(lab, finDans(BORNES.echeanceMs)); } catch { return { schema: SCHEMA, etat: 'indisponible' }; }
 }
 
-// Miroir asynchrone de `enteteGit` (vf-cockpit-git-entete.mjs, synchrone, servi par /api/vf/git/entete) : mêmes lectures, même résultat (parité testée, R3.3).
+// Miroir asynchrone de `enteteGit` (vf-cockpit-git-entete.mjs, synchrone, ne sert plus qu'à l'assemblage, vf-cockpit-build.mjs ; la route /api/vf/git/entete sert cette version asynchrone) : mêmes lectures, même résultat (parité testée, R3.3).
 async function enteteAsync(lab, fin) {
   const git = async (...a) => { try { return String((await lancerGitAsync(lab, a, { fin })).sortie ?? '').trim(); } catch { return ''; } };
   const vide = (etat, depot) => ({ etat, depot: nettoie(depot, 200), branche: null, worktree: null, detache: false, sha7: null });
