@@ -68,6 +68,13 @@ PREFIXE_LIGNE = b"claude --session-id '"
 ALPHABET_LIGNE = re.compile(rb"[A-Za-z0-9 ._:/'-]+")
 HEX_LIGNE = re.compile(rb"(?:[0-9A-Fa-f]{2})+")
 CTRL_C = bytes([3])
+# Ligne lancée : Ctrl-C part SEUL, la ligne suit quand le shell a réagi (sortie vue puis 30 ms de calme, ou 300 ms sans rien) — mesuré sous Linux
+# (ubuntu 26.04, bash) : Ctrl-C et ligne dans la même écriture, bash perd le premier octet de la ligne (« cho: command not found »).
+CALME_APRES_CTRLC = 0.03  # la boucle se réveille au plus tard toutes les 0,2 s : la ligne part donc au plus ~0,25 s après la réaction du shell
+ATTENTE_MAX_CTRLC = 0.3
+# 'ligne' : en attente de la réaction du shell à Ctrl-C ; 'vu' : dernière sortie du shell depuis Ctrl-C ; 'suite' : réponses « LANCE … » des lignes L arrivées pendant l'attente.
+# La réponse « LANCE ok » ne part qu'avec la ligne (204 = la ligne est à l'invite) ; les réponses se suivent dans l'ordre des demandes (le serveur les apparie en FIFO).
+DIFFEREE = {'ligne': None, 't0': 0.0, 'vu': 0.0, 'suite': []}
 arret = False
 
 
@@ -147,17 +154,40 @@ def lancer_ligne(hexa, maitre, pid, vers_shell):
     code = valider_ligne(ligne)
     if code != 'ok':
         return code
-    if vers_shell:
+    if vers_shell or DIFFEREE['ligne'] is not None:
         return 'premier-plan'  # une entrée déjà en attente d'écriture n'est pas un shell au repos : la file ne grossit pas devant un shell sourd
     if not premier_plan_libre(maitre, pid):
         return 'premier-plan'
-    vers_shell += CTRL_C + ligne
+    vers_shell += CTRL_C
+    DIFFEREE.update(ligne=ligne, t0=time.time(), vu=0.0, suite=[])  # la ligne part dans liberer_ligne(), pas dans la même écriture que Ctrl-C
     try:
         pousser(maitre, vers_shell)  # même passe de boucle ; sur BlockingIOError rien ne part ici, la ligne reste en file (réponse « ok » quand même), le reste part au prochain select
     except OSError:
         del vers_shell[:]  # la ligne n'est pas partie : rien ne reste en file pour un shell qui ne l'a pas reçue
+        DIFFEREE['ligne'] = None
         return 'ecriture'
     return 'ok'
+
+
+def liberer_ligne(vers_shell, maitre, maintenant):
+    """Écrit la ligne différée quand le shell a réagi à Ctrl-C (sortie vue, puis calme) ou après ATTENTE_MAX_CTRLC sans réaction, puis répond (« ok » ou « ecriture »)."""
+    ligne = DIFFEREE['ligne']
+    if ligne is None:
+        return
+    calme = DIFFEREE['vu'] and maintenant - DIFFEREE['vu'] >= CALME_APRES_CTRLC
+    if not (calme or maintenant - DIFFEREE['t0'] >= ATTENTE_MAX_CTRLC):
+        return
+    suite = DIFFEREE['suite']
+    DIFFEREE.update(ligne=None, suite=[])
+    vers_shell += ligne
+    try:
+        pousser(maitre, vers_shell)
+        reponse = 'ok'
+    except OSError:
+        del vers_shell[:]
+        reponse = 'ecriture'
+    for code in [reponse] + suite:
+        statut(2, 'LANCE ' + code)
 
 
 def lire_controle(tampon, maitre, pid=None, vers_shell=None):
@@ -170,8 +200,13 @@ def lire_controle(tampon, maitre, pid=None, vers_shell=None):
             if 0 < l <= LIGNES_MAX and 0 < c <= COLONNES_MAX:
                 taille(maitre, l, c)
         elif mots and mots[0] == b'L':
+            avant = DIFFEREE['ligne'] is not None
             code = lancer_ligne(mots[1], maitre, pid, vers_shell) if len(mots) == 2 and vers_shell is not None else 'invalide'
-            statut(2, 'LANCE ' + code)
+            if avant:
+                DIFFEREE['suite'].append(code)  # une ligne attend déjà : cette réponse suit la sienne
+            elif DIFFEREE['ligne'] is None:
+                statut(2, 'LANCE ' + code)
+            # sinon cette demande vient de différer sa ligne : sa réponse part avec la ligne (liberer_ligne)
     return tampon[-1024:]
 
 
@@ -493,13 +528,16 @@ def main():
                     donnees = b''
                 if donnees:
                     vers_serveur += donnees
+                    if DIFFEREE['ligne'] is not None:
+                        DIFFEREE['vu'] = time.time()
             if avec_controle and 3 in pret:
                 donnees = os.read(3, 4096)
                 if donnees:
                     controle = lire_controle(controle + donnees, maitre, pid, vers_shell)
                 else:
                     avec_controle = False
-            if maitre in pret_e:
+            liberer_ligne(vers_shell, maitre, time.time())
+            if maitre in pret_e or (vers_shell and not ecrire):
                 try:
                     pousser(maitre, vers_shell)
                 except OSError:

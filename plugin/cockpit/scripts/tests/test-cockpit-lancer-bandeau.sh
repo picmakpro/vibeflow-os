@@ -515,9 +515,13 @@ await executer(chrome, async (s) => {
         !JSON.stringify(msgs).includes(ID_A) && !JSON.stringify(msgs).includes(secret) && !JSON.stringify(msgs).includes('claude')].join('/');
     });
     await essai('e2', async () => { // clic avant l'armement : aucun POST ; après : UN POST de clés exactes id,mode, jamais d'octet au PTY
+      // Proposition NEUVE d'armement long : le minuteur du bandeau d'e1 court depuis son affichage, et sous charge (CI Linux) il était déjà échu quand ce clic « avant l'armement » partait
+      // (204 au lieu d'un clic ignoré, bandeau retiré, attente d'armement vaine). Le témoin `desarme` (premier terme du résultat) reste exigé : un bandeau déjà armé rougit.
+      await scenario({ prop: valide(ID(35), { arme_apres_ms: 3000 }), lancers: [] });
+      await q.attendre(`(document.getElementById('proposition') || {}).dataset && document.getElementById('proposition').dataset.id === ${JSON.stringify(ID(35))}`, 'bandeau de la proposition neuve', 5000);
       const desarme = await arme() === 'true'; await clic(LANCER); await pause(400);
       const tot = (await journal()).filter((x) => x.u === '/lancer').length;
-      await attendreArme(); await choisir('acceptEdits'); await clic(LANCER);
+      await attendreArme(6000); await choisir('acceptEdits'); await clic(LANCER);
       await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après 204', 4000);
       const l = (await journal()).filter((x) => x.u === '/lancer');
       r.e2 = [desarme, tot, l.length, l[0] && Object.keys(JSON.parse(l[0].b)).sort().join(','), l[0] && !l[0].b.includes('claude'), l[0] && l[0].st, entrees(), String(await q.ev(`localStorage.getItem('vf.terminal.mode')`))].join('/');

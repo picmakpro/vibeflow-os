@@ -254,6 +254,7 @@ res = []
 for nom, f in (('casse', casse), ('eio', eio), ('temoin', passe)):
     m.pousser = f; v = bytearray(); r = m.lancer_ligne(hexa, -1, 1, v); res.append('%s:%s:%d' % (nom, r, len(v)))
 sorties = []; m.statut = lambda fd, t: sorties.append(t); m.pousser = casse
+m.DIFFEREE['ligne'] = None  # le témoin ci-dessus a laissé une ligne différée : l'état est remis à zéro, ce cas-ci juge l'échec d'écriture
 m.lire_controle(b'L ' + hexa + b'\n', -1, 1, bytearray())
 print(' '.join(res) + ' | ' + ';'.join(sorties))
 PY
@@ -285,13 +286,13 @@ cat > "$WORK/sed/hex.sed" <<'SED'
 s|^    if len(hexa) > 2 \* LIGNE_MAX:$|    if False:|
 SED
 cat > "$WORK/sed/auto.sed" <<'SED'
-s|^    vers_shell += CTRL_C + ligne$|    vers_shell += CTRL_C + ligne + bytes([13])|
+s|^    vers_shell += ligne$|    vers_shell += ligne + bytes([13])|
 SED
 cat > "$WORK/sed/reste.sed" <<'SED'
 s|^    return tampon\[-1024:\]$|    return tampon[-256:]|
 SED
 cat > "$WORK/sed/file.sed" <<'SED'
-s|^    if vers_shell:$|    if False:|
+s|^    if vers_shell or DIFFEREE\['ligne'\] is not None:$|    if False:|
 SED
 if mut_pty premierplan "$WORK/sed/premier.sed"; then
   ASSIST="$MUT_ASSIST"; t_l2 "$MSH"; X2="$L2_1"; t_l3 "$MSH"; ASSIST="$ASSIST0"
