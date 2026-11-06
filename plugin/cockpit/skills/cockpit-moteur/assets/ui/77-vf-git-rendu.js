@@ -164,10 +164,11 @@
   // ---------- états : chargement, vide, indisponible ----------
   const etatChargement = () => { const d = el('div', 'vf-git-etat'); d.append(el('div', 'vf-git-fantome'), el('div', 'vf-git-fantome'), el('div', 'vf-git-fantome'), el('p', 'vf-git-note', 'Lecture du dépôt')); return d; };
   const etatVide = (cmd, annonce) => { const d = el('div', 'vf-git-etat'); d.append(el('h3', 'vf-git-titre', 'Aucun commit pour l\'instant'), el('p', 'vf-git-note', 'Le dépôt existe mais son historique est vide.'), commande(cmd, annonce, 'du premier commit')); return d; };
-  const etatIndisponible = (cmd, reessayer, annonce) => {
+  const etatIndisponible = (cmd, reessayer, annonce, delai) => { // delai : git a répondu « indisponible » (muet ou trop lent) ; sinon aucune réponse exploitable
+    const raison = delai ? 'Git a mis trop de temps à répondre (machine chargée ?). Réessayer.' : "La lecture du dépôt n'a pas abouti. Réessayer.";
     const d = el('div', 'vf-git-etat vf-git-carte'), b = el('button', 'btn soft', 'Réessayer', { type: 'button' });
     b.addEventListener('click', () => { if (reessayer) reessayer(); });
-    d.append(el('h3', 'vf-git-titre', 'Git est indisponible'), el('p', 'vf-git-note', 'La lecture du dépôt a échoué ou dépassé le délai.'), b, commande(cmd, annonce, 'de diagnostic'));
+    d.append(el('h3', 'vf-git-titre', 'Git est indisponible'), el('p', 'vf-git-note', raison), b, commande(cmd, annonce, 'de diagnostic'));
     return d;
   };
   window.VFGitRendu = Object.freeze({ graphe, rangee, sectionWorktrees, sectionTags, sectionStash, sectionAuteurs, mergees, commande, etatChargement, etatVide, etatIndisponible, relatif, section, ico, el });

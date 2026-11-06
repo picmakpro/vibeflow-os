@@ -132,7 +132,7 @@
     donnees = j;
     corps.replaceChildren();
     if (j && j.entete && typeof j.entete === 'object') emettre('vf-git:entete', j.entete); // l'en-tête suit la lecture, même indisponible
-    if (!j || (j.etat !== 'ok' && j.etat !== 'vide')) { corps.append(R.etatIndisponible(j && j.commandes ? j.commandes.diagnostic : 'git status', recharger, annoncer)); return; }
+    if (!j || (j.etat !== 'ok' && j.etat !== 'vide')) { corps.append(R.etatIndisponible(j && j.commandes ? j.commandes.diagnostic : 'git status', recharger, annoncer, !!j && j.etat === 'indisponible')); return; }
     if (j.etat === 'vide') { corps.append(R.etatVide(j.commandes.vide, annoncer)); return; }
     const g = R.el('div'), pied = j.bornes && j.bornes.tronque ? 'Historique tronqué : seuls les commits les plus récents sont lus.' : `${j.rangees.length} commits affichés.`;
     g.append(j.rangees.length ? R.graphe(j.rangees, { couloirsMax: j.couloirsMax, replies: j.replies, tactile: MOBILE.matches }) : R.el('p', 'vf-git-note', 'Aucun commit à afficher.'));
@@ -141,13 +141,15 @@
     corps.append(...[R.sectionWorktrees(j.worktrees, annoncer), R.section('Graphe', null, g, true, 'vf-git-s-graphe'), R.sectionTags(j.tags), R.sectionStash(j.stash, annoncer), R.sectionAuteurs(j.auteurs, j.parBranche)].filter(Boolean));
     crochet('rendu', corps, j);
   };
-  function recharger() { // GET de même origine ; au-delà de 150 ms, rangées fantômes ; une réponse périmée est ignorée
+  function recharger(relance) { // GET de même origine ; au-delà de 150 ms, rangées fantômes ; une réponse périmée est ignorée ; une réponse « indisponible » ou nulle est relancée UNE fois (191), jamais en boucle
     const moi = ++seq, SRV = window.FLOORPLAN_SERVER || {};
     const attente = setTimeout(() => { if (moi === seq) { corps.setAttribute('aria-busy', 'true'); corps.replaceChildren(R.etatChargement()); } }, 150);
     return fetch('/api/vf/git', { method: 'GET', headers: { 'x-floorplan-token': SRV.token || '' }, cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null)).catch(() => null)
       .then((j) => { // rend { ok, change } (null si périmée) : 77-vf-git-vue-detail n'annonce qu'une relecture réussie qui a changé quelque chose
-        clearTimeout(attente); if (moi !== seq) return null; corps.removeAttribute('aria-busy');
+        clearTimeout(attente); if (moi !== seq) return null;
+        if (relance !== true && (!j || j.etat === 'indisponible' || !valide(j))) return recharger(true); // la relance prend la main : son propre ++seq périme celle-ci
+        corps.removeAttribute('aria-busy');
         const bon = valide(j) && (j.etat === 'ok' || j.etat === 'vide'), change = !(bon && donnees && JSON.stringify(j) === JSON.stringify(donnees));
         montrer(valide(j) ? j : null); eviter(); return { ok: bon, change };
       });

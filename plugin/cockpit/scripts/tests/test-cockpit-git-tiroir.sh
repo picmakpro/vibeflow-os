@@ -263,7 +263,7 @@ return out;
 JS
   R2B="$(cdp "$AUX/d2b.js" "$BASE")"
   assert_eq "D2.6 — indisponible : carte « Git est indisponible », « Réessayer », commande git status, l'en-tête dit « Branche indisponible »" "$(jq_ "$R2B" '[j.indispo.code.join(","), j.indispo.bouton, /Branche indisponible/.test(j.indispo.ligne)].join("|")' 2>/dev/null)" "git status|true|true"
-  assert_eq "D2.6 — « Réessayer » relance un GET (2 requêtes en tout), la page continue, 40 rangées" "$(jq_ "$R2B" '[j.reessai.reqs, j.reessai.page].join("|")' 2>/dev/null)" "2|true"
+  assert_eq "D2.6 — « Réessayer » relance un GET (3 requêtes en tout : la lecture, sa relance automatique unique, puis le clic), la page continue, 40 rangées" "$(jq_ "$R2B" '[j.reessai.reqs, j.reessai.page].join("|")' 2>/dev/null)" "3|true"
   assert_eq "D2.6 — vide : « Aucun commit pour l'instant », commande git commit -m \"premier commit\", aucune rangée" "$(jq_ "$R2B" '[j.vide.code.join(","), j.vide.rangees].join("|")' 2>/dev/null)" 'git commit -m "premier commit"|0'
   assert_eq "D2.6 — chargement : rien à 60 ms ; à 260 ms aria-busy, 3 rangées fantômes, « Lecture du dépôt », sans animation ; réponse reçue : plus rien" "$(jq_ "$R2B" 'JSON.stringify([j.avant150.busy, j.avant150.fantomes, j.pendant.busy, j.pendant.fantomes, j.pendant.texte, j.pendant.anim, j.apres.busy, j.apres.fantomes])' 2>/dev/null)" '[false,0,"true",3,true,"none",null,0]'
   assert_eq "D2.x — aucune erreur de page (états)" "$(jq_ "$R2B" 'j.errs.length' 2>/dev/null)" "0"
@@ -830,7 +830,7 @@ JS
   assert_eq "D16.4 — surface durcie : un nom de base hostile ne crée ni <img>, ni <script>, ni alerte, et n'entre dans aucune commande affichée" "$(jq_ "$R16" '[j.inerte.balises, j.inerte.alertes, j.inerte.cmdHostile, j.detail.hostile].join("|")' 2>/dev/null)" "0|0|false|false"
   assert_eq "D16.5 — PU-G-194 : deux groupes, lecture puis « Change votre copie de travail » (git show / git switch --detach), séparé, texte neutre, glyphe décoratif" "$(jq_ "$R16" '[j.detail.n, j.detail.titres.join("/"), j.detail.cmds.join("/"), j.detail.change.join(), j.detail.neutre, /^"△ " \/ ""$/.test(j.detail.glyphe)].join("|")' 2>/dev/null)" "2|Pour lire ce commit/Change votre copie de travail|git show/git switch|false,true|true|true"
   assert_eq "D16.x — aucune erreur de page" "$(jq_ "$R16" 'j.errs.length' 2>/dev/null)" "0"
-  # D17 (GT2, PU-G-198/199/200/201) : focus visible à l'ouverture, détail hors de la liste, noms des boutons Copier, Échap à 390 px.
+  # D17 (GT2, PU-G-198/199/200/201 ; DG-01 part page, PU-G-191) : focus visible à l'ouverture, détail hors de la liste, noms des boutons Copier, Échap à 390 px, une relance automatique unique.
   # SURFACE DURCIE : le nom d'une branche entre dans un aria-label (setAttribute) et nulle part ailleurs ; la commande copiée reste celle du <code> affiché.
   cat > "$AUX/d17a.js" <<'JS'
 const [base] = ARGS; const out = {};
@@ -879,6 +879,30 @@ out.errs = await s.ev(`window.__errs`);
 return out;
 JS
   { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d17b.js"; } > "$AUX/d17b-complet.js"
+  cat > "$AUX/d17c.js" <<'JS'
+const [base] = ARGS; const out = {};
+await fenetre(1440, 900); await s.naviguer(base + '/'); await pret();
+await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne');
+const T = `document.querySelector('#vf-git-tiroir')`;
+const INDISPO = `{ schema: 'vibeflow/cockpit-git@1', etat: 'indisponible', entete: { etat: 'indisponible', depot: 'depot' }, commandes: { vide: null, diagnostic: 'git status' } }`;
+// mock de route : la première lecture répond « indisponible », les suivantes le bon état
+await s.ev(`(() => { const f = window.fetch.bind(window), bon = JSON.parse(JSON.stringify(window.__TEMOIN_REF)); let n = 0; window.fetch = (u, i) => { if (/\\/api\\/vf\\/git(\\?|$)/.test(typeof u === 'string' ? u : u.url)) { n++; window.__vfGit.reponse = n === 1 ? ${INDISPO} : bon; } return f(u, i); }; })()`);
+await s.ev(`document.querySelector('#vf-git-ligne').click()`);
+for (let k = 0; k < 40 && !(await s.ev(`${LIGNES}.length === 40`)); k++) await pause(100); // pas d'attendre() : sans relance, le mutant doit rendre une trace, pas une erreur de scénario
+out.relance = await s.ev(`({ reqs: window.__vfReqs.length, carte: /Git est indisponible/.test(${T}.textContent), busy: ${T}.querySelector('.vf-git-corps').getAttribute('aria-busy') })`);
+// toujours « indisponible » : une seule relance, jamais de boucle, puis la raison humaine
+await s.ev(`window.__vfGit.reponse = ${INDISPO}; window.fetch = (u, i) => { if (/\\/api\\/vf\\/git(\\?|$)/.test(typeof u === 'string' ? u : u.url)) { window.__vfReqs.push({ url: u }); return Promise.resolve(new Response(JSON.stringify(${INDISPO}), { status: 200, headers: { 'content-type': 'application/json' } })); } return Promise.resolve(new Response('{}')); }; window.__avant = window.__vfReqs.length; window.VFGitTiroir.fermer(); window.VFGitTiroir.recharger()`);
+await s.attendre(`/Git est indisponible/.test(${T}.textContent)`, 'carte indisponible');
+await pause(700);
+out.boucle = await s.ev(`({ reqs: window.__vfReqs.length - window.__avant, texte: ${T}.querySelector('.vf-git-carte .vf-git-note').textContent })`);
+// aucune réponse exploitable (hors schéma) : même relance unique, autre raison
+await s.ev(`window.fetch = (u, i) => { window.__vfReqs.push({ url: u }); return Promise.resolve(new Response(JSON.stringify({ schema: 'autre@1' }), { status: 200, headers: { 'content-type': 'application/json' } })); }; window.__avant = window.__vfReqs.length; window.VFGitTiroir.recharger()`);
+await pause(700);
+out.horsSchema = await s.ev(`({ reqs: window.__vfReqs.length - window.__avant, texte: ${T}.querySelector('.vf-git-carte .vf-git-note').textContent })`);
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d17c.js"; } > "$AUX/d17c-complet.js"
   R17="$(cdp "$AUX/d17a-complet.js" "$BASE")"
   [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$R17" > "$TIROIR_TRACE-d17a.json"
   assert_eq "D17.1 — PU-G-198 : après la touche g, le titre « Historique Git » a le focus ET un anneau visible (2 px, couleur --ring)" "$(jq_ "$R17" '[j.focus.sur, j.focus.style !== "none", j.focus.largeur, j.focus.couleur === j.focus.anneau].join("|")' 2>/dev/null)" "true|true|2px|true"
@@ -891,6 +915,12 @@ JS
     R17B="$(cdp "$AUX/d17b-complet.js" "$BASE" "$W")"; ATT="vf-git-ligne"; [ "$W" = 390 ] && ATT="vf-plus"
     assert_eq "D17.6 [$W px] — PU-G-201 : tiroir ouvert depuis le menu « Plus d'actions », Échap le ferme et rend le focus à $ATT" "$(jq_ "$R17B" '[j.ouvert, j.ferme, j.focus].join("|")' 2>/dev/null)" "true|true|$ATT"
   done
+  R17C="$(cdp "$AUX/d17c-complet.js" "$BASE")"
+  [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$R17C" > "$TIROIR_TRACE-d17c.json"
+  assert_eq "D17.7 — PU-G-191 : première lecture « indisponible » puis bon état : UNE relance automatique, les 40 rangées, aucune carte d'erreur" "$(jq_ "$R17C" '[j.relance.reqs, j.relance.carte, j.relance.busy === null].join("|")' 2>/dev/null)" "2|false|true"
+  assert_eq "D17.8 — PU-G-191 : toujours « indisponible » : deux requêtes exactement (jamais de boucle), raison humaine « Git a mis trop de temps à répondre (machine chargée ?). Réessayer. »" "$(jq_ "$R17C" '[j.boucle.reqs, j.boucle.texte].join("|")' 2>/dev/null)" "2|Git a mis trop de temps à répondre (machine chargée ?). Réessayer."
+  assert_eq "D17.9 — PU-G-191 : réponse hors schéma : même relance unique, raison distincte (« n'a pas abouti »)" "$(jq_ "$R17C" '[j.horsSchema.reqs, j.horsSchema.texte].join("|")' 2>/dev/null)" "2|La lecture du dépôt n'a pas abouti. Réessayer."
+  assert_eq "D17.y — aucune erreur de page (relance)" "$(jq_ "$R17C" 'j.errs.length' 2>/dev/null)" "0"
   stop_srv
   # --- copies privées du module pour les mutants (build lit assets/ui/*.js) : chaque mutant a son propre lab et son propre serveur ---
   mkmod() { local d="$WORK/mod-$1"; mkdir -p "$d/scripts" "$d/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$d/skills/cockpit-moteur"; echo "$d/scripts"; }
@@ -945,6 +975,8 @@ JS
   assert_eq "M-LABEL-HTML — rougit D17.4 (le nom hostile écrit en HTML casse l'aria-label et ajoute des attributs) alors que les boutons existent et que la copie D17.5 fonctionne" "$(jq_ "$RM" '[j.hostile.label === j.hostile.attendu, j.attributs, j.copie.spy === j.hostile.code].join("|")' 2>/dev/null)" "false|false|true"
   mutant M-ECHAP-390 77-vf-git-tiroir.js ".some((d) => getComputedStyle(d).visibility !== 'hidden')" ".some(() => true)" d17b-complet.js
   assert_eq "M-ECHAP-390 — rougit D17.6 (le panneau fermé du téléphone, role=dialog invisible, bloque Échap : le tiroir reste ouvert, le focus part sur le corps) alors que le tiroir s'ouvre" "$(jq_ "$RM" '[j.ouvert, j.ferme, j.focus].join("|")' 2>/dev/null)" "true|false|"
+  mutant M-RELANCE 77-vf-git-tiroir.js "if (relance !== true && (!j ||" "if (false && (!j ||" d17c-complet.js
+  assert_eq "M-RELANCE — rougit D17.7 (plus de relance : une requête, la carte d'erreur au premier « indisponible ») alors que le bon état aurait été servi à la seconde" "$(jq_ "$RM" '[j.relance.reqs, j.relance.carte].join("|")' 2>/dev/null)" "1|true"
 fi
 
 echo "=== D10 — correction design de la critique fraîche (78-10 : F2, F12, F14, F15) ==="
