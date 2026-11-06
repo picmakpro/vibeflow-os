@@ -393,6 +393,13 @@ mkdir -p "$LAB/.claude/scripts"; reset_lab; printf 'alpha\r\ngamma\r\n' > "$OFFE
 if [ "$ENG_RC" -eq 0 ] && [ "$(cat "$OFFERED")" = "$(printf 'alpha\nbeta\ngamma')" ] && sans_cr "$OFFERED"; then ok "N18e : mark-offered sur état CRLF → noms gardés, LF"; else ko "N18e : rc=$ENG_RC [$(tr '\r\n' '^|' < "$OFFERED" 2>/dev/null)]"; fi
 reset_lab; printf 'alpha\r\ngamma\r\n' > "$OFFERED"; eng "$CACHE5" unmark-offered gamma
 if [ "$ENG_RC" -eq 0 ] && [ "$(cat "$OFFERED")" = alpha ] && sans_cr "$OFFERED"; then ok "N18f : unmark-offered sur état CRLF → alpha gardé, LF"; else ko "N18f : rc=$ENG_RC [$(tr '\r\n' '^|' < "$OFFERED" 2>/dev/null)]"; fi
+# g : new-modules lit l'état « proposé » CRLF comme en LF : un module déjà proposé n'est pas reproposé
+mkdir -p "$LAB/.claude/scripts"; reset_lab; printf 'alpha\r\n' > "$OFFERED"; eng "$CACHE5" new-modules
+if [ "$ENG_RC" -eq 0 ] && ! printf '%s\n' "$ENG_OUT" | grep -q '^alpha='; then ok "N18g : new-modules, état « proposé » CRLF → alpha non reproposé"; else ko "N18g : alpha reproposé ou verbe en échec : rc=$ENG_RC [$(printf '%s' "$ENG_OUT" | tr '\r\n' '^|' | cut -c1-70)]"; fi
+# h : le backup d'un module d'un registre CRLF capture une .version sans \r
+fresh_reg; printf 'conductor=v1.0.0\r\nalpha=v1.0.0\r\n' > "$REG"; inst
+BV="$(ls -1d "$LAB/.claude/.backups/conductor-"*/.version 2>/dev/null | head -1)"
+if [ "$ENG_RC" -eq 0 ] && [ -n "$BV" ] && [ "$(cat "$BV")" = v1.0.0 ] && sans_cr "$BV"; then ok "N18h : backup depuis registre CRLF → .version = v1.0.0 sans \\r"; else ko "N18h : rc=$ENG_RC .version=[$( [ -n "$BV" ] && od -c "$BV" | head -1 | cut -c1-60)]"; fi
 rm -rf "$LAB/.claude" "$VICTIM"
 
 echo "== $pass ok, $fail ko =="

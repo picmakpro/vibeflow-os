@@ -498,8 +498,9 @@ module_version_available() {
   cat "$CACHE_DIR/$mod/VERSION" 2>/dev/null || echo "—"
 }
 
-# strip_final_cr — retire le SEUL retour chariot final de chaque ligne (stdin → stdout). Registre ou état
-# « proposé » versionné et extrait en CRLF (Windows, core.autocrlf=true) : lu comme le même fichier en LF.
+# strip_final_cr — retire le SEUL retour chariot final de chaque ligne (stdin → stdout). Le registre, versionné
+# en scope project et extrait en CRLF (Windows, core.autocrlf=true), est lu comme le même fichier en LF ; l'état
+# « proposé » (ignoré par git) est lu de la même façon.
 # Un \r au milieu d'une ligne reste en place, donc rejeté par les filtres de format qui suivent (arbitrage Samuel,
 # AskUserQuestion session principale, 2026-11-06). Le \r est posé par printf : sed BSD ne connaît pas `\r`.
 strip_final_cr() { sed "s/$(printf '\r')\$//"; }
@@ -4030,7 +4031,7 @@ list_new_modules() {
     [ "$(module_version_installed "$mod")" = "—" ] || continue
     # Jamais en double : un module posé dans l'autre scope (user <-> project) n'est pas reproposé ici.
     if [ -n "$other" ] && grep -q "^${mod}=" "$other"; then continue; fi
-    if [ -f "$offered" ] && grep -qx "$mod" "$offered"; then continue; fi
+    if [ -f "$offered" ] && grep -qx "$mod" <(strip_final_cr < "$offered"); then continue; fi
     module_is_proposable "$mod" || continue
     role_visible "$mod" || continue
     echo "$mod=$(module_version_available "$mod")"
