@@ -781,7 +781,31 @@
    if (recentOf(item)) cls += ' recent';
    else if (recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item)) cls += ' recent-in';
    return `<div class="card ${cls}" style="--c:${colorOf(i)}"><div class="head">${head}</div>${title}${desc}${noteHTML}${cardFoot(item)}</div>`;
-@@ -1015,7 +1037,7 @@ async function layout(view) {
+@@ -972,11 +994,13 @@ function connectorHTML(c) {
+   const i = info(c.entity);
+   return `<div class="card connector" style="--c:${colorOf(i)}"><span class="ico">${icon(iconKey(i))}</span><span class="lbl">${h(i.name)}</span><span class="dir-ico">${icon(c.side === 'in' ? 'in' : 'out')}</span></div>`;
+ }
++/** The mouse hints under a tooltip ("2×click", "right-click") mean nothing to a finger: on a touch screen the row is left out (PU-G-036). */
++const tipHints = (spans) => matchMedia('(pointer: coarse)').matches ? '' : `<div class="th">${spans}</div>`;
+ /** Hover tooltip for a card: what it is, where it lives, and what you can do with it. */
+ function cardTip(id) {
+   if (id.startsWith('x:')) {
+     const i = info(connEntity(id));
+-    return `<div class="tt">${id.startsWith('x:in') ? 'From' : 'To'} ${h(i.name)}</div>${i.desc ? `<div class="td">${h(i.desc)}</div>` : ''}<div class="th"><span><span class="kbd">2×click</span> go there</span><span><span class="kbd">right-click</span> more</span></div>`;
++    return `<div class="tt">${id.startsWith('x:in') ? 'From' : 'To'} ${h(i.name)}</div>${i.desc ? `<div class="td">${h(i.desc)}</div>` : ''}${tipHints('<span><span class="kbd">2×click</span> go there</span><span><span class="kbd">right-click</span> more</span>')}`;
+   }
+   const i = info(id);
+   const st = statsOf(id);
+@@ -984,7 +1008,7 @@ function cardTip(id) {
+   const where = i.type === 'node' ? (i.n.paths || []).join('\n') : i.type === 'route' ? `${i.f.p}${i.r.h ? ` · ${i.r.h}()` : ''}` : i.path || '';
+   const size = !st?.files ? '' : PLAN ? (i.type === 'file' || i.type === 'module' ? 'planned' : plural(st.files, 'planned file')) : i.type === 'file' || i.type === 'module' ? `${fmt(st.loc)} lines` : `${plural(st.files, 'file')} · ${fmt(st.loc)} lines`;
+   const hints = [drillable(id) && state.container !== id ? '<span><span class="kbd">2×click</span> open</span>' : '', '<span><span class="kbd">right-click</span> more</span>'].join('');
+-  return `<div class="tt">${h(i.name)}</div><div class="td" style="text-transform:capitalize">${h(kind)}${size ? ` · ${size}` : ''}</div>${where ? `<div class="tp">${h(where)}</div>` : ''}${recentTip(id)}<div class="th">${hints}</div>`;
++  return `<div class="tt">${h(i.name)}</div><div class="td" style="text-transform:capitalize">${h(kind)}${size ? ` · ${size}` : ''}</div>${where ? `<div class="tp">${h(where)}</div>` : ''}${recentTip(id)}${tipHints(hints)}`;
+ }
+ /** Hover lines for recent work: what changed on this card and how it serves the request, or what changed inside it. */
+ function recentTip(id) {
+@@ -1015,7 +1039,7 @@ async function layout(view) {
      children.push({ id: item, width: w, height: Math.max(hh + cardExtraH(item) + (answerNote(item) ? NOTE_H : 0), (deg.get(item) || 0) * 7 + 28), ...(ext ? { layoutOptions: { 'elk.layered.layering.layerConstraint': 'LAST' } } : {}) });
    }
    for (const c of view.connectors) {
@@ -790,7 +814,15 @@
        layoutOptions: { 'elk.layered.layering.layerConstraint': c.side === 'in' ? 'FIRST_SEPARATE' : 'LAST_SEPARATE' } });
    }
    return elk.layout({
-@@ -1108,6 +1130,10 @@ function draw(view, res) {
+@@ -1051,6 +1075,7 @@ function roundedPath(pts, r = 10) {
+ let renderToken = 0;
+ async function render(opts = {}) {
+   const token = ++renderToken;
++  hideTip(); // the cards are about to be redrawn
+   const view = buildView(state.container);
+   const loading = setTimeout(() => $('#loading').classList.add('on'), 160);
+   let res;
+@@ -1108,6 +1133,10 @@ function draw(view, res) {
      const fo = el('foreignObject', { x: -GUTTER, y: -GUTTER, width: c.width + GUTTER * 2, height: c.height + GUTTER * 2 }, g);
      fo.innerHTML = `<div class="fo-pad">${c.id.startsWith('x:') ? connectorHTML(view.connectors.find((x) => x.id === c.id)) : cardHTML(c.id)}</div>`;
      fo.querySelector('.card')?.style.setProperty('--d', `${delay.get(c.id)}ms`);
@@ -801,7 +833,72 @@
      g.addEventListener('click', (ev) => { ev.stopPropagation(); select(c.id); });
      g.addEventListener('dblclick', (ev) => { ev.stopPropagation(); if (ev.button !== 0) return; hideTip(); open(c.id); });
      g.addEventListener('contextmenu', (ev) => { ev.preventDefault(); ev.stopPropagation(); hideTip(); openMenu(ev, itemMenu(c.id)); });
-@@ -1261,8 +1287,13 @@ function freeArea() {
+@@ -1140,23 +1169,37 @@ function drawColumns(g, view, res) {
+ 
+ // ======================= tooltips =======================
+ const tip = $('#tooltip');
+-let tipTimer = null, lastPointer = null;
++let tipTimer = null, lastPointer = null, tipAnchor = null; // tipAnchor: the card the tooltip belongs to, so it can sit beside it
+ // a tap also sends mouseenter, so remember whether the last pointer was a finger: hover tooltips are for a mouse
+ let touching = false;
+ ['pointerdown', 'pointermove'].forEach((t) => window.addEventListener(t, (ev) => { touching = ev.pointerType === 'touch'; }, { capture: true, passive: true }));
+-function showTip(ev, html) { clearTimeout(tipTimer); if (!html || touching || drag?.moved || !$('#ctxmenu').hidden) return; tip.innerHTML = html; tip.hidden = false; moveTip(ev); }
++function showTip(ev, html, anchor) { clearTimeout(tipTimer); if (!html || touching || drag?.moved || !$('#ctxmenu').hidden) return; tip.innerHTML = html; tip.hidden = false; tipAnchor = anchor || null; moveTip(ev); }
+ /** Cards explain themselves after a short hover, so passing over them doesn't flicker tooltips. */
+-function tipSoon(ev, make) { clearTimeout(tipTimer); lastPointer = ev; tipTimer = setTimeout(() => showTip(lastPointer, make()), 420); }
++function tipSoon(ev, make) { clearTimeout(tipTimer); lastPointer = ev; const anchor = ev.currentTarget; tipTimer = setTimeout(() => showTip(lastPointer, make(), anchor), 420); }
+ function moveTip(ev) {
+   lastPointer = ev;
+   if (tip.hidden) return;
+-  const r = $('#stage').getBoundingClientRect();
+-  let x = ev.clientX - r.left + 18, y = ev.clientY - r.top + 18;
+-  if (x + tip.offsetWidth + 12 > r.width) x = ev.clientX - r.left - tip.offsetWidth - 14;
+-  if (y + tip.offsetHeight + 12 > r.height) y = ev.clientY - r.top - tip.offsetHeight - 14;
++  const r = $('#stage').getBoundingClientRect(), w = tip.offsetWidth, hh = tip.offsetHeight;
++  // the details panel on the right hides what is under it: the tooltip stops short of it (PU-G-035)
++  const pr = !document.body.classList.contains('no-panel') && !isPhone() ? panel.getBoundingClientRect() : null;
++  const right = Math.min(r.width, pr && pr.width ? pr.left - r.left : r.width) - 8;
++  const c = tipAnchor?.querySelector?.('.card')?.getBoundingClientRect();
++  let x, y;
++  if (c && c.width) { // beside the card, never on it: to its right, else to its left, else under or over it
++    const cl = c.left - r.left, cr = c.right - r.left, ct = c.top - r.top, cb = c.bottom - r.top;
++    y = ct;
++    if (cr + 12 + w <= right) x = cr + 12;
++    else if (cl - 12 - w >= 8) x = cl - 12 - w;
++    else { x = clamp(cl, 8, Math.max(8, right - w)); y = cb + 8 + hh <= r.height - 8 ? cb + 8 : ct - 8 - hh; }
++    y = clamp(y, 8, Math.max(8, r.height - hh - 8));
++  } else { // a link line: next to the pointer
++    x = ev.clientX - r.left + 18; y = ev.clientY - r.top + 18;
++    if (x + w + 12 > right) x = ev.clientX - r.left - w - 14;
++    if (y + hh + 12 > r.height) y = ev.clientY - r.top - hh - 14;
++  }
+   tip.style.left = Math.max(8, x) + 'px'; tip.style.top = Math.max(8, y) + 'px'; // flipped on a narrow screen, it still stays on it
+ }
+-function hideTip() { clearTimeout(tipTimer); tip.hidden = true; }
++function hideTip() { clearTimeout(tipTimer); tip.hidden = true; tipAnchor = null; }
+ function endpointsOf(e) {
+   const m = new Map();
+   for (const l of e.links) for (const [ri] of l.calls || []) if (ri != null) m.set(ri, (m.get(ri) || 0) + 1);
+@@ -1200,8 +1243,8 @@ function itemMenu(id) {
+   const url = fileForEditor && editorUrl(...fileForEditor);
+   return [
+     { title: i.name },
+-    id.startsWith('x:') ? { label: `Go to ${i.name}`, icon: 'right', hint: '2×click', run: () => reveal(real) }
+-      : drillable(real) && state.container !== real ? { label: 'Open', icon: 'drill', hint: '2×click', run: () => open(real) } : null,
++    id.startsWith('x:') ? { label: `Go to ${i.name}`, icon: 'right', hint: matchMedia('(pointer: coarse)').matches ? undefined : '2×click', run: () => reveal(real) }
++      : drillable(real) && state.container !== real ? { label: 'Open', icon: 'drill', hint: matchMedia('(pointer: coarse)').matches ? undefined : '2×click', run: () => open(real) } : null,
+     state.container === 'q:answer' && !id.startsWith('x:') ? { label: 'Show on the map', icon: 'external', run: () => reveal(real) } : null,
+     EXPORTED ? null : { label: 'Ask about this', icon: 'spark', run: () => addAskContext(real) },
+     { label: 'Show details', icon: 'panel', run: () => { setPanel(true); if (id.startsWith('x:')) reveal(real); else select(id); } },
+@@ -1239,6 +1282,7 @@ window.addEventListener('blur', closeMenu);
+ // ======================= pan / zoom =======================
+ function applyTransform() {
+   const { x, y, k } = state.t;
++  if (!tip.hidden) hideTip(); // the map moves under the pointer (zoom, pan, fit): what the tooltip described is no longer there (PU-G-035)
+   vp.style.transform = `translate(${x}px,${y}px) scale(${k})`;
+   svg.classList.toggle('lod-low', k < 0.42);
+   svg.classList.toggle('lod-mid', k >= 0.42 && k < 0.65);
+@@ -1261,8 +1305,13 @@ function freeArea() {
  function fit(animate) {
    const b = state.bounds; if (!b) return;
    const a = freeArea();
@@ -817,7 +914,7 @@
  }
  function zoomBy(f, cx, cy) {
    const r = stageRect();
-@@ -1270,13 +1301,12 @@ function zoomBy(f, cx, cy) {
+@@ -1270,13 +1319,12 @@ function zoomBy(f, cx, cy) {
    const k = clamp(state.t.k * f, 0.08, 2.5);
    setT({ k, x: cx - (cx - state.t.x) * (k / state.t.k), y: cy - (cy - state.t.y) * (k / state.t.k) }, false);
  }
@@ -834,7 +931,7 @@
  }, { passive: false });
  let drag = null;
  const fingers = new Map(); let pinch = null; // touch only: the fingers on the map, and the pinch they make
-@@ -1437,7 +1467,7 @@ function renderContext() {
+@@ -1437,7 +1485,7 @@ function renderContext() {
    const i = info(state.container);
    const kind = state.container === 'root' ? 'Overview' : i.type === 'node' ? i.kind.charAt(0).toUpperCase() + i.kind.slice(1) : i.type === 'dir' ? 'Folder' : i.type === 'file' ? 'File' : i.type;
    const badge = state.container === 'root' ? '' : `<span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span>`;
@@ -843,7 +940,7 @@
    foldContext();
  }
  /** On a phone the description folds to one line; the More / Less toggle shows only when there's more to read, and the choice is remembered on this device. */
-@@ -1503,7 +1533,7 @@ const rowFor = (item, extra = '', dotColor) => {
+@@ -1503,7 +1551,7 @@ const rowFor = (item, extra = '', dotColor) => {
  };
  const routeRow = (ri, extra = '') => {
    const r = routes[ri];
@@ -852,7 +949,7 @@
  };
  const listSec = (title, rows, count, max = 30) => rows.length ? `<div class="sec"><h3>${h(title)} <span class="c">${count ?? rows.length}</span></h3><div class="list">${rows.slice(0, max).join('')}${rows.length > max ? `<div class="more">+${rows.length - max} more</div>` : ''}</div></div>` : '';
  const pathBox = (p) => `<div class="pp"><span>${h(p)}</span><button data-copy="${h(p)}" title="Copy">${iconI('copy')}</button></div>`;
-@@ -1520,7 +1550,7 @@ function renderPanel() {
+@@ -1520,7 +1568,7 @@ function renderPanel() {
    else if (sel && sel.startsWith('x:')) html = itemPanel(connEntity(sel), true);
    else if (sel && sel.startsWith('m:')) html = itemPanel('f:' + sel.slice(2));
    else if (sel) html = itemPanel(sel);
@@ -861,7 +958,7 @@
    // extensions add sections: 'overview' on the codebase panel, 'item' on a selected/opened item
    const where = sel && typeof sel === 'object' ? null : sel ? 'item' : state.container === 'root' ? 'overview' : state.container === 'q:answer' ? null : 'item';
    const target = sel && typeof sel === 'string' ? (sel.startsWith('x:') ? connEntity(sel) : sel.startsWith('m:') ? 'f:' + sel.slice(2) : sel) : state.container;
-@@ -1582,7 +1612,7 @@ function overviewPanel() {
+@@ -1582,7 +1630,7 @@ function overviewPanel() {
    const tops = kids.get('root') || [];
    const undescribed = G.files.filter((f) => f.auto).length + routes.filter((r) => r.auto).length;
    return `<div class="sec"><div class="ph"><span class="ico" style="--c:var(--accent)">${icon('feature')}</span><span class="kind">${PLAN ? 'Blueprint' : 'Codebase'}</span></div><h2 class="pt">${h(p.name)}</h2>${p.summary ? `<p class="pd">${h(p.summary)}</p>` : ''}
@@ -870,7 +967,7 @@
        ${undescribed ? `<div class="callout">${undescribed} files and endpoints still use generated names. Run the skill again to describe them.</div>` : ''}</div>
      ${systemsSection(tops)}
      ${listSec('Guided flows', G.flows.map((f) => `<a class="row" data-flow="${h(f.id)}"><span class="dot" style="background:var(--accent)"></span><span class="rt"><div class="rn">${h(f.title)}</div>${f.description ? `<div class="rd">${h(f.description)}</div>` : ''}</span><span class="rc">${f.steps.length} steps</span></a>`))}
-@@ -1617,7 +1647,7 @@ function itemPanel(item, viaConnector) {
+@@ -1617,7 +1665,7 @@ function itemPanel(item, viaConnector) {
    if (viaConnector || (parentOf.get(item) !== state.container && state.container !== item)) actions.push(`<button class="btn soft" data-go="${h(item)}">Show on map</button>`);
    if (i.type === 'node' || i.type === 'dir') {
      const n = i.n, s = statsOf(item);
@@ -879,7 +976,7 @@
      if (n?.paths?.length || i.d) html += pathBox(i.d ? i.d.path + '/' : n.paths.join('  '));
      if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
      html += '</div>';
-@@ -1644,7 +1674,7 @@ function itemPanel(item, viaConnector) {
+@@ -1644,7 +1692,7 @@ function itemPanel(item, viaConnector) {
      if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
      const owner = nodes.get(f.n);
      html += `</div><div class="sec"><div class="stats">${PLAN ? `<div><b>${fmt(G.links.filter((l) => l.a === fid).length)}</b><span>uses</span></div>` : `<div><b>${fmt(f.loc)}</b><span>lines</span></div>`}<div><b>${(routesByFile.get(f.p) || []).length}</b><span>endpoints</span></div><div><b>${technical() ? (f.s || []).length : fmt(G.links.filter((l) => l.b === 'f:' + f.p).length)}</b><span>${technical() ? 'exports' : 'used by'}</span></div></div>
@@ -888,7 +985,7 @@
      html += listSec('Endpoints', (routesByFile.get(f.p) || []).map((ri) => routeRow(ri)), undefined, 60);
      const inL = G.links.filter((l) => l.b === fid), outL = G.links.filter((l) => l.a === fid);
      const rowL = (l, other) => rowFor(other, l.calls?.length ? plural(l.calls.length, 'call') : KIND_LABEL[l.k], `var(--k-${l.k})`);
-@@ -1805,16 +1835,21 @@ async function loadCustomFlows() {
+@@ -1805,16 +1853,21 @@ async function loadCustomFlows() {
    const S = window.FLOORPLAN_SERVER;
    if (!S || typeof EventSource === 'undefined') return;
    const reload = () => { toast('Map updated'); setTimeout(() => location.reload(), 500); };
@@ -919,7 +1016,7 @@
  })();
  
  async function requestFlow(prompt) {
-@@ -1862,9 +1897,9 @@ function flowStep() {
+@@ -1862,9 +1915,9 @@ function flowStep() {
    const container = b ? lcaContainer(a, b) : parentOf.get(a) || 'root';
    const bar = $('#flowbar'); bar.hidden = false;
    bar.innerHTML = `<div class="ft"><div class="fk">${h(f.title)} · step ${i + 1} of ${f.steps.length}</div><b>${h(info(a).name)}</b>${b ? ` <span>→</span> <b>${h(info(b).name)}</b>` : ''}<br><span>${h(f.steps[i].note)}</span><div class="dots">${f.steps.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div></div>
@@ -931,7 +1028,7 @@
    $('#fl-x').onclick = stopFlow;
    // an answer's walkthrough plays on the answer board itself
    if (state.flow.inPlace) { if (state.container === 'q:answer') highlightFlow(a, b); else go('q:answer', { after: () => highlightFlow(a, b) }); }
-@@ -1951,7 +1986,10 @@ function refChip(id) {
+@@ -1951,7 +2004,10 @@ function refChip(id) {
    return `<span class="ref" data-ref="${h(id)}" style="--c:${colorOf(ii)}"><i></i>${h(b.name)}</span>`;
  }
  function md(src) {
@@ -943,7 +1040,7 @@
    const out = [];
    let list = null;
    for (const raw of String(src || '').split('\n')) {
-@@ -2191,16 +2229,7 @@ if (EXPORTED) {
+@@ -2191,16 +2247,7 @@ if (EXPORTED) {
    tag.textContent = isNaN(at) ? 'Exported copy' : `Exported ${at.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
    tag.title = 'A copy of this map to look around in. Asking questions needs Floorplan with Claude Code or Codex, in the codebase itself.';
    $('#proj-name').after(tag);
@@ -961,7 +1058,7 @@
  }
  document.title = `${G.project.name} map`;
  $('#btn-up').onclick = up;
-@@ -2372,6 +2401,8 @@ window.Floorplan = Object.freeze({
+@@ -2372,6 +2419,8 @@ window.Floorplan = Object.freeze({
    technical, setTechnical,
    store,
    on(event, fn) { (ext.listeners[event] ||= []).push(fn); },

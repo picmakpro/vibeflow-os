@@ -994,11 +994,13 @@ function connectorHTML(c) {
   const i = info(c.entity);
   return `<div class="card connector" style="--c:${colorOf(i)}"><span class="ico">${icon(iconKey(i))}</span><span class="lbl">${h(i.name)}</span><span class="dir-ico">${icon(c.side === 'in' ? 'in' : 'out')}</span></div>`;
 }
+/** The mouse hints under a tooltip ("2×click", "right-click") mean nothing to a finger: on a touch screen the row is left out (PU-G-036). */
+const tipHints = (spans) => matchMedia('(pointer: coarse)').matches ? '' : `<div class="th">${spans}</div>`;
 /** Hover tooltip for a card: what it is, where it lives, and what you can do with it. */
 function cardTip(id) {
   if (id.startsWith('x:')) {
     const i = info(connEntity(id));
-    return `<div class="tt">${id.startsWith('x:in') ? 'From' : 'To'} ${h(i.name)}</div>${i.desc ? `<div class="td">${h(i.desc)}</div>` : ''}<div class="th"><span><span class="kbd">2×click</span> go there</span><span><span class="kbd">right-click</span> more</span></div>`;
+    return `<div class="tt">${id.startsWith('x:in') ? 'From' : 'To'} ${h(i.name)}</div>${i.desc ? `<div class="td">${h(i.desc)}</div>` : ''}${tipHints('<span><span class="kbd">2×click</span> go there</span><span><span class="kbd">right-click</span> more</span>')}`;
   }
   const i = info(id);
   const st = statsOf(id);
@@ -1006,7 +1008,7 @@ function cardTip(id) {
   const where = i.type === 'node' ? (i.n.paths || []).join('\n') : i.type === 'route' ? `${i.f.p}${i.r.h ? ` · ${i.r.h}()` : ''}` : i.path || '';
   const size = !st?.files ? '' : PLAN ? (i.type === 'file' || i.type === 'module' ? 'planned' : plural(st.files, 'planned file')) : i.type === 'file' || i.type === 'module' ? `${fmt(st.loc)} lines` : `${plural(st.files, 'file')} · ${fmt(st.loc)} lines`;
   const hints = [drillable(id) && state.container !== id ? '<span><span class="kbd">2×click</span> open</span>' : '', '<span><span class="kbd">right-click</span> more</span>'].join('');
-  return `<div class="tt">${h(i.name)}</div><div class="td" style="text-transform:capitalize">${h(kind)}${size ? ` · ${size}` : ''}</div>${where ? `<div class="tp">${h(where)}</div>` : ''}${recentTip(id)}<div class="th">${hints}</div>`;
+  return `<div class="tt">${h(i.name)}</div><div class="td" style="text-transform:capitalize">${h(kind)}${size ? ` · ${size}` : ''}</div>${where ? `<div class="tp">${h(where)}</div>` : ''}${recentTip(id)}${tipHints(hints)}`;
 }
 /** Hover lines for recent work: what changed on this card and how it serves the request, or what changed inside it. */
 function recentTip(id) {
@@ -1073,6 +1075,7 @@ function roundedPath(pts, r = 10) {
 let renderToken = 0;
 async function render(opts = {}) {
   const token = ++renderToken;
+  hideTip(); // the cards are about to be redrawn
   const view = buildView(state.container);
   const loading = setTimeout(() => $('#loading').classList.add('on'), 160);
   let res;
@@ -1166,23 +1169,37 @@ function drawColumns(g, view, res) {
 
 // ======================= tooltips =======================
 const tip = $('#tooltip');
-let tipTimer = null, lastPointer = null;
+let tipTimer = null, lastPointer = null, tipAnchor = null; // tipAnchor: the card the tooltip belongs to, so it can sit beside it
 // a tap also sends mouseenter, so remember whether the last pointer was a finger: hover tooltips are for a mouse
 let touching = false;
 ['pointerdown', 'pointermove'].forEach((t) => window.addEventListener(t, (ev) => { touching = ev.pointerType === 'touch'; }, { capture: true, passive: true }));
-function showTip(ev, html) { clearTimeout(tipTimer); if (!html || touching || drag?.moved || !$('#ctxmenu').hidden) return; tip.innerHTML = html; tip.hidden = false; moveTip(ev); }
+function showTip(ev, html, anchor) { clearTimeout(tipTimer); if (!html || touching || drag?.moved || !$('#ctxmenu').hidden) return; tip.innerHTML = html; tip.hidden = false; tipAnchor = anchor || null; moveTip(ev); }
 /** Cards explain themselves after a short hover, so passing over them doesn't flicker tooltips. */
-function tipSoon(ev, make) { clearTimeout(tipTimer); lastPointer = ev; tipTimer = setTimeout(() => showTip(lastPointer, make()), 420); }
+function tipSoon(ev, make) { clearTimeout(tipTimer); lastPointer = ev; const anchor = ev.currentTarget; tipTimer = setTimeout(() => showTip(lastPointer, make(), anchor), 420); }
 function moveTip(ev) {
   lastPointer = ev;
   if (tip.hidden) return;
-  const r = $('#stage').getBoundingClientRect();
-  let x = ev.clientX - r.left + 18, y = ev.clientY - r.top + 18;
-  if (x + tip.offsetWidth + 12 > r.width) x = ev.clientX - r.left - tip.offsetWidth - 14;
-  if (y + tip.offsetHeight + 12 > r.height) y = ev.clientY - r.top - tip.offsetHeight - 14;
+  const r = $('#stage').getBoundingClientRect(), w = tip.offsetWidth, hh = tip.offsetHeight;
+  // the details panel on the right hides what is under it: the tooltip stops short of it (PU-G-035)
+  const pr = !document.body.classList.contains('no-panel') && !isPhone() ? panel.getBoundingClientRect() : null;
+  const right = Math.min(r.width, pr && pr.width ? pr.left - r.left : r.width) - 8;
+  const c = tipAnchor?.querySelector?.('.card')?.getBoundingClientRect();
+  let x, y;
+  if (c && c.width) { // beside the card, never on it: to its right, else to its left, else under or over it
+    const cl = c.left - r.left, cr = c.right - r.left, ct = c.top - r.top, cb = c.bottom - r.top;
+    y = ct;
+    if (cr + 12 + w <= right) x = cr + 12;
+    else if (cl - 12 - w >= 8) x = cl - 12 - w;
+    else { x = clamp(cl, 8, Math.max(8, right - w)); y = cb + 8 + hh <= r.height - 8 ? cb + 8 : ct - 8 - hh; }
+    y = clamp(y, 8, Math.max(8, r.height - hh - 8));
+  } else { // a link line: next to the pointer
+    x = ev.clientX - r.left + 18; y = ev.clientY - r.top + 18;
+    if (x + w + 12 > right) x = ev.clientX - r.left - w - 14;
+    if (y + hh + 12 > r.height) y = ev.clientY - r.top - hh - 14;
+  }
   tip.style.left = Math.max(8, x) + 'px'; tip.style.top = Math.max(8, y) + 'px'; // flipped on a narrow screen, it still stays on it
 }
-function hideTip() { clearTimeout(tipTimer); tip.hidden = true; }
+function hideTip() { clearTimeout(tipTimer); tip.hidden = true; tipAnchor = null; }
 function endpointsOf(e) {
   const m = new Map();
   for (const l of e.links) for (const [ri] of l.calls || []) if (ri != null) m.set(ri, (m.get(ri) || 0) + 1);
@@ -1226,8 +1243,8 @@ function itemMenu(id) {
   const url = fileForEditor && editorUrl(...fileForEditor);
   return [
     { title: i.name },
-    id.startsWith('x:') ? { label: `Go to ${i.name}`, icon: 'right', hint: '2×click', run: () => reveal(real) }
-      : drillable(real) && state.container !== real ? { label: 'Open', icon: 'drill', hint: '2×click', run: () => open(real) } : null,
+    id.startsWith('x:') ? { label: `Go to ${i.name}`, icon: 'right', hint: matchMedia('(pointer: coarse)').matches ? undefined : '2×click', run: () => reveal(real) }
+      : drillable(real) && state.container !== real ? { label: 'Open', icon: 'drill', hint: matchMedia('(pointer: coarse)').matches ? undefined : '2×click', run: () => open(real) } : null,
     state.container === 'q:answer' && !id.startsWith('x:') ? { label: 'Show on the map', icon: 'external', run: () => reveal(real) } : null,
     EXPORTED ? null : { label: 'Ask about this', icon: 'spark', run: () => addAskContext(real) },
     { label: 'Show details', icon: 'panel', run: () => { setPanel(true); if (id.startsWith('x:')) reveal(real); else select(id); } },
@@ -1265,6 +1282,7 @@ window.addEventListener('blur', closeMenu);
 // ======================= pan / zoom =======================
 function applyTransform() {
   const { x, y, k } = state.t;
+  if (!tip.hidden) hideTip(); // the map moves under the pointer (zoom, pan, fit): what the tooltip described is no longer there (PU-G-035)
   vp.style.transform = `translate(${x}px,${y}px) scale(${k})`;
   svg.classList.toggle('lod-low', k < 0.42);
   svg.classList.toggle('lod-mid', k >= 0.42 && k < 0.65);
