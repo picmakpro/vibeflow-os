@@ -36,3 +36,29 @@ et R1 court/index, court/project. Taux comparables avec et sans la 72 (3/5 contr
 
 ## Non reproduit / environnement
 - M-FOCUS-CLIENT/VUE/CARTE/BANDEAU (bandeau.sh) rougissent dans mon Chromium arm64 de conteneur, mais passent sur le Chrome de la CI et ne sont pas liés à ces causes.
+
+## Correction ciblée après revue de 9f40408b (1 majeur, 3 mineurs)
+
+1. **Majeur — premier plan non retesté.** `liberer_ligne` écrivait la ligne sans revérifier `tcgetpgrp`, alors que l'entrée humaine continue d'aller au shell pendant l'attente
+   (30 ms à 0,5 s) : `L` valide puis `cat\r` humain, et la ligne était écrite DANS `cat`. Correctif : `premier_plan_libre(maitre, pid)` est retesté au moment d'écrire ;
+   faux -> rien n'est écrit, réponse `LANCE premier-plan` (409), puis la file `suite`. Témoins : L11.2 (vrai shell bash et zsh, lecteur brut lancé 5 ms après le L :
+   `LANCE premier-plan`, 0 octet reçu) et L11.1(b) (fonctions seules). Mutant M-RETEST-PREMIER-PLAN rouge sur les deux.
+2. **Écriture de la ligne différée en échec** -> `LANCE ecriture` puis `suite` : L11.1(a) ; mutant M-ECRITURE-DIFFEREE (`'ecriture'` -> `'ok'` dans `liberer_ligne`) rouge.
+3. **Témoin portable de « Ctrl-C seul, la ligne plus tard ».** L11.1(c, d) : horloge passée en argument (ni sortie ni 0,3 s : rien ; sortie sans 30 ms de calme : rien ; calme : la ligne
+   dans une écriture distincte de Ctrl-C ; sans sortie 0,31 s suffit). L12.1 : shell brut horodateur (Ctrl-C n'y est qu'un octet), deux lectures seulement, la première `03` seule, la seconde exactement la ligne,
+   ≥ 0,2 s plus tard — portable macOS et Linux. Mutants rouges sur les deux : M-SANS-ATTENTE, M-UNE-ECRITURE.
+   Moitié `vers_shell or` de `file.sed` : elle garde une entrée humaine déjà en file d'écriture. L9 ne peut pas la voir (un shell sourd ne reçoit qu'une ligne à la fois, Ctrl-C puis ligne
+   séparés par l'attente, sans jamais remplir le tampon du PTY) ; un témoin propre existe donc : L11.1(e) + mutant M-FILE-ENTREE-EN-ATTENTE rouge.
+4. **Textes** : docstrings de `lancer_ligne` et `liberer_ligne`, commentaires (réponse `ok`, 0,25 s -> calme de 30 ms plus un réveil, 0,5 s au plus sans sortie), 72-CONTRATS.md §5.
+
+### Limites connues (non corrigées)
+- Le drapeau `vu` peut être posé par l'écho d'une frappe humaine arrivée après Ctrl-C : l'attente se prolonge de la même manière (version probabiliste, jamais l'écriture avant la réaction du shell
+  puisque le calme court depuis la dernière sortie) ; non corrigé, aucune preuve d'un tort.
+- Si l'écriture de Ctrl-C est retenue par `BlockingIOError` (tampon du PTY plein) et que la ligne rejoint la file derrière lui, Ctrl-C et ligne partent dans la même écriture : le défaut d'origine,
+  sur un terminal qui ne lit déjà plus. Le correctif demande de retenir la ligne tant que la file n'est pas vide ; non fait faute de preuve d'un cas réel.
+- Texte humain tapé pendant l'attente (sans Entrée) : il précède la ligne dans le shell. Même famille que ci-dessus.
+
+### Rejeux (code corrigé)
+Linux ubuntu 26.04 (node 24, compte non root, Chromium) et macOS : lancer-pty (Linux 58/0 bash seul ; macOS 75/0 bash et zsh), lancer-processus 46/0 et 46/0, lancer-xss 76/0 et 76/0,
+lancer-bout-en-bout 54/0 et 54/0, terminal-session (Linux 58/0 avec `docker run --init` ; macOS 58/0), terminal-pty-plantage 21/0 et 21/0.
+Correction de mon rapport précédent : les rouges de terminal-pty / terminal-session sous Linux venaient de l'absence d'init dans le conteneur (zombies) ; avec `--init` : terminal-pty 63/0, terminal-session 58/0.

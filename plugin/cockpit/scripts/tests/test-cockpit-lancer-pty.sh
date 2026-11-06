@@ -49,7 +49,22 @@ echo $$ > "$VFT_RUN/sourd.pid"
 stty raw -echo
 exec sleep 299
 SH
-chmod +x "$WORK/bin/claude" "$WORK/bin/dormir" "$WORK/bin/shell-sourd"
+cat > "$WORK/temoins/horodate.py" <<'PY'
+# shell « horodateur » : mode brut (Ctrl-C n'est qu'un octet), consigne chaque lecture du terminal (heure, hexadécimal) dans horo.log ; sort sur Q
+import os, sys, time, tty
+r = os.environ['VFT_RUN']
+tty.setraw(0)
+while True:
+    d = os.read(0, 4096)
+    if not d:
+        break
+    with open(r + '/horo.log', 'a') as f:
+        f.write('%.6f %s\n' % (time.time(), d.hex()))
+    if b'Q' in d:
+        break
+PY
+printf '#!/bin/sh\necho $$ > "$VFT_RUN/horo.pid"\nexec python3 -I %s/temoins/horodate.py\n' "$WORK" > "$WORK/bin/shell-horodate"
+chmod +x "$WORK/bin/claude" "$WORK/bin/dormir" "$WORK/bin/shell-sourd" "$WORK/bin/shell-horodate"
 cat > "$WORK/temoins/lecteur.py" <<'PY'
 # lecteur brut : enregistre chaque octet reçu dans lecteur.recu, sort sur Q
 import os, tty
@@ -193,6 +208,18 @@ t_l8() {
   L8_F="$(fd2)"; L8_S="$([ "$(cnt "$P_O1" 'LANCE ok')" -ge 1 ] && echo oui || echo non)"
   L8_G="$(tr -d '\r' < "$P_O2" | grep -a -c -v -E '^(LANCE (ok|premier-plan|alphabet|invalide)|FIN [0-9]+|SIG [0-9]+)$')"
 }
+t_l11() { # un programme prend le premier plan PENDANT l'attente qui suit Ctrl-C (entrée humaine 5 ms après le L) : rien n'est écrit dans le programme
+  pil "$1" 'a:VFP> ' "F:$ref_l" 's:5' "w:$PYR\\r" 'N:1' 'a:LECTEUR-PRET' 's:500' 'z:@RUN@/lecteur.recu=R0' 'p:@RUN@/lecteur.pid=V0' 'w:Q' 's:300' 'e'
+  L11_RES="$(fd2) $(rv R0) $(rv V0)"
+}
+t_l12() { # shell brut horodateur : Ctrl-C SEUL, puis la ligne dans une écriture distincte, au moins 0,2 s plus tard (le shell ne produit aucune sortie : attente maximale)
+  pil "$WORK/bin/shell-horodate" 'f:@RUN@/horo.pid' 's:300' "F:$ref_l" 'N:1' 's:300' 'w:Q' 's:300' 'e'
+  L12_RES="$(fd2) $(node -e "
+const L = require('fs').readFileSync(process.argv[1] + '/horo.log', 'utf8').split('\n').filter(Boolean).map((l) => l.split(' ')); const ref = Buffer.from(process.env.VFT_REF, 'latin1').toString('hex');
+const c = L.filter((x) => x[1] !== '51');
+console.log(c.length + ' ' + (c[0] && c[0][1]) + ' ' + (c[1] && c[1][1] === ref) + ' ' + (c.length > 1 && Number(c[1][0]) - Number(c[0][0]) >= 0.2));
+" "$RUN" 2>&1)"
+}
 t_l9() {
   pil "$WORK/bin/shell-sourd" 'f:@RUN@/sourd.pid' 's:700' "G:$WORK/t/l9.L:10" 'N:60' 's:300' 'v:A' 'e'
   L9_PP="$(grep -a -c '^LANCE premier-plan$' "$P_O2")"; L9_T="$(grep -a -c '^LANCE ' "$P_O2")"; L9_RES="$([ "$L9_PP" -ge 1 ] && echo oui || echo "non($L9_PP)") $L9_T $(rv A) $P_FIN"
@@ -262,6 +289,47 @@ ecr() { python3 -I "$AUX/ecriture.py" "$1" "$REF" 2>&1 | tail -1; }
 L10_ATT="casse:ecriture:0 eio:ecriture:0 temoin:ok:0 | LANCE ecriture"
 assert_eq "L10.1 — un échec d'écriture (tube rompu, EIO) rend le motif « ecriture » et ne laisse rien en file ; la réponse du descripteur 2 est « LANCE ecriture », jamais « LANCE ok » (témoin : une écriture réussie rend ok)" "$(ecr "$ASSIST")" "$L10_ATT"
 
+echo "=== L11 / L12 — l'attente entre Ctrl-C et la ligne : premier plan retesté, écritures distinctes et espacées, échec d'écriture différée ==="
+cat > "$AUX/differe.py" <<'PY'
+# differe.py <assistant> <ligne> : fonctions de l'assistant seules, horloge passée en argument (aucun shell, aucun délai réel)
+import importlib.util, sys, time
+spec = importlib.util.spec_from_file_location('assist', sys.argv[1]); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+lig = sys.argv[2].encode(); hexa = lig.hex().encode()
+m.premier_plan_libre = lambda maitre, pid: True
+sorties = []; m.statut = lambda fd, t: sorties.append(t)
+ecr = []
+def trace(fd, t): ecr.append(bytes(t)); del t[:]
+def casse(fd, t): raise BrokenPipeError(32, 'tube rompu')
+def amorcer(v):
+    m.DIFFEREE.update(ligne=None, suite=[], vu=0.0); del ecr[:]; del sorties[:]; m.pousser = trace
+    return m.lancer_ligne(hexa, -1, 1, v)
+res = []
+v = bytearray(); r = amorcer(v); m.lire_controle(b'L ' + hexa + b'\n', -1, 1, v); m.pousser = casse; m.liberer_ligne(v, -1, 1, time.time() + 1)  # (a) la ligne différée ne peut pas être écrite
+res.append('a:%s:%s:%s:%d' % (r, ','.join(sorties), ecr == [b'\x03'], len(v)))
+v = bytearray(); r = amorcer(v); m.premier_plan_libre = lambda maitre, pid: False; m.liberer_ligne(v, -1, 1, time.time() + 1); m.premier_plan_libre = lambda maitre, pid: True  # (b) un programme a pris le terminal
+res.append('b:%s:%s:%s:%d' % (r, ','.join(sorties), ecr == [b'\x03'], len(v)))
+v = bytearray(); r = amorcer(v); t0 = m.DIFFEREE['t0']  # (c) horloge explicite : ni sortie ni 0,3 s -> rien ; sortie sans calme -> rien ; calme -> la ligne, seule, après Ctrl-C
+m.liberer_ligne(v, -1, 1, t0 + 0.001); c1 = (len(ecr), len(sorties))
+m.DIFFEREE['vu'] = t0 + 0.01; m.liberer_ligne(v, -1, 1, t0 + 0.02); c2 = (len(ecr), len(sorties))
+m.liberer_ligne(v, -1, 1, t0 + 0.05)
+res.append('c:%s:%s:%s:%s' % (c1, c2, ecr == [b'\x03', lig], ','.join(sorties)))
+v = bytearray(); r = amorcer(v); t0 = m.DIFFEREE['t0']; m.liberer_ligne(v, -1, 1, t0 + 0.31)  # (d) sans aucune sortie : attente maximale
+res.append('d:%s:%s' % (ecr == [b'\x03', lig], ','.join(sorties)))
+v = bytearray(b'x'); m.DIFFEREE.update(ligne=None, suite=[], vu=0.0); del ecr[:]; m.pousser = trace  # (e) une entrée déjà en attente d'écriture : refus, rien de plus en file
+r = m.lancer_ligne(hexa, -1, 1, v)
+res.append('e:%s:%s:%s:%d' % (r, m.DIFFEREE['ligne'] is None, ecr == [], len(v)))
+print(' '.join(res))
+PY
+L11_ATT="a:ok:LANCE ecriture,LANCE premier-plan:True:0 b:ok:LANCE premier-plan:True:0 c:(1, 0):(1, 0):True:LANCE ok d:True:LANCE ok e:premier-plan:True:True:1"
+dif() { python3 -I "$AUX/differe.py" "$1" "$REF" 2>&1 | tail -1; }
+assert_eq "L11.1 — fonctions seules, horloge explicite : (a) échec d'écriture de la ligne DIFFÉRÉE -> « LANCE ecriture » puis la demande en file, jamais « ok » ; (b) premier plan perdu pendant l'attente -> « LANCE premier-plan » et seul Ctrl-C est écrit ; (c) ni sortie ni 0,3 s -> rien, sortie sans 30 ms de calme -> rien, calme -> la ligne dans une écriture distincte de Ctrl-C ; (d) sans sortie, 0,31 s suffit ; (e) entrée déjà en attente -> refus sans rien mettre en file" "$(dif "$ASSIST")" "$L11_ATT"
+for SH in $SHELLS; do
+  B="$(basename "$SH")"; t_l11 "$SH"
+  assert_eq "L11.2 [$B] — un programme (lecteur brut) lancé 5 ms après le L prend le premier plan pendant l'attente : « LANCE premier-plan », 0 octet reçu par le programme (ni la ligne), lecteur vivant" "$L11_RES" "LANCE premier-plan| 0 oui"
+done
+t_l12
+assert_eq "L12.1 — shell brut horodateur : « LANCE ok », deux lectures du terminal seulement, la première est Ctrl-C (03) SEULE, la seconde est exactement la ligne, au moins 0,2 s plus tard" "$L12_RES" "LANCE ok|FIN 0| 2 03 true true"
+
 echo "=== M-* — mutants de l'assistant (copies du moteur, bash seul) ==="
 SAV="$SHELLS"; SHELLS="/bin/bash"; [ -x /bin/bash ] || SHELLS="$(command -v bash)"; MSH="${SHELLS%% *}"; ASSIST0="$ASSIST"
 cat > "$WORK/sed/premier.sed" <<'SED'
@@ -286,7 +354,7 @@ cat > "$WORK/sed/hex.sed" <<'SED'
 s|^    if len(hexa) > 2 \* LIGNE_MAX:$|    if False:|
 SED
 cat > "$WORK/sed/auto.sed" <<'SED'
-s|^    vers_shell += ligne$|    vers_shell += ligne + bytes([13])|
+s|^        vers_shell += ligne$|        vers_shell += ligne + bytes([13])|
 SED
 cat > "$WORK/sed/reste.sed" <<'SED'
 s|^    return tampon\[-1024:\]$|    return tampon[-256:]|
@@ -325,6 +393,42 @@ SED
 if mut_pty ecritureavalee "$WORK/sed/ecriture.sed"; then
   rougit "M-ECRITURE-AVALEE — le mutant avale l'échec d'écriture et répond ok (L10.1 rouge)" "$(ecr "$MUT_ASSIST")" "$L10_ATT"
 else sans_effet M-ECRITURE-AVALEE; fi
+cat > "$WORK/sed/ecrdiff.sed" <<'SED'
+s|^            reponse = 'ecriture'$|            reponse = 'ok'|
+SED
+cat > "$WORK/sed/retest.sed" <<'SED'
+s|^    libre = premier_plan_libre(maitre, pid)|    libre = True|
+SED
+cat > "$WORK/sed/attente.sed" <<'SED'
+s|^    if not (calme or maintenant - DIFFEREE\['t0'\] >= ATTENTE_MAX_CTRLC):$|    if False:|
+SED
+cat > "$WORK/sed/uneecr.sed" <<'SED'
+s|^    vers_shell += CTRL_C$|    vers_shell += CTRL_C + ligne|
+SED
+cat > "$WORK/sed/vsh.sed" <<'SED'
+s|^    if vers_shell or DIFFEREE\['ligne'\] is not None:$|    if DIFFEREE['ligne'] is not None:|
+SED
+if mut_pty ecrdiff "$WORK/sed/ecrdiff.sed"; then
+  rougit "M-ECRITURE-DIFFEREE — le mutant répond ok quand l'écriture de la ligne différée échoue (L11.1 rouge)" "$(dif "$MUT_ASSIST")" "$L11_ATT"
+else sans_effet M-ECRITURE-DIFFEREE; fi
+if mut_pty retest "$WORK/sed/retest.sed"; then
+  rougit "M-RETEST-PREMIER-PLAN — le mutant ne reteste plus le premier plan au moment d'écrire la ligne différée (L11.1 rouge)" "$(dif "$MUT_ASSIST")" "$L11_ATT"
+  ASSIST="$MUT_ASSIST"; t_l11 "$MSH"; ASSIST="$ASSIST0"
+  rougit "M-RETEST-PREMIER-PLAN — même mutant, vrai shell : la ligne est écrite dans le programme au premier plan (L11.2 rouge)" "$L11_RES" "LANCE premier-plan| 0 oui"
+else sans_effet M-RETEST-PREMIER-PLAN; fi
+if mut_pty sansattente "$WORK/sed/attente.sed"; then
+  rougit "M-SANS-ATTENTE — le mutant écrit la ligne sans attendre la réaction du shell (L11.1 rouge)" "$(dif "$MUT_ASSIST")" "$L11_ATT"
+  ASSIST="$MUT_ASSIST"; t_l12; ASSIST="$ASSIST0"
+  rougit "M-SANS-ATTENTE — même mutant, shell horodateur : la ligne suit Ctrl-C de moins de 0,2 s (L12.1 rouge)" "$L12_RES" "LANCE ok|FIN 0| 2 03 true true"
+else sans_effet M-SANS-ATTENTE; fi
+if mut_pty uneecriture "$WORK/sed/uneecr.sed"; then
+  rougit "M-UNE-ECRITURE — le mutant écrit Ctrl-C et la ligne ensemble, comme avant le correctif Linux (L11.1 rouge)" "$(dif "$MUT_ASSIST")" "$L11_ATT"
+  ASSIST="$MUT_ASSIST"; t_l12; ASSIST="$ASSIST0"
+  rougit "M-UNE-ECRITURE — même mutant, shell horodateur : la première lecture porte déjà la ligne (L12.1 rouge)" "$L12_RES" "LANCE ok|FIN 0| 2 03 true true"
+else sans_effet M-UNE-ECRITURE; fi
+if mut_pty filedemie "$WORK/sed/vsh.sed"; then
+  rougit "M-FILE-ENTREE-EN-ATTENTE — le mutant ne refuse plus une entrée déjà en attente d'écriture, seule la ligne différée garde (L11.1 rouge ; L9.1 reste vert : un shell sourd ne remplit jamais le tampon avec une ligne à la fois)" "$(dif "$MUT_ASSIST")" "$L11_ATT"
+else sans_effet M-FILE-ENTREE-EN-ATTENTE; fi
 if mut_pty entreeauto "$WORK/sed/auto.sed"; then
   ASSIST="$MUT_ASSIST"; t_l1 "$MSH"; ASSIST="$ASSIST0"
   rougit "M-ENTREE-AUTO — le mutant ajoute un retour chariot : le faux claude tourne sans geste humain (L1.2 rouge)" "$L1_VU $L1_A1" "vue absent"

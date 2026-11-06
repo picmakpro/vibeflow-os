@@ -140,7 +140,7 @@ cat > "$AUX/sans-confirm.sed" <<'SED'
 s#^( *)const recevoirProposition = (.*);$#\1const recevoirProposition = (m) => { (\2)(m); const t = setInterval(async () => { if ((await lancer({ id: lireProposition().id, mode: "herite" }, proprietaire)) === 204) clearInterval(t); }, 200); setTimeout(() => clearInterval(t), 20000); };#
 SED
 cat > "$AUX/entree-auto.sed" <<'SED'
-s|^    vers_shell += ligne$|    vers_shell += ligne + bytes([13])|
+s|^        vers_shell += ligne$|        vers_shell += ligne + bytes([13])|
 SED
 MUTFILES=(serve.mjs index.html project.html vf-cockpit-terminal-processus.mjs vf-cockpit-terminal-session.mjs vf-cockpit-lancer.mjs vf-cockpit-terminal-vue.mjs)
 empreinte() { local f; for f in "${MUTFILES[@]}"; do cat "$1/$f"; done | cksum; } # chaque fichier ; une pièce d'un mutant qui touche deux fichiers se contrôle à part
