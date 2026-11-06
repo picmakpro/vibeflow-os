@@ -56,3 +56,21 @@ Mandat du manager (2026-11-06) : F3 (audit), ST-1, ST-3, ST-4 (revue). Chaque po
 - Témoin côté session : J8.1 — un assistant factice qui répond `LANCE ecriture` rend `{ok:false,motif:ecriture}` ; qui répond `LANCE ok` rend `{ok:true}` (témoin).
 - Mutants : M-ECRITURE-AVALEE (`return 'ecriture'` devient `pass`) : L10.1 rouge ; M-REGEX-ECRITURE (la regex ne connaît plus `ecriture`) : J8.1 rouge, l'attente expire en `delai`.
 - Vert après : voir le rapport (preuves).
+
+## Correctifs C (F-3, F-4)
+
+Audit du lot 2 au SHA b5efcc40. Suites rejouées sur un export `git archive` à SHA fixe (b5efcc40) plus les deux fichiers de test corrigés.
+
+### F-3 — M-LISTE-PAGE périmé (test-cockpit-lancer-bout-en-bout.sh)
+
+- Cause : depuis ST-1 (41f08dbe), `proposer()` porte deux gardes d'appartenance (recherche de cible et appel de `verdict()`). Le mutant n'en retirait qu'une : la seconde refusait encore (409 au lieu de 202).
+- Rouge avant : 53 PASS / 1 FAIL (M-LISTE-PAGE, attendu 202, obtenu 409).
+- Correctif : le mutant retire les deux gardes, comme M-LISTE-PAGE de test-cockpit-lancer-serveur.sh. Valeur attendue inchangée (202).
+- Vert après : 54 PASS / 0 FAIL, et le mutant rougit pour la bonne raison (carte hostile ph-9 proposée, 202).
+
+### F-4 — `ecriture: 410` sans témoin (test-cockpit-lancer-processus.sh)
+
+- Défaut : retirer `ecriture: 410` de `STATUT_LANCER` laissait la suite à 44 PASS.
+- Témoin Q14 : doublure de `sessions.lancer` (`{ ok:false, motif:'ecriture' }`) posée par sed sur la copie de la sortie ; POST /lancer rend 410, la proposition est restituée (en attente, même id), aucun message `lancee`, flux inchangé.
+- Mutant M-STATUT-ECRITURE : même doublure, mapping retiré : le motif devient inconnu, 400 au lieu de 410, Q14 rougit.
+- Vert après : 46 PASS / 0 FAIL.

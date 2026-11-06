@@ -293,8 +293,9 @@ if mutant cr vf-cockpit-terminal-processus.mjs "s#sessions.lancer(ligneQ, onglet
   manche_debut "$MUT_OUT"; prop_p ph-1 "$V1"; lire_prop; attente_arme; R="$(lancer_q herite)"
   assert_eq "M-RETOUR-CHARIOT — sous le mutant, l'assistant refuse la ligne (400 au lieu de 204) et elle n'arrive pas à l'invite : B2 rougit" "$R $(node "$TA" attendre "$FLUX" "$LH" 3000) $([ -e "$RUN/argv" ] && echo argv || echo sans-argv)" "400 ABSENT sans-argv"; manche_fin
 else assert_eq "M-RETOUR-CHARIOT — mutant sans effet (ancre absente ou inchangée)" "sans effet" "effet"; fi
-echo "=== M-LISTE-PAGE — une cible hors liste ou bloquée est proposée quand même : B6 rougit ==="
-if mutant liste-page vf-cockpit-lancer.mjs "s|const cible = liste.find((x) => x.id === demande.cible);|const cible = { id: demande.cible, verbes: [demande.verbe], bloquants: [], avertissements: [], kind: 'phase', phase: '1', ws: null };|"; then
+echo "=== M-LISTE-PAGE — les deux gardes d'appartenance de proposer() retirées (recherche de cible ET verdict) : B6 rougit ==="
+if mutant liste-page vf-cockpit-lancer.mjs "s|const cible = liste.find((x) => x.id === demande.cible);|const cible = { id: demande.cible, verbes: [demande.verbe], bloquants: [], avertissements: [], kind: 'phase', phase: '1', ws: null };|
+s|const v = verdict(liste, cible.id, demande.verbe);.*$|const v = { lancable: true, bloquants: [] };|"; then
   manche_debut "$MUT_OUT"; prop_p ph-9 cadrer; R="$PST"
   assert_eq "M-LISTE-PAGE — sous le mutant, la carte du compartiment hostile ph-9 est proposée (202 au lieu de 409) : B6 rougit" "$R" "202"; manche_fin
 else assert_eq "M-LISTE-PAGE — mutant sans effet (ancre absente ou inchangée)" "sans effet" "effet"; fi

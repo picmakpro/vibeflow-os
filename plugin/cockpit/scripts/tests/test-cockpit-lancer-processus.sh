@@ -286,6 +286,18 @@ if mutant annprop "s#if (onglet !== proprietaire) return refus(res, 409);##"; th
   assert_eq "M-ANNULER-PROPRIETAIRE — sous le mutant, l'onglet B annule la proposition de l'onglet A (204 au lieu de 409) : Q10b rougit" "$R" "204"; manche_fin
 else assert_eq "M-ANNULER-PROPRIETAIRE — mutant sans effet (ancre absente ou inchangée)" "sans effet" "effet"; fi
 
+echo "=== Q14 / M-STATUT-ECRITURE — la session répond le motif « ecriture » : POST /lancer rend 410 et la proposition est restituée ==="
+# doublure de sessions.lancer posée sur la copie de la sortie (la même copie que les mutants) : l'assistant refuse l'écriture, sans octet au PTY
+STUB_ECR="s#const w = await sessions.lancer(ligneQ, onglet);#const w = { ok: false, motif: 'ecriture' };#"
+if mutant ecriture "$STUB_ECR"; then
+  mut_manche "$MUT_OUT"; SZ="$(tflux)"; R="$(pl "$(lj "$ID_M" herite)")"
+  assert_eq "Q14 — session doublée sur le motif ecriture : POST /lancer rend 410, la proposition est restituée (en attente, même id), aucun message « lancee », flux inchangé" "$R $(pbody | evj 'j.etat + " " + (j.id === "'"$ID_M"'")') $(nlancee) $(inchange "$SZ")" "410 en-attente true 0 inchange"; manche_fin
+else assert_eq "Q14 — doublure sans effet (ancre absente ou inchangée)" "sans effet" "effet"; fi
+if mutant ecriture-retire "$STUB_ECR" "s#, ecriture: 410 }# }#"; then
+  mut_manche "$MUT_OUT"; R="$(pl "$(lj "$ID_M" herite)")"
+  assert_eq "M-STATUT-ECRITURE — mapping ecriture retiré, même doublure : le motif devient inconnu, 400 au lieu de 410 : Q14 rougit" "$R" "400"; manche_fin
+else assert_eq "M-STATUT-ECRITURE — mutant sans effet (ancre absente ou inchangée)" "sans effet" "effet"; fi
+
 vf_hyg_assert
 echo "Résultats : $PASS PASS, $FAIL FAIL"
 [ $((PASS+FAIL)) -ge 40 ] || { echo "  ❌ FAIL — anti-vert-à-vide : moins de 40 assertions jouées"; exit 1; }
