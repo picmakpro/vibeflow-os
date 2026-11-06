@@ -2,7 +2,7 @@
 // Q retient la dernière liste fermée de cibles reçue de P, UNE proposition en attente, valide l'une contre l'autre, la précompose par le gabarit, l'arme,
 // la fait expirer et la consomme une seule fois. Aucun octet ne peut partir au PTY pour une cible hors liste : sans ligne composée, rien à écrire.
 // Exports : creerEtatLancer({ gabarit, maintenant, genId, uuid, armeMs, expireMs }) -> { definirCibles, proposer, lire, consommer, confirmer, rendre, annuler }, ARME_MS, EXPIRE_MS.
-// Module pur : le seul import est node:crypto ; aucune écriture disque, aucun réseau, aucun journal ; deux variables d'environnement de test, lues une fois à l'import.
+// Module pur : le seul import est node:crypto ; aucune écriture disque, aucun réseau, aucun journal ; deux variables d'environnement de test, lues une fois au chargement (l'armement ne peut qu'être rallongé, jamais abaissé sous 1000).
 // Gabarit injecté (72-01, noms de référence) : lignesParModes({ session, verbe, phase, ws, chat }) -> { ok, lignes, intention, nom } ou { ok:false, motif },
 //   validerLigne(ligne) -> { ok }, MODES, VERBES. Il est l'unique source de l'alphabet, du préfixe et de la longueur de la ligne : rien n'en est copié ici.
 // Consommation en DEUX temps : consommer réserve (la ligne part à l'assistant), confirmer acte (message « lancee » pour P), rendre restitue la proposition
@@ -17,7 +17,7 @@ import crypto from 'node:crypto';
 
 const depuisEnv = (v, min, max, defaut) => { const n = Number(v); return Number.isInteger(n) && n >= min && n <= max ? n : defaut; }; // garde:env-bornes
 const ARME_DEF = 1000; const EXPIRE_DEF = 120000;
-const arme0 = depuisEnv(process.env.VF_COCKPIT_LANCER_ARME_MS, 100, 10000, ARME_DEF);
+const arme0 = Math.max(ARME_DEF, depuisEnv(process.env.VF_COCKPIT_LANCER_ARME_MS, 100, 10000, ARME_DEF)); // garde:plancher — l'environnement ne peut que RALLONGER l'armement, jamais l'abaisser sous la valeur de production
 const expire0 = depuisEnv(process.env.VF_COCKPIT_LANCER_EXPIRE_MS, 1000, 600000, EXPIRE_DEF);
 const coherent = expire0 > arme0; // une expiration qui n'excède pas l'armement ne laisserait aucune fenêtre : les deux reprennent leur défaut
 export const ARME_MS = coherent ? arme0 : ARME_DEF;

@@ -266,8 +266,11 @@ env63() { # env63 <module> : dix cas, séparés par « ; » ; la variable posée
   o="$o$(envval "$m" VF_COCKPIT_LANCER_ARME_MS=5000 VF_COCKPIT_LANCER_EXPIRE_MS=3000)"; printf '%s' "$o"
 }
 assert_eq "LQ6.1 — défauts : ARME_MS = 1000, EXPIRE_MS = 120000" "$(envval "$MOD" X=1)" "1000,120000"
-assert_eq "LQ6.2 — VF_COCKPIT_LANCER_ARME_MS=250 -> 250" "$(envval "$MOD" VF_COCKPIT_LANCER_ARME_MS=250)" "250,120000"
+assert_eq "LQ6.2 — VF_COCKPIT_LANCER_ARME_MS=5000 -> 5000 (l'environnement RALLONGE le délai d'armement)" "$(envval "$MOD" VF_COCKPIT_LANCER_ARME_MS=5000)" "5000,120000"
 assert_eq "LQ6.2 — VF_COCKPIT_LANCER_EXPIRE_MS=5000 -> 5000" "$(envval "$MOD" VF_COCKPIT_LANCER_EXPIRE_MS=5000)" "1000,5000"
+env64() { local v o=""; for v in 100 250 999 1000 1001; do o="$o$(envval "$1" "VF_COCKPIT_LANCER_ARME_MS=$v");"; done; printf '%s' "$o"; }
+E64ATT="1000,120000;1000,120000;1000,120000;1000,120000;1001,120000;"
+assert_eq "LQ6.4 — l'environnement ne peut jamais abaisser l'armement sous la valeur de production : 100, 250, 999 -> 1000 ; 1000 -> 1000 ; 1001 -> 1001 (témoin : il rallonge)" "$(env64 "$MOD")" "$E64ATT"
 E63ATT="$(rep '1000,120000' 10 ';')"
 assert_eq "LQ6.3 — valeurs hors bornes, non entières ou vides (0, 99, 10001, -5, 1.5, abc, ''; 999, 600001; EXPIRE <= ARME) : les défauts" "$(env63 "$MOD")" "$E63ATT"
 
@@ -314,8 +317,11 @@ mut M-REMPLACE-PAS '/garde:remplace/s/attente = nouvelle;/if (!attente) attente 
 mut M-RESERVATION-MULTIPLE '/garde:occupee/d' "deux réservations à la fois" LQ5.4
 mut M-RENDRE-PERD '/garde:rendre/d' "rendre ne remet plus la proposition en attente" LQ5.5a LQ5.5b
 if mutj M-ENV-SANS-BORNE '/garde:env-bornes/s/n >= min && n <= max/true/'; then
-  assert_eq "M-ENV-SANS-BORNE — le mutant rougit LQ6.3 : une valeur hors bornes est retenue" "$([ "$(env63 "$MUT")" = "$E63ATT" ] && echo 'rouge=false' || echo 'rouge=true') temoin=$(envval "$MUT" VF_COCKPIT_LANCER_ARME_MS=250 | grep -q '^250,' && echo true || echo false)" "rouge=true temoin=true"
+  assert_eq "M-ENV-SANS-BORNE — le mutant rougit LQ6.3 : une valeur hors bornes est retenue" "$([ "$(env63 "$MUT")" = "$E63ATT" ] && echo 'rouge=false' || echo 'rouge=true') temoin=$(envval "$MUT" VF_COCKPIT_LANCER_ARME_MS=5000 | grep -q '^5000,' && echo true || echo false)" "rouge=true temoin=true"
 else sans_effet M-ENV-SANS-BORNE; fi
+if mutj M-ARME-ABAISSABLE '/garde:plancher/s/Math.max(ARME_DEF,/Math.max(0,/'; then
+  assert_eq "M-ARME-ABAISSABLE — le mutant rougit LQ6.4 : l'environnement abaisse l'armement sous la valeur de production" "$([ "$(env64 "$MUT")" = "$E64ATT" ] && echo 'rouge=false' || echo 'rouge=true') temoin=$(envval "$MUT" VF_COCKPIT_LANCER_ARME_MS=5000 | grep -q '^5000,' && echo true || echo false)" "rouge=true temoin=true"
+else sans_effet M-ARME-ABAISSABLE; fi
 mut M-CHAT-TYPE-LIBRE '/garde:chat-type/d' "un chat qui n'est pas un booléen est accepté" LQ5.9c
 mut M-CHAT-SANS-LIGNES '/garde:chat-absent/d' "chat true est accepté sans lignes de reprise" LQ5.9d
 mut M-CHAT-LIGNE-FAUSSE '/garde:chat-ligne/s/chat === true ?/attente.lignes_chat ?/' "la ligne de reprise est choisie sans le booléen" LQ5.9a
