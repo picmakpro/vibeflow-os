@@ -107,6 +107,23 @@ git -C "$LT" add -A && git -C "$LT" -c user.email=t@t -c user.name=t commit -q -
 assert_eq "C6.2 — l'assemblage rend 0" "$(assembler "$LT")" "0"
 assert_eq "C6.3 — le titre du travail récent est entier (jamais coupé à 60 caractères)" "$(node -e 'const t=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).tasks;console.log(t.length+"|"+(t[0]||{}).title)' "$LT/.vibeflow/cockpit/recent-work.json")" "1|Phase 1 · $TITRE"
 
+echo "=== C7 — résumés de fichiers : ni « > » initial, ni HTML brut, texte sans accents marqué « extrait brut » (PU-G-067, PU-G-068) ==="
+LR="$WORK/resumes"; mklab "$LR" modules; mkdir -p "$LR/plugin/a/references"
+printf '# Titre\n\n> Une citation de tête qui sert de résumé à ce fichier de référence.\n> Sa seconde ligne continue la citation.\n' > "$LR/plugin/a/references/citation.md"
+printf '<picture>\n  <source media="(prefers-color-scheme: dark)" srcset="logo-dark.svg">\n  <img alt="logo" src="logo.svg">\n</picture>\n\nLe texte lisible du fichier commence ici, après le balisage.\n' > "$LR/plugin/a/references/balise.md"
+printf '# Titre\n\nLancer <lab> puis lire <chemin> avant de continuer le travail demandé.\n' > "$LR/plugin/a/references/prose.md"
+printf '# Titre\n\nUne regle auto-scopee est une convention chargee sur certains fichiers, a chaque etape.\n' > "$LR/plugin/a/references/sans-accent.md"
+printf '# Title\n\nThis reference is complete and different from the other one in every detail.\n' > "$LR/plugin/a/references/anglais.md"
+git -C "$LR" add -A && git -C "$LR" -c user.email=t@t -c user.name=t commit -q -m resumes
+assert_eq "C7.0 — l'assemblage rend 0" "$(assembler "$LR")" "0"
+desc() { donnee "$LR" "(j.files.find(f=>f.p==='plugin/a/references/$1')||{}).d"; }
+assert_eq "C7.1 — citation : le « > » initial est retiré, première phrase entière" "$(desc citation.md)" "Une citation de tête qui sert de résumé à ce fichier de référence."
+assert_eq "C7.2 — HTML brut : le résumé est le premier texte lisible, sans balise" "$(desc balise.md)" "Le texte lisible du fichier commence ici, après le balisage."
+assert_eq "C7.3 — un « <lab> » de la prose reste intact (liste fermée de balises)" "$(desc prose.md)" "Lancer <lab> puis lire <chemin> avant de continuer le travail demandé."
+assert_eq "C7.4 — texte sans accents : conservé tel quel, marqué « extrait brut »" "$(desc sans-accent.md)" "Une regle auto-scopee est une convention chargee sur certains fichiers, a chaque etape. (extrait brut)"
+assert_eq "C7.5 — texte anglais sans accents : jamais marqué (mots français seulement)" "$(desc anglais.md)" "This reference is complete and different from the other one in every detail."
+assert_eq "C7.6 — aucun résumé de l'index ne commence par « > » ou « < »" "$(donnee "$LR" 'j.files.filter(f=>f.d&&/^[<>]/.test(f.d)).length')" "0"
+
 echo "=== C3 — aucun appel à claude pendant l'assemblage ==="
 assert_eq "C3.1 — le faux claude n'a été appelé par aucun assemblage (C1, C2 et le témoin)" "$([ -s "$VF_FAKE_LOG" ] && wc -l < "$VF_FAKE_LOG" | tr -d ' ' || echo 0)" "0"
 PATH="$WORK/fake:$PATH" claude --version
