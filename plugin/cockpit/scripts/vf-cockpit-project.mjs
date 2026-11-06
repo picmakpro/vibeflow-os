@@ -175,14 +175,17 @@ export function buildProjectGraph(root, { layout } = {}) {
   const cur = trouverPhase(phases, curPhase, layout.actif);
   const phaseEtat = cur ? cur.avancement.etat : null, perime = etatPerime(state.status, phaseEtat);
   if (cur && has(phId(cur))) tour.push({ ref: 'n:' + phId(cur), kicker: 'La phase en cours', title: `Phase ${cur.n}${cur.name ? ` · ${cur.name}` : ''}`, note: `La phase sur laquelle le projet travaille : ${LIBELLES_ETAT[cur.avancement.etat]}${perime ? ' (STATE.md semble périmé)' : ''}.` });
-  // PU-G-092 : la mission montrée est une mission VIVANTE du jalon en cours (jamais une abandonnée d'un autre jalon) : celle qui travaille, sinon la première non terminée d'une phase pas faite, sinon la première non terminée, sinon la première vivante ; aucune -> l'étape est omise.
-  // Les comptes sont ceux du jalon (les missions rattachées à ses phases), pas ceux du lab entier : ils s'accordent avec ce que la carte du jalon montre. Le mot du panneau est « étapes », jamais « nœuds ».
+  // PU-G-092 : la mission montrée est une mission VIVANTE du jalon en cours (jamais une abandonnée d'un autre jalon) : celle qui travaille, sinon la première non terminée d'une phase pas faite, sinon la première non terminée,
+  // sinon la première vivante ; à défaut, une mission vivante hors phase (la carte « Missions hors phase ») ; aucune -> l'étape est omise. Les comptes sont ceux de ce groupe (les missions rattachées aux phases du jalon,
+  // ou celles hors phase), ils s'accordent avec la carte ; le mot du panneau est « étapes », jamais « nœuds ».
   const clesJalon = new Set(active ? active.ks.map((p) => p.key) : []);
-  const duJalon = P.dags.filter((d) => clesJalon.has(d.phaseKey) && has('dag-' + d.name)), vivante = (d) => d.etat !== 'abandonnee' && d.etat !== 'inconnu';
-  const dg = duJalon.find((d) => d.nodes.some((x) => x?.status === 'running')) || duJalon.find((d) => vivante(d) && d.nodes.some((x) => x?.status !== 'done') && phases.get(d.phaseKey)?.avancement.etat !== 'fait') || duJalon.find((d) => vivante(d) && d.nodes.some((x) => x?.status !== 'done')) || duJalon.find(vivante);
+  const duJalon = P.dags.filter((d) => clesJalon.has(d.phaseKey) && has('dag-' + d.name)), horsPhase = P.dags.filter((d) => !(d.phaseKey && phases.get(d.phaseKey)) && has('dag-' + d.name));
+  const vivante = (d) => d.etat !== 'abandonnee' && d.etat !== 'inconnu', travaille = (d) => d.nodes.some((x) => x?.status === 'running'), ouverte = (d) => d.nodes.some((x) => x?.status !== 'done');
+  const choisir = (g) => g.find(travaille) || g.find((d) => vivante(d) && ouverte(d) && phases.get(d.phaseKey)?.avancement.etat !== 'fait') || g.find((d) => vivante(d) && ouverte(d)) || g.find(vivante);
+  const grp = choisir(duJalon) ? duJalon : choisir(horsPhase) ? horsPhase : null, dg = grp && choisir(grp);
   if (dg) {
-    const fait = dg.nodes.filter((x) => x?.status === 'done').length, enCoursN = duJalon.filter((d) => vivante(d) && d.nodes.some((x) => x?.status === 'running')).length;
-    tour.push({ ref: 'n:dag-' + dg.name, kicker: 'Les missions', title: `Mission ${dg.name.replace(/^MISSION-/, '')}`, note: `Ce jalon compte ${duJalon.length} mission${duJalon.length > 1 ? 's' : ''}${enCoursN ? `, dont ${enCoursN} en cours` : ''} ; celle-ci a ${fait} étape${fait > 1 ? 's' : ''} faite${fait > 1 ? 's' : ''} sur ${dg.nodes.length}.` });
+    const fait = dg.nodes.filter((x) => x?.status === 'done').length, enCoursN = grp.filter((d) => vivante(d) && travaille(d)).length, n = grp.length;
+    tour.push({ ref: 'n:dag-' + dg.name, kicker: 'Les missions', title: `Mission ${dg.name.replace(/^MISSION-/, '')}`, note: `${grp === duJalon ? 'Ce jalon compte' : 'Hors phase, le projet compte'} ${n} mission${n > 1 ? 's' : ''}${enCoursN ? `, dont ${enCoursN} en cours` : ''} ; celle-ci a ${fait} étape${fait > 1 ? 's' : ''} faite${fait > 1 ? 's' : ''} sur ${dg.nodes.length}.` });
   }
   tour.push({ ref: 'root', cible: '#vf-lock', kicker: 'Au travail', title: 'Qui est au travail', note: "Ce point en haut de la page s'anime quand quelqu'un travaille sur le projet, et reste éteint sinon ; un clic ouvre la liste. L'onglet Équipe en montre le détail." });
   const ids = new Set(nodes.map((n) => 'n:' + n.id)), fids = new Set(files.map((f) => 'f:' + f.p));
