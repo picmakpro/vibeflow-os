@@ -160,7 +160,7 @@ seule).
   peut lui-même envoyer à `POST /api/vf/lancer` un identifiant `chat` de forme valide, issu d'une conversation qu'il a écrite ; la seule
   barrière réelle est le clic et l'Entrée dans le terminal. Décision : « continuer le chat » reste tel quel. Le README et l'audit disent
   qu'un script qui s'exécute dans la page Projet peut proposer la reprise d'une conversation qu'il a écrite, que la case est décochée par
-  défaut, que l'identifiant est affiché, et que rien ne part sans le clic et l'Entrée dans le terminal. Le correctif 2b9e23b9 (activation
+  défaut, que l'identifiant est affiché dans la ligne quand la case est cochée (mesure RES.2/RES.2b), et que rien ne part sans le clic et l'Entrée dans le terminal. La fenêtre d'activation de la page Projet (garde `garde:activation`, environ 5 s) s'ouvre aussi sur un geste réel dans le cadre du terminal, pas seulement dans la page (mesuré par l'audit du lot 3, 2026-11-06). Le correctif 2b9e23b9 (activation
   utilisateur) reste, au titre de l'honnêteté du chemin normal, non de la protection contre un script de la page. Options écartées : B'
   (date et première question affichées dans le terminal) et D (reporter). Témoin de caractérisation, à ne jamais lire comme une protection :
   manche RES de `test-cockpit-lancer-xss.sh`. Surface voisine, hors phase : `.planning/BACKLOG.md`, entrée sur `POST /api/ask`.

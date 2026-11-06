@@ -1014,17 +1014,17 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | TERM-10 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
 | TERM-11 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
 | TERM-12 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
-| LANC-01 | Phase 72 | Pending — 2026-11-05 (planification) |
-| LANC-02 | Phase 72 | Pending — 2026-11-05 (planification) |
-| LANC-03 | Phase 72 | Pending — 2026-11-05 (planification) |
-| LANC-04 | Phase 72 | Pending — 2026-11-05 (planification) |
-| LANC-05 | Phase 72 | Pending — 2026-11-05 (planification) |
-| LANC-06 | Phase 72 | Pending — 2026-11-05 (planification) |
-| LANC-07 | Phase 72 | Pending — 2026-11-05 (planification) |
-| LANC-08 | Phase 72 | Pending — 2026-11-05 (planification) |
-| LANC-09 | Phase 72 | Pending — 2026-11-05 (planification) |
-| LANC-10 | Phase 72 | Pending — 2026-11-05 (planification) |
-| LANC-11 | Phase 72 | Pending — 2026-11-05 (planification) |
+| LANC-01 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-02 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-03 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-04 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-05 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-06 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-07 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-08 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-09 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-10 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-11 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
 | LANC-12 | Phase 72 | Pending — 2026-11-05 (planification) |
 
 **Coverage:**
@@ -1609,17 +1609,17 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 
 ### Lancer du travail depuis les cartes du cockpit (Phase 72 — posées à la planification, 2026-11-05)
 
-- [ ] **LANC-01**: Cartes : avec `--terminal`, les cartes de phase et de mission de l'onglet Projet portent une action principale selon l'état et un menu des autres verbes de la liste fermée (P72-D-04, P72-D-05).
-- [ ] **LANC-02**: Sans `--terminal` : CSP de page identique octet pour octet, aucun bouton, aucune route POST (P72-D-17, TERM-01).
-- [ ] **LANC-03**: Route POST de P : Host, Origin exacte, jeton en temps constant, `Content-Type`, corps borné, schéma fermé ; témoins : Origin tierce, Origin absente, Origin de Q, mauvais jeton, corps trop long, champ inconnu → refus et 0 proposition (P72-D-11).
-- [ ] **LANC-04**: Liste fermée : une cible malformée (`72;touch M`, `$(touch M)`) ou bien formée mais absente de la liste du serveur → aucun bandeau, 0 octet au PTY, aucun marqueur (P72-D-12).
-- [ ] **LANC-05**: Gabarit : avec un lab de test dont le titre de phase vaut `"; touch M #` et `<img src=x onerror=…>`, la ligne écrite est exactement le gabarit, dans l'alphabet fermé ; titre affiché par `textContent` ; 0 violation CSP, 0 marqueur ; mutant qui interpole le titre → rouge (P72-D-13).
-- [ ] **LANC-06**: Premier plan : programme témoin au premier plan, confirmation → 0 octet reçu par le programme et message clair ; mutant sans contrôle → rouge (P72-D-01).
-- [ ] **LANC-07**: Double geste : aucune écriture sans clic dans Q ; clic avant le délai d'armement ignoré ; ligne écrite sans `\r` ; la charge XSS de `test-cockpit-terminal-xss.sh` (proposition, `iframe.click()`, `postMessage`, popup) ne crée aucun marqueur (P72-D-14, TERM-12).
-- [ ] **LANC-08**: Pré-vols : chaque bloquant de P72-D-06 empêche le lancement avec son motif ; chaque avertissement s'affiche sans bloquer ; emplacement « travail non commité » prévu, inactif (P72-D-06, P72-D-07).
-- [ ] **LANC-09**: Mode de permission : le bandeau propose `default`, `acceptEdits`, `plan` et « hérité » ; « hérité » = aucun drapeau ; présélection = dernier mode choisi, retenu dans le stockage de l'origine Q, `default` au premier lancement ou si la valeur retenue est hors liste ; témoins : P ne peut ni lire ni écrire ce choix (`SecurityError` mesuré), une valeur forgée dans le stockage de Q retombe sur `default` (P72-D-02, P72-D-02bis).
-- [ ] **LANC-10**: Suivi : `--session-id` généré, la carte montre « lancée » et rattache la session de l'onglet Équipe ; proposition consommée une seule fois (un rechargement ou une bascule de thème ne la fait pas revenir) (P72-D-16, P72-D-10).
-- [ ] **LANC-11**: Continuer le chat : option offerte seulement si une conversation existe et si la sonde de P72-D-03 est verte ; identifiant validé UUID (P72-D-03).
+- [x] **LANC-01**: Cartes : avec `--terminal`, les cartes de phase et de mission de l'onglet Projet portent une action principale selon l'état et un menu des autres verbes de la liste fermée (P72-D-04, P72-D-05). — Livré 2026-11-06, preuve : 72-06 (`test-cockpit-lancer-ui.sh` 45/0), 72-09, 72-14 (tiroir 75/0) ; recette par juge au SHA 4fa5fe95, étapes 1 à 6.
+- [x] **LANC-02**: Sans `--terminal` : CSP de page identique octet pour octet, aucun bouton, aucune route POST (P72-D-17, TERM-01). — Livré 2026-11-06, preuve : 72-06 (LU.S1 à LU.S7) et 72-09 (CSP de `v2.75.0` identique sans `--terminal`) ; audit du lot 3 SECURED.
+- [x] **LANC-03**: Route POST de P : Host, Origin exacte, jeton en temps constant, `Content-Type`, corps borné, schéma fermé ; témoins : Origin tierce, Origin absente, Origin de Q, mauvais jeton, corps trop long, champ inconnu → refus et 0 proposition (P72-D-11). — Livré 2026-11-06, preuve : 72-04 (`test-cockpit-lancer-post.sh` 95/0, douze mutants rouges) ; 72-09.
+- [x] **LANC-04**: Liste fermée : une cible malformée (`72;touch M`, `$(touch M)`) ou bien formée mais absente de la liste du serveur → aucun bandeau, 0 octet au PTY, aucun marqueur (P72-D-12). — Livré 2026-11-06, preuve : 72-03 (cibles), 72-05, 72-10, 72-11 (chaîne XSS, 57/0 sous Chrome) ; audits des lots 1 à 3.
+- [x] **LANC-05**: Gabarit : avec un lab de test dont le titre de phase vaut `"; touch M #` et `<img src=x onerror=…>`, la ligne écrite est exactement le gabarit, dans l'alphabet fermé ; titre affiché par `textContent` ; 0 violation CSP, 0 marqueur ; mutant qui interpole le titre → rouge (P72-D-13). — Livré 2026-11-06, preuve : 72-01 (gabarit, 51 verdicts, mutant d'interpolation rouge), 72-11 (titre hostile), 72-12 (argv comparé octet pour octet).
+- [x] **LANC-06**: Premier plan : programme témoin au premier plan, confirmation → 0 octet reçu par le programme et message clair ; mutant sans contrôle → rouge (P72-D-01). — Livré 2026-11-06, preuve : 72-02 (assistant PTY 45/0, session 15/0), 72-10, correctif `ecriture` (`vf-cockpit-pty.py`, L10.1).
+- [x] **LANC-07**: Double geste : aucune écriture sans clic dans Q ; clic avant le délai d'armement ignoré ; ligne écrite sans `\r` ; la charge XSS de `test-cockpit-terminal-xss.sh` (proposition, `iframe.click()`, `postMessage`, popup) ne crée aucun marqueur (P72-D-14, TERM-12). — Livré 2026-11-06, preuve : 72-02, 72-05, 72-10, 72-11 (aucun marqueur), 72-12 (clic précoce ignoré, ligne sans retour chariot, Entrée au clavier) ; audit du lot 3.
+- [x] **LANC-08**: Pré-vols : chaque bloquant de P72-D-06 empêche le lancement avec son motif ; chaque avertissement s'affiche sans bloquer ; emplacement « travail non commité » prévu, inactif (P72-D-06, P72-D-07). — Livré 2026-11-06, preuve : 72-03 (50 témoins rouges puis verts), 72-09 ; correctif ST-1 (`verdict()` source unique, E2c).
+- [x] **LANC-09**: Mode de permission : le bandeau propose `default`, `acceptEdits`, `plan` et « hérité » ; « hérité » = aucun drapeau ; présélection = dernier mode choisi, retenu dans le stockage de l'origine Q, `default` au premier lancement ou si la valeur retenue est hors liste ; témoins : P ne peut ni lire ni écrire ce choix (`SecurityError` mesuré), une valeur forgée dans le stockage de Q retombe sur `default` (P72-D-02, P72-D-02bis). — Livré 2026-11-06, preuve : 72-10, 72-11, 72-12 (présélection du mode) et 72-16 (fichier du lab, P72-D-20, 18 mutants) ; audit du lot 3 SECURED.
+- [x] **LANC-10**: Suivi : `--session-id` généré, la carte montre « lancée » et rattache la session de l'onglet Équipe ; proposition consommée une seule fois (un rechargement ou une bascule de thème ne la fait pas revenir) (P72-D-16, P72-D-10). — Livré 2026-11-06, preuve : 72-05, 72-07 (37/0), 72-09, 72-10, 72-12 (suivi rattaché à l'onglet Équipe) ; proposition consommée une fois.
+- [x] **LANC-11**: Continuer le chat : option offerte seulement si une conversation existe et si la sonde de P72-D-03 est verte ; identifiant validé UUID (P72-D-03). — Livré 2026-11-06, preuve : 72-13 : porte A5 VERTE le 2026-11-05 (claude 2.1.318) ; garde d'activation (P72-D-21, `2b9e23b9`) et manche RES (P72-D-22).
 - [ ] **LANC-12**: Usage réel et non-régression : de bout en bout dans Chromium avec un faux `claude` dans le PATH (suites), puis avec le vrai `claude` (recette par juges, captures) ; toutes les suites du cockpit vertes sous macOS et Linux.
 
 ---
