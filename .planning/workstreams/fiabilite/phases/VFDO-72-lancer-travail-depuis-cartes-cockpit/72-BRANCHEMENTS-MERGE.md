@@ -45,3 +45,17 @@ Modules `scripts/vf-cockpit-lancer-{gabarit,cibles,post,q,ui,suivi,canal}.mjs` e
 4. README racine : nombre de suites recompté après fusion.
 5. Rejouer après fusion : les suites `test-cockpit-lancer-*.sh`, les dix `test-cockpit-terminal-*.sh`, `test-cockpit-chaine-xss.sh`, `test-cockpit-serveur.sh`, `test-cockpit-securite.sh`, `test-cockpit-reseau.sh`, `test-cockpit-projet.sh`, `test-cockpit-equipe.sh`, `test-cockpit-vendor.sh`, `synchro.sh verifier`, `check-version-sync.sh`, les gates du job `gates` de `ci.yml`.
 6. Précondition connue : `check-machine-paths` est rouge à la base sur `72-RESEARCH.md:238` (chemin de compte) ; à corriger avant la PR.
+
+## 5. Ajouts du plan 72-16 (mode retenu d'une relance à l'autre ; P72-D-20)
+
+Relevé réel sur `git diff --numstat 2b9e23b9..HEAD` (insertions / suppressions ; lignes avant -> après).
+
+| # | Fichier existant | Plan | Changement | Lignes | Conflit attendu |
+|---|------------------|------|------------|--------|-----------------|
+| B7 (précision) | `scripts/vf-cockpit-terminal-processus.mjs` | 72-16 | un import, une création de mémoire (`// garde:mode-support`), `lireProposition` enrichie de `mode_retenu` pour l'état en-attente (`// garde:mode-servi`), un appel `ecrire` après le test de `w.ok` et avant `lq.confirmer` (`// garde:mode-ecrit`), une phrase d'en-tête ; la table `routes`, les trois lignes de contrôle de la 71 et le routeur IPC intacts | +5 / -1 ; 199 -> 203 | moyen : `lancer()` et `lireProposition` sont aussi touchés par les correctifs de revue |
+| B4 (précision) | `scripts/vf-cockpit-terminal-client.mjs` | 72-16 | `CLE_MODE` retiré ; `modeRetenu()` (lecture du stockage) remplacée par `modeServi(p)` (valeur servie relue contre `MODES`, marqueurs `garde:mode-lecture` et `garde:mode-relu` conservés) ; `lire` passe le JSON brut à `modeServi` ; l'écriture `setItem` du 204 retirée | +8 / -9 ; 280 -> 279 (plafond LB.S3 : 280, jamais relevé) | faible |
+| B11 | `scripts/tests/test-cockpit-lancer-bandeau.sh`, `scripts/tests/test-cockpit-lancer-processus.sh` | 72-16 | bandeau : LB.C4 (deux assertions), LB.E2 (dernière valeur), LB.E5, LB.E6 transposés, serveur factice qui sert `mode_retenu`, doublures du stockage qui observent toutes les opérations, deux sondes Chrome de plus sur M-MODE-NON-RELU et M-PARAM-URL ; processus : `mode_retenu` dans la liste exacte de clés de Q2 | bandeau +35 / -28 (838 -> 845) ; processus +1 / -1 | faible |
+| B12 | `README.md` (module cockpit) | 72-16 | un paragraphe d'usage dans « Terminal intégré » : le mode retenu survit aux relances, fichier du lab non suivi, jamais lu par la page Projet | +2 / -0 | moyen : 72-15 réécrit la même section ; 72-15 passe APRÈS et ajoute sans réécrire |
+
+Fichiers neufs de 72-16 : `scripts/vf-cockpit-lancer-mode.mjs` (57 lignes) et `scripts/tests/test-cockpit-lancer-mode.sh`. Hors `files_modified`, dits : `72-CONTRATS.md` §4 (clé `mode_retenu`).
+Rappel au manager : 72-15 (bump de version, README, CHANGELOG) doit dépendre de 72-16.

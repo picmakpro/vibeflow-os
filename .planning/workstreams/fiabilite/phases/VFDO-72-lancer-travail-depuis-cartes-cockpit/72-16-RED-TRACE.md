@@ -100,3 +100,39 @@ Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-lancer-bandeau.sh` au
 
 Vertes déjà sur la base, avec leur raison : LB.E7, LB.E2 (partie « aucun octet à /entree » et armement), LB.F1 à LB.F3, LB.C1 à LB.C3, LB.C5 à LB.C7, LB.S1 à LB.S4 (pas de changement de la forme), M-PARAM-URL (volet Chrome : le paramètre d'adresse du mutant est lu avant toute autre source, donc visible même sur la base ; sa sonde statique LB.S1 est, elle, la sonde décisive).
 Précision sur LB.E2 : le plan 72-16 le disait « intact » ; sa dernière valeur lisait la clé `vf.terminal.mode` (le mode lancé) : elle ne peut plus tenir. Transposée (voir le tableau final) : la clé reste ABSENTE (`null`), plus fort qu'avant.
+
+# Tâche 3 — vert, mutants du client et tableau de transposition
+
+Code : `vf-cockpit-terminal-client.mjs` 280 -> 279 lignes (plafond LB.S3 : 280, jamais relevé ; aucun module neuf nécessaire). `CLE_MODE` retiré, `modeRetenu()` remplacée par `modeServi(p)` (marqueurs `garde:mode-lecture` et `garde:mode-relu` CONSERVÉS pour que les mutants existants visent les lignes), `modeInitial` posé par `lire` depuis le JSON brut, `setItem` du 204 retiré ; `forme(j)` n'exige pas `mode_retenu`. `grep -c vf.terminal.mode` du client : 0.
+
+## Deux corrections du harnais au premier vert de la suite bandeau (aucune assertion affaiblie)
+
+- LB.E1 : le serveur factice servait `acceptEdits` par défaut (consigne du plan) ; la commande affichée de E1 est celle du mode présélectionné, donc l'attendu « ligne default » rougissait (`false/1/true/true/true`). Le défaut du serveur factice est `default` (premier lancement) ; LB.E5 sert `acceptEdits` EXPLICITEMENT pour son témoin. Aucun attendu modifié.
+- M-MODE-NON-RELU, volet Chrome (LB.E5) : retiré. Le menu déroulant normalise une valeur hors liste vers `default` : la présélection forgée non relue est invisible dans le DOM, E5 ne peut donc pas rougir sous ce mutant (obtenu `…/acceptEdits/default`, identique au sain). C'est exactement le constat de W-1 (« au HEAD il rougit LB.C4, pas E5 ») : le mutant vise LB.C4, sonde qui existe encore, et ses indices (`j.lu[1]`, `j.lu[9]`) sont inchangés parce que la liste des douze valeurs l'est.
+
+## Rejeu au vert
+
+`test-cockpit-lancer-bandeau.sh` : 68 PASS / 0 FAIL (Chrome présent : aucune « SUITE SAUTÉE », aucun « mutant sans effet »). `test-cockpit-lancer-mode.sh` : 72 PASS / 0 FAIL, aucune « non jouée », dont les six sondes rouges de la fin de tâche 2 (LM.S4, LM.C1, LM.C2, LM.C3, M-STOCKAGE-RESTE, M-SERVI-NON-RELU), désormais vertes.
+
+## Mutants rejoués sur le code livré (client, bandeau transposé)
+
+| Mutant | Sonde rougie | Obtenu sous le mutant |
+|---|---|---|
+| M-STOCKAGE-RESTE | LM.S4 ; LM.C3 | 1 occurrence de `vf.terminal.mode` ; `1/true` (un `getItem` d'une clé mode) ; précondition « sain » : `0/true` sur le client livré |
+| M-SERVI-NON-RELU | LM.C2 | `false` (bypassPermissions devient la présélection) ; précondition `true` sur le client livré |
+| M-MODE-NON-RELU (existant, repointé) | LB.C4 | `bypassPermissions=>bypassPermissions` à l'indice 1 (verdict `rouge`) ; les valeurs valides restent lues (indice 9) |
+| M-PARAM-URL (existant, réécrit sur la nouvelle ligne `const v = new URLSearchParams(location.search).get('mode') \|\| p.mode_retenu;`) | LB.S1 (statique) ; LB.E6 (Chrome) | `URLSearchParams` lu ; `acceptEdits/0` au lieu de `plan/0` |
+
+## Tableau de transposition (ancien attendu -> nouvel attendu -> verdict)
+
+| Sonde | Avant | Après | Pourquoi ce n'est pas plus faible |
+|---|---|---|---|
+| LB.C4 (1) | douze valeurs LUES du stockage (clé `vf.terminal.mode`) : `absent=>default \| bypassPermissions=>default \| … \| herite=>herite` | LA MÊME liste de douze valeurs, SERVIE par `mode_retenu` : même chaîne attendue, mot pour mot | même entrée forgée (douze valeurs), même sortie ; le canal change, la relecture contre la liste fermée reste testée sur chacune ; mutant M-MODE-NON-RELU conservé |
+| LB.C4 (2) | « après 204 la clé vaut le mode lancé ; inchangée après 409, 425, 400, 500 ; un seul `setItem` » | « AUCUNE opération (get, set, del) sur une clé dont le nom contient `mode`, après 204, 409, 425, 400, 500 ; secret lu (témoin) ; le bandeau suivant le 204 présélectionne le mode servi (`plan`), inchangé (`acceptEdits` servi) après chaque échec » | zéro opération au lieu d'une ; observation prouvée sensible (le secret, lui, est vu, et M-STOCKAGE-RESTE rougit) ; la propriété « le mode n'est retenu qu'au 204 » passe à Q, prouvée par LM.Q6 (neuf refus) et ses mutants |
+| LB.E2 (dernier champ) | `acceptEdits` (clé du stockage = mode lancé) | `null` (clé du stockage absente après le 204) | la clé reste absente : plus fort ; le plan le disait « intact », ce qui était faux (le champ lisait la clé retirée) |
+| LB.E5 | `SecurityError/acceptEdits/default` : SecurityError, témoin « le stockage de Q porte le mode », forgée dans le stockage -> `default` | `SecurityError/secret/acceptEdits/default` : SecurityError, témoin « le stockage de Q porte le SECRET » (W-3 : la clé du mode n'existe plus), serveur factice servant `acceptEdits` -> présélection `acceptEdits` (témoin positif), servant `bypassPermissions` -> `default` | un champ de plus (le témoin du secret) ; la sonde SecurityError est inchangée ; le témoin positif de la présélection est conservé ; limite dite : le menu normalise une valeur hors liste, E5 seul ne prouve pas la relecture (LB.C4 et M-MODE-NON-RELU la prouvent) |
+| LB.E6 | adresse `?mode=acceptEdits…`, stockage vidé : `default/0` | adresse identique, serveur factice servant `plan` : `plan/0` | un paramètre d'adresse lu donnerait `acceptEdits` : la sonde DISCRIMINE désormais (l'ancienne valeur `default` ne distinguait le paramètre que parce que le stockage était vide) ; M-PARAM-URL rougit LB.E6 en Chrome et LB.S1 |
+| LB.E7, LB.E2 (autres champs) | intacts | intacts | aucune lecture du stockage |
+
+Les ancres `garde:mode-lecture` / `garde:mode-relu` : même nom, nouveau texte de ligne (`const v = p.mode_retenu; // garde:mode-lecture` ; `return MODES.indexOf(v) >= 0 ? v : 'default'; // garde:mode-relu`) ; le texte de la table des gardes de `72-08-PLAN.md` n'est PAS modifié (plan exécuté).
+Hors `files_modified`, dits : `test-cockpit-lancer-bout-en-bout.sh` (CH2 parle d'un premier lancement : le mode retenu par les manches B survit désormais aux relances ; le fichier est retiré avant la section CH, un `rm -f` et un commentaire) ; `72-16-PLAN.md` (phrase de l'INFO ajoutée à T-72-128).
