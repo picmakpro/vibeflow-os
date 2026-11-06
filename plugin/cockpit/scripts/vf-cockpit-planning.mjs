@@ -23,7 +23,7 @@ const ls = (d) => { try { return dedans(d) ? fs.readdirSync(d) : []; } catch { r
 export const clip = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').replace(/\*\*/g, '').replace(/`/g, '').trim(); return s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s; };
 export const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/\*\*/g, '').replace(/`/g, '').trim(); const i = s.search(/[.!?](\s|$)/); return clip(i > 25 ? s.slice(0, i + 1) : s, n); };
 export const num = (s) => parseFloat(s);
-export const fm = (txt) => { const m = /^---\n([\s\S]*?)\n---/.exec(txt); const o = {}; if (!m) return o; for (const l of m[1].split('\n')) { const k = /^([\w-]+):\s*(.*)$/.exec(l); if (k) o[k[1]] = k[2].trim(); } return o; };
+export const fm = (txt) => { txt = texte(txt); const m = /^---\n([\s\S]*?)\n---/.exec(txt); const o = {}; if (!m) return o; for (const l of m[1].split('\n')) { const k = /^([\w-]+):[ \t]*([^\n]*)$/.exec(l); if (k) o[k[1]] = k[2].trim(); } return o; };
 export const list = (v) => (v || '').replace(/^\[|\]$/g, '').split(',').map((s) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
 // motifs des champs lus (titres, Goal, dépendances, exigences, statut) : vf-cockpit-formats.mjs, partagés avec le diagnostic de vf-cockpit-drift.mjs
 const STATUS_SUFFIX = /\s*\((inscrite|completed|INSERTED|exécutée|cadrée|complete|clôturée|clos|CLOSE).*$/i;
@@ -153,8 +153,8 @@ export function readPlanning(root, layout, opts = {}) {
     const dir = phaseDirs.get(`${ph.ws || ''}|${ph.n}`) || phaseDirs.get(`*|${ph.n}`);
     ph.avancement = avancement({ ph, fichiers: ls(dir), missions: parPhase.get(ph.key) || [], lire: (f) => read(path.join(dir, f)) });
   }
-  const backlog = read(path.join(B, 'BACKLOG.md'));
-  const seeds = ls(path.join(B, 'seeds')).filter((f) => f.endsWith('.md')).map((f) => ({ file: rel(path.join(B, 'seeds', f)), text: read(path.join(B, 'seeds', f)) }));
+  const backlog = texte(read(path.join(B, 'BACKLOG.md')));
+  const seeds = ls(path.join(B, 'seeds')).filter((f) => f.endsWith('.md')).map((f) => ({ file: rel(path.join(B, 'seeds', f)), text: texte(read(path.join(B, 'seeds', f))) }));
   let tags = [];
   if (!opts.sansTags) { // shBorne : même plafond, même échéance globale et même PATH assaini que les autres appels git du socle (F-06, H-1) ; sortie vide = aucun tag
     const out = shBorne('git', [...GIT_SUR, '-C', root, 'for-each-ref', '--sort=-creatordate', '--count=30', '--format=%(refname:short)\t%(creatordate:short)\t%(contents:subject)', 'refs/tags/v*'], undefined, LAB);
