@@ -122,7 +122,7 @@ const m = await import(pathToFileURL(path.join(dir, 'vf-cockpit-build.mjs')).hre
 m.assembler({ lab, scriptsDir: scripts });
 JS
 LAB6="$WORK/lab6"; mkdir -p "$LAB6/src" "$LAB6/.planning/phases/01-x"; cp "$LAB/src/"*.js "$LAB6/src/"
-printf '%s\n' '- [x] **Phase 1: Socle** - premier jet' '- [ ] **Phase 2 — Suite** - illisible' '' '### Phase 1: Socle' '**Goal**: ok' '' '### Phase 2: Suite' '**Goal** — non lu' > "$LAB6/.planning/ROADMAP.md"
+printf '%s\n' '- [x] **Phase 1: Socle** - premier jet' '- [ ] **Phase 2 Suite** - illisible' '' '### Phase 1: Socle' '**Goal**: ok' '' '### Phase 2: Suite' '**Goal** — non lu' > "$LAB6/.planning/ROADMAP.md"
 printf '<objective>Faire le socle</objective>\n' > "$LAB6/.planning/phases/01-x/01-01-PLAN.md"; echo ok > "$LAB6/.planning/phases/01-x/01-01-SUMMARY.md"
 git -C "$LAB6" init -q && git -C "$LAB6" add -A && git -C "$LAB6" -c user.email=t@t -c user.name=t commit -q -m init
 AV6="$(find "$LAB6/.planning" | sort | while read -r f; do [ -f "$f" ] && cksum "$f" || echo "$f"; done)"

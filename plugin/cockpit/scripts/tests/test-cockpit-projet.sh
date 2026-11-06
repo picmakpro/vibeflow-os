@@ -236,7 +236,7 @@ git -C "$L6" apply "$WORK/p6.patch"
 graph "$L6" "$WORK/g6b.json"
 assert_eq "P6.7 — après correctif : reste seulement la phase courante, non devinable" "$(G "$WORK/g6b.json" 'j.meta.vf.drift.regles.map(r=>r.regle).join(",")')" "phase-courante-absente"
 assert_eq "P6.8 — après correctif : jalon v2.0 réel, même lecture des phases" "$(G "$WORK/g6b.json" 'j.nodes.filter(n=>n.kind==="jalon").map(n=>n.label).join(",")')|$(G "$WORK/g6b.json" 'j.nodes.filter(n=>n.kind==="phase").map(n=>n.id+":"+n.st).join(",")')" "v2.0|ph-1:done,ph-2:todo"
-printf -- '- [ ] Phase 1 — sans deux-points\n' | wr "$L6/x/.planning/ROADMAP.md"
+printf -- '- [ ] Phase 1 sans séparateur\n' | wr "$L6/x/.planning/ROADMAP.md"
 assert_eq "P6.9 — phases citées mais illisibles : niveau bloquant" "$(node "$DR" "$L6/x" --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).constats.filter(c=>c.niveau==="bloquant").map(c=>c.regle).join(",")))')" "phases-illisibles"
 
 # P6.10-14 — relecture adverse SOBR-04 de v2.75.1 : coupe au champ suivant, gras dans la valeur, « aucune » suivi d'un ordre,
@@ -716,6 +716,10 @@ for (const box of ['[ ]', '[x]', '[X]']) for (const b of ['-', '*', '+']) for (c
   const n = 5000 + i++, ligne = `${b} ${box} ${g}Phase ${z}${n}${sp}: Case${n}${g} - description`;
   cases.push(ligne); attendus.push({ id: `case ${JSON.stringify(ligne)}`, verif: (ph) => [`Case${n}|${box !== '[ ]'}`, ph.has(`|${n}`) ? `${ph.get(`|${n}`).name}|${ph.get(`|${n}`).done}` : 'phase absente'] });
 }
+for (const box of ['[ ]', '[x]', '[X]']) for (const b of ['-', '*', '+']) for (const g of ['', '**']) for (const sep of [' — ', ' – ', ' - ', '—']) {
+  const n = 7000 + i++, ligne = `${b} ${box} ${g}Phase ${n}${sep}Tiret${n}${g} - description`;
+  cases.push(ligne); attendus.push({ id: `case-tiret ${JSON.stringify(ligne)}`, verif: (ph) => [`Tiret${n}|${box !== '[ ]'}`, ph.has(`|${n}`) ? `${ph.get(`|${n}`).name}|${ph.get(`|${n}`).done}` : 'phase absente'] });
+}
 const dir = path.join(work, '.planning'); fs.mkdirSync(dir, { recursive: true });
 fs.writeFileSync(path.join(dir, 'ROADMAP.md'), ['# Roadmap', '', '## Phases', ...cases, '', ...road.slice(2)].join('\n') + '\n');
 // exigences : 4 formes × 3 cases × 2 puces = 24
@@ -734,7 +738,7 @@ const echecs = []; for (const a of attendus) { const [att, obt] = a.verif(P.phas
 console.log(JSON.stringify({ total: attendus.length, echecs: echecs.length, traces: echecs.slice(0, 4) }));
 JS
 node "$AUX/matrice.mjs" "$SCRIPTS" "$WORK/p8m" > "$WORK/mat.json"
-assert_eq "P8.1 — matrice : 980 variantes de dépendances, titres, Goal, cases, exigences, statut (anti-vert-à-vide)" "$(G "$WORK/mat.json" 'j.total')" "980"
+assert_eq "P8.1 — matrice : 1052 variantes de dépendances, titres, Goal, cases, exigences, statut (anti-vert-à-vide)" "$(G "$WORK/mat.json" 'j.total')" "1052"
 assert_eq "P8.2 — matrice : toutes lues comme attendu ($(G "$WORK/mat.json" 'j.traces.join(" ; ")'))" "$(G "$WORK/mat.json" 'j.echecs')" "0"
 mut7 anciennedep vf-cockpit-formats.mjs "const m = DEP_RE.exec(corps); if (!m) return [];" "const m = /\\*\\*(?:Depends on|Dépend de)(?::\\*\\*|\\*\\*\\s*:)\\s*(.*)/.exec(corps); if (!m) return [];" > "$WORK/ancre-dep.txt"
 node "$AUX/matrice.mjs" "$WORK/mut-anciennedep" "$WORK/p8mut" > "$WORK/mat-mut.json"
@@ -759,7 +763,7 @@ printf -- '---\nstatus: executing\ncurrent_phase: 1\nmilestone: v1.0\n---\n\nPha
 git -C "$L9" init -q; graph "$L9" "$WORK/g9.json"
 assert_eq "P8.6 — gabarit GSD riche (jalons, décimale, critères, plans, table, exigences) : zéro ligne non comprise (pas de faux positif)" "$(G "$WORK/g9.json" 'j.meta.vf.drift.nonComprisesN+"|"+j.meta.vf.drift.regles.filter(r=>r.regle==="ligne-non-comprise").length')" "0|0"
 LA="$WORK/p8-illisible"; BA="$LA/.planning"; mkdir -p "$BA"
-printf '%s\n' '# Roadmap' '' '## Phases' '- [ ] **Phase 1: Un** - a' '- [ ] **Phase 2 — Deux** - b' '' '### Phase 1: Un' '**Goal**: g1' '**Depends on**: Nothing' '' '### Phase 2: Deux' '**Goal** — g2' 'Dépends sur : Phase 1' '' '##### Phase 3: Trois' 'Phase 3 est la plus grosse, voir Goal: aucun.' '' '```' '### Phase 9: dans un bloc de code' '```' > "$BA/ROADMAP.md"
+printf '%s\n' '# Roadmap' '' '## Phases' '- [ ] **Phase 1: Un** - a' '- [ ] **Phase 2 Deux** - b' '' '### Phase 1: Un' '**Goal**: g1' '**Depends on**: Nothing' '' '### Phase 2: Deux' '**Goal** — g2' 'Dépends sur : Phase 1' '' '##### Phase 3: Trois' 'Phase 3 est la plus grosse, voir Goal: aucun.' '' '```' '### Phase 9: dans un bloc de code' '- [ ] **Phase 8 Huit** - illisible hors du bloc' '```' > "$BA/ROADMAP.md"
 printf '%s\n' '# R' '- [ ] **AUTH-01**: ok' '- [ ] **Req_02** illisible' '- [ ] Faire un truc 2 fois' > "$BA/REQUIREMENTS.md"
 printf -- '---\nstatus: executing\ncurrent_phase: deux\n---\n' > "$BA/STATE.md"
 git -C "$LA" init -q; graph "$LA" "$WORK/gA.json"
@@ -773,6 +777,57 @@ mut7 sansdiag vf-cockpit-drift.mjs "for (const x of lignesNonComprises(txt, 'roa
 node "$AUX/q.mjs" "$WORK/mut-sansdiag" project "$LA" > "$WORK/gA-mut.json"
 assert_eq "P8.11 — mutant (diagnostic du ROADMAP coupé, ancre présente) : le test P8.7 rougit (2 lignes du ROADMAP en moins : 2 restent, exigences et STATE)" "$(cat "$WORK/ancre-diag.txt")|$(G "$WORK/gA-mut.json" 'j.meta.vf.drift.nonComprisesN')" "muté|2"
 assert_eq "P8.12 — l'interface porte le panneau (« Lignes non comprises », échappé par h, jeton --text-3, aucun px brut ajouté)" "$(grep -c 'const nonComprises = ' "$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js")|$(grep -c 'derive(V.drift)}${nonComprises(V.drift)}' "$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js")|$(grep -A3 'const nonComprises = ' "$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js" | grep -c 'px')" "1|1|0"
+
+# ---------- P9 — corrections de la revue (cout linéaire, puces après une ligne vide, CRLF, « Depends on Phase 3 », mot-clé collé, cases à tiret) ----------
+echo "=== P9 — corrections de la revue du parseur tolérant ==="
+cat > "$AUX/lin.mjs" <<'JS'
+// lin.mjs <scripts> : 100 000 espaces dans six formes de ligne ; readPlanning ET detectDrift doivent rester sous 1 s chacun (quadratique : plusieurs secondes). « ok » ou les formes lentes.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts] = process.argv; const imp = (f) => import(pathToFileURL(path.join(scripts, f)).href);
+const { readPlanning } = await imp('vf-cockpit-planning.mjs'); const { detectDrift } = await imp('vf-cockpit-drift.mjs');
+const N = ' '.repeat(100000), lentes = [];
+const FORMES = { titre: '##' + N, case: '- [ ]' + N, 'case-gras': '- [ ] **' + N, dep: '### Phase 1: A\n**Depends on:** Phase 2' + N + 'x', 'dep-gras': '### Phase 1: A\n**' + N + 'Depends on:** 2', 'nom-case': '- [ ] **Phase 1: A' + N + 'x** - d', 'nom-suffixe': '- [x] Phase 1: A' + N + '(complete', 'dep-point': '### Phase 1: A\n**Depends on:** 2' + N + ' · x', nu: '### Phase 1: A\n' + N + 'Depends on' + N + '9' };
+for (const [nom, l] of Object.entries(FORMES)) {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'lin-')); fs.mkdirSync(path.join(d, '.planning')); fs.writeFileSync(path.join(d, '.planning/ROADMAP.md'), '# R\n\n' + l + '\n');
+  const a = Date.now(); readPlanning(d, undefined, { sansTags: true }); const b = Date.now(); detectDrift(d); const c = Date.now();
+  if (b - a > 1000) lentes.push(`${nom} lecture ${b - a} ms`); if (c - b > 1000) lentes.push(`${nom} diagnostic ${c - b} ms`);
+  fs.rmSync(d, { recursive: true, force: true });
+}
+console.log(lentes.length ? lentes.join(' ; ') : 'ok');
+JS
+assert_eq "P9.1 (C1) — coût linéaire : 100 000 espaces dans six formes de ligne, lecture et diagnostic sous 1 s chacun" "$(node "$AUX/lin.mjs" "$SCRIPTS")" "ok"
+cat > "$AUX/c.mjs" <<'JS'
+// c.mjs <scripts> <cas> : sondes unitaires de P9 sur une planification jetable ; une ligne de sortie
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, cas] = process.argv; const imp = (f) => import(pathToFileURL(path.join(scripts, f)).href);
+const { readPlanning } = await imp('vf-cockpit-planning.mjs'); const { detectDrift } = await imp('vf-cockpit-drift.mjs');
+const mk = (road, state) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'c-')); fs.mkdirSync(path.join(d, '.planning')); fs.writeFileSync(path.join(d, '.planning/ROADMAP.md'), road); if (state) fs.writeFileSync(path.join(d, '.planning/STATE.md'), state); return d; };
+const deps = (road) => [...readPlanning(mk(road), undefined, { sansTags: true }).phases.values()].map((p) => `${p.n}:${p.depends}`).join(' ');
+const nc = (road) => detectDrift(mk(road)).constats.filter((c) => c.regle === 'ligne-non-comprise').map((c) => c.ligne).join(',');
+if (cas === 'puces') { const f = (sep) => deps(`### Phase 1: A\n### Phase 2: B\n**Depends on:**${sep}- Phase 1\n- Phase 1\n`); console.log([f('\n'), f('\n\n'), f('\n \n\n')].join('|')); }
+else if (cas === 'crlf') { const f = (nl, bom) => (detectDrift(mk('- [ ] **Phase 1: A** - x\n### Phase 1: A\n', `${bom}---${nl}milestone: v9.9${nl}status: executing${nl}current_phase: 1${nl}---${nl}`)).constats.find((c) => c.regle === 'jalons-absents')?.apres.match(/\*\*([^*]+)\*\*/)?.[1]); console.log([f('\n', ''), f('\r\n', ''), f('\r\n', '﻿')].join('|')); }
+else if (cas === 'dep-sans-deux-points') console.log(nc('### Phase 1: A\nDepends on Phase 3\n- Depends on Phase 3\n**Depends on** Phase 3\n**Depends on**: Phase 3\nLa Phase 2 en dépend.\nDependencies are documented below.\n'));
+else if (cas === 'colle') console.log(nc("### Phase 1: A\n- goal-backward : valider d'abord\nObjectif-cible : x\nGoal-driven : y\n**Goal** — non lu\n"));
+JS
+assert_eq "P9.2 (C2) — puces après un en-tête vide : lues pareil avec 0, 1 ou 2 lignes vides intercalées" "$(node "$AUX/c.mjs" "$SCRIPTS" puces)" "1: 2:1|1: 2:1|1: 2:1"
+assert_eq "P9.3 (C4) — jalons-absents propose le jalon du STATE (v9.9) en LF, en CRLF et en CRLF avec BOM" "$(node "$AUX/c.mjs" "$SCRIPTS" crlf)" "v9.9|v9.9|v9.9"
+assert_eq "P9.4 (C5) — « Depends on Phase 3 » sans deux-points (nu, puce, gras) est SIGNALÉE (lignes 2,3,4), pas lue ; la forme correcte, la prose « en dépend » et « Dependencies are documented » ne le sont pas" "$(node "$AUX/c.mjs" "$SCRIPTS" dep-sans-deux-points)" "2,3,4"
+assert_eq "P9.5 (C6) — mot-clé collé à un trait d'union (goal-backward, Objectif-cible, Goal-driven) : jamais signalé ; « **Goal** — » l'est toujours" "$(node "$AUX/c.mjs" "$SCRIPTS" colle)" "5"
+mut7 fence vf-cockpit-formats.mjs "    if (code) return;
+" "" > "$WORK/ancre-fence.txt"
+node "$AUX/q.mjs" "$WORK/mut-fence" project "$LA" > "$WORK/gA-fence.json"
+assert_eq "P9.6 (C3) — mutant (gestion des blocs de code retirée) : la ligne illisible DANS le bloc est signalée, P8.7 rougirait (7 au lieu de 6)" "$(cat "$WORK/ancre-fence.txt")|$(G "$WORK/gA-fence.json" 'j.meta.vf.drift.nonComprisesN')" "muté|7"
+mut7 sansillisible vf-cockpit-drift.mjs "if (!nb && /(^|\\n)" "if (false && /(^|\\n)" > "$WORK/ancre-illis.txt"
+assert_eq "P9.7 (C10) — P6.9 garde son sens : sur « Phase 1 sans séparateur » le détecteur dit bloquant ; mutant (règle phases-illisibles coupée) : plus rien" "$(cat "$WORK/ancre-illis.txt")|$(node "$DR" "$L6/x" --json | G /dev/stdin 'j.constats.filter(c=>c.niveau==="bloquant").length')|$(node "$WORK/mut-sansillisible/vf-cockpit-drift.mjs" "$L6/x" --json | G /dev/stdin 'j.constats.filter(c=>c.niveau==="bloquant").length')" "muté|1|0"
+UIP="$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js"
+assert_eq "P9.8 (C7) — le chemin fichier:ligne du panneau ne se coupe jamais (white-space:nowrap, word-break:normal sur le <code> de nonComprises, aucun px)" "$(grep -A3 'const nonComprises = ' "$UIP" | grep -c '<code style="white-space:nowrap;word-break:normal">')|$(grep -A3 'const nonComprises = ' "$UIP" | grep -c 'px')" "1|0"
+assert_eq "P9.9 (C8) — le commentaire de avancement.mjs dit où vit normNum (formats, ré-exporté par planning)" "$(grep -c 'normNum de vf-cockpit-formats, ré-exporté par vf-cockpit-planning' "$SCRIPTS/vf-cockpit-avancement.mjs")" "1"
 
 echo ""
 echo "=================================="
