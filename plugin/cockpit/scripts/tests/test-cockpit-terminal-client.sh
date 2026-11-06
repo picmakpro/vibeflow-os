@@ -673,7 +673,7 @@ if mutant mj12 vf-cockpit-terminal-client.mjs "s|sessionStorage.setItem(CLE_FIN,
   scenario "$MUT_OUT" termine
   assert_eq "M-J12 — le mutant (l'état « Terminé » n'est pas retenu) rougit J12.2 : un nouveau shell démarre au rechargement" "$(rj "$SCJ" '"bandeau="+(j.apres&&j.apres.bandeau)+" session="+(j.apres&&j.apres.session)')" "bandeau=false session=vivante"
 else sans_effet "M-J12"; fi
-if mutant msa vf-cockpit-terminal-client.mjs "s|vue.carte('sansamorce'); emettre('expire'); return;|expire(); return;|"; then
+if mutant msa vf-cockpit-terminal-client.mjs "s|vue.carte('sansamorce'); return;|expire(); return;|"; then
   MS_SC=8000 scenario "$MUT_OUT" sansamorce ""
   assert_eq "M-SANS-AMORCE-CARTE — le mutant (secret absent traité de nouveau comme une expiration) rougit J2.3 : « Session expirée » sans session préalable" "$(rj "$SCJ" '"expiree="+(j.carte||"").includes("Session expirée")')" "expiree=true"
 else sans_effet "M-SANS-AMORCE-CARTE"; fi
