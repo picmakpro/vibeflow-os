@@ -577,6 +577,55 @@ M22B="$(mut17 memo vf-cockpit-who.mjs 'm.taille === st.size) return m.arbre;' 't
 assert_eq "M-MEMO.0 — l'ancre du mutant existe" "$M22B" "muté"
 assert_eq "M-MEMO — rougit W22.4 : un mémo jamais invalidé par la taille ne voit pas la ligne ajoutée" "$(node "$AUX/w22-grow.mjs" "$WORK/mut17-memo" "$L22" "$H22" "$SD22/agent-sa.jsonl" "$WA")" "cwd|arbre principal#cwd|arbre principal"
 
+echo "=== W23 — titre de carte de session : le custom-title (/rename), jamais l'ai-title (PU-G-162) ==="
+# arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 : liste blanche de lecture amendée pour le seul champ customTitle
+cat > "$AUX/w23-titre.mjs" <<'JS'
+import fs from 'node:fs'; import path from 'node:path'; import { execFileSync } from 'node:child_process'; import { pathToFileURL } from 'node:url';
+const [, , S, base] = process.argv;
+const lab = path.join(base, 'lab'), home = path.join(base, 'home'), noscripts = path.join(base, 'noscripts');
+fs.mkdirSync(lab, { recursive: true }); fs.mkdirSync(noscripts, { recursive: true });
+const g = (...a) => execFileSync('git', ['-C', lab, ...a], { stdio: 'pipe' });
+g('init', '-q', '-b', 'ma-branche'); g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'i');
+const labR = fs.realpathSync(lab), proj = path.join(home, '.claude', 'projects', 'slug'); fs.mkdirSync(proj, { recursive: true });
+const ligne = (o) => JSON.stringify({ cwd: labR, timestamp: new Date().toISOString(), gitBranch: 'ma-branche', ...o });
+const ua = (id, t) => ligne({ type: 'user', sessionId: id, message: { role: 'user', content: t } });
+const session = (id, extra, filler = 0) => {
+  const L = [...extra, ua(id, 'bonjour')];
+  for (let i = 0; i < filler; i++) L.push(ligne({ type: 'assistant', sessionId: id, message: { role: 'assistant', content: [{ type: 'text', text: 'x'.repeat(900) }] } }));
+  if (filler) L.push(ua(id, 'fin'));
+  fs.writeFileSync(path.join(proj, id + '.jsonl'), L.join('\n') + '\n');
+};
+const ct = (id, t) => JSON.stringify({ type: 'custom-title', customTitle: t, sessionId: id }), at = (id, t) => JSON.stringify({ type: 'ai-title', aiTitle: t, sessionId: id });
+const SEC = 'ghp_' + 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4', LS = String.fromCharCode(0x2028), PS = String.fromCharCode(0x2029), NEL = String.fromCharCode(0x85);
+session('s1', [ct('s1', 'Mon chantier carte')]); session('s2', [at('s2', 'TITRE-IA-SECRET-MODELE')]);
+session('s3', [ct('s3', '<img src=x onerror=alert(1)></script>' + String.fromCharCode(0, 7) + LS + PS + '\r\n\t' + NEL + ' ' + SEC + ' ' + 'z'.repeat(500))]);
+session('s4', [ct('s4', 'TITRE-TROP-LOIN')], 400); session('s5', []);
+const imp = (f) => import(pathToFileURL(path.join(S, f)).href);
+const who = (await imp('vf-cockpit-who.mjs')).collectWho(lab, { home, scriptsDir: noscripts, fresh: 600 });
+const graph = (await imp('vf-cockpit-equipe-carte.mjs')).buildEquipeGraph(who, { nom: 'x' });
+const n = (id) => graph.nodes.find((x) => x.id === 'se-' + id), w = (id) => who.workers.find((x) => x.id === id);
+const CTRL = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]'), json = JSON.stringify({ who, graph }), h = n('s3')?.label || '', hw = w('s3')?.titre;
+console.log(JSON.stringify({ t1a: n('s1')?.label, t1b: n('s5')?.label, t1c: !!n('s1')?.details.includes('Identifiant : s1'), t2a: n('s2')?.label, t2b: json.includes('TITRE-IA-SECRET-MODELE'),
+  t3a: [h.startsWith('<img src=x'), h.length <= 80, CTRL.test(h), h.includes('A1b2C3d4'), /\[masqué\]/.test(h)], t3b: [typeof hw === 'string' && hw.length <= 80, CTRL.test(hw || ''), String(hw).includes('A1b2C3d4')],
+  t4: [n('s4')?.label, json.includes('TITRE-TROP-LOIN')] }));
+JS
+w23() { node "$AUX/w23-titre.mjs" "$1" "$2" > "$2.json" 2>"$2.err"; }
+mkdir -p "$WORK/w23a" && w23 "$SCRIPTS" "$WORK/w23a"
+assert_eq "W23.0 — contrôle positif : la fabrique rend un JSON lisible" "$(node "$AUX/get.mjs" "$WORK/w23a.json" 'typeof j.t1b')" "string"
+assert_eq "W23.1 — custom-title -> titre de la carte ; sans titre -> « Session principale · <branche> »" "$(node "$AUX/get.mjs" "$WORK/w23a.json" '[j.t1a,j.t1b].join("|")')" "Mon chantier carte|Session principale · ma-branche"
+assert_eq "W23.2 — l'identifiant de session passe au détail de la carte" "$(node "$AUX/get.mjs" "$WORK/w23a.json" 'j.t1c')" "true"
+assert_eq "W23.3 — ai-title seul : aucun titre lu, carte « Session principale · <branche> », l'ai-title n'est nulle part dans la sortie" "$(node "$AUX/get.mjs" "$WORK/w23a.json" '[j.t2a,j.t2b].join("|")')" "Session principale · ma-branche|false"
+assert_eq "W23.4 — custom-title hostile (balises, contrôles, U+2028, 500 car., secret) : texte inerte, ≤ 80, sans contrôle, masqué (carte)" "$(node "$AUX/get.mjs" "$WORK/w23a.json" 'j.t3a.join(",")')" "true,true,false,false,true"
+assert_eq "W23.5 — custom-title hostile : le champ titre de la collecte est ≤ 80, sans contrôle, masqué" "$(node "$AUX/get.mjs" "$WORK/w23a.json" 'j.t3b.join(",")')" "true,false,false"
+assert_eq "W23.6 — custom-title hors de la fenêtre de 256 Kio : non lu, pas d'escalade de lecture" "$(node "$AUX/get.mjs" "$WORK/w23a.json" 'j.t4.join("|")')" "Session principale · ma-branche|false"
+mut23() { mut17 "w23-$1" vf-cockpit-lecture.mjs "$2" "$3" >/dev/null; mkdir -p "$WORK/w23-$1-b"; w23 "$WORK/mut17-w23-$1" "$WORK/w23-$1-b"; }
+mut23 controles "replace(/[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029\\p{Cf}]/gu, ' ')" "replace(/zzzzzz/gu, ' ')"
+assert_eq "M-W23-CONTROLES — mutant (nettoyage des contrôles retiré) : W23.4 rougit" "$(node "$AUX/get.mjs" "$WORK/w23-controles-b.json" 'j.t3a.join(",")')" "true,true,true,false,true"
+mut23 aititle "d.type === 'custom-title' && typeof d.customTitle === 'string' ? d.customTitle : null" "(d.type === 'ai-title' && typeof d.aiTitle === 'string' ? d.aiTitle : null) || (d.type === 'custom-title' && typeof d.customTitle === 'string' ? d.customTitle : null)"
+assert_eq "M-W23-AITITLE — mutant (ai-title lu) : W23.3 rougit" "$(node "$AUX/get.mjs" "$WORK/w23-aititle-b.json" '[j.t2a,j.t2b].join("|")')" "TITRE-IA-SECRET-MODELE|true"
+mut23 escalade ", [FENETRES[0]]) || '')" ") || '')"
+assert_eq "M-W23-ESCALADE — mutant (escalade vers 2 puis 8 Mio) : W23.6 rougit" "$(node "$AUX/get.mjs" "$WORK/w23-escalade-b.json" 'j.t4.join("|")')" "TITRE-TROP-LOIN|true"
+
 vf_hyg_assert
 
 echo ""

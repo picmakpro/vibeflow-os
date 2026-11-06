@@ -5,7 +5,7 @@
 // Seuls les candidats de la fenêtre (le .jsonl voisin modifié depuis moins de `fenetre`) et leurs ancêtres retrouvés par identifiant sont ouverts.
 import fs from 'node:fs';
 import path from 'node:path';
-import { ls, mtime, readJson, ID_RE, premiereLigne } from './vf-cockpit-lecture.mjs';
+import { ls, mtime, readJson, ID_RE, premiereLigne, titreSession } from './vf-cockpit-lecture.mjs';
 import { derniereAction, citationsDuMandat } from './vf-cockpit-transcript.mjs';
 
 export const FENETRE = 86400;
@@ -83,7 +83,7 @@ export function collecteAgents(ctx) {
       if (age <= fresh || inclus.size) {
         const at = byActivity(last, tree, file);
         const desc = [...inclus.values()].some((x) => x.etat !== 'termine');
-        workers.push(action({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, last.gitBranch), cwd: last.cwd, ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', etat: age <= fresh ? 'actif' : desc ? 'en-attente' : 'termine', _tr: file }));
+        workers.push(action({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, last.gitBranch), cwd: last.cwd, ...(titreSession(file) ? { titre: titreSession(file) } : {}), ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', etat: age <= fresh ? 'actif' : desc ? 'en-attente' : 'termine', _tr: file }));
       }
       for (const { c, etat } of inclus.values()) {
         const sl = tail(c.tr); if (sl && !ctx.formeOk(sl)) { inconnuSub++; continue; } // dernière ligne hors forme : l'agent est exclu
