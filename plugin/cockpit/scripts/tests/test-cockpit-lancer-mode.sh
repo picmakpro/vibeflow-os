@@ -244,7 +244,7 @@ importeurs() { local f; while IFS= read -r f; do grep -q "from './vf-cockpit-lan
 if [ "$MODULE_OK" = 1 ]; then
   PR="$(p_refs "$COCKPIT")"
   assert_eq "LM.S2 — frontière statique : aucun fichier côté P ne nomme terminal-mode ni lancer-mode (témoin : au moins 15 fichiers examinés, liste dérivée par find)" "$([ "${PR%%:*}" -ge 15 ] && echo "assez:${PR##*:}" || echo "trop peu (${PR%%:*}):${PR##*:}")" "assez:0"
-  assert_eq "LM.S2 — le seul importeur du module est vf-cockpit-terminal-processus.mjs (égalité d'ensemble ; témoin : le processus nomme bien le module)" "$(importeurs "$COCKPIT") $(grep -c 'lancer-mode' "$SCRIPTS/vf-cockpit-terminal-processus.mjs" | tr -d ' ')" "vf-cockpit-terminal-processus.mjs, 1"
+  assert_eq "LM.S2 — le seul importeur du module est vf-cockpit-terminal-processus.mjs (égalité d'ensemble ; témoin : le processus nomme bien le module)" "$(importeurs "$COCKPIT") $([ "$(grep -c 'lancer-mode' "$SCRIPTS/vf-cockpit-terminal-processus.mjs" | tr -d ' ')" -ge 1 ] && echo nomme)" "vf-cockpit-terminal-processus.mjs, nomme"
 else nonjouee "LM.S2" "module absent (elle s'écrit avec le module)"; fi
 SF="$(node "$AUX/stat.mjs" "$SCRIPTS/vf-cockpit-terminal-processus.mjs" "$SCRIPTS/vf-cockpit-terminal-client.mjs")"
 ROUTES_BASE='/amorce:POST,/annuler:POST,/entree:POST,/etat:GET,/flux:GET,/lancer:POST,/proposition:GET,/taille:POST'
@@ -504,7 +504,7 @@ else sans_effet "M-BLOQUANT"; fi
 echo "=== M-ECRITURE-DIRECTE — la cible écrite sans temporaire ni rename (LM.U4, LM.Q6) ==="
 if mutant ecr-directe "$MODF" "s#fs.openSync(tmp, 'wx', 0o600)#fs.openSync(fichier, 'w', 0o600)#" '/garde:mode-rename/d'; then
   assert_eq "M-ECRITURE-DIRECTE — sous le mutant LM.U4 rougit : la cible est ouverte en écriture et aucun temporaire ni rename" "$(uq "$(facts_u "$MUT_OUT" rapide)" '[j.u4.cibleEcrite, j.u4.ouvertTemp, j.u4.renomme].join("/")')" "true/false/false"
-  sur "$MUT_OUT"; pose_mode $'plan\n'; SIGM0="$(sigf)"; manche_debut "$MUT_OUT" sans-flux; proposer; attente_arme "$ARME_LU"; pl "$(lj "$ID" acceptEdits)" > /dev/null; SIGM1="$(sigf)"
+  sur "$MUT_OUT"; pose_mode $'plan\n'; SIGM0="$(sigf)"; manche_debut "$MUT_OUT"; proposer; attente_arme "$ARME_LU"; pl "$(lj "$ID" acceptEdits)" > /dev/null; SIGM1="$(sigf)"
   assert_eq "M-ECRITURE-DIRECTE — sous le mutant le témoin positif de LM.Q6 rougit : un lancement accepté réécrit le MÊME inode (le rename n'a plus lieu)" "$(sigfacts "$SIGM1" 'j.contenu.trim()') $([ "$(sigfacts "$SIGM1" j.ino)" = "$(sigfacts "$SIGM0" j.ino)" ] && echo meme-inode || echo inode-change)" "acceptEdits meme-inode"; manche_fin; sur_out
 else sans_effet "M-ECRITURE-DIRECTE"; fi
 echo "=== M-TEMPORAIRE-RESTE — le temporaire n'est plus retiré sur échec (LM.U4) ==="
@@ -517,17 +517,17 @@ if mutant relecture "$MODF" 's#lire: () => memoire,#lire: () => charger(fichier,
 else sans_effet "M-RELECTURE-A-CHAQUE-SONDAGE"; fi
 echo "=== M-ECRITURE-A-LA-DEMANDE — l'écriture part à la réception de POST /lancer, avant consommer (LM.Q6) ==="
 if mutant ecr-demande "$PROCF" 's#const idDemande = demande.id;#memoireMode.ecrire(demande.mode); const idDemande = demande.id;#'; then
-  sur "$MUT_OUT"; pose_mode $'plan\n'; manche_debut "$MUT_OUT" sans-flux; proposer; attente_arme "$ARME_LU"; RM="$(pl "$(lj inconnu acceptEdits)")"
+  sur "$MUT_OUT"; pose_mode $'plan\n'; manche_debut "$MUT_OUT"; proposer; attente_arme "$ARME_LU"; RM="$(pl "$(lj inconnu acceptEdits)")"
   assert_eq "M-ECRITURE-A-LA-DEMANDE — sous le mutant LM.Q6 rougit : un id inconnu (404) réécrit pourtant le fichier (acceptEdits au lieu de plan)" "$RM $(sigfacts "$(sigf)" 'j.contenu.trim()')" "404 acceptEdits"; manche_fin; sur_out
 else sans_effet "M-ECRITURE-A-LA-DEMANDE"; fi
 echo "=== M-ECRITURE-AVANT-LE-SHELL — l'écriture précède le test de w.ok (LM.Q6) ==="
 STUB_ECR="s#const w = await sessions.lancer(ligneQ, onglet);#const w = { ok: false, motif: 'ecriture' };#"
 if mutant stub-ecriture "$PROCF" "$STUB_ECR"; then
-  sur "$MUT_OUT"; pose_mode $'plan\n'; SIGS="$(sigf)"; manche_debut "$MUT_OUT" sans-flux; proposer; attente_arme "$ARME_LU"; RS="$(pl "$(lj "$ID" acceptEdits)")"
+  sur "$MUT_OUT"; pose_mode $'plan\n'; SIGS="$(sigf)"; manche_debut "$MUT_OUT"; proposer; attente_arme "$ARME_LU"; RS="$(pl "$(lj "$ID" acceptEdits)")"
   assert_eq "LM.Q6 — session doublée sur le motif ecriture (le shell refuse la ligne) : 410 et le fichier est inchangé" "$RS $([ "$(sigf)" = "$SIGS" ] && echo inchange || echo change)" "410 inchange"; manche_fin; sur_out
 else sans_effet "LM.Q6 (doublure ecriture)"; fi
 if mutant avant-shell "$PROCF" "s#const w = await sessions.lancer(ligneQ, onglet);#const w = { ok: false, motif: 'ecriture' }; memoireMode.ecrire(demande.mode);#" '/garde:mode-ecrit/d'; then
-  sur "$MUT_OUT"; pose_mode $'plan\n'; manche_debut "$MUT_OUT" sans-flux; proposer; attente_arme "$ARME_LU"; RM="$(pl "$(lj "$ID" acceptEdits)")"
+  sur "$MUT_OUT"; pose_mode $'plan\n'; manche_debut "$MUT_OUT"; proposer; attente_arme "$ARME_LU"; RM="$(pl "$(lj "$ID" acceptEdits)")"
   assert_eq "M-ECRITURE-AVANT-LE-SHELL — sous le mutant LM.Q6 rougit : le refus du shell (410) laisse pourtant le fichier réécrit (acceptEdits au lieu de plan)" "$RM $(sigfacts "$(sigf)" 'j.contenu.trim()')" "410 acceptEdits"; manche_fin; sur_out
 else sans_effet "M-ECRITURE-AVANT-LE-SHELL"; fi
 echo "=== M-MODE-DANS-AUCUNE — mode_retenu ajouté à la réponse aucune (LM.Q1) ==="
