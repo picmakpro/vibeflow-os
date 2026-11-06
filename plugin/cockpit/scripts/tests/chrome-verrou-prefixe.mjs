@@ -20,6 +20,6 @@ await executer(chrome, async (s) => {
     { present: true, owner: 'L1', step: 'a', scope: 'compartiment', ws: 'fiabilite', age_seconds: 40 },
     { present: true, owner: 'L1', step: 'b', scope: 'compartiment', ws: 'fiabilite-2', age_seconds: 600 }] } })`);
   await s.ev("document.querySelector('#vf-lock').click()");
-  await s.attendre("document.querySelectorAll('.vf-whop .vf-who').length >= 2", 'deux lignes de verrou');
-  return { lignes: await s.ev("[...document.querySelectorAll('.vf-whop .vf-who')].map((e) => e.textContent.trim().slice(0, 120))") };
+  await s.attendre("document.querySelectorAll('.vf-whop .r-verr li').length >= 2", 'deux lignes de verrou');
+  return { lignes: await s.ev("[...document.querySelectorAll('.vf-whop .r-verr li')].map((e) => [...e.children].map((c) => c.textContent.trim()).join(' · ').slice(0, 120))") };
 }, { csp: true });
