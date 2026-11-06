@@ -412,3 +412,14 @@ ou de `vf-new-lab`.
 - **Affirmation héritée :** le README et le CHANGELOG du module disent que le calcul de l'arbre « sale » est reporté à la Phase 78 ; la 78 est fusionnée sans l'avoir câblé (`AVERTISSEMENTS_RESERVES` reste inactif). `LANC-12` est encore « Pending » dans `REQUIREMENTS.md` alors que la 72 est à 16/16 plans (identique au parent de la 72).
 
 **Déclencheur de reprise :** la prochaine phase qui touche le bandeau de proposition ou le style du terminal, après la fusion de `feat/cockpit-retours-utilisateurs`.
+
+## Verrou de driver par phase : trois mineurs de la relecture adverse de la release v2.76.0 — DIFFÉRÉ (2026-11-06)
+
+**Priorité : basse.** Aucun verrou orphelin observé ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 (relayé par la session principale) : au BACKLOG.
+
+**Origine :** relecture adverse SOBR-04 de la release v2.76.0 (volet hors cockpit, SHA `f0bbcf4c`).
+- **Graphie du numéro de phase :** `driver-lock.sh` (`vf_dl_phase_valid`, dossier `phases/<N>`) accepte `--phase=41.1` puis `--phase=041.1` comme deux verrous distincts, alors que `phase_covers` de `guard-driver-lock.sh` les tient pour équivalents. Sondé : deux `acquire` rendus `acquired: true`. Propriété attendue : le numéro est normalisé avant de nommer le dossier.
+- **Dossier vide :** `phases/<N>/` reste vide sous `.git/vf-driver/ws/<ws>/` après `release`. Inoffensif (`status --all`, le guard et la sonde de hiérarchie le tolèrent).
+- **Versions mixtes :** un `driver-lock.sh` de v2.75.1 ignore les verrous de phase et accorde le verrou de compartiment pendant qu'une phase est tenue. Ne vaut que si deux sessions d'un même dépôt n'ont pas la même version du plugin.
+
+**Déclencheur de reprise :** la prochaine phase qui touche `driver-lock.sh` ou `guard-driver-lock.sh`.
