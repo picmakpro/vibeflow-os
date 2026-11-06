@@ -83,6 +83,7 @@ R.u2 = forges.map((v) => lire(pose(v)));
 R.u2n = forges.length;
 // mots valides entourés de blancs : seule la forme « mot » ou « mot + UN \n » est lue (un trim() les accepterait)
 R.u2blancs = [' plan', 'plan ', 'plan \n', 'plan\n\n', 'plan\r\n', '\nplan'].map((v) => lire(pose(v)));
+R.u2bom = lire(pose(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('plan')])));
 R.u2fin = [lire(pose('plan\n')), lire(pose('plan'))];
 // borne de taille : un fichier DONT LE FSTAT annonce plus de 32 octets ne doit déclencher aucune lecture
 const tracer = (extra = {}) => { const appels = []; const o = { ...fs }; for (const k of Object.keys(fs)) if (typeof fs[k] === 'function') o[k] = (...a) => { appels.push([k, ...a.map((x) => (typeof x === 'number' || typeof x === 'string' || typeof x === 'boolean' ? x : typeof x === 'object' && x !== null ? '{}' : typeof x))]); return fs[k](...a); }; Object.assign(o, extra); return { fs: o, appels }; };
@@ -113,6 +114,11 @@ const noms = (t) => t.appels.map((a) => a[0]);
 { const d = frais(), f = path.join(d, 'terminal-mode'); const t = tracer(); const m = M.creerMemoireMode({ fichier: f, fs: t.fs }); const dep = t.appels.length; const rs = [];
   for (const v of ['bypassPermissions', 'toString', 42, undefined, null, 'Plan', ['plan']]) rs.push(m.ecrire(v));
   R.u4hors = { rend: rs.join(','), appels: t.appels.length - dep, lu: m.lire(), existe: fs.existsSync(f) }; }
+// dossier support redirigé : .cache devenu un lien vers un autre dossier -> aucune écriture, aucune exception ; témoin : un vrai dossier -> écrit
+{ const essai = (lien) => { const racine = frais(), cible = frais(), cache = path.join(racine, '.cache'); if (lien) fs.symlinkSync(cible, cache); else fs.mkdirSync(cache);
+    const m = M.creerMemoireMode({ fichier: path.join(cache, 'terminal-mode') }); let exc = 'aucune', r; try { r = m.ecrire('plan'); } catch (e) { exc = e.message; }
+    return [r, exc, fs.readdirSync(cible).length, fs.readdirSync(cache).filter((x) => x === 'terminal-mode').length].join(','); };
+  R.u4lien = essai(true); R.u4vrai = essai(false); }
 // la valeur lue au démarrage reste celle de la mémoire
 { const f = pose('plan'); const m = M.creerMemoireMode({ fichier: f }); const a = m.lire(); fs.writeFileSync(f, 'acceptEdits\n'); R.u5 = [a, m.lire()]; }
 // lecteur concurrent : un écrivain (autre processus) alterne 500 fois, le lecteur lit en boucle (cas « rapide » : omis, pour les mutants)
@@ -264,6 +270,8 @@ UF="$(facts_u "$SCRIPTS")"
 assert_eq "LM.U1 — témoin : fichier valide « plan » -> plan ; fichier absent -> default ; « plan » + un retour à la ligne -> plan" "$(uq "$UF" 'j.u1.join(",")')" "plan,default,plan"
 assert_eq "LM.U2 — dix-sept contenus forgés (bypassPermissions, Plan, PLAN, plan plan, plan\\nplan, plan\\0, vide, un retour à la ligne, JSON, tableau JSON, __proto__, constructor, toString, 33 octets, 4096 octets, plan+28 octets, non UTF-8) : tous default, aucune exception" "$(uq "$UF" 'j.u2.length + ":" + j.u2.filter((x) => x === "default").length')" "17:17"
 assert_eq "LM.U2 — mot valide entouré de blancs (' plan', 'plan ', 'plan \\n', 'plan\\n\\n', 'plan\\r\\n', '\\nplan') : tous default ; 'plan\\n' et 'plan' : plan" "$(uq "$UF" 'j.u2blancs.join(",") + "|" + j.u2fin.join(",")')" "default,default,default,default,default,default|plan,plan"
+assert_eq "LM.U2 — un BOM devant le mot (EF BB BF + plan) : default (égalité stricte)" "$(uq "$UF" 'j.u2bom')" "default"
+assert_eq "LM.U4 — .cache devenu un lien vers un autre dossier : ecrire rend false, sans exception, le dossier visé reste vide, rien n'est écrit ; témoin : un vrai dossier -> true, écrit" "$(uq "$UF" 'j.u4lien + "|" + j.u4vrai')" "false,aucune,0,0|true,aucune,0,1"
 assert_eq "LM.U2 — borne de taille avant toute lecture : un fstat annonçant 4096 octets rend default SANS aucun readSync (témoin : la même doublure sur la taille réelle lit une fois et rend plan)" "$(uq "$UF" 'j.u2taille.join(",")')" "default,0,plan,1"
 assert_eq "LM.U3 — fichier d'un autre propriétaire (fstat simulé, la vraie situation exige un privilège : non jouable sans lui) -> default ; le vrai propriétaire -> plan" "$(uq "$UF" 'j.u3uid.join(",")')" "default,plan"
 assert_eq "LM.U3 — lien symbolique vers un fichier plan valide -> default ; répertoire -> default" "$(uq "$UF" 'j.u3lien + "," + j.u3dossier')" "default,default"
@@ -488,6 +496,14 @@ echo "=== M-TRIM — la lecture tolère les blancs au lieu d'un seul retour fina
 if mutant trim "$MODF" "s#const mot = txt.endsWith('\\\\n') ? txt.slice(0, -1) : txt;#const mot = txt.trim();#"; then
   assert_eq "M-TRIM — sous le mutant LM.U2 rougit : les mots entourés de blancs sont lus comme plan" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.u2blancs.join(",")')" "plan,plan,plan,plan,plan,plan"
 else sans_effet "M-TRIM"; fi
+echo "=== M-BOM — le BOM est retiré par le décodeur (LM.U2) ==="
+if mutant bom "$MODF" 's#{ fatal: true, ignoreBOM: true }#{ fatal: true }#'; then
+  assert_eq "M-BOM — sous le mutant LM.U2 rougit : un BOM devant plan est lu plan" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.u2bom')" "plan"
+else sans_effet "M-BOM"; fi
+echo "=== M-DOSSIER-LIEN — contrôle du dossier support retiré (LM.U4) ==="
+if mutant dossier-lien "$MODF" '/garde:mode-dossier/,/catch (e) { if (!e/d'; then
+  assert_eq "M-DOSSIER-LIEN — sous le mutant LM.U4 rougit : l'écriture traverse le lien (true, un fichier dans le dossier visé)" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.u4lien')" "true,aucune,1,1"
+else sans_effet "M-DOSSIER-LIEN"; fi
 echo "=== M-SUIT-LIEN — O_NOFOLLOW retiré (LM.U3, LM.Q5) ==="
 if mutant suit-lien "$MODF" 's#const noFollow = c.O_NOFOLLOW || 0;#const noFollow = 0;#'; then
   assert_eq "M-SUIT-LIEN — sous le mutant LM.U3 rougit : le lien symbolique est suivi (plan au lieu de default)" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.u3lien')" "plan"

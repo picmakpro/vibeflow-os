@@ -27,7 +27,7 @@ function charger(fichier, fs, modes, os) {
     if (st.size > MAX_OCTETS) return DEFAUT; // garde:mode-taille
     const tampon = Buffer.alloc(MAX_OCTETS + 1), n = fs.readSync(fd, tampon, 0, tampon.length, 0);
     if (n > MAX_OCTETS) return DEFAUT;
-    const txt = new TextDecoder('utf-8', { fatal: true }).decode(tampon.subarray(0, n));
+    const txt = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }) /* garde:mode-bom */.decode(tampon.subarray(0, n));
     const mot = txt.endsWith('\n') ? txt.slice(0, -1) : txt;
     return modes.indexOf(mot) >= 0 ? mot : DEFAUT; // garde:mode-valide
   } catch { return DEFAUT; } finally { if (fd !== null) { try { fs.closeSync(fd); } catch {} } }
@@ -39,6 +39,10 @@ export function creerMemoireMode({ fichier, fs = nodeFs, modes = MODES, os = pro
     if (typeof mode !== 'string' || modes.indexOf(mode) < 0) return false;
     memoire = mode;
     const dossier = path.dirname(fichier), tmp = path.join(dossier, `${FICHIER_MODE}.${process.pid}.${crypto.randomBytes(8).toString('hex')}.tmp`);
+    try { // garde:mode-dossier : le dernier composant doit être un vrai dossier à nous, jamais un lien (O_NOFOLLOW ne couvre que le fichier)
+      const ls = fs.lstatSync(dossier);
+      if (ls.isSymbolicLink() || !ls.isDirectory() || (typeof os.getuid === 'function' && ls.uid !== os.getuid())) return false;
+    } catch (e) { if (!e || e.code !== 'ENOENT') return false; }
     let fd = null;
     try {
       fs.mkdirSync(dossier, { recursive: true });
