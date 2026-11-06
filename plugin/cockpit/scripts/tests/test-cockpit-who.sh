@@ -711,7 +711,8 @@ const POS = [
 const NEG = ['task-runner', 'desk-lamp', 'mask-image', 'risk-assessment-2026-11-06-panel', 'ask-user', 'gsd-ask-user-question-batch-mode-2026', 'kiosk-mode', 'whisk-ey', 'Task-1', 'sk-learn', 'the sk-ok plan',
   'AKIAS', 'AKIAS_BUCKET', 'AKIA-docs', 'ghp_court', 'high_priority', 'laughs_and_cries_over_everything', 'Hughs_Hughs', 'xoxo-hugs', 'github_pat_', 'my_github_pat_rotation',
   'Bearer token is required for this endpoint', 'Bearer authentication scheme is used', 'Flagbearer internationalization', 'Pallbearer ceremonyarrangements-x',
-  'Task-Force-Review-2026-11-06-Panel-Alpha-Beta-Gamma', 'Desk-Lamp2Of3', 'ask-' + 'user-question-for-the-planning-of-the-next-release-2026-11-06-A1', 'feat/retours-equipe-git', 'gsd-quick', 'cockpit-moteur'];
+  'Task-Force-Review-2026-11-06-Panel-Alpha-Beta-Gamma', 'Desk-Lamp2Of3', 'ask-' + 'user-question-for-the-planning-of-the-next-release-2026-11-06-A1', 'feat/retours-equipe-git', 'gsd-quick', 'cockpit-moteur',
+  'task-admin-dashboard-redesign-for-the-q4-planning-board', 'ask-internationalizationcounterrevolutionaryelectroencephalo', 'desk-proj-Plan2'];
 const git = (...x) => { try { return execFileSync('git', ['-C', repo, ...x], { encoding: 'utf8', maxBuffer: 1 << 28 }); } catch { return ''; } };
 const corpus = new Set(NEG);
 for (const l of [...git('ls-files').split('\n'), ...git('for-each-ref', '--format=%(refname)').split('\n'), ...git('for-each-ref', '--format=%(refname:short)').split('\n')]) { if (!l) continue; corpus.add(l); for (const c of l.split('/')) if (c) corpus.add(c); }
@@ -771,6 +772,11 @@ assert_eq "M-W24-BEAR2 — mutant (corps Bearer collé à un mot de 1 caractère
 # frontière de lettre retirée : « task- », « risk- » sont masqués
 mut24 sklarge '/(?<![A-Za-z])sk-[A-Za-z0-9_-]{16,}/g' '/sk-[A-Za-z0-9_-]{16,}/g'
 assert_eq "M-W24-SKLARGE — mutant (plus aucune frontière avant sk-) : W24.2 rougit sur risk-assessment-2026-11-06-panel" "$(r24 sklarge 'j.fausse.filter(s => /risk-assessment/.test(s)).length > 0')" "true"
+# lookaheads majuscule et chiffre retirés, puis corps de la branche proj|ant|svcacct|admin ramené à 1
+mut24 sklook '(?=[A-Za-z0-9_-]{0,127}[A-Z])(?=[A-Za-z0-9_-]{0,127}\d)' ''
+assert_eq "M-W24-SKLOOK — mutant (sk- collé à une lettre sans lookahead majuscule ni chiffre) : W24.2 rougit sur task-admin-dashboard-redesign-for-the-q4-planning-board ET sur le mot minuscule de plus de 40 lettres" "$(r24 sklook 'j.fausse.filter(s => /task-admin-dashboard/.test(s)).length + "," + j.fausse.filter(s => /ask-internationalization/.test(s)).length')" "5,5"
+mut24 skpref '{36,}|' '{1,}|'
+assert_eq "M-W24-SKPREF — mutant (corps proj|ant|svcacct|admin de 1 caractère) : W24.2 rougit sur desk-proj-Plan2" "$(r24 skpref 'j.fausse.filter(s => /desk-proj-Plan2/.test(s)).length > 0')" "true"
 # `\b` remis partout : les cas collés refuient
 mut24 bord '/gh[pousr]_' '/\bgh[pousr]_' '/github_pat_' '/\bgithub_pat_' '(?<![A-Za-z])sk-[A-Za-z0-9_-]{16,}' '\bsk-[A-Za-z0-9_-]{16,}' '(?<=[A-Za-z])sk-(?=' '\bsk-(?=' '/AKIA[A-Z0-9]{16}/g' '/\bAKIA[A-Z0-9]{16}/g' '/xox[baprs]-' '/\bxox[baprs]-' '/(?<![A-Za-z])Bearer' '/\bBearer' '/(?<=[A-Za-z])Bearer' '/\bBearer'
 assert_eq "M-W24-BORD — mutant (\\b remis devant tous les motifs) : W24.1 rougit sur xxxghp_, key_sk-, idAKIA, xBearer, my_github_pat_, axoxb-, 1ghp_" "$(r24 bord 'j.manque.map(s => s.split("@")[0]).filter((s, i, t) => t.indexOf(s) === i).join(",")')" "ghp-colle-mot,ghp-apres-souligne,ghp-apres-chiffre,gho-colle,ghu-colle,ghs-colle,ghr-colle,sk-apres-souligne,sk-apres-chiffre,sk-colle-mot-alnum,sk-colle-mot-proj,sk-colle-mot-ant,akia-colle-mot,akia-apres-chiffre,bearer-colle-mot,bearer-apres-souligne,bearer-apres-chiffre,pat-colle-mot,pat-colle-chiffre,xox-colle-mot,xox-apres-souligne"
