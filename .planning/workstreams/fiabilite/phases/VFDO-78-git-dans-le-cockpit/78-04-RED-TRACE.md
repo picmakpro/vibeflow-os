@@ -136,3 +136,21 @@ P78-D-39 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 : « 
 - Une première version de M1 (remplacer `header[data-vf-git] .hc` par `header .hc` dans le sous-arbre sans Git) restait verte : la règle n'est jamais injectée sans dépôt (76 sort avant le style). Elle ne comptait pas ; remplacée par la forme ci-dessus.
 
 Captures : `78-d39-entete-1024-git.png` (« Chercher… », icône Git, aucun bouton hors fenêtre) et `78-d39-entete-1024-sansgit.png` (invite d'origine, 200 px).
+
+## Correction revue page (mgr78-reprise, 2026-11-06) — S2 : `vf-git:signal` écouté sur document
+
+Finding S2 / P1 de la revue de code (SHA jugé `8edb0bf7`, GITC-11, P78-D-15) : `70-vf-live.js:223` émet `vf-git:signal` par `document.dispatchEvent(new CustomEvent(...))`, sans `bubbles` ; `76-vf-git-entete.js` l'écoutait sur `window`, que cet événement n'atteint jamais.
+
+**Pourquoi l'ancienne forme des tests était fausse.** H3.3/H3.4b de `test-cockpit-git-entete.sh` émettaient `window.dispatchEvent(new CustomEvent('vf-git:signal'))` : un événement émis sur window atteint un écouteur de window, donc le test était vert alors que le vrai émetteur (sur document, sans bubbles) n'atteint aucun écouteur de window. Le test verrouillait le défaut. Réécrit pour émettre exactement comme 70 (`document.dispatchEvent`, sans bubbles, `detail: { sig }`). B3 de `test-cockpit-git-e2e.sh` ne voyait pas non plus le défaut : tiroir OUVERT, la seconde ligne suit par l'événement `vf-git:entete` du tiroir, pas par l'écouteur de 76.
+
+**Rouge avant (76 de `0a8a9b63`).** Journaux `78-rv-rouge-git-entete.log` et `78-rv-rouge-git-e2e.log`.
+- `test-cockpit-git-entete.sh` : scénario H3 interrompu à l'attente « relecture sur signal » (aucun appel de `/api/vf/git/entete` sur un signal émis comme 70) : 85 réussis, 13 échoués (H3.3 à H3.5 et H3.x, par interruption du scénario ; H3.4 « relit l'en-tête avec le jeton » attendu `1|true`, obtenu vide).
+- `test-cockpit-git-e2e.sh` B3b (nouveau : tiroir fermé par la touche g, puis `git switch -q -c troisieme` dans le lab, la seconde ligne doit dire « troisieme » en moins de 10 s) : B3.1 rouge, `seconde ligne inchangée, tiroir fermé : autre · worktree wt-ag` ; 33 réussis, 2 échoués (l'autre : M-ECOUTEUR « mutation impossible », l'ancre `document.addEventListener(...)` n'existe pas encore).
+
+**Vert après.** `78-rv-vert-git-entete.log` rc 0 (H3.4b vert, signal émis comme 70) ; `78-rv-vert-git-e2e.log` rc 0 : B3b vert, B3.1 vert.
+
+**Mutant M-ECOUTEUR** (copie de la sortie construite, l'écouteur de 76 remis sur `window`) : rouge sur B3b seulement, pour la bonne raison : `ligne-fermee` faux ET `rangee-neuve`, `ligne-autre` (tiroir ouvert) toujours vrais, B2 vert (assertion `true|true|true|`).
+
+## Correction revue page — P78-D-40 : libellé « Par branche — avance sur la base »
+
+Rouge avant : `D10.5` de `test-cockpit-git-tiroir.sh` (1440 et 390 px), attendu `Par branche — avance sur la base`, obtenu `Par branche (30 jours)` (`78-rv-rouge2-git-tiroir.log`). Vert après : `78-rv-dbg-git-tiroir.log`, rc 0. `78-UI-SPEC.md` ligne 121 mise à jour (référence P78-D-40).

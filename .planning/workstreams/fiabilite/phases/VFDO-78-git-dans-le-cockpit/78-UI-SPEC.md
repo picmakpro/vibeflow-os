@@ -118,7 +118,7 @@ puis « et 14 autres ». Pas de diff. Commandes : `git show --stat --end-of-opti
 **Tags / Stash / Auteurs.** Lignes denses (`padding: 6px 10px`, rayon `--r-ctl`, survol `.06`) : tag = nom mono + sha court + date ;
 stash = `stash@{0}` mono + message + branche d'origine + date, commande `git stash show --stat 'stash@{0}'` ; auteurs : nom,
 nombre de commits, barre `.vf-bar` (6 px, piste `--raise-2`, remplissage `--text-3`) proportionnelle au plus actif, puis sous-liste
-« Par branche (30 jours) » : nom mono, nombre de commits, dernier commit relatif. Pas d'e-mail affiché.
+« Par branche — avance sur la base » (P78-D-40, plus de fenêtre de 30 jours) : nom mono, nombre de commits d'avance sur la base, dernier commit relatif. Pas d'e-mail affiché.
 
 **Commandes à copier.** Rangée `.vf-git-cmd` : `--well` en fond, `--r-ctl`, `padding: 4px 4px 4px 10px`, `gap: 6px`, `min-height: 28px`
 (44 px tactile). `<code>` mono 11,5 px `--text-2`, 1 ligne, ellipsis, `title` = commande complète, sélectionnable ; à droite un bouton

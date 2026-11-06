@@ -143,7 +143,7 @@
       const x2 = el('div', 'vf-git-aut'); x2.append(ligne(el('span', 'vf-git-gras', a.nom), el('span', 'meta', pl(a.commits, 'commit')), el('span', null, relatif(a.dernier))), b); d.appendChild(x2);
     }
     if (parBranche && parBranche.length) {
-      d.appendChild(el('div', 'vf-git-sous', 'Par branche (30 jours)'));
+      d.appendChild(el('div', 'vf-git-sous', 'Par branche — avance sur la base'));
       for (const p of parBranche) d.appendChild(ligne(mono(p.nom), el('span', 'meta', pl(p.avance || 0, 'commit')), el('span', null, p.dernier ? relatif(p.dernier) : '')));
     }
     return section('Auteurs et activité', auteurs.length, d, false, 'vf-git-s-aut');

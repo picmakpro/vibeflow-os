@@ -4,6 +4,7 @@
 #   MJ mutants de jonction, joués d'abord (chacun doit rougir la section qu'il vise : un mutant sans effet ou rouge pour une autre raison ne compte pas)
 #       M-ROUTE   l'accroche `routeGit` retirée du serveur (copie de la sortie)        -> rougit B2
 #       M-SIGNAL  le relais de l'événement `git` retiré de la page (copie de la sortie) -> rougit B3
+#       M-ECOUTEUR l'écouteur de `vf-git:signal` de l'en-tête remis sur window (le défaut S2) -> rougit B3b (tiroir fermé) seulement
 #       M-OUVREUR le nom d'événement `vf-git:basculer` changé dans l'en-tête (copie)    -> rougit B2
 #   B1 nom du dépôt sur les trois onglets, seconde ligne · B2 tiroir réel (clic, touche g, graphe = route, détail = route, worktrees = git status)
 #   B3 rafraîchissement réel : un commit puis un `git switch` faits PENDANT la séance · B4 lab hors dépôt · B5 lab piégé, GIT_DIR leurre exporté
@@ -183,6 +184,12 @@ out.avantLigne = await s.ev(`document.querySelector('#vf-git-ligne').textContent
 git('switch', '-q', '-c', 'autre');
 await att(out, 'ligne-autre', `/autre/.test(document.querySelector('#vf-git-ligne').textContent)`, Number(process.env.E2E_SIGNAL_MS) || 10000);
 out.ligne = await s.ev(`document.querySelector('#vf-git-ligne').textContent`);
+// B3b (revue S2, P78-D-15) : tiroir FERMÉ, sur le flux réel : un `git switch -c` change la seconde ligne sans que le tiroir ne relise rien (70-vf-live émet sur document, sans bubbles)
+await s.ev(`document.activeElement && document.activeElement.blur && document.activeElement.blur(); document.body.focus()`);
+await touche('g'); await att(out, 'ferme-b3b', `!(${OUVERT})`);
+git('switch', '-q', '-c', 'troisieme');
+await att(out, 'ligne-fermee', `/troisieme/.test(document.querySelector('#vf-git-ligne').textContent)`, Number(process.env.E2E_SIGNAL_MS) || 10000);
+out.ligneFermee = await s.ev(`document.querySelector('#vf-git-ligne').textContent`);
 out.errs = await s.ev(`window.__errs`); out.violations = [...s.violations];
 return out;
 JS
@@ -200,6 +207,8 @@ faux_b3() { jq_ "$1" '(() => { const f = []; const o = j.ok || {};
   if (o["rangee-neuve"] === false) f.push("aucune rangée neuve en tête sous " + "'"$SIG_MS"'" + " ms (rangées " + j.avant + " -> " + j.apres + ")");
   if (o["rangee-neuve"] !== false && !j.selConservee) f.push("sélection perdue");
   if (o["ligne-autre"] === false) f.push("seconde ligne inchangée : " + j.ligne);
+  if (o["ferme-b3b"] === false) f.push("tiroir non fermé avant B3b");
+  if (o["ligne-fermee"] === false) f.push("seconde ligne inchangée, tiroir fermé : " + j.ligneFermee);
   return f.join("; "); })()'; }
 
 # --- jonction : sortie copiée DANS le lab (racine = deux niveaux au-dessus), mutant posé, parcours rejoué ---
@@ -219,6 +228,9 @@ if [ -z "$CHROME" ]; then skip "MJ" "pas de navigateur"; else
   mutant_jonction M-SIGNAL "index.html project.html" "es.addEventListener('git'," "es.addEventListener('git-mort'," faux_b3
   echo "     M-SIGNAL : B3 -> [$(faux_b3 "$RM")]"; echo "     M-SIGNAL : mesure ${RM:0:420}"
   assert_eq "M-SIGNAL — rougit B3 (aucune rangée neuve, la seconde ligne ne bouge pas) alors que B2 est vert sur le même serveur" "$(jq_ "$RM" '[ (j.ok||{})["rangee-neuve"] === false, (j.ok||{})["ligne-autre"] === false ].join("|")' 2>/dev/null)|$(faux_b2 "$RM")" "true|true|"
+  mutant_jonction M-ECOUTEUR "index.html project.html" "document.addEventListener('vf-git:signal', () => { // relecture de l'en-tête" "window.addEventListener('vf-git:signal', () => { // relecture de l'en-tête" faux_b3
+  echo "     M-ECOUTEUR : B3 -> [$(faux_b3 "$RM")]"; echo "     M-ECOUTEUR : mesure ${RM:0:420}"
+  assert_eq "M-ECOUTEUR — rougit B3b (la seconde ligne ne bouge pas tiroir fermé) alors que le tiroir ouvert suit (rangée neuve, ligne « autre »)" "$(jq_ "$RM" '[ (j.ok||{})["ligne-fermee"] === false, (j.ok||{})["rangee-neuve"] !== false, (j.ok||{})["ligne-autre"] !== false ].join("|")' 2>/dev/null)|$(faux_b2 "$RM")" "true|true|true|"
   mutant_jonction M-OUVREUR "index.html project.html" "new CustomEvent('vf-git:basculer'," "new CustomEvent('vf-git:basculer-mort'," faux_b2
   echo "     M-OUVREUR : B2 -> [$(faux_b2 "$RM")]"; echo "     M-OUVREUR : mesure ${RM:0:420}"
   assert_eq "M-OUVREUR — rougit B2 (le clic sur la seconde ligne n'ouvre plus rien) alors que la route répond 200 (le graphe existe côté serveur)" "$(jq_ "$RM" '[ (j.ok||{})["ouvert-clic"] === false, (j.api||{}).status === 200 ].join("|")' 2>/dev/null)" "true|true"

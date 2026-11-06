@@ -2,7 +2,7 @@
 // Donnée : G.meta.vfGit (vf-cockpit-git-entete.mjs). Sans git (état « absent ») ou sans donnée : ni seconde ligne, ni ouvreur, ni bloc .vf-nom ;
 // seul le nom change. Tout texte venu de git s'écrit en textContent / setAttribute, jamais en innerHTML. Ne touche pas au viewer.
 // Contrat d'événements (sur window) : vf-git:basculer (émis ici, detail.source = ligne | ouvreur) · vf-git:etat (reçu, detail.ouvert) ·
-// vf-git:entete (reçu, detail = objet d'en-tête) · vf-git:signal (reçu : relecture de /api/vf/git/entete, schéma vibeflow/cockpit-git-entete@1).
+// vf-git:entete (reçu, detail = objet d'en-tête) · vf-git:signal (reçu SUR document, sans bubbles, comme l'émet 70-vf-live.js : relecture de /api/vf/git/entete, schéma vibeflow/cockpit-git-entete@1).
 (() => {
   const SC = window.Floorplan;
   if (!SC) return;
@@ -161,7 +161,7 @@
   window.addEventListener('vf-git:etat', (e) => { const o = String(!!(e.detail && e.detail.ouvert)); ligne.setAttribute('aria-expanded', o); ouvreur.setAttribute('aria-expanded', o); });
   const valide = (d) => d && typeof d === 'object' && (d.etat === 'ok' || d.etat === 'indisponible' || d.etat === 'absent');
   window.addEventListener('vf-git:entete', (e) => { if (valide(e.detail)) lire(e.detail); });
-  window.addEventListener('vf-git:signal', () => { // relecture de l'en-tête (le serveur vérifie le jeton) ; réponse hors schéma : ignorée
+  document.addEventListener('vf-git:signal', () => { // relecture de l'en-tête (le serveur vérifie le jeton) ; réponse hors schéma : ignorée
     const SRV = window.FLOORPLAN_SERVER;
     if (!SRV || !SRV.token) return;
     fetch('/api/vf/git/entete', { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' })

@@ -169,6 +169,9 @@ await s.attendre(`document.readyState === 'complete' && !!document.querySelector
 const out = {};
 const ligne = () => `document.querySelector('.vf-git-ligne')`;
 const evt = (nom, d) => s.ev(`window.dispatchEvent(new CustomEvent('${nom}', { detail: ${JSON.stringify(d)} }))`);
+// Revue de code S2 (P78-D-15) : 70-vf-live.js émet `vf-git:signal` sur `document`, SANS bubbles (contrat de 78-09), exactement comme ici. L'ancienne forme (window.dispatchEvent) atteignait un écouteur posé sur window
+// que le vrai émetteur n'atteint jamais : H3.4b était vert alors que l'en-tête ne se relisait pas sur le signal réel.
+const signal = () => s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'abc' } }))`);
 // H3.3 : noms longs
 const longB = 'feature/' + 'b'.repeat(112), longW = 'w'.repeat(60);
 await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: longB, worktree: longW, detache: false });
@@ -180,11 +183,11 @@ await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: 'autre' });
 out.evt = await s.ev(`(() => ({ texte: ${ligne()}.querySelector('.vf-git-branche').textContent, wt: ${ligne()}.querySelector('.vf-git-wt').textContent }))()`);
 // H3.4b : signal -> relecture de /api/vf/git/entete avec le jeton ; réponse hors schéma refusée
 await s.ev(`window.__vfFetch.reponse = { schema: 'vibeflow/cockpit-git-entete@1', etat: 'ok', depot: 'depot', branche: 'via-signal', worktree: null, detache: false }`);
-await evt('vf-git:signal', {});
+await signal();
 await s.attendre(`${ligne()}.textContent.includes('via-signal')`, 'relecture sur signal');
 out.signal = await s.ev(`(() => ({ appels: window.__vfFetch.appels.length, jeton: window.__vfFetch.appels[0].headers['x-vf-cockpit-token'] === window.VF_COCKPIT_SERVER.token && !!window.VF_COCKPIT_SERVER.token }))()`);
 await s.ev(`window.__vfFetch.reponse = { schema: 'autre@1', etat: 'ok', depot: 'depot', branche: 'pirate' }`);
-await evt('vf-git:signal', {});
+await signal();
 await s.attendre(`window.__vfFetch.appels.length === 2`, 'second appel');
 await s.ev(`new Promise((r) => setTimeout(r, 400))`);
 out.horsSchema = await s.ev(`${ligne()}.querySelector('.vf-git-branche').textContent`);

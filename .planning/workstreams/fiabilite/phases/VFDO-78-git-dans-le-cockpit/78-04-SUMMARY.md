@@ -103,3 +103,10 @@ P78-D-39 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 : « 
 - **Valeurs posées** : `152px` (largeur plancher, sans jeton équivalent : plancher mesuré de la recherche) ; aucun padding, marge ni écart nouveau ou modifié ; `css-jetons.mjs` rc 0 sur 76 et 77.
 - **Déviations** : aucune. `chrome-responsive.mjs` (hors liste) non modifié : le plancher de 200 px reste son minimum, la borne conditionnelle vit dans le filtre `viol.mjs` de la suite.
 - Mesure : à 1 024 px avec Git, la recherche mesure 174 px (onglet Code, tous les boutons optionnels) ; sans Git elle dépasse 200 px.
+
+### Correction revue page (mgr78-reprise, 2026-11-06) : FAITE
+
+Traces : section « Correction revue page » de `78-04-RED-TRACE.md`.
+- **S2 (GITC-11, P78-D-15)** : `76-vf-git-entete.js` écoute `vf-git:signal` sur `document` (là où `70-vf-live.js` l'émet, sans bubbles) ; 70 inchangé. `test-cockpit-git-entete.sh` H3.4b émet maintenant comme 70 ; `test-cockpit-git-e2e.sh` B3b (tiroir fermé, flux réel, `git switch -c` : la seconde ligne change en moins de 10 s) et mutant M-ECOUTEUR.
+- **P78-D-40** : « Par branche — avance sur la base » (`77-vf-git-rendu.js`), `78-UI-SPEC.md` §121 ; assertion D10.5 dans `test-cockpit-git-tiroir.sh`.
+- Valeurs posées : aucune valeur de padding, marge, écart, couleur ou rayon. Déviations : aucune.
