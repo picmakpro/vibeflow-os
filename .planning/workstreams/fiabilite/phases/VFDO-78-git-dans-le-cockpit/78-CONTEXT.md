@@ -164,6 +164,10 @@ verrous de driver, arbitrages en attente, watchdog et serveurs orphelins (Phase 
   l'onglet Code et le tiroir.
 - **P78-D-37 (découvrabilité au repos).** « Garder tel quel (Recommandé) » (arbitrage Samuel, AskUserQuestion session
   principale, 2026-11-06) : ligne sobre au repos, le « g » se découvre au survol ou au focus (P78-D-10).
+- **P78-D-38 (worktree au lien retour non vérifié).** Un worktree dont `<chemin>/.git` ne désigne pas
+  `<common>/worktrees/<id>` du dépôt lu n'est jamais lu (`status` non lancé) : il s'affiche « non vérifié », sans comptes
+  ni commande `cd` (finding F3 de l'audit du 2026-11-06 : `gitdir` forgé = lecture d'un dossier arbitraire du poste).
+  Décision du manager de reprise (durcissement de la lecture seule, aucun nouveau comportement visible hors ce cas).
 
 ### Claude's Discretion
 
