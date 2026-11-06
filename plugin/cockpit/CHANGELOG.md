@@ -2,7 +2,7 @@
 
 ## v1.4.0 — 2026-11-06 — non publié
 
-Phase 78 « Git dans le cockpit » (jalon vibeflow-v2.0, compartiment fiabilité) : nouvelle capacité, version mineure. Arbitrages de Samuel : P78-D-01 à P78-D-10 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 ; P78-D-10 au second tour, même canal et même date), P78-D-20, P78-D-21 et P78-D-25 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05, troisième tour). Les décisions techniques du manager portent leur propre préfixe.
+Phase 78 « Git dans le cockpit » (jalon vibeflow-v2.0, compartiment fiabilité) : nouvelle capacité, version mineure. Arbitrages de Samuel : P78-D-01 à P78-D-10 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 ; P78-D-10 au second tour, même canal et même date), P78-D-20, P78-D-21 et P78-D-25 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05, troisième tour) ; puis P78-D-34 (ratification), P78-D-36, P78-D-37 et P78-D-39 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 : « Valider le seuil (Recommandé) », « Garder le plafond (Recommandé) », « Garder tel quel (Recommandé) », « Recherche à 152 px (Recommandé) »). Les décisions techniques du manager portent leur propre préfixe.
 
 ### Ajouté
 - **En-tête Git** (P78-D-01, P78-D-02, P78-D-03) : le titre est le nom du dossier du dépôt principal sur Code, Projet et Équipe (dans un worktree, « vibeflow-os », pas « phase-78 ») ; une seconde ligne dit la branche et, hors de l'arbre principal, le worktree ; le bloc de vue dit ce que montre la vue au lieu de répéter le nom du projet. Branche détachée en texte neutre (P78-D-35, jetons figés de la 71.5 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-05).
@@ -11,7 +11,12 @@ Phase 78 « Git dans le cockpit » (jalon vibeflow-v2.0, compartiment fiabilité
 - **Signal** (P78-D-15, P78-D-23) : événement `git` sur le flux en direct, calculé dans le filet de 5 s sur une signature bon marché (refs, worktrees, index) ; le tiroir ouvert relit une fois par rafale, sans polling.
 - **Lecture des worktrees non bloquante** (P78-D-32 : décision du manager de reprise, 2026-11-06) : `GET /api/vf/git/worktrees` passe en asynchrone, le flux SSE et le terminal ne gèlent plus (~1,2 s synchrones mesurées sur ce dépôt).
 - **Pastilles d'état des worktrees en texte neutre** (P78-D-33) : glyphe et mot, sans fond teinté ni couleur d'état (jetons figés de la 71.5, arbitrage Samuel, AskUserQuestion session principale, 2026-11-05).
-- **Seconde ligne masquée sous 1280 px** (P78-D-34) : sur la délégation de P78-D-19 (« sauf avis contraire du juge de design »), la critique du 2026-11-06 la mesure illisible de 1000 à 1279 px ; l'icône de 44 px la remplace de 701 à 1279 px. Signalé à Samuel (SendMessage session principale, 2026-11-06), réversible sur son avis.
+- **Seconde ligne masquée sous 1280 px** (P78-D-34) : sur la délégation de P78-D-19 (« sauf avis contraire du juge de design »), la critique du 2026-11-06 la mesure illisible de 1000 à 1279 px ; l'icône de 44 px la remplace de 701 à 1279 px. Seuil ratifié par Samuel (« Valider le seuil (Recommandé) », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06), sans retour en arrière.
+- **Lecture du graphe et détail d'un commit non bloquants** (P78-D-41, étend P78-D-32 : décision du manager de reprise, 2026-11-06) : `GET /api/vf/git` et `GET /api/vf/git/commit` passent en asynchrone (362 ms de boucle gelée mesurés sur ce dépôt, jusqu'à 5 s sur un git muet).
+- **Seconde ligne plafonnée à 220 px** (P78-D-36, arbitrage Samuel, 2026-11-06) : le texte complet reste dans l'infobulle, le titre de l'onglet Code et le tiroir. **« g » découvert au survol ou au focus** (P78-D-37, arbitrage Samuel, 2026-11-06) : ligne sobre au repos.
+- **Plancher de la recherche à 152 px** (P78-D-39, amende P70-D-16 : arbitrage Samuel, 2026-11-06) : de 1000 à 1279 px et seulement avec Git, texte d'invite plus court ; 200 px partout ailleurs et sans Git.
+- **Libellé « Par branche — avance sur la base »** (P78-D-40 : décision du manager de reprise, 2026-11-06) : plus de fenêtre de 30 jours, la section montre la date de la pointe et l'avance sur la base.
+- **Dépôt sans branche de base** (P78-D-42, précise P78-D-11 et P78-D-23) : sans `main` ni `origin/HEAD`, le graphe est rendu sans comptes d'avance, au lieu de « indisponible ».
 - **Suites** : `test-cockpit-git-e2e.sh` (serveur réel, page en Chrome CDP : B1 à B5, mutants de jonction M-ROUTE, M-SIGNAL, M-OUVREUR, captures pour le juge de design), volet git C0g à C4g de `test-cockpit-chaine-xss.sh`.
 
 ### Sécurité
@@ -19,6 +24,17 @@ Phase 78 « Git dans le cockpit » (jalon vibeflow-v2.0, compartiment fiabilité
 - **Moteur vendorisé fermé par défaut** (P78-D-25) : patch P27 de `scripts/lib/common.mjs` : `git()` ne lit rien sans `VF_COCKPIT_GIT_DURCI=1`. Un moteur lancé à la main hors de l'assemblage n'a donc plus de liste git (documenté au README).
 - **Commandes à copier** (P78-D-14, P78-D-27, P78-D-29) : un nom de branche hostile ne produit jamais une commande qui fait autre chose que celle affichée ; aucune commande si le nom est masqué, ni pour `-` et `@`.
 - **Chaîne XSS étendue aux données git** (P78-D-17) : un nom de branche, un message de commit, un auteur ou un stash hostiles n'aboutissent à rien ; chaque maillon (rendu en `textContent`, CSP, garde du moteur) casse la chaîne seul.
+
+- **Worktree « non vérifié »** (P78-D-38 : décision du manager de reprise, 2026-11-06) : un worktree dont le lien retour n'est pas celui du dépôt lu n'est jamais lu (`status` non lancé) ; champ `verifie` ajouté aux entrées de `/api/vf/git` et `/api/vf/git/worktrees`, comptes et commande `cd` à `null`.
+- **Durcissements de l'audit en lecture du 2026-11-06 (A1 à A8)** :
+  - A1 : plus de troncature de la liste des filtres déclarés ; au-delà de 256 filtres, ou liste illisible, `status`, `diff`, `ls-files` et `stash` ne sont pas lancés (refus fail-closed, comptes « inconnus »).
+  - A2 : `--ignore-submodules=all` sur tout `status` et tout `diff` (l'état modifié d'un sous-module n'est plus compté).
+  - A3 : vérification du lien retour de chaque worktree avant lecture (P78-D-38).
+  - A4 : `detailCommit` asynchrone, échéance globale de 8 s, sortie bornée à 16 Mio, détection de renommages bornée ; un délai rend `indisponible`, jamais « commit-inconnu ».
+  - A5 : `signatureGit` asynchrone, échéance de tick de 2 s, jamais deux ticks en vol, retrait après un git muet.
+  - A6 : `--` ajouté à toutes les lectures qui passent une révision.
+  - A7 : garde E6 de `test-cockpit-git-env.sh` en liste blanche des importeurs de `child_process`, balayage récursif de `plugin/cockpit/`.
+  - A8 : `\p{Cf}` neutralise les caractères de formatage invisibles (U+200B, bidi, U+FEFF, U+00AD, etc.) dans les noms affichés ; les noms accentués gardent leur commande.
 
 ### Modifié
 - **Attribution des sous-agents au worktree** (P78-D-26 : décision d'ordonnancement de la session principale, 2026-11-05) : `byActivity` de `vf-cockpit-who.mjs` retient le dernier worktree cité sur l'ensemble des appels de l'agent, au lieu de la seule dernière ligne du transcript.

@@ -65,7 +65,7 @@ se lit comme telle, en texte neutre (P78-D-02, P78-D-35). Le bloc de vue ne rép
 Les suffixes « — Projet » / « — Équipe » du titre et la liste « Repositories » de l'onglet Code sont retirés (P78-D-09).
 
 **Ouvrir le tiroir** (P78-D-10) : clic sur la seconde ligne, ou touche `g` (ouvre et ferme ; sans effet dans un champ de saisie). Quand la seconde ligne est
-masquée faute de largeur, une icône de 44 px dans l'en-tête la remplace, et sur téléphone une entrée « Historique Git » du menu « ⋯ » (P78-D-20, P78-D-30, P78-D-34).
+masquée faute de largeur (seuil de 1280 px, ratifié par Samuel le 2026-11-06), une icône de 44 px dans l'en-tête la remplace, et sur téléphone une entrée « Historique Git » du menu « ⋯ » (P78-D-20, P78-D-30, P78-D-34).
 Le tiroir est vertical, à gauche, et coexiste avec le tiroir Terminal (en bas) et les boutons de zoom.
 
 **Ce qu'il montre** (tout est lu sur le disque, jamais de `fetch`, jamais de lecture réseau) :
@@ -75,6 +75,8 @@ Le tiroir est vertical, à gauche, et coexiste avec le tiroir Terminal (en bas) 
 - le **détail d'un commit** sous sa rangée : auteur, date, message complet, fichiers touchés avec +/− (30 d'abord, puis « et k autres »), **sans diff** ;
 - l'**état de chaque worktree** : modifiés, non suivis, avance et retard sur la base ; lu à l'ouverture du tiroir et après un signal, en asynchrone pour ne pas
   geler le serveur (P78-D-32) ;
+- le **graphe** et le **détail d'un commit** sont lus en asynchrone, eux aussi (P78-D-41) ;
+- la section « Par branche — avance sur la base » dit la date de la pointe et l'avance sur la base (P78-D-40) ; sans `main` ni `origin/HEAD`, le graphe est rendu sans comptes d'avance (P78-D-42) ;
 - les **tags**, les **stash**, les **auteurs et l'activité** (agrégés sur les commits lus, pas sur tout l'historique : jamais « tous les auteurs »).
 
 **Lecture seule, commandes à copier** (P78-D-07, P78-D-13) : le cockpit n'écrit ni dans le dépôt lu ni dans `.git`, et **n'ajoute aucune route qui agit** : les routes
@@ -110,6 +112,8 @@ et `test-cockpit-chaine-xss.sh` (volet git C0g à C4g : un nom de branche, un me
   Retour arrière : retirer la garde du patch P27. L'assemblage (`vf-cockpit-build.mjs`) pose la variable pour le moteur ; les lancements du moteur par le serveur (`plan`, `build`) ne la posent pas, et la carte qu'ils écrivent n'a alors pas de liste git.
 - Le `status` de chaque worktree est relu **à l'ouverture du tiroir et au signal** seulement ; une **modification d'un fichier suivi sans `git add`**, ou un fichier neuf non ajouté, ne change ni les refs, ni la
   liste des worktrees, ni les index : aucun signal, le tiroir ne se met à jour qu'à sa prochaine lecture.
+- Un **worktree « non vérifié »** (son lien retour ne désigne pas le dépôt lu) n'est jamais lu : ni `status`, ni comptes, ni commande `cd` (P78-D-38).
+- De 1000 à 1279 px avec Git, la recherche de l'en-tête descend à 152 px (P78-D-39, amende P70-D-16) ; la seconde ligne est plafonnée à 220 px (P78-D-36) et le « g » se découvre au survol ou au focus (P78-D-37).
 - Le graphe est borné (500 + 500 commits, 2 000 refs, 50 worktrees, 200 tags, 50 stash) ; au-delà, « tronqué », jamais un graphe faux (une sortie tronquée ou désalignée rend « indisponible »).
 - Un dépôt aux refs pointant un objet sans date (blob, arbre) est lu sans ces refs, comptées à part (P78-D-31).
 
