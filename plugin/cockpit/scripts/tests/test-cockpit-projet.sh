@@ -830,6 +830,65 @@ UIP="$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js"
 assert_eq "P9.8 (C7) — le chemin fichier:ligne du panneau ne se coupe jamais (white-space:nowrap, word-break:normal sur le <code> de nonComprises, aucun px)" "$(grep -A3 'const nonComprises = ' "$UIP" | grep -c '<code style="white-space:nowrap;word-break:normal">')|$(grep -A3 'const nonComprises = ' "$UIP" | grep -c 'px')" "1|0"
 assert_eq "P9.9 (C8) — le commentaire de avancement.mjs dit où vit normNum (formats, ré-exporté par planning)" "$(grep -c 'normNum de vf-cockpit-formats, ré-exporté par vf-cockpit-planning' "$SCRIPTS/vf-cockpit-avancement.mjs")" "1"
 
+# ---------- P10 — croissance : aucune regex lue sur le planning n'est plus que linéaire (classe fermée, pas une forme à la fois) ----------
+# Inventaire des regex appliquées au texte du planning (formats.mjs : tous les motifs de champ, de titre, d'exigence, de coupe et du diagnostic ; planning.mjs : nom de case, suffixe de statut,
+# jalons, frontmatter ; drift.mjs : espace avant « : », coupe « · », phases illisibles, jalons ; project.mjs : objectif de plan, intertitres de BACKLOG ; avancement.mjs : statut de recette).
+# Le test fabrique pour chaque forme lue et chaque caractère pathologique une ligne à N puis 2N, lue par readPlanning ET detectDrift ; il juge le RAPPORT des temps, pas un temps absolu seul.
+cat > "$AUX/croissance.mjs" <<'JS'
+// croissance.mjs <scripts> [bavard] : test de CROISSANCE générique. Pour chaque forme de ligne que le cockpit lit dans .planning/ (titres, cases, dépendances, Goal, exigences, jalons,
+// STATE, puces) et chaque caractère de chaque classe (espaces des 4 sortes, * _ ( ) [ ] - — – # : : chiffres), une ligne pathologique est fabriquée (trous « ◇ » remplis de N caractères,
+// avec et sans saut de ligne final) puis lue à N et 2N par readPlanning ET detectDrift. Échec : le temps à 2N dépasse 2,8 fois celui à N (tailles où il dépasse le bruit) ou 1,5 s.
+// Sortie : « ok <nb de cas> » ou les premiers échecs « forme | caractère | opération | N → 2N | t1 → t2 | ratio ».
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, bavard] = process.argv; const imp = (f) => import(pathToFileURL(path.join(scripts, f)).href);
+const { readPlanning } = await imp('vf-cockpit-planning.mjs'); const { detectDrift } = await imp('vf-cockpit-drift.mjs');
+const N = 20000, SEUIL = 2.8, BRUIT = 40, PLAFOND = 1500;
+const CARS = [' ', '\t', ' ', ' ', '*', '_', '(', ')', '[', ']', '-', '—', '–', '#', ':', '1', '.', '·', '\n'];
+// formes : { f: ligne avec trous ◇, doc: 'roadmap' | 'exigences' | 'state' | 'jalons' }
+const FORMES = [
+  ['##◇', 'roadmap'], ['## ◇Phase 1◇', 'roadmap'], ['## Phase 1◇:◇x', 'roadmap'], ['### Phase 1 ◇—◇x', 'roadmap'], ['#### **◇Phase 1: x**◇', 'roadmap'], ['## Phase ◇1 — ◇', 'roadmap'], ['## Phase 1 ◇—', 'roadmap'],
+  ['- [ ]◇', 'roadmap'], ['- [x] **◇Phase 1: x◇**◇- ◇d', 'roadmap'], ['- [ ] Phase 1: A◇(complete◇', 'roadmap'], ['- [X] Phase 1 ◇- ◇Trois', 'roadmap'], ['* [ ] **Phase ◇1◇**', 'roadmap'],
+  ['### Phase 1: A\n**Depends on:**◇', 'roadmap'], ['### Phase 1: A\n**Depends on:** 1 **◇x', 'roadmap'], ['### Phase 1: A\n**Depends on:** (◇', 'roadmap'], ['### Phase 1: A\n**Depends on:** 2 ◇· ◇x', 'roadmap'],
+  ['### Phase 1: A\nDepends on◇:◇1◇', 'roadmap'], ['### Phase 1: A\n- ◇Depends on ◇Phase 2', 'roadmap'], ['### Phase 1: A\n**◇Depends on◇**◇:◇ 2', 'roadmap'], ['### Phase 1: A\n**Depends on:**\n◇- ◇Phase 1', 'roadmap'],
+  ['### Phase 1: A\n**Depends on:** 3. ◇A', 'roadmap'], ['### Phase 1: A\n**Depends on:** P1-D-◇1', 'roadmap'],
+  ['### Phase 1: A\n**Goal**:◇\n**x', 'roadmap'], ['### Phase 1: A\nGoal ◇: ◇y', 'roadmap'], ['### Phase 1: A\n**Goal** ◇— ◇z', 'roadmap'], ['### Phase 1: A\n**Goal**: a\n◇\n◇\n**Depends on**: 1', 'roadmap'],
+  ['- [ ] **◇REQ-1◇**:◇x', 'exigences'], ['- [ ] ◇A-◇1', 'exigences'], ['- [x] **A-1:**◇y', 'exigences'], ['| ◇AB-1◇ | Phase ◇2 |', 'exigences'],
+  ['## Milestones\n\n- ✅ **v1** — Phases 1-◇', 'jalons'], ['## Milestones\n\n- ✅ **v1** — Phases ◇-◇', 'jalons'], ['## Milestones\n\n- ✅ **◇v1◇** — ◇Phases ◇1', 'jalons'],
+  ['current_phase: ◇', 'state'], ['status: ◇', 'state'], ['current_phase: "◇2"', 'state'],
+];
+const holes = (f, c) => f.split('◇').join(c.repeat(N));
+const t = (g) => { const a = process.hrtime.bigint(); g(); return Number(process.hrtime.bigint() - a) / 1e6; };
+const mesure = (ops, ecrire, taille) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')); fs.mkdirSync(path.join(d, '.planning')); ecrire(d, taille); const r = Object.fromEntries(ops.map(([nom, g]) => [nom, Math.min(t(() => g(d)), t(() => g(d)))])); fs.rmSync(d, { recursive: true, force: true }); return r; };
+const OPS = [['readPlanning', (d) => readPlanning(d, undefined, { sansTags: true })], ['detectDrift', (d) => detectDrift(d)]];
+const echecs = []; let cas = 0; const FILTRE = process.env.CROISSANCE_FORME || ''; // sous-chaîne : restreint aux formes qui la contiennent (preuves par mutant)
+for (const [forme, doc] of FORMES.filter(([f]) => f.includes(FILTRE))) for (const c of CARS) for (const fin of ['\n', '']) {
+  const f = (taille) => forme.split('◇').join(c.repeat(taille));
+  const ecrire = (d, taille) => {
+    const p = (x) => path.join(d, '.planning', x); const ligne = f(taille) + fin;
+    if (doc === 'exigences') fs.writeFileSync(p('REQUIREMENTS.md'), ligne);
+    else if (doc === 'state') { fs.writeFileSync(p('ROADMAP.md'), '### Phase 1: A\n'); fs.writeFileSync(p('STATE.md'), '---\n' + ligne + (fin ? '---\n' : '')); }
+    else fs.writeFileSync(p('ROADMAP.md'), (doc === 'jalons' ? '- [ ] **Phase 1: A**\n\n' : '') + ligne);
+  };
+  cas++;
+  let a = mesure(OPS, ecrire, N), b = mesure(OPS, ecrire, 2 * N);
+  for (const [nom] of OPS) {
+    let r = b[nom] / Math.max(a[nom], 1);
+    for (let k = 0; k < 2 && b[nom] > BRUIT && (r > SEUIL || b[nom] > PLAFOND); k++) { a = mesure(OPS, ecrire, N); b = mesure(OPS, ecrire, 2 * N); r = b[nom] / Math.max(a[nom], 1); } // un faux rouge de bruit ne survit pas à deux rejeux
+    if (b[nom] > BRUIT && (r > SEUIL || b[nom] > PLAFOND)) echecs.push(`${JSON.stringify(forme)} | ${JSON.stringify(c)}${fin ? '' : ' sans \\n final'} | ${nom} | ${N} → ${2 * N} | ${a[nom].toFixed(0)} ms → ${b[nom].toFixed(0)} ms | ×${r.toFixed(1)}`);
+  }
+}
+console.log(echecs.length ? `${echecs.length} échec(s) sur ${cas} cas :\n` + echecs.slice(0, Number(bavard) || 12).join('\n') : `ok ${cas}`);
+JS
+CR="$(node "$AUX/croissance.mjs" "$SCRIPTS")"
+assert_eq "P10.1 — croissance : 1368 cas (38 formes x 19 caractères x avec/sans saut final), lecture et diagnostic, ratio 2N/N sous 2,8" "$CR" "ok 1368"
+mut7 cr-paren vf-cockpit-formats.mjs ".replace(PARENTHESES, ' ')" ".replace(/\\([^)]*\\)/g, ' ')" > "$WORK/ancre-cr1.txt"
+mut7 cr-coupe vf-cockpit-formats.mjs "(?::\\\\*\\\\*|\\\\*\\\\*\${COLON})))" "(?:\${COLON}\\\\*\\\\*|\\\\*\\\\*\${COLON})))" > "$WORK/ancre-cr2.txt"
+assert_eq "P10.2 — mutant (ancienne regex des parenthèses rétablie, ancre présente) : le test de croissance rougit" "$(cat "$WORK/ancre-cr1.txt")|$(CROISSANCE_FORME='Depends on:** (' node "$AUX/croissance.mjs" "$WORK/mut-cr-paren" | grep -c 'échec(s) sur')" "muté|1"
+assert_eq "P10.3 — mutant (ancienne coupe de valeur rétablie, ancre présente) : le test de croissance rougit" "$(cat "$WORK/ancre-cr2.txt")|$(CROISSANCE_FORME='Depends on:** 1 **' node "$AUX/croissance.mjs" "$WORK/mut-cr-coupe" | grep -c 'échec(s) sur')" "muté|1"
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
