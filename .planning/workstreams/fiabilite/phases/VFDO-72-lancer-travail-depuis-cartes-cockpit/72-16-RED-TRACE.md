@@ -84,3 +84,19 @@ M-STOCKAGE-RESTE et M-SERVI-NON-RELU sortent en FAIL par leur précondition « s
 
 Écarts avec les rouges annoncés par le plan, dits : M-ECRITURE-DIRECTE rougit LM.U4 et le TÉMOIN POSITIF de LM.Q6 (inode inchangé), pas LM.Q3 (qui reste vert : le contenu est bien celui du dernier 204) ; M-NOUVELLE-ROUTE rougit LM.S3 seul (une route sans gestionnaire ne fait rien de plus que répondre 400, aucune écriture : rien à rougir dans LM.Q6) ; M-MODE-VERS-P rougit LM.P3 par le témoin positif « cible marquée lancée » (le message à clé de plus est refusé par P, il ne FUIT donc pas : `fuites=0` reste vrai), pas par une fuite.
 Lignes finales : processus 203, module 57 (`check-file-size.sh` rc 0).
+
+# Tâche 3 — rouge de la suite bandeau transposée, jouée sur le client de la base (avant tout code client)
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-lancer-bandeau.sh` au HEAD 3fa5a965 (client inchangé, 280 lignes) : 63 PASS / 6 FAIL, aucune erreur de harnais, aucune « SUITE SAUTÉE » (Chrome présent), aucun « mutant sans effet ».
+
+| Sonde | Attendu | Obtenu sur le client de la base | Raison du rouge |
+|---|---|---|---|
+| LB.C4 (présélection servie) | `sain` (douze valeurs servies : absent, forgées, valides) | `rouge` | le client lit son stockage, la valeur servie est ignorée |
+| LB.C4 (aucune clé `mode` du stockage) | `sain` | `rouge` | le client lit et écrit `vf.terminal.mode` (opérations get/set observées) |
+| LB.E2 | `…/204/0/null` | `…/204/0/acceptEdits` | la clé `vf.terminal.mode` du stockage de Q est encore écrite au 204 |
+| LB.E5 | `SecurityError/secret/acceptEdits/default` | `SecurityError/secret/acceptEdits/acceptEdits` | la valeur forgée servie (bypassPermissions) est ignorée, le client relit une valeur périmée de son stockage ; le témoin SecurityError et le témoin du secret sont VERTS |
+| LB.E6 | `plan/0` | `acceptEdits/0` | la présélection ne vient pas du serveur factice (plan) mais du stockage laissé par E2 |
+| M-MODE-NON-RELU (volet Chrome) | `SecurityError/secret/acceptEdits/bypassPermissions` | `SecurityError/secret/default/default` | le client de la base n'a pas le chemin « valeur servie » que le mutant doit casser (précondition : le témoin acceptEdits servi n'est pas rendu) |
+
+Vertes déjà sur la base, avec leur raison : LB.E7, LB.E2 (partie « aucun octet à /entree » et armement), LB.F1 à LB.F3, LB.C1 à LB.C3, LB.C5 à LB.C7, LB.S1 à LB.S4 (pas de changement de la forme), M-PARAM-URL (volet Chrome : le paramètre d'adresse du mutant est lu avant toute autre source, donc visible même sur la base ; sa sonde statique LB.S1 est, elle, la sonde décisive).
+Précision sur LB.E2 : le plan 72-16 le disait « intact » ; sa dernière valeur lisait la clé `vf.terminal.mode` (le mode lancé) : elle ne peut plus tenir. Transposée (voir le tableau final) : la clé reste ABSENTE (`null`), plus fort qu'avant.

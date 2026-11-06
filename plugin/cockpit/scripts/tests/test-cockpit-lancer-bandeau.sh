@@ -117,16 +117,16 @@ cat > "$AUX/doubles.mjs" <<'JS'
 import { pathToFileURL } from 'node:url';
 const { ID_A, ID, valide } = await import(pathToFileURL(process.env.LB_DONNEES).href);
 const [, , chemin, sc] = process.argv;
-const J = { vue: [], msgs: [], journal: [], setMode: [], periodes: [], focus: 0, terms: 0, rejets: 0 };
+const J = { vue: [], msgs: [], journal: [], stockage: [], periodes: [], focus: 0, terms: 0, rejets: 0 };
 process.on('unhandledRejection', () => { J.rejets++; });
 const att = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const souple = async (f, ms) => { const fin = Date.now() + ms; while (!f() && Date.now() < fin) await att(10); return f(); }; // attente qui ne lève pas : l'absence d'effet se mesure, elle ne fait pas planter la sonde
 const until = async (f, nom, ms = 3000) => { const fin = Date.now() + ms; for (;;) { if (f()) return; if (Date.now() > fin) throw new Error(`attente de « ${nom} » dépassée`); await att(10); } };
 const el = () => ({ addEventListener() {}, setAttribute() {}, querySelector: () => null, classList: { add() {}, remove() {} }, style: {}, textContent: '' });
 globalThis.getComputedStyle = () => ({ paddingTop: '0', paddingBottom: '0' });
-const memoire = (spy) => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { if (spy) spy(k, v); m.set(k, String(v)); }, removeItem: (k) => { m.delete(k); }, brut: (k, v) => { m.set(k, v); } }; };
-const CLE_MODE = 'vf.terminal.mode';
-globalThis.localStorage = memoire((k, v) => { if (k === CLE_MODE) J.setMode.push(v); }); globalThis.sessionStorage = memoire();
+const memoire = (spy) => { const m = new Map(); return { getItem: (k) => { if (spy) spy('get', k); return m.has(k) ? m.get(k) : null; }, setItem: (k, v) => { if (spy) spy('set', k); m.set(k, String(v)); }, removeItem: (k) => { if (spy) spy('del', k); m.delete(k); }, brut: (k, v) => { m.set(k, v); } }; };
+// P72-D-20 : le stockage du navigateur n'est plus la source du mode ; toute opération sur LocalStorage est consignée (op, clé)
+globalThis.localStorage = memoire((op, k) => { J.stockage.push([op, k]); }); globalThis.sessionStorage = memoire();
 localStorage.brut('vf.terminal.secret', 'a'.repeat(64));
 const W = {
   top: {}, opener: null, innerWidth: 800, innerHeight: 600, addEventListener() {}, parent: { postMessage: (m, o) => J.msgs.push({ m, o }) },
@@ -231,16 +231,16 @@ const SCEN = {
     f.hors = { st: await v.cb.lancer('bypassPermissions'), reqs: autres().filter((r) => J.journal.indexOf(r) >= marque).length };
     return f;
   },
-  async mode() { // LB.C4
+  async mode() { // LB.C4 : la présélection vient de mode_retenu servi (relu contre la liste fermée) ; le client n'écrit ni ne lit AUCUNE clé « mode » (P72-D-20)
     demarrer(); const f = { lu: [] };
     const valeurs = [null, 'bypassPermissions', 'HERITE', 'default ', '__proto__', 'constructor', 'x'.repeat(5000), '', 'default', 'acceptEdits', 'plan', 'herite'];
     let k = 50;
-    for (const v of valeurs) { if (v === null) localStorage.removeItem(CLE_MODE); else localStorage.brut(CLE_MODE, v); const r = await afficher(ID(++k)); f.lu.push([v === null ? 'absent' : v.length > 20 ? 'long' : v, r.p.modeInitial].join('=>')); }
-    localStorage.brut(CLE_MODE, 'default'); f.setAvant = J.setMode.length; S.lancer = 204;
-    const r1 = await afficher(ID(70)); f.st204 = await r1.cb.lancer('plan'); f.apres204 = localStorage.getItem(CLE_MODE); f.setApres = J.setMode.length; S.prop = AUCUNE;
-    f.inchange = [];
-    for (const code of [409, 425, 400, 500]) { localStorage.brut(CLE_MODE, 'acceptEdits'); const r = await afficher(ID(71 + f.inchange.length)); S.lancer = code; await r.cb.lancer('plan'); f.inchange.push(code + ':' + localStorage.getItem(CLE_MODE)); }
-    f.setTotal = J.setMode.length;
+    for (const v of valeurs) { const r = await afficher(ID(++k), v === null ? {} : { mode_retenu: v }); f.lu.push([v === null ? 'absent' : v.length > 20 ? 'long' : v, r.p.modeInitial].join('=>')); }
+    S.lancer = 204;
+    const r1 = await afficher(ID(70), { mode_retenu: 'plan' }); f.st204 = await r1.cb.lancer('plan'); S.prop = AUCUNE;
+    const r2 = await afficher(ID(71), { mode_retenu: 'plan' }); f.suivant = r2.p.modeInitial; f.inchange = [];
+    for (const code of [409, 425, 400, 500]) { const r = await afficher(ID(72 + f.inchange.length), { mode_retenu: 'acceptEdits' }); S.lancer = code; await r.cb.lancer('plan'); f.inchange.push(code + ':' + r.p.modeInitial); }
+    f.opsMode = J.stockage.filter((x) => /mode/i.test(x[1])).map((x) => x.join(':')); f.secretLu = J.stockage.some((x) => x[0] === 'get' && x[1] === 'vf.terminal.secret');
     return f;
   },
   async focus() { // LB.C5 : aucun octet au PTY après un lancement accepté, le terminal reprend le focus
@@ -299,7 +299,8 @@ const q = http.createServer(async (req, res) => {
   if (req.method === 'GET' && chemin === '/proposition') {
     if (!scen.prop) return json(200, { etat: 'aucune' });
     if (!premiere[scen.prop.id]) premiere[scen.prop.id] = Date.now();
-    return json(200, scen.prop);
+    const mr = 'mode_retenu' in scen ? scen.mode_retenu : 'acceptEdits'; // contrat §4 (72-16) : valeur réglable par scénario, « __absent__ » = clé omise
+    return json(200, mr === '__absent__' ? scen.prop : Object.assign({}, scen.prop, { mode_retenu: mr }));
   }
   if (req.method === 'POST' && chemin === '/lancer') {
     let o = null; try { o = JSON.parse(corps.toString('utf8')); } catch { o = null; }
@@ -519,7 +520,7 @@ await executer(chrome, async (s) => {
       await attendreArme(); await choisir('acceptEdits'); await clic(LANCER);
       await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après 204', 4000);
       const l = (await journal()).filter((x) => x.u === '/lancer');
-      r.e2 = [desarme, tot, l.length, l[0] && Object.keys(JSON.parse(l[0].b)).sort().join(','), l[0] && !l[0].b.includes('claude'), l[0] && l[0].st, entrees(), await q.ev(`localStorage.getItem('vf.terminal.mode')`)].join('/');
+      r.e2 = [desarme, tot, l.length, l[0] && Object.keys(JSON.parse(l[0].b)).sort().join(','), l[0] && !l[0].b.includes('claude'), l[0] && l[0].st, entrees(), String(await q.ev(`localStorage.getItem('vf.terminal.mode')`))].join('/');
     });
     await essai('e3', async () => { // 409 : message, 0 octet, le bandeau reste, un second clic armé aboutit
       const n0 = (await journal()).filter((x) => x.u === '/lancer').length;
@@ -540,16 +541,18 @@ await executer(chrome, async (s) => {
       await s.ev(`(() => { const w = document.querySelector('iframe[data-t]').contentWindow; w.postMessage('proposition', '*'); w.postMessage({ id: 'zzz' }, '*'); w.postMessage('{"id":"zzz","mode":"plan"}', '*'); return true; })()`); await pause(900);
       r.e7 = [vu, await q.ev(`document.querySelectorAll('#proposition').length`), (await journal()).filter((x) => x.u === '/lancer').length - n0].join('/');
     });
-    await essai('e5', async () => { // stockage de Q illisible depuis P ; valeur forgée relue contre la liste fermée
+    await essai('e5', async () => { // stockage de Q illisible depuis P ; mode servi relu contre la liste fermée (P72-D-20 : le stockage ne porte plus le mode)
       const sec = await s.ev(`(() => { try { void document.querySelector('iframe[data-t]').contentWindow.localStorage; return 'lu'; } catch (e) { return e.name; } })()`);
-      const temoin = await q.ev(`localStorage.getItem('vf.terminal.mode')`);
-      await q.ev(`(() => { localStorage.setItem('vf.terminal.mode', 'bypassPermissions'); return true; })()`);
-      await scenario({ prop: valide(ID(51), { arme_apres_ms: 600 }), lancers: [] });
-      await q.attendre(`!!document.getElementById('proposition')`, 'bandeau de la proposition suivante', 5000);
-      r.e5 = [sec, temoin, await q.ev(`${SEL}.value`)].join('/');
+      const temoinSecret = await q.ev(`localStorage.getItem('vf.terminal.secret') !== null`); // W-3 : le stockage de Q n'est pas vide (il porte le secret) et P n'y accède pourtant pas
+      await scenario({ prop: valide(ID(52), { arme_apres_ms: 600 }), lancers: [] });
+      await q.attendre(`(document.getElementById('proposition') || {}).dataset && document.getElementById('proposition').dataset.id === ${JSON.stringify(ID(52))}`, 'bandeau du témoin', 5000);
+      const temoin = await q.ev(`${SEL}.value`);
+      await scenario({ prop: valide(ID(51), { arme_apres_ms: 600 }), lancers: [], mode_retenu: 'bypassPermissions' });
+      await q.attendre(`(document.getElementById('proposition') || {}).dataset && document.getElementById('proposition').dataset.id === ${JSON.stringify(ID(51))}`, 'bandeau de la proposition suivante', 5000);
+      r.e5 = [sec, temoinSecret ? 'secret' : 'sans-secret', temoin, await q.ev(`${SEL}.value`)].join('/');
     });
-    await essai('e6', async () => { // paramètres d'adresse : jamais lus
-      await q.ev(`(() => { localStorage.removeItem('vf.terminal.mode'); return true; })()`);
+    await essai('e6', async () => { // paramètres d'adresse : jamais lus (le serveur factice sert plan : un paramètre lu donnerait acceptEdits)
+      await scenario({ prop: valide(ID(51), { arme_apres_ms: 600 }), lancers: [], mode_retenu: 'plan' });
       const n0 = (await journal()).filter((x) => x.u === '/lancer').length;
       await q.recharger(`${OQ}/?theme=dark&mode=acceptEdits&lancer=1&id=zzz`);
       await q.attendre(`!!document.getElementById('proposition')`, 'bandeau après rechargement', 5000); await pause(800);
@@ -687,10 +690,10 @@ assert_eq "LB.C3 — statuts : 204 ok, 409 occupe, 425 attendre, 404 absente, 41
   "$(verdict "$CJ" 'j.cas.length===8 && j.cas.every((c)=>c.st===c.attendu && c.nreq===1)')" "sain"
 assert_eq "LB.C3 — un mode hors liste (bypassPermissions) rend refus SANS requête" "$(verdict "$CJ" 'j.hors.st==="refus" && j.hors.reqs===0')" "sain"
 CJ="$(doubles "$SCRIPTS" mode)"
-assert_eq "LB.C4 — mode retenu : absence, valeurs forgées (bypassPermissions, HERITE, « default », __proto__, constructor, 5000 caractères, vide) = default ; valeurs valides retenues" \
+assert_eq "LB.C4 — présélection servie par Q (mode_retenu) : absence, valeurs forgées (bypassPermissions, HERITE, « default », __proto__, constructor, 5000 caractères, vide) = default ; valeurs valides retenues (même liste de douze valeurs qu'avant le plan 72-16, servie au lieu d'être lue du stockage)" \
   "$(verdict "$CJ" 'j.lu.join("|")==="absent=>default|bypassPermissions=>default|HERITE=>default|default =>default|__proto__=>default|constructor=>default|long=>default|=>default|default=>default|acceptEdits=>acceptEdits|plan=>plan|herite=>herite"')" "sain"
-assert_eq "LB.C4 — après 204 la clé vf.terminal.mode vaut le mode lancé ; après 409, 425, 400, 500 elle est inchangée ; aucune écriture sur cette clé hors 204 (un seul setItem)" \
-  "$(verdict "$CJ" 'j.st204==="ok" && j.apres204==="plan" && j.setAvant===0 && j.setApres===1 && j.inchange.join(",")==="409:acceptEdits,425:acceptEdits,400:acceptEdits,500:acceptEdits" && j.setTotal===1')" "sain"
+assert_eq "LB.C4 — le client n'écrit NI ne lit AUCUNE clé de stockage dont le nom contient « mode » (get, set, del) : ni avant, ni après un 204, ni après 409, 425, 400, 500 (zéro opération au lieu d'une seule écriture) ; témoin : le secret, lui, est lu ; le bandeau suivant le 204 présélectionne le mode servi (plan), inchangé après les échecs" \
+  "$(verdict "$CJ" 'j.st204==="ok" && j.suivant==="plan" && j.opsMode.length===0 && j.secretLu===true && j.inchange.join(",")==="409:acceptEdits,425:acceptEdits,400:acceptEdits,500:acceptEdits"')" "sain"
 CJ="$(doubles "$SCRIPTS" focus)"
 assert_eq "LB.C5 — après le 204 : aucune requête /entree pendant 1,5 s (ni \\r, ni aucun octet) ; le focus du terminal est repris (témoin)" "$(verdict "$CJ" 'j.st==="ok" && j.entrees===0 && j.focus>=1')" "sain"
 CJ="$(doubles "$SCRIPTS" annuler)"
@@ -726,11 +729,11 @@ if [ -n "$CHROME" ]; then
   faux "$SCRIPTS"; FQ0="$FQ"; FP0="$FP"; EJ="$(navig client)"; unfaux
   ev_() { rj "$EJ" "(j.erreur ? 'plante: ' + j.erreur : j.$1 !== undefined ? j.$1 : 'erreur: ' + ((j.erreurs || {}).$1 || 'étape absente'))"; }
   assert_eq "LB.E1 — proposition servie : bandeau en moins de 4 s, commande exacte du serveur, UN message proposition d'origine Q (aucune donnée : ni identifiant, ni ligne, ni secret)" "$(ev_ e1)" "true/1/true/true/true"
-  assert_eq "LB.E2 — clic de confiance avant l'armement : aucun POST /lancer ; après armement : UN POST de clés exactes id,mode sans « claude », 204, bandeau retiré, aucun octet à /entree, vf.terminal.mode de Q = mode lancé" "$(ev_ e2)" "true/0/1/id,mode/true/204/0/acceptEdits"
+  assert_eq "LB.E2 — clic de confiance avant l'armement : aucun POST /lancer ; après armement : UN POST de clés exactes id,mode sans « claude », 204, bandeau retiré, aucun octet à /entree, la clé vf.terminal.mode du stockage de Q reste absente (le mode retenu vit côté serveur : LM.Q)" "$(ev_ e2)" "true/0/1/id,mode/true/204/0/null"
   assert_eq "LB.E3 — 409 une fois : message « Le terminal n'a pas pris la demande… », 0 octet à /entree, le bandeau reste, Lancer de nouveau actif, un second clic armé aboutit (204)" "$(ev_ e3)" "true/0/true/true/true/409,204"
   assert_eq "LB.E4 — après usage le serveur dit aucune : le cadre rechargé en ?theme=light, puis après trois sondages aucun #proposition" "$(ev_ e4)" "true/0/light"
-  assert_eq "LB.E5 — depuis P, iframe.contentWindow.localStorage lève SecurityError (témoin : le stockage de Q porte vf.terminal.mode) ; une valeur forgée bypassPermissions dans le stockage de Q : présélection default" "$(ev_ e5)" "SecurityError/acceptEdits/default"
-  assert_eq "LB.E6 — cadre chargé avec ?theme=dark&mode=acceptEdits&lancer=1&id=zzz : présélection default, aucune requête /lancer" "$(ev_ e6)" "default/0"
+  assert_eq "LB.E5 — depuis P, iframe.contentWindow.localStorage lève SecurityError (témoin : le stockage de Q porte le secret) ; le serveur factice sert acceptEdits : présélection acceptEdits (témoin) ; il sert bypassPermissions (forgé) : présélection default" "$(ev_ e5)" "SecurityError/secret/acceptEdits/default"
+  assert_eq "LB.E6 — cadre chargé avec ?theme=dark&mode=acceptEdits&lancer=1&id=zzz, le serveur factice servant plan : présélection plan (un paramètre d'adresse lu donnerait acceptEdits), aucune requête /lancer" "$(ev_ e6)" "plan/0"
   assert_eq "LB.E7 — postMessage('proposition', '*') puis postMessage({ id: 'zzz' }, '*') du faux P vers le cadre : aucun nouveau bandeau, aucun POST /lancer" "$(ev_ e7)" "true/0/0"
   faux "$SCRIPTS"; FJ="$(navig froid)"; unfaux
   assert_eq "LB.E8 — cadre masqué : UN message proposition d'origine Q en moins de 4 s, aucun .xterm ni #proposition, aucune requête /flux, /lancer, /entree ; cadre agrandi : bandeau, /flux demandé, TOUJOURS UN seul message" \
@@ -760,6 +763,8 @@ if mutant texte-serveur vf-cockpit-terminal-client.mjs "/garde:corps-lancer/s/{ 
 else sans_effet "M-TEXTE-AU-SERVEUR"; fi
 if mutant mode-non-relu vf-cockpit-terminal-client.mjs "/garde:mode-relu/s#.*#return v || 'default';#"; then
   assert_eq "M-MODE-NON-RELU — le mutant rougit LB.C4 : bypassPermissions devient la présélection (témoin : les valeurs valides sont lues)" "$(verdict "$(doubles "$MUT_DIR" mode)" 'j.lu[1]==="bypassPermissions=>default" && j.lu[9]==="acceptEdits=>acceptEdits"')" "rouge"
+  if [ -n "$CHROME" ]; then faux "$MUT_DIR"; MJ="$(navig client '"only":["e5"]')"; unfaux
+    assert_eq "M-MODE-NON-RELU — le mutant rougit aussi LB.E5 (Chrome) : la valeur forgée servie devient la présélection (bypassPermissions au lieu de default ; témoins : SecurityError, secret, acceptEdits intacts)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e5 !== undefined ? j.e5 : 'erreur: ' + ((j.erreurs || {}).e5 || 'étape absente'))")" "SecurityError/secret/acceptEdits/bypassPermissions"; fi
 else sans_effet "M-MODE-NON-RELU"; fi
 if mutant message-avec-donnees vf-cockpit-terminal-client.mjs "/garde:emission/s#emettre('proposition')#window.parent.postMessage('proposition:' + p.id, cfg.origineP)#"; then
   assert_eq "M-MESSAGE-AVEC-DONNEES — le mutant rougit LB.C2 : le message porte l'identifiant (témoin : la proposition s'affiche)" "$(verdict "$(doubles "$MUT_DIR" suivi)" 'j.a1.n===1 && j.msg.n===3 && j.msg.strict')" "rouge"
@@ -783,8 +788,10 @@ else sans_effet "M-INNERHTML"; fi
 if mutant prop-au-dessus vf-cockpit-terminal-vue.mjs "/garde:collage-dessus/s|.*|document.body.appendChild(b);|"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v6"]'; assert_eq "M-PROP-AU-DESSUS — le mutant rougit LB.V6 : le bandeau passe au-dessus du collage (témoin : les deux sont affichés)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v6 === 'true/true' ? 'sain' : j.v6 ? 'rouge' : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"; }
 else sans_effet "M-PROP-AU-DESSUS"; fi
-if mutant param-url vf-cockpit-terminal-client.mjs "/garde:mode-lecture/s#.*#const v = new URLSearchParams(location.search).get('mode') || localStorage.getItem(CLE_MODE);#"; then
+if mutant param-url vf-cockpit-terminal-client.mjs "/garde:mode-lecture/s#.*#const v = new URLSearchParams(location.search).get('mode') || p.mode_retenu; // garde:mode-lecture#"; then
   node "$AUX/pagegen.mjs" "$MUT_DIR" "$ENG" dark "$WORK/m-url.html"; assert_eq "M-PARAM-URL — le mutant rougit LB.S1 : URLSearchParams lu dans le client (témoin : la page est vivante)" "$(rj "$(node "$AUX/stat.mjs" "$WORK/m-url.html")" '(j.urlsp===0 && j.search===2) ? "sain" : (j.propres>200 ? "rouge" : "plante")')" "rouge"
+  if [ -n "$CHROME" ]; then faux "$MUT_DIR"; MJ="$(navig client '"only":["e6"]')"; unfaux
+    assert_eq "M-PARAM-URL — le mutant rougit aussi LB.E6 (Chrome) : la présélection suit le paramètre d'adresse (acceptEdits/0 au lieu de plan/0 ; témoin : la sonde s'exécute)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e6 !== undefined ? j.e6 : 'erreur: ' + ((j.erreurs || {}).e6 || 'étape absente'))")" "acceptEdits/0"; fi
 else sans_effet "M-PARAM-URL"; fi
 if mutant sondage-apres-visible vf-cockpit-terminal-client.mjs "/garde:sondage-precoce/d;/garde:pret/s/afficher();/lire(); setInterval(lire, PROPOSITION_MS); afficher();/"; then
   assert_eq "M-SONDAGE-APRES-VISIBLE — le mutant rougit LB.C7 : aucun message ne part pendant la phase masquée (témoin : après l'ouverture la proposition s'affiche)" "$(verdict "$(doubles "$MUT_DIR" froid)" 'j.masque.msgs===1')" "rouge"
