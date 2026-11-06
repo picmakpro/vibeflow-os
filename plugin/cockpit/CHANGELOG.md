@@ -1,5 +1,33 @@
 # Changelog — cockpit
 
+## v1.3.4 — 2026-11-06 — non publié
+
+Phase 71.5 : réexamen du design system du cockpit (espacements, couleurs, onglet « Au travail »). Mission de `vf-design-manager`, registre `P71.5-D-xx` dans `71.5-CONTEXT.md`. Demande d'origine : Samuel, session principale Claude Code, 2026-11-05. Les gestes de release racine (version, tag, release GitHub) restent humains : cette entrée part avec la release groupée après les Phases 72 et 78.
+
+### Changé — grille d'espacement fermée et jetons (D-01 à D-11)
+- **Échelle fermée « 8 avec demi-pas »** : 2, 4, 6, 8, 12, 16, 20, 24, 32 (`--sp-*`) et sept jetons sémantiques (`--edge`, `--inset-panel`, `--gap-section`, `--inset-card`, `--inset-box`, `--inset-row`, `--inset-pill`) ; exceptions en liste fermée. Appliquée à la coque, aux cartes du moteur, aux pages Projet et Équipe, au tiroir du terminal, à la visite guidée.
+- **Valeurs tranchées** : panneaux à 20 sur leurs quatre bords (D-02), cartes à 16 avec un gap de 8 (D-03), titre de vue au bord à 16 (D-04), rail des onglets à 4 px (D-05), gouttière du graphe à 24 avec `GUTTER = 24` (D-09). Délégués à la session principale par Samuel : arbitrage Samuel, AskUserQuestion, session principale, 2026-11-05 (« choisi »).
+- **Pastille « Terminal »** : elle ne recouvre plus la barre de question ni la feuille de détail (D-06, décision d'ordonnancement, pas un arbitrage). Défaut existant laissé au backlog : cartes du téléphone trop larges (D-10).
+
+### Changé — jeu de couleurs « pastel lumineux » et règles anti-slop (D-18 à D-30)
+- **Jeu de couleurs** : retour à Graphite, les palettes A2 et B2 étant rejetées (D-12) ; teintes d'état « pastel lumineux » (D-27, arbitrage Samuel, AskUserQuestion, session principale, 2026-11-05, réponse définitive « (d) Pastel lumineux ») ; jaune sombre appliqué tel que choisi, `#ffe08a` (D-30) ; `--ok` et `--recent` fusionnés (D-26). Aucun jeton supprimé ni renommé : `--ok`, `--ok-bg`, `--warn-sheet` restent des alias (D-29).
+- **Anti-slop** (D-18 à D-28, mêmes canal et date) : plus de liserés ni de bordures colorés, plus de bandeau coloré du message principal ; pastille de statut sans fond (glyphe coloré, mot neutre) ; « à recetter » en glyphe et mot propres ; barres neutres sauf « en cours » ; carte bloquée en symbole et mot seuls, sans anneau ; surtitre de Projet supprimé ; corrections AA appliquées.
+- **Terminal** : palette xterm sur le jeu 71.5, ANSI clair en texte lisible.
+
+### Changé — « Au travail » en fils de liaison (D-14, D-23, D-24)
+- **Tiroir refondu** : un fil relie chaque point, l'actif respire, les terminés sont regroupés et repliables, la durée figure sur la ligne de tâche, le texte complet de la tâche s'affiche au survol. Direction approuvée par Samuel (message direct, session principale, 2026-11-05) puis « Fils de liaison » (arbitrage Samuel, AskUserQuestion, session principale, 2026-11-05).
+
+### Changé — finitions et arbitrages du 2026-11-06 (D-34 à D-36)
+- **Jaune du terminal adouci, terminal seul** (D-34) : ANSI sombre `yellow` `#f0d17c`, `brightYellow` `#e3df78` ; `--sev-medium` garde `#ffe08a`. Arbitrage Samuel, AskUserQuestion, session principale, 2026-11-06 : « Adoucir le terminal seul ».
+- **Points des phases grisés** (D-35) : les points des listes de phases passent à `--text-4`. Arbitrage Samuel, AskUserQuestion, session principale, 2026-11-06 : « Griser les points seuls ».
+- **Conformité DESIGN.md §9** (D-36, sans arbitrage) : glyphe actif qui respire par l'échelle, plus de fils entre les terminés, bloqué jamais atténué, pastille d'état jamais soulignée, glyphe d'état à 16 px. Les points du tiroir (pastille fermée et barre : connecté, reconnexion, refusé, arrêté, expiré) n'ont plus de teinte d'état sur `--raise` en clair : variantes `--recent-text`, `--warn-text`, `--err-text` (4,3:1 au lieu de 2,9, 2,9 et 3,2:1) ; sombre inchangé, aucun jeton `:root` ajouté.
+- **Juges de rendu frais** (seuil 70) : coque 85, Code 79, Projet 76, Équipe + « Au travail » 74, tiroir 84. Retour de Samuel : « Ça me convient » (AskUserQuestion, session principale, 2026-11-06).
+
+### Suites
+- `test-cockpit-terminal-tiroir.sh` : T23.1 (point de la pastille, mutant `M-POINT-RECENT`) et T23.2 (six points d'état de la barre, douze mesures, mutants `M-ETAT-RECENT` et `M-ETAT-MEDIUM`), suites du tiroir « Au travail » alignées sur le balisage en fils.
+- Suivent le nouveau balisage ou les nouvelles valeurs, sans assertion affaiblie : `-terminal-page`, `-equipe`, `-avancement`, `-responsive`, `-securite`, `-who`, `-direct`, `-ailleurs`, `-transcript`, `-chrome-fr`, `chrome-verrou*.mjs` et trois tests `signal/tests/`.
+- Le moteur vendorisé change par ses patchs (`amont/patches/`), pas par une édition du vendor.
+
 ## v1.3.3 — 2026-11-05 — non publié
 
 Réglage visuel (demande de Samuel, session principale, 2026-11-05) : tiroir fermé, la pastille « Terminal » se place sous les boutons de zoom (− ▢ +), au plus bas à gauche, et les boutons de zoom remontent au-dessus d'elle ; plus de chevauchement. Tiroir ouvert, rien ne change. Vaut pour les pages Projet et Code.
