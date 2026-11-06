@@ -553,20 +553,24 @@ await executer(chrome, async (s) => {
       r.v14 = await q.ev(`(() => { const b = document.getElementById('proposition'), t = document.getElementById('terminal'), a = document.getElementById('annonce'), F = Node.DOCUMENT_POSITION_FOLLOWING;
         return [!!(b.compareDocumentPosition(t) & F), !!(a.compareDocumentPosition(b) & F), a.getAttribute('role'), a.getAttribute('aria-live'), a.textContent.startsWith('Lancement proposé')].join('/'); })()`); await raz();
     });
-    await essai('v15', async () => { // LB2 (PU-G-119) : un bandeau manipulé (sélecteur focalisé, ou bouton de souris enfoncé dans le bandeau) n'est jamais remplacé ; libre, il l'est
+    await essai('v15', async () => { // LB2 (PU-G-119) : un bandeau manipulé (sélecteur focalisé ET touche tapée il y a moins de 3 s, ou bouton de souris enfoncé dans le bandeau) n'est jamais remplacé ; un focus posé SANS geste ne protège rien ; libre, il est remplacé
       await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }); await s.ev(`document.querySelector('iframe[data-t]').focus()`);
+      await pause(3200); // un geste d'une étape précédente ne doit plus compter
       await raz(); await monter({ id: ID(150) });
       const nouvelle = (id) => q.ev(`(() => { const x = vfTermVue.proposition(Object.assign({}, __base, { id: ${JSON.stringify(id)}, modeInitial: 'default' }), __cb); return String(x) + ':' + document.getElementById('proposition').dataset.id; })()`);
       await q.ev(`(() => { ${SEL}.focus(); return true; })()`);
-      const a = await nouvelle(ID(151));
+      const z = await nouvelle(ID(149)); // focus sans geste : remplacé
+      await q.ev(`(() => { ${SEL}.focus(); return true; })()`);
+      await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 });
+      const a = await nouvelle(ID(151)); // touche tapée dans le sélecteur : refusé
       await q.ev(`(() => { document.activeElement.blur(); return true; })()`);
-      const b = await nouvelle(ID(151));
+      const b = await nouvelle(ID(151)); // focus rendu : remplacé
       const c0 = await centre(`document.querySelector('#proposition .vf-q-texte')`);
       await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: c0.x, y: c0.y, button: 'left', clickCount: 1 });
-      const c = await nouvelle(ID(152));
+      const c = await nouvelle(ID(152)); // souris enfoncée : refusé
       await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c0.x, y: c0.y, button: 'left', clickCount: 1 });
-      const d = await nouvelle(ID(152));
-      r.v15 = [a === `false:${ID(150)}`, b === `undefined:${ID(151)}`, c === `false:${ID(151)}`, d === `undefined:${ID(152)}`].join('/'); await raz();
+      const d = await nouvelle(ID(152)); // relâchée : remplacé
+      r.v15 = [z === `undefined:${ID(149)}`, a === `false:${ID(149)}`, b === `undefined:${ID(151)}`, c === `false:${ID(151)}`, d === `undefined:${ID(152)}`].join('/'); await raz();
     });
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
@@ -837,7 +841,7 @@ if [ -n "$CHROME" ]; then
   assert_eq "LB.V12 — LB2 (PU-G-123 ; Q6) : case du chat décochée par défaut, liée à sa phrase ; la phrase dit ce que fait la reprise et écrit « Risque : la session lancée relit toute cette conversation » sans « -r » ni « --fork-session » ; la commande exacte reste sans reprise tant que la case est décochée, puis porte « -r … --fork-session »" "$(vv v12)" "false/proposition-chat-aide/true/true/true/true/true"
   assert_eq "LB.V13 — LB2 (PU-G-114) : compte à rebours « Expire dans 1 min 30 s » (role timer) et annonce polie ; à l'échéance « Proposition expirée — la renvoyer. » (seul bouton : Fermer, plus de bouton de lancement) ; proposition(null) ne l'efface pas, « Fermer » oui ; une disparition annoncée à 2 s de l'échéance vaut expiration, à 100 s elle retire" "$(vv v13)" "Expire dans 1 min 30 s|timer|polite|Lancement proposé : Planifie la Phase 72 du compartiment alpha. Expire dans 1 min 30 s./Proposition expirée — la renvoyer.|Fermer|false|Proposition expirée — la renvoyer./true/true/expiree/true"
   assert_eq "LB.V14 — LB2 (PU-G-117 ; Q5) : le bandeau précède #terminal dans l'ordre de la page, la région #annonce (role status, aria-live polite) le précède et annonce « Lancement proposé… »" "$(vv v14)" "true/true/status/polite/true"
-  assert_eq "LB.V15 — LB2 (PU-G-119) : proposition() rend false et garde le bandeau tant que le sélecteur de mode est focalisé ou qu'un bouton de souris est enfoncé dans le bandeau ; libre, il est remplacé" "$(vv v15)" "true/true/true/true"
+  assert_eq "LB.V15 — LB2 (PU-G-119) : proposition() rend false et garde le bandeau tant qu'une touche vient d'être tapée dans le sélecteur de mode focalisé ou qu'un bouton de souris est enfoncé dans le bandeau ; un focus sans geste, ou un bandeau libre, est remplacé" "$(vv v15)" "true/true/true/true/true"
 
   echo "=== LB.E — client réel, serveur factice du contrat §4, faux P ==="
   faux "$SCRIPTS"; FQ0="$FQ"; FP0="$FP"; EJ="$(navig client)"; unfaux
@@ -924,7 +928,7 @@ if mutant visite-ignoree vf-cockpit-terminal-client.mjs "/garde:visite/d"; then
   [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e9"]')"; unfaux; assert_eq "M-VISITE-IGNOREE — le mutant rougit LB.E9 : la proposition d'une visite précédente est montrée puis remplacée (témoin : la sonde s'exécute et le même cadre rechargé la retrouve)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e9 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e9 === '0/0/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-VISITE-IGNOREE"; fi
 if mutant manipule-ignore vf-cockpit-terminal-vue.mjs "/garde:manipule/d"; then
-  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v15"]'; assert_eq "M-MANIPULE-IGNORE — le mutant rougit LB.V15 : un bandeau manipulé est remplacé sous la main (témoin : le bandeau s'affiche et la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v15 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v15 === 'true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v15"]'; assert_eq "M-MANIPULE-IGNORE — le mutant rougit LB.V15 : un bandeau manipulé est remplacé sous la main (témoin : le bandeau s'affiche et la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v15 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v15 === 'true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-MANIPULE-IGNORE"; fi
 if mutant expiration-silencieuse vf-cockpit-terminal-vue.mjs "s/const EXPIRE_PROCHE_MS = 3000;/const EXPIRE_PROCHE_MS = -1;/"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v13"]'; assert_eq "M-EXPIRATION-SILENCIEUSE — le mutant rougit LB.V13 : une disparition annoncée à 2 s de l'échéance efface le bandeau sans le dire (témoin : le compte à rebours et le message d'expiration existent)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v13 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : /^Expire dans 1 min 30 s\|timer/.test(j.v13) && /expiree\/true$/.test(j.v13) ? 'sain' : /^Expire dans 1 min 30 s\|timer/.test(j.v13) ? 'rouge' : 'plante: ' + j.v13)")" "rouge"; }

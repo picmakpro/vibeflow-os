@@ -53,6 +53,7 @@ export function vueTerminal(cfg) {
     verifier: ['Verifie', 'Vérifie', 'vérifier', 'contrôler que la phase livre ce qui était promis'],
     reprendre: ['Reprends', 'Reprends', 'reprendre', 'relancer la mission interrompue là où elle s’était arrêtée'],
   };
+  const GESTE_MS = 3000; // un geste dans le bandeau plus ancien que cela ne le rend plus « manipulé »
   const EXPIRE_PROCHE_MS = 3000; // sous ce reste, la disparition annoncée par Q vaut expiration : le bandeau le dit au lieu de s'effacer en silence
   const BOUTON_PREPARER = 'Préparer dans le terminal', BOUTON_EN_COURS = 'Préparation…';
   const PHRASE_ENTREE = 'Appuyez sur Entrée dans le terminal pour démarrer.';
@@ -90,16 +91,20 @@ export function vueTerminal(cfg) {
   const duree = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)), m = Math.floor(s / 60); return m > 0 ? m + ' min ' + String(s % 60).padStart(2, '0') + ' s' : s + ' s'; };
   const annoncer = (txt) => { const r = document.getElementById('annonce'); if (r) r.textContent = txt; }; // région live polie de la page (aucun focus pris)
   const affichee = (intention, verbe) => { const v = VERBES_UI[verbe]; return v && typeof intention === 'string' && intention.indexOf(v[0]) === 0 ? v[1] + intention.slice(v[0].length) : intention; };
-  let courant = null, minuterie = 0, compte = 0, echeance = 0, appui = false; // identifiant du bandeau affiché ; minuterie d'armement ; compte à rebours et son échéance ; geste de souris en cours dans le bandeau
+  let courant = null, minuterie = 0, compte = 0, echeance = 0, appui = false, geste = 0; // identifiant du bandeau affiché ; minuterie d'armement ; compte à rebours et son échéance ; geste de souris en cours dans le bandeau
   const retirerProposition = () => { clearTimeout(minuterie); minuterie = 0; clearInterval(compte); compte = 0; echeance = 0; const a = document.getElementById('proposition'); if (a) a.remove(); courant = null; };
-  // « manipulé » : un bouton de souris est enfoncé dans le bandeau, ou le cadre a le focus sur le sélecteur de mode ou la case du chat ; un bandeau manipulé n'est jamais remplacé sous la main (PU-G-119)
+  // « manipulé » : un bouton de souris est enfoncé dans le bandeau, ou le cadre a le focus sur le sélecteur de mode ou la case du chat ET l'utilisateur y a fait un geste (touche, saisie, clic) il y a moins de GESTE_MS ;
+  // un bandeau manipulé n'est jamais remplacé sous la main (PU-G-119). Un focus posé sans geste (programme, restauration du focus) ne protège rien.
   const manipule = () => {
     const a = document.getElementById('proposition'); if (!a) return false;
     if (appui) return true;
-    const f = document.activeElement; return document.hasFocus() && !!f && f !== document.body && a.contains(f) && (f.tagName === 'SELECT' || f.type === 'checkbox');
+    const f = document.activeElement; return Date.now() - geste < GESTE_MS && document.hasFocus() && !!f && f !== document.body && a.contains(f) && (f.tagName === 'SELECT' || f.type === 'checkbox');
   };
-  document.addEventListener('pointerdown', (ev) => { appui = !!(ev.target && ev.target.closest && ev.target.closest('#proposition')); }, true);
-  ['pointerup', 'pointercancel'].forEach((n) => document.addEventListener(n, () => { appui = false; }, true));
+  if (typeof document === 'object' && document && typeof document.addEventListener === 'function') { // la vue se charge aussi hors page (sonde de parité de la palette) : aucun écouteur sans document
+    ['keydown', 'input', 'change'].forEach((n) => document.addEventListener(n, (ev) => { if (ev.target && ev.target.closest && ev.target.closest('#proposition')) geste = Date.now(); }, true));
+    document.addEventListener('pointerdown', (ev) => { appui = !!(ev.target && ev.target.closest && ev.target.closest('#proposition')); if (appui) geste = Date.now(); }, true);
+    ['pointerup', 'pointercancel'].forEach((n) => document.addEventListener(n, () => { appui = false; }, true));
+  }
   // bandeau d'une proposition arrivée à échéance : dit en clair ce qui s'est passé, ne propose plus rien (« Fermer » seulement)
   const montrerExpiree = () => {
     retirerProposition();
@@ -185,6 +190,14 @@ export function vueTerminal(cfg) {
       const ligne = el('div', 'vf-q-apercu', lignes()); ligne.id = 'proposition-ligne'; ligne.tabIndex = 0; ligne.setAttribute('role', 'region'); ligne.setAttribute('aria-label', 'Commande exacte'); b.appendChild(ligne);
       const entree = el('div', 'vf-q-reste'); const et = el('span', 'vf-q-texte vf-q-aide', 'Le bouton écrit cette ligne dans le terminal sans la lancer. ' + PHRASE_ENTREE); et.id = 'proposition-entree'; entree.appendChild(et); b.appendChild(entree); lancer.setAttribute('aria-describedby', 'proposition-armement proposition-entree');
       const msg = el('div', 'vf-q-reste'); msg.id = 'proposition-message'; msg.setAttribute('role', 'status'); b.appendChild(msg);
+      const avecChat = CHAT_LIVRE && p.chat === true && !!p.lignesChat && typeof p.lignesChat === 'object'; // garde:chat-offre
+      if (avecChat) {
+        const d = el('div', 'vf-q-reste'), lab = el('label', 'vf-q-texte'); caseChat = el('input'); caseChat.type = 'checkbox'; caseChat.id = 'proposition-chat'; caseChat.setAttribute('aria-describedby', 'proposition-chat-aide');
+        lab.appendChild(caseChat); lab.appendChild(el('span', '', 'Continuer la conversation du chat')); d.appendChild(lab); b.appendChild(d);
+        const e = el('div', 'vf-q-reste'), at = el('span', 'vf-q-texte vf-q-aide'); at.id = 'proposition-chat-aide'; // décochée par défaut ; l'explication et le risque sont écrits, jamais repliés
+        at.appendChild(document.createTextNode(AIDE_CHAT + ' '));
+        const r = el('span', 'vf-q-risque'); r.appendChild(picto(PICTO_RISQUE)); r.appendChild(document.createTextNode('Risque')); at.appendChild(r); at.appendChild(document.createTextNode(' : ' + RISQUE_CHAT)); e.appendChild(at); b.appendChild(e);
+      }
       const retenu = MODES_UI.some((m) => m.mode === p.modeInitial) && p.modeInitial !== 'default' ? p.modeInitial : null; // un mode autre que « Par défaut » ne vient que d'un choix précédent
       const modes = el('ul', 'vf-q-modes'); modes.id = 'proposition-modes';
       MODES_UI.forEach((m) => {
@@ -194,14 +207,6 @@ export function vueTerminal(cfg) {
         li.appendChild(document.createTextNode(m.aide)); modes.appendChild(li);
       });
       b.appendChild(modes);
-      const avecChat = CHAT_LIVRE && p.chat === true && !!p.lignesChat && typeof p.lignesChat === 'object'; // garde:chat-offre
-      if (avecChat) {
-        const d = el('div', 'vf-q-reste'), lab = el('label', 'vf-q-texte'); caseChat = el('input'); caseChat.type = 'checkbox'; caseChat.id = 'proposition-chat'; caseChat.setAttribute('aria-describedby', 'proposition-chat-aide');
-        lab.appendChild(caseChat); lab.appendChild(el('span', '', 'Continuer la conversation du chat')); d.appendChild(lab); b.appendChild(d);
-        const e = el('div', 'vf-q-reste'), at = el('span', 'vf-q-texte vf-q-aide'); at.id = 'proposition-chat-aide'; // décochée par défaut ; l'explication et le risque sont écrits, jamais repliés
-        at.appendChild(document.createTextNode(AIDE_CHAT + ' '));
-        const r = el('span', 'vf-q-risque'); r.appendChild(picto(PICTO_RISQUE)); r.appendChild(document.createTextNode('Risque')); at.appendChild(r); at.appendChild(document.createTextNode(' : ' + RISQUE_CHAT)); e.appendChild(at); b.appendChild(e);
-      }
       let note = null;
       const majMode = () => {
         ligne.textContent = lignes();
