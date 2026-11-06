@@ -6,6 +6,7 @@
 //   enfant -> parent : { t:'pret', port } · { t:'occupe', v } · { t:'echec', code } · { t:'lancee', cible, verbe, session, at } (la ligne a été écrite au shell)
 // Lancement (72-10) : GET /proposition, POST /lancer { id, mode, chat? } et POST /annuler { id } sous les contrôles des routes voisines. La ligne ne vient JAMAIS du client (P72-D-13) :
 // elle est composée par l'état de Q (vf-cockpit-lancer-q.mjs) ; elle est écrite au shell sans retour chariot, une fois, seulement armée et le shell au repos ; aucune ligne ni UUID n'est journalisé.
+// Mode retenu (72-16 ; P72-D-20) : Q écrit le mode d'un lancement ACCEPTÉ dans <sortie>/.cache/terminal-mode (vf-cockpit-lancer-mode.mjs) et le sert dans GET /proposition (mode_retenu) ; jamais transmis par l'IPC.
 // Contrôles, amorçage, session unique, grâce, tampon : inchangés (voir vf-cockpit-terminal-session.mjs). Le parent meurt (même par SIGKILL) :
 // l'IPC se ferme, ou le ppid change, et l'enfant arrête toute la session puis sort. Arrêt volontaire du parent (message `arret`) : état « arret »,
 // les flux sont fermés, GET /etat répond { etat: 'arret' } pendant ARRET_MS (au moins 1 s) puis l'enfant sort. Aucun octet du terminal n'est journalisé.
@@ -17,6 +18,7 @@ import { creerSessions, resoudrePython3, TAILLE_MAX } from './vf-cockpit-termina
 import { preparerPage, pageTerminal } from './vf-cockpit-terminal-page.mjs';
 import { creerEtatLancer } from './vf-cockpit-lancer-q.mjs';
 import * as gabarit from './vf-cockpit-lancer-gabarit.mjs';
+import { FICHIER_MODE, creerMemoireMode } from './vf-cockpit-lancer-mode.mjs';
 
 const log = (m) => console.error(`vf-cockpit (terminal) : ${m}`);
 const json = (res, statut, objet) => { res.writeHead(statut, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(objet)); };
@@ -63,9 +65,10 @@ function demarrerQ({ engineDir, root, here, jetons: jetons0, portP, envOrigine }
   let proprietaire = null;
   const gabaritQ = gabarit;
   const lq = creerEtatLancer({ gabarit: gabaritQ });
+  const memoireMode = creerMemoireMode({ fichier: path.join(here, '.cache', FICHIER_MODE) }); // garde:mode-support
   const recevoirCibles = (l) => lq.definirCibles(l);
   const recevoirProposition = (m) => lq.proposer(m);
-  const lireProposition = () => lq.lire();
+  const lireProposition = () => { const p = lq.lire(); return p.etat === 'en-attente' ? { ...p, mode_retenu: memoireMode.lire() } : p; }; // garde:mode-servi
   // seule fonction qui atteint sessions.lancer : réserve (consommer), écrit, puis acte (confirmer, message `lancee`) ou restitue (rendre) ; rend un statut HTTP
   async function lancer(demande, onglet) {
     const vivante = sessions.etat().session; if (vivante !== 'vivante' && vivante !== 'detachee') return 410;
@@ -76,6 +79,7 @@ function demarrerQ({ engineDir, root, here, jetons: jetons0, portP, envOrigine }
     const ligneQ = r.ligne;
     const w = await sessions.lancer(ligneQ, onglet);
     if (!w.ok) { lq.rendre(idDemande); return statutDe(STATUT_LANCER, w.motif); }
+    memoireMode.ecrire(demande.mode); // garde:mode-ecrit
     const msg = lq.confirmer(idDemande);
     if (msg && process.connected) { try { process.send(msg); } catch {} } // canal fermé : jamais d'envoi
     return 204;

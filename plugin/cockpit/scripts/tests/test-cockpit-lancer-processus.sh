@@ -40,7 +40,7 @@ const cas = process.argv[2], chat = process.argv[3];
 const verdict = () => {
   if (j.etat !== 'en-attente') return `etat ${j.etat}`;
   const cles = Object.keys(j).sort().join(',');
-  const attendues = ['arme_apres_ms', 'avertissements', 'bloquants', 'etat', 'expire_ms', 'id', 'intention', 'lignes', 'phase', 'verbe', 'ws'].concat(cas === 'chat' ? ['chat', 'lignes_chat'] : []).sort().join(',');
+  const attendues = ['arme_apres_ms', 'avertissements', 'bloquants', 'etat', 'expire_ms', 'id', 'intention', 'lignes', 'mode_retenu', 'phase', 'verbe', 'ws'].concat(cas === 'chat' ? ['chat', 'lignes_chat'] : []).sort().join(',');
   if (cles !== attendues) return `clés ${cles}`;
   if (Object.keys(j.lignes).sort().join(',') !== [...MODES].sort().join(',')) return 'lignes : modes';
   if (!Number.isInteger(j.arme_apres_ms) || j.arme_apres_ms <= 0 || !Number.isInteger(j.expire_ms) || j.expire_ms <= 0) return 'arme_apres_ms / expire_ms';

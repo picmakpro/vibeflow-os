@@ -72,7 +72,7 @@ P (72-04 pose le mécanisme, 72-09 branche) :
   à l'actuelle pour toute route `/api/vf/` inconnue), aucun script injecté, CSP de page inchangée.
 Q (72-10 branche ; table fermée existante étendue) :
 - `GET /proposition` (mêmes contrôles que `GET /etat`) → `{ etat:'aucune' }` ou `{ etat:'en-attente', id, verbe, intention, phase, ws, lignes:{ default, acceptEdits, plan, herite },
-  bloquants, avertissements, arme_apres_ms, expire_ms }`. Les textes viennent des constantes du gabarit.
+  bloquants, avertissements, arme_apres_ms, expire_ms, mode_retenu }`. Les textes viennent des constantes du gabarit. `mode_retenu` (72-16 ; P72-D-20) : un mot de la liste fermée `default, acceptEdits, plan, herite`, présent SEULEMENT dans la réponse `en-attente` (jamais dans `{ etat:'aucune' }`), lu au démarrage de Q dans `<sortie>/.cache/terminal-mode` (`default` si le fichier est absent, vide, forgé ou illisible) ; le client le relit contre la liste fermée.
 - `POST /lancer` corps `{ id, mode }` (Origin Q exacte, secret, onglet) → `204`, `409` premier plan occupé, `425` pas encore armé (armement refusé AUSSI côté
   serveur), `404` proposition inconnue ou consommée, `410` pas de session, `400`, `504` délai de l'assistant PTY (`STATUT_LANCER.delai`, `vf-cockpit-terminal-processus.mjs:29`, `lancer()` l.70-82 ; `LANCER_DELAI_MS = 2000`, `vf-cockpit-terminal-session.mjs:25`). Le client de Q traite le 504 comme un refus (`vf-cockpit-terminal-client.mjs:84`, repli `'refus'`). Limite connue : une réponse tardive de l'assistant peut encore écrire la ligne à l'invite après le 504, sans retour chariot ; la proposition revient `en-attente`, un second clic réécrit Ctrl-C puis la ligne. Aucune exécution sans Entrée humaine. Le client n'envoie JAMAIS le texte de la ligne : Q retrouve la ligne précomposée.
 - `POST /annuler` corps `{ id }`.
@@ -110,6 +110,6 @@ La clôture de la 71 est mergée sur main (`1e4d1ecd`, cockpit v1.3.3). 72-14 pa
 
 Ajoutés par 72-05, 72-09, 72-10 et exigés par 72-13 : `GET /proposition` rend aussi `chat` (booléen) et `lignes_chat` ; `POST /lancer` accepte `chat` booléen strict
 facultatif ; `chat` (UUID) est validé côté P (72-09) et côté Q (72-05) et relayé de bout en bout, inerte tant que 72-13 n'offre pas la case. Sans conversation,
-`GET /proposition` garde exactement les clés du §4. `lancee` a la forme riche `{ etat, verbe }` ou `false` dans la réponse de P (livrée par 72-09, `vf-cockpit-lancer.mjs:6` et `:96`, lue par la carte de 72-06) ; l'état du suivi (72-07) sert l'avertissement de récence
+`GET /proposition` garde exactement les clés du §4 (`mode_retenu` compris). `lancee` a la forme riche `{ etat, verbe }` ou `false` dans la réponse de P (livrée par 72-09, `vf-cockpit-lancer.mjs:6` et `:96`, lue par la carte de 72-06) ; l'état du suivi (72-07) sert l'avertissement de récence
 et le rattachement Équipe. Un refus de `POST /api/vf/lancer` porte la clé `refus` (corps `{ refus: <code fermé> }`, `vf-cockpit-lancer.mjs:7`, `vf-cockpit-lancer-post.mjs:81`). `sessions.lancer` peut aussi répondre `delai` (HTTP 504 côté Q). Sans `--terminal`, `POST /api/vf/lancer` répond comme `POST /api/vf/inconnu` (405 actuel) et
 `GET` inconnu 404 : identité à prouver, jamais un statut écrit en dur. Règle de dépôt : aucun `vf-cockpit-*.mjs` ne contient `fiabilite` ni `gouvernance` (`test-cockpit-projet.sh`, P4.8).
