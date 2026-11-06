@@ -140,7 +140,12 @@ export function envGit(lab, { env = process.env, config = [] } = {}) {
 }
 // `--no-ext-diff --no-textconv` se placent APRÈS la sous-commande (options de la sous-commande, pas de git : `git --no-ext-diff log` rend 129). L'environnement retire GIT_CONFIG_GLOBAL, la
 // config de l'utilisateur s'applique : `log.showSignature=true` ajouterait la sortie gpg et désalignerait les parseurs, d'où `--no-show-signature` (que `diff-tree` refuse).
-export const OPTIONS_LECTURE = { log: ['--no-ext-diff', '--no-textconv', '--no-show-signature'], show: ['--no-ext-diff', '--no-textconv', '--no-show-signature'], 'diff-tree': ['--no-ext-diff', '--no-textconv'], diff: ['--no-ext-diff', '--no-textconv'] };
+// A2 (audit 2026-11-06) : `status` et `diff` ne descendent JAMAIS dans les sous-modules. Sinon git relance un `status` dans chaque sous-module, avec la configuration de `.git/modules/<n>/config`
+// et SANS les filtres vidés par l'environnement (git retire GIT_CONFIG_COUNT/KEY/VALUE de l'environnement des processus de sous-module) : un filtre déclaré là s'exécuterait. Contrepartie : l'état modifié
+// d'un sous-module n'est plus compté (il n'est pas lu, pas « propre » : simplement ignoré).
+export const IGNORER_SOUS_MODULES = '--ignore-submodules=all';
+export const OPTIONS_LECTURE = { log: ['--no-ext-diff', '--no-textconv', '--no-show-signature'], show: ['--no-ext-diff', '--no-textconv', '--no-show-signature'], 'diff-tree': ['--no-ext-diff', '--no-textconv'],
+  diff: ['--no-ext-diff', '--no-textconv', IGNORER_SOUS_MODULES], status: [IGNORER_SOUS_MODULES] };
 export const SOUS_COMMANDES_FILTRANTES = ['status', 'diff', 'ls-files', 'stash']; // sous-commandes qui relisent le contenu d'un fichier suivi (filtres clean/process du dépôt)
 // repère la sous-commande après les options globales (--no-optional-locks, -c <v>, -C <dir>) et y insère les options de lecture
 export function argsGit(args) {
@@ -160,35 +165,42 @@ export function avecEcheance(ms, fn) {
 // exécuteur interne unique (shBorne, lancerGit, filtresDeclares) : échéance respectée, jamais `timeout: 0` ; rend { sortie, code, tronque (ENOBUFS), absent (ENOENT), echeance }
 function lancer(cmd, args, cwd, env, maxBuffer) {
   const reste = FIN === null ? 10000 : Math.min(10000, FIN - Date.now());
-  if (!(reste >= 1)) return { sortie: '', code: null, tronque: false, absent: false, echeance: true }; // échéance atteinte (ou valeur non numérique) : rien n'est lancé
-  try { return { sortie: execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: Math.floor(reste), env, maxBuffer }), code: 0, tronque: false, absent: false, echeance: false }; }
-  catch (e) { return { sortie: e.stdout || '', code: typeof e.status === 'number' ? e.status : null, tronque: e.code === 'ENOBUFS', absent: e.code === 'ENOENT', echeance: false }; }
+  if (!(reste >= 1)) return { sortie: '', code: null, tronque: false, absent: false, echeance: true, delai: true }; // échéance atteinte (ou valeur non numérique) : rien n'est lancé
+  try { return { sortie: execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: Math.floor(reste), env, maxBuffer }), code: 0, tronque: false, absent: false, echeance: false, delai: false }; }
+  catch (e) { return { sortie: e.stdout || '', code: typeof e.status === 'number' ? e.status : null, tronque: e.code === 'ENOBUFS', absent: e.code === 'ENOENT', echeance: false, delai: e.code === 'ETIMEDOUT' }; } // delai : le processus n'a pas répondu à temps (tué)
 }
 // Variante ASYNCHRONE de l'exécuteur (P78-D-32) : mêmes options, même environnement, même sémantique de résultat que `lancer`, mais la boucle du serveur reste libre pendant que git travaille.
 // L'échéance globale `FIN` est une variable de portée synchrone : elle ne survit pas à un `await`. L'appelant asynchrone passe donc sa date butoir (`fin`, en ms epoch) à chaque appel.
 export const finDans = (ms) => Date.now() + ms;
 function lancerAsync(cmd, args, cwd, env, maxBuffer, fin) {
   const reste = Math.min(10000, (fin ?? Date.now() + 10000) - Date.now());
-  if (!(reste >= 1)) return Promise.resolve({ sortie: '', code: null, tronque: false, absent: false, echeance: true });
+  if (!(reste >= 1)) return Promise.resolve({ sortie: '', code: null, tronque: false, absent: false, echeance: true, delai: true });
   return new Promise((resolve) => {
     let enfant;
     try {
       enfant = execFile(cmd, args, { cwd, encoding: 'utf8', timeout: Math.floor(reste), env, maxBuffer }, (e, sortie) => {
-        if (!e) return resolve({ sortie, code: 0, tronque: false, absent: false, echeance: false });
-        resolve({ sortie: sortie || '', code: typeof e.code === 'number' ? e.code : null, tronque: e.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' || e.code === 'ENOBUFS', absent: e.code === 'ENOENT', echeance: false });
+        if (!e) return resolve({ sortie, code: 0, tronque: false, absent: false, echeance: false, delai: false });
+        resolve({ sortie: sortie || '', code: typeof e.code === 'number' ? e.code : null, tronque: e.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' || e.code === 'ENOBUFS', absent: e.code === 'ENOENT', echeance: false, delai: e.killed === true });
       });
       enfant.stdin?.end(); // l'exécuteur synchrone ferme l'entrée standard (stdio 'ignore')
-    } catch { resolve({ sortie: '', code: null, tronque: false, absent: true, echeance: false }); }
+    } catch { resolve({ sortie: '', code: null, tronque: false, absent: true, echeance: false, delai: false }); }
   });
 }
+// A1 (audit 2026-11-06) : AUCUN filtre déclaré n'est exécuté, quel que soit leur nombre. La liste n'est donc jamais tronquée. La seule borne est celle de l'environnement transmis à git (4 paires par filtre) :
+// au-delà de MAX_FILTRES, `status`/`diff`/`ls-files`/`stash` ne sont PAS lancés (refus : ok=false, sortie vide, comptes « inconnus » chez l'appelant), jamais « le reste n'est pas vidé ».
+// Même refus quand la liste elle-même n'est pas lisible (git config en échec, tronquée, hors délai) : un filtre inconnu n'est pas un filtre absent.
+export const MAX_FILTRES = 256;
+const motifFiltre = /^filter\.(.+)\.[^.]+$/;
+const lireFiltres = (r) => ({ noms: [...new Set(r.sortie.split('\n').map((l) => motifFiltre.exec(l.trim())?.[1]).filter(Boolean))],
+  fiable: !r.echeance && !r.tronque && !r.absent && (r.code === 0 || r.code === 1) }); // git config --get-regexp : 0 = trouvé, 1 = aucun filtre ; tout autre code = liste inconnue
+const argsFiltres = (dir) => [...GIT_SUR, '-C', dir, 'config', '--name-only', '--get-regexp', '^filter\\.'];
+const refus = (noms, fiable) => !fiable || noms.length > MAX_FILTRES;
 export async function filtresDeclaresAsync(dir, lab = dir, fin) {
-  const r = await lancerAsync('git', [...GIT_SUR, '-C', dir, 'config', '--name-only', '--get-regexp', '^filter\\.'], dir, envGit(lab), 1 << 20, fin);
-  return [...new Set(r.sortie.split('\n').map((l) => /^filter\.(.+)\.[^.]+$/.exec(l.trim())?.[1]).filter(Boolean))].slice(0, 64);
+  return lireFiltres(await lancerAsync('git', argsFiltres(dir), dir, envGit(lab), 1 << 20, fin)).noms;
 }
-// pilotes de filtre déclarés par le dépôt (et la config de l'utilisateur) : `filter.<x>.<clé>`, x = tout ce qui sépare le premier `filter.` de la dernière `.clé` ; au plus 64
+// pilotes de filtre déclarés par le dépôt (et la config de l'utilisateur) : `filter.<x>.<clé>`, x = tout ce qui sépare le premier `filter.` de la dernière `.clé`
 export function filtresDeclares(dir, lab = dir) {
-  const r = lancer('git', [...GIT_SUR, '-C', dir, 'config', '--name-only', '--get-regexp', '^filter\\.'], dir, envGit(lab), 1 << 20);
-  return [...new Set(r.sortie.split('\n').map((l) => /^filter\.(.+)\.[^.]+$/.exec(l.trim())?.[1]).filter(Boolean))].slice(0, 64);
+  return lireFiltres(lancer('git', argsFiltres(dir), dir, envGit(lab), 1 << 20)).noms;
 }
 // chaque pilote vidé, par paires clé/valeur de GIT_CONFIG_* : clean, smudge, process vides et required=false (status rend 0 et n'exécute rien, mesuré)
 export const configFiltres = (noms) => noms.flatMap((x) => [['clean', ''], ['smudge', ''], ['process', ''], ['required', 'false']].map(([k, v]) => [`filter.${x}.${k}`, v]));
@@ -198,27 +210,42 @@ export const configFiltres = (noms) => noms.flatMap((x) => [['clean', ''], ['smu
 export function shBorne(cmd, args, cwd, lab = cwd) {
   if (cmd !== 'git') return lancer(cmd, args, cwd, envEnfant(lab), 1 << 20).sortie;
   const { argv, sous, dir } = argsGit(args), base = dir ? path.resolve(cwd || '.', dir) : cwd || process.cwd();
-  const config = SOUS_COMMANDES_FILTRANTES.includes(sous) ? configFiltres(filtresDeclares(base, lab)) : [];
+  let config = [];
+  if (SOUS_COMMANDES_FILTRANTES.includes(sous)) {
+    const f = lireFiltres(lancer('git', argsFiltres(base), base, envGit(lab), 1 << 20));
+    if (refus(f.noms, f.fiable)) return ''; // A1 : filtres en nombre ou en état indéterminable, rien n'est lancé
+    config = configFiltres(f.noms);
+  }
   return lancer('git', argv, cwd, envGit(lab, { config }), 1 << 20).sortie;
 }
 
 // lecture git bornée pour les modules du socle (tiroir Git, plans 78-05 et 78-08) : GIT_SUR et `-C dir` posés ici, même exécuteur et même échéance que shBorne.
 // { ok (code 0 sans sortie tronquée, sans échéance), sortie, code, tronque (ENOBUFS : sortie partielle, jamais présentée comme complète), absent (ENOENT) } ; `binaire` ne sert qu'aux tests, jamais lu d'une variable d'environnement.
 export function lancerGit(dir, args, { lab = dir, maxBuffer = 4 << 20, binaire = 'git' } = {}) {
-  if (!isDir(dir)) return { ok: false, sortie: '', code: null, tronque: false, absent: false };
+  if (!isDir(dir)) return { ok: false, sortie: '', code: null, tronque: false, absent: false, delai: false };
   const { argv, sous } = argsGit([...GIT_SUR, '-C', dir, ...args]);
-  const config = SOUS_COMMANDES_FILTRANTES.includes(sous) ? configFiltres(filtresDeclares(dir, lab)) : [];
+  let config = [];
+  if (SOUS_COMMANDES_FILTRANTES.includes(sous)) {
+    const f = lireFiltres(lancer('git', argsFiltres(dir), dir, envGit(lab), 1 << 20));
+    if (refus(f.noms, f.fiable)) return { ok: false, sortie: '', code: null, tronque: false, absent: false, delai: f.fiable ? false : true, refuse: true }; // A1 : jamais lancé
+    config = configFiltres(f.noms);
+  }
   const r = lancer(binaire, argv, dir, envGit(lab, { config }), maxBuffer);
-  return { ok: r.code === 0 && !r.tronque && !r.echeance, sortie: r.sortie, code: r.code, tronque: r.tronque, absent: r.absent };
+  return { ok: r.code === 0 && !r.tronque && !r.echeance, sortie: r.sortie, code: r.code, tronque: r.tronque, absent: r.absent, delai: r.delai };
 }
 
 // Même contrat et mêmes arguments que `lancerGit`, rendu en promesse ; `fin` : date butoir de l'appelant (voir `finDans`).
 export async function lancerGitAsync(dir, args, { lab = dir, maxBuffer = 4 << 20, binaire = 'git', fin } = {}) {
-  if (!isDir(dir)) return { ok: false, sortie: '', code: null, tronque: false, absent: false };
+  if (!isDir(dir)) return { ok: false, sortie: '', code: null, tronque: false, absent: false, delai: false };
   const { argv, sous } = argsGit([...GIT_SUR, '-C', dir, ...args]);
-  const config = SOUS_COMMANDES_FILTRANTES.includes(sous) ? configFiltres(await filtresDeclaresAsync(dir, lab, fin)) : [];
+  let config = [];
+  if (SOUS_COMMANDES_FILTRANTES.includes(sous)) {
+    const f = lireFiltres(await lancerAsync('git', argsFiltres(dir), dir, envGit(lab), 1 << 20, fin));
+    if (refus(f.noms, f.fiable)) return { ok: false, sortie: '', code: null, tronque: false, absent: false, delai: f.fiable ? false : true, refuse: true };
+    config = configFiltres(f.noms);
+  }
   const r = await lancerAsync(binaire, argv, dir, envGit(lab, { config }), maxBuffer, fin);
-  return { ok: r.code === 0 && !r.tronque && !r.echeance, sortie: r.sortie, code: r.code, tronque: r.tronque, absent: r.absent };
+  return { ok: r.code === 0 && !r.tronque && !r.echeance, sortie: r.sortie, code: r.code, tronque: r.tronque, absent: r.absent, delai: r.delai };
 }
 
 // P71-D-29 (N2) : le lanceur s'exécute depuis la racine du lab. Un binaire lancé par son NOM est cherché par le système dans le PATH, où « . », un élément
