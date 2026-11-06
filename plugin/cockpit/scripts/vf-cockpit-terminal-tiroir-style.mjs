@@ -20,6 +20,10 @@ export const STYLE_TIROIR = `
 .vf-term-etat-point[data-etat="connecte"] { background: var(--recent); }
 .vf-term-etat-point[data-etat="reconnexion"], .vf-term-etat-point[data-etat="refuse"] { background: var(--sev-medium); }
 .vf-term-etat-point[data-etat="arrete"], .vf-term-etat-point[data-etat="expire"] { background: var(--sev-high); }
+/* jamais une teinte d'état sur --raise en clair (DESIGN.md §9, P71.5-D-36) : variantes -text en clair (4,3:1 ; --recent 2,9:1, --sev-medium 2,9:1, --sev-high 3,2:1 sur --raise clair), sombre inchangé ; aucun jeton :root ajouté */
+:root[data-theme="light"] .vf-term-etat-point[data-etat="connecte"] { background: var(--recent-text); }
+:root[data-theme="light"] .vf-term-etat-point[data-etat="reconnexion"], :root[data-theme="light"] .vf-term-etat-point[data-etat="refuse"] { background: var(--warn-text); }
+:root[data-theme="light"] .vf-term-etat-point[data-etat="arrete"], :root[data-theme="light"] .vf-term-etat-point[data-etat="expire"] { background: var(--err-text); }
 .vf-term-titre { font: 500 13px var(--sans); color: var(--text); }
 .vf-term-etat { font: 400 12px var(--sans); color: var(--text-3); }
 .vf-term-espace { flex: 1; }
