@@ -192,9 +192,9 @@ body.in-flow #context { opacity: 0; }
 /* selected: a soft ring that follows the card's radius, plus a faint halo */
 .node.sel .card { background: var(--surface-hover); box-shadow: 0 0 0 1.5px rgba(var(--ink), .5), var(--shadow-lift); }
 .node.sel .card.external { box-shadow: inset 0 0 0 1.5px rgba(var(--ink), .1), 0 0 0 1.5px rgba(var(--ink), .5); }
-.node.flash .card { animation: flash .6s var(--ease) 1; } /* one short pulse: DESIGN.md §6, 700 ms at most (PU-G-047) */
+.node.flash .card { outline: 2px solid transparent; outline-offset: -2px; animation: flash .6s var(--ease) 1; } /* one short neutral contour, no halo and no tint: DESIGN.md §6 and §9, 700 ms at most (PU-G-047) */
 .node:focus { outline: none; } /* a card the search sent the focus to: the selection already shows it */
-@keyframes flash { 50% { box-shadow: 0 0 0 1.5px rgba(var(--ink), .6), 0 0 0 10px rgba(var(--ink), .08); } }
+@keyframes flash { 40% { outline-color: var(--ring); } }
 .head { display: flex; align-items: center; gap: var(--sp-8); min-width: 0; }
 .ico { display: grid; place-items: center; flex: none; color: var(--c); } /* 71.5 : icône nue, sans tuile ni fond coloré */
 .ico svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
@@ -398,6 +398,9 @@ body.no-panel #panel-resize { opacity: 0; pointer-events: none; }
 .more { color: var(--text-4); font-size: 12.5px; padding: var(--sp-6) var(--sp-12); }
 .tags { display: flex; flex-wrap: wrap; gap: var(--sp-6); }
 .tag { font-family: var(--mono); font-size: 11.5px; color: var(--text-2); background: rgba(var(--ink), .05); border-radius: 999px; padding: var(--inset-pill); }
+.callout p { margin: 0; }
+.callout .cmd { display: flex; align-items: center; gap: var(--sp-8); margin-top: var(--sp-8); flex-wrap: wrap; }
+.callout .cmd code { font-family: var(--mono); font-size: 12.5px; background: rgba(var(--ink), .07); padding: var(--sp-2) var(--sp-6); border-radius: 7px; color: var(--text); }
 .callout { margin-top: var(--sp-12); padding: var(--inset-box); border-radius: 14px; background: var(--warn-bg); color: var(--warn-text); font-size: 13px; line-height: 1.55; }
 
 /* ---------- command palette ---------- */
@@ -467,7 +470,7 @@ body.no-panel #panel-resize { opacity: 0; pointer-events: none; }
 #ask-warn.info a { color: var(--text); }
 #ask-warn button { margin-left: auto; background: rgba(var(--ink), .08); border: 0; color: inherit; border-radius: 999px; padding: var(--sp-6) var(--sp-12); cursor: pointer; font-size: 12.5px; white-space: nowrap; }
 #ask-warn button:hover { background: rgba(var(--ink), .14); }
-#ask-sheet { max-height: min(46vh, 480px); display: flex; flex-direction: column; overflow: hidden; border-radius: var(--r-panel); animation: sheetIn .45s var(--ease); }
+#ask-sheet { max-height: min(30vh, 480px); display: flex; flex-direction: column; overflow: hidden; border-radius: var(--r-panel); animation: sheetIn .45s var(--ease); }
 @keyframes sheetIn { from { opacity: 0; transform: translateY(12px) scale(.985); } }
 #ask-sheet[hidden] { display: none; }
 #ask-sheet .sh { display: flex; align-items: center; gap: var(--sp-6); padding: var(--inset-panel) var(--inset-panel) var(--sp-4); }
@@ -495,6 +498,9 @@ body.no-panel #panel-resize { opacity: 0; pointer-events: none; }
 
 /* ---------- extension chrome: header slot, modal, toast, grouped lists ---------- */
 .hr-ext { display: contents; }
+header .btn:focus-visible, #zoom button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; } /* the keyboard ring at every width, not only under 1000 px (PU-G-013) */
+.row:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; } /* list rows in the details panel are reachable with Tab (PU-G-174) */
+#modal:focus, #modal .box:focus { outline: none; } /* the box takes the focus when it opens; the ring belongs to the controls inside (PU-G-014) */
 #modal { position: fixed; inset: 0; z-index: 45; background: var(--scrim-2); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: var(--sp-24); }
 #modal.open { display: flex; animation: fadeIn .2s var(--ease); }
 #modal .box { width: min(620px, 100%); max-height: min(80vh, 760px); overflow: auto; border-radius: var(--r-panel); background: var(--modal-bg); animation: menuIn .3s var(--ease); padding: var(--inset-panel); }
@@ -518,7 +524,6 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
 /* ---------- phones and tablets: windows under 1000 px and touch screens under 1280 px (a mouse at 1000 px and wider is untouched) ---------- */
 @media (max-width: 999px), (max-width: 1279px) and (pointer: coarse) {
   #btn-up, .brand { flex: none; }
-  header .btn:focus-visible, #zoom button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
   /* one flowing row that wraps to a second row, so nothing runs off the edge; buttons keep their icons and lose their words */
   header { display: flex; flex-wrap: wrap; align-items: center; height: auto; min-height: 56px; padding: var(--sp-6) var(--sp-12); gap: 0 var(--sp-8); }
   .hl { flex: 1 1 240px; }
@@ -626,7 +631,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
       <span id="ask-chips"></span>
       <input id="ask-input" placeholder="Ask anything about this codebase…" spellcheck="false">
       <span class="engine" id="ask-engine"><i></i>checking…</span>
-      <button id="ask-send" type="submit" title="Ask" disabled><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+      <button id="ask-send" type="submit" title="Ask" aria-label="Ask" disabled><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
     </form>
   </div>
   <div id="tooltip" class="glass" hidden></div>
@@ -1045,9 +1050,10 @@ function cardTip(id) {
   const st = statsOf(id);
   const kind = i.type === 'node' ? i.kind : i.type === 'route' ? 'endpoint' : i.type === 'symbol' ? i.symKind : i.type === 'module' ? 'file' : i.type;
   const where = i.type === 'node' ? (i.n.paths || []).join('\n') : i.type === 'route' ? `${i.f.p}${i.r.h ? ` · ${i.r.h}()` : ''}` : i.path || '';
-  const size = !st?.files ? '' : PLAN ? (i.type === 'file' || i.type === 'module' ? 'planned' : plural(st.files, 'planned file')) : i.type === 'file' || i.type === 'module' ? `${fmt(st.loc)} lines` : `${plural(st.files, 'file')} · ${fmt(st.loc)} lines`;
+  const sv = i.n?.st || i.f?.st;
+  const size = sv ? '' : !st?.files ? '' : PLAN ? (i.type === 'file' || i.type === 'module' ? 'planned' : plural(st.files, 'planned file')) : i.type === 'file' || i.type === 'module' ? `${fmt(st.loc)} lines` : `${plural(st.files, 'file')} · ${fmt(st.loc)} lines`;
   const hints = [drillable(id) && state.container !== id ? '<span><span class="kbd">2×click</span> open</span>' : '', '<span><span class="kbd">right-click</span> more</span>'].join('');
-  return `<div class="tt">${h(i.name)}</div><div class="td" style="text-transform:capitalize">${h(kind)}${size ? ` · ${size}` : ''}</div>${where ? `<div class="tp">${h(where)}</div>` : ''}${recentTip(id)}${tipHints(hints)}`;
+  return `<div class="tt">${h(i.name)}</div><div class="td" style="text-transform:capitalize">${h(kind)}${size ? ` · ${size}` : ''}</div>${sv ? `<div class="td">${statePill(sv)}</div>` : ''}${where ? `<div class="tp">${h(where)}</div>` : ''}${recentTip(id)}${tipHints(hints)}`;
 }
 /** Hover lines for recent work: what changed on this card and how it serves the request, or what changed inside it. */
 function recentTip(id) {
@@ -1091,6 +1097,7 @@ async function layout(view) {
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX', 'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
       'elk.layered.thoroughness': '12', 'elk.separateConnectedComponents': 'true', 'elk.spacing.componentComponent': '80',
       'elk.padding': '[top=40,left=40,bottom=40,right=40]',
+      ...(innerWidth <= 700 && /\/equipe\.html$/.test(location.pathname) ? { 'elk.aspectRatio': '0.2' } : {}), // one column on a phone, Team tab only: the Code map and the Project roadmap keep their layout (PU-G-176)
     },
   });
 }
@@ -1444,6 +1451,7 @@ async function go(container, { select: sel = null, push = true, zoomFrom = null,
   hideTip();
   custom.panel = null;
   const changed = container !== state.container;
+  if (changed && container !== 'q:answer' && !keepSheet) $('#ask-sheet').hidden = true; // going to another map puts the answer bubble away: it covered the canvas (PU-G-149)
   state.container = container; state.selected = sel;
   if (push) setHash(container, sel);
   if (!changed && state.layout && !force) { applySelection(); renderPanel(); if (after) after(); return; }
@@ -1601,6 +1609,9 @@ function renderLegend(view) {
 
 // ======================= inspector =======================
 const editorUrl = (p, line = 1) => G.meta.root && !PLAN ? `vscode://file/${encodeURI(G.meta.root.replace(/\\/g, '/'))}/${encodeURI(p)}:${line}` : null;
+// the real state of an item (project missions, plans, requirements): the same glyph + word as on its card, in place of a size in lines of code that is always 0 there (PU-G-105)
+const STATE_WORD = { done: 'Fait', active: 'En cours', recette: 'À recetter', todo: 'À faire', blocked: 'Bloqué' };
+const statePill = (st) => `<span class="vst vst-${h(st).replace(/[^\w-]/g, '')}">${h(STATE_WORD[st] || st)}</span>`;
 const rowFor = (item, extra = '', dotColor) => {
   const i = info(item);
   return `<a class="row" data-go="${h(item)}" title="${h(i.path || '')}"><span class="dot" style="background:${dotColor || colorOf(i)}"></span><span class="rt"><div class="rn">${h(shownName(item))}</div>${i.desc ? `<div class="rd">${h(i.desc)}</div>` : ''}</span>${extra ? `<span class="rc">${extra}</span>` : ''}</a>`;
@@ -1609,8 +1620,8 @@ const routeRow = (ri, extra = '') => {
   const r = routes[ri];
   return `<a class="row" data-go="r:${ri}"><span class="method" style="--m:${methodVar(r.m)};margin-top:var(--sp-2)">${h(r.m)}</span><span class="rt"><div class="rn">${h(r.name)}</div>${r.d ? `<div class="rd">${h(r.d)}</div>` : ''}<div class="rp">${h(r.p)}</div></span>${extra ? `<span class="rc">${extra}</span>` : ''}</a>`;
 };
-const listSec = (title, rows, count, max = 30) => rows.length ? `<div class="sec"><h3>${h(title)} <span class="c">${count ?? rows.length}</span></h3><div class="list">${rows.slice(0, max).join('')}${rows.length > max ? `<div class="more">+${rows.length - max} more</div>` : ''}</div></div>` : '';
-const pathBox = (p) => `<div class="pp"><span>${h(p).split('/').map((x) => `<span class="sg">${x}</span>`).join('/<wbr>')}</span><button data-copy="${h(p)}" title="Copy">${iconI('copy')}</button></div>`;
+const listSec = (title, rows, count, max = 30, note = '') => rows.length ? `<div class="sec"><h3>${h(title)} <span class="c">${count ?? rows.length}</span></h3>${note ? `<p class="pd">${h(note)}</p>` : ''}<div class="list">${rows.slice(0, max).join('')}${rows.length > max ? `<div class="more">+${rows.length - max} more</div>` : ''}</div></div>` : '';
+const pathBox = (p) => `<div class="pp"><span>${h(p).split('/').map((x) => `<span class="sg">${x}</span>`).join('/<wbr>')}</span><button data-copy="${h(p)}" title="Copy" aria-label="Copy path">${iconI('copy')}</button></div>`;
 function header(i) {
   const kind = i.type === 'node' ? i.kind : i.type === 'symbol' ? i.symKind : i.type === 'route' ? 'Endpoint' : i.type === 'module' ? 'file' : i.type;
   return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(kind)}</span></div>
@@ -1649,7 +1660,10 @@ function renderPanel() {
   panel.querySelectorAll('[data-open]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); open(a.dataset.open); }));
   panel.querySelectorAll('[data-flow]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); startFlow(a.dataset.flow); }));
   panel.querySelectorAll('[data-sel]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); select(a.dataset.sel); centerOn(a.dataset.sel); }));
-  panel.querySelector('[data-goroot]')?.addEventListener('click', () => go('root'));
+  panel.querySelector('[data-goroot]')?.addEventListener('click', () => backToAsker(true));
+  panel.querySelectorAll('[data-copycmd]').forEach((b) => b.addEventListener('click', () => { copy(b.dataset.copycmd); const was = b.textContent; b.textContent = 'Copied'; setTimeout(() => { if (b.isConnected) b.textContent = was; }, 1600); }));
+  // every row that acts is a control: reachable with Tab, opened with Enter or Space (PU-G-174)
+  panel.querySelectorAll('a.row[data-go], a.row[data-open], a.row[data-flow], a.row[data-sel]').forEach((a) => { a.tabIndex = 0; a.setAttribute('role', 'link'); a.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); a.click(); } }); });
   panel.querySelectorAll('[data-copy]').forEach((a) => a.addEventListener('click', () => { navigator.clipboard?.writeText(a.dataset.copy); a.textContent = '✓'; }));
   emit('panel', { selected: sel, container: state.container });
 }
@@ -1681,13 +1695,14 @@ function systemsSection(tops) {
   return `<div class="sec"><h3>Systems <span class="c">${tops.length}</span></h3>${parts.join('')}</div>`;
 }
 
+const DESCRIBE_CMD = '/vf-cockpit build'; // descriptions come from the header of each .md / .sh, read again by this command (PU-G-074)
 function overviewPanel() {
   const p = G.project;
   const tops = kids.get('root') || [];
   const undescribed = G.files.filter((f) => f.auto).length + routes.filter((r) => r.auto).length;
   return `<div class="sec"><div class="ph"><span class="ico" style="--c:var(--accent)">${icon('feature')}</span><span class="kind">${PLAN ? 'Blueprint' : 'Codebase'}</span></div><h2 class="pt">${h(p.name)}</h2>${p.summary ? `<p class="pd">${h(p.summary)}</p>` : ''}
       <div class="stats" style="margin-top:var(--sp-12)"><div><b>${fmt(G.meta.counts.files)}</b><span>${PLAN ? 'planned files' : 'files'}</span></div>${PLAN ? `<div><b>${fmt((G.screens || []).length)}</b><span>screens</span></div>` : `<div><b>${fmt(G.meta.counts.loc)}</b><span>lines</span></div>`}<div><b>${fmt(routes.length)}</b><span>endpoints</span></div></div>
-      ${undescribed ? `<div class="callout">${undescribed} files and endpoints still use generated names. Run the skill again to describe them.</div>` : ''}</div>
+      ${undescribed ? `<div class="callout"><p>${undescribed} files and endpoints still use generated names: they are named after their file, with no description. To describe them, run this command again.</p><div class="cmd"><code>${h(DESCRIBE_CMD)}</code><button type="button" class="btn soft" data-copycmd="${h(DESCRIBE_CMD)}">Copy command</button></div></div>` : ''}</div>
     ${systemsSection(tops)}
     ${listSec('Guided flows', G.flows.map((f) => `<a class="row" data-flow="${h(f.id)}"><span class="dot" style="background:var(--accent)"></span><span class="rt"><div class="rn">${h(f.title)}</div>${f.description ? `<div class="rd">${h(f.description)}</div>` : ''}</span><span class="rc">${f.steps.length} steps</span></a>`))}
     ${listSec('Repositories', G.meta.repos.map((r) => `<div class="row" style="cursor:default"><span class="dot" style="background:var(--text-4)"></span><span class="rt"><div class="rn">${h(r.name)}</div><div class="rp">${h(r.branch || '')} @ ${h((r.head || '').slice(0, 7))}</div></span></div>`))}
@@ -1738,7 +1753,7 @@ function itemPanel(item, viaConnector) {
     const c = connections(item);
     html += listSec('Used by', c.inn) + listSec('Depends on', c.out);
     const fl = (i.d ? i.d.files : G.files.filter((f) => chain('f:' + f.p).includes(item))).slice().sort((a, b) => b.loc - a.loc);
-    html += listSec(PLAN ? 'Planned files' : 'Files', fl.map((f) => rowFor('f:' + f.p, PLAN ? '' : fmt(f.loc))), fl.length, 25);
+    html += listSec(PLAN ? 'Planned files' : 'Files', fl.map((f) => rowFor('f:' + f.p, f.st ? statePill(f.st) : PLAN ? '' : fmt(f.loc))), fl.length, 25);
   } else if (i.type === 'file' || i.type === 'module') {
     const f = i.f, fid = 'f:' + f.p, url = editorUrl(f.p);
     if (f.note) html += `<div class="callout">${h(f.note)}</div>`;
@@ -1747,13 +1762,15 @@ function itemPanel(item, viaConnector) {
     if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}Open in editor</a>`);
     if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
     const owner = nodes.get(f.n);
-    html += `</div><div class="sec"><div class="stats">${PLAN ? `<div><b>${fmt(G.links.filter((l) => l.a === fid).length)}</b><span>uses</span></div>` : `<div><b>${fmt(f.loc)}</b><span>lines</span></div>`}<div><b>${(routesByFile.get(f.p) || []).length}</b><span>endpoints</span></div><div><b>${technical() ? (f.s || []).length : fmt(G.links.filter((l) => l.b === 'f:' + f.p).length)}</b><span>${technical() ? 'exports' : 'used by'}</span></div></div>
+    html += `</div><div class="sec"><div class="stats">${PLAN ? `<div><b>${fmt(G.links.filter((l) => l.a === fid).length)}</b><span>uses</span></div>` : `<div><b>${fmt(f.loc)}</b><span>lines</span></div>`}<div><b>${(routesByFile.get(f.p) || []).length}</b><span>endpoints</span></div><div><b>${fmt(G.links.filter((l) => l.b === 'f:' + f.p).length)}</b><span>used by</span></div></div>
       ${owner ? `<div class="list" style="margin-top:var(--sp-12)">${rowFor('n:' + owner.id, 'module')}</div>` : ''}</div>`;
     html += listSec('Endpoints', (routesByFile.get(f.p) || []).map((ri) => routeRow(ri)), undefined, 60);
     const inL = G.links.filter((l) => l.b === fid), outL = G.links.filter((l) => l.a === fid);
-    const rowL = (l, other) => rowFor(other, l.calls?.length ? plural(l.calls.length, 'call') : KIND_LABEL[l.k], `var(--k-${l.k})`);
+    // the same words in both modes (PU-G-058): the technical switch adds the Exports list below, it never renames what is already there
+    const doc = /\.(md|mdx|markdown|rst|txt)$/i.test(f.p) && !/(^|\/)SKILL\.md$|(^|\/)agents\//.test(f.p); // a document mentions files, it doesn't call or depend on them; an agent or a skill really dispatches (PU-G-072)
+    const rowL = (l, other) => rowFor(other, doc ? (l.calls?.length ? plural(l.calls.length, 'mention') : 'Mention') : l.calls?.length ? plural(l.calls.length, 'call') : KIND_PLAIN[l.k] || l.k, `var(--k-${l.k})`);
     html += listSec('Used by', inL.map((l) => rowL(l, l.a)));
-    html += listSec('Depends on', outL.map((l) => rowL(l, l.b)));
+    html += doc ? listSec('Mentions', outL.map((l) => rowL(l, l.b)), undefined, 30, 'The files, folders and pages this document names or links to.') : listSec('Depends on', outL.map((l) => rowL(l, l.b)));
     const handlers = new Set((routesByFile.get(f.p) || []).map((ri) => routes[ri].h));
     if (technical()) html += listSec('Exports', (f.s || []).map((s, k) => [s, k]).filter(([s]) => !handlers.has(s[0])).map(([s, k]) => `<a class="row" ${parentOf.has(`s:${f.p}#${k}`) ? `data-go="s:${h(f.p)}#${k}"` : ''}><span class="dot" style="background:var(--n-symbol)"></span><span class="rt"><div class="rn" style="font-family:var(--mono);font-size:12px">${h(s[0])}</div>${s[4] ? `<div class="rd">${h(s[4])}</div>` : ''}</span><span class="rc">${h(s[1])} · L${s[2]}</span></a>`), undefined, 60);
   } else if (i.type === 'route') {
@@ -2087,18 +2104,27 @@ function md(src) {
   return out.join('');
 }
 
+// the map the question was asked from: "Back" on the answer board returns there, not to the overview (PU-G-148)
+const askFrom = { id: 'root' };
+const noteAskOrigin = () => { if (state.container !== 'q:answer') askFrom.id = state.container; };
+function backToAsker(keepAnswer = false) {
+  const to = askFrom.id !== 'q:answer' && (askFrom.id === 'root' || parentOf.has(askFrom.id) || kids.has(askFrom.id)) ? askFrom.id : 'root';
+  const had = !sheet.hidden;
+  go(to, { after: () => { if (keepAnswer && had && askState.last) renderAnswer(askState.last); } });
+}
+let keepSheet = false; // the answer's own links move around the map without putting the answer away
 function sheetShell(question, body) {
   sheet.hidden = false;
   sheet.innerHTML = `<div class="sh"><span class="q" title="${h(question)}">${h(question)}</span>
     ${askState.last && state.container !== 'q:answer' ? '<button class="btn soft" data-act="board">Show answer board</button>' : ''}
     ${state.container === 'q:answer' ? '<button class="btn soft" data-act="map">Back to map</button>' : ''}
     <button class="btn icon" data-act="close" title="Close">${iconI('x')}</button></div><div class="sb">${body}</div>`;
-  sheet.querySelector('[data-act="close"]').onclick = () => { if (askState.busy) cancelAsk(); sheet.hidden = true; if (state.container === 'q:answer') go('root'); else fit(true); };
-  sheet.querySelector('[data-act="map"]')?.addEventListener('click', () => go('root'));
+  sheet.querySelector('[data-act="close"]').onclick = () => { if (askState.busy) cancelAsk(); sheet.hidden = true; if (state.container === 'q:answer') backToAsker(); else fit(true); };
+  sheet.querySelector('[data-act="map"]')?.addEventListener('click', () => backToAsker(true));
   sheet.querySelector('[data-act="board"]')?.addEventListener('click', () => go('q:answer'));
   sheet.querySelectorAll('[data-ref]').forEach((r) => r.onclick = () => {
     const id = r.dataset.ref;
-    if (state.container === 'q:answer' && state.view.visible.includes(id)) { select(id); centerOn(id); } else reveal(id);
+    if (state.container === 'q:answer' && state.view.visible.includes(id)) { select(id); centerOn(id); } else { keepSheet = true; try { reveal(id); } finally { keepSheet = false; } }
   });
   sheet.querySelectorAll('[data-follow]').forEach((b) => b.onclick = () => { askInput.value = b.dataset.follow; submitAsk(); });
   sheet.querySelector('[data-act="steps"]')?.addEventListener('click', () => {
@@ -2137,7 +2163,7 @@ function setBusy(b) {
   askState.busy = b;
   askSend.classList.toggle('stop', b);
   askSend.innerHTML = b ? `<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>` : `<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
-  askSend.title = b ? 'Stop' : 'Ask';
+  askSend.title = b ? 'Stop' : 'Ask'; askSend.setAttribute('aria-label', askSend.title);
 }
 function cancelAsk() {
   askState.ctl?.abort();
@@ -2282,6 +2308,7 @@ async function submitAsk() {
   askState.context = []; renderChips();
   if (askState.mode === 'change') return requestChange(ctxIds.length ? `${question}\n\nThis is about: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.` : question);
   const shown = question;
+  noteAskOrigin();
   // what Claude sees: the question plus the pinned items, by id, so it starts from them
   if (ctxIds.length) question += `\n\nFocus on these map items: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.`;
   setBusy(true);
@@ -2375,7 +2402,8 @@ const setPanel = (on) => {
     else if (!on && sheetReturn) { if (panel.contains(document.activeElement) || document.activeElement === document.body) sheetReturn.focus?.({ preventScroll: true }); sheetReturn = null; }
   }
 };
-document.body.classList.toggle('no-panel', isPhone() || !store.get('panel', true));
+// with no choice of the user's on record, the details panel opens only where it leaves room for the map: from 1 000 px, so a tablet in portrait (768 px) starts with the map in full (PU-G-045, Q11)
+document.body.classList.toggle('no-panel', isPhone() || !store.get('panel', innerWidth >= 1000));
 $('#btn-panel').setAttribute('aria-expanded', String(!document.body.classList.contains('no-panel')));
 // the top bar can be one or two rows tall: everything under it follows its real height
 const headerEl = document.querySelector('header');
@@ -2394,7 +2422,9 @@ window.addEventListener('keydown', (ev) => {
   else if (ev.key === 'Escape') {
     if (!ctxEl.hidden || fm.classList.contains('open') || legendEl.classList.contains('open')) { closeMenu(); fm.classList.remove('open'); legendEl.classList.remove('open'); }
     else if (isPhone() && !document.body.classList.contains('no-panel')) closeSheet(); // on a phone the first Escape puts the details sheet away
-    else if (state.flow) stopFlow(); else if (state.selected) select(null); else up();
+    // from the canvas, Escape steps back one level; with the focus anywhere else (a button in the details, a menu) it is left to that control, so what it just showed is not lost (PU-G-175)
+    else if (state.flow) stopFlow();
+    else if (ev.target === document.body || ev.target === document.documentElement || svg.contains(ev.target)) { if (state.selected) select(null); else up(); }
   }
   else if (ev.key === 'f' || ev.key === 'F') fit(true);
   else if (ev.key === 'p' || ev.key === 'P') $('#btn-panel').click();
@@ -2413,14 +2443,27 @@ function setTechnical(on) {
   render({ keepTransform: true, after: renderPanel });
   emit('technical', technicalFlag);
 }
+// a window over the map: Escape and a click on the backdrop close it, the focus moves into it when it opens and goes back to where it came from when it closes (PU-G-014)
+let modalClose = null;
+window.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && modalClose) { ev.preventDefault(); ev.stopImmediatePropagation(); modalClose(); } }, true);
 function showModal({ title = '', html = '', actions = [] } = {}) {
   const m = $('#modal'), box = m.querySelector('.box');
-  box.innerHTML = `<h2>${h(title)}</h2><div class="mb">${html}</div><div class="ma">${actions.map((a, i) => `<button class="btn ${a.primary ? 'primary' : 'soft'}" data-mi="${i}">${a.icon ? iconI(a.icon) : ''}${h(a.label)}</button>`).join('')}<button class="btn" data-close>Close</button></div>`;
-  const close = () => m.classList.remove('open');
+  const origin = m.classList.contains('open') && modalClose ? null : document.activeElement; // a window opened over another keeps the first origin
+  box.innerHTML = `<h2 id="modal-title">${h(title)}</h2><div class="mb">${html}</div><div class="ma">${actions.map((a, i) => `<button class="btn ${a.primary ? 'primary' : 'soft'}" data-mi="${i}">${a.icon ? iconI(a.icon) : ''}${h(a.label)}</button>`).join('')}<button class="btn" data-close>Close</button></div>`;
+  box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-labelledby', 'modal-title'); box.tabIndex = -1;
+  if (origin !== null) m.__origin = origin;
+  const close = () => {
+    if (!m.classList.contains('open')) return;
+    m.classList.remove('open'); modalClose = null;
+    const back = m.__origin; m.__origin = null;
+    if (back && back.isConnected && back !== document.body) back.focus?.({ preventScroll: true });
+  };
+  modalClose = close;
   box.querySelectorAll('[data-mi]').forEach((b) => b.onclick = () => { const a = actions[+b.dataset.mi]; if (a.onClick?.(close) !== false && !a.keepOpen) close(); });
   box.querySelector('[data-close]').onclick = close;
   m.onmousedown = (ev) => { if (ev.target === m) close(); };
   m.classList.add('open');
+  box.focus({ preventScroll: true });
   return { close, el: box };
 }
 let toastTimer = null;
@@ -2429,6 +2472,7 @@ function showBoard({ title, question = '', answer = '', items = [], steps = [], 
   const clean = (arr) => (arr || []).map((x) => typeof x === 'string' ? { id: x, note: '' } : x).filter((x) => x && Q.exists(String(x.id))).map((x) => ({ id: String(x.id), note: String(x.note || '') }));
   const a = { title: title || 'Board', question, answer, items: clean(items).slice(0, 24), steps: clean(steps), followups: [], ...(kind ? { kind } : {}), ...(ic ? { icon: ic } : {}) };
   if (!a.items.length) { toast('Nothing on the map matches that.'); return; }
+  noteAskOrigin();
   state.answer = a; askState.last = a;
   go('q:answer', { force: true });
 }
