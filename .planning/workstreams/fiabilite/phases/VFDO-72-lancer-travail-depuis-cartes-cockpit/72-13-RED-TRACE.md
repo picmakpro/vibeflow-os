@@ -69,3 +69,31 @@ Pilote durci ensuite : sortie écrite au fil de l'eau, signaux journalisés, arr
 - Effets de bord laissés, conformément à la règle « ne supprimer que les transcripts ». Le fork reprend la mémoire automatique de l'utilisateur et a écrit `memory/MEMORY.md` et `memory/sonde-password.md` sous le dossier de projet du slug `…sonde72-a5-yoFKlE` (PTY : « Wrote 2 memories »). Les deux dossiers de slug (`…-XsrjJF`, `…-yoFKlE`) restent, et l'acceptation de confiance des deux dossiers jetables reste inscrite dans `~/.claude.json`.
 - C'est une confirmation supplémentaire de R-REGLAGE : la session reprise charge la configuration complète de l'utilisateur (mémoire automatique, hooks Stop visibles dans le PTY : « running Stophoks… 0/4 », texte brut du rendu).
 - Les hooks utilisateur ont tourné dans la session reprise. Le lab jetable n'avait pas VibeFlow installé : le skill `/vf-dev` n'a pas été exercé, et la sonde ne le visait pas.
+
+## Rouge (tâche 1) — suite `test-cockpit-lancer-chat.sh` jouée sur la base, sans le code du plan
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-lancer-chat.sh` — HEAD `2c73b795` (arbre : suite seule ajoutée, aucun fichier de code touché). Résultat : 17 PASS / 18 FAIL, rc 1.
+Sortie : `/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/13e1f1c3-f616-4fb2-9ff3-f349e3c3e010/scratchpad/r72-13/rouge3.out`.
+
+- **TC.1** — attendu `ok`, obtenu `ABSENT : extraireSessionChat` (l'export n'existe pas).
+- **TC.2** — attendu `ok`, obtenu `ABSENT : installerObservateurChat`.
+- **TC.3** — attendu `ok`, obtenu `ABSENT : corpsProposition`.
+- **TC.4** — attendu `true/true/true/true`, obtenu `///` (aucune constante `CHAT_LIVRE` ni dans le script de P ni dans la vue de Q) ; `corps` attendu `cible,verbe,chat`, obtenu vide.
+- **TC.6** — attendu `true|checkbox|false|Continuer la conversation du chat|true|1`, obtenu `false|||||` (aucune case) ; les trois mesures suivantes (lignes, rappel, hostile) tombent sur `erreur: élément introuvable` (la case manque). Témoin vert : « sans chat : aucune case » (`0|0|0|0`).
+- **TC.7** — attendu `[{"type":"checkbox",…},{…}]`, obtenu `[null,null]` ; erreurs nommées `e1` et `e2` : `attente de « case dans le bandeau de Q » dépassée (20000 ms)`. Les deux `POST /api/vf/lancer` rendent 202 (témoin positif : l'infrastructure, le tiroir, le terminal connecté et la proposition arrivent bien jusqu'à Q).
+- **Mutants** — les six annoncent « mutant sans effet (cible absente ou inchangée) » sur la base, sauf `M-CHAT-NON-VALIDE-P` et `M-CHAT-NON-VALIDE-Q` (voir « Écarts »).
+
+### Sonde boîte noire de « Interface exigée de Q » (TC.5, sans lire le code de Q)
+
+Les trois points de l'interface sont DÉJÀ tenus par le code livré (72-05 amendé, 72-10), aucun arrêt `human_needed` :
+1. `chat` forgé (`x;touch M`, `$(touch M)`, 37 caractères, vide, nombre, tableau, 35 caractères + point-virgule, `null`) : 8 propositions sur 8 ignorées (`GET /proposition` = `aucune`), `POST /lancer` → 404, 0 octet capturé, aucun fichier `M`.
+2. `chat` valide : `GET /proposition` porte `chat: true` et `lignes_chat` (quatre modes), égales à `composerLigne` du gabarit 72-01 pour la session relevée, `lignes` sans `-r` (verdict `ok`).
+3. `POST /lancer { id, mode, chat }` : `true` → 204 et capture = `lignes_chat[mode]` ; `false` ou absent → 204 et capture = `lignes[mode]` ; chat chaîne ou nombre, champ `ligne` → 400, 0 octet ; avant armement 425.
+
+### Écarts constatés (code livré contre le plan écrit)
+
+- **Octet `\x03` en tête** : la capture du shell témoin vaut `\x03` + ligne (contrat §4 de 72-02 : Ctrl-C puis la ligne, sans `\r`), et non la ligne seule ; la suite l'attend ainsi.
+- **TC.5 et la route de P sont verts sur la base** : le plan les croyait rouges, parce que 72-05 et 72-10 portaient seulement la variante « reprise seule ». Le code livré porte déjà les deux jeux de lignes. Ils restent dans la suite comme gardes de non-régression et comme preuve boîte noire.
+- **`M-CHAT-NON-VALIDE-Q` ne peut pas rougir TC.5b** : retirer le test d'UUID de Q laisse le gabarit (`composerLigne`, `validerLigne`) refuser l'identifiant forgé. Défense en profondeur sur au moins trois couches (forme de Q, motif du gabarit, alphabet et grammaire). La suite l'asserte comme « absorbé » (propositions forgées toujours ignorées, 0 octet) au lieu d'un rouge fabriqué.
+- **Majuscules** : le motif `/^[0-9a-f-]{36}$/i` du plan, repris par P et Q, accepte un UUID en majuscules que le motif du gabarit (minuscules seules) refuse : la proposition est alors ignorée en silence. Fail-closed, sans conséquence (les identifiants de `claude` sont en minuscules).
+- **Shell témoin** : il écrit `VFP> ` avant `stty raw -echo` ; sans octet initial, le flux de Q n'ouvre pas ses en-têtes et la page n'émet jamais `etat:connecte` (premier essai du TC.7 : `tiroir ouvert et terminal connecté dépassée`).
