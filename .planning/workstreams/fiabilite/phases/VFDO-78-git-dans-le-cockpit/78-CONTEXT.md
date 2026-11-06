@@ -174,6 +174,16 @@ verrous de driver, arbitrages en attente, watchdog et serveurs orphelins (Phase 
   ailleurs et sans Git. Amende P70-D-16 (`70-CONTEXT.md`, arbitrage Samuel, AskUserQuestion session principale,
   2026-11-03) sur cette seule plage et à cette seule condition. Options écartées : icône de 28 px, masquer « Écrans »,
   revenir sur P78-D-34.
+- **P78-D-40 (« Par branche » sans fenêtre de 30 jours).** La section montre la date de la pointe et l'avance sur la base
+  (définition de `78-05-PLAN.md`), pas une activité sur 30 jours : le libellé « (30 jours) » de `78-UI-SPEC.md` §121 est
+  retiré au profit de « Par branche — avance sur la base ». Contradiction spec/plan relevée par la revue du 2026-11-06 ;
+  décision du manager de reprise (aucune donnée ni coût nouveaux).
+- **P78-D-41 (lecture du graphe non bloquante, étend P78-D-32).** `GET /api/vf/git` (`lireGit`) passe en asynchrone sur le
+  point unique, comme les worktrees et le détail : 362 ms de boucle gelée mesurés sur ce dépôt, jusqu'à 5 s sur un git
+  muet, à chaque rafale de signal tiroir ouvert (revue du 2026-11-06). Décision du manager de reprise.
+- **P78-D-42 (dépôt sans branche de base).** Sans `main` ni `origin/HEAD` (dépôt `master`, `develop`, `trunk` sans
+  distant), le graphe est rendu sans comptes d'avance au lieu de « indisponible » : précise P78-D-11 et P78-D-23 (revue du
+  2026-11-06).
 
 ### Claude's Discretion
 
