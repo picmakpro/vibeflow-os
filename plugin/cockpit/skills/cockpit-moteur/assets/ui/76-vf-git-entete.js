@@ -91,7 +91,7 @@
     .vf-git-ligne:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; } /* anneau DANS la pastille : à l'extérieur il mordait sur le nom juste au-dessus */
     .vf-git-branche, .vf-git-wt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .vf-git-branche { flex: 0 1 auto; }
-    .vf-git-etat { flex: none; white-space: pre; }
+    .vf-git-ligne-etat { flex: none; white-space: pre; }
     .vf-git-wt { flex: 0 2 auto; white-space: pre; } /* l'espace avant le point médian est le premier caractère de l'élément : sans white-space: pre il s'effondre en tête d'élément flex */
     .vf-git-ligne .kbd { color: var(--text-2); margin-left: 6px; opacity: 0; transition: opacity 150ms var(--ease); flex: none; }
     .vf-git-ligne:hover .kbd, .vf-git-ligne:focus-visible .kbd { opacity: 1; }
@@ -132,7 +132,7 @@
   ligne.setAttribute('aria-expanded', 'false'); ligne.setAttribute('aria-controls', 'vf-git-tiroir');
   const spBranche = document.createElement('span'); spBranche.className = 'vf-git-branche';
   const spWt = document.createElement('span'); spWt.className = 'vf-git-wt';
-  const spEtat = document.createElement('span'); spEtat.className = 'vf-git-etat';
+  const spEtat = document.createElement('span'); spEtat.className = 'vf-git-ligne-etat';
   const kbd = document.createElement('span'); kbd.className = 'kbd'; kbd.textContent = 'g'; kbd.setAttribute('aria-hidden', 'true');
   ligne.append(spBranche, spWt, spEtat, kbd);
   bloc.appendChild(ligne);
@@ -158,7 +158,7 @@
     const change = sans(V) !== sans(d); V = d;
     if (change && TAB === 'code') ecrireEtRecadrer(); // le bloc de vue Code cite la branche de la même lecture que la seconde ligne
     if (entete) entete.toggleAttribute('data-vf-git', d.etat !== 'absent'); // l'ouvreur est posé : le plancher et l'invite courts s'appliquent
-    if (d.etat === 'absent') { ligne.hidden = true; ouvreur.hidden = true; return; } // le dépôt a disparu en cours de route : tout se tait
+    if (d.etat === 'absent') { connue = null; ligne.hidden = true; ouvreur.hidden = true; return; } // le dépôt a disparu en cours de route : tout se tait
     ligne.hidden = false; ouvreur.hidden = false;
     if (d.etat === 'ok') connue = d;
     const indispo = d.etat === 'indisponible' && !connue; // rien de connu : « Branche indisponible »
@@ -173,7 +173,7 @@
     ligne.title = texteBranche + spWt.textContent + spEtat.textContent;
     ligne.setAttribute('aria-label', `Historique Git, ${lisible}. Ouvrir (g)`);
     ouvreur.setAttribute('aria-label', `Historique Git, ${lisible}. Ouvrir (g)`); ouvreur.title = ouvreur.getAttribute('aria-label');
-    ligne.classList.toggle('vf-git-detache', !!d.detache);
+    ligne.classList.toggle('vf-git-detache', !!c.detache && !indispo);
     ligne.classList.toggle('vf-git-indispo', indispo || nonConfirme);
   };
   lire(V);

@@ -515,7 +515,7 @@ const lecture = async (rep) => { // une lecture du serveur (réponse simulée) ;
   await s.attendre(`window.__vfFetch.appels.length === ${n + 1}`, 'lecture faite');
   await s.ev(`new Promise((r) => setTimeout(r, 150))`);
   return s.ev(`(() => { const l = ${L}, o = document.querySelector('#vf-git-ouvreur'), cs = getComputedStyle(l), t = document.createElement('i'); t.style.color = 'var(--text-3)'; document.body.appendChild(t); const neutre = getComputedStyle(t).color; t.remove();
-    return { branche: l.querySelector('.vf-git-branche').textContent, wt: l.querySelector('.vf-git-wt').textContent, etat: l.querySelector('.vf-git-etat').textContent, ligneCachee: l.hidden || cs.display === 'none',
+    return { branche: l.querySelector('.vf-git-branche').textContent, wt: l.querySelector('.vf-git-wt').textContent, etat: l.querySelector('.vf-git-ligne-etat').textContent, ligneCachee: l.hidden || cs.display === 'none',
       ouvreurCache: !o || o.hidden, dataGit: document.querySelector('header').hasAttribute('data-vf-git'), titre: l.title, aria: l.getAttribute('aria-label'), largeur: l.getBoundingClientRect().width,
       neutre: cs.color === neutre, halo: cs.boxShadow !== 'none' || cs.borderTopWidth !== '0px' || cs.backgroundColor !== 'rgba(0, 0, 0, 0)' }; })()`);
 };
@@ -525,8 +525,9 @@ if (mode === 'connue') {
   out.encore = await lecture({ etat: 'indisponible' });
   out.revenue = await lecture({ etat: 'ok', branche: 'autre', worktree: null });
   out.absent = await lecture({ etat: 'absent' });
+  out.apresAbsent = await lecture({ etat: 'indisponible' });
 } else {
-  out.premiere = await s.ev(`(() => ({ branche: ${L}.querySelector('.vf-git-branche').textContent, etat: ${L}.querySelector('.vf-git-etat').textContent, cachee: ${L}.hidden, ouvreurCache: document.querySelector('#vf-git-ouvreur').hidden }))()`);
+  out.premiere = await s.ev(`(() => ({ branche: ${L}.querySelector('.vf-git-branche').textContent, etat: ${L}.querySelector('.vf-git-ligne-etat').textContent, cachee: ${L}.hidden, ouvreurCache: document.querySelector('#vf-git-ouvreur').hidden }))()`);
   out.muet = await lecture({ etat: 'indisponible' });
   out.ok = await lecture({ etat: 'ok', branche: 'revenue', worktree: null });
 }
@@ -538,6 +539,7 @@ JS
   assert_eq "H9.1 — branche et worktree connus, puis deux lectures « indisponible » : la dernière valeur reste (« ○ feat/memoire », « · worktree wt-m »), le mot « non confirmée » s'ajoute, la ligne et l'ouvreur restent, data-vf-git reste posé" "$(jq_ "$R9" '[j.muet, j.encore].map((x) => [x.branche, x.wt, x.etat, x.ligneCachee, x.ouvreurCache, x.dataGit].join("|")).join(" // ")' 2>/dev/null)" "○ feat/memoire| · worktree wt-m| · non confirmée|false|false|true // ○ feat/memoire| · worktree wt-m| · non confirmée|false|false|true"
   assert_eq "H9.1b — état non confirmé : texte neutre (--text-3), ni halo ni liseré ni fond, la ligne tient dans 220 px ; le nom complet et le mot sont dans le title et le nom accessible" "$(jq_ "$R9" '[j.muet.neutre, j.muet.halo, j.muet.largeur <= 221, j.muet.titre.includes("feat/memoire") && j.muet.titre.includes("non confirmée"), /feat\/memoire.*non confirmée/.test(j.muet.aria)].join("|")' 2>/dev/null)" "true|false|true|true|true"
   assert_eq "H9.1c — la lecture suivante réussie remplace tout (« autre », plus de mot, plus de worktree) ; « absent » (vrai « pas un dépôt ») masque toujours la ligne et l'ouvreur" "$(jq_ "$R9" '[j.revenue.branche, j.revenue.etat, j.revenue.wt, j.absent.ligneCachee, j.absent.ouvreurCache, j.absent.dataGit].join("|")' 2>/dev/null)" "autre|||true|true|false"
+  assert_eq "H9.1e — après « absent » puis « indisponible » : aucune ancienne branche ne réapparaît comme non confirmée (« Branche indisponible », sans mot)" "$(jq_ "$R9" '[j.apresAbsent.branche, j.apresAbsent.etat].join("|")' 2>/dev/null)" "Branche indisponible|"
   assert_eq "H9.1d — aucune erreur de page" "$(jq_ "$R9" 'j.errs.length' 2>/dev/null)" "0"
   # première lecture SANS valeur connue : la page servie dit déjà « indisponible » (le HTML posé est réécrit pour le test) -> « Branche indisponible », jamais masquée
   env $ENVX "$NODE" "$SCRIPTS/vf-cockpit-build.mjs" "$WT" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
@@ -578,7 +580,7 @@ JS
   assert_eq "M-MEMOIRE — rougit H9.1 (la branche connue est écrasée par « Branche indisponible »)" "$(jq_ "$RMM" 'j.muet.branche' 2>/dev/null)" "Branche indisponible"
   # M-MASQUE : une lecture « indisponible » masque de nouveau la ligne et l'ouvreur (comme l'ancien « absent » sur git muet) -> H9.1 rougit
   MK="$(mkmod mmasque)"
-  mutate "$MK/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "if (d.etat === 'absent') { ligne.hidden = true;" "if (d.etat === 'absent' || d.etat === 'indisponible') { ligne.hidden = true;" || echo "  ❌ FAIL — M-MASQUE : mutation impossible" >&2
+  mutate "$MK/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "if (d.etat === 'absent') { connue = null; ligne.hidden = true;" "if (d.etat === 'absent' || d.etat === 'indisponible') { connue = null; ligne.hidden = true;" || echo "  ❌ FAIL — M-MASQUE : mutation impossible" >&2
   build_serve "$WT" "$MK"; RMK="$(cdp "$AUX/h9.js" "http://127.0.0.1:$PORT" connue 2>&1 | tail -1)"; stop_srv
   assert_eq "M-MASQUE — rougit H9.1 (la ligne et l'ouvreur disparaissent sur une lecture non confirmée)" "$(jq_ "$RMK" '[j.muet.ligneCachee, j.muet.ouvreurCache].join("|")' 2>/dev/null)" "true|true"
   # M-REPOS : l'index garde la liste des dépôts (retrait annulé dans une copie du build) -> H6.5 rougit
