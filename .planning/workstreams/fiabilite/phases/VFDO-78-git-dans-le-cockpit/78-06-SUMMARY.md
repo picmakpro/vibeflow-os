@@ -85,3 +85,7 @@ Constat visuel : un arc sombre très fin sur le bord haut du tiroir en thème cl
 ## Suites rejouées (rc)
 
 `test-cockpit-git-tiroir.sh` 60/0/0 · `test-cockpit-vendor.sh` 117/0 · `test-cockpit-git-entete.sh` 0 · `responsive` 0 · `chrome-fr` 0 · `terminal-tiroir` 0 (62/0) · `assemblage` 0 · `marque-blanche` 0 · `onglet-code` 0 (les sept voisines rejouées avant les trois derniers réglages de feuille de 77, sans effet sur elles : le tiroir est fermé dans leurs scénarios). Gates : `css-jetons.mjs` 0 sur les deux fichiers, `check-file-size.sh` OK (171 et 180 lignes), aucun `postMessage` ni `innerHTML`.
+
+## Correction T7.5 (2026-11-06)
+
+Le tiroir Git ne nomme plus le Terminal (`--vf-term-reserve`, `.vf-term-*` retirés de `77-vf-git-tiroir.js`, `bottom: 16px` en CSS) : il suit le bas de `#stage` (ResizeObserver) et monte au-dessus des petits éléments fixed/absolute du coin bas (zoom, pastille, puce). T7.5 vert, D3.4 et terminal-tiroir verts, deux mutants rouges ; détail dans `78-06-RED-TRACE.md` §Correction T7.5. Jeton : `bottom: 16px` -> bord de fenêtre (jeton `--edge` après rebase 71.5).

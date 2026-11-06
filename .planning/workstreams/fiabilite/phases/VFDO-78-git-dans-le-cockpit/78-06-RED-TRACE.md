@@ -40,3 +40,15 @@ Mesures retenues (poste, Chrome headless, 1440 x 900, Terminal sous `--terminal`
 
 - **M-GLOBAL-G** : garde `INPUT / TEXTAREA / contenteditable` remplacée par `if (false) return;`. Obtenu (`78-06-trace-M-GLOBAL-G.json`) : `g1 = true`, `g2 = false` (g hors champ marche toujours), mais dans un INPUT et un TEXTAREA le tiroir S'OUVRE (`ouvert: true`) et la lettre n'est pas tapée (`valeur: ""`, `preventDefault` du mutant) : D3.1 rougit, seul.
 - **M-HORS-DEPOT** (ajouté : D3.1 « hors dépôt » est un négatif, sans mutant il ne pouvait pas rougir) : retrait de `if (!V || …) return;` sur un lab hors dépôt. Obtenu (`78-06-trace-M-HORS-DEPOT.json`) : `tiroir: true`, `ligne: false`, `api: "object"` : le tiroir existe sans aucun ouvreur ; la page est rendue (pas de panne d'un autre ordre).
+
+## Correction T7.5 (2026-11-06, mandat de correction ciblée de mgr78-reprise)
+
+Régression : `test-cockpit-terminal-activation.sh`, T7.5 « pages servies sans « VibeFlow (71- » ni « vf-term- » » : attendu 0, obtenu 4. Cause : `77-vf-git-tiroir.js` nommait `--vf-term-reserve` (CSS) et `#zoom`, `.vf-term-pastille`, `.vf-term-puce` (évitement). Rouge d'origine : log du manager `scratchpad/78-nr2/test-cockpit-terminal-activation.log`.
+
+Correction : plus aucun nom du terminal. Le tiroir se cale (a) sur le bas de `#stage` (qui rétrécit quand un panneau bas s'ouvre ; un ResizeObserver rappelle l'évitement) et (b) au-dessus de tout élément fixed/absolute de `#stage > *` ou `body > *`, de hauteur <= 64 px, dans la moitié basse, qui le recouvre (zoom, pastille, puce). Un panneau large (le Terminal ouvert/plein) n'est pas évité : sa réserve passe par la scène, et en plein il recouvre le tiroir (z-index), comme avant.
+
+Vert (suites inchangées) : terminal-activation rc 0 (40/0, T7.5 vert) ; git-tiroir rc 0 (153/0, D3.4 jouée sur vrai Terminal) ; terminal-tiroir rc 0 (62/0) ; git-e2e rc 0 ; responsive rc 0 (323/0) ; css-jetons sur 77 rc 0 ; `grep -c` sur 76/77 = 0 partout.
+
+Mutants (copie de sauvegarde restaurée, `cmp` identique) :
+- **M-LITTERAL** : `// vf-term-pastille` ajouté dans 77-vf-git-tiroir.js. Obtenu : `test-cockpit-terminal-activation.sh` rc 1, seule ligne rouge : T7.5 « pages servies sans … vf-term- ».
+- **M-SANS-EVITEMENT** : `return;` en tête d'`eviter`. Obtenu : `test-cockpit-git-tiroir.sh` rc 1 ; rouges : D3.4 Terminal fermé (recouvre zoom/pastille), Terminal ouvert, sortie du plein, Terminal refermé.

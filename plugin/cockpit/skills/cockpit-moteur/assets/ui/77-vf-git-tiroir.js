@@ -20,7 +20,7 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    .vf-git-tiroir { position: fixed; left: 16px; top: calc(var(--hh, 64px) + 4px); bottom: calc(var(--vf-term-reserve, 0px) + 16px); width: 360px; z-index: 7; display: flex; flex-direction: column; border-radius: var(--r-panel); overflow: hidden; }
+    .vf-git-tiroir { position: fixed; left: 16px; top: calc(var(--hh, 64px) + 4px); bottom: 16px; width: 360px; z-index: 7; display: flex; flex-direction: column; border-radius: var(--r-panel); overflow: hidden; }
     body:not(.no-panel) .vf-git-tiroir { width: max(240px, min(360px, calc(100vw - var(--panel-w, 360px) - 312px))); }
     .vf-git-tiroir[hidden] { display: none; }
     .vf-git-tiroir.vf-git-entree { animation: vf-git-entree 250ms var(--ease) both; }
@@ -110,17 +110,21 @@
   const ligne = () => document.querySelector('#vf-git-ligne'), ouvreur = () => document.querySelector('#vf-git-ouvreur');
   const emettre = (nom, detail) => window.dispatchEvent(new CustomEvent(nom, { detail }));
 
-  const eviter = () => { // même geste que le tiroir Terminal (P71-D-34) : jamais sur le zoom, la pastille ou la puce du Terminal ; en mobile, aucun évitement
+  const eviter = () => { // sans nommer personne : le tiroir se cale sur le bas de la scène (qui rétrécit quand un panneau bas s'ouvre) puis monte au-dessus de tout petit élément posé dans le coin bas-gauche (zoom, pastilles, puces) ; en mobile, aucun évitement
     tiroir.style.bottom = '';
     if (tiroir.hidden || MOBILE.matches) return;
-    const a = tiroir.getBoundingClientRect();
+    const a = tiroir.getBoundingClientRect(), sc = document.querySelector('#stage'), H = window.innerHeight;
     let haut = Infinity;
-    for (const s of ['#zoom', '.vf-term-pastille', '.vf-term-puce']) {
-      const n = document.querySelector(s), b = visible(n) ? n.getBoundingClientRect() : null;
-      if (b && b.width > 0 && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) haut = Math.min(haut, b.top);
+    if (sc && sc.getBoundingClientRect().bottom < H) haut = sc.getBoundingClientRect().bottom;
+    for (const n of document.querySelectorAll('#stage > *, body > *')) {
+      if (n === tiroir || !visible(n)) continue;
+      const p = getComputedStyle(n).position, b = n.getBoundingClientRect();
+      if ((p !== 'fixed' && p !== 'absolute') || b.height > 64 || b.top < H / 2) continue; // petit et bas : ni bandeau, ni panneau large
+      if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) haut = Math.min(haut, b.top);
     }
-    if (haut < Infinity) tiroir.style.bottom = Math.round(window.innerHeight - haut + 8) + 'px';
+    if (haut < Infinity) tiroir.style.bottom = Math.max(16, Math.round(H - haut + 8)) + 'px';
   };
+  if (window.ResizeObserver && document.querySelector('#stage')) new ResizeObserver(() => eviter()).observe(document.querySelector('#stage')); // la scène bouge quand un panneau bas s'ouvre, se ferme ou se redimensionne
 
   const montrer = (j) => {
     donnees = j;
