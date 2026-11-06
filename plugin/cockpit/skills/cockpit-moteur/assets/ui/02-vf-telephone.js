@@ -1,3 +1,6 @@
+// AMENDEMENT de P70-D-01 (« Icônes dans le menu ⋯ », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : le menu « ⋯ » n'est plus réservé au téléphone, il commence à 999 px et moins. De 701 à 999 px les icônes secondaires
+// (thème, Santé, Travail récent, Écrans, Visite, Exporter, Parcours, Types de liens, et toute action ajoutée) y passent ; restent dehors la recherche, le point « au travail », le bouton Détail (le tiroir n'a pas, au-dessus de 700 px, de titre à toucher) et l'ouvreur Git
+// (seule entrée du tiroir Git quand le nom du dépôt est masqué). De 1 000 px et plus, rien n'est posé.
 // VibeFlow (70-04, P70-D-01 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : le téléphone (≤ 700 px). L'en-tête tient sur UNE rangée : logo, onglets, recherche, point « au travail »
 // et un bouton « ⋯ ». Les autres actions d'en-tête (thème, Santé, Travail récent, Écrans, Visite, Exporter, Parcours, Types de liens, et toute action ajoutée plus tard) vivent dans le menu du « ⋯ »,
 // avec un libellé visible ; leurs pastilles de compte sont reportées sur l'entrée et sur le « ⋯ ». Chaque entrée appelle .click() du bouton d'origine (son comportement, ses gardes, ses menus) ;
@@ -6,12 +9,29 @@
 (() => {
   const hr = document.querySelector('header .hr'), stage = document.getElementById('stage'), zoom = document.getElementById('zoom');
   if (!hr) return;
-  const phone = matchMedia('(max-width: 700px)');
+  const phone = matchMedia('(max-width: 700px)'), tablette = matchMedia('(max-width: 999px)'); // menu dès 999 px (amendement de P70-D-01), téléphone seul à 700 px
   const style = document.createElement('style');
   style.textContent = `
     #vf-plus { display: none; }
     #vf-plus-menu { display: none; }
     .vf-nb { display: inline-block; max-width: 100%; word-break: break-all; } /* un mot à traits d'union tient en un bloc ; plus large que sa boîte, il se coupe n'importe où (70-05, P70-D-04) */
+    @media (max-width: 999px) { /* amendement de P70-D-01 (2026-11-06) : le menu « ⋯ » dès 999 px */
+      #hdr-ext > button:not(#vf-lock), #theme-toggle, #btn-health, #flows-btn, #filters-btn { display: none !important; }
+      #vf-plus { display: inline-flex; position: relative; }
+      #vf-plus .badge, .vf-pl-i .badge { min-width: 16px; height: 16px; border-radius: 999px; background: var(--on); color: var(--on-text); font-size: 10px; font-weight: 600; display: grid; place-items: center; padding: 0 var(--sp-4); }
+      #vf-plus .badge { position: absolute; top: var(--sp-8); right: var(--sp-8); min-width: 0; width: 8px; height: 8px; padding: 0; }
+      #vf-plus-voile { position: fixed; inset: 0; z-index: 39; background: var(--scrim); } /* DESIGN.md §5 : un menu se pose toujours sur un voile --scrim */
+      #vf-plus-menu { display: block; position: fixed; z-index: 40; top: calc(var(--hh, 56px) + var(--sp-4)); left: var(--sp-8); right: var(--sp-8); max-height: 60vh; overflow: auto; padding: var(--sp-6); border-radius: 18px; background-color: var(--bg); background-image: linear-gradient(var(--menu-solid), var(--menu-solid)); box-shadow: var(--shadow-float); } /* PU-G-011 : --menu-solid est translucide (.94 en sombre), posé sur le fond plein du thème il devient opaque : le titre ne se lit plus à travers */
+      .vf-pl-i { display: flex; align-items: center; gap: var(--sp-8); width: 100%; min-height: 44px; padding: 0 var(--sp-12); border: 0; border-radius: 12px; background: none; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+      .vf-pl-i:hover { background: rgba(var(--ink), .07); }
+      .vf-pl-i:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+      .vf-pl-i.vf-pl-off { opacity: .5; cursor: default; }
+      .vf-pl-i.vf-pl-off:hover { background: none; }
+      .vf-pl-i .vf-pl-t { flex: 1; min-width: 0; }
+      .vf-pl-i .vf-pl-ic { flex: none; width: 18px; height: 18px; color: var(--text-2); } /* PU-G-011 / PU-G-007 : une icône par ligne, celle du bouton d'origine */
+      .vf-pl-etat { padding: var(--sp-8) var(--sp-12); font-size: 12px; color: var(--text-3); } /* PU-G-012 : légende du point « au travail » */
+    }
+    @media (min-width: 701px) and (max-width: 999px) { #vf-plus-menu { left: auto; width: min(320px, calc(100% - 2 * var(--sp-8))); } }
     @media (max-width: 700px) {
       header { display: flex; flex-wrap: nowrap; align-items: center; }
       header .hl { flex: 1 1 auto; min-width: 0; }
@@ -28,17 +48,7 @@
       .vf-sheet-x:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
       header:has(#btn-up:not([hidden])) .brand { display: none; }
       .vf-tabs { margin-left: var(--sp-6); padding: var(--sp-4); } .vf-tabs a { padding: var(--sp-4) var(--sp-8); font-size: 13px; }
-      #hdr-ext > button:not(#vf-lock), #theme-toggle, #btn-health, #flows-btn, #filters-btn, #btn-panel { display: none !important; }
-      #vf-plus { display: inline-flex; position: relative; }
-      #vf-plus .badge, .vf-pl-i .badge { min-width: 16px; height: 16px; border-radius: 999px; background: var(--on); color: var(--on-text); font-size: 10px; font-weight: 600; display: grid; place-items: center; padding: 0 var(--sp-4); }
-      #vf-plus .badge { position: absolute; top: var(--sp-8); right: var(--sp-8); min-width: 0; width: 8px; height: 8px; padding: 0; }
-      #vf-plus-menu { display: block; position: fixed; z-index: 40; top: calc(var(--hh, 56px) + var(--sp-4)); left: var(--sp-8); right: var(--sp-8); max-height: 60vh; overflow: auto; padding: var(--sp-6); border-radius: 18px; background: var(--menu-solid); box-shadow: var(--shadow-float); }
-      .vf-pl-i { display: flex; align-items: center; gap: var(--sp-8); width: 100%; min-height: 44px; padding: 0 var(--sp-12); border: 0; border-radius: 12px; background: none; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
-      .vf-pl-i:hover { background: rgba(var(--ink), .07); }
-      .vf-pl-i:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
-      .vf-pl-i.vf-pl-off { opacity: .5; cursor: default; }
-      .vf-pl-i.vf-pl-off:hover { background: none; }
-      .vf-pl-i .vf-pl-t { flex: 1; min-width: 0; }
+      #btn-panel { display: none !important; }
     }`;
   document.head.appendChild(style);
 
@@ -46,7 +56,7 @@
   // Q11 (même arbitrage) : le thème dit son état seulement (« Thème : Auto »), pas l'infobulle entière (« … (suit votre appareil). Appuyer pour clair. »)
   const court = (b) => b.id === 'theme-toggle' ? lib(b).split(/[(.]/)[0].trim() : lib(b);
   const pastille = (b) => (b.querySelector('.badge')?.textContent || '').trim();
-  const actions = () => [...hr.querySelectorAll('button')].filter((b) => !['vf-lock', 'vf-plus', 'btn-panel'].includes(b.id) && !b.hidden && !b.closest('.menu'));
+  const actions = () => [...hr.querySelectorAll('button')].filter((b) => !['vf-lock', 'vf-plus', 'btn-panel'].includes(b.id) && !b.hidden && !b.closest('.menu') && (phone.matches || b.id !== 'vf-git-ouvreur')); // de 701 à 999 px l'ouvreur Git reste dans l'en-tête
 
   const plus = document.createElement('button');
   plus.id = 'vf-plus'; plus.type = 'button'; plus.className = 'btn icon';
@@ -58,19 +68,24 @@
   // pastille du « ⋯ » (Q8, « Tout selon les recos (Recommandé) », AskUserQuestion session principale, 2026-11-04) : un simple point de présence, jamais une somme ; les comptes restent sur les entrées du menu
   const majPastille = () => {
     const a = actions().some((b) => pastille(b)); let badge = plus.querySelector('.badge');
+    const t = a ? "Plus d'actions, des compteurs à lire dans le menu" : "Plus d'actions"; plus.title = t; plus.setAttribute('aria-label', t); // PU-G-012 : la pastille dit ce qu'elle annonce
     if (!a) { badge?.remove(); return; }
     if (!badge) { badge = document.createElement('span'); badge.className = 'badge'; badge.setAttribute('aria-hidden', 'true'); plus.appendChild(badge); }
   };
   new MutationObserver((ms) => { if (ms.some((m) => !plus.contains(m.target))) majPastille(); }).observe(hr, { childList: true, subtree: true, characterData: true });
   majPastille();
 
-  let menu = null;
-  const fermer = (rendre) => { if (!menu) return; menu.remove(); menu = null; plus.setAttribute('aria-expanded', 'false'); if (rendre) plus.focus(); };
+  let menu = null, voile = null;
+  const fermer = (rendre) => { if (!menu) return; menu.remove(); voile?.remove(); voile = null; menu = null; plus.setAttribute('aria-expanded', 'false'); if (rendre) plus.focus(); };
   const ouvrir = () => {
     fermer(false);
+    voile = document.createElement('div'); voile.id = 'vf-plus-voile'; voile.setAttribute('aria-hidden', 'true'); document.body.appendChild(voile);
     menu = document.createElement('div'); menu.id = 'vf-plus-menu'; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', "Plus d'actions");
+    const lock = document.getElementById('vf-lock'), etat = lock && (lock.getAttribute('aria-label') || lock.title || '').trim(); // PU-G-012 : légende du point « au travail » (« Personne au travail », « 2 au travail »)
+    if (etat) { const l = document.createElement('div'); l.className = 'vf-pl-etat'; l.setAttribute('role', 'none'); l.textContent = etat; menu.appendChild(l); }
     for (const src of actions()) {
       const it = document.createElement('button'); it.type = 'button'; it.className = 'vf-pl-i'; it.setAttribute('role', 'menuitem');
+      const ic = src.querySelector('svg'); if (ic) { const c = ic.cloneNode(true); c.setAttribute('class', 'i vf-pl-ic'); c.setAttribute('aria-hidden', 'true'); it.appendChild(c); } // PU-G-011 : l'icône du bouton d'origine
       const t = document.createElement('span'); t.className = 'vf-pl-t'; t.textContent = court(src); it.appendChild(t);
       const p = pastille(src); if (p) { const b = document.createElement('span'); b.className = 'badge'; b.textContent = p; it.appendChild(b); }
       // Q13a : une action désactivée l'est aussi dans le menu (aria-disabled, atténuée, même infobulle) ; elle ne fait rien et ne ferme pas le menu
@@ -93,7 +108,7 @@
 
   // le viewer range le zoom dans l'en-tête sur un téléphone : il retourne dans la scène, après le geste du viewer (même requête, écouteur posé après le sien)
   const scene = () => { if (zoom && stage && phone.matches && zoom.parentNode !== stage) stage.insertBefore(zoom, document.getElementById('flowbar')); };
-  phone.addEventListener('change', () => { if (!phone.matches) fermer(false); scene(); }); scene();
+  phone.addEventListener('change', () => { scene(); }); tablette.addEventListener('change', () => { if (!tablette.matches) fermer(false); }); scene();
 
   // pile du zoom : la barre de question change de hauteur (invite, avertissement) et la visite guidée se pose au même endroit : on relit leurs hauteurs, le zoom reste au-dessus des deux
   const ask = document.getElementById('ask');

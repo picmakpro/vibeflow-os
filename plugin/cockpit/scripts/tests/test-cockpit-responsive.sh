@@ -532,7 +532,7 @@ for onglet in index project equipe; do
   done
 done
 for onglet in index project; do # sur l'onglet Équipe, la position du zoom à ≥ 701 px change en 70-12 (P70-D-20) : non jugée ici
-  assert_eq "R14.4 — $onglet / 800 px : la position du zoom est celle d'avant la phase (x,y,largeur,hauteur relevés au premier passage)" "$(mv_ "$WORK/r13-$onglet.json" '(()=>{const z=j.mesures["800"].m.zoom;return z?z.r.join(","):"zoom absent"})()')" "340,108,52,144"
+  assert_eq "R14.4 — $onglet / 800 px : la position du zoom est celle d'avant la phase (x,y,largeur,hauteur : y = 64 = en-tête d'une rangée (56) + 8 depuis l'amendement de P70-D-01, « Icônes dans le menu ⋯ », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 ; 108 quand les icônes occupaient une seconde rangée)" "$(mv_ "$WORK/r13-$onglet.json" '(()=>{const z=j.mesures["800"].m.zoom;return z?z.r.join(","):"zoom absent"})()')" "340,64,52,144"
 done
 assert_eq "R14.5 — Projet / 390 px, pendant un parcours : le zoom et « Remonter d'un niveau » ne se recouvrent pas" "$(mv_ "$WORK/r14-parcours.json" '(()=>{const m=j.mesures["390"].m,z=m.zoom,u=m.upRect;if(!u)return "témoin : « Remonter » absent (aucun parcours)";if(!z||!z.vis)return "zoom absent";const a=z.r,b=u;const x=Math.min(a[0]+a[2],b[0]+b[2])-Math.max(a[0],b[0]),y=Math.min(a[1]+a[3],b[1]+b[3])-Math.max(a[1],b[1]);return x>1.5&&y>1.5?"recouvrement "+Math.round(x)+"x"+Math.round(y)+" px":"aucun"})()')" "aucun"
 assert_eq "R15.1 — 390 px : le bouton Détail est invisible sur les trois onglets" "$(mv_ "$WORK/r13-index.json" 'j.mesures["390"].m.btnPanel')|$(mv_ "$WORK/r13-project.json" 'j.mesures["390"].m.btnPanel')|$(mv_ "$WORK/r13-equipe.json" 'j.mesures["390"].m.btnPanel')" "false|false|false"
@@ -563,7 +563,7 @@ sous_agent() { # sous_agent <numéro de session de agent_actif> <lab> : un sous-
 }
 LE="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-equipe"; mklab "$LE"; sous_agent "$NSESS" "$LE"
 srv "$LE/.vibeflow/cockpit"; P_e=$SRV_PORT; PID_e=$SRV_PID
-zoom_base() { case "$1" in 768) echo "308|108|52|144" ;; 1024) echo "574|72|42|114" ;; 1440) echo "16|842|114|42" ;; esac; } # x|y|largeur|hauteur du zoom de Code et de Projet, relevés sur 794c6dba (labs de la suite)
+zoom_base() { case "$1" in 768) echo "308|64|52|144" ;; 1024) echo "574|72|42|114" ;; 1440) echo "16|842|114|42" ;; esac; } # x|y|largeur|hauteur du zoom de Code et de Projet, relevés sur 794c6dba (labs de la suite)
 J_PAUSE_E='const p = (ms) => new Promise((r) => setTimeout(r, ms));'
 INJ_SESSION="(async () => { $J_PAUSE_E const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0); nd?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); for (let i = 0; i < 60 && !/^Session/.test(document.querySelector('#context .k')?.textContent || ''); i++) await p(50); await p(400); return true; })()"
 OPIDS=()
@@ -571,17 +571,20 @@ mes "http://127.0.0.1:$P_e/equipe.html" 390,768,1024,1440 - > "$WORK/r17-equipe.
 RESP_INJECT="$INJ_SESSION" mes "http://127.0.0.1:$P_e/equipe.html" 390,1024 - > "$WORK/r19-session.json" & OPIDS+=($!)
 mes "http://127.0.0.1:$P_e/project.html" 1024 - > "$WORK/r18-projet.json" & OPIDS+=($!)
 wait "${OPIDS[@]}"
+# R18 (PU-G-001, coque étroite 2026-11-06) : sous 1 280 px la racine du fil prend un libellé court et cède sa place au NOM DU DÉPÔT (masquée plutôt que rognée) ; le témoin ne dit donc plus « fil visible » mais « fil visible ou masqué par la règle » : un fil absent sans l'attribut de masquage reste un échec
+R18X='(() => { const f = document.getElementById("crumbs"), b = f && f.querySelector("button"), s = document.getElementById("search-btn"), v = (e) => e && e.getBoundingClientRect().width > 0 && getComputedStyle(e).display !== "none"; const rf = f && v(f) && v(b) ? f.getBoundingClientRect() : null, rs = s && v(s) ? s.getBoundingClientRect() : null; return { visible: !!rf, masque: !!(b && b.hasAttribute("data-vf-masque")), recherche: !!rs, recouvre: rf && rs ? Math.min(rf.right, rs.right) - Math.max(rf.left, rs.left) > 1 && Math.min(rf.bottom, rs.bottom) - Math.max(rf.top, rs.top) > 1 : false }; })()'
+for pg in equipe project; do CDP_VIEWPORT=1024x768 node "$HERE_T/chrome-cdp.mjs" "$CHROME" 800 "$R18X" "http://127.0.0.1:$P_e/$pg.html" > "$WORK/r18x-$pg.json"; done
 SRV_PID=$PID_e; unsrv
 assert_eq "R17.0 — témoin : la fixture de l'onglet Équipe montre au moins une carte à 1 024 px" "$(mv_ "$WORK/r17-equipe.json" 'j.mesures["1024"].m.nCartes>=1')" "true"
 for w in 768 1024 1440; do
   assert_eq "R17.1 — Équipe / $w px : le zoom est la rangée en bas à gauche (x, écart au bas de la fenêtre, direction)" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;const z=m.zoom;if(!z)return 'zoom absent';return z.r[0]+'|'+(m.fenetre[1]-(z.r[1]+z.r[3]))+'|'+z.dir})()")" "16|16|row"
   assert_eq "R17.1b — Équipe / $w px : le zoom ne recouvre aucune carte" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1?String(m.zoomCartes):'témoin : aucune carte'})()")" "0"
   for onglet in index project; do
-    assert_eq "R17.2 — $onglet / $w px : la position du zoom est celle de 794c6dba (x,y,largeur,hauteur)" "$(mv_ "$WORK/r13-$onglet.json" "(()=>{const z=j.mesures[\"$w\"].m.zoom;return z?z.r.join('|'):'zoom absent'})()")" "$(zoom_base "$w")"
+    assert_eq "R17.2 — $onglet / $w px : la position du zoom est celle de 794c6dba (x,y,largeur,hauteur), au y près à 768 px : 64 au lieu de 108, l'en-tête n'a plus qu'une rangée (amendement de P70-D-01, 2026-11-06)" "$(mv_ "$WORK/r13-$onglet.json" "(()=>{const z=j.mesures[\"$w\"].m.zoom;return z?z.r.join('|'):'zoom absent'})()")" "$(zoom_base "$w")"
   done
 done
-for spec in "Équipe:$WORK/r17-equipe.json" "Projet:$WORK/r18-projet.json"; do
-  assert_eq "R18 — ${spec%%:*} / 1 024 px, lab au nom long : le fil d'Ariane ne recouvre pas la recherche (aire en px² ; témoin : les deux sont visibles)" "$(mv_ "${spec#*:}" '(()=>{const m=j.mesures["1024"].m;return m.filRecherche===null?"témoin : fil ou recherche absents":String(m.filRecherche)})()')" "0"
+for spec in "Équipe:equipe" "Projet:project"; do
+  assert_eq "R18 — ${spec%%:*} / 1 024 px, lab au nom long : le fil d'Ariane ne recouvre pas la recherche (témoin : la recherche est visible, le fil est visible ou masqué par la règle de la racine)" "$(mv_ "$WORK/r18x-${spec#*:}.json" '(()=>{const v=j.resultats[0].valeur;if(!v.recherche)return "témoin : recherche absente";if(!v.visible&&!v.masque)return "témoin : fil absent sans masquage";return v.recouvre?"recouvrement":"aucun"})()')" "aucun"
 done
 for w in 390 768 1024 1440; do
   assert_eq "R19.1 — Équipe / $w px, premier affichage : le titre ne recouvre pas la première carte (aire en px²)" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1&&m.titreRect?String(m.titreCarte):'témoin : titre ou carte absents'})()")" "0"
@@ -590,7 +593,7 @@ for w in 390 1024; do
   assert_eq "R19.2 — Équipe / $w px, session ouverte : le titre ne recouvre pas la première carte (aire en px²)" "$(mv_ "$WORK/r19-session.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1&&m.titreRect?String(m.titreCarte):'témoin : titre ou carte absents'})()")" "0"
 done
 for w in 390 768 1024 1440; do
-  mode=equipe; [ "$w" -lt 1000 ] && mode=equipe-bas
+  mode=equipe-git; [ "$w" -lt 1000 ] && mode=equipe-bas # lab avec Git : le plancher de la recherche est de 152 px de 1 000 à 1 279 px (P78-D-39), comme pour Code et Projet (R1) ; le nom du dépôt entier prend la place avant (PU-G-001)
   assert_eq "R20 — Équipe / $w px : aucune superposition d'en-tête ni de surfaces, aucun défilement horizontal" "$(printf '%s' "$(cat "$WORK/r17-equipe.json")" | node "$AUX/viol.mjs" "$w" "$mode")" "aucune"
 done
 
@@ -664,6 +667,40 @@ if [ $M22 = 0 ]; then # les mutants du repli : sans lui, chacun de ces trois rel
   assert_rouge "R22m — mutant « le repli ne pose plus le point » : Projet parcours à 1 700 px rougit" "$(viol_ "$WORK/m22-projet.json" 1700)"
 fi
 [ $M23 = 0 ] && assert_rouge "R23m — mutant « le menu ne reporte plus l'état désactivé » : la mesure rougit" "$(printf '%s' "$(cat "$WORK/m23.json")" | node "$AUX/ev.mjs" "$EXPR23")"
+
+# R24 (coque étroite, 2026-11-06) — le menu « ⋯ » dès 999 px (amendement de P70-D-01, « Icônes dans le menu ⋯ », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 ; PU-G-008), une icône par ligne et un fond opaque (PU-G-011, PU-G-007 en partie),
+# la légende du point « au travail » (PU-G-012), le nom du dépôt et le libellé court de la racine (PU-G-001), le niveau courant du fil entier (PU-G-002). Lab nommé « vibeflow-os » avec un dossier « scripts » : un nom de 11 caractères, un niveau de 7.
+#   R24.1 701 à 999 px : « ⋯ » visible, les six icônes secondaires hors de l'en-tête, ouvreur Git et Détail restés dehors ; 1 000 px : rien n'est posé (« ⋯ » absent, icônes visibles)
+#   R24.2 menu ouvert à 800 px : une icône par ligne, fond opaque, voile --scrim, légende « Personne au travail » ; R24.3 pastille du « ⋯ » : nom accessible qui dit ce qu'elle annonce
+#   R24.4 dans « scripts » à 1 000 px et en paysage 844 px : le niveau courant est entier (flèche + « scripts »), jamais rogné ; R24.5 racine à 1 000 et 1 279 px : le nom « vibeflow-os » n'est jamais rogné, et à 1 279 px la racine s'écrit « Ensemble » (nom accessible : « Vue d'ensemble »)
+echo "=== R24 — coque étroite : menu « ⋯ » dès 999 px, icônes, légende, fil d'Ariane, nom du dépôt ==="
+LV="$WORK/vibeflow-os"; mkdir -p "$LV/scripts"; for f in vf-cockpit-git vf-cockpit-server vf-cockpit-paths; do printf 'export const x = 1;\n' > "$LV/scripts/$f.mjs"; done; mklab "$LV" sans-agent
+srv "$LV/.vibeflow/cockpit"; P_v=$SRV_PORT; PID_v=$SRV_PID
+cdpv() { CDP_VIEWPORT="$1" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1200 "$2" "http://127.0.0.1:$P_v/index.html"; } # cdpv <LxH> <expression>
+EV24='const vis = (e) => !!e && e.getBoundingClientRect().width > 0 && getComputedStyle(e).display !== "none"; const p = (ms) => new Promise((r) => setTimeout(r, ms));'
+X_MENU="(async () => { $EV24 await p(600); const ids = ['theme-toggle', 'btn-health', 'tour-btn', 'btn-export', 'flows-btn', 'filters-btn'].filter((i) => document.getElementById(i)); return { n: ids.length, hors: ids.filter((i) => !vis(document.getElementById(i))).length, plus: vis(document.getElementById('vf-plus')), ouvreur: vis(document.getElementById('vf-git-ouvreur')), detail: vis(document.getElementById('btn-panel')) }; })()"
+X_OUVERT="(async () => { $EV24 await p(600); document.documentElement.setAttribute('data-theme', 'dark'); const sa = document.getElementById('btn-health'); if (sa && !sa.querySelector('.badge')) { const c = document.createElement('span'); c.className = 'badge'; c.textContent = '4'; sa.appendChild(c); await p(400); } if (!document.getElementById('vf-plus-menu')) { document.getElementById('vf-plus').click(); await p(300); } const m = document.getElementById('vf-plus-menu'), l = [...m.querySelectorAll('.vf-pl-i')], v = document.getElementById('vf-plus-voile'); return { lignes: l.length, sansIcone: l.filter((b) => !b.querySelector('svg.vf-pl-ic')).length, fond: getComputedStyle(m).backgroundColor, image: getComputedStyle(m).backgroundImage.slice(0, 15), voile: !!v && getComputedStyle(v).backgroundColor !== 'rgba(0, 0, 0, 0)', legende: (m.querySelector('.vf-pl-etat') || {}).textContent || '', pastille: document.getElementById('vf-plus').getAttribute('aria-label') }; })()"
+X_FIL="(async () => { $EV24 await p(600); if (document.querySelector('#crumbs button') && !document.getElementById('btn-up').offsetWidth) { window.VibeFlow.go('n:d-scripts'); } await p(900); const b = document.querySelector('#crumbs button.cur'), n = document.getElementById('proj-name'); return { texte: b ? b.textContent.trim() : '', large: b ? Math.round(b.getBoundingClientRect().width) : 0, rogne: b ? b.scrollWidth > b.clientWidth + 1 : null, haut: vis(document.getElementById('btn-up')), nomRogne: n && n.getBoundingClientRect().width > 0 ? n.scrollWidth > n.clientWidth + 1 : null, racine: !!document.querySelector('#crumbs [data-vf-racine]:not([data-vf-masque])') }; })()"
+X_RACINE="(async () => { $EV24 await p(600); const n = document.getElementById('proj-name'), r = document.querySelector('#crumbs [data-vf-racine]'); return { nomRogne: n.scrollWidth > n.clientWidth + 1, nom: n.textContent, racine: r ? { court: r.getAttribute('data-vf-racine'), nomAccessible: r.getAttribute('aria-label'), masque: r.hasAttribute('data-vf-masque') } : null }; })()"
+for w in 701x800 800x600 999x800 1000x800; do eval "R241_${w%%x*}=\"\$(cdpv $w \"\$X_MENU\")\""; done
+R242="$(cdpv 800x600 "$X_OUVERT")"; R242b="$(cdpv 390x844 "$X_OUVERT")"
+R244a="$(cdpv 1000x800 "$X_FIL")"; R244b="$(cdpv 844x390 "$X_FIL")"; R245a="$(cdpv 1000x800 "$X_RACINE")"; R245b="$(cdpv 1279x800 "$X_RACINE")"
+SRV_PID=$PID_v; unsrv
+ev24() { printf '%s' "$1" | node "$AUX/ev.mjs" "$2"; }
+for w in 701 800 999; do
+  vn="R241_$w"
+  assert_eq "R24.1 — $w px : « ⋯ » visible, les icônes secondaires hors de l'en-tête (6 sur 6), ouvreur Git et Détail restés dehors" "$(ev24 "${!vn}" '(()=>{const v=j.resultats[0].valeur;return (v.plus?"plus":"sans plus")+" "+v.hors+"/"+v.n+" "+(v.ouvreur?"ouvreur":"sans ouvreur")+" "+(v.detail?"detail":"sans detail")})()')" "plus 6/6 ouvreur detail"
+done
+assert_eq "R24.1 — 1 000 px : rien n'est posé (« ⋯ » absent, les six icônes secondaires visibles)" "$(ev24 "$R241_1000" '(()=>{const v=j.resultats[0].valeur;return (v.plus?"plus":"sans plus")+" "+v.hors+"/"+v.n})()')" "sans plus 0/6"
+for spec in "800 px:$R242" "390 px:$R242b"; do
+  assert_eq "R24.2 — ${spec%%:*}, menu ouvert, thème sombre : une icône par ligne, fond opaque (--menu-solid sur le fond du thème), voile --scrim, légende du point « au travail »" "$(ev24 "${spec#*:}" '(()=>{const v=j.resultats[0].valeur;const o=/^rgb\(/.test(v.fond);return (v.lignes>=6?"lignes":"témoin : "+v.lignes+" lignes")+" sans-icone="+v.sansIcone+" opaque="+o+" image="+v.image+" voile="+v.voile+" legende="+v.legende})()')" "lignes sans-icone=0 opaque=true image=linear-gradient voile=true legende=Personne au travail"
+  assert_eq "R24.3 — ${spec%%:*} : la pastille du « ⋯ » a un nom accessible qui dit ce qu'elle annonce" "$(ev24 "${spec#*:}" 'j.resultats[0].valeur.pastille')" "Plus d'actions, des compteurs à lire dans le menu"
+done
+for spec in "1000 px:$R244a" "844 px paysage:$R244b"; do
+  assert_eq "R24.4 — dans « scripts » à ${spec%%:*} : le niveau courant est entier (flèche « Remonter » et « scripts », largeur > 30 px, non rogné)" "$(ev24 "${spec#*:}" '(()=>{const v=j.resultats[0].valeur;return v.texte+" rogne="+v.rogne+" haut="+v.haut+" large="+(v.large>30)})()')" "scripts rogne=false haut=true large=true"
+done
+assert_eq "R24.5 — racine à 1 000 px : le nom « vibeflow-os » n'est pas rogné (la racine, qui ne tient pas, est masquée plutôt que rognée)" "$(ev24 "$R245a" '(()=>{const v=j.resultats[0].valeur;return v.nom+" rogne="+v.nomRogne})()')" "vibeflow-os rogne=false"
+assert_eq "R24.5 — racine à 1 279 px : nom non rogné, racine écrite « Ensemble », nom accessible « Vue d'ensemble », non masquée" "$(ev24 "$R245b" '(()=>{const v=j.resultats[0].valeur;return v.nom+" rogne="+v.nomRogne+" "+(v.racine?v.racine.court+"/"+v.racine.nomAccessible+" masque="+v.racine.masque:"racine absente")})()')" "vibeflow-os rogne=false Ensemble/Vue d'ensemble masque=false"
 
 
 vf_hyg_assert
