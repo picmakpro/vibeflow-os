@@ -44,3 +44,43 @@ LM.S2, LM.S3, LM.S5/LM.S6, LM.G1 (chemin du processus), la doublure `ecriture` d
 ## Mutation du harnais pendant la tâche
 
 Le lab de la suite portait d'abord `- [x] Phase 1` (phase finie : bloquant `phase-finie`, la cible n'est jamais proposée) : LM.P3 rendait `lancee=non` pour une mauvaise raison (harnais). Corrigé en `- [ ] Phase 1` AVANT le rouge tracé ; LM.P3 est alors vert (`lancee=oui fuites=0`).
+
+# Tâche 2 — module et processus : trace
+
+Code : `vf-cockpit-lancer-mode.mjs` (57 lignes) ; `vf-cockpit-terminal-processus.mjs` : 199 → 203 lignes (un import, une création de mémoire `garde:mode-support`, `lireProposition` enrichie `garde:mode-servi`, un appel `ecrire` `garde:mode-ecrit` juste après le test de `w.ok` et avant `lq.confirmer`, une phrase d'en-tête). Contrat 72-CONTRATS.md §4 étendu (`mode_retenu`). Liste exacte de clés de Q2 de `test-cockpit-lancer-processus.sh` étendue (`mode_retenu`).
+
+## Corrections du harnais découvertes au premier vert (aucune assertion affaiblie)
+
+Premier rejeu de la suite du mode sur le code livré : 4 FAIL de harnais, tous corrigés avant le rejeu final.
+- LM.S2 (témoin « le processus nomme le module ») comptait EXACTEMENT 1 ligne ; l'en-tête du processus en porte deux (le commentaire cite le module) : le témoin est devenu « au moins une ligne ». L'égalité d'ensemble des importeurs, elle, est inchangée.
+- Trois mutants (M-ECRITURE-DIRECTE témoin Q6, M-ECRITURE-A-LA-DEMANDE, M-ECRITURE-AVANT-LE-SHELL) et la doublure « ecriture » de LM.Q6 jouaient une manche SANS session : `lancer()` rend alors 410 AVANT tout autre contrôle, le mutant n'était jamais atteint (obtenu `410 plan` au lieu de `404 acceptEdits`), et la doublure « 410, fichier inchangé » était verte pour la mauvaise raison. Ces manches ouvrent désormais le flux de l'onglet A (session vivante).
+
+## Ensemble des FAIL attendu en fin de tâche 2 (W-2 : DÉRIVÉ de la trace rejouée, non recopié du plan)
+
+Rejeu final au HEAD 2d54848e plus les fichiers de la tâche 2 : 66 PASS, 6 FAIL, aucun « mutant sans effet », aucune sonde « non jouée ».
+`grep -o 'FAIL — [A-Za-z0-9.-]*' | sort -u` = { LM.C1, LM.C2, LM.C3, LM.S4, M-SERVI-NON-RELU, M-STOCKAGE-RESTE } = exactement l'ensemble du plan. Note sur LM.C2 : le plan prévoyait « vraisemblablement verte avant la tâche 3 » ; elle est ROUGE par construction, car son témoin positif (plan servi donne plan) est faux tant que le client lit son stockage : c'est voulu (un LM.C2 vert à vide, tous les cas « default », ne prouverait rien).
+M-STOCKAGE-RESTE et M-SERVI-NON-RELU sortent en FAIL par leur précondition « sain/mutant » (le client livré n'est pas encore sain : `24/true/2/true/4` et `false/false`) : ce n'est PAS « mutant sans effet » (les ancres `garde:mode-lecture` et `garde:mode-relu` du client de la base existent et le mutant change bien la copie).
+
+## Mutants rejoués sur le code livré (processus, module)
+
+| Mutant | Sonde rougie | Obtenu sous le mutant |
+|---|---|---|
+| M-SANS-REVALIDATION | LM.U2 ; LM.Q5 | moins de 17 contenus forgés valent `default` ; `bypassPermissions` servi tel quel |
+| M-SUIT-LIEN | LM.U3 ; LM.Q5 | lien symbolique lu : `plan` ; Q servie : `plan` |
+| M-DROITS-IGNORES | LM.U3 | `plan,plan,plan,plan,plan` (0644, 0660, 0640 lus) |
+| M-PROPRIETAIRE | LM.U3 | `plan,plan` (autre uid simulé lu) |
+| M-TAILLE | LM.U2 | `plan,1,plan,1` (fstat 4096 déclenche une lecture) |
+| M-BLOQUANT | LM.U3 (FIFO) | `TIMEOUT` (ouverture bloquée, échéance de 20 s) |
+| M-ECRITURE-DIRECTE | LM.U4 ; LM.Q6 (témoin positif) | `true/false/false` (cible ouverte en écriture, ni temporaire ni rename) ; `acceptEdits meme-inode` |
+| M-TEMPORAIRE-RESTE | LM.U4 | un `.tmp` reste après l'échec du rename |
+| M-RELECTURE-A-CHAQUE-SONDAGE | LM.U5 | `plan,acceptEdits` |
+| M-ECRITURE-A-LA-DEMANDE | LM.Q6 | `404 acceptEdits` (un id inconnu réécrit le fichier) |
+| M-ECRITURE-AVANT-LE-SHELL | LM.Q6 | `410 acceptEdits` (le refus du shell laisse le fichier réécrit) ; sa doublure saine (même 410 sans le déplacement) : `410 inchange` |
+| M-MODE-DANS-AUCUNE | LM.Q1 | clés `etat,mode_retenu` |
+| M-NOUVELLE-ROUTE | LM.S3 | `/mode:POST` ajoutée à la table |
+| M-MODE-VERS-P | LM.S5 ; LM.P3 | `1` ligne d'envoi portant le mode ; `lancee=non` (P refuse le message à clé de plus : forme fermée) |
+| M-P-LIT-LE-FICHIER | LM.S2 ; LM.P1 | une référence à `terminal-mode` côté P ; la sentinelle est servie |
+| M-SERVEUR-OUVRE-LE-CHEMIN | LM.G1 | chemin `terminal-mode` à la racine du lab, `check-ignore` rend 1 |
+
+Écarts avec les rouges annoncés par le plan, dits : M-ECRITURE-DIRECTE rougit LM.U4 et le TÉMOIN POSITIF de LM.Q6 (inode inchangé), pas LM.Q3 (qui reste vert : le contenu est bien celui du dernier 204) ; M-NOUVELLE-ROUTE rougit LM.S3 seul (une route sans gestionnaire ne fait rien de plus que répondre 400, aucune écriture : rien à rougir dans LM.Q6) ; M-MODE-VERS-P rougit LM.P3 par le témoin positif « cible marquée lancée » (le message à clé de plus est refusé par P, il ne FUIT donc pas : `fuites=0` reste vrai), pas par une fuite.
+Lignes finales : processus 203, module 57 (`check-file-size.sh` rc 0).
