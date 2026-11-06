@@ -7,7 +7,7 @@ export const STYLE_TIROIR = `
 .vf-term-pastille:hover { background: var(--raise-2); color: var(--text); }
 .vf-term-pastille[hidden], .vf-term-point[hidden] { display: none; }
 .vf-term-pastille svg, .vf-term-bouton svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
-.vf-term-point { width: 6px; height: 6px; border-radius: 50%; background: var(--recent); }
+.vf-term-point { width: 6px; height: 6px; border-radius: 50%; background: var(--recent-text); } /* jamais une teinte d'état sur --raise en clair (DESIGN.md §9) : --recent-text fait 4,3:1 sur --raise clair, --recent 2,9:1 ; sombre identique */
 .vf-term-puce { min-height: 32px; max-width: calc(100vw - 2 * var(--edge)); display: inline-flex; align-items: center; padding: var(--sp-6) var(--sp-12); color: var(--text-3); font-weight: 400; line-height: 1.4; }
 .vf-term-tiroir { position: fixed; left: var(--edge); bottom: var(--edge); right: max(var(--edge), var(--pw, 0px)); height: 320px; z-index: 8; border-radius: var(--r-panel); background: var(--surface); box-shadow: var(--shadow-float); }
 .vf-term-tiroir[hidden] { display: none; }

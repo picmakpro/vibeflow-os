@@ -555,6 +555,32 @@ assert_eq "TU.13 — aucune adresse web écrite en entier dans le script inject�
 assert_eq "TU.13b — un seul fetch( et il vise /api/vf/terminal ; aucun cookie ; seules clés de stockage : vf.terminal.h et vf.terminal.open" "$(rj "$SG" '(j.taille>500)+"/"+j.fetchs+"/"+j.api+"/"+j.cookie+"/"+j.cles')" "true/1/true/0/vf.terminal.h,vf.terminal.open"
 assert_eq "T17.6 — aucun postMessage( dans le script injecté (le sens P vers le cadre est fermé), aucun attribut allow posé, Échap jamais cité (le script est vivant)" "$(rj "$SG" '(j.taille>500)+"/"+j.postmsg+"/"+j.allow+"/"+j.echap')" "true/0/0/0"
 
+echo "=== T23 — point de la pastille fermée : jamais une teinte d'état sur --raise en clair (71.5, juge de rendu 2026-11-06 ; DESIGN.md §9) ==="
+cat > "$AUX/contraste-point.mjs" <<'JS'
+// contraste-point.mjs <style.mjs> <viewer.html> : rapport de contraste du point `.vf-term-point` sur --raise, thème sombre puis clair ; UNE ligne « sombre=N clair=N ».
+import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
+const { STYLE_TIROIR } = await import(pathToFileURL(process.argv[2]).href); const html = fs.readFileSync(process.argv[3], 'utf8');
+const bloc = (re) => { const m = re.exec(html); return m ? m[0] : ''; };
+const jetons = { sombre: bloc(/:root \{[\s\S]*?\n\}/), clair: bloc(/:root\[data-theme="light"\] \{[\s\S]*?\n\}/) };
+const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+const L = (h) => { const n = parseInt(h.slice(1), 16); return 0.2126 * lin(n >> 16) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255); };
+const ratio = (a, b) => { const [x, y] = [L(a), L(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const regle = /\.vf-term-point \{[^}]*background: var\((--[\w-]+)\)/.exec(STYLE_TIROIR); const out = [];
+for (const t of ['sombre', 'clair']) {
+  const val = (nom) => { const m = new RegExp(nom + ': (#[0-9a-fA-F]{6})').exec(jetons[t]) || (t === 'clair' ? new RegExp(nom + ': (#[0-9a-fA-F]{6})').exec(jetons.sombre) : null); return m && m[1]; };
+  const fond = val('--raise'), pt = regle && val(regle[1]);
+  out.push(t + '=' + (fond && pt ? ratio(pt, fond).toFixed(2) : 'illisible'));
+}
+console.log(out.join(' '));
+JS
+CT="$(node "$AUX/contraste-point.mjs" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
+assert_eq "T23.1 — le point de la pastille fermée fait au moins 3:1 sur --raise dans les deux thèmes (sombre inchangé : 8,6:1 ; clair : --recent-text 4,3:1, --recent faisait 2,9:1)" "$(echo "$CT" | awk '{ split($1,a,"="); split($2,b,"="); print (a[2]+0 >= 3 && b[2]+0 >= 3) ? "ok" : "ko" }') [$CT]" "ok [$CT]"
+MUTP="$WORK/mut-point-style.mjs"; sed 's|background: var(--recent-text); }|background: var(--recent); }|' "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" > "$MUTP"
+if cmp -s "$MUTP" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs"; then sans_effet "M-POINT-RECENT"; else
+  CM="$(node "$AUX/contraste-point.mjs" "$MUTP" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
+  assert_eq "M-POINT-RECENT — l'ancien point (--recent) rougit T23.1 : clair sous 3:1 (témoin : le sombre est lu)" "$(echo "$CM" | awk '{ split($1,a,"="); split($2,b,"="); print (a[2]+0 >= 3 && b[2]+0 < 3) ? "rouge" : "vert" }')" "rouge"
+fi
+
 echo "=== T17.4 — table de accepteMessage et mutants M-MSG-* ==="
 ATT_TABLE="accepte=oui accepte-ready=oui origine-de-P=non origine-voisine=non source-autre=non source-nulle=non valeur-inconnue=non objet=non tableau=non chaine-10000=non non-fiable=non confiance-absente=non"
 node "$AUX/harnais-msg.mjs" "$OUT" > "$WORK/h.out" 2>&1
