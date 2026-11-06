@@ -83,6 +83,8 @@ const json = (l) => { try { return JSON.parse(l); } catch { return null; } };
 // liste blanche : mandat = contenu chaîne de la première ligne `user` ; messages = blocs `text` des lignes `assistant` ; outils = nom et cible réduite des blocs `tool_use`.
 // Tout le reste (lignes user ultérieures, api-request*, attachment, blocs thinking et tool_result, champ des résultats d'outils) n'est jamais lu.
 // Le coût est borné par ce qui sort (F4) : la fenêtre n'est qu'analysée ; masque et étiquette (donc realpath) ne s'appliquent qu'aux 50 messages et 200 outils gardés.
+// PU-G-170 : des appels consécutifs de même étiquette (même outil, même verbe, même cible) ne font plus qu'une entrée, avec leur nombre `n` (absent pour un appel seul) ; le regroupement ne lit que l'étiquette déjà réduite, jamais une valeur d'entrée (liste blanche inchangée)
+const regrouper = (liste) => liste.reduce((acc, e) => { const d = acc[acc.length - 1]; if (d && d.outil === e.outil && d.verbe === e.verbe && d.cible === e.cible) d.n = (d.n || 1) + 1; else acc.push({ ...e }); return acc; }, []);
 export function reduireTranscript(fichier, { root, roles } = {}) {
   try { return reduire(fichier, root, roles); } catch { return { mandat: '', messages: [], outils: [], tronque: true }; } // aucune exception ne remonte à l'appelant
 }
@@ -109,5 +111,5 @@ function reduire(fichier, root, roles) {
   if (msgs.length > MAX_MESSAGES) { msgs = msgs.slice(-MAX_MESSAGES); tronque = true; }
   if (outs.length > MAX_OUTILS) { outs = outs.slice(-MAX_OUTILS); tronque = true; }
   if (msgs.some((t) => t.length > BORNE_MESSAGE)) tronque = true;
-  return { mandat, messages: msgs.map((t) => coupe(t, BORNE_MESSAGE)), outils: outs.map((o) => etiquette(o.n, o.i, root, roles)), tronque };
+  return { mandat, messages: msgs.map((t) => coupe(t, BORNE_MESSAGE)), outils: regrouper(outs.map((o) => etiquette(o.n, o.i, root, roles))), tronque };
 }
