@@ -2,7 +2,8 @@
 // Usage : node chrome-moteur-carte.mjs <chrome> <racine-du-serveur> <identifiant-de-session-équipe>
 //   UN Chrome, plusieurs pages (en anglais : ?lang=en, pour que les libellés du moteur soient lus tels qu'il les écrit, sans le dictionnaire).
 //   Chaque mesure est interrogée dans la page (jamais une durée fixe pour décider d'un état). Rend une ligne JSON { <clé>: valeur } ou { erreur }.
-//   Clés : modale · noms · stats · document · encart · echap · rangees · feuille · retour · jalon · pastille · info · bague · halo · equipe
+//   Clés : panneau · modale · noms · stats · document · encart · echap · rangees · feuille · retour · jalon · pastille · info · bague · halo · equipe
+//   M5 : colonnes · titres · retour059 · reponse · recent · dedoublon
 import { executer, pause } from './chrome-session.mjs';
 const [, , chrome, racine, equipeSession] = process.argv;
 const U = (page) => `${racine}/${page}?lang=en`;
@@ -126,5 +127,64 @@ await executer(chrome, async (s) => {
   await vue(390, 844, true); await charger('equipe.html');
   await aller('n:ag-' + equipeSession);
   o.equipe = JSON.parse(await s.ev(`JSON.stringify((() => { const cs = [...document.querySelectorAll('#viewport .node .card')].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0); return { cartes: cs.length, colonnes: new Set(cs.map((r) => Math.round(r.left / 20))).size, debordent: cs.filter((r) => r.right > innerWidth + 1 || r.left < -1).length }; })())`));
+  // ---------- M5 : diagnostics de viewer.html (DG-12 colonnes, DG-04 vue de réponse, DG-03 compteurs, PU-G-049 homonymes) ----------
+  await vue(1280, 720); await charger('index.html');
+  // DG-12 / PU-G-040 : une carte sans aucun lien, dans la vue d'une partie qui a des liens avec l'extérieur, se range dans la colonne « Inside … », jamais sous « Used by »
+  await aller('n:m-mod.scripts');
+  o.colonnes = JSON.parse(await s.ev(`JSON.stringify((() => { const ch = VibeFlow.state.layout.children; const ins = ch.filter((c) => c.id.startsWith('x:in:')); const seul = ch.find((c) => c.id === 'f:plugin/mod/scripts/seul.sh'); const droite = Math.max(...ins.map((c) => c.x + c.width));
+    return { appelants: ins.length, seul: !!seul, seulX: seul ? Math.round(seul.x) : null, droiteDesAppelants: Math.round(droite), apres: !!seul && seul.x >= droite, chevauche: ch.some((a) => ch.some((b) => a !== b && a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height)) }; })())`));
+  // titres de colonnes : leur hauteur à l'écran, à l'ouverture puis la carte éloignée (le titre ne rapetisse pas avec elle)
+  const hauteurs = async () => JSON.parse(await s.ev("JSON.stringify([...document.querySelectorAll('#viewport .cols text')].map((t) => Math.round(t.getBoundingClientRect().height)))"));
+  o.titres = { ouverture: await hauteurs(), k0: await s.ev('VibeFlow.state.t.k') };
+  for (let i = 0; i < 2; i++) { await s.ev("document.querySelector('#z-out').click()"); await pause(150); }
+  o.titres.eloigne = await hauteurs(); o.titres.k1 = await s.ev('VibeFlow.state.t.k');
+
+  // DG-04 / PU-G-059 : la carte revient à la vue d'ensemble (Échap, ou le fil d'Ariane) : le panneau de droite redevient « Base de code », sans la réponse
+  await charger('index.html');
+  const panneau = () => s.ev("(document.querySelector('#panel h2') || { innerText: '' }).innerText");
+  const racine = await panneau();
+  const TABLEAU = "VibeFlow.showBoard({ kind: 'Answer', title: 'Titre du tableau', question: 'Q', items: ['f:plugin/mod/README.md', 'f:plugin/mod/scripts/run.sh'] })";
+  const montrer = async () => { await s.ev(TABLEAU); await s.attendre("VibeFlow.state.container === 'q:answer' && !!document.querySelector('#viewport .node')", 'tableau montré'); await pause(500); };
+  await montrer(); const surTableau = await panneau();
+  await s.ev('document.body.focus()'); await echap(); await s.attendre("VibeFlow.state.container === 'root'", 'vue d\'ensemble (Échap)'); await pause(500);
+  const viaEchap = { vue: await s.ev('VibeFlow.state.container'), titre: await panneau(), selection: await s.ev('String(VibeFlow.state.selected)') };
+  await montrer();
+  await s.ev("[...document.querySelectorAll('#crumbs button')][0].click()"); await s.attendre("VibeFlow.state.container === 'root'", 'vue d\'ensemble (fil)'); await pause(500);
+  const viaFil = { vue: await s.ev('VibeFlow.state.container'), titre: await panneau(), selection: await s.ev('String(VibeFlow.state.selected)') };
+  o.retour059 = { racine, surTableau, viaEchap, viaFil };
+
+  // DG-04 / PU-G-143, PU-G-144 : une réponse sans carte n'a pas de tableau — ni bouton « Show answer board », ni tableau de la question d'avant, ni erreur
+  const REPONDRE = (ans) => `(() => { window.__ans = ${JSON.stringify(ans)}; if (!window.__mockAsk) { window.__mockAsk = true; const f = window.fetch; window.fetch = (u, x) => String(u).includes('/api/ask') ? Promise.resolve(new Response('event: answer\\ndata: ' + JSON.stringify(window.__ans) + '\\n\\n')) : f(u, x); } })()`;
+  const avecCartes = { title: 'Premier tableau', answer: 'Voici des cartes.', items: ['n:m-mod', 'f:plugin/mod/README.md', 'f:plugin/mod/scripts/run.sh', 'f:plugin/mod/scripts/check.sh'], steps: [], followups: [] };
+  const sansCarte = { title: 'Sans carte', answer: 'Aucune carte pour celle-ci.', items: [], steps: [], followups: [] };
+  const attendreFeuille = (texte) => s.attendre(`!document.querySelector('#ask-sheet').hidden && document.querySelector('#ask-sheet .sb').innerText.includes(${JSON.stringify(texte)})`, `réponse « ${texte} »`);
+  const feuille = () => s.ev("JSON.stringify({ bouton: !!document.querySelector('#ask-sheet [data-act=\"board\"]'), vue: VibeFlow.state.container, titre: (document.querySelector('#context h1') || { innerText: '' }).innerText, erreurs: window.__errs.length })").then(JSON.parse);
+  await charger('index.html');
+  await s.ev("window.__errs = []; addEventListener('unhandledrejection', (e) => window.__errs.push(String((e.reason && e.reason.message) || e.reason))); addEventListener('error', (e) => window.__errs.push(String(e.message)))");
+  await s.ev(REPONDRE(sansCarte)); await poser('Une question sans carte ?'); await attendreFeuille('Aucune carte'); await pause(400);
+  const frais = await feuille();
+  await s.ev("VibeFlow.go('q:answer')"); await pause(900); // ce que faisait le bouton
+  frais.apresAller = { vue: await s.ev('VibeFlow.state.container'), erreurs: await s.ev('window.__errs.slice()') };
+  await charger('index.html');
+  await s.ev("window.__errs = []; addEventListener('unhandledrejection', (e) => window.__errs.push(String((e.reason && e.reason.message) || e.reason)))");
+  await s.ev(REPONDRE(avecCartes)); await poser('Une question avec cartes ?'); await attendreFeuille('Voici des cartes'); await pause(600);
+  const premier = await feuille();
+  await s.ev(REPONDRE(sansCarte)); await poser('La suivante, sans carte ?'); await attendreFeuille('Aucune carte'); await pause(900);
+  const suivant = await feuille();
+  o.reponse = { frais, premier, suivant };
+
+  // DG-03 / PU-G-054 : le badge de Travail récent et le titre du tableau disent le même nombre ; un tableau coupé à 24 cartes le dit
+  await charger('index.html');
+  const titreTableau = () => s.ev("document.querySelector('#context .k').innerText.replace(/\\s+/g, ' ').trim()");
+  o.recent = { badge: await s.ev("document.querySelector('#btn-recent .badge').innerText") };
+  await s.ev("document.querySelector('#btn-recent').click()"); await s.attendre("VibeFlow.state.container === 'q:answer' && !!document.querySelector('#viewport .node')", 'tableau du travail récent'); await pause(500);
+  o.recent.titre = await titreTableau();
+  const nbFichiers = await s.ev('VibeFlow.files.size');
+  await s.ev("VibeFlow.showBoard({ kind: 'Recent work', title: 'Recent work', items: [...VibeFlow.files.keys()].map((k) => 'f:' + k) })"); await pause(900);
+  o.recent.coupe = { titre: await titreTableau(), fichiers: nbFichiers, cartes: await s.ev('VibeFlow.state.answer.items.length') };
+
+  // PU-G-049 : les lignes « Recent work inside » portent le dossier parent des homonymes (deux README)
+  await charger('index.html'); await aller('n:m-mod'); await pause(300);
+  o.dedoublon = JSON.parse(await s.ev(`JSON.stringify((() => { const h = [...document.querySelectorAll('#panel h3')].find((x) => /^Recent work inside/.test(x.innerText)); return { section: !!h, noms: h ? [...h.parentElement.querySelectorAll('.rn')].map((x) => x.innerText.trim()) : [] }; })())`));
   return o;
 }, { csp: false });

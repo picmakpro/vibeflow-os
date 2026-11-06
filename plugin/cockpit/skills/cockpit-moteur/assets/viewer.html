@@ -1095,7 +1095,8 @@ async function layout(view) {
       'elk.layered.spacing.nodeNodeBetweenLayers': '130', 'elk.spacing.nodeNode': '32',
       'elk.layered.spacing.edgeEdgeBetweenLayers': '8', 'elk.spacing.edgeEdge': '8', 'elk.layered.spacing.edgeNodeBetweenLayers': '24',
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX', 'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
-      'elk.layered.thoroughness': '12', 'elk.separateConnectedComponents': 'true', 'elk.spacing.componentComponent': '80',
+      // a card with no connection is a component of its own, and ELK packs components from the left edge: in a view with outside connections it landed under « Used by » (PU-G-040). Without the separation it takes the first layer of the middle column.
+      'elk.layered.thoroughness': '12', 'elk.separateConnectedComponents': view.connectors?.length && view.visible.some((v) => !deg.get(v)) ? 'false' : 'true', 'elk.spacing.componentComponent': '80',
       'elk.padding': '[top=40,left=40,bottom=40,right=40]',
       ...(innerWidth <= 700 && /\/equipe\.html$/.test(location.pathname) ? { 'elk.aspectRatio': '0.2' } : {}), // one column on a phone, Team tab only: the Code map and the Project roadmap keep their layout (PU-G-176)
     },
@@ -1149,6 +1150,7 @@ function draw(view, res) {
   const gCols = el('g', { class: 'cols' }, vp);
   const gEdges = el('g', { class: 'edges' }, vp), gFx = el('g', {}, vp), gNodes = el('g', {}, vp), gPorts = el('g', { class: 'edges' }, vp);
   state.fxLayer = gFx;
+  colsG = gCols; colsK = 0; // the titles follow the zoom: drawn again by applyTransform, once the fit has set it
   drawColumns(gCols, view, res);
   state.edgeEls = new Map(); state.chipEls = new Map();
   for (const re of res.edges || []) {
@@ -1195,6 +1197,9 @@ function draw(view, res) {
 
 /** Brackets over the three columns of a view that has outside connections: what uses this part (left),
  *  what's inside it (middle), and what it uses (right). Drawn in map space so they pan and zoom with it. */
+let colsG = null, colsK = 0;
+/** A column title keeps 13 px on the screen when the map is zoomed out (it read about 6 px), up to 32 px of map space (PU-G-040). */
+const colFont = (k) => clamp(13 / k, 13, 32);
 function drawColumns(g, view, res) {
   if (!view.connectors?.length || state.container === 'root' || state.container === 'q:answer') return;
   const span = (cs) => cs.length ? [Math.min(...cs.map((c) => c.x)), Math.max(...cs.map((c) => c.x + c.width))] : null;
@@ -1206,10 +1211,11 @@ function drawColumns(g, view, res) {
   for (const [s, label] of cols) {
     if (!s) continue;
     const [x0, x1] = s, cx = (x0 + x1) / 2;
-    const half = Math.min(textW(label, 13, 500) / 2 + 10, (x1 - x0) / 2 - 12);
+    const fs = colFont(state.t.k);
+    const half = Math.min(textW(label, fs, 500) / 2 + 10, (x1 - x0) / 2 - 12);
     // ⌐—— label ——¬ : end ticks curl down toward the cards, with a gap in the line for the label
     el('path', { d: `M${x0},${y + 9} v-5 q0,-4 4,-4 H${cx - half} M${cx + half},${y} H${x1 - 4} q4,0 4,4 v5` }, g);
-    el('text', { x: cx, y }, g).textContent = label;
+    const t = el('text', { x: cx, y }, g); t.textContent = label; t.style.fontSize = fs + 'px';
   }
 }
 
@@ -1332,6 +1338,7 @@ function applyTransform() {
   vp.style.transform = `translate(${x}px,${y}px) scale(${k})`;
   svg.classList.toggle('lod-low', k < 0.42);
   svg.classList.toggle('lod-mid', k >= 0.42 && k < 0.65);
+  if (colsG && state.view && state.layout && Math.abs(colFont(k) - colsK) > 0.5) { colsK = colFont(k); colsG.replaceChildren(); drawColumns(colsG, state.view, state.layout); }
 }
 const stageRect = () => svg.getBoundingClientRect();
 function setT(t, animate) {
@@ -1448,6 +1455,8 @@ function readHash() {
 window.addEventListener('popstate', () => { const { v, s } = readHash(); go(v, { select: s, push: false }); });
 
 async function go(container, { select: sel = null, push = true, zoomFrom = null, after, force = false } = {}) {
+  if (container === 'q:answer' && !state.answer?.items) return; // no answer on a board to show (the last one had no cards): nothing to open, no error (PU-G-144)
+  if (sel === 'q:answer' && container !== 'q:answer') sel = null; // leaving the answer board: its details do not follow to the map (PU-G-059)
   hideTip();
   custom.panel = null;
   const changed = container !== state.container;
@@ -1532,7 +1541,7 @@ function applySelection() {
 // ======================= chrome: context, crumbs, legend =======================
 function renderContext() {
   if (state.container === 'q:answer') {
-    $('#context').innerHTML = `<div class="k"><span class="ico" style="--c:var(--on)">${icon(state.answer.icon || 'spark')}</span>${h(state.answer.kind || 'Answer')} · ${plural(state.answer.items.length, 'card')}</div><h1>${h(state.answer.title)}</h1><p>${h(state.answer.question)}</p>`;
+    $('#context').innerHTML = `<div class="k"><span class="ico" style="--c:var(--on)">${icon(state.answer.icon || 'spark')}</span>${h(state.answer.kind || 'Answer')} · ${state.answer.total > state.answer.items.length ? `${state.answer.items.length} of ${state.answer.total} cards` : plural(state.answer.items.length, 'card')}</div><h1>${h(state.answer.title)}</h1><p>${h(state.answer.question)}</p>`;
     return;
   }
   const i = info(state.container);
@@ -2116,7 +2125,7 @@ let keepSheet = false; // the answer's own links move around the map without put
 function sheetShell(question, body) {
   sheet.hidden = false;
   sheet.innerHTML = `<div class="sh"><span class="q" title="${h(question)}">${h(question)}</span>
-    ${askState.last && state.container !== 'q:answer' ? '<button class="btn soft" data-act="board">Show answer board</button>' : ''}
+    ${askState.last?.items?.length && state.container !== 'q:answer' ? '<button class="btn soft" data-act="board">Show answer board</button>' : ''}
     ${state.container === 'q:answer' ? '<button class="btn soft" data-act="map">Back to map</button>' : ''}
     <button class="btn icon" data-act="close" title="Close">${iconI('x')}</button></div><div class="sb">${body}</div>`;
   sheet.querySelector('[data-act="close"]').onclick = () => { if (askState.busy) cancelAsk(); sheet.hidden = true; if (state.container === 'q:answer') backToAsker(); else fit(true); };
@@ -2150,7 +2159,12 @@ function showAnswer(raw, question) {
   const a = { title: String(raw.title || 'Answer'), answer: String(raw.answer || ''), items: items.slice(0, 18), steps, followups: (raw.followups || []).map(String), question };
   askState.last = a;
   if (a.items.length) { state.answer = a; go('q:answer', { force: true, after: () => renderAnswer(a) }); }
-  else renderAnswer(a);
+  else {
+    // an answer with no card has no board: the one behind belonged to the previous question, so it goes (PU-G-143, PU-G-144)
+    const wasBoard = state.container === 'q:answer';
+    state.answer = null;
+    if (wasBoard) backToAsker(true); else renderAnswer(a);
+  }
 }
 function showFailure(question, code, message, partial) {
   if (code === 'not_logged_in' || code === 'not_granted') setWarning(code);
@@ -2309,6 +2323,7 @@ async function submitAsk() {
   if (askState.mode === 'change') return requestChange(ctxIds.length ? `${question}\n\nThis is about: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.` : question);
   const shown = question;
   noteAskOrigin();
+  askState.last = null; // the previous answer is not this question's: no « Show answer board » for it while this one is pending (PU-G-143)
   // what Claude sees: the question plus the pinned items, by id, so it starts from them
   if (ctxIds.length) question += `\n\nFocus on these map items: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.`;
   setBusy(true);
@@ -2469,7 +2484,8 @@ let toastTimer = null;
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 2200); }
 function showBoard({ title, question = '', answer = '', items = [], steps = [], kind = '', icon: ic = '' }) {
   const clean = (arr) => (arr || []).map((x) => typeof x === 'string' ? { id: x, note: '' } : x).filter((x) => x && Q.exists(String(x.id))).map((x) => ({ id: String(x.id), note: String(x.note || '') }));
-  const a = { title: title || 'Board', question, answer, items: clean(items).slice(0, 24), steps: clean(steps), followups: [], ...(kind ? { kind } : {}), ...(ic ? { icon: ic } : {}) };
+  const all = clean(items); // the board holds 24 cards at most; when it is cut, its title says so (PU-G-054)
+  const a = { title: title || 'Board', question, answer, items: all.slice(0, 24), ...(all.length > 24 ? { total: all.length } : {}), steps: clean(steps), followups: [], ...(kind ? { kind } : {}), ...(ic ? { icon: ic } : {}) };
   if (!a.items.length) { toast('Nothing on the map matches that.'); return; }
   noteAskOrigin();
   state.answer = a; askState.last = a;
@@ -2488,7 +2504,7 @@ window.Floorplan = Object.freeze({
   version: 1,
   graph: G, query: Q, state, agent: AGENT, exported: EXPORTED,
   // model helpers
-  info, chain, children: (id) => visibleKids(id), parentOf: (id) => parentOf.get(id), exists: (id) => Q.exists(id),
+  info, shownName, chain, children: (id) => visibleKids(id), parentOf: (id) => parentOf.get(id), exists: (id) => Q.exists(id),
   files, nodes, routes, colorOf, iconKey,
   // html helpers
   h, icon, iconI, fmt, plural, md,

@@ -8,6 +8,9 @@
 #   K6 lignes du panneau atteignables au Tab (PU-G-174) · K7 Échap hors du canevas ne remonte pas d'un niveau (PU-G-175)
 #   K8 anneau de focus de l'en-tête à toutes les largeurs (PU-G-013) · K9 repérage sans halo, 700 ms au plus
 #   K10 bulle de réponse : hauteur limitée, refermée au changement de vue (PU-G-149) · K11 « Retour » revient à la carte d'où partait la question (PU-G-148)
+#   K14 panneau de détail fermé par défaut à 768 px, ouvert à 1 024 px (PU-G-045)
+#   K15 colonnes d'une vue de partie : carte sans lien dans la colonne du milieu, titres lisibles (PU-G-040) · K16 vue de réponse remise à zéro (PU-G-059, PU-G-143, PU-G-144)
+#   K17 compteurs et homonymes du travail récent (PU-G-054, PU-G-049)
 #   K12 nœud d'une mission : état réel en glyphe et mot, plus de « 0 » ni de « 0 lines » (PU-G-105) · K13 onglet Équipe à 390 px : une seule colonne (PU-G-176)
 # Un chargement de page unique (chrome-moteur-carte.mjs, un Chrome, profil jetable) ; les assertions se lisent ensuite sur sa sortie JSON. Lab construit par la suite, dans mktemp.
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
@@ -52,8 +55,11 @@ mklab() { # mklab <dir> : un module avec un document et deux scripts qui s'appel
   printf '# Module\n\nLancer `run.sh`, puis `check.sh`.\n' > "$L/plugin/mod/README.md"
   printf '#!/usr/bin/env bash\necho run\n' > "$L/plugin/mod/scripts/run.sh"
   printf '#!/usr/bin/env bash\nsource ./run.sh\necho check\n' > "$L/plugin/mod/scripts/check.sh"
+  printf '#!/usr/bin/env bash\necho seul\n' > "$L/plugin/mod/scripts/seul.sh" # aucun lien : sa carte forme un composant à part (PU-G-040)
+  printf '# Scripts\n\nLes scripts du module.\n' > "$L/plugin/mod/scripts/README.md" # homonyme du README du module (PU-G-049)
+  mkdir -p "$L/lots"; for i in $(seq -w 1 30); do printf '# Note %s\n' "$i" > "$L/lots/n$i.md"; done # de quoi remplir un tableau au-delà de son plafond de 24 cartes (PU-G-054)
   printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n' > "$B/ROADMAP.md"
-  printf '<objective>Faire le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"; echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
+  printf -- '---\nfiles_modified: [plugin/mod/README.md, plugin/mod/scripts/README.md]\n---\n<objective>Faire le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"; echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
   printf '{"nodes":[{"id":"a","step":"première étape","stage":"","deps":[],"scope":["src/**"],"status":"done"},{"id":"b","step":"seconde étape","stage":"","deps":["a"],"scope":["src/**"],"status":"running"},{"id":"c","step":"troisième étape","stage":"","deps":["b"],"scope":["src/**"],"status":"failed"}]}\n' > "$B/missions/demo.dag.json"
   git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
   node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
@@ -116,6 +122,27 @@ echo "=== K13 — onglet Équipe à 390 px ==="
 assert_eq "K13.1 — contrôle positif : la session porte une grille d'au moins 3 cartes" "$(E 'j.equipe.cartes >= 3')" "true"
 assert_eq "K13.2 — une seule colonne de cartes" "$(E 'j.equipe.colonnes')" "1"
 assert_eq "K13.3 — aucune carte ne déborde de l'écran" "$(E 'j.equipe.debordent')" "0"
+echo "=== K15 — colonnes de la vue d'une partie (DG-12, PU-G-040) ==="
+assert_eq "K15.1 — contrôle positif : la vue a une colonne « Used by » et la carte sans lien" "$(E 'j.colonnes.appelants > 0 && j.colonnes.seul')" "true"
+assert_eq "K15.2 — la carte sans lien est rangée dans la colonne du milieu, à droite de « Used by »" "$(E 'j.colonnes.apres')" "true"
+assert_eq "K15.3 — aucune carte n'en recouvre une autre" "$(E 'j.colonnes.chevauche')" "false"
+assert_eq "K15.4 — à l'ouverture, les titres de colonnes font 14 px à l'écran au moins" "$(E 'j.titres.ouverture.length > 0 && Math.min(...j.titres.ouverture) >= 14')" "true"
+assert_eq "K15.5 — la carte éloignée (contrôle positif : zoom sous 0,7), ils gardent 14 px au moins" "$(E 'j.titres.k1 < 0.7 && Math.min(...j.titres.eloigne) >= 14')" "true"
+echo "=== K16 — vue de réponse remise à zéro (DG-04, PU-G-059, PU-G-143, PU-G-144) ==="
+assert_eq "K16.1 — contrôle positif : sur le tableau, le panneau montre bien son titre" "$(E 'j.retour059.surTableau')" "Titre du tableau"
+assert_eq "K16.2 — Échap vers la vue d'ensemble : le panneau redevient celui de la vue d'ensemble" "$(E 'j.retour059.viaEchap.vue + "|" + j.retour059.viaEchap.titre + "|" + j.retour059.viaEchap.selection')" "$(E 'j.retour059.viaEchap.vue + "|" + j.retour059.racine + "|null"')"
+assert_eq "K16.3 — le fil d'Ariane « Overview » : de même" "$(E 'j.retour059.viaFil.vue + "|" + j.retour059.viaFil.titre + "|" + j.retour059.viaFil.selection')" "$(E 'j.retour059.viaFil.vue + "|" + j.retour059.racine + "|null"')"
+assert_eq "K16.4 — contrôle positif : une réponse avec cartes montre bien son tableau et son bouton se pose au retour" "$(E 'j.reponse.premier.vue + "|" + j.reponse.premier.titre')" "q:answer|Premier tableau"
+assert_eq "K16.5 — une réponse sans carte, après un tableau : plus de bouton « Show answer board »" "$(E 'j.reponse.suivant.bouton')" "false"
+assert_eq "K16.6 — … et le tableau de la question d'avant n'est plus affiché" "$(E 'j.reponse.suivant.titre !== "Premier tableau"')" "true"
+assert_eq "K16.7 — une première réponse sans carte : pas de bouton « Show answer board »" "$(E 'j.reponse.frais.bouton')" "false"
+assert_eq "K16.8 — … et ouvrir la vue de réponse sans réponse ne lève aucune erreur et ne change pas de vue" "$(E 'j.reponse.frais.apresAller.vue + "|" + j.reponse.frais.apresAller.erreurs.length')" "root|0"
+echo "=== K17 — compteurs et homonymes du travail récent (DG-03, PU-G-054, PU-G-049) ==="
+assert_eq "K17.1 — le titre du tableau dit le nombre du badge" "$(E 'j.recent.titre')" "Recent work · $(E 'j.recent.badge') cards"
+assert_eq "K17.2 — contrôle positif : le lab a plus de 24 fichiers à mettre sur un tableau" "$(E 'j.recent.coupe.fichiers > 24')" "true"
+assert_eq "K17.3 — un tableau coupé à 24 cartes dit l'écart dans son titre" "$(E 'j.recent.coupe.titre')" "Recent work · 24 of $(E 'j.recent.coupe.fichiers') cards"
+assert_eq "K17.4 — contrôle positif : le panneau d'une partie liste deux modifications dedans" "$(E 'j.dedoublon.section && j.dedoublon.noms.length')" "2"
+assert_eq "K17.5 — les deux README s'y distinguent par leur dossier parent" "$(E "j.dedoublon.noms.every((x) => /^Readme · \\S+/.test(x)) && new Set(j.dedoublon.noms).size === 2")" "true"
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

@@ -79,8 +79,7 @@
     const inside = uniq(items.filter((it) => it.id !== key && SC.chain(it.id).includes(key)));
     if (!mine.length && !inside.length) return '';
     if (!mine.length) return { top: true, html: `<div class="sec"><h3>Recent work inside <span class="c">${inside.length}</span></h3><div class="list">${inside.map((it) => {
-      const i = SC.info(it.id);
-      return `<a class="row" data-go="${h(it.id)}"><span class="dot" style="background:var(--recent)"></span><span class="rt"><div class="rn">${h(i.name)}</div>${it.note ? `<div class="rd">${h(it.note)}</div>` : ''}</span></a>`;
+      return `<a class="row" data-go="${h(it.id)}"><span class="dot" style="background:var(--recent)"></span><span class="rt"><div class="rn">${h(SC.shownName ? SC.shownName(it.id) : SC.info(it.id).name)}</div>${it.note ? `<div class="rd">${h(it.note)}</div>` : ''}</span></a>`;
     }).join('')}</div></div>` };
     return { top: true, html: `<div class="sec">${mine.map((it) => {
       const t = tasks[it.task] || {};

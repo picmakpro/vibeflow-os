@@ -68,7 +68,7 @@
      bind: (el) => el.querySelectorAll('[data-rw]').forEach((x) => x.addEventListener('click', () => showRecent(+x.dataset.rw))),
    }));
  
-@@ -73,7 +76,7 @@
+@@ -73,15 +76,14 @@
    SC.addPanelSection('item', (id) => {
      const key = id.startsWith('m:') ? 'f:' + id.slice(2) : id;
      const mine = items.filter((it) => it.id === key);
@@ -76,8 +76,9 @@
 +    const inside = uniq(items.filter((it) => it.id !== key && SC.chain(it.id).includes(key)));
      if (!mine.length && !inside.length) return '';
      if (!mine.length) return { top: true, html: `<div class="sec"><h3>Recent work inside <span class="c">${inside.length}</span></h3><div class="list">${inside.map((it) => {
-       const i = SC.info(it.id);
-@@ -81,7 +84,7 @@
+-      const i = SC.info(it.id);
+-      return `<a class="row" data-go="${h(it.id)}"><span class="dot" style="background:var(--recent)"></span><span class="rt"><div class="rn">${h(i.name)}</div>${it.note ? `<div class="rd">${h(it.note)}</div>` : ''}</span></a>`;
++      return `<a class="row" data-go="${h(it.id)}"><span class="dot" style="background:var(--recent)"></span><span class="rt"><div class="rn">${h(SC.shownName ? SC.shownName(it.id) : SC.info(it.id).name)}</div>${it.note ? `<div class="rd">${h(it.note)}</div>` : ''}</span></a>`;
      }).join('')}</div></div>` };
      return { top: true, html: `<div class="sec">${mine.map((it) => {
        const t = tasks[it.task] || {};
