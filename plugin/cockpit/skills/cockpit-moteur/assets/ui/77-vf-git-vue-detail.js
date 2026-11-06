@@ -26,7 +26,7 @@
     .vf-git-d-chemin { min-width: 0; font-family: var(--mono); color: var(--text-2); overflow-wrap: anywhere; }
     .vf-git-etat-wt { display: flex; flex-wrap: wrap; gap: 4px; }
     .vf-git-pastille { padding: 2px 8px; border-radius: 999px; background: none; font-size: 11.5px; font-weight: 400; color: var(--text-2); }
-    .vf-git-p-ok::before { content: '✓ ' / ''; } .vf-git-p-warn::before { content: '◐ ' / ''; } .vf-git-p-nonsuivi::before { content: '○ ' / ''; } /* glyphe décoratif : texte alternatif vide, le mot qui suit reste lu */ .vf-git-p-mono { font-family: var(--mono); }
+    .vf-git-p-ok::before { content: '✓ ' / ''; } .vf-git-p-warn::before { content: '◐ ' / ''; } .vf-git-p-nonsuivi::before { content: '○ ' / ''; } .vf-git-p-nonverif::before { content: '⊘ ' / ''; } /* glyphe décoratif : texte alternatif vide, le mot qui suit reste lu */ .vf-git-p-mono { font-family: var(--mono); }
     .vf-git-mention { margin-top: 8px; }
     @media (max-width: 999px), (pointer: coarse) { .vf-git-det .btn { min-height: 44px; } }
   `;
@@ -124,8 +124,10 @@
       const ou = lignesWt[i]; if (!ou) return;
       for (const x of ou.querySelectorAll('.vf-git-etat-wt')) x.remove();
       const etat = wt.etat === 'ok' ? (wt.worktrees.find((x) => x.chemin === w.chemin) || null) : null, bloc = el('div', 'vf-git-etat-wt');
-      for (const [txt, cls] of etat ? pastilles(etat) : [['état indisponible', '']]) bloc.appendChild(el('span', 'vf-git-pastille' + (cls ? ' ' + cls : ''), txt));
+      const nv = w.verifie === false || (etat && etat.verifie === false); // P78-D-38 (A3) : lien retour non vérifié, jamais lu côté serveur : ni comptes, ni commande cd, ni bouton de copie
+      for (const [txt, cls] of nv ? [['non vérifié', 'vf-git-p-nonverif']] : etat ? pastilles(etat) : [['état indisponible', '']]) bloc.appendChild(el('span', 'vf-git-pastille' + (cls ? ' ' + cls : ''), txt));
       ou.insertBefore(bloc, ou.querySelector('.vf-git-cmd, .vf-git-sans'));
+      if (nv) for (const x of ou.querySelectorAll('.vf-git-cmd, .vf-git-sans')) x.remove();
     });
     for (const x of sec.querySelectorAll('.vf-git-mention')) x.remove();
     if (wt.etat === 'ok' && wt.approximatif) sec.appendChild(el('p', 'vf-git-note vf-git-mention', typeof wt.mention === 'string' && wt.mention ? wt.mention : WT_REPLI));

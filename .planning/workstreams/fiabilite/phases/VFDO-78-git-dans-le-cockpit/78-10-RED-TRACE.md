@@ -50,3 +50,19 @@ Suite : section D10 de `test-cockpit-git-tiroir.sh` (réponse `/api/vf/git` fig�
 
 Lecture : F2 — `HEAD` coupé en « HEA » (1440 et 390 px) et nom de branche sans span interne (`.vf-git-ref` portait l'ellipse en `display:flex`) ; F12 — `stash@{0}` coupé quand message et branche sont longs (sur la donnée courte la mesure restait verte : fixture rallongée avant de compter le témoin) ; F14 — le contenu des trois `::before` est exposé (`✓ `, `◐ `, `○ `), quatre nœuds de glyphe dans l'arbre d'accessibilité (`Accessibility.getFullAXTree`) ; F15 — tailles 10,5 / 11 / 12 hors de {11,5 ; 12,5 ; 13 ; 15}, trois graisses (400, 500, 600).
 Gardes vertes dès le départ : D10.1 troisième assertion (aucune étiquette ne dépasse la gauche du message ni la droite de la ligne ; HEAD entier à 999 px) — conservée comme garde de non-régression.
+
+## Correction A3 page (mgr78-reprise, 2026-11-06) — worktree « non vérifié » dans le tiroir
+
+Finding A3 de l'audit du 2026-11-06 (P78-D-38), côté serveur en `d0da89d0` ; champ `verifie` documenté dans `78-08-SUMMARY.md` et `vf-cockpit-interface.json`.
+
+**Rouge avant (77-vf-git-vue-detail.js de `8edb0bf7`).** Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-git-tiroir.sh` ; la réponse figée (D11) porte le worktree `wt-b` avec `verifie:false` dans `/api/vf/git` (commande null, étiquette de branche `feat/deux` sans commande) ET dans `/api/vf/git/worktrees` (champs à null) ; `wt-c` reste vérifié (témoin positif). Résultat : 120 réussis, 4 échoués (`78-d39-tiroir-rouge.log`) :
+- D11.1 : attendu `3|wt-b|non vérifié|0|0|false|false`, obtenu `3|wt-b|état illisible|1|0|false|false` (pastille « état illisible » et le texte « Aucune commande proposée » au lieu de « non vérifié ») ;
+- D11.3 : attendu `true|true|true`, obtenu `false||` (aucune pastille `vf-git-p-nonverif`) ;
+- M-NONVERIFIE : « mutation impossible » (l'ancre n'existe pas encore) et son assertion à vide.
+Verts d'emblée, preuves que la mesure n'est pas vide : D11.2 (wt-c : « 1 modifié », commande cd, un bouton), D11.4 (aucune commande ni bouton sur les étiquettes, aucun chemin `/tmp/wt-b` dans le tiroir), D11.x.
+
+**Vert après.** `78-d39-tiroir-vert3.log` : 123 réussis, 0 échoué, 0 sauté (avant : 120 + 4 ; les quatre rouges sont verts).
+
+**Mutant M-NONVERIFIE** : `const nv = w.verifie === false || (etat && etat.verifie === false);` remplacé par `const nv = false;` (l'état est ignoré). Rouge sur D11.1 (`false|1 modifié|3` : la pastille de wt-b n'est plus « non vérifié », le témoin positif tient, les trois worktrees sont là), pas une panne d'un autre ordre.
+
+Capture : `78-d39-non-verifie.png` (« ⊘ non vérifié » en texte neutre, ni compte ni commande).

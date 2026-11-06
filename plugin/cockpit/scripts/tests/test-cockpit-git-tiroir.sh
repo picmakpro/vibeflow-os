@@ -4,7 +4,7 @@
 #   D3 clavier, focus, coexistence avec le Terminal et le zoom, mobile
 #   D7 détail d'un commit sous sa rangée · D8 clavier du graphe, état des worktrees · D9 rafraîchissement par vf-git:signal (78-10)
 #   D10 correction design de la critique fraîche (F2 étiquettes, F12 stash, F14 glyphes muets, F15 tailles et graisses)
-#   Mutants : M-HTML, M-COPIE, M-GLOBAL-G, M-HORS-DEPOT, M-DETAIL-HTML, M-SELECTION, M-RAFALE. La réponse `/api/vf/git` est figée (temoins/git-tiroir.json) et servie par un `fetch` remplacé dans la page.
+#   Mutants : M-HTML, M-COPIE, M-GLOBAL-G, M-HORS-DEPOT, M-DETAIL-HTML, M-SELECTION, M-RAFALE, M-NONVERIFIE (D11 : worktree non vérifié, audit A3). La réponse `/api/vf/git` est figée (temoins/git-tiroir.json) et servie par un `fetch` remplacé dans la page.
 #   Chrome headless en CDP (SAUTÉ, jamais compté réussi, sans navigateur), ports éphémères. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -616,6 +616,36 @@ JS
   assert_eq "D9.3 — à la réouverture, le signal manqué est rattrapé (une relecture de chaque)" "$(jq_ "$R9" '[j.reouverture.git, j.reouverture.wt].join("|")' 2>/dev/null)" "1|1"
   assert_eq "D9.4 — 375 px : le détail se déplie dans le tiroir, la page ne défile pas horizontalement, le tiroir défile seul" "$(jq_ "$R9" '[j.mobile.debord, j.mobile.corpsDebord, j.mobile.defile, j.mobile.dansTiroir, j.mobile.pageDefile].join("|")' 2>/dev/null)" "false|false|true|true|false"
   assert_eq "D9.x — aucune erreur de page" "$(jq_ "$R9" 'j.errs.length' 2>/dev/null)" "0"
+  # D11 (78-10, correction audit A3, P78-D-38) : un worktree servi avec verifie === false s'affiche « non vérifié » (glyphe + mot en texte neutre), sans compte, sans commande cd, sans bouton de copie ; ses étiquettes de branche non plus.
+  # Réponse figée : le worktree wt-b est « non vérifié » dans le graphe (GET /api/vf/git) ET dans GET /api/vf/git/worktrees (champs à null, verifie false, comme le serveur d0da89d0) ; wt-c reste vérifié (témoin positif).
+  cat > "$AUX/d11.js" <<'JS'
+const [base] = ARGS; const out = {};
+await fenetre(1440, 900); await s.naviguer(base + '/'); await pret();
+await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne');
+await s.ev(`(() => { const nul = { modifies: null, nonSuivis: null, plus: false, propre: null, avance: null, retard: null, avanceOrigin: null, retardOrigin: null, commande: null };
+  for (const w of window.__vfGit.reponse.worktrees) w.verifie = w.chemin !== '/tmp/wt-b'; Object.assign(window.__vfGit.reponse.worktrees.find((w) => w.chemin === '/tmp/wt-b'), { commande: null });
+  for (const r of window.__vfGit.reponse.rangees) for (const e of (r.refs || [])) if (e.worktree === '/tmp/wt-b') e.commande = null;
+  for (const w of window.__vfDet.worktrees.worktrees) { w.verifie = w.chemin !== '/tmp/wt-b'; if (!w.verifie) Object.assign(w, nul); } })()`);
+await s.ev(`document.querySelector('#vf-git-ligne').click()`);
+await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l .vf-git-etat-wt').length === 3`, 'tiroir ouvert, états des trois worktrees');
+await pause(200);
+out.wt = await s.ev(`[...document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l')].map((w) => ({ nom: (w.querySelector('.vf-git-gras') || {}).textContent, pastilles: [...w.querySelectorAll('.vf-git-pastille')].map((p) => p.textContent), cmd: w.querySelectorAll('.vf-git-cmd, .vf-git-sans').length, boutons: w.querySelectorAll('button').length, texte: w.textContent }))`);
+out.nv = await s.ev(`(() => { const p = document.querySelector('.vf-git-p-nonverif'); if (!p) return null; const c = getComputedStyle(p), N = window.__couleur('--text-2');
+  return { glyphe: getComputedStyle(p, '::before').content, neutre: c.color === N, fond: c.backgroundColor === 'rgba(0, 0, 0, 0)' || c.backgroundImage === 'none' && c.backgroundColor === 'transparent' }; })()`);
+out.etiquettes = await s.ev(`({ ref: document.querySelectorAll('#vf-git-tiroir .vf-git-ref').length, avecCmd: document.querySelectorAll('#vf-git-tiroir .vf-git-ref button, #vf-git-tiroir .vf-git-ref code').length, cdWtB: document.querySelector('#vf-git-tiroir').textContent.includes("/tmp/wt-b") })`);
+if (process.env.TIROIR_CAPTURE && !(await import('node:fs')).existsSync(process.env.TIROIR_CAPTURE)) { const c = await s.send('Page.captureScreenshot', { format: 'png' }); (await import('node:fs')).writeFileSync(process.env.TIROIR_CAPTURE, Buffer.from(c.data, 'base64')); } // capture facultative du D11, la première seulement (les mutants ne l'écrasent pas)
+out.errs = await s.ev(`window.__errs`);
+out.csp = s.violations.length;
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d11.js"; } > "$AUX/d11-complet.js"
+  R11="$(cdp "$AUX/d11-complet.js" "$BASE")"
+  D11A="$(jq_ "$R11" '[j.wt.length, j.wt[1].nom, j.wt[1].pastilles.join("/"), j.wt[1].cmd, j.wt[1].boutons, /[0-9]/.test(j.wt[1].texte.replace(j.wt[1].nom, "").replace(/feat\/deux/, "")), /cd /.test(j.wt[1].texte)].join("|")' 2>/dev/null)"
+  assert_eq "D11.1 — worktree « non vérifié » : une seule pastille « non vérifié », aucune commande, aucun bouton de copie, aucun chiffre, aucun « cd »" "$D11A" "3|wt-b|non vérifié|0|0|false|false"
+  assert_eq "D11.2 — témoin positif : le worktree vérifié (wt-c) garde ses pastilles de comptes et sa commande cd" "$(jq_ "$R11" '[j.wt[2].pastilles.join("/"), j.wt[2].cmd, j.wt[2].boutons].join("|")' 2>/dev/null)" "1 modifié|1|1"
+  assert_eq "D11.3 — « non vérifié » : glyphe décoratif (texte alternatif vide), mot en texte neutre (--text-2), fond transparent" "$(jq_ "$R11" '[/ \/ ""$/.test(j.nv && j.nv.glyphe || ""), j.nv && j.nv.neutre, j.nv && j.nv.fond].join("|")' 2>/dev/null)" "true|true|true"
+  assert_eq "D11.4 — étiquettes de branche du worktree non vérifié : aucune commande, aucun bouton, aucun chemin du worktree dans le tiroir" "$(jq_ "$R11" '[j.etiquettes.ref > 0, j.etiquettes.avecCmd, j.etiquettes.cdWtB].join("|")' 2>/dev/null)" "true|0|false"
+  assert_eq "D11.x — 0 violation CSP, 0 erreur de page" "$(jq_ "$R11" '[j.csp, j.errs.length].join("|")' 2>/dev/null)" "0|0"
   stop_srv
   # --- copies privées du module pour les mutants (build lit assets/ui/*.js) : chaque mutant a son propre lab et son propre serveur ---
   mkmod() { local d="$WORK/mod-$1"; mkdir -p "$d/scripts" "$d/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$d/skills/cockpit-moteur"; echo "$d/scripts"; }
@@ -640,6 +670,8 @@ JS
   assert_eq "M-SELECTION — rougit D8.1 (deux détails ouverts) alors que le clavier du graphe marche (↓ ↓ ↑ -> 2e rangée)" "$(jq_ "$RM" '[j.unSeul.details > 1, j.bas2haut1.i, j.entree.details].join("|")' 2>/dev/null)" "true|1|1"
   mutant M-RAFALE 77-vf-git-vue-detail.js "clearTimeout(minuterie); minuterie = setTimeout(rafraichir, RAFALE);" "rafraichir();" d9-complet.js
   assert_eq "M-RAFALE — rougit D9.1 (une relecture par signal : 3 et 3 au lieu de 1 et 1) alors que la sélection est conservée" "$(jq_ "$RM" '[j.deltas.git, j.deltas.wt, j.selection.sel.join() === j.selection.attendu].join("|")' 2>/dev/null)" "3|3|true"
+  mutant M-NONVERIFIE 77-vf-git-vue-detail.js "const nv = w.verifie === false || (etat && etat.verifie === false);" "const nv = false;" d11-complet.js
+  assert_eq "M-NONVERIFIE — rougit D11.1 (l'état verifie === false est ignoré : pastille « état illisible » et pas de « non vérifié ») alors que le tiroir se charge et que le témoin positif D11.2 tient" "$(jq_ "$RM" '[j.wt[1].pastilles.join("/") === "non vérifié", j.wt[2].pastilles.join("/"), j.wt.length].join("|")' 2>/dev/null)" "false|1 modifié|3"
 fi
 
 echo "=== D10 — correction design de la critique fraîche (78-10 : F2, F12, F14, F15) ==="

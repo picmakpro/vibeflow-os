@@ -90,3 +90,11 @@ Correction ciblée, une passe, fichiers : `assets/ui/77-vf-git-rendu.js`, `77-vf
 - **F15** : quatre tailles (11,5 / 12,5 / 13 / 15) et deux graisses (400, 600) dans le tiroir, états chargement, vide et indisponible compris. 10,5 et 11 passent à 11,5 ; 12 à 12,5 ; la graisse 500 passe à 600 (titre de barre, noms en gras) ou 400 (étiquettes, pastilles, bouton « branches mergées »). Aucune valeur de padding, marge ou écart modifiée (`css-jetons.mjs` rc 0).
 
 Valeurs de grille posées : aucune nouvelle. Hors mandat, non faits : F4, F7, F10.
+
+### Correction A3 page (mgr78-reprise, 2026-11-06) : FAITE
+
+Finding A3 de l'audit (P78-D-38), côté page. Traces : section « Correction A3 page » de `78-10-RED-TRACE.md`. Le serveur sert `verifie` depuis `d0da89d0` (voir `78-08-SUMMARY.md`).
+- **77-vf-git-vue-detail.js** (185 lignes) : dans `appliquerWt`, `nv = w.verifie === false || etat.verifie === false` (graphe OU réponse `/api/vf/git/worktrees`). Un worktree non vérifié reçoit une seule pastille « non vérifié » (classe `vf-git-p-nonverif`, glyphe `⊘` à texte alternatif vide, texte neutre comme les autres pastilles), et sa commande (`.vf-git-cmd`) et la mention « Aucune commande proposée » sont retirées : ni compte, ni `cd`, ni bouton de copie. Les étiquettes de branche (`77-vf-git-rendu.js`, `etiquette`) ne portent déjà aucune commande : `77-vf-git-rendu.js` NON modifié.
+- **test-cockpit-git-tiroir.sh** : bloc D11 (réponse figée avec `wt-b` non vérifié, témoin positif `wt-c`) et mutant M-NONVERIFIE ; capture facultative `TIROIR_CAPTURE` (la première seulement). 123 réussis, 0 échoué.
+- **Valeurs posées** : aucune valeur de padding, marge ou écart (une règle `::before` de glyphe seule) ; `css-jetons.mjs` rc 0.
+- **Déviations** : aucune.
