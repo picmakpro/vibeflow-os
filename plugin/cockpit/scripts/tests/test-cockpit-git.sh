@@ -410,6 +410,58 @@ assert_eq "M-NOBASE.0 — mutant avec effet (le défaut revient : --not est émi
 LIREM nobase "$WORK/r-master" > "$WORK/m-nobase-m.json"; LIREM nobase "$WORK/r-develop" > "$WORK/m-nobase-d.json"; LIREM nobase "$LAB" > "$WORK/m-nobase-lab.json"
 assert_eq "M-NOBASE — le défaut revient : les deux dépôts sans base redeviennent indisponibles (S8.1a et S8.2a rougissent pour leur raison), le lab AVEC base reste lu (le mutant ne casse que la raison visée)" "$(J "$WORK/m-nobase-m.json" 'j.etat')|$(J "$WORK/m-nobase-d.json" 'j.etat')|$(J "$WORK/m-nobase-lab.json" 'j.etat')" "indisponible|indisponible|ok"
 
+echo "=== S9 — revue serveur 2026-11-06, R3 (P78-D-41) : GET /api/vf/git ne bloque pas la boucle du serveur ==="
+# git emballé : `log` pose un marqueur puis dort 0,5 s (le graphe en lance deux : lecture de plus de 1 s), tout le reste passe tel quel. La requête légère part QUAND le marqueur existe, c'est-à-dire
+# pendant que le premier `log` tourne : un git synchrone gèle la boucle, le marqueur n'est vu qu'après la lecture (ordre déterministe, indépendant de la durée de ce qui précède).
+WRAPG="$WORK/wrap-glog"; mkdir -p "$WRAPG"; MARQG="$WORK/glog.marque"
+printf '#!/bin/sh\nfor a in "$@"; do [ "$a" = log ] && { : > "%s"; sleep 0.5; }; done\nexec "%s" "$@"\n' "$MARQG" "$GIT_REEL" > "$WRAPG/git"; chmod +x "$WRAPG/git"
+# lat.mjs <scripts> <lab> : serveur http en processus avec le VRAI routeGit des <scripts> ; la lecture du graphe part, 150 ms plus tard une requête légère ; rend « légère terminée avant la lourde | état | lourde lente »
+cat > "$AUX/lat-git.mjs" <<'JS'
+import http from 'node:http';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import fs from 'node:fs';
+const [, , scripts, lab, marque] = process.argv;
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href);
+const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
+const srv = http.createServer((req, res) => {
+  const url = new URL(req.url, 'http://x');
+  if (url.pathname === '/legere') { res.end('ok'); return; }
+  if (!m.routeGit(req, res, url, { root: lab, json })) { res.writeHead(404); res.end(); }
+}).listen(0, '127.0.0.1', async () => {
+  const port = srv.address().port, t0 = Date.now();
+  const get = (p) => new Promise((ok) => http.get({ host: '127.0.0.1', port, path: p }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => ok({ ms: Date.now() - t0, b })); }));
+  const lourde = get('/api/vf/git');
+  for (let i = 0; i < 1000 && !fs.existsSync(marque); i++) await new Promise((r) => setTimeout(r, 10)); // le premier `log` est lancé
+  const legere = await get('/legere');
+  const l = await lourde;
+  let etat = 'illisible'; try { etat = JSON.parse(l.b).etat; } catch {}
+  console.log(`${legere.ms < l.ms}|${etat}|${l.ms >= 1000}`);
+  srv.close(); process.exit(0);
+});
+JS
+LATG() { rm -f "$MARQG"; PATH="$WRAPG:$PATH" node "$AUX/lat-git.mjs" "$1" "$LAB" "$MARQG" 2>&1 | tail -1; }
+assert_eq "S9.1 — pendant une lecture lente du graphe (git emballé : > 1 s), une requête légère est servie AVANT la fin de la lecture ; la lecture aboutit (état ok)" "$(LATG "$SCRIPTS")" "true|ok|true"
+# S9.2 : l'en-tête servi dans le graphe (lecture asynchrone) est celui de enteteGit (lecture synchrone de /api/vf/git/entete), sur six dépôts : ok, worktree, détaché, hors dépôt, sans commit, sans base
+cat > "$AUX/parite-entete.mjs" <<'JS'
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, ...labs] = process.argv;
+const g = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href);
+const e = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git-entete.mjs')).href);
+const out = [];
+for (const lab of labs) { const a = JSON.stringify((await g.lireGit(lab)).entete), b = JSON.stringify(e.enteteGit(lab)); out.push(a === b ? 'egal' : `DIFF ${a} ${b}`); }
+console.log(out.join('|'));
+JS
+PARITE="egal|egal|egal|egal|egal|egal"
+assert_eq "S9.2 — enteteGit et son miroir asynchrone rendent le même objet (lab, worktree, détaché, hors dépôt, sans commit, sans base)" "$(node "$AUX/parite-entete.mjs" "$SCRIPTS" "$LAB" "$WORK/wt-b" "$WORK/wt-det" "$WORK/hors-depot" "$WORK/r-vide" "$WORK/r-master" 2>&1 | tail -1)" "$PARITE"
+assert_eq "M-SYNC-GRAPHE.0 — mutant avec effet (le git du graphe redevient synchrone : lancerGit)" "$(mutant syncg "const git = (...a) => lancerGitAsync(lab, a, { fin });" "const git = async (...a) => lancerGit(lab, a); // MUTANT : appel git synchrone")" "effet"
+A2="$(node "$AUX/mut.mjs" "$WORK/mut/syncg/vf-cockpit-git.mjs" "import { lancerGitAsync, finDans }" "import { lancerGit, lancerGitAsync, finDans }")"
+assert_eq "M-SYNC-GRAPHE.1 — import ajouté (cible présente)" "$A2" "applique"
+assert_eq "M-SYNC-GRAPHE — la requête légère n'est servie qu'APRÈS la lecture (légère avant lourde : false), la lecture aboutit et elle est lente (le rouge vient de l'ordre, pas d'un module cassé)" "$(LATG "$WORK/mut/syncg")" "false|ok|true"
+assert_eq "M-ENTETE.0 — mutant avec effet (le miroir asynchrone ne détecte plus le worktree)" "$(mutant entete "const worktree = haut && reel(haut) !== reel(racine) ? path.basename(haut) : null;" "const worktree = null; // MUTANT")" "effet"
+assert_eq "M-ENTETE — la parité rougit sur les worktrees (wt-b, wt-det) et sur eux seuls" "$(node "$AUX/parite-entete.mjs" "$WORK/mut/entete" "$LAB" "$WORK/wt-b" "$WORK/wt-det" "$WORK/hors-depot" "$WORK/r-vide" "$WORK/r-master" 2>&1 | tail -1 | tr '|' '\n' | cut -c1-4 | paste -sd'|' -)" "egal|DIFF|DIFF|egal|egal|egal"
+
 stop_srv
 vf_hyg_assert
 echo ""

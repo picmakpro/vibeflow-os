@@ -8,8 +8,8 @@
 // ressemble à un secret (masque(nom) !== nom). Refs passées à `log` : entièrement qualifiées (refs/…) ou sha de 40 caractères, jamais --all.
 import fs from 'node:fs';
 import path from 'node:path';
-import { lancerGit, avecEcheance, gitCommonDir } from './vf-cockpit-paths.mjs';
-import { nettoie, brancheBase } from './vf-cockpit-arbres.mjs';
+import { lancerGitAsync, finDans } from './vf-cockpit-paths.mjs';
+import { nettoie, brancheBaseAsync } from './vf-cockpit-arbres.mjs';
 import { masque } from './vf-cockpit-lecture.mjs';
 import { enteteGit } from './vf-cockpit-git-entete.mjs';
 import { detailCommit, etatWorktrees, worktreeVerifie } from './vf-cockpit-git-details.mjs';
@@ -25,8 +25,27 @@ const reel = (p) => { try { return fs.realpathSync(p); } catch { return path.res
 // commande à copier : jamais nettoyée ni masquée ; null si un des noms qui la composent serait masqué à l'affichage (la copie ne dirait pas ce que l'écran dit)
 const commande = (cmd, ...noms) => (cmd !== null && noms.every((n) => masque(n) === n) ? cmd : null);
 
-export function lireGit(lab) {
-  try { return avecEcheance(BORNES.echeanceMs, () => assembler(lab)); } catch { return { schema: SCHEMA, etat: 'indisponible' }; }
+// P78-D-41 : lecture ASYNCHRONE (la boucle du serveur reste libre pendant que git travaille : 362 ms mesurés sur ce dépôt, 5 s sur un git muet). Tout git passe par `lancerGitAsync` (même point unique,
+// mêmes options) ; l'échéance globale est une DATE (`fin`) passée à chaque appel, passée elle plus rien n'est lancé. Contrat de retour inchangé : états ok | vide | indisponible | absent.
+export async function lireGit(lab) {
+  try { return await assembler(lab, finDans(BORNES.echeanceMs)); } catch { return { schema: SCHEMA, etat: 'indisponible' }; }
+}
+
+// Miroir asynchrone de `enteteGit` (vf-cockpit-git-entete.mjs, synchrone, servi par /api/vf/git/entete) : mêmes lectures, même résultat (parité testée, R3.3).
+async function enteteAsync(lab, fin) {
+  const git = async (...a) => { try { return String((await lancerGitAsync(lab, a, { fin })).sortie ?? '').trim(); } catch { return ''; } };
+  const vide = (etat, depot) => ({ etat, depot: nettoie(depot, 200), branche: null, worktree: null, detache: false, sha7: null });
+  const commun = await git('rev-parse', '--path-format=absolute', '--git-common-dir');
+  if (!commun) return vide('absent', path.basename(path.resolve(lab)));
+  const racine = path.basename(commun) === '.git' ? path.dirname(commun) : commun.replace(/[\\/]+$/, '').replace(/\.git$/, '');
+  const haut = await git('rev-parse', '--show-toplevel');
+  const worktree = haut && reel(haut) !== reel(racine) ? path.basename(haut) : null;
+  const branche = await git('symbolic-ref', '--quiet', '--short', 'HEAD');
+  const sha7 = branche ? '' : await git('rev-parse', '--short=7', 'HEAD');
+  const base = { depot: nettoie(path.basename(racine), 200), worktree: worktree && nettoie(worktree, 200) };
+  if (branche) return { etat: 'ok', ...base, branche: nettoie(branche, 200), detache: false, sha7: null };
+  if (sha7) return { etat: 'ok', ...base, branche: null, detache: true, sha7: nettoie(sha7, 40) };
+  return { etat: 'indisponible', ...base, branche: null, detache: false, sha7: null };
 }
 
 const refLog = (r) => r.ref; // REF-QUALIFIEE : jamais un nom court (« -x » serait lu comme une option)
@@ -59,19 +78,19 @@ function sansDate(sortie) {
   return { sortie: gardees.length ? gardees.join('\n') + '\n' : '', ignorees };
 }
 
-function assembler(lab) {
-  const entete = enteteGit(lab);
+async function assembler(lab, fin) {
+  const entete = await enteteAsync(lab, fin);
   const commandes = (vide = null) => ({ vide, diagnostic: cmdStatus() });
   if (entete.etat === 'absent') {
     // A5 : l'en-tête rend « absent » aussi pour un git qui ne répond pas (sortie vide après délai). Un git muet n'est pas un dépôt absent : état distinct « indisponible ».
-    const sonde = lancerGit(lab, ['rev-parse', '--git-dir']);
+    const sonde = await lancerGitAsync(lab, ['rev-parse', '--git-dir'], { fin });
     if (sonde.delai) return { schema: SCHEMA, etat: 'indisponible', entete, commandes: commandes() };
     return { schema: SCHEMA, etat: 'absent', entete };
   }
   const ko = () => ({ schema: SCHEMA, etat: 'indisponible', entete, commandes: commandes() });
-  const git = (...a) => lancerGit(lab, a);
-  const nomBase = brancheBase(lab);
-  const rb = git('for-each-ref', '--format=%(refname)', ...(nomBase ? [`refs/heads/${nomBase}`, `refs/remotes/origin/${nomBase}`] : []));
+  const git = (...a) => lancerGitAsync(lab, a, { fin });
+  const nomBase = await brancheBaseAsync(lab, { fin });
+  const rb = await git('for-each-ref', '--format=%(refname)', ...(nomBase ? [`refs/heads/${nomBase}`, `refs/remotes/origin/${nomBase}`] : []));
   const presentes = new Set(nomBase && rb.ok ? rb.sortie.split('\n') : []);
   const locale = `refs/heads/${nomBase}`, distante = `refs/remotes/origin/${nomBase}`;
   const refBase = presentes.has(locale) ? locale : presentes.has(distante) ? distante : null;
@@ -82,24 +101,25 @@ function assembler(lab) {
   const champs = [...CHAMPS_REFS, ...(avecAB ? ['ab', ...(refOrigine ? ['ab2'] : [])] : [])];
   const fmt = (ab) => '%(refname)%00%(objectname)%00%(*objectname)%00%(creatordate:unix)' + (ab ? `%00%(ahead-behind:${refBase})` + (refOrigine ? `%00%(ahead-behind:${refOrigine})` : '') : '');
   const motifs = ['refs/heads', 'refs/remotes', 'refs/tags'];
-  let fer = git('for-each-ref', `--format=${fmt(avecAB)}`, ...motifs), repli = false;
-  if (!fer.ok && avecAB) { repli = true; fer = git('for-each-ref', `--format=${fmt(false)}`, ...motifs); }
+  let fer = await git('for-each-ref', `--format=${fmt(avecAB)}`, ...motifs), repli = false;
+  if (!fer.ok && avecAB) { repli = true; fer = await git('for-each-ref', `--format=${fmt(false)}`, ...motifs); }
   const sd = fer.ok ? sansDate(fer.sortie) : { sortie: '', ignorees: 0 }; // P78-D-31 : une ref sans date (blob, arbre) est écartée et comptée, le reste du graphe est lu
   const lr = fer.ok ? lireRefs(sd.sortie, { champs: repli || !avecAB ? CHAMPS_REFS : champs }) : { ok: false };
-  const wl = git('worktree', 'list', '--porcelain', '-z');
+  const wl = await git('worktree', 'list', '--porcelain', '-z');
   const lw = wl.ok ? lireWorktrees(wl.sortie) : { ok: false };
   if (!lr.ok || !lw.ok) return ko();
   const refs = lr.refs.filter((r) => !/^refs\/remotes\/[^/]+\/HEAD$/.test(r.ref));
   const tronqueRefs = refs.length > BORNES.refs; refs.length = Math.min(refs.length, BORNES.refs);
   const worktrees = lw.worktrees;
-  const commun = (() => { try { return fs.realpathSync(gitCommonDir(lab) ?? ''); } catch { return null; } })();
+  const cm = await git('rev-parse', '--path-format=absolute', '--git-common-dir');
+  const commun = (() => { try { return fs.realpathSync(cm.sortie.trim() || ''); } catch { return null; } })();
   const verifie = new Map(worktrees.map((w) => [w, commun !== null && worktreeVerifie(commun, w.chemin)])); // P78-D-38 : lien retour vérifié, sinon ni commande `cd` ni « verifie »
   const branches = refs.filter((r) => r.ref.startsWith('refs/heads/') || r.ref.startsWith('refs/remotes/'));
   const estBase = (r) => r.ref === refBase;
-  const gaucheDroite = (x, y) => { const r = git('rev-list', '--left-right', '--count', '--end-of-options', `${x}...${y}`, '--'); const m = /^(\d+)\t(\d+)\n$/.exec(r.sortie); return m ? [m[1], m[2]] : null; }; // [seulement à gauche, seulement à droite]
+  const gaucheDroite = async (x, y) => { const r = await git('rev-list', '--left-right', '--count', '--end-of-options', `${x}...${y}`, '--'); const m = /^(\d+)\t(\d+)\n$/.exec(r.sortie); return m ? [m[1], m[2]] : null; }; // [seulement à gauche, seulement à droite]
   if (repli && refBase) { // au plus 50 branches comptées, les autres sans compte (traitées comme non mergées)
-    for (const r of branches.filter((x) => !estBase(x)).slice(0, 50)) { const c = gaucheDroite(refBase, r.ref); if (c) r.ab = `${c[1]} ${c[0]}`; }
-    const b = refs.find(estBase), c = refOrigine && b ? gaucheDroite(refBase, refOrigine) : null;
+    for (const r of branches.filter((x) => !estBase(x)).slice(0, 50)) { const c = await gaucheDroite(refBase, r.ref); if (c) r.ab = `${c[1]} ${c[0]}`; }
+    const b = refs.find(estBase), c = refOrigine && b ? await gaucheDroite(refBase, refOrigine) : null;
     if (c) b.ab2 = `${c[0]} ${c[1]}`;
   }
   const avance = (r) => compte(r.ab)?.avance ?? null;
@@ -121,9 +141,9 @@ function assembler(lab) {
   const repliees = new Set(mergees);
   const aGarder = refs.filter((r) => !repliees.has(r));
 
-  const log1 = git('log', '--topo-order', '-z', `--format=${FORMAT_JOURNAL}`, '-n', String(BORNES.base), racineLog, ...tetes, '--'); // `--` : une révision n'est jamais prise pour un fichier de l'arbre (A6)
+  const log1 = await git('log', '--topo-order', '-z', `--format=${FORMAT_JOURNAL}`, '-n', String(BORNES.base), racineLog, ...tetes, '--'); // `--` : une révision n'est jamais prise pour un fichier de l'arbre (A6)
   const j1 = log1.ok ? lireJournal(log1.sortie) : { ok: false };
-  const log2 = nonMergees.length ? git('log', '--topo-order', '-z', `--format=${FORMAT_JOURNAL}`, '-n', String(BORNES.nonMergees), ...nonMergees.map(refLog), ...(refBase ? ['--not', refBase] : []), '--') : { ok: true, sortie: '' }; // LOG2 ; P78-D-42 : sans base (master, develop, trunk sans distant) `--not` n'est pas émis, jamais `--not null`
+  const log2 = nonMergees.length ? await git('log', '--topo-order', '-z', `--format=${FORMAT_JOURNAL}`, '-n', String(BORNES.nonMergees), ...nonMergees.map(refLog), ...(refBase ? ['--not', refBase] : []), '--') : { ok: true, sortie: '' }; // LOG2 ; P78-D-42 : sans base (master, develop, trunk sans distant) `--not` n'est pas émis, jamais `--not null`
   const j2 = log2.ok ? lireJournal(log2.sortie) : { ok: false };
   if (!j1.ok || !j2.ok) return ko();
   const commits = ordonner([j1.commits, j2.commits]);
@@ -144,7 +164,7 @@ function assembler(lab) {
     return { h: r.h, h7: r.h.slice(0, 7), p: c.p, at: c.at, an: net(c.an), s: net(c.s), col: r.col, entrants: r.entrants, sortants: r.sortants, largeur: r.largeur,
       ouvertBas: r.ouvertBas, fusion: r.fusion, racine: r.racine, teinte: t, refs: liste.slice(0, 12), refsPlus: Math.max(0, liste.length - 12) };
   });
-  const ls = git('stash', 'list', '-z', '--format=%gd%x00%H%x00%ct%x00%gs', '-n', String(BORNES.stash));
+  const ls = await git('stash', 'list', '-z', '--format=%gd%x00%H%x00%ct%x00%gs', '-n', String(BORNES.stash));
   const st = ls.ok ? lireStash(ls.sortie) : { ok: false };
   if (!st.ok) return ko();
   const parAuteur = new Map(); // agrégé en JS sur les commits déjà lus (aucun outil de comptage git)
@@ -172,7 +192,7 @@ export function routeGit(req, res, url, { root, json }) {
   if (p !== '/api/vf/git' && !p.startsWith('/api/vf/git/')) return false;
   if (req.method !== 'GET') { res.writeHead(405, { Allow: 'GET' }); res.end(); return true; } // contrôlé ici aussi : indépendant de la ligne commune du serveur
   try {
-    if (p === '/api/vf/git') json(res, 200, lireGit(root));
+    if (p === '/api/vf/git') lireGit(root).then((r) => json(res, 200, r), () => json(res, 200, { schema: SCHEMA, etat: 'indisponible' })); // P78-D-41 : asynchrone, la boucle reste libre
     else if (p === '/api/vf/git/entete') json(res, 200, { schema: SCHEMA_ENTETE, ...enteteGit(root) });
     else if (p === '/api/vf/git/commit') detailCommit(root, url.searchParams.get('sha')).then((r) => json(res, r.code, r.corps), () => json(res, 200, { schema: SCHEMAS_ROUTES[p], etat: 'indisponible' })); // A4 : asynchrone, la boucle reste libre
     else if (p === '/api/vf/git/worktrees') etatWorktrees(root).then((c) => json(res, 200, c), () => json(res, 200, { schema: SCHEMAS_ROUTES[p] || SCHEMA, etat: 'indisponible' })); // P78-D-32 : asynchrone, la boucle reste libre
