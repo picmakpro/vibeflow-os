@@ -98,3 +98,10 @@ Finding A3 de l'audit (P78-D-38), côté page. Traces : section « Correction A3
 - **test-cockpit-git-tiroir.sh** : bloc D11 (réponse figée avec `wt-b` non vérifié, témoin positif `wt-c`) et mutant M-NONVERIFIE ; capture facultative `TIROIR_CAPTURE` (la première seulement). 123 réussis, 0 échoué.
 - **Valeurs posées** : aucune valeur de padding, marge ou écart (une règle `::before` de glyphe seule) ; `css-jetons.mjs` rc 0.
 - **Déviations** : aucune.
+
+### Correction revue page (mgr78-reprise, 2026-11-06) : FAITE
+
+Traces : section « Correction revue page » de `78-10-RED-TRACE.md`.
+- **S5** : garde de séquence sur `chargerWt` (seule la dernière réponse est rendue) ; `recharger` (77-vf-git-tiroir.js, 187 lignes) et `chargerWt` rendent `{ ok, change }` ; l'annonce « Historique mis à jour » n'a lieu qu'après une relecture réussie qui a changé quelque chose, un échec s'annonce une seule fois (« Historique indisponible, la relecture a échoué »). `77-vf-git-vue-detail.js` : 197 lignes (plafond 220).
+- **Tests** : bloc D12 et mutants M-SEQ-WT, M-ANNONCE dans `test-cockpit-git-tiroir.sh` ; `TIROIR_TRACE` écrit aussi la réponse de D12.
+- Valeurs posées : aucune. Déviations : `77-vf-git-tiroir.js` modifié (autorisé « si nécessaire ») pour que `recharger` dise ce qui s'est passé.

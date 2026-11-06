@@ -4,7 +4,7 @@
 #   D3 clavier, focus, coexistence avec le Terminal et le zoom, mobile
 #   D7 détail d'un commit sous sa rangée · D8 clavier du graphe, état des worktrees · D9 rafraîchissement par vf-git:signal (78-10)
 #   D10 correction design de la critique fraîche (F2 étiquettes, F12 stash, F14 glyphes muets, F15 tailles et graisses)
-#   Mutants : M-HTML, M-COPIE, M-GLOBAL-G, M-HORS-DEPOT, M-DETAIL-HTML, M-SELECTION, M-RAFALE, M-NONVERIFIE (D11 : worktree non vérifié, audit A3). La réponse `/api/vf/git` est figée (temoins/git-tiroir.json) et servie par un `fetch` remplacé dans la page.
+#   Mutants (D12 : M-SEQ-WT, M-ANNONCE) : M-HTML, M-COPIE, M-GLOBAL-G, M-HORS-DEPOT, M-DETAIL-HTML, M-SELECTION, M-RAFALE, M-NONVERIFIE (D11 : worktree non vérifié, audit A3). La réponse `/api/vf/git` est figée (temoins/git-tiroir.json) et servie par un `fetch` remplacé dans la page.
 #   Chrome headless en CDP (SAUTÉ, jamais compté réussi, sans navigateur), ports éphémères. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -646,6 +646,50 @@ JS
   assert_eq "D11.3 — « non vérifié » : glyphe décoratif (texte alternatif vide), mot en texte neutre (--text-2), fond transparent" "$(jq_ "$R11" '[/ \/ ""$/.test(j.nv && j.nv.glyphe || ""), j.nv && j.nv.neutre, j.nv && j.nv.fond].join("|")' 2>/dev/null)" "true|true|true"
   assert_eq "D11.4 — étiquettes de branche du worktree non vérifié : aucune commande, aucun bouton, aucun chemin du worktree dans le tiroir" "$(jq_ "$R11" '[j.etiquettes.ref > 0, j.etiquettes.avecCmd, j.etiquettes.cdWtB].join("|")' 2>/dev/null)" "true|0|false"
   assert_eq "D11.x — 0 violation CSP, 0 erreur de page" "$(jq_ "$R11" '[j.csp, j.errs.length].join("|")' 2>/dev/null)" "0|0"
+  # D12 (78-10, revue de code S5) : relectures qui se chevauchent et annonces de la région vive.
+  # a) un signal émis comme 70-vf-live (sur document, sans bubbles), réponses de /api/vf/git/worktrees RETARDÉES et rendues dans le désordre : seule la réponse de la dernière demande reste affichée.
+  # b) région vive : rien d'annoncé quand la relecture ne change rien ; une seule annonce « Historique mis à jour » quand elle change quelque chose ; l'échec s'annonce une seule fois, même sur deux rafales.
+  cat > "$AUX/d12.js" <<'JS'
+const [base] = ARGS; const out = {};
+await ouvrirTiroir(base, true);
+const sig = () => s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'x' } }))`);
+await s.ev(`(() => { window.__ann = []; const t = document.querySelector('#vf-git-tiroir');
+  new MutationObserver((ms) => { for (const m of ms) { const e = m.target.nodeType === 1 ? m.target : m.target.parentElement; if (e && e.closest('.vf-git-live-det') && m.addedNodes.length) window.__ann.push([...m.addedNodes].map((n) => n.textContent).join('')); } }).observe(t, { subtree: true, childList: true, characterData: true }); })()`);
+// b) 1 : rien ne change
+await sig(); await pause(900);
+out.inchange = await s.ev(`window.__ann.splice(0)`);
+// b) 2 : le graphe change (réponse « apres » du témoin)
+await s.ev(`window.__vfGit.reponse = window.__vfDet.apres`);
+await sig(); await pause(900);
+out.change = await s.ev(`window.__ann.splice(0)`);
+// b) 3 : la relecture échoue (réponse hors schéma), deux rafales d'affilée
+await s.ev(`window.__vfGit.reponse = { schema: 'autre@1', etat: 'ok', rangees: [] }`);
+await sig(); await pause(900); await sig(); await pause(900);
+out.echec = await s.ev(`window.__ann.splice(0)`);
+// a) page neuve : réponses des worktrees retardées, rendues dans le désordre
+await ouvrirTiroir(base, true);
+await s.ev(`(() => { window.__wtRes = []; const f = window.fetch; window.fetch = (u, i) => { const url = typeof u === 'string' ? u : u.url;
+  if (url.includes('/api/vf/git/worktrees')) return new Promise((ok) => window.__wtRes.push((o) => ok(new Response(JSON.stringify(o), { status: 200, headers: { 'content-type': 'application/json' } }))));
+  return f(u, i); }; })()`);
+await sig(); await pause(700); await sig(); await pause(700);
+out.demandes = await s.ev(`window.__wtRes.length`);
+const etat = (n) => s.ev(`(() => { const o = JSON.parse(JSON.stringify(window.__vfDet.worktrees)); o.worktrees[0].modifies = ${n}; return o; })()`);
+const vieux = await etat(3), neuf = await etat(9);
+await s.ev(`window.__wtRes[1](${JSON.stringify(neuf)})`); await pause(300); // la plus RÉCENTE répond d'abord
+await s.ev(`window.__wtRes[0](${JSON.stringify(vieux)})`); await pause(400); // puis la plus ancienne
+out.pastilles = await s.ev(`[...document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l')][0].textContent`);
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d12.js"; } > "$AUX/d12-complet.js"
+  R12="$(cdp "$AUX/d12-complet.js" "$BASE")"
+  [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$R12" > "$TIROIR_TRACE-d12.json"
+  assert_eq "D12.1 — une relecture qui ne change rien : aucune annonce de la région vive" "$(jq_ "$R12" 'j.inchange.length' 2>/dev/null)" "0"
+  assert_eq "D12.2 — une relecture réussie qui change le graphe : une seule annonce, « Historique mis à jour »" "$(jq_ "$R12" 'j.change.join("|")' 2>/dev/null)" "Historique mis à jour"
+  assert_eq "D12.3 — relecture en échec, deux rafales : l'échec est annoncé une seule fois, jamais « mis à jour »" "$(jq_ "$R12" '[j.echec.length, /indisponible/.test(j.echec[0] || ""), j.echec.some((t) => /mis à jour/.test(t))].join("|")' 2>/dev/null)" "1|true|false"
+  assert_eq "D12.4 — deux relectures des worktrees en vol : les deux demandes sont parties (témoin)" "$(jq_ "$R12" 'j.demandes' 2>/dev/null)" "2"
+  assert_eq "D12.4 — réponses rendues dans le désordre (la récente d'abord) : seule la dernière demande reste affichée (9 modifiés, pas 3)" "$(jq_ "$R12" '[/9 modifiés/.test(j.pastilles), /3 modifiés/.test(j.pastilles)].join("|")' 2>/dev/null)" "true|false"
+  assert_eq "D12.x — aucune erreur de page" "$(jq_ "$R12" 'j.errs.length' 2>/dev/null)" "0"
   stop_srv
   # --- copies privées du module pour les mutants (build lit assets/ui/*.js) : chaque mutant a son propre lab et son propre serveur ---
   mkmod() { local d="$WORK/mod-$1"; mkdir -p "$d/scripts" "$d/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$d/skills/cockpit-moteur"; echo "$d/scripts"; }
@@ -672,6 +716,10 @@ JS
   assert_eq "M-RAFALE — rougit D9.1 (une relecture par signal : 3 et 3 au lieu de 1 et 1) alors que la sélection est conservée" "$(jq_ "$RM" '[j.deltas.git, j.deltas.wt, j.selection.sel.join() === j.selection.attendu].join("|")' 2>/dev/null)" "3|3|true"
   mutant M-NONVERIFIE 77-vf-git-vue-detail.js "const nv = w.verifie === false || (etat && etat.verifie === false);" "const nv = false;" d11-complet.js
   assert_eq "M-NONVERIFIE — rougit D11.1 (l'état verifie === false est ignoré : pastille « état illisible » et pas de « non vérifié ») alors que le tiroir se charge et que le témoin positif D11.2 tient" "$(jq_ "$RM" '[j.wt[1].pastilles.join("/") === "non vérifié", j.wt[2].pastilles.join("/"), j.wt.length].join("|")' 2>/dev/null)" "false|1 modifié|3"
+  mutant M-SEQ-WT 77-vf-git-vue-detail.js "if (moi !== seqWt) return null;" "/* mutant : aucune garde de séquence */" d12-complet.js
+  assert_eq "M-SEQ-WT — rougit D12.4 (la réponse la plus ancienne écrase la plus récente : 3 modifiés) alors que les deux demandes sont parties" "$(jq_ "$RM" '[j.demandes, /9 modifiés/.test(j.pastilles), /3 modifiés/.test(j.pastilles)].join("|")' 2>/dev/null)" "2|false|true"
+  mutant M-ANNONCE 77-vf-git-vue-detail.js "if (g.change || w.change) annoncer('Historique mis à jour');" "annoncer('Historique mis à jour');" d12-complet.js
+  assert_eq "M-ANNONCE — rougit D12.1 (une relecture sans changement annonce quand même) alors que l'annonce d'un vrai changement (D12.2) est là" "$(jq_ "$RM" '[j.inchange.length > 0, j.change.length >= 1].join("|")' 2>/dev/null)" "true|true"
 fi
 
 echo "=== D10 — correction design de la critique fraîche (78-10 : F2, F12, F14, F15) ==="
@@ -711,6 +759,7 @@ await s.attendre(`!!document.querySelector('.vf-git-pastille')`, 'pastilles des 
 await s.ev(`document.querySelectorAll('.vf-git-rangee')[2].click()`);
 await s.attendre(`!!document.querySelector('.vf-git-det .vf-git-d-fichiers')`, 'détail ouvert');
 const out = {};
+out.sous = await s.ev(`[...document.querySelectorAll('.vf-git-sous')].map((e) => e.textContent)`); // P78-D-40
 out.stash = await s.stable(`[...document.querySelectorAll('.vf-git-st .vf-git-gras')].map((e) => ({ txt: e.textContent, coupe: e.scrollWidth > e.clientWidth + 0.5 }))`, 'stash');
 const tout = `(() => { const S = new Set(), W = new Set(); const hors = [];
   for (const e of document.querySelectorAll('#vf-git-tiroir *')) {
@@ -735,6 +784,7 @@ return out;
 JS
   for W in 1440 390; do
     R="$(cdp "$AUX/d10-sec.js" "$BASE" "$W")"
+    assert_eq "D10.5 [$W px] — P78-D-40 : le sous-titre de la section Auteurs dit « Par branche — avance sur la base » (aucune fenêtre de 30 jours)" "$(jq_ "$R" 'j.sous.join("|")' 2>/dev/null)" "Par branche — avance sur la base"
     assert_eq "D10.2 [$W px] — l'identifiant du stash est toujours entier (stash@{0}, stash@{1}), jamais coupé" "$(jq_ "$R" 'j.stash.map((e) => e.txt + ":" + e.coupe).join(",")' 2>/dev/null)" "stash@{0}:false,stash@{1}:false"
     assert_eq "D10.3 [$W px] — glyphes ✓ ◐ ○ : texte alternatif vide (content: '…' / '') pour les trois" "$(jq_ "$R" 'j.contenus.map((c) => / \/ ""$/.test(c || "") ? "vide" : String(c)).join(",")' 2>/dev/null)" "vide,vide,vide"
     assert_eq "D10.3 [$W px] — arbre d'accessibilité : aucun glyphe ✓ ◐ ○ lu, les mots propre, modifié, non suivi restent" "$(jq_ "$R" '[j.axGlyphes.length, j.axMots.join(",")].join("|")' 2>/dev/null)" "0|true,true,true"

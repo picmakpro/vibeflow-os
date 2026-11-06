@@ -138,7 +138,11 @@
     const attente = setTimeout(() => { if (moi === seq) { corps.setAttribute('aria-busy', 'true'); corps.replaceChildren(R.etatChargement()); } }, 150);
     return fetch('/api/vf/git', { method: 'GET', headers: { 'x-floorplan-token': SRV.token || '' }, cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null)).catch(() => null)
-      .then((j) => { clearTimeout(attente); if (moi !== seq) return; corps.removeAttribute('aria-busy'); montrer(valide(j) ? j : null); eviter(); });
+      .then((j) => { // rend { ok, change } (null si périmée) : 77-vf-git-vue-detail n'annonce qu'une relecture réussie qui a changé quelque chose
+        clearTimeout(attente); if (moi !== seq) return null; corps.removeAttribute('aria-busy');
+        const bon = valide(j) && (j.etat === 'ok' || j.etat === 'vide'), change = !(bon && donnees && JSON.stringify(j) === JSON.stringify(donnees));
+        montrer(valide(j) ? j : null); eviter(); return { ok: bon, change };
+      });
   }
 
   const ouvrir = () => {

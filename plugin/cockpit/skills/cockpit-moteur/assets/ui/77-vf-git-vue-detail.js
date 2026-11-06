@@ -7,7 +7,7 @@
   if (!R || !T) return; // sans dépôt, le tiroir n'existe pas
   const el = R.el, SHA = /^[0-9a-f]{40}$/, LIM = 30, RAFALE = 300;
   const WT_REPLI = 'approximatif : filtres du dépôt non exécutés';
-  let sel = null, ouvertSha = null, wt = null, perime = false, minuterie = null, ancre = null;
+  let sel = null, ouvertSha = null, wt = null, perime = false, minuterie = null, ancre = null, seqWt = 0, wtJson = null, echecDit = false;
   const cache = new Map(); // un commit ne change pas : sa lecture est gardée par sha, une relecture du tiroir ne la repose pas
 
   const style = document.createElement('style');
@@ -132,7 +132,14 @@
     for (const x of sec.querySelectorAll('.vf-git-mention')) x.remove();
     if (wt.etat === 'ok' && wt.approximatif) sec.appendChild(el('p', 'vf-git-note vf-git-mention', typeof wt.mention === 'string' && wt.mention ? wt.mention : WT_REPLI));
   };
-  const chargerWt = () => lire('/api/vf/git/worktrees').then((j) => { wt = wtOk(j) ? j : { etat: 'indisponible' }; appliquerWt(); });
+  const chargerWt = () => { // rend { ok, change } ; null si une demande plus récente a pris la main (seule la dernière réponse est rendue)
+    const moi = ++seqWt;
+    return lire('/api/vf/git/worktrees').then((j) => {
+      if (moi !== seqWt) return null;
+      const nouveau = wtOk(j) ? j : { etat: 'indisponible' }, json = JSON.stringify(nouveau), change = json !== wtJson;
+      wt = nouveau; wtJson = json; appliquerWt(); return { ok: nouveau.etat === 'ok', change };
+    });
+  };
 
   // ---------- rafraîchissement par le signal du flux ----------
   const rafraichir = () => {
@@ -140,7 +147,12 @@
     if (!T.ouvert()) { perime = true; return; }
     const c = corps(), s = sel && lignes().find((l) => l.dataset.h === sel);
     ancre = c ? { top: c.scrollTop, sha: s ? sel : null, delta: s ? s.getBoundingClientRect().top - c.getBoundingClientRect().top : 0, focus: !!s && document.activeElement === s } : null;
-    Promise.all([T.recharger(), chargerWt()]).then(() => annoncer('Historique mis à jour'));
+    Promise.all([T.recharger(), chargerWt()]).then(([g, w]) => {
+      if (!g || !w) return; // périmée : la relecture plus récente parlera
+      if (!(g.ok && w.ok)) { if (!echecDit) { echecDit = true; annoncer('Historique indisponible, la relecture a échoué'); } return; } // l'échec ne s'annonce qu'une fois
+      echecDit = false;
+      if (g.change || w.change) annoncer('Historique mis à jour');
+    });
   };
   document.addEventListener('vf-git:signal', () => {
     if (!T.ouvert()) { perime = true; return; } // tiroir fermé : aucune requête, la lecture sera refaite à l'ouverture

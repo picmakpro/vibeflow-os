@@ -66,3 +66,20 @@ Verts d'emblée, preuves que la mesure n'est pas vide : D11.2 (wt-c : « 1 modif
 **Mutant M-NONVERIFIE** : `const nv = w.verifie === false || (etat && etat.verifie === false);` remplacé par `const nv = false;` (l'état est ignoré). Rouge sur D11.1 (`false|1 modifié|3` : la pastille de wt-b n'est plus « non vérifié », le témoin positif tient, les trois worktrees sont là), pas une panne d'un autre ordre.
 
 Capture : `78-d39-non-verifie.png` (« ⊘ non vérifié » en texte neutre, ni compte ni commande).
+
+## Correction revue page (mgr78-reprise, 2026-11-06) — S5 : relectures qui se chevauchent, annonces
+
+Finding S5 de la revue de code : `chargerWt` sans garde de séquence ; `rafraichir` annonce « Historique mis à jour » même après un échec de `recharger`, et à chaque rafale.
+
+**Témoins** (`test-cockpit-git-tiroir.sh`, bloc D12 ; signal émis sur document sans bubbles, comme 70-vf-live) :
+- D12.1 : relecture qui ne change rien, aucune annonce ; D12.2 : relecture qui change le graphe, une seule annonce « Historique mis à jour » ; D12.3 : relecture en échec sur deux rafales, une seule annonce d'échec, jamais « mis à jour » ; D12.4 : deux relectures des worktrees en vol (2 demandes parties), réponses rendues dans le désordre (la récente d'abord), seule la dernière demande reste affichée (« 9 modifiés », pas « 3 »).
+
+**Rouge avant (code de `0a8a9b63`, journal `78-rv-rouge2-git-tiroir.log`).** D12.1 attendu 0 annonce, obtenu 1. D12.3 attendu `1|true|false`, obtenu `2|false|true` (deux annonces « mis à jour » après un échec). D12.2 verte d'emblée (un vrai changement s'annonçait déjà : témoin que la mesure n'est pas vide). D12.4 : la première version du témoin était cassée (un `\/` dans un gabarit de chaîne devenait un commentaire : `__wtRes` jamais posé) ; son rouge n'est donc pas retenu comme preuve. Le rouge de D12.4 vient du mutant M-SEQ-WT ci-dessous (la garde retirée = le comportement d'avant), après correction du témoin (`url.includes`).
+
+**Vert après.** `78-rv-dbg-git-tiroir.log` rc 0 ; `78-rv-trace-d12.json` : `inchange: []`, `change: ["Historique mis à jour"]`, `echec: ["Historique indisponible, la relecture a échoué"]`, `demandes: 2`, pastilles « 9 modifiés ».
+
+**Mutants.**
+- M-SEQ-WT (`if (moi !== seqWt) return null;` retiré) : D12.4 rougit, `2|false|true` (2 demandes parties, « 3 modifiés » affiché : la plus ancienne écrase la plus récente).
+- M-ANNONCE (`if (g.change || w.change) annoncer(...)` remplacé par l'annonce inconditionnelle) : D12.1 rougit (`true|true` : annonce sans changement ET l'annonce d'un vrai changement toujours présente).
+
+**Contrat.** `77-vf-git-tiroir.js` : `recharger()` rend `{ ok, change }` (`null` si une relecture plus récente a pris la main) ; `chargerWt()` aussi ; `rafraichir` n'annonce qu'une relecture réussie qui a changé quelque chose, l'échec une seule fois par série d'échecs (réarmé au premier succès).
