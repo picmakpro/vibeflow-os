@@ -685,6 +685,99 @@ assert_eq "M-W23-SIG — mutant du juge (titre neutralisé dans whoSig par « 0 
 mut17 w23-lib vf-cockpit-who.mjs "LIBRES = { titre: 80," "LIBRES = {" >/dev/null
 assert_eq "M-W23-LIBRES — mutant (titre retiré de LIBRES) : W23.16 rougit" "$(grep -c "LIBRES = { titre: 80," "$WORK/mut17-w23-lib/vf-cockpit-who.mjs")" "0"
 
+echo "=== W24 — masque des jetons à format reconnu : collés à un mot ou après « _ », jamais un identifiant ordinaire (retour de revue, 2026-11-06) ==="
+# arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 : « Corriger maintenant (Recommandé) » — `\b` laissait fuir xxxghp_…, key_sk-…, 1ghp_…, idAKIA…, xBearer …
+cat > "$AUX/w24.mjs" <<'JS'
+// w24.mjs <dossier des scripts> <racine du dépôt> <N> <essais> — positifs, négatifs (dont les noms réels du dépôt), preuve générative de temps
+import { pathToFileURL } from 'node:url';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+const [, , dir, repo, nArg, essaisArg] = process.argv;
+const imp = (f) => import(pathToFileURL(path.join(dir, f)).href);
+const L = await imp('vf-cockpit-lecture.mjs'), A = await imp('vf-cockpit-arbres.mjs'), W = await imp('vf-cockpit-who.mjs');
+const T = 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4', a = (n) => 'a'.repeat(n), ab = 'Ab3'.repeat(16), proj = 'Ab3_-'.repeat(20);
+// [nom, texte, corps qui ne doit plus sortir]
+const POS = [
+  ['ghp-nu', 'ghp_' + T, T], ['ghp-colle-mot', 'xxxghp_' + T, T], ['ghp-apres-souligne', 'tok_ghp_' + T, T], ['ghp-apres-chiffre', '1ghp_' + T, T], ['ghp-apres-deux-points', 'tok:ghp_' + T, T],
+  ['gho-colle', 'idgho_' + T, T], ['ghu-colle', 'idghu_' + T, T], ['ghs-colle', 'idghs_' + T, T], ['ghr-colle', 'idghr_' + T, T],
+  ['sk-nu', 'sk-' + a(24), a(24)], ['sk-apres-souligne', 'key_sk-' + a(30), a(30)], ['sk-apres-espace', 'key sk-' + a(30), a(30)], ['sk-apres-chiffre', '1sk-' + a(20), a(20)],
+  ['sk-colle-mot-alnum', 'idsk-' + ab, ab], ['sk-colle-mot-proj', 'idsk-proj-' + proj, proj], ['sk-colle-mot-ant', 'ksk-ant-api03-' + proj, proj],
+  ['akia-nu', 'AKIA' + 'A'.repeat(16), 'A'.repeat(16)], ['akia-colle-mot', 'idAKIA' + 'A'.repeat(16), 'A'.repeat(16)], ['akia-apres-chiffre', '1AKIA' + 'B7'.repeat(8), 'B7'.repeat(8)],
+  ['bearer-nu', 'Bearer ' + a(20), a(20)], ['bearer-colle-mot', 'xBearer ' + a(30), a(30)], ['bearer-apres-souligne', '_Bearer ' + a(16), a(16)], ['bearer-apres-chiffre', '1Bearer ' + a(30), a(30)],
+  ['pat-nu', 'github_pat_' + T, T], ['pat-colle-mot', 'my_github_pat_' + T, T], ['pat-colle-chiffre', '9github_pat_' + T, T],
+  ['xox-nu', 'xoxb-123456789', '123456789'], ['xox-colle-mot', 'axoxb-123456789', '123456789'], ['xox-apres-souligne', 'k_xoxp-123456789-abc', '123456789'],
+];
+// identifiants ordinaires : jamais modifiés
+const NEG = ['task-runner', 'desk-lamp', 'mask-image', 'risk-assessment-2026-11-06-panel', 'ask-user', 'gsd-ask-user-question-batch-mode-2026', 'kiosk-mode', 'whisk-ey', 'Task-1', 'sk-learn', 'the sk-ok plan',
+  'AKIAS', 'AKIAS_BUCKET', 'AKIA-docs', 'ghp_court', 'high_priority', 'laughs_and_cries_over_everything', 'Hughs_Hughs', 'xoxo-hugs', 'github_pat_', 'my_github_pat_rotation',
+  'Bearer token is required for this endpoint', 'Bearer authentication scheme is used', 'Flagbearer internationalization', 'Pallbearer ceremonyarrangements-x',
+  'Task-Force-Review-2026-11-06-Panel-Alpha-Beta-Gamma', 'Desk-Lamp2Of3', 'ask-' + 'user-question-for-the-planning-of-the-next-release-2026-11-06-A1', 'feat/retours-equipe-git', 'gsd-quick', 'cockpit-moteur'];
+const git = (...x) => { try { return execFileSync('git', ['-C', repo, ...x], { encoding: 'utf8', maxBuffer: 1 << 28 }); } catch { return ''; } };
+const corpus = new Set(NEG);
+for (const l of [...git('ls-files').split('\n'), ...git('for-each-ref', '--format=%(refname)').split('\n'), ...git('for-each-ref', '--format=%(refname:short)').split('\n')]) { if (!l) continue; corpus.add(l); for (const c of l.split('/')) if (c) corpus.add(c); }
+const appelants = { masque: (t) => L.masque(t), titre: (t) => L.nettoieTitre(t), arbres: (t) => A.nettoie(t, 400), commande: (t) => W.commandeAffichee(t), coupe: (t) => L.masqueCoupe(t + ' ' + 'Z'.repeat(900), 600) };
+const manque = [], fausse = [];
+for (const [nom, t, corps] of POS) for (const [an, f] of Object.entries(appelants)) { const r = f(t); if (!r.includes('[masqué]') || r.includes(corps)) manque.push(nom + '@' + an); }
+for (const s of corpus) { const r = L.masque(s); if (r !== s) fausse.push(s.slice(0, 80)); }
+for (const s of NEG) for (const [an, f] of Object.entries(appelants)) { if (an === 'coupe') continue; const r = f(s); if (r.includes('[masqué]')) fausse.push(an + ':' + s); }
+// ---- preuve générative de temps : entrées de taille N puis 2N, presque valides (jamais un jeton complet), rapport 2N/N attendu proche de 2 (4 si quadratique)
+const N = Number(nArg), essais = Number(essaisArg), rep = (m, n) => m.repeat(Math.ceil(n / m.length)).slice(0, n), LS = ' ';
+const GEN = {
+  ghp: (n) => rep('ghp_', n), 'ghp-presque': (n) => rep('ghp_' + a(19) + LS, n), sk: (n) => 'sk-' + '-'.repeat(n - 3), 'sk-repete': (n) => rep('sk-', n), 'ask-repete': (n) => rep('ask-', n),
+  'sk-presque': (n) => rep('sk-' + a(15) + LS, n), 'lettre-sk-presque': (n) => rep('xsk-' + a(39) + '!', n), 'lettre-sk-sans-majuscule': (n) => rep('ask-' + a(120), n), 'proj-presque': (n) => rep('ask-proj-' + 'A1'.repeat(17) + ' ', n),
+  alnum: (n) => a(n), 'alnum-long-apres-sk': (n) => 'x' + rep('sk-', 3) + a(n), bearer: (n) => rep('Bearer ', n), 'bearer-espaces': (n) => 'Bearer' + ' '.repeat(n - 7) + '!', 'bearer-presque': (n) => rep('xBearer ' + a(23) + ' ', n),
+  'bearer-u2028': (n) => rep('Bearer' + LS + a(15) + LS, n), akia: (n) => rep('AKIA', n), 'akia-presque': (n) => rep('AKIA' + 'A'.repeat(15) + LS, n), xox: (n) => rep('xoxb', n), pat: (n) => rep('github_pat_', n), 'pat-presque': (n) => rep('github_pat_' + a(19) + LS, n),
+};
+const mesure = (f) => { let best = Infinity; for (let e = 0; e < essais; e++) { let reps = 1, t = 0; for (;;) { const t0 = performance.now(); for (let i = 0; i < reps; i++) f(); t = performance.now() - t0; if (t >= 30 || reps >= 256 || t * reps > 400 && reps > 1) break; reps = Math.min(256, Math.max(reps * 2, Math.ceil(reps * 40 / Math.max(t, 0.05)))); } best = Math.min(best, t / reps); } return best; };
+const rapports = []; const pire = { r: 0, nom: '', t1: 0, t2: 0 }; let lent = 0;
+// masque et coupe lisent toute l'entrée (rapport 2N/N) ; titre, arbres et commande bornent l'entrée AVANT les masques (4 000 car.) : leur temps est constant, jugé en absolu (noyé de bruit en rapport)
+const LECTEURS = { masque: (t) => () => L.masque(t, t.length), coupe: (t) => () => L.masqueCoupe(t, t.length >> 1), titre: (t) => () => L.nettoieTitre(t), arbres: (t) => () => A.nettoie(t, 200), commande: (t) => () => W.commandeAffichee(t) };
+const BORNES = new Set(['titre', 'arbres', 'commande']);
+for (const [g, mk] of Object.entries(GEN)) for (const [lec, mkf] of Object.entries(LECTEURS)) {
+  let t1 = mesure(mkf(mk(N))), t2 = mesure(mkf(mk(2 * N))), r = t2 / Math.max(t1, 0.001);
+  if (BORNES.has(lec)) { if (t2 > 100) lent++; rapports.push(1); continue; }
+  if (r > 3) { t1 = Math.min(t1, mesure(mkf(mk(N)))); t2 = Math.min(t2, mesure(mkf(mk(2 * N)))); r = t2 / Math.max(t1, 0.001); } // une seconde mesure avant de conclure : la charge du poste déforme une mesure, jamais deux
+  rapports.push(r); if (r > pire.r) { pire.r = r; pire.nom = g + '/' + lec; pire.t1 = t1; pire.t2 = t2; }
+}
+console.log(JSON.stringify({ positifs: POS.length * Object.keys(appelants).length, manque, corpus: corpus.size, fausse, mesures: rapports.length, pire: { ...pire, r: +pire.r.toFixed(2), t1: +pire.t1.toFixed(3), t2: +pire.t2.toFixed(3) }, redos: pire.r <= 3 && lent === 0 ? 'lineaire' : 'SUPERLINEAIRE' }));
+JS
+w24() { node "$AUX/w24.mjs" "$1" "$REPO24" "${2:-50000}" "${3:-2}" 2>"$WORK/w24.err"; }
+REPO24="$(git -C "$SCRIPTS" rev-parse --show-toplevel 2>/dev/null)"
+W24J="$WORK/w24.json"; w24 "$SCRIPTS" 50000 2 > "$W24J"
+g24() { node "$AUX/get.mjs" "$W24J" "$1"; }
+assert_eq "W24.0 — contrôle positif : la sonde rend un JSON lisible, 29 cas collés ou nus × 5 lecteurs (masque, titre, arbres, commande, coupe)" "$(g24 'j.positifs')" "145"
+assert_eq "W24.1 — chaque jeton à format reconnu est masqué, nu, collé à un mot, à un chiffre ou après « _ », par les cinq lecteurs, et son corps ne sort pas" "$(g24 'j.manque.join(",")')" ""
+assert_eq "W24.2 — négatif : aucun identifiant ordinaire n'est masqué (task-runner, ask-user, risk-assessment-…, Bearer comme mot, AKIAS…) ni aucun nom de fichier, de branche ou de skill du dépôt" "$(g24 'j.fausse.join(" | ")')" ""
+assert_eq "W24.3 — le jeu négatif est bien rempli (plus de 1 000 chaînes : fichiers, composants de chemin, refs du dépôt)" "$(g24 'j.corpus > 1000')" "true"
+assert_eq "W24.4 — ReDoS : sur des entrées presque valides de 50 000 puis 100 000 caractères (ghp_ répété, sk- et tirets, alphanumérique sans fin, U+2028, Bearer et espaces), 5 lecteurs, le temps reste linéaire (rapport 2N/N ≤ 3)" "$(g24 'j.redos')" "lineaire"
+assert_eq "W24.5 — la mesure ReDoS a bien eu lieu (20 générateurs × 5 lecteurs)" "$(g24 'j.mesures')" "100"
+echo "     pire rapport 2N/N : $(g24 'j.pire.nom') = $(g24 'j.pire.r') (N : $(g24 'j.pire.t1') ms, 2N : $(g24 'j.pire.t2') ms)"
+# mutants : chacun doit rougir sur SA assertion, et le témoin vert reste vert sur le dépôt
+mut24() { local nom="$1" f="vf-cockpit-lecture.mjs"; shift; mut17 "w24-$nom" "$f" "$1" "$2" >/dev/null || { echo "ancre absente"; return 1; }; shift 2; while [ $# -ge 2 ]; do FROM="$1" TO="$2" node "$AUX/mutsub.mjs" "$WORK/mut17-w24-$nom/$f" >/dev/null || { echo "ancre absente"; return 1; }; shift 2; done; node "$AUX/w24.mjs" "$WORK/mut17-w24-$nom" "$REPO24" "${MUT_N:-20000}" 1 2>/dev/null > "$WORK/w24-$nom.json"; }
+r24() { node "$AUX/get.mjs" "$WORK/w24-$1.json" "$2"; }
+# corps élargi à 1 caractère, un motif à la fois : le négatif rougit
+mut24 ghp1 '/gh[pousr]_[A-Za-z0-9]{20,}/g' '/gh[pousr]_[A-Za-z0-9]{1,}/g'
+assert_eq "M-W24-GHP1 — mutant (corps ghp_ de 1 caractère) : W24.2 rougit sur laughs_and_cries_over_everything" "$(r24 ghp1 'j.fausse.filter(s => /laughs_and/.test(s)).length > 0')" "true"
+mut24 sk1 '/(?<![A-Za-z])sk-[A-Za-z0-9_-]{16,}/g' '/(?<![A-Za-z])sk-[A-Za-z0-9_-]{1,}/g'
+assert_eq "M-W24-SK1 — mutant (corps sk- de 1 caractère) : W24.2 rougit sur sk-learn" "$(r24 sk1 'j.fausse.filter(s => /sk-learn/.test(s)).length > 0')" "true"
+mut24 sk2 '|[A-Za-z0-9]{40,})/g' '|[A-Za-z0-9]{1,})/g'
+assert_eq "M-W24-SK2 — mutant (corps sk- collé à un mot de 1 caractère) : W24.2 rougit sur Desk-Lamp2Of3" "$(r24 sk2 'j.fausse.filter(s => /Desk-Lamp2Of3/.test(s)).length > 0')" "true"
+mut24 akia1 '/AKIA[A-Z0-9]{16}/g' '/AKIA[A-Z0-9]{1}/g'
+assert_eq "M-W24-AKIA1 — mutant (corps AKIA de 1 caractère) : W24.2 rougit sur AKIAS" "$(r24 akia1 'j.fausse.filter(s => /AKIAS/.test(s)).length > 0')" "true"
+mut24 bear1 '/(?<![A-Za-z])Bearer\s+[A-Za-z0-9._~+\/=-]{16,}/gi' '/(?<![A-Za-z])Bearer\s+[A-Za-z0-9._~+\/=-]{1,}/gi'
+assert_eq "M-W24-BEAR1 — mutant (corps Bearer de 1 caractère) : W24.2 rougit sur « Bearer token is required »" "$(r24 bear1 'j.fausse.filter(s => /Bearer token/.test(s)).length > 0')" "true"
+mut24 bear2 '/(?<=[A-Za-z])Bearer\s+[A-Za-z0-9._~+\/=-]{24,}/gi' '/(?<=[A-Za-z])Bearer\s+[A-Za-z0-9._~+\/=-]{1,}/gi'
+assert_eq "M-W24-BEAR2 — mutant (corps Bearer collé à un mot de 1 caractère) : W24.2 rougit sur Pallbearer" "$(r24 bear2 'j.fausse.filter(s => /Pallbearer/.test(s)).length > 0')" "true"
+# frontière de lettre retirée : « task- », « risk- » sont masqués
+mut24 sklarge '/(?<![A-Za-z])sk-[A-Za-z0-9_-]{16,}/g' '/sk-[A-Za-z0-9_-]{16,}/g'
+assert_eq "M-W24-SKLARGE — mutant (plus aucune frontière avant sk-) : W24.2 rougit sur risk-assessment-2026-11-06-panel" "$(r24 sklarge 'j.fausse.filter(s => /risk-assessment/.test(s)).length > 0')" "true"
+# `\b` remis partout : les cas collés refuient
+mut24 bord '/gh[pousr]_' '/\bgh[pousr]_' '/github_pat_' '/\bgithub_pat_' '(?<![A-Za-z])sk-[A-Za-z0-9_-]{16,}' '\bsk-[A-Za-z0-9_-]{16,}' '(?<=[A-Za-z])sk-(?=' '\bsk-(?=' '/AKIA[A-Z0-9]{16}/g' '/\bAKIA[A-Z0-9]{16}/g' '/xox[baprs]-' '/\bxox[baprs]-' '/(?<![A-Za-z])Bearer' '/\bBearer' '/(?<=[A-Za-z])Bearer' '/\bBearer'
+assert_eq "M-W24-BORD — mutant (\\b remis devant tous les motifs) : W24.1 rougit sur xxxghp_, key_sk-, idAKIA, xBearer, my_github_pat_, axoxb-, 1ghp_" "$(r24 bord 'j.manque.map(s => s.split("@")[0]).filter((s, i, t) => t.indexOf(s) === i).join(",")')" "ghp-colle-mot,ghp-apres-souligne,ghp-apres-chiffre,gho-colle,ghu-colle,ghs-colle,ghr-colle,sk-apres-souligne,sk-apres-chiffre,sk-colle-mot-alnum,sk-colle-mot-proj,sk-colle-mot-ant,akia-colle-mot,akia-apres-chiffre,bearer-colle-mot,bearer-apres-souligne,bearer-apres-chiffre,pat-colle-mot,pat-colle-chiffre,xox-colle-mot,xox-apres-souligne"
+# lookahead non borné : la preuve générative rougit (taille réduite, le mutant est quadratique)
+mut24 redos '(?=[A-Za-z0-9_-]{0,127}[A-Z])(?=[A-Za-z0-9_-]{0,127}\d)' '(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*\d)'
+assert_eq "M-W24-REDOS — mutant (lookaheads de sk- non bornés, quadratiques) : W24.4 rougit (rapport 2N/N > 3)" "$(r24 redos 'j.redos')" "SUPERLINEAIRE"
+
 vf_hyg_assert
 
 echo ""

@@ -34,9 +34,16 @@ export const cherche = (f, accepte, fenetres = FENETRES, etat = null) => {
 };
 
 // Ces masques restent le filet de ce qui est affiché (un premier argument peut être une URL à identifiants ou un jeton nu) ET de task/cwd/role (texte libre écrit par d'autres, voir `bornes`).
+// Jetons à format reconnu : le PRÉFIXE et le CORPS portent la reconnaissance, pas la frontière de mot. `\b` ne coupe ni après `_` ni entre un chiffre et une lettre : un jeton collé
+// à un mot (`xxxghp_…`, `key_sk-…`, `1ghp_…`) y échappait. Règle par motif (preuve : test-cockpit-who.sh W24, jeu négatif de noms réels du dépôt) :
+//  - `ghp_`, `github_pat_`, `AKIA`, `xoxb-` : préfixe assez rare et corps long ou typé, aucune frontière (un mot ordinaire ne les porte pas) ;
+//  - `sk-` : « ask- », « task- », « desk- », « risk- » sont des mots ; une lettre juste avant exige donc la forme réelle d'une clé (corps de 40 caractères, une majuscule et un chiffre,
+//    `proj-`/`ant-`… ou 40 alphanumériques d'un seul tenant), sinon (début, blanc, `_`, chiffre, ponctuation) le corps de 16 suffit ;
+//  - `Bearer` : « Flagbearer » est un mot ; une lettre juste avant exige un corps de 24, sinon 16. Les lookbehinds sont d'un seul caractère (coût constant), les lookaheads bornés (127).
 const MASQUES = [
-  /\bgh[pousr]_[A-Za-z0-9]{20,}/g, /\bgithub_pat_[A-Za-z0-9_]{20,}/g, /\bsk-[A-Za-z0-9_-]{16,}/g, /\bAKIA[A-Z0-9]{16}/g, /\bxox[baprs]-[A-Za-z0-9-]+/g,
-  /\bBearer\s+[A-Za-z0-9._~+\/=-]{16,}/gi,
+  /gh[pousr]_[A-Za-z0-9]{20,}/g, /github_pat_[A-Za-z0-9_]{20,}/g, /(?<![A-Za-z])sk-[A-Za-z0-9_-]{16,}/g,
+  /(?<=[A-Za-z])sk-(?=[A-Za-z0-9_-]{0,127}[A-Z])(?=[A-Za-z0-9_-]{0,127}\d)(?:(?:proj|ant|svcacct|admin)-[A-Za-z0-9_-]{36,}|[A-Za-z0-9]{40,})/g, /AKIA[A-Z0-9]{16}/g, /xox[baprs]-[A-Za-z0-9-]+/g,
+  /(?<![A-Za-z])Bearer\s+[A-Za-z0-9._~+\/=-]{16,}/gi, /(?<=[A-Za-z])Bearer\s+[A-Za-z0-9._~+\/=-]{24,}/gi,
   // un nom de variable ou de clé qui finit par un mot sensible (GITHUB_TOKEN=, AWS_SECRET_ACCESS_KEY=, API_KEY=) : `\b` ne coupe pas après `_`, d'où `[A-Za-z0-9_]*`
   /[A-Za-z0-9_]{0,64}(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential)[A-Za-z0-9_]{0,64}=\S+/gi,
   /--(?:password|passwd|secret|token|api[_-]?key)(?:=|\s+)\S+/gi, /\bX-Api-Key:\s*\S+/gi,
