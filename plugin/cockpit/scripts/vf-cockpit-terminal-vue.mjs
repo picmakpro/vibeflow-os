@@ -39,7 +39,7 @@ export function vueTerminal(cfg) {
   };
   // bandeau de proposition (72-08) : modes, note du mode hérité, motifs des pré-vols (mêmes codes et mêmes textes que la carte, une page par origine), messages par statut de lancement
   const MODES_UI = [{ mode: 'default', libelle: 'Par défaut' }, { mode: 'acceptEdits', libelle: 'Accepter les modifications' }, { mode: 'plan', libelle: 'Plan (lecture seule)' }, { mode: 'herite', libelle: 'Hérité du poste' }];
-  const NOTE_HERITE = "Aucun mode n'est imposé : le réglage de votre poste s'applique, y compris « tout autoriser » s'il est configuré.";
+  const NOTE_HERITE = "Aucun mode n'est imposé : Claude Code suit les réglages de votre poste ou du projet (jamais « tout autoriser » ni auto depuis le projet).";
   const MOTIFS = Object.assign(Object.create(null), {
     'phase-finie': 'La phase est terminée.', 'terminal-absent': 'Le terminal est indisponible sur ce poste.', 'terminal-arrete': 'Le terminal est arrêté. Relancez /vf-cockpit --terminal.',
     'premier-plan-occupe': 'Un programme occupe déjà le terminal.', 'claude-introuvable': 'La commande claude est introuvable.', 'python3-absent': 'Python 3 est introuvable sur ce poste.',
@@ -48,7 +48,7 @@ export function vueTerminal(cfg) {
     'phase-plus-avancee-ailleurs': 'La phase est plus avancée dans un autre arbre de travail.', 'lancement-recent': 'Cette cible a déjà été lancée récemment.', 'travail-non-commite': "Du travail non commité existe dans l'arbre de travail.",
   });
   const MESSAGES_LANCEMENT = Object.assign(Object.create(null), {
-    occupe: "Un programme occupe le terminal : quittez-le, puis cliquez sur Lancer. Rien n'a été écrit.", attendre: 'Patientez un instant, puis cliquez de nouveau sur Lancer.',
+    occupe: "Le terminal n'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n'a été écrit ; vérifiez, puis cliquez sur Lancer.", attendre: 'Patientez un instant, puis cliquez de nouveau sur Lancer.',
     'sans-session': "Aucune session de terminal n'est ouverte : relancez le shell, puis réessayez.", refus: 'Le lancement a été refusé.', reseau: 'Le terminal ne répond pas.',
   });
   let courant = null, minuterie = 0; // identifiant du bandeau affiché ; minuterie d'armement
@@ -139,7 +139,7 @@ export function vueTerminal(cfg) {
       });
       const c = document.getElementById('collage');
       if (c) document.body.insertBefore(b, c); else document.body.appendChild(b); // garde:collage-dessus
-      courant = p.id; if (premier) annuler.focus();
+      courant = p.id; if (premier && document.hasFocus()) annuler.focus(); // F1 : jamais de focus pris à la page ; Annuler (inoffensif) seulement si ce cadre l'a déjà
     },
     // collage à confirmer : ce que l'utilisateur confirme est EXACTEMENT ce qui part. Le texte intégral est montré (zone défilante, atteignable au clavier) par textContent
     // seulement, avec ses nombres de lignes et de caractères ; seul l'AFFICHAGE est neutralisé (caractères invisibles ou de contrôle rendus ⟨U+XXXX⟩, jamais retirés ;

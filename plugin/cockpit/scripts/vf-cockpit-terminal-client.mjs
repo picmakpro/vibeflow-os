@@ -137,7 +137,7 @@ export function clientTerminal(cfg) {
       if (e.inputType.indexOf('insertFrom') === 0 || (e.inputType === 'insertReplacementText') || SUR.test(t) || vue.invisible(t)) { prendre(e); soumettre(t); }
     }, true);
     document.addEventListener('keydown', (e) => { if (propose !== null && e.key === 'Escape') { prendre(e); abandonner(); } }, true);
-    term.focus(); window.addEventListener('focus', () => term.focus());
+    if (!document.hasFocus || document.hasFocus()) term.focus(); window.addEventListener('focus', () => term.focus()); // F1 : un cadre qui n'a pas le focus (proposition, rechargement) ne le prend jamais
     // la barre de défilement n'apparaît qu'au survol (feuille) ou pendant un défilement : molette ou clavier la montrent une seconde
     let defile = 0;
     const montrerBarre = () => { zone.classList.add('vf-q-defile'); clearTimeout(defile); defile = setTimeout(() => zone.classList.remove('vf-q-defile'), 1000); };

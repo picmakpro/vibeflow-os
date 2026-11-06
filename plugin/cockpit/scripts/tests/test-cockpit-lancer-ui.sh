@@ -66,7 +66,8 @@ import http from 'node:http'; import fs from 'node:fs'; import { execFileSync } 
 const [, , module_, port, ta] = process.argv; const WORKD = process.env.LU_WORK;
 let inj = ''; try { inj = (await import(pathToFileURL(module_).href)).injectionLancer({ indisponible: false }) || ''; } catch { inj = ''; }
 function aide() { // exécutée dans la page : le faux viewer (boucle des sections de viewer.html, écouteur d'Entrée de window)
-  window.__err = []; window.__sections = { item: [] }; window.__redraws = 0; window.__sel = null; window.__M72 = undefined;
+  window.__err = []; window.__sections = { item: [] }; window.__redraws = 0; window.__sel = null; window.__M72 = undefined; window.__prop = 0;
+  document.addEventListener('vf-lancer-propose', () => { window.__prop++; }); // SP-1 : le signal de proposition acceptée que le tiroir écoute
   addEventListener('error', (e) => window.__err.push(String(e.message))); addEventListener('unhandledrejection', () => window.__err.push('rejet'));
   window.definirVibeFlow = () => { window.VibeFlow = { addPanelSection(where, fn) { (window.__sections[where] = window.__sections[where] || []).push(fn); } }; };
   window.__selectionner = (cible, titre) => {
@@ -183,7 +184,7 @@ await executer(chrome, async (s) => {
       await defaut({ post: { status: 202, body: '{"propose":true}', delai: 500 } }); await ouvrir(); await carte('n:ph-72', 'Phase 72');
       await clic('Planifier', 2); await att(`${STATUT}.length > 0`, 'message de l’envoi'); R.statutRole = await s.ev(`document.querySelector('#panel [data-vf-lancer] [role="status"]').tagName.toLowerCase()`);
       R.statut = await s.ev(STATUT); const j = await jrn(); R.n = j.posts.length; R.p = j.posts[0] || {}; R.cles = Object.keys(JSON.parse(R.p.corps || '{}')).join();
-      R.getsJeton = j.gets.map((g) => g.jeton).join(); R.gets = j.gets.length;
+      R.getsJeton = j.gets.map((g) => g.jeton).join(); R.gets = j.gets.length; R.prop = await s.ev('window.__prop');
     });
     R.fin = await jrn().then((j) => ({ gets: j.gets.length, getsKo: j.gets.filter((g) => !g.jeton).length, posts: j.posts.length, postsKo: j.posts.filter((p) => !p.jeton).length }), () => null);
     await essai('menu', async () => {
@@ -252,6 +253,7 @@ await executer(chrome, async (s) => {
         await scen(st === 'panne' ? { panne: true } : { panne: false, post: { status: st, body: corps, delai: 0 } }); await carte('n:ph-72', 'Phase 72'); await clic('Planifier');
         await att(`${STATUT}.length > 0`, `message du cas ${st}`); R.msgs.push(await s.ev(STATUT)); R.imgs = Math.max(R.imgs, await s.ev(`document.querySelectorAll('#panel img').length`));
       }
+      R.prop = await s.ev('window.__prop');
     });
   } else if (mode === 'lu13') {
     await essai('temoin', async () => { await defaut(); await ouvrir(); R.temoin = (await carte('n:ph-72')).princ.join(); });
@@ -271,6 +273,14 @@ await executer(chrome, async (s) => {
   } else { throw new Error('mode inconnu : ' + mode); }
   return R;
 }, { csp: true });
+JS
+cat > "$AUX/parite.mjs" <<'JS'
+// parite.mjs <module-ui> <module-cibles> : ST-2. La liste des codes de pré-vol est DÉRIVÉE du module de cibles (import réel, jamais un littéral) ; { n, sans } = nombre de codes et codes sans texte dans MOTIFS.
+import { pathToFileURL } from 'node:url';
+const [, , ui, cibles] = process.argv;
+const c = await import(pathToFileURL(cibles).href), u = await import(pathToFileURL(ui).href);
+const codes = [...c.BLOQUANTS, ...c.AVERTISSEMENTS, ...c.AVERTISSEMENTS_RESERVES];
+console.log(JSON.stringify({ n: codes.length, sans: codes.filter((k) => !Object.prototype.hasOwnProperty.call(u.MOTIFS, k) || typeof u.MOTIFS[k] !== 'string' || !u.MOTIFS[k]) }));
 JS
 rj() { printf '%s\n' "$1" | node "$AUX/ev.mjs" "$2" 2>/dev/null; }
 rq() { node "$TA" req "$@"; }
@@ -297,6 +307,8 @@ assert_eq "LU.S3 — aucune adresse web écrite en entier dans le script (témoi
 assert_eq "LU.S4 — exactement deux fetch, vers /api/vf/lancer et /api/vf/lancer/cibles" "$(rj "$ST" "${ABS}(j.fetchs+\"|\"+j.urls)")" "2|/api/vf/lancer,/api/vf/lancer/cibles"
 assert_eq "LU.S5 — aucun innerHTML, outerHTML, insertAdjacentHTML, document.write, eval(, new Function, postMessage(, localStorage, sessionStorage, document.cookie, littéral de couleur, .style, cssText (témoin : le détecteur en voit 13 plantés)" "$(rj "$ST" "${ABS}(\"interdits=\"+j.interdits+\" temoin=\"+j.temoinInterdits)")" "interdits=aucun temoin=13"
 assert_eq "LU.S6 — LIBELLES_VERBES : exactement cadrer, planifier, executer, verifier, reprendre (ordre fermé), figé, libellés accentués" "$(rj "$ST" "${ABS}(j.cles+\"|\"+j.valeurs+\"|\"+j.fige)")" "cadrer,planifier,executer,verifier,reprendre|Cadrer,Planifier,Exécuter,Vérifier,Reprendre|true"
+CIB="$SCRIPTS/vf-cockpit-lancer-cibles.mjs"; PJ="$(node "$AUX/parite.mjs" "$MOD" "$CIB")"
+assert_eq "LU.S8 — ST-2 : chaque code de la table de cibles (liste DÉRIVÉE du module réel, au moins 14 codes) a un texte dans MOTIFS de l'interface" "$(rj "$PJ" '(j.n>=14?"n>=14":"liste trop courte "+j.n)+"/sans="+j.sans.join()')" "n>=14/sans="
 assert_eq "LU.S7 — MOTIFS : les quatorze codes de 72-03 et leurs textes, mot pour mot, aucun code en plus" "$(rj "$ST" "${ABS}j.ecart")" "aucun"
 
 if [ -n "$CHROME" ]; then
@@ -318,6 +330,7 @@ assert_eq "LU.3 — clic sur le principal : UN POST /api/vf/lancer, Content-Type
 assert_eq "LU.3 — un double clic rapide (réponse retardée de 500 ms) ne fait partir qu'UN POST" "$(rj "$J" '"posts="+(j.fin&&j.fin.posts)')" "posts=1"
 assert_eq "LU.3 — le GET de la liste porte le jeton de la page (témoin : au moins une lecture), le POST aussi" "$(rj "$J" '"gets="+(j.fin&&j.fin.gets>=1)+" getsKo="+(j.fin&&j.fin.getsKo)+" postsKo="+(j.fin&&j.fin.postsKo)')" "gets=true getsKo=0 postsKo=0"
 assert_eq "LU.3 — réponse 202 : message d'envoi dans un p role=status, avec le titre de la carte" "$(rj "$J" 'j.statutRole+"|"+j.statut')" "p|Proposition envoyée au terminal : Planifier — Phase 72. Confirmez-la dans le terminal."
+assert_eq "LU.3 — SP-1 : le 202 signale la proposition acceptée par UN évènement vf-lancer-propose du document (le double clic ne fait partir qu'un POST)" "$(rj "$J" '"prop="+j.prop+" n="+j.n')" "prop=1 n=1"
 assert_eq "LU.4 — clic sur « Exécuter » du menu : corps {cible: ph-72, verbe: executer}" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+j.menu')" "{} {\"cible\":\"ph-72\",\"verbe\":\"executer\"}"
 
 echo "=== LU.5 / LU.6 — pré-vols : bloquants, avertissements, travail non commité ==="
@@ -356,6 +369,8 @@ run_lu "$MOD" lu12; J="$LJ"
 REFUSE="Le lancement a été refusé."
 assert_eq "LU.12 — 403, 404, 409 {refus:bloque}, 500, réseau coupé, refus hostile, champ motif, 409 {refus:jeton}, corps illisible : un message par cas, jamais le texte du serveur ni un img" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+(j.msgs||[]).join(" ## ")+" imgs="+j.imgs')" "{} $REFUSE ## Le lancement n'est pas disponible. Relancez /vf-cockpit --terminal. ## Le lancement est bloqué : voyez les motifs ci-dessus. ## $REFUSE ## Le cockpit ne répond pas. ## $REFUSE ## $REFUSE ## $REFUSE ## $REFUSE imgs=0"
 
+assert_eq "LU.12 — SP-1 : aucun des refus ou pannes ne signale d'évènement vf-lancer-propose (témoin : les neuf cas ont rendu leur message)" "$(rj "$J" '"prop="+j.prop+" msgs="+(j.msgs||[]).length')" "prop=0 msgs=9"
+
 echo "=== LU.13 / LU.14 — liste invalide, verbes ==="
 run_lu "$MOD" lu13; J="$LJ"
 assert_eq "LU.13 — actif:false, cibles absent, corps non JSON, statut 404, cibles non tableau : aucune section ni titre, aucune exception, aucun POST ; témoin : la liste valide rend son principal" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+(j.cas||[]).join()+" "+(j.titres||[]).join()+" posts="+j.posts+" temoin="+j.temoin')" "{} 0,0,0,0,0 0/0,0/0,0/0,0/0,0/0 posts=0 temoin=Planifier:btn primary"
@@ -364,6 +379,12 @@ assert_eq "LU.14 — verbe inconnu ignoré (principal Planifier, autre Exécuter
 assert_eq "LU.14 — verbes vide ou sans verbe valide : « Aucune action disponible. » et aucun bouton" "$(rj "$J" '["vide","inval"].map((k)=>j[k]?j[k].lignes.join("|")+"/"+j[k].nb:"?").join(" ")')" "Aucune action disponible./0 Aucune action disponible./0"
 
 echo "=== Mutants — chaque garde du module a sa sonde ==="
+if mutant M-TEXTE-RETIRE "/^  'lancement-recent':/d"; then
+  assert_eq "M-TEXTE-RETIRE — le mutant rougit LU.S8 : un code de la table de cibles n'a plus de texte dans l'interface (témoin : la liste dérivée a ses codes)" "$(rj "$(node "$AUX/parite.mjs" "$MUT_MOD" "$CIB")" '(j.n>=14?"n>=14":"plante")+"/"+(j.sans.length>=1?"rouge":"sain")')" "n>=14/rouge"
+else sans_effet M-TEXTE-RETIRE; fi
+if [ -n "$CHROME" ] && mutant M-PROPOSE '/garde:propose/d'; then run_lu "$MUT_MOD" lu3
+  assert_eq "M-PROPOSE — le mutant rougit LU.3 : le 202 ne signale plus rien au tiroir (témoin : le POST est parti et le message d'envoi s'affiche)" "$(rj "$LJ" '"n="+j.n+" rouge="+(j.prop!==1)')" "n=1 rouge=true"
+elif [ -n "$CHROME" ]; then sans_effet M-PROPOSE; fi
 if mutant M-INNERHTML '/garde:titre/s/\.textContent =/.innerHTML =/'; then run_lu "$MUT_MOD" lu8
   assert_eq "M-INNERHTML — le mutant rougit LU.8 : un img entre dans le panneau, une requête hors liste part ou la CSP est violée (témoin : section rendue)" "$(rj "$LJ" '"section="+(!!j.h2&&j.h2.nb>0)+" rouge="+(j.imgs>=1||(j.hors||[]).length>=1||j.violations>=1)')" "section=true rouge=true"
 else sans_effet M-INNERHTML; fi

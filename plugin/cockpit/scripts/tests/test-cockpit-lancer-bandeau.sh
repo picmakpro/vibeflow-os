@@ -8,8 +8,9 @@
 #   LB.C  client sans navigateur (doublures Node, minuteur accéléré) : sondage précoce, formes refusées, écriture { id, mode }, mode retenu, aucun octet au PTY,
 #         annulation, cas froid (cadre masqué)
 #   LB.E  client réel + serveur factice du contrat §4 + faux P sous Chrome (E1 à E7, puis E8 cadre masqué)
+#   LB.F  F1 (focus) : faux P à champ de saisie, frappes abc, fenêtre focalisée puis non focalisée ; SP-1 : clic Lancer, tiroir fermé, le bandeau apparaît dans Q
 #   LB.P  le serveur factice écoute un port >= 4600 et différent de 4456
-#   M-*   quatorze mutants (copies des sources, « mutant sans effet » = FAIL)
+#   M-*   vingt et un mutants (copies des sources, « mutant sans effet » = FAIL)
 # Sans Chrome : les sections statiques et les doublures tournent, la suite annonce SUITE SAUTÉE (navigateur) pour V et E.
 # Variables : VF_CLIENT_MS (échéance d'une attente navigateur, 20000 par défaut) · VF_LB_PORTS=bas-haut (plage de ports du serveur factice ; sinon ports libres du système).
 # Exit 0 si tout passe, 1 sinon.
@@ -59,7 +60,7 @@ export const valide = (id = ID_A, over = {}) => Object.assign({
   lignes: { default: ligne('default'), acceptEdits: ligne('acceptEdits'), plan: ligne('plan'), herite: ligne('') },
   bloquants: [], avertissements: [], arme_apres_ms: 1500, expire_ms: 100000,
 }, over);
-export const NOTE = "Aucun mode n'est imposé : le réglage de votre poste s'applique, y compris « tout autoriser » s'il est configuré.";
+export const NOTE = "Aucun mode n'est imposé : Claude Code suit les réglages de votre poste ou du projet (jamais « tout autoriser » ni auto depuis le projet).";
 export const MOTIFS = {
   'phase-finie': 'La phase est terminée.', 'terminal-absent': 'Le terminal est indisponible sur ce poste.', 'terminal-arrete': 'Le terminal est arrêté. Relancez /vf-cockpit --terminal.',
   'premier-plan-occupe': 'Un programme occupe déjà le terminal.', 'claude-introuvable': 'La commande claude est introuvable.', 'python3-absent': 'Python 3 est introuvable sur ce poste.',
@@ -71,7 +72,7 @@ export const MOTIFS = {
 };
 export const INCONNU = 'Contrôle non reconnu.';
 export const MSG = {
-  occupe: 'Un programme occupe le terminal : quittez-le, puis cliquez sur Lancer. Rien n\'a été écrit.', attendre: 'Patientez un instant, puis cliquez de nouveau sur Lancer.',
+  occupe: 'Le terminal n\'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n\'a été écrit ; vérifiez, puis cliquez sur Lancer.', attendre: 'Patientez un instant, puis cliquez de nouveau sur Lancer.',
   'sans-session': 'Aucune session de terminal n\'est ouverte : relancez le shell, puis réessayez.', refus: 'Le lancement a été refusé.', reseau: 'Le terminal ne répond pas.',
 };
 JS
@@ -312,8 +313,20 @@ const q = http.createServer(async (req, res) => {
   if (req.method === 'POST' && chemin === '/annuler') { try { if (scen.prop && scen.prop.id === JSON.parse(corps.toString('utf8')).id) scen.prop = null; } catch { /* corps invalide */ } return fin(204); }
   return fin(404);
 });
+// SP-1 : page Projet factice (tiroir + interface de lancement RÉELS lus dans FAUX_INJ, faux window.VibeFlow, routes du contrat) servie sur /project.html?sp1=1 seulement
+let injPage = '';
+if (process.env.FAUX_INJ) {
+  const t = await import(pathToFileURL(`${process.env.FAUX_INJ}/vf-cockpit-terminal-tiroir.mjs`).href), l = await import(pathToFileURL(`${process.env.FAUX_INJ}/vf-cockpit-lancer-ui.mjs`).href);
+  injPage = t.injectionTiroir({}) + l.injectionLancer({});
+}
+const CIBLES = { actif: true, cibles: [{ id: 'ph-1', kind: 'phase', principal: 'planifier', verbes: ['planifier'], bloquants: [], avertissements: [], lancee: false }] };
+const pageSp1 = () => `<!doctype html><title>P factice</title><script>window.VF_COCKPIT_SERVER={token:'t'};window.__msgs=[];addEventListener('message',function(e){window.__msgs.push({o:e.origin,d:String(e.data).slice(0,60)})});window.__secs=[];window.VibeFlow={addPanelSection:function(w,f){window.__secs.push(f)}};</script><div id="panel"></div>${injPage}<script>(function t(){var f=window.__secs[0];if(!f)return void setTimeout(t,50);var r=f('n:ph-1'),z=document.getElementById('panel');z.innerHTML=r.html;r.bind(z)})()</script>`;
 const p = http.createServer(async (req, res) => {
   const chemin = new URL(req.url, OP).pathname;
+  if (req.method === 'GET' && chemin === '/api/vf/terminal') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ etat: 'actif', port: Number(portQ) })); }
+  if (req.method === 'GET' && chemin === '/api/vf/lancer/cibles') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(CIBLES)); }
+  if (req.method === 'POST' && chemin === '/api/vf/lancer') { await lire(req); scen.prop = scen.apres || null; res.writeHead(202, { 'Content-Type': 'application/json' }); return res.end('{"propose":true}'); }
+  if (req.method === 'GET' && chemin === '/project.html' && new URL(req.url, OP).searchParams.get('sp1') === '1') { res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(pageSp1()); }
   if (req.method === 'POST' && chemin === '/__scenario') { scen = JSON.parse((await lire(req)).toString('utf8')); scen.lancers = scen.lancers || []; res.writeHead(204); return res.end(); }
   if (req.method === 'GET' && chemin === '/__journal') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(journal)); }
   res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -330,7 +343,7 @@ import { pathToFileURL } from 'node:url'; import fs from 'node:fs';
 const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const { valide, ID_A, ID, NOTE, MOTIFS, INCONNU, MSG, ligne } = await import(pathToFileURL(process.env.LB_DONNEES).href);
 const [, , chrome, mode, brut] = process.argv;
-const { P, Q, secret, run, only = null } = JSON.parse(brut);
+const { P, Q, secret, run, only = null, emu = false, codes = [] } = JSON.parse(brut);
 const OP = `http://127.0.0.1:${P}`, OQ = `http://127.0.0.1:${Q}`, MS = Number(process.env.VF_CLIENT_MS) || 20000;
 const LISTE = ['ready', 'etat:connecte', 'etat:reconnexion', 'etat:termine', 'etat:refuse', 'etat:expire', 'etat:arrete', 'toggle'];
 const erreurs = {};
@@ -468,7 +481,8 @@ await executer(chrome, async (s) => {
       }
       r.v7 = sortie.join(';'); await raz();
     });
-    await essai('v8', async () => { // retrait sans exception tardive, remplacement, focus au premier affichage seulement
+    await essai('v8', async () => { // retrait sans exception tardive, remplacement, focus au premier affichage seulement (F1 : Annuler ne prend le focus que si le cadre de Q l'a déjà : le cadre est focalisé ici)
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.ev(`document.body.focus()`);
       await raz(); await monter({ id: ID(81), arme_apres_ms: 500 });
       await q.ev(`window.__vieux = ${LANCER}; vfTermVue.proposition(null); true`); await pause(900);
       const f1 = await q.ev(`({ present: !!document.getElementById('proposition'), vieux: __vieux.getAttribute('aria-disabled'), erreurs: __erreurs.length })`);
@@ -477,6 +491,15 @@ await executer(chrome, async (s) => {
       await q.ev(`(() => { ${LANCER}.focus(); return true; })()`); await monter({ id: ID(83) });
       const f3 = await q.ev(`(document.activeElement && document.activeElement.textContent) || ''`);
       r.v8 = [f1.present, f1.vieux, f1.erreurs, f2.n, f2.id === ID(83), f2.focus, f3 !== 'Annuler'].join('/'); await raz();
+    });
+    await essai('v9', async () => { // ST-2 : chaque code de la table de cibles (liste DÉRIVÉE du module, passée par la suite, jamais un littéral) a un texte dans la vue
+      const sans = [];
+      for (const [i, c] of codes.entries()) {
+        await raz(); await monter({ id: ID(90 + i), bloquants: [c] });
+        const t = await q.ev(`(document.querySelector('#proposition .vf-q-erreur-texte') || {}).textContent || ''`);
+        if (t === '' || t.includes(INCONNU)) sans.push(c);
+      }
+      r.v9 = codes.length + '/' + sans.join(','); await raz();
     });
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
@@ -535,6 +558,54 @@ await executer(chrome, async (s) => {
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
 
+  if (mode === 'focus') {
+    // F1 (audit) : le scénario de l'audit. Faux P avec un champ de saisie FOCALISÉ avant la création du cadre de Q ; le cadre démarre, une proposition arrive, des frappes partent.
+    // emu : émulation de focus de Chrome (fenêtre focalisée) ; sans elle, fenêtre non focalisée. Dans les deux cas : les frappes vont au champ de P, jamais à l'entrée du shell de Q.
+    await scenario({ prop: null });
+    if (emu) await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', ${JSON.stringify(secret)})`);
+    await s.naviguer(`${OP}/project.html`); await s.attendre(`document.readyState === 'complete'`, 'page P', MS);
+    await s.ev(`(() => { const i = document.createElement('input'); i.id = 'champP'; i.style.cssText = 'position:fixed;left:0;top:0'; document.body.appendChild(i); i.focus();
+      const f = document.createElement('iframe'); f.dataset.t = '1'; f.setAttribute('sandbox', ${JSON.stringify(SBXQ)}); f.style.cssText = 'position:fixed;left:0;bottom:0;width:100vw;height:300px;border:0'; f.src = ${JSON.stringify(OQ + '/?theme=dark')}; document.body.appendChild(f); return true; })()`);
+    await essai('f1', async () => {
+      await s.attendre(`window.__msgs.some((m) => m.d === 'ready')`, 'cadre de Q prêt', MS);
+      const fin = Date.now() + MS; while (Date.now() < fin && !(await journal()).some((x) => x.u === '/flux')) await pause(100); // le terminal de Q est démarré
+      await pause(600);
+      await scenario({ prop: valide(ID_A), lancers: [] });
+      await s.attendre(`window.__msgs.some((m) => m.d === 'proposition')`, 'message proposition', MS);
+      await trouverCtx(s); await q.attendre(`!!document.getElementById('proposition')`, 'bandeau dans Q', 6000);
+      await pause(500);
+      for (const ch of 'abc') { await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ch, text: ch, code: 'Key' + ch.toUpperCase() }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ch, code: 'Key' + ch.toUpperCase() }); }
+      await pause(1200);
+      const champ = await s.ev(`document.getElementById('champP').value`), actif = await s.ev(`document.activeElement.id || document.activeElement.tagName`);
+      r.f1 = [champ, actif, entrees()].join('/');
+    });
+    return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
+  }
+
+  if (mode === 'sp1') {
+    // SP-1 : rechargement sans fragment, tiroir fermé (aucun cadre de Q), clic « Lancer » sur une carte : le POST rend 202, le tiroir s'ouvre, le bandeau apparaît dans Q, sans prendre le focus de P.
+    await scenario({ prop: null, apres: valide(ID_A) });
+    if (emu) await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', ${JSON.stringify(secret)})`);
+    await s.naviguer(`${OP}/project.html?sp1=1`); await s.attendre(`document.readyState === 'complete'`, 'page P', MS);
+    await essai('sp1', async () => {
+      await s.attendre(`!!document.querySelector('#panel button')`, 'carte avec son bouton Lancer', MS);
+      await pause(800);
+      const avant = await s.ev(`document.querySelectorAll('iframe').length`);
+      const c = await s.ev(`(() => { const b = document.querySelector('#panel button').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c.x, y: c.y });
+      await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: c.x, y: c.y, button: 'left', clickCount: 1 });
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c.x, y: c.y, button: 'left', clickCount: 1 });
+      await s.attendre(`/Confirmez-la dans le terminal/.test(document.getElementById('panel').textContent)`, 'message de la carte', MS);
+      const cadre = await s.attendre(`document.querySelectorAll('iframe').length === 1`, 'cadre de Q monté', 4000).then(() => true, () => false);
+      let bandeau = false; if (cadre) { await trouverCtx(s).catch(() => {}); if (ctx) bandeau = await q.attendre(`!!document.getElementById('proposition')`, 'bandeau dans Q', 6000).then(() => true, () => false); }
+      const focusP = await s.ev(`document.activeElement.tagName !== 'IFRAME'`);
+      r.sp1 = [avant, cadre, bandeau, focusP].join('/');
+    });
+    return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
+  }
+
   if (mode === 'froid') {
     await scenario({ prop: valide(ID_A), lancers: [] }); await q.naviguer(`${OQ}/?theme=dark`, 'nulle');
     const recus = async () => JSON.parse(await s.ev('JSON.stringify(window.__msgs)')).filter((m) => m.d === 'proposition');
@@ -570,7 +641,7 @@ FN=0
 faux() { # faux <dossier-des-modules> -> FQ FP FSEC FRUN FPID ; un seul processus, deux ports
   port; FQ="$PORT"; port; FP="$PORT"; FSEC="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
   FN=$((FN+1)); FRUN="$WORK/run/$FN"; mkdir -p "$FRUN"
-  node "$AUX/faux.mjs" "$1" "$ENG" "$FQ" "$FP" "$FSEC" "$FRUN" > "$FRUN/faux.out" 2>&1 < /dev/null &
+  FAUX_INJ="${FAUX_INJ:-}" node "$AUX/faux.mjs" "$1" "$ENG" "$FQ" "$FP" "$FSEC" "$FRUN" > "$FRUN/faux.out" 2>&1 < /dev/null &
   FPID=$!; PIDS+=($FPID)
   for _ in $(seq 1 100); do [ -s "$FRUN/pret" ] && break; sleep 0.1; done
 }
@@ -631,10 +702,12 @@ assert_eq "LB.C7 — cas froid : fenêtre de taille nulle, une proposition servi
 assert_eq "LB.C7 — la fenêtre prend une taille : Terminal construit UNE fois, vue.proposition appelée UNE fois avec la même proposition, toujours UN seul message (aucune seconde émission)" \
   "$(verdict "$CJ" 'j.ouvert.terms===1 && j.ouvert.data===1 && j.ouvert.memeId && j.ouvert.msgs===1')" "sain"
 
+CODES="$(node --input-type=module -e "import * as c from '$SCRIPTS/vf-cockpit-lancer-cibles.mjs'; console.log(JSON.stringify([...c.BLOQUANTS, ...c.AVERTISSEMENTS, ...c.AVERTISSEMENTS_RESERVES]))")" # ST-2 : liste des codes DÉRIVÉE du module de cibles réel
+NCODES="$(node -e "console.log(JSON.parse(process.argv[1]).length)" "$CODES")"
 # --- LB.V, LB.E, LB.P : navigateur ----------------------------------------------------------------------------------------------------------------------
 if [ -n "$CHROME" ]; then
   echo "=== LB.V — vue du bandeau sous Chrome ==="
-  run_vue "$SCRIPTS"; VJ0="$VJ"
+  run_vue "$SCRIPTS" "\"codes\":$CODES"; VJ0="$VJ"
   vv() { rj "$VJ0" "(j.erreur ? 'plante: ' + j.erreur : j.$1 !== undefined ? j.$1 : 'erreur: ' + ((j.erreurs || {}).$1 || 'étape absente'))"; }
   H="Lancement à confirmer"
   assert_eq "LB.V1 — #proposition : classes vf-q-bandeau vf-q-collage, role group, libellé de groupe ; sélecteur à quatre options dans l'ordre ; zone « Commande exacte » = lignes.default puis acceptEdits, herite (avec la note, sans --permission-mode), plan ; présélection modeInitial" \
@@ -647,13 +720,14 @@ if [ -n "$CHROME" ]; then
   assert_eq "LB.V7 — ok retire ; attendre : message, bouton redésarmé puis ré-armé ; occupe, sans-session, refus, reseau : message exact et Lancer actif, bandeau conservé ; absente retire" \
     "$(vv v7)" "ok=ok;attendre=ok;occupe=ok;sans-session=ok;refus=ok;reseau=ok;absente=ok"
   assert_eq "LB.V8 — proposition(null) retire sans exception tardive (minuterie arrêtée) ; un identifiant nouveau remplace (un seul #proposition) ; le focus va à Annuler au premier affichage seulement" "$(vv v8)" "false/true/0/1/true/Annuler/true"
+  assert_eq "LB.V9 — ST-2 : la liste des codes de pré-vol est DÉRIVÉE du module de cibles (non vide : $NCODES codes) et chaque code a un texte dans la vue (aucun « Contrôle non reconnu. »)" "$([ "$NCODES" -ge 14 ] && echo "$(vv v9)" || echo "liste trop courte: $NCODES")" "$NCODES/"
 
   echo "=== LB.E — client réel, serveur factice du contrat §4, faux P ==="
   faux "$SCRIPTS"; FQ0="$FQ"; FP0="$FP"; EJ="$(navig client)"; unfaux
   ev_() { rj "$EJ" "(j.erreur ? 'plante: ' + j.erreur : j.$1 !== undefined ? j.$1 : 'erreur: ' + ((j.erreurs || {}).$1 || 'étape absente'))"; }
   assert_eq "LB.E1 — proposition servie : bandeau en moins de 4 s, commande exacte du serveur, UN message proposition d'origine Q (aucune donnée : ni identifiant, ni ligne, ni secret)" "$(ev_ e1)" "true/1/true/true/true"
   assert_eq "LB.E2 — clic de confiance avant l'armement : aucun POST /lancer ; après armement : UN POST de clés exactes id,mode sans « claude », 204, bandeau retiré, aucun octet à /entree, vf.terminal.mode de Q = mode lancé" "$(ev_ e2)" "true/0/1/id,mode/true/204/0/acceptEdits"
-  assert_eq "LB.E3 — 409 une fois : message « Un programme occupe le terminal… », 0 octet à /entree, le bandeau reste, Lancer de nouveau actif, un second clic armé aboutit (204)" "$(ev_ e3)" "true/0/true/true/true/409,204"
+  assert_eq "LB.E3 — 409 une fois : message « Le terminal n'a pas pris la demande… », 0 octet à /entree, le bandeau reste, Lancer de nouveau actif, un second clic armé aboutit (204)" "$(ev_ e3)" "true/0/true/true/true/409,204"
   assert_eq "LB.E4 — après usage le serveur dit aucune : le cadre rechargé en ?theme=light, puis après trois sondages aucun #proposition" "$(ev_ e4)" "true/0/light"
   assert_eq "LB.E5 — depuis P, iframe.contentWindow.localStorage lève SecurityError (témoin : le stockage de Q porte vf.terminal.mode) ; une valeur forgée bypassPermissions dans le stockage de Q : présélection default" "$(ev_ e5)" "SecurityError/acceptEdits/default"
   assert_eq "LB.E6 — cadre chargé avec ?theme=dark&mode=acceptEdits&lancer=1&id=zzz : présélection default, aucune requête /lancer" "$(ev_ e6)" "default/0"
@@ -661,11 +735,20 @@ if [ -n "$CHROME" ]; then
   faux "$SCRIPTS"; FJ="$(navig froid)"; unfaux
   assert_eq "LB.E8 — cadre masqué : UN message proposition d'origine Q en moins de 4 s, aucun .xterm ni #proposition, aucune requête /flux, /lancer, /entree ; cadre agrandi : bandeau, /flux demandé, TOUJOURS UN seul message" \
     "$(rj "$FJ" "(j.erreur ? 'plante: ' + j.erreur : j.e8 !== undefined ? j.e8 : 'erreur: ' + ((j.erreurs || {}).e8 || 'étape absente'))")" "1/true/0/0/0/true|true|1"
+  faux "$SCRIPTS"; FJ1="$(navig focus '"emu":true')"; unfaux
+  assert_eq "LB.F1 — F1, fenêtre FOCALISÉE (émulation de focus) : champ de saisie de P focalisé, cadre de Q créé, proposition reçue, frappes abc : le champ de P les reçoit, le focus reste au champ de P, AUCUN octet à /entree" \
+    "$(rj "$FJ1" "(j.erreur ? 'plante: ' + j.erreur : j.f1 !== undefined ? j.f1 : 'erreur: ' + ((j.erreurs || {}).f1 || 'étape absente'))")" "abc/champP/0"
+  faux "$SCRIPTS"; FJ2="$(navig focus '"emu":false')"; unfaux
+  assert_eq "LB.F2 — F1, fenêtre NON focalisée (sans émulation) : même scénario, mêmes attentes" \
+    "$(rj "$FJ2" "(j.erreur ? 'plante: ' + j.erreur : j.f1 !== undefined ? j.f1 : 'erreur: ' + ((j.erreurs || {}).f1 || 'étape absente'))")" "abc/champP/0"
+  FAUX_INJ="$SCRIPTS" faux "$SCRIPTS"; SJ1="$(navig sp1 '"emu":true')"; unfaux
+  assert_eq "LB.F3 — SP-1 : page rechargée sans fragment, tiroir fermé (aucun cadre avant), clic Lancer sur une carte : 202, cadre de Q monté, bandeau dans Q, le focus de P n'est pas pris par le cadre" \
+    "$(rj "$SJ1" "(j.erreur ? 'plante: ' + j.erreur : j.sp1 !== undefined ? j.sp1 : 'erreur: ' + ((j.erreurs || {}).sp1 || 'étape absente'))")" "0/true/true/true"
   assert_eq "LB.P — le serveur factice écoute des ports >= 4600 et différents de 4456 (Q $FQ0, P $FP0)" "$([ "$FQ0" -ge 4600 ] && [ "$FP0" -ge 4600 ] && [ "$FQ0" -ne 4456 ] && [ "$FP0" -ne 4456 ] && [ "$FQ0" -ne "$FP0" ] && echo oui || echo non)" "oui"
 fi
 
 # --- mutants ---------------------------------------------------------------------------------------------------------------------------------------------
-echo "=== M-* — quatorze mutants (copies des sources) ==="
+echo "=== M-* — vingt et un mutants (copies des sources) ==="
 if mutant entree-auto vf-cockpit-terminal-client.mjs "/garde:apres-usage/s#.*#if (terminal) terminal.focus(); fetch('/entree', { method: 'POST', headers: entetes(), body: new Uint8Array([13]) });#"; then
   assert_eq "M-ENTREE-AUTO — le mutant rougit LB.C5 : un octet part à /entree après le 204 (témoin : le scénario s'exécute, le lancement est accepté)" "$(verdict "$(doubles "$MUT_DIR" focus)" 'j.st==="ok" && j.entrees===0')" "rouge"
 else sans_effet "M-ENTREE-AUTO"; fi
@@ -709,6 +792,45 @@ else sans_effet "M-SONDAGE-APRES-VISIBLE"; fi
 if mutant retard-reaffiche vf-cockpit-terminal-client.mjs "/garde:fermee/d"; then
   assert_eq "M-RETARD-REAFFICHE — le mutant rougit LB.C2 : un sondage en retard remonte la proposition consommée (témoin : le lancement est accepté)" "$(verdict "$(doubles "$MUT_DIR" retard)" 'j.ok.st==="ok" && j.ok.dv===0 && j.ok.dm===0')" "rouge"
 else sans_effet "M-RETARD-REAFFICHE"; fi
+
+mutant_inj() { # mutant_inj <nom> <fichier> <expression-sed> -> MUT_DIR ; copie du tiroir et de l'interface de lancement ; code 1 si la cible manque ou n'a pas changé
+  local d="$WORK/mut-$1" f x; rm -rf "$d"; mkdir -p "$d"
+  for x in terminal-tiroir terminal-tiroir-ui terminal-tiroir-style lancer-ui; do cp "$SCRIPTS/vf-cockpit-$x.mjs" "$d/"; done
+  MUT_DIR="$d"; f="$d/$2"; [ -f "$f" ] || return 1
+  cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
+}
+rouge_f1() { rj "$1" "(j.erreur ? 'plante: ' + j.erreur : j.f1 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.f1 === 'abc/champP/0' ? 'sain' : 'rouge')"; }
+rouge_sp1() { rj "$1" "(j.erreur ? 'plante: ' + j.erreur : j.sp1 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.sp1 === '0/true/true/true' ? 'sain' : 'rouge')"; }
+if [ -n "$CHROME" ]; then
+  if mutant focus-client vf-cockpit-terminal-client.mjs "s/if (!document.hasFocus || document.hasFocus()) term.focus();/term.focus();/"; then
+    faux "$MUT_DIR"; MJ="$(navig focus '"emu":false')"; unfaux
+    assert_eq "M-FOCUS-CLIENT — le mutant rougit LB.F2 : le client reprend le focus sans condition, les frappes de P atteignent le shell (témoin : le scénario s'exécute jusqu'aux frappes)" "$(rouge_f1 "$MJ")" "rouge"
+  else sans_effet "M-FOCUS-CLIENT"; fi
+  if mutant focus-vue vf-cockpit-terminal-vue.mjs "s/if (premier \&\& document.hasFocus()) annuler.focus();/if (premier) annuler.focus();/"; then
+    faux "$MUT_DIR"; MJ="$(navig focus '"emu":true')"; unfaux
+    assert_eq "M-FOCUS-VUE — le mutant rougit LB.F1 : Annuler prend le focus au champ de P à l'arrivée d'une proposition (témoin : le scénario s'exécute jusqu'aux frappes)" "$(rouge_f1 "$MJ")" "rouge"
+  else sans_effet "M-FOCUS-VUE"; fi
+  if mutant_inj sp1-signal vf-cockpit-lancer-ui.mjs '/garde:propose/d'; then
+    FAUX_INJ="$MUT_DIR" faux "$SCRIPTS"; MJ="$(navig sp1 '"emu":true')"; unfaux
+    assert_eq "M-SP1-SIGNAL — le mutant rougit LB.F3 : le 202 ne signale rien au tiroir, aucun cadre de Q, aucun bandeau (témoin : la carte a affiché « Confirmez-la dans le terminal »)" "$(rouge_sp1 "$MJ")" "rouge"
+  else sans_effet "M-SP1-SIGNAL"; fi
+  if mutant_inj sp1-ecoute vf-cockpit-terminal-tiroir.mjs "/addEventListener('vf-lancer-propose'/d"; then
+    FAUX_INJ="$MUT_DIR" faux "$SCRIPTS"; MJ="$(navig sp1 '"emu":true')"; unfaux
+    assert_eq "M-SP1-ECOUTE — le mutant rougit LB.F3 : le tiroir n'écoute plus le signal (témoin : la carte a affiché le message d'envoi)" "$(rouge_sp1 "$MJ")" "rouge"
+  else sans_effet "M-SP1-ECOUTE"; fi
+  if mutant texte-retire vf-cockpit-terminal-vue.mjs "s/'lancement-recent': 'Cette cible a déjà été lancée récemment.', //"; then
+    run_vue "$MUT_DIR" "\"only\":[\"v9\"],\"codes\":$CODES"
+    assert_eq "M-ST2-TEXTE — le mutant rougit LB.V9 : un code de la table de cibles n'a plus de texte dans la vue (témoin : la liste dérivée a ses $NCODES codes et la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v9 === '$NCODES/' ? 'sain' : /^$NCODES\\/./.test(j.v9 || '') ? 'rouge' : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"
+  else sans_effet "M-ST2-TEXTE"; fi
+  if mutant note-ancienne vf-cockpit-terminal-vue.mjs "s/Claude Code suit les réglages de votre poste ou du projet (jamais « tout autoriser » ni auto depuis le projet)\./le réglage de votre poste s'applique, y compris « tout autoriser » s'il est configuré./"; then
+    run_vue "$MUT_DIR" '"only":["v1"]'
+    assert_eq "M-NOTE-ANCIENNE — le mutant rougit LB.V1 : l'ancienne note du mode hérité (faux pour le mode venu du projet) n'est plus celle attendue (témoin : le bandeau s'affiche, la sonde s'exécute)" "$(m1="$(rj "$VJ" 'j.v1')"; if [ -z "$m1" ] || [ "$m1" = "undefined" ]; then echo plante; elif [ "$m1" = "$(vv v1)" ]; then echo sain; else echo rouge; fi)" "rouge"
+  else sans_effet "M-NOTE-ANCIENNE"; fi
+  if mutant occupe-ancien vf-cockpit-terminal-vue.mjs "s/occupe: \"Le terminal n'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n'a été écrit ; vérifiez, puis cliquez sur Lancer.\"/occupe: \"Un programme occupe le terminal : quittez-le, puis cliquez sur Lancer. Rien n'a été écrit.\"/"; then
+    run_vue "$MUT_DIR" '"only":["v7"]'
+    assert_eq "M-OCCUPE-ANCIEN — le mutant rougit LB.V7 : l'ancien texte du 409, qui nomme une cause unique, n'est plus celui attendu (témoin : les autres statuts s'exécutent)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : /;sans-session=ok;/.test(j.v7 || '') ? (/occupe=ok;/.test(j.v7) ? 'sain' : 'rouge') : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"
+  else sans_effet "M-OCCUPE-ANCIEN"; fi
+fi
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

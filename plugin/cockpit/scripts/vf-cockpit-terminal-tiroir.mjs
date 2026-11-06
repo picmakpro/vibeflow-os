@@ -183,6 +183,8 @@ function scriptTiroir(cfg, accepte, construire) {
       });
       d.poignee.addEventListener('dblclick', () => { h = defaut(); appliquer(); memoH(); });
 
+      // SP-1 : la page signale une proposition acceptée (évènement du document, sans donnée) : le cadre de Q est monté et le tiroir s'ouvre sans prendre le focus
+      document.addEventListener('vf-lancer-propose', proposer);
       // canal Q vers P : un seul écouteur, tout passe par le filtre ; aucun message n'est envoyé au cadre
       window.addEventListener('message', (e) => {
         if (!cadre || !accepte(e, origineQ, cadre.contentWindow, cfg.liste)) return;
