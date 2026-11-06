@@ -114,7 +114,7 @@
     b.appendChild(ico('M9 6l6 6-6 6'));
     const c = el('div', 'vf-git-sec-c', null, { id, role: 'region', 'aria-label': titre });
     c.hidden = !ouvert; c.appendChild(corps);
-    b.addEventListener('click', () => { const o = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(o)); c.hidden = !o; });
+    b.addEventListener('click', () => { const o = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(o)); c.hidden = !o; if (o) s.scrollIntoView({ block: 'nearest' }); }); // à l'ouverture, la section se rend visible (197) : rien ne bouge si elle l'est déjà
     s.append(b, c);
     return s;
   };

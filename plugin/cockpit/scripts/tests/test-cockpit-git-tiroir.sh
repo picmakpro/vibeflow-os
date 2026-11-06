@@ -109,7 +109,7 @@ window.__vfDet.erreurs = {}; window.__vfDetReqs = [];
     const m = /^\/api\/vf\/git\/(commit|worktrees)(\?|$)/.exec(url);
     if (!m) return f1(u, i);
     window.__vfDetReqs.push({ url, route: m[1], methode: (i && i.method) || 'GET', headers: (i && i.headers) || {} });
-    if (m[1] === 'worktrees') return rep(200, window.__vfDet.worktrees);
+    if (m[1] === 'worktrees') return window.__vfDet.delaiWt ? new Promise((ok) => setTimeout(() => ok(rep(200, window.__vfDet.worktrees)), window.__vfDet.delaiWt)).then((r) => r) : rep(200, window.__vfDet.worktrees);
     const sha = decodeURIComponent((/sha=([^&]*)/.exec(url) || [])[1] || '');
     if (window.__vfDet.erreurs[sha]) return rep(window.__vfDet.erreurs[sha], { erreur: 'commit-inconnu' });
     return rep(200, Object.assign({}, window.__vfDet.commit, { h: sha, h7: sha.slice(0, 7), commandes: { show: 'git show --stat --end-of-options ' + sha.slice(0, 7), detacher: 'git switch --detach --end-of-options ' + sha.slice(0, 7) } })); }; }
@@ -795,6 +795,41 @@ JS
   assert_eq "D15.4 — une seule région aria-live dans le tiroir, une annonce « Commande copiée » par copie (deux copies : deux annonces), toutes de la même région" "$(jq_ "$R15" '[j.regions, j.copies.length, new Set(j.copies.map((c) => c[0])).size].join("|")' 2>/dev/null)" "1|2|1"
   assert_eq "D15.5 — icône de copie : coche le temps du « Copiée », puis de nouveau l'icône de copie" "$(jq_ "$R15" '[j.iconeAvant, j.iconeCoche, j.retour, j.iconeApres === j.iconeAvant].join("|")' 2>/dev/null)" "M9 9h10v10H9zM5 15V5h10|M5 13l4 4L19 7|Copiée|true"
   assert_eq "D15.x — aucune erreur de page" "$(jq_ "$R15" 'j.errs.length' 2>/dev/null)" "0"
+  # D16 (GT1, PU-G-192/194/195/196/197) : « lecture… » tant que l'état des worktrees n'est pas lu (distinct d'un échec « lecture impossible »), infobulle des ↑↓, détail d'un commit :
+  # la commande qui change la copie de travail porte son étiquette. SURFACE DURCIE : un nom de base hostile n'entre que dans un title/aria-label (setAttribute), jamais dans une commande ni en HTML.
+  cat > "$AUX/d16.js" <<'JS'
+const [base] = ARGS; const out = {};
+const HOSTILE = `ma"b'$(touch x);<img src=x onerror=alert(1)>`;
+await fenetre(1440, 900); await s.naviguer(base + '/'); await pret();
+await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne');
+await s.ev(`(() => { window.__vfGit.reponse.base.nom = ${JSON.stringify(HOSTILE)}; const W = window.__vfDet.worktrees.worktrees;
+  Object.assign(W[0], { propre: false, modifies: 1, nonSuivis: 0, avance: 312, retard: 4 });
+  Object.assign(W[1], { modifies: null, nonSuivis: null, plus: false, propre: null, avance: null, retard: null });
+  window.__vfDet.delaiWt = 1200; })()`);
+await s.ev(`document.querySelector('#vf-git-ligne').click()`);
+await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l').length === 3`, 'tiroir ouvert');
+const etats = `[...document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l')].map((w) => [...w.querySelectorAll('.vf-git-pastille')].map((p) => p.textContent).join('/'))`;
+out.enCours = await s.ev(etats);
+await s.attendre(`/lecture impossible/.test(document.querySelector('#vf-git-s-wt').textContent)`, 'état lu', 6000);
+out.lu = await s.ev(etats);
+out.avance = await s.ev(`(() => { const p = document.querySelector('#vf-git-s-wt .vf-git-p-mono'); return { txt: p.textContent, title: p.getAttribute('title'), aria: p.getAttribute('aria-label') }; })()`);
+out.attendu = `312 commits d'avance sur ${HOSTILE}, 4 commits de retard`;
+out.inerte = await s.ev(`({ balises: document.querySelectorAll('#vf-git-tiroir img, #vf-git-tiroir script').length, alertes: window.__alerte, cmdHostile: [...document.querySelectorAll('#vf-git-tiroir .vf-git-cmd code')].some((c) => c.textContent.includes('touch x')) })`);
+await s.ev(`document.querySelector('#vf-git-tiroir li[role=option]').click()`);
+await s.attendre(`!!document.querySelector('.vf-git-det .vf-git-cmd')`, 'détail');
+out.detail = await s.ev(`(() => { const G = [...document.querySelectorAll('.vf-git-det .vf-git-d-cmds')], N = window.__couleur('--text-3');
+  return { n: G.length, titres: G.map((g) => g.firstChild.textContent), cmds: G.map((g) => g.querySelector('code').textContent.split(' ').slice(0, 2).join(' ')), change: G.map((g) => g.classList.contains('vf-git-d-change')), neutre: G.every((g) => getComputedStyle(g.firstChild).color === N), glyphe: getComputedStyle(G[1].firstChild, '::before').content, hostile: document.querySelector('.vf-git-det').textContent.includes('touch x') }; })()`);
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d16.js"; } > "$AUX/d16-complet.js"
+  R16="$(cdp "$AUX/d16-complet.js" "$BASE")"
+  assert_eq "D16.1 — PU-G-192 : tant que git status n'est pas lu, chaque worktree dit « lecture… » (jamais « état illisible »)" "$(jq_ "$R16" 'j.enCours.join(" | ")' 2>/dev/null)" "lecture… | lecture… | lecture…"
+  assert_eq "D16.2 — PU-G-192 : une lecture qui échoue (comptes null) se distingue de la lecture en cours : « lecture impossible »" "$(jq_ "$R16" 'j.lu.join(" | ")' 2>/dev/null)" "1 modifié/↑312 ↓4 | lecture impossible | 1 modifié"
+  assert_eq "D16.3 — PU-G-196 : infobulle ↑/↓ « 312 commits d'avance sur <base>, 4 commits de retard » (title et aria-label identiques, nom de base lu comme texte)" "$(jq_ "$R16" '[j.avance.title === j.attendu, j.avance.aria === j.attendu, j.avance.txt].join("|")' 2>/dev/null)" "true|true|↑312 ↓4"
+  assert_eq "D16.4 — surface durcie : un nom de base hostile ne crée ni <img>, ni <script>, ni alerte, et n'entre dans aucune commande affichée" "$(jq_ "$R16" '[j.inerte.balises, j.inerte.alertes, j.inerte.cmdHostile, j.detail.hostile].join("|")' 2>/dev/null)" "0|0|false|false"
+  assert_eq "D16.5 — PU-G-194 : deux groupes, lecture puis « Change votre copie de travail » (git show / git switch --detach), séparé, texte neutre, glyphe décoratif" "$(jq_ "$R16" '[j.detail.n, j.detail.titres.join("/"), j.detail.cmds.join("/"), j.detail.change.join(), j.detail.neutre, /^"△ " \/ ""$/.test(j.detail.glyphe)].join("|")' 2>/dev/null)" "2|Pour lire ce commit/Change votre copie de travail|git show/git switch|false,true|true|true"
+  assert_eq "D16.x — aucune erreur de page" "$(jq_ "$R16" 'j.errs.length' 2>/dev/null)" "0"
   stop_srv
   # --- copies privées du module pour les mutants (build lit assets/ui/*.js) : chaque mutant a son propre lab et son propre serveur ---
   mkmod() { local d="$WORK/mod-$1"; mkdir -p "$d/scripts" "$d/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$d/skills/cockpit-moteur"; echo "$d/scripts"; }
@@ -827,6 +862,8 @@ JS
   assert_eq "M-ANNONCE — rougit D12.1 (une relecture sans changement annonce quand même) alors que l'annonce d'un vrai changement (D12.2) est là" "$(jq_ "$RM" '[j.inchange.length > 0, j.change.length >= 1].join("|")' 2>/dev/null)" "true|true"
   mutant M-AVANCE-ZERO 77-vf-git-rendu.js "const avance = (a) => a == null ?" "const avance = (a) => (a = a || 0) == null ?" d13-complet.js
   assert_eq "M-AVANCE-ZERO — rougit D13.1 (le retour à « avance || 0 » affiche « 0 commit » pour un avance null) alors que les témoins positifs D13.2 tiennent" "$(jq_ "$RM" '[(j.branches.find((b) => b.nom === "feat/inconnue") || {}).txt, j.branches.map((b) => b.txt).join("/")].join("|")' 2>/dev/null)" "0 commit|0 commit/0 commit/3 commits"
+  mutant M-ECHAPPEMENT 77-vf-git-vue-detail.js "bloc.appendChild(sp);" "if (tip && cls === 'vf-git-p-mono') sp.innerHTML = tip; bloc.appendChild(sp);" d16-complet.js
+  assert_eq "M-ECHAPPEMENT — rougit D16.4 (le nom de base hostile rendu en HTML fait naître un <img>) alors que l'infobulle D16.3 et les états D16.1 tiennent" "$(jq_ "$RM" '[j.inerte.balises > 0, j.enCours.join("/") === "lecture…/lecture…/lecture…"].join("|")' 2>/dev/null)" "true|true"
   mutant M-AVANCE-WT 77-vf-git-vue-detail.js "const nb = (n) => (n == null ? '—' : n);" "const nb = (n) => (n || 0);" d13-complet.js
   assert_eq "M-AVANCE-WT — rougit D13.3 (la pastille d'un worktree à avance inconnue redit « ↑0 ») alors que les branches D13.1 tiennent" "$(jq_ "$RM" '[j.wt, (j.branches.find((b) => b.nom === "feat/inconnue") || {}).txt].join("|")' 2>/dev/null)" "↑0 ↓1|—"
   mutant M-ECHEC-DIT 77-vf-git-vue-detail.js $'echecDit = false;\n      if (g.change || w.change)' $'if (g.change || w.change)' d14-complet.js

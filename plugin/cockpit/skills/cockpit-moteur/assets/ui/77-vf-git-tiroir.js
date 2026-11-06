@@ -60,6 +60,7 @@
     .vf-git-ref { flex: 0 1 auto; min-width: 0; max-width: 140px; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; white-space: nowrap; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 400; background: rgba(var(--ink), .06); color: var(--text-2); }
     .vf-git-ref-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* seul le nom de la ref cède (ellipse) ; HEAD, l'icône et le message restent entiers */
     .vf-git-ref-head { flex: none; max-width: none; }
+    .vf-git-ref:hover, .vf-git-rangee:focus-visible .vf-git-ref { flex: none; max-width: 100%; } /* 195 : l'étiquette tronquée se montre entière au survol de la pastille ou au focus de la rangée (le title porte déjà le nom) ; le message cède */
     .vf-git-ref svg { flex: none; width: 12px; height: 12px; }
     .vf-git-ref-cur { background: var(--on); color: var(--on-text); } .vf-git-ref-tag { background: var(--raise); }
     .vf-git-ref-distante { background: none; border: 1px solid var(--hair-2); color: var(--text-3); }
