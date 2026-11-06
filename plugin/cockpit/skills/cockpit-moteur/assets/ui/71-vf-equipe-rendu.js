@@ -71,12 +71,12 @@
     const meta = sess ? `${h(tpath(w.tree))}${w.branch ? ' · ' + h(w.branch) : ''}${marques}`
       : `<b>${h(w.role || 'Agent')}</b>${calme(w) ? ' · sans nouvelle depuis ' + h(duree(w.ageS)) : ''}${w.etat === 'en-attente' ? ' · en attente' : w.etat === 'bloque' ? ' · bloqué' : ''}${!calme(w) && v ? ' · ' + h(v) : ''}${puce}${marques}`;
     const corps = `<span class="r-top"><span class="r-task">${h(tache)}${sr}</span>${temps(w, h)}</span>${fini ? '' : `<span class="r-meta">${meta}</span>`}`;
-    const rang = `<a class="r-row" href="${h(lien('equipe.html', carte(w)))}" title="Voir dans l'onglet Équipe">${glyphe(nom, (w.etat === 'actif' && !w.orphan ? 'aw-pulse ' : '') + 'aw-s-' + nom)}<span class="r-main">${corps}</span></a>`;
+    const rang = `<a class="r-row" href="${h(lien('equipe.html', carte(w)))}" title="${h(sess ? 'Session principale' : tache)} — voir dans l'onglet Équipe">${glyphe(nom, (w.etat === 'actif' && !w.orphan ? 'aw-pulse ' : '') + 'aw-s-' + nom)}<span class="r-main">${corps}</span></a>`;
     const repli = ks.length ? `<button type="button" class="r-tog" data-vf-repli="${h(w.id)}" aria-expanded="true" aria-controls="k-${h(w.id)}" aria-label="Sous-agents de ${h(w.role || 'la session')}, ${ks.length}">${glyphe('repli', 'r-caret')}</button>` : '';
     const doing = !fini ? `<button type="button" class="r-doing" data-vf-doing="${h(w.id)}" aria-label="Voir la dernière commande de ${h(tache)}" title="Voir la dernière commande">${glyphe('commande')}</button><div class="vf-doing" hidden></div>` : '';
     const n = noeud(w);
     const vers = n ? `<a class="vf-link r-noeud" href="${h(lien('project.html', n))}">Nœud ${h(w.rattachement.noeud)}</a>` : '';
-    const cls = `r-ag${ks.length ? ' has-kids' : ''}${sess ? ' r-sess' : ''}${calme(w) ? ' r-calme' : ''}${w.stale ? ' r-stale' : ''}${fini ? ' r-fini' : ''}`;
+    const cls = `r-ag${ks.length ? ' has-kids' : ''}${sess ? ' r-sess' : ''}${calme(w) ? ' r-calme' : ''}${w.stale ? ' r-stale' : ''}${w.etat === 'bloque' ? ' r-bloque' : ''}${fini ? ' r-fini' : ''}`;
     return `<li class="${cls}" data-vf-agent="${h(w.id)}"><div class="r-line">${rang}${repli}${doing}${vers}</div>`
       + (ks.length ? `<ul class="r-kids" id="k-${h(w.id)}">${ks.map((k) => ligne(k, w, enfants, tous, h)).join('')}</ul>` : '') + '</li>';
   };
@@ -132,7 +132,8 @@
     .aw-driver .n { font: 500 11.5px var(--mono, monospace); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .aw-g { width: 16px; height: 16px; flex: none; display: block; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
     .aw-s-actif { color: var(--st-active); } .aw-s-attente { color: var(--text-2); } .aw-s-termine { color: var(--st-done); } .aw-s-bloque { color: var(--st-blocked); } .aw-s-orphelin { color: var(--text-3); }
-    .aw-pulse { animation: vfpulse 1.6s ease-in-out infinite; }
+    .aw-pulse { animation: vfrespire 2.4s ease-in-out infinite; }
+    @keyframes vfrespire { 50% { transform: scale(.82); } }
     @media (prefers-reduced-motion: reduce) { .aw-pulse { animation: none; } .r-caret { transition: none !important; } }
     /* l'arbre : un fil de 1 px (--fil) relie le glyphe d'un parent à ceux de ses enfants, avec un coude vers chacun ; les traits s'arrêtent à 4 px des glyphes */
     .r-tree, .r-tree ul { list-style: none; margin: 0; padding: 0; }
@@ -157,18 +158,15 @@
     .r-meta b { font-weight: 500; color: var(--text-2); font-family: var(--mono, monospace); font-size: 11.5px; white-space: nowrap; }
     .r-chip, .r-flag { display: inline-block; margin-left: var(--sp-6); padding: 0 var(--sp-6); border-radius: 999px; border: 1px solid rgba(var(--ink), .2); font: 500 11px/16px var(--mono, monospace); color: var(--text-2); max-width: 152px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
     .r-flag { border-style: dashed; font-family: var(--sans); }
-    .r-calme > .r-line .r-meta { color: var(--text-2); } .r-stale > .r-line .r-task { color: var(--text-3); } .r-sess > .r-line .r-task { font-weight: 600; }
+    .r-calme > .r-line .r-meta { color: var(--text-2); } .r-stale:not(.r-bloque) > .r-line .r-task { color: var(--text-3); } .r-sess > .r-line .r-task { font-weight: 600; }
     .r-fini .r-row { align-items: center; } .r-fini .r-task { font-weight: 400; color: var(--text-2); } .r-fini .r-t { line-height: 20px; } .r-fini .aw-g { margin-top: 0; }
-    .r-line > .r-noeud { margin: 0 0 var(--sp-4) var(--sp-24); min-height: 44px; display: flex; align-items: center; font-size: 12px; justify-self: start; }
+    .r-line > .r-noeud { margin: 0 0 0 var(--sp-24); padding-top: var(--sp-4); min-height: 44px; box-sizing: border-box; display: flex; align-items: flex-start; font-size: 12px; justify-self: start; }
     .vf-whop .vf-doing { margin: 0 0 var(--sp-8) var(--sp-24); padding: var(--sp-8) var(--sp-12); border-radius: 8px; background: var(--raise); font: 12px/1.5 var(--mono, monospace); color: var(--text-2); word-break: break-word; }
     .vf-whop .vf-doing[hidden] { display: none; }
     .r-kids { margin-left: var(--sp-8); } .r-kids[hidden] { display: none; } .r-kids > li { padding-left: var(--sp-16); }
     .r-kids > li::after { content: ""; position: absolute; left: 0; top: 0; width: 12px; height: 18px; border-left: 1px solid var(--fil); border-bottom: 1px solid var(--fil); border-bottom-left-radius: 8px; }
     .r-kids > li:not(:last-child)::before { content: ""; position: absolute; left: 0; top: 18px; bottom: 0; border-left: 1px solid var(--fil); }
     .r-ag.has-kids:not(.closed) > .r-line::before { content: ""; position: absolute; left: 8px; top: 30px; bottom: 0; border-left: 1px solid var(--fil); }
-    .r-tl > li { position: relative; }
-    .r-tl > li:not(:first-child)::before { content: ""; position: absolute; left: 8px; top: 0; height: calc(50% - 12px); border-left: 1px solid var(--fil); }
-    .r-tl > li:not(:last-child)::after { content: ""; position: absolute; left: 8px; top: calc(50% + 12px); bottom: 0; border-left: 1px solid var(--fil); }
     .aw-sec { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin: var(--sp-8) 0 0; font-size: 12px; color: var(--text-3); font-weight: 500; cursor: pointer; list-style: none; }
     .aw-sec::-webkit-details-marker { display: none; }
     details[open] > .aw-sec .r-caret { transform: rotate(90deg); }
