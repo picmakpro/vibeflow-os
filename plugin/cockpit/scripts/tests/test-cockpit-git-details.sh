@@ -53,7 +53,7 @@ let m, g;
 try { m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git-details.mjs')).href); } catch { console.log(JSON.stringify({ erreur: 'module absent' })); process.exit(0); }
 if (fn === 'commit') console.log(JSON.stringify(await m.detailCommit(lab, arg))); // asynchrone (A4)
 else if (fn === 'wt') console.log(JSON.stringify(await m.etatWorktrees(lab)));
-else if (fn === 'git') { g = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href); console.log(JSON.stringify(g.lireGit(lab))); }
+else if (fn === 'git') { g = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href); console.log(JSON.stringify(await g.lireGit(lab))); } // P78-D-41 : asynchrone
 else if (fn === 'status') console.log(JSON.stringify(m.lireStatusV2(arg, { max: 200 })));
 JS
 # route.mjs <scripts> <méthode> <chemin> <lab> : appelle routeGit avec un faux req/res ; rend « traité|statut »
@@ -62,8 +62,10 @@ import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 const [, , scripts, methode, p, lab] = process.argv;
 let m; try { m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href); } catch { console.log('module absent'); process.exit(0); }
-let statut = null; const res = { writeHead: (c) => { statut = c; }, end: () => {} };
-const traite = m.routeGit({ method: methode }, res, new URL('http://x' + p), { root: lab, json: (r, c) => { statut = c; } });
+let statut = null, fini; const attente = new Promise((r) => { fini = r; });
+const res = { writeHead: (c) => { statut = c; fini(); }, end: () => {} };
+const traite = m.routeGit({ method: methode }, res, new URL('http://x' + p), { root: lab, json: (r, c) => { statut = c; fini(); } });
+if (traite) await Promise.race([attente, new Promise((r) => setTimeout(r, 8000))]); // P78-D-41 : GET /api/vf/git répond après la promesse
 console.log(traite + '|' + statut);
 JS
 # empreinte.mjs <dossier> : une ligne par fichier (chemin, taille, date), triée — lue en Node, jamais par stat ou find
@@ -198,7 +200,21 @@ assert_eq "X2.2b — branche ws (en retard de la base) : comptes conformes à re
 assert_eq "X2.3 — 250 fichiers non suivis : borne de 200 entrées lues, plus vrai, propre faux, aucun modifié" "$(WT wt-many 'w.nonSuivis+"|"+w.plus+"|"+w.propre+"|"+w.modifies')" "200|true|false|0"
 assert_eq "X2.4 — commande à copier : cd cité pour chaque worktree ; aucun diff ni e-mail dans la réponse" "$(WT wt-sale 'w.commande')|$(J "$WORK/wt.json" '/a@t\.test|^[-+]{3} |^@@/m.test(JSON.stringify(j))')" "cd -- '$WTS'|false"
 CONTRAT_W="$(node "$AUX/j.mjs" "$SCRIPTS/vf-cockpit-interface.json" 'JSON.stringify(j.schemas["vibeflow/cockpit-git-worktrees@1"]||null)')"
-assert_eq "X2.5 — le contrat du schéma worktrees tient contre la réponse réelle (clés, types, clés de chaque worktree)" "$(J "$WORK/wt.json" '(()=>{const c='"$CONTRAT_W"';if(!c)return "schéma absent";const ty=(v)=>Array.isArray(v)?"array":v===null?"null":typeof v;const ko=Object.entries(c.requis).filter(([k,t])=>t!=="any"&&ty(j[k])!==t&&!(t==="string"&&j[k]===null));const kw=j.worktrees.filter(w=>!c.worktree.requis.every(k=>k in w));return JSON.stringify([ko,kw.length])})()')" '[[],0]'
+# conf.mjs <contrat JSON> <réponse JSON> : écarts de conformité schéma/réponse. Un type s'écrit « string », « number|null »… ; `null` n'est admis que s'il est listé (R7, revue serveur 2026-11-06 :
+# `mention` était « string » alors que le serveur sert null sans filtre, et l'ancienne tolérance « une chaîne peut être null » cachait l'écart). Sortie : [[clés du corps hors type], [champs d'entrée hors type], nb d'entrées sans clé].
+cat > "$AUX/conf.mjs" <<'JS'
+import fs from 'node:fs';
+const c = JSON.parse(process.argv[2]), j = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+const juste = (spec, v) => spec.split('|').some((t) => t === 'any' || (t === 'null' ? v === null : t === 'array' ? Array.isArray(v) : v !== null && !Array.isArray(v) && typeof v === t));
+const ko = Object.entries(c.requis).filter(([k, t]) => !juste(t, j[k])).map(([k]) => k);
+const ent = []; let sansCle = 0;
+for (const w of j.worktrees) {
+  if (!c.worktree.requis.every((k) => k in w)) sansCle++;
+  for (const [k, t] of Object.entries(c.worktree.types || {})) if (!juste(t, w[k])) ent.push(`${w.nom}.${k}`);
+}
+console.log(JSON.stringify([ko, ent, sansCle]));
+JS
+assert_eq "X2.5 — le contrat du schéma worktrees tient contre la réponse réelle (clés, types dont null déclaré, clés et types de chaque worktree)" "$(node "$AUX/conf.mjs" "$CONTRAT_W" "$WORK/wt.json")" '[[],[],0]'
 
 echo "=== X3 — dépôt piégé, lecture seule, GET seul ==="
 MARQ="$WORK/marques"; PROGS="$WORK/progs"; mkdir -p "$MARQ" "$PROGS"
@@ -374,6 +390,14 @@ NS_ETRANGERS="$(STATUTS "$SCRIPTS" "$WORK/lab3-wt.json")"
 assert_eq "X7.0a — témoin : l'emballage voit les status des deux worktrees vérifiables (la sonde X7.2 n'est pas aveugle)" "$(grep '^ARGV ' "$WORK/argv.log" | grep -E ' status( |$)' | grep -c -e "-C $L3 " -e "-C $WT3 ")" "2"
 assert_eq "X7.1 — A3 : seuls l'arbre principal et le vrai worktree sont « vérifiés » ; les 4 faux (principal d'un autre dépôt, dossier sans .git, worktree d'un autre dépôt, lien retour qui ne revient pas) ne le sont pas" "$(J "$WORK/lab3-wt.json" 'j.worktrees.map(w=>w.nom+":"+w.verifie).sort().join(" ")')" "dossier:false lab3-wt:true lab3:true victime:false vw:false w4:false"
 assert_eq "X7.2 — A3 : aucun status n'a été lancé hors de lab3 et lab3-wt (ni dans la victime, ni dans son worktree, ni dans le dossier sans .git, ni dans w4) : journal d'argv" "$NS_ETRANGERS" "0"
+assert_eq "X7.1b — R7 : le contrat tient aussi contre la réponse qui porte des worktrees « non vérifiés » (modifies, nonSuivis, propre, avance… à null : types déclarés nullables)" "$(node "$AUX/conf.mjs" "$CONTRAT_W" "$WORK/lab3-wt.json")" '[[],[],0]'
+# mutants du contrat (R7) : chacun remet le défaut dans une COPIE du contrat et rougit la conformité pour sa raison
+CW1="$WORK/contrat-mention.json"; cp "$SCRIPTS/vf-cockpit-interface.json" "$CW1"
+CW2="$WORK/contrat-propre.json"; cp "$SCRIPTS/vf-cockpit-interface.json" "$CW2"
+A1="$(muter "$CW1" '"mention": "string|null"' '"mention": "string"')"; A2="$(muter "$CW2" '"propre": "boolean|null"' '"propre": "boolean"')"
+assert_eq "X7 M-CONTRAT.0 — mutants avec effet (mention redevient « string », propre redevient « boolean ») : cibles présentes" "$A1|$A2" "applique|applique"
+assert_eq "X7 M-CONTRAT-MENTION — rouge sur la réponse sans filtre : mention (null servi) n'est plus conforme, rien d'autre" "$(node "$AUX/conf.mjs" "$(node "$AUX/j.mjs" "$CW1" 'JSON.stringify(j.schemas["vibeflow/cockpit-git-worktrees@1"])')" "$WORK/wt.json")" '[["mention"],[],0]'
+assert_eq "X7 M-CONTRAT-PROPRE — rouge sur la réponse aux worktrees non vérifiés : propre (null servi) n'est plus conforme, uniquement sur les quatre faux" "$(node "$AUX/conf.mjs" "$(node "$AUX/j.mjs" "$CW2" 'JSON.stringify(j.schemas["vibeflow/cockpit-git-worktrees@1"])')" "$WORK/lab3-wt.json" | node "$AUX/j.mjs" - 'j[1].map(x=>x.split(".")[0]).sort().join(",")+"|"+[...new Set(j[1].map(x=>x.split(".")[1]))].join(",")')" "dossier,victime,vw,w4|propre"
 assert_eq "X7.3 — A3 : un worktree non vérifié est servi sans comptes, sans propre, sans compte avance/retard et sans commande cd (tous null, plus faux)" "$(J "$WORK/lab3-wt.json" 'JSON.stringify(j.worktrees.filter(w=>!w.verifie).map(w=>[w.modifies,w.nonSuivis,w.propre,w.avance,w.retard,w.avanceOrigin,w.retardOrigin,w.commande,w.plus]).filter(a=>a.some(x=>x!==null&&x!==false)))')" "[]"
 assert_eq "X7.4 — témoin : les worktrees vérifiés sont lus comme avant (comptes numériques, propre, commande cd)" "$(J "$WORK/lab3-wt.json" 'JSON.stringify(j.worktrees.filter(w=>w.verifie).map(w=>[typeof w.modifies,w.propre,w.commande===null?"sans":"cd"]))')" '[["number",true,"cd"],["number",true,"cd"]]'
 node "$AUX/det.mjs" "$SCRIPTS" git "$L3" > "$WORK/lab3-git.json"
@@ -496,7 +520,7 @@ mut_amb() { # mut_amb <nom> <fichier> <de> <vers> : retire un « -- » et rend �
   JOURNAL "$d"; echo "$(sans_tirets)|$(node "$AUX/det.mjs" "$d" git "$AM" | node "$AUX/j.mjs" - 'j.etat')|$(node "$AUX/det.mjs" "$d" commit "$AM" "$SAM" | node "$AUX/j.mjs" - 'j.corps.etat')"
 }
 assert_eq "X7 M-TIRETS-LOG1 — le « -- » du log de la base est retiré : le graphe devient indisponible (X7.9) et le journal compte 1 lancement sans « -- » (X7.10)" "$(mut_amb tl1 vf-cockpit-git.mjs "...tetes, '--'); //" "...tetes); //")" "1|indisponible|ok"
-assert_eq "X7 M-TIRETS-LOG2 — le « -- » du log des branches non mergées est retiré : le graphe devient indisponible (branche non mergée feat) et 1 lancement sans « -- »" "$(mut_amb tl2 vf-cockpit-git.mjs "'--not', refBase, '--')" "'--not', refBase)")" "1|indisponible|ok"
+assert_eq "X7 M-TIRETS-LOG2 — le « -- » du log des branches non mergées est retiré : le graphe devient indisponible (branche non mergée feat) et 1 lancement sans « -- »" "$(mut_amb tl2 vf-cockpit-git.mjs "...(refBase ? ['--not', refBase] : []), '--')" "...(refBase ? ['--not', refBase] : []))")" "1|indisponible|ok"
 assert_eq "X7 M-TIRETS-DETAIL-LOG — le « -- » du log -1 du détail est retiré : le détail devient indisponible, 1 lancement sans « -- »" "$(mut_amb tdl vf-cockpit-git-details.mjs "'--end-of-options', sha, '--']);" "'--end-of-options', sha]);")" "1|ok|indisponible"
 assert_eq "X7 M-TIRETS-DETAIL-DT — le « -- » du diff-tree du détail est retiré : le détail devient indisponible, 1 lancement sans « -- »" "$(mut_amb tdd vf-cockpit-git-details.mjs "'--root', sha]), '--'], {" "'--root', sha])], {")" "1|ok|indisponible"
 assert_eq "X7 M-TIRETS-COMPTE — le « -- » du rev-list de compteLR est retiré : aucun comportement ne change (git ne se plaint pas d'une plage), mais le journal le voit (2 lancements sans « -- », un par worktree lu) : la classe est tenue par le journal" "$(mut_amb tcm vf-cockpit-git-details.mjs '`${base}...${oid}`, '"'--'"'], { fin })' '`${base}...${oid}`], { fin })')" "2|ok|ok"
