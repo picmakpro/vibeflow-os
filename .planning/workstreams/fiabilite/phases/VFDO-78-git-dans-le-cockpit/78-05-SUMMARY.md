@@ -121,3 +121,7 @@ S7 (helpers `realpath` et `gaucheDroite`/`compteLR` dupliqués), S10 (bash de `d
 
 - R3 : le code a été écrit avant la trace rouge ; le rouge est établi après coup sur une copie `git archive` de la tête d'avant (8c1857e1), ce qui reste un rouge dû au défaut. Première forme du mutant M-SYNC-GRAPHE (requête à 150 ms) non retenue : verte, remplacée par un marqueur de lancement.
 - Un outil d'entrée a transformé des séquences d'échappement Unicode saisies dans des commandes en caractères réels dans `test-cockpit-git-commandes.sh` ; repéré et remplacé par les séquences littérales (aucun caractère Cf ni U+2028/9 ne reste dans la suite, vérifié par balayage de catégorie).
+
+### Suites rejouées (correction revue serveur, après les six commits de code)
+
+`test-cockpit-git.sh` 99/0 · `git-details` 129/0 · `git-signature` 45/0/0 sauté · `git-commandes` 49/0 · `git-env` 130/0 · `equipe` 157/0 · `serveur` 70/0 · `vendor` 118/0 · `who` 107/0 · `securite` 91/0 · `assemblage` 40/0 · `git-graphe` 50/0 · importeurs des fichiers modifiés (grep) : `path-enfants` 37/0, `retard` 40/0, `avancement` 62/0, `signal` 76/0, `forme-claude` 56/0, `projet` 162/0, `vie` 64/0, `terminal-lanceur` 111/0. Toutes rc 0. Non rejouées (interdites, autre worker) : `git-entete`, `git-tiroir`, `git-e2e`, `responsive`, qui importent `vf-cockpit-build.mjs` et la route `/api/vf/git` : à rejouer par le manager après la jonction.
