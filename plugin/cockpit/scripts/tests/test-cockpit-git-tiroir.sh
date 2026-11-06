@@ -873,8 +873,10 @@ JS
 const [base, w0] = ARGS, w = w0 || 390; const out = {};
 await fenetre(Number(w), 800); await s.naviguer(base + '/');
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#vf-plus') && !!document.querySelector('#vf-git-tiroir')`, 'page prête');
-await s.ev(`document.querySelector('#vf-plus').click()`);
-await s.ev(`[...document.querySelectorAll('#vf-plus-menu button')].find((b) => /Git/.test(b.textContent)).click()`);
+// le vrai chemin à cette largeur : de 1000 px, la seconde ligne de l'en-tête (le menu « ⋯ » n'est posé que jusqu'à 999 px, l'ouvreur n'y figure qu'à 700 px et moins) ; à 390 px, l'entrée « Historique Git » du menu
+if (Number(w) >= 1000) await s.ev(`document.querySelector('#vf-git-ligne').click()`);
+else { await s.ev(`document.querySelector('#vf-plus').click()`);
+  await s.ev(`[...document.querySelectorAll('#vf-plus-menu button')].find((b) => /Git/.test(b.textContent)).click()`); }
 await s.attendre(`!document.querySelector('#vf-git-tiroir').hidden`, 'tiroir ouvert');
 out.ouvert = await s.ev(`document.activeElement.classList.contains('vf-git-titre-t')`);
 await touche('Escape'); await pause(400);
@@ -918,7 +920,7 @@ JS
   assert_eq "D17.x — aucune erreur de page" "$(jq_ "$R17" 'j.errs.length' 2>/dev/null)" "0"
   for W in 1440 390; do # à 1440 px la seconde ligne est visible : le focus lui revient (témoin « comme à 1440 px ») ; à 390 px seul « Plus d'actions » l'est
     R17B="$(cdp "$AUX/d17b-complet.js" "$BASE" "$W")"; ATT="vf-git-ligne"; [ "$W" = 390 ] && ATT="vf-plus"
-    assert_eq "D17.6 [$W px] — PU-G-201 : tiroir ouvert depuis le menu « Plus d'actions », Échap le ferme et rend le focus à $ATT" "$(jq_ "$R17B" '[j.ouvert, j.ferme, j.focus].join("|")' 2>/dev/null)" "true|true|$ATT"
+    assert_eq "D17.6 [$W px] — PU-G-201 : tiroir ouvert par son vrai chemin (seconde ligne dès 1000 px, menu « Plus d'actions » à 390 px), Échap le ferme et rend le focus à $ATT" "$(jq_ "$R17B" '[j.ouvert, j.ferme, j.focus].join("|")' 2>/dev/null)" "true|true|$ATT"
   done
   R17C="$(cdp "$AUX/d17c-complet.js" "$BASE")"
   [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$R17C" > "$TIROIR_TRACE-d17c.json"

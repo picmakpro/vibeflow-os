@@ -6,6 +6,7 @@
 // AMENDEMENT de P70-D-01 (« Icônes dans le menu ⋯ », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : le menu « ⋯ » n'est plus réservé au téléphone, il commence à 999 px et moins. De 701 à 999 px les icônes secondaires
 // (thème, Santé, Travail récent, Écrans, Visite, Exporter, Parcours, Types de liens, et toute action ajoutée) y passent ; restent dehors la recherche, le point « au travail », le bouton Détail (le tiroir n'a pas, au-dessus de 700 px, de titre à toucher) et l'ouvreur Git
 // (seule entrée du tiroir Git quand le nom du dépôt est masqué). De 1 000 px et plus, rien n'est posé.
+// PU-G-001 (« Garder ce compromis (Recommandé) », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : le nom du dépôt est entier à la racine ; il n'est abrégé que dans un dossier, où le niveau courant du fil a la priorité ; le menu « ⋯ » reste à 999 px et moins.
 (() => {
   const hr = document.querySelector('header .hr'), stage = document.getElementById('stage'), zoom = document.getElementById('zoom');
   if (!hr) return;

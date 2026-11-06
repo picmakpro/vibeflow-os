@@ -93,6 +93,7 @@
     @media (min-width: 701px) and (max-width: 999px) { /* la colonne gauche garde la largeur de son contenu (nom accessible du niveau courant entier) et la recherche cède la première */
       header .hl { flex: 1 0 auto; }
       header .hc { flex: 2 100 120px; }
+      header[data-vf-git] .hc { flex-basis: 72px; } /* l'ouvreur Git ajoute 48 px à la rangée : la recherche en cède autant (même règle que 76-vf-git-entete.js), pour que l'en-tête se replie aux MÊMES largeurs avec et sans Git (témoin F5, Phase 78) */
     }
     @media (min-width: 1000px) and (max-width: 1279px) and (not (pointer: coarse)) {
       header #theme-toggle { width: 36px; height: 36px; padding: 0; justify-content: center; } /* l'ouvreur Git garde ses 44 px (P78-D-34) */
