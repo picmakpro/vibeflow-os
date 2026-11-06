@@ -1,5 +1,24 @@
 # Changelog — cockpit
 
+## v1.4.0 — 2026-11-06 — non publié
+
+Parseurs tolérants du planning et diagnostic des lignes non comprises (constat du lab portfolio, 2026-11-05 : « **Depends on :** Phase 02 (…) » ne donnait aucun lien dans le graphe Projet). Arbitrage : Samuel, AskUserQuestion en session principale, 2026-11-05 — hotfix et chantier de fond traités ensemble, release minor.
+
+### Corrigé — dépendances (hotfix)
+- `**Depends on :**` (espace, U+00A0 ou U+202F avant « : »), deux-points dans le gras ou dehors, gras ou non, puce « - », casse, `Dépend de` / `Dépendance(s)` / `Dependency` / `Dependencies` / `Depends` : lus. Les coupures existantes (« · », champ gras suivant, « La Phase 68 en dépend ») sont intactes. Valeur portée par les puces qui suivent : lue.
+
+### Ajouté — normalisation partagée (`vf-cockpit-formats.mjs`, module pur)
+- Une grammaire commune à la lecture (`vf-cockpit-planning.mjs`) et au diagnostic (`vf-cockpit-drift.mjs`) : titres de phase (`##`, `###`, `####`, `Phase N:`, `Phase N :`, `Phase N —`, 01 = 1, décimales, gras autour du titre), cases `[ ]` `[x]` `[X]` avec puces `-` `*` `+`, `Goal` / `Objectif` / `Objective`, exigences `**REQ-01**:` `**REQ-01:**` `REQ-01:`, statut STATE normalisé (« In Progress » → `in_progress`), `current_phase` entre guillemets ou « Phase 2 », CRLF et BOM.
+- La case « - [x] Phase 3 - Trois » ou « **Phase 2 — Deux** » (tiret au lieu des deux-points) est lue, état coché compris (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06).
+- **Limite assumée** : la tolérance des titres est large (`##` à `####`, tiret) ; un intertitre de prose « ### Phase N — … » est donc lu comme une phase (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06).
+- Un nom de case vide reste vide (« - [ ] Phase 1: » puis « - [ ] Phase 2: B » donnent deux phases) ; BACKLOG.md, seeds et plans en CRLF/BOM sont lus comme en LF ; `## Phase N: …` posé sur la dernière ligne d'un ROADMAP sans saut de ligne final est désormais lu (changement voulu, auparavant ignoré).
+- Coût linéaire : toutes les regex lues sur le planning (titres, cases, dépendances, Goal, exigences, jalons, STATE, BACKLOG, objectif de plan) restent linéaires en la longueur de la ligne, y compris les suites de 100 000 caractères pathologiques (lecture et diagnostic) ; un test de croissance générique (44 formes, 21 caractères dont U+2028/U+2029, lecture, diagnostic et graphe Projet) en garde la classe. Les puces qui suivent un « Depends on » vide se lisent avec ou sans ligne vide ; une dépendance répétée ne donne qu'un lien. STATE.md en CRLF/BOM est lu comme en LF (jalons-absents).
+
+### Ajouté — diagnostic « lignes non comprises »
+- Règle `ligne-non-comprise` (niveau « ignoré », une par ligne, jamais de correctif proposé ; « Depends on Phase 3 » sans deux-points est signalée, jamais lue ; un mot-clé collé à un trait d'union comme « goal-backward » n'est pas un champ) dans `vf-cockpit-drift.mjs` : une ligne qui ressemble à un champ lu (titre de phase, Goal, Depends on, case d'exigence, `current_phase`) sans qu'aucun lecteur la reconnaisse. Prose libre, tables, plans et blocs de code ne sont jamais signalés.
+- Sortie du build : « N ligne(s) non comprise(s) du planning : fichier:ligne … », au premier assemblage et à chaque `build --rebuild`. Panneau « Lignes du planning non comprises » dans l'interface (20 premières lignes, fichier:ligne sans coupure et extrait). Le cockpit n'écrit toujours rien dans `.planning/`.
+- Suites : `test-cockpit-projet.sh` P8 (matrice générée de 1052 variantes, P9 corrections de revue, P10 croissance générique de 2712 cas (ratio 2N/N, lecture et diagnostic), mutants), `test-cockpit-assemblage.sh` A6.
+
 ## v1.3.3 — 2026-11-05 — non publié
 
 Réglage visuel (demande de Samuel, session principale, 2026-11-05) : tiroir fermé, la pastille « Terminal » se place sous les boutons de zoom (− ▢ +), au plus bas à gauche, et les boutons de zoom remontent au-dessus d'elle ; plus de chevauchement. Tiroir ouvert, rien ne change. Vaut pour les pages Projet et Code.
