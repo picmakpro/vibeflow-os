@@ -369,7 +369,7 @@ cat > "$AUX/tiroir.js" <<'JS'
   await pause(700);
   const tr = pa.getBoundingClientRect(), h3 = w.querySelector('h3'), hr = h3.getBoundingClientRect();
   const m = { vh: innerHeight, vw: innerWidth, refMarge, marge: Math.round(hr.left - tr.left), h3Dedans: hr.left >= tr.left && hr.right <= tr.right && hr.top >= tr.top,
-    h3Rogne: h3.scrollWidth > h3.clientWidth + 1, debordeX: pa.scrollWidth > pa.clientWidth + 1, hauteur: Math.round(tr.height), doing: zone.textContent, overflowY: getComputedStyle(pa).overflowY, titre: h3.textContent };
+    h3Rogne: h3.scrollWidth > h3.clientWidth + 1, debordeX: pa.scrollWidth > pa.clientWidth + 1, hauteur: Math.round(tr.height), doing: zone.textContent, overflowY: getComputedStyle(pa).overflowY, titre: h3.textContent + '|' + ((pa.querySelector('.aw-count') || {}).textContent || 'effectif absent') };
   for (let i = 0; i < 40; i++) { const d = document.createElement('div'); d.className = 'vf-who'; d.textContent = 'ligne ' + i; w.appendChild(d); }
   await pause(100);
   const tl = pa.getBoundingClientRect();
@@ -381,7 +381,7 @@ XD="$(CDP_VIEWPORT=1280x800 CDP_PRET="document.readyState === 'complete' && !!do
 vf_hyg_stop "$SRVD"
 [ -z "${KEEPXD:-}" ] || echo "$XD" > "$KEEPXD"
 V='j.resultats[0].valeur'
-assert_eq "W16.0 — témoin : la mesure a eu lieu (aucune erreur) et le tiroir est ouvert" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" '(j.erreur||"")+"|"+('$V'.erreur||"")+"|"+'$V'.titre')" "||Au travail (1)"
+assert_eq "W16.0 — témoin : la mesure a eu lieu (aucune erreur) et le tiroir est ouvert" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" '(j.erreur||"")+"|"+('$V'.erreur||"")+"|"+'$V'.titre')" "||Au travail|1 actif · 0 terminé"
 assert_eq "W16.1 — D3 dans le tiroir : « Voir la dernière commande » montre la commande Bash" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "$V.doing")" "echo COMMANDE-BASH-D3 …"
 assert_eq "W16.2 — témoin : le panneau de référence a une marge gauche (>= 16 px)" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "$V.refMarge >= 16")" "true"
 assert_eq "W16.3 — D2 : la marge gauche du titre du tiroir est au moins celle du panneau de référence" "$(printf '%s' "$XD" | node "$AUX/stdin-get.mjs" "$V.marge >= $V.refMarge")" "true"
@@ -531,6 +531,51 @@ assert_eq "W21.1 — la cible a..b n'est jamais passée au script (grammaire : j
 M21="$(mut17 sansdoublepoint vf-cockpit-who.mjs "WS_RE.test(ws) && !ws.includes('..')" "WS_RE.test(ws)")"
 run21 "$WORK/mut17-sansdoublepoint"
 assert_eq "W21.2 — mutant (seule la clause « .. » retirée, le reste du filtre intact) : a..b arrive au script, détecté par le comportement" "$M21|$(grep -c -- '--ws=a\.\.b' "$LOG17")" "muté|1"
+
+echo "=== W22 — GITC-14, P78-D-26 : un sous-agent sans chemin dans son dernier appel reste rattaché au dernier worktree cité sur l'ensemble de ses appels ==="
+L22="$WORK/lab22"; mkdir -p "$L22"; git -C "$L22" init -q; git -C "$L22" -c user.email=t@t -c user.name=t commit -q --allow-empty -m i; git -C "$L22" branch -m principale
+git -C "$L22" worktree add -q "$WORK/lab22-a" -b feat/a; git -C "$L22" worktree add -q "$WORK/lab22-b" -b feat/b
+L22="$(cd "$L22" && pwd -P)"; WA="$(cd "$WORK/lab22-a" && pwd -P)"; WB="$(cd "$WORK/lab22-b" && pwd -P)"
+cat > "$AUX/mk-sub-act.mjs" <<'JS'
+// mk-sub-act.mjs <fichier> <cwd> <idAgent> <cd…> : transcript de sous-agent lancé depuis <cwd> ; un appel Bash par argument, `cd <chemin> && ls` ou `ls` seul si « - »
+import fs from 'node:fs'; const [, , f, cwd, id, ...cds] = process.argv; const base = { cwd, sessionId: 'aaaa1111-2222-3333-4444-555566667777', gitBranch: 'principale', version: '2.1.316' };
+const L = (o, t) => JSON.stringify({ ...base, timestamp: t, ...o });
+const lignes = [L({ isSidechain: true, agentId: id, type: 'user', message: { content: 'va' } }, '2026-11-01T10:00:00Z'),
+  ...cds.map((cd, i) => L({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: cd === '-' ? 'ls' : 'cd ' + cd + ' && ls' } }] } }, `2026-11-01T10:00:${String(5 + i).padStart(2, '0')}Z`))];
+fs.writeFileSync(f, lignes.join('\n') + '\n');
+JS
+H22="$WORK/home22"; SD22="$H22/.claude/projects/-lab/$SID/subagents"; mkdir -p "$SD22"
+mk_session "$H22/.claude/projects/-lab/$SID.jsonl" cwd "x"; sed -i.bak "s#\"cwd\":\"$LAB\"#\"cwd\":\"$L22\"#" "$H22/.claude/projects/-lab/$SID.jsonl"; rm -f "$H22/.claude/projects/-lab/$SID.jsonl.bak"
+printf '%s\n' "$META_REELLE" > "$SD22/agent-sa.meta.json"
+arbre22() { node "$AUX/q.mjs" "$1" who "$L22" "$H22" "$NOSCRIPTS" | node "$AUX/stdin-get.mjs" 'j.workers.filter(w=>w.kind==="subagent"&&w.id==="sa").map(w=>w.treeBy+"|"+w.tree+"|"+w.branch).join(",")'; }
+node "$AUX/mk-sub-act.mjs" "$SD22/agent-sa.jsonl" "$L22" sa "$WA" "-"
+assert_eq "W22.0 — témoin : le sous-agent est listé, lancé depuis l'arbre principal" "$(node "$AUX/q.mjs" "$SCRIPTS" who "$L22" "$H22" "$NOSCRIPTS" | node "$AUX/stdin-get.mjs" 'j.workers.filter(w=>w.kind==="subagent").map(w=>w.id).join(",")')" "sa"
+assert_eq "W22.1 — le dernier appel (ls) ne cite rien, un appel antérieur citait le worktree a : treeBy = activité, arbre = a, branche = feat/a" "$(arbre22 "$SCRIPTS")" "activité|../lab22-a|feat/a"
+node "$AUX/mk-sub-act.mjs" "$SD22/agent-sa.jsonl" "$L22" sa "$WA" "$WB"
+assert_eq "W22.2 — le dernier appel cite le worktree b : le plus récent l'emporte" "$(arbre22 "$SCRIPTS")" "activité|../lab22-b|feat/b"
+node "$AUX/mk-sub-act.mjs" "$SD22/agent-sa.jsonl" "$L22" sa "-" "-"
+assert_eq "W22.3 — aucune ligne ne cite de worktree : cwd, arbre principal (inchangé)" "$(arbre22 "$SCRIPTS")" "cwd|arbre principal|principale"
+cat > "$AUX/w22-grow.mjs" <<'JS'
+// w22-grow.mjs <scripts> <lab> <home> <transcript> <chemin> : deux collectes dans le MÊME processus, le transcript grossit d'une ligne citant <chemin> entre les deux
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , scripts, lab, home, tr, cite] = process.argv;
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-who.mjs')).href);
+const vue = () => m.collectWho(lab, { home, scriptsDir: path.join(home, 'x') }).workers.filter((w) => w.kind === 'subagent').map((w) => w.treeBy + '|' + w.tree).join(',');
+const avant = vue();
+const ligne = (commande, t) => JSON.stringify({ cwd: lab, sessionId: 'aaaa1111-2222-3333-4444-555566667777', gitBranch: 'principale', version: '2.1.316', timestamp: t, type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: commande } }] } }) + '\n';
+fs.appendFileSync(tr, ligne('cd ' + cite + ' && ls', '2026-11-01T10:09:00Z') + ligne('ls', '2026-11-01T10:09:05Z')); // la ligne ajoutée en dernier ne cite rien : seule la lecture de l'ensemble (mémo, octets ajoutés) voit le worktree
+console.log(avant + '#' + vue());
+JS
+node "$AUX/mk-sub-act.mjs" "$SD22/agent-sa.jsonl" "$L22" sa "-"
+assert_eq "W22.4 — le transcript grossit de deux lignes (la première cite le worktree a, la dernière non) : la collecte suivante, dans le même processus, le voit (mémo invalidé par la taille)" "$(node "$AUX/w22-grow.mjs" "$SCRIPTS" "$L22" "$H22" "$SD22/agent-sa.jsonl" "$WA")" "cwd|arbre principal#activité|../lab22-a"
+node "$AUX/mk-sub-act.mjs" "$SD22/agent-sa.jsonl" "$L22" sa "$WA" "-"
+M22="$(mut17 derniere vf-cockpit-who.mjs '|| (fichier ? dernierArbre(fichier, trees, cite) : null)' '|| null')"
+assert_eq "M-DERNIERE.0 — l'ancre du mutant existe" "$M22" "muté"
+assert_eq "M-DERNIERE — rougit W22.1 : byActivity ne lit que la dernière ligne, le sous-agent retombe sur cwd, arbre principal" "$(arbre22 "$WORK/mut17-derniere")" "cwd|arbre principal|principale"
+node "$AUX/mk-sub-act.mjs" "$SD22/agent-sa.jsonl" "$L22" sa "-"
+M22B="$(mut17 memo vf-cockpit-who.mjs 'm.taille === st.size) return m.arbre;' 'true) return m.arbre;')"
+assert_eq "M-MEMO.0 — l'ancre du mutant existe" "$M22B" "muté"
+assert_eq "M-MEMO — rougit W22.4 : un mémo jamais invalidé par la taille ne voit pas la ligne ajoutée" "$(node "$AUX/w22-grow.mjs" "$WORK/mut17-memo" "$L22" "$H22" "$SD22/agent-sa.jsonl" "$WA")" "cwd|arbre principal#cwd|arbre principal"
 
 vf_hyg_assert
 

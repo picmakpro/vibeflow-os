@@ -1,0 +1,9 @@
+#!/bin/sh
+# faux `claude -p` du CHAT — témoin de la manche RES de test-cockpit-lancer-xss.sh (caractérisation de P72-D-22).
+# Il tient la place du `claude` que le serveur du cockpit lance pour POST /api/ask : jamais le shell du terminal (celui-là reçoit temoins/lancer-fauxbin/claude).
+# `--version` répond ; sinon il lit la question sur l'entrée standard et rend UN évènement `result` (flux stream-json) dont `session_id` est FAUX_ASK_SESSION.
+case "$1" in --version) echo "0.0.0-faux"; exit 0 ;; esac
+[ -n "${FAUX_ASK_SESSION:-}" ] || { echo "FAUX_ASK_SESSION absent" >&2; exit 64; }
+cat > /dev/null
+printf '{"type":"result","subtype":"success","is_error":false,"result":"{\\"title\\":\\"OK\\",\\"answer\\":\\"OK\\",\\"items\\":[]}","session_id":"%s"}\n' "$FAUX_ASK_SESSION"
+exit 0

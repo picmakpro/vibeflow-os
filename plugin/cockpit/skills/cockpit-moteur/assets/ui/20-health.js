@@ -26,19 +26,19 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    .hc-issue { padding: 12px 14px; border-radius: 16px; background: rgba(var(--ink), .04); margin-bottom: 8px; }
+    .hc-issue { padding: var(--inset-box); border-radius: 16px; background: rgba(var(--ink), .04); margin-bottom: var(--sp-12); }
     .hc-issue:last-child { margin-bottom: 0; }
-    .hc-t { display: flex; gap: 9px; align-items: flex-start; font-weight: 500; line-height: 1.4; }
-    .hc-t .dot { margin-top: 6px; }
-    .hc-d { color: var(--text-2); font-size: 12.5px; line-height: 1.55; margin: 6px 0 0 17px; }
-    .hc-n { color: var(--text-3); font-size: 12.5px; line-height: 1.45; margin: 4px 0 0 17px; }
-    .hc-w { font-family: var(--mono); font-size: 11px; color: var(--text-3); margin: 6px 0 0 17px; word-break: break-all; line-height: 1.5; }
-    .hc-a { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 0 17px; }
-    .hc-a .btn { height: 30px; padding: 0 12px; font-size: 12.5px; gap: 6px; }
+    .hc-t { display: flex; gap: var(--sp-8); align-items: flex-start; font-weight: 500; line-height: 1.4; }
+    .hc-t .dot { margin-top: var(--sp-6); }
+    .hc-d { color: var(--text-2); font-size: 12.5px; line-height: 1.55; margin: var(--sp-6) 0 0 var(--sp-16); }
+    .hc-n { color: var(--text-3); font-size: 12.5px; line-height: 1.45; margin: var(--sp-6) 0 0 var(--sp-16); }
+    .hc-w { font-family: var(--mono); font-size: 11px; color: var(--text-3); margin: var(--sp-6) 0 0 var(--sp-16); word-break: break-all; line-height: 1.5; }
+    .hc-a { display: flex; gap: var(--sp-6); flex-wrap: wrap; margin: var(--sp-12) 0 0 var(--sp-16); }
+    .hc-a .btn { height: 30px; padding: 0 var(--sp-12); font-size: 12.5px; gap: var(--sp-6); }
     .hc-a .btn svg.i { width: 14px; height: 14px; }
-    .hc-calm { margin-top: 14px; padding: 11px 13px; border-radius: 14px; background: var(--ok-bg); color: var(--ok-text); font-size: 13px; line-height: 1.55; }
-    .hc-sub { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 12px; font-size: 12px; color: var(--text-2); }
-    .hc-sub span { display: inline-flex; align-items: center; gap: 6px; }
+    .hc-calm { margin-top: var(--sp-16); padding: var(--inset-box); border-radius: 14px; background: var(--ok-bg); color: var(--ok-text); font-size: 13px; line-height: 1.55; }
+    .hc-sub { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-12); margin-top: var(--sp-12); font-size: 12px; color: var(--text-2); }
+    .hc-sub span { display: inline-flex; align-items: center; gap: var(--sp-6); }
     #btn-health .badge { background: var(--hc-badge, var(--on)); color: var(--hc-badge-text, var(--on-text)); }
     #btn-health.calm svg.i { color: var(--ok); }
     #modal .hc-hint { margin: 0; }

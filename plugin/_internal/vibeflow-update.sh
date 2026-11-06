@@ -498,10 +498,17 @@ module_version_available() {
   cat "$CACHE_DIR/$mod/VERSION" 2>/dev/null || echo "—"
 }
 
+# strip_final_cr — retire le SEUL retour chariot final de chaque ligne (stdin → stdout). Le registre, versionné
+# en scope project et extrait en CRLF (Windows, core.autocrlf=true), est lu comme le même fichier en LF ; l'état
+# « proposé » (ignoré par git) est lu de la même façon.
+# Un \r au milieu d'une ligne reste en place, donc rejeté par les filtres de format qui suivent (arbitrage Samuel,
+# AskUserQuestion session principale, 2026-11-06). Le \r est posé par printf : sed BSD ne connaît pas `\r`.
+strip_final_cr() { sed "s/$(printf '\r')\$//"; }
+
 module_version_installed() {
   local mod="$1"
   if [ -f "$INSTALLED_REGISTRY" ]; then
-    grep "^$mod=" "$INSTALLED_REGISTRY" 2>/dev/null | cut -d= -f2 || echo "—"
+    strip_final_cr < "$INSTALLED_REGISTRY" | grep "^$mod=" 2>/dev/null | cut -d= -f2 || echo "—"
   else
     echo "—"
   fi
@@ -558,7 +565,7 @@ _registry_rewrite() {
   rm -f "$tmp"
   # Création exclusive (noclobber) : un lien apparu entre le contrôle et l'écriture n'est pas suivi.
   if ! ( set -C
-         { grep -E '^[a-z0-9-]+=[^=[:space:]]+$' "$reg" 2>/dev/null | grep -v "^$mod=" || true
+         { strip_final_cr < "$reg" 2>/dev/null | grep -E '^[a-z0-9-]+=[^=[:space:]]+$' 2>/dev/null | grep -v "^$mod=" || true
            [ -z "$version" ] || echo "$mod=$version"
          } > "$tmp" ) 2>/dev/null; then
     rm -f "$tmp"; err "$who : écriture de ${VF_REGISTRY_RELPATH}.tmp impossible — registre inchangé"
@@ -3570,7 +3577,7 @@ backup_module() {
   # backuppé avant) → .version absent, rollback_module traite ce cas sans version devinée.
   if [ -f "$INSTALLED_REGISTRY" ]; then
     local captured_version
-    captured_version=$(grep "^$mod=" "$INSTALLED_REGISTRY" 2>/dev/null | cut -d= -f2 || true)
+    captured_version=$(strip_final_cr < "$INSTALLED_REGISTRY" | grep "^$mod=" 2>/dev/null | cut -d= -f2 || true)
     [ -n "$captured_version" ] && printf '%s' "$captured_version" > "$bdir/.version"
   fi
   # ROLL-01 (38-03), corrigé D-38-J (correction ciblée post-ROLL) : hooks — la source n'est PLUS
@@ -4024,7 +4031,7 @@ list_new_modules() {
     [ "$(module_version_installed "$mod")" = "—" ] || continue
     # Jamais en double : un module posé dans l'autre scope (user <-> project) n'est pas reproposé ici.
     if [ -n "$other" ] && grep -q "^${mod}=" "$other"; then continue; fi
-    if [ -f "$offered" ] && grep -qx "$mod" "$offered"; then continue; fi
+    if [ -f "$offered" ] && grep -qx "$mod" <(strip_final_cr < "$offered"); then continue; fi
     module_is_proposable "$mod" || continue
     role_visible "$mod" || continue
     echo "$mod=$(module_version_available "$mod")"
@@ -4058,7 +4065,7 @@ mark_offered() {
   if [ -e "$offered" ]; then
     [ -f "$offered" ] && [ -r "$offered" ] || err "mark-offered : $VF_OFFERED_RELPATH illisible — rien n'est écrit"
     # L'ancien état n'est recopié que pour les lignes qui sont des noms de module valides.
-    old="$(grep -E '^[a-z0-9-]+$' "$offered" || true)"
+    old="$(strip_final_cr < "$offered" | grep -E '^[a-z0-9-]+$' || true)"
   fi
   rm -f "$tmp"
   # BL35-A2 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Local, ignoré par git ») :
@@ -4092,7 +4099,7 @@ unmark_offered() {
   [ ! -L "$tmp" ] || err "unmark-offered : ${VF_OFFERED_RELPATH}.tmp est un lien symbolique — refus, rien n'est écrit"
   [ -e "$offered" ] || { log "$VF_OFFERED_RELPATH absent : rien à retirer"; return 0; }
   [ -f "$offered" ] && [ -r "$offered" ] || err "unmark-offered : $VF_OFFERED_RELPATH illisible — rien n'est écrit"
-  old="$(grep -E '^[a-z0-9-]+$' "$offered" || true)"
+  old="$(strip_final_cr < "$offered" | grep -E '^[a-z0-9-]+$' || true)"
   rm -f "$tmp"
   if ! ( set -C
          { while IFS= read -r l; do

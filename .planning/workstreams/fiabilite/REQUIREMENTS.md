@@ -1014,6 +1014,32 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | TERM-10 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
 | TERM-11 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
 | TERM-12 | Phase 71 | Complete — 2026-11-05 (PR #203 et #209, recette humaine du 2026-11-05) |
+| LANC-01 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-02 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-03 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-04 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-05 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-06 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-07 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-08 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-09 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-10 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-11 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
+| LANC-12 | Phase 72 | Pending — 2026-11-05 (planification) |
+| GITC-01 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
+| GITC-02 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
+| GITC-03 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
+| GITC-04 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
+| GITC-05 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
+| GITC-06 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
+| GITC-07 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
+| GITC-08 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
+| GITC-09 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
+| GITC-10 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
+| GITC-11 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
+| GITC-12 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
+| GITC-13 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
+| GITC-14 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1594,6 +1620,39 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **TERM-10**: xterm.js vendorisé avec sha256 et licence ; aucun addon presse-papiers ; séquences OSC 52, OSC 8, DCS, CSI 21t, DECRQSS dans la sortie : presse-papiers inchangé, aucun octet choisi par la sortie réinjecté dans l'entrée du PTY (seules les réponses de format fixe d'xterm — DA1, DA2, DSR, CPR, DECRQM, couleurs OSC — le sont, F8 de l'audit, P71-D-25) (P71-D-16).
 - [x] **TERM-11**: Aucune frappe ni sortie du terminal sur disque ni dans les flux du cockpit (journal, SSE, export) ; le tampon de reprise est vidé à la fin de la session.
 - [x] **TERM-12**: Non-régression et chaîne XSS : toutes les suites du cockpit restent vertes ; la chaîne de `test-cockpit-chaine-xss.sh` étendue — une charge exécutée dans P qui tente `window.open` vers Q, `postMessage`, `fetch`/POST vers Q avec le jeton de page, la lecture du stockage de Q — ne crée aucun fichier marqueur par le shell.
+
+### Lancer du travail depuis les cartes du cockpit (Phase 72 — posées à la planification, 2026-11-05)
+
+- [x] **LANC-01**: Cartes : avec `--terminal`, les cartes de phase et de mission de l'onglet Projet portent une action principale selon l'état et un menu des autres verbes de la liste fermée (P72-D-04, P72-D-05). — Livré 2026-11-06, preuve : 72-06 (`test-cockpit-lancer-ui.sh` 45/0), 72-09, 72-14 (tiroir 75/0) ; recette par juge au SHA 4fa5fe95, étapes 1 à 6.
+- [x] **LANC-02**: Sans `--terminal` : CSP de page identique octet pour octet, aucun bouton, aucune route POST (P72-D-17, TERM-01). — Livré 2026-11-06, preuve : 72-06 (LU.S1 à LU.S7) et 72-09 (CSP de `v2.75.0` identique sans `--terminal`) ; audit du lot 3 SECURED.
+- [x] **LANC-03**: Route POST de P : Host, Origin exacte, jeton en temps constant, `Content-Type`, corps borné, schéma fermé ; témoins : Origin tierce, Origin absente, Origin de Q, mauvais jeton, corps trop long, champ inconnu → refus et 0 proposition (P72-D-11). — Livré 2026-11-06, preuve : 72-04 (`test-cockpit-lancer-post.sh` 95/0, douze mutants rouges) ; 72-09.
+- [x] **LANC-04**: Liste fermée : une cible malformée (`72;touch M`, `$(touch M)`) ou bien formée mais absente de la liste du serveur → aucun bandeau, 0 octet au PTY, aucun marqueur (P72-D-12). — Livré 2026-11-06, preuve : 72-03 (cibles), 72-05, 72-10, 72-11 (chaîne XSS, 57/0 sous Chrome) ; audits des lots 1 à 3.
+- [x] **LANC-05**: Gabarit : avec un lab de test dont le titre de phase vaut `"; touch M #` et `<img src=x onerror=…>`, la ligne écrite est exactement le gabarit, dans l'alphabet fermé ; titre affiché par `textContent` ; 0 violation CSP, 0 marqueur ; mutant qui interpole le titre → rouge (P72-D-13). — Livré 2026-11-06, preuve : 72-01 (gabarit, 51 verdicts, mutant d'interpolation rouge), 72-11 (titre hostile), 72-12 (argv comparé octet pour octet).
+- [x] **LANC-06**: Premier plan : programme témoin au premier plan, confirmation → 0 octet reçu par le programme et message clair ; mutant sans contrôle → rouge (P72-D-01). — Livré 2026-11-06, preuve : 72-02 (assistant PTY 45/0, session 15/0), 72-10, correctif `ecriture` (`vf-cockpit-pty.py`, L10.1).
+- [x] **LANC-07**: Double geste : aucune écriture sans clic dans Q ; clic avant le délai d'armement ignoré ; ligne écrite sans `\r` ; la charge XSS de `test-cockpit-terminal-xss.sh` (proposition, `iframe.click()`, `postMessage`, popup) ne crée aucun marqueur (P72-D-14, TERM-12). — Livré 2026-11-06, preuve : 72-02, 72-05, 72-10, 72-11 (aucun marqueur), 72-12 (clic précoce ignoré, ligne sans retour chariot, Entrée au clavier) ; audit du lot 3.
+- [x] **LANC-08**: Pré-vols : chaque bloquant de P72-D-06 empêche le lancement avec son motif ; chaque avertissement s'affiche sans bloquer ; emplacement « travail non commité » prévu, inactif (P72-D-06, P72-D-07). — Livré 2026-11-06, preuve : 72-03 (50 témoins rouges puis verts), 72-09 ; correctif ST-1 (`verdict()` source unique, E2c).
+- [x] **LANC-09**: Mode de permission : le bandeau propose `default`, `acceptEdits`, `plan` et « hérité » ; « hérité » = aucun drapeau ; présélection = dernier mode choisi, retenu dans le stockage de l'origine Q, `default` au premier lancement ou si la valeur retenue est hors liste ; témoins : P ne peut ni lire ni écrire ce choix (`SecurityError` mesuré), une valeur forgée dans le stockage de Q retombe sur `default` (P72-D-02, P72-D-02bis). — Livré 2026-11-06, preuve : 72-10, 72-11, 72-12 (présélection du mode) et 72-16 (fichier du lab, P72-D-20, 18 mutants) ; audit du lot 3 SECURED.
+- [x] **LANC-10**: Suivi : `--session-id` généré, la carte montre « lancée » et rattache la session de l'onglet Équipe ; proposition consommée une seule fois (un rechargement ou une bascule de thème ne la fait pas revenir) (P72-D-16, P72-D-10). — Livré 2026-11-06, preuve : 72-05, 72-07 (37/0), 72-09, 72-10, 72-12 (suivi rattaché à l'onglet Équipe) ; proposition consommée une fois.
+- [x] **LANC-11**: Continuer le chat : option offerte seulement si une conversation existe et si la sonde de P72-D-03 est verte ; identifiant validé UUID (P72-D-03). — Livré 2026-11-06, preuve : 72-13 : porte A5 VERTE le 2026-11-05 (claude 2.1.318) ; garde d'activation (P72-D-21, `2b9e23b9`) et manche RES (P72-D-22).
+- [ ] **LANC-12**: Usage réel et non-régression : de bout en bout dans Chromium avec un faux `claude` dans le PATH (suites), puis avec le vrai `claude` (recette par juges, captures) ; toutes les suites du cockpit vertes sous macOS et Linux.
+
+### Git dans le cockpit (Phase 78 — posées au cadrage, 2026-11-05)
+> Dérivent de P78-D-01..26 (`78-CONTEXT.md` ; arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-05, relayés au manager , second tour pour P78-D-10 ; décisions techniques du manager sur mesures). Famille neuve `GITC` (vérifiée libre le 2026-11-05 sur `origin/main`, `feat/phase-72-lancer-depuis-cartes` et `docs/jalon-v2-phases-73-77`). Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code.
+
+- [x] **GITC-01**: En-tête : sur Code, Projet et Équipe, le titre à droite du logo est le nom du dossier du dépôt principal, identique sur les trois onglets, y compris depuis un worktree ; les suffixes « — Projet » et « — Équipe » disparaissent (P78-D-01, P78-D-09).
+- [x] **GITC-02**: Seconde ligne de l'en-tête : branche courante, et worktree seulement hors de l'arbre principal, en petit sous le nom ; branche détachée lisible comme telle ; noms longs tronqués avec le nom complet au survol (P78-D-02, P78-D-19).
+- [x] **GITC-03**: Bloc de vue à la racine : surtitre = nom de l'onglet, titre = ce que montre la vue (jalon en cours, dépôt et branche, mission en cours), sous-titre court ; plus aucune répétition du nom du projet ; sous-vues inchangées (P78-D-03).
+- [x] **GITC-04**: Tiroir Git vertical à gauche, sans 4ᵉ onglet, ouvert selon P78-D-10 ; il coexiste avec le tiroir Terminal et les boutons du bas à gauche sans chevauchement, et tient en largeur mobile (P78-D-04, P78-D-10, P78-D-19).
+- [x] **GITC-05**: Dégradation : Git absent du PATH ou lab hors dépôt : seconde ligne et ouvreur absents, aucune erreur dans le chrome, le reste du cockpit identique ; une commande git en échec ou hors borne rend « indisponible » dans le tiroir seulement (P78-D-11).
+- [x] **GITC-06**: Graphe façon gitgraph : branches locales, worktrees et branches distantes déjà présentes sur le disque, N derniers commits bornés, branches mergées repliées, placement en couloirs déterministe ; aucun `fetch` ni lecture réseau (P78-D-05).
+- [x] **GITC-07**: Détail d'un commit : auteur, date, message complet, fichiers touchés avec +/− (binaires et renommages compris), sans diff ; SHA validé par motif strict puis `rev-parse --verify` (P78-D-06, P78-D-13).
+- [x] **GITC-08**: État de chaque worktree (modifiés, non suivis, avance et retard sur la base), tags, liste des stash, auteurs et activité récente par branche (P78-D-06).
+- [x] **GITC-09**: Lecture seule : routes neuves en GET seul sous `/api/vf/`, derrière Host, Origin et jeton ; aucune écriture dans le dépôt ni dans `.git` ; programmes externes de git neutralisés ; sorties bornées (P78-D-07, P78-D-13).
+- [x] **GITC-10**: Commandes à copier : construites par une fonction unique, refs et chemins cités pour le shell ; un nom de branche hostile ne produit jamais une commande différente de celle affichée ; copie par le presse-papiers de la page seule ; texte venu de git rendu en `textContent` (P78-D-14).
+- [x] **GITC-11**: Rafraîchissement par le flux existant sur une signature bon marché (HEAD et refs des worktrees), sans relancer `git log` à chaque tick ; aucune variable CSS ni valeur d'espacement en dur, aucune valeur de padding existante modifiée (P78-D-12, P78-D-15).
+- [x] **GITC-12**: Retrait et non-régression : liste « Repositories » de l'onglet Code retirée ; toutes les suites du cockpit vertes ; chaîne XSS étendue aux données git (nom de branche, message de commit, auteur hostiles) ; bump du module au-dessus de `main` (P78-D-09, P78-D-17, P78-D-18).
+- [x] **GITC-13**: Lectures git existantes durcies : `vf-cockpit-who.mjs`, `vf-cockpit-arbres.mjs`, `vf-cockpit-planning.mjs`, `vf-cockpit-paths.mjs` et le moteur passent par un environnement git unique (variables `GIT_*` héritées retirées, filtres du dépôt neutralisés) ; témoin : dépôt piégé (`filter.<x>.process`, `GIT_DIR` hérité) qui déclenche sans la parade et plus avec (P78-D-25).
+- [x] **GITC-14**: Attribution worktree des sous-agents : l'onglet Équipe montre le dernier worktree cité sur l'ensemble des appels de l'agent, pas le `cwd` de la session parente ; témoin : transcript dont le dernier appel ne cite aucun chemin (P78-D-26).
 
 ---
 *Requirements defined: 2026-06-04*

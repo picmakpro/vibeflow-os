@@ -9,8 +9,8 @@ import { apresDemarrage } from './apres-demarrage'
 // (M10) garde `tokens.ts` contre `DESIGN.md`, ces tests gardent le rendu contre ces valeurs. Préfixe R8- (verdict.sh refuse un
 // identifiant en double).
 
-const SOMBRE = { done: '#4ade80', active: '#f0c36b', todo: '#5c5c5c', blocked: '#f28b8b', text: '#ececec', t2: '#b4b4b4', t3: '#8b8b8b', t4: '#5c5c5c' }
-const CLAIR = { done: '#157a3a', active: '#946000', todo: '#666666', blocked: '#c94a4a', text: '#161616', t2: '#3f3f3f', t3: '#595959', t4: '#666666' }
+const SOMBRE = { done: '#9ece6a', active: '#ffe08a', todo: '#828282', blocked: '#ff9aa8', text: '#ececec', t2: '#c6c6c6', t3: '#a8a8a8', t4: '#828282' }
+const CLAIR = { done: '#009e5a', active: '#b88100', todo: '#666666', blocked: '#f2384a', text: '#161616', t2: '#3f3f3f', t3: '#595959', t4: '#666666' }
 
 const PANE = {
   plugin: 'vibeflow',

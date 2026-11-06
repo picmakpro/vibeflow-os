@@ -23,7 +23,7 @@
   };
 
   const style = document.createElement('style');
-  style.textContent = `#vf-modele { flex: none; max-width: 110px; font: inherit; font-size: 12px; color: var(--text-3); background: transparent; border: 0; border-radius: 8px; padding: 4px 2px; cursor: pointer; }
+  style.textContent = `#vf-modele { flex: none; max-width: 110px; font: inherit; font-size: 12px; color: var(--text-3); background: transparent; border: 0; border-radius: 8px; padding: var(--sp-4) var(--sp-2); cursor: pointer; }
     #vf-modele:hover { color: var(--text); } #vf-modele:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }`;
   document.head.appendChild(style);
 

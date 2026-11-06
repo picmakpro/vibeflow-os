@@ -9,11 +9,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fork } from 'node:child_process';
-import { realUnder } from './vf-cockpit-paths.mjs';
+import { realUnder, resoudreBinaire } from './vf-cockpit-paths.mjs';
 import { envEnfant } from './vf-cockpit-env.mjs';
+import { envShell } from './vf-cockpit-terminal-env.mjs';
 import { preparerPage } from './vf-cockpit-terminal-page.mjs';
-import { TAILLE_MAX } from './vf-cockpit-terminal-session.mjs';
+import { TAILLE_MAX, resoudrePython3 } from './vf-cockpit-terminal-session.mjs';
 import { injectionTiroir } from './vf-cockpit-terminal-tiroir.mjs';
+import { injectionLancer } from './vf-cockpit-lancer-ui.mjs';
+import { definir } from './vf-cockpit-lancer-canal.mjs';
 
 const log = (m) => console.error(`vf-cockpit (terminal) : ${m}`);
 const json = (res, statut, objet) => { res.writeHead(statut, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(objet)); };
@@ -26,12 +29,17 @@ export function envDuProcessusTerminal(lab) {
   return envEnfant(lab, process.env);
 }
 
+// Lecteurs des pré-vols du lancement (72-09, P72-D-06) : `claude` dans le PATH D'ORIGINE que recevra le shell, `python3` comme le résout Q.
+const claudeDisponible = () => { try { return resoudreBinaire('claude', envShell(process.env, []).PATH) !== null; } catch { return false; } };
+const python3Disponible = () => { try { return resoudrePython3(process.env.PATH) !== null; } catch { return false; } };
+
 export function preparerTerminal({ here, root, jetons = () => [], plateforme = process.platform } = {}) {
   let etat = 'arrete'; // 'actif' | 'arrete' | 'indisponible'
   let portQ = null, enfant = null, occupe = false;
   const origineQ = () => `http://127.0.0.1:${portQ}`;
-  const inerte = (indisponible) => ({
-    actif: false, indisponible, injection: () => injectionTiroir({ indisponible }), frameSrc: () => '', occupe: () => false,
+  const abonnes = []; // abonnés aux messages `lancee` de l'enfant (le lanceur de P, 72-09)
+  const inerte = (indisponible) => (definir({ etat: () => (indisponible ? 'indisponible' : 'arrete'), envoyer: () => false, abonner: () => {}, claude: claudeDisponible, python3: python3Disponible }), {
+    actif: false, indisponible, injection: () => injectionTiroir({ indisponible }) + injectionLancer({ indisponible }), frameSrc: () => '', occupe: () => false,
     routeP: (req, res) => { json(res, 200, { etat: indisponible ? 'indisponible' : 'arrete' }); return true; }, demarrer: () => {},
   });
 
@@ -43,9 +51,10 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
   try { preparerPage({ engineDir: moteur }); } catch (e) { log(`${e.message}`); return inerte(false); }
 
   const envoyer = (msg) => { try { if (enfant && enfant.connected) { enfant.send(msg); return true; } } catch {} return false; };
+  definir({ etat: () => (etat === 'actif' ? 'actif' : 'arrete'), envoyer, abonner: (f) => { if (typeof f === 'function') abonnes.push(f); }, claude: claudeDisponible, python3: python3Disponible });
   return {
     get actif() { return etat === 'actif'; }, indisponible: false,
-    injection: () => injectionTiroir({ indisponible: false }),
+    injection: () => injectionTiroir({ indisponible: false }) + injectionLancer({ indisponible: false }),
     frameSrc: () => (portQ ? `; frame-src http://127.0.0.1:${portQ}` : ''),
     occupe: () => occupe,
     routeP(req, res) { envoyer({ t: 'jetons', jetons: jetons() }); json(res, 200, etat === 'actif' ? { etat: 'actif', port: portQ } : { etat: 'arrete' }); return true; },
@@ -57,6 +66,7 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
       enfant.on('message', (m) => {
         if (!m || typeof m !== 'object') return;
         if (m.t === 'occupe') occupe = m.v === true;
+        else if (m.t === 'lancee') { for (const f of abonnes) { try { f(m); } catch {} } } // validé par le lanceur de P, jamais ici
         else if (m.t === 'echec') { etat = 'arrete'; occupe = false; }
         else if (m.t === 'pret' && Number.isInteger(m.port)) {
           portQ = m.port; etat = 'actif';

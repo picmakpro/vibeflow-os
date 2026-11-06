@@ -102,7 +102,7 @@ echo "=== L2 — priorité ==="
 assert_eq "L2.1 — clos sur l'arbre courant reste clos (phase 3 : plans non faits dans le worktree)" "$(carte "$L" 3 | cut -d'|' -f1)" "done"
 assert_not "L2.2 — la phase 3 close ne porte aucune mention de worktree" "$(carte "$L" 3)" "worktree"
 assert_has "L2.3 — le worktree plus avancé gagne : phase 5 passe à recetter (2/2)" "$(carte "$L" 5)" "à recetter · 2/2 plans · dans worktree wt-phase-2"
-assert_eq "L2.4 — l'arbre courant plus avancé garde la main : phase 6 à recetter, sans mention" "$(carte "$L" 6)" "active|à recetter · 1/1 plans"
+assert_eq "L2.4 — l'arbre courant plus avancé garde la main : phase 6 à recetter, sans mention" "$(carte "$L" 6)" "recette|à recetter · 1/1 plans"
 
 echo "=== L3 — lien symbolique sortant ==="
 assert_eq "L3.1 — la phase 4 (dossier lié hors du worktree) reste à faire : le lien n'est pas suivi" "$(carte "$L" 4)" "todo|pas de plan"

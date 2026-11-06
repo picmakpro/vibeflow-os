@@ -116,7 +116,9 @@
 - [x] Phase 69: Suivi du travail en cours dans le cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-04
 - [x] Phase 70: Finitions UI du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-04 : 12/12 plans, recette par juges frais jouée et triée par Samuel (`70-RECETTE-JUGES.md`), PR #200 mergée le 2026-11-04T21:02:38Z (`503aa657`), sans release ; au ledger, UIFN-04, 06 et 07 cochées, les onze autres exigences restent décochées (REQUIREMENTS.md)
 - [x] Phase 71: Terminal intégré au cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-05 : PR #203 (`d4171ded`) et correctif Safari PR #209, recette humaine jouée par Samuel le 2026-11-05 (Arc, Firefox, Safari, clavier AZERTY, `71-RECETTE-HUMAINE.md`), TERM-01..12 cochées, sans release
+- [ ] Phase 71.5: Réexamen du design system du cockpit — couleurs d'abord, puis icônes, espacements, hiérarchie des vues (INSERTED, inscrite 2026-11-05, élargie le même jour, jalon vibeflow-v2.0) — part avec la release groupée après les Phases 72 et 78
 - [ ] Phase 72: Lancer du travail depuis les cartes du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
+- [ ] Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git (inscrite 2026-11-05, jalon vibeflow-v2.0)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
 
@@ -466,17 +468,74 @@ terminal en 71 (Recommandé) », puis « Oui, 69 / 71 / 72 (Recommandé) »). **
 **Requirements**: TERM-01, TERM-02, TERM-03, TERM-04, TERM-05, TERM-06, TERM-07, TERM-08, TERM-09, TERM-10, TERM-11, TERM-12
 **Depends on:** Phase 67 (serveur unique) ; ordre du jalon : après la 70 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « 69 → 68 → 70 → 71 → 72 (Recommandé) »).
 
+### Phase 71.5: Réexamen du design system du cockpit (INSERTED)
+
+> **Inscrite le 2026-11-05, phase décimale entre la 71 et la 72, élargie le même jour.** Demande initiale de Samuel, session principale Claude Code, 2026-11-05, mot pour mot : « Je veux aussi que tu lances un VFDesign Manager tout de suite. Le but, ça sera de unslop la les paddings, etc. Et ça, on le fait partir dans une microphase 71.5. » Élargissement, même canal, même date, mot pour mot : « Je pense qu'on pourrait aussi revoir le design system de manière générale, le challenger avec Claude Design. Le but, ça serait de reprendre l'existant et de modifier en particulier les couleurs, qui je trouve ne sont pas très parlantes et assez fades selon moi. Je pense qu'on pourrait avoir quelque chose de mieux. Challenger aussi éventuellement au niveau des icônes et voilà, des paddings, de la hiérarchie des vues, de la créativité qu'on pourrait en avoir et des informations à en tirer utiles finalement. Voilà, je pense qu'on pourrait unslope un peu tout ça avec Claude Design aussi. Donc demande au design manager de le faire. » Mission portée par `vf-design-manager` ; elle part avec la release groupée, après les Phases 72 et 78.
+
+**Goal:** En partant de l'existant (`DESIGN.md`, direction « Graphite », et jetons de `viewer.html`), le design system du cockpit (`plugin/cockpit/`) est réexaminé : (1) priorité aux couleurs, qui doivent porter du sens (statut, sévérité, type de carte) et sortir du terne, contraste AA mesuré dans les deux thèmes ; (2) les espacements suivent une seule échelle de jetons, appliquée partout ; (3) icônes, hiérarchie des vues et informations utiles à afficher sont proposées comme des choix. Ordre : une direction d'abord (audit avec captures, 2 ou 3 directions de palette en maquettes jetables sur les vrais écrans Projet, Code et Équipe), tranchée par Samuel, puis `DESIGN.md`, jetons et application. L'en-tête : couleurs et hiérarchie proposables, structure et contenus à la Phase 78.
+**Requirements**: aucune exigence au ledger (« vert » = critique scorée ≥ 70/100 contre `DESIGN.md` par un juge frais, suites de mise en page existantes vertes).
+**Depends on:** Phase 71 (mergée). Missions parallèles : Phases 72 et 78 (la 78 possède l'en-tête et la vue Git ; la 71.5 possède les jetons d'espacement et de couleur, que la 72 et la 78 consommeront).
+**Plans:** mission design, plan de bataille en DAG (`.planning/missions/2026-11-05-unslop-espacements.dag.json`).
+
 ### Phase 72: Lancer du travail depuis les cartes du cockpit
 
-> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Oui, 69 / 71 / 72 (Recommandé) »).
+> **Cadrée le 2026-11-05 (`72-CONTEXT.md`, P72-D-01..19, arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-05) et planifiée le 2026-11-05** : 15 plans en 4 vagues, puis un seizième (72-16) et une cinquième vague le 2026-11-06, `files_modified` disjoints deux à deux dans chaque vague, contrats inter-plans dans `72-CONTRATS.md`, branchements dans `72-BRANCHEMENTS-MERGE.md`. Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « Oui, 69 / 71 / 72 (Recommandé) »).
 
 **Goal:** Depuis une carte de phase ou de mission, ou depuis le cockpit, lancer du travail dans une session Claude Code qui tourne sur le poste, avec le contexte du projet, en anticipant les dépendances manquantes et les impossibilités avant de lancer.
 **Vision de Samuel** (AskUserQuestion session principale, 2026-11-03, mot pour mot) : « Je veux aussi anticiper à l'intégration prochaine terminale et de pouvoir travailler directement dans le cockpit, c'est-à-dire que on a déjà un chat qui est prévu enfin qui est actuellement dans l'application, ils permet de poser des questions mais pas forcément de lancer du travail, il faudrait qu'on puisse aussi lancer du travail éventuellement donc ça sera l'idée d'avoir une session Claude code qui tourne dans le code une session de terminale dans l'idéal, et ça permettrait de lancer par exemple depuis les cartes ou depuis le cockpit du travail soit en cliquant sur les cartes de phase ou de mission ou peu importe. Bien sûr, il faudrait qu'on anticipe les manque, les dépendances manquantes donc ça empêcherait l'exécution, il faudrait qu'on anticipe aussi et les impossibilité voilà qu'on qu'on fasse pas de but en blanc donc ça potentiellement le chat qui permet de poser des questions permet déjà d'avoir le contexte et puis ensuite on pourrait éventuellement lancer du travail depuis le cockpit donc c'est-à-dire avec la méthode Vilo avec le Fail système qui vit qui vit littéralement sur le PC et donc il peut travailler sur les work qui peut faire des poches qui peut écrire dans des fichiers qui s'ouvre avec déjà le contexte, projets, les skis etc. cetera » (lecture de la transcription vocale : « Vilo » = VibeFlow, « Fail système » = file system, « work » = worktrees, « poches » = PR, « skis » = skills).
-**Requirements**: TBD — posées au cadrage.
-**Depends on:** Phase 71 (terminal intégré).
+**Requirements**: LANC-01, LANC-02, LANC-03, LANC-04, LANC-05, LANC-06, LANC-07, LANC-08, LANC-09, LANC-10, LANC-11, LANC-12
+**Depends on:** Phase 71 (terminal intégré ; clôture mergée, cockpit v1.3.3).
 **Sources:** `69-CONTEXT.md` P69-D-19 et P69-D-21.
-**Plans:** 0 plans
+**Plans:** 16/16 plans exécutés (72-16 ajouté le 2026-11-06, non prévu au départ : P72-D-20)
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 72 to break down)
+**Vague 1** (parallèle, aucun fichier commun)
+- [x] 72-01-PLAN.md — Gabarit de commande, alphabet fermé, motifs, forme du prompt (LANC-05, LANC-09)
+- [x] 72-02-PLAN.md — Assistant PTY : premier plan, revalidation de la ligne, écriture sans retour chariot (LANC-06, LANC-07)
+- [x] 72-03-PLAN.md — Cibles lançables et pré-vols (LANC-04, LANC-08)
+- [x] 72-04-PLAN.md — Mécanisme POST de P : Host, Origin exacte, jeton, schéma fermé (LANC-03)
+- [x] 72-05-PLAN.md — État de Q : liste fermée, proposition unique, armement, consommation (LANC-04, LANC-07, LANC-10)
+- [x] 72-06-PLAN.md — Interface des cartes servie à la volée avec `--terminal` (LANC-01, LANC-02)
+- [x] 72-07-PLAN.md — Registre de suivi et rattachement à l'onglet Équipe (LANC-10)
+- [x] 72-08-PLAN.md — Bandeau de proposition dans la page Q, mode retenu dans le stockage de Q (LANC-07, LANC-09)
+
+**Vague 2**
+- [x] 72-09-PLAN.md — Assemblage côté P : canal, orchestration, branchements serveur et terminal (LANC-01..04, LANC-08, LANC-10)
+- [x] 72-10-PLAN.md — Assemblage côté Q : routes `/proposition`, `/lancer`, `/annuler`, IPC (LANC-04..07, LANC-09, LANC-10)
+
+**Vague 3**
+- [x] 72-11-PLAN.md — Chaîne XSS étendue jusqu'au lancement (LANC-04, LANC-05, LANC-07, LANC-09)
+- [x] 72-12-PLAN.md — Bout en bout avec faux `claude` dans Chromium (LANC-05, LANC-09, LANC-10, LANC-12)
+- [x] 72-13-PLAN.md — « Continuer le chat » : porte de décision sur la sonde A5, puis option (LANC-11)
+- [x] 72-14-PLAN.md — Tiroir : ouvrir à l'arrivée d'une proposition (LANC-01, LANC-07)
+
+**Vague 4**
+- [x] 72-16-PLAN.md — Mode de permission retenu dans un fichier du lab tenu par Q, survit aux relances (LANC-09, P72-D-20)
+
+**Vague 5**
+- [x] 72-15-PLAN.md — Documentation et bump unique du module cockpit (LANC-12)
+
+### Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git
+
+> **Cadrée le 2026-11-05** (`78-CONTEXT.md`, P78-D-01..26 ; arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-05 ). Inscrite le 2026-11-05 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Nouvelle Phase 73 « Git », en parallèle de la 72 (Recommandé) », libellé de l'option : « La numérotation se cale sur ce qu'il a déjà pris »). Les numéros 73 à 77 étant déjà réservés par la branche `docs/jalon-v2-phases-73-77` (non mergée), la phase prend le numéro 78. Exécutée en parallèle de la 72 (demande de Samuel, session principale, 2026-11-05 : « Ensuite on enchaîne […] avec un maximum de parallélisation. On enlève la restriction d'un seul manager »).
+
+**Goal:** L'en-tête du cockpit garde, sur les trois onglets, le nom du dossier du projet et montre la branche et le worktree courants sans encombrer ; un graphe façon « gitgraph » situe les worktrees et les branches du lab ; le cockpit montre des données Git du projet façon GitKraken, et les actions Git éventuelles suivent le périmètre arbitré au cadrage. La revue de diff complète est hors périmètre.
+**Demande de Samuel** (session principale Claude Code, 2026-11-05, mot pour mot) : « dernier point, je remarque que le titre dans le header a droite du logo vibeflow change en fonction de si c'est Code Projet Equipe. Il faut reprend la version Code qui montre le nom du dossier, mais on doit aussi pouvoir voir le nom de la branche/worktree, mais plus habilement. Je pense qu'on revoit la partie "Vue d'ensemble / Titre / Sous titre" et le nom du projet a cote du logo. Ensuite on réflechi a une feature pour afficher un graph facon "gitgraph" pour voir ou on en est exactement dans les wt/branch. On reflechira aussi a afficher des actions et data Git du projet. Facon GitKraken. On laisse de côté la review de diff compelte pour le moment. »
+**Requirements**: GITC-01, GITC-02, GITC-03, GITC-04, GITC-05, GITC-06, GITC-07, GITC-08, GITC-09, GITC-10, GITC-11, GITC-12, GITC-13, GITC-14
+**Depends on:** Phase 67 (serveur et onglets du cockpit) ; Phase 71 (modèle de menace des routes qui agissent sur le poste). En parallèle de la 72. Recoupements à trancher au cadrage : Phase 73 (worktrees, branches et travail non commité, idée 13) et Phase 75 (données tirées de `git log`), toutes deux sur `docs/jalon-v2-phases-73-77` ; Phase 71.5 (jetons d'espacement et paddings, qu'elle possède).
+**Plans:** 11 plans
+
+Plans:
+
+- [x] 78-01-PLAN.md — Environnement git durci (shBorne, lancerGit) et attribution des sous-agents (vague 1)
+- [x] 78-02-PLAN.md — Parseurs alignés et placement des couloirs (JS pur) (vague 1)
+- [x] 78-03-PLAN.md — Citation shell et commandes à copier (vague 1)
+- [x] 78-04-PLAN.md — En-tête, bloc de vue, retrait de « Repositories » (vague 1)
+- [x] 78-05-PLAN.md — Routes GET /api/vf/git et /entete (vague 2)
+- [x] 78-06-PLAN.md — Tiroir : coquille, graphe, listes, commandes, coexistence, mobile (vague 2)
+- [x] 78-07-PLAN.md — Moteur vendorisé durci (patch P27) (vague 3)
+- [x] 78-08-PLAN.md — Détail de commit et état des worktrees (routes) (vague 3)
+- [x] 78-09-PLAN.md — Signature Git dans le filet de 5 s, relais SSE (vague 3)
+- [x] 78-10-PLAN.md — Tiroir : détail, états des worktrees, clavier, rafraîchissement (vague 3)
+- [x] 78-11-PLAN.md — Bout en bout réel, chaîne XSS git, toutes les suites, bump du module (vague 4)

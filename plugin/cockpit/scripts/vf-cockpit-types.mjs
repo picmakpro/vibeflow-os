@@ -14,6 +14,6 @@ export const KIND_ICONS = {
 };
 export const KIND_COLORS = {
   historique: ['#6b7280', '#9ca3af'], jalon: ['#b45309', '#f0b45a'], phase: ['#6a45d6', '#b49cff'],
-  exigences: ['#0b7f6b', '#63d2b8'], mission: ['#c43a85', '#f19ac7'], backlog: ['#4f5661', '#a3a3a3'],
-  graine: ['#3f7d20', '#8fd16a'], release: ['#1f5fd6', '#7aa7ff'],
+  exigences: ['#0b7f6b', '#63d2b8'], mission: ['#c43a85', '#ea7fbe'], backlog: ['#4f5661', '#a3a3a3'],
+  graine: ['#666666', '#a3a3a3'], release: ['#1f5fd6', '#7aa7ff'],
 };

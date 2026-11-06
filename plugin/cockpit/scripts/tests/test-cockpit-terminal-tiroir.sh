@@ -11,7 +11,9 @@
 #         (cartes de P et de Q, balayage de largeurs) · J6 aucun terminal sous la carte « déjà ouvert » · J7 boutons de la barre >= 44 px sous pointer: coarse · J13 pas de bague
 #         de focus sur une carte d'alerte focalisée par programme
 #   T21   recette 71 (E2, G1 ; P71-D-34, P71-D-35) : zoom jamais sous la pastille, atteignable tiroir ouvert · « Ajuster » et cadrage initial au-dessus du tiroir · #ask rangée · visite fermée ;
-#         huit relevés (2 pages x 2 fenêtres x 2 thèmes) + mutants M-PASTILLE-SUR-ZOOM, M-AJUSTE-SANS-TIROIR, M-ASK-RESTE, M-VISITE-RESTE
+#         huit relevés (2 pages x 2 fenêtres x 2 thèmes) + mutants M-PASTILLE-SUR-ZOOM, M-AJUSTE-SANS-TIROIR, M-ASK-RESTE, M-VISITE-RESTE ;
+#         T21.7/T21.8 (71.5, P71.5-D-06) : la pastille fermée ne recouvre ni la barre de question, ni la feuille de détail, ni le zoom, ni la visite (de 390 à 1280 px, panneau ouvert,
+#         fermé, rouvert, visite affichée, état tactile) + témoin d'atteinte ; mutants M-PASTILLE-SUR-ASK et M-PASTILLE-SANS-RAPPEL
 #   T22   recette 71 (G4 ; P71-D-37) : hauteur par défaut = 36 % de la fenêtre (220 à 380 px), bande de carte >= moitié de la fenêtre en 1280x720, hauteur mémorisée plafonnée à 70 %,
 #         la fenêtre qui rétrécit ; mutants M-HAUTEUR-FIXE-320, M-MEMO-NON-BORNEE
 #   T17   T17.1 témoin (messages réels de Q) · T17.2 postMessage de P ignoré · T17.3 MessageEvent forgé ignoré · T17.5 espion : liste fermée, aucun octet du shell (M-MSG-DONNEE)
@@ -61,7 +63,25 @@ const cas = [['accepte', {}], ['accepte-ready', { data: 'ready' }], ['origine-de
   ['valeur-inconnue', { data: 'fermer-tout' }], ['objet', { data: { toggle: 1 } }], ['tableau', { data: ['toggle'] }], ['chaine-10000', { data: 'x'.repeat(10000) }],
   ['non-fiable', { isTrusted: false }], ['confiance-absente', { isTrusted: undefined }]];
 console.log(cas.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
-console.log('liste=' + [...L].sort().join(','));
+// 72-14 : la phase 71 garde ses huit valeurs (ligne 2), la phase 72 ajoute des valeurs FIXES, déclarées ici (ligne 3), avec leur table de cas (ligne 4)
+const AJOUTS_72 = ['proposition'];
+console.log('liste=' + [...L].filter((v) => !AJOUTS_72.includes(v)).sort().join(','));
+console.log('ajouts72=' + AJOUTS_72.filter((v) => L.includes(v)).sort().join(','));
+const casP = [['prop', {}], ['prop-suffixe', { data: 'proposition:ouvre' }], ['prop-majuscule', { data: 'Proposition' }], ['prop-espace', { data: 'proposition ' }],
+  ['prop-10000', { data: 'proposition' + 'x'.repeat(9989) }], ['prop-origine-de-P', { origin: P }], ['prop-source-autre', { source: {} }], ['prop-non-fiable', { isTrusted: false }]];
+console.log(casP.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, data: 'proposition', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
+JS
+cat > "$AUX/harnais-liste-q.mjs" <<'JS'
+// harnais-liste-q.mjs <sortie> : la liste fermée de P égale l'ensemble des valeurs de la table MESSAGES du client de Q (72-14, contrat §8) ; une ligne JSON
+import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
+const m = await import(pathToFileURL(`${process.argv[2]}/vf-cockpit-terminal-tiroir.mjs`).href);
+const src = fs.readFileSync(`${process.argv[2]}/vf-cockpit-terminal-client.mjs`, 'utf8');
+const bloc = (src.match(/const MESSAGES = Object\.freeze\(\{([\s\S]*?)\}\)/) || [, ''])[1];
+const paires = [...bloc.matchAll(/([A-Za-z]+):\s*'([^']+)'/g)].map((x) => [x[1], x[2]]);
+const Qv = paires.map((x) => x[1]).sort(), Pv = [...(m.LISTE_MESSAGES || [])].sort();
+const cle = (paires.find((x) => x[1] === 'proposition') || [, ''])[1];
+const appel = !!cle && new RegExp("emettre\\('" + cle + "'\\)").test(src);
+console.log(JSON.stringify({ q: Qv.length, p: Pv.length, egal: Qv.join(',') === Pv.join(','), cle, appel }));
 JS
 cat > "$AUX/scriptgen.mjs" <<'JS'
 // scriptgen.mjs <sortie> <indisponible 0|1> : faits statiques du script injecté (contenu du <script>) ; une ligne JSON
@@ -90,7 +110,7 @@ http.createServer((q, r) => {
 }).listen(Number(port), '127.0.0.1');
 JS
 cat > "$AUX/chrome-tiroir.mjs" <<'JS'
-// chrome-tiroir.mjs <chrome> <mode> <json> : scénarios navigateur du tiroir ; UNE ligne JSON. Modes : sans · flag · donnee · froid · localhost · page · etats.
+// chrome-tiroir.mjs <chrome> <mode> <json> : scénarios navigateur du tiroir ; UNE ligne JSON. Modes : sans · flag · donnee · froid · localhost · page · etats · proposition.
 // Chaque étape est isolée (essai) ; en mode flag, la première étape en échec arrête le reste (les mesures absentes sont nommées dans `erreurs`).
 // Gestes par Input.dispatchMouseEvent / Input.dispatchKeyEvent seulement. Le secret de session n'apparaît jamais en sortie.
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import { execFileSync } from 'node:child_process';
@@ -224,10 +244,81 @@ await executer(chrome, async (s) => {
       // gagne, course). Un seul cadre Q pendant la mesure : on efface la mémoire d'ouverture avant de naviguer. Le focus perdu au chargement reste rouge ; la sonde dit pageFocus, l'élément actif et les cadres de P.
       await s.ev(`localStorage.removeItem('vf.terminal.open')`);
       await q.naviguer(); await q.attendre(CARTE('Session expirée'), 'carte Session expirée');
+      // L2 : la vue ne prend le focus que si le cadre l'a déjà ; P donne le focus au cadre de Q, puis la carte est montée de nouveau (même contenu), comme à la perte de session dans un cadre actif
+      await s.ev(`(() => { const f = document.querySelector('iframe'); if (f) f.focus(); return true; })()`); await q.ev(`window.vfTermVue.carte('expire')`);
       const SONDE_J13 = `(() => { const k = document.querySelector('.vf-q-carte'), c = getComputedStyle(k); return { titre: (document.querySelector('.vf-q-titre') || {}).textContent, focus: document.activeElement === k, fv: k.matches(':focus-visible'), role: k.getAttribute('role'), contour: c.outlineStyle, pageFocus: document.hasFocus(), actif: document.activeElement && document.activeElement.tagName }; })()`;
       r.alerte = await q.ev(SONDE_J13); r.alerte.cadresP = await s.ev(`document.querySelectorAll('iframe').length`);
       r.coupure = await balayer('.vf-q-commande', '.vf-q-corps', LARGEURS, q);
     });
+    return r;
+  }
+
+  if (mode === 'proposition') { // 72-14 : la valeur fixe `proposition` émise par Q ouvre le tiroir de P, sans focus, sans canal de P vers Q (contrat §8 ; P72-D-09)
+    const r = { erreurs };
+    const pid = () => { try { return fs.readFileSync(A.fichierPid, 'utf8').trim(); } catch { return ''; } };
+    const RECT = (sel) => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const b = e.getBoundingClientRect(); return { l: Math.round(b.left), t: Math.round(b.top), r: Math.round(b.right), b: Math.round(b.bottom) }; })()`;
+    const RELEVE = `({ ouvert: ${OUVERT}, focus: document.activeElement ? (document.activeElement.id || document.activeElement.tagName) : '', annonce: (document.querySelector('.vf-term-annonce') || {}).textContent || '',
+      cadres: document.querySelectorAll('iframe').length, barre: (document.querySelector('.vf-term-etat') || {}).textContent || '', etiquette: (document.querySelector('button.vf-term-pastille') || { getAttribute: () => '' }).getAttribute('aria-label'),
+      h: document.querySelector('.vf-term-tiroir') ? Math.round(document.querySelector('.vf-term-tiroir').getBoundingClientRect().height) : -1 })`;
+    // attente tolérante : sur la base ou sous un mutant le tiroir ne s'ouvre pas ; la mesure continue, c'est l'assertion qui rougit (pas une erreur de scénario)
+    const attOuvre = async (ms = 6000) => { const fin = Date.now() + ms; while (Date.now() < fin) { if (await s.ev(OUVERT)) return true; await pause(100); } return false; };
+    const monde = async () => { // le monde du cadre de Q DANS le tiroir de P : origine de Q et window.vfTermVue, sans condition de fragment
+      const fin = Date.now() + MS; let essais = 0, c = 0;
+      while (!c) {
+        const et = 600 * 5 ** Math.min(essais++, 3);
+        for (let id = 1; id < et && !c; id++) {
+          const v = await s.send('Runtime.evaluate', { contextId: id, expression: `location.origin === ${JSON.stringify(OQ)} && typeof window.vfTermVue === 'object'`, returnByValue: true }).then((x) => x && x.result && x.result.value, () => false);
+          if (v === true) c = id;
+        }
+        if (!c) { if (Date.now() > fin) throw new Error('contexte du cadre de Q introuvable'); await pause(150); }
+      }
+      return c;
+    };
+    let cq = 0;
+    const deQ = (valeur) => s.send('Runtime.evaluate', { contextId: cq, expression: `window.parent.postMessage(${JSON.stringify(valeur)}, ${JSON.stringify(OP)})`, returnByValue: true });
+    await essai('amorcage', () => amorcerParP());
+    await essai('P', async () => { await s.naviguer(`${OP}/project.html`); await att(`!!document.querySelector('button.vf-term-pastille')`, 'pastille Terminal'); });
+    await essai('ouvrir', async () => {
+      await s.ev(`(() => { const b = document.createElement('button'); b.id = 'temoin'; b.textContent = 't'; b.style.cssText = 'position:fixed;left:0;top:0;width:12px;height:12px;z-index:1'; document.body.appendChild(b); b.focus(); })()`);
+      await raccourci(); await att(OUVERT, 'tiroir ouvert'); await att(`${MSG('ready')} && ${MSG('etat:connecte')}`, 'ready puis etat:connecte');
+      r.pid0 = pid(); cq = await monde();
+    });
+    await essai('fermer', async () => {
+      await clic('.vf-term-fermer'); await att(`!(${OUVERT})`, 'tiroir fermé par le bouton');
+      await s.ev(`document.getElementById('temoin').focus()`); await pause(300);
+      r.avant = await s.ev(RELEVE); r.avant.pastille = await s.ev(RECT('button.vf-term-pastille')); r.avant.zoom = await s.ev(RECT('#zoom'));
+    });
+    await essai('proposition-1', async () => { // TP.4 : tiroir fermé, la valeur fixe arrive de Q
+      await deQ('proposition'); await attOuvre(); await pause(300);
+      r.ouvre1 = await s.ev(RELEVE); r.ouvre1.pid = pid(); r.ouvre1.recu = await s.ev(MSG('proposition'));
+    });
+    await essai('proposition-2', async () => { // TP.5 : tiroir déjà ouvert ; l'annonce est effacée avant, elle seule doit revenir
+      await s.ev(`document.querySelector('.vf-term-annonce').textContent = ''`);
+      await deQ('proposition'); await pause(500);
+      r.ouvre2 = await s.ev(RELEVE); r.ouvre2.pid = pid();
+    });
+    await essai('cycle', async () => { // TP.7 et TP.8 : fermeture au bouton après l'ouverture par proposition
+      if (!(await s.ev(OUVERT))) { r.cycleSansOuverture = true; return; }
+      await clic('.vf-term-fermer'); await att(`!(${OUVERT})`, 'tiroir refermé'); await pause(300);
+      r.apres = await s.ev(RELEVE); r.apres.pastille = await s.ev(RECT('button.vf-term-pastille')); r.apres.zoom = await s.ev(RECT('#zoom'));
+    });
+    await essai('espion', async () => { // TP.8 : tout message d'origine Q vu par P est dans la liste (relevé AVANT les envois hostiles de TP.6)
+      const msgs = JSON.parse(await s.ev('JSON.stringify(window.__msgs)')), q = msgs.filter((m) => m.o === OQ);
+      r.espion = { de_q: q.length, hors_liste: q.filter((m) => !A.liste.includes(m.d)).length, proposition: q.filter((m) => m.d === 'proposition').length };
+    });
+    await essai('hostiles', async () => { // TP.6 : tiroir fermé, tout ce qui n'est pas la valeur fixe de Q laisse le tiroir fermé
+      if (await s.ev(OUVERT)) { await clic('.vf-term-fermer'); await att(`!(${OUVERT})`, 'tiroir fermé avant les envois hostiles'); }
+      const clos = async () => { await pause(600); return !(await s.ev(OUVERT)); };
+      r.hostile = {};
+      await s.ev(`postMessage('proposition', location.origin)`); r.hostile.deP = await clos();
+      await s.ev(`dispatchEvent(new MessageEvent('message', { data: 'proposition', origin: ${JSON.stringify(OQ)}, source: document.querySelector('iframe').contentWindow }))`); r.hostile.forge = await clos();
+      await deQ('proposition:ouvre'); r.hostile.suffixe = await clos();
+      await deQ('Proposition'); r.hostile.majuscule = await clos();
+      await deQ('proposition '); r.hostile.espace = await clos();
+      await deQ('proposition' + 'x'.repeat(9989)); r.hostile.long = await clos();
+      await deQ('proposition'); r.hostile.vivant = await attOuvre(); // témoin positif : le canal de Q vit, les refus ci-dessus ne sont pas un harnais mort
+    });
+    r.violations = [...s.violations];
     return r;
   }
 
@@ -409,6 +500,64 @@ await executer(chrome, async (s) => {
   return { erreurs, n: sorties.length, api: sorties.every((r) => r.api === 1), noeuds: sorties.every((r) => r.apresF && r.apresF.n > 0), G, sorties: A.detail ? sorties : undefined };
 });
 JS
+cat > "$AUX/chrome-pastille.mjs" <<'JS'
+// chrome-pastille.mjs <chrome> <json> : T21.7 (71.5, P71.5-D-06) — la pastille fermée ne recouvre ni #ask (affichée), ni #panel (ouvert), ni #zoom, ni #tour (affichée) ; UNE ligne JSON.
+// Entrée : { P, court }. Les relevés ne dépendent pas de chrome-geom (son « court » ne règle que ses propres huit combinaisons). Par largeur : panneau dans son état initial, puis bascule, puis bascule
+// retour (le cas « refermé » est celui qu'un rappel périmé laisse faux). Puis : la visite affichée, panneau ouvert, aux cinq largeurs qui comptent ; puis deux états tactiles (pointer: coarse).
+import { pathToFileURL } from 'node:url';
+const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const [, , chrome, brut] = process.argv; const A = JSON.parse(brut);
+const OP = `http://127.0.0.1:${A.P}`, MS = Number(process.env.VF_TIROIR_MS) || 20000;
+const TOUTES = [[390, 844], [600, 900], [700, 900], [701, 900], [768, 1024], [900, 900], [1000, 800], [1024, 768], [1100, 800], [1200, 800], [1260, 800], [1280, 800]];
+const COURTES = [[390, 844], [768, 1024], [1024, 768], [1200, 800]];
+const AVEC_VISITE = new Set([390, 600, 700, 768, 1024]);
+const MESURE = `(() => {
+  const r = (e) => { if (!e) return null; const b = e.getBoundingClientRect(), cs = getComputedStyle(e); if (!(b.width > 0 && b.height > 0) || cs.display === 'none' || cs.visibility === 'hidden') return null; return { left: b.left, top: b.top, right: b.right, bottom: b.bottom }; };
+  const p = r(document.querySelector('.vf-term-pastille')); const ouvert = !document.body.classList.contains('no-panel');
+  const ask = r(document.getElementById('ask')), panel = ouvert ? r(document.getElementById('panel')) : null, zoom = r(document.getElementById('zoom')), tour = r(document.getElementById('tour'));
+  const sur = (a, o) => !!a && !!o && a.left < o.right && a.right > o.left && a.top < o.bottom && a.bottom > o.top;
+  return { pastille: !!p, ask: !!ask, panneau: ouvert, tour: !!tour, mal: [['ask', ask], ['panel', panel], ['zoom', zoom], ['tour', tour]].filter(([, o]) => sur(p, o)).map(([n]) => n) };
+})()`;
+await executer(chrome, async (s) => {
+  const releves = [], erreurs = {};
+  const mesurer = async (cle, extra) => { try { const m = await s.ev(MESURE); releves.push({ cle, ...m, ...(extra || {}) }); } catch (e) { erreurs[cle] = String(e.message).slice(0, 160); } };
+  const basculer = async () => { await s.ev(`document.getElementById('btn-panel').click()`); await pause(900); };
+  const charger = async (W, H, tactile) => {
+    await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: !!tactile });
+    await s.send('Emulation.setTouchEmulationEnabled', { enabled: !!tactile });
+    await s.naviguer(`${OP}/index.html`); await s.ev(`localStorage.clear(); sessionStorage.clear()`);
+    await s.naviguer(`${OP}/index.html`);
+    await s.attendre(`!!document.querySelector('button.vf-term-pastille') && document.querySelectorAll('#viewport .node').length > 0`, 'pastille et nœuds', MS);
+    await pause(1800);
+  };
+  await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  for (const [W, H] of (A.court ? COURTES : TOUTES)) {
+    const cle = `${W}x${H}`;
+    try {
+      await charger(W, H, false);
+      await mesurer(`${cle}/initial`);
+      await basculer(); await mesurer(`${cle}/bascule`);
+      await basculer(); await mesurer(`${cle}/retour`);
+      if (AVEC_VISITE.has(W)) { // visite affichée, panneau ouvert
+        if (await s.ev(`document.body.classList.contains('no-panel')`)) await basculer();
+        await s.ev(`window.VibeFlowTour && !window.VibeFlowTour.active() && window.VibeFlowTour.start()`); await pause(1400);
+        await mesurer(`${cle}/visite`); await s.ev(`window.VibeFlowTour && window.VibeFlowTour.active() && window.VibeFlowTour.end()`);
+      }
+    } catch (e) { erreurs[cle] = String(e.message).slice(0, 160); }
+  }
+  if (!A.court) for (const [W, H] of [[390, 844], [768, 1024]]) { // état tactile : pointer: coarse (pastille de 44 px)
+    const cle = `tactile-${W}x${H}`;
+    try {
+      await charger(W, H, true);
+      const coarse = await s.ev(`matchMedia('(pointer: coarse)').matches`);
+      await mesurer(`${cle}/initial`, { coarse });
+      await basculer(); await mesurer(`${cle}/bascule`, { coarse }); await basculer(); await mesurer(`${cle}/retour`, { coarse });
+    } catch (e) { erreurs[cle] = String(e.message).slice(0, 160); }
+  }
+  const mauvais = releves.filter((x) => !x.pastille || x.mal.length).map((x) => x.cle + ':' + (x.pastille ? x.mal.join('+') : 'sans-pastille'));
+  return { erreurs, n: releves.length, mauvais, avecAskOuvert: releves.filter((x) => x.ask && x.panneau).length, avecVisite: releves.filter((x) => x.tour).length, tactile: releves.filter((x) => x.coarse === true).length };
+});
+JS
 cat > "$AUX/chrome-defaut.mjs" <<'JS'
 // chrome-defaut.mjs <chrome> <json> : hauteur du tiroir selon la fenêtre (G4 ; P71-D-37) ; UNE ligne JSON. Entrée : { P }. Page Projet, stockage vidé avant chaque relevé.
 import { pathToFileURL } from 'node:url';
@@ -474,13 +623,21 @@ run_etats() { # run_etats <sortie> -> EJ ; un serveur neuf, un amorçage neuf, u
 run_geom() { # run_geom <sortie> <court 0|1> -> GJ ; un serveur neuf, un Chrome neuf (le shell n'est pas piloté : la géométrie seule)
   srv "$1" 1; GJ="$(node "$AUX/chrome-geom.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":$2}")"; unsrv
 }
+run_pastille() { # run_pastille <sortie> <court 0|1> -> PJ ; un serveur neuf, un Chrome neuf (T21.7)
+  srv "$1" 1; PJ="$(node "$AUX/chrome-pastille.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":$2}")"; unsrv
+}
 run_defaut() { # run_defaut <sortie> -> DJ ; un serveur neuf, un Chrome neuf
   srv "$1" 1; DJ="$(node "$AUX/chrome-defaut.mjs" "$CHROME" "{\"P\":$SRV_PORT}")"; unsrv
 }
-LISTE_JSON='["ready","etat:connecte","etat:reconnexion","etat:termine","etat:refuse","etat:expire","etat:arrete","toggle"]'
+LISTE_JSON='["ready","etat:connecte","etat:reconnexion","etat:termine","etat:refuse","etat:expire","etat:arrete","toggle","proposition"]'
 run_flag() { # run_flag <sortie> <court 0|1> -> FJ FP FQ ; un serveur neuf, un amorçage neuf, un Chrome neuf
   srv "$1" 1; FP=$SRV_PORT; FQ=$QP; FMARQ="MARQUEUR-P-$RANDOM$RANDOM"; rm -f "$WORK/run/m.txt" "$WORK/run/shell.pid"
   FJ="$(navig flag "{\"P\":$FP,\"Q\":$FQ,\"amorce\":\"$AMORCE\",\"marqueur\":\"$FMARQ\",\"fichierPid\":\"$WORK/run/shell.pid\",\"fichierM\":\"$WORK/run/m.txt\",\"TA\":\"$TA\",\"liste\":$LISTE_JSON,\"court\":$2}")"; unsrv
+}
+
+run_prop() { # run_prop <sortie> -> PJ ; un serveur neuf, un amorçage neuf, un Chrome neuf (72-14 : valeur fixe proposition)
+  srv "$1" 1; rm -f "$WORK/run/shell.pid"
+  PJ="$(navig proposition "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"fichierPid\":\"$WORK/run/shell.pid\",\"liste\":$LISTE_JSON}")"; unsrv
 }
 
 LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"
@@ -491,6 +648,73 @@ assert_eq "TU.13.0 — témoin : le script injecté existe (taille > 500), sa pr
 assert_eq "TU.13 — aucune adresse web écrite en entier dans le script injecté, commentaires compris (témoin : le motif trouve une adresse plantée)" "$(rj "$SG" 'j.adresses+"/"+j.temoin')" "0/1"
 assert_eq "TU.13b — un seul fetch( et il vise /api/vf/terminal ; aucun cookie ; seules clés de stockage : vf.terminal.h et vf.terminal.open" "$(rj "$SG" '(j.taille>500)+"/"+j.fetchs+"/"+j.api+"/"+j.cookie+"/"+j.cles')" "true/1/true/0/vf.terminal.h,vf.terminal.open"
 assert_eq "T17.6 — aucun postMessage( dans le script injecté (le sens P vers le cadre est fermé), aucun attribut allow posé, Échap jamais cité (le script est vivant)" "$(rj "$SG" '(j.taille>500)+"/"+j.postmsg+"/"+j.allow+"/"+j.echap')" "true/0/0/0"
+
+echo "=== T23 — point de la pastille fermée : jamais une teinte d'état sur --raise en clair (71.5, juge de rendu 2026-11-06 ; DESIGN.md §9) ==="
+cat > "$AUX/contraste-point.mjs" <<'JS'
+// contraste-point.mjs <style.mjs> <viewer.html> : rapport de contraste du point `.vf-term-point` sur --raise, thème sombre puis clair ; UNE ligne « sombre=N clair=N ».
+import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
+const { STYLE_TIROIR } = await import(pathToFileURL(process.argv[2]).href); const html = fs.readFileSync(process.argv[3], 'utf8');
+const bloc = (re) => { const m = re.exec(html); return m ? m[0] : ''; };
+const jetons = { sombre: bloc(/:root \{[\s\S]*?\n\}/), clair: bloc(/:root\[data-theme="light"\] \{[\s\S]*?\n\}/) };
+const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+const L = (h) => { const n = parseInt(h.slice(1), 16); return 0.2126 * lin(n >> 16) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255); };
+const ratio = (a, b) => { const [x, y] = [L(a), L(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const regle = /\.vf-term-point \{[^}]*background: var\((--[\w-]+)\)/.exec(STYLE_TIROIR); const out = [];
+for (const t of ['sombre', 'clair']) {
+  const val = (nom) => { const m = new RegExp(nom + ': (#[0-9a-fA-F]{6})').exec(jetons[t]) || (t === 'clair' ? new RegExp(nom + ': (#[0-9a-fA-F]{6})').exec(jetons.sombre) : null); return m && m[1]; };
+  const fond = val('--raise'), pt = regle && val(regle[1]);
+  out.push(t + '=' + (fond && pt ? ratio(pt, fond).toFixed(2) : 'illisible'));
+}
+console.log(out.join(' '));
+JS
+CT="$(node "$AUX/contraste-point.mjs" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
+assert_eq "T23.1 — le point de la pastille fermée fait au moins 3:1 sur --raise dans les deux thèmes (sombre inchangé : 8,6:1 ; clair : --recent-text 4,3:1, --recent faisait 2,9:1)" "$(echo "$CT" | awk '{ split($1,a,"="); split($2,b,"="); print (a[2]+0 >= 3 && b[2]+0 >= 3) ? "ok" : "ko" }') [$CT]" "ok [$CT]"
+MUTP="$WORK/mut-point-style.mjs"; sed 's|background: var(--recent-text); }|background: var(--recent); }|' "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" > "$MUTP"
+if cmp -s "$MUTP" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs"; then sans_effet "M-POINT-RECENT"; else
+  CM="$(node "$AUX/contraste-point.mjs" "$MUTP" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
+  assert_eq "M-POINT-RECENT — l'ancien point (--recent) rougit T23.1 : clair sous 3:1 (témoin : le sombre est lu)" "$(echo "$CM" | awk '{ split($1,a,"="); split($2,b,"="); print (a[2]+0 >= 3 && b[2]+0 < 3) ? "rouge" : "vert" }')" "rouge"
+fi
+
+cat > "$AUX/contraste-etat.mjs" <<'JS'
+// contraste-etat.mjs <style.mjs> <viewer.html> : rapport de contraste de chaque point d'état de la barre (`.vf-term-etat-point`) sur --raise, par thème ; UNE ligne « sombre:defaut=N sombre:connecte=N ... clair:expire=N ». Résolution : dernière règle applicable (en clair, les règles `:root[data-theme="light"]` s'ajoutent aux règles de base).
+import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
+const { STYLE_TIROIR } = await import(pathToFileURL(process.argv[2]).href); const html = fs.readFileSync(process.argv[3], 'utf8');
+const bloc = (re) => { const m = re.exec(html); return m ? m[0] : ''; };
+const jetons = { sombre: bloc(/:root \{[\s\S]*?\n\}/), clair: bloc(/:root\[data-theme="light"\] \{[\s\S]*?\n\}/) };
+const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+const L = (h) => { const n = parseInt(h.slice(1), 16); return 0.2126 * lin(n >> 16) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255); };
+const ratio = (a, b) => { const [x, y] = [L(a), L(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const regles = []; const re = /([^{}\/]+)\{([^}]*)\}/g; let m;
+while ((m = re.exec(STYLE_TIROIR.replace(/\/\*[\s\S]*?\*\//g, '')))) { const bg = /background: var\((--[\w-]+)\)/.exec(m[2]); if (bg) regles.push({ sels: m[1].split(',').map((s) => s.trim()), jeton: bg[1] }); }
+const out = [];
+for (const t of ['sombre', 'clair']) {
+  const val = (nom) => { const x = new RegExp(nom + ': (#[0-9a-fA-F]{6})').exec(jetons[t]) || new RegExp(nom + ': (#[0-9a-fA-F]{6})').exec(jetons.sombre); return x && x[1]; };
+  for (const etat of ['defaut', 'connecte', 'reconnexion', 'refuse', 'arrete', 'expire']) {
+    let jeton = null;
+    for (const r of regles) for (const s of r.sels) {
+      const clair = s.startsWith(':root[data-theme="light"] '); const nu = clair ? s.slice(26) : s;
+      if (clair && t !== 'clair') continue;
+      const ok = etat === 'defaut' ? nu === '.vf-term-etat-point' : nu === '.vf-term-etat-point[data-etat="' + etat + '"]';
+      if (ok) jeton = r.jeton;
+    }
+    const fond = val('--raise'), pt = jeton && val(jeton);
+    out.push(t + ':' + etat + '=' + (fond && pt ? ratio(pt, fond).toFixed(2) : 'illisible'));
+  }
+}
+console.log(out.join(' '));
+JS
+CE="$(node "$AUX/contraste-etat.mjs" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
+assert_eq "T23.2 — les six points d'état de la barre (défaut, connecte, reconnexion, refuse, arrete, expire) font au moins 3:1 sur --raise dans les deux thèmes, douze mesures lues (clair : variantes -text, sombre inchangé ; DESIGN.md §9, P71.5-D-36)" "$(echo "$CE" | awk '{ n=0; bon=0; for (i=1;i<=NF;i++) { split($i,a,"="); n++; if (a[2]+0 >= 3) bon++ } print (n==12 && bon==12) ? "ok" : "ko" }') [$CE]" "ok [$CE]"
+MUTE="$WORK/mut-etat-style.mjs"; sed 's|:root\[data-theme="light"\] .vf-term-etat-point\[data-etat="connecte"\] { background: var(--recent-text); }|:root[data-theme="light"] .vf-term-etat-point[data-etat="connecte"] { background: var(--recent); }|' "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" > "$MUTE"
+if cmp -s "$MUTE" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs"; then sans_effet "M-ETAT-RECENT"; else
+  CM="$(node "$AUX/contraste-etat.mjs" "$MUTE" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
+  assert_eq "M-ETAT-RECENT — le point connecté en --recent sur --raise clair rougit T23.2 (clair:connecte sous 3:1, témoin : le sombre est lu)" "$(echo "$CM" | awk '{ for (i=1;i<=NF;i++) { split($i,a,"="); v[a[1]]=a[2]+0 } print (v["clair:connecte"] < 3 && v["sombre:connecte"] >= 3) ? "rouge" : "vert" }')" "rouge"
+fi
+MUTH="$WORK/mut-etat-medium.mjs"; sed 's|\(:root\[data-theme="light"\] .vf-term-etat-point\[data-etat="refuse"\] { background: \)var(--warn-text)|\1var(--sev-medium)|' "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" > "$MUTH"
+if cmp -s "$MUTH" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs"; then sans_effet "M-ETAT-MEDIUM"; else
+  CM="$(node "$AUX/contraste-etat.mjs" "$MUTH" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
+  assert_eq "M-ETAT-MEDIUM — le point reconnexion/refus en --sev-medium sur --raise clair rougit T23.2 (clair:reconnexion sous 3:1, témoin : le sombre est lu)" "$(echo "$CM" | awk '{ for (i=1;i<=NF;i++) { split($i,a,"="); v[a[1]]=a[2]+0 } print (v["clair:reconnexion"] < 3 && v["sombre:reconnexion"] >= 3) ? "rouge" : "vert" }')" "rouge"
+fi
 
 echo "=== T17.4 — table de accepteMessage et mutants M-MSG-* ==="
 ATT_TABLE="accepte=oui accepte-ready=oui origine-de-P=non origine-voisine=non source-autre=non source-nulle=non valeur-inconnue=non objet=non tableau=non chaine-10000=non non-fiable=non confiance-absente=non"
@@ -507,6 +731,19 @@ mut_msg M-MSG-ORIGINE 's|if (e.origin !== origineQ) return false;||' origine-de-
 mut_msg M-MSG-SOURCE 's|if (!fenetreCadre \|\| e.source !== fenetreCadre) return false;||' source-autre
 mut_msg M-MSG-LISTE 's|typeof e.data === .string. && liste.indexOf(e.data) >= 0|typeof e.data === "string"|' valeur-inconnue
 mut_msg M-MSG-CONFIANCE 's|if (!e \|\| e.isTrusted !== true) return false;|if (!e) return false;|' non-fiable
+
+echo "=== TP — valeur fixe « proposition » de Q vers P (72-14 ; P72-D-09, P71-D-18 ; contrat §8) ==="
+assert_eq "TP.1 — la liste de la phase 71 garde ses huit valeurs (ligne 2 du harnais), la phase 72 ajoute exactement une valeur fixe (ligne 3)" "$(sed -n 2p "$WORK/h.out") $(sed -n 3p "$WORK/h.out")" "liste=etat:arrete,etat:connecte,etat:expire,etat:reconnexion,etat:refuse,etat:termine,ready,toggle ajouts72=proposition"
+assert_eq "TP.2 — accepteMessage : « proposition » seule passe ; refusés : suffixe, majuscule, espace final, 10 000 caractères, origine de P, autre source, non fiable" "$(sed -n 4p "$WORK/h.out")" "prop=oui prop-suffixe=non prop-majuscule=non prop-espace=non prop-10000=non prop-origine-de-P=non prop-source-autre=non prop-non-fiable=non"
+node "$AUX/harnais-liste-q.mjs" "$OUT" > "$WORK/hq.out" 2>&1
+assert_eq "TP.3 — câblage : LISTE_MESSAGES de P = ensemble des valeurs de la table MESSAGES du client de Q (neuf valeurs), et le client appelle emettre sur la clé de « proposition »" "$(tail -n 1 "$WORK/hq.out" | node "$AUX/ev.mjs" '"q="+j.q+" p="+j.p+" egal="+j.egal+" cle="+j.cle+" appel="+j.appel')" "q=9 p=9 egal=true cle=proposition appel=true"
+mut_prop() { # mut_prop <libellé> <nom> <expression-sed> <cas qui doit passer à « oui » dans la ligne 4>
+  if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
+    node "$AUX/harnais-msg.mjs" "$MUT_OUT" > "$WORK/hm-$2.out" 2>&1
+    assert_eq "$1 $2 — le mutant rougit TP.2 : le cas « $4 » est accepté" "$(sed -n 4p "$WORK/hm-$2.out" | tr ' ' '\n' | grep "^$4=")" "$4=oui"
+  else sans_effet "$1 $2"; fi
+}
+mut_prop TP.9 M-MESSAGE-LIBRE 's|liste.indexOf(e.data) >= 0|(liste.indexOf(e.data) >= 0 \|\| e.data.indexOf("proposition") === 0)|' prop-suffixe
 
 if [ -n "$CHROME" ]; then
 echo "=== TU.1 — sans --terminal : rien (UI-SPEC §15.1) ==="
@@ -579,6 +816,17 @@ mut_geom M-PASTILLE-SUR-ZOOM vf-cockpit-terminal-tiroir.mjs 's|if (recouvre) z.s
 mut_geom M-AJUSTE-SANS-TIROIR vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #stage {|body.vf-term-ouvert #stage-absent {|' G1F
 mut_geom M-ASK-RESTE vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #ask { display: none; }|body.vf-term-ouvert #ask { }|' G1ask
 mut_geom M-VISITE-RESTE vf-cockpit-terminal-tiroir.mjs 's|window.VibeFlowTour.end();|void 0;|' G1visite
+run_pastille "$OUT" 0; PA="$PJ"
+assert_eq "T21.7 (D-06) — tiroir fermé : la pastille ne recouvre ni la barre de question, ni la feuille de détail, ni le zoom, ni la visite, de 390 à 1280 px, panneau dans son état initial, basculé, rebasculé, visite affichée, et en état tactile" "$(rj "$PA" '(j.erreur||JSON.stringify(j.erreurs))+" "+JSON.stringify(j.mauvais)')" "{} []"
+assert_eq "T21.8 — témoin de T21.7 : au moins 36 relevés pris, au moins 6 avec #ask affiché ET panneau ouvert, au moins 5 avec la visite affichée, au moins 3 en état tactile (sinon T21.7 est vert à vide)" "$(rj "$PA" '(j.n>=36&&j.avecAskOuvert>=6&&j.avecVisite>=5&&j.tactile>=3)?"ok":"n="+j.n+" ask="+j.avecAskOuvert+" visite="+j.avecVisite+" tactile="+j.tactile')" "ok"
+mut_pastille() { # mut_pastille <nom> <expression-sed> : le mutant doit laisser au moins un relevé en défaut (témoin : au moins 8 relevés, aucune erreur)
+  if mutant "$1" vf-cockpit-terminal-tiroir.mjs "$2"; then
+    srv "$MUT_OUT" 1; PM="$(node "$AUX/chrome-pastille.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":1}")"; unsrv
+    assert_eq "$1 — le mutant rougit T21.7 : au moins un relevé en défaut (témoin : au moins 8 relevés, aucune erreur)" "$(rj "$PM" '(j.n>=8)+" "+JSON.stringify(j.erreurs)+" rouge="+(j.mauvais.length>=1)')" "true {} rouge=true"
+  else sans_effet "$1"; fi
+}
+mut_pastille M-PASTILLE-SUR-ASK 's|if (sur(n.getBoundingClientRect(), kb)) n.style.bottom|if (false) n.style.bottom|'
+mut_pastille M-PASTILLE-SANS-RAPPEL "s|ask.addEventListener('transitionend', surTransition);||"
 
 echo "=== T22 — hauteur par défaut proportionnelle à la fenêtre (recette 71, G4 ; P71-D-37) ==="
 run_defaut "$OUT"; D="$DJ"
@@ -612,6 +860,25 @@ if mutant donnee vf-cockpit-terminal-client.mjs 's|term.write(m.value);|term.wri
   run_flag "$MUT_OUT" 1; J="$FJ"
   assert_eq "M-MSG-DONNEE — le mutant rougit T17.5 : un message hors liste ou portant le marqueur arrive à P (témoin : la commande a tourné)" "$(rj "$J" '"fichier="+j.t175.fichier+" rouge="+(j.t175.hors_liste>=1||j.t175.marqueur>=1)')" "fichier=true rouge=true"
 else sans_effet "M-MSG-DONNEE"; fi
+
+echo "=== TP.4-TP.8 — le tiroir s'ouvre sur « proposition » : sans focus, sans canal vers Q, pastille de la clôture 71 intacte ==="
+run_prop "$OUT"; PJ0="$PJ"
+PA="Proposition de lancement dans le terminal."
+assert_eq "TP.0 — témoin : le scénario n'a pas échoué (aucune étape en erreur), le tiroir était fermé et la valeur fixe de Q est parvenue à P" "$(rj "$PJ0" '(j.erreur||JSON.stringify(j.erreurs))+" ferme="+(j.avant&&!j.avant.ouvert)+" recu="+(j.ouvre1&&j.ouvre1.recu)')" "{} ferme=true recu=true"
+assert_eq "TP.4 — tiroir fermé, « proposition » de Q : il s'ouvre, le focus reste sur l'élément de P, un seul cadre, même shell, annonce « $PA »" "$(rj "$PJ0" '"ouvre="+(j.ouvre1&&j.ouvre1.ouvert)+" focus="+(j.ouvre1&&j.ouvre1.focus)+" cadres="+(j.ouvre1&&j.ouvre1.cadres)+" shell="+(j.ouvre1&&j.pid0&&j.ouvre1.pid===j.pid0?"meme":"autre")+" annonce="+(j.ouvre1&&j.ouvre1.annonce)')" "ouvre=true focus=temoin cadres=1 shell=meme annonce=$PA"
+assert_eq "TP.5 — tiroir déjà ouvert : même hauteur, même focus, aucun cadre de plus, l'annonce seule est redite (effacée avant)" "$(rj "$PJ0" '"ouvert="+(j.ouvre2&&j.ouvre2.ouvert)+" h="+(j.ouvre2&&j.ouvre1&&j.ouvre2.h===j.ouvre1.h&&j.ouvre1.h>0)+" focus="+(j.ouvre2&&j.ouvre2.focus)+" cadres="+(j.ouvre2&&j.ouvre2.cadres)+" annonce="+(j.ouvre2&&j.ouvre2.annonce)')" "ouvert=true h=true focus=temoin cadres=1 annonce=$PA"
+assert_eq "TP.7 — après ouverture par proposition puis fermeture au bouton : la pastille est sous #zoom (haut >= bas du zoom), ne le recouvre pas et reprend son rectangle d'avant le cycle" "$(rj "$PJ0" '(()=>{const a=j.apres,v=j.avant;if(!a||!v||!a.pastille||!a.zoom||!v.pastille)return "cycle="+!!a;const p=a.pastille,z=a.zoom,inter=p.l<z.r&&p.r>z.l&&p.t<z.b&&p.b>z.t;return "cycle=true sous="+(p.t>=z.b)+" libre="+(!inter)+" meme="+(JSON.stringify(p)===JSON.stringify(v.pastille)&&JSON.stringify(z)===JSON.stringify(v.zoom))})()')" "cycle=true sous=true libre=true meme=true"
+assert_eq "TP.8 — la proposition ne passe pas par la branche des états : barre « Connecté », pastille « session en cours », 0 violation de CSP, espion : que des valeurs de la liste étendue (la valeur fixe y figure)" "$(rj "$PJ0" '"ouvre="+(j.ouvre1&&j.ouvre1.ouvert)+" barre="+(j.apres&&j.apres.barre)+" etiquette="+(j.apres&&j.apres.etiquette)+" violations="+(j.violations&&j.violations.length)+" hors_liste="+(j.espion&&j.espion.hors_liste)+" prop="+(j.espion&&j.espion.proposition>=1)')" "ouvre=true barre=Connecté etiquette=Ouvrir le terminal, une session est en cours violations=0 hors_liste=0 prop=true"
+assert_eq "TP.6 — tiroir fermé : postMessage de P, MessageEvent forgé, « proposition:ouvre », « Proposition », « proposition » + espace, 10 000 caractères depuis Q : il reste fermé ; témoin : la vraie valeur de Q l'ouvre ensuite" "$(rj "$PJ0" 'JSON.stringify(j.hostile)')" '{"deP":true,"forge":true,"suffixe":true,"majuscule":true,"espace":true,"long":true,"vivant":true}'
+mut_prop_nav() { # mut_prop_nav <libellé> <nom> <expression-sed> <expression de rougissement sur le relevé du mutant>
+  if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
+    run_prop "$MUT_OUT"
+    assert_eq "$1 $2 — le mutant rougit : $5 (témoin : aucune erreur de scénario)" "$(rj "$PJ" '(j.erreur||JSON.stringify(j.erreurs))+" rouge="+('"$4"')')" "{} rouge=true"
+  else sans_effet "$1 $2"; fi
+}
+mut_prop_nav TP.10 M-LISTE-SANS-PROPOSITION "s|, 'proposition'\]);|]);|" '!(j.ouvre1&&j.ouvre1.ouvert)' "le tiroir ne s'ouvre plus (liste sans la valeur)"
+mut_prop_nav TP.11 M-PROPOSITION-COMME-ETAT 's|else if (e.data === .proposition.) proposer();||' '!(j.ouvre1&&j.ouvre1.barre==="Connecté")' "la barre perd son libellé « Connecté »"
+mut_prop_nav TP.12 M-FOCUS-VOLE 's|const proposer = () => { ouvrir(false);|const proposer = () => { ouvrir(true);|' '!(j.ouvre1&&j.ouvre1.focus==="temoin")' "le focus passe au cadre"
 fi
 
 vf_hyg_assert

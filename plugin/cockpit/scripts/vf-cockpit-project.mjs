@@ -9,6 +9,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { planningLayout } from './vf-cockpit-paths.mjs';
 import { readPlanning, read, clip, sentence, num, fm, list } from './vf-cockpit-planning.mjs';
+import { texte } from './vf-cockpit-formats.mjs';
 import { trouverPhase, LIBELLES_RESTE, LIBELLES_MISSION } from './vf-cockpit-avancement.mjs';
 import { KIND_ICONS, KIND_COLORS } from './vf-cockpit-types.mjs';
 import { detectDrift } from './vf-cockpit-drift.mjs';
@@ -17,13 +18,16 @@ import { lireAilleurs, fusionner } from './vf-cockpit-ailleurs.mjs';
 const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
 const DST = { done: 'done', running: 'active', ready: 'todo', blocked: 'todo', failed: 'blocked' }; // dag.sh : blocked = en attente des deps
 const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
-// projection de l'état d'avancement sur les statuts du viewer : « à recetter » prend la couleur « en cours » (P69-D-25, P69-PL-02) ; l'état exact reste dans avancement.etat
-const PROJECTION_ST = { fait: 'done', 'a-recetter': 'active', 'en-cours': 'active', 'a-faire': 'todo' };
+// projection de l'état d'avancement sur les statuts du viewer : « à recetter » prend la teinte « en cours » mais son propre statut `recette` : glyphe et mot « À recetter » sur la carte (P69-D-25, P69-PL-02, P71.5-D-20) ; l'état exact reste dans avancement.etat
+const PROJECTION_ST = { fait: 'done', 'a-recetter': 'recette', 'en-cours': 'active', 'a-faire': 'todo' };
 // pied de jalon : « N clos · [N en cours · ]N à recetter · N à faire · N % » ; le pourcentage ne compte que les phases closes (P69-D-06, P69-PL-03)
 function piedJalon(ks) {
   const n = (e) => ks.filter((p) => p.avancement.etat === e).length; const clos = n('fait'), enc = n('en-cours');
   return [`${clos} clos`, enc ? `${enc} en cours` : '', `${n('a-recetter')} à recetter`, `${n('a-faire')} à faire`, `${pct(clos, ks.length)} %`].filter(Boolean).join(' · ');
 }
+
+// contenu de la première balise <objective> (indexOf : une balise sans fermeture ne fait pas rebalayer le texte pour chaque ouverture)
+const objectif = (t) => { const a = t.indexOf('<objective>'); if (a < 0) return undefined; const b = t.indexOf('</objective>', a + 11); return b < 0 ? undefined : t.slice(a + 11, b).replace(/^\s+/, ''); };
 
 export function buildProjectGraph(root, { layout } = {}) {
   root = path.resolve(root); layout = layout || planningLayout(root);
@@ -82,8 +86,8 @@ export function buildProjectGraph(root, { layout } = {}) {
       details: [ph.goal, av.reste.length ? `Reste : ${av.reste.map((c) => LIBELLES_RESTE[c]).join(', ')}.` : '', av.ailleurs ? `Avancement lu dans le worktree ${av.ailleurs.arbre}${av.ailleurs.branche ? ` (branche ${av.ailleurs.branche})` : ''} : plus avancé que celui de l'arbre courant.` : '', av.mission ? `Mission : ${av.mission.nom} (${LIBELLES_MISSION[av.mission.etat] || av.mission.etat}).` : '', ph.depends.length ? `Dépend de : Phase ${ph.depends.join(', ')}.` : '', ph.line ? `Ligne de ROADMAP : ${ph.line}` : '', `Source : ${ph.roadmap}${dir ? ` · dossier ${rel(dir)}` : ''}`].filter(Boolean).join('\n\n'),
       st, foot: [av.etat === 'a-recetter' ? 'à recetter' : '', av.plans.total ? `${av.plans.faits}/${av.plans.total} plans` : '', av.correctifs ? `${av.correctifs} correctif${av.correctifs > 1 ? 's' : ''}` : '', phReqs.length ? `${phReqs.filter((r) => r.done).length}/${phReqs.length} exigences` : '', av.ailleurs ? `dans worktree ${av.ailleurs.arbre}` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [] });
     for (const pf of planFiles) {
-      const txt = read(path.join(dir, pf)); const meta = fm(txt); const pid = pf.replace('-PLAN.md', '');
-      const obj = /<objective>\s*([\s\S]*?)<\/objective>/.exec(txt)?.[1] || /^#\s+(.*)$/m.exec(txt)?.[1] || '';
+      const txt = texte(read(path.join(dir, pf))); const meta = fm(txt); const pid = pf.replace('-PLAN.md', '');
+      const obj = objectif(txt) || /^#\s+(.*)$/m.exec(txt)?.[1] || '';
       const touched = list(meta.files_modified); const p = rel(path.join(dir, pf));
       file({ p, n: id, name: `${pid} — ${clip(obj.split('\n').find((l) => l.trim()) || '', 70)}`, d: sentence(obj, 220), st: sums.has(pid) || ph.done ? 'done' : enCours.some((x) => x.id === pid || (Array.isArray(x.scope) && x.scope.includes(p))) ? 'active' : 'todo',
         foot: `vague ${meta.wave || '?'}${touched.length ? ` · ${touched.length} fichiers` : ''}`, note: touched.length ? `Fichiers touchés : ${touched.slice(0, 12).join(', ')}${touched.length > 12 ? ` … (+${touched.length - 12})` : ''}` : undefined, touched });
@@ -113,8 +117,8 @@ export function buildProjectGraph(root, { layout } = {}) {
 
   // backlog, graines, releases
   const bl = node({ id: 'backlog', parent: null, label: 'Backlog', kind: 'backlog', summary: 'Ce qui est consigné, différé ou investigué, hors des jalons.' });
-  for (const m of P.backlog.matchAll(/^## (.*)\n([\s\S]*?)(?=^## |(?![\s\S]))/gm)) {
-    const [title, status] = m[1].split(/\s+—\s+(?=[A-ZÉ]{4,}|consigné|mesuré)/);
+  for (const m of P.backlog.matchAll(/^## ([^\n]*)\n([\s\S]*?)(?=^## |(?![\s\S]))/gm)) {
+    const [title, status] = m[1].split(/(?<!\s)\s+—\s+(?=[A-ZÉ]{4,}|consigné|mesuré)/);
     file({ p: `.planning/BACKLOG.md#${title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 60)}`, n: bl, name: clip(title, 80), d: sentence(m[2].replace(/^>.*$/gm, ''), 220), st: /INVESTIGUÉ|mesuré/i.test(status || '') ? 'done' : 'todo', foot: clip(status || '', 40) });
   }
   const sd = node({ id: 'seeds', parent: null, label: 'Graines', kind: 'graine', summary: 'Idées de jalons futurs, avec leurs déclencheurs.' });
@@ -149,7 +153,10 @@ export function buildProjectGraph(root, { layout } = {}) {
         milestones: msList.map((m) => ({ key: m.key, st: m.st, done: m.done, total: m.ks.length, id: 'n:' + m.id })),
         next: active ? active.ks.filter((p) => !p.done).map((p) => ({ id: 'n:' + phId(p), label: `Phase ${p.n} · ${p.name}`, etat: p.avancement.etat })) : [],
         drift: { resume: drift.resume, regles: Object.values(drift.constats.reduce((o, c) => { (o[c.regle] ||= { regle: c.regle, niveau: c.niveau, message: c.message, fichier: c.fichier, n: 0 }).n++; return o; }, {})),
-          corrigeable: drift.constats.some((c) => c.apres !== undefined) },
+          corrigeable: drift.constats.some((c) => c.apres !== undefined),
+          // lignes non comprises (fichier:ligne + extrait), au plus 20 : le total est dans `nonComprisesN` (diagnostic du premier assemblage, P-PARS)
+          nonComprisesN: drift.constats.filter((c) => c.regle === 'ligne-non-comprise').length,
+          nonComprises: drift.constats.filter((c) => c.regle === 'ligne-non-comprise').slice(0, 20).map((c) => ({ fichier: c.fichier, ligne: c.ligne, extrait: c.avant })) },
         counts: { phases: phases.size, plans: files.filter((f) => f.p.endsWith('-PLAN.md')).length, reqs: reqs.size, reqsDone: [...reqs.values()].filter((r) => r.done).length, dags: P.dags.length } },
       layout: { forme: layout.forme, actif: layout.actif } },
     project: { name: `${P.projectName} — Projet`, summary: resume(state, curPhase, phases.size, files) },

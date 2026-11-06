@@ -1,0 +1,17 @@
+#!/bin/sh
+# faux `claude` — témoin de LANC-05, LANC-10 et LANC-12 (Phase 72, plan 72-12).
+# Ce programme remplace `claude` dans le PATH d'origine du shell du terminal : jamais une session Claude réelle.
+# Variable obligatoire : FAUX_CLAUDE_SORTIE = dossier (hors du lab) où il consigne ce qu'il a reçu, puis il sort 0.
+#   env   noms des variables d'environnement (jamais leurs valeurs), triés
+#   cwd   dossier courant physique
+#   argv  arguments séparés par un octet nul — écrit EN DERNIER et de façon atomique (fichier temporaire puis mv) :
+#         sa présence annonce que env et cwd sont déjà posés.
+if [ -z "${FAUX_CLAUDE_SORTIE:-}" ] || [ ! -d "$FAUX_CLAUDE_SORTIE" ]; then
+  echo "faux claude : FAUX_CLAUDE_SORTIE doit désigner un dossier existant" >&2
+  exit 3
+fi
+d="$FAUX_CLAUDE_SORTIE"
+env | sed 's/=.*//' | LC_ALL=C sort > "$d/env.tmp" && mv "$d/env.tmp" "$d/env"
+pwd -P > "$d/cwd.tmp" && mv "$d/cwd.tmp" "$d/cwd"
+printf '%s\0' "$@" > "$d/argv.tmp" && mv "$d/argv.tmp" "$d/argv"
+exit 0

@@ -15,7 +15,7 @@ Un plugin Claude Code de développement agentique piloté par la spec. Un agent 
 une équipe d'agents challenge, planifie, construit et prouve le travail, et des gates machine le
 vérifient. Rien n'est fait sans preuve, rien n'est mergé sans toi.
 
-[![Version](https://img.shields.io/badge/version-2.75.1-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.76.0-2563eb)](./VERSION)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#autres-runtimes)
 [![Modules](https://img.shields.io/badge/modules-19-16a34a)](#modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -64,7 +64,7 @@ projet recule. La dernière étape t'appartient.
 
 Un vert qui ne peut pas devenir rouge ne prouve rien. Les tests s'écrivent rouges d'abord, les
 gates `check-*.sh` tournent en CI, et le juge n'est jamais l'auteur. Le dépôt s'applique la même
-règle : 167 suites tournent à chaque push, et un job « lab frais » installe le socle dans un lab
+règle : 190 suites tournent à chaque push, et un job « lab frais » installe le socle dans un lab
 vierge qui doit passer ses propres gates sans intervention.
 
 → [Les gates machine](./manual/fr/07-sous-le-capot/les-gates-machine.md)
@@ -156,6 +156,7 @@ gate). Les trois dernières sont ci-dessous ; l'historique complet vit dans
 
 | Version | Date | Changement |
 |---------|------|------------|
+| `v2.76.0` | 2026-11-06 | **Cockpit : suivi du travail, terminal intégré, Git et lancement depuis les cartes (minor).** `cockpit` v1.4.0 : suivi du travail et onglet Équipe (Phase 69), mod `vf-signal` embarqué (68), finitions de l'interface en français (70), terminal intégré derrière `--terminal` (71), grille d'espacement fermée et jeu « pastel » (71.5), lancer du travail depuis les cartes en double geste (72), tiroir et en-tête Git en lecture seule (78), et un onglet Projet qui lit des formats de planning variés (`**Depends on :**`, `Phase N — nom`, `[X]`, CRLF) et signale les lignes non comprises ; `PATH` des enfants assaini, phases menées en worktree vues, gardien du PTY, Safari. `conductor` v1.53.2 : un verrou de driver par phase, `/vf-update` propose les modules nouveaux du catalogue, `check-agents.sh` exige `TaskStop` (plus de worker orphelin) ; `dev-orchestrator` v2.31.1 et les autres modules reçoivent le patch `TaskStop`. Prend effet sur un poste après `/vf-update`. **190 suites.** |
 | `v2.75.1` | 2026-11-03 | **ROADMAP à la française lu par le cockpit (patch).** L'onglet Projet lit `Phase N : nom` (espace avant les deux-points, insécable comprise), `## Jalons`, `**Objectif**`, `**Dépend de**` ; `Depends on` s'arrête au champ suivant de la même ligne. Nouveau `vf-cockpit-drift.mjs` : dérive de format mesurée avant la lecture, affichée dans le panneau d'ensemble, avec un correctif unifié vers le gabarit GSD jamais écrit sur disque (`cockpit` v1.0.1). **142 suites.** |
 | `v2.75.0` | 2026-11-03 | **Cockpit (minor).** Nouveau module `cockpit` v1.0.0 : cockpit web local du lab, en lecture seule sur `127.0.0.1`, en français et en direct — onglet Projet (plan du lab : jalons, phases, plans, exigences, missions, qui est au travail) et onglet Code, questions locales ou à l'agent `claude -p` confiné ; ouvert par `/vf-cockpit`. `dag.sh save()` écrit désormais de façon atomique (`conductor` v1.52.1, CKPT-11). Le test `CPV-GSD-IDS` est compatible gsd-core 1.20.0 (PR #190). Prend effet sur un poste après `/vf-update`. **142 suites.** |
 | `v2.74.0` | 2026-10-29 | **Gate d'architecture et phases proposées (minor).** `check-phase-validation.sh`, `check-architecture.sh` et `vf-validation.sh` (`conductor` v1.52.0) : une phase ajoutée hors du poste `solo` naît « proposée » jusqu'à la validation d'un dev, `vf-coder` et `vf-auto` refusent une étape proposée (seule une étape absente du ROADMAP laisse continuer, tout autre résultat indéterminé arrête), le head demande une `ARCHITECTURE.md` validée avant le découpage en phases. `dev-orchestrator` v2.30.0, `planning-core` v2.10.0, `product-team-bundle` v1.1.0 (worker `vf-product-architect`). Phase 61, deux humains sur un même dépôt : `vf-divergence-hook.sh` arme le filet de divergence (hooks `post-merge` et `post-rewrite`, jamais en remplacement d'un hook de l'utilisateur, journal dans le dossier git) aux postes `product` et `dev`, l'installeur l'arme, le re-pointe et le retire, et les entrées de registre peuvent porter un champ `Role` (`consolidator` v1.12.0, `reference` v2.6.0). Prend effet sur un poste après `/vf-update`. **123 suites.** |

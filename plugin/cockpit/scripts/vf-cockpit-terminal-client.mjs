@@ -2,13 +2,15 @@
 // Export : clientTerminal(cfg) -> rien. cfg = { origineP, theme } : configuration non sensible, posée par pageTerminal.
 // Sérialisé par .toString() dans un <script> sans attribut : aucune référence à un identifiant du module, tout est local à la fonction.
 // Les commentaires placés DANS la fonction sont servis tels quels : ils ne citent aucun motif que la suite de test cherche. Rien d'autre ici n'est servi.
-// Flux : amorçage (dans le cadre : fragment effacé avant l'échange, secret dans le stockage du cadre, rechargement sans fragment) ou terminal (flux fetch, POST d'entrée et de taille).
+// Flux : amorçage (dans le cadre : fragment effacé avant l'échange, secret dans le stockage du cadre, rechargement sans fragment) ou terminal (flux fetch, POST d'entrée et de taille). 72-08 : sondage de GET /proposition dès l'initialisation (avant visible()), écriture par POST /lancer { id, mode[, chat:true] } (72-13 : chat seulement si la case est cochée) sans le texte de la ligne ni octet au terminal, message fixe proposition vers P. 72-16 (P72-D-20) : le mode présélectionné est celui que Q sert dans la proposition (mode_retenu) ; le stockage du navigateur ne porte plus le mode.
 export function clientTerminal(cfg) {
   const MESSAGES = Object.freeze({
     ready: 'ready', connecte: 'etat:connecte', reconnexion: 'etat:reconnexion', termine: 'etat:termine',
     refuse: 'etat:refuse', expire: 'etat:expire', arrete: 'etat:arrete', toggle: 'toggle',
+    proposition: 'proposition',
   });
   const CLE_SECRET = 'vf.terminal.secret', CLE_ONGLET = 'vf.terminal.onglet', CLE_FIN = 'vf.terminal.fin';
+  const MODES = Object.freeze(['default', 'acceptEdits', 'plan', 'herite']), PROPOSITION_MS = 1000;
   const RACCOURCI = Object.freeze({ code: 'Space', ctrl: true, shift: true });
   const ATTENTES = [500, 1000, 2000, 4000], LIMITE_MS = 30000, POLICES_MS = 2500, REJEU_SILENCE_MS = 150, REJEU_BORNE_MS = 3000;
   const vue = window.vfTermVue;
@@ -50,6 +52,43 @@ export function clientTerminal(cfg) {
   emettre('ready');
   if (!localStorage.getItem(CLE_SECRET)) { expire(); return; }
   const entetes = () => ({ 'X-VF-Terminal': localStorage.getItem(CLE_SECRET) || '', 'X-VF-Onglet': onglet() });
+  const modeServi = (p) => { // la présélection vient de Q (valeur servie), relue contre la liste fermée ; rien n'est gardé dans le navigateur
+    const v = p.mode_retenu; // garde:mode-lecture
+    return MODES.indexOf(v) >= 0 ? v : 'default'; // garde:mode-relu
+  };
+  const forme = (j) => {
+    const s = (v, max) => typeof v === 'string' && v.length <= max, ent = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi, liste = (v) => Array.isArray(v) && v.length <= 20 && v.every((c) => s(c, 40));
+    if (!j || typeof j !== 'object' || j.etat !== 'en-attente' || typeof j.id !== 'string' || !/^[A-Za-z0-9_-]{8,64}$/.test(j.id) || !s(j.verbe, 40) || !s(j.intention, 200) || !s(j.phase, 20) || !(j.ws === null || s(j.ws, 40))) return null;
+    if (!j.lignes || typeof j.lignes !== 'object' || MODES.some((m) => typeof j.lignes[m] !== 'string' || !/^[\x20-\x7e]{1,400}$/.test(j.lignes[m])) || !liste(j.bloquants) || !liste(j.avertissements) || !ent(j.arme_apres_ms, 0, 10000) || !ent(j.expire_ms, 1, 600000)) return null;
+    if ((j.chat !== undefined || j.lignes_chat !== undefined) && (j.chat !== true || !j.lignes_chat || typeof j.lignes_chat !== 'object' || MODES.some((m) => typeof j.lignes_chat[m] !== 'string' || !/^[\x20-\x7e]{1,400}$/.test(j.lignes_chat[m])))) return null; // 72-13 : chat (vrai) et lignes_chat vont ensemble, sinon « aucune »
+    return { chat: j.chat === true ? true : undefined, lignesChat: j.chat === true ? Object.fromEntries(MODES.map((m) => [m, j.lignes_chat[m]])) : undefined, id: j.id, verbe: j.verbe, intention: j.intention, phase: j.phase, ws: j.ws, lignes: Object.fromEntries(MODES.map((m) => [m, j.lignes[m]])), bloquants: j.bloquants.slice(), avertissements: j.avertissements.slice(), arme_apres_ms: j.arme_apres_ms, expire_ms: j.expire_ms }; };
+  let attente = null, courante = null, fermee = null, pret = false, terminal = null, enVol = false;
+  const afficher = () => { if (!pret || attente === null || courante === attente.id) return; courante = attente.id; vue.proposition(Object.assign({}, attente), { lancer, annuler }); };
+  const lire = async () => {
+    if (enVol) return; enVol = true; try {
+      const r = await fetch('/proposition', { headers: entetes(), cache: 'no-store' }); if (!r.ok) return;
+      const j = await r.json().catch(() => null), p = forme(j);
+      if (!p) { attente = null; if (courante !== null) { courante = null; vue.proposition(null); } return; } // garde:aucune
+      if (p.id === fermee) return; // garde:fermee
+      const nouveau = attente === null || p.id !== attente.id; attente = Object.assign(p, { modeInitial: modeServi(j) });
+      if (nouveau) emettre('proposition'); // garde:emission
+      afficher(); } catch (e) { void e; } finally { enVol = false; }
+  };
+  const lancer = async (mode, avecChat) => {
+    if (courante === null) return 'absente'; if (MODES.indexOf(mode) < 0) return 'refus';
+    const id = courante; let r; try { r = await fetch('/lancer', { method: 'POST', headers: Object.assign(entetes(), { 'Content-Type': 'application/json' }),
+      body: JSON.stringify(Object.assign({ id: courante, mode }, avecChat === true ? { chat: true } : {})), cache: 'no-store' }); } catch (e) { return 'reseau'; } // garde:corps-lancer
+    if (r.status === 204 || r.status === 404) { fermee = id; if (courante === id) { courante = null; attente = null; } }
+    if (r.status !== 204) return r.status === 404 ? 'absente' : { 409: 'occupe', 425: 'attendre', 410: 'sans-session' }[r.status] || 'refus';
+    if (terminal) terminal.focus(); // garde:apres-usage
+    return 'ok';
+  };
+  const annuler = () => {
+    const id = courante; fermee = id; courante = null; attente = null;
+    if (id) fetch('/annuler', { method: 'POST', headers: Object.assign(entetes(), { 'Content-Type': 'application/json' }), body: JSON.stringify({ id }), cache: 'no-store' }).catch(() => {});
+    if (terminal) terminal.focus();
+  };
+  lire(); setInterval(lire, PROPOSITION_MS); // garde:sondage-precoce
   // la grille est mesurée à l'ouverture : le terminal n'est créé qu'une fois la police prête (repli borné), faute de quoi la cellule est mesurée en police de secours et rien ne la remesure
   const polices = Promise.race([
     Promise.all([document.fonts.load('13px "JetBrains Mono"'), document.fonts.load('13px "JetBrains Mono"', '\u2500\u2502\u256d'), document.fonts.ready]).catch(() => {}),
@@ -97,7 +136,7 @@ export function clientTerminal(cfg) {
       if (e.inputType.indexOf('insertFrom') === 0 || (e.inputType === 'insertReplacementText') || SUR.test(t) || vue.invisible(t)) { prendre(e); soumettre(t); }
     }, true);
     document.addEventListener('keydown', (e) => { if (propose !== null && e.key === 'Escape') { prendre(e); abandonner(); } }, true);
-    term.focus(); window.addEventListener('focus', () => term.focus());
+    if (!document.hasFocus || document.hasFocus()) term.focus(); window.addEventListener('focus', () => term.focus()); // F1 : un cadre qui n'a pas le focus (proposition, rechargement) ne le prend jamais
     // la barre de défilement n'apparaît qu'au survol (feuille) ou pendant un défilement : molette ou clavier la montrent une seconde
     let defile = 0;
     const montrerBarre = () => { zone.classList.add('vf-q-defile'); clearTimeout(defile); defile = setTimeout(() => zone.classList.remove('vf-q-defile'), 1000); };
@@ -230,6 +269,7 @@ export function clientTerminal(cfg) {
       }
       eteint = false;
     };
+    pret = true; terminal = term; afficher(); // garde:pret
     ajuster(); const fin = finRetenue();
     if (fin) { vue.bandeau(fin.type, fin.detail, relancer); emettre('termine'); } else boucle();
   };
