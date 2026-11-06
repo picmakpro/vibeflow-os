@@ -13,8 +13,7 @@
 #tour { position: fixed; left: var(--edge); bottom: 76px; /* dérivé : 16 + 42 de zoom + 18 ; la visite se place en JS (repli) */ width: min(360px, calc(100vw - 2 * var(--edge))); max-height: calc(100vh - 170px); display: flex; flex-direction: column; padding: var(--inset-panel); border-radius: var(--r-panel); z-index: 6; animation: tourIn .4s var(--ease); }
 #tour.right { left: auto; right: var(--edge); }
 #tour .tb { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-.tour-target { position: fixed; z-index: 5; pointer-events: none; } /* repère de cadrage : sa boîte sert au placement de la carte, rien n'est dessiné autour d'un bloc de la page (PU-G-087, pas de halo) */
-.tour-target.lit { border-radius: 999px; background: rgba(var(--ink), .1); } /* un bouton de l'en-tête présenté : une surbrillance neutre, ni contour ni teinte (PU-G-089) */
+.tour-target { position: fixed; z-index: 5; pointer-events: none; } /* repère de cadrage : sa boîte sert au placement de la carte, rien n'est dessiné autour d'un bloc de la page (PU-G-087, pas de halo) */ .tour-target.lit { border-radius: 999px; background: rgba(var(--ink), .1); } /* un bouton de l'en-tête présenté : une surbrillance neutre, ni contour ni teinte (PU-G-089) */
 #tour[hidden] { display: none; }
 #tour .tk { font-size: 12px; color: var(--text-3); margin-bottom: var(--sp-4); display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-6); align-items: center; padding-right: var(--sp-24); }
 #tour .tk span { white-space: nowrap; } /* « Étape 1 sur 4 » ne se coupe jamais en trois lignes (PU-G-090) */
@@ -238,6 +237,7 @@
     // still covering something: fold the title description and search again; kept only if that covers less, else put back
     if (!folded && best.covered > 0 && fold()) { const before = best.covered; place(true); if (lastPlace.best.covered >= before) { unfold(); place(true); } }
   }
+  function cedeAuZoom() { const z = document.getElementById('zoom'), c = card.getBoundingClientRect(), b = z && z.getBoundingClientRect(); if (b && b.width && b.bottom > c.top && b.right > c.left && b.left < c.right) card.style.maxHeight = Math.max(120, c.height - (b.bottom - c.top) - 4) + 'px'; } // téléphone : le zoom monte avec la feuille, mais d'un cran en retard : la feuille lui cède la place
   window.addEventListener('resize', () => { if (active()) place(); });
   function show(i) {
     at = i;
@@ -246,7 +246,7 @@
     go(steps[at]);
     place();
     // the page lays itself out after the step and on its own (title block, zoom stack, Ask notices): while the tour is open, place again whenever a surface has moved
-    if (!placeTimer) placeTimer = setInterval(() => { if (active() && sigOf(obstacles(visible)) !== placedSig) place(); }, 200);
+    if (!placeTimer) placeTimer = setInterval(() => { if (!active()) return; if (sigOf(obstacles(visible)) !== placedSig) place(); else if (innerWidth < 701) cedeAuZoom(); }, 200);
     // the opening fit is only for a first step on the overview itself: after a card step it would undo the centring (a page already seen settles faster, so the card was measured before the fit)
     if (at === 0 && (!steps[0].ref || steps[0].ref === 'root')) setTimeout(() => { if (at === 0) SC.fit(true); }, 450);
   }
