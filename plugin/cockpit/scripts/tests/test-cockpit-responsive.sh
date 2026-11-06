@@ -35,8 +35,12 @@ import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); cons
 if (!m) { console.log('mesure absente : ' + (j.erreur || process.argv[2])); process.exit(0); }
 const bas = /bas/.test(process.argv[3] || ''); // sous 1 000 px le panneau est un tiroir fermé : seul l'en-tête et la barre de question sont mesurés
 const equipe = /equipe/.test(process.argv[3] || ''); // 70-12 : l'onglet Équipe n'a pas de barre de question (« equipe » ou « equipe-bas »)
+// P78-D-39 (amende P70-D-16, arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : seul le drapeau « git » (lab avec Git, donc ouvreur posé) abaisse le plancher de la recherche
+// à 152 px, et seulement de 1 000 à 1 279 px (dernière largeur de la clé : « 1024 », « resize:1920:1024 »). Sans drapeau, ou hors de cette plage, le minimum reste 200 px, à l'identique.
+const larg = Number((String(process.argv[2]).match(/(\d+)$/) || [])[1]), git = /git/.test(process.argv[3] || '');
+const garde = (x) => { const r = /^recherche : (\d+) px, minimum 200$/.exec(x); return !(git && larg >= 1000 && larg <= 1279 && r && Number(r[1]) >= 152); };
 const plein = m.m.enteteElements >= (bas ? 3 : 6) && (bas || /#panel/.test(m.m.surfaces || '')) && (equipe || /#ask/.test(m.m.surfaces || ''));
-console.log(!plein ? 'mesure vide : ' + JSON.stringify(m.m) : m.v.length ? m.v.slice(0, 4).join(' | ') : 'aucune');
+console.log(!plein ? 'mesure vide : ' + JSON.stringify(m.m) : m.v.filter(garde).length ? m.v.filter(garde).slice(0, 4).join(' | ') : 'aucune');
 JS
 # faux verrou de driver (HOME jetable) : un propriétaire au nom long, comme en vraie mission
 cat > "$HOME/.claude/scripts/driver-lock.sh" <<'SH'
@@ -53,7 +57,7 @@ agent_actif() { # agent_actif <lab> : une session Claude Code récente de ce lab
     printf '{"type":"user","cwd":"%s","sessionId":"%s","gitBranch":"main","version":"2.1.317","timestamp":"%s","message":{"content":"salut"}}\n{"type":"assistant","cwd":"%s","sessionId":"%s","gitBranch":"main","version":"2.1.317","timestamp":"%s","message":{"content":[{"type":"text","text":"bonjour"}]}}\n' "$L" "$SID" "$TS" "$L" "$SID" "$TS" > "$D/$SID.jsonl"
     ( while kill -0 $$ 2>/dev/null; do touch "$D/$SID.jsonl"; sleep 10; done ) </dev/null >/dev/null 2>&1 &
 }
-mklab() { # mklab <dir> [sans-agent] : lab GSD sans STATE.md, deux phases, un DAG de mission avec un nœud en cours, une session active (sauf sans-agent)
+mklab() { # mklab <dir> [sans-agent] [sans-git] : lab GSD sans STATE.md, deux phases, un DAG de mission avec un nœud en cours, une session active (sauf sans-agent)
   local L="$1" B="$1/.planning"; mkdir -p "$L/src" "$B/phases/01-socle" "$B/phases/02-suite" "$B/missions"
   printf 'export const u = () => 1;\n' > "$L/src/util.js"
   printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n- [ ] **Phase 2: Suite** - la suite\n' > "$B/ROADMAP.md"
@@ -61,7 +65,7 @@ mklab() { # mklab <dir> [sans-agent] : lab GSD sans STATE.md, deux phases, un DA
   printf '<objective>Faire la suite</objective>\n' > "$B/phases/02-suite/02-01-PLAN.md"
   printf '{"nodes":[{"id":"a","step":"première étape","stage":"","deps":[],"scope":["src/**"],"status":"done"},{"id":"b","step":"seconde étape","stage":"","deps":["a"],"scope":["src/**"],"status":"running"}]}\n' > "$B/missions/demo.dag.json"
   [ "${2:-}" = sans-agent ] || agent_actif "$L"
-  git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
+  [ "${3:-}" = sans-git ] || { git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init; } # sans-git (P78-D-39) : un dossier qui n'est pas un dépôt
   node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build-$(basename "$L").out" 2>&1 || cat "$WORK/build-$(basename "$L").out"
 }
 # le serveur reçoit les scripts par un lien nommé autrement que « scripts » : pas de conductor voisin, le faux driver-lock.sh de HOME répond (v1.1.1 : le conductor voisin passe avant)
@@ -81,6 +85,7 @@ LARGES="1024,1280,1440,1920,2560"
 INJ_CODE="(() => { const SC = window.VibeFlow; SC.addHeaderButton({ id: 'btn-recent', label: 'Recent work', icon: 'recent', title: 'What was just worked on, on one board', onClick() {} }); SC.addHeaderButton({ id: 'screens-btn', label: 'Screens', icon: 'ui', title: 'Pick a screen of the app', onClick() {} }); return true; })()"
 
 LC="$WORK/lab-court"; mklab "$LC"
+LS="$WORK/lab-sans-git"; mklab "$LS" "" sans-git # P78-D-39 : un lab sans Git à 1 024 px
 LL="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-pour-tester"; mklab "$LL"
 echo "=== R1, R2 — chargement et redimensionnement à chaud : deux onglets, deux labs ==="
 # P70-D-18 : les deux labs sont servis d'emblée et leurs six mesures (R1/R2 : quatre, R3 : deux) partent en même temps, un Chrome chacune ; les assertions se lisent ensuite, dans l'ordre d'origine
@@ -101,9 +106,9 @@ for nom in court long; do
   assert_eq "0 — serveur du lab « $nom » démarré" "$([ "$P" -gt 0 ] && echo oui || echo non)" "oui"
   for onglet in index project; do
     R="$(cat "$WORK/mes-$nom-$onglet.json")"
-    for w in ${LARGES//,/ }; do assert_eq "R1 — $nom / $onglet / $w px : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w")" "aucune"; done
-    assert_eq "R2 — $nom / $onglet : 1 920 -> 1 024 à chaud" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "resize:1920:1024")" "aucune"
-    assert_eq "R2 — $nom / $onglet : 1 024 -> 1 920 à chaud (retour)" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "resize:1024:1920")" "aucune"
+    for w in ${LARGES//,/ }; do assert_eq "R1 — $nom / $onglet / $w px : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w" git)" "aucune"; done
+    assert_eq "R2 — $nom / $onglet : 1 920 -> 1 024 à chaud" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "resize:1920:1024" git)" "aucune"
+    assert_eq "R2 — $nom / $onglet : 1 024 -> 1 920 à chaud (retour)" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "resize:1024:1920" git)" "aucune"
   done
   if [ "$nom" = court ]; then
     echo "=== R3 — en dessous de 1 024 px : rendu non cassé (800 et 390 px) ==="
@@ -324,7 +329,7 @@ for nom in court long; do
   for onglet in index project; do
     R="$(cat "$WORK/r8-$nom-$onglet.json")"
     assert_eq "R8.0 — $nom / $onglet : le Chrome du témoin n'a bien aucun pointeur" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.mesures["1024"].m.pointeur')" "none"
-    for w in 1024 1280 1440; do assert_eq "R8 — $nom / $onglet / $w px sans pointeur : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w")" "aucune"; done
+    for w in 1024 1280 1440; do assert_eq "R8 — $nom / $onglet / $w px sans pointeur : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "$w" git)" "aucune"; done
   done
 done
 SRV_PID=$PID_court; unsrv; SRV_PID=$PID_long; unsrv
@@ -341,9 +346,65 @@ done
 wait "${MPIDS[@]}"
 for onglet in index project; do
   R="$(cat "$WORK/r9-$onglet.json")"
-  assert_eq "R9 — long / $onglet / 1 024 px, texte élargi : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "1024")" "aucune"
+  assert_eq "R9 — long / $onglet / 1 024 px, texte élargi : aucune superposition, aucun rognage" "$(printf '%s' "$R" | node "$AUX/viol.mjs" "1024" git)" "aucune"
 done
 unsrv
+
+# P78-D-39 (amende P70-D-16, arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : de 1 000 à 1 279 px ET seulement quand Git est présent (ouvreur posé), le plancher de la recherche
+# est de 152 px et son invite devient « Chercher… » ; partout ailleurs (1 280 px et plus, ou lab sans Git) les 200 px et l'invite d'origine restent EXIGÉS, à l'identique de R1.
+echo "=== D39 — plancher de la recherche : 152 px de 1 000 à 1 279 px avec Git, 200 px partout ailleurs et sans Git ==="
+EXPR39='(() => { const hc = document.querySelector("header .hc"), sb = document.querySelector("#search-btn"), st = sb.querySelector(".st"); return { git: !!document.querySelector("#vf-git-ouvreur"), plancher: getComputedStyle(hc).minWidth, recherche: Math.round(sb.getBoundingClientRect().width), invite: getComputedStyle(sb, "::after").content, stVisible: getComputedStyle(st).display !== "none", texte: st.textContent }; })()'
+mes39() { CDP_VIEWPORT="$2x800" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 600 "$EXPR39" "http://127.0.0.1:$1/index.html"; } # mes39 <port> <largeur>
+v39() { printf '%s' "$1" | node "$AUX/ev.mjs" "$2"; }
+srv "$LC/.vibeflow/cockpit"; P39g=$SRV_PORT; PID39g=$SRV_PID
+srv "$LS/.vibeflow/cockpit"; P39s=$SRV_PORT; PID39s=$SRV_PID
+for w in 1000 1024 1279; do
+  X="$(mes39 $P39g $w)"
+  assert_eq "D39.1 — avec Git / $w px : l'ouvreur est posé et le plancher de la recherche est 152 px" "$(v39 "$X" 'j.resultats[0].valeur.git + "/" + j.resultats[0].valeur.plancher')" "true/152px"
+  assert_eq "D39.2 — avec Git / $w px : l'invite courte « Chercher… » remplace l'invite d'origine" "$(v39 "$X" '(j.resultats[0].valeur.invite) + "/" + j.resultats[0].valeur.stVisible')" '"Chercher…"/false'
+  assert_eq "D39.3 — avec Git / $w px : la recherche garde au moins 152 px" "$(v39 "$X" 'j.resultats[0].valeur.recherche >= 152')" "true"
+done
+for w in 1280 1440; do
+  X="$(mes39 $P39g $w)"
+  assert_eq "D39.4 — avec Git / $w px : plancher de 200 px, invite d'origine" "$(v39 "$X" 'j.resultats[0].valeur.plancher + "/" + j.resultats[0].valeur.invite + "/" + j.resultats[0].valeur.stVisible')" "200px/none/true"
+  assert_eq "D39.4b — avec Git / $w px : la recherche garde au moins 200 px" "$(v39 "$X" 'j.resultats[0].valeur.recherche >= 200')" "true"
+done
+for w in 1000 1024 1279 1280; do
+  X="$(mes39 $P39s $w)"
+  assert_eq "D39.5 — SANS Git / $w px : aucun ouvreur, plancher de 200 px, invite d'origine entière" "$(v39 "$X" 'j.resultats[0].valeur.git + "/" + j.resultats[0].valeur.plancher + "/" + j.resultats[0].valeur.invite + "/" + j.resultats[0].valeur.stVisible')" "false/200px/none/true"
+  assert_eq "D39.5b — SANS Git / $w px : la recherche garde au moins 200 px" "$(v39 "$X" 'j.resultats[0].valeur.recherche >= 200')" "true"
+done
+MPIDS=()
+for onglet in index project; do
+  inj=""; [ "$onglet" = index ] && inj="$INJ_CODE"
+  RESP_INJECT="$inj" mes "http://127.0.0.1:$P39s/$onglet.html" 1024,1280 - ${SHOTS:+"$SHOTS/sansgit-$onglet"} > "$WORK/d39-sg-$onglet.json" & MPIDS+=($!)
+done
+wait "${MPIDS[@]}"
+for onglet in index project; do
+  for w in 1024 1280; do assert_eq "D39.6 — lab SANS Git / $onglet / $w px : aucune superposition, aucun rognage, recherche >= 200 px (aucun drapeau : borne d'origine)" "$(printf '%s' "$(cat "$WORK/d39-sg-$onglet.json")" | node "$AUX/viol.mjs" "$w")" "aucune"; done
+done
+SRV_PID=$PID39g; unsrv; SRV_PID=$PID39s; unsrv
+# mutants : chacun doit rougir un témoin de SA propre règle (copie du lab construit, une chaîne remplacée, échec si la chaîne est introuvable)
+mut39() { # mut39 <labSource> <dest> <ancien> <nouveau>
+  mkdir -p "$2/.planning/missions" "$2/.vibeflow"; cp -R "$1/.vibeflow/cockpit" "$2/.vibeflow/cockpit"; cp "$1/.planning/missions/demo.dag.json" "$2/.planning/missions/"; agent_actif "$2"
+  M39_A="$3" M39_B="$4" node -e "
+const fs=require('fs');for(const f of ['index.html','project.html']){const p='$2/.vibeflow/cockpit/'+f;const h=fs.readFileSync(p,'utf8');
+const n=h.split(process.env.M39_A).join(process.env.M39_B);if(n===h){console.error('mutant : chaîne introuvable');process.exit(1)}fs.writeFileSync(p,n)}"
+}
+# mutant 1 : le plancher de 152 px s'applique aussi sans Git (le défaut de c743e356 : une règle posée avant la sortie « pas de dépôt » de 76-vf-git-entete.js, sans clé sur l'ouvreur)
+if mut39 "$LS" "$WORK/lab-mut39a" "if (!V || V.etat === 'absent' || !V.depot) return; // P78-D-11" "document.head.appendChild(Object.assign(document.createElement('style'), { textContent: '@media (min-width: 1000px) and (max-width: 1279px) and (not (pointer: coarse)) { header .hc { min-width: 152px; } }' })); if (!V || V.etat === 'absent' || !V.depot) return; // P78-D-11"; then
+  srv "$WORK/lab-mut39a/.vibeflow/cockpit"; X="$(mes39 $SRV_PORT 1024)"; unsrv
+  assert_eq "D39m1a — mutant « plancher de 152 px aussi SANS Git » : le plancher mesuré à 1 024 px sans Git est 152 px" "$(v39 "$X" 'j.resultats[0].valeur.plancher')" "152px"
+  assert_eq "D39m1 — le même mutant : le témoin D39.5 (sans Git, 1 024 px) rougit" "$([ "$(v39 "$X" 'j.resultats[0].valeur.git + "/" + j.resultats[0].valeur.plancher + "/" + j.resultats[0].valeur.invite + "/" + j.resultats[0].valeur.stVisible')" != "false/200px/none/true" ] && echo rouge || echo vert)" "rouge"
+else FAIL=$((FAIL+1)); echo "  ❌ FAIL — D39m1 : mutant non construit"; fi
+# mutant 2 : le plancher de 152 px s'applique aussi à 1 280 px
+if mut39 "$LC" "$WORK/lab-mut39b" '(max-width: 1279px) and (not (pointer: coarse)) {
+      header[data-vf-git] .hc' '(max-width: 1280px) and (not (pointer: coarse)) {
+      header[data-vf-git] .hc'; then
+  srv "$WORK/lab-mut39b/.vibeflow/cockpit"; X="$(mes39 $SRV_PORT 1280)"; unsrv
+  assert_eq "D39m2a — mutant « plancher de 152 px aussi à 1 280 px » : le plancher mesuré à 1 280 px est 152 px" "$(v39 "$X" 'j.resultats[0].valeur.plancher')" "152px"
+  assert_eq "D39m2 — le même mutant : le témoin D39.4 (avec Git, 1 280 px) rougit" "$([ "$(v39 "$X" 'j.resultats[0].valeur.plancher + "/" + j.resultats[0].valeur.invite + "/" + j.resultats[0].valeur.stVisible')" != "200px/none/true" ] && echo rouge || echo vert)" "rouge"
+else FAIL=$((FAIL+1)); echo "  ❌ FAIL — D39m2 : mutant non construit"; fi
 
 echo "=== R7 — chaque bouton d'en-tête a un nom accessible et une infobulle ; badge « au travail » ==="
 srv "$LC/.vibeflow/cockpit"; PC7=$SRV_PORT

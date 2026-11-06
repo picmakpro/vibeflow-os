@@ -119,3 +119,20 @@ Cause (sondée par un crochet sur `state.t`, `freeArea()` et la hauteur de `#con
 Expérience 1 (rouge) : `c743e356`, sonde `78-debug-probe.mjs` : `fits` montre le fit de `render` à `ctx` 142 (`a.y` 202, y 244,2) puis le fit de fermeture depuis la racine à `ctx` 77 (`a.y` 149, y 217,7).
 Expérience 2 (cause seule changée) : `c743e356`, aucune modification de code, seulement `#context{min-height:142px}` injecté (la hauteur du bloc ne change plus à la réécriture) : O6.11 vert, y 244 / 244.
 Correctif (76) : `ecrireEtRecadrer` — si la vue était exactement le cadrage de l'ancienne zone libre et que le haut de la zone libre bouge, `SC.fit(false)`. Vert : y 218 / 218 à 1440 px, 314 / 314 à 390 px.
+
+## Correction D-39 (mgr78-reprise, 2026-11-06) — plancher de la recherche à 152 px, de 1 000 à 1 279 px, avec Git seulement
+
+P78-D-39 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 : « Recherche à 152 px (Recommandé) »), amende P70-D-16.
+
+**Rouge avant (code de `c743e356`, 76 non modifié).**
+- Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-responsive.sh` avec la suite AVANT correction (`git show HEAD:…/test-cockpit-responsive.sh`). Assertion : `viol.mjs` à 1 024 px, onglet Code, attendu `aucune`. Obtenu, 7 rouges sur 291 : `recherche : 174 px, minimum 200` pour R1 (court et long, 1 024 px), R2 (court et long, 1 920 -> 1 024), R8 (court et long, 1 024 px sans pointeur), R9 (long, 1 024 px, texte élargi). Journal : `78-d39-resp-ancien-rouge.log`.
+- Suite NOUVELLE sur le code de `c743e356` : 313 PASS / 5 FAIL. D39.2 rouge aux trois largeurs (1 000, 1 024, 1 279 px, avec Git) : attendu `"Chercher…"/false`, obtenu `none/true` (l'invite d'origine reste affichée) ; D39m1 et D39m2 « mutant non construit : chaîne introuvable » (le code n'a pas encore la clé `header[data-vf-git]`). Les témoins D39.1, D39.3, D39.4, D39.5, D39.6 sont déjà verts : le plancher de 152 px existait (`c743e356`), ce que la correction ajoute est sa clé sur l'ouvreur, l'invite courte et la borne conditionnelle des tests. Journal : `78-d39-resp-rouge.log`.
+
+**Vert après.** `78-d39-resp-vert2.log` : 320 PASS / 0 FAIL. R1, R2, R8, R9 : borne de 152 px SEULEMENT via le drapeau `git` de `viol.mjs` (lab avec dépôt, largeur de 1 000 à 1 279 px) ; l'assertion à 200 px est conservée à l'identique partout ailleurs (1 280 px et plus, R3, labs sans drapeau) et D39.5, D39.6 l'exigent explicitement pour un lab SANS Git à 1 000, 1 024, 1 279 et 1 280 px (plancher calculé `200px`, recherche mesurée ≥ 200, aucune violation de R1 à 1 024 et 1 280 px, onglets Code et Projet).
+
+**Mutants (chacun avec la trace de SON rouge).**
+- M1 « plancher de 152 px aussi sans Git » : dans une copie du lab sans Git, une règle `header .hc { min-width: 152px; }` posée avant la sortie « pas de dépôt » de 76 (le défaut de `c743e356`). D39m1a : plancher calculé `152px` (le mutant est vivant) ; D39m1 : le témoin D39.5 (sans Git, 1 024 px, attendu `false/200px/none/true`) rougit. Note de mesure : la recherche d'un lab sans Git est naturellement plus large que 200 px à 1 024 px (pas d'icône), donc la mesure de largeur seule ne rougit pas ; le témoin qui rougit est le plancher calculé.
+- M2 « plancher de 152 px aussi à 1 280 px » : dans une copie du lab avec Git, la borne haute de la requête passe de 1 279 à 1 280 px. D39m2a : plancher calculé `152px` à 1 280 px ; D39m2 : le témoin D39.4 (attendu `200px/none/true`) rougit.
+- Une première version de M1 (remplacer `header[data-vf-git] .hc` par `header .hc` dans le sous-arbre sans Git) restait verte : la règle n'est jamais injectée sans dépôt (76 sort avant le style). Elle ne comptait pas ; remplacée par la forme ci-dessus.
+
+Captures : `78-d39-entete-1024-git.png` (« Chercher… », icône Git, aucun bouton hors fenêtre) et `78-d39-entete-1024-sansgit.png` (invite d'origine, 200 px).

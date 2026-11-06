@@ -95,7 +95,14 @@
     /* l'icône ajoute 48 px à droite (44 px et l'écart) ; comme pour le bouton Thème (viewer.html), la zone de recherche en cède autant, pour que l'en-tête passe sur deux rangées à la même largeur avec et sans git :
        rangée qui se replie (≤ 999 px, ou tactile ≤ 1279 px) = sa base flex ; ligne unique de bureau (1000 à 1279 px, 01-vf-responsive.js : plancher de 200 px) = son plancher, 152 px */
     @media (min-width: 701px) and (max-width: 999px), (min-width: 701px) and (max-width: 1279px) and (pointer: coarse) { .hc { flex-basis: calc(min(460px, 24vw) - 48px); } }
-    @media (min-width: 1000px) and (max-width: 1279px) and (not (pointer: coarse)) { header .hc { min-width: 152px; } }
+    /* P78-D-39 (amende P70-D-16, arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : 152 px de plancher et une invite courte, de 1000 à 1279 px et seulement quand l'ouvreur est posé (header[data-vf-git]) ;
+       l'invite d'origine est masquée, jamais réécrite : hors de la plage ou sans Git, la requête ne s'applique plus et l'original (et ses 200 px) reviennent */
+    @media (min-width: 1000px) and (max-width: 1279px) and (not (pointer: coarse)) {
+      header[data-vf-git] .hc { min-width: 152px; }
+      header[data-vf-git] #search-btn[data-vf-invite] .st { display: none; }
+      header[data-vf-git] #search-btn[data-vf-invite]::after { content: attr(data-vf-invite); order: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      header[data-vf-git] #search-btn[data-vf-invite] .kbd { order: 2; }
+    }
     /* téléphone (≤ 700 px, 02-vf-telephone.js, P70-D-01) : l'en-tête tient sur une rangée et les actions vivent dans le menu « ⋯ », qui reprend ce bouton (libellé .bl, clic relayé) */
     @media (max-width: 700px) { #vf-git-ouvreur { display: none !important; } }
     #vf-git-ouvreur .bl { display: none; }
@@ -129,7 +136,10 @@
   const hr = document.querySelector('header .hr');
   if (hr) hr.insertBefore(ouvreur, hr.firstChild);
 
+  const entete = document.querySelector('header'), recherche = document.querySelector('#search-btn');
+  if (recherche) recherche.setAttribute('data-vf-invite', 'Chercher…'); // P78-D-39 : libellé court, lu par la requête de 1000 à 1279 px (voir le style) ; inerte ailleurs
   const lire = (d) => {
+    if (entete) entete.toggleAttribute('data-vf-git', d.etat !== 'absent'); // l'ouvreur est posé : le plancher et l'invite courts s'appliquent
     if (d.etat === 'absent') { ligne.hidden = true; ouvreur.hidden = true; return; } // le dépôt a disparu en cours de route : tout se tait
     ligne.hidden = false; ouvreur.hidden = false;
     const indispo = d.etat === 'indisponible';
