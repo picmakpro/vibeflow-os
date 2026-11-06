@@ -425,10 +425,12 @@ JS
   assert_eq "H7.11 — HEAD détaché : texte neutre (même couleur que var(--text-3)) dans les deux thèmes" "$(jq_ "$R" '[j.detache.dark.couleur === j.detache.dark.neutre, j.detache.light.couleur === j.detache.light.neutre].join("|")' 2>/dev/null)" "true|true"
   assert_eq "H7.8 — anneau de focus : témoin :focus-visible vrai et contour tracé" "$(jq_ "$R" '[j.anneau.focusVisible, j.anneau.style].join("|")' 2>/dev/null)" "true|solid"
   assert_eq "H7.8 — anneau de focus de la seconde ligne : aucune intersection avec la boîte du nom (aire en px²)" "$(jq_ "$R" 'j.anneau.aire' 2>/dev/null)" "0"
-  # F5 : même seuil de passage sur deux rangées avec et sans git (701 à 939 px)
+  # F5 : même seuil de passage sur deux rangées avec et sans git (701 à 1000 px). Depuis la coque étroite (menu « ⋯ » dès 999 px, fil d'Ariane entier) l'en-tête racine tient
+  # sur une rangée à toute largeur : le repli ne se mesure plus à la racine mais dans la vue d'un fichier (fil d'Ariane long), où il existe encore. Les deux labs portent
+  # le MÊME nom de dossier (« depot ») : un nom plus long avancerait le repli de lui-même et fausserait la comparaison.
   cat > "$AUX/h7-seuil.js" <<'JS'
-const [base] = ARGS;
-await s.naviguer(base + '/');
+const [base, vue] = ARGS;
+await s.naviguer(base + '/' + (vue || ''));
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow`, 'page rendue');
 const res = [];
 for (let w = 700; w <= 1000; w += 10) {
@@ -437,11 +439,12 @@ for (let w = 700; w <= 1000; w += 10) {
 }
 return res;
 JS
-  NOG7="$WORK/hors-depot-7"; mk_lab "$NOG7"
-  stop_srv; build_serve "$NOG7"; RS0="$(cdp "$AUX/h7-seuil.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
-  ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WT"; RS1="$(cdp "$AUX/h7-seuil.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"
-  assert_eq "H7.5 — témoin : le lab sans git passe d'une rangée double à une rangée simple dans la plage mesurée" "$(jq_ "$RS0" 'j.some((m) => m[1] === 2) && j.some((m) => m[1] === 1) ? "deux régimes" : "un seul : " + JSON.stringify(j)' 2>/dev/null)" "deux régimes"
-  assert_eq "H7.5 — de 700 à 1000 px, l'en-tête passe sur deux rangées aux mêmes largeurs avec et sans git" "$(jq_ "$RS1" 'j.map((m) => m.join(":")).join(" ")' 2>/dev/null)" "$(jq_ "$RS0" 'j.map((m) => m.join(":")).join(" ")' 2>/dev/null)"
+  NOG7="$WORK/hors-depot-7/depot"; mk_lab "$NOG7"; VUE7="#v=f%3Asrc%2Futil.js"
+  stop_srv; build_serve "$NOG7"; RS0="$(cdp "$AUX/h7-seuil.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; RD0="$(cdp "$AUX/h7-seuil.js" "http://127.0.0.1:$PORT" "$VUE7" 2>&1 | tail -1)"; stop_srv
+  ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WT"; RS1="$(cdp "$AUX/h7-seuil.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; RD1="$(cdp "$AUX/h7-seuil.js" "http://127.0.0.1:$PORT" "$VUE7" 2>&1 | tail -1)"
+  assert_eq "H7.5 — témoin : le lab sans git passe d'une rangée double à une rangée simple dans la plage mesurée (vue d'un fichier : le fil d'Ariane long replie encore l'en-tête)" "$(jq_ "$RD0" 'j.some((m) => m[1] === 2) && j.some((m) => m[1] === 1) ? "deux régimes" : "un seul : " + JSON.stringify(j)' 2>/dev/null)" "deux régimes"
+  assert_eq "H7.5 — de 700 à 1000 px, l'en-tête racine passe sur les mêmes rangées avec et sans git (une rangée partout depuis la coque étroite)" "$(jq_ "$RS1" 'j.map((m) => m.join(":")).join(" ")' 2>/dev/null)" "$(jq_ "$RS0" 'j.map((m) => m.join(":")).join(" ")' 2>/dev/null)"
+  assert_eq "H7.5b — de 700 à 1000 px, dans la vue d'un fichier, l'en-tête passe sur deux rangées aux mêmes largeurs avec et sans git" "$(jq_ "$RD1" 'j.map((m) => m.join(":")).join(" ")' 2>/dev/null)" "$(jq_ "$RD0" 'j.map((m) => m.join(":")).join(" ")' 2>/dev/null)"
   # F13 : le bloc de vue Code ne se coupe qu'après « / » ou « - » (ou une espace), jamais en plein mot ; branche longue, 768 px
   WTL="$WORK/wt-long"; $GIT -C "$DEPOT" worktree add -q -b "feat/phase-78-git-cockpit-corrections-de-la-critique-fraiche" "$WTL" >/dev/null 2>&1
   cat > "$AUX/h7-coupure.js" <<'JS'
