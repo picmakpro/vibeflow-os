@@ -294,6 +294,10 @@ assert_eq "Q18.15 — aucun mot de l'intérieur du panneau (clé de règle, « n
 H locg "$SCRIPTS" "$WORK/q18h.json" "lignes du planning non comprises ?" > "$WORK/q18z.json"
 assert_eq "Q18.16 — aucune ligne non comprise : la réponse le dit, sans liste vide" "$(H json "$WORK/q18z.json" "/aucune ligne/i.test(j.answer) && !/Lignes? concern/.test(j.answer)")" "true"
 
+assert_eq "Q18.17 — témoin de linéarité : 40 000 « ligne » sans « non compris » se traitent en moins de 2 s (le motif de PU-G-150 n'est pas quadratique ; mesuré avant correction : 38 s)" "$("$NODE" --input-type=module -e "
+import { answerLocally } from '$SCRIPTS/vf-cockpit-ask.mjs';
+const t = Date.now(); answerLocally({ nodes: [], files: [], links: [], meta: { vf: {} } }, 'ligne '.repeat(40000) + 'x'); console.log(Date.now() - t < 2000);")" "true"
+
 vf_hyg_assert
 echo ""
 echo "=================================="

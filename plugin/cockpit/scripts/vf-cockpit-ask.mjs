@@ -57,7 +57,7 @@ function reponseFormat(d) {
 export function answerLocally(G, question) {
   const I = projectIndex(G), q = fold(question), vf = G.meta?.vf || {};
   // PU-G-150 : « lignes du planning non comprises » (panneau Format) : expliquée avant la garde de raisonnement, car « pourquoi » y est la forme naturelle
-  if (/lignes?\b[^.?!]*\bnon (compris|lu)|\bnon comprises?\b|lignes? (ignoree|mise de cote)|format (de la |du )?(planification|planning)/.test(q)) return reponseFormat(vf.drift);
+  if ((q.includes('ligne') && /\bnon (compris|lu)/.test(q)) || /\bnon comprises?\b|lignes? (ignoree|mise de cote)|format (de la |du )?(planification|planning)/.test(q)) return reponseFormat(vf.drift); // pas de `[^.?!]*` entre deux mots : quadratique sur « ligne ligne ligne… »
   // une question de raisonnement (pourquoi, comment, risque, conseil) n'a pas de réponse calculable : l'agent
   if (/\b(pourquoi|comment|explique|quel(le)? risque|faut-il|devrai|conseill|compare|difference|impact)/.test(q)) return null;
   // cibles nommées dans la question
