@@ -2505,7 +2505,7 @@ window.Floorplan = Object.freeze({
   version: 1,
   graph: G, query: Q, state, agent: AGENT, exported: EXPORTED,
   // model helpers
-  info, chain, children: (id) => visibleKids(id), parentOf: (id) => parentOf.get(id), exists: (id) => Q.exists(id),
+  info, shownName, chain, children: (id) => visibleKids(id), parentOf: (id) => parentOf.get(id), exists: (id) => Q.exists(id),
   files, nodes, routes, colorOf, iconKey,
   // html helpers
   h, icon, iconI, fmt, plural, md,
