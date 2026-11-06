@@ -26,7 +26,7 @@ export const ARRET_MS = 2500; // P71-D-35 : Q répond encore « arret » ce temp
 const CORPS_LANCER_MAX = 512;
 // motif de refus de l'état de Q (72-05) -> statut ; refus de l'écriture (72-02) -> statut. Tables fermées lues par Object.hasOwn : un motif inconnu est 400, jamais 204.
 const STATUT_MOTIF = { inconnue: 404, consommee: 404, annulee: 404, remplacee: 404, expiree: 404, absente: 404, 'pas-arme': 425, occupee: 409, bloquee: 409, mode: 400, chat: 400 };
-const STATUT_LANCER = { 'premier-plan': 409, absente: 410, alphabet: 400, invalide: 400, delai: 504 };
+const STATUT_LANCER = { 'premier-plan': 409, absente: 410, alphabet: 400, invalide: 400, delai: 504, ecriture: 410 }; // ecriture : le PTY a refusé l'écriture, la session n'est plus utilisable
 const statutDe = (table, motif) => (Object.hasOwn(table, motif) ? table[motif] : 400);
 // corps -> objet JSON non tableau aux seules clés `cles`, dont chaque clé de `requises` est une chaîne et dont `chat`, s'il est présent, est un booléen strict ; sinon null
 function lireDemande(brut, cles, requises) {

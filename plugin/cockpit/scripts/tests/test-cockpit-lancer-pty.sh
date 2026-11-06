@@ -240,6 +240,27 @@ assert_eq "L0.0 — au moins un shell a été exercé (anti-vert-à-vide)" "$([ 
 t_l9
 assert_eq "L9.1 — shell sourd (stty raw -echo puis exec sleep) : 60 lignes de 390 caractères, au moins un « LANCE premier-plan » (la file ne grossit pas), 60 réponses, l'assistant reste vivant puis sort de lui-même" "$L9_RES" "oui 60 vivant code=0 sig=null"
 
+echo "=== L10 — écriture au PTY refusée : jamais « LANCE ok » pour une ligne non poussée (ST-4) ==="
+cat > "$AUX/ecriture.py" <<'PY'
+# ecriture.py <assistant> <ligne> : importe l'assistant, force le test du premier plan à « libre » et fait échouer pousser() (tube rompu, EIO) ; un témoin réussit
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location('assist', sys.argv[1]); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+hexa = sys.argv[2].encode().hex().encode()
+m.premier_plan_libre = lambda maitre, pid: True
+def casse(fd, t): raise BrokenPipeError(32, 'tube rompu')
+def eio(fd, t): raise OSError(5, 'EIO')
+def passe(fd, t): del t[:]
+res = []
+for nom, f in (('casse', casse), ('eio', eio), ('temoin', passe)):
+    m.pousser = f; v = bytearray(); r = m.lancer_ligne(hexa, -1, 1, v); res.append('%s:%s:%d' % (nom, r, len(v)))
+sorties = []; m.statut = lambda fd, t: sorties.append(t); m.pousser = casse
+m.lire_controle(b'L ' + hexa + b'\n', -1, 1, bytearray())
+print(' '.join(res) + ' | ' + ';'.join(sorties))
+PY
+ecr() { python3 -I "$AUX/ecriture.py" "$1" "$REF" 2>&1 | tail -1; }
+L10_ATT="casse:ecriture:0 eio:ecriture:0 temoin:ok:0 | LANCE ecriture"
+assert_eq "L10.1 — un échec d'écriture (tube rompu, EIO) rend le motif « ecriture » et ne laisse rien en file ; la réponse du descripteur 2 est « LANCE ecriture », jamais « LANCE ok » (témoin : une écriture réussie rend ok)" "$(ecr "$ASSIST")" "$L10_ATT"
+
 echo "=== M-* — mutants de l'assistant (copies du moteur, bash seul) ==="
 SAV="$SHELLS"; SHELLS="/bin/bash"; [ -x /bin/bash ] || SHELLS="$(command -v bash)"; MSH="${SHELLS%% *}"; ASSIST0="$ASSIST"
 cat > "$WORK/sed/premier.sed" <<'SED'
@@ -297,6 +318,12 @@ if mut_pty hexborne "$WORK/sed/hex.sed"; then
   ASSIST="$MUT_ASSIST"; t_table "$MSH" "$WORK/t/l52.L" "$N52"; ASSIST="$ASSIST0"
   rougit "M-HEX-BORNE — le mutant retire la borne de 800 caractères hexadécimaux : la ligne de 401 octets est acceptée (L5.2 rouge)" "$T_RES" "$(exp l52) | absent absent"
 else sans_effet M-HEX-BORNE; fi
+cat > "$WORK/sed/ecriture.sed" <<'SED'
+s|^        return 'ecriture'$|        pass|
+SED
+if mut_pty ecritureavalee "$WORK/sed/ecriture.sed"; then
+  rougit "M-ECRITURE-AVALEE — le mutant avale l'échec d'écriture et répond ok (L10.1 rouge)" "$(ecr "$MUT_ASSIST")" "$L10_ATT"
+else sans_effet M-ECRITURE-AVALEE; fi
 if mut_pty entreeauto "$WORK/sed/auto.sed"; then
   ASSIST="$MUT_ASSIST"; t_l1 "$MSH"; ASSIST="$ASSIST0"
   rougit "M-ENTREE-AUTO — le mutant ajoute un retour chariot : le faux claude tourne sans geste humain (L1.2 rouge)" "$L1_VU $L1_A1" "vue absent"
@@ -377,6 +404,30 @@ assert_eq "J5.2 — second appel (ligne hostile) pendant la suspension puis SIGC
 assert_eq "J6.1 — assistant suspendu puis arreterTout() : l'appel en attente rend absente en moins de 1,5 s" "$(jv J6.1)" '{"r":{"ok":false,"motif":"absente"},"rapide":true}'
 assert_eq "J7.1 — après des lancer, exit 3 dans le shell : etat().code vaut 3 (l'analyse de FIN est intacte)" "$(jv J7.1)" "3"
 
+echo "=== J8 — l'écriture refusée par l'assistant (« LANCE ecriture ») ressort en motif « ecriture », jamais en ok (ST-4) ==="
+mkdir -p "$WORK/eng-faux/terminal"
+cat > "$WORK/eng-faux/terminal/vf-cockpit-pty.py" <<'PY'
+# assistant factice : répond à chaque ligne « L <hex> » du canal 3 par la réponse choisie (descripteur 2), sans shell
+import os, sys, time
+rep = os.environ.get('VFT_REPONSE', 'ecriture')
+for l in os.fdopen(3, 'r'):
+    if l.startswith('L '):
+        sys.stderr.write('LANCE ' + rep + '\n'); sys.stderr.flush()
+PY
+cat > "$AUX/session-faux.mjs" <<'JS'
+// session-faux.mjs <dossier des scripts> <moteur factice> <run> <reponse> : S.lancer face à un assistant factice qui répond « LANCE <reponse> »
+import path from 'node:path'; import { pathToFileURL } from 'node:url'; import { EventEmitter } from 'node:events';
+const [, , scripts, moteur, run, rep] = process.argv;
+const { creerSessions } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-terminal-session.mjs')).href);
+const S = creerSessions({ engineDir: moteur, lab: run, env: { ...process.env, SHELL: '/bin/bash', VFT_REPONSE: rep } });
+S.attacher({}, Object.assign(new EventEmitter(), { writeHead() {}, write() { return true; }, end() {} }), { onglet: 'a', lignes: 24, colonnes: 80 });
+const r = await S.lancer(process.argv[6] || "claude --session-id 'x'", 'a'); console.log(JSON.stringify(r)); S.arreterTout(); setTimeout(() => process.exit(0), 300);
+JS
+sfaux() { RUNN=$((RUNN+1)); mkdir -p "$WORK/run/j$RUNN"; node "$AUX/session-faux.mjs" "$1" "$WORK/eng-faux" "$WORK/run/j$RUNN" "$2" 2>/dev/null | tail -1; }
+assert_eq "J8.1 — assistant factice qui répond « LANCE ecriture » : { ok:false, motif:'ecriture' } ; qui répond « LANCE ok » : { ok:true } (témoin)" "$(sfaux "$SCRIPTS" ecriture) $(sfaux "$SCRIPTS" ok)" '{"ok":false,"motif":"ecriture"} {"ok":true}'
+cat > "$WORK/sed/regex.sed" <<'SED'
+s#alphabet|invalide|ecriture)\$/#alphabet|invalide)$/#
+SED
 echo "=== M-* — mutants de la session (copie des trois fichiers) ==="
 mut_session() { # mut_session <nom> <script sed> -> MUT_S ; code 1 si la cible manque ou si la copie n'a pas changé
   MUT_S="$WORK/mut-s-$1"; rm -rf "$MUT_S"; mkdir -p "$MUT_S"; local f; for f in vf-cockpit-terminal-session.mjs vf-cockpit-terminal-env.mjs vf-cockpit-terminal-amorce.mjs; do cp "$SCRIPTS/$f" "$MUT_S/$f"; done
@@ -388,6 +439,9 @@ SED
 cat > "$WORK/sed/fifo.sed" <<'SED'
 s|^        entree.minuterie = setTimeout(() => entree.finir({ ok: false, motif: 'delai' }), LANCER_DELAI_MS);$|        entree.minuterie = setTimeout(() => { const i = c.attentes.indexOf(entree); if (i >= 0) c.attentes.splice(i, 1); entree.finir({ ok: false, motif: 'delai' }); }, LANCER_DELAI_MS);|
 SED
+if mut_session regexecriture "$WORK/sed/regex.sed"; then
+  rougit "M-REGEX-ECRITURE — le mutant ne reconnaît plus « LANCE ecriture » : l'attente expire (delai) au lieu du motif ecriture (J8.1 rouge)" "$(sfaux "$MUT_S" ecriture)" '{"ok":false,"motif":"ecriture"}'
+else sans_effet M-REGEX-ECRITURE; fi
 if mut_session jssansattente "$WORK/sed/jssans.sed"; then
   t_j "$MUT_S"
   rougit "M-JS-SANS-ATTENTE — le mutant rend { ok:true } sans attendre l'assistant : un lecteur au premier plan n'est plus refusé (J3.1 rouge)" "$(jv J3.1)" '{"ok":false,"motif":"premier-plan"}'

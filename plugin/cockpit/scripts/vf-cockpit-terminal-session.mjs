@@ -3,7 +3,7 @@
 // Une seule session. L'assistant (vf-cockpit-pty.py de l'arbre du moteur, lancé en mode isolé) ne se lance qu'à la PREMIÈRE attache, jamais avant ; il
 // n'est jamais détaché : il meurt avec le serveur. Sa sortie (descripteur 1) est le flux ; son descripteur 2 porte l'état (FIN, SIG) et n'est
 // jamais journalisé ; le descripteur 3 reçoit les tailles. Les messages nomment des états, jamais des données du terminal.
-// Lancement (72-02 ; P72-D-01, D-14) : lancer(ligne, onglet) envoie « L <hex> » à l'assistant, qui revalide seul la ligne et ne l'écrit (sans retour chariot) que si le shell est au repos ; sa réponse « LANCE ok|premier-plan|alphabet|invalide »
+// Lancement (72-02 ; P72-D-01, D-14) : lancer(ligne, onglet) envoie « L <hex> » à l'assistant, qui revalide seul la ligne et ne l'écrit (sans retour chariot) que si le shell est au repos ; sa réponse « LANCE ok|premier-plan|alphabet|invalide|ecriture »
 // (descripteur 2) arrive dans l'ordre d'envoi : file FIFO d'attentes, délai de LANCER_DELAI_MS (une attente expirée reste dans la file jusqu'à sa réponse, jamais attribuée à l'appel suivant). Jamais de retour chariot ni de journal de la ligne.
 // Cycle de vie (71-04 ; P71-D-05, P71-D-19) : un seul onglet propriétaire (autre onglet : 409) ; flux fermé -> état « detachee » et grâce de GRACE_MS ;
 // retour du même onglet avant l'échéance -> même shell, tampon (TAMPON_MAX octets, MÉMOIRE SEULEMENT) rejoué puis direct ; échéance ou fin du shell -> EOF à
@@ -109,7 +109,7 @@ export function creerSessions({ engineDir, lab, jetons = () => [], env = process
       reste += b.toString('latin1'); let i;
       while ((i = reste.indexOf('\n')) >= 0) {
         const l = reste.slice(0, i); reste = reste.slice(i + 1);
-        const lm = /^LANCE (ok|premier-plan|alphabet|invalide)$/.exec(l); // réponse à une ligne « L » : la PREMIÈRE attente (FIFO) la reçoit, même expirée
+        const lm = /^LANCE (ok|premier-plan|alphabet|invalide|ecriture)$/.exec(l); // réponse à une ligne « L » : la PREMIÈRE attente (FIFO) la reçoit, même expirée
         if (lm) { const a = cible.attentes.shift(); if (a) a.finir(lm[1] === 'ok' ? { ok: true } : { ok: false, motif: lm[1] }); }
         const m = /^(FIN|SIG) (\d{1,3})$/.exec(l);
         if (m && cible.etat !== 'terminee') { if (m[1] === 'FIN') cible.code = Number(m[2]); else cible.signal = Number(m[2]); }

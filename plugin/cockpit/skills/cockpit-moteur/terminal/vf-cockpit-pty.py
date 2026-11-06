@@ -139,7 +139,7 @@ def premier_plan_libre(maitre, pid):
 
 
 def lancer_ligne(hexa, maitre, pid, vers_shell):
-    """Écrit Ctrl-C puis la ligne (sans retour chariot) au shell s'il est au repos ; rend « ok », « premier-plan », « alphabet » ou « invalide »."""
+    """Écrit Ctrl-C puis la ligne (sans retour chariot) au shell s'il est au repos ; rend « ok », « premier-plan », « alphabet », « invalide » ou « ecriture » (écriture au PTY échouée)."""
     code, ligne = decoder_ligne(hexa)
     if code != 'ok':
         return code
@@ -154,7 +154,8 @@ def lancer_ligne(hexa, maitre, pid, vers_shell):
     try:
         pousser(maitre, vers_shell)  # même passe de boucle ; le reste part au prochain select
     except OSError:
-        pass
+        del vers_shell[:]  # la ligne n'est pas partie : rien ne reste en file pour un shell qui ne l'a pas reçue
+        return 'ecriture'
     return 'ok'
 
 
