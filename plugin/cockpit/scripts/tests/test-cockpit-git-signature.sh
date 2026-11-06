@@ -2,6 +2,7 @@
 # test-cockpit-git-signature.sh — signal Git du direct : signature bon marché dans le filet de 5 s (78-09 ; GITC-11 ; P78-D-15, P78-D-23).
 #   R1 un commit arrive en événement `git` sur le flux SSE, sans changement : aucun événement
 #   R2 worktrees, index, argv journalisé (jamais log/status/diff), coût de la signature · R3 relais vers la page (Chrome, SAUTÉ sans navigateur) · R4 lab hors dépôt
+#   R5 audit 2026-11-06 (A5) : git muet (FIFO en include.path) — boucle libre, échéance globale, retrait, état distinct de lireGit
 #   Mutants : M-POLL, M-LOG, M-RELAIS. Ports éphémères, jamais 4456. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -170,7 +171,7 @@ return await s.ev(`({ signaux: window.__sig, marque: window.__marque, atteint: $
 JS
 cdp31() { node "$AUX/cdp-run.mjs" "$CHROME" "$AUX/r31.js" "$@"; }
 temps_sig() { # temps_sig <lab> : médiane de 7 appels de signatureGit (ms), 2 décimales
-  node -e "import(process.argv[1]).then(({signatureGit})=>{const t=[];let ok=true;for(let i=0;i<8;i++){const a=process.hrtime.bigint();const s=signatureGit(process.argv[2]);const b=process.hrtime.bigint();if(!s)ok=false;if(i)t.push(Number(b-a)/1e6)}t.sort((x,y)=>x-y);console.log((ok?'':'NULL ')+t[3].toFixed(2))})" "$SCRIPTS/vf-cockpit-git-signature.mjs" "$1"
+  node -e "import(process.argv[1]).then(async ({signatureGit})=>{const t=[];let ok=true;for(let i=0;i<8;i++){const a=process.hrtime.bigint();const s=await signatureGit(process.argv[2]);const b=process.hrtime.bigint();if(!s)ok=false;if(i)t.push(Number(b-a)/1e6)}t.sort((x,y)=>x-y);console.log((ok?'':'NULL ')+t[3].toFixed(2))})" "$SCRIPTS/vf-cockpit-git-signature.mjs" "$1"
 }
 
 # sous_cmds <journal> : la sous-commande de chaque ligne d'argv, options globales (--no-optional-locks, -c <v>, -C <dir>) écartées
@@ -214,6 +215,80 @@ assert_eq "R4.0 — témoin : le client hors dépôt reçoit le hello" "$(grep -
 assert_eq "R4.1a — hors dépôt : aucun événement git" "$(nb_git "$WORK/w4.sse")" "0"
 assert_eq "R4.1b — hors dépôt : aucune erreur dans la sortie du serveur" "$(grep -ciE 'error|erreur|TypeError|Unhandled' "$WORK/serve.out")" "0"
 stop_srv
+
+echo "=== R5 — audit 2026-11-06 : A5 (git muet : la boucle reste libre, échéance globale, retrait, état distinct) ==="
+# Un git qui ne répond pas : include.path de la configuration du dépôt vers un FIFO (git le lit à CHAQUE commande et bloque à l'ouverture). Le FIFO vit dans mktemp -d ; aucun lecteur ni écrivain ne le tient :
+# le processus git bloqué est tué par le délai (SIGTERM sur le pid de l'emballage, exec'é en git), et la suite vérifie qu'aucun git du dépôt ne survit.
+HG="$WORK/muet"; mkdir -p "$HG"; mk_lab "$HG/lab"; G_ -C "$HG/lab" init -q -b main && G_ -C "$HG/lab" add -A && G_ -C "$HG/lab" commit -q -m init
+HGL="$(cd "$HG/lab" && pwd -P)"
+mkfifo "$HG/ff"; printf '[include]\n\tpath = %s\n' "$HG/ff" >> "$HGL/.git/config"
+mkdir -p "$WORK/bin-h"; printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "%s/hang.log"\nexec "%s" "$@"\n' "$WORK" "$GIT_REEL" > "$WORK/bin-h/git"; chmod +x "$WORK/bin-h/git"
+cat > "$AUX/muet.mjs" <<'JS'
+// muet.mjs <scripts> <lab> <mode seq|concurrent> <journal> : signatureGit sur un git muet ; une ligne JSON {…} (durées, battement d'un minuteur de 50 ms posé avant l'appel, lancements journalisés)
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab, mode, journal] = process.argv;
+const sg = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git-signature.mjs')).href);
+const lancements = () => { try { return fs.readFileSync(journal, 'utf8').split('\n').filter(Boolean).length; } catch { return 0; } };
+// battement : un minuteur de 50 ms posé AVANT l'appel ; il ne sonne à l'heure que si la boucle reste libre pendant que git travaille (un git synchrone le retarde de toute sa durée)
+const opts = { commun: lab + '/.git', echeanceMs: 700 };
+const t0 = Date.now(); let max = null; setTimeout(() => { max = Date.now() - t0; }, 50);
+if (mode === 'concurrent') {
+  const r = await Promise.all([sg.signatureGit(lab, opts), sg.signatureGit(lab, opts)]); await new Promise((ok) => setTimeout(ok, 150));
+  console.log(JSON.stringify({ nulls: r.filter((x) => x === null).length, ms: Date.now() - t0, bloc: max, n: lancements() }));
+} else {
+  const s1 = await sg.signatureGit(lab, opts); const d1 = Date.now() - t0, n1 = lancements();
+  const t1 = Date.now(); const s2 = await sg.signatureGit(lab, opts); const d2 = Date.now() - t1, n2 = lancements(); await new Promise((ok) => setTimeout(ok, 150));
+  console.log(JSON.stringify({ s1: s1 === null ? null : 'hex', d1, n1, s2: s2 === null ? null : 'hex', d2, n2, bloc: max }));
+}
+JS
+MUET() { : > "$WORK/hang.log"; PATH="$WORK/bin-h:$PATH" node "$AUX/muet.mjs" "$1" "$2" "$3" "$WORK/hang.log" 2>&1 | tail -1; }
+SEQ="$(MUET "$SCRIPTS" "$HGL" seq)"
+assert_eq "R5.0 — témoin : un git du dépôt muet ne répond pas ; l'emballage a vu son lancement (la sonde n'est pas aveugle)" "$(jq_ "$SEQ" 'j.n1 >= 1 ? "oui" : "non"')" "oui"
+assert_eq "R5.1 — A5 : la signature d'un git muet rend null en moins de 3 s (échéance globale de 700 ms demandée, jamais 20 s) et la boucle reste libre (un minuteur de 50 ms posé avant l'appel sonne en moins de 300 ms)" "$(jq_ "$SEQ" '[j.s1, j.d1 < 3000, j.bloc < 300].join("|")')" "|true|true"
+assert_eq "R5.2 — A5 : après l'échec, la signature est en RETRAIT : le second appel rend null sans lancer aucun git (même nombre de lancements, moins de 100 ms)" "$(jq_ "$SEQ" '[j.s2, j.d2 < 100, j.n2 === j.n1].join("|")')" "|true|true"
+CON="$(MUET "$SCRIPTS" "$HGL" concurrent)"
+assert_eq "R5.3 — A5 : deux ticks simultanés ne lancent qu'un seul jeu de git (le second rend null aussitôt, sans git) : 1 lancement, boucle libre" "$(jq_ "$CON" '[j.n, j.bloc < 300].join("|")')" "1|true"
+SAIN="$(MUET "$SCRIPTS" "$DEPOT" seq)"
+assert_eq "R5.4 — témoin : sur un dépôt sain, la signature est calculée deux fois de suite (pas de retrait sans git muet), sans latence" "$(jq_ "$SAIN" '[j.s1, j.s2, j.d1 < 1500].join("|")')" "hex|hex|true"
+sleep 0.5
+assert_eq "R5.5 — aucun git du dépôt muet ne survit aux appels (pgrep)" "$(pgrep -f "$HGL" | wc -l | tr -d ' ')" "0"
+cat > "$AUX/lire-muet.mjs" <<'JS'
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, muet, hors] = process.argv;
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href);
+const t = Date.now(); const a = m.lireGit(muet).etat; const ms = Date.now() - t; const b = m.lireGit(hors).etat;
+console.log(JSON.stringify({ muet: a, hors: b, borne: ms < 9000 }));
+JS
+mkdir -p "$WORK/sans-depot"
+LM="$(node "$AUX/lire-muet.mjs" "$SCRIPTS" "$HGL" "$WORK/sans-depot" 2>&1 | tail -1)"
+assert_eq "R5.6 — A5 : lireGit d'un git muet rend « indisponible » (jamais « absent ») dans l'échéance de 5 s ; un lab hors dépôt reste « absent »" "$(jq_ "$LM" '[j.muet, j.hors, j.borne].join("|")')" "indisponible|absent|true"
+sleep 0.5
+assert_eq "R5.7 — aucun git du dépôt muet ne survit à lireGit (pgrep)" "$(pgrep -f "$HGL" | wc -l | tr -d ' ')" "0"
+assert_eq "R5.8 — le direct appelle la signature en asynchrone, graine et filet (les deux appels de signatureGit portent .then) : un git muet ne gèle plus le serveur" "$(grep -c "signatureGit(root, " "$SCRIPTS/vf-cockpit-live.mjs" | tr -d ' ')|$(grep -c "signatureGit(root, { commun: common }).then(" "$SCRIPTS/vf-cockpit-live.mjs" | tr -d ' ')" "2|2"
+# mutants A5 : chacun remet le défaut et rougit SA sonde de R5
+MA="$(mkmod sansech)"; mutate "$MA/vf-cockpit-git-signature.mjs" "const fin = finDans(echeanceMs);" "const fin = finDans(60000);" || echo "  ❌ mutation M-SANS-ECHEANCE impossible"
+R="$(MUET "$MA" "$HGL" seq)"
+assert_eq "M-SANS-ECHEANCE — l'échéance globale du tick est retirée : rouge sur R5.1 (la signature d'un git muet dure plus de 3 s ; la boucle, elle, reste libre : le rouge vient de l'échéance)" "$(jq_ "$R" '[j.s1, j.d1 < 3000, j.bloc < 300].join("|")')" "|false|true"
+MB="$(mkmod sansret)"; mutate "$MB/vf-cockpit-git-signature.mjs" "if (muet) {" "if (false) {" || echo "  ❌ mutation M-SANS-RETRAIT impossible"
+R="$(MUET "$MB" "$HGL" seq)"
+assert_eq "M-SANS-RETRAIT — le retrait est retiré : rouge sur R5.2 (le second appel relance un git : plus de lancements, plus de 100 ms)" "$(jq_ "$R" '[j.s2, j.d2 < 100, j.n2 === j.n1].join("|")')" "|false|false"
+MC="$(mkmod sansvol)"; mutate "$MC/vf-cockpit-git-signature.mjs" "if (e.enVol || maintenant() < e.jusqu) return null;" "if (maintenant() < e.jusqu) return null;" || echo "  ❌ mutation M-RECOUVREMENT impossible"
+R="$(MUET "$MC" "$HGL" concurrent)"
+assert_eq "M-RECOUVREMENT — la garde contre le recouvrement est retirée : rouge sur R5.3 (deux jeux de git lancés au lieu d'un)" "$(jq_ "$R" 'j.n')" "2"
+MD="$(mkmod syncsig)"
+mutate "$MD/vf-cockpit-git-signature.mjs" "import { lancerGitAsync, finDans }" "import { lancerGit, lancerGitAsync, finDans }" && mutate "$MD/vf-cockpit-git-signature.mjs" "await lancerGitAsync(lab, ['for-each-ref', '--format=%(objectname) %(refname)'], { fin })" "lancerGit(lab, ['for-each-ref', '--format=%(objectname) %(refname)'])" || echo "  ❌ mutation M-SIGNATURE-SYNC impossible"
+R="$(MUET "$MD" "$HGL" seq)"
+assert_eq "M-SIGNATURE-SYNC — le git de la signature redevient synchrone : rouge sur R5.1 (la boucle est gelée : le minuteur de 50 ms ne sonne qu'après 300 ms)" "$(jq_ "$R" 'j.bloc < 300')" "false"
+sleep 0.5
+assert_eq "R5.9 — aucun git du dépôt muet ne survit aux mutants (pgrep)" "$(pgrep -f "$HGL" | wc -l | tr -d ' ')" "0"
+ME="$(mkmod sansdistinct)"; mutate "$ME/vf-cockpit-git.mjs" "if (sonde.delai) return" "if (false) return" || echo "  ❌ mutation M-ABSENT impossible"
+LM="$(node "$AUX/lire-muet.mjs" "$ME" "$HGL" "$WORK/sans-depot" 2>&1 | tail -1)"
+assert_eq "M-ABSENT — l'état distinct est retiré : rouge sur R5.6 (un git muet redevient « absent »)" "$(jq_ "$LM" '[j.muet, j.hors].join("|")')" "absent|absent"
+sleep 0.5
+assert_eq "R5.10 — aucun git du dépôt muet ne survit à M-ABSENT (pgrep)" "$(pgrep -f "$HGL" | wc -l | tr -d ' ')" "0"
 
 echo "=== Mutants ==="
 # M-POLL : émission à chaque tick -> R1.1 rougit

@@ -8,11 +8,11 @@
 // ressemble à un secret (masque(nom) !== nom). Refs passées à `log` : entièrement qualifiées (refs/…) ou sha de 40 caractères, jamais --all.
 import fs from 'node:fs';
 import path from 'node:path';
-import { lancerGit, avecEcheance } from './vf-cockpit-paths.mjs';
+import { lancerGit, avecEcheance, gitCommonDir } from './vf-cockpit-paths.mjs';
 import { nettoie, brancheBase } from './vf-cockpit-arbres.mjs';
 import { masque } from './vf-cockpit-lecture.mjs';
 import { enteteGit } from './vf-cockpit-git-entete.mjs';
-import { detailCommit, etatWorktrees } from './vf-cockpit-git-details.mjs';
+import { detailCommit, etatWorktrees, worktreeVerifie } from './vf-cockpit-git-details.mjs';
 import { FORMAT_JOURNAL, CHAMPS_REFS, MOTIF_SHA, lireJournal, lireRefs, lireWorktrees, ordonner, placer, etiquettes, teinte } from './vf-cockpit-git-graphe.mjs';
 import { cmdCd, cmdSwitch, cmdBranchSupprimer, cmdStashShow, cmdCommitInitial, cmdStatus } from './vf-cockpit-git-commandes.mjs';
 
@@ -62,7 +62,12 @@ function sansDate(sortie) {
 function assembler(lab) {
   const entete = enteteGit(lab);
   const commandes = (vide = null) => ({ vide, diagnostic: cmdStatus() });
-  if (entete.etat === 'absent') return { schema: SCHEMA, etat: 'absent', entete };
+  if (entete.etat === 'absent') {
+    // A5 : l'en-tête rend « absent » aussi pour un git qui ne répond pas (sortie vide après délai). Un git muet n'est pas un dépôt absent : état distinct « indisponible ».
+    const sonde = lancerGit(lab, ['rev-parse', '--git-dir']);
+    if (sonde.delai) return { schema: SCHEMA, etat: 'indisponible', entete, commandes: commandes() };
+    return { schema: SCHEMA, etat: 'absent', entete };
+  }
   const ko = () => ({ schema: SCHEMA, etat: 'indisponible', entete, commandes: commandes() });
   const git = (...a) => lancerGit(lab, a);
   const nomBase = brancheBase(lab);
@@ -87,9 +92,11 @@ function assembler(lab) {
   const refs = lr.refs.filter((r) => !/^refs\/remotes\/[^/]+\/HEAD$/.test(r.ref));
   const tronqueRefs = refs.length > BORNES.refs; refs.length = Math.min(refs.length, BORNES.refs);
   const worktrees = lw.worktrees;
+  const commun = (() => { try { return fs.realpathSync(gitCommonDir(lab) ?? ''); } catch { return null; } })();
+  const verifie = new Map(worktrees.map((w) => [w, commun !== null && worktreeVerifie(commun, w.chemin)])); // P78-D-38 : lien retour vérifié, sinon ni commande `cd` ni « verifie »
   const branches = refs.filter((r) => r.ref.startsWith('refs/heads/') || r.ref.startsWith('refs/remotes/'));
   const estBase = (r) => r.ref === refBase;
-  const gaucheDroite = (x, y) => { const r = git('rev-list', '--left-right', '--count', '--end-of-options', `${x}...${y}`); const m = /^(\d+)\t(\d+)\n$/.exec(r.sortie); return m ? [m[1], m[2]] : null; }; // [seulement à gauche, seulement à droite]
+  const gaucheDroite = (x, y) => { const r = git('rev-list', '--left-right', '--count', '--end-of-options', `${x}...${y}`, '--'); const m = /^(\d+)\t(\d+)\n$/.exec(r.sortie); return m ? [m[1], m[2]] : null; }; // [seulement à gauche, seulement à droite]
   if (repli && refBase) { // au plus 50 branches comptées, les autres sans compte (traitées comme non mergées)
     for (const r of branches.filter((x) => !estBase(x)).slice(0, 50)) { const c = gaucheDroite(refBase, r.ref); if (c) r.ab = `${c[1]} ${c[0]}`; }
     const b = refs.find(estBase), c = refOrigine && b ? gaucheDroite(refBase, refOrigine) : null;
@@ -114,9 +121,9 @@ function assembler(lab) {
   const repliees = new Set(mergees);
   const aGarder = refs.filter((r) => !repliees.has(r));
 
-  const log1 = git('log', '--topo-order', '-z', `--format=${FORMAT_JOURNAL}`, '-n', String(BORNES.base), racineLog, ...tetes);
+  const log1 = git('log', '--topo-order', '-z', `--format=${FORMAT_JOURNAL}`, '-n', String(BORNES.base), racineLog, ...tetes, '--'); // `--` : une révision n'est jamais prise pour un fichier de l'arbre (A6)
   const j1 = log1.ok ? lireJournal(log1.sortie) : { ok: false };
-  const log2 = nonMergees.length ? git('log', '--topo-order', '-z', `--format=${FORMAT_JOURNAL}`, '-n', String(BORNES.nonMergees), ...nonMergees.map(refLog), '--not', refBase) : { ok: true, sortie: '' }; // LOG2
+  const log2 = nonMergees.length ? git('log', '--topo-order', '-z', `--format=${FORMAT_JOURNAL}`, '-n', String(BORNES.nonMergees), ...nonMergees.map(refLog), '--not', refBase, '--') : { ok: true, sortie: '' }; // LOG2
   const j2 = log2.ok ? lireJournal(log2.sortie) : { ok: false };
   if (!j1.ok || !j2.ok) return ko();
   const commits = ordonner([j1.commits, j2.commits]);
@@ -125,6 +132,7 @@ function assembler(lab) {
   const etiq = etiquettes(aGarder, { head, worktrees });
   const chaine = new Set();
   for (let c = parSha.get(shaRef(refBase) ?? tetes[0]); c && !chaine.has(c.h); c = parSha.get(c.p[0])) chaine.add(c.h);
+  const verifieChemin = new Set(worktrees.filter((w) => verifie.get(w)).map((w) => w.chemin));
   const couleur = new Map();
   const rangees = pl.rangees.map((r) => {
     const c = parSha.get(r.h), labels = etiq.get(r.h) || [];
@@ -132,7 +140,7 @@ function assembler(lab) {
     const t = chaine.has(r.h) ? 0 : (couleur.get(r.h) ?? (tete ? teinte(tete.nom) : teinte(r.h)));
     if (c.p[0] && !couleur.has(c.p[0])) couleur.set(c.p[0], t);
     const liste = labels.map((e) => ({ type: e.type, nom: net(e.nom), courante: e.courante, worktree: e.worktree ? net(path.basename(e.worktree)) : null,
-      commande: e.type !== 'locale' || e.courante ? null : commande(e.worktree ? cmdCd(e.worktree) : cmdSwitch(e.nom), e.nom, e.worktree ?? '') }));
+      commande: e.type !== 'locale' || e.courante || (e.worktree && !verifieChemin.has(e.worktree)) ? null : commande(e.worktree ? cmdCd(e.worktree) : cmdSwitch(e.nom), e.nom, e.worktree ?? '') }));
     return { h: r.h, h7: r.h.slice(0, 7), p: c.p, at: c.at, an: net(c.an), s: net(c.s), col: r.col, entrants: r.entrants, sortants: r.sortants, largeur: r.largeur,
       ouvertBas: r.ouvertBas, fusion: r.fusion, racine: r.racine, teinte: t, refs: liste.slice(0, 12), refsPlus: Math.max(0, liste.length - 12) };
   });
@@ -144,8 +152,8 @@ function assembler(lab) {
   const cb = refOrigine ? compte(refs.find(estBase)?.ab2) : null;
   const base = { nom: refBase ? net(court(refBase)) : null, locale: cb?.avance ?? null, distante: cb?.retard ?? null, divergent: !!cb && cb.avance > 0 && cb.retard > 0 };
   return { schema: SCHEMA, etat: 'ok', entete, base,
-    worktrees: worktrees.map((w, i) => ({ nom: net(path.basename(w.chemin)), chemin: net(w.chemin), branche: w.branche ? net(court(w.branche)) : null, detache: w.detache, ici: w === ici, principal: i === 0,
-      commande: w === ici ? null : commande(cmdCd(w.chemin), w.chemin) })),
+    worktrees: worktrees.map((w, i) => ({ nom: net(path.basename(w.chemin)), chemin: net(w.chemin), branche: w.branche ? net(court(w.branche)) : null, detache: w.detache, ici: w === ici, principal: i === 0, verifie: verifie.get(w),
+      commande: w === ici || !verifie.get(w) ? null : commande(cmdCd(w.chemin), w.chemin) })),
     rangees, couloirsMax: pl.couloirsMax, replies: pl.replies, refsIgnorees: sd.ignorees,
     horsFenetre: nonMergees.filter((r) => !parSha.has(r.pelee || r.sha)).map((r) => ({ nom: net(court(r.ref)), h7: (r.pelee || r.sha).slice(0, 7), avance: avance(r), retard: compte(r.ab)?.retard ?? null })),
     mergees: mergees.slice(0, 200).map((r) => ({ nom: net(court(r.ref)), commande: r.ref.startsWith('refs/heads/') ? commande(cmdBranchSupprimer(court(r.ref)), court(r.ref)) : null })),
@@ -166,7 +174,7 @@ export function routeGit(req, res, url, { root, json }) {
   try {
     if (p === '/api/vf/git') json(res, 200, lireGit(root));
     else if (p === '/api/vf/git/entete') json(res, 200, { schema: SCHEMA_ENTETE, ...enteteGit(root) });
-    else if (p === '/api/vf/git/commit') { const r = detailCommit(root, url.searchParams.get('sha')); json(res, r.code, r.corps); }
+    else if (p === '/api/vf/git/commit') detailCommit(root, url.searchParams.get('sha')).then((r) => json(res, r.code, r.corps), () => json(res, 200, { schema: SCHEMAS_ROUTES[p], etat: 'indisponible' })); // A4 : asynchrone, la boucle reste libre
     else if (p === '/api/vf/git/worktrees') etatWorktrees(root).then((c) => json(res, 200, c), () => json(res, 200, { schema: SCHEMAS_ROUTES[p] || SCHEMA, etat: 'indisponible' })); // P78-D-32 : asynchrone, la boucle reste libre
     else { res.writeHead(404); res.end(); }
   } catch { json(res, 200, { schema: SCHEMAS_ROUTES[p] || SCHEMA, etat: 'indisponible' }); }

@@ -84,7 +84,9 @@ let sansN = 0, hors = 0;
 for (const x of l) {
   const t = x.split(' '), i = t.indexOf('-n');
   if (i < 0) { sansN++; continue; }
-  for (const r of t.slice(i + 2)) if (r !== '--not' && !/^(refs\/|[0-9a-f]{40}$)/.test(r)) hors++;
+  const refs = t.slice(i + 2), fin = refs[refs.length - 1] === '--'; // A6 : « -- » final obligatoire, une révision n'est jamais prise pour un fichier de l'arbre
+  if (!fin) hors++;
+  for (const r of fin ? refs.slice(0, -1) : refs) if (r !== '--not' && !/^(refs\/|[0-9a-f]{40}$)/.test(r)) hors++;
 }
 console.log(`${l.length}|${sansN}|${hors}`);
 JS
@@ -270,7 +272,7 @@ PATH="$WORK/bin:$PATH" node "$AUX/lire.mjs" "$SCRIPTS" "$LAB" > /dev/null 2>&1; 
 PATH="$WORK/bin:$PATH" git -C "$LAB" fetch --dry-run origin > /dev/null 2>&1
 RES="$(grep -cE '(^| )(fetch|pull|push|ls-remote|remote|commit-graph|gc|maintenance)( |$)' "$VF_GITLOG")"
 assert_eq "S2.6c — témoin positif : l'emballage voit un fetch délibéré (1) ; seul celui-là" "$RES|$(grep -cE '(^| )fetch( |$)' "$VF_GITLOG")|$([ "$(grep -c . "$VF_GITLOG")" -ge 10 ] && echo vu || echo aveugle)" "1|1|vu"
-assert_eq "S2.6d — tout log porte -n ; toute ref passée est refs/… ou un sha de 40 caractères (lignes log vues : 4 au moins)" "$(node "$AUX/argv.mjs" "$VF_GITLOG" | awk -F'|' '{print ($1>=4?"vu":"aveugle") "|" $2 "|" $3}')" "vu|0|0"
+assert_eq "S2.6d — tout log porte -n et se termine par « -- » (A6) ; toute ref passée est refs/… ou un sha de 40 caractères (lignes log vues : 4 au moins)" "$(node "$AUX/argv.mjs" "$VF_GITLOG" | awk -F'|' '{print ($1>=4?"vu":"aveugle") "|" $2 "|" $3}')" "vu|0|0"
 unset VF_GITLOG
 export VF_SONDE_OUT="$WORK/sonde.out"; : > "$VF_SONDE_OUT"; rm -f "$VF_SONDE_OUT.charge"
 node --import "$AUX/sonde.mjs" "$AUX/temoin-sortant.mjs" > /dev/null 2>&1
@@ -371,7 +373,7 @@ assert_eq "M-BORNE — sans -n, 600 rangées au lieu de 500 : S2.1a rougit pour 
 assert_eq "M-COURT.0 — mutant avec effet (noms courts passés à log)" "$(mutant court 'const refLog = (r) => r.ref;' 'const refLog = (r) => r.ref.replace(/^refs\/(heads|remotes)\//, "");')" "effet"
 LIREM court "$WORK/r-host" > "$WORK/m-court-host.json"; LIREM court "$LAB" > "$WORK/m-court-lab.json"
 assert_eq "M-COURT — noms courts : le dépôt aux refs hostiles n'est plus lu (S2.5a rougit), alors que le lab sans nom hostile reste lu (le mutant ne casse que la raison visée)" "$(J "$WORK/m-court-host.json" 'j.etat')|$(J "$WORK/m-court-lab.json" 'j.etat')" "indisponible|ok"
-assert_eq "M-EOO-LOG.0 — mutant avec effet (--not placé avant les refs)" "$(mutant eoo "...nonMergees.map(refLog), '--not', refBase)" "'--not', refBase, ...nonMergees.map(refLog))")" "effet"
+assert_eq "M-EOO-LOG.0 — mutant avec effet (--not placé avant les refs)" "$(mutant eoo "...nonMergees.map(refLog), '--not', refBase, '--')" "'--not', refBase, ...nonMergees.map(refLog), '--')")" "effet"
 LIREM eoo "$WORK/r-trente" > "$WORK/m-eoo.json"
 assert_eq "M-EOO-LOG — --not avant les refs : aucune des 30 pointes n'a de rangée (S2.2 rougit pour sa raison, état ok)" "$(J "$WORK/m-eoo.json" 'j.etat+"|"+j.rangees.flatMap(r=>r.refs).filter(e=>/^b\d+$/.test(e.nom)).length')" "ok|0"
 assert_eq "M-NETTOIE.0 — mutant avec effet (la porte « le nom serait masqué » est retirée)" "$(mutant nettoie 'noms.every((n) => masque(n) === n)' 'true')" "effet"

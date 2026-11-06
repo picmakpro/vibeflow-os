@@ -51,7 +51,7 @@ import path from 'node:path';
 const [, , scripts, fn, lab, arg] = process.argv;
 let m, g;
 try { m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git-details.mjs')).href); } catch { console.log(JSON.stringify({ erreur: 'module absent' })); process.exit(0); }
-if (fn === 'commit') console.log(JSON.stringify(m.detailCommit(lab, arg)));
+if (fn === 'commit') console.log(JSON.stringify(await m.detailCommit(lab, arg))); // asynchrone (A4)
 else if (fn === 'wt') console.log(JSON.stringify(await m.etatWorktrees(lab)));
 else if (fn === 'git') { g = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href); console.log(JSON.stringify(g.lireGit(lab))); }
 else if (fn === 'status') console.log(JSON.stringify(m.lireStatusV2(arg, { max: 200 })));
@@ -288,7 +288,7 @@ assert_eq "X4 M-MOTIF — le motif est retiré des deux endroits (cibles présen
 verifie "M-MOTIF (sha court)" sonde_motif 400 "$D"
 verifie "M-MOTIF (64 caractères dans un dépôt sha1)" sonde_motif64 400 "$D"
 D="$(mutant_dir verify)"
-A="$(muter "$D/vf-cockpit-git-details.mjs" "if (v.sortie.trim() !== sha) return { code: 404, corps: { schema: SCHEMA_COMMIT, etat: 'commit-inconnu' } };" "")"
+A="$(muter "$D/vf-cockpit-git-details.mjs" "if (v.sortie.trim() !== sha) return v.delai || v.echeance ? ko200 : { code: 404, corps: { schema: SCHEMA_COMMIT, etat: 'commit-inconnu' } };" "")"
 assert_eq "X4 M-VERIFY — rev-parse --verify retiré (cible présente)" "$A" "applique"
 verifie "M-VERIFY (sha d'un arbre)" sonde_verify 404 "$D"
 D="$(mutant_dir pp)"
@@ -339,11 +339,178 @@ JS
 LAT() { PATH="$WRAP:$PATH" node "$AUX/lat.mjs" "$1" "$LAB" 2>&1 | tail -1; }
 assert_eq "X6.1 — pendant une lecture lente des worktrees (git emballé : > 1,5 s), une requête légère est servie AVANT la fin de la lecture ; la lecture aboutit (état ok)" "$(LAT "$SCRIPTS")" "true|ok|true"
 D="$(mutant_dir sync)"
-A1="$(muter "$D/vf-cockpit-git-details.mjs" "lancerGitAsync, " "")"
+A1="$(muter "$D/vf-cockpit-git-details.mjs" "lancerGitAsync, " "lancerGit, ")"
 A2="$(muter "$D/vf-cockpit-git-details.mjs" "export const BORNES_DETAILS" "const lancerGitAsync = async (...a) => lancerGit(...a); // MUTANT : appel git synchrone
 export const BORNES_DETAILS")"
 assert_eq "X6.2 — M-SYNC : le git de la lecture des worktrees redevient synchrone (cibles présentes)" "$A1|$A2" "applique|applique"
 assert_eq "X6.2 — M-SYNC : la requête légère n'est servie qu'APRÈS la lecture (légère avant lourde : false), la lecture aboutit et elle est lente (le rouge vient de l'ordre, pas d'un module cassé)" "$(LAT "$D")" "false|ok|true"
+
+echo "=== X7 — audit 2026-11-06 : A3 (worktree au lien retour non vérifié, P78-D-38), A4 (détail d'un commit non bloquant et borné), A6 (révision séparée des chemins) ==="
+# --- A3 : un worktree dont le lien retour n'est pas vérifié n'est JAMAIS lu ---
+mkdir -p "$WORK/wrap-j"; printf '#!/bin/sh\nprintf "ARGV %%s\\n" "$*" >> "%s/argv.log"\nexec "%s" "$@"\n' "$WORK" "$GIT_REEL" > "$WORK/wrap-j/git"; chmod +x "$WORK/wrap-j/git"
+mk_prog VICTIME 'cat'
+L3="$WORK/lab3"; "$GIT_REEL" init -q -b main "$L3"; L3="$(cd "$L3" && pwd -P)"
+printf 'x\n' > "$L3/a.txt"; "$GIT_REEL" -C "$L3" add -A; tick; "$GIT_REEL" -C "$L3" commit -q -m lab3
+WT3="$WORK/lab3-wt"; "$GIT_REEL" -C "$L3" worktree add -q -b w3 "$WT3" HEAD; WT3="$(cd "$WT3" && pwd -P)"
+# dépôt victime hors du lab (autre projet du poste) : fichier modifié (stat-dirty sous un filtre dont le programme pose VICTIME) et worktree propre à lui
+VI="$WORK/victime"; "$GIT_REEL" init -q -b main "$VI"; VI="$(cd "$VI" && pwd -P)"
+printf 's.txt filter=v\n' > "$VI/.gitattributes"; printf 'secret\n' > "$VI/s.txt"; "$GIT_REEL" -C "$VI" add -A; tick; "$GIT_REEL" -C "$VI" commit -q -m v
+"$GIT_REEL" -C "$VI" config filter.v.clean "$PROGS/VICTIME.sh"
+VW="$WORK/vw"; "$GIT_REEL" -C "$VI" worktree add -q -b vwb "$VW" HEAD; VW="$(cd "$VW" && pwd -P)"
+printf 'n1\n' > "$VI/nonsuivi1"; printf 'n2\n' > "$VI/nonsuivi2"; touch -t "$UNE_MIN" "$VI/s.txt" "$VW/s.txt"   # même contenu, date décalée : status relit le fichier, donc exécute le filtre
+mkdir -p "$VI/sous/dossier"; W4="$WORK/w4"; mkdir -p "$W4"; W4="$(cd "$W4" && pwd -P)"
+forge() { # forge <id> <chemin du worktree annoncé> : fausse entrée de worktree sous le dossier commun du lab
+  mkdir -p "$L3/.git/worktrees/$1"; printf '%s\n' "$2/.git" > "$L3/.git/worktrees/$1/gitdir"; printf 'ref: refs/heads/main\n' > "$L3/.git/worktrees/$1/HEAD"; printf '../..\n' > "$L3/.git/worktrees/$1/commondir"
+}
+forge evil "$VI"                    # (a) le .git du chemin est le dépôt PRINCIPAL d'un autre projet : un dossier qui n'est pas le dossier commun du lab
+forge evil2 "$VI/sous/dossier"      # (b) aucun .git dans ce dossier (git le découvrirait vers le haut : dans victime)
+forge evil3 "$VW"                   # (c) un vrai worktree... d'un AUTRE dépôt : son .git désigne <victime>/.git/worktrees/vwb (lien retour valide, mais hors <commun du lab>/worktrees)
+printf 'gitdir: %s\n' "$L3/.git/worktrees/$(basename "$WT3")" > "$W4/.git"; forge evil4 "$W4"   # (d) .git désigne l'administration d'un worktree RÉEL du lab (celle de lab3-wt), dont le fichier gitdir désigne en retour un autre .git
+raz
+"$GIT_REEL" --no-optional-locks -c core.fsmonitor=false -C "$VI" status --porcelain >/dev/null 2>&1   # sans verrou optionnel : l'index n'est pas rafraîchi, le fichier reste « stat-dirty » pour la suite
+assert_eq "X7.0 — témoin : un status BRUT dans la victime y exécute son filtre (le marqueur VICTIME se pose : la victime est réellement un dossier que lire ferait travailler) ; git voit bien les 4 faux worktrees dans la liste du lab" "$(marque VICTIME)|$("$GIT_REEL" -C "$L3" worktree list --porcelain | grep -c '^worktree ')" "posé|6"; # STATUTS <scripts> <sortie json> : lit les worktrees de lab3 sous l'emballage qui journalise l'argv, rend le nombre de status lancés AILLEURS que dans lab3 et lab3-wt (les deux worktrees vérifiables)
+STATUTS() { : > "$WORK/argv.log"; PATH="$WORK/wrap-j:$PATH" node "$AUX/det.mjs" "$1" wt "$L3" > "$2"; grep '^ARGV ' "$WORK/argv.log" | grep -E ' status( |$)' | grep -vc -e "-C $L3 " -e "-C $WT3 "; }
+NS_ETRANGERS="$(STATUTS "$SCRIPTS" "$WORK/lab3-wt.json")"
+assert_eq "X7.0a — témoin : l'emballage voit les status des deux worktrees vérifiables (la sonde X7.2 n'est pas aveugle)" "$(grep '^ARGV ' "$WORK/argv.log" | grep -E ' status( |$)' | grep -c -e "-C $L3 " -e "-C $WT3 ")" "2"
+assert_eq "X7.1 — A3 : seuls l'arbre principal et le vrai worktree sont « vérifiés » ; les 4 faux (principal d'un autre dépôt, dossier sans .git, worktree d'un autre dépôt, lien retour qui ne revient pas) ne le sont pas" "$(J "$WORK/lab3-wt.json" 'j.worktrees.map(w=>w.nom+":"+w.verifie).sort().join(" ")')" "dossier:false lab3-wt:true lab3:true victime:false vw:false w4:false"
+assert_eq "X7.2 — A3 : aucun status n'a été lancé hors de lab3 et lab3-wt (ni dans la victime, ni dans son worktree, ni dans le dossier sans .git, ni dans w4) : journal d'argv" "$NS_ETRANGERS" "0"
+assert_eq "X7.3 — A3 : un worktree non vérifié est servi sans comptes, sans propre, sans compte avance/retard et sans commande cd (tous null, plus faux)" "$(J "$WORK/lab3-wt.json" 'JSON.stringify(j.worktrees.filter(w=>!w.verifie).map(w=>[w.modifies,w.nonSuivis,w.propre,w.avance,w.retard,w.avanceOrigin,w.retardOrigin,w.commande,w.plus]).filter(a=>a.some(x=>x!==null&&x!==false)))')" "[]"
+assert_eq "X7.4 — témoin : les worktrees vérifiés sont lus comme avant (comptes numériques, propre, commande cd)" "$(J "$WORK/lab3-wt.json" 'JSON.stringify(j.worktrees.filter(w=>w.verifie).map(w=>[typeof w.modifies,w.propre,w.commande===null?"sans":"cd"]))')" '[["number",true,"cd"],["number",true,"cd"]]'
+node "$AUX/det.mjs" "$SCRIPTS" git "$L3" > "$WORK/lab3-git.json"
+assert_eq "X7.5 — A3, graphe (GET /api/vf/git) : chaque worktree porte verifie ; les faux n'ont aucune commande cd" "$(J "$WORK/lab3-git.json" 'j.worktrees.map(w=>w.nom+":"+w.verifie+":"+(w.commande===null?"sans":"cd")).sort().join(" ")')" "dossier:false:sans lab3-wt:true:cd lab3:true:sans victime:false:sans vw:false:sans w4:false:sans"
+# mutants A3
+D="$(mutant_dir lien)"
+A="$(muter "$D/vf-cockpit-git-details.mjs" "export function worktreeVerifie(communReel, chemin) {" "export function worktreeVerifie(communReel, chemin) { return true;")"
+assert_eq "X7 M-LIEN — la vérification est neutralisée (cible présente)" "$A" "applique"
+NSM="$(STATUTS "$D" "$WORK/m-lien.json")"
+assert_eq "X7 M-LIEN — rouge sur X7.1 ET X7.2 : les 4 faux sont « vérifiés » et 4 status sont lancés ailleurs que dans lab3 et lab3-wt (journal d'argv)" "$(J "$WORK/m-lien.json" 'j.worktrees.filter(w=>w.verifie).length')|$NSM" "6|4"
+D="$(mutant_dir retour)"
+A="$(muter "$D/vf-cockpit-git-details.mjs" "return reelOuNull(retour) === reelOuNull(dotgit) && reelOuNull(dotgit) !== null;" "return true;")"
+assert_eq "X7 M-RETOUR — le lien retour n'est plus comparé (cible présente)" "$A" "applique"
+NSM="$(STATUTS "$D" "$WORK/m-retour.json")"
+assert_eq "X7 M-RETOUR — rouge sur X7.1 : seul le cas (d) devient « vérifié » (w4:true), les trois autres restent refusés" "$(J "$WORK/m-retour.json" 'j.worktrees.map(w=>w.nom+":"+w.verifie).sort().join(" ")')" "dossier:false lab3-wt:true lab3:true victime:false vw:false w4:true"
+assert_eq "X7 M-RETOUR — rouge aussi sur X7.2 : un status est lancé dans w4 (journal d'argv)" "$NSM" "1"
+D="$(mutant_dir pere)"
+A="$(muter "$D/vf-cockpit-git-details.mjs" "if (!admin || path.dirname(admin) !== path.join(communReel, 'worktrees')) return false;" "if (!admin) return false;")"
+assert_eq "X7 M-PERE — l'administration n'est plus exigée sous <commun>/worktrees (cible présente)" "$A" "applique"
+NSM="$(STATUTS "$D" "$WORK/m-pere.json")"
+assert_eq "X7 M-PERE — rouge sur X7.1 : le worktree d'un AUTRE dépôt (vw) devient « vérifié »" "$(J "$WORK/m-pere.json" 'j.worktrees.map(w=>w.nom+":"+w.verifie).sort().join(" ")')" "dossier:false lab3-wt:true lab3:true victime:false vw:true w4:false"
+assert_eq "X7 M-PERE — rouge aussi sur X7.2 : un status est lancé dans le worktree de l'autre dépôt (journal d'argv)" "$NSM" "1"
+D="$(mutant_dir principal)"
+A="$(muter "$D/vf-cockpit-git-details.mjs" "if (st.isDirectory()) return reelOuNull(dotgit) === communReel;" "if (st.isDirectory()) return true;")"
+assert_eq "X7 M-PRINCIPAL — tout dossier .git est accepté comme dépôt principal (cible présente)" "$A" "applique"
+NSM="$(STATUTS "$D" "$WORK/m-principal.json")"
+assert_eq "X7 M-PRINCIPAL — rouge sur X7.1 : le principal d'un autre dépôt (victime) devient « vérifié » et son status est lancé (journal d'argv : 1)" "$(J "$WORK/m-principal.json" 'j.worktrees.map(w=>w.nom+":"+w.verifie).sort().join(" ")')|$NSM" "dossier:false lab3-wt:true lab3:true victime:true vw:false w4:false|1"
+
+# --- A4 : détail d'un commit asynchrone (la boucle reste libre), borné en temps, renommages bornés ---
+mkdir -p "$WORK/wrap-dt"; printf '#!/bin/sh\nfor a in "$@"; do [ "$a" = diff-tree ] && exec sleep 1.2; done\nexec "%s" "$@"\n' "$GIT_REEL" > "$WORK/wrap-dt/git"; chmod +x "$WORK/wrap-dt/git"
+mkdir -p "$WORK/wrap-dt3"; printf '#!/bin/sh\nfor a in "$@"; do [ "$a" = diff-tree ] && exec sleep 3; done\nexec "%s" "$@"\n' "$GIT_REEL" > "$WORK/wrap-dt3/git"; chmod +x "$WORK/wrap-dt3/git"
+# lat2.mjs <scripts> <lab> <sha> : serveur http en processus avec le VRAI routeGit ; la lecture d'un commit part, 150 ms plus tard une requête légère ; rend « légère avant lourde | état | lourde lente »
+cat > "$AUX/lat2.mjs" <<'JS'
+import http from 'node:http';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab, sha] = process.argv;
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href);
+const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
+const srv = http.createServer((req, res) => {
+  const url = new URL(req.url, 'http://x');
+  if (url.pathname === '/legere') { res.end('ok'); return; }
+  if (!m.routeGit(req, res, url, { root: lab, json })) { res.writeHead(404); res.end(); }
+}).listen(0, '127.0.0.1', async () => {
+  const port = srv.address().port, t0 = Date.now();
+  const get = (p) => new Promise((ok) => http.get({ host: '127.0.0.1', port, path: p }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => ok({ ms: Date.now() - t0, b })); }));
+  const lourde = get('/api/vf/git/commit?sha=' + sha);
+  await new Promise((r) => setTimeout(r, 150));
+  const legere = await get('/legere');
+  const l = await lourde;
+  let etat = 'illisible'; try { etat = JSON.parse(l.b).etat; } catch {}
+  console.log(`${legere.ms < l.ms}|${etat}|${l.ms >= 1000}`);
+  srv.close(); process.exit(0);
+});
+JS
+LAT2() { PATH="$WORK/wrap-dt:$PATH" node "$AUX/lat2.mjs" "$1" "$LAB" "$C1" 2>&1 | tail -1; }
+assert_eq "X7.6 — A4 : pendant la lecture lente d'un commit (git emballé : diff-tree dort 1,2 s), une requête légère est servie AVANT la fin ; le détail aboutit (ok)" "$(LAT2 "$SCRIPTS")" "true|ok|true"
+D="$(mutant_dir syncdt)"
+A1="$(muter "$D/vf-cockpit-git-details.mjs" "import { lancerGitAsync, filtresDeclaresAsync, finDans }" "import { lancerGit, lancerGitAsync, filtresDeclaresAsync, finDans }")"
+A2="$(muter "$D/vf-cockpit-git-details.mjs" "const git = (a, opts = {}) => lancerGitAsync(lab, a, { fin, ...opts });" "const git = async (a, opts = {}) => lancerGit(lab, a, { ...opts }); // MUTANT : appel git synchrone")"
+assert_eq "X7 M-SYNC-COMMIT — le git du détail redevient synchrone (cibles présentes)" "$A1|$A2" "applique|applique"
+assert_eq "X7 M-SYNC-COMMIT — rouge sur X7.6 : la requête légère n'est servie qu'APRÈS la lecture (légère avant lourde : false), le détail aboutit et il est lent (le rouge vient de l'ordre, pas d'un module cassé)" "$(LAT2 "$D")" "false|ok|true"
+# borne en temps : echeanceMs abaissé à 600 ms, diff-tree dort 3 s : le détail rend « indisponible » en moins de 2 s, il n'attend pas
+cat > "$AUX/lim.mjs" <<'JS'
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab, sha] = process.argv;
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git-details.mjs')).href);
+m.BORNES_DETAILS.echeanceMs = 600;
+const t = Date.now(); const r = await m.detailCommit(lab, sha);
+console.log(`${Date.now() - t < 2000}|${r.corps.etat}`);
+JS
+LIM() { PATH="$WORK/wrap-dt3:$PATH" node "$AUX/lim.mjs" "$1" "$LAB" "$C1" 2>&1 | tail -1; }
+assert_eq "X7.7 — A4 : lecture bornée en temps par BORNES_DETAILS.echeanceMs (600 ms, git emballé endormi 3 s) : « indisponible » en moins de 2 s" "$(LIM "$SCRIPTS")" "true|indisponible"
+D="$(mutant_dir sansech)"
+A="$(muter "$D/vf-cockpit-git-details.mjs" "const fin = finDans(BORNES_DETAILS.echeanceMs); // A4" "const fin = finDans(60000); // A4")"
+assert_eq "X7 M-SANS-ECHEANCE — l'échéance globale du détail n'est plus celle de BORNES_DETAILS (cible présente)" "$A" "applique"
+assert_eq "X7 M-SANS-ECHEANCE — rouge sur X7.7 : le détail attend la fin du git endormi (plus de 2 s) puis aboutit (ok)" "$(LIM "$D")" "false|ok"
+# renommages : 450 fichiers renommés ET modifiés (détection inexacte, la seule coûteuse), au-delà de BORNES_DETAILS.renommages (400) git ne la tente plus : ajout + suppression ; 5 renommages restent détectés
+RN="$WORK/ren"; "$GIT_REEL" init -q -b main "$RN"; RN="$(cd "$RN" && pwd -P)"; mkdir -p "$RN/a" "$RN/p"
+node -e 'const fs=require("fs");for(let i=0;i<450;i++){let s="";for(let k=0;k<20;k++)s+="ligne "+i+" "+k+"\n";fs.writeFileSync(process.argv[1]+"/a/f"+i+".txt",s)}for(let i=0;i<5;i++){let s="";for(let k=0;k<20;k++)s+="petit "+i+" "+k+"\n";fs.writeFileSync(process.argv[1]+"/p/g"+i+".txt",s)}' "$RN"
+"$GIT_REEL" -C "$RN" add -A; tick; "$GIT_REEL" -C "$RN" commit -q -m "ajout"
+# noms de base DIFFÉRENTS (git devine d'abord les renommages à nom de base identique, sans la recherche exhaustive que -l borne), contenu légèrement modifié
+node -e 'const fs=require("fs"),r=process.argv[1];fs.mkdirSync(r+"/b");fs.mkdirSync(r+"/q");for(let i=0;i<450;i++){fs.renameSync(r+"/a/f"+i+".txt",r+"/b/h"+i+".txt");fs.appendFileSync(r+"/b/h"+i+".txt","ligne ajoutée\n")}for(let i=0;i<5;i++){fs.renameSync(r+"/p/g"+i+".txt",r+"/q/k"+i+".txt");fs.appendFileSync(r+"/q/k"+i+".txt","ligne ajoutée\n")}' "$RN"
+"$GIT_REEL" -C "$RN" add -A; tick; "$GIT_REEL" -C "$RN" commit -q -m "renommages"; HR="$("$GIT_REEL" -C "$RN" rev-parse HEAD)"
+assert_eq "X7.8a — témoin : git, SANS borne, voit 455 renommages inexacts dans ce commit (la fixture exerce bien la détection coûteuse)" "$("$GIT_REEL" -C "$RN" diff-tree -r -M --name-status --no-commit-id "$HR" | grep -c '^R')" "455"
+R8="$(node "$AUX/det.mjs" "$SCRIPTS" commit "$RN" "$HR")"
+assert_eq "X7.8 — A4 : au-delà de 400 fichiers, la détection de renommages n'est plus tentée (455 renommages deviennent 910 entrées : total 910, aucun ancien chemin) ; borne de 500 fichiers lus inchangée" "$(node "$AUX/j.mjs" - 'j.corps.total+"|"+j.corps.fichiers.filter(f=>f.ancien!==null).length+"|"+j.corps.fichiers.length' <<< "$R8")" "910|0|500"
+D="$(mutant_dir renom)"
+A="$(muter "$D/vf-cockpit-git-details.mjs" '`-l${BORNES_DETAILS.renommages}`, ' "")"
+assert_eq "X7 M-SANS-BORNE-RENOMMAGES — l'option -l<n> est retirée (cible présente)" "$A" "applique"
+R8M="$(node "$AUX/det.mjs" "$D" commit "$RN" "$HR")"
+assert_eq "X7 M-SANS-BORNE-RENOMMAGES — rouge sur X7.8 : git cherche les 455 renommages (total 455, anciens chemins présents) : le coût exhaustif est de retour" "$(node "$AUX/j.mjs" - 'j.corps.total+"|"+(j.corps.fichiers.filter(f=>f.ancien!==null).length>0)' <<< "$R8M")" "455|true"
+
+# --- A6 : toute révision passée à git est séparée des chemins (--) ; un fichier de l'arbre nommé comme une ref ou un sha ne rend rien indisponible ---
+AM="$WORK/amb"; "$GIT_REEL" init -q -b main "$AM"; AM="$(cd "$AM" && pwd -P)"
+printf 'a\n' > "$AM/a.txt"; "$GIT_REEL" -C "$AM" add -A; tick; "$GIT_REEL" -C "$AM" commit -q -m base
+"$GIT_REEL" -C "$AM" checkout -q -b feat; printf 'f\n' > "$AM/f.txt"; "$GIT_REEL" -C "$AM" add -A; tick; "$GIT_REEL" -C "$AM" commit -q -m "sur feat"; "$GIT_REEL" -C "$AM" checkout -q main
+"$GIT_REEL" -C "$AM" worktree add -q -b wamb "$WORK/wamb" HEAD
+SAM="$("$GIT_REEL" -C "$AM" rev-parse HEAD)"
+assert_eq "X7.9a — avant le piège : lireGit ok, détail du commit ok, worktrees ok" "$(node "$AUX/det.mjs" "$SCRIPTS" git "$AM" | node "$AUX/j.mjs" - 'j.etat')|$(node "$AUX/det.mjs" "$SCRIPTS" commit "$AM" "$SAM" | node "$AUX/j.mjs" - 'j.corps.etat')|$(node "$AUX/det.mjs" "$SCRIPTS" wt "$AM" | node "$AUX/j.mjs" - 'j.etat')" "ok|ok|ok"
+mkdir -p "$AM/refs/heads"; printf 'piege\n' > "$AM/refs/heads/main"; printf 'piege\n' > "$AM/refs/heads/feat"; printf 'piege\n' > "$AM/$SAM"; printf 'piege\n' > "$AM/HEAD"
+assert_eq "X7.9 — A6 : avec des fichiers de l'arbre nommés comme les refs (refs/heads/main, refs/heads/feat), un sha et HEAD : la lecture du graphe reste ok, le détail du commit aussi, l'état des worktrees aussi" "$(node "$AUX/det.mjs" "$SCRIPTS" git "$AM" | node "$AUX/j.mjs" - 'j.etat+"|"+j.rangees.length')|$(node "$AUX/det.mjs" "$SCRIPTS" commit "$AM" "$SAM" | node "$AUX/j.mjs" - 'j.corps.etat')|$(node "$AUX/det.mjs" "$SCRIPTS" wt "$AM" | node "$AUX/j.mjs" - 'j.etat+"|"+j.worktrees[0].avance')" "ok|2|ok|ok|0"
+# classe, par le journal d'argv : TOUTE lecture qui passe une révision (liste dérivée par grep des appels lancerGit* et shBorne : log, rev-list, diff-tree dans git.mjs, git-details.mjs, arbres.mjs ; rev-parse --verify n'a pas d'ambiguïté fichier/révision, mesuré) porte « -- »
+cat > "$AUX/retard.mjs" <<'JS'
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, chemin, base] = process.argv;
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-arbres.mjs')).href);
+console.log(JSON.stringify(m.retard({ chemin, base, commonDir: null })));
+JS
+JOURNAL() { : > "$WORK/argv.log"; ( export PATH="$WORK/wrap-j:$PATH"; node "$AUX/det.mjs" "$1" git "$AM" >/dev/null 2>&1; node "$AUX/det.mjs" "$1" commit "$AM" "$SAM" >/dev/null 2>&1; node "$AUX/det.mjs" "$1" wt "$AM" >/dev/null 2>&1; node "$AUX/retard.mjs" "$1" "$AM" main >/dev/null 2>&1 ); }
+sans_tirets() { grep '^ARGV ' "$WORK/argv.log" | grep -E ' (log|rev-list|diff-tree)( |$)' | grep -vc -e ' -- *$' ; }
+nb_revs() { grep '^ARGV ' "$WORK/argv.log" | grep -cE ' (log|rev-list|diff-tree)( |$)'; }
+JOURNAL "$SCRIPTS"
+assert_eq "X7.10 — A6 classe : sur les quatre lectures (graphe, détail, worktrees, retard), les lancements de log, rev-list et diff-tree sont tous terminés par « -- » ; il y en a au moins 6 (la sonde voit les appels)" "$([ "$(nb_revs)" -ge 6 ] && echo oui || echo "non:$(nb_revs)")|$(sans_tirets)" "oui|0"
+# mutants A6 : un « -- » retiré à la fois rougit le comportement (X7.9) ou le journal (X7.10), pour cette raison
+mut_amb() { # mut_amb <nom> <fichier> <de> <vers> : retire un « -- » et rend « tirets manquants|état du graphe|état du détail »
+  local d; d="$(mutant_dir "$1")"; [ "$(muter "$d/$2" "$3" "$4")" = applique ] || { echo "ancre absente"; return; }
+  JOURNAL "$d"; echo "$(sans_tirets)|$(node "$AUX/det.mjs" "$d" git "$AM" | node "$AUX/j.mjs" - 'j.etat')|$(node "$AUX/det.mjs" "$d" commit "$AM" "$SAM" | node "$AUX/j.mjs" - 'j.corps.etat')"
+}
+assert_eq "X7 M-TIRETS-LOG1 — le « -- » du log de la base est retiré : le graphe devient indisponible (X7.9) et le journal compte 1 lancement sans « -- » (X7.10)" "$(mut_amb tl1 vf-cockpit-git.mjs "...tetes, '--'); //" "...tetes); //")" "1|indisponible|ok"
+assert_eq "X7 M-TIRETS-LOG2 — le « -- » du log des branches non mergées est retiré : le graphe devient indisponible (branche non mergée feat) et 1 lancement sans « -- »" "$(mut_amb tl2 vf-cockpit-git.mjs "'--not', refBase, '--')" "'--not', refBase)")" "1|indisponible|ok"
+assert_eq "X7 M-TIRETS-DETAIL-LOG — le « -- » du log -1 du détail est retiré : le détail devient indisponible, 1 lancement sans « -- »" "$(mut_amb tdl vf-cockpit-git-details.mjs "'--end-of-options', sha, '--']);" "'--end-of-options', sha]);")" "1|ok|indisponible"
+assert_eq "X7 M-TIRETS-DETAIL-DT — le « -- » du diff-tree du détail est retiré : le détail devient indisponible, 1 lancement sans « -- »" "$(mut_amb tdd vf-cockpit-git-details.mjs "'--root', sha]), '--'], {" "'--root', sha])], {")" "1|ok|indisponible"
+assert_eq "X7 M-TIRETS-COMPTE — le « -- » du rev-list de compteLR est retiré : aucun comportement ne change (git ne se plaint pas d'une plage), mais le journal le voit (2 lancements sans « -- », un par worktree lu) : la classe est tenue par le journal" "$(mut_amb tcm vf-cockpit-git-details.mjs '`${base}...${oid}`, '"'--'"'], { fin })' '`${base}...${oid}`], { fin })')" "2|ok|ok"
+assert_eq "X7 M-TIRETS-RETARD — le « -- » du rev-list --count d'arbres.mjs est retiré : le journal le voit (1 lancement sans « -- »)" "$(mut_amb tre vf-cockpit-arbres.mjs '`HEAD..${ref}`, '"'--'"')' '`HEAD..${ref}`)')" "1|ok|ok"
+
+# --- A8 : le message d'un commit servi par le détail est privé de tout caractère de catégorie Cf (classe de `nettoie`), pas seulement du bidi ---
+CF="$WORK/cf"; "$GIT_REEL" init -q -b main "$CF"; CF="$(cd "$CF" && pwd -P)"; printf 'x\n' > "$CF/a.txt"; "$GIT_REEL" -C "$CF" add -A
+tick; "$GIT_REEL" -C "$CF" commit -q -m "$(printf 'sujet\n\nco\xe2\x80\x8brps\xe2\x80\xae fin\xef\xbb\xbf\xe2\x81\xa0 caf\xc3\xa9')"; HCF="$("$GIT_REEL" -C "$CF" rev-parse HEAD)"
+assert_eq "X7.11a — témoin : git conserve bien U+200B, U+202E, U+FEFF et U+2060 dans le message (la sonde n'est pas aveugle)" "$("$GIT_REEL" -C "$CF" log -1 --format=%B | LC_ALL=C grep -c $'\xe2\x80\x8b')" "1"
+assert_eq "X7.11 — A8 : le message servi n'a plus aucun caractère Cf (largeur nulle, bidi, U+FEFF, U+2060) et garde le texte accentué : « corps fin café »" "$(node "$AUX/det.mjs" "$SCRIPTS" commit "$CF" "$HCF" | node "$AUX/j.mjs" - 'JSON.stringify(j.corps.message)+"|"+/\p{Cf}/u.test(j.corps.message)')" '"sujet\n\ncorps fin café"|false'
+D="$(mutant_dir cfmsg)"
+A="$(muter "$D/vf-cockpit-git-details.mjs" '\u2029\p{Cf}]/gu; // la classe' '\u2029\u202a-\u202e\u2066-\u2069]/g; // la classe')"
+assert_eq "X7 M-ILLISIBLE — la classe du message revient au seul bidi (cible présente)" "$A" "applique"
+assert_eq "X7 M-ILLISIBLE — rouge sur X7.11 : U+200B, U+FEFF et U+2060 restent dans le message" "$(node "$AUX/det.mjs" "$D" commit "$CF" "$HCF" | node "$AUX/j.mjs" - '/\p{Cf}/u.test(j.corps.message)')" "true"
 
 # --- FIN ---
 stop_srv

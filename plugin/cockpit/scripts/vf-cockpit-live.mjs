@@ -66,7 +66,9 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
   // « qui » : poussé seulement quand la liste change (pas à chaque seconde d'âge qui passe)
   const whoSig = (w) => JSON.stringify((w.workers || []).map((x) => [x.kind, x.id, x.tree, x.branch || '', !!x.stale, x.task || '', x.parent || '', x.etat || '', x.action ? `${x.action.verbe} ${x.action.cible}` : '', x.rattachement ? [x.rattachement.etat, x.rattachement.dag, x.rattachement.noeud, x.rattachement.raison].join('|') : '']));
 
-  let graph = buildProjectGraph(root), idx = index(graph), lock = lockStatus(), who = whoNow(), gitSig = signatureGit(root, { commun: common }); // 78-09
+  let graph = buildProjectGraph(root), idx = index(graph), lock = lockStatus(), who = whoNow(), gitSig = null, gitSemee = false; // 78-09
+  // A5 : la signature Git est asynchrone ; le premier calcul SEME gitSig sans événement (comme avant), les suivants (filet) n'émettent qu'au changement, et seulement une fois la graine posée
+  signatureGit(root, { commun: common }).then((gs) => { if (!stopped && !gitSemee) { gitSemee = true; gitSig = gs; } }, () => {});
   const snapshot = () => ({ seq: state.seq, lock, who });
   const emit = (nom, data) => { try { onEvent(nom, data); } catch (e) { log('error', `onEvent(${nom}) : ${e.message}`); } };
 
@@ -141,8 +143,10 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
     if (whoSig(nw) !== whoSig(who)) { who = nw; emit('who', { seq: ++state.seq, at: Date.now(), who }); }
     const n = lockStatus();
     if (JSON.stringify(n) !== JSON.stringify(lock)) { lock = n; emit('lock', { seq: ++state.seq, at: Date.now(), lock }); }
-    const gs = signatureGit(root, { commun: common }); // 78-09 : refs, worktrees, index ; un événement sans charge au seul changement
-    if (gs && gs !== gitSig) { gitSig = gs; emit('git', { seq: ++state.seq, at: Date.now(), sig: gs.slice(0, 16) }); }
+    signatureGit(root, { commun: common }).then((gs) => { // 78-09 : refs, worktrees, index ; un événement sans charge au seul changement. A5 : asynchrone, un git muet ne gèle plus la boucle
+      if (stopped || !gitSemee) return;
+      if (gs && gs !== gitSig) { gitSig = gs; emit('git', { seq: ++state.seq, at: Date.now(), sig: gs.slice(0, 16) }); }
+    }, () => {});
   } catch (e) { log('error', `filet : ${e.message}`); } }, NET_MS);
   filet.unref?.(); timers.add(filet);
 
