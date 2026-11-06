@@ -538,6 +538,12 @@ await executer(chrome, async (s) => {
       await mesurer(`${cle}/initial`);
       await basculer(); await mesurer(`${cle}/bascule`);
       await basculer(); await mesurer(`${cle}/retour`);
+      // 72.1 : de 701 à 1 279 px la barre garde son bord gauche quel que soit le panneau, donc seule sa HAUTEUR change le recouvrement : l'avertissement « connecter un outil d'IA » l'allonge vers le haut, la pastille doit remonter avec elle (rappel du ResizeObserver de la barre)
+      if (W >= 701 && W <= 1279) {
+        await s.ev(`(() => { const a = document.getElementById('ask'), w = document.getElementById('ask-warn'); if (!a || !w) return 0; a.classList.add('asking'); w.hidden = false; return 1; })()`); await pause(600);
+        await mesurer(`${cle}/avertissement`, { avert: await s.ev(`(() => { const w = document.getElementById('ask-warn'); return !!w && w.getBoundingClientRect().height > 0; })()`) });
+        await s.ev(`(() => { const a = document.getElementById('ask'), w = document.getElementById('ask-warn'); if (a) a.classList.remove('asking'); if (w) w.hidden = true; return 1; })()`); await pause(400);
+      }
       if (AVEC_VISITE.has(W)) { // visite affichée, panneau ouvert
         if (await s.ev(`document.body.classList.contains('no-panel')`)) await basculer();
         await s.ev(`window.VibeFlowTour && !window.VibeFlowTour.active() && window.VibeFlowTour.start()`); await pause(1400);
@@ -555,7 +561,7 @@ await executer(chrome, async (s) => {
     } catch (e) { erreurs[cle] = String(e.message).slice(0, 160); }
   }
   const mauvais = releves.filter((x) => !x.pastille || x.mal.length).map((x) => x.cle + ':' + (x.pastille ? x.mal.join('+') : 'sans-pastille'));
-  return { erreurs, n: releves.length, mauvais, avecAskOuvert: releves.filter((x) => x.ask && x.panneau).length, avecVisite: releves.filter((x) => x.tour).length, tactile: releves.filter((x) => x.coarse === true).length };
+  return { erreurs, n: releves.length, mauvais, avecAskOuvert: releves.filter((x) => x.ask && x.panneau).length, avecVisite: releves.filter((x) => x.tour).length, avertissements: releves.filter((x) => x.avert === true).length, tactile: releves.filter((x) => x.coarse === true).length };
 });
 JS
 cat > "$AUX/chrome-defaut.mjs" <<'JS'
@@ -818,7 +824,7 @@ mut_geom M-ASK-RESTE vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert
 mut_geom M-VISITE-RESTE vf-cockpit-terminal-tiroir.mjs 's|window.VibeFlowTour.end();|void 0;|' G1visite
 run_pastille "$OUT" 0; PA="$PJ"
 assert_eq "T21.7 (D-06) — tiroir fermé : la pastille ne recouvre ni la barre de question, ni la feuille de détail, ni le zoom, ni la visite, de 390 à 1280 px, panneau dans son état initial, basculé, rebasculé, visite affichée, et en état tactile" "$(rj "$PA" '(j.erreur||JSON.stringify(j.erreurs))+" "+JSON.stringify(j.mauvais)')" "{} []"
-assert_eq "T21.8 — témoin de T21.7 : au moins 36 relevés pris, au moins 6 avec #ask affiché ET panneau ouvert, au moins 5 avec la visite affichée, au moins 3 en état tactile (sinon T21.7 est vert à vide)" "$(rj "$PA" '(j.n>=36&&j.avecAskOuvert>=6&&j.avecVisite>=5&&j.tactile>=3)?"ok":"n="+j.n+" ask="+j.avecAskOuvert+" visite="+j.avecVisite+" tactile="+j.tactile')" "ok"
+assert_eq "T21.8 — témoin de T21.7 : au moins 36 relevés pris, au moins 6 avec #ask affiché ET panneau ouvert, au moins 5 avec la visite affichée, au moins 3 en état tactile, au moins 6 avec l'avertissement de la barre réellement affiché de 701 à 1 279 px (sinon T21.7 est vert à vide)" "$(rj "$PA" '(j.n>=36&&j.avecAskOuvert>=6&&j.avecVisite>=5&&j.tactile>=3&&j.avertissements>=6)?"ok":"n="+j.n+" ask="+j.avecAskOuvert+" visite="+j.avecVisite+" tactile="+j.tactile+" avert="+j.avertissements')" "ok"
 mut_pastille() { # mut_pastille <nom> <expression-sed> : le mutant doit laisser au moins un relevé en défaut (témoin : au moins 8 relevés, aucune erreur)
   if mutant "$1" vf-cockpit-terminal-tiroir.mjs "$2"; then
     srv "$MUT_OUT" 1; PM="$(node "$AUX/chrome-pastille.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":1}")"; unsrv
@@ -826,7 +832,7 @@ mut_pastille() { # mut_pastille <nom> <expression-sed> : le mutant doit laisser 
   else sans_effet "$1"; fi
 }
 mut_pastille M-PASTILLE-SUR-ASK 's|if (sur(n.getBoundingClientRect(), kb)) n.style.bottom|if (false) n.style.bottom|'
-mut_pastille M-PASTILLE-SANS-RAPPEL "s|ask.addEventListener('transitionend', surTransition);||"
+mut_pastille M-PASTILLE-SANS-RAPPEL "s|if (window.ResizeObserver) new ResizeObserver(eviterTout).observe(ask); ||" # 72.1 : refondu, la barre ne change plus de bord gauche de 701 à 1 279 px ; le rappel qui compte est celui de sa taille (le rappel de fin de transition ne prouve plus rien : il ne rattrape que le décalage latéral, qui ne recouvre plus la pastille)
 
 echo "=== T22 — hauteur par défaut proportionnelle à la fenêtre (recette 71, G4 ; P71-D-37) ==="
 run_defaut "$OUT"; D="$DJ"

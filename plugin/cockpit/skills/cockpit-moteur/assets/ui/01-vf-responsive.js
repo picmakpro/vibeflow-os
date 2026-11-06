@@ -73,6 +73,9 @@
       #ask-form { padding-top: var(--sp-4); padding-bottom: var(--sp-4); padding-right: var(--sp-4); }
       #ask-input, #ask-send { height: 32px; } #ask-send { width: 32px; }
     }
+    @media (min-width: 701px) and (max-width: 1279px) { /* barre et pastille au même bord gauche (--edge) : la barre ne se centre plus dans l'aire laissée par le panneau (24 à 1 024 px, 28 à 768 px contre 16). Au-delà de 1 279 px elle reste centrée : la pastille ne la rencontre jamais. */
+      #ask { left: var(--edge); transform: none; width: min(700px, calc(100% - var(--pw) - 2 * var(--edge))); }
+    }
     @media (max-width: 999px), (pointer: coarse) {
       #ask-form { padding-top: var(--sp-4); padding-bottom: var(--sp-4); padding-right: var(--sp-4); }
     }
