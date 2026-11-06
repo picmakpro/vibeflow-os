@@ -11,6 +11,8 @@ Le cockpit est une page locale en lecture seule, sauf le terminal intégré que 
 posées en français) et `Code` (carte du code). Il est servi sur `127.0.0.1` uniquement ; aucun appel sortant, hors
 l'agent `claude -p` confiné qui répond aux questions de l'onglet Projet.
 
+Avec `--terminal`, les cartes de phase et de mission portent « Lancer » : un clic propose une session `claude`, écrite dans le terminal seulement après un geste dans le terminal.
+
 ## Lancer
 
 1. Résoudre le lanceur : `.claude/scripts/vf-cockpit.mjs` s'il existe dans le lab (poses `project` et `local`),

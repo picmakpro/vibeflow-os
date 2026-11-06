@@ -1,5 +1,21 @@
 # Changelog — cockpit
 
+## v1.4.0 — 2026-11-06 — non publié
+
+Phase 72 : lancer du travail depuis les cartes du cockpit (jalon vibeflow-v2.0, compartiment fiabilité), avec `--terminal` seulement. Un clic sur une carte propose, le terminal dispose : rien ne s'exécute sans un geste dans le terminal. Numéro de version recalculé à la fusion (P71-PL-12) : mineure suivante de la v1.3.3 de `origin/main`. Les gestes de release racine (version, tag, release GitHub) restent humains.
+
+Décisions : arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-05, pour P72-D-01 à P72-D-07 (Q2, mode de permission, réponse libre mot pour mot : « choix + hérité don bypass ») ; décisions d'ordonnancement de la session principale pour P72-D-08 ; décisions du manager (vf-dev-manager, 2026-11-05) pour P72-D-09 à P72-D-19 ; arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-06, pour P72-D-20 (« Fichier du lab (Recommandé) »), P72-D-21 (« Geste humain exigé (Recommandé) ») et P72-D-22 (« Garder, risque écrit (Recommandé) »).
+
+### Ajouté — Lancer du travail depuis les cartes (Phase 72)
+- **Cartes** (LANC-01, LANC-02) : action principale selon l'état de la phase et menu des autres verbes sur les cartes de phase et de mission. Sans `--terminal` : aucun bouton, aucune route `POST`, aucun script ajouté, politique de contenu identique (P72-D-17).
+- **Route et canal** (LANC-03, LANC-04) : `POST /api/vf/lancer` (`Host`, `Origin` exacte, jeton en temps constant, JSON borné, schéma fermé) ; proposition transmise par l'IPC du serveur au processus du terminal ; liste des cibles calculée par le serveur depuis le disque.
+- **Gabarit et double geste** (LANC-05 à LANC-07) : ligne fermée `claude --session-id '<uuid>' -n '<nom>' [--permission-mode '<mode>'] '/vf-dev <intention>'`, alphabet revalidé par l'assistant PTY ; bouton armé après 1 s ; ligne écrite sans retour chariot, terminal au repos seulement ; refus `ecriture` (410) quand la ligne n'a pas pu être écrite.
+- **Pré-vols** (LANC-08) : bloquants et avertissements de P72-D-06 ; emplacement « travail non commité » inactif (P72-D-07, Phase 78).
+- **Mode de permission** (LANC-09) : `default`, `acceptEdits`, `plan` et « hérité du poste » (aucun drapeau) ; le dernier mode choisi est présélectionné, gardé dans un fichier du lab tenu par le processus du terminal (P72-D-02bis, P72-D-20).
+- **Suivi** (LANC-10) : identifiant de session généré, carte « lancée » rattachée à l'onglet Équipe.
+- **Continuer le chat** (LANC-11) : case décochée par défaut, reprise par `claude -r '<uuid>' --fork-session` ; sonde A5 verte sur Claude Code 2.1.318 ; geste humain exigé pour retenir l'identifiant (P72-D-21) ; résiduel d'un script de la page Projet accepté et écrit au README (P72-D-22).
+- **Suites** (LANC-12) : `test-cockpit-lancer-gabarit.sh`, `-cibles.sh`, `-post.sh`, `-q.sh`, `-ui.sh`, `-suivi.sh`, `-bandeau.sh`, `-serveur.sh`, `-processus.sh`, `-pty.sh`, `-xss.sh`, `-bout-en-bout.sh`, `-chat.sh`, `-mode.sh`.
+
 ## v1.3.3 — 2026-11-05 — non publié
 
 Réglage visuel (demande de Samuel, session principale, 2026-11-05) : tiroir fermé, la pastille « Terminal » se place sous les boutons de zoom (− ▢ +), au plus bas à gauche, et les boutons de zoom remontent au-dessus d'elle ; plus de chevauchement. Tiroir ouvert, rien ne change. Vaut pour les pages Projet et Code.
