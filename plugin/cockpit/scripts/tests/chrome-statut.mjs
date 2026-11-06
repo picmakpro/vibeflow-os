@@ -7,6 +7,7 @@ await executer(chrome, async (s) => {
   await s.attendre("document.readyState === 'complete' && !!window.VibeFlow && !!window.__vfFrTraduire && !!document.querySelector('.vf-now .vst')", 'page Projet rendue');
   return await s.ev(`(() => { const w = document.createTreeWalker(document.body, 4); const visibles = [], sous = [];
     while (w.nextNode()) { const n = w.currentNode, p = n.parentElement; if (!p || /^(SCRIPT|STYLE)$/.test(p.tagName)) continue; const t = n.nodeValue.trim();
-      if (/\\b(ready_to_plan|ready_to_execute|milestone_complete)\\b/.test(t)) visibles.push(t.slice(0, 120)); if (/^Jalon .* · phase /.test(t)) sous.push(t.slice(0, 120)); }
+      if (/\\b(ready_to_plan|ready_to_execute|milestone_complete)\\b/.test(t)) visibles.push(t.slice(0, 120)); }
+    const d = document.querySelector('#ctx-desc'); if (d) sous.push(d.textContent.trim().slice(0, 120));
     return { visibles, sousTitre: sous[0] || null, pastille: document.querySelector('.vf-now .vst')?.textContent || null }; })()`);
 });

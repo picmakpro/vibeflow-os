@@ -26,19 +26,19 @@
     .vf-git-tiroir.vf-git-entree { animation: vf-git-entree 250ms var(--ease) both; }
     @keyframes vf-git-entree { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
     .vf-git-barre { flex: none; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px 0 16px; background: var(--raise); border-bottom: 1px solid var(--hair); }
-    .vf-git-titre-t { margin: 0; font: 500 13px var(--sans); color: var(--text); }
+    .vf-git-titre-t { margin: 0; font: 600 13px var(--sans); color: var(--text); }
     .vf-git-titre-t:focus { outline: none; }
     .vf-git-fermer { margin-left: auto; }
     .vf-git-fermer, .vf-git-btn { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: var(--text-2); cursor: pointer; }
     .vf-git-fermer:hover, .vf-git-btn:hover { background: var(--raise-2); color: var(--text); }
     .vf-git-tiroir button:focus-visible, .vf-git-rangee:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
-    .vf-git-aide { margin: 0; padding: 8px 16px; font-size: 12px; color: var(--text-3); }
+    .vf-git-aide { margin: 0; padding: 8px 16px; font-size: 12.5px; color: var(--text-3); }
     .vf-git-corps { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 16px; font-family: var(--sans); overflow-x: hidden; }
     .vf-git-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     body.vf-git-ouvert #context { opacity: 0; }
     .vf-git-sec { margin-top: 12px; }
     .vf-git-sec-t, .vf-git-merg-b { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 0; border: 0; background: none; color: var(--text-3); font: 600 11.5px var(--sans); letter-spacing: .02em; cursor: pointer; text-align: left; }
-    .vf-git-merg-b { font-weight: 500; letter-spacing: 0; margin-top: 8px; }
+    .vf-git-merg-b { font-weight: 400; letter-spacing: 0; margin-top: 8px; }
     .vf-git-sec-t .meta { margin-left: auto; }
     .vf-git-sec-t svg { transition: transform 200ms var(--ease); }
     .vf-git-sec-t[aria-expanded="true"] svg { transform: rotate(90deg); }
@@ -57,18 +57,21 @@
     .vf-git-msg, .vf-git-mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     .vf-git-sha, .vf-git-mono, .vf-git-ref, .vf-git-cmd code { font-family: var(--mono); }
     .vf-git-mono { font-size: 11.5px; }
-    .vf-git-ref { flex: 0 1 auto; min-width: 0; max-width: 140px; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; background: rgba(var(--ink), .06); color: var(--text-2); }
-    .vf-git-ref svg { width: 12px; height: 12px; }
+    .vf-git-ref { flex: 0 1 auto; min-width: 0; max-width: 140px; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; white-space: nowrap; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 400; background: rgba(var(--ink), .06); color: var(--text-2); }
+    .vf-git-ref-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* seul le nom de la ref cède (ellipse) ; HEAD, l'icône et le message restent entiers */
+    .vf-git-ref-head { flex: none; max-width: none; }
+    .vf-git-ref svg { flex: none; width: 12px; height: 12px; }
     .vf-git-ref-cur { background: var(--on); color: var(--on-text); } .vf-git-ref-tag { background: var(--raise); }
     .vf-git-ref-distante { background: none; border: 1px solid var(--hair-2); color: var(--text-3); }
-    .vf-git-plus { margin: 2px 0 0; font: 10.5px var(--mono); color: var(--text-4); }
+    .vf-git-plus { margin: 2px 0 0; font: 11.5px var(--mono); color: var(--text-4); }
     .vf-git-liste { display: flex; flex-direction: column; gap: 4px; }
     .vf-git-wt-l, .vf-git-st, .vf-git-aut { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-radius: var(--r-ctl); background: var(--raise); }
-    .vf-git-ligne-d { white-space: nowrap; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 12px; border-radius: var(--r-ctl); font-size: 12px; color: var(--text-3); }
+    .vf-git-ligne-d { white-space: nowrap; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 12px; border-radius: var(--r-ctl); font-size: 12.5px; color: var(--text-3); }
     .vf-git-liste > .vf-git-ligne-d:hover { background: rgba(var(--ink), .06); }
     .vf-git-wt-l .vf-git-ligne-d, .vf-git-st .vf-git-ligne-d, .vf-git-aut .vf-git-ligne-d { padding: 0; }
-    .vf-git-gras { font-size: 12.5px; font-weight: 500; color: var(--text); }
-    .vf-git-ici { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: var(--on); color: var(--on-text); font-size: 10.5px; font-weight: 600; }
+    .vf-git-gras { font-size: 12.5px; font-weight: 600; color: var(--text); }
+    .vf-git-mono.vf-git-entier { flex: none; overflow: visible; } /* identifiant de stash : toujours entier, le message cède */
+    .vf-git-ici { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: var(--on); color: var(--on-text); font-size: 11.5px; font-weight: 600; }
     .vf-git-ligne-d .meta { margin-left: auto; } .vf-git-sous { margin-top: 8px; font-size: 11.5px; color: var(--text-3); }
     .vf-git-cmd { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 28px; padding: 4px 4px 4px 12px; border-radius: var(--r-ctl); background: var(--well); }
     .vf-git-cmd code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--text-2); user-select: text; }

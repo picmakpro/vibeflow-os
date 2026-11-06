@@ -24,3 +24,29 @@ Pourquoi ces rouges valent quelque chose : D1 à D3 (même serveur, mêmes fixtu
 - Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-git-tiroir.sh` (assertion D8.2 « P78-D-33 », style rendu des pastilles : couleur = `--text-2`, fond transparent, glyphe ✓/◐).
 - Attendu : `true|true|true|true|true`. Obtenu AVANT le code (CSS `--warn-text`/`--ok-text` sur fond `rgba(var(--ink), .06)`) : `true|false|false|false|false` (97 réussis, 1 échoué). Log : scratchpad `78-fix-rouge-tiroir.log`.
 - Après : 98 réussis, 0 échoué (`78-fix-vert-tiroir.log`).
+
+
+## Correction design (critique fraîche du 2026-11-06 : F2, F12, F14, F15)
+
+Suite : section D10 de `test-cockpit-git-tiroir.sh` (réponse `/api/vf/git` figée, branche et message de la rangée de tête rallongés dans la page, stash rallongé). Rouge AVANT le code (`78-design-d10-rouge.log` du scratchpad : 5 PASS / 15 FAIL), vert après (`78-design-tiroir-vert.log`, puis suite complète rc 0).
+
+| Assertion | Attendu | Obtenu (rouge) |
+|---|---|---|
+| D10.1 [1440 px] — HEAD toujours entier : texte « HEAD », jamais coupé | `HEAD\|false` | `HEAD\|true` |
+| D10.1 [1440 px] — le nom de branche est tronqué avec « … » dans un span interne | `true\|true\|ellipsis` | `false\|true\|ellipsis` |
+| D10.1 [999 px] — le nom de branche est tronqué avec « … » dans un span interne | `true\|true\|ellipsis` | `false\|true\|ellipsis` |
+| D10.1 [390 px] — HEAD toujours entier : texte « HEAD », jamais coupé | `HEAD\|false` | `HEAD\|true` |
+| D10.1 [390 px] — le nom de branche est tronqué avec « … » dans un span interne | `true\|true\|ellipsis` | `false\|true\|ellipsis` |
+| D10.2 [1440 px] — l'identifiant du stash est toujours entier (stash@{0}, stash@{1}), jamais coupé | `stash@{0}:false,stash@{1}:false` | `stash@{0}:true,stash@{1}:false` |
+| D10.3 [1440 px] — glyphes ✓ ◐ ○ : texte alternatif vide (content: '…' / '') pour les trois | `vide,vide,vide` | `"✓ ","◐ ","○ "` |
+| D10.3 [1440 px] — arbre d'accessibilité : aucun glyphe ✓ ◐ ○ lu, les mots propre, modifié, non suivi restent | `0\|true,true,true` | `4\|true,true,true` |
+| D10.4 [1440 px] — quatre tailles de police au plus, toutes dans {11.5, 12.5, 13, 15} (liste + indisponible) | `ok` | `10.5px,11px,12px` |
+| D10.4 [1440 px] — deux graisses au plus (liste + indisponible) | `ok` | `400,500,600` |
+| D10.2 [390 px] — l'identifiant du stash est toujours entier (stash@{0}, stash@{1}), jamais coupé | `stash@{0}:false,stash@{1}:false` | `stash@{0}:true,stash@{1}:false` |
+| D10.3 [390 px] — glyphes ✓ ◐ ○ : texte alternatif vide (content: '…' / '') pour les trois | `vide,vide,vide` | `"✓ ","◐ ","○ "` |
+| D10.3 [390 px] — arbre d'accessibilité : aucun glyphe ✓ ◐ ○ lu, les mots propre, modifié, non suivi restent | `0\|true,true,true` | `4\|true,true,true` |
+| D10.4 [390 px] — quatre tailles de police au plus, toutes dans {11.5, 12.5, 13, 15} (liste + indisponible) | `ok` | `10.5px,11px,12px` |
+| D10.4 [390 px] — deux graisses au plus (liste + indisponible) | `ok` | `400,500,600` |
+
+Lecture : F2 — `HEAD` coupé en « HEA » (1440 et 390 px) et nom de branche sans span interne (`.vf-git-ref` portait l'ellipse en `display:flex`) ; F12 — `stash@{0}` coupé quand message et branche sont longs (sur la donnée courte la mesure restait verte : fixture rallongée avant de compter le témoin) ; F14 — le contenu des trois `::before` est exposé (`✓ `, `◐ `, `○ `), quatre nœuds de glyphe dans l'arbre d'accessibilité (`Accessibility.getFullAXTree`) ; F15 — tailles 10,5 / 11 / 12 hors de {11,5 ; 12,5 ; 13 ; 15}, trois graisses (400, 500, 600).
+Gardes vertes dès le départ : D10.1 troisième assertion (aucune étiquette ne dépasse la gauche du message ni la droite de la ligne ; HEAD entier à 999 px) — conservée comme garde de non-régression.

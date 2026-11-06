@@ -80,3 +80,30 @@ Obtenu (rouge, 285 PASS / 6 FAIL, `78-04-responsive-rouge.log` du scratchpad) :
 Cause : le téléphone (≤ 700 px, `02-vf-telephone.js`, P70-D-01) tient l'en-tête sur une rangée et range toute action de `.hr` dans le menu « ⋯ » ; le bouton de 44 px s'y ajoutait.
 Correction : sous 700 px le bouton est masqué (`display: none !important`) ; le menu « ⋯ » le reprend sous le libellé « Historique Git » (span `.bl`), son clic relaie `vf-git:basculer` ; entre 701 et 999 px il reste l'icône de 44 px en tête de `.hr`.
 Vert : `test-cockpit-responsive.sh` rc 0 ; H4.1 réécrit (768 et 999 px : ouvreur visible ; 375 et 700 px : absent de la rangée ; entrée « Historique Git » du menu, clic -> `vf-git:basculer` source `ouvreur`) : 74 réussis, 0 échoué.
+
+
+## Correction design (critique fraîche du 2026-11-06 : F1, F3, F5, F6, F8, F9, F11, F13 ; P78-D-34, P78-D-35)
+
+Mandat de correction ciblée de `mgr78-reprise`. Chaque propriété est MESURÉE dans Chrome (style calculé, boîtes, texte, rangées) par la suite `test-cockpit-git-entete.sh` (sections H4 et H7). Rouge joué AVANT le code, sur le code d'avant la correction (`78-design-entete-rouge.log` du scratchpad : 84 PASS / 14 FAIL), puis vert (`78-design-entete-vert2.log`, 98 PASS / 0 FAIL).
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-git-entete.sh` ; labs : `depot` + worktree `wt-a` (F1, F5, F6, F8, F11), worktree `wt-long` à branche longue (F13), lab sans git, lab à `current_phase: 2` (F9).
+
+| Assertion | Attendu | Obtenu (rouge) |
+|---|---|---|
+| H4.1 — 1000 px : ligne masquée, ouvreur 44 × 44 en tête de .hr (P78-D-34, icône de 701 à 1279 px) | `false\|true\|44\|44\|true` | `true\|false\|0\|0\|true` |
+| H4.1 — 1100 px : ligne masquée, ouvreur 44 × 44 en tête de .hr (P78-D-34, icône de 701 à 1279 px) | `false\|true\|44\|44\|true` | `true\|false\|0\|0\|true` |
+| H4.1 — 1279 px : ligne masquée, ouvreur 44 × 44 en tête de .hr (P78-D-34, icône de 701 à 1279 px) | `false\|true\|44\|44\|true` | `true\|false\|0\|0\|true` |
+| H6.2 — Projet : surtitre, titre « Jalon <jalon> », sous-titre = phases faites (le titre n'y est plus répété, voir H7.9) | `Projet\|Jalon vibeflow-test\|1 phase faite sur 2.` | `Projet\|Jalon vibeflow-test\|Jalon vibeflow-test · en exécution.` |
+| H7.1 — / (lab dans un worktree wt-a) : le panneau dit « depot », sans « wt-a » ni suffixe « — Projet » / « — Équipe » | `depot\|depot\|false\|false` | `depot\|wt-a\|true\|false` |
+| H7.1 — /project.html (lab dans un worktree wt-a) : le panneau dit « depot », sans « wt-a » ni suffixe « — Projet » / « — Équipe » | `depot\|depot\|false\|false` | `depot\|wt-a — Projet\|true\|true` |
+| H7.1 — /equipe.html (lab dans un worktree wt-a) : le panneau dit « depot », sans « wt-a » ni suffixe « — Projet » / « — Équipe » | `depot\|depot\|false\|false` | `depot\|wt-a — Équipe\|true\|true` |
+| H7.6 — « Branche indisponible » : contraste ≥ 4,5:1 dans les deux thèmes (fond du corps opaque) | `true\|true\|true` | `false\|true\|true` |
+| H7.11 — HEAD détaché : texte neutre (même couleur que var(--text-3)) dans les deux thèmes | `true\|true` | `false\|false` |
+| H7.8 — anneau de focus de la seconde ligne : aucune intersection avec la boîte du nom (aire en px²) | `0` | `279.6875` |
+| H7.5 — de 700 à 1000 px, l'en-tête passe sur deux rangées aux mêmes largeurs avec et sans git | `700:1 710:2 720:2 730:2 740:2 750:2 760:2 770:2 780:2 790:2 800:2 810:2 820:2 830:2 840:2 850:2 860:2 870:1 880:1 890:1 900:1 910:1 920:1 930:1 940:1 950:1 960:1 970:1 98…` | `700:1 710:2 720:2 730:2 740:2 750:2 760:2 770:2 780:2 790:2 800:2 810:2 820:2 830:2 840:2 850:2 860:2 870:2 880:2 890:2 900:2 910:2 920:2 930:2 940:1 950:1 960:1 970:1 98…` |
+| H7.13 — aucune coupure en plein mot dans le titre du bloc de vue (coupures hors « / », « - », espace) | `` | `k\|p,i\|t` |
+| H7.9 — Projet : le sous-titre ne contient ni le titre ni le nom du jalon | `false\|false` | `true\|true` |
+| H7.9 — Projet : le sous-titre résume la vue (« Phase N en cours, k phases faites sur n. ») | `Phase 2 en cours, 1 phase faite sur 2.` | `Jalon vibeflow-test · phase 2 · en exécution.` |
+
+Lecture : F1 (H7.1, trois onglets) — le panneau disait `wt-a`, `wt-a — Projet`, `wt-a — Équipe` pendant que l'en-tête disait `depot` ; F3 (H4.1 à 1000, 1100, 1279 px) — seconde ligne visible et ouvreur absent ; F5 (H7.5) — l'en-tête repasse sur une rangée à 940 px avec git contre 870 px sans (la base flex de `.hc` fait le saut de ligne, pas la largeur de la recherche : une première tentative sur `#search-btn` laissait le seuil à 940, constaté en injectant le CSS dans la page avant d'écrire le correctif) ; F6 (H7.6) — contraste sous 4,5:1 ; F8 (H7.8) — l'anneau de focus (décalage +2 px) recouvre 279,7 px² du nom ; F9 (H7.9, H6.2) — le sous-titre répétait le titre ; F11 (H7.11) — couleur d'avertissement ; F13 (H7.13) — coupure `k|p`, `i|t` en plein mot.
+Témoins verts d'emblée, preuves que la mesure n'est pas vide : H7.5 « deux régimes » (le lab sans git passe bien de deux rangées à une) et H7.13 « le titre passe sur deux lignes » ; H7.8 pose `:focus-visible` vrai et contour `solid`.
+Vert : H4 (1000, 1100, 1279 px : icône 44 × 44 en tête de `.hr` ; 1280 et 1440 px : seconde ligne, ouvreur caché ; une rangée, aucun bouton hors fenêtre ni superposé), H6.2, H7.1 à H7.13, toutes PASS.

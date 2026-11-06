@@ -25,8 +25,8 @@
     .vf-git-d-plus { color: var(--ok-text); } .vf-git-d-moins { color: var(--err-text); }
     .vf-git-d-chemin { min-width: 0; font-family: var(--mono); color: var(--text-2); overflow-wrap: anywhere; }
     .vf-git-etat-wt { display: flex; flex-wrap: wrap; gap: 4px; }
-    .vf-git-pastille { padding: 2px 8px; border-radius: 999px; background: none; font-size: 11px; font-weight: 500; color: var(--text-2); }
-    .vf-git-p-ok::before { content: '✓ '; } .vf-git-p-warn::before { content: '◐ '; } .vf-git-p-nonsuivi::before { content: '○ '; } .vf-git-p-mono { font-family: var(--mono); }
+    .vf-git-pastille { padding: 2px 8px; border-radius: 999px; background: none; font-size: 11.5px; font-weight: 400; color: var(--text-2); }
+    .vf-git-p-ok::before { content: '✓ ' / ''; } .vf-git-p-warn::before { content: '◐ ' / ''; } .vf-git-p-nonsuivi::before { content: '○ ' / ''; } /* glyphe décoratif : texte alternatif vide, le mot qui suit reste lu */ .vf-git-p-mono { font-family: var(--mono); }
     .vf-git-mention { margin-top: 8px; }
     @media (max-width: 999px), (pointer: coarse) { .vf-git-det .btn { min-height: 44px; } }
   `;

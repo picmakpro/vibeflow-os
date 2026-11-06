@@ -70,7 +70,8 @@
     return svg;
   };
   const etiquette = (e) => {
-    const p = el('span', `vf-git-ref vf-git-ref-${e.type}${e.courante ? ' vf-git-ref-cur' : ''}`, e.nom, { title: e.nom });
+    const p = el('span', `vf-git-ref vf-git-ref-${e.type}${e.courante ? ' vf-git-ref-cur' : ''}`, null, { title: e.nom });
+    p.appendChild(el('span', 'vf-git-ref-t', e.nom)); // le nom seul porte l'ellipse : HEAD (flex: none) reste entier, l'icône aussi
     if (e.type === 'tag') p.prepend(ico('M4 4h8l8 8-8 8-8-8z'));
     else if (e.worktree) p.prepend(ico('M3 7h7l2 2h9v10H3z'));
     return p;
@@ -132,7 +133,7 @@
   const sectionTags = (l) => !l || !l.length ? null : section('Tags', l.length, liste(l.map((t) => ligne(mono(t.nom, 'vf-git-gras'), mono(t.h7), el('span', null, relatif(t.at))))), false, 'vf-git-s-tags');
   const sectionStash = (l, annonce) => {
     if (!l || !l.length) return null;
-    return section('Stash', l.length, liste(l.map((s) => { const d = el('div', 'vf-git-st'); d.append(ligne(mono(s.ref, 'vf-git-gras'), el('span', null, s.message), mono(s.branche || ''), el('span', null, relatif(s.at))), commande(s.commande, annonce)); return d; })), false, 'vf-git-s-stash');
+    return section('Stash', l.length, liste(l.map((s) => { const d = el('div', 'vf-git-st'); d.append(ligne(mono(s.ref, 'vf-git-gras vf-git-entier'), el('span', 'vf-git-msg', s.message), mono(s.branche || ''), el('span', null, relatif(s.at))), commande(s.commande, annonce)); return d; })), false, 'vf-git-s-stash');
   };
   const sectionAuteurs = (auteurs, parBranche) => {
     if (!auteurs || !auteurs.length) return null;

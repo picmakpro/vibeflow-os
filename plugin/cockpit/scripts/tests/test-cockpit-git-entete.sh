@@ -142,7 +142,7 @@ const [base, page] = ARGS;
 await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow`, 'page rendue');
 return await s.ev(`(() => ({ nom: document.querySelector('#proj-name').textContent, entete: document.querySelector('header').textContent,
-  titre: document.title, attendu: String(window.VibeFlow.graph.project.name || '').replace(/ — (Projet|Équipe)$/, ''),
+  titre: document.title, attendu: window.VibeFlow.graph.meta.rootName,
   ligne: (document.querySelector('.vf-git-ligne') || {}).textContent || null }))()`);
 JS
   for pg in / /project.html /equipe.html; do
@@ -224,12 +224,16 @@ const [base] = ARGS;
 await s.naviguer(base + '/');
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne')`, 'seconde ligne');
 const res = {};
-for (const w of [375, 700, 768, 999, 1000, 1440]) {
+for (const w of [375, 700, 768, 999, 1000, 1100, 1279, 1280, 1440]) {
   await s.send('Emulation.setDeviceMetricsOverride', { width: w, height: 800, deviceScaleFactor: 1, mobile: false });
   res[w] = await s.stable(`(() => { const l = document.querySelector('.vf-git-ligne'), o = document.querySelector('#vf-git-ouvreur'), h = document.querySelector('header');
     const r = o ? o.getBoundingClientRect() : { width: 0, height: 0 };
     return { ligneVisible: getComputedStyle(l).display !== 'none' && l.getBoundingClientRect().width > 0, ouvreurVisible: !!o && getComputedStyle(o).display !== 'none' && r.width > 0,
-      w: Math.round(r.width), h: Math.round(r.height), debord: h.scrollWidth > h.clientWidth + 1, premier: o ? o.parentElement.firstElementChild === o && o.parentElement.classList.contains('hr') : false }; })()`, 'mesure à ' + w);
+      w: Math.round(r.width), h: Math.round(r.height), debord: h.scrollWidth > h.clientWidth + 1, premier: o ? o.parentElement.firstElementChild === o && o.parentElement.classList.contains('hr') : false,
+      rangees: h.getBoundingClientRect().height > 80 ? 2 : 1,
+      hors: [...document.querySelectorAll('header .hr > *')].filter((e) => e.getClientRects().length).filter((e) => e.getBoundingClientRect().right > innerWidth + 0.5).length,
+      chevauche: (() => { const k = [...document.querySelectorAll('header .hr > *')].filter((e) => e.getClientRects().length).map((e) => e.getBoundingClientRect()); let n = 0;
+        for (let i = 0; i < k.length; i++) for (let j = i + 1; j < k.length; j++) if (k[i].left < k[j].right - 0.5 && k[j].left < k[i].right - 0.5 && k[i].top < k[j].bottom - 0.5 && k[j].top < k[i].bottom - 0.5) n++; return n; })() }; })()`, 'mesure à ' + w);
 }
 // téléphone (≤ 700 px) : l'ouvreur quitte la rangée et vit dans le menu « ⋯ » (02-vf-telephone.js, P70-D-01) ; l'entrée relaie le clic
 await s.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -241,17 +245,20 @@ res.menu.basculer = await s.ev(`window.__bas`);
 return res;
 JS
   R="$(cdp "$AUX/h4.js" "$BASE" 2>&1 | tail -1)"
-  for w in 768 999; do
-    assert_eq "H4.1 — ${w} px : ligne masquée, ouvreur 44 × 44 en tête de .hr" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible, j['$w'].w, j['$w'].h, j['$w'].premier].join('|')" 2>/dev/null)" "false|true|44|44|true"
+  for w in 768 999 1000 1100 1279; do
+    assert_eq "H4.1 — ${w} px : ligne masquée, ouvreur 44 × 44 en tête de .hr (P78-D-34, icône de 701 à 1279 px)" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible, j['$w'].w, j['$w'].h, j['$w'].premier].join('|')" 2>/dev/null)" "false|true|44|44|true"
   done
   for w in 375 700; do
     assert_eq "H4.1 — ${w} px (téléphone) : ligne masquée, ouvreur absent de la rangée" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible].join('|')" 2>/dev/null)" "false|false"
   done
   assert_eq "H4.1 — téléphone : l'ouvreur est une entrée du menu « ⋯ » et son clic émet vf-git:basculer" "$(jq_ "$R" '[j.menu.entrees.includes("Historique Git"), j.menu.basculer.join(",")].join("|")' 2>/dev/null)" "true|ouvreur"
-  for w in 1000 1440; do
-    assert_eq "H4.1 — ${w} px : ligne visible, ouvreur caché" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible].join('|')" 2>/dev/null)" "true|false"
+  for w in 1280 1440; do
+    assert_eq "H4.1 — ${w} px : ligne visible, ouvreur caché (P78-D-34, seconde ligne dès 1280 px)" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible].join('|')" 2>/dev/null)" "true|false"
   done
-  assert_eq "H4.1 — aucun débordement horizontal de l'en-tête (6 largeurs)" "$(jq_ "$R" 'Object.values(j).filter((m) => m.debord).length' 2>/dev/null)" "0"
+  assert_eq "H4.1 — aucun débordement horizontal de l'en-tête (largeurs mesurées)" "$(jq_ "$R" 'Object.values(j).filter((m) => m.debord).length' 2>/dev/null)" "0"
+  for w in 1000 1100 1279 1280 1440; do
+    assert_eq "H4.1 — ${w} px : une seule rangée, aucun bouton hors fenêtre ni superposé dans .hr" "$(jq_ "$R" "[j['$w'].rangees, j['$w'].hors, j['$w'].chevauche].join('|')" 2>/dev/null)" "1|0|0"
+  done
   stop_srv
 
   echo "=== H3.1 — branche détachée ==="
@@ -266,7 +273,7 @@ return await s.ev(`(() => { const l = document.querySelector('.vf-git-ligne'); r
 JS
   R="$(cdp "$AUX/h31.js" "$BASE" 2>&1 | tail -1)"
   assert_eq "H3.1 — la ligne dit « HEAD détaché · <sha7> »" "$(jq_ "$R" 'j.texte.replace(/ · worktree .*/, "")' 2>/dev/null)" "HEAD détaché · $SHA7"
-  assert_eq "H3.1 — marquée détachée (couleur d'avertissement)" "$(jq_ "$R" 'j.detache' 2>/dev/null)" "true"
+  assert_eq "H3.1 — marquée détachée (classe ; la couleur reste neutre, voir H7.11)" "$(jq_ "$R" 'j.detache' 2>/dev/null)" "true"
   stop_srv
 
   echo "=== H5 — dégradation sans git, texte venu de git rendu en texte ==="
@@ -329,7 +336,7 @@ JS
   assert_eq "H6.5 — témoin positif : le panneau d'ensemble est rendu (des sections)" "$(jq_ "$R" 'j.sections.length > 0' 2>/dev/null)" "true"
   assert_eq "H6.5 — aucun titre « Repositories » ni « Dépôts » dans le panneau, aucune ligne « branche @ sha »" "$(jq_ "$R" '[j.sections.filter((t) => /^(Repositories|Dépôts)/.test(t)).length, j.depots].join("|")' 2>/dev/null)" "0|0"
   R="$(cdp "$AUX/h6.js" "$BASE" /project.html 2>&1 | tail -1)"
-  assert_eq "H6.2 — Projet : surtitre, titre « Jalon <jalon> », sous-titre = résumé du projet" "$(jq_ "$R" '[j.k, j.h1, j.p === j.resume].join("|")' 2>/dev/null)" "Projet|Jalon vibeflow-test|true"
+  assert_eq "H6.2 — Projet : surtitre, titre « Jalon <jalon> », sous-titre = phases faites (le titre n'y est plus répété, voir H7.9)" "$(jq_ "$R" '[j.k, j.h1, j.p].join("|")' 2>/dev/null)" "Projet|Jalon vibeflow-test|1 phase faite sur 2."
   assert_eq "H6.3 — Projet : le titre ne répète pas le nom du projet" "$(jq_ "$R" '[j.h1.includes(j.nomProjet), /vf-ctx-titre/.test(j.cls)].join("|")' 2>/dev/null)" "false|true"
   R="$(cdp "$AUX/h6.js" "$BASE" /equipe.html 2>&1 | tail -1)"
   assert_eq "H6.2 — Équipe sans mission : « Aucune mission en cours », « L'équipe est au repos. »" "$(jq_ "$R" '[j.k, j.h1, j.p].join("|")' 2>/dev/null)" "Équipe|Aucune mission en cours|L'équipe est au repos."
@@ -359,6 +366,104 @@ JS
   stop_srv
   build_serve "$NOGIT"; R="$(cdp "$AUX/h6.js" "http://127.0.0.1:$PORT" / 2>&1 | tail -1)"; stop_srv
   assert_eq "H6.1 — Code sans git : « Le code du projet », « … lus dans le dossier. »" "$(jq_ "$R" '[j.k, j.h1, /^[0-9]+ .*lus dans le dossier\.$/.test(j.p)].join("|")' 2>/dev/null)" "Code|Le code du projet|true"
+
+  echo "=== H7 — correction design de la critique fraîche (78-04 : F1, F5, F6, F8, F9, F11, F13 ; F3 est dans H4) ==="
+  PRETH7="document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow"
+  # F1 : un seul nom, celui du dépôt principal, dans tout le cockpit (panneau compris), sans suffixe ; le titre de l'onglet garde le nom du dossier du lab (inchangé)
+  cat > "$AUX/h7-nom.js" <<'JS'
+const [base, page] = ARGS;
+await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+await s.naviguer(base + page);
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow && !!document.querySelector('#panel .pt')`, 'page et panneau rendus');
+await s.ev(`new Promise((r) => setTimeout(r, 500))`);
+return await s.ev(`(() => { const G = window.VibeFlow.graph, T = G.meta.vfTab, p = document.querySelector('#panel');
+  return { nom: document.querySelector('#proj-name').textContent, pt: [...p.querySelectorAll('.pt')].map((e) => e.textContent), panneauWt: /wt-a/.test(p.innerText), suffixe: / — (Projet|Équipe)/.test(p.innerText),
+    titre: document.title, attendu: T === 'equipe' ? 'Équipe · ' + G.meta.rootName : G.meta.rootName + ' — ' + (T === 'project' ? 'Projet' : 'Code') }; })()`);
+JS
+  ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WT"; BASE="http://127.0.0.1:$PORT"
+  for pg in / /project.html /equipe.html; do
+    R="$(cdp "$AUX/h7-nom.js" "$BASE" "$pg" 2>&1 | tail -1)"
+    assert_eq "H7.1 — $pg (lab dans un worktree wt-a) : le panneau dit « depot », sans « wt-a » ni suffixe « — Projet » / « — Équipe »" "$(jq_ "$R" '[j.nom, j.pt.join("+"), j.panneauWt, j.suffixe].join("|")' 2>/dev/null)" "depot|depot|false|false"
+    assert_eq "H7.1 — $pg : le titre de l'onglet garde sa forme (nom du dossier du lab, R6.1 inchangé)" "$(jq_ "$R" 'j.titre === j.attendu ? "inchangé" : j.titre + " ≠ " + j.attendu' 2>/dev/null)" "inchangé"
+  done
+  # F6, F8, F11 : couleurs et anneau de focus de la seconde ligne
+  cat > "$AUX/h7-ligne.js" <<'JS'
+const [base] = ARGS;
+await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+await s.naviguer(base + '/');
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne') && getComputedStyle(document.querySelector('.vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
+const out = {};
+const evt = (nom, d) => s.ev(`window.dispatchEvent(new CustomEvent('${nom}', { detail: ${JSON.stringify(d)} }))`);
+const mesure = `(() => { const rgb = (c) => c.match(/[\\d.]+/g).slice(0, 3).map(Number), lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const l = document.querySelector('.vf-git-ligne'), a = lum(rgb(getComputedStyle(l).color)), b = lum(rgb(getComputedStyle(document.body).backgroundColor)), h = Math.max(a, b), c = Math.min(a, b);
+  const t = document.createElement('i'); t.style.color = 'var(--text-3)'; document.body.appendChild(t); const neutre = getComputedStyle(t).color; t.remove();
+  return { ratio: (h + 0.05) / (c + 0.05), couleur: getComputedStyle(l).color, neutre, bgOpaque: !/rgba\\(.*, 0\\)$/.test(getComputedStyle(document.body).backgroundColor) }; })()`;
+// F6 : « Branche indisponible », deux thèmes
+await evt('vf-git:entete', { etat: 'indisponible', depot: 'depot' });
+out.indispo = {};
+for (const t of ['dark', 'light']) { await s.ev(`document.documentElement.setAttribute('data-theme', '${t}')`); out.indispo[t] = await s.ev(mesure); }
+// F11 : HEAD détaché, texte neutre
+await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: null, detache: true, sha7: 'abc1234', worktree: null });
+out.detache = {};
+for (const t of ['dark', 'light']) { await s.ev(`document.documentElement.setAttribute('data-theme', '${t}')`); out.detache[t] = await s.ev(mesure); }
+// F8 : anneau de focus au clavier
+await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: 'feat/x', detache: false, sha7: null, worktree: null });
+await s.ev(`document.querySelector('#vf-git-ligne').focus()`);
+await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Shift', code: 'ShiftLeft' }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Shift', code: 'ShiftLeft' });
+await s.ev(`document.activeElement.blur(); document.querySelector('#vf-git-ligne').focus()`);
+out.anneau = await s.ev(`(() => { const l = document.querySelector('#vf-git-ligne'), n = document.querySelector('#proj-name'), cs = getComputedStyle(l), e = parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth), r = l.getBoundingClientRect(), m = n.getBoundingClientRect();
+  const boite = { l: r.left - e, t: r.top - e, r: r.right + e, b: r.bottom + e }, x = Math.min(boite.r, m.right) - Math.max(boite.l, m.left), y = Math.min(boite.b, m.bottom) - Math.max(boite.t, m.top);
+  return { focusVisible: l.matches(':focus-visible'), style: cs.outlineStyle, aire: Math.max(0, x) * Math.max(0, y) }; })()`);
+return out;
+JS
+  R="$(cdp "$AUX/h7-ligne.js" "$BASE" 2>&1 | tail -1)"
+  assert_eq "H7.6 — « Branche indisponible » : contraste ≥ 4,5:1 dans les deux thèmes (fond du corps opaque)" "$(jq_ "$R" '[Math.min(j.indispo.dark.ratio, j.indispo.light.ratio) >= 4.5, j.indispo.dark.bgOpaque, j.indispo.light.bgOpaque].join("|")' 2>/dev/null)" "true|true|true"
+  assert_eq "H7.11 — HEAD détaché : texte neutre (même couleur que var(--text-3)) dans les deux thèmes" "$(jq_ "$R" '[j.detache.dark.couleur === j.detache.dark.neutre, j.detache.light.couleur === j.detache.light.neutre].join("|")' 2>/dev/null)" "true|true"
+  assert_eq "H7.8 — anneau de focus : témoin :focus-visible vrai et contour tracé" "$(jq_ "$R" '[j.anneau.focusVisible, j.anneau.style].join("|")' 2>/dev/null)" "true|solid"
+  assert_eq "H7.8 — anneau de focus de la seconde ligne : aucune intersection avec la boîte du nom (aire en px²)" "$(jq_ "$R" 'j.anneau.aire' 2>/dev/null)" "0"
+  # F5 : même seuil de passage sur deux rangées avec et sans git (701 à 939 px)
+  cat > "$AUX/h7-seuil.js" <<'JS'
+const [base] = ARGS;
+await s.naviguer(base + '/');
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow`, 'page rendue');
+const res = [];
+for (let w = 700; w <= 1000; w += 10) {
+  await s.send('Emulation.setDeviceMetricsOverride', { width: w, height: 800, deviceScaleFactor: 1, mobile: false });
+  res.push([w, (await s.stable(`document.querySelector('header').getBoundingClientRect().height > 80 ? 2 : 1`, 'rangées à ' + w))]);
+}
+return res;
+JS
+  NOG7="$WORK/hors-depot-7"; mk_lab "$NOG7"
+  stop_srv; build_serve "$NOG7"; RS0="$(cdp "$AUX/h7-seuil.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
+  ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WT"; RS1="$(cdp "$AUX/h7-seuil.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"
+  assert_eq "H7.5 — témoin : le lab sans git passe d'une rangée double à une rangée simple dans la plage mesurée" "$(jq_ "$RS0" 'j.some((m) => m[1] === 2) && j.some((m) => m[1] === 1) ? "deux régimes" : "un seul : " + JSON.stringify(j)' 2>/dev/null)" "deux régimes"
+  assert_eq "H7.5 — de 700 à 1000 px, l'en-tête passe sur deux rangées aux mêmes largeurs avec et sans git" "$(jq_ "$RS1" 'j.map((m) => m.join(":")).join(" ")' 2>/dev/null)" "$(jq_ "$RS0" 'j.map((m) => m.join(":")).join(" ")' 2>/dev/null)"
+  # F13 : le bloc de vue Code ne se coupe qu'après « / » ou « - » (ou une espace), jamais en plein mot ; branche longue, 768 px
+  WTL="$WORK/wt-long"; $GIT -C "$DEPOT" worktree add -q -b "feat/phase-78-git-cockpit-corrections-de-la-critique-fraiche" "$WTL" >/dev/null 2>&1
+  cat > "$AUX/h7-coupure.js" <<'JS'
+const [base] = ARGS;
+await s.send('Emulation.setDeviceMetricsOverride', { width: 768, height: 900, deviceScaleFactor: 1, mobile: false });
+await s.naviguer(base + '/');
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#context h1') && /feat/.test(document.querySelector('#context h1').textContent)`, 'bloc de vue Code');
+await s.ev(`new Promise((r) => setTimeout(r, 500))`);
+return await s.ev(`(() => { const h = document.querySelector('#context h1'), box = h.getBoundingClientRect(), w = document.createTreeWalker(h, NodeFilter.SHOW_TEXT), coupes = []; let prev = null, tout = '', lignes = new Set();
+  for (let n = w.nextNode(); n; n = w.nextNode()) for (let i = 0; i < n.data.length; i++) {
+    const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 1); const b = r.getBoundingClientRect(); tout += n.data[i];
+    if (!b.height || b.top >= box.bottom - 1) { prev = null; continue; } // hors du cadre (ligne écrêtée) ou sans boîte
+    lignes.add(Math.round(b.top));
+    if (prev !== null && b.top > prev.top + 2) coupes.push({ avant: tout[tout.length - 2], apres: n.data[i] });
+    prev = { top: b.top }; }
+  return { texte: h.textContent, lignes: lignes.size, coupes, enPleinMot: coupes.filter((c) => !/[\\/\\- ]/.test(c.avant)).map((c) => c.avant + '|' + c.apres), wbr: h.querySelectorAll('wbr').length }; })()`);
+JS
+  stop_srv; build_serve "$WTL"; R="$(cdp "$AUX/h7-coupure.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
+  assert_eq "H7.13 — témoin : le titre du bloc de vue Code passe bien sur deux lignes à 768 px (au moins une coupure mesurée)" "$(jq_ "$R" 'j.lignes >= 2 && j.coupes.length >= 1 ? "oui" : "non : " + j.lignes + " ligne(s)"' 2>/dev/null)" "oui"
+  assert_eq "H7.13 — aucune coupure en plein mot dans le titre du bloc de vue (coupures hors « / », « - », espace)" "$(jq_ "$R" 'j.enPleinMot.join(",")' 2>/dev/null)" ""
+  # F9 : bloc de vue Projet, sous-titre qui résume la vue sans répéter le titre
+  P97="$WORK/depot-f9"; mk_lab "$P97"; printf -- '---\nstatus: executing\nmilestone: vibeflow-test\ncurrent_phase: 2\n---\n# State\n' > "$P97/.planning/STATE.md"
+  $GIT -C "$P97" init -q -b main && $GIT -C "$P97" add -A && $GIT -C "$P97" commit -q -m init
+  build_serve "$P97"; R="$(cdp "$AUX/h6.js" "http://127.0.0.1:$PORT" /project.html 2>&1 | tail -1)"; stop_srv
+  assert_eq "H7.9 — Projet : le sous-titre ne contient ni le titre ni le nom du jalon" "$(jq_ "$R" '[j.p.includes(j.h1), j.p.includes("vibeflow-test")].join("|")' 2>/dev/null)" "false|false"
+  assert_eq "H7.9 — Projet : le sous-titre résume la vue (« Phase N en cours, k phases faites sur n. »)" "$(jq_ "$R" 'j.p' 2>/dev/null)" "Phase 2 en cours, 1 phase faite sur 2."
 
   echo "=== Mutants ==="
   # M-DEPOT : le nom du dépôt pris de --show-toplevel (le worktree) -> H1.1 et H2.2 rougissent

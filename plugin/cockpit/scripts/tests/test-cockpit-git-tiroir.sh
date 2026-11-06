@@ -3,6 +3,7 @@
 #   D1 ouverture depuis la seconde ligne, graphe servi, schéma vérifié · D2 sections, graphe complet, commandes à copier, états, XSS
 #   D3 clavier, focus, coexistence avec le Terminal et le zoom, mobile
 #   D7 détail d'un commit sous sa rangée · D8 clavier du graphe, état des worktrees · D9 rafraîchissement par vf-git:signal (78-10)
+#   D10 correction design de la critique fraîche (F2 étiquettes, F12 stash, F14 glyphes muets, F15 tailles et graisses)
 #   Mutants : M-HTML, M-COPIE, M-GLOBAL-G, M-HORS-DEPOT, M-DETAIL-HTML, M-SELECTION, M-RAFALE. La réponse `/api/vf/git` est figée (temoins/git-tiroir.json) et servie par un `fetch` remplacé dans la page.
 #   Chrome headless en CDP (SAUTÉ, jamais compté réussi, sans navigateur), ports éphémères. Exit 0 si tout passe, 1 sinon.
 
@@ -344,8 +345,9 @@ const out = {}, rect = (sel) => `(() => { const e = document.querySelector('${se
 if (mode === 'bureau') {
   for (const w of [1000, 1440]) {
     await fenetre(w, 800); await s.naviguer(base + '/'); await pret();
-    await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne');
-    await s.ev(`if (document.body.classList.contains('no-panel')) document.querySelector('#btn-panel').click(); document.querySelector('#vf-git-ligne').click()`);
+    const ouvreur = w < 1280 ? '#vf-git-ouvreur' : '#vf-git-ligne'; // P78-D-34 : l'icône de 701 à 1279 px, la seconde ligne dès 1280 px
+    await s.attendre(`getComputedStyle(document.querySelector('${ouvreur}')).display !== 'none'`, 'ouvreur');
+    await s.ev(`if (document.body.classList.contains('no-panel')) document.querySelector('#btn-panel').click(); document.querySelector('${ouvreur}').click()`);
     await s.attendre(`${OUVERT} && !document.body.classList.contains('no-panel')`, 'tiroir et panneau ouverts');
     out[w] = await s.stable(`({ tiroir: ${rect('#vf-git-tiroir')}, panel: ${rect('#panel')} })`, 'mesure ' + w);
   }
@@ -638,6 +640,76 @@ JS
   assert_eq "M-SELECTION — rougit D8.1 (deux détails ouverts) alors que le clavier du graphe marche (↓ ↓ ↑ -> 2e rangée)" "$(jq_ "$RM" '[j.unSeul.details > 1, j.bas2haut1.i, j.entree.details].join("|")' 2>/dev/null)" "true|1|1"
   mutant M-RAFALE 77-vf-git-vue-detail.js "clearTimeout(minuterie); minuterie = setTimeout(rafraichir, RAFALE);" "rafraichir();" d9-complet.js
   assert_eq "M-RAFALE — rougit D9.1 (une relecture par signal : 3 et 3 au lieu de 1 et 1) alors que la sélection est conservée" "$(jq_ "$RM" '[j.deltas.git, j.deltas.wt, j.selection.sel.join() === j.selection.attendu].join("|")' 2>/dev/null)" "3|3|true"
+fi
+
+echo "=== D10 — correction design de la critique fraîche (78-10 : F2, F12, F14, F15) ==="
+if [ -z "$CHROME" ]; then skip "D10" "pas de navigateur"; else
+  build_serve "$DEPOT"; BASE="http://127.0.0.1:$PORT"
+  # rangée de tête : HEAD, une branche très longue, un message long ; mesures à largeur donnée (le tiroir est ouvert par l'API de la page, l'ouvreur dépend de la largeur)
+  cat > "$AUX/d10-refs.js" <<'JS'
+const [base, w] = ARGS;
+await s.naviguer(base + '/');
+await s.send('Emulation.setDeviceMetricsOverride', { width: Number(w), height: 900, deviceScaleFactor: 1, mobile: false });
+await s.attendre(`document.readyState === 'complete' && !!window.VFGitTiroir`, 'tiroir prêt');
+await s.ev(`(() => { const r = window.__vfGit.reponse.rangees[0]; r.refs[1].nom = 'feature/' + 'x'.repeat(70); r.s = 'Un message de commit assez long pour mesurer le recouvrement des étiquettes'; })()`);
+await s.ev(`window.VFGitTiroir.ouvrir()`);
+await s.attendre(`document.querySelectorAll('#vf-git-tiroir li[role=option]').length > 0`, 'rangées');
+return await s.stable(`(() => { const l1 = document.querySelector('.vf-git-rangee .vf-git-l1'), L = l1.getBoundingClientRect(), m = l1.querySelector('.vf-git-msg').getBoundingClientRect();
+  return { l1: [L.left, L.right], msg: [m.left, m.right], refs: [...l1.querySelectorAll('.vf-git-ref')].map((e) => { const t = e.querySelector('.vf-git-ref-t') || e, r = e.getBoundingClientRect();
+    return { txt: e.textContent, interne: !!e.querySelector('.vf-git-ref-t'), coupe: t.scrollWidth > t.clientWidth + 0.5, ell: getComputedStyle(t).textOverflow, left: r.left, right: r.right }; }) }; })()`, 'rangée de tête');
+JS
+  for W in 1440 999 390; do
+    R="$(cdp "$AUX/d10-refs.js" "$BASE" "$W")"
+    assert_eq "D10.1 [$W px] — HEAD toujours entier : texte « HEAD », jamais coupé" "$(jq_ "$R" '[j.refs[0].txt, j.refs[0].coupe].join("|")' 2>/dev/null)" "HEAD|false"
+    assert_eq "D10.1 [$W px] — le nom de branche est tronqué avec « … » dans un span interne" "$(jq_ "$R" '[j.refs[1].interne, j.refs[1].coupe, j.refs[1].ell].join("|")' 2>/dev/null)" "true|true|ellipsis"
+    assert_eq "D10.1 [$W px] — le message n'est recouvert par aucune étiquette et les étiquettes restent dans la ligne" "$(jq_ "$R" 'j.refs.filter((e) => e.right > j.msg[0] + 0.5 || e.right > j.l1[1] + 0.5).length' 2>/dev/null)" "0"
+  done
+  # sections dépliées, stash entier, glyphes muets, tailles et graisses
+  cat > "$AUX/d10-sec.js" <<'JS'
+const [base, w] = ARGS;
+await s.naviguer(base + '/');
+await s.send('Emulation.setDeviceMetricsOverride', { width: Number(w), height: 900, deviceScaleFactor: 1, mobile: false });
+await s.attendre(`document.readyState === 'complete' && !!window.VFGitTiroir`, 'tiroir prêt');
+await s.send('Accessibility.enable');
+await s.ev(`(() => { const st = window.__vfGit.reponse.stash; st[0].message = 'Un message de remisage assez long pour pousser la rangée'; st[0].branche = 'feature/' + 'y'.repeat(40); })()`); // rangée de stash chargée : l'identifiant ne doit jamais céder la place
+await s.ev(`window.VFGitTiroir.ouvrir()`);
+await s.attendre(`document.querySelectorAll('#vf-git-tiroir li[role=option]').length > 0 && !!document.querySelector('#vf-git-s-stash')`, 'rangées et sections');
+await s.ev(`document.querySelectorAll('.vf-git-sec-t[aria-expanded="false"]').forEach((b) => b.click()); document.querySelectorAll('.vf-git-merg-b[aria-expanded="false"]').forEach((b) => b.click())`);
+await s.attendre(`!!document.querySelector('.vf-git-pastille')`, 'pastilles des worktrees');
+await s.ev(`document.querySelectorAll('.vf-git-rangee')[2].click()`);
+await s.attendre(`!!document.querySelector('.vf-git-det .vf-git-d-fichiers')`, 'détail ouvert');
+const out = {};
+out.stash = await s.stable(`[...document.querySelectorAll('.vf-git-st .vf-git-gras')].map((e) => ({ txt: e.textContent, coupe: e.scrollWidth > e.clientWidth + 0.5 }))`, 'stash');
+const tout = `(() => { const S = new Set(), W = new Set(); const hors = [];
+  for (const e of document.querySelectorAll('#vf-git-tiroir *')) {
+    if (e.closest('.vf-git-live') || !e.getClientRects().length) continue;
+    const direct = [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+    if (!direct) continue;
+    const c = getComputedStyle(e); S.add(c.fontSize); W.add(c.fontWeight); }
+  return { tailles: [...S].sort(), graisses: [...W].sort() }; })()`;
+out.styles = await s.ev(tout);
+// glyphes d'état : l'arbre d'accessibilité ne doit contenir aucun texte ✓ ◐ ○ et garder les mots
+const ax = await s.send('Accessibility.getFullAXTree');
+const noms = (ax.nodes || []).filter((n) => n.role && n.role.value === 'StaticText').map((n) => String((n.name && n.name.value) || ''));
+out.axGlyphes = noms.filter((t) => /[✓◐○]/.test(t));
+out.axMots = ['propre', 'modifié', 'non suivi'].map((m) => noms.some((t) => t.includes(m)));
+out.contenus = await s.ev(`['vf-git-p-ok', 'vf-git-p-warn', 'vf-git-p-nonsuivi'].map((c) => { const e = document.querySelector('.' + c); return e ? getComputedStyle(e, '::before').content : null; })`);
+// état indisponible : mêmes tailles et graisses (bouton « Réessayer » compris)
+await s.ev(`window.__vfGit.reponse = { schema: 'autre@1', etat: 'ok', rangees: [] }; window.VFGitTiroir.recharger()`);
+await s.attendre(`/Git est indisponible/.test(document.querySelector('#vf-git-tiroir').textContent)`, 'carte indisponible');
+const apres = await s.ev(tout);
+out.indispo = apres;
+return out;
+JS
+  for W in 1440 390; do
+    R="$(cdp "$AUX/d10-sec.js" "$BASE" "$W")"
+    assert_eq "D10.2 [$W px] — l'identifiant du stash est toujours entier (stash@{0}, stash@{1}), jamais coupé" "$(jq_ "$R" 'j.stash.map((e) => e.txt + ":" + e.coupe).join(",")' 2>/dev/null)" "stash@{0}:false,stash@{1}:false"
+    assert_eq "D10.3 [$W px] — glyphes ✓ ◐ ○ : texte alternatif vide (content: '…' / '') pour les trois" "$(jq_ "$R" 'j.contenus.map((c) => / \/ ""$/.test(c || "") ? "vide" : String(c)).join(",")' 2>/dev/null)" "vide,vide,vide"
+    assert_eq "D10.3 [$W px] — arbre d'accessibilité : aucun glyphe ✓ ◐ ○ lu, les mots propre, modifié, non suivi restent" "$(jq_ "$R" '[j.axGlyphes.length, j.axMots.join(",")].join("|")' 2>/dev/null)" "0|true,true,true"
+    assert_eq "D10.4 [$W px] — quatre tailles de police au plus, toutes dans {11.5, 12.5, 13, 15} (liste + indisponible)" "$(jq_ "$R" '[...new Set([...j.styles.tailles, ...j.indispo.tailles])].filter((t) => ["11.5px", "12.5px", "13px", "15px"].indexOf(t) < 0).join(",") || "ok"' 2>/dev/null)" "ok"
+    assert_eq "D10.4 [$W px] — deux graisses au plus (liste + indisponible)" "$(jq_ "$R" '[...new Set([...j.styles.graisses, ...j.indispo.graisses])].length <= 2 ? "ok" : [...new Set([...j.styles.graisses, ...j.indispo.graisses])].join(",")' 2>/dev/null)" "ok"
+  done
+  stop_srv
 fi
 
 vf_hyg_assert

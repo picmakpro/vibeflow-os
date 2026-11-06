@@ -79,3 +79,14 @@ Pastilles d'état des worktrees : plus de fond (`background: none`), texte `--te
 Le finding « route worktrees bloquante » (P78-D-32) n'est PAS traité ici : voir 78-08-SUMMARY, correction ciblée.
 
 P78-D-32 traitée côté route/exécuteur (voir 78-08-SUMMARY) ; la page n'a pas changé, D9.1 (une relecture des worktrees par rafale) reste vert (git-tiroir rc 0).
+
+## Correction design (critique fraîche du 2026-11-06 ; P78-D-33)
+
+Correction ciblée, une passe, fichiers : `assets/ui/77-vf-git-rendu.js`, `77-vf-git-tiroir.js`, `77-vf-git-vue-detail.js`, `test-cockpit-git-tiroir.sh` (section D10, plus le clic d'ouverture de D3.5 passé à l'ouvreur sous 1280 px, P78-D-34). Traces rouge puis vert : section « Correction design » de `78-10-RED-TRACE.md`. Suite complète rc 0.
+
+- **F2 (majeur)** : l'étiquette de ref porte désormais son texte dans un `span.vf-git-ref-t` qui seul a l'ellipse ; la pastille reste `inline-flex` avec l'icône (`flex: none`) ; `HEAD` en `flex: none` et sans plafond, entier à 1440, 999 et 390 px ; le nom de branche est tronqué par « … » ; la branche ne recouvre jamais le message.
+- **F12** : l'identifiant du stash est `flex: none`, le message de la rangée cède (`vf-git-msg`, ellipse).
+- **F14** : `content: '✓ ' / ''` (et `◐`, `○`) : texte alternatif vide, les mots « propre », « modifié », « non suivi » restent lus (arbre d'accessibilité mesuré).
+- **F15** : quatre tailles (11,5 / 12,5 / 13 / 15) et deux graisses (400, 600) dans le tiroir, états chargement, vide et indisponible compris. 10,5 et 11 passent à 11,5 ; 12 à 12,5 ; la graisse 500 passe à 600 (titre de barre, noms en gras) ou 400 (étiquettes, pastilles, bouton « branches mergées »). Aucune valeur de padding, marge ou écart modifiée (`css-jetons.mjs` rc 0).
+
+Valeurs de grille posées : aucune nouvelle. Hors mandat, non faits : F4, F7, F10.

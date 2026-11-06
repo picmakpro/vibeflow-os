@@ -11,6 +11,9 @@
   if (!nom) return;
   const SUFFIXE = / — (Projet|Équipe)$/;
   nom.textContent = String(V && V.depot ? V.depot : nom.textContent).replace(SUFFIXE, ''); // GITC-01 : même nom sur les trois onglets, aucun suffixe
+  // P78-D-01, P78-D-09 : le panneau de droite lit le même nom que l'en-tête (dépôt principal, jamais « wt-a — Projet »). Posé APRÈS 00-vibeflow.js : le titre de l'onglet, déjà écrit, et les clés
+  // enregistrées par nom (flux, visite) gardent leur valeur d'avant.
+  G.project.name = nom.textContent;
 
   // ---------- bloc de vue racine (P78-D-03) : dit ce que montre la vue, jamais le nom du projet — même sans git ----------
   const TAB = G.meta.vfTab === 'project' ? 'project' : G.meta.vfTab === 'equipe' ? 'equipe' : 'code';
@@ -22,7 +25,12 @@
       return { k: 'Code', h1: b ? `Le code, ${b}` : 'Le code du projet',
         p: `${pl((G.files || []).length, 'fichier')} et ${pl((G.routes || []).length, 'route')} lus dans le ${depot ? 'dépôt' : 'dossier'}.` };
     }
-    if (TAB === 'project') return { k: 'Projet', h1: VF.milestone ? `Jalon ${VF.milestone}` : 'Le projet', p: G.project.summary || '' };
+    if (TAB === 'project') { // P78-D-03 : le sous-titre résume la vue (phase en cours, phases faites sur le total du jalon), il ne redit jamais le titre
+      const L = Array.isArray(VF.milestones) ? VF.milestones : [], m = L.find((x) => x.key === VF.milestone && x.st !== 'done') || L.find((x) => x.st === 'active') || L[L.length - 1], fait = m && m.total > 0 ? `${pl(m.done, 'phase')} ${m.done > 1 ? 'faites' : 'faite'} sur ${m.total}` : '';
+      const c = VF.counts || {}, tout = typeof c.phases === 'number' && typeof c.plans === 'number' ? `${pl(c.phases, 'phase')} · ${pl(c.plans, 'plan')}` : '';
+      const p = [VF.phase ? `Phase ${VF.phase}${/^(executing|in_progress|verifying)$/.test(String(VF.status)) ? ' en cours' : ''}` : '', fait].filter(Boolean).join(', ');
+      return { k: 'Projet', h1: VF.milestone ? `Jalon ${VF.milestone}` : 'Le projet', p: p ? p + '.' : tout ? tout + '.' : '' };
+    }
     const M = Array.isArray(VF.missions) ? VF.missions : [], c = VF.compte || {};
     const repos = !M.length && !c.actif && !c.enAttente; // aucune mission et personne au travail
     return { k: 'Équipe', h1: M.length === 1 ? `Mission : ${M[0]}` : M.length > 1 ? `${M.length} missions en cours` : 'Aucune mission en cours', p: repos ? "L'équipe est au repos." : G.project.summary || '' };
@@ -31,7 +39,9 @@
     const ctx = document.querySelector('#context'), k = ctx && ctx.querySelector('.k'), h1 = ctx && ctx.querySelector('h1');
     if (!k || !h1) return;
     const t = texteVue();
-    k.textContent = t.k; h1.textContent = t.h1; h1.classList.add('vf-ctx-titre');
+    k.textContent = t.k; h1.classList.add('vf-ctx-titre');
+    h1.replaceChildren(); // F13 : le titre ne se coupe qu'après « / » ou « - » : un <wbr> (élément DOM, jamais de HTML) suit chaque séparateur ; textContent reste le texte exact
+    t.h1.split(/(?<=[/-])/).forEach((morceau, i) => { if (i) h1.appendChild(document.createElement('wbr')); h1.appendChild(document.createTextNode(morceau)); });
     let d = ctx.querySelector('.cd');
     if (!d) { d = document.createElement('p'); d.className = 'cd'; d.id = 'ctx-desc'; h1.after(d); }
     d.textContent = t.p;
@@ -62,9 +72,7 @@
       font-family: var(--mono); font-size: 11px; font-weight: 500; line-height: 1.4; color: var(--text-3); cursor: pointer; text-align: left; }
     .vf-git-ligne:hover { background: rgba(var(--ink), .06); color: var(--text); }
     .vf-git-ligne[aria-expanded="true"] { background: rgba(var(--ink), .1); color: var(--text); }
-    .vf-git-ligne:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-    .vf-git-ligne.vf-git-detache { color: var(--warn-text); }
-    .vf-git-ligne.vf-git-indispo { color: var(--text-4); }
+    .vf-git-ligne:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; } /* anneau DANS la pastille : à l'extérieur il mordait sur le nom juste au-dessus */
     .vf-git-branche, .vf-git-wt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .vf-git-branche { flex: 0 1 auto; }
     .vf-git-wt { flex: 0 2 auto; }
@@ -73,11 +81,17 @@
     .vf-git-ligne[hidden], #vf-git-ouvreur[hidden] { display: none !important; }
     #vf-git-ouvreur { display: none; }
     #vf-git-ouvreur:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-    /* même requête que viewer.html (« phones and tablets ») : la seconde ligne part avec le nom, l'ouvreur icône prend le relais */
-    @media (max-width: 999px), (max-width: 1279px) and (pointer: coarse) {
-      .vf-nom { display: none; }
+    /* P78-D-34 (avis du juge de design) : la seconde ligne est illisible sous 1280 px ; l'ouvreur icône de 44 px la remplace de 701 à 1279 px */
+    @media (max-width: 1279px) {
+      .vf-git-ligne { display: none; }
       #vf-git-ouvreur { display: inline-flex; width: 44px; height: 44px; }
     }
+    /* même requête que viewer.html (« phones and tablets ») : le nom et sa seconde ligne partent ensemble */
+    @media (max-width: 999px), (max-width: 1279px) and (pointer: coarse) { .vf-nom { display: none; } }
+    /* l'icône ajoute 48 px à droite (44 px et l'écart) ; comme pour le bouton Thème (viewer.html), la zone de recherche en cède autant, pour que l'en-tête passe sur deux rangées à la même largeur avec et sans git :
+       rangée qui se replie (≤ 999 px, ou tactile ≤ 1279 px) = sa base flex ; ligne unique de bureau (1000 à 1279 px, 01-vf-responsive.js : plancher de 200 px) = son plancher, 152 px */
+    @media (min-width: 701px) and (max-width: 999px), (min-width: 701px) and (max-width: 1279px) and (pointer: coarse) { .hc { flex-basis: calc(min(460px, 24vw) - 48px); } }
+    @media (min-width: 1000px) and (max-width: 1279px) and (not (pointer: coarse)) { header .hc { min-width: 152px; } }
     /* téléphone (≤ 700 px, 02-vf-telephone.js, P70-D-01) : l'en-tête tient sur une rangée et les actions vivent dans le menu « ⋯ », qui reprend ce bouton (libellé .bl, clic relayé) */
     @media (max-width: 700px) { #vf-git-ouvreur { display: none !important; } }
     #vf-git-ouvreur .bl { display: none; }
