@@ -265,6 +265,7 @@ manche_fin
 # ---- section CH : Chromium ----
 echo "=== CH — Chromium : bandeau, clic de confiance armé, Entrée au clavier, présélection du mode ==="
 if [ -n "$CHROME" ]; then
+  rm -f "$OUT/.cache/terminal-mode" # 72-16 (P72-D-20) : le mode retenu par les manches B survit aux relances de Q ; CH2 parle d'un PREMIER lancement, donc d'un fichier absent
   serveur_debut "$OUT"; RESCH="$WORK/ch.json"; BASEC="$(cibles_p)"; VC="$(cible_de "$BASEC" ph-1 .principal)" # le navigateur est la session : aucun client Node ici
   echo "     [CH] Chrome : $("$CHROME" --version 2>/dev/null | head -1)"
   CHJ="$(printf '{"P":%s,"Q":%s,"amorce":"%s","ptoken":"%s","cible":"ph-1","verbe":"%s","argv":"%s/argv"}' "$SRV_PORT" "$QP" "$AMORCE" "$PTOK" "$VC" "$RUN")"

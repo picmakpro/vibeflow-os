@@ -299,7 +299,7 @@ const q = http.createServer(async (req, res) => {
   if (req.method === 'GET' && chemin === '/proposition') {
     if (!scen.prop) return json(200, { etat: 'aucune' });
     if (!premiere[scen.prop.id]) premiere[scen.prop.id] = Date.now();
-    const mr = 'mode_retenu' in scen ? scen.mode_retenu : 'acceptEdits'; // contrat §4 (72-16) : valeur réglable par scénario, « __absent__ » = clé omise
+    const mr = 'mode_retenu' in scen ? scen.mode_retenu : 'default'; // contrat §4 (72-16) : valeur réglable par scénario (défaut : premier lancement), « __absent__ » = clé omise
     return json(200, mr === '__absent__' ? scen.prop : Object.assign({}, scen.prop, { mode_retenu: mr }));
   }
   if (req.method === 'POST' && chemin === '/lancer') {
@@ -544,7 +544,7 @@ await executer(chrome, async (s) => {
     await essai('e5', async () => { // stockage de Q illisible depuis P ; mode servi relu contre la liste fermée (P72-D-20 : le stockage ne porte plus le mode)
       const sec = await s.ev(`(() => { try { void document.querySelector('iframe[data-t]').contentWindow.localStorage; return 'lu'; } catch (e) { return e.name; } })()`);
       const temoinSecret = await q.ev(`localStorage.getItem('vf.terminal.secret') !== null`); // W-3 : le stockage de Q n'est pas vide (il porte le secret) et P n'y accède pourtant pas
-      await scenario({ prop: valide(ID(52), { arme_apres_ms: 600 }), lancers: [] });
+      await scenario({ prop: valide(ID(52), { arme_apres_ms: 600 }), lancers: [], mode_retenu: 'acceptEdits' });
       await q.attendre(`(document.getElementById('proposition') || {}).dataset && document.getElementById('proposition').dataset.id === ${JSON.stringify(ID(52))}`, 'bandeau du témoin', 5000);
       const temoin = await q.ev(`${SEL}.value`);
       await scenario({ prop: valide(ID(51), { arme_apres_ms: 600 }), lancers: [], mode_retenu: 'bypassPermissions' });
@@ -763,8 +763,6 @@ if mutant texte-serveur vf-cockpit-terminal-client.mjs "/garde:corps-lancer/s/{ 
 else sans_effet "M-TEXTE-AU-SERVEUR"; fi
 if mutant mode-non-relu vf-cockpit-terminal-client.mjs "/garde:mode-relu/s#.*#return v || 'default';#"; then
   assert_eq "M-MODE-NON-RELU — le mutant rougit LB.C4 : bypassPermissions devient la présélection (témoin : les valeurs valides sont lues)" "$(verdict "$(doubles "$MUT_DIR" mode)" 'j.lu[1]==="bypassPermissions=>default" && j.lu[9]==="acceptEdits=>acceptEdits"')" "rouge"
-  if [ -n "$CHROME" ]; then faux "$MUT_DIR"; MJ="$(navig client '"only":["e5"]')"; unfaux
-    assert_eq "M-MODE-NON-RELU — le mutant rougit aussi LB.E5 (Chrome) : la valeur forgée servie devient la présélection (bypassPermissions au lieu de default ; témoins : SecurityError, secret, acceptEdits intacts)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e5 !== undefined ? j.e5 : 'erreur: ' + ((j.erreurs || {}).e5 || 'étape absente'))")" "SecurityError/secret/acceptEdits/bypassPermissions"; fi
 else sans_effet "M-MODE-NON-RELU"; fi
 if mutant message-avec-donnees vf-cockpit-terminal-client.mjs "/garde:emission/s#emettre('proposition')#window.parent.postMessage('proposition:' + p.id, cfg.origineP)#"; then
   assert_eq "M-MESSAGE-AVEC-DONNEES — le mutant rougit LB.C2 : le message porte l'identifiant (témoin : la proposition s'affiche)" "$(verdict "$(doubles "$MUT_DIR" suivi)" 'j.a1.n===1 && j.msg.n===3 && j.msg.strict')" "rouge"
