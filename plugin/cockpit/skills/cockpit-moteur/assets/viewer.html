@@ -1095,7 +1095,8 @@ async function layout(view) {
       'elk.layered.spacing.nodeNodeBetweenLayers': '130', 'elk.spacing.nodeNode': '32',
       'elk.layered.spacing.edgeEdgeBetweenLayers': '8', 'elk.spacing.edgeEdge': '8', 'elk.layered.spacing.edgeNodeBetweenLayers': '24',
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX', 'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
-      'elk.layered.thoroughness': '12', 'elk.separateConnectedComponents': 'true', 'elk.spacing.componentComponent': '80',
+      // a card with no connection is a component of its own, and ELK packs components from the left edge: in a view with outside connections it landed under « Used by » (PU-G-040). Without the separation it takes the first layer of the middle column.
+      'elk.layered.thoroughness': '12', 'elk.separateConnectedComponents': view.connectors?.length && view.visible.some((v) => !deg.get(v)) ? 'false' : 'true', 'elk.spacing.componentComponent': '80',
       'elk.padding': '[top=40,left=40,bottom=40,right=40]',
       ...(innerWidth <= 700 && /\/equipe\.html$/.test(location.pathname) ? { 'elk.aspectRatio': '0.2' } : {}), // one column on a phone, Team tab only: the Code map and the Project roadmap keep their layout (PU-G-176)
     },
@@ -1149,6 +1150,7 @@ function draw(view, res) {
   const gCols = el('g', { class: 'cols' }, vp);
   const gEdges = el('g', { class: 'edges' }, vp), gFx = el('g', {}, vp), gNodes = el('g', {}, vp), gPorts = el('g', { class: 'edges' }, vp);
   state.fxLayer = gFx;
+  colsG = gCols; colsK = 0; // the titles follow the zoom: drawn again by applyTransform, once the fit has set it
   drawColumns(gCols, view, res);
   state.edgeEls = new Map(); state.chipEls = new Map();
   for (const re of res.edges || []) {
@@ -1195,6 +1197,9 @@ function draw(view, res) {
 
 /** Brackets over the three columns of a view that has outside connections: what uses this part (left),
  *  what's inside it (middle), and what it uses (right). Drawn in map space so they pan and zoom with it. */
+let colsG = null, colsK = 0;
+/** A column title keeps 13 px on the screen when the map is zoomed out (it read about 6 px), up to 32 px of map space (PU-G-040). */
+const colFont = (k) => clamp(13 / k, 13, 32);
 function drawColumns(g, view, res) {
   if (!view.connectors?.length || state.container === 'root' || state.container === 'q:answer') return;
   const span = (cs) => cs.length ? [Math.min(...cs.map((c) => c.x)), Math.max(...cs.map((c) => c.x + c.width))] : null;
@@ -1206,10 +1211,11 @@ function drawColumns(g, view, res) {
   for (const [s, label] of cols) {
     if (!s) continue;
     const [x0, x1] = s, cx = (x0 + x1) / 2;
-    const half = Math.min(textW(label, 13, 500) / 2 + 10, (x1 - x0) / 2 - 12);
+    const fs = colFont(state.t.k);
+    const half = Math.min(textW(label, fs, 500) / 2 + 10, (x1 - x0) / 2 - 12);
     // ⌐—— label ——¬ : end ticks curl down toward the cards, with a gap in the line for the label
     el('path', { d: `M${x0},${y + 9} v-5 q0,-4 4,-4 H${cx - half} M${cx + half},${y} H${x1 - 4} q4,0 4,4 v5` }, g);
-    el('text', { x: cx, y }, g).textContent = label;
+    const t = el('text', { x: cx, y }, g); t.textContent = label; t.style.fontSize = fs + 'px';
   }
 }
 
@@ -1332,6 +1338,7 @@ function applyTransform() {
   vp.style.transform = `translate(${x}px,${y}px) scale(${k})`;
   svg.classList.toggle('lod-low', k < 0.42);
   svg.classList.toggle('lod-mid', k >= 0.42 && k < 0.65);
+  if (colsG && state.view && state.layout && Math.abs(colFont(k) - colsK) > 0.5) { colsK = colFont(k); colsG.replaceChildren(); drawColumns(colsG, state.view, state.layout); }
 }
 const stageRect = () => svg.getBoundingClientRect();
 function setT(t, animate) {
