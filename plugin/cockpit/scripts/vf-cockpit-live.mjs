@@ -47,6 +47,9 @@ const empreinte = (dir) => {
 };
 const changes = (a, b) => [...new Set([...a.keys(), ...b.keys()])].filter((k) => a.get(k) !== b.get(k));
 
+// signature de la liste « qui » (PU-G-162 : testable seule, déplacée hors de startLive sans changer son corps) : poussée seulement quand la liste change, pas à chaque seconde d'âge qui passe
+export const whoSig = (w) => JSON.stringify((w.workers || []).map((x) => [x.kind, x.id, x.tree, x.branch || '', !!x.stale, x.titre || '', x.task || '', x.parent || '', x.etat || '', x.action ? `${x.action.verbe} ${x.action.cible}` : '', x.rattachement ? [x.rattachement.etat, x.rattachement.dag, x.rattachement.noeud, x.rattachement.raison].join('|') : '']));
+
 export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mode = process.env.VF_COCKPIT_WATCH || 'auto' }) {
   root = path.resolve(root);
   const common = gitCommonDir(root);
@@ -64,7 +67,6 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
   };
   const whoNow = () => { try { return collectWho(root, { scriptsDir }); } catch (e) { return { workers: [], sources: {}, error: e.message }; } };
   // « qui » : poussé seulement quand la liste change (pas à chaque seconde d'âge qui passe)
-  const whoSig = (w) => JSON.stringify((w.workers || []).map((x) => [x.kind, x.id, x.tree, x.branch || '', !!x.stale, x.task || '', x.parent || '', x.etat || '', x.action ? `${x.action.verbe} ${x.action.cible}` : '', x.rattachement ? [x.rattachement.etat, x.rattachement.dag, x.rattachement.noeud, x.rattachement.raison].join('|') : '']));
 
   let graph = buildProjectGraph(root), idx = index(graph), lock = lockStatus(), who = whoNow(), gitSig = null, gitSemee = false; // 78-09
   // A5 : la signature Git est asynchrone ; le premier calcul SEME gitSig sans événement (comme avant), les suivants (filet) n'émettent qu'au changement, et seulement une fois la graine posée

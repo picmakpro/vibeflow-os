@@ -1,5 +1,5 @@
 // vf-cockpit-lecture — lecteurs bas niveau partagés du socle du cockpit (déplacés de vf-cockpit-who.mjs, comportement inchangé).
-// Exports : ls, mtime, readJson, cherche (recherche en fin de fichier), masque / MAX_MASQUE (masques de secrets), masqueCoupe / MARGE_MASQUE (masquer avant de couper), ID_RE, premiereLigne.
+// Exports : ls, mtime, readJson, cherche (recherche en fin de fichier), titreSession (nom /rename d'une session), masque / MAX_MASQUE (masques de secrets), masqueCoupe / MARGE_MASQUE (masquer avant de couper), ID_RE, premiereLigne.
 // Lecture seule, aucun réseau.
 import fs from 'node:fs';
 
@@ -12,15 +12,17 @@ export const readJson = (f, max = Infinity) => { try { const st = fs.statSync(f)
 // cherchée ou null. Une ligne plus longue que la fenêtre (un gros résultat d'outil) est ignorée au lieu de faire croire qu'il n'y a rien :
 // c'était la cause d'une session très active absente du badge « au travail » ou sans dernière commande (E-5).
 const FENETRES = [256 << 10, 2 << 20, 8 << 20];
-export const cherche = (f, accepte) => {
-  for (const bytes of FENETRES) {
+// `fenetres` : liste des fenêtres essayées (défaut : les trois) ; `[FENETRES[0]]` = une seule lecture de 256 Kio, sans escalade.
+// `etat` (optionnel) : objet où `etat.erreur = true` signale un échec de lecture (distinct de « rien trouvé »).
+export const cherche = (f, accepte, fenetres = FENETRES, etat = null) => {
+  for (const bytes of fenetres) {
     let fd = null, size = 0, lignes = [];
     try {
       if (!fs.statSync(f).isFile()) return null; // un tube (FIFO) bloquerait l'ouverture
       fd = fs.openSync(f, 'r'); size = fs.fstatSync(fd).size; const len = Math.min(size, bytes);
       const buf = Buffer.alloc(len); fs.readSync(fd, buf, 0, len, size - len);
       lignes = buf.toString('utf8').split('\n'); if (size > len) lignes.shift(); // la première ligne de la fenêtre est coupée
-    } catch { return null; } finally { if (fd !== null) { try { fs.closeSync(fd); } catch {} } } // le descripteur se ferme aussi quand readSync lève
+    } catch { if (etat) etat.erreur = true; return null; } finally { if (fd !== null) { try { fs.closeSync(fd); } catch {} } } // le descripteur se ferme aussi quand readSync lève
     for (const l of lignes.reverse()) {
       if (!l.trim()) continue;
       let d; try { d = JSON.parse(l); } catch { continue; }
@@ -60,7 +62,36 @@ export const masqueCoupe = (t, n) => {
   const s = String(t), a = masque(s, n); if (s.length <= n) return a;
   const b = masque(s, n + MARGE_MASQUE), m = Math.min(a.length, b.length); let i = 0;
   while (i < m && a.charCodeAt(i) === b.charCodeAt(i)) i++;
-  return a.slice(0, Math.min(i, n));
+  const r = a.slice(0, Math.min(i, n)), d = r.charCodeAt(r.length - 1);
+  return d >= 0xd800 && d <= 0xdbff ? r.slice(0, -1) : r; // PU-G-162 (S5) : une coupe ne laisse jamais une moitié de paire de substitution
+};
+// PU-G-162 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06, « Branche + ton nom /rename ») : amendement de la liste blanche de lecture des transcripts
+// (P69-D-19, P69-D-23) pour le SEUL champ `customTitle` d'une entrée `custom-title` (le nom que l'utilisateur donne avec /rename). Jamais `ai-title` (texte écrit par le modèle),
+// ni `last-prompt`, ni un message. Garanties : une seule fenêtre de 256 Kio en fin de fichier (aucune escalade pour chercher un titre), forme typée (chaîne), contrôles retirés
+// (C0, C1, U+2028/U+2029, catégorie Cf), masque des secrets AVANT la coupe, 80 caractères au plus APRÈS nettoyage ; la page ne l'affiche qu'en `textContent`.
+export const BORNE_TITRE = 80;
+// la classe d'affichage (C0, C1, U+2028/2029, catégorie Cf) : copie n°5, mesurée par la parité R4.1 de test-cockpit-git-commandes.sh ; `retireAffichage` la retire sans rien laisser, `nettoieTitre` met une espace à la place
+// exportée SANS drapeau g (un `.test` d'appelant n'alterne pas par lastIndex, cf. R4.2) ; les remplacements utilisent la copie globale privée
+export const CLASSE_AFFICHAGE = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/u;
+const CLASSE_GLOBALE = new RegExp(CLASSE_AFFICHAGE.source, 'gu');
+export const retireAffichage = (t) => (typeof t === 'string' ? t.replace(CLASSE_GLOBALE, '') : '');
+export const nettoieTitre = (t) => {
+  if (typeof t !== 'string') return '';
+  const entree = t.slice(0, MAX_MASQUE), d = entree.charCodeAt(entree.length - 1); // la borne d'entrée ne coupe pas non plus une paire de substitution
+  const propre = (d >= 0xd800 && d <= 0xdbff ? entree.slice(0, -1) : entree).replace(CLASSE_GLOBALE, ' ').replace(/ {2,}/g, ' ').trim();
+  return masqueCoupe(propre, BORNE_TITRE).trim();
+};
+const CACHE_TITRES = new Map();
+// le titre le plus récent l'emporte, même vide (l'utilisateur a pu le vider) ; un échec de lecture n'est jamais mémorisé comme « pas de titre »
+export const titreSession = (f) => {
+  let st; try { st = fs.statSync(f); } catch { return ''; }
+  const c = CACHE_TITRES.get(f); if (c && c.mt === st.mtimeMs && c.size === st.size) return c.titre;
+  const etat = {}, r = cherche(f, (d) => (d.type === 'custom-title' && typeof d.customTitle === 'string' ? { t: d.customTitle } : null), [FENETRES[0]], etat);
+  if (etat.erreur) return '';
+  const titre = nettoieTitre(r ? r.t : '');
+  if (CACHE_TITRES.size >= 4000) CACHE_TITRES.clear();
+  CACHE_TITRES.set(f, { mt: st.mtimeMs, size: st.size, titre });
+  return titre;
 };
 export const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 

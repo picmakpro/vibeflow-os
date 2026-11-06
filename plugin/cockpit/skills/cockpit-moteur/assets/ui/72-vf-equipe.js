@@ -18,11 +18,12 @@
   SC.setOverview(() => {
     const c = G.meta.vf?.compte || {};
     const n = (v) => Number(v) || 0;
-    const src = Object.entries(G.meta.vf?.sources || {}).map(([k, s]) => `<div class="vf-link"><span>${h(Object.prototype.hasOwnProperty.call(SOURCES, k) ? SOURCES[k] : k)}</span><span class="vst vst-${s?.etat === 'lue' ? 'done' : 'todo'}">${h(Object.prototype.hasOwnProperty.call(ETATS, s?.etat) ? ETATS[s.etat] : 'absente')}</span></div>`).join('');
+    const mal = Object.entries(G.meta.vf?.sources || {}).filter(([, s]) => s?.etat === 'erreur' || s?.etat === 'forme-inconnue'); // PU-G-180 : tout est lu, rien à dire ; une source absente n'est pas une panne
+    const src = mal.map(([k, s]) => `<div class="vf-link"><span>${h(Object.prototype.hasOwnProperty.call(SOURCES, k) ? SOURCES[k] : k)}</span><span class="vst vst-todo">${h(ETATS[s.etat])}</span></div>`).join('');
     return `<div class="sec"><div class="ph"><span class="kind">Équipe</span></div><h2 class="pt">${h(G.project.name)}</h2>
         <div class="stats vf-stats" style="margin-top:var(--sp-12)"><div><b>${n(c.actif)}</b><span>actifs</span></div><div><b>${n(c.enAttente)}</b><span>en attente</span></div><div><b>${n(c.termine)}</b><span>terminés depuis moins de 24 h</span></div></div>
         <p class="pd" style="margin-top:var(--sp-12)">Actifs et terminés depuis moins de 24 h ; le transcript d'un agent ne se lit qu'à la demande.</p></div>
-      <div class="sec"><h3>Sources lues <span class="c">${Object.keys(G.meta.vf?.sources || {}).length}</span></h3>${src || '<p class="pd">Aucune source lue.</p>'}</div>`;
+      ${src ? `<div class="sec"><h3>${mal.length > 1 ? 'Sources illisibles' : 'Source illisible'} <span class="c">${mal.length}</span></h3>${src}</div>` : ''}`;
   });
 
   // P69-D-33 : la recherche de cet onglet trouve des agents et des sessions (les cartes), pas des fichiers, des routes ni des modules
@@ -55,7 +56,7 @@
   const zoneDe = (b) => {
     let z = b.nextElementSibling;
     if (z && z.classList.contains('vf-transcript')) return z;
-    z = document.createElement('div'); z.className = 'vf-transcript'; z.dataset.vfDe = b.dataset.vfTranscript;
+    z = document.createElement('div'); z.className = 'vf-transcript'; z.dataset.vfDe = b.dataset.vfTranscript; z.style.order = '4'; z.style.flex = '0 0 100%';
     b.after(z); return z;
   };
   // arrivée par un lien `equipe.html#r=n:<carte>` : 00-vibeflow.js la traite à `ready` et à chaque changement de fragment, mais un rerender() lancé pendant le premier rendu
@@ -137,22 +138,23 @@
     const parId = new Map(liste.map((w) => [idCarte(w), w]));
     const compte = { actif: 0, enAttente: 0, termine: 0 };
     for (const w of liste) { if (R().actif(w)) compte.actif++; else if (w.etat === 'termine') compte.termine++; else compte.enAttente++; } // même prédicat que le badge de l'en-tête (70-vf-live.js)
-    for (const x of G.nodes) { const w = parId.get(x.id); if (w) { x.st = w.etat === 'termine' ? 'done' : 'active'; x.foot = R().pied(w); } }
+    for (const x of G.nodes) { const w = parId.get(x.id); if (w) { x.st = R().st(w); x.foot = R().piedCarte(w); } }
     G.meta.vf = { ...G.meta.vf, compte };
     await SC.rerender();
     arrivee();
   }
   document.addEventListener('vf-who', suivre);
-  SC.on('ready', () => { arrive = true; plafond(); for (const [id, w] of parCarte()) { const x = G.nodes.find((n) => n.id === id); if (x) x.foot = R().pied(w); } });
+  SC.on('ready', () => { arrive = true; plafond(); for (const [id, w] of parCarte()) { const x = G.nodes.find((n) => n.id === id); if (x) x.foot = R().piedCarte(w); } });
 
   // panneau d'une carte d'agent ou de session
   SC.addPanelSection('item', (id) => {
     const w = typeof id === 'string' && id.startsWith('n:') ? parCarte().get(id.slice(2)) : null;
     if (!w) return '';
     const vers = R().versNoeud(w, h);
-    return `<div class="sec"><h3>Activité</h3><p class="pd">${h(R().pied(w))}</p>${vers}
-      <button type="button" data-vf-doing="${h(w.id)}">Voir la dernière commande</button><div class="vf-doing" hidden></div>
-      <button type="button" data-vf-transcript="${h(w.id)}">Lire le transcript</button></div>`;
+    // PU-G-171 : les deux boutons restent côte à côte, les résultats (commande, transcript) s'affichent dessous (order) : « Lire le transcript » ne saute plus quand la commande arrive
+    return `<div class="sec"><h3>Activité</h3><p class="pd">${h(R().pied(w))}</p>${vers}<div style="display:flex;flex-wrap:wrap">
+      <button type="button" data-vf-doing="${h(w.id)}" style="order:1">Voir la dernière commande</button><div class="vf-doing" style="order:3;flex:0 0 100%" hidden></div>
+      <button type="button" data-vf-transcript="${h(w.id)}" style="order:2">Lire le transcript</button></div></div>`;
   });
   // Entrée sur un de ces boutons : le viewer l'écoute aussi sur `window` (raccourci « ouvrir le nœud sélectionné »), descend dans le nœud et redessine le panneau ;
   // le bouton quitte le document avant que son clic ait lieu et le transcript n'est jamais lu (UIFN-12). L'évènement s'arrête au document, le clic du bouton reste.
@@ -166,10 +168,12 @@
     const id = b.dataset.vfTranscript;
     if (b.getAttribute('aria-disabled') === 'true') return; // lecture en cours : les clics répétés sont ignorés
     b.setAttribute('aria-disabled', 'true'); // jamais `disabled` : un bouton désactivé perd le focus clavier (UIFN-12)
+    b.textContent = 'Lecture du transcript…'; b.setAttribute('aria-busy', 'true'); // PU-G-172 : le serveur peut mettre ~3 s à répondre ; indicateur sur le bouton, jamais dans la zone (elle ne se remplit qu'avec le transcript lu)
     let d = null;
     try { const r = SRV && SRV.token ? await fetch('/api/vf/transcript?id=' + encodeURIComponent(id), { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' }) : null; d = r && r.ok ? await r.json() : null; } catch {}
     lu = { id, noeuds: [...R().transcript(d, document).childNodes] }; marque(id);
     for (const x of boutons()) if (x.dataset.vfTranscript === id) { zoneDe(x).replaceChildren(...lu.noeuds); x.removeAttribute('aria-disabled'); }
-    b.removeAttribute('aria-disabled');
+    for (const x of boutons()) if (x.dataset.vfTranscript === id) { x.textContent = 'Lire le transcript'; x.removeAttribute('aria-busy'); }
+    b.textContent = 'Lire le transcript'; b.removeAttribute('aria-busy'); b.removeAttribute('aria-disabled');
   });
 })();
