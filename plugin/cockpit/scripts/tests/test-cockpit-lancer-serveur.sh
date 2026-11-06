@@ -104,11 +104,12 @@ console.error = () => {};
 const ptoken = 'a1'.repeat(16), UG = new URL('http://127.0.0.1:1234/api/vf/lancer/cibles'), UP = new URL('http://127.0.0.1:1234/api/vf/lancer');
 const res0 = () => ({ headersSent: false, writeHead(c) { this.code = c; this.headersSent = true; }, end(b) { this.body = b; } });
 const lire = async (lancer) => { const res = res0(); lancer.get({ method: 'GET', headers: {} }, res, UG); return JSON.parse(res.body); };
-const poster = async (lancer, corps) => {
+const posterRes = async (lancer, corps) => {
   const buf = Buffer.from(JSON.stringify(corps)), req = Readable.from([buf]); req.method = 'POST'; req.socket = { localPort: 1234 };
   req.headers = { host: '127.0.0.1:1234', origin: 'http://127.0.0.1:1234', [P.ENTETE_JETON]: ptoken, 'content-type': 'application/json', 'content-length': String(buf.length) };
-  const res = res0(); await lancer.traiter(req, res, UP); return res.code;
+  const res = res0(); await lancer.traiter(req, res, UP); return res;
 };
+const poster = async (lancer, corps) => (await posterRes(lancer, corps)).code;
 const faux = (sur = {}) => { const sent = []; let abo = null; return { sent, pousser: (m) => abo && abo(m), canal: { etat: () => 'actif', envoyer: (m) => { sent.push(m); return true; }, abonner: (f) => { abo = f; }, claude: () => true, python3: () => true, ...sur } }; };
 const lanceur = () => L.creerLancer({ root: lab, here: sortie, ptoken, log: () => {} });
 const ph1 = (j) => j.cibles.find((x) => x.id === 'ph-1');
@@ -131,6 +132,15 @@ if (mode === 'e2') { // preparerTerminal sous win32 : registre « indisponible �
   const T = await imp('vf-cockpit-terminal.mjs'); const t = T.preparerTerminal({ here: sortie, root: lab, jetons: () => [], plateforme: 'win32' });
   const j = await lire(lanceur()), marque = U.injectionLancer({ indisponible: false });
   sortir({ terminal: j.terminal, balise: t.injection().includes(marque) ? 'oui' : 'non', temoin: marque.length > 100, bloquees: j.cibles.length > 0 && j.cibles.every((c) => c.bloquants.length > 0) });
+}
+if (mode === 'e4') { // canal « indisponible » (win32) puis « arrete » : le code du refus de POST est celui du contrat, jamais un autre code 503
+  const r = []; for (const etat of ['indisponible', 'arrete', 'actif']) { const f = faux({ etat: () => etat }); C.definir(f.canal); const res = await posterRes(lanceur(), { cible: 'ph-1', verbe: 'executer' }); r.push(`${etat}:${res.code}:${res.code === 202 ? '' : JSON.parse(res.body).refus}`); }
+  sortir(r.join(' '));
+}
+if (mode === 'e5') { // refus de proposer() : cible inconnue 404, verbe hors liste 422, bloquant 409 (claude absent), témoin 202 ; la règle « verbe permis, aucun bloquant » est celle de verdict()
+  const cas = [['ph-999', 'executer', {}], ['ph-1', 'deployer', {}], ['ph-1', 'executer', { claude: () => false }], ['ph-1', 'executer', {}]], r = [];
+  for (const [cible, verbe, sur] of cas) { const f = faux(sur); C.definir(f.canal); const res = await posterRes(lanceur(), { cible, verbe }); const b = res.code === 202 ? {} : JSON.parse(res.body); r.push(`${res.code}:${b.refus || ''}:${(b.bloquants || []).join('+')}`); }
+  sortir(r.join(' '));
 }
 if (mode === 'e3') { // e3 <sortie> <lab> <moteur> <fauxbin> <pathsans> : les DEUX lecteurs réels (claude, python3), état du canal forcé à « actif »
   const [eng, fauxbin, sans] = reste; process.env.VF_COCKPIT_ENGINE_DIR = eng;
@@ -336,6 +346,9 @@ assert_eq "E1 — enfant tué : terminal arrete, chaque cible porte un bloquant 
 assert_eq "E1 — un POST valide est refusé (409 ou 503, jamais 202) et le journal du faux enfant ne grandit pas" "$([ "$S" = 409 ] || [ "$S" = 503 ] && echo refus || echo "statut $S") $(( $(wc -l < "$STUB_LOG" | tr -d ' ') - N0 ))" "refus 0"
 unsrv
 assert_eq "E2 — sous win32 : terminal indisponible, cibles toutes bloquées, injection() sans la balise du lanceur" "$(node "$AUX/harnais.mjs" e2 "$STUBO" "$LAB")" '{"terminal":"indisponible","balise":"non","temoin":true,"bloquees":true}'
+assert_eq "E2b — POST /api/vf/lancer : canal indisponible -> 503 terminal-indisponible ; canal arrete -> 503 terminal-arrete ; actif -> 202 (témoin)" "$(node "$AUX/harnais.mjs" e4 "$STUBO" "$LAB")" "indisponible:503:terminal-indisponible arrete:503:terminal-arrete actif:202:"
+E5_ATT="404:cible-inconnue: 422:verbe-refuse: 409:bloque:claude-introuvable 202::"
+assert_eq "E2c — refus de POST /api/vf/lancer : cible inconnue 404 cible-inconnue ; verbe hors liste 422 verbe-refuse ; claude absent 409 bloque + claude-introuvable ; complet 202 (témoin)" "$(node "$AUX/harnais.mjs" e5 "$STUBO" "$LAB")" "$E5_ATT"
 assert_eq "E3 — claude absent du PATH du shell : bloquant claude-introuvable et POST refusé ; python3 absent : python3-absent et POST refusé ; les deux présents : 202, +1 (témoin)" "$(node "$AUX/harnais.mjs" e3 "$STUBO" "$LAB" "$ENG" "$WORK/fauxbin" "$WORK/pathsans")" '{"sansClaude":"false|claude-introuvable|409|+0","sansPython":"true|python3-absent|409|+0","complet":"true||202|+1"}'
 
 echo "=== M — mutants (copies de la sortie) ==="
@@ -344,7 +357,8 @@ if mutant sans-drapeau vf-cockpit-lancer.mjs 's|const servi = () => canal() !== 
   MA="$(sig "$MP" GET /api/vf/lancer/cibles --jeton "$MT")"; MB="$(sig "$MP" GET /api/vf/inconnu --jeton "$MT")"; MC="$(sig "$MP" POST /api/vf/lancer --jeton "$MT" --entete "$JSONH" --corps "$OKB")"; MD="$(sig "$MP" POST /api/vf/inconnu --jeton "$MT" --entete "$JSONH" --corps "$OKB")"
   assert_eq "M-SANS-DRAPEAU — le mutant rougit S1 et S2 : les deux routes sont servies sans le drapeau" "$([ "$MA" != "$MB" ] && echo S1-rouge || echo S1-vert) $([ "$MC" != "$MD" ] && echo S2-rouge || echo S2-vert)" "S1-rouge S2-rouge"; unsrv
 else assert_eq "M-SANS-DRAPEAU — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant liste-page vf-cockpit-lancer.mjs "s|const cible = liste.find((x) => x.id === demande.cible);|const cible = { id: demande.cible, verbes: [demande.verbe], bloquants: [], avertissements: [], kind: 'phase', phase: '1', ws: null };|"; then
+if mutant liste-page vf-cockpit-lancer.mjs "s|const cible = liste.find((x) => x.id === demande.cible);|const cible = { id: demande.cible, verbes: [demande.verbe], bloquants: [], avertissements: [], kind: 'phase', phase: '1', ws: null };|
+s|const v = verdict(liste, cible.id, demande.verbe);.*$|const v = { lancable: true, bloquants: [] };|"; then
   srv_stub "$MUT_OUT" defaut; n0="$(nprop)"; sta "$SRV_PORT" POST /api/vf/lancer --jeton "$PTOK" --entete "$JSONH" --corps '{"cible":"ph-9999","verbe":"executer"}' > /dev/null; sleep 0.5
   assert_eq "M-LISTE-PAGE — le mutant rougit R11 : une cible absente de la liste du disque envoie une proposition (+1 au lieu de 0)" "+$(( $(nprop) - n0 ))" "+1"; unsrv
 else assert_eq "M-LISTE-PAGE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
@@ -357,6 +371,20 @@ if mutant lancee-libre vf-cockpit-lancer.mjs 's|if (!lanceeValide(m)) return;|if
   for _ in $(seq 1 30); do grep -q '"envoye"' "$STUB_LOG" && break; sleep 0.1; done; sleep 0.4
   assert_eq "M-LANCEE-LIBRE — le mutant rougit L2 : un message mal formé est enregistré (la carte n'est plus false)" "$([ "$(lancee_de)" != false ] && echo L2-rouge || echo L2-vert)" "L2-rouge"; unsrv
 else assert_eq "M-LANCEE-LIBRE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
+if mutant code-indispo vf-cockpit-lancer.mjs "s#refus: etat === 'indisponible' ? 'terminal-indisponible' : 'terminal-arrete'#refus: 'terminal-arrete'#"; then
+  assert_eq "M-CODE-INDISPONIBLE — le mutant rend toujours terminal-arrete : E2b rougit" "$(node "$AUX/harnais.mjs" e4 "$MUT_OUT" "$LAB")" "indisponible:503:terminal-arrete arrete:503:terminal-arrete actif:202:"
+else assert_eq "M-CODE-INDISPONIBLE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant garde-actif vf-cockpit-lancer.mjs "s#if (etat !== 'actif') return { statut: 503, corps: { refus: etat === 'indisponible' ? 'terminal-indisponible' : 'terminal-arrete' } };##"; then
+  assert_eq "M-GARDE-ACTIF — le mutant retire la garde d'état : un canal indisponible ne rend plus 503 terminal-indisponible (E2b rougit)" "$(node "$AUX/harnais.mjs" e4 "$MUT_OUT" "$LAB")" "indisponible:409:bloque arrete:409:bloque actif:202:"
+else assert_eq "M-GARDE-ACTIF — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
+if mutant verdict-bloque vf-cockpit-lancer-cibles.mjs "s#return { lancable: bloquants.length === 0,#return { lancable: true,#"; then
+  assert_eq "M-VERDICT-BLOQUE — le mutant rend toujours lançable : le POST d'une cible bloquée passe (409 -> 202), E2c rougit : proposer() s'appuie bien sur verdict()" "$(node "$AUX/harnais.mjs" e5 "$MUT_OUT" "$LAB")" "404:cible-inconnue: 422:verbe-refuse: 202:: 202::"
+else assert_eq "M-VERDICT-BLOQUE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+if mutant verdict-verbe vf-cockpit-lancer-cibles.mjs "s#if (!c || !Array.isArray(c.verbes) || !c.verbes.includes(verbe)) return null;#if (!c || !Array.isArray(c.verbes)) return null;#"; then
+  assert_eq "M-VERDICT-VERBE — le mutant ne juge plus le verbe : un verbe hors liste passe (422 -> 202), E2c rougit" "$(node "$AUX/harnais.mjs" e5 "$MUT_OUT" "$LAB")" "404:cible-inconnue: 202:: 409:bloque:claude-introuvable 202::"
+else assert_eq "M-VERDICT-VERBE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

@@ -12,7 +12,7 @@ import { planningLayout } from './vf-cockpit-paths.mjs';
 import { readPlanning } from './vf-cockpit-planning.mjs';
 import { lireAilleurs, fusionner } from './vf-cockpit-ailleurs.mjs';
 import * as gabarit from './vf-cockpit-lancer-gabarit.mjs';
-import { calculerCibles, listePourQ } from './vf-cockpit-lancer-cibles.mjs';
+import { calculerCibles, listePourQ, verdict } from './vf-cockpit-lancer-cibles.mjs';
 import { creerPost } from './vf-cockpit-lancer-post.mjs';
 import { creerSuivi } from './vf-cockpit-lancer-suivi.mjs';
 import { canal } from './vf-cockpit-lancer-canal.mjs';
@@ -71,8 +71,9 @@ export function creerLancer({ root, here, ptoken, log = () => {} }) {
     const liste = calcul.cibles;
     const cible = liste.find((x) => x.id === demande.cible);
     if (!cible) return { statut: 404, corps: { refus: 'cible-inconnue' } };
-    if (!cible.verbes.includes(demande.verbe)) return { statut: 422, corps: { refus: 'verbe-refuse' } };
-    if (cible.bloquants.length > 0) return { statut: 409, corps: { refus: 'bloque', bloquants: [...cible.bloquants] } };
+    const v = verdict(liste, cible.id, demande.verbe); // l'unique règle « verbe permis, aucun bloquant » : jamais refaite ici
+    if (!v) return { statut: 422, corps: { refus: 'verbe-refuse' } };
+    if (!v.lancable) return { statut: 409, corps: { refus: 'bloque', bloquants: v.bloquants } };
     const chat = demande.chat;
     if (chat !== undefined && !UUID.test(chat)) return { statut: 422, corps: { refus: 'chat-invalide' } };
     if (!publier(liste, true)) return { statut: 503, corps: { refus: 'terminal-arrete' } };

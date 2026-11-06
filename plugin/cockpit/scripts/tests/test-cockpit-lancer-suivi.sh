@@ -2,7 +2,7 @@
 # test-cockpit-lancer-suivi.sh — registre des lancements, états de carte, ligne de détail de l'onglet Équipe
 # (LANC-10 ; P72-D-06, P72-D-16, P72-D-18 ; plan 72-07). Modules purs joués par Node : ni navigateur ni port.
 #   LS1 noter : forme refusée, contexte hostile, session déjà notée, borne de 200 entrées
-#   LS2 récence : fenêtre de RECENCE_MS, heure de P (jamais le champ `at` du message)
+#   LS2 une seule source de la récence (cibles), heure de P (jamais le champ `at` du message)
 #   LS3 états : attendue / vue / terminee par l'identifiant de session SEUL, oubli à ATTENTE_MAX_MS et TTL_MS
 #   LS4 sorties : clés exactes, aucune clé interdite, module sans import ni écriture, constantes
 #   LE  carte Équipe : paramètre optionnel `lancees` ; sortie d'avant identique octet pour octet sans lui (copie figée, sha256)
@@ -127,15 +127,11 @@ const SC = {
     const l = s.lancees();
     return s.taille() + '|' + [0, 4, 5, 204].map((i) => l.has(u(i))).join(',');
   },
-  ls21: () => {
-    const s = S(); const a = s.recent(C); s.noter(msg(A), ctx); s.etats(wh(sess(A, 'actif'))); const t0 = t; const r = [a, s.recent(C)];
-    t = t0 + m.RECENCE_MS - 1; r.push(s.recent(C)); r.push(s.recent('autre@cible'));
-    t = t0 + m.RECENCE_MS; r.push(s.recent(C));
-    return r.join(',');
-  },
+  ls21: () => [typeof m.RECENCE_MS, typeof S().recent, Object.keys(S()).join(',')].join('|'), // la fenêtre de récence n'a qu'une source (cibles) : ce module ne l'exporte ni ne la juge
+
   ls22: () => {
     const s = S(); s.noter(msg(A, { at: 5 }), ctx); s.noter(msg(B, { at: 0, cible: 'ph-72@beta' }), ctx);
-    return [s.recent(C), s.recent('ph-72@beta'), s.lancements().map((x) => x.at === t).join('/')].join(',');
+    return s.lancements().map((x) => x.at === t).join('/');
   },
   ls31: () => { const s = S(); s.noter(msg(A), ctx); return [wh(), null, {}, { workers: 'x' }, undefined].map((w) => et(s, w)).join(','); },
   ls32: () => { const s = S(); s.noter(msg(A), ctx); return et(s, wh(sess(A, 'actif'))) + ',' + et(s, wh(sess(A, 'en-attente'))); },
@@ -152,7 +148,7 @@ const SC = {
   },
   ls35: () => {
     const s = S(); s.noter(msg(A), ctx); t += m.ATTENTE_MAX_MS;
-    const r = [s.etats(wh()).size, s.recent(C), s.lancees().size];
+    const r = [s.etats(wh()).size, s.lancements().length, s.lancees().size];
     const s2 = S(); s2.noter(msg(B), ctx);
     const v1 = et(s2, wh(sess(B, 'actif'))); t += 1000; const v2 = et(s2, wh()); const v3 = et(s2, wh(sess(B, 'actif')));
     return r.join(',') + '|' + [v1, v2, v3].join(',');
@@ -175,7 +171,7 @@ const SC = {
     const temoin = [interdit({ a: { b: [{ doing: 1 }] } }), interdit(new Map([['x', { mandat: 1 }]])), interdit(new Map([['outils', 1]]))];
     return rendus.map(interdit).join(',') + '|' + temoin.join(',');
   },
-  ls44: () => [m.RECENCE_MS, m.ATTENTE_MAX_MS, m.TTL_MS, m.MAX_ENTREES, Object.keys(m.LIBELLES_VERBES).join(','),
+  ls44: () => [m.ATTENTE_MAX_MS, m.TTL_MS, m.MAX_ENTREES, Object.keys(m.LIBELLES_VERBES).join(','),
     Object.values(m.LIBELLES_VERBES).join(','), Object.isFrozen(m.LIBELLES_VERBES)].join('|'),
 };
 const r = await SC[sc]();
@@ -298,12 +294,12 @@ mut_le() { # mut_le <nom> <expression-sed> <scénario> <valeur saine> <sonde>
 }
 
 SAIN_LS12="forme,forme,forme,forme,forme,forme,forme,forme|0"
-SAIN_LS22="true,true,true/true"
-SAIN_LS21="false,true,true,false,false"
+SAIN_LS22="true/true"
+SAIN_LS21="undefined|undefined|noter,lancements,etats,lancees,taille"
 SAIN_LS14="200|false,false,true,true"
 SAIN_LS34="attendue,attendue,attendue,vue"
 SAIN_LS33="terminee"
-SAIN_LS35="0,false,0|vue,terminee,vue"
+SAIN_LS35="0,0,0|vue,terminee,vue"
 SAIN_LS36="1,0,0"
 SAIN_LE1="63|0"
 SAIN_LE2="details:ok|reste:ok"
@@ -318,7 +314,7 @@ assert_eq "LS1.3 — même session deux fois : deja:true, une entrée, at d'orig
 assert_eq "LS1.4 — 205 notes : 200 entrées, les cinq plus anciennes sont sorties" "$(LSM ls14)" "$SAIN_LS14"
 
 echo "== LS2 récence =="
-assert_eq "LS2.1 — recent : faux sans entrée, vrai à RECENCE_MS-1, faux à RECENCE_MS, faux pour une autre cible" "$(LSM ls21)" "$SAIN_LS21"
+assert_eq "LS2.1 — une seule source de la fenêtre de récence : ce module n'exporte ni RECENCE_MS ni recent() ; seul vf-cockpit-lancer-cibles.mjs la définit parmi les modules lancer" "$(LSM ls21) $(for f in "$SCRIPTS"/vf-cockpit-lancer*.mjs; do grep -l '^export const RECENCE_MS' "$f" 2>/dev/null; done | xargs -n1 basename | tr '\n' ,)" "$SAIN_LS21 vf-cockpit-lancer-cibles.mjs,"
 assert_eq "LS2.2 — un message portant at:5 ou at:0 : l'entrée a l'heure de P" "$(LSM ls22)" "$SAIN_LS22"
 
 echo "== LS3 états =="
@@ -334,7 +330,7 @@ echo "== LS4 sorties =="
 assert_eq "LS4.1 — clés exactes : etats {etat,verbe}, lancees Map {phase,verbe,ws}, lancements {at,cible,verbe}, at = horloge de P" "$(LSM ls41)" "etat,verbe/etat,verbe|true|phase,verbe,ws/phase,verbe,ws|at,cible,verbe/at,cible,verbe|2|true"
 assert_eq "LS4.2 — aucune clé doing, mandat, messages, outils dans ce que rendent noter, etats, lancees, lancements (témoin : le détecteur voit les clés plantées)" "$(LSM ls42)" "false,false,false,false,false|true,true,true"
 assert_eq "LS4.3 — le module n'importe rien, n'écrit rien, ne journalise rien, ne lit pas l'environnement" "$(node "$AUX/statique.mjs" "$SCRIPTS/vf-cockpit-lancer-suivi.mjs")" '{"imports":false,"console":false,"env":false,"fs":false,"live":false}'
-assert_eq "LS4.4 — constantes et libellés des cinq verbes" "$(LSM ls44)" "900000|600000|86400000|200|cadrer,planifier,executer,verifier,reprendre|Cadrer,Planifier,Exécuter,Vérifier,Reprendre|true"
+assert_eq "LS4.4 — constantes et libellés des cinq verbes" "$(LSM ls44)" "600000|86400000|200|cadrer,planifier,executer,verifier,reprendre|Cadrer,Planifier,Exécuter,Vérifier,Reprendre|true"
 
 echo "== LE carte Équipe =="
 assert_eq "LE.0 — la copie figée est le module d'avant (sha256)" "$(shasum -a 256 "$AUX/base/vf-cockpit-equipe-carte.mjs" | cut -d' ' -f1)" "$BASE_EQUIPE_CARTE_SHA256"
@@ -349,7 +345,7 @@ echo "== Mutants =="
 mut_ls M-FORME-LIBRE '/garde:forme/d' ls12 "$SAIN_LS12" LS1.2
 mut_ls M-AT-DU-MESSAGE '/garde:at-de-p/s#maintenant()#Number(msg.at) || maintenant()#' ls22 "$SAIN_LS22" LS2.2
 mut_ls M-SANS-BORNE '/garde:max/d' ls14 "$SAIN_LS14" LS1.4
-mut_ls M-RECENCE-INFINIE '/garde:recence/s#< RECENCE_MS#>= 0#' ls21 "$SAIN_LS21" LS2.1
+mut_ls M-RECENCE-RETABLIE 's#^export const MAX_ENTREES = 200;#export const MAX_ENTREES = 200; export const RECENCE_MS = 900000;#' ls21 "$SAIN_LS21" LS2.1
 mut_ls M-ATTENTE-ILLIMITEE '/garde:attente-max/d' ls35 "$SAIN_LS35" LS3.5
 mut_ls M-TTL-IGNORE '/garde:ttl/d' ls36 "$SAIN_LS36" LS3.6
 mut_ls M-RATTACHE-PAR-NOM "/garde:session-id/s#w\\.id === e\\.session#(w.id === e.session || w.task === 'vf-phase-' + String(e.phase).replace('.', '-') + '-' + e.ws)#" ls34 "$SAIN_LS34" LS3.4

@@ -1,11 +1,11 @@
 // vf-cockpit-lancer-suivi — suivi des lancements depuis les cartes (LANC-10 ; P72-D-06, P72-D-16, P72-D-18).
-// Exports : creerSuivi({ maintenant }) -> { noter(msg, ctx), recent(cible), lancements(), etats(who), lancees(), taille() },
-//           RECENCE_MS, ATTENTE_MAX_MS, TTL_MS, MAX_ENTREES, LIBELLES_VERBES, entreeLanceeValide({ phase, ws, verbe }).
+// Exports : creerSuivi({ maintenant }) -> { noter(msg, ctx), lancements(), etats(who), lancees(), taille() },
+//           ATTENTE_MAX_MS, TTL_MS, MAX_ENTREES, LIBELLES_VERBES, entreeLanceeValide({ phase, ws, verbe }).
 // EN MÉMOIRE seulement : jamais écrit, jamais journalisé, jamais diffusé (journal, SSE, export). Le contrat `interdits` de
 // vf-cockpit-interface.json (doing, mandat, messages, outils) vaut pour tout objet rendu. Module pur : aucun import, aucune lecture d'environnement.
 // L'horodatage d'une entrée est l'horloge de P, jamais le champ `at` du message. Le rattachement à la collecte Équipe se fait par
 // l'IDENTIFIANT de session SEUL (nom du transcript) : un nom de session, un rôle, un titre, une tâche ne sont jamais une clé.
-export const RECENCE_MS = 900000; // quinze minutes : la valeur de 72-03 (avertissement « lancement récent », jamais un blocage) ; une seule valeur dans la phase
+// La fenêtre de récence (« lancement récent ») vit dans vf-cockpit-lancer-cibles.mjs (RECENCE_MS) : une seule source, ce module n'en juge pas.
 export const ATTENTE_MAX_MS = 600000; // dix minutes : une ligne laissée à l'invite sans Entrée, ou la boîte de confiance du dossier qui attend l'utilisateur (P72-D-19)
 export const TTL_MS = 86400000; // la fenêtre de 24 h de la collecte Équipe (FENETRE × 1000) : au-delà, une session absente de `who` n'est plus visible
 export const MAX_ENTREES = 200;
@@ -44,7 +44,6 @@ export function creerSuivi({ maintenant = Date.now } = {}) {
     while (entrees.size > MAX_ENTREES) entrees.delete(entrees.keys().next().value); // garde:max
     return { ok: true };
   };
-  const recent = (cible) => { purge(); return [...entrees.values()].some((e) => e.cible === cible && maintenant() - e.at < RECENCE_MS); }; // garde:recence
   const lancements = () => { purge(); return [...entrees.values()].map((e) => ({ cible: e.cible, verbe: e.verbe, at: e.at })); };
   const etats = (who) => {
     purge();
@@ -60,5 +59,5 @@ export function creerSuivi({ maintenant = Date.now } = {}) {
   };
   const lancees = () => { purge(); return new Map([...entrees.values()].map((e) => [e.session, { phase: e.phase, ws: e.ws, verbe: e.verbe }])); };
   const taille = () => { purge(); return entrees.size; };
-  return { noter, recent, lancements, etats, lancees, taille };
+  return { noter, lancements, etats, lancees, taille };
 }
