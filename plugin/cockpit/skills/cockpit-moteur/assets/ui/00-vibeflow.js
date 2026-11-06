@@ -11,7 +11,7 @@
   document.body.classList.add('vf-tab-' + TAB); // 70-12 (P70-D-20) : marqueur de l'onglet sur le corps de page (`vf-tab-code`, `vf-tab-project`, `vf-tab-equipe`), pour les règles de mise en page propres à un onglet
   // titre de l'onglet du navigateur : « <nom> — Code », « <nom> — Projet » ou « Équipe · <nom> » (le viewer écrit « <nom> map », qui devenait le nom seul)
   { const nom = String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''); document.title = TAB === 'equipe' ? `Équipe · ${nom}` : `${nom} — ${TAB === 'project' ? 'Projet' : 'Code'}`; }
-  const ST = { done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' };
+  const ST = { done: 'Fait', active: 'En cours', recette: 'À recetter', todo: 'À faire', blocked: 'Bloqué' };
   // P67-D-04 : logo VibeFlow clair ou sombre selon le thème du viewer (meta.vfLogos est posé par l'assemblage)
   const LOGOS = G.meta.vfLogos;
   if (LOGOS) {
@@ -40,18 +40,20 @@
     .vf-tabs a.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
     /* 71.5 (P71.5-D-18, N1) : pastille sans fond : un glyphe coloré (--c-st) puis le mot en --text-2. Hauteur 20 = 16 + 2 x 2, jamais de height ; padding horizontal nul hors paliers lod, pour que le bord visible s'aligne sur le titre */
     .vst { display: inline-flex; align-items: center; gap: var(--sp-4); font-size: 11px; font-weight: 500; padding: var(--sp-2) 0; line-height: 16px; border-radius: 999px; white-space: nowrap; color: var(--text-2); background: none; }
-    .vst::before { content: ""; width: .9em; height: .9em; flex: none; background: var(--c-st); -webkit-mask: var(--g-st) center / contain no-repeat; mask: var(--g-st) center / contain no-repeat; }
+    .vst::before { content: ""; width: 1.45em; height: 1.45em; flex: none; background: var(--c-st); -webkit-mask: var(--g-st) center / contain no-repeat; mask: var(--g-st) center / contain no-repeat; }
     .vst-done { --c-st: var(--st-done); --g-st: ${G_ST.done}; } .vst-active { --c-st: var(--st-active); --g-st: ${G_ST.active}; } .vst-todo { --c-st: var(--st-todo); --g-st: ${G_ST.todo}; } .vst-blocked { --c-st: var(--st-blocked); --g-st: ${G_ST.blocked}; }
     .vst-recette { --c-st: var(--st-recette); --g-st: ${G_ST.recette}; }
+    /* 71.5 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 : « Griser les points seuls ») : le point d'une phase dans les listes du panneau (Contenu, Utilisé par, Dépend de) est gris neutre, plus violet ; --n-phase garde sa valeur (cartes, icônes, barre de langage). !important : le point porte sa couleur en style en ligne (viewer.html rowFor). */
+    #panel .row[data-go^="n:ph-"] > .dot { background: var(--text-4) !important; }
     /* recette 68 R5 (P68-D-35, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04 : « Tout selon les recos ») : une mission abandonnée dit « Abandonnée » ; 71.5 : gris neutre (--text-3), anneau barré d'une diagonale (distinct de « bloqué » et de « à faire ») */
     .vst-abandonnee { --c-st: var(--text-3); --g-st: ${G_ST.abandonnee}; }
     /* recette 68 R7 (même arbitrage) : le pied d'une carte (« 0/2 nœuds · abandonnée, nœuds non refermés ») passe à la ligne au lieu de pousser la pastille hors de la carte ; la pastille garde sa taille */
     .foot .meta { white-space: normal; min-width: 0; border-radius: 12px; }
     .foot .vst { flex: none; }
     /* 71.5 (P71.5-D-18, D-28, N2) : ni anneau ni halo, une seule élévation ; l'état se lit dans le pied (glyphe + mot) et la graisse du titre. « En cours » : palier neutre plus marqué (--raise allégé), car --surface-hover ne se voit pas en clair */
-    .card.st-active, .node:hover .card.st-active { background: color-mix(in srgb, var(--raise) 70%, var(--surface)); }
-    .card.st-active, .card.st-blocked { box-shadow: var(--shadow-card); }
-    .card.st-active .title, .card.st-blocked .title { font-weight: 600; color: var(--text); }
+    .card.st-active, .card.st-recette, .node:hover .card.st-active, .node:hover .card.st-recette { background: color-mix(in srgb, var(--raise) 70%, var(--surface)); }
+    .card.st-active, .card.st-recette, .card.st-blocked { box-shadow: var(--shadow-card); }
+    .card.st-active .title, .card.st-recette .title, .card.st-blocked .title { font-weight: 600; color: var(--text); }
     .card.st-done .title, .card.st-todo .title { font-weight: 500; color: var(--text-2); }
     .card.st-done .desc { color: var(--text-3); }
     /* piste --raise-2, remplissage neutre ; seule la barre « en cours » prend --warn-text (une teinte d'état ne se pose pas sur --raise-2 en clair, 71.5 §1.2) */

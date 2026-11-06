@@ -95,7 +95,7 @@ Texte d'état (le texte coloré lit au moins 4,5:1) :
 > 2026-11-04) : dans `ui/00-vibeflow.js`, `--st-active` vaut `var(--sev-medium)` et `--st-blocked`
 > `var(--sev-high)`, comme la colonne « Doit valoir » ; le texte des pastilles est teinté vers `--text`
 > pour tenir 4,5:1 dans les deux thèmes.
-> « À recetter » a la teinte de « en cours » et se distingue par son glyphe (anneau et point) et son mot (P69-D-25, P71.5-D-20). Le glyphe est la seule couleur d'une pastille ; le mot est en `--text-2`.
+> « À recetter » a la teinte de « en cours » et se distingue par son glyphe (anneau et point) et son mot, sur la carte de phase comme dans le panneau (statut `recette`, classe `st-recette`, mêmes paliers que `st-active`) (P69-D-25, P71.5-D-20). Le glyphe est la seule couleur d'une pastille ; le mot est en `--text-2`.
 > Une famille du graphe qui valait une teinte d'état la suit (`--n-worker`, `--k-queue`, `--m-PUT` = `--sev-medium` ; `--n-library`, `--m-GET` = `--recent` ; `--n-infra`, `--m-DELETE` = `--sev-high`).
 > **En thème clair, une teinte d'état ne se pose ni sur `--raise` ni sur `--raise-2`** (2,6 à 2,9:1) : seules les variantes texte y reposent.
 
@@ -177,7 +177,7 @@ serait 8, mais les rayons ne font pas partie de la grille d'espacement.
   - `module` : fond `--raise` ;
   - `external` : contour seul, fond transparent ;
   - `has-note` : point de 6 px après le titre (`--sev-medium`).
-- **Pastille de statut** (`.vst`, `.rw`) : 20 px de haut à l'échelle 1 (`line-height 16` + `padding var(--inset-pill)` vertical), pastille sans fond : glyphe et mot. Un glyphe coloré (coche fait, demi-disque en cours, anneau-point à recetter, anneau à faire, anneau barré bloqué, anneau barré en diagonale abandonnée, disque plein récent) suivi du mot en `--text-2`, 11 px, 500. Le glyphe suit la taille de police (`em`), donc les paliers du zoom d'éloignement.
+- **Pastille de statut** (`.vst`, `.rw`) : 20 px de haut à l'échelle 1 (`line-height 16` + `padding var(--inset-pill)` vertical), pastille sans fond : glyphe et mot. Un glyphe coloré (coche fait, demi-disque en cours, anneau-point à recetter, anneau à faire, anneau barré bloqué, anneau barré en diagonale abandonnée, disque plein récent) suivi du mot en `--text-2`, 11 px, 500. Le glyphe suit la taille de police (`em`), donc les paliers du zoom d'éloignement ; il vaut 1,45 em (16 px à l'échelle 1, la hauteur de ligne), assez pour distinguer le demi-disque « en cours » de l'anneau-point « à recetter » à 1x. Un lien qui porte une pastille ne la souligne jamais : seul son libellé l'est.
 - **Groupe d'onglets** (`.vf-tabs`) : piste `--raise`, rayon 12 px, 4 px de padding (onglet 4 × 12). L'onglet actif
   prend `--surface` et une ombre de 1 px. Un nouvel onglet (par exemple « Équipe », P69-D-17) suit
   exactement ce modèle.
@@ -199,6 +199,7 @@ serait 8, mais les rayons ne font pas partie de la grille d'espacement.
   `cubic-bezier(.65, 0, .35, 1)` pour un aller-retour.
 - **Durées** : 150 ms (survol), 200 ms (le défaut), 250-300 ms (ouverture d'un panneau),
   450 ms (grands déplacements). On ne dépasse pas 700 ms.
+- **Respiration du glyphe « actif »** (tiroir « Au travail ») : une échelle de 1 à .82 en 2,4 s, jamais une variation d'opacité (le glyphe garde son contraste à chaque instant : `--st-active` clair fait 3,06:1 sur `--bg`, aucun palier d'opacité n'y tient 3:1).
 - **Mouvement réduit** : toute animation a une variante `prefers-reduced-motion: reduce` qui la
   coupe.
 - **Jamais animé** : le changement de thème (`html.theme-switching`, transitions coupées).

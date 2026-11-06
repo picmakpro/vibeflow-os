@@ -946,7 +946,7 @@ function cardFoot(item) {
   if (i.n?.foot || i.f?.foot) size = i.n?.foot || i.f?.foot; // vibeflow P2
   const vst = i.n?.st || i.f?.st;
   const rec = recentOf(item), inside = recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item);
-  const pill = vst ? `<span class="vst vst-${h(vst).replace(/[^\w-]/g, '')}">${h(({ done: 'Fait', active: 'En cours', todo: 'À faire', blocked: 'Bloqué' })[vst] || vst)}</span>` : rec ? `<span class="rw">${recentLabel(rec)}</span>` : inside ? `<span class="rw soft">${inside.length} changed</span>` : '';
+  const pill = vst ? `<span class="vst vst-${h(vst).replace(/[^\w-]/g, '')}">${h(({ done: 'Fait', active: 'En cours', recette: 'À recetter', todo: 'À faire', blocked: 'Bloqué' })[vst] || vst)}</span>` : rec ? `<span class="rw">${recentLabel(rec)}</span>` : inside ? `<span class="rw soft">${inside.length} changed</span>` : '';
   return size || pill ? `<div class="foot">${size ? `<span class="meta">${h(size)}</span>` : '<span></span>'}${pill}</div>` : '';
 }
 /** Extra height a card needs beyond its base size: a footer, and a title long enough to wrap. */

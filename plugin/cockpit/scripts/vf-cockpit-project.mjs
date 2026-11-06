@@ -17,8 +17,8 @@ import { lireAilleurs, fusionner } from './vf-cockpit-ailleurs.mjs';
 const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
 const DST = { done: 'done', running: 'active', ready: 'todo', blocked: 'todo', failed: 'blocked' }; // dag.sh : blocked = en attente des deps
 const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
-// projection de l'état d'avancement sur les statuts du viewer : « à recetter » prend la couleur « en cours » (P69-D-25, P69-PL-02) ; l'état exact reste dans avancement.etat
-const PROJECTION_ST = { fait: 'done', 'a-recetter': 'active', 'en-cours': 'active', 'a-faire': 'todo' };
+// projection de l'état d'avancement sur les statuts du viewer : « à recetter » prend la teinte « en cours » mais son propre statut `recette` : glyphe et mot « À recetter » sur la carte (P69-D-25, P69-PL-02, P71.5-D-20) ; l'état exact reste dans avancement.etat
+const PROJECTION_ST = { fait: 'done', 'a-recetter': 'recette', 'en-cours': 'active', 'a-faire': 'todo' };
 // pied de jalon : « N clos · [N en cours · ]N à recetter · N à faire · N % » ; le pourcentage ne compte que les phases closes (P69-D-06, P69-PL-03)
 function piedJalon(ks) {
   const n = (e) => ks.filter((p) => p.avancement.etat === e).length; const clos = n('fait'), enc = n('en-cours');

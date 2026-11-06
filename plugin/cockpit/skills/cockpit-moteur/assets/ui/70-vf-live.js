@@ -35,6 +35,10 @@
     body.vf-tab-equipe .sec > a.vf-link { padding: var(--sp-6) 0; margin-inline: 0; }
     .vf-whop .src { color: var(--text-4); font-size: 11px; margin-top: var(--sp-16); }
     a.vf-link { text-decoration: underline; text-decoration-color: rgba(var(--ink), .35); text-underline-offset: 3px; }
+    /* 71.5 (juge de rendu, 2026-11-06) : la pastille d'état (glyphe + mot) d'un lien n'est jamais soulignée ; seul le libellé qui l'accompagne l'est */
+    a.vf-link:has(> .vst) { text-decoration: none; }
+    a.vf-link:has(> .vst) > :not(.vst) { text-decoration: underline; text-decoration-color: rgba(var(--ink), .35); text-underline-offset: 3px; }
+    a.vf-link:has(> .vst):hover > :not(.vst) { text-decoration-color: currentColor; }
     a.vf-link:hover { color: var(--text); text-decoration-color: currentColor; } a.vf-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
     .vf-nr { white-space: nowrap; }
     .vf-transcript { max-height: 320px; overflow-y: auto; margin-top: var(--sp-8); font-size: 12px; color: var(--text-2); }
