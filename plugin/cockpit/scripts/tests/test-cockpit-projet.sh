@@ -806,18 +806,22 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 const [, , scripts, cas] = process.argv; const imp = (f) => import(pathToFileURL(path.join(scripts, f)).href);
-const { readPlanning } = await imp('vf-cockpit-planning.mjs'); const { detectDrift } = await imp('vf-cockpit-drift.mjs');
+const { readPlanning } = await imp('vf-cockpit-planning.mjs'); const { detectDrift } = await imp('vf-cockpit-drift.mjs'); const { buildProjectGraph } = await imp('vf-cockpit-project.mjs');
 const mk = (road, state) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'c-')); fs.mkdirSync(path.join(d, '.planning')); fs.writeFileSync(path.join(d, '.planning/ROADMAP.md'), road); if (state) fs.writeFileSync(path.join(d, '.planning/STATE.md'), state); return d; };
 const deps = (road) => [...readPlanning(mk(road), undefined, { sansTags: true }).phases.values()].map((p) => `${p.n}:${p.depends}`).join(' ');
 const nc = (road) => detectDrift(mk(road)).constats.filter((c) => c.regle === 'ligne-non-comprise').map((c) => c.ligne).join(',');
 if (cas === 'puces') { const f = (sep) => deps(`### Phase 1: A\n### Phase 2: B\n**Depends on:**${sep}- Phase 1\n- Phase 1\n`); console.log([f('\n'), f('\n\n'), f('\n \n\n')].join('|')); }
 else if (cas === 'crlf') { const f = (nl, bom) => (detectDrift(mk('- [ ] **Phase 1: A** - x\n### Phase 1: A\n', `${bom}---${nl}milestone: v9.9${nl}status: executing${nl}current_phase: 1${nl}---${nl}`)).constats.find((c) => c.regle === 'jalons-absents')?.apres.match(/\*\*([^*]+)\*\*/)?.[1]); console.log([f('\n', ''), f('\r\n', ''), f('\r\n', '﻿')].join('|')); }
 else if (cas === 'dep-sans-deux-points') console.log(nc('### Phase 1: A\nDepends on Phase 3\n- Depends on Phase 3\n**Depends on** Phase 3\n**Depends on**: Phase 3\nLa Phase 2 en dépend.\nDependencies are documented below.\n'));
+else if (cas === 'case-vide') console.log([deps('- [ ] Phase 1:\n- [ ] Phase 2: B\n'), deps('- [ ] Phase 1 —\n- [ ] Phase 2 — B\n')].map(() => '').join('') + [...readPlanning(mk('- [ ] Phase 1:\n- [ ] Phase 2: B\n'), undefined, { sansTags: true }).phases.values()].map((p) => `${p.n}=${p.name}`).join(',') + '|' + [...readPlanning(mk('- [x] Phase 1 —\n- [ ] Phase 2 — B\n'), undefined, { sansTags: true }).phases.values()].map((p) => `${p.n}=${p.name}${p.done ? '+' : ''}`).join(','));
+else if (cas === 'backlog-crlf') { const f = (nl) => { const d = mk('- [ ] **Phase 1: A** - x\n### Phase 1: A\n'); fs.writeFileSync(path.join(d, '.planning/BACKLOG.md'), ['## Un — INVESTIGUÉ', 'texte un', '## Deux', 'texte deux', ''].join(nl)); return buildProjectGraph(d).files.filter((x) => x.p.startsWith('.planning/BACKLOG.md#')).length; }; console.log(f('\n') + '|' + f('\r\n')); }
 else if (cas === 'colle') console.log(nc("### Phase 1: A\n- goal-backward : valider d'abord\nObjectif-cible : x\nGoal-driven : y\n**Goal** — non lu\n"));
 JS
 assert_eq "P9.2 (C2) — puces après un en-tête vide : lues pareil avec 0, 1 ou 2 lignes vides intercalées" "$(node "$AUX/c.mjs" "$SCRIPTS" puces)" "1: 2:1|1: 2:1|1: 2:1"
 assert_eq "P9.3 (C4) — jalons-absents propose le jalon du STATE (v9.9) en LF, en CRLF et en CRLF avec BOM" "$(node "$AUX/c.mjs" "$SCRIPTS" crlf)" "v9.9|v9.9|v9.9"
 assert_eq "P9.4 (C5) — « Depends on Phase 3 » sans deux-points (nu, puce, gras) est SIGNALÉE (lignes 2,3,4), pas lue ; la forme correcte, la prose « en dépend » et « Dependencies are documented » ne le sont pas" "$(node "$AUX/c.mjs" "$SCRIPTS" dep-sans-deux-points)" "2,3,4"
+assert_eq "P9.10 (R4) — un nom de case vide reste vide : « Phase 1: » puis « Phase 2: B » donnent deux phases, avec deux-points ET avec tiret (la ligne suivante est lue pour elle-même)" "$(node "$AUX/c.mjs" "$SCRIPTS" case-vide)" "1=,2=B|1=+,2=B"
+assert_eq "P9.11 (R5) — BACKLOG.md en CRLF : même nombre d'entrées qu'en LF (2)" "$(node "$AUX/c.mjs" "$SCRIPTS" backlog-crlf)" "2|2"
 assert_eq "P9.5 (C6) — mot-clé collé à un trait d'union (goal-backward, Objectif-cible, Goal-driven) : jamais signalé ; « **Goal** — » l'est toujours" "$(node "$AUX/c.mjs" "$SCRIPTS" colle)" "5"
 mut7 fence vf-cockpit-formats.mjs "    if (code) return;
 " "" > "$WORK/ancre-fence.txt"
@@ -844,9 +848,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 const [, , scripts, bavard] = process.argv; const imp = (f) => import(pathToFileURL(path.join(scripts, f)).href);
-const { readPlanning } = await imp('vf-cockpit-planning.mjs'); const { detectDrift } = await imp('vf-cockpit-drift.mjs');
+const { readPlanning } = await imp('vf-cockpit-planning.mjs'); const { detectDrift } = await imp('vf-cockpit-drift.mjs'); const { buildProjectGraph } = await imp('vf-cockpit-project.mjs');
 const N = 20000, SEUIL = 2.8, BRUIT = 40, PLAFOND = 1500;
-const CARS = [' ', '\t', ' ', ' ', '*', '_', '(', ')', '[', ']', '-', '—', '–', '#', ':', '1', '.', '·', '\n'];
+const CARS = [' ', '\t', ' ', ' ', '*', '_', '(', ')', '[', ']', '-', '—', '–', '#', ':', '1', '.', '·', '\n', '\u2028', '\u2029'];
 // formes : { f: ligne avec trous ◇, doc: 'roadmap' | 'exigences' | 'state' | 'jalons' }
 const FORMES = [
   ['##◇', 'roadmap'], ['## ◇Phase 1◇', 'roadmap'], ['## Phase 1◇:◇x', 'roadmap'], ['### Phase 1 ◇—◇x', 'roadmap'], ['#### **◇Phase 1: x**◇', 'roadmap'], ['## Phase ◇1 — ◇', 'roadmap'], ['## Phase 1 ◇—', 'roadmap'],
@@ -857,35 +861,47 @@ const FORMES = [
   ['### Phase 1: A\n**Goal**:◇\n**x', 'roadmap'], ['### Phase 1: A\nGoal ◇: ◇y', 'roadmap'], ['### Phase 1: A\n**Goal** ◇— ◇z', 'roadmap'], ['### Phase 1: A\n**Goal**: a\n◇\n◇\n**Depends on**: 1', 'roadmap'],
   ['- [ ] **◇REQ-1◇**:◇x', 'exigences'], ['- [ ] ◇A-◇1', 'exigences'], ['- [x] **A-1:**◇y', 'exigences'], ['| ◇AB-1◇ | Phase ◇2 |', 'exigences'],
   ['## Milestones\n\n- ✅ **v1** — Phases 1-◇', 'jalons'], ['## Milestones\n\n- ✅ **v1** — Phases ◇-◇', 'jalons'], ['## Milestones\n\n- ✅ **◇v1◇** — ◇Phases ◇1', 'jalons'],
+  ['## T◇— x', 'backlog'], ['## T ◇— ◇x', 'backlog'], ['## ◇T — ◇', 'backlog'], ['<objective>◇', 'plan'], ['<objective>◇</objective>', 'plan'], ['※', 'plan'], ['---\ndepends_on: ◇\n', 'plan'], ['---\nfiles_modified: [◇\n', 'plan'],
   ['current_phase: ◇', 'state'], ['status: ◇', 'state'], ['current_phase: "◇2"', 'state'],
 ];
 const holes = (f, c) => f.split('◇').join(c.repeat(N));
 const t = (g) => { const a = process.hrtime.bigint(); g(); return Number(process.hrtime.bigint() - a) / 1e6; };
 const mesure = (ops, ecrire, taille) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')); fs.mkdirSync(path.join(d, '.planning')); ecrire(d, taille); const r = Object.fromEntries(ops.map(([nom, g]) => [nom, Math.min(t(() => g(d)), t(() => g(d)))])); fs.rmSync(d, { recursive: true, force: true }); return r; };
 const OPS = [['readPlanning', (d) => readPlanning(d, undefined, { sansTags: true })], ['detectDrift', (d) => detectDrift(d)]];
+const OPS_PROJET = [['buildProjectGraph', (d) => buildProjectGraph(d)]]; // BACKLOG, plans : lus par le graphe Projet seulement
 const echecs = []; let cas = 0; const FILTRE = process.env.CROISSANCE_FORME || ''; // sous-chaîne : restreint aux formes qui la contiennent (preuves par mutant)
-for (const [forme, doc] of FORMES.filter(([f]) => f.includes(FILTRE))) for (const c of CARS) for (const fin of ['\n', '']) {
-  const f = (taille) => forme.split('◇').join(c.repeat(taille));
+for (const [forme, doc] of FORMES.filter(([f]) => f.includes(FILTRE))) for (const c of CARS) for (const [queue, fin] of [['', '\n'], ['', ''], ['v\u2028w', '\n']]) {
+  if (forme.includes('※') && c !== CARS[0]) continue; // forme à jeton : une seule passe
+  const ops = doc === 'backlog' || doc === 'plan' ? OPS_PROJET : OPS;
+  const f = (taille) => forme.split('◇').join(c.repeat(taille)).split('※').join('<objective>'.repeat(Math.floor(taille / 2)));
   const ecrire = (d, taille) => {
-    const p = (x) => path.join(d, '.planning', x); const ligne = f(taille) + fin;
+    const p = (x) => path.join(d, '.planning', x); const ligne = f(taille) + queue + fin;
     if (doc === 'exigences') fs.writeFileSync(p('REQUIREMENTS.md'), ligne);
     else if (doc === 'state') { fs.writeFileSync(p('ROADMAP.md'), '### Phase 1: A\n'); fs.writeFileSync(p('STATE.md'), '---\n' + ligne + (fin ? '---\n' : '')); }
+    else if (doc === 'backlog' || doc === 'plan') {
+      fs.writeFileSync(p('ROADMAP.md'), '- [ ] **Phase 1: A** - x\n### Phase 1: A\n');
+      if (doc === 'backlog') fs.writeFileSync(p('BACKLOG.md'), ligne); else { fs.mkdirSync(p('phases/01-a'), { recursive: true }); fs.writeFileSync(p('phases/01-a/01-01-PLAN.md'), ligne); }
+    }
     else fs.writeFileSync(p('ROADMAP.md'), (doc === 'jalons' ? '- [ ] **Phase 1: A**\n\n' : '') + ligne);
   };
   cas++;
-  let a = mesure(OPS, ecrire, N), b = mesure(OPS, ecrire, 2 * N);
-  for (const [nom] of OPS) {
+  let a = mesure(ops, ecrire, N), b = mesure(ops, ecrire, 2 * N);
+  for (const [nom] of ops) {
     let r = b[nom] / Math.max(a[nom], 1);
-    for (let k = 0; k < 2 && b[nom] > BRUIT && (r > SEUIL || b[nom] > PLAFOND); k++) { a = mesure(OPS, ecrire, N); b = mesure(OPS, ecrire, 2 * N); r = b[nom] / Math.max(a[nom], 1); } // un faux rouge de bruit ne survit pas à deux rejeux
-    if (b[nom] > BRUIT && (r > SEUIL || b[nom] > PLAFOND)) echecs.push(`${JSON.stringify(forme)} | ${JSON.stringify(c)}${fin ? '' : ' sans \\n final'} | ${nom} | ${N} → ${2 * N} | ${a[nom].toFixed(0)} ms → ${b[nom].toFixed(0)} ms | ×${r.toFixed(1)}`);
+    for (let k = 0; k < 2 && b[nom] > BRUIT && (r > SEUIL || b[nom] > PLAFOND); k++) { a = mesure(ops, ecrire, N); b = mesure(ops, ecrire, 2 * N); r = b[nom] / Math.max(a[nom], 1); } // un faux rouge de bruit ne survit pas à deux rejeux
+    if (b[nom] > BRUIT && (r > SEUIL || b[nom] > PLAFOND)) echecs.push(`${JSON.stringify(forme)} | ${JSON.stringify(c)}${fin ? '' : ' sans \\n final'}${queue ? ' + queue ' + JSON.stringify(queue) : ''} | ${nom} | ${N} → ${2 * N} | ${a[nom].toFixed(0)} ms → ${b[nom].toFixed(0)} ms | ×${r.toFixed(1)}`);
   }
 }
 console.log(echecs.length ? `${echecs.length} échec(s) sur ${cas} cas :\n` + echecs.slice(0, Number(bavard) || 12).join('\n') : `ok ${cas}`);
 JS
 CR="$(node "$AUX/croissance.mjs" "$SCRIPTS")"
-assert_eq "P10.1 — croissance : 1368 cas (38 formes x 19 caractères x avec/sans saut final), lecture et diagnostic, ratio 2N/N sous 2,8" "$CR" "ok 1368"
+assert_eq "P10.1 — croissance : 2712 cas (44 formes x 21 caractères dont U+2028/U+2029 x 3 fins de ligne), lecture, diagnostic et graphe Projet (BACKLOG, plans), ratio 2N/N sous 2,8" "$CR" "ok 2712"
 mut7 cr-paren vf-cockpit-formats.mjs ".replace(PARENTHESES, ' ')" ".replace(/\\([^)]*\\)/g, ' ')" > "$WORK/ancre-cr1.txt"
 mut7 cr-coupe vf-cockpit-formats.mjs "(?::\\\\*\\\\*|\\\\*\\\\*\${COLON})))" "(?:\${COLON}\\\\*\\\\*|\\\\*\\\\*\${COLON})))" > "$WORK/ancre-cr2.txt"
+mut7 cr-backlog vf-cockpit-project.mjs "(?<!\\s)\\s+—\\s+" "\\s+—\\s+" > "$WORK/ancre-cr3.txt"
+mut7 cr-objectif vf-cockpit-project.mjs "objectif(txt) ||" "/<objective>\\s*([\\s\\S]*?)<\\/objective>/.exec(txt)?.[1] ||" > "$WORK/ancre-cr4.txt"
+assert_eq "P10.4 (R2) — mutant (ancienne coupe de l'intertitre de BACKLOG rétablie) : le test de croissance rougit, par buildProjectGraph" "$(cat "$WORK/ancre-cr3.txt")|$(CROISSANCE_FORME='## T◇— x' node "$AUX/croissance.mjs" "$WORK/mut-cr-backlog" | grep -c 'échec(s) sur')" "muté|1"
+assert_eq "P10.5 (R2) — mutant (ancienne regex de <objective> rétablie) : le test de croissance rougit, par buildProjectGraph" "$(cat "$WORK/ancre-cr4.txt")|$(CROISSANCE_FORME='※' node "$AUX/croissance.mjs" "$WORK/mut-cr-objectif" | grep -c 'échec(s) sur')" "muté|1"
 assert_eq "P10.2 — mutant (ancienne regex des parenthèses rétablie, ancre présente) : le test de croissance rougit" "$(cat "$WORK/ancre-cr1.txt")|$(CROISSANCE_FORME='Depends on:** (' node "$AUX/croissance.mjs" "$WORK/mut-cr-paren" | grep -c 'échec(s) sur')" "muté|1"
 assert_eq "P10.3 — mutant (ancienne coupe de valeur rétablie, ancre présente) : le test de croissance rougit" "$(cat "$WORK/ancre-cr2.txt")|$(CROISSANCE_FORME='Depends on:** 1 **' node "$AUX/croissance.mjs" "$WORK/mut-cr-coupe" | grep -c 'échec(s) sur')" "muté|1"
 
