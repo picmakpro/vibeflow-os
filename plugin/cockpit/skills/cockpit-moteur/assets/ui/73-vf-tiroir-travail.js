@@ -2,6 +2,7 @@
 // ici seulement ce qui l'entoure : le bouton « N au travail » dit s'il est ouvert (aria-expanded) et ce qu'il ouvre (aria-controls, comme la ligne Git), et Échap
 // ferme ce tiroir-là, seul, sans faire remonter le canevas, puis rend le focus au bouton. Rien ne se pose hors du direct (page exportée ou ouverte en fichier).
 // Q12 (PU-G-203) : sous 1280 px un seul tiroir latéral à la fois, Git (gauche) ou « Au travail » (droite) ; celui qui s'ouvre replie l'autre et prend le focus. Le détail d'une carte n'est pas concerné (question en attente).
+// Q12, réponse de Samuel (AskUserQuestion, session principale, 2026-11-06, « Non, lecture étroite (Recommandé) ») : seuls le tiroir Git et « Au travail » s'excluent sous 1280 px ; le détail d'une carte reste ouvert à côté du tiroir Git (PU-G-203).
 (() => {
   const SC = window.Floorplan, SRV = window.FLOORPLAN_SERVER;
   if (!SC || !SRV || !SRV.token || typeof EventSource === 'undefined') return; // même garde que 70-vf-live.js
