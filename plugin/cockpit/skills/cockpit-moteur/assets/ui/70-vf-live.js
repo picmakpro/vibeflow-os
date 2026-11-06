@@ -105,7 +105,7 @@
     const mal = Object.entries(who?.sources || {}).filter(([, v]) => v && (v.etat === 'erreur' || v.etat === 'forme-inconnue')).map(([k]) => SOURCES[k] || k);
     const src = mal.length ? `${mal.length > 1 ? 'Sources illisibles' : 'Source illisible'} : ${mal.join(', ')}` : '';
     const arbre = window.__vfEquipeRendu.arbre(ws, h);
-    return (`<div class="vf-whop"><div class="aw-head"><h3>Au travail</h3><span class="aw-count"><b>${act.length}</b> ${act.length > 1 ? 'actifs' : 'actif'} · ${pluriel(finis, 'terminé', 'terminés')}</span></div>${driverLigne()}`
+    return (`<div class="vf-whop"><div class="aw-head"><h3>Au travail</h3><span class="aw-count"><b>${act.length}</b> ${act.length > 1 ? 'actifs' : 'actif'} · ${pluriel(finis, 'terminé', 'terminés')}</span></div>${window.__vfEquipeRendu.surveiller(ws)}${driverLigne()}`
       + `${act.length ? '' : '<p>Personne ne travaille en ce moment</p>'}${arbre}`
       + `${verrous.length ? `<div class="aw-sec2"><span>Qui a la main</span><span>${verrous.length}</span></div><p class="aw-aide">Un verrou évite que deux sessions modifient la même chose en même temps : rien à faire de votre côté.</p><ul class="r-verr">${verrous.map(ligneVerrou).join('')}</ul>` : ''}`
       + `${orph.length ? `<div class="aw-sec2"><span>Agents sans verrou tenu</span><span>${orph.length}</span></div><ul class="r-verr">${orph.map(ligneOrph).join('')}</ul>` : ''}`

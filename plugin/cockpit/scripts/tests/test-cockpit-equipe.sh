@@ -932,6 +932,14 @@ JSON
   EKC libelles "equipe.html#t"
   assert_eq "EK11 — le pied du tiroir, qui ne nomme plus qu'une source illisible (PU-G-180), est en français (aucune clé « sessions », « locks », « dags » brute)" "$(G "$WORK/ek-libelles.json" 'j.erreur||(/\b(sessions|locks|dags)\b/.test(j.src)?"anglais : "+j.src:"français")')" "français"
   assert_eq "EK12 — l'infobulle de la recherche de l'onglet Équipe dit la même chose que son libellé" "$(G "$WORK/ek-libelles.json" 'j.erreur||j.titre')" "Chercher un agent ou une session"
+  # EK15 (EA3, PU-G-189, PU-G-190) : Échap ferme le tiroir « Au travail » seul, le bouton dit s'il est ouvert et ce qu'il ouvre
+  EK15() { EK_FOCUS="$1" EKC echap-tiroir "project.html#t"; mv "$WORK/ek-echap-tiroir.json" "$WORK/ek-echap-$1.json"; }
+  EK15 panneau
+  assert_eq "EK15.0 — témoin : le bouton « N au travail » porte aria-controls=panel ; aria-expanded vaut false tiroir fermé, true tiroir ouvert (PU-G-190)" "$(G "$WORK/ek-echap-panneau.json" 'j.erreur||[j.ferme0.controls,j.ferme0.expanded,j.ouvert.controls,j.ouvert.expanded].join()')" "panel,false,panel,true"
+  assert_eq "EK15.1 — témoin : avant Échap le focus est dans le tiroir et une carte est sélectionnée (la sonde sait lire le focus et la sélection)" "$(G "$WORK/ek-echap-panneau.json" 'j.erreur||[j.place.dansTiroir,j.avant.selection!==null].join()')" "true,true"
+  assert_eq "EK15 — Échap, focus dans le tiroir : le tiroir se ferme seul, la sélection et la vue ne bougent pas, le focus revient au bouton « N au travail », aria-expanded repasse à false (PU-G-189)" "$(G "$WORK/ek-echap-panneau.json" 'j.erreur||["ferme="+j.ferme,"selection "+(j.apres.selection===j.avant.selection?"gardée":"perdue ("+j.avant.selection+" -> "+j.apres.selection+")"),"vue "+(j.apres.hash===j.avant.hash?"gardée":"changée"),"focus="+j.apres.actif,"expanded="+j.apres.expanded].join(" | ")')" "ferme=true | selection gardée | vue gardée | focus=vf-lock | expanded=false"
+  EK15 bouton
+  assert_eq "EK15.2 — Échap, focus sur le bouton « N au travail » lui-même : même résultat (PU-G-189)" "$(G "$WORK/ek-echap-bouton.json" 'j.erreur||["ferme="+j.ferme,"selection "+(j.apres.selection===j.avant.selection?"gardée":"perdue"),"vue "+(j.apres.hash===j.avant.hash?"gardée":"changée"),"focus="+j.apres.actif,"expanded="+j.apres.expanded].join(" | ")')" "ferme=true | selection gardée | vue gardée | focus=vf-lock | expanded=false"
   vf_hyg_stop "$EK_PID"
 
   # --- mutants : chacun posé dans la page servie, serveur relancé, le témoin DOIT rougir ---
@@ -954,6 +962,14 @@ JSON
   assert_eq "EK13.2 — mutant (plafond de 0,75 retiré) : la scène est réduite sous 0,75, détecté" "$(ek_mutant r6 echelle "equipe.html" 'j.erreur||(j["390"].concat(j["768"]).some((m)=>m.k<0.75)?"réduit":"plafonné")' 'if (!actif || !st.t || st.t.k > 0.75) return;' 'return;')" "muté|réduit"
   assert_eq "EK13.3 — mutant (cadrage sous freeArea() au lieu du bas réel de #context) : le titre recouvre la première carte, détecté" "$(ek_mutant r7 echelle "equipe.html" 'j.erreur||(j["390"].concat(j["768"]).some((m)=>m.aire>0)?"recouvre":"libre")' 'const y = Math.max(a.y, bas - haut + 12)' 'const y = a.y')" "muté|recouvre"
   assert_eq "EK14.2 — mutant (le cadrage n'écoute plus la taille du titre) : le titre qui grandit recouvre la première carte, détecté" "$(ek_mutant r8 titre-grandi "equipe.html" 'j.erreur||(j.aire>0?"recouvre":"libre")' 'taille?.observe(ctx);' '')" "muté|recouvre"
+  EK15M() { local m; m="$(ek_muter "$2" "$3")"; ek_demarrer; EK_FOCUS="$1" EKC echap-tiroir "project.html#t"; local v; v="$(G "$WORK/ek-echap-tiroir.json" "$4")"; vf_hyg_stop "$EK_PID"; ek_restaurer; echo "$m|$v"; }
+  EK15V='j.erreur||(j.ferme?"fermé":"ouvert")+" | "+(j.apres.selection===j.avant.selection?"sélection gardée":"sélection perdue")'
+  assert_eq "EK15.3 — mutant (aucun écouteur d'Échap dans le tiroir) : le viewer désélectionne la carte et le tiroir reste ouvert, détecté (trace attendu : fermé | sélection gardée)" "$(EK15M panneau "panneau.addEventListener('keydown', echap);" "" "$EK15V")" "muté|ouvert | sélection perdue"
+  assert_eq "EK15.4 — mutant (aucun écouteur d'Échap pour le bouton) : focus sur le bouton, le viewer désélectionne la carte, détecté" "$(EK15M bouton "document.addEventListener('keydown', (e) => { if (e.target === bouton()) echap(e); }, true);" "" "$EK15V")" "muté|ouvert | sélection perdue"
+  assert_eq "EK15.5 — mutant (l'Échap du tiroir ne s'arrête pas avant le viewer) : le tiroir se ferme MAIS le viewer désélectionne la carte, détecté" "$(EK15M panneau "e.stopPropagation(); e.preventDefault(); // le viewer" "e.preventDefault(); // le viewer" "$EK15V")" "muté|fermé | sélection perdue"
+  assert_eq "EK15.6 — mutant (le focus n'est plus rendu au bouton) : il reste sur le bouton du tiroir (BUTTON) au lieu de revenir sur #vf-lock, détecté" "$(EK15M panneau "bouton()?.focus({ preventScroll: true });" "" 'j.erreur||j.apres.actif')" "muté|BUTTON"
+  assert_eq "EK15.7 — mutant (aria-expanded figé à false) : le tiroir ouvert n'est pas dit ouvert, détecté" "$(EK15M panneau "String(ouvert())" "'false'" 'j.erreur||j.ouvert.expanded')" "muté|false"
+  assert_eq "EK15.8 — mutant (aria-controls retiré) : le bouton ne dit plus ce qu'il ouvre, détecté" "$(EK15M panneau "b.setAttribute('aria-controls', 'panel'); " "" 'j.erreur||String(j.ouvert.controls)')" "muté|null"
   # témoins de la sonde de mutation elle-même
   ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"
   assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK2.1 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "a1|null|identique"
@@ -1074,6 +1090,54 @@ ER() { node "$AUX/ea2-rendu.mjs" "${2:-$RENDU}" | node "$AUX/jq.mjs" "$1"; }
 assert_eq "EA2.14 — plusieurs « Session principale » se distinguent par l'arbre, puis par l'identifiant court quand l'arbre est le même ; une seule garde son titre (PU-G-186)" "$(ER 'JSON.stringify([j.memeArbre,j.arbres,j.une])')" '[["Session principale · main · aaaaaaaa","Session principale · main · bbbbbbbb"],["Session principale · main","Session principale · wt1"],["Session principale"]]'
 assert_eq "EA2.15 — agent terminé sans titre : « rôle · identifiant court » (PU-G-184)" "$(ER 'j.fini.join()')" "vf-coder · cccccccc"
 assert_eq "EA2.16 — le bouton « Voir la dernière commande » ne porte plus le chevron et le tiret d'un terminal (PU-G-187) ; témoin : le code d'avant le portait" "$(ER 'j.terminal')|$(ER 'j.terminal' "$MUT/avant/71-vf-equipe-rendu.js")" "false|true"
+
+# --- EA3 (lot 9) : « À surveiller » (PU-G-181), commande longue (PU-G-183), titre /rename des sessions (PU-G-186) ---
+cat > "$AUX/ea3-surveiller.json" <<'JSON'
+{"who":{"sources":{},"workers":[
+ {"kind":"session","id":"s1","etat":"actif","ageS":5,"tree":".","branch":"main"},
+ {"kind":"subagent","id":"a1","etat":"actif","ageS":300,"dureeS":700,"role":"vf-coder","task":"TACHE-MUETTE","parent":"s1","tree":".","action":{"verbe":"lit","cible":"x"}},
+ {"kind":"subagent","id":"a2","etat":"actif","ageS":1200,"dureeS":1500,"role":"vf-auditer","task":"TACHE-LONGUE","parent":"s1","tree":".","action":{"verbe":"lance une commande"}},
+ {"kind":"subagent","id":"a3","etat":"actif","ageS":4,"dureeS":60,"role":"vf-coder","task":"TACHE-VIVANTE","parent":"s1","tree":".","action":{"verbe":"lance une commande"}}]}}
+JSON
+cat > "$AUX/ea3-calme.json" <<'JSON'
+{"who":{"sources":{},"workers":[
+ {"kind":"session","id":"s1","etat":"actif","ageS":900,"tree":".","branch":"main"},
+ {"kind":"subagent","id":"a3","etat":"actif","ageS":4,"dureeS":60,"role":"vf-coder","task":"TACHE-VIVANTE","parent":"s1","tree":".","action":{"verbe":"lance une commande"}},
+ {"kind":"subagent","id":"a4","etat":"en-attente","ageS":5000,"dureeS":60,"role":"vf-coder","task":"TACHE-ATTENTE","parent":"s1","tree":"."}]}}
+JSON
+mkdir -p "$MUT/avant3"
+for f in 70-vf-live.js 71-vf-equipe-rendu.js; do git -C "$SCRIPTS" show "f146c21d:plugin/cockpit/skills/cockpit-moteur/assets/ui/$f" > "$MUT/avant3/$f" 2>/dev/null; done
+TXT='j.html.replace(/<[^>]*>/g,"").replace(/\u00a0/g," ")'
+assert_eq "EA3.1 — « À surveiller » en tête du tiroir (avant le driver et l'arbre) : un agent sans nouvelle depuis plus de 2 min, une commande en cours depuis plus de 15 min, l'agent vivant ignoré (PU-G-181, PU-G-183)" "$(T70 ea3-surveiller.json "[($TXT).includes('À surveiller · 1 agent sans nouvelle depuis plus de 2 min · 1 commande en cours depuis plus de 15 min'), j.html.indexOf('aw-surv') < j.html.indexOf('aw-driver'), j.html.indexOf('aw-driver') < j.html.indexOf('r-tree')].join()")" "true,true,true"
+assert_eq "EA3.2 — la ligne de l'agent le dit aussi : « commande en cours, sans nouvelle depuis 20 min » ; l'agent muet reste « sans nouvelle depuis 5 min » (PU-G-183)" "$(T70 ea3-surveiller.json "[($TXT).includes('commande en cours, sans nouvelle depuis 20 min'), ($TXT).includes('sans nouvelle depuis 5 min'), (($TXT).match(/commande en cours,/g)||[]).length].join()")" "true,true,1"
+assert_eq "EA3.3 — règle Q9 « Règle actuelle » : un glyphe et des mots, aucune couleur d'alerte, aucun style en ligne, ni la forme « bloqué » (PU-G-181)" "$(T70 ea3-surveiller.json '(() => { const p = /<p class="aw-surv">.*?<\/p>/.exec(j.html)[0]; return [p.includes("<svg"), p.includes("style="), /bloque|alerte|danger|rouge/.test(p), p.includes("aw-s-attente")].join(); })()')" "true,false,false,true"
+assert_eq "EA3.4 — rien à surveiller (agent vivant, session muette, agent en attente) ou personne : aucune ligne « À surveiller » (PU-G-181)" "$(T70 ea3-calme.json 'j.html.includes("aw-surv")')|$(T70 ea2-vide.json 'j.html.includes("aw-surv")')|$(T70 ea2-orph.json 'j.html.includes("aw-surv")')" "false|false|false"
+assert_eq "EA3.5 — témoin rouge : le code d'avant (f146c21d) n'a ni la ligne « À surveiller » ni la commande en cours" "$(T70 ea3-surveiller.json "[j.html.includes('À surveiller'), ($TXT).includes('commande en cours')].join()" "$MUT/avant3/70-vf-live.js" "$MUT/avant3/71-vf-equipe-rendu.js")" "false,false"
+sed 's/const LONGUE_S = 900;/const LONGUE_S = 9e9;/' "$RENDU" > "$MUT/71-longue.js"
+assert_eq "EA3.6 — mutant (seuil de la commande longue inatteignable) : la commande longue disparaît de la ligne et des rangées, détectée" "$(T70 ea3-surveiller.json "[($TXT).includes('commande en cours'), ($TXT).includes('2 agents sans nouvelle')].join()" "$UI/70-vf-live.js" "$MUT/71-longue.js")" "false,true"
+cat > "$AUX/ea3-rendu.mjs" <<'JS'
+// ea3-rendu.mjs <71-vf-equipe-rendu.js> : { titree, deux, blanc, balise, sans } — les noms de session rendus par l'arbre : titre /rename, deux sessions de même titre, titre blanc, titre porteur de balisage, session sans titre.
+import fs from 'node:fs';
+import vm from 'node:vm';
+const ctx = vm.createContext({ window: {}, encodeURIComponent });
+const h = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), ctx, { timeout: 5000 });
+const R = ctx.window.__vfEquipeRendu;
+const s = (id, tree, titre) => ({ kind: 'session', id, tree, etat: 'actif', ageS: 3, ...(titre === undefined ? {} : { titre }) });
+const noms = (html) => [...html.matchAll(/<span class="r-task">([^<]*?)(?: <span class="sr">|<\/span>)/g)].map((m) => m[1]);
+console.log(JSON.stringify({
+  titree: noms(R.arbre([s('aaaaaaaa-1111', '.', 'Mon chantier')], h)),
+  deux: noms(R.arbre([s('aaaaaaaa-1111', '.', 'Mon chantier'), s('bbbbbbbb-2222', '.claude/worktrees/wt1', 'Mon chantier')], h)),
+  blanc: noms(R.arbre([s('aaaaaaaa-1111', '.', '   ')], h)),
+  balise: noms(R.arbre([s('aaaaaaaa-1111', '.', '<b>x</b>')], h)),
+  sans: noms(R.arbre([s('aaaaaaaa-1111', '.')], h)),
+  detenteur: R.nomDeSession([s('aaaaaaaa-1111', '.', 'Mon chantier')], 'aaaaaaaa-1111'),
+}));
+JS
+E3R() { node "$AUX/ea3-rendu.mjs" "${2:-$RENDU}" | node "$AUX/jq.mjs" "$1"; }
+assert_eq "EA3.7 — une session nommée avec /rename s'affiche sous son titre ; deux sessions de même titre se distinguent par l'arbre ; titre blanc ou absent : « Session principale » ; le détenteur du verrou la nomme de même (PU-G-186)" "$(E3R 'JSON.stringify([j.titree,j.deux,j.blanc,j.sans,j.detenteur])')" '[["Mon chantier"],["Mon chantier · main","Mon chantier · wt1"],["Session principale"],["Session principale"],"Mon chantier"]'
+assert_eq "EA3.8 — un titre porteur de balisage reste du texte : échappé dans le rendu, jamais interprété (PU-G-186)" "$(E3R 'j.balise.join()')" "&lt;b&gt;x&lt;/b&gt;"
+assert_eq "EA3.9 — témoin rouge : le code d'avant (f146c21d) ignore le titre /rename" "$(E3R 'j.titree.join()' "$MUT/avant3/71-vf-equipe-rendu.js")" "Session principale"
 
 vf_hyg_assert
 
