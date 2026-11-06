@@ -582,49 +582,104 @@ echo "=== W23 — titre de carte de session : le custom-title (/rename), jamais 
 cat > "$AUX/w23-titre.mjs" <<'JS'
 import fs from 'node:fs'; import path from 'node:path'; import { execFileSync } from 'node:child_process'; import { pathToFileURL } from 'node:url';
 const [, , S, base] = process.argv;
-const lab = path.join(base, 'lab'), home = path.join(base, 'home'), noscripts = path.join(base, 'noscripts');
-fs.mkdirSync(lab, { recursive: true }); fs.mkdirSync(noscripts, { recursive: true });
-const g = (...a) => execFileSync('git', ['-C', lab, ...a], { stdio: 'pipe' });
-g('init', '-q', '-b', 'ma-branche'); g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'i');
-const labR = fs.realpathSync(lab), proj = path.join(home, '.claude', 'projects', 'slug'); fs.mkdirSync(proj, { recursive: true });
+const home = path.join(base, 'home'), noscripts = path.join(base, 'noscripts'), proj = path.join(home, '.claude', 'projects', 'slug');
+fs.mkdirSync(noscripts, { recursive: true }); fs.mkdirSync(proj, { recursive: true });
+const mkLab = (nom, branche) => { const d = path.join(base, nom); fs.mkdirSync(d, { recursive: true }); const g = (...a) => execFileSync('git', ['-C', d, ...a], { stdio: 'pipe' });
+  g('init', '-q', '-b', branche); g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'i'); return d; };
+const CP = (...c) => String.fromCodePoint(...c), SEC = 'ghp_' + 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4', BIDI = CP(0x202e), ZW = CP(0x200b), TAG = CP(0xe0041);
+const lab = mkLab('lab', 'ma-branche'), lab2 = mkLab('lab2', 'feat/' + BIDI + 'evil' + ZW + 'x');
+const labR = fs.realpathSync(lab), labR2 = fs.realpathSync(lab2);
 const ligne = (o) => JSON.stringify({ cwd: labR, timestamp: new Date().toISOString(), gitBranch: 'ma-branche', ...o });
-const ua = (id, t) => ligne({ type: 'user', sessionId: id, message: { role: 'user', content: t } });
-const session = (id, extra, filler = 0) => {
-  const L = [...extra, ua(id, 'bonjour')];
-  for (let i = 0; i < filler; i++) L.push(ligne({ type: 'assistant', sessionId: id, message: { role: 'assistant', content: [{ type: 'text', text: 'x'.repeat(900) }] } }));
-  if (filler) L.push(ua(id, 'fin'));
+const ua = (id, t, o = {}) => ligne({ type: 'user', sessionId: id, message: { role: 'user', content: t }, ...o });
+const session = (id, extra, filler = 0, o = {}) => {
+  const L = [...extra, ua(id, 'bonjour', o)];
+  for (let i = 0; i < filler; i++) L.push(ligne({ type: 'assistant', sessionId: id, message: { role: 'assistant', content: [{ type: 'text', text: 'x'.repeat(900) }] }, ...o }));
+  if (filler) L.push(ua(id, 'fin', o));
   fs.writeFileSync(path.join(proj, id + '.jsonl'), L.join('\n') + '\n');
 };
 const ct = (id, t) => JSON.stringify({ type: 'custom-title', customTitle: t, sessionId: id }), at = (id, t) => JSON.stringify({ type: 'ai-title', aiTitle: t, sessionId: id });
-const SEC = 'ghp_' + 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4', LS = String.fromCharCode(0x2028), PS = String.fromCharCode(0x2029), NEL = String.fromCharCode(0x85);
 session('s1', [ct('s1', 'Mon chantier carte')]); session('s2', [at('s2', 'TITRE-IA-SECRET-MODELE')]);
-session('s3', [ct('s3', '<img src=x onerror=alert(1)></script>' + String.fromCharCode(0, 7) + LS + PS + '\r\n\t' + NEL + ' ' + SEC + ' ' + 'z'.repeat(500))]);
+session('s3', [ct('s3', '<img src=x onerror=alert(1)></script>' + String.fromCharCode(0, 7, 0x2028, 0x2029) + '\r\n\t' + CP(0x85) + BIDI + ZW + TAG + ' ' + SEC + ' ' + 'z'.repeat(500))]);
 session('s4', [ct('s4', 'TITRE-TROP-LOIN')], 400); session('s5', []);
+session('s6', [ct('s6', 'x'.repeat(69) + ' ' + SEC)]);                                   // secret à cheval sur la borne de 80
+session('s7', [ct('s7', 'a'.repeat(79) + CP(0x1f600) + 'zzz')]);                          // coupe au milieu d'une paire de substitution
+session('s9', [], 0, { cwd: labR2, gitBranch: 'sans-importance' });                       // branche hostile (bidi, largeur nulle)
+session('s10', [ct('s10', 'Old'), ct('s10', '')]); session('s11', [ct('s11', 'Old'), ct('s11', String.fromCharCode(0))]); session('s12', [ct('s12', 'Old'), ct('s12', 'New')]);
 const imp = (f) => import(pathToFileURL(path.join(S, f)).href);
 const who = (await imp('vf-cockpit-who.mjs')).collectWho(lab, { home, scriptsDir: noscripts, fresh: 600 });
-const graph = (await imp('vf-cockpit-equipe-carte.mjs')).buildEquipeGraph(who, { nom: 'x' });
-const n = (id) => graph.nodes.find((x) => x.id === 'se-' + id), w = (id) => who.workers.find((x) => x.id === id);
-const CTRL = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]'), json = JSON.stringify({ who, graph }), h = n('s3')?.label || '', hw = w('s3')?.titre;
+const who2 = (await imp('vf-cockpit-who.mjs')).collectWho(lab2, { home, scriptsDir: noscripts, fresh: 600 });
+const { buildEquipeGraph } = await imp('vf-cockpit-equipe-carte.mjs');
+const graph = buildEquipeGraph(who, { nom: 'x' }), graph2 = buildEquipeGraph(who2, { nom: 'x' });
+const n = (id, g = graph) => g.nodes.find((x) => x.id === 'se-' + id), w = (id) => who.workers.find((x) => x.id === id);
+const CTRL = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]'), CF = /\p{Cf}/u, json = JSON.stringify({ who, graph }), h = n('s3')?.label || '', hw = w('s3')?.titre;
+// mémo et lecture ratée : directement sur lecture.mjs
+const L = await imp('vf-cockpit-lecture.mjs'), mf = path.join(base, 'memo.jsonl'), uf = path.join(base, 'illisible.jsonl');
+const ecris = (f, t) => fs.writeFileSync(f, JSON.stringify({ type: 'custom-title', customTitle: t }) + '\n');
+const T0 = new Date(Date.now() - 60000), T1 = new Date(Date.now() + 10000), ecrisA = (t, d) => { ecris(mf, t); fs.utimesSync(mf, d, d); };
+ecrisA('AAAAAA', T0); const m1 = L.titreSession(mf); ecrisA('BBBBBBB', T0); const m2 = L.titreSession(mf); ecrisA('CCCCCCC', T1); const m3 = L.titreSession(mf); // m2 : même date, taille différente ; m3 : même taille, date différente
+ecris(uf, 'ZZ'); fs.chmodSync(uf, 0); const u1 = L.titreSession(uf); fs.chmodSync(uf, 0o644); const u2 = L.titreSession(uf);
+const iface = JSON.parse(fs.readFileSync(path.join(S, 'vf-cockpit-interface.json'), 'utf8')).schemas['vibeflow/cockpit-who@2'].travailleur;
+const permis = new Set([...iface.requis, ...iface.optionnels]), nonDeclares = [...new Set(who.workers.flatMap((x) => Object.keys(x)).filter((k) => !permis.has(k)))];
 console.log(JSON.stringify({ t1a: n('s1')?.label, t1b: n('s5')?.label, t1c: !!n('s1')?.details.includes('Identifiant : s1'), t2a: n('s2')?.label, t2b: json.includes('TITRE-IA-SECRET-MODELE'),
   t3a: [h.startsWith('<img src=x'), h.length <= 80, CTRL.test(h), h.includes('A1b2C3d4'), /\[masqué\]/.test(h)], t3b: [typeof hw === 'string' && hw.length <= 80, CTRL.test(hw || ''), String(hw).includes('A1b2C3d4')],
-  t4: [n('s4')?.label, json.includes('TITRE-TROP-LOIN')] }));
+  t3cf: [CF.test(h), CF.test(hw || '')], t4: [n('s4')?.label, json.includes('TITRE-TROP-LOIN')],
+  t6: [(n('s6')?.label || '').includes('ghp_'), (n('s6')?.label || '').length <= 80, (n('s6')?.label || '').length],
+  t7: [n('s7')?.label.isWellFormed(), String(w('s7')?.titre).isWellFormed(), n('s7')?.label.length],
+  t8: [n('s9', graph2)?.label, n('s9', graph2)?.details.includes('Branche : feat/evilx'), CF.test(JSON.stringify(graph2))],
+  t10: [n('s10')?.label, n('s11')?.label, n('s12')?.label], t11: [m1, m2, m3], t12: [u1, u2], t13: nonDeclares }));
 JS
 w23() { node "$AUX/w23-titre.mjs" "$1" "$2" > "$2.json" 2>"$2.err"; }
+g23() { node "$AUX/get.mjs" "$1.json" "$2"; }
 mkdir -p "$WORK/w23a" && w23 "$SCRIPTS" "$WORK/w23a"
-assert_eq "W23.0 — contrôle positif : la fabrique rend un JSON lisible" "$(node "$AUX/get.mjs" "$WORK/w23a.json" 'typeof j.t1b')" "string"
-assert_eq "W23.1 — custom-title -> titre de la carte ; sans titre -> « Session principale · <branche> »" "$(node "$AUX/get.mjs" "$WORK/w23a.json" '[j.t1a,j.t1b].join("|")')" "Mon chantier carte|Session principale · ma-branche"
-assert_eq "W23.2 — l'identifiant de session passe au détail de la carte" "$(node "$AUX/get.mjs" "$WORK/w23a.json" 'j.t1c')" "true"
-assert_eq "W23.3 — ai-title seul : aucun titre lu, carte « Session principale · <branche> », l'ai-title n'est nulle part dans la sortie" "$(node "$AUX/get.mjs" "$WORK/w23a.json" '[j.t2a,j.t2b].join("|")')" "Session principale · ma-branche|false"
-assert_eq "W23.4 — custom-title hostile (balises, contrôles, U+2028, 500 car., secret) : texte inerte, ≤ 80, sans contrôle, masqué (carte)" "$(node "$AUX/get.mjs" "$WORK/w23a.json" 'j.t3a.join(",")')" "true,true,false,false,true"
-assert_eq "W23.5 — custom-title hostile : le champ titre de la collecte est ≤ 80, sans contrôle, masqué" "$(node "$AUX/get.mjs" "$WORK/w23a.json" 'j.t3b.join(",")')" "true,false,false"
-assert_eq "W23.6 — custom-title hors de la fenêtre de 256 Kio : non lu, pas d'escalade de lecture" "$(node "$AUX/get.mjs" "$WORK/w23a.json" 'j.t4.join("|")')" "Session principale · ma-branche|false"
-mut23() { mut17 "w23-$1" vf-cockpit-lecture.mjs "$2" "$3" >/dev/null; mkdir -p "$WORK/w23-$1-b"; w23 "$WORK/mut17-w23-$1" "$WORK/w23-$1-b"; }
-mut23 controles "replace(/[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029\\p{Cf}]/gu, ' ')" "replace(/zzzzzz/gu, ' ')"
-assert_eq "M-W23-CONTROLES — mutant (nettoyage des contrôles retiré) : W23.4 rougit" "$(node "$AUX/get.mjs" "$WORK/w23-controles-b.json" 'j.t3a.join(",")')" "true,true,true,false,true"
-mut23 aititle "d.type === 'custom-title' && typeof d.customTitle === 'string' ? d.customTitle : null" "(d.type === 'ai-title' && typeof d.aiTitle === 'string' ? d.aiTitle : null) || (d.type === 'custom-title' && typeof d.customTitle === 'string' ? d.customTitle : null)"
-assert_eq "M-W23-AITITLE — mutant (ai-title lu) : W23.3 rougit" "$(node "$AUX/get.mjs" "$WORK/w23-aititle-b.json" '[j.t2a,j.t2b].join("|")')" "TITRE-IA-SECRET-MODELE|true"
-mut23 escalade ", [FENETRES[0]]) || '')" ") || '')"
-assert_eq "M-W23-ESCALADE — mutant (escalade vers 2 puis 8 Mio) : W23.6 rougit" "$(node "$AUX/get.mjs" "$WORK/w23-escalade-b.json" 'j.t4.join("|")')" "TITRE-TROP-LOIN|true"
+assert_eq "W23.0 — contrôle positif : la fabrique rend un JSON lisible" "$(g23 "$WORK/w23a" 'typeof j.t1b')" "string"
+assert_eq "W23.1 — custom-title -> titre de la carte ; sans titre -> « Session principale · <branche> »" "$(g23 "$WORK/w23a" '[j.t1a,j.t1b].join("|")')" "Mon chantier carte|Session principale · ma-branche"
+assert_eq "W23.2 — l'identifiant de session passe au détail de la carte" "$(g23 "$WORK/w23a" 'j.t1c')" "true"
+assert_eq "W23.3 — ai-title seul : aucun titre lu, carte « Session principale · <branche> », l'ai-title n'est nulle part dans la sortie" "$(g23 "$WORK/w23a" '[j.t2a,j.t2b].join("|")')" "Session principale · ma-branche|false"
+assert_eq "W23.4 — custom-title hostile (balises, contrôles, U+2028, 500 car., secret) : texte inerte, ≤ 80, sans contrôle, masqué (carte)" "$(g23 "$WORK/w23a" 'j.t3a.join(",")')" "true,true,false,false,true"
+assert_eq "W23.5 — custom-title hostile : le champ titre de la collecte est ≤ 80, sans contrôle, masqué" "$(g23 "$WORK/w23a" 'j.t3b.join(",")')" "true,false,false"
+assert_eq "W23.6 — custom-title hors de la fenêtre de 256 Kio : non lu, pas d'escalade de lecture" "$(g23 "$WORK/w23a" 'j.t4.join("|")')" "Session principale · ma-branche|false"
+assert_eq "W23.7 — la classe entière : U+202E, U+200B et U+E0041 (Cf) ne sortent ni dans le libellé ni dans le titre" "$(g23 "$WORK/w23a" 'j.t3cf.join(",")')" "false,false"
+assert_eq "W23.8 — un secret à cheval sur la borne de 80 est masqué avant la coupe : aucun fragment « ghp_ », ≤ 80, le secret entier est retiré (69 car. restent)" "$(g23 "$WORK/w23a" 'j.t6.join(",")')" "false,true,69"
+assert_eq "W23.9 — une coupe à 80 ne laisse jamais une moitié de paire de substitution (libellé et titre bien formés, 79 unités)" "$(g23 "$WORK/w23a" 'j.t7.join(",")')" "true,true,79"
+assert_eq "W23.10 — la branche du libellé passe par la classe d'affichage : bidi et largeur nulle retirés (libellé, détail, graphe entier)" "$(g23 "$WORK/w23a" 'j.t8.join("|")')" "Session principale · feat/evilx|true|false"
+assert_eq "W23.11 — le titre le plus récent l'emporte, même vide ou blanc (l'utilisateur l'a vidé) : jamais l'ancien" "$(g23 "$WORK/w23a" 'j.t10.join("|")')" "Session principale · ma-branche|Session principale · ma-branche|New"
+assert_eq "W23.12 — le mémo est invalidé par la taille (même date) ET par la date (même taille)" "$(g23 "$WORK/w23a" 'j.t11.join("|")')" "AAAAAA|BBBBBBB|CCCCCCC"
+assert_eq "W23.13 — un fichier illisible n'est pas mémorisé comme « pas de titre » : chmod 000 puis 644 relit" "$(g23 "$WORK/w23a" 'j.t12.join("|")')" "|ZZ"
+assert_eq "W23.14 — toute clé d'un travailleur est déclarée au contrat vf-cockpit-interface.json (requis ∪ optionnels), titre compris" "$(g23 "$WORK/w23a" 'j.t13.join(",")')" ""
+assert_eq "W23.15 — `titre` est dans la signature whoSig de live.mjs, et LIBRES.titre vaut 80 dans who.mjs (gardes statiques, chacune rougit par mutant)" "$(grep -c "x.titre || ''" "$SCRIPTS/vf-cockpit-live.mjs")|$(grep -c "LIBRES = { titre: 80," "$SCRIPTS/vf-cockpit-who.mjs")" "1|1"
+mut23() { mut17 "w23-$1" "$2" "$3" "$4" >/dev/null; mkdir -p "$WORK/w23-$1-b"; w23 "$WORK/mut17-w23-$1" "$WORK/w23-$1-b"; }
+L23="vf-cockpit-lecture.mjs"
+mut23 controles $L23 "replace(CLASSE_AFFICHAGE, ' ').replace(/ {2,}/g" "replace(/zzzzzz/gu, ' ').replace(/ {2,}/g"
+assert_eq "M-W23-CONTROLES — mutant (nettoyage des contrôles retiré) : W23.4 rougit" "$(g23 "$WORK/w23-controles-b" 'j.t3a.join(",")')" "true,true,true,false,true"
+mut23 cf $L23 '\u2029\p{Cf}]/gu' '\u2029]/gu'
+assert_eq "M-W23-CF — mutant (classe sans \\p{Cf}) : W23.7 rougit" "$(g23 "$WORK/w23-cf-b" 'j.t3cf.join(",")')" "true,true"
+mut23 aititle $L23 "d.type === 'custom-title' && typeof d.customTitle === 'string' ? { t: d.customTitle } : null" "(d.type === 'ai-title' && typeof d.aiTitle === 'string' ? { t: d.aiTitle } : null) || (d.type === 'custom-title' && typeof d.customTitle === 'string' ? { t: d.customTitle } : null)"
+assert_eq "M-W23-AITITLE — mutant (ai-title lu) : W23.3 rougit" "$(g23 "$WORK/w23-aititle-b" '[j.t2a,j.t2b].join("|")')" "TITRE-IA-SECRET-MODELE|true"
+mut23 escalade $L23 ", [FENETRES[0]], etat)" ", FENETRES, etat)"
+assert_eq "M-W23-ESCALADE — mutant (escalade vers 2 puis 8 Mio) : W23.6 rougit" "$(g23 "$WORK/w23-escalade-b" 'j.t4.join("|")')" "TITRE-TROP-LOIN|true"
+mut23 sansmasque $L23 "masqueCoupe(propre, BORNE_TITRE).trim()" "propre.slice(0, BORNE_TITRE).trim()"
+assert_eq "M-W23-SANSMASQUE — mutant (couper sans masquer) : W23.8 rougit (fragment du secret rendu)" "$(g23 "$WORK/w23-sansmasque-b" 'j.t6.join(",")')" "true,true,80"
+mut23 paire $L23 "return d >= 0xd800 && d <= 0xdbff ? r.slice(0, -1) : r; //" "return r; //"
+assert_eq "M-W23-PAIRE — mutant (coupe sans garde de paire de substitution) : W23.9 rougit" "$(g23 "$WORK/w23-paire-b" 'j.t7.join(",")')" "false,false,80"
+mut23 vide $L23 "(d.type === 'custom-title' && typeof d.customTitle === 'string' ? { t: d.customTitle } : null)" "(d.type === 'custom-title' && typeof d.customTitle === 'string' && d.customTitle.trim() ? { t: d.customTitle } : null)"
+assert_eq "M-W23-VIDE — mutant (un titre vide est ignoré) : W23.11 rougit (l'ancien « Old » ressort)" "$(g23 "$WORK/w23-vide-b" 'j.t10.join("|")')" "Old|Session principale · ma-branche|New"
+mut23 memo $L23 "if (c && c.mt === st.mtimeMs && c.size === st.size) return c.titre;" "if (c) return c.titre;"
+assert_eq "M-W23-MEMO — mutant (mémo jamais invalidé) : W23.12 rougit" "$(g23 "$WORK/w23-memo-b" 'j.t11.join("|")')" "AAAAAA|AAAAAA|AAAAAA"
+mut23 memotaille $L23 "c.mt === st.mtimeMs && c.size === st.size) return c.titre;" "c.mt === st.mtimeMs) return c.titre;"
+assert_eq "M-W23-MEMO-TAILLE — mutant (mémo invalidé par la date seule) : W23.12 rougit sur la taille" "$(g23 "$WORK/w23-memotaille-b" 'j.t11.join("|")')" "AAAAAA|AAAAAA|CCCCCCC"
+mut23 memodate $L23 "c.mt === st.mtimeMs && c.size === st.size) return c.titre;" "c.size === st.size) return c.titre;"
+assert_eq "M-W23-MEMO-DATE — mutant (mémo invalidé par la taille seule) : W23.12 rougit sur la date" "$(g23 "$WORK/w23-memodate-b" 'j.t11.join("|")')" "AAAAAA|BBBBBBB|BBBBBBB"
+mut23 erreur $L23 "  if (etat.erreur) return '';
+" ""
+assert_eq "M-W23-ERREUR — mutant (échec de lecture mémorisé comme « pas de titre ») : W23.13 rougit" "$(g23 "$WORK/w23-erreur-b" 'j.t12.join("|")')" "|"
+mut23 branche vf-cockpit-equipe-carte.mjs "['Session principale', nettoieTitre(branche)]" "['Session principale', w.branch]"
+assert_eq "M-W23-BRANCHE — mutant (branche brute dans le libellé) : W23.10 rougit" "$(g23 "$WORK/w23-branche-b" 'j.t8[0]')" "$(node -e 'console.log("Session principale · feat/"+String.fromCodePoint(0x202e)+"evil"+String.fromCodePoint(0x200b)+"x")')"
+mut23 branchedet vf-cockpit-equipe-carte.mjs "const branche = retireAffichage(w.branch);" "const branche = w.branch || '';"
+assert_eq "M-W23-BRANCHE-DETAIL — mutant (branche brute dans le détail et le résumé) : W23.10 rougit sur le détail" "$(g23 "$WORK/w23-branchedet-b" 'j.t8[1]')" "false"
+mut23 iface vf-cockpit-interface.json '"task", "titre",' '"task",'
+assert_eq "M-W23-IFACE — mutant (contrat sans `titre`) : W23.14 rougit" "$(g23 "$WORK/w23-iface-b" 'j.t13.join(",")')" "titre"
+mut17 w23-sig vf-cockpit-live.mjs "x.titre || '', " "" >/dev/null; mut17 w23-lib vf-cockpit-who.mjs "LIBRES = { titre: 80," "LIBRES = {" >/dev/null
+assert_eq "M-W23-STATIQUES — mutants (titre retiré de whoSig, de LIBRES) : W23.15 rougit" "$(grep -c "x.titre || ''" "$WORK/mut17-w23-sig/vf-cockpit-live.mjs")|$(grep -c "LIBRES = { titre: 80," "$WORK/mut17-w23-lib/vf-cockpit-who.mjs")" "0|0"
 
 vf_hyg_assert
 
