@@ -400,3 +400,15 @@ ou de `vf-new-lab`.
 - **NON vérifié :** les autres éléments de la page qui se rangent à l'ouverture du tiroir.
 
 **Déclencheur de reprise :** une passe sur l'ouverture automatique du tiroir.
+
+## Cockpit : points de fusion 71.5 × 72 laissés en place à la release v2.76.0 (`vf-lancer-style`, replis `var(--sp-N, px)`, id `P27` en double) — DIFFÉRÉ (2026-11-06)
+
+**Priorité : basse.** Aucun effet visible : le rendu de la branche assemblée a été recetté et validé par Samuel (message direct en session principale, 2026-11-06 : « c'est parfait on valide. On garde ca en release. »).
+
+**Origine :** relevé de clôture de la Phase 72 (`72-BRANCHEMENTS-MERGE.md` §6) et relecture des résolutions de merge de la release v2.76.0 (2026-11-06).
+- **Laissé en place :** la feuille `<style id="vf-lancer-style">` posée à l'exécution par `poserStyleProposition` (`plugin/cockpit/scripts/vf-cockpit-terminal-vue.mjs`), à fondre dans `vf-cockpit-terminal-style.mjs` ; les deux replis `var(--sp-N, <px>)` de `vf-cockpit-lancer-style.mjs`, à retirer maintenant que les jetons d'espacement de la 71.5 sont fusionnés.
+- **Motif du report :** la mission de release n'admettait ce rangement que s'il était prouvé sans effet de rendu (captures avant/après identiques sur tous les états du bandeau de proposition) ; une autre branche partie du même commit (`feat/cockpit-retours-utilisateurs`) travaillait au même moment sur la zone basse du cockpit, le rangement y aurait créé des conflits.
+- **Id de patch en double :** dans `plugin/cockpit/skills/cockpit-moteur/VENDORED.txt`, `P27` désigne à la fois la garde `VF_COCKPIT_GIT_DURCI` de `scripts/lib/common.mjs` (Phase 78) et les patches d'espacement de la 71.5 (sept lignes) : chaque branche a pris le numéro suivant sans connaître l'autre. Ambiguïté documentaire seule, aucun gate connu ne lit ces ids (non vérifié).
+- **Affirmation héritée :** le README et le CHANGELOG du module disent que le calcul de l'arbre « sale » est reporté à la Phase 78 ; la 78 est fusionnée sans l'avoir câblé (`AVERTISSEMENTS_RESERVES` reste inactif). `LANC-12` est encore « Pending » dans `REQUIREMENTS.md` alors que la 72 est à 16/16 plans (identique au parent de la 72).
+
+**Déclencheur de reprise :** la prochaine phase qui touche le bandeau de proposition ou le style du terminal, après la fusion de `feat/cockpit-retours-utilisateurs`.
