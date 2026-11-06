@@ -92,7 +92,7 @@
   const statut = (x) => (Object.hasOwn(STATUT, x) ? STATUT[x] : '');
   // lignes non comprises du planning (drift.nonComprises, règle ligne-non-comprise) : fichier:ligne + extrait, jamais corrigées d'ici
   const nonComprises = (D) => !D || !D.nonComprises || !D.nonComprises.length ? '' : `<div class="sec"><h3>Lignes du planning non comprises <span class="c">${Number(D.nonComprisesN) || D.nonComprises.length}</span></h3>
-      ${D.nonComprises.map((x) => `<div class="vf-link"><code>${h(x.fichier)}:${Number(x.ligne) || 0}</code><span style="color:var(--text-3)">${h(x.extrait)}</span></div>`).join('')}
+      ${D.nonComprises.map((x) => `<div class="vf-link"><code style="white-space:nowrap;word-break:normal">${h(x.fichier)}:${Number(x.ligne) || 0}</code><span style="color:var(--text-3)">${h(x.extrait)}</span></div>`).join('')}
       ${(Number(D.nonComprisesN) || 0) > D.nonComprises.length ? `<p class="pd">${(Number(D.nonComprisesN) || 0) - D.nonComprises.length} autre(s) non listée(s).</p>` : ''}</div>`;
   // dérive de format de la planification (vf-cockpit-drift.mjs) : rien n'est corrigé d'ici, le panneau donne la commande
   const NIV = { bloquant: 'blocked', 'toléré': 'todo', info: 'todo' };
