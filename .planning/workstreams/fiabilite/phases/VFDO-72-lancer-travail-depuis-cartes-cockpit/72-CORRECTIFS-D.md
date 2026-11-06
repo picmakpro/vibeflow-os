@@ -26,3 +26,23 @@ Mandat du manager (2026-11-06). Décision : P72-D-21 (72-CONTEXT.md). Périmètr
 
 ## Preuves de la livraison
 Voir le rapport typé (commandes, codes de sortie, SHA).
+
+## Résiduel accepté P72-D-22 — manche RES (caractérisation, jamais une protection)
+
+Décision : P72-D-22 (72-CONTEXT.md), qui remplace P72-D-21 comme arbitrage sur le résiduel (limite 3 ci-dessus). Suite : `test-cockpit-lancer-xss.sh`, manche RES ; pilote : mode `residuel` de `temoins/lancer-xss.mjs` ; faux `claude -p` du chat : `temoins/lancer-fauxbin/claude-ask` (posé dans le PATH du SERVEUR seulement : la vraie route `/api/ask`, aucun faux serveur ; le shell du terminal garde `lancer-fauxbin/claude`).
+- Ce que la manche exécute : Chrome réel, tiroir ouvert par le clavier, activation expirée (mesurée : `false` avant et pendant), puis un script de la page Projet pose sa question (200), lit l'UUID de la réponse, POSTe `/api/vf/lancer {cible, verbe, chat}` avec le jeton de la page : 202 ; la case « Continuer la conversation du chat » apparaît dans Q, DÉCOCHÉE.
+- Mesure à connaître : la ligne affichée avec la case décochée ne porte PAS l'identifiant (ni `-r`, ni `--fork-session`) ; il apparaît une fois la case cochée (RES.2b, cochée par script dans Q seulement, rien n'est envoyé). Le README doit donc dire « l'identifiant est affiché quand la case est cochée », non « toujours affiché ».
+- Barrière réelle : aucun octet au shell (terminal de Q lu, invite lue en témoin), aucun argv du faux claude du shell, tant qu'il n'y a ni clic ni Entrée dans Q.
+
+### Mutants (chacun posé sur une copie de la sortie construite, « sans effet » = FAIL nommé)
+| Mutant | Sonde | Résultat mesuré |
+|---|---|---|
+| M-CASE-COCHEE (`caseChat.checked = true` dans la vue de Q) | RES.1 case décochée | ROUGE : `coche:true`, ligne avec `-r '<uuid>' --fork-session` |
+| M-SANS-CONFIRM (Q confirme seul) | RES.3 aucun octet | ROUGE : le terminal montre `claude --session-id` ; l'argv reste absent (sonde d'argv séparée, verte, faute d'Entrée) |
+| M-SANS-CONFIRM + M-ENTREE-AUTO (retour chariot ajouté) | RES.4 aucun argv | ROUGE : argv présent sans clic ni Entrée dans Q |
+
+Sonde RES.4 et assertions de mutants : chacune exige aussi la charge faite (`false/false/200/<uuid>/202`), pour qu'une absence ne soit jamais une absence de tentative.
+
+### Preuves
+- Rejeu complet de `test-cockpit-lancer-xss.sh` sur export `git archive` de HEAD 86d6a4b9 (fichiers du plan 72-16 non commités dans l'arbre) : `76 PASS / 0 FAIL`, code de sortie 0.
+- `bash scripts/check-machine-paths.sh` : ✓.
