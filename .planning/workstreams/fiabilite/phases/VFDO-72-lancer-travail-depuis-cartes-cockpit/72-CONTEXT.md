@@ -153,6 +153,17 @@ seule).
   moment de l'appel à la fonction de requête (garde `garde:activation`), échec fermé si l'API est absente. Résiduel accepté en clair par Samuel :
   un script peut encore attendre le prochain geste réel de l'humain pour glisser sa question (pendant la fenêtre d'activation, mesurée par
   la suite XSS, manche ACT). Trace : `72-CORRECTIFS-D.md`.
+  Renvoi : remplacée sur le résiduel par P72-D-22.
+- **P72-D-22 (reprise du chat : résiduel du POST direct accepté ; arbitrage Samuel, AskUserQuestion, session principale Claude Code,
+  2026-11-06 ; remplace P72-D-21 comme arbitrage sur le résiduel).** Mot pour mot : « Garder, risque écrit (Recommandé) ». Constat qui a motivé
+  la nouvelle question : la garde d'activation de P72-D-21 ne ferme que le chemin par l'interface. Un script qui s'exécute dans la page Projet
+  peut lui-même envoyer à `POST /api/vf/lancer` un identifiant `chat` de forme valide, issu d'une conversation qu'il a écrite ; la seule
+  barrière réelle est le clic et l'Entrée dans le terminal. Décision : « continuer le chat » reste tel quel. Le README et l'audit disent
+  qu'un script qui s'exécute dans la page Projet peut proposer la reprise d'une conversation qu'il a écrite, que la case est décochée par
+  défaut, que l'identifiant est affiché, et que rien ne part sans le clic et l'Entrée dans le terminal. Le correctif 2b9e23b9 (activation
+  utilisateur) reste, au titre de l'honnêteté du chemin normal, non de la protection contre un script de la page. Options écartées : B'
+  (date et première question affichées dans le terminal) et D (reporter). Témoin de caractérisation, à ne jamais lire comme une protection :
+  manche RES de `test-cockpit-lancer-xss.sh`. Surface voisine, hors phase : `.planning/BACKLOG.md`, entrée sur `POST /api/ask`.
 
 ### Contraintes héritées (Phases 67 et 71)
 
