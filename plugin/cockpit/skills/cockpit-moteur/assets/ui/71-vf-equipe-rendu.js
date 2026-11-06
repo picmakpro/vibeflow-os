@@ -14,17 +14,26 @@
   // même format que l'ancien age() du tiroir : secondes, minutes, heures, jours
   const duree = (s) => (s == null ? '' : s < 90 ? `${s} s` : s < 5400 ? `${Math.round(s / 60)} min` : s < 172800 ? `${Math.round(s / 3600)} h` : `${Math.round(s / 86400)} j`);
 
-  const pied = (w) => {
-    const a = w.action || {};
-    const action = [a.verbe, a.cible].filter((x) => typeof x === 'string' && x).join(' ');
-    return [etat(w), duree(w.dureeS != null ? w.dureeS : w.ageS), action].filter(Boolean).join(' · ');
+  // PU-G-173 : la durée dit de quoi elle parle — ancienneté de la dernière écriture (« dernière activité il y a … »), tenue d'un agent (« au travail depuis … », « a duré … »)
+  const quand = (w) => {
+    const dur = w.kind === 'subagent' && w.etat !== 'en-attente' && w.dureeS != null ? w.dureeS : null;
+    if (dur != null) return `${w.etat === 'termine' ? 'a duré' : 'au travail depuis'} ${duree(dur)}`;
+    return w.ageS == null ? '' : `dernière activité il y a ${duree(w.ageS)}`;
   };
+  const action = (w) => { const a = w.action || {}; return [a.verbe, a.cible].filter((x) => typeof x === 'string' && x).join(' '); };
+  const pied = (w) => [etat(w), quand(w), action(w)].filter(Boolean).join(' · ');
+  // pied d'une CARTE (PU-G-165) : la pastille dit déjà « En cours », « Fait » ou « Bloqué » ; seul « en attente », sans pastille, garde son mot ; l'action générique est tue
+  const piedCarte = (w) => [w.etat === 'en-attente' ? etat(w) : '', quand(w), (w.action || {}).verbe === GENERIQUE ? '' : action(w)].filter(Boolean).join(' · ');
+  const st = (w) => (w.etat === 'termine' ? 'done' : w.etat === 'bloque' ? 'blocked' : w.etat === 'en-attente' ? undefined : 'active'); // même table que vf-cockpit-equipe-carte.mjs
 
+  // PU-G-167 : « inconnu » et « sans-citation » ne disent rien à l'utilisateur ; toute autre raison (ambigu, valeur inattendue) reste affichée, échappée
+  const raisonDe = (w) => (w.rattachement && w.rattachement.raison) || 'inconnu';
+  const CLAIR = new Set(['inconnu', 'sans-citation']);
   // lien vers le nœud de mission : seulement un rattachement établi ; sinon « non rattaché » et sa raison, jamais un lien deviné
   const versNoeud = (w, h) => {
     const n = noeud(w);
     return n ? `<a class="vf-link" href="${h(lien('project.html', n))}">Nœud ${h(w.rattachement.noeud)}</a>`
-      : w.kind === 'subagent' ? `<span class="vf-nr">non rattaché (${h((w.rattachement && w.rattachement.raison) || 'inconnu')})</span>` : '';
+      : w.kind === 'subagent' ? `<span class="vf-nr">${CLAIR.has(raisonDe(w)) ? 'pas lié à une phase du projet' : `non rattaché (${h(raisonDe(w))})`}</span>` : '';
   };
 
   // ---------- tiroir « Au travail » (P71.5-D-14, D-23, D-24) : une ligne par agent, des fils entre les points, les terminés regroupés en bas ----------
@@ -177,5 +186,5 @@
     .aw-foot { margin: var(--sp-12) 0 0; color: var(--text-3); font-size: 12px; line-height: 20px; }
   `;
 
-  window.__vfEquipeRendu = { arbre, agentsDuNoeud, transcript, pied, duree, versNoeud, actif, css: CSS };
+  window.__vfEquipeRendu = { arbre, agentsDuNoeud, transcript, pied, piedCarte, st, duree, versNoeud, actif, css: CSS };
 })();

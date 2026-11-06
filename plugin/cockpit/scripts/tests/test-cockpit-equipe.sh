@@ -959,6 +959,31 @@ JSON
   assert_eq "EK7 — témoin de la sonde : un mutant dont l'ancre n'existe pas est refusé, la page servie reste intacte" "$(ek_muter 'ANCRE-QUI-N-EXISTE-PAS-70-11' 'x')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "ancre absente|identique"
 fi
 
+echo "=== EA1 — retours du panel (PU-G-134, 163, 164, 165, 167, 171 compatible, 173) ==="
+cat > "$AUX/ea1-workers.json" <<'JSON'
+{"workers":[{"kind":"session","id":"s1","etat":"actif","ageS":11,"branch":"feat/x","tree":".claude/worktrees/wt1","action":{"verbe":"lance une commande"}},
+ {"kind":"session","id":"s2","etat":"en-attente","ageS":7200,"tree":"arbre principal"},
+ {"kind":"subagent","id":"a1","etat":"actif","dureeS":2280,"ageS":3,"role":"vf-coder","rattachement":{"etat":"non","raison":"sans-citation"}},
+ {"kind":"subagent","id":"a2","etat":"termine","dureeS":60,"rattachement":{"etat":"non","raison":"<x-raison>"}}]}
+JSON
+cat > "$AUX/ea1-pilote.js" <<'JS'
+const R = window.__vfEquipeRendu, W = DONNEES.workers, w = (i) => W.find((x) => x.id === i);
+__r = { p1: R.pied(w('s1')), c1: R.piedCarte(w('s1')), c2: R.piedCarte(w('s2')), p3: R.pied(w('a1')), p4: R.pied(w('a2')), st: W.map((x) => String(R.st(x))).join(','), v1: R.versNoeud(w('a1'), h), v2: R.versNoeud(w('a2'), h) };
+JS
+node "$AUX/vm-rendu.mjs" "$RENDU" "$AUX/ea1-pilote.js" "$AUX/ea1-workers.json" > "$WORK/vm-ea1.json"
+assert_eq "EA1.1 — pied : « dernière activité il y a 11 s » (session), « au travail depuis 38 min » (agent), « a duré 60 s » (terminé) (PU-G-173)" "$(G "$WORK/vm-ea1.json" 'j.erreur||[j.retour.p1,j.retour.p3,j.retour.p4].join("|")')" "actif · dernière activité il y a 11 s · lance une commande|actif · au travail depuis 38 min|terminé · a duré 60 s"
+assert_eq "EA1.2 — pied de carte : pas de mot d'état quand la pastille le dit, « en attente » gardé sans pastille, action générique tue (PU-G-165)" "$(G "$WORK/vm-ea1.json" 'j.erreur||[j.retour.c1,j.retour.c2].join("|")')" "dernière activité il y a 11 s|en attente · dernière activité il y a 2 h"
+assert_eq "EA1.3 — pastille : l'agent en attente n'en porte aucune (jamais « En cours »)" "$(G "$WORK/vm-ea1.json" 'j.erreur||j.retour.st')" "active,undefined,active,done"
+assert_eq "EA1.4 — « non rattaché » : « sans-citation » dit en clair, une raison inattendue reste affichée et échappée (PU-G-167)" "$(G "$WORK/vm-ea1.json" 'j.erreur||(j.retour.v1.includes("pas lié à une phase du projet")+"|"+j.retour.v2.includes("non rattaché (&lt;x-raison&gt;)"))')" "true|true"
+cat > "$AUX/ea1-carte.mjs" <<'JS'
+const { buildEquipeGraph } = await import(process.argv[2]);
+const W = JSON.parse((await import('node:fs')).readFileSync(process.argv[3], 'utf8')).workers;
+const g = buildEquipeGraph({ workers: W }, { nom: 'x', lancees: new Map([['s1', { phase: '71.5', verbe: 'planifier' }]]) });
+const n = (i) => g.nodes.find((x) => x.id === i);
+console.log(JSON.stringify({ s1: n('se-s1').summary, s2: n('se-s2').summary, st: ['se-s1', 'se-s2', 'ag-a1', 'ag-a2'].map((i) => String(n(i).st)).join(',') }));
+JS
+assert_eq "EA1.5 — carte : étiquette de lancement, branche et arbre en description (jamais vide), « en attente » sans état projeté (PU-G-134, 163, 164, 165)" "$(node "$AUX/ea1-carte.mjs" "$SCRIPTS/vf-cockpit-equipe-carte.mjs" "$AUX/ea1-workers.json" 2>&1 | node "$AUX/jq.mjs" 'j.s1+"|"+j.s2+"|"+j.st' 2>&1)" "Depuis Phase 71.5 · Branche feat/x · arbre wt1|arbre principal|active,undefined,active,done"
+
 vf_hyg_assert
 
 echo ""

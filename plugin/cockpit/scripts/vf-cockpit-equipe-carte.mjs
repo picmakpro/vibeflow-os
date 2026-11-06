@@ -9,7 +9,9 @@
 import { LIBELLES_VERBES, entreeLanceeValide } from './vf-cockpit-lancer-suivi.mjs';
 const SORTES = new Set(['session', 'subagent']);
 const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
-const ST = { actif: 'active', 'en-attente': 'active', termine: 'done' };
+// PU-G-165 : un seul état par carte — « en attente » n'a pas de pastille (le pied le dit), il n'est jamais projeté sur « En cours » ; ui/71 (`st`) tient la même table
+const ST = { actif: 'active', 'en-attente': undefined, termine: 'done', bloque: 'blocked' };
+const GENERIQUE = 'lance une commande'; // l'action de presque tous : elle n'informe pas (même seuil que ui/71)
 const ETAT = { actif: 'actif', 'en-attente': 'en attente', termine: 'terminé' };
 
 // 78-04 : libellés des missions en cours (nœuds `mission` d'état `active` du graphe Projet), au plus 10, sans contrôle ni préfixe « Mission »
@@ -51,9 +53,14 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, miss
     if (w.branch) lignes.push(`Branche : ${w.branch}`);
     if (w.tree) lignes.push(`Arbre : ${w.tree}`);
     if (w.rattachement?.etat === 'rattache') lignes.push(`Nœud de mission : ${w.rattachement.noeud} (${w.rattachement.dag})`);
+    // PU-G-134/163/164 : la description d'une carte n'est plus vide — étiquette de lancement, tâche (à défaut la dernière action si elle informe), puis branche et arbre d'une session
+    const a = w.action || {}, act = a.verbe && a.verbe !== GENERIQUE ? [a.verbe, a.cible].filter((x) => typeof x === 'string' && x).join(' ') : '';
+    const arbre = !sous && w.tree ? (w.tree === 'arbre principal' ? w.tree : `arbre ${String(w.tree).replace(/^\.claude\/worktrees\//, '')}`) : '';
+    const lieu = !sous ? [w.branch ? `Branche ${w.branch}` : '', arbre].filter(Boolean).join(' · ') : '';
+    const resume = [t ? `Depuis Phase ${l.phase}` : '', w.task || act, lieu].filter(Boolean).join(' · ');
     nodes.push({ ...base, id: idCarte(w), parent: fini && parent ? `${parent}~termines` : parent, kind: sous ? 'agent' : 'session',
       label: sous ? clip([w.role, w.task].filter(Boolean).join(' · ') || 'Agent', 80) : `Session ${w.id.slice(0, 8)}`,
-      summary: clip(w.task || '', 200), details: lignes.join('\n\n'), st: ST[w.etat] || 'active', foot: '' });
+      summary: clip(resume, 200), details: lignes.join('\n\n'), st: Object.hasOwn(ST, w.etat) ? ST[w.etat] : 'active', foot: '' });
   }
   for (const [carte, n] of termines) {
     nodes.push({ ...base, id: `${carte}~termines`, parent: carte, kind: 'terminés', label: `Terminés depuis moins de 24 h (${n})`, summary: '', details: '', st: 'done', foot: '' });

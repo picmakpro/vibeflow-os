@@ -164,7 +164,7 @@
       const r = await fetch('/api/vf/doing?id=' + encodeURIComponent(id), { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' });
       const d = r.ok ? await r.json() : null;
       // `doing` vide : le serveur remonte à la dernière commande Bash de la session ; sans appel Bash lisible il n'y a rien à montrer, jamais un texte de l'assistant en repli (D3)
-      texte = d?.doing || (d?.erreur === 'inconnu' ? 'Plus active : rien à montrer.' : d?.erreur === 'sans-action' ? "Aucune commande Bash dans la fin du journal de cette session." : 'Indisponible.');
+      texte = d?.doing || (d?.erreur === 'inconnu' ? 'Plus active : rien à montrer.' : d?.erreur === 'sans-action' ? "Aucune commande récente." : 'Indisponible.');
     } catch { texte = 'Indisponible.'; }
     if (demandes.size >= 50) demandes.delete(demandes.keys().next().value);
     demandes.set(id, texte);
