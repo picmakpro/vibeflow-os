@@ -9,6 +9,8 @@
 // Gardes (une instruction par ligne, marquée « garde:<nom> », mutants de la suite) : titre, entree, bloquants, corps, verbes, envol, jeton (deux lignes), chemin, cible, propose, activation (72-13 F-1).
 // Le script est la fonction scriptLancer sérialisée par .toString() : ses commentaires sont servis tels quels, ils ne citent ni adresse web ni nom d'appel interdit.
 
+import { STYLE_LANCER } from './vf-cockpit-lancer-style.mjs';
+
 export const LIBELLES_VERBES = Object.freeze({ cadrer: 'Cadrer', planifier: 'Planifier', executer: 'Exécuter', verifier: 'Vérifier', reprendre: 'Reprendre' });
 const ORDRE = Object.keys(LIBELLES_VERBES);
 
@@ -98,7 +100,8 @@ function scriptLancer(cfg, extraire, installer, corpsProp) {
   const entetesPost = { 'x-vf-cockpit-token': jeton, 'Content-Type': 'application/json' }; // garde:jeton
   const a = (o, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k);
   const el = (tag, cls, texte) => { const e = document.createElement(tag); if (cls) e.className = cls; if (texte !== undefined) e.textContent = texte; return e; };
-  const statut = (zone, texte) => { const p = el('p', 'pd'); p.setAttribute('role', 'status'); p.textContent = texte; zone.appendChild(p); }; // garde:titre
+  const statut = (zone, texte) => { const p = el('p', 'pd'); p.setAttribute('role', 'status'); p.textContent = texte; zone.appendChild(p); if (typeof p.scrollIntoView === 'function') p.scrollIntoView({ block: 'nearest' }); }; // garde:titre ; le message reste visible au-dessus du tiroir (scroll-padding de la feuille)
+  if (cfg.css) { const st = document.createElement('style'); st.textContent = cfg.css; document.head.appendChild(st); } // feuille de la section (vf-cockpit-lancer-style) : posée à l'exécution, la CSP de la page autorise le style en ligne
 
   // liste du serveur, mémorisée 2 s sauf demande de relecture ; toute réponse inutilisable donne null (aucune section)
   let memo = null, memoLe = 0;
@@ -194,6 +197,6 @@ function scriptLancer(cfg, extraire, installer, corpsProp) {
 
 export function injectionLancer({ indisponible = false } = {}) {
   if (indisponible) return '';
-  const cfg = JSON.stringify({ verbes: ORDRE, libelles: LIBELLES_VERBES, motifs: MOTIFS, textes: TEXTES, chatLivre: CHAT_LIVRE }).replace(/</g, '\\u003c');
+  const cfg = JSON.stringify({ verbes: ORDRE, libelles: LIBELLES_VERBES, motifs: MOTIFS, textes: TEXTES, chatLivre: CHAT_LIVRE, css: STYLE_LANCER }).replace(/</g, '\\u003c');
   return `<script>// VibeFlow (72-06) : lancer du travail depuis les cartes\n(${scriptLancer.toString()})(${cfg}, ${extraireSessionChat.toString()}, ${installerObservateurChat.toString()}, ${corpsProposition.toString()});\n</script>`;
 }

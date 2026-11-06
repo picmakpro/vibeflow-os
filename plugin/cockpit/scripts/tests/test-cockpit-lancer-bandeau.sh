@@ -60,7 +60,7 @@ export const valide = (id = ID_A, over = {}) => Object.assign({
   lignes: { default: ligne('default'), acceptEdits: ligne('acceptEdits'), plan: ligne('plan'), herite: ligne('') },
   bloquants: [], avertissements: [], arme_apres_ms: 1500, expire_ms: 100000,
 }, over);
-export const NOTE = "Aucun mode n'est imposé : Claude Code suit les réglages de votre poste ou du projet (jamais « tout autoriser » ni auto depuis le projet).";
+export const NOTE = "Aucun mode n'est imposé : Claude Code suit les réglages de votre poste ou du projet ; un projet ne peut imposer ni « tout autoriser » ni auto (Claude Code 2.1.257 et plus).";
 export const MOTIFS = {
   'phase-finie': 'La phase est terminée.', 'terminal-absent': 'Le terminal est indisponible sur ce poste.', 'terminal-arrete': 'Le terminal est arrêté. Relancez /vf-cockpit --terminal.',
   'premier-plan-occupe': 'Un programme occupe déjà le terminal.', 'claude-introuvable': 'La commande claude est introuvable.', 'python3-absent': 'Python 3 est introuvable sur ce poste.',
@@ -800,7 +800,7 @@ else sans_effet "M-RETARD-REAFFICHE"; fi
 
 mutant_inj() { # mutant_inj <nom> <fichier> <expression-sed> -> MUT_DIR ; copie du tiroir et de l'interface de lancement ; code 1 si la cible manque ou n'a pas changé
   local d="$WORK/mut-$1" f x; rm -rf "$d"; mkdir -p "$d"
-  for x in terminal-tiroir terminal-tiroir-ui terminal-tiroir-style lancer-ui; do cp "$SCRIPTS/vf-cockpit-$x.mjs" "$d/"; done
+  for x in terminal-tiroir terminal-tiroir-ui terminal-tiroir-style lancer-ui lancer-style; do cp "$SCRIPTS/vf-cockpit-$x.mjs" "$d/"; done
   MUT_DIR="$d"; f="$d/$2"; [ -f "$f" ] || return 1
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
@@ -827,7 +827,7 @@ if [ -n "$CHROME" ]; then
     run_vue "$MUT_DIR" "\"only\":[\"v9\"],\"codes\":$CODES"
     assert_eq "M-ST2-TEXTE — le mutant rougit LB.V9 : un code de la table de cibles n'a plus de texte dans la vue (témoin : la liste dérivée a ses $NCODES codes et la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v9 === '$NCODES/' ? 'sain' : /^$NCODES\\/./.test(j.v9 || '') ? 'rouge' : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"
   else sans_effet "M-ST2-TEXTE"; fi
-  if mutant note-ancienne vf-cockpit-terminal-vue.mjs "s/Claude Code suit les réglages de votre poste ou du projet (jamais « tout autoriser » ni auto depuis le projet)\./le réglage de votre poste s'applique, y compris « tout autoriser » s'il est configuré./"; then
+  if mutant note-ancienne vf-cockpit-terminal-vue.mjs "s/Claude Code suit les réglages de votre poste ou du projet ; un projet ne peut imposer ni « tout autoriser » ni auto (Claude Code 2\.1\.257 et plus)\./le réglage de votre poste s'applique, y compris « tout autoriser » s'il est configuré./"; then
     run_vue "$MUT_DIR" '"only":["v1"]'
     assert_eq "M-NOTE-ANCIENNE — le mutant rougit LB.V1 : l'ancienne note du mode hérité (faux pour le mode venu du projet) n'est plus celle attendue (témoin : le bandeau s'affiche, la sonde s'exécute)" "$(m1="$(rj "$VJ" 'j.v1')"; if [ -z "$m1" ] || [ "$m1" = "undefined" ]; then echo plante; elif [ "$m1" = "$(vv v1)" ]; then echo sain; else echo rouge; fi)" "rouge"
   else sans_effet "M-NOTE-ANCIENNE"; fi

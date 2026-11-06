@@ -287,7 +287,7 @@ rq() { node "$TA" req "$@"; }
 
 mutant() { # mutant <nom> <expression-sed> -> MUT_MOD ; code 1 si le module manque ou si la copie n'a pas changé
   local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; f="$d/vf-cockpit-lancer-ui.mjs"; MUT_MOD="$f"; [ -f "$MOD" ] || return 1
-  cp "$MOD" "$f"; cp "$f" "$f.orig"; sed -i.bak "$2" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
+  cp "$MOD" "$f"; cp "$(dirname "$MOD")/vf-cockpit-lancer-style.mjs" "$d/"; cp "$f" "$f.orig"; sed -i.bak "$2" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
 sans_effet() { assert_eq "$1 — mutant sans effet (module absent ou ligne marquée inchangée)" "sans effet" "effet"; }
 SRVN=0

@@ -39,7 +39,7 @@ export function vueTerminal(cfg) {
   };
   // bandeau de proposition (72-08) : modes, note du mode hérité, motifs des pré-vols (mêmes codes et mêmes textes que la carte, une page par origine), messages par statut de lancement
   const MODES_UI = [{ mode: 'default', libelle: 'Par défaut' }, { mode: 'acceptEdits', libelle: 'Accepter les modifications' }, { mode: 'plan', libelle: 'Plan (lecture seule)' }, { mode: 'herite', libelle: 'Hérité du poste' }];
-  const NOTE_HERITE = "Aucun mode n'est imposé : Claude Code suit les réglages de votre poste ou du projet (jamais « tout autoriser » ni auto depuis le projet).";
+  const NOTE_HERITE = "Aucun mode n'est imposé : Claude Code suit les réglages de votre poste ou du projet ; un projet ne peut imposer ni « tout autoriser » ni auto (Claude Code 2.1.257 et plus).";
   const MOTIFS = Object.assign(Object.create(null), {
     'phase-finie': 'La phase est terminée.', 'terminal-absent': 'Le terminal est indisponible sur ce poste.', 'terminal-arrete': 'Le terminal est arrêté. Relancez /vf-cockpit --terminal.',
     'premier-plan-occupe': 'Un programme occupe déjà le terminal.', 'claude-introuvable': 'La commande claude est introuvable.', 'python3-absent': 'Python 3 est introuvable sur ce poste.',
@@ -51,6 +51,12 @@ export function vueTerminal(cfg) {
     occupe: "Le terminal n'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n'a été écrit ; vérifiez, puis cliquez sur Lancer.", attendre: 'Patientez un instant, puis cliquez de nouveau sur Lancer.',
     'sans-session': "Aucune session de terminal n'est ouverte : relancez le shell, puis réessayez.", refus: 'Le lancement a été refusé.', reseau: 'Le terminal ne répond pas.',
   });
+  // feuille des contrôles du bandeau de proposition (72, réglages du 2026-11-06) : variables de Q seulement, identifiants du bandeau, texte neutre ; posée une fois, la CSP de Q autorise le style en ligne
+  const STYLE_PROPOSITION = '#proposition-mode { border: thin solid var(--hair-2); border-radius: var(--r-ctl); background: var(--raise-2); color: var(--text); color-scheme: inherit; font: inherit; }'
+    + '#proposition input[type="checkbox"] { accent-color: var(--on); color-scheme: inherit; }'
+    + '#proposition-lancer[aria-disabled="true"], #proposition-lancer[aria-disabled="true"]:hover { cursor: not-allowed; background: var(--raise-2); color: var(--text-3); }'
+    + '.vf-lancer-armement { display: none; } #proposition:has(#proposition-lancer[aria-disabled="true"]) .vf-lancer-armement { display: inline; }';
+  const poserStyleProposition = () => { if (document.getElementById('vf-lancer-style')) return; const st = document.createElement('style'); st.id = 'vf-lancer-style'; st.textContent = STYLE_PROPOSITION; document.head.appendChild(st); };
   let courant = null, minuterie = 0; // identifiant du bandeau affiché ; minuterie d'armement
   const retirerProposition = () => { clearTimeout(minuterie); minuterie = 0; const a = document.getElementById('proposition'); if (a) a.remove(); courant = null; };
   window.vfTermVue = {
@@ -102,9 +108,12 @@ export function vueTerminal(cfg) {
       const sel = el('select'); sel.id = 'proposition-mode'; sel.setAttribute('aria-label', 'Mode de permission');
       MODES_UI.forEach((m) => { const o = el('option', '', m.libelle); o.value = m.mode; sel.appendChild(o); });
       sel.value = MODES_UI.some((m) => m.mode === p.modeInitial) ? p.modeInitial : 'default'; b.appendChild(sel);
+      poserStyleProposition();
+      const armement = el('span', 'vf-q-decompte vf-lancer-armement', bloquants.length ? 'Lancement bloqué' : 'Prêt dans un instant'); armement.id = 'proposition-armement'; b.appendChild(armement); // l'état « pas encore armé » se dit en texte neutre ; masqué dès que le bouton est armé
       const annuler = bouton('Annuler', () => { cb.annuler(); retirerProposition(); }, 'vf-q-secondaire'); b.appendChild(annuler);
       const lancer = el('button', 'vf-q-bouton', 'Lancer'); lancer.type = 'button'; lancer.id = 'proposition-lancer';
       lancer.setAttribute('aria-disabled', 'true'); // garde:armement
+      lancer.setAttribute('aria-describedby', 'proposition-armement');
       b.appendChild(lancer);
       const prevol = (cls, prefixe, code) => { const d = el('div', 'vf-q-reste'); d.appendChild(el('span', 'vf-q-texte ' + cls, prefixe + (MOTIFS[code] || 'Contrôle non reconnu.'))); b.appendChild(d); };
       bloquants.forEach((c) => prevol('vf-q-erreur-texte', 'Bloquant : ', c)); avertissements.forEach((c) => prevol('vf-q-attention-texte', 'Attention : ', c));

@@ -382,6 +382,7 @@ window.__pret = true;</script>`;
 http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (req.method === 'GET' && u.pathname === '/hote.html') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(PAGE); return; }
+  if (req.method === 'GET' && u.pathname === '/vf-cockpit-lancer-style.mjs') { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(fs.readFileSync(dossier + '/vf-cockpit-lancer-style.mjs')); return; } // importé par ui.mjs
   if (req.method === 'GET' && u.pathname === '/ui.mjs') { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(fs.readFileSync(dossier + '/vf-cockpit-lancer-ui.mjs')); return; }
   if (req.method === 'POST' && u.pathname === '/api/ask') { req.resume(); req.on('end', () => { res.writeHead(200, { 'content-type': 'text/event-stream' }); res.end(`event: answer\ndata: ${JSON.stringify({ title: 'OK', answer: 'OK', items: [], session: crypto.randomUUID() })}\n\n`); }); return; }
   res.writeHead(404); res.end();
