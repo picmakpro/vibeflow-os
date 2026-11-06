@@ -12,7 +12,7 @@ import { readPlanning, read, clip, sentence, num, fm, list } from './vf-cockpit-
 import { texte } from './vf-cockpit-formats.mjs';
 import { trouverPhase, LIBELLES_RESTE, LIBELLES_MISSION, LIBELLES_ETAT } from './vf-cockpit-avancement.mjs';
 import { KIND_ICONS, KIND_COLORS } from './vf-cockpit-types.mjs';
-import { detectDrift } from './vf-cockpit-drift.mjs';
+import { detectDrift, commandeCorrectif } from './vf-cockpit-drift.mjs';
 import { lireAilleurs, fusionner } from './vf-cockpit-ailleurs.mjs';
 
 const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
@@ -61,7 +61,7 @@ const etatPerime = (status, etat) => !!etat && Object.hasOwn(COMPAT_STATE, Strin
 export function buildProjectGraph(root, { layout } = {}) {
   root = path.resolve(root); layout = layout || planningLayout(root);
   // dérive de format mesurée AVANT la lecture : le panneau propose le correctif au lieu d'une carte vide sans explication
-  let drift; try { drift = detectDrift(root, layout); } catch (e) { drift = { constats: [], resume: `Contrôle de format impossible : ${e.message}` }; }
+  let drift; try { drift = detectDrift(root, layout); } catch (e) { drift = { constats: [], resume: `Contrôle de format impossible : ${e.message}`, erreur: true }; }
   const P = readPlanning(root, layout); const { rel, state, reqs } = P;
   P.phases = fusionner(P.phases, lireAilleurs(root)); // N5 : une phase menée dans un worktree du même dépôt prend l'avancement du worktree si elle y est plus avancée
   const { phases } = P;
@@ -197,11 +197,22 @@ export function buildProjectGraph(root, { layout } = {}) {
       vf: { milestone: state.milestone, phase: curPhase, phaseEtat, stateStale: perime, phaseName: state.current_phase_name, status: state.status, lastActivity: state.last_activity, lastDesc: state.last_activity_desc, progress: state.progress,
         milestones: msList.filter((m) => !m.horsJalon).map((m) => ({ key: m.key, st: m.st, done: m.done, total: m.ks.length, id: 'n:' + m.id })),
         next: active ? active.ks.filter((p) => !p.done).map((p) => ({ id: 'n:' + phId(p), label: `Phase ${p.n} · ${p.name}`, etat: p.avancement.etat })) : [],
-        drift: { resume: drift.resume, regles: Object.values(drift.constats.reduce((o, c) => { (o[c.regle] ||= { regle: c.regle, niveau: c.niveau, message: c.message, fichier: c.fichier, n: 0 }).n++; return o; }, {})),
+        drift: { resume: drift.resume, erreur: !!drift.erreur,
+          // une règle = un groupe de constats ; `fichier` reste celui du PREMIER constat (champ historique) : la répartition vraie est dans `fichiers` ([{fichier, n}]) et les endroits dans `emplacements` ([{fichier, ligne}], 5 au plus) — PU-G-156
+          regles: Object.values(drift.constats.reduce((o, c) => { const r = (o[c.regle] ||= { regle: c.regle, niveau: c.niveau, message: c.message, fichier: c.fichier, n: 0, fichiers: [], emplacements: [], corrigeable: false });
+            r.n++; (r.fichiers.find((f) => f.fichier === c.fichier) || (r.fichiers.push({ fichier: c.fichier, n: 0 }), r.fichiers.at(-1))).n++;
+            if (c.ligne > 0 && r.emplacements.length < 5) r.emplacements.push({ fichier: c.fichier, ligne: c.ligne }); if (c.apres !== undefined) r.corrigeable = true; return o; }, {})),
           corrigeable: drift.constats.some((c) => c.apres !== undefined),
+          // PU-G-155 : le compte de chaque niveau, pour écrire « 5 écarts : 1 toléré, 4 non lus » sans recompter côté page ; `couvertsN` = écarts que le correctif remet en forme (PU-G-156)
+          ecartsN: drift.constats.length, couvertsN: drift.constats.filter((c) => c.apres !== undefined).length,
+          parNiveau: { bloquant: drift.constats.filter((c) => c.niveau === 'bloquant').length, tolere: drift.constats.filter((c) => c.niveau === 'toléré').length, info: drift.constats.filter((c) => c.niveau === 'info').length, ignore: drift.constats.filter((c) => c.niveau === 'ignoré').length },
+          // PU-G-153 : la commande complète (chemins absolus), seule source de ce que le panneau affiche ET copie
+          commande: drift.constats.some((c) => c.apres !== undefined) ? commandeCorrectif(root) : '',
           // lignes non comprises (fichier:ligne + extrait), au plus 20 : le total est dans `nonComprisesN` (diagnostic du premier assemblage, P-PARS)
           nonComprisesN: drift.constats.filter((c) => c.regle === 'ligne-non-comprise').length,
           nonComprises: drift.constats.filter((c) => c.regle === 'ligne-non-comprise').slice(0, 20).map((c) => ({ fichier: c.fichier, ligne: c.ligne, extrait: c.avant })) },
+        // PU-G-160 : le groupe « Hors jalon » (phases sans jalon dans un ROADMAP qui en a), signalé dans le panneau Format
+        horsJalon: horsJalon && loose.length ? { n: loose.length, id: 'n:ms-hors-jalon' } : null,
         counts: { phases: phases.size, plans: files.filter((f) => f.p.endsWith('-PLAN.md')).length, reqs: reqs.size, reqsDone: [...reqs.values()].filter((r) => r.done).length, dags: P.dags.length } },
       layout: { forme: layout.forme, actif: layout.actif } },
     project: { name: `${P.projectName} — Projet`, summary: resume(state, curPhase, phases.size, files, phaseEtat) },

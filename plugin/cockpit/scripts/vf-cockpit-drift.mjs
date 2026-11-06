@@ -7,7 +7,7 @@
 // CLI : node vf-cockpit-drift.mjs <lab> [--diff | --json]. Lecture seule : la correction reste un geste humain (ADR-031).
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { planningLayout, stateFile } from './vf-cockpit-paths.mjs';
 import { readPlanning, fm, read } from './vf-cockpit-planning.mjs'; // read borné partagé : fichier régulier, plafond de taille (jamais un tube ni /dev/zero)
 import { DEP_TETE, texte, lignesNonComprises } from './vf-cockpit-formats.mjs'; // mêmes motifs que la lecture : « compris » = consommé par planning
@@ -18,7 +18,12 @@ const DEP = DEP_TETE; // tolérant (espace avant « : », deux-points dedans ou 
 
 // une ligne non comprise : `avant` porte l'extrait, jamais de `apres` (le détecteur ne devine pas ce que l'auteur voulait dire)
 const nonComprise = (fichier, x) => ({ regle: 'ligne-non-comprise', niveau: 'ignoré', fichier, ligne: x.ligne,
-  message: 'Ligne qui ressemble à un champ lu par le cockpit (titre de phase, Goal, Depends on, exigence, current_phase) mais qu\'aucun lecteur ne reconnaît : elle est ignorée.', avant: x.extrait });
+  message: 'Ligne qui ressemble à un champ lu par le cockpit (titre de phase, objectif, « dépend de », exigence, phase courante) mais qu\'aucun lecteur ne reconnaît : elle n\'est pas lue.', avant: x.extrait });
+
+// PU-G-153 : la commande du correctif, COMPLÈTE et rejouable telle quelle depuis n'importe quel dossier (chemin du script et du lab absolus, entre apostrophes).
+// Un tube plutôt qu'un fichier « drift.patch » : écrit dans le dossier courant puis lu depuis le lab (`git -C`), il n'était trouvé que si les deux étaient le même.
+const apostrophes = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+export const commandeCorrectif = (root) => { root = path.resolve(root); return `node ${apostrophes(fileURLToPath(import.meta.url))} ${apostrophes(root)} --diff | git -C ${apostrophes(root)} apply -`; };
 
 export function detectDrift(root, layout) {
   root = path.resolve(root); layout = layout || planningLayout(root);
@@ -31,13 +36,13 @@ export function detectDrift(root, layout) {
     const lignes = texte(txt).split('\n'); const fichier = rel(f);
     lignes.forEach((l, i) => {
       if (PHASE_ESPACE.test(l)) constats.push({ regle: 'phase-deux-points', niveau: 'toléré', fichier, ligne: i + 1,
-        message: 'Espace avant les deux-points après le numéro de phase : le gabarit GSD écrit « Phase N: ».', avant: l, apres: l.replace(PHASE_ESPACE, '$1:') });
+        message: 'Espace avant les deux-points après le numéro de phase : le format attendu est « Phase N: ».', avant: l, apres: l.replace(PHASE_ESPACE, '$1:') });
       const d = DEP.exec(l);
       if (d) {
         // seul l'enchaînement de champs fausse la lecture (« rien · **Parallélisable avec**: Phase 4 » donnait une dépendance à 4)
         const [val, ...autres] = d[2].split(/(?<!\s)\s+·\s+(?=\*\*)/);
         if (autres.length) constats.push({ regle: 'depends-on', niveau: 'toléré', fichier, ligne: i + 1,
-          message: 'Plusieurs champs sur la ligne « Depends on » : un champ par ligne, « Nothing » si aucune dépendance.',
+          message: 'Plusieurs champs sur la ligne « dépend de » du ROADMAP : un champ par ligne, « Nothing » si la phase ne dépend de rien.',
           avant: l, apres: [`${d[1]} ${/^\s*(rien|aucune?)\s*$/i.test(val) ? 'Nothing' : val}`, ...autres].join('\n') });
       }
     });
@@ -57,7 +62,7 @@ export function detectDrift(root, layout) {
       if (ancre < 0) ancre = h1 >= 0 && h1 + 1 < reelles ? h1 + 1 : 0;
       const section = ['## Milestones', '', `- 🚧 **${cle}** — Phases ${nums[0]}-${nums.at(-1)}${nom && !/[*:]/.test(nom) ? ` (${nom})` : ''}`, ''];
       if (nums.length) constats.push({ regle: 'jalons-absents', niveau: 'info', fichier, ligne: ancre + 1,
-        message: 'Pas de section « ## Milestones » : les phases sont rangées sous un jalon générique « Phases du lab ».',
+        message: 'Le ROADMAP n\'a pas de section « ## Milestones » (les jalons) : les phases sont rangées sous un jalon générique « Phases du lab ».',
         avant: lignes[ancre], apres: [...section, lignes[ancre]].join('\n') });
     }
   }
@@ -68,7 +73,7 @@ export function detectDrift(root, layout) {
     const st = fm(texte(read(sf)));
     if (st.status && !/closed|complete|archived|shipped/i.test(st.status) && !st.current_phase && !new RegExp('^Phase:\\s*\\d', 'm').test(read(sf)))
       constats.push({ regle: 'phase-courante-absente', niveau: 'info', fichier: rel(sf), ligne: 0,
-        message: 'STATE.md sans « current_phase » : le cockpit ne sait pas quelle phase est en cours. À compléter à la main, la phase ne se devine pas.' });
+        message: 'STATE.md ne dit pas quelle phase est en cours (champ « current_phase » absent) : le cockpit ne sait pas laquelle montrer. À compléter à la main, la phase ne se devine pas.' });
   }
   const n = (x) => constats.filter((c) => c.niveau === x).length;
   return { constats, resume: constats.length ? `${constats.length} écart(s) de format : ${n('bloquant')} bloquant(s), ${n('toléré')} toléré(s), ${n('info')} info${n('ignoré') ? `, ${n('ignoré')} ligne(s) non comprise(s)` : ''}.` : 'Format de la planification conforme.' };
@@ -119,6 +124,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process
   else {
     console.log(r.resume);
     for (const c of r.constats) console.log(`  [${c.niveau}] ${c.fichier}${c.ligne ? ':' + c.ligne : ''} — ${c.message}`);
-    if (r.constats.some((c) => c.apres !== undefined)) console.log(`\nCorrectif proposé (rien n'est écrit) : node ${path.relative(process.cwd(), fs.realpathSync(process.argv[1]))} ${lab} --diff > drift.patch && git -C ${lab} apply drift.patch`);
+    if (r.constats.some((c) => c.apres !== undefined)) console.log(`\nCorrectif proposé (rien n'est écrit ; à coller tel quel dans un terminal, depuis n'importe quel dossier) : ${commandeCorrectif(lab)}`);
   }
 }
