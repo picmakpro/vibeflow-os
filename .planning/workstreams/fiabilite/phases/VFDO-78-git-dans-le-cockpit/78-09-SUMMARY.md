@@ -18,7 +18,7 @@ status: complete
 - Pas de rejeu : à la reconnexion un `hello` seul, l'écouteur doit relire l'état à l'ouverture.
 
 ## Coût mesuré de `signatureGit` (médiane de 7 appels)
-- fixture : 29 à 31 ms ; ce dépôt (`/Users/samuel/Documents/dev/vibeflow-os`, nombreux worktrees et refs, lecture seule) : 26 à 29 ms. Sous les 50 ms ; l'essentiel est le lancement des deux processus git (une fois par tick de 5 s).
+- fixture : 29 à 31 ms ; ce dépôt (`~/Documents/dev/vibeflow-os`, nombreux worktrees et refs, lecture seule) : 26 à 29 ms. Sous les 50 ms ; l'essentiel est le lancement des deux processus git (une fois par tick de 5 s).
 
 ## Limite assumée
 Un fichier suivi modifié sans `git add` ne change aucun élément de la signature (refs, worktrees, index) : aucun événement (R2.1d). Le tiroir relit le status à l'ouverture. Un fichier neuf non ajouté non plus (R2.1b).
