@@ -76,3 +76,14 @@ Aucun défaut du code livré. Aucune assertion n'a été affaiblie ni retirée. 
 - Le vrai `claude` : recette par juges avec captures, hors plan (skill `/vf-dev` ouvert, boîte de confiance du dossier, transcript dans l'onglet Équipe).
 - Le rattachement visible dans l'onglet Équipe : un faux `claude` n'écrit pas de transcript ; prouvé au niveau de la table par 72-07 et 72-09.
 - Linux : l'exécution sous Linux se lit sur le job de CI de la PR ; le témoin des leurres (B0) lit `/proc/<pid>/environ` sous Linux et `ps eww` sous macOS (seul ce dernier est mesuré ici).
+
+## Jalon LANC-12 (partiel, 2026-11-06, macOS)
+
+- J2 : la découverte de la CI (`scripts/ci-shard-suites.sh --all`) porte exactement les 51 suites du dossier de tests du cockpit : OK-JALON-J2. Linux : joué par le job de CI de la PR (à constater).
+- J3 : 13 suites `test-cockpit-lancer-*.sh` trouvées ; aucune construction non portable (formes BSD de `ln` et `mv`, `sed -i` sans suffixe, `timeout` suivi d'une durée, `pkill -f`, `mapfile`, `declare -A`, `stat -f/-c`) dans les suites de la phase ni le faux `claude` : OK-JALON-J3.
+- J1 (boucle de toutes les suites) : NON terminé. Relevé partiel sur HEAD 217f1c81 : 9 suites vertes (ailleurs, assemblage, avancement, chaine-xss, chrome-fr, direct, equipe, forme-claude, hygiene) ; `test-cockpit-lancer-bandeau.sh` rouge sur LB.S3 (client 282 lignes pour un plafond de 280) parce que 72-13 modifiait `vf-cockpit-terminal-client.mjs` et `vf-cockpit-terminal-vue.mjs` (fichiers non commités au moment du rejeu) : ce rouge n'est pas un défaut de 72-12. La boucle est à rejouer sur un arbre où ces trois fichiers de 72-13 n'ont aucune modification non commitée.
+- Recette avec le vrai `claude` : recette par juges avec captures, hors plan.
+
+### Défaut constaté (jalon)
+
+Aucun du code livré par 72-08 à 72-10. À surveiller : si LB.S3 reste rouge après le commit de 72-13, c'est un défaut de 72-13 (plafond de lignes de 72-08).
