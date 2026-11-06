@@ -17,7 +17,7 @@
   // gabarits dont une variable est une liste construite par le viewer (« A, B and C ») : le « and » final y est traduit, nulle part ailleurs
   const LISTES = ['It also relies on {}{}. They sit at the edge of the map; the lines show which parts talk to them.', 'How do {} relate?'];
   // gabarits dont la variable est un nom du lab, laissé intact : « Inside {} » (en-tête d'une carte ouverte) ; durées : la variable est un nombre ou rien
-  const LIBRES = ['Inside {}'];
+  const LIBRES = ['Inside {}', 'You asked: {}', 'Everything behind {}', 'Exported {}', 'Changed · {}'];
   const P = [];
   const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   for (const [k, v] of Object.entries(T)) if (k.includes('{}')) { delete T[k]; P.push([new RegExp('^' + k.split('{}').map(esc).join('(.*?)') + (v.includes('|') && /[a-z]$/.test(k) ? 's?' : '') + '$'), v.split('|').map((x) => x.split('{}')), k.replace(/\{\}/g, '').length, LISTES.includes(k), LIBRES.includes(k), /^\{\} \w+ ago$/.test(k)]); }
@@ -38,6 +38,8 @@
     [/^Searching code for "(.+)"$/, (_, x) => `Cherche « ${x} » dans le code`],
     [/^Looking at (.+)$/, (_, x) => `Examine ${x}`], [/^Reading (.+)$/, (_, x) => `Lit ${x}`], [/^Listing (.+)$/, (_, x) => `Liste ${x}`],
     [/^Running a command$/, () => 'Lance une commande'], [/^Tracing a dependency path$/, () => 'Suit une chaîne de dépendances'],
+    [/^(.+) and (\d+) more$/, (_, a, n) => `${a} et ${n} ${n > 1 ? 'autres' : 'autre'}`], // « Readme and 7 more » : liste de noms du viewer, le dernier segment est un compte
+    [/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2}), (\d{4})$/, (_, m, d, y) => `${d} ${{ Jan: 'janv.', Feb: 'févr.', Mar: 'mars', Apr: 'avr.', May: 'mai', Jun: 'juin', Jul: 'juil.', Aug: 'août', Sep: 'sept.', Oct: 'oct.', Nov: 'nov.', Dec: 'déc.' }[m]} ${y}`], // date de l'en-tête d'export (toLocaleDateString en anglais)
     [/^\(\+(\d+) more\)$/, (_, n) => `(+${n} autres)`], [/^\+(\d+) more$/, (_, n) => `+${n} autres`],
     [/^(\d+) cards?$/, (_, n) => `${n} carte${n > 1 ? 's' : ''}`], [/^(\d+) files?$/, (_, n) => `${n} ${G.meta.vfTab === 'project' ? 'élément' : 'fichier'}${n > 1 ? 's' : ''}`],
     [/^Theme: (.+)\. Press for (.+)\.$/, (_, a, b) => `Thème : ${T[a] || a}. Appuyer pour ${(T[b.replace(/\.$/, '')] || b).toLowerCase()}.`],
@@ -55,8 +57,8 @@
     if (out == null) for (const [re, formes, fixe, liste, libre, duree] of P) {
       const m = re.exec(t); if (!m) continue;
       if (duree && !/^\d+$/.test(m[1].trim())) continue; // « Updated 3 minutes ago » n'est pas « {} minutes ago » : la durée porte un nombre seul
-      if (formes.length > 1 && !/^\d+$/.test(m[1].trim())) continue; // « singulier|pluriel » : seulement derrière un nombre (« Uses connection » n'est pas « 1 connection »)
-      if (!(fixe >= 16 || libre || m.slice(1).some((c) => /^\d+$/.test(c.trim()) || noyau(c.trim()) != null))) continue;
+      if (formes.length > 1 && !/^\d+$/.test(m[1].trim()) && !/^\d+(\.\d)?k$/.test(m[1].trim())) continue; // « singulier|pluriel » : seulement derrière un nombre (« Uses connection » n'est pas « 1 connection »)
+      if (!(fixe >= 16 || libre || m.slice(1).some((c) => /^\d+(\.\d)?k?$/.test(c.trim()) || noyau(c.trim()) != null))) continue;
       out = formes[formes.length > 1 && Number(m[1]) !== 1 ? 1 : 0].reduce((x, p, i) => { if (!i) return x + p; const [a, b] = lier(x, liste ? enListe(noyau(m[i].trim()) ?? m[i]) : (noyau(m[i].trim()) ?? m[i])); return a + b + p; }, '');
       break;
     }
@@ -67,9 +69,12 @@
     if (out == null && /^[A-Za-z]{3,}s$/.test(t) && T[t.slice(0, -1)] != null) out = T[t.slice(0, -1)] + 's';
     return out;
   };
+  // « 1.3k » / « 48k » (fmt du viewer) → « 1,3 k » / « 48 k » : virgule décimale, espace insécable avant l'unité (PU-G-066)
+  const kfr = (x) => x.replace(/(^|[^\w.,])(\d+)(?:\.(\d))?k\b/g, (_, a, i, d) => `${a}${i}${d ? ',' + d : ''}\u00a0k`);
+  const SING = { lignes: 'ligne', fichiers: 'fichier', 'éléments': 'élément', "points d'accès": "point d'accès" };
   const tr = (s) => {
     const t = typeof s === 'string' ? s.trim() : ''; if (!t || t.length > 600 || !/[A-Za-z]/.test(t)) return null; // chaîne vide → rien : garde contre la boucle des attributs vides
-    const out = noyau(t);
+    const brut = noyau(t), out = brut == null ? null : kfr(brut);
     return out == null || out === t ? null : s.replace(t, () => out); // une fonction : `$&`, `$'`, `$$` d'un chemin ne sont jamais interprétés
   };
   window.__vfFrTraduire = tr;
@@ -77,7 +82,7 @@
   // Types fixes de carte (recette 2026-11-02 : « Library » au-dessus du dossier). Le viewer écrit le NOM DU TYPE tel quel (minuscule, ou 1re lettre
   // en capitale dans l'en-tête de la vue) à quatre endroits : libellé du panneau, en-tête de la vue, rang de la recherche, première partie de
   // l'infobulle. Ils sont traduits PAR EMPLACEMENT, jamais par le dictionnaire : un dossier du lab nommé « library » ou « config » est une donnée et reste intact.
-  const TYPES = { ui: 'interface', service: 'service', worker: 'tâche de fond', library: 'bibliothèque', feature: 'fonctionnalité', data: 'données', config: 'configuration', test: 'test', script: 'script',
+  const TYPES = { ui: 'interface', service: 'module', worker: 'tâche de fond', library: 'bibliothèque', feature: 'fonctionnalité', data: 'données', config: 'configuration', test: 'test', script: 'script',
     infra: 'infrastructure', external: 'service externe', misc: 'divers', endpoint: "point d'accès", function: 'fonction', class: 'classe', route: 'route', dir: 'dossier', module: 'module' };
   const type = (s) => { const t = typeof s === 'string' ? s.trim() : '', k = Object.prototype.hasOwnProperty.call(TYPES, t.toLowerCase()) ? TYPES[t.toLowerCase()] : null; return k == null ? null : s.replace(t, () => (/^[A-Z]/.test(t) ? k[0].toUpperCase() + k.slice(1) : k)); };
   window.__vfFrType = type;
@@ -85,6 +90,13 @@
     const p = n.parentElement, t = n.nodeValue; if (!p) return null;
     if (p.matches('.kindlabel, #results .rk, #context .k')) return type(t);
     if (p.matches('#tooltip .td')) { const i = t.indexOf(' · '), k = type(i < 0 ? t : t.slice(0, i)); return k == null ? null : k + (i < 0 ? '' : t.slice(i)); }
+    if (p.matches('.stats b') && /^\d+(\.\d)?k$/.test(t.trim())) return kfr(t); // chiffre abrégé d'un panneau
+    if (p.matches('.stats span') && p.previousElementSibling?.matches('b') && p.previousElementSibling.textContent.trim() === '1') { const f = tr(t); return f != null && SING[f.trim()] ? SING[f.trim()] : null; } // « 1 ligne », « 1 fichier »
+    if (p.matches('.rw') && t.trim() === 'Changed') return 'Récent'; // pastille d'une carte touchée par une phase récente (« modifié » reste l'état Git)
+    if (p.matches('.tag')) { // « Détecté via » : l'origine de chaque correspondance, dite en toutes lettres (PU-G-070)
+      const h3 = p.closest('.sec')?.querySelector('h3')?.textContent.trim();
+      if (h3 === 'Matched by' || h3 === 'Détecté via') { const m = /^(pkg|host|#) ?(.+)$/.exec(t.trim()); if (m) return ({ pkg: 'paquet', host: 'hôte', '#': 'tag' })[m[1]] + ' ' + m[2]; }
+    }
     return null;
   };
   if (!SC || new URLSearchParams(location.search).get('lang') === 'en') return;
@@ -101,6 +113,8 @@
   // l'en-tête de panneau : le viewer capitalise chaque mot (« Contrôle De Santé ») ; en français, seule la première lettre l'est (P70-D-04)
   const sp = document.createElement('style');
   sp.textContent = '.ph .kindlabel { text-transform: none; display: inline-block; } .ph .kindlabel::first-letter { text-transform: uppercase; }';
+  // infobulle d'une carte : le viewer capitalise chaque mot (« 115 Fichiers · 48k Lignes ») ; en français, seule la première lettre l'est (PU-G-066, PU-G-161)
+  sp.textContent += ' #tooltip .td[style*="capitalize"] { text-transform: none !important; } #tooltip .td[style*="capitalize"]::first-letter { text-transform: uppercase; }';
   document.head.appendChild(sp);
 
   // la mise en page de l'en-tête (libellés français plus longs) est le travail de 01-vf-responsive.js
