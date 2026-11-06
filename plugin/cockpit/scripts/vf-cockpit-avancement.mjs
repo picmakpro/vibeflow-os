@@ -17,7 +17,7 @@ export const LIBELLES_MISSION = { running: 'en cours', abandonnee: 'abandonnée,
 
 const NUM_STRICT = /^\d+(?:\.\d+)?$/;
 const MOTIF_MISSION = /^MISSION-(\d+(?:\.\d+)?)/;
-// 01 -> 1, 02.1 -> 2.1 (même règle que normNum de vf-cockpit-planning, qui importe ce module : pas de cycle)
+// 01 -> 1, 02.1 -> 2.1 (même règle que normNum de vf-cockpit-formats, ré-exporté par vf-cockpit-planning, qui importe ce module : pas de cycle)
 const norm = (s) => { const [a, b] = String(s).split('.'); return `${Number(a)}${b !== undefined ? '.' + b : ''}`; };
 
 // Un plan est fait s'il a son *-PLAN.md ET son *-SUMMARY.md ; un SUMMARY sans PLAN est un correctif (P69-D-04).

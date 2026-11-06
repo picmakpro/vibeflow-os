@@ -111,6 +111,33 @@ MUT="$WORK/mut"; mkdir -p "$MUT"; cp "$SCRIPTS"/vf-cockpit-*.mjs "$SCRIPTS/vf-co
 sed 's#, /^vf-cockpit-fr-.\*\\.mjs$/##' "$MUT/vf-cockpit-build.mjs" > "$MUT/b.tmp" && mv "$MUT/b.tmp" "$MUT/vf-cockpit-build.mjs"
 assert_eq "A5.2 — témoin rouge : sans le motif fr-, le leurre fr-inventaire est recopié" "$(node "$AUX/liste.mjs" "$MUT" "$D5")" "vf-cockpit-fr-inventaire.mjs,vf-cockpit-who.mjs"
 
+echo "=== A6 — diagnostic des lignes non comprises (premier assemblage et --rebuild) ; .planning jamais écrit ==="
+# Les motifs sont éprouvés en bibliothèque par test-cockpit-projet.sh (P8) ; ici la sortie du lanceur et la lecture seule du chemin `build --rebuild`.
+cat > "$AUX/asm.mjs" <<'JS'
+// asm.mjs <dossier de scripts à tester> <lab> <dossier de scripts du moteur> : assemble avec le build du dossier donné (mutant) et le moteur réel
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , dir, lab, scripts] = process.argv;
+const m = await import(pathToFileURL(path.join(dir, 'vf-cockpit-build.mjs')).href);
+m.assembler({ lab, scriptsDir: scripts });
+JS
+LAB6="$WORK/lab6"; mkdir -p "$LAB6/src" "$LAB6/.planning/phases/01-x"; cp "$LAB/src/"*.js "$LAB6/src/"
+printf '%s\n' '- [x] **Phase 1: Socle** - premier jet' '- [ ] **Phase 2 Suite** - illisible' '' '### Phase 1: Socle' '**Goal**: ok' '' '### Phase 2: Suite' '**Goal** — non lu' > "$LAB6/.planning/ROADMAP.md"
+printf '<objective>Faire le socle</objective>\n' > "$LAB6/.planning/phases/01-x/01-01-PLAN.md"; echo ok > "$LAB6/.planning/phases/01-x/01-01-SUMMARY.md"
+git -C "$LAB6" init -q && git -C "$LAB6" add -A && git -C "$LAB6" -c user.email=t@t -c user.name=t commit -q -m init
+AV6="$(find "$LAB6/.planning" | sort | while read -r f; do [ -f "$f" ] && cksum "$f" || echo "$f"; done)"
+node "$SCRIPTS/vf-cockpit.mjs" build --lab "$LAB6" > "$WORK/a6a.out" 2>&1; assert_eq "A6.1 — premier assemblage : rend 0" "$?" "0"
+assert_has "A6.2 — premier assemblage : « 2 ligne(s) non comprise(s) » nommées fichier:ligne (CLI)" "$(cat "$WORK/a6a.out")" "2 ligne(s) non comprise(s) du planning : .planning/ROADMAP.md:2 .planning/ROADMAP.md:8"
+node "$SCRIPTS/vf-cockpit.mjs" build --rebuild --lab "$LAB6" > "$WORK/a6b.out" 2>&1; assert_eq "A6.3 — build --rebuild : rend 0" "$?" "0"
+assert_has "A6.4 — build --rebuild : le même diagnostic" "$(cat "$WORK/a6b.out")" "2 ligne(s) non comprise(s) du planning : .planning/ROADMAP.md:2 .planning/ROADMAP.md:8"
+assert_eq "A6.5 — le diagnostic est aussi dans les données de la page Projet (interface)" "$(node "$AUX/donnees.mjs" "$LAB6/.vibeflow/cockpit" "$LAB6/.vibeflow/cockpit/project.html" 'j.meta.vf.drift.nonComprises.map(x=>x.fichier+":"+x.ligne).join(",")')" ".planning/ROADMAP.md:2,.planning/ROADMAP.md:8"
+assert_eq "A6.6 — .planning intact après deux assemblages (liste et cksum avant/après)" "$(find "$LAB6/.planning" | sort | while read -r f; do [ -f "$f" ] && cksum "$f" || echo "$f"; done | cmp -s - <(printf '%s\n' "$AV6") && echo identique)" "identique"
+assert_eq "A6.7 — témoin : le lab canonique de A1 ne dit rien de non compris" "$(grep -c 'non comprise' "$WORK/build.out")" "0"
+MUT6="$WORK/mut6"; mkdir -p "$MUT6"; cp "$SCRIPTS"/vf-cockpit-*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$MUT6/"
+sed 's#^  if (diagnostic && !quiet) console.log(diagnostic);$##' "$MUT6/vf-cockpit-build.mjs" > "$MUT6/b.tmp" && mv "$MUT6/b.tmp" "$MUT6/vf-cockpit-build.mjs"
+assert_eq "A6.8 — mutant (affichage du diagnostic retiré : 0 occurrence restante) : plus aucune ligne « non comprise » en sortie, A6.2 rougirait" "$(grep -c 'console.log(diagnostic)' "$MUT6/vf-cockpit-build.mjs")|$(node "$AUX/asm.mjs" "$MUT6" "$LAB6" "$SCRIPTS" 2>&1 | grep -c 'non comprise')" "0|0"
+assert_eq "A6.9 — témoin du mutant : le build réel, lui, affiche le diagnostic par le même chemin" "$(node "$AUX/asm.mjs" "$SCRIPTS" "$LAB6" "$SCRIPTS" 2>&1 | grep -c 'non comprise')" "1"
+
 vf_hyg_assert
 echo ""
 echo "=================================="

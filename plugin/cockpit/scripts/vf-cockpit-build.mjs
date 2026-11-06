@@ -114,7 +114,10 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
 
   const resume = `Cockpit assemblé : Code ${g.files.length} fichiers (${decrits} décrits sans modèle), Projet ${project.nodes.length} cartes · ${((Date.now() - t0) / 1000).toFixed(1)} s · ${sortie}${ferme ? ` · git du moteur fermé (${ferme}) : carte sans fichiers suivis ni head` : ''}`;
   if (!quiet) console.log(resume);
-  return { lab, sortie, fichiersCode: g.files.length, cartesProjet: project.nodes.length, gitFerme: ferme, resume };
+  const nc = project.meta.vf.drift; // diagnostic : ce que les lecteurs n'ont pas compris (sinon un graphe vide et muet)
+  const diagnostic = nc.nonComprisesN ? `${nc.nonComprisesN} ligne(s) non comprise(s) du planning : ${nc.nonComprises.map((x) => `${x.fichier}:${x.ligne}`).join(' ')}${nc.nonComprisesN > nc.nonComprises.length ? ` … (+${nc.nonComprisesN - nc.nonComprises.length})` : ''}` : '';
+  if (diagnostic && !quiet) console.log(diagnostic);
+  return { lab, sortie, fichiersCode: g.files.length, cartesProjet: project.nodes.length, gitFerme: ferme, resume, diagnostic };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
