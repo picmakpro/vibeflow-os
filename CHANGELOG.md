@@ -33,6 +33,7 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 - **Fin de tour inerte** (patch, `TaskStop` et une ligne de règle) : `design-orchestrator` v1.5.17, `mobile-test-team` v1.4.9, `product-team-bundle` v1.1.1, `business-pilot-bundle` v2.0.18, `content-bundle` v2.0.18, `growth-bundle` v2.0.17 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05, « Mandat maintenant »).
 - **Gate** : `check-machine-paths.sh` rendait un faux vert sous macOS (`LC_ALL=C`, code retour du balayage ; #206, BACKLOG n° 38).
 - **Hors module** : `DESIGN.md` figé en direction « Graphite » (#196), mémoires d'agents et tri du planning (#195, #205, #207), clôture de la Phase 71 et SEED-003 (#211, #212).
+- **Correctif `/vf-update` (CRLF)** : un registre `.claude/scripts/.vibeflow-installed` (ou l'état `.vibeflow-offered`) aux fins de ligne CRLF — checkout Windows, `core.autocrlf=true` — perdait toutes ses lignes à la première pose depuis #208 (le filtre de format jetait la ligne finissant par `\r`) ; le `\r` final est retiré avant le filtre, la réécriture est en LF, les lignes invalides restent rejetées. Arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 (« Corriger dans la release (Recommandé) »).
 - **190 suites** en CI.
 
 ## [v2.75.1] — 2026-11-03
