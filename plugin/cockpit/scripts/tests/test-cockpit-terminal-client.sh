@@ -52,6 +52,7 @@ console.log(JSON.stringify({
   dcs: /registerDcsHandler\(\s*\{(?=[^}]*intermediates\s*:\s*['"]\$['"])(?=[^}]*final\s*:\s*['"]q['"])/.test(p),
   winopt: /windowOptions\s*:\s*\{\s*\}/.test(p), macopt: /macOptionIsMeta\s*:\s*false/.test(p),
   presse: n(/ClipboardAddon|navigator\s*\.\s*clipboard|execCommand\s*\(/g),
+  execVue: ((s[2] || '').match(/execCommand\s*\(/g) || []).length, execCopy: ((s[2] || '').match(/execCommand\(\s*['"]copy['"]\s*\)/g) || []).length,
   lien: /linkHandler\s*:/.test(p) && /activate/.test(p) && /window\s*\.\s*open\s*\([^)]*['"]noopener['"]/.test(p), confirm: n(/\bconfirm\s*\(/g),
   ecoute: n(/addEventListener\(\s*['"]message['"]|\bonmessage\s*=/g), postmsg: n(/\bpostMessage\s*\(/g), etoile: n(/postMessage\s*\([^)]*['"]\*['"]/g), etats,
 }));
@@ -497,7 +498,7 @@ ST="$(node "$AUX/stat.mjs" "$WORK/q/page.html")"
 assert_eq "ST.0 — témoin : la page de Q a ses quatre <script> (les deux derniers sont les scripts propres)" "$(rj "$ST" 'j.scripts')" "4"
 assert_eq "T14.S1 — gestionnaire DCS de remplacement (registerDcsHandler sur \$ et q) dans le client servi" "$(rj "$ST" 'j.dcs')" "true"
 assert_eq "T14.S2 — windowOptions vide et macOptionIsMeta faux" "$(rj "$ST" 'j.winopt+"/"+j.macopt')" "true/true"
-assert_eq "T14.S3 — aucun addon presse-papiers, navigator.clipboard ni execCommand dans les scripts propres (la page est vivante : propres > 200)" "$(rj "$ST" 'j.presse+"/"+(j.propres>200)')" "0/true"
+assert_eq "T14.S3 — aucun addon presse-papiers ni navigator.clipboard dans les scripts propres, et UN SEUL execCommand : execCommand('copy') dans la vue, pour le bouton « Copier la commande » de la carte (Q14, arbitrage de Samuel, AskUserQuestion, session principale, 2026-11-06) ; le client n'en a aucun (la page est vivante : propres > 200)" "$(rj "$ST" '(j.presse-j.execVue)+"/"+j.execVue+"/"+j.execCopy+"/"+(j.propres>200)')" "0/1/1/true"
 assert_eq "T14.S4 — linkHandler avec activate qui ouvre en noopener ; aucun confirm(" "$(rj "$ST" 'j.lien+"/"+j.confirm')" "true/0"
 assert_eq "T17.Q1 — aucun écouteur de messages entrants dans Q (la page est vivante : propres > 200)" "$(rj "$ST" 'j.ecoute+"/"+(j.propres>200)')" "0/true"
 assert_eq "T17.Q2 — au moins un postMessage( et aucun avec l'étoile" "$(rj "$ST" '(j.postmsg>=1)+"/"+j.etoile')" "true/0"
@@ -518,8 +519,11 @@ else sans_effet "M-ETOILE"; fi
 if mutant ecoute vf-cockpit-terminal-client.mjs "s|const RACCOURCI|addEventListener('message', () => {}); const RACCOURCI|"; then
   assert_eq "M-ECOUTE — le mutant rougit T17.Q1 : un écouteur de messages entrants" "$(rj "$(mut_page ecoute)" 'j.ecoute>=1')" "true"
 else sans_effet "M-ECOUTE"; fi
+if mutant execc vf-cockpit-terminal-client.mjs "s|const RACCOURCI|document.execCommand('copy'); const RACCOURCI|"; then
+  assert_eq "M-EXEC — un second execCommand (dans le client) rougit T14.S3 : le presse-papiers ne se touche que par la vue" "$(rj "$(mut_page execc)" '(j.presse-j.execVue)>=1')" "true"
+else sans_effet "M-EXEC"; fi
 if mutant clip vf-cockpit-terminal-client.mjs "s|const RACCOURCI|navigator.clipboard.writeText('x'); const RACCOURCI|"; then
-  assert_eq "M-CLIP — le mutant rougit T14.S3 : un appel au presse-papiers" "$(rj "$(mut_page clip)" 'j.presse>=1')" "true"
+  assert_eq "M-CLIP — le mutant rougit T14.S3 : un appel au presse-papiers" "$(rj "$(mut_page clip)" '(j.presse-j.execVue)>=1')" "true"
 else sans_effet "M-CLIP"; fi
 if mutant setcookie vf-cockpit-terminal-processus.mjs "s|res.setHeader('Referrer-Policy', 'no-referrer');|res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('Set-Cookie', 'a=b');|"; then
   srv "$MUT_OUT"; rq "$QP" GET / > "$WORK/m-setcookie.out"

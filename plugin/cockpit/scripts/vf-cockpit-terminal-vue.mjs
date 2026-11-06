@@ -74,23 +74,14 @@ export function vueTerminal(cfg) {
     occupe: "Le terminal n'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n'a été écrit ; vérifiez, puis cliquez sur Préparer dans le terminal.", attendre: 'Patientez un instant, puis cliquez de nouveau sur Préparer dans le terminal.',
     'sans-session': "Aucune session de terminal n'est ouverte : relancez le shell, puis réessayez.", refus: 'Le lancement a été refusé.', reseau: 'Le terminal ne répond pas.',
   });
-  // feuille des contrôles du bandeau de proposition (72, réglages du 2026-11-06 ; LB2) : variables de Q seulement, identifiants du bandeau, texte neutre ; posée une fois, la CSP de Q autorise le style en ligne
-  const STYLE_PROPOSITION = '#proposition-mode { border: thin solid var(--hair-2); border-radius: var(--r-ctl); background: var(--raise-2); color: var(--text); color-scheme: inherit; font: inherit; }'
-    + '#proposition input[type="checkbox"] { accent-color: var(--on); color-scheme: inherit; }'
-    + '#proposition-lancer[aria-disabled="true"], #proposition-lancer[aria-disabled="true"]:hover { cursor: not-allowed; background: var(--raise-2); color: var(--text-3); }'
-    + '.vf-lancer-armement { display: none; } #proposition:has(#proposition-lancer[aria-disabled="true"]) .vf-lancer-armement { display: inline; }'
-    + '#proposition { max-height: calc(100% - var(--sp-16)); overflow-y: auto; }'
-    + '#proposition-message:empty { display: none; }'
-    + '#proposition .vf-q-aide { font-size: .92em; font-weight: 400; line-height: 1.5; color: var(--text-2); }'
-    + '#proposition ul.vf-q-modes { flex: 1 1 100%; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); }'
-    + '#proposition ul.vf-q-modes li { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-8); font-size: .92em; line-height: 1.5; color: var(--text-2); }'
-    + '#proposition ul.vf-q-modes .vf-q-mode-nom { font-weight: 500; color: var(--text); }'
-    + '#proposition .vf-q-risque { display: inline-flex; align-items: center; gap: var(--sp-4); font-weight: 500; color: var(--text); }'
-    + '#proposition svg.i { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }';
-  const poserStyleProposition = () => { if (document.getElementById('vf-lancer-style')) return; const st = document.createElement('style'); st.id = 'vf-lancer-style'; st.textContent = STYLE_PROPOSITION; document.head.appendChild(st); };
   const PICTO_RISQUE = 'M8 2L14.5 13.5H1.5Z M8 6.5V9.5 M8 11.6V11.7'; // triangle : forme distincte des pastilles rondes, sans teinte
   const duree = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)), m = Math.floor(s / 60); return m > 0 ? m + ' min ' + String(s % 60).padStart(2, '0') + ' s' : s + ' s'; };
   const annoncer = (txt) => { const r = document.getElementById('annonce'); if (r) r.textContent = txt; }; // région live polie de la page (aucun focus pris)
+  const copier = (k, cp) => { // Q14 : « Copier la commande » pour la commande de relance du cockpit, JAMAIS pour un lancement de session ; le texte copié est celui de la carte (sélection de l'élément affiché) ; un seul appel au presse-papiers
+    const r = document.createRange(), s = window.getSelection(); r.selectNodeContents(k.querySelector('.vf-q-commande')); s.removeAllRanges(); s.addRange(r);
+    let ok = false; try { ok = document.execCommand('copy'); } catch (e) { void e; }
+    cp.textContent = ok ? 'Copiée' : 'Copiez avec Ctrl+C'; annoncer(ok ? 'Commande copiée.' : 'Commande sélectionnée : copiez-la avec Ctrl+C ou Commande+C.'); setTimeout(() => { cp.textContent = 'Copier la commande'; }, 2500);
+  };
   const affichee = (intention, verbe) => { const v = VERBES_UI[verbe]; return v && typeof intention === 'string' && intention.indexOf(v[0]) === 0 ? v[1] + intention.slice(v[0].length) : intention; };
   let courant = null, minuterie = 0, compte = 0, echeance = 0, appui = false, geste = 0; // identifiant du bandeau affiché ; minuterie d'armement ; compte à rebours et son échéance ; geste de souris en cours dans le bandeau
   const retirerProposition = () => { clearTimeout(minuterie); minuterie = 0; clearInterval(compte); compte = 0; echeance = 0; const a = document.getElementById('proposition'); if (a) a.remove(); courant = null; };
@@ -138,6 +129,7 @@ export function vueTerminal(cfg) {
       });
       k.appendChild(corps);
       const b = c.bouton ? bouton(c.bouton, action) : null; if (b) k.appendChild(b);
+      if (c.corps.indexOf(COMMANDE) >= 0) { const cp = bouton('Copier la commande', () => copier(k, cp), 'vf-q-secondaire'); k.appendChild(cp); }
       z.appendChild(k); if (c.masque) document.getElementById('terminal').classList.add('vf-q-cache'); if (document.hasFocus()) (b || k).focus(); // L2 : jamais de focus pris à la page ; masque : sous la carte « déjà ouvert » aucun terminal vide ni curseur
     },
     bandeau(type, detail, action) {
@@ -172,7 +164,6 @@ export function vueTerminal(cfg) {
       const sel = el('select'); sel.id = 'proposition-mode'; sel.setAttribute('aria-label', 'Mode de permission'); sel.setAttribute('aria-describedby', 'proposition-modes');
       MODES_UI.forEach((m) => { const o = el('option', '', m.libelle); o.value = m.mode; sel.appendChild(o); });
       sel.value = MODES_UI.some((m) => m.mode === p.modeInitial) ? p.modeInitial : 'default'; b.appendChild(sel);
-      poserStyleProposition();
       const armement = el('span', 'vf-q-decompte vf-lancer-armement', bloquants.length ? 'Lancement bloqué' : 'Prêt dans un instant'); armement.id = 'proposition-armement'; b.appendChild(armement); // l'état « pas encore armé » se dit en texte neutre ; masqué dès que le bouton est armé
       const reste = Number.isFinite(p.expire_ms) && p.expire_ms > 0 ? p.expire_ms : 0;
       let delai = null; if (reste) { delai = el('span', 'vf-q-decompte', 'Expire dans ' + duree(reste)); delai.id = 'proposition-expire'; delai.setAttribute('role', 'timer'); b.appendChild(delai); } // compte à rebours : jamais annoncé à chaque seconde
