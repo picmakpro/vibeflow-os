@@ -625,15 +625,19 @@ cat > "$AUX/titres.mjs" <<'JS'
 // titres.mjs <chrome> <session.mjs> <url> : titre, kicker et repère de chaque étape de la visite lancée par son API ; une ligne JSON { etapes: [ { kicker, titre, note } ] } ou { erreur }
 import { pathToFileURL } from 'node:url';
 const [, , chrome, sess, url] = process.argv;
-const { executer, pause } = await import(pathToFileURL(sess).href);
+const { executer, pause, stabiliser, attendreValeur } = await import(pathToFileURL(sess).href);
 await executer(chrome, async (s) => {
   await s.naviguer(url); await s.attendre("document.readyState === 'complete' && !!window.VibeFlowTour && !!document.getElementById('tour-btn')", 'page prête');
-  await s.attendre("!!window.__vfModele && !!window.__vfModele.modele", 'lab connu'); await pause(1200);
+  await s.attendre("!!window.__vfModele && !!window.__vfModele.modele", 'lab connu');
+  await attendreValeur(() => s.ev('window.VibeFlowTour.active()'), (v) => v === true, { max: 3000 }); // le démarrage d'office a eu lieu (ou n'aura pas lieu : plafond 3 s)
   await s.ev('window.VibeFlowTour.end()'); await s.ev('window.VibeFlowTour.start()'); await s.attendre('window.VibeFlowTour.active()', 'visite lancée', 15000);
   const etapes = [];
   for (let i = 0; i < 12 && (await s.ev('window.VibeFlowTour.active()')); i++) {
-    await pause(400);
-    etapes.push(await s.ev("(() => { const c = document.getElementById('tour'); const q = (x) => (c.querySelector(x) || {}).textContent || ''; return { kicker: q('.tk span:last-child'), titre: q('.tt'), note: q('.tn') }; })()"));
+    // l'étape affichée est celle attendue (« i sur N »), puis son texte est posé (deux relevés identiques) : on ne lit plus 400 ms après la touche
+    const lire = () => s.ev("(() => { const c = document.getElementById('tour'); const q = (x) => (c.querySelector(x) || {}).textContent || ''; return { kicker: q('.tk span:last-child'), titre: q('.tt'), note: q('.tn'), rep: ((/(\\d+) sur \\d+/.exec(q('.tk')) || [])[1]) || '' }; })()");
+    await attendreValeur(lire, (v) => v.rep === String(i + 1), { max: 10000 });
+    const { kicker, titre, note } = await stabiliser(lire, { pas: 250, max: 5000 });
+    etapes.push({ kicker, titre, note });
     await s.ev("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))"); await pause(150);
   }
   return { etapes };
@@ -821,14 +825,15 @@ cat > "$AUX/format.mjs" <<'JS'
 // format.mjs <chrome> <session.mjs> <url> : une ligne JSON { ... } mesurée dans le panneau d'ensemble de l'onglet Projet
 import { pathToFileURL } from 'node:url';
 const [, , chrome, sess, url] = process.argv;
-const { executer, pause } = await import(pathToFileURL(sess).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser } = await import(pathToFileURL(sess).href);
 const r = await executer(chrome, async (s) => {
   await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
-  await s.naviguer(url); await s.attendre("document.readyState === 'complete' && !!document.querySelector('#panel .vf-stats') && !!document.getElementById('vf-format')", 'section Format'); await pause(1500);
-  return await s.ev(`(async () => {
+  await s.naviguer(url); await s.attendre("document.readyState === 'complete' && !!document.querySelector('#panel .vf-stats') && !!document.getElementById('vf-format')", 'section Format');
+  // la mise en page du panneau est posée (section, lignes non lues, texte) avant toute mesure de géométrie : deux relevés identiques, jamais une durée fixe
+  await stabiliser(() => s.ev("(() => { const b = (e) => { if (!e) return null; const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round); }; const rf = [...document.querySelectorAll('.vf-ref')].map((e) => [b(e.querySelector('.vf-texte')), b(e.querySelector('code'))]); return { sec: b(document.getElementById('vf-format')), al: b(document.querySelector('.vf-alerte')), cmd: b(document.querySelector('.vf-cmd')), rf, pw: document.getElementById('panel').scrollWidth }; })()"), { pas: 250, max: 5000 });
+  const o = await s.ev(`(async () => {
     window.__cp = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: (t) => { window.__cp.push(t); return Promise.resolve(); } }, configurable: true });
     const q = (x) => document.querySelector(x), qa = (x) => [...document.querySelectorAll(x)];
-    const attente = (ms) => new Promise((r) => setTimeout(r, ms));
     const sec = q('#vf-format'), al = q('.vf-alerte'), cmd = q('.vf-cmd code'), btn = q('.vf-cmd .vf-copie'), refs = qa('.vf-ref');
     const txt = (e) => (e ? e.innerText.replace(/\\s+/g, ' ').trim() : '');
     // glyphes : une pastille témoin par classe, injectée dans le panneau, lue par son style calculé (chaque forme est un masque propre)
@@ -845,11 +850,29 @@ const r = await executer(chrome, async (s) => {
     if (refs.length) { const t = refs[0].querySelector('.vf-texte'), c = refs[0].querySelector('code'); o.largeurTexte = Math.round(t.getBoundingClientRect().width); o.largeurPanneau = Math.round(panneau.clientWidth); o.refSurUneLigne = c.getBoundingClientRect().height < 40; o.texteApresRef = t.getBoundingClientRect().top >= c.getBoundingClientRect().bottom - 1;
       // le dernier segment (« ROADMAP.md:23 ») tient sur UNE ligne : jamais coupé au milieu d'un nom ou d'un numéro
       const tn = [...c.childNodes].filter((n) => n.nodeType === 3).at(-1), seg = tn.textContent.split('/').pop(), r = document.createRange(); r.setStart(tn, tn.textContent.length - seg.length); r.setEnd(tn, tn.textContent.length); o.dernierSegmentUneLigne = r.getClientRects().length === 1; }
-    if (al) { al.querySelector('[data-vf-section]').click(); await attente(500); const s2 = q('#vf-format'); o.sectionVisible = (() => { const b = s2.getBoundingClientRect(), p = panneau.getBoundingClientRect(); return b.top >= p.top - 2 && b.top < p.bottom; })(); }
-    { const b2 = q('.vf-cmd .vf-copie'); if (b2) { b2.click(); await attente(300); o.copieCommande = window.__cp.at(-1) || ''; o.etatBouton = b2.textContent.trim(); } }
-    { const r2 = qa('.vf-ref')[0]; if (r2) { r2.click(); await attente(300); o.copieRef = window.__cp.at(-1) || ''; o.refAffichee = r2.querySelector('code').textContent.replace(/^Copié/, '').trim(); o.etatRef = r2.querySelector('.vf-copie-etat').textContent; } }
-    o.nbCopies = window.__cp.length;
+    o.alertePresente = !!al; o.copiePresente = !!q('.vf-cmd .vf-copie'); o.refPresente = refs.length > 0;
     return o; })()`);
+  // les trois gestes suivants lisent leur effet dès qu'il est posé (défilement fini, copie faite et libellé « Copié », qui peut être éphémère), jamais après un délai fixe
+  if (o.alertePresente) {
+    await s.ev("document.querySelector('.vf-alerte [data-vf-section]').click()");
+    // la section est visible dans le panneau (le prédicat de l'assertion), PUIS son défilement est fini ; un relevé pris avant que le défilement ne commence n'est pas retenu
+    const lireSection = () => s.ev("(() => { const b = document.getElementById('vf-format').getBoundingClientRect(), p = document.getElementById('panel').getBoundingClientRect(); return { top: Math.round(b.top), ok: b.top >= p.top - 2 && b.top < p.bottom }; })()");
+    const sec = await attendreEtStabiliser(lireSection, (v) => v.ok, { max: 6000 });
+    o.sectionVisible = !!(sec && sec.ok);
+  }
+  if (o.copiePresente) {
+    await s.ev("document.querySelector('.vf-cmd .vf-copie').click()");
+    const c = await attendreValeur(() => s.ev("(() => { const b = document.querySelector('.vf-cmd .vf-copie'); return { cp: window.__cp.at(-1) || '', et: b ? b.textContent.trim() : '' }; })()"), (v) => v.cp !== '' && v.et === 'Copié');
+    o.copieCommande = c.cp; o.etatBouton = c.et;
+  }
+  if (o.refPresente) {
+    const avant = await s.ev('window.__cp.length');
+    await s.ev("document.querySelectorAll('.vf-ref')[0].click()");
+    const c = await attendreValeur(() => s.ev("(() => { const r2 = document.querySelectorAll('.vf-ref')[0]; return { n: window.__cp.length, cp: window.__cp.at(-1) || '', aff: r2.querySelector('code').textContent.replace(/^Copié/, '').trim(), et: r2.querySelector('.vf-copie-etat').textContent }; })()"), (v) => v.n > avant && v.et === 'Copié');
+    o.copieRef = c.cp; o.refAffichee = c.aff; o.etatRef = c.et;
+  }
+  o.nbCopies = await s.ev('window.__cp.length');
+  return o;
 });
 console.log(JSON.stringify(r));
 JS
