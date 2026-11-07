@@ -34,8 +34,7 @@ await executer(chrome, async (s) => {
   // ---------- page Code, 1 280 x 720 ----------
   await vue(1280, 720); await charger('index.html');
   await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
-  // la visite guidée s'ouvre d'elle-même au premier passage et prend Échap : on la ferme d'abord, pour mesurer la carte seule
-  // la visite guidée s'ouvre d'elle-même au premier passage (profil jetable : toujours) : on l'attend sans la borne courte d'avant, puis on la ferme, pour mesurer la carte seule
+  // la visite guidée s'ouvre d'elle-même au premier passage (profil jetable : toujours) : on l'attend (borne 30 s), puis on la ferme, pour mesurer la carte seule
   await s.attendre("!!document.querySelector('#tour') && !document.querySelector('#tour').hidden", 'visite ouverte', 30000).catch(() => {});
   await echap(); await s.attendre("!document.querySelector('#tour') || document.querySelector('#tour').hidden", 'visite fermée'); await stabiliser(() => s.ev("JSON.stringify([!document.querySelector('#tour') || document.querySelector('#tour').hidden, document.activeElement && document.activeElement.tagName])"), { pas: 150, max: 3000 });
 
