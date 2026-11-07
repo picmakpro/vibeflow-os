@@ -75,7 +75,7 @@ build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; $ENV
   PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
 }
 
-# faux driver-lock.sh TENU (comme test-cockpit-projet.sh) : une mission dont un nœud est running n'est « en cours » que si son verrou est vivant (P68-D-05) ;
+# faux driver-lock.sh TENU (comme projet-commun.sh, socle de test-cockpit-projet-graphe.sh) : une mission dont un nœud est running n'est « en cours » que si son verrou est vivant (P68-D-05) ;
 # VF_COCKPIT_SCRIPTS_DIR n'est posé que pour le SERVEUR (ENVS), jamais pour le build
 mkdir -p "$WORK/locks"
 printf '#!/usr/bin/env bash\ncase "$1" in status) echo "{\\"present\\": true, \\"ws\\": \\"\\", \\"stale\\": false, \\"ttl\\": 1800, \\"progress_age_seconds\\": 30}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' > "$WORK/locks/driver-lock.sh"; chmod +x "$WORK/locks/driver-lock.sh"

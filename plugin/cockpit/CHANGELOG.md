@@ -45,6 +45,8 @@ Retours du panel d'utilisateurs du cockpit (2026-11-06, registre `.planning/miss
 - **Libellés français** : Non classés, Demande d'origine, récent, liens, Module ; résumés sans « > » ni HTML, marqués « extrait brut ».
 
 ### Modifié
+- **`test-cockpit-projet.sh` découpée en trois suites** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-07 : « Oui, découper projet ») pour tenir la durée d'un job de CI (la suite seule dépassait 16 à 25 min) : `test-cockpit-projet-graphe.sh` (moteur, parseurs, P1 à P9, P10.1, P10.2, P10.4, P10.5), `test-cockpit-projet-visite.sh` (le bloc Chrome : O4, O5, O6.5 à O6.19, R3.13 à R3.22 ; « SUITE SAUTÉE » sans navigateur) et `test-cockpit-projet-croissance.sh` (P10.3, le mutant le plus long). Socle commun sourcé `projet-commun.sh` (hors du motif `test-*.sh`) et harnais de croissance en un seul fichier versionné `projet-croissance.mjs` ; même nombre d'assertions et mêmes neuf mutants qu'avant, répartis.
+- **Aides « mesurer une fois posé » des sondes Chrome** (`stabiliser`, `attendreValeur`, `attendreEtStabiliser`, `positionPosee` dans `chrome-session.mjs`) et suite neuve `test-cockpit-sondes-stables.sh` qui les éprouve (partie pure, partie Chrome, mutants) : les lectures des suites Chrome se prennent une fois la valeur posée, jamais après une pause fixe.
 - **Q1 « Icônes dans le menu ⋯ »** : le menu « ⋯ » monte de 700 à 999 px (amende P70-D-01).
 - **Limites consignées au BACKLOG** : états « annulée/expirée/remplacée » du lancement, état « bloqué » sans source, titres de santé à variables, 40-tour.js à 298 lignes (seuil 300) — voir `.planning/BACKLOG.md`.
 
