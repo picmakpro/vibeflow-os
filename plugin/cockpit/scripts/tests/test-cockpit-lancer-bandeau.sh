@@ -1125,9 +1125,9 @@ else sans_effet "M-ACCUEIL-RECOUVRE"; fi
 if mutant accueil-sans-frappe vf-cockpit-terminal-vue.mjs "s/ if (n === 'keydown' \&\& ev.target.*closest('#terminal')) fermerAccueil();//"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v20"]'; assert_eq "M-ACCUEIL-SANS-FRAPPE — le mutant (la première frappe ne range plus l'accueil) rougit LB.V20 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v20 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v20 === 'true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-ACCUEIL-SANS-FRAPPE"; fi
-if mutant accueil-frappe-avalee vf-cockpit-terminal-vue.mjs "s/closest('#terminal')) fermerAccueil();/closest('#terminal')) { fermerAccueil(); ev.stopPropagation(); }/"; then
-  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v20"]'; assert_eq "M-ACCUEIL-FRAPPE-AVALEE — le mutant (le rangement retient la frappe : propagation arrêtée) rougit LB.V20 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v20 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v20 === 'true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
-else sans_effet "M-ACCUEIL-FRAPPE-AVALEE"; fi
+if mutant accueil-range-deplace-focus vf-cockpit-terminal-vue.mjs "s/ retirerAccueil(); }; \/\/ première frappe/ retirerAccueil(); document.activeElement.blur(); }; \/\/ première frappe/"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v20"]'; assert_eq "M-ACCUEIL-RANGE-DEPLACE-FOCUS — le mutant (ranger l'accueil retire le focus au terminal : la frappe est perdue) rougit LB.V20 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v20 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v20 === 'true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-ACCUEIL-RANGE-DEPLACE-FOCUS"; fi
 if mutant accueil-compris-focalise vf-cockpit-terminal-vue.mjs "s/ c.addEventListener('mousedown', (ev) => ev.preventDefault());//"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v20"]'; assert_eq "M-ACCUEIL-COMPRIS-FOCALISE — le mutant (« Compris » reprend le focus au clic puis disparaît avec lui) rougit LB.V20 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v20 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v20 === 'true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-ACCUEIL-COMPRIS-FOCALISE"; fi
