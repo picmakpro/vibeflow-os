@@ -139,6 +139,30 @@ mutant m-positionPosee-sans-catch 'catch { return null; } })()' 'catch { throw 0
 GARDE=4000 mutant n-stabiliser-sans-echeance 'prec = c.ok ? c : null; await pause(pas); } while (Date.now() < fin);' 'prec = c.ok ? c : null; await pause(pas); } while (true);'
 GARDE=4000 mutant o-attendreValeur-sans-echeance 'return c.v; await pause(pas); } while (Date.now() < fin);' 'return c.v; await pause(pas); } while (true);'
 
+echo "=== A — amorçage de Chrome borné par l'échéance GLOBALE (AMORCE), jamais par VF_CDP_ECHEANCE_MS ==="
+# faux « chrome » : annonce son port de débogage après ~1,5 s (stderr), puis reste en vie ; ECHEANCE = 500 ms. Aucun Chrome réel requis.
+cat > "$AUX/faux-chrome" <<'JS'
+#!/usr/bin/env node
+setTimeout(() => { process.stderr.write('DevTools listening on ws://127.0.0.1:1/devtools/browser/x\n'); }, 1500); setInterval(() => {}, 1000);
+JS
+chmod +x "$AUX/faux-chrome"
+cat > "$AUX/amorce.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const M = await import(pathToFileURL(process.argv[2]).href);
+const garde = setTimeout(() => { console.log(JSON.stringify({ erreur: 'ÉCHÉANCE de amorce.mjs', amorce: M.AMORCE })); process.exit(0); }, 20000);
+try { await M.ouvrir(process.argv[3]); console.log(JSON.stringify({ erreur: 'aucune erreur', amorce: M.AMORCE })); } catch (e) { console.log(JSON.stringify({ erreur: String(e.message), amorce: M.AMORCE })); }
+clearTimeout(garde); process.exit(0);
+JS
+amorce() { VF_CDP_ECHEANCE_MS=500 VF_CDP_AMORCE_MS= node "$AUX/amorce.mjs" "$1" "$AUX/faux-chrome" 2>&1 | tail -1; }
+A0="$(amorce "$SRC")"
+assert_eq "A1 — AMORCE vaut l'échéance globale par défaut (600000), pas ECHEANCE (500)" "$(printf '%s' "$A0" | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).amorce)")" "600000"
+assert_eq "A2 — ECHEANCE = 500 ms, le port est annoncé à ~1,5 s : l'erreur n'est PAS « n'a pas annoncé son port de débogage »" "$(printf '%s' "$A0" | node -e "console.log(/n'a pas annoncé son port/.test(JSON.parse(require('fs').readFileSync(0,'utf8')).erreur))")" "false"
+M_MOTIF='annoncé son port de débogage en ${AMORCE} ms`)), AMORCE)' M_REMPL='annoncé son port de débogage en ${ECHEANCE} ms`)), ECHEANCE)' node -e "const fs=require('fs');const s=fs.readFileSync(process.argv[1],'utf8');const m=process.env.M_MOTIF;if(!s.includes(m))process.exit(3);fs.writeFileSync(process.argv[2],s.replace(m,()=>process.env.M_REMPL))" "$SRC" "$WORK/mut/amorce-ref.mjs" || assert_eq "A-mutant appliqué (motif présent)" "motif absent" "motif présent"
+A1="$(amorce "$WORK/mut/amorce-ref.mjs")"
+echo "  trace du rouge (mutant « amorçage borné par ECHEANCE ») : $A1"
+assert_eq "A3 — mutant « amorçage borné par ECHEANCE » : rougit A2 (l'erreur devient « n'a pas annoncé son port »)" "$(printf '%s' "$A1" | node -e "console.log(/n'a pas annoncé son port/.test(JSON.parse(require('fs').readFileSync(0,'utf8')).erreur))")" "true"
+vf_hyg_arreter
+
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

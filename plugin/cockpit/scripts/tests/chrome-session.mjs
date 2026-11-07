@@ -2,6 +2,8 @@
 // Une seule instance de Chrome headless par exécution, fermée proprement (SIGKILL puis attente de sa sortie, profil jetable effacé), même sur
 // signal ou sur échéance globale. Aucune attente à durée fixe pour décider d'un état : on interroge la page (attendre), avec une échéance bornée.
 // Échéances (millisecondes, surchargeables) : VF_CDP_ECHEANCE_MS = par attente (défaut 90 000) · VF_CDP_GLOBAL_MS = par exécution (défaut 600 000).
+// Amorçage (VF_CDP_AMORCE_MS, défaut = l'échéance globale ; export AMORCE) : annonce du port, /json/new, connexion WebSocket, Page.enable, PREMIER chargement (naviguer) — bornés par
+//   AMORCE (max(ECHEANCE, AMORCE) pour le premier naviguer), jamais par ECHEANCE : une suite qui abaisse VF_CDP_ECHEANCE_MS à 20 s borne ses attentes, pas le démarrage de Chrome. Les attentes ordinaires restent à ECHEANCE.
 // Une mesure indisponible lève une erreur NOMMÉE (« attente de <nom> dépassée ») : jamais un résultat vide silencieux.
 // Le HOME du compte est rendu à Chrome (chromeHome) : sous un HOME jetable il ne démarre pas sur macOS.
 //
@@ -23,6 +25,7 @@ import { spawn } from 'node:child_process'; import fs from 'node:fs'; import os 
 
 export const ECHEANCE = Number(process.env.VF_CDP_ECHEANCE_MS) || 90000;
 export const GLOBAL = Number(process.env.VF_CDP_GLOBAL_MS) || 600000;
+export const AMORCE = Number(process.env.VF_CDP_AMORCE_MS) || GLOBAL; // amorçage de Chrome/CDP : borné par l'échéance GLOBALE (un runner à froid démarre Chrome en plus de 20 s), jamais par ECHEANCE
 export const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const ARGS = ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0'];
 
@@ -37,27 +40,28 @@ export async function ouvrir(chrome, { csp = false } = {}) {
   const fermer = async () => { try { ch.kill('SIGKILL'); } catch {} if (!sorti) await Promise.race([sortie, pause(3000)]); try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} };
   try {
     const port = await new Promise((ok, ko) => {
-      let buf = ''; const t = setTimeout(() => ko(new Error(`Chrome n'a pas annoncé son port de débogage en ${ECHEANCE} ms`)), ECHEANCE);
+      let buf = ''; const t = setTimeout(() => ko(new Error(`Chrome n'a pas annoncé son port de débogage en ${AMORCE} ms`)), AMORCE);
       ch.stderr.on('data', (d) => { buf += d; const m = /ws:\/\/127\.0\.0\.1:(\d+)\//.exec(buf); if (m) { clearTimeout(t); ok(m[1]); } });
       ch.once('exit', (c) => { clearTimeout(t); ko(new Error(`Chrome s'est arrêté avant d'être prêt (code ${c})`)); });
     });
-    const cible = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT', signal: AbortSignal.timeout(ECHEANCE) })).json();
+    const cible = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT', signal: AbortSignal.timeout(AMORCE) })).json();
     const ws = new WebSocket(cible.webSocketDebuggerUrl); let id = 0; const pend = new Map(); const ecoutes = []; const violations = [];
     ws.onmessage = (e) => { const j = JSON.parse(e.data);
       if (j.id && pend.has(j.id)) { const p = pend.get(j.id); pend.delete(j.id); clearTimeout(p.t); p.ok(j.result); return; }
       if (j.method === 'Log.entryAdded' && /Content Security Policy|Refused to/i.test(j.params.entry.text)) violations.push(j.params.entry.text.slice(0, 160));
       for (const l of ecoutes) if (l.m === j.method) l.f(j.params); };
     ws.onclose = () => { for (const p of pend.values()) { clearTimeout(p.t); p.ko(new Error('connexion au navigateur perdue')); } pend.clear(); };
-    await new Promise((ok, ko) => { ws.onopen = ok; ws.onerror = () => ko(new Error('connexion au navigateur impossible')); setTimeout(() => ko(new Error('connexion au navigateur : échéance')), ECHEANCE); });
-    const send = (method, params = {}) => new Promise((ok, ko) => { const i = ++id; const t = setTimeout(() => { pend.delete(i); ko(new Error(`${method} : pas de réponse en ${ECHEANCE} ms`)); }, ECHEANCE); pend.set(i, { ok, ko, t }); ws.send(JSON.stringify({ id: i, method, params })); });
+    await new Promise((ok, ko) => { ws.onopen = ok; ws.onerror = () => ko(new Error('connexion au navigateur impossible')); setTimeout(() => ko(new Error(`connexion au navigateur : échéance (${AMORCE} ms)`)), AMORCE); });
+    const send = (method, params = {}, ms = ECHEANCE) => new Promise((ok, ko) => { const i = ++id; const t = setTimeout(() => { pend.delete(i); ko(new Error(`${method} : pas de réponse en ${ms} ms`)); }, ms); pend.set(i, { ok, ko, t }); ws.send(JSON.stringify({ id: i, method, params })); });
     const ev = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }))?.result?.value;
     // naviguer : passe par about:blank (un changement de hash seul recharge ainsi quand même), rend la main à l'évènement load de la page
+    let premier = true; // le premier chargement d'une session paie l'amorçage de la page (Chrome à froid) : borné par max(ECHEANCE, AMORCE)
     const naviguer = async (url) => {
-      violations.length = 0;
-      await send('Page.navigate', { url: 'about:blank' });
+      violations.length = 0; const ms = premier ? Math.max(ECHEANCE, AMORCE) : ECHEANCE; premier = false;
+      await send('Page.navigate', { url: 'about:blank' }, ms);
       const charge = new Promise((ok) => ecoutes.push({ m: 'Page.loadEventFired', f: ok }));
-      await send('Page.navigate', { url });
-      await Promise.race([charge, pause(ECHEANCE).then(() => { throw new Error(`chargement de ${url} : événement load absent en ${ECHEANCE} ms`); })]);
+      await send('Page.navigate', { url }, ms);
+      await Promise.race([charge, pause(ms).then(() => { throw new Error(`chargement de ${url} : événement load absent en ${ms} ms`); })]);
       ecoutes.length = 0;
     };
     // attendre : sonde l'expression (booléenne) toutes les 100 ms jusqu'à ce qu'elle soit vraie ; échec nommé sinon
@@ -72,7 +76,7 @@ export async function ouvrir(chrome, { csp = false } = {}) {
       do { let c; try { c = await ev(`(async () => JSON.stringify(await (${expr})))()`); } catch { c = null; } if (c && c === prec) return JSON.parse(c); prec = c; await pause(250); } while (Date.now() < fin);
       throw new Error(`« ${nom} » ne s'est pas stabilisé (${ms} ms)`);
     };
-    await send('Page.enable'); if (csp) await send('Log.enable');
+    await send('Page.enable', {}, AMORCE); if (csp) await send('Log.enable', {}, AMORCE);
     return { send, ev, naviguer, attendre, stable, fermer, violations };
   } catch (e) { await fermer(); throw e; }
 }
