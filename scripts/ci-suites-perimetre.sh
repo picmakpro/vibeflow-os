@@ -98,8 +98,10 @@ ambigu() {
 classe() {
   case "$1" in
     # 1. Docs : aucune suite par eux-mêmes, et ils ne déclenchent pas non plus la règle « citée ».
-    #    Option (a), PROVISOIRE (en attente de Samuel) : un .md SOUS plugin/<module>/ n'est pas une doc, il suit la règle
-    #    module. Bascule vers l'option (b) : ajouter `plugin/*.md` à la ligne suivante.
+    #    Arbitrage Samuel, AskUserQuestion session principale, 2026-11-07, option (a) « Hors plugin/ seulement » : sont des docs
+    #    docs/, .planning/, .claude/agent-memory/ et les .md À LA RACINE (sans « / » dans le chemin). Un .md sous plugin/<m>/
+    #    (agent, SKILL.md, README ou CHANGELOG de module) suit la règle module + citée, parce que des suites le lisent (mesuré :
+    #    37 suites lisent un agent ou un SKILL.md, 19 lisent docs/, 110 lisent .planning/). Un .md ailleurs (.github/…) est hors carte.
     docs/*|.planning/*|.claude/agent-memory/*) echo doc ;;
     # 2. Partagé → tout. (Les bibliothèques de test partagées et les scripts conductor appelés ailleurs sont
     #    reconnus dans classe_plugin ; scripts/ passe avant `*.md` : une fixture sous scripts/tests/ n'est pas une doc.)
@@ -107,7 +109,8 @@ classe() {
     scripts/*|.github/workflows/ci.yml) echo partage ;;
     # 3. Module : plugin/<m>/ où module.json existe (voir classe_plugin), sinon hors carte.
     plugin/*) classe_plugin "$1" ;;
-    # 1 (suite). Les .md hors de plugin/ sont des docs.
+    # 1 (suite). Un .md hors de la racine, hors plugin/ et hors des dossiers de docs n'est PAS une doc : hors carte (tout).
+    */*.md) echo hors ;;
     *.md) echo doc ;;
     # 4. Hors carte → tout (VERSION racine, .claude-plugin/, .github/ autre que ci.yml, …).
     *) echo hors ;;
@@ -184,7 +187,41 @@ while IFS="$TAB" read -r f c; do
   } | sort -u | awk -v f="$f" '{ printf "%s\t3\t%s\tcitée — %s\n", $0, f, f }' >> "$T/cand"
 done < <(awk -F'\t' '$2 != "doc"' "$T/classes")
 
-sort -t "$TAB" -k1,1 -k2,2 -k3,3 "$T/cand" | awk -F'\t' '!s[$1]++ { printf "%s\t%s\n", $1, $4 }' > "$T/joued"
+# Citée par motif : un motif de chemin écrit dans une suite (contenant « * » et visant plugin/) EST une citation de chemin. La
+# suite est retenue quand un fichier touché correspond au motif (case), ou à un fichier sous le dossier qu'il désigne.
+cat > "$T/glob.awk" <<'AWK'
+{
+  n = split($0, w, /[ \t]+/)
+  for (i = 1; i <= n; i++) {
+    t = w[i]
+    if (t !~ /\*/ || t !~ /[Pp][Ll][Uu][Gg][Ii][Nn]/) continue
+    gsub(/["\047();|<>`,]/, "", t)
+    if (t ~ /plugin\//) sub(/^.*plugin\//, "plugin/", t)
+    else if (t ~ /\$\{?[A-Za-z_]*PLUGIN[A-Za-z_]*\}?\//) sub(/^.*\$\{?[A-Za-z_]*PLUGIN[A-Za-z_]*\}?\//, "plugin/", t)
+    else continue
+    if (t !~ /^plugin\// || t !~ /\*/ || (FILENAME "\t" t) in vu) continue
+    vu[FILENAME "\t" t] = 1
+    print FILENAME "\t" t
+  }
+}
+AWK
+: > "$T/globs"
+[ "${#SUITES[@]}" -gt 0 ] && awk -f "$T/glob.awk" "${SUITES[@]}" > "$T/globs"
+while IFS="$TAB" read -r suite pat; do
+  [ -n "$pat" ] || continue
+  while IFS="$TAB" read -r f c; do
+    [ "$c" = doc ] && continue
+    case "$pat" in
+      */) m="$pat*" ;;
+      *) m="$pat" ;;
+    esac
+    case "$f" in
+      $m|$m/*) printf '%s\t3\t%s\tcitée — %s (motif %s)\n' "$suite" "$f" "$f" "$pat" >> "$T/cand"; break ;;
+    esac
+  done < "$T/classes"
+done < "$T/globs"
+
+sort -t "$TAB" -k1,1 -k2,2 -k3,3 -k4,4 "$T/cand" | awk -F'\t' '!s[$1]++ { printf "%s\t%s\n", $1, $4 }' > "$T/joued"
 nj=$(wc -l < "$T/joued" | tr -d ' '); nt=$(wc -l < "$T/suites" | tr -d ' ')
 if [ "$nj" -eq 0 ]; then
   premier=$(awk -F'\t' '$2 != "doc" { print $1; exit }' "$T/classes")

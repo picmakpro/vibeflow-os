@@ -49,10 +49,17 @@ for m in alpha beta gamma conductor; do put "plugin/$m/module.json" "{\"name\":\
 put plugin/alpha/scripts/alpha.sh "echo alpha"
 put plugin/alpha/scripts/alpha-compose.sh "echo compose"
 put plugin/alpha/scripts/tests/lib-shared.sh "echo lib"
-put plugin/alpha/scripts/tests/test-alpha-own.sh 'bash scripts/alpha.sh; . tests/lib-shared.sh'
-put plugin/alpha/scripts/tests/test-alpha-two.sh 'echo deux'
+put plugin/alpha/scripts/tests/test-alpha-own.sh 'bash scripts/alpha.sh; . tests/lib-shared.sh; cat fixtures/fx.txt'
+put plugin/alpha/scripts/tests/fixtures/fx.txt 'fixture'
+put plugin/alpha/OWN.txt 'o'
+put plugin/beta/OWN.txt 'o'
+put plugin/beta/scripts/tests/test-beta-own-txt.sh 'cat OWN.txt'
+put plugin/beta/scripts/tests/test-beta-sweep.sh 'for f in "$PLUGIN"/*/module.json; do cat "$f"; done'
+put plugin/beta/scripts/tests/test-beta-sweep-agents.sh "find plugin/*/agents -name '*.md'"
+put plugin/beta/scripts/tests/test-beta-mod-seul.sh 'cat VERSION; ls alpha'
+put plugin/alpha/scripts/tests/test-alpha-two.sh 'echo deux; cat fixtures/fx.txt'
 put plugin/beta/scripts/beta.sh 'bash plugin/conductor/scripts/called.sh'
-put plugin/beta/scripts/tests/test-beta-own.sh '. lib-shared.sh'
+put plugin/beta/scripts/tests/test-beta-own.sh '. lib-shared.sh; bash test-alpha-two.sh'
 put plugin/beta/scripts/tests/test-beta-dep-path.sh 'bash plugin/alpha/scripts/alpha.sh'
 put plugin/beta/scripts/tests/test-beta-dep-compose.sh 'd=plugin/alpha/scripts; bash "$d/alpha-compose.sh"; cat note-unique.txt'
 put plugin/beta/scripts/tests/test-beta-ambig.sh 'cat VERSION'
@@ -63,7 +70,7 @@ put plugin/gamma/scripts/gamma.sh 'echo gamma'
 put plugin/gamma/scripts/tests/test-gamma-own.sh 'echo gamma own'
 put plugin/conductor/scripts/called.sh 'echo appelé'
 put plugin/conductor/scripts/uncalled.sh 'echo seul'
-put plugin/conductor/scripts/tests/test-conductor-own.sh 'bash called.sh; bash uncalled.sh'
+put plugin/conductor/scripts/tests/test-conductor-own.sh 'bash called.sh; bash uncalled.sh; bash test-alpha-two.sh'
 G add -A && G commit -q -m base && G tag base
 
 # mkcase <branche> <commandes> : une branche issue de base portant un commit.
@@ -83,6 +90,12 @@ mkcase c-renom       'git mv plugin/gamma/scripts/gamma.sh plugin/alpha/scripts/
 mkcase c-hors-v      'echo plus >> VERSION'
 mkcase c-hors-ref    'echo plus >> plugin/reference/r.txt'
 mkcase c-md-plugin   'echo plus > plugin/alpha/NOTES.md'
+mkcase c-github-md   'mkdir -p .github; echo x > .github/x.md'
+mkcase c-glob-module 'echo plus >> plugin/gamma/module.json'
+mkcase c-glob-agents 'mkdir -p plugin/alpha/agents; echo x > plugin/alpha/agents/vf.md'
+mkcase c-supprime    'git rm -q plugin/alpha/OWN.txt'
+mkcase c-fixture     'echo plus >> plugin/alpha/scripts/tests/fixtures/fx.txt'
+mkcase c-suite-citee 'echo plus >> plugin/alpha/scripts/tests/test-alpha-two.sh'
 G checkout -q base
 
 # Découverte de référence (jeu de suites du dépôt synthétique), triée.
@@ -94,12 +107,14 @@ A1=plugin/alpha/scripts/tests/test-alpha-own.sh;      A2=plugin/alpha/scripts/te
 B1=plugin/beta/scripts/tests/test-beta-ambig-dir.sh;  B2=plugin/beta/scripts/tests/test-beta-ambig.sh
 B3=plugin/beta/scripts/tests/test-beta-dep-compose.sh; B4=plugin/beta/scripts/tests/test-beta-dep-path.sh
 B5=plugin/beta/scripts/tests/test-beta-own.sh
+B6=plugin/beta/scripts/tests/test-beta-mod-seul.sh;   B7=plugin/beta/scripts/tests/test-beta-own-txt.sh
+B8=plugin/beta/scripts/tests/test-beta-sweep.sh;       B9=plugin/beta/scripts/tests/test-beta-sweep-agents.sh
 C1=plugin/conductor/scripts/tests/test-conductor-own.sh
 G1=plugin/gamma/scripts/tests/test-gamma-own.sh
 S1=scripts/tests/test-misc.sh
 
 E() { printf '%s|%s\n' "$1" "$2"; }
-TOUS() { local s; for s in $A1 $A2 $B1 $B2 $B3 $B4 $B5 $C1 $G1 $S1; do E "$s" "$1"; done; }
+TOUS() { local s; for s in $A1 $A2 $B1 $B2 $B3 $B4 $B5 $B6 $B7 $B8 $B9 $C1 $G1 $S1; do E "$s" "$1"; done; }
 
 # --- Exécution et vérification ---------------------------------------------------------------------------------
 SCRIPT_UNDER="$SCRIPT"
@@ -146,9 +161,15 @@ $OUT"
   # Une sortie vide avec un rc inattendu n'est pas « bien formée » pour un mutant qui aurait cessé de tourner.
 }
 
-NOMS="docs vide delta gamma docs-gamma dep-path dep-compose ambigu partage lib cond-appele cond-seul renom hors-version hors-reference md-plugin tout liste-selection liste-tout sha-inconnu head-inconnu usage-vide usage-un usage-tout usage-option usage-trop"
+NOMS="github-md glob-module glob-agents supprime fixture suite-citee docs vide delta gamma docs-gamma dep-path dep-compose ambigu partage lib cond-appele cond-seul renom hors-version hors-reference md-plugin tout liste-selection liste-tout sha-inconnu head-inconnu usage-vide usage-un usage-tout usage-option usage-trop"
 run_case() {
   case "$1" in
+    github-md) verifie_perimetre c-github-md tout "$(TOUS 'tout — hors carte .github/x.md')" ;;
+    glob-module) verifie_perimetre c-glob-module selection "$(E $G1 'module gamma — plugin/gamma/module.json'; E $B8 'citée — plugin/gamma/module.json (motif plugin/*/module.json)')" ;;
+    glob-agents) verifie_perimetre c-glob-agents selection "$(E $A1 'module alpha — plugin/alpha/agents/vf.md'; E $A2 'module alpha — plugin/alpha/agents/vf.md'; E $B9 'citée — plugin/alpha/agents/vf.md (motif plugin/*/agents)')" ;;
+    supprime) verifie_perimetre c-supprime selection "$(E $A1 'module alpha — plugin/alpha/OWN.txt'; E $A2 'module alpha — plugin/alpha/OWN.txt')" ;;
+    fixture) verifie_perimetre c-fixture selection "$(E $A1 'module alpha — plugin/alpha/scripts/tests/fixtures/fx.txt'; E $A2 'module alpha — plugin/alpha/scripts/tests/fixtures/fx.txt')" ;;
+    suite-citee) verifie_perimetre c-suite-citee selection "$(E $A1 'module alpha — plugin/alpha/scripts/tests/test-alpha-two.sh'; E $A2 'module alpha — plugin/alpha/scripts/tests/test-alpha-two.sh'; E $B5 'citée — plugin/alpha/scripts/tests/test-alpha-two.sh'; E $C1 'citée — plugin/alpha/scripts/tests/test-alpha-two.sh')" ;;
     docs) verifie_perimetre c-docs docs-seules "" ;;
     vide) verifie_perimetre base vide "" ;;
     delta) verifie_perimetre c-delta vide "" ;;
@@ -156,7 +177,7 @@ run_case() {
     docs-gamma) verifie_perimetre c-docs-gamma selection "$(E $G1 'module gamma — plugin/gamma/scripts/gamma.sh')" ;;
     dep-path) verifie_perimetre c-dep-path selection "$(E $A1 'module alpha — plugin/alpha/scripts/alpha.sh'; E $A2 'module alpha — plugin/alpha/scripts/alpha.sh'; E $B4 'citée — plugin/alpha/scripts/alpha.sh')" ;;
     dep-compose) verifie_perimetre c-dep-compose selection "$(E $A1 'module alpha — plugin/alpha/scripts/alpha-compose.sh'; E $A2 'module alpha — plugin/alpha/scripts/alpha-compose.sh'; E $B3 'citée — plugin/alpha/scripts/alpha-compose.sh')" ;;
-    ambigu) verifie_perimetre c-ambigu selection "$(E $A1 'module alpha — plugin/alpha/VERSION'; E $A2 'module alpha — plugin/alpha/VERSION'; E $B1 'citée — plugin/alpha/VERSION')" ;;
+    ambigu) verifie_perimetre c-ambigu selection "$(E $A1 'module alpha — plugin/alpha/VERSION'; E $A2 'module alpha — plugin/alpha/VERSION'; E $B1 'citée — plugin/alpha/VERSION'; E $B6 'citée — plugin/alpha/VERSION')" ;;
     partage) verifie_perimetre c-partage tout "$(TOUS 'tout — fichier partagé scripts/tools.sh')" ;;
     lib) verifie_perimetre c-lib tout "$(TOUS 'tout — fichier partagé plugin/alpha/scripts/tests/lib-shared.sh')" ;;
     cond-appele) verifie_perimetre c-cond-appele tout "$(TOUS 'tout — fichier partagé plugin/conductor/scripts/called.sh')" ;;
@@ -168,7 +189,7 @@ run_case() {
     tout) # --tout n'a pas de diff
           G checkout -q base; exec_script --tout "label ci: complet"
           CASE_ATT="rc=0 mode=tout
-$(TOUS 'tout — label ci: complet')
+$(TOUS 'tout — label ci: complet' | LC_ALL=C sort)
 ecartees=0"
           CASE_OBT="rc=$RC mode=$(printf '%s\n' "$OUT" | head -1 | sed 's/^# mode=//' | cut -f1)
 $(printf '%s\n' "$OUT" | awk -F'\t' '$1 == "jouee" { print $2 "|" $3 }')
@@ -203,28 +224,51 @@ else
   ko "réel : --tout x --liste égal à ci-shard-suites.sh --all" "$(head -3 "$WORK/real.all")" "$(head -3 "$WORK/real.tout")"
 fi
 
-# Un commit synthétique qui touche chrome-session.mjs, écrit dans un répertoire d'objets jetable (alternates sur le
-# dépôt réel) : ni ref ni objet n'est ajouté au dépôt réel.
+# Un commit synthétique qui touche un fichier réel, écrit dans un répertoire d'objets jetable (alternates sur le dépôt réel) :
+# ni ref ni objet n'est ajouté au dépôt réel.
 COMMON="$(cd "$REAL" && cd "$(git rev-parse --git-common-dir)" && pwd)"
 mkdir -p "$WORK/objs"
+# reel_commit <chemin> : imprime le sha d'un commit enfant de HEAD où ce fichier a un autre contenu.
+reel_commit() {
+  (cd "$REAL" && export GIT_OBJECT_DIRECTORY="$WORK/objs" GIT_ALTERNATE_OBJECT_DIRECTORIES="$COMMON/objects" GIT_INDEX_FILE="$WORK/idx" \
+    GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
+   git read-tree HEAD && blob=$(printf 'x\n' | git hash-object -w --stdin) \
+   && git update-index --add --cacheinfo "100644,$blob,$1" && tree=$(git write-tree) && git commit-tree "$tree" -p HEAD -m synth)
+}
+reel_perimetre() { (cd "$REAL" && GIT_OBJECT_DIRECTORY="$WORK/objs" GIT_ALTERNATE_OBJECT_DIRECTORIES="$COMMON/objects" bash scripts/ci-suites-perimetre.sh "$@" 2>/dev/null); }
+NREEL=$(wc -l < "$WORK/real.all" | tr -d ' ')
 CS=plugin/cockpit/scripts/tests/chrome-session.mjs
-CSFIX=$(cd "$REAL" && export GIT_OBJECT_DIRECTORY="$WORK/objs" GIT_ALTERNATE_OBJECT_DIRECTORIES="$COMMON/objects" GIT_INDEX_FILE="$WORK/idx" \
-  GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
-  git read-tree HEAD && blob=$(printf 'x\n' | git hash-object -w --stdin) \
-  && git update-index --add --cacheinfo "100644,$blob,$CS" && tree=$(git write-tree) && git commit-tree "$tree" -p HEAD -m synth)
+CSFIX=$(reel_commit "$CS")
 if [ -z "$CSFIX" ]; then
   ko "réel : commit synthétique sur chrome-session.mjs" "un sha" "vide"
 else
-  REEL_OUT=$(cd "$REAL" && GIT_OBJECT_DIRECTORY="$WORK/objs" GIT_ALTERNATE_OBJECT_DIRECTORIES="$COMMON/objects" bash scripts/ci-suites-perimetre.sh HEAD "$CSFIX" 2>/dev/null)
+  REEL_OUT=$(reel_perimetre HEAD "$CSFIX")
   mode=$(printf '%s\n' "$REEL_OUT" | head -1 | cut -f1)
   njoue=$(printf '%s\n' "$REEL_OUT" | awk -F'\t' '$1 == "jouee"' | wc -l | tr -d ' ')
   motif=$(printf '%s\n' "$REEL_OUT" | awk -F'\t' '$1 == "jouee" { print $3; exit }')
-  if [ "$mode" = "# mode=tout" ] && [ "$njoue" = "$(wc -l < "$WORK/real.all" | tr -d ' ')" ] && [ "$motif" = "tout — fichier partagé $CS" ]; then
+  if [ "$mode" = "# mode=tout" ] && [ "$njoue" = "$NREEL" ] && [ "$motif" = "tout — fichier partagé $CS" ]; then
     ok "réel : chrome-session.mjs est une bibliothèque de test partagée (→ tout, $njoue suites)"
   else
     ko "réel : chrome-session.mjs est une bibliothèque de test partagée" "mode=tout, toutes les suites, motif 'tout — fichier partagé $CS'" "$mode, $njoue suites, motif '$motif'"
   fi
 fi
+
+# reel_joue <chemin touché> <suite>… : chaque suite doit être jouée (balayeuses par motif de chemin).
+reel_joue() {
+  local f=$1 sha liste miss="" s; shift
+  sha=$(reel_commit "$f")
+  [ -n "$sha" ] || { ko "réel : commit synthétique sur $f" "un sha" "vide"; return; }
+  liste=$(reel_perimetre --liste HEAD "$sha")
+  for s in "$@"; do printf '%s\n' "$liste" | grep -qxF -e "$s" || miss="$miss $s"; done
+  if [ -z "$miss" ]; then ok "réel : $f joue $* (périmètre de $(printf '%s\n' "$liste" | wc -l | tr -d ' ') suites)"
+  else ko "réel : $f doit jouer $*" "toutes jouées" "manquantes :$miss"; fi
+}
+reel_joue plugin/dev-orchestrator/agents/vf-dev-manager.md plugin/_internal/tests/test-roles-e2e.sh plugin/conductor/scripts/tests/test-check-agents.sh
+reel_joue plugin/conductor/hooks/hooks.json plugin/cockpit/scripts/tests/test-cockpit-signal-mod.sh
+reel_joue plugin/software-architecture/module.json plugin/_internal/tests/test-module-roles.sh
+# Limite connue (rapportée, jamais compensée par une liste en dur) : test-resolve-preset.sh ne porte AUCUN motif de chemin
+# (il pose VF_MODULES_ROOT=$REPO_ROOT puis laisse resolve-preset.sh lire les module.json) ; la règle « citée par motif » ne
+# peut donc pas le retrouver depuis module.json.
 
 # --- Mutants --------------------------------------------------------------------------------------------------
 echo "== Mutants =="
@@ -252,6 +296,12 @@ muter 3  's#^      cite_files "\$name"$#      true#' "dep-compose"
 muter 4a 's#\[ "\$nondoc" -eq 0 \]#[ "$nondoc" -eq 99999 ]#' "docs"
 muter 4b 's#^done < <(awk .*classes")$#done < "$T/classes"#' "docs-gamma"
 muter 11 's#\[ "\$nj" -eq 0 \]#[ "$nj" -eq 99999 ]#' "delta"
+muter 12 's#^  grep -qxF -e "\$2" "\$T/tracked" || c=\$((c + 1))#  true#' "supprime"
+muter 13 's#\*/fixtures/\*) ;;#*/fixturesX/*) ;;#' "fixture"
+muter 14 's#test-\*\.sh) ;;#test-ZZ) ;;#' "suite-citee"
+muter 15 's#^done < "\$T/globs"#done < /dev/null#' "glob-module glob-agents"
+muter 16 's#^    \*/\*\.md) echo hors ;;#    */*.md) echo doc ;;#' "github-md"
+muter 17 's#cite_files "\${mod%%/\*}" ;; esac#true ;; esac#' "ambigu"
 muter 5  's#(p in f)#(p in zzz)#' "gamma cond-seul"
 muter 6  's# --name-only --no-renames # --name-only #' "renom"
 muter 7  's#if conductor_appele_ailleurs "\$name"; then#if false; then#' "cond-appele"
