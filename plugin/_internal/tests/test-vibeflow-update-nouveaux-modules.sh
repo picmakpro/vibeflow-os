@@ -365,5 +365,42 @@ ENG_OUT="$(cd "$LAB" && HOME="$FH" VIBEFLOW_CACHE="$IE" bash "$ENGINE" --scope p
 if [ "$ENG_RC" -ne 0 ] && [ "$(cat "$REG")" = 'alpha=v1.0.0' ] && regtmp_absent; then ok "N17i : VERSION vide → install refuse (rc≠0), registre intact"; else ko "N17i : rc=$ENG_RC registre=[$(tr '\n' '|' < "$REG" | cut -c1-70)]"; fi
 rm -rf "$LAB/.claude" "$VICTIM"
 
+# ---- N18 : registre et état « proposé » en CRLF lus comme en LF (arbitrage Samuel, AskUserQuestion session principale,
+# 2026-11-06 : « Corriger dans la release (Recommandé) »). Entrée plausible : registre versionné, checkout Windows
+# core.autocrlf=true. Rouge d'avant : le filtre de #208 jetait toute ligne finissant par \r — le registre fondait.
+CR="$(printf '\r')"
+sans_cr() { [ "$(LC_ALL=C grep -c "$CR" "$1")" = 0 ]; }
+# a : install d'un autre module sur un registre CRLF → tous les modules gardés, réécriture en LF pur
+fresh_reg; printf 'alpha=v1.0.0\r\nbeta=v2.0.0\r\nzed=INCONSISTENT:install:v2.0.0\r\n' > "$REG"; inst
+if [ "$ENG_RC" -eq 0 ] && [ "$(LC_ALL=C sort "$REG")" = "$(printf 'alpha=v1.0.0\nbeta=v2.0.0\nconductor=v1.0.0\nzed=INCONSISTENT:install:v2.0.0')" ] && sans_cr "$REG" && regtmp_absent; then ok "N18a : install sur registre CRLF → aucune ligne perdue, réécrit en LF"; else ko "N18a : attendu alpha+beta+conductor+zed en LF, reçu rc=$ENG_RC [$(tr '\r\n' '^|' < "$REG" | cut -c1-90)]"; fi
+# b : le durcissement n'est pas affaibli — lignes invalides rejetées même en CRLF ; seul le \r FINAL est normalisé
+fresh_reg; printf 'a=b=c\r\na= b\r\n\r\nUpper=v1\r\nx=a\rb\r\nalpha=v1.0.0\r\n' > "$REG"; inst
+if [ "$ENG_RC" -eq 0 ] && [ "$(LC_ALL=C sort "$REG")" = "$(printf 'alpha=v1.0.0\nconductor=v1.0.0')" ] && sans_cr "$REG"; then ok "N18b : lignes invalides (a=b=c, valeur à espace, vide, majuscules, \\r au milieu) toujours rejetées en CRLF"; else ko "N18b : attendu alpha+conductor seuls, reçu rc=$ENG_RC [$(tr '\r\n' '^|' < "$REG" | cut -c1-90)]"; fi
+# c : uninstall sur registre CRLF (même primitive)
+fresh_reg; printf 'alpha=v1.0.0\r\nconductor=v1.0.0\r\nbeta=v2.0.0\r\n' > "$REG"; unin
+if [ "$ENG_RC" -eq 0 ] && [ "$(cat "$REG")" = "$(printf 'alpha=v1.0.0\nbeta=v2.0.0')" ] && sans_cr "$REG"; then ok "N18c : uninstall sur registre CRLF → autres lignes gardées, LF"; else ko "N18c : rc=$ENG_RC [$(tr '\r\n' '^|' < "$REG" | cut -c1-90)]"; fi
+# d : update --all sur registre CRLF multi-modules ne s'arrête pas (le 1er module mis à jour réécrit le registre : les
+# suivants doivent y rester) ; versions lues sans \r (module_version_installed)
+UC="$WORK/cache18"; mkcache "$UC"; echo v1.0.1 > "$UC/conductor/VERSION"; mkmod "$UC" alpha v1.0.0; mkmod "$UC" beta v2.0.0
+updcrlf() { ENG_OUT="$(cd "$LAB" && HOME="$FH" VIBEFLOW_CACHE="$UC" bash "$ENGINE" --scope project update --all 2>"$WORK/eng.err")"; ENG_RC=$?; }
+fresh_reg; printf 'conductor=v1.0.0\r\nalpha=v1.0.0\r\nbeta=v2.0.0\r\n' > "$REG"; updcrlf
+if [ "$ENG_RC" -eq 0 ] && [ "$(LC_ALL=C sort "$REG")" = "$(printf 'alpha=v1.0.0\nbeta=v2.0.0\nconductor=v1.0.1')" ] && sans_cr "$REG" && ! printf '%s' "$ENG_OUT" | LC_ALL=C grep -q "$CR"; then ok "N18d : update --all sur registre CRLF → rc 0, aucun module perdu, registre LF, sortie sans \\r"; else ko "N18d : rc=$ENG_RC registre=[$(tr '\r\n' '^|' < "$REG" | cut -c1-80)] err=[$(head -1 "$WORK/eng.err" | cut -c1-70)]"; fi
+# d2 : module_version_installed ne rend aucun \r (verbe status, colonne « Installed »)
+fresh_reg; printf 'alpha=v1.0.0\r\n' > "$REG"; ENG_OUT="$(cd "$LAB" && HOME="$FH" VIBEFLOW_CACHE="$UC" bash "$ENGINE" --scope project status 2>/dev/null)"; ENG_RC=$?
+if [ "$ENG_RC" -eq 0 ] && ! printf '%s' "$ENG_OUT" | LC_ALL=C grep -q "$CR" && printf '%s\n' "$ENG_OUT" | grep -Eq '^alpha +v1\.0\.0 +v1\.0\.0 '; then ok "N18d2 : registre CRLF → version installée lue sans \\r (status)"; else ko "N18d2 : rc=$ENG_RC [$(printf '%s' "$ENG_OUT" | grep alpha | tr '\r' '^' | cut -c1-80)]"; fi
+# e : état « proposé » en CRLF : mark-offered et unmark-offered gardent les noms, réécrivent en LF
+mkdir -p "$LAB/.claude/scripts"; reset_lab; printf 'alpha\r\ngamma\r\n' > "$OFFERED"; eng "$CACHE5" mark-offered beta
+if [ "$ENG_RC" -eq 0 ] && [ "$(cat "$OFFERED")" = "$(printf 'alpha\nbeta\ngamma')" ] && sans_cr "$OFFERED"; then ok "N18e : mark-offered sur état CRLF → noms gardés, LF"; else ko "N18e : rc=$ENG_RC [$(tr '\r\n' '^|' < "$OFFERED" 2>/dev/null)]"; fi
+reset_lab; printf 'alpha\r\ngamma\r\n' > "$OFFERED"; eng "$CACHE5" unmark-offered gamma
+if [ "$ENG_RC" -eq 0 ] && [ "$(cat "$OFFERED")" = alpha ] && sans_cr "$OFFERED"; then ok "N18f : unmark-offered sur état CRLF → alpha gardé, LF"; else ko "N18f : rc=$ENG_RC [$(tr '\r\n' '^|' < "$OFFERED" 2>/dev/null)]"; fi
+# g : new-modules lit l'état « proposé » CRLF comme en LF : un module déjà proposé n'est pas reproposé
+mkdir -p "$LAB/.claude/scripts"; reset_lab; printf 'alpha\r\n' > "$OFFERED"; eng "$CACHE5" new-modules
+if [ "$ENG_RC" -eq 0 ] && ! printf '%s\n' "$ENG_OUT" | grep -q '^alpha='; then ok "N18g : new-modules, état « proposé » CRLF → alpha non reproposé"; else ko "N18g : alpha reproposé ou verbe en échec : rc=$ENG_RC [$(printf '%s' "$ENG_OUT" | tr '\r\n' '^|' | cut -c1-70)]"; fi
+# h : le backup d'un module d'un registre CRLF capture une .version sans \r
+fresh_reg; printf 'conductor=v1.0.0\r\nalpha=v1.0.0\r\n' > "$REG"; inst
+BV="$(ls -1d "$LAB/.claude/.backups/conductor-"*/.version 2>/dev/null | head -1)"
+if [ "$ENG_RC" -eq 0 ] && [ -n "$BV" ] && [ "$(cat "$BV")" = v1.0.0 ] && sans_cr "$BV"; then ok "N18h : backup depuis registre CRLF → .version = v1.0.0 sans \\r"; else ko "N18h : rc=$ENG_RC .version=[$( [ -n "$BV" ] && od -c "$BV" | head -1 | cut -c1-60)]"; fi
+rm -rf "$LAB/.claude" "$VICTIM"
+
 echo "== $pass ok, $fail ko =="
 [ "$fail" -eq 0 ] && [ $((pass+fail)) -gt 0 ]

@@ -199,6 +199,9 @@ const imp = (d) => import(pathToFileURL(path.join(d, 'vf-cockpit-equipe-carte.mj
 const N = (await imp(dNew)).buildEquipeGraph, Bz = (await imp(dBase)).buildEquipeGraph;
 const OPT = { nom: 'Lab', racine: '/x', logos: {} };
 const norm = (g) => { const c = JSON.parse(JSON.stringify(g)); c.meta.generatedAt = 'X'; return c; };
+// Phase 78 : buildEquipeGraph émet désormais meta.vf.missions = [] même sans option (vfGit reste absent sans option). La copie figée d'avant 72-07
+// ne connaît pas ce champ : on le réconcilie côté BASE seulement, en dernier dans meta.vf (même ordre que le module), et rien d'autre.
+const normBase = (g) => { const c = norm(g); if (!('missions' in c.meta.vf)) c.meta.vf.missions = []; return c; };
 const U = (n) => `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).repeat(12)}`;
 const S1 = U(1), S2 = U(2), S3 = U(3);
 const sess = (id, o = {}) => ({ kind: 'session', id, etat: 'actif', tree: 'arbre', source: 'transcript', ...o });
@@ -218,7 +221,7 @@ const VARS = [['absent', OPT], ['undefined', { ...OPT, lancees: undefined }], ['
   ['chaine', { ...OPT, lancees: 'x' }], ['null', { ...OPT, lancees: null }], ['nombre', { ...OPT, lancees: 42 }]];
 const noeud = (g, id) => g.nodes.find((n) => n.id === id);
 const essai = (who, lancees, id, L) => { // la ligne L juste après « État : », aucun autre champ du graphe ne change
-  const base = norm(Bz(who, OPT)); const g = norm(N(who, { ...OPT, lancees }));
+  const base = normBase(Bz(who, OPT)); const g = norm(N(who, { ...OPT, lancees }));
   const nb = noeud(base, id), ng = noeud(g, id); const lg = nb.details.split('\n\n'); const i = lg.findIndex((l) => l.startsWith('État : '));
   const attendu = [...lg.slice(0, i + 1), L, ...lg.slice(i + 1)].join('\n\n');
   const reste = JSON.stringify({ ...g, nodes: g.nodes.map((n) => (n.id === id ? { ...n, details: nb.details } : n)) }) === JSON.stringify(base);
@@ -229,7 +232,7 @@ const SC = {
   identique: () => {
     let n = 0; const diffs = [];
     for (const [jn, who] of Object.entries(JEUX)) {
-      const base = JSON.stringify(norm(Bz(who, OPT)));
+      const base = JSON.stringify(normBase(Bz(who, OPT)));
       for (const [vn, o] of VARS) { n++; let got; try { got = JSON.stringify(norm(N(who, o))); } catch (e) { got = 'EXC ' + e.message; } if (got !== base) diffs.push(jn + '/' + vn); }
     }
     return n + '|' + diffs.length + (diffs.length ? '|' + diffs.slice(0, 5).join(',') : '');
@@ -245,7 +248,7 @@ const SC = {
     const who = { workers: [...ids.map((id) => sess(id)), sess(S2)], sources: {} };
     const map = new Map(ids.map((id, i) => [id, H[i]])); map.set(S2, V('72', 'alpha', 'verifier'));
     let exc = 0, g; try { g = norm(N(who, { ...OPT, lancees: map })); } catch { exc = 1; return `exc:1`; }
-    const base = norm(Bz(who, OPT)); const nb = noeud(base, 'se-' + S2), ng = noeud(g, 'se-' + S2);
+    const base = normBase(Bz(who, OPT)); const nb = noeud(base, 'se-' + S2), ng = noeud(g, 'se-' + S2);
     const reste = JSON.stringify({ ...g, nodes: g.nodes.map((n) => (n.id === ng.id ? { ...n, details: nb.details } : n)) }) === JSON.stringify(base);
     const hostile = /\$\(|touch M|onerror|72;x|piege|constructor|alpha\\n/.test(JSON.stringify(g));
     return `exc:${exc}|reste:${reste ? 'ok' : 'ko'}|temoin:${ng.details.includes('Lancée depuis la carte : Phase 72 · alpha · Vérifier') ? 'ok' : 'ko'}|hostile:${hostile ? 'presente' : 'aucune'}`;
@@ -253,7 +256,7 @@ const SC = {
   'hors-session': () => {
     const who = { workers: [sess(S1), sess(S2), ag('agent-1')], sources: {} };
     const map = new Map([['agent-1', V('72', 'alpha', 'executer')], ['absent-id', V('72', 'alpha', 'executer')], [S2, V('72', 'alpha', 'executer')]]);
-    const base = norm(Bz(who, OPT)), g = norm(N(who, { ...OPT, lancees: map }));
+    const base = normBase(Bz(who, OPT)), g = norm(N(who, { ...OPT, lancees: map }));
     const diff = g.nodes.filter((n) => JSON.stringify(n) !== JSON.stringify(noeud(base, n.id))).map((n) => n.id);
     return `diff:${diff.join(',')}|noeuds:${g.nodes.length === base.nodes.length}|ligne:${noeud(g, 'se-' + S2).details.includes('Lancée depuis la carte : Phase 72 · alpha · Exécuter') ? 'ok' : 'ko'}`;
   },

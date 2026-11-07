@@ -400,3 +400,36 @@ ou de `vf-new-lab`.
 - **NON vérifié :** les autres éléments de la page qui se rangent à l'ouverture du tiroir.
 
 **Déclencheur de reprise :** une passe sur l'ouverture automatique du tiroir.
+
+## Cockpit : points de fusion 71.5 × 72 laissés en place à la release v2.76.0 (`vf-lancer-style`, replis `var(--sp-N, px)`, id `P27` en double) — DIFFÉRÉ (2026-11-06)
+
+**Priorité : basse.** Aucun effet visible : le rendu de la branche assemblée a été recetté et validé par Samuel (message direct en session principale, 2026-11-06 : « c'est parfait on valide. On garde ca en release. »).
+
+**Origine :** relevé de clôture de la Phase 72 (`72-BRANCHEMENTS-MERGE.md` §6) et relecture des résolutions de merge de la release v2.76.0 (2026-11-06).
+- **Laissé en place :** la feuille `<style id="vf-lancer-style">` posée à l'exécution par `poserStyleProposition` (`plugin/cockpit/scripts/vf-cockpit-terminal-vue.mjs`), à fondre dans `vf-cockpit-terminal-style.mjs` ; les deux replis `var(--sp-N, <px>)` de `vf-cockpit-lancer-style.mjs`, à retirer maintenant que les jetons d'espacement de la 71.5 sont fusionnés.
+- **Motif du report :** la mission de release n'admettait ce rangement que s'il était prouvé sans effet de rendu (captures avant/après identiques sur tous les états du bandeau de proposition) ; une autre branche partie du même commit (`feat/cockpit-retours-utilisateurs`) travaillait au même moment sur la zone basse du cockpit, le rangement y aurait créé des conflits.
+- **Id de patch en double :** dans `plugin/cockpit/skills/cockpit-moteur/VENDORED.txt`, `P27` désigne à la fois la garde `VF_COCKPIT_GIT_DURCI` de `scripts/lib/common.mjs` (Phase 78) et les patches d'espacement de la 71.5 (sept lignes) : chaque branche a pris le numéro suivant sans connaître l'autre. Ambiguïté documentaire seule, aucun gate connu ne lit ces ids (non vérifié).
+- **Affirmation héritée :** le README et le CHANGELOG du module disent que le calcul de l'arbre « sale » est reporté à la Phase 78 ; la 78 est fusionnée sans l'avoir câblé (`AVERTISSEMENTS_RESERVES` reste inactif). `LANC-12` est encore « Pending » dans `REQUIREMENTS.md` alors que la 72 est à 16/16 plans (identique au parent de la 72).
+
+**Déclencheur de reprise :** la prochaine phase qui touche le bandeau de proposition ou le style du terminal, après la fusion de `feat/cockpit-retours-utilisateurs`.
+
+## Verrou de driver par phase : trois mineurs de la relecture adverse de la release v2.76.0 — DIFFÉRÉ (2026-11-06)
+
+**Priorité : basse.** Aucun verrou orphelin observé ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 (relayé par la session principale) : au BACKLOG.
+
+**Origine :** relecture adverse SOBR-04 de la release v2.76.0 (volet hors cockpit, SHA `f0bbcf4c`).
+- **Graphie du numéro de phase :** `driver-lock.sh` (`vf_dl_phase_valid`, dossier `phases/<N>`) accepte `--phase=41.1` puis `--phase=041.1` comme deux verrous distincts, alors que `phase_covers` de `guard-driver-lock.sh` les tient pour équivalents. Sondé : deux `acquire` rendus `acquired: true`. Propriété attendue : le numéro est normalisé avant de nommer le dossier.
+- **Dossier vide :** `phases/<N>/` reste vide sous `.git/vf-driver/ws/<ws>/` après `release`. Inoffensif (`status --all`, le guard et la sonde de hiérarchie le tolèrent).
+- **Versions mixtes :** un `driver-lock.sh` de v2.75.1 ignore les verrous de phase et accorde le verrou de compartiment pendant qu'une phase est tenue. Ne vaut que si deux sessions d'un même dépôt n'ont pas la même version du plugin.
+
+**Déclencheur de reprise :** la prochaine phase qui touche `driver-lock.sh` ou `guard-driver-lock.sh`.
+
+## Mod vf-signal : version minimale de Claude Code pour ses hooks — NON MESURÉ (2026-11-06)
+
+**Priorité : basse.** Arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 (relayé par la session principale) : « Noter et reporter » — la release v2.76.0 dit seulement « mesuré sur Claude Code 2.1.319 ».
+
+**Origine :** relecture adverse SOBR-04 de la release v2.76.0 (volet cockpit, SHA `f0bbcf4c`).
+- **Observé :** `plugin/.claude-plugin/plugin.json` déclare `hooks: ./cockpit/signal/hooks/hooks.json`, au format `{modules:[...]}` ; `claude plugin validate plugin` passe sur Claude Code 2.1.319.
+- **NON mesuré :** le comportement d'un Claude Code plus ancien (fichier de hooks refusé, plugin entier refusé, ou hooks seuls ignorés) ; aucune version minimale n'est écrite pour le mod.
+
+**Déclencheur de reprise :** un utilisateur sur une version ancienne de Claude Code, ou la prochaine phase qui touche le mod vf-signal. Mesure dans un `HOME` jetable avec une version ancienne installée à part.

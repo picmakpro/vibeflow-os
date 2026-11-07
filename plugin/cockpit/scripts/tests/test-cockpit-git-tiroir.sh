@@ -749,9 +749,9 @@ await s.ev(`(() => { const w = window.__vfGit.reponse.worktrees.find((x) => !x.i
 await s.ev(`document.querySelector('#vf-git-ligne').click()`);
 await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l .vf-git-etat-wt').length === 3`, 'tiroir ouvert, états des worktrees');
 await s.ev(`document.querySelector('.vf-git-sec-t[aria-controls="vf-git-s-aut"]').click()`);
-// G4 : remplissage de barre = texte neutre ; la même classe hors du tiroir reste telle quelle
+// G4 : remplissage de barre DANS le tiroir = texte neutre, jamais le vert d'état (--st-done). Témoin d'existence : la barre est là et a une largeur. `hors` (la même classe hors du tiroir) n'est pas affirmé : le thème global la rend neutre aussi (71.5), il ne sert qu'à prouver, par mutant, que le thème global a bien été recoloré.
 out.barre = await s.ev(`(() => { const i = document.querySelector('#vf-git-s-aut .vf-bar i'), p = document.createElement('div'); p.className = 'vf-bar'; p.appendChild(document.createElement('i')); document.body.appendChild(p);
-  const hors = getComputedStyle(p.firstChild).backgroundColor; p.remove(); return { dans: getComputedStyle(i).backgroundColor, neutre: window.__couleur('--text-3'), hors }; })()`);
+  const hors = getComputedStyle(p.firstChild).backgroundColor; p.remove(); return { existe: !!i, largeur: i ? i.getBoundingClientRect().width : 0, dans: i ? getComputedStyle(i).backgroundColor : null, neutre: window.__couleur('--text-3'), vert: window.__couleur('--st-done'), hors }; })()`);
 // G5 : contrastes (composition alpha des fonds jusqu'au premier fond opaque), deux thèmes
 const mesure = `(() => { const num = (c) => (c.match(/[\\d.]+/g) || []).map(Number), over = (f, b) => { const a = f[3] == null ? 1 : f[3]; return [0, 1, 2].map((k) => f[k] * a + b[k] * (1 - a)).concat(1); };
   const fond = (e) => { const L = []; for (let n = e; n; n = n.parentElement) { const c = num(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c[3] == null || c[3] > 0)) { L.push(c); if (c[3] == null || c[3] === 1) break; } } let b = [255, 255, 255, 1]; if (L.length && (L[L.length - 1][3] == null || L[L.length - 1][3] === 1)) b = L.pop().slice(0, 3).concat(1); while (L.length) b = over(L.pop(), b); return b; };
@@ -788,7 +788,7 @@ JS
   { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d15.js"; } > "$AUX/d15-complet.js"
   R15="$(cdp "$AUX/d15-complet.js" "$BASE")"
   [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$R15" > "$TIROIR_TRACE-d15.json"
-  assert_eq "D15.1 — barres d'activité : remplissage en texte neutre (--text-3), jamais le vert d'état ; la même classe hors du tiroir garde son fond" "$(jq_ "$R15" '[j.barre.dans === j.barre.neutre, j.barre.hors !== j.barre.neutre].join("|")' 2>/dev/null)" "true|true"
+  assert_eq "D15.1 — barres d'activité DANS le tiroir : remplissage en texte neutre (--text-3), jamais le vert d'état (--st-done) ; la barre existe, a une largeur, et le neutre est distinct du vert d'état" "$(jq_ "$R15" '[j.barre.existe, j.barre.largeur > 0, j.barre.dans === j.barre.neutre, j.barre.neutre !== j.barre.vert].join("|")' 2>/dev/null)" "true|true|true|true"
   assert_eq "D15.2 — contraste >= 4,5:1 en sombre : « Aucune commande proposée », pilules .meta, kbd « g », pastilles" "$(jq_ "$R15" 'Object.values(j.sombre).every((v) => v >= 4.5) ? "ok" : JSON.stringify(j.sombre)' 2>/dev/null)" "ok"
   assert_eq "D15.2a — témoin : la mesure « sombre » est faite en thème sombre et la mesure « clair » en thème clair (le thème n'est jamais laissé à prefers-color-scheme du poste), les deux jeux de rapports diffèrent" "$(jq_ "$R15" '[j.themes.join("/"), JSON.stringify(j.sombre) !== JSON.stringify(j.clair)].join("|")' 2>/dev/null)" "dark/light|true"
   assert_eq "D15.3 — contraste >= 4,5:1 en clair : mêmes éléments" "$(jq_ "$R15" 'Object.values(j.clair).every((v) => v >= 4.5) ? "ok" : JSON.stringify(j.clair)' 2>/dev/null)" "ok"
@@ -802,6 +802,12 @@ JS
   mutant() { # mutant <nom> <fichier ui> <ancien> <nouveau> <scénario> [nogit] -> RM (une ligne JSON) ; une mutation impossible compte comme un échec
     local M L; M="$(mkmod "$1")"; L="$(mutlab "$1" "${6:-}")"
     if ! mutate "$M/../skills/cockpit-moteur/assets/ui/$2" "$3" "$4"; then echo "  ❌ FAIL — $1 : mutation impossible"; FAIL=$((FAIL+1)); RM="{}"; return; fi
+    # MUT_AUX="fichier ui|ancien|nouveau" : seconde mutation sur un autre fichier (mutant à deux fichiers) ; elle aussi doit s'appliquer, sinon échec
+    if [ -n "${MUT_AUX:-}" ]; then local af ao an; IFS='|' read -r af ao an <<EOF
+$MUT_AUX
+EOF
+      if ! mutate "$M/../skills/cockpit-moteur/assets/ui/$af" "$ao" "$an"; then echo "  ❌ FAIL — $1 : mutation auxiliaire impossible"; FAIL=$((FAIL+1)); RM="{}"; return; fi
+    fi
     build_serve "$L" "$M"; RM="$(cdp "$AUX/$5" "http://127.0.0.1:$PORT")"; stop_srv
     [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$RM" > "$TIROIR_TRACE-$1.json"
   }
@@ -831,8 +837,12 @@ JS
   assert_eq "M-AVANCE-WT — rougit D13.3 (la pastille d'un worktree à avance inconnue redit « ↑0 ») alors que les branches D13.1 tiennent" "$(jq_ "$RM" '[j.wt, (j.branches.find((b) => b.nom === "feat/inconnue") || {}).txt].join("|")' 2>/dev/null)" "↑0 ↓1|—"
   mutant M-ECHEC-DIT 77-vf-git-vue-detail.js $'echecDit = false;\n      if (g.change || w.change)' $'if (g.change || w.change)' d14-complet.js
   assert_eq "M-ECHEC-DIT — rougit D14.2 (le drapeau ne retombe plus au succès : le second échec n'est pas annoncé) alors que le premier échec (D14.1) l'est" "$(jq_ "$RM" '[j.echec1.length, j.succes.some((x) => /indisponible/.test(x)), j.echec2.length].join("|")' 2>/dev/null)" "1|false|0"
-  mutant M-BARRE-VERT 77-vf-git-tiroir.js "#vf-git-tiroir .vf-bar i { background: var(--text-3); }" "" d15-complet.js
-  assert_eq "M-BARRE-VERT — rougit D15.1 (la barre retrouve le vert d'état de .vf-bar) alors que la barre existe et que la même classe hors du tiroir est intacte" "$(jq_ "$RM" '[j.barre.dans === j.barre.neutre, j.barre.hors !== j.barre.neutre].join("|")' 2>/dev/null)" "false|true"
+  VERT_GLOBAL="00-vibeflow.js|.vf-bar i { display: block; height: 100%; border-radius: 99px; background: var(--text-3); }|.vf-bar i { display: block; height: 100%; border-radius: 99px; background: var(--st-done); }"
+  MUT_AUX="$VERT_GLOBAL" mutant M-BARRE-VERT 77-vf-git-tiroir.js "#vf-git-tiroir .vf-bar i { background: var(--text-3); }" "" d15-complet.js; MUT_AUX=
+  assert_eq "M-BARRE-VERT — thème global recoloré au vert d'état ET règle du tiroir retirée : rougit D15.1 (la barre du tiroir prend le vert d'état) alors que la barre existe et que le vert d'état est distinct du neutre" "$(jq_ "$RM" '[j.barre.existe, j.barre.dans === j.barre.neutre, j.barre.dans === j.barre.vert, j.barre.neutre !== j.barre.vert].join("|")' 2>/dev/null)" "true|false|true|true"
+  # preuve que la règle du tiroir porte la charge : thème global recoloré SEUL (règle du tiroir intacte) -> la barre du tiroir reste neutre alors que la même classe hors du tiroir est bien devenue verte (témoin que le mutant global est effectif)
+  MUT_AUX="$VERT_GLOBAL" mutant M-BARRE-THEME-SEUL 77-vf-git-tiroir.js "#vf-git-tiroir .vf-bar i { background: var(--text-3); }" "#vf-git-tiroir .vf-bar i { background: var(--text-3); }" d15-complet.js; MUT_AUX=
+  assert_eq "M-BARRE-THEME-SEUL — thème global recoloré au vert d'état, règle du tiroir intacte : D15.1 reste verte (barre du tiroir neutre) pendant que la même classe hors du tiroir est devenue verte (la règle du tiroir porte la charge)" "$(jq_ "$RM" '[j.barre.existe, j.barre.dans === j.barre.neutre, j.barre.hors === j.barre.vert, j.barre.hors !== j.barre.neutre].join("|")' 2>/dev/null)" "true|true|true|true"
   mutant M-CONTRASTE-SANS 77-vf-git-tiroir.js ".vf-git-sans { font-size: 11.5px; color: var(--text-2); }" ".vf-git-sans { font-size: 11.5px; color: var(--text-4); }" d15-complet.js
   assert_eq "M-CONTRASTE-SANS — rougit D15.2 sur « Aucune commande proposée » seule (sous 4,5:1) alors que les pilules et le kbd tiennent" "$(jq_ "$RM" '[j.sombre.sans < 4.5, j.sombre.meta >= 4.5, j.sombre.kbd >= 4.5].join("|")' 2>/dev/null)" "true|true|true"
   mutant M-LIVE-DOUBLE 77-vf-git-vue-detail.js "let l = tiroir && tiroir.querySelector('.vf-git-live');" "let l = tiroir && tiroir.querySelector('.vf-git-live-det'); if (!l && tiroir) { l = el('div', 'vf-git-live vf-git-live-det', null, { 'aria-live': 'polite' }); tiroir.appendChild(l); }" d15-complet.js

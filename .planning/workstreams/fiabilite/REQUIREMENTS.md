@@ -1026,7 +1026,6 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | LANC-10 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
 | LANC-11 | Phase 72 | Complete — 2026-11-06 (suites vertes, audit du lot 3 SECURED ; phase non close avant le merge de la PR) |
 | LANC-12 | Phase 72 | Pending — 2026-11-05 (planification) |
-
 | GITC-01 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
 | GITC-02 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |
 | GITC-03 | Phase 78 | Complete — 2026-11-06 (Phase 78, branche feat/phase-78-git-cockpit ; revue, audit en lecture, critique design et recette par juges navigateur) |

@@ -516,8 +516,6 @@ Plans:
 **Vague 5**
 - [x] 72-15-PLAN.md — Documentation et bump unique du module cockpit (LANC-12)
 
-- [ ] TBD (run /gsd-plan-phase 72 to break down)
-
 ### Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git
 
 > **Cadrée le 2026-11-05** (`78-CONTEXT.md`, P78-D-01..26 ; arbitrages Samuel, AskUserQuestion session principale Claude Code, 2026-11-05 ). Inscrite le 2026-11-05 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Nouvelle Phase 73 « Git », en parallèle de la 72 (Recommandé) », libellé de l'option : « La numérotation se cale sur ce qu'il a déjà pris »). Les numéros 73 à 77 étant déjà réservés par la branche `docs/jalon-v2-phases-73-77` (non mergée), la phase prend le numéro 78. Exécutée en parallèle de la 72 (demande de Samuel, session principale, 2026-11-05 : « Ensuite on enchaîne […] avec un maximum de parallélisation. On enlève la restriction d'un seul manager »).
