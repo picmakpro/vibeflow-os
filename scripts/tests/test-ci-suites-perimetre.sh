@@ -56,6 +56,7 @@ put plugin/beta/OWN.txt 'o'
 put plugin/beta/scripts/tests/test-beta-own-txt.sh 'cat OWN.txt'
 put plugin/beta/scripts/tests/test-beta-sweep.sh 'for f in "$PLUGIN"/*/module.json; do cat "$f"; done'
 put plugin/beta/scripts/tests/test-beta-sweep-agents.sh "find plugin/*/agents -name '*.md'"
+put plugin/beta/scripts/tests/test-beta-hooks-dir.sh 'ls plugin/*/hooks/'
 put plugin/beta/scripts/tests/test-beta-mod-seul.sh 'cat VERSION; ls alpha'
 put plugin/alpha/scripts/tests/test-alpha-two.sh 'echo deux; cat fixtures/fx.txt'
 put plugin/beta/scripts/beta.sh 'bash plugin/conductor/scripts/called.sh'
@@ -75,7 +76,7 @@ G add -A && G commit -q -m base && G tag base
 
 # mkcase <branche> <commandes> : une branche issue de base portant un commit.
 mkcase() { local b=$1; G checkout -q -B "$b" base && (cd "$REPO" && eval "$2") >/dev/null 2>&1 && G add -A && G commit -q -m "$b"; }
-mkcase c-docs        'echo plus >> docs/x.md; echo plus >> .planning/p.md; echo plus >> README.md'
+mkcase c-docs        'echo plus >> docs/x.md; echo plus >> .planning/p.md; echo plus >> README.md; mkdir -p .claude/agent-memory/x; echo m > .claude/agent-memory/x/m.md'
 mkcase c-delta       'echo plus >> plugin/delta/scripts/delta.sh'
 mkcase c-gamma       'echo plus >> plugin/gamma/scripts/gamma.sh'
 mkcase c-docs-gamma  'echo c > docs/note-unique.txt; echo plus >> plugin/gamma/scripts/gamma.sh'
@@ -93,6 +94,7 @@ mkcase c-md-plugin   'echo plus > plugin/alpha/NOTES.md'
 mkcase c-github-md   'mkdir -p .github; echo x > .github/x.md'
 mkcase c-glob-module 'echo plus >> plugin/gamma/module.json'
 mkcase c-glob-agents 'mkdir -p plugin/alpha/agents; echo x > plugin/alpha/agents/vf.md'
+mkcase c-hooks-dir   'mkdir -p plugin/alpha/hooks; echo x > plugin/alpha/hooks/h.json'
 mkcase c-supprime    'git rm -q plugin/alpha/OWN.txt'
 mkcase c-fixture     'echo plus >> plugin/alpha/scripts/tests/fixtures/fx.txt'
 mkcase c-suite-citee 'echo plus >> plugin/alpha/scripts/tests/test-alpha-two.sh'
@@ -108,13 +110,14 @@ B1=plugin/beta/scripts/tests/test-beta-ambig-dir.sh;  B2=plugin/beta/scripts/tes
 B3=plugin/beta/scripts/tests/test-beta-dep-compose.sh; B4=plugin/beta/scripts/tests/test-beta-dep-path.sh
 B5=plugin/beta/scripts/tests/test-beta-own.sh
 B6=plugin/beta/scripts/tests/test-beta-mod-seul.sh;   B7=plugin/beta/scripts/tests/test-beta-own-txt.sh
+B10=plugin/beta/scripts/tests/test-beta-hooks-dir.sh
 B8=plugin/beta/scripts/tests/test-beta-sweep.sh;       B9=plugin/beta/scripts/tests/test-beta-sweep-agents.sh
 C1=plugin/conductor/scripts/tests/test-conductor-own.sh
 G1=plugin/gamma/scripts/tests/test-gamma-own.sh
 S1=scripts/tests/test-misc.sh
 
 E() { printf '%s|%s\n' "$1" "$2"; }
-TOUS() { local s; for s in $A1 $A2 $B1 $B2 $B3 $B4 $B5 $B6 $B7 $B8 $B9 $C1 $G1 $S1; do E "$s" "$1"; done; }
+TOUS() { local s; for s in $A1 $A2 $B1 $B2 $B3 $B4 $B5 $B6 $B7 $B8 $B9 $B10 $C1 $G1 $S1; do E "$s" "$1"; done; }
 
 # --- Exécution et vérification ---------------------------------------------------------------------------------
 SCRIPT_UNDER="$SCRIPT"
@@ -161,12 +164,13 @@ $OUT"
   # Une sortie vide avec un rc inattendu n'est pas « bien formée » pour un mutant qui aurait cessé de tourner.
 }
 
-NOMS="github-md glob-module glob-agents supprime fixture suite-citee docs vide delta gamma docs-gamma dep-path dep-compose ambigu partage lib cond-appele cond-seul renom hors-version hors-reference md-plugin tout liste-selection liste-tout sha-inconnu head-inconnu usage-vide usage-un usage-tout usage-option usage-trop"
+NOMS="hooks-dir github-md glob-module glob-agents supprime fixture suite-citee docs vide delta gamma docs-gamma dep-path dep-compose ambigu partage lib cond-appele cond-seul renom hors-version hors-reference md-plugin tout liste-selection liste-tout sha-inconnu head-inconnu usage-vide usage-un usage-tout usage-option usage-trop"
 run_case() {
   case "$1" in
     github-md) verifie_perimetre c-github-md tout "$(TOUS 'tout — hors carte .github/x.md')" ;;
     glob-module) verifie_perimetre c-glob-module selection "$(E $G1 'module gamma — plugin/gamma/module.json'; E $B8 'citée — plugin/gamma/module.json (motif plugin/*/module.json)')" ;;
     glob-agents) verifie_perimetre c-glob-agents selection "$(E $A1 'module alpha — plugin/alpha/agents/vf.md'; E $A2 'module alpha — plugin/alpha/agents/vf.md'; E $B9 'citée — plugin/alpha/agents/vf.md (motif plugin/*/agents)')" ;;
+    hooks-dir) verifie_perimetre c-hooks-dir selection "$(E $A1 'module alpha — plugin/alpha/hooks/h.json'; E $A2 'module alpha — plugin/alpha/hooks/h.json'; E $B10 'citée — plugin/alpha/hooks/h.json (motif plugin/*/hooks/)')" ;;
     supprime) verifie_perimetre c-supprime selection "$(E $A1 'module alpha — plugin/alpha/OWN.txt'; E $A2 'module alpha — plugin/alpha/OWN.txt')" ;;
     fixture) verifie_perimetre c-fixture selection "$(E $A1 'module alpha — plugin/alpha/scripts/tests/fixtures/fx.txt'; E $A2 'module alpha — plugin/alpha/scripts/tests/fixtures/fx.txt')" ;;
     suite-citee) verifie_perimetre c-suite-citee selection "$(E $A1 'module alpha — plugin/alpha/scripts/tests/test-alpha-two.sh'; E $A2 'module alpha — plugin/alpha/scripts/tests/test-alpha-two.sh'; E $B5 'citée — plugin/alpha/scripts/tests/test-alpha-two.sh'; E $C1 'citée — plugin/alpha/scripts/tests/test-alpha-two.sh')" ;;
@@ -302,6 +306,8 @@ muter 14 's#test-\*\.sh) ;;#test-ZZ) ;;#' "suite-citee"
 muter 15 's#^done < "\$T/globs"#done < /dev/null#' "glob-module glob-agents"
 muter 16 's#^    \*/\*\.md) echo hors ;;#    */*.md) echo doc ;;#' "github-md"
 muter 17 's#cite_files "\${mod%%/\*}" ;; esac#true ;; esac#' "ambigu"
+muter 18 's#^      \*/) m="\$pat\*" ;;#      */) m="$pat" ;;#' "hooks-dir"
+muter 19 's#docs/\*|\.planning/\*|\.claude/agent-memory/\*) echo doc#docs/*|.planning/*) echo doc#' "docs"
 muter 5  's#(p in f)#(p in zzz)#' "gamma cond-seul"
 muter 6  's# --name-only --no-renames # --name-only #' "renom"
 muter 7  's#if conductor_appele_ailleurs "\$name"; then#if false; then#' "cond-appele"
