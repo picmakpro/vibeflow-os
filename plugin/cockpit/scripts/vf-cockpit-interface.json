@@ -103,6 +103,12 @@
     },
     "transcriptSousAgent": {
       "requis": ["isSidechain", "agentId"]
+    },
+    "transcriptTitre": {
+      "type": "custom-title",
+      "champ": "customTitle",
+      "typeChamp": "string",
+      "refuse": ["ai-title"]
     }
   }
 }

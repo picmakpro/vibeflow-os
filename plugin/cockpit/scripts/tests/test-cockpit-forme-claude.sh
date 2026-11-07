@@ -3,7 +3,7 @@
 # (CKPT-27 ; P69-D-22) : une fixture conforme de forme réelle, puis une fixture amputée par champ ; un champ disparu
 # rend la source forme-inconnue, jamais un arbre faux.
 #   F0  fixture conforme (m, w, t listés, source lue) · F1 à F10 une amputation par champ lu (agent absent ET source forme-inconnue)
-#   F11 le contrat déclare chaque champ lu · F12 parent absent du dossier · F13 le manager de profondeur 1 sans parentAgentId reste listé
+#   F11 le contrat déclare chaque champ lu (dont custom-title, F11.7 à F11.10) · F12 parent absent du dossier · F13 le manager de profondeur 1 sans parentAgentId reste listé
 #   F14 35 vieux meta.json dégradés hors fenêtre ne changent rien · F15 forme arrêtée {agentType, stoppedByUser}
 #   F16 coût de collecte à l'échelle du poste : zéro ouverture hors fenêtre sur 1 000 meta.json
 # Le code testé est chargé depuis le dossier de ce script (jamais depuis le répertoire courant).
@@ -149,6 +149,17 @@ assert_eq "F11.3 — booleensFacultatifs contient finished" "$(G "$IFACE" '(j.cl
 assert_eq "F11.4 — transcriptSousAgent.requis = isSidechain,agentId" "$(G "$IFACE" '(j.claudeCode.transcriptSousAgent?.requis||[]).join(",")')" "isSidechain,agentId"
 assert_eq "F11.5 — verifieSur est de forme N.N.N" "$(G "$IFACE" '/^[0-9]+[.][0-9]+[.][0-9]+$/.test(j.claudeCode.verifieSur)')" "true"
 assert_eq "F11.6 — formeArretee.requis = agentType,stoppedByUser" "$(G "$IFACE" '(j.claudeCode.metaSousAgent?.formeArretee?.requis||[]).join(",")')" "agentType,stoppedByUser"
+# PU-G-162 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : la forme `custom-title` lue par la collecte (vf-cockpit-lecture.mjs) est déclarée au contrat ; `ai-title` n'y entre jamais.
+assert_eq "F11.7 — transcriptTitre déclare type custom-title, champ customTitle (chaîne)" "$(G "$IFACE" '[j.claudeCode.transcriptTitre?.type,j.claudeCode.transcriptTitre?.champ,j.claudeCode.transcriptTitre?.typeChamp].join(",")')" "custom-title,customTitle,string"
+assert_eq "F11.8 — ai-title est refusé au contrat (refuse) et n'est ni type ni champ lu" "$(G "$IFACE" '(t=>(t.refuse||[]).includes("ai-title")&&![t.type,t.champ].some(x=>/ai-?title/i.test(String(x))))(j.claudeCode.transcriptTitre||{})')" "true"
+assert_eq "F11.9 — la collecte lit exactement la forme déclarée (type et champ dans vf-cockpit-lecture.mjs, ai-title jamais lu)" "$(node -e '
+const fs=require("fs");const c=JSON.parse(fs.readFileSync(process.argv[1],"utf8")).claudeCode.transcriptTitre||{};
+const src=fs.readFileSync(process.argv[2],"utf8").split("\n").filter(l=>!/^\s*\/\//.test(l)).join("\n");
+console.log(c.type&&c.champ&&src.includes("d.type === \x27"+c.type+"\x27 && typeof d."+c.champ+" === \x27string\x27")&&!/d\.type === .ai-title./.test(src)&&!/d\.aiTitle/.test(src))' "$IFACE" "$SCRIPTS/vf-cockpit-lecture.mjs")" "true"
+assert_eq "F11.10 — types/index.d.ts : SignalWorker porte titre?: string, et who@2.travailleur.optionnels déclare titre" "$(node -e '
+const fs=require("fs");const d=fs.readFileSync(process.argv[2],"utf8");const m=d.match(/export type SignalWorker = \{[^}]*\}/);
+const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8")).schemas["vibeflow/cockpit-who@2"].travailleur.optionnels;
+console.log(!!m&&/^\s*titre\?: string$/m.test(m[0])&&j.includes("titre"))' "$IFACE" "$SCRIPTS/../signal/types/index.d.ts")" "true"
 
 echo "=== F12 — parentAgentId désignant un agent absent du dossier ==="
 whofx F12

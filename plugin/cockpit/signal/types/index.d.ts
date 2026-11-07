@@ -106,6 +106,8 @@ export type SignalWorker = {
   source: string
   role?: string
   task?: string
+  /** Le nom donné à la session avec /rename (`custom-title` du transcript), jamais l'`ai-title`. */
+  titre?: string
   parent?: string
   branch?: string
   ageS?: number
