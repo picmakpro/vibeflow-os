@@ -150,7 +150,7 @@ function scriptTiroir(cfg, accepte, construire) {
         (visible ? ouvreur : d.pastille).focus();
       };
       // 72-14 : mot fixe de Q ; ouvrir est idempotent et ne donne jamais le focus au cadre, puis l'annonce seule est dite
-      const proposer = () => { ouvrir(false); annoncer(T.annonceProposition); };
+      const proposer = () => { ouvrir(false); if (!plein && h < 300) { h = borne(300); appliquer(); } annoncer(T.annonceProposition); };
       const basculerPlein = () => {
         plein = !plein; d.region.classList.toggle('vf-term-plein-etat', plein);
         d.boutonPlein.setAttribute('aria-pressed', String(plein)); d.boutonPlein.setAttribute('aria-label', plein ? T.reduire : T.agrandir); d.boutonPlein.title = d.boutonPlein.getAttribute('aria-label');

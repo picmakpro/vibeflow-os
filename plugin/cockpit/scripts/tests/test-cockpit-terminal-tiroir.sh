@@ -318,6 +318,33 @@ await executer(chrome, async (s) => {
       await deQ('proposition' + 'x'.repeat(9989)); r.hostile.long = await clos();
       await deQ('proposition'); r.hostile.vivant = await attOuvre(); // témoin positif : le canal de Q vit, les refus ci-dessus ne sont pas un harnais mort
     });
+    if (A.hauteur) await essai('hauteur', async () => { // PU-G-136 : une proposition ouvre le tiroir à 300 px au moins, sans écraser la hauteur choisie, jamais en plein écran
+      const MES = `({ ouvert: ${OUVERT}, now: Number(document.querySelector('.vf-term-poignee').getAttribute('aria-valuenow')), px: Math.round(document.querySelector('.vf-term-tiroir').getBoundingClientRect().height), memo: localStorage.getItem('vf.terminal.h'), plein: document.querySelector('.vf-term-tiroir').classList.contains('vf-term-plein-etat') })`;
+      const fermer = async () => { if (await s.ev(OUVERT)) { await clic('.vf-term-fermer'); await att(`!(${OUVERT})`, 'tiroir fermé'); } };
+      const ouvrirP = async () => { if (!(await s.ev(OUVERT))) { await clic('button.vf-term-pastille'); await att(OUVERT, 'tiroir ouvert'); } };
+      const regler = async (grands, petits) => { // Home = 160 px, Maj+flèche = 96 px, flèche = 24 px ; mémorisé par la poignée
+        await ouvrirP(); await s.ev(`document.querySelector('.vf-term-poignee').focus()`); await touche('Home', 'Home', 36);
+        for (let i = 0; i < grands; i++) await touche('ArrowUp', 'ArrowUp', 38, 8);
+        for (let i = 0; i < petits; i++) await touche('ArrowUp', 'ArrowUp', 38);
+      };
+      const evenement = () => s.ev(`document.dispatchEvent(new Event('vf-lancer-propose'))`);
+      const message = () => deQ('proposition');
+      const cas = async (nom, grands, petits, chemin, plein) => {
+        await fermer(); await regler(grands, petits);
+        if (plein) await clic('.vf-term-plein');
+        await fermer(); const avant = await s.ev(MES);
+        await chemin(); await attOuvre(); await pause(400);
+        const apres = await s.ev(MES); r.haut[nom] = { avantNow: avant.now, avantMemo: avant.memo, ...apres };
+        if (plein) { await clic('.vf-term-plein'); }
+      };
+      r.haut = {};
+      await cas('bas-evt', 0, 0, evenement, false);
+      await cas('bas-msg', 0, 0, message, false);
+      await cas('haut-evt', 2, 3, evenement, false);
+      await cas('haut-msg', 2, 3, message, false);
+      await cas('plein-evt', 0, 0, evenement, true);
+      await cas('plein-msg', 0, 0, message, true);
+    });
     r.violations = [...s.violations];
     return r;
   }
@@ -641,6 +668,11 @@ run_flag() { # run_flag <sortie> <court 0|1> -> FJ FP FQ ; un serveur neuf, un a
   FJ="$(navig flag "{\"P\":$FP,\"Q\":$FQ,\"amorce\":\"$AMORCE\",\"marqueur\":\"$FMARQ\",\"fichierPid\":\"$WORK/run/shell.pid\",\"fichierM\":\"$WORK/run/m.txt\",\"TA\":\"$TA\",\"liste\":$LISTE_JSON,\"court\":$2}")"; unsrv
 }
 
+run_haut() { # run_haut <sortie> -> PJ ; comme run_prop, avec en plus le scénario de hauteur (PU-G-136)
+  srv "$1" 1; rm -f "$WORK/run/shell.pid"
+  PJ="$(navig proposition "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"fichierPid\":\"$WORK/run/shell.pid\",\"liste\":$LISTE_JSON,\"hauteur\":true}")"; unsrv
+}
+
 run_prop() { # run_prop <sortie> -> PJ ; un serveur neuf, un amorçage neuf, un Chrome neuf (72-14 : valeur fixe proposition)
   srv "$1" 1; rm -f "$WORK/run/shell.pid"
   PJ="$(navig proposition "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"fichierPid\":\"$WORK/run/shell.pid\",\"liste\":$LISTE_JSON}")"; unsrv
@@ -885,6 +917,27 @@ mut_prop_nav() { # mut_prop_nav <libellé> <nom> <expression-sed> <expression de
 mut_prop_nav TP.10 M-LISTE-SANS-PROPOSITION "s|, 'proposition'\]);|]);|" '!(j.ouvre1&&j.ouvre1.ouvert)' "le tiroir ne s'ouvre plus (liste sans la valeur)"
 mut_prop_nav TP.11 M-PROPOSITION-COMME-ETAT 's|else if (e.data === .proposition.) proposer();||' '!(j.ouvre1&&j.ouvre1.barre==="Connecté")' "la barre perd son libellé « Connecté »"
 mut_prop_nav TP.12 M-FOCUS-VOLE 's|const proposer = () => { ouvrir(false);|const proposer = () => { ouvrir(true);|' '!(j.ouvre1&&j.ouvre1.focus==="temoin")' "le focus passe au cadre"
+
+echo "=== TH — la proposition ouvre le tiroir à 300 px au moins (PU-G-136) ==="
+run_haut "$OUT"; PH="$PJ"
+HV() { rj "$PH" "(()=>{const c=j.haut&&j.haut['$1'];if(!c)return 'absent';$2})()"; }
+assert_eq "TH.0 — témoin : aucune étape en erreur, les six cas ont été mesurés" "$(rj "$PH" '(j.erreur||JSON.stringify(j.erreurs))+" cas="+Object.keys(j.haut||{}).length')" "{} cas=6"
+for ch in evt msg; do
+  assert_eq "TH.1 ($ch) — tiroir fermé réglé à 160 px : la proposition l'ouvre à 300 px au moins (avant : 160), hauteur mesurée ET aria-valuenow" "$(HV bas-$ch 'return "avant="+c.avantNow+" ouvert="+c.ouvert+" now="+(c.now>=300)+" px="+(c.px>=300)')" "avant=160 ouvert=true now=true px=true"
+  assert_eq "TH.2 ($ch) — tiroir réglé à 424 px : la proposition le laisse à 424 (jamais réduit)" "$(HV haut-$ch 'return "avant="+c.avantNow+" now="+c.now+" px="+c.px')" "avant=424 now=424 px=424"
+  assert_eq "TH.3 ($ch) — la hauteur mémorisée (vf.terminal.h) n'est pas touchée par le rehaussement : 160 avant, 160 après (cas bas) ; 424 avant, 424 après (cas haut)" "$(HV bas-$ch 'return c.avantMemo+"/"+c.memo') $(HV haut-$ch 'return c.avantMemo+"/"+c.memo')" "160/160 424/424"
+  assert_eq "TH.4 ($ch) — plein écran : la proposition ne rehausse pas (hauteur interne restée à 160, état plein conservé)" "$(HV plein-$ch 'return "avant="+c.avantNow+" now="+c.now+" plein="+c.plein+" ouvert="+c.ouvert+" memo="+c.memo')" "avant=160 now=160 plein=true ouvert=true memo=160"
+done
+mut_haut() { # mut_haut <libellé> <nom> <expression-sed> <expression de rougissement>
+  if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
+    run_haut "$MUT_OUT"
+    assert_eq "$1 $2 — le mutant rougit : $5 (témoin : aucune erreur de scénario)" "$(rj "$PJ" '(j.erreur||JSON.stringify(j.erreurs))+" rouge="+('"$4"')')" "{} rouge=true"
+  else sans_effet "$1 $2"; fi
+}
+mut_haut TH.9 M-HAUT-SANS-REHAUSSEMENT 's|if (!plein \&\& h < 300) { h = borne(300); appliquer(); }||' 'j.haut["bas-evt"].now<300&&j.haut["bas-msg"].now<300' "le tiroir reste sous 300 px par les deux chemins"
+mut_haut TH.10 M-HAUT-ECRASE-MEMO 's|h = borne(300); appliquer(); }|h = borne(300); appliquer(); memoH(); }|' 'j.haut["bas-evt"].memo!=="160"' "la hauteur mémorisée est écrasée"
+mut_haut TH.11 M-HAUT-REDUIT 's|if (!plein \&\& h < 300) { h = borne(300)|if (!plein) { h = borne(300)|' 'j.haut["haut-evt"].now!==424' "un tiroir à 424 px est ramené à 300"
+mut_haut TH.12 M-HAUT-EN-PLEIN 's|if (!plein \&\& h < 300)|if (h < 300)|' 'j.haut["plein-evt"].now>=300' "le plein écran est rehaussé"
 fi
 
 vf_hyg_assert
