@@ -448,8 +448,8 @@ await executer(chrome, async (sp) => {
       await s.send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
       const cond = `(() => { const m = ${TXT}.match(/WINCH (\\d+)x(\\d+)/g); if (!m) return false; const d = m[m.length - 1].match(/(\\d+)x(\\d+)/); return Number(d[1]) === document.querySelector('.xterm-rows').childElementCount; })()`;
       await att(cond, 'WINCH <lignes>x<colonnes> aux dimensions de la grille');
-      r.winch = await s.ev(`(() => { const m = ${TXT}.match(/WINCH (\\d+x\\d+)/g); return m[m.length - 1].slice(6); })()`);
-      r.lignes = await s.ev(`document.querySelector('.xterm-rows').childElementCount`);
+      const lu = JSON.parse(await s.ev(`(() => { const m = ${TXT}.match(/WINCH (\\d+x\\d+)/g); return JSON.stringify({ winch: m[m.length - 1].slice(6), lignes: document.querySelector('.xterm-rows').childElementCount }); })()`)); // les deux valeurs se lisent dans le même instant : un WINCH de plus entre deux lectures séparées les désaccordait une fois sur deux en CI Linux (runs 42386847278 et 42396920032)
+      r.winch = lu.winch; r.lignes = lu.lignes;
     });
     await essai('sigint', async () => {
       await touche({ key: 'c', code: 'KeyC', windowsVirtualKeyCode: 67, modifiers: 2 });
