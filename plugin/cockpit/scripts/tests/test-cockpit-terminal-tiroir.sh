@@ -290,7 +290,7 @@ await executer(chrome, async (s) => {
     await essai('fermer', async () => {
       await clic('.vf-term-fermer'); await att(`!(${OUVERT})`, 'tiroir fermé par le bouton');
       await s.ev(`document.getElementById('temoin').focus()`);
-      const av = await attendreEtStabiliser(lireRel, (v) => !!v && !!v.releve && v.releve.ouvert === false, { max: 5000 });
+      const av = await attendreEtStabiliser(lireRel, (v) => !!v && !!v.releve && v.releve.ouvert === false && !!v.pastille && !!v.zoom && v.pastille.t >= v.zoom.b, { max: 5000 }); // les positions que TP.7 compare, pas seulement « fermé »
       r.avant = av.releve; r.avant.pastille = av.pastille; r.avant.zoom = av.zoom;
     });
     await essai('proposition-1', async () => { // TP.4 : tiroir fermé, la valeur fixe arrive de Q
@@ -309,7 +309,7 @@ await executer(chrome, async (s) => {
     await essai('cycle', async () => { // TP.7 et TP.8 : fermeture au bouton après l'ouverture par proposition
       if (!(await s.ev(OUVERT))) { r.cycleSansOuverture = true; return; }
       await clic('.vf-term-fermer'); await att(`!(${OUVERT})`, 'tiroir refermé');
-      const ap = await attendreEtStabiliser(lireRel, (v) => !!v && !!v.releve && v.releve.ouvert === false, { max: 5000 });
+      const ap = await attendreEtStabiliser(lireRel, (v) => !!v && !!v.releve && v.releve.ouvert === false && !!v.pastille && !!v.zoom && !!r.avant && !!r.avant.pastille && JSON.stringify(v.pastille) === JSON.stringify(r.avant.pastille) && JSON.stringify(v.zoom) === JSON.stringify(r.avant.zoom), { max: 5000 }); // revenu au rectangle d'avant le cycle (TP.7)
       r.apres = ap.releve; r.apres.pastille = ap.pastille; r.apres.zoom = ap.zoom;
     });
     await essai('espion', async () => { // TP.8 : tout message d'origine Q vu par P est dans la liste (relevé AVANT les envois hostiles de TP.6)
@@ -521,7 +521,7 @@ await executer(chrome, async (s) => {
       const avant = await stabiliser(() => s.ev(NOEUDS), { max: 5000 }); await clic('#z-out'); const apres = await attendreEtStabiliser(() => s.ev(NOEUDS), (v) => !!v && !!avant && (v.right - v.left) < (avant.right - avant.left), { max: 5000 }); r.zoomOutAgit = !!avant && !!apres && (apres.right - apres.left) < (avant.right - avant.left); r.tiroirResteOuvert = await s.ev(ouvert);
       // fermeture : tout revient
       await clic('.vf-term-fermer');
-      const fi = await attendreEtStabiliser(async () => ({ ferme2: await s.ev(`!document.querySelector('.vf-term-tiroir') || document.querySelector('.vf-term-tiroir').hidden`), ask: await s.ev(ASK), zoom: await s.ev(ZOOM), past: await s.ev(PAST), z: await s.ev(ZRECT) }), (v) => !!v && v.ferme2 === true, { max: 5000 });
+      const fi = await attendreEtStabiliser(async () => ({ ferme2: await s.ev(`!document.querySelector('.vf-term-tiroir') || document.querySelector('.vf-term-tiroir').hidden`), ask: await s.ev(ASK), zoom: await s.ev(ZOOM), past: await s.ev(PAST), z: await s.ev(ZRECT) }), (v) => !!v && v.ferme2 === true && !!v.z && JSON.stringify(v.z) === JSON.stringify(fe.z) && !!v.ask && v.ask.display !== 'none' && !!fe.ask && v.ask.bottom === fe.ask.bottom, { max: 5000 }); // E2f/fin : retour aux positions d'avant l'ouverture
       r.ferme2 = fi.ferme2; r.finAsk = fi.ask; r.finZoom = fi.zoom; r.finPast = fi.past; r.finZ = fi.z;
       // reprise : tiroir mémorisé ouvert, la première mise en page tient déjà compte de lui
       await s.ev(`localStorage.setItem('vf.terminal.open', '1')`); await s.naviguer(`${OP}/${page}`); await s.ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)})`);
