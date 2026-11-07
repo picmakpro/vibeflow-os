@@ -62,8 +62,7 @@ export function clientTerminal(cfg) {
     if (!j.lignes || typeof j.lignes !== 'object' || MODES.some((m) => typeof j.lignes[m] !== 'string' || !/^[\x20-\x7e]{1,400}$/.test(j.lignes[m])) || !liste(j.bloquants) || !liste(j.avertissements) || !ent(j.arme_apres_ms, 0, 10000) || !ent(j.expire_ms, 1, 600000) || !ent(j.duree_ms, 1000, 600000)) return null;
     if ((j.chat !== undefined || j.lignes_chat !== undefined) && (j.chat !== true || !j.lignes_chat || typeof j.lignes_chat !== 'object' || MODES.some((m) => typeof j.lignes_chat[m] !== 'string' || !/^[\x20-\x7e]{1,400}$/.test(j.lignes_chat[m])))) return null; // 72-13 : chat (vrai) et lignes_chat vont ensemble, sinon « aucune »
     return { chat: j.chat === true ? true : undefined, lignesChat: j.chat === true ? Object.fromEntries(MODES.map((m) => [m, j.lignes_chat[m]])) : undefined, id: j.id, verbe: j.verbe, intention: j.intention, phase: j.phase, ws: j.ws, lignes: Object.fromEntries(MODES.map((m) => [m, j.lignes[m]])), bloquants: j.bloquants.slice(), avertissements: j.avertissements.slice(), arme_apres_ms: j.arme_apres_ms, expire_ms: j.expire_ms, duree_ms: j.duree_ms }; };
-  let attente = null, courante = null, fermee = null, pret = false, terminal = null, enVol = false, premiere = true, ancienne = null, entreeTenue = false;
-  const rendre = (t) => { entreeTenue = true; t.focus(); }; // tout retour du focus au terminal provoqué par un bouton : une Entrée maintenue sur ce bouton ne doit pas suivre le focus (garde:entree-tenue)
+  let attente = null, courante = null, fermee = null, pret = false, terminal = null, enVol = false, premiere = true, ancienne = null, entreeTenue = false; // entreeTenue : armée par la prise de focus du terminal lui-même, quelle qu'en soit la source (garde:point-fixe-focus)
   // LB2 (Q7, PU-G-118 et PU-G-119) : une proposition d'une visite précédente (cadre neuf, déjà plus vieille que VISITE_MS) est effacée au premier sondage, jamais montrée puis remplacée sous le clic ;
   // le cadre qui se recharge dans la MÊME visite (thème) garde son nom de fenêtre et retrouve sa proposition tant qu'elle n'a pas expiré ; un bandeau manipulé n'est pas remplacé (la vue rend false : on réessaie au sondage suivant)
   const VISITE_MS = 30000, memeVisite = window.name === 'vf-q-visite'; window.name = 'vf-q-visite';
@@ -86,13 +85,13 @@ export function clientTerminal(cfg) {
       body: JSON.stringify(Object.assign({ id: courante, mode }, avecChat === true ? { chat: true } : {})), cache: 'no-store' }); } catch (e) { return 'reseau'; } // garde:corps-lancer
     if (r.status === 204 || r.status === 404) { fermee = id; if (courante === id) { courante = null; attente = null; } }
     if (r.status !== 204) return r.status === 404 ? 'absente' : { 409: 'occupe', 425: 'attendre', 410: 'sans-session' }[r.status] || 'refus';
-    if (terminal) rendre(terminal); // garde:apres-usage : Entrée a pu déclencher le clic et rester tenue ; ses répétitions ne doivent pas suivre le focus jusqu'au shell (garde:entree-tenue)
+    if (terminal) terminal.focus(); // garde:apres-usage : Entrée a pu déclencher le clic et rester tenue ; la prise de focus arme la retenue (garde:point-fixe-focus)
     return 'ok';
   };
   const annuler = () => {
     const id = courante; fermee = id; courante = null; attente = null;
     if (id) fetch('/annuler', { method: 'POST', headers: Object.assign(entetes(), { 'Content-Type': 'application/json' }), body: JSON.stringify({ id }), cache: 'no-store' }).catch(() => {});
-    if (terminal) rendre(terminal); // garde:retour-annuler
+    if (terminal) terminal.focus();
   };
   lire(); setInterval(lire, PROPOSITION_MS); // garde:sondage-precoce
   // la grille est mesurée à l'ouverture : le terminal n'est créé qu'une fois la police prête (repli borné), faute de quoi la cellule est mesurée en police de secours et rien ne la remesure
@@ -113,6 +112,7 @@ export function clientTerminal(cfg) {
     const fit = new FitAddon.FitAddon();
     term.loadAddon(fit);
     term.open(document.getElementById('terminal'));
+    term.textarea.addEventListener('focus', () => { entreeTenue = true; }); // garde:point-fixe-focus : point fixe unique, CHAQUE prise de focus du terminal (bouton de Q, bouton du parent par iframe.focus(), retour d'onglet, tout chemin futur) retient les Entrée en répétition jusqu'au relâchement ou à une pression fraîche
     term.attachCustomKeyEventHandler((e) => {
       if (e.key === 'Enter' && entreeTenue) { if (e.type === 'keyup' || !e.repeat) entreeTenue = false; else { e.preventDefault(); return false; } } // garde:entree-tenue : seules les répétitions de l'Entrée du clic sont retenues ; son relâchement ou une nouvelle pression (repeat faux) lève la retenue, rien ne dépend d'un délai
       if (e.code === RACCOURCI.code && e.ctrlKey === RACCOURCI.ctrl && e.shiftKey === RACCOURCI.shift && !e.altKey && !e.metaKey) {
@@ -124,13 +124,13 @@ export function clientTerminal(cfg) {
     // collage et dépôt de texte : un texte à retour à la ligne, à caractère de contrôle ou invisible (Cf, Tag, bidi) n'atteint le shell qu'après « Coller » (le collage entre crochets ne suffit pas : certains shells exécutent dès la réception)
     const SUR = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
     let propose = null;
-    const abandonner = () => { if (propose !== null) { propose = null; vue.collage(null); rendre(term); } }; // garde:retour-abandonner
+    const abandonner = () => { if (propose !== null) { propose = null; vue.collage(null); term.focus(); } }; 
     const soumettre = (t) => {
       abandonner();
       if (!t) return;
       if (!SUR.test(t) && !vue.invisible(t)) { term.paste(t); return; }
       propose = t;
-      vue.collage(t, () => { const x = propose; propose = null; vue.collage(null); if (x !== null) term.paste(x); rendre(term); /* garde:retour-coller */ }, abandonner);
+      vue.collage(t, () => { const x = propose; propose = null; vue.collage(null); if (x !== null) term.paste(x); term.focus(); }, abandonner);
     };
     const zone = document.getElementById('terminal');
     const prendre = (e) => { e.preventDefault(); e.stopPropagation(); };
@@ -256,7 +256,7 @@ export function clientTerminal(cfg) {
     const finRetenue = () => {
       try { const j = JSON.parse(sessionStorage.getItem(CLE_FIN) || 'null'); return j && (j.type === 'termine' || j.type === 'fermee') ? j : null; } catch (e) { return null; }
     };
-    const relancer = () => { try { sessionStorage.removeItem(CLE_FIN); } catch (e) { void e; } vue.effacer(); term.reset(); rendre(term); boucle(); }; // garde:retour-relancer
+    const relancer = () => { try { sessionStorage.removeItem(CLE_FIN); } catch (e) { void e; } vue.effacer(); term.reset(); term.focus(); boucle(); };
     const boucle = async () => {
       if (eteint) return; eteint = true;
       let essais = 0, perte = 0;

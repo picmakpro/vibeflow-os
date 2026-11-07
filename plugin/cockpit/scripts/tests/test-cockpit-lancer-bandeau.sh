@@ -761,6 +761,28 @@ await executer(chrome, async (s) => {
       sortie.push('relancer:' + await cycle(async () => { await clic(`document.querySelector('#etat .vf-q-texte')`); await q.ev(`${bouton('#etat', 'Relancer le shell')}.focus()`); }));
       r.e12 = sortie.join('|');
     });
+    // LB3-S3 (F1 de la revue de a83890da..45a2396e ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-07, « et tout autre bouton du même genre ») : la retenue est posée sur la PRISE DE FOCUS du terminal lui-même, pas sur chaque appelant.
+    // Le vrai client de Q tourne dans l'iframe de P ; P est ici une page minimale qui reproduit `cadre.focus()` de la pastille du tiroir (vf-cockpit-terminal-tiroir.mjs, ouvrir(true)) : un bouton de P dont l'Entrée (keydown) donne le focus à l'iframe.
+    const PASTILLE = `(() => { const b = document.createElement('button'); b.id = 'pastille-t'; b.textContent = 'Terminal'; b.style.cssText = 'position:fixed;right:0;bottom:0;z-index:100000'; b.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.querySelector('iframe[data-t]').focus(); }); document.body.appendChild(b); b.focus(); return document.activeElement.id; })()`;
+    const TERMINAL_FOCALISE = `document.hasFocus() && document.activeElement && document.activeElement.className === 'xterm-helper-textarea'`;
+    const reprises = async (r0) => { for (let i = 0; i < 6; i++) { await ENTREE_TOUCHE('keyDown', { text: '\r', autoRepeat: true }); await pause(40); } await pause(400); const tenue = retours() - r0; await ENTREE_TOUCHE('keyUp'); await pause(100); await ENTREE_TOUCHE('keyDown', { text: '\r' }); await ENTREE_TOUCHE('keyUp'); await pause(500); return tenue + '/' + (retours() - r0 - tenue); };
+    await essai('e13', async () => { // chemin PARENT : Entrée tenue sur la pastille de P, qui donne le focus à l'iframe de Q ; les répétitions qui suivent n'atteignent pas le shell ; puis Entrée fraîche : 1
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+      await scenario({ prop: null, lancers: [] }); await q.naviguer(); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.attendre(TERMINAL_FOCALISE, 'terminal focalisé', 5000);
+      const sur = await s.ev(PASTILLE); const r0 = retours();
+      await ENTREE_TOUCHE('keyDown', { text: '\r' }); await q.attendre(TERMINAL_FOCALISE, 'focus donné au terminal par le parent', 3000);
+      const premiere = retours() - r0;
+      r.e13 = [sur, premiere, await reprises(r0 + premiere)].join('/');
+    });
+    await essai('e14', async () => { // chemin « retour d'onglet » : le focus quitte le terminal, une Entrée est tenue, l'événement focus de la fenêtre de Q redonne le focus au terminal (écouteur window.focus du client) ; répétitions : 0 ; fraîche : 1
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+      await scenario({ prop: null, lancers: [] }); await q.naviguer(); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.attendre(TERMINAL_FOCALISE, 'terminal focalisé', 5000);
+      await q.ev(`(() => { document.querySelector('.xterm-helper-textarea').blur(); return true; })()`);
+      const r0 = retours(); await ENTREE_TOUCHE('keyDown', { text: '\r' });
+      await q.ev(`(() => { window.dispatchEvent(new Event('focus')); return true; })()`); await q.attendre(TERMINAL_FOCALISE, 'focus rendu au terminal par la fenêtre', 3000);
+      r.e14 = await reprises(r0);
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: false });
+    });
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
 
@@ -899,7 +921,9 @@ assert_eq "LB.S4 — aucun fiabilite ni gouvernance dans la vue ni le client ; a
 regles_prop() { grep -F '#proposition' "$1"; } # les règles de la proposition dans la feuille de Q : toutes portent #proposition
 # LB3-S2 (F6) : R3 du plan 72-08 (« seulement les variables CSS existantes ») couvre TOUTES les règles que le lot a ajoutées : #proposition, #accueil, .vf-lancer-armement, la carte tassée (.vf-q-carte { max-height … } et sa requête de média)
 regles_lot() { grep -E '#proposition|#accueil|vf-lancer-armement|vf-q-carte \{ max-height|@media \(max-height' "$1"; }
-couleurs_lot() { regles_lot "$1" | grep -cE '#[0-9a-fA-F]{3,8}([^0-9a-zA-Z_-]|$)|(rgb|hsl)a?\(' || true; }
+# LB3-S3 (F3) : liste noire des couleurs dans les règles du lot : hexadécimaux, rgb( hsl( hwb( lab( lch( oklab( oklch( color-mix( color( light-dark( device-cmyk(, et tous les NOMS de couleur CSS (transparent et currentColor compris) ; hors usage autorisé : « stroke: currentColor » (le picto, préexistant, mesuré : seul emploi d'un mot-couleur dans le lot)
+NOMS_COULEUR='aliceblue|antiquewhite|aqua|aquamarine|azure|beige|bisque|black|blanchedalmond|blue|blueviolet|brown|burlywood|cadetblue|chartreuse|chocolate|coral|cornflowerblue|cornsilk|crimson|cyan|darkblue|darkcyan|darkgoldenrod|darkgray|darkgreen|darkgrey|darkkhaki|darkmagenta|darkolivegreen|darkorange|darkorchid|darkred|darksalmon|darkseagreen|darkslateblue|darkslategray|darkslategrey|darkturquoise|darkviolet|deeppink|deepskyblue|dimgray|dimgrey|dodgerblue|firebrick|floralwhite|forestgreen|fuchsia|gainsboro|ghostwhite|gold|goldenrod|gray|green|greenyellow|grey|honeydew|hotpink|indianred|indigo|ivory|khaki|lavender|lavenderblush|lawngreen|lemonchiffon|lightblue|lightcoral|lightcyan|lightgoldenrodyellow|lightgray|lightgreen|lightgrey|lightpink|lightsalmon|lightseagreen|lightskyblue|lightslategray|lightslategrey|lightsteelblue|lightyellow|lime|limegreen|linen|magenta|maroon|mediumaquamarine|mediumblue|mediumorchid|mediumpurple|mediumseagreen|mediumslateblue|mediumspringgreen|mediumturquoise|mediumvioletred|midnightblue|mintcream|mistyrose|moccasin|navajowhite|navy|oldlace|olive|olivedrab|orange|orangered|orchid|palegoldenrod|palegreen|paleturquoise|palevioletred|papayawhip|peachpuff|peru|pink|plum|powderblue|purple|rebeccapurple|red|rosybrown|royalblue|saddlebrown|salmon|sandybrown|seagreen|seashell|sienna|silver|skyblue|slateblue|slategray|slategrey|snow|springgreen|steelblue|tan|teal|thistle|tomato|turquoise|violet|wheat|white|whitesmoke|yellow|yellowgreen|transparent|currentcolor|canvas|canvastext|accentcolor|accentcolortext|highlight|highlighttext|buttonface|buttontext|linktext|field|fieldtext'
+couleurs_lot() { regles_lot "$1" | sed -E 's/stroke: *currentColor//g' | grep -ciE "#[0-9a-f]{3,8}([^0-9a-z_-]|\$)|(^|[^a-z0-9_-])(rgb|hsl|hwb|lab|lch|oklab|oklch|color-mix|color|light-dark|device-cmyk)a?\(|(^|[^a-z0-9_.#-])($NOMS_COULEUR)([^a-z0-9_-]|\$)" || true; }
 px_lot() { regles_lot "$1" | grep -oE '[0-9]+(\.[0-9]+)?px' | LC_ALL=C sort | tr '\n' ' '; } # tous les littéraux en px des règles du lot, triés
 echem_prop() { regles_prop "$1" | grep -cE '(font-size|width|height): *[0-9.]+em' || true; }
 nb_prop() { [ "$(regles_prop "$1" | wc -l | tr -d ' ')" -ge 8 ] && echo ok || echo vide; } # témoin : les règles sont bien trouvées (jamais un zéro obtenu sur une sélection vide)
@@ -996,6 +1020,8 @@ if [ -n "$CHROME" ]; then
   assert_eq "LB.E10 — LB3-S, Entrée TENUE sur « Préparer » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : après le retour du focus au terminal, six répétitions de la touche (autoRepeat) n'envoient AUCUN octet \\r au shell ; Entrée relâchée puis pressée de nouveau : UN \\r (témoin)" "$(ev_ e10)" "xterm-helper-textarea/0/1"
   assert_eq "LB.E10b — LB3-S2 (F2), le cas du TAP : « Préparer » au clic de souris (aucune Entrée tenue, le relâchement est parti au bouton ou n'a jamais existé), focus rendu au terminal, une Entrée FRAÎCHE : EXACTEMENT un \\r — la clause « pression fraîche » de la retenue ne l'avale jamais" "$(ev_ e10b)" "1"
   assert_eq "LB.E12 — LB3-S2 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-07, option A) : Entrée TENUE sur chaque bouton qui rend le focus au terminal (Annuler de la proposition, Annuler du collage, Coller, Relancer le shell) : six répétitions après le retour du focus = 0 octet \\r ; puis une Entrée fraîche = 1 (témoin) ; cadre par bouton : <répétitions>/<fraîche>" "$(ev_ e12)" "annuler:0/1|abandonner:0/1|coller:0/1|relancer:0/1"
+  assert_eq "LB.E13 — LB3-S3 (F1, arbitrage Samuel, AskUserQuestion session principale, 2026-11-07), chemin PARENT : Entrée tenue sur un bouton de P qui appelle iframe.focus() au keydown (reproduit la pastille du tiroir ; le vrai client de Q est dans l'iframe) : la première pression n'envoie aucun \\r (le focus a changé entre keydown et keypress), six répétitions = 0 octet \\r, puis Entrée fraîche = 1 (témoin) ; cadre : <bouton focalisé>/<première pression>/<répétitions>/<fraîche>" "$(ev_ e13)" "pastille-t/0/0/1"
+  assert_eq "LB.E14 — LB3-S3 (F1), chemin « retour d'onglet » : le terminal a perdu le focus, une Entrée est tenue, l'événement focus de la fenêtre de Q (écouteur window.focus du client) lui rend le focus : six répétitions = 0 octet \\r, puis Entrée fraîche = 1 (témoin)" "$(ev_ e14)" "0/1"
   assert_eq "LB.E11 — LB3-S (c), référence d'âge servie par Q : proposition fraîche d'une durée courte (duree_ms 10 s) montrée ; ancienne d'une durée longue (600 s, 300 s restantes) effacée dans Q (aucun bandeau, POST /annuler parti) ; témoin : une fraîche de durée longue est montrée" "$(ev_ e11)" "true/0/true/true"
   faux "$SCRIPTS"; FJ="$(navig froid)"; unfaux
   assert_eq "LB.E8 — cadre masqué : UN message proposition d'origine Q en moins de 4 s, aucun .xterm ni #proposition, aucune requête /flux, /lancer, /entree ; cadre agrandi : bandeau, /flux demandé, TOUJOURS UN seul message" \
@@ -1080,15 +1106,15 @@ if mutant pression-fraiche vf-cockpit-terminal-client.mjs "s/if (e.type === 'key
   [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e10b"]')"; unfaux; assert_eq "M-PRESSION-FRAICHE — le mutant (la retenue ne se lève plus à une pression fraîche, seulement au relâchement) rougit LB.E10b : l'Entrée fraîche du cas du tap est avalée, 0 \\r au lieu de 1 (témoin : la sonde s'exécute)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e10b === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e10b === '1' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-PRESSION-FRAICHE"; fi
 e12_verdict() { rj "$1" "(j.erreur ? 'plante: ' + j.erreur : j.e12 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e12.split('|').map((x) => x.split(':')[1] === '0/1' ? 'sain' : 'rouge').join(','))"; }
-mut_retour() { # mut_retour <bouton> <verdict attendu, un mot par bouton> <objet xterm de la ligne> : le mutant retire la retenue de CE bouton seulement
-  if mutant "retour-$1" vf-cockpit-terminal-client.mjs "/garde:retour-$1/s/rendre($3)/$3.focus()/"; then
-    [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e12"]')"; unfaux; assert_eq "M-RETOUR-$1 — le mutant (le retour du focus du bouton « $1 » n'arme plus la retenue de l'Entrée tenue) rougit SON témoin de LB.E12 et lui seul : les répétitions atteignent le shell (témoin : la sonde s'exécute, les autres boutons restent sains)" "$(e12_verdict "$MJ")" "$2"; }
-  else sans_effet "M-RETOUR-$1"; fi
-}
-mut_retour annuler "rouge,sain,sain,sain" terminal
-mut_retour abandonner "sain,rouge,sain,sain" term
-mut_retour coller "sain,sain,rouge,sain" term
-mut_retour relancer "sain,sain,sain,rouge" term
+# LB3-S3 (F1, F2) : la retenue n'a plus qu'un point d'armement, la prise de focus du terminal (l'événement focus de son textarea) ; les gardes restantes sont la clause de la touche (M-ENTREE-TENUE) et la pression fraîche (M-PRESSION-FRAICHE)
+# UN mutant retire le point fixe : il doit rougir le témoin de CHAQUE chemin de prise de focus (Préparer E10, les quatre boutons de Q E12, le bouton du parent E13, le retour d'onglet E14), et lui seul laisse sain le cas du tap E10b
+if mutant point-fixe-focus vf-cockpit-terminal-client.mjs "/term.textarea.addEventListener('focus'/d"; then
+  [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e10","e10b","e12","e13","e14"]')"; unfaux
+    assert_eq "M-POINT-FIXE-PREPARER — le mutant (la prise de focus du terminal n'arme plus la retenue) rougit LB.E10, « Préparer » (témoin : E10b, le cas du tap, reste sain)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e10 === undefined || j.e10b === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : (j.e10 === 'xterm-helper-textarea/0/1' ? 'sain' : 'rouge') + '/' + (j.e10b === '1' ? 'sain' : 'rouge'))")" "rouge/sain"
+    assert_eq "M-POINT-FIXE-BOUTONS-Q — le même mutant rougit LB.E12 pour CHACUN des quatre boutons de Q (annuler, abandonner, coller, relancer)" "$(e12_verdict "$MJ")" "rouge,rouge,rouge,rouge"
+    assert_eq "M-POINT-FIXE-PARENT — le même mutant rougit LB.E13 (bouton de P qui appelle iframe.focus())" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e13 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e13 === 'pastille-t/0/0/1' ? 'sain' : 'rouge')")" "rouge"
+    assert_eq "M-POINT-FIXE-ONGLET — le même mutant rougit LB.E14 (retour d'onglet, événement focus de la fenêtre)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e14 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e14 === '0/1' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-POINT-FIXE-FOCUS"; fi
 if mutant ref-constante vf-cockpit-terminal-client.mjs "s#p.duree_ms - p.expire_ms > VISITE_MS#120000 - p.expire_ms > VISITE_MS#"; then
   [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e11"]')"; unfaux; assert_eq "M-REF-CONSTANTE — le mutant (référence d'âge codée à 120 s au lieu de la durée servie) rougit LB.E11 (témoin : la sonde s'exécute)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e11 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e11 === 'true/0/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-REF-CONSTANTE"; fi
@@ -1104,6 +1130,21 @@ else sans_effet "M-COULEUR-PROPOSITION"; fi
 if mutant couleur-accueil vf-cockpit-terminal-style.mjs "s|^#accueil .vf-q-texte { font-weight: 400;|#accueil .vf-q-texte { background: rgba(0, 0, 0, .5); font-weight: 400;|"; then
   assert_eq "M-COULEUR-ACCUEIL — le mutant (un rgba( dans la règle de l'accueil, hors #proposition) rougit LB.S4 élargi (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
 else sans_effet "M-COULEUR-ACCUEIL"; fi
+if mutant couleur-nom vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: red; border: thin solid|"; then
+  assert_eq "M-COULEUR-NOM — le mutant (un nom de couleur, red, dans une règle de la proposition) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+else sans_effet "M-COULEUR-NOM"; fi
+if mutant couleur-transparent vf-cockpit-terminal-style.mjs "s|^#accueil .vf-q-texte { font-weight: 400;|#accueil .vf-q-texte { background: transparent; font-weight: 400;|"; then
+  assert_eq "M-COULEUR-TRANSPARENT — le mutant (transparent dans la règle de l accueil) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+else sans_effet "M-COULEUR-TRANSPARENT"; fi
+if mutant couleur-courante vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: currentColor; border: thin solid|"; then
+  assert_eq "M-COULEUR-COURANTE — le mutant (currentColor hors du picto, « stroke: currentColor » restant seul autorisé) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+else sans_effet "M-COULEUR-COURANTE"; fi
+if mutant couleur-oklch vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: oklch(60% .1 20); border: thin solid|"; then
+  assert_eq "M-COULEUR-OKLCH — le mutant (une fonction moderne, oklch() rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+else sans_effet "M-COULEUR-OKLCH"; fi
+if mutant couleur-color-mix vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: color-mix(in srgb, var(--text) 50%, var(--on)); border: thin solid|"; then
+  assert_eq "M-COULEUR-COLOR-MIX — le mutant (color-mix() rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+else sans_effet "M-COULEUR-COLOR-MIX"; fi
 if mutant px-proposition vf-cockpit-terminal-style.mjs "s|#proposition .vf-q-pied { justify-content: flex-end; }|#proposition .vf-q-pied { justify-content: flex-end; padding: 6px; }|"; then
   assert_eq "M-PX-PROPOSITION — le mutant (un px de plus dans une règle de la proposition) rougit LB.S4 : l'ensemble des px n'est plus celui des exceptions nommées (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(px_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/12.5px 12.5px 240px 44px 560px 6px "
 else sans_effet "M-PX-PROPOSITION"; fi
