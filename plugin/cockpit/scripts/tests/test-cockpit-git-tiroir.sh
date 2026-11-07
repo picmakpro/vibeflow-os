@@ -315,6 +315,7 @@ await touche('g'); out.ouverture = await s.ev(etat);
 await touche('Escape'); out.echapTiroir = await s.ev(etat);
 await touche('g'); await s.ev(`document.querySelector('#vf-git-ligne').focus()`); await touche('Escape'); out.echapLigne = await s.ev(etat);
 await s.ev(`document.querySelector('#vf-git-ligne').focus()`); await touche('Escape'); out.echapFerme = await s.ev(etat);
+await s.ev(`document.activeElement && document.activeElement.blur()`); await touche('Escape'); out.echapCanvas = await s.ev(etat); // focus sur le canvas (body) : le viewer lève la sélection
 await s.ev(`VibeFlow.select(window.__id)`); await touche('g'); await touche('/'); await s.attendre(`!!document.activeElement && document.activeElement.id === 'search'`, 'focus dans la palette'); out.palette1 = await s.ev(`({ palette: document.querySelector('#palette').classList.contains('open'), ouvert: ${OUVERT} })`);
 await touche('Escape'); out.palette2 = await s.ev(`({ palette: document.querySelector('#palette').classList.contains('open'), ouvert: ${OUVERT} })`);
 // D3.3 : #context masqué tiroir ouvert, f p + - vivants
@@ -340,7 +341,8 @@ JS
   assert_eq "D3.2 — ouvrir porte le focus sur le titre du tiroir" "$(jq_ "$R3" '[j.sel0, j.ouverture.ouvert, j.ouverture.titre].join("|")' 2>/dev/null)" "true|true|true"
   assert_eq "D3.2 — Échap (focus dans le tiroir) : fermé, focus rendu à la seconde ligne, sélection et vue inchangées" "$(jq_ "$R3" '[j.echapTiroir.ouvert, j.echapTiroir.focus, j.echapTiroir.selection, j.echapTiroir.vue].join("|")' 2>/dev/null)" "false|vf-git-ligne|true|root"
   assert_eq "D3.2 — Échap (focus sur la seconde ligne) : fermé, sélection inchangée" "$(jq_ "$R3" '[j.echapLigne.ouvert, j.echapLigne.selection].join("|")' 2>/dev/null)" "false|true"
-  assert_eq "D3.2 — tiroir fermé, Échap sur la seconde ligne : le viewer garde son comportement (sélection levée)" "$(jq_ "$R3" '[j.echapFerme.ouvert, j.echapFerme.selection].join("|")' 2>/dev/null)" "false|false"
+  assert_eq "D3.2 — tiroir fermé, Échap sur la seconde ligne : le viewer la laisse à ce contrôle, la sélection n'est pas perdue (PU-G-175, lot code-moteur : hors du canvas, Échap ne lève plus la sélection)" "$(jq_ "$R3" '[j.echapFerme.ouvert, j.echapFerme.selection].join("|")' 2>/dev/null)" "false|true"
+  assert_eq "D3.2 — tiroir fermé, Échap focus sur le canvas : le viewer garde son comportement (sélection levée)" "$(jq_ "$R3" '[j.echapCanvas.ouvert, j.echapCanvas.selection].join("|")' 2>/dev/null)" "false|false"
   assert_eq "D3.2 — palette ouverte au-dessus du tiroir : Échap ferme la palette, le tiroir reste" "$(jq_ "$R3" '[j.palette1.palette, j.palette1.ouvert, j.palette2.palette, j.palette2.ouvert].join("|")' 2>/dev/null)" "true|true|false|true"
   assert_eq "D3.3 — body.vf-git-ouvert, #context transparent puis rendu à la fermeture" "$(jq_ "$R3" '[j.ctxOuvert, j.ctxFerme].join("|")' 2>/dev/null)" "true|true"
   assert_eq "D3.3 — p, +, -, f marchent tiroir ouvert (panneau basculé, zoom + puis -, ajustement)" "$(jq_ "$R3" '[j.p[0] !== j.p[1], j.zoom.plus, j.zoom.moins, j.zoom.fit].join("|")' 2>/dev/null)" "true|true|true|true"
