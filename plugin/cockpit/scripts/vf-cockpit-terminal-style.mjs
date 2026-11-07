@@ -86,16 +86,18 @@ button { font: inherit; color: inherit; }
 #proposition-lancer[aria-disabled="true"], #proposition-lancer[aria-disabled="true"]:hover { cursor: not-allowed; background: var(--raise-2); color: var(--text-3); }
 .vf-lancer-armement { display: none; } #proposition:has(#proposition-lancer[aria-disabled="true"]) .vf-lancer-armement { display: inline; }
 #proposition-message:empty { display: none; }
-#proposition .vf-q-aide { font-size: .92em; font-weight: 400; line-height: 1.5; color: var(--text-2); }
+#proposition .vf-q-aide { font-size: 12.5px; font-weight: 400; line-height: 1.5; color: var(--text-2); }
 #proposition ul.vf-q-modes { flex: 1 1 100%; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); }
-#proposition ul.vf-q-modes li { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-8); font-size: .92em; line-height: 1.5; color: var(--text-2); }
+#proposition ul.vf-q-modes li { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-8); font-size: 12.5px; line-height: 1.5; color: var(--text-2); }
 #proposition ul.vf-q-modes .vf-q-mode-nom { font-weight: 500; color: var(--text); }
 #proposition .vf-q-risque { display: inline-flex; align-items: center; gap: var(--sp-4); font-weight: 500; color: var(--text); }
-#proposition svg.i { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+#proposition svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 /* PU-G-136 : un bandeau de proposition prend sa place dans la page (colonne) au lieu de recouvrir la sortie du shell : le terminal rétrécit, la sortie remonte ; le bandeau défile au-delà de 60 % de la hauteur */
 body:has(#proposition) { display: flex; flex-direction: column; }
 body:has(#proposition) #terminal { position: relative; inset: auto; flex: 1 1 0; min-height: 0; order: 1; }
-body #proposition { position: static; flex: none; order: 2; z-index: 1; max-height: 60%; overflow-y: auto; }
+body #proposition { position: static; flex: none; order: 2; z-index: auto; max-height: 60%; overflow-y: auto; } /* z-index auto : un élément de colonne flex porte le z-index de .vf-q-collage même statique, et recouvrirait la carte et le bandeau d'état (fixes) */
+body:has(#etat .vf-q-bandeau) #proposition { margin-bottom: calc(44px + 2 * var(--sp-8)); } /* dérivé : le bandeau d'état (fixe, en bas) a 44 px de haut et 8 de marge ; la proposition se pose au-dessus, comme le collage */
+#proposition .vf-q-pied { justify-content: flex-end; } /* Préparer vient APRÈS la commande exacte et la case du chat, à droite de sa rangée */
 /* PU-G-140 : accueil de la première ouverture, posé sur le bas du terminal sans le déplacer */
 #accueil { max-height: 60%; overflow-y: auto; }
 #accueil .vf-q-texte { font-weight: 400; color: var(--text-2); }

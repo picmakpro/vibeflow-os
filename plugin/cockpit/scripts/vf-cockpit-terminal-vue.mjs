@@ -171,14 +171,13 @@ export function vueTerminal(cfg) {
       const sel = el('select'); sel.id = 'proposition-mode'; sel.setAttribute('aria-label', 'Mode de permission'); sel.setAttribute('aria-describedby', 'proposition-modes');
       MODES_UI.forEach((m) => { const o = el('option', '', m.libelle); o.value = m.mode; sel.appendChild(o); });
       sel.value = MODES_UI.some((m) => m.mode === p.modeInitial) ? p.modeInitial : 'default'; b.appendChild(sel);
-      const armement = el('span', 'vf-q-decompte vf-lancer-armement', bloquants.length ? 'Lancement bloqué' : 'Prêt dans un instant'); armement.id = 'proposition-armement'; b.appendChild(armement); // l'état « pas encore armé » se dit en texte neutre ; masqué dès que le bouton est armé
+      const armement = el('span', 'vf-q-decompte vf-lancer-armement', bloquants.length ? 'Lancement bloqué' : 'Prêt dans un instant'); armement.id = 'proposition-armement'; // posé dans le pied avec Préparer ; l'état « pas encore armé » se dit en texte neutre ; masqué dès que le bouton est armé
       const reste = Number.isFinite(p.expire_ms) && p.expire_ms > 0 ? p.expire_ms : 0;
       let delai = null; if (reste) { delai = el('span', 'vf-q-decompte', 'Expire dans ' + duree(reste)); delai.id = 'proposition-expire'; delai.setAttribute('role', 'timer'); b.appendChild(delai); } // compte à rebours : jamais annoncé à chaque seconde
       const annuler = bouton('Annuler', () => { cb.annuler(); retirerProposition(); }, 'vf-q-secondaire'); b.appendChild(annuler);
       const lancer = el('button', 'vf-q-bouton', BOUTON_PREPARER); lancer.type = 'button'; lancer.id = 'proposition-lancer';
       lancer.setAttribute('aria-disabled', 'true'); // garde:armement
       lancer.setAttribute('aria-describedby', 'proposition-armement');
-      b.appendChild(lancer);
       const phrase = el('div', 'vf-q-reste'); const v = VERBES_UI[p.verbe]; // phrase en clair, avant la commande : ce que l'assistant va faire (la commande exacte reste montrée plus bas)
       const quoi = v ? 'L’assistant va ' + v[2] + ' la phase ' + p.phase + (p.ws ? ' du compartiment ' + p.ws : '') + ' : ' + v[3] + '.' : 'L’assistant va lancer ce travail dans une session Claude Code.';
       const phraseTxt = el('span', 'vf-q-texte vf-q-aide', quoi); phraseTxt.id = 'proposition-phrase'; phrase.appendChild(phraseTxt); b.appendChild(phrase);
@@ -188,7 +187,7 @@ export function vueTerminal(cfg) {
       const lignes = () => (caseChat && caseChat.checked ? p.lignesChat : p.lignes)[sel.value];
       const ligne = el('div', 'vf-q-apercu', lignes()); ligne.id = 'proposition-ligne'; ligne.tabIndex = 0; ligne.setAttribute('role', 'region'); ligne.setAttribute('aria-label', 'Commande exacte'); b.appendChild(ligne);
       const entree = el('div', 'vf-q-reste'); const et = el('span', 'vf-q-texte vf-q-aide', 'Le bouton écrit cette ligne dans le terminal sans la lancer. ' + PHRASE_ENTREE); et.id = 'proposition-entree'; entree.appendChild(et); b.appendChild(entree); lancer.setAttribute('aria-describedby', 'proposition-armement proposition-entree');
-      const msg = el('div', 'vf-q-reste'); msg.id = 'proposition-message'; msg.setAttribute('role', 'status'); b.appendChild(msg);
+      const msg = el('div', 'vf-q-reste'); msg.id = 'proposition-message'; msg.setAttribute('role', 'status');
       const avecChat = CHAT_LIVRE && p.chat === true && !!p.lignesChat && typeof p.lignesChat === 'object'; // garde:chat-offre
       if (avecChat) {
         const d = el('div', 'vf-q-reste'), lab = el('label', 'vf-q-texte'); caseChat = el('input'); caseChat.type = 'checkbox'; caseChat.id = 'proposition-chat'; caseChat.setAttribute('aria-describedby', 'proposition-chat-aide');
@@ -197,6 +196,7 @@ export function vueTerminal(cfg) {
         at.appendChild(document.createTextNode(AIDE_CHAT + ' '));
         const r = el('span', 'vf-q-risque'); r.appendChild(picto(PICTO_RISQUE)); r.appendChild(document.createTextNode('Risque')); at.appendChild(r); at.appendChild(document.createTextNode(' : ' + RISQUE_CHAT)); e.appendChild(at); b.appendChild(e);
       }
+      const pied = el('div', 'vf-q-reste vf-q-pied'); pied.appendChild(armement); pied.appendChild(lancer); b.appendChild(pied); b.appendChild(msg); // Préparer après la commande exacte et la case du chat : jamais atteignable avant elles (ordre de lecture, de tabulation et de défilement)
       const retenu = MODES_UI.some((m) => m.mode === p.modeInitial) && p.modeInitial !== 'default' ? p.modeInitial : null; // un mode autre que « Par défaut » ne vient que d'un choix précédent
       const modes = el('ul', 'vf-q-modes'); modes.id = 'proposition-modes';
       MODES_UI.forEach((m) => {

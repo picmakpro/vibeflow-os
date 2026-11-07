@@ -37,7 +37,7 @@ const TEXTES = {
   titre: 'Lancer du travail', menu: 'Autres actions', aucune: 'Aucune action disponible.', inconnu: 'Contrôle non reconnu.', bloque: 'Bloqué : ', attention: 'Attention : ',
   envoi: ['Proposition envoyée au terminal : ', '. Confirmez-la dans le terminal.'], refuse: 'Le lancement a été refusé.', reseau: 'Le cockpit ne répond pas.',
   absent: "Le lancement n'est pas disponible. Relancez /vf-cockpit --terminal.", bloquant: 'Le lancement est bloqué : voyez les motifs ci-dessus.',
-  lancee: 'Lancée depuis la carte.', lanceeVerbe: 'Lancée : ', etats: { vue: 'session en cours.', terminee: 'session terminée.' },
+  preparee0: 'Préparée depuis la carte.', lanceeVerbe: 'Lancée : ', etats: { vue: 'session en cours.', terminee: 'session terminée.' },
   // « Lancée » n'est écrit qu'à un signal réel d'exécution (la session est vue) : une ligne seulement posée dans le terminal n'a rien démarré (double geste, Entrée dans le terminal)
   preparee: ['Commande préparée dans le terminal : ', '. Elle ne démarre qu\'avec Entrée dans le terminal ; en attente de la session.'],
   preparation: 'Préparation…', preparationStatut: 'Préparation de la proposition…', chargement: 'Chargement des actions…',
@@ -162,7 +162,7 @@ function scriptLancer(cfg, extraire, installer, corpsProp) {
     const liste = (v) => (Array.isArray(v) ? v.slice(0, 10) : []);
     const motif = (c) => (a(cfg.motifs, c) ? cfg.motifs[c] : T.inconnu);
     const l = e.lancee;
-    if (l === true) ligne(T.lancee);
+    if (l === true) ligne(T.preparee0); // forme sans état : aucun signal d'exécution, donc jamais « Lancée » (PU-G-113)
     else if (l && typeof l === 'object' && cfg.verbes.indexOf(l.verbe) >= 0) {
       if (l.etat === 'attendue') ligne(T.preparee[0] + cfg.libelles[l.verbe] + T.preparee[1]); // la ligne est posée, rien n'a démarré
       else if (a(T.etats, l.etat)) ligne(T.lanceeVerbe + cfg.libelles[l.verbe] + ', ' + T.etats[l.etat]); // signal réel : session vue ou terminée
