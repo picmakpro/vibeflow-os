@@ -4,6 +4,20 @@
 // Échéances (millisecondes, surchargeables) : VF_CDP_ECHEANCE_MS = par attente (défaut 90 000) · VF_CDP_GLOBAL_MS = par exécution (défaut 600 000).
 // Une mesure indisponible lève une erreur NOMMÉE (« attente de <nom> dépassée ») : jamais un résultat vide silencieux.
 // Le HOME du compte est rendu à Chrome (chromeHome) : sous un HOME jetable il ne démarre pas sur macOS.
+//
+// AIDES « MESURER UNE FOIS POSÉ » (exports, aucune session requise) — règle : on mesure une fois posé, jamais dans la foulée du geste.
+//   stabiliser(lire, { pas = 250, max = 10000 } = {})            relit `await lire()` jusqu'à deux lectures CONSÉCUTIVES identiques (JSON.stringify) ; rend cette valeur
+//   attendreValeur(lire, predicat, { pas = 100, max = 10000 } = {}) relit jusqu'à `predicat(valeur)` vrai ; rend cette valeur
+//   attendreEtStabiliser(lire, predicat, opts)                   attendreValeur, puis stabiliser : condition vraie PUIS valeur stable
+//   positionPosee(ev, expr, { pas = 120, max = 3000 } = {})      `ev` = toute fonction ev(expression) -> Promise<valeur> (s.ev, ou l'ev d'une façade d'iframe) ; `expr` = expression JS
+//                                                                rendant l'élément (l'aide construit l'expression du rect) ; rend { x, y, l, h, cx, cy } (rect + centre) une fois deux
+//                                                                lectures égales, null si l'élément est absent
+// Trois familles de défaut qu'elles corrigent : G géométrie lue avant que l'élément cesse de bouger (geste visé sur un rect périmé) ·
+//   R état lu avant le rendu (dans la foulée d'un évènement, d'un postMessage, d'une navigation, d'un redimensionnement) · F pause fixe trop courte suivie d'une lecture qui JUGE.
+// Différence avec s.stable(expr, nom) : s.stable évalue dans la page principale et LÈVE une erreur nommée si rien ne se pose ; ces aides prennent n'importe quel lecteur
+//   (iframe comprise) et ne lèvent jamais : à l'échéance elles rendent la DERNIÈRE lecture (undefined si toutes les lectures ont levé) — l'assertion juge, la stabilisation ne décide jamais d'un verdict.
+// Une lecture qui lève compte comme « pas de lecture » (undefined, jamais égale à une autre : deux échecs ne font pas une valeur stable) ; un prédicat qui lève vaut faux.
+// Une pause fixe reste juste pour PROUVER UNE ABSENCE (« rien n'est arrivé en N ms » ne s'attend que par une durée) ou quand la durée est l'objet testé (débounce, cadence de répétition).
 import { spawn } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 
 export const ECHEANCE = Number(process.env.VF_CDP_ECHEANCE_MS) || 90000;
@@ -60,6 +74,29 @@ export async function ouvrir(chrome, { csp = false } = {}) {
     await send('Page.enable'); if (csp) await send('Log.enable');
     return { send, ev, naviguer, attendre, stable, fermer, violations };
   } catch (e) { await fermer(); throw e; }
+}
+
+// ---- aides « mesurer une fois posé » (voir l'en-tête) ----
+const identiques = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const lireSur = async (lire) => { try { return { v: await lire(), ok: true }; } catch { return { v: undefined, ok: false }; } };
+const vrai = (predicat, v) => { try { return !!predicat(v); } catch { return false; } };
+export async function stabiliser(lire, { pas = 250, max = 10000 } = {}) {
+  const fin = Date.now() + max; let prec = null, der;
+  do { const c = await lireSur(lire); der = c.v; if (c.ok && prec && identiques(prec.v, c.v)) return c.v; prec = c.ok ? c : null; await pause(pas); } while (Date.now() < fin);
+  return der;
+}
+export async function attendreValeur(lire, predicat, { pas = 100, max = 10000 } = {}) {
+  const fin = Date.now() + max; let der;
+  do { const c = await lireSur(lire); der = c.v; if (c.ok && vrai(predicat, c.v)) return c.v; await pause(pas); } while (Date.now() < fin);
+  return der;
+}
+export async function attendreEtStabiliser(lire, predicat, opts = {}) {
+  await attendreValeur(lire, predicat, opts);
+  return stabiliser(lire, opts);
+}
+export function positionPosee(ev, expr, { pas = 120, max = 3000 } = {}) {
+  const lire = () => ev(`(() => { try { const e = (${expr}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, l: r.width, h: r.height, cx: r.x + r.width / 2, cy: r.y + r.height / 2 }; } catch { return null; } })()`);
+  return stabiliser(lire, { pas, max });
 }
 
 // executer(chrome, corps, opts) : ouvre la session, joue corps(session), imprime UNE ligne JSON ({ erreur } sur échec nommé), ferme Chrome, sort 0.
