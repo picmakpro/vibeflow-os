@@ -102,7 +102,7 @@ function png(buf) {
 // trous le long d'un trait : un pixel du trait sans encre (luminance > 60 dans ±2 densités autour de l'axe) est un trou
 const PHASES = [0, 0.25, 0.5, 0.75];
 const trous = (arr) => arr.reduce((n, v) => n + (v ? 0 : 1), 0);
-const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, AMORCE } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv;
 const { P, Q, amorce, plein, hostile, sortieHex, recepteurHex, avecRecepteur, densite, dossier, journal, recepteurPy } = JSON.parse(brut);
 const OQ = `http://127.0.0.1:${Q}`, MS = Number(process.env.VF_XTERM_MS) || 20000;
@@ -122,6 +122,8 @@ const ESPION = `(() => { const E = window.__esp = { clip: 0, exec: 0, confirm: 0
 // Le contexte du cadre est retrouvé par sondage des identifiants (le socle n'expose pas les évènements) : le plus récent à porter window.vfTermVue.
 const OP = `http://127.0.0.1:${P}`, SBX = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox';
 let ctx = 0, theme = 'dark';
+// amorçage (Chrome à froid : premier chargement de P, du cadre de Q, premier terminal) : borné par AMORCE (échéance globale), jamais par MS ; les attentes suivantes restent à MS
+let froid = true; const msA = () => (froid ? Math.max(MS, AMORCE) : MS);
 const monde = async (sp, etendue = 600) => {
   let trouve = 0;
   for (let id = 1; id < etendue; id++) {
@@ -157,13 +159,13 @@ await executer(chrome, async (sp) => {
   };
   const ouvrirCadre = async () => {
     ctx = 0;
-    await sp.naviguer(`${OP}/project.html`); await sp.attendre(`document.readyState === 'complete'`, 'page P', MS);
+    await sp.naviguer(`${OP}/project.html`); await sp.attendre(`document.readyState === 'complete'`, 'page P', msA());
     await sp.ev(`(() => { document.querySelectorAll('iframe[data-t]').forEach((f) => f.remove()); const f = document.createElement('iframe'); f.dataset.t = '1'; f.setAttribute('sandbox', ${JSON.stringify(SBX)});
       f.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;border:0;z-index:99999'; f.src = '${OQ}/?theme=${theme}'; document.body.appendChild(f); })()`);
-    const fin = Date.now() + MS;
+    const fin = Date.now() + msA();
     let essais = 0;
     while (!ctx) { ctx = await monde(sp, 600 * 5 ** Math.min(essais++, 3)); if (!ctx) { if (Date.now() > fin) throw new Error('contexte du cadre de Q introuvable'); await pause(150); } }
-    await attCadre(`!!document.querySelector('.xterm-helper-textarea') || !!document.querySelector('#etat:not([hidden])')`, 'terminal ou carte dans le cadre');
+    await attCadre(`!!document.querySelector('.xterm-helper-textarea') || !!document.querySelector('#etat:not([hidden])')`, 'terminal ou carte dans le cadre', msA());
     await sp.ev(`document.querySelector('iframe[data-t]').focus()`); await evCadre(`(document.querySelector('.xterm-helper-textarea') || document.body).focus()`);
   };
   const s = { send: sp.send, ev: evCadre, attendre: attCadre, naviguer: ouvrirCadre };
@@ -183,9 +185,10 @@ await executer(chrome, async (sp) => {
     // SAF-1 : l'amorçage passe par la page Projet, qui monte le cadre de Q ; l'échange se fait dans le cadre (prêt = message ready de Q, après son rechargement sans fragment)
     await sp.send('Page.addScriptToEvaluateOnNewDocument', { source: `if (window.top === window) { window.__prets = []; addEventListener('message', (e) => { if (typeof e.data === 'string') window.__prets.push(e.data); }); }` });
     await sp.naviguer(`http://127.0.0.1:${P}/project.html#t=${amorce}`);
-    await sp.attendre(`window.__prets.includes('ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)', MS);
+    await sp.attendre(`window.__prets.includes('ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)', msA());
   });
-  await essai('invite', async () => { await s.naviguer(); await att(`${TXT}.includes('VFP>')`, 'invite du shell'); r.invite = true; });
+  await essai('invite', async () => { await s.naviguer(); await attCadre(`${TXT}.includes('VFP>')`, 'invite du shell', msA()); r.invite = true; });
+  froid = false; // le terminal a répondu une fois (ou l'amorçage a échoué nommé) : tout ce qui suit est une attente ordinaire
   if (!r.invite) return r;
 
   if (mode === 'collage') { // F2 (P71-D-26) : un texte à retour à la ligne ou à caractère de contrôle n'atteint le shell qu'après « Coller »
