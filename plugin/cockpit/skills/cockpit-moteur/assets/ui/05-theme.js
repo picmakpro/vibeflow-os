@@ -67,8 +67,8 @@
   btn.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') ev.stopPropagation(); });
   window.addEventListener('floorplan-theme-change', show);
   show();
-  window.addEventListener('resize', refit);
+  window.addEventListener('resize', fit);
   const hd = document.querySelector('header'); // le contenu de l'en-tête arrive après le thème (branche Git, badges, libellés traduits) : on revoit la place à chaque changement
-  if (hd) { new MutationObserver(refit).observe(hd, { childList: true, subtree: true, characterData: true }); const ro = new ResizeObserver(refit); for (const e of hd.querySelectorAll('.hl, .hc, .hr, #hdr-ext')) ro.observe(e); }
+  if (hd) { new MutationObserver(fit).observe(hd, { childList: true, subtree: true, characterData: true }); const ro = new ResizeObserver(refit); for (const e of hd.querySelectorAll('.hl, .hc, .hr, #hdr-ext')) ro.observe(e); }
   refit();
 })();
