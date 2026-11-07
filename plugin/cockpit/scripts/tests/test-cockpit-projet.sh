@@ -2,6 +2,7 @@
 # test-cockpit-projet.sh — graphe Projet du cockpit sur tout lab GSD (CKPT-06) : plat au gabarit GSD (P1),
 # partitionné (P2), sans liste de jalons avec missions (P3), contrat et absence de nom de compartiment (P4),
 # identité d'une phase = (compartiment, numéro) (P5), visite « Par où commencer » (O4 : ne revient pas d'elle-même ; O5 : étape par étape, cible, centrage, texte entier, « Passer », repère, français ; O6 : l'onglet Projet a sa propre visite, tirée de ses données).
+# R3 (retours panel, lot 6) : panneau « Format de la planification » (écarts comptés et situés, commande rejouable telle quelle, mots du cockpit, copie, section toujours affichée, bloc Santé masqué).
 # Fixtures écrites par la suite dans mktemp.
 # Exit 0 si tout passe, 1 sinon.
 
@@ -346,8 +347,191 @@ assert_eq "O6.2 — chaque étape vise une carte du graphe (n:<id> existant) ou 
 assert_eq "O6.3 — aucune étape ne parle de « La base de code » ni « dans le code »" "$(t8 'j.tour.filter((s)=>/base de code|dans le code|codebase/i.test([s.kicker,s.title,s.note].join(" "))).length')" "0"
 assert_eq "O6.4 — sur un lab sans STATE.md, aucune étape avec « ? », « undefined », « null » ni champ vide" "$(G "$WORK/g3.json" 'j.tour.filter((s)=>[s.title,s.note].some((x)=>!x||/\?|undefined|null/.test(x))).length')|$(G "$WORK/g3.json" 'j.tour.length>=2')" "0|true"
 assert_eq "O6.6 — les étapes dans l'ordre : le jalon en cours, la phase 2 (statut lisible), la mission, au travail (#vf-lock)" "$(t8 'j.tour.map((s)=>s.ref+(s.cible?"+"+s.cible:"")).join(" ")')" "n:ms-v1.0-mvp n:ph-2 n:dag-MISSION-ECRAN root+#vf-lock"
-assert_eq "O6.7 — le statut de la phase est celui de statutLisible (« en exécution »), le jalon dit les phases faites (« 1 sur 2 »), l'étape « au travail » nomme l'onglet Équipe" "$(t8 '[/en exécution/.test(j.tour[1].note),/1 sur 2/.test(j.tour[0].note),/Équipe/.test(j.tour[3].note)].join(",")')" "true,true,true"
+assert_eq "O6.7 — l'état de la phase est celui de sa CARTE (« en cours » : un plan non fait, une mission vivante ; PU-G-093, ce n'est plus le « en exécution » de STATE.md), sans « périmé » quand STATE.md s'accorde, le jalon dit les phases faites (« 1 sur 2 »), l'étape « au travail » nomme l'onglet Équipe" "$(t8 '[/en cours/.test(j.tour[1].note),!/périmé|en exécution/.test(j.tour[1].note),/1 sur 2/.test(j.tour[0].note),/Équipe/.test(j.tour[3].note)].join(",")')" "true,true,true,true"
 assert_eq "O6.8 — un lab sans planning : visite vide (le repli de 70-07 s'applique, sans parler de code)" "$(G "$WORK/g9.json" 'j.tour.length')" "0"
+
+# R1 (lot 6 « Projet », étape PR1 « vérité des états », 2026-11-06 ; arbitrage Samuel, message direct en session principale, 2026-11-06 : toutes les propositions du panel) : PU-G-093, 097, 099, DG-10. Sans navigateur.
+echo "=== R1 — vérité des états : une phase dit l'état de sa carte, jalon « Hors jalon », exigences non cochées, exigences sans doublon ==="
+# PU-G-093 : STATE.md « ready_to_plan » alors que tous les plans de la phase 2 sont faits (carte « à recetter »)
+LR="$WORK/r1"; B="$LR/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+## Milestones
+
+- 🚧 **v1.0 MVP** - Phases 1-2 (in progress)
+
+## Phases
+
+- [x] **Phase 1: Socle** - premier jet
+- [ ] **Phase 2: Écran** - second jet
+MD
+printf -- '---\nmilestone: v1.0 MVP\nstatus: ready_to_plan\ncurrent_phase: 2\ncurrent_phase_name: Écran\n---\n' | wr "$B/STATE.md"
+wr "$B/phases/01-socle/01-01-PLAN.md" <<'MD'
+<objective>Socle</objective>
+MD
+echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
+wr "$B/phases/02-ecran/02-01-PLAN.md" <<'MD'
+<objective>Écran</objective>
+MD
+echo ok > "$B/phases/02-ecran/02-01-SUMMARY.md"
+graph "$LR" "$WORK/gr1.json"
+assert_eq "R1.1 — PU-G-093 : meta.vf.phaseEtat est l'état de la carte (a-recetter) et STATE.md est dit périmé (ready_to_plan contredit)" "$(G "$WORK/gr1.json" 'j.meta.vf.phaseEtat+"|"+j.meta.vf.stateStale+"|"+j.nodes.find(n=>n.id==="ph-2").st')" "a-recetter|true|recette"
+assert_eq "R1.2 — PU-G-093 : la visite (étape 2) et le sous-titre disent « à recetter », jamais « prête à planifier » ; la visite signale STATE.md périmé" "$(G "$WORK/gr1.json" '[/à recetter/.test(j.tour[1].note),/STATE\.md semble périmé/.test(j.tour[1].note),/prête/.test(j.tour[1].note+j.project.summary),/phase 2 \(Écran\) · à recetter\./.test(j.project.summary)].join(",")')" "true,true,false,true"
+# repli : phase courante introuvable -> le statut de STATE.md, sans accusation de péremption
+printf -- '---\nmilestone: v1.0 MVP\nstatus: executing\ncurrent_phase: 9\n---\n' | wr "$B/STATE.md"
+graph "$LR" "$WORK/gr1b.json"
+assert_eq "R1.3 — PU-G-093 : phase courante introuvable : phaseEtat null, repli sur le statut de STATE.md (« en exécution »), jamais périmé" "$(G "$WORK/gr1b.json" '[j.meta.vf.phaseEtat,j.meta.vf.stateStale,/en exécution/.test(j.project.summary)].join(",")')" ",false,true"
+printf -- '---\nmilestone: v1.0 MVP\nstatus: ready_to_plan\ncurrent_phase: 2\ncurrent_phase_name: Écran\n---\n' | wr "$B/STATE.md"
+UIV="$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js"
+assert_eq "R1.4 — PU-G-093 / DG-13 : 00-vibeflow.js lit V.phaseEtat pour le bloc « Maintenant », dit STATE.md périmé, et écrit « Dans l'ordre de la feuille de route. » sous « Jalons »" "$(grep -c 'V\.phaseEtat' "$UIV" | awk '{print ($1>=2)?"ok":"ko"}')|$(grep -c 'STATE.md semble périmé' "$UIV")|$(grep -c "Dans l'ordre de la feuille de route\." "$UIV")" "ok|1|1"
+# PU-G-099 : un vrai jalon (clos) et deux phases hors jalon, faites
+LJ="$WORK/r1j"; B="$LJ/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+## Milestones
+
+- ✅ **v1.0 MVP** — Phase 1 (livré)
+
+## Phases
+
+- [x] **Phase 1: Socle** - premier jet
+- [x] **Phase 2: Annexe** - hors jalon
+- [ ] **Phase 3: Suite** - hors jalon
+MD
+wr "$B/phases/01-socle/01-01-PLAN.md" <<'MD'
+<objective>Socle</objective>
+MD
+echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
+graph "$LJ" "$WORK/gj.json"
+assert_eq "R1.5 — PU-G-099 : avec un vrai jalon, le groupe des phases sans jalon s'appelle « Hors jalon » (id ms-hors-jalon), plus « Phases »" "$(G "$WORK/gj.json" 'j.nodes.filter(n=>n.kind==="jalon").map(n=>n.id+"="+n.label).sort().join(",")')" "ms-hors-jalon=Hors jalon,ms-v1.0-mvp=v1.0 MVP"
+assert_eq "R1.6 — PU-G-099 : « Hors jalon » n'est ni dans meta.vf.milestones, ni dans « Historique » (1 jalon clos, 1 phase), ni jalon mis en avant, ni chaîne « puis »" "$(G "$WORK/gj.json" '[j.meta.vf.milestones.map(m=>m.key).join("+"),j.nodes.find(n=>n.id==="history").foot,j.nodes.find(n=>n.id==="ms-hors-jalon").parent,j.flows[0].title,j.links.filter(l=>l.k==="event"&&(l.a==="n:ms-hors-jalon"||l.b==="n:ms-hors-jalon")).length].join("|")')" "v1.0 MVP|1 jalons · 1 phases||Trajectoire de v1.0 MVP|0"
+assert_eq "R1.7 — PU-G-099 : sans aucun jalon, le groupe garde « Phases » (lab P3)" "$(G "$WORK/g3.json" 'j.nodes.filter(n=>n.kind==="jalon").map(n=>n.label).join(",")')|$(G "$WORK/g3.json" 'j.meta.vf.milestones.map(m=>m.key).join(",")')" "Phases|Phases"
+# PU-G-097 : phase faite dont des exigences ne sont pas cochées, et phase non faite (inchangée)
+LX="$WORK/r1x"; B="$LX/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+- [x] **Phase 1: Faite** - a
+- [ ] **Phase 2: Ouverte** - b
+MD
+printf -- '- [x] **A-01**: un\n- [ ] **A-02**: deux\n- [ ] **A-03**: trois\n- [x] **B-01**: un\n- [ ] **B-02**: deux\n\n| A-01 | Phase 1 | Complete |\n| A-02 | Phase 1 | Pending |\n| A-03 | Phase 1 | Pending |\n| B-01 | Phase 2 | Complete |\n| B-02 | Phase 2 | Pending |\n' | wr "$B/REQUIREMENTS.md"
+graph "$LX" "$WORK/gx.json"
+assert_eq "R1.8 — PU-G-097 : phase faite, 2 exigences sur 3 non cochées : « 2 exigences non cochées » (texte neutre), plus « 1/3 exigences » ; phase non faite : « 1/2 exigences » inchangé" "$(G "$WORK/gx.json" '["ph-1","ph-2"].map(i=>j.nodes.find(n=>n.id===i).foot).join("|")')" "2 exigences non cochées|1/2 exigences"
+# DG-10 (PU-G-052) : même exigence dans le fichier vivant du compartiment ET dans l'archive de jalon, même phase par la traçabilité
+LD="$WORK/r1d"; B="$LD/.planning"
+wr "$B/workstreams/alpha/ROADMAP.md" <<'MD'
+- [x] **Phase 1: Un** - a
+- [ ] **Phase 2: Deux** - b
+MD
+echo alpha > "$B/active-workstream"
+printf -- '- [x] **RND-02**: recherche\n- [ ] **NEW-01**: neuf\n\n| RND-02 | Phase 1 | Complete |\n| NEW-01 | Phase 2 | Pending |\n' | wr "$B/workstreams/alpha/REQUIREMENTS.md"
+printf -- '- [x] **RND-02**: recherche\n- [x] **OLD-09**: autre phase\n\n| RND-02 | Phase 1 | Complete |\n| OLD-09 | Phase 5 | Complete |\n' | wr "$B/milestones/v0-REQUIREMENTS.md"
+graph "$LD" "$WORK/gd.json"
+assert_eq "R1.9 — DG-10 : RND-02 (vivant + archive, même phase) n'est lue qu'UNE fois (RND-02 sous ph-1, jamais en double) ; l'exigence propre à l'archive (OLD-09, phase 5 sans carte) reste comptée : 3 exigences dont 2 cochées" "$(G "$WORK/gd.json" 'j.files.filter(f=>f.p.startsWith("req/")).map(f=>f.name).sort().join(",")')|$(G "$WORK/gd.json" 'j.meta.vf.counts.reqs+"/"+j.meta.vf.counts.reqsDone')" "NEW-01,RND-02|3/2"
+
+# R2 (lot 6 « Projet », étape PR2 « panneau de phase et visite », 2026-11-06 ; arbitrage Samuel, message direct en session principale, 2026-11-06 : toutes les propositions du panel) : PU-G-091, 092, 102, 103, 106, 107 (+ 104 côté moteur). Sans navigateur.
+echo "=== R2 — panneau de phase et visite : visite expliquée, mission vivante du jalon, texte propre, aucune répétition, exigence lisible ==="
+LK="$WORK/r2"; B="$LK/.planning"
+GOAL_LONG="Depuis une carte de phase ou de mission, ou depuis le cockpit, lancer du travail dans une session Claude Code qui tourne sur le poste, avec le contexte du projet, en anticipant les dépendances manquantes et les impossibilités avant de lancer, puis garder la main sur chaque étape du lancement jusqu'à la fin de la session, sans jamais écrire ni exécuter à la place de l'utilisateur sans son accord explicite."
+wr "$B/ROADMAP.md" <<MD
+## Milestones
+
+- ✅ **v0 Ancien** - Phase 1 (livré)
+- 🚧 **v1.0 MVP** - Phases 2-3 — **inscrit 2026-11-01** — le cockpit avec \`vf-signal\` <!-- vf-archive: .planning/archives/roadmap/x.md --> fin du jalon <!-- jamais fermé
+
+## Phases
+
+- [x] **Phase 1: Socle** - a
+- [ ] **Phase 2: Écran** - b
+- [ ] **Phase 3: Suite** - c
+
+### Phase 1: Socle
+**Goal**: Poser le socle
+
+### Phase 2: Écran
+**Goal**: Poser **l'écran** avec \`vf-signal\`
+
+### Phase 3: Suite
+**Goal**: $GOAL_LONG
+MD
+printf -- '---\nmilestone: v1.0 MVP\nstatus: executing\ncurrent_phase: 3\n---\n' | wr "$B/STATE.md"
+printf -- '- [ ] **UIFN-01**: À 700 px, l'"'"'en-tête tient sur une rangée.\n- [ ] **UIFN-02**: Le panneau garde une aide.\n\n| UIFN-01 | Phase 2 | Pending |\n| UIFN-02 | Phase 2 | Pending |\n' | wr "$B/REQUIREMENTS.md"
+wr "$B/phases/01-socle/01-01-PLAN.md" <<'MD'
+<objective>Socle</objective>
+MD
+echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
+wr "$B/phases/03-suite/03-01-PLAN.md" <<'MD'
+<objective>Suite</objective>
+MD
+# trois missions : une abandonnée d'un jalon CLOS (phase 1, la première du dossier), une terminée du jalon en cours (phase 2), une vivante du jalon en cours (phase 3)
+wr "$B/missions/MISSION-1.dag.json" <<'JSON'
+{"phase":"1","nodes":[{"id":"a","step":"s","deps":[],"status":"done"},{"id":"b","step":"s","deps":["a"],"status":"running"}]}
+JSON
+wr "$B/missions/MISSION-2.dag.json" <<'JSON'
+{"phase":"2","nodes":[{"id":"a","step":"s","deps":[],"status":"done"}]}
+JSON
+wr "$B/missions/MISSION-3.dag.json" <<'JSON'
+{"phase":"3","nodes":[{"id":"a","step":"s","deps":[],"status":"done"},{"id":"b","step":"s","deps":["a"],"status":"ready"},{"id":"c","step":"s","deps":["b"],"status":"ready"}]}
+JSON
+VF_PIN="$WORK/locks-abs" graph "$LK" "$WORK/gk.json"
+assert_eq "R2.1 — PU-G-091 : l'étape 1 de la visite dit ce que fait VibeFlow, puis « Jalon = … ; phase = … ; mission = … », et garde « Phases faites » (jalon en cours)" "$(G "$WORK/gk.json" '[/VibeFlow fait avancer/.test(j.tour[0].note),/Jalon = [^;]+ ; phase = [^;]+ ; mission = /.test(j.tour[0].note),/Phases faites : \d+ sur \d+/.test(j.tour[0].note)].join(",")')" "true,true,true"
+assert_eq "R2.2 — PU-G-092 : l'étape « missions » montre la mission VIVANTE du jalon en cours (MISSION-3), pas l'abandonnée d'un jalon clos (MISSION-1, la première du dossier)" "$(G "$WORK/gk.json" 'j.tour.find(s=>s.kicker==="Les missions").ref')" "n:dag-MISSION-3"
+assert_eq "R2.3 — PU-G-092 : les comptes sont ceux du jalon (2 missions : MISSION-2 et MISSION-3, pas les 3 du lab), le mot est « étapes » et jamais « nœuds »" "$(G "$WORK/gk.json" 'j.tour.find(s=>s.kicker==="Les missions").note')" "Ce jalon compte 2 missions ; celle-ci a 1 étape faite sur 3."
+# aucune mission vivante dans le jalon en cours : on retire MISSION-2 et MISSION-3, il ne reste que l'abandonnée du jalon clos
+cp -R "$LK" "$WORK/r2b"; rm -f "$WORK/r2b/.planning/missions/MISSION-2.dag.json" "$WORK/r2b/.planning/missions/MISSION-3.dag.json"
+VF_PIN="$WORK/locks-abs" graph "$WORK/r2b" "$WORK/gk2.json"
+assert_eq "R2.4 — PU-G-092 : aucune mission vivante dans le jalon en cours -> l'étape « missions » est omise (jamais l'abandonnée d'un jalon clos montrée) ; témoin : MISSION-1 est bien dans le graphe, abandonnée" "$(G "$WORK/gk2.json" 'j.tour.filter(s=>s.kicker==="Les missions").length+"|"+j.nodes.find(n=>n.id==="dag-MISSION-1").foot.includes("abandonnée")')" "0|true"
+# PU-G-102 : le jalon et la phase sans balisage brut ni commentaire d'archive
+assert_eq "R2.5 — PU-G-102 : le texte du jalon (résumé et détail) ne porte ni « ** », ni accent grave, ni « <!-- », ni « vf-archive » ; le sens reste (« inscrit 2026-11-01 », « fin du jalon »)" "$(G "$WORK/gk.json" '(()=>{const m=j.nodes.find(n=>n.id==="ms-v1.0-mvp");return [/\*\*|`|<!--|vf-archive/.test(m.summary+m.details),m.details.includes("inscrit 2026-11-01"),m.details.includes("fin du jalon")].join(",")})()')" "false,true,true"
+assert_eq "R2.6 — PU-G-102 : le but d'une phase est rendu sans gras ni accents graves, et aucune carte du graphe (résumé, détail) ne montre de balisage brut" "$(G "$WORK/gk.json" '[j.nodes.find(n=>n.id==="ph-2").summary,j.nodes.filter(n=>/\*\*|`|<!--/.test(n.summary+n.details)).length].join("|")')" "Poser l'écran avec vf-signal|0"
+# PU-G-103 : le résumé et le détail ne disent pas deux fois la même chose
+assert_eq "R2.7 — PU-G-103 : but court (tient dans le résumé) : le détail ne le reprend pas ; il garde « Reste : … » en tête" "$(G "$WORK/gk.json" '(()=>{const n=j.nodes.find(n=>n.id==="ph-2");return [n.details.includes("avec"),n.summary.includes("avec")].join(",")})()')" "false,true"
+assert_eq "R2.8 — PU-G-103 : but long (> 400 signes) : le résumé en porte le début, le détail la SUITE seulement ; mis bout à bout ils redisent le but une fois (ni répétition du début, ni perte)" "$(GOAL="$GOAL_LONG" node -e "
+const j=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')), n=j.nodes.find(x=>x.id==='ph-3'), d=n.details.split('\\n\\n')[0];
+const a=n.summary.replace(/…\$/,''), b=d.replace(/^…/,''), g=process.env.GOAL.replace(/\\s+/g,' ').trim();
+console.log([n.summary.length<=401, b.length>0, (a+' '+b).replace(/\\s+/g,' ').trim()===g||(a+b).replace(/\\s+/g,' ').trim()===g, !d.startsWith(a.slice(0,40))].join(','))" "$WORK/gk.json")" "true,true,true,true"
+# PU-G-106 : l'exigence se lit sur sa carte
+assert_eq "R2.9 — PU-G-106 : le pied d'une carte d'exigence est la phrase de l'exigence, plus « REQUIREMENTS.md »" "$(G "$WORK/gk.json" 'j.files.filter(f=>f.n==="ph-2.req").map(f=>f.foot).join("|")')" "À 700 px, l'en-tête tient sur une rangée.|Le panneau garde une aide."
+UIK="$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js"
+assert_eq "R2.10 — PU-G-107 / PU-G-104 / PU-G-106 : 00-vibeflow.js pose l'aide de navigation AVANT « Maintenant », construit le repli « Détails techniques » à l'ouverture du panneau et marque les cartes dont le pied répète la description" "$(node -e "
+const s=require('fs').readFileSync(process.argv[1],'utf8');
+const aide=s.indexOf('Double-clic sur une carte pour plonger'), now=s.indexOf('\${now}');
+console.log([aide>0&&aide<now,(s.match(/Double-clic sur une carte pour plonger/g)||[]).length===1,/SC\.on\('panel'/.test(s)&&/Détails techniques/.test(s),/vf-meme/.test(s)].join(','))" "$UIK")" "true,true,true,true"
+
+echo "=== R3 — panneau « Format de la planification » : écarts comptés et situés, commande rejouable, mots du cockpit, hors jalon (PU-G-153, 155, 156, 158, 160 ; DG-15) ==="
+# lab de dérive : 1 toléré (« Phase 2 : » ligne 11), 3 lignes non lues au ROADMAP et 1 aux exigences ; la phase 3 ne figure dans aucun jalon
+L3="$WORK/r3"; B="$L3/.planning"; mkdir -p "$B"
+printf '%s\n' '# Roadmap' '' '## Milestones' '' '- 🚧 **v1.0 Démo** - Phases 1-2 (in progress)' '' '## Phases' '' '- [x] **Phase 1: Socle** - a' '- [ ] **Phase 2: Écran** - b' '- [ ] **Phase 3: Orpheline** - c' '' \
+  '### Phase 1: Socle' '**Goal**: g1' '' '### Phase 2 : Écran' '**Goal** — g2' 'Dépends sur : Phase 1' '' '##### Phase 4: trop profond' > "$B/ROADMAP.md"
+printf '%s\n' '- [ ] **AUTH-01**: ok' '- [ ] **Req_02** illisible' > "$B/REQUIREMENTS.md"
+printf -- '---\nstatus: executing\ncurrent_phase: 2\nmilestone: v1.0 Démo\n---\n' > "$B/STATE.md"
+printf '<objective>Socle</objective>\n' | wr "$B/phases/01-socle/01-01-PLAN.md"; echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
+git -C "$L3" init -q && git -C "$L3" add -A && git -C "$L3" -c user.email=t@t -c user.name=t commit -qm init
+graph "$L3" "$WORK/g-r3.json"
+assert_eq "R3.1 — PU-G-155 : le compte de chaque niveau est dans la donnée (5 écarts : 1 toléré, 4 non lus) et la liste des lignes non lues a 4 entrées" "$(G "$WORK/g-r3.json" 'j.meta.vf.drift.ecartsN+"|"+JSON.stringify(j.meta.vf.drift.parNiveau)+"|"+j.meta.vf.drift.nonComprises.length')" '5|{"bloquant":0,"tolere":1,"info":0,"ignore":4}|4'
+assert_eq "R3.2 — PU-G-156 : la répartition par fichier des lignes non lues est la vraie (3 au ROADMAP, 1 aux exigences : le champ historique « fichier » ne dit que le premier constat), la règle tolérée donne son fichier:ligne" "$(G "$WORK/g-r3.json" '(()=>{const r=j.meta.vf.drift.regles;const i=r.find(x=>x.regle==="ligne-non-comprise"),t=r.find(x=>x.regle==="phase-deux-points");return i.fichiers.map(f=>f.fichier.split("/").pop()+":"+f.n).join(",")+"|"+i.fichier.split("/").pop()+"|"+t.emplacements.map(e=>e.fichier+":"+e.ligne).join(",")})()')" "ROADMAP.md:3,REQUIREMENTS.md:1|ROADMAP.md|.planning/ROADMAP.md:16"
+assert_eq "R3.3 — PU-G-156 : le correctif dit ce qu'il couvre (1 écart sur 5 : seule la ligne tolérée porte une réécriture)" "$(G "$WORK/g-r3.json" 'j.meta.vf.drift.couvertsN+"|"+j.meta.vf.drift.regles.filter(r=>r.corrigeable).map(r=>r.regle).join(",")')" "1|phase-deux-points"
+assert_eq "R3.4 — PU-G-160 : un lab dont une phase ne figure dans aucun jalon porte meta.vf.horsJalon ; un lab sans ce groupe, null (témoin : P1, au gabarit)" "$(G "$WORK/g-r3.json" 'JSON.stringify(j.meta.vf.horsJalon)')|$(G "$WORK/g1.json" 'JSON.stringify(j.meta.vf.horsJalon)')" '{"n":1,"id":"n:ms-hors-jalon"}|null'
+assert_eq "R3.5 — PU-G-160 : lab conforme -> aucun écart, aucune commande (la section existe quand même côté page, R3.20)" "$(G "$WORK/g1.json" 'j.meta.vf.drift.ecartsN+"|"+JSON.stringify(j.meta.vf.drift.commande)+"|"+j.meta.vf.drift.erreur')" '0|""|false'
+# PU-G-153 : la commande affichée est rejouée TELLE QUELLE depuis un autre dossier que le lab ; témoin rouge : l'ancienne forme (script relatif, chemin du lab réel) échoue depuis ce même dossier
+CMD3="$(G "$WORK/g-r3.json" 'j.meta.vf.drift.commande')"
+mkdir -p "$WORK/ailleurs-r3"; cp -R "$L3" "$WORK/r3-copie-a"; cp -R "$L3" "$WORK/r3-copie-b"
+OLD3="node vf-cockpit-drift.mjs '$WORK/r3-copie-a' --diff > drift.patch && git -C '$WORK/r3-copie-a' apply drift.patch"
+OLDRC="$(cd "$WORK/ailleurs-r3" && bash -c "$OLD3" >/dev/null 2>&1; echo $?)"
+assert_eq "R3.6 — PU-G-153, témoin rouge : l'ancienne commande (script relatif) échoue depuis un autre dossier que le lab (code de sortie non nul)" "$([ "$OLDRC" != 0 ] && echo echec)" "echec"
+CMDB="$(printf '%s' "$CMD3" | sed "s#$L3#$WORK/r3-copie-b#g")"
+assert_eq "R3.7 — PU-G-153 : la commande de la donnée est complète (aucun « <lab> », chemins absolus du script et du lab) ; rejouée telle quelle depuis un autre dossier sur une copie jetable : code 0, le toléré est corrigé et les 4 lignes non lues restent" "$(printf '%s' "$CMD3" | grep -c '<lab>')|$(printf '%s' "$CMD3" | grep -c "^node '/.*vf-cockpit-drift.mjs' '$L3' --diff | git -C '$L3' apply -\$")|$(cd "$WORK/ailleurs-r3" && bash -c "$CMDB" >/dev/null 2>&1; echo $?)|$(node "$DR" "$WORK/r3-copie-b" | head -1)" "0|1|0|4 écart(s) de format : 0 bloquant(s), 0 toléré(s), 0 info, 4 ligne(s) non comprise(s)."
+# un lab dont le chemin porte une espace et une apostrophe, puis un lab qui n'est qu'un sous-dossier d'un dépôt git : la même forme tient
+LQ="$WORK/lab d'essai r3"; cp -R "$L3" "$LQ"; node "$AUX/q.mjs" "$SCRIPTS" project "$LQ" > "$WORK/g-r3q.json"
+CMDQ="$(G "$WORK/g-r3q.json" 'j.meta.vf.drift.commande')"
+assert_eq "R3.8 — PU-G-153 : chemin du lab avec espace et apostrophe, la commande (entre apostrophes, « '\\'' ») s'exécute telle quelle : code 0, toléré corrigé" "$(cd "$WORK/ailleurs-r3" && bash -c "$CMDQ" >/dev/null 2>&1; echo $?)|$(node "$DR" "$LQ" | head -1 | grep -c ' 0 toléré')" "0|1"
+mkdir -p "$WORK/depot-r3"; cp -R "$L3" "$WORK/depot-r3/sous"; rm -rf "$WORK/depot-r3/sous/.git"; git -C "$WORK/depot-r3" init -q && git -C "$WORK/depot-r3" add -A && git -C "$WORK/depot-r3" -c user.email=t@t -c user.name=t commit -qm init
+node "$AUX/q.mjs" "$SCRIPTS" project "$WORK/depot-r3/sous" > "$WORK/g-r3s.json"
+assert_eq "R3.9 — PU-G-153 : lab en sous-dossier d'un dépôt git : la commande s'applique (code 0, toléré corrigé)" "$(cd "$WORK/ailleurs-r3" && bash -c "$(G "$WORK/g-r3s.json" 'j.meta.vf.drift.commande')" >/dev/null 2>&1; echo $?)|$(node "$DR" "$WORK/depot-r3/sous" | head -1 | grep -c ' 0 toléré')" "0|1"
+assert_eq "R3.10 — PU-G-153 : la commande imprimée par le détecteur en ligne de commande est la même que celle de la page (une seule source)" "$(node "$DR" "$L3" | grep -c -F "$CMD3")" "1"
+# PU-G-158 : les mots du cockpit dans les messages des règles (ni « gabarit GSD », ni « Goal », ni « Depends on », ni « ignorée ») ; « current_phase » n'y reste que comme ligne à écrire
+printf '%s\n' '# Roadmap' '- [ ] **Phase 1: Un** - a' '- [ ] **Phase 2 : Deux** - b' '### Phase 1: Un' '**Depends on**: Nothing · **Parallélisable avec**: Phase 2' '**Goal** — g' > "$WORK/r3m.md"
+L3M="$WORK/r3m"; wr "$L3M/.planning/ROADMAP.md" < "$WORK/r3m.md"; printf -- '---\nstatus: executing\n---\n' | wr "$L3M/.planning/STATE.md"; git -C "$L3M" init -q
+MSG3="$(node "$DR" "$L3M" --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const c=JSON.parse(s).constats;console.log([...new Set(c.map(x=>x.regle))].sort().join(",")+"|"+c.map(x=>x.message).join(" / "))})')"
+assert_eq "R3.11 — PU-G-158 : les cinq règles sont sorties (témoin : toutes présentes) et leurs messages n'emploient ni « gabarit GSD », ni « Goal », ni « Depends on », ni « ignoré/ignorée »" "${MSG3%%|*}|$(printf '%s' "${MSG3#*|}" | grep -c -E 'gabarit GSD|Goal|Depends on|ignor')" "depends-on,jalons-absents,ligne-non-comprise,phase-courante-absente,phase-deux-points|0"
+# DG-15 : la cause (le bloc « Santé » de 20-health.js lit graph.health, que le graphe Projet ne porte pas) est levée côté page : le bloc est masqué avec le bouton, dans l'onglet Projet
+assert_eq "R3.12 — DG-15 : le graphe Projet ne porte aucune clé health (c'est la cause : 20-health.js en conclut « aucun problème trouvé ») ; l'onglet Projet masque le bloc Santé du panneau" "$(G "$WORK/g-r3.json" 'Object.keys(j).includes("health")||Object.keys(j.meta).includes("health")')|$(grep -c "#panel .sec:has(> .list > a\[data-hc-open\]) { display: none; }" "$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js")" "false|1"
 
 # O4 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : la visite « Par où commencer » revenait à chaque chargement et recouvrait la réponse. Cause : son « déjà vue » vivait dans le localStorage
 # de l'ORIGINE (port compris) et le port du serveur changeait à chaque lancement. Décision (même date, « C : port stable par lab ») : port stable par lab (vf-cockpit-port.mjs), « déjà vue » en localStorage seul,
@@ -631,6 +815,68 @@ for OPT in cartehaute cartehaute,police cartehaute,dejavu; do
     diag17 "O6.19 $OPT Projet" "$XH" "$W"
   done
 done
+# R3 (retours panel, lot 6) — le panneau « Format de la planification » dans Chrome : section toujours là (PU-G-160), écart en tête avec lien (PU-G-151), glyphes distincts (PU-G-159), liste lisible (PU-G-152),
+# clic = copie de « fichier:ligne » (PU-G-154), bouton Copier = exactement la commande affichée (PU-G-153, Q14), bloc Santé absent (DG-15). Le presse-papiers est remplacé par un témoin qui note ce qu'on lui donne.
+cat > "$AUX/format.mjs" <<'JS'
+// format.mjs <chrome> <session.mjs> <url> : une ligne JSON { ... } mesurée dans le panneau d'ensemble de l'onglet Projet
+import { pathToFileURL } from 'node:url';
+const [, , chrome, sess, url] = process.argv;
+const { executer, pause } = await import(pathToFileURL(sess).href);
+const r = await executer(chrome, async (s) => {
+  await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await s.naviguer(url); await s.attendre("document.readyState === 'complete' && !!document.querySelector('#panel .vf-stats') && !!document.getElementById('vf-format')", 'section Format'); await pause(1500);
+  return await s.ev(`(async () => {
+    window.__cp = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: (t) => { window.__cp.push(t); return Promise.resolve(); } }, configurable: true });
+    const q = (x) => document.querySelector(x), qa = (x) => [...document.querySelectorAll(x)];
+    const attente = (ms) => new Promise((r) => setTimeout(r, ms));
+    const sec = q('#vf-format'), al = q('.vf-alerte'), cmd = q('.vf-cmd code'), btn = q('.vf-cmd .vf-copie'), refs = qa('.vf-ref');
+    const txt = (e) => (e ? e.innerText.replace(/\\s+/g, ' ').trim() : '');
+    // glyphes : une pastille témoin par classe, injectée dans le panneau, lue par son style calculé (chaque forme est un masque propre)
+    const sonde = document.createElement('div'); document.body.appendChild(sonde);
+    const forme = (c) => { sonde.innerHTML = '<span class="vst vst-' + c + '">x</span>'; return getComputedStyle(sonde.firstChild).getPropertyValue('--g-st').trim(); };
+    const G = Object.fromEntries(['done', 'active', 'todo', 'blocked', 'recette', 'abandonnee', 'tolere', 'ignore', 'info'].map((c) => [c, forme(c)])); sonde.remove();
+    const o = { section: !!sec, titre: txt(sec && sec.querySelector('h3')), texteSection: txt(sec),
+      alerte: txt(al), lienAlerte: al && al.querySelector('[data-vf-section]') ? al.querySelector('[data-vf-section]').dataset.vfSection : '',
+      formes: Object.values(G).filter(Boolean).length, formesDistinctes: new Set(Object.values(G)).size,
+      santeDansDom: qa('#panel [data-hc-open]').length, sante: qa('#panel .sec').some((e) => e.querySelector('[data-hc-open]') && getComputedStyle(e).display !== 'none'),
+      listeTitre: txt(qa('#panel h3').find((h) => /non lues/.test(h.textContent))), nbRefs: refs.length,
+      commande: cmd ? cmd.textContent : '', commandeBouton: btn ? btn.dataset.vfCopie : '' };
+    const panneau = q('#panel'); o.debordeH = panneau.scrollWidth > panneau.clientWidth + 1;
+    if (refs.length) { const t = refs[0].querySelector('.vf-texte'), c = refs[0].querySelector('code'); o.largeurTexte = Math.round(t.getBoundingClientRect().width); o.largeurPanneau = Math.round(panneau.clientWidth); o.refSurUneLigne = c.getBoundingClientRect().height < 40; o.texteApresRef = t.getBoundingClientRect().top >= c.getBoundingClientRect().bottom - 1;
+      // le dernier segment (« ROADMAP.md:23 ») tient sur UNE ligne : jamais coupé au milieu d'un nom ou d'un numéro
+      const tn = [...c.childNodes].filter((n) => n.nodeType === 3).at(-1), seg = tn.textContent.split('/').pop(), r = document.createRange(); r.setStart(tn, tn.textContent.length - seg.length); r.setEnd(tn, tn.textContent.length); o.dernierSegmentUneLigne = r.getClientRects().length === 1; }
+    if (al) { al.querySelector('[data-vf-section]').click(); await attente(500); const s2 = q('#vf-format'); o.sectionVisible = (() => { const b = s2.getBoundingClientRect(), p = panneau.getBoundingClientRect(); return b.top >= p.top - 2 && b.top < p.bottom; })(); }
+    { const b2 = q('.vf-cmd .vf-copie'); if (b2) { b2.click(); await attente(300); o.copieCommande = window.__cp.at(-1) || ''; o.etatBouton = b2.textContent.trim(); } }
+    { const r2 = qa('.vf-ref')[0]; if (r2) { r2.click(); await attente(300); o.copieRef = window.__cp.at(-1) || ''; o.refAffichee = r2.querySelector('code').textContent.replace(/^Copié/, '').trim(); o.etatRef = r2.querySelector('.vf-copie-etat').textContent; } }
+    o.nbCopies = window.__cp.length;
+    return o; })()`);
+});
+console.log(JSON.stringify(r));
+JS
+mkdir -p "$WORK/lab-r3c/src"; LR3="$WORK/lab-r3c"; cp -R "$WORK/r3/.planning" "$LR3/.planning"; printf 'export const u = () => 1;\n' > "$LR3/src/util.js"
+git -C "$LR3" init -q && git -C "$LR3" add -A && git -C "$LR3" -c user.email=t@t -c user.name=t commit -q -m init; LABS4+=("$LR3")
+UR3="$(adr4 "$LR3")"; SRVPIDS+=("$(pid4 "$LR3")"); PR3="${UR3%index.html}project.html"
+XR3="$(node "$AUX/format.mjs" "$CHROME" "$SCRIPTS/tests/chrome-session.mjs" "$PR3")"
+[ -n "${DBG:-}" ] && echo "RAWR3: $XR3"
+xr3() { printf '%s' "$XR3" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "R3.13 — PU-G-155 : le panneau dit « 5 écarts : 1 lu malgré une petite différence, 4 non lus » (le compteur du titre vaut 5)" "$(xr3 'j.titre')|$(xr3 '/5 écarts : 1 lu malgré une petite différence, 4 non lus\./.test(j.texteSection)')" "Format de la planification 5|true"
+assert_eq "R3.14 — PU-G-151 : l'écart est dit EN TÊTE du panneau (« 4 lignes du planning non lues — chiffres peut-être incomplets ») avec un lien vers la section, qui l'amène à l'écran" "$(xr3 'j.alerte')|$(xr3 'j.lienAlerte')|$(xr3 'j.sectionVisible')" "4 lignes du planning non lues — chiffres peut-être incomplets · Voir|vf-format|true"
+assert_eq "R3.15 — PU-G-159 : « lu malgré une petite différence » (triangle), « non lu » (losange) et « à savoir » (anneau à point) ont chacun un glyphe de forme propre : neuf formes de pastille, non vides, toutes distinctes (dont l'anneau de « À faire » et la coche de « Fait »)" "$(xr3 'j.formes+"|"+j.formesDistinctes')" "9|9"
+assert_eq "R3.16 — PU-G-158 : le panneau n'emploie ni « gabarit GSD », ni « Goal », ni « Depends on », ni « toléré », ni « ignoré » ; il dit « Lu malgré une petite différence » et « Non lu — à corriger »" "$(xr3 '/gabarit GSD|Goal|Depends on|toléré|ignoré/.test(j.texteSection)')|$(xr3 '/Lu malgré une petite différence/.test(j.texteSection)')|$(xr3 '/Non lu — à corriger/.test(j.texteSection)')" "false|true|true"
+assert_eq "R3.17 — PU-G-152 : la liste « Lignes du planning non lues » a 4 lignes ; chaque chemin:numéro tient sur sa ligne en petit, le texte vient dessous en (presque) pleine largeur, et le dernier segment (« ROADMAP.md:23 ») n'est jamais coupé, sans défilement horizontal" "$(xr3 'j.listeTitre')|$(xr3 'j.nbRefs')|$(xr3 'j.refSurUneLigne')|$(xr3 'j.texteApresRef')|$(xr3 'j.largeurTexte>=j.largeurPanneau-70')|$(xr3 'j.debordeH')|$(xr3 'j.dernierSegmentUneLigne')" "Lignes du planning non lues 4|4|true|true|true|false|true"
+node "$AUX/q.mjs" "$SCRIPTS" project "$LR3" > "$WORK/g-r3c.json"
+assert_eq "R3.18 — PU-G-153 / Q14 : le bouton Copier donne au presse-papiers EXACTEMENT la commande affichée, qui est celle de la donnée (une seule source) ; le bouton dit « Copié » ensuite" "$(xr3 'j.copieCommande===j.commande&&j.commande===j.commandeBouton&&j.commande.length>60')|$([ "$(xr3 'j.copieCommande')" = "$(G "$WORK/g-r3c.json" 'j.meta.vf.drift.commande')" ] && echo meme)|$(xr3 'j.etatBouton')" "true|meme|Copié"
+assert_eq "R3.19 — PU-G-154 : un clic sur une ligne non lue copie « fichier:ligne » tel qu'affiché et dit « Copié » (deux copies au total : la commande, puis la ligne)" "$(xr3 'j.copieRef===j.refAffichee&&/ROADMAP\.md:\d+$/.test(j.copieRef)')|$(xr3 'j.etatRef')|$(xr3 'j.nbCopies')" "true|Copié|2"
+assert_eq "R3.20 — DG-15 : le bloc Santé existe dans la page (témoin positif : 1) mais est masqué dans l'onglet Projet : aucun « Aucun problème trouvé » ne côtoie les lignes non lues" "$(xr3 'j.santeDansDom')|$(xr3 'j.sante')" "1|false"
+# PU-G-160 : un lab CONFORME montre quand même la section (« Conforme · 0 ligne non comprise ») et y signale le groupe « Hors jalon »
+mkdir -p "$WORK/lab-r3d/src"; LR3D="$WORK/lab-r3d"; cp -R "$WORK/r3/.planning" "$LR3D/.planning"; printf '%s\n' '# Roadmap' '' '## Milestones' '' '- 🚧 **v1.0 Démo** - Phases 1-2 (in progress)' '' '## Phases' '' '- [x] **Phase 1: Socle** - a' '- [ ] **Phase 2: Écran** - b' '- [ ] **Phase 3: Orpheline** - c' '' '### Phase 1: Socle' '**Goal**: g1' '' '### Phase 2: Écran' '**Goal**: g2' '**Depends on**: Phase 1' > "$LR3D/.planning/ROADMAP.md"; printf '%s\n' '- [ ] **AUTH-01**: ok' > "$LR3D/.planning/REQUIREMENTS.md"
+printf 'export const u = () => 1;\n' > "$LR3D/src/util.js"; git -C "$LR3D" init -q && git -C "$LR3D" add -A && git -C "$LR3D" -c user.email=t@t -c user.name=t commit -q -m init; LABS4+=("$LR3D")
+UR3D="$(adr4 "$LR3D")"; SRVPIDS+=("$(pid4 "$LR3D")"); PR3D="${UR3D%index.html}project.html"
+XR3D="$(node "$AUX/format.mjs" "$CHROME" "$SCRIPTS/tests/chrome-session.mjs" "$PR3D")"
+[ -n "${DBG:-}" ] && echo "RAWR3D: $XR3D"
+xr3d() { printf '%s' "$XR3D" | node "$AUX/get.mjs" /dev/stdin "$1"; }
+assert_eq "R3.21 — PU-G-160 : lab conforme -> la section est affichée : « Conforme · 0 ligne non comprise », sans écart en tête, sans commande" "$(xr3d 'j.section')|$(xr3d 'j.titre')|$(xr3d '/Conforme · 0 ligne non comprise/.test(j.texteSection)')|$(xr3d 'j.alerte===""&&j.commande===""')" "true|Format de la planification|true|true"
+assert_eq "R3.22 — PU-G-160 : le groupe « Hors jalon » (phase 3, aucun jalon ne la cite) est signalé dans la section, même quand le lab est conforme" "$(xr3d '/Hors jalon 1 phase ne figure dans aucun jalon du ROADMAP/.test(j.texteSection)')|$(xr3d 'j.santeDansDom')|$(xr3d 'j.sante')" "true|1|false"
 unset VF_COCKPIT_PORT_BASE
 for L in "${LABS4[@]}"; do node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L" >/dev/null 2>&1; done; for p in "${SRVPIDS[@]}"; do vf_hyg_stop "$p"; done; SRVPIDS=()
 vf_hyg_assert
@@ -831,7 +1077,7 @@ printf -- '- [ ] Phase 1 sans séparateur\n' | wr "$WORK/p9-ill/.planning/ROADMA
 mut7 sansillisible vf-cockpit-drift.mjs "if (!nb && /(^|\\n)" "if (false && /(^|\\n)" > "$WORK/ancre-illis.txt"
 assert_eq "P9.7 (C10) — P6.9 garde son sens : sur « Phase 1 sans séparateur » le détecteur dit bloquant ; mutant (règle phases-illisibles coupée) : plus rien" "$(cat "$WORK/ancre-illis.txt")|$(node "$DR" "$WORK/p9-ill" --json | G /dev/stdin 'j.constats.filter(c=>c.niveau==="bloquant").length')|$(node "$WORK/mut-sansillisible/vf-cockpit-drift.mjs" "$WORK/p9-ill" --json | G /dev/stdin 'j.constats.filter(c=>c.niveau==="bloquant").length')" "muté|1|0"
 UIP="$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js"
-assert_eq "P9.8 (C7) — le chemin fichier:ligne du panneau ne se coupe jamais (white-space:nowrap, word-break:normal sur le <code> de nonComprises, aucun px)" "$(grep -A3 'const nonComprises = ' "$UIP" | grep -c '<code style="white-space:nowrap;word-break:normal">')|$(grep -A3 'const nonComprises = ' "$UIP" | grep -c 'px')" "1|0"
+assert_eq "P9.8 (C7, reprise PU-G-152) — le chemin:ligne du panneau ne se coupe jamais DANS son dernier segment : coupures permises après « / » seulement (<wbr>), word-break:normal et jamais overflow-wrap:anywhere sur son <code>, aucun px (le « white-space:nowrap » d'origine donnait des lignes écrasées à 1-3 signes avec défilement horizontal ; la mesure en navigateur est R3.17)" "$(grep -cF "replace(/\\//g, '/<wbr>')" "$UIP")|$(grep -c '\.vf-ref code { .*word-break: normal' "$UIP")|$(grep '\.vf-ref code { ' "$UIP" | grep -c 'overflow-wrap: anywhere')|$(grep -A3 'const nonComprises = ' "$UIP" | grep -c 'px')" "1|1|0|0"
 assert_eq "P9.9 (C8) — le commentaire de avancement.mjs dit où vit normNum (formats, ré-exporté par planning)" "$(grep -c 'normNum de vf-cockpit-formats, ré-exporté par vf-cockpit-planning' "$SCRIPTS/vf-cockpit-avancement.mjs")" "1"
 
 # ---------- P10 — croissance : aucune regex lue sur le planning n'est plus que linéaire (classe fermée, pas une forme à la fois) ----------

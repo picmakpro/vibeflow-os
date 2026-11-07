@@ -70,7 +70,7 @@ export function pageTerminal({ theme, origineP = "'none'" } = {}) {
   const attr = clair ? ' data-theme="light"' : '';
   const cfg = JSON.stringify({ origineP, theme: clair ? 'light' : 'dark' }).replace(/</g, '\\u003c'); // jamais une valeur d'adresse
   let html = `<!doctype html>\n<html lang="fr"${attr}><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>Terminal</title>\n`
-    + `<style>${vendor.polices}\n${STYLE_Q}</style>\n<style>${vendor.css}</style>\n</head><body><div id="terminal"></div><div id="etat" hidden></div>\n`
+    + `<style>${vendor.polices}\n${STYLE_Q}</style>\n<style>${vendor.css}</style>\n</head><body><div id="annonce" class="vf-q-sr" role="status" aria-live="polite"></div><div id="terminal"></div><div id="etat" hidden></div>\n`
     + `<script>${vendor.js}</script>\n<script>${vendor.fit}</script>\n<script>(${vueTerminal.toString()})(${cfg});</script>\n<script>(${clientTerminal.toString()})(${cfg});</script>\n</body></html>\n`;
   const csp = cspDe(html);
   const r = { html, csp };

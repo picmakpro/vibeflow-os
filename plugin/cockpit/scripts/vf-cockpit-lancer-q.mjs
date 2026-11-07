@@ -35,6 +35,8 @@ const formeOk = (m) => !!m && typeof m === 'object' && typeof m.cible === 'strin
 const entreeOk = (e, verbes) => !!e && typeof e === 'object' && typeof e.id === 'string' && ID_RE.test(e.id) && (e.kind === 'phase' || e.kind === 'mission')
   && Array.isArray(e.verbes) && e.verbes.length >= 1 && e.verbes.length <= 5 && new Set(e.verbes).size === e.verbes.length && e.verbes.every((v) => verbes.includes(v))
   && typeof e.verbe === 'string' && e.verbes.includes(e.verbe);
+// Exécuter sur une phase dont l'action principale est cadrer ou planifier (aucun plan) : avertissement ajouté, jamais un bloquant ; le même texte vit dans la page de P et dans la vue (terminal-vue)
+const sansPlan = (msg, entree) => [...msg.avertissements, ...(msg.verbe === 'executer' && entree && (entree.principal === 'cadrer' || entree.principal === 'planifier') && !msg.avertissements.includes('phase-sans-plan') ? ['phase-sans-plan'] : [])];
 const ligneOk = (gabarit, l) => { try { const r = gabarit.validerLigne(l); return !!r && r.ok === true; } catch { return false; } };
 
 // Appelle le gabarit (une fois, deux avec un chat, même session) ; { ok:false } pour un refus, une exception, des lignes incomplètes ou des intentions divergentes.
@@ -69,7 +71,7 @@ export function creerEtatLancer({ gabarit, maintenant = Date.now, genId = () => 
     const m = new Map(); let retenues = 0; let ecartees = 0;
     for (const e of l) {
       if (!entreeOk(e, gabarit.VERBES)) { ecartees += 1; continue; } // garde:entree-forme
-      m.set(e.id, { verbes: [...e.verbes], phase: e.phase, ws: e.ws }); retenues += 1;
+      m.set(e.id, { verbes: [...e.verbes], phase: e.phase, ws: e.ws, principal: e.verbe }); retenues += 1;
     }
     liste = m; return { ok: true, retenues, ecartees };
   }
@@ -85,7 +87,7 @@ export function creerEtatLancer({ gabarit, maintenant = Date.now, genId = () => 
     if (!c.ok) return refus('compose'); // garde:compose
     if (![...Object.values(c.lignes || {}), ...Object.values(c.lignesChat || {})].every((l) => ligneOk(gabarit, l))) return refus('compose'); // garde:alphabet
     if (attente) fermer(attente.id, 'remplacee');
-    const nouvelle = { id: genId(), cible: msg.cible, verbe: msg.verbe, phase, ws, session, cree_a: maintenant(), vue_a: null, bloquants: [...msg.bloquants], avertissements: [...msg.avertissements], lignes: c.lignes, intention: c.intention, chat: msg.chat !== undefined, lignes_chat: c.lignesChat }; // garde:vue-null
+    const nouvelle = { id: genId(), cible: msg.cible, verbe: msg.verbe, phase, ws, session, cree_a: maintenant(), vue_a: null, bloquants: [...msg.bloquants], avertissements: sansPlan(msg, entree), lignes: c.lignes, intention: c.intention, chat: msg.chat !== undefined, lignes_chat: c.lignesChat }; // garde:vue-null
     attente = nouvelle; // garde:remplace
     return { ok: true, id: nouvelle.id };
   }
@@ -96,7 +98,7 @@ export function creerEtatLancer({ gabarit, maintenant = Date.now, genId = () => 
     if (!dansListe(attente)) return { etat: 'aucune' }; // garde:liste-lire
     if (attente.vue_a === null) attente.vue_a = maintenant();
     const r = { etat: 'en-attente', id: attente.id, verbe: attente.verbe, intention: attente.intention, phase: attente.phase, ws: attente.ws, lignes: pick(attente.lignes), bloquants: [...attente.bloquants],
-      avertissements: [...attente.avertissements], arme_apres_ms: armeMs, expire_ms: attente.cree_a + expireMs - maintenant() };
+      avertissements: [...attente.avertissements], arme_apres_ms: armeMs, expire_ms: attente.cree_a + expireMs - maintenant(), duree_ms: expireMs };
     if (attente.chat) { r.chat = true; r.lignes_chat = pick(attente.lignes_chat); } // jamais l'identifiant du chat hors des lignes de reprise
     return r;
   }

@@ -129,6 +129,10 @@ export function readPlanning(root, layout, opts = {}) {
     for (const m of txt.matchAll(reExigences())) { const id = idExigence(m); if (!reqs.has(`${ws}|${id}`)) reqs.set(`${ws}|${id}`, { id, ws: ws || null, wsKey: ws, done: m[1].toLowerCase() === 'x', text: texteExigence(m), file: rel(f) }); }
     for (const m of txt.matchAll(reTraceabilite())) { const r = reqs.get(`${ws}|${m[1]}`); if (r && !r.phase) r.phase = normNum(m[2]); }
   }
+  // DG-10 (PU-G-052) : une exigence lue dans le fichier vivant d'un compartiment ET dans l'archive de jalon (clé joker `*`), avec le même identifiant et la même phase par la traçabilité,
+  // est UNE exigence : l'entrée du fichier vivant (case à jour) reste, celle de l'archive est écartée. Sans phase connue des deux côtés, rien n'est écarté (deux archives peuvent réutiliser un identifiant).
+  const vivantes = new Set([...reqs.values()].filter((r) => r.wsKey !== '*' && r.phase).map((r) => `${r.id}|${r.phase}`));
+  for (const [k, r] of [...reqs]) if (r.wsKey === '*' && r.phase && vivantes.has(`${r.id}|${r.phase}`)) reqs.delete(k);
 
   // état : frontmatter du STATE du compartiment actif, repli sur la ligne de corps « Phase: N »
   const sf = stateFile(root, layout); const sTxt = sf ? texte(read(sf)) : '';
