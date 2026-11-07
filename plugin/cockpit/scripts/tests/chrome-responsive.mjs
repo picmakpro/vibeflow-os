@@ -147,8 +147,8 @@ await executer(chrome, async (s) => {
   for (const w of largeurs.split(',').map(Number)) { await charger(w); await mesurer(String(w)); }
   if (resize && resize !== '-') {
     const [a, b] = resize.split(':').map(Number);
-    await charger(a); await taille(b); await mesurer(`resize:${a}:${b}`);
-    await taille(a); await mesurer(`resize:${b}:${a}`);
+    await charger(a); await taille(b); await calme(b); await mesurer(`resize:${a}:${b}`); // le re-cadrage qui suit un redimensionnement se pose comme celui d'un chargement : calme() avant de mesurer
+    await taille(a); await calme(a); await mesurer(`resize:${b}:${a}`);
   }
   return { mesures };
 });
