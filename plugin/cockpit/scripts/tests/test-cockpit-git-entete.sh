@@ -532,7 +532,7 @@ const lecture = async (rep) => { // une lecture du serveur (réponse simulée) ;
     return { branche: l.querySelector('.vf-git-branche').textContent, wt: l.querySelector('.vf-git-wt').textContent, etat: l.querySelector('.vf-git-ligne-etat').textContent, ligneCachee: l.hidden || cs.display === 'none',
       ouvreurCache: !o || o.hidden, dataGit: document.querySelector('header').hasAttribute('data-vf-git'), titre: l.title, aria: l.getAttribute('aria-label'), largeur: l.getBoundingClientRect().width,
       neutre: cs.color === neutre, halo: cs.boxShadow !== 'none' || cs.borderTopWidth !== '0px' || cs.backgroundColor !== 'rgba(0, 0, 0, 0)' }; })()`);
-  return attendreEtStabiliser(lire, (v) => rep.etat === 'ok' ? v.branche.includes(rep.branche) : rep.etat === 'absent' ? v.ligneCachee : true, { max: 10000 });
+  return attendreEtStabiliser(lire, (v) => rep.etat === 'ok' ? v.branche.includes(rep.branche) : rep.etat === 'absent' ? v.ligneCachee : /indisponible/.test(v.branche) || /^○/.test(v.branche), { max: 10000 }); // « indisponible » : « Branche indisponible » (aucune valeur connue) ou « ○ <dernière branche> » (non confirmée) — jamais l'état d'avant la réponse
 };
 if (mode === 'connue') {
   out.avant = await lecture({ etat: 'ok', branche: 'feat/memoire', worktree: 'wt-m' });
