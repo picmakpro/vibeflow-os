@@ -68,6 +68,7 @@
   window.addEventListener('floorplan-theme-change', show);
   show();
   window.addEventListener('resize', refit);
-  const ext = document.getElementById('hdr-ext'); if (ext) new MutationObserver(refit).observe(ext, { childList: true, subtree: true, characterData: true });
+  const hd = document.querySelector('header'); // le contenu de l'en-tête arrive après le thème (branche Git, badges, libellés traduits) : on revoit la place à chaque changement
+  if (hd) { new MutationObserver(refit).observe(hd, { childList: true, subtree: true, characterData: true }); const ro = new ResizeObserver(refit); for (const e of hd.querySelectorAll('.hl, .hc, .hr, #hdr-ext')) ro.observe(e); }
   refit();
 })();
