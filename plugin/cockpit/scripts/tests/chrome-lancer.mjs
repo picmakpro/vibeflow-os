@@ -6,7 +6,7 @@
 // seule exception : les fenêtres bornées d'observation d'une ABSENCE (FENETRE_ABSENCE).
 import fs from 'node:fs';
 import http from 'node:http';
-import { executer, pause } from './chrome-session.mjs';
+import { executer, pause, positionPosee } from './chrome-session.mjs';
 
 const SEL = { bandeau: 'proposition', lancer: 'proposition-lancer', mode: 'proposition-mode', ligne: 'proposition-ligne' }; // identifiants posés par 72-08
 const MS = Number(process.env.VF_LANCER_MS) || 20000, FENETRE_ABSENCE = 2000, APPARITION_MAX = 4000;
@@ -62,7 +62,8 @@ await executer(chrome, async (sp) => {
   const clic = async (x, y) => {
     for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await sp.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: type === 'mouseMoved' ? 0 : 1 });
   };
-  const sonder = (id) => ev(`(() => { const b = document.getElementById(${JSON.stringify(id)}); const q = b.getBoundingClientRect(); const x = q.x + q.width / 2, y = q.y + q.height / 2; const e = document.elementFromPoint(x, y);
+  const sonder = async (id) => { await positionPosee(ev, `document.getElementById(${JSON.stringify(id)})`); return sonderUneFois(id); }; // la position est lue une fois posée (bandeau rendu, terminal refit), puis relevée avec la cible du clic dans le MÊME ev
+  const sonderUneFois = (id) => ev(`(() => { const b = document.getElementById(${JSON.stringify(id)}); const q = b.getBoundingClientRect(); const x = q.x + q.width / 2, y = q.y + q.height / 2; const e = document.elementFromPoint(x, y);
     return { x, y, desactive: b.getAttribute('aria-disabled') === 'true', cible: e ? e.id : null }; })()`);
   const touche = async (o) => { await sp.send('Input.dispatchKeyEvent', { type: 'keyDown', ...o }); await sp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: o.key, code: o.code, windowsVirtualKeyCode: o.windowsVirtualKeyCode }); };
   const proposer = async () => { const x = await appeler('POST', '/api/vf/lancer', { cible, verbe }); if (x.statut !== 202) throw new Error(`POST /api/vf/lancer : ${x.statut}`); return Date.now(); };
@@ -122,8 +123,8 @@ await executer(chrome, async (sp) => {
   });
   // CH8 : clic de confiance sur « Annuler » ; GET /proposition du cadre (secret et onglet de la session du navigateur) rend aucune
   await essai('ch8', async () => {
-    const c = await ev(`(() => { const b = [...document.querySelectorAll('#${SEL.bandeau} button')].find((x) => x.textContent === 'Annuler'); const q = b.getBoundingClientRect(); return { x: q.x + q.width / 2, y: q.y + q.height / 2 }; })()`);
-    await clic(c.x, c.y); await attendre(`!${BANDEAU}`, 'disparition du bandeau après Annuler'); r.ch8.bandeau = !!(await ev(BANDEAU));
+    const q = await positionPosee(ev, `[...document.querySelectorAll('#${SEL.bandeau} button')].find((x) => x.textContent === 'Annuler')`); if (!q) throw new Error('bouton Annuler introuvable');
+    await clic(q.cx, q.cy); await attendre(`!${BANDEAU}`, 'disparition du bandeau après Annuler'); r.ch8.bandeau = !!(await ev(BANDEAU));
     const lire = `fetch('/proposition', { headers: { 'X-VF-Terminal': localStorage.getItem('vf.terminal.secret') || '', 'X-VF-Onglet': sessionStorage.getItem('vf.terminal.onglet') || '' }, cache: 'no-store' }).then((x) => x.json()).then((j) => j.etat, () => 'illisible')`;
     await attendre(`${lire}.then((e) => e === 'aucune')`, 'GET /proposition : aucune'); r.ch8.etat = await ev(lire);
   });
