@@ -2,17 +2,17 @@
 
 ## Non publié
 
-Retours du panel d'utilisateurs du cockpit (2026-11-06, registre `.planning/missions/2026-11-06-panel-utilisateurs-GLOBAL.md`, PU-G-001 à PU-G-204) : correctifs et réglages, aucune capacité nouvelle, aucun bump de version à ce stade. Réponses de Samuel aux questions du registre : arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 (Q1 C, Q3 A, Q9 A, Q12 lecture étroite, Q13 A, Q14, PU-G-001 « Garder ce compromis », PU-G-204, PU-G-162 option B, focus gardé sur « Annuler », « Corriger maintenant » pour le masque des secrets et la retenue de l'Entrée), la retenue de l'Entrée étendue à toute prise de focus du terminal le 2026-11-07, même canal.
+Retours du panel d'utilisateurs du cockpit (2026-11-06, registre `.planning/missions/2026-11-06-panel-utilisateurs-GLOBAL.md`, PU-G-001 à PU-G-204) : correctifs et réglages, aucune capacité nouvelle, aucun bump de version à ce stade. Réponses de Samuel aux 14 questions du registre, formulaire unique : arbitrage Samuel, AskUserQuestion session principale, 2026-11-06. Libellés choisis : Q1 « Icônes dans le menu ⋯ », Q3 « Termes Git + définition », Q4 « Préparer, puis Entrée », Q5 « Non, annoncé seulement », Q6 « Tout visible, expliqué », Q7 « Oui, 120 s visibles », Q8 « Non, Projet et Code », Q9 « Règle actuelle », Q10 « Flou gardé, texte court », Q11 « Inchangés » (et PU-G-045 « Fermer sous 1000 px », même jour), Q12 « Un seul latéral sous 1280 px » puis « Non, lecture étroite », Q13 « Inchangé, mieux dit », Q14 « Oui pour ces trois ». Même canal et même jour : PU-G-162 « Branche + ton nom /rename », DG-09 « Non, garder l'exclusion », PU-G-026 « Projet sans plancher », PU-G-001 « Garder ce compromis », PU-G-086 « Rien ne change », focus sur « Annuler » « Garder l'exception », Entrée tenue « Corriger maintenant », masque des secrets « Corriger maintenant ». Même canal, 2026-11-07 : Entrée tenue « Étendre à tous ».
 
 ### Ajouté
 - **Carte lisible à l'ouverture (onglet Code)** : zoom initial plancher, liaisons discrètes au repos, molette et toucher réglés pour la carte (PU-G-026 sur Code seulement, Projet sans plancher).
-- **Infobulle, description et chemins** : l'infobulle se range quand la carte se décale, la description d'un module tient sur trois lignes avec « Lire la suite » / « Réduire », les chemins se coupent après les « / » (Q10 : flou sans fond gardé).
+- **Infobulle, description et chemins** : l'infobulle se range quand la carte se décale, la description d'un module tient sur trois lignes avec « Lire la suite » / « Réduire », les chemins se coupent après les « / » (Q10 « Flou gardé, texte court »).
 - **Recherche** : focus posé, croix tactile, dossier parent sous le nom des homonymes.
 - **Fenêtre d'export au clavier, état réel des nœuds, anneau de focus de l'en-tête** à toutes les largeurs ; halo de la carte remplacé par un contour de 2 px.
 - **Bouton de copie de la commande de relance du cockpit** (`/vf-cockpit build`, Q14) : jamais un lancement ; le passage « pas de repli copier la commande » du README nomme cette exception.
 - **Panneau de détail fermé par défaut sous 1 000 px** (PU-G-045) ; **onglet Équipe sur une colonne à 390 px** (PU-G-176, limité à l'onglet Équipe).
 - **Bouton de thème avec son état** (mot du thème quand la place le permet, `aria-label` et `title` toujours) ; **visite cadrée**, en feuille au téléphone, avec une seule touche Échap pour la fermer (DG-05) ; la feuille de visite laisse libre la pastille Terminal.
-- **Santé** : compte exact, clés factices signalées comme telles, fichiers tiers écartés des conseils « découper » et « supprimer », services cités seulement s'ils sont utilisés, titre « Santé (sécurité seulement) » ; suite neuve `test-cockpit-sante.sh`.
+- **Santé** : compte exact, clés factices signalées comme telles, fichiers tiers écartés des conseils « découper » et « supprimer », services cités seulement s'ils sont utilisés ; suite neuve `test-cockpit-sante.sh`.
 - **Onglet Projet : états et exigences** (PU-G-093, 097, 098, 099) : « Maintenant », la visite et le sous-titre suivent l'état de la carte ; « STATE.md semble périmé : il dit « … » » quand `STATE.md` diverge ; « N exigences non cochées » ; « Reste : cadrage, plan, exécution, … » ; « Hors jalon ».
 - **Panneau Format de la planification** (PU-G-151 à 160) : « Copier » copie exactement la commande, commande de correctif complète avec chemins absolus (témoins espace et apostrophe) ; « Détails techniques » repliés (PU-G-104, repli seulement).
 - **Chat** (PU-G-096, 147, 150) : réponses non coupées en plein mot ; une expression régulière quadratique rendue linéaire (témoin).
@@ -21,14 +21,14 @@ Retours du panel d'utilisateurs du cockpit (2026-11-06, registre `.planning/miss
 - **Terminal : taille renvoyée au PTY à la reconnexion** (DG-08), accueil qui se range à la première frappe.
 - **Onglet Équipe, lot 9 « Au travail » et « Qui a la main »** (PU-G-134, 163 à 190) : « Aucune commande récente » sans saut, regroupement « × n » des répétitions de commandes, glyphe et mot neutres pour l'état (Q9 A), seuil de commande longue à 15 min, titre de session (/rename), « orphelin ? » et « aucune session active » ; nouveau fichier `ui/73-vf-tiroir-travail.js`. La commande reste abrégée et masquée (Q13 A).
 - **Onglet Équipe, lot 10 « tiroir Git »** (PU-G-042, 166, 192 à 201) : étiquette complète au survol et au focus, états sans couleur (Q9 A), termes Git avec leur définition au survol et au focus (Q3 A) ; le chemin vient après le nom.
-- **Coque étroite** (Q1 C, PU-G-001, 002, 007, 008, 011, 012, 142) : menu « ⋯ » jusqu'à 999 px, qui amende P70-D-01 ; PU-G-001 : « Garder ce compromis ».
-- **Un seul tiroir latéral sous 1 280 px** (Q12, PU-G-203) : ouvrir le tiroir Git replie « Au travail », et inversement, le focus va au tiroir qui s'ouvre ; lecture étroite (seul le contenu « Au travail » compte) ; l'option « le tiroir pousse la carte » est écartée (PU-G-204). Preuve : `test-cockpit-equipe.sh` (EK16).
-- **Titre de session `custom-title`** (PU-G-162, option B) : la liste blanche du transcript, fermée par P69-D-19 et P69-D-23, est amendée pour ce seul champ ; `ai-title` reste refusé.
+- **Coque étroite** (Q1 « Icônes dans le menu ⋯ », PU-G-001, 002, 007, 008, 011, 012, 142) : menu « ⋯ » jusqu'à 999 px, qui amende P70-D-01 ; PU-G-001 : « Garder ce compromis ».
+- **Un seul tiroir latéral sous 1 280 px** (Q12 « Un seul latéral sous 1280 px », PU-G-203) : ouvrir le tiroir Git replie « Au travail », et inversement, le focus va au tiroir qui s'ouvre ; « Non, lecture étroite » (seul le contenu « Au travail » compte) ; l'option « le tiroir pousse la carte » est écartée (PU-G-204). Preuve : `test-cockpit-equipe.sh` (EK16).
+- **Titre de session `custom-title`** (PU-G-162 « Branche + ton nom /rename ») : la liste blanche du transcript, fermée par P69-D-19 et P69-D-23, est amendée pour ce seul champ ; `ai-title` reste refusé.
 - **Suites neuves** : `test-cockpit-sante.sh`, `test-cockpit-ecrans-recent.sh`, `test-cockpit-moteur-carte.sh`, `test-cockpit-visite-retours.sh`.
-- **Tiroir terminal rouvert à 300 px au moins sur une proposition** (PU-G-136) : une proposition qui arrive sur un tiroir plus bas le remonte à 300 px, sans écraser la hauteur mémorisée.
+- **Tiroir terminal rouvert à 300 px au moins sur une proposition** (PU-G-136) : une proposition qui arrive sur un tiroir plus bas le remonte à 300 px, sans écraser la hauteur choisie par l'utilisateur, jamais en plein écran (3ee4c300).
 - **Pied du panneau Santé en français** (PU-G-080) : « elle vérifie le code avant de rien modifier » et « elle explique le choix et met le plan à jour une fois que vous avez décidé ».
-- **« Clic droit : plus d'actions »** (PU-G-036) : le libellé de la souris est fait, le deux-points exige une retouche de `viewer.html`.
-- **Libellé « Utilisé par »** (PU-G-100) : corrigé dans `viewer.html`, là où il vit.
+- **« Clic droit : plus d'actions »** (PU-G-036) : le deux-points est posé dans les infobulles de carte, de connexion et dans le pied d'aide (6b3d90ee).
+- **Libellé « Utilisé par »** (PU-G-100) : sur l'onglet Projet, le panneau d'une phase et les titres de colonnes lisent « Dépend de » / « Utilisé par » dans le bon sens ; le lien et l'ordre des cartes ne changent pas (6b3d90ee). Le panneau d'un fichier-plan et l'infobulle d'arête restent à l'ancien sens (BACKLOG).
 
 ### Corrigé
 - **Écran fantôme** (DG-02) : `findScreens` lisait `createFileRoute` dans un commentaire ; à 0 écran, le bouton « Écrans » n'est plus posé.
@@ -45,7 +45,7 @@ Retours du panel d'utilisateurs du cockpit (2026-11-06, registre `.planning/miss
 - **Libellés français** : Non classés, Demande d'origine, récent, liens, Module ; résumés sans « > » ni HTML, marqués « extrait brut ».
 
 ### Modifié
-- **Q1 C** : le menu « ⋯ » monte de 700 à 999 px (amende P70-D-01).
+- **Q1 « Icônes dans le menu ⋯ »** : le menu « ⋯ » monte de 700 à 999 px (amende P70-D-01).
 - **Limites consignées au BACKLOG** : états « annulée/expirée/remplacée » du lancement, état « bloqué » sans source, titres de santé à variables, 40-tour.js à 298 lignes (seuil 300) — voir `.planning/BACKLOG.md`.
 
 ## v1.4.0 — 2026-11-06 — non publié

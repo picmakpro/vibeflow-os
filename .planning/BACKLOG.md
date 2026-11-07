@@ -527,3 +527,22 @@ ou de `vf-new-lab`.
 - **Points de goût :** intentions en ASCII sans accent (alphabet fermé de la ligne, voulu) ; bouton principal « Cadrer » désactivé sur une phase finie ; pas de bouton « Lancer » sur la carte (l'action est le verbe) ; message du refus 409 générique (quatre causes indistinguables côté serveur) ; ligne `VFP>` vide ajoutée par le Ctrl-C avant la ligne proposée ; « Lancée » et la récence ne survivent pas à une relance du cockpit (en partie traité par PU-G-113, ci-dessus).
 
 **Déclencheur de reprise :** la prochaine recette de Samuel sur le lancement depuis les cartes.
+
+## Cockpit : sens des liens de phase restant à l'ancienne lecture (suite de PU-G-100) — DIFFÉRÉ (2026-11-07)
+
+**Priorité : basse.** À trancher par Samuel.
+
+**Origine :** jointure des retours du panel utilisateurs, 2026-11-07. PU-G-100 (6b3d90ee) a corrigé le panneau d'une phase et les titres de colonnes de l'onglet Projet ; lien et ordre des cartes inchangés.
+- **Reste lu dans l'ancien sens :** le panneau d'un fichier-plan (lien plan vers plan `depends_on`, `plugin/cockpit/scripts/vf-cockpit-project.mjs:130`) liste le prérequis sous « Utilisé par » avec la pastille « Mention » ; l'infobulle d'arête « Phase 1 → Phase 2 · Dépend de » aussi.
+- Lectures déjà fausses avant la jointure, hors demande du panel.
+
+**Déclencheur de reprise :** la prochaine passe sur le panneau d'un fichier-plan ou sur les infobulles d'arête.
+
+## Cockpit : titre « Health (security only) » et témoin S5.1 visent un bloc masqué sur Projet (DG-15) — DIFFÉRÉ (2026-11-07)
+
+**Priorité : basse.** À trancher par Samuel : garder ou retirer. Aucune suppression faite.
+
+**Origine :** jointure des retours du panel utilisateurs, 2026-11-07.
+- `ui/20-health.js:27` pose « Health (security only) » seulement quand l'onglet est Projet, or DG-15 masque tout le bloc santé sur Projet (`ui/00-vibeflow.js:134`) : ce titre n'est visible nulle part. Sa clé de dictionnaire et le témoin S5.1 de `test-cockpit-sante.sh` visent donc un bloc masqué.
+
+**Déclencheur de reprise :** la prochaine passe sur le panneau Santé ou le dictionnaire.
