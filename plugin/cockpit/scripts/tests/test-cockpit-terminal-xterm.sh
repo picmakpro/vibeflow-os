@@ -339,6 +339,7 @@ await executer(chrome, async (sp) => {
   if (mode === 'ecran') { // E3 (hauteur utile) et G3 (barre de défilement discrète) : le cadre de Q est redimensionné, la grille et la barre sont mesurées dans la page réelle
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
     const cadre = (w, h) => sp.ev(`document.querySelector('iframe[data-t]').style.cssText = 'position:fixed;left:0;top:0;width:${w}px;height:${h}px;border:0;z-index:99999'`);
+    await s.ev(`(() => { const b = [...document.querySelectorAll('#accueil button')].find((x) => x.textContent === 'Compris'); if (b) b.click(); return true; })()`); await pause(300); // LB3-S2 : l'accueil, dans la colonne, retire sa hauteur au terminal ; E3 mesure la hauteur utile du terminal SEUL (l'accueil a son témoin : LB.V20)
     r.e3 = {};
     for (const h of [160, 208, 280, 328, 570]) {
       await essai(`e3-${h}`, async () => {
@@ -370,6 +371,7 @@ await executer(chrome, async (sp) => {
     });
     // R2 : tout l'espace du cadre suit le fond du thème (le fond de la zone de défilement de xterm est noir par défaut) — styles calculés et colonne de pixels, dans les deux thèmes
     r.fond = {};
+    await essai('accueil-range', async () => { await s.ev(`(() => { const b = [...document.querySelectorAll('#accueil button')].find((x) => x.textContent === 'Compris'); if (b) b.click(); return true; })()`); await pause(300); }); // LB3 (PU-G-140) : la phrase d'accueil de la première ouverture se pose sur le bas du cadre ; R2 mesure le fond du cadre une fois rangée, comme le fait un utilisateur
     const FOND = `(() => { const t = getComputedStyle(document.getElementById('terminal')).backgroundColor, v = getComputedStyle(document.querySelector('.xterm-viewport')).backgroundColor; return { terminal: t, viewport: v }; })()`;
     for (const th of ['dark', 'light']) {
       if (th !== theme) { theme = th; await s.naviguer(); }

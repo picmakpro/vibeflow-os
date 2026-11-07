@@ -7,10 +7,10 @@
 #         textes hostiles, collage au-dessus, statuts, retrait
 #   LB.C  client sans navigateur (doublures Node, minuteur accéléré) : sondage précoce, formes refusées, écriture { id, mode }, mode retenu, aucun octet au PTY,
 #         annulation, cas froid (cadre masqué)
-#   LB.E  client réel + serveur factice du contrat §4 + faux P sous Chrome (E1 à E7, puis E8 cadre masqué)
+#   LB.E  client réel + serveur factice du contrat §4 + faux P sous Chrome (E1 à E7, E9 à E11, puis E8 cadre masqué)
 #   LB.F  F1 (focus) : faux P à champ de saisie, frappes abc, fenêtre focalisée puis non focalisée ; SP-1 : clic Lancer, tiroir fermé, le bandeau apparaît dans Q
 #   LB.P  le serveur factice écoute un port >= 4600 et différent de 4456
-#   M-*   vingt-trois mutants (copies des sources, « mutant sans effet » = FAIL)
+#   M-*   vingt-six mutants, plus six du lot 8 LB3-S (copies des sources, « mutant sans effet » = FAIL)
 # Sans Chrome : les sections statiques et les doublures tournent, la suite annonce SUITE SAUTÉE (navigateur) pour V et E.
 # Variables : VF_CLIENT_MS (échéance d'une attente navigateur, 20000 par défaut) · VF_LB_PORTS=bas-haut (plage de ports du serveur factice ; sinon ports libres du système).
 # Exit 0 si tout passe, 1 sinon.
@@ -58,21 +58,21 @@ export const ligne = (mode) => `claude --session-id '5b9c2e0a-7d41-4f3a-9c58-0e1
 export const valide = (id = ID_A, over = {}) => Object.assign({
   etat: 'en-attente', id, verbe: 'planifier', intention: 'Planifie la Phase 72 du compartiment alpha', phase: '72', ws: 'alpha',
   lignes: { default: ligne('default'), acceptEdits: ligne('acceptEdits'), plan: ligne('plan'), herite: ligne('') },
-  bloquants: [], avertissements: [], arme_apres_ms: 1500, expire_ms: 100000,
+  bloquants: [], avertissements: [], arme_apres_ms: 1500, expire_ms: 100000, duree_ms: 120000,
 }, over);
 export const NOTE = "Aucun mode n'est imposé : Claude Code suit les réglages de votre poste ou du projet ; un projet ne peut imposer ni « tout autoriser » ni auto (Claude Code 2.1.257 et plus).";
 export const MOTIFS = {
   'phase-finie': 'La phase est terminée.', 'terminal-absent': 'Le terminal est indisponible sur ce poste.', 'terminal-arrete': 'Le terminal est arrêté. Relancez /vf-cockpit --terminal.',
   'premier-plan-occupe': 'Un programme occupe déjà le terminal.', 'claude-introuvable': 'La commande claude est introuvable.', 'python3-absent': 'Python 3 est introuvable sur ce poste.',
   'phase-hors-motif': "Le numéro de phase n'est pas lançable.", 'compartiment-hors-motif': "Le nom du compartiment n'est pas lançable.",
-  'mission-hors-phase': 'Une mission hors phase ne se lance pas depuis sa carte.',
+  'mission-hors-phase': "Cette mission n'est rattachée à aucune phase : le lancement depuis une carte ne part que d'un numéro de phase. Pour la reprendre, ouvrez une session Claude Code dans le terminal, tapez /vf-dev et nommez la mission.",
   'dependance-non-close': 'Une phase dont celle-ci dépend n\'est pas close (lecture de la prose du ROADMAP, indicative).', 'mission-vivante': 'Une mission vivante travaille déjà sur cette phase.',
-  'phase-plus-avancee-ailleurs': 'La phase est plus avancée dans un autre arbre de travail.', 'lancement-recent': 'Cette cible a déjà été lancée récemment.',
+  'phase-plus-avancee-ailleurs': "Une version plus récente de ce travail existe à part (autre arbre de travail). Le lancement part du dossier principal, qui n'a pas cette avance : consultez cette version avant de lancer.", 'phase-sans-plan': "Aucun plan à exécuter pour cette phase : cadrez puis planifiez d'abord.", 'lancement-recent': 'Cette cible a déjà été lancée récemment.',
   'travail-non-commite': "Du travail non commité existe dans l'arbre de travail.",
 };
 export const INCONNU = 'Contrôle non reconnu.';
 export const MSG = {
-  occupe: 'Le terminal n\'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n\'a été écrit ; vérifiez, puis cliquez sur Lancer.', attendre: 'Patientez un instant, puis cliquez de nouveau sur Lancer.',
+  occupe: 'Le terminal n\'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n\'a été écrit ; vérifiez, puis cliquez sur Préparer dans le terminal.', attendre: 'Patientez un instant, puis cliquez de nouveau sur Préparer dans le terminal.',
   'sans-session': 'Aucune session de terminal n\'est ouverte : relancez le shell, puis réessayez.', refus: 'Le lancement a été refusé.', reseau: 'Le terminal ne répond pas.',
 };
 JS
@@ -140,7 +140,7 @@ globalThis.ResizeObserver = class { observe() {} };
 globalThis.requestAnimationFrame = () => 0;
 globalThis.FitAddon = { FitAddon: class { fit() {} } };
 globalThis.Terminal = class {
-  constructor() { J.terms++; this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; }
+  constructor() { J.terms++; this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; this.textarea = { addEventListener() {} }; }
   loadAddon() {} open() {} attachCustomKeyEventHandler() {} focus() { J.focus++; } write() {} paste() {} reset() {} resize() {} onData() {} onBinary() {}
 };
 const realSI = globalThis.setInterval;
@@ -277,7 +277,7 @@ const [, , dossier, moteur, portQ, portP, secret, run] = process.argv;
 const page = await import(pathToFileURL(`${dossier}/vf-cockpit-terminal-page.mjs`).href);
 page.preparerPage({ engineDir: moteur });
 const OQ = `http://127.0.0.1:${portQ}`, OP = `http://127.0.0.1:${portP}`;
-const journal = [], premiere = {}; let scen = { prop: null, lancers: [] };
+const journal = [], premiere = {}; let scen = { prop: null, lancers: [] }, finEtat = false; // scen.fin : le premier /flux se termine aussitôt et /etat dit la session terminée (bouton « Relancer le shell »)
 const lire = (req) => new Promise((ok) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => ok(Buffer.concat(c))); });
 const q = http.createServer(async (req, res) => {
   const chemin = new URL(req.url, OQ).pathname, corps = await lire(req);
@@ -292,8 +292,8 @@ const q = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.headers.origin !== OQ) return fin(403);
   if (req.method === 'GET' && (req.headers.origin ? req.headers.origin !== OQ : req.headers['sec-fetch-site'] !== 'same-origin')) return fin(403);
   const json = (st, o) => fin(st, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, JSON.stringify(o));
-  if (req.method === 'GET' && chemin === '/etat') return json(200, { etat: 'ok', session: 'vivante' });
-  if (req.method === 'GET' && chemin === '/flux') { note(200); res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' }); res.write('$ '); return; }
+  if (req.method === 'GET' && chemin === '/etat') return json(200, finEtat ? { etat: 'ok', session: 'terminee', code: 0 } : { etat: 'ok', session: 'vivante' });
+  if (req.method === 'GET' && chemin === '/flux') { note(200); res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' }); if (scen.fin) { scen.fin = false; finEtat = true; return res.end(); } finEtat = false; res.write('$ '); return; }
   if (req.method === 'POST' && chemin === '/taille') return fin(204);
   if (req.method === 'POST' && chemin === '/entree') { fs.appendFileSync(`${run}/entree.log`, corps.toString('hex') + '\n'); return fin(204); }
   if (req.method === 'GET' && chemin === '/proposition') {
@@ -386,6 +386,7 @@ const facadeQ = (s) => {
 const scenario = (o) => fetch(`${OP}/__scenario`, { method: 'POST', body: JSON.stringify(o) }).then((x) => { if (x.status !== 204) throw new Error('scénario refusé ' + x.status); });
 const journal = () => fetch(`${OP}/__journal`).then((x) => x.json());
 const entrees = () => { try { return fs.readFileSync(`${run}/entree.log`, 'utf8').split('\n').filter(Boolean).length; } catch { return 0; } };
+const retours = () => { try { return (fs.readFileSync(`${run}/entree.log`, 'utf8').replace(/\s/g, '').match(/(..)/g) || []).filter((o) => o === '0d').length; } catch { return 0; } }; // nombre d'octets \r reçus par l'entrée du shell factice
 
 await executer(chrome, async (s) => {
   const q = facadeQ(s), r = { erreurs }; let vu = false; // vu : le bandeau s'est affiché au moins une fois (témoin positif des sondes négatives E4 et E7)
@@ -457,7 +458,7 @@ await executer(chrome, async (s) => {
       await monter({ id: ID(51), intention, lignes: { default: hostile, acceptEdits: hostile + ' a', plan: hostile + ' b', herite: hostile + ' c' }, bloquants: ['<b>x</b>'], avertissements: ['<i>y</i>'] });
       await pause(400);
       const f = await q.ev(`(() => { const b = document.getElementById('proposition'); return { lit: b.textContent.includes(${JSON.stringify(intention)}), ligne: document.getElementById('proposition-ligne').textContent, img: b.querySelectorAll('img').length, m72: typeof window.__M72,
-        styles: b.querySelectorAll('[style]').length + (b.hasAttribute('style') ? 1 : 0), brut: b.textContent.includes('<b>x</b>') || b.textContent.includes('<i>y</i>'), noeuds: b.querySelectorAll('b, i, script, a, svg').length }; })()`);
+        styles: b.querySelectorAll('[style]').length + (b.hasAttribute('style') ? 1 : 0), brut: b.textContent.includes('<b>x</b>') || b.textContent.includes('<i>y</i>'), noeuds: b.querySelectorAll('b, i, script, a').length + [...b.querySelectorAll('svg')].filter((x) => !x.closest('.vf-q-risque')).length }; })()`); // LB2 : le seul svg admis est le glyphe du risque (LB.V11 le dénombre), jamais un nœud sorti d'un texte hostile
       r.v5 = [f.lit, f.ligne === hostile, f.img, f.m72, f.styles, f.brut, f.noeuds, s.violations.length].join('/');
       await raz();
     });
@@ -501,6 +502,140 @@ await executer(chrome, async (s) => {
         if (t === '' || t.includes(INCONNU)) sans.push(c);
       }
       r.v9 = codes.length + '/' + sans.join(','); await raz();
+    });
+    await essai('v10', async () => { // LB2 (PU-G-112, 120, 124) : accents à l'AFFICHAGE seulement, phrase en clair avant la commande, bouton « Préparer dans le terminal », phrase d'Entrée
+      const sortie = [];
+      for (const [verbe, affiche, intention, inf] of [['cadrer', 'Cadre', 'Cadre', 'cadrer'], ['planifier', 'Planifie', 'Planifie', 'planifier'], ['executer', 'Exécute', 'Execute', 'exécuter'], ['verifier', 'Vérifie', 'Verifie', 'vérifier'], ['reprendre', 'Reprends', 'Reprends', 'reprendre']]) {
+        await raz(); await monter({ id: ID(100), verbe, intention: `${intention} la Phase 72 du compartiment alpha` });
+        const f = await q.ev(`(() => { const b = document.getElementById('proposition'), ph = document.getElementById('proposition-phrase'), l = document.getElementById('proposition-ligne');
+          return { texte: b.querySelector('.vf-q-texte').textContent, phrase: ph.textContent, avant: !!(ph.compareDocumentPosition(l) & Node.DOCUMENT_POSITION_FOLLOWING), bouton: document.getElementById('proposition-lancer').textContent,
+            entree: document.getElementById('proposition-entree').textContent, ascii: /^[\\x20-\\x7e]+$/.test(l.textContent) }; })()`);
+        sortie.push([f.texte === `Lancement proposé : ${affiche} la Phase 72 du compartiment alpha`, f.phrase.startsWith(`L’assistant va ${inf} la phase 72 du compartiment alpha : `), f.avant, f.bouton, f.entree.includes('Appuyez sur Entrée dans le terminal pour démarrer.'), f.ascii].join('.'));
+      }
+      r.v10 = sortie.join(';'); await raz();
+    });
+    await essai('v11', async () => { // LB2 (PU-G-121, 122 ; Q9) : une ligne par mode, « Risqué » (glyphe + mot, couleur neutre) sur « Accepter les modifications » seulement, « votre dernier choix » seulement pour un mode retenu autre que « Par défaut »
+      await raz(); await monter({ id: ID(110), modeInitial: 'default' });
+      const a = await q.ev(`(() => { const li = [...document.querySelectorAll('#proposition-modes li')], cs = (e) => getComputedStyle(e), nom = (x) => x.querySelector('.vf-q-mode-nom').textContent, risque = document.querySelector('.vf-q-risque');
+        return { modes: li.map((x) => x.dataset.mode).join('|'), noms: li.map(nom).join('|'), aides: li.every((x) => x.textContent.length > nom(x).length + 20),
+          risques: li.filter((x) => x.querySelector('.vf-q-risque')).map((x) => x.dataset.mode + ':' + x.querySelector('.vf-q-risque').textContent + ':' + x.querySelectorAll('.vf-q-risque svg').length).join('|'),
+          neutre: !!risque && cs(risque).color === cs(document.querySelector('.vf-q-mode-nom')).color && cs(risque.querySelector('svg')).stroke === cs(risque).color,
+          decrit: document.getElementById('proposition-mode').getAttribute('aria-describedby') === 'proposition-modes', dernier: document.getElementById('proposition-modes').textContent.includes('dernier choix') }; })()`);
+      await monter({ id: ID(111), modeInitial: 'plan' });
+      const b = await q.ev(`document.querySelector('#proposition-modes li[data-mode="plan"] .vf-q-mode-nom').textContent + '/' + document.getElementById('proposition-modes').textContent.split('dernier choix').length`);
+      r.v11 = [a.modes, a.noms, a.aides, a.risques, a.neutre, a.decrit, a.dernier, b].join('/'); await raz();
+    });
+    await essai('v12', async () => { // LB2 (PU-G-123 ; Q6) : case du chat décochée par défaut, ce que fait la reprise et son risque écrits SANS exposer « -r … --fork-session » dans la phrase ; la commande, elle, change à la coche
+      const lc = (m) => ligne(m) + " -r '0b8c7d6e-1111-4222-8333-444455556666' --fork-session";
+      await raz(); await monter({ id: ID(120), chat: true, lignesChat: { default: lc('default'), acceptEdits: lc('acceptEdits'), plan: lc('plan'), herite: lc('') } });
+      const f = await q.ev(`(() => { const c = document.getElementById('proposition-chat'), a = document.getElementById('proposition-chat-aide'); return { coche: c.checked, desc: c.getAttribute('aria-describedby'), aide: a.textContent, ligne0: document.getElementById('proposition-ligne').textContent }; })()`);
+      await q.ev(`(() => { const c = document.getElementById('proposition-chat'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+      const l1 = await q.ev(`document.getElementById('proposition-ligne').textContent`);
+      r.v12 = [f.coche, f.desc, f.aide.includes('Reprend le fil de votre conversation'), f.aide.includes('Risque : la session lancée relit toute cette conversation'), !/--fork-session|-r '/.test(f.aide), !f.ligne0.includes('--fork-session'), l1.includes('--fork-session') && l1.includes("-r '0b8c7d6e")].join('/'); await raz();
+    });
+    await essai('v13', async () => { // LB2 (PU-G-114) : compte à rebours depuis expire_ms ; à l'échéance « Proposition expirée — la renvoyer. » (annoncé, seul « Fermer » reste) ; proposition(null) ne l'efface pas ; une disparition annoncée à moins de 3 s de l'échéance vaut expiration, pas à 100 s
+      await raz(); await monter({ id: ID(130), expire_ms: 90000 });
+      const c0 = await q.ev(`(() => { const e = document.getElementById('proposition-expire'), a = document.getElementById('annonce'); return e.textContent + '|' + e.getAttribute('role') + '|' + a.getAttribute('aria-live') + '|' + a.textContent; })()`);
+      await monter({ id: ID(131), expire_ms: 2500, arme_apres_ms: 400 });
+      await q.attendre(`(document.getElementById('proposition') || {}).getAttribute && document.getElementById('proposition').getAttribute('data-etat') === 'expiree'`, 'bandeau expiré', 8000);
+      const e1 = await q.ev(`(() => { const b = document.getElementById('proposition'); return b.querySelector('.vf-q-texte').textContent + '|' + [...b.querySelectorAll('button')].map((x) => x.textContent).join(',') + '|' + !!document.getElementById('proposition-lancer') + '|' + document.getElementById('annonce').textContent; })()`);
+      await q.ev(`(() => { vfTermVue.proposition(null); return true; })()`); await pause(200);
+      const reste = await q.ev(`!!document.getElementById('proposition')`);
+      await clic(`[...document.querySelectorAll('#proposition button')].find((b) => b.textContent === 'Fermer')`); await pause(200);
+      const ferme = await q.ev(`!document.getElementById('proposition')`);
+      await monter({ id: ID(132), expire_ms: 2000 }); await q.ev(`(() => { vfTermVue.proposition(null); return true; })()`);
+      const proche = await q.ev(`(document.getElementById('proposition') || { getAttribute: () => 'absent' }).getAttribute('data-etat')`);
+      await raz(); await monter({ id: ID(133), expire_ms: 100000 }); await q.ev(`(() => { vfTermVue.proposition(null); return true; })()`);
+      const loin = await q.ev(`!document.getElementById('proposition')`);
+      r.v13 = [c0, e1, reste, ferme, proche, loin].join('/'); await raz();
+    });
+    await essai('v14', async () => { // LB2 (PU-G-117 ; Q5) : le bandeau est avant la saisie dans l'ordre de la page, après la région annoncée (live, polie) qui le dit
+      await raz(); await monter({ id: ID(140) });
+      r.v14 = await q.ev(`(() => { const b = document.getElementById('proposition'), t = document.getElementById('terminal'), a = document.getElementById('annonce'), F = Node.DOCUMENT_POSITION_FOLLOWING;
+        return [!!(b.compareDocumentPosition(t) & F), !!(a.compareDocumentPosition(b) & F), a.getAttribute('role'), a.getAttribute('aria-live'), a.textContent.startsWith('Lancement proposé')].join('/'); })()`); await raz();
+    });
+    await essai('v15', async () => { // LB2 (PU-G-119) : un bandeau manipulé (sélecteur focalisé ET touche tapée il y a moins de 3 s, ou bouton de souris enfoncé dans le bandeau) n'est jamais remplacé ; un focus posé SANS geste ne protège rien ; libre, il est remplacé
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }); await s.ev(`document.querySelector('iframe[data-t]').focus()`);
+      await pause(3200); // un geste d'une étape précédente ne doit plus compter
+      await raz(); await monter({ id: ID(150) });
+      const nouvelle = (id) => q.ev(`(() => { const x = vfTermVue.proposition(Object.assign({}, __base, { id: ${JSON.stringify(id)}, modeInitial: 'default' }), __cb); return String(x) + ':' + document.getElementById('proposition').dataset.id; })()`);
+      await q.ev(`(() => { ${SEL}.focus(); return true; })()`);
+      const z = await nouvelle(ID(149)); // focus sans geste : remplacé
+      await q.ev(`(() => { ${SEL}.focus(); return true; })()`);
+      await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 });
+      const a = await nouvelle(ID(151)); // touche tapée dans le sélecteur : refusé
+      await q.ev(`(() => { document.activeElement.blur(); return true; })()`);
+      const b = await nouvelle(ID(151)); // focus rendu : remplacé
+      const c0 = await centre(`document.querySelector('#proposition .vf-q-texte')`);
+      await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: c0.x, y: c0.y, button: 'left', clickCount: 1 });
+      const c = await nouvelle(ID(152)); // souris enfoncée : refusé
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c0.x, y: c0.y, button: 'left', clickCount: 1 });
+      const d = await nouvelle(ID(152)); // relâchée : remplacé
+      r.v15 = [z === `undefined:${ID(149)}`, a === `false:${ID(149)}`, b === `undefined:${ID(151)}`, c === `false:${ID(151)}`, d === `undefined:${ID(152)}`].join('/'); await raz();
+    });
+    await essai('v16', async () => { // LB3 (PU-G-136) : cadre bas (124 px, le plus petit tiroir) : la proposition prend sa place SOUS le terminal au lieu de le recouvrir ; retirée, le terminal reprend toute la hauteur
+      await s.ev(`document.querySelector('iframe[data-t]').style.height = '124px'`); await pause(400);
+      await raz(); await monter({ id: ID(160) }); await pause(400);
+      r.v16 = await q.ev(`(() => { const t = document.getElementById('terminal').getBoundingClientRect(), b = document.getElementById('proposition').getBoundingClientRect(), H = innerHeight; return [H, t.height >= 24, t.bottom <= b.top + 0.5, b.height <= H * 0.6 + 1, b.bottom <= H].join('/'); })()`);
+      await raz(); await pause(400);
+      r.v16 += '/' + (await q.ev(`document.getElementById('terminal').getBoundingClientRect().height >= 120`));
+      await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
+    });
+    await essai('v17', async () => { // LB3 (PU-G-141 ; Q14) : la carte reste entière dans un cadre bas (marge de 8 px, sans défilement) ; « Copier la commande » copie EXACTEMENT la commande affichée, annonce le résultat ; aucun bouton de copie sur une proposition de lancement
+      await s.ev(`document.querySelector('iframe[data-t]').style.height = '124px'`); await pause(400);
+      await q.ev(`(() => { vfTermVue.carte('arrete'); window.__copie = null; document.addEventListener('copy', () => { window.__copie = String(getSelection()); }, true); return true; })()`); await pause(300);
+      const geo = await q.ev(`(() => { const k = document.querySelector('.vf-q-carte'), b = k.getBoundingClientRect(), H = innerHeight; return [b.top >= 7.5, b.bottom <= H - 7.5, k.scrollHeight <= k.clientHeight + 1].join('/'); })()`);
+      await clic(`[...document.querySelectorAll('.vf-q-carte button')].find((x) => x.textContent === 'Copier la commande')`); await pause(300);
+      const ap = await q.ev(`({ copie: window.__copie, affichee: document.querySelector('.vf-q-commande').textContent, bouton: [...document.querySelectorAll('.vf-q-carte button')].map((x) => x.textContent).join(','), annonce: document.getElementById('annonce').textContent })`);
+      await q.ev(`(() => { vfTermVue.effacer(); return true; })()`); await raz(); await monter({ id: ID(170) });
+      const sansCopie = await q.ev(`![...document.querySelectorAll('#proposition button')].some((x) => /copi/i.test(x.textContent))`); await raz();
+      r.v17 = [geo, ap.copie === ap.affichee && ap.affichee === '/vf-cockpit --terminal', ap.bouton, ap.annonce, sansCopie].join('|');
+      await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
+    });
+    await essai('v18', async () => { // LB3 (PU-G-140) : accueil de la première ouverture : effaçable, jamais d'octet au shell ni de focus pris ; une proposition ou une carte le remplace ; « Compris » le range pour de bon
+      await q.ev(`(() => { localStorage.removeItem('vf.terminal.accueil'); vfTermVue.proposition(null); return true; })()`);
+      const foc = () => q.ev(`document.activeElement ? document.activeElement.tagName + '#' + document.activeElement.id : ''`);
+      await q.ev(`(() => { const x = document.getElementById('accueil'); if (x) x.remove(); document.querySelector('.xterm-helper-textarea').focus(); return true; })()`); // état connu : pas d'accueil, le focus sur la saisie du terminal
+      const foc0 = await foc(), n0 = entrees();
+      await q.ev(`(() => { vfTermVue.effacer(); return true; })()`);
+      const a = await q.ev(`(() => { const e = document.getElementById('accueil'); return e ? [e.getAttribute('role'), e.textContent.includes('Vous n’en avez pas besoin pour suivre le travail dans le cockpit'), [...e.querySelectorAll('button')].map((x) => x.textContent).join(',')].join('|') : 'absent'; })()`);
+      const foc1 = await foc(); await pause(300); const n1 = entrees();
+      await monter({ id: ID(180) }); const remplace = await q.ev(`!document.getElementById('accueil')`); await raz();
+      await q.ev(`(() => { vfTermVue.effacer(); return true; })()`); const revient = await q.ev(`!!document.getElementById('accueil')`);
+      await q.ev(`(() => { vfTermVue.carte('refuse'); return true; })()`); const carte = await q.ev(`!document.getElementById('accueil')`);
+      await q.ev(`(() => { vfTermVue.effacer(); return true; })()`);
+      await clic(`[...document.querySelectorAll('#accueil button')].find((x) => x.textContent === 'Compris')`); await pause(200);
+      const ferme = await q.ev(`!document.getElementById('accueil') && localStorage.getItem('vf.terminal.accueil') === '1'`);
+      await q.ev(`(() => { vfTermVue.effacer(); return true; })()`); const nonRevenu = await q.ev(`!document.getElementById('accueil')`);
+      r.v18 = [a === 'status|true|Compris', foc0 === foc1, n0 === n1, remplace, revient, carte, ferme, nonRevenu].join('/');
+    });
+    await essai('v20', async () => { // LB3-S2 (F3, PU-G-140) : l'accueil ne masque ni la sortie ni l'invite (le terminal rétrécit, comme pour la proposition) ; il se range à la première frappe dans le terminal SANS la retenir ni la modifier (UN octet « x » au shell, celui de la frappe), le focus reste où il était ; « Compris » à la souris ne prend jamais le focus
+      await q.ev(`(() => { localStorage.removeItem('vf.terminal.accueil'); vfTermVue.proposition(null); const x = document.getElementById('accueil'); if (x) x.remove(); return true; })()`);
+      const foc = () => q.ev(`document.activeElement ? document.activeElement.className : ''`);
+      const lignesLog = () => { try { return fs.readFileSync(`${run}/entree.log`, 'utf8').split('\n').filter(Boolean); } catch { return []; } };
+      await q.ev(`(() => { vfTermVue.effacer(); return true; })()`); await pause(400);
+      await clic(`document.querySelector('.xterm-screen')`); await pause(200);
+      const foc0 = await foc(), n0 = lignesLog().length;
+      const geo = await q.ev(`(() => { const a = document.getElementById('accueil'), t = document.getElementById('terminal').getBoundingClientRect(), b = a.getBoundingClientRect(); return [t.bottom <= b.top + 1, b.bottom <= innerHeight + 1, t.height > 24, a.querySelector('button').tabIndex === -1].join('.'); })()`);
+      await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'x', code: 'KeyX', text: 'x', windowsVirtualKeyCode: 88 }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'x', code: 'KeyX', windowsVirtualKeyCode: 88 }); await pause(500);
+      const rangee = await q.ev(`!document.getElementById('accueil') && localStorage.getItem('vf.terminal.accueil') === '1'`), octets = lignesLog().slice(n0), focFin = await foc();
+      await q.ev(`(() => { localStorage.removeItem('vf.terminal.accueil'); vfTermVue.effacer(); return true; })()`); await pause(300);
+      await clic(`document.querySelector('.xterm-screen')`); await pause(200); const focS = await foc();
+      await clic(`[...document.querySelectorAll('#accueil button')].find((x) => x.textContent === 'Compris')`); await pause(200);
+      r.v20 = [geo, foc0 === 'xterm-helper-textarea' && foc0 === focFin, rangee, octets.length === 1 && octets[0] === '78', !(await q.ev(`!!document.getElementById('accueil')`)) && (await foc()) === focS].join('/');
+    });
+    await essai('v19', async () => { // LB3-S (revue LB1-LB2, findings b et a) : « Préparer » vient APRÈS la commande exacte et la case du chat dans l'ordre du document (donc de tabulation et de lecture) ; la carte et le bandeau d'état ne sont jamais masqués par la proposition, à 124 px comme à pleine hauteur
+      const lc = (m) => ligne(m) + " -r '0b8c7d6e-1111-4222-8333-444455556666' --fork-session";
+      await raz(); await monter({ id: ID(190), chat: true, lignesChat: { default: lc('default'), acceptEdits: lc('acceptEdits'), plan: lc('plan'), herite: lc('') } });
+      const ordre = await q.ev(`(() => { const f = (id) => document.getElementById(id), apres = (a, b) => !!(f(a).compareDocumentPosition(f(b)) & Node.DOCUMENT_POSITION_FOLLOWING); return [apres('proposition-ligne', 'proposition-lancer'), apres('proposition-chat', 'proposition-lancer'), apres('proposition-entree', 'proposition-lancer'), apres('proposition-modes', 'proposition-lancer'), !!document.querySelector('#proposition-modes li[data-mode="acceptEdits"] .vf-q-risque')].join('.'); })()`);
+      const masque = async (h, appel) => {
+        await s.ev(`document.querySelector('iframe[data-t]').style.height = '${h}'`); await pause(300); await raz(); await monter({ id: ID(191) }); await q.ev(`(() => { ${appel}; return true; })()`); await pause(300);
+        const v = await q.ev(`(() => { const e = document.querySelector('#etat .vf-q-bandeau, #etat .vf-q-carte'), b = e.getBoundingClientRect(), pts = [[(b.left + b.right) / 2, (b.top + b.bottom) / 2], [b.left + 24, b.bottom - 14], [b.left + 24, b.top + 14]]; return pts.every(([x, y]) => { const h = document.elementFromPoint(x, y); return !!h && !h.closest('#proposition'); }); })()`);
+        await q.ev(`(() => { vfTermVue.effacer(); vfTermVue.proposition(null); return true; })()`); return v;
+      };
+      const m = [await masque('124px', `vfTermVue.bandeau('reconnexion')`), await masque('124px', `vfTermVue.carte('arrete')`), await masque('100vh', `vfTermVue.bandeau('reconnexion')`), await masque('100vh', `vfTermVue.carte('arrete')`)];
+      r.v19 = [ordre, ...m].join('/');
+      await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
     });
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
@@ -561,6 +696,92 @@ await executer(chrome, async (s) => {
       await q.recharger(`${OQ}/?theme=dark&mode=acceptEdits&lancer=1&id=zzz`);
       await q.attendre(`!!document.getElementById('proposition')`, 'bandeau après rechargement', 5000); await pause(800);
       r.e6 = [await q.ev(`${SEL}.value`), (await journal()).filter((x) => x.u === '/lancer').length - n0].join('/');
+    });
+    await essai('e9', async () => { // LB2 (Q7 ; PU-G-118 et PU-G-119) : une proposition d'une visite précédente (cadre NEUF, 115 s d'âge) n'est jamais montrée ni annoncée et est effacée dans Q ; le MÊME cadre rechargé dans la même visite la retrouve
+      await scenario({ prop: valide(ID(91), { expire_ms: 5000, arme_apres_ms: 600 }), lancers: [] });
+      const n0 = (await journal()).filter((x) => x.u === '/annuler').length;
+      await q.naviguer(); await pause(3500);
+      const msgs = JSON.parse(await s.ev('JSON.stringify(window.__msgs)')).filter((m) => m.d === 'proposition').length;
+      const annule = (await journal()).filter((x) => x.u === '/annuler').length - n0, nul = await q.ev(`document.querySelectorAll('#proposition').length`);
+      await scenario({ prop: valide(ID(92), { expire_ms: 5000, arme_apres_ms: 600 }), lancers: [] });
+      await q.recharger(`${OQ}/?theme=light`); const garde = await q.attendre(`!!document.getElementById('proposition')`, 'proposition gardée', 5000).then(() => true, () => false);
+      r.e9 = [nul, msgs, annule >= 1, garde].join('/');
+    });
+    await essai('e10', async () => { // LB3-S (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06, remarque du relecteur de LB1-LB2) : Entrée TENUE sur « Préparer » ; le focus revient au terminal après la réponse, les répétitions de la touche ne l'atteignent pas ; Entrée relâchée puis pressée de nouveau passe
+      await scenario({ prop: valide(ID(101), { arme_apres_ms: 600 }), lancers: [] }); await q.naviguer();
+      await q.attendre(`!!document.getElementById('proposition')`, 'bandeau de la proposition', 5000); await attendreArme();
+      await clic(`document.getElementById('proposition-phrase')`); await q.ev(`${LANCER}.focus()`);
+      const touche = (type, extra = {}) => s.send('Input.dispatchKeyEvent', Object.assign({ type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, extra));
+      const r0 = retours(); await touche('keyDown', { text: '\r' });
+      await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après 204', 4000);
+      const foc = await q.attendre(`document.activeElement && document.activeElement.className`, 'focus rendu au terminal', 3000);
+      for (let i = 0; i < 6; i++) { await touche('keyDown', { text: '\r', autoRepeat: true }); await pause(40); }
+      await pause(400); const tenue = retours() - r0;
+      await touche('keyUp'); await pause(100);
+      await touche('keyDown', { text: '\r' }); await touche('keyUp'); await pause(500);
+      r.e10 = [foc, tenue, retours() - r0 - tenue].join('/');
+    });
+    const ENTREE_TOUCHE = (type, extra = {}) => s.send('Input.dispatchKeyEvent', Object.assign({ type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, extra)), SUR_TERMINAL = `!!document.activeElement && document.activeElement.className === 'xterm-helper-textarea'`;
+    await essai('e10b', async () => { // LB3-S2 (F2) : le cas du TAP — aucune touche n'a été tenue au clavier sur « Préparer » (clic de souris : le relâchement de touche est parti au bouton, ou n'a jamais existé) ; le focus revient au terminal ; une Entrée FRAÎCHE y passe : exactement UN octet CR, jamais avalé par la retenue
+      await scenario({ prop: valide(ID(102), { arme_apres_ms: 600 }), lancers: [] }); await q.naviguer();
+      await q.attendre(`!!document.getElementById('proposition')`, 'bandeau de la proposition', 5000); await attendreArme();
+      const r0 = retours(); await clic(LANCER);
+      await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après 204', 4000); await q.attendre(SUR_TERMINAL, 'focus rendu au terminal', 3000);
+      await ENTREE_TOUCHE('keyDown', { text: '\r' }); await ENTREE_TOUCHE('keyUp'); await pause(500);
+      r.e10b = String(retours() - r0);
+    });
+    await essai('e11', async () => { // LB3-S (finding c) : la référence d'âge est la durée servie par Q (duree_ms), pas une constante : une proposition FRAÎCHE d'une durée courte est montrée ; une ancienne d'une durée longue est effacée
+      await scenario({ prop: valide(ID(111), { duree_ms: 10000, expire_ms: 9000, arme_apres_ms: 600 }), lancers: [] }); await q.naviguer();
+      const courte = await q.attendre(`!!document.getElementById('proposition')`, 'proposition fraîche, durée courte', 4000).then(() => true, () => false);
+      await scenario({ prop: valide(ID(112), { duree_ms: 600000, expire_ms: 300000, arme_apres_ms: 600 }), lancers: [] }); const n0 = (await journal()).filter((x) => x.u === '/annuler').length;
+      await q.naviguer(); await pause(3500); const nul = await q.ev(`document.querySelectorAll('#proposition').length`), annule = (await journal()).filter((x) => x.u === '/annuler').length - n0;
+      await scenario({ prop: valide(ID(113), { duree_ms: 600000, expire_ms: 599000, arme_apres_ms: 600 }), lancers: [] });
+      const temoin = await q.attendre(`!!document.getElementById('proposition')`, 'témoin : proposition fraîche, durée longue', 4000).then(() => true, () => false);
+      r.e11 = [courte, nul, annule >= 1, temoin].join('/');
+    });
+    await essai('e12', async () => { // LB3-S2 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-07, option A) : la retenue de l'Entrée tenue couvre CHAQUE bouton qui rend le focus au terminal (Annuler, Abandonner, Coller, Relancer le shell) ; Entrée maintenue sur le bouton, répétitions après le retour du focus : 0 CR ; puis Entrée fraîche : exactement 1
+      const cycle = async (focaliser) => {
+        const r0 = retours(); await focaliser(); await ENTREE_TOUCHE('keyDown', { text: '\r' });
+        await q.attendre(SUR_TERMINAL, 'focus rendu au terminal', 3000);
+        for (let i = 0; i < 6; i++) { await ENTREE_TOUCHE('keyDown', { text: '\r', autoRepeat: true }); await pause(40); }
+        await pause(400); const tenue = retours() - r0;
+        await ENTREE_TOUCHE('keyUp'); await pause(100); await ENTREE_TOUCHE('keyDown', { text: '\r' }); await ENTREE_TOUCHE('keyUp'); await pause(500);
+        return tenue + '/' + (retours() - r0 - tenue);
+      };
+      const bouton = (zone, texte) => `[...document.querySelectorAll('${zone} button')].find((x) => x.textContent === ${JSON.stringify(texte)})`;
+      const coller = async () => { await q.ev(`(() => { const dt = new DataTransfer(); dt.setData('text/plain', 'a\\u200bb'); document.getElementById('terminal').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`); await q.attendre(`!!document.getElementById('collage')`, 'bandeau du collage', 3000); };
+      const sortie = [];
+      await scenario({ prop: valide(ID(121), { arme_apres_ms: 600 }), lancers: [] }); await q.naviguer(); await q.attendre(`!!document.getElementById('proposition')`, 'bandeau de la proposition', 5000);
+      sortie.push('annuler:' + await cycle(async () => { await clic(`document.getElementById('proposition-phrase')`); await q.ev(`${ANNULER}.focus()`); }));
+      await scenario({ prop: null }); await q.naviguer(); await coller();
+      sortie.push('abandonner:' + await cycle(async () => { await clic(`document.querySelector('#collage .vf-q-texte')`); await q.ev(`${bouton('#collage', 'Annuler')}.focus()`); }));
+      await coller();
+      sortie.push('coller:' + await cycle(async () => { await clic(`document.querySelector('#collage .vf-q-texte')`); await q.ev(`${bouton('#collage', 'Coller')}.focus()`); }));
+      await scenario({ prop: null, fin: true }); await q.naviguer(); await q.attendre(`!!${bouton('#etat', 'Relancer le shell')}`, 'bandeau du shell terminé', 5000);
+      sortie.push('relancer:' + await cycle(async () => { await clic(`document.querySelector('#etat .vf-q-texte')`); await q.ev(`${bouton('#etat', 'Relancer le shell')}.focus()`); }));
+      r.e12 = sortie.join('|');
+    });
+    // LB3-S3 (F1 de la revue de a83890da..45a2396e ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-07, « et tout autre bouton du même genre ») : la retenue est posée sur la PRISE DE FOCUS du terminal lui-même, pas sur chaque appelant.
+    // Le vrai client de Q tourne dans l'iframe de P ; P est ici une page minimale qui reproduit `cadre.focus()` de la pastille du tiroir (vf-cockpit-terminal-tiroir.mjs, ouvrir(true)) : un bouton de P dont l'Entrée (keydown) donne le focus à l'iframe.
+    const PASTILLE = `(() => { const b = document.createElement('button'); b.id = 'pastille-t'; b.textContent = 'Terminal'; b.style.cssText = 'position:fixed;right:0;bottom:0;z-index:100000'; b.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.querySelector('iframe[data-t]').focus(); }); document.body.appendChild(b); b.focus(); return document.activeElement.id; })()`;
+    const TERMINAL_FOCALISE = `document.hasFocus() && document.activeElement && document.activeElement.className === 'xterm-helper-textarea'`;
+    const reprises = async (r0) => { for (let i = 0; i < 6; i++) { await ENTREE_TOUCHE('keyDown', { text: '\r', autoRepeat: true }); await pause(40); } await pause(400); const tenue = retours() - r0; await ENTREE_TOUCHE('keyUp'); await pause(100); await ENTREE_TOUCHE('keyDown', { text: '\r' }); await ENTREE_TOUCHE('keyUp'); await pause(500); return tenue + '/' + (retours() - r0 - tenue); };
+    await essai('e13', async () => { // chemin PARENT : Entrée tenue sur la pastille de P, qui donne le focus à l'iframe de Q ; les répétitions qui suivent n'atteignent pas le shell ; puis Entrée fraîche : 1
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+      await scenario({ prop: null, lancers: [] }); await q.naviguer(); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.attendre(TERMINAL_FOCALISE, 'terminal focalisé', 5000);
+      const sur = await s.ev(PASTILLE); const r0 = retours();
+      await ENTREE_TOUCHE('keyDown', { text: '\r' }); await q.attendre(TERMINAL_FOCALISE, 'focus donné au terminal par le parent', 3000);
+      const premiere = retours() - r0;
+      r.e13 = [sur, premiere, await reprises(r0 + premiere)].join('/');
+    });
+    await essai('e14', async () => { // chemin « retour d'onglet » : le focus quitte le terminal, une Entrée est tenue, l'événement focus de la fenêtre de Q redonne le focus au terminal (écouteur window.focus du client) ; répétitions : 0 ; fraîche : 1
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+      await scenario({ prop: null, lancers: [] }); await q.naviguer(); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.attendre(TERMINAL_FOCALISE, 'terminal focalisé', 5000);
+      await q.ev(`(() => { document.querySelector('.xterm-helper-textarea').blur(); return true; })()`);
+      const r0 = retours(); await ENTREE_TOUCHE('keyDown', { text: '\r' });
+      await q.ev(`(() => { window.dispatchEvent(new Event('focus')); return true; })()`); await q.attendre(TERMINAL_FOCALISE, 'focus rendu au terminal par la fenêtre', 3000);
+      r.e14 = await reprises(r0);
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: false });
     });
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
@@ -695,9 +916,26 @@ assert_eq "LB.S1 — aucune écriture innerHTML, outerHTML ni insertAdjacentHTML
 assert_eq "LB.S1 — lignes de littéral de couleur : vue 6 / client 0 ; .style : 0 / 0 ; cssText : 0 / 0 ; rgb( ou hsl( : vue 3 / client 0 ; <chiffre>px : vue 0 / client 1" \
   "$(rj "$LV" 'j.couleur+"/"+j.style+"/"+j.css+"/"+j.rgb+"/"+j.px')|$(rj "$LC" 'j.couleur+"/"+j.style+"/"+j.css+"/"+j.rgb+"/"+j.px')" "6/0/0/3/0|0/0/0/0/1"
 assert_eq "LB.S2 — la table MESSAGES a exactement neuf clés dont proposition ; l'unique postMessage( vise cfg.origineP" "$(rj "$ST" 'j.cles+"/"+j.proposition+"/"+j.cible')" "9/true/true"
-assert_eq "LB.S3 — client <= 280 lignes, vue <= 215 lignes (le chiffre mesuré : client $(rj "$LC" j.lignes), vue $(rj "$LV" j.lignes))" "$(rj "$LC" 'j.lignes<=280')/$(rj "$LV" 'j.lignes<=215')" "true/true"
+assert_eq "LB.S3 — client <= 290 lignes, vue <= 290 lignes (le chiffre mesuré : client $(rj "$LC" j.lignes), vue $(rj "$LV" j.lignes)) ; le plafond a été relevé de 280/215 par le lot 8 (LB2), qui ajoute à la vue les phrases en clair, une explication par mode et pour la case du chat, le compte à rebours et le bandeau expiré" "$(rj "$LC" 'j.lignes<=290')/$(rj "$LV" 'j.lignes<=290')" "true/true"
 assert_eq "LB.S4 — aucun fiabilite ni gouvernance dans la vue ni le client ; aucun appel confirm(" "$(rj "$LV" 'j.compartiments+"/"+j.confirm')|$(rj "$LC" 'j.compartiments+"/"+j.confirm')" "0/0|0/0"
-assert_eq "LB.S4 — aucune valeur de style ajoutée : le fichier de style, la page et le tiroir ne sont pas modifiés (git, chemins du plan)" "$(git -C "$SCRIPTS" status --porcelain -- vf-cockpit-terminal-style.mjs vf-cockpit-terminal-page.mjs vf-cockpit-terminal-tiroir.mjs | wc -l | tr -d ' ')" "0"
+regles_prop() { grep -F '#proposition' "$1"; } # les règles de la proposition dans la feuille de Q : toutes portent #proposition
+# LB3-S2 (F6) : R3 du plan 72-08 (« seulement les variables CSS existantes ») couvre TOUTES les règles que le lot a ajoutées : #proposition, #accueil, .vf-lancer-armement, la carte tassée (.vf-q-carte { max-height … } et sa requête de média)
+regles_lot() { grep -E '#proposition|#accueil|vf-lancer-armement|vf-q-carte \{ max-height|@media \(max-height' "$1"; }
+# LB3-S3 (F3) : liste noire des couleurs dans les règles du lot : hexadécimaux, rgb( hsl( hwb( lab( lch( oklab( oklch( color-mix( color( light-dark( device-cmyk(, et tous les NOMS de couleur CSS (transparent et currentColor compris) ; hors usage autorisé : « stroke: currentColor » (le picto, préexistant, mesuré : seul emploi d'un mot-couleur dans le lot)
+NOMS_COULEUR='aliceblue|antiquewhite|aqua|aquamarine|azure|beige|bisque|black|blanchedalmond|blue|blueviolet|brown|burlywood|cadetblue|chartreuse|chocolate|coral|cornflowerblue|cornsilk|crimson|cyan|darkblue|darkcyan|darkgoldenrod|darkgray|darkgreen|darkgrey|darkkhaki|darkmagenta|darkolivegreen|darkorange|darkorchid|darkred|darksalmon|darkseagreen|darkslateblue|darkslategray|darkslategrey|darkturquoise|darkviolet|deeppink|deepskyblue|dimgray|dimgrey|dodgerblue|firebrick|floralwhite|forestgreen|fuchsia|gainsboro|ghostwhite|gold|goldenrod|gray|green|greenyellow|grey|honeydew|hotpink|indianred|indigo|ivory|khaki|lavender|lavenderblush|lawngreen|lemonchiffon|lightblue|lightcoral|lightcyan|lightgoldenrodyellow|lightgray|lightgreen|lightgrey|lightpink|lightsalmon|lightseagreen|lightskyblue|lightslategray|lightslategrey|lightsteelblue|lightyellow|lime|limegreen|linen|magenta|maroon|mediumaquamarine|mediumblue|mediumorchid|mediumpurple|mediumseagreen|mediumslateblue|mediumspringgreen|mediumturquoise|mediumvioletred|midnightblue|mintcream|mistyrose|moccasin|navajowhite|navy|oldlace|olive|olivedrab|orange|orangered|orchid|palegoldenrod|palegreen|paleturquoise|palevioletred|papayawhip|peachpuff|peru|pink|plum|powderblue|purple|rebeccapurple|red|rosybrown|royalblue|saddlebrown|salmon|sandybrown|seagreen|seashell|sienna|silver|skyblue|slateblue|slategray|slategrey|snow|springgreen|steelblue|tan|teal|thistle|tomato|turquoise|violet|wheat|white|whitesmoke|yellow|yellowgreen|transparent|currentcolor|canvas|canvastext|accentcolor|accentcolortext|highlight|highlighttext|buttonface|buttontext|linktext|field|fieldtext'
+couleurs_lot() { regles_lot "$1" | sed -E 's/stroke: *currentColor//g' | grep -ciE "#[0-9a-f]{3,8}([^0-9a-z_-]|\$)|(^|[^a-z0-9_-])(rgb|hsl|hwb|lab|lch|oklab|oklch|color-mix|color|light-dark|device-cmyk)a?\(|(^|[^a-z0-9_.#-])($NOMS_COULEUR)([^a-z0-9_-]|\$)" || true; }
+px_lot() { regles_lot "$1" | grep -oE '[0-9]+(\.[0-9]+)?px' | LC_ALL=C sort | tr '\n' ' '; } # tous les littéraux en px des règles du lot, triés
+echem_prop() { regles_prop "$1" | grep -cE '(font-size|width|height): *[0-9.]+em' || true; }
+nb_prop() { [ "$(regles_prop "$1" | wc -l | tr -d ' ')" -ge 8 ] && echo ok || echo vide; } # témoin : les règles sont bien trouvées (jamais un zéro obtenu sur une sélection vide)
+nb_lot() { [ "$(regles_lot "$1" | wc -l | tr -d ' ')" -ge 15 ] && echo ok || echo vide; }
+# EXCEPTIONS NOMMÉES : les seuls px du lot sans variable équivalente (aucun nouveau jeton, DESIGN.md) ; égalité d'ensemble, jamais une liste noire : un px de plus OU de moins rougit
+#  12.5px x2 : taille du texte courant dense (DESIGN.md §3), aide et liste des modes ; la feuille n'a aucune variable de taille de police
+#  44px x1   : hauteur du bandeau d'état (valeur de .vf-q-bandeau, préexistante), dans la marge de la proposition ; aucune variable
+#  560px x1  : largeur de la carte sur un cadre bas ; aucune variable
+#  240px x1  : seuil de la requête de média (max-height) ; une propriété personnalisée ne s'emploie pas dans une requête de média
+EXC_PX_LOT="12.5px 12.5px 240px 44px 560px "
+assert_eq "LB.S4 — aucune valeur de style en dur (R3, plan 72-08, élargi au lot 8 LB3-S2) : (1) aucun littéral de couleur, rgb( ni hsl( dans les règles ajoutées par le lot (témoin : elles sont trouvées) ; (2) leurs littéraux en px sont EXACTEMENT les exceptions nommées (12.5px x2 taille de texte, 44px hauteur du bandeau d'état, 560px largeur de carte, 240px seuil de média) ; (3) la page et le tiroir ne sont pas modifiés (git)" "$(nb_lot "$SCRIPTS/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$SCRIPTS/vf-cockpit-terminal-style.mjs")/$(px_lot "$SCRIPTS/vf-cockpit-terminal-style.mjs")/$(git -C "$SCRIPTS" status --porcelain -- vf-cockpit-terminal-page.mjs vf-cockpit-terminal-tiroir.mjs | wc -l | tr -d ' ')" "ok/0/$EXC_PX_LOT/0"
+assert_eq "LB.S5 — échelle de DESIGN.md (§3 texte courant dense 12-12,5 px, §7 pictos 16 x 16) : aucune taille en em dans les règles de la proposition ; témoin : l'aide et les modes sont à 12.5px et le picto à 16 px par le jeton --sp-16 (F6 : plus de littéral)" "$(echem_prop "$SCRIPTS/vf-cockpit-terminal-style.mjs")/$(regles_prop "$SCRIPTS/vf-cockpit-terminal-style.mjs" | grep -c 'font-size: 12.5px')/$(regles_prop "$SCRIPTS/vf-cockpit-terminal-style.mjs" | grep -c 'svg.i { width: var(--sp-16); height: var(--sp-16)')" "0/2/1"
 
 # --- LB.C : client sans navigateur -----------------------------------------------------------------------------------------------------------------------
 echo "=== LB.C — client de Q, doublures sans navigateur ==="
@@ -746,7 +984,7 @@ if [ -n "$CHROME" ]; then
   vv() { rj "$VJ0" "(j.erreur ? 'plante: ' + j.erreur : j.$1 !== undefined ? j.$1 : 'erreur: ' + ((j.erreurs || {}).$1 || 'étape absente'))"; }
   H="Lancement à confirmer"
   assert_eq "LB.V1 — #proposition : classes vf-q-bandeau vf-q-collage, role group, libellé de groupe ; sélecteur à quatre options dans l'ordre ; zone « Commande exacte » = lignes.default puis acceptEdits, herite (avec la note, sans --permission-mode), plan ; présélection modeInitial" \
-    "$(vv v1)" "vf-q-bandeau vf-q-collage/group/$H/Mode de permission/default|Par défaut;acceptEdits|Accepter les modifications;plan|Plan (lecture seule);herite|Hérité du poste/true/Commande exacte/Lancement proposé : Planifie la Phase 72 du compartiment alpha/Annuler,Lancer/false/true/false/true/false/true/true/false/plan/true"
+    "$(vv v1)" "vf-q-bandeau vf-q-collage/group/$H/Mode de permission/default|Par défaut;acceptEdits|Accepter les modifications;plan|Plan (lecture seule);herite|Hérité du poste/true/Commande exacte/Lancement proposé : Planifie la Phase 72 du compartiment alpha/Annuler,Préparer dans le terminal/false/true/false/true/false/true/true/false/plan/true"
   assert_eq "LB.V2 — bloquants phase-finie et terminal-absent : deux lignes « Bloquant : <motif> », Lancer reste aria-disabled=true après arme_apres_ms ; avertissement : « Attention : <motif> » et Lancer s'arme ; code inconnu : « Contrôle non reconnu. » jamais le code brut" "$(vv v2)" "true/true/true/true/false"
   assert_eq "LB.V3 — clic de confiance à arme_apres_ms / 3 : cb.lancer jamais appelé ; après armement : appelé UNE fois avec le mode choisi ; un second clic pendant que la promesse est en vol : ignoré" "$(vv v3)" 'tôt/0/["default"]'
   assert_eq "LB.V4 — un click() programmatique (non fiable) sur Lancer armé : ignoré ; puis le clic de confiance part (témoin)" "$(vv v4)" "0/1"
@@ -756,6 +994,17 @@ if [ -n "$CHROME" ]; then
     "$(vv v7)" "ok=ok;attendre=ok;occupe=ok;sans-session=ok;refus=ok;reseau=ok;absente=ok"
   assert_eq "LB.V8 — proposition(null) retire sans exception tardive (minuterie arrêtée) ; un identifiant nouveau remplace (un seul #proposition) ; le focus va à Annuler au premier affichage seulement" "$(vv v8)" "false/true/0/1/true/Annuler/true"
   assert_eq "LB.V9 — ST-2 : la liste des codes de pré-vol est DÉRIVÉE du module de cibles (non vide : $NCODES codes) et chaque code a un texte dans la vue (aucun « Contrôle non reconnu. »)" "$([ "$NCODES" -ge 14 ] && echo "$(vv v9)" || echo "liste trop courte: $NCODES")" "$NCODES/"
+  assert_eq "LB.V10 — LB2 (PU-G-112, 120, 124) : pour chacun des cinq verbes, l'intention AFFICHÉE porte les accents (Exécute, Vérifie) alors que la ligne de commande reste en ASCII ; la phrase en clair « L’assistant va <infinitif> la phase 72 du compartiment alpha : … » précède la commande ; le bouton s'appelle « Préparer dans le terminal » ; la phrase « Appuyez sur Entrée dans le terminal pour démarrer. » est écrite" "$(vv v10)" "true.true.true.Préparer dans le terminal.true.true;true.true.true.Préparer dans le terminal.true.true;true.true.true.Préparer dans le terminal.true.true;true.true.true.Préparer dans le terminal.true.true;true.true.true.Préparer dans le terminal.true.true"
+  assert_eq "LB.V11 — LB2 (PU-G-121, 122 ; Q9) : une ligne d'explication par mode, dans l'ordre ; « Risqué » (glyphe svg + mot, couleur identique au texte neutre, trait en currentColor) sur « Accepter les modifications » seulement ; aucun « dernier choix » pour « Par défaut » ; « Plan (lecture seule) — votre dernier choix » exactement une fois pour un mode retenu" "$(vv v11)" "default|acceptEdits|plan|herite/Par défaut|Accepter les modifications|Plan (lecture seule)|Hérité du poste/true/acceptEdits:Risqué:1/true/true/false/Plan (lecture seule) — votre dernier choix/2"
+  assert_eq "LB.V12 — LB2 (PU-G-123 ; Q6) : case du chat décochée par défaut, liée à sa phrase ; la phrase dit ce que fait la reprise et écrit « Risque : la session lancée relit toute cette conversation » sans « -r » ni « --fork-session » ; la commande exacte reste sans reprise tant que la case est décochée, puis porte « -r … --fork-session »" "$(vv v12)" "false/proposition-chat-aide/true/true/true/true/true"
+  assert_eq "LB.V13 — LB2 (PU-G-114) : compte à rebours « Expire dans 1 min 30 s » (role timer) et annonce polie ; à l'échéance « Proposition expirée — la renvoyer. » (seul bouton : Fermer, plus de bouton de lancement) ; proposition(null) ne l'efface pas, « Fermer » oui ; une disparition annoncée à 2 s de l'échéance vaut expiration, à 100 s elle retire" "$(vv v13)" "Expire dans 1 min 30 s|timer|polite|Lancement proposé : Planifie la Phase 72 du compartiment alpha. Expire dans 1 min 30 s./Proposition expirée — la renvoyer.|Fermer|false|Proposition expirée — la renvoyer./true/true/expiree/true"
+  assert_eq "LB.V14 — LB2 (PU-G-117 ; Q5) : le bandeau précède #terminal dans l'ordre de la page, la région #annonce (role status, aria-live polite) le précède et annonce « Lancement proposé… »" "$(vv v14)" "true/true/status/polite/true"
+  assert_eq "LB.V15 — LB2 (PU-G-119) : proposition() rend false et garde le bandeau tant qu'une touche vient d'être tapée dans le sélecteur de mode focalisé ou qu'un bouton de souris est enfoncé dans le bandeau ; un focus sans geste, ou un bandeau libre, est remplacé" "$(vv v15)" "true/true/true/true/true"
+  assert_eq "LB.V16 — LB3 (PU-G-136) : dans un cadre de 124 px (le plus petit tiroir), la proposition prend sa place sous le terminal (terminal d'au moins 24 px, son bas au-dessus du haut du bandeau, bandeau d'au plus 60 % du cadre, dans le cadre) ; retirée, le terminal reprend au moins 120 px" "$(vv v16)" "124/true/true/true/true/true"
+  assert_eq "LB.V17 — LB3 (PU-G-141 ; Q14) : la carte « Serveur arrêté » reste entière dans un cadre de 124 px (marge de 8 px en haut et en bas, sans défilement) ; « Copier la commande » copie EXACTEMENT /vf-cockpit --terminal (la sélection au moment de la copie est le texte affiché), le bouton dit « Copiée » et la région polie annonce « Commande copiée. » ; aucun bouton de copie sur une proposition de lancement" "$(vv v17)" "true/true/true|true|Copiée|Commande copiée.|true"
+  assert_eq "LB.V18 — LB3 (PU-G-140) : accueil à la première ouverture (role status, phrase « pas besoin pour suivre le travail », bouton Compris), aucun focus pris, aucun octet au terminal ; une proposition puis une carte le remplacent ; il revient tant qu'il n'est pas rangé ; « Compris » le range pour de bon (clé du stockage de Q posée, plus de retour)" "$(vv v18)" "true/true/true/true/true/true/true/true"
+  assert_eq "LB.V19 — LB3-S (revue LB1-LB2) : « Préparer » est APRÈS la commande exacte, la phrase d'Entrée, la case du chat ET la liste des modes (dont le « Risqué » d'acceptEdits, F8 du LB3-S2) dans l'ordre du document ; la carte « Serveur arrêté » et le bandeau « Reconnexion… » ne sont jamais masqués par la proposition (trois points de l'élément d'état testés), cadre de 124 px et pleine hauteur" "$(vv v19)" "true.true.true.true.true/true/true/true/true"
+  assert_eq "LB.V20 — LB3-S2 (F3, PU-G-140) : l'accueil se pose DANS la colonne (le bas du terminal est au-dessus de son haut, il tient dans le cadre, le terminal garde plus de 24 px, « Compris » n'est pas dans l'ordre de tabulation) ; à la première frappe dans le terminal il est rangé pour de bon (clé du stockage posée), la frappe arrive au shell intacte (UN seul envoi, l'octet 78), le focus du terminal reste ; « Compris » à la souris ne déplace pas le focus" "$(vv v20)" "true.true.true.true/true/true/true/true"
 
   echo "=== LB.E — client réel, serveur factice du contrat §4, faux P ==="
   faux "$SCRIPTS"; FQ0="$FQ"; FP0="$FP"; EJ="$(navig client)"; unfaux
@@ -767,6 +1016,13 @@ if [ -n "$CHROME" ]; then
   assert_eq "LB.E5 — depuis P, iframe.contentWindow.localStorage lève SecurityError (témoin : le stockage de Q porte le secret) ; le serveur factice sert acceptEdits : présélection acceptEdits (témoin) ; il sert bypassPermissions (forgé) : présélection default" "$(ev_ e5)" "SecurityError/secret/acceptEdits/default"
   assert_eq "LB.E6 — cadre chargé avec ?theme=dark&mode=acceptEdits&lancer=1&id=zzz, le serveur factice servant plan : présélection plan (un paramètre d'adresse lu donnerait acceptEdits), aucune requête /lancer" "$(ev_ e6)" "plan/0"
   assert_eq "LB.E7 — postMessage('proposition', '*') puis postMessage({ id: 'zzz' }, '*') du faux P vers le cadre : aucun nouveau bandeau, aucun POST /lancer" "$(ev_ e7)" "true/0/0"
+  assert_eq "LB.E9 — LB2 (Q7) : proposition d'une visite précédente (cadre neuf, 115 s d'âge) : aucun bandeau, aucun message proposition, POST /annuler parti ; le même cadre rechargé dans la même visite retrouve sa proposition" "$(ev_ e9)" "0/0/true/true"
+  assert_eq "LB.E10 — LB3-S, Entrée TENUE sur « Préparer » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : après le retour du focus au terminal, six répétitions de la touche (autoRepeat) n'envoient AUCUN octet \\r au shell ; Entrée relâchée puis pressée de nouveau : UN \\r (témoin)" "$(ev_ e10)" "xterm-helper-textarea/0/1"
+  assert_eq "LB.E10b — LB3-S2 (F2), le cas du TAP : « Préparer » au clic de souris (aucune Entrée tenue, le relâchement est parti au bouton ou n'a jamais existé), focus rendu au terminal, une Entrée FRAÎCHE : EXACTEMENT un \\r — la clause « pression fraîche » de la retenue ne l'avale jamais" "$(ev_ e10b)" "1"
+  assert_eq "LB.E12 — LB3-S2 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-07, option A) : Entrée TENUE sur chaque bouton qui rend le focus au terminal (Annuler de la proposition, Annuler du collage, Coller, Relancer le shell) : six répétitions après le retour du focus = 0 octet \\r ; puis une Entrée fraîche = 1 (témoin) ; cadre par bouton : <répétitions>/<fraîche>" "$(ev_ e12)" "annuler:0/1|abandonner:0/1|coller:0/1|relancer:0/1"
+  assert_eq "LB.E13 — LB3-S3 (F1, arbitrage Samuel, AskUserQuestion session principale, 2026-11-07), chemin PARENT : Entrée tenue sur un bouton de P qui appelle iframe.focus() au keydown (reproduit la pastille du tiroir ; le vrai client de Q est dans l'iframe) : la première pression n'envoie aucun \\r (le focus a changé entre keydown et keypress), six répétitions = 0 octet \\r, puis Entrée fraîche = 1 (témoin) ; cadre : <bouton focalisé>/<première pression>/<répétitions>/<fraîche>" "$(ev_ e13)" "pastille-t/0/0/1"
+  assert_eq "LB.E14 — LB3-S3 (F1), chemin « retour d'onglet » : le terminal a perdu le focus, une Entrée est tenue, l'événement focus de la fenêtre de Q (écouteur window.focus du client) lui rend le focus : six répétitions = 0 octet \\r, puis Entrée fraîche = 1 (témoin)" "$(ev_ e14)" "0/1"
+  assert_eq "LB.E11 — LB3-S (c), référence d'âge servie par Q : proposition fraîche d'une durée courte (duree_ms 10 s) montrée ; ancienne d'une durée longue (600 s, 300 s restantes) effacée dans Q (aucun bandeau, POST /annuler parti) ; témoin : une fraîche de durée longue est montrée" "$(ev_ e11)" "true/0/true/true"
   faux "$SCRIPTS"; FJ="$(navig froid)"; unfaux
   assert_eq "LB.E8 — cadre masqué : UN message proposition d'origine Q en moins de 4 s, aucun .xterm ni #proposition, aucune requête /flux, /lancer, /entree ; cadre agrandi : bandeau, /flux demandé, TOUJOURS UN seul message" \
     "$(rj "$FJ" "(j.erreur ? 'plante: ' + j.erreur : j.e8 !== undefined ? j.e8 : 'erreur: ' + ((j.erreurs || {}).e8 || 'étape absente'))")" "1/true/0/0/0/true|true|1"
@@ -790,7 +1046,7 @@ if [ -n "$CHROME" ]; then
 fi
 
 # --- mutants ---------------------------------------------------------------------------------------------------------------------------------------------
-echo "=== M-* — vingt-trois mutants (copies des sources) ==="
+echo "=== M-* — vingt-six mutants, plus six de LB3-S (copies des sources) ==="
 if mutant entree-auto vf-cockpit-terminal-client.mjs "/garde:apres-usage/s#.*#if (terminal) terminal.focus(); fetch('/entree', { method: 'POST', headers: entetes(), body: new Uint8Array([13]) });#"; then
   assert_eq "M-ENTREE-AUTO — le mutant rougit LB.C5 : un octet part à /entree après le 204 (témoin : le scénario s'exécute, le lancement est accepté)" "$(verdict "$(doubles "$MUT_DIR" focus)" 'j.st==="ok" && j.entrees===0')" "rouge"
 else sans_effet "M-ENTREE-AUTO"; fi
@@ -837,6 +1093,97 @@ if mutant retard-reaffiche vf-cockpit-terminal-client.mjs "/garde:fermee/d"; the
   assert_eq "M-RETARD-REAFFICHE — le mutant rougit LB.C2 : un sondage en retard remonte la proposition consommée (témoin : le lancement est accepté)" "$(verdict "$(doubles "$MUT_DIR" retard)" 'j.ok.st==="ok" && j.ok.dv===0 && j.ok.dm===0')" "rouge"
 else sans_effet "M-RETARD-REAFFICHE"; fi
 
+if mutant visite-ignoree vf-cockpit-terminal-client.mjs "/garde:visite/d"; then
+  [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e9"]')"; unfaux; assert_eq "M-VISITE-IGNOREE — le mutant rougit LB.E9 : la proposition d'une visite précédente est montrée puis remplacée (témoin : la sonde s'exécute et le même cadre rechargé la retrouve)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e9 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e9 === '0/0/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-VISITE-IGNOREE"; fi
+if mutant bandeau-fixe vf-cockpit-terminal-style.mjs "s|body #proposition { position: static;|body #proposition { position: fixed;|"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v16"]'; assert_eq "M-BANDEAU-FIXE — le mutant (le bandeau recouvre de nouveau le terminal) rougit LB.V16 (témoin : la sonde s'exécute et rend un résultat)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v16 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v16 === '124/true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-BANDEAU-FIXE"; fi
+if mutant entree-tenue vf-cockpit-terminal-client.mjs "/entreeTenue) { if (e.type/d"; then
+  [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e10"]')"; unfaux; assert_eq "M-ENTREE-TENUE — le mutant (la retenue des répétitions d'Entrée est retirée) rougit LB.E10 : des octets CR atteignent le shell (témoin : la sonde s'exécute et rend un résultat)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e10 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e10 === 'xterm-helper-textarea/0/1' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-ENTREE-TENUE"; fi
+if mutant pression-fraiche vf-cockpit-terminal-client.mjs "s/if (e.type === 'keyup' || !e.repeat) entreeTenue = false;/if (e.type === 'keyup') entreeTenue = false;/"; then
+  [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e10b"]')"; unfaux; assert_eq "M-PRESSION-FRAICHE — le mutant (la retenue ne se lève plus à une pression fraîche, seulement au relâchement) rougit LB.E10b : l'Entrée fraîche du cas du tap est avalée, 0 \\r au lieu de 1 (témoin : la sonde s'exécute)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e10b === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e10b === '1' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-PRESSION-FRAICHE"; fi
+e12_verdict() { rj "$1" "(j.erreur ? 'plante: ' + j.erreur : j.e12 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e12.split('|').map((x) => x.split(':')[1] === '0/1' ? 'sain' : 'rouge').join(','))"; }
+# LB3-S3 (F1, F2) : la retenue n'a plus qu'un point d'armement, la prise de focus du terminal (l'événement focus de son textarea) ; les gardes restantes sont la clause de la touche (M-ENTREE-TENUE) et la pression fraîche (M-PRESSION-FRAICHE)
+# UN mutant retire le point fixe : il doit rougir le témoin de CHAQUE chemin de prise de focus (Préparer E10, les quatre boutons de Q E12, le bouton du parent E13, le retour d'onglet E14), et lui seul laisse sain le cas du tap E10b
+if mutant point-fixe-focus vf-cockpit-terminal-client.mjs "/term.textarea.addEventListener('focus'/d"; then
+  [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e10","e10b","e12","e13","e14"]')"; unfaux
+    assert_eq "M-POINT-FIXE-PREPARER — le mutant (la prise de focus du terminal n'arme plus la retenue) rougit LB.E10, « Préparer » (témoin : E10b, le cas du tap, reste sain)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e10 === undefined || j.e10b === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : (j.e10 === 'xterm-helper-textarea/0/1' ? 'sain' : 'rouge') + '/' + (j.e10b === '1' ? 'sain' : 'rouge'))")" "rouge/sain"
+    assert_eq "M-POINT-FIXE-BOUTONS-Q — le même mutant rougit LB.E12 pour CHACUN des quatre boutons de Q (annuler, abandonner, coller, relancer)" "$(e12_verdict "$MJ")" "rouge,rouge,rouge,rouge"
+    assert_eq "M-POINT-FIXE-PARENT — le même mutant rougit LB.E13 (bouton de P qui appelle iframe.focus())" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e13 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e13 === 'pastille-t/0/0/1' ? 'sain' : 'rouge')")" "rouge"
+    assert_eq "M-POINT-FIXE-ONGLET — le même mutant rougit LB.E14 (retour d'onglet, événement focus de la fenêtre)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e14 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e14 === '0/1' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-POINT-FIXE-FOCUS"; fi
+if mutant ref-constante vf-cockpit-terminal-client.mjs "s#p.duree_ms - p.expire_ms > VISITE_MS#120000 - p.expire_ms > VISITE_MS#"; then
+  [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e11"]')"; unfaux; assert_eq "M-REF-CONSTANTE — le mutant (référence d'âge codée à 120 s au lieu de la durée servie) rougit LB.E11 (témoin : la sonde s'exécute)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e11 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e11 === 'true/0/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-REF-CONSTANTE"; fi
+if mutant preparer-avant vf-cockpit-terminal-vue.mjs "s#b.appendChild(pied); b.appendChild(msg);#b.insertBefore(pied, b.children[3]); b.appendChild(msg);#"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v19"]'; assert_eq "M-PREPARER-AVANT — le mutant (Préparer remonte avant la commande exacte) rougit LB.V19 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v19 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v19 === 'true.true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-PREPARER-AVANT"; fi
+if mutant etat-recouvert vf-cockpit-terminal-style.mjs "s#order: 2; z-index: auto;#order: 2; z-index: 1;#"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v19"]'; assert_eq "M-ETAT-RECOUVERT — le mutant (la proposition reprend un z-index) rougit LB.V19 : elle masque la carte ou le bandeau d'état (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v19 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v19 === 'true.true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-ETAT-RECOUVERT"; fi
+if mutant couleur-proposition vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: #fff; border: thin solid|"; then
+  assert_eq "M-COULEUR-PROPOSITION — le mutant (un littéral de couleur dans une règle de la proposition) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+else sans_effet "M-COULEUR-PROPOSITION"; fi
+if mutant couleur-accueil vf-cockpit-terminal-style.mjs "s|^#accueil .vf-q-texte { font-weight: 400;|#accueil .vf-q-texte { background: rgba(0, 0, 0, .5); font-weight: 400;|"; then
+  assert_eq "M-COULEUR-ACCUEIL — le mutant (un rgba( dans la règle de l'accueil, hors #proposition) rougit LB.S4 élargi (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+else sans_effet "M-COULEUR-ACCUEIL"; fi
+if mutant couleur-nom vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: red; border: thin solid|"; then
+  assert_eq "M-COULEUR-NOM — le mutant (un nom de couleur, red, dans une règle de la proposition) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+else sans_effet "M-COULEUR-NOM"; fi
+if mutant couleur-transparent vf-cockpit-terminal-style.mjs "s|^#accueil .vf-q-texte { font-weight: 400;|#accueil .vf-q-texte { background: transparent; font-weight: 400;|"; then
+  assert_eq "M-COULEUR-TRANSPARENT — le mutant (transparent dans la règle de l accueil) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+else sans_effet "M-COULEUR-TRANSPARENT"; fi
+if mutant couleur-courante vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: currentColor; border: thin solid|"; then
+  assert_eq "M-COULEUR-COURANTE — le mutant (currentColor hors du picto, « stroke: currentColor » restant seul autorisé) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+else sans_effet "M-COULEUR-COURANTE"; fi
+if mutant couleur-oklch vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: oklch(60% .1 20); border: thin solid|"; then
+  assert_eq "M-COULEUR-OKLCH — le mutant (une fonction moderne, oklch() rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+else sans_effet "M-COULEUR-OKLCH"; fi
+if mutant couleur-color-mix vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: color-mix(in srgb, var(--text) 50%, var(--on)); border: thin solid|"; then
+  assert_eq "M-COULEUR-COLOR-MIX — le mutant (color-mix() rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+else sans_effet "M-COULEUR-COLOR-MIX"; fi
+if mutant px-proposition vf-cockpit-terminal-style.mjs "s|#proposition .vf-q-pied { justify-content: flex-end; }|#proposition .vf-q-pied { justify-content: flex-end; padding: 6px; }|"; then
+  assert_eq "M-PX-PROPOSITION — le mutant (un px de plus dans une règle de la proposition) rougit LB.S4 : l'ensemble des px n'est plus celui des exceptions nommées (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(px_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/12.5px 12.5px 240px 44px 560px 6px "
+else sans_effet "M-PX-PROPOSITION"; fi
+if mutant px-carte vf-cockpit-terminal-style.mjs "s|.vf-q-carte { max-height: calc(100% - var(--sp-16));|.vf-q-carte { max-height: calc(100% - 16px);|"; then
+  assert_eq "M-PX-CARTE — le mutant (la carte tassée repasse en 16px au lieu du jeton --sp-16) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(px_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/12.5px 12.5px 16px 240px 44px 560px "
+else sans_effet "M-PX-CARTE"; fi
+if mutant px-svg vf-cockpit-terminal-style.mjs "s|#proposition svg.i { width: var(--sp-16); height: var(--sp-16);|#proposition svg.i { width: 16px; height: var(--sp-16);|"; then
+  assert_eq "M-PX-SVG — le mutant (le picto repasse en 16px) rougit LB.S4 et LB.S5 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(px_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(regles_prop "$MUT_DIR/vf-cockpit-terminal-style.mjs" | grep -c 'svg.i { width: var(--sp-16); height: var(--sp-16)')" "ok/12.5px 12.5px 16px 240px 44px 560px /0"
+else sans_effet "M-PX-SVG"; fi
+if mutant taille-em vf-cockpit-terminal-style.mjs "s|#proposition .vf-q-aide { font-size: 12.5px;|#proposition .vf-q-aide { font-size: .92em;|"; then
+  assert_eq "M-TAILLE-EM — le mutant (la taille de l'aide repasse en .92em) rougit LB.S5 (témoin : les règles sont trouvées)" "$(nb_prop "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(echem_prop "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+else sans_effet "M-TAILLE-EM"; fi
+if mutant copie-autre-texte vf-cockpit-terminal-vue.mjs "s|r.selectNodeContents(k.querySelector('.vf-q-commande'))|r.selectNodeContents(k.querySelector('.vf-q-titre'))|"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v17"]'; assert_eq "M-COPIE-AUTRE-TEXTE — le mutant (le bouton copie un autre texte que la commande affichée) rougit LB.V17 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v17 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v17 === 'true/true/true|true|Copiée|Commande copiée.|true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-COPIE-AUTRE-TEXTE"; fi
+if mutant accueil-recouvre vf-cockpit-terminal-style.mjs "s|body #accueil { position: static;|body #accueil { position: fixed;|"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v20"]'; assert_eq "M-ACCUEIL-RECOUVRE — le mutant (l'accueil recouvre de nouveau le bas du terminal) rougit LB.V20 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v20 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v20 === 'true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-ACCUEIL-RECOUVRE"; fi
+if mutant accueil-sans-frappe vf-cockpit-terminal-vue.mjs "s/ if (n === 'keydown' \&\& ev.target.*closest('#terminal')) fermerAccueil();//"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v20"]'; assert_eq "M-ACCUEIL-SANS-FRAPPE — le mutant (la première frappe ne range plus l'accueil) rougit LB.V20 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v20 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v20 === 'true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-ACCUEIL-SANS-FRAPPE"; fi
+if mutant accueil-range-deplace-focus vf-cockpit-terminal-vue.mjs "s/ retirerAccueil(); }; \/\/ première frappe/ retirerAccueil(); document.activeElement.blur(); }; \/\/ première frappe/"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v20"]'; assert_eq "M-ACCUEIL-RANGE-DEPLACE-FOCUS — le mutant (ranger l'accueil retire le focus au terminal : la frappe est perdue) rougit LB.V20 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v20 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v20 === 'true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-ACCUEIL-RANGE-DEPLACE-FOCUS"; fi
+if mutant accueil-compris-focalise vf-cockpit-terminal-vue.mjs "s/ c.addEventListener('mousedown', (ev) => ev.preventDefault());//"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v20"]'; assert_eq "M-ACCUEIL-COMPRIS-FOCALISE — le mutant (« Compris » reprend le focus au clic puis disparaît avec lui) rougit LB.V20 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v20 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v20 === 'true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-ACCUEIL-COMPRIS-FOCALISE"; fi
+if mutant modes-apres vf-cockpit-terminal-vue.mjs "s#b.appendChild(pied); b.appendChild(msg);#b.appendChild(pied); b.appendChild(msg); b.appendChild(modes);#"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v19"]'; assert_eq "M-MODES-APRES — le mutant (la liste des modes, dont le « Risqué », revient APRÈS « Préparer ») rougit LB.V19 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v19 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v19 === 'true.true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-MODES-APRES"; fi
+if mutant accueil-focus vf-cockpit-terminal-vue.mjs "s|'vf-q-secondaire')); document.body.appendChild(b);|'vf-q-secondaire')); document.body.appendChild(b); b.querySelector('button').focus();|"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v18"]'; assert_eq "M-ACCUEIL-FOCUS — le mutant (l'accueil prend le focus) rougit LB.V18 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v18 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v18 === 'true/true/true/true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-ACCUEIL-FOCUS"; fi
+if mutant manipule-ignore vf-cockpit-terminal-vue.mjs "/garde:manipule/d"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v15"]'; assert_eq "M-MANIPULE-IGNORE — le mutant rougit LB.V15 : un bandeau manipulé est remplacé sous la main (témoin : le bandeau s'affiche et la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v15 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v15 === 'true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-MANIPULE-IGNORE"; fi
+if mutant expiration-silencieuse vf-cockpit-terminal-vue.mjs "s/const EXPIRE_PROCHE_MS = 3000;/const EXPIRE_PROCHE_MS = -1;/"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v13"]'; assert_eq "M-EXPIRATION-SILENCIEUSE — le mutant rougit LB.V13 : une disparition annoncée à 2 s de l'échéance efface le bandeau sans le dire (témoin : le compte à rebours et le message d'expiration existent)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v13 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : /^Expire dans 1 min 30 s\|timer/.test(j.v13) && /expiree\/true$/.test(j.v13) ? 'sain' : /^Expire dans 1 min 30 s\|timer/.test(j.v13) ? 'rouge' : 'plante: ' + j.v13)")" "rouge"; }
+else sans_effet "M-EXPIRATION-SILENCIEUSE"; fi
 mutant_inj() { # mutant_inj <nom> <fichier> <expression-sed> -> MUT_DIR ; copie du tiroir et de l'interface de lancement ; code 1 si la cible manque ou n'a pas changé
   local d="$WORK/mut-$1" f x; rm -rf "$d"; mkdir -p "$d"
   for x in terminal-tiroir terminal-tiroir-ui terminal-tiroir-style lancer-ui lancer-style; do cp "$SCRIPTS/vf-cockpit-$x.mjs" "$d/"; done
@@ -876,7 +1223,7 @@ if [ -n "$CHROME" ]; then
     run_vue "$MUT_DIR" '"only":["v1"]'
     assert_eq "M-NOTE-ANCIENNE — le mutant rougit LB.V1 : l'ancienne note du mode hérité (faux pour le mode venu du projet) n'est plus celle attendue (témoin : le bandeau s'affiche, la sonde s'exécute)" "$(m1="$(rj "$VJ" 'j.v1')"; if [ -z "$m1" ] || [ "$m1" = "undefined" ]; then echo plante; elif [ "$m1" = "$(vv v1)" ]; then echo sain; else echo rouge; fi)" "rouge"
   else sans_effet "M-NOTE-ANCIENNE"; fi
-  if mutant occupe-ancien vf-cockpit-terminal-vue.mjs "s/occupe: \"Le terminal n'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n'a été écrit ; vérifiez, puis cliquez sur Lancer.\"/occupe: \"Un programme occupe le terminal : quittez-le, puis cliquez sur Lancer. Rien n'a été écrit.\"/"; then
+  if mutant occupe-ancien vf-cockpit-terminal-vue.mjs "s/occupe: \"Le terminal n'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n'a été écrit ; vérifiez, puis cliquez sur Préparer dans le terminal.\"/occupe: \"Un programme occupe le terminal : quittez-le, puis cliquez sur Préparer dans le terminal. Rien n'a été écrit.\"/"; then
     run_vue "$MUT_DIR" '"only":["v7"]'
     assert_eq "M-OCCUPE-ANCIEN — le mutant rougit LB.V7 : l'ancien texte du 409, qui nomme une cause unique, n'est plus celui attendu (témoin : les autres statuts s'exécutent)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : /;sans-session=ok;/.test(j.v7 || '') ? (/occupe=ok;/.test(j.v7) ? 'sain' : 'rouge') : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"
   else sans_effet "M-OCCUPE-ANCIEN"; fi
