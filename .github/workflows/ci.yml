@@ -92,6 +92,8 @@ jobs:
         shard: [0, 1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # historique complet : test-cockpit-equipe.sh lit « le code d'avant » par `git show <sha>:<fichier>` (témoins rouges EA2.11, EA2.16, EA3.5, EA3.9) ; à profondeur 1 le fichier est vide et le témoin plante
 
       - name: Dépendances (bash, jq, python3)
         run: |
