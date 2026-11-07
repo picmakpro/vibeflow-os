@@ -330,7 +330,7 @@ cat > "$AUX/chrome-chat.mjs" <<'JS'
 // chrome-chat.mjs <chrome> <mode> <json> : scénarios navigateur de l'option chat ; UNE ligne JSON. Modes : vue (TC.6) · e2e (TC.7). Gestes par Input.dispatchMouseEvent / Input.dispatchKeyEvent seulement
 // (la case se coche par un clic de souris ; « Lancer » exige un clic de confiance). Chaque étape est isolée : une mesure indisponible est nommée dans `erreurs`.
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import http from 'node:http';
-const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee, AMORCE } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv; const A = JSON.parse(brut); const MS = Number(process.env.VF_CHAT_MS) || 20000;
 const erreurs = {}; const essai = async (nom, f) => { try { return await f(); } catch (e) { erreurs[nom] = String(e.message).slice(0, 160); return undefined; } };
 await executer(chrome, async (s) => {
@@ -403,7 +403,7 @@ await executer(chrome, async (s) => {
     /* PU-G-136 : une proposition remonte le tiroir à 300 px juste après que Q a rendu le bandeau ; le cadre bouge ET la mise en page de Q suit sa hauteur : la position visée est le composite (rect de l'élément dans Q + position du cadre dans P), lu jusqu'à deux lectures égales */
     const lireC = async () => { const c = await evQ(RECT(sel)); const f = await positionPosee(s.ev, `document.querySelector('.vf-term-tiroir iframe') || document.querySelector('iframe')`, { max: 1000 }); return c && f ? { x: c.x + f.x, y: c.y + f.y } : null; };
     await geste(await stabiliser(lireC, { pas: 120, max: 3000 })); };
-  await essai('amorcage', async () => { await s.naviguer(`${OP}/project.html#t=${A.amorce}`); await s.attendre(`${MSG('ready')} && !location.hash`, 'cadre de Q prêt', MS); });
+  await essai('amorcage', async () => { await s.naviguer(`${OP}/project.html#t=${A.amorce}`); await s.attendre(`${MSG('ready')} && !location.hash`, 'cadre de Q prêt', process.env.VF_CHAT_MS ? MS : Math.max(MS, AMORCE)); }); // amorçage : borné par l'échéance globale (par défaut), sauf VF_CHAT_MS posée explicitement
   await essai('P', async () => { await s.naviguer(`${OP}/project.html`); await s.attendre(`!!document.querySelector('button.vf-term-pastille')`, 'pastille Terminal', MS);
     await s.ev(`(() => { const b = document.createElement('button'); b.id = 'temoin'; b.textContent = 't'; b.style.cssText = 'position:fixed;left:0;top:0;width:12px;height:12px;z-index:1'; document.body.appendChild(b); b.focus(); })()`);
     for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key: ' ', code: 'Space', windowsVirtualKeyCode: 32, modifiers: 10 });
@@ -507,7 +507,7 @@ if [ -n "$CHROME" ]; then
     assert_eq "M-CASE-TOUJOURS — le mutant (case offerte sans chat) rougit TC.6 : une case existe sans conversation" "$(rj "$VJ" '(j.erreur ? "plante" : (/^[0-9]\|[0-9]\|[0-9]\|[0-9]$/.test(j.t2 || "") && j.t2 !== "0|0|0|0") ? "rouge" : "autre : " + j.t2)')" "rouge"
   else sans_effet "M-CASE-TOUJOURS"; fi
   if mutant force vf-cockpit-terminal-client.mjs '/garde:corps-lancer/s/avecChat === true ? { chat: true } : {}/{ chat: true }/'; then
-    run_e2e "$MUT_OUT"
+    VF_CHAT_MS=20000 run_e2e "$MUT_OUT"
     assert_eq "M-CLIENT-CHAT-FORCE — le mutant (chat:true même case décochée) rougit TC.7 non cochée : la ligne de reprise part alors que la ligne standard était affichée" "$(rj "$EJ" '(j.erreur ? "plante" : (j.e2 && j.e2.cocheApres === false && typeof j.e2.capture === "string" && j.e2.capture.includes(" -r ") && j.e2.capture !== "\u0003" + j.e2.affichee) ? "rouge" : "autre : " + JSON.stringify(j.e2 || j.erreurs))')" "rouge"
   else sans_effet "M-CLIENT-CHAT-FORCE"; fi
 fi
