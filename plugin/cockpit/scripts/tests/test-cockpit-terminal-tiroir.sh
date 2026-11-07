@@ -864,7 +864,7 @@ mut_pastille() { # mut_pastille <nom> <expression-sed> : le mutant doit laisser 
   else sans_effet "$1"; fi
 }
 mut_pastille M-PASTILLE-SUR-ASK 's|if (sur(n.getBoundingClientRect(), kb)) n.style.bottom|if (false) n.style.bottom|'
-mut_pastille M-PASTILLE-SANS-RAPPEL "s|if (window.ResizeObserver) new ResizeObserver(eviterTout).observe(ask); ||" # 72.1 : refondu, la barre ne change plus de bord gauche de 701 à 1 279 px ; le rappel qui compte est celui de sa taille (le rappel de fin de transition ne prouve plus rien : il ne rattrape que le décalage latéral, qui ne recouvre plus la pastille)
+mut_pastille M-PASTILLE-SANS-RAPPEL "s|if (ask) { if (window.ResizeObserver)|if (false) { if (window.ResizeObserver)|" # jointure du panel (2026-11-07) : le mutant retire TOUT rappel lié à la barre (ResizeObserver et transitionend) ; la forme précédente, qui ne retirait que l'observateur, restait verte en CI Linux (shard 5, run 42386847278) alors qu'elle rougissait sous macOS : la fin de transition suffisait là-bas à replacer la pastille
 
 echo "=== T22 — hauteur par défaut proportionnelle à la fenêtre (recette 71, G4 ; P71-D-37) ==="
 run_defaut "$OUT"; D="$DJ"
