@@ -151,7 +151,7 @@ cat > "$AUX/chrome-client.mjs" <<'JS'
 // chrome-client.mjs <chrome> <mode> <json> : scénarios navigateur du client de Q ; UNE ligne JSON. Modes : t6 · cadre · tierce.
 // Chaque étape est isolée (essai) : une mesure indisponible est nommée dans `erreurs`, jamais un résultat vide. Amorçage et secret sont masqués en sortie.
 import { pathToFileURL } from 'node:url'; import { execFileSync } from 'node:child_process'; import fs from 'node:fs';
-const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv;
 const { P, Q, amorce, tierce, secret: secretN = '', pid: pidN = 0, fichier = '', octets = 0 } = JSON.parse(brut);
 const OP = `http://127.0.0.1:${P}`, OQ = `http://127.0.0.1:${Q}`, MS = Number(process.env.VF_CLIENT_MS) || 20000;
@@ -243,9 +243,11 @@ await executer(chrome, async (s) => {
       await q.ev(`(() => { const f0 = window.fetch; window.fetch = function (u) { if (String(u) === '/taille') return Promise.resolve(new Response(null, { status: 204 })); return f0.apply(this, arguments); }; })()`); // le premier cadre ne dit plus sa taille : le terminal garde celle de sa création
       await s.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 400, deviceScaleFactor: 1, mobile: false });
       await essai('reconnexion', async () => { await q.naviguer(); await att(INVITE, 'invite après la reconnexion'); });
+      const GRILLE = `document.querySelectorAll('.xterm-rows > div').length`;
+      await stabiliser(() => q.ev(GRILLE).catch(() => -2), { max: 5000 }); // le terminal a pris la grille de l'écran (et dit sa taille) avant la commande
       await essai('taille', async () => { await taper('echo TAI""LLE=$(stty size)x'); await poll(async () => /TAILLE=\d+ \d+x/.test(await lignes()), 'sortie de stty size'); });
       const m = /TAILLE=(\d+) (\d+)x/.exec(await lignes()); r.pty = m ? Number(m[1]) : -1;
-      r.ecran = await q.ev(`document.querySelectorAll('.xterm-rows > div').length`).catch(() => -2);
+      r.ecran = await stabiliser(() => q.ev(GRILLE).catch(() => -2), { max: 5000 });
     } else if (mode === 'arret') {
       await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
       try { process.kill(pidN, 'SIGTERM'); r.tue = true; } catch (e) { r.tue = false; }
@@ -297,7 +299,8 @@ await executer(chrome, async (s) => {
       const shells = () => { const ls = execFileSync('ps', ['-axo', 'pid=,ppid=,args=']).toString().split('\n').map((l) => l.trim().split(/\s+/)); const peres = new Set([String(pidN), ...ls.filter((c) => c[1] === String(pidN) && /vf-cockpit-terminal-processus\.mjs/.test(c.slice(2).join(' '))).map((c) => c[0])]); return ls.filter((c) => peres.has(c[1]) && /vf-cockpit-pty\.py/.test(c.slice(2).join(' '))).length; };
       const popups = async () => (await s.send('Target.getTargets')).targetInfos.filter((t) => t.type === 'page' && t.url.includes('theme=dark')).length;
       await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
-      const refocaliser = async () => { await s.send('Page.bringToFront'); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.ev(`document.querySelector('.xterm-helper-textarea').focus()`); };
+      const refocaliser = async () => { await s.send('Page.bringToFront'); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.ev(`document.querySelector('.xterm-helper-textarea').focus()`);
+        await attendreValeur(() => q.ev(`document.hasFocus() && !!document.activeElement && document.activeElement.classList.contains('xterm-helper-textarea')`).catch(() => false), (v) => v === true, { max: 5000 }); }; // la frappe suivante se perd si le focus du cadre n'est pas posé
       await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
       await s.ev(`window.__msgs = []; addEventListener('message', (e) => window.__msgs.push(String(e.data).slice(0, 40)))`);
       r.avant = { shells: shells() };
@@ -341,7 +344,8 @@ await executer(chrome, async (s) => {
       await s.naviguer(`${OP}/project.html#t=${amorce}`);
       await att(`window.__prets.includes('etat:expire') && !location.hash`, 'etat:expire (échange refusé dans le cadre)');
     });
-    r.refus = await cadreQ().then(async (c) => ({ hash: c.fragment, port: new URL(c.url).port, carte: await s.ev(`(document.querySelector('.vf-term-etat') || {}).textContent || ''`) })).catch(() => r.refus);
+    const lireRefus = async () => { const c = await cadreQ(); return { hash: c.fragment, port: new URL(c.url).port, carte: await s.ev(`(document.querySelector('.vf-term-etat') || {}).textContent || ''`) }; };
+    r.refus = (await attendreEtStabiliser(lireRefus, (v) => !!v && v.hash === '' && v.carte.includes('Session expirée'), { max: 8000 })) || r.refus;
     // --- S3 : Q en premier niveau : secret dans son stockage, aucun cookie, terminal vivant ---
     r.secretQ = null; r.cookieQ = '?'; r.invite = false;
     await essai('q-premier-niveau', async () => {
