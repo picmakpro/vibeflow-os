@@ -11,7 +11,7 @@ sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 release au-dessus de la première ligne qui commence par `## [` — une section « non releasé »
 entre crochets se retrouverait publiée SOUS la version suivante.*
 
-- **CI sélective** (ADR-078) : une PR ne joue que les suites des zones touchées (module, plus les suites qui citent un chemin touché) et les gates ; un fichier partagé ou hors carte joue tout ; le push sur `main` et le label `ci: complet` rejouent toute la découverte. 9 shards répartis d'après les durées mesurées (shard le plus chargé estimé à 25,2 min avant le découpage de `projet`, environ 17,7 min après, contre 54 min pour le shard 5 au run 42400570610) ; le job « Suites de tests (découverte non vide) » imprime les suites jouées et non jouées. Classe « docs seules » provisoire, en attente de confirmation. Arbitrage Samuel, AskUserQuestion session principale, 2026-11-07.
+- **CI sélective** (ADR-078) : une PR ne joue que les suites des zones touchées (module, plus les suites qui citent un chemin touché) et les gates ; un fichier partagé ou hors carte joue tout ; le push sur `main` et le label `ci: complet` rejouent toute la découverte. 9 shards répartis d'après les durées mesurées (shard le plus chargé estimé à 25,2 min avant le découpage de `projet`, environ 17,7 min après, contre 54 min pour le shard 5 au run 42400570610) ; le job « Suites de tests (découverte non vide) » imprime les suites jouées et non jouées. Docs seules (`docs/`, `.planning/`, `.claude/agent-memory/`, `.md` à la racine) : les gates seuls ; un `.md` sous `plugin/` suit la règle module. Arbitrage Samuel, AskUserQuestion session principale, 2026-11-07, option (a) « Hors plugin/ seulement ».
 
 ## [v2.76.0] — 2026-11-06
 
