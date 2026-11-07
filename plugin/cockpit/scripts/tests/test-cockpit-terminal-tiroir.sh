@@ -114,7 +114,7 @@ cat > "$AUX/chrome-tiroir.mjs" <<'JS'
 // Chaque étape est isolée (essai) ; en mode flag, la première étape en échec arrête le reste (les mesures absentes sont nommées dans `erreurs`).
 // Gestes par Input.dispatchMouseEvent / Input.dispatchKeyEvent seulement. Le secret de session n'apparaît jamais en sortie.
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import { execFileSync } from 'node:child_process';
-const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee, AMORCE } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv;
 const A = JSON.parse(brut);
 const OP = `http://127.0.0.1:${A.P}`, OQ = A.Q ? `http://127.0.0.1:${A.Q}` : '', MS = Number(process.env.VF_TIROIR_MS) || 20000;
@@ -169,7 +169,7 @@ await executer(chrome, async (s) => {
   // SAF-1 : l'amorçage passe par la page Projet, qui monte le cadre de Q ; l'échange se fait dans le cadre (prêt = message ready de Q, après son rechargement sans fragment)
   const amorcerParP = async () => {
     await s.naviguer(`${OP}/project.html#t=${A.amorce}`);
-    await att(`window.__msgs.some((m) => m.o === ${JSON.stringify(OQ)} && m.d === 'ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)');
+    await att(`window.__msgs.some((m) => m.o === ${JSON.stringify(OQ)} && m.d === 'ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)', process.env.VF_TIROIR_MS ? MS : Math.max(MS, AMORCE)); // amorçage : borné par l'échéance globale (par défaut), sauf VF_TIROIR_MS posée explicitement (les mutants la posent à 20000 : un amorçage cassé doit rougir en 20 s)
   };
   const centre = async (sel) => { const p = await positionPosee(s.ev, `document.querySelector(${JSON.stringify(sel)})`); return p ? { x: p.cx, y: p.cy } : null; }; // le rect est relu jusqu'à deux lectures égales : le tiroir entre en 250 ms, monte à 300 px, la pastille suit le rappel de la barre
   const souris = (type, x, y) => s.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 });
@@ -909,18 +909,18 @@ mut_defaut M-MEMO-NON-BORNEE vf-cockpit-terminal-tiroir.mjs 's|Math.min(borne(me
 
 echo "=== TU.11 / T8.3 — cadre injoignable, frame-src absent (mutants jouées en navigateur) ==="
 if mutant injoignable vf-cockpit-terminal.mjs "s|{ etat: 'actif', port: portQ }|{ etat: 'actif', port: 1 }|"; then
-  srv "$MUT_OUT" 1; J="$(navig froid "{\"P\":$SRV_PORT,\"attendre\":\"carte\"}")"; unsrv
+  srv "$MUT_OUT" 1; J="$(VF_TIROIR_MS=20000 navig froid "{\"P\":$SRV_PORT,\"attendre\":\"carte\"}")"; unsrv
   assert_eq "TU.11 — aucun ready : après 8 s, carte « Le terminal ne répond pas. Relancez /vf-cockpit --terminal. »" "$(rj "$J" '"carte="+j.carte+" ready="+j.ready')" "carte=Le terminal ne répond pas. Relancez /vf-cockpit --terminal. ready=false"
   assert_eq "T20.5 (J5, carte de P) — la commande /vf-cockpit --terminal ne se coupe jamais et son point final reste collé, à huit largeurs de fenêtre (témoin : la carte a changé de largeur au moins trois fois)" "$(rj "$J" '"mal="+JSON.stringify(j.coupure&&j.coupure.mal)+" larges="+(j.coupure&&j.coupure.largeurs>=3)')" 'mal=[] larges=true'
 else sans_effet "TU.11 (injection de panne)"; fi
 if mutant framesrc vf-cockpit-terminal.mjs "s#frameSrc: () => (portQ ? \`; frame-src http://127\.0\.0\.1:\${portQ}\` : ''),#frameSrc: () => '',#"; then
-  srv "$MUT_OUT" 1; J="$(navig froid "{\"P\":$SRV_PORT,\"attendre\":\"violation\"}")"; unsrv
+  srv "$MUT_OUT" 1; J="$(VF_TIROIR_MS=20000 navig froid "{\"P\":$SRV_PORT,\"attendre\":\"violation\"}")"; unsrv
   assert_eq "T8.3 / M-FRAMESRC — copie de sortie sans frame-src : une violation de CSP relevée, aucun ready reçu" "$(rj "$J" '"violation="+(j.violations.length>=1)+" ready="+j.ready')" "violation=true ready=false"
 else sans_effet "M-FRAMESRC"; fi
 
 echo "=== M-MSG-DONNEE — client de Q qui joint du texte du terminal à un message (T17.5) ==="
 if mutant donnee vf-cockpit-terminal-client.mjs 's|term.write(m.value);|term.write(m.value); window.parent.postMessage(new TextDecoder().decode(m.value), cfg.origineP);|'; then
-  run_flag "$MUT_OUT" 1; J="$FJ"
+  VF_TIROIR_MS=20000 run_flag "$MUT_OUT" 1; J="$FJ"
   assert_eq "M-MSG-DONNEE — le mutant rougit T17.5 : un message hors liste ou portant le marqueur arrive à P (témoin : la commande a tourné)" "$(rj "$J" '"fichier="+j.t175.fichier+" rouge="+(j.t175.hors_liste>=1||j.t175.marqueur>=1)')" "fichier=true rouge=true"
 else sans_effet "M-MSG-DONNEE"; fi
 
@@ -935,7 +935,7 @@ assert_eq "TP.8 — la proposition ne passe pas par la branche des états : barr
 assert_eq "TP.6 — tiroir fermé : postMessage de P, MessageEvent forgé, « proposition:ouvre », « Proposition », « proposition » + espace, 10 000 caractères depuis Q : il reste fermé ; témoin : la vraie valeur de Q l'ouvre ensuite" "$(rj "$PJ0" 'JSON.stringify(j.hostile)')" '{"deP":true,"forge":true,"suffixe":true,"majuscule":true,"espace":true,"long":true,"vivant":true}'
 mut_prop_nav() { # mut_prop_nav <libellé> <nom> <expression-sed> <expression de rougissement sur le relevé du mutant>
   if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
-    run_prop "$MUT_OUT"
+    VF_TIROIR_MS=20000 run_prop "$MUT_OUT"
     assert_eq "$1 $2 — le mutant rougit : $5 (témoin : aucune erreur de scénario)" "$(rj "$PJ" '(j.erreur||JSON.stringify(j.erreurs))+" rouge="+('"$4"')')" "{} rouge=true"
   else sans_effet "$1 $2"; fi
 }
@@ -955,7 +955,7 @@ for ch in evt msg; do
 done
 mut_haut() { # mut_haut <libellé> <nom> <expression-sed> <expression de rougissement>
   if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
-    run_haut "$MUT_OUT"
+    VF_TIROIR_MS=20000 run_haut "$MUT_OUT"
     assert_eq "$1 $2 — le mutant rougit : $5 (témoin : aucune erreur de scénario)" "$(rj "$PJ" '(j.erreur||JSON.stringify(j.erreurs))+" rouge="+('"$4"')')" "{} rouge=true"
   else sans_effet "$1 $2"; fi
 }
