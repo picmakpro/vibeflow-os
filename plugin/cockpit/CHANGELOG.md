@@ -1,5 +1,53 @@
 # Changelog — cockpit
 
+## Non publié
+
+Retours du panel d'utilisateurs du cockpit (2026-11-06, registre `.planning/missions/2026-11-06-panel-utilisateurs-GLOBAL.md`, PU-G-001 à PU-G-204) : correctifs et réglages, aucune capacité nouvelle, aucun bump de version à ce stade. Réponses de Samuel aux questions du registre : arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 (Q1 C, Q3 A, Q9 A, Q12 lecture étroite, Q13 A, Q14, PU-G-001 « Garder ce compromis », PU-G-204, PU-G-162 option B, focus gardé sur « Annuler », « Corriger maintenant » pour le masque des secrets et la retenue de l'Entrée), la retenue de l'Entrée étendue à toute prise de focus du terminal le 2026-11-07, même canal.
+
+### Ajouté
+- **Carte lisible à l'ouverture (onglet Code)** : zoom initial plancher, liaisons discrètes au repos, molette et toucher réglés pour la carte (PU-G-026 sur Code seulement, Projet sans plancher).
+- **Infobulle, description et chemins** : l'infobulle se range quand la carte se décale, la description d'un module tient sur trois lignes avec « Lire la suite » / « Réduire », les chemins se coupent après les « / » (Q10 : flou sans fond gardé).
+- **Recherche** : focus posé, croix tactile, dossier parent sous le nom des homonymes.
+- **Fenêtre d'export au clavier, état réel des nœuds, anneau de focus de l'en-tête** à toutes les largeurs ; halo de la carte remplacé par un contour de 2 px.
+- **Bouton de copie de la commande de relance du cockpit** (`/vf-cockpit build`, Q14) : jamais un lancement ; le passage « pas de repli copier la commande » du README nomme cette exception.
+- **Panneau de détail fermé par défaut sous 1 000 px** (PU-G-045) ; **onglet Équipe sur une colonne à 390 px** (PU-G-176, limité à l'onglet Équipe).
+- **Bouton de thème avec son état** (mot du thème quand la place le permet, `aria-label` et `title` toujours) ; **visite cadrée**, en feuille au téléphone, avec une seule touche Échap pour la fermer (DG-05) ; la feuille de visite laisse libre la pastille Terminal.
+- **Santé** : compte exact, clés factices signalées comme telles, fichiers tiers écartés des conseils « découper » et « supprimer », services cités seulement s'ils sont utilisés, titre « Santé (sécurité seulement) » ; suite neuve `test-cockpit-sante.sh`.
+- **Onglet Projet : états et exigences** (PU-G-093, 097, 098, 099) : « Maintenant », la visite et le sous-titre suivent l'état de la carte ; « STATE.md semble périmé : il dit « … » » quand `STATE.md` diverge ; « N exigences non cochées » ; « Reste : cadrage, plan, exécution, … » ; « Hors jalon ».
+- **Panneau Format de la planification** (PU-G-151 à 160) : « Copier » copie exactement la commande, commande de correctif complète avec chemins absolus (témoins espace et apostrophe) ; « Détails techniques » repliés (PU-G-104, repli seulement).
+- **Chat** (PU-G-096, 147, 150) : réponses non coupées en plein mot ; une expression régulière quadratique rendue linéaire (témoin).
+- **Lancer et bandeau** (PU-G-110 à 141) : remontée sous le titre, « Chargement des actions… », « Préparée depuis la carte. » à la place de « Lancée » sans signal, message d'envoi borné à 120 s, expiration identique dans la page et dans le terminal, cartes d'état, « Copier la commande » (un seul `execCommand('copy')`, PU-G-141).
+- **Bouton « Préparer dans le terminal »** posé après la commande exacte, la case du chat et les modes ; la carte d'état n'est jamais masquée par une proposition.
+- **Terminal : taille renvoyée au PTY à la reconnexion** (DG-08), accueil qui se range à la première frappe.
+- **Onglet Équipe, lot 9 « Au travail » et « Qui a la main »** (PU-G-134, 163 à 190) : « Aucune commande récente » sans saut, regroupement « × n » des répétitions de commandes, glyphe et mot neutres pour l'état (Q9 A), seuil de commande longue à 15 min, titre de session (/rename), « orphelin ? » et « aucune session active » ; nouveau fichier `ui/73-vf-tiroir-travail.js`. La commande reste abrégée et masquée (Q13 A).
+- **Onglet Équipe, lot 10 « tiroir Git »** (PU-G-042, 166, 192 à 201) : étiquette complète au survol et au focus, états sans couleur (Q9 A), termes Git avec leur définition au survol et au focus (Q3 A) ; le chemin vient après le nom.
+- **Coque étroite** (Q1 C, PU-G-001, 002, 007, 008, 011, 012, 142) : menu « ⋯ » jusqu'à 999 px, qui amende P70-D-01 ; PU-G-001 : « Garder ce compromis ».
+- **Un seul tiroir latéral sous 1 280 px** (Q12, PU-G-203) : ouvrir le tiroir Git replie « Au travail », et inversement, le focus va au tiroir qui s'ouvre ; lecture étroite (seul le contenu « Au travail » compte) ; l'option « le tiroir pousse la carte » est écartée (PU-G-204). Preuve : `test-cockpit-equipe.sh` (EK16).
+- **Titre de session `custom-title`** (PU-G-162, option B) : la liste blanche du transcript, fermée par P69-D-19 et P69-D-23, est amendée pour ce seul champ ; `ai-title` reste refusé.
+- **Suites neuves** : `test-cockpit-sante.sh`, `test-cockpit-ecrans-recent.sh`, `test-cockpit-moteur-carte.sh`, `test-cockpit-visite-retours.sh`.
+- **Tiroir terminal rouvert à 300 px au moins sur une proposition** (PU-G-136) : une proposition qui arrive sur un tiroir plus bas le remonte à 300 px, sans écraser la hauteur mémorisée.
+- **Pied du panneau Santé en français** (PU-G-080) : « elle vérifie le code avant de rien modifier » et « elle explique le choix et met le plan à jour une fois que vous avez décidé ».
+- **« Clic droit : plus d'actions »** (PU-G-036) : le libellé de la souris est fait, le deux-points exige une retouche de `viewer.html`.
+- **Libellé « Utilisé par »** (PU-G-100) : corrigé dans `viewer.html`, là où il vit.
+
+### Corrigé
+- **Écran fantôme** (DG-02) : `findScreens` lisait `createFileRoute` dans un commentaire ; à 0 écran, le bouton « Écrans » n'est plus posé.
+- **Compteurs de Travail récent alignés** (DG-03) : le badge comptait des entrées et non des cartes ; « 24 sur 41 cartes ».
+- **Vue de réponse remise à zéro** (DG-04) : `go()` emportait `q:answer`, l'état de réponse périmé.
+- **Colonne des cartes sans lien** (DG-12) : `separateConnectedComponents` isolait une carte sans lien.
+- **Exigences lues deux fois** (DG-10) : compartiment et archive, 184 doublons ; compteurs 627/660 devenus 444/476.
+- **Proposition gardée 120 s** (DG-07) : elle l'était depuis sa création, toutes visites confondues.
+- **Bloc « Santé » masqué sur l'onglet Projet** (DG-15) : il ne lit que le code, pas la planification. Changement visible.
+- **Git indisponible** (DG-01, PU-G-191, PU-G-003) : `/api/vf/git` lançait douze à treize commandes git en série sous une seule échéance de 5 s ; l'échéance passe à 15 s, une seule lecture à la fois (REG-D-01, décision de manager, qui étend P78-D-41 ; pas un arbitrage humain). Un git muet est dit `indisponible`, jamais `absent` ; le tiroir relance une fois seul et donne une raison en clair ; l'en-tête garde la dernière branche, marquée « non confirmée ».
+- **Orphelins et durée « tenu depuis »** (DG-06, PU-G-179, PU-G-182) : `who.mjs` écartait les orphelins (`stale` valait toujours `orphan`) et la durée lisait `age_seconds` au lieu de `lease_seconds`.
+- **Masque des secrets** : un secret collé à un mot (`xxxghp_…`, `key_sk-…`) est désormais masqué (3ca3cd91, témoin W24 de `test-cockpit-who.sh`) ; antérieur à la mission, il touchait tous les appelants.
+- **Retenue de l'Entrée tenue** : une Entrée maintenue n'exécute plus la ligne qui vient d'être écrite au retour du focus du terminal ; la retenue se pose sur toute prise de focus (Préparer, Annuler, Abandonner, Coller, Relancer le shell, pastille du tiroir, retour d'onglet). Sécurité du double geste. Le focus sur « Annuler » du collage est gardé.
+- **Libellés français** : Non classés, Demande d'origine, récent, liens, Module ; résumés sans « > » ni HTML, marqués « extrait brut ».
+
+### Modifié
+- **Q1 C** : le menu « ⋯ » monte de 700 à 999 px (amende P70-D-01).
+- **Limites consignées au BACKLOG** : états « annulée/expirée/remplacée » du lancement, état « bloqué » sans source, titres de santé à variables, 40-tour.js à 298 lignes (seuil 300) — voir `.planning/BACKLOG.md`.
+
 ## v1.4.0 — 2026-11-06 — non publié
 
 Phase 78 « Git dans le cockpit » (jalon vibeflow-v2.0, compartiment fiabilité) : nouvelle capacité, version mineure. Arbitrages de Samuel : P78-D-01 à P78-D-10 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 ; P78-D-10 au second tour, même canal et même date), P78-D-20, P78-D-21 et P78-D-25 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05, troisième tour) ; puis P78-D-34 (ratification), P78-D-36, P78-D-37 et P78-D-39 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 : « Valider le seuil (Recommandé) », « Garder le plafond (Recommandé) », « Garder tel quel (Recommandé) », « Recherche à 152 px (Recommandé) »). Les décisions techniques du manager portent leur propre préfixe.
