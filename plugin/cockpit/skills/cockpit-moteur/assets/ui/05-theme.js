@@ -47,10 +47,11 @@
 
   // Le mot n'est montré que si l'en-tête a la place : il ne doit ni rogner l'en-tête ni rétrécir la recherche (sinon l'icône seule ; l'état reste dit par title et aria-label).
   const fit = () => {
-    const h = document.querySelector('header'), hc = document.querySelector('.hc'); if (!h || !hc) return;
-    word.style.display = ''; const avec = hc.getBoundingClientRect().width, deborde = h.scrollWidth > h.clientWidth;
-    word.style.display = 'none'; const sans = hc.getBoundingClientRect().width;
-    word.style.display = !deborde && avec >= sans - 0.5 ? '' : 'none';
+    const h = document.querySelector('header'), cr = document.getElementById('crumbs'); if (!h) return;
+    const larges = () => ['.hl', '.hc', '#crumbs'].map((q) => { const e = document.querySelector(q); return e ? e.getBoundingClientRect().width : 0; });
+    word.style.display = ''; const avec = larges(), deborde = h.scrollWidth > h.clientWidth || (cr && cr.scrollWidth > cr.clientWidth + 1);
+    word.style.display = 'none'; const sans = larges();
+    word.style.display = !deborde && avec.every((w, i) => w >= sans[i] - 0.5) ? '' : 'none';
   };
   let attente = 0; const refit = () => { if (!attente) attente = requestAnimationFrame(() => { attente = 0; fit(); }); };
 
@@ -69,6 +70,6 @@
   show();
   window.addEventListener('resize', fit);
   const hd = document.querySelector('header'); // le contenu de l'en-tête arrive après le thème (branche Git, badges, libellés traduits) : on revoit la place à chaque changement
-  if (hd) { new MutationObserver(fit).observe(hd, { childList: true, subtree: true, characterData: true }); const ro = new ResizeObserver(refit); for (const e of hd.querySelectorAll('.hl, .hc, .hr, #hdr-ext')) ro.observe(e); }
+  if (hd) { new MutationObserver(fit).observe(hd, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'hidden'] }); const ro = new ResizeObserver(refit); for (const e of hd.querySelectorAll('.hl, .hc, .hr, #hdr-ext')) ro.observe(e); }
   refit();
 })();
