@@ -43,8 +43,13 @@ jobs:
   # dont 20,5 min pour test-guard-driver-lock-ws.sh et 17,3 min pour SES SEULS mutants. Quatre leviers :
   #   1. les suites tournent sur SHARDS jobs parallèles, répartis d'après leur DURÉE MESURÉE (scripts/ci-shard-suites.sh) ;
   #   2. les mutants du guard de verrou ne tournent que si la PR touche le guard, le verrou, leur suite, leur lib
-  #      portable ou ce workflow — et sur TOUT push de `main` ; sinon la suite tourne en GW_MODE=sans-mutants (A/B
-  #      compris). Une preuve qui peut rougir reste exécutée là où elle a quelque chose à juger ;
+  #      portable — ou, dans ce workflow, une ligne qui cite GW_MODE ou test-guard-driver-lock-ws, ou la RÉGION
+  #      délimitée par les marqueurs `# >>> REGION-MUTANTS` / `# <<< FIN-REGION-MUTANTS` (les jobs tests-shard et
+  #      tests-mutants) : un diff de ci.yml ailleurs (étapes du job changes, autres jobs, commentaires) ne les rejoue
+  #      pas (arbitrage « Affiner par région », Samuel, AskUserQuestion session principale, 2026-11-07 ;
+  #      scripts/ci-mutants-perimetre.sh). Un diff illisible ou des marqueurs défaits les rejouent, comme TOUT push de
+  #      `main` ; sinon la suite tourne en GW_MODE=sans-mutants (A/B compris). Une preuve qui peut rougir reste exécutée
+  #      là où elle a quelque chose à juger ;
   #   3. « PR sélective, main complète » : une PR ne joue que les suites des zones touchées (job `changes`, carte et
   #      dépendances citées dans scripts/ci-suites-perimetre.sh, arbitrage « Module + dépendances citées »), le push sur
   #      `main` rejoue TOUT, et un label « ci: complet » posé sur la PR force le run complet. Le job `tests` imprime en
@@ -142,26 +147,27 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -u
+          # Push sur main : tout rejoué. PR : scripts/ci-mutants-perimetre.sh (déclencheurs fichiers, puis lecture par
+          # région de ce workflow). Rc != 0 ou sortie mal formée : mutants joués par défaut.
           mutants=true
+          raison="push sur main : tout est rejoué"
           if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
-            if files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"; then
-              mutants=false
-              while IFS= read -r f; do
-                case "$f" in
-                  plugin/conductor/scripts/guard-driver-lock.sh|plugin/conductor/scripts/driver-lock.sh|\
-                  plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh|plugin/_internal/lib/vf-portable.sh|\
-                  plugin/planning-core/scripts/workstream-policy.sh|.github/workflows/ci.yml) mutants=true ;;
-                esac
-              done <<EOF
-          $files
-          EOF
+            if out="$(bash scripts/ci-mutants-perimetre.sh "$BASE_SHA" "$HEAD_SHA")"; then
+              mutants="$(printf '%s\n' "$out" | cut -f1)"; mutants="${mutants#mutants=}"
+              raison="$(printf '%s\n' "$out" | cut -f2-)"
+              case "$mutants" in
+                true|false) ;;
+                *) mutants=true; raison="sortie du calcul mal formée : mutants joués par défaut" ;;
+              esac
             else
-              echo "::warning::diff de la PR illisible ($BASE_SHA...$HEAD_SHA) : mutants joués par défaut"
+              echo "::warning::périmètre des mutants illisible ($BASE_SHA...$HEAD_SHA) : mutants joués par défaut"
+              mutants=true; raison="calcul en échec : mutants joués par défaut"
             fi
           fi
-          echo "== mutants à jouer : $mutants (événement : $GITHUB_EVENT_NAME) =="
+          echo "== mutants à jouer : $mutants — $raison (événement : $GITHUB_EVENT_NAME) =="
           echo "mutants=$mutants" >> "$GITHUB_OUTPUT"
 
+  # >>> REGION-MUTANTS (scripts/ci-mutants-perimetre.sh) : jobs tests-shard et tests-mutants
   tests-shard:
     name: Suites de tests — shard ${{ matrix.shard }}
     needs: changes
@@ -451,6 +457,7 @@ jobs:
           GW_MODE: full
         run: bash plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh
 
+  # <<< FIN-REGION-MUTANTS
   tests:
     # NOM EXACT exigé par le ruleset de main (.github/rulesets/main.json) — ne pas le changer.
     name: Suites de tests (découverte non vide)
