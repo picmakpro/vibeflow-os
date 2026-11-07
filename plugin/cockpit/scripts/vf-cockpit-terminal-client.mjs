@@ -61,8 +61,8 @@ export function clientTerminal(cfg) {
     if (!j || typeof j !== 'object' || j.etat !== 'en-attente' || typeof j.id !== 'string' || !/^[A-Za-z0-9_-]{8,64}$/.test(j.id) || !s(j.verbe, 40) || !s(j.intention, 200) || !s(j.phase, 20) || !(j.ws === null || s(j.ws, 40))) return null;
     if (!j.lignes || typeof j.lignes !== 'object' || MODES.some((m) => typeof j.lignes[m] !== 'string' || !/^[\x20-\x7e]{1,400}$/.test(j.lignes[m])) || !liste(j.bloquants) || !liste(j.avertissements) || !ent(j.arme_apres_ms, 0, 10000) || !ent(j.expire_ms, 1, 600000)) return null;
     if ((j.chat !== undefined || j.lignes_chat !== undefined) && (j.chat !== true || !j.lignes_chat || typeof j.lignes_chat !== 'object' || MODES.some((m) => typeof j.lignes_chat[m] !== 'string' || !/^[\x20-\x7e]{1,400}$/.test(j.lignes_chat[m])))) return null; // 72-13 : chat (vrai) et lignes_chat vont ensemble, sinon « aucune »
-    return { chat: j.chat === true ? true : undefined, lignesChat: j.chat === true ? Object.fromEntries(MODES.map((m) => [m, j.lignes_chat[m]])) : undefined, id: j.id, verbe: j.verbe, intention: j.intention, phase: j.phase, ws: j.ws, lignes: Object.fromEntries(MODES.map((m) => [m, j.lignes[m]])), bloquants: j.bloquants.slice(), avertissements: j.avertissements.slice(), arme_apres_ms: j.arme_apres_ms, expire_ms: j.expire_ms }; };
-  let attente = null, courante = null, fermee = null, pret = false, terminal = null, enVol = false, premiere = true, ancienne = null;
+    return { chat: j.chat === true ? true : undefined, lignesChat: j.chat === true ? Object.fromEntries(MODES.map((m) => [m, j.lignes_chat[m]])) : undefined, id: j.id, verbe: j.verbe, intention: j.intention, phase: j.phase, ws: j.ws, lignes: Object.fromEntries(MODES.map((m) => [m, j.lignes[m]])), bloquants: j.bloquants.slice(), avertissements: j.avertissements.slice(), arme_apres_ms: j.arme_apres_ms, expire_ms: j.expire_ms, duree_ms: j.duree_ms }; };
+  let attente = null, courante = null, fermee = null, pret = false, terminal = null, enVol = false, premiere = true, ancienne = null, entreeTenue = false;
   // LB2 (Q7, PU-G-118 et PU-G-119) : une proposition d'une visite précédente (cadre neuf, déjà plus vieille que VISITE_MS) est effacée au premier sondage, jamais montrée puis remplacée sous le clic ;
   // le cadre qui se recharge dans la MÊME visite (thème) garde son nom de fenêtre et retrouve sa proposition tant qu'elle n'a pas expiré ; un bandeau manipulé n'est pas remplacé (la vue rend false : on réessaie au sondage suivant)
   const EXPIRE_REF = 120000, VISITE_MS = 30000, memeVisite = window.name === 'vf-q-visite'; window.name = 'vf-q-visite';
@@ -85,7 +85,7 @@ export function clientTerminal(cfg) {
       body: JSON.stringify(Object.assign({ id: courante, mode }, avecChat === true ? { chat: true } : {})), cache: 'no-store' }); } catch (e) { return 'reseau'; } // garde:corps-lancer
     if (r.status === 204 || r.status === 404) { fermee = id; if (courante === id) { courante = null; attente = null; } }
     if (r.status !== 204) return r.status === 404 ? 'absente' : { 409: 'occupe', 425: 'attendre', 410: 'sans-session' }[r.status] || 'refus';
-    if (terminal) terminal.focus(); // garde:apres-usage
+    if (terminal) { entreeTenue = true; terminal.focus(); } // garde:apres-usage : Entrée a pu déclencher le clic et rester tenue ; ses répétitions ne doivent pas suivre le focus jusqu'au shell (garde:entree-tenue)
     return 'ok';
   };
   const annuler = () => {
@@ -113,6 +113,7 @@ export function clientTerminal(cfg) {
     term.loadAddon(fit);
     term.open(document.getElementById('terminal'));
     term.attachCustomKeyEventHandler((e) => {
+      if (e.key === 'Enter' && entreeTenue) { if (e.type === 'keyup' || !e.repeat) entreeTenue = false; else { e.preventDefault(); return false; } } // garde:entree-tenue : seules les répétitions de l'Entrée du clic sont retenues ; son relâchement ou une nouvelle pression (repeat faux) lève la retenue, rien ne dépend d'un délai
       if (e.code === RACCOURCI.code && e.ctrlKey === RACCOURCI.ctrl && e.shiftKey === RACCOURCI.shift && !e.altKey && !e.metaKey) {
         e.preventDefault(); if (e.type === 'keydown') emettre('toggle'); return false;
       }

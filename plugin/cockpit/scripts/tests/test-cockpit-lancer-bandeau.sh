@@ -386,6 +386,7 @@ const facadeQ = (s) => {
 const scenario = (o) => fetch(`${OP}/__scenario`, { method: 'POST', body: JSON.stringify(o) }).then((x) => { if (x.status !== 204) throw new Error('scénario refusé ' + x.status); });
 const journal = () => fetch(`${OP}/__journal`).then((x) => x.json());
 const entrees = () => { try { return fs.readFileSync(`${run}/entree.log`, 'utf8').split('\n').filter(Boolean).length; } catch { return 0; } };
+const retours = () => { try { return (fs.readFileSync(`${run}/entree.log`, 'utf8').replace(/\s/g, '').match(/(..)/g) || []).filter((o) => o === '0d').length; } catch { return 0; } }; // nombre d'octets \r reçus par l'entrée du shell factice
 
 await executer(chrome, async (s) => {
   const q = facadeQ(s), r = { erreurs }; let vu = false; // vu : le bandeau s'est affiché au moins une fois (témoin positif des sondes négatives E4 et E7)
@@ -678,6 +679,20 @@ await executer(chrome, async (s) => {
       await q.recharger(`${OQ}/?theme=light`); const garde = await q.attendre(`!!document.getElementById('proposition')`, 'proposition gardée', 5000).then(() => true, () => false);
       r.e9 = [nul, msgs, annule >= 1, garde].join('/');
     });
+    await essai('e10', async () => { // LB3-S (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06, remarque du relecteur de LB1-LB2) : Entrée TENUE sur « Préparer » ; le focus revient au terminal après la réponse, les répétitions de la touche ne l'atteignent pas ; Entrée relâchée puis pressée de nouveau passe
+      await scenario({ prop: valide(ID(101), { arme_apres_ms: 600 }), lancers: [] }); await q.naviguer();
+      await q.attendre(`!!document.getElementById('proposition')`, 'bandeau de la proposition', 5000); await attendreArme();
+      await clic(`document.getElementById('proposition-phrase')`); await q.ev(`${LANCER}.focus()`);
+      const touche = (type, extra = {}) => s.send('Input.dispatchKeyEvent', Object.assign({ type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, extra));
+      const r0 = retours(); await touche('keyDown', { text: '\r' });
+      await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après 204', 4000);
+      const foc = await q.attendre(`document.activeElement && document.activeElement.className`, 'focus rendu au terminal', 3000);
+      for (let i = 0; i < 6; i++) { await touche('keyDown', { text: '\r', autoRepeat: true }); await pause(40); }
+      await pause(400); const tenue = retours() - r0;
+      await touche('keyUp'); await pause(100);
+      await touche('keyDown', { text: '\r' }); await touche('keyUp'); await pause(500);
+      r.e10 = [foc, tenue, retours() - r0 - tenue].join('/');
+    });
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
 
@@ -893,6 +908,7 @@ if [ -n "$CHROME" ]; then
   assert_eq "LB.E6 — cadre chargé avec ?theme=dark&mode=acceptEdits&lancer=1&id=zzz, le serveur factice servant plan : présélection plan (un paramètre d'adresse lu donnerait acceptEdits), aucune requête /lancer" "$(ev_ e6)" "plan/0"
   assert_eq "LB.E7 — postMessage('proposition', '*') puis postMessage({ id: 'zzz' }, '*') du faux P vers le cadre : aucun nouveau bandeau, aucun POST /lancer" "$(ev_ e7)" "true/0/0"
   assert_eq "LB.E9 — LB2 (Q7) : proposition d'une visite précédente (cadre neuf, 115 s d'âge) : aucun bandeau, aucun message proposition, POST /annuler parti ; le même cadre rechargé dans la même visite retrouve sa proposition" "$(ev_ e9)" "0/0/true/true"
+  assert_eq "LB.E10 — LB3-S, Entrée TENUE sur « Préparer » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : après le retour du focus au terminal, six répétitions de la touche (autoRepeat) n'envoient AUCUN octet \\r au shell ; Entrée relâchée puis pressée de nouveau : UN \\r (témoin)" "$(ev_ e10)" "xterm-helper-textarea/0/1"
   faux "$SCRIPTS"; FJ="$(navig froid)"; unfaux
   assert_eq "LB.E8 — cadre masqué : UN message proposition d'origine Q en moins de 4 s, aucun .xterm ni #proposition, aucune requête /flux, /lancer, /entree ; cadre agrandi : bandeau, /flux demandé, TOUJOURS UN seul message" \
     "$(rj "$FJ" "(j.erreur ? 'plante: ' + j.erreur : j.e8 !== undefined ? j.e8 : 'erreur: ' + ((j.erreurs || {}).e8 || 'étape absente'))")" "1/true/0/0/0/true|true|1"
@@ -969,6 +985,9 @@ else sans_effet "M-VISITE-IGNOREE"; fi
 if mutant bandeau-fixe vf-cockpit-terminal-style.mjs "s|body #proposition { position: static;|body #proposition { position: fixed;|"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v16"]'; assert_eq "M-BANDEAU-FIXE — le mutant (le bandeau recouvre de nouveau le terminal) rougit LB.V16 (témoin : la sonde s'exécute et rend un résultat)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v16 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v16 === '124/true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-BANDEAU-FIXE"; fi
+if mutant entree-tenue vf-cockpit-terminal-client.mjs "/entreeTenue) { if (e.type/d"; then
+  [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e10"]')"; unfaux; assert_eq "M-ENTREE-TENUE — le mutant (la retenue des répétitions d'Entrée est retirée) rougit LB.E10 : des octets CR atteignent le shell (témoin : la sonde s'exécute et rend un résultat)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e10 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e10 === 'xterm-helper-textarea/0/1' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-ENTREE-TENUE"; fi
 if mutant copie-autre-texte vf-cockpit-terminal-vue.mjs "s|r.selectNodeContents(k.querySelector('.vf-q-commande'))|r.selectNodeContents(k.querySelector('.vf-q-titre'))|"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v17"]'; assert_eq "M-COPIE-AUTRE-TEXTE — le mutant (le bouton copie un autre texte que la commande affichée) rougit LB.V17 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v17 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v17 === 'true/true/true|true|Copiée|Commande copiée.|true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-COPIE-AUTRE-TEXTE"; fi
