@@ -78,11 +78,11 @@ export function vueTerminal(cfg) {
   const duree = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)), m = Math.floor(s / 60); return m > 0 ? m + ' min ' + String(s % 60).padStart(2, '0') + ' s' : s + ' s'; };
   const annoncer = (txt) => { const r = document.getElementById('annonce'); if (r) r.textContent = txt; }; // région live polie de la page (aucun focus pris)
   const ACCUEIL = 'Ce terminal est un shell de votre poste, ouvert dans le dossier du projet. Vous n’en avez pas besoin pour suivre le travail dans le cockpit : il sert à lancer ou reprendre une session Claude Code.', CLE_ACCUEIL = 'vf.terminal.accueil'; // PU-G-140 : accueil posé une seule fois par navigateur, effaçable, sans écriture au shell ni focus pris ; une carte, un bandeau ou une proposition le remplace
-  const retirerAccueil = () => { const a = document.getElementById('accueil'); if (a) a.remove(); };
+  const retirerAccueil = () => { const a = document.getElementById('accueil'); if (a) a.remove(); }; const fermerAccueil = () => { if (!document.getElementById('accueil')) return; try { localStorage.setItem(CLE_ACCUEIL, '1'); } catch (e) { void e; } retirerAccueil(); }; // première frappe dans le terminal ou « Compris » : rangé pour de bon ; l'accueil n'est jamais focalisable, donc le ranger ne déplace jamais le focus
   const accueil = () => {
     let vu = true; try { vu = !!localStorage.getItem(CLE_ACCUEIL); } catch (e) { void e; } if (vu || document.getElementById('accueil') || document.getElementById('proposition')) return;
     const b = el('div', 'vf-q-bandeau vf-q-collage'); b.id = 'accueil'; b.setAttribute('role', 'status'); b.appendChild(el('span', 'vf-q-pastille')); b.appendChild(el('span', 'vf-q-texte', ACCUEIL));
-    b.appendChild(bouton('Compris', () => { try { localStorage.setItem(CLE_ACCUEIL, '1'); } catch (e) { void e; } b.remove(); }, 'vf-q-secondaire')); document.body.appendChild(b);
+    b.appendChild(bouton('Compris', fermerAccueil, 'vf-q-secondaire')); document.body.appendChild(b); const c = b.querySelector('button'); c.tabIndex = -1; c.addEventListener('mousedown', (ev) => ev.preventDefault()); // ni Tab ni clic ne lui donnent le focus
   };
   const copier = (k, cp) => { // Q14 : « Copier la commande » pour la commande de relance du cockpit, JAMAIS pour un lancement de session ; le texte copié est celui de la carte (sélection de l'élément affiché) ; un seul appel au presse-papiers
     const r = document.createRange(), s = window.getSelection(); r.selectNodeContents(k.querySelector('.vf-q-commande')); s.removeAllRanges(); s.addRange(r);
@@ -100,7 +100,7 @@ export function vueTerminal(cfg) {
     const f = document.activeElement; return Date.now() - geste < GESTE_MS && document.hasFocus() && !!f && f !== document.body && a.contains(f) && (f.tagName === 'SELECT' || f.type === 'checkbox');
   };
   if (typeof document === 'object' && document && typeof document.addEventListener === 'function') { // la vue se charge aussi hors page (sonde de parité de la palette) : aucun écouteur sans document
-    ['keydown', 'input', 'change'].forEach((n) => document.addEventListener(n, (ev) => { if (ev.target && ev.target.closest && ev.target.closest('#proposition')) geste = Date.now(); }, true));
+    ['keydown', 'input', 'change'].forEach((n) => document.addEventListener(n, (ev) => { if (ev.target && ev.target.closest && ev.target.closest('#proposition')) geste = Date.now(); if (n === 'keydown' && ev.target && ev.target.closest && ev.target.closest('#terminal')) fermerAccueil(); }, true)); // la frappe n'est ni retenue ni modifiée
     document.addEventListener('pointerdown', (ev) => { appui = !!(ev.target && ev.target.closest && ev.target.closest('#proposition')); if (appui) geste = Date.now(); }, true);
     ['pointerup', 'pointercancel'].forEach((n) => document.addEventListener(n, () => { appui = false; }, true));
   }
@@ -196,7 +196,6 @@ export function vueTerminal(cfg) {
         at.appendChild(document.createTextNode(AIDE_CHAT + ' '));
         const r = el('span', 'vf-q-risque'); r.appendChild(picto(PICTO_RISQUE)); r.appendChild(document.createTextNode('Risque')); at.appendChild(r); at.appendChild(document.createTextNode(' : ' + RISQUE_CHAT)); e.appendChild(at); b.appendChild(e);
       }
-      const pied = el('div', 'vf-q-reste vf-q-pied'); pied.appendChild(armement); pied.appendChild(lancer); b.appendChild(pied); b.appendChild(msg); // Préparer après la commande exacte et la case du chat : jamais atteignable avant elles (ordre de lecture, de tabulation et de défilement)
       const retenu = MODES_UI.some((m) => m.mode === p.modeInitial) && p.modeInitial !== 'default' ? p.modeInitial : null; // un mode autre que « Par défaut » ne vient que d'un choix précédent
       const modes = el('ul', 'vf-q-modes'); modes.id = 'proposition-modes';
       MODES_UI.forEach((m) => {
@@ -206,6 +205,7 @@ export function vueTerminal(cfg) {
         li.appendChild(document.createTextNode(m.aide)); modes.appendChild(li);
       });
       b.appendChild(modes);
+      const pied = el('div', 'vf-q-reste vf-q-pied'); pied.appendChild(armement); pied.appendChild(lancer); b.appendChild(pied); b.appendChild(msg); // Préparer après la commande exacte, la case du chat ET la liste des modes (dont le « Risqué » d'acceptEdits) : jamais atteignable avant elles (ordre de lecture, de tabulation et de défilement)
       let note = null;
       const majMode = () => {
         ligne.textContent = lignes();

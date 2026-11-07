@@ -91,15 +91,15 @@ button { font: inherit; color: inherit; }
 #proposition ul.vf-q-modes li { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-8); font-size: 12.5px; line-height: 1.5; color: var(--text-2); }
 #proposition ul.vf-q-modes .vf-q-mode-nom { font-weight: 500; color: var(--text); }
 #proposition .vf-q-risque { display: inline-flex; align-items: center; gap: var(--sp-4); font-weight: 500; color: var(--text); }
-#proposition svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+#proposition svg.i { width: var(--sp-16); height: var(--sp-16); flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 /* PU-G-136 : un bandeau de proposition prend sa place dans la page (colonne) au lieu de recouvrir la sortie du shell : le terminal rétrécit, la sortie remonte ; le bandeau défile au-delà de 60 % de la hauteur */
-body:has(#proposition) { display: flex; flex-direction: column; }
-body:has(#proposition) #terminal { position: relative; inset: auto; flex: 1 1 0; min-height: 0; order: 1; }
+body:has(#proposition, #accueil) { display: flex; flex-direction: column; }
+body:has(#proposition, #accueil) #terminal { position: relative; inset: auto; flex: 1 1 0; min-height: 0; order: 1; }
 body #proposition { position: static; flex: none; order: 2; z-index: auto; max-height: 60%; overflow-y: auto; } /* z-index auto : un élément de colonne flex porte le z-index de .vf-q-collage même statique, et recouvrirait la carte et le bandeau d'état (fixes) */
 body:has(#etat .vf-q-bandeau) #proposition { margin-bottom: calc(44px + 2 * var(--sp-8)); } /* dérivé : le bandeau d'état (fixe, en bas) a 44 px de haut et 8 de marge ; la proposition se pose au-dessus, comme le collage */
 #proposition .vf-q-pied { justify-content: flex-end; } /* Préparer vient APRÈS la commande exacte et la case du chat, à droite de sa rangée */
-/* PU-G-140 : accueil de la première ouverture, posé sur le bas du terminal sans le déplacer */
-#accueil { max-height: 60%; overflow-y: auto; }
+/* PU-G-140 (lot 8 LB3-S2) : l'accueil prend sa place dans la colonne comme le bandeau de proposition : il ne masque ni la sortie ni l'invite, le terminal rétrécit et la sortie remonte */
+body #accueil { position: static; flex: none; order: 2; z-index: auto; max-height: 60%; overflow-y: auto; }
 #accueil .vf-q-texte { font-weight: 400; color: var(--text-2); }
 /* PU-G-141 : la carte reste entière dans le cadre ; sur un cadre bas elle s'élargit et se tasse */
 .vf-q-carte { max-height: calc(100% - var(--sp-16)); overflow-y: auto; }
