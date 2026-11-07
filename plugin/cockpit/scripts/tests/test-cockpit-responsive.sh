@@ -581,7 +581,7 @@ for w in 768 1024 1440; do
   assert_eq "R17.1 — Équipe / $w px : le zoom est la rangée en bas à gauche (x, écart au bas de la fenêtre, direction)" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;const z=m.zoom;if(!z)return 'zoom absent';return z.r[0]+'|'+(m.fenetre[1]-(z.r[1]+z.r[3]))+'|'+z.dir})()")" "16|16|row"
   assert_eq "R17.1b — Équipe / $w px : le zoom ne recouvre aucune carte" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1?String(m.zoomCartes):'témoin : aucune carte'})()")" "0"
   for onglet in index project; do
-    assert_eq "R17.2 — $onglet / $w px : la position du zoom est celle de 794c6dba (x,y,largeur,hauteur), au y près à 768 px : 64 au lieu de 108, l'en-tête n'a plus qu'une rangée (amendement de P70-D-01, 2026-11-06)" "$(mv_ "$WORK/r13-$onglet.json" "(()=>{const z=j.mesures[\"$w\"].m.zoom;return z?z.r.join('|'):'zoom absent'})()")" "$(zoom_base "$w")"
+    assert_eq "R17.2 — $onglet / $w px : la position du zoom est celle de 794c6dba (x,y,largeur,hauteur), sauf à 768 px : x = 700 au lieu de 308 (panneau de détail fermé par défaut sous 1 000 px, PU-G-045) et y = 64 au lieu de 108 (l'en-tête n'a plus qu'une rangée, amendement de P70-D-01, 2026-11-06)" "$(mv_ "$WORK/r13-$onglet.json" "(()=>{const z=j.mesures[\"$w\"].m.zoom;return z?z.r.join('|'):'zoom absent'})()")" "$(zoom_base "$w")"
   done
 done
 for spec in "Équipe:equipe" "Projet:project"; do

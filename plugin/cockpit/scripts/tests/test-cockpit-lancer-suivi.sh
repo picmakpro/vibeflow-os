@@ -373,7 +373,23 @@ assert_eq "LS4.3 — le module n'importe rien, n'écrit rien, ne journalise rien
 assert_eq "LS4.4 — constantes et libellés des cinq verbes" "$(LSM ls44)" "600000|86400000|200|cadrer,planifier,executer,verifier,reprendre|Cadrer,Planifier,Exécuter,Vérifier,Reprendre|true"
 
 echo "== LE carte Équipe =="
-assert_eq "LE.0 — la copie figée est le module d'avant (sha256)" "$(shasum -a 256 "$AUX/base/vf-cockpit-equipe-carte.mjs" | cut -d' ' -f1)" "$BASE_EQUIPE_CARTE_SHA256"
+assert_eq "LE.0 — la copie figée est figée : son sha256 est celui de la constante (module courant moins la fonction 72-07, rafraîchi le 2026-11-07)" "$(shasum -a 256 "$AUX/base/vf-cockpit-equipe-carte.mjs" | cut -d' ' -f1)" "$BASE_EQUIPE_CARTE_SHA256"
+# LE.0b : la copie ne diffère du module courant QUE par l'import 72-07 et les trois lignes garde:lancees / garde:ligne-valide / garde:ligne-insert (neutralisées en `const l = undefined;` et `const t = '';`) ;
+# sans cela un rafraîchissement silencieux de la copie rendrait la comparaison A/B tautologique (la copie suivrait le module, LE.1 à LE.5 ne verraient plus rien)
+cat > "$AUX/copie.mjs" <<'JS'
+import fs from 'node:fs';
+const [, , courant, copie] = process.argv;
+const att = fs.readFileSync(courant, 'utf8').split('\n').flatMap((l) => l.startsWith('import { LIBELLES_VERBES, entreeLanceeValide }') || l.includes('// garde:ligne-insert') ? [] : l.includes('// garde:lancees') ? ['    const l = undefined; // copie figée : sans la ligne de lancement (72-07)'] : l.includes('// garde:ligne-valide') ? ["    const t = '';"] : [l]);
+const obt = fs.readFileSync(copie, 'utf8').split('\n');
+const trim = (a) => { while (a.length && a[a.length - 1] === '') a.pop(); return a; };
+const A = trim(att), O = trim(obt);
+const i = A.findIndex((l, k) => l !== O[k]);
+console.log(i < 0 && A.length === O.length ? 'identique' : 'écart ligne ' + ((i < 0 ? Math.min(A.length, O.length) : i) + 1) + ' : attendu [' + (A[i] ?? '').slice(0, 80) + '] obtenu [' + (O[i] ?? '').slice(0, 80) + ']');
+JS
+assert_eq "LE.0b — la copie figée ne diffère du module courant que par l'import 72-07 et les trois lignes garde:lancees / garde:ligne-valide / garde:ligne-insert" "$(node "$AUX/copie.mjs" "$SCRIPTS/vf-cockpit-equipe-carte.mjs" "$AUX/base/vf-cockpit-equipe-carte.mjs")" "identique"
+sed '/^const ST = /s/done/fini/' "$AUX/base/vf-cockpit-equipe-carte.mjs" > "$AUX/base-mutee.mjs"
+cmp -s "$AUX/base-mutee.mjs" "$AUX/base/vf-cockpit-equipe-carte.mjs" && assert_eq "LE.0c — mutant sans effet (cible de sed absente)" "sans effet" "effet"
+assert_eq "LE.0c — mutant : une quatrième différence dans la copie (état « done » renommé) rougit LE.0b" "$(node "$AUX/copie.mjs" "$SCRIPTS/vf-cockpit-equipe-carte.mjs" "$AUX/base-mutee.mjs" | cut -c1-12)" "écart ligne "
 assert_eq "LE.1 — sept jeux who × neuf valeurs de paramètre : sortie identique octet pour octet à la copie figée (generatedAt neutralisé)" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" identique 2>&1)" "$SAIN_LE1"
 assert_eq "LE.2 — la ligne « Lancée depuis la carte : Phase 72 · alpha · Planifier » juste après « État : » (et de « Identifiant : » qui le suit sur une session, PU-G-162), la description s'ouvre sur « Depuis Phase 72 » (c7d96740), aucun autre champ ne change" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" ligne 2>&1)" "$SAIN_LE2"
 assert_eq "LE.3 — sans compartiment : « Lancée depuis la carte : Phase 72 · Planifier »" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" sans-ws 2>&1)" "$SAIN_LE2"
