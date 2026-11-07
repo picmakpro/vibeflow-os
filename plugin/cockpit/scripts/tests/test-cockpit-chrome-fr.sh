@@ -78,7 +78,9 @@ const jugement = (e) => { const o = tr(e); if (o == null || o === e) return `non
 const f11 = CORPUS.map(jugement);
 // recette 2026-11-04 (juge Playwright, P70-D-04) : formes exactes ; l'ordre des gabarits ne doit pas faire revenir « il y a 3 mis à jour minutes »
 const suite = [tr('Updated 3 minutes ago'), tr('Inside kpi-analyst'), tr('Inside equipe-produit'), tr('Recent work: Recent work'), tr('2×click'), tr('right-click'), tr('Top of the world'), tr('click')];
-console.log(JSON.stringify({ mauvaisGabarits, f11, suite, corpus: CORPUS, inventaire: inv.length, liste: inv, dict: Object.keys(dico).length, motifs: code.__vfFrTraduire.motifs, gabarits: code.__vfFrTraduire.gabarits, exclusions: excl.length,
+// lot Langue (rcm lot 4, 2026-11-06) : formes lues par le panel — LG1 anglais résiduel, LG2 libellés reformulés
+const lg = ['Readme and 7 more', 'A, B and 1 more', 'You asked: foo', 'You asked:', 'Exported Nov 5, 2026', 'Unassigned', 'Everything behind /products/:id', 'The screen itself', '9 connections.', '1 connection.', 'Calls connection', '115 files · 48k lines', '1.3k lines', '1 lines', 'Changed · Phase 61', '10 changed', '1 changed', 'Matched by', 'more', 'Back to map', 'Nothing stood out. This is a quick automatic check, not a full security review.', '10 changed inside · Phase 61', "Qu'est-ce qui bloque ?", "Qu'est-ce qui est en cours ?"].map((e) => tr(e));
+console.log(JSON.stringify({ mauvaisGabarits, f11, suite, lg, svc: [code.__vfFrType('service'), code.__vfFrType('Service')], corpus: CORPUS, inventaire: inv.length, liste: inv, dict: Object.keys(dico).length, motifs: code.__vfFrTraduire.motifs, gabarits: code.__vfFrTraduire.gabarits, exclusions: excl.length,
   nonTraduits, sansObjet, problemesDico: controler(dico), problemesTemoin: fautive,
   f6: { etapes: [tr('Previous step'), tr('Next step')], motif: tr('Answer · 3 cards'), exact: tr('Fit to screen'), gabarit: tr('Your Claude session expired. Sign in again.'), vide: tr(''), espaces: tr('   '), inconnu: tr('Ma phrase de données'), projet: proj.__vfFrTraduire('File'), code: code.__vfFrTraduire('File'), pluriels: [proj.__vfFrTraduire('files'), code.__vfFrTraduire('files')], donnees: [tr('Top of the world'), tr('Fix with Claude Code'), tr('3 of 4'), tr('Health check: nothing urgent')],
     types: typeof code.__vfFrType === 'function' ? [code.__vfFrType('library'), code.__vfFrType('Library'), code.__vfFrType('Ma donnée'), code.__vfFrType('config'), tr('library')] : 'absent' }}));
@@ -163,6 +165,22 @@ assert_eq "F13.2 : « Inside <nom du lab> » → « Dans <nom> », le nom du lab
 assert_eq "F13.3 : « Recent work: Recent work » (fil d'Ariane) ne dit qu'une fois « Travail récent »" "$(lire "$WORK/m.json" 'j.suite[3]')" "Travail récent"
 assert_eq "F13.4 : indications de souris « 2×click », « right-click », « click » en français" "$(lire "$WORK/m.json" '[...j.suite.slice(4,6), j.suite[7]]')" '["2×clic","clic droit","clic"]'
 assert_eq "F13.5 : le gabarit libre « Inside {} » n'abîme pas une autre donnée (« Top of the world » reste intacte)" "$(lire "$WORK/m.json" 'j.suite[6]')" "null"
+
+echo "[F14] lot Langue : anglais résiduel et libellés reformulés (PU-G-060 à 064, 066, 070, 078, 055, 036, 148, 161) ; DG-14 apostrophe"
+assert_eq "F14.1 : « Readme and 7 more » → « Readme et 7 autres » ; « 1 more » au singulier" "$(lire "$WORK/m.json" 'j.lg.slice(0,2)')" '["Readme et 7 autres","A, B et 1 autre"]'
+assert_eq "F14.2 : une seule formule, « Demande d'origine », pour « You asked: » avec ou sans suite (PU-G-062, PU-G-063)" "$(lire "$WORK/m.json" 'j.lg.slice(2,4)')" '["Demande d'"'"'origine : foo","Demande d'"'"'origine :"]'
+assert_eq "F14.3 : « Exported <date> » → « Exporté le 5 nov. 2026 » (PU-G-161)" "$(lire "$WORK/m.json" 'j.lg[4]')" "Exporté le 5 nov. 2026"
+assert_eq "F14.4 : « Unassigned », « Everything behind … », « The screen itself » (PU-G-060, PU-G-078)" "$(lire "$WORK/m.json" 'j.lg.slice(5,8)')" '["Non classés","Tout ce qu'"'"'il y a derrière /products/:id","L'"'"'écran lui-même"]'
+assert_eq "F14.5 : « 9 connections. » (point final), « 1 connection. », « Calls connection » (PU-G-064)" "$(lire "$WORK/m.json" 'j.lg.slice(8,11)')" '["9 liens.","1 lien.","Appels entre modules"]'
+assert_eq "F14.6 : chiffres : « 48 k lignes », « 1,3 k lignes », « 1 ligne » au singulier (PU-G-066)" "$(lire "$WORK/m.json" 'j.lg.slice(11,14).map((x) => x.replace(/\u00a0/g, "_"))')" '["115 fichiers · 48_k lignes","1,3_k lignes","1 ligne"]'
+assert_eq "F14.7 : « Changed » ne veut plus dire « modifié » : « Touché par : … », « 10 récents », « 1 récent » (PU-G-055)" "$(lire "$WORK/m.json" 'j.lg.slice(14,17)')" '["Touché par : Phase 61","10 récents","1 récent"]'
+assert_eq "F14.8 : « Matched by » → « Détecté via » ; hint « more » → « plus d'actions » ; « Back to map » sans le mot carte (PU-G-070, PU-G-036, PU-G-148)" "$(lire "$WORK/m.json" 'j.lg.slice(17,20)')" '["Détecté via","plus d'"'"'actions","Quitter le tableau"]'
+assert_eq "F14.9 : « revue de sécurité complète » ; « 10 récents à l'intérieur » (PU-G-161, PU-G-055)" "$(lire "$WORK/m.json" '[j.lg[20], j.lg[21]]')" '["Rien de saillant. C'"'"'est un contrôle automatique rapide, pas une revue de sécurité complète.","10 récents à l'"'"'intérieur · Phase 61"]'
+assert_eq "F14.10 : PU-G-071 — le type « service » (module à agents, kindOf de vf-cockpit-code-vf.mjs) s'affiche « module » / « Module » ; le kind, lui, ne change pas (icône, légende)" "$(lire "$WORK/m.json" 'j.svc')" '["module","Module"]'
+# DG-14 : la pastille « Qu'est-ce qui bloque ? » garde son apostrophe de bout en bout ; l'apostrophe perdue du panel venait du FAUX claude du banc (« Qu est-ce qui bloque ? » écrit sans apostrophe dans sa sortie JSON), pas du cockpit
+assert_eq "DG-14.1 : la couche française n'altère pas une phrase de relance française (rend null, texte intact)" "$(lire "$WORK/m.json" 'j.lg.slice(22,24)')" "[null,null]"
+assert_eq "DG-14.2 : la source des relances locales porte l'apostrophe (vf-cockpit-ask.mjs)" "$(grep -cF "Qu'est-ce qui bloque ?" "$SCRIPTS/vf-cockpit-ask.mjs")" "1"
+assert_eq "DG-14.3 : le chip du viewer écrit le texte reçu tel quel (h() n'ôte pas l'apostrophe) — témoin : une entrée sans apostrophe reste sans apostrophe" "$(node -e 'const u=(s)=>s.replace(/&#39;/g,String.fromCharCode(39));console.log(u("Qu&#39;est-ce qui bloque ?")+"|"+u("Qu est-ce qui bloque ?"))')" "Qu'est-ce qui bloque ?|Qu est-ce qui bloque ?"
 
 echo "[F3] témoin du détecteur : une chaîne anglaise inventée"
 T3="$WORK/t3"; cp -R "$SORTIE" "$T3"

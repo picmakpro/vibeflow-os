@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# test-cockpit-visite-retours.sh — retours du panel utilisateurs, lot « visite et thème » (PU-G-009, 013, 018, 085, 087, 089, 090).
+# Un lab jetable de forme VibeFlow (16 modules, deux services extérieurs : gsd et claude) servi par le VRAI lanceur ; un Chrome headless par mesure
+# (chrome-visite-retours.mjs). Sans navigateur la suite est SAUTÉE, jamais comptée comme réussie.
+# T1 bouton de thème : l'état courant en texte · T2 croix de la visite nommée · T3 anneau de focus du bouton de visite : clavier seulement
+# T4 feuille de visite au téléphone : pleine largeur, « Étape n sur N » sur une ligne · T5 cadrage : la carte présentée est lisible, les services extérieurs sont cadrés
+# T6 aucun cadre dessiné autour du titre ; boutons de rappel éclairés à la dernière étape · T7 tiroir Git ouvert pendant la visite : une seule Échap le ferme
+set -uo pipefail
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+export HOME="$WORK/home"; mkdir -p "$HOME"
+PASS=0; FAIL=0
+assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
+CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
+if [ -z "$CHROME" ]; then echo "  ⊘ SAUTÉE : aucun navigateur — les retours de visite ne sont PAS vérifiés"; exit 0; fi
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+. "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+L="$WORK/lab"; mkdir -p "$L/.planning"
+for i in $(seq -w 1 16); do
+  M="$L/plugin/mod$i"; mkdir -p "$M/agents" "$M/scripts"
+  printf '{"name":"mod%s","type":"agent-bundle","description":"Module numero %s du lab de test, qui fait une chose utile."}\n' "$i" "$i" > "$M/module.json"; echo 1.0.0 > "$M/VERSION"
+  printf -- '---\nname: ag%s\ndescription: agent\ntools: Read, Agent(gsd-planner, general-purpose)\n---\ncorps\n' "$i" > "$M/agents/ag$i.md"
+  printf '#!/usr/bin/env bash\necho %s\n' "$i" > "$M/scripts/run$i.sh"
+done
+printf '# Roadmap\n\n## Jalon demo\n\n- [ ] **Phase 1: Socle** - premier jet\n' > "$L/.planning/ROADMAP.md"
+git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
+export VF_COCKPIT_PORT_BASE=$((30000 + (RANDOM * 11) % 30000))
+trap 'node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L" >/dev/null 2>&1; vf_hyg_fin; rm -rf "$WORK"' EXIT
+U="$(node "$SCRIPTS/vf-cockpit.mjs" open --no-open --lab "$L" | sed -En 's#^Cockpit : (http://127\.0\.0\.1:[0-9]+)/ .*#\1/index.html#p' | head -1)"
+[ -n "$U" ] || { echo "  ❌ FAIL — le cockpit n'a pas démarré"; exit 1; }
+AUX="$WORK/aux"; mkdir -p "$AUX"
+cat > "$AUX/get.mjs" <<'JS'
+import fs from 'node:fs';
+const j = JSON.parse(fs.readFileSync(process.argv[2] === '/dev/stdin' ? 0 : process.argv[2], 'utf8'));
+console.log(String(Function('j', 'return (' + process.argv[3] + ')')(j)));
+JS
+mes() { node "$SCRIPTS/tests/chrome-visite-retours.mjs" "$CHROME" "$U" "$1" "$2"; }
+g() { printf '%s' "$1" | node "$AUX/get.mjs" /dev/stdin "$2"; }
+
+echo "=== T1 — bouton de thème : l'état courant en texte ==="
+X="$(mes 1440 theme)"; [ -n "${DBG:-}" ] && echo "RAW: $X"
+assert_eq "T1.1 — mesure sans erreur, le texte du bouton suit le cycle Auto, Clair, Sombre, Auto" "$(g "$X" "j.erreur||j.textes.join(',')")" "Auto,Clair,Sombre,Auto"
+
+echo "=== T3 — anneau de focus du bouton de visite ==="
+X="$(mes 1280 focus)"; [ -n "${DBG:-}" ] && echo "RAW: $X"
+assert_eq "T3.1 — visite rouverte à la souris puis une flèche : le bouton ne porte pas d'anneau (focus-visible faux) et la visite est ouverte" "$(g "$X" "j.erreur||[j.souris1.fv,j.souris1.ouverte].join(',')")" "false,true"
+assert_eq "T3.2 — activé au clavier (Entrée), le bouton garde le focus et son anneau" "$(g "$X" "j.erreur||[j.clavier.actif,j.clavier.fv,j.clavier.ouverte].join(',')")" "true,true,true"
+
+echo "=== T7 — tiroir Git ouvert pendant la visite : une seule Échap ==="
+X="$(mes 1440 tiroir)"; [ -n "${DBG:-}" ] && echo "RAW: $X"
+assert_eq "T7.1 — le tiroir est ouvert avant la touche (témoin) puis fermé par UNE Échap" "$(g "$X" "j.erreur||[j.avant.tiroir,j.apres.tiroir].join(',')")" "true,false"
+
+echo "=== T2, T5, T6 — visite parcourue sur 1440 px ==="
+X="$(mes 1440 visite)"; [ -n "${DBG:-}" ] && echo "RAW: $X"
+assert_eq "T2.0 — témoin : visite parcourue sans erreur, au moins trois étapes" "$(g "$X" "j.erreur||(j.n>=3)")" "true"
+assert_eq "T2.1 — la croix de la visite porte un nom accessible à chaque étape" "$(g "$X" "j.etapes.every((e)=>e.croix&&e.croix.length>3)")" "true"
+assert_eq "T5.1 — la carte présentée aux étapes 2 et 3 mesure au moins 200 px de large à l'écran (lisible)" "$(g "$X" "j.etapes.slice(1,j.n-1).every((e)=>e.largeurCartes.length>0&&Math.max(...e.largeurCartes)>=200)")" "true"
+assert_eq "T5.2 — la dernière étape éclaire les services extérieurs, tous dans la fenêtre et lisibles (≥ 150 px)" "$(g "$X" "[j.etapes[j.n-1].cartesEclairees>=2,j.etapes[j.n-1].dansFenetre,Math.min(...j.etapes[j.n-1].largeurCartes)>=150].join(',')")" "true,true,true"
+assert_eq "T6.1 — aucune étape ne dessine de contour autour d'un bloc de la page" "$(g "$X" "j.etapes.every((e)=>e.contours.every((c)=>c==='none'))")" "true"
+assert_eq "T6.2 — la dernière étape éclaire le bouton de visite (surbrillance posée sur lui)" "$(g "$X" "j.etapes[j.n-1].litSurTour")" "true"
+assert_eq "T6.3 — la dernière étape ne vise pas le titre : aucun repère de cadrage sur #context quand des cartes sont éclairées" "$(g "$X" "j.etapes[j.n-1].cadreSurTitre")" "false"
+
+echo "=== T4 — feuille de visite à 390 px ==="
+X="$(mes 390 visite)"; [ -n "${DBG:-}" ] && echo "RAW: $X"
+assert_eq "T4.0 — témoin : mesure sans erreur, au moins trois étapes" "$(g "$X" "j.erreur||(j.n>=3)")" "true"
+assert_eq "T4.1 — la carte de visite est une feuille pleine largeur (≥ 370 px de large) à chaque étape" "$(g "$X" "j.etapes.every((e)=>e.carte.w>=370)")" "true"
+assert_eq "T4.2 — la feuille est en bas : son bord bas est dans le dernier quart de l'écran" "$(g "$X" "j.etapes.every((e)=>e.carte.b>=e.ecran[1]*0.75)")" "true"
+assert_eq "T4.3 — « Étape n sur N » tient sur une seule ligne (chaque segment du repère ≤ 20 px de haut)" "$(g "$X" "j.etapes.every((e)=>e.repereHauteurs.every((h)=>h<=20))")" "true"
+echo; echo "Résultat : $PASS passés, $FAIL en échec"; [ "$FAIL" -eq 0 ]

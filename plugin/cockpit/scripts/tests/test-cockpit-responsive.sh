@@ -532,7 +532,8 @@ for onglet in index project equipe; do
   done
 done
 for onglet in index project; do # sur l'onglet Équipe, la position du zoom à ≥ 701 px change en 70-12 (P70-D-20) : non jugée ici
-  assert_eq "R14.4 — $onglet / 800 px : la position du zoom est celle d'avant la phase (x,y,largeur,hauteur relevés au premier passage)" "$(mv_ "$WORK/r13-$onglet.json" '(()=>{const z=j.mesures["800"].m.zoom;return z?z.r.join(","):"zoom absent"})()')" "340,108,52,144"
+  assert_eq "R14.4 — $onglet / 800 px : la position du zoom, panneau fermé par défaut (x,y,largeur,hauteur ; PU-G-045)" "$(mv_ "$WORK/r13-$onglet.json" '(()=>{const z=j.mesures["800"].m.zoom;return z?z.r.join(","):"zoom absent"})()')" "732,108,52,144"
+  assert_eq "R14.4b — $onglet / 800 px : le panneau de détail est fermé par défaut (PU-G-045) — c'est ce qui place le zoom à droite ; un panneau rouvert remettrait [340,108,52,144] et ferait rougir R14.4" "$(mv_ "$WORK/r13-$onglet.json" 'j.mesures["800"].m.tiroir')" "false"
 done
 assert_eq "R14.5 — Projet / 390 px, pendant un parcours : le zoom et « Remonter d'un niveau » ne se recouvrent pas" "$(mv_ "$WORK/r14-parcours.json" '(()=>{const m=j.mesures["390"].m,z=m.zoom,u=m.upRect;if(!u)return "témoin : « Remonter » absent (aucun parcours)";if(!z||!z.vis)return "zoom absent";const a=z.r,b=u;const x=Math.min(a[0]+a[2],b[0]+b[2])-Math.max(a[0],b[0]),y=Math.min(a[1]+a[3],b[1]+b[3])-Math.max(a[1],b[1]);return x>1.5&&y>1.5?"recouvrement "+Math.round(x)+"x"+Math.round(y)+" px":"aucun"})()')" "aucun"
 assert_eq "R15.1 — 390 px : le bouton Détail est invisible sur les trois onglets" "$(mv_ "$WORK/r13-index.json" 'j.mesures["390"].m.btnPanel')|$(mv_ "$WORK/r13-project.json" 'j.mesures["390"].m.btnPanel')|$(mv_ "$WORK/r13-equipe.json" 'j.mesures["390"].m.btnPanel')" "false|false|false"
@@ -563,7 +564,7 @@ sous_agent() { # sous_agent <numéro de session de agent_actif> <lab> : un sous-
 }
 LE="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-equipe"; mklab "$LE"; sous_agent "$NSESS" "$LE"
 srv "$LE/.vibeflow/cockpit"; P_e=$SRV_PORT; PID_e=$SRV_PID
-zoom_base() { case "$1" in 768) echo "308|108|52|144" ;; 1024) echo "574|72|42|114" ;; 1440) echo "16|842|114|42" ;; esac; } # x|y|largeur|hauteur du zoom de Code et de Projet, relevés sur 794c6dba (labs de la suite)
+zoom_base() { case "$1" in 768) echo "700|108|52|144" ;; 1024) echo "574|72|42|114" ;; 1440) echo "16|842|114|42" ;; esac; } # x|y|largeur|hauteur du zoom de Code et de Projet, relevés sur 794c6dba (labs de la suite)
 J_PAUSE_E='const p = (ms) => new Promise((r) => setTimeout(r, ms));'
 INJ_SESSION="(async () => { $J_PAUSE_E const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0); nd?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); for (let i = 0; i < 60 && !/^Session/.test(document.querySelector('#context .k')?.textContent || ''); i++) await p(50); await p(400); return true; })()"
 OPIDS=()
