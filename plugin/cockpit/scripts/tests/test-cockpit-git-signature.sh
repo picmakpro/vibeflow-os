@@ -162,6 +162,7 @@ cat > "$AUX/r31.js" <<'JS'
 const [base, page, lab] = ARGS;
 await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!window.VibeFlow`, 'page rendue');
+await s.attendre('!!(window.__vfLive && window.__vfLive.connected)', 'flux direct branché avant le commit'); // un commit joué avant l'abonnement du flux n'émet aucun signal
 await s.ev(`(() => { window.__sig = 0; window.__marque = 1; document.addEventListener('vf-git:signal', () => { window.__sig++; }); })()`);
 const { execFileSync } = await import('node:child_process');
 execFileSync('git', ['-C', lab, 'commit', '-q', '--allow-empty', '-m', 'commit de R3.1'], { stdio: 'ignore' });
