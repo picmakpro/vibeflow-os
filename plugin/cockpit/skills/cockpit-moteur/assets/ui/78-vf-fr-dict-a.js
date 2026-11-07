@@ -185,7 +185,6 @@ window.__vfFrDict = Object.assign(window.__vfFrDict || {}, {
   "{} days ago": "il y a {} jours",
   "{} hours ago": "il y a {} heures",
   "{} minutes ago": "il y a {} minutes",
-  "{} files and endpoints still use generated names. Run the skill again to describe them.": "{} fichiers et points d'accès portent encore un nom généré à partir de leur chemin, faute de description. Une description se lit dans l'en-tête d'un fichier (.md ou .sh) ; /vf-cockpit build la reprend.",
   "{} files and endpoints still use generated names: they are named after their file, with no description. To describe them, run this command again.": "{} fichiers et points d'accès portent encore un nom généré à partir de leur chemin, faute de description. Une description se lit dans l'en-tête d'un fichier (.md ou .sh) ; /vf-cockpit build la reprend.",
   "{} is busy or you have hit a usage limit. Try again in a bit.": "{} est occupé ou vous avez atteint une limite d'usage. Réessayez dans un moment.",
   "{} isn't signed in. {}": "{} n'est pas connecté. {}",

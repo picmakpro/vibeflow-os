@@ -233,7 +233,7 @@ await executer(chrome, async (s) => {
       r.barreRefuse = { texte: await texte('.vf-term-etat'), point: await s.ev(`document.querySelector('.vf-term-etat-point').getAttribute('data-etat')`), annonce: await texte('.vf-term-annonce') };
     });
     await essai('expire-p', async () => { // J1 : secret absent, la barre dit « Session expirée »
-      await s.naviguer(`${OQ}/`); await s.ev(`localStorage.removeItem('vf.terminal.secret')`);
+      await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', 'secret-perime-' + 'x'.repeat(24))`); // PU-G-132 : un secret ABSENT n'est plus une expiration (la carte dit « non disponible », rien n'est dit à P) ; l'expiration vraie est un secret périmé, refusé par le serveur
       await s.naviguer(`${OP}/project.html`); await att(`!!document.querySelector('button.vf-term-pastille')`, 'pastille'); await clic('button.vf-term-pastille');
       await att(`(document.querySelector('.vf-term-etat') || {}).textContent`, 'état de la barre');
       r.barreExpire = { texte: await texte('.vf-term-etat'), point: await s.ev(`document.querySelector('.vf-term-etat-point').getAttribute('data-etat')`) };
