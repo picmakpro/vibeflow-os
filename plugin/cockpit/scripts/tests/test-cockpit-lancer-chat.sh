@@ -343,7 +343,7 @@ await executer(chrome, async (s) => {
   if (mode === 'vue') {
     const ev = (x) => s.ev(x); const att = (x, n) => s.attendre(x, n, MS);
     const LANCER = `document.getElementById('proposition-lancer')`, CASE = `document.getElementById('proposition-chat')`, LIGNE = `document.getElementById('proposition-ligne')`, SEL = `document.getElementById('proposition-mode')`;
-    const clic = async (sel) => geste(await ev(RECT(sel)));
+    const clic = async (sel) => { await ev(`(() => { const e = ${sel}; if (e) e.scrollIntoView({ block: 'center' }); return true; })()`); return geste(await ev(RECT(sel))); }; // LB3-S : « Préparer » est APRÈS la commande exacte et la case, dans la zone défilante du bandeau : l'utilisateur l'amène sous la souris avant de cliquer (comme clicQ, LB2)
     await s.naviguer(pathToFileURL(A.page).href); await att(`typeof window.vfTermVue === 'object'`, 'vue');
     await ev(`(() => { window.__T = { appels: [] }; window.__cb = { lancer: (m, c) => { __T.appels.push(JSON.stringify([m, c])); return new Promise(() => {}); }, annuler() {} };
       window.__base = ${JSON.stringify(A.base)}; window.__monter = (over) => { vfTermVue.proposition(Object.assign({}, __base, { modeInitial: 'default' }, over), __cb); return true; }; return true; })()`);

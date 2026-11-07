@@ -210,7 +210,7 @@ await executer(chrome, async (s) => {
       etatx: { etat: 'x', verbe: 'planifier' }, verbex: { etat: 'vue', verbe: 'x;y' }, chaine: 'vue', un: 1, vide: {} };
     await essai('liste', async () => {
       await defaut({ liste: liste(Object.entries(L7).map(([k, v]) => { const e = E('l-' + k, 'phase', 'planifier', ['planifier']); if (v === undefined) delete e.lancee; else e.lancee = v; return e; })) }); await ouvrir();
-      for (const k of Object.keys(L7)) { const lg = (await carte('n:l-' + k)).lignes; R[k] = lg.filter((l) => l.indexOf('Lancée') === 0 || l.indexOf('Commande préparée') === 0).join('|'); R[k + 'L'] = lg.filter((l) => l.indexOf('Lancée') === 0).join('|'); } // LB1 PU-G-113 : « attendue » n'est plus une « Lancée »
+      for (const k of Object.keys(L7)) { const lg = (await carte('n:l-' + k)).lignes; R[k] = lg.filter((l) => l.indexOf('Lancée') === 0 || l.indexOf('Commande préparée') === 0 || l.indexOf('Préparée depuis') === 0).join('|'); R[k + 'L'] = lg.filter((l) => l.indexOf('Lancée') === 0).join('|'); } // LB1 PU-G-113 : « attendue » n'est plus une « Lancée »
     });
   } else if (mode === 'lu8') {
     await essai('hostile', async () => {
@@ -388,7 +388,7 @@ assert_eq "LU.6 — sans le code travail-non-commite aucune ligne de ce motif ; 
 echo "=== LU.7 — état « lancée » ==="
 run_lu "$MOD" lu7; J="$LJ"
 assert_eq "LU.7 — lancee = true : « Préparée depuis la carte. » (jamais « Lancée » sans signal d'exécution, PU-G-113) ; forme riche attendue, vue, terminée : « Lancée : Planifier, … »" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+[j.vrai,j.attendue,j.vue,j.terminee].join("¤")')" "{} Préparée depuis la carte.¤Commande préparée dans le terminal : Planifier. Elle ne démarre qu'avec Entrée dans le terminal ; en attente de la session.¤Lancée : Planifier, session en cours.¤Lancée : Planifier, session terminée."
-assert_eq "LU.7 (PU-G-113) — état attendue (ligne seulement posée dans le terminal, rien n'a démarré) : aucune ligne « Lancée » ; vue et terminée en ont une (témoin)" "$(rj "$J" '"attendue="+j.attendueL+"|vue="+j.vueL+"|terminee="+j.termineeL')" "attendue=|vue=Lancée : Planifier, session en cours.|terminee=Lancée : Planifier, session terminée."
+assert_eq "LU.7 (PU-G-113) — forme sans état (lancee = true) et état attendue (ligne seulement posée dans le terminal, rien n'a démarré) : aucune ligne « Lancée » ; vue et terminée en ont une (témoin)" "$(rj "$J" '"vrai="+j.vraiL+"|attendue="+j.attendueL+"|vue="+j.vueL+"|terminee="+j.termineeL')" "vrai=|attendue=|vue=Lancée : Planifier, session en cours.|terminee=Lancée : Planifier, session terminée."
 assert_eq "LU.7 — false, null, absent, {etat:x}, {etat:vue, verbe:x;y}, 'vue', 1, {} : aucune ligne « Lancée » (témoin : les quatre formes valides en ont une)" "$(rj "$J" '[j.faux,j.nul,j.absent,j.etatx,j.verbex,j.chaine,j.un,j.vide].map((x)=>x===undefined?"?":x).join("¤")+" temoin="+(j.vrai&&j.vue&&j.terminee&&j.attendue?"oui":"non")')" "¤¤¤¤¤¤¤ temoin=oui"
 
 echo "=== LU.8 — rendu hostile ==="
