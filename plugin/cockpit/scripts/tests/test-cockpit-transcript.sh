@@ -482,17 +482,17 @@ JS
   const S = { kind: 'session', id: 'S1', etat: 'actif', tree: '.', task: 'session' }, M = { kind: 'subagent', id: 'M1', etat: 'actif', role: 'vf-dev-manager', tree: '.', parent: 'S1', task: 'manager', dureeS: 60 };
   const C = { kind: 'subagent', id: 'C1', etat: 'actif', role: 'vf-coder', tree: '.', parent: 'M1', task: 'coder', dureeS: 30 }, F = { kind: 'subagent', id: 'F1', etat: 'termine', role: 'vf-reviewer', tree: '.', parent: 'M1', task: 'revu', dureeS: 90 };
   if (!await attendre(() => flux() && document.querySelector('#vf-lock'))) return 'badge absent';
-  emettre([S, M, C, F]); await sleep(200);
+  emettre([S, M, C, F]);
   document.querySelector('#vf-lock').click();
   const titre = () => { const h3 = document.querySelector('.vf-whop h3'); return h3 ? h3.textContent + '|' + ((document.querySelector('.vf-whop .aw-count') || {}).textContent || 'effectif absent') : 'tiroir absent'; };
-  const avant = titre();
+  const avant = await attendre(() => /3 actifs/.test(titre()) && titre(), 5000) || titre(); // le tiroir porte l'état émis avant de le mesurer
   const d = document.querySelector('.vf-whop details.vf-termines'); if (d) d.open = true;
-  emettre([S, M, { ...C, etat: 'termine', dureeS: 45 }, F]); await sleep(300);
+  emettre([S, M, { ...C, etat: 'termine', dureeS: 45 }, F]);
   const apres = await attendre(() => titre() !== avant && titre(), 3000) || titre();
   const dans = !!document.querySelector('.vf-whop details.vf-termines [data-vf-agent="C1"]');
   const ouvert = !!(document.querySelector('.vf-whop details.vf-termines') || {}).open;
-  emettre([S, M, { ...C, etat: 'termine', dureeS: 45 }, F, { kind: 'subagent', id: 'N1', etat: 'actif', role: 'vf-coder', tree: '.', parent: 'M1', task: 'nouveau', dureeS: 1 }]); await sleep(300);
-  const nouveau = !!document.querySelector('.vf-whop [data-vf-agent="N1"]') ;
+  emettre([S, M, { ...C, etat: 'termine', dureeS: 45 }, F, { kind: 'subagent', id: 'N1', etat: 'actif', role: 'vf-coder', tree: '.', parent: 'M1', task: 'nouveau', dureeS: 1 }]);
+  const nouveau = !!(await attendre(() => document.querySelector('.vf-whop [data-vf-agent="N1"]'), 5000));
   return [avant, apres, 'C1 replié=' + dans, 'Terminés resté ouvert=' + ouvert, 'N1 visible=' + nouveau].join(' | ');
 })()
 JS
@@ -521,7 +521,8 @@ JS
   const t1 = await attendre(() => long() > 0 && long(), 6000) || long(), c1 = await attendre(() => cmd() > 0 && cmd(), 6000) || cmd();
   for (let i = 0; i < 4; i++) { bouge(); await sleep(250); }
   const t2 = long(), c2 = cmd();
-  VF.select('n:ag-ag1'); await sleep(400);
+  VF.select('n:ag-ag1');
+  await attendre(() => !document.querySelector('.vf-transcript'), 5000); // la disparition est le résultat attendu : on l'attend, plus de délai fixe
   const apres = !document.querySelector('.vf-transcript');
   return ['transcript lu=' + (t1 > 0), 'transcript après 4 who=' + (t2 > 0), 'commande lue=' + (c1 > 0), 'commande après 4 who=' + (c2 > 0), 'disparu avec l\'agent=' + apres].join(' | ');
 })()
@@ -540,11 +541,14 @@ JS
 (async () => { $COMMUN
   const VF = window.VibeFlow; if (!await attendre(() => flux() && VF && VF.state && VF.state.layout && document.querySelector('#vf-lock'))) return 'page absente';
   const base = window.__vfLive.who.workers.filter((w) => w.kind === 'session' || w.kind === 'subagent');
-  emettre([...base, { kind: 'lock', id: 'v1', tree: '.', task: 'verrou' }, { kind: 'dag-node', id: 'd1', tree: '.', task: 'nœud', etat: 'actif' }, { kind: 'registered', id: 'r1', tree: '.', task: 'registre' }]); await sleep(400);
+  emettre([...base, { kind: 'lock', id: 'v1', tree: '.', task: 'verrou' }, { kind: 'dag-node', id: 'd1', tree: '.', task: 'nœud', etat: 'actif' }, { kind: 'registered', id: 'r1', tree: '.', task: 'registre' }]);
+  await attendre(() => window.__vfLive.who.workers.some((w) => w.id === 'v1'), 5000); await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); // l'état émis est appliqué et rendu
+  await attendre(() => { const b = ((document.querySelector('#vf-lock .bl') || {}).textContent || '').replace(/\\D/g, ''), st = ((document.querySelector('.vf-stats b') || {}).textContent || '').replace(/\\D/g, ''); return b !== '' && b === st; }, 5000);
   const badge = (document.querySelector('#vf-lock .bl') || {}).textContent || '';
   const stat = (document.querySelector('.vf-stats b') || {}).textContent || '';
   const lib = (document.querySelector('#search-btn .st') || {}).textContent || '';
-  document.querySelector('#search-btn').click(); const si = document.querySelector('#search'); si.value = 'vf-dev-manager'; si.dispatchEvent(new Event('input')); await sleep(300);
+  document.querySelector('#search-btn').click(); const si = document.querySelector('#search'); si.value = 'vf-dev-manager'; si.dispatchEvent(new Event('input'));
+  await attendre(() => document.querySelectorAll('#results .r').length > 0, 5000);
   const trouves = document.querySelectorAll('#results .r').length;
   return ['badge=' + badge.replace(/\\D/g, ''), 'actifs=' + stat, 'titre=' + document.title, 'libelle=' + lib, 'trouves=' + (trouves > 0)].join(' | ');
 })()
