@@ -340,6 +340,8 @@ cat > "$AUX/chrome-bandeau.mjs" <<'JS'
 // chrome-bandeau.mjs <chrome> <mode> <json> : scénarios navigateur du bandeau de proposition ; UNE ligne JSON. Modes : vue (LB.V) · client (LB.E1 à E7) · froid (LB.E8).
 // Q factice dans un cadre sandbox de P factice, plein viewport (ou de taille nulle), secret posé dans le stockage de Q ; gestes par Input.dispatchMouseEvent seulement.
 // Chaque étape est isolée (essai) : une mesure indisponible est nommée dans `erreurs`, jamais un résultat vide.
+// Bornes d'attente : les plafonds d'attente POSITIVE sont à MS (20 s par défaut) : sur un produit cassé, N essais perdus × 20 s peuvent dépasser l'échéance globale de la session (VF_CDP_GLOBAL_MS, 600 s) ;
+// la sonde est alors interrompue (la suite voit un scénario sans résultat). Le diagnostic se lit par cas perdu (`erreurs`, « attente de … dépassée »), pas sur la durée. Une borne qui EST l'objet d'une assertion ne se relève jamais.
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs';
 const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const { valide, ID_A, ID, NOTE, MOTIFS, INCONNU, MSG, ligne } = await import(pathToFileURL(process.env.LB_DONNEES).href);
@@ -478,7 +480,7 @@ await executer(chrome, async (s) => {
         await raz(); await monter({ id: ID(++k), arme_apres_ms: 400 }); await attendreArme(MS); await clic(LANCER);
         await q.attendre('__T.appels.length === 1', 'appel de lancer', MS); await q.ev(`__T.resolve(${JSON.stringify(st)})`);
         const f = await attendreValeur(() => q.ev(`(() => { const b = document.getElementById('proposition'); return b ? { present: true, msg: document.getElementById('proposition-message').textContent, arme: ${LANCER}.getAttribute('aria-disabled') } : { present: false }; })()`),
-          (x) => (st === 'ok' || st === 'absente') ? x.present === false : x.present && x.msg === MSG[st]); // le statut se rend après la résolution de la promesse : on lit l'état une fois posé
+          (x) => (st === 'ok' || st === 'absente') ? x.present === false : x.present && x.msg === MSG[st] && x.arme === (st === 'attendre' ? 'true' : 'false')); // le statut se rend après la résolution de la promesse : on lit l'état une fois posé
         if (st === 'attendre') f.rearme = await attendreArme(MS).then(() => true, () => false);
         sortie.push(`${st}=${attendu(st, f) ? 'ok' : 'KO ' + JSON.stringify(f)}`);
       }
@@ -577,7 +579,7 @@ await executer(chrome, async (s) => {
     await essai('v16', async () => { // LB3 (PU-G-136) : cadre bas (124 px, le plus petit tiroir) : la proposition prend sa place SOUS le terminal au lieu de le recouvrir ; retirée, le terminal reprend toute la hauteur
       await s.ev(`document.querySelector('iframe[data-t]').style.height = '124px'`);
       await raz(); await monter({ id: ID(160) });
-      r.v16 = await attendreEtStabiliser(() => q.ev(`(() => { const t = document.getElementById('terminal').getBoundingClientRect(), b = document.getElementById('proposition').getBoundingClientRect(), H = innerHeight; return [H, t.height >= 24, t.bottom <= b.top + 0.5, b.height <= H * 0.6 + 1, b.bottom <= H].join('/'); })()`), (v) => typeof v === 'string' && !v.includes('false'), { max: 4000 }); // la géométrie se juge une fois posée (redimensionnement du cadre, fit du terminal)
+      r.v16 = await attendreEtStabiliser(() => q.ev(`(() => { const t = document.getElementById('terminal').getBoundingClientRect(), b = document.getElementById('proposition').getBoundingClientRect(), H = innerHeight; return [H, t.height >= 24, t.bottom <= b.top + 0.5, b.height <= H * 0.6 + 1, b.bottom <= H].join('/'); })()`), (v) => typeof v === 'string' && v.startsWith('124/') && !v.includes('false'), { max: 4000 }); // la géométrie se juge une fois posée (redimensionnement du cadre, fit du terminal)
       await raz();
       r.v16 += '/' + (await attendreValeur(() => q.ev(`document.getElementById('terminal').getBoundingClientRect().height >= 120`), (v) => v === true, { max: 4000 }));
       await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
@@ -585,7 +587,7 @@ await executer(chrome, async (s) => {
     await essai('v17', async () => { // LB3 (PU-G-141 ; Q14) : la carte reste entière dans un cadre bas (marge de 8 px, sans défilement) ; « Copier la commande » copie EXACTEMENT la commande affichée, annonce le résultat ; aucun bouton de copie sur une proposition de lancement
       await s.ev(`document.querySelector('iframe[data-t]').style.height = '124px'`);
       await q.ev(`(() => { vfTermVue.carte('arrete'); window.__copie = null; document.addEventListener('copy', () => { window.__copie = String(getSelection()); }, true); return true; })()`);
-      const geo = await attendreEtStabiliser(() => q.ev(`(() => { const k = document.querySelector('.vf-q-carte'), b = k.getBoundingClientRect(), H = innerHeight; return [b.top >= 7.5, b.bottom <= H - 7.5, k.scrollHeight <= k.clientHeight + 1].join('/'); })()`), (v) => typeof v === 'string' && !v.includes('false'), { max: 4000 });
+      const geo = (await attendreEtStabiliser(() => q.ev(`(() => { const k = document.querySelector('.vf-q-carte'), b = k.getBoundingClientRect(), H = innerHeight; return { H, g: [b.top >= 7.5, b.bottom <= H - 7.5, k.scrollHeight <= k.clientHeight + 1].join('/') }; })()`), (v) => !!v && v.H === 124 && !v.g.includes('false'), { max: 4000 })).g; // cadre à 124 px posé, carte jugée une fois entière
       await clic(`[...document.querySelectorAll('.vf-q-carte button')].find((x) => x.textContent === 'Copier la commande')`);
       // la copie est synchrone dans le clic ; « Copiée » se rétablit au bout de 2,5 s (vue) : on lit dès que l'évènement copy est passé, jamais plus tard
       const ap = await attendreValeur(() => q.ev(`({ copie: window.__copie, affichee: document.querySelector('.vf-q-commande').textContent, bouton: [...document.querySelectorAll('.vf-q-carte button')].map((x) => x.textContent).join(','), annonce: document.getElementById('annonce').textContent })`), (a) => a.copie !== null, { pas: 50, max: 2000 });
@@ -618,10 +620,10 @@ await executer(chrome, async (s) => {
       await q.ev(`(() => { vfTermVue.effacer(); return true; })()`); await q.attendre(`!!document.getElementById('accueil')`, 'accueil monté');
       await clic(`document.querySelector('.xterm-screen')`);
       const foc0 = await attendreValeur(foc, (v) => v === 'xterm-helper-textarea'), n0 = lignesLog().length;
-      const geo = await attendreEtStabiliser(() => q.ev(`(() => { const a = document.getElementById('accueil'), t = document.getElementById('terminal').getBoundingClientRect(), b = a.getBoundingClientRect(); return [t.bottom <= b.top + 1, b.bottom <= innerHeight + 1, t.height > 24, a.querySelector('button').tabIndex === -1].join('.'); })()`), (v) => typeof v === 'string' && !v.includes('false'), { max: 4000 });
+      const geo = (await attendreEtStabiliser(() => q.ev(`(() => { const a = document.getElementById('accueil'), t = document.getElementById('terminal').getBoundingClientRect(), b = a.getBoundingClientRect(); return { H: innerHeight, g: [t.bottom <= b.top + 1, b.bottom <= innerHeight + 1, t.height > 24, a.querySelector('button').tabIndex === -1].join('.') }; })()`), (v) => !!v && v.H === 700 && !v.g.includes('false'), { max: 4000 })).g; // pleine hauteur de la fenêtre émulée (700 px)
       await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'x', code: 'KeyX', text: 'x', windowsVirtualKeyCode: 88 }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'x', code: 'KeyX', windowsVirtualKeyCode: 88 });
       // la frappe traverse POST /entree et le rangement de l'accueil : on lit une fois l'octet arrivé et l'accueil rangé, puis stable (un second octet se verrait)
-      const apres = await attendreEtStabiliser(async () => ({ rangee: await q.ev(`!document.getElementById('accueil') && localStorage.getItem('vf.terminal.accueil') === '1'`), octets: lignesLog().slice(n0), foc: await foc() }), (a) => a.rangee === true && a.octets.length >= 1, { max: 6000 });
+      const apres = await attendreEtStabiliser(async () => ({ rangee: await q.ev(`!document.getElementById('accueil') && localStorage.getItem('vf.terminal.accueil') === '1'`), octets: lignesLog().slice(n0), foc: await foc() }), (a) => a.rangee === true && a.octets.length >= 1 && a.octets[0] === '78', { pas: 500, max: 6000 }); // pas 500 : fenêtre de silence d'origine (un second octet se verrait)
       const rangee = apres.rangee, octets = apres.octets, focFin = apres.foc;
       await q.ev(`(() => { localStorage.removeItem('vf.terminal.accueil'); vfTermVue.effacer(); return true; })()`); await q.attendre(`!!document.getElementById('accueil')`, 'accueil remonté');
       await clic(`document.querySelector('.xterm-screen')`); const focS = await stabiliser(foc, { max: 3000 });
