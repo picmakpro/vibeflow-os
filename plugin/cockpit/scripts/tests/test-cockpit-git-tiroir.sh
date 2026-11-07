@@ -200,7 +200,7 @@ const cible = `[...document.querySelectorAll('#vf-git-tiroir .vf-git-cmd code')]
 await s.ev(`${cible}.parentNode.querySelector('button').click()`);
 await s.attendre(`window.__copies.length === 1`, 'copie');
 out.copie = await s.ev(`({ spy: window.__copies[0], affiche: ${cible}.textContent, retour: ${cible}.parentNode.querySelector('.vf-git-retour').textContent, live: document.querySelector('#vf-git-tiroir .vf-git-live').textContent, label: ${cible}.parentNode.querySelector('button').getAttribute('aria-label') })`);
-out.copie.apres = await attendreValeur(() => s.ev(`${cible}.parentNode.querySelector('.vf-git-retour').textContent`), (v) => v === '', { max: 10000 }); // minuterie produit 1600 ms : on attend le retour effacé, plus un délai fixe
+out.copie.apres = await attendreValeur(() => s.ev(`${cible}.parentNode.querySelector('.vf-git-retour').textContent`), (v) => v === '', { max: 4000 }); // minuterie produit 1600 ms : borne 4 s (≈ 2,5 x) — une régression du minuteur (retour jamais effacé) reste rouge
 await s.ev(`window.__refuse = true; ${cible}.parentNode.querySelector('button').click()`);
 await s.attendre(`/Copie impossible/.test(${cible}.parentNode.querySelector('.vf-git-retour').textContent)`, 'copie refusée');
 out.refus = await s.ev(`({ retour: ${cible}.parentNode.querySelector('.vf-git-retour').textContent, selection: String(window.getSelection()), affiche: ${cible}.textContent })`);
@@ -258,7 +258,7 @@ out.vide = await s.ev(`({ code: [...${T}.querySelectorAll('.vf-git-cmd code')].m
 await s.ev(`window.__vfGit.reponse = JSON.parse(JSON.stringify(window.__TEMOIN_REF)); window.__vfGit.delai = 4000; void window.VFGitTiroir.recharger(); 0`); // réponse tenue 4 s : la fenêtre « chargement » reste ouverte sous une CI lente (l'attendu ne change pas : fantômes tant que la réponse n'est pas là)
 await attente(60);
 out.avant150 = await s.ev(`({ busy: ${T}.querySelector('[aria-busy="true"]') !== null || ${T}.querySelector('.vf-git-corps').getAttribute('aria-busy') === 'true', fantomes: ${T}.querySelectorAll('.vf-git-fantome').length })`);
-out.pendant = await attendreValeur(() => s.ev(`({ busy: ${T}.querySelector('.vf-git-corps').getAttribute('aria-busy'), fantomes: ${T}.querySelectorAll('.vf-git-fantome').length, texte: /Lecture du dépôt/.test(${T}.textContent), anim: ${T}.querySelector('.vf-git-fantome') ? getComputedStyle(${T}.querySelector('.vf-git-fantome')).animationName : 'none' })`), (v) => v.fantomes > 0 && v.busy === 'true', { pas: 50, max: 3500 }); // lue une fois le squelette posé (minuterie produit 150 ms)
+out.pendant = await attendreValeur(() => s.ev(`({ busy: ${T}.querySelector('.vf-git-corps').getAttribute('aria-busy'), fantomes: ${T}.querySelectorAll('.vf-git-fantome').length, texte: /Lecture du dépôt/.test(${T}.textContent), anim: ${T}.querySelector('.vf-git-fantome') ? getComputedStyle(${T}.querySelector('.vf-git-fantome')).animationName : 'none' })`), (v) => v.fantomes > 0 && v.busy === 'true', { pas: 50, max: 1000 }); // squelette posé par la minuterie produit de 150 ms : borne 1 s (≈ 6 x), lecture voulue dans la fenêtre « chargement » (réponse tenue 4 s)
 await s.attendre(`document.querySelectorAll('#vf-git-tiroir li[role=option]').length === 40`, 'rangées après le délai');
 out.apres = await s.ev(`({ busy: ${T}.querySelector('.vf-git-corps').getAttribute('aria-busy'), fantomes: ${T}.querySelectorAll('.vf-git-fantome').length })`);
 out.errs = await s.ev(`window.__errs`);
@@ -780,13 +780,13 @@ await s.ev(`(() => { navigator.clipboard.writeText = () => Promise.resolve(); wi
 const bouton = `document.querySelector('#vf-git-s-wt .vf-git-cmd .vf-git-btn')`;
 out.iconeAvant = await s.ev(`${bouton}.querySelector('path').getAttribute('d')`);
 await s.ev(`${bouton}.click()`);
-const coche = await attendreValeur(() => s.ev(`({ d: ${bouton}.querySelector('path').getAttribute('d'), retour: ${bouton}.parentElement.querySelector('.vf-git-retour').textContent })`), (v) => v.retour !== '', { max: 5000 }); // « Copiée » affiché (icône et texte posés par le même appel du produit) : on lit les deux à cet instant, avant l'effacement à 1600 ms
+const coche = await attendreValeur(() => s.ev(`({ d: ${bouton}.querySelector('path').getAttribute('d'), retour: ${bouton}.parentElement.querySelector('.vf-git-retour').textContent })`), (v) => v.retour !== '', { max: 1500 }); // « Copiée » posé au retour de la promesse, avant l'effacement produit à 1600 ms : borne 1,5 s ; « Copiée » affiché (icône et texte posés par le même appel du produit) : on lit les deux à cet instant, avant l'effacement à 1600 ms
 out.iconeCoche = coche.d;
 out.retour = coche.retour;
 await s.ev(`${LIGNES}[2].click()`);
 await s.attendre(`!!document.querySelector('.vf-git-detail .vf-git-d-fichiers')`, 'détail ouvert');
 await s.ev(`document.querySelector('.vf-git-det .vf-git-cmd .vf-git-btn').click()`);
-out.iconeApres = await attendreValeur(() => s.ev(`${bouton}.querySelector('path').getAttribute('d')`), (d) => d === out.iconeAvant, { max: 10000 }); // minuterie produit 1600 ms : on attend le retour de l'icône de copie
+out.iconeApres = await attendreValeur(() => s.ev(`${bouton}.querySelector('path').getAttribute('d')`), (d) => d === out.iconeAvant, { max: 4000 }); // minuterie produit 1600 ms : borne 4 s (≈ 2,5 x), une régression du minuteur reste rouge
 out.regions = await s.ev(`document.querySelectorAll('#vf-git-tiroir [aria-live]').length`);
 out.copies = await s.ev(`window.__ann.filter((a) => /Commande copiée/.test(a[1]))`);
 out.errs = await s.ev(`window.__errs`);
