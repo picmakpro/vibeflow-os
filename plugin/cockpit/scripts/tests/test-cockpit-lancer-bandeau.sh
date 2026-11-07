@@ -343,11 +343,12 @@ cat > "$AUX/chrome-bandeau.mjs" <<'JS'
 // Bornes d'attente : les plafonds d'attente POSITIVE sont à MS (20 s par défaut) : sur un produit cassé, N essais perdus × 20 s peuvent dépasser l'échéance globale de la session (VF_CDP_GLOBAL_MS, 600 s) ;
 // la sonde est alors interrompue (la suite voit un scénario sans résultat). Le diagnostic se lit par cas perdu (`erreurs`, « attente de … dépassée »), pas sur la durée. Une borne qui EST l'objet d'une assertion ne se relève jamais.
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs';
-const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee, AMORCE } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const { valide, ID_A, ID, NOTE, MOTIFS, INCONNU, MSG, ligne } = await import(pathToFileURL(process.env.LB_DONNEES).href);
 const [, , chrome, mode, brut] = process.argv;
 const { P, Q, secret, run, only = null, emu = false, codes = [] } = JSON.parse(brut);
 const OP = `http://127.0.0.1:${P}`, OQ = `http://127.0.0.1:${Q}`, MS = Number(process.env.VF_CLIENT_MS) || 20000;
+const AM = process.env.VF_CLIENT_MS ? MS : Math.max(MS, AMORCE); // première attente après l'ouverture de Chrome (amorçage à froid, CI PR #219) : bornée par AMORCE ; un VF_CLIENT_MS posé (mutants) la ramène à MS
 const LISTE = ['ready', 'etat:connecte', 'etat:reconnexion', 'etat:termine', 'etat:refuse', 'etat:expire', 'etat:arrete', 'toggle'];
 const erreurs = {};
 const essai = async (nom, f) => { if (only && !only.includes(nom)) return; try { return await f(); } catch (e) { erreurs[nom] = String(e.message).slice(0, 160); return undefined; } };
@@ -361,8 +362,8 @@ const mondeQ = async (s, etendue = 600) => {
   }
   return trouve;
 };
-const trouverCtx = async (s) => {
-  const fin = Date.now() + MS; let essais = 0; ctx = 0;
+const trouverCtx = async (s, borne = MS) => {
+  const fin = Date.now() + borne; let essais = 0; ctx = 0;
   while (!ctx) { ctx = await mondeQ(s, 600 * 5 ** Math.min(essais++, 3)); if (!ctx) { if (Date.now() > fin) throw new Error('contexte du cadre de Q introuvable'); await pause(150); } }
 };
 const facadeQ = (s) => {
@@ -373,14 +374,15 @@ const facadeQ = (s) => {
     throw new Error(`attente de « ${nom} » dépassée (${ms} ms)`);
   };
   // naviguer(url, taille) : secret posé dans le stockage de Q (premier niveau), puis Q dans un cadre sandbox de P ; taille 'nulle' = cadre masqué (tiroir jamais ouvert)
+  let froid = true; // la première navigation d'un Chrome est l'amorçage à froid : ses attentes sont bornées par AM
   const naviguer = async (url = `${OQ}/?theme=dark`, taille = 'plein') => {
-    ctx = 0;
+    const lim = froid ? AM : MS; froid = false; ctx = 0;
     await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', ${JSON.stringify(secret)})`);
-    await s.naviguer(`${OP}/project.html`); await s.attendre(`document.readyState === 'complete'`, 'page P', MS);
+    await s.naviguer(`${OP}/project.html`); await s.attendre(`document.readyState === 'complete'`, 'page P', lim);
     const dim = taille === 'nulle' ? 'width:0;height:0' : 'width:100vw;height:100vh';
     await s.ev(`(() => { const f = document.createElement('iframe'); f.dataset.t = '1'; f.setAttribute('sandbox', ${JSON.stringify(SBXQ)}); f.style.cssText = 'position:fixed;left:0;top:0;${dim};border:0;z-index:99999'; f.src = ${JSON.stringify(url)}; document.body.appendChild(f); })()`);
-    await trouverCtx(s);
-    if (taille !== 'nulle') await attendre(`!!document.querySelector('.xterm-helper-textarea')`, 'terminal dans le cadre');
+    await trouverCtx(s, lim);
+    if (taille !== 'nulle') await attendre(`!!document.querySelector('.xterm-helper-textarea')`, 'terminal dans le cadre', lim);
   };
   const recharger = async (url) => { ctx = 0; await s.ev(`document.querySelector('iframe[data-t]').src = ${JSON.stringify(url)}`); await pause(300); await trouverCtx(s); await attendre(`!!document.querySelector('.xterm-helper-textarea')`, 'terminal après rechargement'); };
   return { ev, attendre, naviguer, recharger };
@@ -716,8 +718,11 @@ await executer(chrome, async (s) => {
       r.e9 = [nul, msgs, annule >= 1, garde].join('/');
     });
     const ENTREE_TOUCHE = (type, extra = {}) => s.send('Input.dispatchKeyEvent', Object.assign({ type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, extra)), SUR_TERMINAL = `!!document.activeElement && document.activeElement.className === 'xterm-helper-textarea'`;
+    const TERMINAL_FOCALISE = `document.hasFocus() && document.activeElement && document.activeElement.className === 'xterm-helper-textarea'`;
     // reprises(r0) : six répétitions de l'Entrée tenue (cadence d'auto-répétition, 40 ms : c'est l'entrée testée) → 0 octet CR attendu après 400 ms ; puis Entrée fraîche → l'octet arrive PUIS reste stable (LB.E14, run 42405220695 : après 500 ms il arrivait parfois plus tard en CI Linux)
-    const reprises = async (r0) => { for (let i = 0; i < 6; i++) { await ENTREE_TOUCHE('keyDown', { text: '\r', autoRepeat: true }); await pause(40); } await pause(400); const tenue = retours() - r0; await ENTREE_TOUCHE('keyUp'); await pause(100); await ENTREE_TOUCHE('keyDown', { text: '\r' }); await ENTREE_TOUCHE('keyUp'); await pause(500); return tenue + '/' + (await attendreEtStabiliser(() => retours() - r0 - tenue, (n) => n >= 1, { max: 3000 })); };
+    const reprises = async (r0) => { for (let i = 0; i < 6; i++) { await ENTREE_TOUCHE('keyDown', { text: '\r', autoRepeat: true }); await pause(40); } await pause(400); const tenue = retours() - r0; await ENTREE_TOUCHE('keyUp'); await pause(100); await q.attendre(SUR_TERMINAL, 'saisie du terminal focalisée avant l\'Entrée fraîche'); const n1 = (await journal()).filter((x) => x.u === '/entree').length; await ENTREE_TOUCHE('keyDown', { text: '\r' }); await ENTREE_TOUCHE('keyUp'); await pause(500); const fraiche = await attendreEtStabiliser(() => retours() - r0 - tenue, (n) => n >= 1, { max: 3000 });
+      if (fraiche < 1) { const e = await q.ev(`({ focus: document.hasFocus(), actif: document.activeElement && document.activeElement.className, vis: document.visibilityState })`).catch(() => null); const j = await journal(); console.error('DIAG reprises : Entrée fraîche perdue ; état de Q ' + JSON.stringify(e) + ' ; POST /entree avant/après la fraîche ' + n1 + '/' + j.filter((x) => x.u === '/entree').length + ' ; dernières requêtes ' + j.slice(-8).map((x) => x.m + ' ' + x.u + ' ' + x.st).join(', ')); } // trace (stderr, jamais dans le verdict) : où se perd l'octet
+      return tenue + '/' + fraiche; };
     await essai('e10', async () => { // LB3-S (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06, remarque du relecteur de LB1-LB2) : Entrée TENUE sur « Préparer » ; le focus revient au terminal après la réponse, les répétitions de la touche ne l'atteignent pas ; Entrée relâchée puis pressée de nouveau passe
       await scenario({ prop: valide(ID(101), { arme_apres_ms: 600 }), lancers: [] }); await q.naviguer();
       await q.attendre(`!!document.getElementById('proposition')`, 'bandeau de la proposition', MS); await attendreArme();
@@ -768,7 +773,6 @@ await executer(chrome, async (s) => {
     // LB3-S3 (F1 de la revue de a83890da..45a2396e ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-07, « et tout autre bouton du même genre ») : la retenue est posée sur la PRISE DE FOCUS du terminal lui-même, pas sur chaque appelant.
     // Le vrai client de Q tourne dans l'iframe de P ; P est ici une page minimale qui reproduit `cadre.focus()` de la pastille du tiroir (vf-cockpit-terminal-tiroir.mjs, ouvrir(true)) : un bouton de P dont l'Entrée (keydown) donne le focus à l'iframe.
     const PASTILLE = `(() => { const b = document.createElement('button'); b.id = 'pastille-t'; b.textContent = 'Terminal'; b.style.cssText = 'position:fixed;right:0;bottom:0;z-index:100000'; b.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.querySelector('iframe[data-t]').focus(); }); document.body.appendChild(b); b.focus(); return document.activeElement.id; })()`;
-    const TERMINAL_FOCALISE = `document.hasFocus() && document.activeElement && document.activeElement.className === 'xterm-helper-textarea'`;
     await essai('e13', async () => { // chemin PARENT : Entrée tenue sur la pastille de P, qui donne le focus à l'iframe de Q ; les répétitions qui suivent n'atteignent pas le shell ; puis Entrée fraîche : 1
       await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
       await scenario({ prop: null, lancers: [] }); await q.naviguer(); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.attendre(TERMINAL_FOCALISE, 'terminal focalisé', MS);
@@ -799,7 +803,7 @@ await executer(chrome, async (s) => {
     await s.ev(`(() => { const i = document.createElement('input'); i.id = 'champP'; i.style.cssText = 'position:fixed;left:0;top:0'; document.body.appendChild(i); i.focus();
       const f = document.createElement('iframe'); f.dataset.t = '1'; f.setAttribute('sandbox', ${JSON.stringify(SBXQ)}); f.style.cssText = 'position:fixed;left:0;bottom:0;width:100vw;height:300px;border:0'; f.src = ${JSON.stringify(OQ + '/?theme=dark')}; document.body.appendChild(f); return true; })()`);
     await essai('f1', async () => {
-      await s.attendre(`window.__msgs.some((m) => m.d === 'ready')`, 'cadre de Q prêt', MS);
+      await s.attendre(`window.__msgs.some((m) => m.d === 'ready')`, 'cadre de Q prêt', AM);
       const fin = Date.now() + MS; while (Date.now() < fin && !(await journal()).some((x) => x.u === '/flux')) await pause(100); // le terminal de Q est démarré
       await pause(600);
       await scenario({ prop: valide(ID_A), lancers: [] });
@@ -825,7 +829,7 @@ await executer(chrome, async (s) => {
     await s.ev(`(() => { const i = document.createElement('input'); i.id = 'champP'; i.style.cssText = 'position:fixed;left:0;top:0'; document.body.appendChild(i); i.focus();
       const f = document.createElement('iframe'); f.dataset.t = '1'; f.setAttribute('sandbox', ${JSON.stringify(SBXQ)}); f.style.cssText = 'position:fixed;left:0;bottom:0;width:100vw;height:300px;border:0'; f.src = ${JSON.stringify(OQ + '/?theme=dark')}; document.body.appendChild(f); return true; })()`);
     await essai('l2', async () => {
-      await s.attendre(`window.__msgs.some((m) => m.d === 'ready')`, 'cadre de Q prêt', MS);
+      await s.attendre(`window.__msgs.some((m) => m.d === 'ready')`, 'cadre de Q prêt', AM);
       const fin = Date.now() + MS; while (Date.now() < fin && !(await journal()).some((x) => x.u === '/flux')) await pause(100);
       await pause(600); await trouverCtx(s);
       if (cadre) await s.ev(`document.querySelector('iframe[data-t]').focus()`); else await s.ev(`document.getElementById('champP').focus()`);
@@ -895,8 +899,10 @@ mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_DIR ; code 1 si la c
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
 doubles() { node "$AUX/doubles.mjs" "$1/vf-cockpit-terminal-client.mjs" "$2" 2>&1 | tail -1; } # doubles <dossier> <scénario>
-FN=0
+FN=0; VF_CLIENT_MS0="${VF_CLIENT_MS:-}"
 faux() { # faux <dossier-des-modules> -> FQ FP FSEC FRUN FPID ; un seul processus, deux ports
+  # un mutant (modules ou injection copiés) peut casser l'amorçage : ses attentes restent à 20 s (jamais l'AMORCE de 600 s) ; la suite normale garde l'amorçage large
+  if [ "$1" != "$SCRIPTS" ] || [ "${FAUX_INJ:-$SCRIPTS}" != "$SCRIPTS" ]; then export VF_CLIENT_MS=20000; elif [ -n "$VF_CLIENT_MS0" ]; then export VF_CLIENT_MS="$VF_CLIENT_MS0"; else unset VF_CLIENT_MS; fi
   port; FQ="$PORT"; port; FP="$PORT"; FSEC="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
   FN=$((FN+1)); FRUN="$WORK/run/$FN"; mkdir -p "$FRUN"
   FAUX_INJ="${FAUX_INJ:-}" node "$AUX/faux.mjs" "$1" "$ENG" "$FQ" "$FP" "$FSEC" "$FRUN" > "$FRUN/faux.out" 2>&1 < /dev/null &
