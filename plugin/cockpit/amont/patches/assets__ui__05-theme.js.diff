@@ -24,7 +24,7 @@
 +  const fit = () => {
 +    const h = document.querySelector('header'), cr = document.getElementById('crumbs'); if (!h) return;
 +    const larges = () => ['.hl', '.hc', '#crumbs'].map((q) => { const e = document.querySelector(q); return e ? e.getBoundingClientRect().width : 0; });
-+    word.style.display = ''; const avec = larges(), deborde = h.scrollWidth > h.clientWidth || (cr && cr.scrollWidth > cr.clientWidth + 1);
++    word.style.display = ''; const avec = larges(), deborde = h.scrollWidth > h.clientWidth || (cr && cr.scrollWidth > cr.clientWidth + 1) || btn.scrollWidth > btn.clientWidth; // le bouton lui-même ne doit pas rogner son mot (de 1 000 à 1 279 px, `header #theme-toggle` le ramène à 36 px : P78-D-34)
 +    word.style.display = 'none'; const sans = larges();
 +    word.style.display = !deborde && avec.every((w, i) => w >= sans[i] - 0.5) ? '' : 'none';
 +  };

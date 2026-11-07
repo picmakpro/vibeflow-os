@@ -6,6 +6,7 @@
 //   M5 : colonnes · titres · retour059 · reponse · recent · dedoublon
 import { executer, pause } from './chrome-session.mjs';
 const [, , chrome, racine, equipeSession] = process.argv;
+const BASE = racine;
 const U = (page) => `${racine}/${page}?lang=en`;
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout";
 
@@ -122,6 +123,23 @@ await executer(chrome, async (s) => {
     await s.attendre("!document.querySelector('#tooltip').hidden && document.querySelector('#tooltip').innerText.length > 0", 'infobulle de carte');
   }
   o.info = { texte: await s.ev("(document.querySelector('#tooltip') || { innerText: '' }).innerText"), pastille: await s.ev("!!document.querySelector('#tooltip .vst')") };
+  // PU-G-036 : la même infobulle, en français (sans ?lang=en) — « Clic droit : plus d'actions »
+  await s.naviguer(`${BASE}/project.html`); await s.attendre(PRET, 'page projet en français'); await s.attendre("!!document.querySelector('#viewport .node')", 'cartes (français)'); await pause(300);
+  const cf = JSON.parse(await s.ev(`(() => { const cs = [...document.querySelectorAll('#viewport .node .card')].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.right < innerWidth - 340 && r.top > 130); const r = cs[0]; return JSON.stringify(r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null); })()`));
+  if (cf) {
+    await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5, button: 'none' });
+    for (const dx of [-30, -10, 0, 3]) { await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cf.x + dx, y: cf.y, button: 'none' }); await pause(120); }
+    await s.attendre("!document.querySelector('#tooltip').hidden && document.querySelector('#tooltip .th')", 'infobulle de carte (français)');
+  }
+  o.infoFr = { texte: await s.ev("(document.querySelector('#tooltip .th') || { textContent: '' }).textContent") };
+  // PU-G-100 : le sens des liens entre phases. Le panneau d'une phase dit ce que la phase attend (« Dépend de ») et ce qu'elle débloque (« Utilisé par ») ; l'ordre des cartes, lui, ne bouge pas
+  await vue(1280, 720); await s.naviguer(`${BASE}/project.html`); await s.attendre(PRET, 'page projet en français'); await s.attendre("!!document.querySelector('#viewport .node')", 'cartes (phases)'); await pause(500);
+  const phases = JSON.parse(await s.ev(`JSON.stringify([...VibeFlow.nodes.keys()].filter((k) => /^ph-/.test(k)))`));
+  await aller('n:ms-phases');
+  const ordre = JSON.parse(await s.ev(`JSON.stringify(VibeFlow.state.layout.children.filter((c) => /^n:ph-/.test(c.id)).sort((a, b) => a.x - b.x || a.y - b.y).map((c) => c.id))`));
+  const panneauPhase = async (id) => { await s.ev(`VibeFlow.reveal(${JSON.stringify('n:' + id)})`); await s.attendre(`VibeFlow.state.selected === ${JSON.stringify('n:' + id)} && !!document.querySelector('#panel h2')`, `fiche ${id}`); await pause(400);
+    return JSON.parse(await s.ev(`JSON.stringify({ titres: [...document.querySelectorAll('#panel .sec h3')].map((e) => e.firstChild.textContent.trim()).filter((t) => /^(Utilisé par|Dépend de|Used by|Depends on)$/.test(t)), lignes: [...document.querySelectorAll('#panel .sec')].filter((e) => /^(Utilisé par|Dépend de|Used by|Depends on)/.test(e.querySelector('h3')?.textContent.trim() || '')).flatMap((e) => [...e.querySelectorAll('.row .rn')].map((r) => r.textContent.trim())) })`)); };
+  o.sens = { phases, p1: await panneauPhase(phases[0] || 'ph-1'), p2: await panneauPhase(phases[1] || 'ph-2'), ordre };
 
   // ---------- panneau de détail par défaut : fermé à 768 px, ouvert à 1 024 px (PU-G-045) ----------
   const ouvertA = async (w, h) => { await vue(w, h); await charger('index.html'); return s.ev("!document.body.classList.contains('no-panel') && document.querySelector('#btn-panel').getAttribute('aria-expanded') === 'true'"); };

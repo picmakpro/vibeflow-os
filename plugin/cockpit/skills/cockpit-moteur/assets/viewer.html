@@ -1044,7 +1044,7 @@ const tipHints = (spans) => matchMedia('(pointer: coarse)').matches ? '' : `<div
 function cardTip(id) {
   if (id.startsWith('x:')) {
     const i = info(connEntity(id));
-    return `<div class="tt">${id.startsWith('x:in') ? 'From' : 'To'} ${h(i.name)}</div>${i.desc ? `<div class="td">${h(i.desc)}</div>` : ''}${tipHints('<span><span class="kbd">2×click</span> go there</span><span><span class="kbd">right-click</span> more</span>')}`;
+    return `<div class="tt">${id.startsWith('x:in') ? 'From' : 'To'} ${h(i.name)}</div>${i.desc ? `<div class="td">${h(i.desc)}</div>` : ''}${tipHints('<span><span class="kbd">2×click</span> go there</span><span><span class="kbd">right-click</span><span class="sep">:</span> more</span>')}`;
   }
   const i = info(id);
   const st = statsOf(id);
@@ -1052,7 +1052,7 @@ function cardTip(id) {
   const where = i.type === 'node' ? (i.n.paths || []).join('\n') : i.type === 'route' ? `${i.f.p}${i.r.h ? ` · ${i.r.h}()` : ''}` : i.path || '';
   const sv = i.n?.st || i.f?.st;
   const size = sv ? '' : !st?.files ? '' : PLAN ? (i.type === 'file' || i.type === 'module' ? 'planned' : plural(st.files, 'planned file')) : i.type === 'file' || i.type === 'module' ? `${fmt(st.loc)} lines` : `${plural(st.files, 'file')} · ${fmt(st.loc)} lines`;
-  const hints = [drillable(id) && state.container !== id ? '<span><span class="kbd">2×click</span> open</span>' : '', '<span><span class="kbd">right-click</span> more</span>'].join('');
+  const hints = [drillable(id) && state.container !== id ? '<span><span class="kbd">2×click</span> open</span>' : '', '<span><span class="kbd">right-click</span><span class="sep">:</span> more</span>'].join('');
   return `<div class="tt">${h(i.name)}</div><div class="td" style="text-transform:capitalize">${h(kind)}${size ? ` · ${size}` : ''}</div>${sv ? `<div class="td">${statePill(sv)}</div>` : ''}${where ? `<div class="tp">${h(where)}</div>` : ''}${recentTip(id)}${tipHints(hints)}`;
 }
 /** Hover lines for recent work: what changed on this card and how it serves the request, or what changed inside it. */
@@ -1207,7 +1207,8 @@ function drawColumns(g, view, res) {
   const outs = res.children.filter((c) => c.id.startsWith('x:out:'));
   const mid = res.children.filter((c) => !c.id.startsWith('x:'));
   const y = Math.min(...res.children.map((c) => c.y)) - 26;
-  const cols = [[span(ins), 'Used by'], [span(mid), `Inside ${info(state.container).name}`], [span(outs), 'Uses']];
+  const depFirst = G.meta?.vfTab === 'project'; // same reading as the panel lists: on the Project tab the incoming side is what this part depends on (PU-G-100)
+  const cols = [[span(ins), depFirst ? 'Depends on' : 'Used by'], [span(mid), `Inside ${info(state.container).name}`], [span(outs), depFirst ? 'Used by' : 'Uses']];
   for (const [s, label] of cols) {
     if (!s) continue;
     const [x0, x1] = s, cx = (x0 + x1) / 2;
@@ -1265,7 +1266,7 @@ function edgeTip(e) {
   const desc = e.links.map((l) => l.desc).find(Boolean);
   const meta = eps.length ? eps.slice(0, 4).map((x) => `${x.r.m} ${x.r.p}`).join('\n') + (eps.length > 4 ? `\n+${eps.length - 4} more` : '')
     : names.length ? 'uses ' + names.slice(0, 8).join(', ') + (names.length > 8 ? '…' : '') : labels.slice(0, 4).join('\n');
-  return `<div class="tt">${h(nameOf(e.a))} → ${h(nameOf(e.b))}</div><div class="td">${h(KIND_LABEL[e.k])} · ${plural(e.w, 'connection')}${eps.length ? ` · ${plural(eps.length, 'endpoint')}` : ''}</div>${desc ? `<div class="td">${h(desc)}</div>` : ''}${meta ? `<div class="tp">${h(meta)}</div>` : ''}<div class="th"><span><span class="kbd">click</span> details</span><span><span class="kbd">right-click</span> more</span></div>`;
+  return `<div class="tt">${h(nameOf(e.a))} → ${h(nameOf(e.b))}</div><div class="td">${h(KIND_LABEL[e.k])} · ${plural(e.w, 'connection')}${eps.length ? ` · ${plural(eps.length, 'endpoint')}` : ''}</div>${desc ? `<div class="td">${h(desc)}</div>` : ''}${meta ? `<div class="tp">${h(meta)}</div>` : ''}<div class="th"><span><span class="kbd">click</span> details</span><span><span class="kbd">right-click</span><span class="sep">:</span> more</span></div>`;
 }
 
 // ======================= right-click menus =======================
@@ -1760,7 +1761,9 @@ function itemPanel(item, viaConnector) {
     if (n?.packages?.length || n?.hosts?.length || n?.tags?.length) html += `<div class="sec"><h3>Matched by</h3><div class="tags">${[...n.packages.map((p) => 'pkg ' + p), ...n.hosts.map((p) => 'host ' + p), ...n.tags.map((t) => '#' + t)].map((t) => `<span class="tag">${h(t)}</span>`).join('')}</div></div>`;
     html += listSec('Inside', (kids.get(item) || []).filter((k) => !k.startsWith('f:')).map((k) => rowFor(k)));
     const c = connections(item);
-    html += listSec('Used by', c.inn) + listSec('Depends on', c.out);
+    // on the Project tab a link runs from what comes first to what follows (a phase, then the one that depends on it): the incoming side is what this card depends on, not what uses it (PU-G-100)
+    const depFirst = G.meta?.vfTab === 'project';
+    html += listSec(depFirst ? 'Depends on' : 'Used by', c.inn) + listSec(depFirst ? 'Used by' : 'Depends on', c.out);
     const fl = (i.d ? i.d.files : G.files.filter((f) => chain('f:' + f.p).includes(item))).slice().sort((a, b) => b.loc - a.loc);
     html += listSec(PLAN ? 'Planned files' : 'Files', fl.map((f) => rowFor('f:' + f.p, f.st ? statePill(f.st) : PLAN ? '' : fmt(f.loc))), fl.length, 25);
   } else if (i.type === 'file' || i.type === 'module') {

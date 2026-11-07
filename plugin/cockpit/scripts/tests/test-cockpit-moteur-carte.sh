@@ -58,7 +58,7 @@ mklab() { # mklab <dir> : un module avec un document et deux scripts qui s'appel
   printf '#!/usr/bin/env bash\necho seul\n' > "$L/plugin/mod/scripts/seul.sh" # aucun lien : sa carte forme un composant à part (PU-G-040)
   printf '# Scripts\n\nLes scripts du module.\n' > "$L/plugin/mod/scripts/README.md" # homonyme du README du module (PU-G-049)
   mkdir -p "$L/lots"; for i in $(seq -w 1 30); do printf '# Note %s\n' "$i" > "$L/lots/n$i.md"; done # de quoi remplir un tableau au-delà de son plafond de 24 cartes (PU-G-054)
-  printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n' > "$B/ROADMAP.md"
+  printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n- [ ] **Phase 2: Suite** - second jet\n\n### Phase 1: Socle\n**Depends on**: Nothing (first phase)\n\n### Phase 2: Suite\n**Depends on**: Phase 1\n' > "$B/ROADMAP.md" # phase 2 : la dépendance du panneau de phase (PU-G-100)
   printf -- '---\nfiles_modified: [plugin/mod/README.md, plugin/mod/scripts/README.md]\n---\n<objective>Faire le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"; echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
   printf '{"nodes":[{"id":"a","step":"première étape","stage":"","deps":[],"scope":["src/**"],"status":"done"},{"id":"b","step":"seconde étape","stage":"","deps":["a"],"scope":["src/**"],"status":"running"},{"id":"c","step":"troisième étape","stage":"","deps":["b"],"scope":["src/**"],"status":"failed"}]}\n' > "$B/missions/demo.dag.json"
   git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
@@ -118,6 +118,10 @@ echo "=== K12 — état réel d'un nœud de mission ==="
 assert_eq "K12.1 — chaque ligne de la mission porte une pastille d'état" "$(E 'j.pastille.pastilles > 0 && j.pastille.pastilles === j.pastille.lignes.length')" "true"
 assert_eq "K12.2 — plus aucun « 0 » à droite des éléments" "$(E "j.pastille.lignes.length > 0 && !j.pastille.lignes.some((x) => x === '0' || /lines/i.test(x))")" "true"
 assert_eq "K12.3 — l'infobulle d'une carte dit l'état, plus « 0 lines »" "$(E "j.info.pastille && !/lines/i.test(j.info.texte)")" "true"
+assert_eq "K12.4 — PU-G-036 : l'infobulle d'une carte dit « Clic droit : plus d'actions », avec son deux-points" "$(E "/clic droit\\s*:\\s*plus d'actions/.test(j.infoFr.texte.replace(/\\u00a0/g, ' '))")" "true"
+assert_eq "K12.5 — PU-G-100 : le panneau de la phase 2 dit « Dépend de » (la phase 1), pas « Utilisé par »" "$(E "j.sens.p2.titres.join('|') + ' : ' + j.sens.p2.lignes.join('|')")" "Dépend de : Phase 1 · Socle"
+assert_eq "K12.6 — PU-G-100 : le panneau de la phase 1 dit « Utilisé par » (la phase 2), pas « Dépend de »" "$(E "j.sens.p1.titres.join('|') + ' : ' + j.sens.p1.lignes.join('|')")" "Utilisé par : Phase 2 · Suite"
+assert_eq "K12.7 — PU-G-100 : l'ordre des cartes de phase est celui d'avant (la phase 1 avant la phase 2, lien non inversé)" "$(E "j.sens.ordre.join('>')")" "n:ph-1>n:ph-2"
 echo "=== K13 — onglet Équipe à 390 px ==="
 assert_eq "K13.1 — contrôle positif : la session porte une grille d'au moins 3 cartes" "$(E 'j.equipe.cartes >= 3')" "true"
 assert_eq "K13.2 — une seule colonne de cartes" "$(E 'j.equipe.colonnes')" "1"
