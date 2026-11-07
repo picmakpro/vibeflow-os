@@ -175,6 +175,7 @@ const signal = () => s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal
 // H3.3 : noms longs
 const longB = 'feature/' + 'b'.repeat(112), longW = 'w'.repeat(60);
 await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: longB, worktree: longW, detache: false });
+await s.attendre(`(${ligne()} || {}).title && ${ligne()}.title.includes(${JSON.stringify(longW)})`, 'ligne rendue avec les noms longs', 3000); // la ligne se redessine après l'événement, pas dans la même tâche : lue trop tôt, elle portait encore les noms courts (CI Linux, run 42408767738)
 out.longs = await s.ev(`(() => { const l = ${ligne()}, b = l.querySelector('.vf-git-branche'), w = l.querySelector('.vf-git-wt');
   return { ellipseB: b.scrollWidth > b.clientWidth, ellipseW: w.scrollWidth > w.clientWidth, titre: l.title, largeur: l.getBoundingClientRect().width }; })()`);
 out.longs.complet = out.longs.titre.includes(longB) && out.longs.titre.includes(longW);
