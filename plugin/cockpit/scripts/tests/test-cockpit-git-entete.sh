@@ -381,7 +381,7 @@ await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow && !!document.querySelector('#panel .pt')`, 'page et panneau rendus');
 await s.ev(`new Promise((r) => setTimeout(r, 500))`);
 return await s.ev(`(() => { const G = window.VibeFlow.graph, T = G.meta.vfTab, p = document.querySelector('#panel');
-  return { nom: document.querySelector('#proj-name').textContent, pt: [...p.querySelectorAll('.pt')].map((e) => e.textContent), panneauWt: /wt-a/.test((() => { const c = p.cloneNode(true); c.querySelectorAll('.vf-cmd').forEach((e) => e.remove()); return c.textContent; })()), // hors la commande de correctif du panneau Format, qui cite le chemin absolu du lab (PU-G-153) ; le titre et les en-têtes restent jugés suffixe: / — (Projet|Équipe)/.test(p.innerText),
+  return { nom: document.querySelector('#proj-name').textContent, pt: [...p.querySelectorAll('.pt')].map((e) => e.textContent), panneauWt: /wt-a/.test((() => { const c = p.cloneNode(true); c.querySelectorAll('.vf-cmd').forEach((e) => e.remove()); return c.textContent; })()), /* hors la commande de correctif du panneau Format, qui cite le chemin absolu du lab (PU-G-153) ; le titre et les en-têtes restent jugés */ suffixe: / — (Projet|Équipe)/.test(p.innerText),
     titre: document.title, attendu: T === 'equipe' ? 'Équipe · ' + G.meta.rootName : G.meta.rootName + ' — ' + (T === 'project' ? 'Projet' : 'Code') }; })()`);
 JS
   ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WT"; BASE="http://127.0.0.1:$PORT"
