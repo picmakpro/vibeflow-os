@@ -5,6 +5,7 @@
 
 set -uo pipefail
 . "$(dirname "$0")/projet-commun.sh"
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null   # environnement d'origine : posé par le bloc Chrome de l'ancienne suite unique, il valait pour les sections suivantes (en CI, Chrome présent) ; ni config git système ni globale du poste
 
 # ---------- P10 — croissance : aucune regex lue sur le planning n'est plus que linéaire (classe fermée, pas une forme à la fois) ----------
 # Inventaire des regex appliquées au texte du planning (formats.mjs : tous les motifs de champ, de titre, d'exigence, de coupe et du diagnostic ; planning.mjs : nom de case, suffixe de statut,
