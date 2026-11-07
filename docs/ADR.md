@@ -3284,10 +3284,14 @@ la PR sans perdre le filet là où il compte, c'est-à-dire sur `main`.
 4. **Mutants du guard de verrou.** Ils restent déclenchés par leur propre périmètre, `ci.yml` compris.
 5. **Classe « docs seules » (provisoire, en attente de confirmation de Samuel).** Une PR qui ne touche
    que `docs/`, `.planning/`, `.claude/agent-memory/` et les `*.md` hors de `plugin/` ne joue que le
-   job des gates. Un `.md` sous `plugin/<module>/` (agent, `SKILL.md`) suit la règle module, parce que
+   job des gates. Quand le diff touche des fichiers non-docs mais qu'aucune suite n'est retenue, le mode
+   est `vide` : aucune suite à jouer, jamais une liste vide prise pour « tout ». Un `.md` sous `plugin/<module>/` (agent, `SKILL.md`) suit la règle module, parce que
    des suites le lisent. Cette précision n'est pas arbitrée.
 6. **Shards.** Les suites de plus de 600 s ont un shard réservé, le reste est réparti par LPT sur les
-   durées mesurées sur le runner. `test-cockpit-projet.sh` est découpée sur la branche
+   durées mesurées sur le runner (run 42400570610, 194 suites, 9085 s au total). 9 shards. Le shard le
+   plus chargé était estimé à 25,2 min avant le découpage de projet (`test-cockpit-projet.sh` seule, 1509 s) et à
+   environ 17,7 min après : estimation, les suites `test-cockpit-projet-*.sh` n'existent pas encore. Le
+   shard 5 avait duré 54 min au run 42400570610. `test-cockpit-projet.sh` est découpée sur la branche
    `feat/sondes-stables`, pas ici.
 7. **Preuve que la sélection est complète.** Le job requis « Suites de tests (découverte non vide) »
    vérifie que l'union des shards est la liste sélectionnée, et imprime les suites JOUÉES et NON JOUÉES
