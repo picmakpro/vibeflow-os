@@ -637,6 +637,19 @@ return out;
 JS
   build_serve "$WT8"; B8="http://127.0.0.1:$PORT"
   $GIT -C "$WT8" switch -q -c feat/y
+  # le serveur a été lancé AVANT le switch : son filet (NET_MS = 5 s, vf-cockpit-live.mjs:148-150) émet un événement `git` au premier tick qui voit le switch, et la page ouverte à ce moment relirait
+  # l'en-tête une 2e fois (diagnostic H8.1). On laisse donc le filet absorber le switch AVANT les chargements : attente OBSERVABLE du premier événement `git` du flux direct (borne 15 s = 3 ticks).
+  # Sans événement en 15 s, la graine du filet est postérieure au switch (rien à absorber) : on continue, ce que le script dit (« aucun »).
+  cat > "$AUX/attendre-git.mjs" <<'JS'
+// attendre-git.mjs <port> <jeton> <maxMs> : s'abonne à /api/vf/events, imprime « git » au premier événement `git`, « aucun » à l'échéance
+import http from 'node:http';
+const [, , port, jeton, max] = process.argv; let tampon = '';
+const fin = (m) => { console.log(m); process.exit(0); };
+setTimeout(() => fin('aucun'), Number(max));
+http.get({ host: '127.0.0.1', port: Number(port), path: '/api/vf/events?token=' + encodeURIComponent(jeton) }, (r) => { r.on('data', (c) => { tampon += c; if (/^event: git$/m.test(tampon)) fin('git'); }); }).on('error', () => fin('erreur'));
+JS
+  TOK8="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).token)")"
+  G8="$(node "$AUX/attendre-git.mjs" "$PORT" "$TOK8" 15000)"; echo "     filet : $G8 (événement git du filet après le switch)"
   for pg in / /project.html /equipe.html; do
     R8="$(cdp "$AUX/h8.js" "$B8" "$pg" feat/y 2>&1 | tail -1)"
     assert_eq "H8.1 — $pg : après un switch sans réassemblage, la seconde ligne dit la branche réelle (feat/y) en moins de 2 s" "$(jq_ "$R8" 'j.ligne' 2>/dev/null)" "feat/y"
@@ -660,6 +673,10 @@ JS
   RM="$(h8mut m-chargement "  relire(); // chargement : la page assemblée peut dater d'avant un \`git switch\`, une seule lecture par chargement
 " "")"
   assert_eq "M-CHARGEMENT — rougit H8.1 (sans la lecture au chargement, la seconde ligne garde feat/x et aucune lecture ne part) alors que l'écart du point médian est là" "$(jq_ "$RM" '[j.ligne, j.lectures, j.ecart.avant >= 4].join("|")' 2>/dev/null)" "feat/x|0|true"
+  RM="$(h8mut m-double "  relire(); // chargement : la page assemblée peut dater d'avant un \`git switch\`, une seule lecture par chargement
+" "  relire(); relire(); // mutant : deux lectures au chargement
+")"
+  assert_eq "M-DOUBLE-LECTURE — témoin : une DOUBLE lecture au chargement rend H8.1 rouge (obtenu 2 ou plus au lieu de 1) : la mesure sait voir un doublon" "$(jq_ "$RM" 'j.lectures >= 2 ? "rouge" : "vert (lectures=" + j.lectures + ")"' 2>/dev/null)" "rouge"
   RM="$(h8mut m-bloc "    if (change && TAB === 'code') ecrireEtRecadrer(); // le bloc de vue Code cite la branche de la même lecture que la seconde ligne
 " "")"
   assert_eq "M-BLOC-VUE — rougit H8.2 (le bloc de vue garde feat/x alors que la seconde ligne dit feat/y)" "$(jq_ "$RM" '[j.ligne, j.h1].join("|")' 2>/dev/null)" "feat/y|Le code, branche feat/x"
