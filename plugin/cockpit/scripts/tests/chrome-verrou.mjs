@@ -11,8 +11,8 @@ await executer(chrome, async (s) => {
   await s.naviguer(url + '#sans-visite');
   await s.attendre("document.readyState === 'complete' && !!document.querySelector('#vf-lock') && window.__es.some((e) => e.url.includes('/api/vf/events'))", 'flux et badge');
   await s.ev(`window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('who', { seq: 9000, at: Date.now(), who: { workers: [{ kind: 'lock', id: 'L1', tree: 'depot', task: 'x', ageS: 1, stale: false }], sources: {} } })`);
-  // le `who` reste figé (ageS 1, whoSig exclut l'âge) pendant que le battement du verrou vieillit : le flux `lock` porte age_seconds 57 (P68-D-39)
-  await s.ev(`window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('lock', { seq: 9001, at: Date.now(), lock: { present: true, locks: [{ present: true, owner: 'L1', step: 'x', scope: 'depot', age_seconds: 57, lease_seconds: 57 }] } })`);
+  // le `who` reste figé (ageS 1, whoSig exclut l'âge) pendant que le battement du verrou vieillit : le flux `lock` porte lease_seconds 57 (la prise du verrou) et un age_seconds différent, 3 (le dernier battement) : la durée « tenu depuis » doit venir du premier (PU-G-179)
+  await s.ev(`window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('lock', { seq: 9001, at: Date.now(), lock: { present: true, locks: [{ present: true, owner: 'L1', step: 'x', scope: 'depot', age_seconds: 3, lease_seconds: 57 }] } })`);
   await s.ev("document.querySelector('#vf-lock').click()");
   await s.attendre("!!document.querySelector('.vf-whop .r-verr li')", 'ligne de verrou');
   return { lignes: await s.ev("[...document.querySelectorAll('.vf-whop .r-verr li')].map((e) => [...e.children].map((c) => c.textContent.trim()).join(' · ').slice(0, 80))"), regle: await s.ev("document.querySelector('.vf-whop .aw-driver').textContent.trim()") };

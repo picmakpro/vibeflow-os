@@ -12,13 +12,13 @@ await executer(chrome, async (s) => {
   await s.naviguer(url + '#sans-visite');
   await s.attendre("document.readyState === 'complete' && !!document.querySelector('#vf-lock') && window.__es.some((e) => e.url.includes('/api/vf/events'))", 'flux et badge');
   const flux = "window.__es.find((e) => e.url.includes('/api/vf/events'))";
-  // le `who` porte des âges figés (1 s) ; le flux `lock` porte les vrais : `fiabilite` 40 s, `fiabilite-2` 600 s, `fiabilite` listé AVANT son extension (l'ordre qui trompait la sous-chaîne)
+  // le `who` porte des âges figés (1 s) ; le flux `lock` porte les vrais (`lease_seconds`, la prise ; `age_seconds` du battement reste distinct) : `fiabilite` 40 s, `fiabilite-2` 600 s, `fiabilite` listé AVANT son extension (l'ordre qui trompait la sous-chaîne)
   await s.ev(`${flux}.__emit('who', { seq: 9000, at: Date.now(), who: { workers: [
     { kind: 'lock', id: 'L1', tree: 'compartiment fiabilite', task: 'a', ageS: 1, stale: false },
     { kind: 'lock', id: 'L1', tree: 'compartiment fiabilite-2', task: 'b', ageS: 1, stale: false }], sources: {} } })`);
   await s.ev(`${flux}.__emit('lock', { seq: 9001, at: Date.now(), lock: { present: true, locks: [
-    { present: true, owner: 'L1', step: 'a', scope: 'compartiment', ws: 'fiabilite', age_seconds: 40, lease_seconds: 40 },
-    { present: true, owner: 'L1', step: 'b', scope: 'compartiment', ws: 'fiabilite-2', age_seconds: 600, lease_seconds: 600 }] } })`);
+    { present: true, owner: 'L1', step: 'a', scope: 'compartiment', ws: 'fiabilite', age_seconds: 4, lease_seconds: 40 },
+    { present: true, owner: 'L1', step: 'b', scope: 'compartiment', ws: 'fiabilite-2', age_seconds: 5, lease_seconds: 600 }] } })`);
   await s.ev("document.querySelector('#vf-lock').click()");
   await s.attendre("document.querySelectorAll('.vf-whop .r-verr li').length >= 2", 'deux lignes de verrou');
   return { lignes: await s.ev("[...document.querySelectorAll('.vf-whop .r-verr li')].map((e) => [...e.children].map((c) => c.textContent.trim()).join(' · ').slice(0, 120))") };

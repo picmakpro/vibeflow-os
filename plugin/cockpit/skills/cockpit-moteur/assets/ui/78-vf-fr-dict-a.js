@@ -204,7 +204,6 @@ window.__vfFrDict = Object.assign(window.__vfFrDict || {}, {
   "Show less": "Réduire",
   "Mention": "Une mention",
   "Mentions": "Mentionne",
-  "{} mention": "{} mention|{} mentions",
   "The files, folders and pages this document names or links to.": "Les fichiers, dossiers et pages que ce document nomme ou cite.",
   "Close tour": "Fermer la visite",
   "Step {} of {}": "Étape {} sur {}",
