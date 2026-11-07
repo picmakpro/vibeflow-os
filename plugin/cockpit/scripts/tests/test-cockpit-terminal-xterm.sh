@@ -221,7 +221,7 @@ await executer(chrome, async (sp) => {
       r.c.remplace = { bandeaux: n, A: await existe('rA'), B: await existe('rB') };
     });
     await essai('ligne-abandonne', async () => {
-      await coller(`touch ${M('l1')}\n`); await attBandeau(); await coller('echo SUITE""OK'); await attEnt('echo SUITE""OK');
+      await coller(`touch ${M('l1')}\n`); await attBandeau(); await coller('echo SUITE""OK'); await attEnt('echo SUITE""OK'); await pause(600); // attente positive faite : la fenêtre fixe prouve que l'ancien texte (touch l1) n'est PAS envoyé
       r.c.abandonne = { bandeau: await bandeau(), entre: (await ent()).includes('echo SUITE""OK'), marqueur: await existe('l1') };
     });
     await essai('controle', async () => { await vide(); await coller('echo \u001b[31mx'); await attBandeau(); r.c.controle = { bandeau: await bandeau(), texte: await s.ev(`(document.querySelector('#collage .vf-q-texte') || {}).textContent`) }; await bouton('Annuler'); });
@@ -266,6 +266,7 @@ await executer(chrome, async (sp) => {
     await essai('n10', async () => {
       await vide(); const orig = '\n'.repeat(60) + `touch ${M('n10')}\n`; await coller(orig); await attBandeau();
       const mesure = await stabiliser(() => s.ev(`(() => { const z = document.getElementById('collage-apercu'); return { txt: z.textContent, debord: z.scrollHeight > z.clientHeight + 1, avert: !!document.querySelector('#collage .vf-q-depasse'), focus: document.activeElement.textContent }; })()`));
+      await pause(600); // fenêtre d'absence après le bandeau : rien ne doit avoir tourné avant « Coller »
       const sans = await existe('n10'); await bouton('Coller'); await attExiste('n10'); const h = async (x) => (await import('node:crypto')).createHash('sha256').update(x, 'utf8').digest('hex');
       r.c.n10 = { replie: mesure.txt.includes('⟨' + 60 + ' lignes vides⟩'), charge: mesure.txt.includes(`touch ${M('n10')}`), debord: mesure.debord, avert: mesure.avert, focus: mesure.focus, longueur: mesure.txt.length,
         sans, apres: await existe('n10'), sha: (await h(await ent())) === (await h(orig.replace(/\n/g, '\r'))) };
@@ -371,9 +372,9 @@ await executer(chrome, async (sp) => {
       r.g5 = { sombre: await attendreEtStabiliser(() => s.ev(CURSEUR), (v) => v !== null && v !== undefined) };
       await s.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 300, y: 300, deltaX: 0, deltaY: -400 });
       r.g3.fin1 = await attendreValeur(() => s.ev(`${TXT}.includes('300')`), (v) => v === false);
-      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 900, y: 300 }); await pause(1600); /* durée du retardateur produit conservée : l'état de départ de G3.5 (xterm natif replié) en dépend */ r.g3.apres = await attendreValeur(() => s.ev(barre), (v) => v === '0');
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 900, y: 300 }); await pause(1600); /* durée du retardateur produit conservée : l'état de départ de G3.5 (xterm natif replié) en dépend */ r.g3.apres = await attendreValeur(() => s.ev(barre), (v) => v === '0', { max: 2500 }); // minuteur produit 1 000 ms (vf-cockpit-terminal-client.mjs, montrerBarre) : déjà écoulé après la pause, borne ~2,5x
       await touche({ key: 'PageUp', code: 'PageUp', windowsVirtualKeyCode: 33, modifiers: 8 }); await pause(400); r.g3.clavier = await s.ev(barre); // échantillon FIXE conservé : la barre native d'xterm se montre aussi au défilement, un sondage jusqu'à « 1 » verrait le mutant (montrerBarre retiré) lui aussi — M-BARRE-CLAVIER perdrait sa discrimination
-      r.g3.repos = await attendreValeur(() => s.ev(barre), (v) => v === '0');
+      r.g3.repos = await attendreValeur(() => s.ev(barre), (v) => v === '0', { max: 2500 }); // ~1 000 ms de minuteur produit depuis PageUp (déjà 400 ms écoulées), borne ~2,5x : une régression du retardateur reste rouge
     });
     // R2 : tout l'espace du cadre suit le fond du thème (le fond de la zone de défilement de xterm est noir par défaut) — styles calculés et colonne de pixels, dans les deux thèmes
     r.fond = {};
@@ -710,6 +711,10 @@ if mutant depot vf-cockpit-terminal-client.mjs "/addEventListener('drop'/d; /add
   run_collage "$MUT_OUT"
   assert_eq "M-DEPOT — écoutes de dépôt retirées : drop et beforeinput ne sont plus annulés (le navigateur insérerait le texte dans la zone de saisie), T21.9 rouge" "$(rouge "drop_annule=$(rj "$CJ" 'j.c.depot.drop===false') beforeinput_annule=$(rj "$CJ" 'j.c.depot.avant===false')" "drop_annule=true beforeinput_annule=true")" "rouge"
 else sans_effet "M-DEPOT"; fi
+if mutant abandon-envoie vf-cockpit-terminal-client.mjs 's|const abandonner = () => { if (propose !== null) { propose = null;|const abandonner = () => { if (propose !== null) { term.paste(propose); propose = null;|'; then
+  run_collage "$MUT_OUT"
+  assert_eq "M-ABANDON-ENVOIE — abandonner() envoie l'ancien texte au lieu de l'oublier : « touch l1 » part au shell quand une ligne remplace le bandeau, T21.6 rouge (la fenêtre d'absence de 600 ms laisse le marqueur apparaître)" "$(rouge "marqueur=$(rj "$CJ" 'j.c.abandonne.marqueur')" "marqueur=false")" "rouge"
+else sans_effet "M-ABANDON-ENVOIE"; fi
 
 if mutant n9-sans-cf vf-cockpit-terminal-vue.mjs 's|const INVISIBLE = /\[\\p{Cc}\\p{Cf}\\p{Cs}\\u{E0000}-\\u{E007F}\]/u;|const INVISIBLE = /[\\p{Cc}\\p{Cs}]/u;|'; then
   run_collage "$MUT_OUT"
