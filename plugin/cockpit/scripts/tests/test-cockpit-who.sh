@@ -512,10 +512,11 @@ assert_eq "W20.1 — F-9 : un DAG à nœuds nuls ne fait pas planter l'émetteur
 Q who "$L20" "$HOME_T" "$NOSCRIPTS" > "$WORK/who20.json" 2>/dev/null
 assert_eq "W20.2 — F-9 : les nœuds valides du même DAG sont encore lus" "$(G "$WORK/who20.json" 'j.workers.filter(w=>w.kind==="dag-node").map(w=>w.id).sort().join(",")' 2>/dev/null)" "n20,z"
 assert_eq "W20.3 — F-6 : chaque ls-files --error-unmatch de who.mjs met -- devant le chemin" "$(grep -c "'ls-files', '--error-unmatch', '--', f" "$SCRIPTS/vf-cockpit-who.mjs")" "1"
-git -C "$L20" status >/dev/null 2>&1; touch -t 202001010000 "$L20/.git/index"; M0="$(stat -f %m "$L20/.git/index" 2>/dev/null || stat -c %Y "$L20/.git/index")"
+# date de modification : GNU/uutils d'abord (`stat -f` y rend l'état du SYSTÈME DE FICHIERS, pas la date) ; sur BSD/macOS `stat -c` échoue et le repli `stat -f %m` prend le relais
+git -C "$L20" status >/dev/null 2>&1; touch -t 202001010000 "$L20/.git/index"; M0="$(stat -c %Y "$L20/.git/index" 2>/dev/null || stat -f %m "$L20/.git/index")"
 printf '\n' >> "$L20/.planning/ROADMAP.md"   # sale : git status voudrait rafraîchir l'index
 HOME="$HOME_T" node "$SCRIPTS/vf-cockpit-signal.mjs" "$L20" > /dev/null 2>&1
-M1="$(stat -f %m "$L20/.git/index" 2>/dev/null || stat -c %Y "$L20/.git/index")"
+M1="$(stat -c %Y "$L20/.git/index" 2>/dev/null || stat -f %m "$L20/.git/index")"
 assert_eq "W20.4 — F-5 : la date de modification de .git/index ne bouge pas après l'émetteur" "$M1" "$M0"
 
 # ---------- W21 — la clause `..` de la grammaire ws, prouvée par le COMPORTEMENT (Phase 70, plan 70-11, UIFN-13) ----------
