@@ -14,6 +14,8 @@
 //   badge             : (EK10) marge entre le bord droit du badge d'état et celui de sa carte, pied long, à 390 / 1024 / 1440 px → { "390": px, "1024": px, "1440": px }
 //   echelle           : (EK13, Q3b) échelle de l'ajustement au premier affichage et recouvrement titre / première carte, à 390 et 768 px → { "390": { k, aire }, "768": { k, aire } }
 //   titre-grandi      : (EK14) le titre de #context grandit après le cadrage (police plus large du runner) ; recouvrement avec la première carte une fois la page stable → { k, aire }
+//   echap-tiroir      : (EK15) sélectionne une carte, ouvre le tiroir « Au travail », focalise le tiroir ou le bouton (EK_FOCUS), frappe Échap → { ferme0, ouvert, avant, place, ferme, apres } (attributs aria du bouton, sélection et vue avant/après)
+//   un-lateral        : (EK16, Q12, PU-G-203) largeur EK_LARGEUR, ordre EK_ORDRE (git-puis-travail | travail-puis-git) : ouvre Git (touche g) puis « Au travail » (ou l'inverse), relève l'état et le focus à chaque pas, puis élargit à 1440 px → { etapes: { premier, second, large }, ... }
 //   libelles          : (EK11) ligne des sources du tiroir et infobulle de la recherche de l'onglet Équipe → { src, titre }
 // Rend une ligne JSON { ... } ou { erreur }. Socle : chrome-session.mjs (une instance de Chrome, fermée proprement).
 import { executer } from './chrome-session.mjs';
@@ -189,10 +191,48 @@ await executer(chrome, async (s) => {
   }
   if (ACTION === 'libelles') {
     await s.attendre("!!window.__es && !!window.__es.find((e) => e.url.includes('/api/vf/events')) && !!document.querySelector('#vf-lock')", 'flux et badge');
-    await s.ev(`(() => { window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('who', { seq: 9000, at: Date.now(), who: { workers: window.__vfLive.who.workers, sources: { sessions: { etat: 'lue' }, locks: { etat: 'lue' }, dags: { etat: 'lue' } } } }); })()`);
+    await s.ev(`(() => { window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('who', { seq: 9000, at: Date.now(), who: { workers: window.__vfLive.who.workers, sources: { sessions: { etat: 'lue' }, locks: { etat: 'erreur' }, dags: { etat: 'lue' } } } }); })()`); // PU-G-180 : le pied ne paraît que pour une source illisible
     await s.ev("document.querySelector('#vf-lock').click()");
     await s.attendre("!!document.querySelector('.vf-whop .src')", 'ligne des sources').catch(async () => { throw new Error('ligne des sources absente ; panneau : ' + (await s.ev("document.getElementById('panel').innerHTML.slice(0, 300)")) + ' ; no-panel=' + (await s.ev("document.body.classList.contains('no-panel')"))); });
     return await s.stable("({ src: document.querySelector('.vf-whop .src').textContent, titre: (document.getElementById('search-btn') || {}).title || 'absent' })", 'libellés');
+  }
+  if (ACTION === 'echap-tiroir') { // (EK15, PU-G-189, PU-G-190) Échap sur le tiroir « Au travail », focus dans le tiroir (EK_FOCUS=panneau) ou sur le bouton (EK_FOCUS=bouton)
+    const corps = `const flux = () => window.__es.find((e) => e.url.includes('/api/vf/events'));
+      const S = { kind: 'session', id: 'S1', etat: 'actif', tree: '.', task: 'session' }, M = { kind: 'subagent', id: 'M1', etat: 'actif', role: 'vf-dev-manager', tree: '.', parent: 'S1', task: 'manager', dureeS: 60 };`;
+    const lire = "(() => { const b = document.querySelector('#vf-lock'); return b ? { expanded: b.getAttribute('aria-expanded'), controls: b.getAttribute('aria-controls') } : null; })()";
+    await s.attendre("!!window.__es && !!window.__es.find((e) => e.url.includes('/api/vf/events')) && !!document.querySelector('#vf-lock')", 'flux et badge');
+    await s.ev(`(() => { ${corps} flux().__emit('who', { seq: 5000, at: Date.now(), who: { workers: [S, M], sources: {} } }); })()`);
+    await calme();
+    // une carte sélectionnée : sans écouteur propre au tiroir, Échap la désélectionne (le viewer remonte le canevas) ; la sélection se pose AVANT l'ouverture du tiroir (select() ferme les panneaux posés)
+    const nd = await s.ev("(() => { const k = window.VibeFlow.children(window.VibeFlow.state.container || 'root') || [], x = k[0]; return x ? (typeof x === 'string' ? x : x.id) : null; })()");
+    if (!nd) return { erreur: 'aucun nœud à sélectionner : ' + await s.ev("(() => { try { const F = window.VibeFlow, V = window.VibeFlow; return JSON.stringify({ c: V.state.container, kids: F.children('root'), keys: Object.keys(F.graph).join(), cartes: document.querySelectorAll('#svg .card').length, noeuds: [...document.querySelectorAll('#svg .node')].slice(0, 3).map((e) => e.getAttribute('data-id') || e.id || e.outerHTML.slice(0, 100)) }); } catch (e) { return 'exc ' + e.message; } })()") };
+    await s.ev(`window.VibeFlow.select(${JSON.stringify(nd)})`);
+    const ferme0 = await s.stable(lire, 'attributs du bouton, tiroir fermé');
+    await s.ev("document.querySelector('#vf-lock').click()");
+    await s.attendre("!!document.querySelector('.vf-whop') && !document.body.classList.contains('no-panel')", 'tiroir ouvert');
+    const ouvert = await s.stable(lire, 'attributs du bouton, tiroir ouvert');
+    const avant = await s.ev("({ selection: window.VibeFlow.state.selected, hash: location.hash })");
+    await s.ev(process.env.EK_FOCUS === 'bouton' ? "document.querySelector('#vf-lock').focus()" : "(document.querySelector('.vf-whop [data-vf-doing]') || document.querySelector('.vf-whop .aw-head')).focus()");
+    const place = await s.ev("(() => { const a = document.activeElement; return { tag: a.tagName, id: a.id || '', dansTiroir: !!a.closest('#panel') }; })()");
+    await touche('Escape', 'Escape', 27);
+    const ferme = await s.attendre("document.body.classList.contains('no-panel')", 'tiroir fermé par Échap', 4000).then(() => true, () => false);
+    const apres = await s.stable("(() => { const a = document.activeElement, b = document.querySelector('#vf-lock'); return { selection: window.VibeFlow.state.selected, hash: location.hash, actif: a ? a.id || a.tagName : null, expanded: b.getAttribute('aria-expanded'), ferme: document.body.classList.contains('no-panel') }; })()", 'état après Échap');
+    return { ferme0, ouvert, avant, place, ferme, apres };
+  }
+  if (ACTION === 'un-lateral') { // (EK16, PU-G-203) un seul tiroir latéral sous 1280 px ; les deux à 1280 px et au-delà
+    await s.send('Emulation.setDeviceMetricsOverride', { width: +process.env.EK_LARGEUR, height: 800, deviceScaleFactor: 1, mobile: false });
+    await s.attendre("!!window.__es && !!window.__es.find((e) => e.url.includes('/api/vf/events')) && !!document.querySelector('#vf-lock') && !!window.VFGitTiroir", 'flux, badge et tiroir Git');
+    await s.ev("(() => { const S = { kind: 'session', id: 'S1', etat: 'actif', tree: '.', task: 'session' }; window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('who', { seq: 5000, at: Date.now(), who: { workers: [S], sources: {} } }); })()");
+    await calme();
+    const etat = () => s.stable(`(() => { const a = document.activeElement, g = document.querySelector('#vf-git-tiroir'), b = document.body.classList; return { git: window.VFGitTiroir.ouvert(), travail: !!document.querySelector('#panel > .vf-whop') && !b.contains('no-panel'), focus: !a ? null : g && g.contains(a) ? 'git' : a.closest('#panel') ? 'travail' : a.id === 'vf-lock' ? 'bouton-travail' : a.tagName }; })()`, 'état des tiroirs');
+    const ouvrirGit = async () => { await s.ev('document.activeElement && document.activeElement.blur()'); await touche('g', 'KeyG', 71, 'g'); await s.attendre('window.VFGitTiroir.ouvert()', 'tiroir Git ouvert'); };
+    const ouvrirTravail = async () => { await s.ev("document.querySelector('#vf-lock').click()"); await s.attendre("!!document.querySelector('#panel > .vf-whop') && !document.body.classList.contains('no-panel')", 'tiroir « Au travail » ouvert'); };
+    const etapes = {};
+    if (process.env.EK_ORDRE === 'travail-puis-git') { await ouvrirTravail(); etapes.premier = await etat(); await ouvrirGit(); etapes.second = await etat(); }
+    else { await ouvrirGit(); etapes.premier = await etat(); await ouvrirTravail(); etapes.second = await etat(); }
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 800, deviceScaleFactor: 1, mobile: false });
+    etapes.large = await etat();
+    return { largeur: +process.env.EK_LARGEUR, etapes };
   }
   return { erreur: 'EK_ACTION inconnue : ' + ACTION };
 }, { csp: false });

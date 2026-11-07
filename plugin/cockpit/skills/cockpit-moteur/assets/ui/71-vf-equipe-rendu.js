@@ -14,17 +14,26 @@
   // même format que l'ancien age() du tiroir : secondes, minutes, heures, jours
   const duree = (s) => (s == null ? '' : s < 90 ? `${s} s` : s < 5400 ? `${Math.round(s / 60)} min` : s < 172800 ? `${Math.round(s / 3600)} h` : `${Math.round(s / 86400)} j`);
 
-  const pied = (w) => {
-    const a = w.action || {};
-    const action = [a.verbe, a.cible].filter((x) => typeof x === 'string' && x).join(' ');
-    return [etat(w), duree(w.dureeS != null ? w.dureeS : w.ageS), action].filter(Boolean).join(' · ');
+  // PU-G-173 : la durée dit de quoi elle parle — ancienneté de la dernière écriture (« dernière activité il y a … »), tenue d'un agent (« au travail depuis … », « a duré … »)
+  const quand = (w) => {
+    const dur = w.kind === 'subagent' && w.etat !== 'en-attente' && w.dureeS != null ? w.dureeS : null;
+    if (dur != null) return `${w.etat === 'termine' ? 'a duré' : 'au travail depuis'} ${duree(dur)}`;
+    return w.ageS == null ? '' : `dernière activité il y a ${duree(w.ageS)}`;
   };
+  const action = (w) => { const a = w.action || {}; return [a.verbe, a.cible].filter((x) => typeof x === 'string' && x).join(' '); };
+  const pied = (w) => [etat(w), quand(w), action(w)].filter(Boolean).join(' · ');
+  // pied d'une CARTE (PU-G-165) : la pastille dit déjà « En cours », « Fait » ou « Bloqué » ; seul « en attente », sans pastille, garde son mot ; l'action générique est tue
+  const piedCarte = (w) => [w.etat === 'en-attente' ? etat(w) : '', quand(w), (w.action || {}).verbe === GENERIQUE ? '' : action(w)].filter(Boolean).join(' · ');
+  const st = (w) => (w.etat === 'termine' ? 'done' : w.etat === 'bloque' ? 'blocked' : w.etat === 'en-attente' ? undefined : 'active'); // même table que vf-cockpit-equipe-carte.mjs
 
+  // PU-G-167 : « inconnu » et « sans-citation » ne disent rien à l'utilisateur ; toute autre raison (ambigu, valeur inattendue) reste affichée, échappée
+  const raisonDe = (w) => (w.rattachement && w.rattachement.raison) || 'inconnu';
+  const CLAIR = new Set(['inconnu', 'sans-citation']);
   // lien vers le nœud de mission : seulement un rattachement établi ; sinon « non rattaché » et sa raison, jamais un lien deviné
   const versNoeud = (w, h) => {
     const n = noeud(w);
     return n ? `<a class="vf-link" href="${h(lien('project.html', n))}">Nœud ${h(w.rattachement.noeud)}</a>`
-      : w.kind === 'subagent' ? `<span class="vf-nr">non rattaché (${h((w.rattachement && w.rattachement.raison) || 'inconnu')})</span>` : '';
+      : w.kind === 'subagent' ? `<span class="vf-nr">${CLAIR.has(raisonDe(w)) ? 'pas lié à une phase du projet' : `non rattaché (${h(raisonDe(w))})`}</span>` : '';
   };
 
   // ---------- tiroir « Au travail » (P71.5-D-14, D-23, D-24) : une ligne par agent, des fils entre les points, les terminés regroupés en bas ----------
@@ -37,17 +46,30 @@
     bloque: '<path d="M8 2.5l6 10.5H2z"/><path d="M8 6.6v3M8 11.4v.1"/>',
     orphelin: '<circle cx="8" cy="8" r="5.5" stroke-dasharray="2 2.4"/>',
     repli: '<path d="M6 4l4 4-4 4"/>',
-    commande: '<path d="M3 4.5l4 3.5-4 3.5"/><path d="M9 12h4"/>',
+    surveiller: '<circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.4l2.2 1.3"/>', // un cadran : « du temps passe » (PU-G-181, PU-G-183) ; la forme porte le sens, jamais une couleur d'alerte (Q9, Règle actuelle)
+    commande: '<path d="M1.5 8s2.3-4.5 6.5-4.5S14.5 8 14.5 8s-2.3 4.5-6.5 4.5S1.5 8 1.5 8z"/><circle cx="8" cy="8" r="1.8"/>', // un œil : « voir », jamais l'invite d'un terminal (PU-G-187)
   };
   const glyphe = (nom, cls) => `<svg class="aw-g${cls ? ' ' + cls : ''}" viewBox="0 0 16 16" aria-hidden="true" focusable="false">${GLYPHE[nom]}</svg>`;
   const GLYPHE_ETAT = { actif: 'actif', 'en-attente': 'attente', termine: 'termine', bloque: 'bloque' };
   const MOT = { actif: 'actif', 'en-attente': 'en attente', termine: 'terminé', bloque: 'bloqué' };
   const CALME_S = 120; // un agent actif sans écriture depuis 2 min est dit « sans nouvelle depuis … » (seuil dérivé, P71.5-D-14)
   const GENERIQUE = 'lance une commande'; // l'action de presque tous : elle n'informe pas, on ne la montre pas
+  const LONGUE_S = 900; // PU-G-183 : une commande en cours sans écriture depuis 15 min (une commande qui tourne n'écrit rien dans le transcript : l'âge de la dernière écriture est sa durée)
   const tpath = (t) => String(t || '').replace(/^\.claude\/worktrees\//, '');
   const court = (w) => String(w.branch || tpath(w.tree));
   const calme = (w) => w.etat === 'actif' && typeof w.ageS === 'number' && w.ageS >= CALME_S;
+  const longue = (w) => calme(w) && w.ageS >= LONGUE_S && (w.action || {}).verbe === GENERIQUE;
   const verbe = (w) => { const a = w.action || {}; if (!a.verbe || a.verbe === GENERIQUE) return ''; return [a.verbe, a.cible].filter((x) => typeof x === 'string' && x).join(' '); };
+  // PU-G-186 : le titre d'une session passe par ce seul point : le nom donné avec /rename (`titre`, le `custom-title` du transcript) quand la collecte le porte, sinon « Session principale » ; plusieurs sessions de même titre se distinguent par leur arbre, puis par leur identifiant court
+  const titreDe = (w) => (w && typeof w.titre === 'string' && w.titre.trim()) || 'Session principale';
+  const lieu = (w) => (tpath(w.tree) === 'arbre principal' || tpath(w.tree) === '.' ? 'main' : tpath(w.tree) || court(w));
+  const nommer = (workers) => {
+    const ss = (Array.isArray(workers) ? workers : []).filter((w) => w && w.kind === 'session' && typeof w.id === 'string'), noms = new Map();
+    for (const s of ss) { const g = ss.filter((x) => titreDe(x) === titreDe(s)); noms.set(s.id, g.length < 2 ? titreDe(s) : `${titreDe(s)} · ${lieu(s)}${g.filter((x) => lieu(x) === lieu(s)).length > 1 ? ' · ' + s.id.slice(0, 8) : ''}`); }
+    return noms;
+  };
+  let noms = new Map();
+  const SILENCE_PARENT_S = 1800; // PU-G-182 : une session parente en attente ou muette depuis plus de 30 min (le TTL de driver-lock.sh)
   const aVivant = (w, enfants) => w.etat !== 'termine' || (enfants.get(w.id) || []).some((k) => aVivant(k, enfants));
 
   // la durée dit de quoi elle parle : tenue d'un sous-agent en cours, ancienneté de la dernière écriture d'une session, durée d'un terminé
@@ -59,19 +81,21 @@
 
   const ligne = (w, parent, enfants, tous, h) => {
     const sess = w.kind === 'session', fini = w.etat === 'termine', ks = (tous.get(w.id) || []).filter((k) => aVivant(k, tous)).sort((a, b) => (b.dureeS || 0) - (a.dureeS || 0));
-    const nom = w.orphan ? 'orphelin' : GLYPHE_ETAT[w.etat] || 'actif';
-    const tache = sess ? 'Session principale' : w.task || '';
+    // PU-G-182 : « orphelin ? » (le registre dit « jamais fermé », pas « processus mort ») ; un enfant actif dont la session parente se tait depuis plus de 30 min l'est aussi
+    const orphe = !!w.orphan || (w.kind === 'subagent' && w.etat === 'actif' && !!parent && parent.kind === 'session' && parent.etat !== 'termine' && parent.ageS > SILENCE_PARENT_S);
+    const nom = orphe ? 'orphelin' : GLYPHE_ETAT[w.etat] || 'actif';
+    const tache = sess ? noms.get(w.id) || titreDe(w) : w.task || (fini ? `${w.role || 'Agent'} · ${String(w.id).slice(0, 8)}` : ''); // PU-G-184 : un agent terminé sans titre se nomme par son rôle et son identifiant court
     const raison = w.rattachement && w.rattachement.raison;
     const hors = w.kind === 'subagent' && !noeud(w) && !fini;
-    const sr = ` <span class="sr">(${MOT[w.etat] || 'actif'}${w.orphan ? ', orphelin' : ''}${w.stale ? ', donnée ancienne' : ''}${hors ? ', non rattaché : ' + h(raison || 'inconnu') : ''})</span>`;
+    const sr = ` <span class="sr">(${MOT[w.etat] || 'actif'}${orphe ? ', orphelin ?' : ''}${w.stale ? ', donnée ancienne' : ''}${hors ? ', non rattaché : ' + h(raison || 'inconnu') : ''})</span>`;
     // branche et arbre : une fois sur la session, puis en puce seulement quand ils diffèrent du parent (frontière Phase 78)
-    const puce = !sess && (!parent || court(parent) !== court(w)) ? `<span class="r-chip" title="${h(court(w))}">${h(tpath(w.tree) === 'arbre principal' || tpath(w.tree) === '.' ? 'main' : tpath(w.tree) || court(w))}</span>` : '';
-    const marques = (w.orphan ? '<span class="r-flag">orphelin</span>' : '') + (w.stale ? '<span class="r-flag">donnée ancienne</span>' : '') + (hors && raison === 'ambigu' ? '<span class="r-flag">non rattaché (ambigu)</span>' : '');
+    const puce = !sess && (!parent || court(parent) !== court(w)) ? `<span class="r-chip" title="${h(court(w))}">${h(lieu(w))}</span>` : '';
+    const marques = (orphe ? '<span class="r-flag">orphelin ?</span>' : '') + (w.stale ? '<span class="r-flag">donnée ancienne</span>' : '') + (hors && raison === 'ambigu' ? '<span class="r-flag">non rattaché (ambigu)</span>' : '');
     const v = verbe(w);
     const meta = sess ? `${h(tpath(w.tree))}${w.branch ? ' · ' + h(w.branch) : ''}${marques}`
-      : `<b>${h(w.role || 'Agent')}</b>${calme(w) ? ' · sans nouvelle depuis ' + h(duree(w.ageS)) : ''}${w.etat === 'en-attente' ? ' · en attente' : w.etat === 'bloque' ? ' · bloqué' : ''}${!calme(w) && v ? ' · ' + h(v) : ''}${puce}${marques}`;
+      : `<b>${h(w.role || 'Agent')}</b>${calme(w) ? (longue(w) ? ' · commande en cours, sans nouvelle depuis ' : ' · sans nouvelle depuis ') + h(duree(w.ageS)) : ''}${w.etat === 'en-attente' ? ' · en attente' : w.etat === 'bloque' ? ' · bloqué' : ''}${!calme(w) && v ? ' · ' + h(v) : ''}${puce}${marques}`;
     const corps = `<span class="r-top"><span class="r-task">${h(tache)}${sr}</span>${temps(w, h)}</span>${fini ? '' : `<span class="r-meta">${meta}</span>`}`;
-    const rang = `<a class="r-row" href="${h(lien('equipe.html', carte(w)))}" title="${h(sess ? 'Session principale' : tache)} — voir dans l'onglet Équipe">${glyphe(nom, (w.etat === 'actif' && !w.orphan ? 'aw-pulse ' : '') + 'aw-s-' + nom)}<span class="r-main">${corps}</span></a>`;
+    const rang = `<a class="r-row" href="${h(lien('equipe.html', carte(w)))}" title="${h(tache)} — voir dans l'onglet Équipe">${glyphe(nom, (w.etat === 'actif' && !orphe ? 'aw-pulse ' : '') + 'aw-s-' + nom)}<span class="r-main">${corps}</span></a>`;
     const repli = ks.length ? `<button type="button" class="r-tog" data-vf-repli="${h(w.id)}" aria-expanded="true" aria-controls="k-${h(w.id)}" aria-label="Sous-agents de ${h(w.role || 'la session')}, ${ks.length}">${glyphe('repli', 'r-caret')}</button>` : '';
     const doing = !fini ? `<button type="button" class="r-doing" data-vf-doing="${h(w.id)}" aria-label="Voir la dernière commande de ${h(tache)}" title="Voir la dernière commande">${glyphe('commande')}</button><div class="vf-doing" hidden></div>` : '';
     const n = noeud(w);
@@ -81,7 +105,15 @@
       + (ks.length ? `<ul class="r-kids" id="k-${h(w.id)}">${ks.map((k) => ligne(k, w, enfants, tous, h)).join('')}</ul>` : '') + '</li>';
   };
 
+  // PU-G-181 : « À surveiller », en tête du tiroir : les sous-agents actifs sans nouvelle depuis CALME_S, et ceux dont la commande dure depuis LONGUE_S (PU-G-183) ; un glyphe et des mots en texte neutre (Q9) ; rien à surveiller, pas de ligne
+  const surveiller = (workers) => {
+    const ss = (Array.isArray(workers) ? workers : []).filter((w) => w && w.kind === 'subagent' && calme(w)), lg = ss.filter(longue).length, mu = ss.length - lg;
+    const dit = [mu ? `${mu} ${mu > 1 ? 'agents' : 'agent'} sans nouvelle depuis plus de ${CALME_S / 60}${NB}min` : '', lg ? `${lg} ${lg > 1 ? 'commandes' : 'commande'} en cours depuis plus de ${LONGUE_S / 60}${NB}min` : ''].filter(Boolean);
+    return dit.length ? `<p class="aw-surv">${glyphe('surveiller', 'aw-s-attente')}<span><b>À surveiller</b> · ${dit.join(' · ')}</span></p>` : '';
+  };
+
   const arbre = (workers, h) => {
+    noms = nommer(workers);
     const tous = (Array.isArray(workers) ? workers : []).filter(dedans);
     const connus = new Map(tous.map((w) => [w.id, w]));
     const racines = [], enfants = new Map();
@@ -117,14 +149,16 @@
     for (const m of Array.isArray(d.messages) ? d.messages : []) f.appendChild(el('p', m));
     f.appendChild(el('h4', 'Outils'));
     const ul = el('ul');
-    for (const o of Array.isArray(d.outils) ? d.outils : []) ul.appendChild(el('li', `${o.verbe || ''} ${o.cible || ''} (${o.outil || ''})`.replace(/\s+/g, ' ')));
+    for (const o of Array.isArray(d.outils) ? d.outils : []) ul.appendChild(el('li', `${o.verbe || ''} ${o.cible || ''} (${o.outil || ''})${Number.isInteger(o.n) && o.n > 1 ? ' × ' + o.n : ''}`.replace(/\s+/g, ' '))); // PU-G-170 : les répétitions consécutives sont regroupées par le réducteur
     f.appendChild(ul);
     return f;
   };
 
   // CSS du tiroir « Au travail » (posé par 70-vf-live.js au premier dessin : ce fichier ne touche jamais au DOM au chargement)
   const CSS = `
-    .aw-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-12); }
+    /* PU-G-188 : le titre reste en haut au défilement (collant, fond --surface du tiroir, aucune teinte) ; il reprend la marge du tiroir pour garder sa place au repos. Le bouton de fermeture du tiroir est celui de l'en-tête de la page (#btn-panel), hors du défilement */
+    .vf-whop .aw-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-12); margin: calc(-1 * var(--inset-panel)) calc(-1 * var(--inset-panel)) 0; padding: var(--inset-panel) var(--inset-panel) var(--sp-8); background: var(--surface); }
+    .aw-surv { display: flex; align-items: flex-start; gap: var(--sp-8); margin: var(--sp-8) 0 0; font-size: 12px; line-height: 16px; color: var(--text-2); } .aw-surv b { font-weight: 500; color: var(--text); }
     .aw-count { font-size: 12px; color: var(--text-3); } .aw-count b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
     .aw-driver { display: flex; align-items: center; gap: var(--sp-8); margin: var(--sp-8) 0 var(--sp-12); font-size: 12px; color: var(--text-3); }
     .aw-driver .d { width: 6px; height: 6px; border-radius: 50%; background: var(--st-active); flex: none; }
@@ -173,9 +207,10 @@
     .r-more { display: flex; align-items: center; min-height: 44px; padding-left: var(--sp-24); font-size: 12px; color: var(--text-2); text-decoration: underline; text-decoration-color: rgba(var(--ink), .35); text-underline-offset: 4px; }
     .aw-sec2 { display: flex; justify-content: space-between; margin: var(--sp-16) 0 var(--sp-4); font-size: 12px; color: var(--text-3); font-weight: 500; }
     .r-verr { display: grid; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--text-3); }
-    .r-verr li { display: flex; justify-content: space-between; gap: var(--sp-12); padding: var(--sp-4) 0; } .r-verr b { color: var(--text-2); font-weight: 500; } .r-verr .n { font: 500 11.5px var(--mono, monospace); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .r-verr .aw-g { display: inline-block; vertical-align: -3px; margin-right: var(--sp-6); } .aw-aide { margin: 0 0 var(--sp-4); font-size: 12px; color: var(--text-3); }
+    .r-verr li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-4) var(--sp-12); padding: var(--sp-4) 0; } .r-verr li .n { margin-left: auto; } .r-verr b { color: var(--text-2); font-weight: 500; } .r-verr .n { font: 500 11.5px var(--mono, monospace); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .aw-foot { margin: var(--sp-12) 0 0; color: var(--text-3); font-size: 12px; line-height: 20px; }
   `;
 
-  window.__vfEquipeRendu = { arbre, agentsDuNoeud, transcript, pied, duree, versNoeud, actif, css: CSS };
+  window.__vfEquipeRendu = { glyphe, nomDeSession: (workers, id) => nommer(workers).get(id) || null, arbre, agentsDuNoeud, transcript, pied, piedCarte, st, duree, versNoeud, actif, surveiller, css: CSS };
 })();

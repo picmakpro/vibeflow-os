@@ -16,6 +16,8 @@
 //     Dans le fil, ordre de troncature : le nom du projet, puis les segments LONGS du milieu (poids 100 000), puis le premier et le dernier longs (poids 1 : ils ne cèdent qu'une fois le milieu à son plancher, à un centième de pixel près : un poids égal à 1 contre 1 000 laissait rogner le nom du projet de 1 px à 1 440 px), chaque segment long gardant 64 px ; un segment COURT (moins de 12 caractères, soit 11 au plus)
 //     ne rétrécit jamais (poids 0). Si, tous les longs réduits à leur plancher, le fil déborde encore, les segments du milieu sont masqués un à un (du plus proche du premier) derrière un « … » (infobulle : leurs noms) ; le premier et le dernier restent.
 //     Le masquage ne joue qu'à partir de 1 280 px et se rejoue au rendu du fil, au changement de nom, à la mise à jour de la largeur de la colonne gauche (badge, redimensionnement) et au chargement des polices.
+//   - sous 1 280 px (PU-G-001, PU-G-002, coque étroite 2026-11-06) : la vue d'ensemble s'écrit « Ensemble » (le nom entier reste le nom accessible) ; le niveau COURANT du fil est toujours entier (flèche « Remonter » + niveau), les niveaux d'avant cèdent d'abord (masqués un à un, du plus proche de la racine), puis, de 1 000 à 1 279 px
+//     (souris), le nom du dépôt cède au niveau courant tant qu'on est dans un dossier ; à la racine le nom du dépôt garde sa place et le libellé « Ensemble » est masqué plutôt que rogné. Le bouton Thème passe à 36 px (comme les autres boutons de la rangée) : 8 px rendus au nom ; l'ouvreur Git garde ses 44 px (P78-D-34).
 (() => {
   const style = document.createElement('style');
   style.textContent = `
@@ -80,6 +82,27 @@
       #ask-form { padding-top: var(--sp-4); padding-bottom: var(--sp-4); padding-right: var(--sp-4); }
     }
     @media (max-width: 700px) { header #crumbs { display: none; } }
+    /* PU-G-001 / PU-G-002 : fil d'Ariane sous 1 280 px. Racine : libellé court (le nom entier reste le nom accessible, posé par ajuste0). Niveau courant : jamais rogné. Niveaux d'avant : les premiers à céder (masqués par ajuste0). */
+    @media (max-width: 1279px) {
+      header #crumbs button[data-vf-racine] { font-size: 0; flex: 0 1 auto; min-width: max-content; padding-inline: var(--sp-6); } /* jamais rogné : ajuste0 le masque s'il ne tient pas */
+      header #crumbs button[data-vf-racine]::before { content: attr(data-vf-racine); font-size: 13.5px; }
+      header #crumbs button.cur { flex: none; max-width: none; }
+      header #crumbs button:not(.cur):not([data-vf-racine]) { flex: 0 100000 auto; min-width: 64px; }
+      header #crumbs [data-vf-masque] { display: none; }
+    }
+    @media (min-width: 701px) and (max-width: 999px) { /* la colonne gauche garde la largeur de son contenu (nom accessible du niveau courant entier) et la recherche cède la première */
+      header .hl { flex: 1 0 auto; }
+      header .hc { flex: 2 100 120px; }
+      header[data-vf-git] .hc { flex-basis: 72px; } /* l'ouvreur Git ajoute 48 px à la rangée : la recherche en cède autant (même règle que 76-vf-git-entete.js), pour que l'en-tête se replie aux MÊMES largeurs avec et sans Git (témoin F5, Phase 78) */
+    }
+    @media (min-width: 1000px) and (max-width: 1279px) and (not (pointer: coarse)) {
+      header #theme-toggle { width: 36px; height: 36px; padding: 0; justify-content: center; } /* l'ouvreur Git garde ses 44 px (P78-D-34) */
+      header .hl { flex: 1 1 auto; } /* la colonne gauche prend la largeur naturelle de son contenu et c'est la RECHERCHE (poids 100 000, plancher de 152 px de P78-D-39) qui cède la première, comme dès 1 280 px */
+      header .hc { flex: 0 100000 400px; }
+      
+      header:has(#btn-up:not([hidden])) .hl { min-width: calc(288px + var(--vf-cur, 0px)); } /* dans un dossier : 342 px moins les 54 px laissés au niveau courant, plus sa largeur (relevée par ajuste0 : --vf-cur) ... */
+      header:has(#btn-up:not([hidden])) .brand { min-width: 30px; } /* ... et le nom du dépôt cède sa place au niveau courant */
+    }
   `;
   document.head.appendChild(style);
   // fil d'Ariane : étiquette les segments courts (moins de 12 caractères), puis masque derrière « … » les segments du milieu tant que le fil déborde (CSS : un segment long garde 64 px)
@@ -92,6 +115,13 @@
     fil.querySelector('.vf-ell')?.remove();
     const bs = [...fil.querySelectorAll('button')];
     for (const b of bs) { if (b.textContent.trim().length < 12) b.setAttribute('data-vf-court', ''); else b.removeAttribute('data-vf-court'); }
+    const racine = bs.length && bs[0] === fil.firstElementChild ? bs[0] : null; // PU-G-001 : seule la vue d'ensemble prend un libellé court
+    if (racine && /^(Vue d'ensemble|Overview)$/.test(racine.textContent.trim())) { racine.setAttribute('data-vf-racine', 'Ensemble'); racine.setAttribute('aria-label', racine.textContent.trim()); }
+    const cur = fil.querySelector('button.cur'); document.querySelector('header')?.style.setProperty('--vf-cur', (cur ? cur.offsetWidth : 0) + 'px'); // largeur naturelle du niveau courant (flex: none sous 1 280 px)
+    if (!matchMedia('(min-width: 1280px)').matches && bs.length) { // PU-G-002 : le niveau courant reste entier ; les niveaux d'avant cèdent un à un, puis la racine seule si elle ne tient pas
+      for (let k = 0; k < bs.length - 1 && fil.scrollWidth > fil.clientWidth + 1; k++) { bs[k].setAttribute('data-vf-masque', ''); bs[k].nextElementSibling?.setAttribute('data-vf-masque', ''); }
+      if (bs.length === 1 && bs[0].hasAttribute('data-vf-racine') && (fil.scrollWidth > fil.clientWidth + 1 || (nomProjet && nomProjet.scrollWidth > nomProjet.clientWidth + 1))) bs[0].setAttribute('data-vf-masque', ''); // PU-G-001 : le nom du dépôt passe avant le libellé de la racine
+    }
     if (matchMedia('(min-width: 1280px)').matches && bs.length > 2) {
       const ell = document.createElement('span'); ell.className = 'vf-ell'; ell.textContent = '…'; const noms = [];
       for (let k = 1; k < bs.length - 1 && fil.scrollWidth > fil.clientWidth + 1; k++) {

@@ -266,6 +266,29 @@ assert_eq "T24.14 — fixture --gros : tronque = vrai et réponse en moins de 2 
 assert_eq "T24.15 — fixture normale : tronque = faux" "$(RX 'j.r.tronque===false?"ok":"tronque="+j.r.tronque')" "ok"
 assert_eq "T24.16 — fixture --gros : le mandat tient en 8 000 caractères, de 1 à 50 messages de 2 000 caractères au plus (hors mention de coupe)" "$(G "$WORK/red-gros.json" 'j.absent||(()=>{const MENTION=/ … \(tronqué, [0-9 ]+ caractères\)$/;const m=j.r.messages||[];return String(j.r.mandat).replace(MENTION,"").length<=8000&&m.length>=1&&m.length<=50&&m.every((x)=>String(x).replace(MENTION,"").length<=2000)?"ok":"mandat="+String(j.r.mandat).length+" messages="+m.length+" max="+Math.max(0,...m.map((x)=>String(x).length))})()')" "ok"
 
+# T24g — PU-G-170 : les répétitions consécutives de la liste « Outils » sont regroupées ; la liste blanche reste fermée (aucune valeur d'entrée ne sort)
+cat > "$AUX/mk-rep.mjs" <<'JS'
+// mk-rep.mjs <fichier> <racineLab> : mandat, puis Bash x3 (commandes distinctes, secrètes), Read a.js, Bash x1, Read a.js x2, Read b.js
+import fs from 'node:fs';
+const [, , out, lab] = process.argv;
+let k = 0; const side = (o) => JSON.stringify({ cwd: lab, sessionId: 'sess-synthetique', gitBranch: 'main', version: '2.1.317', isSidechain: true, agentId: 'rep1', timestamp: new Date(Date.now() - 600000 + 1000 * k++).toISOString(), ...o });
+const tu = (name, input) => side({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'u' + k, name, input }] } });
+fs.writeFileSync(out, [side({ type: 'user', message: { role: 'user', content: 'MANDAT-REP-170' } }),
+  tu('Bash', { command: 'echo CMD-SECRET-170-A' }), tu('Bash', { command: 'echo CMD-SECRET-170-B' }), tu('Bash', { command: 'echo CMD-SECRET-170-C' }),
+  tu('Read', { file_path: `${lab}/src/a.js` }), tu('Bash', { command: 'echo CMD-SECRET-170-D' }),
+  tu('Read', { file_path: `${lab}/src/a.js` }), tu('Read', { file_path: `${lab}/src/a.js` }), tu('Read', { file_path: `${lab}/src/b.js` })].join('\n') + '\n');
+JS
+node "$AUX/mk-rep.mjs" "$AUX/fx/agent-rep.jsonl" "$LAB0"
+node "$AUX/red.mjs" "$SCRIPTS" "$AUX/fx/agent-rep.jsonl" "$LAB0" > "$WORK/red-rep.json"
+FMT='(j.r.outils||[]).map((o)=>[o.outil,o.verbe,o.cible,o.n===undefined?"":o.n].join("|")).join(",")'
+assert_eq "T24.17 — PU-G-170 : trois Bash consécutifs ne font qu'une entrée « × 3 », un Bash seul n'a pas de n, deux Read de même cible se regroupent, une autre cible reste à part, l'ordre est gardé" "$(G "$WORK/red-rep.json" "j.absent||($FMT)")" "Bash|lance une commande||3,Read|lit|src/a.js|,Bash|lance une commande||,Read|lit|src/a.js|2,Read|lit|src/b.js|"
+assert_eq "T24.18 — le regroupement ne fait sortir aucune valeur d'entrée (apparié à T24.17 : les 4 commandes sont dans la fixture, aucune dans la sortie)" "$(grep -c 'CMD-SECRET-170' "$AUX/fx/agent-rep.jsonl")|$(G "$WORK/red-rep.json" 'j.absent||JSON.stringify(j.r).includes("CMD-SECRET-170")')" "4|false"
+mkdir -p "$WORK/mut-scripts"; cp "$SCRIPTS/vf-cockpit-transcript.mjs" "$SCRIPTS/vf-cockpit-lecture.mjs" "$WORK/mut-scripts/"
+sed 's#outils: regrouper(#outils: ((x) => x)(#' "$SCRIPTS/vf-cockpit-transcript.mjs" > "$WORK/mut-scripts/vf-cockpit-transcript.mjs"
+cmp -s "$SCRIPTS/vf-cockpit-transcript.mjs" "$WORK/mut-scripts/vf-cockpit-transcript.mjs" && echo "MUTANT VIDE : regrouper"
+node "$AUX/red.mjs" "$WORK/mut-scripts" "$AUX/fx/agent-rep.jsonl" "$LAB0" > "$WORK/red-rep-mut.json"
+assert_eq "T24.19 — mutant (regroupement retiré) : huit entrées au lieu de cinq, détecté" "$(G "$WORK/red-rep-mut.json" 'j.absent||(j.r.outils||[]).length')|$(G "$WORK/red-rep.json" 'j.absent||(j.r.outils||[]).length')" "8|5"
+
 # =====================================================================================================================
 echo "=== T25 — GET /api/vf/transcript : jeton, identifiants, fenêtre, aucune fuite (P69-D-19, P69-D-23 ; CKPT-25) ==="
 LABS="$WORK/labsrv"; mkdir -p "$LABS/src" "$LABS/.planning/phases/01-x"
@@ -395,6 +418,11 @@ VT() { G "$WORK/vm-t.json" "j.erreur||($1)"; }
 assert_eq "T26.1 — transcript() ne crée que des balises div, h4, p, ul, li, pre, span (ni img ni script), et en crée" "$(VT '(()=>{const ok=new Set(["div","h4","p","ul","li","pre","span"]);const t=j.tags;const hors=[...new Set(t.filter((x)=>!ok.has(x)))];return !t.length?"aucune balise créée":hors.length?"hors liste : "+hors.join(","):"ok"})()')" "ok"
 assert_eq "T26.2 — un nœud a pour texte exactement <img src=x onerror=alert(1)>" "$(VT 'j.tags.length?String(j.textes.includes("<img src=x onerror=alert(1)>")):"aucune balise créée"')" "true"
 assert_eq "T26.3 — aucune affectation innerHTML (appariée à la création de balises)" "$(VT 'j.tags.length?String(j.innerHTML):"aucune balise créée"')" "0"
+cat > "$AUX/pilote-transcript-n.js" <<'JS'
+__r = !!window.__vfEquipeRendu.transcript({ mandat: 'm', messages: [], outils: [{ outil: 'Bash', verbe: 'lance une commande', cible: '', n: 14 }, { outil: 'Read', verbe: 'lit', cible: 'src/a.js' }] }, document);
+JS
+node "$AUX/vm-rendu.mjs" "$RENDU" "$AUX/pilote-transcript-n.js" > "$WORK/vm-tn.json"
+assert_eq "T26.5 — PU-G-170 : le transcript dit « lance une commande (Bash) × 14 » pour 14 appels, et rien après un appel seul" "$(G "$WORK/vm-tn.json" 'j.erreur||j.textes.filter((t)=>/\(Bash\)|\(Read\)/.test(t)).join("|")')" "lance une commande (Bash) × 14|lit src/a.js (Read)"
 assert_eq "T26.4 — arbre() avec l'échappement standard : la description piégée sort en &lt;img, jamais en <img" "$(G "$WORK/vm-a.json" 'j.erreur||(String(j.retour).includes("&lt;img")+"|"+!String(j.retour).includes("<img"))')" "true|true"
 CSPV="default-src 'none'; script-src ; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'"
 rafraichir
@@ -556,7 +584,7 @@ import fs from 'node:fs';
 const [, , out, lab, mode] = process.argv; const motif = 'tokensecret'.repeat(355).slice(0, 3900);
 const L = [JSON.stringify({ type: 'user', isSidechain: true, agentId: 'f4', message: { role: 'user', content: 'MANDAT-VISIBLE-69' } })]; let n = 0;
 while (n < 8.5 * 1048576) {
-  const c = mode === 'outils' ? [{ type: 'tool_use', id: 'u', name: 'Read', input: { file_path: `${lab}/src/a.js` } }] : [{ type: 'text', text: motif }];
+  const c = mode === 'outils' ? [{ type: 'tool_use', id: 'u', name: 'Read', input: { file_path: `${lab}/src/a${L.length}.js` } }] : [{ type: 'text', text: motif }]; // une cible distincte par appel : des appels identiques consécutifs sont regroupés (PU-G-170), ils ne feraient plus 200 outils
   const l = JSON.stringify({ type: 'assistant', isSidechain: true, agentId: 'f4', message: { role: 'assistant', content: c } }); L.push(l); n += l.length + 1;
 }
 fs.writeFileSync(out, L.join('\n') + '\n');

@@ -27,7 +27,7 @@
       "requis": { "at": "string", "root": "string", "trees": "array", "fresh": "number", "fenetre": "number", "busy": "boolean", "workers": "array", "sources": "object" },
       "travailleur": {
         "requis": ["kind", "id", "tree", "source"],
-        "optionnels": ["role", "task", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "action", "rattachement"],
+        "optionnels": ["role", "task", "titre", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "action", "rattachement"],
         "etats": ["actif", "en-attente", "termine"]
       },
       "rattachement": {
