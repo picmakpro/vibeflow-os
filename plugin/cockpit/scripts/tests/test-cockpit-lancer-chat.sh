@@ -368,7 +368,7 @@ await executer(chrome, async (s) => {
     });
     await essai('t4', async () => { // rappel lancer(mode, avecChat) : faux par défaut, vrai après le clic sur la case
       const armee = () => att(`${LANCER}.getAttribute('aria-disabled') === 'false'`, 'armement');
-      const appels = () => attendreValeur(() => ev(`__T.appels.slice()`), (v) => Array.isArray(v) && v.length >= 1, { max: 5000 }); // l'appel du rappel est lu une fois posé, plus après une pause fixe
+      const appels = () => attendreEtStabiliser(() => ev(`__T.appels.slice()`), (v) => Array.isArray(v) && v.length >= 1, { pas: 300, max: 5000 }); // l'appel du rappel est lu une fois posé, plus après une pause fixe
       await ev(`(__T.appels.length = 0, true)`); await monter({ id: 'c4aaaaaa44' }); await armee(); await clic(LANCER); const a = await appels();
       await ev(`(__T.appels.length = 0, true)`); await monter({ id: 'c5aaaaaa55' }); await clic(CASE); await armee(); await clic(LANCER); const b = await appels();
       r.t4 = JSON.stringify([a, b]);
@@ -414,7 +414,7 @@ await executer(chrome, async (s) => {
     await attQ(`!!${CASE}`, 'case dans le bandeau de Q'); r[nom].case = await evQ(`({ type: ${CASE}.type, coche: ${CASE}.checked, texte: ${CASE}.closest('label').textContent.trim() })`);
     if (cocher) await clicQ(CASE); r[nom].cocheApres = await evQ(`${CASE}.checked`); r[nom].affichee = await evQ(`${LIGNE}.textContent`);
     await attQ(`${LANCER}.getAttribute('aria-disabled') === 'false'`, 'bouton Lancer armé'); await clicQ(LANCER);
-    await attendreEtStabiliser(async () => taille(), (n) => n > av, { pas: 250, max: MS }); /* ^C puis la ligne peuvent arriver en deux morceaux : la capture est lue une fois la taille posée */
+    await attendreEtStabiliser(async () => taille(), (n) => n > av, { pas: 500, max: MS }); /* ^C puis la ligne peuvent arriver en deux morceaux : la capture est lue une fois la taille posée */
     r[nom].capture = fs.readFileSync(A.capture).subarray(av).toString('latin1');
   });
   await lancement('e1', A.cibles[0], true); await attQ(`!document.getElementById('proposition')`, 'bandeau de e1 retiré'); await lancement('e2', A.cibles[1], false);
