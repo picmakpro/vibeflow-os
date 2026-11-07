@@ -322,7 +322,7 @@ OUT="$LABS/.vibeflow/cockpit"
 node "$WORK/leurre.mjs" "$(libre)" & LEURRE=$!; PIDS+=("$LEURRE")
 HOME="$HS" node "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
 SRV=$!; PIDS+=("$SRV")
-for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
+for _ in $(seq 1 300); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
 PORT="$(G "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
 TOK="$(node "$AUX/token.mjs" "$PORT" /)"
 assert_eq "E22.0b — contrôle positif : serveur démarré, jeton lu dans la page, leurre vivant" "$([ "$PORT" -gt 0 ] && [ "${#TOK}" -ge 16 ] && echo serveur)|$(ps -p "$LEURRE" >/dev/null 2>&1 && echo leurre)" "serveur|leurre"
@@ -428,7 +428,7 @@ H23="$(mkhome e23 "$AUX/spec-e23.json" "$LABS")"
 rm -f "$OUT/.cache/server.json"
 HOME="$H23" node "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve23.out" 2>&1 &
 SRV23=$!; PIDS+=("$SRV23")
-for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
+for _ in $(seq 1 300); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
 PORT23="$(G "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
 S23="$(node "$AUX/fetchp.mjs" "$PORT23" /equipe.html "$WORK/equipe.html")"
 P23="$(node "$AUX/fetchp.mjs" "$PORT23" /project.html "$WORK/project23.html")"
@@ -882,7 +882,7 @@ JSON
   ek_demarrer() { rm -f "$OUTEK/.cache/server.json"; ek_rafraichir
     HOME="$HEK" node "$OUTEK/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-ek.out" 2>&1 &
     EK_PID=$!; PIDS+=("$EK_PID")
-    for _ in $(seq 1 100); do [ -s "$OUTEK/.cache/server.json" ] && break; sleep 0.1; done
+    for _ in $(seq 1 300); do [ -s "$OUTEK/.cache/server.json" ] && break; sleep 0.1; done
     EK_PORT="$(G "$OUTEK/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"; }
   # ek_muter <ancre> <remplacement> : pose le mutant dans la page assemblée (project.html de la sortie), « muté » ou « ancre absente »
   ek_muter() { cp "$WORK/project-ek.html.orig" "$OUTEK/project.html"; if [ -z "${3:-}" ]; then EK_FROM="$1" EK_TO="$2" node "$AUX/ek-sub.mjs" "$OUTEK/project.html"; else EK_FROM="$1" EK_TO="$2" node "$AUX/ek-sub.mjs" "$OUTEK/project.html" >/dev/null || return 1; EK_FROM="$3" EK_TO="$4" node "$AUX/ek-sub.mjs" "$OUTEK/project.html"; fi; }  # $3/$4 : seconde substitution (fusion de la 68 : deux règles de pied de carte)

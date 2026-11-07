@@ -2,13 +2,14 @@
 // Usage : node chrome-fr-rendu.mjs <chrome> <urlCode> <urlProjet>
 // `innerText` applique la capitalisation CSS (text-transform) : c'est ce que lit l'œil, pas le nœud de texte de l'inventaire statique.
 // Rend sur une ligne { code: { sante, corps }, projet: { sousTitre, ensemble, corps } } ou { erreur } nommée.
-import { executer } from './chrome-session.mjs';
+import { executer, stabiliser } from './chrome-session.mjs';
 const [, , chrome, urlCode, urlProjet] = process.argv;
 const PRET = `document.readyState === 'complete' && document.documentElement.lang === 'fr' && !!document.querySelector('header .brand .mark') && !!document.getElementById('panel')`;
 await executer(chrome, async (s) => {
   await s.naviguer(urlCode);
   await s.attendre(PRET, 'onglet Code prêt, en français');
   await s.attendre(`!!document.getElementById('btn-health')`, 'bouton Santé');
+  await s.attendre("!!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout", 'viewer prêt (gestionnaire du bouton Santé posé)');
   await s.ev(`document.getElementById('btn-health').click()`);
   const sante = await s.attendre(`(() => { const k = [...document.querySelectorAll('#panel .kindlabel')].find((e) => /sant|health/i.test(e.textContent)); return k ? k.innerText : false; })()`, 'en-tête du panneau Santé');
   const code = { sante, corps: await s.stable(`document.body.innerText`, 'texte visible du Code') };

@@ -1,7 +1,7 @@
 // chrome-verrou-prefixe.mjs — recette 68 M-3 (P68-D-39) : deux verrous d'un même propriétaire, dont un compartiment est préfixe de l'autre (`fiabilite` et `fiabilite-2`),
 // gardent chacun leur âge dans le tiroir « Au travail » (correspondance exacte sur la portée et le compartiment, jamais par sous-chaîne).
 // Usage : node chrome-verrou-prefixe.mjs <chrome> <url http de project.html>. Rend { lignes } : le texte de chaque ligne de verrou, dans l'ordre du flux `who`.
-import { executer } from './chrome-session.mjs';
+import { executer, attendreEtStabiliser } from './chrome-session.mjs';
 const [, , chrome, url] = process.argv;
 const INJ = `(() => { const R = window.EventSource; window.__es = []; window.EventSource = class extends R {
   constructor(u, o) { super(u, o); this.__l = {}; window.__es.push(this); }
@@ -21,5 +21,7 @@ await executer(chrome, async (s) => {
     { present: true, owner: 'L1', step: 'b', scope: 'compartiment', ws: 'fiabilite-2', age_seconds: 5, lease_seconds: 600 }] } })`);
   await s.ev("document.querySelector('#vf-lock').click()");
   await s.attendre("document.querySelectorAll('.vf-whop .r-verr li').length >= 2", 'deux lignes de verrou');
-  return { lignes: await s.ev("[...document.querySelectorAll('.vf-whop .r-verr li')].map((e) => [...e.children].map((c) => c.textContent.trim()).join(' · ').slice(0, 120))") };
+  // les âges réels (40 s, 10 min) viennent du flux `lock` : on les attend avant de lire, puis une lecture stable
+  const lire = () => s.ev("[...document.querySelectorAll('.vf-whop .r-verr li')].map((e) => [...e.children].map((c) => c.textContent.trim()).join(' · ').slice(0, 120))");
+  return { lignes: await attendreEtStabiliser(lire, (v) => v.length >= 2 && /fiabilite · .*40 s/.test(String(v[0])) && /fiabilite-2 · .*10 min/.test(String(v[1])), { pas: 150, max: 8000 }) };
 }, { csp: true });
