@@ -448,7 +448,10 @@ await executer(chrome, async (sp) => {
       await s.send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
       const cond = `(() => { const m = ${TXT}.match(/WINCH (\\d+)x(\\d+)/g); if (!m) return false; const d = m[m.length - 1].match(/(\\d+)x(\\d+)/); return Number(d[1]) === document.querySelector('.xterm-rows').childElementCount; })()`;
       await att(cond, 'WINCH <lignes>x<colonnes> aux dimensions de la grille');
-      const lu = JSON.parse(await s.ev(`(() => { const m = ${TXT}.match(/WINCH (\\d+x\\d+)/g); return JSON.stringify({ winch: m[m.length - 1].slice(6), lignes: document.querySelector('.xterm-rows').childElementCount }); })()`)); // les deux valeurs se lisent dans le même instant : un WINCH de plus entre deux lectures séparées les désaccordait une fois sur deux en CI Linux (runs 42386847278 et 42396920032)
+      // les deux valeurs se lisent dans le même instant, et seulement une fois posées : l'agrandissement produit parfois deux WINCH (la grille se réajuste après le premier), et une lecture prise entre les deux les désaccordait une fois sur deux en CI Linux (runs 42386847278, 42396920032, 42400570610)
+      const LIRE = `(() => { const m = ${TXT}.match(/WINCH (\\d+x\\d+)/g) || []; return JSON.stringify({ winch: m.length ? m[m.length - 1].slice(6) : '', n: m.length, lignes: document.querySelector('.xterm-rows').childElementCount }); })()`;
+      let lu = JSON.parse(await s.ev(LIRE));
+      for (const fin = Date.now() + 10000; Date.now() < fin;) { await pause(400); const lu2 = JSON.parse(await s.ev(LIRE)); if (lu2.winch === lu.winch && lu2.n === lu.n && lu2.lignes === lu.lignes) break; lu = lu2; }
       r.winch = lu.winch; r.lignes = lu.lignes;
     });
     await essai('sigint', async () => {
