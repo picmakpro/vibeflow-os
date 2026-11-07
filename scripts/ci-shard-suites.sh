@@ -39,6 +39,7 @@
 # Sorties : 0 = liste rendue (éventuellement vide) · 64 = usage ou trop de suites lourdes · 65 = --liste hors découverte
 # (ligne inconnue, doublon, fichier illisible).
 set -u
+export LC_ALL=C
 set -o pipefail
 
 SEUIL=600

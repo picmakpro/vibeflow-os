@@ -81,8 +81,6 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
-          # Étiquettes du payload d'origine : repli seulement si l'API échoue.
-          PAYLOAD_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
           set -u
           tsv="$RUNNER_TEMP/perimetre.tsv"
@@ -96,14 +94,14 @@ jobs:
             full="événement $GITHUB_EVENT_NAME : repli complet"
           else
             if labels="$(gh api "repos/$REPO/issues/$PR_NUMBER/labels" --paginate --jq '.[].name')"; then
-              src=api
+              echo "== étiquettes de la PR (api) : $(printf '%s' "$labels" | tr '\n' ',') =="
+              if printf '%s\n' "$labels" | grep -qxF 'ci: complet'; then full='label ci: complet'; fi
             else
-              echo "::warning::étiquettes de la PR illisibles par l'API : repli sur le payload de l'événement"
-              labels="$(printf '%s' "$PAYLOAD_LABELS" | jq -r '.[]?' 2>/dev/null || true)"
-              src=payload
+              # Un label « ci: complet » posé après l'ouverture serait invisible dans le payload : sur-sélectionner est
+              # acceptable, ignorer le label ne l'est pas.
+              echo "::warning::étiquettes de la PR illisibles par l'API : toutes les suites sont jouées"
+              full='repli : étiquettes illisibles par l'"'"'API'
             fi
-            echo "== étiquettes de la PR ($src) : $(printf '%s' "$labels" | tr '\n' ',') =="
-            if printf '%s\n' "$labels" | grep -qxF 'ci: complet'; then full='label ci: complet'; fi
           fi
 
           if [ -n "$full" ]; then
