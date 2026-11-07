@@ -19,7 +19,7 @@
 # l'arbre de travail courant ; la racine se résout par `git rev-parse --show-toplevel`.
 # Défaut conservateur : sous-sélectionner est le défaut à éviter, sur-sélectionner est acceptable.
 #
-# Sorties : 0 = périmètre rendu (y compris vide ou docs seules) · 2 = diff illisible (base/head inconnu) : la CI
+# Sorties : 0 = périmètre rendu (y compris vide ou docs seules ; mode vide aussi quand aucune suite n'est retenue) · 2 = diff illisible (base/head inconnu) : la CI
 # retombe alors sur le mode tout · 64 = usage.
 set -u
 LC_ALL=C; export LC_ALL
@@ -186,4 +186,8 @@ done < <(awk -F'\t' '$2 != "doc"' "$T/classes")
 
 sort -t "$TAB" -k1,1 -k2,2 -k3,3 "$T/cand" | awk -F'\t' '!s[$1]++ { printf "%s\t%s\n", $1, $4 }' > "$T/joued"
 nj=$(wc -l < "$T/joued" | tr -d ' '); nt=$(wc -l < "$T/suites" | tr -d ' ')
+if [ "$nj" -eq 0 ]; then
+  premier=$(awk -F'\t' '$2 != "doc" { print $1; exit }' "$T/classes")
+  emit vide "aucune suite du module ni citation pour $premier"   # jamais une liste vide en mode selection
+fi
 emit selection "$nj suite(s) jouée(s) sur $nt"

@@ -57,6 +57,8 @@ put plugin/beta/scripts/tests/test-beta-dep-path.sh 'bash plugin/alpha/scripts/a
 put plugin/beta/scripts/tests/test-beta-dep-compose.sh 'd=plugin/alpha/scripts; bash "$d/alpha-compose.sh"; cat note-unique.txt'
 put plugin/beta/scripts/tests/test-beta-ambig.sh 'cat VERSION'
 put plugin/beta/scripts/tests/test-beta-ambig-dir.sh 'cat VERSION; ls plugin/alpha'
+put plugin/delta/module.json '{"name":"delta"}'
+put plugin/delta/scripts/delta.sh 'echo delta'
 put plugin/gamma/scripts/gamma.sh 'echo gamma'
 put plugin/gamma/scripts/tests/test-gamma-own.sh 'echo gamma own'
 put plugin/conductor/scripts/called.sh 'echo appelé'
@@ -67,6 +69,7 @@ G add -A && G commit -q -m base && G tag base
 # mkcase <branche> <commandes> : une branche issue de base portant un commit.
 mkcase() { local b=$1; G checkout -q -B "$b" base && (cd "$REPO" && eval "$2") >/dev/null 2>&1 && G add -A && G commit -q -m "$b"; }
 mkcase c-docs        'echo plus >> docs/x.md; echo plus >> .planning/p.md; echo plus >> README.md'
+mkcase c-delta       'echo plus >> plugin/delta/scripts/delta.sh'
 mkcase c-gamma       'echo plus >> plugin/gamma/scripts/gamma.sh'
 mkcase c-docs-gamma  'echo c > docs/note-unique.txt; echo plus >> plugin/gamma/scripts/gamma.sh'
 mkcase c-dep-path    'echo plus >> plugin/alpha/scripts/alpha.sh'
@@ -143,11 +146,12 @@ $OUT"
   # Une sortie vide avec un rc inattendu n'est pas « bien formée » pour un mutant qui aurait cessé de tourner.
 }
 
-NOMS="docs vide gamma docs-gamma dep-path dep-compose ambigu partage lib cond-appele cond-seul renom hors-version hors-reference md-plugin tout liste-selection liste-tout sha-inconnu head-inconnu usage-vide usage-un usage-tout usage-option usage-trop"
+NOMS="docs vide delta gamma docs-gamma dep-path dep-compose ambigu partage lib cond-appele cond-seul renom hors-version hors-reference md-plugin tout liste-selection liste-tout sha-inconnu head-inconnu usage-vide usage-un usage-tout usage-option usage-trop"
 run_case() {
   case "$1" in
     docs) verifie_perimetre c-docs docs-seules "" ;;
     vide) verifie_perimetre base vide "" ;;
+    delta) verifie_perimetre c-delta vide "" ;;
     gamma) verifie_perimetre c-gamma selection "$(E $G1 'module gamma — plugin/gamma/scripts/gamma.sh')" ;;
     docs-gamma) verifie_perimetre c-docs-gamma selection "$(E $G1 'module gamma — plugin/gamma/scripts/gamma.sh')" ;;
     dep-path) verifie_perimetre c-dep-path selection "$(E $A1 'module alpha — plugin/alpha/scripts/alpha.sh'; E $A2 'module alpha — plugin/alpha/scripts/alpha.sh'; E $B4 'citée — plugin/alpha/scripts/alpha.sh')" ;;
@@ -247,6 +251,7 @@ muter 2  's#^done < <(awk .*#done < /dev/null#' "dep-path dep-compose"
 muter 3  's#^      cite_files "\$name"$#      true#' "dep-compose"
 muter 4a 's#\[ "\$nondoc" -eq 0 \]#[ "$nondoc" -eq 99999 ]#' "docs"
 muter 4b 's#^done < <(awk .*classes")$#done < "$T/classes"#' "docs-gamma"
+muter 11 's#\[ "\$nj" -eq 0 \]#[ "$nj" -eq 99999 ]#' "delta"
 muter 5  's#(p in f)#(p in zzz)#' "gamma cond-seul"
 muter 6  's# --name-only --no-renames # --name-only #' "renom"
 muter 7  's#if conductor_appele_ailleurs "\$name"; then#if false; then#' "cond-appele"
