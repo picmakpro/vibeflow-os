@@ -53,7 +53,9 @@ const TEXTES = {
   aideFin: ' Rien ne démarre avant votre confirmation dans le terminal.',
 };
 // Durée de validité d'une proposition dans Q : le cockpit la lit dans la MÊME variable que Q (VF_COCKPIT_LANCER_EXPIRE_MS, 1 000 à 600 000 ms ; 120 s par défaut), Q étant son enfant ; le module ne peut pas importer lancer-q (node:crypto) : il est aussi chargé hors de Node par les suites. Le paramètre expireMs de injectionLancer ne sert qu'aux suites
-const EXPIRE_PAGE_MS = (() => { const n = typeof process === 'object' && process && process.env ? Number(process.env.VF_COCKPIT_LANCER_EXPIRE_MS) : NaN; return Number.isInteger(n) && n >= 1000 && n <= 600000 ? n : 120000; })();
+const EXPIRE_PAGE_MS = (() => { // mêmes lectures, mêmes bornes et même règle de cohérence que lancer-q (garde:env-bornes, garde:plancher, expire > arme) : une expiration qui n'excède pas l'armement reprend le défaut, comme dans Q
+  const e = typeof process === 'object' && process && process.env ? process.env : {}, lire = (v, min, max, d) => { const n = Number(v); return Number.isInteger(n) && n >= min && n <= max ? n : d; };
+  const arme = Math.max(1000, lire(e.VF_COCKPIT_LANCER_ARME_MS, 100, 10000, 1000)), expire = lire(e.VF_COCKPIT_LANCER_EXPIRE_MS, 1000, 600000, 120000); return expire > arme ? expire : 120000; })();
 
 // Option « continuer le chat » (72-13 ; LANC-11, P72-D-03). Livrée parce que la sonde A5 est VERTE (2026-11-05, claude 2.1.318, 72-13-RED-TRACE.md) ; la vue de Q porte la même valeur.
 export const CHAT_LIVRE = true;

@@ -350,11 +350,18 @@ assert_eq "LU.S8 — ST-2 : chaque code de la table de cibles (liste DÉRIVÉE d
 assert_eq "LU.S7 — MOTIFS : les quatorze codes de 72-03 et phase-sans-plan (LB1) avec leurs textes, mot pour mot, aucun code en plus" "$(rj "$ST" "${ABS}j.ecart")" "aucun"
 
 # LU.S9 (lot 8 LB3-S, revue LB1-LB2, finding c) : la durée de validité que la page connaît suit la variable que Q lit (VF_COCKPIT_LANCER_EXPIRE_MS, 1 000 à 600 000), et non une constante : défaut 120 s, valeur hors bornes ou illisible = défaut
-expire_servi() { VF_COCKPIT_LANCER_EXPIRE_MS="$2" node -e "import(process.argv[1]).then((m) => { const h = m.injectionLancer({}); const x = /\"expireMs\":([0-9]+)/.exec(h); console.log(x ? x[1] : 'absent'); })" "$1" 2>&1 | tail -1; }
+expire_servi() { VF_COCKPIT_LANCER_ARME_MS="${3:-}" VF_COCKPIT_LANCER_EXPIRE_MS="$2" node -e "import(process.argv[1]).then((m) => { const h = m.injectionLancer({}); const x = /\"expireMs\":([0-9]+)/.exec(h); console.log(x ? x[1] : 'absent'); })" "$1" 2>&1 | tail -1; }
 assert_eq "LU.S9 — expireMs du script servi : variable absente 120000 ; 30000 -> 30000 ; 600000 -> 600000 ; 500 (hors bornes) -> 120000 ; 'abc' -> 120000" "$(expire_servi "$MOD" ''),$(expire_servi "$MOD" 30000),$(expire_servi "$MOD" 600000),$(expire_servi "$MOD" 500),$(expire_servi "$MOD" abc)" "120000,30000,600000,120000,120000"
 if mutant M-EXPIRE-CONSTANTE 's|^const EXPIRE_PAGE_MS = (() => {|const EXPIRE_PAGE_MS = 120000; const EXPIRE_ENV_IGNOREE = (() => {|'; then
   assert_eq "M-EXPIRE-CONSTANTE — le mutant (durée codée en dur) rougit LU.S9 : la variable posée à 30000 n'est plus suivie (témoin : le défaut, lui, reste 120000)" "$(expire_servi "$MUT_MOD" ''),$(expire_servi "$MUT_MOD" 30000)" "120000,120000"
 else sans_effet M-EXPIRE-CONSTANTE; fi
+# LU.S10 (lot 8 LB3-S2, revue du delta, finding F7) : la page retient EXACTEMENT la durée que Q retient (lancer-q : expire > arme, sinon défaut) ; témoin : mêmes réponses que le module de Q lui-même, pour toutes les combinaisons
+q_servi() { VF_COCKPIT_LANCER_ARME_MS="${2:-}" VF_COCKPIT_LANCER_EXPIRE_MS="$1" node -e "import(process.argv[1]).then((m) => console.log(m.EXPIRE_MS))" "$SCRIPTS/vf-cockpit-lancer-q.mjs" 2>&1 | tail -1; }
+combi() { local e="$1" a="$2" q p; q="$(q_servi "$e" "$a")"; p="$(expire_servi "$MOD" "$e" "$a")"; [ "$q" = "$p" ] && echo "$e/$a=$p" || echo "$e/$a=ECART(Q $q, page $p)"; }
+assert_eq "LU.S10 — la page suit la règle de cohérence de Q : (expire/arme) 1500/2000 -> 120000 (Q et page) ; 2000/2000 -> 120000 ; 2001/2000 -> 2001 ; 1000/500 -> 120000 (plancher d'armement 1000) ; 1500/1000 -> 1500 ; 30000/abc -> 30000 ; 600000/10000 -> 600000" "$(combi 1500 2000),$(combi 2000 2000),$(combi 2001 2000),$(combi 1000 500),$(combi 1500 1000),$(combi 30000 abc),$(combi 600000 10000)" "1500/2000=120000,2000/2000=120000,2001/2000=2001,1000/500=120000,1500/1000=1500,30000/abc=30000,600000/10000=600000"
+if mutant M-EXPIRE-SANS-COHERENCE 's|return expire > arme ? expire : 120000;|return expire;|'; then
+  assert_eq "M-EXPIRE-SANS-COHERENCE — le mutant (la page ignore expire > arme) rougit LU.S10 : avec 1500/2000 la page prend 1500 là où Q sert 120000 (témoin : le module de Q sert bien 120000, et 1500/1000 reste 1500)" "$(expire_servi "$MUT_MOD" 1500 2000),$(q_servi 1500 2000),$(expire_servi "$MUT_MOD" 1500 1000)" "1500,120000,1500"
+else sans_effet M-EXPIRE-SANS-COHERENCE; fi
 
 if [ -n "$CHROME" ]; then
 echo "=== LU.15 — port du serveur factice ==="
