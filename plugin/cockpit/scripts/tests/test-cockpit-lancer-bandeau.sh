@@ -58,7 +58,7 @@ export const ligne = (mode) => `claude --session-id '5b9c2e0a-7d41-4f3a-9c58-0e1
 export const valide = (id = ID_A, over = {}) => Object.assign({
   etat: 'en-attente', id, verbe: 'planifier', intention: 'Planifie la Phase 72 du compartiment alpha', phase: '72', ws: 'alpha',
   lignes: { default: ligne('default'), acceptEdits: ligne('acceptEdits'), plan: ligne('plan'), herite: ligne('') },
-  bloquants: [], avertissements: [], arme_apres_ms: 1500, expire_ms: 100000,
+  bloquants: [], avertissements: [], arme_apres_ms: 1500, expire_ms: 100000, duree_ms: 120000,
 }, over);
 export const NOTE = "Aucun mode n'est imposé : Claude Code suit les réglages de votre poste ou du projet ; un projet ne peut imposer ni « tout autoriser » ni auto (Claude Code 2.1.257 et plus).";
 export const MOTIFS = {
@@ -693,6 +693,15 @@ await executer(chrome, async (s) => {
       await touche('keyDown', { text: '\r' }); await touche('keyUp'); await pause(500);
       r.e10 = [foc, tenue, retours() - r0 - tenue].join('/');
     });
+    await essai('e11', async () => { // LB3-S (finding c) : la référence d'âge est la durée servie par Q (duree_ms), pas une constante : une proposition FRAÎCHE d'une durée courte est montrée ; une ancienne d'une durée longue est effacée
+      await scenario({ prop: valide(ID(111), { duree_ms: 10000, expire_ms: 9000, arme_apres_ms: 600 }), lancers: [] }); await q.naviguer();
+      const courte = await q.attendre(`!!document.getElementById('proposition')`, 'proposition fraîche, durée courte', 4000).then(() => true, () => false);
+      await scenario({ prop: valide(ID(112), { duree_ms: 600000, expire_ms: 300000, arme_apres_ms: 600 }), lancers: [] }); const n0 = (await journal()).filter((x) => x.u === '/annuler').length;
+      await q.naviguer(); await pause(3500); const nul = await q.ev(`document.querySelectorAll('#proposition').length`), annule = (await journal()).filter((x) => x.u === '/annuler').length - n0;
+      await scenario({ prop: valide(ID(113), { duree_ms: 600000, expire_ms: 599000, arme_apres_ms: 600 }), lancers: [] });
+      const temoin = await q.attendre(`!!document.getElementById('proposition')`, 'témoin : proposition fraîche, durée longue', 4000).then(() => true, () => false);
+      r.e11 = [courte, nul, annule >= 1, temoin].join('/');
+    });
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
 
@@ -909,6 +918,7 @@ if [ -n "$CHROME" ]; then
   assert_eq "LB.E7 — postMessage('proposition', '*') puis postMessage({ id: 'zzz' }, '*') du faux P vers le cadre : aucun nouveau bandeau, aucun POST /lancer" "$(ev_ e7)" "true/0/0"
   assert_eq "LB.E9 — LB2 (Q7) : proposition d'une visite précédente (cadre neuf, 115 s d'âge) : aucun bandeau, aucun message proposition, POST /annuler parti ; le même cadre rechargé dans la même visite retrouve sa proposition" "$(ev_ e9)" "0/0/true/true"
   assert_eq "LB.E10 — LB3-S, Entrée TENUE sur « Préparer » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : après le retour du focus au terminal, six répétitions de la touche (autoRepeat) n'envoient AUCUN octet \\r au shell ; Entrée relâchée puis pressée de nouveau : UN \\r (témoin)" "$(ev_ e10)" "xterm-helper-textarea/0/1"
+  assert_eq "LB.E11 — LB3-S (c), référence d'âge servie par Q : proposition fraîche d'une durée courte (duree_ms 10 s) montrée ; ancienne d'une durée longue (600 s, 300 s restantes) effacée dans Q (aucun bandeau, POST /annuler parti) ; témoin : une fraîche de durée longue est montrée" "$(ev_ e11)" "true/0/true/true"
   faux "$SCRIPTS"; FJ="$(navig froid)"; unfaux
   assert_eq "LB.E8 — cadre masqué : UN message proposition d'origine Q en moins de 4 s, aucun .xterm ni #proposition, aucune requête /flux, /lancer, /entree ; cadre agrandi : bandeau, /flux demandé, TOUJOURS UN seul message" \
     "$(rj "$FJ" "(j.erreur ? 'plante: ' + j.erreur : j.e8 !== undefined ? j.e8 : 'erreur: ' + ((j.erreurs || {}).e8 || 'étape absente'))")" "1/true/0/0/0/true|true|1"
@@ -988,6 +998,9 @@ else sans_effet "M-BANDEAU-FIXE"; fi
 if mutant entree-tenue vf-cockpit-terminal-client.mjs "/entreeTenue) { if (e.type/d"; then
   [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e10"]')"; unfaux; assert_eq "M-ENTREE-TENUE — le mutant (la retenue des répétitions d'Entrée est retirée) rougit LB.E10 : des octets CR atteignent le shell (témoin : la sonde s'exécute et rend un résultat)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e10 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e10 === 'xterm-helper-textarea/0/1' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-ENTREE-TENUE"; fi
+if mutant ref-constante vf-cockpit-terminal-client.mjs "s#p.duree_ms - p.expire_ms > VISITE_MS#120000 - p.expire_ms > VISITE_MS#"; then
+  [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e11"]')"; unfaux; assert_eq "M-REF-CONSTANTE — le mutant (référence d'âge codée à 120 s au lieu de la durée servie) rougit LB.E11 (témoin : la sonde s'exécute)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e11 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e11 === 'true/0/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-REF-CONSTANTE"; fi
 if mutant copie-autre-texte vf-cockpit-terminal-vue.mjs "s|r.selectNodeContents(k.querySelector('.vf-q-commande'))|r.selectNodeContents(k.querySelector('.vf-q-titre'))|"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v17"]'; assert_eq "M-COPIE-AUTRE-TEXTE — le mutant (le bouton copie un autre texte que la commande affichée) rougit LB.V17 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v17 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v17 === 'true/true/true|true|Copiée|Commande copiée.|true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-COPIE-AUTRE-TEXTE"; fi

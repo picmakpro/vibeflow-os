@@ -52,8 +52,8 @@ const TEXTES = {
   },
   aideFin: ' Rien ne démarre avant votre confirmation dans le terminal.',
 };
-// Durée de validité d'une proposition dans Q (EXPIRE_MS de vf-cockpit-lancer-q : 120 s) ; le paramètre expireMs de injectionLancer ne sert qu'aux suites
-const EXPIRE_PAGE_MS = 120000;
+// Durée de validité d'une proposition dans Q : le cockpit la lit dans la MÊME variable que Q (VF_COCKPIT_LANCER_EXPIRE_MS, 1 000 à 600 000 ms ; 120 s par défaut), Q étant son enfant ; le module ne peut pas importer lancer-q (node:crypto) : il est aussi chargé hors de Node par les suites. Le paramètre expireMs de injectionLancer ne sert qu'aux suites
+const EXPIRE_PAGE_MS = (() => { const n = typeof process === 'object' && process && process.env ? Number(process.env.VF_COCKPIT_LANCER_EXPIRE_MS) : NaN; return Number.isInteger(n) && n >= 1000 && n <= 600000 ? n : 120000; })();
 
 // Option « continuer le chat » (72-13 ; LANC-11, P72-D-03). Livrée parce que la sonde A5 est VERTE (2026-11-05, claude 2.1.318, 72-13-RED-TRACE.md) ; la vue de Q porte la même valeur.
 export const CHAT_LIVRE = true;

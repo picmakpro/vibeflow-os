@@ -98,7 +98,7 @@ export function creerEtatLancer({ gabarit, maintenant = Date.now, genId = () => 
     if (!dansListe(attente)) return { etat: 'aucune' }; // garde:liste-lire
     if (attente.vue_a === null) attente.vue_a = maintenant();
     const r = { etat: 'en-attente', id: attente.id, verbe: attente.verbe, intention: attente.intention, phase: attente.phase, ws: attente.ws, lignes: pick(attente.lignes), bloquants: [...attente.bloquants],
-      avertissements: [...attente.avertissements], arme_apres_ms: armeMs, expire_ms: attente.cree_a + expireMs - maintenant() };
+      avertissements: [...attente.avertissements], arme_apres_ms: armeMs, expire_ms: attente.cree_a + expireMs - maintenant(), duree_ms: expireMs };
     if (attente.chat) { r.chat = true; r.lignes_chat = pick(attente.lignes_chat); } // jamais l'identifiant du chat hors des lignes de reprise
     return r;
   }

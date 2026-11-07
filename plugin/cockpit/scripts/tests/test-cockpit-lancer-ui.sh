@@ -349,6 +349,13 @@ CIB="$SCRIPTS/vf-cockpit-lancer-cibles.mjs"; PJ="$(node "$AUX/parite.mjs" "$MOD"
 assert_eq "LU.S8 — ST-2 : chaque code de la table de cibles (liste DÉRIVÉE du module réel, au moins 14 codes) a un texte dans MOTIFS de l'interface" "$(rj "$PJ" '(j.n>=14?"n>=14":"liste trop courte "+j.n)+"/sans="+j.sans.join()')" "n>=14/sans="
 assert_eq "LU.S7 — MOTIFS : les quatorze codes de 72-03 et phase-sans-plan (LB1) avec leurs textes, mot pour mot, aucun code en plus" "$(rj "$ST" "${ABS}j.ecart")" "aucun"
 
+# LU.S9 (lot 8 LB3-S, revue LB1-LB2, finding c) : la durée de validité que la page connaît suit la variable que Q lit (VF_COCKPIT_LANCER_EXPIRE_MS, 1 000 à 600 000), et non une constante : défaut 120 s, valeur hors bornes ou illisible = défaut
+expire_servi() { VF_COCKPIT_LANCER_EXPIRE_MS="$2" node -e "import(process.argv[1]).then((m) => { const h = m.injectionLancer({}); const x = /\"expireMs\":([0-9]+)/.exec(h); console.log(x ? x[1] : 'absent'); })" "$1" 2>&1 | tail -1; }
+assert_eq "LU.S9 — expireMs du script servi : variable absente 120000 ; 30000 -> 30000 ; 600000 -> 600000 ; 500 (hors bornes) -> 120000 ; 'abc' -> 120000" "$(expire_servi "$MOD" ''),$(expire_servi "$MOD" 30000),$(expire_servi "$MOD" 600000),$(expire_servi "$MOD" 500),$(expire_servi "$MOD" abc)" "120000,30000,600000,120000,120000"
+if mutant M-EXPIRE-CONSTANTE 's|^const EXPIRE_PAGE_MS = (() => {|const EXPIRE_PAGE_MS = 120000; const EXPIRE_ENV_IGNOREE = (() => {|'; then
+  assert_eq "M-EXPIRE-CONSTANTE — le mutant (durée codée en dur) rougit LU.S9 : la variable posée à 30000 n'est plus suivie (témoin : le défaut, lui, reste 120000)" "$(expire_servi "$MUT_MOD" ''),$(expire_servi "$MUT_MOD" 30000)" "120000,120000"
+else sans_effet M-EXPIRE-CONSTANTE; fi
+
 if [ -n "$CHROME" ]; then
 echo "=== LU.15 — port du serveur factice ==="
 P15="$(libre)"; assert_eq "LU.15 — le port du serveur factice vient de libre() : >= 4600 et différent de 4456" "$([ "$P15" -ge 4600 ] && [ "$P15" != 4456 ] && echo ok || echo "port=$P15")" "ok"
