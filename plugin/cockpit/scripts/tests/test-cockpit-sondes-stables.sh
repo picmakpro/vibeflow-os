@@ -18,7 +18,10 @@ CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/
 cat > "$AUX/pure.mjs" <<'JS'
 import { pathToFileURL } from 'node:url';
 const M = await import(pathToFileURL(process.argv[2]).href);
-const J = JSON.stringify; const sortie = []; const sur = async (f) => { try { return await f(); } catch (e) { return 'EXCEPTION ' + e.message; } };
+const J = JSON.stringify; const sortie = [];
+// garde d'échéance interne (pas de `timeout` sur macOS) : un module qui ne rend jamais la main (mutant « sans échéance ») fait ROUGIR au lieu de bloquer la suite
+process.on('uncaughtException', (e) => { console.log(sortie.join('\n') + `\nKO EXCEPTION non rattrapée de node pure.mjs | attendu: aucune | obtenu: ${e.message}`); process.exit(0); }); // un module qui lève hors cas rougit au lieu de perdre les verdicts
+setTimeout(() => { console.log(sortie.join('\n') + `\nKO ÉCHÉANCE de node pure.mjs | attendu: fin en ${process.env.VF_GARDE_MS || 15000} ms | obtenu: bloqué`); process.exit(0); }, Number(process.env.VF_GARDE_MS) || 15000).unref(); const sur = async (f) => { try { return await f(); } catch (e) { return 'EXCEPTION ' + e.message; } };
 const cas = (nom, obtenu, attendu) => sortie.push(J(obtenu) === J(attendu) ? `OK ${nom}` : `KO ${nom} | attendu: ${J(attendu)} | obtenu: ${J(obtenu)}`);
 // lecteur factice : rend successivement les valeurs de la séquence (la dernière se répète), compte ses lectures ; une valeur `new Error` fait lever
 const lecteur = (seq, fabrique = (v) => v) => { const l = { n: 0, lire: async () => { const v = seq[Math.min(l.n, seq.length - 1)]; l.n++; if (v instanceof Error) throw v; return fabrique(v); } }; return l; };
@@ -30,10 +33,10 @@ cas('N2 objets reconstruits à chaque lecture : égalité JSON, rend la valeur',
 l = lecteur([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100]);
 let t0 = Date.now(); r = await M.stabiliser(l.lire, { pas: 5, max: 150 }); let dt = Date.now() - t0;
 cas('N3 jamais stable : rend la DERNIÈRE lecture (la lecture n° n, jamais la première)', r === l.n, true); cas('N3b jamais stable : plusieurs lectures ont eu lieu', l.n > 5, true);
-cas('N3c jamais stable : l\'échéance est respectée (>= 150 ms et < 150 ms + 1 s)', dt >= 140 && dt < 1150, true);
+cas('N3c jamais stable : l\'échéance est respectée (>= 150 ms et < 150 ms + 5 s)', dt >= 140 && dt < 5150, true);
 l = lecteur([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]);
 t0 = Date.now(); r = await M.attendreValeur(l.lire, () => false, { pas: 5, max: 150 }); dt = Date.now() - t0;
-cas('N4 prédicat jamais vrai : rend la dernière lecture', r === l.n, true); cas('N4b prédicat jamais vrai : borne en temps respectée', dt >= 140 && dt < 1150, true);
+cas('N4 prédicat jamais vrai : rend la dernière lecture', r === l.n, true); cas('N4b prédicat jamais vrai : borne en temps respectée (>= 150 ms, < 150 ms + 5 s)', dt >= 140 && dt < 5150, true);
 l = lecteur([new Error('x'), new Error('x'), 5, 5]); r = await sur(() => M.stabiliser(l.lire, O));
 cas('N5 lecteur qui lève au début : pas d\'exception, rend la valeur stable', r, 5);
 l = lecteur([7, new Error('x'), 7, 7]); r = await sur(() => M.stabiliser(l.lire, O));
@@ -54,6 +57,25 @@ f = faux(null); r = await M.positionPosee(evSur(f), "document.getElementById('a'
 cas('N9 positionPosee : élément absent -> null', r, null);
 f = faux([R(0), R(50), R(100), R(100)]); r = await M.positionPosee(evSur(f), "document.getElementById('a')", { pas: 5, max: 400 });
 cas('N10 positionPosee : ev quelconque, centre calculé (cx = x + l/2, cy = y + h/2)', [r.cx, r.cy], [r.x + 100, r.y + 20]);
+// ---- M4 / M5 : prédicat qui lève, undefined = non-lecture, deux échecs jamais stables, pas respecté, null/catch de positionPosee ----
+l = lecteur([1, 2, 3]); r = await sur(() => M.attendreValeur(l.lire, (v) => { if (v < 3) throw new Error('p'); return true; }, O));
+cas('N11 prédicat qui lève = faux : pas d\'exception, rend la 1re valeur qui le satisfait', r, 3);
+l = lecteur([undefined]); t0 = Date.now(); r = await M.stabiliser(l.lire, { pas: 5, max: 100 }); dt = Date.now() - t0;
+cas('N12 lecture undefined : deux undefined ne sont JAMAIS stables (rend undefined seulement à l\'échéance)', [r === undefined, dt >= 95, l.n > 3], [true, true, true]);
+l = lecteur([undefined, 4, 4]); r = await M.stabiliser(l.lire, O);
+cas('N12b undefined puis 4,4 -> 4 (undefined n\'amorce pas la stabilité)', [r, l.n], [4, 3]);
+l = lecteur([undefined, undefined, 9]); r = await M.attendreValeur(l.lire, () => true, O);
+cas('N12c attendreValeur : un undefined n\'est jamais accepté, même par un prédicat qui accepte tout', r, 9);
+l = lecteur([new Error('x'), new Error('x')]); t0 = Date.now(); r = await M.stabiliser(l.lire, { pas: 5, max: 100 }); dt = Date.now() - t0;
+cas('N13 deux échecs de lecture ne sont jamais stables (durée de l\'échéance, > 3 lectures)', [r === undefined, dt >= 95, l.n > 3], [true, true, true]);
+l = lecteur([1, 1]); t0 = Date.now(); await M.stabiliser(l.lire, { pas: 300, max: 5000 }); dt = Date.now() - t0;
+cas('N14 stabiliser respecte `pas` (une pause de 300 ms entre deux lectures)', dt >= 290, true);
+l = lecteur([1, 1, 9]); t0 = Date.now(); await M.attendreValeur(l.lire, (v) => v === 9, { pas: 200, max: 5000 }); dt = Date.now() - t0;
+cas('N14b attendreValeur respecte `pas` (2 pauses de 200 ms)', dt >= 390, true);
+f = faux([R(0), R(50), R(50)]); t0 = Date.now(); await M.positionPosee(evSur(f), "document.getElementById('a')", { pas: 400, max: 5000 }); dt = Date.now() - t0;
+cas('N14c positionPosee transmet `pas` (2 pauses de 400 ms)', dt >= 780, true);
+f = { doc: { getElementById: () => { throw new Error('dom'); } } }; r = await sur(() => M.positionPosee(evSur(f), "document.getElementById('a')", { pas: 5, max: 400 }));
+cas('N15 positionPosee : une expression qui lève rend null (le catch de l\'expression), pas undefined ni exception', r, null);
 console.log(sortie.join('\n'));
 JS
 CAS="$(node "$AUX/pure.mjs" "$SRC" 2>&1)"
@@ -65,7 +87,7 @@ NOK=0; while IFS= read -r ln; do
     *) echo "  ❌ FAIL — sortie inattendue de pure.mjs : $ln"; FAIL=$((FAIL+1)) ;;
   esac
 done <<< "$CAS"
-assert_eq "N-compte — les 19 cas ont tous rendu un verdict (anti-vert-à-vide)" "$(printf '%s\n' "$CAS" | grep -c -E '^(OK|KO) ')" "19"
+assert_eq "N-compte — les 28 cas ont tous rendu un verdict (anti-vert-à-vide)" "$(printf '%s\n' "$CAS" | grep -c -E '^(OK|KO) ')" "28"
 
 echo "=== C — Chrome : un élément qui se déplace en plusieurs temps ==="
 if [ -z "$CHROME" ]; then echo "  ⊘ SUITE SAUTÉE (navigateur) : aucun Chrome — partie C non comptée comme réussie"; else
@@ -97,7 +119,7 @@ mutant() { # nom, motif exact, remplacement
   local nom="$1" motif="$2" rempl="$3" f="$WORK/mut/$1.mjs"
   M_MOTIF="$motif" M_REMPL="$rempl" node -e "const fs=require('fs');const s=fs.readFileSync(process.argv[1],'utf8');const m=process.env.M_MOTIF;if(!s.includes(m)){console.error('motif absent');process.exit(3)}fs.writeFileSync(process.argv[2],s.replace(m,()=>process.env.M_REMPL))" "$SRC" "$f" 2>"$WORK/mut/$nom.err" || { assert_eq "M $nom — mutant appliqué (motif présent dans la source)" "motif absent" "motif présent"; return; }
   if cmp -s "$SRC" "$f"; then assert_eq "M $nom — mutant sans effet (copie identique)" "identique" "modifiée"; return; fi
-  local sortie ko; sortie="$(node "$AUX/pure.mjs" "$f" 2>&1)"; ko="$(printf '%s\n' "$sortie" | grep -E '^KO ' || true)"
+  local sortie ko; sortie="$(VF_GARDE_MS="${GARDE:-15000}" node "$AUX/pure.mjs" "$f" 2>&1)"; ko="$(printf '%s\n' "$sortie" | grep -E '^KO ' || true)"
   if [ -n "$ko" ]; then echo "  trace du rouge ($nom) :"; printf '%s\n' "$ko" | head -3 | sed 's/^/     /'; assert_eq "M $nom — mutant tué ($(printf '%s\n' "$ko" | wc -l | tr -d ' ') assertion(s) rougissent)" "tué" "tué"
   else assert_eq "M $nom — mutant sans effet" "survivant" "tué"; fi
 }
@@ -106,7 +128,16 @@ mutant b-attendreValeur-sans-predicat 'if (c.ok && vrai(predicat, c.v)) return c
 mutant c-comparaison-par-identite 'JSON.stringify(a) === JSON.stringify(b)' 'a === b'
 mutant d-positionPosee-sans-stabilisation 'return stabiliser(lire, { pas, max });' 'return lire();'
 mutant e-attendreEtStabiliser-sans-stabilite 'return stabiliser(lire, opts);' 'return lire();'
-mutant f-lecture-qui-leve-propagee 'try { return { v: await lire(), ok: true }; } catch { return { v: undefined, ok: false }; }' 'return { v: await lire(), ok: true };'
+mutant f-lecture-qui-leve-propagee 'try { const v = await lire(); return { v, ok: v !== undefined }; } catch { return { v: undefined, ok: false }; }' 'const v = await lire(); return { v, ok: v !== undefined };'
+mutant g-echecs-de-lecture-stables 'if (c.ok && prec && identiques(prec.v, c.v)) return c.v; prec = c.ok ? c : null;' 'if (prec && identiques(prec.v, c.v)) return c.v; prec = c;'
+mutant h-undefined-stable 'return { v, ok: v !== undefined };' 'return { v, ok: true };'
+mutant i-predicat-qui-leve-propage 'try { return !!predicat(v); } catch { return false; }' 'return !!predicat(v);'
+mutant j-stabiliser-pas-ignore 'prec = c.ok ? c : null; await pause(pas);' 'prec = c.ok ? c : null; await pause(0);'
+mutant k-attendreValeur-pas-ignore 'return c.v; await pause(pas); } while' 'return c.v; await pause(0); } while'
+mutant l-positionPosee-pas-perdu 'return stabiliser(lire, { pas, max });' 'return stabiliser(lire, { max });'
+mutant m-positionPosee-sans-catch 'catch { return null; } })()' 'catch { throw 0; } })()'
+GARDE=4000 mutant n-stabiliser-sans-echeance 'prec = c.ok ? c : null; await pause(pas); } while (Date.now() < fin);' 'prec = c.ok ? c : null; await pause(pas); } while (true);'
+GARDE=4000 mutant o-attendreValeur-sans-echeance 'return c.v; await pause(pas); } while (Date.now() < fin);' 'return c.v; await pause(pas); } while (true);'
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

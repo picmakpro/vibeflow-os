@@ -16,7 +16,8 @@
 //   R état lu avant le rendu (dans la foulée d'un évènement, d'un postMessage, d'une navigation, d'un redimensionnement) · F pause fixe trop courte suivie d'une lecture qui JUGE.
 // Différence avec s.stable(expr, nom) : s.stable évalue dans la page principale et LÈVE une erreur nommée si rien ne se pose ; ces aides prennent n'importe quel lecteur
 //   (iframe comprise) et ne lèvent jamais : à l'échéance elles rendent la DERNIÈRE lecture (undefined si toutes les lectures ont levé) — l'assertion juge, la stabilisation ne décide jamais d'un verdict.
-// Une lecture qui lève compte comme « pas de lecture » (undefined, jamais égale à une autre : deux échecs ne font pas une valeur stable) ; un prédicat qui lève vaut faux.
+// Une lecture qui lève, ou qui rend undefined (s.ev rend undefined sur une exception de la page), est une NON-LECTURE : jamais stable (deux échecs de suite ne font pas une valeur stable), jamais
+//   acceptée par attendreValeur, même si le prédicat l'accepterait ; rendue seulement comme dernière lecture à l'échéance (undefined). Un prédicat qui lève vaut faux.
 // Une pause fixe reste juste pour PROUVER UNE ABSENCE (« rien n'est arrivé en N ms » ne s'attend que par une durée) ou quand la durée est l'objet testé (débounce, cadence de répétition).
 import { spawn } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 
@@ -78,7 +79,7 @@ export async function ouvrir(chrome, { csp = false } = {}) {
 
 // ---- aides « mesurer une fois posé » (voir l'en-tête) ----
 const identiques = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const lireSur = async (lire) => { try { return { v: await lire(), ok: true }; } catch { return { v: undefined, ok: false }; } };
+const lireSur = async (lire) => { try { const v = await lire(); return { v, ok: v !== undefined }; } catch { return { v: undefined, ok: false }; } }; // undefined (s.ev d'une exception de page, ou rien à rendre) = non-lecture
 const vrai = (predicat, v) => { try { return !!predicat(v); } catch { return false; } };
 export async function stabiliser(lire, { pas = 250, max = 10000 } = {}) {
   const fin = Date.now() + max; let prec = null, der;
