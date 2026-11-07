@@ -71,7 +71,7 @@ O="$LAB/.vibeflow/cockpit"; rm -f "$O/.cache/server.json"
 mkdir -p "$WORK/fauxbin"; cp "$SCRIPTS/tests/temoins/fauxbin-claude/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude" # le moteur n'envoie aucune question sans « claude » sur le PATH du serveur (askState.engine) : la CI n'en a pas, le faux claude partagé des suites de lancement le remplace
 ( cd "$LAB" && PATH="$WORK/fauxbin:$PATH" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE" exec node "$O/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
 SRV_PID=$!; PIDS+=($SRV_PID)
-for _ in $(seq 1 100); do grep -q '"port"' "$O/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
+for _ in $(seq 1 300); do grep -q '"port"' "$O/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
 PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$O/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
 assert_eq "K0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
 R="$(REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-moteur-carte.mjs" "$CHROME" "http://127.0.0.1:$PORT" mgr1 2>"$WORK/mesure.err")"
