@@ -356,8 +356,9 @@ cat > "$AUX/tiroir.js" <<'JS'
   const SC = window.VibeFlow || window.Floorplan, pa = document.getElementById('panel');
   const att = async (f) => { for (let i = 0; i < 100; i++) { const v = f(); if (v) return v; await new Promise((r) => setTimeout(r, 50)); } return null; };
   const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  const posee = () => att(() => !pa.getAnimations({ subtree: true }).some((a) => a.playState === 'running') && (pa.getBoundingClientRect().width > 0)); // panneau posé : plus de transition en cours
   // panneau de référence : un panneau ouvert par SC.showPanel avec le gabarit commun (.sec), mesuré dans le même Chrome
-  SC.showPanel('<div class="sec"><h3>Référence</h3><p>x</p></div>'); await pause(700);
+  SC.showPanel('<div class="sec"><h3>Référence</h3><p>x</p></div>'); await posee();
   const refMarge = Math.round(pa.querySelector('.sec h3').getBoundingClientRect().left - pa.getBoundingClientRect().left);
   document.getElementById('vf-lock').click();
   const w = await att(() => pa.querySelector('.vf-whop'));
@@ -366,7 +367,7 @@ cat > "$AUX/tiroir.js" <<'JS'
   bouton.click();
   const zone = bouton.nextElementSibling;
   await att(() => !zone.hidden && zone.textContent);
-  await pause(700);
+  await posee();
   const tr = pa.getBoundingClientRect(), h3 = w.querySelector('h3'), hr = h3.getBoundingClientRect();
   const m = { vh: innerHeight, vw: innerWidth, refMarge, marge: Math.round(hr.left - tr.left), h3Dedans: hr.left >= tr.left && hr.right <= tr.right && hr.top >= tr.top,
     h3Rogne: h3.scrollWidth > h3.clientWidth + 1, debordeX: pa.scrollWidth > pa.clientWidth + 1, hauteur: Math.round(tr.height), doing: zone.textContent, overflowY: getComputedStyle(pa).overflowY, titre: h3.textContent + '|' + ((pa.querySelector('.aw-count') || {}).textContent || 'effectif absent') };
