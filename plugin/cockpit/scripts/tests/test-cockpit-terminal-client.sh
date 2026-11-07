@@ -81,7 +81,7 @@ globalThis.ResizeObserver = class { observe() {} };
 globalThis.requestAnimationFrame = () => 0;
 globalThis.FitAddon = { FitAddon: class { fit() {} } };
 globalThis.Terminal = class {
-  constructor() { this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; }
+  constructor() { this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; this.textarea = { addEventListener() {} }; }
   loadAddon() {} open() {} attachCustomKeyEventHandler() {} focus() {} write() {} paste() {} reset() {}
   onData(f) { onData = f; } onBinary(f) { onBinary = f; }
 };
@@ -120,7 +120,7 @@ globalThis.ResizeObserver = class { observe() {} };
 globalThis.requestAnimationFrame = () => 0;
 globalThis.FitAddon = { FitAddon: class { fit() {} } };
 globalThis.Terminal = class {
-  constructor() { this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; }
+  constructor() { this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; this.textarea = { addEventListener() {} }; }
   loadAddon() {} open() {} attachCustomKeyEventHandler() {} focus() {} write() {} paste() {} reset() {} resize() {} onData() {} onBinary() {}
 };
 const rep = (status, corps) => ({ status, ok: status >= 200 && status < 300, json: async () => corps, body: { getReader: () => ({ read: async () => ({ done: true }) }) } });

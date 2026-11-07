@@ -140,7 +140,7 @@ globalThis.ResizeObserver = class { observe() {} };
 globalThis.requestAnimationFrame = () => 0;
 globalThis.FitAddon = { FitAddon: class { fit() {} } };
 globalThis.Terminal = class {
-  constructor() { J.terms++; this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; }
+  constructor() { J.terms++; this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; this.textarea = { addEventListener() {} }; }
   loadAddon() {} open() {} attachCustomKeyEventHandler() {} focus() { J.focus++; } write() {} paste() {} reset() {} resize() {} onData() {} onBinary() {}
 };
 const realSI = globalThis.setInterval;

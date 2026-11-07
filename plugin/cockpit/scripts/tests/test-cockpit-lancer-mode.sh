@@ -154,7 +154,7 @@ globalThis.window = { top: {}, opener: null, innerWidth: 800, innerHeight: 600, 
 globalThis.document = { fonts: { load: () => Promise.resolve(), ready: Promise.resolve() }, getElementById: el, addEventListener() {} };
 globalThis.location = { hash: '', pathname: '/', search: '' }; globalThis.history = { replaceState() {} }; globalThis.ResizeObserver = class { observe() {} }; globalThis.requestAnimationFrame = () => 0;
 globalThis.FitAddon = { FitAddon: class { fit() {} } };
-globalThis.Terminal = class { constructor() { this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; } loadAddon() {} open() {} attachCustomKeyEventHandler() {} focus() {} write() {} paste() {} reset() {} resize() {} onData() {} onBinary() {} };
+globalThis.Terminal = class { constructor() { this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; this.textarea = { addEventListener() {} }; } loadAddon() {} open() {} attachCustomKeyEventHandler() {} focus() {} write() {} paste() {} reset() {} resize() {} onData() {} onBinary() {} };
 const realSI = globalThis.setInterval; globalThis.setInterval = (f, ms, ...a) => realSI(f, Math.max(5, Math.round(ms / 50)), ...a);
 const ligne = (m) => `claude --session-id '5b9c2e0a-7d41-4f3a-9c58-0e1d2f3a4b5c' -n 'vf-phase-72-alpha' ${m ? `--permission-mode '${m}' ` : ''}'/vf-dev Planifie la Phase 72 du compartiment alpha'`;
 const ID = (n) => ('p' + String(n)).padEnd(32, 'e');
