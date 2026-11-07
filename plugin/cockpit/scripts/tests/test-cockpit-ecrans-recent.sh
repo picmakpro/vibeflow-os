@@ -2,7 +2,7 @@
 # test-cockpit-ecrans-recent.sh — DG-02 (écran fantôme) et DG-03 (compteurs du travail récent), retours panel 2026-11-06.
 #   E1 une route citée dans un commentaire n'est pas une route (// et /* */), la vraie route reste lue (témoin positif)
 #   E2 la marque de taille n'est pas le résumé d'un écran (buildScreens)
-#   E3 aucun écran : le bouton reste et dit « No screen detected in this repository. » ; avec un écran, pas de message vide
+#   E3 aucun écran : aucun bouton Écrans (rien à proposer, l'en-tête ne s'élargit pas) ; avec un écran, le bouton et le menu
 #   E4 la marque de taille n'est pas la description d'une carte de fichier (extract.mjs)
 #   R1 le badge de Travail récent compte des cartes (un fichier touché par deux tâches = une carte)
 #   R2 le panneau d'une partie compte les mêmes cartes que la carte (viewer.html : une par carte)
@@ -52,10 +52,10 @@ const j = JSON.parse(process.argv[2]);
 console.log(new Function('j', 'return (' + process.argv[3] + ')')(j));
 JS
 q() { node "$WORK/j.mjs" "$1" "$2" 2>&1; }
-assert_eq "E3.1 sans écran : le bouton Screens est posé" "$(q "$J0" "j.buttons.map((b)=>b.id).join()")" "screens-btn"
-assert_eq "E3.2 sans écran : le menu dit qu'il n'y a aucun écran" "$(q "$J0" "j.menuOuvert.join('').includes('No screen detected in this repository.')")" "true"
+assert_eq "E3.1 sans écran : aucun bouton Screens dans l'en-tête" "$(q "$J0" "j.buttons.length")" "0"
+assert_eq "E3.2 un écran : le bouton Screens est posé" "$(q "$J1" "j.buttons.map((b)=>b.id).join()")" "screens-btn"
 assert_eq "E3.3 sans écran : pas de section « Screens 0 » dans le panneau" "$(q "$J0" "j.sections.filter((s)=>s.html).length")" "0"
-assert_eq "E3.4 un écran : le menu le liste, sans message vide" "$(q "$J1" "j.menuOuvert.join('').includes('/vraie/:id') && !j.menuOuvert.join('').includes('No screen detected')")" "true"
+assert_eq "E3.4 un écran : le menu le liste" "$(q "$J1" "j.menuOuvert.join('').includes('/vraie/:id')")" "true"
 
 echo "== R1/R2 comptes du travail récent =="
 JR="$(node "$H" "$MOTEUR/assets/ui/25-recent.js" "$FX/recent-doublons.json" 2>&1)"

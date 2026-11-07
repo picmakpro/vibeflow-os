@@ -7,6 +7,7 @@
   const G = SC.graph;
   // pages that only bounce you elsewhere have nothing behind them worth a board
   const screens = (G.screens || []).filter((s) => s && s.url && Array.isArray(s.behind) && s.behind.length && !(s.behind.length < 2 && /redirect/i.test(`${s.name} ${s.description}`)));
+  if (!screens.length) return;
   const { h } = SC;
 
   const style = document.createElement('style');
@@ -67,7 +68,7 @@
       for (const s of rows) html += `<button class="sc-r" data-sc="${h(s.id)}"><b>${h(s.name)}</b><span>${h(s.url)}</span></button>`;
       shown += rows.length;
     }
-    if (!shown) html = screens.length ? `<div class="sc-none">No screen matches “${h(q)}”.</div>` : '<div class="sc-none">No screen detected in this repository.</div>';
+    if (!shown) html = `<div class="sc-none">No screen matches “${h(q)}”.</div>`;
     const list = menu.querySelector('.sc-l');
     list.innerHTML = html;
     list.querySelectorAll('[data-sc]').forEach((b) => b.onclick = (ev) => { ev.stopPropagation(); showScreen(screens.find((s) => s.id === b.dataset.sc)); });
@@ -130,7 +131,7 @@
     if (on.length) html += `<div class="sec"><h3>Behind these screens <span class="c">${on.length}</span></h3><div class="list">${on.slice(0, 8).map((s) => row(s)).join('')}</div></div>`;
     return { html, bind: bindRows };
   });
-  SC.addPanelSection('overview', () => !screens.length ? null : ({
+  SC.addPanelSection('overview', () => ({
     html: `<div class="sec"><h3>Screens <span class="c">${screens.length}</span></h3><div class="list"><a class="row" data-sc-open><span class="dot" style="background:var(--n-ui)"></span><span class="rt"><div class="rn">Start from a screen</div><div class="rd">Pick a page of the app to see the parts on it, the requests it makes and the server code behind them.</div></span></a></div></div>`,
     bind: (el) => el?.querySelector('[data-sc-open]')?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); openMenu(); }),
   }));
