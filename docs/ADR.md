@@ -3285,7 +3285,14 @@ la PR sans perdre le filet là où il compte, c'est-à-dire sur `main`.
    partagées comme `chrome-session.mjs`, et `plugin/conductor/scripts/` quand un autre module l'appelle.
 3. **Hors carte, tout.** Un fichier qui n'entre dans aucune classe connue déclenche tout : on préfère
    jouer trop que trop peu. Un diff illisible joue tout aussi, avec un avertissement.
-4. **Mutants du guard de verrou.** Ils restent déclenchés par leur propre périmètre, `ci.yml` compris.
+4. **Mutants du guard de verrou, affinés par région.** Sur une PR qui touche `.github/workflows/ci.yml`, ils ne
+   se jouent que si son diff touche `GW_MODE`, `test-guard-driver-lock-ws`, ou les jobs `tests-mutants` /
+   `tests-shard`, délimités par des marqueurs de région dans `ci.yml`. Le calcul est fait par
+   `scripts/ci-mutants-perimetre.sh`, gardé par sa suite `scripts/tests/test-ci-mutants-perimetre.sh`. Un diff
+   illisible, ou des marqueurs absents ou mal formés, les jouent quand même ; le push sur `main` rejoue tout. Les
+   autres déclencheurs (guard, verrou, leur suite, `vf-portable.sh`, `workstream-policy.sh`) ne changent pas.
+   Arbitrage Samuel, AskUserQuestion session principale, 2026-11-07, option « Affiner par région ». Cela
+   remplace la formulation antérieure « toute PR qui touche `ci.yml` joue les mutants ».
 5. **Classe « docs seules ».** Une PR qui ne touche que `docs/`, `.planning/`, `.claude/agent-memory/` et
    les `.md` à la racine (`README.md`, `README.fr.md`, `CHANGELOG.md`, `DESIGN.md`) ne joue que le job des
    gates. Quand le diff touche des fichiers non-docs mais qu'aucune suite n'est retenue, le mode est `vide` :
@@ -3324,7 +3331,10 @@ n'a pas joué se lit dans le bloc « suites NON JOUÉES » du job « Suites de t
   les rattrape.
 - Limite connue : `plugin/_internal/tests/test-resolve-preset.sh` lit les `module.json` de tous les modules par une
   variable d'environnement, sans aucun motif de chemin. Toucher `plugin/<m>/module.json` ne la joue donc pas ;
-  le run complet de `main` la rattrape. La question est remontée à Samuel.
+  le run complet de `main` la rattrape. Arbitrage Samuel, AskUserQuestion session principale, 2026-11-07, option
+  « Non, main la rattrape » : `test-resolve-preset.sh` reste hors de la sélection et le sélecteur ne change pas.
+  Mesure qui fonde la décision : une contre-revue (2026-11-07) a ajouté une dépendance inexistante dans
+  `plugin/kpi-analyst/module.json` ; les 11 suites non jouées sont restées vertes, `test-resolve-preset` comprise.
 - Si l'API des étiquettes est illisible, la CI joue tout (pas de repli sur le payload de l'événement).
 
 ### Gardes et limite de fond
