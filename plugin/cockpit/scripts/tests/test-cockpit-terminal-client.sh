@@ -239,6 +239,7 @@ await executer(chrome, async (s) => {
       // DG-08 : un cadre qui se reconnecte à un shell déjà ouvert, à une AUTRE taille, dit sa taille : le terminal la reprend (stty size) ; sinon le shell dessine pour une grille que l'écran n'a pas
       await s.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
       await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
+      await q.ev(`localStorage.setItem('vf.terminal.accueil', '1')`); // la phrase d'accueil (LB3-S2 : dans la colonne) rétrécirait le terminal et ferait redire la taille au second cadre : elle masquerait ce que ce scénario mesure ; elle est rangée avant (son propre témoin : LB.V20)
       await q.ev(`(() => { const f0 = window.fetch; window.fetch = function (u) { if (String(u) === '/taille') return Promise.resolve(new Response(null, { status: 204 })); return f0.apply(this, arguments); }; })()`); // le premier cadre ne dit plus sa taille : le terminal garde celle de sa création
       await s.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 400, deviceScaleFactor: 1, mobile: false });
       await essai('reconnexion', async () => { await q.naviguer(); await att(INVITE, 'invite après la reconnexion'); });
