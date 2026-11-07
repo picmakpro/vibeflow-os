@@ -214,10 +214,13 @@ await executer(chrome, async (s) => {
     const avant = await s.ev("({ selection: window.VibeFlow.state.selected, hash: location.hash })");
     await s.ev(process.env.EK_FOCUS === 'bouton' ? "document.querySelector('#vf-lock').focus()" : "(document.querySelector('.vf-whop [data-vf-doing]') || document.querySelector('.vf-whop .aw-head')).focus()");
     const place = await s.ev("(() => { const a = document.activeElement; return { tag: a.tagName, id: a.id || '', dansTiroir: !!a.closest('#panel') }; })()");
+    // PU-G-175 : le viewer ne lève plus la sélection quand le focus est dans un contrôle ; l'arrêt de la propagation se lit donc sur un écouteur de fenêtre (le viewer écoute là), non plus sur la sélection
+    await s.ev("(() => { window.__escRemonte = false; window.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.__escRemonte = true; }); })()");
     await touche('Escape', 'Escape', 27);
     const ferme = await s.attendre("document.body.classList.contains('no-panel')", 'tiroir fermé par Échap', 4000).then(() => true, () => false);
     const apres = await s.stable("(() => { const a = document.activeElement, b = document.querySelector('#vf-lock'); return { selection: window.VibeFlow.state.selected, hash: location.hash, actif: a ? a.id || a.tagName : null, expanded: b.getAttribute('aria-expanded'), ferme: document.body.classList.contains('no-panel') }; })()", 'état après Échap');
-    return { ferme0, ouvert, avant, place, ferme, apres };
+    const remonte = await s.ev('window.__escRemonte');
+    return { ferme0, ouvert, avant, place, ferme, apres, remonte };
   }
   if (ACTION === 'un-lateral') { // (EK16, PU-G-203) un seul tiroir latéral sous 1280 px ; les deux à 1280 px et au-delà
     await s.send('Emulation.setDeviceMetricsOverride', { width: +process.env.EK_LARGEUR, height: 800, deviceScaleFactor: 1, mobile: false });
