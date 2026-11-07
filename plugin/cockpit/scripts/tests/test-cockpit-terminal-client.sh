@@ -151,7 +151,7 @@ cat > "$AUX/chrome-client.mjs" <<'JS'
 // chrome-client.mjs <chrome> <mode> <json> : scénarios navigateur du client de Q ; UNE ligne JSON. Modes : t6 · cadre · tierce.
 // Chaque étape est isolée (essai) : une mesure indisponible est nommée dans `erreurs`, jamais un résultat vide. Amorçage et secret sont masqués en sortie.
 import { pathToFileURL } from 'node:url'; import { execFileSync } from 'node:child_process'; import fs from 'node:fs';
-const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, AMORCE } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv;
 const { P, Q, amorce, tierce, secret: secretN = '', pid: pidN = 0, fichier = '', octets = 0 } = JSON.parse(brut);
 const OP = `http://127.0.0.1:${P}`, OQ = `http://127.0.0.1:${Q}`, MS = Number(process.env.VF_CLIENT_MS) || 20000;
@@ -331,7 +331,7 @@ await executer(chrome, async (s) => {
   await essai('amorcage', async () => {
     await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `if (window.top === window) { window.__prets = []; addEventListener('message', (e) => { if (typeof e.data === 'string') window.__prets.push(e.data); }); }` });
     await s.naviguer(`${OP}/project.html#t=${amorce}`);
-    await att(`window.__prets.includes('ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)');
+    await s.attendre(`window.__prets.includes('ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)', process.env.VF_CLIENT_MS ? MS : Math.max(MS, AMORCE)); // amorçage : borné par l'échéance globale (par défaut), sauf VF_CLIENT_MS posée explicitement (mutants à 6 s)
   });
   r.cadre1 = await cadreQ().catch(() => null);
   r.adresse1 = await s.ev('location.href').catch(() => '?');
@@ -599,23 +599,23 @@ assert_eq "T9.6 — page tierce (autre port) qui encadre Q : une violation frame
 
 echo "=== M-COOKIE / M-FRAGMENT / M-STOCKAGE / M-PREMIER-NIVEAU / M-SANS-AMORCE / M-ANCETRES — mutants jouées en navigateur ==="
 if mutant cookie vf-cockpit-terminal-client.mjs "s|localStorage.setItem(CLE_SECRET, secret);|localStorage.setItem(CLE_SECRET, secret); document.cookie = 'vfs=' + secret + '; path=/';|"; then
-  run_t6 "$MUT_OUT"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_has "M-COOKIE — le mutant rougit T6.2 : un cookie existe" "$(rj "$T6J" 'j.cookieQ')" "vfs="
 else sans_effet "M-COOKIE"; fi
 if mutant fragment vf-cockpit-terminal-client.mjs "s|history.replaceState(null, '', location.pathname + location.search);||"; then
-  run_t6 "$MUT_OUT"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_eq "M-FRAGMENT — le mutant rougit T6.1b : l'échange refusé laisse #t= dans l'adresse de Q" "$(rj "$T6J" 'j.refus.hash.slice(0,3)')" "#t="
 else sans_effet "M-FRAGMENT"; fi
 if mutant premier vf-cockpit-terminal-client.mjs "s|^    if (!encadree) { vue.carte('horscadre'); return; }||"; then
-  run_t6 "$MUT_OUT"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_eq "M-PREMIER-NIVEAU — le mutant (SAF-1 défait : l'échange refait au premier niveau de Q) rougit T6.9 : un secret est rangé par Q ouvert seul" "$(rj "$T6J" '(j.q1||{}).secret')" "range"
 else sans_effet "M-PREMIER-NIVEAU"; fi
 if mutant sansamorce vf-cockpit-terminal-tiroir.mjs "s|adresse + '#t=' + amorce|adresse|"; then
-  run_t6 "$MUT_OUT"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_eq "M-SANS-AMORCE — le mutant (l'amorçage n'est plus passé dans l'adresse du cadre de Q) rougit T6.3 : le cadre n'échange rien, aucun secret n'est rangé" "$(rj "$T6J" 'j.secretOk?"oui":"non"')" "non"
 else sans_effet "M-SANS-AMORCE"; fi
 if mutant stockage vf-cockpit-terminal-client.mjs "s|location.replace(location.pathname + location.search)|location.replace(location.pathname + '?s=' + secret)|"; then
-  run_t6 "$MUT_OUT"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_has "M-STOCKAGE — le mutant rougit T6.1c : le secret figure dans l'adresse du cadre de Q" "$(rj "$T6J" '(j.cadre1||{}).url')" "?s="
 else sans_effet "M-STOCKAGE"; fi
 if mutant ancetres vf-cockpit-terminal-page.mjs 's|frame-ancestors \${origineP}|frame-ancestors *|'; then
