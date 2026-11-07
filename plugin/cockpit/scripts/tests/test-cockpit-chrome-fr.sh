@@ -253,7 +253,7 @@ printf -- '---\nmilestone: v1\nstatus: ready_to_plan\ncurrent_phase: 1\ncurrent_
 node "$SCRIPTS/vf-cockpit-build.mjs" "$L9" --quiet >/dev/null 2>&1 || { echo "assemblage F9 impossible"; exit 1; }
 perl -e 'alarm 300; exec @ARGV' node "$SCRIPTS/tests/chrome-statut.mjs" "$CHROME" "file://$L9/.vibeflow/cockpit/project.html" > "$WORK/f9.json" 2>/dev/null
 assert_eq "F9.1 : aucun texte visible de la page Projet ne porte « ready_to_plan »" "$(lire "$WORK/f9.json" '(j.erreur||j.visibles)')" "[]"
-assert_eq "F9.2 : sous-titre et pastille en français" "$(lire "$WORK/f9.json" '[j.sousTitre, j.pastille]')" '["Phase 1, 0 phase faite sur 1.","prête à planifier"]'
+assert_eq "F9.2 : sous-titre et pastille en français" "$(lire "$WORK/f9.json" '[j.sousTitre, j.pastille]')" '["Phase 1, 0 phase faite sur 1.","À faire"]'
 # F10 : N2 (P68-D-38) — le tiroir « Au travail » dit « dépôt » (serveur réel, flux `who` simulé)
 export VF_COCKPIT_PORT_BASE=$((30000 + (RANDOM * 11) % 30000))
 U10="$(node "$SCRIPTS/vf-cockpit.mjs" open --no-open --lab "$L9" 2>/dev/null | sed -En 's#^Cockpit : (http://127\.0\.0\.1:[0-9]+)/ .*#\1/project.html#p' | head -1)"
