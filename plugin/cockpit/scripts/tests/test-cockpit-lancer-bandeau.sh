@@ -391,7 +391,8 @@ const retours = () => { try { return (fs.readFileSync(`${run}/entree.log`, 'utf8
 await executer(chrome, async (s) => {
   const q = facadeQ(s), r = { erreurs }; let vu = false; // vu : le bandeau s'est affiché au moins une fois (témoin positif des sondes négatives E4 et E7)
   await s.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
-  const centre = (expr) => q.ev(`(() => { const e = ${expr}; if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+  const lireCentre = (expr) => q.ev(`(() => { const e = ${expr}; if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+  const centre = async (expr) => { let c = await lireCentre(expr); for (const fin = Date.now() + 2000; c && Date.now() < fin;) { await new Promise((r) => setTimeout(r, 120)); const c2 = await lireCentre(expr); if (c2 && c2.x === c.x && c2.y === c.y) break; c = c2; } return c; }; // la position se lit une fois posée : un bandeau qui vient de monter bouge encore (défilement, accueil retiré) et un geste visé trop tôt tombe à côté (LB.V15 c, CI Linux, run 42392202936)
   const clic = async (expr) => {
     const c = await centre(expr); if (!c) throw new Error('élément introuvable : ' + expr.slice(0, 60));
     await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c.x, y: c.y });
