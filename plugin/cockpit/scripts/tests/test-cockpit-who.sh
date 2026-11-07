@@ -356,7 +356,7 @@ cat > "$AUX/tiroir.js" <<'JS'
   const SC = window.VibeFlow || window.Floorplan, pa = document.getElementById('panel');
   const att = async (f) => { for (let i = 0; i < 100; i++) { const v = f(); if (v) return v; await new Promise((r) => setTimeout(r, 50)); } return null; };
   const pause = (ms) => new Promise((r) => setTimeout(r, ms));
-  const posee = () => att(() => !pa.getAnimations({ subtree: true }).some((a) => a.playState === 'running') && (pa.getBoundingClientRect().width > 0)); // panneau posé : plus de transition en cours
+  const posee = () => att(() => !pa.getAnimations({ subtree: true }).some((a) => a.playState === 'running' && a.effect.getComputedTiming().iterations !== Infinity) && (pa.getBoundingClientRect().width > 0)); // panneau posé : plus de transition finie en cours (les animations infinies, ex. .aw-pulse, ne se posent jamais : filtrées)
   // panneau de référence : un panneau ouvert par SC.showPanel avec le gabarit commun (.sec), mesuré dans le même Chrome
   SC.showPanel('<div class="sec"><h3>Référence</h3><p>x</p></div>'); await posee();
   const refMarge = Math.round(pa.querySelector('.sec h3').getBoundingClientRect().left - pa.getBoundingClientRect().left);
