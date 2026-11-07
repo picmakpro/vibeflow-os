@@ -44,6 +44,7 @@
 | ADR-074 | 2026-09-23 | Portée des gates : bloquant pour l'intégrité technique, consultatif pour le jugement métier | Validée |
 | ADR-076 | 2026-09-30 | Sobriété de méthode : ce qu'on crée, on le range — un ajout, un retrait ; archiver est un déplacement tracé, pas une correction (précision d'ADR-031) | Validée |
 | ADR-077 | 2026-10-16 | Agentique first, ouvert à la collaboration humaine — un poste est une vue, pas un droit | Validée |
+| ADR-078 | 2026-11-07 | CI sélective : la PR joue les suites des zones touchées, main rejoue tout — ce qu'une PR verte prouve, et ce qu'elle ne prouve pas | Validée (classe « docs seules » provisoire) |
 
 > **`ADR-065` : numéro non attribué** — constaté le 2026-08-04. Le registre saute de `ADR-064` à
 > `ADR-066` ; aucune décision ne porte ce numéro et aucune n'a été retirée. Un registre qui saute
@@ -3248,3 +3249,70 @@ ouvert à ce poste) pose superpowers, qui apporte aussi des skills orientés dev
 est une vue, pas un droit. Une « commande dev » désigne les skills et agents des trois modules
 `roles:["dev"]` plus gsd-* ; superpowers n'en fait pas partie. Les ADR sont immuables hors amendement daté :
 celui-ci précise P58-D-06, il ne réécrit pas la décision.
+
+## ADR-078 : CI sélective — la PR joue les suites des zones touchées, main rejoue tout
+
+**Date** : 2026-11-07 · **Statut** : Validée (la classe « docs seules » est provisoire, voir Décision 5) ·
+**Décideur** : Samuel · **Voisines** : ADR-072 (gardes in-repo, même limite de fond), ADR-074 (portée
+des gates), ADR-073 (une release publie une évolution fonctionnelle).
+Arbitrages de doctrine, trois : arbitrage Samuel, AskUserQuestion session principale, 2026-11-07
+(« PR sélective, main complète » ; « Module + dépendances citées » ; découpage de
+`test-cockpit-projet.sh`, « Oui, découper projet »).
+Origine : Phase 65, durée de la CI (arbitrage Samuel, message session principale, 2026-10-29 : « on corrige le maximum »).
+
+### Contexte
+
+Chaque PR rejouait la découverte complète des suites, quelle que soit la zone touchée : une
+correction de texte payait le prix de toute la batterie. La durée de la CI freinait l'enchaînement
+des PR et poussait à relancer à la main des runs rouges pour cause de charge. Il faut jouer moins sur
+la PR sans perdre le filet là où il compte, c'est-à-dire sur `main`.
+
+### Décision
+
+1. **« PR sélective, main complète ».** Une PR ne joue que les suites des zones qu'elle touche, plus
+   les gates. Un push sur `main` rejoue toute la découverte. Un label `ci: complet` posé sur une PR
+   force le run complet. Le label est lu par l'API au moment du run : le poser ne relance rien, il faut
+   relancer le run ou pousser un commit.
+2. **La carte : « module + dépendances citées ».** Un fichier touché sous `plugin/<module>/` joue les
+   suites de ce module, plus toute suite du dépôt qui cite un chemin touché (le chemin, ou le nom de
+   fichier quand la suite le compose). Un nom de fichier ambigu (`VERSION`, `SKILL.md`,
+   `module.json`) ne compte comme citation que si la suite cite aussi son dossier. Un fichier partagé
+   joue tout : `plugin/_internal/`, `scripts/`, `.github/workflows/ci.yml`, les bibliothèques de test
+   partagées comme `chrome-session.mjs`, et `plugin/conductor/scripts/` quand un autre module l'appelle.
+3. **Hors carte, tout.** Un fichier qui n'entre dans aucune classe connue déclenche tout : on préfère
+   jouer trop que trop peu. Un diff illisible joue tout aussi, avec un avertissement.
+4. **Mutants du guard de verrou.** Ils restent déclenchés par leur propre périmètre, `ci.yml` compris.
+5. **Classe « docs seules » (provisoire, en attente de confirmation de Samuel).** Une PR qui ne touche
+   que `docs/`, `.planning/`, `.claude/agent-memory/` et les `*.md` hors de `plugin/` ne joue que le
+   job des gates. Un `.md` sous `plugin/<module>/` (agent, `SKILL.md`) suit la règle module, parce que
+   des suites le lisent. Cette précision n'est pas arbitrée.
+6. **Shards.** Les suites de plus de 600 s ont un shard réservé, le reste est réparti par LPT sur les
+   durées mesurées sur le runner. `test-cockpit-projet.sh` est découpée sur la branche
+   `feat/sondes-stables`, pas ici.
+7. **Preuve que la sélection est complète.** Le job requis « Suites de tests (découverte non vide) »
+   vérifie que l'union des shards est la liste sélectionnée, et imprime les suites JOUÉES et NON JOUÉES
+   avec leur motif, dans son log et dans le résumé du run.
+
+Implémentation : `scripts/ci-suites-perimetre.sh` (sélecteur : `jouee` ou `ecartee`, motif, mode
+`tout`, `selection`, `docs-seules` ou `vide`) et `scripts/ci-shard-suites.sh` (répartition), appelés
+par le job `changes` de `.github/workflows/ci.yml`.
+
+### Ce qu'une PR verte prouve, et ce qu'elle ne prouve pas
+
+Elle prouve : les suites des zones touchées et les gates passent. Elle ne prouve pas : que la
+découverte complète passe. Seul le push sur `main` (ou le label `ci: complet`) la rejoue. Ce que la PR
+n'a pas joué se lit dans le bloc « suites NON JOUÉES » du job « Suites de tests (découverte non vide) ».
+
+### Risques
+
+- Une suite qui lit un fichier par un chemin calculé, donc non greppable, peut être écartée à tort.
+- Un rouge peut arriver sur `main` après un merge vert ; il se traite par une PR de suite, pas par un
+  retour en arrière automatique.
+- La classe « docs seules » écarte les suites qui lisent la doc réelle : une dizaine lisent `docs/` ou
+  `.planning/` (mesure du 2026-10-29). Le run de `main` les rattrape.
+
+### Gardes et limite de fond
+
+Une PR qui modifie le sélecteur touche `scripts/`, donc joue tout. Mais le sélecteur vit dans le
+dépôt : la PR qu'il juge peut le modifier. C'est la même limite de fond qu'ADR-072 : il rend visible
+ce qui est joué ou non, il ne verrouille rien.

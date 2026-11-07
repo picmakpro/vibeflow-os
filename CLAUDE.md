@@ -125,6 +125,8 @@ section précédente (ADR-072).
 - `scripts/check-push-sans-pr.sh` (G-3) : alarme après coup, un commit arrivé sur `main` sans PR
   associée — quand elle rougit, le commit est déjà sur `main`.
 
+**CI sélective** (ADR-078) : une PR verte prouve les suites des zones touchées plus les gates, pas la découverte complète, que seul le push sur `main` rejoue (ou le label `ci: complet`). Ce qu'elle n'a pas joué se lit dans le job « Suites de tests (découverte non vide) », bloc « suites NON JOUÉES » de son log et résumé du run.
+
 **Marqueur** : tout commit qui touche un gate, sa suite, les fixtures de ces suites, le workflow CI ou un hook porte un trailer
 `Gate-Touche: <chemin-ou-motif> — <raison>`. Déclaratif — forme et présence vérifiées, jamais la
 véracité de la raison — de portée branche : un commit ultérieur peut couvrir un chemin touché plus
