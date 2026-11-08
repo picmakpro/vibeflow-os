@@ -593,6 +593,25 @@ JS
     R="$(cdp "$AUX/h7-nom.js" "$BASE" "$pg" 2>&1 | tail -1)"
     assert_eq "H7.1b — $pg, polices déjà prêtes avant les scripts d'extension (Linux, CI) : le panneau dit « depot » (le dépôt principal), sans le nom du worktree (wt-p, mesuré par j.pt) ni suffixe « — Projet »" "$(jq_ "$R" '[j.nom, j.pt.join("+"), j.panneauWt, j.suffixe].join("|")' 2>/dev/null)" "depot|depot|false|false"
   done
+  # H7.1c (K5-2, même cause que H7.1b) : sous la même condition, `ready` partait avant les scripts d'extension, donc avant l'écouteur `SC.on('ready', arriver)` de ui/00-vibeflow.js : une arrivée par lien profond `#r=<id>` ne révélait plus la carte visée. La carte (d-src, le seul nœud du lab) doit être sélectionnée.
+  cat > "$AUX/h7-arrivee.js" <<'JS'
+const [base, page, cible] = ARGS;
+const { stabiliser } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
+await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+await s.naviguer(base + page + '#r=' + encodeURIComponent(cible));
+await s.attendre(`document.readyState === 'complete' && !!window.VibeFlow && !!document.querySelector('#panel .pt')`, 'page et panneau rendus');
+return await stabiliser(() => s.ev(`({ selection: window.VibeFlow.state.selected, existe: window.VibeFlow.exists(${JSON.stringify(cible)}), toast: (document.querySelector('.toast, #toast')?.textContent || '') })`), { max: 10000 }); // mesure posée (deux relevés identiques)
+JS
+  R="$(cdp "$AUX/h7-arrivee.js" "$BASE" / "n:d-src" 2>&1 | tail -1)"
+  assert_eq "H7.1c — polices déjà prêtes avant les scripts d'extension : l'arrivée par #r=n:d-src sélectionne la carte visée (nœud présent, aucun toast « Pas sur cette carte »)" "$(jq_ "$R" '[j.selection, j.existe, /Pas sur cette carte/.test(j.toast)].join("|")' 2>/dev/null)" "n:d-src|true|false"
+  # M-ARRIVER : l'écouteur `ready` de l'arrivée par lien profond est débranché -> H7.1c rougit (le témoin peut rougir ; la promesse « #r= révèle la carte » ne tient que par cet écouteur à la première arrivée)
+  MA="$(mkmod marriver)"
+  mutate "$MA/../skills/cockpit-moteur/assets/viewer.html" "const fontsReady = document.fonts?.ready ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();" "const fontsReady = Promise.resolve();" || echo "  ❌ FAIL — M-ARRIVER : mutation impossible" >&2
+  mutate "$MA/../skills/cockpit-moteur/assets/ui/00-vibeflow.js" "SC.on('ready', arriver);" "void 0;" || echo "  ❌ FAIL — M-ARRIVER : mutation impossible (00-vibeflow.js)" >&2
+  stop_srv
+  ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WTP" "$MA"; BASE="http://127.0.0.1:$PORT"
+  R="$(cdp "$AUX/h7-arrivee.js" "$BASE" / "n:d-src" 2>&1 | tail -1)"
+  assert_eq "M-ARRIVER — mutant (écouteur de l'arrivée par #r= débranché) : la carte visée n'est plus sélectionnée, H7.1c rougit" "$(jq_ "$R" '[j.selection === "n:d-src", j.existe].join("|")' 2>/dev/null)" "false|true"
   stop_srv
 
   echo "=== Mutants ==="
