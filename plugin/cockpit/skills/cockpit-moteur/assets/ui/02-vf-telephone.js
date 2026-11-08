@@ -194,6 +194,8 @@
       const git = window.VFGitTiroir; if (git && git.ouvert()) git.fermer(true); // P4 : le tiroir Git (z 7) recouvrirait le panneau (z 5) ; un seul latéral à la fois, comme « Au travail » sous 1 280 px (73-vf-tiroir-travail.js)
       if (g && g.clavier) { panel.tabIndex = -1; panel.focus({ preventScroll: true }); versPanneau = true; }
     });
+    // P4 bis : la règle est symétrique, la dernière surface ouverte l'emporte. Git s'ouvre (touche g, ligne ou ouvreur) pendant que le panneau est ouvert : le panneau se replie, la sélection est gardée, la préférence n'est pas écrite ; il ne se rouvre pas à la fermeture de Git
+    window.addEventListener('vf-git:etat', (e) => { if (e.detail && e.detail.ouvert && mi.matches && ouvert() && !panel.querySelector(':scope > .vf-whop')) sansTrace(() => bascule(false)); });
     new MutationObserver(() => {
       const o = ouvert(); if (o === etaitOuvert) return; etaitOuvert = o;
       if (o || !mi.matches || panel.querySelector(':scope > .vf-whop')) { if (o) return; retour = null; return; }

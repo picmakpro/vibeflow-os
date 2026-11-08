@@ -88,6 +88,24 @@ await executer(chrome, async (s) => {
   }
   out.p4 = p4.join('|');
 
+  // P4 bis : le panneau est ouvert par une sélection, puis Git s'ouvre (touche g réelle, puis clic réel sur l'ouvreur) : le panneau se replie, la sélection reste, la préférence n'est pas écrite, et il ne se rouvre pas quand Git se referme
+  const p4b = [];
+  for (const [w, via] of [[768, 'touche'], [999, 'clic']]) {
+    await vider(); await charger(w);
+    await clicCarte(); await attendreOuvert(true);
+    const sel = await s.ev('JSON.stringify(window.VibeFlow.state.selected ?? null)');
+    await s.ev('document.activeElement && document.activeElement.blur()');
+    if (via === 'touche') await touche(s, 'g');
+    else { const c = await s.ev(CENTRE("[document.getElementById('vf-git-ouvreur'), document.getElementById('vf-git-ligne')].find((e) => e && e.getBoundingClientRect().width > 0)")); if (!c) throw new Error('aucun ouvreur Git visible'); await clic(s, c.x, c.y); }
+    await s.attendre('window.VFGitTiroir.ouvert()', 'tiroir Git ouvert');
+    const ferme = await attendreOuvert(false);
+    const garde = (await s.ev('JSON.stringify(window.VibeFlow.state.selected ?? null)')) === sel;
+    const mem = await s.ev(STORE);
+    await s.ev('document.activeElement && document.activeElement.blur()'); await touche(s, 'g'); await s.attendre('!window.VFGitTiroir.ouvert()', 'tiroir Git refermé'); await pause(500);
+    p4b.push([w, via, ferme, garde, mem, await ouvert()].join(':'));
+  }
+  out.p4b = p4b.join('|');
+
   // S7 : la sélection est choisie à la souris, Échap (focus au corps de la page) referme le panneau, la sélection reste
   await vider(); await charger(768);
   await clicCarte(); await attendreOuvert(true);

@@ -541,6 +541,7 @@ r15c_mutant p1 "sansMemoire && k === 'panel' ? undefined : ecrire(k, v)" "ecrire
 r15c_mutant p2 "panel.focus({ preventScroll: true }); versPanneau = true; }" "panel.focus({ preventScroll: true }); }"
 r15c_mutant p3 "if (!change && !g) return;" ""
 r15c_mutant p4 "git.fermer(true); // P4" "void 0; // P4"
+r15c_mutant p4b "if (e.detail && e.detail.ouvert && mi.matches && ouvert()" "if (false && mi.matches && ouvert()"
 r15c_mutant s7 "ev.stopPropagation(); ev.preventDefault(); sansTrace(() => bascule(false));" "ev.preventDefault(); sansTrace(() => bascule(false));"
 [ "${#R15C_PIDS[@]}" -gt 0 ] && wait "${R15C_PIDS[@]}"
 for i in "${!R15C_SRV[@]}"; do SRV_PID="${R15C_SRV[$i]}"; unsrv; done
@@ -581,11 +582,12 @@ assert_eq "R15.7 — Projet / 768 px : un choix au clavier (Entrée) ouvre le pa
 assert_eq "R15.8 — Projet / 768 px : Échap referme le panneau (témoin : il s'était ouvert, R15.6) ET garde la sélection (S7, revue du 2026-11-08 : le viewer n'entend pas cet Échap, il n'efface pas la sélection ; l'Échap vise le corps de la page, comme au clavier sans focus)" "$(mv_ "$WORK/r15t-echap.json" 'j.mesures["768"].m.tiroir+"|"+j.mesures["768"].m.selection')" "false|true"
 assert_eq "R15.9 — Projet / 768 px : le bouton « Détail » referme le panneau" "$(mv_ "$WORK/r15t-bouton.json" 'j.mesures["768"].m.tiroir')" "false"
 assert_eq "R15.10 — Projet / 768 px : un rendu de plus sur la même sélection (flux en direct) ne rouvre pas le panneau refermé" "$(mv_ "$WORK/r15t-referme.json" 'j.mesures["768"].m.tiroir')" "false"
-SAIN_P1="true|aucune|false|aucune|false|true|vf-cockpit:panel=false"; SAIN_P2="true|true|true|true"; SAIN_P3="false|true"; SAIN_P4="768:true:false|999:true:false"; SAIN_S7="true|false|true"
+SAIN_P1="true|aucune|false|aucune|false|true|vf-cockpit:panel=false"; SAIN_P2="true|true|true|true"; SAIN_P3="false|true"; SAIN_P4="768:true:false|999:true:false"; SAIN_S7="true|false|true"; SAIN_P4B="768:touche:false:true:aucune:false|999:clic:false:true:aucune:false"
 assert_eq "R15c.1 — P1 : à 768 px, choisir une carte puis Échap n'écrivent PAS la préférence du panneau (aucune clé) ; le rechargement à 768 px le retrouve fermé, à 1 440 px ouvert (défaut du bureau) ; « Détail » l'écrit bien (témoin : la clé existe, false)" "$(mv_ "$WORK/r15c.json" 'j.p1')" "$SAIN_P1"
 assert_eq "R15c.2 — P2 : par la palette au clavier réel (/, saisie, Entrée) le panneau s'ouvre et le focus y entre, y compris une fois le recentrage de la carte terminé" "$(mv_ "$WORK/r15c.json" 'j.p2')" "$SAIN_P2"
 assert_eq "R15c.3 — P3 : fermé par « Détail » à la souris, un rendu de la MÊME sélection 150 ms plus tard ne rouvre pas le panneau (false) ; choisir une autre carte le rouvre (témoin : true)" "$(mv_ "$WORK/r15c.json" 'j.p3')" "$SAIN_P3"
 assert_eq "R15c.4 — P4 : à 768 et à 999 px, une sélection avec le tiroir Git ouvert ouvre le panneau (témoin : true) et replie le tiroir Git (false)" "$(mv_ "$WORK/r15c.json" 'j.p4')" "$SAIN_P4"
+assert_eq "R15c.6 — P4 bis : à 768 px (touche g réelle) puis 999 px (clic réel sur l'ouvreur), ouvrir Git avec le panneau ouvert replie le panneau, garde la sélection, n'écrit pas la préférence, et le panneau ne se rouvre pas à la fermeture de Git" "$(mv_ "$WORK/r15c.json" 'j.p4b')" "$SAIN_P4B"
 assert_eq "R15c.5 — S7 : un Échap réel (focus au corps de la page) referme le panneau et la sélection reste (témoin : elle existait avant)" "$(mv_ "$WORK/r15c.json" 'j.s7')" "$SAIN_S7"
 for i in "${!R15C_ID[@]}"; do
   n="${R15C_ID[$i]}"; v="$(mv_ "$WORK/mut-r15c-$n.json" "j.$n")"; eval "sain=\$SAIN_$(printf %s "$n" | tr a-z A-Z)"; echo "     trace du mutant $n : $v"
