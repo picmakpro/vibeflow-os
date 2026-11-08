@@ -338,6 +338,12 @@ assert_eq "Q19.3 — L1 : compteur voisin, 2 exigences -> « 2 exigences pour »
 H locg "$SCRIPTS" "$WORK/q18g.json" "Quelles sont les exigences de la phase 1 ?" > "$WORK/q19d.json"
 assert_eq "Q19.4 — L1 : compteur voisin, 1 exigence -> « 1 exigence pour »" "$(H json "$WORK/q19d.json" "j.answer.startsWith('1 exigence pour')")" "true"
 
+# Q19.5 à Q19.6 — L2 (même arbitrage, § 10) : la pastille de relance d'une phase dit « dans la Phase 2 ? » avec l'article ; un jalon garde sa forme
+H locg "$SCRIPTS" "$WORK/q19-1.json" "Que contient la phase 2 ?" > "$WORK/q19e.json"
+assert_eq "Q19.5 — L2 : relances d'une phase -> « Qu'est-ce qui reste dans la Phase 2 ? » et « Qu'est-ce qui bloque dans la Phase 2 ? »" "$(H json "$WORK/q19e.json" "j.followups.includes(\"Qu'est-ce qui reste dans la Phase 2 ?\") && j.followups.includes(\"Qu'est-ce qui bloque dans la Phase 2 ?\")")" "true"
+H locg "$SCRIPTS" "$WORK/q19-1.json" "Qu'est-ce qui reste dans le jalon v2 ?" > "$WORK/q19f.json"
+assert_eq "Q19.6 — L2 : témoin, la relance d'un jalon reste « dans v2 » (pas d'article inventé)" "$(H json "$WORK/q19f.json" "j.followups.includes(\"Qu'est-ce qui bloque dans v2 ?\")")" "true"
+
 vf_hyg_assert
 echo ""
 echo "=================================="

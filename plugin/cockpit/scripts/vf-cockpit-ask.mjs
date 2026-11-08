@@ -23,6 +23,8 @@ const etat = (x) => {
 };
 // accord réel (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3da818fe)) : « 1 bloqué », « 4 bloqués », jamais « bloqué(s) » ; même règle que le panneau (ui/00-vibeflow.js)
 const pl = (n, un, plus) => (n > 1 ? plus : un);
+// « dans la Phase 72 ? » : l'article devant un nom de phase ; un jalon ou une autre carte garde sa forme
+const dans = (label) => (/^Phase\b/.test(label) ? `dans la ${label}` : `dans ${label}`);
 const fold = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 export function projectIndex(G) {
@@ -120,7 +122,7 @@ export function answerLocally(G, question) {
     }
     const xs = (t ? I.under(t.id) : pool).filter((x) => x !== t && (x.st === 'todo' || x.st === 'active') && (x.id ? x.kind === 'phase' || /^dag-/.test(x.id) : !x.p.startsWith('req/') || /^ph-/.test(t?.id || '')));
     return answer(`Reste${t ? ' · ' + I.label(t).split(' · ')[0] : ''}`, `${xs.length} à finir dans [[${I.ref(t)}]]${t?.foot ? ` (${t.foot})` : ''} :\n${xs.slice(0, 12).map((x) => line(I, x)).join('\n')}${xs.length > 12 ? `\n- … et ${xs.length - 12} ${pl(xs.length - 12, 'autre', 'autres')}` : ''}`,
-      [item(I, t), ...xs.map((x) => item(I, x))], xs[0] ? [`Qu'est-ce qui bloque dans ${I.label(t).split(' · ')[0]} ?`] : []);
+      [item(I, t), ...xs.map((x) => item(I, x))], xs[0] ? [`Qu'est-ce qui bloque ${dans(I.label(t).split(' · ')[0])} ?`] : []);
   }
   if (/exigence/.test(q) && phase) {
     const xs = I.files.get(phase.id + '.req') || [];
@@ -130,7 +132,7 @@ export function answerLocally(G, question) {
     const sub = I.under(target.id).filter((x) => x !== target);
     const direct = [...(I.kids.get(target.id) || []), ...(I.files.get(target.id) || [])];
     return answer(I.label(target).split(' · ')[0], `[[${I.ref(target)}]] · ${etat(target)}.\n\n${target.summary || ''}\n\nContenu : ${sub.length ? count(sub) : 'rien encore (pas de plan)'}.\n${direct.slice(0, 10).map((x) => line(I, x)).join('\n')}`,
-      [item(I, target), ...direct.map((x) => item(I, x))], [`Qu'est-ce qui reste dans ${I.label(target).split(' · ')[0]} ?`, `Qu'est-ce qui bloque dans ${I.label(target).split(' · ')[0]} ?`]);
+      [item(I, target), ...direct.map((x) => item(I, x))], [`Qu'est-ce qui reste ${dans(I.label(target).split(' · ')[0])} ?`, `Qu'est-ce qui bloque ${dans(I.label(target).split(' · ')[0])} ?`]);
   }
   if (/ou en (est|sommes)|on en est|etat|avancement|resume|statut|progression/.test(q)) {
     const cur = curMs, p = I.N.get('ph-' + vf.phase) || G.nodes.find((n) => n.kind === 'phase' && String(n.num) === String(vf.phase));
