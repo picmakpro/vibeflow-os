@@ -21,6 +21,8 @@ const etat = (x) => {
   if (ST[x.st] && (foot === lab || foot.startsWith(lab + ' · '))) foot = foot.slice(lab.length).replace(/^ · /, '');
   return foot ? `${lab} · ${foot}` : lab;
 };
+// accord réel (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3da818fe)) : « 1 bloqué », « 4 bloqués », jamais « bloqué(s) » ; même règle que le panneau (ui/00-vibeflow.js)
+const pl = (n, un, plus) => (n > 1 ? plus : un);
 const fold = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 export function projectIndex(G) {
@@ -93,7 +95,7 @@ export function answerLocally(G, question) {
   if (pathHit) {
     const plans = G.files.filter((f) => (f.touched || []).includes(pathHit));
     if (!plans.length) return answer('Aucun plan', `Aucun plan ni nœud de mission ne déclare avoir touché \`${pathHit}\` (champ \`files_modified\`).`, []);
-    return answer(`Qui a touché ${pathHit.split('/').pop()}`, `${plans.length} plan(s) déclarent \`${pathHit}\` :\n${plans.slice(0, 12).map((p) => line(I, p)).join('\n')}`, plans.map((p) => item(I, p)));
+    return answer(`Qui a touché ${pathHit.split('/').pop()}`, `${plans.length} ${pl(plans.length, 'plan déclare', 'plans déclarent')} \`${pathHit}\` :\n${plans.slice(0, 12).map((p) => line(I, p)).join('\n')}`, plans.map((p) => item(I, p)));
   }
   // le groupe d'exigences d'une phase faite garde « en cours » tant que des cases restent décochées : ce n'est pas du travail en cours
   const exigPhaseFaite = (x) => { const g = I.N.get(x.id || x.n); return !!g && /\.req$/.test(g.id) && I.N.get(g.parent)?.st === 'done'; };
@@ -102,7 +104,7 @@ export function answerLocally(G, question) {
   if (/bloqu|coince|en echec|echoue/.test(q)) {
     const xs = pool.filter((x) => x.st === 'blocked');
     if (!xs.length) { const act = pool.filter((x) => x.st === 'active' && !exigPhaseFaite(x)); return answer('Rien de bloqué', `Rien n'est bloqué${scope}. En cours : ${act.length}.\n${act.slice(0, 8).map((x) => line(I, x)).join('\n')}`, act.map((x) => item(I, x))); }
-    return answer(`${xs.length} bloqué(s)`, `${xs.length} élément(s) bloqué(s)${scope} (étape de mission en échec) :\n${xs.map((x) => line(I, x, I.label(I.N.get(x.n || x.parent) || {}) || '')).join('\n')}`, xs.map((x) => item(I, x)));
+    return answer(`${xs.length} ${pl(xs.length, 'bloqué', 'bloqués')}`, `${xs.length} ${pl(xs.length, 'élément bloqué', 'éléments bloqués')}${scope} (étape de mission en échec) :\n${xs.map((x) => line(I, x, I.label(I.N.get(x.n || x.parent) || {}) || '')).join('\n')}`, xs.map((x) => item(I, x)));
   }
   if (/en cours|actif|au travail|qui travaille/.test(q)) {
     const xs = pool.filter((x) => x.st === 'active' && !exigPhaseFaite(x));
@@ -114,15 +116,15 @@ export function answerLocally(G, question) {
     if (!t) {
       const phases = G.nodes.filter((n) => n.kind === 'phase'); if (!phases.length) return null; // rien à calculer : c'est à l'agent de lire le planning
       const reste = phases.filter((x) => x.st === 'todo' || x.st === 'active');
-      return answer('Reste', reste.length ? `${reste.length} phase(s) à finir (aucun jalon courant reconnu) :\n${reste.slice(0, 12).map((x) => line(I, x)).join('\n')}${reste.length > 12 ? `\n- … et ${reste.length - 12} autre(s)` : ''}` : 'Toutes les phases du planning sont terminées.', reste.map((x) => item(I, x)));
+      return answer('Reste', reste.length ? `${reste.length} ${pl(reste.length, 'phase', 'phases')} à finir (aucun jalon courant reconnu) :\n${reste.slice(0, 12).map((x) => line(I, x)).join('\n')}${reste.length > 12 ? `\n- … et ${reste.length - 12} ${pl(reste.length - 12, 'autre', 'autres')}` : ''}` : 'Toutes les phases du planning sont terminées.', reste.map((x) => item(I, x)));
     }
     const xs = (t ? I.under(t.id) : pool).filter((x) => x !== t && (x.st === 'todo' || x.st === 'active') && (x.id ? x.kind === 'phase' || /^dag-/.test(x.id) : !x.p.startsWith('req/') || /^ph-/.test(t?.id || '')));
-    return answer(`Reste${t ? ' · ' + I.label(t).split(' · ')[0] : ''}`, `${xs.length} à finir dans [[${I.ref(t)}]]${t?.foot ? ` (${t.foot})` : ''} :\n${xs.slice(0, 12).map((x) => line(I, x)).join('\n')}${xs.length > 12 ? `\n- … et ${xs.length - 12} autre(s)` : ''}`,
+    return answer(`Reste${t ? ' · ' + I.label(t).split(' · ')[0] : ''}`, `${xs.length} à finir dans [[${I.ref(t)}]]${t?.foot ? ` (${t.foot})` : ''} :\n${xs.slice(0, 12).map((x) => line(I, x)).join('\n')}${xs.length > 12 ? `\n- … et ${xs.length - 12} ${pl(xs.length - 12, 'autre', 'autres')}` : ''}`,
       [item(I, t), ...xs.map((x) => item(I, x))], xs[0] ? [`Qu'est-ce qui bloque dans ${I.label(t).split(' · ')[0]} ?`] : []);
   }
   if (/exigence/.test(q) && phase) {
     const xs = I.files.get(phase.id + '.req') || [];
-    return answer(`Exigences · Phase ${ph}`, `${xs.length} exigence(s) pour [[${I.ref(phase)}]] (${count(xs)}) :\n${xs.slice(0, 14).map((x) => line(I, x, coupe(x.d, 70))).join('\n')}`, xs.map((x) => item(I, x)));
+    return answer(`Exigences · Phase ${ph}`, `${xs.length} ${pl(xs.length, 'exigence', 'exigences')} pour [[${I.ref(phase)}]] (${count(xs)}) :\n${xs.slice(0, 14).map((x) => line(I, x, coupe(x.d, 70))).join('\n')}`, xs.map((x) => item(I, x)));
   }
   if (target) {
     const sub = I.under(target.id).filter((x) => x !== target);

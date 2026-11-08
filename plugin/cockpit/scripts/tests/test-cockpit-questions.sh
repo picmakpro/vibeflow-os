@@ -321,6 +321,23 @@ for fq in "Pourquoi la phase 72 est-elle en recette ?" "Quelles sont les lignes 
   assert_eq "Q18.21 — témoin négatif : « $fq » ne déclenche pas la réponse « Format »" "$(H json "$WORK/q18m.json" 'j === null || !/Lignes du planning non lues/.test(j.title)')" "true"
 done
 
+# Q19 — libellés du Projet tranchés par Samuel (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3da818fe)) : accord réel des compteurs (L1)
+"$NODE" --input-type=module -e "
+import fs from 'node:fs';
+const nd = (id, o) => ({ id, label: id, kind: 'phase', st: 'todo', parent: null, ...o });
+const bl = (n) => Array.from({ length: n }, (_, i) => ({ p: 'dag/' + i, n: 'ph-2', name: 'b' + i, st: 'blocked', d: 'x' }));
+const mk = (nb) => ({ nodes: [nd('ms-v2', { kind: 'milestone', label: 'v2', st: 'active' }), nd('ph-2', { label: 'Phase 2 · Deux', num: '2', st: 'active', parent: 'ms-v2' }), nd('ph-2.req', { kind: 'exigences', label: 'Exigences', st: 'active', parent: 'ph-2' })],
+  files: [...bl(nb), { p: 'req/B-01', n: 'ph-2.req', name: 'B-01', st: 'todo', d: 'un' }, { p: 'req/B-02', n: 'ph-2.req', name: 'B-02', st: 'todo', d: 'deux' }], links: [], meta: { vf: { milestone: 'v2', phase: '2' } } });
+fs.writeFileSync('$WORK/q19-1.json', JSON.stringify(mk(1))); fs.writeFileSync('$WORK/q19-4.json', JSON.stringify(mk(4)));"
+H locg "$SCRIPTS" "$WORK/q19-4.json" "Qu'est-ce qui bloque ?" > "$WORK/q19a.json"
+H locg "$SCRIPTS" "$WORK/q19-1.json" "Qu'est-ce qui bloque ?" > "$WORK/q19b.json"
+assert_eq "Q19.1 — L1 : 4 éléments bloqués -> « 4 bloqués » et « 4 éléments bloqués », jamais « (s) »" "$(H json "$WORK/q19a.json" "j.title === '4 bloqués' && j.answer.startsWith('4 éléments bloqués') && !/\\(s\\)/.test(j.title + j.answer)")" "true"
+assert_eq "Q19.2 — L1 : 1 élément bloqué -> « 1 bloqué » et « 1 élément bloqué »" "$(H json "$WORK/q19b.json" "j.title === '1 bloqué' && j.answer.startsWith('1 élément bloqué ') && !/\\(s\\)/.test(j.title + j.answer)")" "true"
+H locg "$SCRIPTS" "$WORK/q19-1.json" "Quelles sont les exigences de la phase 2 ?" > "$WORK/q19c.json"
+assert_eq "Q19.3 — L1 : compteur voisin, 2 exigences -> « 2 exigences pour », sans « (s) »" "$(H json "$WORK/q19c.json" "j.answer.startsWith('2 exigences pour') && !/\\(s\\)/.test(j.answer)")" "true"
+H locg "$SCRIPTS" "$WORK/q18g.json" "Quelles sont les exigences de la phase 1 ?" > "$WORK/q19d.json"
+assert_eq "Q19.4 — L1 : compteur voisin, 1 exigence -> « 1 exigence pour »" "$(H json "$WORK/q19d.json" "j.answer.startsWith('1 exigence pour')")" "true"
+
 vf_hyg_assert
 echo ""
 echo "=================================="
