@@ -2,11 +2,15 @@
 # Test de worktree-procs.sh (issue #223) — autonome, borné, sans orphelin.
 # Chaque leurre (`sleep 300`) a son PID consigné dans $TMP/pids et tué par le trap EXIT.
 # Chaque garde est prouvée par un mutant : copie du script SANS la garde, le cas correspondant doit
-# rougir (trace : cas, attendu, obtenu). Les cas de refus ne lancent que `list` sur les mutants :
-# `stop` n'est joué que sur le vrai script, avec --max=1 (filet : si un refus régresse, rc 3, rien tué).
+# rougir (trace : cas, attendu, obtenu). Un mutant ne joue `stop` QUE dans une cible temporaire sous $TMP
+# (leurres seuls) ; les cas de refus et de sélection large ne lancent que `list` sur les mutants. `stop` sur
+# des chemins dangereux n'est joué que sur le vrai script, avec --max=1 (filet : rc 3, rien tué).
+# Un rc 2 (survivant après SIGKILL) n'est pas simulable sans processus infaillible : il l'est via
+# VF_WTP_SANS_SIGNAL=1 (aucun signal envoyé), seule direction sûre d'un tel réglage.
+# WTP_SCRIPT=<chemin> juge un autre script ; WTP_SEUL="cas1 cas2" ne joue que ces cas (sans mutants).
 set -uo pipefail
 
-REAL="$(cd "$(dirname "$0")/.." && pwd)/worktree-procs.sh"
+REAL="${WTP_SCRIPT:-$(cd "$(dirname "$0")/.." && pwd)/worktree-procs.sh}"
 PASS=0; FAIL=0
 ok() { echo "  ✓ $1"; PASS=$((PASS+1)); }
 ko() { echo "  ✗ $1"; FAIL=$((FAIL+1)); }
@@ -19,7 +23,7 @@ tuer_tout() {
   while read -r p; do
     [ -n "$p" ] || continue
     c="$(ps -o command= -p "$p" 2>/dev/null)"
-    case "$c" in *"sleep 300"*) kill -KILL "$p" 2>/dev/null || : ;; esac
+    case "$c" in *"sleep 300"*|*wtp-mobile*) kill -KILL "$p" 2>/dev/null || : ;; esac
     { wait "$p"; } 2>/dev/null || :
   done < "$TMP/pids"
   : > "$TMP/pids"
@@ -31,10 +35,16 @@ assert_eq() { # label attendu obtenu
   [ "$2" = "$3" ] && return 0
   DETAIL="cas [$1] attendu [$2] obtenu [$3]"; return 1
 }
-leurre() { # leurre <dir> [ignterm] -> LP
-  if [ "${2:-}" = "ignterm" ]; then (cd "$1" && trap '' TERM && exec sleep 300) &
-  else (cd "$1" && exec sleep 300) & fi
+cwd_de() { if [ -r /proc/self/cwd ]; then readlink "/proc/$1/cwd" 2>/dev/null; else lsof -a -d cwd -p "$1" -Fn 2>/dev/null | sed -n 's/^n//p'; fi; }
+leurre() { # leurre <dir> [ignterm|mobile] -> LP ; attend (<= 5 s) que le cwd du leurre soit visible
+  case "${2:-}" in
+    ignterm) (cd "$1" && trap '' TERM && exec sleep 300) & ;;
+    mobile) (cd "$1" && exec bash -c ': wtp-mobile; trap "cd /" TERM; while :; do sleep 1; done') & ;;
+    *) (cd "$1" && exec sleep 300) & ;;
+  esac
   LP=$!; echo "$LP" >> "$TMP/pids"
+  local i=0
+  while [ "$i" -lt 50 ] && [ "$(cwd_de "$LP")" != "$1" ]; do sleep 0.1; i=$((i+1)); done
 }
 vivant() { local s; s="$(ps -o stat= -p "$1" 2>/dev/null | tr -d ' ')"; [ -n "$s" ] && [ "${s#Z}" = "$s" ]; }
 etat() { if vivant "$1"; then echo vivant; else echo mort; fi; }
@@ -46,7 +56,7 @@ cible() { mkdir -p "$TMP/$1/cible" "$TMP/$1/cible/sous" "$TMP/$1/cible-b" "$TMP/
 
 # --- cas : chacun prend le script à juger, rend 0 (ok) ou 1 (DETAIL posé)
 cas_liste_arret() {
-  cible liste; leurre "$CIB"; local a=$LP; leurre "$CIB/sous"; local b=$LP; sleep 0.3
+  cible liste; leurre "$CIB"; local a=$LP; leurre "$CIB/sous"; local b=$LP
   run "$1" list --path="$CIB"
   assert_eq "list rc" 1 "$RC" || return 1
   assert_eq "list nb lignes" 2 "$(printf '%s\n' "$OUT" | grep -c .)" || return 1
@@ -58,7 +68,7 @@ cas_liste_arret() {
   tuer_tout
 }
 cas_frere() {
-  cible frere; leurre "$CIB"; local a=$LP; leurre "$CIB-b"; local f=$LP; sleep 0.3
+  cible frere; leurre "$CIB"; local a=$LP; leurre "$CIB-b"; local f=$LP
   run "$1" list --path="$CIB"
   assert_eq "list ne cite pas le frère" 0 "$(printf '%s\n' "$OUT" | grep -c "^$f$(printf '\t')")" || return 1
   run "$1" stop --path="$CIB"
@@ -67,17 +77,23 @@ cas_frere() {
   assert_eq "frère préfixe cible-b" vivant "$(etat $f)" || return 1
   tuer_tout
 }
-cas_hors() {
-  cible hors; leurre "$TMP/hors/hors"; local h=$LP; mkdir -p "$TMP/hors/hors"; sleep 0.3
+cas_hors() { # list seulement : jouable sur un mutant à sélection large
+  cible hors; leurre "$TMP/hors/hors"; local h=$LP
   run "$1" list --path="$CIB"
   assert_eq "list rc (rien dans la cible)" 0 "$RC" || return 1
+  assert_eq "leurre hors cible" vivant "$(etat $h)" || return 1
+  tuer_tout
+}
+cas_hors_stop() { # vrai script seulement
+  cible horss; leurre "$TMP/horss/hors"; local h=$LP; leurre "$CIB"; local a=$LP
   run "$1" stop --path="$CIB"
   assert_eq "stop rc" 0 "$RC" || return 1
+  assert_eq "leurre cible" mort "$(etat $a)" || return 1
   assert_eq "leurre hors cible" vivant "$(etat $h)" || return 1
   tuer_tout
 }
 cas_appelant() {
-  cible appelant; leurre "$CIB"; local a=$LP; sleep 0.3
+  cible appelant; leurre "$CIB"; local a=$LP
   local got
   got="$(bash -c 'cd "$1" && bash "$2" stop --path="$1" >/dev/null 2>&1; echo "rc=$?"; echo VIVANT' _ "$CIB" "$1" 2>/dev/null | tr '\n' ' ')"
   assert_eq "shell appelant (cwd dans la cible) survit" "rc=0 VIVANT " "$got" || return 1
@@ -86,7 +102,7 @@ cas_appelant() {
 }
 cas_plafond() {
   cible plafond; local i pids=""
-  for i in 1 2 3 4; do leurre "$CIB"; pids="$pids $LP"; done; sleep 0.3
+  for i in 1 2 3 4; do leurre "$CIB"; pids="$pids $LP"; done
   run "$1" stop --path="$CIB" --max=3
   assert_eq "stop 4 > --max=3 rc" 3 "$RC" || return 1
   local p v=""; for p in $pids; do v="$v$(etat $p) "; done
@@ -96,14 +112,14 @@ cas_plafond() {
   tuer_tout
 }
 cas_sigkill() {
-  cible sigkill; leurre "$CIB" ignterm; local a=$LP; sleep 0.3
+  cible sigkill; leurre "$CIB" ignterm; local a=$LP
   run "$1" stop --path="$CIB"
   assert_eq "stop d'un leurre qui ignore SIGTERM rc" 0 "$RC" || return 1
   assert_eq "leurre" mort "$(etat $a)" || return 1
   tuer_tout
 }
 cas_indet_aucune() {
-  cible indetA; leurre "$CIB"; local a=$LP; sleep 0.3
+  cible indetA; leurre "$CIB"; local a=$LP
   OUT="$(VF_WTP_METHODE=aucune bash "$1" list --path="$CIB" 2>/dev/null)"; RC=$?
   assert_eq "list sans méthode rc" 4 "$RC" || return 1
   OUT="$(VF_WTP_METHODE=aucune bash "$1" stop --path="$CIB" 2>/dev/null)"; RC=$?
@@ -113,7 +129,7 @@ cas_indet_aucune() {
 }
 cas_indet_vide() {
   cible indetV; mkdir -p "$TMP/fakebin"; printf '#!/bin/sh\nexit 0\n' > "$TMP/fakebin/lsof"; chmod +x "$TMP/fakebin/lsof"
-  leurre "$CIB"; local a=$LP; sleep 0.3
+  leurre "$CIB"; local a=$LP
   OUT="$(PATH="$TMP/fakebin:$PATH" VF_WTP_METHODE=lsof bash "$1" list --path="$CIB" 2>/dev/null)"; RC=$?
   assert_eq "list, lsof muet (sortie vide) rc" 4 "$RC" || return 1
   OUT="$(PATH="$TMP/fakebin:$PATH" VF_WTP_METHODE=lsof bash "$1" stop --path="$CIB" 2>/dev/null)"; RC=$?
@@ -160,11 +176,118 @@ cas_usage() {
   run "$1" list --path="$CIB" --bidon ; assert_eq "option inconnue rc" 64 "$RC"
 }
 
+# --- correction ciblée de revue (M1-M3, m1-m3, m5)
+UTF8=0; LOCALES="$(locale -a 2>/dev/null)"; printf '%s\n' "$LOCALES" | grep -i 'utf-\{0,1\}8' >/dev/null && UTF8=1
+run_borne() { # run_borne <secondes> <script> args... -> RC (124 si dépassé), OUT
+  local n=$(( $1 * 10 )) sc="$2" i=0; shift 2
+  bash "$sc" "$@" >"$TMP/borne.out" 2>/dev/null & local bp=$!
+  while kill -0 "$bp" 2>/dev/null && [ "$i" -lt "$n" ]; do sleep 0.1; i=$((i+1)); done
+  if kill -0 "$bp" 2>/dev/null; then kill -KILL "$bp" 2>/dev/null; { wait "$bp"; } 2>/dev/null; RC=124
+  else { wait "$bp"; } 2>/dev/null; RC=$?; fi
+  OUT="$(cat "$TMP/borne.out")"
+}
+cas_m1_accent() { # chemin accentué trouvé même sous LC_ALL=C si une locale UTF-8 existe, sinon rc 4
+  mkdir -p "$TMP/m1/cíble-é-🙂"; leurre "$TMP/m1/cíble-é-🙂"; local a=$LP
+  OUT="$(env -i PATH="$PATH" HOME="$HOME" LC_ALL=C bash "$1" list --path="$TMP/m1/cíble-é-🙂" 2>/dev/null)"; RC=$?
+  if [ "$UTF8" -eq 1 ]; then assert_eq "list accentué sous LC_ALL=C (UTF-8 dispo)" 1 "$RC" || return 1
+    OUT="$(env -i PATH="$PATH" HOME="$HOME" LC_ALL=C bash "$1" stop --path="$TMP/m1/cíble-é-🙂" 2>/dev/null)"; RC=$?
+    assert_eq "stop accentué rc" 0 "$RC" || return 1
+    assert_eq "leurre accentué" mort "$(etat $a)" || return 1
+  else assert_eq "list accentué sans locale UTF-8" 4 "$RC" || return 1; fi
+  tuer_tout
+}
+cas_m1_sans_locale() { # non-ASCII et aucune locale UTF-8 : rc 4, jamais un vide
+  mkdir -p "$TMP/m1b/cíble"; leurre "$TMP/m1b/cíble"; local a=$LP
+  OUT="$(VF_WTP_LOCALE=aucune bash "$1" list --path="$TMP/m1b/cíble" 2>/dev/null)"; RC=$?
+  assert_eq "list non-ASCII sans locale rc" 4 "$RC" || return 1
+  OUT="$(VF_WTP_LOCALE=aucune bash "$1" stop --path="$TMP/m1b/cíble" 2>/dev/null)"; RC=$?
+  assert_eq "stop non-ASCII sans locale rc" 4 "$RC" || return 1
+  assert_eq "leurre épargné" vivant "$(etat $a)" || return 1
+  tuer_tout
+}
+cas_m1_caracteres() { # backslash, tabulation : non représentable sans ambiguïté -> rc 4, rien tué
+  local d n=0
+  for d in 'bs\\x' "tab$(printf '\t')x"; do
+    n=$((n+1)); mkdir -p "$TMP/m1c$n/$d"; leurre "$TMP/m1c$n/$d"; local a=$LP
+    run "$1" list --path="$TMP/m1c$n/$d"; assert_eq "list chemin #$n rc" 4 "$RC" || return 1
+    run "$1" stop --path="$TMP/m1c$n/$d"; assert_eq "stop chemin #$n rc" 4 "$RC" || return 1
+    assert_eq "leurre #$n épargné" vivant "$(etat $a)" || return 1
+  done
+  tuer_tout
+}
+cas_m2_partiel() { # faux lsof : un seul PID étranger, rc 1 -> lecture partielle = rc 4
+  cible m2; mkdir -p "$TMP/fakep"; printf '#!/bin/sh\necho p1234; echo fcwd; echo n/ailleurs; exit 1\n' > "$TMP/fakep/lsof"; chmod +x "$TMP/fakep/lsof"
+  leurre "$CIB"; local a=$LP
+  OUT="$(PATH="$TMP/fakep:$PATH" VF_WTP_METHODE=lsof bash "$1" list --path="$CIB" 2>/dev/null)"; RC=$?
+  assert_eq "list lecture partielle rc" 4 "$RC" || return 1
+  OUT="$(PATH="$TMP/fakep:$PATH" VF_WTP_METHODE=lsof bash "$1" stop --path="$CIB" 2>/dev/null)"; RC=$?
+  assert_eq "stop lecture partielle rc" 4 "$RC" || return 1
+  assert_eq "leurre épargné" vivant "$(etat $a)" || return 1
+  tuer_tout
+}
+cas_m3_ps() { # ps en échec : la chaîne d'ancêtres ne remonte pas -> rc 4 AVANT tout signal, appelant vivant
+  cible m3; mkdir -p "$TMP/fakeps"; printf '#!/bin/sh\nexit 1\n' > "$TMP/fakeps/ps"; chmod +x "$TMP/fakeps/ps"
+  leurre "$CIB"; local a=$LP got
+  got="$(PATH="$TMP/fakeps:$PATH" VF_WTP_PPID=ps bash -c 'cd "$1" && bash "$2" stop --path="$1" >/dev/null 2>&1; echo "rc=$?"; echo VIVANT' _ "$CIB" "$1" 2>/dev/null | tr '\n' ' ')"
+  assert_eq "ps en échec : rc 4 et shell appelant vivant" "rc=4 VIVANT " "$got" || return 1
+  assert_eq "leurre épargné" vivant "$(etat $a)" || return 1
+  tuer_tout
+}
+cas_m1_casse() { # Darwin, volume insensible à la casse : autre casse = rc 4, jamais un 0 faux
+  [ "$(uname -s)" = Darwin ] || { SKIP=1; return 0; }
+  mkdir -p "$TMP/m1k/Cible"; [ -d "$TMP/m1k/cIBLE" ] || { SKIP=1; return 0; }
+  leurre "$TMP/m1k/Cible"; local a=$LP
+  run "$1" list --path="$TMP/m1k/cIBLE"
+  assert_eq "list autre casse rc" 4 "$RC" || return 1
+  run "$1" stop --path="$TMP/m1k/cIBLE"
+  assert_eq "stop autre casse rc" 4 "$RC" || return 1
+  assert_eq "leurre épargné" vivant "$(etat $a)" || return 1
+  tuer_tout
+}
+cas_m2_git() { # chemin englobant un dépôt ou des worktrees : 64 ; .git fichier (worktree) accepté
+  mkdir -p "$TMP/m2g/dep/.git" "$TMP/m2g/wts/.claude/worktrees" "$TMP/m2g/wt"; : > "$TMP/m2g/wt/.git"
+  refus_list "chemin avec .git répertoire" "$1" "$TMP/m2g/dep" || return 1
+  refus_list "chemin avec .claude/worktrees" "$1" "$TMP/m2g/wts" || return 1
+  run "$1" list --path="$TMP/m2g/wt"
+  assert_eq "témoin : .git fichier accepté rc" 0 "$RC"
+}
+cas_m3_lsof_bloque() { # lsof figé : échéance, rc 4, faux lsof tué
+  cible m3b; mkdir -p "$TMP/fakeb"; rm -f "$TMP/fakeb.pid"
+  printf '#!/bin/sh\necho $$ > "%s"\nexec sleep 300\n' "$TMP/fakeb.pid" > "$TMP/fakeb/lsof"; chmod +x "$TMP/fakeb/lsof"
+  local t0=$SECONDS
+  PATH="$TMP/fakeb:$PATH" VF_WTP_METHODE=lsof VF_WTP_ECHEANCE=2 run_borne 15 "$1" list --path="$CIB"
+  [ -s "$TMP/fakeb.pid" ] && cat "$TMP/fakeb.pid" >> "$TMP/pids"
+  assert_eq "lsof figé : rc (124 = jamais rendu)" 4 "$RC" || return 1
+  [ $((SECONDS - t0)) -le 8 ] || { DETAIL="cas [échéance] attendu [<= 8 s] obtenu [$((SECONDS - t0)) s]"; return 1; }
+  assert_eq "faux lsof tué à l'échéance" mort "$(etat "$(cat "$TMP/fakeb.pid" 2>/dev/null || echo 0)")" || return 1
+  tuer_tout
+}
+cas_comm() { # survivant déplacé (plus dans la cible après SIGTERM) : jamais de SIGKILL (anti-PID réutilisé)
+  cible comm; leurre "$CIB" mobile; local m=$LP
+  run "$1" stop --path="$CIB"
+  assert_eq "stop rc" 0 "$RC" || return 1
+  assert_eq "processus sorti de la cible épargné" vivant "$(etat $m)" || return 1
+  tuer_tout
+}
+cas_survivants() { # rc 2 : signaux neutralisés, le leurre reste -> survivants listés
+  cible surv; leurre "$CIB"; local a=$LP
+  VF_WTP_SANS_SIGNAL=1 run "$1" stop --path="$CIB"
+  assert_eq "stop sans effet rc" 2 "$RC" || return 1
+  assert_eq "survivants listés" 1 "$(printf '%s\n' "$ERR" | grep -c "^$a$(printf '\t')")" || return 1
+  assert_eq "leurre" vivant "$(etat $a)" || return 1
+  tuer_tout
+}
+
+SKIP=0
+CASES="liste_arret frere hors hors_stop appelant plafond sigkill indet_aucune indet_vide refus_absolu refus_dotdot refus_inexistant refus_composants refus_home refus_ancetre stop_refus_reel usage m1_accent m1_sans_locale m1_caracteres m2_partiel m3_ps m1_casse m2_git m3_lsof_bloque comm survivants"
+[ -n "${WTP_SEUL:-}" ] && CASES="$WTP_SEUL"
 echo "== test-worktree-procs =="
-for c in liste_arret frere hors appelant plafond sigkill indet_aucune indet_vide refus_absolu refus_dotdot refus_inexistant refus_composants refus_home refus_ancetre stop_refus_reel usage; do
-  DETAIL=""
-  if cas_$c "$REAL"; then ok "cas $c"; else ko "cas $c — $DETAIL"; tuer_tout; fi
+for c in $CASES; do
+  DETAIL=""; SKIP=0
+  if cas_$c "$REAL"; then if [ "$SKIP" -eq 1 ]; then ok "cas $c (non applicable ici, ignoré)"; else ok "cas $c"; fi
+  else ko "cas $c — $DETAIL"; tuer_tout; fi
 done
+if [ -n "${WTP_SEUL:-}" ]; then echo "== $PASS ok, $FAIL ko (WTP_SEUL : mutants non joués) =="; [ "$FAIL" -eq 0 ]; exit; fi
 
 # --- mutants : la copie sans la garde DOIT rougir sur le cas désigné
 mutant() { # mutant <nom> <cas> <sed args...>
@@ -172,17 +295,30 @@ mutant() { # mutant <nom> <cas> <sed args...>
   local m="$TMP/mut-$nom.sh"
   sed "$@" "$REAL" > "$m"
   if cmp -s "$REAL" "$m"; then ko "mutant $nom identique au script (sed sans effet)"; return; fi
-  DETAIL=""
-  if "cas_$cas" "$m"; then ko "mutant $nom SURVIT : le cas $cas reste vert sans la garde"; tuer_tout
+  DETAIL=""; SKIP=0
+  if "cas_$cas" "$m"; then
+    if [ "$SKIP" -eq 1 ]; then ok "mutant $nom non jouable ici (cas non applicable)"; tuer_tout; return; fi
+    ko "mutant $nom SURVIT : le cas $cas reste vert sans la garde"; tuer_tout
   else ok "mutant $nom tué — rouge : $DETAIL"; tuer_tout; fi
 }
-mutant frontiere      frere            -e 's/index(\$2, P "\/") == 1/index($2, P) == 1/'
-mutant selection-tout hors             -e 's/(\$2 == P || index(\$2, P "\/") == 1)/1/'
-mutant ancetres       appelant         -e 's/p=\$\$; i=0/p=""; i=0/'
+mutant frontiere      frere            -e 's/index(c,p"\/")==1/index(c,p)==1/'
+mutant selection-tout hors             -e 's/(c==p||index(c,p"\/")==1)/1/'
+mutant ancetres       appelant         -e 's/p=\$\$; i=0; reached=0/p=1; i=0; reached=0/'
+mutant chaine         m3_ps            -e '/# GARDE:chaine/d'
 mutant plafond        plafond          -e 's/\[ "\$n" -gt "\$MAX" \]/false/'
 mutant sigkill        sigkill          -e '/# GARDE:sigkill/d'
-mutant lecture-vide   indet_vide       -e '/# GARDE:lecture-vide/d'
-mutant methode-absente indet_aucune    -e '/# GARDE:lecture-vide/d' -e 's/\*) return 4 ;;/*) : ;;/'
+mutant comm-12        comm             -e 's|^comm -12 "\$WORK/s1" "\$WORK/s2" > "\$WORK/surv"|cat "$WORK/s1" > "$WORK/surv"|'
+mutant survivants     survivants       -e 's/exit 2   # GARDE:survivants/exit 0/'
+mutant canari         m2_partiel       -e '/# GARDE:canari/d'
+mutant canari-vide    indet_vide       -e '/# GARDE:canari/d'
+mutant methode-absente indet_aucune    -e '/# GARDE:canari/d' -e 's/\*) return 4 ;;/*) : ;;/'
+mutant echeance       m3_lsof_bloque   -e '/# GARDE:echeance/d'
+mutant caracteres     m1_caracteres    -e '/# GARDE:caracteres/d'
+mutant locale         m1_sans_locale   -e 's/ \&\& \[ -z "\$LOCALE_LSOF" \]/ \&\& false/'
+mutant locale-forcee  m1_accent        -e 's/LC_ALL="\${LOCALE_LSOF:-C}" lsof/lsof/'
+mutant casse          m1_casse         -e 's/ || return 4   # GARDE:casse/ || :/'
+mutant git            m2_git           -e '/# GARDE:git/d'
+mutant worktrees      m2_git           -e '/# GARDE:worktrees/d'
 mutant absolu         refus_absolu     -e '/# GARDE:absolu/d'
 mutant dotdot         refus_dotdot     -e '/# GARDE:dotdot/d'
 mutant inexistant     refus_inexistant -e '/# GARDE:inexistant/d' -e 's/^\[ -n "\$P" \] || refus "illisible"/P="${P:-$PATH_ARG}"/'
