@@ -393,6 +393,26 @@ JS
 XTAB="$(node "$AUX/tableau.mjs" "$CHROME" "$SCRIPTS/tests/chrome-session.mjs" "$PR3")"
 [ -n "${DBG:-}" ] && echo "RAWTAB: $XTAB"
 assert_eq "R3.23 — PU-G-147 : trois lignes de « Sur ce tableau » dont la note dépasse 90 caractères et dont la première a un NOM de plus de 60 caractères (coupé au mot entier) : aucune n'est rognée par la CSS (ni largeur ni hauteur), la note finit sur un mot entier (« … dans le… ») et le libellé complet reste au title (témoin rouge sur 82de0712 : rognée, title vide)" "$(printf '%s' "$XTAB" | node "$AUX/get.mjs" /dev/stdin 'j.rows.length+"|"+(j.rows[0].rn.txt.endsWith("…") && j.nom.startsWith(j.rows[0].rn.txt.slice(0, -1)) && j.nom[j.rows[0].rn.txt.length - 1] === " ")+"|"+j.rows.every((r) => !r.rd.coupe && !r.rn.coupe && r.title.includes(j.note) && r.rd.txt.endsWith("…") && j.note.startsWith(r.rd.txt.slice(0, -1)) && j.note[r.rd.txt.length - 1] === " ")')" "3|true|true"
+# R3.24 — M3 (contre-revue) : le message « STATE.md semble périmé » est RENDU dans le bloc « Maintenant » (lab dont STATE.md dit « ready_to_plan » alors que les plans de la phase 2 sont faits), avec sa seconde phrase (L3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3da818fe))
+LRM="$WORK/lab-r3m"; mkdir -p "$LRM/src" "$LRM/.planning/phases/01-socle" "$LRM/.planning/phases/02-ecran"
+printf '## Milestones\n\n- 🚧 **v1.0 MVP** - Phases 1-2 (in progress)\n\n## Phases\n\n- [x] **Phase 1: Socle** - premier jet\n- [ ] **Phase 2: Écran** - second jet\n' > "$LRM/.planning/ROADMAP.md"
+printf -- '---\nmilestone: v1.0 MVP\nstatus: ready_to_plan\ncurrent_phase: 2\ncurrent_phase_name: Écran\n---\n' > "$LRM/.planning/STATE.md"
+for n in 01-socle/01-01 02-ecran/02-01; do printf '<objective>Faire</objective>\n' > "$LRM/.planning/phases/$n-PLAN.md"; echo ok > "$LRM/.planning/phases/$n-SUMMARY.md"; done
+printf 'export const u = () => 1;\n' > "$LRM/src/util.js"; git -C "$LRM" init -q && git -C "$LRM" add -A && git -C "$LRM" -c user.email=t@t -c user.name=t commit -q -m init; LABS4+=("$LRM")
+URM="$(adr4 "$LRM")"; SRVPIDS+=("$(pid4 "$LRM")"); PRM="${URM%index.html}project.html"
+cat > "$AUX/maintenant.mjs" <<'JS'
+// maintenant.mjs <chrome> <session.mjs> <url> : texte du bloc « Maintenant » du panneau d'ensemble (onglet Projet)
+import { pathToFileURL } from 'node:url';
+const [, , chrome, sess, url] = process.argv;
+const { executer, attendreEtStabiliser } = await import(pathToFileURL(sess).href);
+await executer(chrome, async (s) => {
+  await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await s.naviguer(url); await s.attendre("document.readyState === 'complete' && !!document.querySelector('#panel .vf-now')", 'bloc Maintenant');
+  return { texte: await attendreEtStabiliser(() => s.ev("document.querySelector('#panel .vf-now').innerText.replace(/\\s+/g, ' ').trim()"), (v) => typeof v === 'string' && v.length > 0, { max: 15000 }) };
+});
+JS
+XMAIN="$(node "$AUX/maintenant.mjs" "$CHROME" "$SCRIPTS/tests/chrome-session.mjs" "$PRM")"
+assert_eq "R3.24 — M3 : le bloc « Maintenant » d'un lab dont STATE.md est périmé affiche « STATE.md semble périmé : il dit « prête à planifier ». La carte fait foi ; mettez STATE.md à jour à la fin de la phase. » (témoin du rendu : rouge si le message n'est plus posé)" "$(printf '%s' "$XMAIN" | node "$AUX/get.mjs" /dev/stdin '/STATE\.md semble périmé : il dit « prête à planifier »\. La carte fait foi ; mettez STATE\.md à jour à la fin de la phase\./.test(j.texte)')" "true"
 # PU-G-160 : un lab CONFORME montre quand même la section (« Conforme · 0 ligne non comprise ») et y signale le groupe « Hors jalon »
 mkdir -p "$WORK/lab-r3d/src"; LR3D="$WORK/lab-r3d"; cp -R "$WORK/r3/.planning" "$LR3D/.planning"; printf '%s\n' '# Roadmap' '' '## Milestones' '' '- 🚧 **v1.0 Démo** - Phases 1-2 (in progress)' '' '## Phases' '' '- [x] **Phase 1: Socle** - a' '- [ ] **Phase 2: Écran** - b' '- [ ] **Phase 3: Orpheline** - c' '' '### Phase 1: Socle' '**Goal**: g1' '' '### Phase 2: Écran' '**Goal**: g2' '**Depends on**: Phase 1' > "$LR3D/.planning/ROADMAP.md"; printf '%s\n' '- [ ] **AUTH-01**: ok' > "$LR3D/.planning/REQUIREMENTS.md"
 printf 'export const u = () => 1;\n' > "$LR3D/src/util.js"; git -C "$LR3D" init -q && git -C "$LR3D" add -A && git -C "$LR3D" -c user.email=t@t -c user.name=t commit -q -m init; LABS4+=("$LR3D")
