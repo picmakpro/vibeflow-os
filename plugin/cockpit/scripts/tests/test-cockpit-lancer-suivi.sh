@@ -26,8 +26,8 @@ assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)
 
 # sha256 de la copie figée ci-dessous. Elle a été rafraîchie à la jointure du panel utilisateurs (2026-11-07) : c'était le module d'AVANT 72-07 (HEAD b93fb088, sha cd40e07b…) ;
 # c'est maintenant le module courant SANS la fonction 72-07 (les trois lignes `garde:lancees`, `garde:ligne-valide`, `garde:ligne-insert` neutralisées), parce que PU-G-134/162/163/164/165 (titre, description, état, identifiant)
-# ont changé la sortie de toute carte sans rapport avec les lancements. Constante figée : elle ne se met plus à jour qu'en refaisant cette même soustraction.
-BASE_EQUIPE_CARTE_SHA256="fb75b1a7543b0ba6dccda9a93ab7b06c691c5752aad53b49a64368fe2884ed1e"
+# ont changé la sortie de toute carte sans rapport avec les lancements. Rafraîchie une seconde fois le 2026-11-08 (lot B2, 3f972a6b, PU-G-163 : repli de description et résumé du groupe « Terminés »), même soustraction. Constante figée : elle ne se met plus à jour qu'en refaisant cette même soustraction.
+BASE_EQUIPE_CARTE_SHA256="0178ba6335306a8c13b0f1d6a525833f3330e9e6277b015e11cee9a6bf73e076"
 
 # --- copie figée de vf-cockpit-equipe-carte.mjs sans la fonction du plan 72-07 (octet pour octet ; elle importe vf-cockpit-lecture.mjs, copié à côté avant usage) ---
 cat > "$AUX/base/vf-cockpit-equipe-carte.mjs" <<'BASE_EQUIPE_CARTE_FIGEE'
@@ -93,13 +93,14 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, miss
     const a = w.action || {}, act = a.verbe && a.verbe !== GENERIQUE ? [a.verbe, a.cible].filter((x) => typeof x === 'string' && x).join(' ') : '';
     const arbre = !sous && w.tree ? (w.tree === 'arbre principal' ? w.tree : `arbre ${String(w.tree).replace(/^\.claude\/worktrees\//, '')}`) : '';
     const lieu = !sous ? [branche ? `Branche ${branche}` : '', arbre].filter(Boolean).join(' · ') : '';
-    const resume = [t ? `Depuis Phase ${l.phase}` : '', w.task || act, lieu].filter(Boolean).join(' · ');
+    // PU-G-163 (recette du 2026-11-08) : un agent ou une session sans rien à dire ne montre plus « Pas encore de description » — le repli dit ce qui est connu (nature, état)
+    const resume = [t ? `Depuis Phase ${l.phase}` : '', w.task || act, lieu].filter(Boolean).join(' · ') || `${sous ? 'Agent sans tâche annoncée' : 'Session sans tâche annoncée'} · ${ETAT[w.etat] || 'actif'}`;
     nodes.push({ ...base, id: idCarte(w), parent: fini && parent ? `${parent}~termines` : parent, kind: sous ? 'agent' : 'session',
       label: sous ? clip([w.role, w.task].filter(Boolean).join(' · ') || 'Agent', 80) : clip(typeof w.titre === 'string' && w.titre.trim() ? w.titre : ['Session principale', nettoieTitre(branche)].filter(Boolean).join(' · '), 80),
       summary: clip(resume, 200), details: lignes.join('\n\n'), st: Object.hasOwn(ST, w.etat) ? ST[w.etat] : 'active', foot: '' });
   }
   for (const [carte, n] of termines) {
-    nodes.push({ ...base, id: `${carte}~termines`, parent: carte, kind: 'terminés', label: `Terminés depuis moins de 24 h (${n})`, summary: '', details: '', st: 'done', foot: '' });
+    nodes.push({ ...base, id: `${carte}~termines`, parent: carte, kind: 'terminés', label: `Terminés depuis moins de 24 h (${n})`, summary: `${n} agent${n > 1 ? 's' : ''} de cette session, terminé${n > 1 ? 's' : ''} depuis moins de 24 h.`, details: '', st: 'done', foot: '' });
   }
   const etatSource = (s) => ({ etat: s?.etat === 'lue' || s?.etat === 'absente' || s?.etat === 'erreur' || s?.etat === 'forme-inconnue' ? s.etat : 'absente' });
   const sources = {};
