@@ -55,7 +55,7 @@
        verticale du haut à droite (celle du viewer sous 1 000 px et sur tactile, et celle de ce fichier de 1 000 à 1 279 px), mais la rangée de 1 280 px et plus, au bord gauche --edge ; il se pose au-dessus de la pastille « Terminal »
        (qui prend sa largeur, vf-cockpit-terminal-tiroir.mjs), elle-même au-dessus de la barre de question quand elles se recouvrent. Plus de bouton à droite : le titre retrouve sa largeur d'origine. Sous 701 px la pile du téléphone reste (P70-D-09). */
     @media (min-width: 701px) and (max-width: 1279px) {
-      #zoom { left: var(--edge); right: auto; top: auto; bottom: var(--edge); flex-direction: row; border-radius: 999px; }
+      #zoom { left: var(--edge); right: auto; top: auto; bottom: calc(var(--edge) + var(--vf-ask-bas, 0px)); flex-direction: row; border-radius: 999px; } /* --vf-ask-bas : hauteur de la barre de question + 8, relue plus bas ; sans la pastille « Terminal » (cockpit sans --terminal) le zoom clôt déjà la barre */
       #context { max-width: min(520px, calc(100% - var(--pw) - 64px)); }
     }
     @media (min-width: 1280px) {
@@ -111,6 +111,10 @@
     }
   `;
   document.head.appendChild(style);
+  // hauteur de la barre de question + 8, pour poser le zoom au-dessus d'elle de 701 à 1 279 px (règle ci-dessus) : 0 quand la barre n'est pas affichée (tiroir du terminal ouvert, onglet Équipe). Observateur posé ici, avant celui du tiroir
+  // (vf-cockpit-terminal-tiroir.mjs) : à chaque changement de taille de la barre la variable est à jour AVANT que la pastille et le zoom se replacent.
+  const barreQ = document.getElementById('ask');
+  if (barreQ) { const poser = () => document.documentElement.style.setProperty('--vf-ask-bas', barreQ.offsetHeight ? barreQ.offsetHeight + 8 + 'px' : '0px'); if (window.ResizeObserver) new ResizeObserver(poser).observe(barreQ); window.addEventListener('resize', poser); poser(); }
   // fil d'Ariane : étiquette les segments courts (moins de 12 caractères), puis masque derrière « … » les segments du milieu tant que le fil déborde (CSS : un segment long garde 64 px)
   const fil = document.getElementById('crumbs'), nomProjet = document.getElementById('proj-name'), gauche = document.querySelector('header .hl');
   let obs = null, replieRaf = null;

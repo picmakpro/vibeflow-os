@@ -153,6 +153,7 @@ et `test-cockpit-chaine-xss.sh` (volet git C0g à C4g : un nom de branche, un me
 
 - **Tablette et téléphone (≤ 999 px)** : menu « ⋯ » pour les actions rares (amende P70-D-01, qui le posait à 700 px ; Q1 « Icônes dans le menu ⋯ », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06).
 - **Panneau de détail fermé par défaut sous 1 000 px** (PU-G-045) : il s'ouvre sur un tap ou un clic, et se ferme par « Fermer ».
+- **Zone basse, axe commun** (PU-G-021 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px ») : de 390 à 1 440 px, le zoom, la pastille « Terminal » et la barre de question partagent le bord gauche `--edge` (16 px) ; de 701 à 1 279 px le zoom est la rangée de 1 280 px et plus, empilée au-dessus de la pastille (aussi large que lui), elle-même au-dessus de la barre ; dès 1 280 px la barre, centrée, reste après leur colonne. Barre de 40 px dès 1 000 px ; en dessous, cibles de 44 px et invite entière sur sa ligne. Preuve : `test-cockpit-terminal-tiroir.sh` (T21.9 à T21.11).
 - **Téléphone (≤ 700 px)** : l'en-tête tient sur une rangée ; le zoom est une pile
   verticale à gauche, au-dessus de la barre de question ; un tap sur une carte ou sur le titre ouvre le tiroir, qu'une poignée, une croix,
   Échap ou un tap dans le vide referment. Preuve : `test-cockpit-responsive.sh` (R13 à R16 ; R17 à R20 pour l'onglet Équipe, dont le zoom
