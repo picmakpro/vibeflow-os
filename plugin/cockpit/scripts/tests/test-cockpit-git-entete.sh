@@ -641,15 +641,23 @@ JS
   # l'en-tête une 2e fois (diagnostic H8.1). On laisse donc le filet absorber le switch AVANT les chargements : attente OBSERVABLE du premier événement `git` du flux direct (borne 15 s = 3 ticks).
   # Sans événement en 15 s, la graine du filet est postérieure au switch (rien à absorber) : on continue, ce que le script dit (« aucun »).
   cat > "$AUX/attendre-git.mjs" <<'JS'
-// attendre-git.mjs <port> <jeton> <maxMs> : s'abonne à /api/vf/events, imprime « git » au premier événement `git`, « aucun » à l'échéance
+// attendre-git.mjs <port> <jeton> <maxMs> : s'abonne à /api/vf/events, imprime « git » au premier événement `git`, « aucun » à l'échéance, « erreur » si l'abonnement échoue
 import http from 'node:http';
 const [, , port, jeton, max] = process.argv; let tampon = '';
 const fin = (m) => { console.log(m); process.exit(0); };
 setTimeout(() => fin('aucun'), Number(max));
 http.get({ host: '127.0.0.1', port: Number(port), path: '/api/vf/events?token=' + encodeURIComponent(jeton) }, (r) => { r.on('data', (c) => { tampon += c; if (/^event: git$/m.test(tampon)) fin('git'); }); }).on('error', () => fin('erreur'));
 JS
-  TOK8="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).token)")"
-  G8="$(node "$AUX/attendre-git.mjs" "$PORT" "$TOK8" 15000)"; echo "     filet : $G8 (événement git du filet après le switch)"
+  absorber_filet() { # absorber_filet <étiquette> : après un git switch, attend le premier événement `git` du filet (serveur courant : $OUT, $PORT) ; avertit si rien, FAIL nommé si l'outil d'attente échoue
+    local tok g; tok="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).token)" 2>/dev/null)"
+    g="$(node "$AUX/attendre-git.mjs" "$PORT" "$tok" 15000 2>&1 | tail -1)"
+    case "$g" in
+      git) echo "     filet [$1] : événement git absorbé" >&2 ;;
+      aucun) echo "     ⚠ filet [$1] : aucun événement git en 15 s — graine postérieure au switch (rien à absorber) ou filet muet ; la mesure continue" >&2 ;;
+      *) echo "  ❌ FAIL — H8.0 [$1] — l'attente d'absorption du filet a échoué (« $g ») : la mesure qui suit n'est pas fiable" >&2; echo "$1" >> "$WORK/absorption-ratee.txt" ;; # le FAIL est compté une fois, après les mutants (un sous-shell $(…) ne remonte pas FAIL)
+    esac
+  }
+  absorber_filet principal
   for pg in / /project.html /equipe.html; do
     R8="$(cdp "$AUX/h8.js" "$B8" "$pg" feat/y 2>&1 | tail -1)"
     assert_eq "H8.1 — $pg : après un switch sans réassemblage, la seconde ligne dit la branche réelle (feat/y) en moins de 2 s" "$(jq_ "$R8" 'j.ligne' 2>/dev/null)" "feat/y"
@@ -667,7 +675,7 @@ JS
     $GIT -C "$D" init -q -b main && $GIT -C "$D" add -A && $GIT -C "$D" commit -q -m init
     $GIT -C "$D" worktree add -q -b feat/x "$W" >/dev/null 2>&1
     mutate "$M/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "$2" "$3" || { echo "  ❌ FAIL — $1 : mutation impossible" >&2; echo '{}'; return; }
-    build_serve "$W" "$M"; $GIT -C "$W" switch -q -c feat/y
+    build_serve "$W" "$M"; $GIT -C "$W" switch -q -c feat/y; absorber_filet "$1"
     cdp "$AUX/h8.js" "http://127.0.0.1:$PORT" / feat/y 2>&1 | tail -1; stop_srv
   }
   RM="$(h8mut m-chargement "  relire(); // chargement : la page assemblée peut dater d'avant un \`git switch\`, une seule lecture par chargement
@@ -682,6 +690,7 @@ JS
   assert_eq "M-BLOC-VUE — rougit H8.2 (le bloc de vue garde feat/x alors que la seconde ligne dit feat/y)" "$(jq_ "$RM" '[j.ligne, j.h1].join("|")' 2>/dev/null)" "feat/y|Le code, branche feat/x"
   RM="$(h8mut m-ecart "flex: 0 2 auto; white-space: pre; }" "flex: 0 2 auto; }")"
   assert_eq "M-ECART — rougit H8.3 (plus d'écart avant le point médian) alors que la branche est à jour" "$(jq_ "$RM" '[j.ecart.avant >= 4, j.ligne].join("|")' 2>/dev/null)" "false|feat/y"
+  [ ! -s "$WORK/absorption-ratee.txt" ] || { echo "  ❌ FAIL — H8.0 — l'attente d'absorption du filet a échoué ($(tr '\n' ' ' < "$WORK/absorption-ratee.txt")) : leurs mesures ne sont pas fiables"; FAIL=$((FAIL+1)); } # FAIL posé dans un sous-shell $(…) ne remonte pas : relayé par fichier
 fi
 
 echo "=== H6.6 — la feuille de 76 n'emploie que des variables et des valeurs existantes (P78-D-12) ==="
