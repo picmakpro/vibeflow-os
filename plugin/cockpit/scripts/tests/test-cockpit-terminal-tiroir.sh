@@ -1013,11 +1013,15 @@ assert_eq "T21.8 — témoin de T21.7 : au moins 36 relevés pris, au moins 6 av
 mut_pastille() { # mut_pastille <nom> <expression-sed> : le mutant doit laisser au moins un relevé en défaut (témoin : au moins 8 relevés, aucune erreur)
   if mutant "$1" vf-cockpit-terminal-tiroir.mjs "$2"; then
     srv "$MUT_OUT" 1; PM="$(node "$AUX/chrome-pastille.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":1}")"; unsrv
+    echo "     trace du mutant $1 : $(rj "$PM" 'j.mauvais.length+" relevé(s) en défaut ; premiers : "+JSON.stringify(j.mauvais.slice(0,2)).slice(0,420)')"
     assert_eq "$1 — le mutant rougit T21.7 : au moins un relevé en défaut (témoin : au moins 8 relevés, aucune erreur)" "$(rj "$PM" '(j.n>=8)+" "+JSON.stringify(j.erreurs)+" rouge="+(j.mauvais.length>=1)')" "true {} rouge=true"
   else sans_effet "$1"; fi
 }
 mut_pastille M-PASTILLE-SUR-ASK 's|monter(n, window.innerHeight, () => \[rect(k)\]);|monter(n, window.innerHeight, () => []);|' # la pastille ne monte plus au-dessus de la barre (lot C de la recette du 2026-11-08 : la ligne « if (sur(...kb)) n.style.bottom » est devenue la liste d'obstacles de la pastille dans eviter())
-mut_pastille M-PASTILLE-SANS-RAPPEL "s|if (ask) { if (window.ResizeObserver)|if (false) { if (window.ResizeObserver)|" # jointure du panel (2026-11-07) : le mutant retire TOUT rappel lié à la barre (ResizeObserver et transitionend) ; la forme précédente, qui ne retirait que l'observateur, restait verte en CI Linux (shard 5, run 42386847278) alors qu'elle rougissait sous macOS : la fin de transition suffisait là-bas à replacer la pastille
+# M-PASTILLE-SANS-RAPPEL (recette du 2026-11-08, K3) : TOUS les rappels de la pastille passent par eviterTout (resize, vf-zoom-replie, MutationObserver de data-vf-visite, MutationObserver de la classe du corps - no-panel -, ResizeObserver de la barre, transitionend de la barre) ; le mutant vide eviterTout, donc les retire d'un coup. Les appels directs (ouvrir, fermer, puce, pose initiale) restent : la pastille est placée, mais plus jamais rappelée. Les formes précédentes ne retiraient que la barre et restaient vertes sous Linux (shard 5 puis shard 3), un autre rappel replaçant la pastille.
+# Garde de recensement : sept mentions d'eviterTout (la définition et ses six branchements) et six appels directs eviter(d.*) ; un nouveau rappel qui appellerait eviter() sans passer par eviterTout échapperait au mutant : ce compte rougit alors, le mutant est à élargir avant de le changer.
+assert_eq "T21.7r — recensement des rappels de la pastille : 7 mentions d'eviterTout (définition + resize, vf-zoom-replie, 2 MutationObserver, ResizeObserver, transitionend) et 6 appels directs eviter(d.*) (eviterTout x2, puce, ouvrir, fermer, pose initiale)" "$(grep -o 'eviterTout' "$SCRIPTS/vf-cockpit-terminal-tiroir.mjs" | wc -l | tr -d ' ')/$(grep -o 'eviter(d\.[a-z]*)' "$SCRIPTS/vf-cockpit-terminal-tiroir.mjs" | wc -l | tr -d ' ')" "7/6"
+mut_pastille M-PASTILLE-SANS-RAPPEL "s|const eviterTout = () => { eviter(d.pastille); eviter(d.puce); };|const eviterTout = () => {};|"
 
 run_axe "$OUT" 0; AX="$XJ"
 assert_eq "T21.9 — témoin de l'axe : 18 relevés complets (9 largeurs x Code et Projet), aucune erreur, --edge vaut 16" "$(rj "$AX" '(j.erreur||JSON.stringify(j.erreurs))+" n="+j.n+" complets="+j.complets+" edge="+JSON.stringify(j.edge)')" "{} n=18 complets=18 edge=[16]"
