@@ -303,6 +303,13 @@ assert_eq "Q18.17 — témoin de linéarité : 40 000 « ligne » sans « non co
 import { answerLocally } from '$SCRIPTS/vf-cockpit-ask.mjs';
 const t = Date.now(); answerLocally({ nodes: [], files: [], links: [], meta: { vf: {} } }, 'ligne '.repeat(40000) + 'x'); console.log(Date.now() - t < 2000);")" "true"
 
+# Q18.18 — PU-G-147 (recette du 2026-11-08) : le pied d'une exigence (sentence, 120 car.) se coupe au mot entier ; témoin rouge sur 82de0712 : « … puis avec le vr… »
+assert_eq "Q18.18 — la phrase d'une exigence coupée à 120 caractères ne finit pas dans un mot (« vr… » pour « vrai »), et reste sous 120" "$("$NODE" --input-type=module -e "
+import { sentence } from '$SCRIPTS/vf-cockpit-planning.mjs';
+const t = 'Usage réel et non-régression : de bout en bout dans Chromium avec un faux claude dans le PATH (suites), puis avec le vrai claude local.';
+const a = sentence(t, 120), mot = a.replace(/…\$/, '').split(' ').pop();
+console.log(a.endsWith('…') && a.length <= 120 && t.split(' ').includes(mot) && /\\S…\$/.test(a));")" "true"
+
 vf_hyg_assert
 echo ""
 echo "=================================="
