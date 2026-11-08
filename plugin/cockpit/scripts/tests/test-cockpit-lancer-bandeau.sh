@@ -10,7 +10,7 @@
 #   LB.E  client réel + serveur factice du contrat §4 + faux P sous Chrome (E1 à E7, E9 à E11, puis E8 cadre masqué)
 #   LB.F  F1 (focus) : faux P à champ de saisie, frappes abc, fenêtre focalisée puis non focalisée ; SP-1 : clic Lancer, tiroir fermé, le bandeau apparaît dans Q
 #   LB.P  le serveur factice écoute un port >= 4600 et différent de 4456
-#   M-*   vingt-six mutants, plus six du lot 8 LB3-S (copies des sources, « mutant sans effet » = FAIL)
+#   M-*   vingt-six mutants, plus six du lot 8 LB3-S, plus huit de la revue du 2026-11-08 (S1, S2, S3, S4, P5), plus quatre du 3e tour (F2, F4, F6b ; le mutant de réserve M-RESERVE-PIED vise désormais F3) (copies des sources, « mutant sans effet » = FAIL)
 # Sans Chrome : les sections statiques et les doublures tournent, la suite annonce SUITE SAUTÉE (navigateur) pour V et E.
 # Variables : VF_CLIENT_MS (échéance d'une attente navigateur, 20000 par défaut) · VF_LB_PORTS=bas-haut (plage de ports du serveur factice ; sinon ports libres du système).
 # Exit 0 si tout passe, 1 sinon.
@@ -586,6 +586,109 @@ await executer(chrome, async (s) => {
       r.v16 += '/' + (await attendreValeur(() => q.ev(`document.getElementById('terminal').getBoundingClientRect().height >= 120`), (v) => v === true, { max: 4000 }));
       await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
     });
+    await essai('v21', async () => { // PU-G-136 (recette du 2026-11-08) : à la hauteur du tiroir à l'arrivée d'une proposition (300 px), le bandeau le plus long (case du chat comprise) défile, et « Préparer dans le terminal » reste VISIBLE sans défiler (collé au bas du bandeau), défilement au repos
+      const lc = (m) => ligne(m) + " -r '0b8c7d6e-1111-4222-8333-444455556666' --fork-session";
+      await s.ev(`document.querySelector('iframe[data-t]').style.height = '300px'`);
+      await raz(); await monter({ id: ID(210), chat: true, lignesChat: { default: lc('default'), acceptEdits: lc('acceptEdits'), plan: lc('plan'), herite: lc('') } });
+      r.v21 = await attendreEtStabiliser(() => q.ev(`(() => { const p = document.getElementById('proposition'), l = document.getElementById('proposition-lancer'), a = p.getBoundingClientRect(), b = l.getBoundingClientRect(), H = innerHeight; return [H, p.scrollTop, p.scrollHeight > p.clientHeight + 1, b.top >= a.top - 0.5, b.bottom <= a.bottom + 0.5, b.bottom <= H + 0.5].join('/'); })()`), (v) => typeof v === 'string' && v.startsWith('300/'), { max: 4000 }); // la géométrie se juge une fois posée (cadre redimensionné, fit du terminal)
+      await raz(); await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
+    });
+    await essai('v22', async () => { // PU-G-136 / WCAG 2.4.11 (revue du 2026-11-08, S1) : au focus CLAVIER (vraies touches Tab et Maj+Tab), chaque arrêt dans le bandeau est visible, hors du pied collé, à 124, 300 et 450 px ; un arrêt dans le pied (Préparer) est visible dans le bandeau
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+      const lc = (m) => ligne(m) + " -r '0b8c7d6e-1111-4222-8333-444455556666' --fork-session";
+      const arret = () => q.ev(`(() => { const p = document.getElementById('proposition'), f = document.activeElement; if (!f || !p.contains(f)) return 'hors'; const pied = p.querySelector('.vf-q-pied'), a = p.getBoundingClientRect(), r = f.getBoundingClientRect(), d = pied.getBoundingClientRect(), H = innerHeight;
+        const utile = d.top - a.top, vis = Math.min(r.bottom, d.top) - Math.max(r.top, a.top); // fenêtre utile = au-dessus du pied ; un élément plus haut qu'elle (la commande exacte à 124 px) doit la remplir, un autre doit y tenir entier
+        const vu = pied.contains(f) ? (r.top >= a.top - 0.5 && r.bottom <= a.bottom + 0.5) : vis >= Math.min(r.height, utile) - 0.5; return (f.id || f.tagName + '=' + (f.textContent || '').trim()) + ':' + (vu && r.bottom <= H + 0.5) + ':' + Math.round(p.scrollTop) + ':' + Math.round(r.top) + '-' + Math.round(r.bottom) + '/' + Math.round(d.top); })()`);
+      const sortie = [];
+      for (const H of [124, 300, 450]) {
+        await s.ev(`document.querySelector('iframe[data-t]').style.height = '${H}px'`);
+        await raz(); await monter({ id: ID(220 + (H % 7)), chat: true, lignesChat: { default: lc('default'), acceptEdits: lc('acceptEdits'), plan: lc('plan'), herite: lc('') } });
+        await attendreEtStabiliser(() => q.ev(`(() => { const p = document.getElementById('proposition'), t = document.getElementById('terminal'); return [innerHeight, !!p, p && Math.round(p.getBoundingClientRect().top), t && Math.round(t.getBoundingClientRect().height)].join('/'); })()`), (v) => typeof v === 'string' && v.startsWith(H + '/true'), { max: 4000 });
+        await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.attendre(`document.hasFocus()`, 'focus du cadre de Q');
+        const frappe = async (shift) => { const base = { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9, modifiers: shift ? 8 : 0 }; await s.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...base }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base }); };
+        // F3 (3e tour) : deux parcours réels, chacun partant d'un élément DU bandeau (Maj+Tab depuis le terminal sortait du cadre : la moitié restait vide) : Tab depuis le sélecteur de mode (Annuler, commande, case du chat, Préparer),
+        // Maj+Tab depuis Préparer (case du chat, commande, Annuler, sélecteur de mode). Chaque arrêt est nommé : un parcours qui ne traverse pas le bandeau ne peut plus passer pour un parcours vert.
+        const parcours = async (depart, shift) => {
+          await q.ev(`(() => { const p = document.getElementById('proposition'); p.scrollTop = 0; document.getElementById('${depart}').focus(); return true; })()`);
+          await stabiliser(arret, { pas: 80, max: 2000 });
+          const arrets = []; for (let i = 0; i < 4; i++) { await frappe(shift); arrets.push(await stabiliser(arret, { pas: 80, max: 2000 })); } return arrets;
+        };
+        const tab = await parcours('proposition-mode', false), maj = await parcours('proposition-lancer', true);
+        const noms = (l) => l.map((a) => a.split(':')[0]).join('>'), mal = [...tab, ...maj].filter((a) => a === 'hors' || a.split(':')[1] !== 'true');
+        sortie.push(`${H}/${noms(tab)}/${noms(maj)}/${mal.length ? '[' + mal.join(',') + ']' : 'true'}`);
+      }
+      r.v22 = sortie.join(';'); await raz(); await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
+    });
+    await essai('v23', async () => { // S3 (revue du 2026-11-08) : le pied collé a un fond OPAQUE (ce qui défile dessous ne doit pas transparaître derrière « Préparer »)
+      await s.ev(`document.querySelector('iframe[data-t]').style.height = '300px'`);
+      await raz(); await monter({ id: ID(230), chat: true, lignesChat: { default: ligne('default'), acceptEdits: ligne('acceptEdits'), plan: ligne('plan'), herite: ligne('') } });
+      r.v23 = await attendreEtStabiliser(() => q.ev(`(() => { const d = document.querySelector('#proposition .vf-q-pied'), c = getComputedStyle(d); return [c.position, /^rgb\\(/.test(c.backgroundColor)].join('/') + '/' + c.backgroundColor; })()`), (v) => typeof v === 'string' && v.startsWith('sticky/'), { max: 4000 }).then((v) => v.split('/').slice(0, 2).join('/'));
+      await raz(); await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
+    });
+    await essai('v24', async () => { // S2 (revue du 2026-11-08) : après un refus de lancement, la raison est VISIBLE sans défiler, à 300 px avec la case du chat (elle se range sous le pied, le défilement l'y ramène) et distincte du pied
+      await s.ev(`document.querySelector('iframe[data-t]').style.height = '300px'`);
+      await raz(); await monter({ id: ID(240), arme_apres_ms: 400, chat: true, lignesChat: { default: ligne('default'), acceptEdits: ligne('acceptEdits'), plan: ligne('plan'), herite: ligne('') } });
+      await attendreArme(MS); await clic(LANCER); await q.attendre('__T.appels.length === 1', 'appel de lancer', MS); await q.ev(`__T.resolve('occupe')`);
+      r.v24 = await attendreEtStabiliser(() => q.ev(`(() => { const p = document.getElementById('proposition'), m = document.getElementById('proposition-message'), d = p.querySelector('.vf-q-pied').getBoundingClientRect(), a = p.getBoundingClientRect(), b = m.getBoundingClientRect(), H = innerHeight;
+        return [H, m.textContent === ${JSON.stringify(MSG.occupe)}, b.height > 0 && b.top >= a.top - 0.5 && b.bottom <= a.bottom + 0.5 && b.bottom <= H + 0.5, b.top >= d.bottom - 0.5 || b.bottom <= d.top + 0.5].join('/'); })()`), (v) => typeof v === 'string' && v.startsWith('300/true'), { max: 4000 });
+      await raz(); await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
+    });
+    await essai('v25', async () => { // P5 (revue du 2026-11-08, seconde réserve de PU-G-136) : une fois la commande préparée, la consigne « Appuyez sur Entrée » reste VISIBLE (pas seulement annoncée) jusqu'à Entrée dans le terminal, ou jusqu'à la fin du compte à rebours de la proposition
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+      const consigne = () => q.ev(`(() => { const c = document.getElementById('consigne'); if (!c) return 'absente'; const b = c.getBoundingClientRect(); return (b.height > 0 && b.bottom <= innerHeight + 0.5 ? 'visible:' : 'cachee:') + c.textContent + '|proposition=' + !!document.getElementById('proposition'); })()`);
+      const DIT = 'visible:Commande préparée dans le terminal. Appuyez sur Entrée dans le terminal pour démarrer.|proposition=false';
+      const sortie = [];
+      for (const fin of ['entree', 'compte-a-rebours']) {
+        await raz(); await monter({ id: ID(fin === 'entree' ? 250 : 251), arme_apres_ms: 400, expire_ms: fin === 'entree' ? 100000 : 6000 });
+        await attendreArme(MS); await clic(LANCER); await q.attendre('__T.appels.length === 1', 'appel de lancer', MS); await q.ev(`__T.resolve('ok')`);
+        const vu = await attendreValeur(consigne, (v) => v === DIT, { max: 3000 });
+        await pause(fin === 'entree' ? 1500 : 300); const encore = await consigne(); // toujours là sans rien faire (hors échéance), tant qu'Entrée n'est pas tapée
+        if (fin === 'entree') {
+          await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.attendre(`document.hasFocus()`, 'focus du cadre de Q'); await q.ev(`document.querySelector('.xterm-helper-textarea').focus()`);
+          const base = { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 };
+          await s.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...base }); await s.send('Input.dispatchKeyEvent', { type: 'char', text: '\r', ...base }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
+        }
+        const apres = await attendreValeur(consigne, (v) => v === 'absente', { max: 8000 });
+        sortie.push([fin, vu === DIT, encore === DIT, apres].join(':'));
+      }
+      r.v25 = sortie.join(';'); await raz();
+    });
+    await essai('v25b', async () => { // 3e tour de la recette du 2026-11-08 : F2 une Entrée TENUE (répétitions, autoRepeat) dans le terminal ne retire pas la consigne, seule une Entrée fraîche la retire ; F4 une nouvelle proposition, puis une carte, REMPLACENT la consigne ; F6b la consigne est entièrement visible au-dessus du bandeau d'état fixe
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+      const consigne = () => q.ev(`(() => { const c = document.getElementById('consigne'); if (!c) return 'absente'; const b = c.getBoundingClientRect(); return (b.height > 0 && b.bottom <= innerHeight + 0.5 ? 'visible:' : 'cachee:') + c.textContent; })()`);
+      const DIT = 'visible:Commande préparée dans le terminal. Appuyez sur Entrée dans le terminal pour démarrer.';
+      let n = 0;
+      const preparer = async () => { await raz(); await monter({ id: ID(260 + (++n)), arme_apres_ms: 400, expire_ms: 100000 }); await attendreArme(MS); await clic(LANCER); await q.attendre('__T.appels.length === 1', 'appel de lancer', MS); await q.ev(`__T.resolve('ok')`); return attendreValeur(consigne, (v) => v === DIT, { max: 3000 }); };
+      const entree = async (repetition) => {
+        const base = { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13, autoRepeat: repetition };
+        await s.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...base }); await s.send('Input.dispatchKeyEvent', { type: 'char', text: '\r', ...base }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
+      };
+      const sortie = [];
+      // F2 : trois répétitions d'Entrée (touche tenue) : la consigne reste ; une pression fraîche la retire
+      let vu = await preparer();
+      await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.attendre(`document.hasFocus()`, 'focus du cadre de Q'); await q.ev(`document.querySelector('.xterm-helper-textarea').focus()`);
+      for (let i = 0; i < 3; i++) await entree(true);
+      await pause(400); const tenue = await consigne();
+      await entree(false); const fraiche = await attendreValeur(consigne, (v) => v === 'absente', { max: 4000 });
+      sortie.push('tenue:' + (vu === DIT) + ':' + (tenue === DIT) + ':' + fraiche);
+      // F4 : une nouvelle proposition remplace la consigne affichée
+      vu = await preparer(); await monter({ id: ID(290 + n) });
+      sortie.push('proposition:' + (vu === DIT) + ':' + await attendreValeur(consigne, (v) => v === 'absente', { max: 3000 }));
+      // F4 : une carte (« Serveur arrêté ») remplace la consigne affichée
+      vu = await preparer(); await q.ev(`(() => { vfTermVue.carte('arrete'); return true; })()`);
+      sortie.push('carte:' + (vu === DIT) + ':' + await attendreValeur(consigne, (v) => v === 'absente', { max: 3000 }));
+      // F6b : avec le bandeau d'état fixe (44 px + 8 de marge), la consigne se pose au-dessus ; mesurée à 124, 300 px et pleine hauteur
+      for (const h of ['124px', '300px', '100vh']) {
+        await s.ev(`document.querySelector('iframe[data-t]').style.height = '${h}'`);
+        vu = await preparer(); await q.ev(`(() => { vfTermVue.bandeau('reconnexion'); return true; })()`);
+        const au_dessus = await attendreEtStabiliser(() => q.ev(`(() => { const c = document.getElementById('consigne'), e = document.querySelector('#etat .vf-q-bandeau'); if (!c || !e) return 'absent'; const a = c.getBoundingClientRect(), b = e.getBoundingClientRect(); return String(a.height > 0 && a.bottom <= b.top + 0.5); })()`), (v) => v === 'true' || v === 'false', { max: 4000 });
+        sortie.push('etat-' + h + ':' + (vu === DIT) + ':' + au_dessus);
+      }
+      r.v25b = sortie.join(';'); await q.ev(`(() => { vfTermVue.effacer(); return true; })()`); await raz(); await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
+    });
+    await essai('v26', async () => { // S4 (revue du 2026-11-08, PU-G-139) : à l'EXÉCUTION, le champ de saisie du vrai xterm s'annonce « Saisie du terminal » (l'inventaire F15 de chrome-fr ne lit que le texte du client : une ligne commentée ou posée après open() le laissait vert)
+      r.v26 = await attendreValeur(() => q.ev(`(document.querySelector('.xterm-helper-textarea') || { getAttribute: () => 'absent' }).getAttribute('aria-label')`), (v) => typeof v === 'string' && v !== 'absent', { max: 4000 });
+    });
     await essai('v17', async () => { // LB3 (PU-G-141 ; Q14) : la carte reste entière dans un cadre bas (marge de 8 px, sans défilement) ; « Copier la commande » copie EXACTEMENT la commande affichée, annonce le résultat ; aucun bouton de copie sur une proposition de lancement
       await s.ev(`document.querySelector('iframe[data-t]').style.height = '124px'`);
       await q.ev(`(() => { vfTermVue.carte('arrete'); window.__copie = null; document.addEventListener('copy', () => { window.__copie = String(getSelection()); }, true); return true; })()`);
@@ -912,6 +1015,8 @@ faux() { # faux <dossier-des-modules> -> FQ FP FSEC FRUN FPID ; un seul processu
 }
 unfaux() { vf_hyg_stop "$FPID"; PORT_NEXT="$PORT_LO"; }
 navig() { node "$AUX/chrome-bandeau.mjs" "$CHROME" "$1" "{\"P\":$FP,\"Q\":$FQ,\"secret\":\"$FSEC\",\"run\":\"$FRUN\"${2:+,$2}}"; } # navig <mode> [json-supplémentaire]
+V22_SAIN='124/BUTTON=Annuler>proposition-ligne>proposition-chat>proposition-lancer/proposition-chat>proposition-ligne>BUTTON=Annuler>proposition-mode/true;300/BUTTON=Annuler>proposition-ligne>proposition-chat>proposition-lancer/proposition-chat>proposition-ligne>BUTTON=Annuler>proposition-mode/true;450/BUTTON=Annuler>proposition-ligne>proposition-chat>proposition-lancer/proposition-chat>proposition-ligne>BUTTON=Annuler>proposition-mode/true' # LB.V22 et son mutant : les arrêts nommés de chaque parcours, puis « true » (tous visibles, hors du pied)
+V25B_SAIN='tenue:true:true:absente;proposition:true:absente;carte:true:absente;etat-124px:true:true;etat-300px:true:true;etat-100vh:true:true' # LB.V25b et ses mutants
 run_vue() { faux "$1"; VJ="$(navig vue "${2:-}")"; unfaux; } # run_vue <dossier> [json]
 
 # --- LB.S : statique ------------------------------------------------------------------------------------------------------------------------------------
@@ -925,7 +1030,7 @@ assert_eq "LB.S1 — aucune écriture innerHTML, outerHTML ni insertAdjacentHTML
 assert_eq "LB.S1 — lignes de littéral de couleur : vue 6 / client 0 ; .style : 0 / 0 ; cssText : 0 / 0 ; rgb( ou hsl( : vue 3 / client 0 ; <chiffre>px : vue 0 / client 1" \
   "$(rj "$LV" 'j.couleur+"/"+j.style+"/"+j.css+"/"+j.rgb+"/"+j.px')|$(rj "$LC" 'j.couleur+"/"+j.style+"/"+j.css+"/"+j.rgb+"/"+j.px')" "6/0/0/3/0|0/0/0/0/1"
 assert_eq "LB.S2 — la table MESSAGES a exactement neuf clés dont proposition ; l'unique postMessage( vise cfg.origineP" "$(rj "$ST" 'j.cles+"/"+j.proposition+"/"+j.cible')" "9/true/true"
-assert_eq "LB.S3 — client <= 290 lignes, vue <= 290 lignes (le chiffre mesuré : client $(rj "$LC" j.lignes), vue $(rj "$LV" j.lignes)) ; le plafond a été relevé de 280/215 par le lot 8 (LB2), qui ajoute à la vue les phrases en clair, une explication par mode et pour la case du chat, le compte à rebours et le bandeau expiré" "$(rj "$LC" 'j.lignes<=290')/$(rj "$LV" 'j.lignes<=290')" "true/true"
+assert_eq "LB.S3 — client <= 290 lignes, vue <= 302 lignes (le chiffre mesuré : client $(rj "$LC" j.lignes), vue $(rj "$LV" j.lignes)) ; le plafond a été relevé de 280/215 par le lot 8 (LB2), qui ajoute à la vue les phrases en clair, une explication par mode et pour la case du chat, le compte à rebours et le bandeau expiré ; celui de la vue est passé de 290 à 310 pour la consigne « Appuyez sur Entrée » qui reste visible après la préparation (P5, revue du 2026-11-08 : décision déléguée par Samuel, message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5, option recommandée : relever le plafond plutôt que compresser le code) ; F6c (3e tour) : remis au plus juste, 301 lignes mesurées plus une ligne d'avance, car les correctifs F2, F4 et F6b tiennent dans des lignes existantes ou dans la feuille de style (décision déléguée par Samuel, message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5, option recommandée : remettre le plafond au plus juste après les ajouts)" "$(rj "$LC" 'j.lignes<=290')/$(rj "$LV" 'j.lignes<=302')" "true/true"
 assert_eq "LB.S4 — aucun fiabilite ni gouvernance dans la vue ni le client ; aucun appel confirm(" "$(rj "$LV" 'j.compartiments+"/"+j.confirm')|$(rj "$LC" 'j.compartiments+"/"+j.confirm')" "0/0|0/0"
 regles_prop() { grep -F '#proposition' "$1"; } # les règles de la proposition dans la feuille de Q : toutes portent #proposition
 # LB3-S2 (F6) : R3 du plan 72-08 (« seulement les variables CSS existantes ») couvre TOUTES les règles que le lot a ajoutées : #proposition, #accueil, .vf-lancer-armement, la carte tassée (.vf-q-carte { max-height … } et sa requête de média)
@@ -1010,6 +1115,13 @@ if [ -n "$CHROME" ]; then
   assert_eq "LB.V14 — LB2 (PU-G-117 ; Q5) : le bandeau précède #terminal dans l'ordre de la page, la région #annonce (role status, aria-live polite) le précède et annonce « Lancement proposé… »" "$(vv v14)" "true/true/status/polite/true"
   assert_eq "LB.V15 — LB2 (PU-G-119) : proposition() rend false et garde le bandeau tant qu'une touche vient d'être tapée dans le sélecteur de mode focalisé ou qu'un bouton de souris est enfoncé dans le bandeau ; un focus sans geste, ou un bandeau libre, est remplacé" "$(vv v15)" "true/true/true/true/true"
   assert_eq "LB.V16 — LB3 (PU-G-136) : dans un cadre de 124 px (le plus petit tiroir), la proposition prend sa place sous le terminal (terminal d'au moins 24 px, son bas au-dessus du haut du bandeau, bandeau d'au plus 60 % du cadre, dans le cadre) ; retirée, le terminal reprend au moins 120 px" "$(vv v16)" "124/true/true/true/true/true"
+  assert_eq "LB.V21 — PU-G-136 (recette du 2026-11-08) : dans un cadre de 300 px (hauteur du tiroir à l'arrivée d'une proposition), le bandeau le plus long défile (témoin : plus haut que sa fenêtre) et « Préparer dans le terminal » est visible sans défiler : défilement à 0, haut et bas du bouton dans le bandeau, bas du bouton dans le cadre" "$(vv v21)" "300/0/true/true/true/true"
+  assert_eq "LB.V22 — S1 (revue du 2026-11-08 ; WCAG 2.4.11) puis F3 (3e tour) : au focus clavier réel, dans un cadre de 124, 300 et 450 px, avec la case du chat, DEUX parcours qui traversent le bandeau — Tab depuis le sélecteur de mode (Annuler, commande, case du chat, Préparer) et Maj+Tab depuis Préparer (case du chat, commande, Annuler, sélecteur de mode) — dont chaque arrêt est nommé et visible, hors du pied collé (Annuler compris : 2 à 4 px sous le pied à 124 px avant F3 ; un arrêt dans le pied : visible dans le bandeau)" "$(vv v22)" "$V22_SAIN"
+  assert_eq "LB.V23 — S3 (revue du 2026-11-08) : le pied collé de la proposition est positionné (sticky) et son fond est OPAQUE (rgb, jamais rgba ni transparent)" "$(vv v23)" "sticky/true"
+  assert_eq "LB.V24 — S2 (revue du 2026-11-08) : après un refus de lancement (occupe), à 300 px avec la case du chat, la raison est visible dans le bandeau et dans le cadre, sans recouvrir le pied ni être recouverte par lui" "$(vv v24)" "300/true/true/true"
+  assert_eq "LB.V25 — P5 (revue du 2026-11-08) : après « ok », la consigne « Commande préparée dans le terminal. Appuyez sur Entrée dans le terminal pour démarrer. » est visible alors que la proposition est retirée, y reste sans rien faire, puis disparaît à Entrée dans le terminal (échéance de 100 s) ou à la fin du compte à rebours (échéance de 6 s)" "$(vv v25)" "entree:true:true:absente;compte-a-rebours:true:true:absente"
+  assert_eq "LB.V25b — F2, F4, F6b (3e tour de la recette du 2026-11-08) : (F2) trois répétitions d'Entrée tenue dans le terminal (autoRepeat) ne retirent PAS la consigne, une Entrée fraîche la retire ; (F4) une nouvelle proposition, puis une carte « Serveur arrêté », la remplacent ; (F6b) avec le bandeau d'état fixe, la consigne reste entièrement au-dessus de lui, à 124 px, 300 px et pleine hauteur (chaque segment commence par le témoin : la consigne était visible)" "$(vv v25b)" "$V25B_SAIN"
+  assert_eq "LB.V26 — S4 (revue du 2026-11-08) : le champ de saisie du xterm réel a pour nom accessible « Saisie du terminal » (jamais « Terminal input »)" "$(vv v26)" "Saisie du terminal"
   assert_eq "LB.V17 — LB3 (PU-G-141 ; Q14) : la carte « Serveur arrêté » reste entière dans un cadre de 124 px (marge de 8 px en haut et en bas, sans défilement) ; « Copier la commande » copie EXACTEMENT /vf-cockpit --terminal (la sélection au moment de la copie est le texte affiché), le bouton dit « Copiée » et la région polie annonce « Commande copiée. » ; aucun bouton de copie sur une proposition de lancement" "$(vv v17)" "true/true/true|true|Copiée|Commande copiée.|true"
   assert_eq "LB.V18 — LB3 (PU-G-140) : accueil à la première ouverture (role status, phrase « pas besoin pour suivre le travail », bouton Compris), aucun focus pris, aucun octet au terminal ; une proposition puis une carte le remplacent ; il revient tant qu'il n'est pas rangé ; « Compris » le range pour de bon (clé du stockage de Q posée, plus de retour)" "$(vv v18)" "true/true/true/true/true/true/true/true"
   assert_eq "LB.V19 — LB3-S (revue LB1-LB2) : « Préparer » est APRÈS la commande exacte, la phrase d'Entrée, la case du chat ET la liste des modes (dont le « Risqué » d'acceptEdits, F8 du LB3-S2) dans l'ordre du document ; la carte « Serveur arrêté » et le bandeau « Reconnexion… » ne sont jamais masqués par la proposition (trois points de l'élément d'état testés), cadre de 124 px et pleine hauteur" "$(vv v19)" "true.true.true.true.true/true/true/true/true"
@@ -1133,6 +1245,43 @@ else sans_effet "M-PREPARER-AVANT"; fi
 if mutant etat-recouvert vf-cockpit-terminal-style.mjs "s#order: 2; z-index: auto;#order: 2; z-index: 1;#"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v19"]'; assert_eq "M-ETAT-RECOUVERT — le mutant (la proposition reprend un z-index) rougit LB.V19 : elle masque la carte ou le bandeau d'état (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v19 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v19 === 'true.true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-ETAT-RECOUVERT"; fi
+if mutant pied-colle vf-cockpit-terminal-style.mjs "s#.vf-q-pied { position: sticky; bottom: 0;#.vf-q-pied { position: static; bottom: 0;#"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v21"]'; assert_eq "M-PIED-COLLE — le mutant (le pied n'est plus collé au bas du bandeau) rougit LB.V21 : « Préparer dans le terminal » repasse sous le pli à 300 px (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v21 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v21 === '300/0/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-PIED-COLLE"; fi
+if mutant etat-sous-pied vf-cockpit-terminal-style.mjs "s#\#etat .vf-q-bandeau, \#etat .vf-q-carte { z-index: 1; }#\#etat .vf-q-bandeau, \#etat .vf-q-carte { z-index: auto; }#"; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v19"]'; assert_eq "M-ETAT-SOUS-PIED — le mutant (la carte et le bandeau d'état perdent leur z-index) rougit LB.V19 : le pied collé, élément positionné, les recouvre (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v19 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v19 === 'true.true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-ETAT-SOUS-PIED"; fi
+if mutant reserve-pied vf-cockpit-terminal-style.mjs 's#^\#proposition { scroll-padding-bottom: calc(var(--sp-32) + var(--sp-8)); }#\#proposition { }#'; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v22"]'; assert_eq "M-RESERVE-PIED — le mutant (la fenêtre de défilement n'a plus de réserve sous le pied) rougit LB.V22 : un arrêt de Tab passe sous le pied collé (case du chat à 300 px, 124 px) (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v22 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v22 === '$V22_SAIN' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-RESERVE-PIED"; fi
+if mutant pied-sans-fond vf-cockpit-terminal-style.mjs 's#sticky; bottom: 0; background: var(--raise); }#sticky; bottom: 0; }#'; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v23"]'; assert_eq "M-PIED-SANS-FOND — le mutant (le pied collé perd son fond) rougit LB.V23 : le fond n'est plus opaque (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v23 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v23 === 'sticky/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-PIED-SANS-FOND"; fi
+if mutant refus-sans-defilement vf-cockpit-terminal-vue.mjs '/msg.scrollIntoView/d'; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v24"]'; assert_eq "M-REFUS-SANS-DEFILEMENT — le mutant (la raison du refus n'est plus ramenée dans le champ) rougit LB.V24 : elle reste sous le pli à 300 px (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v24 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v24 === '300/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-REFUS-SANS-DEFILEMENT"; fi
+for m in "consigne-absente|s#annoncer(ANNONCE_PREPAREE); montrerConsigne(rest); }#annoncer(ANNONCE_PREPAREE); }#|la consigne n'est jamais montrée" "consigne-sans-entree|s#(ev.key === 'Enter' \&\& !ev.repeat \&\& ev.target#(false \&\& ev.target#|Entrée ne retire plus la consigne" "consigne-sans-echeance|s#if (reste > 0) finConsigne = setTimeout(retirerConsigne, reste);##|la fin du compte à rebours ne retire plus la consigne"; do
+  MN="${m%%|*}"; MR="${m#*|}"; MS_="${MR%%|*}"; MD="${MR#*|}"; MU="$(printf %s "$MN" | tr a-z A-Z)" # bash 3.2 : pas de ${var^^}
+  if mutant "$MN" vf-cockpit-terminal-vue.mjs "$MS_"; then
+    [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v25"]'; assert_eq "M-${MU} — le mutant ($MD) rougit LB.V25 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v25 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v25 === 'entree:true:true:absente;compte-a-rebours:true:true:absente' ? 'sain' : 'rouge')")" "rouge"; }
+  else sans_effet "M-${MU}"; fi
+done
+# 3e tour (F2, F4, F6b) : un mutant par garde, chacun doit rougir LB.V25b (la consigne survit à une Entrée tenue ; une proposition puis une carte la remplacent ; elle reste au-dessus du bandeau d'état)
+for m in "consigne-tenue|s#(ev.key === 'Enter' \&\& !ev.repeat \&\& ev.target#(ev.key === 'Enter' \&\& ev.target#|une Entrée tenue retire la consigne" "proposition-garde-consigne|s#retirerProposition(); retirerAccueil(); retirerConsigne();#retirerProposition(); retirerAccueil();#|une nouvelle proposition laisse la consigne" "carte-garde-consigne|/const c = CARTES\[type\]/{n;s#retirerConsigne();##;}|une carte laisse la consigne"; do
+  MN="${m%%|*}"; MR="${m#*|}"; MS_="${MR%%|*}"; MD="${MR#*|}"; MU="$(printf %s "$MN" | tr a-z A-Z)"
+  if mutant "$MN" vf-cockpit-terminal-vue.mjs "$MS_"; then
+    [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v25b"]'; assert_eq "M-${MU} — le mutant ($MD) rougit LB.V25b (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v25b === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v25b === '$V25B_SAIN' ? 'sain' : 'rouge')")" "rouge"; }
+  else sans_effet "M-${MU}"; fi
+done
+if mutant consigne-sous-etat vf-cockpit-terminal-style.mjs 's#, body:has(\#etat .vf-q-bandeau) \#consigne { margin-bottom#  { margin-bottom#'; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v25b"]'; assert_eq "M-CONSIGNE-SOUS-ETAT — le mutant (la consigne perd la marge du bandeau d'état) rougit LB.V25b : elle passe dessous (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v25b === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v25b === '$V25B_SAIN' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-CONSIGNE-SOUS-ETAT"; fi
+if mutant strings-commente vf-cockpit-terminal-client.mjs 's#^\( *\)if (Terminal.strings)#\1// if (Terminal.strings)#'; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v26"]'; assert_eq "M-STRINGS-COMMENTE — le mutant (la ligne Terminal.strings est commentée) rougit LB.V26 : le champ s'annonce « Terminal input » (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v26 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v26 === 'Saisie du terminal' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-STRINGS-COMMENTE"; fi
+if mutant strings-apres-open vf-cockpit-terminal-client.mjs '/^ *if (Terminal.strings)/{h;d;};/term.open(/G'; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v26"]'; assert_eq "M-STRINGS-APRES-OPEN — le mutant (la ligne Terminal.strings est posée après term.open()) rougit LB.V26 : le champ est déjà nommé en anglais (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v26 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v26 === 'Saisie du terminal' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-STRINGS-APRES-OPEN"; fi
 if mutant couleur-proposition vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: #fff; border: thin solid|"; then
   assert_eq "M-COULEUR-PROPOSITION — le mutant (un littéral de couleur dans une règle de la proposition) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
 else sans_effet "M-COULEUR-PROPOSITION"; fi

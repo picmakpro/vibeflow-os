@@ -33,6 +33,9 @@
     .vf-git-fermer, .vf-git-btn { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: var(--text-2); cursor: pointer; }
     .vf-git-fermer:hover, .vf-git-btn:hover { background: var(--raise-2); color: var(--text); }
     .vf-git-tiroir button:focus-visible, .vf-git-rangee:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+    .vf-git-bulle { position: fixed; z-index: 45; max-width: 280px; padding: 8px 12px; border-radius: 12px; font: 400 12.5px/1.5 var(--sans); color: var(--text-2); pointer-events: none; } /* PU-G-193, 196 : définition d'un terme Git au focus */
+    .vf-git-bulle[hidden] { display: none; }
+    .vf-git-mono[tabindex]:focus-visible, .vf-git-pastille[tabindex]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
     .vf-git-aide { margin: 0; padding: 8px 16px; font-size: 12.5px; color: var(--text-3); }
     .vf-git-corps { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 16px; font-family: var(--sans); overflow-x: hidden; }
     .vf-git-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

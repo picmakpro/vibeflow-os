@@ -151,12 +151,12 @@
   const BTN = '[data-vf-doing],[data-vf-transcript],[data-vf-repli]', DANS_PANNEAU = '#panel [data-vf-doing],#panel [data-vf-transcript],#panel [data-vf-repli]';
   const cleBtn = (b) => (b.dataset.vfDoing !== undefined ? 'doing:' + b.dataset.vfDoing : b.dataset.vfRepli !== undefined ? 'repli:' + b.dataset.vfRepli : 'transcript:' + b.dataset.vfTranscript);
   let cleFocus = null;
-  document.addEventListener('focusin', (ev) => { const b = ev.target.closest?.(DANS_PANNEAU); cleFocus = b ? cleBtn(b) : null; });
+  document.addEventListener('focusin', (ev) => { const b = ev.target.closest?.(DANS_PANNEAU); cleFocus = b ? cleBtn(b) : ev.target.matches?.('#panel > .vf-whop h3') ? 'titre' : null; }); // 'titre' : le focus posé sur le titre du tiroir à son ouverture (73-vf-tiroir-travail.js, PU-G-203) survit lui aussi à un redessin
   document.addEventListener('focusout', (ev) => { const b = ev.target; if (b.matches?.(BTN)) queueMicrotask(() => { if (b.isConnected && document.activeElement !== b) cleFocus = null; }); });
   const rendreFocus = () => {
     if (!cleFocus || (document.activeElement && document.activeElement !== document.body)) return;
-    const b = [...document.querySelectorAll(DANS_PANNEAU)].find((x) => cleBtn(x) === cleFocus);
-    if (b) b.focus({ preventScroll: true });
+    const b = cleFocus === 'titre' ? document.querySelector('#panel > .vf-whop h3') : [...document.querySelectorAll(DANS_PANNEAU)].find((x) => cleBtn(x) === cleFocus);
+    if (b) { if (cleFocus === 'titre') b.tabIndex = -1; b.focus({ preventScroll: true }); }
   };
   new MutationObserver(() => { rendreFocus(); if (demandes.size) for (const b of document.querySelectorAll('#panel [data-vf-doing]')) poser(b); }).observe(document.getElementById('panel') || document.documentElement, { childList: true, subtree: true });
   document.addEventListener('click', (ev) => {

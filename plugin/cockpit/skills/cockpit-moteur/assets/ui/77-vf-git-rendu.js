@@ -21,6 +21,29 @@
   const ico = (d) => { const s = sv('svg', { class: 'i', viewBox: '0 0 24 24', 'aria-hidden': 'true' }); sv('path', { d }, s); return s; };
   const pl = (n, mot, plur) => `${n} ${n > 1 ? plur || mot + 's' : mot}`;
   const avance = (a) => a == null ? el('span', 'meta', '—', { role: 'img', 'aria-label': 'avance inconnue', title: 'avance inconnue' }) : el('span', 'meta', pl(a, 'commit')); // null = inconnu (dépôt sans base, au-delà de la limite) : jamais « 0 commit »
+  // PU-G-193 et 196 (recette du 2026-11-08, arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « Les partiels qui te concernaient ») : la définition d'un terme Git ne passait que par `title`, visible au survol de la souris
+  // seulement. aideFocus la montre aussi au FOCUS clavier, dans une bulle visuelle unique (texte posé en textContent, jamais du HTML ; aria-hidden : le lecteur d'écran lit déjà la même phrase par aria-description ou aria-label).
+  // Échap la ferme sans fermer le tiroir ; elle se ferme aussi au départ du focus et suit l'élément quand il défile.
+  let bulle = null, ancre = null, clavier = false; // clavier : la dernière entrée était une touche (un focus posé par script ne vaut :focus-visible qu'après une touche ou sur un élément déjà visible au clavier) ; un clic de souris la remet à faux
+  document.addEventListener('keydown', () => { clavier = true; }, true); document.addEventListener('pointerdown', () => { clavier = false; }, true);
+  const cacher = () => { if (bulle) bulle.hidden = true; ancre = null; };
+  const placer = () => {
+    if (!bulle || bulle.hidden || !ancre) return;
+    const r = ancre.getBoundingClientRect(), b = bulle.getBoundingClientRect(), bas = r.bottom + 6 + b.height <= window.innerHeight - 8;
+    bulle.style.top = Math.max(8, bas ? r.bottom + 6 : r.top - 6 - b.height) + 'px';
+    bulle.style.left = Math.max(8, Math.min(r.left, window.innerWidth - b.width - 8)) + 'px';
+  };
+  const montrer = (e, texte) => {
+    if (!bulle) { bulle = el('div', 'vf-git-bulle glass', null, { role: 'tooltip', 'aria-hidden': 'true' }); bulle.hidden = true; document.body.appendChild(bulle); window.addEventListener('scroll', placer, true); } // le focus fait défiler l'élément dans sa fenêtre : la bulle le suit (elle ne se ferme pas au défilement, sinon le focus clavier d'un élément hors champ ne la montrerait jamais)
+    bulle.textContent = texte; bulle.hidden = false; ancre = e; placer();
+  };
+  const aideFocus = (e, texte) => {
+    e.setAttribute('tabindex', '0');
+    e.addEventListener('focus', () => { if (clavier || e.matches(':focus-visible')) montrer(e, typeof texte === 'function' ? texte() : texte); }); // texte : une chaîne, ou une fonction quand la définition change avec la vue (titre de la vue)
+    e.addEventListener('blur', cacher);
+    e.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && bulle && !bulle.hidden && ancre === e) { ev.stopPropagation(); ev.preventDefault(); cacher(); } });
+    return e;
+  };
   const relatif = (at, maintenant) => {
     const s = Math.max(0, Math.floor(((maintenant == null ? Date.now() : maintenant) - at * 1000) / 1000)), m = Math.floor(s / 60), h = Math.floor(m / 60), j = Math.floor(h / 24);
     if (s < 60) return "à l'instant";
@@ -110,7 +133,7 @@
   // ---------- sections repliables et listes ----------
   const section = (titre, n, corps, ouvert, id, aide) => { // aide : définition en texte constant (title au survol, aria-description au focus), jamais une donnée lue de git
     const s = el('section', 'vf-git-sec'), b = el('button', 'vf-git-sec-t', null, { type: 'button', 'aria-expanded': String(!!ouvert), 'aria-controls': id });
-    if (aide) { b.setAttribute('title', aide); b.setAttribute('aria-description', aide); }
+    if (aide) { b.setAttribute('title', aide); b.setAttribute('aria-description', aide); aideFocus(b, aide); }
     b.append(el('span', 'vf-git-sec-n', titre));
     if (n != null) b.appendChild(el('span', 'meta', n));
     b.appendChild(ico('M9 6l6 6-6 6'));
@@ -130,7 +153,7 @@
       const d = el('div', 'vf-git-wt-l'), t = ligne(mono(w.nom, 'vf-git-gras'));
       if (w.ici) t.appendChild(el('span', 'vf-git-ici', 'ici'));
       const br = mono(w.detache ? 'HEAD détaché' : w.branche || '—');
-      if (w.detache) br.setAttribute('title', AIDE_DETACHE); // PU-G-193 : le terme reste, sa définition au survol
+      if (w.detache) { br.setAttribute('title', AIDE_DETACHE); br.setAttribute('aria-description', AIDE_DETACHE); aideFocus(br, AIDE_DETACHE); } // PU-G-193 : le terme reste, sa définition au survol ET au focus
       d.append(t, ligne(br));
       if (!w.ici) d.appendChild(commande(w.commande, annonce, 'cd vers ' + w.nom));
       return d;
@@ -175,5 +198,5 @@
     d.append(el('h3', 'vf-git-titre', 'Git est indisponible'), el('p', 'vf-git-note', raison), b, commande(cmd, annonce, 'de diagnostic'));
     return d;
   };
-  window.VFGitRendu = Object.freeze({ graphe, rangee, sectionWorktrees, sectionTags, sectionStash, sectionAuteurs, mergees, commande, etatChargement, etatVide, etatIndisponible, relatif, section, ico, el });
+  window.VFGitRendu = Object.freeze({ graphe, rangee, sectionWorktrees, sectionTags, sectionStash, sectionAuteurs, mergees, commande, etatChargement, etatVide, etatIndisponible, relatif, section, ico, el, aideFocus });
 })();

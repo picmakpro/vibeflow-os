@@ -143,7 +143,7 @@
       const nv = w.verifie === false || (etat && etat.verifie === false); // P78-D-38 (A3) : lien retour non vérifié, jamais lu côté serveur : ni comptes, ni commande cd, ni bouton de copie
       for (const [txt, cls, tip] of nv ? [['non vérifié', 'vf-git-p-nonverif']] : !wt ? [['lecture…', 'vf-git-p-lecture', "Lecture de l'état de ce worktree en cours"]] : etat ? pastilles(etat, d.base && d.base.nom) : [['état indisponible', '']]) {
         const sp = el('span', 'vf-git-pastille' + (cls ? ' ' + cls : ''), txt, tip ? { title: tip } : null);
-        if (tip && cls === 'vf-git-p-mono') { sp.setAttribute('role', 'img'); sp.setAttribute('aria-label', tip); }
+        if (tip && cls === 'vf-git-p-mono') { sp.setAttribute('role', 'img'); sp.setAttribute('aria-label', tip); R.aideFocus(sp, tip); } // PU-G-196 : la définition des ↑/↓ aussi au focus clavier
         bloc.appendChild(sp);
       }
       ou.insertBefore(bloc, ou.querySelector('.vf-git-cmd, .vf-git-sans'));

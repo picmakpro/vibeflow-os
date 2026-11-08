@@ -101,9 +101,20 @@ export function vueTerminal(cfg) {
   };
   if (typeof document === 'object' && document && typeof document.addEventListener === 'function') { // la vue se charge aussi hors page (sonde de parité de la palette) : aucun écouteur sans document
     ['keydown', 'input', 'change'].forEach((n) => document.addEventListener(n, (ev) => { if (ev.target && ev.target.closest && ev.target.closest('#proposition')) geste = Date.now(); if (n === 'keydown' && ev.target && ev.target.closest && ev.target.closest('#terminal')) fermerAccueil(); }, true)); // la frappe n'est ni retenue ni modifiée
+    document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.repeat && ev.target && ev.target.closest && ev.target.closest('#terminal')) retirerConsigne(); }, true); // P5 : Entrée dans le terminal range la consigne « Appuyez sur Entrée » ; F2 (3e tour) : seule une Entrée FRAÎCHE, une répétition d'Entrée tenue est avalée par la retenue du client et n'exécute rien
     document.addEventListener('pointerdown', (ev) => { appui = !!(ev.target && ev.target.closest && ev.target.closest('#proposition')); if (appui) geste = Date.now(); }, true);
     ['pointerup', 'pointercancel'].forEach((n) => document.addEventListener(n, () => { appui = false; }, true));
   }
+  // P5 (recette du 2026-11-08) : une fois la commande écrite dans le terminal, la consigne « Appuyez sur Entrée » reste VISIBLE (l'annonce vocale seule ne suffit pas) jusqu'à Entrée dans le terminal ou, si la proposition avait une échéance, jusqu'à la fin de son compte à rebours
+  let finConsigne = 0;
+  const retirerConsigne = () => { clearTimeout(finConsigne); finConsigne = 0; const c = document.getElementById('consigne'); if (c) c.remove(); };
+  const montrerConsigne = (reste) => {
+    retirerConsigne();
+    const b = el('div', 'vf-q-bandeau vf-q-collage'); b.id = 'consigne'; // pas de role : la région live #annonce la dit déjà, un second role=status la ferait lire deux fois
+    b.appendChild(el('span', 'vf-q-pastille')); b.appendChild(el('span', 'vf-q-texte', ANNONCE_PREPAREE));
+    const t = document.getElementById('terminal'); if (t) document.body.insertBefore(b, t); else document.body.appendChild(b);
+    if (reste > 0) finConsigne = setTimeout(retirerConsigne, reste);
+  };
   // bandeau d'une proposition arrivée à échéance : dit en clair ce qui s'est passé, ne propose plus rien (« Fermer » seulement)
   const montrerExpiree = () => {
     retirerProposition();
@@ -125,6 +136,7 @@ export function vueTerminal(cfg) {
     },
     carte(type, action) {
       const c = CARTES[type]; if (!c) return;
+      retirerConsigne();
       const z = vider(); z.hidden = false;
       z.appendChild(el('div', 'vf-q-voile'));
       const k = el('div', 'vf-q-carte'); k.setAttribute('role', c.role); k.tabIndex = -1;
@@ -163,7 +175,7 @@ export function vueTerminal(cfg) {
         retirerProposition(); return;
       }
       if (courant !== p.id && manipule()) return false; // garde:manipule
-      const premier = courant !== p.id; retirerProposition(); retirerAccueil();
+      const premier = courant !== p.id; retirerProposition(); retirerAccueil(); retirerConsigne();
       const bloquants = p.bloquants || [], avertissements = p.avertissements || [];
       const b = el('div', 'vf-q-bandeau vf-q-collage'); b.id = 'proposition'; b.setAttribute('data-id', p.id); b.setAttribute('role', 'group'); b.setAttribute('aria-label', 'Lancement à confirmer');
       b.appendChild(el('span', 'vf-q-pastille vf-q-attention'));
@@ -221,9 +233,10 @@ export function vueTerminal(cfg) {
       }
       const fin = (st) => {
         if (document.getElementById('proposition') !== b) return; // le bandeau a été remplacé ou retiré entre-temps
-        if (st === 'ok' || st === 'absente') { retirerProposition(); if (st === 'ok') annoncer(ANNONCE_PREPAREE); return; } // garde:retrait-usage
+        if (st === 'ok' || st === 'absente') { const rest = echeance ? Math.max(1, echeance - Date.now()) : 0; retirerProposition(); if (st === 'ok') { annoncer(ANNONCE_PREPAREE); montrerConsigne(rest); } return; } // garde:retrait-usage
         lancer.textContent = BOUTON_PREPARER;
         msg.textContent = MESSAGES_LANCEMENT[st] || MESSAGES_LANCEMENT.refus;
+        if (msg.scrollIntoView) msg.scrollIntoView({ block: 'nearest' }); // S2 : la raison du refus se range SOUS le pied (il la précède dans le bandeau) ; le défilement l'amène dans le champ, au-dessus du bord bas du bandeau (témoin LB.V24)
         if (st === 'attendre') armer(); else if (bloquants.length === 0) lancer.setAttribute('aria-disabled', 'false');
       };
       lancer.addEventListener('click', (ev) => {

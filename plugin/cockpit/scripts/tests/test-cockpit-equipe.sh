@@ -10,6 +10,7 @@
 #   EP  coût de collecte sur 40 sous-agents (garde de non-régression, T-69-06)
 #   E23 onglet Équipe : page /equipe.html, graphe cockpit-equipe@1, couche d'onglets, sonde de libellés (CKPT-23 ; P69-D-17)
 #   EK17 (Q8, PU-G-137) la frappe ne déclenche pas le canevas sur Équipe, le fait toujours sur Projet et Code
+#   EK18 (S6, PU-G-193) le titre de la vue n'est plus un arrêt de Tab sous le tiroir Git (numéro 17 pris par la frappe du canevas, fusion de A et B)
 #   EUI rendu de l'arbre hors navigateur (vm) : imbrication, terminés repliés, liens dans les deux sens, pied (CKPT-19 à 22 ; P69-D-14 à P69-D-18)
 #   EK  clavier et témoins mineurs de l'onglet Équipe dans un vrai Chromium : focus après Entrée sur « Lire le transcript », mutants de comportement (UIFN-12, UIFN-13)
 # 69-04 ajoute E23 et EUI.
@@ -946,9 +947,10 @@ JSON
   EK16() { EK_LARGEUR="$1" EK_ORDRE="$2" EKC un-lateral "project.html#t"; mv "$WORK/ek-un-lateral.json" "$WORK/ek-lat-$1-$2.json"; }
   EK16V='j.erreur||["premier","second","large"].map((k)=>{const e=j.etapes[k];return (e.git?"G":"-")+(e.travail?"T":"-")+":"+e.focus}).join(" ")'
   EK16 1024 git-puis-travail
-  assert_eq "EK16.0 — 1024 px, Git puis « Au travail » : Git est replié, le focus va au bouton « N au travail » ; élargi à 1440 px, Git ne se rouvre pas (Q12, PU-G-203)" "$(G "$WORK/ek-lat-1024-git-puis-travail.json" "$EK16V")" "G-:git -T:bouton-travail -T:bouton-travail"
+  assert_eq "EK16.0 — 1024 px, Git puis « Au travail » : Git est replié, le focus va au tiroir « Au travail » qui s'ouvre (recette du 2026-11-08 : il restait sur le bouton « N au travail ») ; élargi à 1440 px, Git ne se rouvre pas (Q12, PU-G-203)" "$(G "$WORK/ek-lat-1024-git-puis-travail.json" "$EK16V")" "G-:git -T:travail -T:travail"
+  assert_eq "EK16.0b — 1024 px : un redessin du tiroir par le flux (nouveau « who ») laisse le focus dans le tiroir « Au travail » (le titre remplacé le retrouve ; PU-G-203, recette du 2026-11-08)" "$(G "$WORK/ek-lat-1024-git-puis-travail.json" 'j.erreur||(j.etapes.redessin.travail?"T":"-")+":"+j.etapes.redessin.focus')" "T:travail"
   EK16 1024 travail-puis-git
-  assert_eq "EK16.1 — 1024 px, « Au travail » puis Git : « Au travail » est replié, le focus est dans Git ; élargi à 1440 px, « Au travail » ne se rouvre pas" "$(G "$WORK/ek-lat-1024-travail-puis-git.json" "$EK16V")" "-T:BODY G-:git G-:git"
+  assert_eq "EK16.1 — 1024 px, « Au travail » puis Git : « Au travail » s'ouvre avec le focus dans son tiroir (il partait de la page : PU-G-203), est replié quand Git s'ouvre, le focus est dans Git ; élargi à 1440 px, « Au travail » ne se rouvre pas" "$(G "$WORK/ek-lat-1024-travail-puis-git.json" "$EK16V")" "-T:travail G-:git G-:git"
   EK16 1279 travail-puis-git
   assert_eq "EK16.2 — 1279 px (sous 1280) : un seul tiroir latéral" "$(G "$WORK/ek-lat-1279-travail-puis-git.json" 'j.erreur||(j.etapes.second.git?"G":"-")+(j.etapes.second.travail?"T":"-")')" "G-"
   EK16 1280 travail-puis-git
@@ -973,6 +975,7 @@ JSON
   assert_eq "EK9.2 — même mutant, tiroir « Au travail » : le focus tombe sur BODY, détecté" "$(ek_mutant r2 focus-tiroir "project.html#t" 'j.erreur||(j.apres.tag)' 'new MutationObserver(() => { rendreFocus(); ' 'new MutationObserver(() => { ')" "muté|BODY"
   assert_eq "EK10.2 — mutant (la règle du pied retirée de la page servie) : le badge sort de sa carte à 1440 px, détecté" "$(ek_mutant r3 badge "$EKA1" 'j.erreur||(j["1440"]<0?"rogné":"dans la carte")' ".foot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .foot .vst { flex: none; }" '.foot .meta { }' ".foot .meta { white-space: normal; min-width: 0; border-radius: 12px; }" '.foot .meta { }')" "muté|rogné"
   assert_eq "EK11.2 — mutant (les clés de la collecte affichées telles quelles) : « sessions : lue » reparaît, détecté" "$(ek_mutant r4 libelles "equipe.html#t" 'j.erreur||(/\b(sessions|locks|dags)\b/.test(j.src)?"anglais":"français")' '.map(([k]) => SOURCES[k] || k);' '.map(([k]) => k);')" "muté|anglais"
+  assert_eq "EK16.8 — mutant (le focus du titre n'est plus rendu après un redessin du tiroir) : le focus tombe sur BODY, détecté" "$(EK_LARGEUR=1024 EK_ORDRE=git-puis-travail ek_mutant r6 un-lateral "project.html#t" 'j.erreur||(j.etapes.redessin.travail?"T":"-")+":"+j.etapes.redessin.focus' "cleFocus === 'titre' ? document.querySelector('#panel > .vf-whop h3') :" "cleFocus === 'titre' ? null :")" "muté|T:BODY"
   assert_eq "EK12.2 — mutant (infobulle laissée au viewer) : « Chercher un fichier, une route, un module » reparaît, détecté" "$(ek_mutant r5 libelles "equipe.html#t" 'j.erreur||j.titre' "bouton.setAttribute('aria-label', LIB); bouton.title = LIB;" "bouton.setAttribute('aria-label', LIB);")" "muté|Chercher un fichier, une route, un module"
   assert_eq "EK13.2 — mutant (plafond de 0,75 retiré) : la scène est réduite sous 0,75, détecté" "$(ek_mutant r6 echelle "equipe.html" 'j.erreur||(j["390"].concat(j["768"]).some((m)=>m.k<0.75)?"réduit":"plafonné")' 'if (!actif || !st.t || st.t.k > 0.75) return;' 'return;')" "muté|réduit"
   assert_eq "EK13.3 — mutant (cadrage sous freeArea() au lieu du bas réel de #context) : le titre recouvre la première carte, détecté" "$(ek_mutant r7 echelle "equipe.html" 'j.erreur||(j["390"].concat(j["768"]).some((m)=>m.aire>0)?"recouvre":"libre")' 'const y = Math.max(a.y, bas - haut + 12)' 'const y = a.y')" "muté|recouvre"
@@ -987,12 +990,19 @@ JSON
   assert_eq "EK15.8 — mutant (aria-controls retiré) : le bouton ne dit plus ce qu'il ouvre, détecté" "$(EK15M panneau "b.setAttribute('aria-controls', 'panel'); " "" 'j.erreur||String(j.ouvert.controls)')" "muté|null"
   EK16M() { local m; m="$(ek_muter "$3" "$4")"; ek_demarrer; EK_LARGEUR="$1" EK_ORDRE="$2" EKC un-lateral "project.html#t"; local v; v="$(G "$WORK/ek-un-lateral.json" "$EK16V")"; vf_hyg_stop "$EK_PID"; ek_restaurer; echo "$m|$v"; }
   assert_eq "EK16.5 — mutant (la règle Q12 retirée : seuil à 0 px) : à 1024 px les deux tiroirs restent ouverts, détecté" "$(EK16M 1024 git-puis-travail "window.matchMedia('(max-width: 1279px)')" "window.matchMedia('(max-width: 0px)')")" "muté|G-:git GT:git GT:git"
-  assert_eq "EK16.6 — mutant (seuil à 1500 px) : à 1440 px le second tiroir replie le premier, détecté" "$(EK16M 1440 git-puis-travail "window.matchMedia('(max-width: 1279px)')" "window.matchMedia('(max-width: 1500px)')")" "muté|G-:git -T:bouton-travail -T:bouton-travail"
-  assert_eq "EK16.7 — mutant (le focus n'est plus posé sur le bouton après le repli de Git) : il ne va plus au tiroir qui s'ouvre, détecté" "$(EK16M 1024 git-puis-travail "if (!panneau.contains(document.activeElement)) b.focus({ preventScroll: true });" "")" "muté|G-:git -T:BODY -T:BODY"
+  assert_eq "EK16.6 — mutant (seuil à 1500 px) : à 1440 px le second tiroir replie le premier, détecté" "$(EK16M 1440 git-puis-travail "window.matchMedia('(max-width: 1279px)')" "window.matchMedia('(max-width: 1500px)')")" "muté|G-:git -T:travail -T:travail"
+  assert_eq "EK16.7 — mutant (le focus n'est plus posé sur le titre du tiroir « Au travail » après le repli de Git) : il ne va plus au tiroir qui s'ouvre, détecté" "$(EK16M 1024 git-puis-travail "titre.tabIndex = -1; titre.focus({ preventScroll: true });" "titre.tabIndex = -1;")" "muté|G-:git -T:BODY -T:BODY"
   # EK17 (Q8, PU-G-137, recette du 2026-11-08) : « on empêche seulement la frappe de déclencher le canevas » sur Équipe (pas de terminal) ; Projet et Code gardent leurs raccourcis
   ek_demarrer; EKC touches-canevas "equipe.html"; mv "$WORK/ek-touches-canevas.json" "$WORK/ek-touches.json"; vf_hyg_stop "$EK_PID"
   assert_eq "EK17.0 — témoin : sur Projet et sur Code, f, F, p, P, +, = et - agissent toujours, chacune, sur la caméra ou le tiroir (la sonde sait lire un clavier qui agit)" "$(G "$WORK/ek-touches.json" 'j.erreur||(j.projet.erreur||j.code.erreur||[j.projet,j.code].map((x)=>Object.values(x.agit).every(Boolean)).join())')" "true,true"
   assert_eq "EK17.1 — Équipe, après un clic sur le fond : f, F, p, P, +, = et - ne déplacent, ne cadrent ni ne zooment la carte et n'ouvrent ni ne ferment le tiroir de détail (chaque touche est frappée sur une caméra décalée du cadrage où elle aurait un effet ; caméra et tiroir inchangés)" "$(G "$WORK/ek-touches.json" 'j.erreur||(j.equipe.erreur||"agissent : "+Object.entries(j.equipe.agit).filter(([k,v])=>v).map(([k])=>k).join(","))')" "agissent : "
+  # EK18 (S6, revue de la recette du 2026-11-08, PU-G-193) : à 1 440 px, tiroir Git ouvert, le titre de la vue (masqué dessous) n'est plus un arrêt de Tab ; il le redevient à la fermeture
+  EK18V='j.erreur||j.verdict'
+  ek_demarrer; EKC tab-titre "equipe.html"; vf_hyg_stop "$EK_PID"
+  assert_eq "EK18 — 1 440 px, vraies touches Tab : le titre de la vue est un arrêt Git fermé (témoin), n'en est PAS un Git ouvert (alors que d'autres arrêts existent : témoin), l'est de nouveau Git refermé" "$(G "$WORK/ek-tab-titre.json" "$EK18V")" "true/false/true/true"
+  EK18M() { local m; m="$(ek_muter "$1" "$2")"; ek_demarrer; EKC tab-titre "equipe.html"; local v; v="$(G "$WORK/ek-tab-titre.json" "$EK18V")"; vf_hyg_stop "$EK_PID"; ek_restaurer; echo "$m|$v"; }
+  assert_eq "EK18.1 — mutant (le tabindex du titre n'est plus retiré Git ouvert) : le titre, masqué sous le tiroir, redevient un arrêt de Tab, détecté" "$(EK18M "if (document.body.classList.contains('vf-git-ouvert')) h1.removeAttribute('tabindex'); else h1.tabIndex = 0;" "h1.tabIndex = 0;")" "muté|true/true/true/true"
+  assert_eq "EK18.2 — mutant (le tabindex n'est plus rendu à la fermeture de Git) : le titre n'est plus atteignable une fois Git refermé, détecté" "$(EK18M "else h1.tabIndex = 0; };" "};")" "muté|true/false/true/false"
   # témoins de la sonde de mutation elle-même
   ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"
   assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK2.1 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "a1|null|identique"

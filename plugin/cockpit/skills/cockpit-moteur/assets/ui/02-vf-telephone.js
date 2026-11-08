@@ -160,11 +160,69 @@
         n.replaceWith(f);
       }
     }
-    if (phone.matches) { h1.setAttribute('role', 'button'); h1.tabIndex = 0; } else { h1.removeAttribute('role'); h1.removeAttribute('tabindex'); }
+    if (phone.matches) { h1.setAttribute('role', 'button'); h1.tabIndex = 0; } else { h1.removeAttribute('role'); if (!h1.dataset.vfAide) h1.removeAttribute('tabindex'); } // le titre à définition Git reste atteignable par Tab (76-vf-git-entete.js)
   };
   if (ctx) {
     new MutationObserver(titre).observe(ctx, { childList: true }); phone.addEventListener('change', titre); titre();
     ctx.addEventListener('click', (ev) => { if (phone.matches && ev.target.closest('h1')) bascule(true); });
     ctx.addEventListener('keydown', (ev) => { if (phone.matches && ev.target.closest?.('h1') && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); bascule(true); } });
+  }
+  // PU-G-045 (recette du 2026-11-08, arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « Les partiels qui te concernaient ») : de 701 à 999 px le panneau est fermé par défaut (à garder), mais le viewer
+  // ne l'ouvrait qu'au téléphone : choisir une carte ou un fichier n'y montrait rien. Ici le choix l'ouvre (souris, toucher, clavier), il se referme par son bouton « Détail » ou par Échap, et le focus revient où il était.
+  // Pas de role=dialog : un dialogue visible empêcherait l'Échap des tiroirs « Au travail » et Git (leur « surcouche »).
+  const mi = window.matchMedia('(min-width: 701px) and (max-width: 999px)'), SCm = window.Floorplan;
+  if (btn && panel && SCm && SCm.on) {
+    // P1 (revue du 2026-11-08) : la préférence « panneau ouvert » (SC.store, clé panel) est celle du BUREAU, et seul le bouton « Détail » l'écrit ; une ouverture ou une fermeture par sélection ou par Échap n'y touche pas
+    // (sinon le rechargement à 768 px ouvrait le panneau d'office, et Échap à 768 px fermait celui du bureau à 1 440 px). Même procédé que 75-vf-modele.js : l'objet store est partagé, on enveloppe son écriture.
+    let sansMemoire = false;
+    if (SCm.store && SCm.store.set) { const ecrire = SCm.store.set; SCm.store.set = (k, v) => (sansMemoire && k === 'panel' ? undefined : ecrire(k, v)); }
+    const sansTrace = (f) => { sansMemoire = true; try { f(); } finally { sansMemoire = false; } };
+    // P3 : la règle s'ancre sur le CHOIX, pas sur une fenêtre de temps. Sans geste, seul un CHANGEMENT de sélection ouvre : un rendu de plus sur la même sélection (flux en direct) ne rouvre jamais ce que l'utilisateur vient de refermer, quel que soit le délai.
+    // F1 (3e tour) : un geste armé « au pointeur posé » restait armé quand il n'aboutissait à aucune sélection (glisser sur le fond, pan, pincement) et le rendu suivant rouvrait le panneau. Sur la carte, le choix est donc
+    // l'évènement en cours au moment de l'émission (window.event) : le clic de la carte, ou l'Entrée / Espace qui la choisit ; un glisser, un pan ou un pincement n'émettent aucun clic, rien ne reste armé.
+    // La palette choisit plus tard (le viewer recentre d'abord) : son geste reste armé jusqu'au premier évènement « panel » qui le suit, et seulement lui (jamais le graphe).
+    let choixPalette = null, clavier = false, versPanneau = false, precedent = null, retour = null, etaitOuvert = ouvert();
+    const sur = (ev) => !!(ev && ev.target && ev.target.closest && ev.target.closest('#svg'));
+    const dansPalette = (ev) => !!(ev.target && ev.target.closest && ev.target.closest('#palette'));
+    document.addEventListener('pointerdown', (ev) => { clavier = false; choixPalette = dansPalette(ev) ? { clavier: false } : null; versPanneau = false; }, true);
+    document.addEventListener('keydown', (ev) => {
+      versPanneau = false;
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      clavier = sur(ev); choixPalette = dansPalette(ev) ? { clavier: true } : null;
+    }, true);
+    document.addEventListener('keyup', () => { clavier = false; }, true);
+    // P2 : au clavier le focus entre dans le panneau. Par la palette (/, saisie, Entrée) le viewer rend ensuite le focus à la carte (reveal, après le recentrage) : tant que le geste du clavier court, un focus qui tombe sur le graphe est ramené au panneau.
+    document.addEventListener('focusin', (ev) => {
+      if (versPanneau && ev.target.closest && ev.target.closest('#svg')) { versPanneau = false; panel.tabIndex = -1; panel.focus({ preventScroll: true }); }
+    }, true);
+    SCm.on('panel', (d) => {
+      const ev = window.event, sel0 = ev && ev.type === 'click' && sur(ev) ? { clavier } : ev && ev.type === 'keydown' && (ev.key === 'Enter' || ev.key === ' ') && sur(ev) ? { clavier: true } : null;
+      const g = choixPalette || sel0; choixPalette = null; // le geste de la palette est consommé par le premier évènement « panel » qui le suit
+      const sel = d && d.selected, cle = sel == null ? null : typeof sel === 'string' ? sel : JSON.stringify(sel), change = cle !== precedent;
+      precedent = cle;
+      if (!cle || !mi.matches || ouvert() || panel.querySelector(':scope > .vf-whop')) return;
+      if (!change && !g) return;
+      const a = document.activeElement; retour = a && a !== document.body && !panel.contains(a) ? a : null;
+      sansTrace(() => bascule(true));
+      if (g && g.clavier) { panel.tabIndex = -1; panel.focus({ preventScroll: true }); versPanneau = true; }
+    });
+    // P4 bis : la règle est symétrique, la dernière surface ouverte l'emporte. Git s'ouvre (touche g, ligne ou ouvreur) pendant que le panneau est ouvert : le panneau se replie, la sélection est gardée, la préférence n'est pas écrite ; il ne se rouvre pas à la fermeture de Git
+    window.addEventListener('vf-git:etat', (e) => { if (e.detail && e.detail.ouvert && mi.matches && ouvert() && !panel.querySelector(':scope > .vf-whop')) sansTrace(() => bascule(false)); });
+    new MutationObserver(() => {
+      const o = ouvert(); if (o === etaitOuvert) return; etaitOuvert = o;
+      // P4 et F5 : le tiroir Git (z 7) recouvrirait le panneau (z 5) ; un seul latéral à la fois, comme « Au travail » sous 1 280 px (73-vf-tiroir-travail.js). La règle se tient ICI, sur l'ouverture elle-même,
+      // et non dans chaque chemin qui ouvre (sélection, « Détail » au clic ou au clavier, palette) : la dernière surface ouverte l'emporte par tous les chemins.
+      if (o) { const git = window.VFGitTiroir; if (mi.matches && git && git.ouvert()) git.fermer(true); return; }
+      if (!mi.matches || panel.querySelector(':scope > .vf-whop')) { retour = null; return; }
+      const a = document.activeElement;
+      if (a === document.body || panel.contains(a)) (retour && document.contains(retour) ? retour : btn).focus({ preventScroll: true });
+      retour = null;
+    }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Escape' || ev.defaultPrevented || !mi.matches || !ouvert() || panel.querySelector(':scope > .vf-whop')) return;
+      if (document.querySelector('#palette.open, #flowmenu.open, #legend.open, #ctxmenu:not([hidden])') || (window.FloorplanTour && window.FloorplanTour.active())) return; // une palette, un menu ou la visite prennent l'Échap d'abord
+      if (ev.target && /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) return;
+      ev.stopPropagation(); ev.preventDefault(); sansTrace(() => bascule(false)); // le viewer n'entend pas cet Échap : il ne remonte pas le canevas ni n'efface la sélection (R15.8)
+    });
   }
 })();
