@@ -23,8 +23,8 @@ const etat = (x) => {
 };
 // accord réel (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3da818fe)) : « 1 bloqué », « 4 bloqués », jamais « bloqué(s) » ; même règle que le panneau (ui/00-vibeflow.js)
 const pl = (n, un, plus) => (n > 1 ? plus : un);
-// « dans la Phase 72 ? » : l'article devant un nom de phase ; un jalon ou une autre carte garde sa forme
-const dans = (label) => (/^Phase\b/.test(label) ? `dans la ${label}` : `dans ${label}`);
+// « dans la Phase 72 ? », « dans la Mission 414 ? » : l'article devant un nom de phase ou de mission (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3f67e7aa)) ; un jalon ou une autre carte garde sa forme
+const dans = (label) => (/^(Phase|Mission)\b/.test(label) ? `dans la ${label}` : `dans ${label}`);
 const fold = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 export function projectIndex(G) {

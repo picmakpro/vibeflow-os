@@ -373,6 +373,15 @@ H locg "$SCRIPTS" "$WORK/q19-c4.json" "Que contient la phase 3 ?" > "$WORK/q19g.
 H locg "$SCRIPTS" "$WORK/q19-c1.json" "Que contient la phase 3 ?" > "$WORK/q19h.json"
 assert_eq "Q19.7 — M1 : n > 1 -> « 4 bloqués », « 27 faits », « 2 en cours » (invariable) ; n = 1 -> « 1 bloqué », « 1 fait », « 1 en cours »" "$(H json "$WORK/q19g.json" "/4 bloqués/.test(j.answer) && /27 faits/.test(j.answer) && /2 en cours/.test(j.answer)")|$(H json "$WORK/q19h.json" "/1 bloqué[,.]/.test(j.answer) && /1 fait,/.test(j.answer) && /1 en cours/.test(j.answer) && !/1 (bloqués|faits)/.test(j.answer)")" "true|true"
 
+# Q19.8 — M2 : l'article s'étend aux missions (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3f67e7aa)) ; la phase (Q19.5) et le jalon (Q19.6) ne bougent pas
+"$NODE" --input-type=module -e "
+import fs from 'node:fs';
+const g = JSON.parse(fs.readFileSync('$WORK/q19-1.json', 'utf8'));
+g.nodes.push({ id: 'dag-MISSION-414', label: 'Mission 414', kind: 'mission', st: 'active', parent: 'ms-v2' });
+fs.writeFileSync('$WORK/q19-m.json', JSON.stringify(g));"
+H locg "$SCRIPTS" "$WORK/q19-m.json" "Que contient la mission 414 ?" > "$WORK/q19i.json"
+assert_eq "Q19.8 — M2 : relances d'une mission -> « … reste dans la Mission 414 ? » et « … bloque dans la Mission 414 ? »" "$(H json "$WORK/q19i.json" "j.followups.includes(\"Qu'est-ce qui reste dans la Mission 414 ?\") && j.followups.includes(\"Qu'est-ce qui bloque dans la Mission 414 ?\")")" "true"
+
 vf_hyg_assert
 echo ""
 echo "=================================="
