@@ -19,6 +19,8 @@ const KEY = { Escape: 27, ArrowRight: 39, Enter: 13, Tab: 9 };
 await executer(chrome, async (s) => {
   await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: HX || HAUT[W] || 800, deviceScaleFactor: 1, mobile: false });
   await s.naviguer(url); await s.attendre(PRET, 'page prête');
+  // VF_CSS : du CSS posé sur la page avant la visite (témoin des métriques de texte : la CI Linux n'a pas la police système de macOS, ses titres et descriptions sont plus larges ou plus hauts, donc le bloc titre est plus haut)
+  if (process.env.VF_CSS) await s.ev(`(() => { const st = document.createElement('style'); st.textContent = ${JSON.stringify(process.env.VF_CSS)}; document.head.appendChild(st); return true; })()`);
   const touche = async (k) => { for (const t of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type: t, key: k, code: k, windowsVirtualKeyCode: KEY[k], ...(k === 'Enter' && t === 'keyDown' ? { text: '\r' } : {}) }); };
   // le centre du bouton est lu une fois posé (deux relevés égaux), jamais dans la foulée d'un changement de mise en page
   const clic = async (sel) => { const p = await positionPosee(s.ev, `document.querySelector(${JSON.stringify(sel)})`); if (!p) return false; for (const t of ['mouseMoved', 'mousePressed', 'mouseReleased']) await s.send('Input.dispatchMouseEvent', { type: t, x: p.cx, y: p.cy, button: 'left', clickCount: 1 }); return true; };

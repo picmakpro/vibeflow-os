@@ -25,6 +25,9 @@ for i in $(seq -w 1 16); do
 done
 printf '# Roadmap\n\n## Jalon demo\n\n- [ ] **Phase 1: Socle** - premier jet\n' > "$L/.planning/ROADMAP.md"
 git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
+# Moteur de questions : sans `claude` sur le PATH, la barre de question porte l'avis « no_engine » et mesure 44 à 56 px de plus (CI Linux, run 42486502412 : T9 à 701 et 760 px). La suite principale tourne AVEC un moteur
+# (le faux claude des suites de lancement, identique sur un poste de dev et en CI) ; T9N, plus bas, rejoue la matrice basse SANS moteur.
+FAUXBIN="$WORK/fauxbin"; mkdir -p "$FAUXBIN"; cp "$SCRIPTS/tests/temoins/fauxbin-claude/claude" "$FAUXBIN/claude"; chmod +x "$FAUXBIN/claude"; export PATH="$FAUXBIN:$PATH"
 export VF_COCKPIT_PORT_BASE=$((30000 + (RANDOM * 11) % 30000))
 trap 'node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L" >/dev/null 2>&1; vf_hyg_fin; rm -rf "$WORK"' EXIT
 U="$(node "$SCRIPTS/vf-cockpit.mjs" open --no-open --terminal --lab "$L" | sed -En 's#^Cockpit : (http://127\.0\.0\.1:[0-9]+)/ .*#\1/index.html#p' | head -1)"
@@ -90,13 +93,45 @@ echo "=== T9 — carte de visite : ni la pastille Terminal ni le titre recouvert
 # le tient pour une surface) le côté droit : la carte retombait sur la pastille (Code, Projet) ou sur le titre (Projet). Elle peut maintenant se poser à droite de cette colonne. Chaque étape est jugée une fois posée ;
 # la pastille est posée (--terminal), la visite compte au moins deux étapes.
 # décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée : placer la carte du côté libre (à droite de la colonne) plutôt que la réduire ou la rendre défilable
+cote_attendu() { case "$1:$2" in index.html:701x390|index.html:760x390) echo colonne ;; *) echo titre ;; esac; }
 for pg in index.html project.html; do
   for t in 701x390 760x390 844x390 1000x420 1100x390 1279x450 1440x390; do
     X="$(mes $t visite $pg)"; [ -n "${DBG:-}" ] && echo "RAW: $X"
     assert_eq "T9.$pg.$t — au moins deux étapes, pastille posée à chacune, la carte de visite ne recouvre ni la pastille ni le titre" "$(g "$X" "j.erreur||[j.n>=2,j.etapes.every((e)=>e.lisible.pastille),JSON.stringify(j.etapes.map((e)=>e.recouvre).filter((r)=>r.length))].join(',')")" "true,true,[]"
     # J1 (passe de suivi) : la carte se LIT aussi. À 844 x 390 elle restait à 121 px de haut, son texte rogné, alors que la place à droite du bloc titre était libre. À chaque étape le texte tient sans défiler ;
     # faute de toute place (701 px, panneau ouvert) au moins le titre entier et la première ligne de la description sont visibles .
+    # M-B (revue finale) : le côté « titre » (à droite du bloc titre) sert dans une fenêtre basse quand la place libre le permet ; sans lui T9L restait vert (le critère se contente de 72 px de texte utile). Côté attendu par taille : la place
+    # à droite du titre (entre lui et le panneau) fait au moins 160 px dès 844 px de large sur l'onglet Code, et à toute largeur sur l'onglet Projet (titre plus court) ; en dessous, sur Code, la colonne du zoom.
+    assert_eq "T9S.$pg.$t — le côté de la carte à chaque étape ($(cote_attendu $pg $t))" "$(g "$X" "j.erreur||[...new Set(j.etapes.map((e)=>JSON.parse(e.placement).choice.side))].join(',')")" "$(cote_attendu $pg $t)"
     assert_eq "T9L.$pg.$t — à chaque étape la carte se lit : le texte tient sans défiler, ou à défaut le titre est entier et la première ligne de la description visible" "$(g "$X" "j.erreur||JSON.stringify(j.etapes.map((e,k)=>[k,e.lisible]).filter(([k,l])=>!(l.texteEntier||(l.titreEntier&&l.debutDescription))).map(([k,l])=>[k,l.utile,l.titreEntier,l.debutDescription]))")" "[]"
   done
 done
+
+echo "=== T10 — tailles normales : la carte est posée comme avant J1, jamais à droite du titre (revue finale, M-A) ==="
+# Le côté « titre » (J1) ne sert que dans une fenêtre basse (<= 480 px, la borne de la règle @media de la carte). Avant la correction, à 1 440 x 900 la carte passait de 16,519,376,786 (bas à gauche) à 285,557,645,824 (« titre »), et la caméra
+# de la carte bougeait avec. Valeurs : côté|gauche|droite|bas de la carte à la première étape, mesurées sur 0a0259b5 (avant J1) ; la colonne du zoom prend la place d'en bas à gauche sous 1 280 px (PU-G-021).
+for spec in 1440x900:left\|16\|376\|786 1366x768:left\|16\|376\|654 1280x720:left\|16\|376\|606 1100x700:colonne\|138\|498\|624 1024x768:colonne\|138\|498\|692 901x800:colonne\|168\|528\|680; do
+  t="${spec%%:*}"; att="${spec#*:}"; att="${att//\\/}"
+  X="$(mes $t visite index.html)"; [ -n "${DBG:-}" ] && echo "RAW: $X"
+  assert_eq "T10.$t — première étape : côté|gauche|droite|bas de la carte, comme avant J1" "$(g "$X" "j.erreur||[JSON.parse(j.etapes[0].placement).choice.side,j.etapes[0].carte.l,j.etapes[0].carte.r,j.etapes[0].carte.b].join('|')")" "$att"
+done
+
+echo "=== T9N — la matrice basse SANS moteur de questions : l'avis allonge la barre, la carte ne recouvre toujours ni le titre ni la pastille (CI Linux) ==="
+# Sans `claude` (le cas de la CI et d'un poste neuf) la barre de question porte l'avis « no_engine » : 148 px au lieu de 92 à 701 px. La place sous le bloc titre tombait à 88 px, sous les 120 de la carte : elle recouvrait le titre
+# aux quatre étapes à 701 et 760 px (Code). L'avis est le seul obstacle qui s'efface (il revient à la fin de la visite) : son aire compte dix fois moins. Le PATH du serveur est celui du système (aucun claude) plus un lien vers node.
+SANS="$WORK/bin-sans-moteur"; mkdir -p "$SANS"; ln -sf "$(command -v node)" "$SANS/node"; PATH_SANS="$SANS:/usr/bin:/bin:/usr/sbin:/sbin"
+PATH="$PATH_SANS" command -v claude >/dev/null 2>&1 && { echo "  ❌ FAIL — T9N : le PATH sans moteur porte un claude ($(PATH="$PATH_SANS" command -v claude))"; FAIL=$((FAIL+1)); }
+L2="$WORK/lab2"; cp -R "$L" "$L2"; rm -rf "$L2/.vibeflow" # sinon le lanceur réutilise le serveur (avec moteur) de la copie
+U2="$(PATH="$PATH_SANS" node "$SCRIPTS/vf-cockpit.mjs" open --no-open --terminal --lab "$L2" | sed -En 's#^Cockpit : (http://127\.0\.0\.1:[0-9]+)/ .*#\1/index.html#p' | head -1)"
+[ -n "$U2" ] || { echo "  ❌ FAIL — le cockpit sans moteur n'a pas démarré"; FAIL=$((FAIL+1)); }
+U1="$U"; U="$U2"
+for pg in index.html project.html; do
+  for t in 701x390 760x390 844x390; do
+    X="$(mes $t visite $pg)"; [ -n "${DBG:-}" ] && echo "RAW: $X"
+    assert_eq "T9N.0.$pg.$t — sans moteur : l'avis est affiché (la barre de question est plus haute que les 92 px d'une barre sans avis)" "$(g "$X" "j.erreur||j.etapes[0].placement.includes('#ask-warn')")" "true"
+    assert_eq "T9N.$pg.$t — sans moteur : la carte ne recouvre ni la pastille ni le titre, à chaque étape" "$(g "$X" "j.erreur||[j.n>=2,j.etapes.every((e)=>e.lisible.pastille),JSON.stringify(j.etapes.map((e)=>e.recouvre).filter((r)=>r.length))].join(',')")" "true,true,[]"
+    assert_eq "T9NL.$pg.$t — sans moteur : à chaque étape la carte se lit (texte entier, ou titre entier et début de la description)" "$(g "$X" "j.erreur||JSON.stringify(j.etapes.map((e,k)=>[k,e.lisible]).filter(([k,l])=>!(l.texteEntier||(l.titreEntier&&l.debutDescription))).map(([k,l])=>[k,l.utile,l.titreEntier,l.debutDescription]))")" "[]"
+  done
+done
+U="$U1"; PATH="$PATH_SANS" node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L2" >/dev/null 2>&1
 echo; echo "Résultat : $PASS passés, $FAIL en échec"; [ "$FAIL" -eq 0 ]
