@@ -165,6 +165,16 @@ await executer(chrome, async (s) => {
     return { avant, depart, arrivee: await s.ev('VibeFlow.state.container'), apres, coherente: !apres.visible || (!!apres.titre && sous.includes(apres.titre)) };
   };
   o.infoRecherche = { code1440: await infobulleApresRecherche('index.html', 1440, 900, 'run.sh', 'premier'), code768: await infobulleApresRecherche('index.html', 768, 1024, 'run.sh', 'premier'), projet1440: await infobulleApresRecherche('project.html', 1440, 900, 'Suite', 'dernier') };
+  // PU-G-050 (Code seulement) : un fichier de la recherche porte son vrai nom et son dossier à droite ; sur Projet les éléments ne sont pas des fichiers (carte de BACKLOG, exigence, plan) : leur titre reste le titre lisible
+  const resultatsRecherche = async (page, requete) => {
+    await vue(1440, 900); await chargerUrl(U(page), `titres de recherche ${page}`);
+    await s.ev("(() => { try { const T = window.VibeFlowTour; if (T && T.active()) T.end(); } catch (e) { void e; } })()");
+    await touche('/', 'Slash', 191); await s.attendre("document.activeElement && document.activeElement.id === 'search'", 'recherche ouverte');
+    await s.send('Input.insertText', { text: requete });
+    await attendreValeur(() => s.ev("document.querySelectorAll('#results .r').length"), (v) => v > 0, { max: 5000 });
+    return JSON.parse(await stabiliser(() => s.ev("JSON.stringify([...document.querySelectorAll('#results .r')].slice(0, 12).map((r) => ({ titre: ((r.querySelector('.rn') || {}).textContent || '').trim(), droite: ((r.querySelector('.rdr, .rk') || {}).textContent || '').trim(), dossier: !!r.querySelector('.rdr') })))"), { pas: 150, max: 4000 }));
+  };
+  o.titresRecherche = { code: await resultatsRecherche('index.html', 'run.sh'), projet: await resultatsRecherche('project.html', 'socle') };
   // PU-G-100 : le sens des liens entre phases. Le panneau d'une phase dit ce que la phase attend (« Dépend de ») et ce qu'elle débloque (« Utilisé par ») ; l'ordre des cartes, lui, ne bouge pas
   await vue(1280, 720); await chargerUrl(`${BASE}/project.html`, 'phases');
   const phases = JSON.parse(await s.ev(`JSON.stringify([...VibeFlow.nodes.keys()].filter((k) => /^ph-/.test(k)))`));

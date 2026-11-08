@@ -1293,8 +1293,8 @@
      const ii = info(it.id);
      const ic = it.kind === 'route' ? `<span class="method" style="--m:${methodVar(ii.r.m)}">${h(ii.r.m)}</span>` : `<span class="ico" style="--c:${colorOf(ii)}">${icon(iconKey(ii))}</span>`;
 -    return `<div class="r${i === 0 ? ' active' : ''}" data-i="${i}">${ic}<span class="rt"><div class="rn">${h(it.name)}</div><div class="rd">${h(it.desc || it.path)}</div></span><span class="rk">${h(it.kind === 'route' ? ii.r.p : it.kind)}</span></div>`;
-+    // a file shows its real file name and, on the right, its folder instead of the word "file" (PU-G-050); when another result has the same file name, its whole folder also sits under the name (PU-G-049)
-+    const file = it.kind === 'file', dir = file ? parentDir(it.path) : '', twin = file && (sameBase.get(baseName(it.path)) || []).length > 1;
++    // a file shows its real file name and, on the right, its folder instead of the word "file" (PU-G-050) — on the Code tab only: on the Project tab a "file" is a card of the planning (BACKLOG entry, requirement, plan), its readable title stays; when another result has the same file name, its whole folder also sits under the name (PU-G-049)
++    const file = it.kind === 'file' && G.meta?.vfTab !== 'project', dir = file ? parentDir(it.path) : '', twin = file && (sameBase.get(baseName(it.path)) || []).length > 1;
 +    const right = file ? dirTag(it.path, sameBase.get(baseName(it.path))) || dir.split('/').slice(-2).join('/') || '/' : it.kind === 'route' ? ii.r.p : it.kind;
 +    return `<div class="r${i === 0 ? ' active' : ''}" data-i="${i}">${ic}<span class="rt"><div class="rn">${h(file ? baseName(it.path) : it.name)}</div><div class="rd">${h(twin && dir ? `${dir} · ${it.desc || ''}` : it.desc || it.path)}</div></span>${file ? `<span class="rdr rp" title="${h(dir || '/')}">${h(right)}</span>` : `<span class="rk">${h(right)}</span>`}</div>`;
    }).join('') || '<div class="empty">No matches</div>';
