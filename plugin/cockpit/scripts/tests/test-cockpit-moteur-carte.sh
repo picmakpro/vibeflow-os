@@ -12,7 +12,7 @@
 #   K15 colonnes d'une vue de partie : carte sans lien dans la colonne du milieu, titres lisibles (PU-G-040) · K16 vue de réponse remise à zéro (PU-G-059, PU-G-143, PU-G-144)
 #   K17 compteurs et homonymes du travail récent (PU-G-054, PU-G-049)
 #   K18 l'infobulle ne revient pas après une navigation par la recherche, sur Code (1 440 et 768 px) et Projet (PU-G-035, recette du 2026-11-08)
-#   K19 titres de la recherche : vrai nom de fichier sur Code seulement, titre lisible sur Projet (PU-G-050, recette du 2026-11-08)
+#   K19 titres de la recherche : vrai nom de fichier sur Code seulement, titre lisible sur Projet (PU-G-050) ; dossier à point en tête (recette du 2026-11-08)
 #   K12 nœud d'une mission : état réel en glyphe et mot, plus de « 0 » ni de « 0 lines » (PU-G-105) · K13 onglet Équipe à 390 px : une seule colonne (PU-G-176)
 # Un chargement de page unique (chrome-moteur-carte.mjs, un Chrome, profil jetable) ; les assertions se lisent ensuite sur sa sortie JSON. Lab construit par la suite, dans mktemp.
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
@@ -60,6 +60,7 @@ mklab() { # mklab <dir> : un module avec un document et deux scripts qui s'appel
   printf '#!/usr/bin/env bash\necho seul\n' > "$L/plugin/mod/scripts/seul.sh" # aucun lien : sa carte forme un composant à part (PU-G-040)
   printf '# Scripts\n\nLes scripts du module.\n' > "$L/plugin/mod/scripts/README.md" # homonyme du README du module (PU-G-049)
   mkdir -p "$L/lots"; for i in $(seq -w 1 30); do printf '# Note %s\n' "$i" > "$L/lots/n$i.md"; done # de quoi remplir un tableau au-delà de son plafond de 24 cartes (PU-G-054)
+  mkdir -p "$L/.github/scripts"; printf '#!/usr/bin/env bash\necho verif\n' > "$L/.github/scripts/verif.sh" # un dossier à point : sa colonne de droite doit garder le point en tête (recette du 2026-11-08)
   printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n- [ ] **Phase 2: Suite** - second jet\n\n### Phase 1: Socle\n**Depends on**: Nothing (first phase)\n\n### Phase 2: Suite\n**Depends on**: Phase 1\n' > "$B/ROADMAP.md" # phase 2 : la dépendance du panneau de phase (PU-G-100)
   printf -- '---\nfiles_modified: [plugin/mod/README.md, plugin/mod/scripts/README.md]\n---\n<objective>Faire le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"; echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
   printf '{"nodes":[{"id":"a","step":"première étape","stage":"","deps":[],"scope":["src/**"],"status":"done"},{"id":"b","step":"seconde étape","stage":"","deps":["a"],"scope":["src/**"],"status":"running"},{"id":"c","step":"troisième étape","stage":"","deps":["b"],"scope":["src/**"],"status":"failed"}]}\n' > "$B/missions/demo.dag.json"
@@ -131,6 +132,8 @@ echo "=== K19 — titres de la recherche : vrai nom de fichier sur Code seulemen
 assert_eq "K19.1 — Code : un fichier trouvé porte son vrai nom et son dossier à droite (PU-G-050 tenu)" "$(E "j.titresRecherche.code[0].titre + '|' + j.titresRecherche.code[0].droite + '|' + j.titresRecherche.code[0].dossier")" "run.sh|mod/scripts|true"
 assert_eq "K19.0 — témoin : la recherche Projet rend la phase et au moins un autre élément" "$(E "j.titresRecherche.projet.length >= 2 && j.titresRecherche.projet.some((r) => /^Phase 1/.test(r.titre))")" "true"
 assert_eq "K19.2 — Projet : aucun titre n'est un nom de fichier (ni « 01-01-PLAN.md », ni « BACKLOG.md#… ») et aucune colonne de dossier" "$(E "j.titresRecherche.projet.filter((r) => /\\.(md|json|ya?ml|mjs|sh)(#|\$)/.test(r.titre) || r.dossier).length")" "0"
+assert_eq "K19.3 — Code : le dossier d'un fichier sous un dossier à point s'affiche « .github/scripts », point en tête (le point ne passe pas à la fin sous direction: rtl)" "$(E "j.titresRecherche.codePoint[0].droite + '|' + j.titresRecherche.codePoint[0].pointEnTete")" ".github/scripts|true"
+assert_eq "K19.4 — Code : la colonne de droite garde la coupe d'un chemin long par la gauche (direction rtl et points de suspension conservés)" "$(E "j.titresRecherche.codePoint[0].coupeParLaGauche")" "true"
 
 assert_eq "K12.5 — PU-G-100 : le panneau de la phase 2 dit « Dépend de » (la phase 1), pas « Utilisé par »" "$(E "j.sens.p2.titres.join('|') + ' : ' + j.sens.p2.lignes.join('|')")" "Dépend de : Phase 1 · Socle"
 assert_eq "K12.6 — PU-G-100 : le panneau de la phase 1 dit « Utilisé par » (la phase 2), pas « Dépend de »" "$(E "j.sens.p1.titres.join('|') + ' : ' + j.sens.p1.lignes.join('|')")" "Utilisé par : Phase 2 · Suite"

@@ -172,9 +172,9 @@ await executer(chrome, async (s) => {
     await touche('/', 'Slash', 191); await s.attendre("document.activeElement && document.activeElement.id === 'search'", 'recherche ouverte');
     await s.send('Input.insertText', { text: requete });
     await attendreValeur(() => s.ev("document.querySelectorAll('#results .r').length"), (v) => v > 0, { max: 5000 });
-    return JSON.parse(await stabiliser(() => s.ev("JSON.stringify([...document.querySelectorAll('#results .r')].slice(0, 12).map((r) => ({ titre: ((r.querySelector('.rn') || {}).textContent || '').trim(), droite: ((r.querySelector('.rdr, .rk') || {}).textContent || '').trim(), dossier: !!r.querySelector('.rdr') })))"), { pas: 150, max: 4000 }));
+    return JSON.parse(await stabiliser(() => s.ev("JSON.stringify([...document.querySelectorAll('#results .r')].slice(0, 12).map((r) => ({ titre: ((r.querySelector('.rn') || {}).textContent || '').trim(), droite: ((r.querySelector('.rdr, .rk') || {}).textContent || '').trim(), dossier: !!r.querySelector('.rdr'), pointEnTete: (() => { const e = r.querySelector('.rdr'); const t = e && (e.querySelector('bdi') || e).firstChild; if (!t || t.nodeType !== 3 || t.length < 2) return null; const g = document.createRange(); g.setStart(t, 0); g.setEnd(t, 1); const a = g.getBoundingClientRect().left; g.setStart(t, 1); g.setEnd(t, 2); return a < g.getBoundingClientRect().left; })(), coupeParLaGauche: (() => { const e = r.querySelector('.rdr'); if (!e) return null; const c = getComputedStyle(e); return c.direction === 'rtl' && c.textOverflow === 'ellipsis'; })() })))"), { pas: 150, max: 4000 }));
   };
-  o.titresRecherche = { code: await resultatsRecherche('index.html', 'run.sh'), projet: await resultatsRecherche('project.html', 'socle') };
+  o.titresRecherche = { code: await resultatsRecherche('index.html', 'run.sh'), codePoint: await resultatsRecherche('index.html', 'verif.sh'), projet: await resultatsRecherche('project.html', 'socle') };
   // PU-G-100 : le sens des liens entre phases. Le panneau d'une phase dit ce que la phase attend (« Dépend de ») et ce qu'elle débloque (« Utilisé par ») ; l'ordre des cartes, lui, ne bouge pas
   await vue(1280, 720); await chargerUrl(`${BASE}/project.html`, 'phases');
   const phases = JSON.parse(await s.ev(`JSON.stringify([...VibeFlow.nodes.keys()].filter((k) => /^ph-/.test(k)))`));
