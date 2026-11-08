@@ -43,7 +43,9 @@ export function projectIndex(G) {
 const line = (I, x, note) => `- [[${I.ref(x)}]]${/\.req$/.test(x.id || '') ? ` (${String(x.id).slice(3, -4).replace(/^/, 'phase ')})` : ''} · ${etat(x)}${note ? ' · ' + note : ''}`;
 const item = (I, x, note) => ({ id: I.ref(x), note: coupe(note || etat(x), 90) });
 const answer = (title, md, items, followups = []) => ({ title, answer: md, items: items.slice(0, 14), steps: [], followups, engine: 'local' });
-const count = (xs) => { const c = {}; for (const x of xs) if (x.st) c[x.st] = (c[x.st] || 0) + 1; return Object.entries(c).map(([k, v]) => `${v} ${ST[k] || k}`).join(', ') || 'aucun statut'; };
+// accord des statuts (L1, arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3da818fe)) : « 1 bloqué », « 4 bloqués », « 27 faits » ; « en cours », « à faire », « à recetter » sont invariables
+const ACCORD = { fait: 'faits', 'bloqué': 'bloqués' };
+const count = (xs) => { const c = {}; for (const x of xs) if (x.st) c[x.st] = (c[x.st] || 0) + 1; return Object.entries(c).map(([k, v]) => `${v} ${pl(v, ST[k] || k, ACCORD[ST[k] || k] || ST[k] || k)}`).join(', ') || 'aucun statut'; };
 
 // Réponse sur les « lignes non comprises » du panneau Format, en langage courant. Jointure avec le panneau (vf-cockpit-project.mjs) : seuls les
 // CHIFFRES et les positions de meta.vf.drift sont lus (nonComprisesN, nonComprises[{fichier, ligne, extrait}], corrigeable, regles[].regle/.n) ;

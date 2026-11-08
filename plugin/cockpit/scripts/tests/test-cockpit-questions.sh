@@ -362,6 +362,17 @@ assert_eq "Q20.3 — R3 : une coupe qui tombe exactement sur une espace garde le
 import { clipMot } from '$SCRIPTS/vf-cockpit-planning.mjs';
 console.log(clipMot('aaaa bbbb cccc', 10) + '|' + clipMot('aaaa bbbbb', 9));")" "aaaa bbbb…|aaaa…"
 
+# Q19.7 — M1 (contre-revue) : le compteur de statuts de « Que contient la phase ? » s'accorde aussi (arbitrage de L1, § 10 du rapport GLOBAL, 3da818fe)
+"$NODE" --input-type=module -e "
+import fs from 'node:fs';
+const nd = (id, o) => ({ id, label: id, kind: 'phase', st: 'todo', parent: null, ...o });
+const f = (n, st, k) => Array.from({ length: n }, (_, i) => ({ p: 'p/' + st + k + i, n: 'ph-3', name: st + i, st, d: 'x' }));
+const mk = (a, b, c) => ({ nodes: [nd('ph-3', { label: 'Phase 3 · Trois', num: '3', st: 'active' })], files: [...f(a, 'blocked', 'b'), ...f(b, 'done', 'd'), ...f(c, 'active', 'a')], links: [], meta: { vf: {} } });
+fs.writeFileSync('$WORK/q19-c1.json', JSON.stringify(mk(1, 1, 1))); fs.writeFileSync('$WORK/q19-c4.json', JSON.stringify(mk(4, 27, 2)));"
+H locg "$SCRIPTS" "$WORK/q19-c4.json" "Que contient la phase 3 ?" > "$WORK/q19g.json"
+H locg "$SCRIPTS" "$WORK/q19-c1.json" "Que contient la phase 3 ?" > "$WORK/q19h.json"
+assert_eq "Q19.7 — M1 : n > 1 -> « 4 bloqués », « 27 faits », « 2 en cours » (invariable) ; n = 1 -> « 1 bloqué », « 1 fait », « 1 en cours »" "$(H json "$WORK/q19g.json" "/4 bloqués/.test(j.answer) && /27 faits/.test(j.answer) && /2 en cours/.test(j.answer)")|$(H json "$WORK/q19h.json" "/1 bloqué[,.]/.test(j.answer) && /1 fait,/.test(j.answer) && /1 en cours/.test(j.answer) && !/1 (bloqués|faits)/.test(j.answer)")" "true|true"
+
 vf_hyg_assert
 echo ""
 echo "=================================="
