@@ -1,8 +1,6 @@
 // vf-cockpit-terminal-vue — vue du terminal dans la page de Q : thème xterm, cartes d'état, bandeau (71-05 pour l'amorce, 71-06 pour le contenu).
 // Export : vueTerminal(cfg) -> rien ; pose window.vfTermVue = { theme(clair), carte(type, action), bandeau(type, detail, action), effacer(), collage(...), proposition(p, cb) }.
-// proposition (72-08) : bandeau de proposition de lancement, qui réutilise les classes vf-q-bandeau et vf-q-collage ; aucune écriture au terminal depuis la vue : tout passe par cb.lancer.
-// cfg = { origineP, theme }. Sérialisé par .toString() dans un <script> sans attribut, donc autonome : aucune référence à un identifiant du module.
-// Textes de l'UI-SPEC §12, posés par textContent ; le seul nombre rendu (code ou signal) est converti en entier. Aucun innerHTML.
+// proposition (72-08) : bandeau de proposition de lancement, qui réutilise les classes vf-q-bandeau et vf-q-collage ; aucune écriture au terminal depuis la vue : tout passe par cb.lancer. cfg = { origineP, theme }. Sérialisé par .toString() dans un <script> sans attribut, donc autonome : aucune référence à un identifiant du module. Textes de l'UI-SPEC §12, posés par textContent ; le seul nombre rendu (code ou signal) est converti en entier. Aucun innerHTML.
 export function vueTerminal(cfg) {
   void cfg;
   const CHAT_LIVRE = true; // option « continuer le chat » (72-13) : même valeur que dans le script de P ; la fonction est sérialisée, aucune référence au module
