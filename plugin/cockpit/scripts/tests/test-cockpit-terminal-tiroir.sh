@@ -948,6 +948,7 @@ run_axe "$OUT" 0; AX="$XJ"
 assert_eq "T21.9 — témoin de l'axe : 18 relevés complets (9 largeurs x Code et Projet), aucune erreur, --edge vaut 16" "$(rj "$AX" '(j.erreur||JSON.stringify(j.erreurs))+" n="+j.n+" complets="+j.complets+" edge="+JSON.stringify(j.edge)')" "{} n=18 complets=18 edge=[16]"
 assert_eq "T21.9 (PU-G-021) — zoom au bord --edge de 390 à 1 440 px : en rangée au-dessus de la pastille de 701 à 1 279 px (plus la pile du haut à droite), pile du téléphone sous 701 px (P70-D-09)" "$(rj "$AX" 'JSON.stringify(j.zoom)')" "[]"
 assert_eq "T21.10 (PU-G-021 ; « Pastille large comme le zoom », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) — pastille au bord --edge de 390 à 1 440 px, aussi large que le zoom dès 701 px" "$(rj "$AX" 'JSON.stringify(j.pastille)')" "[]"
+assert_eq "T21.11 (PU-G-021 ; « Barre au même bord gauche », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) — barre de question au bord --edge jusqu'à 1 279 px, après la colonne du zoom dès 1 280 px, de 40 px dès 1 000 px" "$(rj "$AX" 'JSON.stringify(j.barre)')" "[]"
 
 echo "=== T22 — hauteur par défaut proportionnelle à la fenêtre (recette 71, G4 ; P71-D-37) ==="
 run_defaut "$OUT"; D="$DJ"

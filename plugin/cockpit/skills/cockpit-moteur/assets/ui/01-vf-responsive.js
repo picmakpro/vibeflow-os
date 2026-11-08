@@ -87,6 +87,7 @@
       #ask-form { padding-top: var(--sp-4); padding-bottom: var(--sp-4); padding-right: var(--sp-4); }
     }
     @media (max-width: 700px) { header #crumbs { display: none; } }
+    @media (max-width: 700px) { #ask { width: calc(100% - 2 * var(--edge)); } } /* téléphone : la barre garde le bord gauche de la pastille et du zoom, --edge (16) et non 8, comme de 701 à 1 279 px */
     /* PU-G-001 / PU-G-002 : fil d'Ariane sous 1 280 px. Racine : libellé court (le nom entier reste le nom accessible, posé par ajuste0). Niveau courant : jamais rogné. Niveaux d'avant : les premiers à céder (masqués par ajuste0). */
     @media (max-width: 1279px) {
       header #crumbs button[data-vf-racine] { font-size: 0; flex: 0 1 auto; min-width: max-content; padding-inline: var(--sp-6); } /* jamais rogné : ajuste0 le masque s'il ne tient pas */
