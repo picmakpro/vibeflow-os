@@ -325,8 +325,14 @@ await s.attendre(`getComputedStyle(document.querySelector('#context')).opacity =
 out.ctxOuvert = await s.ev(`document.body.classList.contains('vf-git-ouvert')`);
 const k = () => s.ev(`VibeFlow.state.t.k`), panneau = () => s.ev(`document.body.classList.contains('no-panel')`);
 const p0 = await panneau(); await s.ev(`document.querySelector('#vf-git-tiroir .vf-git-titre-t').focus()`); await touche('p'); out.p = [p0, await panneau()];
-const k0 = await k(); await touche('='); const k1 = await attendreEtStabiliser(k, (v) => v > k0, { max: 5000 }); await touche('-'); const k2 = await attendreEtStabiliser(k, (v) => v < k1, { max: 5000 }); await touche('f'); const k3 = await attendreEtStabiliser(k, (v) => v !== k2, { max: 5000 });
-out.zoom = { plus: k1 > k0, moins: k2 < k1, fit: k3 !== k2 };
+const k0 = await k(); await touche('='); const k1 = await attendreEtStabiliser(k, (v) => v > k0, { max: 5000 }); await touche('-'); const k2 = await attendreEtStabiliser(k, (v) => v < k1, { max: 5000 }); // « -» ramène le zoom à son point de départ, qui EST déjà l'ajustement (viewer.html fit()) : un « f » lu alors ne changeait rien d'observable. De plus le viewer se REPLACE seul (fit(false) à chaque mise en page du graphe, ~300 ms après un zoom dans cette page) : un état « non ajusté » ne dure donc pas.
+// Discriminant : on pose un état non ajusté (« = »), on le relève IMMÉDIATEMENT (kz), on frappe « f » et on attend un état postérieur différent ; si une remise en page est passée entre les deux (kz périmé, k3 === kz), on recommence (3 essais) — un « f » mort échoue aux 3 essais.
+let kz = k2, k3 = k2;
+for (let essai = 0; essai < 3 && k3 === kz; essai++) {
+  await touche('='); await touche('='); kz = await k();
+  await touche('f'); k3 = await attendreEtStabiliser(k, (v) => v !== kz, { pas: 50, max: 2000 });
+}
+out.zoom = { plus: k1 > k0, moins: k2 < k1, fit: k3 !== kz };
 await fermer();
 await s.attendre(`getComputedStyle(document.querySelector('#context')).opacity === '1'`, '#context rendu');
 out.ctxFerme = await s.ev(`!document.body.classList.contains('vf-git-ouvert')`);
@@ -334,7 +340,7 @@ out.errs = await s.ev(`window.__errs`);
 return out;
 JS
   { cat "$AUX/touche.js"; cat "$AUX/d3a.js"; } > "$AUX/d3a-complet.js"
-  R3="$(cdp "$AUX/d3a-complet.js" "$BASE")"
+  R3="$(cdp "$AUX/d3a-complet.js" "$BASE")"; [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$R3" > "$TIROIR_TRACE-d3a.json"
   assert_eq "D3.1 — touche g ouvre puis ferme" "$(jq_ "$R3" '[j.g1, j.g2].join("|")' 2>/dev/null)" "true|false"
   assert_eq "D3.1 — g ignorée dans INPUT, TEXTAREA, contenteditable (la lettre est tapée)" "$(jq_ "$R3" '[j.champ_input, j.champ_textarea, j.champ_edit].map((c) => c.ouvert + ":" + c.valeur.includes("g")).join("|")' 2>/dev/null)" "false:true|false:true|false:true"
   assert_eq "D3.1 — g ignorée avec Ctrl, Alt, Meta et palette ouverte" "$(jq_ "$R3" '[...j.modif, j.palette].join("|")' 2>/dev/null)" "false|false|false|false"
