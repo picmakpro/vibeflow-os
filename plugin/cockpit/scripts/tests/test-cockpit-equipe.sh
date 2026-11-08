@@ -990,6 +990,13 @@ JSON
   assert_eq "EK16.5 — mutant (la règle Q12 retirée : seuil à 0 px) : à 1024 px les deux tiroirs restent ouverts, détecté" "$(EK16M 1024 git-puis-travail "window.matchMedia('(max-width: 1279px)')" "window.matchMedia('(max-width: 0px)')")" "muté|G-:git GT:git GT:git"
   assert_eq "EK16.6 — mutant (seuil à 1500 px) : à 1440 px le second tiroir replie le premier, détecté" "$(EK16M 1440 git-puis-travail "window.matchMedia('(max-width: 1279px)')" "window.matchMedia('(max-width: 1500px)')")" "muté|G-:git -T:travail -T:travail"
   assert_eq "EK16.7 — mutant (le focus n'est plus posé sur le titre du tiroir « Au travail » après le repli de Git) : il ne va plus au tiroir qui s'ouvre, détecté" "$(EK16M 1024 git-puis-travail "titre.tabIndex = -1; titre.focus({ preventScroll: true });" "titre.tabIndex = -1;")" "muté|G-:git -T:BODY -T:BODY"
+  # EK17 (S6, revue de la recette du 2026-11-08, PU-G-193) : à 1 440 px, tiroir Git ouvert, le titre de la vue (masqué dessous) n'est plus un arrêt de Tab ; il le redevient à la fermeture
+  EK17V='j.erreur||j.verdict'
+  ek_demarrer; EKC tab-titre "equipe.html"; vf_hyg_stop "$EK_PID"
+  assert_eq "EK17 — 1 440 px, vraies touches Tab : le titre de la vue est un arrêt Git fermé (témoin), n'en est PAS un Git ouvert (alors que d'autres arrêts existent : témoin), l'est de nouveau Git refermé" "$(G "$WORK/ek-tab-titre.json" "$EK17V")" "true/false/true/true"
+  EK17M() { local m; m="$(ek_muter "$1" "$2")"; ek_demarrer; EKC tab-titre "equipe.html"; local v; v="$(G "$WORK/ek-tab-titre.json" "$EK17V")"; vf_hyg_stop "$EK_PID"; ek_restaurer; echo "$m|$v"; }
+  assert_eq "EK17.1 — mutant (le tabindex du titre n'est plus retiré Git ouvert) : le titre, masqué sous le tiroir, redevient un arrêt de Tab, détecté" "$(EK17M "if (document.body.classList.contains('vf-git-ouvert')) h1.removeAttribute('tabindex'); else h1.tabIndex = 0;" "h1.tabIndex = 0;")" "muté|true/true/true/true"
+  assert_eq "EK17.2 — mutant (le tabindex n'est plus rendu à la fermeture de Git) : le titre n'est plus atteignable une fois Git refermé, détecté" "$(EK17M "else h1.tabIndex = 0; };" "};")" "muté|true/false/true/false"
   # témoins de la sonde de mutation elle-même
   ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"
   assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK2.1 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "a1|null|identique"

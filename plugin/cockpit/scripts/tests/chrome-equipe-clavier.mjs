@@ -16,6 +16,7 @@
 //   titre-grandi      : (EK14) le titre de #context grandit après le cadrage (police plus large du runner) ; recouvrement avec la première carte une fois la page stable → { k, aire }
 //   echap-tiroir      : (EK15) sélectionne une carte, ouvre le tiroir « Au travail », focalise le tiroir ou le bouton (EK_FOCUS), frappe Échap → { ferme0, ouvert, avant, place, ferme, apres } (attributs aria du bouton, sélection et vue avant/après)
 //   un-lateral        : (EK16, Q12, PU-G-203) largeur EK_LARGEUR, ordre EK_ORDRE (git-puis-travail | travail-puis-git) : ouvre Git (touche g) puis « Au travail » (ou l'inverse), relève l'état et le focus à chaque pas, puis élargit à 1440 px → { etapes: { premier, second, large }, ... }
+//   tab-titre         : (EK17, S6, revue du 2026-11-08) 1 440 px : vraies touches Tab, le titre de la vue est un arrêt Git fermé, ne l'est pas Git ouvert, l'est de nouveau refermé → { ferme, ouvert, referme, verdict }
 //   libelles          : (EK11) ligne des sources du tiroir et infobulle de la recherche de l'onglet Équipe → { src, titre }
 // Rend une ligne JSON { ... } ou { erreur }. Socle : chrome-session.mjs (une instance de Chrome, fermée proprement).
 import { executer } from './chrome-session.mjs';
@@ -221,6 +222,26 @@ await executer(chrome, async (s) => {
     const apres = await s.stable("(() => { const a = document.activeElement, b = document.querySelector('#vf-lock'); return { selection: window.VibeFlow.state.selected, hash: location.hash, actif: a ? a.id || a.tagName : null, expanded: b.getAttribute('aria-expanded'), ferme: document.body.classList.contains('no-panel') }; })()", 'état après Échap');
     const remonte = await s.ev('window.__escRemonte');
     return { ferme0, ouvert, avant, place, ferme, apres, remonte };
+  }
+  if (ACTION === 'tab-titre') { // (EK17, S6 de la revue du 2026-11-08) à 1 440 px, avec le tiroir Git ouvert, le titre de la vue (masqué dessous) n'est plus un arrêt de Tab ; fermé, il l'est de nouveau (la définition du titre reste atteignable au clavier, PU-G-193)
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 800, deviceScaleFactor: 1, mobile: false });
+    await s.attendre("!!window.VFGitTiroir && !!document.querySelector('#context h1[tabindex]')", 'tiroir Git et titre à définition');
+    await calme();
+    const parcours = async () => { // des vraies touches Tab depuis le début de la page : les arrêts, jusqu'au retour au corps de la page
+      await s.ev('document.activeElement && document.activeElement.blur()'); const arrets = [];
+      for (let i = 0; i < 60; i++) {
+        await touche('Tab', 'Tab', 9);
+        const a = await s.stable("(() => { const a = document.activeElement; return !a || a === document.body ? '#fin' : a.closest('#context') ? 'titre' : a.id || a.tagName; })()", 'arrêt de Tab stable');
+        if (a === '#fin') break; arrets.push(a);
+      }
+      return arrets;
+    };
+    const r = { ferme: await parcours() };
+    await s.ev('document.activeElement && document.activeElement.blur()'); await touche('g', 'KeyG', 71, 'g'); await s.attendre('window.VFGitTiroir.ouvert()', 'tiroir Git ouvert'); await calme();
+    r.ouvert = await parcours();
+    await s.ev('document.activeElement && document.activeElement.blur()'); await touche('g', 'KeyG', 71, 'g'); await s.attendre('!window.VFGitTiroir.ouvert()', 'tiroir Git refermé'); await calme();
+    r.referme = await parcours();
+    return { ...r, verdict: [r.ferme.includes('titre'), r.ouvert.includes('titre'), r.ouvert.length > 3, r.referme.includes('titre')].join('/') };
   }
   if (ACTION === 'un-lateral') { // (EK16, PU-G-203) un seul tiroir latéral sous 1280 px ; les deux à 1280 px et au-delà
     await s.send('Emulation.setDeviceMetricsOverride', { width: +process.env.EK_LARGEUR, height: 800, deviceScaleFactor: 1, mobile: false });

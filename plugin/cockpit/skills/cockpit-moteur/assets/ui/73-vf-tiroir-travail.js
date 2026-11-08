@@ -19,8 +19,8 @@
     if (o && !etaitOuvert && ETROIT.matches) { // « Au travail » s'ouvre sous 1280 px : Git se replie s'il était ouvert (sans voler le focus à autre chose), et le focus va au tiroir qui s'ouvre (Q12, PU-G-203 ; recette du 2026-11-08 : il restait sur le bouton « N au travail », 15 à 20 Tab pour entrer)
       const gitOuvert = !!git() && git().ouvert(); if (gitOuvert) git().fermer(true);
       const a = document.activeElement, titre = panneau.querySelector(':scope > .vf-whop h3');
+      // le tiroir « Au travail » porte toujours son titre (le gabarit de 70-vf-live.js, seul producteur de .vf-whop, le pose) : l'ancienne branche « sinon, Git vient de se replier, le focus au bouton » n'était atteinte dans aucun scénario (revue du 2026-11-08, S8)
       if (titre && !panneau.contains(a) && (gitOuvert || a === b || a === document.body || !a)) { titre.tabIndex = -1; titre.focus({ preventScroll: true }); }
-      else if (gitOuvert && !panneau.contains(a)) b.focus({ preventScroll: true });
     }
     etaitOuvert = o;
   };
