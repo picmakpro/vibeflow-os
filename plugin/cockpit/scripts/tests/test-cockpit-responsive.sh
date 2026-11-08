@@ -544,7 +544,8 @@ r15c_mutant p1 "sansMemoire && k === 'panel' ? undefined : ecrire(k, v)" "ecrire
 r15c_mutant p2 "panel.focus({ preventScroll: true }); versPanneau = true; }" "panel.focus({ preventScroll: true }); }"
 r15c_mutant p3 "if (!change && !g) return;" ""
 r15c_mutant p4 "git.fermer(true); return; }" "void 0; return; }" # P4 et F5 tiennent le même repli (à l'ouverture du panneau, quel que soit le chemin) : ce mutant-ci le supprime, et rougit donc aussi f5 ; le suivant ne vise que « Détail »
-r15c_mutant f1 "choixPalette = dansPalette(ev) ? { clavier: false } : null;" "choixPalette = (dansPalette(ev) || sur(ev)) ? { clavier: false } : null;" # F1 : le geste armé au pointeur posé sur le graphe (l'ancien comportement)
+r15c_mutant f1 "choixPalette = dansPalette(ev) && ev.target.closest && ev.target.closest('#results .r') ? { clavier: false } : null;" "choixPalette = (dansPalette(ev) || sur(ev)) ? { clavier: false } : null;" # F1 : le geste armé au pointeur posé sur le graphe (l'ancien comportement)
+r15c_mutant j6 "dansPalette(ev) && document.querySelector('#results .r.active') ? { clavier: true } : null;" "dansPalette(ev) ? { clavier: true } : null;" # J6 : le geste de la palette armé même sans résultat choisi (l'ancien comportement)
 r15c_mutant f5 "if (mi.matches && git && git.ouvert()) git.fermer(true); return; }" "if (mi.matches && document.activeElement !== btn && git && git.ouvert()) git.fermer(true); return; }" # F5 : le repli oublie les ouvertures par « Détail » (le bouton a le focus, au clic comme au clavier)
 r15c_mutant p4b "if (e.detail && e.detail.ouvert && mi.matches && ouvert()" "if (false && mi.matches && ouvert()"
 r15c_mutant s7 "ev.stopPropagation(); ev.preventDefault(); sansTrace(() => bascule(false));" "ev.preventDefault(); sansTrace(() => bascule(false));"
@@ -591,7 +592,7 @@ assert_eq "R15.8 — Projet / 768 px : Échap referme le panneau (témoin : il s
 assert_eq "R15.9 — Projet / 768 px : le bouton « Détail » referme le panneau" "$(mv_ "$WORK/r15t-bouton.json" 'j.mesures["768"].m.tiroir')" "false"
 assert_eq "R15.10 — Projet / 768 px : un rendu de plus sur la même sélection (flux en direct) ne rouvre pas le panneau refermé" "$(mv_ "$WORK/r15t-referme.json" 'j.mesures["768"].m.tiroir')" "false"
 SAIN_P1="true|aucune|false|aucune|false|true|vf-cockpit:panel=false"; SAIN_P2="true|true|true|true"; SAIN_P3="false|true"; SAIN_P4="768:true:false|999:true:false"; SAIN_S7="true|false|true"; SAIN_P4B="768:touche:false:true:aucune:false|999:clic:false:true:aucune:false"
-SAIN_F1="false|false|false|false|false|false|true"; SAIN_F5="768:clavier:true:false:PANEL:vf-cockpit:panel=true|999:clic:true:false:PANEL:vf-cockpit:panel=true"
+SAIN_F1="false|false|false|false|false|false|true"; SAIN_J6="true|false|true|true|false"; SAIN_F5="768:clavier:true:false:PANEL:vf-cockpit:panel=true|999:clic:true:false:PANEL:vf-cockpit:panel=true"
 assert_eq "R15c.1 — P1 : à 768 px, choisir une carte puis Échap n'écrivent PAS la préférence du panneau (aucune clé) ; le rechargement à 768 px le retrouve fermé, à 1 440 px ouvert (défaut du bureau) ; « Détail » l'écrit bien (témoin : la clé existe, false)" "$(mv_ "$WORK/r15c.json" 'j.p1')" "$SAIN_P1"
 assert_eq "R15c.2 — P2 : par la palette au clavier réel (/, saisie, Entrée) le panneau s'ouvre et le focus y entre, y compris une fois le recentrage de la carte terminé" "$(mv_ "$WORK/r15c.json" 'j.p2')" "$SAIN_P2"
 assert_eq "R15c.3 — P3 : fermé par « Détail » à la souris, un rendu de la MÊME sélection 150 ms plus tard ne rouvre pas le panneau (false) ; choisir une autre carte le rouvre (témoin : true)" "$(mv_ "$WORK/r15c.json" 'j.p3')" "$SAIN_P3"
@@ -600,6 +601,7 @@ assert_eq "R15c.6 — P4 bis : à 768 px (touche g réelle) puis 999 px (clic r�
 assert_eq "R15c.5 — S7 : un Échap réel (focus au corps de la page) referme le panneau et la sélection reste (témoin : elle existait avant)" "$(mv_ "$WORK/r15c.json" 'j.s7')" "$SAIN_S7"
 assert_eq "R15c.7 — F1 : fermé par « Détail », un glisser sur le fond du graphe ne rouvre pas le panneau, ni le rendu qui suit (souris réelle, doigt réel, pincement : six fois false) ; un vrai clic sur une carte le rouvre (témoin : true)" "$(mv_ "$WORK/r15c.json" 'j.f1')" "$SAIN_F1"
 assert_eq "R15c.8 — F5 : tiroir Git ouvert, « Détail » (clavier à 768 px, clic réel à 999 px) ouvre le panneau, replie Git, laisse le panneau au sommet (PANEL, jamais GIT) ; la préférence n'est écrite que par ce bouton (panel=true)" "$(mv_ "$WORK/r15c.json" 'j.f5')" "$SAIN_F5"
+assert_eq "R15c.9 — J6 : un geste de palette qui ne choisit rien (saisie sans résultat, Entrée, Échap) ne laisse aucun armement : fermé par « Détail », le panneau ne se rouvre pas au rendu suivant (témoins : carte choisie, panneau ouvert puis fermé, aucun résultat, palette refermée)" "$(mv_ "$WORK/r15c.json" 'j.j6')" "$SAIN_J6"
 for i in "${!R15C_ID[@]}"; do
   n="${R15C_ID[$i]}"; v="$(mv_ "$WORK/mut-r15c-$n.json" "j.$n")"; eval "sain=\$SAIN_$(printf %s "$n" | tr a-z A-Z)"; echo "     trace du mutant $n : $v"
   assert_eq "R15c.m-$n — le mutant de la règle « $n » rougit R15c (le champ $n n'est plus « $sain »)" "$([ "$v" = "$sain" ] && echo sain || echo rouge)" "rouge"

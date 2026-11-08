@@ -184,11 +184,11 @@
     let choixPalette = null, clavier = false, versPanneau = false, precedent = null, retour = null, etaitOuvert = ouvert();
     const sur = (ev) => !!(ev && ev.target && ev.target.closest && ev.target.closest('#svg'));
     const dansPalette = (ev) => !!(ev.target && ev.target.closest && ev.target.closest('#palette'));
-    document.addEventListener('pointerdown', (ev) => { clavier = false; choixPalette = dansPalette(ev) ? { clavier: false } : null; versPanneau = false; }, true);
+    document.addEventListener('pointerdown', (ev) => { clavier = false; choixPalette = dansPalette(ev) && ev.target.closest && ev.target.closest('#results .r') ? { clavier: false } : null; versPanneau = false; }, true);
     document.addEventListener('keydown', (ev) => {
       versPanneau = false;
       if (ev.key !== 'Enter' && ev.key !== ' ') return;
-      clavier = sur(ev); choixPalette = dansPalette(ev) ? { clavier: true } : null;
+      clavier = sur(ev); choixPalette = dansPalette(ev) && document.querySelector('#results .r.active') ? { clavier: true } : null; // J6 : le geste de la palette n'est armé que s'il CHOISIT un résultat (saisie sans résultat, clic sur le fond ou sur la croix : rien)
     }, true);
     document.addEventListener('keyup', () => { clavier = false; }, true);
     // P2 : au clavier le focus entre dans le panneau. Par la palette (/, saisie, Entrée) le viewer rend ensuite le focus à la carte (reveal, après le recentrage) : tant que le geste du clavier court, un focus qui tombe sur le graphe est ramené au panneau.

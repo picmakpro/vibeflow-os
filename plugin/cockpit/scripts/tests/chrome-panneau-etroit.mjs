@@ -2,7 +2,7 @@
 // Revue de la recette du 2026-11-08 (lot B, PU-G-045) : P1 la préférence « panneau ouvert » du bureau n'est écrite que par le bouton « Détail » · P2 la palette au clavier amène le focus dans le panneau ·
 // P3 un rendu de la même sélection, peu après la fermeture par « Détail », ne rouvre rien · P4 ouvrir le panneau par une sélection replie le tiroir Git · S7 Échap referme le panneau SANS effacer la sélection.
 // F1 (3e tour) : fermé par « Détail », un glisser sur le fond (souris réelle, doigt réel, pincement) ne rouvre rien, un rendu non plus ; un clic réel sur une carte rouvre (témoin) · F5 : « Détail » (clavier, clic réel) avec Git ouvert replie Git.
-// Rend sur une ligne { p1, p2, p3, p4, p4b, s7, f1, f5 } (chaînes courtes à comparer mot pour mot) ou { erreur }. Chaque scénario repart d'un stockage vide.
+// Rend sur une ligne { p1, p2, p3, p4, p4b, s7, f1, f5, j6 } (chaînes courtes à comparer mot pour mot) ou { erreur }. Chaque scénario repart d'un stockage vide.
 import { executer, pause, attendreValeur } from './chrome-session.mjs';
 const [, , chrome, url] = process.argv;
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout";
@@ -165,5 +165,17 @@ await executer(chrome, async (s) => {
     f5.push([w, via, o, await s.ev('window.VFGitTiroir.ouvert()'), haut, await s.ev(STORE)].join(':'));
   }
   out.f5 = f5.join('|');
+
+  // J6 (passe de suivi) : un geste de palette qui ne choisit RIEN ne laisse aucun armement derrière lui. À 768 px : une carte choisie, « Détail » la referme, la palette (« / »), une saisie sans résultat, Entrée, Échap, puis un rendu : le panneau reste fermé
+  await vider(); await charger(768);
+  await clicCarte(); const j6a = await attendreOuvert(true); await clicDetail(); const j6b = await attendreOuvert(false);
+  await s.ev('document.activeElement && document.activeElement.blur()');
+  await touche(s, '/'); await s.attendre("document.getElementById('palette').classList.contains('open')", 'palette ouverte');
+  await s.ev("(() => { const i = document.querySelector('#palette input'); i.focus(); i.value = 'zzzzqqqq'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()"); await pause(400);
+  const j6r = await s.ev("document.querySelectorAll('#results .r').length");
+  await touche(s, 'Enter'); await pause(300); await touche(s, 'Escape');
+  const j6c = await attendreValeur(() => s.ev("document.getElementById('palette').classList.contains('open')"), (v) => v === false, { max: 3000 });
+  await s.ev('window.VibeFlow.rerender()'); await pause(800);
+  out.j6 = [j6a, j6b, j6r === 0, j6c === false, await ouvert()].join('|');
   return out;
 });
