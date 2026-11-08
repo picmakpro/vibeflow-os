@@ -207,6 +207,7 @@ await executer(chrome, async (s) => {
     });
     r.violations = [...s.violations];
     r.msgs = await s.ev('JSON.stringify(window.__msgs)').then((x) => JSON.parse(x || '[]')).catch(() => []);
+    r.temoin = await s.ev(`({ cadres: document.querySelectorAll('iframe').length, href: location.href })`).catch(() => null); // la page tierce a chargé et porte le cadre de Q : la sonde s'est exécutée
     return masquer(r);
   }
 
@@ -612,7 +613,7 @@ if mutant premier vf-cockpit-terminal-client.mjs "s|^    if (!encadree) { vue.ca
 else sans_effet "M-PREMIER-NIVEAU"; fi
 if mutant sansamorce vf-cockpit-terminal-tiroir.mjs "s|adresse + '#t=' + amorce|adresse|"; then
   VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
-  assert_eq "M-SANS-AMORCE — le mutant (l'amorçage n'est plus passé dans l'adresse du cadre de Q) rougit T6.3 : le cadre n'échange rien, aucun secret n'est rangé" "$(rj "$T6J" 'j.secretOk?"oui":"non"')" "non"
+  assert_eq "M-SANS-AMORCE — le mutant (l'amorçage n'est plus passé dans l'adresse du cadre de Q) rougit T6.3 : le cadre n'échange rien, aucun secret n'est rangé" "$(rj "$T6J" '(j.q1&&j.q1.carte&&j.q1.carte.includes("Terminal indisponible")&&j.cadre1)?(j.secretOk?"oui":"non"):"mutant non jugé (sonde non exécutée)"')" "non"
 else sans_effet "M-SANS-AMORCE"; fi
 if mutant stockage vf-cockpit-terminal-client.mjs "s|location.replace(location.pathname + location.search)|location.replace(location.pathname + '?s=' + secret)|"; then
   VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
@@ -622,7 +623,7 @@ if mutant ancetres vf-cockpit-terminal-page.mjs 's|frame-ancestors \${origineP}|
   srv "$MUT_OUT"; TP="$(libre)"; node "$AUX/tierce.mjs" "$TP" "http://127.0.0.1:$QP" & TIERCE_PID=$!; PIDS+=($TIERCE_PID)
   for _ in $(seq 1 50); do rq "$TP" GET / --host "127.0.0.1:$TP" --sans-origin 2>/dev/null | grep -q '^200' && break; sleep 0.1; done
   VF_CLIENT_MS=6000 J="$(navig tierce "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"tierce\":\"http://127.0.0.1:$TP/\"}")"; vf_hyg_stop "$TIERCE_PID"; unsrv
-  assert_eq "M-ANCETRES — le mutant rougit T9.6 : aucune violation frame-ancestors (la page tierce encadre Q)" "$(rj "$J" '(j.violations||[]).some(v=>/frame-ancestors/.test(v))?"oui":"non"')" "non"
+  assert_eq "M-ANCETRES — le mutant rougit T9.6 : aucune violation frame-ancestors (la page tierce encadre Q)" "$(rj "$J" '(j.temoin&&j.temoin.cadres>=1)?((j.violations||[]).some(v=>/frame-ancestors/.test(v))?"oui":"non"):"mutant non jugé (sonde non exécutée)"')" "non"
 else sans_effet "M-ANCETRES"; fi
 
 echo "=== J2 / J12 / S5 / S3 — scénarios sur le serveur réel (secret périmé, serveur arrêté, « Terminé », onBinary, contre-pression) ==="
