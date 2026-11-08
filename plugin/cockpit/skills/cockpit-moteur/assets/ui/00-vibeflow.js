@@ -212,7 +212,7 @@
       // PU-G-093 : l'état de la phase courante est celui de sa carte (V.phaseEtat, calculé sur les fichiers de la phase) ; STATE.md ne sert que de repli quand la phase est introuvable, et le bloc dit quand il s'en écarte
       const eu = V.phaseEtat && Object.prototype.hasOwnProperty.call(ETAT_UI, V.phaseEtat) ? ETAT_UI[V.phaseEtat] : null;
       const pastille = eu ? `<span class="vst ${eu[0]}">${eu[1]}</span>` : statut(V.status) ? `<span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span>` : '';
-      const perime = eu && V.stateStale && statut(V.status) ? `<div style="margin-top:var(--sp-6);color:var(--text-3);font-size:12px">STATE.md semble périmé : il dit « ${h(statut(V.status))} ».</div>` : '';
+      const perime = eu && V.stateStale && statut(V.status) ? `<div style="margin-top:var(--sp-6);color:var(--text-3);font-size:12px">STATE.md semble périmé : il dit « ${h(statut(V.status))} ». La carte fait foi ; mettez STATE.md à jour à la fin de la phase.</div>` : '';
       const now = V.milestone || V.phase || V.status
         ? `<div class="vf-now" style="margin-top:var(--sp-12)"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${pastille}${perime}${desc ? `<div style="margin-top:var(--sp-6);color:var(--text-3);font-size:12px">${h(desc.slice(0, 260))}${desc.length > 260 ? '…' : ''}</div>` : ''}</div>`
         : '';
