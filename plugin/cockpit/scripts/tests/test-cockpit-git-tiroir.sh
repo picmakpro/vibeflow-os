@@ -871,6 +871,8 @@ const lire = async (fin) => { let v; for (let i = 0; i < 20; i++) { v = await s.
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const echap = (cible) => s.ev(`${cible}.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`);
 const ouvert = () => s.ev(`(() => { const t = ${T}; return !!t && !t.hidden; })()`);
+// le titre de la vue se juge tiroir FERMÉ (S6, revue du 2026-11-08 : tiroir ouvert il est masqué dessous et n'est plus un arrêt de Tab, EK17) : on referme le tiroir, on juge le titre, on le rouvre
+await s.ev(`document.querySelector('#vf-git-ligne').click()`); await s.attendre(`${T}.hidden`, 'tiroir refermé');
 await s.ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))`); // la dernière entrée est une touche (le chemin des vraies touches est vérifié à la main)
 await s.attendre(`!!document.querySelector('#context h1[data-vf-aide]')`, 'titre de la vue avec sa définition');
 await s.ev(`document.querySelector('#context h1').focus()`);
@@ -878,6 +880,8 @@ out.h1 = await lire((v) => v !== null);
 out.h1tab = await s.ev(`document.querySelector('#context h1').tabIndex`);
 await s.ev(`document.activeElement.blur()`);
 await lire((v) => v === null);
+await s.ev(`document.querySelector('#vf-git-ligne').click()`); await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l').length >= 3`, 'tiroir rouvert, worktrees rendus');
+await attendreValeur(() => s.ev(`!!document.querySelector('#vf-git-s-wt .vf-git-etat-wt')`), (v) => v === true, { max: 6000 });
 await s.ev(`${DETACHE}.focus()`);
 out.detache.bulle = await lire((v) => v !== null);
 out.detache.atteignable = await s.ev(`(() => { const m = ${DETACHE}; return { tab: m.tabIndex, desc: m.getAttribute('aria-description') === m.getAttribute('title'), actif: document.activeElement === m }; })()`);
