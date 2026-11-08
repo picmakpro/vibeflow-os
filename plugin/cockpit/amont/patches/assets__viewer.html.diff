@@ -1462,7 +1462,7 @@
  $('#btn-panel').setAttribute('aria-expanded', String(!document.body.classList.contains('no-panel')));
  // the top bar can be one or two rows tall: everything under it follows its real height
  const headerEl = document.querySelector('header');
-@@ -2281,7 +2439,9 @@ window.addEventListener('keydown', (ev) => {
+@@ -2281,8 +2439,11 @@ window.addEventListener('keydown', (ev) => {
    else if (ev.key === 'Escape') {
      if (!ctxEl.hidden || fm.classList.contains('open') || legendEl.classList.contains('open')) { closeMenu(); fm.classList.remove('open'); legendEl.classList.remove('open'); }
      else if (isPhone() && !document.body.classList.contains('no-panel')) closeSheet(); // on a phone the first Escape puts the details sheet away
@@ -1471,9 +1471,11 @@
 +    else if (state.flow) stopFlow();
 +    else if (ev.target === document.body || ev.target === document.documentElement || svg.contains(ev.target)) { if (state.selected) select(null); else up(); }
    }
++  else if (G.meta?.vfTab === 'equipe' && /^[fFpP=+-]$/.test(ev.key)) { /* Équipe : ni cadrage, ni tiroir, ni zoom par la frappe (PU-G-137, Q8) */ }
    else if (ev.key === 'f' || ev.key === 'F') fit(true);
    else if (ev.key === 'p' || ev.key === 'P') $('#btn-panel').click();
-@@ -2300,22 +2460,37 @@ function setTechnical(on) {
+   else if (ev.key === 'Enter' && typeof state.selected === 'string') open(state.selected);
+@@ -2300,22 +2461,37 @@ function setTechnical(on) {
    render({ keepTransform: true, after: renderPanel });
    emit('technical', technicalFlag);
  }
@@ -1514,7 +1516,7 @@
    state.answer = a; askState.last = a;
    go('q:answer', { force: true });
  }
-@@ -2332,7 +2507,7 @@ window.Floorplan = Object.freeze({
+@@ -2332,7 +2508,7 @@ window.Floorplan = Object.freeze({
    version: 1,
    graph: G, query: Q, state, agent: AGENT, exported: EXPORTED,
    // model helpers
@@ -1523,7 +1525,7 @@
    files, nodes, routes, colorOf, iconKey,
    // html helpers
    h, icon, iconI, fmt, plural, md,
-@@ -2372,6 +2547,8 @@ window.Floorplan = Object.freeze({
+@@ -2372,6 +2548,8 @@ window.Floorplan = Object.freeze({
    technical, setTechnical,
    store,
    on(event, fn) { (ext.listeners[event] ||= []).push(fn); },

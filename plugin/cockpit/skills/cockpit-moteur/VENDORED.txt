@@ -53,7 +53,7 @@ AJOUT VENDORED.txt
 AJOUT LICENCES-TIERCES.txt
 TAILLE assets/serve.mjs 616
 TAILLE assets/vendor/elk.bundled.js 6697
-TAILLE assets/viewer.html 2564 .html, hors gate
+TAILLE assets/viewer.html 2565 .html, hors gate
 TAILLE scripts/build.mjs 484
 TAILLE scripts/lib/extract.mjs 602
 TAILLE scripts/lib/health.mjs 1213

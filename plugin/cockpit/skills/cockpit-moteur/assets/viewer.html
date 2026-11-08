@@ -2443,6 +2443,7 @@ window.addEventListener('keydown', (ev) => {
     else if (state.flow) stopFlow();
     else if (ev.target === document.body || ev.target === document.documentElement || svg.contains(ev.target)) { if (state.selected) select(null); else up(); }
   }
+  else if (G.meta?.vfTab === 'equipe' && /^[fFpP=+-]$/.test(ev.key)) { /* Équipe : ni cadrage, ni tiroir, ni zoom par la frappe (PU-G-137, Q8) */ }
   else if (ev.key === 'f' || ev.key === 'F') fit(true);
   else if (ev.key === 'p' || ev.key === 'P') $('#btn-panel').click();
   else if (ev.key === 'Enter' && typeof state.selected === 'string') open(state.selected);
