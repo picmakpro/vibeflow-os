@@ -6,7 +6,7 @@
 // CLI : node vf-cockpit-build.mjs [<lab>] [--quiet]   Codes : 0 ok · 2 pas de .planning · 3 moteur absent · 4 échec d'une étape.
 import fs from 'node:fs';
 import path from 'node:path';
-import { read as lireGarde } from './vf-cockpit-planning.mjs';
+import { read as lireGarde, clipMot } from './vf-cockpit-planning.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { findLabRoot, engineDir, envGit, configFiltres, filtresEtat, MAX_FILTRES, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
@@ -32,7 +32,7 @@ export const nettoyerMarkdown = (s) => String(s || '').replace(/<!--[\s\S]*?-->/
 // on ne réécrit pas le fichier source — mais se dit « extrait brut ». Liste fermée de mots, jamais une règle de langue.
 const MOTS_SANS_ACCENT = /\b(etapes?|deja|apres|verifie[rsz]?|verifiables?|generer|necessaires?|creer|executer|systemes?|systematique|resultats?|donnees|ecrire|ecrit|prefere|empeche\w*|regles?|ecarts?|defauts?|deploiement|problemes?|derniere|entrees?|memoire|developpe\w*|evenements?|evite[rsz]?|definit|apres)\b/i; // sans mot qui existe aussi en anglais (reference, complete, different, detect…)
 export const extraitBrut = (d) => (d && !/[^\x00-\x7f]/.test(d) && MOTS_SANS_ACCENT.test(d) ? `${d} (extrait brut)` : d);
-const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/[`*]/g, '').trim(); const i = s.search(/[.!?](\s|$)/); s = i > 25 ? s.slice(0, i + 1) : s; return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/[`*]/g, '').trim(); const i = s.search(/[.!?](\s|$)/); return clipMot(i > 25 ? s.slice(0, i + 1) : s, n); }; // PU-G-147 : coupe au mot entier, comme la version du planning
 // R6 : environnement du moteur. Liste des filtres lue et bornée : filtres vidés, marqueur VF_COCKPIT_GIT_DURCI posé (le moteur lit git). Liste illisible ou au-delà de MAX_FILTRES : le marqueur n'est PAS posé, git() du
 // moteur reste fermé (patch P27 de common.mjs : carte sans fichiers suivis ni head) ; `ferme` dit pourquoi. Même règle fail-closed que lancerGit : un filtre inconnu n'est pas un filtre absent.
 export function etatMoteur(lab) {

@@ -344,6 +344,21 @@ assert_eq "Q19.5 — L2 : relances d'une phase -> « Qu'est-ce qui reste dans la
 H locg "$SCRIPTS" "$WORK/q19-1.json" "Qu'est-ce qui reste dans le jalon v2 ?" > "$WORK/q19f.json"
 assert_eq "Q19.6 — L2 : témoin, la relance d'un jalon reste « dans v2 » (pas d'article inventé)" "$(H json "$WORK/q19f.json" "j.followups.includes(\"Qu'est-ce qui bloque dans v2 ?\")")" "true"
 
+# Q20 — revue de 82de0712..3f972a6b : R1 (aucun libellé affiché ne se coupe en plein mot) et R3 (coupe exactement sur un espace)
+mkdir -p "$WORK/lab20/.planning/phases/01-premiere"
+printf '# Roadmap\n\n## Milestone v1\n\n### Phase 1: Premiere\n**Goal:** faire la chose\n' > "$WORK/lab20/.planning/ROADMAP.md"
+printf -- '---\nphase: 01\nplan: 01\n---\n<objective>\nScaffolder le monorepo, le packaging et la chaîne de construction afin de livrer une première version installable et lisible\n</objective>\n' > "$WORK/lab20/.planning/phases/01-premiere/01-01-PLAN.md"
+assert_eq "Q20.1 — R1 : le nom d'un plan de plus de 70 caractères se coupe au mot entier (« … construction… », jamais « … afi… »), et reste sous 70" "$("$NODE" --input-type=module -e "
+import { buildProjectGraph } from '$SCRIPTS/vf-cockpit-project.mjs';
+const g = buildProjectGraph('$WORK/lab20'), f = g.files.find((x) => x.name.startsWith('01-01'));
+const obj = 'Scaffolder le monorepo, le packaging et la chaîne de construction afin de livrer une première version installable et lisible';
+const part = f.name.split(' — ').slice(1).join(' — '), tete = part.replace(/…\$/, '');
+console.log(part.endsWith('…') && part.length <= 70 && obj.startsWith(tete) && obj[tete.length] === ' ');")" "true"
+assert_eq "Q20.2 — R1 : la coupe du pied d'exigence et celle du nom sont la MÊME fonction (clip = clipMot sur 5 longueurs)" "$("$NODE" --input-type=module -e "
+import { clip, clipMot } from '$SCRIPTS/vf-cockpit-planning.mjs';
+const t = 'un deux trois quatre cinq six sept huit neuf dix onze douze';
+console.log([5, 12, 20, 33, 80].every((n) => clip(t, n) === clipMot(t, n)));")" "true"
+
 vf_hyg_assert
 echo ""
 echo "=================================="
