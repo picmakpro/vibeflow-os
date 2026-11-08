@@ -32,7 +32,7 @@ export const nettoyerMarkdown = (s) => String(s || '').replace(/<!--[\s\S]*?-->/
 // on ne réécrit pas le fichier source — mais se dit « extrait brut ». Liste fermée de mots, jamais une règle de langue.
 const MOTS_SANS_ACCENT = /\b(etapes?|deja|apres|verifie[rsz]?|verifiables?|generer|necessaires?|creer|executer|systemes?|systematique|resultats?|donnees|ecrire|ecrit|prefere|empeche\w*|regles?|ecarts?|defauts?|deploiement|problemes?|derniere|entrees?|memoire|developpe\w*|evenements?|evite[rsz]?|definit|apres)\b/i; // sans mot qui existe aussi en anglais (reference, complete, different, detect…)
 export const extraitBrut = (d) => (d && !/[^\x00-\x7f]/.test(d) && MOTS_SANS_ACCENT.test(d) ? `${d} (extrait brut)` : d);
-const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/[`*]/g, '').trim(); const i = s.search(/[.!?](\s|$)/); return clipMot(i > 25 ? s.slice(0, i + 1) : s, n); }; // PU-G-147 : coupe au mot entier, comme la version du planning
+export const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/[`*]/g, '').trim(); const i = s.search(/[.!?](\s|$)/); return clipMot(i > 25 ? s.slice(0, i + 1) : s, n); }; // PU-G-147 : coupe au mot entier, comme la version du planning
 // R6 : environnement du moteur. Liste des filtres lue et bornée : filtres vidés, marqueur VF_COCKPIT_GIT_DURCI posé (le moteur lit git). Liste illisible ou au-delà de MAX_FILTRES : le marqueur n'est PAS posé, git() du
 // moteur reste fermé (patch P27 de common.mjs : carte sans fichiers suivis ni head) ; `ferme` dit pourquoi. Même règle fail-closed que lancerGit : un filtre inconnu n'est pas un filtre absent.
 export function etatMoteur(lab) {

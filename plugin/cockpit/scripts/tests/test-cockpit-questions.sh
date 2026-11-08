@@ -382,6 +382,13 @@ fs.writeFileSync('$WORK/q19-m.json', JSON.stringify(g));"
 H locg "$SCRIPTS" "$WORK/q19-m.json" "Que contient la mission 414 ?" > "$WORK/q19i.json"
 assert_eq "Q19.8 — M2 : relances d'une mission -> « … reste dans la Mission 414 ? » et « … bloque dans la Mission 414 ? »" "$(H json "$WORK/q19i.json" "j.followups.includes(\"Qu'est-ce qui reste dans la Mission 414 ?\") && j.followups.includes(\"Qu'est-ce qui bloque dans la Mission 414 ?\")")" "true"
 
+# Q18.22 — M7c : sentence() du build (descriptions de l'onglet Code) coupe au mot entier ; rouge sur 82de0712 (« … avec le vr… »)
+assert_eq "Q18.22 — M7c : la phrase d'une description de fichier (build) coupée à 120 caractères ne finit pas dans un mot, et reste sous 120" "$("$NODE" --input-type=module -e "
+import { sentence } from '$SCRIPTS/vf-cockpit-build.mjs';
+const t = 'Usage réel et non-régression : de bout en bout dans Chromium avec un faux claude dans le PATH (suites), puis avec le vrai claude local.';
+const a = sentence(t, 120), mot = a.replace(/…\$/, '').split(' ').pop();
+console.log(a.endsWith('…') && a.length <= 120 && t.split(' ').includes(mot));")" "true"
+
 vf_hyg_assert
 echo ""
 echo "=================================="
