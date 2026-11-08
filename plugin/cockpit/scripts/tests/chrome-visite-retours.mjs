@@ -1,5 +1,5 @@
 // chrome-visite-retours.mjs — témoins des retours du panel sur la visite guidée et le bouton de thème (lot « visite et thème »).
-// Usage : node chrome-visite-retours.mjs <chrome> <urlCode> <largeur> <scenario>      scenario : theme | visite | tiroir | focus | fin | fin-sans
+// Usage : node chrome-visite-retours.mjs <chrome> <urlCode> <largeur|largeurxhauteur> <scenario> [<page>]      scenario : theme | visite | tiroir | focus | fin | fin-sans
 //   theme    : texte du bouton de thème à l'arrivée puis après chaque clic souris réel (Auto, Clair, Sombre attendus)
 //   visite   : visite ouverte d'office, parcourue jusqu'au bout ; par étape : croix (nom accessible), largeur de la feuille, « Étape n sur N » sur une ligne,
 //              largeur à l'écran de la carte présentée, cadre dessiné autour du titre, boutons éclairés (.tour-target.lit), cartes éclairées visibles
@@ -9,13 +9,15 @@
 //              activé au clavier (Entrée), il le garde
 // Rend une ligne JSON ou { erreur }.
 import { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } from './chrome-session.mjs';
-const [, , chrome, url, largeur = '1440', scenario = 'visite'] = process.argv;
-const W = Number(largeur), HAUT = { 390: 844, 1000: 760, 1280: 800, 1440: 900 };
+const [, , chrome, url0, largeur = '1440', scenario = 'visite', page = ''] = process.argv;
+// largeur : « 1440 » (hauteur d'usage) ou « 844x390 » (largeur x hauteur) ; page : « project.html » pour l'onglet Projet (par défaut la page de l'adresse)
+const [W, HX] = String(largeur).split('x').map(Number), HAUT = { 390: 844, 1000: 760, 1280: 800, 1440: 900 };
+const url = page ? url0.replace(/[^/]*$/, page) : url0;
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlowTour && !!document.getElementById('tour-btn') && !!window.__vfModele && !!window.__vfModele.modele";
 const OUVERTE = "(() => { const t = document.getElementById('tour'); return !!t && !t.hidden; })()";
 const KEY = { Escape: 27, ArrowRight: 39, Enter: 13, Tab: 9 };
 await executer(chrome, async (s) => {
-  await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: HAUT[W] || 800, deviceScaleFactor: 1, mobile: false });
+  await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: HX || HAUT[W] || 800, deviceScaleFactor: 1, mobile: false });
   await s.naviguer(url); await s.attendre(PRET, 'page prête');
   const touche = async (k) => { for (const t of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type: t, key: k, code: k, windowsVirtualKeyCode: KEY[k], ...(k === 'Enter' && t === 'keyDown' ? { text: '\r' } : {}) }); };
   // le centre du bouton est lu une fois posé (deux relevés égaux), jamais dans la foulée d'un changement de mise en page
@@ -69,8 +71,12 @@ await executer(chrome, async (s) => {
     const hl = SC.state.chipEls ? [...SC.state.chipEls.values()].filter((g) => g.classList.contains('hl')).map((g) => R(g)) : [];
     const bt = document.getElementById('tour-btn'), btr = bt ? R(bt) : null;
     const tb = card.querySelector('.tb'), tf = card.querySelector('.tf'), zr = document.getElementById('zoom').getBoundingClientRect(), pa = document.querySelector('.vf-term-pastille'), par = pa ? pa.getBoundingClientRect() : null;
+    // I-3 : la carte de visite ne recouvre ni la pastille Terminal ni le titre (h1, description) ; 0,5 px de tolérance, comme les autres témoins de la zone basse
+    const rr = (e) => { if (!e) return null; const b = e.getBoundingClientRect(), cs = getComputedStyle(e); return b.width > 0 && b.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden' ? b : null; };
+    const sur = (a, o) => !!a && !!o && a.left < o.right - 0.5 && a.right > o.left + 0.5 && a.top < o.bottom - 0.5 && a.bottom > o.top + 0.5;
+    const recouvre = [['pastille', rr(pa)], ['h1', rr(document.querySelector('#context h1'))], ['description', rr(document.querySelector('#context p'))]].filter(([, o]) => sur(rr(card), o)).map(([n]) => n);
     const lisible = { texteEntier: tb.scrollHeight <= tb.clientHeight + 1, texteBas: Math.round(R(tb).b), boutonsHaut: Math.round(R(tf).t), carteH: Math.round(cr.h), carteHaut: Math.round(cr.t), zoomBas: Math.round(zr.bottom), pastille: !!par && par.width > 0 && !pa.hidden, pastilleHaut: par ? Math.round(par.top) : null };
-    return { lisible, croix: x ? x.getAttribute('aria-label') : null, carte: { l: Math.round(cr.l), r: Math.round(cr.r), b: Math.round(cr.b), w: Math.round(cr.w) }, ecran: [innerWidth, innerHeight],
+    return { recouvre, lisible, croix: x ? x.getAttribute('aria-label') : null, carte: { l: Math.round(cr.l), r: Math.round(cr.r), b: Math.round(cr.b), w: Math.round(cr.w) }, ecran: [innerWidth, innerHeight],
       repere: spans.map((e) => e.t).join(' | '), repereHauteurs: spans.map((e) => e.h), litBoutons: lit.length, litSurTour: !!btr && lit.some((l) => Math.abs(l.l - btr.l) < 2 && Math.abs(l.w - btr.w) < 2),
       cadreSurTitre: cadres.some((c) => Math.abs(c.r.l - ctx.l) < 2 && Math.abs(c.r.w - ctx.w) < 2 && (c.contour !== 'none')),
       contours: cadres.map((c) => c.contour), cartesEclairees: hl.length, largeurCartes: hl.map((r) => Math.round(r.w)), dansFenetre: hl.every((r) => r.l >= 0 && r.r <= innerWidth && r.t >= 0 && r.b <= innerHeight) };

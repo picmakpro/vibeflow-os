@@ -214,24 +214,25 @@
     const w0 = feuille ? innerWidth - 16 : Math.min(360, innerWidth - 32);
     const widths = feuille ? [w0] : [w0, 300, 260, 220, 200].filter((w, k, a) => w <= w0 && a.indexOf(w) === k);
     const bottoms = [76, ...obs.map((o) => Math.round(innerHeight - o.top + 12))].filter((b, k, a) => b >= 12 && b <= innerHeight - 120 && a.indexOf(b) === k).sort((a, b) => a - b);
+    const colonne = feuille ? 0 : obs.filter((o) => (o.n === '#zoom' || o.n.indexOf('term-pastille') > 0) && o.left < 60).reduce((m, o) => Math.max(m, o.right + 8), 0); // I-3 : une fenêtre basse ne laisse, au bord gauche, que la colonne du zoom et de la pastille ; la carte peut aussi se poser À DROITE de cette colonne (troisième côté, le moins favorisé), entre elle et le panneau ou le bord droit
     const G6 = 2; // px counted around each surface: borders and rounding that the layout box does not show (6 made the search pick needlessly narrow cards and pushed the map out of the free area)
     const area = (a, b) => Math.max(0, Math.min(a.right, b.right + G6) - Math.max(a.left, b.left - G6)) * Math.max(0, Math.min(a.bottom, b.bottom + G6) - Math.max(a.top, b.top - G6));
     let best = null;
     // widths first; when nothing fits without covering a surface, the card also gets shorter (its text scrolls), down to a floor of 200 x 120 px
     for (const [lvl, hcap] of (feuille ? [Math.round(innerHeight * 0.5)] : [1e6, 240, 180, 120]).entries()) { // feuille : au plus la moitié de l'écran, le texte défile, le reste montre la carte
-      for (const w of widths) for (const side of (feuille ? ['left'] : ['left', 'right'])) for (const b of bottoms) {
-        card.style.width = w + 'px'; card.style.bottom = b + 'px'; card.style.maxHeight = Math.min(hcap, Math.max(120, innerHeight - b - topLimit)) + 'px'; card.classList.toggle('right', side === 'right');
+      for (const w of widths) for (const side of (feuille ? ['left'] : colonne ? ['left', 'right', 'colonne'] : ['left', 'right'])) for (const b of bottoms) {
+        card.style.width = w + 'px'; card.style.bottom = b + 'px'; card.style.maxHeight = Math.min(hcap, Math.max(120, innerHeight - b - topLimit)) + 'px'; card.classList.toggle('right', side === 'right'); card.style.left = side === 'colonne' ? colonne + 'px' : '';
         // the card's layout box, not its painted box: during its entry animation (98 % size, 8 px down) the painted box is smaller and shows a gap that the finished card does not have
         const r = { left: card.offsetLeft, top: card.offsetTop, right: card.offsetLeft + card.offsetWidth, bottom: card.offsetTop + card.offsetHeight };
         // the cost: what it covers first (a covered pixel outweighs any move), then how far it is from the usual place (bottom left, full width, full height)
         const covered = obs.reduce((n, o) => n + area(r, o), 0);
-        const score = covered * 1e3 + (r.top < 0 || r.left < -0.5 || r.right > innerWidth + 0.5 ? 1e12 : 0) + Math.abs(b - 76) + (side === 'right' ? 40 : 0) + (w0 - w) * 0.5 + lvl * 20;
+        const score = covered * 1e3 + (r.top < 0 || r.left < -0.5 || r.right > innerWidth + 0.5 ? 1e12 : 0) + Math.abs(b - 76) + (side === 'right' ? 40 : side === 'colonne' ? 60 : 0) + (w0 - w) * 0.5 + lvl * 20;
         if (!best || score < best.score) best = { score, covered, w, side, b, mh: card.style.maxHeight };
       }
       if (best.covered === 0) break;
     }
     lastPlace.best = best; lastPlace.topLimit = topLimit;
-    card.style.width = best.w + 'px'; card.style.bottom = best.b + 'px'; card.style.maxHeight = best.mh; card.classList.toggle('right', best.side === 'right');
+    card.style.width = best.w + 'px'; card.style.bottom = best.b + 'px'; card.style.maxHeight = best.mh; card.classList.toggle('right', best.side === 'right'); card.style.left = best.side === 'colonne' ? colonne + 'px' : '';
     // still covering something: fold the title description and search again; kept only if that covers less, else put back
     if (!folded && best.covered > 0 && fold()) { const before = best.covered; place(true); if (lastPlace.best.covered >= before) { unfold(); place(true); } }
   }

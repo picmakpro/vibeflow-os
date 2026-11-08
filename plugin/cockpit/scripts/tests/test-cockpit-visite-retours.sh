@@ -35,7 +35,7 @@ import fs from 'node:fs';
 const j = JSON.parse(fs.readFileSync(process.argv[2] === '/dev/stdin' ? 0 : process.argv[2], 'utf8'));
 console.log(String(Function('j', 'return (' + process.argv[3] + ')')(j)));
 JS
-mes() { node "$SCRIPTS/tests/chrome-visite-retours.mjs" "$CHROME" "$U" "$1" "$2"; }
+mes() { node "$SCRIPTS/tests/chrome-visite-retours.mjs" "$CHROME" "$U" "$1" "$2" "${3:-}"; }
 g() { printf '%s' "$1" | node "$AUX/get.mjs" /dev/stdin "$2"; }
 
 echo "=== T1 — bouton de thème : l'état courant en texte ==="
@@ -84,5 +84,16 @@ done
 for w in 390 768; do
   X="$(mes $w fin-sans)"; [ -n "${DBG:-}" ] && echo "RAW: $X"
   assert_eq "T8.sans.$w — pastille posée, visite finie, aucun recouvrement zoom / pastille / barre (sans redimensionnement)" "$(sans_recouvrement "$X")" "true,true,false,false"
+done
+echo "=== T9 — carte de visite : ni la pastille Terminal ni le titre recouverts, de 701 à 1 440 px, jusqu'à 390 px de haut (I-3, intégration) ==="
+# la carte de visite se place là où elle recouvre le moins ; sur une fenêtre basse la colonne du zoom et de la pastille barrait le bord gauche et le panneau de détail (même fermé : O6.17 de la suite projet-visite
+# le tient pour une surface) le côté droit : la carte retombait sur la pastille (Code, Projet) ou sur le titre (Projet). Elle peut maintenant se poser à droite de cette colonne. Chaque étape est jugée une fois posée ;
+# la pastille est posée (--terminal), la visite compte au moins deux étapes.
+# décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée : placer la carte du côté libre (à droite de la colonne) plutôt que la réduire ou la rendre défilable
+for pg in index.html project.html; do
+  for t in 701x390 844x390 1000x420 1100x390 1279x450 1440x390; do
+    X="$(mes $t visite $pg)"; [ -n "${DBG:-}" ] && echo "RAW: $X"
+    assert_eq "T9.$pg.$t — au moins deux étapes, pastille posée à chacune, la carte de visite ne recouvre ni la pastille ni le titre" "$(g "$X" "j.erreur||[j.n>=2,j.etapes.every((e)=>e.lisible.pastille),JSON.stringify(j.etapes.map((e)=>e.recouvre).filter((r)=>r.length))].join(',')")" "true,true,[]"
+  done
 done
 echo; echo "Résultat : $PASS passés, $FAIL en échec"; [ "$FAIL" -eq 0 ]
