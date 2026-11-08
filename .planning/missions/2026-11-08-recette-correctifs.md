@@ -50,7 +50,10 @@ CI → passes K1-K4 sur les rouges CI.
 | B2 | 3 (majeur au tour 1 : 315 coupes en plein mot par `clip()`) | passed |
 | C | 2 (+ critique design 84/100, passed) | passed |
 | Intégration | jointure passed ; passe de suivi gaps_found (M-A, M-B, M-C) puis corrigée | voir CI |
-| Passe CI K1-K3 | gaps_found (R3.23 non corrigé) puis K4 | voir CI |
+| Passe CI K1-K3 | gaps_found (R3.23 non corrigé) puis K4 | corrigé |
+| Passe K4 | gaps_found (taille de chrome-equipe-clavier.mjs) puis K5 | corrigé |
+| Passe K5 | passed (3 mineurs de commentaire, corrigés) | corrigé |
+| Passe K6 | M-BLOC-VUE trop étroit depuis K5 (4 chemins d'écriture, un seul retiré) : le mutant coupe la source, recensement 4/1/2 | voir CI |
 
 Juge de design (vf-design-judge, frais, contre DESIGN.md) : **84/100, passed** (seuil 70) ; findings
 d'exécution repris en C-R1 à C-R4.
@@ -79,6 +82,7 @@ d'exécution repris en C-R1 à C-R4.
 | C | `bash plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh` | 0 | 4b8f1aad |
 | Intégration | `bash plugin/cockpit/amont/synchro.sh verifier` | 0 | a1275048 |
 | Intégration | `bash scripts/check-machine-paths.sh` | 0 | a1275048 |
+| K5 | `bash plugin/cockpit/scripts/tests/test-cockpit-git-tiroir.sh` (D18.4b) | 0 | 7eedd4e8 |
 
 ## Captures
 
@@ -94,12 +98,15 @@ lot, zone basse aux six largeurs (390, 700, 1 000, 1 279, 1 280, 1 440 px) en cl
 
 ## Décompte
 
-26 agents dispatchés : 13 vf-coder (lots A, B, B2, C ; corrections B ×2 ; intégration ×2 ; CI K1-K5),
-12 vf-reviewer, 1 vf-design-judge.
+29 agents dispatchés : 15 vf-coder (lots A, B, B2, C ; corrections B ×2 ; intégration ×2 ; CI K1-K6, retouches),
+13 vf-reviewer, 1 vf-design-judge.
 
 ## Next step
 
-Run sur a1275048 : 8 shards verts sur 9 ; shard 8 rouge (V4 taille de chrome-equipe-clavier.mjs, D18.4).
-Passe K5 en cours au moment du rapport (extraction du parcours de Tab, premier rendu après les extensions
-dans viewer.html) : à pousser, puis CI à relire. La fusion dans `feat/cockpit-retours-utilisateurs` reste un
-geste de Samuel une fois le gel levé.
+Passe K5 (e9bf1f44, 846ce4ab, 7eedd4e8) : parcours de Tab extrait (chrome-equipe-clavier.mjs 308 → 291
+lignes) ; premier rendu et `ready` du viewer après les polices ET DOMContentLoaded (cause commune de H7.1 et
+D18.4 sous Linux, correctif de symptôme de a1275048 retiré, patch P31) ; H7.1c gardé comme non-régression
+de l'arrivée par `#r=`, avec le mutant M-ARRIVER. Revue fraîche : passed (trois retouches de commentaires
+appliquées). K6 (c27b8dfa) : mutant M-BLOC-VUE élargi à la source du texte du bloc de vue,
+rouge dans trois conditions de polices, recensement des chemins d'écriture. Verdict CI final : voir la PR #222. La fusion dans `feat/cockpit-retours-utilisateurs` (et la
+branche de release) reste un geste de la session principale et de Samuel.
