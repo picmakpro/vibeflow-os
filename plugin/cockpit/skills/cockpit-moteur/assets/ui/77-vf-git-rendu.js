@@ -39,7 +39,7 @@
   };
   const aideFocus = (e, texte) => {
     e.setAttribute('tabindex', '0');
-    e.addEventListener('focus', () => { if (clavier || e.matches(':focus-visible')) montrer(e, texte); });
+    e.addEventListener('focus', () => { if (clavier || e.matches(':focus-visible')) montrer(e, typeof texte === 'function' ? texte() : texte); }); // texte : une chaîne, ou une fonction quand la définition change avec la vue (titre de la vue)
     e.addEventListener('blur', cacher);
     e.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && bulle && !bulle.hidden && ancre === e) { ev.stopPropagation(); ev.preventDefault(); cacher(); } });
     return e;

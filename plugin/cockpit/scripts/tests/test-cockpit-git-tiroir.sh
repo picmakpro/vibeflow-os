@@ -4,7 +4,7 @@
 #   D3 clavier, focus, coexistence avec le Terminal et le zoom, mobile
 #   D7 détail d'un commit sous sa rangée · D8 clavier du graphe, état des worktrees · D9 rafraîchissement par vf-git:signal (78-10)
 #   D10 correction design de la critique fraîche (F2 étiquettes, F12 stash, F14 glyphes muets, F15 tailles et graisses)
-#   Recette du 2026-11-08 (PU-G-193, 196) : D18.1 à D18.3 et D16.3b — la définition d'un terme Git (HEAD détaché, Worktrees, ↑/↓) se montre aussi au focus clavier, Échap la ferme sans fermer le tiroir ; mutants M-BULLE-ECHAP, M-BULLE-FOCUS.
+#   Recette du 2026-11-08 (PU-G-193, 196) : D18.1 à D18.4 et D16.3b — la définition d'un terme Git (HEAD détaché, Worktrees, ↑/↓) se montre aussi au focus clavier, Échap la ferme sans fermer le tiroir ; mutants M-BULLE-ECHAP, M-BULLE-FOCUS.
 #   Mutants (D12 : M-SEQ-WT, M-ANNONCE) : M-HTML, M-COPIE, M-GLOBAL-G, M-HORS-DEPOT, M-DETAIL-HTML, M-SELECTION, M-RAFALE, M-NONVERIFIE (D11 : worktree non vérifié, audit A3). La réponse `/api/vf/git` est figée (temoins/git-tiroir.json) et servie par un `fetch` remplacé dans la page.
 #   Chrome headless en CDP (SAUTÉ, jamais compté réussi, sans navigateur), ports éphémères. Exit 0 si tout passe, 1 sinon.
 
@@ -872,6 +872,12 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const echap = (cible) => s.ev(`${cible}.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`);
 const ouvert = () => s.ev(`(() => { const t = ${T}; return !!t && !t.hidden; })()`);
 await s.ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))`); // la dernière entrée est une touche (le chemin des vraies touches est vérifié à la main)
+await s.attendre(`!!document.querySelector('#context h1[data-vf-aide]')`, 'titre de la vue avec sa définition');
+await s.ev(`document.querySelector('#context h1').focus()`);
+out.h1 = await lire((v) => v !== null);
+out.h1tab = await s.ev(`document.querySelector('#context h1').tabIndex`);
+await s.ev(`document.activeElement.blur()`);
+await lire((v) => v === null);
 await s.ev(`${DETACHE}.focus()`);
 out.detache.bulle = await lire((v) => v !== null);
 out.detache.atteignable = await s.ev(`(() => { const m = ${DETACHE}; return { tab: m.tabIndex, desc: m.getAttribute('aria-description') === m.getAttribute('title'), actif: document.activeElement === m }; })()`);
@@ -892,6 +898,7 @@ JS
   assert_eq "D18.1 — PU-G-193 : au focus clavier, « HEAD détaché » (atteignable par Tab, même phrase en aria-description) montre sa définition dans une bulle visible, dans la fenêtre" "$(jq_ "$R18" '[j.detache.atteignable.tab, j.detache.atteignable.desc, j.detache.atteignable.actif, !!j.detache.bulle && j.detache.bulle.vu, !!j.detache.bulle && /^HEAD détaché : ce dossier n.est sur aucune branche/.test(j.detache.bulle.texte)].join("|")' 2>/dev/null)" "0|true|true|true|true"
   assert_eq "D18.2 — PU-G-193 : Échap ferme la bulle SANS fermer le tiroir (le premier Échap ne sert qu'à elle) ; un second Échap, bulle fermée, ferme le tiroir (témoin : il aurait pu se fermer)" "$(jq_ "$R18" '[j.detache.apresEchap.bulle === null, j.detache.apresEchap.tiroir, j.detache.secondEchap].join("|")' 2>/dev/null)" "true|true|false"
   assert_eq "D18.3 — PU-G-193 : le bouton « Worktrees » montre aussi sa définition au focus ; elle se ferme quand le focus part" "$(jq_ "$R18" '[!!j.worktrees && /^Worktrees : copies de travail du dépôt/.test(j.worktrees.texte), j.depart === null].join("|")' 2>/dev/null)" "true|true"
+  assert_eq "D18.4 — PU-G-193 : le titre de la vue (« Le code, <branche> », définition Branche / HEAD détaché) est atteignable par Tab et montre sa définition au focus clavier" "$(jq_ "$R18" '[j.h1tab, !!j.h1 && /^Branche : une ligne de travail du dépôt/.test(j.h1.texte)].join("|")' 2>/dev/null)" "0|true"
   assert_eq "D18.x — aucune erreur de page" "$(jq_ "$R18" '(j.errs || []).length' 2>/dev/null)" "0"
   # D17 (GT2, PU-G-198/199/200/201 ; DG-01 part page, PU-G-191) : focus visible à l'ouverture, détail hors de la liste, noms des boutons Copier, Échap à 390 px, une relance automatique unique.
   # SURFACE DURCIE : le nom d'une branche entre dans un aria-label (setAttribute) et nulle part ailleurs ; la commande copiée reste celle du <code> affiché.
@@ -1053,8 +1060,8 @@ mutant M-GLOBAL-G 77-vf-git-tiroir.js "if (t && (t.isContentEditable || ['INPUT'
   assert_eq "M-ECHAP-390 — rougit D17.6 (le panneau fermé du téléphone, role=dialog invisible, bloque Échap : le tiroir reste ouvert, le focus part sur le corps) alors que le tiroir s'ouvre" "$(jq_ "$RM" '[j.ouvert, j.ferme, j.focus].join("|")' 2>/dev/null)" "true|false|"
   mutant M-BULLE-ECHAP 77-vf-git-rendu.js "if (ev.key === 'Escape' && bulle && !bulle.hidden && ancre === e) {" "if (false) {" d18-complet.js
   assert_eq "M-BULLE-ECHAP — rougit D18.2 (la bulle n'a plus son Échap : le premier Échap atteint le tiroir et le ferme, la bulle disparaît avec lui) alors que la bulle s'était bien ouverte (D18.1)" "$(jq_ "$RM" '[!!j.detache.bulle && j.detache.bulle.vu, j.detache.apresEchap.bulle === null, j.detache.apresEchap.tiroir].join("|")' 2>/dev/null)" "true|true|false"
-  mutant M-BULLE-FOCUS 77-vf-git-rendu.js "if (clavier || e.matches(':focus-visible')) montrer(e, texte);" "void 0;" d18-complet.js
-  assert_eq "M-BULLE-FOCUS — rougit D18.1 et D18.3 (le focus clavier ne montre plus rien : retour au title seul) alors que les éléments sont atteignables par Tab" "$(jq_ "$RM" '[j.detache.atteignable.tab, j.detache.bulle === null, j.worktrees === null].join("|")' 2>/dev/null)" "0|true|true"
+  mutant M-BULLE-FOCUS 77-vf-git-rendu.js "if (clavier || e.matches(':focus-visible')) montrer(e, typeof texte === 'function' ? texte() : texte);" "void 0;" d18-complet.js
+  assert_eq "M-BULLE-FOCUS — rougit D18.1 et D18.3 (le focus clavier ne montre plus rien : retour au title seul) alors que les éléments sont atteignables par Tab" "$(jq_ "$RM" '[j.detache.atteignable.tab, j.detache.bulle === null, j.worktrees === null, j.h1 === null].join("|")' 2>/dev/null)" "0|true|true|true"
   mutant M-RELANCE 77-vf-git-tiroir.js "if (relance !== true && (!j ||" "if (false && (!j ||" d17c-complet.js
   assert_eq "M-RELANCE — rougit D17.7 (plus de relance : une requête, la carte d'erreur au premier « indisponible ») alors que le bon état aurait été servi à la seconde" "$(jq_ "$RM" '[j.relance.reqs, j.relance.carte].join("|")' 2>/dev/null)" "1|true"
 fi

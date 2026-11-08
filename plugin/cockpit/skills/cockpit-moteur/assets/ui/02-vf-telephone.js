@@ -156,7 +156,7 @@
         n.replaceWith(f);
       }
     }
-    if (phone.matches) { h1.setAttribute('role', 'button'); h1.tabIndex = 0; } else { h1.removeAttribute('role'); h1.removeAttribute('tabindex'); }
+    if (phone.matches) { h1.setAttribute('role', 'button'); h1.tabIndex = 0; } else { h1.removeAttribute('role'); if (!h1.dataset.vfAide) h1.removeAttribute('tabindex'); } // le titre à définition Git reste atteignable par Tab (76-vf-git-entete.js)
   };
   if (ctx) {
     new MutationObserver(titre).observe(ctx, { childList: true }); phone.addEventListener('change', titre); titre();
