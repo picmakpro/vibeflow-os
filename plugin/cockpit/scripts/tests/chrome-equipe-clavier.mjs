@@ -229,22 +229,32 @@ await executer(chrome, async (s) => {
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 800, deviceScaleFactor: 1, mobile: false });
     await s.attendre("!!window.VFGitTiroir && !!document.querySelector('#context h1[tabindex]')", 'tiroir Git et titre à définition');
     await calme();
-    const parcours = async () => { // des vraies touches Tab depuis le début de la page : les arrêts, jusqu'au retour au corps de la page
-      // blur() ne ramène pas le point de départ de la navigation séquentielle : il reste là où le focus était (dans le tiroir Git qui vient de s'ouvrir, sous Linux CI), et le parcours ne passait plus par le titre, situé avant. La sélection est le point de départ : elle est posée au début du document.
-      await s.ev("(() => { document.activeElement && document.activeElement.blur(); const r = document.createRange(); r.setStart(document.body, 0); r.collapse(true); const g = getSelection(); g.removeAllRanges(); g.addRange(r); })()"); const arrets = [];
-      for (let i = 0; i < 60; i++) {
+    const detail = {}; // les arrêts visités à chaque parcours (balise, id ou classe, texte court, tabindex, visibilité) : le DIAG de la suite les montre quand le verdict n'est pas celui attendu
+    const parcours = async (nom) => { // des vraies touches Tab depuis le début de la page : les arrêts, jusqu'au retour au corps de la page OU au premier arrêt déjà visité (le cycle), borne de sécurité large
+      // Ni blur() ni une sélection posée au début du document ne ramènent de façon sûre le point de départ de la navigation séquentielle : il reste là où le focus était (le tiroir Git qui vient de s'ouvrir, ou le bouton que la fermeture a refocalisé), et le parcours démarrait alors APRÈS le titre (DIAG du run 42500903126 rejoué : « ouvert » commençait au bouton de fermeture du tiroir, « referme » après le bouton Git). Départ explicite : un repère hors parcours (tabindex -1) en tête du corps reçoit le focus ; la touche Tab suivante va au premier arrêt qui le suit, donc au premier arrêt du document.
+      await s.ev("(() => { document.getElementById('vf-tab-depart')?.remove(); const d = document.createElement('span'); d.id = 'vf-tab-depart'; d.tabIndex = -1; d.setAttribute('style', 'position:fixed;left:0;top:0;width:0;height:0;outline:none'); document.body.prepend(d); d.focus({ preventScroll: true }); return document.activeElement === d; })()");
+      const arrets = [], vus = new Set(), fiche = [];
+      const LIRE = `(() => { const a = document.activeElement; if (!a || a === document.body) return JSON.stringify({ fin: true });
+        const W = (window.__tabIds ||= new WeakMap()); if (!W.has(a)) W.set(a, (window.__tabN = (window.__tabN || 0) + 1)); const cs = getComputedStyle(a), r = a.getBoundingClientRect();
+        return JSON.stringify({ n: W.get(a), titre: !!a.closest('#context'), cle: a.id || a.tagName, balise: a.tagName.toLowerCase(), id: a.id || '', classe: String(a.className && a.className.baseVal !== undefined ? a.className.baseVal : a.className || '').slice(0, 40), texte: (a.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 30), tabindex: a.getAttribute('tabindex'), visible: cs.visibility !== 'hidden' && cs.display !== 'none' && r.width > 0 && r.height > 0 }); })()`;
+      for (let i = 0; i < 400; i++) {
         await touche('Tab', 'Tab', 9);
-        const a = await s.stable("(() => { const a = document.activeElement; return !a || a === document.body ? '#fin' : a.closest('#context') ? 'titre' : a.id || a.tagName; })()", 'arrêt de Tab stable');
-        if (a === '#fin') break; arrets.push(a);
+        const a = JSON.parse(await s.stable(LIRE, 'arrêt de Tab stable'));
+        if (a.fin) { fiche.push('<corps>'); break; }
+        if (vus.has(a.n)) { fiche.push('<cycle sur #' + a.n + '>'); break; }
+        vus.add(a.n); arrets.push(a.titre ? 'titre' : a.cle);
+        fiche.push(`#${a.n} <${a.balise}${a.id ? '#' + a.id : ''}${a.classe ? '.' + a.classe.split(/\s+/)[0] : ''}> « ${a.texte} » tabindex=${a.tabindex} ${a.visible ? 'visible' : 'MASQUÉ'}${a.titre ? ' [dans #context]' : ''}`);
       }
+      await s.ev("document.getElementById('vf-tab-depart')?.remove()");
+      detail[nom] = fiche;
       return arrets;
     };
-    const r = { ferme: await parcours() };
+    const r = { ferme: await parcours('ferme') };
     await s.ev('document.activeElement && document.activeElement.blur()'); await touche('g', 'KeyG', 71, 'g'); await s.attendre('window.VFGitTiroir.ouvert()', 'tiroir Git ouvert'); await calme();
-    r.ouvert = await parcours();
+    r.ouvert = await parcours('ouvert');
     await s.ev('document.activeElement && document.activeElement.blur()'); await touche('g', 'KeyG', 71, 'g'); await s.attendre('!window.VFGitTiroir.ouvert()', 'tiroir Git refermé'); await calme();
-    r.referme = await parcours();
-    return { ...r, verdict: [r.ferme.includes('titre'), r.ouvert.includes('titre'), r.ouvert.length > 3, r.referme.includes('titre')].join('/') };
+    r.referme = await parcours('referme');
+    return { ...r, detail, verdict: [r.ferme.includes('titre'), r.ouvert.includes('titre'), r.ouvert.length > 3, r.referme.includes('titre')].join('/') };
   }
   if (ACTION === 'un-lateral') { // (EK16, PU-G-203) un seul tiroir latéral sous 1280 px ; les deux à 1280 px et au-delà
     await s.send('Emulation.setDeviceMetricsOverride', { width: +process.env.EK_LARGEUR, height: 800, deviceScaleFactor: 1, mobile: false });
