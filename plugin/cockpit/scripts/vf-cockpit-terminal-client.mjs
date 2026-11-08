@@ -100,9 +100,8 @@ export function clientTerminal(cfg) {
     attendre(POLICES_MS),
   ]);
   const demarrer = () => {
-    // les deux phrases que la bibliothèque dit d'elle-même (nom du champ de saisie, lu par un lecteur d'écran à chaque entrée dans le terminal ; sortie trop abondante) : posées avant open(), sinon l'anglais d'origine est annoncé
-    Terminal.strings.promptLabel = 'Saisie du terminal';
-    Terminal.strings.tooMuchOutput = 'Trop de sortie pour être annoncée : parcourez les lignes à la main pour la lire';
+    // les deux phrases que la bibliothèque dit d'elle-même (nom du champ de saisie lu par un lecteur d'écran, sortie trop abondante) : posées avant open() ; `if` : une bibliothèque de substitution (banc LB.C2 à C7) n'a pas `strings`
+    if (Terminal.strings) { Terminal.strings.promptLabel = 'Saisie du terminal'; Terminal.strings.tooMuchOutput = 'Trop de sortie pour être annoncée : parcourez les lignes à la main pour la lire'; }
     const term = new Terminal({
       fontFamily: '"JetBrains Mono", ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace', fontSize: 13, lineHeight: 1, letterSpacing: 0,
       fontWeight: '400', fontWeightBold: '600', drawBoldTextInBrightColors: false, minimumContrastRatio: 4.5,
