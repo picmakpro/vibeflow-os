@@ -1012,6 +1012,12 @@ EOF
     build_serve "$L" "$M"; RM="$(cdp "$AUX/$5" "http://127.0.0.1:$PORT")"; stop_srv
     [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$RM" > "$TIROIR_TRACE-$1.json"
   }
+  # D18.4b (K5-2, CI Linux, run 42512568864) : sous Linux `document.fonts.ready` est déjà résolu quand le script du viewer s'achève ; le viewer posait alors le premier rendu et `ready` AVANT les scripts d'extension. Condition reproduite sur tout poste par une copie du module dont le viewer attend `Promise.resolve()` (comme H7.1b) : le scénario D18 complet y est rejoué et le titre de la vue doit toujours être atteignable par Tab ET montrer sa définition au focus.
+  MP="$(mkmod mpolices)"
+  mutate "$MP/../skills/cockpit-moteur/assets/viewer.html" "const fontsReady = document.fonts?.ready ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();" "const fontsReady = Promise.resolve();" || { echo "  ❌ FAIL — D18.4b : mutation impossible"; FAIL=$((FAIL+1)); }
+  build_serve "$DEPOT" "$MP"; R18B="$(cdp "$AUX/d18-complet.js" "http://127.0.0.1:$PORT")"; stop_srv
+  assert_eq "D18.4b — polices déjà prêtes avant les scripts d'extension (Linux, CI) : le titre de la vue est atteignable par Tab et montre sa définition au focus clavier (même attendu que D18.4)" "$(jq_ "$R18B" '[j.h1tab, !!j.h1 && /^Branche : une ligne de travail du dépôt/.test(j.h1.texte)].join("|")' 2>/dev/null)" "0|true"
+  assert_eq "D18.xb — polices déjà prêtes : aucune erreur de page" "$(jq_ "$R18B" '(j.errs || []).length' 2>/dev/null)" "0"
   mutant M-HTML 77-vf-git-rendu.js "l1.appendChild(el('span', 'vf-git-msg', r.s));" "{ const m = el('span', 'vf-git-msg'); m.innerHTML = r.s; l1.appendChild(m); }" d2.js
   assert_eq "M-HTML — rougit D2.5 (un message rendu en HTML fait naître un <img>) alors que les 40 rangées sont là (pas une panne d'un autre ordre)" "$(jq_ "$RM" '[j.xss.img > 0, j.xss.lit.includes("false"), j.ouvert.rangees].join("|")' 2>/dev/null)" "true|true|40"
   mutant M-COPIE 77-vf-git-rendu.js "writeText(code.textContent)" "writeText(code.textContent.slice(0, -1))" d2.js

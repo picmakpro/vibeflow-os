@@ -2563,7 +2563,9 @@ const init = readHash();
 state.container = init.v; state.selected = init.s;
 if (init.s && isPhone()) { document.body.classList.remove('no-panel'); $('#btn-panel').setAttribute('aria-expanded', 'true'); } // a shared link to a box opens its details
 const fontsReady = document.fonts?.ready ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();
-fontsReady.then(() => render({ after: () => { renderPanel(); emit('ready', {}); if (PLAN && window.FLOORPLAN_SERVER) showChangeResult(); } }));
+// vibeflow K5 : le premier rendu et `ready` attendent aussi que les scripts d'extension (ui/*.js, posés APRÈS ce script par la page) aient été exécutés (DOMContentLoaded) : polices déjà prêtes (Linux), `fontsReady` est résolue à la fin de ce script et le rendu partait avant eux (titre du panneau, définitions au focus posés sur un rendu déjà fait, écouteurs de `ready` posés trop tard)
+const extensionsPosees = document.readyState === 'loading' ? new Promise((ok) => document.addEventListener('DOMContentLoaded', ok, { once: true })) : Promise.resolve();
+Promise.all([fontsReady, extensionsPosees]).then(() => render({ after: () => { renderPanel(); emit('ready', {}); if (PLAN && window.FLOORPLAN_SERVER) showChangeResult(); } }));
 })();
 </script>
 <!--__UI_EXTENSIONS__-->
