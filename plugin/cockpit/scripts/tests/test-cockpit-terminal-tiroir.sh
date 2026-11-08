@@ -707,6 +707,7 @@ await executer(chrome, async (s) => {
   const charger = async (page, W, H, tactile) => { await fen(W, H, tactile); await s.naviguer(`${OP}/${page}`); await s.ev(`localStorage.clear(); sessionStorage.clear()`); await s.naviguer(`${OP}/${page}`);
     await s.attendre(`document.querySelectorAll('#svg g.node, #viewport .node').length > 0 && !!document.querySelector('button.vf-term-pastille')`, 'nœuds et pastille', 20000); await pause(700); };
   const fermerPanneau = async () => { await s.ev(`document.body.classList.contains('no-panel') || document.getElementById('btn-panel').click()`); await pause(700); }; // mêmes états pour le chaud et le froid : panneau fermé (sous 701 px il l'est déjà : la feuille de détail est un autre cas)
+  const ouvrirPanneau = async () => { await s.ev(`document.body.classList.contains('no-panel') && document.getElementById('btn-panel').click()`); await pause(700); }; // panneau (feuille de détail sous 701 px) OUVERT : le cas que fermerPanneau écarte
   const fermerVisite = () => s.ev(`window.VibeFlowTour && window.VibeFlowTour.active() && window.VibeFlowTour.end()`);
   const ouvrirTiroir = async () => { await s.ev(`document.querySelector('.vf-term-pastille').click()`); await pause(1300); };
   const fermerTiroir = async () => { await s.ev(`(document.querySelector('.vf-term-tiroir button[aria-label^="Fermer"]')||{click(){}}).click()`); await pause(900); };
@@ -722,6 +723,11 @@ await executer(chrome, async (s) => {
       await charger(page, 768, 1024); await fermerVisite(); await s.ev(`document.body.classList.contains('no-panel') && document.getElementById('btn-panel').click()`); await pause(700); await mes(`${p}/panneau-768x1024`);
       await charger(page, 1024, 768, true); await fermerVisite(); await pause(500); await mes(`${p}/tactile-1024x768`);
       for (const [W, H] of [[1280, 800], [1000, 700]]) { await charger(page, W, H); await fermerVisite(); await ouvrirTiroir(); await mes(`${p}/tiroir-${W}x${H}`); }
+      // I-2 (intégration ; décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée : le zoom se relève au-dessus de la feuille de détail, comme la pastille, et se replie s'il recouvrirait le titre) :
+      // le panneau de détail reste OUVERT pendant le redimensionnement à chaud, puis la feuille est ouverte à froid (390 x 844, 700 x 700, 844 x 390) ; le froid n'est pas comparé (sous 701 px le panneau ouvert est la feuille, le chargement à froid le ferme)
+      await fen(1280, 800); await s.naviguer(`${OP}/${page}`); await pause(900); await fermerVisite(); await ouvrirPanneau();
+      for (const [W, H] of [[1280, 800], [1000, 700], [700, 700], [1280, 800]]) { await fen(W, H); await pause(700); await mes(`${p}/chaud-panneau-${W}x${H}`); }
+      for (const [W, H] of [[390, 844], [700, 700], [844, 390]]) { await charger(page, W, H); await fermerVisite(); await ouvrirPanneau(); await mes(`${p}/feuille-${W}x${H}`); }
       for (const [W, H] of bas) {
         await charger(page, W, H); await fermerVisite(); await ouvrirTiroir(); await mes(`${p}/bas-tiroir-${W}x${H}`); await fermerTiroir();
         await s.ev(`window.VibeFlowTour && !window.VibeFlowTour.active() && window.VibeFlowTour.start()`); await pause(1100); await mes(`${p}/bas-visite-${W}x${H}`); await fermerVisite(); await pause(500);
@@ -1020,8 +1026,8 @@ assert_eq "T21.10 (PU-G-021 ; « Pastille large comme le zoom », arbitrage Samu
 assert_eq "T21.11 (PU-G-021 ; « Barre au même bord gauche », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) — barre de question au bord --edge jusqu'à 1 279 px, après la colonne du zoom dès 1 280 px, de 40 px dès 1 000 px" "$(rj "$AX" 'JSON.stringify(j.barre)')" "[]"
 assert_eq "T21.12 (PU-G-021 ; correction ciblée du lot C, arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette) — sous 701 px la barre finit à --edge du bas sans que zoom, pastille et barre se recouvrent ; dès 1 280 px la pastille et la barre ont le même centre" "$(rj "$AX" 'JSON.stringify(j.bas)')" "[]"
 run_vivant "$OUT" 0; VV="$VJ"
-assert_eq "T21.13 — témoin de la zone basse en vie : 42 relevés (redimensionnement à chaud, panneau ouvert à 768 px, tactile à 1 024 px, tiroir ouvert, fenêtres basses avec tiroir et visite, Code et Projet), aucune erreur" "$(rj "$VV" '(j.erreur||JSON.stringify(j.erreurs))+" n="+j.n+" bas="+j.bas')" "{} n=42 bas=20"
-assert_eq "T21.13 (C-R7 ; revue adverse du lot C) — ni le zoom ni la pastille ne recouvrent la barre, le panneau, le tiroir ni l'un l'autre, à chaud (1 280 -> 1 000 -> 700 -> 1 280), panneau ouvert à 768 px, tiroir ouvert, tactile à 1 024 px" "$(rj "$VV" 'JSON.stringify(j.mal)')" "[]"
+assert_eq "T21.13 — témoin de la zone basse en vie : 56 relevés (redimensionnement à chaud, panneau ouvert à 768 px, panneau ouvert pendant le redimensionnement et feuille de détail ouverte à froid, tactile à 1 024 px, tiroir ouvert, fenêtres basses avec tiroir et visite, Code et Projet), aucune erreur" "$(rj "$VV" '(j.erreur||JSON.stringify(j.erreurs))+" n="+j.n+" bas="+j.bas')" "{} n=56 bas=20"
+assert_eq "T21.13 (C-R7 ; revue adverse du lot C) — ni le zoom ni la pastille ne recouvrent la barre, le panneau, le tiroir ni l'un l'autre, à chaud (1 280 -> 1 000 -> 700 -> 1 280, panneau fermé ou ouvert), feuille de détail ouverte, panneau ouvert à 768 px, tiroir ouvert, tactile à 1 024 px" "$(rj "$VV" 'JSON.stringify(j.mal)')" "[]"
 assert_eq "T21.14 (C-R7) — après un redimensionnement à chaud, zoom, pastille et barre sont où un chargement à froid à cette taille les pose" "$(rj "$VV" 'JSON.stringify(j.ecarts)')" "[]"
 assert_eq "T21.15 (C-R6 ; décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée : le zoom se replie) — de 701 à 1 440 px, jusqu'à 390 px de haut, le zoom ne recouvre ni le titre (h1, description) ni la carte de la visite, tiroir ouvert ou visite en cours" "$(rj "$VV" 'JSON.stringify(j.titre)')" "[]"
 mut_vivant() { # mut_vivant <nom> <fichier> <expression-sed> <groupe qui doit rougir> <1 si l'ancien T21.9 à T21.12 doit rester vert> : le mutant rougit le groupe visé du nouveau témoin ; pour C-R7, le témoin d'état initial (T21.9 à T21.12) l'aurait laissé vert
@@ -1045,6 +1051,8 @@ mut_axe M-BAS-A-8 index.html 's|#ask { width: calc(100% - 2 \* var(--edge)); bot
 mut_axe M-RETRAIT-A-12 index.html 's|#ask-form { padding-left: var(--sp-16); } }|#ask-form { padding-left: var(--sp-12); } }|' barre pastille
 mut_vivant M-ZOOM-JAMAIS-REPLIE index.html "s|if (motif) z.setAttribute|if (false) z.setAttribute|" titre 0
 mut_vivant M-EVITER-BAS-PERSISTE vf-cockpit-terminal-tiroir.mjs "s|e.style.bottom = '';|void 0;|" ecarts 1
+mut_vivant M-ZOOM-SOUS-FEUILLE index.html 's@body:not(.no-panel) #stage > #zoom { bottom: calc(var(--sp-8) + min(56vh, 480px)@body:not(.no-panel) #stage > #zoomX { bottom: calc(var(--sp-8) + min(56vh, 480px)@' mal 1
+mut_vivant M-REPLIE-SOUS-701-SANS-FEUILLE index.html 's/if (mq701.matches || !document.body.classList.contains(.no-panel.)) {/if (mq701.matches) {/' titre 0
 
 echo "=== T22 — hauteur par défaut proportionnelle à la fenêtre (recette 71, G4 ; P71-D-37) ==="
 run_defaut "$OUT"; D="$DJ"

@@ -80,6 +80,8 @@ function scriptTiroir(cfg, accepte, construire) {
     // I-1 (intégration, revue du lot A) : pendant la visite, la règle !important de html[data-vf-visite] (ui/02-vf-telephone.js) masque le style en ligne du zoom ; un évitement rejoué alors (redimensionnement) mesure le zoom à sa place masquée,
     // ne voit aucun recouvrement et vide le style en ligne. La visite finie, le zoom retomberait sur la pastille jusqu'au redimensionnement suivant : l'évitement est donc rejoué quand l'attribut apparaît ou disparaît.
     new MutationObserver(eviterTout).observe(document.documentElement, { attributes: true, attributeFilter: ['data-vf-visite'] });
+    // I-2 (intégration) : la feuille de détail s'ouvre ou se ferme (classe no-panel du corps) : le zoom, posé au-dessus d'elle par la feuille de style de ui/02, doit se replacer au-dessus de la pastille sans attendre un redimensionnement
+    new MutationObserver(eviterTout).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     // la barre de question apparaît, disparaît ou change de largeur sans que la fenêtre bouge (panneau ouvert ou fermé) : ResizeObserver, puis transitionend de la barre elle-même
     // (left et width transitionnent 450 ms : le dernier rappel de l'observateur tombe avant la fin de left). Filtré sur la barre : un enfant qui finit sa transition ne relance rien.
     { const ask = document.getElementById('ask');

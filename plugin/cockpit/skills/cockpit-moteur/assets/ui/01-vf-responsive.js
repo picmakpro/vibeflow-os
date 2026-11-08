@@ -132,8 +132,9 @@
     const visiteLa = !!visite && visite.getBoundingClientRect().width > 0;
     if (avant === 'visite' && visiteLa && mq701.matches) return; // replié par la visite : il le reste tant qu'elle est là (la carte se replace autour du zoom : sans cela il clignoterait)
     z.removeAttribute('data-vf-replie');
+    if (avant) window.dispatchEvent(new Event('vf-zoom-replie')); // I-2 : replié, le zoom n'avait plus de style en ligne ; déplié, la pastille et lui se replacent (vf-cockpit-terminal-tiroir.mjs, eviter) AVANT la mesure ci-dessous, sinon on le mesure à sa place de base, où il ne recouvre pas le titre, puis il se relève dessus
     let motif = null;
-    if (mq701.matches) {
+    if (mq701.matches || !document.body.classList.contains('no-panel')) { // I-2 : sous 701 px le zoom ne se replie que feuille de détail ouverte (relevé au-dessus d'elle, il peut recouvrir le titre dans une fenêtre basse)
       const b = z.getBoundingClientRect();
       if (b.width > 0 && b.height > 0) {
         const sur = (e) => { if (!e) return false; const c = e.getBoundingClientRect(); return c.width > 0 && c.height > 0 && getComputedStyle(e).visibility !== 'hidden' && b.left < c.right - 0.5 && b.right > c.left + 0.5 && b.top < c.bottom - 0.5 && b.bottom > c.top + 0.5; };

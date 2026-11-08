@@ -40,6 +40,7 @@
       header .hr { flex: 0 0 auto; justify-content: flex-end; }
       header #proj-name { display: none; }
       #stage > #zoom { left: var(--edge); right: auto; top: auto; bottom: calc(var(--vf-ask-h, var(--sp-8)) + var(--edge)); flex-direction: column; border-radius: 26px; } /* --vf-ask-h : hauteur relue de la barre de question + sa marge */
+      body:not(.no-panel) #stage > #zoom { bottom: calc(var(--sp-8) + min(56vh, 480px) + var(--sp-8)); } /* I-2 (intégration ; décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée : relevé au-dessus de la feuille) : feuille de détail ouverte, le zoom se pose comme la pastille « Terminal » (vf-cockpit-terminal-tiroir-style.mjs, même dérivé : min(56vh, 480px) = hauteur max du #panel de viewer.html), au-dessus d'elle ; la pastille est son obstacle et il la surmonte (eviter), et il se replie s'il recouvrirait le titre (01-vf-responsive.js, replier) */
       html[data-vf-visite] #stage > #zoom { bottom: calc(var(--vf-ask-h, var(--sp-8)) + var(--edge)) !important; } /* visite ouverte : le zoom reste au-dessus de la feuille, même quand le terminal l'a remonté au-dessus de sa pastille (style en ligne, vf-cockpit-terminal-tiroir.mjs) */
       #context h1 { pointer-events: auto; width: fit-content; max-width: 100%; cursor: pointer; }
       #context h1:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
