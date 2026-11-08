@@ -54,11 +54,11 @@ body.vf-term-ouvert #ask { display: none; }
 /* feuille de détail ouverte (<= 700 px) : la pastille se pose au-dessus d'elle, 8 d'écart. dérivé : min(56vh, 480px) est la hauteur max du #panel de viewer.html (règle #panel du @media (max-width: 700px), l.548) : à tenir ensemble. !important : eviter() pose un bottom en ligne. */
 @media (max-width: 700px) { body:not(.no-panel) .vf-term-pastille, body:not(.no-panel) .vf-term-puce { bottom: calc(var(--sp-8) + min(56vh, 480px) + var(--sp-8)) !important; } }
 @media (pointer: coarse) { .vf-term-barre { height: 52px; } .vf-term-bouton { width: 44px; height: 44px; } }
-/* 72.1 : souris (>= 1 000 px, hors tactile) : la pastille garde ses 32 (T20.8) et se centre sur l'axe de la barre de question (40, ui/01-vf-responsive.js) : 16 + (40 - 32) / 2 = 16 + 4 au-dessus du bas. */
+/* 72.1 : souris (>= 1 000 px, hors tactile) : la pastille garde ses 32 (T20.8) et se centre sur l'axe de la barre de question (40, ui/01-vf-responsive.js) : 16 + (40 - 32) / 2 = 16 + 4 au-dessus du bas (garde de l'axe : T21.12). */
 @media (min-width: 1000px) and (not (pointer: coarse)) { .vf-term-pastille { bottom: calc(var(--edge) + var(--sp-4)); } }
 /* 72.1 : cibles de 44 (tactile ou < 1 000 px, comme le zoom du viewer) : la pastille égale le groupe de zoom (4 + 44 + 4) et la barre de question (52). Téléphone (<= 700 px) : zoom, pastille et barre au même bord gauche --edge (16), le bas restant à 8 (comme le tiroir et la barre) ; recette du 2026-11-08, lot C (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px »). */
 @media (max-width: 999px), (pointer: coarse) { .vf-term-pastille { height: 52px; } }
-@media (max-width: 700px) { .vf-term-pastille, .vf-term-puce { left: var(--edge); bottom: var(--edge); } } /* correction ciblée du lot C (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (574c8b6f, 70bf5046)) : le bas de la zone basse à --edge, comme la barre de question ; le tiroir reste à 8 */
+@media (max-width: 700px) { .vf-term-pastille, .vf-term-puce { left: var(--edge); bottom: var(--edge); } } /* correction ciblée du lot C (C-R2 : décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée) : le bas de la zone basse à --edge, comme la barre de question ; le tiroir reste à 8 */
 @media (prefers-reduced-motion: reduce) { .vf-term-tiroir.vf-term-entree { animation: none; } .vf-term-grip, .vf-term-pastille, .vf-term-bouton { transition: none; } }
 html.theme-switching .vf-term-tiroir, html.theme-switching .vf-term-tiroir * { animation: none !important; transition: none !important; }
 `;
