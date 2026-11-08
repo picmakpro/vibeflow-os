@@ -118,3 +118,5 @@
 - [cwd des workers = celui du manager](project_cwd-des-workers-herite-du-manager.md) — un worker part du cwd du manager, pas du worktree du mandat : imposer `cd <abs> &&`, vérifier `branch --contains`
 - [Coût d'une correction ciblée prouvée](project_cout-correction-ciblee-vf-coder.md) — 4 arbitrages + témoins + mutants = 203k tokens ; un budget de 300k ne loge pas aussi la revue
 - [TaskStop : propriétaire seul](project_taskstop-proprietaire-seul.md) — un parent ne stoppe pas son enfant ; « waiting on its own background work » ≠ retour, jamais close done dessus
+- [Pause remplacée qui drainait un flux](feedback_pause-remplacee-drainait-un-flux.md) — attendre la FIN du flux, pas son premier octet : R1.3 rouge 2 runs CI, 2 hypothèses fausses, signature `1R` tranchait
+- [Vert par effet de bord produit](feedback_vert-par-effet-de-bord-produit.md) — D3.3 vert avec `f` mort (auto-fit de la visite) : exiger le mutant « fonction morte » avant de croire un vert
