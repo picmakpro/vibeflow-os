@@ -61,7 +61,9 @@ function reponseFormat(d) {
 export function answerLocally(G, question) {
   const I = projectIndex(G), q = fold(question), vf = G.meta?.vf || {};
   // PU-G-150 : « lignes du planning non comprises / non lues / pas lues », « chiffres incomplets » (panneau Format, qui dit « Non lu ») : expliquée avant la garde de raisonnement, car « pourquoi » y est la forme naturelle
-  if ((q.includes('ligne') && /\b(non|pas) (compris|lu)/.test(q)) || (/\bincomplets?\b/.test(q) && /\b(chiffres?|nombres?|comptes?|totaux)\b/.test(q)) || /\bnon comprises?\b|lignes? (ignoree|mise de cote)|format (de la |du )?(planification|planning)/.test(q)) return reponseFormat(vf.drift); // pas de `[^.?!]*` entre deux mots : quadratique sur « ligne ligne ligne… »
+  // R2 (revue de 82de0712..3f972a6b) : une question qui porte sur une phase numérotée, une exigence, un plan ou une commande n'est pas celle du panneau Format
+  const autreObjet = /\bphases?\s*\d|\bexigences?\b|\bplans?\b|\bcommandes?\b|\b[a-z]{2,6}-\d+\b/.test(q);
+  if (!autreObjet && ((/\blignes?\b/.test(q) && /\b(non|pas) (compris|lu)(es|e|s)?\b/.test(q)) || (/\bincomplets?\b/.test(q) && /\b(chiffres?|nombres?|comptes?|totaux)\b/.test(q)) || /\bnon comprises?\b|lignes? (ignoree|mise de cote)|format (de la |du )?(planification|planning)/.test(q))) return reponseFormat(vf.drift); // pas de `[^.?!]*` entre deux mots : quadratique sur « ligne ligne ligne… »
   // une question de raisonnement (pourquoi, comment, risque, conseil) n'a pas de réponse calculable : l'agent
   if (/\b(pourquoi|comment|explique|quel(le)? risque|faut-il|devrai|conseill|compare|difference|impact)/.test(q)) return null;
   // cibles nommées dans la question

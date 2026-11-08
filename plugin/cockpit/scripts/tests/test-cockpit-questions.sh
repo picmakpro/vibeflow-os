@@ -316,7 +316,7 @@ for fq in "Quelles lignes du planning ne sont pas comprises ?" "Quelles lignes d
   assert_eq "Q18.19 — réponse locale « Format » à « $fq »" "$(H json "$WORK/q18n.json" 'j !== null && j.engine === "local" && /4 ligne/.test(j.answer)')" "true"
 done
 assert_eq "Q18.20 — le vocabulaire de la réponse est celui du panneau : « non lue » et « Non lu », plus « ligne non comprise »" "$(H json "$WORK/q18n.json" "/non lue/.test(j.answer + j.title) && /Non lu/.test(j.answer) && !/non compris/i.test(j.answer + j.title)")" "true"
-for fq in "Pourquoi la phase 72 est-elle en recette ?" "Quelles sont les lignes de commande de la phase 72 ?" "Le plan est-il incomplet ?"; do
+for fq in "Pourquoi la phase 72 est-elle en recette ?" "Quelles sont les lignes de commande de la phase 72 ?" "Le plan est-il incomplet ?" "Pourquoi le nombre de plans de la phase 72 est-il incomplet ?" "La ligne de commande du lanceur n'est pas comprise" "Quelle ligne de la phase 3 n'est pas lue ?" "La phase 3 n'est pas lundi, quelle ligne ?"; do
   H locg "$SCRIPTS" "$WORK/q18g.json" "$fq" > "$WORK/q18m.json"
   assert_eq "Q18.21 — témoin négatif : « $fq » ne déclenche pas la réponse « Format »" "$(H json "$WORK/q18m.json" 'j === null || !/Lignes du planning non lues/.test(j.title)')" "true"
 done
