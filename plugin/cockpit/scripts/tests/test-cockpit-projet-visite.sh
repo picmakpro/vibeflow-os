@@ -9,6 +9,8 @@ set -uo pipefail
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
 if [ -z "$CHROME" ]; then echo "  ⊘ SUITE SAUTÉE : aucun navigateur (Chrome, Chromium) — la visite (O4, O5, O6.5-O6.19) et le panneau Format dans la page (R3.13-R3.22) ne sont PAS vérifiés, non comptés comme réussis"; exit 0; fi
 . "$(dirname "$0")/projet-commun.sh"
+# Moteur de questions (K4, run 42500903126, R3.23) : les lignes de « Sur ce tableau » n'existent qu'après une réponse du moteur, et le champ de question est désactivé quand le serveur ne trouve aucun `claude` sur son PATH (avis no_engine : CI Linux, poste neuf). Le serveur reçoit donc un faux `claude`, identique sur le poste d'un dev et en CI (le témoin de test-cockpit-responsive.sh et de test-cockpit-visite-retours.sh) ; la réponse, elle, reste simulée dans la page. Le cas sans moteur a ses propres témoins (T9N.0, R25.0).
+FAUXBIN="$WORK/fauxbin"; mkdir -p "$FAUXBIN"; cp "$(dirname "$0")/temoins/fauxbin-claude/claude" "$FAUXBIN/claude"; chmod +x "$FAUXBIN/claude"; export PATH="$FAUXBIN:$PATH"
 # lab de dérive de R3 (R3.13-R3.22 en copient le .planning), construit comme dans test-cockpit-projet-graphe.sh
 mk_r3 "$WORK/r3"
 # O4 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : la visite « Par où commencer » revenait à chaque chargement et recouvrait la réponse. Cause : son « déjà vue » vivait dans le localStorage
@@ -383,12 +385,12 @@ const r = await executer(chrome, async (s) => {
   await s.ev(`(() => { const ids = [...VibeFlow.nodes.keys()].slice(0, 3).map((k) => 'n:' + k);
     const ans = { title: 'Réponse', answer: 'Trois cartes.', items: ids.map((id) => ({ id, note: ${JSON.stringify(NOTE)} })), steps: ids.map((id) => ({ id, note: ${JSON.stringify(NOTE)} })), followups: [] };
     const f = window.fetch; window.fetch = (u, x) => String(u).includes('/api/ask') ? Promise.resolve(new Response('event: answer\\ndata: ' + JSON.stringify(ans) + '\\n\\n')) : f(u, x); })()`);
-  // Le moteur de réponse est celui du serveur (FLOORPLAN_SERVER.cli = un `claude` sur le PATH) : sans lui (CI Linux, aucun claude), askState.engine reste nul, le champ est désactivé et submitAsk() rend la main sans rien afficher (aucune ligne, R3.23 vide en CI). La réponse est simulée ci-dessus : le moteur n'est pas l'objet de la sonde, il est posé comme le serveur le poserait avec un claude.
-  await s.ev(`(() => { if (!askState.engine) setEngine('cli', 'Claude'); return askState.engine; })()`);
+  // Le moteur de réponse est celui du serveur (FLOORPLAN_SERVER.cli = un `claude` sur le PATH : le faux claude posé en tête de suite) ; la réponse est simulée ci-dessus. Le champ doit être actif avant la question (témoin : sans moteur il est désactivé et submitAsk() ne rend rien).
+  await s.attendre("!document.querySelector('#ask-input').disabled", 'champ de question actif (moteur de questions du serveur)');
   await s.ev(`(() => { const i = document.querySelector('#ask-input'); i.value = 'Question'; document.querySelector('#ask-form').requestSubmit(); })()`);
   const lire = () => s.ev(`(() => { const rows = [...document.querySelectorAll('#panel a.row[data-sel]')]; return rows.map((a) => { const rd = a.querySelector('.rd'), rn = a.querySelector('.rn'); const c = (e) => e ? { txt: e.textContent, coupe: e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1 } : null; return { rd: c(rd), rn: c(rn), title: a.getAttribute('title') || '', parcours: /Walkthrough|Parcours/.test((a.closest('.sec')?.querySelector('h3')?.textContent) || '') }; }); })()`);
   const rows = await attendreEtStabiliser(lire, (v) => Array.isArray(v) && v.length >= 6, { max: 20000 });
-  if (!Array.isArray(rows) || rows.length < 6) console.error('DIAG tableau : ' + (Array.isArray(rows) ? rows.length : String(rows)) + ' ligne(s) ; ' + JSON.stringify(await s.ev(`({ moteur: askState.engine, champ: document.querySelector('#ask-input').disabled, occupe: askState.busy, panneau: (document.querySelector('#panel') || {}).innerText && document.querySelector('#panel').innerText.slice(0, 300) })`).catch(() => null)));
+  if (!Array.isArray(rows) || rows.length < 6) console.error('DIAG tableau : ' + (Array.isArray(rows) ? rows.length : String(rows)) + ' ligne(s) ; ' + JSON.stringify(await s.ev(`({ champDesactive: document.querySelector('#ask-input').disabled, avisMoteur: (document.querySelector('#ask-form') || {}).innerText && document.querySelector('#ask-form').innerText.slice(0, 120), panneau: (document.querySelector('#panel') || {}).innerText && document.querySelector('#panel').innerText.slice(0, 300) })`).catch(() => null)));
   return { rows, note: NOTE, nom: NOM };
 });
 console.log(JSON.stringify(r));
