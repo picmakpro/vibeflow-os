@@ -25,6 +25,7 @@ RETRAIT agents/openai.yaml
 AJOUT assets/ui/00-vibeflow.js
 AJOUT assets/ui/01-vf-responsive.js
 AJOUT assets/ui/02-vf-telephone.js
+AJOUT assets/ui/39-vf-tour-placement.js
 AJOUT assets/ui/70-vf-live.js
 AJOUT assets/ui/71-vf-equipe-rendu.js
 AJOUT assets/ui/72-vf-equipe.js
