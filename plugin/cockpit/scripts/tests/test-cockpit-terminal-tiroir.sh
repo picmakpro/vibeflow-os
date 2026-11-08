@@ -14,6 +14,8 @@
 #         huit relevés (2 pages x 2 fenêtres x 2 thèmes) + mutants M-PASTILLE-SUR-ZOOM, M-AJUSTE-SANS-TIROIR, M-ASK-RESTE, M-VISITE-RESTE ;
 #         T21.7/T21.8 (71.5, P71.5-D-06) : la pastille fermée ne recouvre ni la barre de question, ni la feuille de détail, ni le zoom, ni la visite (de 390 à 1280 px, panneau ouvert,
 #         fermé, rouvert, visite affichée, état tactile) + témoin d'atteinte ; mutants M-PASTILLE-SUR-ASK et M-PASTILLE-SANS-RAPPEL
+#         T21.9 à T21.11 (recette du 2026-11-08, lot C ; PU-G-021) : l'axe commun de la zone basse de 390 à 1 440 px sur Code et Projet (zoom, pastille et barre au bord --edge ; pastille large comme
+#         le zoom dès 701 px ; barre de 40 px dès 1 000 px) + mutants M-ZOOM-COLONNE, M-PASTILLE-ETROITE, M-BARRE-A-8
 #   T22   recette 71 (G4 ; P71-D-37) : hauteur par défaut = 36 % de la fenêtre (220 à 380 px), bande de carte >= moitié de la fenêtre en 1280x720, hauteur mémorisée plafonnée à 70 %,
 #         la fenêtre qui rétrécit ; mutants M-HAUTEUR-FIXE-320, M-MEMO-NON-BORNEE
 #   T17   T17.1 témoin (messages réels de Q) · T17.2 postMessage de P ignoré · T17.3 MessageEvent forgé ignoré · T17.5 espion : liste fermée, aucun octet du shell (M-MSG-DONNEE)
@@ -928,7 +930,7 @@ mut_geom() { # mut_geom <nom> <fichier> <expression-sed> <groupe qui doit rougir
     assert_eq "$1 — le mutant rougit T21 : le groupe $4 compte au moins un relevé en défaut (témoin : deux relevés, aucune erreur)" "$(rj "$GM" '"n="+j.n+" erreurs="+JSON.stringify(j.erreurs)+" rouge="+(j.G.'"$4"'.length>=1)')" "n=2 erreurs={} rouge=true"
   else sans_effet "$1"; fi
 }
-mut_geom M-PASTILLE-SUR-ZOOM vf-cockpit-terminal-tiroir.mjs 's|if (recouvre) z.style.bottom|if (false) z.style.bottom|' E2f
+mut_geom M-PASTILLE-SUR-ZOOM vf-cockpit-terminal-tiroir.mjs 's|() => \[montre ? rect(n) : null, rect(k)\]|() => [rect(k)]|' E2f # le zoom ne monte plus au-dessus de la pastille (lot C de la recette du 2026-11-08 : la ligne « if (recouvre) z.style.bottom » est devenue la liste d'obstacles du zoom dans eviter())
 mut_geom M-AJUSTE-SANS-TIROIR vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #stage {|body.vf-term-ouvert #stage-absent {|' G1F
 mut_geom M-ASK-RESTE vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #ask { display: none; }|body.vf-term-ouvert #ask { }|' G1ask
 mut_geom M-VISITE-RESTE vf-cockpit-terminal-tiroir.mjs 's|window.VibeFlowTour.end();|void 0;|' G1visite
@@ -941,7 +943,7 @@ mut_pastille() { # mut_pastille <nom> <expression-sed> : le mutant doit laisser 
     assert_eq "$1 — le mutant rougit T21.7 : au moins un relevé en défaut (témoin : au moins 8 relevés, aucune erreur)" "$(rj "$PM" '(j.n>=8)+" "+JSON.stringify(j.erreurs)+" rouge="+(j.mauvais.length>=1)')" "true {} rouge=true"
   else sans_effet "$1"; fi
 }
-mut_pastille M-PASTILLE-SUR-ASK 's|if (sur(n.getBoundingClientRect(), kb)) n.style.bottom|if (false) n.style.bottom|'
+mut_pastille M-PASTILLE-SUR-ASK 's|monter(n, window.innerHeight, () => \[rect(k)\]);|monter(n, window.innerHeight, () => []);|' # la pastille ne monte plus au-dessus de la barre (lot C de la recette du 2026-11-08 : la ligne « if (sur(...kb)) n.style.bottom » est devenue la liste d'obstacles de la pastille dans eviter())
 mut_pastille M-PASTILLE-SANS-RAPPEL "s|if (ask) { if (window.ResizeObserver)|if (false) { if (window.ResizeObserver)|" # jointure du panel (2026-11-07) : le mutant retire TOUT rappel lié à la barre (ResizeObserver et transitionend) ; la forme précédente, qui ne retirait que l'observateur, restait verte en CI Linux (shard 5, run 42386847278) alors qu'elle rougissait sous macOS : la fin de transition suffisait là-bas à replacer la pastille
 
 run_axe "$OUT" 0; AX="$XJ"
@@ -949,6 +951,15 @@ assert_eq "T21.9 — témoin de l'axe : 18 relevés complets (9 largeurs x Code 
 assert_eq "T21.9 (PU-G-021) — zoom au bord --edge de 390 à 1 440 px : en rangée au-dessus de la pastille de 701 à 1 279 px (plus la pile du haut à droite), pile du téléphone sous 701 px (P70-D-09)" "$(rj "$AX" 'JSON.stringify(j.zoom)')" "[]"
 assert_eq "T21.10 (PU-G-021 ; « Pastille large comme le zoom », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) — pastille au bord --edge de 390 à 1 440 px, aussi large que le zoom dès 701 px" "$(rj "$AX" 'JSON.stringify(j.pastille)')" "[]"
 assert_eq "T21.11 (PU-G-021 ; « Barre au même bord gauche », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) — barre de question au bord --edge jusqu'à 1 279 px, après la colonne du zoom dès 1 280 px, de 40 px dès 1 000 px" "$(rj "$AX" 'JSON.stringify(j.barre)')" "[]"
+mut_axe() { # mut_axe <nom> <fichier> <expression-sed> <groupe qui doit rougir> <groupe qui doit rester vert> : le mutant rougit le groupe visé, et lui seul (témoin : huit relevés complets, aucune erreur)
+  if mutant "$1" "$2" "$3"; then
+    srv "$MUT_OUT" 1; XM="$(node "$AUX/chrome-axe.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":1}")"; unsrv
+    assert_eq "$1 — le mutant rougit T21.9 à T21.11 pour la bonne raison : le groupe $4 compte au moins un défaut, le groupe $5 aucun (témoin : huit relevés complets, aucune erreur)" "$(rj "$XM" 'JSON.stringify(j.erreurs)+" complets="+j.complets+" rouge="+(j.'"$4"'.length>=1)+" "+"'"$5"'"+"="+j.'"$5"'.length')" "{} complets=8 rouge=true $5=0"
+  else sans_effet "$1"; fi
+}
+mut_axe M-ZOOM-COLONNE index.html 's|^      #zoom { left: var(--edge); right: auto; top: auto; bottom: calc(var(--edge) + var(--vf-ask-bas, 0px)); flex-direction: row;|      #zoom { left: auto; right: var(--edge); top: 80px; bottom: auto; flex-direction: column;|' zoom barre
+mut_axe M-PASTILLE-ETROITE vf-cockpit-terminal-tiroir.mjs "s|n.style.minWidth = zb ? zb.width + 'px' : '';|n.style.minWidth = '';|" pastille barre
+mut_axe M-BARRE-A-8 index.html 's|#ask { width: calc(100% - 2 \* var(--edge)); }|#ask { width: calc(100% - 2 * var(--sp-8)); }|' barre pastille
 
 echo "=== T22 — hauteur par défaut proportionnelle à la fenêtre (recette 71, G4 ; P71-D-37) ==="
 run_defaut "$OUT"; D="$DJ"
