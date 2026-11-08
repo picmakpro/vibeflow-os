@@ -9,12 +9,12 @@
 #   - team-kernel.md porte une section `## Fin de mandat` ;
 #   - tout WORKER porte l'étiquette `**Fin de mandat**` et, DANS son bloc, les jetons « aucune main
 #     rendue en attente », « premier plan », « échéance », « processus », « même tour »,
-#     « id de tâche », « §Fin de mandat » ;
+#     « id de tâche », « par PID », « §Fin de mandat » ;
 #   - tout MANAGER porte ce bloc worker ET `**Clôture des workers**` (TaskStop, owned by, balayage,
-#     worktree-procs.sh, worktree secondaire, arbre partagé, aucun enfant vivant, orphans, consigne
+#     worktree-procs.sh, worktree secondaire, arbre partagé, checkout principal, aucun enfant vivant, orphans, consigne
 #     de reprise, §Fin de mandat), avec la première occurrence de `TaskStop` AVANT la première de `close` ;
 #   - le HEAD (plugin/dev-orchestrator/AGENT.md) porte `**Balayage de sortie**` (orphans, dernier
-#     message, TaskStop, worktree-procs.sh, worktree secondaire, autre mission, §Fin de mandat).
+#     message, TaskStop, worktree-procs.sh, worktree secondaire, checkout principal, autre mission, §Fin de mandat).
 # Étiquette : reconnue en DÉBUT DE LIGNE (après une puce ou une numérotation éventuelle), jamais au
 # milieu d'une phrase ; première occurrence gagne. Bloc = cette ligne + ses continuations, jusqu'à
 # ligne vide, nouvelle puce, nouvelle étiquette `**` (indentée ou non) ou titre. Sont ignorés pour la
@@ -40,7 +40,7 @@
 # seul le head nommé est exigé ; la règle (c) les rattrape s'ils citent la doctrine.
 # Un membre du plancher introuvable sur disque = rouge (jamais un vert à vide).
 #
-# Preuves de rouge : (1) fixture conforme verte ; (2) 35 cas de base (m1..m11 avec m2b, m5b, m6b ; o1, x2..x4 ; c1a..c5e, 17 cas),
+# Preuves de rouge : (1) fixture conforme verte ; (2) 38 cas de base (m1..m11 avec m2b, m5b, m6b ; o1, n1..n3, x2..x4 ; c1a..c5e, 17 cas),
 # 4 cas du budget d'instructions (b1, b2, b2b, b3), chacun rouge ou vert pour SA raison, message vérifié ;
 # (3) 12 « méta-mutants » : une copie de CETTE suite dont on retire un correctif (ligne repérée par
 # un jeton `FDM-…` en fin de ligne) doit rougir sur le cas qui le garde.
@@ -86,6 +86,7 @@ premier plan
 processus
 même tour
 id de tâche
+par PID
 §Fin de mandat'
 MANAGER_TOKENS='TaskStop
 owned by
@@ -93,6 +94,7 @@ balayage
 worktree-procs.sh
 worktree secondaire
 arbre partagé
+checkout principal
 aucun enfant vivant
 orphans
 consigne de reprise
@@ -103,6 +105,7 @@ TaskStop
 worktree-procs.sh
 worktree secondaire
 autre mission
+checkout principal
 §Fin de mandat'
 
 # extract_block FILE LABEL → bloc sur stdout (vide si l'étiquette est absente).
@@ -323,12 +326,12 @@ EOF
 
 # --- fixture conforme minimale ---
 BLK_WORKER='- **Fin de mandat** : aucune main rendue en attente d'"'"'une tâche de fond, attente au premier plan
-  avec une échéance ; aucun processus vivant au rapport, dans le même tour, id de tâche rendu sinon (§Fin de mandat).'
+  avec une échéance ; aucun processus vivant au rapport, dans le même tour, id de tâche rendu sinon, arrêt par PID (§Fin de mandat).'
 BLK_MANAGER='- **Clôture des workers** : TaskStop sur chaque enfant (owned by le mandat), puis close au registre ;
-  balayage via worktree-procs.sh, worktree secondaire ou arbre partagé,
+  balayage via worktree-procs.sh, worktree secondaire ou arbre partagé, hors du checkout principal,
   aucun enfant vivant ; orphans signalés, consigne de reprise écrite (§Fin de mandat).'
 BLK_HEAD='- **Balayage de sortie** : orphans repérés au dernier message de chaque worker, TaskStop,
-  worktree-procs.sh sur tout worktree secondaire, sans toucher une autre mission (§Fin de mandat).'
+  worktree-procs.sh sur tout worktree secondaire, hors checkout principal, sans toucher une autre mission (§Fin de mandat).'
 
 mk_agent() { # FILE NAME TOOLS [BLOCS...]
   local f="$1" name="$2" tools="$3" b
@@ -473,11 +476,21 @@ mk_agent "$M/plugin/dev-orchestrator/agents/vf-notools.md" vf-notools ""
 sed '/^tools:/d' "$M/plugin/dev-orchestrator/agents/vf-notools.md" > "$M/n" && mv "$M/n" "$M/plugin/dev-orchestrator/agents/vf-notools.md"
 sedf "$M/plugin/dev-orchestrator/agents/vf-dev-manager.md" 's/Agent(vf-coder,/Agent(vf-notools, vf-coder,/'
 expect_red "x4: agent dérivé sans ligne tools: (tous les outils), sans bloc → rouge" "$M" "vf-notools.md: étiquette **Fin de mandat** absente"
+M="$(new_mutant n1)"
+sedf "$M/plugin/design-orchestrator/agents/vf-crafter.md" 's/par PID/par signal/'
+expect_red "n1: jeton « par PID » retiré du bloc worker → rouge" "$M" "vf-crafter.md: jeton « par PID » absent du bloc **Fin de mandat**"
+M="$(new_mutant n2)"
+sedf "$M/plugin/growth-bundle/agents/vf-growth-manager.md" 's/hors du checkout principal/hors du dépôt/'
+expect_red "n2: jeton « checkout principal » retiré du bloc manager → rouge" "$M" "vf-growth-manager.md: jeton « checkout principal » absent du bloc **Clôture des workers**"
+M="$(new_mutant n3)"
+sedf "$M/plugin/dev-orchestrator/AGENT.md" 's/hors checkout principal/hors dépôt/'
+expect_red "n3: jeton « checkout principal » retiré du bloc head → rouge" "$M" "plugin/dev-orchestrator/AGENT.md: jeton « checkout principal » absent du bloc **Balayage de sortie**"
+
 
 # ====================================================================================
 echo "== sondage de la revue adverse (c1..c5) =="
 CODER="plugin/dev-orchestrator/agents/vf-coder.md"
-BASE_LINE='- **Fin de mandat** : aucune main rendue en attente, au premier plan, processus, même tour, id de tâche (§Fin de mandat).'
+BASE_LINE='- **Fin de mandat** : aucune main rendue en attente, au premier plan, processus, même tour, id de tâche, par PID (§Fin de mandat).'
 
 # c1 : blocs de code et commentaires HTML
 M="$(new_mutant c1a)"
