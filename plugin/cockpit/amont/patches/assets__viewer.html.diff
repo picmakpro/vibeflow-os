@@ -326,7 +326,7 @@
  #legend label:hover { background: rgba(var(--ink), .07); }
  #legend label.off { color: var(--text-4); }
  #legend label.off .sw { opacity: .25; }
-@@ -274,202 +301,219 @@ svg.dim .edge:not(.hl) { opacity: .1; }
+@@ -274,202 +301,221 @@ svg.dim .edge:not(.hl) { opacity: .1; }
  #legend .sw { width: 16px; height: 3px; border-radius: 2px; }
  #legend .n { margin-left: auto; color: var(--text-3); font-variant-numeric: tabular-nums; font-size: 12px; }
  #legend .tog { width: 28px; height: 16px; border-radius: 999px; background: rgba(var(--ink), .12); position: relative; transition: background .2s var(--ease); flex: none; }
@@ -462,6 +462,8 @@
 -.row .rd { color: var(--text-3); font-size: 12.5px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 1px; }
 +.row .rd { color: var(--text-3); font-size: 12.5px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: var(--sp-2); }
  .row .rp { font-family: var(--mono); font-size: 11.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
++/* PU-G-147 : les lignes de « On this board » passent à la ligne au lieu de s'arrêter sur « … » en plein mot */
++.row.vf-rep .rn, .row.vf-rep .rd, .row.vf-rep .rp { display: block; white-space: normal; overflow: visible; text-overflow: clip; -webkit-line-clamp: unset; overflow-wrap: anywhere; }
  .row .rc { font-size: 12px; color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
 -.more { color: var(--text-4); font-size: 12.5px; padding: 6px 10px; }
 -.tags { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -629,7 +631,7 @@
  /* Safari/WebKit: HTML inside <foreignObject> that gets its own render layer (position, overflow clip,
     transform, opacity, animation) is painted at the page origin, ignoring the SVG transform. Keep cards layer-free there. */
  html.wk .node foreignObject { overflow: hidden; }
-@@ -480,9 +524,8 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+@@ -480,9 +526,8 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
  /* ---------- phones and tablets: windows under 1000 px and touch screens under 1280 px (a mouse at 1000 px and wider is untouched) ---------- */
  @media (max-width: 999px), (max-width: 1279px) and (pointer: coarse) {
    #btn-up, .brand { flex: none; }
@@ -640,7 +642,7 @@
    .hl { flex: 1 1 240px; }
    .hc { flex: 2 3 min(460px, 24vw); max-width: 460px; min-width: 44px; justify-content: stretch; }
    #search-btn { width: 100%; min-width: 44px; }
-@@ -490,7 +533,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+@@ -490,7 +535,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
    .hr { flex: 0 0 auto; flex-wrap: wrap; }
    .brand #proj-name { display: none; }
    header .rel { position: static; } /* Flows and Filters open under the bar, inside the screen, wherever the bar wrapped */
@@ -649,7 +651,7 @@
    .hr .btn { position: relative; padding: 0; justify-content: center; }
    .hr .btn .bl { display: none; }
    .hr .btn .badge { position: absolute; }
-@@ -505,47 +548,47 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+@@ -505,47 +550,47 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
  }
  @media (max-width: 999px), (max-width: 1279px) and (pointer: coarse) {
    header .hr .btn { width: 44px; }
@@ -714,7 +716,7 @@
  }
  @media (prefers-reduced-motion: reduce) and (max-width: 999px), (prefers-reduced-motion: reduce) and (pointer: coarse) {
    #panel, body.no-panel #panel, #viewport.anim, #ask, #flowbar, #zoom button { transition: none; }
-@@ -555,6 +598,22 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+@@ -555,6 +600,22 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
  </head>
  <body>
  <script>if (matchMedia('(max-width: 700px)').matches && !/[#&]s=/.test(location.hash)) document.body.classList.add('no-panel'); // a phone starts with the details closed, so the panel doesn't flash open and shut</script>
@@ -737,7 +739,7 @@
  <div id="stage">
    <svg id="svg" xmlns="http://www.w3.org/2000/svg"><g id="viewport"></g></svg>
    <div id="context"></div>
-@@ -572,29 +631,13 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+@@ -572,29 +633,13 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
        <span id="ask-chips"></span>
        <input id="ask-input" placeholder="Ask anything about this codebase…" spellcheck="false">
        <span class="engine" id="ask-engine"><i></i>checking…</span>
@@ -768,7 +770,7 @@
  <aside id="panel"></aside>
  <div id="panel-resize" title="Drag to resize"></div>
  <div id="ctxmenu" class="menu glass" hidden></div>
-@@ -603,7 +646,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+@@ -603,7 +648,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
  <div id="palette"><div class="box glass">
    <div class="in"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="search" placeholder="Search by name, description, path or route…" autocomplete="off" spellcheck="false"></div>
    <div id="results"></div>
@@ -777,7 +779,7 @@
  </div></div>
  <!--__ELK_SCRIPT__-->
  <script>if (/AppleWebKit/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|OPR/.test(navigator.userAgent)) document.documentElement.classList.add('wk');</script>
-@@ -635,6 +678,7 @@ const KINDS = ['import', 'http', 'call', 'rpc', 'event', 'queue', 'data', 'confi
+@@ -635,6 +680,7 @@ const KINDS = ['import', 'http', 'call', 'rpc', 'event', 'queue', 'data', 'confi
  // connection names: plain by default, developer terms when "Show technical detail" is on
  const KIND_TECH = { contains: 'Contains', import: 'Imports', http: 'HTTP', call: 'Calls', rpc: 'RPC', event: 'Events', queue: 'Queues', data: 'Data', config: 'Config' };
  const KIND_PLAIN = { contains: 'Contains', import: 'Uses', http: 'Web requests', call: 'Calls', rpc: 'Calls', event: 'Events', queue: 'Background jobs', data: 'Reads & writes data', config: 'Settings' };
@@ -785,7 +787,7 @@
  const KIND_LABEL = new Proxy({}, { get: (_, k) => (technical() ? KIND_TECH : KIND_PLAIN)[k] || k });
  let technicalFlag = false;
  const technical = () => technicalFlag;
-@@ -686,6 +730,7 @@ const P = {
+@@ -686,6 +732,7 @@ const P = {
    left: '<path d="m15 18-6-6 6-6"/>',
    right: '<path d="m9 18 6-6-6-6"/>',
  };
@@ -793,7 +795,7 @@
  const icon = (k) => `<svg viewBox="0 0 24 24">${P[k] || P.file}</svg>`;
  const iconI = (k) => `<svg class="i" viewBox="0 0 24 24">${P[k] || P.file}</svg>`;
  const symIcon = (kind) => (['class', 'interface', 'struct', 'type', 'enum', 'record', 'trait', 'object'].includes(kind) ? 'class' : 'function');
-@@ -772,6 +817,24 @@ function info(item) {
+@@ -772,6 +819,24 @@ function info(item) {
  }
  const connEntity = (id) => id.replace(/^x:(in|out):/, '');
  const nameOf = (item) => info(item.startsWith('x:') ? connEntity(item) : item).name;
@@ -818,7 +820,7 @@
  // in plain mode a file opens only when it has endpoints to show (its exports are developer detail)
  const visibleKids = (item) => (kids.get(item) || []).filter((k) => technical() || !k.startsWith('s:'));
  const drillable = (item) => /^(n:|d:|f:)/.test(item) && visibleKids(item).length > 0;
-@@ -912,10 +975,10 @@ function buildView(container) {
+@@ -912,10 +977,10 @@ function buildView(container) {
  // sizes live in the hover tooltip and the details panel.
  // [width, min height]
  const SIZES = { node: [300, 128], dir: [272, 110], file: [284, 110], module: [284, 110], route: [300, 128], symbol: [260, 100] };
@@ -832,7 +834,7 @@
  /** Footer pieces: the card's size (modules / files / endpoints) and its recent-work pill. Empty when neither applies. */
  function cardFoot(item) {
    const i = info(item);
-@@ -924,16 +987,18 @@ function cardFoot(item) {
+@@ -924,16 +989,18 @@ function cardFoot(item) {
    else if (i.type === 'dir') size = plural(statsOf(item).files, 'file');
    else if (i.type === 'module') size = 'this file';
    else if (i.type === 'file') { const nr = (routesByFile.get(i.f.p) || []).length; size = nr ? plural(nr, 'endpoint') : ''; }
@@ -855,7 +857,7 @@
    return (cardFoot(item) ? FOOT_H : 0) + (textW(name, 15, 600) > room ? TITLE2_H : 0);
  }
  function cardHTML(item) {
-@@ -951,7 +1016,7 @@ function cardHTML(item) {
+@@ -951,7 +1018,7 @@ function cardHTML(item) {
    } else if (i.type === 'file' || i.type === 'module') {
      const f = i.f;
      if (f.note) cls += ' has-note';
@@ -864,7 +866,7 @@
      desc = dsc(f.d, 2);
    } else if (i.type === 'route') {
      const r = i.r;
-@@ -964,6 +1029,7 @@ function cardHTML(item) {
+@@ -964,6 +1031,7 @@ function cardHTML(item) {
    }
    const note = answerNote(item);
    const noteHTML = note ? `<div class="anote"><b>${note.n}</b><span>${h(note.text)}</span></div>` : '';
@@ -872,7 +874,7 @@
    if (recentOf(item)) cls += ' recent';
    else if (recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item)) cls += ' recent-in';
    return `<div class="card ${cls}" style="--c:${colorOf(i)}"><div class="head">${head}</div>${title}${desc}${noteHTML}${cardFoot(item)}</div>`;
-@@ -972,19 +1038,22 @@ function connectorHTML(c) {
+@@ -972,19 +1040,22 @@ function connectorHTML(c) {
    const i = info(c.entity);
    return `<div class="card connector" style="--c:${colorOf(i)}"><span class="ico">${icon(iconKey(i))}</span><span class="lbl">${h(i.name)}</span><span class="dir-ico">${icon(c.side === 'in' ? 'in' : 'out')}</span></div>`;
  }
@@ -899,7 +901,7 @@
  }
  /** Hover lines for recent work: what changed on this card and how it serves the request, or what changed inside it. */
  function recentTip(id) {
-@@ -1015,7 +1084,7 @@ async function layout(view) {
+@@ -1015,7 +1086,7 @@ async function layout(view) {
      children.push({ id: item, width: w, height: Math.max(hh + cardExtraH(item) + (answerNote(item) ? NOTE_H : 0), (deg.get(item) || 0) * 7 + 28), ...(ext ? { layoutOptions: { 'elk.layered.layering.layerConstraint': 'LAST' } } : {}) });
    }
    for (const c of view.connectors) {
@@ -908,7 +910,7 @@
        layoutOptions: { 'elk.layered.layering.layerConstraint': c.side === 'in' ? 'FIRST_SEPARATE' : 'LAST_SEPARATE' } });
    }
    return elk.layout({
-@@ -1026,8 +1095,10 @@ async function layout(view) {
+@@ -1026,8 +1097,10 @@ async function layout(view) {
        'elk.layered.spacing.nodeNodeBetweenLayers': '130', 'elk.spacing.nodeNode': '32',
        'elk.layered.spacing.edgeEdgeBetweenLayers': '8', 'elk.spacing.edgeEdge': '8', 'elk.layered.spacing.edgeNodeBetweenLayers': '24',
        'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX', 'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
@@ -920,7 +922,7 @@
      },
    });
  }
-@@ -1051,6 +1122,7 @@ function roundedPath(pts, r = 10) {
+@@ -1051,6 +1124,7 @@ function roundedPath(pts, r = 10) {
  let renderToken = 0;
  async function render(opts = {}) {
    const token = ++renderToken;
@@ -928,7 +930,7 @@
    const view = buildView(state.container);
    const loading = setTimeout(() => $('#loading').classList.add('on'), 160);
    let res;
-@@ -1078,6 +1150,7 @@ function draw(view, res) {
+@@ -1078,6 +1152,7 @@ function draw(view, res) {
    const gCols = el('g', { class: 'cols' }, vp);
    const gEdges = el('g', { class: 'edges' }, vp), gFx = el('g', {}, vp), gNodes = el('g', {}, vp), gPorts = el('g', { class: 'edges' }, vp);
    state.fxLayer = gFx;
@@ -936,7 +938,7 @@
    drawColumns(gCols, view, res);
    state.edgeEls = new Map(); state.chipEls = new Map();
    for (const re of res.edges || []) {
-@@ -1102,12 +1175,16 @@ function draw(view, res) {
+@@ -1102,12 +1177,16 @@ function draw(view, res) {
    }
    // cards rise in left-to-right, a few ms apart
    const order = res.children.slice().sort((a, b) => a.x - b.x || a.y - b.y);
@@ -954,7 +956,7 @@
      g.addEventListener('click', (ev) => { ev.stopPropagation(); select(c.id); });
      g.addEventListener('dblclick', (ev) => { ev.stopPropagation(); if (ev.button !== 0) return; hideTip(); open(c.id); });
      g.addEventListener('contextmenu', (ev) => { ev.preventDefault(); ev.stopPropagation(); hideTip(); openMenu(ev, itemMenu(c.id)); });
-@@ -1120,6 +1197,9 @@ function draw(view, res) {
+@@ -1120,6 +1199,9 @@ function draw(view, res) {
  
  /** Brackets over the three columns of a view that has outside connections: what uses this part (left),
   *  what's inside it (middle), and what it uses (right). Drawn in map space so they pan and zoom with it. */
@@ -964,7 +966,7 @@
  function drawColumns(g, view, res) {
    if (!view.connectors?.length || state.container === 'root' || state.container === 'q:answer') return;
    const span = (cs) => cs.length ? [Math.min(...cs.map((c) => c.x)), Math.max(...cs.map((c) => c.x + c.width))] : null;
-@@ -1127,36 +1207,52 @@ function drawColumns(g, view, res) {
+@@ -1127,36 +1209,52 @@ function drawColumns(g, view, res) {
    const outs = res.children.filter((c) => c.id.startsWith('x:out:'));
    const mid = res.children.filter((c) => !c.id.startsWith('x:'));
    const y = Math.min(...res.children.map((c) => c.y)) - 26;
@@ -1028,7 +1030,7 @@
  function endpointsOf(e) {
    const m = new Map();
    for (const l of e.links) for (const [ri] of l.calls || []) if (ri != null) m.set(ri, (m.get(ri) || 0) + 1);
-@@ -1170,7 +1266,7 @@ function edgeTip(e) {
+@@ -1170,7 +1268,7 @@ function edgeTip(e) {
    const desc = e.links.map((l) => l.desc).find(Boolean);
    const meta = eps.length ? eps.slice(0, 4).map((x) => `${x.r.m} ${x.r.p}`).join('\n') + (eps.length > 4 ? `\n+${eps.length - 4} more` : '')
      : names.length ? 'uses ' + names.slice(0, 8).join(', ') + (names.length > 8 ? '…' : '') : labels.slice(0, 4).join('\n');
@@ -1037,7 +1039,7 @@
  }
  
  // ======================= right-click menus =======================
-@@ -1200,8 +1296,8 @@ function itemMenu(id) {
+@@ -1200,8 +1298,8 @@ function itemMenu(id) {
    const url = fileForEditor && editorUrl(...fileForEditor);
    return [
      { title: i.name },
@@ -1048,7 +1050,7 @@
      state.container === 'q:answer' && !id.startsWith('x:') ? { label: 'Show on the map', icon: 'external', run: () => reveal(real) } : null,
      EXPORTED ? null : { label: 'Ask about this', icon: 'spark', run: () => addAskContext(real) },
      { label: 'Show details', icon: 'panel', run: () => { setPanel(true); if (id.startsWith('x:')) reveal(real); else select(id); } },
-@@ -1239,9 +1335,11 @@ window.addEventListener('blur', closeMenu);
+@@ -1239,9 +1337,11 @@ window.addEventListener('blur', closeMenu);
  // ======================= pan / zoom =======================
  function applyTransform() {
    const { x, y, k } = state.t;
@@ -1060,7 +1062,7 @@
  }
  const stageRect = () => svg.getBoundingClientRect();
  function setT(t, animate) {
-@@ -1261,8 +1359,13 @@ function freeArea() {
+@@ -1261,8 +1361,13 @@ function freeArea() {
  function fit(animate) {
    const b = state.bounds; if (!b) return;
    const a = freeArea();
@@ -1076,7 +1078,7 @@
  }
  function zoomBy(f, cx, cy) {
    const r = stageRect();
-@@ -1270,13 +1373,12 @@ function zoomBy(f, cx, cy) {
+@@ -1270,13 +1375,12 @@ function zoomBy(f, cx, cy) {
    const k = clamp(state.t.k * f, 0.08, 2.5);
    setT({ k, x: cx - (cx - state.t.x) * (k / state.t.k), y: cy - (cy - state.t.y) * (k / state.t.k) }, false);
  }
@@ -1093,7 +1095,7 @@
  }, { passive: false });
  let drag = null;
  const fingers = new Map(); let pinch = null; // touch only: the fingers on the map, and the pinch they make
-@@ -1354,9 +1456,12 @@ function readHash() {
+@@ -1354,9 +1458,12 @@ function readHash() {
  window.addEventListener('popstate', () => { const { v, s } = readHash(); go(v, { select: s, push: false }); });
  
  async function go(container, { select: sel = null, push = true, zoomFrom = null, after, force = false } = {}) {
@@ -1106,7 +1108,7 @@
    state.container = container; state.selected = sel;
    if (push) setHash(container, sel);
    if (!changed && state.layout && !force) { applySelection(); renderPanel(); if (after) after(); return; }
-@@ -1380,10 +1485,16 @@ function open(item) {
+@@ -1380,10 +1487,16 @@ function open(item) {
    go(item, { zoomFrom: item });
  }
  function up() { if (state.container === 'root') return; closeSheet(); const from = state.container; go(parentOf.get(from) || 'root', { select: from }); }
@@ -1125,7 +1127,7 @@
  }
  /** Moves the map just far enough that a box isn't hidden behind the top bar or the sheet; the zoom and everything else stay as they are. */
  function bringIntoView(item) {
-@@ -1431,13 +1542,13 @@ function applySelection() {
+@@ -1431,13 +1544,13 @@ function applySelection() {
  // ======================= chrome: context, crumbs, legend =======================
  function renderContext() {
    if (state.container === 'q:answer') {
@@ -1141,7 +1143,7 @@
    foldContext();
  }
  /** On a phone the description folds to one line; the More / Less toggle shows only when there's more to read, and the choice is remembered on this device. */
-@@ -1449,11 +1560,22 @@ function foldContext() {
+@@ -1449,11 +1562,22 @@ function foldContext() {
    const long = desc.scrollHeight > desc.clientHeight + 1 || !!ctx.querySelector('.cx');
    ctx.classList.toggle('folded', !open);
    more.hidden = !long;
@@ -1166,7 +1168,7 @@
  function renderCrumbs() {
    const c = $('#crumbs'); c.innerHTML = '';
    const path = chain(state.container).slice().reverse();
-@@ -1497,16 +1619,19 @@ function renderLegend(view) {
+@@ -1497,16 +1621,19 @@ function renderLegend(view) {
  
  // ======================= inspector =======================
  const editorUrl = (p, line = 1) => G.meta.root && !PLAN ? `vscode://file/${encodeURI(G.meta.root.replace(/\\/g, '/'))}/${encodeURI(p)}:${line}` : null;
@@ -1190,7 +1192,7 @@
  function header(i) {
    const kind = i.type === 'node' ? i.kind : i.type === 'symbol' ? i.symKind : i.type === 'route' ? 'Endpoint' : i.type === 'module' ? 'file' : i.type;
    return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(kind)}</span></div>
-@@ -1520,7 +1645,7 @@ function renderPanel() {
+@@ -1520,7 +1647,7 @@ function renderPanel() {
    else if (sel && sel.startsWith('x:')) html = itemPanel(connEntity(sel), true);
    else if (sel && sel.startsWith('m:')) html = itemPanel('f:' + sel.slice(2));
    else if (sel) html = itemPanel(sel);
@@ -1199,7 +1201,7 @@
    // extensions add sections: 'overview' on the codebase panel, 'item' on a selected/opened item
    const where = sel && typeof sel === 'object' ? null : sel ? 'item' : state.container === 'root' ? 'overview' : state.container === 'q:answer' ? null : 'item';
    const target = sel && typeof sel === 'string' ? (sel.startsWith('x:') ? connEntity(sel) : sel.startsWith('m:') ? 'f:' + sel.slice(2) : sel) : state.container;
-@@ -1545,7 +1670,10 @@ function renderPanel() {
+@@ -1545,16 +1672,22 @@ function renderPanel() {
    panel.querySelectorAll('[data-open]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); open(a.dataset.open); }));
    panel.querySelectorAll('[data-flow]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); startFlow(a.dataset.flow); }));
    panel.querySelectorAll('[data-sel]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); select(a.dataset.sel); centerOn(a.dataset.sel); }));
@@ -1211,7 +1213,20 @@
    panel.querySelectorAll('[data-copy]').forEach((a) => a.addEventListener('click', () => { navigator.clipboard?.writeText(a.dataset.copy); a.textContent = '✓'; }));
    emit('panel', { selected: sel, container: state.container });
  }
-@@ -1577,13 +1705,14 @@ function systemsSection(tops) {
+ 
++// PU-G-147 (recette du 2026-11-08, arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (1e718a4f)) : un libellé de « On this board » se coupe au mot entier, ici, avant l'affichage ;
++// même algorithme que clipMot (scripts/vf-cockpit-planning.mjs), recopié car la page ne charge pas les modules du serveur ; la CSS ne coupe plus (.vf-rep), le libellé complet reste au title
++const cutWord = (s, n) => { s = String(s ?? '').replace(/\s+/g, ' ').trim(); if (s.length <= n) return s; let c = s.slice(0, n - 1); if (/\S/.test(c.at(-1)) && /\S/.test(s[n - 1])) { const m = c.replace(/\s*\S+$/, ''); if (m) c = m; } return c.replace(/[\s,;:·(–—-]+$/, '') + '…'; };
+ function answerPanel() {
+   const a = state.answer;
+   return `<div class="sec"><div class="ph"><span class="ico" style="--c:var(--accent)">${icon('feature')}</span><span class="kind">${h(a.kind || 'Answer')}</span></div><h2 class="pt">${h(a.title)}</h2><p class="pd">${h(a.question)}</p>${a.kind && a.answer ? `<div class="pd md">${md(a.answer)}</div>` : ''}
+       <div class="actions"><button class="btn soft" data-goroot>Back to map</button></div></div>
+-    ${listSec('On this board', a.items.map((x, i) => { const ii = info(x.id); return `<a class="row" data-sel="${h(x.id)}"><span class="anote" style="margin:0;padding:0;background:none;border:0"><b>${i + 1}</b></span><span class="rt"><div class="rn">${h(ii.name)}</div>${x.note ? `<div class="rd">${h(x.note)}</div>` : ''}${ii.path ? `<div class="rp">${h(ii.path)}</div>` : ''}</span></a>`; }))}
++    ${listSec('On this board', a.items.map((x, i) => { const ii = info(x.id); return `<a class="row vf-rep" title="${h([ii.name, x.note].filter(Boolean).join(' — '))}" data-sel="${h(x.id)}"><span class="anote" style="margin:0;padding:0;background:none;border:0"><b>${i + 1}</b></span><span class="rt"><div class="rn">${h(cutWord(ii.name, 90))}</div>${x.note ? `<div class="rd">${h(cutWord(x.note, 90))}</div>` : ''}${ii.path ? `<div class="rp">${h(ii.path)}</div>` : ''}</span></a>`; }))}
+     ${a.steps?.length >= 2 ? `<div class="sec"><h3>Walkthrough <span class="c">${a.steps.length}</span></h3><div class="list">${a.steps.map((s, i) => `<a class="row" data-sel="${h(s.id)}"><span class="dot" style="background:var(--accent)"></span><span class="rt"><div class="rn">${i + 1}. ${h(info(s.id).name)}</div><div class="rd">${h(s.note)}</div></span></a>`).join('')}</div></div>` : ''}`;
+ }
+ 
+@@ -1577,13 +1710,14 @@ function systemsSection(tops) {
    return `<div class="sec"><h3>Systems <span class="c">${tops.length}</span></h3>${parts.join('')}</div>`;
  }
  
@@ -1228,7 +1243,7 @@
      ${systemsSection(tops)}
      ${listSec('Guided flows', G.flows.map((f) => `<a class="row" data-flow="${h(f.id)}"><span class="dot" style="background:var(--accent)"></span><span class="rt"><div class="rn">${h(f.title)}</div>${f.description ? `<div class="rd">${h(f.description)}</div>` : ''}</span><span class="rc">${f.steps.length} steps</span></a>`))}
      ${listSec('Repositories', G.meta.repos.map((r) => `<div class="row" style="cursor:default"><span class="dot" style="background:var(--text-4)"></span><span class="rt"><div class="rn">${h(r.name)}</div><div class="rp">${h(r.branch || '')} @ ${h((r.head || '').slice(0, 7))}</div></span></div>`))}
-@@ -1617,7 +1746,7 @@ function itemPanel(item, viaConnector) {
+@@ -1617,7 +1751,7 @@ function itemPanel(item, viaConnector) {
    if (viaConnector || (parentOf.get(item) !== state.container && state.container !== item)) actions.push(`<button class="btn soft" data-go="${h(item)}">Show on map</button>`);
    if (i.type === 'node' || i.type === 'dir') {
      const n = i.n, s = statsOf(item);
@@ -1237,7 +1252,7 @@
      if (n?.paths?.length || i.d) html += pathBox(i.d ? i.d.path + '/' : n.paths.join('  '));
      if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
      html += '</div>';
-@@ -1632,9 +1761,11 @@ function itemPanel(item, viaConnector) {
+@@ -1632,9 +1766,11 @@ function itemPanel(item, viaConnector) {
      if (n?.packages?.length || n?.hosts?.length || n?.tags?.length) html += `<div class="sec"><h3>Matched by</h3><div class="tags">${[...n.packages.map((p) => 'pkg ' + p), ...n.hosts.map((p) => 'host ' + p), ...n.tags.map((t) => '#' + t)].map((t) => `<span class="tag">${h(t)}</span>`).join('')}</div></div>`;
      html += listSec('Inside', (kids.get(item) || []).filter((k) => !k.startsWith('f:')).map((k) => rowFor(k)));
      const c = connections(item);
@@ -1251,7 +1266,7 @@
    } else if (i.type === 'file' || i.type === 'module') {
      const f = i.f, fid = 'f:' + f.p, url = editorUrl(f.p);
      if (f.note) html += `<div class="callout">${h(f.note)}</div>`;
-@@ -1643,13 +1774,15 @@ function itemPanel(item, viaConnector) {
+@@ -1643,13 +1779,15 @@ function itemPanel(item, viaConnector) {
      if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}Open in editor</a>`);
      if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
      const owner = nodes.get(f.n);
@@ -1271,7 +1286,7 @@
      const handlers = new Set((routesByFile.get(f.p) || []).map((ri) => routes[ri].h));
      if (technical()) html += listSec('Exports', (f.s || []).map((s, k) => [s, k]).filter(([s]) => !handlers.has(s[0])).map(([s, k]) => `<a class="row" ${parentOf.has(`s:${f.p}#${k}`) ? `data-go="s:${h(f.p)}#${k}"` : ''}><span class="dot" style="background:var(--n-symbol)"></span><span class="rt"><div class="rn" style="font-family:var(--mono);font-size:12px">${h(s[0])}</div>${s[4] ? `<div class="rd">${h(s[4])}</div>` : ''}</span><span class="rc">${h(s[1])} · L${s[2]}</span></a>`), undefined, 60);
    } else if (i.type === 'route') {
-@@ -1701,8 +1834,14 @@ const index = [
+@@ -1701,8 +1839,14 @@ const index = [
  ];
  const pal = $('#palette'), sInput = $('#search'), sRes = $('#results');
  let sActive = 0, sItems = [];
@@ -1288,7 +1303,7 @@
  function runSearch() {
    const terms = sInput.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
    let scored = [];
-@@ -1723,19 +1862,23 @@ function runSearch() {
+@@ -1723,19 +1867,23 @@ function runSearch() {
    sRes.innerHTML = sItems.map((it, i) => {
      const ii = info(it.id);
      const ic = it.kind === 'route' ? `<span class="method" style="--m:${methodVar(ii.r.m)}">${h(ii.r.m)}</span>` : `<span class="ico" style="--c:${colorOf(ii)}">${icon(iconKey(ii))}</span>`;
@@ -1316,7 +1331,7 @@
  $('#search-btn').onclick = openPalette;
  
  // ======================= flows =======================
-@@ -1805,16 +1948,21 @@ async function loadCustomFlows() {
+@@ -1805,16 +1953,21 @@ async function loadCustomFlows() {
    const S = window.FLOORPLAN_SERVER;
    if (!S || typeof EventSource === 'undefined') return;
    const reload = () => { toast('Map updated'); setTimeout(() => location.reload(), 500); };
@@ -1347,7 +1362,7 @@
  })();
  
  async function requestFlow(prompt) {
-@@ -1862,9 +2010,9 @@ function flowStep() {
+@@ -1862,9 +2015,9 @@ function flowStep() {
    const container = b ? lcaContainer(a, b) : parentOf.get(a) || 'root';
    const bar = $('#flowbar'); bar.hidden = false;
    bar.innerHTML = `<div class="ft"><div class="fk">${h(f.title)} · step ${i + 1} of ${f.steps.length}</div><b>${h(info(a).name)}</b>${b ? ` <span>→</span> <b>${h(info(b).name)}</b>` : ''}<br><span>${h(f.steps[i].note)}</span><div class="dots">${f.steps.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div></div>
@@ -1359,7 +1374,7 @@
    $('#fl-x').onclick = stopFlow;
    // an answer's walkthrough plays on the answer board itself
    if (state.flow.inPlace) { if (state.container === 'q:answer') highlightFlow(a, b); else go('q:answer', { after: () => highlightFlow(a, b) }); }
-@@ -1951,7 +2099,10 @@ function refChip(id) {
+@@ -1951,7 +2104,10 @@ function refChip(id) {
    return `<span class="ref" data-ref="${h(id)}" style="--c:${colorOf(ii)}"><i></i>${h(b.name)}</span>`;
  }
  function md(src) {
@@ -1371,7 +1386,7 @@
    const out = [];
    let list = null;
    for (const raw of String(src || '').split('\n')) {
-@@ -1965,18 +2116,27 @@ function md(src) {
+@@ -1965,18 +2121,27 @@ function md(src) {
    return out.join('');
  }
  
@@ -1403,7 +1418,7 @@
    });
    sheet.querySelectorAll('[data-follow]').forEach((b) => b.onclick = () => { askInput.value = b.dataset.follow; submitAsk(); });
    sheet.querySelector('[data-act="steps"]')?.addEventListener('click', () => {
-@@ -2002,7 +2162,12 @@ function showAnswer(raw, question) {
+@@ -2002,7 +2167,12 @@ function showAnswer(raw, question) {
    const a = { title: String(raw.title || 'Answer'), answer: String(raw.answer || ''), items: items.slice(0, 18), steps, followups: (raw.followups || []).map(String), question };
    askState.last = a;
    if (a.items.length) { state.answer = a; go('q:answer', { force: true, after: () => renderAnswer(a) }); }
@@ -1417,7 +1432,7 @@
  }
  function showFailure(question, code, message, partial) {
    if (code === 'not_logged_in' || code === 'not_granted') setWarning(code);
-@@ -2015,7 +2180,7 @@ function setBusy(b) {
+@@ -2015,7 +2185,7 @@ function setBusy(b) {
    askState.busy = b;
    askSend.classList.toggle('stop', b);
    askSend.innerHTML = b ? `<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>` : `<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
@@ -1426,7 +1441,7 @@
  }
  function cancelAsk() {
    askState.ctl?.abort();
-@@ -2160,6 +2325,8 @@ async function submitAsk() {
+@@ -2160,6 +2330,8 @@ async function submitAsk() {
    askState.context = []; renderChips();
    if (askState.mode === 'change') return requestChange(ctxIds.length ? `${question}\n\nThis is about: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.` : question);
    const shown = question;
@@ -1435,7 +1450,7 @@
    // what Claude sees: the question plus the pinned items, by id, so it starts from them
    if (ctxIds.length) question += `\n\nFocus on these map items: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.`;
    setBusy(true);
-@@ -2191,16 +2358,7 @@ if (EXPORTED) {
+@@ -2191,16 +2363,7 @@ if (EXPORTED) {
    tag.textContent = isNaN(at) ? 'Exported copy' : `Exported ${at.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
    tag.title = 'A copy of this map to look around in. Asking questions needs Floorplan with Claude Code or Codex, in the codebase itself.';
    $('#proj-name').after(tag);
@@ -1453,7 +1468,7 @@
  }
  document.title = `${G.project.name} map`;
  $('#btn-up').onclick = up;
-@@ -2262,7 +2420,7 @@ const setPanel = (on) => {
+@@ -2262,7 +2425,7 @@ const setPanel = (on) => {
      else if (!on && sheetReturn) { if (panel.contains(document.activeElement) || document.activeElement === document.body) sheetReturn.focus?.({ preventScroll: true }); sheetReturn = null; }
    }
  };
@@ -1462,7 +1477,7 @@
  $('#btn-panel').setAttribute('aria-expanded', String(!document.body.classList.contains('no-panel')));
  // the top bar can be one or two rows tall: everything under it follows its real height
  const headerEl = document.querySelector('header');
-@@ -2281,7 +2439,9 @@ window.addEventListener('keydown', (ev) => {
+@@ -2281,7 +2444,9 @@ window.addEventListener('keydown', (ev) => {
    else if (ev.key === 'Escape') {
      if (!ctxEl.hidden || fm.classList.contains('open') || legendEl.classList.contains('open')) { closeMenu(); fm.classList.remove('open'); legendEl.classList.remove('open'); }
      else if (isPhone() && !document.body.classList.contains('no-panel')) closeSheet(); // on a phone the first Escape puts the details sheet away
@@ -1473,7 +1488,7 @@
    }
    else if (ev.key === 'f' || ev.key === 'F') fit(true);
    else if (ev.key === 'p' || ev.key === 'P') $('#btn-panel').click();
-@@ -2300,22 +2460,37 @@ function setTechnical(on) {
+@@ -2300,22 +2465,37 @@ function setTechnical(on) {
    render({ keepTransform: true, after: renderPanel });
    emit('technical', technicalFlag);
  }
@@ -1514,7 +1529,7 @@
    state.answer = a; askState.last = a;
    go('q:answer', { force: true });
  }
-@@ -2332,7 +2507,7 @@ window.Floorplan = Object.freeze({
+@@ -2332,7 +2512,7 @@ window.Floorplan = Object.freeze({
    version: 1,
    graph: G, query: Q, state, agent: AGENT, exported: EXPORTED,
    // model helpers
@@ -1523,7 +1538,7 @@
    files, nodes, routes, colorOf, iconKey,
    // html helpers
    h, icon, iconI, fmt, plural, md,
-@@ -2372,6 +2547,8 @@ window.Floorplan = Object.freeze({
+@@ -2372,6 +2552,8 @@ window.Floorplan = Object.freeze({
    technical, setTechnical,
    store,
    on(event, fn) { (ext.listeners[event] ||= []).push(fn); },
