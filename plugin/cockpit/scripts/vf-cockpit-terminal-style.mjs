@@ -93,16 +93,21 @@ button { font: inherit; color: inherit; }
 #proposition .vf-q-risque { display: inline-flex; align-items: center; gap: var(--sp-4); font-weight: 500; color: var(--text); }
 #proposition svg.i { width: var(--sp-16); height: var(--sp-16); flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 /* PU-G-136 : un bandeau de proposition prend sa place dans la page (colonne) au lieu de recouvrir la sortie du shell : le terminal rétrécit, la sortie remonte ; le bandeau défile au-delà de 60 % de la hauteur */
-body:has(#proposition, #accueil) { display: flex; flex-direction: column; }
-body:has(#proposition, #accueil) #terminal { position: relative; inset: auto; flex: 1 1 0; min-height: 0; order: 1; }
+body:has(#proposition, #accueil, #consigne) { display: flex; flex-direction: column; }
+body:has(#proposition, #accueil, #consigne) #terminal { position: relative; inset: auto; flex: 1 1 0; min-height: 0; order: 1; }
 body #proposition { position: static; flex: none; order: 2; z-index: auto; max-height: 60%; overflow-y: auto; } /* z-index auto : un élément de colonne flex porte le z-index de .vf-q-collage même statique, et recouvrirait la carte et le bandeau d'état (fixes) */
 body:has(#etat .vf-q-bandeau) #proposition { margin-bottom: calc(44px + 2 * var(--sp-8)); } /* dérivé : le bandeau d'état (fixe, en bas) a 44 px de haut et 8 de marge ; la proposition se pose au-dessus, comme le collage */
 #proposition .vf-q-pied { justify-content: flex-end; } /* Préparer vient APRÈS la commande exacte et la case du chat, à droite de sa rangée */
 #proposition .vf-q-pied { position: sticky; bottom: 0; background: var(--raise); } /* PU-G-136 (recette du 2026-11-08) : le pied (« Prêt dans un instant », Préparer dans le terminal) reste au bas du bandeau qui défile : à la hauteur par défaut du tiroir il était sous le pli, derrière la phrase, la commande exacte et la liste des modes */
+#proposition { scroll-padding-bottom: var(--sp-32); } /* S1 (revue du 2026-11-08) : le pied collé (32 px, la hauteur de Préparer) recouvre le bas de la fenêtre ; sans cette réserve le focus clavier laisse un élément du bandeau SOUS le pied (case du chat, Annuler à 124 px) : invisible (WCAG 2.4.11) */
+@media (pointer: coarse) { #proposition { scroll-padding-bottom: calc(var(--sp-32) + var(--sp-12)); } } /* au toucher le bouton fait 44 px : la réserve suit */
 #etat .vf-q-bandeau, #etat .vf-q-carte { z-index: 1; } /* le pied collé est un élément positionné : sans cela il passerait au-dessus de la carte et du bandeau d'état fixes (LB.V19) ; le collage (z-index 2) reste au-dessus */
 /* PU-G-140 (lot 8 LB3-S2) : l'accueil prend sa place dans la colonne comme le bandeau de proposition : il ne masque ni la sortie ni l'invite, le terminal rétrécit et la sortie remonte */
 body #accueil { position: static; flex: none; order: 2; z-index: auto; max-height: 60%; overflow-y: auto; }
 #accueil .vf-q-texte { font-weight: 400; color: var(--text-2); }
+/* P5 (recette du 2026-11-08) : la consigne « Appuyez sur Entrée » prend sa place dans la colonne comme l'accueil */
+body #consigne { position: static; flex: none; order: 2; z-index: auto; max-height: 60%; overflow-y: auto; }
+#consigne .vf-q-texte { font-weight: 400; color: var(--text-2); }
 /* PU-G-141 : la carte reste entière dans le cadre ; sur un cadre bas elle s'élargit et se tasse */
 .vf-q-carte { max-height: calc(100% - var(--sp-16)); overflow-y: auto; }
 @media (max-height: 240px) { .vf-q-carte { width: min(560px, calc(100% - 2 * var(--sp-16))); padding: var(--sp-8) var(--sp-12); gap: var(--sp-4); } .vf-q-carte svg.i { display: none; } }
