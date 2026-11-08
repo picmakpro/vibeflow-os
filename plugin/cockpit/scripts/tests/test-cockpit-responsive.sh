@@ -478,7 +478,7 @@ done
 
 # R13 à R16 (70-04 ; P70-D-01 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 ; P70-D-16 : même canal, même date ; P70-D-09 et P70-D-10 : choix du manager) — le téléphone (≤ 700 px) et les onglets.
 #   R13 en-tête : une seule rangée sur les trois onglets, aucune action dans la rangée, bouton « ⋯ » et son menu (une entrée par action présente, libellé visible, pastille reportée) ; onglets à 13 px, rail à 4 px à toutes les largeurs
-#   R14 zoom : hors de l'en-tête, pile verticale à gauche au-dessus de la barre de question, nom accessible français, position inchangée à 800 px, jamais sur « Remonter d'un niveau »
+#   R14 zoom : hors de l'en-tête, pile verticale à gauche au-dessus de la barre de question, nom accessible français, au bord gauche à 800 px (lot C : au-dessus de la barre, plus en haut à droite), jamais sur « Remonter d'un niveau »
 #   R15 tiroir : pas de bouton Détail, ouvert par une carte ou par le titre de la vue d'ensemble, poignée et croix nommée, fermé par la croix, Échap ou le tap dans le vide
 #   R16 titre de la vue d'ensemble : un mot ne se coupe jamais sur deux lignes, sauf s'il est plus large que sa boîte (un nom de lab de 60 caractères ; un nom dont le mot à traits d'union tient dans la boîte)
 # Poignée = élément décoratif (aria-hidden) plus large que haut en tête du tiroir ; croix = bouton du tiroir dont le nom accessible commence par « Fermer » (le contrat est écrit ici, 70-05 le tient).
@@ -534,8 +534,8 @@ for onglet in index project equipe; do
   done
 done
 for onglet in index project; do # sur l'onglet Équipe, la position du zoom à ≥ 701 px change en 70-12 (P70-D-20) : non jugée ici
-  assert_eq "R14.4 — $onglet / 800 px : la position du zoom, panneau fermé par défaut (x,y,largeur,hauteur ; PU-G-045 : x = 732 panneau fermé ; y = 64 = en-tête d'une rangée (56) + 8 depuis l'amendement de P70-D-01, « Icônes dans le menu ⋯ », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 ; 108 quand les icônes occupaient une seconde rangée)" "$(mv_ "$WORK/r13-$onglet.json" '(()=>{const z=j.mesures["800"].m.zoom;return z?z.r.join(","):"zoom absent"})()')" "732,64,52,144"
-  assert_eq "R14.4b — $onglet / 800 px : le panneau de détail est fermé par défaut (PU-G-045) — c'est ce qui place le zoom à droite ; un panneau rouvert remettrait [340,64,52,144] et ferait rougir R14.4" "$(mv_ "$WORK/r13-$onglet.json" 'j.mesures["800"].m.tiroir')" "false"
+  assert_eq "R14.4 — $onglet / 800 px : la position du zoom (x,y,largeur,hauteur) : la rangée au bord --edge, 8 au-dessus de la barre de question de 92 px (fenêtre de 800 x 600, cibles de 44 : 144 x 52) ; avant la recette du 2026-11-08 (lot C, PU-G-021 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px »), la pile du haut à droite [732,64,52,144]" "$(mv_ "$WORK/r13-$onglet.json" '(()=>{const z=j.mesures["800"].m.zoom;return z?z.r.join(","):"zoom absent"})()')" "16,432,144,52"
+  assert_eq "R14.4b — $onglet / 800 px : le panneau de détail est fermé par défaut (PU-G-045) ; le zoom, au bord gauche depuis le lot C, ne dépend plus de lui" "$(mv_ "$WORK/r13-$onglet.json" 'j.mesures["800"].m.tiroir')" "false"
 done
 assert_eq "R14.5 — Projet / 390 px, pendant un parcours : le zoom et « Remonter d'un niveau » ne se recouvrent pas" "$(mv_ "$WORK/r14-parcours.json" '(()=>{const m=j.mesures["390"].m,z=m.zoom,u=m.upRect;if(!u)return "témoin : « Remonter » absent (aucun parcours)";if(!z||!z.vis)return "zoom absent";const a=z.r,b=u;const x=Math.min(a[0]+a[2],b[0]+b[2])-Math.max(a[0],b[0]),y=Math.min(a[1]+a[3],b[1]+b[3])-Math.max(a[1],b[1]);return x>1.5&&y>1.5?"recouvrement "+Math.round(x)+"x"+Math.round(y)+" px":"aucun"})()')" "aucun"
 assert_eq "R15.1 — 390 px : le bouton Détail est invisible sur les trois onglets" "$(mv_ "$WORK/r13-index.json" 'j.mesures["390"].m.btnPanel')|$(mv_ "$WORK/r13-project.json" 'j.mesures["390"].m.btnPanel')|$(mv_ "$WORK/r13-equipe.json" 'j.mesures["390"].m.btnPanel')" "false|false|false"
@@ -554,7 +554,7 @@ done
 # R17 à R20 (70-12 ; P70-D-20 : choix du manager, vf-dev-manager, 2026-11-04, PAS un arbitrage de Samuel) — l'onglet Équipe (UIFN-14), sur un lab STABLE : une session et un sous-agent
 # jetables (la première carte ne varie pas), nom de lab long (le fil d'Ariane et la recherche se disputent la colonne gauche de l'en-tête à 1 024 px).
 #   R17.1 zoom : à 768, 1 024 et 1 440 px (donc dès 701 px) la rangée en bas à gauche du viewer d'origine (x=16, 16 px au-dessus du bas, direction « row »), sans recouvrir une carte (R17.1b) ;
-#   R17.2 Code et Projet gardent la position du zoom de 794c6dba ; R18 fil d'Ariane et recherche ne se recouvrent pas à 1 024 px (Projet et Équipe) ;
+#   R17.2 Code et Projet gardent la position du zoom de 794c6dba à 1 440 px, et de 701 à 1 279 px prennent la rangée au bord gauche au-dessus de la barre (PU-G-021, lot C) ; R18 fil d'Ariane et recherche ne se recouvrent pas à 1 024 px (Projet et Équipe) ;
 #   R19 le titre `#context h1` ne recouvre pas la première carte, au premier affichage (R19.1 : 390, 768, 1 024, 1 440 px) et après l'ouverture de la session (R19.2 : 390, 1 024 px) ;
 #   R20 la page Équipe entre dans la matrice : aucune superposition d'en-tête ni de surfaces, aucun défilement horizontal (R1 et R3 appliqués à `equipe.html`, 390 / 768 / 1 024 / 1 440 px).
 echo "=== R17 à R20 — onglet Équipe : zoom, titre, fil d'Ariane, matrice (UIFN-14) ==="
@@ -566,7 +566,7 @@ sous_agent() { # sous_agent <numéro de session de agent_actif> <lab> : un sous-
 }
 LE="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-equipe"; mklab "$LE"; sous_agent "$NSESS" "$LE"
 srv "$LE/.vibeflow/cockpit"; P_e=$SRV_PORT; PID_e=$SRV_PID
-zoom_base() { case "$1" in 768) echo "700|64|52|144" ;; 1024) echo "574|72|42|114" ;; 1440) echo "16|842|114|42" ;; esac; } # x|y|largeur|hauteur du zoom de Code et de Projet, relevés sur 794c6dba (labs de la suite) ; à 768 px : x = 700 (panneau fermé par défaut sous 1 000 px, PU-G-045), y = 64 (en-tête d'une rangée, P70-D-01 amendé)
+zoom_base() { case "$1" in 768) echo "16|312|144|52" ;; 1024) echo "16|662|114|42" ;; 1440) echo "16|842|114|42" ;; esac; } # x|y|largeur|hauteur du zoom de Code et de Projet (labs de la suite, sans le terminal donc sans pastille) : 1 440 px, celui de 794c6dba ; de 701 à 1 279 px (recette du 2026-11-08, lot C ; PU-G-021 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px ») la rangée au bord --edge, 8 au-dessus de la barre de question (768 px : fenêtre de 480, barre de 92, cibles de 44 donc 144 x 52 ; 1 024 px : fenêtre de 768, barre de 40, 114 x 42)
 J_PAUSE_E='const p = (ms) => new Promise((r) => setTimeout(r, ms));'
 INJ_SESSION="(async () => { $J_PAUSE_E const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0); nd?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); for (let i = 0; i < 60 && !/^Session/.test(document.querySelector('#context .k')?.textContent || ''); i++) await p(50); await p(400); return true; })()"
 OPIDS=()
@@ -583,7 +583,7 @@ for w in 768 1024 1440; do
   assert_eq "R17.1 — Équipe / $w px : le zoom est la rangée en bas à gauche (x, écart au bas de la fenêtre, direction)" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;const z=m.zoom;if(!z)return 'zoom absent';return z.r[0]+'|'+(m.fenetre[1]-(z.r[1]+z.r[3]))+'|'+z.dir})()")" "16|16|row"
   assert_eq "R17.1b — Équipe / $w px : le zoom ne recouvre aucune carte" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1?String(m.zoomCartes):'témoin : aucune carte'})()")" "0"
   for onglet in index project; do
-    assert_eq "R17.2 — $onglet / $w px : la position du zoom est celle de 794c6dba (x,y,largeur,hauteur), sauf à 768 px : x = 700 au lieu de 308 (panneau de détail fermé par défaut sous 1 000 px, PU-G-045) et y = 64 au lieu de 108 (l'en-tête n'a plus qu'une rangée, amendement de P70-D-01, 2026-11-06)" "$(mv_ "$WORK/r13-$onglet.json" "(()=>{const z=j.mesures[\"$w\"].m.zoom;return z?z.r.join('|'):'zoom absent'})()")" "$(zoom_base "$w")"
+    assert_eq "R17.2 — $onglet / $w px : la position du zoom (x,y,largeur,hauteur) : celle de 794c6dba à 1 440 px ; de 768 à 1 024 px, la rangée au bord --edge posée 8 au-dessus de la barre de question, plus la pile du haut à droite (PU-G-021, lot C de la recette du 2026-11-08)" "$(mv_ "$WORK/r13-$onglet.json" "(()=>{const z=j.mesures[\"$w\"].m.zoom;return z?z.r.join('|'):'zoom absent'})()")" "$(zoom_base "$w")"
   done
 done
 for spec in "Équipe:equipe" "Projet:project"; do

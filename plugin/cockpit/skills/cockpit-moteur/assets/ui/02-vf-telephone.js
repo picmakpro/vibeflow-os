@@ -39,8 +39,8 @@
       header .hc { flex: 0 0 44px; }
       header .hr { flex: 0 0 auto; justify-content: flex-end; }
       header #proj-name { display: none; }
-      #stage > #zoom { left: var(--sp-8); right: auto; top: auto; bottom: calc(var(--vf-ask-h, var(--sp-8)) + var(--sp-8)); flex-direction: column; border-radius: 26px; } /* --vf-ask-h : hauteur relue de la barre de question + sa marge */
-      html[data-vf-visite] #stage > #zoom { bottom: calc(var(--vf-ask-h, var(--sp-8)) + var(--sp-8)) !important; } /* visite ouverte : le zoom reste au-dessus de la feuille, même quand le terminal l'a remonté au-dessus de sa pastille (style en ligne, vf-cockpit-terminal-tiroir.mjs) */
+      #stage > #zoom { left: var(--edge); right: auto; top: auto; bottom: calc(var(--vf-ask-h, var(--sp-8)) + var(--edge)); flex-direction: column; border-radius: 26px; } /* --vf-ask-h : hauteur relue de la barre de question + sa marge */
+      html[data-vf-visite] #stage > #zoom { bottom: calc(var(--vf-ask-h, var(--sp-8)) + var(--edge)) !important; } /* visite ouverte : le zoom reste au-dessus de la feuille, même quand le terminal l'a remonté au-dessus de sa pastille (style en ligne, vf-cockpit-terminal-tiroir.mjs) */
       #context h1 { pointer-events: auto; width: fit-content; max-width: 100%; cursor: pointer; }
       #context h1:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
       .vf-sheet-bar { position: sticky; top: 0; z-index: 2; height: 36px; margin-bottom: calc(-1 * var(--sp-4)); background: var(--menu-solid); }

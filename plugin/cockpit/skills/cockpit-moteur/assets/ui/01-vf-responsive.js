@@ -8,7 +8,7 @@
 //     la droite garde son contenu ; sous 1 600 px les boutons d'action passent en icône seule (le libellé reste dans l'infobulle) ;
 //   - bornes mesurées à 1 024 px sur l'onglet Code AVEC ses boutons optionnels (Travail récent, Écrans) : aucun bouton ne sort de la fenêtre ;
 //   - infobulle : tout bouton d'en-tête sans `title` reprend son libellé (le viewer n'en pose pas sur « Parcours »), car sous 1 600 px il n'est plus qu'une icône ;
-//   - zoom au-dessus de la barre de question jusqu'à 1 279 px (comme le viewer le fait déjà sur écran tactile) ;
+//   - zoom en rangée au bord gauche, au-dessus de la pastille « Terminal » et de la barre de question, de 701 à 1 279 px (comme dès 1 280 px) ;
 //   - logo VibeFlow : le viewer inverse le logo clair du thème (il attend un logo blanc) ; nos deux logos ont déjà le bon contraste ;
 //   - sous 1 000 px : la barre de question range l'invite sur sa propre ligne ; sous 700 px le fil d'Ariane cède sa place au zoom.
 //   - fil d'Ariane (O2, recette 2026-11-03 ; budget revu après la revue de la recette 3, F1/F2) : dès 1 280 px, la colonne gauche de l'en-tête prend la largeur naturelle de son contenu (`flex: 1 1 auto`) et c'est la RECHERCHE qui cède
@@ -49,9 +49,14 @@
       #vf-lock[data-vf-point] .bl { display: none; }
     }
     @media (min-width: 1000px) and (max-width: 1279px) {
-      #zoom { left: auto; right: calc(var(--pw) + var(--edge)); bottom: auto; top: calc(var(--hh, 64px) + var(--sp-8)); flex-direction: column; border-radius: 26px; }
-      #context { max-width: min(520px, calc(100% - var(--pw) - 104px)); }
       #ask { width: min(700px, calc(100% - var(--pw) - 48px)); }
+    }
+    /* Zone basse, axe commun de 701 à 1 279 px (recette du 2026-11-08, lot C ; PU-G-021 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px ») : le zoom n'est plus la pile
+       verticale du haut à droite (celle du viewer sous 1 000 px et sur tactile, et celle de ce fichier de 1 000 à 1 279 px), mais la rangée de 1 280 px et plus, au bord gauche --edge ; il se pose au-dessus de la pastille « Terminal »
+       (qui prend sa largeur, vf-cockpit-terminal-tiroir.mjs), elle-même au-dessus de la barre de question quand elles se recouvrent. Plus de bouton à droite : le titre retrouve sa largeur d'origine. Sous 701 px la pile du téléphone reste (P70-D-09). */
+    @media (min-width: 701px) and (max-width: 1279px) {
+      #zoom { left: var(--edge); right: auto; top: auto; bottom: calc(var(--edge) + var(--vf-ask-bas, 0px)); flex-direction: row; border-radius: 999px; } /* --vf-ask-bas : hauteur de la barre de question + 8, relue plus bas ; sans la pastille « Terminal » (cockpit sans --terminal) le zoom clôt déjà la barre */
+      #context { max-width: min(520px, calc(100% - var(--pw) - 64px)); }
     }
     @media (min-width: 1280px) {
       header .hl { flex: 1 1 auto; } /* sa largeur naturelle ; il cède après la recherche */
@@ -68,6 +73,7 @@
        (celle de 1 440 px), jamais la colonne du haut qui recouvrait les cartes. Code et Projet gardent leur position (la barre de question occupe le bas) ; sous 701 px la pile verticale du téléphone (02-vf-telephone.js) reste seule. */
     @media (min-width: 701px) { body.vf-tab-equipe #zoom { left: var(--edge); right: auto; top: auto; bottom: var(--edge); flex-direction: row; border-radius: 999px; } }
     @media (max-width: 999px) { #ask-input { flex: 1 1 100%; } }
+    #zoom[data-vf-replie] { display: none; } /* C-R6 : zoom replié, voir replier() plus bas */
     /* 72.1 (réglage du 2026-11-06, demande de Samuel) : la pastille « Terminal » et la barre de question se centrent sur le même axe horizontal, à la même marge du bord (--edge) ; le zoom (R17.2 en fixe la position et la taille) reste empilé 8 au-dessus de la pastille, au même bord gauche.
        Souris (>= 1 000 px, hors tactile) : la barre passe de 54 à 40 = 4 + 32 + 4 (invite et envoi de 32) et la pastille, qui garde ses 32 (T20.8), se pose à 16 + 4 = 20 du bas : (40 - 32) / 2 = 4, axe commun exact (cy identiques).
        Tactile ou < 1 000 px : les cibles font 44, donc 52 = 4 + 44 + 4 comme le zoom (barre : rembourrage de 4 autour de la ligne de 44 d'ask-mode ; pastille : 52). Le rembourrage gauche de la barre reste celui du viewer. Une barre sur deux lignes (< 1 000 px) garde sa face basse sur la ligne de base. */
@@ -82,6 +88,9 @@
       #ask-form { padding-top: var(--sp-4); padding-bottom: var(--sp-4); padding-right: var(--sp-4); }
     }
     @media (max-width: 700px) { header #crumbs { display: none; } }
+    @media (max-width: 700px) { #ask { width: calc(100% - 2 * var(--edge)); bottom: var(--edge); } #ask-form { padding-left: var(--sp-16); } } /* correction ciblée du lot C (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (574c8b6f, 70bf5046) ; juge de design 84/100) : --edge vaut pour tout bord de fenêtre (DESIGN.md § 4), le bas de la barre est donc à 16 comme ses côtés (la feuille de détail et le tiroir gardent 8, hors de ce lot) ; et un seul retrait intérieur gauche du champ, 16 à toutes les largeurs (le viewer le met à 12 sous 701 px : l'invite sautait de 4 px au passage de 700 à 701 px) */
+    /* 1 280 px et plus (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, « À droite de la colonne (Recommandé) », consigné en § 10 du rapport GLOBAL de la recette (70bf5046)) : la barre part juste à droite de la colonne zoom/pastille, écart --sp-8 (x = 16 + 114 + 8 = 138), au lieu d'être centrée dans la carte (x = 160 à 1 280, 174 à 1 440 : l'écart variait avec la largeur). --vf-col : largeur de la colonne, relue sur le zoom (une seule source, plus bas). Elle finit à --edge du panneau. */
+    @media (min-width: 1280px) { #ask { left: calc(var(--edge) + var(--vf-col, 114px) + var(--sp-8)); transform: none; width: min(700px, calc(100% - var(--pw) - 2 * var(--edge) - var(--vf-col, 114px) - var(--sp-8))); } }
     /* PU-G-001 / PU-G-002 : fil d'Ariane sous 1 280 px. Racine : libellé court (le nom entier reste le nom accessible, posé par ajuste0). Niveau courant : jamais rogné. Niveaux d'avant : les premiers à céder (masqués par ajuste0). */
     @media (max-width: 1279px) {
       header #crumbs button[data-vf-racine] { font-size: 0; flex: 0 1 auto; min-width: max-content; padding-inline: var(--sp-6); } /* jamais rogné : ajuste0 le masque s'il ne tient pas */
@@ -105,6 +114,42 @@
     }
   `;
   document.head.appendChild(style);
+  // hauteur de la barre de question + 8, pour poser le zoom au-dessus d'elle de 701 à 1 279 px (règle ci-dessus) : 0 quand la barre n'est pas affichée (tiroir du terminal ouvert, onglet Équipe). Observateur posé ici, avant celui du tiroir
+  // (vf-cockpit-terminal-tiroir.mjs) : à chaque changement de taille de la barre la variable est à jour AVANT que la pastille et le zoom se replacent.
+  const barreQ = document.getElementById('ask');
+  if (barreQ) { const poser = () => document.documentElement.style.setProperty('--vf-ask-bas', barreQ.offsetHeight ? barreQ.offsetHeight + 8 + 'px' : '0px'); if (window.ResizeObserver) new ResizeObserver(poser).observe(barreQ); window.addEventListener('resize', poser); poser(); }
+  // largeur de la colonne zoom/pastille (le zoom en rangée de 701 px et plus) : la barre de question part à sa droite dès 1 280 px (règle ci-dessus). Relue à chaque changement de taille du zoom, jamais recopiée.
+  const zoomCol = document.getElementById('zoom');
+  if (zoomCol) { const poserCol = () => { if (zoomCol.offsetWidth) document.documentElement.style.setProperty('--vf-col', zoomCol.offsetWidth + 'px'); }; poserCol(); if (window.ResizeObserver) new ResizeObserver(poserCol).observe(zoomCol); window.addEventListener('resize', poserCol); }
+  // C-R6 (revue du lot C ; décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée : le zoom se replie) : de 701 px à 1 440 px, dans une fenêtre assez basse pour que la rangée du zoom
+  // ne tienne plus sans recouvrir le titre (h1, description) ou la carte de la visite guidée (tiroir du terminal ouvert, visite), le zoom se replie (data-vf-replie, display: none) tant que le recouvrement dure. Le zoom reste au clavier (+, -, 0) et à la molette.
+  // Mesure : on le déplie, on lit son rectangle, on le replie s'il recouvre : tout dans la même tâche, sans rendu entre les deux. Le titre ne dépend pas du zoom, la visite se replace d'elle-même autour de lui : pas de boucle.
+  const mq701 = window.matchMedia('(min-width: 701px)');
+  const replier = () => {
+    const z = document.getElementById('zoom'); if (!z) return;
+    const avant = z.getAttribute('data-vf-replie');
+    const visite = document.getElementById('tour');
+    const visiteLa = !!visite && visite.getBoundingClientRect().width > 0;
+    if (avant === 'visite' && visiteLa && mq701.matches) return; // replié par la visite : il le reste tant qu'elle est là (la carte se replace autour du zoom : sans cela il clignoterait)
+    z.removeAttribute('data-vf-replie');
+    let motif = null;
+    if (mq701.matches) {
+      const b = z.getBoundingClientRect();
+      if (b.width > 0 && b.height > 0) {
+        const sur = (e) => { if (!e) return false; const c = e.getBoundingClientRect(); return c.width > 0 && c.height > 0 && getComputedStyle(e).visibility !== 'hidden' && b.left < c.right - 0.5 && b.right > c.left + 0.5 && b.top < c.bottom - 0.5 && b.bottom > c.top + 0.5; };
+        if (sur(document.querySelector('#context h1')) || sur(document.querySelector('#context p'))) motif = 'titre'; else if (sur(visite)) motif = 'visite';
+      }
+    }
+    if (motif) z.setAttribute('data-vf-replie', motif);
+    if (motif !== avant) window.dispatchEvent(new Event('vf-zoom-replie')); // la pastille et la barre se replacent (vf-cockpit-terminal-tiroir.mjs)
+  };
+  let replierRaf = 0;
+  const replierPlusTard = () => { cancelAnimationFrame(replierRaf); replierRaf = requestAnimationFrame(() => { replier(); setTimeout(replier, 450); }); }; // 450 : fin des transitions du tiroir et du panneau
+  window.addEventListener('resize', replierPlusTard);
+  new MutationObserver(replierPlusTard).observe(document.body, { childList: true, attributes: true, attributeFilter: ['class'] });
+  if (barreQ && window.ResizeObserver) new ResizeObserver(replierPlusTard).observe(barreQ);
+  setInterval(() => { if (document.getElementById('tour')) replier(); }, 500); // la carte de la visite se replace d'elle-même, sans mutation du corps de page : on la relit tant qu'elle est là
+  replierPlusTard();
   // fil d'Ariane : étiquette les segments courts (moins de 12 caractères), puis masque derrière « … » les segments du milieu tant que le fil déborde (CSS : un segment long garde 64 px)
   const fil = document.getElementById('crumbs'), nomProjet = document.getElementById('proj-name'), gauche = document.querySelector('header .hl');
   let obs = null, replieRaf = null;
