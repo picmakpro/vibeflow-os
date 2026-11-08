@@ -101,7 +101,7 @@ export function vueTerminal(cfg) {
   };
   if (typeof document === 'object' && document && typeof document.addEventListener === 'function') { // la vue se charge aussi hors page (sonde de parité de la palette) : aucun écouteur sans document
     ['keydown', 'input', 'change'].forEach((n) => document.addEventListener(n, (ev) => { if (ev.target && ev.target.closest && ev.target.closest('#proposition')) geste = Date.now(); if (n === 'keydown' && ev.target && ev.target.closest && ev.target.closest('#terminal')) fermerAccueil(); }, true)); // la frappe n'est ni retenue ni modifiée
-    document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target && ev.target.closest && ev.target.closest('#terminal')) retirerConsigne(); }, true); // P5 : Entrée dans le terminal range la consigne « Appuyez sur Entrée »
+    document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.repeat && ev.target && ev.target.closest && ev.target.closest('#terminal')) retirerConsigne(); }, true); // P5 : Entrée dans le terminal range la consigne « Appuyez sur Entrée » ; F2 (3e tour) : seule une Entrée FRAÎCHE, une répétition d'Entrée tenue est avalée par la retenue du client et n'exécute rien
     document.addEventListener('pointerdown', (ev) => { appui = !!(ev.target && ev.target.closest && ev.target.closest('#proposition')); if (appui) geste = Date.now(); }, true);
     ['pointerup', 'pointercancel'].forEach((n) => document.addEventListener(n, () => { appui = false; }, true));
   }
