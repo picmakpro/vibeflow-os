@@ -254,10 +254,12 @@ cas_m2_git() { # chemin englobant un dépôt ou des worktrees : 64 ; .git fichie
 cas_famille() { # chemin englobant : .claude, .claude/worktrees, parent d'un dépôt = 64 ; worktree seul accepté
   mkdir -p "$TMP/fam/repo/.git" "$TMP/fam/repo/.claude/worktrees/wt" "$TMP/fam/wt0" "$TMP/fam2/x/.claude/worktrees/vide"
   : > "$TMP/fam/repo/.claude/worktrees/wt/.git"; : > "$TMP/fam/wt0/.git"
-  refus_list "parent d'un dépôt (.git à 2 niveaux)" "$1" "$TMP/fam" || return 1
+  refus_list "parent d'un dépôt (.git à 1 niveau : fam/repo/.git)" "$1" "$TMP/fam" || return 1
   refus_list "dossier .claude seul (par le nom)" "$1" "$TMP/fam2/x/.claude" || return 1
   refus_list "dossier .claude/worktrees seul (par le nom)" "$1" "$TMP/fam2/x/.claude/worktrees" || return 1
-  refus_list "repo/.claude (.git à 2 niveaux)" "$1" "$TMP/fam/repo/.claude" || return 1
+  refus_list "repo/.claude (.git à 1 niveau sous worktrees/wt)" "$1" "$TMP/fam/repo/.claude" || return 1
+  mkdir -p "$TMP/ws/x/repo/.git"   # refusé UNIQUEMENT par le glob à 2 niveaux (ws/x/repo/.git), hors .claude
+  refus_list "parent de x/repo/.git (.git à 2 niveaux)" "$1" "$TMP/ws" || return 1
   run "$1" list --path="$TMP/fam/wt0"
   assert_eq "témoin : worktree (.git fichier racine) accepté rc" 0 "$RC"
 }
@@ -339,6 +341,7 @@ mutant locale-forcee  m1_accent        -e 's/LC_ALL="\${LOCALE_LSOF:-C}" lsof/ls
 mutant casse          m1_casse         -e 's/ || return 4   # GARDE:casse/ || :/'
 mutant famille-nom    famille          -e '/# GARDE:famille-nom/d'
 mutant famille-git    famille          -e 's/\[ ! -e "\$g" \] || refus "englobe un autre dépôt ou worktree"/:/'
+mutant famille-git-2n famille          -e 's|for g in "\$P"/\*/.git "\$P"/\*/\*/.git; do|for g in "$P"/*/.git; do|'
 mutant vivant         vivant_sans_ps   -e '/# GARDE:vivant/d'
 mutant git            m2_git           -e '/# GARDE:git/d'
 mutant worktrees      m2_git           -e '/# GARDE:worktrees/d'
