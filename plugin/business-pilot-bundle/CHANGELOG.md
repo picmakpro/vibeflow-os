@@ -1,5 +1,9 @@
 # CHANGELOG — business-pilot-bundle
 
+## [Non publié] — 2026-11-08 (fin de mandat, #223)
+
+**Patch** (aucune release racine : groupée ; aucun bump de `VERSION`). Issue #223 : des workers restaient vivants après leur travail (tâche de fond jamais terminée, commande de premier plan basculée en fond, processus survivants dans le worktree). Les agents `vf-business-manager`, `vf-business-commercial`, `vf-business-delivery`, `vf-business-finance`, `quality-gate-client` reçoivent des blocs **Fin de mandat** (rien en attente d'une tâche de fond, attente au premier plan bornée par une échéance, commit avant le rapport, aucun processus à soi vivant au rapport) et **Clôture des workers** / **Balayage de sortie** selon leur rôle, avec renvoi vers `conductor/references/team-kernel.md` § Fin de mandat (source unique). Aucune ligne ajoutée au compteur du budget d'instructions.
+
 ## [v2.0.18] — 2026-11-05 (fin de tour inerte) — non publiée
 
 **Patch.** Correctif des workers orphelins des 3-5 novembre : un agent qui rend la main pendant qu'une commande Bash tourne en fond (bascule automatique du timeout comprise) reste vivant sans que personne ne l'arrête. `TaskStop` ajouté au champ `tools:` et une ligne de règle ajoutée, avec renvoi vers `conductor/references/team-kernel.md` § Fin de tour inerte (source unique) : vf-business-manager. Arbitrages Samuel, AskUserQuestion session principale, 2026-11-05 : « Mandat maintenant » (correctif) ; hook `SubagentStop` « Plus tard, en spike » (`.planning/BACKLOG.md`).  Suite de tests : l'ancrage de la recherche de `Task`/`Agent` dans `tools:` est un mot entier (`TaskStop` ne rougit plus à tort).
