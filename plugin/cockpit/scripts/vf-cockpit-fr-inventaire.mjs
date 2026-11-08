@@ -3,7 +3,7 @@
 // Base de la synchro amont : à rejouer après chaque resynchronisation du moteur (amont/SYNCHRO.md).
 // Entrées : le HTML des pages servies (index.html, project.html) et le source de serve.mjs de la sortie.
 // Sortie : liste triée et dédoublonnée (ordre des points de code), `${…}` d'un gabarit écrit `{}`.
-// Exports : inventaire({ html: [...], serveur }), litteraux(src), textesHtml(html), estAnglais(chaine).
+// Exports : inventaire({ html: [...], serveur }), litteraux(src), textesHtml(html), estAnglais(chaine), chainesBibliotheque(xterm), bibliothequeNonTraitee(xterm, client).
 // CLI : node vf-cockpit-fr-inventaire.mjs <sortie> [--json]   Code 0 ; 2 sortie sans index.html.
 //
 // Ce qui entre : littéraux (apostrophes, guillemets, gabarits) des blocs <script> en ligne, texte et attributs
@@ -160,6 +160,23 @@ export function inventaire({ html = [], serveur = '' } = {}) {
   }
   for (const l of litterauxServeur(serveur)) ajouter(set, l);
   return [...set].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
+// --- chaînes que la bibliothèque du terminal affiche d'elle-même (hors pages servies) --------------------------
+// Le bundle xterm porte ses phrases d'interface en anglais, rangées dans un module de réglages : `let i="Terminal input";const s={get:()=>i,set:e=>i=e};t.promptLabel=s`.
+// Elles n'apparaissent dans aucune page servie, donc l'inventaire des pages ne les voit pas ; le client du terminal doit les poser en français
+// (`Terminal.strings.<clé> = '…'`). chainesBibliotheque lit les défauts du bundle, bibliothequeNonTraitee rend les clés dont le client ne pose pas de valeur française.
+export function chainesBibliotheque(xterm) {
+  const r = {};
+  for (const m of xterm.matchAll(/let (\w+)="([^"]+)";const (\w+)=\{get:\(\)=>\1,set:\w+=>\1=\w+\};\w+\.(\w+)=\3/g)) r[m[4]] = m[2];
+  return r;
+}
+export function bibliothequeNonTraitee(xterm, client) {
+  const defauts = chainesBibliotheque(xterm);
+  return Object.keys(defauts).filter((cle) => {
+    const m = new RegExp(`\\.strings\\.${cle}\\s*=\\s*(['"])((?:(?!\\1).)*)\\1`).exec(client);
+    return !m || m[2] === defauts[cle] || estAnglais(m[2], true);
+  });
 }
 
 export function inventaireDeSortie(sortie) {

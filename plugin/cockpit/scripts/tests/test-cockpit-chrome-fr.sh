@@ -182,6 +182,28 @@ assert_eq "DG-14.1 : la couche française n'altère pas une phrase de relance fr
 assert_eq "DG-14.2 : la source des relances locales porte l'apostrophe (vf-cockpit-ask.mjs)" "$(grep -cF "Qu'est-ce qui bloque ?" "$SCRIPTS/vf-cockpit-ask.mjs")" "1"
 assert_eq "DG-14.3 : le chip du viewer écrit le texte reçu tel quel (h() n'ôte pas l'apostrophe) — témoin : une entrée sans apostrophe reste sans apostrophe" "$(node -e 'const u=(s)=>s.replace(/&#39;/g,String.fromCharCode(39));console.log(u("Qu&#39;est-ce qui bloque ?")+"|"+u("Qu est-ce qui bloque ?"))')" "Qu'est-ce qui bloque ?|Qu est-ce qui bloque ?"
 
+echo "[F15] recette 2026-11-08 : les phrases que la bibliothèque du terminal dit d'elle-même sont posées en français (« Terminal input », annoncé à chaque entrée dans le terminal)"
+XTERM="$SCRIPTS/../skills/cockpit-moteur/assets/vendor/xterm/xterm.js"; CLIENT="$SCRIPTS/vf-cockpit-terminal-client.mjs"
+cat > "$AUX/biblio.mjs" <<'JS'
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scriptsDir, xtermF, clientF, mode] = process.argv;
+const { chainesBibliotheque, bibliothequeNonTraitee } = await import(pathToFileURL(path.join(scriptsDir, 'vf-cockpit-fr-inventaire.mjs')).href);
+const x = fs.readFileSync(xtermF, 'utf8'), c = fs.readFileSync(clientF, 'utf8');
+if (mode === 'defauts') console.log(JSON.stringify(Object.keys(chainesBibliotheque(x)).sort()));
+else if (mode === 'reel') console.log(JSON.stringify(bibliothequeNonTraitee(x, c)));
+else if (mode === 'sans') console.log(JSON.stringify(bibliothequeNonTraitee(x, c.replace(/^.*Terminal\.strings\..*$/gm, ''))));
+else if (mode === 'anglais') console.log(JSON.stringify(bibliothequeNonTraitee(x, c.replace("'Saisie du terminal'", "'Terminal input'"))));
+else if (mode === 'autre-langue') console.log(JSON.stringify(bibliothequeNonTraitee(x, c.replace("'Saisie du terminal'", "'Keyboard entry field'"))));
+JS
+assert_eq "F15.1 : l'inventaire voit les deux phrases d'interface du bundle xterm (nom du champ de saisie, sortie trop abondante)" "$(node "$AUX/biblio.mjs" "$SCRIPTS" "$XTERM" "$CLIENT" defauts)" '["promptLabel","tooMuchOutput"]'
+assert_eq "F15.2 : le client du terminal les pose toutes en français (aucune clé non traitée)" "$(node "$AUX/biblio.mjs" "$SCRIPTS" "$XTERM" "$CLIENT" reel)" '[]'
+assert_eq "F15.3 témoin : sans surcharge, les deux sont signalées" "$(node "$AUX/biblio.mjs" "$SCRIPTS" "$XTERM" "$CLIENT" sans)" '["promptLabel","tooMuchOutput"]'
+assert_eq "F15.4 témoin : la valeur d'origine « Terminal input » reposée à l'identique est signalée" "$(node "$AUX/biblio.mjs" "$SCRIPTS" "$XTERM" "$CLIENT" anglais)" '["promptLabel"]'
+assert_eq "F15.5 témoin : une autre valeur anglaise est signalée aussi" "$(node "$AUX/biblio.mjs" "$SCRIPTS" "$XTERM" "$CLIENT" autre-langue)" '["promptLabel"]'
+assert_eq "F15.6 : le libellé français du champ de saisie est posé tel quel dans le client" "$(grep -cF "Terminal.strings.promptLabel = 'Saisie du terminal'" "$CLIENT")" "1"
+
 echo "[F3] témoin du détecteur : une chaîne anglaise inventée"
 T3="$WORK/t3"; cp -R "$SORTIE" "$T3"
 node -e 'const f=process.argv[1],fs=require("fs");let h=fs.readFileSync(f,"utf8");h=h.replace("</body>","<script>const m = \"Pending approval from the review board\";</script></body>");fs.writeFileSync(f,h)' "$T3/project.html"
