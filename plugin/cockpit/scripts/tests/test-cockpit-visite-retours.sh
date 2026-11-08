@@ -69,11 +69,9 @@ assert_eq "T4.2 — la feuille est en bas : son bord bas est dans le dernier qua
 assert_eq "T4.3 — « Étape n sur N » tient sur une seule ligne (chaque segment du repère ≤ 20 px de haut)" "$(g "$X" "j.etapes.every((e)=>e.repereHauteurs.every((h)=>h<=20))")" "true"
 # PU-G-090 (recette du 2026-11-08) : au téléphone AVEC la pastille Terminal, la feuille est posée au-dessus d'elle, plus haut que la barre de question ; le zoom doit rester au-dessus de la FEUILLE
 # (et non d'une hauteur supposée), sinon il la recouvre et elle se réduit à 120 px : titre coupé, description sous « Passer / Suivant ».
-if [ "$(g "$X" "j.etapes.every((e)=>e.lisible.pastille)")" = "true" ]; then
-  assert_eq "T4.4 — le texte de la feuille se lit en entier à chaque étape (le titre et la description tiennent, rien ne défile ni n'est coupé)" "$(g "$X" "j.etapes.every((e)=>e.lisible.texteEntier)")" "true"
-  assert_eq "T4.5 — la rangée Passer / Suivant ne recouvre pas le texte (le bas du texte est au-dessus du haut des boutons) et la feuille dépasse 120 px" "$(g "$X" "j.etapes.every((e)=>e.lisible.texteBas<=e.lisible.boutonsHaut&&e.lisible.carteH>120)")" "true"
-  assert_eq "T4.6 — le zoom ne recouvre pas la feuille (son bord bas est au-dessus du bord haut de la feuille) et la feuille laisse la pastille libre" "$(g "$X" "j.etapes.every((e)=>e.lisible.zoomBas<=e.lisible.carteHaut&&e.carte.b<=e.lisible.pastilleHaut)")" "true"
-else
-  echo "  ⊘ T4.4 à T4.6 SAUTÉS : la pastille Terminal est absente de ce banc — la feuille au-dessus de la pastille n'est PAS vérifiée"
-fi
+# la suite lance elle-même le cockpit avec --terminal : une pastille absente est une panne du banc, jamais un saut (un saut rendrait T4.4 à T4.6 verts à vide)
+assert_eq "T4.3b — témoin : la pastille Terminal est posée à chaque étape (la suite lance --terminal)" "$(g "$X" "j.etapes.every((e)=>e.lisible.pastille)")" "true"
+assert_eq "T4.4 — le texte de la feuille se lit en entier à chaque étape (le titre et la description tiennent, rien ne défile ni n'est coupé)" "$(g "$X" "j.etapes.every((e)=>e.lisible.texteEntier)")" "true"
+assert_eq "T4.5 — la rangée Passer / Suivant ne recouvre pas le texte (le bas du texte est au-dessus du haut des boutons) et la feuille dépasse 120 px" "$(g "$X" "j.etapes.every((e)=>e.lisible.texteBas<=e.lisible.boutonsHaut&&e.lisible.carteH>120)")" "true"
+assert_eq "T4.6 — le zoom ne recouvre pas la feuille (son bord bas est au-dessus du bord haut de la feuille) et la feuille laisse la pastille libre" "$(g "$X" "j.etapes.every((e)=>e.lisible.zoomBas<=e.lisible.carteHaut&&e.carte.b<=e.lisible.pastilleHaut)")" "true"
 echo; echo "Résultat : $PASS passés, $FAIL en échec"; [ "$FAIL" -eq 0 ]
