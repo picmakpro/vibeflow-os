@@ -129,6 +129,8 @@ await executer(chrome, async (s) => {
   // la mesure se prend quand le graphe et la carte de visite ne bougent plus : mêmes positions sur deux relevés espacés de 250 ms (plafond 5 s). Le cadrage de la visite s'anime ; sur un runner lent, la mesure tombait parfois en plein transit
   // (R1 long / project / 1 024 px, intermittent). RESP_SANS_ATTENTE=1 retire l'attente (mutant, pour prouver que la course est vue).
   const CALME = "(() => { const b = (e) => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom].map(Math.round); }; const n = [...document.querySelectorAll('#svg g.node')].map(b); const T = document.getElementById('tour'); const t = window.VibeFlow && window.VibeFlow.state.t; return { n: n.length ? [Math.min(...n.map((x) => x[0])), Math.min(...n.map((x) => x[1])), Math.max(...n.map((x) => x[2])), Math.max(...n.map((x) => x[3]))] : null, tour: T && !T.hidden ? b(T) : null, t: t && [t.k, t.x, t.y].map((v) => Math.round(v * 100)), anim: document.getElementById('viewport') && document.getElementById('viewport').classList.contains('anim') }; })()";
+  // calme() reste ici, hors des aides communes de chrome-session.mjs (stabiliser, attendreEtStabiliser) : sa spécification est plus forte (valeur identique pendant au moins 800 ms continues, absence de la classe « anim »,
+  // plafond 6 s sans erreur) et un arrêt d'animation de 700 ms (RESP_COURSE) trompe un stabiliser à deux relevés ; un prédicat « différent de l'avant » pourrait de plus ne jamais aboutir quand le graphe ne bouge pas.
   // calme : la même valeur sur des relevés espacés de 150 ms pendant au moins 800 ms (plus long qu'un arrêt de l'animation), sans classe « anim » ; plafond 6 s
   const calme = async (w) => { if (process.env.RESP_SANS_ATTENTE) return; const fin = Date.now() + 6000; let prec = null, depuis = 0;
     while (Date.now() < fin) { let c = null; try { c = JSON.stringify(await s.ev(CALME)); } catch { c = null; } const maintenant = Date.now();
@@ -147,8 +149,8 @@ await executer(chrome, async (s) => {
   for (const w of largeurs.split(',').map(Number)) { await charger(w); await mesurer(String(w)); }
   if (resize && resize !== '-') {
     const [a, b] = resize.split(':').map(Number);
-    await charger(a); await taille(b); await mesurer(`resize:${a}:${b}`);
-    await taille(a); await mesurer(`resize:${b}:${a}`);
+    await charger(a); await taille(b); await calme(b); await mesurer(`resize:${a}:${b}`); // le re-cadrage qui suit un redimensionnement se pose comme celui d'un chargement : calme() avant de mesurer
+    await taille(a); await calme(a); await mesurer(`resize:${b}:${a}`);
   }
   return { mesures };
 });

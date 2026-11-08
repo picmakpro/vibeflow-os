@@ -114,7 +114,7 @@ cat > "$AUX/chrome-tiroir.mjs" <<'JS'
 // Chaque étape est isolée (essai) ; en mode flag, la première étape en échec arrête le reste (les mesures absentes sont nommées dans `erreurs`).
 // Gestes par Input.dispatchMouseEvent / Input.dispatchKeyEvent seulement. Le secret de session n'apparaît jamais en sortie.
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import { execFileSync } from 'node:child_process';
-const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee, AMORCE } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv;
 const A = JSON.parse(brut);
 const OP = `http://127.0.0.1:${A.P}`, OQ = A.Q ? `http://127.0.0.1:${A.Q}` : '', MS = Number(process.env.VF_TIROIR_MS) || 20000;
@@ -169,9 +169,9 @@ await executer(chrome, async (s) => {
   // SAF-1 : l'amorçage passe par la page Projet, qui monte le cadre de Q ; l'échange se fait dans le cadre (prêt = message ready de Q, après son rechargement sans fragment)
   const amorcerParP = async () => {
     await s.naviguer(`${OP}/project.html#t=${A.amorce}`);
-    await att(`window.__msgs.some((m) => m.o === ${JSON.stringify(OQ)} && m.d === 'ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)');
+    await att(`window.__msgs.some((m) => m.o === ${JSON.stringify(OQ)} && m.d === 'ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)', process.env.VF_TIROIR_MS ? MS : Math.max(MS, AMORCE)); // amorçage : borné par l'échéance globale (par défaut), sauf VF_TIROIR_MS posée explicitement (les mutants la posent à 20000 : un amorçage cassé doit rougir en 20 s)
   };
-  const centre = (sel) => s.ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  const centre = async (sel) => { const p = await positionPosee(s.ev, `document.querySelector(${JSON.stringify(sel)})`); return p ? { x: p.cx, y: p.cy } : null; }; // le rect est relu jusqu'à deux lectures égales : le tiroir entre en 250 ms, monte à 300 px, la pastille suit le rappel de la barre
   const souris = (type, x, y) => s.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 });
   const clic = async (sel) => { const c = await centre(sel); if (!c) throw new Error(`élément absent : ${sel}`); await souris('mouseMoved', c.x, c.y); await souris('mousePressed', c.x, c.y); await souris('mouseReleased', c.x, c.y); };
   const touche = async (key, code, vk, modifiers = 0) => { for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, modifiers }); };
@@ -186,8 +186,9 @@ await executer(chrome, async (s) => {
   const balayer = async (cmd, corps, largeurs, cible = s) => {
     const mal = [], vus = new Set();
     for (const W of largeurs) {
-      await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: 800, deviceScaleFactor: 1, mobile: false }); await pause(150);
-      const m = await cible.ev(COUPURE(cmd, corps)); if (!m || m.sansPoint) throw new Error(`carte illisible à ${W} px`);
+      await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: 800, deviceScaleFactor: 1, mobile: false });
+      await attendreValeur(() => cible.ev('innerWidth'), (v) => v === W, { max: 5000 }); // le redimensionnement atteint le cadre de Q après P
+      const m = await stabiliser(() => cible.ev(COUPURE(cmd, corps)), { max: 5000 }); if (!m || m.sansPoint) throw new Error(`carte illisible à ${W} px`);
       vus.add(m.larg); if (m.coupee || m.decolle) mal.push(`${W}:${m.coupee ? 'coupee' : ''}${m.decolle ? 'decolle' : ''}`);
     }
     return { mal, largeurs: vus.size };
@@ -229,14 +230,14 @@ await executer(chrome, async (s) => {
     });
     await essai('refuse-p', async () => { // J1 : la barre dit « Déjà ouvert » (autre onglet que celui de Q ci-dessus)
       await s.naviguer(`${OP}/project.html`); await att(`!!document.querySelector('button.vf-term-pastille')`, 'pastille'); await clic('button.vf-term-pastille');
-      await att(`(document.querySelector('.vf-term-etat') || {}).textContent && document.querySelector('.vf-term-etat').textContent !== 'Connecté'`, 'état de la barre');
-      r.barreRefuse = { texte: await texte('.vf-term-etat'), point: await s.ev(`document.querySelector('.vf-term-etat-point').getAttribute('data-etat')`), annonce: await texte('.vf-term-annonce') };
+      const lireRefuse = async () => ({ texte: await texte('.vf-term-etat'), point: await s.ev(`(document.querySelector('.vf-term-etat-point') || { getAttribute: () => null }).getAttribute('data-etat')`), annonce: await texte('.vf-term-annonce') });
+      r.barreRefuse = await attendreEtStabiliser(lireRefuse, (v) => !!v && v.texte === 'Déjà ouvert' && v.point === 'refuse', { max: 10000 }); // le libellé attendu, pas « non vide » (qui accepte « Connexion… »)
     });
     await essai('expire-p', async () => { // J1 : secret absent, la barre dit « Session expirée »
       await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', 'secret-perime-' + 'x'.repeat(24))`); // PU-G-132 : un secret ABSENT n'est plus une expiration (la carte dit « non disponible », rien n'est dit à P) ; l'expiration vraie est un secret périmé, refusé par le serveur
       await s.naviguer(`${OP}/project.html`); await att(`!!document.querySelector('button.vf-term-pastille')`, 'pastille'); await clic('button.vf-term-pastille');
-      await att(`(document.querySelector('.vf-term-etat') || {}).textContent`, 'état de la barre');
-      r.barreExpire = { texte: await texte('.vf-term-etat'), point: await s.ev(`document.querySelector('.vf-term-etat-point').getAttribute('data-etat')`) };
+      const lireExpire = async () => ({ texte: await texte('.vf-term-etat'), point: await s.ev(`(document.querySelector('.vf-term-etat-point') || { getAttribute: () => null }).getAttribute('data-etat')`) });
+      r.barreExpire = await attendreEtStabiliser(lireExpire, (v) => !!v && v.texte === 'Session expirée' && v.point === 'expire', { max: 10000 });
     });
     await essai('expire-q', async () => { // J13 : carte d'alerte focalisée par programme ; J5 : commande et point jamais coupés
       await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -245,9 +246,11 @@ await executer(chrome, async (s) => {
       await s.ev(`localStorage.removeItem('vf.terminal.open')`);
       await q.naviguer(); await q.attendre(CARTE('Session expirée'), 'carte Session expirée');
       // L2 : la vue ne prend le focus que si le cadre l'a déjà ; P donne le focus au cadre de Q, puis la carte est montée de nouveau (même contenu), comme à la perte de session dans un cadre actif
-      await s.ev(`(() => { const f = document.querySelector('iframe'); if (f) f.focus(); return true; })()`); await q.ev(`window.vfTermVue.carte('expire')`);
+      await s.ev(`(() => { const f = document.querySelector('iframe'); if (f) f.focus(); return true; })()`);
+      await attendreValeur(() => q.ev('document.hasFocus()'), (v) => v === true, { max: 5000 }); // la carte ne prend le focus que si le cadre l'a déjà : on attend qu'il l'ait
+      await q.ev(`window.vfTermVue.carte('expire')`);
       const SONDE_J13 = `(() => { const k = document.querySelector('.vf-q-carte'), c = getComputedStyle(k); return { titre: (document.querySelector('.vf-q-titre') || {}).textContent, focus: document.activeElement === k, fv: k.matches(':focus-visible'), role: k.getAttribute('role'), contour: c.outlineStyle, pageFocus: document.hasFocus(), actif: document.activeElement && document.activeElement.tagName }; })()`;
-      r.alerte = await q.ev(SONDE_J13); r.alerte.cadresP = await s.ev(`document.querySelectorAll('iframe').length`);
+      r.alerte = await attendreEtStabiliser(() => q.ev(SONDE_J13), (v) => !!v && v.focus === true, { max: 5000 }); r.alerte.cadresP = await s.ev(`document.querySelectorAll('iframe').length`);
       r.coupure = await balayer('.vf-q-commande', '.vf-q-corps', LARGEURS, q);
     });
     return r;
@@ -274,6 +277,7 @@ await executer(chrome, async (s) => {
       }
       return c;
     };
+    const lireRel = async () => ({ releve: await s.ev(RELEVE), pastille: await s.ev(RECT('button.vf-term-pastille')), zoom: await s.ev(RECT('#zoom')) });
     let cq = 0;
     const deQ = (valeur) => s.send('Runtime.evaluate', { contextId: cq, expression: `window.parent.postMessage(${JSON.stringify(valeur)}, ${JSON.stringify(OP)})`, returnByValue: true });
     await essai('amorcage', () => amorcerParP());
@@ -285,22 +289,28 @@ await executer(chrome, async (s) => {
     });
     await essai('fermer', async () => {
       await clic('.vf-term-fermer'); await att(`!(${OUVERT})`, 'tiroir fermé par le bouton');
-      await s.ev(`document.getElementById('temoin').focus()`); await pause(300);
-      r.avant = await s.ev(RELEVE); r.avant.pastille = await s.ev(RECT('button.vf-term-pastille')); r.avant.zoom = await s.ev(RECT('#zoom'));
+      await s.ev(`document.getElementById('temoin').focus()`);
+      const av = await attendreEtStabiliser(lireRel, (v) => !!v && !!v.releve && v.releve.ouvert === false && !!v.pastille && !!v.zoom && v.pastille.t >= v.zoom.b, { max: 5000 }); // les positions que TP.7 compare, pas seulement « fermé »
+      r.avant = av.releve; r.avant.pastille = av.pastille; r.avant.zoom = av.zoom;
     });
     await essai('proposition-1', async () => { // TP.4 : tiroir fermé, la valeur fixe arrive de Q
-      await deQ('proposition'); await attOuvre(); await pause(300);
-      r.ouvre1 = await s.ev(RELEVE); r.ouvre1.pid = pid(); r.ouvre1.recu = await s.ev(MSG('proposition'));
+      await deQ('proposition'); await attOuvre();
+      const o1 = await stabiliser(async () => ({ releve: await s.ev(RELEVE), pid: pid(), recu: await s.ev(MSG('proposition')) }), { max: 5000 }); // tiroir ouvert : la montée à 300 px est posée avant la mesure
+      r.ouvre1 = o1.releve; r.ouvre1.pid = o1.pid; r.ouvre1.recu = o1.recu;
     });
     await essai('proposition-2', async () => { // TP.5 : tiroir déjà ouvert ; l'annonce est effacée avant, elle seule doit revenir
       await s.ev(`document.querySelector('.vf-term-annonce').textContent = ''`);
-      await deQ('proposition'); await pause(500);
-      r.ouvre2 = await s.ev(RELEVE); r.ouvre2.pid = pid();
+      await deQ('proposition');
+      await attendreValeur(() => s.ev(`(document.querySelector('.vf-term-annonce') || {}).textContent || ''`), (v) => !!v, { max: 5000 }); // l'annonce est revenue
+      await pause(500); // fenêtre d'absence conservée : aucun second cadre ni autre shell ne doit apparaître
+      const o2 = await stabiliser(async () => ({ releve: await s.ev(RELEVE), pid: pid() }), { max: 5000 });
+      r.ouvre2 = o2.releve; r.ouvre2.pid = o2.pid;
     });
     await essai('cycle', async () => { // TP.7 et TP.8 : fermeture au bouton après l'ouverture par proposition
       if (!(await s.ev(OUVERT))) { r.cycleSansOuverture = true; return; }
-      await clic('.vf-term-fermer'); await att(`!(${OUVERT})`, 'tiroir refermé'); await pause(300);
-      r.apres = await s.ev(RELEVE); r.apres.pastille = await s.ev(RECT('button.vf-term-pastille')); r.apres.zoom = await s.ev(RECT('#zoom'));
+      await clic('.vf-term-fermer'); await att(`!(${OUVERT})`, 'tiroir refermé');
+      const ap = await attendreEtStabiliser(lireRel, (v) => !!v && !!v.releve && v.releve.ouvert === false && !!v.pastille && !!v.zoom && !!r.avant && !!r.avant.pastille && JSON.stringify(v.pastille) === JSON.stringify(r.avant.pastille) && JSON.stringify(v.zoom) === JSON.stringify(r.avant.zoom), { max: 5000 }); // revenu au rectangle d'avant le cycle (TP.7)
+      r.apres = ap.releve; r.apres.pastille = ap.pastille; r.apres.zoom = ap.zoom;
     });
     await essai('espion', async () => { // TP.8 : tout message d'origine Q vu par P est dans la liste (relevé AVANT les envois hostiles de TP.6)
       const msgs = JSON.parse(await s.ev('JSON.stringify(window.__msgs)')), q = msgs.filter((m) => m.o === OQ);
@@ -333,8 +343,10 @@ await executer(chrome, async (s) => {
         await fermer(); await regler(grands, petits);
         if (plein) await clic('.vf-term-plein');
         await fermer(); const avant = await s.ev(MES);
-        await chemin(); await attOuvre(); await pause(400);
-        const apres = await s.ev(MES); r.haut[nom] = { avantNow: avant.now, avantMemo: avant.memo, ...apres };
+        await chemin(); await attOuvre();
+        const apres = await stabiliser(() => s.ev(MES), { max: 5000 });
+        // la hauteur d'une proposition (300 px) est lue une fois posée
+        r.haut[nom] = { avantNow: avant.now, avantMemo: avant.memo, ...apres };
         if (plein) { await clic('.vf-term-plein'); }
       };
       r.haut = {};
@@ -372,8 +384,8 @@ await executer(chrome, async (s) => {
     barre: (document.querySelector('.vf-term-etat') || {}).textContent, region: document.querySelector('.vf-term-tiroir').getAttribute('role') + '/' + document.querySelector('.vf-term-tiroir').getAttribute('aria-label'),
     annonce: window.__annonces[0], ready: ${MSG('ready')}, connecte: ${MSG('etat:connecte')} }; })()`)), etat: session(), violations: [...s.violations], pid: pid() }));
   if (A.court) { /* mode donnee : pas de gestes intermédiaires */ } else {
-  await essai('tu4b', async () => { await s.ev(`document.getElementById('ouvreur').focus()`); await raccourci(); await pause(300);
-    r.tu4b = await s.ev(`({ ouvert: ${OUVERT}, actif: document.activeElement.tagName })`); });
+  await essai('tu4b', async () => { await s.ev(`document.getElementById('ouvreur').focus()`); await raccourci();
+    r.tu4b = await attendreEtStabiliser(() => s.ev(`({ ouvert: ${OUVERT}, actif: document.activeElement.tagName })`), (v) => !!v && v.actif === 'IFRAME', { max: 5000 }); });
   await essai('tu4c', async () => { await raccourci(); await att(`!(${OUVERT})`, 'fermeture par le message toggle de Q'); await att(`document.activeElement && document.activeElement.id === 'ouvreur'`, 'focus rendu à l’ouvreur');
     r.tu4c = await s.ev(`({ ferme: !(${OUVERT}), focus: document.activeElement.id, toggle: ${MSG('toggle')}, annonce: (document.querySelector('.vf-term-annonce') || {}).textContent, inert: document.querySelector('.vf-term-tiroir').inert })`); });
   await essai('reouvrir', async () => { await clic('button.vf-term-pastille'); await att(OUVERT, 'tiroir rouvert au clic'); await pause(500); r.reouv = await s.ev(`({ iframes: document.querySelectorAll('iframe').length })`); r.reouv.pid = pid(); });
@@ -383,7 +395,7 @@ await executer(chrome, async (s) => {
     r.tu5 = await s.ev(`({ h: ${HAUT}, now: document.querySelector('.vf-term-poignee').getAttribute('aria-valuenow'), texte: document.querySelector('.vf-term-poignee').getAttribute('aria-valuetext'), stock: [localStorage.getItem('vf.terminal.h'), localStorage.getItem('vf.terminal.open')].join('/') })`);
     const pid1 = pid(); await s.send('Page.reload');
     await att(`${OUVERT} && ${MSG('etat:connecte')}`, 'tiroir rouvert et reconnecté après rechargement');
-    r.tu5.reload = await s.ev(`({ h: ${HAUT}, iframes: document.querySelectorAll('iframe').length })`); r.tu5.pid = pid1 === pid() ? 'identique' : 'change:' + pid1 + '>' + pid();
+    r.tu5.reload = await stabiliser(() => s.ev(`({ h: ${HAUT}, iframes: document.querySelectorAll('iframe').length })`), { max: 5000 }); r.tu5.pid = pid1 === pid() ? 'identique' : 'change:' + pid1 + '>' + pid();
   });
   await essai('tu6', async () => {
     r.h5 = await s.ev(HAUT); await clic('.vf-term-plein');
@@ -412,22 +424,29 @@ await executer(chrome, async (s) => {
   });
   }
   await essai('tu14', async () => { // J4 : focus clavier de la poignée = bague autour du grip, pas deux bandes pleine largeur
-    await s.ev(`document.querySelector('.vf-term-plein').focus()`); await touche('Tab', 'Tab', 9, 8); await pause(200); // Maj+Tab depuis le bouton : le clavier amène le focus sur la poignée
-    r.tu14 = await s.ev(`(() => { const p = document.querySelector('.vf-term-poignee'), g = document.querySelector('.vf-term-grip'), cp = getComputedStyle(p), cg = getComputedStyle(g), b = g.getBoundingClientRect(), q = p.getBoundingClientRect();
-      return { sur_poignee: document.activeElement === p, fv: p.matches(':focus-visible'), poignee: cp.outlineStyle, grip: cg.outlineStyle + '/' + cg.outlineWidth, opaque: cg.opacity, grip_larg: Math.round(b.width), poignee_larg: Math.round(q.width) }; })()`);
+    await s.ev(`document.querySelector('.vf-term-plein').focus()`); await touche('Tab', 'Tab', 9, 8); // Maj+Tab depuis le bouton : le clavier amène le focus sur la poignée
+    r.tu14 = await attendreEtStabiliser(() => s.ev(`(() => { const p = document.querySelector('.vf-term-poignee'), g = document.querySelector('.vf-term-grip'), cp = getComputedStyle(p), cg = getComputedStyle(g), b = g.getBoundingClientRect(), q = p.getBoundingClientRect();
+      return { sur_poignee: document.activeElement === p, fv: p.matches(':focus-visible'), poignee: cp.outlineStyle, grip: cg.outlineStyle + '/' + cg.outlineWidth, opaque: cg.opacity, grip_larg: Math.round(b.width), poignee_larg: Math.round(q.width) }; })()`), (v) => !!v && v.sur_poignee === true, { max: 5000 });
   });
   await essai('tu15', async () => { // J7 : sous pointer: coarse les boutons de la barre font au moins 44 px et la barre les contient ; sous pointeur fin, 28 px
     const mesure = () => s.ev(`(() => { const bs = [...document.querySelectorAll('.vf-term-bouton')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height); }); return { coarse: matchMedia('(pointer: coarse)').matches, boutons: bs.join(','), barre: Math.round(document.querySelector('.vf-term-barre').getBoundingClientRect().height), pastille: parseFloat(getComputedStyle(document.querySelector('button.vf-term-pastille')).height) }; })()`);
-    await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await pause(200);
-    r.tu15 = { fin: await mesure() };
-    await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: true }); await s.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 }); await pause(400);
-    r.tu15.tactile = await mesure();
-    await s.send('Emulation.setTouchEmulationEnabled', { enabled: false }); await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await pause(200);
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+    r.tu15 = { fin: await attendreEtStabiliser(mesure, (v) => !!v && v.coarse === false, { max: 5000 }) };
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: true }); await s.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+    r.tu15.tactile = await attendreEtStabiliser(mesure, (v) => !!v && v.coarse === true, { max: 5000 }); // matchMedia(pointer: coarse) se met à jour après l'émulation
+    await s.send('Emulation.setTouchEmulationEnabled', { enabled: false }); await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+    await attendreValeur(() => s.ev(`matchMedia('(pointer: coarse)').matches`), (v) => v === false, { max: 5000 });
   });
   // T17.5 : saisie au clavier dans le cadre, relevé de l'espion
   await essai('t175', async () => {
     if (!(await s.ev(OUVERT))) { await clic('button.vf-term-pastille'); await att(OUVERT, 'tiroir ouvert pour la saisie'); }
-    await s.ev(`document.querySelector('iframe').focus()`); await pause(400);
+    await s.ev(`document.querySelector('iframe').focus()`);
+    await attendreValeur(() => s.ev(`document.activeElement && document.activeElement.tagName`), (v) => v === 'IFRAME', { max: 5000 });
+    { // le focus doit être arrivé jusqu'au terminal du cadre de Q avant la frappe, sinon les octets se perdent
+      const scan = async (n) => { let c = 0; for (let id = 1; id < n && !c; id++) { const v = await s.send('Runtime.evaluate', { contextId: id, expression: `location.origin === ${JSON.stringify(OQ)} && typeof window.vfTermVue === 'object'`, returnByValue: true }).then((x) => x && x.result && x.result.value, () => false); if (v === true) c = id; } return c; };
+      let essais = 0; const cq = await attendreValeur(() => scan(essais++ ? 3000 : 600), (v) => v > 0, { pas: 150, max: 10000 });
+      if (cq) await attendreValeur(() => s.send('Runtime.evaluate', { contextId: cq, expression: `document.hasFocus() && !!document.activeElement && document.activeElement.classList.contains('xterm-helper-textarea')`, returnByValue: true }).then((x) => x && x.result && x.result.value, () => false), (v) => v === true, { max: 5000 });
+    }
     for (const c of `echo ${A.marqueur} > ${A.fichierM}`) { await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: c, text: c, unmodifiedText: c }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: c }); }
     await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
     const fin = Date.now() + MS; while (!fs.existsSync(A.fichierM) && Date.now() < fin) await pause(100);
@@ -445,7 +464,7 @@ cat > "$AUX/chrome-geom.mjs" <<'JS'
 // Entrée : { P } (port du cockpit lancé avec --terminal), optionnel { shots } (dossier de captures), { court } (2 combinaisons au lieu de 8, pour les mutants). Chaque combinaison page x fenêtre x thème a son relevé.
 // Gestes par Input.dispatchMouseEvent / Input.dispatchKeyEvent seulement : le test de recouvrement est celui du navigateur (elementFromPoint).
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs';
-const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, brut] = process.argv; const A = JSON.parse(brut);
 const OP = `http://127.0.0.1:${A.P}`, MS = Number(process.env.VF_TIROIR_MS) || 20000;
 const FENETRES = [[1440, 900], [1280, 720]], THEMES = ['dark', 'light'], PAGES = ['index.html', 'project.html'];
@@ -460,7 +479,7 @@ const ZRECT = `(() => { const z = document.getElementById('zoom'); const b = z.g
 
 await executer(chrome, async (s) => {
   const att = (expr, nom, ms) => s.attendre(expr, nom, ms || MS);
-  const centre = (sel) => s.ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  const centre = async (sel) => { const p = await positionPosee(s.ev, `document.querySelector(${JSON.stringify(sel)})`); return p ? { x: p.cx, y: p.cy } : null; }; // le rect est relu jusqu'à deux lectures égales : le tiroir entre en 250 ms, monte à 300 px, la pastille suit le rappel de la barre
   const souris = (type, x, y) => s.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 });
   const clic = async (sel) => { const c = await centre(sel); if (!c) throw new Error(`élément absent : ${sel}`); await souris('mouseMoved', c.x, c.y); await souris('mousePressed', c.x, c.y); await souris('mouseReleased', c.x, c.y); };
   const touche = async (key, code, vk) => { for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key, text: type === 'keyDown' ? key : undefined, code, windowsVirtualKeyCode: vk }); };
@@ -479,32 +498,36 @@ await executer(chrome, async (s) => {
       await s.naviguer(`${OP}/${page}`); await s.ev(`localStorage.clear(); sessionStorage.clear(); document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)})`);
       await s.naviguer(`${OP}/${page}`); await s.ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)})`);
       await att(`!!document.querySelector('button.vf-term-pastille') && document.querySelectorAll('#viewport .node').length > 0`, 'pastille et nœuds', MS);
-      await pause(1800);
-      r.fermeZoom = await s.ev(ZOOM); r.fermePast = await s.ev(PAST); r.fermeZ = await s.ev(ZRECT); r.fermeAsk = await s.ev(ASK);
+      const fe = await stabiliser(async () => ({ zoom: await s.ev(ZOOM), past: await s.ev(PAST), z: await s.ev(ZRECT), ask: await s.ev(ASK) }), { max: 8000 }); // page neuve : mise en page lue une fois posée
+      r.fermeZoom = fe.zoom; r.fermePast = fe.past; r.fermeZ = fe.z; r.fermeAsk = fe.ask;
       // un clic sur « + » ne doit pas ouvrir le terminal
       const k0 = await s.ev(`window.VibeFlow ? 1 : 0`); r.api = k0;
       await clic('#z-in'); await pause(300); r.clicPlusOuvre = await s.ev(ouvert);
       await capture(`${cle.replace(/[^a-z0-9]+/gi, '_')}-ferme`);
       // la visite « Par où commencer » est ouverte avant l'ouverture du tiroir
       r.visiteAvant = await s.ev(`(() => { try { if (window.VibeFlowTour && !window.VibeFlowTour.active()) window.VibeFlowTour.start(); return !!(window.VibeFlowTour && window.VibeFlowTour.active()); } catch (e) { return 'err'; } })()`);
-      await pause(500);
-      await clic('button.vf-term-pastille'); await att(ouvert, 'tiroir ouvert'); await pause(900);
-      r.tiroir = await s.ev(TIROIR); r.ouvZoom = await s.ev(ZOOM); r.ouvZ = await s.ev(ZRECT); r.ouvAsk = await s.ev(ASK);
-      r.visiteApres = await s.ev(`window.VibeFlowTour ? window.VibeFlowTour.active() : null`); r.visiteCachee = await s.ev(`(document.getElementById('tour') || { hidden: true }).hidden`);
+      await stabiliser(() => s.ev(PAST), { max: 5000 });
+      await clic('button.vf-term-pastille'); await att(ouvert, 'tiroir ouvert');
+      const lireOuv = async () => ({ tiroir: await s.ev(TIROIR), zoom: await s.ev(ZOOM), z: await s.ev(ZRECT), ask: await s.ev(ASK), visiteApres: await s.ev(`window.VibeFlowTour ? window.VibeFlowTour.active() : null`), visiteCachee: await s.ev(`(document.getElementById('tour') || { hidden: true }).hidden`) });
+      const ou = await attendreEtStabiliser(lireOuv, (v) => !!v && !!v.tiroir && !!v.z && v.z.bottom <= v.tiroir.top, { max: 5000 }); // le zoom a quitté le dessous du tiroir (l'assertion E2o juge ensuite)
+      r.tiroir = ou.tiroir; r.ouvZoom = ou.zoom; r.ouvZ = ou.z; r.ouvAsk = ou.ask; r.visiteApres = ou.visiteApres; r.visiteCachee = ou.visiteCachee;
       // « Ajuster » : touche F (focus rendu à la page) puis bouton
       await s.ev(`document.activeElement && document.activeElement.blur && document.activeElement.blur()`);
-      await touche('f', 'KeyF', 70); await pause(900); r.apresF = await s.ev(NOEUDS);
+      await stabiliser(() => s.ev(NOEUDS), { max: 5000 });
+      await touche('f', 'KeyF', 70); r.apresF = await attendreEtStabiliser(() => s.ev(NOEUDS), (v) => !!v && !!r.tiroir && v.bottom <= r.tiroir.top, { max: 5000 });
       await capture(`${cle.replace(/[^a-z0-9]+/gi, '_')}-ouvert-F`);
-      await clic('#z-fit'); await pause(900); r.apresBouton = await s.ev(NOEUDS);
+      await clic('#z-fit'); r.apresBouton = await attendreEtStabiliser(() => s.ev(NOEUDS), (v) => !!v && !!r.tiroir && v.bottom <= r.tiroir.top, { max: 5000 });
       // un clic sur « + » tiroir ouvert rend la main à la page : le tiroir reste ouvert, le zoom agit (les nœuds grossissent)
-      const avant = await s.ev(NOEUDS); await clic('#z-out'); await pause(300); const apres = await s.ev(NOEUDS); r.zoomOutAgit = !!avant && !!apres && (apres.right - apres.left) < (avant.right - avant.left); r.tiroirResteOuvert = await s.ev(ouvert);
+      const avant = await stabiliser(() => s.ev(NOEUDS), { max: 5000 }); await clic('#z-out'); const apres = await attendreEtStabiliser(() => s.ev(NOEUDS), (v) => !!v && !!avant && (v.right - v.left) < (avant.right - avant.left), { max: 5000 }); r.zoomOutAgit = !!avant && !!apres && (apres.right - apres.left) < (avant.right - avant.left); r.tiroirResteOuvert = await s.ev(ouvert);
       // fermeture : tout revient
-      await clic('.vf-term-fermer'); await pause(700); r.ferme2 = await s.ev(`!document.querySelector('.vf-term-tiroir') || document.querySelector('.vf-term-tiroir').hidden`);
-      r.finAsk = await s.ev(ASK); r.finZoom = await s.ev(ZOOM); r.finPast = await s.ev(PAST); r.finZ = await s.ev(ZRECT);
+      await clic('.vf-term-fermer');
+      const fi = await attendreEtStabiliser(async () => ({ ferme2: await s.ev(`!document.querySelector('.vf-term-tiroir') || document.querySelector('.vf-term-tiroir').hidden`), ask: await s.ev(ASK), zoom: await s.ev(ZOOM), past: await s.ev(PAST), z: await s.ev(ZRECT) }), (v) => !!v && v.ferme2 === true && !!v.z && JSON.stringify(v.z) === JSON.stringify(fe.z) && !!v.ask && v.ask.display !== 'none' && !!fe.ask && v.ask.bottom === fe.ask.bottom, { max: 5000 }); // E2f/fin : retour aux positions d'avant l'ouverture
+      r.ferme2 = fi.ferme2; r.finAsk = fi.ask; r.finZoom = fi.zoom; r.finPast = fi.past; r.finZ = fi.z;
       // reprise : tiroir mémorisé ouvert, la première mise en page tient déjà compte de lui
       await s.ev(`localStorage.setItem('vf.terminal.open', '1')`); await s.naviguer(`${OP}/${page}`); await s.ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)})`);
-      await att(`${ouvert} && document.querySelectorAll('#viewport .node').length > 0`, 'tiroir rouvert et nœuds'); await pause(2200);
-      r.repriseTiroir = await s.ev(TIROIR); r.repriseNoeuds = await s.ev(NOEUDS);
+      await att(`${ouvert} && document.querySelectorAll('#viewport .node').length > 0`, 'tiroir rouvert et nœuds');
+      const rp = await attendreEtStabiliser(async () => ({ tiroir: await s.ev(TIROIR), noeuds: await s.ev(NOEUDS) }), (v) => !!v && !!v.tiroir && !!v.noeuds && v.noeuds.bottom <= v.tiroir.top, { max: 6000 });
+      r.repriseTiroir = rp.tiroir; r.repriseNoeuds = rp.noeuds;
       await capture(`${cle.replace(/[^a-z0-9]+/gi, '_')}-reprise`);
     } catch (e) { erreurs[cle] = String(e.message).slice(0, 160); }
     sorties.push(r);
@@ -532,7 +555,7 @@ cat > "$AUX/chrome-pastille.mjs" <<'JS'
 // Entrée : { P, court }. Les relevés ne dépendent pas de chrome-geom (son « court » ne règle que ses propres huit combinaisons). Par largeur : panneau dans son état initial, puis bascule, puis bascule
 // retour (le cas « refermé » est celui qu'un rappel périmé laisse faux). Puis : la visite affichée, panneau ouvert, aux cinq largeurs qui comptent ; puis deux états tactiles (pointer: coarse).
 import { pathToFileURL } from 'node:url';
-const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, brut] = process.argv; const A = JSON.parse(brut);
 const OP = `http://127.0.0.1:${A.P}`, MS = Number(process.env.VF_TIROIR_MS) || 20000;
 const TOUTES = [[390, 844], [600, 900], [700, 900], [701, 900], [768, 1024], [900, 900], [1000, 800], [1024, 768], [1100, 800], [1200, 800], [1260, 800], [1280, 800]];
@@ -547,15 +570,15 @@ const MESURE = `(() => {
 })()`;
 await executer(chrome, async (s) => {
   const releves = [], erreurs = {};
-  const mesurer = async (cle, extra) => { try { const m = await s.ev(MESURE); releves.push({ cle, ...m, ...(extra || {}) }); } catch (e) { erreurs[cle] = String(e.message).slice(0, 160); } };
-  const basculer = async () => { await s.ev(`document.getElementById('btn-panel').click()`); await pause(900); };
+  const mesurer = async (cle, extra, lecture = () => s.ev(MESURE), pred = null) => { try { const m = pred ? await attendreEtStabiliser(lecture, pred, { max: 6000 }) : await stabiliser(lecture, { max: 6000 }); releves.push({ cle, ...m, ...(extra || {}) }); } catch (e) { erreurs[cle] = String(e.message).slice(0, 160); } };
+  const basculer = async () => { await s.ev(`document.getElementById('btn-panel').click()`); };
   const charger = async (W, H, tactile) => {
     await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: !!tactile });
     await s.send('Emulation.setTouchEmulationEnabled', { enabled: !!tactile });
     await s.naviguer(`${OP}/index.html`); await s.ev(`localStorage.clear(); sessionStorage.clear()`);
     await s.naviguer(`${OP}/index.html`);
     await s.attendre(`!!document.querySelector('button.vf-term-pastille') && document.querySelectorAll('#viewport .node').length > 0`, 'pastille et nœuds', MS);
-    await pause(1800);
+    await attendreValeur(() => s.ev(`matchMedia('(pointer: coarse)').matches`), (v) => v === !!tactile, { max: 5000 }); // l'émulation tactile se répercute sur le média après coup
   };
   await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   for (const [W, H] of (A.court ? COURTES : TOUTES)) {
@@ -567,14 +590,16 @@ await executer(chrome, async (s) => {
       await basculer(); await mesurer(`${cle}/retour`);
       // 72.1 : de 701 à 1 279 px la barre garde son bord gauche quel que soit le panneau, donc seule sa HAUTEUR change le recouvrement : l'avertissement « connecter un outil d'IA » l'allonge vers le haut, la pastille doit remonter avec elle (rappel du ResizeObserver de la barre)
       if (W >= 701 && W <= 1279) {
-        await s.ev(`(() => { const a = document.getElementById('ask'), w = document.getElementById('ask-warn'); if (!a || !w) return 0; a.classList.add('asking'); w.hidden = false; return 1; })()`); await pause(600);
-        await mesurer(`${cle}/avertissement`, { avert: await s.ev(`(() => { const w = document.getElementById('ask-warn'); return !!w && w.getBoundingClientRect().height > 0; })()`) });
+        await s.ev(`(() => { const a = document.getElementById('ask'), w = document.getElementById('ask-warn'); if (!a || !w) return 0; a.classList.add('asking'); w.hidden = false; return 1; })()`);
+        // la barre s'allonge, le rappel remonte la pastille : on attend l'avertissement posé, puis la mise en page stable (sans prédicat sur le verdict)
+        const lireAv = async () => ({ ...(await s.ev(MESURE)), avert: await s.ev(`(() => { const w = document.getElementById('ask-warn'); return !!w && w.getBoundingClientRect().height > 0; })()`) });
+        await mesurer(`${cle}/avertissement`, {}, lireAv, (v) => !!v && v.avert === true);
         await s.ev(`(() => { const a = document.getElementById('ask'), w = document.getElementById('ask-warn'); if (a) a.classList.remove('asking'); if (w) w.hidden = true; return 1; })()`); await pause(400);
       }
       if (AVEC_VISITE.has(W)) { // visite affichée, panneau ouvert
         if (await s.ev(`document.body.classList.contains('no-panel')`)) await basculer();
-        await s.ev(`window.VibeFlowTour && !window.VibeFlowTour.active() && window.VibeFlowTour.start()`); await pause(1400);
-        await mesurer(`${cle}/visite`); await s.ev(`window.VibeFlowTour && window.VibeFlowTour.active() && window.VibeFlowTour.end()`);
+        await s.ev(`window.VibeFlowTour && !window.VibeFlowTour.active() && window.VibeFlowTour.start()`);
+        await mesurer(`${cle}/visite`, {}, () => s.ev(MESURE), (v) => !!v && v.tour === true); await s.ev(`window.VibeFlowTour && window.VibeFlowTour.active() && window.VibeFlowTour.end()`);
       }
     } catch (e) { erreurs[cle] = String(e.message).slice(0, 160); }
   }
@@ -594,7 +619,7 @@ JS
 cat > "$AUX/chrome-defaut.mjs" <<'JS'
 // chrome-defaut.mjs <chrome> <json> : hauteur du tiroir selon la fenêtre (G4 ; P71-D-37) ; UNE ligne JSON. Entrée : { P }. Page Projet, stockage vidé avant chaque relevé.
 import { pathToFileURL } from 'node:url';
-const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, brut] = process.argv; const A = JSON.parse(brut);
 const OP = `http://127.0.0.1:${A.P}`, MS = Number(process.env.VF_TIROIR_MS) || 20000;
 const OUVERT = `(() => { const r = document.querySelector('.vf-term-tiroir'); return !!r && !r.hidden && r.getBoundingClientRect().height > 0; })()`;
@@ -605,15 +630,15 @@ await executer(chrome, async (s) => {
   const ouvrirA = async (W, H, stock) => {
     await fenetre(W, H); await s.naviguer(`${OP}/project.html`); await s.ev(`localStorage.clear()`);
     if (stock) await s.ev(`localStorage.setItem('vf.terminal.h', '${stock}'); localStorage.setItem('vf.terminal.open', '1')`); else await s.ev(`localStorage.setItem('vf.terminal.open', '1')`);
-    await s.naviguer(`${OP}/project.html`); await att(OUVERT, 'tiroir ouvert'); await pause(600); return s.ev(MESURE);
+    await s.naviguer(`${OP}/project.html`); await att(OUVERT, 'tiroir ouvert'); return stabiliser(() => s.ev(MESURE), { max: 5000 });
   };
   const r = { erreurs: {} };
   try {
     r.d720 = await ouvrirA(1280, 720); r.d900 = await ouvrirA(1440, 900); r.d1080 = await ouvrirA(1920, 1080);
     r.m720 = await ouvrirA(1280, 720, 600); r.m900 = await ouvrirA(1440, 900, 600);
     r.m360 = await ouvrirA(1280, 720, 360);
-    await ouvrirA(1440, 900); await fenetre(1280, 720); await pause(500); r.suit = await s.ev(MESURE);
-    await ouvrirA(1440, 900, 600); await fenetre(1280, 720); await pause(500); r.retrecit = await s.ev(MESURE);
+    await ouvrirA(1440, 900); await fenetre(1280, 720); r.suit = await attendreEtStabiliser(() => s.ev(MESURE), (v) => !!v && v.fenetre === 720, { max: 5000 });
+    await ouvrirA(1440, 900, 600); await fenetre(1280, 720); r.retrecit = await attendreEtStabiliser(() => s.ev(MESURE), (v) => !!v && v.fenetre === 720, { max: 5000 });
   } catch (e) { r.erreurs.defaut = String(e.message).slice(0, 160); }
   return r;
 });
@@ -884,18 +909,18 @@ mut_defaut M-MEMO-NON-BORNEE vf-cockpit-terminal-tiroir.mjs 's|Math.min(borne(me
 
 echo "=== TU.11 / T8.3 — cadre injoignable, frame-src absent (mutants jouées en navigateur) ==="
 if mutant injoignable vf-cockpit-terminal.mjs "s|{ etat: 'actif', port: portQ }|{ etat: 'actif', port: 1 }|"; then
-  srv "$MUT_OUT" 1; J="$(navig froid "{\"P\":$SRV_PORT,\"attendre\":\"carte\"}")"; unsrv
+  srv "$MUT_OUT" 1; J="$(VF_TIROIR_MS=20000 navig froid "{\"P\":$SRV_PORT,\"attendre\":\"carte\"}")"; unsrv
   assert_eq "TU.11 — aucun ready : après 8 s, carte « Le terminal ne répond pas. Relancez /vf-cockpit --terminal. »" "$(rj "$J" '"carte="+j.carte+" ready="+j.ready')" "carte=Le terminal ne répond pas. Relancez /vf-cockpit --terminal. ready=false"
   assert_eq "T20.5 (J5, carte de P) — la commande /vf-cockpit --terminal ne se coupe jamais et son point final reste collé, à huit largeurs de fenêtre (témoin : la carte a changé de largeur au moins trois fois)" "$(rj "$J" '"mal="+JSON.stringify(j.coupure&&j.coupure.mal)+" larges="+(j.coupure&&j.coupure.largeurs>=3)')" 'mal=[] larges=true'
 else sans_effet "TU.11 (injection de panne)"; fi
 if mutant framesrc vf-cockpit-terminal.mjs "s#frameSrc: () => (portQ ? \`; frame-src http://127\.0\.0\.1:\${portQ}\` : ''),#frameSrc: () => '',#"; then
-  srv "$MUT_OUT" 1; J="$(navig froid "{\"P\":$SRV_PORT,\"attendre\":\"violation\"}")"; unsrv
+  srv "$MUT_OUT" 1; J="$(VF_TIROIR_MS=20000 navig froid "{\"P\":$SRV_PORT,\"attendre\":\"violation\"}")"; unsrv
   assert_eq "T8.3 / M-FRAMESRC — copie de sortie sans frame-src : une violation de CSP relevée, aucun ready reçu" "$(rj "$J" '"violation="+(j.violations.length>=1)+" ready="+j.ready')" "violation=true ready=false"
 else sans_effet "M-FRAMESRC"; fi
 
 echo "=== M-MSG-DONNEE — client de Q qui joint du texte du terminal à un message (T17.5) ==="
 if mutant donnee vf-cockpit-terminal-client.mjs 's|term.write(m.value);|term.write(m.value); window.parent.postMessage(new TextDecoder().decode(m.value), cfg.origineP);|'; then
-  run_flag "$MUT_OUT" 1; J="$FJ"
+  VF_TIROIR_MS=20000 run_flag "$MUT_OUT" 1; J="$FJ"
   assert_eq "M-MSG-DONNEE — le mutant rougit T17.5 : un message hors liste ou portant le marqueur arrive à P (témoin : la commande a tourné)" "$(rj "$J" '"fichier="+j.t175.fichier+" rouge="+(j.t175.hors_liste>=1||j.t175.marqueur>=1)')" "fichier=true rouge=true"
 else sans_effet "M-MSG-DONNEE"; fi
 
@@ -910,7 +935,7 @@ assert_eq "TP.8 — la proposition ne passe pas par la branche des états : barr
 assert_eq "TP.6 — tiroir fermé : postMessage de P, MessageEvent forgé, « proposition:ouvre », « Proposition », « proposition » + espace, 10 000 caractères depuis Q : il reste fermé ; témoin : la vraie valeur de Q l'ouvre ensuite" "$(rj "$PJ0" 'JSON.stringify(j.hostile)')" '{"deP":true,"forge":true,"suffixe":true,"majuscule":true,"espace":true,"long":true,"vivant":true}'
 mut_prop_nav() { # mut_prop_nav <libellé> <nom> <expression-sed> <expression de rougissement sur le relevé du mutant>
   if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
-    run_prop "$MUT_OUT"
+    VF_TIROIR_MS=20000 run_prop "$MUT_OUT"
     assert_eq "$1 $2 — le mutant rougit : $5 (témoin : aucune erreur de scénario)" "$(rj "$PJ" '(j.erreur||JSON.stringify(j.erreurs))+" rouge="+('"$4"')')" "{} rouge=true"
   else sans_effet "$1 $2"; fi
 }
@@ -930,7 +955,7 @@ for ch in evt msg; do
 done
 mut_haut() { # mut_haut <libellé> <nom> <expression-sed> <expression de rougissement>
   if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
-    run_haut "$MUT_OUT"
+    VF_TIROIR_MS=20000 run_haut "$MUT_OUT"
     assert_eq "$1 $2 — le mutant rougit : $5 (témoin : aucune erreur de scénario)" "$(rj "$PJ" '(j.erreur||JSON.stringify(j.erreurs))+" rouge="+('"$4"')')" "{} rouge=true"
   else sans_effet "$1 $2"; fi
 }

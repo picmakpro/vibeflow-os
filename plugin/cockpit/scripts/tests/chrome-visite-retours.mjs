@@ -7,7 +7,7 @@
 //   focus    : clic souris réel sur le bouton de visite (rouvre la visite), puis une flèche : le bouton ne doit pas porter d'anneau (:focus-visible) ;
 //              activé au clavier (Entrée), il le garde
 // Rend une ligne JSON ou { erreur }.
-import { executer, pause } from './chrome-session.mjs';
+import { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } from './chrome-session.mjs';
 const [, , chrome, url, largeur = '1440', scenario = 'visite'] = process.argv;
 const W = Number(largeur), HAUT = { 390: 844, 1000: 760, 1280: 800, 1440: 900 };
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlowTour && !!document.getElementById('tour-btn') && !!window.__vfModele && !!window.__vfModele.modele";
@@ -17,29 +17,31 @@ await executer(chrome, async (s) => {
   await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: HAUT[W] || 800, deviceScaleFactor: 1, mobile: false });
   await s.naviguer(url); await s.attendre(PRET, 'page prête');
   const touche = async (k) => { for (const t of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type: t, key: k, code: k, windowsVirtualKeyCode: KEY[k], ...(k === 'Enter' && t === 'keyDown' ? { text: '\r' } : {}) }); };
-  const clic = async (sel) => { const r = await s.ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const b = e.getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })()`); if (!r) return false; for (const t of ['mouseMoved', 'mousePressed', 'mouseReleased']) await s.send('Input.dispatchMouseEvent', { type: t, x: r[0], y: r[1], button: 'left', clickCount: 1 }); return true; };
+  // le centre du bouton est lu une fois posé (deux relevés égaux), jamais dans la foulée d'un changement de mise en page
+  const clic = async (sel) => { const p = await positionPosee(s.ev, `document.querySelector(${JSON.stringify(sel)})`); if (!p) return false; for (const t of ['mouseMoved', 'mousePressed', 'mouseReleased']) await s.send('Input.dispatchMouseEvent', { type: t, x: p.cx, y: p.cy, button: 'left', clickCount: 1 }); return true; };
   if (scenario === 'theme') {
     const lire = () => s.ev("(() => { const b = document.getElementById('theme-toggle'); return b ? (b.querySelector('.theme-word') || {}).textContent || b.innerText : null; })()");
-    const textes = [await lire()];
-    for (let i = 0; i < 3; i++) { await clic('#theme-toggle'); await pause(400); textes.push(await lire()); }
+    const textes = [await stabiliser(lire, { pas: 150, max: 3000 })];
+    for (let i = 0; i < 3; i++) { const prec = textes[textes.length - 1]; await clic('#theme-toggle'); textes.push(await attendreEtStabiliser(lire, (v) => v !== prec, { pas: 150, max: 3000 })); }
     return { textes };
   }
   await s.attendre(OUVERTE, 'visite ouverte d\'office', 30000);
   if (scenario === 'tiroir') {
-    await s.ev('window.VFGitTiroir.ouvrir()'); await pause(600);
-    const avant = await s.ev('({ tiroir: window.VFGitTiroir.ouvert(), visite: window.VibeFlowTour.active() })');
-    await touche('Escape'); await pause(500);
-    const apres = await s.ev('({ tiroir: window.VFGitTiroir.ouvert(), visite: window.VibeFlowTour.active() })');
+    await s.ev('window.VFGitTiroir.ouvrir()');
+    const lireT = () => s.ev('({ tiroir: window.VFGitTiroir.ouvert(), visite: window.VibeFlowTour.active() })');
+    const avant = await attendreEtStabiliser(lireT, (v) => v && v.tiroir === true, { pas: 150, max: 3000 });
+    await touche('Escape');
+    const apres = await attendreEtStabiliser(lireT, (v) => v && v.tiroir === false, { pas: 150, max: 3000 });
     return { avant, apres };
   }
   if (scenario === 'focus') {
-    await s.ev('window.VibeFlowTour.end()'); await pause(300);
+    await s.ev('window.VibeFlowTour.end()'); await attendreValeur(() => s.ev(OUVERTE), (v) => v === false, { max: 3000 });
     const info = () => s.ev("(() => { const b = document.getElementById('tour-btn'); return { actif: document.activeElement === b, fv: b.matches(':focus-visible'), ouverte: window.VibeFlowTour.active() }; })()");
-    await clic('#tour-btn'); await s.attendre(OUVERTE, 'visite rouverte à la souris'); await pause(300);
-    const souris0 = await info(); await touche('ArrowRight'); await pause(300); const souris1 = await info();
-    await s.ev('window.VibeFlowTour.end()'); await pause(300);
-    await touche('Tab'); await s.ev("document.getElementById('tour-btn').focus()"); await touche('Enter'); await pause(500);
-    const clavier = await info();
+    await clic('#tour-btn'); await s.attendre(OUVERTE, 'visite rouverte à la souris'); await positionPosee(s.ev, "document.getElementById('tour')");
+    const souris0 = await info(); await touche('ArrowRight'); await pause(300); const souris1 = await stabiliser(info, { pas: 120, max: 3000 }); // la pause reste : fv doit rester FAUX (absence d'anneau)
+    await s.ev('window.VibeFlowTour.end()'); await attendreValeur(() => s.ev(OUVERTE), (v) => v === false, { max: 3000 });
+    await touche('Tab'); await s.ev("document.getElementById('tour-btn').focus()"); await touche('Enter');
+    const clavier = await attendreEtStabiliser(info, (v) => v && v.ouverte === true, { pas: 150, max: 3000 });
     return { souris0, souris1, clavier };
   }
   // visite : parcours
@@ -57,9 +59,11 @@ await executer(chrome, async (s) => {
       cadreSurTitre: cadres.some((c) => Math.abs(c.r.l - ctx.l) < 2 && Math.abs(c.r.w - ctx.w) < 2 && (c.contour !== 'none')),
       contours: cadres.map((c) => c.contour), cartesEclairees: hl.length, largeurCartes: hl.map((r) => Math.round(r.w)), dansFenetre: hl.every((r) => r.l >= 0 && r.r <= innerWidth && r.t >= 0 && r.b <= innerHeight) };
   })()`);
-  const etapes = [];
+  const etapes = []; let precRepere = null;
   for (let i = 0; i < 12; i++) {
-    await pause(1600); etapes.push(await mesure());
+    // la caméra et la feuille bougent après chaque étape : on attend le repère de la NOUVELLE étape, puis une mesure stable
+    const m = i === 0 ? await stabiliser(mesure, { pas: 400, max: 8000 }) : await attendreEtStabiliser(mesure, (v) => v && v.repere !== precRepere, { pas: 400, max: 8000 });
+    etapes.push(m); precRepere = m && m.repere;
     const dernier = await s.ev("!!document.querySelector('#tour [data-next]') && /^(Done|Terminé)$/.test(document.querySelector('#tour [data-next]').textContent.trim())");
     if (dernier) break;
     await s.ev("document.querySelector('#tour [data-next]').click()");

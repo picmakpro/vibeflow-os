@@ -112,7 +112,7 @@ sed 's#, /^vf-cockpit-fr-.\*\\.mjs$/##' "$MUT/vf-cockpit-build.mjs" > "$MUT/b.tm
 assert_eq "A5.2 — témoin rouge : sans le motif fr-, le leurre fr-inventaire est recopié" "$(node "$AUX/liste.mjs" "$MUT" "$D5")" "vf-cockpit-fr-inventaire.mjs,vf-cockpit-who.mjs"
 
 echo "=== A6 — diagnostic des lignes non comprises (premier assemblage et --rebuild) ; .planning jamais écrit ==="
-# Les motifs sont éprouvés en bibliothèque par test-cockpit-projet.sh (P8) ; ici la sortie du lanceur et la lecture seule du chemin `build --rebuild`.
+# Les motifs sont éprouvés en bibliothèque par test-cockpit-projet-graphe.sh (P8) ; ici la sortie du lanceur et la lecture seule du chemin `build --rebuild`.
 cat > "$AUX/asm.mjs" <<'JS'
 // asm.mjs <dossier de scripts à tester> <lab> <dossier de scripts du moteur> : assemble avec le build du dossier donné (mutant) et le moteur réel
 import path from 'node:path';

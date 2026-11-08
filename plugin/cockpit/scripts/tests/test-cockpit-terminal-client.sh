@@ -151,7 +151,7 @@ cat > "$AUX/chrome-client.mjs" <<'JS'
 // chrome-client.mjs <chrome> <mode> <json> : scénarios navigateur du client de Q ; UNE ligne JSON. Modes : t6 · cadre · tierce.
 // Chaque étape est isolée (essai) : une mesure indisponible est nommée dans `erreurs`, jamais un résultat vide. Amorçage et secret sont masqués en sortie.
 import { pathToFileURL } from 'node:url'; import { execFileSync } from 'node:child_process'; import fs from 'node:fs';
-const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, AMORCE } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv;
 const { P, Q, amorce, tierce, secret: secretN = '', pid: pidN = 0, fichier = '', octets = 0 } = JSON.parse(brut);
 const OP = `http://127.0.0.1:${P}`, OQ = `http://127.0.0.1:${Q}`, MS = Number(process.env.VF_CLIENT_MS) || 20000;
@@ -207,6 +207,7 @@ await executer(chrome, async (s) => {
     });
     r.violations = [...s.violations];
     r.msgs = await s.ev('JSON.stringify(window.__msgs)').then((x) => JSON.parse(x || '[]')).catch(() => []);
+    r.temoin = await s.ev(`({ cadres: document.querySelectorAll('iframe').length, href: location.href })`).catch(() => null); // la page tierce a chargé et porte le cadre de Q : la sonde s'est exécutée
     return masquer(r);
   }
 
@@ -243,9 +244,11 @@ await executer(chrome, async (s) => {
       await q.ev(`(() => { const f0 = window.fetch; window.fetch = function (u) { if (String(u) === '/taille') return Promise.resolve(new Response(null, { status: 204 })); return f0.apply(this, arguments); }; })()`); // le premier cadre ne dit plus sa taille : le terminal garde celle de sa création
       await s.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 400, deviceScaleFactor: 1, mobile: false });
       await essai('reconnexion', async () => { await q.naviguer(); await att(INVITE, 'invite après la reconnexion'); });
+      const GRILLE = `document.querySelectorAll('.xterm-rows > div').length`;
+      await stabiliser(() => q.ev(GRILLE).catch(() => -2), { max: 5000 }); // le terminal a pris la grille de l'écran (et dit sa taille) avant la commande
       await essai('taille', async () => { await taper('echo TAI""LLE=$(stty size)x'); await poll(async () => /TAILLE=\d+ \d+x/.test(await lignes()), 'sortie de stty size'); });
       const m = /TAILLE=(\d+) (\d+)x/.exec(await lignes()); r.pty = m ? Number(m[1]) : -1;
-      r.ecran = await q.ev(`document.querySelectorAll('.xterm-rows > div').length`).catch(() => -2);
+      r.ecran = await stabiliser(() => q.ev(GRILLE).catch(() => -2), { max: 5000 });
     } else if (mode === 'arret') {
       await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
       try { process.kill(pidN, 'SIGTERM'); r.tue = true; } catch (e) { r.tue = false; }
@@ -297,7 +300,8 @@ await executer(chrome, async (s) => {
       const shells = () => { const ls = execFileSync('ps', ['-axo', 'pid=,ppid=,args=']).toString().split('\n').map((l) => l.trim().split(/\s+/)); const peres = new Set([String(pidN), ...ls.filter((c) => c[1] === String(pidN) && /vf-cockpit-terminal-processus\.mjs/.test(c.slice(2).join(' '))).map((c) => c[0])]); return ls.filter((c) => peres.has(c[1]) && /vf-cockpit-pty\.py/.test(c.slice(2).join(' '))).length; };
       const popups = async () => (await s.send('Target.getTargets')).targetInfos.filter((t) => t.type === 'page' && t.url.includes('theme=dark')).length;
       await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
-      const refocaliser = async () => { await s.send('Page.bringToFront'); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.ev(`document.querySelector('.xterm-helper-textarea').focus()`); };
+      const refocaliser = async () => { await s.send('Page.bringToFront'); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.ev(`document.querySelector('.xterm-helper-textarea').focus()`);
+        await attendreValeur(() => q.ev(`document.hasFocus() && !!document.activeElement && document.activeElement.classList.contains('xterm-helper-textarea')`).catch(() => false), (v) => v === true, { max: 5000 }); }; // la frappe suivante se perd si le focus du cadre n'est pas posé
       await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
       await s.ev(`window.__msgs = []; addEventListener('message', (e) => window.__msgs.push(String(e.data).slice(0, 40)))`);
       r.avant = { shells: shells() };
@@ -328,7 +332,7 @@ await executer(chrome, async (s) => {
   await essai('amorcage', async () => {
     await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `if (window.top === window) { window.__prets = []; addEventListener('message', (e) => { if (typeof e.data === 'string') window.__prets.push(e.data); }); }` });
     await s.naviguer(`${OP}/project.html#t=${amorce}`);
-    await att(`window.__prets.includes('ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)');
+    await s.attendre(`window.__prets.includes('ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)', process.env.VF_CLIENT_MS ? MS : Math.max(MS, AMORCE)); // amorçage : borné par l'échéance globale (par défaut), sauf VF_CLIENT_MS posée explicitement (mutants à 6 s)
   });
   r.cadre1 = await cadreQ().catch(() => null);
   r.adresse1 = await s.ev('location.href').catch(() => '?');
@@ -341,7 +345,8 @@ await executer(chrome, async (s) => {
       await s.naviguer(`${OP}/project.html#t=${amorce}`);
       await att(`window.__prets.includes('etat:expire') && !location.hash`, 'etat:expire (échange refusé dans le cadre)');
     });
-    r.refus = await cadreQ().then(async (c) => ({ hash: c.fragment, port: new URL(c.url).port, carte: await s.ev(`(document.querySelector('.vf-term-etat') || {}).textContent || ''`) })).catch(() => r.refus);
+    const lireRefus = async () => { const c = await cadreQ(); return { hash: c.fragment, port: new URL(c.url).port, carte: await s.ev(`(document.querySelector('.vf-term-etat') || {}).textContent || ''`) }; };
+    r.refus = (await attendreEtStabiliser(lireRefus, (v) => !!v && v.hash === '' && v.carte.includes('Session expirée'), { max: 8000 })) || r.refus;
     // --- S3 : Q en premier niveau : secret dans son stockage, aucun cookie, terminal vivant ---
     r.secretQ = null; r.cookieQ = '?'; r.invite = false;
     await essai('q-premier-niveau', async () => {
@@ -595,30 +600,30 @@ assert_eq "T9.6 — page tierce (autre port) qui encadre Q : une violation frame
 
 echo "=== M-COOKIE / M-FRAGMENT / M-STOCKAGE / M-PREMIER-NIVEAU / M-SANS-AMORCE / M-ANCETRES — mutants jouées en navigateur ==="
 if mutant cookie vf-cockpit-terminal-client.mjs "s|localStorage.setItem(CLE_SECRET, secret);|localStorage.setItem(CLE_SECRET, secret); document.cookie = 'vfs=' + secret + '; path=/';|"; then
-  run_t6 "$MUT_OUT"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_has "M-COOKIE — le mutant rougit T6.2 : un cookie existe" "$(rj "$T6J" 'j.cookieQ')" "vfs="
 else sans_effet "M-COOKIE"; fi
 if mutant fragment vf-cockpit-terminal-client.mjs "s|history.replaceState(null, '', location.pathname + location.search);||"; then
-  run_t6 "$MUT_OUT"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_eq "M-FRAGMENT — le mutant rougit T6.1b : l'échange refusé laisse #t= dans l'adresse de Q" "$(rj "$T6J" 'j.refus.hash.slice(0,3)')" "#t="
 else sans_effet "M-FRAGMENT"; fi
 if mutant premier vf-cockpit-terminal-client.mjs "s|^    if (!encadree) { vue.carte('horscadre'); return; }||"; then
-  run_t6 "$MUT_OUT"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_eq "M-PREMIER-NIVEAU — le mutant (SAF-1 défait : l'échange refait au premier niveau de Q) rougit T6.9 : un secret est rangé par Q ouvert seul" "$(rj "$T6J" '(j.q1||{}).secret')" "range"
 else sans_effet "M-PREMIER-NIVEAU"; fi
 if mutant sansamorce vf-cockpit-terminal-tiroir.mjs "s|adresse + '#t=' + amorce|adresse|"; then
-  run_t6 "$MUT_OUT"
-  assert_eq "M-SANS-AMORCE — le mutant (l'amorçage n'est plus passé dans l'adresse du cadre de Q) rougit T6.3 : le cadre n'échange rien, aucun secret n'est rangé" "$(rj "$T6J" 'j.secretOk?"oui":"non"')" "non"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
+  assert_eq "M-SANS-AMORCE — le mutant (l'amorçage n'est plus passé dans l'adresse du cadre de Q) rougit T6.3 : le cadre n'échange rien, aucun secret n'est rangé" "$(rj "$T6J" '(j.q1&&j.q1.carte&&j.q1.carte.includes("Terminal indisponible")&&j.cadre1)?(j.secretOk?"oui":"non"):"mutant non jugé (sonde non exécutée)"')" "non"
 else sans_effet "M-SANS-AMORCE"; fi
 if mutant stockage vf-cockpit-terminal-client.mjs "s|location.replace(location.pathname + location.search)|location.replace(location.pathname + '?s=' + secret)|"; then
-  run_t6 "$MUT_OUT"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_has "M-STOCKAGE — le mutant rougit T6.1c : le secret figure dans l'adresse du cadre de Q" "$(rj "$T6J" '(j.cadre1||{}).url')" "?s="
 else sans_effet "M-STOCKAGE"; fi
 if mutant ancetres vf-cockpit-terminal-page.mjs 's|frame-ancestors \${origineP}|frame-ancestors *|'; then
   srv "$MUT_OUT"; TP="$(libre)"; node "$AUX/tierce.mjs" "$TP" "http://127.0.0.1:$QP" & TIERCE_PID=$!; PIDS+=($TIERCE_PID)
   for _ in $(seq 1 50); do rq "$TP" GET / --host "127.0.0.1:$TP" --sans-origin 2>/dev/null | grep -q '^200' && break; sleep 0.1; done
   VF_CLIENT_MS=6000 J="$(navig tierce "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"tierce\":\"http://127.0.0.1:$TP/\"}")"; vf_hyg_stop "$TIERCE_PID"; unsrv
-  assert_eq "M-ANCETRES — le mutant rougit T9.6 : aucune violation frame-ancestors (la page tierce encadre Q)" "$(rj "$J" '(j.violations||[]).some(v=>/frame-ancestors/.test(v))?"oui":"non"')" "non"
+  assert_eq "M-ANCETRES — le mutant rougit T9.6 : aucune violation frame-ancestors (la page tierce encadre Q)" "$(rj "$J" '(j.temoin&&j.temoin.cadres>=1)?((j.violations||[]).some(v=>/frame-ancestors/.test(v))?"oui":"non"):"mutant non jugé (sonde non exécutée)"')" "non"
 else sans_effet "M-ANCETRES"; fi
 
 echo "=== J2 / J12 / S5 / S3 — scénarios sur le serveur réel (secret périmé, serveur arrêté, « Terminé », onBinary, contre-pression) ==="

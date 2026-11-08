@@ -227,7 +227,7 @@ cat > "$AUX/d1.js" <<'JS'
   const debut = mesure();
   for (let i = 0; i < f.steps.length - 1; i++) { const vieux = document.getElementById('fl-next'); vieux.click(); if (!await att(() => !vieux.isConnected && document.getElementById('fl-next'))) return { erreur: 'étape ' + (i + 2) + ' non atteinte' }; }
   const fin = mesure();
-  document.getElementById('fl-x').click(); await pause(200);
+  document.getElementById('fl-x').click(); await att(() => bar().hidden); // la barre se ferme : on attend l'état, plus de délai fixe
   return { etapes: f.steps.length, debut, fin, barreFermee: bar().hidden };
 })()
 JS
@@ -258,7 +258,7 @@ cat > "$AUX/i3.js" <<'JS'
   const a0 = window.__vfLive.applied;
   const marque = new EventSource('/api/vf/events?token=' + encodeURIComponent(window.VF_COCKPIT_SERVER.token)); // un second client : le signal « prêt » que la suite lit sur /api/vf/etat
   if (!await att(() => window.__vfLive.applied > a0 && !vieille.isConnected, 600)) return { erreur: 'patch non appliqué', applied: window.__vfLive.applied };
-  await pause(120);
+  await att(() => document.getAnimations().some((a) => a.animationName === 'flash' && a.effect?.target?.closest?.('#stage, #panel')), 60); // l'animation « flash » (600 ms) est VIVANTE : on relève l'ensemble des animations à cet instant, plus après un délai fixe
   const anims = document.getAnimations().filter((a) => a.animationName && a.effect?.target?.closest?.('#stage, #panel'));
   marque.close();
   return window.__i3 = { avant, apres: { t: tr(), cartes: document.querySelectorAll('#viewport .node .card').length }, entree: anims.filter((a) => ENTREE.test(a.animationName)).map((a) => a.animationName), flash: anims.filter((a) => a.animationName === 'flash').length, autres: anims.filter((a) => !ENTREE.test(a.animationName) && a.animationName !== 'flash').map((a) => a.animationName) };
@@ -272,7 +272,7 @@ cat > "$AUX/lib.js" <<'JS'
   if (!lib) return { erreur: 'aucun nœud de type library' };
   SC.select('n:' + lib.id);
   if (!await att(() => document.querySelector('#panel .kindlabel'))) return { erreur: 'panneau sans libellé de type' };
-  await pause(400);
+  await att(() => /biblioth/i.test((document.querySelector('#panel .kindlabel') || {}).textContent || '')); // la traduction passe après la pose du panneau : on attend le libellé, plus de délai fixe
   const panneau = document.querySelector('#panel .kindlabel').textContent;
   const g = [...document.querySelectorAll('#viewport .node')].find((x) => x.querySelector('.title')?.textContent === lib.label);
   let infobulle = null;

@@ -130,7 +130,7 @@ cat > "$AUX/chrome-lancer-ui.mjs" <<'JS'
 // Chaque mode joue ses étapes isolées par `essai` (la première en échec arrête le mode : la mesure absente est nommée dans `erreurs`, jamais un résultat vide).
 // Gestes par Input.dispatchMouseEvent / Input.dispatchKeyEvent seulement. Toute sonde négative joint son témoin positif (la carte valide rend sa section) dans le MÊME mode.
 import { pathToFileURL } from 'node:url';
-const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, attendreEtStabiliser, positionPosee } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv; const A = JSON.parse(brut);
 const OP = `http://127.0.0.1:${A.P}`, MS = Number(process.env.VF_LU_MS) || 6000, J = JSON.stringify;
 const erreurs = {}; let echec = false;
@@ -158,7 +158,7 @@ await executer(chrome, async (s) => {
   await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
   await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   await s.send('Page.addScriptToEvaluateOnNewDocument', { source: ESPION });
-  const centreDe = (expr) => s.ev(`(() => { const e = ${expr}; if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  const centreDe = async (expr) => { const p = await positionPosee(s.ev, expr); return p ? { x: p.cx, y: p.cy } : null; }; // le geste vise le centre lu une fois l'élément posé (deux lectures égales), pas celui d'une mise en page en mouvement
   const souris = (type, x, y, n = 1) => s.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: n });
   const BTN = (t) => `[...document.querySelectorAll('#panel [data-vf-lancer] button')].find((b) => b.textContent.trim() === ${J(t)})`;
   const clicExpr = async (expr, nom, fois = 1) => { const c = await centreDe(expr); if (!c) throw new Error(`élément absent : ${nom}`); await souris('mouseMoved', c.x, c.y); for (let i = 1; i <= fois; i++) { await souris('mousePressed', c.x, c.y, i); await souris('mouseReleased', c.x, c.y, i); } };
@@ -226,7 +226,8 @@ await executer(chrome, async (s) => {
     await essai('entree', async () => {
       await defaut(); await ouvrir(); await carte('n:ph-72', 'Phase 72'); await s.ev(`document.querySelector('#panel [data-vf-lancer] button.primary').focus()`);
       R.avant = await s.ev('window.__redraws'); await touche('Enter', 'Enter', 13, '\r');
-      await s.stable(`({ r: window.__redraws, p: ${STATUT}.length })`, 'après la touche Entrée'); const j = await jrn();
+      /* le message de la réponse est attendu AVANT de juger la stabilité (une réponse lente ne laisse plus deux lectures égales à vide) */
+      await attendreEtStabiliser(() => s.ev(`({ r: window.__redraws, p: ${STATUT}.length })`), (v) => !!v && v.p > 0, { pas: 250, max: MS }); const j = await jrn();
       R.posts = j.posts.length; R.redessine = (await s.ev('window.__redraws')) - R.avant;
     });
   } else if (mode === 'lu10') {

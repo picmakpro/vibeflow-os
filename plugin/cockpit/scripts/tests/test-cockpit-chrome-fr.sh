@@ -230,7 +230,7 @@ else
   O12="$LAB12/.vibeflow/cockpit"; ln -s "$SCRIPTS" "$WORK/scripts-hote"; rm -f "$O12/.cache/server.json"
   ( cd "$LAB12" && HOME="$WORK/home" VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$WORK/scripts-hote" exec node "$O12/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve12.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
   SRV12=$!; PIDS+=($SRV12)
-  for _ in $(seq 1 100); do grep -q '"port"' "$O12/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
+  for _ in $(seq 1 300); do grep -q '"port"' "$O12/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
   P12="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$O12/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
   assert_eq "F12.0 : serveur du lab jetable démarré" "$([ "$P12" -gt 0 ] && echo oui || echo non)" "oui"
   REAL_HOME="$REAL_HOME" node "$SCRIPTS/tests/chrome-fr-rendu.mjs" "$CHROME" "http://127.0.0.1:$P12/index.html" "http://127.0.0.1:$P12/project.html" > "$WORK/rendu12.json" 2>"$WORK/rendu12.err"

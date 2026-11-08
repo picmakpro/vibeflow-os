@@ -1,6 +1,6 @@
 // chrome-verrou.mjs — recette 68 N2 (P68-D-38) : le tiroir « Au travail » écrit « dépôt » (liste « Verrous tenus »), jamais « depot » (la valeur `tree`/`scope` du flux reste `depot`).
 // Usage : node chrome-verrou.mjs <chrome> <url http de project.html>. Rend { lignes, regle } : les textes des lignes de verrou du tiroir et la ligne d'en-tête du verrou (même âge, P68-D-39).
-import { executer } from './chrome-session.mjs';
+import { executer, attendreEtStabiliser } from './chrome-session.mjs';
 const [, , chrome, url] = process.argv;
 const INJ = `(() => { const R = window.EventSource; window.__es = []; window.EventSource = class extends R {
   constructor(u, o) { super(u, o); this.__l = {}; window.__es.push(this); }
@@ -15,5 +15,7 @@ await executer(chrome, async (s) => {
   await s.ev(`window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('lock', { seq: 9001, at: Date.now(), lock: { present: true, locks: [{ present: true, owner: 'L1', step: 'x', scope: 'depot', age_seconds: 3, lease_seconds: 57 }] } })`);
   await s.ev("document.querySelector('#vf-lock').click()");
   await s.attendre("!!document.querySelector('.vf-whop .r-verr li')", 'ligne de verrou');
-  return { lignes: await s.ev("[...document.querySelectorAll('.vf-whop .r-verr li')].map((e) => [...e.children].map((c) => c.textContent.trim()).join(' · ').slice(0, 80))"), regle: await s.ev("document.querySelector('.vf-whop .aw-driver').textContent.trim()") };
+  // la ligne peut se dessiner depuis `who` (âge figé à 1 s) avant que le flux `lock` n'y pose les 57 s : on attend l'âge du verrou, puis une lecture stable
+  const lire = () => s.ev("({ lignes: [...document.querySelectorAll('.vf-whop .r-verr li')].map((e) => [...e.children].map((c) => c.textContent.trim()).join(' · ').slice(0, 80)), regle: (document.querySelector('.vf-whop .aw-driver') || { textContent: '' }).textContent.trim() })");
+  return await attendreEtStabiliser(lire, (v) => v && /57 s/.test(v.regle) && v.lignes.length > 0 && !/(^|[^0-9])1 s/.test(String(v.lignes[0])), { pas: 150, max: 8000 });
 }, { csp: true });

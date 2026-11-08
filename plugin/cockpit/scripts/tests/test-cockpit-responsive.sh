@@ -354,18 +354,19 @@ unsrv
 # est de 152 px et son invite devient « Chercher… » ; partout ailleurs (1 280 px et plus, ou lab sans Git) les 200 px et l'invite d'origine restent EXIGÉS, à l'identique de R1.
 echo "=== D39 — plancher de la recherche : 152 px de 1 000 à 1 279 px avec Git, 200 px partout ailleurs et sans Git ==="
 EXPR39='(() => { const hc = document.querySelector("header .hc"), sb = document.querySelector("#search-btn"), st = sb.querySelector(".st"); return { git: !!document.querySelector("#vf-git-ouvreur"), plancher: getComputedStyle(hc).minWidth, recherche: Math.round(sb.getBoundingClientRect().width), invite: getComputedStyle(sb, "::after").content, stVisible: getComputedStyle(st).display !== "none", texte: st.textContent }; })()'
-mes39() { CDP_VIEWPORT="$2x800" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 600 "$EXPR39" "http://127.0.0.1:$1/index.html"; } # mes39 <port> <largeur>
+# mes39 <port> <largeur> [git] : avec « git » (lab AVEC Git) la page n'est prête qu'une fois l'ouvreur posé (il vient d'un fetch asynchrone : plancher 152 px, invite courte) ; SANS Git on prouve son ABSENCE, seule la durée (600 ms + deux relevés égaux) l'établit
+mes39() { local pret=""; [ "${3:-}" = git ] && pret="document.readyState === 'complete' && !!document.querySelector('header .brand .mark') && document.querySelector('header .brand .mark').naturalWidth > 0 && !!document.querySelector('#vf-git-ouvreur')"; CDP_PRET="$pret" CDP_VIEWPORT="$2x800" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 600 "$EXPR39" "http://127.0.0.1:$1/index.html"; }
 v39() { printf '%s' "$1" | node "$AUX/ev.mjs" "$2"; }
 srv "$LC/.vibeflow/cockpit"; P39g=$SRV_PORT; PID39g=$SRV_PID
 srv "$LS/.vibeflow/cockpit"; P39s=$SRV_PORT; PID39s=$SRV_PID
 for w in 1000 1024 1279; do
-  X="$(mes39 $P39g $w)"
+  X="$(mes39 $P39g $w git)"
   assert_eq "D39.1 — avec Git / $w px : l'ouvreur est posé et le plancher de la recherche est 152 px" "$(v39 "$X" 'j.resultats[0].valeur.git + "/" + j.resultats[0].valeur.plancher')" "true/152px"
   assert_eq "D39.2 — avec Git / $w px : l'invite courte « Chercher… » remplace l'invite d'origine" "$(v39 "$X" '(j.resultats[0].valeur.invite) + "/" + j.resultats[0].valeur.stVisible')" '"Chercher…"/false'
   assert_eq "D39.3 — avec Git / $w px : la recherche garde au moins 152 px" "$(v39 "$X" 'j.resultats[0].valeur.recherche >= 152')" "true"
 done
 for w in 1280 1440; do
-  X="$(mes39 $P39g $w)"
+  X="$(mes39 $P39g $w git)"
   assert_eq "D39.4 — avec Git / $w px : plancher de 200 px, invite d'origine" "$(v39 "$X" 'j.resultats[0].valeur.plancher + "/" + j.resultats[0].valeur.invite + "/" + j.resultats[0].valeur.stVisible')" "200px/none/true"
   assert_eq "D39.4b — avec Git / $w px : la recherche garde au moins 200 px" "$(v39 "$X" 'j.resultats[0].valeur.recherche >= 200')" "true"
 done
@@ -386,18 +387,19 @@ done
 SRV_PID=$PID39g; unsrv; SRV_PID=$PID39s; unsrv
 # D39.7 (78-10, revue de delta F6a) : Git présent (152 px, invite courte), puis un signal dont la relecture de l'en-tête rend « absent » : le drapeau tombe, le plancher de 200 px et l'invite d'origine reviennent.
 cat > "$AUX/d39-absent.mjs" <<JS
-import { executer, pause } from '$HERE_T/chrome-session.mjs';
+import { executer, stabiliser, attendreValeur } from '$HERE_T/chrome-session.mjs';
 const [, , chrome, url] = process.argv;
 const PRET = "document.readyState === 'complete' && !!document.querySelector('header .brand .mark') && document.querySelector('header .brand .mark').naturalWidth > 0 && !!document.querySelector('#vf-git-ouvreur')";
 await executer(chrome, async (s) => {
   await s.send('Emulation.setDeviceMetricsOverride', { width: 1024, height: 800, deviceScaleFactor: 1, mobile: false });
-  await s.naviguer(url); await s.attendre(PRET, 'page prête avec Git'); await pause(300);
+  await s.naviguer(url); await s.attendre(PRET, 'page prête avec Git');
   const mes = () => s.ev("(() => { const hc = document.querySelector('header .hc'), sb = document.querySelector('#search-btn'); return { drapeau: document.querySelector('header').hasAttribute('data-vf-git'), plancher: getComputedStyle(hc).minWidth, invite: getComputedStyle(sb, '::after').content, stVisible: getComputedStyle(sb.querySelector('.st')).display !== 'none' }; })()");
-  const out = { avant: await mes() };
+  const out = { avant: await stabiliser(mes) }; // l'état de départ est posé (deux relevés identiques) avant de le juger
   await s.ev("(() => { const f0 = window.fetch.bind(window); window.fetch = (u, i) => /\\\\/api\\\\/vf\\\\/git\\\\/entete/.test(typeof u === 'string' ? u : u.url) ? Promise.resolve(new Response(JSON.stringify({ schema: 'vibeflow/cockpit-git-entete@1', etat: 'absent', depot: 'x', branche: null, worktree: null, detache: false, sha7: null }), { status: 200, headers: { 'content-type': 'application/json' } })) : f0(u, i); document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'x' } })); })()");
-  await pause(600);
-  out.apres = await mes();
-  out.ouvreurCache = await s.ev("document.querySelector('#vf-git-ouvreur').hidden && document.querySelector('#vf-git-ligne').hidden");
+  // la relecture de l'en-tête arrive dans une tâche suivante : on attend que le drapeau soit retiré (borné : le mutant D39m3 le garde, la dernière lecture est alors jugée), puis l'état posé
+  await attendreValeur(mes, (v) => v.drapeau === false, { max: 6000 });
+  out.apres = await stabiliser(mes);
+  out.ouvreurCache = await attendreValeur(() => s.ev("document.querySelector('#vf-git-ouvreur').hidden && document.querySelector('#vf-git-ligne').hidden"), (v) => v === true, { max: 3000 });
   return out;
 }, { csp: true });
 JS
@@ -422,7 +424,7 @@ if mut39 "$LC" "$WORK/lab-mut39b" '(max-width: 1279px) and (not (pointer: coarse
       header[data-vf-git] .hc' '(max-width: 1280px) and (not (pointer: coarse)) {
       header[data-vf-git] .hc'; then
   git -C "$WORK/lab-mut39b" init -q -b main # la page relit l'en-tête au chargement : la copie du lab doit rester un dépôt, sinon « absent » retire le drapeau avant la mesure
-  srv "$WORK/lab-mut39b/.vibeflow/cockpit"; X="$(mes39 $SRV_PORT 1280)"; unsrv
+  srv "$WORK/lab-mut39b/.vibeflow/cockpit"; X="$(mes39 $SRV_PORT 1280 git)"; unsrv
   assert_eq "D39m2a — mutant « plancher de 152 px aussi à 1 280 px » : le plancher mesuré à 1 280 px est 152 px" "$(v39 "$X" 'j.resultats[0].valeur.plancher')" "152px"
   assert_eq "D39m2 — le même mutant : le témoin D39.4 (avec Git, 1 280 px) rougit" "$([ "$(v39 "$X" 'j.resultats[0].valeur.plancher + "/" + j.resultats[0].valeur.invite + "/" + j.resultats[0].valeur.stVisible')" != "200px/none/true" ] && echo rouge || echo vert)" "rouge"
 else FAIL=$((FAIL+1)); echo "  ❌ FAIL — D39m2 : mutant non construit"; fi
@@ -677,13 +679,14 @@ fi
 echo "=== R24 — coque étroite : menu « ⋯ » dès 999 px, icônes, légende, fil d'Ariane, nom du dépôt ==="
 LV="$WORK/vibeflow-os"; mkdir -p "$LV/scripts"; for f in vf-cockpit-git vf-cockpit-server vf-cockpit-paths; do printf 'export const x = 1;\n' > "$LV/scripts/$f.mjs"; done; mklab "$LV" sans-agent
 srv "$LV/.vibeflow/cockpit"; P_v=$SRV_PORT; PID_v=$SRV_PID
-cdpv() { CDP_VIEWPORT="$1" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1200 "$2" "http://127.0.0.1:$P_v/index.html"; } # cdpv <LxH> <expression>
+PRET_OUVREUR="document.readyState === 'complete' && !!document.querySelector('header .brand .mark') && document.querySelector('header .brand .mark').naturalWidth > 0 && !!document.querySelector('#vf-git-ouvreur')" # l'ouvreur Git (fetch asynchrone) est posé : le lab de R24 est un dépôt
+cdpv() { CDP_PRET="${3:-}" CDP_VIEWPORT="$1" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1200 "$2" "http://127.0.0.1:$P_v/index.html"; } # cdpv <LxH> <expression> [<CDP_PRET>]
 EV24='const vis = (e) => !!e && e.getBoundingClientRect().width > 0 && getComputedStyle(e).display !== "none"; const p = (ms) => new Promise((r) => setTimeout(r, ms));'
 X_MENU="(async () => { $EV24 await p(600); const ids = ['theme-toggle', 'btn-health', 'tour-btn', 'btn-export', 'flows-btn', 'filters-btn'].filter((i) => document.getElementById(i)); return { n: ids.length, hors: ids.filter((i) => !vis(document.getElementById(i))).length, plus: vis(document.getElementById('vf-plus')), ouvreur: vis(document.getElementById('vf-git-ouvreur')), detail: vis(document.getElementById('btn-panel')) }; })()"
 X_OUVERT="(async () => { $EV24 await p(600); document.documentElement.setAttribute('data-theme', 'dark'); const sa = document.getElementById('btn-health'); if (sa && !sa.querySelector('.badge')) { const c = document.createElement('span'); c.className = 'badge'; c.textContent = '4'; sa.appendChild(c); await p(400); } if (!document.getElementById('vf-plus-menu')) { document.getElementById('vf-plus').click(); await p(300); } const m = document.getElementById('vf-plus-menu'), l = [...m.querySelectorAll('.vf-pl-i')], v = document.getElementById('vf-plus-voile'); return { lignes: l.length, sansIcone: l.filter((b) => !b.querySelector('svg.vf-pl-ic')).length, fond: getComputedStyle(m).backgroundColor, image: getComputedStyle(m).backgroundImage.slice(0, 15), voile: !!v && getComputedStyle(v).backgroundColor !== 'rgba(0, 0, 0, 0)', legende: (m.querySelector('.vf-pl-etat') || {}).textContent || '', pastille: document.getElementById('vf-plus').getAttribute('aria-label') }; })()"
 X_FIL="(async () => { $EV24 await p(600); if (document.querySelector('#crumbs button') && !document.getElementById('btn-up').offsetWidth) { window.VibeFlow.go('n:d-scripts'); } await p(900); const b = document.querySelector('#crumbs button.cur'), n = document.getElementById('proj-name'); return { texte: b ? b.textContent.trim() : '', large: b ? Math.round(b.getBoundingClientRect().width) : 0, rogne: b ? b.scrollWidth > b.clientWidth + 1 : null, haut: vis(document.getElementById('btn-up')), nomRogne: n && n.getBoundingClientRect().width > 0 ? n.scrollWidth > n.clientWidth + 1 : null, racine: !!document.querySelector('#crumbs [data-vf-racine]:not([data-vf-masque])') }; })()"
 X_RACINE="(async () => { $EV24 await p(600); const n = document.getElementById('proj-name'), r = document.querySelector('#crumbs [data-vf-racine]'); return { nomRogne: n.scrollWidth > n.clientWidth + 1, nom: n.textContent, racine: r ? { court: r.getAttribute('data-vf-racine'), nomAccessible: r.getAttribute('aria-label'), masque: r.hasAttribute('data-vf-masque') } : null }; })()"
-for w in 701x800 800x600 999x800 1000x800; do eval "R241_${w%%x*}=\"\$(cdpv $w \"\$X_MENU\")\""; done
+for w in 701x800 800x600 999x800 1000x800; do eval "R241_${w%%x*}=\"\$(cdpv $w \"\$X_MENU\" \"\$PRET_OUVREUR\")\""; done
 R242="$(cdpv 800x600 "$X_OUVERT")"; R242b="$(cdpv 390x844 "$X_OUVERT")"
 R244a="$(cdpv 1000x800 "$X_FIL")"; R244b="$(cdpv 844x390 "$X_FIL")"; R245a="$(cdpv 1000x800 "$X_RACINE")"; R245b="$(cdpv 1279x800 "$X_RACINE")"
 SRV_PID=$PID_v; unsrv

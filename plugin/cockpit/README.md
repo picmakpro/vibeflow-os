@@ -158,8 +158,8 @@ et `test-cockpit-chaine-xss.sh` (volet git C0g à C4g : un nom de branche, un me
   Échap ou un tap dans le vide referment. Preuve : `test-cockpit-responsive.sh` (R13 à R16 ; R17 à R20 pour l'onglet Équipe, dont le zoom
   passe en bas à gauche dès 701 px).
 - **Visite « Par où commencer »** : sur Code comme sur Projet (jalon, phase, mission et « au travail » sur Projet), chaque étape vise un
-  élément, le texte est entier, « Passer » est toujours là, la visite éclaire une carte sans la sélectionner. Preuve : `test-cockpit-projet.sh`
-  (O5 pour Code, O6 pour Projet).
+  élément, le texte est entier, « Passer » est toujours là, la visite éclaire une carte sans la sélectionner. Preuve : `test-cockpit-projet-visite.sh`
+  (O5 pour Code, O6 pour Projet ; le contenu de la visite Projet lu sans navigateur, O6.1 à O6.8, est dans `test-cockpit-projet-graphe.sh`).
 
 ## Équipe au travail
 

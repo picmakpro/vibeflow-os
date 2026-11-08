@@ -171,7 +171,7 @@ const autres = () => J.journal.filter((r) => r.u !== '/proposition' && r.u !== '
 
 const SCEN = {
   async precoce() { // LB.C1
-    S.hold = true; demarrer(); await att(500);
+    S.hold = true; demarrer(); await souple(() => nProp() >= 1, 3000); await att(500);
     const r = J.journal.filter((x) => x.u === '/proposition'), h = (r[0] || { h: {} }).h;
     return { premiere: (J.journal[0] || {}).u, n: r.length, secret: h['X-VF-Terminal'], onglet: /^[0-9a-f]{32}$/.test(h['X-VF-Onglet'] || ''), periode: J.periodes[0], periodes: J.periodes.length };
   },
@@ -244,7 +244,7 @@ const SCEN = {
     return f;
   },
   async focus() { // LB.C5 : aucun octet au PTY après un lancement accepté, le terminal reprend le focus
-    demarrer(); const v = await afficher(ID_A); const f0 = J.focus; S.lancer = 204; const st = await v.cb.lancer('default'); S.prop = AUCUNE; await att(1500);
+    demarrer(); const v = await afficher(ID_A); const f0 = J.focus; S.lancer = 204; const st = await v.cb.lancer('default'); S.prop = AUCUNE; await att(1500); await souple(() => J.focus - f0 >= 1, 3000);
     return { st, entrees: J.journal.filter((r) => r.u === '/entree').length, focus: J.focus - f0 };
   },
   async annuler() { // LB.C6
@@ -340,12 +340,15 @@ cat > "$AUX/chrome-bandeau.mjs" <<'JS'
 // chrome-bandeau.mjs <chrome> <mode> <json> : scénarios navigateur du bandeau de proposition ; UNE ligne JSON. Modes : vue (LB.V) · client (LB.E1 à E7) · froid (LB.E8).
 // Q factice dans un cadre sandbox de P factice, plein viewport (ou de taille nulle), secret posé dans le stockage de Q ; gestes par Input.dispatchMouseEvent seulement.
 // Chaque étape est isolée (essai) : une mesure indisponible est nommée dans `erreurs`, jamais un résultat vide.
+// Bornes d'attente : les plafonds d'attente POSITIVE sont à MS (20 s par défaut) : sur un produit cassé, N essais perdus × 20 s peuvent dépasser l'échéance globale de la session (VF_CDP_GLOBAL_MS, 600 s) ;
+// la sonde est alors interrompue (la suite voit un scénario sans résultat). Le diagnostic se lit par cas perdu (`erreurs`, « attente de … dépassée »), pas sur la durée. Une borne qui EST l'objet d'une assertion ne se relève jamais.
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs';
-const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee, AMORCE } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const { valide, ID_A, ID, NOTE, MOTIFS, INCONNU, MSG, ligne } = await import(pathToFileURL(process.env.LB_DONNEES).href);
 const [, , chrome, mode, brut] = process.argv;
 const { P, Q, secret, run, only = null, emu = false, codes = [] } = JSON.parse(brut);
 const OP = `http://127.0.0.1:${P}`, OQ = `http://127.0.0.1:${Q}`, MS = Number(process.env.VF_CLIENT_MS) || 20000;
+const AM = process.env.VF_CLIENT_MS ? MS : Math.max(MS, AMORCE); // première attente après l'ouverture de Chrome (amorçage à froid, CI PR #219) : bornée par AMORCE ; un VF_CLIENT_MS posé (mutants) la ramène à MS
 const LISTE = ['ready', 'etat:connecte', 'etat:reconnexion', 'etat:termine', 'etat:refuse', 'etat:expire', 'etat:arrete', 'toggle'];
 const erreurs = {};
 const essai = async (nom, f) => { if (only && !only.includes(nom)) return; try { return await f(); } catch (e) { erreurs[nom] = String(e.message).slice(0, 160); return undefined; } };
@@ -359,8 +362,8 @@ const mondeQ = async (s, etendue = 600) => {
   }
   return trouve;
 };
-const trouverCtx = async (s) => {
-  const fin = Date.now() + MS; let essais = 0; ctx = 0;
+const trouverCtx = async (s, borne = MS) => {
+  const fin = Date.now() + borne; let essais = 0; ctx = 0;
   while (!ctx) { ctx = await mondeQ(s, 600 * 5 ** Math.min(essais++, 3)); if (!ctx) { if (Date.now() > fin) throw new Error('contexte du cadre de Q introuvable'); await pause(150); } }
 };
 const facadeQ = (s) => {
@@ -371,14 +374,15 @@ const facadeQ = (s) => {
     throw new Error(`attente de « ${nom} » dépassée (${ms} ms)`);
   };
   // naviguer(url, taille) : secret posé dans le stockage de Q (premier niveau), puis Q dans un cadre sandbox de P ; taille 'nulle' = cadre masqué (tiroir jamais ouvert)
+  let froid = true; // la première navigation d'un Chrome est l'amorçage à froid : ses attentes sont bornées par AM
   const naviguer = async (url = `${OQ}/?theme=dark`, taille = 'plein') => {
-    ctx = 0;
+    const lim = froid ? AM : MS; froid = false; ctx = 0;
     await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', ${JSON.stringify(secret)})`);
-    await s.naviguer(`${OP}/project.html`); await s.attendre(`document.readyState === 'complete'`, 'page P', MS);
+    await s.naviguer(`${OP}/project.html`); await s.attendre(`document.readyState === 'complete'`, 'page P', lim);
     const dim = taille === 'nulle' ? 'width:0;height:0' : 'width:100vw;height:100vh';
     await s.ev(`(() => { const f = document.createElement('iframe'); f.dataset.t = '1'; f.setAttribute('sandbox', ${JSON.stringify(SBXQ)}); f.style.cssText = 'position:fixed;left:0;top:0;${dim};border:0;z-index:99999'; f.src = ${JSON.stringify(url)}; document.body.appendChild(f); })()`);
-    await trouverCtx(s);
-    if (taille !== 'nulle') await attendre(`!!document.querySelector('.xterm-helper-textarea')`, 'terminal dans le cadre');
+    await trouverCtx(s, lim);
+    if (taille !== 'nulle') await attendre(`!!document.querySelector('.xterm-helper-textarea')`, 'terminal dans le cadre', lim);
   };
   const recharger = async (url) => { ctx = 0; await s.ev(`document.querySelector('iframe[data-t]').src = ${JSON.stringify(url)}`); await pause(300); await trouverCtx(s); await attendre(`!!document.querySelector('.xterm-helper-textarea')`, 'terminal après rechargement'); };
   return { ev, attendre, naviguer, recharger };
@@ -391,8 +395,7 @@ const retours = () => { try { return (fs.readFileSync(`${run}/entree.log`, 'utf8
 await executer(chrome, async (s) => {
   const q = facadeQ(s), r = { erreurs }; let vu = false; // vu : le bandeau s'est affiché au moins une fois (témoin positif des sondes négatives E4 et E7)
   await s.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
-  const lireCentre = (expr) => q.ev(`(() => { const e = ${expr}; if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
-  const centre = async (expr) => { let c = await lireCentre(expr); for (const fin = Date.now() + 2000; c && Date.now() < fin;) { await new Promise((r) => setTimeout(r, 120)); const c2 = await lireCentre(expr); if (c2 && c2.x === c.x && c2.y === c.y) break; c = c2; } return c; }; // la position se lit une fois posée : un bandeau qui vient de monter bouge encore (défilement, accueil retiré) et un geste visé trop tôt tombe à côté (LB.V15 c, CI Linux, run 42392202936)
+  const centre = async (expr) => { const p = await positionPosee(q.ev, expr); return p && { x: p.cx, y: p.cy }; }; // la position se lit une fois posée (deux rects égaux, aide commune) : un bandeau qui vient de monter bouge encore (défilement, accueil retiré) et un geste visé trop tôt tombe à côté (LB.V15 c, CI Linux, run 42392202936)
   const clic = async (expr) => {
     const c = await centre(expr); if (!c) throw new Error('élément introuvable : ' + expr.slice(0, 60));
     await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c.x, y: c.y });
@@ -402,7 +405,7 @@ await executer(chrome, async (s) => {
   const LANCER = `document.getElementById('proposition-lancer')`, SEL = `document.getElementById('proposition-mode')`;
   const ANNULER = `[...document.querySelectorAll('#proposition button')].find((b) => b.textContent === 'Annuler')`;
   const arme = () => q.ev(`(${LANCER} || { getAttribute: () => null }).getAttribute('aria-disabled')`);
-  const attendreArme = (ms = 4000) => q.attendre(`${LANCER}.getAttribute('aria-disabled') === 'false'`, 'armement du bouton Lancer', ms);
+  const attendreArme = (ms = MS) => q.attendre(`${LANCER}.getAttribute('aria-disabled') === 'false'`, 'armement du bouton Lancer', ms);
   const choisir = (m) => q.ev(`(() => { const e = ${SEL}; e.value = ${JSON.stringify(m)}; e.dispatchEvent(new Event('change', { bubbles: true })); return e.value; })()`);
 
   if (mode === 'vue') {
@@ -432,7 +435,7 @@ await executer(chrome, async (s) => {
     await essai('v2', async () => { // pré-vols : bloquants, avertissements, code inconnu
       await monter({ id: ID(21), arme_apres_ms: 400, bloquants: ['phase-finie', 'terminal-absent'] }); await pause(900);
       const b = await q.ev(`({ bloq: [...document.querySelectorAll('#proposition .vf-q-erreur-texte')].map((e) => e.textContent).join('|'), arme: ${LANCER}.getAttribute('aria-disabled') })`);
-      await monter({ id: ID(22), arme_apres_ms: 400, avertissements: ['dependance-non-close'] }); await attendreArme(3000);
+      await monter({ id: ID(22), arme_apres_ms: 400, avertissements: ['dependance-non-close'] }); await attendreArme(MS);
       const a = await q.ev(`[...document.querySelectorAll('#proposition .vf-q-attention-texte')].map((e) => e.textContent).join('|')`);
       await monter({ id: ID(23), arme_apres_ms: 400, bloquants: ['zz-inconnu'], avertissements: ['yy-inconnu'] });
       const u = await q.ev(`document.getElementById('proposition').textContent`);
@@ -449,9 +452,9 @@ await executer(chrome, async (s) => {
       await raz();
     });
     await essai('v4', async () => { // clic non fiable ignoré même armé, puis le clic de confiance part (témoin)
-      await raz(); await monter({ id: ID(41), arme_apres_ms: 400 }); await attendreArme(3000);
+      await raz(); await monter({ id: ID(41), arme_apres_ms: 400 }); await attendreArme(MS);
       await q.ev(`${LANCER}.click()`); await pause(200); const a0 = await q.ev('__T.appels.length');
-      await clic(LANCER); await pause(200); r.v4 = `${a0}/${await q.ev('__T.appels.length')}`;
+      await clic(LANCER); r.v4 = `${a0}/${await attendreEtStabiliser(() => q.ev('__T.appels.length'), (n) => n >= 1, { pas: 200 })}`; // l'appel de confiance se lit une fois parti, puis stable (un second appel se verrait)
       await raz();
     });
     await essai('v5', async () => { // textes hostiles : littéraux, aucun nœud créé, aucune exécution, aucun style, aucune violation de CSP
@@ -476,16 +479,17 @@ await executer(chrome, async (s) => {
         : st === 'attendre' ? f.present && f.msg === MSG.attendre && f.arme === 'true' && f.rearme === true : f.present && f.msg === MSG[st] && f.arme === 'false';
       const sortie = []; let k = 70;
       for (const st of ['ok', 'attendre', 'occupe', 'sans-session', 'refus', 'reseau', 'absente']) {
-        await raz(); await monter({ id: ID(++k), arme_apres_ms: 400 }); await attendreArme(3000); await clic(LANCER);
-        await q.attendre('__T.appels.length === 1', 'appel de lancer', 3000); await q.ev(`__T.resolve(${JSON.stringify(st)})`); await pause(150);
-        const f = await q.ev(`(() => { const b = document.getElementById('proposition'); return b ? { present: true, msg: document.getElementById('proposition-message').textContent, arme: ${LANCER}.getAttribute('aria-disabled') } : { present: false }; })()`);
-        if (st === 'attendre') f.rearme = await attendreArme(3000).then(() => true, () => false);
+        await raz(); await monter({ id: ID(++k), arme_apres_ms: 400 }); await attendreArme(MS); await clic(LANCER);
+        await q.attendre('__T.appels.length === 1', 'appel de lancer', MS); await q.ev(`__T.resolve(${JSON.stringify(st)})`);
+        const f = await attendreValeur(() => q.ev(`(() => { const b = document.getElementById('proposition'); return b ? { present: true, msg: document.getElementById('proposition-message').textContent, arme: ${LANCER}.getAttribute('aria-disabled') } : { present: false }; })()`),
+          (x) => (st === 'ok' || st === 'absente') ? x.present === false : x.present && x.msg === MSG[st] && x.arme === (st === 'attendre' ? 'true' : 'false')); // le statut se rend après la résolution de la promesse : on lit l'état une fois posé
+        if (st === 'attendre') f.rearme = await attendreArme(MS).then(() => true, () => false);
         sortie.push(`${st}=${attendu(st, f) ? 'ok' : 'KO ' + JSON.stringify(f)}`);
       }
       r.v7 = sortie.join(';'); await raz();
     });
     await essai('v8', async () => { // retrait sans exception tardive, remplacement, focus au premier affichage seulement (F1 : Annuler ne prend le focus que si le cadre de Q l'a déjà : le cadre est focalisé ici)
-      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.ev(`document.body.focus()`);
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.ev(`document.body.focus()`); await q.attendre(`document.hasFocus()`, 'focus du cadre de Q'); // la vue ne prend le focus que si le cadre l'a (hasFocus au montage)
       await raz(); await monter({ id: ID(81), arme_apres_ms: 500 });
       await q.ev(`window.__vieux = ${LANCER}; vfTermVue.proposition(null); true`); await pause(900);
       const f1 = await q.ev(`({ present: !!document.getElementById('proposition'), vieux: __vieux.getAttribute('aria-disabled'), erreurs: __erreurs.length })`);
@@ -542,8 +546,8 @@ await executer(chrome, async (s) => {
       const e1 = await q.ev(`(() => { const b = document.getElementById('proposition'); return b.querySelector('.vf-q-texte').textContent + '|' + [...b.querySelectorAll('button')].map((x) => x.textContent).join(',') + '|' + !!document.getElementById('proposition-lancer') + '|' + document.getElementById('annonce').textContent; })()`);
       await q.ev(`(() => { vfTermVue.proposition(null); return true; })()`); await pause(200);
       const reste = await q.ev(`!!document.getElementById('proposition')`);
-      await clic(`[...document.querySelectorAll('#proposition button')].find((b) => b.textContent === 'Fermer')`); await pause(200);
-      const ferme = await q.ev(`!document.getElementById('proposition')`);
+      await clic(`[...document.querySelectorAll('#proposition button')].find((b) => b.textContent === 'Fermer')`);
+      const ferme = await attendreValeur(() => q.ev(`!document.getElementById('proposition')`), (v) => v === true);
       await monter({ id: ID(132), expire_ms: 2000 }); await q.ev(`(() => { vfTermVue.proposition(null); return true; })()`);
       const proche = await q.ev(`(document.getElementById('proposition') || { getAttribute: () => 'absent' }).getAttribute('data-etat')`);
       await raz(); await monter({ id: ID(133), expire_ms: 100000 }); await q.ev(`(() => { vfTermVue.proposition(null); return true; })()`);
@@ -556,7 +560,7 @@ await executer(chrome, async (s) => {
         return [!!(b.compareDocumentPosition(t) & F), !!(a.compareDocumentPosition(b) & F), a.getAttribute('role'), a.getAttribute('aria-live'), a.textContent.startsWith('Lancement proposé')].join('/'); })()`); await raz();
     });
     await essai('v15', async () => { // LB2 (PU-G-119) : un bandeau manipulé (sélecteur focalisé ET touche tapée il y a moins de 3 s, ou bouton de souris enfoncé dans le bandeau) n'est jamais remplacé ; un focus posé SANS geste ne protège rien ; libre, il est remplacé
-      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }); await s.ev(`document.querySelector('iframe[data-t]').focus()`);
+      await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.attendre(`document.hasFocus()`, 'focus du cadre de Q');
       await pause(3200); // un geste d'une étape précédente ne doit plus compter
       await raz(); await monter({ id: ID(150) });
       const nouvelle = (id) => q.ev(`(() => { const x = vfTermVue.proposition(Object.assign({}, __base, { id: ${JSON.stringify(id)}, modeInitial: 'default' }), __cb); return String(x) + ':' + document.getElementById('proposition').dataset.id; })()`);
@@ -575,19 +579,20 @@ await executer(chrome, async (s) => {
       r.v15 = [z === `undefined:${ID(149)}`, a === `false:${ID(149)}`, b === `undefined:${ID(151)}`, c === `false:${ID(151)}`, d === `undefined:${ID(152)}`].join('/'); await raz();
     });
     await essai('v16', async () => { // LB3 (PU-G-136) : cadre bas (124 px, le plus petit tiroir) : la proposition prend sa place SOUS le terminal au lieu de le recouvrir ; retirée, le terminal reprend toute la hauteur
-      await s.ev(`document.querySelector('iframe[data-t]').style.height = '124px'`); await pause(400);
-      await raz(); await monter({ id: ID(160) }); await pause(400);
-      r.v16 = await q.ev(`(() => { const t = document.getElementById('terminal').getBoundingClientRect(), b = document.getElementById('proposition').getBoundingClientRect(), H = innerHeight; return [H, t.height >= 24, t.bottom <= b.top + 0.5, b.height <= H * 0.6 + 1, b.bottom <= H].join('/'); })()`);
-      await raz(); await pause(400);
-      r.v16 += '/' + (await q.ev(`document.getElementById('terminal').getBoundingClientRect().height >= 120`));
+      await s.ev(`document.querySelector('iframe[data-t]').style.height = '124px'`);
+      await raz(); await monter({ id: ID(160) });
+      r.v16 = await attendreEtStabiliser(() => q.ev(`(() => { const t = document.getElementById('terminal').getBoundingClientRect(), b = document.getElementById('proposition').getBoundingClientRect(), H = innerHeight; return [H, t.height >= 24, t.bottom <= b.top + 0.5, b.height <= H * 0.6 + 1, b.bottom <= H].join('/'); })()`), (v) => typeof v === 'string' && v.startsWith('124/') && !v.includes('false'), { max: 4000 }); // la géométrie se juge une fois posée (redimensionnement du cadre, fit du terminal)
+      await raz();
+      r.v16 += '/' + (await attendreValeur(() => q.ev(`document.getElementById('terminal').getBoundingClientRect().height >= 120`), (v) => v === true, { max: 4000 }));
       await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
     });
     await essai('v17', async () => { // LB3 (PU-G-141 ; Q14) : la carte reste entière dans un cadre bas (marge de 8 px, sans défilement) ; « Copier la commande » copie EXACTEMENT la commande affichée, annonce le résultat ; aucun bouton de copie sur une proposition de lancement
-      await s.ev(`document.querySelector('iframe[data-t]').style.height = '124px'`); await pause(400);
-      await q.ev(`(() => { vfTermVue.carte('arrete'); window.__copie = null; document.addEventListener('copy', () => { window.__copie = String(getSelection()); }, true); return true; })()`); await pause(300);
-      const geo = await q.ev(`(() => { const k = document.querySelector('.vf-q-carte'), b = k.getBoundingClientRect(), H = innerHeight; return [b.top >= 7.5, b.bottom <= H - 7.5, k.scrollHeight <= k.clientHeight + 1].join('/'); })()`);
-      await clic(`[...document.querySelectorAll('.vf-q-carte button')].find((x) => x.textContent === 'Copier la commande')`); await pause(300);
-      const ap = await q.ev(`({ copie: window.__copie, affichee: document.querySelector('.vf-q-commande').textContent, bouton: [...document.querySelectorAll('.vf-q-carte button')].map((x) => x.textContent).join(','), annonce: document.getElementById('annonce').textContent })`);
+      await s.ev(`document.querySelector('iframe[data-t]').style.height = '124px'`);
+      await q.ev(`(() => { vfTermVue.carte('arrete'); window.__copie = null; document.addEventListener('copy', () => { window.__copie = String(getSelection()); }, true); return true; })()`);
+      const geo = (await attendreEtStabiliser(() => q.ev(`(() => { const k = document.querySelector('.vf-q-carte'), b = k.getBoundingClientRect(), H = innerHeight; return { H, g: [b.top >= 7.5, b.bottom <= H - 7.5, k.scrollHeight <= k.clientHeight + 1].join('/') }; })()`), (v) => !!v && v.H === 124 && !v.g.includes('false'), { max: 4000 })).g; // cadre à 124 px posé, carte jugée une fois entière
+      await clic(`[...document.querySelectorAll('.vf-q-carte button')].find((x) => x.textContent === 'Copier la commande')`);
+      // la copie est synchrone dans le clic ; « Copiée » se rétablit au bout de 2,5 s (vue) : on lit dès que l'évènement copy est passé, jamais plus tard
+      const ap = await attendreValeur(() => q.ev(`({ copie: window.__copie, affichee: document.querySelector('.vf-q-commande').textContent, bouton: [...document.querySelectorAll('.vf-q-carte button')].map((x) => x.textContent).join(','), annonce: document.getElementById('annonce').textContent })`), (a) => a.copie !== null, { pas: 50, max: 2000 });
       await q.ev(`(() => { vfTermVue.effacer(); return true; })()`); await raz(); await monter({ id: ID(170) });
       const sansCopie = await q.ev(`![...document.querySelectorAll('#proposition button')].some((x) => /copi/i.test(x.textContent))`); await raz();
       r.v17 = [geo, ap.copie === ap.affichee && ap.affichee === '/vf-cockpit --terminal', ap.bouton, ap.annonce, sansCopie].join('|');
@@ -605,8 +610,8 @@ await executer(chrome, async (s) => {
       await q.ev(`(() => { vfTermVue.effacer(); return true; })()`); const revient = await q.ev(`!!document.getElementById('accueil')`);
       await q.ev(`(() => { vfTermVue.carte('refuse'); return true; })()`); const carte = await q.ev(`!document.getElementById('accueil')`);
       await q.ev(`(() => { vfTermVue.effacer(); return true; })()`);
-      await clic(`[...document.querySelectorAll('#accueil button')].find((x) => x.textContent === 'Compris')`); await pause(200);
-      const ferme = await q.ev(`!document.getElementById('accueil') && localStorage.getItem('vf.terminal.accueil') === '1'`);
+      await clic(`[...document.querySelectorAll('#accueil button')].find((x) => x.textContent === 'Compris')`);
+      const ferme = await attendreValeur(() => q.ev(`!document.getElementById('accueil') && localStorage.getItem('vf.terminal.accueil') === '1'`), (v) => v === true);
       await q.ev(`(() => { vfTermVue.effacer(); return true; })()`); const nonRevenu = await q.ev(`!document.getElementById('accueil')`);
       r.v18 = [a === 'status|true|Compris', foc0 === foc1, n0 === n1, remplace, revient, carte, ferme, nonRevenu].join('/');
     });
@@ -614,25 +619,28 @@ await executer(chrome, async (s) => {
       await q.ev(`(() => { localStorage.removeItem('vf.terminal.accueil'); vfTermVue.proposition(null); const x = document.getElementById('accueil'); if (x) x.remove(); return true; })()`);
       const foc = () => q.ev(`document.activeElement ? document.activeElement.className : ''`);
       const lignesLog = () => { try { return fs.readFileSync(`${run}/entree.log`, 'utf8').split('\n').filter(Boolean); } catch { return []; } };
-      await q.ev(`(() => { vfTermVue.effacer(); return true; })()`); await pause(400);
-      await clic(`document.querySelector('.xterm-screen')`); await pause(200);
-      const foc0 = await foc(), n0 = lignesLog().length;
-      const geo = await q.ev(`(() => { const a = document.getElementById('accueil'), t = document.getElementById('terminal').getBoundingClientRect(), b = a.getBoundingClientRect(); return [t.bottom <= b.top + 1, b.bottom <= innerHeight + 1, t.height > 24, a.querySelector('button').tabIndex === -1].join('.'); })()`);
-      await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'x', code: 'KeyX', text: 'x', windowsVirtualKeyCode: 88 }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'x', code: 'KeyX', windowsVirtualKeyCode: 88 }); await pause(500);
-      const rangee = await q.ev(`!document.getElementById('accueil') && localStorage.getItem('vf.terminal.accueil') === '1'`), octets = lignesLog().slice(n0), focFin = await foc();
-      await q.ev(`(() => { localStorage.removeItem('vf.terminal.accueil'); vfTermVue.effacer(); return true; })()`); await pause(300);
-      await clic(`document.querySelector('.xterm-screen')`); await pause(200); const focS = await foc();
-      await clic(`[...document.querySelectorAll('#accueil button')].find((x) => x.textContent === 'Compris')`); await pause(200);
-      r.v20 = [geo, foc0 === 'xterm-helper-textarea' && foc0 === focFin, rangee, octets.length === 1 && octets[0] === '78', !(await q.ev(`!!document.getElementById('accueil')`)) && (await foc()) === focS].join('/');
+      await q.ev(`(() => { vfTermVue.effacer(); return true; })()`); await q.attendre(`!!document.getElementById('accueil')`, 'accueil monté');
+      await clic(`document.querySelector('.xterm-screen')`);
+      const foc0 = await attendreValeur(foc, (v) => v === 'xterm-helper-textarea'), n0 = lignesLog().length;
+      const geo = (await attendreEtStabiliser(() => q.ev(`(() => { const a = document.getElementById('accueil'), t = document.getElementById('terminal').getBoundingClientRect(), b = a.getBoundingClientRect(); return { H: innerHeight, g: [t.bottom <= b.top + 1, b.bottom <= innerHeight + 1, t.height > 24, a.querySelector('button').tabIndex === -1].join('.') }; })()`), (v) => !!v && v.H === 700 && !v.g.includes('false'), { max: 4000 })).g; // pleine hauteur de la fenêtre émulée (700 px)
+      await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'x', code: 'KeyX', text: 'x', windowsVirtualKeyCode: 88 }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'x', code: 'KeyX', windowsVirtualKeyCode: 88 });
+      // la frappe traverse POST /entree et le rangement de l'accueil : on lit une fois l'octet arrivé et l'accueil rangé, puis stable (un second octet se verrait)
+      const apres = await attendreEtStabiliser(async () => ({ rangee: await q.ev(`!document.getElementById('accueil') && localStorage.getItem('vf.terminal.accueil') === '1'`), octets: lignesLog().slice(n0), foc: await foc() }), (a) => a.rangee === true && a.octets.length >= 1 && a.octets[0] === '78', { pas: 500, max: 6000 }); // pas 500 : fenêtre de silence d'origine (un second octet se verrait)
+      const rangee = apres.rangee, octets = apres.octets, focFin = apres.foc;
+      await q.ev(`(() => { localStorage.removeItem('vf.terminal.accueil'); vfTermVue.effacer(); return true; })()`); await q.attendre(`!!document.getElementById('accueil')`, 'accueil remonté');
+      await clic(`document.querySelector('.xterm-screen')`); const focS = await stabiliser(foc, { max: 3000 });
+      await clic(`[...document.querySelectorAll('#accueil button')].find((x) => x.textContent === 'Compris')`);
+      const finale = await attendreValeur(async () => !(await q.ev(`!!document.getElementById('accueil')`)) && (await foc()) === focS, (v) => v === true, { max: 5000 });
+      r.v20 = [geo, foc0 === 'xterm-helper-textarea' && foc0 === focFin, rangee, octets.length === 1 && octets[0] === '78', finale].join('/');
     });
     await essai('v19', async () => { // LB3-S (revue LB1-LB2, findings b et a) : « Préparer » vient APRÈS la commande exacte et la case du chat dans l'ordre du document (donc de tabulation et de lecture) ; la carte et le bandeau d'état ne sont jamais masqués par la proposition, à 124 px comme à pleine hauteur
       const lc = (m) => ligne(m) + " -r '0b8c7d6e-1111-4222-8333-444455556666' --fork-session";
       await raz(); await monter({ id: ID(190), chat: true, lignesChat: { default: lc('default'), acceptEdits: lc('acceptEdits'), plan: lc('plan'), herite: lc('') } });
       const ordre = await q.ev(`(() => { const f = (id) => document.getElementById(id), apres = (a, b) => !!(f(a).compareDocumentPosition(f(b)) & Node.DOCUMENT_POSITION_FOLLOWING); return [apres('proposition-ligne', 'proposition-lancer'), apres('proposition-chat', 'proposition-lancer'), apres('proposition-entree', 'proposition-lancer'), apres('proposition-modes', 'proposition-lancer'), !!document.querySelector('#proposition-modes li[data-mode="acceptEdits"] .vf-q-risque')].join('.'); })()`);
       const masque = async (h, appel) => {
-        await s.ev(`document.querySelector('iframe[data-t]').style.height = '${h}'`); await pause(300); await raz(); await monter({ id: ID(191) }); await q.ev(`(() => { ${appel}; return true; })()`); await pause(300);
-        const v = await q.ev(`(() => { const e = document.querySelector('#etat .vf-q-bandeau, #etat .vf-q-carte'), b = e.getBoundingClientRect(), pts = [[(b.left + b.right) / 2, (b.top + b.bottom) / 2], [b.left + 24, b.bottom - 14], [b.left + 24, b.top + 14]]; return pts.every(([x, y]) => { const h = document.elementFromPoint(x, y); return !!h && !h.closest('#proposition'); }); })()`);
-        await q.ev(`(() => { vfTermVue.effacer(); vfTermVue.proposition(null); return true; })()`); return v;
+        await s.ev(`document.querySelector('iframe[data-t]').style.height = '${h}'`); await raz(); await monter({ id: ID(191) }); await q.ev(`(() => { ${appel}; return true; })()`);
+        const v = await attendreEtStabiliser(() => q.ev(`(() => { const e = document.querySelector('#etat .vf-q-bandeau, #etat .vf-q-carte'), b = e.getBoundingClientRect(), pts = [[(b.left + b.right) / 2, (b.top + b.bottom) / 2], [b.left + 24, b.bottom - 14], [b.left + 24, b.top + 14]]; return pts.every(([x, y]) => { const h = document.elementFromPoint(x, y); return !!h && !h.closest('#proposition'); }); })()`), (x) => x === true, { max: 3000 }); // jugé une fois la géométrie posée (hauteur du cadre, carte/bandeau montés)
+        await q.ev(`(() => { vfTermVue.effacer(); vfTermVue.proposition(null); return true; })()`); return v === true;
       };
       const m = [await masque('124px', `vfTermVue.bandeau('reconnexion')`), await masque('124px', `vfTermVue.carte('arrete')`), await masque('100vh', `vfTermVue.bandeau('reconnexion')`), await masque('100vh', `vfTermVue.carte('arrete')`)];
       r.v19 = [ordre, ...m].join('/');
@@ -644,9 +652,9 @@ await executer(chrome, async (s) => {
   if (mode === 'client') {
     await scenario({ prop: valide(ID_A), lancers: [] }); await q.naviguer();
     await essai('e1', async () => { // proposition servie : bandeau, commande exacte du serveur, UN message fixe vers P
-      await q.attendre(`!!document.getElementById('proposition')`, 'bandeau de proposition', 4000); vu = true;
+      await q.attendre(`!!document.getElementById('proposition')`, 'bandeau de proposition', MS); vu = true;
       const ligneQ = await q.ev(`document.getElementById('proposition-ligne').textContent`);
-      const msgs = JSON.parse(await s.ev('JSON.stringify(window.__msgs)')), props = msgs.filter((m) => m.d === 'proposition');
+      const msgs = await attendreEtStabiliser(async () => JSON.parse(await s.ev('JSON.stringify(window.__msgs)')), (m) => m.some((x) => x.d === 'proposition')), props = msgs.filter((m) => m.d === 'proposition'); // le message vers P arrive dans une tâche suivante : lu une fois reçu, puis stable
       r.e1 = [ligneQ === valide(ID_A).lignes.default, props.length, props.every((m) => m.o === OQ && m.t === 'string'), msgs.every((m) => m.o === OQ && (LISTE.includes(m.d) || m.d === 'proposition')),
         !JSON.stringify(msgs).includes(ID_A) && !JSON.stringify(msgs).includes(secret) && !JSON.stringify(msgs).includes('claude')].join('/');
     });
@@ -657,8 +665,8 @@ await executer(chrome, async (s) => {
       await q.attendre(`(document.getElementById('proposition') || {}).dataset && document.getElementById('proposition').dataset.id === ${JSON.stringify(ID(35))}`, 'bandeau de la proposition neuve', 5000);
       const desarme = await arme() === 'true'; await clic(LANCER); await pause(400);
       const tot = (await journal()).filter((x) => x.u === '/lancer').length;
-      await attendreArme(6000); await choisir('acceptEdits'); await clic(LANCER);
-      await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après 204', 4000);
+      await attendreArme(MS); await choisir('acceptEdits'); await clic(LANCER);
+      await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après 204', MS);
       const l = (await journal()).filter((x) => x.u === '/lancer');
       r.e2 = [desarme, tot, l.length, l[0] && Object.keys(JSON.parse(l[0].b)).sort().join(','), l[0] && !l[0].b.includes('claude'), l[0] && l[0].st, entrees(), String(await q.ev(`localStorage.getItem('vf.terminal.mode')`))].join('/');
     });
@@ -667,9 +675,9 @@ await executer(chrome, async (s) => {
       await scenario({ prop: valide(ID(32), { arme_apres_ms: 600 }), lancers: [409] });
       await q.attendre(`(document.getElementById('proposition') || {}).dataset && document.getElementById('proposition').dataset.id === ${JSON.stringify(ID(32))}`, 'bandeau de la seconde proposition', 5000);
       await attendreArme(); await clic(LANCER);
-      const msgOk = await q.attendre(`document.getElementById('proposition-message').textContent === ${JSON.stringify(MSG.occupe)}`, 'message occupé', 3000).then(() => true, () => false);
+      const msgOk = await q.attendre(`document.getElementById('proposition-message').textContent === ${JSON.stringify(MSG.occupe)}`, 'message occupé', MS).then(() => true, () => false);
       const present = await q.ev(`!!document.getElementById('proposition')`), rearme = (await arme()) === 'false', e0 = entrees();
-      await clic(LANCER); const parti = await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après le second clic', 3000).then(() => true, () => false);
+      await clic(LANCER); const parti = await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après le second clic', MS).then(() => true, () => false);
       r.e3 = [msgOk, e0, present, rearme, parti, (await journal()).filter((x) => x.u === '/lancer').slice(n0).map((x) => x.st).join(',')].join('/');
     });
     await essai('e4', async () => { // après usage le serveur dit aucune : bascule de thème, puis plus aucun bandeau
@@ -695,93 +703,92 @@ await executer(chrome, async (s) => {
       await scenario({ prop: valide(ID(51), { arme_apres_ms: 600 }), lancers: [], mode_retenu: 'plan' });
       const n0 = (await journal()).filter((x) => x.u === '/lancer').length;
       await q.recharger(`${OQ}/?theme=dark&mode=acceptEdits&lancer=1&id=zzz`);
-      await q.attendre(`!!document.getElementById('proposition')`, 'bandeau après rechargement', 5000); await pause(800);
+      await q.attendre(`!!document.getElementById('proposition')`, 'bandeau après rechargement', MS); await pause(800);
       r.e6 = [await q.ev(`${SEL}.value`), (await journal()).filter((x) => x.u === '/lancer').length - n0].join('/');
     });
     await essai('e9', async () => { // LB2 (Q7 ; PU-G-118 et PU-G-119) : une proposition d'une visite précédente (cadre NEUF, 115 s d'âge) n'est jamais montrée ni annoncée et est effacée dans Q ; le MÊME cadre rechargé dans la même visite la retrouve
       await scenario({ prop: valide(ID(91), { expire_ms: 5000, arme_apres_ms: 600 }), lancers: [] });
       const n0 = (await journal()).filter((x) => x.u === '/annuler').length;
       await q.naviguer(); await pause(3500);
+      const annule = await attendreValeur(async () => (await journal()).filter((x) => x.u === '/annuler').length - n0, (n) => n >= 1); // l'effacement part du client : attendu, jamais supposé arrivé en 3,5 s
       const msgs = JSON.parse(await s.ev('JSON.stringify(window.__msgs)')).filter((m) => m.d === 'proposition').length;
-      const annule = (await journal()).filter((x) => x.u === '/annuler').length - n0, nul = await q.ev(`document.querySelectorAll('#proposition').length`);
+      const nul = await q.ev(`document.querySelectorAll('#proposition').length`);
       await scenario({ prop: valide(ID(92), { expire_ms: 5000, arme_apres_ms: 600 }), lancers: [] });
-      await q.recharger(`${OQ}/?theme=light`); const garde = await q.attendre(`!!document.getElementById('proposition')`, 'proposition gardée', 5000).then(() => true, () => false);
+      await q.recharger(`${OQ}/?theme=light`); const garde = await q.attendre(`!!document.getElementById('proposition')`, 'proposition gardée', MS).then(() => true, () => false);
       r.e9 = [nul, msgs, annule >= 1, garde].join('/');
     });
+    const ENTREE_TOUCHE = (type, extra = {}) => s.send('Input.dispatchKeyEvent', Object.assign({ type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, extra)), SUR_TERMINAL = `!!document.activeElement && document.activeElement.className === 'xterm-helper-textarea'`;
+    const TERMINAL_FOCALISE = `document.hasFocus() && document.activeElement && document.activeElement.className === 'xterm-helper-textarea'`;
+    // reprises(r0, pret) : pret = TERMINAL_FOCALISE (élément actif ET fenêtre focalisée) sous émulation de focus (E13, E14) ; SUR_TERMINAL par défaut (E10, E10b, E12) : sans émulation la fenêtre n'a pas le focus par construction, hasFocus() y est faux
+    // reprises(r0) : six répétitions de l'Entrée tenue (cadence d'auto-répétition, 40 ms : c'est l'entrée testée) → 0 octet CR attendu après 400 ms ; puis Entrée fraîche → l'octet arrive PUIS reste stable (LB.E14, run 42405220695 : après 500 ms il arrivait parfois plus tard en CI Linux)
+    const reprises = async (r0, pret = SUR_TERMINAL) => { for (let i = 0; i < 6; i++) { await ENTREE_TOUCHE('keyDown', { text: '\r', autoRepeat: true }); await pause(40); } await pause(400); const tenue = retours() - r0; await ENTREE_TOUCHE('keyUp'); await pause(100); await q.attendre(pret, 'saisie du terminal focalisée avant l\'Entrée fraîche'); const n1 = (await journal()).filter((x) => x.u === '/entree').length; await ENTREE_TOUCHE('keyDown', { text: '\r' }); await ENTREE_TOUCHE('keyUp'); await pause(500); const fraiche = await attendreEtStabiliser(() => retours() - r0 - tenue, (n) => n >= 1, { max: 3000 });
+      if (fraiche < 1) { const e = await q.ev(`({ focus: document.hasFocus(), actif: document.activeElement && document.activeElement.className, vis: document.visibilityState })`).catch(() => null); const j = await journal(); console.error('DIAG reprises : Entrée fraîche perdue ; état de Q ' + JSON.stringify(e) + ' ; POST /entree avant/après la fraîche ' + n1 + '/' + j.filter((x) => x.u === '/entree').length + ' ; dernières requêtes ' + j.slice(-8).map((x) => x.m + ' ' + x.u + ' ' + x.st).join(', ')); } // trace (stderr, jamais dans le verdict) : où se perd l'octet
+      return tenue + '/' + fraiche; };
     await essai('e10', async () => { // LB3-S (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06, remarque du relecteur de LB1-LB2) : Entrée TENUE sur « Préparer » ; le focus revient au terminal après la réponse, les répétitions de la touche ne l'atteignent pas ; Entrée relâchée puis pressée de nouveau passe
       await scenario({ prop: valide(ID(101), { arme_apres_ms: 600 }), lancers: [] }); await q.naviguer();
-      await q.attendre(`!!document.getElementById('proposition')`, 'bandeau de la proposition', 5000); await attendreArme();
+      await q.attendre(`!!document.getElementById('proposition')`, 'bandeau de la proposition', MS); await attendreArme();
       await clic(`document.getElementById('proposition-phrase')`); await q.ev(`${LANCER}.focus()`);
       const touche = (type, extra = {}) => s.send('Input.dispatchKeyEvent', Object.assign({ type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, extra));
       const r0 = retours(); await touche('keyDown', { text: '\r' });
-      await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après 204', 4000);
-      const foc = await q.attendre(`document.activeElement && document.activeElement.className`, 'focus rendu au terminal', 3000);
-      for (let i = 0; i < 6; i++) { await touche('keyDown', { text: '\r', autoRepeat: true }); await pause(40); }
-      await pause(400); const tenue = retours() - r0;
-      await touche('keyUp'); await pause(100);
-      await touche('keyDown', { text: '\r' }); await touche('keyUp'); await pause(500);
-      r.e10 = [foc, tenue, retours() - r0 - tenue].join('/');
+      await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après 204', MS);
+      const foc = await q.attendre(`document.activeElement && document.activeElement.className`, 'focus rendu au terminal', MS);
+      r.e10 = foc + '/' + await reprises(r0);
     });
-    const ENTREE_TOUCHE = (type, extra = {}) => s.send('Input.dispatchKeyEvent', Object.assign({ type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, extra)), SUR_TERMINAL = `!!document.activeElement && document.activeElement.className === 'xterm-helper-textarea'`;
     await essai('e10b', async () => { // LB3-S2 (F2) : le cas du TAP — aucune touche n'a été tenue au clavier sur « Préparer » (clic de souris : le relâchement de touche est parti au bouton, ou n'a jamais existé) ; le focus revient au terminal ; une Entrée FRAÎCHE y passe : exactement UN octet CR, jamais avalé par la retenue
       await scenario({ prop: valide(ID(102), { arme_apres_ms: 600 }), lancers: [] }); await q.naviguer();
-      await q.attendre(`!!document.getElementById('proposition')`, 'bandeau de la proposition', 5000); await attendreArme();
+      await q.attendre(`!!document.getElementById('proposition')`, 'bandeau de la proposition', MS); await attendreArme();
       const r0 = retours(); await clic(LANCER);
-      await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après 204', 4000); await q.attendre(SUR_TERMINAL, 'focus rendu au terminal', 3000);
-      await ENTREE_TOUCHE('keyDown', { text: '\r' }); await ENTREE_TOUCHE('keyUp'); await pause(500);
-      r.e10b = String(retours() - r0);
+      await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après 204', MS); await q.attendre(SUR_TERMINAL, 'focus rendu au terminal', MS);
+      await ENTREE_TOUCHE('keyDown', { text: '\r' }); await ENTREE_TOUCHE('keyUp');
+      r.e10b = String(await attendreEtStabiliser(() => retours() - r0, (n) => n >= 1, { pas: 500, max: 10000 })); // l'octet frais se lit une fois arrivé, puis 500 ms sans second octet
     });
     await essai('e11', async () => { // LB3-S (finding c) : la référence d'âge est la durée servie par Q (duree_ms), pas une constante : une proposition FRAÎCHE d'une durée courte est montrée ; une ancienne d'une durée longue est effacée
       await scenario({ prop: valide(ID(111), { duree_ms: 10000, expire_ms: 9000, arme_apres_ms: 600 }), lancers: [] }); await q.naviguer();
-      const courte = await q.attendre(`!!document.getElementById('proposition')`, 'proposition fraîche, durée courte', 4000).then(() => true, () => false);
+      const courte = await q.attendre(`!!document.getElementById('proposition')`, 'proposition fraîche, durée courte', MS).then(() => true, () => false);
       await scenario({ prop: valide(ID(112), { duree_ms: 600000, expire_ms: 300000, arme_apres_ms: 600 }), lancers: [] }); const n0 = (await journal()).filter((x) => x.u === '/annuler').length;
-      await q.naviguer(); await pause(3500); const nul = await q.ev(`document.querySelectorAll('#proposition').length`), annule = (await journal()).filter((x) => x.u === '/annuler').length - n0;
+      await q.naviguer(); await pause(3500);
+      const annule = await attendreValeur(async () => (await journal()).filter((x) => x.u === '/annuler').length - n0, (n) => n >= 1), nul = await q.ev(`document.querySelectorAll('#proposition').length`);
       await scenario({ prop: valide(ID(113), { duree_ms: 600000, expire_ms: 599000, arme_apres_ms: 600 }), lancers: [] });
-      const temoin = await q.attendre(`!!document.getElementById('proposition')`, 'témoin : proposition fraîche, durée longue', 4000).then(() => true, () => false);
+      const temoin = await q.attendre(`!!document.getElementById('proposition')`, 'témoin : proposition fraîche, durée longue', MS).then(() => true, () => false);
       r.e11 = [courte, nul, annule >= 1, temoin].join('/');
     });
     await essai('e12', async () => { // LB3-S2 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-07, option A) : la retenue de l'Entrée tenue couvre CHAQUE bouton qui rend le focus au terminal (Annuler, Abandonner, Coller, Relancer le shell) ; Entrée maintenue sur le bouton, répétitions après le retour du focus : 0 CR ; puis Entrée fraîche : exactement 1
       const cycle = async (focaliser) => {
         const r0 = retours(); await focaliser(); await ENTREE_TOUCHE('keyDown', { text: '\r' });
-        await q.attendre(SUR_TERMINAL, 'focus rendu au terminal', 3000);
-        for (let i = 0; i < 6; i++) { await ENTREE_TOUCHE('keyDown', { text: '\r', autoRepeat: true }); await pause(40); }
-        await pause(400); const tenue = retours() - r0;
-        await ENTREE_TOUCHE('keyUp'); await pause(100); await ENTREE_TOUCHE('keyDown', { text: '\r' }); await ENTREE_TOUCHE('keyUp'); await pause(500);
-        return tenue + '/' + (retours() - r0 - tenue);
+        await q.attendre(SUR_TERMINAL, 'focus rendu au terminal', MS);
+        return reprises(r0);
       };
       const bouton = (zone, texte) => `[...document.querySelectorAll('${zone} button')].find((x) => x.textContent === ${JSON.stringify(texte)})`;
-      const coller = async () => { await q.ev(`(() => { const dt = new DataTransfer(); dt.setData('text/plain', 'a\\u200bb'); document.getElementById('terminal').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`); await q.attendre(`!!document.getElementById('collage')`, 'bandeau du collage', 3000); };
+      const coller = async () => { await q.ev(`(() => { const dt = new DataTransfer(); dt.setData('text/plain', 'a\\u200bb'); document.getElementById('terminal').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`); await q.attendre(`!!document.getElementById('collage')`, 'bandeau du collage', MS); };
       const sortie = [];
-      await scenario({ prop: valide(ID(121), { arme_apres_ms: 600 }), lancers: [] }); await q.naviguer(); await q.attendre(`!!document.getElementById('proposition')`, 'bandeau de la proposition', 5000);
+      await scenario({ prop: valide(ID(121), { arme_apres_ms: 600 }), lancers: [] }); await q.naviguer(); await q.attendre(`!!document.getElementById('proposition')`, 'bandeau de la proposition', MS);
       sortie.push('annuler:' + await cycle(async () => { await clic(`document.getElementById('proposition-phrase')`); await q.ev(`${ANNULER}.focus()`); }));
       await scenario({ prop: null }); await q.naviguer(); await coller();
       sortie.push('abandonner:' + await cycle(async () => { await clic(`document.querySelector('#collage .vf-q-texte')`); await q.ev(`${bouton('#collage', 'Annuler')}.focus()`); }));
       await coller();
       sortie.push('coller:' + await cycle(async () => { await clic(`document.querySelector('#collage .vf-q-texte')`); await q.ev(`${bouton('#collage', 'Coller')}.focus()`); }));
-      await scenario({ prop: null, fin: true }); await q.naviguer(); await q.attendre(`!!${bouton('#etat', 'Relancer le shell')}`, 'bandeau du shell terminé', 5000);
+      await scenario({ prop: null, fin: true }); await q.naviguer(); await q.attendre(`!!${bouton('#etat', 'Relancer le shell')}`, 'bandeau du shell terminé', MS);
       sortie.push('relancer:' + await cycle(async () => { await clic(`document.querySelector('#etat .vf-q-texte')`); await q.ev(`${bouton('#etat', 'Relancer le shell')}.focus()`); }));
       r.e12 = sortie.join('|');
     });
     // LB3-S3 (F1 de la revue de a83890da..45a2396e ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-07, « et tout autre bouton du même genre ») : la retenue est posée sur la PRISE DE FOCUS du terminal lui-même, pas sur chaque appelant.
     // Le vrai client de Q tourne dans l'iframe de P ; P est ici une page minimale qui reproduit `cadre.focus()` de la pastille du tiroir (vf-cockpit-terminal-tiroir.mjs, ouvrir(true)) : un bouton de P dont l'Entrée (keydown) donne le focus à l'iframe.
     const PASTILLE = `(() => { const b = document.createElement('button'); b.id = 'pastille-t'; b.textContent = 'Terminal'; b.style.cssText = 'position:fixed;right:0;bottom:0;z-index:100000'; b.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.querySelector('iframe[data-t]').focus(); }); document.body.appendChild(b); b.focus(); return document.activeElement.id; })()`;
-    const TERMINAL_FOCALISE = `document.hasFocus() && document.activeElement && document.activeElement.className === 'xterm-helper-textarea'`;
-    const reprises = async (r0) => { for (let i = 0; i < 6; i++) { await ENTREE_TOUCHE('keyDown', { text: '\r', autoRepeat: true }); await pause(40); } await pause(400); const tenue = retours() - r0; await ENTREE_TOUCHE('keyUp'); await pause(100); await ENTREE_TOUCHE('keyDown', { text: '\r' }); await ENTREE_TOUCHE('keyUp'); await pause(500); for (const fin = Date.now() + 3000; retours() - r0 - tenue < 1 && Date.now() < fin;) await pause(100); return tenue + '/' + (retours() - r0 - tenue); }; // l'octet de l'Entrée fraîche arrive parfois après 500 ms en CI Linux (LB.E14, run 42405220695) : attendu jusqu'à 3 s ; les répétitions tenues, elles, restent comptées après 400 ms fixes
     await essai('e13', async () => { // chemin PARENT : Entrée tenue sur la pastille de P, qui donne le focus à l'iframe de Q ; les répétitions qui suivent n'atteignent pas le shell ; puis Entrée fraîche : 1
       await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
-      await scenario({ prop: null, lancers: [] }); await q.naviguer(); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.attendre(TERMINAL_FOCALISE, 'terminal focalisé', 5000);
+      await scenario({ prop: null, lancers: [] }); await q.naviguer(); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.attendre(TERMINAL_FOCALISE, 'terminal focalisé', MS);
       const sur = await s.ev(PASTILLE); const r0 = retours();
-      await ENTREE_TOUCHE('keyDown', { text: '\r' }); await q.attendre(TERMINAL_FOCALISE, 'focus donné au terminal par le parent', 3000);
+      await ENTREE_TOUCHE('keyDown', { text: '\r' }); await q.attendre(TERMINAL_FOCALISE, 'focus donné au terminal par le parent', MS);
       const premiere = retours() - r0;
-      r.e13 = [sur, premiere, await reprises(r0 + premiere)].join('/');
+      r.e13 = [sur, premiere, await reprises(r0 + premiere, TERMINAL_FOCALISE)].join('/');
     });
     await essai('e14', async () => { // chemin « retour d'onglet » : le focus quitte le terminal, une Entrée est tenue, l'événement focus de la fenêtre de Q redonne le focus au terminal (écouteur window.focus du client) ; répétitions : 0 ; fraîche : 1
       await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
-      await scenario({ prop: null, lancers: [] }); await q.naviguer(); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.attendre(TERMINAL_FOCALISE, 'terminal focalisé', 5000);
+      await scenario({ prop: null, lancers: [] }); await q.naviguer(); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.attendre(TERMINAL_FOCALISE, 'terminal focalisé', MS);
       await q.ev(`(() => { document.querySelector('.xterm-helper-textarea').blur(); return true; })()`);
       const r0 = retours(); await ENTREE_TOUCHE('keyDown', { text: '\r' });
-      await q.ev(`(() => { window.dispatchEvent(new Event('focus')); return true; })()`); await q.attendre(TERMINAL_FOCALISE, 'focus rendu au terminal par la fenêtre', 3000);
-      r.e14 = await reprises(r0);
+      await q.ev(`(() => { window.dispatchEvent(new Event('focus')); return true; })()`); await q.attendre(TERMINAL_FOCALISE, 'focus rendu au terminal par la fenêtre', MS);
+      r.e14 = await reprises(r0, TERMINAL_FOCALISE);
       await s.send('Emulation.setFocusEmulationEnabled', { enabled: false });
     });
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
@@ -797,12 +804,12 @@ await executer(chrome, async (s) => {
     await s.ev(`(() => { const i = document.createElement('input'); i.id = 'champP'; i.style.cssText = 'position:fixed;left:0;top:0'; document.body.appendChild(i); i.focus();
       const f = document.createElement('iframe'); f.dataset.t = '1'; f.setAttribute('sandbox', ${JSON.stringify(SBXQ)}); f.style.cssText = 'position:fixed;left:0;bottom:0;width:100vw;height:300px;border:0'; f.src = ${JSON.stringify(OQ + '/?theme=dark')}; document.body.appendChild(f); return true; })()`);
     await essai('f1', async () => {
-      await s.attendre(`window.__msgs.some((m) => m.d === 'ready')`, 'cadre de Q prêt', MS);
+      await s.attendre(`window.__msgs.some((m) => m.d === 'ready')`, 'cadre de Q prêt', AM);
       const fin = Date.now() + MS; while (Date.now() < fin && !(await journal()).some((x) => x.u === '/flux')) await pause(100); // le terminal de Q est démarré
       await pause(600);
       await scenario({ prop: valide(ID_A), lancers: [] });
       await s.attendre(`window.__msgs.some((m) => m.d === 'proposition')`, 'message proposition', MS);
-      await trouverCtx(s); await q.attendre(`!!document.getElementById('proposition')`, 'bandeau dans Q', 6000);
+      await trouverCtx(s); await q.attendre(`!!document.getElementById('proposition')`, 'bandeau dans Q', MS);
       await pause(500);
       for (const ch of 'abc') { await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ch, text: ch, code: 'Key' + ch.toUpperCase() }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ch, code: 'Key' + ch.toUpperCase() }); }
       await pause(1200);
@@ -823,11 +830,11 @@ await executer(chrome, async (s) => {
     await s.ev(`(() => { const i = document.createElement('input'); i.id = 'champP'; i.style.cssText = 'position:fixed;left:0;top:0'; document.body.appendChild(i); i.focus();
       const f = document.createElement('iframe'); f.dataset.t = '1'; f.setAttribute('sandbox', ${JSON.stringify(SBXQ)}); f.style.cssText = 'position:fixed;left:0;bottom:0;width:100vw;height:300px;border:0'; f.src = ${JSON.stringify(OQ + '/?theme=dark')}; document.body.appendChild(f); return true; })()`);
     await essai('l2', async () => {
-      await s.attendre(`window.__msgs.some((m) => m.d === 'ready')`, 'cadre de Q prêt', MS);
+      await s.attendre(`window.__msgs.some((m) => m.d === 'ready')`, 'cadre de Q prêt', AM);
       const fin = Date.now() + MS; while (Date.now() < fin && !(await journal()).some((x) => x.u === '/flux')) await pause(100);
       await pause(600); await trouverCtx(s);
       if (cadre) await s.ev(`document.querySelector('iframe[data-t]').focus()`); else await s.ev(`document.getElementById('champP').focus()`);
-      await pause(300);
+      if (emu) await q.attendre(cadre ? `document.hasFocus()` : `!document.hasFocus()`, cadre ? 'focus du cadre de Q' : 'focus rendu à P'); else await pause(300); // la vue ne prend le focus de son bouton que si le cadre l'a (hasFocus au montage)
       await q.ev(`window.__act = 0; window.vfTermVue.${quoi === 'carte' ? "carte('refuse'" : "bandeau('termine'"}, ${quoi === 'carte' ? '' : '{ code: 0 }, '}() => { window.__act++; }); true`);
       await pause(500);
       for (const ch of 'abc') { await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ch, text: ch, code: 'Key' + ch.toUpperCase() }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ch, code: 'Key' + ch.toUpperCase() }); }
@@ -848,15 +855,14 @@ await executer(chrome, async (s) => {
     await s.naviguer(`${OP}/project.html?sp1=1`); await s.attendre(`document.readyState === 'complete'`, 'page P', MS);
     await essai('sp1', async () => {
       await s.attendre(`!!document.querySelector('#panel button')`, 'carte avec son bouton Lancer', MS);
-      await pause(800);
       const avant = await s.ev(`document.querySelectorAll('iframe').length`);
-      const c = await s.ev(`(() => { const b = document.querySelector('#panel button').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+      const p = await positionPosee(s.ev, `document.querySelector('#panel button')`), c = { x: p.cx, y: p.cy }; // la carte se pose avant qu'on y vise le clic
       await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c.x, y: c.y });
       await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: c.x, y: c.y, button: 'left', clickCount: 1 });
       await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c.x, y: c.y, button: 'left', clickCount: 1 });
       await s.attendre(`/Confirmez-la dans le terminal/.test(document.getElementById('panel').textContent)`, 'message de la carte', MS);
-      const cadre = await s.attendre(`document.querySelectorAll('iframe').length === 1`, 'cadre de Q monté', 4000).then(() => true, () => false);
-      let bandeau = false; if (cadre) { await trouverCtx(s).catch(() => {}); if (ctx) bandeau = await q.attendre(`!!document.getElementById('proposition')`, 'bandeau dans Q', 6000).then(() => true, () => false); }
+      const cadre = await s.attendre(`document.querySelectorAll('iframe').length === 1`, 'cadre de Q monté', MS).then(() => true, () => false);
+      let bandeau = false; if (cadre) { await trouverCtx(s).catch(() => {}); if (ctx) bandeau = await q.attendre(`!!document.getElementById('proposition')`, 'bandeau dans Q', MS).then(() => true, () => false); }
       const focusP = await s.ev(`document.activeElement.tagName !== 'IFRAME'`);
       r.sp1 = [avant, cadre, bandeau, focusP].join('/');
     });
@@ -867,15 +873,15 @@ await executer(chrome, async (s) => {
     await scenario({ prop: valide(ID_A), lancers: [] }); await q.naviguer(`${OQ}/?theme=dark`, 'nulle');
     const recus = async () => JSON.parse(await s.ev('JSON.stringify(window.__msgs)')).filter((m) => m.d === 'proposition');
     await essai('e8', async () => { // cadre masqué : une annonce avant visible(), rien d'autre ne démarre ; agrandi : bandeau, flux, toujours UNE annonce
-      const fin = Date.now() + 4000; let n = 0; while (Date.now() < fin && (n = (await recus()).length) < 1) await pause(100);
+      const fin = Date.now() + MS; let n = 0; while (Date.now() < fin && (n = (await recus()).length) < 1) await pause(100);
       await pause(1500);
       const msgs = await recus(), j = await journal();
       const dans = await q.ev(`({ xterm: document.querySelectorAll('.xterm').length, prop: document.querySelectorAll('#proposition').length })`);
       const masque = [msgs.length, msgs.every((m) => m.o === OQ), dans.xterm, dans.prop, j.filter((x) => ['/flux', '/lancer', '/entree'].includes(x.u)).length, j.filter((x) => x.u === '/proposition').length >= 1].join('/');
       await s.ev(`(() => { const f = document.querySelector('iframe[data-t]'); f.style.width = '100vw'; f.style.height = '100vh'; return true; })()`);
-      await q.attendre(`!!document.getElementById('proposition')`, 'bandeau après agrandissement', 6000);
-      const j2 = await journal();
-      r.e8 = [masque, j2.filter((x) => x.u === '/flux').length >= 1, (await recus()).length].join('|');
+      await q.attendre(`!!document.getElementById('proposition')`, 'bandeau après agrandissement', MS);
+      const ap = await attendreEtStabiliser(async () => ({ flux: (await journal()).filter((x) => x.u === '/flux').length >= 1, n: (await recus()).length }), (a) => a.flux && a.n >= 1); // flux ouvert par visible() : lu une fois ouvert
+      r.e8 = [masque, ap.flux, ap.n].join('|');
     });
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
@@ -894,8 +900,10 @@ mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_DIR ; code 1 si la c
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
 doubles() { node "$AUX/doubles.mjs" "$1/vf-cockpit-terminal-client.mjs" "$2" 2>&1 | tail -1; } # doubles <dossier> <scénario>
-FN=0
+FN=0; VF_CLIENT_MS0="${VF_CLIENT_MS:-}"
 faux() { # faux <dossier-des-modules> -> FQ FP FSEC FRUN FPID ; un seul processus, deux ports
+  # un mutant (modules ou injection copiés) peut casser l'amorçage : ses attentes restent à 20 s (jamais l'AMORCE de 600 s) ; la suite normale garde l'amorçage large
+  if [ "$1" != "$SCRIPTS" ] || [ "${FAUX_INJ:-$SCRIPTS}" != "$SCRIPTS" ]; then export VF_CLIENT_MS=20000; elif [ -n "$VF_CLIENT_MS0" ]; then export VF_CLIENT_MS="$VF_CLIENT_MS0"; else unset VF_CLIENT_MS; fi
   port; FQ="$PORT"; port; FP="$PORT"; FSEC="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
   FN=$((FN+1)); FRUN="$WORK/run/$FN"; mkdir -p "$FRUN"
   FAUX_INJ="${FAUX_INJ:-}" node "$AUX/faux.mjs" "$1" "$ENG" "$FQ" "$FP" "$FSEC" "$FRUN" > "$FRUN/faux.out" 2>&1 < /dev/null &

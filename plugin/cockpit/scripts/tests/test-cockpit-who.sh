@@ -356,8 +356,9 @@ cat > "$AUX/tiroir.js" <<'JS'
   const SC = window.VibeFlow || window.Floorplan, pa = document.getElementById('panel');
   const att = async (f) => { for (let i = 0; i < 100; i++) { const v = f(); if (v) return v; await new Promise((r) => setTimeout(r, 50)); } return null; };
   const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  const posee = () => att(() => !pa.getAnimations({ subtree: true }).some((a) => a.playState === 'running' && a.effect.getComputedTiming().iterations !== Infinity) && (pa.getBoundingClientRect().width > 0)); // panneau posé : plus de transition finie en cours (les animations infinies, ex. .aw-pulse, ne se posent jamais : filtrées)
   // panneau de référence : un panneau ouvert par SC.showPanel avec le gabarit commun (.sec), mesuré dans le même Chrome
-  SC.showPanel('<div class="sec"><h3>Référence</h3><p>x</p></div>'); await pause(700);
+  SC.showPanel('<div class="sec"><h3>Référence</h3><p>x</p></div>'); await posee();
   const refMarge = Math.round(pa.querySelector('.sec h3').getBoundingClientRect().left - pa.getBoundingClientRect().left);
   document.getElementById('vf-lock').click();
   const w = await att(() => pa.querySelector('.vf-whop'));
@@ -366,7 +367,7 @@ cat > "$AUX/tiroir.js" <<'JS'
   bouton.click();
   const zone = bouton.nextElementSibling;
   await att(() => !zone.hidden && zone.textContent);
-  await pause(700);
+  await posee();
   const tr = pa.getBoundingClientRect(), h3 = w.querySelector('h3'), hr = h3.getBoundingClientRect();
   const m = { vh: innerHeight, vw: innerWidth, refMarge, marge: Math.round(hr.left - tr.left), h3Dedans: hr.left >= tr.left && hr.right <= tr.right && hr.top >= tr.top,
     h3Rogne: h3.scrollWidth > h3.clientWidth + 1, debordeX: pa.scrollWidth > pa.clientWidth + 1, hauteur: Math.round(tr.height), doing: zone.textContent, overflowY: getComputedStyle(pa).overflowY, titre: h3.textContent + '|' + ((pa.querySelector('.aw-count') || {}).textContent || 'effectif absent') };
@@ -511,10 +512,11 @@ assert_eq "W20.1 — F-9 : un DAG à nœuds nuls ne fait pas planter l'émetteur
 Q who "$L20" "$HOME_T" "$NOSCRIPTS" > "$WORK/who20.json" 2>/dev/null
 assert_eq "W20.2 — F-9 : les nœuds valides du même DAG sont encore lus" "$(G "$WORK/who20.json" 'j.workers.filter(w=>w.kind==="dag-node").map(w=>w.id).sort().join(",")' 2>/dev/null)" "n20,z"
 assert_eq "W20.3 — F-6 : chaque ls-files --error-unmatch de who.mjs met -- devant le chemin" "$(grep -c "'ls-files', '--error-unmatch', '--', f" "$SCRIPTS/vf-cockpit-who.mjs")" "1"
-git -C "$L20" status >/dev/null 2>&1; touch -t 202001010000 "$L20/.git/index"; M0="$(stat -f %m "$L20/.git/index" 2>/dev/null || stat -c %Y "$L20/.git/index")"
+# date de modification : GNU/uutils d'abord (`stat -f` y rend l'état du SYSTÈME DE FICHIERS, pas la date) ; sur BSD/macOS `stat -c` échoue et le repli `stat -f %m` prend le relais
+git -C "$L20" status >/dev/null 2>&1; touch -t 202001010000 "$L20/.git/index"; M0="$(stat -c %Y "$L20/.git/index" 2>/dev/null || stat -f %m "$L20/.git/index")"
 printf '\n' >> "$L20/.planning/ROADMAP.md"   # sale : git status voudrait rafraîchir l'index
 HOME="$HOME_T" node "$SCRIPTS/vf-cockpit-signal.mjs" "$L20" > /dev/null 2>&1
-M1="$(stat -f %m "$L20/.git/index" 2>/dev/null || stat -c %Y "$L20/.git/index")"
+M1="$(stat -c %Y "$L20/.git/index" 2>/dev/null || stat -f %m "$L20/.git/index")"
 assert_eq "W20.4 — F-5 : la date de modification de .git/index ne bouge pas après l'émetteur" "$M1" "$M0"
 
 # ---------- W21 — la clause `..` de la grammaire ws, prouvée par le COMPORTEMENT (Phase 70, plan 70-11, UIFN-13) ----------

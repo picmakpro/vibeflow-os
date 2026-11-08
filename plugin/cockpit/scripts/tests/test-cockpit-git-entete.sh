@@ -75,7 +75,7 @@ build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; $ENV
   PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
 }
 
-# faux driver-lock.sh TENU (comme test-cockpit-projet.sh) : une mission dont un nœud est running n'est « en cours » que si son verrou est vivant (P68-D-05) ;
+# faux driver-lock.sh TENU (comme projet-commun.sh, socle de test-cockpit-projet-graphe.sh) : une mission dont un nœud est running n'est « en cours » que si son verrou est vivant (P68-D-05) ;
 # VF_COCKPIT_SCRIPTS_DIR n'est posé que pour le SERVEUR (ENVS), jamais pour le build
 mkdir -p "$WORK/locks"
 printf '#!/usr/bin/env bash\ncase "$1" in status) echo "{\\"present\\": true, \\"ws\\": \\"\\", \\"stale\\": false, \\"ttl\\": 1800, \\"progress_age_seconds\\": 30}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' > "$WORK/locks/driver-lock.sh"; chmod +x "$WORK/locks/driver-lock.sh"
@@ -163,11 +163,14 @@ JS
   echo "=== H3 — seconde ligne, événements, ouvreur ==="
   cat > "$AUX/h3.js" <<'JS'
 const [base] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs) : on mesure une fois posé
 await s.naviguer(base + '/');
 await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }); // la fenêtre headless par défaut est sous 1000 px : la seconde ligne y est masquée
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne') && getComputedStyle(document.querySelector('.vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
 const out = {};
 const ligne = () => `document.querySelector('.vf-git-ligne')`;
+await s.attendre(`performance.getEntriesByType('resource').some((e) => e.name.includes('/api/vf/git/entete'))`, 'lecture du chargement terminée'); // sa réponse réelle, tardive sous charge, écraserait sinon les événements simulés ci-dessous
+await stabiliser(() => s.ev(`(${ligne()} || {}).textContent`), { max: 10000 });
 const evt = (nom, d) => s.ev(`window.dispatchEvent(new CustomEvent('${nom}', { detail: ${JSON.stringify(d)} }))`);
 // Revue de code S2 (P78-D-15) : 70-vf-live.js émet `vf-git:signal` sur `document`, SANS bubbles (contrat de 78-09), exactement comme ici. L'ancienne forme (window.dispatchEvent) atteignait un écouteur posé sur window
 // que le vrai émetteur n'atteint jamais : H3.4b était vert alors que l'en-tête ne se relisait pas sur le signal réel.
@@ -175,13 +178,14 @@ const signal = () => s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal
 // H3.3 : noms longs
 const longB = 'feature/' + 'b'.repeat(112), longW = 'w'.repeat(60);
 await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: longB, worktree: longW, detache: false });
-await s.attendre(`(${ligne()} || {}).title && ${ligne()}.title.includes(${JSON.stringify(longW)})`, 'ligne rendue avec les noms longs', 3000); // la ligne se redessine après l'événement, pas dans la même tâche : lue trop tôt, elle portait encore les noms courts (CI Linux, run 42408767738)
-out.longs = await s.ev(`(() => { const l = ${ligne()}, b = l.querySelector('.vf-git-branche'), w = l.querySelector('.vf-git-wt');
-  return { ellipseB: b.scrollWidth > b.clientWidth, ellipseW: w.scrollWidth > w.clientWidth, titre: l.title, largeur: l.getBoundingClientRect().width }; })()`);
+// la ligne se redessine après l'événement, pas dans la même tâche : on attend la valeur postérieure à l'événement (titre = noms longs), puis on la lit posée (CI Linux, run 42408767738)
+out.longs = await attendreEtStabiliser(() => s.ev(`(() => { const l = ${ligne()}; if (!l) return null; const b = l.querySelector('.vf-git-branche'), w = l.querySelector('.vf-git-wt');
+  return { ellipseB: b.scrollWidth > b.clientWidth, ellipseW: w.scrollWidth > w.clientWidth, titre: l.title, largeur: l.getBoundingClientRect().width }; })()`), (v) => !!v && v.titre.includes(longW), { max: 10000 });
+out.longs = out.longs || { titre: '' };
 out.longs.complet = out.longs.titre.includes(longB) && out.longs.titre.includes(longW);
 // H3.4 : l'événement met la ligne à jour
 await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: 'autre' });
-out.evt = await s.ev(`(() => ({ texte: ${ligne()}.querySelector('.vf-git-branche').textContent, wt: ${ligne()}.querySelector('.vf-git-wt').textContent }))()`);
+out.evt = await attendreEtStabiliser(() => s.ev(`(() => ({ texte: ${ligne()}.querySelector('.vf-git-branche').textContent, wt: ${ligne()}.querySelector('.vf-git-wt').textContent }))()`), (v) => v.texte === 'autre', { max: 10000 }); // redessin hors de la tâche de l'événement
 // H3.4b : signal -> relecture de /api/vf/git/entete avec le jeton ; réponse hors schéma refusée
 await s.ev(`window.__vfFetch.reponse = { schema: 'vibeflow/cockpit-git-entete@1', etat: 'ok', depot: 'depot', branche: 'via-signal', worktree: null, detache: false }`);
 await signal();
@@ -194,7 +198,7 @@ await s.ev(`new Promise((r) => setTimeout(r, 400))`);
 out.horsSchema = await s.ev(`${ligne()}.querySelector('.vf-git-branche').textContent`);
 // H3.2b : état indisponible -> texte et ouvreur présent
 await evt('vf-git:entete', { etat: 'indisponible', depot: 'depot' });
-out.indispo = await s.ev(`(() => ({ texte: ${ligne()}.querySelector('.vf-git-branche').textContent, ouvreur: !!document.querySelector('#vf-git-ouvreur') }))()`);
+out.indispo = await attendreEtStabiliser(() => s.ev(`(() => ({ texte: ${ligne()}.querySelector('.vf-git-branche').textContent, ouvreur: !!document.querySelector('#vf-git-ouvreur') }))()`), (v) => /^○/.test(v.texte), { max: 10000 }); // redessin hors de la tâche de l'événement
 // H3.5 : clic -> basculer ; etat -> aria-expanded
 await s.ev(`window.__bas = []; window.addEventListener('vf-git:basculer', (e) => window.__bas.push(e.detail && e.detail.source))`);
 await s.ev(`${ligne()}.click(); (document.querySelector('#vf-git-ouvreur') || { click() {} }).click()`);
@@ -322,13 +326,13 @@ JS
   echo "=== H6 — bloc de vue racine, retrait de « Repositories » ==="
   cat > "$AUX/h6.js" <<'JS'
 const [base, page] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
 await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#context h1') && !!window.VibeFlow`, 'bloc de vue rendu');
-await s.ev(`new Promise((r) => setTimeout(r, 700))`);
-return await s.ev(`(() => { const c = document.querySelector('#context'), G = window.VibeFlow.graph;
+return await stabiliser(() => s.ev(`(() => { const c = document.querySelector('#context'), G = window.VibeFlow.graph;
   return { k: c.querySelector('.k').textContent, h1: c.querySelector('h1').textContent, p: (c.querySelector('p') || {}).textContent || '', cls: c.querySelector('h1').className,
     nomProjet: String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''), resume: G.project.summary,
-    sections: [...document.querySelectorAll('#panel h3')].map((h) => h.textContent), depots: document.querySelectorAll('#panel .rp').length }; })()`);
+    sections: [...document.querySelectorAll('#panel h3')].map((h) => h.textContent), depots: document.querySelectorAll('#panel .rp').length }; })()`), { max: 10000 }); // mesure posée (deux relevés identiques), plus de délai fixe
 JS
   ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WT"; BASE="http://127.0.0.1:$PORT"
   R="$(cdp "$AUX/h6.js" "$BASE" / 2>&1 | tail -1)"
@@ -353,10 +357,11 @@ JS
   assert_eq "H6.2 — PU-G-166 : sous le titre des missions, les agents sont nommés et comptés à part (« Agents : … actif · … en attente · … terminé »), jamais « actifs » seul" "$(jq_ "$R" 'j.p' 2>/dev/null)" "Agents : 0 actif · 0 en attente · 0 terminé depuis moins de 24 h."
   cat > "$AUX/h64.js" <<'JS'
 const [base] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
 await s.naviguer(base + '/project.html');
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#context h1') && !!window.VibeFlow`, 'page Projet');
-await s.ev(`new Promise((r) => setTimeout(r, 700))`);
-const lire = () => s.ev(`(() => ({ k: document.querySelector('#context .k').textContent, h1: document.querySelector('#context h1').textContent, cls: document.querySelector('#context h1').className }))()`);
+const lire0 = () => s.ev(`(() => ({ k: document.querySelector('#context .k').textContent, h1: document.querySelector('#context h1').textContent, cls: document.querySelector('#context h1').className }))()`);
+const lire = () => stabiliser(lire0, { max: 10000 }); // relevé posé (le bloc est réécrit après l'arrivée de l'en-tête git)
 const racine = await lire();
 const noeud = await s.ev(`(() => { const n = window.VibeFlow.graph.nodes.find((x) => x.kind === 'phase') || window.VibeFlow.graph.nodes[0]; window.VibeFlow.go('n:' + n.id); return { id: n.id, label: n.label }; })()`);
 await s.attendre(`document.querySelector('#context h1').textContent === ${JSON.stringify(noeud.label)}`, 'sous-vue du nœud');
@@ -377,13 +382,13 @@ JS
   # F1 : un seul nom, celui du dépôt principal, dans tout le cockpit (panneau compris), sans suffixe ; le titre de l'onglet garde le nom du dossier du lab (inchangé)
   cat > "$AUX/h7-nom.js" <<'JS'
 const [base, page] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
 await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow && !!document.querySelector('#panel .pt')`, 'page et panneau rendus');
-await s.ev(`new Promise((r) => setTimeout(r, 500))`);
-return await s.ev(`(() => { const G = window.VibeFlow.graph, T = G.meta.vfTab, p = document.querySelector('#panel');
+return await stabiliser(() => s.ev(`(() => { const G = window.VibeFlow.graph, T = G.meta.vfTab, p = document.querySelector('#panel');
   return { nom: document.querySelector('#proj-name').textContent, pt: [...p.querySelectorAll('.pt')].map((e) => e.textContent), panneauWt: /wt-a/.test((() => { const c = p.cloneNode(true); c.querySelectorAll('.vf-cmd').forEach((e) => e.remove()); return c.textContent; })()), /* hors la commande de correctif du panneau Format, qui cite le chemin absolu du lab (PU-G-153) ; le titre et les en-têtes restent jugés */ suffixe: / — (Projet|Équipe)/.test(p.innerText),
-    titre: document.title, attendu: T === 'equipe' ? 'Équipe · ' + G.meta.rootName : G.meta.rootName + ' — ' + (T === 'project' ? 'Projet' : 'Code') }; })()`);
+    titre: document.title, attendu: T === 'equipe' ? 'Équipe · ' + G.meta.rootName : G.meta.rootName + ' — ' + (T === 'project' ? 'Projet' : 'Code') }; })()`), { max: 10000 }); // mesure posée (deux relevés identiques), plus de délai fixe
 JS
   ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WT"; BASE="http://127.0.0.1:$PORT"
   for pg in / /project.html /equipe.html; do
@@ -394,6 +399,7 @@ JS
   # F6, F8, F11 : couleurs et anneau de focus de la seconde ligne
   cat > "$AUX/h7-ligne.js" <<'JS'
 const [base] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
 await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 await s.naviguer(base + '/');
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne') && getComputedStyle(document.querySelector('.vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
@@ -404,21 +410,27 @@ const mesure = `(() => { const rgb = (c) => c.match(/[\\d.]+/g).slice(0, 3).map(
   const t = document.createElement('i'); t.style.color = 'var(--text-3)'; document.body.appendChild(t); const neutre = getComputedStyle(t).color; t.remove();
   return { ratio: (h + 0.05) / (c + 0.05), couleur: getComputedStyle(l).color, neutre, bgOpaque: !/rgba\\(.*, 0\\)$/.test(getComputedStyle(document.body).backgroundColor) }; })()`;
 // F6 : « Branche indisponible », deux thèmes
+const texteLigne = () => s.ev(`(document.querySelector('.vf-git-ligne') || {}).textContent || ''`);
+await s.attendre(`performance.getEntriesByType('resource').some((e) => e.name.includes('/api/vf/git/entete'))`, 'lecture du chargement terminée'); // sa réponse réelle, tardive sous charge, écraserait sinon les événements simulés
+await stabiliser(texteLigne, { max: 10000 });
 await evt('vf-git:entete', { etat: 'indisponible', depot: 'depot' });
+await attendreValeur(texteLigne, (v) => /indisponible/.test(v), { max: 10000 }); // la ligne se redessine après l'événement : on mesure la ligne postérieure à lui
 out.indispo = {};
-for (const t of ['dark', 'light']) { await s.ev(`document.documentElement.setAttribute('data-theme', '${t}')`); out.indispo[t] = await s.ev(mesure); }
+for (const t of ['dark', 'light']) { await s.ev(`document.documentElement.setAttribute('data-theme', '${t}')`); out.indispo[t] = await stabiliser(() => s.ev(mesure), { max: 10000 }); }
 // F11 : HEAD détaché, texte neutre
 await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: null, detache: true, sha7: 'abc1234', worktree: null });
+await attendreValeur(texteLigne, (v) => /abc1234/.test(v), { max: 10000 }); // ligne « HEAD détaché · abc1234 » rendue avant toute mesure
 out.detache = {};
-for (const t of ['dark', 'light']) { await s.ev(`document.documentElement.setAttribute('data-theme', '${t}')`); out.detache[t] = await s.ev(mesure); }
+for (const t of ['dark', 'light']) { await s.ev(`document.documentElement.setAttribute('data-theme', '${t}')`); out.detache[t] = await stabiliser(() => s.ev(mesure), { max: 10000 }); }
 // F8 : anneau de focus au clavier
 await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: 'feat/x', detache: false, sha7: null, worktree: null });
+await attendreValeur(texteLigne, (v) => /feat\/x/.test(v), { max: 10000 }); // ligne redessinée avant le focus et la mesure de l'anneau
 await s.ev(`document.querySelector('#vf-git-ligne').focus()`);
 await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Shift', code: 'ShiftLeft' }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Shift', code: 'ShiftLeft' });
 await s.ev(`document.activeElement.blur(); document.querySelector('#vf-git-ligne').focus()`);
-out.anneau = await s.ev(`(() => { const l = document.querySelector('#vf-git-ligne'), n = document.querySelector('#proj-name'), cs = getComputedStyle(l), e = parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth), r = l.getBoundingClientRect(), m = n.getBoundingClientRect();
+out.anneau = await stabiliser(() => s.ev(`(() => { const l = document.querySelector('#vf-git-ligne'), n = document.querySelector('#proj-name'), cs = getComputedStyle(l), e = parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth), r = l.getBoundingClientRect(), m = n.getBoundingClientRect();
   const boite = { l: r.left - e, t: r.top - e, r: r.right + e, b: r.bottom + e }, x = Math.min(boite.r, m.right) - Math.max(boite.l, m.left), y = Math.min(boite.b, m.bottom) - Math.max(boite.t, m.top);
-  return { focusVisible: l.matches(':focus-visible'), style: cs.outlineStyle, aire: Math.max(0, x) * Math.max(0, y) }; })()`);
+  return { focusVisible: l.matches(':focus-visible'), style: cs.outlineStyle, aire: Math.max(0, x) * Math.max(0, y) }; })()`), { max: 10000 });
 return out;
 JS
   R="$(cdp "$AUX/h7-ligne.js" "$BASE" 2>&1 | tail -1)"
@@ -450,18 +462,18 @@ JS
   WTL="$WORK/wt-long"; $GIT -C "$DEPOT" worktree add -q -b "feat/phase-78-git-cockpit-corrections-de-la-critique-fraiche" "$WTL" >/dev/null 2>&1
   cat > "$AUX/h7-coupure.js" <<'JS'
 const [base] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
 await s.send('Emulation.setDeviceMetricsOverride', { width: 768, height: 900, deviceScaleFactor: 1, mobile: false });
 await s.naviguer(base + '/');
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#context h1') && /feat/.test(document.querySelector('#context h1').textContent)`, 'bloc de vue Code');
-await s.ev(`new Promise((r) => setTimeout(r, 500))`);
-return await s.ev(`(() => { const h = document.querySelector('#context h1'), box = h.getBoundingClientRect(), w = document.createTreeWalker(h, NodeFilter.SHOW_TEXT), coupes = []; let prev = null, tout = '', lignes = new Set();
+return await stabiliser(() => s.ev(`(() => { const h = document.querySelector('#context h1'), box = h.getBoundingClientRect(), w = document.createTreeWalker(h, NodeFilter.SHOW_TEXT), coupes = []; let prev = null, tout = '', lignes = new Set();
   for (let n = w.nextNode(); n; n = w.nextNode()) for (let i = 0; i < n.data.length; i++) {
     const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 1); const b = r.getBoundingClientRect(); tout += n.data[i];
     if (!b.height || b.top >= box.bottom - 1) { prev = null; continue; } // hors du cadre (ligne écrêtée) ou sans boîte
     lignes.add(Math.round(b.top));
     if (prev !== null && b.top > prev.top + 2) coupes.push({ avant: tout[tout.length - 2], apres: n.data[i] });
     prev = { top: b.top }; }
-  return { texte: h.textContent, lignes: lignes.size, coupes, enPleinMot: coupes.filter((c) => !/[\\/\\- ]/.test(c.avant)).map((c) => c.avant + '|' + c.apres), wbr: h.querySelectorAll('wbr').length }; })()`);
+  return { texte: h.textContent, lignes: lignes.size, coupes, enPleinMot: coupes.filter((c) => !/[\\/\\- ]/.test(c.avant)).map((c) => c.avant + '|' + c.apres), wbr: h.querySelectorAll('wbr').length }; })()`), { max: 10000 }); // mesure posée (deux relevés identiques), plus de délai fixe
 JS
   stop_srv; build_serve "$WTL"; R="$(cdp "$AUX/h7-coupure.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
   assert_eq "H7.13 — témoin : le titre du bloc de vue Code passe bien sur deux lignes à 768 px (au moins une coupure mesurée)" "$(jq_ "$R" 'j.lignes >= 2 && j.coupes.length >= 1 ? "oui" : "non : " + j.lignes + " ligne(s)"' 2>/dev/null)" "oui"
@@ -470,17 +482,17 @@ JS
   DI="$WORK/depot-int"; mk_lab "$DI"; $GIT -C "$DI" init -q -b "integration/cockpit-final" && $GIT -C "$DI" add -A && $GIT -C "$DI" commit -q -m init
   cat > "$AUX/h7-coupure390.js" <<'JS'
 const [base, largeur] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
 await s.send('Emulation.setDeviceMetricsOverride', { width: Number(largeur), height: 900, deviceScaleFactor: 1, mobile: false });
 await s.naviguer(base + '/');
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#context h1') && /integration|svg/.test(document.querySelector('#context h1').textContent)`, 'bloc de vue Code');
-await s.ev(`new Promise((r) => setTimeout(r, 500))`);
-return await s.ev(`(() => { const h = document.querySelector('#context h1'), box = h.getBoundingClientRect(), w = document.createTreeWalker(h, NodeFilter.SHOW_TEXT), coupes = []; let prev = null, tout = '';
+return await stabiliser(() => s.ev(`(() => { const h = document.querySelector('#context h1'), box = h.getBoundingClientRect(), w = document.createTreeWalker(h, NodeFilter.SHOW_TEXT), coupes = []; let prev = null, tout = '';
   for (let n = w.nextNode(); n; n = w.nextNode()) for (let i = 0; i < n.data.length; i++) {
     const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 1); const b = r.getBoundingClientRect(); tout += n.data[i];
     if (!b.height || b.top >= box.bottom - 1) { prev = null; continue; }
     if (prev !== null && b.top > prev.top + 2) coupes.push(tout[tout.length - 2]);
     prev = { top: b.top }; }
-  return { texte: h.textContent, coupes, enfants: [...new Set([...h.children].map((e) => e.tagName))].sort().join(','), svg: h.querySelector('svg') !== null, title: h.getAttribute('title') }; })()`);
+  return { texte: h.textContent, coupes, enfants: [...new Set([...h.children].map((e) => e.tagName))].sort().join(','), svg: h.querySelector('svg') !== null, title: h.getAttribute('title') }; })()`), { max: 10000 }); // mesure posée (deux relevés identiques), plus de délai fixe
 JS
   stop_srv; build_serve "$DI"; RI="$(cdp "$AUX/h7-coupure390.js" "http://127.0.0.1:$PORT" 390 2>&1 | tail -1)"; stop_srv
   assert_eq "H7.14 — PU-G-042 : à 390 px le titre « Le code, branche integration/cockpit-final » passe sur deux lignes, coupé sur « / » et jamais sur « - »" "$(jq_ "$RI" '[j.texte, [...new Set(j.coupes)].join("")].join("|")' 2>/dev/null)" "Le code, branche integration/cockpit-final|/"
@@ -500,6 +512,7 @@ JS
   echo "=== H9 — PU-G-003 : une lecture « indisponible » n'efface ni la branche ni l'ouvreur ==="
   cat > "$AUX/h9.js" <<'JS'
 const [base, mode] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
 if (mode === 'premiere') await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `window.__vfFetch.reponse = { schema: 'vibeflow/cockpit-git-entete@1', etat: 'indisponible', depot: 'depot', branche: null, worktree: null, detache: false, sha7: null }` }); // la lecture du chargement dit « indisponible » aussi : jamais de valeur connue
 await s.naviguer(base + '/');
 await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -507,18 +520,19 @@ await s.attendre(`document.readyState === 'complete' && !!document.querySelector
 const out = {};
 const L = `document.querySelector('.vf-git-ligne')`;
 if (mode === 'connue') await s.attendre(`performance.getEntriesByType('resource').some((e) => e.name.includes('/api/vf/git/entete'))`, 'lecture du chargement terminée'); // sa réponse réelle, tardive sous charge, écraserait sinon la simulation
-else await s.ev(`new Promise((r) => setTimeout(r, 300))`);
+else { await attendreValeur(() => s.ev(`window.__vfFetch.appels.length`), (n) => n >= 1, { max: 10000 }); await stabiliser(() => s.ev(`${L}.querySelector('.vf-git-branche').textContent`), { max: 10000 }); } // la lecture du chargement (simulée) est faite et appliquée avant la simulation
 const signal = () => s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'abc' } }))`);
 const lecture = async (rep) => { // une lecture du serveur (réponse simulée) ; rend l'état de la page une fois la réponse appliquée
   const n = await s.ev(`window.__vfFetch.appels.length`);
   await s.ev(`window.__vfFetch.reponse = ${JSON.stringify(Object.assign({ schema: 'vibeflow/cockpit-git-entete@1', depot: 'depot', branche: null, worktree: null, detache: false, sha7: null }, rep))}`);
   await signal();
   await s.attendre(`window.__vfFetch.appels.length === ${n + 1}`, 'lecture faite');
-  await s.ev(`new Promise((r) => setTimeout(r, 150))`);
-  return s.ev(`(() => { const l = ${L}, o = document.querySelector('#vf-git-ouvreur'), cs = getComputedStyle(l), t = document.createElement('i'); t.style.color = 'var(--text-3)'; document.body.appendChild(t); const neutre = getComputedStyle(t).color; t.remove();
+  // la réponse s'applique après l'appel du mock : on attend la valeur postérieure (branche de la réponse, ligne masquée sur « absent »), puis on la lit posée
+  const lire = () => s.ev(`(() => { const l = ${L}, o = document.querySelector('#vf-git-ouvreur'), cs = getComputedStyle(l), t = document.createElement('i'); t.style.color = 'var(--text-3)'; document.body.appendChild(t); const neutre = getComputedStyle(t).color; t.remove();
     return { branche: l.querySelector('.vf-git-branche').textContent, wt: l.querySelector('.vf-git-wt').textContent, etat: l.querySelector('.vf-git-ligne-etat').textContent, ligneCachee: l.hidden || cs.display === 'none',
       ouvreurCache: !o || o.hidden, dataGit: document.querySelector('header').hasAttribute('data-vf-git'), titre: l.title, aria: l.getAttribute('aria-label'), largeur: l.getBoundingClientRect().width,
       neutre: cs.color === neutre, halo: cs.boxShadow !== 'none' || cs.borderTopWidth !== '0px' || cs.backgroundColor !== 'rgba(0, 0, 0, 0)' }; })()`);
+  return attendreEtStabiliser(lire, (v) => rep.etat === 'ok' ? v.branche.includes(rep.branche) : rep.etat === 'absent' ? v.ligneCachee : /indisponible/.test(v.branche) || /^○/.test(v.branche), { max: 10000 }); // « indisponible » : « Branche indisponible » (aucune valeur connue) ou « ○ <dernière branche> » (non confirmée) — jamais l'état d'avant la réponse
 };
 if (mode === 'connue') {
   out.avant = await lecture({ etat: 'ok', branche: 'feat/memoire', worktree: 'wt-m' });
@@ -597,26 +611,25 @@ JS
   $GIT -C "$DEP8" worktree add -q -b feat/x "$WT8" >/dev/null 2>&1
   cat > "$AUX/h8.js" <<'JS'
 const [base, page, branche] = ARGS; const out = {};
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne') && getComputedStyle(document.querySelector('.vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
 const lue = () => s.ev(`document.querySelector('.vf-git-branche').textContent`);
-const t0 = Date.now(); let txt = await lue();
-while (txt !== branche && Date.now() - t0 < 2000) { await pause(100); txt = await lue(); }
+const txt = await attendreValeur(lue, (v) => v === branche, { pas: 100, max: 2000 }); // « en moins de 2 s » est l'attendu : borne inchangée
 out.ligne = txt;
 await pause(500);
 out.lectures = await s.ev(`performance.getEntriesByType('resource').filter((e) => e.name.includes('/api/vf/git/entete')).length`);
 out.h1 = await s.ev(`(document.querySelector('#context h1') || {}).textContent || null`);
-out.ecart = await s.ev(`(() => { const b = document.querySelector('.vf-git-branche'), w = document.querySelector('.vf-git-wt'), n = w.firstChild, r = document.createRange();
+out.ecart = await stabiliser(() => s.ev(`(() => { const b = document.querySelector('.vf-git-branche'), w = document.querySelector('.vf-git-wt'), n = w.firstChild, r = document.createRange();
   const rect = (a, z) => { r.setStart(n, a); r.setEnd(n, z); return r.getBoundingClientRect(); }, txt = n.textContent, i = txt.indexOf('worktree');
   const point = rect(txt.indexOf('·'), txt.indexOf('·') + 1), mot = rect(i, i + 1), B = b.getBoundingClientRect();
-  return { texte: txt, avant: Math.round((point.left - B.right) * 10) / 10, apres: Math.round((mot.left - point.right) * 10) / 10 }; })()`);
+  return { texte: txt, avant: Math.round((point.left - B.right) * 10) / 10, apres: Math.round((mot.left - point.right) * 10) / 10 }; })()`), { max: 10000 }); // écart mesuré une fois posé
 if (page === '/' && process.env.H8_SIGNAL) {
   (await import('node:child_process')).execFileSync('git', ['-C', process.env.H8_LAB, 'switch', '-q', '-c', process.env.H8_SIGNAL], { stdio: 'ignore' }); // la branche change APRÈS le chargement de la page
   await s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'x' } }))`);
-  const t1 = Date.now(); let h = await s.ev(`document.querySelector('#context h1').textContent`);
-  while (!h.includes(process.env.H8_SIGNAL) && Date.now() - t1 < 2000) { await pause(100); h = await s.ev(`document.querySelector('#context h1').textContent`); }
+  const h = await attendreValeur(() => s.ev(`document.querySelector('#context h1').textContent`), (v) => !!v && v.includes(process.env.H8_SIGNAL), { pas: 100, max: 2000 });
   out.h1Signal = h; out.ligneSignal = await lue();
 }
 out.errs = await s.ev(`window.__errs`);
@@ -624,6 +637,27 @@ return out;
 JS
   build_serve "$WT8"; B8="http://127.0.0.1:$PORT"
   $GIT -C "$WT8" switch -q -c feat/y
+  # le serveur a été lancé AVANT le switch : son filet (NET_MS = 5 s, vf-cockpit-live.mjs:148-150) émet un événement `git` au premier tick qui voit le switch, et la page ouverte à ce moment relirait
+  # l'en-tête une 2e fois (diagnostic H8.1). On laisse donc le filet absorber le switch AVANT les chargements : attente OBSERVABLE du premier événement `git` du flux direct (borne 15 s = 3 ticks).
+  # Sans événement en 15 s, la graine du filet est postérieure au switch (rien à absorber) : on continue, ce que le script dit (« aucun »).
+  cat > "$AUX/attendre-git.mjs" <<'JS'
+// attendre-git.mjs <port> <jeton> <maxMs> : s'abonne à /api/vf/events, imprime « git » au premier événement `git`, « aucun » à l'échéance, « erreur » si l'abonnement échoue
+import http from 'node:http';
+const [, , port, jeton, max] = process.argv; let tampon = '';
+const fin = (m) => { console.log(m); process.exit(0); };
+setTimeout(() => fin('aucun'), Number(max));
+http.get({ host: '127.0.0.1', port: Number(port), path: '/api/vf/events?token=' + encodeURIComponent(jeton) }, (r) => { r.on('data', (c) => { tampon += c; if (/^event: git$/m.test(tampon)) fin('git'); }); }).on('error', () => fin('erreur'));
+JS
+  absorber_filet() { # absorber_filet <étiquette> : après un git switch, attend le premier événement `git` du filet (serveur courant : $OUT, $PORT) ; avertit si rien, FAIL nommé si l'outil d'attente échoue
+    local tok g; tok="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).token)" 2>/dev/null)"
+    g="$(node "$AUX/attendre-git.mjs" "$PORT" "$tok" 15000 2>&1 | tail -1)"
+    case "$g" in
+      git) echo "     filet [$1] : événement git absorbé" >&2 ;;
+      aucun) echo "     ⚠ filet [$1] : aucun événement git en 15 s — graine postérieure au switch (rien à absorber) ou filet muet ; la mesure continue" >&2 ;;
+      *) echo "  ❌ FAIL — H8.0 [$1] — l'attente d'absorption du filet a échoué (« $g ») : la mesure qui suit n'est pas fiable" >&2; echo "$1" >> "$WORK/absorption-ratee.txt" ;; # le FAIL est compté une fois, après les mutants (un sous-shell $(…) ne remonte pas FAIL)
+    esac
+  }
+  absorber_filet principal
   for pg in / /project.html /equipe.html; do
     R8="$(cdp "$AUX/h8.js" "$B8" "$pg" feat/y 2>&1 | tail -1)"
     assert_eq "H8.1 — $pg : après un switch sans réassemblage, la seconde ligne dit la branche réelle (feat/y) en moins de 2 s" "$(jq_ "$R8" 'j.ligne' 2>/dev/null)" "feat/y"
@@ -641,17 +675,22 @@ JS
     $GIT -C "$D" init -q -b main && $GIT -C "$D" add -A && $GIT -C "$D" commit -q -m init
     $GIT -C "$D" worktree add -q -b feat/x "$W" >/dev/null 2>&1
     mutate "$M/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "$2" "$3" || { echo "  ❌ FAIL — $1 : mutation impossible" >&2; echo '{}'; return; }
-    build_serve "$W" "$M"; $GIT -C "$W" switch -q -c feat/y
+    build_serve "$W" "$M"; $GIT -C "$W" switch -q -c feat/y; absorber_filet "$1"
     cdp "$AUX/h8.js" "http://127.0.0.1:$PORT" / feat/y 2>&1 | tail -1; stop_srv
   }
   RM="$(h8mut m-chargement "  relire(); // chargement : la page assemblée peut dater d'avant un \`git switch\`, une seule lecture par chargement
 " "")"
   assert_eq "M-CHARGEMENT — rougit H8.1 (sans la lecture au chargement, la seconde ligne garde feat/x et aucune lecture ne part) alors que l'écart du point médian est là" "$(jq_ "$RM" '[j.ligne, j.lectures, j.ecart.avant >= 4].join("|")' 2>/dev/null)" "feat/x|0|true"
+  RM="$(h8mut m-double "  relire(); // chargement : la page assemblée peut dater d'avant un \`git switch\`, une seule lecture par chargement
+" "  relire(); relire(); // mutant : deux lectures au chargement
+")"
+  assert_eq "M-DOUBLE-LECTURE — témoin : une DOUBLE lecture au chargement rend H8.1 rouge (obtenu 2 ou plus au lieu de 1) : la mesure sait voir un doublon" "$(jq_ "$RM" 'j.lectures >= 2 ? "rouge" : "vert (lectures=" + j.lectures + ")"' 2>/dev/null)" "rouge"
   RM="$(h8mut m-bloc "    if (change && TAB === 'code') ecrireEtRecadrer(); // le bloc de vue Code cite la branche de la même lecture que la seconde ligne
 " "")"
   assert_eq "M-BLOC-VUE — rougit H8.2 (le bloc de vue garde feat/x alors que la seconde ligne dit feat/y)" "$(jq_ "$RM" '[j.ligne, j.h1].join("|")' 2>/dev/null)" "feat/y|Le code, branche feat/x"
   RM="$(h8mut m-ecart "flex: 0 2 auto; white-space: pre; }" "flex: 0 2 auto; }")"
   assert_eq "M-ECART — rougit H8.3 (plus d'écart avant le point médian) alors que la branche est à jour" "$(jq_ "$RM" '[j.ecart.avant >= 4, j.ligne].join("|")' 2>/dev/null)" "false|feat/y"
+  [ ! -s "$WORK/absorption-ratee.txt" ] || { echo "  ❌ FAIL — H8.0 — l'attente d'absorption du filet a échoué ($(tr '\n' ' ' < "$WORK/absorption-ratee.txt")) : leurs mesures ne sont pas fiables"; FAIL=$((FAIL+1)); } # FAIL posé dans un sous-shell $(…) ne remonte pas : relayé par fichier
 fi
 
 echo "=== H6.6 — la feuille de 76 n'emploie que des variables et des valeurs existantes (P78-D-12) ==="

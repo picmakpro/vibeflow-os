@@ -57,7 +57,7 @@ cat > "$AUX/charge.js" <<'JS'
     try { f.contentWindow.localStorage.getItem('vf.terminal.secret'); X.stockageCadre = 'lisible'; } catch (x) { X.stockageCadre = x.name; }
     try { f.contentWindow.postMessage('toggle', '*'); f.contentWindow.postMessage('etat:connecte', '*'); X.postMessage = 'envoye'; } catch (x) { X.postMessage = x.name; }
     const w = window.open(Q + '/', '_blank'); X.open = w ? 'ouvert' : 'bloque';
-    if (w) { await att(1500); try { w.localStorage.getItem('vf.terminal.secret'); X.stockageFenetre = 'lisible'; } catch (x) { X.stockageFenetre = x.name; } try { w.postMessage('toggle', '*'); } catch (x) { void x; } }
+    if (w) { for (let i = 0; i < 80; i++) { try { void w.location.href; } catch (e) { break; } await att(100); } try { w.localStorage.getItem('vf.terminal.secret'); X.stockageFenetre = 'lisible'; } catch (x) { X.stockageFenetre = x.name; } try { w.postMessage('toggle', '*'); } catch (x) { void x; } }
   } catch (x) { X.erreur = String((x && x.message) || x); }
   X.fin = true;
 })()
@@ -82,7 +82,7 @@ await executer(chrome, async (s) => {
   // la même tentative window.open, cette fois avec un geste utilisateur (le bloqueur de fenêtres de Chrome ne l'arrête plus) : la fenêtre s'ouvre-t-elle, son stockage est-il lisible ?
   const g = await s.send('Runtime.evaluate', { userGesture: true, awaitPromise: true, returnByValue: true, expression: `(async () => {
     const w = window.open('http://127.0.0.1:' + window.__xss.q + '/', '_blank'); if (!w) return { open: 'bloque' };
-    await new Promise((r) => setTimeout(r, 1500)); let st; try { w.localStorage.getItem('vf.terminal.secret'); st = 'lisible'; } catch (x) { st = x.name; }
+    for (let i = 0; i < 80; i++) { try { void w.location.href; } catch (e) { break; } await new Promise((r) => setTimeout(r, 100)); } let st; try { w.localStorage.getItem('vf.terminal.secret'); st = 'lisible'; } catch (x) { st = x.name; }
     try { w.postMessage('toggle', '*'); } catch (x) { void x; } return { open: 'ouvert', stockage: st }; })()` });
   res.geste = g && g.result && g.result.value;
   return res;
