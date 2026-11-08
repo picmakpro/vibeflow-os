@@ -593,8 +593,9 @@ await executer(chrome, async (s) => {
       r.v21 = await attendreEtStabiliser(() => q.ev(`(() => { const p = document.getElementById('proposition'), l = document.getElementById('proposition-lancer'), a = p.getBoundingClientRect(), b = l.getBoundingClientRect(), H = innerHeight; return [H, p.scrollTop, p.scrollHeight > p.clientHeight + 1, b.top >= a.top - 0.5, b.bottom <= a.bottom + 0.5, b.bottom <= H + 0.5].join('/'); })()`), (v) => typeof v === 'string' && v.startsWith('300/'), { max: 4000 }); // la géométrie se juge une fois posée (cadre redimensionné, fit du terminal)
       await raz(); await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
     });
-    await essai('v22', async () => { // PU-G-136 / WCAG 2.4.11 (revue du 2026-11-08, S1) : au focus CLAVIER (vraies touches Tab et Maj+Tab), chaque arrêt dans le bandeau est visible, hors du pied collé, à 124, 300 et 450 px ; un arrêt dans le pied (Préparer) est visible dans le bandeau
+    const v22run = async (tactile) => { // PU-G-136 / WCAG 2.4.11 (revue du 2026-11-08, S1) : au focus CLAVIER (vraies touches Tab et Maj+Tab), chaque arrêt dans le bandeau est visible, hors du pied collé, à 124, 300 et 450 px ; un arrêt dans le pied (Préparer) est visible dans le bandeau
       await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+      if (tactile) await s.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 }); // J7 : toucher RÉEL émulé (pointer: coarse), la réserve de 52 px du pied à 44 px
       const lc = (m) => ligne(m) + " -r '0b8c7d6e-1111-4222-8333-444455556666' --fork-session";
       const arret = () => q.ev(`(() => { const p = document.getElementById('proposition'), f = document.activeElement; if (!f || !p.contains(f)) return 'hors'; const pied = p.querySelector('.vf-q-pied'), a = p.getBoundingClientRect(), r = f.getBoundingClientRect(), d = pied.getBoundingClientRect(), H = innerHeight;
         const utile = d.top - a.top, vis = Math.min(r.bottom, d.top) - Math.max(r.top, a.top); // fenêtre utile = au-dessus du pied ; un élément plus haut qu'elle (la commande exacte à 124 px) doit la remplir, un autre doit y tenir entier
@@ -617,8 +618,13 @@ await executer(chrome, async (s) => {
         const noms = (l) => l.map((a) => a.split(':')[0]).join('>'), mal = [...tab, ...maj].filter((a) => a === 'hors' || a.split(':')[1] !== 'true');
         sortie.push(`${H}/${noms(tab)}/${noms(maj)}/${mal.length ? '[' + mal.join(',') + ']' : 'true'}`);
       }
-      r.v22 = sortie.join(';'); await raz(); await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
-    });
+      const coarse = tactile ? 'coarse=' + await q.ev(`matchMedia('(pointer: coarse)').matches`) + ';' : ''; // J7 : le témoin que le média est vrai (sans lui, le parcours tactile jugerait la souris)
+      if (tactile) await s.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+      await raz(); await s.ev(`document.querySelector('iframe[data-t]').style.height = '100vh'`); await pause(200);
+      return coarse + sortie.join(';');
+    };
+    await essai('v22', async () => { r.v22 = await v22run(false); });
+    await essai('v22c', async () => { r.v22c = await v22run(true); });
     await essai('v23', async () => { // S3 (revue du 2026-11-08) : le pied collé a un fond OPAQUE (ce qui défile dessous ne doit pas transparaître derrière « Préparer »)
       await s.ev(`document.querySelector('iframe[data-t]').style.height = '300px'`);
       await raz(); await monter({ id: ID(230), chat: true, lignesChat: { default: ligne('default'), acceptEdits: ligne('acceptEdits'), plan: ligne('plan'), herite: ligne('') } });
@@ -1117,6 +1123,7 @@ if [ -n "$CHROME" ]; then
   assert_eq "LB.V16 — LB3 (PU-G-136) : dans un cadre de 124 px (le plus petit tiroir), la proposition prend sa place sous le terminal (terminal d'au moins 24 px, son bas au-dessus du haut du bandeau, bandeau d'au plus 60 % du cadre, dans le cadre) ; retirée, le terminal reprend au moins 120 px" "$(vv v16)" "124/true/true/true/true/true"
   assert_eq "LB.V21 — PU-G-136 (recette du 2026-11-08) : dans un cadre de 300 px (hauteur du tiroir à l'arrivée d'une proposition), le bandeau le plus long défile (témoin : plus haut que sa fenêtre) et « Préparer dans le terminal » est visible sans défiler : défilement à 0, haut et bas du bouton dans le bandeau, bas du bouton dans le cadre" "$(vv v21)" "300/0/true/true/true/true"
   assert_eq "LB.V22 — S1 (revue du 2026-11-08 ; WCAG 2.4.11) puis F3 (3e tour) : au focus clavier réel, dans un cadre de 124, 300 et 450 px, avec la case du chat, DEUX parcours qui traversent le bandeau — Tab depuis le sélecteur de mode (Annuler, commande, case du chat, Préparer) et Maj+Tab depuis Préparer (case du chat, commande, Annuler, sélecteur de mode) — dont chaque arrêt est nommé et visible, hors du pied collé (Annuler compris : 2 à 4 px sous le pied à 124 px avant F3 ; un arrêt dans le pied : visible dans le bandeau)" "$(vv v22)" "$V22_SAIN"
+  assert_eq "LB.V22c — J7 (passe de suivi) : les mêmes deux parcours Tab / Maj+Tab sous pointer: coarse RÉEL (émulation CDP du toucher ; témoin : matchMedia('(pointer: coarse)') est vrai, « coarse=true » en tête) : au toucher le pied fait 44 px et la réserve de défilement monte à 52 px ; chaque arrêt est nommé, visible, hors du pied" "$(vv v22c)" "coarse=true;$V22_SAIN"
   assert_eq "LB.V23 — S3 (revue du 2026-11-08) : le pied collé de la proposition est positionné (sticky) et son fond est OPAQUE (rgb, jamais rgba ni transparent)" "$(vv v23)" "sticky/true"
   assert_eq "LB.V24 — S2 (revue du 2026-11-08) : après un refus de lancement (occupe), à 300 px avec la case du chat, la raison est visible dans le bandeau et dans le cadre, sans recouvrir le pied ni être recouverte par lui" "$(vv v24)" "300/true/true/true"
   assert_eq "LB.V25 — P5 (revue du 2026-11-08) : après « ok », la consigne « Commande préparée dans le terminal. Appuyez sur Entrée dans le terminal pour démarrer. » est visible alors que la proposition est retirée, y reste sans rien faire, puis disparaît à Entrée dans le terminal (échéance de 100 s) ou à la fin du compte à rebours (échéance de 6 s)" "$(vv v25)" "entree:true:true:absente;compte-a-rebours:true:true:absente"
@@ -1254,6 +1261,9 @@ else sans_effet "M-ETAT-SOUS-PIED"; fi
 if mutant reserve-pied vf-cockpit-terminal-style.mjs 's#^\#proposition { scroll-padding-bottom: calc(var(--sp-32) + var(--sp-8)); }#\#proposition { }#'; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v22"]'; assert_eq "M-RESERVE-PIED — le mutant (la fenêtre de défilement n'a plus de réserve sous le pied) rougit LB.V22 : un arrêt de Tab passe sous le pied collé (case du chat à 300 px, 124 px) (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v22 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v22 === '$V22_SAIN' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-RESERVE-PIED"; fi
+if mutant reserve-pied-tactile vf-cockpit-terminal-style.mjs 's#^@media (pointer: coarse) { \#proposition { scroll-padding-bottom: calc(var(--sp-32) + var(--sp-12) + var(--sp-8)); } }#@media (pointer: coarse) { \#proposition { } }#'; then
+  [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v22c"]'; assert_eq "M-RESERVE-PIED-TACTILE — le mutant (la règle pointer: coarse du remplissage de défilement est vidée : 52 px deviennent 40) rougit LB.V22c : un arrêt de Tab passe sous le pied de 44 px (témoin : la sonde s'exécute et le média est vrai)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v22c === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v22c === 'coarse=true;$V22_SAIN' ? 'sain' : 'rouge')")" "rouge"; }
+else sans_effet "M-RESERVE-PIED-TACTILE"; fi
 if mutant pied-sans-fond vf-cockpit-terminal-style.mjs 's#sticky; bottom: 0; background: var(--raise); }#sticky; bottom: 0; }#'; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v23"]'; assert_eq "M-PIED-SANS-FOND — le mutant (le pied collé perd son fond) rougit LB.V23 : le fond n'est plus opaque (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v23 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v23 === 'sticky/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-PIED-SANS-FOND"; fi
