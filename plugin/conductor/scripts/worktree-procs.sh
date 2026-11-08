@@ -18,6 +18,7 @@
 # Linux : PID du même uid dont le cwd est illisible ; Darwin : sélection différente selon la casse (volume insensible).
 # Détection : macOS `lsof -a -d cwd -Fpn` ; Linux /proc/<pid>/cwd. Aucune méthode, ou lecture vide :
 # code 4 « indéterminé », JAMAIS « 0 trouvé ».
+# Limite : le canari prouve que la lecture contient le script lui-même, pas qu'elle est complète.
 # Réglages de test : VF_WTP_METHODE=lsof|proc|aucune (détection) · VF_WTP_PPID=ps|proc (lecture des parents) ·
 # VF_WTP_LOCALE=aucune (simule l'absence de locale UTF-8) · VF_WTP_ECHEANCE=<s> (échéance lsof) ·
 # VF_WTP_SANS_SIGNAL=1 (n'envoie aucun signal : seule direction sûre).
@@ -63,6 +64,13 @@ ncomp="$(printf '%s' "$P" | awk -F/ '{n=0; for(i=1;i<=NF;i++) if($i!="") n++; pr
 
 [ ! -d "$P/.git" ] || refus "contient un dépôt (.git)"                                    # GARDE:git
 [ ! -d "$P/.claude/worktrees" ] || refus "contient des worktrees (.claude/worktrees)"     # GARDE:worktrees
+# famille « englobe d'autres dépôts » : le chemin lui-même est .claude ou .claude/worktrees, ou un sous-dossier
+# direct / à 2 niveaux porte un .git (fichier ou répertoire). Deux globs, pas de parcours. Le .git FICHIER à la
+# racine d'un worktree reste accepté. Un sous-module (.git fichier à 1-2 niveaux) fait refuser : sens sûr.
+case "$P" in */.claude|*/.claude/worktrees) refus "englobe les worktrees (.claude)" ;; esac   # GARDE:famille-nom
+for g in "$P"/*/.git "$P"/*/*/.git; do
+  [ ! -e "$g" ] || refus "englobe un autre dépôt ou worktree"   # GARDE:famille-git
+done
 
 # --- chemin représentable sans ambiguïté dans la sortie de lsof ?
 case "$P" in *[[:cntrl:]]*|*\\*) echo "[worktree-procs] indéterminé : backslash ou caractère de contrôle dans le chemin" >&2; exit 4 ;; esac   # GARDE:caracteres
@@ -176,8 +184,10 @@ print_sel() {
   done < "$WORK/sel"
 }
 
-vivant() { # vivant <pid> : existe et n'est pas un zombie
-  local s; s="$(ps -o stat= -p "$1" 2>/dev/null | tr -d ' ')"
+vivant() { # vivant <pid> : existe et n'est pas un zombie (/proc sous Linux, ps sinon)
+  local s
+  if [ -r /proc/self/stat ]; then s="$(sed 's/.*) //' "/proc/$1/stat" 2>/dev/null | cut -c1-1)"
+  else s="$(ps -o stat= -p "$1" 2>/dev/null | tr -d ' ')"; fi
   [ -n "$s" ] && [ "${s#Z}" = "$s" ]
 }
 
@@ -197,6 +207,7 @@ if [ "$n" -gt "$MAX" ]; then   # GARDE:plafond
   print_sel >&2
   exit 3
 fi
+vivant $$ || { echo "[worktree-procs] indéterminé : l'état d'un processus n'est pas lisible (ps absent ou en échec)" >&2; exit 4; }   # GARDE:vivant
 cut -f1 "$WORK/sel" > "$WORK/pids"
 while read -r pid; do sig -TERM "$pid"; done < "$WORK/pids"
 i=0

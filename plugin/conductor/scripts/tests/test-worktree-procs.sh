@@ -226,7 +226,7 @@ cas_m2_partiel() { # faux lsof : un seul PID étranger, rc 1 -> lecture partiell
   tuer_tout
 }
 cas_m3_ps() { # ps en échec : la chaîne d'ancêtres ne remonte pas -> rc 4 AVANT tout signal, appelant vivant
-  cible m3; mkdir -p "$TMP/fakeps"; printf '#!/bin/sh\nexit 1\n' > "$TMP/fakeps/ps"; chmod +x "$TMP/fakeps/ps"
+  cible m3; mkdir -p "$TMP/fakeps"; printf '#!/bin/sh\ncase "$*" in *ppid=*) exit 1 ;; *) exec %s "$@" ;; esac\n' "$(command -v ps)" > "$TMP/fakeps/ps"; chmod +x "$TMP/fakeps/ps"
   leurre "$CIB"; local a=$LP got
   got="$(PATH="$TMP/fakeps:$PATH" VF_WTP_PPID=ps bash -c 'cd "$1" && bash "$2" stop --path="$1" >/dev/null 2>&1; echo "rc=$?"; echo VIVANT' _ "$CIB" "$1" 2>/dev/null | tr '\n' ' ')"
   assert_eq "ps en échec : rc 4 et shell appelant vivant" "rc=4 VIVANT " "$got" || return 1
@@ -250,6 +250,26 @@ cas_m2_git() { # chemin englobant un dépôt ou des worktrees : 64 ; .git fichie
   refus_list "chemin avec .claude/worktrees" "$1" "$TMP/m2g/wts" || return 1
   run "$1" list --path="$TMP/m2g/wt"
   assert_eq "témoin : .git fichier accepté rc" 0 "$RC"
+}
+cas_famille() { # chemin englobant : .claude, .claude/worktrees, parent d'un dépôt = 64 ; worktree seul accepté
+  mkdir -p "$TMP/fam/repo/.git" "$TMP/fam/repo/.claude/worktrees/wt" "$TMP/fam/wt0" "$TMP/fam2/x/.claude/worktrees/vide"
+  : > "$TMP/fam/repo/.claude/worktrees/wt/.git"; : > "$TMP/fam/wt0/.git"
+  refus_list "parent d'un dépôt (.git à 2 niveaux)" "$1" "$TMP/fam" || return 1
+  refus_list "dossier .claude seul (par le nom)" "$1" "$TMP/fam2/x/.claude" || return 1
+  refus_list "dossier .claude/worktrees seul (par le nom)" "$1" "$TMP/fam2/x/.claude/worktrees" || return 1
+  refus_list "repo/.claude (.git à 2 niveaux)" "$1" "$TMP/fam/repo/.claude" || return 1
+  run "$1" list --path="$TMP/fam/wt0"
+  assert_eq "témoin : worktree (.git fichier racine) accepté rc" 0 "$RC"
+}
+cas_vivant_sans_ps() { # ps sait donner le parent mais pas l'état : rc 4 avant SIGTERM, leurre épargné (chemin ps seulement)
+  [ -r /proc/self/stat ] && { SKIP=1; return 0; }
+  cible vps; mkdir -p "$TMP/fakevps"; REALPS="$(command -v ps)"
+  printf '#!/bin/sh\ncase "$*" in *stat=*) exit 1 ;; *) exec %s "$@" ;; esac\n' "$REALPS" > "$TMP/fakevps/ps"; chmod +x "$TMP/fakevps/ps"
+  leurre "$CIB" ignterm; local a=$LP
+  OUT="$(PATH="$TMP/fakevps:$PATH" bash "$1" stop --path="$CIB" 2>/dev/null)"; RC=$?
+  assert_eq "stop, état illisible rc" 4 "$RC" || return 1
+  assert_eq "leurre épargné (aucun signal)" vivant "$(etat $a)" || return 1
+  tuer_tout
 }
 cas_m3_lsof_bloque() { # lsof figé : échéance, rc 4, faux lsof tué
   cible m3b; mkdir -p "$TMP/fakeb"; rm -f "$TMP/fakeb.pid"
@@ -279,7 +299,7 @@ cas_survivants() { # rc 2 : signaux neutralisés, le leurre reste -> survivants 
 }
 
 SKIP=0
-CASES="liste_arret frere hors hors_stop appelant plafond sigkill indet_aucune indet_vide refus_absolu refus_dotdot refus_inexistant refus_composants refus_home refus_ancetre stop_refus_reel usage m1_accent m1_sans_locale m1_caracteres m2_partiel m3_ps m1_casse m2_git m3_lsof_bloque comm survivants"
+CASES="liste_arret frere hors hors_stop appelant plafond sigkill indet_aucune indet_vide refus_absolu refus_dotdot refus_inexistant refus_composants refus_home refus_ancetre stop_refus_reel usage m1_accent m1_sans_locale m1_caracteres m2_partiel m3_ps m1_casse m2_git famille vivant_sans_ps m3_lsof_bloque comm survivants"
 [ -n "${WTP_SEUL:-}" ] && CASES="$WTP_SEUL"
 echo "== test-worktree-procs =="
 for c in $CASES; do
@@ -317,6 +337,9 @@ mutant caracteres     m1_caracteres    -e '/# GARDE:caracteres/d'
 mutant locale         m1_sans_locale   -e 's/ \&\& \[ -z "\$LOCALE_LSOF" \]/ \&\& false/'
 mutant locale-forcee  m1_accent        -e 's/LC_ALL="\${LOCALE_LSOF:-C}" lsof/lsof/'
 mutant casse          m1_casse         -e 's/ || return 4   # GARDE:casse/ || :/'
+mutant famille-nom    famille          -e '/# GARDE:famille-nom/d'
+mutant famille-git    famille          -e 's/\[ ! -e "\$g" \] || refus "englobe un autre dépôt ou worktree"/:/'
+mutant vivant         vivant_sans_ps   -e '/# GARDE:vivant/d'
 mutant git            m2_git           -e '/# GARDE:git/d'
 mutant worktrees      m2_git           -e '/# GARDE:worktrees/d'
 mutant absolu         refus_absolu     -e '/# GARDE:absolu/d'
