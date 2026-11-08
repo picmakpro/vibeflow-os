@@ -141,6 +141,8 @@ const RALENTI = `(() => { if (location.origin !== ${JSON.stringify(OQ)}) return;
   Object.defineProperty(window, 'Terminal', { configurable: true, get() { return T; }, set(v) { T = class extends v {
     write(d, cb) {
       if (E.libere) return super.write(d, cb);
+      // clôtures du client (write('') posées par son minuteur de silence, 150 ms) : retenues puis REJETÉES. Sur une CI lente, un trou de plus de 150 ms dans l'arrivée des 360 Ko du tampon en posait une AU MILIEU du rejeu : les réponses de la suite partaient (≈ 131 072 octets + 6b, run 42422526316). La clôture qui compte ici est celle de la frappe, posée après la libération (E.libere) ; le scénario voulu est « tout le tampon arrive d'un bloc »
+      if (d === '') { E.vides = (E.vides || 0) + 1; return; }
       E.file.push([d, cb]); E.retenus++;
       if (!E.armee && typeof d !== 'string') { const t = E.queue + new TextDecoder('latin1').decode(d); E.queue = t.slice(-16);
         if (t.includes('GROS-PRET')) { E.armee = true;
