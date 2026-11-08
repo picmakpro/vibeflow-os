@@ -666,7 +666,7 @@ geste, avec la profondeur explicite et le nœud reçu au digest :
 `--parent=<agentId du worker>` s'ajoute quand le worker connaît son propre identifiant ; sinon
 `--depth=2` suffit à l'ordre feuille vers racine. Le worker ferme l'entrée de son enfant à son
 retour (`close --status=done|failed`). Un worker ne rend pas la main avec un enfant ou une tâche de
-fond vivants (`team-kernel.md` §Fin de tour inerte) ; si l'un survit, il reste `running` au registre,
+fond vivants (`team-kernel.md` §Fin de mandat) ; si l'un survit, il reste `running` au registre,
 et le manager ou son remplaçant doit pouvoir le retrouver.
 
 `register` refuse bruyamment (exit 1, `registry-unwritable`) si le fichier ne s'écrit pas : un
@@ -728,7 +728,7 @@ même dépôt, c'est le scénario mesuré de l'issue.
   repris le mandat du manager mort dans l'arbre du nouveau manager. Conséquence : arrêter de la
   feuille vers la racine ne suffit pas, il faut RELISTER après chaque arrêt et traiter le parent
   réveillé comme un orphelin de plus ; un `completed` assorti de « waiting on its own background
-  work » n'est pas un retour (`team-kernel.md` §Fin de tour inerte, règle du manager).
+  work » n'est pas un retour (`team-kernel.md` §Fin de mandat, règle du manager).
 
 Ces deux points sont des limites observées du runtime, non documentées par Anthropic, qui peuvent
 changer avec une version de Claude Code ; la discipline ci-dessus les rend inoffensives plutôt que
@@ -737,7 +737,7 @@ de s'y fier.
 ### 5. Règle pour les workers
 
 La règle du worker (rien de vivant à la fin du tour) et celle du manager sont dans `team-kernel.md`
-§Fin de tour inerte. Le transcript de l'agent n'est pas un registre : personne ne le relit à la
+§Fin de mandat. Le transcript de l'agent n'est pas un registre : personne ne le relit à la
 reprise, d'où la consignation du §2. Un enfant qui ne s'arrête pas se déclare `blocked`, identifiant
 en finding.
 
