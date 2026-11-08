@@ -719,8 +719,9 @@ await executer(chrome, async (s) => {
     });
     const ENTREE_TOUCHE = (type, extra = {}) => s.send('Input.dispatchKeyEvent', Object.assign({ type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, extra)), SUR_TERMINAL = `!!document.activeElement && document.activeElement.className === 'xterm-helper-textarea'`;
     const TERMINAL_FOCALISE = `document.hasFocus() && document.activeElement && document.activeElement.className === 'xterm-helper-textarea'`;
+    // reprises(r0, pret) : pret = TERMINAL_FOCALISE (élément actif ET fenêtre focalisée) sous émulation de focus (E13, E14) ; SUR_TERMINAL par défaut (E10, E10b, E12) : sans émulation la fenêtre n'a pas le focus par construction, hasFocus() y est faux
     // reprises(r0) : six répétitions de l'Entrée tenue (cadence d'auto-répétition, 40 ms : c'est l'entrée testée) → 0 octet CR attendu après 400 ms ; puis Entrée fraîche → l'octet arrive PUIS reste stable (LB.E14, run 42405220695 : après 500 ms il arrivait parfois plus tard en CI Linux)
-    const reprises = async (r0) => { for (let i = 0; i < 6; i++) { await ENTREE_TOUCHE('keyDown', { text: '\r', autoRepeat: true }); await pause(40); } await pause(400); const tenue = retours() - r0; await ENTREE_TOUCHE('keyUp'); await pause(100); await q.attendre(SUR_TERMINAL, 'saisie du terminal focalisée avant l\'Entrée fraîche'); const n1 = (await journal()).filter((x) => x.u === '/entree').length; await ENTREE_TOUCHE('keyDown', { text: '\r' }); await ENTREE_TOUCHE('keyUp'); await pause(500); const fraiche = await attendreEtStabiliser(() => retours() - r0 - tenue, (n) => n >= 1, { max: 3000 });
+    const reprises = async (r0, pret = SUR_TERMINAL) => { for (let i = 0; i < 6; i++) { await ENTREE_TOUCHE('keyDown', { text: '\r', autoRepeat: true }); await pause(40); } await pause(400); const tenue = retours() - r0; await ENTREE_TOUCHE('keyUp'); await pause(100); await q.attendre(pret, 'saisie du terminal focalisée avant l\'Entrée fraîche'); const n1 = (await journal()).filter((x) => x.u === '/entree').length; await ENTREE_TOUCHE('keyDown', { text: '\r' }); await ENTREE_TOUCHE('keyUp'); await pause(500); const fraiche = await attendreEtStabiliser(() => retours() - r0 - tenue, (n) => n >= 1, { max: 3000 });
       if (fraiche < 1) { const e = await q.ev(`({ focus: document.hasFocus(), actif: document.activeElement && document.activeElement.className, vis: document.visibilityState })`).catch(() => null); const j = await journal(); console.error('DIAG reprises : Entrée fraîche perdue ; état de Q ' + JSON.stringify(e) + ' ; POST /entree avant/après la fraîche ' + n1 + '/' + j.filter((x) => x.u === '/entree').length + ' ; dernières requêtes ' + j.slice(-8).map((x) => x.m + ' ' + x.u + ' ' + x.st).join(', ')); } // trace (stderr, jamais dans le verdict) : où se perd l'octet
       return tenue + '/' + fraiche; };
     await essai('e10', async () => { // LB3-S (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06, remarque du relecteur de LB1-LB2) : Entrée TENUE sur « Préparer » ; le focus revient au terminal après la réponse, les répétitions de la touche ne l'atteignent pas ; Entrée relâchée puis pressée de nouveau passe
@@ -779,7 +780,7 @@ await executer(chrome, async (s) => {
       const sur = await s.ev(PASTILLE); const r0 = retours();
       await ENTREE_TOUCHE('keyDown', { text: '\r' }); await q.attendre(TERMINAL_FOCALISE, 'focus donné au terminal par le parent', MS);
       const premiere = retours() - r0;
-      r.e13 = [sur, premiere, await reprises(r0 + premiere)].join('/');
+      r.e13 = [sur, premiere, await reprises(r0 + premiere, TERMINAL_FOCALISE)].join('/');
     });
     await essai('e14', async () => { // chemin « retour d'onglet » : le focus quitte le terminal, une Entrée est tenue, l'événement focus de la fenêtre de Q redonne le focus au terminal (écouteur window.focus du client) ; répétitions : 0 ; fraîche : 1
       await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
@@ -787,7 +788,7 @@ await executer(chrome, async (s) => {
       await q.ev(`(() => { document.querySelector('.xterm-helper-textarea').blur(); return true; })()`);
       const r0 = retours(); await ENTREE_TOUCHE('keyDown', { text: '\r' });
       await q.ev(`(() => { window.dispatchEvent(new Event('focus')); return true; })()`); await q.attendre(TERMINAL_FOCALISE, 'focus rendu au terminal par la fenêtre', MS);
-      r.e14 = await reprises(r0);
+      r.e14 = await reprises(r0, TERMINAL_FOCALISE);
       await s.send('Emulation.setFocusEmulationEnabled', { enabled: false });
     });
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
