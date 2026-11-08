@@ -584,6 +584,17 @@ JS
   RTI="$(cdp "$AUX/h9.js" "$BASE" connue 2>&1 | tail -1)"; stop_srv
   assert_eq "M-TABINDEX-DEFINITION — le mutant (le titre redevient un arrêt de Tab dès qu'il a porté une définition) rougit H9.1f : « 0/true|0/false » au lieu de « 0/true|aucun/false » (témoin : le témoin positif reste « 0/true »)" "$(jq_ "$RTI" '[j.titreConnu, j.titreIndispo].join("|")' 2>/dev/null)" "0/true|0/false"
 
+  # H7.1b (K4, CI Linux, run 42500903126) : sous Linux, `document.fonts.ready` est déjà résolu quand le script du viewer s'achève ; le viewer pose alors le panneau AVANT les scripts d'extension (dont ui/76, qui réécrit le nom du projet en nom du dépôt) et le titre du panneau gardait « wt-a » (H7.1 : obtenu [depot|wt-a|true|false] sur « / », [depot|wt-a — Projet|true|true] sur le Projet). Condition reproduite sur n'importe quel poste : le viewer d'une copie du module attend `Promise.resolve()` au lieu des polices. Témoin rouge sans le correctif de ui/76 : les deux cas rougissent comme en CI.
+  MP="$(mkmod mpolices)"
+  mutate "$MP/../skills/cockpit-moteur/assets/viewer.html" "const fontsReady = document.fonts?.ready ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();" "const fontsReady = Promise.resolve();" || echo "  ❌ FAIL — H7.1b : mutation impossible" >&2
+  WTP="$WORK/wt-p"; $GIT -C "$DEPOT" worktree add -q -b feat/p "$WTP" >/dev/null 2>&1
+  ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WTP" "$MP"; BASE="http://127.0.0.1:$PORT"
+  for pg in / /project.html; do
+    R="$(cdp "$AUX/h7-nom.js" "$BASE" "$pg" 2>&1 | tail -1)"
+    assert_eq "H7.1b — $pg, polices déjà prêtes avant les scripts d'extension (Linux, CI) : le panneau dit « depot » (le dépôt principal), sans le nom du worktree (wt-p, mesuré par j.pt) ni suffixe « — Projet »" "$(jq_ "$R" '[j.nom, j.pt.join("+"), j.panneauWt, j.suffixe].join("|")' 2>/dev/null)" "depot|depot|false|false"
+  done
+  stop_srv
+
   echo "=== Mutants ==="
   # M-DEPOT : le nom du dépôt pris de --show-toplevel (le worktree) -> H1.1 et H2.2 rougissent
   MD="$(mkmod mdepot)"

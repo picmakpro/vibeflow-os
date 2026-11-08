@@ -14,7 +14,7 @@
   nom.textContent = String(V && V.depot ? V.depot : nom.textContent).replace(SUFFIXE, ''); // GITC-01 : même nom sur les trois onglets, aucun suffixe
   // P78-D-01, P78-D-09 : le panneau de droite lit le même nom que l'en-tête (dépôt principal, jamais « wt-a — Projet »). Posé APRÈS 00-vibeflow.js : le titre de l'onglet, déjà écrit, et les clés
   // enregistrées par nom (flux, visite) gardent leur valeur d'avant.
-  G.project.name = nom.textContent;
+  { const avant = String(G.project.name); G.project.name = nom.textContent; document.querySelectorAll('#panel h2.pt').forEach((t) => { if (t.textContent === avant) t.textContent = G.project.name; }); } // si les polices sont déjà prêtes (Linux, CI), le viewer a posé le panneau AVANT ce script : son titre est réécrit au même nom (K4, H7.1)
 
   // ---------- bloc de vue racine (P78-D-03) : dit ce que montre la vue, jamais le nom du projet — même sans git ----------
   const TAB = G.meta.vfTab === 'project' ? 'project' : G.meta.vfTab === 'equipe' ? 'equipe' : 'code';
