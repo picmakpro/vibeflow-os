@@ -206,6 +206,9 @@ questions ont été posées ensemble ; les réponses sont reprises mot pour mot.
 
 | « Liste « Sur ce tableau » (onglet Projet) : les libellés sont coupés en plein mot (« depuis les cart… ») par une ellipse CSS du moteur vendorisé, pas par le code. Le codeur et le relecteur l'ont classée « limite d'affichage » hors de la promesse PU-G-147 (couper au mot entier) ; le manager recommande de la traiter dans la promesse. Que fait-on ? » (posée à part, réponse horodatée 04:50 UTC environ) | Dans la promesse (Recommandé) : couper le libellé côté code, au mot entier, avant l'affichage (patch du moteur, lot B2) · Hors promesse : garder le classement « limite d'affichage » · Deux lignes | **« Dans la promesse (Recommandé) »** |
 
-Ces quatre décisions sont les seules de la section 8 tranchées à ce jour ; les neuf autres points restent
+| « Zone basse au téléphone (390 à 700 px) : le zoom reste une pile verticale de 52 × 144 px à gauche (ta demande du 2026-11-02), la pastille « Terminal » fait 101,6 × 52 px au même bord. Faut-il changer quelque chose ? » (lot C, Q1) | Garder (Recommandé) : pile du téléphone, pastille avec libellé et largeur, bord gauche commun · Pastille 52 px, icône sans libellé · Zoom en rangée de 144 px au téléphone | **« Garder (Recommandé) »** |
+| « Barre de question sous 1 000 px : elle garde 92 px sur deux rangées (cibles tactiles de 44 px, invite entière sur sa ligne). Au-dessus de 1 000 px elle fait 40 px. Quelle forme sous 1 000 px ? » (lot C, Q2) | Deux rangées (Recommandé) : 92 px de 390 à 999 px, cibles de 44 px (décision 72.1), invite jamais tronquée · Une rangée de 52 px de 701 à 999 · Cibles de 40 px à la souris sous 1 000 px | **« Deux rangées (Recommandé) »** |
+
+Ces six décisions (quatre sur la section 8, deux sur la zone basse de la section 4) sont les seules tranchées à ce jour ; les neuf autres points restent
 au jugement de Samuel. Un commit qui applique l'une d'elles cite ce registre : « arbitrage Samuel,
 AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette ».
