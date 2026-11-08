@@ -74,4 +74,15 @@ assert_eq "T4.3b — témoin : la pastille Terminal est posée à chaque étape 
 assert_eq "T4.4 — le texte de la feuille se lit en entier à chaque étape (le titre et la description tiennent, rien ne défile ni n'est coupé)" "$(g "$X" "j.etapes.every((e)=>e.lisible.texteEntier)")" "true"
 assert_eq "T4.5 — la rangée Passer / Suivant ne recouvre pas le texte (le bas du texte est au-dessus du haut des boutons) et la feuille dépasse 120 px" "$(g "$X" "j.etapes.every((e)=>e.lisible.texteBas<=e.lisible.boutonsHaut&&e.lisible.carteH>120)")" "true"
 assert_eq "T4.6 — le zoom ne recouvre pas la feuille (son bord bas est au-dessus du bord haut de la feuille) et la feuille laisse la pastille libre" "$(g "$X" "j.etapes.every((e)=>e.lisible.zoomBas<=e.lisible.carteHaut&&e.carte.b<=e.lisible.pastilleHaut)")" "true"
+echo "=== T8 — fin de visite avec le terminal : le zoom ne retombe pas sur la pastille (I-1, intégration) ==="
+# la pastille Terminal est posée (--terminal) ; on juge APRÈS la fin de la visite, avec un redimensionnement pendant la visite (« fin ») ou sans (« fin-sans »), de 390 à 1 440 px
+sans_recouvrement() { g "$1" "j.erreur||[j.pendant.pastille,j.apres.pastille,j.apres.visite,j.pendant.zoomPastille||j.pendant.zoomBarre||j.pendant.pastilleBarre||j.apres.zoomPastille||j.apres.zoomBarre||j.apres.pastilleBarre].join(',')"; }
+for w in 390 768 1000 1280 1440; do
+  X="$(mes $w fin)"; [ -n "${DBG:-}" ] && echo "RAW: $X"
+  assert_eq "T8.fin.$w — pastille posée, visite finie, aucun recouvrement zoom / pastille / barre pendant et après la visite (redimensionnement pendant la visite)" "$(sans_recouvrement "$X")" "true,true,false,false"
+done
+for w in 390 768; do
+  X="$(mes $w fin-sans)"; [ -n "${DBG:-}" ] && echo "RAW: $X"
+  assert_eq "T8.sans.$w — pastille posée, visite finie, aucun recouvrement zoom / pastille / barre (sans redimensionnement)" "$(sans_recouvrement "$X")" "true,true,false,false"
+done
 echo; echo "Résultat : $PASS passés, $FAIL en échec"; [ "$FAIL" -eq 0 ]

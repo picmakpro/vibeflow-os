@@ -77,6 +77,9 @@ function scriptTiroir(cfg, accepte, construire) {
     };
     const eviterTout = () => { eviter(d.pastille); eviter(d.puce); };
     window.addEventListener('resize', eviterTout); window.addEventListener('vf-zoom-replie', eviterTout); // le zoom se replie ou se déplie (ui/01-vf-responsive.js, replier()) : la pastille et lui se replacent
+    // I-1 (intégration, revue du lot A) : pendant la visite, la règle !important de html[data-vf-visite] (ui/02-vf-telephone.js) masque le style en ligne du zoom ; un évitement rejoué alors (redimensionnement) mesure le zoom à sa place masquée,
+    // ne voit aucun recouvrement et vide le style en ligne. La visite finie, le zoom retomberait sur la pastille jusqu'au redimensionnement suivant : l'évitement est donc rejoué quand l'attribut apparaît ou disparaît.
+    new MutationObserver(eviterTout).observe(document.documentElement, { attributes: true, attributeFilter: ['data-vf-visite'] });
     // la barre de question apparaît, disparaît ou change de largeur sans que la fenêtre bouge (panneau ouvert ou fermé) : ResizeObserver, puis transitionend de la barre elle-même
     // (left et width transitionnent 450 ms : le dernier rappel de l'observateur tombe avant la fin de left). Filtré sur la barre : un enfant qui finit sa transition ne relance rien.
     { const ask = document.getElementById('ask');

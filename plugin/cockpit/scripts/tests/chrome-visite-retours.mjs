@@ -1,9 +1,10 @@
 // chrome-visite-retours.mjs — témoins des retours du panel sur la visite guidée et le bouton de thème (lot « visite et thème »).
-// Usage : node chrome-visite-retours.mjs <chrome> <urlCode> <largeur> <scenario>      scenario : theme | visite | tiroir | focus
+// Usage : node chrome-visite-retours.mjs <chrome> <urlCode> <largeur> <scenario>      scenario : theme | visite | tiroir | focus | fin | fin-sans
 //   theme    : texte du bouton de thème à l'arrivée puis après chaque clic souris réel (Auto, Clair, Sombre attendus)
 //   visite   : visite ouverte d'office, parcourue jusqu'au bout ; par étape : croix (nom accessible), largeur de la feuille, « Étape n sur N » sur une ligne,
 //              largeur à l'écran de la carte présentée, cadre dessiné autour du titre, boutons éclairés (.tour-target.lit), cartes éclairées visibles
 //   tiroir   : le tiroir Git est ouvert pendant la visite, puis UNE seule Échap réelle : le tiroir doit être fermé
+//   fin      : fin de visite avec le terminal (pastille) après un redimensionnement PENDANT la visite (fin-sans : sans redimensionnement) : le zoom, la pastille et la barre ne se recouvrent pas
 //   focus    : clic souris réel sur le bouton de visite (rouvre la visite), puis une flèche : le bouton ne doit pas porter d'anneau (:focus-visible) ;
 //              activé au clavier (Entrée), il le garde
 // Rend une ligne JSON ou { erreur }.
@@ -43,6 +44,19 @@ await executer(chrome, async (s) => {
     await touche('Tab'); await s.ev("document.getElementById('tour-btn').focus()"); await touche('Enter');
     const clavier = await attendreEtStabiliser(info, (v) => v && v.ouverte === true, { pas: 150, max: 3000 });
     return { souris0, souris1, clavier };
+  }
+  if (scenario === 'fin' || scenario === 'fin-sans') {
+    // I-1 (intégration, revue du lot A) : pendant la visite, une règle !important (ui/02, data-vf-visite) masque le style en ligne du zoom ; si la fenêtre bouge, eviter() (terminal-tiroir) le vide faute de recouvrement visible,
+    // et à la fin de la visite le zoom retombait sur la pastille jusqu'au redimensionnement suivant. 'fin' : un redimensionnement PENDANT la visite ; 'fin-sans' : aucun. On mesure une fois la fin de visite posée.
+    const recouvrements = () => s.ev(`(() => { const R = (e) => { if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? r : null; };
+      const z = R(document.getElementById('zoom')), p = R(document.querySelector('.vf-term-pastille')), a = R(document.getElementById('ask'));
+      const sur = (x, y) => !!x && !!y && x.left < y.right && x.right > y.left && x.top < y.bottom && x.bottom > y.top;
+      return { visite: document.documentElement.hasAttribute('data-vf-visite'), pastille: !!p, zoomPastille: sur(z, p), zoomBarre: sur(z, a), pastilleBarre: sur(p, a) }; })()`);
+    const pendant = await stabiliser(recouvrements, { pas: 300, max: 6000 });
+    if (scenario === 'fin') { await s.ev("window.dispatchEvent(new Event('resize'))"); await stabiliser(recouvrements, { pas: 300, max: 6000 }); }
+    await s.ev('window.VibeFlowTour.end()');
+    const apres = await attendreEtStabiliser(recouvrements, (v) => v && v.visite === false, { pas: 300, max: 6000 });
+    return { pendant, apres };
   }
   // visite : parcours
   const mesure = () => s.ev(`(() => {
