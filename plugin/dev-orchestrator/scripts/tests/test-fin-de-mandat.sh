@@ -8,7 +8,7 @@
 # Contrat D3 :
 #   - team-kernel.md porte une section `## Fin de mandat` ;
 #   - tout WORKER porte l'étiquette `**Fin de mandat**` et, DANS son bloc, les jetons
-#     « jamais en attente », « premier plan », « échéance », « processus », « même tour »,
+#     « aucune main rendue en attente », « premier plan », « échéance », « processus », « même tour »,
 #     « §Fin de mandat » ;
 #   - tout MANAGER porte ce bloc worker ET `**Clôture des workers**` (TaskStop, balayage,
 #     worktree-procs.sh, aucun enfant vivant, orphans, consigne de reprise, §Fin de mandat) ;
@@ -57,7 +57,7 @@ MANAGER_LABEL='**Clôture des workers**'
 HEAD_LABEL='**Balayage de sortie**'
 
 # Jeton par ligne (les jetons contiennent des espaces).
-WORKER_TOKENS='jamais en attente
+WORKER_TOKENS='aucune main rendue en attente
 premier plan
 échéance
 processus
@@ -196,7 +196,7 @@ $p
 }
 
 # --- fixture conforme minimale ---
-BLK_WORKER='- **Fin de mandat** : jamais en attente d'"'"'une tâche de fond, attente au premier plan
+BLK_WORKER='- **Fin de mandat** : aucune main rendue en attente d'"'"'une tâche de fond, attente au premier plan
   avec une échéance ; aucun processus vivant au rapport, dans le même tour (§Fin de mandat).'
 BLK_MANAGER='- **Clôture des workers** : TaskStop sur chaque enfant, balayage via worktree-procs.sh,
   aucun enfant vivant ; orphans signalés, consigne de reprise écrite (§Fin de mandat).'
@@ -275,7 +275,7 @@ printf '\néchéance (hors du bloc)\n' >> "$M/plugin/mobile-test-team/agents/vf-
 expect_red "m3: jeton déplacé hors du bloc (vf-test-runner)" "$M" "vf-test-runner.md: jeton « échéance » absent du bloc **Fin de mandat**"
 
 M="$(new_mutant w-fm)"
-sedf "$M/plugin/product-team-bundle/agents/prd-gate.md" 's/^tools: Read, TaskStop$/tools: Read, TaskStop, jamais en attente, premier plan, échéance, processus, même tour, §Fin de mandat/'
+sedf "$M/plugin/product-team-bundle/agents/prd-gate.md" 's/^tools: Read, TaskStop$/tools: Read, TaskStop, aucune main rendue en attente, premier plan, échéance, processus, même tour, §Fin de mandat/'
 sedf "$M/plugin/product-team-bundle/agents/prd-gate.md" '/\*\*Fin de mandat\*\*/,/§Fin de mandat).$/d'
 expect_red "m4: jetons seulement dans le frontmatter ne comptent pas (prd-gate)" "$M" "prd-gate.md: étiquette **Fin de mandat** absente"
 
@@ -315,6 +315,47 @@ expect_red "m10: membre du plancher absent (prd-gate)" "$M" "prd-gate: membre du
 M="$(new_mutant vide)"
 rm -rf "$M/plugin/dev-orchestrator" "$M/plugin/mobile-test-team"
 expect_red "m11: arbre sans dossiers d'agents → rouge, jamais vert à vide" "$M" "AGENT.md: membre du plancher (head) introuvable" "vf-coder: membre du plancher (worker) introuvable"
+# ====================================================================================
+# Budget d'instructions : les blocs de la fixture conforme ne déclenchent AUCUN marqueur de
+# check-instruction-budget.sh (motif lu dans le script, jamais recopié ; insensible à la casse comme
+# lui). Appliqué à la fixture seulement : sur l'arbre réel, c'est le gate de budget qui juge.
+echo "== blocs de la fixture et marqueurs du budget d'instructions =="
+BUDGET_SH="$(find_repo_root)/plugin/conductor/scripts/check-instruction-budget.sh"
+MARKER_RE="$(sed -n "s/^MARKER_RE='\(.*\)'\$/\1/p" "$BUDGET_SH" 2>/dev/null | head -1)"
+
+# marker_hits ROOT : lignes de blocs (worker, manager, head) qui matchent MARKER_RE, sur toute la fixture
+marker_hits() {
+  local f lab
+  for f in "$1"/plugin/*/agents/*.md "$1"/plugin/*/AGENT.md; do
+    [ -f "$f" ] || continue
+    for lab in "$WORKER_LABEL" "$MANAGER_LABEL" "$HEAD_LABEL"; do
+      extract_block "$f" "$lab" | tr '[:upper:]' '[:lower:]' | grep -Eq -e "$MARKER_RE" && echo "${f#$1/}: $lab"
+    done
+  done
+}
+
+if [ -z "$MARKER_RE" ]; then
+  ko "MARKER_RE lu depuis check-instruction-budget.sh" "motif non vide" "introuvable ($BUDGET_SH)"
+else
+  H="$(marker_hits "$TMP/fx")"
+  if [ -z "$H" ]; then ok "b1: aucune ligne de bloc de la fixture conforme ne matche MARKER_RE"; else ko "b1: fixture sans marqueur" "aucune ligne" "$H"; fi
+  M="$(new_mutant b-jamais)"
+  sedf "$M/plugin/dev-orchestrator/agents/vf-coder.md" 's/au rapport/jamais au rapport/'
+  H="$(marker_hits "$M")"
+  case "$H" in
+    *"vf-coder.md: **Fin de mandat**"*) ok "b2: « jamais » remis dans un bloc → le cas rougit (vf-coder)" ;;
+    *) ko "b2: mutant « jamais » dans un bloc" "rouge sur vf-coder" "[$H]" ;;
+  esac
+  check_root "$M" && ok "b2b: ce mutant reste vert pour la garde de jetons (seul le budget le voit)" || ko "b2b" "vert" "$VIOL"
+  M="$(new_mutant b-doit)"
+  sedf "$M/plugin/dev-orchestrator/AGENT.md" 's/orphans repérés/Il DOIT voir les orphans repérés/'
+  H="$(marker_hits "$M")"
+  case "$H" in
+    *"plugin/dev-orchestrator/AGENT.md: **Balayage de sortie**"*) ok "b3: marqueur en majuscules dans le bloc head → rouge (insensible à la casse)" ;;
+    *) ko "b3: mutant « DOIT » dans le head" "rouge" "[$H]" ;;
+  esac
+fi
+
 
 # ====================================================================================
 echo "== arbre réel =="
