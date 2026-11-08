@@ -225,12 +225,13 @@ await executer(chrome, async (s) => {
     const remonte = await s.ev('window.__escRemonte');
     return { ferme0, ouvert, avant, place, ferme, apres, remonte };
   }
-  if (ACTION === 'tab-titre') { // (EK17, S6 de la revue du 2026-11-08) à 1 440 px, avec le tiroir Git ouvert, le titre de la vue (masqué dessous) n'est plus un arrêt de Tab ; fermé, il l'est de nouveau (la définition du titre reste atteignable au clavier, PU-G-193)
+  if (ACTION === 'tab-titre') { // (EK18, S6 de la revue du 2026-11-08) à 1 440 px, avec le tiroir Git ouvert, le titre de la vue (masqué dessous) n'est plus un arrêt de Tab ; fermé, il l'est de nouveau (la définition du titre reste atteignable au clavier, PU-G-193)
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 800, deviceScaleFactor: 1, mobile: false });
     await s.attendre("!!window.VFGitTiroir && !!document.querySelector('#context h1[tabindex]')", 'tiroir Git et titre à définition');
     await calme();
     const parcours = async () => { // des vraies touches Tab depuis le début de la page : les arrêts, jusqu'au retour au corps de la page
-      await s.ev('document.activeElement && document.activeElement.blur()'); const arrets = [];
+      // blur() ne ramène pas le point de départ de la navigation séquentielle : il reste là où le focus était (dans le tiroir Git qui vient de s'ouvrir, sous Linux CI), et le parcours ne passait plus par le titre, situé avant. La sélection est le point de départ : elle est posée au début du document.
+      await s.ev("(() => { document.activeElement && document.activeElement.blur(); const r = document.createRange(); r.setStart(document.body, 0); r.collapse(true); const g = getSelection(); g.removeAllRanges(); g.addRange(r); })()"); const arrets = [];
       for (let i = 0; i < 60; i++) {
         await touche('Tab', 'Tab', 9);
         const a = await s.stable("(() => { const a = document.activeElement; return !a || a === document.body ? '#fin' : a.closest('#context') ? 'titre' : a.id || a.tagName; })()", 'arrêt de Tab stable');
