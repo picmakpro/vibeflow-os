@@ -1,5 +1,9 @@
 # Changelog — conductor
 
+## [Non publié] — 2026-11-08 (fin de mandat, #223)
+
+**Patch** (aucune release racine : groupée ; aucun bump de `VERSION`). Issue #223 : des workers restaient vivants après leur travail (tâche de fond jamais terminée, commande de premier plan basculée en fond, processus survivants dans le worktree). Doctrine : `references/team-kernel.md` § « Fin de tour inerte » devient **Fin de mandat** (faits F5 à F7 : notification de fin qui réveille, `TaskStop` de vérification après rapport, commande de premier plan basculée en fond par un message entrant ; règles Worker, Manager, Head). Nouveau script `scripts/worktree-procs.sh` (`list` / `stop --path=<abs> [--max=N]` : sélection par cwd, ancêtres exclus, plafond, codes 0/1/2/3/4/64, indéterminé jamais lu comme propre) et sa suite `scripts/tests/test-worktree-procs.sh`. README : ligne du script. Renvois `driver-lock.sh` mis à jour (message de `orphans`, commentaire).
+
 ## [v1.53.2] — 2026-11-05 (non publié : garde machine « workers orphelins »)
 
 **Patch** (aucune release racine : elle sera groupée) : un worker (`vf-coder` en tête) rendait la main pendant qu'une commande Bash tournait en fond (souvent basculée automatiquement par le timeout Bash), et ni lui ni son manager ne pouvaient l'arrêter : leur allowlist `tools:` ne déclarait pas `TaskStop` (mesuré : `No such tool available: TaskStop`). Le lot doctrine/agents ajoute `TaskStop` aux agents ; ce patch pose la garde qui empêche la régression (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05, A1).
