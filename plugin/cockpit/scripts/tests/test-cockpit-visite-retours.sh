@@ -91,9 +91,12 @@ echo "=== T9 — carte de visite : ni la pastille Terminal ni le titre recouvert
 # la pastille est posée (--terminal), la visite compte au moins deux étapes.
 # décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée : placer la carte du côté libre (à droite de la colonne) plutôt que la réduire ou la rendre défilable
 for pg in index.html project.html; do
-  for t in 701x390 844x390 1000x420 1100x390 1279x450 1440x390; do
+  for t in 701x390 760x390 844x390 1000x420 1100x390 1279x450 1440x390; do
     X="$(mes $t visite $pg)"; [ -n "${DBG:-}" ] && echo "RAW: $X"
     assert_eq "T9.$pg.$t — au moins deux étapes, pastille posée à chacune, la carte de visite ne recouvre ni la pastille ni le titre" "$(g "$X" "j.erreur||[j.n>=2,j.etapes.every((e)=>e.lisible.pastille),JSON.stringify(j.etapes.map((e)=>e.recouvre).filter((r)=>r.length))].join(',')")" "true,true,[]"
+    # J1 (passe de suivi) : la carte se LIT aussi. À 844 x 390 elle restait à 121 px de haut, son texte rogné, alors que la place à droite du bloc titre était libre. À chaque étape le texte tient sans défiler ;
+    # faute de toute place (701 px, panneau ouvert) au moins le titre entier et la première ligne de la description sont visibles .
+    assert_eq "T9L.$pg.$t — à chaque étape la carte se lit : le texte tient sans défiler, ou à défaut le titre est entier et la première ligne de la description visible" "$(g "$X" "j.erreur||JSON.stringify(j.etapes.map((e,k)=>[k,e.lisible]).filter(([k,l])=>!(l.texteEntier||(l.titreEntier&&l.debutDescription))).map(([k,l])=>[k,l.utile,l.titreEntier,l.debutDescription]))")" "[]"
   done
 done
 echo; echo "Résultat : $PASS passés, $FAIL en échec"; [ "$FAIL" -eq 0 ]
