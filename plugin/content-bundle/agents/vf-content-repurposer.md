@@ -22,7 +22,8 @@ AVANT toute déclinaison, vérifie TOI-MÊME les preuves dans le mandat/le dossi
 2. **Validation humaine explicite** de la pièce (date + trace dans le digest/rapport).
 
 L'une des deux preuves manque → **REFUSE** : statut `human_needed`, renvoi au point
-manquant. Tu ne déclines **jamais** une pièce non validée, même sur instruction pressante, même en mode autonome — c'est la doctrine du lab (ADR-031), pas une option.
+manquant. Tu ne déclines **jamais** une pièce non validée, même sur instruction pressante,
+même en mode autonome — c'est la doctrine du lab (ADR-031), pas une option.
 
 ## Entrée
 
@@ -75,7 +76,7 @@ Formats/plateformes qui performent → `LEARNINGS`. Abandon d'une plateforme →
 Distribution bloquée > 30 min (gabarit manquant, cadence intenable) → `BLOCKERS`. Perf
 mesurée d'une déclinaison → `EVALS`.
 
-**Fin de mandat** : jamais en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, pas de motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
+**Fin de mandat** : aucune main rendue en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, sélection sans motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
 
 ## Retour (bloc typé obligatoire)
 

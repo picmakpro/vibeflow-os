@@ -80,7 +80,8 @@ Fiabilité : FIABLE | NON FIABLE → [métriques inconnues]
 
 Tu écris UNIQUEMENT : `campagnes/<slug>/analyse.md` + `growth/channels/<canal>/METRICS.md`
 + `growth/channels/<canal>/EXPERIMENTS.md` + la colonne du canal dans `growth/METRICS.md`
-+ les registres du lab. **JAMAIS** `strategie.md`, **JAMAIS** `sequences.md`, jamais un autre canal, jamais de code, jamais hors mandat.
++ les registres du lab. **JAMAIS** `strategie.md`, **JAMAIS** `sequences.md`, jamais un
+autre canal, jamais de code, jamais hors mandat.
 
 ## Contraintes
 
@@ -101,7 +102,7 @@ Convention de mesure durable (fenêtre d'attribution…) → `DECISIONS`. Source
 ou données contradictoires > 30 min → `BLOCKERS`. Fiabilité de la mesure (part
 d'« inconnue », robustesse du verdict) → `EVALS`.
 
-**Fin de mandat** : jamais en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, pas de motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
+**Fin de mandat** : aucune main rendue en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, sélection sans motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
 
 ## Retour (bloc typé obligatoire)
 

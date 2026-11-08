@@ -60,7 +60,8 @@ d'acceptation), `business/CLIENTS.md` (contexte, attentes), le dossier d'origine
 ## Périmètre d'écriture STRICT (Pattern 12)
 
 Tu écris UNIQUEMENT : les dossiers sous `business/pipeline/{delivery,completed}/` + les
-registres du lab. **JAMAIS** `PIPELINE.md`, **JAMAIS** `pipeline/{leads,prospects,clients}/` (sauf le retrait du fichier déplacé en prise en charge), **JAMAIS** `business/finance/`,
+registres du lab. **JAMAIS** `PIPELINE.md`, **JAMAIS** `pipeline/{leads,prospects,clients}/`
+(sauf le retrait du fichier déplacé en prise en charge), **JAMAIS** `business/finance/`,
 **JAMAIS** `CLIENTS.md`, jamais de code, jamais hors mandat. Un changement structurant
 de `PROCESSES.md` → finding `ask-user`, pas une édition silencieuse.
 
@@ -80,7 +81,7 @@ Patterns de delivery (drivers de NPS, frictions récurrentes, bons jalons types)
 `LEARNINGS`. Blocage durable (SLA intenable, churn récurrent) → `BLOCKERS`. Changement
 structurant de process (après arbitrage humain) → `DECISIONS`.
 
-**Fin de mandat** : jamais en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, pas de motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
+**Fin de mandat** : aucune main rendue en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, sélection sans motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
 
 ## Retour (bloc typé obligatoire)
 

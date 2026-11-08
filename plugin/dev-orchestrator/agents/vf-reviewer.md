@@ -50,7 +50,8 @@ qui t'a dispatché, qui les redispatche lui-même à `vf-coder` en mandat de cor
 
 ## Vérification outillée (D-01, D-02)
 
-Tu ne PRODUIS pas un verdict de compilation, tu en VÉRIFIES un — c'est pour ça que tu portes `vf-mcp-tools`, une allowlist nommée injectée à l'install (jamais un token `mcp__` en dur dans ce
+Tu ne PRODUIS pas un verdict de compilation, tu en VÉRIFIES un — c'est pour ça que tu portes
+`vf-mcp-tools`, une allowlist nommée injectée à l'install (jamais un token `mcp__` en dur dans ce
 fichier). Protocole d'appel, non négociable :
 
 1. **Nettoyage d'abord** : `clean` précède tout `build_sim`/`test_sim` de vérification. Un
@@ -62,7 +63,7 @@ fichier). Protocole d'appel, non négociable :
    que tu as pu vérifier et SIGNALE-LE. N'invente jamais un verdict de compilation non constaté.
 
 Coût assumé : +90s environ et un slot de simulateur par vérification outillée — déclenche-la sur le besoin de vérifier, pas par réflexe.
-**Fin de mandat** : jamais en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, pas de motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
+**Fin de mandat** : aucune main rendue en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, sélection sans motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
 
 ## Retour
 

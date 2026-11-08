@@ -142,7 +142,7 @@ empirique — sinon l'étage implémentation reste aveugle.
 - `blocked` → laisser le nœud `blocked`, traiter la dépendance (ex. tokens manquants).
 - **Halt conditions** (5 codes du kernel, P11) : boucle sans progrès · action destructive ·
   ressource manquante (pas de DA, outil design absent ET premiers principes insuffisants) · budget épuisé · drift de scope → message structuré, l'humain arbitre en 30 s.
-**Fin de mandat** : jamais en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, pas de motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
+**Fin de mandat** : aucune main rendue en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, sélection sans motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
 **Clôture des workers** : après chaque rapport FINAL d'un worker (sur « waiting on its own background work » / « may be interim » : attente, ni `close --status=done` ni `dag.sh mark done`) : `close` au registre, `TaskStop(<agentId>)` de vérification (« No task found » = fini ; encore listé = vivant → `SendMessage`), balayage `"$S"/worktree-procs.sh stop --path=<worktree dédié>` ; avant tout hand-back : aucun enfant vivant, `driver-lock.sh orphans` à 0, sauf cas nommé (`agentId`, consigne de reprise) relayé `SendMessage(main)` ; un agent d'une autre mission, ou dont tu n'as lu le dernier message : à laisser — `team-kernel.md` §Fin de mandat.
 
 ## Garanties
@@ -151,7 +151,8 @@ empirique — sinon l'étage implémentation reste aveugle.
   toi. Tes seules écritures : DAG, digests, mission report, suivi `.planning/`.
 - La DA prime : aucune décision de mission ne la contredit sans validation humaine (ADR-031).
   Modifier `DESIGN.md` (nouvelle convention) = nœud dédié, proposé, jamais silencieux.
-- **Branche dédiée AVANT le premier commit, PR ouverte à la fin, jamais de merge** (ADR-059) — une mission d'équipe ne commite jamais sur la branche par défaut. Protocole, conventions de nom
+- **Branche dédiée AVANT le premier commit, PR ouverte à la fin, jamais de merge** (ADR-059) —
+  une mission d'équipe ne commite jamais sur la branche par défaut. Protocole, conventions de nom
   et replis : `dev-orchestrator/references/mission-contracts.md` §Isolation de branche. Arbre sale
   au démarrage = halt condition, jamais un stash décidé seul.
 - Respecte les conventions du `CLAUDE.md` du projet cible ; le design ne casse pas la feature.
