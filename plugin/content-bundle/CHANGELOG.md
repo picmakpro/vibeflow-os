@@ -2,7 +2,7 @@
 
 ## [Non publié] — 2026-11-08 (fin de mandat, #223)
 
-**Patch** (aucune release racine : groupée ; aucun bump de `VERSION`). Issue #223 : des workers restaient vivants après leur travail (tâche de fond jamais terminée, commande de premier plan basculée en fond, processus survivants dans le worktree). Les agents `vf-content-manager`, `vf-content-strategist`, `vf-content-writer`, `vf-content-repurposer`, `content-clarity-judge` reçoivent des blocs **Fin de mandat** (rien en attente d'une tâche de fond, attente au premier plan bornée par une échéance, commit avant le rapport, aucun processus à soi vivant au rapport) et **Clôture des workers** / **Balayage de sortie** selon leur rôle, avec renvoi vers `conductor/references/team-kernel.md` § Fin de mandat (source unique). Aucune ligne ajoutée au compteur du budget d'instructions.
+**Patch** (aucune release racine : groupée ; aucun bump de `VERSION`). Issue #223 : des workers restaient vivants après leur travail (tâche de fond jamais terminée, commande de premier plan basculée en fond, processus survivants dans le worktree). Les agents `vf-content-manager` reçoit des blocs **Fin de mandat** (rien en attente d'une tâche de fond, attente au premier plan bornée par une échéance, commit avant le rapport, aucun processus à soi vivant au rapport) et **Clôture des workers** / **Balayage de sortie** selon leur rôle, avec renvoi vers `conductor/references/team-kernel.md` § Fin de mandat (source unique) ; les autres agents du module, sans `Bash` ni `Agent` dans leurs `tools:`, ne peuvent lancer aucune tâche de fond et ne portent pas le bloc. Aucune ligne ajoutée au compteur du budget d'instructions.
 
 ## [v2.0.18] — 2026-11-05 (fin de tour inerte) — non publiée
 

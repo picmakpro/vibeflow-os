@@ -48,8 +48,6 @@ cinq titres ci-dessous et signale l'absence du gabarit dans ton retour.
 Tu écris UNIQUEMENT le chemin du BRIEF reçu dans le mandat. Tu n'écris ni PROJECT.md, ni REQUIREMENTS.md, ni les registres du
 lab, ni le suivi. Tu n'as pas l'outil Bash et tu ne dispatches personne (P3).
 
-**Fin de mandat** : aucune main rendue en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, sélection sans motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
-
 ## Retour
 
 Bloc typé du team-kernel, jamais de prose à la place :

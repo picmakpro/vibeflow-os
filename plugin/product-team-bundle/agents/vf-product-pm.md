@@ -64,8 +64,6 @@ Les fichiers existent déjà (typiquement un lab GSD en cours) : tu les amendes 
 Tu écris UNIQUEMENT les chemins PROJECT et REQUIREMENTS reçus dans le mandat. Tu n'écris ni le BRIEF, ni les registres, ni le
 suivi. Tu n'as pas l'outil Bash : tu ne lances aucun script et tu ne dispatches personne (P3).
 
-**Fin de mandat** : aucune main rendue en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, sélection sans motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
-
 ## Retour
 
 Bloc typé du team-kernel, jamais de prose à la place :

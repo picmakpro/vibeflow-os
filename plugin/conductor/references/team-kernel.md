@@ -296,26 +296,34 @@ l'arrêt de tout ce que l'agent a lancé, dans le même tour. Mesuré le 2026-11
   le dernier message (un `TaskStop` de la session principale à 03 h sur un worker listé `completed` a tué un juge en attente légitime).
 - **F7** (mesuré par le manager de la mission #223, 2026-11-08). Une commande Bash au premier plan est aussi déplacée en fond par le harnais quand un message arrive pendant qu'elle tourne (« Command was moved to the background so that a message that arrived while it was running can reach you ») : elle continue de tourner et doit être attendue ou arrêtée (`TaskStop` sur son identifiant) comme toute tâche de fond.
 
-**Worker.** Aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (timeout Bash ou message entrant, F7). Toute attente est au premier plan et
-bornée par une échéance explicite : tranches de sommeil sous le timeout Bash puis test de la condition, ou outil Monitor si
-disponible ; un job long se lance détaché (`nohup … &`), PID et journal consignés, puis se sonde au premier plan. Commit AVANT
-tout rejeu long. À l'échéance : arrêt de ses propres processus et `blocked` (identifiant de tâche et PID en finding). Fin de
-mandat = rapport typé + arrêt de ses propres processus (serveurs, navigateurs, tests, `sleep`), PID consignés au lancement,
-jamais par motif de commande ; le tout dans le même tour. Commandes bornées (itérations max, jamais de `pgrep -f` qui se trouve lui-même).
+**Worker.** Aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (timeout Bash ou message entrant, F7) :
+une tâche passée en fond (même automatiquement) s'attend ou s'arrête par `TaskStop(<id de tâche>)` avant le rapport. Toute attente est
+au premier plan et bornée par une échéance explicite : tranches de sommeil sous le timeout Bash puis test de la condition, ou outil
+Monitor si disponible ; un job long se lance détaché (`nohup … &`), PID et journal consignés, puis se sonde au premier plan. Commit AVANT
+tout rejeu long. À l'échéance : arrêt de ses propres processus et `blocked` (id de tâche et PID en finding). Fin de mandat = rapport
+typé + arrêt de ses propres processus (serveurs, navigateurs, tests, `sleep`), PID consignés au lancement, jamais par motif de
+commande ; le tout dans le même tour. Commandes bornées (itérations max, jamais de `pgrep -f` qui se trouve lui-même). Un agent sans
+`Bash` ni `Agent` dans ses `tools:` (juges et rédacteurs en lecture/écriture seule) ne peut lancer aucune tâche de fond : il ne porte pas
+le bloc.
 
-**Manager** (porte AUSSI la règle Worker : il attend ses enfants au premier plan). Après chaque rapport FINAL d'un worker, jamais
-sur « waiting on its own background work » / « may be interim » (attente : ni `close --status=done` ni `dag.sh mark done`) :
-`close` au registre, `TaskStop(<agentId>)` de vérification (F6), puis balayage de son worktree DÉDIÉ par
+**Manager** (porte AUSSI la règle Worker : il attend ses enfants au premier plan). « Rapport final » = bloc typé présent ET aucune
+tâche annoncée en attente (« waiting on its own background work » / « may be interim » : attente, ni `close` ni `dag.sh mark done`).
+Alors, dans cet ordre : `TaskStop(<agentId>)` de vérification D'ABORD (F6) ; « No task found » = fini → `close --status=done` ;
+« owned by <enfant> » ou agent encore listé = vivant → réveil par `SendMessage`, pas de close. Puis balayage par
 `"$S"/worktree-procs.sh stop --path=<abs> [--max=N]` (rc 0 plus rien, 2 survivants, 3 plafond dépassé rien tué, 4 indéterminé ;
-`list` pour constater d'abord) ; sur un arbre partagé par plusieurs workers, balayer seulement quand aucun enfant n'y vit plus.
-Avant tout hand-back ou rapport final, arrêt de budget ou handoff compris : aucun enfant vivant, `driver-lock.sh orphans` à 0,
-sauf cas nommé (`agentId`, consigne de reprise) relayé par `SendMessage(main)`, seule à pouvoir arrêter un enfant vivant (F3) ;
-`close --status=stopped` après sa confirmation.
+`list` pour constater d'abord), seulement d'un worktree git SECONDAIRE ouvert pour le mandat du worker (git-dir ≠ git-common-dir), jamais le
+checkout principal ni le cwd de sa propre session ; sur un arbre partagé par plusieurs workers : `list` et nommer, `stop` seulement quand
+plus aucun enfant n'y vit. Avant tout hand-back ou rapport final, arrêt de budget ou handoff compris : aucun enfant vivant,
+`driver-lock.sh orphans` à 0 (un manager sans registre, tel `vf-test-orchestrator`, liste les agents de fond ; `$S` se résout comme
+`mission-flow.md` §Résolution), sauf cas nommé (`agentId`, consigne de reprise) relayé par `SendMessage(main)`, seule à pouvoir arrêter
+un enfant vivant (F3) ; `close --status=stopped` après sa confirmation.
 
 **Head** (`vibeflow-head`). À la sortie d'un manager : `driver-lock.sh orphans` + liste des agents de fond. Pour chaque enfant de
-CETTE mission encore vivant, lire son dernier message avant tout geste : attente légitime → réveil ou attente ; rapport rendu ou
-attente échouée → `TaskStop` (la session principale peut l'émettre), jamais sur un agent d'une autre mission (F6). Puis balayage
-(`worktree-procs.sh`) des worktrees de la mission.
+CETTE mission encore vivant, lire son dernier message avant tout geste. Attente légitime = l'enfant est un manager qui attend ses
+propres enfants vivants, ou sa tâche progresse (dernier message ou sortie de moins de 30 min) → réveil ou attente. Attente échouée =
+un worker dont le dernier message annonce une attente (règle Worker violée) sans progrès depuis 30 min ; rapport rendu → `TaskStop`
+(la session principale peut l'émettre). Jamais sur un agent d'une autre mission (F6). Puis balayage (`worktree-procs.sh`) des seuls
+worktrees secondaires de la mission, mêmes bornes que le manager.
 
 ## Verrou par compartiment (lab partitionné)
 

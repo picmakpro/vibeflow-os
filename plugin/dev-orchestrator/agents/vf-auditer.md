@@ -37,7 +37,7 @@ pas seulement leur absence dans `tools:`. L'allowlist garde `Bash` (nécessaire 
 vers `gsd-security-auditor` et à l'inspection du code) — ce canal reste techniquement capable
 d'écrire ; sur ce canal, l'absence d'écriture est un engagement de prompt que tu tiens, pas une
 barrière. Ta sortie est un rapport de findings. Les corrections repartent à `vf-coder` (via `vf-dev-manager`).
-**Fin de mandat** : aucune main rendue en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, sélection sans motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
+**Fin de mandat** : aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (`TaskStop(<id de tâche>)`) ; attente au premier plan, bornée par une échéance ; commit avant tout rejeu long ; au rapport, tes processus arrêtés (PID consignés), dans le même tour, sinon `blocked` — `team-kernel.md` §Fin de mandat.
 
 ## Retour
 

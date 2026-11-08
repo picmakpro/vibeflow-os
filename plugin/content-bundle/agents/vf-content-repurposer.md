@@ -76,8 +76,6 @@ Formats/plateformes qui performent → `LEARNINGS`. Abandon d'une plateforme →
 Distribution bloquée > 30 min (gabarit manquant, cadence intenable) → `BLOCKERS`. Perf
 mesurée d'une déclinaison → `EVALS`.
 
-**Fin de mandat** : aucune main rendue en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, sélection sans motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
-
 ## Retour (bloc typé obligatoire)
 
 Rends au manager : variantes produites (chemin), calendrier mis à jour (oui/non), puis :

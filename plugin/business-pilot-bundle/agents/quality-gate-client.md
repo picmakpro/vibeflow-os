@@ -74,8 +74,6 @@ client (ce qui a été VENDU : périmètre, montants, conditions) + le digest du
   L'envoi sans validation humaine n'existe pas, quel que soit ton score (ADR-031).
 - **N'orchestre PAS** (P3) : aucun dispatch, un seul verdict, retour au manager.
 
-**Fin de mandat** : aucune main rendue en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, sélection sans motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
-
 ## Retour (verdict typé obligatoire)
 
 ```json

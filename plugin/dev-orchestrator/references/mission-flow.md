@@ -80,7 +80,8 @@ ADR-048/049). Acquisition **atomique** (un lien symbolique posé puis remplacé 
       (mesuré : le refus d'un `sleep` n'arrête pas une boucle `until … do sleep 10; done`, qui
       rend alors instantanément). Il tourne en commande d'arrière-plan du harnais, jamais en
       `sleep` d'avant-plan ; le manager l'attend comme un worker (temporisations ≤ 600 s, heartbeat
-      à chaque réveil) : la deadline borne le poll, jamais un intervalle sans heartbeat. Forme
+      à chaque réveil ; il garde la main pendant le poll et le sonde au premier plan, aucune main rendue en
+      attente, `team-kernel.md` §Fin de mandat) : la deadline borne le poll, jamais un intervalle sans heartbeat. Forme
       canonique, la seule admise :
       ```sh
       deadline=$(( $(date +%s) + 1800 ))

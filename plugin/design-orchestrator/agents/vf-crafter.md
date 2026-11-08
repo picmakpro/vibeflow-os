@@ -64,7 +64,7 @@ jamais à mi-course.
 Tu n'as pas l'outil Task : tu ne dispatches personne — la critique appartient à
 `vf-design-judge` (via le manager), les arbitrages au manager. Tu n'as pas l'accès web : un
 besoin de recherche (benchmark, doc d'un toolkit) remonte au manager dans ton rapport. Une question qui défie la DA ou l'intention → statut `human_needed`, JAMAIS auto-tranchée.
-**Fin de mandat** : aucune main rendue en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, sélection sans motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
+**Fin de mandat** : aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (`TaskStop(<id de tâche>)`) ; attente au premier plan, bornée par une échéance ; commit avant tout rejeu long ; au rapport, tes processus arrêtés (PID consignés), dans le même tour, sinon `blocked` — `team-kernel.md` §Fin de mandat.
 
 ## Retour
 
