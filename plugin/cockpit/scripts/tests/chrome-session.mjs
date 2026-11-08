@@ -20,6 +20,9 @@
 //   (iframe comprise) et ne lèvent jamais : à l'échéance elles rendent la DERNIÈRE lecture (undefined si toutes les lectures ont levé) — l'assertion juge, la stabilisation ne décide jamais d'un verdict.
 // Une lecture qui lève, ou qui rend undefined (s.ev rend undefined sur une exception de la page), est une NON-LECTURE : jamais stable (deux échecs de suite ne font pas une valeur stable), jamais
 //   acceptée par attendreValeur, même si le prédicat l'accepterait ; rendue seulement comme dernière lecture à l'échéance (undefined). Un prédicat qui lève vaut faux.
+// Attendre ce qui S'ÉCOULE, pas seulement ce qui APPARAÎT : une pause fixe qui précède une lecture laissait peut-être aussi FINIR un flux (réponses en transit, octets en vol dans un PTY ou un tube).
+//   Alors l'attente qui la remplace doit attendre la FIN du flux — compte exact ou sentinelle passée par le même chemin —, pas son premier signe : une stabilisation conclut à tort sur une machine lente.
+//   Cas réel : R1.2 (terminal-xterm) attendait le premier octet au lieu de pause(1200) ; les 131 072 octets de queue des réponses arrivaient après la mesure, R1.3 a rougi en CI.
 // Une pause fixe reste juste pour PROUVER UNE ABSENCE (« rien n'est arrivé en N ms » ne s'attend que par une durée) ou quand la durée est l'objet testé (débounce, cadence de répétition).
 import { spawn } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 
