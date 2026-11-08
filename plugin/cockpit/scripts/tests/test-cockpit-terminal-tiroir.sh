@@ -15,7 +15,8 @@
 #         T21.7/T21.8 (71.5, P71.5-D-06) : la pastille fermée ne recouvre ni la barre de question, ni la feuille de détail, ni le zoom, ni la visite (de 390 à 1280 px, panneau ouvert,
 #         fermé, rouvert, visite affichée, état tactile) + témoin d'atteinte ; mutants M-PASTILLE-SUR-ASK et M-PASTILLE-SANS-RAPPEL
 #         T21.9 à T21.11 (recette du 2026-11-08, lot C ; PU-G-021) : l'axe commun de la zone basse de 390 à 1 440 px sur Code et Projet (zoom, pastille et barre au bord --edge ; pastille large comme
-#         le zoom dès 701 px ; barre de 40 px dès 1 000 px) + mutants M-ZOOM-COLONNE, M-PASTILLE-ETROITE, M-BARRE-A-8
+#         le zoom dès 701 px ; barre de 40 px dès 1 000 px) + mutants M-ZOOM-COLONNE, M-PASTILLE-ETROITE, M-BARRE-A-8 ; correction ciblée (T21.11 étendu, T21.12) : barre à droite de la colonne dès 1 280 px,
+#         retrait unique du champ, bas à --edge sous 701 px, centre commun pastille/barre + mutants M-BARRE-CENTREE, M-BAS-A-8, M-RETRAIT-A-12
 #   T22   recette 71 (G4 ; P71-D-37) : hauteur par défaut = 36 % de la fenêtre (220 à 380 px), bande de carte >= moitié de la fenêtre en 1280x720, hauteur mémorisée plafonnée à 70 %,
 #         la fenêtre qui rétrécit ; mutants M-HAUTEUR-FIXE-320, M-MEMO-NON-BORNEE
 #   T17   T17.1 témoin (messages réels de Q) · T17.2 postMessage de P ignoré · T17.3 MessageEvent forgé ignoré · T17.5 espion : liste fermée, aucun octet du shell (M-MSG-DONNEE)
@@ -631,7 +632,7 @@ const OP = `http://127.0.0.1:${A.P}`, MS = Number(process.env.VF_TIROIR_MS) || 2
 const LARGEURS = A.court ? [[390, 844], [768, 1024], [1000, 800], [1440, 900]] : [[390, 844], [700, 900], [701, 900], [768, 1024], [999, 900], [1000, 800], [1279, 800], [1280, 800], [1440, 900]];
 const MESURE = `(() => {
   const r = (s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(), cs = getComputedStyle(e); if (!(b.width > 0 && b.height > 0) || cs.display === 'none' || cs.visibility === 'hidden') return null; return { x: +b.x.toFixed(1), y: +b.y.toFixed(1), l: +b.width.toFixed(1), h: +b.height.toFixed(1) }; };
-  return { zoom: r('#zoom'), pastille: r('.vf-term-pastille'), barre: r('#ask-form'), edge: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--edge')) || null };
+  return { zoom: r('#zoom'), pastille: r('.vf-term-pastille'), barre: r('#ask-form'), champ: r('#ask-input'), haut: window.innerHeight, sp8: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sp-8')) || null, edge: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--edge')) || null };
 })()`;
 await executer(chrome, async (s) => {
   const rel = [], erreurs = {};
@@ -649,9 +650,9 @@ await executer(chrome, async (s) => {
   }
   const proche = (a, b) => Math.abs(a - b) <= TOL;
   const complets = rel.filter((x) => x.zoom && x.pastille && x.barre);
-  const zoom = [], pastille = [], barre = [];
+  const zoom = [], pastille = [], barre = [], bas = [];
   for (const x of complets) {
-    const { cle, W, zoom: z, pastille: p, barre: b } = x;
+    const { cle, W, zoom: z, pastille: p, barre: b } = x; // x : le relevé entier (champ, haut, sp8)
     // T21.9 : le zoom est au bord --edge ; en rangée dès 701 px, posé au-dessus de la pastille ; en pile (plus haute que large) sous 701 px
     if (!proche(z.x, EDGE)) zoom.push(`${cle}: bord ${z.x}`);
     if (W >= 701 && !(z.l > z.h)) zoom.push(`${cle}: pas en rangée (${z.l}x${z.h})`);
@@ -662,10 +663,20 @@ await executer(chrome, async (s) => {
     if (W >= 701 && !proche(p.l, z.l)) pastille.push(`${cle}: largeur ${p.l} contre zoom ${z.l}`);
     // T21.11 : la barre est au bord --edge jusqu'à 1 279 px (après la colonne du zoom dès 1 280 px), de 40 px dès 1 000 px
     if (W <= 1279 && !proche(b.x, EDGE)) barre.push(`${cle}: bord ${b.x}`);
-    if (W >= 1280 && !(b.x >= z.x + z.l)) barre.push(`${cle}: la barre (${b.x}) recouvre la colonne du zoom (jusqu'à ${+(z.x + z.l).toFixed(1)})`);
+    // correction ciblée du lot C (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, « À droite de la colonne (Recommandé) », consigné en § 10 du rapport GLOBAL de la recette (70bf5046)) : dès 1 280 px la barre part à droite de la colonne,
+    // à un écart --sp-8 (x = 16 + 114 + 8 = 138, le même à 1 280 et à 1 440 px), et ne la recouvre pas
+    if (W >= 1280 && !proche(b.x, z.x + z.l + x.sp8)) barre.push(`${cle}: la barre part à ${b.x} au lieu de ${+(z.x + z.l + x.sp8).toFixed(1)} (colonne ${+(z.x + z.l).toFixed(1)} + écart ${x.sp8})`);
+    // un seul retrait intérieur gauche du champ : --sp-16, à toutes les largeurs (le viewer le mettait à 12 sous 701 px)
+    if (x.champ && !proche(x.champ.x - b.x, 16)) barre.push(`${cle}: retrait du champ ${+(x.champ.x - b.x).toFixed(1)} au lieu de 16`);
+    // T21.12 : le bas de la zone basse. Sous 701 px la barre finit à --edge du bas (comme ses côtés), et zoom, pastille et barre ne se recouvrent pas ; dès 1 280 px, souris, la pastille et la barre ont le même centre (72.1, demande de Samuel du 2026-11-06 : pied de la pastille à --edge + 4)
+    const bi = (o) => x.haut - (o.y + o.h);
+    if (W <= 700 && !proche(bi(b), EDGE)) bas.push(`${cle}: la barre finit à ${+bi(b).toFixed(1)} du bas au lieu de ${EDGE}`);
+    const tr = (a2, c) => a2.x < c.x + c.l && a2.x + a2.l > c.x && a2.y < c.y + c.h && a2.y + a2.h > c.y;
+    if (W <= 700 && (tr(z, p) || tr(z, b) || tr(p, b))) bas.push(`${cle}: zoom, pastille et barre se recouvrent`);
+    if (W >= 1280 && !proche(p.y + p.h / 2, b.y + b.h / 2)) bas.push(`${cle}: centre de la pastille ${+(p.y + p.h / 2).toFixed(1)} contre centre de la barre ${+(b.y + b.h / 2).toFixed(1)}`);
     if (W >= 1000 && !proche(b.h, 40)) barre.push(`${cle}: hauteur ${b.h}`);
   }
-  return { erreurs, n: rel.length, complets: complets.length, edge: [...new Set(rel.map((x) => x.edge))], zoom, pastille, barre };
+  return { erreurs, n: rel.length, complets: complets.length, edge: [...new Set(rel.map((x) => x.edge))], zoom, pastille, barre, bas };
 });
 JS
 cat > "$AUX/chrome-defaut.mjs" <<'JS'
@@ -951,6 +962,7 @@ assert_eq "T21.9 — témoin de l'axe : 18 relevés complets (9 largeurs x Code 
 assert_eq "T21.9 (PU-G-021) — zoom au bord --edge de 390 à 1 440 px : en rangée au-dessus de la pastille de 701 à 1 279 px (plus la pile du haut à droite), pile du téléphone sous 701 px (P70-D-09)" "$(rj "$AX" 'JSON.stringify(j.zoom)')" "[]"
 assert_eq "T21.10 (PU-G-021 ; « Pastille large comme le zoom », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) — pastille au bord --edge de 390 à 1 440 px, aussi large que le zoom dès 701 px" "$(rj "$AX" 'JSON.stringify(j.pastille)')" "[]"
 assert_eq "T21.11 (PU-G-021 ; « Barre au même bord gauche », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) — barre de question au bord --edge jusqu'à 1 279 px, après la colonne du zoom dès 1 280 px, de 40 px dès 1 000 px" "$(rj "$AX" 'JSON.stringify(j.barre)')" "[]"
+assert_eq "T21.12 (PU-G-021 ; correction ciblée du lot C, arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette) — sous 701 px la barre finit à --edge du bas sans que zoom, pastille et barre se recouvrent ; dès 1 280 px la pastille et la barre ont le même centre" "$(rj "$AX" 'JSON.stringify(j.bas)')" "[]"
 mut_axe() { # mut_axe <nom> <fichier> <expression-sed> <groupe qui doit rougir> <groupe qui doit rester vert> : le mutant rougit le groupe visé, et lui seul (témoin : huit relevés complets, aucune erreur)
   if mutant "$1" "$2" "$3"; then
     srv "$MUT_OUT" 1; XM="$(node "$AUX/chrome-axe.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":1}")"; unsrv
@@ -959,7 +971,10 @@ mut_axe() { # mut_axe <nom> <fichier> <expression-sed> <groupe qui doit rougir> 
 }
 mut_axe M-ZOOM-COLONNE index.html 's|^      #zoom { left: var(--edge); right: auto; top: auto; bottom: calc(var(--edge) + var(--vf-ask-bas, 0px)); flex-direction: row;|      #zoom { left: auto; right: var(--edge); top: 80px; bottom: auto; flex-direction: column;|' zoom barre
 mut_axe M-PASTILLE-ETROITE vf-cockpit-terminal-tiroir.mjs "s|n.style.minWidth = zb ? zb.width + 'px' : '';|n.style.minWidth = '';|" pastille barre
-mut_axe M-BARRE-A-8 index.html 's|#ask { width: calc(100% - 2 \* var(--edge)); }|#ask { width: calc(100% - 2 * var(--sp-8)); }|' barre pastille
+mut_axe M-BARRE-A-8 index.html 's|#ask { width: calc(100% - 2 \* var(--edge)); bottom: var(--edge); }|#ask { width: calc(100% - 2 * var(--sp-8)); bottom: var(--edge); }|' barre pastille
+mut_axe M-BARRE-CENTREE index.html 's|#ask { left: calc(var(--edge) + var(--vf-col, 114px) + var(--sp-8)); transform: none;|#ask { left: calc((100% - var(--pw)) / 2); transform: translateX(-50%);|' barre pastille
+mut_axe M-BAS-A-8 index.html 's|#ask { width: calc(100% - 2 \* var(--edge)); bottom: var(--edge); }|#ask { width: calc(100% - 2 * var(--edge)); bottom: var(--sp-8); }|' bas pastille
+mut_axe M-RETRAIT-A-12 index.html 's|#ask-form { padding-left: var(--sp-16); } }|#ask-form { padding-left: var(--sp-12); } }|' barre pastille
 
 echo "=== T22 — hauteur par défaut proportionnelle à la fenêtre (recette 71, G4 ; P71-D-37) ==="
 run_defaut "$OUT"; D="$DJ"

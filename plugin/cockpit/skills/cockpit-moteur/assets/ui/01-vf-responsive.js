@@ -87,7 +87,9 @@
       #ask-form { padding-top: var(--sp-4); padding-bottom: var(--sp-4); padding-right: var(--sp-4); }
     }
     @media (max-width: 700px) { header #crumbs { display: none; } }
-    @media (max-width: 700px) { #ask { width: calc(100% - 2 * var(--edge)); } } /* téléphone : la barre garde le bord gauche de la pastille et du zoom, --edge (16) et non 8, comme de 701 à 1 279 px */
+    @media (max-width: 700px) { #ask { width: calc(100% - 2 * var(--edge)); bottom: var(--edge); } #ask-form { padding-left: var(--sp-16); } } /* correction ciblée du lot C (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (574c8b6f, 70bf5046) ; juge de design 84/100) : --edge vaut pour tout bord de fenêtre (DESIGN.md § 4), le bas de la barre est donc à 16 comme ses côtés (la feuille de détail et le tiroir gardent 8, hors de ce lot) ; et un seul retrait intérieur gauche du champ, 16 à toutes les largeurs (le viewer le met à 12 sous 701 px : l'invite sautait de 4 px au passage de 700 à 701 px) */
+    /* 1 280 px et plus (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, « À droite de la colonne (Recommandé) », consigné en § 10 du rapport GLOBAL de la recette (70bf5046)) : la barre part juste à droite de la colonne zoom/pastille, écart --sp-8 (x = 16 + 114 + 8 = 138), au lieu d'être centrée dans la carte (x = 160 à 1 280, 174 à 1 440 : l'écart variait avec la largeur). --vf-col : largeur de la colonne, relue sur le zoom (une seule source, plus bas). Elle finit à --edge du panneau. */
+    @media (min-width: 1280px) { #ask { left: calc(var(--edge) + var(--vf-col, 114px) + var(--sp-8)); transform: none; width: min(700px, calc(100% - var(--pw) - 2 * var(--edge) - var(--vf-col, 114px) - var(--sp-8))); } }
     /* PU-G-001 / PU-G-002 : fil d'Ariane sous 1 280 px. Racine : libellé court (le nom entier reste le nom accessible, posé par ajuste0). Niveau courant : jamais rogné. Niveaux d'avant : les premiers à céder (masqués par ajuste0). */
     @media (max-width: 1279px) {
       header #crumbs button[data-vf-racine] { font-size: 0; flex: 0 1 auto; min-width: max-content; padding-inline: var(--sp-6); } /* jamais rogné : ajuste0 le masque s'il ne tient pas */
@@ -115,6 +117,9 @@
   // (vf-cockpit-terminal-tiroir.mjs) : à chaque changement de taille de la barre la variable est à jour AVANT que la pastille et le zoom se replacent.
   const barreQ = document.getElementById('ask');
   if (barreQ) { const poser = () => document.documentElement.style.setProperty('--vf-ask-bas', barreQ.offsetHeight ? barreQ.offsetHeight + 8 + 'px' : '0px'); if (window.ResizeObserver) new ResizeObserver(poser).observe(barreQ); window.addEventListener('resize', poser); poser(); }
+  // largeur de la colonne zoom/pastille (le zoom en rangée de 701 px et plus) : la barre de question part à sa droite dès 1 280 px (règle ci-dessus). Relue à chaque changement de taille du zoom, jamais recopiée.
+  const zoomCol = document.getElementById('zoom');
+  if (zoomCol) { const poserCol = () => { if (zoomCol.offsetWidth) document.documentElement.style.setProperty('--vf-col', zoomCol.offsetWidth + 'px'); }; poserCol(); if (window.ResizeObserver) new ResizeObserver(poserCol).observe(zoomCol); window.addEventListener('resize', poserCol); }
   // fil d'Ariane : étiquette les segments courts (moins de 12 caractères), puis masque derrière « … » les segments du milieu tant que le fil déborde (CSS : un segment long garde 64 px)
   const fil = document.getElementById('crumbs'), nomProjet = document.getElementById('proj-name'), gauche = document.querySelector('header .hl');
   let obs = null, replieRaf = null;
