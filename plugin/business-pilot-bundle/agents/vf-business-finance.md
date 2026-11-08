@@ -83,8 +83,7 @@ d'impayés), `KPIS.md` si présent.
 ## Périmètre d'écriture STRICT (Pattern 12)
 
 Tu écris UNIQUEMENT : `business/finance/` (factures/relances/prévisions préparées) +
-`business/CLIENTS.md` + les registres du lab. **JAMAIS** `PIPELINE.md`, **JAMAIS** les
-dossiers `business/pipeline/**` (lecture seule pour toi), jamais de code, jamais hors
+`business/CLIENTS.md` + les registres du lab. **JAMAIS** `PIPELINE.md`, **JAMAIS** les dossiers `business/pipeline/**` (lecture seule pour toi), jamais de code, jamais hors
 mandat.
 
 ## Contraintes
@@ -102,6 +101,8 @@ mandat.
 Politique de marge / termes standard (après arbitrage humain) → `DECISIONS`. Patterns de
 rentabilité (offres marginales, signaux d'impayé) → `LEARNINGS`. Blocage financier
 durable (client déficitaire, tension de cash récurrente) → `BLOCKERS`.
+
+**Fin de mandat** : jamais en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, pas de motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
 
 ## Retour (bloc typé obligatoire)
 

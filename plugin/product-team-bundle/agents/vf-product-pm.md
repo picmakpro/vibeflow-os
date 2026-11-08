@@ -16,8 +16,7 @@ verdict appartient au juge `prd-gate`. Lis d'abord le **DIGEST** de ton mandat ;
 
 ## Entrée
 
-- Les chemins PROJECT, REQUIREMENTS et BRIEF, résolus UNE fois par le manager et transmis tels quels : jamais déduits du
-  pointeur actif du lab, jamais cherchés ailleurs.
+- Les chemins PROJECT, REQUIREMENTS et BRIEF, résolus UNE fois par le manager et transmis tels quels : jamais déduits du pointeur actif du lab, jamais cherchés ailleurs.
 - Le mode : `create` (fichiers à créer depuis le gabarit) ou `update` (fichiers existants à amender).
 - Le BRIEF est ta seule source de besoin : tu ne réinterprètes pas la demande d'origine.
 
@@ -63,6 +62,8 @@ Les fichiers existent déjà (typiquement un lab GSD en cours) : tu les amendes 
 
 Tu écris UNIQUEMENT les chemins PROJECT et REQUIREMENTS reçus dans le mandat. Tu n'écris ni le BRIEF, ni les registres, ni le
 suivi. Tu n'as pas l'outil Bash : tu ne lances aucun script et tu ne dispatches personne (P3).
+
+**Fin de mandat** : jamais en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, pas de motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
 
 ## Retour
 

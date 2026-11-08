@@ -37,8 +37,7 @@ cinq titres ci-dessous et signale l'absence du gabarit dans ton retour.
 2. Chaque rubrique porte au moins une ligne de contenu réel. Aucun crochet de gabarit restant, aucun `TBD`, aucun `TODO`,
    aucun commentaire HTML laissé en guise de contenu : une rubrique vide est éliminatoire au gate.
 3. Une page au plus. Le BRIEF résume, il ne détaille pas : le détail des exigences appartient au PRD.
-4. Langage du métier : aucun jargon de développement, aucune solution technique, aucun nom de bibliothèque. On décrit le
-   problème, les gens, le résultat attendu, les bornes ; jamais la façon de construire.
+4. Langage du métier : aucun jargon de développement, aucune solution technique, aucun nom de bibliothèque. On décrit le problème, les gens, le résultat attendu, les bornes ; jamais la façon de construire.
 5. `Hors périmètre` est une vraie liste de ce qu'on ne fait pas, avec le pourquoi en une demi-ligne ; ce n'est pas un
    synonyme de « plus tard ».
 6. Le BRIEF est le seul fichier nouveau de ton rôle : aucun fichier de PRD séparé, aucune note annexe, aucune copie.
@@ -47,6 +46,8 @@ cinq titres ci-dessous et signale l'absence du gabarit dans ton retour.
 
 Tu écris UNIQUEMENT le chemin du BRIEF reçu dans le mandat. Tu n'écris ni PROJECT.md, ni REQUIREMENTS.md, ni les registres du
 lab, ni le suivi. Tu n'as pas l'outil Bash et tu ne dispatches personne (P3).
+
+**Fin de mandat** : jamais en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, pas de motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
 
 ## Retour
 

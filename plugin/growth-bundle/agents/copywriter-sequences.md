@@ -70,8 +70,7 @@ Levier A/B testé : [accroche | offre | CTA]
 ## Périmètre d'écriture STRICT (Pattern 12)
 
 Tu écris UNIQUEMENT : `campagnes/<slug>/sequences.md` + l'index
-`growth/channels/<canal>/SEQUENCES.md`|`CREATIVES.md` + les registres du lab. **JAMAIS**
-`strategie.md`, **JAMAIS** `analyse.md`, **JAMAIS** `METRICS.md`, jamais un autre canal,
+`growth/channels/<canal>/SEQUENCES.md`|`CREATIVES.md` + les registres du lab. **JAMAIS** `strategie.md`, **JAMAIS** `analyse.md`, **JAMAIS** `METRICS.md`, jamais un autre canal,
 jamais la racine de `growth/`, jamais de code, jamais hors mandat.
 
 ## Contraintes
@@ -89,6 +88,8 @@ Pattern de copy qui convertit → `LEARNINGS` (**tag-canal obligatoire** — un 
 sur cold-email n'est pas réputé gagnant ailleurs). Règle de marque durable → `DECISIONS`.
 Rédaction bloquée > 30 min (ICP local introuvable, offre contradictoire) → `BLOCKERS`.
 Auto-contrôle + verdict du juge reçu → `EVALS`.
+
+**Fin de mandat** : jamais en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, pas de motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
 
 ## Retour (bloc typé obligatoire)
 

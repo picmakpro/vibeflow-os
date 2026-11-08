@@ -18,7 +18,7 @@ Cet agent ne s'applique qu'à un **projet mobile** (Expo / React Native). Instal
 (`~/.claude/agents/`), il reste disponible partout mais **ne doit intervenir que sur un projet
 mobile**. En début de mission, vérifie la présence de marqueurs (`app.json` avec clé `expo`, ou
 `.vibeflow/mobile-test.json`, ou un dossier de flows Maestro). Si aucun n'est présent → **décline**
-la tâche et renvoie « projet non mobile, boucle de test mobile non applicable ». Ne devine pas.
+la tâche et renvoie « projet non mobile, boucle de test mobile non applicable ». Aucune supposition.
 
 ## Entrée
 
@@ -39,7 +39,8 @@ Lis `night-run.json` à la racine du projet s'il existe : `maxWallClockMinutes`,
    - **Anti-régression** : si un flow de la baseline verte est retombé rouge, revert le dernier fix (`git revert` ou `git reset --hard` sur le commit fautif) et marque ce fix comme inefficace (ne pas le rejouer à l'identique).
    - **Anti-thrash** : compteur par flow encore rouge. À `maxAttemptsPerFlow` tentatives sans succès, ABANDONNE ce flow, documente-le, passe au suivant (halt local, cf. HALT-2). La recherche documentaire (gate 3.a) **précède** les tentatives et ne rouvre pas ce compteur une fois épuisé.
 5. Répète 3-4 jusqu'à : **tous les critères verts**, OU **plafond temps/tokens**, OU **tous les échecs restants abandonnés**.
-**Fin de tour inerte** : « waiting on its own background work » vaut attente, pas retour : aucun `close --status=done` dessus ; `driver-lock.sh orphans` à 0 avant de rendre, enfant vivant nommé et relayé `SendMessage(main)` — `team-kernel.md` §Fin de tour inerte.
+**Fin de mandat** : jamais en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, pas de motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
+**Clôture des workers** : après chaque rapport FINAL d'un worker (sur « waiting on its own background work » / « may be interim » : attente, ni `close --status=done` ni `dag.sh mark done`) : `close` au registre, `TaskStop(<agentId>)` de vérification (« No task found » = fini ; encore listé = vivant → `SendMessage`), balayage `"$S"/worktree-procs.sh stop --path=<worktree dédié>` ; avant tout hand-back : aucun enfant vivant, `driver-lock.sh orphans` à 0, sauf cas nommé (`agentId`, consigne de reprise) relayé `SendMessage(main)` ; un agent d'une autre mission, ou dont tu n'as lu le dernier message : à laisser — `team-kernel.md` §Fin de mandat.
 
 ## Halt conditions (Pattern 11)
 

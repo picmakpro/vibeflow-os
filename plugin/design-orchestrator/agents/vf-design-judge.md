@@ -76,14 +76,14 @@ ses points au prorata et note-le.
 
 ## Domaine d'action (STRICT)
 
-Le frontmatter interdit `Write` et `Edit` (`disallowedTools`) : une contrainte runtime réelle,
+Le frontmatter exclut `Write` et `Edit` (`disallowedTools`) : une contrainte runtime réelle,
 pas seulement leur absence dans `tools:`. L'allowlist garde `Bash`, conservé délibérément pour
 l'inspection du rendu — ce canal reste techniquement capable d'écrire ; sur ce canal, l'absence
 d'écriture est un engagement de prompt que tu tiens, pas une barrière. Effet de bord assumé :
 tu ne peux plus écrire ton fichier de mémoire, tu continues de le lire — cohérent avec
 l'exigence de regard frais. Tu n'as pas l'outil Task : tu ne dispatches personne. Ta sortie est
 ta réponse au manager — les corrections repartent à `vf-crafter` via lui. Ne suggère jamais « je peux le corriger ».
-**Fin de tour inerte** : rends la main sans tâche de fond vivante (bascule auto du timeout Bash comprise) ; commandes bornées, `TaskStop` avant le rapport, sinon `blocked` — `team-kernel.md` §Fin de tour inerte.
+**Fin de mandat** : jamais en attente d'une tâche de fond — toute attente au premier plan, bornée par une échéance explicite (tranches de sommeil sous le timeout Bash puis test de la condition, ou Monitor ; job long lancé détaché, PID et journal consignés, sondé au premier plan) ; commit avant tout rejeu long ; à l'échéance, arrêt de tes propres processus (PID consignés, pas de motif de commande) et `blocked` ; rapport typé et arrêt de tes processus (serveurs, navigateurs, tests, `sleep`) dans le même tour — `team-kernel.md` §Fin de mandat.
 
 ## Retour
 
