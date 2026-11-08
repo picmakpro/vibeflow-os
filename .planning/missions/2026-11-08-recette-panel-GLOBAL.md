@@ -17,27 +17,28 @@ Version recettée : branche `feat/cockpit-retours-utilisateurs`, commit `a286f0f
 | Utilisateur non technique | `2026-11-08-recette-panel-nontech.md` | 001-019, 085-092, 111-142, DG-05, 07, 08, 11 (59 + 4) | **75** (Utilité 24, Lisibilité 17, Confiance 21, Finition 13) |
 | Développeur solo | `2026-11-08-recette-panel-dev.md` | 026-084, DG-02, 03, 04, 09, 12 (59 + 5) | **74** |
 | Accessibilité et clavier | `2026-11-08-recette-panel-a11y.md` | 020-025, 177-204, DG-01, 06, plus une contre-vérification clavier transverse (34 + 2) | **64** (21, 17, 15, 11) |
-| Responsable de lab | **non rendu** | 093-110, 143-176, DG-10, 13, 14, 15 (52 + 4) | — |
+| Responsable de lab | `2026-11-08-recette-panel-lab.md` | 093-110, 143-176, DG-04 (côté Projet), DG-10, 13, 14, 15 (52 + 5) | **79** (Utilité 25, Lisibilité 19, Confiance 20, Finition 15) |
 
-**Le juge « responsable de lab » n'a pas rendu.** Il a produit 50 captures (sous `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/`, surtout le panneau Format, PU-G-151 à 155), puis il est resté bloqué sur une attente en arrière-plan à partir de 01:56. Il a été arrêté. Son périmètre n'est **pas jugé** : onglet Projet (vérité des états, panneau de droite, barre de question), panneau « Format de la planification », onglet Équipe et « Qui a la main », masque des secrets. Constat du manager, sans valeur de verdict : la capture de fumée `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/manager/projet-etats-et-terminal-faux-claude-1440.png` montre « STATE.md semble périmé : il dit « prête à planifier ». », la carte « Hors jalon », « 4 lignes du planning non lues — chiffres peut-être incomplets · Voir » et les compteurs 444/476. Il faut un nouveau passage de juge sur ce périmètre (voir la fin du document).
+**Juge « responsable de lab » : deux passages.** Le premier juge a pris 50 captures, gardées sous `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab-tour1/`, puis il a été arrêté depuis la session principale pendant une attente en arrière-plan ; il n'a pas rendu de rapport. Un juge neuf a refait tout le périmètre sur un banc remonté de zéro (ports 4462 et 4482). Ses consignes interdisaient toute attente en arrière-plan et lui faisaient écrire le rapport au fil de l'eau. Ses captures sont sous `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/`. Le Chromium de la révision 1223 manquait ; il a lancé la révision 1254, présente sur la machine, via `executablePath`. Il n'a pas utilisé le terminal, qu'aucune de ses propositions ne demandait.
 
-## Comptes (152 propositions jugées sur 204, 11 diagnostics sur 15)
+## Comptes (204 propositions, 15 diagnostics)
 
-| Verdict | Non technique | Développeur | Accessibilité | **Total** |
-|---|---|---|---|---|
-| livré | 31 | 39 | 19 | **89** |
-| partiel | 10 | 5 | 9 | **24** |
-| non livré | 6 | 11 | 1 | **18** |
-| régression | 1 | 1 | 0 | **2** (+ 1 hors registre) |
-| clos par arbitrage, vérifié | 2 | 2 | 1 | **5** |
-| mis de côté, constaté | 2 | 0 | 1 | **3** |
-| non reproduit | 7 | 1 | 2 | **10** |
-| constat de classe C | — | — | 1 | **1** |
-| non jugé (juge lab) | | | | **52** |
+| Verdict | Non technique | Développeur | Accessibilité | Responsable de lab | **Total** |
+|---|---|---|---|---|---|
+| livré | 31 | 39 | 19 | 38 | **127** |
+| partiel | 10 | 5 | 9 | 6 | **30** |
+| non livré | 6 | 11 | 1 | 7 | **25** |
+| régression | 1 | 1 | 0 | 0 | **2** (+ 1 hors registre) |
+| clos par arbitrage, vérifié | 2 | 2 | 1 | 0 | **5** |
+| mis de côté, constaté | 2 | 0 | 1 | 1 | **4** |
+| non reproduit | 7 | 1 | 2 | 0 | **10** |
+| constat de classe C | — | — | 1 | — | **1** |
 
-Diagnostics : livrés DG-02, 03, 04, 06, 07, 08, 12 ; partiels DG-05 (régression au téléphone, ci-dessous) et DG-11 (attendu) ; clos DG-09 ; non reproduit DG-01 (v2.76.0 ne reproduit pas non plus l'échec Git sur ce banc) ; non jugés DG-10, 13, 14, 15.
+Diagnostics : 11 livrés (DG-02, 03, 04 côté Code et côté Projet, 06, 07, 08, 10, 12, 13, 14, 15) ; 2 partiels, DG-05 (régression au téléphone, ci-dessous) et DG-11 (partiel attendu) ; DG-09 clos ; DG-01 non reproduit (v2.76.0 ne reproduit pas non plus l'échec Git sur ce banc).
 
-**Lecture des non livrés.** 16 des 18 visent des propositions que la mission n'a jamais promises : classe C hors lots (016, 028, 031, 033, 046, 053, 056, 065, 069, 073, 075, 076, 088, 129, 185) ou Q2 restée sans réponse (004, 005). Une seule est une **promesse rompue** : **PU-G-137**. La réponse Q8 A « Non, Projet et Code » comportait « on empêche seulement la frappe de déclencher le canevas » ; or sur l'onglet Équipe, à 1 440 px, après un clic sur le fond, les touches p, g, + et − déplacent et zooment toujours le canevas (translate de 106 à 302 px, échelle de 1,1 à 1,32). Capture : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/nontech/PU-G-137-equipe-apres-frappes-1440.png`.
+**Lecture des non livrés.** 23 des 25 visent des propositions que la mission n'a jamais promises : classe C hors lots (016, 028, 031, 033, 046, 053, 056, 065, 069, 073, 075, 076, 088, 095, 108, 109, 129, 145, 157, 169, 185) ou Q2 restée sans réponse (004, 005). **Deux sont des promesses rompues :**
+- **PU-G-137** : la réponse Q8 A « Non, Projet et Code » comportait « on empêche seulement la frappe de déclencher le canevas ». Or sur l'onglet Équipe, à 1 440 px, après un clic sur le fond, les touches p, g, + et − déplacent et zooment toujours le canevas (translate de 106 à 302 px, échelle de 1,1 à 1,32). Capture : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/nontech/PU-G-137-equipe-apres-frappes-1440.png`.
+- **PU-G-147** : les réponses du chat sont encore coupées en plein mot. Sur Projet à 1 440 px, la question « Qu'est-ce qui reste à faire dans la phase 72 ? » donne une réponse qui finit sur « … puis avec le vr… ». Ce n'est pas une régression : en v2.76.0, la même réponse ne contenait pas de phrase. Captures : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/PU-G-147-coupe-vr-neuf-1440.png` contre `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/PU-G-147-coupe-vr-ancien-1440.png`.
 
 ## 1. Régressions (marchait en v2.76.0, ne marche plus)
 
@@ -68,6 +69,9 @@ Un retrait n'est **pas** une régression : le bouton « Écrans » a disparu de 
 - **Panneau de détail entre 600 et 999 px** : il est bien fermé par défaut, mais choisir une carte ou un fichier **ne l'ouvre jamais**, à la souris comme au toucher. À 390 px, la feuille s'ouvre. Capture : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-fichier-choisi-jointe-768.png`.
 - **PU-G-020** : l'en-tête passe d'abord dans l'ordre de tabulation, mais les cartes ne sont jamais atteintes et la pastille Terminal vient en dernier. **PU-G-189** : Échap dans « Au travail » ferme aussi une visite ouverte. **PU-G-188** : le tiroir n'a pas de bouton de fermeture. **PU-G-179** : le verrou périmé de `sess-willy-gouv`, sans session connue, n'est pas signalé.
 - **PU-G-038** : la limite à 3 lignes manque sur la vue Phase de Travail récent (5 lignes, sans « Lire la suite »). **PU-G-041** : « route » reçoit le toucher à 390 px mais n'affiche pas de définition. **PU-G-066** : la liste « Fichiers » affiche encore « 4.0k ». **PU-G-068** : la fiche de `driver-lock.sh` n'a pas la mention « extrait brut ». **PU-G-080** : constats de santé et demande « Corriger avec Claude » en anglais (partiel attendu, BACKLOG).
+- **PU-G-150** : la réponse locale sur le planning ne se déclenche qu'avec la formule exacte « lignes du planning non comprises ». Une question posée naturellement, ou avec le mot du panneau (« non lues »), part au modèle. Capture : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/chat-b-q1-neuf-1440.png`.
+- **PU-G-163** : « Pas encore de description » reste affiché sur les groupes « Terminés depuis moins de 24 h » et sur l'agent general-purpose.
+- **Verrou périmé non signalé** (PU-G-179, constaté par deux juges) : « gouvernance · sess-willy-gouv — tenu depuis 2 h » s'affiche comme un verrou normal, alors que le délai est de 1 800 s. Même affichage en v2.76.0. Capture : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/tiroir-au-travail-bas-neuf-1440.png`.
 - **PU-G-009** : le mot du thème (« Thème : Auto ») n'apparaît que dans le menu ⋯ ; dès 1 000 px, le bouton montre seulement une icône.
 - **PU-G-002** : à 1 000 px, avec un fichier ouvert, le nom du dépôt tombe à « v » et le fil d'Ariane est rogné (« Gates du dépô »). Capture : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/nontech/PU-G-002-fil-ariane-fichier-1000.png`.
 
@@ -86,6 +90,11 @@ Un retrait n'est **pas** une régression : le bouton « Écrans » a disparu de 
 - **« Au travail » et « Qui a la main »** : en français ; « Session qui pilote », « Qui a la main » et « orphelin ? » s'affichent ; titres /rename présents ; « tenu depuis » stable.
 - **Tiroir Git** : étiquette complète au survol et au focus ; pilotage au clavier (`g`, Échap qui rend le focus, y compris à 390 px) ; copies nommées et annoncées.
 - **Santé** : compte exact (4 = 3 à corriger + 1 mineur), clés de test signalées, plus de conseil « découper » ou « supprimer » sur le fichier vendorisé.
+- **Onglet Projet, états vrais** : la Phase 72 est « À recetter » partout, dans « Maintenant », sur la carte, dans la visite et dans « Prochaines phases ». La mention « STATE.md semble périmé : il dit « prête à planifier » » apparaît, mais elle ne dit pas quoi faire. « Hors jalon » est juste. Les compteurs sont cohérents : 79 phases, 12 jalons, 444/476 exigences (doublons supprimés, DG-10). Captures : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/explore-projet-neuf-1440.png` contre `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/explore-projet-ancien-1440.png`, et `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/PU-G-099-hors-jalon-groupe-1440.png`.
+- **Panneau Format** : alerte en tête du panneau, mots courants, lignes copiables. « Copier » copie **exactement** le texte affiché (489 caractères sur 489, égalité stricte), avec des chemins absolus qui existent sur disque. Captures : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/PU-G-151-signal-tete-panneau-1440.png`, `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/PU-G-153-apres-copier-1440.png`.
+- **« Qui a la main » et onglet Équipe** : les sessions portent leur nom /rename et leur branche ; « Qui a la main » affiche des noms au lieu d'identifiants ; les orphelins sont visibles ; « Aucune commande récente » et le regroupement « × n » sont présents. Capture : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/equipe-neuf-1440.png`.
+- **Masque des secrets** : aucun des trois secrets factices n'apparaît en clair, ni à l'écran ni dans les réponses réseau. Le jeton `xxxghp_…` s'affiche « curl … », la clé `key_sk-proj-…` s'affiche « export … », et pour `sk-ant-…` la variable est retirée (« node scripts/sonde.mjs »). Le masquage se fait côté serveur. Captures : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/secret-oeil-*.png`.
+- **Chat** : la réponse est bien remise à zéro entre deux questions (DG-04). La pastille « Qu'est-ce qui bloque ? » garde son apostrophe (DG-14). Les pastilles sans apostrophe vues après une réponse du modèle viennent du faux claude du banc, pas du produit.
 - **Chiffres** : « 24 sur 41 cartes », conductor 10/10, vue d'un module juste (DG-03, DG-12).
 - **Contre-vérification clavier** : tenus PU-G-014 (fenêtre d'export), 018 (noms accessibles), 019 (recherche « / »), 116 (« Préparation… », `aria-busy`, focus gardé) ; 117 tenu en partie (Maj+Tab depuis la saisie du terminal ne remonte pas au bandeau) ; non tenus 031 et 139, deux propositions de classe C non promises.
 
@@ -117,6 +126,11 @@ Gains par rapport à v2.76.0 : la saisie revient au bord de 16 px de 701 à 1 27
 | Lancement | Densité du bandeau | 6 | Tout est expliqué, mais c'est long et le bouton tombe hors de vue (non technique) |
 | Terminal | Phrase d'accueil | 8 | « Elle répond exactement à ma peur » (non technique) |
 | Visite | Feuille au téléphone, forme seule | 7 | Bonne forme, il lui manque la place pour le texte (non technique) |
+| Format | Glyphes du panneau (triangle « lu malgré », losange « non lu ») | 8 | Formes distinctes du rond « À faire », lisibles dans les deux thèmes (lab) |
+| Mots | Titre « 4 bloqué(s) » | 5 | Le pluriel entre parenthèses fait brouillon ; « 4 éléments bloqués » se lirait mieux (lab) |
+| Mots | Pastille « Qu'est-ce qui bloque dans Phase 72 ? » | 6 | Il manque l'article (« dans la Phase 72 ») (lab) |
+| Projet | Nom « Hors jalon » | 8 | Juste et court, mais le panneau l'étiquette « Jalon » (lab) |
+| Équipe | Cartes de session | 7 | Le titre /rename et la branche suffisent, mais il reste un grand vide au milieu de la carte (lab) |
 | Au travail | Œil « voir la dernière commande » (PU-G-187) | 8 | Dit « regarder » sans évoquer un terminal (accessibilité) |
 | Au travail | Titre figé sans fond opaque (PU-G-188) | 7 | Rassurant, mais le texte qui défile se devine derrière (accessibilité) |
 
@@ -126,6 +140,7 @@ Gains par rapport à v2.76.0 : la saisie revient au bord de 16 px de 701 à 1 27
   - `aria-label="Terminal input"` sur la saisie du terminal, annoncé par un lecteur d'écran à chaque entrée ;
   - les 4 constats de santé, « One file is very large », « 1,146 lines » et la demande « Corriger avec Claude » entière (BACKLOG, PU-G-080 part C) ;
   - les nombres au format anglais « 4.0k » à « 1.0k » dans la liste « Fichiers » d'un module ;
+  - « Backlog » et « Releases » / « Release », titres de cartes et de panneau sur l'onglet Projet (`/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/explore-projet-neuf-1440.png`) ;
   - la page transitoire au chargement de Code et au passage Projet → Code (de 60 à plus de 600 ms selon la charge, déjà présente en v2.76.0, PU-G-017 classe C) : « Search files, routes, modules », « Flows », « Ask anything about this codebase... », « checking... », « Laying out… », et les titres de fenêtre « vibeflow-os map » et « VibeFlow · Code ».
 - **Données affichées telles quelles** :
   - titres de tâches d'agents : « Replay CI gates job », « Review machine-paths fix diff », « Fix check-machine-paths awk macOS » (PU-G-185) ;
@@ -147,6 +162,13 @@ Gains par rapport à v2.76.0 : la saisie revient au bord de 16 px de 701 à 1 27
   - le tiroir « Au travail » n'a pas de nom accessible ;
   - l'infobulle de « 8 au travail » garde un identifiant de session brut ;
   - la saisie du chat a un anneau de focus de 1 px, contre 2 px ailleurs.
+- **Onglet Projet** (lab) :
+  - une phase faite affiche « Lancer du travail — Bloqué : La phase est terminée. » avec un « Cadrer » grisé ;
+  - les panneaux de jalon écrivent leur description deux fois ;
+  - la Phase 36 « RÉSERVÉ » compte comme « 1 clos » dans « Hors jalon » ;
+  - « Voir la dernière commande » met 2 à 10 s sous charge, sans indicateur ;
+  - « Quitter le tableau » perd la carte sélectionnée ;
+  - l'en-tête est tronqué en « vibeflow… · non confirm » après une plongée dans l'onglet Équipe.
 - **Cartes** : deux cartes « Readme » homonymes dans « Racine du dépôt ». Le détail et les captures sont dans les rapports des juges.
 
 ## 8. Ce que Samuel doit regarder lui-même (goût pur, dix points)
@@ -157,11 +179,16 @@ Gains par rapport à v2.76.0 : la saisie revient au bord de 16 px de 701 à 1 27
 4. **Le libellé « Ensemble »** pour la vue (701-999 px, et sur Projet et Équipe dès 1 000 px). Capture : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/nontech/PU-G-002-fil-ariane-fichier-1000.png`.
 5. **La densité du bandeau de lancement** et le bouton sous le pli. Capture : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/nontech/PU-G-136-bandeau-hauteur-par-defaut-1440.png`.
 6. **La feuille de visite au téléphone** : la forme plaît au juge ; sa hauteur est un défaut (régression 1). Capture : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/nontech/DG-05-feuille-code-etape3-390.png`.
-7. **Les traits au repos et les cartes atténuées en sombre**. Captures : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-029-liens-au-repos-jointe-1440-sombre.png`, `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-030-selection-cockpit-jointe-1440-sombre.png`.
+7. **Les libellés du Projet** : « 4 bloqué(s) » (5/10), la pastille « … dans Phase 72 ? » sans article (6/10), et « STATE.md semble périmé » qui ne dit pas quoi faire. Captures : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/DG-14-PU-G-143-bloque-apres-chip-neuf-1440.png`, `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/lab/explore-projet-neuf-1440.png`. (Les traits au repos et les cartes atténuées en sombre, notés 8/10 et sans désaccord, sortent de la liste ; voir la section 5.)
 8. **Le bloc de titre de la vue Phase** (paragraphe de 5 lignes). Capture : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-038-travail-recent-titre-jointe-1440.png`.
 9. **Le menu ⋯ opaque, avec icônes et légende**. Captures : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/nontech/PU-G-008-menu-plus-768-sombre.png`, `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/nontech/PU-G-008-menu-plus-390-sombre.png`.
 10. **Le tiroir « Au travail »** : titre figé sans fond opaque, et l'œil « dernière commande ». Captures : `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/a11y/PU-G-188-au-travail-defile-1440.png`, `/Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/a11y/PU-G-187-oeil-derniere-commande-1440.png`.
 
-## 9. Reste à faire
+## 9. Suite proposée
 
-Il faut un second passage du juge « responsable de lab » sur son périmètre non jugé (PU-G-093 à 110, 143 à 176, DG-10, 13, 14, 15) : états vrais de l'onglet Projet, « STATE.md semble périmé », « Hors jalon », panneau Format et commande copiable, « Qui a la main », masque des secrets. Le banc se remonte avec `scratchpad/recette/setup-lab.sh lab` et `lab-old`, puis `cockpit.sh lab open` et `lab-old open`. Ce passage doit précéder toute correction des régressions 1 à 3 et de PU-G-137.
+Il n'y a plus de périmètre non jugé. Le prochain geste proposé est un lot de corrections, après validation de Samuel :
+- les régressions 1 à 3 : feuille de visite au téléphone, infobulle après une recherche, titres de la recherche Projet ;
+- les deux promesses rompues, PU-G-137 et PU-G-147 ;
+- les parts promises manquantes : zoom de 701 à 1 279 px (PU-G-021), focus du tiroir qui s'ouvre (PU-G-203), définitions Git au focus (PU-G-193 et 196), panneau qui ne s'ouvre pas au choix d'une carte entre 600 et 999 px, PU-G-150, PU-G-163, verrou périmé non signalé.
+
+Les dix points de la section 8 restent au jugement de Samuel.
