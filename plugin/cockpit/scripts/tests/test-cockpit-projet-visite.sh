@@ -383,9 +383,12 @@ const r = await executer(chrome, async (s) => {
   await s.ev(`(() => { const ids = [...VibeFlow.nodes.keys()].slice(0, 3).map((k) => 'n:' + k);
     const ans = { title: 'Réponse', answer: 'Trois cartes.', items: ids.map((id) => ({ id, note: ${JSON.stringify(NOTE)} })), steps: ids.map((id) => ({ id, note: ${JSON.stringify(NOTE)} })), followups: [] };
     const f = window.fetch; window.fetch = (u, x) => String(u).includes('/api/ask') ? Promise.resolve(new Response('event: answer\\ndata: ' + JSON.stringify(ans) + '\\n\\n')) : f(u, x); })()`);
+  // Le moteur de réponse est celui du serveur (FLOORPLAN_SERVER.cli = un `claude` sur le PATH) : sans lui (CI Linux, aucun claude), askState.engine reste nul, le champ est désactivé et submitAsk() rend la main sans rien afficher (aucune ligne, R3.23 vide en CI). La réponse est simulée ci-dessus : le moteur n'est pas l'objet de la sonde, il est posé comme le serveur le poserait avec un claude.
+  await s.ev(`(() => { if (!askState.engine) setEngine('cli', 'Claude'); return askState.engine; })()`);
   await s.ev(`(() => { const i = document.querySelector('#ask-input'); i.value = 'Question'; document.querySelector('#ask-form').requestSubmit(); })()`);
   const lire = () => s.ev(`(() => { const rows = [...document.querySelectorAll('#panel a.row[data-sel]')]; return rows.map((a) => { const rd = a.querySelector('.rd'), rn = a.querySelector('.rn'); const c = (e) => e ? { txt: e.textContent, coupe: e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1 } : null; return { rd: c(rd), rn: c(rn), title: a.getAttribute('title') || '', parcours: /Walkthrough|Parcours/.test((a.closest('.sec')?.querySelector('h3')?.textContent) || '') }; }); })()`);
   const rows = await attendreEtStabiliser(lire, (v) => Array.isArray(v) && v.length >= 6, { max: 20000 });
+  if (!Array.isArray(rows) || rows.length < 6) console.error('DIAG tableau : ' + (Array.isArray(rows) ? rows.length : String(rows)) + ' ligne(s) ; ' + JSON.stringify(await s.ev(`({ moteur: askState.engine, champ: document.querySelector('#ask-input').disabled, occupe: askState.busy, panneau: (document.querySelector('#panel') || {}).innerText && document.querySelector('#panel').innerText.slice(0, 300) })`).catch(() => null)));
   return { rows, note: NOTE, nom: NOM };
 });
 console.log(JSON.stringify(r));
