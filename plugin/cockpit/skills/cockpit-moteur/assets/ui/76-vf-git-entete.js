@@ -79,7 +79,7 @@
   const styleVue = document.createElement('style');
   styleVue.textContent = '.vf-ctx-titre { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }\n.vf-ctx-seg { display: inline-block; max-width: 100%; vertical-align: top; overflow-wrap: anywhere; }';
   document.head.appendChild(styleVue);
-  // le premier rendu peut précéder ce fichier (l'analyseur rend la main entre deux scripts) : on réécrit aussi à l'arrivée du fichier, puis à « ready »
+  // le premier rendu attend DOMContentLoaded (donc ce fichier) ; la réécriture à l'arrivée du fichier est un garde défensif et idempotent, puis « render » et « ready » prennent le relais
   SC.on('render', (e) => { if (e && e.container === 'root') ecrireEtRecadrer(); });
   SC.on('ready', () => { if (SC.state && SC.state.container === 'root') ecrireEtRecadrer(); });
   if (SC.state && SC.state.container === 'root') ecrireEtRecadrer();

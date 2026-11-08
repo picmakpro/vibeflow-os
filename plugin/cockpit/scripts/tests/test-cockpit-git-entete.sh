@@ -593,7 +593,7 @@ JS
     R="$(cdp "$AUX/h7-nom.js" "$BASE" "$pg" 2>&1 | tail -1)"
     assert_eq "H7.1b — $pg, polices déjà prêtes avant les scripts d'extension (Linux, CI) : le panneau dit « depot » (le dépôt principal), sans le nom du worktree (wt-p, mesuré par j.pt) ni suffixe « — Projet »" "$(jq_ "$R" '[j.nom, j.pt.join("+"), j.panneauWt, j.suffixe].join("|")' 2>/dev/null)" "depot|depot|false|false"
   done
-  # H7.1c (K5-2, même cause que H7.1b) : sous la même condition, `ready` partait avant les scripts d'extension, donc avant l'écouteur `SC.on('ready', arriver)` de ui/00-vibeflow.js : une arrivée par lien profond `#r=<id>` ne révélait plus la carte visée. La carte (d-src, le seul nœud du lab) doit être sélectionnée.
+  # H7.1c (K5-2) : garde de non-régression de l'arrivée par lien profond `#r=<id>` dans le nouvel ordre de démarrage, sous la même condition que H7.1b (polices déjà prêtes avant les scripts d'extension). Ce n'est pas le témoin du correctif : l'arrivée par `#r=` n'était pas cassée, H7.1c et M-ARRIVER restent verts avec le viewer d'avant K5 ; le témoin du correctif, ce sont D18.4b et H7.1b. La carte (d-src, le seul nœud du lab) doit être sélectionnée.
   cat > "$AUX/h7-arrivee.js" <<'JS'
 const [base, page, cible] = ARGS;
 const { stabiliser } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)

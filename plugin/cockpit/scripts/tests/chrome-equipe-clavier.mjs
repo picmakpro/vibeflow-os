@@ -21,7 +21,8 @@
 //   tab-titre         : (EK18, S6, revue du 2026-11-08) 1 440 px : vraies touches Tab, le titre de la vue est un arrêt Git fermé, ne l'est pas Git ouvert, l'est de nouveau refermé → { ferme, ouvert, referme, verdict }
 //   libelles          : (EK11) ligne des sources du tiroir et infobulle de la recherche de l'onglet Équipe → { src, titre }
 // Rend une ligne JSON { ... } ou { erreur }. Socle : chrome-session.mjs (une instance de Chrome, fermée proprement).
-import { executer } from './chrome-session.mjs'; import { parcoursTab } from './chrome-parcours-tab.mjs';
+import { executer } from './chrome-session.mjs';
+import { parcoursTab } from './chrome-parcours-tab.mjs';
 const [, , chrome, url] = process.argv;
 const ACTION = process.env.EK_ACTION || '';
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout";
