@@ -23,6 +23,11 @@ export REAL_HOME="$HOME"; export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 PASS=0; FAIL=0
+# Moteur de questions : sans `claude` sur le PATH du serveur, la barre de question porte l'avis « no_engine » et mesure 56 à 75 px de plus (CI Linux, run 42486502412, R14.4 et R17.2 :
+# 376 au lieu de 432 à 800 px, 256 au lieu de 312 à 768 px, 587 au lieu de 662 à 1 024 px ; reproduit sous macOS en retirant `claude` du PATH). Les positions absolues de la suite sont celles de la barre
+# SANS avis (92 px, 40 px à 1 024 px) : le serveur reçoit donc un faux `claude` (le témoin du moteur, comme test-cockpit-moteur-carte.sh), identique sur le poste d'un dev et en CI.
+# Le cas sans moteur a son propre bloc (R25, en fin de suite) : le zoom se pose 8 px au-dessus de la barre TELLE QU'ELLE EST.
+FAUXBIN="$WORK/fauxbin"; mkdir -p "$FAUXBIN"; cp "$(dirname "$0")/temoins/fauxbin-claude/claude" "$FAUXBIN/claude"; chmod +x "$FAUXBIN/claude"; PATH_AVEC_MOTEUR="$FAUXBIN:$PATH"; export PATH="$PATH_AVEC_MOTEUR"
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [${2:0:600}]"; FAIL=$((FAIL+1)); fi; }
 assert_has() { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): [$3]"; echo "     obtenu:  [${2:0:600}]"; FAIL=$((FAIL+1)); fi; }
 
@@ -546,6 +551,8 @@ r15c_mutant p3 "if (!change && !g) return;" ""
 r15c_mutant p4 "git.fermer(true); return; }" "void 0; return; }" # P4 et F5 tiennent le même repli (à l'ouverture du panneau, quel que soit le chemin) : ce mutant-ci le supprime, et rougit donc aussi f5 ; le suivant ne vise que « Détail »
 r15c_mutant f1 "choixPalette = dansPalette(ev) && ev.target.closest && ev.target.closest('#results .r') ? { clavier: false } : null;" "choixPalette = (dansPalette(ev) || sur(ev)) ? { clavier: false } : null;" # F1 : le geste armé au pointeur posé sur le graphe (l'ancien comportement)
 r15c_mutant j6 "dansPalette(ev) && document.querySelector('#results .r.active') ? { clavier: true } : null;" "dansPalette(ev) ? { clavier: true } : null;" # J6 : le geste de la palette armé même sans résultat choisi (l'ancien comportement)
+r15c_mutant j6s "choixPalette = ev.key === 'Enter' && dansPalette(ev) &&" "choixPalette = dansPalette(ev) &&" # J6 variante Espace (revue finale, M-C) : le geste de la palette armé par toute touche de la saisie (l'Espace est un caractère de la requête)
+r15c_mutant j6k "ev && ev.type === 'keydown' && (ev.key === 'Enter' || ev.key === ' ') && sur(ev) ? { clavier: true } : null;" "ev && ev.type === 'keydown' && (ev.key === 'Enter' || ev.key === ' ') && sur(ev) ? null : null;" # le choix clavier sur une carte de #svg n'ouvre plus le panneau (témoin de la variante Espace : l'Entrée et l'Espace d'une carte, hors palette, ouvrent toujours)
 r15c_mutant f5 "if (mi.matches && git && git.ouvert()) git.fermer(true); return; }" "if (mi.matches && document.activeElement !== btn && git && git.ouvert()) git.fermer(true); return; }" # F5 : le repli oublie les ouvertures par « Détail » (le bouton a le focus, au clic comme au clavier)
 r15c_mutant p4b "if (e.detail && e.detail.ouvert && mi.matches && ouvert()" "if (false && mi.matches && ouvert()"
 r15c_mutant s7 "ev.stopPropagation(); ev.preventDefault(); sansTrace(() => bascule(false));" "ev.preventDefault(); sansTrace(() => bascule(false));"
@@ -592,7 +599,7 @@ assert_eq "R15.8 — Projet / 768 px : Échap referme le panneau (témoin : il s
 assert_eq "R15.9 — Projet / 768 px : le bouton « Détail » referme le panneau" "$(mv_ "$WORK/r15t-bouton.json" 'j.mesures["768"].m.tiroir')" "false"
 assert_eq "R15.10 — Projet / 768 px : un rendu de plus sur la même sélection (flux en direct) ne rouvre pas le panneau refermé" "$(mv_ "$WORK/r15t-referme.json" 'j.mesures["768"].m.tiroir')" "false"
 SAIN_P1="true|aucune|false|aucune|false|true|vf-cockpit:panel=false"; SAIN_P2="true|true|true|true"; SAIN_P3="false|true"; SAIN_P4="768:true:false|999:true:false"; SAIN_S7="true|false|true"; SAIN_P4B="768:touche:false:true:aucune:false|999:clic:false:true:aucune:false"
-SAIN_F1="false|false|false|false|false|false|true"; SAIN_J6="true|false|true|true|false"; SAIN_F5="768:clavier:true:false:PANEL:vf-cockpit:panel=true|999:clic:true:false:PANEL:vf-cockpit:panel=true"
+SAIN_F1="false|false|false|false|false|false|true"; SAIN_J6="true|false|true|true|false"; SAIN_J6S="true|false|true|true|false"; SAIN_J6K="true|true"; SAIN_F5="768:clavier:true:false:PANEL:vf-cockpit:panel=true|999:clic:true:false:PANEL:vf-cockpit:panel=true"
 assert_eq "R15c.1 — P1 : à 768 px, choisir une carte puis Échap n'écrivent PAS la préférence du panneau (aucune clé) ; le rechargement à 768 px le retrouve fermé, à 1 440 px ouvert (défaut du bureau) ; « Détail » l'écrit bien (témoin : la clé existe, false)" "$(mv_ "$WORK/r15c.json" 'j.p1')" "$SAIN_P1"
 assert_eq "R15c.2 — P2 : par la palette au clavier réel (/, saisie, Entrée) le panneau s'ouvre et le focus y entre, y compris une fois le recentrage de la carte terminé" "$(mv_ "$WORK/r15c.json" 'j.p2')" "$SAIN_P2"
 assert_eq "R15c.3 — P3 : fermé par « Détail » à la souris, un rendu de la MÊME sélection 150 ms plus tard ne rouvre pas le panneau (false) ; choisir une autre carte le rouvre (témoin : true)" "$(mv_ "$WORK/r15c.json" 'j.p3')" "$SAIN_P3"
@@ -602,6 +609,8 @@ assert_eq "R15c.5 — S7 : un Échap réel (focus au corps de la page) referme l
 assert_eq "R15c.7 — F1 : fermé par « Détail », un glisser sur le fond du graphe ne rouvre pas le panneau, ni le rendu qui suit (souris réelle, doigt réel, pincement : six fois false) ; un vrai clic sur une carte le rouvre (témoin : true)" "$(mv_ "$WORK/r15c.json" 'j.f1')" "$SAIN_F1"
 assert_eq "R15c.8 — F5 : tiroir Git ouvert, « Détail » (clavier à 768 px, clic réel à 999 px) ouvre le panneau, replie Git, laisse le panneau au sommet (PANEL, jamais GIT) ; la préférence n'est écrite que par ce bouton (panel=true)" "$(mv_ "$WORK/r15c.json" 'j.f5')" "$SAIN_F5"
 assert_eq "R15c.9 — J6 : un geste de palette qui ne choisit rien (saisie sans résultat, Entrée, Échap) ne laisse aucun armement : fermé par « Détail », le panneau ne se rouvre pas au rendu suivant (témoins : carte choisie, panneau ouvert puis fermé, aucun résultat, palette refermée)" "$(mv_ "$WORK/r15c.json" 'j.j6')" "$SAIN_J6"
+assert_eq "R15c.9b — J6, variante Espace (revue finale, M-C) : dans la saisie de la palette l'Espace est un caractère de la requête, seule l'Entrée choisit un résultat : saisie « pha » (un résultat actif : témoin), Espace, Échap, rendu : le panneau fermé par « Détail » reste fermé (témoins : carte choisie, panneau ouvert puis fermé, résultat actif, palette refermée)" "$(mv_ "$WORK/r15c.json" 'j.j6s')" "$SAIN_J6S"
+assert_eq "R15c.9c — J6, témoin du choix clavier hors palette (F1) : Entrée puis Espace sur une carte de #svg (choisie par un écouteur de la sonde) ouvrent le panneau fermé par « Détail » (true|true)" "$(mv_ "$WORK/r15c.json" 'j.j6k')" "$SAIN_J6K"
 for i in "${!R15C_ID[@]}"; do
   n="${R15C_ID[$i]}"; v="$(mv_ "$WORK/mut-r15c-$n.json" "j.$n")"; eval "sain=\$SAIN_$(printf %s "$n" | tr a-z A-Z)"; echo "     trace du mutant $n : $v"
   assert_eq "R15c.m-$n — le mutant de la règle « $n » rougit R15c (le champ $n n'est plus « $sain »)" "$([ "$v" = "$sain" ] && echo sain || echo rouge)" "rouge"
@@ -767,6 +776,26 @@ done
 assert_eq "R24.5 — racine à 1 000 px : le nom « vibeflow-os » n'est pas rogné (la racine, qui ne tient pas, est masquée plutôt que rognée)" "$(ev24 "$R245a" '(()=>{const v=j.resultats[0].valeur;return v.nom+" rogne="+v.nomRogne})()')" "vibeflow-os rogne=false"
 assert_eq "R24.5 — racine à 1 279 px : nom non rogné, racine écrite « Ensemble », nom accessible « Vue d'ensemble », non masquée" "$(ev24 "$R245b" '(()=>{const v=j.resultats[0].valeur;return v.nom+" rogne="+v.nomRogne+" "+(v.racine?v.racine.court+"/"+v.racine.nomAccessible+" masque="+v.racine.masque:"racine absente")})()')" "vibeflow-os rogne=false Ensemble/Vue d'ensemble masque=false"
 
+
+# R25 — sans moteur de questions (aucun `claude` sur le PATH du serveur, le cas de la CI Linux et d'un poste neuf) : la barre porte l'avis « no_engine » et est plus haute ; le zoom en rangée de 701 à 1 279 px
+# se pose quand même 8 px au-dessus de la barre telle qu'elle est (PU-G-021), jamais sur elle. Le PATH du serveur est un dossier de liens vers les seuls outils dont il a besoin (jamais celui du poste, qui peut porter un vrai `claude`).
+echo "=== R25 — sans moteur de questions : l'avis allonge la barre, le zoom reste 8 px au-dessus d'elle ==="
+SANS="$WORK/bin-sans-moteur"; mkdir -p "$SANS"; for b in node git sh bash env dirname date mkdir cat rm grep sed seq sleep ln cp chmod touch kill pwd printf tr awk ps pgrep head tail wc basename uname; do p="$(command -v $b 2>/dev/null)"; [ -n "$p" ] && ln -sf "$p" "$SANS/$b"; done
+r25_serveur() { PATH="$SANS" command -v claude >/dev/null 2>&1 && { echo "  ❌ le dossier sans moteur porte un claude"; FAIL=$((FAIL+1)); }; local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
+  ( cd "$lab" && PATH="$SANS" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
+  SRV_PID=$!; PIDS+=($SRV_PID); for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
+  SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"; }
+r25_serveur "$LC/.vibeflow/cockpit"; P_sm=$SRV_PORT; PID_sm=$SRV_PID
+OPIDS=()
+for onglet in index project; do mes "http://127.0.0.1:$P_sm/$onglet.html" 768,800,1024 - > "$WORK/r25-$onglet.json" & OPIDS+=($!); done
+wait "${OPIDS[@]}"
+SRV_PID=$PID_sm; unsrv
+for onglet in index project; do
+  for w in 768 800 1024; do
+    assert_eq "R25.0 — $onglet / $w px sans moteur : l'avis est affiché, la barre est plus haute que sans avis (témoin de l'état de départ)" "$(mv_ "$WORK/r25-$onglet.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.askBarre?(m.askBarre[3]>(${w}===1024?40:92)):'barre absente'})()")" "true"
+    assert_eq "R25.1 — $onglet / $w px sans moteur : le zoom (rangée au bord gauche) se pose 8 px au-dessus de la barre telle qu'elle est (écart au pixel près : 7 à 9)" "$(mv_ "$WORK/r25-$onglet.json" "(()=>{const m=j.mesures[\"$w\"].m;if(!m.zoom||!m.askBarre)return 'mesure absente';const e=m.askBarre[1]-(m.zoom.r[1]+m.zoom.r[3]);return e>=7&&e<=9?'8':'écart '+e})()")" "8"
+  done
+done
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

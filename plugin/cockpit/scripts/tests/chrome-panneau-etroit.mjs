@@ -2,15 +2,15 @@
 // Revue de la recette du 2026-11-08 (lot B, PU-G-045) : P1 la préférence « panneau ouvert » du bureau n'est écrite que par le bouton « Détail » · P2 la palette au clavier amène le focus dans le panneau ·
 // P3 un rendu de la même sélection, peu après la fermeture par « Détail », ne rouvre rien · P4 ouvrir le panneau par une sélection replie le tiroir Git · S7 Échap referme le panneau SANS effacer la sélection.
 // F1 (3e tour) : fermé par « Détail », un glisser sur le fond (souris réelle, doigt réel, pincement) ne rouvre rien, un rendu non plus ; un clic réel sur une carte rouvre (témoin) · F5 : « Détail » (clavier, clic réel) avec Git ouvert replie Git.
-// Rend sur une ligne { p1, p2, p3, p4, p4b, s7, f1, f5, j6 } (chaînes courtes à comparer mot pour mot) ou { erreur }. Chaque scénario repart d'un stockage vide.
+// Rend sur une ligne { p1, p2, p3, p4, p4b, s7, f1, f5, j6, j6s, j6k } (chaînes courtes à comparer mot pour mot) ou { erreur }. Chaque scénario repart d'un stockage vide.
 import { executer, pause, attendreValeur } from './chrome-session.mjs';
 const [, , chrome, url] = process.argv;
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout";
-const CODES = { Tab: [9, 'Tab'], Escape: [27, 'Escape'], Enter: [13, 'Enter'], '/': [191, 'Slash'], g: [71, 'KeyG'] };
+const CODES = { Tab: [9, 'Tab'], Escape: [27, 'Escape'], Enter: [13, 'Enter'], '/': [191, 'Slash'], g: [71, 'KeyG'], ' ': [32, 'Space'] };
 const touche = async (s, k) => {
   const [vk, code] = CODES[k]; const base = { key: k, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk };
   await s.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...base });
-  if (k === 'Enter' || k === '/' || k === 'g') await s.send('Input.dispatchKeyEvent', { type: 'char', text: k === 'Enter' ? '\r' : k, ...base });
+  if (k === 'Enter' || k === '/' || k === 'g' || k === ' ') await s.send('Input.dispatchKeyEvent', { type: 'char', text: k === 'Enter' ? '\r' : k, ...base });
   await s.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
 };
 const clic = async (s, x, y) => {
@@ -177,5 +177,28 @@ await executer(chrome, async (s) => {
   const j6c = await attendreValeur(() => s.ev("document.getElementById('palette').classList.contains('open')"), (v) => v === false, { max: 3000 });
   await s.ev('window.VibeFlow.rerender()'); await pause(800);
   out.j6 = [j6a, j6b, j6r === 0, j6c === false, await ouvert()].join('|');
+
+  // J6, variante ESPACE (revue finale, M-C) : dans la saisie de la palette l'Espace est un caractère de la requête ; seule l'Entrée CHOISIT un résultat. Une saisie qui a des résultats, un Espace, Échap, un rendu : le panneau reste fermé (rouge sur b06a58be : « pha » + espace armait la réouverture)
+  await vider(); await charger(768);
+  await clicCarte(); const j6sa = await attendreOuvert(true); await clicDetail(); const j6sb = await attendreOuvert(false);
+  await s.ev('document.activeElement && document.activeElement.blur()');
+  await touche(s, '/'); await s.attendre("document.getElementById('palette').classList.contains('open')", 'palette ouverte');
+  await s.ev("(() => { const i = document.querySelector('#palette input'); i.focus(); i.value = 'pha'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()");
+  const j6sr = await attendreValeur(() => s.ev("document.querySelectorAll('#results .r.active').length"), (v) => v >= 1, { max: 3000 }); // témoin : un résultat est actif, c'est ce qui armait l'Espace
+  await touche(s, ' '); await pause(300); await touche(s, 'Escape');
+  const j6sc = await attendreValeur(() => s.ev("document.getElementById('palette').classList.contains('open')"), (v) => v === false, { max: 3000 });
+  await s.ev('window.VibeFlow.rerender()'); await pause(800);
+  out.j6s = [j6sa, j6sb, j6sr >= 1, j6sc === false, await ouvert()].join('|');
+
+  // J6, témoin du choix clavier HORS palette (F1) : une touche Entrée puis Espace sur une carte de #svg (un écouteur de la sonde choisit la carte, comme le ferait un choix au clavier) ouvrent le panneau fermé par « Détail »
+  await vider(); await charger(768);
+  await clicCarte(); await attendreOuvert(true);
+  const j6k = [];
+  for (const k of ['Enter', ' ']) {
+    if (await ouvert()) { await clicDetail(); await attendreOuvert(false); }
+    await s.ev(`(() => { const g = ${CARTE}; if (!g) return false; const id = window.VibeFlow.state.selected; g.setAttribute('tabindex', '-1'); if (!g.__k) { g.__k = true; g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') window.VibeFlow.select(id); }); } g.focus({ preventScroll: true }); return document.activeElement === g; })()`);
+    await touche(s, k); j6k.push(await attendreOuvert(true));
+  }
+  out.j6k = j6k.join('|');
   return out;
 });
