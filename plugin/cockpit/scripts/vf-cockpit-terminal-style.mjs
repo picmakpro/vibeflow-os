@@ -98,6 +98,8 @@ body:has(#proposition, #accueil) #terminal { position: relative; inset: auto; fl
 body #proposition { position: static; flex: none; order: 2; z-index: auto; max-height: 60%; overflow-y: auto; } /* z-index auto : un élément de colonne flex porte le z-index de .vf-q-collage même statique, et recouvrirait la carte et le bandeau d'état (fixes) */
 body:has(#etat .vf-q-bandeau) #proposition { margin-bottom: calc(44px + 2 * var(--sp-8)); } /* dérivé : le bandeau d'état (fixe, en bas) a 44 px de haut et 8 de marge ; la proposition se pose au-dessus, comme le collage */
 #proposition .vf-q-pied { justify-content: flex-end; } /* Préparer vient APRÈS la commande exacte et la case du chat, à droite de sa rangée */
+#proposition .vf-q-pied { position: sticky; bottom: 0; background: var(--raise); } /* PU-G-136 (recette du 2026-11-08) : le pied (« Prêt dans un instant », Préparer dans le terminal) reste au bas du bandeau qui défile : à la hauteur par défaut du tiroir il était sous le pli, derrière la phrase, la commande exacte et la liste des modes */
+#etat .vf-q-bandeau, #etat .vf-q-carte { z-index: 1; } /* le pied collé est un élément positionné : sans cela il passerait au-dessus de la carte et du bandeau d'état fixes (LB.V19) ; le collage (z-index 2) reste au-dessus */
 /* PU-G-140 (lot 8 LB3-S2) : l'accueil prend sa place dans la colonne comme le bandeau de proposition : il ne masque ni la sortie ni l'invite, le terminal rétrécit et la sortie remonte */
 body #accueil { position: static; flex: none; order: 2; z-index: auto; max-height: 60%; overflow-y: auto; }
 #accueil .vf-q-texte { font-weight: 400; color: var(--text-2); }

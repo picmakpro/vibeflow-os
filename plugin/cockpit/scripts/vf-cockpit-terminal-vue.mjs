@@ -224,6 +224,7 @@ export function vueTerminal(cfg) {
         if (st === 'ok' || st === 'absente') { retirerProposition(); if (st === 'ok') annoncer(ANNONCE_PREPAREE); return; } // garde:retrait-usage
         lancer.textContent = BOUTON_PREPARER;
         msg.textContent = MESSAGES_LANCEMENT[st] || MESSAGES_LANCEMENT.refus;
+        if (msg.scrollIntoView) msg.scrollIntoView({ block: 'nearest' }); // le pied reste collé au bas du bandeau : la raison du refus se range au-dessus de lui, jamais dessous
         if (st === 'attendre') armer(); else if (bloquants.length === 0) lancer.setAttribute('aria-disabled', 'false');
       };
       lancer.addEventListener('click', (ev) => {
