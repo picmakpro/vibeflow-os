@@ -3,6 +3,9 @@
 #   N  partie node pure : lecteurs factices à séquence de valeurs (sans navigateur)
 #   C  partie Chrome : un élément qui se déplace en plusieurs temps — positionPosee rend la position FINALE, une lecture immédiate (témoin) une autre
 #   M  mutants (sur une COPIE de chrome-session.mjs) : chacun doit faire rougir au moins une assertion de N, sinon FAIL « mutant sans effet »
+#   A  amorçage borné par AMORCE : témoins de l'annonce du port (A1-A4, faux Chrome sans navigateur réel) et du PREMIER naviguer (C6-C8, vrai Chrome, partie C)
+# Couverture AMORCE assumée : annonce du port et premier naviguer ont chacun un témoin mutant. Les sites /json/new, ouverture du WebSocket et Page.enable/Log.enable n'en ont PAS
+#   (un faux serveur CDP serait nécessaire) : ils partagent la même constante AMORCE ; A2 prouve seulement que l'on passe le stade du port (l'erreur est celle de /json/new).
 # Exit 0 si tout passe.
 set -uo pipefail
 HERE_T="$(cd "$(dirname "$0")" && pwd)"; SRC="$HERE_T/chrome-session.mjs"
@@ -112,6 +115,26 @@ assert_eq "C2 — témoin : la lecture immédiate rend une position intermédiai
 assert_eq "C3 — positionPosee rend la position FINALE (x = 400, centre 410/35)" "$(ev '[j.posee.x,j.posee.cx,j.posee.cy]')" "[400,410,35]"
 assert_eq "C4 — la position posée diffère de la lecture immédiate" "$(ev 'j.posee.x !== j.immediate')" "true"
 assert_eq "C5 — élément absent : null" "$(ev 'j.absent')" "null"
+cat > "$AUX/nav.mjs" <<'JS'
+// nav.mjs <module> <chrome> : serveur local dont la réponse met 1500 ms à venir (load tardif) ; VF_CDP_ECHEANCE_MS=500 ; 1er naviguer doit passer, le 2e (à ECHEANCE) échouer nommé
+import http from 'node:http'; import { pathToFileURL } from 'node:url';
+const M = await import(pathToFileURL(process.argv[2]).href);
+const srv = http.createServer((q, r) => setTimeout(() => { r.writeHead(200, { 'content-type': 'text/html' }); r.end('<title>lent</title>ok'); }, 1500));
+await new Promise((ok) => srv.listen(0, '127.0.0.1', ok)); const url = `http://127.0.0.1:${srv.address().port}/`;
+await M.executer(process.argv[3], async (s) => {
+  const r = {}; try { await s.naviguer(url); r.premier = 'ok'; } catch (e) { r.premier = String(e.message); }
+  try { await s.naviguer(url + '?2'); r.second = 'ok'; } catch (e) { r.second = String(e.message); }
+  return r;
+});
+JS
+nav() { VF_CDP_ECHEANCE_MS=500 node "$AUX/nav.mjs" "$1" "$CHROME" 2>&1 | tail -1; }
+NV="$(nav "$SRC")"; nvj() { printf '%s' "$1" | node -e "const j=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log($2)"; }
+assert_eq "C6 — ECHEANCE = 500 ms, page qui charge en ~1,5 s : le PREMIER naviguer passe (borné par max(ECHEANCE, AMORCE))" "$(nvj "$NV" 'j.premier')" "ok"
+assert_eq "C7 — le SECOND naviguer reste à ECHEANCE (500 ms) : échec nommé" "$(nvj "$NV" '/500 ms/.test(j.second)')" "true"
+M_MOTIF='const ms = premier ? Math.max(ECHEANCE, AMORCE) : ECHEANCE;' M_REMPL='const ms = ECHEANCE;' node -e "const fs=require('fs');const s=fs.readFileSync(process.argv[1],'utf8');const m=process.env.M_MOTIF;if(!s.includes(m))process.exit(3);fs.writeFileSync(process.argv[2],s.replace(m,()=>process.env.M_REMPL))" "$SRC" "$WORK/mut/premier-naviguer.mjs" || assert_eq "C-mutant appliqué (motif présent)" "motif absent" "motif présent"
+NM="$(nav "$WORK/mut/premier-naviguer.mjs")"
+echo "  trace du rouge (mutant « premier naviguer à ECHEANCE ») : premier = $(nvj "$NM" 'j.premier')"
+assert_eq "C8 — mutant « premier naviguer à ECHEANCE » : rougit C6 (le premier naviguer échoue, nommé, en 500 ms)" "$(nvj "$NM" '/500 ms/.test(j.premier)')" "true"
 fi
 
 echo "=== M — mutants de chrome-session.mjs (copie jetable) : chacun doit rougir au moins une assertion de N ==="
@@ -143,7 +166,7 @@ echo "=== A — amorçage de Chrome borné par l'échéance GLOBALE (AMORCE), ja
 # faux « chrome » : annonce son port de débogage après ~1,5 s (stderr), puis reste en vie ; ECHEANCE = 500 ms. Aucun Chrome réel requis.
 cat > "$AUX/faux-chrome" <<'JS'
 #!/usr/bin/env node
-setTimeout(() => { process.stderr.write('DevTools listening on ws://127.0.0.1:1/devtools/browser/x\n'); }, 1500); setInterval(() => {}, 1000);
+require('fs').writeFileSync(process.env.FAUX_PID, String(process.pid)); setTimeout(() => { process.stderr.write('DevTools listening on ws://127.0.0.1:1/devtools/browser/x\n'); }, 1500); setTimeout(() => process.exit(0), 40000);
 JS
 chmod +x "$AUX/faux-chrome"
 cat > "$AUX/amorce.mjs" <<'JS'
@@ -153,15 +176,16 @@ const garde = setTimeout(() => { console.log(JSON.stringify({ erreur: 'ÉCHÉANC
 try { await M.ouvrir(process.argv[3]); console.log(JSON.stringify({ erreur: 'aucune erreur', amorce: M.AMORCE })); } catch (e) { console.log(JSON.stringify({ erreur: String(e.message), amorce: M.AMORCE })); }
 clearTimeout(garde); process.exit(0);
 JS
-amorce() { VF_CDP_ECHEANCE_MS=500 VF_CDP_AMORCE_MS= node "$AUX/amorce.mjs" "$1" "$AUX/faux-chrome" 2>&1 | tail -1; }
+amorce() { rm -f "$AUX/faux.pid"; FAUX_PID="$AUX/faux.pid" VF_CDP_ECHEANCE_MS=500 VF_CDP_AMORCE_MS= node "$AUX/amorce.mjs" "$1" "$AUX/faux-chrome" 2>&1 | tail -1
+  local fp; fp="$(cat "$AUX/faux.pid" 2>/dev/null)"; [ -n "$fp" ] && ps -p "$fp" -o args= 2>/dev/null | grep -q "$AUX/faux-chrome" && kill -9 "$fp" 2>/dev/null; return 0; } # le faux Chrome est tué quoi qu'il arrive (garde comprise)
 A0="$(amorce "$SRC")"
 assert_eq "A1 — AMORCE vaut l'échéance globale par défaut (600000), pas ECHEANCE (500)" "$(printf '%s' "$A0" | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).amorce)")" "600000"
-assert_eq "A2 — ECHEANCE = 500 ms, le port est annoncé à ~1,5 s : l'erreur n'est PAS « n'a pas annoncé son port de débogage »" "$(printf '%s' "$A0" | node -e "console.log(/n'a pas annoncé son port/.test(JSON.parse(require('fs').readFileSync(0,'utf8')).erreur))")" "false"
+assert_eq "A2 — ECHEANCE = 500 ms, le port est annoncé à ~1,5 s : l'erreur est celle du stade SUIVANT (/json/new : « fetch failed »), pas « n'a pas annoncé son port de débogage »" "$(printf '%s' "$A0" | node -e "const e=JSON.parse(require('fs').readFileSync(0,'utf8')).erreur;console.log(/^fetch failed/.test(e) && !/n'a pas annoncé son port/.test(e))")" "true"
 M_MOTIF='annoncé son port de débogage en ${AMORCE} ms`)), AMORCE)' M_REMPL='annoncé son port de débogage en ${ECHEANCE} ms`)), ECHEANCE)' node -e "const fs=require('fs');const s=fs.readFileSync(process.argv[1],'utf8');const m=process.env.M_MOTIF;if(!s.includes(m))process.exit(3);fs.writeFileSync(process.argv[2],s.replace(m,()=>process.env.M_REMPL))" "$SRC" "$WORK/mut/amorce-ref.mjs" || assert_eq "A-mutant appliqué (motif présent)" "motif absent" "motif présent"
 A1="$(amorce "$WORK/mut/amorce-ref.mjs")"
 echo "  trace du rouge (mutant « amorçage borné par ECHEANCE ») : $A1"
 assert_eq "A3 — mutant « amorçage borné par ECHEANCE » : rougit A2 (l'erreur devient « n'a pas annoncé son port »)" "$(printf '%s' "$A1" | node -e "console.log(/n'a pas annoncé son port/.test(JSON.parse(require('fs').readFileSync(0,'utf8')).erreur))")" "true"
-vf_hyg_arreter
+assert_eq "A4 — aucun faux Chrome ne survit à A2/A3 (garde de amorce.mjs comprise)" "$(pgrep -f "$AUX/faux-chrome" | wc -l | tr -d ' ')" "0"
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
