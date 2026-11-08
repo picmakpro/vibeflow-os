@@ -33,7 +33,9 @@ trap 'tuer_tout; rm -rf "$TMP"' EXIT
 DETAIL=""
 assert_eq() { # label attendu obtenu
   [ "$2" = "$3" ] && return 0
-  DETAIL="cas [$1] attendu [$2] obtenu [$3]"; return 1
+  DETAIL="cas [$1] attendu [$2] obtenu [$3]"
+  [ -n "${ERR:-}" ] && DETAIL="$DETAIL | stderr du script : $(printf '%s' "$ERR" | tr '\n' ' ' | cut -c1-400)"
+  return 1
 }
 cwd_de() { if [ -r /proc/self/cwd ]; then readlink "/proc/$1/cwd" 2>/dev/null; else lsof -a -d cwd -p "$1" -Fn 2>/dev/null | sed -n 's/^n//p'; fi; }
 leurre() { # leurre <dir> [ignterm|mobile] -> LP ; attend (<= 5 s) que le cwd du leurre soit visible
@@ -186,11 +188,12 @@ run_borne() { # run_borne <secondes> <script> args... -> RC (124 si dépassé), 
   else { wait "$bp"; } 2>/dev/null; RC=$?; fi
   OUT="$(cat "$TMP/borne.out")"
 }
-cas_m1_accent() { # chemin accentué trouvé même sous LC_ALL=C si une locale UTF-8 existe, sinon rc 4
+cas_m1_accent() { # chemin accentué trouvé même sous LC_ALL=C si une locale UTF-8 existe, sinon rc 4 (méthode lsof forcée)
+  command -v lsof >/dev/null 2>&1 || { SKIP=1; return 0; }
   mkdir -p "$TMP/m1/cíble-é-🙂"; leurre "$TMP/m1/cíble-é-🙂"; local a=$LP
-  OUT="$(env -i PATH="$PATH" HOME="$HOME" LC_ALL=C bash "$1" list --path="$TMP/m1/cíble-é-🙂" 2>/dev/null)"; RC=$?
+  OUT="$(env -i PATH="$PATH" HOME="$HOME" LC_ALL=C VF_WTP_METHODE=lsof bash "$1" list --path="$TMP/m1/cíble-é-🙂" 2>/dev/null)"; RC=$?
   if [ "$UTF8" -eq 1 ]; then assert_eq "list accentué sous LC_ALL=C (UTF-8 dispo)" 1 "$RC" || return 1
-    OUT="$(env -i PATH="$PATH" HOME="$HOME" LC_ALL=C bash "$1" stop --path="$TMP/m1/cíble-é-🙂" 2>/dev/null)"; RC=$?
+    OUT="$(env -i PATH="$PATH" HOME="$HOME" LC_ALL=C VF_WTP_METHODE=lsof bash "$1" stop --path="$TMP/m1/cíble-é-🙂" 2>/dev/null)"; RC=$?
     assert_eq "stop accentué rc" 0 "$RC" || return 1
     assert_eq "leurre accentué" mort "$(etat $a)" || return 1
   else assert_eq "list accentué sans locale UTF-8" 4 "$RC" || return 1; fi
@@ -273,6 +276,35 @@ cas_vivant_sans_ps() { # ps sait donner le parent mais pas l'état : rc 4 avant 
   assert_eq "leurre épargné (aucun signal)" vivant "$(etat $a)" || return 1
   tuer_tout
 }
+fake_readlink() { # échoue pour /proc/$WTP_FAIL_PID/cwd, délègue sinon
+  mkdir -p "$TMP/fakerl"
+  printf '#!/bin/sh\n[ "$1" = "/proc/$WTP_FAIL_PID/cwd" ] && exit 1\nexec %s "$@"\n' "$(command -v readlink)" > "$TMP/fakerl/readlink"; chmod +x "$TMP/fakerl/readlink"
+}
+cas_proc_priv() { # Linux : même uid, cwd refusé, cause PROUVÉE (capacités supérieures) -> ignoré avec une note, le reste est lu
+  [ -r /proc/self/cwd ] || { SKIP=1; return 0; }
+  cible pp; fake_readlink; leurre "$CIB"; local a=$LP; leurre "$TMP/pp/hors"; local x=$LP
+  mkdir -p "$TMP/stfx/$x"; printf 'CapPrm:\tffffffffffffffff\n' > "$TMP/stfx/$x/status"
+  OUT="$(PATH="$TMP/fakerl:$PATH" WTP_FAIL_PID=$x VF_WTP_STATUS_DIR="$TMP/stfx" bash "$1" list --path="$CIB" 2>"$TMP/err")"; RC=$?; ERR="$(cat "$TMP/err")"
+  assert_eq "list avec un processus plus privilégié illisible rc" 1 "$RC" || return 1
+  assert_eq "seul le leurre de la cible est listé" 1 "$(printf '%s\n' "$OUT" | grep -c .)" || return 1
+  assert_eq "note émise" 1 "$(printf '%s\n' "$ERR" | grep -c 'note — 1 processus')" || return 1
+  tuer_tout
+}
+cas_proc_inexplique() { # Linux : même uid, cwd refusé SANS cause prouvée -> rc 4 nommant la garde
+  [ -r /proc/self/cwd ] || { SKIP=1; return 0; }
+  cible pi; fake_readlink; leurre "$CIB"; leurre "$TMP/pi/hors"; local x=$LP
+  OUT="$(PATH="$TMP/fakerl:$PATH" WTP_FAIL_PID=$x bash "$1" list --path="$CIB" 2>"$TMP/err")"; RC=$?; ERR="$(cat "$TMP/err")"
+  assert_eq "cwd illisible sans cause prouvée rc" 4 "$RC" || return 1
+  assert_eq "garde nommée sur stderr" 1 "$(printf '%s\n' "$ERR" | grep -c 'indéterminé — proc-illisible')" || return 1
+  tuer_tout
+}
+cas_proc_ancetre() { # Linux : le cwd illisible d'un ANCÊTRE (jamais signalé) n'est pas une raison d'indéterminer
+  [ -r /proc/self/cwd ] || { SKIP=1; return 0; }
+  cible pa; fake_readlink
+  local got
+  got="$(PATH="$TMP/fakerl:$PATH" bash -c 'WTP_FAIL_PID=$$ bash "$1" list --path="$2" >/dev/null 2>&1; echo "rc=$?"' _ "$1" "$CIB" 2>/dev/null)"
+  assert_eq "ancêtre illisible, cible vide rc" "rc=0" "$got"
+}
 cas_m3_lsof_bloque() { # lsof figé : échéance, rc 4, faux lsof tué
   cible m3b; mkdir -p "$TMP/fakeb"; rm -f "$TMP/fakeb.pid"
   printf '#!/bin/sh\necho $$ > "%s"\nexec sleep 300\n' "$TMP/fakeb.pid" > "$TMP/fakeb/lsof"; chmod +x "$TMP/fakeb/lsof"
@@ -301,11 +333,11 @@ cas_survivants() { # rc 2 : signaux neutralisés, le leurre reste -> survivants 
 }
 
 SKIP=0
-CASES="liste_arret frere hors hors_stop appelant plafond sigkill indet_aucune indet_vide refus_absolu refus_dotdot refus_inexistant refus_composants refus_home refus_ancetre stop_refus_reel usage m1_accent m1_sans_locale m1_caracteres m2_partiel m3_ps m1_casse m2_git famille vivant_sans_ps m3_lsof_bloque comm survivants"
+CASES="liste_arret frere hors hors_stop appelant plafond sigkill indet_aucune indet_vide refus_absolu refus_dotdot refus_inexistant refus_composants refus_home refus_ancetre stop_refus_reel usage m1_accent m1_sans_locale m1_caracteres m2_partiel m3_ps m1_casse m2_git famille vivant_sans_ps proc_priv proc_inexplique proc_ancetre m3_lsof_bloque comm survivants"
 [ -n "${WTP_SEUL:-}" ] && CASES="$WTP_SEUL"
 echo "== test-worktree-procs =="
 for c in $CASES; do
-  DETAIL=""; SKIP=0
+  DETAIL=""; SKIP=0; ERR=""
   if cas_$c "$REAL"; then if [ "$SKIP" -eq 1 ]; then ok "cas $c (non applicable ici, ignoré)"; else ok "cas $c"; fi
   else ko "cas $c — $DETAIL"; tuer_tout; fi
 done
@@ -317,7 +349,7 @@ mutant() { # mutant <nom> <cas> <sed args...>
   local m="$TMP/mut-$nom.sh"
   sed "$@" "$REAL" > "$m"
   if cmp -s "$REAL" "$m"; then ko "mutant $nom identique au script (sed sans effet)"; return; fi
-  DETAIL=""; SKIP=0
+  DETAIL=""; SKIP=0; ERR=""
   if "cas_$cas" "$m"; then
     if [ "$SKIP" -eq 1 ]; then ok "mutant $nom non jouable ici (cas non applicable)"; tuer_tout; return; fi
     ko "mutant $nom SURVIT : le cas $cas reste vert sans la garde"; tuer_tout
@@ -333,15 +365,18 @@ mutant comm-12        comm             -e 's|^comm -12 "\$WORK/s1" "\$WORK/s2" >
 mutant survivants     survivants       -e 's/exit 2   # GARDE:survivants/exit 0/'
 mutant canari         m2_partiel       -e '/# GARDE:canari/d'
 mutant canari-vide    indet_vide       -e '/# GARDE:canari/d'
-mutant methode-absente indet_aucune    -e '/# GARDE:canari/d' -e 's/\*) return 4 ;;/*) : ;;/'
+mutant methode-absente indet_aucune    -e '/# GARDE:canari/d' -e 's/\*) indet [^;]*; return 4 ;;/*) : ;;/'
 mutant echeance       m3_lsof_bloque   -e '/# GARDE:echeance/d'
 mutant caracteres     m1_caracteres    -e '/# GARDE:caracteres/d'
 mutant locale         m1_sans_locale   -e 's/ \&\& \[ -z "\$LOCALE_LSOF" \]/ \&\& false/'
 mutant locale-forcee  m1_accent        -e 's/LC_ALL="\${LOCALE_LSOF:-C}" lsof/lsof/'
-mutant casse          m1_casse         -e 's/ || return 4   # GARDE:casse/ || :/'
+mutant casse          m1_casse         -e 's/ || { indet casse[^}]*}   # GARDE:casse/ || :/'
 mutant famille-nom    famille          -e '/# GARDE:famille-nom/d'
 mutant famille-git    famille          -e 's/\[ ! -e "\$g" \] || refus "englobe un autre dépôt ou worktree"/:/'
 mutant famille-git-2n famille          -e 's|for g in "\$P"/\*/.git "\$P"/\*/\*/.git; do|for g in "$P"/*/.git; do|'
+mutant privilegie     proc_priv        -e 's/if plus_privilegie "\$pid"; then/if false; then/'
+mutant proc-illisible proc_inexplique  -e 's/; return 4   # GARDE:proc-illisible/; continue   # GARDE:proc-illisible/'
+mutant ancetre-ignore proc_ancetre     -e '/# GARDE:ancetre-ignore/d'
 mutant vivant         vivant_sans_ps   -e '/# GARDE:vivant/d'
 mutant git            m2_git           -e '/# GARDE:git/d'
 mutant worktrees      m2_git           -e '/# GARDE:worktrees/d'
