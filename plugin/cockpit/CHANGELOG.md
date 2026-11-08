@@ -31,6 +31,7 @@ Retours du panel d'utilisateurs du cockpit (2026-11-06, registre `.planning/miss
 - **Libellé « Utilisé par »** (PU-G-100) : sur l'onglet Projet, le panneau d'une phase et les titres de colonnes lisent « Dépend de » / « Utilisé par » dans le bon sens ; le lien et l'ordre des cartes ne changent pas (6b3d90ee). Le panneau d'un fichier-plan et l'infobulle d'arête restent à l'ancien sens (BACKLOG).
 
 ### Corrigé
+- **Infobulle d'une carte sur un appareil sans survol** : la garde de PU-G-035 testait `:hover`, faux quand le navigateur n'annonce ni survol ni pointeur (`hover: none`) ; l'infobulle ne s'affichait plus. Le pointeur est désormais suivi explicitement (armé à l'entrée, désarmé par `mouseleave` et `pointerleave`), la carte retirée ou quittée pendant le délai n'en montre toujours pas (corrige la recette du 2026-11-08).
 - **Écran fantôme** (DG-02) : `findScreens` lisait `createFileRoute` dans un commentaire ; à 0 écran, le bouton « Écrans » n'est plus posé.
 - **Compteurs de Travail récent alignés** (DG-03) : le badge comptait des entrées et non des cartes ; « 24 sur 41 cartes ».
 - **Vue de réponse remise à zéro** (DG-04) : `go()` emportait `q:answer`, l'état de réponse périmé.

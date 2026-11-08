@@ -938,7 +938,7 @@
    drawColumns(gCols, view, res);
    state.edgeEls = new Map(); state.chipEls = new Map();
    for (const re of res.edges || []) {
-@@ -1102,12 +1177,16 @@ function draw(view, res) {
+@@ -1102,24 +1177,32 @@ function draw(view, res) {
    }
    // cards rise in left-to-right, a few ms apart
    const order = res.children.slice().sort((a, b) => a.x - b.x || a.y - b.y);
@@ -956,7 +956,13 @@
      g.addEventListener('click', (ev) => { ev.stopPropagation(); select(c.id); });
      g.addEventListener('dblclick', (ev) => { ev.stopPropagation(); if (ev.button !== 0) return; hideTip(); open(c.id); });
      g.addEventListener('contextmenu', (ev) => { ev.preventDefault(); ev.stopPropagation(); hideTip(); openMenu(ev, itemMenu(c.id)); });
-@@ -1120,6 +1199,9 @@ function draw(view, res) {
+     g.addEventListener('mouseenter', (ev) => tipSoon(ev, () => cardTip(c.id)));
+     g.addEventListener('mousemove', moveTip);
+     g.addEventListener('mouseleave', hideTip);
++    g.addEventListener('pointerleave', hideTip);
+     state.chipEls.set(c.id, g);
+   }
+ }
  
  /** Brackets over the three columns of a view that has outside connections: what uses this part (left),
   *  what's inside it (middle), and what it uses (right). Drawn in map space so they pan and zoom with it. */
@@ -966,7 +972,7 @@
  function drawColumns(g, view, res) {
    if (!view.connectors?.length || state.container === 'root' || state.container === 'q:answer') return;
    const span = (cs) => cs.length ? [Math.min(...cs.map((c) => c.x)), Math.max(...cs.map((c) => c.x + c.width))] : null;
-@@ -1127,36 +1209,52 @@ function drawColumns(g, view, res) {
+@@ -1127,36 +1210,52 @@ function drawColumns(g, view, res) {
    const outs = res.children.filter((c) => c.id.startsWith('x:out:'));
    const mid = res.children.filter((c) => !c.id.startsWith('x:'));
    const y = Math.min(...res.children.map((c) => c.y)) - 26;
@@ -989,7 +995,7 @@
  // ======================= tooltips =======================
  const tip = $('#tooltip');
 -let tipTimer = null, lastPointer = null;
-+let tipTimer = null, lastPointer = null, tipAnchor = null; // tipAnchor: the card the tooltip belongs to, so it can sit beside it
++let tipTimer = null, lastPointer = null, tipAnchor = null, tipOver = null; // tipAnchor: the card the tooltip belongs to, so it can sit beside it
  // a tap also sends mouseenter, so remember whether the last pointer was a finger: hover tooltips are for a mouse
  let touching = false;
  ['pointerdown', 'pointermove'].forEach((t) => window.addEventListener(t, (ev) => { touching = ev.pointerType === 'touch'; }, { capture: true, passive: true }));
@@ -997,7 +1003,7 @@
 +function showTip(ev, html, anchor) { clearTimeout(tipTimer); if (!html || touching || drag?.moved || !$('#ctxmenu').hidden) return; tip.innerHTML = html; tip.hidden = false; tipAnchor = anchor || null; moveTip(ev); }
  /** Cards explain themselves after a short hover, so passing over them doesn't flicker tooltips. */
 -function tipSoon(ev, make) { clearTimeout(tipTimer); lastPointer = ev; tipTimer = setTimeout(() => showTip(lastPointer, make()), 420); }
-+function tipSoon(ev, make) { clearTimeout(tipTimer); lastPointer = ev; const anchor = ev.currentTarget; tipTimer = setTimeout(() => { if (anchor.isConnected && anchor.matches(':hover')) showTip(lastPointer, make(), anchor); }, 420); } // PU-G-035 : la carte a pu être retirée (vue redessinée) ou quittée sans mouseleave pendant le délai : jamais d'infobulle pour une carte qui n'est plus sous le pointeur
++function tipSoon(ev, make) { clearTimeout(tipTimer); lastPointer = ev; const anchor = ev.currentTarget; tipOver = anchor; tipTimer = setTimeout(() => { if (anchor.isConnected && tipOver === anchor) showTip(lastPointer, make(), anchor); }, 420); } // PU-G-035 : la carte a pu être retirée (vue redessinée) ou quittée pendant le délai : jamais d'infobulle pour une carte qui n'est plus sous le pointeur. Le pointeur est suivi explicitement (tipOver, désarmé par hideTip sur mouseleave et pointerleave), jamais par :hover, faux sur un appareil sans survol (recette du 2026-11-08, D7.16)
  function moveTip(ev) {
    lastPointer = ev;
    if (tip.hidden) return;
@@ -1026,11 +1032,11 @@
    tip.style.left = Math.max(8, x) + 'px'; tip.style.top = Math.max(8, y) + 'px'; // flipped on a narrow screen, it still stays on it
  }
 -function hideTip() { clearTimeout(tipTimer); tip.hidden = true; }
-+function hideTip() { clearTimeout(tipTimer); tip.hidden = true; tipAnchor = null; }
++function hideTip() { clearTimeout(tipTimer); tip.hidden = true; tipAnchor = null; tipOver = null; }
  function endpointsOf(e) {
    const m = new Map();
    for (const l of e.links) for (const [ri] of l.calls || []) if (ri != null) m.set(ri, (m.get(ri) || 0) + 1);
-@@ -1170,7 +1268,7 @@ function edgeTip(e) {
+@@ -1170,7 +1269,7 @@ function edgeTip(e) {
    const desc = e.links.map((l) => l.desc).find(Boolean);
    const meta = eps.length ? eps.slice(0, 4).map((x) => `${x.r.m} ${x.r.p}`).join('\n') + (eps.length > 4 ? `\n+${eps.length - 4} more` : '')
      : names.length ? 'uses ' + names.slice(0, 8).join(', ') + (names.length > 8 ? '…' : '') : labels.slice(0, 4).join('\n');
@@ -1039,7 +1045,7 @@
  }
  
  // ======================= right-click menus =======================
-@@ -1200,8 +1298,8 @@ function itemMenu(id) {
+@@ -1200,8 +1299,8 @@ function itemMenu(id) {
    const url = fileForEditor && editorUrl(...fileForEditor);
    return [
      { title: i.name },
@@ -1050,7 +1056,7 @@
      state.container === 'q:answer' && !id.startsWith('x:') ? { label: 'Show on the map', icon: 'external', run: () => reveal(real) } : null,
      EXPORTED ? null : { label: 'Ask about this', icon: 'spark', run: () => addAskContext(real) },
      { label: 'Show details', icon: 'panel', run: () => { setPanel(true); if (id.startsWith('x:')) reveal(real); else select(id); } },
-@@ -1239,9 +1337,11 @@ window.addEventListener('blur', closeMenu);
+@@ -1239,9 +1338,11 @@ window.addEventListener('blur', closeMenu);
  // ======================= pan / zoom =======================
  function applyTransform() {
    const { x, y, k } = state.t;
@@ -1062,7 +1068,7 @@
  }
  const stageRect = () => svg.getBoundingClientRect();
  function setT(t, animate) {
-@@ -1261,8 +1361,13 @@ function freeArea() {
+@@ -1261,8 +1362,13 @@ function freeArea() {
  function fit(animate) {
    const b = state.bounds; if (!b) return;
    const a = freeArea();
@@ -1078,7 +1084,7 @@
  }
  function zoomBy(f, cx, cy) {
    const r = stageRect();
-@@ -1270,13 +1375,12 @@ function zoomBy(f, cx, cy) {
+@@ -1270,13 +1376,12 @@ function zoomBy(f, cx, cy) {
    const k = clamp(state.t.k * f, 0.08, 2.5);
    setT({ k, x: cx - (cx - state.t.x) * (k / state.t.k), y: cy - (cy - state.t.y) * (k / state.t.k) }, false);
  }
@@ -1095,7 +1101,7 @@
  }, { passive: false });
  let drag = null;
  const fingers = new Map(); let pinch = null; // touch only: the fingers on the map, and the pinch they make
-@@ -1354,9 +1458,12 @@ function readHash() {
+@@ -1354,9 +1459,12 @@ function readHash() {
  window.addEventListener('popstate', () => { const { v, s } = readHash(); go(v, { select: s, push: false }); });
  
  async function go(container, { select: sel = null, push = true, zoomFrom = null, after, force = false } = {}) {
@@ -1108,7 +1114,7 @@
    state.container = container; state.selected = sel;
    if (push) setHash(container, sel);
    if (!changed && state.layout && !force) { applySelection(); renderPanel(); if (after) after(); return; }
-@@ -1380,10 +1487,16 @@ function open(item) {
+@@ -1380,10 +1488,16 @@ function open(item) {
    go(item, { zoomFrom: item });
  }
  function up() { if (state.container === 'root') return; closeSheet(); const from = state.container; go(parentOf.get(from) || 'root', { select: from }); }
@@ -1127,7 +1133,7 @@
  }
  /** Moves the map just far enough that a box isn't hidden behind the top bar or the sheet; the zoom and everything else stay as they are. */
  function bringIntoView(item) {
-@@ -1431,13 +1544,13 @@ function applySelection() {
+@@ -1431,13 +1545,13 @@ function applySelection() {
  // ======================= chrome: context, crumbs, legend =======================
  function renderContext() {
    if (state.container === 'q:answer') {
@@ -1143,7 +1149,7 @@
    foldContext();
  }
  /** On a phone the description folds to one line; the More / Less toggle shows only when there's more to read, and the choice is remembered on this device. */
-@@ -1449,11 +1562,22 @@ function foldContext() {
+@@ -1449,11 +1563,22 @@ function foldContext() {
    const long = desc.scrollHeight > desc.clientHeight + 1 || !!ctx.querySelector('.cx');
    ctx.classList.toggle('folded', !open);
    more.hidden = !long;
@@ -1168,7 +1174,7 @@
  function renderCrumbs() {
    const c = $('#crumbs'); c.innerHTML = '';
    const path = chain(state.container).slice().reverse();
-@@ -1497,16 +1621,19 @@ function renderLegend(view) {
+@@ -1497,16 +1622,19 @@ function renderLegend(view) {
  
  // ======================= inspector =======================
  const editorUrl = (p, line = 1) => G.meta.root && !PLAN ? `vscode://file/${encodeURI(G.meta.root.replace(/\\/g, '/'))}/${encodeURI(p)}:${line}` : null;
@@ -1192,7 +1198,7 @@
  function header(i) {
    const kind = i.type === 'node' ? i.kind : i.type === 'symbol' ? i.symKind : i.type === 'route' ? 'Endpoint' : i.type === 'module' ? 'file' : i.type;
    return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(kind)}</span></div>
-@@ -1520,7 +1647,7 @@ function renderPanel() {
+@@ -1520,7 +1648,7 @@ function renderPanel() {
    else if (sel && sel.startsWith('x:')) html = itemPanel(connEntity(sel), true);
    else if (sel && sel.startsWith('m:')) html = itemPanel('f:' + sel.slice(2));
    else if (sel) html = itemPanel(sel);
@@ -1201,7 +1207,7 @@
    // extensions add sections: 'overview' on the codebase panel, 'item' on a selected/opened item
    const where = sel && typeof sel === 'object' ? null : sel ? 'item' : state.container === 'root' ? 'overview' : state.container === 'q:answer' ? null : 'item';
    const target = sel && typeof sel === 'string' ? (sel.startsWith('x:') ? connEntity(sel) : sel.startsWith('m:') ? 'f:' + sel.slice(2) : sel) : state.container;
-@@ -1545,17 +1672,23 @@ function renderPanel() {
+@@ -1545,17 +1673,23 @@ function renderPanel() {
    panel.querySelectorAll('[data-open]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); open(a.dataset.open); }));
    panel.querySelectorAll('[data-flow]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); startFlow(a.dataset.flow); }));
    panel.querySelectorAll('[data-sel]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); select(a.dataset.sel); centerOn(a.dataset.sel); }));
@@ -1228,7 +1234,7 @@
  }
  
  // Top-level parts, grouped under names people understand instead of bare colour dots.
-@@ -1577,13 +1710,14 @@ function systemsSection(tops) {
+@@ -1577,13 +1711,14 @@ function systemsSection(tops) {
    return `<div class="sec"><h3>Systems <span class="c">${tops.length}</span></h3>${parts.join('')}</div>`;
  }
  
@@ -1245,7 +1251,7 @@
      ${systemsSection(tops)}
      ${listSec('Guided flows', G.flows.map((f) => `<a class="row" data-flow="${h(f.id)}"><span class="dot" style="background:var(--accent)"></span><span class="rt"><div class="rn">${h(f.title)}</div>${f.description ? `<div class="rd">${h(f.description)}</div>` : ''}</span><span class="rc">${f.steps.length} steps</span></a>`))}
      ${listSec('Repositories', G.meta.repos.map((r) => `<div class="row" style="cursor:default"><span class="dot" style="background:var(--text-4)"></span><span class="rt"><div class="rn">${h(r.name)}</div><div class="rp">${h(r.branch || '')} @ ${h((r.head || '').slice(0, 7))}</div></span></div>`))}
-@@ -1617,7 +1751,7 @@ function itemPanel(item, viaConnector) {
+@@ -1617,7 +1752,7 @@ function itemPanel(item, viaConnector) {
    if (viaConnector || (parentOf.get(item) !== state.container && state.container !== item)) actions.push(`<button class="btn soft" data-go="${h(item)}">Show on map</button>`);
    if (i.type === 'node' || i.type === 'dir') {
      const n = i.n, s = statsOf(item);
@@ -1254,7 +1260,7 @@
      if (n?.paths?.length || i.d) html += pathBox(i.d ? i.d.path + '/' : n.paths.join('  '));
      if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
      html += '</div>';
-@@ -1632,9 +1766,11 @@ function itemPanel(item, viaConnector) {
+@@ -1632,9 +1767,11 @@ function itemPanel(item, viaConnector) {
      if (n?.packages?.length || n?.hosts?.length || n?.tags?.length) html += `<div class="sec"><h3>Matched by</h3><div class="tags">${[...n.packages.map((p) => 'pkg ' + p), ...n.hosts.map((p) => 'host ' + p), ...n.tags.map((t) => '#' + t)].map((t) => `<span class="tag">${h(t)}</span>`).join('')}</div></div>`;
      html += listSec('Inside', (kids.get(item) || []).filter((k) => !k.startsWith('f:')).map((k) => rowFor(k)));
      const c = connections(item);
@@ -1268,7 +1274,7 @@
    } else if (i.type === 'file' || i.type === 'module') {
      const f = i.f, fid = 'f:' + f.p, url = editorUrl(f.p);
      if (f.note) html += `<div class="callout">${h(f.note)}</div>`;
-@@ -1643,13 +1779,15 @@ function itemPanel(item, viaConnector) {
+@@ -1643,13 +1780,15 @@ function itemPanel(item, viaConnector) {
      if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}Open in editor</a>`);
      if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
      const owner = nodes.get(f.n);
@@ -1288,7 +1294,7 @@
      const handlers = new Set((routesByFile.get(f.p) || []).map((ri) => routes[ri].h));
      if (technical()) html += listSec('Exports', (f.s || []).map((s, k) => [s, k]).filter(([s]) => !handlers.has(s[0])).map(([s, k]) => `<a class="row" ${parentOf.has(`s:${f.p}#${k}`) ? `data-go="s:${h(f.p)}#${k}"` : ''}><span class="dot" style="background:var(--n-symbol)"></span><span class="rt"><div class="rn" style="font-family:var(--mono);font-size:12px">${h(s[0])}</div>${s[4] ? `<div class="rd">${h(s[4])}</div>` : ''}</span><span class="rc">${h(s[1])} · L${s[2]}</span></a>`), undefined, 60);
    } else if (i.type === 'route') {
-@@ -1701,8 +1839,14 @@ const index = [
+@@ -1701,8 +1840,14 @@ const index = [
  ];
  const pal = $('#palette'), sInput = $('#search'), sRes = $('#results');
  let sActive = 0, sItems = [];
@@ -1305,7 +1311,7 @@
  function runSearch() {
    const terms = sInput.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
    let scored = [];
-@@ -1723,19 +1867,23 @@ function runSearch() {
+@@ -1723,19 +1868,23 @@ function runSearch() {
    sRes.innerHTML = sItems.map((it, i) => {
      const ii = info(it.id);
      const ic = it.kind === 'route' ? `<span class="method" style="--m:${methodVar(ii.r.m)}">${h(ii.r.m)}</span>` : `<span class="ico" style="--c:${colorOf(ii)}">${icon(iconKey(ii))}</span>`;
@@ -1333,7 +1339,7 @@
  $('#search-btn').onclick = openPalette;
  
  // ======================= flows =======================
-@@ -1805,16 +1953,21 @@ async function loadCustomFlows() {
+@@ -1805,16 +1954,21 @@ async function loadCustomFlows() {
    const S = window.FLOORPLAN_SERVER;
    if (!S || typeof EventSource === 'undefined') return;
    const reload = () => { toast('Map updated'); setTimeout(() => location.reload(), 500); };
@@ -1364,7 +1370,7 @@
  })();
  
  async function requestFlow(prompt) {
-@@ -1862,9 +2015,9 @@ function flowStep() {
+@@ -1862,9 +2016,9 @@ function flowStep() {
    const container = b ? lcaContainer(a, b) : parentOf.get(a) || 'root';
    const bar = $('#flowbar'); bar.hidden = false;
    bar.innerHTML = `<div class="ft"><div class="fk">${h(f.title)} · step ${i + 1} of ${f.steps.length}</div><b>${h(info(a).name)}</b>${b ? ` <span>→</span> <b>${h(info(b).name)}</b>` : ''}<br><span>${h(f.steps[i].note)}</span><div class="dots">${f.steps.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div></div>
@@ -1376,7 +1382,7 @@
    $('#fl-x').onclick = stopFlow;
    // an answer's walkthrough plays on the answer board itself
    if (state.flow.inPlace) { if (state.container === 'q:answer') highlightFlow(a, b); else go('q:answer', { after: () => highlightFlow(a, b) }); }
-@@ -1951,7 +2104,10 @@ function refChip(id) {
+@@ -1951,7 +2105,10 @@ function refChip(id) {
    return `<span class="ref" data-ref="${h(id)}" style="--c:${colorOf(ii)}"><i></i>${h(b.name)}</span>`;
  }
  function md(src) {
@@ -1388,7 +1394,7 @@
    const out = [];
    let list = null;
    for (const raw of String(src || '').split('\n')) {
-@@ -1965,18 +2121,27 @@ function md(src) {
+@@ -1965,18 +2122,27 @@ function md(src) {
    return out.join('');
  }
  
@@ -1420,7 +1426,7 @@
    });
    sheet.querySelectorAll('[data-follow]').forEach((b) => b.onclick = () => { askInput.value = b.dataset.follow; submitAsk(); });
    sheet.querySelector('[data-act="steps"]')?.addEventListener('click', () => {
-@@ -2002,7 +2167,12 @@ function showAnswer(raw, question) {
+@@ -2002,7 +2168,12 @@ function showAnswer(raw, question) {
    const a = { title: String(raw.title || 'Answer'), answer: String(raw.answer || ''), items: items.slice(0, 18), steps, followups: (raw.followups || []).map(String), question };
    askState.last = a;
    if (a.items.length) { state.answer = a; go('q:answer', { force: true, after: () => renderAnswer(a) }); }
@@ -1434,7 +1440,7 @@
  }
  function showFailure(question, code, message, partial) {
    if (code === 'not_logged_in' || code === 'not_granted') setWarning(code);
-@@ -2015,7 +2185,7 @@ function setBusy(b) {
+@@ -2015,7 +2186,7 @@ function setBusy(b) {
    askState.busy = b;
    askSend.classList.toggle('stop', b);
    askSend.innerHTML = b ? `<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>` : `<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
@@ -1443,7 +1449,7 @@
  }
  function cancelAsk() {
    askState.ctl?.abort();
-@@ -2160,6 +2330,8 @@ async function submitAsk() {
+@@ -2160,6 +2331,8 @@ async function submitAsk() {
    askState.context = []; renderChips();
    if (askState.mode === 'change') return requestChange(ctxIds.length ? `${question}\n\nThis is about: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.` : question);
    const shown = question;
@@ -1452,7 +1458,7 @@
    // what Claude sees: the question plus the pinned items, by id, so it starts from them
    if (ctxIds.length) question += `\n\nFocus on these map items: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.`;
    setBusy(true);
-@@ -2191,16 +2363,7 @@ if (EXPORTED) {
+@@ -2191,16 +2364,7 @@ if (EXPORTED) {
    tag.textContent = isNaN(at) ? 'Exported copy' : `Exported ${at.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
    tag.title = 'A copy of this map to look around in. Asking questions needs Floorplan with Claude Code or Codex, in the codebase itself.';
    $('#proj-name').after(tag);
@@ -1470,7 +1476,7 @@
  }
  document.title = `${G.project.name} map`;
  $('#btn-up').onclick = up;
-@@ -2262,7 +2425,7 @@ const setPanel = (on) => {
+@@ -2262,7 +2426,7 @@ const setPanel = (on) => {
      else if (!on && sheetReturn) { if (panel.contains(document.activeElement) || document.activeElement === document.body) sheetReturn.focus?.({ preventScroll: true }); sheetReturn = null; }
    }
  };
@@ -1479,7 +1485,7 @@
  $('#btn-panel').setAttribute('aria-expanded', String(!document.body.classList.contains('no-panel')));
  // the top bar can be one or two rows tall: everything under it follows its real height
  const headerEl = document.querySelector('header');
-@@ -2281,8 +2444,11 @@ window.addEventListener('keydown', (ev) => {
+@@ -2281,8 +2445,11 @@ window.addEventListener('keydown', (ev) => {
    else if (ev.key === 'Escape') {
      if (!ctxEl.hidden || fm.classList.contains('open') || legendEl.classList.contains('open')) { closeMenu(); fm.classList.remove('open'); legendEl.classList.remove('open'); }
      else if (isPhone() && !document.body.classList.contains('no-panel')) closeSheet(); // on a phone the first Escape puts the details sheet away
@@ -1492,7 +1498,7 @@
    else if (ev.key === 'f' || ev.key === 'F') fit(true);
    else if (ev.key === 'p' || ev.key === 'P') $('#btn-panel').click();
    else if (ev.key === 'Enter' && typeof state.selected === 'string') open(state.selected);
-@@ -2300,22 +2466,37 @@ function setTechnical(on) {
+@@ -2300,22 +2467,37 @@ function setTechnical(on) {
    render({ keepTransform: true, after: renderPanel });
    emit('technical', technicalFlag);
  }
@@ -1533,7 +1539,7 @@
    state.answer = a; askState.last = a;
    go('q:answer', { force: true });
  }
-@@ -2332,7 +2513,7 @@ window.Floorplan = Object.freeze({
+@@ -2332,7 +2514,7 @@ window.Floorplan = Object.freeze({
    version: 1,
    graph: G, query: Q, state, agent: AGENT, exported: EXPORTED,
    // model helpers
@@ -1542,7 +1548,7 @@
    files, nodes, routes, colorOf, iconKey,
    // html helpers
    h, icon, iconI, fmt, plural, md,
-@@ -2372,6 +2553,8 @@ window.Floorplan = Object.freeze({
+@@ -2372,6 +2554,8 @@ window.Floorplan = Object.freeze({
    technical, setTechnical,
    store,
    on(event, fn) { (ext.listeners[event] ||= []).push(fn); },

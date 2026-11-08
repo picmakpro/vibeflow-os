@@ -277,7 +277,7 @@ cat > "$AUX/lib.js" <<'JS'
   const g = [...document.querySelectorAll('#viewport .node')].find((x) => x.querySelector('.title')?.textContent === lib.label);
   let infobulle = null;
   if (g) { g.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, clientX: 400, clientY: 300 })); infobulle = await att(() => document.querySelector('#tooltip .td')?.textContent || null); }
-  return { lib: lib.label, panneau, infobulle, titres: [...document.querySelectorAll('#viewport .node .title')].map((t) => t.textContent), anglais: /\blibrary\b/i.test(document.getElementById('panel').innerText + ' ' + (document.getElementById('tooltip')?.innerText || '')) };
+  return { lib: lib.label, panneau, survol: matchMedia("(hover: hover)").matches, infobulle, titres: [...document.querySelectorAll('#viewport .node .title')].map((t) => t.textContent), anglais: /\blibrary\b/i.test(document.getElementById('panel').innerText + ' ' + (document.getElementById('tooltip')?.innerText || '')) };
 })()
 JS
 LABN="$WORK/labn"; mkdir -p "$LABN/src" "$LABN/library" "$LABN/config" "$LABN/.planning/phases/01-x" "$LABN/.planning/missions"
@@ -326,6 +326,11 @@ assert_eq "D7.14 — libellé témoin : la mesure a eu lieu et le nœud library 
 assert_eq "D7.15 — libellé : le type « library » est en français dans le panneau" "$(printf '%s' "$XL" | node "$AUX/jg.mjs" "$V.panneau.toLowerCase()")" "bibliothèque"
 assert_eq "D7.16 — libellé : le type est en français dans l'infobulle (et plus de « library » nulle part dans l'interface)" "$(printf '%s' "$XL" | node "$AUX/jg.mjs" "[/^bibliothèque/i.test($V.infobulle||''),$V.anglais]")" "[true,false]"
 assert_eq "D7.17 — libellé : une DONNÉE du lab (dossiers nommés library et config) n'est jamais traduite" "$(printf '%s' "$XL" | node "$AUX/jg.mjs" "['library','config','src'].every((t)=>$V.titres.includes(t))")" "true"
+# D7.16b (recette du 2026-11-08, corrige PU-G-035) : même mesure sous un Chrome SANS survol ni pointeur (`pointer: none`, `hover: none`, comme Chrome headless Linux, CI) : l'infobulle ne dépend pas de `:hover`
+CHROME_NOPTR="$AUX/chrome-sans-pointeur.sh"
+printf '#!/bin/sh\nexec "%s" --blink-settings=primaryPointerType=1,availablePointerTypes=1,primaryHoverType=1,availableHoverTypes=1 "$@"\n' "$CHROME" > "$CHROME_NOPTR"; chmod +x "$CHROME_NOPTR"
+XLN="$(CDP_VIEWPORT=1280x800 CDP_PRET="document.readyState === 'complete' && !!window.VibeFlow && !!document.querySelector('#viewport .node .card')" node "$SCRIPTS/tests/chrome-cdp.mjs" "$CHROME_NOPTR" 500 "$(cat "$AUX/lib.js")" "$URLC")"
+assert_eq "D7.16b — libellé sans survol ni pointeur : témoin (mesure faite, aucun pointeur ni survol dans le navigateur) puis l'infobulle dit le type en français" "$(printf '%s' "$XLN" | node "$AUX/jg.mjs" "[($V.erreur||j.erreur||''),$V.panneau.length>0,$V.survol===false,/^bibliothèque/i.test($V.infobulle||'')]")" '["",true,true,true]'
 
 # O3 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : *italique* et _italique_ rendus dans les réponses de l'agent (VibeFlow.md, le rendu du viewer).
 # Bornes de mot : l'ouvrant suit le début ou un non-mot (ni lettre, chiffre, `_`, `*`, `\`, ni `/` pour `*`) et n'est pas suivi d'une espace ; le fermant n'est pas précédé d'une espace et est suivi d'un non-mot.
