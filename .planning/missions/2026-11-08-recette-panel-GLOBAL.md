@@ -204,6 +204,8 @@ questions ont été posées ensemble ; les réponses sont reprises mot pour mot.
 | « La pastille de l'état d'une phase dit « … dans Phase 72 ? », sans article (6/10). Quelle forme ? » | Avec article (Recommandé) : « … dans la Phase 72 ? » · Sans « dans » : « … Phase 72 ? » · Garder tel quel | **« Avec article (Recommandé) »** |
 | « « STATE.md semble périmé : il dit « prête à planifier » » est juste mais ne dit pas quoi faire. Ajoute-t-on une suite ? » | Dire quoi faire (Recommandé) : ajouter une seconde phrase courte, « La carte fait foi ; mettez STATE.md à jour à la fin de la phase. » · Lien vers le panneau Format · Garder tel quel | **« Dire quoi faire (Recommandé) »** |
 
-Ces trois décisions sont les seules de la section 8 tranchées à ce jour ; les neuf autres points restent
+| « Liste « Sur ce tableau » (onglet Projet) : les libellés sont coupés en plein mot (« depuis les cart… ») par une ellipse CSS du moteur vendorisé, pas par le code. Le codeur et le relecteur l'ont classée « limite d'affichage » hors de la promesse PU-G-147 (couper au mot entier) ; le manager recommande de la traiter dans la promesse. Que fait-on ? » (posée à part, réponse horodatée 04:50 UTC environ) | Dans la promesse (Recommandé) : couper le libellé côté code, au mot entier, avant l'affichage (patch du moteur, lot B2) · Hors promesse : garder le classement « limite d'affichage » · Deux lignes | **« Dans la promesse (Recommandé) »** |
+
+Ces quatre décisions sont les seules de la section 8 tranchées à ce jour ; les neuf autres points restent
 au jugement de Samuel. Un commit qui applique l'une d'elles cite ce registre : « arbitrage Samuel,
 AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette ».
