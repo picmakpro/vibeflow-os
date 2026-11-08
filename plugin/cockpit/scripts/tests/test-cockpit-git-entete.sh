@@ -717,11 +717,15 @@ JS
   assert_eq "H8.x — aucune erreur de page" "$(jq_ "$R8" 'j.errs.length' 2>/dev/null)" "0"
   stop_srv
   # mutants H8 : copie du module mutée, lab neuf assemblé sur feat/x puis basculé sur feat/y (le défaut de chaque mutant ne rougit que SON témoin)
-  h8mut() { # h8mut <nom> <ancien> <nouveau> : rend la ligne JSON de h8.js sur / (« {} » si la mutation est impossible)
+  h8mut() { # h8mut <nom> <ancien> <nouveau> [<ancien2> <nouveau2>] : rend la ligne JSON de h8.js sur / (« {} » si la mutation est impossible)
     local M D W; M="$(mkmod "$1")"; D="$WORK/depot-$1"; W="$WORK/wt-$1"; mk_lab "$D"
     $GIT -C "$D" init -q -b main && $GIT -C "$D" add -A && $GIT -C "$D" commit -q -m init
     $GIT -C "$D" worktree add -q -b feat/x "$W" >/dev/null 2>&1
     mutate "$M/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "$2" "$3" || { echo "  ❌ FAIL — $1 : mutation impossible" >&2; echo '{}'; return; }
+    if [ -n "${4:-}" ]; then mutate "$M/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "$4" "$5" || { echo "  ❌ FAIL — $1 : seconde mutation impossible" >&2; echo '{}'; return; }; fi # seconde mutation du même fichier ($4 -> $5), facultative
+    if [ -n "${H8_POLICES:-}" ]; then # condition Linux (H7.1b) : le viewer n'attend plus les polices, `ready` arrive donc aux écouteurs d'extension
+      mutate "$M/../skills/cockpit-moteur/assets/viewer.html" "const fontsReady = document.fonts?.ready ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();" "const fontsReady = ${H8_POLICES};" || { echo "  ❌ FAIL — $1 : mutation des polices impossible" >&2; echo '{}'; return; }
+    fi
     build_serve "$W" "$M"; $GIT -C "$W" switch -q -c feat/y; absorber_filet "$1"
     cdp "$AUX/h8.js" "http://127.0.0.1:$PORT" / feat/y 2>&1 | tail -1; stop_srv
   }
@@ -732,9 +736,17 @@ JS
 " "  relire(); relire(); // mutant : deux lectures au chargement
 ")"
   assert_eq "M-DOUBLE-LECTURE — témoin : une DOUBLE lecture au chargement rend H8.1 rouge (obtenu 2 ou plus au lieu de 1) : la mesure sait voir un doublon" "$(jq_ "$RM" 'j.lectures >= 2 ? "rouge" : "vert (lectures=" + j.lectures + ")"' 2>/dev/null)" "rouge"
-  RM="$(h8mut m-bloc "    if (change && TAB === 'code') ecrireEtRecadrer(); // le bloc de vue Code cite la branche de la même lecture que la seconde ligne
-" "")"
+  # M-BLOC-VUE (K6) : le bloc de vue s'écrit par QUATRE chemins dans ui/76 (la lecture `lire`, l'écouteur `render`, l'écouteur `ready`, la pose à l'arrivée du fichier), qui lisent tous la même variable V. Retirer le seul appel de `lire` ne suffisait pas : sous Linux (CI, run 42522934974) le premier rendu ou `ready` arrive APRÈS la réponse de la lecture et réécrit le bloc avec la branche neuve, le mutant ne produisait plus son effet. Le mutant coupe donc la SOURCE du texte du bloc (une copie figée de V, posée à l'assemblage) : aucun chemin d'écriture, présent ou à venir, ne peut plus le remettre à jour.
+  BLOC_B="let V = G.meta && G.meta.vfGit;"; BLOC_C="let V = G.meta && G.meta.vfGit; const V0 = V; /* mutant : copie figée */"
+  BLOC_D="  const texteVue = () => {"; BLOC_E="  const texteVue = () => { const V = V0; /* mutant : le bloc ne lit jamais la lecture neuve */"
+  RM="$(h8mut m-bloc "$BLOC_B" "$BLOC_C" "$BLOC_D" "$BLOC_E")"
   assert_eq "M-BLOC-VUE — rougit H8.2 (le bloc de vue garde feat/x alors que la seconde ligne dit feat/y)" "$(jq_ "$RM" '[j.ligne, j.h1].join("|")' 2>/dev/null)" "feat/y|Le code, branche feat/x"
+  RM="$(H8_POLICES="Promise.resolve()" h8mut m-bloc-tot "$BLOC_B" "$BLOC_C" "$BLOC_D" "$BLOC_E")"
+  assert_eq "M-BLOC-VUE — polices prêtes tôt (Linux, H7.1b) : rougit H8.2 de la même façon" "$(jq_ "$RM" '[j.ligne, j.h1].join("|")' 2>/dev/null)" "feat/y|Le code, branche feat/x"
+  RM="$(H8_POLICES="new Promise((ok) => setTimeout(ok, 250))" h8mut m-bloc-tard "$BLOC_B" "$BLOC_C" "$BLOC_D" "$BLOC_E")"
+  assert_eq "M-BLOC-VUE — premier rendu APRÈS la réponse de la lecture (polices en retard de 250 ms) : rougit H8.2 de la même façon" "$(jq_ "$RM" '[j.ligne, j.h1].join("|")' 2>/dev/null)" "feat/y|Le code, branche feat/x"
+  # recensement (comme T21.7r pour la pastille) : un nouveau chemin d'écriture du bloc rougit ici ; le mutant ci-dessus coupe la source, ce nombre dit que la source est toujours la seule lue par ces chemins
+  assert_eq "M-BLOC-VUE — recensement des chemins d'écriture du bloc de vue dans ui/76 : 4 appels de ecrireEtRecadrer() (lire, render, ready, pose initiale), 1 appel de ecrireVue(), 2 mentions de texteVue (définition + ecrireVue)" "$(grep -oF 'ecrireEtRecadrer()' "$UI/76-vf-git-entete.js" | wc -l | tr -d ' ')/$(grep -oF 'ecrireVue()' "$UI/76-vf-git-entete.js" | wc -l | tr -d ' ')/$(grep -oF 'texteVue' "$UI/76-vf-git-entete.js" | wc -l | tr -d ' ')" "4/1/2"
   RM="$(h8mut m-ecart "flex: 0 2 auto; white-space: pre; }" "flex: 0 2 auto; }")"
   assert_eq "M-ECART — rougit H8.3 (plus d'écart avant le point médian) alors que la branche est à jour" "$(jq_ "$RM" '[j.ecart.avant >= 4, j.ligne].join("|")' 2>/dev/null)" "false|feat/y"
   [ ! -s "$WORK/absorption-ratee.txt" ] || { echo "  ❌ FAIL — H8.0 — l'attente d'absorption du filet a échoué ($(tr '\n' ' ' < "$WORK/absorption-ratee.txt")) : leurs mesures ne sont pas fiables"; FAIL=$((FAIL+1)); } # FAIL posé dans un sous-shell $(…) ne remonte pas : relayé par fichier
