@@ -679,6 +679,59 @@ await executer(chrome, async (s) => {
   return { erreurs, n: rel.length, complets: complets.length, edge: [...new Set(rel.map((x) => x.edge))], zoom, pastille, barre, bas };
 });
 JS
+cat > "$AUX/chrome-vivant.mjs" <<'JS'
+// chrome-vivant.mjs <chrome> <json> : T21.13 à T21.15 (correction ciblée du lot C, C-R6 et C-R7 ; revue adverse du 2026-11-08 ; décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5)) — la zone basse EN VIE, pas seulement à l'état initial : redimensionnement à chaud (1 280 -> 1 000 -> 700 -> 1 280),
+// panneau de détail ouvert à 768 px, tiroir du terminal ouvert, tactile (pointer: coarse) à 1 024 px, et fenêtres basses (jusqu'à 390 px de haut) avec tiroir ouvert ou visite guidée. UNE ligne JSON. Entrée : { P, court }.
+// Invariants : (mal) ni le zoom ni la pastille ne recouvrent la barre, le panneau, le tiroir ni l'un l'autre ; (ecarts) après un redimensionnement à chaud, zoom, pastille et barre sont où un chargement à froid à cette taille les pose ;
+// (titre) le zoom ne recouvre ni le titre (h1, description) ni la carte de la visite. Les rects se lisent une fois posés (stabiliser).
+import { pathToFileURL } from 'node:url';
+const { executer, pause, stabiliser } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const [, , chrome, brut] = process.argv; const A = JSON.parse(brut);
+const OP = `http://127.0.0.1:${A.P}`;
+const MESURE = `(() => {
+  const r = (e) => { if (!e) return null; const b = e.getBoundingClientRect(), cs = getComputedStyle(e); if (!(b.width > 0 && b.height > 0) || cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') return null; return { l: +b.left.toFixed(1), t: +b.top.toFixed(1), r: +b.right.toFixed(1), b: +b.bottom.toFixed(1) }; };
+  const q = (s) => r(document.querySelector(s));
+  const S = { zoom: q('#zoom'), pastille: q('.vf-term-pastille'), ask: q('#ask'), panneau: document.body.classList.contains('no-panel') ? null : q('#panel'), tiroir: q('.vf-term-tiroir') };
+  const T = { h1: q('#context h1'), p: q('#context p'), visite: q('#tour') };
+  const sur = (a, o) => !!a && !!o && a.l < o.r - 0.5 && a.r > o.l + 0.5 && a.t < o.b - 0.5 && a.b > o.t + 0.5;
+  const mal = [], titre = [];
+  for (const [a, o] of [['zoom', 'pastille'], ['zoom', 'ask'], ['zoom', 'panneau'], ['zoom', 'tiroir'], ['pastille', 'ask'], ['pastille', 'panneau'], ['pastille', 'tiroir']]) if (sur(S[a], S[o])) mal.push(a + '/' + o);
+  for (const o of Object.keys(T)) if (sur(S.zoom, T[o])) titre.push('zoom/' + o);
+  const f = (x) => x && [x.l, x.t, x.r, x.b].join(',');
+  return { mal, titre, pos: { z: f(S.zoom), p: f(S.pastille), a: f(S.ask) } };
+})()`;
+await executer(chrome, async (s) => {
+  const rel = [], erreurs = {};
+  const fen = (W, H, tactile) => Promise.all([s.send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: !!tactile }), s.send('Emulation.setTouchEmulationEnabled', { enabled: !!tactile })]);
+  const mes = async (cle) => { const m = await stabiliser(() => s.ev(MESURE), { max: 6000 }); rel.push({ cle, ...m }); return m; };
+  const charger = async (page, W, H, tactile) => { await fen(W, H, tactile); await s.naviguer(`${OP}/${page}`); await s.ev(`localStorage.clear(); sessionStorage.clear()`); await s.naviguer(`${OP}/${page}`);
+    await s.attendre(`document.querySelectorAll('#svg g.node, #viewport .node').length > 0 && !!document.querySelector('button.vf-term-pastille')`, 'nœuds et pastille', 20000); await pause(700); };
+  const fermerPanneau = async () => { await s.ev(`document.body.classList.contains('no-panel') || document.getElementById('btn-panel').click()`); await pause(700); }; // mêmes états pour le chaud et le froid : panneau fermé (sous 701 px il l'est déjà : la feuille de détail est un autre cas)
+  const fermerVisite = () => s.ev(`window.VibeFlowTour && window.VibeFlowTour.active() && window.VibeFlowTour.end()`);
+  const ouvrirTiroir = async () => { await s.ev(`document.querySelector('.vf-term-pastille').click()`); await pause(1300); };
+  const fermerTiroir = async () => { await s.ev(`(document.querySelector('.vf-term-tiroir button[aria-label^="Fermer"]')||{click(){}}).click()`); await pause(900); };
+  const pages = A.court ? ['index.html'] : ['index.html', 'project.html'];
+  const bas = A.court ? [[701, 420], [844, 390]] : [[701, 420], [844, 390], [1000, 420], [1279, 450], [1440, 390]];
+  const froid = {};
+  for (const page of pages) {
+    const p = page.slice(0, 5);
+    try {
+      for (const [W, H] of [[1280, 800], [1000, 700], [700, 700]]) { await charger(page, W, H); await fermerVisite(); await fermerPanneau(); await pause(300); froid[`${p}-${W}`] = (await mes(`${p}/froid-${W}x${H}`)).pos; }
+      await fen(1280, 800); await s.naviguer(`${OP}/${page}`); await pause(900); await fermerVisite(); await fermerPanneau(); await pause(300);
+      for (const [W, H] of [[1280, 800], [1000, 700], [700, 700], [1280, 800]]) { await fen(W, H); await pause(700); const m = await mes(`${p}/chaud-${W}x${H}`); rel[rel.length - 1].froid = froid[`${p}-${W}`]; rel[rel.length - 1].pos = m.pos; }
+      await charger(page, 768, 1024); await fermerVisite(); await s.ev(`document.body.classList.contains('no-panel') && document.getElementById('btn-panel').click()`); await pause(700); await mes(`${p}/panneau-768x1024`);
+      await charger(page, 1024, 768, true); await fermerVisite(); await pause(500); await mes(`${p}/tactile-1024x768`);
+      for (const [W, H] of [[1280, 800], [1000, 700]]) { await charger(page, W, H); await fermerVisite(); await ouvrirTiroir(); await mes(`${p}/tiroir-${W}x${H}`); }
+      for (const [W, H] of bas) {
+        await charger(page, W, H); await fermerVisite(); await ouvrirTiroir(); await mes(`${p}/bas-tiroir-${W}x${H}`); await fermerTiroir();
+        await s.ev(`window.VibeFlowTour && !window.VibeFlowTour.active() && window.VibeFlowTour.start()`); await pause(1100); await mes(`${p}/bas-visite-${W}x${H}`); await fermerVisite(); await pause(500);
+      }
+    } catch (e) { erreurs[p] = String(e.message).slice(0, 160); }
+  }
+  const ecarts = rel.filter((x) => x.froid && (x.froid.z !== x.pos.z || x.froid.p !== x.pos.p || x.froid.a !== x.pos.a)).map((x) => `${x.cle}: chaud ${JSON.stringify(x.pos)} contre froid ${JSON.stringify(x.froid)}`);
+  return { erreurs, n: rel.length, mal: rel.filter((x) => x.mal.length).map((x) => `${x.cle}: ${x.mal.join(' ')}`), titre: rel.filter((x) => x.titre.length).map((x) => `${x.cle}: ${x.titre.join(' ')}`), ecarts, bas: rel.filter((x) => /^.{5}\/bas-/.test(x.cle)).length };
+});
+JS
 cat > "$AUX/chrome-defaut.mjs" <<'JS'
 // chrome-defaut.mjs <chrome> <json> : hauteur du tiroir selon la fenêtre (G4 ; P71-D-37) ; UNE ligne JSON. Entrée : { P }. Page Projet, stockage vidé avant chaque relevé.
 import { pathToFileURL } from 'node:url';
@@ -749,6 +802,9 @@ run_pastille() { # run_pastille <sortie> <court 0|1> -> PJ ; un serveur neuf, un
 }
 run_axe() { # run_axe <sortie> <court 0|1> -> XJ ; un serveur neuf, un Chrome neuf (T21.9 à T21.11)
   srv "$1" 1; XJ="$(node "$AUX/chrome-axe.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":$2}")"; unsrv
+}
+run_vivant() { # run_vivant <sortie> <court 0|1> -> VJ ; un serveur neuf, un Chrome neuf (T21.13 à T21.15)
+  srv "$1" 1; VJ="$(node "$AUX/chrome-vivant.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":$2}")"; unsrv
 }
 run_defaut() { # run_defaut <sortie> -> DJ ; un serveur neuf, un Chrome neuf
   srv "$1" 1; DJ="$(node "$AUX/chrome-defaut.mjs" "$CHROME" "{\"P\":$SRV_PORT}")"; unsrv
@@ -963,6 +1019,18 @@ assert_eq "T21.9 (PU-G-021) — zoom au bord --edge de 390 à 1 440 px : en rang
 assert_eq "T21.10 (PU-G-021 ; « Pastille large comme le zoom », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) — pastille au bord --edge de 390 à 1 440 px, aussi large que le zoom dès 701 px" "$(rj "$AX" 'JSON.stringify(j.pastille)')" "[]"
 assert_eq "T21.11 (PU-G-021 ; « Barre au même bord gauche », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) — barre de question au bord --edge jusqu'à 1 279 px, après la colonne du zoom dès 1 280 px, de 40 px dès 1 000 px" "$(rj "$AX" 'JSON.stringify(j.barre)')" "[]"
 assert_eq "T21.12 (PU-G-021 ; correction ciblée du lot C, arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette) — sous 701 px la barre finit à --edge du bas sans que zoom, pastille et barre se recouvrent ; dès 1 280 px la pastille et la barre ont le même centre" "$(rj "$AX" 'JSON.stringify(j.bas)')" "[]"
+run_vivant "$OUT" 0; VV="$VJ"
+assert_eq "T21.13 — témoin de la zone basse en vie : 42 relevés (redimensionnement à chaud, panneau ouvert à 768 px, tactile à 1 024 px, tiroir ouvert, fenêtres basses avec tiroir et visite, Code et Projet), aucune erreur" "$(rj "$VV" '(j.erreur||JSON.stringify(j.erreurs))+" n="+j.n+" bas="+j.bas')" "{} n=42 bas=20"
+assert_eq "T21.13 (C-R7 ; revue adverse du lot C) — ni le zoom ni la pastille ne recouvrent la barre, le panneau, le tiroir ni l'un l'autre, à chaud (1 280 -> 1 000 -> 700 -> 1 280), panneau ouvert à 768 px, tiroir ouvert, tactile à 1 024 px" "$(rj "$VV" 'JSON.stringify(j.mal)')" "[]"
+assert_eq "T21.14 (C-R7) — après un redimensionnement à chaud, zoom, pastille et barre sont où un chargement à froid à cette taille les pose" "$(rj "$VV" 'JSON.stringify(j.ecarts)')" "[]"
+assert_eq "T21.15 (C-R6 ; décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée : le zoom se replie) — de 701 à 1 440 px, jusqu'à 390 px de haut, le zoom ne recouvre ni le titre (h1, description) ni la carte de la visite, tiroir ouvert ou visite en cours" "$(rj "$VV" 'JSON.stringify(j.titre)')" "[]"
+mut_vivant() { # mut_vivant <nom> <fichier> <expression-sed> <groupe qui doit rougir> <1 si l'ancien T21.9 à T21.12 doit rester vert> : le mutant rougit le groupe visé du nouveau témoin ; pour C-R7, le témoin d'état initial (T21.9 à T21.12) l'aurait laissé vert
+  if mutant "$1" "$2" "$3"; then
+    srv "$MUT_OUT" 1; XM="$(node "$AUX/chrome-vivant.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":1}")"; XA=""; [ "$5" = 1 ] && XA="$(node "$AUX/chrome-axe.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":1}")"; unsrv
+    local ancien="-"; [ "$5" = 1 ] && ancien="$(rj "$XA" 'j.zoom.length+j.pastille.length+j.barre.length+j.bas.length')"
+    assert_eq "$1 — le mutant rougit le groupe $4 du témoin en vie ; l'ancien témoin d'état initial (défauts : $ancien) $([ "$5" = 1 ] && echo "le laissait vert" || echo "n'est pas concerné")" "$(rj "$XM" 'JSON.stringify(j.erreurs)+" rouge="+(j.'"$4"'.length>=1)')$([ "$5" = 1 ] && echo " ancien=$ancien")" "{} rouge=true$([ "$5" = 1 ] && echo " ancien=0")"
+  else sans_effet "$1"; fi
+}
 mut_axe() { # mut_axe <nom> <fichier> <expression-sed> <groupe qui doit rougir> <groupe qui doit rester vert> : le mutant rougit le groupe visé, et lui seul (témoin : huit relevés complets, aucune erreur)
   if mutant "$1" "$2" "$3"; then
     srv "$MUT_OUT" 1; XM="$(node "$AUX/chrome-axe.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":1}")"; unsrv
@@ -975,6 +1043,8 @@ mut_axe M-BARRE-A-8 index.html 's|#ask { width: calc(100% - 2 \* var(--edge)); b
 mut_axe M-BARRE-CENTREE index.html 's|#ask { left: calc(var(--edge) + var(--vf-col, 114px) + var(--sp-8)); transform: none;|#ask { left: calc((100% - var(--pw)) / 2); transform: translateX(-50%);|' barre pastille
 mut_axe M-BAS-A-8 index.html 's|#ask { width: calc(100% - 2 \* var(--edge)); bottom: var(--edge); }|#ask { width: calc(100% - 2 * var(--edge)); bottom: var(--sp-8); }|' bas pastille
 mut_axe M-RETRAIT-A-12 index.html 's|#ask-form { padding-left: var(--sp-16); } }|#ask-form { padding-left: var(--sp-12); } }|' barre pastille
+mut_vivant M-ZOOM-JAMAIS-REPLIE index.html "s|if (motif) z.setAttribute|if (false) z.setAttribute|" titre 0
+mut_vivant M-EVITER-BAS-PERSISTE vf-cockpit-terminal-tiroir.mjs "s|e.style.bottom = '';|void 0;|" ecarts 1
 
 echo "=== T22 — hauteur par défaut proportionnelle à la fenêtre (recette 71, G4 ; P71-D-37) ==="
 run_defaut "$OUT"; D="$DJ"

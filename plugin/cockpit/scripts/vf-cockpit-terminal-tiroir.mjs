@@ -76,7 +76,7 @@ function scriptTiroir(cfg, accepte, construire) {
       monter(n, window.innerHeight, () => [rect(z), rect(k)]);
     };
     const eviterTout = () => { eviter(d.pastille); eviter(d.puce); };
-    window.addEventListener('resize', eviterTout);
+    window.addEventListener('resize', eviterTout); window.addEventListener('vf-zoom-replie', eviterTout); // le zoom se replie ou se déplie (ui/01-vf-responsive.js, replier()) : la pastille et lui se replacent
     // la barre de question apparaît, disparaît ou change de largeur sans que la fenêtre bouge (panneau ouvert ou fermé) : ResizeObserver, puis transitionend de la barre elle-même
     // (left et width transitionnent 450 ms : le dernier rappel de l'observateur tombe avant la fin de left). Filtré sur la barre : un enfant qui finit sa transition ne relance rien.
     { const ask = document.getElementById('ask');
