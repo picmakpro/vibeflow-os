@@ -45,9 +45,10 @@ set -o pipefail
 SEUIL=600
 DEFAUT=7
 
-# Table des durées : « <secondes> <chemin ou glob> ». Mesure du 2026-11-07, run 42400570610. Les deux dernières
-# lignes sont des ESTIMATIONS : test-cockpit-projet.sh (1509 s) est découpée en test-cockpit-projet-*.sh d'environ
-# 540 s chacune (arbitrage Samuel, AskUserQuestion session principale, 2026-11-07 : « Oui, découper projet »).
+# Table des durées : « <secondes> <chemin ou glob> ». Mesure du 2026-11-07, run 42400570610. test-cockpit-projet.sh
+# (1509 s) est découpée en trois suites (arbitrage Samuel, AskUserQuestion session principale, 2026-11-07 : « Oui, découper
+# projet ») : leurs durées et celle de test-cockpit-sondes-stables.sh sont MESURÉES sur le run CI 42435171473 de la PR #220 ;
+# le glob projet-* (540 s) reste en repli pour une suite de cette famille qui n'aurait pas sa ligne.
 # L'entrée exacte précède le glob : tant que la suite entière existe, sa mesure prime.
 durees() {
   cat <<'DUREES'
@@ -245,6 +246,10 @@ durees() {
 0 scripts/tests/test-measure-server-rulesets.sh
 40 scripts/tests/test-python-isolation-sites.sh
 1 scripts/tests/test-traffic-snapshot.sh
+240 plugin/cockpit/scripts/tests/test-cockpit-projet-graphe.sh
+658 plugin/cockpit/scripts/tests/test-cockpit-projet-visite.sh
+515 plugin/cockpit/scripts/tests/test-cockpit-projet-croissance.sh
+48 plugin/cockpit/scripts/tests/test-cockpit-sondes-stables.sh
 540 plugin/cockpit/scripts/tests/test-cockpit-projet-*.sh
 DUREES
 }
