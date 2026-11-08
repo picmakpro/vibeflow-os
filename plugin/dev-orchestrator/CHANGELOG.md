@@ -1,5 +1,9 @@
 # CHANGELOG — dev-orchestrator
 
+## [Non publié] — 2026-11-08 (fin de mandat, #223)
+
+**Patch** (aucune release racine : groupée ; aucun bump de `VERSION`). Issue #223 : des workers restaient vivants après leur travail (tâche de fond jamais terminée, commande de premier plan basculée en fond, processus survivants dans le worktree). Agents `vf-coder`, `vf-dev-manager`, `vf-reviewer`, `vf-auditer` : blocs **Fin de mandat** / **Clôture des workers** (manager) ; head `AGENT.md` : bloc **Balayage de sortie** (`driver-lock.sh orphans`, liste des agents de fond, `worktree-procs.sh`). `references/mission-flow.md` : renvois vers § Fin de mandat. Suite témoin `scripts/tests/test-fin-de-mandat.sh` : vérifie que les prompts PORTENT la consigne (rouge avant, vert après), pas qu'un worker l'applique.
+
 ## [v2.31.1] — 2026-11-05 (fin de tour inerte) — non publiée
 
 **Patch.** Correctif des workers orphelins des 3-5 novembre : un agent qui rend la main pendant qu'une commande Bash tourne en fond (bascule automatique du timeout comprise) reste vivant sans que personne ne l'arrête. `TaskStop` ajouté au champ `tools:` et une ligne de règle ajoutée, avec renvoi vers `conductor/references/team-kernel.md` § Fin de tour inerte (source unique) : vf-coder, vf-dev-manager, vf-reviewer, vf-auditer ; mission-flow.md §Pattern I corrigé (un manager ne peut pas arrêter son enfant). Arbitrages Samuel, AskUserQuestion session principale, 2026-11-05 : « Mandat maintenant » (correctif) ; hook `SubagentStop` « Plus tard, en spike » (`.planning/BACKLOG.md`).
