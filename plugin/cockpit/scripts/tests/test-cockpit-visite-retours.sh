@@ -27,7 +27,7 @@ printf '# Roadmap\n\n## Jalon demo\n\n- [ ] **Phase 1: Socle** - premier jet\n' 
 git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
 export VF_COCKPIT_PORT_BASE=$((30000 + (RANDOM * 11) % 30000))
 trap 'node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L" >/dev/null 2>&1; vf_hyg_fin; rm -rf "$WORK"' EXIT
-U="$(node "$SCRIPTS/vf-cockpit.mjs" open --no-open --lab "$L" | sed -En 's#^Cockpit : (http://127\.0\.0\.1:[0-9]+)/ .*#\1/index.html#p' | head -1)"
+U="$(node "$SCRIPTS/vf-cockpit.mjs" open --no-open --terminal --lab "$L" | sed -En 's#^Cockpit : (http://127\.0\.0\.1:[0-9]+)/ .*#\1/index.html#p' | head -1)"
 [ -n "$U" ] || { echo "  ❌ FAIL — le cockpit n'a pas démarré"; exit 1; }
 AUX="$WORK/aux"; mkdir -p "$AUX"
 cat > "$AUX/get.mjs" <<'JS'
@@ -67,4 +67,13 @@ assert_eq "T4.0 — témoin : mesure sans erreur, au moins trois étapes" "$(g "
 assert_eq "T4.1 — la carte de visite est une feuille pleine largeur (≥ 370 px de large) à chaque étape" "$(g "$X" "j.etapes.every((e)=>e.carte.w>=370)")" "true"
 assert_eq "T4.2 — la feuille est en bas : son bord bas est dans le dernier quart de l'écran" "$(g "$X" "j.etapes.every((e)=>e.carte.b>=e.ecran[1]*0.75)")" "true"
 assert_eq "T4.3 — « Étape n sur N » tient sur une seule ligne (chaque segment du repère ≤ 20 px de haut)" "$(g "$X" "j.etapes.every((e)=>e.repereHauteurs.every((h)=>h<=20))")" "true"
+# PU-G-090 (recette du 2026-11-08) : au téléphone AVEC la pastille Terminal, la feuille est posée au-dessus d'elle, plus haut que la barre de question ; le zoom doit rester au-dessus de la FEUILLE
+# (et non d'une hauteur supposée), sinon il la recouvre et elle se réduit à 120 px : titre coupé, description sous « Passer / Suivant ».
+if [ "$(g "$X" "j.etapes.every((e)=>e.lisible.pastille)")" = "true" ]; then
+  assert_eq "T4.4 — le texte de la feuille se lit en entier à chaque étape (le titre et la description tiennent, rien ne défile ni n'est coupé)" "$(g "$X" "j.etapes.every((e)=>e.lisible.texteEntier)")" "true"
+  assert_eq "T4.5 — la rangée Passer / Suivant ne recouvre pas le texte (le bas du texte est au-dessus du haut des boutons) et la feuille dépasse 120 px" "$(g "$X" "j.etapes.every((e)=>e.lisible.texteBas<=e.lisible.boutonsHaut&&e.lisible.carteH>120)")" "true"
+  assert_eq "T4.6 — le zoom ne recouvre pas la feuille (son bord bas est au-dessus du bord haut de la feuille) et la feuille laisse la pastille libre" "$(g "$X" "j.etapes.every((e)=>e.lisible.zoomBas<=e.lisible.carteHaut&&e.carte.b<=e.lisible.pastilleHaut)")" "true"
+else
+  echo "  ⊘ T4.4 à T4.6 SAUTÉS : la pastille Terminal est absente de ce banc — la feuille au-dessus de la pastille n'est PAS vérifiée"
+fi
 echo; echo "Résultat : $PASS passés, $FAIL en échec"; [ "$FAIL" -eq 0 ]
