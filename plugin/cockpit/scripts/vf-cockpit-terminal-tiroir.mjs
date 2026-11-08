@@ -46,28 +46,34 @@ function scriptTiroir(cfg, accepte, construire) {
     // P71-D-34 (E2), inversé en v1.3.3 : jamais sur les boutons de zoom. Tiroir fermé, la pastille garde sa place au plus bas ; si elle recouvre #zoom, c'est #zoom qui remonte juste au-dessus d'elle.
     // 71.5 (P71.5-D-06) : la barre de question #ask est un obstacle de plus, lue comme le zoom avec la même marge de 8 : la pastille se pose 8 au-dessus d'elle quand elle la recouvre (#zoom remonte ensuite
     // au-dessus de la pastille). La visite « Par où commencer » traite la pastille comme un obstacle de son côté (ui/40, obstacles()) : aucune marge fixe ici. La puce (message d'indisponibilité) se pose au-dessus du plus haut des deux.
+    // Recette du 2026-11-08, lot C (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px ») : de 701 à 1 279 px le zoom est en rangée au bord gauche, comme la pastille et la barre de question : trois
+    // surfaces dans la même colonne, qui montent l'une au-dessus de l'autre, la barre en bas, la pastille au-dessus d'elle, le zoom au-dessus des deux. Chacune remonte juste au-dessus (8) des obstacles qu'elle recouvre, tant qu'il en reste (le zoom
+    // peut en recouvrir deux : la barre, puis la pastille que la barre vient de faire monter). Sans pastille affichée (tiroir ouvert, puce, carte d'injoignabilité) le zoom clôt tout seul la barre.
     const eviter = (n) => {
-      const z = document.getElementById('zoom'), b = z ? z.getBoundingClientRect() : null;
-      const k = document.getElementById('ask'), kb = k ? k.getBoundingClientRect() : null;
-      const sur = (a, o) => !!o && o.width > 0 && a.left < o.right && a.right > o.left && a.top < o.bottom && a.bottom > o.top;
+      const z = document.getElementById('zoom'), k = document.getElementById('ask'), st = document.getElementById('stage');
+      const rect = (e) => { if (!e || !e.parentNode || e.hidden) return null; const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 ? b : null; };
+      const sur = (a, o) => !!o && a.left < o.right && a.right > o.left && a.top < o.bottom && a.bottom > o.top;
+      const monter = (e, fond, obstacles) => { // e remonte au-dessus des obstacles qu'il recouvre (fond : le bas de son repère, en pixels de fenêtre)
+        e.style.bottom = '';
+        for (let i = 0; i < 4; i++) {
+          const a = rect(e); if (!a) return;
+          const hauts = obstacles().filter((o) => sur(a, o)).map((o) => o.top);
+          if (!hauts.length) return;
+          e.style.bottom = Math.round(fond - Math.min(...hauts) + 8) + 'px';
+        }
+      };
       if (n === d.pastille) {
-        if (z) z.style.bottom = '';
-        n.style.bottom = '';
-        if (!n.parentNode || n.hidden) return;
-        // 72.1 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06, « Pastille large comme le zoom ») : la pastille prend la largeur du groupe de zoom, lue sur lui (une seule règle, aucun nombre recopié) ; min-width ne fait que l'élargir : en colonne (téléphone, 701-1 279 px) le zoom est plus étroit qu'elle et rien ne change.
-        n.style.minWidth = b && b.width > 0 ? b.width + 'px' : '';
-        if (sur(n.getBoundingClientRect(), kb)) n.style.bottom = Math.round(window.innerHeight - kb.top + 8) + 'px';
-        if (!z) return;
-        const a = n.getBoundingClientRect(), s = document.getElementById('stage'), fond = s ? s.getBoundingClientRect().bottom : window.innerHeight, zb = z.getBoundingClientRect();
-        const recouvre = zb.width > 0 && a.left < zb.right && a.right > zb.left && a.top < zb.bottom && a.bottom > zb.top;
-        if (recouvre) z.style.bottom = Math.round(fond - a.top + 8) + 'px';
+        const montre = !!n.parentNode && !n.hidden;
+        if (montre) {
+          // 72.1 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06, « Pastille large comme le zoom ») : la pastille prend la largeur du groupe de zoom, lue sur lui (une seule règle, aucun nombre recopié) ; min-width ne fait que l'élargir : en pile (téléphone, <= 700 px, P70-D-09) le zoom est plus étroit qu'elle et rien ne change ; dès 701 px il est en rangée comme elle et lui donne sa largeur.
+          const zb = rect(z); n.style.minWidth = zb ? zb.width + 'px' : '';
+          monter(n, window.innerHeight, () => [rect(k)]);
+        } else n.style.bottom = '';
+        if (z) monter(z, st ? st.getBoundingClientRect().bottom : window.innerHeight, () => [montre ? rect(n) : null, rect(k)]);
         return;
       }
       if (!n.parentNode || n.hidden) return;
-      n.style.bottom = '';
-      const a = n.getBoundingClientRect();
-      const haut = Math.min(sur(a, b) ? b.top : Infinity, sur(a, kb) ? kb.top : Infinity);
-      if (haut < Infinity) n.style.bottom = Math.round(window.innerHeight - haut + 8) + 'px';
+      monter(n, window.innerHeight, () => [rect(z), rect(k)]);
     };
     const eviterTout = () => { eviter(d.pastille); eviter(d.puce); };
     window.addEventListener('resize', eviterTout);

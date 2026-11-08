@@ -49,6 +49,7 @@ Retours du panel d'utilisateurs du cockpit (2026-11-06, registre `.planning/miss
 - **Aides « mesurer une fois posé » des sondes Chrome** (`stabiliser`, `attendreValeur`, `attendreEtStabiliser`, `positionPosee` dans `chrome-session.mjs`) et suite neuve `test-cockpit-sondes-stables.sh` qui les éprouve (partie pure, partie Chrome, mutants) : les lectures des suites Chrome se prennent une fois la valeur posée, jamais après une pause fixe.
 - **Q1 « Icônes dans le menu ⋯ »** : le menu « ⋯ » monte de 700 à 999 px (amende P70-D-01).
 - **Limites consignées au BACKLOG** : états « annulée/expirée/remplacée » du lancement, état « bloqué » sans source, titres de santé à variables, 40-tour.js à 298 lignes (seuil 300) — voir `.planning/BACKLOG.md`.
+- **Zone basse de 701 à 1 279 px : le zoom en rangée au bord gauche** (PU-G-021 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px ») : la pile verticale en haut à droite laisse place à la rangée de 1 280 px et plus, au bord `--edge`, au-dessus de la pastille « Terminal » et de la barre de question (qui remontent chacune au-dessus de ce qu'elles recouvrent, y compris sans pastille) ; sous 701 px la pile du téléphone reste (P70-D-09), désormais à `--edge` et non à 8 px. Suite : `test-cockpit-terminal-tiroir.sh` (T21.9). (corrige la recette du 2026-11-08)
 
 ## v1.4.0 — 2026-11-06 — non publié
 

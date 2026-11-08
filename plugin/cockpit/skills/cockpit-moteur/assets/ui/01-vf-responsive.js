@@ -8,7 +8,7 @@
 //     la droite garde son contenu ; sous 1 600 px les boutons d'action passent en icône seule (le libellé reste dans l'infobulle) ;
 //   - bornes mesurées à 1 024 px sur l'onglet Code AVEC ses boutons optionnels (Travail récent, Écrans) : aucun bouton ne sort de la fenêtre ;
 //   - infobulle : tout bouton d'en-tête sans `title` reprend son libellé (le viewer n'en pose pas sur « Parcours »), car sous 1 600 px il n'est plus qu'une icône ;
-//   - zoom au-dessus de la barre de question jusqu'à 1 279 px (comme le viewer le fait déjà sur écran tactile) ;
+//   - zoom en rangée au bord gauche, au-dessus de la pastille « Terminal » et de la barre de question, de 701 à 1 279 px (comme dès 1 280 px) ;
 //   - logo VibeFlow : le viewer inverse le logo clair du thème (il attend un logo blanc) ; nos deux logos ont déjà le bon contraste ;
 //   - sous 1 000 px : la barre de question range l'invite sur sa propre ligne ; sous 700 px le fil d'Ariane cède sa place au zoom.
 //   - fil d'Ariane (O2, recette 2026-11-03 ; budget revu après la revue de la recette 3, F1/F2) : dès 1 280 px, la colonne gauche de l'en-tête prend la largeur naturelle de son contenu (`flex: 1 1 auto`) et c'est la RECHERCHE qui cède
@@ -49,9 +49,14 @@
       #vf-lock[data-vf-point] .bl { display: none; }
     }
     @media (min-width: 1000px) and (max-width: 1279px) {
-      #zoom { left: auto; right: calc(var(--pw) + var(--edge)); bottom: auto; top: calc(var(--hh, 64px) + var(--sp-8)); flex-direction: column; border-radius: 26px; }
-      #context { max-width: min(520px, calc(100% - var(--pw) - 104px)); }
       #ask { width: min(700px, calc(100% - var(--pw) - 48px)); }
+    }
+    /* Zone basse, axe commun de 701 à 1 279 px (recette du 2026-11-08, lot C ; PU-G-021 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px ») : le zoom n'est plus la pile
+       verticale du haut à droite (celle du viewer sous 1 000 px et sur tactile, et celle de ce fichier de 1 000 à 1 279 px), mais la rangée de 1 280 px et plus, au bord gauche --edge ; il se pose au-dessus de la pastille « Terminal »
+       (qui prend sa largeur, vf-cockpit-terminal-tiroir.mjs), elle-même au-dessus de la barre de question quand elles se recouvrent. Plus de bouton à droite : le titre retrouve sa largeur d'origine. Sous 701 px la pile du téléphone reste (P70-D-09). */
+    @media (min-width: 701px) and (max-width: 1279px) {
+      #zoom { left: var(--edge); right: auto; top: auto; bottom: var(--edge); flex-direction: row; border-radius: 999px; }
+      #context { max-width: min(520px, calc(100% - var(--pw) - 64px)); }
     }
     @media (min-width: 1280px) {
       header .hl { flex: 1 1 auto; } /* sa largeur naturelle ; il cède après la recherche */

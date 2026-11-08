@@ -616,6 +616,56 @@ await executer(chrome, async (s) => {
   return { erreurs, n: releves.length, mauvais, avecAskOuvert: releves.filter((x) => x.ask && x.panneau).length, avecVisite: releves.filter((x) => x.tour).length, avertissements: releves.filter((x) => x.avert === true).length, tactile: releves.filter((x) => x.coarse === true).length };
 });
 JS
+cat > "$AUX/chrome-axe.mjs" <<'JS'
+// chrome-axe.mjs <chrome> <json> : T21.9 à T21.11 (recette du 2026-11-08, lot C ; PU-G-021 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px ») — l'axe commun de la zone basse,
+// de 390 à 1 440 px, sur Code et sur Projet : zoom, pastille « Terminal » et barre de question au même bord gauche --edge (16), pastille aussi large que le zoom, barre de 40 px. UNE ligne JSON.
+// Les rects se lisent une fois posés (stabiliser : deux lectures identiques).
+// Exceptions écrites, mesurées ici pour qu'elles ne glissent pas : sous 701 px le zoom reste la pile verticale du téléphone (P70-D-09, demande de Samuel du 2026-11-02) donc la pastille n'a pas sa largeur ;
+// sous 1 000 px les cibles font 44 px (viewer.html, règle « 999 px et moins ») et l'invite reste entière sur sa ligne : la barre n'y fait pas 40 px (finding ask-user du lot C) ; dès 1 280 px la barre est centrée, après la colonne du zoom.
+import { pathToFileURL } from 'node:url';
+const { executer, stabiliser, attendreValeur } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const [, , chrome, brut] = process.argv; const A = JSON.parse(brut);
+const OP = `http://127.0.0.1:${A.P}`, MS = Number(process.env.VF_TIROIR_MS) || 20000, EDGE = 16, TOL = 0.6;
+const LARGEURS = A.court ? [[390, 844], [768, 1024], [1000, 800], [1440, 900]] : [[390, 844], [700, 900], [701, 900], [768, 1024], [999, 900], [1000, 800], [1279, 800], [1280, 800], [1440, 900]];
+const MESURE = `(() => {
+  const r = (s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(), cs = getComputedStyle(e); if (!(b.width > 0 && b.height > 0) || cs.display === 'none' || cs.visibility === 'hidden') return null; return { x: +b.x.toFixed(1), y: +b.y.toFixed(1), l: +b.width.toFixed(1), h: +b.height.toFixed(1) }; };
+  return { zoom: r('#zoom'), pastille: r('.vf-term-pastille'), barre: r('#ask-form'), edge: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--edge')) || null };
+})()`;
+await executer(chrome, async (s) => {
+  const rel = [], erreurs = {};
+  for (const page of ['index.html', 'project.html']) for (const [W, H] of LARGEURS) {
+    const cle = `${page.replace('index.html', 'code').replace('project.html', 'projet')}-${W}`;
+    try {
+      await s.send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false });
+      await s.naviguer(`${OP}/${page}`); await s.ev(`localStorage.clear(); sessionStorage.clear()`); await s.naviguer(`${OP}/${page}`);
+      await s.attendre(`!!document.querySelector('button.vf-term-pastille') && !!document.getElementById('ask-form') && document.querySelectorAll('#viewport .node, #svg g.node').length > 0`, 'pastille, barre et nœuds', MS);
+      const lire = () => s.ev(MESURE);
+      await attendreValeur(lire, (v) => !!v && !!v.zoom && !!v.pastille && !!v.barre, { max: 6000 });
+      const m = await stabiliser(lire, { max: 6000 });
+      rel.push({ cle, W, ...m });
+    } catch (e) { erreurs[cle] = String(e.message).slice(0, 160); }
+  }
+  const proche = (a, b) => Math.abs(a - b) <= TOL;
+  const complets = rel.filter((x) => x.zoom && x.pastille && x.barre);
+  const zoom = [], pastille = [], barre = [];
+  for (const x of complets) {
+    const { cle, W, zoom: z, pastille: p, barre: b } = x;
+    // T21.9 : le zoom est au bord --edge ; en rangée dès 701 px, posé au-dessus de la pastille ; en pile (plus haute que large) sous 701 px
+    if (!proche(z.x, EDGE)) zoom.push(`${cle}: bord ${z.x}`);
+    if (W >= 701 && !(z.l > z.h)) zoom.push(`${cle}: pas en rangée (${z.l}x${z.h})`);
+    if (W < 701 && !(z.h > z.l)) zoom.push(`${cle}: la pile du téléphone a changé (${z.l}x${z.h})`);
+    if (W >= 701 && W <= 1279 && !(z.y + z.h <= p.y + TOL)) zoom.push(`${cle}: le zoom n'est pas au-dessus de la pastille (bas ${+(z.y + z.h).toFixed(1)} > haut ${p.y})`);
+    // T21.10 : la pastille est au bord --edge, aussi large que le zoom dès 701 px
+    if (!proche(p.x, EDGE)) pastille.push(`${cle}: bord ${p.x}`);
+    if (W >= 701 && !proche(p.l, z.l)) pastille.push(`${cle}: largeur ${p.l} contre zoom ${z.l}`);
+    // T21.11 : la barre est au bord --edge jusqu'à 1 279 px (après la colonne du zoom dès 1 280 px), de 40 px dès 1 000 px
+    if (W <= 1279 && !proche(b.x, EDGE)) barre.push(`${cle}: bord ${b.x}`);
+    if (W >= 1280 && !(b.x >= z.x + z.l)) barre.push(`${cle}: la barre (${b.x}) recouvre la colonne du zoom (jusqu'à ${+(z.x + z.l).toFixed(1)})`);
+    if (W >= 1000 && !proche(b.h, 40)) barre.push(`${cle}: hauteur ${b.h}`);
+  }
+  return { erreurs, n: rel.length, complets: complets.length, edge: [...new Set(rel.map((x) => x.edge))], zoom, pastille, barre };
+});
+JS
 cat > "$AUX/chrome-defaut.mjs" <<'JS'
 // chrome-defaut.mjs <chrome> <json> : hauteur du tiroir selon la fenêtre (G4 ; P71-D-37) ; UNE ligne JSON. Entrée : { P }. Page Projet, stockage vidé avant chaque relevé.
 import { pathToFileURL } from 'node:url';
@@ -683,6 +733,9 @@ run_geom() { # run_geom <sortie> <court 0|1> -> GJ ; un serveur neuf, un Chrome 
 }
 run_pastille() { # run_pastille <sortie> <court 0|1> -> PJ ; un serveur neuf, un Chrome neuf (T21.7)
   srv "$1" 1; PJ="$(node "$AUX/chrome-pastille.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":$2}")"; unsrv
+}
+run_axe() { # run_axe <sortie> <court 0|1> -> XJ ; un serveur neuf, un Chrome neuf (T21.9 à T21.11)
+  srv "$1" 1; XJ="$(node "$AUX/chrome-axe.mjs" "$CHROME" "{\"P\":$SRV_PORT,\"court\":$2}")"; unsrv
 }
 run_defaut() { # run_defaut <sortie> -> DJ ; un serveur neuf, un Chrome neuf
   srv "$1" 1; DJ="$(node "$AUX/chrome-defaut.mjs" "$CHROME" "{\"P\":$SRV_PORT}")"; unsrv
@@ -890,6 +943,10 @@ mut_pastille() { # mut_pastille <nom> <expression-sed> : le mutant doit laisser 
 }
 mut_pastille M-PASTILLE-SUR-ASK 's|if (sur(n.getBoundingClientRect(), kb)) n.style.bottom|if (false) n.style.bottom|'
 mut_pastille M-PASTILLE-SANS-RAPPEL "s|if (ask) { if (window.ResizeObserver)|if (false) { if (window.ResizeObserver)|" # jointure du panel (2026-11-07) : le mutant retire TOUT rappel lié à la barre (ResizeObserver et transitionend) ; la forme précédente, qui ne retirait que l'observateur, restait verte en CI Linux (shard 5, run 42386847278) alors qu'elle rougissait sous macOS : la fin de transition suffisait là-bas à replacer la pastille
+
+run_axe "$OUT" 0; AX="$XJ"
+assert_eq "T21.9 — témoin de l'axe : 18 relevés complets (9 largeurs x Code et Projet), aucune erreur, --edge vaut 16" "$(rj "$AX" '(j.erreur||JSON.stringify(j.erreurs))+" n="+j.n+" complets="+j.complets+" edge="+JSON.stringify(j.edge)')" "{} n=18 complets=18 edge=[16]"
+assert_eq "T21.9 (PU-G-021) — zoom au bord --edge de 390 à 1 440 px : en rangée au-dessus de la pastille de 701 à 1 279 px (plus la pile du haut à droite), pile du téléphone sous 701 px (P70-D-09)" "$(rj "$AX" 'JSON.stringify(j.zoom)')" "[]"
 
 echo "=== T22 — hauteur par défaut proportionnelle à la fenêtre (recette 71, G4 ; P71-D-37) ==="
 run_defaut "$OUT"; D="$DJ"
