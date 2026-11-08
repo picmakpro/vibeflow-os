@@ -377,19 +377,22 @@ const r = await executer(chrome, async (s) => {
   await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await s.naviguer(url); await s.attendre("document.readyState === 'complete' && !!window.VibeFlow && !!document.querySelector('#ask-form') && !!document.querySelector('#viewport .node, #viewport')", 'page Projet');
   const NOTE = 'Usage réel et non-régression : de bout en bout dans Chromium avec un faux claude dans le PATH (suites), puis avec le vrai claude local en production';
+  // M6 : la première carte porte un NOM long (plus de 60 caractères) : sans la règle CSS .vf-rep, le nom (une seule ligne, ellipse) serait rogné
+  const NOM = 'Phase 1 · Scaffolder le monorepo, le packaging et la chaîne de construction afin de livrer une première version installable et lisible';
+  await s.ev(`VibeFlow.nodes.get([...VibeFlow.nodes.keys()][0]).label = ${JSON.stringify(NOM)}`);
   await s.ev(`(() => { const ids = [...VibeFlow.nodes.keys()].slice(0, 3).map((k) => 'n:' + k);
     const ans = { title: 'Réponse', answer: 'Trois cartes.', items: ids.map((id) => ({ id, note: ${JSON.stringify(NOTE)} })), steps: [], followups: [] };
     const f = window.fetch; window.fetch = (u, x) => String(u).includes('/api/ask') ? Promise.resolve(new Response('event: answer\\ndata: ' + JSON.stringify(ans) + '\\n\\n')) : f(u, x); })()`);
   await s.ev(`(() => { const i = document.querySelector('#ask-input'); i.value = 'Question'; document.querySelector('#ask-form').requestSubmit(); })()`);
   const lire = () => s.ev(`(() => { const rows = [...document.querySelectorAll('#panel a.row[data-sel]')]; return rows.map((a) => { const rd = a.querySelector('.rd'), rn = a.querySelector('.rn'); const c = (e) => e ? { txt: e.textContent, coupe: e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1 } : null; return { rd: c(rd), rn: c(rn), title: a.getAttribute('title') || '' }; }); })()`);
   const rows = await attendreEtStabiliser(lire, (v) => Array.isArray(v) && v.length >= 3, { max: 20000 });
-  return { rows, note: NOTE };
+  return { rows, note: NOTE, nom: NOM };
 });
 console.log(JSON.stringify(r));
 JS
 XTAB="$(node "$AUX/tableau.mjs" "$CHROME" "$SCRIPTS/tests/chrome-session.mjs" "$PR3")"
 [ -n "${DBG:-}" ] && echo "RAWTAB: $XTAB"
-assert_eq "R3.23 — PU-G-147 : trois lignes de « Sur ce tableau » dont la note dépasse 90 caractères : aucune n'est rognée par la CSS (ni largeur ni hauteur), la note finit sur un mot entier (« … dans le… ») et le libellé complet reste au title (témoin rouge sur 82de0712 : rognée, title vide)" "$(printf '%s' "$XTAB" | node "$AUX/get.mjs" /dev/stdin 'j.rows.length+"|"+j.rows.every((r) => !r.rd.coupe && !r.rn.coupe && r.title.includes(j.note) && r.rd.txt.endsWith("…") && j.note.startsWith(r.rd.txt.slice(0, -1)) && j.note[r.rd.txt.length - 1] === " ")')" "3|true"
+assert_eq "R3.23 — PU-G-147 : trois lignes de « Sur ce tableau » dont la note dépasse 90 caractères et dont la première a un NOM de plus de 60 caractères (coupé au mot entier) : aucune n'est rognée par la CSS (ni largeur ni hauteur), la note finit sur un mot entier (« … dans le… ») et le libellé complet reste au title (témoin rouge sur 82de0712 : rognée, title vide)" "$(printf '%s' "$XTAB" | node "$AUX/get.mjs" /dev/stdin 'j.rows.length+"|"+(j.rows[0].rn.txt.endsWith("…") && j.nom.startsWith(j.rows[0].rn.txt.slice(0, -1)) && j.nom[j.rows[0].rn.txt.length - 1] === " ")+"|"+j.rows.every((r) => !r.rd.coupe && !r.rn.coupe && r.title.includes(j.note) && r.rd.txt.endsWith("…") && j.note.startsWith(r.rd.txt.slice(0, -1)) && j.note[r.rd.txt.length - 1] === " ")')" "3|true|true"
 # PU-G-160 : un lab CONFORME montre quand même la section (« Conforme · 0 ligne non comprise ») et y signale le groupe « Hors jalon »
 mkdir -p "$WORK/lab-r3d/src"; LR3D="$WORK/lab-r3d"; cp -R "$WORK/r3/.planning" "$LR3D/.planning"; printf '%s\n' '# Roadmap' '' '## Milestones' '' '- 🚧 **v1.0 Démo** - Phases 1-2 (in progress)' '' '## Phases' '' '- [x] **Phase 1: Socle** - a' '- [ ] **Phase 2: Écran** - b' '- [ ] **Phase 3: Orpheline** - c' '' '### Phase 1: Socle' '**Goal**: g1' '' '### Phase 2: Écran' '**Goal**: g2' '**Depends on**: Phase 1' > "$LR3D/.planning/ROADMAP.md"; printf '%s\n' '- [ ] **AUTH-01**: ok' > "$LR3D/.planning/REQUIREMENTS.md"
 printf 'export const u = () => 1;\n' > "$LR3D/src/util.js"; git -C "$LR3D" init -q && git -C "$LR3D" add -A && git -C "$LR3D" -c user.email=t@t -c user.name=t commit -q -m init; LABS4+=("$LR3D")
