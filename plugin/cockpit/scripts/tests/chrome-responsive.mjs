@@ -85,6 +85,7 @@ const MESURE = `(() => {
   m.onglets = piste && tabs.length ? { n: tabs.length, police: [...new Set(tabs.map((a) => getComputedStyle(a).fontSize))].join('/'), piste: getComputedStyle(piste).paddingTop + '/' + getComputedStyle(piste).paddingLeft, pad: getComputedStyle(tabs[0]).paddingLeft } : null;
   const zm = document.querySelector('#zoom'), af = document.querySelector('#ask-form'), up = document.querySelector('#btn-up');
   m.zoom = zm ? { entete: hd.contains(zm), vis: vis(zm), replie: zm.getAttribute('data-vf-replie'), feuille: innerWidth <= 700 && !document.body.classList.contains('no-panel'), dir: getComputedStyle(zm).flexDirection, r: arr(rec(zm)), boutons: [...zm.querySelectorAll('button')].map((b) => ({ id: b.id, aria: b.getAttribute('aria-label') || '', title: b.getAttribute('title') || '' })) } : null;
+  { const ak = document.getElementById('ask'); m.askBarre = ak && vis(ak) ? arr(rec(ak)) : null; } // la barre entière (avis compris), pas seulement le formulaire
   m.askRect = af && vis(af) ? arr(rec(af)) : null; m.upRect = up && vis(up) ? arr(rec(up)) : null;
   const bp = document.querySelector('#btn-panel'), pn = document.querySelector('#panel');
   // diagnostic de la visite ouverte (lu par les suites quand une assertion rougit : bbox de la carte de visite, de #ask et de ses avis, de la fenêtre, obstacles vus au dernier placement)
