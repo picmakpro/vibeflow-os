@@ -433,3 +433,11 @@ ou de `vf-new-lab`.
 - **NON mesuré :** le comportement d'un Claude Code plus ancien (fichier de hooks refusé, plugin entier refusé, ou hooks seuls ignorés) ; aucune version minimale n'est écrite pour le mod.
 
 **Déclencheur de reprise :** un utilisateur sur une version ancienne de Claude Code, ou la prochaine phase qui touche le mod vf-signal. Mesure dans un `HOME` jetable avec une version ancienne installée à part.
+
+## Cockpit / équipe : distinguer « attend une tâche de fond » de « terminé » (#223, cause 3)
+
+**Priorité : à arbitrer.** `[cockpit/équipe, #223 cause 3]` Distinguer « attend une tâche de fond » de « terminé » : l'indice transcript (tâche de fond lancée, jamais reprise ni notifiée, dernier message assistant en end_turn) a une précision mesurée d'environ 20 à 40 % (1 vrai positif sur 5, 2026-11-08) et ne dit pas si la tâche tourne ; il faut l'état du registre de tâches du harnais, non exposé dans les transcripts. À reprendre si le harnais l'expose ; sinon indice « tâche de fond sans retour lu » sur lecture de queue bornée, à arbitrer.
+
+## Team-kernel : témoin d'exécution de la doctrine Fin de mandat (#223)
+
+**Priorité : à arbitrer.** `[team-kernel, #223]` Témoin d'exécution de la doctrine Fin de mandat : la garde `test-fin-de-mandat.sh` vérifie que les prompts PORTENT la consigne, pas qu'un worker l'APPLIQUE. Un témoin de comportement (registre driver-lock : enfant fermé sans rapport final, ou `worktree-procs.sh list` non vide au close) reste à concevoir.
