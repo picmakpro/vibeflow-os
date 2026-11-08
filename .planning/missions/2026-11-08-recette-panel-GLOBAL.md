@@ -217,3 +217,13 @@ questions ont été posées ensemble ; les réponses sont reprises mot pour mot.
 Ces neuf décisions (cinq sur la section 8, trois sur la zone basse de la section 4, une sur la recherche Code) sont les seules tranchées à ce jour ; les neuf autres points restent
 au jugement de Samuel. Un commit qui applique l'une d'elles cite ce registre : « arbitrage Samuel,
 AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette ».
+
+### Délégation (message de Samuel, session principale, 2026-11-08)
+
+Après ces neuf réponses, toutes sur l'option recommandée, Samuel a écrit : « Ne m'interroge plus et répond toi
+même par ta solution recommandée, un seul mot d'ordre pas de flemmardise et rigueur ». À partir de là, les
+arbitrages de détail de cette mission sont pris par la session principale ou le manager sur l'option recommandée,
+sans question, et consignés ici au fil de l'eau sous la forme « décision déléguée par Samuel (message session
+principale, 2026-11-08), option recommandée : … ». La délégation ne retranche rien du périmètre et n'allège aucune
+preuve (témoin rouge puis vert, revue adverse, captures). Restent à Samuel : la levée du gel des publications, le
+merge, la release, le tag, et le goût pur quand aucune option n'est recommandable.
