@@ -495,6 +495,8 @@ J_OPEN="const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.g
 INJ_CARTE="(async () => { $J_PAUSE $J_OPEN return true; })()"
 INJ_CROIX="(async () => { $J_PAUSE $J_OPEN [...document.querySelectorAll('#panel button')].find((b) => /^Fermer/i.test(b.getAttribute('aria-label') || ''))?.click(); await p(150); return true; })()"
 # la visite d'office (700 ms après le rendu) est la couche du dessus et capte la première Échap : sous Linux, plus lent, elle s'ouvre pendant la mesure ; R15.4b mesure le tiroir, visite fermée (70-07, O6.15 fixe l'ordre des deux)
+# J2 : la visite d'office est fermée AVANT d'ouvrir la feuille de détail (sinon la feuille de visite relève le zoom au-dessus d'elle et il recouvre vraiment le titre) ; titre court (celui du lab)
+INJ_SANS_VISITE="(async () => { $J_PAUSE for (let i = 0; i < 100 && !window.VibeFlowTour?.active(); i++) await p(50); window.VibeFlowTour?.end(); await p(300); $J_OPEN await p(900); return true; })()"
 INJ_ECHAP="(async () => { $J_PAUSE $J_OPEN window.VibeFlowTour?.end(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await p(150); return true; })()"
 INJ_VIDE="(async () => { $J_PAUSE $J_OPEN document.getElementById('svg').dispatchEvent(new MouseEvent('click', { bubbles: true })); await p(150); return true; })()"
 INJ_TITRE="(async () => { $J_PAUSE const h = document.querySelector('#context h1'); const r = h.getBoundingClientRect(); document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.dispatchEvent(new MouseEvent('click', { bubbles: true })); for (let i = 0; i < 60 && getComputedStyle(document.getElementById('panel')).visibility !== 'visible'; i++) await p(50); await p(300); return true; })()"
@@ -508,6 +510,7 @@ RESP_INJECT="$INJ_DRILL" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK
 wait "${OPIDS[@]}"; OPIDS=()
 RESP_INJECT="$INJ_CARTE" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-carte.json" & OPIDS+=($!)
 RESP_INJECT="$INJ_CROIX" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-croix.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_SANS_VISITE" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r14-sans-visite.json" & OPIDS+=($!)
 RESP_INJECT="$INJ_ECHAP" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-echap.json" & OPIDS+=($!)
 RESP_INJECT="$INJ_VIDE" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-vide.json" & OPIDS+=($!)
 RESP_INJECT="$INJ_TITRE" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-titre.json" & OPIDS+=($!)
@@ -539,6 +542,8 @@ for onglet in index project; do # sur l'onglet Équipe, la position du zoom à �
 done
 # I-2 (intégration) : feuille de détail ouverte (≤ 700 px), le zoom se relève au-dessus d'elle et se replie (data-vf-replie="titre") s'il recouvrirait le titre : replié il ne recouvre rien ; invisible sans cette raison, il reste « zoom absent »
 assert_eq "R14.5 — Projet / 390 px, pendant un parcours : le zoom et « Remonter d'un niveau » ne se recouvrent pas" "$(mv_ "$WORK/r14-parcours.json" '(()=>{const m=j.mesures["390"].m,z=m.zoom,u=m.upRect;if(!u)return "témoin : « Remonter » absent (aucun parcours)";if(!z)return "zoom absent";if(!z.vis)return z.replie==="titre"&&z.feuille?"aucun":"zoom absent";const a=z.r,b=u;const x=Math.min(a[0]+a[2],b[0]+b[2])-Math.max(a[0],b[0]),y=Math.min(a[1]+a[3],b[1]+b[3])-Math.max(a[1],b[1]);return x>1.5&&y>1.5?"recouvrement "+Math.round(x)+"x"+Math.round(y)+" px":"aucun"})()')" "aucun"
+# J2 (passe de suivi) : R14.5 acceptait « aucun » pour tout repli par le titre ; un zoom replié À TORT (feuille de détail ouverte, titre court) passait. Ici le titre du lab est court : le zoom, relevé au-dessus de la feuille, ne le recouvre pas et doit rester visible.
+assert_eq "R14.6 — Projet / 390 px, feuille de détail ouverte, titre court : le zoom reste visible (non replié) quand il ne recouvre pas le titre" "$(mv_ "$WORK/r14-sans-visite.json" '(()=>{const m=j.mesures["390"].m,z=m.zoom;if(!m.tiroir)return "tiroir fermé (témoin)";if(!z)return "zoom absent";return z.vis&&!z.replie?"visible":"replié ou invisible (replie="+z.replie+", vis="+z.vis+")"})()')" "visible"
 assert_eq "R15.1 — 390 px : le bouton Détail est invisible sur les trois onglets" "$(mv_ "$WORK/r13-index.json" 'j.mesures["390"].m.btnPanel')|$(mv_ "$WORK/r13-project.json" 'j.mesures["390"].m.btnPanel')|$(mv_ "$WORK/r13-equipe.json" 'j.mesures["390"].m.btnPanel')" "false|false|false"
 assert_eq "R15.2 — Projet / 390 px : le tap d'une carte ouvre le tiroir" "$(mv_ "$WORK/r15-carte.json" 'j.mesures["390"].m.tiroir')" "true"
 assert_eq "R15.3 — Projet / 390 px, tiroir ouvert : une poignée visible et une croix visible au nom accessible français" "$(mv_ "$WORK/r15-carte.json" '(()=>{const m=j.mesures["390"].m;return m.tiroir?"poignée "+m.poignee+" · croix "+m.croix:"tiroir fermé (témoin)"})()')" "poignée true · croix true"
