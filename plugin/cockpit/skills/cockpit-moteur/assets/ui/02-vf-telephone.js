@@ -173,32 +173,43 @@
     let sansMemoire = false;
     if (SCm.store && SCm.store.set) { const ecrire = SCm.store.set; SCm.store.set = (k, v) => (sansMemoire && k === 'panel' ? undefined : ecrire(k, v)); }
     const sansTrace = (f) => { sansMemoire = true; try { f(); } finally { sansMemoire = false; } };
-    // P3 : la règle s'ancre sur le CHOIX, pas sur une fenêtre de temps. Un geste sur la carte ou dans la palette (pointeur, ou Entrée / Espace) est consommé par le premier évènement « panel » qui le suit ;
-    // sans geste, seul un CHANGEMENT de sélection ouvre : un rendu de plus sur la même sélection (flux en direct) ne rouvre jamais ce que l'utilisateur vient de refermer, quel que soit le délai.
-    let choix = null, versPanneau = false, precedent = null, retour = null, etaitOuvert = ouvert();
-    const sur = (ev) => !!(ev.target && ev.target.closest && ev.target.closest('#svg, #palette'));
-    document.addEventListener('pointerdown', (ev) => { choix = sur(ev) ? { clavier: false } : null; versPanneau = false; }, true);
-    document.addEventListener('keydown', (ev) => { versPanneau = false; if (ev.key === 'Enter' || ev.key === ' ') choix = sur(ev) ? { clavier: true } : null; }, true);
+    // P3 : la règle s'ancre sur le CHOIX, pas sur une fenêtre de temps. Sans geste, seul un CHANGEMENT de sélection ouvre : un rendu de plus sur la même sélection (flux en direct) ne rouvre jamais ce que l'utilisateur vient de refermer, quel que soit le délai.
+    // F1 (3e tour) : un geste armé « au pointeur posé » restait armé quand il n'aboutissait à aucune sélection (glisser sur le fond, pan, pincement) et le rendu suivant rouvrait le panneau. Sur la carte, le choix est donc
+    // l'évènement en cours au moment de l'émission (window.event) : le clic de la carte, ou l'Entrée / Espace qui la choisit ; un glisser, un pan ou un pincement n'émettent aucun clic, rien ne reste armé.
+    // La palette choisit plus tard (le viewer recentre d'abord) : son geste reste armé jusqu'au premier évènement « panel » qui le suit, et seulement lui (jamais le graphe).
+    let choixPalette = null, clavier = false, versPanneau = false, precedent = null, retour = null, etaitOuvert = ouvert();
+    const sur = (ev) => !!(ev && ev.target && ev.target.closest && ev.target.closest('#svg'));
+    const dansPalette = (ev) => !!(ev.target && ev.target.closest && ev.target.closest('#palette'));
+    document.addEventListener('pointerdown', (ev) => { clavier = false; choixPalette = dansPalette(ev) ? { clavier: false } : null; versPanneau = false; }, true);
+    document.addEventListener('keydown', (ev) => {
+      versPanneau = false;
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      clavier = sur(ev); choixPalette = dansPalette(ev) ? { clavier: true } : null;
+    }, true);
+    document.addEventListener('keyup', () => { clavier = false; }, true);
     // P2 : au clavier le focus entre dans le panneau. Par la palette (/, saisie, Entrée) le viewer rend ensuite le focus à la carte (reveal, après le recentrage) : tant que le geste du clavier court, un focus qui tombe sur le graphe est ramené au panneau.
     document.addEventListener('focusin', (ev) => {
       if (versPanneau && ev.target.closest && ev.target.closest('#svg')) { versPanneau = false; panel.tabIndex = -1; panel.focus({ preventScroll: true }); }
     }, true);
     SCm.on('panel', (d) => {
-      const g = choix; choix = null; // le geste est consommé par le premier évènement « panel »
+      const ev = window.event, sel0 = ev && ev.type === 'click' && sur(ev) ? { clavier } : ev && ev.type === 'keydown' && (ev.key === 'Enter' || ev.key === ' ') && sur(ev) ? { clavier: true } : null;
+      const g = choixPalette || sel0; choixPalette = null; // le geste de la palette est consommé par le premier évènement « panel » qui le suit
       const sel = d && d.selected, cle = sel == null ? null : typeof sel === 'string' ? sel : JSON.stringify(sel), change = cle !== precedent;
       precedent = cle;
       if (!cle || !mi.matches || ouvert() || panel.querySelector(':scope > .vf-whop')) return;
       if (!change && !g) return;
       const a = document.activeElement; retour = a && a !== document.body && !panel.contains(a) ? a : null;
       sansTrace(() => bascule(true));
-      const git = window.VFGitTiroir; if (git && git.ouvert()) git.fermer(true); // P4 : le tiroir Git (z 7) recouvrirait le panneau (z 5) ; un seul latéral à la fois, comme « Au travail » sous 1 280 px (73-vf-tiroir-travail.js)
       if (g && g.clavier) { panel.tabIndex = -1; panel.focus({ preventScroll: true }); versPanneau = true; }
     });
     // P4 bis : la règle est symétrique, la dernière surface ouverte l'emporte. Git s'ouvre (touche g, ligne ou ouvreur) pendant que le panneau est ouvert : le panneau se replie, la sélection est gardée, la préférence n'est pas écrite ; il ne se rouvre pas à la fermeture de Git
     window.addEventListener('vf-git:etat', (e) => { if (e.detail && e.detail.ouvert && mi.matches && ouvert() && !panel.querySelector(':scope > .vf-whop')) sansTrace(() => bascule(false)); });
     new MutationObserver(() => {
       const o = ouvert(); if (o === etaitOuvert) return; etaitOuvert = o;
-      if (o || !mi.matches || panel.querySelector(':scope > .vf-whop')) { if (o) return; retour = null; return; }
+      // P4 et F5 : le tiroir Git (z 7) recouvrirait le panneau (z 5) ; un seul latéral à la fois, comme « Au travail » sous 1 280 px (73-vf-tiroir-travail.js). La règle se tient ICI, sur l'ouverture elle-même,
+      // et non dans chaque chemin qui ouvre (sélection, « Détail » au clic ou au clavier, palette) : la dernière surface ouverte l'emporte par tous les chemins.
+      if (o) { const git = window.VFGitTiroir; if (mi.matches && git && git.ouvert()) git.fermer(true); return; }
+      if (!mi.matches || panel.querySelector(':scope > .vf-whop')) { retour = null; return; }
       const a = document.activeElement;
       if (a === document.body || panel.contains(a)) (retour && document.contains(retour) ? retour : btn).focus({ preventScroll: true });
       retour = null;
