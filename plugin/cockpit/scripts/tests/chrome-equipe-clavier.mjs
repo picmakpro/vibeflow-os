@@ -232,7 +232,13 @@ await executer(chrome, async (s) => {
     const ouvrirTravail = async () => { await s.ev("document.querySelector('#vf-lock').click()"); await s.attendre("!!document.querySelector('#panel > .vf-whop') && !document.body.classList.contains('no-panel')", 'tiroir « Au travail » ouvert'); };
     const etapes = {};
     if (process.env.EK_ORDRE === 'travail-puis-git') { await ouvrirTravail(); etapes.premier = await etat(); await ouvrirGit(); etapes.second = await etat(); }
-    else { await ouvrirGit(); etapes.premier = await etat(); await ouvrirTravail(); etapes.second = await etat(); }
+    else {
+      await ouvrirGit(); etapes.premier = await etat(); await ouvrirTravail(); etapes.second = await etat();
+      // un nouveau `who` redessine le tiroir (le titre qui avait le focus est remplacé) : le focus doit y rester (recette du 2026-11-08, PU-G-203)
+      await s.ev("(() => { const S = { kind: 'session', id: 'S1', etat: 'actif', tree: '.', task: 'session' }, S2 = { kind: 'session', id: 'S2', etat: 'actif', tree: '.', task: 'seconde session' }; window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('who', { seq: 5001, at: Date.now(), who: { workers: [S, S2], sources: {} } }); })()");
+      await s.attendre("document.querySelector('#panel > .vf-whop .aw-count b')?.textContent === '2'", 'tiroir redessiné (deux actifs)');
+      await calme(); etapes.redessin = await etat();
+    }
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 800, deviceScaleFactor: 1, mobile: false });
     etapes.large = await etat();
     return { largeur: +process.env.EK_LARGEUR, etapes };

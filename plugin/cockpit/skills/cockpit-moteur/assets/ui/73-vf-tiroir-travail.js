@@ -8,6 +8,7 @@
   if (!SC || !SRV || !SRV.token || typeof EventSource === 'undefined') return; // même garde que 70-vf-live.js
   const panneau = document.getElementById('panel'), entete = document.getElementById('hdr-ext');
   if (!panneau || !entete) return;
+  const st = document.createElement('style'); st.textContent = '.vf-whop h3:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; } .vf-whop h3:focus:not(:focus-visible) { outline: none; }'; document.head.appendChild(st); // le titre reçoit le focus à l\'ouverture (comme celui du tiroir Git) : l\'anneau se voit au clavier
   const bouton = () => document.getElementById('vf-lock');
   const ouvert = () => !!panneau.querySelector(':scope > .vf-whop') && !document.body.classList.contains('no-panel'); // le tiroir « Au travail » occupe le panneau, et le panneau est ouvert
   const ETROIT = window.matchMedia('(max-width: 1279px)'), git = () => window.VFGitTiroir; // 77-vf-git-tiroir.js se charge après ce fichier : lu à l'usage
@@ -15,7 +16,12 @@
   const etat = () => {
     const b = bouton(), o = ouvert(); if (!b) return;
     b.setAttribute('aria-controls', 'panel'); b.setAttribute('aria-expanded', String(o));
-    if (o && !etaitOuvert && ETROIT.matches && git() && git().ouvert()) { git().fermer(true); if (!panneau.contains(document.activeElement)) b.focus({ preventScroll: true }); } // « Au travail » s'ouvre : Git se replie sans voler le focus
+    if (o && !etaitOuvert && ETROIT.matches) { // « Au travail » s'ouvre sous 1280 px : Git se replie s'il était ouvert (sans voler le focus à autre chose), et le focus va au tiroir qui s'ouvre (Q12, PU-G-203 ; recette du 2026-11-08 : il restait sur le bouton « N au travail », 15 à 20 Tab pour entrer)
+      const gitOuvert = !!git() && git().ouvert(); if (gitOuvert) git().fermer(true);
+      const a = document.activeElement, titre = panneau.querySelector(':scope > .vf-whop h3');
+      if (titre && !panneau.contains(a) && (gitOuvert || a === b || a === document.body || !a)) { titre.tabIndex = -1; titre.focus({ preventScroll: true }); }
+      else if (gitOuvert && !panneau.contains(a)) b.focus({ preventScroll: true });
+    }
     etaitOuvert = o;
   };
   window.addEventListener('vf-git:etat', (e) => { if (e.detail && e.detail.ouvert && ETROIT.matches && ouvert()) document.getElementById('btn-panel').click(); }); // Git s'ouvre (le focus est déjà sur son titre) : « Au travail » se replie
