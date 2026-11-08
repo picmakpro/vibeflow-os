@@ -192,3 +192,18 @@ Il n'y a plus de périmètre non jugé. Le prochain geste proposé est un lot de
 - les parts promises manquantes : zoom de 701 à 1 279 px (PU-G-021), focus du tiroir qui s'ouvre (PU-G-203), définitions Git au focus (PU-G-193 et 196), panneau qui ne s'ouvre pas au choix d'une carte entre 600 et 999 px, PU-G-150, PU-G-163, verrou périmé non signalé.
 
 Les dix points de la section 8 restent au jugement de Samuel.
+
+## 10. Arbitrages de Samuel consignés (libellés du Projet, point 7 de la section 8)
+
+Canal : AskUserQuestion, session principale, 2026-11-08 (réponse horodatée 03:27 UTC). Les trois
+questions ont été posées ensemble ; les réponses sont reprises mot pour mot.
+
+| Question posée | Options offertes | Réponse de Samuel |
+|---|---|---|
+| « Onglet Projet : le compteur d'état affiche « 4 bloqué(s) » (noté 5/10 par le juge). Quelle forme ? » | Accord réel (Recommandé) : « 1 bloqué », « 4 bloqués », pluriel calculé comme ailleurs dans le cockpit (`pluriel(n, 'ligne', 'lignes')`) · Nom neutre : « 4 en blocage » · Garder tel quel | **« Accord réel (Recommandé) »** |
+| « La pastille de l'état d'une phase dit « … dans Phase 72 ? », sans article (6/10). Quelle forme ? » | Avec article (Recommandé) : « … dans la Phase 72 ? » · Sans « dans » : « … Phase 72 ? » · Garder tel quel | **« Avec article (Recommandé) »** |
+| « « STATE.md semble périmé : il dit « prête à planifier » » est juste mais ne dit pas quoi faire. Ajoute-t-on une suite ? » | Dire quoi faire (Recommandé) : ajouter une seconde phrase courte, « La carte fait foi ; mettez STATE.md à jour à la fin de la phase. » · Lien vers le panneau Format · Garder tel quel | **« Dire quoi faire (Recommandé) »** |
+
+Ces trois décisions sont les seules de la section 8 tranchées à ce jour ; les neuf autres points restent
+au jugement de Samuel. Un commit qui applique l'une d'elles cite ce registre : « arbitrage Samuel,
+AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette ».
