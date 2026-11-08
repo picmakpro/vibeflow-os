@@ -286,7 +286,7 @@ const OUVERT = `(() => { const t = document.querySelector('#vf-git-tiroir'); ret
 JS
   cat > "$AUX/d3a.js" <<'JS'
 const [base] = ARGS;
-await fenetre(1440); await s.naviguer(base + '/'); await pret();
+await fenetre(1440); await s.naviguer(base + '/#t'); await pret(); // « #t » : un fragment empêche la visite guidée de se lancer seule (40-tour.js:249 rejoue SC.fit(true) à 450 ms : elle faisait varier k et poser `anim` comme un « f », rendant D3.3 non discriminant)
 await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
 const out = {}, fermer = () => s.ev(`window.VFGitTiroir.fermer()`);
 await s.ev(`document.activeElement && document.activeElement.blur()`);
@@ -326,13 +326,17 @@ out.ctxOuvert = await s.ev(`document.body.classList.contains('vf-git-ouvert')`);
 const k = () => s.ev(`VibeFlow.state.t.k`), panneau = () => s.ev(`document.body.classList.contains('no-panel')`);
 const p0 = await panneau(); await s.ev(`document.querySelector('#vf-git-tiroir .vf-git-titre-t').focus()`); await touche('p'); out.p = [p0, await panneau()];
 const k0 = await k(); await touche('='); const k1 = await attendreEtStabiliser(k, (v) => v > k0, { max: 5000 }); await touche('-'); const k2 = await attendreEtStabiliser(k, (v) => v < k1, { max: 5000 }); // « -» ramène le zoom à son point de départ, qui EST déjà l'ajustement (viewer.html fit()) : un « f » lu alors ne changeait rien d'observable. De plus le viewer se REPLACE seul (fit(false) à chaque mise en page du graphe, ~300 ms après un zoom dans cette page) : un état « non ajusté » ne dure donc pas.
-// Discriminant : on pose un état non ajusté (« = »), on le relève IMMÉDIATEMENT (kz), on frappe « f » et on attend un état postérieur différent ; si une remise en page est passée entre les deux (kz périmé, k3 === kz), on recommence (3 essais) — un « f » mort échoue aux 3 essais.
-let kz = k2, k3 = k2;
-for (let essai = 0; essai < 3 && k3 === kz; essai++) {
+// Discriminant : « k change » ne prouve pas que « f » marche si quelque chose d'autre ajuste la vue. C'était le cas : la visite guidée (40-tour.js:249) rejoue SC.fit(true) à 450 ms, ce qui ramenait k à 1,1 et posait `anim` comme un « f » (démontré : avec « f » rendu inopérant, D3.3 restait vert). La page est donc ouverte avec un fragment (#t, qui empêche la visite de se lancer seule) et l'observable propre à « f » est l'ajustement ANIMÉ : fit(true) pose la classe `anim` sur #viewport (viewer.html setT).
+// On pose un état non ajusté (« = »), on le relève IMMÉDIATEMENT (kz), on frappe « f », on attend un état postérieur différent ET la classe `anim` vue pendant « f » ; si une remise en page est passée entre le relevé et « f » (kz périmé), on recommence (3 essais). Un « f » mort (M-AJUSTEMENT) échoue aux 3.
+await s.ev(`window.__animVue = 0; { const vp = document.querySelector('#viewport'); new MutationObserver((ms) => { for (const m of ms) if (vp.classList.contains('anim') && !(m.oldValue || '').split(' ').includes('anim')) window.__animVue++; }).observe(vp, { attributes: true, attributeFilter: ['class'], attributeOldValue: true }); }`);
+let kz = k2, k3 = k2, animVue = false;
+for (let essai = 0; essai < 3 && !(k3 !== kz && animVue); essai++) {
   await touche('='); await touche('='); kz = await k();
+  await s.ev(`window.__animVue = 0`);
   await touche('f'); k3 = await attendreEtStabiliser(k, (v) => v !== kz, { pas: 50, max: 2000 });
+  animVue = await s.ev(`window.__animVue > 0`);
 }
-out.zoom = { plus: k1 > k0, moins: k2 < k1, fit: k3 !== kz };
+out.zoom = { plus: k1 > k0, moins: k2 < k1, fit: k3 !== kz && animVue };
 await fermer();
 await s.attendre(`getComputedStyle(document.querySelector('#context')).opacity === '1'`, '#context rendu');
 out.ctxFerme = await s.ev(`!document.body.classList.contains('vf-git-ouvert')`);
@@ -955,7 +959,9 @@ EOF
   assert_eq "M-HTML — rougit D2.5 (un message rendu en HTML fait naître un <img>) alors que les 40 rangées sont là (pas une panne d'un autre ordre)" "$(jq_ "$RM" '[j.xss.img > 0, j.xss.lit.includes("false"), j.ouvert.rangees].join("|")' 2>/dev/null)" "true|true|40"
   mutant M-COPIE 77-vf-git-rendu.js "writeText(code.textContent)" "writeText(code.textContent.slice(0, -1))" d2.js
   assert_eq "M-COPIE — rougit D2.4 (le texte reçu par l'API n'est plus celui du <code>) alors que la copie a bien eu lieu" "$(jq_ "$RM" '[j.copie.spy === j.copie.affiche, typeof j.copie.spy, j.copie.retour].join("|")' 2>/dev/null)" "false|string|Copiée"
-  mutant M-GLOBAL-G 77-vf-git-tiroir.js "if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(t.tagName) >= 0)) return;" "if (false) return;" d3a-complet.js
+  mutant M-AJUSTEMENT ../viewer.html "else if (ev.key === 'f' || ev.key === 'F') fit(true);" "else if (ev.key === 'f' || ev.key === 'F') { }" d3a-complet.js
+assert_eq "M-AJUSTEMENT — rougit D3.3 (la touche f ne fait rien : ni changement de k ni ajustement animé fit(true)) alors que + et - marchent" "$(jq_ "$RM" '[j.zoom.plus, j.zoom.moins, j.zoom.fit].join("|")' 2>/dev/null)" "true|true|false"
+mutant M-GLOBAL-G 77-vf-git-tiroir.js "if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(t.tagName) >= 0)) return;" "if (false) return;" d3a-complet.js
   assert_eq "M-GLOBAL-G — rougit D3.1 (g ouvre le tiroir depuis un champ de saisie) alors que g hors champ marche toujours" "$(jq_ "$RM" '[j.champ_input.ouvert, j.g1, j.g2].join("|")' 2>/dev/null)" "true|true|false"
   mutant M-HORS-DEPOT 77-vf-git-tiroir.js "if (!V || V.etat === 'absent' || !V.depot) return; // sans dépôt" "if (false) return; // sans dépôt" d3n-complet.js nogit
   assert_eq "M-HORS-DEPOT — rougit D3.1 hors dépôt (le tiroir existe alors qu'aucun ouvreur n'existe) alors que la page est rendue" "$(jq_ "$RM" '[j.tiroir, j.ligne].join("|")' 2>/dev/null)" "true|false"
