@@ -358,6 +358,9 @@ assert_eq "Q20.2 — R1 : la coupe du pied d'exigence et celle du nom sont la M�
 import { clip, clipMot } from '$SCRIPTS/vf-cockpit-planning.mjs';
 const t = 'un deux trois quatre cinq six sept huit neuf dix onze douze';
 console.log([5, 12, 20, 33, 80].every((n) => clip(t, n) === clipMot(t, n)));")" "true"
+assert_eq "Q20.3 — R3 : une coupe qui tombe exactement sur une espace garde le mot entier avant elle (« aaaa bbbb… »), une coupe dans un mot le retire (« aaaa… »)" "$("$NODE" --input-type=module -e "
+import { clipMot } from '$SCRIPTS/vf-cockpit-planning.mjs';
+console.log(clipMot('aaaa bbbb cccc', 10) + '|' + clipMot('aaaa bbbbb', 9));")" "aaaa bbbb…|aaaa…"
 
 vf_hyg_assert
 echo ""
