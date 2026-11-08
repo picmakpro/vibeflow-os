@@ -273,7 +273,7 @@ des étages croisés (quand les insérer, forme DAG, budgets, invariants) :
 ## Fin de mandat
 
 Source unique (ADR-030) ; les agents y renvoient. Un mandat se termine par un rapport typé ET par
-l'arrêt de tout ce que l'agent a lancé, dans le même tour. Mesuré le 2026-11-05 (F1-F4) puis le 2026-11-08 (F5-F6) :
+l'arrêt de tout ce que l'agent a lancé, dans le même tour. Mesuré le 2026-11-05 (F1-F4) puis le 2026-11-08 (F5-F7) :
 - **F1.** Un worker qui rend la main pendant qu'une commande Bash tourne en fond reçoit le statut
   « waiting on its own background work » (`completed`, résultat « may be interim ») et reste vivant.
   Dans les 5 orphelins des 3-5 novembre, la commande avait été basculée AUTOMATIQUEMENT en fond par
@@ -294,8 +294,9 @@ l'arrêt de tout ce que l'agent a lancé, dans le même tour. Mesuré le 2026-11
   après rapport, `TaskStop` VÉRIFIE (« No task found » = fini) ; un enfant encore listé est vivant → réveil par `SendMessage`,
   jamais `close --status=done`. On n'arrête jamais un agent de la liste qui n'est pas le sien, ni un agent dont on n'a pas lu
   le dernier message (un `TaskStop` de la session principale à 03 h sur un worker listé `completed` a tué un juge en attente légitime).
+- **F7** (mesuré par le manager de la mission #223, 2026-11-08). Une commande Bash au premier plan est aussi déplacée en fond par le harnais quand un message arrive pendant qu'elle tourne (« Command was moved to the background so that a message that arrived while it was running can reach you ») : elle continue de tourner et doit être attendue ou arrêtée (`TaskStop` sur son identifiant) comme toute tâche de fond.
 
-**Worker.** Aucune main rendue en attente d'une tâche de fond, bascule automatique du timeout comprise. Toute attente est au premier plan et
+**Worker.** Aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (timeout Bash ou message entrant, F7). Toute attente est au premier plan et
 bornée par une échéance explicite : tranches de sommeil sous le timeout Bash puis test de la condition, ou outil Monitor si
 disponible ; un job long se lance détaché (`nohup … &`), PID et journal consignés, puis se sonde au premier plan. Commit AVANT
 tout rejeu long. À l'échéance : arrêt de ses propres processus et `blocked` (identifiant de tâche et PID en finding). Fin de
