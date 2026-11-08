@@ -28,7 +28,9 @@
           const r = e.getBoundingClientRect();
           return { n: name(e), left: r.left, top: r.top, right: r.right, bottom: r.bottom };
         })
-        .filter((o) => innerWidth >= 701 || o.n !== '#zoom');
+        .filter((o) => innerWidth >= 701 || o.n !== '#zoom')
+        // hors téléphone la barre est comptée par ses enfants (avis, saisie), pas par son conteneur : le conteneur englobe l'avis, qui ne pèse pas comme le reste (voir poids, dans place)
+        .filter((o) => innerWidth < 701 || o.n !== '#ask');
     }
     function place(folded) {
       if (!folded) unfold();
@@ -61,6 +63,10 @@
       const droiteTitre = basse && !!tr && !feuille && tr.left < 60 && libre >= 160;
       // px comptés autour de chaque surface : bordures et arrondis que la boîte de mise en page ne montre pas (6 faisait choisir des cartes inutilement étroites)
       const G6 = 2;
+      // L'avis de la barre (« Nécessite le CLI Claude Code… », sans moteur de questions, donc sur tout poste neuf et en CI) est le seul obstacle qui s'efface : dans une fenêtre basse il allonge la barre de 44 à 56 px
+      // et la place sous le bloc titre tombe sous les 120 px de la carte, qui recouvrait alors le titre que la visite montre (CI Linux, T9 à 701 et 760 px, trace reproduite sous macOS sans `claude`). Recouvrir un avis
+      // qui revient à la fin de la visite coûte moins que recouvrir le titre : son aire compte dix fois moins. Jamais sur un téléphone, où l'avis n'apparaît qu'à la saisie et où la feuille ne change pas.
+      const poids = (o) => (!feuille && o.n === '#ask-warn' ? 0.1 : 1);
       const area = (a, b) => Math.max(0, Math.min(a.right, b.right + G6) - Math.max(a.left, b.left - G6)) * Math.max(0, Math.min(a.bottom, b.bottom + G6) - Math.max(a.top, b.top - G6));
       let best = null;
       // d'abord les largeurs ; quand rien ne tient sans recouvrir une surface, la carte raccourcit aussi (son texte défile), jusqu'à un plancher de 200 x 120 px
@@ -79,7 +85,7 @@
           // la boîte de mise en page de la carte, pas sa boîte peinte : pendant l'animation d'entrée (98 %, 8 px plus bas) la boîte peinte est plus petite et montre un vide que la carte posée n'a pas
           const r = { left: card.offsetLeft, top: card.offsetTop, right: card.offsetLeft + card.offsetWidth, bottom: card.offsetTop + card.offsetHeight };
           // le coût : ce qu'elle recouvre d'abord (un pixel recouvert pèse plus que tout déplacement), puis son éloignement de la place habituelle (en bas à gauche, pleine largeur, pleine hauteur)
-          const covered = obs.reduce((n, o) => n + area(r, o), 0);
+          const covered = obs.reduce((n, o) => n + area(r, o) * poids(o), 0);
           const tb = card.querySelector('.tb');
           const rogne = feuille || !tb ? 0 : Math.max(0, tb.scrollHeight - tb.clientHeight);
           const tn = card.querySelector('.tn');
