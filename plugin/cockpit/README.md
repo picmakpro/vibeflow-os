@@ -99,6 +99,8 @@ masquée faute de largeur (seuil de 1280 px, ratifié par Samuel, AskUserQuestio
 Le tiroir est vertical, à gauche, et coexiste avec le tiroir Terminal (en bas) et les boutons de zoom.
 **Un seul tiroir latéral sous 1 280 px** (Q12 « Un seul latéral sous 1280 px », PU-G-203 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : ouvrir le tiroir Git replie « Au travail » (à droite), et inversement ; le focus va au tiroir qui s'ouvre. Lecture étroite (« Non, lecture étroite », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : seul le contenu « Au travail » compte comme tiroir latéral, le détail d'une carte n'entre pas dans la règle. À 1 280 px et au-delà les deux coexistent, et un redimensionnement ne rouvre rien. Le tiroir Terminal (en bas) n'est pas concerné ; le tiroir Git ne pousse pas la carte (l'option « le tiroir pousse la carte », PU-G-204, a été écartée par Samuel, AskUserQuestion session principale, 2026-11-06). Preuve : `test-cockpit-equipe.sh` (EK16).
 
+**Définitions des termes Git au survol ET au focus** (Q3 A ; PU-G-193, 196, recette du 2026-11-08) : « HEAD détaché », l'indicateur ↑/↓ d'un worktree et le titre « Worktrees » s'atteignent par Tab et montrent leur définition dans une bulle visible au focus clavier (Échap la ferme sans fermer le tiroir), en plus du survol par `title` ; la même phrase reste lue par `aria-description` ou `aria-label`. Preuve : `test-cockpit-git-tiroir.sh` (D2.1b à D2.1d, D16.3b).
+
 **Ce qu'il montre** (tout est lu sur le disque, jamais de `fetch`, jamais de lecture réseau) :
 
 - le **graphe** en couloirs des branches locales, des branches distantes déjà connues (`refs/remotes/*`) et des worktrees (P78-D-05) ; au plus 500 commits de la
