@@ -367,6 +367,55 @@ node "$AUX/q.mjs" "$SCRIPTS" project "$LR3" > "$WORK/g-r3c.json"
 assert_eq "R3.18 — PU-G-153 / Q14 : le bouton Copier donne au presse-papiers EXACTEMENT la commande affichée, qui est celle de la donnée (une seule source) ; le bouton dit « Copié » ensuite" "$(xr3 'j.copieCommande===j.commande&&j.commande===j.commandeBouton&&j.commande.length>60')|$([ "$(xr3 'j.copieCommande')" = "$(G "$WORK/g-r3c.json" 'j.meta.vf.drift.commande')" ] && echo meme)|$(xr3 'j.etatBouton')" "true|meme|Copié"
 assert_eq "R3.19 — PU-G-154 : un clic sur une ligne non lue copie « fichier:ligne » tel qu'affiché et dit « Copié » (deux copies au total : la commande, puis la ligne)" "$(xr3 'j.copieRef===j.refAffichee&&/ROADMAP\.md:\d+$/.test(j.copieRef)')|$(xr3 'j.etatRef')|$(xr3 'j.nbCopies')" "true|Copié|2"
 assert_eq "R3.20 — DG-15 : le bloc Santé existe dans la page (témoin positif : 1) mais est masqué dans l'onglet Projet : aucun « Aucun problème trouvé » ne côtoie les lignes non lues" "$(xr3 'j.santeDansDom')|$(xr3 'j.sante')" "1|false"
+# R3.23 — PU-G-147 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (1e718a4f)) : aucun libellé de « Sur ce tableau » ne s'affiche coupé en plein mot
+cat > "$AUX/tableau.mjs" <<'JS'
+// tableau.mjs <chrome> <session.mjs> <url> : lignes de « On this board » (réponse simulée) — libellés coupés ou non en plein mot (PU-G-147)
+import { pathToFileURL } from 'node:url';
+const [, , chrome, sess, url] = process.argv;
+const { executer, attendreEtStabiliser } = await import(pathToFileURL(sess).href);
+const r = await executer(chrome, async (s) => {
+  await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await s.naviguer(url); await s.attendre("document.readyState === 'complete' && !!window.VibeFlow && !!document.querySelector('#ask-form') && !!document.querySelector('#viewport .node, #viewport')", 'page Projet');
+  const NOTE = 'Usage réel et non-régression : de bout en bout dans Chromium avec un faux claude dans le PATH (suites), puis avec le vrai claude local en production';
+  // M6 : la première carte porte un NOM long (plus de 60 caractères) : sans la règle CSS .vf-rep, le nom (une seule ligne, ellipse) serait rogné
+  const NOM = 'Phase 1 · Scaffolder le monorepo, le packaging et la chaîne de construction afin de livrer une première version installable et lisible';
+  await s.ev(`VibeFlow.nodes.get([...VibeFlow.nodes.keys()][0]).label = ${JSON.stringify(NOM)}`);
+  await s.ev(`(() => { const ids = [...VibeFlow.nodes.keys()].slice(0, 3).map((k) => 'n:' + k);
+    const ans = { title: 'Réponse', answer: 'Trois cartes.', items: ids.map((id) => ({ id, note: ${JSON.stringify(NOTE)} })), steps: ids.map((id) => ({ id, note: ${JSON.stringify(NOTE)} })), followups: [] };
+    const f = window.fetch; window.fetch = (u, x) => String(u).includes('/api/ask') ? Promise.resolve(new Response('event: answer\\ndata: ' + JSON.stringify(ans) + '\\n\\n')) : f(u, x); })()`);
+  await s.ev(`(() => { const i = document.querySelector('#ask-input'); i.value = 'Question'; document.querySelector('#ask-form').requestSubmit(); })()`);
+  const lire = () => s.ev(`(() => { const rows = [...document.querySelectorAll('#panel a.row[data-sel]')]; return rows.map((a) => { const rd = a.querySelector('.rd'), rn = a.querySelector('.rn'); const c = (e) => e ? { txt: e.textContent, coupe: e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1 } : null; return { rd: c(rd), rn: c(rn), title: a.getAttribute('title') || '', parcours: /Walkthrough|Parcours/.test((a.closest('.sec')?.querySelector('h3')?.textContent) || '') }; }); })()`);
+  const rows = await attendreEtStabiliser(lire, (v) => Array.isArray(v) && v.length >= 6, { max: 20000 });
+  return { rows, note: NOTE, nom: NOM };
+});
+console.log(JSON.stringify(r));
+JS
+XTAB="$(node "$AUX/tableau.mjs" "$CHROME" "$SCRIPTS/tests/chrome-session.mjs" "$PR3")"
+[ -n "${DBG:-}" ] && echo "RAWTAB: $XTAB"
+assert_eq "R3.23 — PU-G-147 : trois lignes de « Sur ce tableau » ET trois lignes du parcours (M7b), dont la note dépasse 90 caractères et dont la première a un NOM de plus de 60 caractères (coupé au mot entier) : aucune n'est rognée par la CSS (ni largeur ni hauteur), la note finit sur un mot entier (« … dans le… ») et le libellé complet reste au title (témoin rouge sur 82de0712 : rognée, title vide)" "$(printf '%s' "$XTAB" | node "$AUX/get.mjs" /dev/stdin 'j.rows.length+"|"+j.rows.filter((r) => r.parcours).length+"|"+(j.rows[0].rn.txt.endsWith("…") && j.nom.startsWith(j.rows[0].rn.txt.slice(0, -1)) && j.nom[j.rows[0].rn.txt.length - 1] === " ")+"|"+j.rows.every((r) => !r.rd.coupe && !r.rn.coupe && r.title.includes(j.note) && r.rd.txt.endsWith("…") && j.note.startsWith(r.rd.txt.slice(0, -1)) && j.note[r.rd.txt.length - 1] === " ")')" "6|3|true|true"
+# R3.24 — M3 (contre-revue) : le message « STATE.md semble périmé » est RENDU dans le bloc « Maintenant » (lab dont STATE.md dit « ready_to_plan » alors que les plans de la phase 2 sont faits), avec sa seconde phrase (L3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3da818fe))
+LRM="$WORK/lab-r3m"; mkdir -p "$LRM/src" "$LRM/.planning/phases/01-socle" "$LRM/.planning/phases/02-ecran"
+printf '## Milestones\n\n- 🚧 **v1.0 MVP** - Phases 1-2 (in progress)\n\n## Phases\n\n- [x] **Phase 1: Socle** - premier jet\n- [ ] **Phase 2: Écran** - second jet\n' > "$LRM/.planning/ROADMAP.md"
+DESCM="$(for i in $(seq 0 39); do printf 'alpha%02d ' "$i"; done)"; DESCM="${DESCM% }"
+printf -- '---\nmilestone: v1.0 MVP\nstatus: ready_to_plan\ncurrent_phase: 2\ncurrent_phase_name: Écran\nlast_activity_desc: %s\n---\n' "$DESCM" > "$LRM/.planning/STATE.md"
+for n in 01-socle/01-01 02-ecran/02-01; do printf '<objective>Faire</objective>\n' > "$LRM/.planning/phases/$n-PLAN.md"; echo ok > "$LRM/.planning/phases/$n-SUMMARY.md"; done
+printf 'export const u = () => 1;\n' > "$LRM/src/util.js"; git -C "$LRM" init -q && git -C "$LRM" add -A && git -C "$LRM" -c user.email=t@t -c user.name=t commit -q -m init; LABS4+=("$LRM")
+URM="$(adr4 "$LRM")"; SRVPIDS+=("$(pid4 "$LRM")"); PRM="${URM%index.html}project.html"
+cat > "$AUX/maintenant.mjs" <<'JS'
+// maintenant.mjs <chrome> <session.mjs> <url> : texte du bloc « Maintenant » du panneau d'ensemble (onglet Projet)
+import { pathToFileURL } from 'node:url';
+const [, , chrome, sess, url] = process.argv;
+const { executer, attendreEtStabiliser } = await import(pathToFileURL(sess).href);
+await executer(chrome, async (s) => {
+  await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await s.naviguer(url); await s.attendre("document.readyState === 'complete' && !!document.querySelector('#panel .vf-now')", 'bloc Maintenant');
+  return { texte: await attendreEtStabiliser(() => s.ev("document.querySelector('#panel .vf-now').innerText.replace(/\\s+/g, ' ').trim()"), (v) => typeof v === 'string' && v.length > 0, { max: 15000 }) };
+});
+JS
+XMAIN="$(node "$AUX/maintenant.mjs" "$CHROME" "$SCRIPTS/tests/chrome-session.mjs" "$PRM")"
+assert_eq "R3.24 — M3 : le bloc « Maintenant » d'un lab dont STATE.md est périmé affiche « STATE.md semble périmé : il dit « prête à planifier ». La carte fait foi ; mettez STATE.md à jour à la fin de la phase. » (témoin du rendu : rouge si le message n'est plus posé)" "$(printf '%s' "$XMAIN" | node "$AUX/get.mjs" /dev/stdin '/STATE\.md semble périmé : il dit « prête à planifier »\. La carte fait foi ; mettez STATE\.md à jour à la fin de la phase\./.test(j.texte)')" "true"
+# R3.25 — M7a : la description du bloc « Maintenant » (plus de 260 caractères : 40 mots de 8 caractères, dont la coupe à 260 tombe dans « alpha32 ») se coupe au mot entier (« … alpha31… »), jamais « alph… » (décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée)
+assert_eq "R3.25 — M7a : la description du bloc « Maintenant » finit sur un mot entier suivi de « … » et ne dépasse pas 260 caractères" "$(printf '%s' "$XMAIN" | node "$AUX/get.mjs" /dev/stdin '(() => { const m = /(alpha\d{2}) alpha\d{2}.* (alpha\d{2})…$/.exec(j.texte); const d = j.texte.slice(j.texte.indexOf("alpha00")); return !!m && d.length <= 260 && /alpha\d{2}…$/.test(j.texte); })()')" "true"
 # PU-G-160 : un lab CONFORME montre quand même la section (« Conforme · 0 ligne non comprise ») et y signale le groupe « Hors jalon »
 mkdir -p "$WORK/lab-r3d/src"; LR3D="$WORK/lab-r3d"; cp -R "$WORK/r3/.planning" "$LR3D/.planning"; printf '%s\n' '# Roadmap' '' '## Milestones' '' '- 🚧 **v1.0 Démo** - Phases 1-2 (in progress)' '' '## Phases' '' '- [x] **Phase 1: Socle** - a' '- [ ] **Phase 2: Écran** - b' '- [ ] **Phase 3: Orpheline** - c' '' '### Phase 1: Socle' '**Goal**: g1' '' '### Phase 2: Écran' '**Goal**: g2' '**Depends on**: Phase 1' > "$LR3D/.planning/ROADMAP.md"; printf '%s\n' '- [ ] **AUTH-01**: ok' > "$LR3D/.planning/REQUIREMENTS.md"
 printf 'export const u = () => 1;\n' > "$LR3D/src/util.js"; git -C "$LR3D" init -q && git -C "$LR3D" add -A && git -C "$LR3D" -c user.email=t@t -c user.name=t commit -q -m init; LABS4+=("$LR3D")

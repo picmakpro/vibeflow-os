@@ -21,6 +21,10 @@ const etat = (x) => {
   if (ST[x.st] && (foot === lab || foot.startsWith(lab + ' · '))) foot = foot.slice(lab.length).replace(/^ · /, '');
   return foot ? `${lab} · ${foot}` : lab;
 };
+// accord réel (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3da818fe)) : « 1 bloqué », « 4 bloqués », jamais « bloqué(s) » ; même règle que le panneau (ui/00-vibeflow.js)
+const pl = (n, un, plus) => (n > 1 ? plus : un);
+// « dans la Phase 72 ? », « dans la Mission 414 ? » : l'article devant un nom de phase ou de mission (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3f67e7aa)) ; un jalon ou une autre carte garde sa forme
+const dans = (label) => (/^(Phase|Mission)\b/.test(label) ? `dans la ${label}` : `dans ${label}`);
 const fold = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 export function projectIndex(G) {
@@ -39,7 +43,9 @@ export function projectIndex(G) {
 const line = (I, x, note) => `- [[${I.ref(x)}]]${/\.req$/.test(x.id || '') ? ` (${String(x.id).slice(3, -4).replace(/^/, 'phase ')})` : ''} · ${etat(x)}${note ? ' · ' + note : ''}`;
 const item = (I, x, note) => ({ id: I.ref(x), note: coupe(note || etat(x), 90) });
 const answer = (title, md, items, followups = []) => ({ title, answer: md, items: items.slice(0, 14), steps: [], followups, engine: 'local' });
-const count = (xs) => { const c = {}; for (const x of xs) if (x.st) c[x.st] = (c[x.st] || 0) + 1; return Object.entries(c).map(([k, v]) => `${v} ${ST[k] || k}`).join(', ') || 'aucun statut'; };
+// accord des statuts (L1, arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3da818fe)) : « 1 bloqué », « 4 bloqués », « 27 faits » ; « en cours », « à faire », « à recetter » sont invariables
+const ACCORD = { fait: 'faits', 'bloqué': 'bloqués' };
+const count = (xs) => { const c = {}; for (const x of xs) if (x.st) c[x.st] = (c[x.st] || 0) + 1; return Object.entries(c).map(([k, v]) => `${v} ${pl(v, ST[k] || k, ACCORD[ST[k] || k] || ST[k] || k)}`).join(', ') || 'aucun statut'; };
 
 // Réponse sur les « lignes non comprises » du panneau Format, en langage courant. Jointure avec le panneau (vf-cockpit-project.mjs) : seuls les
 // CHIFFRES et les positions de meta.vf.drift sont lus (nonComprisesN, nonComprises[{fichier, ligne, extrait}], corrigeable, regles[].regle/.n) ;
@@ -48,16 +54,19 @@ function reponseFormat(d) {
   const lignes = Array.isArray(d?.nonComprises) ? d.nonComprises : [], n = Number(d?.nonComprisesN) || lignes.length;
   const autres = (Array.isArray(d?.regles) ? d.regles : []).filter((r) => r?.regle !== 'ligne-non-comprise').reduce((t, r) => t + (Number(r?.n) || 0), 0);
   const suite = ['Rien n\'est modifié dans les fichiers de .planning/ par cette lecture.', 'Ouvre le panneau Format du planning pour le détail et pour le correctif proposé.', 'Il se relit puis s\'applique à la main.'];
-  if (!n) return answer('Lignes du planning non comprises', `Aucune ligne du planning n'est mise de côté : le cockpit les a toutes lues${autres ? ` (${autres} ligne${autres > 1 ? 's' : ''} avec une petite différence de forme, sans conséquence sur la carte)` : ''}.\n\nLe panneau Format du planning ne s'affiche que s'il y a quelque chose à signaler.`, [], ['Où en est le jalon ?']);
+  if (!n) return answer('Lignes du planning non lues', `Aucune ligne du planning n'est mise de côté : le cockpit les a toutes lues${autres ? ` (${autres} ligne${autres > 1 ? 's' : ''} avec une petite différence de forme, sans conséquence sur la carte)` : ''}.\n\nLe panneau Format du planning ne s'affiche que s'il y a quelque chose à signaler.`, [], ['Où en est le jalon ?']);
   const liste = lignes.slice(0, 5).map((l) => `- \`${l.fichier}:${l.ligne}\`${l.extrait ? ` · ${coupe(String(l.extrait).replace(/\s+/g, ' ').trim(), 70)}` : ''}`).join('\n');
-  return answer('Lignes du planning non comprises', `Le cockpit lit le planning ligne par ligne. Une « ligne non comprise » ressemble à un champ qu'il sait lire (titre de phase, objectif, dépendances, exigence…) mais n'a pas la forme attendue : il la laisse de côté. La phase ou l'exigence correspondante peut alors manquer ou rester incomplète sur la carte.\n\n${n} ligne${n > 1 ? 's' : ''} dans ce projet${lignes.length < n ? ` (les ${lignes.length} premières ci-dessous)` : ''} :\n${liste}${autres ? `\n\nPar ailleurs, ${autres} ligne${autres > 1 ? 's sont lues' : ' est lue'} malgré une petite différence de forme.` : ''}\n\n${suite[0]}${d?.corrigeable ? ` ${suite[1]} ${suite[2]}` : ''}`, [], ['Où en est le jalon ?']);
+  return answer('Lignes du planning non lues', `Le cockpit lit le planning ligne par ligne. Une « ligne non lue » (le panneau Format du planning dit « Non lu ») ressemble à un champ qu'il sait lire (titre de phase, objectif, dépendances, exigence…) mais n'a pas la forme attendue : il la laisse de côté. La phase ou l'exigence correspondante peut alors manquer ou rester incomplète sur la carte.\n\n${n} ligne${n > 1 ? 's' : ''} dans ce projet${lignes.length < n ? ` (les ${lignes.length} premières ci-dessous)` : ''} :\n${liste}${autres ? `\n\nPar ailleurs, ${autres} ligne${autres > 1 ? 's sont lues' : ' est lue'} malgré une petite différence de forme.` : ''}\n\n${suite[0]}${d?.corrigeable ? ` ${suite[1]} ${suite[2]}` : ''}`, [], ['Où en est le jalon ?']);
 }
 
 /** Réponse calculée, ou null si la question sort des formes connues (→ agent). */
 export function answerLocally(G, question) {
   const I = projectIndex(G), q = fold(question), vf = G.meta?.vf || {};
-  // PU-G-150 : « lignes du planning non comprises » (panneau Format) : expliquée avant la garde de raisonnement, car « pourquoi » y est la forme naturelle
-  if ((q.includes('ligne') && /\bnon (compris|lu)/.test(q)) || /\bnon comprises?\b|lignes? (ignoree|mise de cote)|format (de la |du )?(planification|planning)/.test(q)) return reponseFormat(vf.drift); // pas de `[^.?!]*` entre deux mots : quadratique sur « ligne ligne ligne… »
+  // PU-G-150 : « lignes du planning non comprises / non lues / pas lues », « chiffres incomplets » (panneau Format, qui dit « Non lu ») : expliquée avant la garde de raisonnement, car « pourquoi » y est la forme naturelle
+  // R2 (revue de 82de0712..3f972a6b) : une question qui porte sur une phase numérotée, une exigence, un plan ou une commande n'est pas celle du panneau Format
+  // M4 : « la commande pour corriger les lignes non comprises » est celle du panneau Format (elle reste ici) ; une ligne de commande ou de CODE est un autre objet
+  const autreObjet = /\bphases?\s*\d|\bexigences?\b|\bplans?\b|\bcode\b|\b[a-z]{2,6}-\d+\b/.test(q) || (/\bcommandes?\b/.test(q) && !/\bcorrig|\bcorrect/.test(q));
+  if (!autreObjet && ((/\blignes?\b/.test(q) && /\b(non|pas) (compris|lu)(es|e|s)?\b/.test(q)) || (/\bincomplets?\b/.test(q) && /\b(chiffres?|nombres?|comptes?|totaux)\b/.test(q)) || /\bnon comprises?\b|lignes? (ignoree|mise de cote)|format (de la |du )?(planification|planning)/.test(q))) return reponseFormat(vf.drift); // pas de `[^.?!]*` entre deux mots : quadratique sur « ligne ligne ligne… »
   // une question de raisonnement (pourquoi, comment, risque, conseil) n'a pas de réponse calculable : l'agent
   if (/\b(pourquoi|comment|explique|quel(le)? risque|faut-il|devrai|conseill|compare|difference|impact)/.test(q)) return null;
   // cibles nommées dans la question
@@ -93,7 +102,7 @@ export function answerLocally(G, question) {
   if (pathHit) {
     const plans = G.files.filter((f) => (f.touched || []).includes(pathHit));
     if (!plans.length) return answer('Aucun plan', `Aucun plan ni nœud de mission ne déclare avoir touché \`${pathHit}\` (champ \`files_modified\`).`, []);
-    return answer(`Qui a touché ${pathHit.split('/').pop()}`, `${plans.length} plan(s) déclarent \`${pathHit}\` :\n${plans.slice(0, 12).map((p) => line(I, p)).join('\n')}`, plans.map((p) => item(I, p)));
+    return answer(`Qui a touché ${pathHit.split('/').pop()}`, `${plans.length} ${pl(plans.length, 'plan déclare', 'plans déclarent')} \`${pathHit}\` :\n${plans.slice(0, 12).map((p) => line(I, p)).join('\n')}`, plans.map((p) => item(I, p)));
   }
   // le groupe d'exigences d'une phase faite garde « en cours » tant que des cases restent décochées : ce n'est pas du travail en cours
   const exigPhaseFaite = (x) => { const g = I.N.get(x.id || x.n); return !!g && /\.req$/.test(g.id) && I.N.get(g.parent)?.st === 'done'; };
@@ -102,7 +111,7 @@ export function answerLocally(G, question) {
   if (/bloqu|coince|en echec|echoue/.test(q)) {
     const xs = pool.filter((x) => x.st === 'blocked');
     if (!xs.length) { const act = pool.filter((x) => x.st === 'active' && !exigPhaseFaite(x)); return answer('Rien de bloqué', `Rien n'est bloqué${scope}. En cours : ${act.length}.\n${act.slice(0, 8).map((x) => line(I, x)).join('\n')}`, act.map((x) => item(I, x))); }
-    return answer(`${xs.length} bloqué(s)`, `${xs.length} élément(s) bloqué(s)${scope} (étape de mission en échec) :\n${xs.map((x) => line(I, x, I.label(I.N.get(x.n || x.parent) || {}) || '')).join('\n')}`, xs.map((x) => item(I, x)));
+    return answer(`${xs.length} ${pl(xs.length, 'bloqué', 'bloqués')}`, `${xs.length} ${pl(xs.length, 'élément bloqué', 'éléments bloqués')}${scope} (étape de mission en échec) :\n${xs.map((x) => line(I, x, I.label(I.N.get(x.n || x.parent) || {}) || '')).join('\n')}`, xs.map((x) => item(I, x)));
   }
   if (/en cours|actif|au travail|qui travaille/.test(q)) {
     const xs = pool.filter((x) => x.st === 'active' && !exigPhaseFaite(x));
@@ -114,21 +123,21 @@ export function answerLocally(G, question) {
     if (!t) {
       const phases = G.nodes.filter((n) => n.kind === 'phase'); if (!phases.length) return null; // rien à calculer : c'est à l'agent de lire le planning
       const reste = phases.filter((x) => x.st === 'todo' || x.st === 'active');
-      return answer('Reste', reste.length ? `${reste.length} phase(s) à finir (aucun jalon courant reconnu) :\n${reste.slice(0, 12).map((x) => line(I, x)).join('\n')}${reste.length > 12 ? `\n- … et ${reste.length - 12} autre(s)` : ''}` : 'Toutes les phases du planning sont terminées.', reste.map((x) => item(I, x)));
+      return answer('Reste', reste.length ? `${reste.length} ${pl(reste.length, 'phase', 'phases')} à finir (aucun jalon courant reconnu) :\n${reste.slice(0, 12).map((x) => line(I, x)).join('\n')}${reste.length > 12 ? `\n- … et ${reste.length - 12} ${pl(reste.length - 12, 'autre', 'autres')}` : ''}` : 'Toutes les phases du planning sont terminées.', reste.map((x) => item(I, x)));
     }
     const xs = (t ? I.under(t.id) : pool).filter((x) => x !== t && (x.st === 'todo' || x.st === 'active') && (x.id ? x.kind === 'phase' || /^dag-/.test(x.id) : !x.p.startsWith('req/') || /^ph-/.test(t?.id || '')));
-    return answer(`Reste${t ? ' · ' + I.label(t).split(' · ')[0] : ''}`, `${xs.length} à finir dans [[${I.ref(t)}]]${t?.foot ? ` (${t.foot})` : ''} :\n${xs.slice(0, 12).map((x) => line(I, x)).join('\n')}${xs.length > 12 ? `\n- … et ${xs.length - 12} autre(s)` : ''}`,
-      [item(I, t), ...xs.map((x) => item(I, x))], xs[0] ? [`Qu'est-ce qui bloque dans ${I.label(t).split(' · ')[0]} ?`] : []);
+    return answer(`Reste${t ? ' · ' + I.label(t).split(' · ')[0] : ''}`, `${xs.length} à finir dans [[${I.ref(t)}]]${t?.foot ? ` (${t.foot})` : ''} :\n${xs.slice(0, 12).map((x) => line(I, x)).join('\n')}${xs.length > 12 ? `\n- … et ${xs.length - 12} ${pl(xs.length - 12, 'autre', 'autres')}` : ''}`,
+      [item(I, t), ...xs.map((x) => item(I, x))], xs[0] ? [`Qu'est-ce qui bloque ${dans(I.label(t).split(' · ')[0])} ?`] : []);
   }
   if (/exigence/.test(q) && phase) {
     const xs = I.files.get(phase.id + '.req') || [];
-    return answer(`Exigences · Phase ${ph}`, `${xs.length} exigence(s) pour [[${I.ref(phase)}]] (${count(xs)}) :\n${xs.slice(0, 14).map((x) => line(I, x, coupe(x.d, 70))).join('\n')}`, xs.map((x) => item(I, x)));
+    return answer(`Exigences · Phase ${ph}`, `${xs.length} ${pl(xs.length, 'exigence', 'exigences')} pour [[${I.ref(phase)}]] (${count(xs)}) :\n${xs.slice(0, 14).map((x) => line(I, x, coupe(x.d, 70))).join('\n')}`, xs.map((x) => item(I, x)));
   }
   if (target) {
     const sub = I.under(target.id).filter((x) => x !== target);
     const direct = [...(I.kids.get(target.id) || []), ...(I.files.get(target.id) || [])];
     return answer(I.label(target).split(' · ')[0], `[[${I.ref(target)}]] · ${etat(target)}.\n\n${target.summary || ''}\n\nContenu : ${sub.length ? count(sub) : 'rien encore (pas de plan)'}.\n${direct.slice(0, 10).map((x) => line(I, x)).join('\n')}`,
-      [item(I, target), ...direct.map((x) => item(I, x))], [`Qu'est-ce qui reste dans ${I.label(target).split(' · ')[0]} ?`, `Qu'est-ce qui bloque dans ${I.label(target).split(' · ')[0]} ?`]);
+      [item(I, target), ...direct.map((x) => item(I, x))], [`Qu'est-ce qui reste ${dans(I.label(target).split(' · ')[0])} ?`, `Qu'est-ce qui bloque ${dans(I.label(target).split(' · ')[0])} ?`]);
   }
   if (/ou en (est|sommes)|on en est|etat|avancement|resume|statut|progression/.test(q)) {
     const cur = curMs, p = I.N.get('ph-' + vf.phase) || G.nodes.find((n) => n.kind === 'phase' && String(n.num) === String(vf.phase));

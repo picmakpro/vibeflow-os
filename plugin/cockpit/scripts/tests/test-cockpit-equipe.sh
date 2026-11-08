@@ -1024,6 +1024,18 @@ console.log(JSON.stringify({ s1: n('se-s1').summary, s2: n('se-s2').summary, st:
 JS
 assert_eq "EA1.5 — carte : étiquette de lancement, branche et arbre en description (jamais vide), « en attente » sans état projeté (PU-G-134, 163, 164, 165)" "$(node "$AUX/ea1-carte.mjs" "$SCRIPTS/vf-cockpit-equipe-carte.mjs" "$AUX/ea1-workers.json" 2>&1 | node "$AUX/jq.mjs" 'j.s1+"|"+j.s2+"|"+j.st' 2>&1)" "Depuis Phase 71.5 · Branche feat/x · arbre wt1|arbre principal|active,undefined,active,done"
 
+cat > "$AUX/ea1-vides.mjs" <<'JS'
+const { buildEquipeGraph } = await import(process.argv[2]);
+const W = [{ kind: 'session', id: 's9', etat: 'actif', ageS: 3, titre: 'Travail', action: { verbe: 'lance une commande' } },
+  { kind: 'subagent', id: 'g1', etat: 'termine', parent: 's9', role: 'general-purpose', dureeS: 60 },
+  { kind: 'subagent', id: 'g2', etat: 'termine', parent: 's9', dureeS: 5 },
+  { kind: 'subagent', id: 'g3', etat: 'actif', parent: 's9', dureeS: 5 }];
+const g = buildEquipeGraph({ workers: W }, { nom: 'x' });
+console.log(JSON.stringify(g.nodes.map((x) => ({ id: x.id, vide: !String(x.summary || '').trim(), s: x.summary }))));
+JS
+# PU-G-163 (recette du 2026-11-08) : ni le groupe « Terminés depuis moins de 24 h » ni un agent sans tâche ne portent une description vide (le viewer y met « Pas encore de description »)
+assert_eq "EA1.6 — carte : aucune description vide (groupe « Terminés », agent general-purpose sans tâche, session sans tâche) ; le groupe compte ses agents (PU-G-163)" "$(node "$AUX/ea1-vides.mjs" "$SCRIPTS/vf-cockpit-equipe-carte.mjs" 2>&1 | node "$AUX/jq.mjs" 'j.length + "|" + j.filter((x) => x.vide).length + "|" + j.find((x) => x.id.endsWith("~termines")).s + "|" + j.find((x) => x.id === "ag-g3").s' 2>&1)" "5|0|2 agents de cette session, terminés depuis moins de 24 h.|Agent sans tâche annoncée · actif"
+
 echo "=== EA2 — tiroir « Au travail » : orphelins, verrous, libellés (PU-G-177, 178, 179, 180, 182, 184, 186, 187) ==="
 cat > "$AUX/vm70s.mjs" <<'JS'
 // vm70s.mjs <70-vf-live.js> <71-vf-equipe-rendu.js> <scénario.json> : le tiroir hors navigateur (vm) ; le scénario porte `who` (workers, sources) et, facultatif, `lock` (flux lock brut). Sortie : le HTML du tiroir, ou { erreur }.

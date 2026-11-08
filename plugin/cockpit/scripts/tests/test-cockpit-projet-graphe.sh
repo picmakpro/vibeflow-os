@@ -307,6 +307,8 @@ assert_eq "R1.3 — PU-G-093 : phase courante introuvable : phaseEtat null, repl
 printf -- '---\nmilestone: v1.0 MVP\nstatus: ready_to_plan\ncurrent_phase: 2\ncurrent_phase_name: Écran\n---\n' | wr "$B/STATE.md"
 UIV="$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js"
 assert_eq "R1.4 — PU-G-093 / DG-13 : 00-vibeflow.js lit V.phaseEtat pour le bloc « Maintenant », dit STATE.md périmé, et écrit « Dans l'ordre de la feuille de route. » sous « Jalons »" "$(grep -c 'V\.phaseEtat' "$UIV" | awk '{print ($1>=2)?"ok":"ko"}')|$(grep -c 'STATE.md semble périmé' "$UIV")|$(grep -c "Dans l'ordre de la feuille de route\." "$UIV")" "ok|1|1"
+# L3 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3da818fe)) : le message « périmé » dit quoi faire, dans le même bloc ; la phrase porte sur la phase (féminin), pas sur un jalon
+assert_eq "R1.4b — L3 : « STATE.md semble périmé : il dit « … ». La carte fait foi ; mettez STATE.md à jour à la fin de la phase. » dans un seul message (une seule occurrence)" "$(grep -cF 'STATE.md semble périmé : il dit « ${h(statut(V.status))} ». La carte fait foi ; mettez STATE.md à jour à la fin de la phase.</div>' "$UIV")" "1"
 # PU-G-099 : un vrai jalon (clos) et deux phases hors jalon, faites
 LJ="$WORK/r1j"; B="$LJ/.planning"
 wr "$B/ROADMAP.md" <<'MD'
