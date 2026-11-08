@@ -309,19 +309,20 @@ le bloc.
 **Manager** (porte AUSSI la règle Worker : il attend ses enfants au premier plan). « Rapport final » = bloc typé présent ET aucune
 tâche annoncée en attente (« waiting on its own background work » / « may be interim » : attente, ni `close` ni `dag.sh mark done`).
 Alors, dans cet ordre : `TaskStop(<agentId>)` de vérification D'ABORD (F6) ; « No task found » = fini → `close --status=done` ;
-« owned by <enfant> » ou agent encore listé = vivant → réveil par `SendMessage`, pas de close. Puis balayage par
+« owned by <enfant> » ou agent encore listé = vivant → réveil par `SendMessage`, ni close ni balayage. Sur « No task found » SEULEMENT, balayage par
 `"$S"/worktree-procs.sh stop --path=<abs> [--max=N]` (rc 0 plus rien, 2 survivants, 3 plafond dépassé rien tué, 4 indéterminé ;
 `list` pour constater d'abord), seulement d'un worktree git SECONDAIRE ouvert pour le mandat du worker (git-dir ≠ git-common-dir), jamais le
 checkout principal ni le cwd de sa propre session ; sur un arbre partagé par plusieurs workers : `list` et nommer, `stop` seulement quand
-plus aucun enfant n'y vit. Avant tout hand-back ou rapport final, arrêt de budget ou handoff compris : aucun enfant vivant,
-`driver-lock.sh orphans` à 0 (un manager sans registre, tel `vf-test-orchestrator`, liste les agents de fond ; `$S` se résout comme
+plus aucun enfant n'y vit. Codes de `worktree-procs.sh` : rc 4 (indéterminé) et rc 2 (survivants) ne se lisent jamais comme « propre » et se nomment
+au rapport ; rc 3 : rien tué, nommer et escalader ; rc 64 : chemin refusé, vérifier le worktree visé. Avant tout hand-back ou rapport final, arrêt de budget ou handoff compris : aucun enfant vivant,
+`driver-lock.sh orphans` à 0 (un manager sans registre, tel `vf-test-orchestrator`, prend la liste rendue par `TaskStop`, F6 ; `$S` se résout comme
 `mission-flow.md` §Résolution), sauf cas nommé (`agentId`, consigne de reprise) relayé par `SendMessage(main)`, seule à pouvoir arrêter
 un enfant vivant (F3) ; `close --status=stopped` après sa confirmation.
 
 **Head** (`vibeflow-head`). À la sortie d'un manager : `driver-lock.sh orphans` + liste des agents de fond. Pour chaque enfant de
 CETTE mission encore vivant, lire son dernier message avant tout geste. Attente légitime = l'enfant est un manager qui attend ses
 propres enfants vivants, ou sa tâche progresse (dernier message ou sortie de moins de 30 min) → réveil ou attente. Attente échouée =
-un worker dont le dernier message annonce une attente (règle Worker violée) sans progrès depuis 30 min ; rapport rendu → `TaskStop`
+un worker dont le dernier message annonce une attente (règle Worker violée) sans progrès depuis 30 min, ou un manager silencieux depuis plus de 30 min sans enfant vivant (relance par `SendMessage`, puis `TaskStop` si aucune réponse) ; rapport rendu → `TaskStop`
 (la session principale peut l'émettre). Jamais sur un agent d'une autre mission (F6). Puis balayage (`worktree-procs.sh`) des seuls
 worktrees secondaires de la mission, mêmes bornes que le manager.
 

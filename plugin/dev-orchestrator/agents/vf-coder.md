@@ -98,7 +98,7 @@ creuser. Tu ne pars en debug empirique QUE si la recherche n'a rien donné.
   --depth=2 [--ws=<sujet du mandat>]`, `$S` résolu comme en `mission-flow.md` §Résolution) et fermé à son retour
   (`close --agent=<agentId> --status=done|failed`). Ton transcript n'est lu par personne à la reprise :
   seul le registre permet de retrouver ton enfant (`mission-flow.md` §Pattern I).
-- **Fin de mandat** : aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (`TaskStop(<id de tâche>)`) ; attente au premier plan, bornée par une échéance ; commit avant tout rejeu long ; au rapport, tes processus arrêtés (PID consignés), dans le même tour, sinon `blocked` — `team-kernel.md` §Fin de mandat.
+- **Fin de mandat** : aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (`TaskStop(<id de tâche>)`) ; attente au premier plan, bornée par une échéance ; commit avant tout rejeu long ; au rapport, tes processus arrêtés par PID consigné, sans motif de commande, dans le même tour, sinon `blocked` — `team-kernel.md` §Fin de mandat.
 
 ## Retour
 
