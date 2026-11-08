@@ -43,6 +43,7 @@ Retours du panel d'utilisateurs du cockpit (2026-11-06, registre `.planning/miss
 - **Masque des secrets** : un secret collé à un mot (`xxxghp_…`, `key_sk-…`) est désormais masqué (3ca3cd91, témoin W24 de `test-cockpit-who.sh`) ; antérieur à la mission, il touchait tous les appelants.
 - **Retenue de l'Entrée tenue** : une Entrée maintenue n'exécute plus la ligne qui vient d'être écrite au retour du focus du terminal ; la retenue se pose sur toute prise de focus (Préparer, Annuler, Abandonner, Coller, Relancer le shell, pastille du tiroir, retour d'onglet). Sécurité du double geste. Le focus sur « Annuler » du collage est gardé.
 - **Libellés français** : Non classés, Demande d'origine, récent, liens, Module ; résumés sans « > » ni HTML, marqués « extrait brut ».
+- **Panneau de détail de 701 à 999 px** (PU-G-045) : il reste fermé par défaut, mais choisir une carte ou un fichier l'ouvre (souris, toucher, clavier), il se referme par le bouton « Détail » ou par Échap, et le focus revient où il était ; un rendu de plus sur la même sélection ne le rouvre pas (corrige la recette du 2026-11-08).
 - **Saisie du terminal en français** (PU-G-139, a11y) : le champ de saisie du terminal s'annonçait « Terminal input » à chaque entrée ; il dit « Saisie du terminal » (et la phrase « sortie trop abondante » de la bibliothèque est traduite). L'inventaire du chrome français voit désormais les phrases d'interface de la bibliothèque xterm, hors pages servies (`bibliothequeNonTraitee`, test-cockpit-chrome-fr.sh F15) (corrige la recette du 2026-11-08).
 
 ### Modifié

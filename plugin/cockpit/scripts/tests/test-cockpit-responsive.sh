@@ -511,6 +511,17 @@ RESP_INJECT="$INJ_CROIX" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK
 RESP_INJECT="$INJ_ECHAP" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-echap.json" & OPIDS+=($!)
 RESP_INJECT="$INJ_VIDE" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-vide.json" & OPIDS+=($!)
 RESP_INJECT="$INJ_TITRE" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-titre.json" & OPIDS+=($!)
+# R15b (recette du 2026-11-08, PU-G-045) : de 701 à 999 px le panneau est fermé par défaut ET s'ouvre au choix d'une carte ; Échap et « Détail » le referment
+INJ_CARTE_T="(async () => { $J_PAUSE window.VibeFlowTour?.end(); $J_OPEN return true; })()"
+INJ_CARTE_CLAVIER="(async () => { $J_PAUSE window.VibeFlowTour?.end(); const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0); nd?.setAttribute('tabindex', '0'); nd?.focus(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); nd?.dispatchEvent(new MouseEvent('click', { bubbles: true })); for (let i = 0; i < 60 && getComputedStyle(document.getElementById('panel')).visibility !== 'visible'; i++) await p(50); await p(300); return true; })()"
+INJ_ECHAP_T="(async () => { $J_PAUSE window.VibeFlowTour?.end(); $J_OPEN document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await p(300); return true; })()"
+INJ_BOUTON_T="(async () => { $J_PAUSE window.VibeFlowTour?.end(); $J_OPEN document.getElementById('btn-panel').click(); await p(300); return true; })()"
+INJ_REFERME_T="(async () => { $J_PAUSE window.VibeFlowTour?.end(); $J_OPEN document.getElementById('btn-panel').click(); await p(300); window.VibeFlow.rerender(); await p(600); return true; })()"
+RESP_INJECT="$INJ_CARTE_T" mes "http://127.0.0.1:$P_c/project.html" 768,999 - > "$WORK/r15t-carte.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_CARTE_CLAVIER" mes "http://127.0.0.1:$P_c/project.html" 768 - > "$WORK/r15t-clavier.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_ECHAP_T" mes "http://127.0.0.1:$P_c/project.html" 768 - > "$WORK/r15t-echap.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_BOUTON_T" mes "http://127.0.0.1:$P_c/project.html" 768 - > "$WORK/r15t-bouton.json" & OPIDS+=($!)
+RESP_INJECT="$INJ_REFERME_T" mes "http://127.0.0.1:$P_c/project.html" 768 - > "$WORK/r15t-referme.json" & OPIDS+=($!)
 mes "http://127.0.0.1:$P_l/project.html" 768,1440 - > "$WORK/r16-long.json" & OPIDS+=($!)
 mes "http://127.0.0.1:$P_h/project.html" 768,1440 - > "$WORK/r16-trait.json" & OPIDS+=($!)
 wait "${OPIDS[@]}"
@@ -545,6 +556,12 @@ assert_eq "R15.4 — Projet / 390 px : la croix ferme le tiroir" "$(mv_ "$WORK/r
 assert_eq "R15.4b — Projet / 390 px : Échap ferme le tiroir (le viewer)" "$(mv_ "$WORK/r15-echap.json" 'j.mesures["390"].m.tiroir')" "false"
 assert_eq "R15.4c — Projet / 390 px : le tap dans le vide ferme le tiroir (le viewer)" "$(mv_ "$WORK/r15-vide.json" 'j.mesures["390"].m.tiroir')" "false"
 assert_eq "R15.5 — Projet / 390 px : le tap du titre de la vue d'ensemble ouvre le tiroir" "$(mv_ "$WORK/r15-titre.json" 'j.mesures["390"].m.tiroir')" "true"
+assert_eq "R15.6 — Projet / 768 px : le choix d'une carte ouvre le panneau de détail (PU-G-045 ; il est fermé par défaut, R14.4b)" "$(mv_ "$WORK/r15t-carte.json" 'j.mesures["768"].m.tiroir')" "true"
+assert_eq "R15.6b — Projet / 999 px : idem à la limite haute de l'étroit" "$(mv_ "$WORK/r15t-carte.json" 'j.mesures["999"].m.tiroir')" "true"
+assert_eq "R15.7 — Projet / 768 px : un choix au clavier (Entrée) ouvre le panneau ET le focus y entre" "$(mv_ "$WORK/r15t-clavier.json" 'j.mesures["768"].m.tiroir+"|"+j.mesures["768"].m.focusTiroir')" "true|true"
+assert_eq "R15.8 — Projet / 768 px : Échap referme le panneau (témoin : il s'était ouvert, R15.6)" "$(mv_ "$WORK/r15t-echap.json" 'j.mesures["768"].m.tiroir')" "false"
+assert_eq "R15.9 — Projet / 768 px : le bouton « Détail » referme le panneau" "$(mv_ "$WORK/r15t-bouton.json" 'j.mesures["768"].m.tiroir')" "false"
+assert_eq "R15.10 — Projet / 768 px : un rendu de plus sur la même sélection (flux en direct) ne rouvre pas le panneau refermé" "$(mv_ "$WORK/r15t-referme.json" 'j.mesures["768"].m.tiroir')" "false"
 for spec in "long:r16-long" "trait:r16-trait"; do
   for w in 768 1440; do
     assert_eq "R16 — lab « ${spec%%:*} » / $w px : aucun mot du titre de la vue d'ensemble n'est coupé sur deux lignes (sauf un mot plus large que sa boîte)" "$(mv_ "$WORK/${spec#*:}.json" "(()=>{const m=j.mesures[\"$w\"].m;if(!m.titreMots||!m.titreMots.length)return 'mesure vide : titre absent';return m.titreMots.filter((w)=>w.rect>1&&!w.large).map((w)=>w.mot+' x'+w.rect+' (boîte '+m.titreBoite+' px)').join(' | ')||'aucun'})()")" "aucun"

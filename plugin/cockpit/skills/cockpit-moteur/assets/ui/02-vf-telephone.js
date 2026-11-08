@@ -163,4 +163,36 @@
     ctx.addEventListener('click', (ev) => { if (phone.matches && ev.target.closest('h1')) bascule(true); });
     ctx.addEventListener('keydown', (ev) => { if (phone.matches && ev.target.closest?.('h1') && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); bascule(true); } });
   }
+  // PU-G-045 (recette du 2026-11-08, arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « Les partiels qui te concernaient ») : de 701 à 999 px le panneau est fermé par défaut (à garder), mais le viewer
+  // ne l'ouvrait qu'au téléphone : choisir une carte ou un fichier n'y montrait rien. Ici le choix l'ouvre (souris, toucher, clavier), il se referme par son bouton « Détail » ou par Échap, et le focus revient où il était.
+  // Pas de role=dialog : un dialogue visible empêcherait l'Échap des tiroirs « Au travail » et Git (leur « surcouche »).
+  const mi = window.matchMedia('(min-width: 701px) and (max-width: 999px)'), SCm = window.Floorplan;
+  if (btn && panel && SCm && SCm.on) {
+    let geste = { t: 0 }, precedent = null, retour = null, etaitOuvert = ouvert();
+    const recent = () => Date.now() - geste.t < 800;
+    document.addEventListener('pointerdown', () => { geste = { t: Date.now(), clavier: false }; }, true);
+    document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') geste = { t: Date.now(), clavier: true }; }, true);
+    SCm.on('panel', (d) => {
+      const sel = d && d.selected, cle = sel == null ? null : typeof sel === 'string' ? sel : JSON.stringify(sel), change = cle !== precedent;
+      precedent = cle;
+      if (!cle || !mi.matches || ouvert() || panel.querySelector(':scope > .vf-whop')) return;
+      if (!change && !recent()) return; // un rendu de plus sur la même sélection (flux en direct) ne rouvre pas ce que l'utilisateur a refermé
+      const a = document.activeElement; retour = a && a !== document.body && !panel.contains(a) ? a : null;
+      bascule(true);
+      if (geste.clavier && recent()) { panel.tabIndex = -1; panel.focus({ preventScroll: true }); } // au clavier le focus entre dans le panneau ; à la souris il reste où il est
+    });
+    new MutationObserver(() => {
+      const o = ouvert(); if (o === etaitOuvert) return; etaitOuvert = o;
+      if (o || !mi.matches || panel.querySelector(':scope > .vf-whop')) { if (o) return; retour = null; return; }
+      const a = document.activeElement;
+      if (a === document.body || panel.contains(a)) (retour && document.contains(retour) ? retour : btn).focus({ preventScroll: true });
+      retour = null;
+    }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Escape' || ev.defaultPrevented || !mi.matches || !ouvert() || panel.querySelector(':scope > .vf-whop')) return;
+      if (document.querySelector('#palette.open, #flowmenu.open, #legend.open, #ctxmenu:not([hidden])') || (window.FloorplanTour && window.FloorplanTour.active())) return; // une palette, un menu ou la visite prennent l'Échap d'abord
+      if (ev.target && /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) return;
+      ev.stopPropagation(); ev.preventDefault(); bascule(false); // le viewer n'entend pas cet Échap : il ne remonte pas le canevas
+    });
+  }
 })();
