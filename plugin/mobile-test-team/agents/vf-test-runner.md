@@ -42,7 +42,7 @@ Utilise le module `mobile-test` (skill `vf-mobile-test`) :
 - Pour attendre avec timeout : `extendedWaitUntil` (jamais `timeout:` sur `assertVisible`/`tapOn`).
 - Texte plutôt que testID quand l'UI est stable ; `testID` sinon.
 - Respecte les conventions du projet (CLAUDE.md, rules).
-**Fin de mandat** : aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (`TaskStop(<id de tâche>)`) ; attente au premier plan, bornée par une échéance ; commit avant tout rejeu long ; au rapport, tes processus arrêtés (PID consignés), dans le même tour, sinon `blocked` — `team-kernel.md` §Fin de mandat.
+**Fin de mandat** : aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (`TaskStop(<id de tâche>)`) ; attente au premier plan, bornée par une échéance ; commit avant tout rejeu long ; au rapport, tes processus arrêtés par PID consigné, sans motif de commande, dans le même tour, sinon `blocked` — `team-kernel.md` §Fin de mandat.
 
 ## Retour
 
