@@ -512,9 +512,10 @@ RESP_INJECT="$INJ_ECHAP" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK
 RESP_INJECT="$INJ_VIDE" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-vide.json" & OPIDS+=($!)
 RESP_INJECT="$INJ_TITRE" mes "http://127.0.0.1:$P_c/project.html" 390 - > "$WORK/r15-titre.json" & OPIDS+=($!)
 # R15b (recette du 2026-11-08, PU-G-045) : de 701 à 999 px le panneau est fermé par défaut ET s'ouvre au choix d'une carte ; Échap et « Détail » le referment
+# (R15.7 : l'Entrée simulée vise la carte focalisée, comme une vraie touche ; elle visait `document`, cible qu'aucune vraie touche n'a. La vraie palette au clavier réel : R15c.2)
 INJ_CARTE_T="(async () => { $J_PAUSE window.VibeFlowTour?.end(); $J_OPEN return true; })()"
-INJ_CARTE_CLAVIER="(async () => { $J_PAUSE window.VibeFlowTour?.end(); const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0); nd?.setAttribute('tabindex', '0'); nd?.focus(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); nd?.dispatchEvent(new MouseEvent('click', { bubbles: true })); for (let i = 0; i < 60 && getComputedStyle(document.getElementById('panel')).visibility !== 'visible'; i++) await p(50); await p(300); return true; })()"
-INJ_ECHAP_T="(async () => { $J_PAUSE window.VibeFlowTour?.end(); $J_OPEN document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await p(300); return true; })()"
+INJ_CARTE_CLAVIER="(async () => { $J_PAUSE window.VibeFlowTour?.end(); const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0); nd?.setAttribute('tabindex', '0'); nd?.focus(); (nd || document).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); nd?.dispatchEvent(new MouseEvent('click', { bubbles: true })); for (let i = 0; i < 60 && getComputedStyle(document.getElementById('panel')).visibility !== 'visible'; i++) await p(50); await p(300); return true; })()"
+INJ_ECHAP_T="(async () => { $J_PAUSE window.VibeFlowTour?.end(); $J_OPEN document.activeElement?.blur(); document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await p(300); return true; })()"
 INJ_BOUTON_T="(async () => { $J_PAUSE window.VibeFlowTour?.end(); $J_OPEN document.getElementById('btn-panel').click(); await p(300); return true; })()"
 INJ_REFERME_T="(async () => { $J_PAUSE window.VibeFlowTour?.end(); $J_OPEN document.getElementById('btn-panel').click(); await p(300); window.VibeFlow.rerender(); await p(600); return true; })()"
 RESP_INJECT="$INJ_CARTE_T" mes "http://127.0.0.1:$P_c/project.html" 768,999 - > "$WORK/r15t-carte.json" & OPIDS+=($!)
@@ -525,6 +526,24 @@ RESP_INJECT="$INJ_REFERME_T" mes "http://127.0.0.1:$P_c/project.html" 768 - > "$
 mes "http://127.0.0.1:$P_l/project.html" 768,1440 - > "$WORK/r16-long.json" & OPIDS+=($!)
 mes "http://127.0.0.1:$P_h/project.html" 768,1440 - > "$WORK/r16-trait.json" & OPIDS+=($!)
 wait "${OPIDS[@]}"
+# R15c (revue de la recette du 2026-11-08, PU-G-045 ; P1 à P4, S7) : le panneau de 701 à 999 px au GESTE RÉEL (chrome-panneau-etroit.mjs : Input.dispatchMouseEvent, Input.dispatchKeyEvent), puis UN mutant par règle
+# (copie du lab court, page mutée, même scénario) : chaque mutant doit rougir le champ de SA règle, et seulement lui
+node "$HERE_T/chrome-panneau-etroit.mjs" "$CHROME" "http://127.0.0.1:$P_c/project.html" > "$WORK/r15c.json" 2> "$WORK/r15c.err"
+R15C_SRV=(); R15C_ID=(); R15C_PIDS=()
+r15c_mutant() { # r15c_mutant <nom> <ancien> <nouveau> : <ancien> doit exister dans la page (sinon FAIL nommé)
+  local M="$WORK/mut-r15c-$1"; rm -rf "$M"; cp -R "$LC" "$M"
+  node -e "
+const fs=require('fs');const p='$M/.vibeflow/cockpit/project.html';const h=fs.readFileSync(p,'utf8');const o=process.argv[1],r=process.argv[2];if(!h.includes(o)){console.error('mutant $1 : motif introuvable');process.exit(1)}fs.writeFileSync(p,h.split(o).join(r))" "$2" "$3" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant R15c.$1 : motif introuvable dans la page"; return; }
+  srv "$M/.vibeflow/cockpit"; R15C_SRV+=("$SRV_PID"); R15C_ID+=("$1")
+  node "$HERE_T/chrome-panneau-etroit.mjs" "$CHROME" "http://127.0.0.1:$SRV_PORT/project.html" > "$WORK/mut-r15c-$1.json" 2>&1 & R15C_PIDS+=($!)
+}
+r15c_mutant p1 "sansMemoire && k === 'panel' ? undefined : ecrire(k, v)" "ecrire(k, v)"
+r15c_mutant p2 "panel.focus({ preventScroll: true }); versPanneau = true; }" "panel.focus({ preventScroll: true }); }"
+r15c_mutant p3 "if (!change && !g) return;" ""
+r15c_mutant p4 "git.fermer(true); // P4" "void 0; // P4"
+r15c_mutant s7 "ev.stopPropagation(); ev.preventDefault(); sansTrace(() => bascule(false));" "ev.preventDefault(); sansTrace(() => bascule(false));"
+[ "${#R15C_PIDS[@]}" -gt 0 ] && wait "${R15C_PIDS[@]}"
+for i in "${!R15C_SRV[@]}"; do SRV_PID="${R15C_SRV[$i]}"; unsrv; done
 SRV_PID=$PID_c; unsrv; SRV_PID=$PID_l; unsrv; SRV_PID=$PID_h; unsrv
 mv_() { printf '%s' "$(cat "$1")" | node "$AUX/ev.mjs" "$2"; } # mv_ <fichier de mesures> <expression JS sur j>
 for onglet in index project equipe; do
@@ -559,9 +578,19 @@ assert_eq "R15.5 — Projet / 390 px : le tap du titre de la vue d'ensemble ouvr
 assert_eq "R15.6 — Projet / 768 px : le choix d'une carte ouvre le panneau de détail (PU-G-045 ; il est fermé par défaut, R14.4b)" "$(mv_ "$WORK/r15t-carte.json" 'j.mesures["768"].m.tiroir')" "true"
 assert_eq "R15.6b — Projet / 999 px : idem à la limite haute de l'étroit" "$(mv_ "$WORK/r15t-carte.json" 'j.mesures["999"].m.tiroir')" "true"
 assert_eq "R15.7 — Projet / 768 px : un choix au clavier (Entrée) ouvre le panneau ET le focus y entre" "$(mv_ "$WORK/r15t-clavier.json" 'j.mesures["768"].m.tiroir+"|"+j.mesures["768"].m.focusTiroir')" "true|true"
-assert_eq "R15.8 — Projet / 768 px : Échap referme le panneau (témoin : il s'était ouvert, R15.6)" "$(mv_ "$WORK/r15t-echap.json" 'j.mesures["768"].m.tiroir')" "false"
+assert_eq "R15.8 — Projet / 768 px : Échap referme le panneau (témoin : il s'était ouvert, R15.6) ET garde la sélection (S7, revue du 2026-11-08 : le viewer n'entend pas cet Échap, il n'efface pas la sélection ; l'Échap vise le corps de la page, comme au clavier sans focus)" "$(mv_ "$WORK/r15t-echap.json" 'j.mesures["768"].m.tiroir+"|"+j.mesures["768"].m.selection')" "false|true"
 assert_eq "R15.9 — Projet / 768 px : le bouton « Détail » referme le panneau" "$(mv_ "$WORK/r15t-bouton.json" 'j.mesures["768"].m.tiroir')" "false"
 assert_eq "R15.10 — Projet / 768 px : un rendu de plus sur la même sélection (flux en direct) ne rouvre pas le panneau refermé" "$(mv_ "$WORK/r15t-referme.json" 'j.mesures["768"].m.tiroir')" "false"
+SAIN_P1="true|aucune|false|aucune|false|true|vf-cockpit:panel=false"; SAIN_P2="true|true|true|true"; SAIN_P3="false|true"; SAIN_P4="768:true:false|999:true:false"; SAIN_S7="true|false|true"
+assert_eq "R15c.1 — P1 : à 768 px, choisir une carte puis Échap n'écrivent PAS la préférence du panneau (aucune clé) ; le rechargement à 768 px le retrouve fermé, à 1 440 px ouvert (défaut du bureau) ; « Détail » l'écrit bien (témoin : la clé existe, false)" "$(mv_ "$WORK/r15c.json" 'j.p1')" "$SAIN_P1"
+assert_eq "R15c.2 — P2 : par la palette au clavier réel (/, saisie, Entrée) le panneau s'ouvre et le focus y entre, y compris une fois le recentrage de la carte terminé" "$(mv_ "$WORK/r15c.json" 'j.p2')" "$SAIN_P2"
+assert_eq "R15c.3 — P3 : fermé par « Détail » à la souris, un rendu de la MÊME sélection 150 ms plus tard ne rouvre pas le panneau (false) ; choisir une autre carte le rouvre (témoin : true)" "$(mv_ "$WORK/r15c.json" 'j.p3')" "$SAIN_P3"
+assert_eq "R15c.4 — P4 : à 768 et à 999 px, une sélection avec le tiroir Git ouvert ouvre le panneau (témoin : true) et replie le tiroir Git (false)" "$(mv_ "$WORK/r15c.json" 'j.p4')" "$SAIN_P4"
+assert_eq "R15c.5 — S7 : un Échap réel (focus au corps de la page) referme le panneau et la sélection reste (témoin : elle existait avant)" "$(mv_ "$WORK/r15c.json" 'j.s7')" "$SAIN_S7"
+for i in "${!R15C_ID[@]}"; do
+  n="${R15C_ID[$i]}"; v="$(mv_ "$WORK/mut-r15c-$n.json" "j.$n")"; eval "sain=\$SAIN_$(printf %s "$n" | tr a-z A-Z)"; echo "     trace du mutant $n : $v"
+  assert_eq "R15c.m-$n — le mutant de la règle « $n » rougit R15c (le champ $n n'est plus « $sain »)" "$([ "$v" = "$sain" ] && echo sain || echo rouge)" "rouge"
+done
 for spec in "long:r16-long" "trait:r16-trait"; do
   for w in 768 1440; do
     assert_eq "R16 — lab « ${spec%%:*} » / $w px : aucun mot du titre de la vue d'ensemble n'est coupé sur deux lignes (sauf un mot plus large que sa boîte)" "$(mv_ "$WORK/${spec#*:}.json" "(()=>{const m=j.mesures[\"$w\"].m;if(!m.titreMots||!m.titreMots.length)return 'mesure vide : titre absent';return m.titreMots.filter((w)=>w.rect>1&&!w.large).map((w)=>w.mot+' x'+w.rect+' (boîte '+m.titreBoite+' px)').join(' | ')||'aucun'})()")" "aucun"

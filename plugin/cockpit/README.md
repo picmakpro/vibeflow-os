@@ -154,7 +154,7 @@ et `test-cockpit-chaine-xss.sh` (volet git C0g à C4g : un nom de branche, un me
 ## Téléphone et visite
 
 - **Tablette et téléphone (≤ 999 px)** : menu « ⋯ » pour les actions rares (amende P70-D-01, qui le posait à 700 px ; Q1 « Icônes dans le menu ⋯ », arbitrage Samuel, AskUserQuestion session principale, 2026-11-06).
-- **Panneau de détail fermé par défaut sous 1 000 px** (PU-G-045) : choisir une carte ou un fichier l'ouvre (souris, toucher, clavier — au clavier le focus y entre) ; il se ferme par son bouton (« Fermer » au téléphone, « Détail » de 701 à 999 px) ou par Échap, et le focus revient là où il était. Preuve : `test-cockpit-responsive.sh` (R15.6 à R15.10).
+- **Panneau de détail fermé par défaut sous 1 000 px** (PU-G-045) : choisir une carte ou un fichier l'ouvre (souris, toucher, clavier — au clavier le focus y entre) ; il se ferme par son bouton (« Fermer » au téléphone, « Détail » de 701 à 999 px) ou par Échap, et le focus revient là où il était. De 701 à 999 px, seul « Détail » écrit la préférence « panneau ouvert » du bureau (un choix ou Échap n'y touchent pas), un rendu de la même sélection ne rouvre jamais un panneau refermé, la palette (/, saisie, Entrée) y amène le focus, et ouvrir le panneau par une sélection replie le tiroir Git. Preuve : `test-cockpit-responsive.sh` (R15.6 à R15.10, puis R15c au geste réel avec un mutant par règle).
 - **Téléphone (≤ 700 px)** : l'en-tête tient sur une rangée ; le zoom est une pile
   verticale à gauche, au-dessus de la barre de question ; un tap sur une carte ou sur le titre ouvre le tiroir, qu'une poignée, une croix,
   Échap ou un tap dans le vide referment. Preuve : `test-cockpit-responsive.sh` (R13 à R16 ; R17 à R20 pour l'onglet Équipe, dont le zoom
