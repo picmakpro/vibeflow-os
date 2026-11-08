@@ -123,7 +123,7 @@ const ESPION = `(() => { const E = window.__esp = { clip: 0, exec: 0, confirm: 0
 const OP = `http://127.0.0.1:${P}`, SBX = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox';
 let ctx = 0, theme = 'dark';
 // amorçage (Chrome à froid : premier chargement de P, du cadre de Q, premier terminal) : borné par AMORCE (échéance globale), jamais par MS ; les attentes suivantes restent à MS
-let froid = true; const msA = () => (froid ? Math.max(MS, AMORCE) : MS);
+let froid = true; const msA = () => (froid && !process.env.VF_XTERM_MS ? Math.max(MS, AMORCE) : MS); // VF_XTERM_MS posé (mutant M-CTRLC) : échéance courte voulue, comme dans les autres suites
 const monde = async (sp, etendue = 600) => {
   let trouve = 0;
   for (let id = 1; id < etendue; id++) {
@@ -437,6 +437,7 @@ await executer(chrome, async (sp) => {
       theme = 'light'; await s.naviguer();
       await att(`!!(window.__ralenti && window.__ralenti.libere && window.__ralenti.cle && window.__ralenti.traite)`, 'rejeu rendu à xterm, frappe tombée, analyse finie');
       r.rejeu.ralenti = await s.ev(`(() => { const e = window.__ralenti; return 'cle=' + e.cle + ' libere=' + e.libere + ' moment=' + e.moment; })()`);
+      console.error('DIAG R1.3 vides=' + await s.ev(`window.__ralenti.vides || 0`).catch(() => 'illisible')); // télémétrie seule (stderr) : combien de clôtures de silence le ralentisseur a rejetées ; hors du JSON jugé
       tai = -1; stab = 0; const fin3 = Date.now() + 30000; while (stab < 12 && Date.now() < fin3) { const t = (await lire()).length; if (t === tai) stab++; else { stab = 0; tai = t; } await pause(100); }
       const gros = (await lire()).slice(n2).filter((l) => l.startsWith('I ')).map((l) => l.slice(2)).join('');
       // la sortie du navigateur passe par un tube de 64 Ko que process.exit() tronque : un relevé de fuite (60000 réponses) est borné, jamais recopié en entier
