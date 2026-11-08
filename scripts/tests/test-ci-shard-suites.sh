@@ -16,7 +16,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$ROOT/scripts/ci-shard-suites.sh"
 N=9   # la valeur de SHARDS visée par la CI ; la propriété est testée aussi sur d'autres n
 XTERM=plugin/cockpit/scripts/tests/test-cockpit-terminal-xterm.sh
-PROJET=plugin/cockpit/scripts/tests/test-cockpit-projet.sh
+PROJET=plugin/cockpit/scripts/tests/test-cockpit-projet-visite.sh
 
 PASS=0; FAIL=0
 ok() { echo "  OK $1"; PASS=$((PASS + 1)); }
@@ -82,7 +82,7 @@ else
 fi
 
 # --- C4 : les suites > 600 s sont seules sur leur shard ----------------------------------------------------------
-heavy_alone() { # script -> 0 si xterm (692 s) et projet (1509 s) sont chacune SEULE sur son shard ; trace sur stdout
+heavy_alone() { # script -> 0 si xterm (692 s) et projet-visite (658 s) sont chacune SEULE sur son shard ; trace sur stdout
   local sc="$1" s=0 bad=0 hx=0 hp=0 cnt
   while [ "$s" -lt "$N" ]; do
     part "$sc" "$s" "$N" > "$WORK/h.txt"; cnt="$(awk 'END { print NR }' "$WORK/h.txt")"
@@ -94,7 +94,7 @@ heavy_alone() { # script -> 0 si xterm (692 s) et projet (1509 s) sont chacune S
   return "$bad"
 }
 if tr=$(heavy_alone "$SCRIPT"); then
-  ok "C4 test-cockpit-terminal-xterm.sh (692 s) et test-cockpit-projet.sh (1509 s) sont chacune seule sur son shard (n=$N)"
+  ok "C4 test-cockpit-terminal-xterm.sh (692 s) et test-cockpit-projet-visite.sh (658 s) sont chacune seule sur son shard (n=$N)"
 else
   ko "C4 suites lourdes seules" "chacune seule sur son shard" "$tr"
 fi
