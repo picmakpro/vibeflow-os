@@ -430,7 +430,12 @@ await executer(chrome, async (sp) => {
       const apres = (await lire()).slice(n1).filter((l) => l.startsWith('I ')).map((l) => l.slice(2));
       r.rejeu.apres = apres.join(''); r.rejeu.frappe = apres.join('').startsWith('71');
       // R1 (réserve) : une frappe pendant un gros rejeu (60000 questions CPR dans le tampon) : xterm fait stopPropagation, l'autorisation « humaine » ne doit pas survivre à l'événement
+      const ng = (await lire()).length;
       await s.send('Input.insertText', { text: 'g' }); await att(`${TXT}.includes('GROS-PRET')`, 'GROS-PRET');
+      // ce qui s'ÉCOULE, pas seulement ce qui apparaît : les 60000 réponses VIVES (ESC[ligne;colonneR) du premier `g` traversent encore tampons Node, tube, assistant PTY et tty quand GROS-PRET est à l'écran. n2 n'est relevé qu'une fois le compte exact atteint (sinon leur fin, « 1R… », serait lue comme une fuite du cadre suivant). L'ancienne pause(1200) de R1.2 les laissait s'écouler sans le dire.
+      const vives = async () => (await lire()).slice(ng).filter((l) => l.startsWith('I ')).map((l) => Buffer.from(l.slice(2), 'hex').toString('latin1')).join('').split('R').length - 1;
+      const nVives = await attendreValeur(vives, (v) => v >= 60000, { pas: 500, max: 60000 });
+      if (!(nVives >= 60000)) throw new Error(`réponses vives du premier gros rejeu : ${nVives} sur 60000 relevées en 60 s`);
       let tai = -1, stab = 0; const fin2 = Date.now() + 30000; while (stab < 12 && Date.now() < fin2) { const t = (await lire()).length; if (t === tai) stab++; else { stab = 0; tai = t; } await pause(100); }
       const n2 = (await lire()).length;
       await s.send('Page.addScriptToEvaluateOnNewDocument', { source: RALENTI });
@@ -442,6 +447,7 @@ await executer(chrome, async (sp) => {
       const gros = (await lire()).slice(n2).filter((l) => l.startsWith('I ')).map((l) => l.slice(2)).join('');
       // la sortie du navigateur passe par un tube de 64 Ko que process.exit() tronque : un relevé de fuite (60000 réponses) est borné, jamais recopié en entier
       r.rejeu.gros = gros.length > 400 ? gros.slice(0, 200) + '…' + gros.length / 2 + ' octets' : gros;
+      console.error('DIAG R1.3 reponses-vives=' + nVives + ' journal@n2=' + n2 + ' journal@jugement=' + (await lire()).length); // télémétrie (stderr) : un futur rouge dit s'il restait un écoulement
       // R1.4 : une frappe RÉELLE (CDP, événement de confiance) après le rejeu arrive au shell, seule
       const n3 = (await lire()).length;
       for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key: 'k', code: 'KeyK', text: type === 'keyDown' ? 'k' : undefined, windowsVirtualKeyCode: 75 });
