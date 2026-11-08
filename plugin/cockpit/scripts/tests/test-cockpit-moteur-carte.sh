@@ -11,6 +11,7 @@
 #   K14 panneau de détail fermé par défaut à 768 px, ouvert à 1 024 px (PU-G-045)
 #   K15 colonnes d'une vue de partie : carte sans lien dans la colonne du milieu, titres lisibles (PU-G-040) · K16 vue de réponse remise à zéro (PU-G-059, PU-G-143, PU-G-144)
 #   K17 compteurs et homonymes du travail récent (PU-G-054, PU-G-049)
+#   K18 l'infobulle ne revient pas après une navigation par la recherche, sur Code (1 440 et 768 px) et Projet (PU-G-035, recette du 2026-11-08)
 #   K12 nœud d'une mission : état réel en glyphe et mot, plus de « 0 » ni de « 0 lines » (PU-G-105) · K13 onglet Équipe à 390 px : une seule colonne (PU-G-176)
 # Un chargement de page unique (chrome-moteur-carte.mjs, un Chrome, profil jetable) ; les assertions se lisent ensuite sur sa sortie JSON. Lab construit par la suite, dans mktemp.
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
@@ -120,6 +121,11 @@ assert_eq "K12.1 — chaque ligne de la mission porte une pastille d'état" "$(E
 assert_eq "K12.2 — plus aucun « 0 » à droite des éléments" "$(E "j.pastille.lignes.length > 0 && !j.pastille.lignes.some((x) => x === '0' || /lines/i.test(x))")" "true"
 assert_eq "K12.3 — l'infobulle d'une carte dit l'état, plus « 0 lines »" "$(E "j.info.pastille && !/lines/i.test(j.info.texte)")" "true"
 assert_eq "K12.4 — PU-G-036 : l'infobulle d'une carte dit « Clic droit : plus d'actions », avec son deux-points" "$(E "/clic droit\\s*:\\s*plus d'actions/.test(j.infoFr.texte.replace(/\\u00a0/g, ' '))")" "true"
+echo "=== K18 — l'infobulle ne revient pas après une navigation par la recherche (PU-G-035, recette du 2026-11-08) ==="
+for CAS in code1440 code768 projet1440; do
+  assert_eq "K18.0 ($CAS) — témoin : l'infobulle était affichée avant la recherche et la recherche a changé de vue" "$(E "!j.infoRecherche.$CAS.erreur && j.infoRecherche.$CAS.avant.visible && j.infoRecherche.$CAS.arrivee !== j.infoRecherche.$CAS.depart")" "true"
+  assert_eq "K18.1 ($CAS) — après Entrée dans la recherche, l'infobulle de l'ancienne carte n'est pas restée ni revenue (fermée, ou celle de la carte sous le pointeur)" "$(E "j.infoRecherche.$CAS.coherente")" "true"
+done
 assert_eq "K12.5 — PU-G-100 : le panneau de la phase 2 dit « Dépend de » (la phase 1), pas « Utilisé par »" "$(E "j.sens.p2.titres.join('|') + ' : ' + j.sens.p2.lignes.join('|')")" "Dépend de : Phase 1 · Socle"
 assert_eq "K12.6 — PU-G-100 : le panneau de la phase 1 dit « Utilisé par » (la phase 2), pas « Dépend de »" "$(E "j.sens.p1.titres.join('|') + ' : ' + j.sens.p1.lignes.join('|')")" "Utilisé par : Phase 2 · Suite"
 assert_eq "K12.7 — PU-G-100 : l'ordre des cartes de phase est celui d'avant (la phase 1 avant la phase 2, lien non inversé)" "$(E "j.sens.ordre.join('>')")" "n:ph-1>n:ph-2"

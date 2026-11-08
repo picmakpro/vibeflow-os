@@ -1228,7 +1228,7 @@ let touching = false;
 ['pointerdown', 'pointermove'].forEach((t) => window.addEventListener(t, (ev) => { touching = ev.pointerType === 'touch'; }, { capture: true, passive: true }));
 function showTip(ev, html, anchor) { clearTimeout(tipTimer); if (!html || touching || drag?.moved || !$('#ctxmenu').hidden) return; tip.innerHTML = html; tip.hidden = false; tipAnchor = anchor || null; moveTip(ev); }
 /** Cards explain themselves after a short hover, so passing over them doesn't flicker tooltips. */
-function tipSoon(ev, make) { clearTimeout(tipTimer); lastPointer = ev; const anchor = ev.currentTarget; tipTimer = setTimeout(() => showTip(lastPointer, make(), anchor), 420); }
+function tipSoon(ev, make) { clearTimeout(tipTimer); lastPointer = ev; const anchor = ev.currentTarget; tipTimer = setTimeout(() => { if (anchor.isConnected && anchor.matches(':hover')) showTip(lastPointer, make(), anchor); }, 420); } // PU-G-035 : la carte a pu être retirée (vue redessinée) ou quittée sans mouseleave pendant le délai : jamais d'infobulle pour une carte qui n'est plus sous le pointeur
 function moveTip(ev) {
   lastPointer = ev;
   if (tip.hidden) return;

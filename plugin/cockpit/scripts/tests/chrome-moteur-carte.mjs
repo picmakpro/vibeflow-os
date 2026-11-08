@@ -139,6 +139,32 @@ await executer(chrome, async (s) => {
     await s.attendre("!document.querySelector('#tooltip').hidden && document.querySelector('#tooltip .th')", 'infobulle de carte (français)');
   }
   o.infoFr = { texte: await s.ev("(document.querySelector('#tooltip .th') || { textContent: '' }).textContent") };
+  // PU-G-035 (recette du 2026-11-08) : l'infobulle d'une carte survolée ne revient pas après une navigation par la recherche. Le pointeur ne bouge pas : la fenêtre de recherche (plein écran) se ferme,
+  // la carte de l'ancienne vue se retrouve sous lui (mouseenter, minuterie de 420 ms), puis la vue est redessinée sans que cette carte reçoive de mouseleave : l'infobulle s'affichait sur la nouvelle vue.
+  // Attendu : fermée, ou — si une carte de la NOUVELLE vue se trouve sous le pointeur — celle de cette carte seulement. L'absence se constate après le délai de la minuterie (pause délibérée : on ne peut pas attendre une absence).
+  const INFO = "(() => { const t = document.querySelector('#tooltip'); return { visible: !t.hidden && getComputedStyle(t).display !== 'none', titre: ((t.querySelector('.tt') || {}).textContent || '').trim() }; })()";
+  const infobulleApresRecherche = async (page, w, h, requete, rang) => {
+    await vue(w, h); await chargerUrl(U(page), `recherche ${page} ${w}`);
+    await s.ev("(() => { try { const T = window.VibeFlowTour; if (T && T.active()) T.end(); } catch (e) { void e; } })()");
+    await attendreValeur(() => s.ev("(() => { const t = document.getElementById('tour'); return !t || t.hidden; })()"), (v) => v === true, { max: 5000 }); await poserVue();
+    const c = await positionPosee(s.ev, `(() => { const cs = [...document.querySelectorAll('#viewport .node .card')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.left > 0 && r.right < innerWidth - (innerWidth >= 1000 ? 340 : 0) && r.top > 130 && r.bottom < innerHeight; }); return ${JSON.stringify(rang)} === 'dernier' ? cs[cs.length - 1] : cs[0]; })()`); // la carte survolée est choisie loin de l'endroit où la nouvelle vue se pose : une carte de la nouvelle vue sous le pointeur remplacerait la minuterie périmée (et masquerait le défaut)
+    if (!c) return { erreur: 'aucune carte survolable' };
+    await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5, button: 'none' });
+    for (const dx of [-30, -10, 0, 3]) { await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c.cx + dx, y: c.cy, button: 'none' }); await pause(120); }
+    await s.attendre("!document.querySelector('#tooltip').hidden && document.querySelector('#tooltip').innerText.length > 0", `infobulle de carte (${page} ${w})`);
+    const avant = await s.ev(INFO), depart = await s.ev('VibeFlow.state.container');
+    await touche('/', 'Slash', 191); await s.attendre("document.activeElement && document.activeElement.id === 'search'", 'recherche ouverte');
+    await s.send('Input.insertText', { text: requete });
+    await s.attendre("document.querySelectorAll('#palette .r, #palette [role=option], #palette .result').length > 0 || document.querySelector('#palette').innerText.length > 40", 'résultats de recherche');
+    await pause(300); await touche('Enter', 'Enter', 13);
+    await s.attendre("!document.querySelector('#palette').classList.contains('open')", 'recherche refermée');
+    await attendreValeur(() => s.ev('VibeFlow.state.container'), (v) => v !== depart, { max: 5000 }); await poserVue();
+    await pause(1000);
+    const apres = await s.ev(INFO);
+    const sous = await s.ev(`(() => { const e = document.elementFromPoint(${c.cx + 3}, ${c.cy}); const k = e && e.closest ? e.closest('.card') : null; return k ? k.innerText : ''; })()`);
+    return { avant, depart, arrivee: await s.ev('VibeFlow.state.container'), apres, coherente: !apres.visible || (!!apres.titre && sous.includes(apres.titre)) };
+  };
+  o.infoRecherche = { code1440: await infobulleApresRecherche('index.html', 1440, 900, 'run.sh', 'premier'), code768: await infobulleApresRecherche('index.html', 768, 1024, 'run.sh', 'premier'), projet1440: await infobulleApresRecherche('project.html', 1440, 900, 'Suite', 'dernier') };
   // PU-G-100 : le sens des liens entre phases. Le panneau d'une phase dit ce que la phase attend (« Dépend de ») et ce qu'elle débloque (« Utilisé par ») ; l'ordre des cartes, lui, ne bouge pas
   await vue(1280, 720); await chargerUrl(`${BASE}/project.html`, 'phases');
   const phases = JSON.parse(await s.ev(`JSON.stringify([...VibeFlow.nodes.keys()].filter((k) => /^ph-/.test(k)))`));
