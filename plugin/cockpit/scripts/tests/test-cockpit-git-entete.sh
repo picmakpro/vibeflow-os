@@ -536,7 +536,12 @@ const lecture = async (rep) => { // une lecture du serveur (réponse simulée) ;
 };
 if (mode === 'connue') {
   out.avant = await lecture({ etat: 'ok', branche: 'feat/memoire', worktree: 'wt-m' });
+  // F6a (3e tour de la recette du 2026-11-08) : le titre de la vue n'est un arrêt de Tab que s'il porte une définition. Branche connue : titre atteignable (témoin) ; dépôt « indisponible » : plus de définition, donc plus d'arrêt, MÊME après un changement de classe du corps (ouverture/fermeture du tiroir Git) qui relance l'observateur de tabindex
+  const titre = () => s.ev(`(() => { const h = document.querySelector('#context h1'); return h ? [h.hasAttribute('tabindex') ? h.getAttribute('tabindex') : 'aucun', h.hasAttribute('title') || h.hasAttribute('aria-description')].join('/') : 'absent'; })()`);
+  const classeDuCorps = async () => { await s.ev(`document.body.classList.add('vf-git-ouvert')`); await s.ev(`document.body.classList.remove('vf-git-ouvert')`); await s.ev(`new Promise((r) => setTimeout(r, 50))`); };
+  await attendreValeur(titre, (v) => v === '0/true', { max: 6000 }); out.titreConnu = await titre();
   out.muet = await lecture({ etat: 'indisponible' });
+  await classeDuCorps(); out.titreIndispo = await attendreEtStabiliser(titre, (v) => v !== 'absent', { max: 6000 });
   out.encore = await lecture({ etat: 'indisponible' });
   out.revenue = await lecture({ etat: 'ok', branche: 'autre', worktree: null });
   out.absent = await lecture({ etat: 'absent' });
@@ -556,6 +561,7 @@ JS
   assert_eq "H9.1c — la lecture suivante réussie remplace tout (« autre », plus de mot, plus de worktree) ; « absent » (vrai « pas un dépôt ») masque toujours la ligne et l'ouvreur" "$(jq_ "$R9" '[j.revenue.branche, j.revenue.etat, j.revenue.wt, j.absent.ligneCachee, j.absent.ouvreurCache, j.absent.dataGit].join("|")' 2>/dev/null)" "autre|||true|true|false"
   assert_eq "H9.1e — après « absent » puis « indisponible » : aucune ancienne branche ne réapparaît comme non confirmée (« Branche indisponible », sans mot)" "$(jq_ "$R9" '[j.apresAbsent.branche, j.apresAbsent.etat].join("|")' 2>/dev/null)" "Branche indisponible|"
   assert_eq "H9.1d — aucune erreur de page" "$(jq_ "$R9" 'j.errs.length' 2>/dev/null)" "0"
+  assert_eq "H9.1f — F6a (3e tour) : le titre de la vue est un arrêt de Tab (tabindex 0) tant qu'il porte sa définition (branche connue, témoin) ; dépôt « indisponible », il n'en porte plus et n'est plus un arrêt, même après un changement de classe du corps qui relance l'observateur de tabindex (aucun tabindex, ni title ni aria-description)" "$(jq_ "$R9" '[j.titreConnu, j.titreIndispo].join("|")' 2>/dev/null)" "0/true|aucun/false"
   # première lecture SANS valeur connue : la page servie dit déjà « indisponible » (le HTML posé est réécrit pour le test) -> « Branche indisponible », jamais masquée
   env $ENVX "$NODE" "$SCRIPTS/vf-cockpit-build.mjs" "$WT" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$WT/.vibeflow/cockpit"
@@ -566,6 +572,17 @@ JS
   PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"; BASE="http://127.0.0.1:$PORT"
   R92="$(cdp "$AUX/h9.js" "$BASE" premiere 2>&1 | tail -1)"; stop_srv
   assert_eq "H9.2 — première lecture sans valeur connue : « Branche indisponible », sans mot ajouté, ligne et ouvreur présents ; la lecture réussie suivante donne la branche" "$(jq_ "$R92" '[j.premiere.branche, j.premiere.etat, j.premiere.cachee, j.premiere.ouvreurCache, j.muet.branche, j.muet.ligneCachee, j.ok.branche].join("|")' 2>/dev/null)" "Branche indisponible||false|false|Branche indisponible|false|revenue"
+
+  # F6a (3e tour) : mutant de la garde de tabindex (elle ne regarde plus la définition COURANTE mais le fait d'en avoir déjà porté une) -> le titre d'un dépôt « indisponible » redevient un arrêt de Tab muet (H9.1f rougit)
+  env $ENVX "$NODE" "$SCRIPTS/vf-cockpit-build.mjs" "$WT" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
+  OUT="$WT/.vibeflow/cockpit"
+  node "$AUX/mut.mjs" "$OUT/index.html" "if (!h1 || !h1.dataset.vfAide) return; if (document.body.classList.contains('vf-git-ouvert'))" "if (!h1 || !h1.dataset.vfAideLie) return; if (document.body.classList.contains('vf-git-ouvert'))" > "$WORK/h91f.out" 2>&1 || { cat "$WORK/h91f.out"; echo "  ❌ FAIL — M-TABINDEX-DEFINITION : mutation impossible" >&2; }
+  env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
+  SRV=$!; PIDS+=("$SRV")
+  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
+  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"; BASE="http://127.0.0.1:$PORT"
+  RTI="$(cdp "$AUX/h9.js" "$BASE" connue 2>&1 | tail -1)"; stop_srv
+  assert_eq "M-TABINDEX-DEFINITION — le mutant (le titre redevient un arrêt de Tab dès qu'il a porté une définition) rougit H9.1f : « 0/true|0/false » au lieu de « 0/true|aucun/false » (témoin : le témoin positif reste « 0/true »)" "$(jq_ "$RTI" '[j.titreConnu, j.titreIndispo].join("|")' 2>/dev/null)" "0/true|0/false"
 
   echo "=== Mutants ==="
   # M-DEPOT : le nom du dépôt pris de --show-toplevel (le worktree) -> H1.1 et H2.2 rougissent
