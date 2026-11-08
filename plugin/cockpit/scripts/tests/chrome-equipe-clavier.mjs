@@ -16,6 +16,8 @@
 //   titre-grandi      : (EK14) le titre de #context grandit après le cadrage (police plus large du runner) ; recouvrement avec la première carte une fois la page stable → { k, aire }
 //   echap-tiroir      : (EK15) sélectionne une carte, ouvre le tiroir « Au travail », focalise le tiroir ou le bouton (EK_FOCUS), frappe Échap → { ferme0, ouvert, avant, place, ferme, apres } (attributs aria du bouton, sélection et vue avant/après)
 //   un-lateral        : (EK16, Q12, PU-G-203) largeur EK_LARGEUR, ordre EK_ORDRE (git-puis-travail | travail-puis-git) : ouvre Git (touche g) puis « Au travail » (ou l'inverse), relève l'état et le focus à chaque pas, puis élargit à 1440 px → { etapes: { premier, second, large }, ... }
+//   touches-canevas   : (EK17, PU-G-137, Q8) 1440 px, clic sur le fond, puis f, F, p, P, +, =, - une à une, chacune sur une caméra décalée du cadrage (elle aurait un effet) : la page dont l'URL est donnée (Équipe) ne bouge pas (transformation de la caméra, tiroir de détail) ; mêmes touches sur Projet et sur Code (témoin : elles y agissent toujours)
+//                       → { [page]: { depart, apres: { f, F, p, P, plus, egal, moins }, agit: { f, F, p, P, plus, egal, moins } } }
 //   libelles          : (EK11) ligne des sources du tiroir et infobulle de la recherche de l'onglet Équipe → { src, titre }
 // Rend une ligne JSON { ... } ou { erreur }. Socle : chrome-session.mjs (une instance de Chrome, fermée proprement).
 import { executer } from './chrome-session.mjs';
@@ -236,6 +238,33 @@ await executer(chrome, async (s) => {
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 800, deviceScaleFactor: 1, mobile: false });
     etapes.large = await etat();
     return { largeur: +process.env.EK_LARGEUR, etapes };
+  }
+  if (ACTION === 'touches-canevas') { // PU-G-137 : sur Équipe, la frappe ne déclenche ni cadrage, ni tiroir, ni zoom ; Projet et Code gardent leurs raccourcis (témoin positif : sans lui, un clavier muet partout passerait)
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+    const KEYS = { f: ['f', 'KeyF', 70, 'f'], F: ['F', 'KeyF', 70, 'F'], p: ['p', 'KeyP', 80, 'p'], P: ['P', 'KeyP', 80, 'P'], plus: ['+', 'Equal', 187, '+'], egal: ['=', 'Equal', 187, '='], moins: ['-', 'Minus', 189, '-'] };
+    const camera = "JSON.stringify([...['x', 'y', 'k'].map((c) => Math.round(window.VibeFlow.state.t[c] * 1000) / 1000), document.body.classList.contains('no-panel')])";
+    const lire = () => s.stable(camera, 'caméra posée');
+    const attendreCalme = async () => { await new Promise((r) => setTimeout(r, 700)); return lire(); }; // le zoom par bouton s'anime : on mesure une fois la caméra posée
+    const sur = async (page) => {
+      await s.naviguer(page === 'equipe' ? url : url.replace(/[^/]*$/, page === 'projet' ? 'project.html' : 'index.html')); await s.attendre(PRET, 'viewer prêt (' + page + ')');
+      await s.ev("(() => { try { const T = window.VibeFlowTour; if (T && T.active()) T.end(); } catch (e) { void e; } })()");
+      await s.stable("performance.timeOrigin + ':' + !!(document.querySelector('#viewport .node'))", 'page calme (' + page + ')');
+      const pt = await s.ev("(() => { for (let y = 160; y < innerHeight - 140; y += 40) for (let x = 40; x < innerWidth - 400; x += 40) { const e = document.elementFromPoint(x, y); if (e && e.tagName.toLowerCase() === 'svg' && !e.closest('#zoom,#ask,#context,header')) return { x, y }; } return null; })()");
+      if (!pt) return { erreur: 'aucun point de fond (' + page + ')' };
+      for (const t of ['mouseMoved', 'mousePressed', 'mouseReleased']) await s.send('Input.dispatchMouseEvent', { type: t, x: pt.x, y: pt.y, button: t === 'mouseMoved' ? 'none' : 'left', clickCount: 1 });
+      await s.ev('document.activeElement && document.activeElement.blur && document.activeElement.blur()');
+      const depart = await lire(), apres = {}, agit = {};
+      for (const [nom, k] of Object.entries(KEYS)) {
+        // chaque touche est frappée sur une caméra où elle AURAIT un effet : décalée du cadrage par le bouton de zoom (jamais par une touche), pour que f et F aient quelque chose à cadrer
+        await s.ev("document.querySelector('#z-in').click(); document.activeElement && document.activeElement.blur && document.activeElement.blur()");
+        const avant = await attendreCalme();
+        await touche(...k); await new Promise((r) => setTimeout(r, 600)); apres[nom] = await lire();
+        agit[nom] = apres[nom] !== avant; // la caméra ou le tiroir a bougé
+      }
+      return { depart, apres, agit };
+    };
+    const r = {}; for (const page of ['equipe', 'projet', 'code']) r[page] = await sur(page);
+    return r;
   }
   return { erreur: 'EK_ACTION inconnue : ' + ACTION };
 }, { csp: false });

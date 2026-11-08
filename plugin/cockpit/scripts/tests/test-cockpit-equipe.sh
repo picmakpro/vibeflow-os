@@ -9,6 +9,7 @@
 #   E28 schéma vibeflow/cockpit-who@2 conforme au contrat, qui ne déclare plus @1
 #   EP  coût de collecte sur 40 sous-agents (garde de non-régression, T-69-06)
 #   E23 onglet Équipe : page /equipe.html, graphe cockpit-equipe@1, couche d'onglets, sonde de libellés (CKPT-23 ; P69-D-17)
+#   EK17 (Q8, PU-G-137) la frappe ne déclenche pas le canevas sur Équipe, le fait toujours sur Projet et Code
 #   EUI rendu de l'arbre hors navigateur (vm) : imbrication, terminés repliés, liens dans les deux sens, pied (CKPT-19 à 22 ; P69-D-14 à P69-D-18)
 #   EK  clavier et témoins mineurs de l'onglet Équipe dans un vrai Chromium : focus après Entrée sur « Lire le transcript », mutants de comportement (UIFN-12, UIFN-13)
 # 69-04 ajoute E23 et EUI.
@@ -988,6 +989,10 @@ JSON
   assert_eq "EK16.5 — mutant (la règle Q12 retirée : seuil à 0 px) : à 1024 px les deux tiroirs restent ouverts, détecté" "$(EK16M 1024 git-puis-travail "window.matchMedia('(max-width: 1279px)')" "window.matchMedia('(max-width: 0px)')")" "muté|G-:git GT:git GT:git"
   assert_eq "EK16.6 — mutant (seuil à 1500 px) : à 1440 px le second tiroir replie le premier, détecté" "$(EK16M 1440 git-puis-travail "window.matchMedia('(max-width: 1279px)')" "window.matchMedia('(max-width: 1500px)')")" "muté|G-:git -T:bouton-travail -T:bouton-travail"
   assert_eq "EK16.7 — mutant (le focus n'est plus posé sur le bouton après le repli de Git) : il ne va plus au tiroir qui s'ouvre, détecté" "$(EK16M 1024 git-puis-travail "if (!panneau.contains(document.activeElement)) b.focus({ preventScroll: true });" "")" "muté|G-:git -T:BODY -T:BODY"
+  # EK17 (Q8, PU-G-137, recette du 2026-11-08) : « on empêche seulement la frappe de déclencher le canevas » sur Équipe (pas de terminal) ; Projet et Code gardent leurs raccourcis
+  ek_demarrer; EKC touches-canevas "equipe.html"; mv "$WORK/ek-touches-canevas.json" "$WORK/ek-touches.json"; vf_hyg_stop "$EK_PID"
+  assert_eq "EK17.0 — témoin : sur Projet et sur Code, f, F, p, P, +, = et - agissent toujours, chacune, sur la caméra ou le tiroir (la sonde sait lire un clavier qui agit)" "$(G "$WORK/ek-touches.json" 'j.erreur||(j.projet.erreur||j.code.erreur||[j.projet,j.code].map((x)=>Object.values(x.agit).every(Boolean)).join())')" "true,true"
+  assert_eq "EK17.1 — Équipe, après un clic sur le fond : f, F, p, P, +, = et - ne déplacent, ne cadrent ni ne zooment la carte et n'ouvrent ni ne ferment le tiroir de détail (chaque touche est frappée sur une caméra décalée du cadrage où elle aurait un effet ; caméra et tiroir inchangés)" "$(G "$WORK/ek-touches.json" 'j.erreur||(j.equipe.erreur||"agissent : "+Object.entries(j.equipe.agit).filter(([k,v])=>v).map(([k])=>k).join(","))')" "agissent : "
   # témoins de la sonde de mutation elle-même
   ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"
   assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK2.1 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "a1|null|identique"

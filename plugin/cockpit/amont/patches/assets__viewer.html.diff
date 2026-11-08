@@ -995,7 +995,7 @@
 +function showTip(ev, html, anchor) { clearTimeout(tipTimer); if (!html || touching || drag?.moved || !$('#ctxmenu').hidden) return; tip.innerHTML = html; tip.hidden = false; tipAnchor = anchor || null; moveTip(ev); }
  /** Cards explain themselves after a short hover, so passing over them doesn't flicker tooltips. */
 -function tipSoon(ev, make) { clearTimeout(tipTimer); lastPointer = ev; tipTimer = setTimeout(() => showTip(lastPointer, make()), 420); }
-+function tipSoon(ev, make) { clearTimeout(tipTimer); lastPointer = ev; const anchor = ev.currentTarget; tipTimer = setTimeout(() => showTip(lastPointer, make(), anchor), 420); }
++function tipSoon(ev, make) { clearTimeout(tipTimer); lastPointer = ev; const anchor = ev.currentTarget; tipTimer = setTimeout(() => { if (anchor.isConnected && anchor.matches(':hover')) showTip(lastPointer, make(), anchor); }, 420); } // PU-G-035 : la carte a pu être retirée (vue redessinée) ou quittée sans mouseleave pendant le délai : jamais d'infobulle pour une carte qui n'est plus sous le pointeur
  function moveTip(ev) {
    lastPointer = ev;
    if (tip.hidden) return;
@@ -1293,10 +1293,10 @@
      const ii = info(it.id);
      const ic = it.kind === 'route' ? `<span class="method" style="--m:${methodVar(ii.r.m)}">${h(ii.r.m)}</span>` : `<span class="ico" style="--c:${colorOf(ii)}">${icon(iconKey(ii))}</span>`;
 -    return `<div class="r${i === 0 ? ' active' : ''}" data-i="${i}">${ic}<span class="rt"><div class="rn">${h(it.name)}</div><div class="rd">${h(it.desc || it.path)}</div></span><span class="rk">${h(it.kind === 'route' ? ii.r.p : it.kind)}</span></div>`;
-+    // a file shows its real file name and, on the right, its folder instead of the word "file" (PU-G-050); when another result has the same file name, its whole folder also sits under the name (PU-G-049)
-+    const file = it.kind === 'file', dir = file ? parentDir(it.path) : '', twin = file && (sameBase.get(baseName(it.path)) || []).length > 1;
++    // a file shows its real file name and, on the right, its folder instead of the word "file" (PU-G-050) — on the Code tab only: on the Project tab a "file" is a card of the planning (BACKLOG entry, requirement, plan), its readable title stays; when another result has the same file name, its whole folder also sits under the name (PU-G-049)
++    const file = it.kind === 'file' && G.meta?.vfTab !== 'project', dir = file ? parentDir(it.path) : '', twin = file && (sameBase.get(baseName(it.path)) || []).length > 1;
 +    const right = file ? dirTag(it.path, sameBase.get(baseName(it.path))) || dir.split('/').slice(-2).join('/') || '/' : it.kind === 'route' ? ii.r.p : it.kind;
-+    return `<div class="r${i === 0 ? ' active' : ''}" data-i="${i}">${ic}<span class="rt"><div class="rn">${h(file ? baseName(it.path) : it.name)}</div><div class="rd">${h(twin && dir ? `${dir} · ${it.desc || ''}` : it.desc || it.path)}</div></span>${file ? `<span class="rdr rp" title="${h(dir || '/')}">${h(right)}</span>` : `<span class="rk">${h(right)}</span>`}</div>`;
++    return `<div class="r${i === 0 ? ' active' : ''}" data-i="${i}">${ic}<span class="rt"><div class="rn">${h(file ? baseName(it.path) : it.name)}</div><div class="rd">${h(twin && dir ? `${dir} · ${it.desc || ''}` : it.desc || it.path)}</div></span>${file ? `<span class="rdr rp" title="${h(dir || '/')}"><bdi dir="ltr">${h(right)}</bdi></span>` : `<span class="rk">${h(right)}</span>`}</div>`;
    }).join('') || '<div class="empty">No matches</div>';
    sRes.querySelectorAll('.r').forEach((r) => { r.addEventListener('mousedown', (ev) => { ev.preventDefault(); pick(+r.dataset.i); }); r.addEventListener('mousemove', () => setActive(+r.dataset.i)); });
  }
@@ -1462,7 +1462,7 @@
  $('#btn-panel').setAttribute('aria-expanded', String(!document.body.classList.contains('no-panel')));
  // the top bar can be one or two rows tall: everything under it follows its real height
  const headerEl = document.querySelector('header');
-@@ -2281,7 +2439,9 @@ window.addEventListener('keydown', (ev) => {
+@@ -2281,8 +2439,11 @@ window.addEventListener('keydown', (ev) => {
    else if (ev.key === 'Escape') {
      if (!ctxEl.hidden || fm.classList.contains('open') || legendEl.classList.contains('open')) { closeMenu(); fm.classList.remove('open'); legendEl.classList.remove('open'); }
      else if (isPhone() && !document.body.classList.contains('no-panel')) closeSheet(); // on a phone the first Escape puts the details sheet away
@@ -1471,9 +1471,11 @@
 +    else if (state.flow) stopFlow();
 +    else if (ev.target === document.body || ev.target === document.documentElement || svg.contains(ev.target)) { if (state.selected) select(null); else up(); }
    }
++  else if (G.meta?.vfTab === 'equipe' && /^[fFpP=+-]$/.test(ev.key)) { /* Équipe : ni cadrage, ni tiroir, ni zoom par la frappe (PU-G-137, Q8) */ }
    else if (ev.key === 'f' || ev.key === 'F') fit(true);
    else if (ev.key === 'p' || ev.key === 'P') $('#btn-panel').click();
-@@ -2300,22 +2460,37 @@ function setTechnical(on) {
+   else if (ev.key === 'Enter' && typeof state.selected === 'string') open(state.selected);
+@@ -2300,22 +2461,37 @@ function setTechnical(on) {
    render({ keepTransform: true, after: renderPanel });
    emit('technical', technicalFlag);
  }
@@ -1514,7 +1516,7 @@
    state.answer = a; askState.last = a;
    go('q:answer', { force: true });
  }
-@@ -2332,7 +2507,7 @@ window.Floorplan = Object.freeze({
+@@ -2332,7 +2508,7 @@ window.Floorplan = Object.freeze({
    version: 1,
    graph: G, query: Q, state, agent: AGENT, exported: EXPORTED,
    // model helpers
@@ -1523,7 +1525,7 @@
    files, nodes, routes, colorOf, iconKey,
    // html helpers
    h, icon, iconI, fmt, plural, md,
-@@ -2372,6 +2547,8 @@ window.Floorplan = Object.freeze({
+@@ -2372,6 +2548,8 @@ window.Floorplan = Object.freeze({
    technical, setTechnical,
    store,
    on(event, fn) { (ext.listeners[event] ||= []).push(fn); },

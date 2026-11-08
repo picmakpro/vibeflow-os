@@ -40,6 +40,7 @@
       header .hr { flex: 0 0 auto; justify-content: flex-end; }
       header #proj-name { display: none; }
       #stage > #zoom { left: var(--sp-8); right: auto; top: auto; bottom: calc(var(--vf-ask-h, var(--sp-8)) + var(--sp-8)); flex-direction: column; border-radius: 26px; } /* --vf-ask-h : hauteur relue de la barre de question + sa marge */
+      html[data-vf-visite] #stage > #zoom { bottom: calc(var(--vf-ask-h, var(--sp-8)) + var(--sp-8)) !important; } /* visite ouverte : le zoom reste au-dessus de la feuille, même quand le terminal l'a remonté au-dessus de sa pastille (style en ligne, vf-cockpit-terminal-tiroir.mjs) */
       #context h1 { pointer-events: auto; width: fit-content; max-width: 100%; cursor: pointer; }
       #context h1:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
       .vf-sheet-bar { position: sticky; top: 0; z-index: 2; height: 36px; margin-bottom: calc(-1 * var(--sp-4)); background: var(--menu-solid); }
@@ -114,9 +115,11 @@
   // pile du zoom : la barre de question change de hauteur (invite, avertissement) et la visite guidée se pose au même endroit : on relit leurs hauteurs, le zoom reste au-dessus des deux
   const ask = document.getElementById('ask');
   if (ask) { // la visite (#tour) est créée à la volée : on la relie quand elle entre dans la page
-    const h = () => { const v = document.getElementById('tour'); document.documentElement.style.setProperty('--vf-ask-h', ask.offsetHeight + 8 + (v && v.offsetHeight ? v.offsetHeight + 8 : 0) + 'px'); };
+    // la feuille de visite se pose au-dessus de la barre de question OU plus haut (au-dessus de la pastille du terminal, PU-G-090) : le zoom monte jusqu'à son bord HAUT réel, jamais à la hauteur supposée (sinon il la recouvre et elle rétrécit à 120 px)
+    const h = () => { const v = document.getElementById('tour'); const bas = v && v.offsetHeight ? Math.max(ask.offsetHeight + 8, parseFloat(getComputedStyle(v).bottom) || 0) + v.offsetHeight + 8 : ask.offsetHeight + 8; document.documentElement.style.setProperty('--vf-ask-h', bas + 'px'); document.documentElement.toggleAttribute('data-vf-visite', !!(v && v.offsetHeight)); };
     let ro = null, vu = null;
-    const lier = () => { const v = document.getElementById('tour'); if (ro && v !== vu) { vu = v; ro.disconnect(); ro.observe(ask); if (v) ro.observe(v); } h(); };
+    const mv = new MutationObserver(h); // la feuille change de place (style) ou apparaît (hidden) sans changer de taille : le ResizeObserver ne la voit pas
+    const lier = () => { const v = document.getElementById('tour'); if (ro && v !== vu) { vu = v; ro.disconnect(); mv.disconnect(); ro.observe(ask); if (v) { ro.observe(v); mv.observe(v, { attributes: true, attributeFilter: ['style', 'hidden'] }); } } h(); };
     if (window.ResizeObserver) ro = new ResizeObserver(h);
     new MutationObserver(lier).observe(document.body, { childList: true }); lier(); window.addEventListener('resize', h);
   }

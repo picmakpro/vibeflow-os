@@ -54,7 +54,9 @@ await executer(chrome, async (s) => {
     const cadres = [...document.querySelectorAll('.tour-target')].filter((e) => !e.classList.contains('lit')).map((e) => ({ r: R(e), contour: getComputedStyle(e).outlineStyle, fond: getComputedStyle(e).backgroundColor }));
     const hl = SC.state.chipEls ? [...SC.state.chipEls.values()].filter((g) => g.classList.contains('hl')).map((g) => R(g)) : [];
     const bt = document.getElementById('tour-btn'), btr = bt ? R(bt) : null;
-    return { croix: x ? x.getAttribute('aria-label') : null, carte: { l: Math.round(cr.l), r: Math.round(cr.r), b: Math.round(cr.b), w: Math.round(cr.w) }, ecran: [innerWidth, innerHeight],
+    const tb = card.querySelector('.tb'), tf = card.querySelector('.tf'), zr = document.getElementById('zoom').getBoundingClientRect(), pa = document.querySelector('.vf-term-pastille'), par = pa ? pa.getBoundingClientRect() : null;
+    const lisible = { texteEntier: tb.scrollHeight <= tb.clientHeight + 1, texteBas: Math.round(R(tb).b), boutonsHaut: Math.round(R(tf).t), carteH: Math.round(cr.h), carteHaut: Math.round(cr.t), zoomBas: Math.round(zr.bottom), pastille: !!par && par.width > 0 && !pa.hidden, pastilleHaut: par ? Math.round(par.top) : null };
+    return { lisible, croix: x ? x.getAttribute('aria-label') : null, carte: { l: Math.round(cr.l), r: Math.round(cr.r), b: Math.round(cr.b), w: Math.round(cr.w) }, ecran: [innerWidth, innerHeight],
       repere: spans.map((e) => e.t).join(' | '), repereHauteurs: spans.map((e) => e.h), litBoutons: lit.length, litSurTour: !!btr && lit.some((l) => Math.abs(l.l - btr.l) < 2 && Math.abs(l.w - btr.w) < 2),
       cadreSurTitre: cadres.some((c) => Math.abs(c.r.l - ctx.l) < 2 && Math.abs(c.r.w - ctx.w) < 2 && (c.contour !== 'none')),
       contours: cadres.map((c) => c.contour), cartesEclairees: hl.length, largeurCartes: hl.map((r) => Math.round(r.w)), dansFenetre: hl.every((r) => r.l >= 0 && r.r <= innerWidth && r.t >= 0 && r.b <= innerHeight) };
