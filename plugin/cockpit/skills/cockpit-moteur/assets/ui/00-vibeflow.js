@@ -209,12 +209,14 @@
       const c = V.counts;
       // « Maintenant » : seulement les champs connus (un lab sans STATE.md n'a ni jalon, ni phase, ni statut)
       const desc = V.lastDesc || '';
+      // M7a (décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée) : la description se coupe au mot entier (même algorithme que clipMot du planning), jamais « … le vr… »
+      const coupeMot = (t, n) => { t = String(t ?? '').replace(/\s+/g, ' ').trim(); if (t.length <= n) return t; let c = t.slice(0, n - 1); if (/\S/.test(c.at(-1)) && /\S/.test(t[n - 1])) { const m = c.replace(/\s*\S+$/, ''); if (m) c = m; } return c.replace(/[\s,;:·(–—-]+$/, '') + '…'; };
       // PU-G-093 : l'état de la phase courante est celui de sa carte (V.phaseEtat, calculé sur les fichiers de la phase) ; STATE.md ne sert que de repli quand la phase est introuvable, et le bloc dit quand il s'en écarte
       const eu = V.phaseEtat && Object.prototype.hasOwnProperty.call(ETAT_UI, V.phaseEtat) ? ETAT_UI[V.phaseEtat] : null;
       const pastille = eu ? `<span class="vst ${eu[0]}">${eu[1]}</span>` : statut(V.status) ? `<span class="vst vst-${V.status === 'closed' ? 'done' : 'active'}">${h(statut(V.status))}</span>` : '';
       const perime = eu && V.stateStale && statut(V.status) ? `<div style="margin-top:var(--sp-6);color:var(--text-3);font-size:12px">STATE.md semble périmé : il dit « ${h(statut(V.status))} ». La carte fait foi ; mettez STATE.md à jour à la fin de la phase.</div>` : '';
       const now = V.milestone || V.phase || V.status
-        ? `<div class="vf-now" style="margin-top:var(--sp-12)"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${pastille}${perime}${desc ? `<div style="margin-top:var(--sp-6);color:var(--text-3);font-size:12px">${h(desc.slice(0, 260))}${desc.length > 260 ? '…' : ''}</div>` : ''}</div>`
+        ? `<div class="vf-now" style="margin-top:var(--sp-12)"><b>Maintenant${V.milestone ? ' · ' + h(V.milestone) : ''}</b>${V.phase ? `Phase ${h(V.phase)}${V.phaseName ? ' — ' + h(V.phaseName) : ''} ` : ''}${pastille}${perime}${desc ? `<div style="margin-top:var(--sp-6);color:var(--text-3);font-size:12px">${h(coupeMot(desc, 260))}</div>` : ''}</div>`
         : '';
       // PU-G-107 : l'aide de navigation est en haut du panneau, sous le titre (elle était tout en bas, sous les jalons, hors de vue)
       return `<div class="sec"><h2 class="pt">${h(G.project.name)}</h2>
