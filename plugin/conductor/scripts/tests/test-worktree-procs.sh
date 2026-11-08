@@ -293,6 +293,20 @@ cas_proc_priv() { # Linux : même uid, cwd refusé, cause PROUVÉE (capacités s
   assert_eq "stop : note une seule fois" 1 "$(printf '%s\n' "$ERR" | grep -c 'note — 1 processus')" || return 1
   tuer_tout
 }
+cas_proc_nondump() { # Linux : même uid, /proc/<pid> à nous mais entrées (environ) à root = non dumpable -> ignoré et nommé ; avec CAP_SYS_PTRACE -> rc 4
+  [ -r /proc/self/cwd ] || { SKIP=1; return 0; }
+  [ -e /etc/hosts ] && [ ! -O /etc/hosts ] || { SKIP=1; return 0; }   # fixture : un fichier qui n'est pas à nous
+  cible nd; fake_readlink; leurre "$CIB"; leurre "$TMP/nd/hors"; local x=$LP
+  mkdir -p "$TMP/stfx3/$x" "$TMP/stfx3/self"; ln -sf /etc/hosts "$TMP/stfx3/$x/environ"
+  printf 'CapPrm:\t0000000000000000\n' > "$TMP/stfx3/self/status"
+  OUT="$(PATH="$TMP/fakerl:$PATH" WTP_FAIL_PID=$x VF_WTP_STATUS_DIR="$TMP/stfx3" bash "$1" list --path="$CIB" 2>"$TMP/err")"; RC=$?; ERR="$(cat "$TMP/err")"
+  assert_eq "non dumpable ignoré : list rc" 1 "$RC" || return 1
+  assert_eq "non dumpable nommé pid:cmdline" 1 "$(printf '%s\n' "$ERR" | grep -c "note — 1 processus.*$x:sleep")" || return 1
+  printf 'CapPrm:\t0000000000080000\n' > "$TMP/stfx3/self/status"
+  OUT="$(PATH="$TMP/fakerl:$PATH" WTP_FAIL_PID=$x VF_WTP_STATUS_DIR="$TMP/stfx3" bash "$1" list --path="$CIB" 2>"$TMP/err")"; RC=$?; ERR="$(cat "$TMP/err")"
+  assert_eq "non dumpable avec CAP_SYS_PTRACE : rc" 4 "$RC" || return 1
+  tuer_tout
+}
 cas_proc_ptrace() { # Linux : si NOUS avons CAP_SYS_PTRACE (bit 19), la preuve « plus privilégié » est inapplicable -> rc 4
   [ -r /proc/self/cwd ] || { SKIP=1; return 0; }
   cible pt; fake_readlink; leurre "$CIB"; leurre "$TMP/pt/hors"; local x=$LP
@@ -346,7 +360,7 @@ cas_survivants() { # rc 2 : signaux neutralisés, le leurre reste -> survivants 
 }
 
 SKIP=0
-CASES="liste_arret frere hors hors_stop appelant plafond sigkill indet_aucune indet_vide refus_absolu refus_dotdot refus_inexistant refus_composants refus_home refus_ancetre stop_refus_reel usage m1_accent m1_sans_locale m1_caracteres m2_partiel m3_ps m1_casse m2_git famille vivant_sans_ps proc_priv proc_ptrace proc_inexplique proc_ancetre m3_lsof_bloque comm survivants"
+CASES="liste_arret frere hors hors_stop appelant plafond sigkill indet_aucune indet_vide refus_absolu refus_dotdot refus_inexistant refus_composants refus_home refus_ancetre stop_refus_reel usage m1_accent m1_sans_locale m1_caracteres m2_partiel m3_ps m1_casse m2_git famille vivant_sans_ps proc_priv proc_nondump proc_ptrace proc_inexplique proc_ancetre m3_lsof_bloque comm survivants"
 [ -n "${WTP_SEUL:-}" ] && CASES="$WTP_SEUL"
 echo "== test-worktree-procs =="
 for c in $CASES; do
@@ -387,8 +401,10 @@ mutant casse          m1_casse         -e 's/ || { indet casse[^}]*}   # GARDE:c
 mutant famille-nom    famille          -e '/# GARDE:famille-nom/d'
 mutant famille-git    famille          -e 's/\[ ! -e "\$g" \] || refus "englobe un autre dépôt ou worktree"/:/'
 mutant famille-git-2n famille          -e 's|for g in "\$P"/\*/.git "\$P"/\*/\*/.git; do|for g in "$P"/*/.git; do|'
-mutant privilegie     proc_priv        -e 's/if plus_privilegie "\$pid"; then/if false; then/'
-mutant ptrace         proc_ptrace      -e '/# GARDE:ptrace/d'
+mutant privilegie     proc_priv        -e 's/if plus_privilegie "\$pid" ||/if false ||/'
+mutant non-dumpable   proc_nondump     -e 's/ || non_dumpable "\$d" "\$pid"//'
+mutant ptrace-nd      proc_nondump     -e '/# GARDE:ptrace-nd$/d'
+mutant ptrace         proc_ptrace      -e '/# GARDE:ptrace$/d'
 mutant proc-illisible proc_inexplique  -e 's/; return 4   # GARDE:proc-illisible/; continue   # GARDE:proc-illisible/'
 mutant ancetre-ignore proc_ancetre     -e '/# GARDE:ancetre-ignore/d'
 mutant vivant         vivant_sans_ps   -e '/# GARDE:vivant/d'

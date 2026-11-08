@@ -19,6 +19,8 @@
 # Détection : macOS `lsof -a -d cwd -Fpn` ; Linux /proc/<pid>/cwd. Aucune méthode, ou lecture vide :
 # code 4 « indéterminé », JAMAIS « 0 trouvé ».
 # Limite : le canari prouve que la lecture contient le script lui-même, pas qu'elle est complète.
+# Deux causes prouvées de cwd refusé (même uid) : capacités supérieures, ou processus non dumpable ; trou documenté :
+# un tel processus réellement dans la cible n'est pas vu (il est nommé, pas arrêté).
 # Les processus exclus « plus privilégiés » restent tuables mais invisibles : ils sont nommés (pid:cmdline) sur stderr,
 # UNE fois par appel, pour audit ; le manager les porte à son rapport. Sans CAP_SYS_PTRACE seulement : avec elle, indéterminé.
 # Réglages de test : VF_WTP_METHODE=lsof|proc|aucune (détection) · VF_WTP_PPID=ps|proc (lecture des parents) ·
@@ -125,10 +127,10 @@ detect() {
         [ "$st" = Z ] && continue                    # zombie : plus de cwd
         [ -e "$d" ] || continue
         grep -qx "$pid" "$excl_file" && continue     # GARDE:ancetre-ignore : le script et ses ancêtres ne sont jamais signalés
-        # Même uid mais cwd refusé : le noyau (ptrace_may_access) exige que les capacités permises de la cible soient
-        # incluses dans les nôtres. Cause PROUVÉE par /proc/<pid>/status : on ne gère que ce que le noyau nous laisse
-        # inspecter (même périmètre que les autres uid), signalé par une note. Cause non prouvée (LSM, autre) = rc 4.
-        if plus_privilegie "$pid"; then nb_np=$((nb_np+1)); np_list="$np_list $pid:$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null | cut -c1-40 | tr ' ' '_')"; continue; fi   # GARDE:privilegie
+        # Même uid mais cwd refusé. Deux causes PROUVÉES par le noyau (plus_privilegie : capacités permises supérieures ;
+        # non_dumpable : entrées de /proc/<pid> à root) : on ne gère que ce que le noyau nous laisse inspecter (même
+        # périmètre que les autres uid), signalé et nommé par une note. Cause non prouvée (LSM, autre) = rc 4.
+        if plus_privilegie "$pid" || non_dumpable "$d" "$pid"; then nb_np=$((nb_np+1)); np_list="$np_list $pid:$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null | cut -c1-40 | tr ' ' '_')"; continue; fi   # GARDE:preuves
         indet proc-illisible "pid $pid (uid identique) : cwd illisible sans cause prouvée, état [$st], cmd [$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null | cut -c1-60)]"; return 4   # GARDE:proc-illisible
       done
       if [ "$nb_np" -gt 0 ] && [ -z "${NP_NOTED:-}" ]; then   # une seule fois par appel
@@ -157,6 +159,18 @@ plus_privilegie() { # 0 si CapPrm(cible) n'est pas inclus dans CapPrm(script) : 
   # un refus a une autre cause, la preuve est inapplicable -> le pid reste indéterminé (rc 4).
   [ -n "$m" ] && [ $(( (16#$m >> 19) & 1 )) -eq 0 ] || return 1   # GARDE:ptrace
   [ -n "$t" ] && [ -n "$m" ] && [ $(( 16#$t & ~(16#$m) )) -ne 0 ]
+}
+
+# Second motif PROUVÉ : processus NON dumpable (prctl PR_SET_DUMPABLE 0 : (sd-pam), ssh-agent, gpg-agent). Le noyau
+# (task_dump_owner) laisse /proc/<pid> lui-même à l'uid réel — c'est pourquoi `-O "$d"` le classe « même uid » — mais fait
+# appartenir ses ENTRÉES (environ, cwd…) à root. Preuve : l'entrée environ n'est pas à nous. Sans CAP_SYS_PTRACE seulement.
+non_dumpable() { # non_dumpable <dir /proc/pid> <pid>
+  local e="${VF_WTP_STATUS_DIR:-/nonexistent}/$2/environ" m
+  [ -e "$e" ] || e="$1/environ"
+  [ -e "$e" ] && [ ! -O "$e" ] || return 1
+  m="$(capprm_of self)"; case "$m" in ""|*[!0-9a-fA-F]*) return 1 ;; esac
+  [ $(( (16#$m >> 19) & 1 )) -eq 0 ] || return 1   # GARDE:ptrace-nd
+  return 0
 }
 
 # parent d'un PID : /proc sous Linux, ps sinon (VF_WTP_PPID force)
