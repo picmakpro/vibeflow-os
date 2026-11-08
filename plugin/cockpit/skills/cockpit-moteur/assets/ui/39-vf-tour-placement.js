@@ -53,8 +53,12 @@
       const gauche = tr && !feuille ? Math.max(Math.round(tr.right + 8), colonne) : 0;
       const panneau = obs.find((o) => o.n === '#panel' && o.left > gauche);
       const libre = (panneau ? panneau.left : innerWidth) - 8 - gauche;
-      // J1 : une fenêtre basse laisse, À DROITE du bloc titre (entre lui et le panneau ou le bord), la plus grande place libre : 4e côté, borné par l'en-tête seul
-      const droiteTitre = !!tr && !feuille && tr.left < 60 && libre >= 160;
+      // J1 : une fenêtre basse laisse, À DROITE du bloc titre (entre lui et le panneau ou le bord), la plus grande place libre : 4e côté, borné par l'en-tête seul.
+      // Il ne sert QUE dans une fenêtre basse (revue finale, M-A) : aux tailles normales la place habituelle (en bas à gauche) ne recouvre rien, et ce côté, noté 10 là où le bas à gauche paie son éloignement de
+      // la place habituelle (|b - 76| = 39 px et plus), la déplaçait sans raison (1 440 x 900 : de 16,519 à 285,557, et la caméra de la carte bougeait avec). La borne est celle de la règle @media de la carte
+      // (max-height: 480px, 40-tour.js) : ce qui compte comme « fenêtre basse » pour le contenu de la carte compte aussi pour sa place ; un nombre de plus n'est pas introduit.
+      const basse = innerHeight <= 480;
+      const droiteTitre = basse && !!tr && !feuille && tr.left < 60 && libre >= 160;
       // px comptés autour de chaque surface : bordures et arrondis que la boîte de mise en page ne montre pas (6 faisait choisir des cartes inutilement étroites)
       const G6 = 2;
       const area = (a, b) => Math.max(0, Math.min(a.right, b.right + G6) - Math.max(a.left, b.left - G6)) * Math.max(0, Math.min(a.bottom, b.bottom + G6) - Math.max(a.top, b.top - G6));
