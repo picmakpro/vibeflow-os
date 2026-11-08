@@ -19,6 +19,8 @@
 # Détection : macOS `lsof -a -d cwd -Fpn` ; Linux /proc/<pid>/cwd. Aucune méthode, ou lecture vide :
 # code 4 « indéterminé », JAMAIS « 0 trouvé ».
 # Limite : le canari prouve que la lecture contient le script lui-même, pas qu'elle est complète.
+# Les processus exclus « plus privilégiés » restent tuables mais invisibles : ils sont nommés (pid:cmdline) sur stderr,
+# UNE fois par appel, pour audit ; le manager les porte à son rapport. Sans CAP_SYS_PTRACE seulement : avec elle, indéterminé.
 # Réglages de test : VF_WTP_METHODE=lsof|proc|aucune (détection) · VF_WTP_PPID=ps|proc (lecture des parents) ·
 # VF_WTP_LOCALE=aucune (simule l'absence de locale UTF-8) · VF_WTP_ECHEANCE=<s> (échéance lsof) ·
 # VF_WTP_SANS_SIGNAL=1 (n'envoie aucun signal : seule direction sûre) · VF_WTP_STATUS_DIR (status de test par pid).
@@ -112,7 +114,7 @@ detect() {
       LC_ALL=C awk '/^p/{pid=substr($0,2)} /^n/{print pid "\t" substr($0,2)}' "$out.raw" > "$out"
       ;;
     proc)
-      local d pid c st nb_np=0
+      local d pid c st nb_np=0 np_list=""
       for d in /proc/[0-9]*; do
         pid="${d#/proc/}"
         c="$(readlink "$d/cwd" 2>/dev/null)"
@@ -126,10 +128,13 @@ detect() {
         # Même uid mais cwd refusé : le noyau (ptrace_may_access) exige que les capacités permises de la cible soient
         # incluses dans les nôtres. Cause PROUVÉE par /proc/<pid>/status : on ne gère que ce que le noyau nous laisse
         # inspecter (même périmètre que les autres uid), signalé par une note. Cause non prouvée (LSM, autre) = rc 4.
-        if plus_privilegie "$pid"; then nb_np=$((nb_np+1)); continue; fi   # GARDE:privilegie
+        if plus_privilegie "$pid"; then nb_np=$((nb_np+1)); np_list="$np_list $pid:$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null | cut -c1-40 | tr ' ' '_')"; continue; fi   # GARDE:privilegie
         indet proc-illisible "pid $pid (uid identique) : cwd illisible sans cause prouvée, état [$st], cmd [$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null | cut -c1-60)]"; return 4   # GARDE:proc-illisible
       done
-      [ "$nb_np" -eq 0 ] || echo "worktree-procs: note — $nb_np processus du même uid, plus privilégiés que nous, non inspectables : hors périmètre" >&2
+      if [ "$nb_np" -gt 0 ] && [ -z "${NP_NOTED:-}" ]; then   # une seule fois par appel
+        NP_NOTED=1
+        echo "worktree-procs: note — $nb_np processus du même uid, plus privilégiés que nous, non inspectables : hors périmètre (pid:cmdline) :$np_list" >&2
+      fi
       ;;
     *) indet methode "aucune méthode de détection (VF_WTP_METHODE=$m)"; return 4 ;;
   esac
@@ -139,14 +144,18 @@ detect() {
 }
 
 # capacités permises (hex) d'un pid ; VF_WTP_STATUS_DIR/<pid>/status prime s'il existe (test)
-capprm_of() {
+capprm_of() { # capprm_of <pid|self>
+  local id="$1"; [ "$id" = self ] && id="$$"
   local f="${VF_WTP_STATUS_DIR:-/nonexistent}/$1/status"
-  [ -r "$f" ] || f="/proc/$1/status"
+  [ -r "$f" ] || f="/proc/$id/status"
   sed -n 's/^CapPrm:[[:space:]]*//p' "$f" 2>/dev/null | head -1
 }
 plus_privilegie() { # 0 si CapPrm(cible) n'est pas inclus dans CapPrm(script) : le noyau nous refuse alors l'inspection
-  local t m; t="$(capprm_of "$1")"; m="$(capprm_of "$$")"
+  local t m; t="$(capprm_of "$1")"; m="$(capprm_of self)"
   case "$t$m" in *[!0-9a-fA-F]*|"") return 1 ;; esac
+  # cap_ptrace_access_check n'oppose CapPrm(cible) ⊄ CapPrm(appelant) que SANS CAP_SYS_PTRACE (bit 19) : avec elle,
+  # un refus a une autre cause, la preuve est inapplicable -> le pid reste indéterminé (rc 4).
+  [ -n "$m" ] && [ $(( (16#$m >> 19) & 1 )) -eq 0 ] || return 1   # GARDE:ptrace
   [ -n "$t" ] && [ -n "$m" ] && [ $(( 16#$t & ~(16#$m) )) -ne 0 ]
 }
 

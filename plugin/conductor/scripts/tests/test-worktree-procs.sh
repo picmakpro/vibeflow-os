@@ -287,7 +287,20 @@ cas_proc_priv() { # Linux : même uid, cwd refusé, cause PROUVÉE (capacités s
   OUT="$(PATH="$TMP/fakerl:$PATH" WTP_FAIL_PID=$x VF_WTP_STATUS_DIR="$TMP/stfx" bash "$1" list --path="$CIB" 2>"$TMP/err")"; RC=$?; ERR="$(cat "$TMP/err")"
   assert_eq "list avec un processus plus privilégié illisible rc" 1 "$RC" || return 1
   assert_eq "seul le leurre de la cible est listé" 1 "$(printf '%s\n' "$OUT" | grep -c .)" || return 1
-  assert_eq "note émise" 1 "$(printf '%s\n' "$ERR" | grep -c 'note — 1 processus')" || return 1
+  assert_eq "note émise une seule fois" 1 "$(printf '%s\n' "$ERR" | grep -c 'note — 1 processus')" || return 1
+  assert_eq "exclu nommé pid:cmdline" 1 "$(printf '%s\n' "$ERR" | grep -c "$x:sleep")" || return 1
+  VF_WTP_STATUS_DIR="$TMP/stfx" PATH="$TMP/fakerl:$PATH" WTP_FAIL_PID=$x run "$1" stop --path="$CIB"
+  assert_eq "stop : note une seule fois" 1 "$(printf '%s\n' "$ERR" | grep -c 'note — 1 processus')" || return 1
+  tuer_tout
+}
+cas_proc_ptrace() { # Linux : si NOUS avons CAP_SYS_PTRACE (bit 19), la preuve « plus privilégié » est inapplicable -> rc 4
+  [ -r /proc/self/cwd ] || { SKIP=1; return 0; }
+  cible pt; fake_readlink; leurre "$CIB"; leurre "$TMP/pt/hors"; local x=$LP
+  mkdir -p "$TMP/stfx2/$x" "$TMP/stfx2/self"
+  printf 'CapPrm:\tffffffffffffffff\n' > "$TMP/stfx2/$x/status"; printf 'CapPrm:\t0000000000080000\n' > "$TMP/stfx2/self/status"
+  OUT="$(PATH="$TMP/fakerl:$PATH" WTP_FAIL_PID=$x VF_WTP_STATUS_DIR="$TMP/stfx2" bash "$1" list --path="$CIB" 2>"$TMP/err")"; RC=$?; ERR="$(cat "$TMP/err")"
+  assert_eq "avec CAP_SYS_PTRACE, cwd refusé = indéterminé rc" 4 "$RC" || return 1
+  assert_eq "garde nommée" 1 "$(printf '%s\n' "$ERR" | grep -c 'indéterminé — proc-illisible')" || return 1
   tuer_tout
 }
 cas_proc_inexplique() { # Linux : même uid, cwd refusé SANS cause prouvée -> rc 4 nommant la garde
@@ -333,7 +346,7 @@ cas_survivants() { # rc 2 : signaux neutralisés, le leurre reste -> survivants 
 }
 
 SKIP=0
-CASES="liste_arret frere hors hors_stop appelant plafond sigkill indet_aucune indet_vide refus_absolu refus_dotdot refus_inexistant refus_composants refus_home refus_ancetre stop_refus_reel usage m1_accent m1_sans_locale m1_caracteres m2_partiel m3_ps m1_casse m2_git famille vivant_sans_ps proc_priv proc_inexplique proc_ancetre m3_lsof_bloque comm survivants"
+CASES="liste_arret frere hors hors_stop appelant plafond sigkill indet_aucune indet_vide refus_absolu refus_dotdot refus_inexistant refus_composants refus_home refus_ancetre stop_refus_reel usage m1_accent m1_sans_locale m1_caracteres m2_partiel m3_ps m1_casse m2_git famille vivant_sans_ps proc_priv proc_ptrace proc_inexplique proc_ancetre m3_lsof_bloque comm survivants"
 [ -n "${WTP_SEUL:-}" ] && CASES="$WTP_SEUL"
 echo "== test-worktree-procs =="
 for c in $CASES; do
@@ -375,6 +388,7 @@ mutant famille-nom    famille          -e '/# GARDE:famille-nom/d'
 mutant famille-git    famille          -e 's/\[ ! -e "\$g" \] || refus "englobe un autre dépôt ou worktree"/:/'
 mutant famille-git-2n famille          -e 's|for g in "\$P"/\*/.git "\$P"/\*/\*/.git; do|for g in "$P"/*/.git; do|'
 mutant privilegie     proc_priv        -e 's/if plus_privilegie "\$pid"; then/if false; then/'
+mutant ptrace         proc_ptrace      -e '/# GARDE:ptrace/d'
 mutant proc-illisible proc_inexplique  -e 's/; return 4   # GARDE:proc-illisible/; continue   # GARDE:proc-illisible/'
 mutant ancetre-ignore proc_ancetre     -e '/# GARDE:ancetre-ignore/d'
 mutant vivant         vivant_sans_ps   -e '/# GARDE:vivant/d'
