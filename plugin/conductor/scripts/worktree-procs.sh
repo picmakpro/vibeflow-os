@@ -116,7 +116,7 @@ detect() {
       LC_ALL=C awk '/^p/{pid=substr($0,2)} /^n/{print pid "\t" substr($0,2)}' "$out.raw" > "$out"
       ;;
     proc)
-      local d pid c st nb_np=0 np_list=""
+      local d pid c st cause nb_np=0 np_list=""
       for d in /proc/[0-9]*; do
         pid="${d#/proc/}"
         c="$(readlink "$d/cwd" 2>/dev/null)"
@@ -130,12 +130,15 @@ detect() {
         # Même uid mais cwd refusé. Deux causes PROUVÉES par le noyau (plus_privilegie : capacités permises supérieures ;
         # non_dumpable : entrées de /proc/<pid> à root) : on ne gère que ce que le noyau nous laisse inspecter (même
         # périmètre que les autres uid), signalé et nommé par une note. Cause non prouvée (LSM, autre) = rc 4.
-        if plus_privilegie "$pid" || non_dumpable "$d" "$pid"; then nb_np=$((nb_np+1)); np_list="$np_list $pid:$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null | cut -c1-40 | tr ' ' '_')"; continue; fi   # GARDE:preuves
+        cause=""
+        if plus_privilegie "$pid"; then cause=capacités; fi   # GARDE:privilegie
+        if [ -z "$cause" ] && non_dumpable "$d" "$pid"; then cause=non-dumpable; fi   # GARDE:nondump
+        if [ -n "$cause" ]; then nb_np=$((nb_np+1)); np_list="$np_list $pid:$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null | cut -c1-40 | tr ' ' '_')($cause)"; continue; fi
         indet proc-illisible "pid $pid (uid identique) : cwd illisible sans cause prouvée, état [$st], cmd [$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null | cut -c1-60)]"; return 4   # GARDE:proc-illisible
       done
       if [ "$nb_np" -gt 0 ] && [ -z "${NP_NOTED:-}" ]; then   # une seule fois par appel
         NP_NOTED=1
-        echo "worktree-procs: note — $nb_np processus du même uid, plus privilégiés que nous, non inspectables : hors périmètre (pid:cmdline) :$np_list" >&2
+        echo "worktree-procs: note — $nb_np processus du même uid, non inspectables (capacités supérieures ou non dumpable, cause par pid) : hors périmètre (pid:cmdline(cause)) :$np_list" >&2
       fi
       ;;
     *) indet methode "aucune méthode de détection (VF_WTP_METHODE=$m)"; return 4 ;;

@@ -287,10 +287,10 @@ cas_proc_priv() { # Linux : même uid, cwd refusé, cause PROUVÉE (capacités s
   OUT="$(PATH="$TMP/fakerl:$PATH" WTP_FAIL_PID=$x VF_WTP_STATUS_DIR="$TMP/stfx" bash "$1" list --path="$CIB" 2>"$TMP/err")"; RC=$?; ERR="$(cat "$TMP/err")"
   assert_eq "list avec un processus plus privilégié illisible rc" 1 "$RC" || return 1
   assert_eq "seul le leurre de la cible est listé" 1 "$(printf '%s\n' "$OUT" | grep -c .)" || return 1
-  assert_eq "note émise une seule fois" 1 "$(printf '%s\n' "$ERR" | grep -c 'note — 1 processus')" || return 1
-  assert_eq "exclu nommé pid:cmdline" 1 "$(printf '%s\n' "$ERR" | grep -c "$x:sleep")" || return 1
+  assert_eq "une seule note (les exclus réels du runner s'y ajoutent)" 1 "$(printf '%s\n' "$ERR" | grep -c 'worktree-procs: note —')" || return 1
+  assert_eq "le leurre est nommé pid:cmdline(capacités)" 1 "$(printf '%s\n' "$ERR" | grep -c "$x:sleep[^ ]*(capacités)")" || return 1
   VF_WTP_STATUS_DIR="$TMP/stfx" PATH="$TMP/fakerl:$PATH" WTP_FAIL_PID=$x run "$1" stop --path="$CIB"
-  assert_eq "stop : note une seule fois" 1 "$(printf '%s\n' "$ERR" | grep -c 'note — 1 processus')" || return 1
+  assert_eq "stop : une seule note" 1 "$(printf '%s\n' "$ERR" | grep -c 'worktree-procs: note —')" || return 1
   tuer_tout
 }
 cas_proc_nondump() { # Linux : même uid, /proc/<pid> à nous mais entrées (environ) à root = non dumpable -> ignoré et nommé ; avec CAP_SYS_PTRACE -> rc 4
@@ -301,16 +301,26 @@ cas_proc_nondump() { # Linux : même uid, /proc/<pid> à nous mais entrées (env
   printf 'CapPrm:\t0000000000000000\n' > "$TMP/stfx3/self/status"
   OUT="$(PATH="$TMP/fakerl:$PATH" WTP_FAIL_PID=$x VF_WTP_STATUS_DIR="$TMP/stfx3" bash "$1" list --path="$CIB" 2>"$TMP/err")"; RC=$?; ERR="$(cat "$TMP/err")"
   assert_eq "non dumpable ignoré : list rc" 1 "$RC" || return 1
-  assert_eq "non dumpable nommé pid:cmdline" 1 "$(printf '%s\n' "$ERR" | grep -c "note — 1 processus.*$x:sleep")" || return 1
+  assert_eq "non dumpable nommé pid:cmdline" 1 "$(printf '%s\n' "$ERR" | grep -c "$x:sleep[^ ]*(non-dumpable)")" || return 1
   printf 'CapPrm:\t0000000000080000\n' > "$TMP/stfx3/self/status"
   OUT="$(PATH="$TMP/fakerl:$PATH" WTP_FAIL_PID=$x VF_WTP_STATUS_DIR="$TMP/stfx3" bash "$1" list --path="$CIB" 2>"$TMP/err")"; RC=$?; ERR="$(cat "$TMP/err")"
   assert_eq "non dumpable avec CAP_SYS_PTRACE : rc" 4 "$RC" || return 1
   tuer_tout
 }
+fixture_illisibles() { # fixture_illisibles <dir> : tout pid réel du runner au cwd illisible (même uid) est déclaré « plus privilégié »
+  local d p
+  for d in /proc/[0-9]*; do
+    p="${d#/proc/}"
+    readlink "$d/cwd" >/dev/null 2>&1 && continue
+    [ -e "$d" ] && [ -O "$d" ] || continue
+    mkdir -p "$1/$p"; printf 'CapPrm:\tffffffffffffffff\n' > "$1/$p/status"
+  done
+}
 cas_proc_ptrace() { # Linux : si NOUS avons CAP_SYS_PTRACE (bit 19), la preuve « plus privilégié » est inapplicable -> rc 4
   [ -r /proc/self/cwd ] || { SKIP=1; return 0; }
   cible pt; fake_readlink; leurre "$CIB"; leurre "$TMP/pt/hors"; local x=$LP
   mkdir -p "$TMP/stfx2/$x" "$TMP/stfx2/self"
+  fixture_illisibles "$TMP/stfx2"   # isole la garde mesurée des processus réels (ex. systemd --user, (sd-pam)) du runner
   printf 'CapPrm:\tffffffffffffffff\n' > "$TMP/stfx2/$x/status"; printf 'CapPrm:\t0000000000080000\n' > "$TMP/stfx2/self/status"
   OUT="$(PATH="$TMP/fakerl:$PATH" WTP_FAIL_PID=$x VF_WTP_STATUS_DIR="$TMP/stfx2" bash "$1" list --path="$CIB" 2>"$TMP/err")"; RC=$?; ERR="$(cat "$TMP/err")"
   assert_eq "avec CAP_SYS_PTRACE, cwd refusé = indéterminé rc" 4 "$RC" || return 1
@@ -401,8 +411,8 @@ mutant casse          m1_casse         -e 's/ || { indet casse[^}]*}   # GARDE:c
 mutant famille-nom    famille          -e '/# GARDE:famille-nom/d'
 mutant famille-git    famille          -e 's/\[ ! -e "\$g" \] || refus "englobe un autre dépôt ou worktree"/:/'
 mutant famille-git-2n famille          -e 's|for g in "\$P"/\*/.git "\$P"/\*/\*/.git; do|for g in "$P"/*/.git; do|'
-mutant privilegie     proc_priv        -e 's/if plus_privilegie "\$pid" ||/if false ||/'
-mutant non-dumpable   proc_nondump     -e 's/ || non_dumpable "\$d" "\$pid"//'
+mutant privilegie     proc_priv        -e 's/if plus_privilegie "\$pid"; then/if false; then/'
+mutant non-dumpable   proc_nondump     -e 's/ \&\& non_dumpable "\$d" "\$pid"/ \&\& false/'
 mutant ptrace-nd      proc_nondump     -e '/# GARDE:ptrace-nd$/d'
 mutant ptrace         proc_ptrace      -e '/# GARDE:ptrace$/d'
 mutant proc-illisible proc_inexplique  -e 's/; return 4   # GARDE:proc-illisible/; continue   # GARDE:proc-illisible/'
