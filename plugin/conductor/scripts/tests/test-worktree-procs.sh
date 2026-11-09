@@ -297,6 +297,7 @@ cas_proc_nondump() { # Linux : même uid, /proc/<pid> à nous mais entrées (env
   [ -r /proc/self/cwd ] || { SKIP=1; return 0; }
   [ -e /etc/hosts ] && [ ! -O /etc/hosts ] || { SKIP=1; return 0; }   # fixture : un fichier qui n'est pas à nous
   cible nd; fake_readlink; leurre "$CIB"; leurre "$TMP/nd/hors"; local x=$LP
+  fixture_illisibles "$TMP/stfx3" nondump   # isole la garde mesurée : tous les exclus réels du runner sont non dumpables par fixture
   mkdir -p "$TMP/stfx3/$x" "$TMP/stfx3/self"; ln -sf /etc/hosts "$TMP/stfx3/$x/environ"
   printf 'CapPrm:\t0000000000000000\n' > "$TMP/stfx3/self/status"
   OUT="$(PATH="$TMP/fakerl:$PATH" WTP_FAIL_PID=$x VF_WTP_STATUS_DIR="$TMP/stfx3" bash "$1" list --path="$CIB" 2>"$TMP/err")"; RC=$?; ERR="$(cat "$TMP/err")"
@@ -307,13 +308,15 @@ cas_proc_nondump() { # Linux : même uid, /proc/<pid> à nous mais entrées (env
   assert_eq "non dumpable avec CAP_SYS_PTRACE : rc" 4 "$RC" || return 1
   tuer_tout
 }
-fixture_illisibles() { # fixture_illisibles <dir> : tout pid réel du runner au cwd illisible (même uid) est déclaré « plus privilégié »
+fixture_illisibles() { # fixture_illisibles <dir> [nondump] : tout pid réel du runner au cwd illisible (même uid) est déclaré
+  # « plus privilégié » (CapPrm), ou, avec nondump, « non dumpable » (environ lié à un fichier qui n'est pas à nous)
   local d p
   for d in /proc/[0-9]*; do
     p="${d#/proc/}"
     readlink "$d/cwd" >/dev/null 2>&1 && continue
     [ -e "$d" ] && [ -O "$d" ] || continue
-    mkdir -p "$1/$p"; printf 'CapPrm:\tffffffffffffffff\n' > "$1/$p/status"
+    mkdir -p "$1/$p"
+    if [ "${2:-}" = nondump ]; then ln -sf /etc/hosts "$1/$p/environ"; else printf 'CapPrm:\tffffffffffffffff\n' > "$1/$p/status"; fi
   done
 }
 cas_proc_ptrace() { # Linux : si NOUS avons CAP_SYS_PTRACE (bit 19), la preuve « plus privilégié » est inapplicable -> rc 4
