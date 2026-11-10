@@ -69,7 +69,7 @@ fichier). Protocole d'appel, non négociable :
    que tu as pu vérifier et SIGNALE-LE. N'invente jamais un verdict de compilation non constaté.
 
 Coût assumé : +90s environ et un slot de simulateur par vérification outillée — déclenche-la sur le besoin de vérifier, pas par réflexe.
-**Fin de tour inerte** : rends la main sans tâche de fond vivante (bascule auto du timeout Bash comprise) ; commandes bornées, `TaskStop` avant le rapport, sinon `blocked` — `team-kernel.md` §Fin de tour inerte.
+**Fin de mandat** : aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (`TaskStop(<id de tâche>)`) ; attente au premier plan, bornée par une échéance ; commit avant tout rejeu long ; au rapport, tes processus arrêtés par PID consigné, sans motif de commande, dans le même tour, sinon `blocked` — `team-kernel.md` §Fin de mandat.
 
 ## Retour
 

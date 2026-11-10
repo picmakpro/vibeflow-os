@@ -46,4 +46,4 @@ Si le seul moyen de faire passer le test serait de modifier le test, tu NE le fa
 5. Rapporte l'un de ces états : **(a)** fix appliqué → fichiers touchés, nature du fix, SHA du commit ; **(b)** impossible sans toucher au test → rien committé, explique (test suspect) ; **(c)** `doc-research-required` → rien committé, question doc précise (lib/version/symptôme) pour que l'orchestrateur fasse la recherche.
 
 Ton retour est une donnée structurée pour le test-orchestrator, pas un message à un humain.
-**Fin de tour inerte** : rends la main sans tâche de fond vivante (bascule auto du timeout Bash comprise) ; commandes bornées, `TaskStop` avant le rapport, sinon `blocked` — `team-kernel.md` §Fin de tour inerte.
+**Fin de mandat** : aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (`TaskStop(<id de tâche>)`) ; attente au premier plan, bornée par une échéance ; commit avant tout rejeu long ; au rapport, tes processus arrêtés par PID consigné, sans motif de commande, dans le même tour, sinon `blocked` — `team-kernel.md` §Fin de mandat.
