@@ -33,3 +33,11 @@ WKTR-02…) ne s'y trouvent pas.
 - **Verdict :** rien à adopter tel quel (pas de benchmark, mono-agent linéaire, le team-kernel est structurellement au-dessus), mais 5 mécanismes à distiller.
 - **Reste à arbitrer (aucun engagé) :** G1 tables « Load / Do NOT Load » (anti-chargement déclaré) ; G2 `CONTEXT.md` par compartiment + `_index.md` de scaling ; G3 sync anti-drift carte↔disque ; G4 lab-starters clonables à placeholders pour `vf-new-lab` (recoupe les items `agency-agents` et « Template d'agent installable ») ; G5 Edit-Source Principle dans la doctrine des managers. Classement levier/coût au §7 du rapport.
 - **Déclencheur de reprise :** la prochaine évolution de `vf-new-lab`, de `scaffold-docs.sh`, du team-kernel ou de la chaîne validator.
+
+## Interfaces de pilotage d'agents de code : quinze outils (investigué 2026-11-10)
+
+- **Rapport :** `.planning/research/2026-11-10-audit-cockpit/A5-veille-pilotage-agents.md` ; synthèse appliquée au § 6 de `.planning/research/2026-11-10-audit-cockpit-etude.md` (audit du cockpit).
+- **Sources :** la vue d'agents et les Projects de Claude Code, Conductor, Cursor 3, Codex, GitHub Agent HQ, Warp Oz, Factory, Devin, Amp, Antigravity, Nimbalyst et Vibe Kanban, Langfuse, Braintrust, zoetrope, agents-observe (liens dans le rapport).
+- **Verdict :** rien à installer. Tous convergent vers une liste d'agents groupée par état ; huit motifs relevés, six repris dans les formes proposées pour le cockpit (régie, frise, fiche d'agent). Cinq angles qu'aucun ne couvre : file d'attente classée par impact, frise du dépôt à horloge commune, radar de collisions, vivacité plutôt que statut, coût par phase et par étage.
+- **Reste à arbitrer :** la revue de diff par agent (rouvre « détail de commit sans diff »), la réponse sur place à une permission (écartée pour l'instant), le plafond de coût par agent ; registre `AUDC-I16`, `AUDC-N1`, `AUDC-I35`.
+- **Déclencheur de reprise :** le cadrage des Phases 73 et 74 du jalon `vibeflow-v2.0`.
