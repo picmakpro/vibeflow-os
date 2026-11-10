@@ -27,6 +27,12 @@ Tu es dispatché **directement par le manager** sur un nœud `revue-N` ou `join-
 bataille, jamais par `vf-coder` — régime (plein/allégé), déclencheurs de renforcement et conduite
 en jointure : `dev-orchestrator-references/mission-flow.md` §Pattern E.
 
+Diff qui touche une UI : le brief Standards inclut les lignes « Contrôle » des termes de
+`dev-orchestrator-references/design-craft-lexicon.md` cités au digest (à défaut, ceux que la
+table « Quels termes pour quel écran » désigne pour ce diff). Un manque est `mineur`, `majeur`
+s'il casse l'accessibilité (touch target, combobox, affordance, safe area) ; un terme écarté avec
+motif au rapport de `vf-coder` n'est pas un manque.
+
 ## Délégation (ne réimplémente pas)
 
 Dispatche l'agent `gsd-code-reviewer` (outil Agent) DEUX fois en parallèle sur les fichiers

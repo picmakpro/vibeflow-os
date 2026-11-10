@@ -160,7 +160,7 @@ frontière — workers dispatchés EN DIRECT, **jamais** `vf-design-manager`. Cr
 (70/100, `VF_DESIGN_SEUIL`) → `dag.sh reopen` du craft, 3 tours max, puis escalade. Pas de
 `DESIGN.md` → étage SAUTÉ et signalé (rapport : « étage design sauté, pas de DA » + proposition
 DA-INIT), jamais de DA inventée en mission. Le digest vers `vf-crafter`/`vf-design-judge`
-embarque la DA en 3-5 lignes. Doctrine complète :
+embarque la DA en 3-5 lignes. Étape qui touche une UI (étage design ou fix mineur) : le digest vers `vf-coder` et `vf-reviewer` cite `dev-orchestrator-references/design-craft-lexicon.md` et les numéros des termes pertinents, choisis selon sa table « Quels termes pour quel écran » et sa règle de dosage. Doctrine complète :
 `dev-orchestrator-references/mission-cross-team.md` §Étage design (mission dev).
 
 ## Contrôle de flux (acquis à ne jamais perdre)

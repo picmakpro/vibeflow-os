@@ -8,6 +8,7 @@
 |---|---|
 | [GSD-PIPELINE.md](GSD-PIPELINE.md) | Doctrine de pipeline GSD complète, chargée on-demand par `vibeflow-head` / `vf-dev-manager` (règle 1%). |
 | [autonomous-guardrails.md](autonomous-guardrails.md) | Garde-fous des boucles autonomes (`vf-auto` et assimilés) : quand une boucle s'arrête d'elle-même. |
+| [design-craft-lexicon.md](design-craft-lexicon.md) | Lexique de craft UI (20 termes : kerning, tabular numbers, layout shift, OKLCH, safe area, stagger…) : définition, application, dosage et contrôle — cité par `vf-dev-manager`, appliqué par `vf-coder`, vérifié par `vf-reviewer`. |
 | [docs-flow.md](docs-flow.md) | Source de vérité de la sortie documentaire : les quatre familles de docs que `vibeflow-head` distingue (DOCF-01→04). |
 | [gsd-capabilities-index.md](gsd-capabilities-index.md) | Index auto-généré des capabilities du moteur GSD — ne pas éditer à la main. |
 | [gsd-skills-index.md](gsd-skills-index.md) | Index auto-généré des skills GSD installés — ne pas éditer à la main. |
