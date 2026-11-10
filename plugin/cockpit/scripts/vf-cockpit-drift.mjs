@@ -25,10 +25,11 @@ const nonComprise = (fichier, x) => ({ regle: 'ligne-non-comprise', niveau: 'ign
 const apostrophes = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 export const commandeCorrectif = (root) => { root = path.resolve(root); return `node ${apostrophes(fileURLToPath(import.meta.url))} ${apostrophes(root)} --diff | git -C ${apostrophes(root)} apply -`; };
 
-export function detectDrift(root, layout) {
+// `lu` : le planning déjà lu par l'appelant (AUDC-H2 : un changement de planning ne le relit pas une seconde fois) ; sans lui, detectDrift le lit comme avant.
+export function detectDrift(root, layout, lu) {
   root = path.resolve(root); layout = layout || planningLayout(root);
   const rel = (abs) => path.relative(root, abs).split(path.sep).join('/');
-  const P = readPlanning(root, layout);
+  const P = lu || readPlanning(root, layout);
   const constats = [];
   for (const c of layout.compartiments || []) {
     const f = path.join(c.dir, 'ROADMAP.md'); const txt = read(f);

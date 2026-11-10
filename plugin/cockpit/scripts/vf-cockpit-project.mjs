@@ -61,8 +61,8 @@ const etatPerime = (status, etat) => !!etat && Object.hasOwn(COMPAT_STATE, Strin
 export function buildProjectGraph(root, { layout } = {}) {
   root = path.resolve(root); layout = layout || planningLayout(root);
   // dérive de format mesurée AVANT la lecture : le panneau propose le correctif au lieu d'une carte vide sans explication
-  let drift; try { drift = detectDrift(root, layout); } catch (e) { drift = { constats: [], resume: `Contrôle de format impossible : ${e.message}`, erreur: true }; }
-  const P = readPlanning(root, layout); const { rel, state, reqs } = P;
+  const P = readPlanning(root, layout); const { rel, state, reqs } = P; // AUDC-H2 : lu UNE fois, le contrôle de format reçoit cette lecture
+  let drift; try { drift = detectDrift(root, layout, P); } catch (e) { drift = { constats: [], resume: `Contrôle de format impossible : ${e.message}`, erreur: true }; }
   P.phases = fusionner(P.phases, lireAilleurs(root)); // N5 : une phase menée dans un worktree du même dépôt prend l'avancement du worktree si elle y est plus avancée
   const { phases } = P;
   const nodes = [], files = [], links = [];

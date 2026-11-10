@@ -86,7 +86,7 @@ export function agentsConnus(root, { fresh = 180, now = Date.now(), home = os.ho
 const rolesDe = (ws) => new Map(ws.filter((w) => w.kind === 'subagent' && typeof w.role === 'string' && w.role).map((w) => [w.id, w.role]));
 
 // collecte interne : les travailleurs gardent `_tr` (chemin du transcript) hors de la sortie publique
-function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 1800, now = Date.now(), home = os.homedir(), scriptsDir } = {}) {
+function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 1800, now = Date.now(), home = os.homedir(), scriptsDir, verrous } = {}) { // AUDC-H2 : `verrous` = le statut déjà lu par l'appelant (un seul appel au verrou par cycle)
   const cx = contexte(root, { fresh, now, home }); root = cx.root;
   const { trees, label } = cx; const sources = {}; const workers = [];
   // 1 + 2 — sessions et sous-agents, en arbre (vf-cockpit-equipe.mjs : fenêtre de 24 h, forme Claude Code lue du contrat)
@@ -103,7 +103,9 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
   if (dl.etat === 'absent') sources.locks = { etat: 'absente' };
   else {
     const DL = dl.chemin; let st = {};
-    try { st = JSON.parse(sh('bash', [DL, 'status', '--all'], root, root)); } catch { sources.locks = { etat: 'erreur' }; }
+    if (verrous && typeof verrous === 'object' && !verrous.error && verrous.available !== false) st = verrous; // lu une fois par le direct : jamais relu ici
+    else if (verrous && verrous.error) sources.locks = { etat: 'erreur' };
+    else try { st = JSON.parse(sh('bash', [DL, 'status', '--all'], root, root)); } catch { sources.locks = { etat: 'erreur' }; }
     st = { ...st, locks: Array.isArray(st?.locks) ? st.locks : st?.present ? [st] : [] }; // lab plat : `status --all` rend l'objet d'UN verrou, sans `locks`
     // ws et phase partent en argument d'un script : grammaire EXACTE de driver-lock.sh, sinon la cible est écartée (champs libres masqués et bornés par collectWho).
     // ws = vf_ws_name_valid (alphanumérique en tête, puis alphanumérique . _ -, jamais `..`) ; phase = vf_dl_phase_valid (chiffres séparés par des points : 69, 41.1, 1.2.3)
