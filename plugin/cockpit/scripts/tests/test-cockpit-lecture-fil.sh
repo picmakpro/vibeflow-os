@@ -32,5 +32,21 @@ console.log(lireDags(lab).map((d) => d.name + '=' + d.file).sort().join(','));
 JS
 assert_eq "D5.1 — les deux nommages sont lus ; un fichier sans nœuds, illisible ou d'un autre nom ne l'est pas" "$(node "$WORK/dags.mjs" "$SCRIPTS" "$LAB")" "essai2=.planning/missions/dag-essai2.json,essai=.planning/missions/essai.dag.json"
 
+# --- D6 : titre par défaut ---
+echo "=== D6 — « New session » n'est pas un nom choisi ==="
+ecrit() { printf '%s\n' "$2" > "$WORK/$1.jsonl"; }
+ecrit defaut '{"type":"custom-title","customTitle":"New session","sessionId":"x"}'
+ecrit choisi '{"type":"custom-title","customTitle":"Ma session de recette","sessionId":"x"}'
+ecrit apres '{"type":"custom-title","customTitle":"Ma session de recette","sessionId":"x"}
+{"type":"custom-title","customTitle":"New session","sessionId":"x"}'
+ecrit genere '{"type":"ai-title","aiTitle":"Titre écrit par le modèle","sessionId":"x"}'
+cat > "$WORK/titre.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const [, , scripts, ...fichiers] = process.argv;
+const { titreSession } = await import(pathToFileURL(scripts + '/vf-cockpit-lecture.mjs').href);
+console.log(fichiers.map((f) => '[' + titreSession(f) + ']').join(''));
+JS
+assert_eq "D6.1 — titre par défaut : aucun titre ; nom choisi : lu ; défaut posé après un nom : aucun titre ; titre généré : jamais lu" "$(node "$WORK/titre.mjs" "$SCRIPTS" "$WORK/defaut.jsonl" "$WORK/choisi.jsonl" "$WORK/apres.jsonl" "$WORK/genere.jsonl")" "[][Ma session de recette][][]"
+
 echo; echo "Résultat : $PASS réussis, $FAIL échoués"
 [ "$FAIL" -eq 0 ]
