@@ -132,3 +132,4 @@
 - [Jeton de suites, attentes orphelines](project_jeton-de-suites-et-attentes-orphelines.md) — sous charge, jeton mkdir une-suite.sh tient ; les until…sleep des workers gèlent sous zsh et survivent à leur fin
 - [Budget de largeur de l'en-tête](feedback_budget-largeur-entete-partage-entre-lots.md) — deux lots disjoints par fichier ont rogné l'en-tête ensemble : responsive sur la branche fusionnée
 - [Jeton de suite de groupe](project_jeton-de-suite-de-groupe.md) — 4 managers en parallèle : baseline complète impossible ; jeton mkdir « une suite à la fois » + worktree parent figé comme ancre
+- [CI sans claude, rendu avant extensions](project_ci-sans-claude-avis-no-engine.md) — rouges Linux de #222 : avis no_engine et fonts.ready précoce, pas pointer: none ; mutants trop étroits après changement d ordre
