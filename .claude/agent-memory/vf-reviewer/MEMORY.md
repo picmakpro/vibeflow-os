@@ -40,3 +40,8 @@
 - [Argument de portee non discrimine (cwd == lab)](feedback_scope-arg-cwd-equals-lab-nondiscriminant.md) — 68-11 : retirer lab:root ne rougit pas path-enfants ; exiger un cas cwd != lab
 - [Env hérité du lab, sonde réelle](feedback_env-herite-lab-settings-sonde-reelle.md) — NODE_OPTIONS via settings.json env charge un fichier du lab ; attribuer le marqueur par PPID (Phase 68)
 - [Nouvel enfant décale les sondes pgrep -P](feedback_new-child-process-shifts-pgrep-first-child-probes.md) — gardien PTY = 1er enfant, session.sh sonde le gardien ; sess= vaut 0 sous macOS
+- [Correctif ReDoS : sonder lookaheads et regex voisines](feedback_redos-fix-probe-lookahead-and-sibling-regex.md) — cockpit parseurs 2026-11-06 : test 6 formes vert, COUPE et parentheses restent quadratiques
+- [Retest d etat ignore le tampon d entree non pousse](feedback_retest-state-ignores-unflushed-input-buffer.md) — Phase 72 ac8cacb7 : balayer les delais de la sonde, pas un seul point
+- [Sonde cockpit : en-tête renommé = 403 partout](feedback_cockpit-sonde-entete-renomme-temoin.md) — x-vf-cockpit-token dans la sortie assemblée ; 200 témoin d'abord (SOBR-04 v2.76.0)
+- [Garde de focus : chemin window focus depuis le parent](feedback_focus-guard-window-focus-path-from-parent.md) — iframe.focus() du parent contourne la garde par bouton (lot 8 LB3-S2)
+- [Drapeau de geste armé périmé](feedback_armed-gesture-flag-stale-until-next-event.md) — pan/Entrée sans évènement laisse le drapeau armé ; rerender rouvre le panneau (lot B, 703afc91)

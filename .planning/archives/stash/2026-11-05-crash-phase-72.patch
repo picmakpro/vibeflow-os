@@ -1,0 +1,674 @@
+diff --git a/plugin/cockpit/scripts/vf-cockpit-server.mjs b/plugin/cockpit/scripts/vf-cockpit-server.mjs
+index e4003add..10f9b490 100644
+--- a/plugin/cockpit/scripts/vf-cockpit-server.mjs
++++ b/plugin/cockpit/scripts/vf-cockpit-server.mjs
+@@ -9,6 +9,7 @@
+ //   GET /api/vf/doing?id=  dernière commande d'UNE session, à la demande (schéma vibeflow/cockpit-doing@1)
+ //   GET /api/vf/transcript?id=  transcript réduit d'UN agent connu (mandat, messages, outils), à la demande (schéma vibeflow/cockpit-transcript@1)
+ //   GET /api/vf/modeles    { modeles, defaut, lab } : liste fermée des modèles, défaut effectif, identifiant du lab
++//   GET /api/vf/lancer/cibles · POST /api/vf/lancer  lancement depuis les cartes (72-09) : servies par vf-cockpit-lancer.mjs, SEULEMENT sous `--terminal` (sinon une route inconnue)
+ // La dernière commande et le transcript ne figurent jamais dans le flux ni dans un fichier : la garde d'émission refuse tout
+ // objet qui porte une clé de la liste `interdits` du contrat (vf-cockpit-interface.json, à côté), à n'importe quelle profondeur.
+ // Contrat illisible ou liste vide : rien n'est émis (fermé par défaut).
+@@ -24,6 +25,7 @@ import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
+ import { buildEquipeGraph } from './vf-cockpit-equipe-carte.mjs';
+ import { answerLocally, instructions } from './vf-cockpit-ask.mjs';
+ import { MODELES, resoudreModele, argsAgent as argsConfines } from './vf-cockpit-agent.mjs';
++import { creerLancer } from './vf-cockpit-lancer.mjs';
+ 
+ let INTERDITS = []; // une seule source : le contrat, lu une fois au chargement
+ try { const l = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json'), 'utf8')).schemas?.['vibeflow/cockpit-who@2']?.interdits; if (Array.isArray(l)) INTERDITS = l.filter((k) => typeof k === 'string' && k); } catch { INTERDITS = []; }
+@@ -39,6 +41,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
+     } catch { pageP = null; GP = null; gabarit = null; }
+   };
+   load();
++  const lancer = creerLancer({ root, here, ptoken, log });
+   if (!INTERDITS.length) log('error', 'contrat illisible : la liste des clés interdites est vide, rien ne sera émis');
+   const dep = resoudreModele({ env: process.env });
+   if (dep.avertissement) log('warn', dep.avertissement);
+@@ -62,12 +65,13 @@ export function attach({ here, root, token, inject, log = () => {} }) {
+   try {
+     live = startLive({ root, sortie: here, log, onEvent: (nom, data) => { if (nom === 'structural' || nom === 'patch') load(); diffuser(nom, data); } });
+   } catch (e) { log('error', `direct indisponible : ${e.message}`); }
++  lancer.sourceWho(() => (live ? live.snapshot().who : null)); // états attendue / vue / terminee des cartes lancées (72-07)
+ 
+   const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
+ 
+   function route(req, res, url) {
+     if (!url.pathname.startsWith('/api/vf/')) return false;
+-    if (req.method !== 'GET') { res.writeHead(405); res.end(); return true; }
++    if (req.method !== 'GET') { if (lancer.reconnait(url)) { lancer.traiter(req, res, url); return true; } res.writeHead(405); res.end(); return true; }
+     if (url.pathname === '/api/vf/events') {
+       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
+       res.write('retry: 1000\n\n');
+@@ -100,6 +104,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
+       json(res, 200, { modeles: MODELES, defaut: dep.modele, lab: crypto.createHash('sha256').update(reel).digest('hex').slice(0, 12) });
+       return true;
+     }
++    if (lancer.get(req, res, url)) return true;
+     res.writeHead(404); res.end(); return true;
+   }
+ 
+@@ -129,7 +134,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
+       const who = live ? live.snapshot().who : null;
+       if (!INTERDITS.length || (who && porteInterdit(who))) { log('error', 'page Équipe refusée : contrat illisible ou contenu interdit'); return null; } // même garde que le flux, fermée par défaut
+       // `nom` : celui que la page Projet affiche (P69-D-33), jamais le nom du dossier
+-      const g = buildEquipeGraph(who, { nom: String(GP?.project?.name || '').replace(/ — Projet$/, '') || GP?.meta?.rootName || path.basename(root), racine: GP?.meta?.root, logos: GP?.meta?.vfLogos });
++      const g = buildEquipeGraph(who, { nom: String(GP?.project?.name || '').replace(/ — Projet$/, '') || GP?.meta?.rootName || path.basename(root), racine: GP?.meta?.root, logos: GP?.meta?.vfLogos, lancees: lancer.lancees() });
+       return insererGraphe(gabarit, g).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Équipe</title>').replace('</head>', () => inject + '</head>');
+     },
+     jetonValide: (j) => typeof j === 'string' && j === ptoken,
+diff --git a/plugin/cockpit/scripts/vf-cockpit-terminal-session.mjs b/plugin/cockpit/scripts/vf-cockpit-terminal-session.mjs
+index 11456a26..be5beadd 100644
+--- a/plugin/cockpit/scripts/vf-cockpit-terminal-session.mjs
++++ b/plugin/cockpit/scripts/vf-cockpit-terminal-session.mjs
+@@ -1,8 +1,10 @@
+ // vf-cockpit-terminal-session — la session unique du terminal intégré : lancement de l'assistant PTY, flux, entrée, taille (71-01).
+-// Export : creerSessions({ engineDir, lab, jetons }) -> { attacher, ecrire, redimensionner, etat, occupe, arreterTout }.
++// Export : creerSessions({ engineDir, lab, jetons }) -> { attacher, ecrire, redimensionner, lancer, etat, occupe, arreterTout }.
+ // Une seule session. L'assistant (vf-cockpit-pty.py de l'arbre du moteur, lancé en mode isolé) ne se lance qu'à la PREMIÈRE attache, jamais avant ; il
+ // n'est jamais détaché : il meurt avec le serveur. Sa sortie (descripteur 1) est le flux ; son descripteur 2 porte l'état (FIN, SIG) et n'est
+ // jamais journalisé ; le descripteur 3 reçoit les tailles. Les messages nomment des états, jamais des données du terminal.
++// Lancement (72-02 ; P72-D-01, D-14) : lancer(ligne, onglet) envoie « L <hex> » à l'assistant, qui revalide seul la ligne et ne l'écrit (sans retour chariot) que si le shell est au repos ; sa réponse « LANCE ok|premier-plan|alphabet|invalide »
++// (descripteur 2) arrive dans l'ordre d'envoi : file FIFO d'attentes, délai de LANCER_DELAI_MS (une attente expirée reste dans la file jusqu'à sa réponse, jamais attribuée à l'appel suivant). Jamais de retour chariot ni de journal de la ligne.
+ // Cycle de vie (71-04 ; P71-D-05, P71-D-19) : un seul onglet propriétaire (autre onglet : 409) ; flux fermé -> état « detachee » et grâce de GRACE_MS ;
+ // retour du même onglet avant l'échéance -> même shell, tampon (TAMPON_MAX octets, MÉMOIRE SEULEMENT) rejoué puis direct ; échéance ou fin du shell -> EOF à
+ // l'assistant (SIGHUP au groupe), tampon vidé. Aucun octet du terminal n'est écrit sur disque ni passé à console.* (TERM-11).
+@@ -19,6 +21,9 @@ const log = (m) => console.error(`vf-cockpit (terminal) : ${m}`);
+ export const TAMPON_MAX = 262144;
+ export const TAILLE_MAX = { lignes: 500, colonnes: 1000 }; // l'unique borne de taille : le serveur (/flux, /taille) et l'assistant PTY (vf-cockpit-pty.py) la tiennent à l'identique
+ export const ENTREE_ATTENTE_MAX = 262144;
++export const LIGNE_MAX = 400; // octets d'une ligne lancée : la même borne que LIGNE_MAX de vf-cockpit-pty.py
++export const LANCER_DELAI_MS = 2000;
++const ATTENTES_MAX = 8;
+ // Fermeture bornée : un assistant qui n'est pas mort FERMETURE_MAX_MS (6 s : grâce interne 3 s + SIGKILL de la session) après l'EOF reçoit SIGTERM ; s'il vit encore
+ // ESCALADE_MS plus tard (SIGTERM n'est qu'un drapeau chez lui, s'il est bloqué dans son arrêt), il reçoit SIGKILL ; ESCALADE_MS après, la place est rendue quoi qu'il arrive :
+ // au plus FERMETURE_MAX_MS + 2 × ESCALADE_MS (8 s) après l'échéance de la grâce, jamais une place prise pour toujours.
+@@ -53,9 +58,11 @@ export function creerSessions({ engineDir, lab, jetons = () => [], env = process
+       if (tete.length <= exces) { tampon.shift(); octets -= tete.length; } else { tampon[0] = tete.subarray(exces); octets -= exces; }
+     }
+   };
++  const finirAttentes = (cible, motif) => { for (const a of cible.attentes.splice(0)) a.finir({ ok: false, motif }); }; // appels en attente d'une réponse : rendus sans attendre le délai
+   const reprendre = (c) => { if (c.pause) { c.pause = false; c.enfant.stdout.resume(); } };
+   const terminer = (cible) => { // l'unique voie de fin : état, flux du client, minuterie, tampon
+     if (cible.etat === 'terminee' || (cible.etat === 'fermeture' && !cible.sorti)) return; // en fermeture, la place n'est rendue qu'à la sortie (réapée) de l'assistant
++    finirAttentes(cible, 'absente');
+     const fermait = cible.etat === 'fermeture';
+     clearTimeout(cible.minuterie); cible.etat = 'terminee';
+     const r = cible.res; cible.res = null; try { r?.end(); } catch {}
+@@ -89,7 +96,7 @@ export function creerSessions({ engineDir, lab, jetons = () => [], env = process
+         cwd: fs.realpathSync(lab), env: envShell(env, [...jetons(), secretShell]), stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+       });
+     } catch { log('python3 est introuvable ou ne se lance pas : le terminal est arrêté.'); return null; }
+-    const cible = { enfant, onglet, res: null, etat: 'vivante', code: null, signal: null, minuterie: null, pause: false, sorti: false };
++    const cible = { enfant, onglet, res: null, etat: 'vivante', code: null, signal: null, minuterie: null, pause: false, sorti: false, attentes: [] };
+     enfant.stdout.on('data', (b) => { // lue même sans flux attaché : le tampon se remplit pendant la grâce
+       if (cible !== s || !actif(cible)) return;
+       ajouter(b);
+@@ -102,6 +109,8 @@ export function creerSessions({ engineDir, lab, jetons = () => [], env = process
+       reste += b.toString('latin1'); let i;
+       while ((i = reste.indexOf('\n')) >= 0) {
+         const l = reste.slice(0, i); reste = reste.slice(i + 1);
++        const lm = /^LANCE (ok|premier-plan|alphabet|invalide)$/.exec(l); // réponse à une ligne « L » : la PREMIÈRE attente (FIFO) la reçoit, même expirée
++        if (lm) { const a = cible.attentes.shift(); if (a) a.finir(lm[1] === 'ok' ? { ok: true } : { ok: false, motif: lm[1] }); }
+         const m = /^(FIN|SIG) (\d{1,3})$/.exec(l);
+         if (m && cible.etat !== 'terminee') { if (m[1] === 'FIN') cible.code = Number(m[2]); else cible.signal = Number(m[2]); }
+       }
+@@ -143,11 +152,25 @@ export function creerSessions({ engineDir, lab, jetons = () => [], env = process
+       try { s.enfant.stdio[3].write(`R ${lignes} ${colonnes}\n`); } catch { return 410; }
+       return 204;
+     },
++    lancer(ligne, onglet) { // une ligne de commande au shell, sans retour chariot, seulement s'il est au repos : { ok:true } ou { ok:false, motif }
++      const c = s, non = (motif) => Promise.resolve({ ok: false, motif });
++      if (!actif(c) || c.onglet !== onglet) return non('absente');
++      if (typeof ligne !== 'string' || ligne.length < 1 || ligne.length > LIGNE_MAX) return non('invalide');
++      if (!/^[\x20-\x7e]+$/.test(ligne)) return non('alphabet'); // transport seulement : l'alphabet fermé et le préfixe sont jugés par l'assistant (revalidation indépendante)
++      if (c.attentes.length >= ATTENTES_MAX) return non('delai');
++      return new Promise((resolve) => {
++        const entree = { fini: false, minuterie: null, finir(r) { if (entree.fini) return; entree.fini = true; clearTimeout(entree.minuterie); resolve(r); } };
++        c.attentes.push(entree);
++        entree.minuterie = setTimeout(() => entree.finir({ ok: false, motif: 'delai' }), LANCER_DELAI_MS);
++        try { c.enfant.stdio[3].write(`L ${Buffer.from(ligne, 'latin1').toString('hex')}\n`); } catch { const i = c.attentes.indexOf(entree); if (i >= 0) c.attentes.splice(i, 1); entree.finir({ ok: false, motif: 'absente' }); }
++      });
++    },
+     etat: () => { const c = s && s.etat !== 'fermeture' ? s : null; return { session: c ? c.etat : 'absente', code: c ? c.code : null, signal: c ? c.signal : null }; },
+     occupe: () => actif(s),
+     arreterTout() {
+       if (!s) return;
+       const c = s; clearTimeout(c.minuterie); c.etat = 'terminee'; try { c.res?.end(); } catch {} c.res = null; vider(); // les flux ouverts sont fermés (P71-D-35)
++      finirAttentes(c, 'absente');
+       try { c.enfant.stdin.end(); } catch {}
+       try { c.enfant.kill('SIGTERM'); } catch {}
+     },
+diff --git a/plugin/cockpit/scripts/vf-cockpit-terminal-tiroir.mjs b/plugin/cockpit/scripts/vf-cockpit-terminal-tiroir.mjs
+index 6e4f6dc8..acf9a153 100644
+--- a/plugin/cockpit/scripts/vf-cockpit-terminal-tiroir.mjs
++++ b/plugin/cockpit/scripts/vf-cockpit-terminal-tiroir.mjs
+@@ -5,14 +5,14 @@
+ import { construireTiroir } from './vf-cockpit-terminal-tiroir-ui.mjs';
+ import { STYLE_TIROIR } from './vf-cockpit-terminal-tiroir-style.mjs';
+ 
+-export const LISTE_MESSAGES = Object.freeze(['ready', 'etat:connecte', 'etat:reconnexion', 'etat:termine', 'etat:refuse', 'etat:expire', 'etat:arrete', 'toggle']);
++export const LISTE_MESSAGES = Object.freeze(['ready', 'etat:connecte', 'etat:reconnexion', 'etat:termine', 'etat:refuse', 'etat:expire', 'etat:arrete', 'toggle', 'proposition']);
+ // mesure O8 (71-06) : allow-popups ouvre une fenêtre dont l'opener est nul ; la décision du manager retient ces cinq jetons, aucun autre (jamais de navigation du haut, ni de formulaire)
+ const SANDBOX = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox';
+ const TEXTES = {
+   pastille: 'Terminal', titre: 'Terminal', ouvrir: 'Ouvrir le terminal (Ctrl+Maj+Espace)', ouvrirEnCours: 'Ouvrir le terminal, une session est en cours',
+   windows: 'Terminal indisponible sous Windows.', localhost: "Ouvrez le cockpit à l'adresse 127.0.0.1 pour utiliser le terminal.",
+   agrandir: 'Agrandir le terminal', reduire: 'Réduire le terminal', fermer: 'Fermer le terminal (Ctrl+Maj+Espace)', poignee: 'Hauteur du terminal',
+-  charge: 'Ouverture du terminal…', injoignable: 'Le terminal ne répond pas. Relancez ', commande: '/vf-cockpit --terminal', annonceOuvert: 'Terminal ouvert', annonceFerme: 'Terminal fermé',
++  charge: 'Ouverture du terminal…', injoignable: 'Le terminal ne répond pas. Relancez ', commande: '/vf-cockpit --terminal', annonceOuvert: 'Terminal ouvert', annonceFerme: 'Terminal fermé', annonceProposition: 'Proposition de lancement dans le terminal.',
+   // table unique état -> libellé de la barre (J1 de la critique 71) : chaque état de la carte de Q a son mot ; « Arrêté » ne sert plus qu'à l'état arrêté
+   etats: { connecte: 'Connecté', reconnexion: 'Reconnexion…', termine: 'Terminé', arrete: 'Arrêté', refuse: 'Déjà ouvert', expire: 'Session expirée' },
+ };
+@@ -139,6 +139,8 @@ function scriptTiroir(cfg, accepte, construire) {
+         const visible = ouvreur && ouvreur !== document.body && document.contains(ouvreur) && !ouvreur.disabled && ouvreur.getClientRects().length > 0;
+         (visible ? ouvreur : d.pastille).focus();
+       };
++      // 72-14 : mot fixe de Q ; ouvrir est idempotent et ne donne jamais le focus au cadre, puis l'annonce seule est dite
++      const proposer = () => { ouvrir(false); annoncer(T.annonceProposition); };
+       const basculerPlein = () => {
+         plein = !plein; d.region.classList.toggle('vf-term-plein-etat', plein);
+         d.boutonPlein.setAttribute('aria-pressed', String(plein)); d.boutonPlein.setAttribute('aria-label', plein ? T.reduire : T.agrandir); d.boutonPlein.title = d.boutonPlein.getAttribute('aria-label');
+@@ -187,6 +189,7 @@ function scriptTiroir(cfg, accepte, construire) {
+         if (e.data === 'ready') {
+           clearTimeout(minuterie); clearTimeout(chargeur); d.charge.hidden = true; retirerCarte();
+         } else if (e.data === 'toggle') fermer();
++        else if (e.data === 'proposition') proposer();
+         else etat(e.data.slice(5));
+       });
+ 
+diff --git a/plugin/cockpit/scripts/vf-cockpit-terminal.mjs b/plugin/cockpit/scripts/vf-cockpit-terminal.mjs
+index ba36cf76..7fa56538 100644
+--- a/plugin/cockpit/scripts/vf-cockpit-terminal.mjs
++++ b/plugin/cockpit/scripts/vf-cockpit-terminal.mjs
+@@ -9,11 +9,14 @@
+ import fs from 'node:fs';
+ import path from 'node:path';
+ import { fork } from 'node:child_process';
+-import { realUnder } from './vf-cockpit-paths.mjs';
++import { realUnder, resoudreBinaire } from './vf-cockpit-paths.mjs';
+ import { envEnfant } from './vf-cockpit-env.mjs';
++import { envShell } from './vf-cockpit-terminal-env.mjs';
+ import { preparerPage } from './vf-cockpit-terminal-page.mjs';
+-import { TAILLE_MAX } from './vf-cockpit-terminal-session.mjs';
++import { TAILLE_MAX, resoudrePython3 } from './vf-cockpit-terminal-session.mjs';
+ import { injectionTiroir } from './vf-cockpit-terminal-tiroir.mjs';
++import { injectionLancer } from './vf-cockpit-lancer-ui.mjs';
++import { definir } from './vf-cockpit-lancer-canal.mjs';
+ 
+ const log = (m) => console.error(`vf-cockpit (terminal) : ${m}`);
+ const json = (res, statut, objet) => { res.writeHead(statut, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(objet)); };
+@@ -26,12 +29,17 @@ export function envDuProcessusTerminal(lab) {
+   return envEnfant(lab, process.env);
+ }
+ 
++// Lecteurs des pré-vols du lancement (72-09, P72-D-06) : `claude` dans le PATH D'ORIGINE que recevra le shell, `python3` comme le résout Q.
++const claudeDisponible = () => { try { return resoudreBinaire('claude', envShell(process.env, []).PATH) !== null; } catch { return false; } };
++const python3Disponible = () => { try { return resoudrePython3(process.env.PATH) !== null; } catch { return false; } };
++
+ export function preparerTerminal({ here, root, jetons = () => [], plateforme = process.platform } = {}) {
+   let etat = 'arrete'; // 'actif' | 'arrete' | 'indisponible'
+   let portQ = null, enfant = null, occupe = false;
+   const origineQ = () => `http://127.0.0.1:${portQ}`;
+-  const inerte = (indisponible) => ({
+-    actif: false, indisponible, injection: () => injectionTiroir({ indisponible }), frameSrc: () => '', occupe: () => false,
++  const abonnes = []; // abonnés aux messages `lancee` de l'enfant (le lanceur de P, 72-09)
++  const inerte = (indisponible) => (definir({ etat: () => (indisponible ? 'indisponible' : 'arrete'), envoyer: () => false, abonner: () => {}, claude: claudeDisponible, python3: python3Disponible }), {
++    actif: false, indisponible, injection: () => injectionTiroir({ indisponible }) + injectionLancer({ indisponible }), frameSrc: () => '', occupe: () => false,
+     routeP: (req, res) => { json(res, 200, { etat: indisponible ? 'indisponible' : 'arrete' }); return true; }, demarrer: () => {},
+   });
+ 
+@@ -43,9 +51,10 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
+   try { preparerPage({ engineDir: moteur }); } catch (e) { log(`${e.message}`); return inerte(false); }
+ 
+   const envoyer = (msg) => { try { if (enfant && enfant.connected) { enfant.send(msg); return true; } } catch {} return false; };
++  definir({ etat: () => (etat === 'actif' ? 'actif' : 'arrete'), envoyer, abonner: (f) => { if (typeof f === 'function') abonnes.push(f); }, claude: claudeDisponible, python3: python3Disponible });
+   return {
+     get actif() { return etat === 'actif'; }, indisponible: false,
+-    injection: () => injectionTiroir({ indisponible: false }),
++    injection: () => injectionTiroir({ indisponible: false }) + injectionLancer({ indisponible: false }),
+     frameSrc: () => (portQ ? `; frame-src http://127.0.0.1:${portQ}` : ''),
+     occupe: () => occupe,
+     routeP(req, res) { envoyer({ t: 'jetons', jetons: jetons() }); json(res, 200, etat === 'actif' ? { etat: 'actif', port: portQ } : { etat: 'arrete' }); return true; },
+@@ -57,6 +66,7 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
+       enfant.on('message', (m) => {
+         if (!m || typeof m !== 'object') return;
+         if (m.t === 'occupe') occupe = m.v === true;
++        else if (m.t === 'lancee') { for (const f of abonnes) { try { f(m); } catch {} } } // validé par le lanceur de P, jamais ici
+         else if (m.t === 'echec') { etat = 'arrete'; occupe = false; }
+         else if (m.t === 'pret' && Number.isInteger(m.port)) {
+           portQ = m.port; etat = 'actif';
+diff --git a/.planning/workstreams/fiabilite/MISSION-72.dag.json b/.planning/workstreams/fiabilite/MISSION-72.dag.json
+new file mode 100644
+index 00000000..a0d79ebe
+--- /dev/null
++++ b/.planning/workstreams/fiabilite/MISSION-72.dag.json
+@@ -0,0 +1,299 @@
++{
++  "nodes": [
++    {
++      "id": "research-72",
++      "step": "carte du code + recherche",
++      "stage": "",
++      "deps": [],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "panel-canal",
++      "step": "panel canal P->Q",
++      "stage": "",
++      "deps": [],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "ask-72",
++      "step": "arbitrages Samuel",
++      "stage": "",
++      "deps": [
++        "research-72",
++        "panel-canal"
++      ],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "discuss-72",
++      "step": "CONTEXT 72",
++      "stage": "",
++      "deps": [
++        "ask-72"
++      ],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "plan-72",
++      "step": "plans + plan-checker",
++      "stage": "",
++      "deps": [
++        "discuss-72"
++      ],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "exec-72",
++      "step": "execution par vagues",
++      "stage": "",
++      "deps": [
++        "plan-72"
++      ],
++      "scope": [],
++      "status": "running"
++    },
++    {
++      "id": "revue-72",
++      "step": "revue",
++      "stage": "",
++      "deps": [
++        "exec-72"
++      ],
++      "scope": [],
++      "status": "blocked"
++    },
++    {
++      "id": "audit-72",
++      "step": "audit securite",
++      "stage": "",
++      "deps": [
++        "exec-72"
++      ],
++      "scope": [],
++      "status": "blocked"
++    },
++    {
++      "id": "recette-72",
++      "step": "juges playwright",
++      "stage": "",
++      "deps": [
++        "exec-72"
++      ],
++      "scope": [],
++      "status": "blocked"
++    },
++    {
++      "id": "docs",
++      "step": "hygiene documentaire",
++      "stage": "",
++      "deps": [
++        "exec-72"
++      ],
++      "scope": [],
++      "status": "blocked"
++    },
++    {
++      "id": "pr-72",
++      "step": "rebase + CI + PR",
++      "stage": "",
++      "deps": [
++        "revue-72",
++        "audit-72",
++        "recette-72",
++        "docs"
++      ],
++      "scope": [],
++      "status": "blocked"
++    },
++    {
++      "id": "sonde-prompt",
++      "step": "sonde A1/A2 prompt initial",
++      "stage": "",
++      "deps": [],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "ex-01",
++      "step": "plan 72-01",
++      "stage": "",
++      "deps": [
++        "plan-72"
++      ],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "ex-02",
++      "step": "plan 72-02",
++      "stage": "",
++      "deps": [
++        "plan-72"
++      ],
++      "scope": [],
++      "status": "running"
++    },
++    {
++      "id": "ex-03",
++      "step": "plan 72-03",
++      "stage": "",
++      "deps": [
++        "plan-72"
++      ],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "ex-04",
++      "step": "plan 72-04",
++      "stage": "",
++      "deps": [
++        "plan-72"
++      ],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "ex-05",
++      "step": "plan 72-05",
++      "stage": "",
++      "deps": [
++        "plan-72"
++      ],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "ex-06",
++      "step": "plan 72-06",
++      "stage": "",
++      "deps": [
++        "plan-72"
++      ],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "ex-07",
++      "step": "plan 72-07",
++      "stage": "",
++      "deps": [
++        "plan-72"
++      ],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "ex-08",
++      "step": "plan 72-08",
++      "stage": "",
++      "deps": [
++        "plan-72"
++      ],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "sonde-a5",
++      "step": "sonde A5 continuer le chat",
++      "stage": "",
++      "deps": [
++        "plan-72"
++      ],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "ex-09",
++      "step": "plan 72-09",
++      "stage": "",
++      "deps": [
++        "ex-01",
++        "ex-03",
++        "ex-04",
++        "ex-06",
++        "ex-07"
++      ],
++      "scope": [],
++      "status": "running"
++    },
++    {
++      "id": "ex-10",
++      "step": "plan 72-10",
++      "stage": "",
++      "deps": [
++        "ex-01",
++        "ex-02",
++        "ex-05"
++      ],
++      "scope": [],
++      "status": "blocked"
++    },
++    {
++      "id": "ex-11",
++      "step": "plan 72-11",
++      "stage": "",
++      "deps": [
++        "ex-08",
++        "ex-09",
++        "ex-10"
++      ],
++      "scope": [],
++      "status": "blocked"
++    },
++    {
++      "id": "ex-12",
++      "step": "plan 72-12",
++      "stage": "",
++      "deps": [
++        "ex-08",
++        "ex-09",
++        "ex-10"
++      ],
++      "scope": [],
++      "status": "blocked"
++    },
++    {
++      "id": "ex-13",
++      "step": "plan 72-13",
++      "stage": "",
++      "deps": [
++        "ex-06",
++        "ex-08",
++        "ex-09",
++        "ex-10",
++        "sonde-a5"
++      ],
++      "scope": [],
++      "status": "blocked"
++    },
++    {
++      "id": "ex-14",
++      "step": "plan 72-14",
++      "stage": "",
++      "deps": [
++        "ex-08"
++      ],
++      "scope": [],
++      "status": "running"
++    },
++    {
++      "id": "ex-15",
++      "step": "plan 72-15",
++      "stage": "",
++      "deps": [
++        "ex-11",
++        "ex-12",
++        "ex-13",
++        "ex-14"
++      ],
++      "scope": [],
++      "status": "blocked"
++    }
++  ]
++}
+diff --git a/plugin/cockpit/scripts/vf-cockpit-lancer-canal.mjs b/plugin/cockpit/scripts/vf-cockpit-lancer-canal.mjs
+new file mode 100644
+index 00000000..b00173c0
+--- /dev/null
++++ b/plugin/cockpit/scripts/vf-cockpit-lancer-canal.mjs
+@@ -0,0 +1,9 @@
++// vf-cockpit-lancer-canal — registre de module du canal serveur P -> processus de Q (72-09 ; P72-D-09, P72-D-17).
++// Exports : definir(canal), canal().
++// Un canal est { etat(): 'actif'|'arrete'|'indisponible', envoyer(msg): boolean, abonner(fn): void, claude(): boolean, python3(): boolean }.
++// Renseigné par preparerTerminal (vf-cockpit-terminal.mjs), qui n'est appelé que sous `--terminal` : sans le drapeau le registre reste VIDE et le lanceur
++// (vf-cockpit-lancer.mjs) ne sert aucune route. Aucun effet de bord à l'import, rien n'est lu ni écrit.
++let courant = null;
++const FONCTIONS = ['etat', 'envoyer', 'abonner', 'claude', 'python3'];
++export function definir(c) { courant = c && typeof c === 'object' && FONCTIONS.every((f) => typeof c[f] === 'function') ? c : null; }
++export function canal() { return courant; }
+diff --git a/plugin/cockpit/scripts/vf-cockpit-lancer.mjs b/plugin/cockpit/scripts/vf-cockpit-lancer.mjs
+new file mode 100644
+index 00000000..1315fa31
+--- /dev/null
++++ b/plugin/cockpit/scripts/vf-cockpit-lancer.mjs
+@@ -0,0 +1,107 @@
++// vf-cockpit-lancer — assemblage du lancement côté serveur P (72-09 ; P72-D-06, D-09 à D-12, D-16, D-17 ; LANC-01 à LANC-04, LANC-08, LANC-10).
++// Routes (jamais sans le drapeau : le registre du canal est alors vide, voir vf-cockpit-lancer-canal.mjs) :
++//   GET  /api/vf/lancer/cibles  { actif, terminal, claude, cibles } ; cible = { id, kind, principal, verbes, bloquants, avertissements, lancee } (jamais un titre, un Goal ni un nom)
++//   POST /api/vf/lancer         { cible, verbe[, chat] } -> 202 { propose: true } : P PROPOSE seulement, la confirmation et l'écriture au PTY sont dans Q (72-10)
++// Messages envoyés à Q par l'IPC : { t:'cibles', cibles } (liste fermée recalculée du disque, toujours AVANT une proposition) puis { t:'proposition', … }.
++// Message reçu de Q : { t:'lancee', cible, verbe, session, at }, validé de façon fermée puis noté par le suivi (72-07). `lancee` d'une cible rendue : { etat, verbe } ou false.
++// Refus du gestionnaire (corps { refus: <code fermé> }) : cible-inconnue 404, verbe-refuse 422, chat-invalide 422, bloque 409 (+ codes), terminal-arrete 503,
++//   terminal-indisponible 503, cibles-indisponibles 503. Aucune ligne de commande n'est composée ici ; aucun texte du lab ne sort ; aucun journal (un avertissement sans donnée).
++// Aucun effet de bord à l'import ni à la création : le disque n'est lu qu'à une requête servie. Pas de `git status` (P72-D-07).
++import fs from 'node:fs';
++import { planningLayout } from './vf-cockpit-paths.mjs';
++import { readPlanning } from './vf-cockpit-planning.mjs';
++import { lireAilleurs, fusionner } from './vf-cockpit-ailleurs.mjs';
++import * as gabarit from './vf-cockpit-lancer-gabarit.mjs';
++import { calculerCibles, listePourQ } from './vf-cockpit-lancer-cibles.mjs';
++import { creerPost } from './vf-cockpit-lancer-post.mjs';
++import { creerSuivi } from './vf-cockpit-lancer-suivi.mjs';
++import { canal } from './vf-cockpit-lancer-canal.mjs';
++
++const ROUTE_GET = '/api/vf/lancer/cibles', ROUTE_POST = '/api/vf/lancer';
++const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
++const CLES_LANCEE = 'at,cible,session,t,verbe';
++const sur = (fn, repli) => { try { return fn(); } catch { return repli; } };
++
++export function creerLancer({ root, here, ptoken, log = () => {} }) {
++  const suivi = creerSuivi({ maintenant: Date.now });
++  let dernier = null; // dernier résultat de readPlanning, fusionné avec les arbres voisins
++  let envoyee = []; // dernière liste envoyée à Q : seule référence de ce que Q peut confirmer
++  let dernierEnvoi = '', abonne = null, postObj = null, qui = null, avert = false;
++  const servi = () => canal() !== null;
++
++  const planning = () => {
++    const P = readPlanning(root, planningLayout(root));
++    P.phases = fusionner(P.phases, lireAilleurs(root)); dernier = P;
++    return { phases: P.phases, dags: P.dags };
++  };
++  const fichiers = (ph) => { // noms du dossier de la phase, tels que relevés par readPlanning
++    const d = dernier && dernier.phaseDirs && (dernier.phaseDirs.get(`${ph.ws || ''}|${ph.n}`) || dernier.phaseDirs.get(`*|${ph.n}`));
++    return d ? sur(() => fs.readdirSync(d), []) : [];
++  };
++  function calculer() {
++    const c = canal();
++    const r = sur(() => calculerCibles({ gabarit, planning, fichiers, lancements: suivi.lancements, maintenant: Date.now,
++      terminal: () => (c ? c.etat() : 'arrete'), claude: () => !!c && c.claude(), python3: () => !!c && c.python3() }), null);
++    if (r && r.contexte && r.contexte.planning) return r;
++    if (!avert) { avert = true; log('warn', 'calcul des cibles impossible'); }
++    return null;
++  }
++  function publier(cibles, force) { // liste fermée vers Q : seules les cibles sans bloquant, six champs chacune
++    const c = canal(); if (!c) return false;
++    const pq = listePourQ(cibles.filter((x) => x.bloquants.length === 0), gabarit), cle = JSON.stringify(pq);
++    if (!force && cle === dernierEnvoi) return true;
++    if (!sur(() => c.envoyer({ t: 'cibles', cibles: pq }), false)) return false;
++    dernierEnvoi = cle; envoyee = pq; return true;
++  }
++  const lanceeValide = (m) => !!m && typeof m === 'object' && !Array.isArray(m) && Object.keys(m).sort().join() === CLES_LANCEE && m.t === 'lancee'
++    && typeof m.cible === 'string' && typeof m.verbe === 'string' && typeof m.session === 'string' && gabarit.MOTIF_UUID_V4.test(m.session) && Number.isInteger(m.at)
++    && envoyee.some((e) => e.id === m.cible && e.verbes.includes(m.verbe));
++  function surLancee(m) {
++    if (!lanceeValide(m)) return;
++    const e = envoyee.find((x) => x.id === m.cible);
++    suivi.noter(m, { phase: e ? e.phase : null, ws: e ? e.ws : null });
++  }
++  const abonner = (c) => { if (c && abonne !== c) { abonne = c; sur(() => c.abonner(surLancee), null); } }; // à la première requête qui trouve le canal renseigné, jamais à la création
++
++  function proposer(demande) {
++    const c = canal(), etat = c ? c.etat() : 'arrete';
++    if (etat !== 'actif') return { statut: 503, corps: { refus: etat === 'indisponible' ? 'terminal-indisponible' : 'terminal-arrete' } };
++    abonner(c);
++    const calcul = calculer(); if (!calcul) return { statut: 503, corps: { refus: 'cibles-indisponibles' } };
++    const liste = calcul.cibles;
++    const cible = liste.find((x) => x.id === demande.cible);
++    if (!cible) return { statut: 404, corps: { refus: 'cible-inconnue' } };
++    if (!cible.verbes.includes(demande.verbe)) return { statut: 422, corps: { refus: 'verbe-refuse' } };
++    if (cible.bloquants.length > 0) return { statut: 409, corps: { refus: 'bloque', bloquants: [...cible.bloquants] } };
++    const chat = demande.chat;
++    if (chat !== undefined && !UUID.test(chat)) return { statut: 422, corps: { refus: 'chat-invalide' } };
++    if (!publier(liste, true)) return { statut: 503, corps: { refus: 'terminal-arrete' } };
++    const msgProposition = { t: 'proposition', cible: cible.id, verbe: demande.verbe, bloquants: cible.bloquants, avertissements: cible.avertissements };
++    if (chat) msgProposition.chat = chat;
++    if (!sur(() => c.envoyer(msgProposition), false)) return { statut: 503, corps: { refus: 'terminal-arrete' } };
++    return { statut: 202, corps: { propose: true } };
++  }
++  const routes = { [ROUTE_POST]: { champs: { cible: { type: 'string', max: 128, requis: true }, verbe: { type: 'string', max: 16, requis: true }, chat: { type: 'string', max: 36, requis: false } },
++    gestionnaire: async (demande) => proposer(demande) } };
++  const post = () => (postObj ||= creerPost({ routes, jetons: () => [ptoken] })); // créé à la première requête servie ; seul le jeton de la page Projet est admis
++
++  function get(req, res, url) {
++    if (!servi() || url.pathname !== ROUTE_GET) return false;
++    const c = canal(), etat = c ? c.etat() : 'arrete';
++    if (etat !== 'actif') dernierEnvoi = ''; // un Q relancé n'a pas la liste : la prochaine lecture la renvoie
++    abonner(c);
++    const calcul = calculer(), liste = calcul ? calcul.cibles : [];
++    if (calcul && etat === 'actif') publier(liste, false);
++    const riche = suivi.etats(sur(() => (qui ? qui() : null), null));
++    const cibles = liste.map((x) => ({ id: x.id, kind: x.kind, principal: x.principal, verbes: x.verbes, bloquants: x.bloquants, avertissements: x.avertissements, lancee: riche.get(x.id) || false }));
++    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
++    res.end(JSON.stringify({ actif: true, terminal: etat, claude: !!c && sur(() => c.claude() === true, false), cibles }));
++    return true;
++  }
++  return {
++    get, lancees: () => suivi.lancees(),
++    reconnait: (url) => servi() && post().reconnait(url),
++    traiter: (req, res, url) => post().traiter(req, res, url),
++    sourceWho: (fn) => { if (typeof fn === 'function') qui = fn; }, // le `who` de la collecte Équipe, pour les états attendue / vue / terminee
++  };
++}

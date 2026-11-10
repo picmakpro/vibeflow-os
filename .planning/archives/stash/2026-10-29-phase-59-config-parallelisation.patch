@@ -1,0 +1,18 @@
+diff --git a/.planning/config.json b/.planning/config.json
+index b31c6a82..30b1ef72 100644
+--- a/.planning/config.json
++++ b/.planning/config.json
+@@ -33,11 +33,11 @@
+     "sub_repos": []
+   },
+   "parallelization": {
+-    "enabled": true,
++    "enabled": false,
+     "plan_level": true,
+     "task_level": false,
+     "skip_checkpoints": false,
+-    "max_concurrent_agents": 3,
++    "max_concurrent_agents": 1,
+     "min_plans_for_parallel": 2
+   },
+   "hooks": {
