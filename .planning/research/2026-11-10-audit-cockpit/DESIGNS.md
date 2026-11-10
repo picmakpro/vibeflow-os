@@ -58,7 +58,7 @@ Une liste en quatre sections, dans cet ordre. L'en-tête de l'onglet dit le comp
 
 | Section | Contenu | Règle |
 |---|---|---|
-| À vous | Les agents et sessions qui attendent une réponse ou une permission. | Classée par ce que chaque attente retient dans le plan : « retient toute la mission · 4 nœuds en aval » passe avant « retient 1 nœud ». Action à droite : « Répondre », « Ouvrir ». |
+| À vous | Les agents et sessions qui attendent une réponse ou une permission. | Classée par ce que chaque attente retient dans le plan : « retient toute la mission · 4 nœuds en aval » passe avant « retient 1 nœud ». Action à droite : « Répondre », « Ouvrir » (si AUDC-Q3). |
 | Au travail | L'arbre session, manager, workers, indenté. | Une ligne par agent ; l'enfant sous son parent ; un agent en attente y figure aussi, à sa place dans l'arbre. |
 | Terminé, à relire | Les agents finis dont le rapport n'a pas été ouvert. | Remplace la carte « Terminés depuis moins de 24 h ». Action : « Lire le rapport ». |
 | Au repos | Les sessions vivantes sans activité, autres arbres compris. | Elles restent listées (aujourd'hui elles disparaissent après 3 minutes). |
@@ -138,7 +138,7 @@ Elle corrige AUDC-BL1 sans toucher au plancher de zoom (PU-G-026).
 | Lecteur de transcript | Plein cadre, fil daté, filtres messages, outils, erreurs, suivi en direct. | AUDC-I28 |
 | Barre d'état en pied | Branche entière, état du direct, shell vivant avec « Terminer », heure de la dernière mise à jour. | AUDC-I29 |
 | Notifications | Titre d'onglet « (2) vous attendent », pastille sur l'icône, notification du système en option ; trois motifs seulement. | AUDC-I09 |
-| En-tête | Trois groupes d'icônes libellés au-delà de 1 280 px ; fil d'Ariane avec chevron ; branche entière. | AUDC-M5 |
+| En-tête | Trois groupes d'icônes libellés au-delà de 1 280 px ; fil d'Ariane avec chevron ; branche entière. Rouvre P70-D-22 et « Garder ce compromis » (PU-G-001). | AUDC-M5 |
 
 ## 8. Critique de la direction artistique (parcours du 2026-11-10)
 
@@ -176,4 +176,7 @@ réponses du 2026-11-06, pas les décisions `AUDC-Q…` ouvertes par l'audit.
 - Transcript sans sortie d'outil, jamais exporté (P69-D-19) ; verbe et cible réduite, jamais un argument (P69-D-16).
 - Titre par `custom-title` seul, jamais de titre généré (PU-G-162).
 - Aucune lecture réseau (P67-D-02) ; lecture seule sur `.planning/`.
+- Badge « au travail » réduit à son point (P70-D-22) ; troncature de l'en-tête : « Garder ce compromis » (PU-G-001) ;
+  dans `vf-signal`, « voir » et « demander l'arrêt » réservés aux agents de la session courante (P68-D-03) ; pas de
+  barre de question sur l'onglet Équipe (plan 69-05).
 - Pas de quatrième onglet (P78-D-04) ; pas de terminal sur l'onglet Équipe (Q8), sauf décision AUDC-Q3.

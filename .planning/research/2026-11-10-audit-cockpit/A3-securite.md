@@ -124,7 +124,7 @@ Constats divers sans gravité :
 
 ## 3. Non vérifié
 
-- Tout ce qui exige un vrai `claude` : effet réel de `--resume` (A-01), tenue de `Bash(node …query.mjs:*)` face à un chemin collé, confinement de `Read` par lien symbolique.
+- Tout ce qui exige un vrai `claude` : effet réel de `--resume` (A-01), tenue de la liste blanche de l'agent, confinement de `Read` par lien symbolique.
 - A-03 de bout en bout et la rafale de B-03, faute de pouvoir lancer un serveur ou charger l'instance.
 - Aucun navigateur : exécution réelle de la CSP, comportement de Safari et Firefox, stockage du cadre Q, xterm.js.
 - Les 28 points `innerHTML` de `viewer.html` : lus par échantillon (cartes, infobulles, menus, flux, réponses), sans fuzz par champ.

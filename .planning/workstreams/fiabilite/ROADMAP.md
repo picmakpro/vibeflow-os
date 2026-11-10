@@ -456,7 +456,7 @@ les Phases 79 (socle), 80 (formes) et 81 (actions sur une session, suspendue à 
 le lot 0, mission hors phase (`2026-11-10-audit-cockpit/LOT-0-MANDAT.md`) ; le suivi ligne à ligne se tient dans
 `2026-11-10-audit-cockpit/REGISTRE.md`. **Ordre recommandé pour la suite du jalon** (décision déléguée par Samuel, message session
 principale, 2026-11-08, option recommandée) : lot 0 → 79 et 80 en parallèle, 73 dès le lot 0 livré → 74 après la 79 → 75 → 76 → 77 ;
-81 seulement si Samuel rouvre « pas de terminal sur l'onglet Équipe ».
+81 seulement si Samuel le décide (`AUDC-Q3`).
 
 ### Phase 67: Cockpit floorplan sur socle partagé
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-11-05.md — Phase 67 (corps : critères, plans, historique ; plans et critères aussi dans phases/VFDO-67-*) -->
@@ -562,7 +562,7 @@ Plans:
 
 **Goal:** L'onglet Équipe montre les agents sur un axe de temps (une ligne par agent, colorée par nœud de DAG), le coût en jetons et en durée par mission, phase et agent, et rejoue une mission nœud par nœud avec un curseur temporel.
 **Requirements**: TBD — posées au cadrage.
-**Depends on:** Phase 69 (onglet Équipe, lien agent ↔ nœud) ; ordre du jalon : après la 72. Depuis l'audit du 2026-11-10 : Phase 79 (index des transcripts, route de frise).
+**Depends on:** Phase 69 (onglet Équipe, lien agent ↔ nœud) ; Phase 79 (index des transcripts, route de frise) ; ordre du jalon : après la 72. La Phase 79 est ajoutée depuis l'audit du 2026-11-10.
 **Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 1, 2, 3) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2.
 **Plans:** 0 plans
 
@@ -576,7 +576,7 @@ Plans:
 
 **Goal:** La carte Code se colore par l'activité : fréquence de changement croisée avec la taille, fichiers qui changent ensemble, fichiers couverts par un gate ou une suite et zones sans témoin, fichiers lus ou modifiés par la mission en cours.
 **Requirements**: TBD — posées au cadrage.
-**Depends on:** Phase 67 (onglet Code) ; Phase 69 pour l'empreinte des agents ; ordre du jalon : après la 74. Depuis l'audit du 2026-11-10 : Phase 79 (index des transcripts).
+**Depends on:** Phase 67 (onglet Code) ; Phase 69 pour l'empreinte des agents ; Phase 79 (index des transcripts) ; ordre du jalon : après la 74. La Phase 79 est ajoutée depuis l'audit du 2026-11-10.
 **Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 5, 6, 7, 8) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2.
 **Plans:** 0 plans
 
@@ -604,7 +604,7 @@ Plans:
 
 **Goal:** Le cockpit montre en jauges les budgets de la méthode (densité des agents, skills, taille du ROADMAP et du BACKLOG, baseline d'instructions), résume ce qui a changé depuis la dernière visite, et trace le burn-up du jalon en pourcentage strict.
 **Requirements**: TBD — posées au cadrage.
-**Depends on:** Phase 69 (avancement des phases et du jalon) ; ordre du jalon : après la 76. Depuis l'audit du 2026-11-10 : Phase 79 pour le coût par phase.
+**Depends on:** Phase 69 (avancement des phases et du jalon) ; Phase 79 pour le coût par phase ; ordre du jalon : après la 76. La Phase 79 est ajoutée depuis l'audit du 2026-11-10.
 **Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 12, 15, 16) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2.
 **Plans:** 0 plans
 
@@ -642,7 +642,7 @@ Plans:
 
 **Goal:** Le serveur du cockpit collecte sans bloquer et sert un état unique : un index incrémental des transcripts, une route d'état en JSON lue par la page et par `vf-signal`, un seul flux d'événements partagé entre les onglets, des données sorties de la page, et un serveur lancé depuis le module plutôt que depuis une copie dans le lab.
 **Requirements**: TBD — famille `SOCL` réservée, posée au cadrage.
-**Depends on:** lot 0 de l'audit (mission hors phase) ; Phase 67 (serveur unique) ; Phase 69 (collecteur `who`). Les Phases 74, 75 et 77 en dépendent ; la 73 n'en dépend pas. En parallèle de la 80.
+**Depends on:** Phase 67 (serveur unique) ; Phase 69 (collecteur `who`). Vient après le lot zéro de l'audit (mission hors phase). Les Phases 74, 75 et 77 en dépendent ; la 73 n'en dépend pas. En parallèle de la 80.
 **Sources:** `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2 ; registre `AUDC-D5`, `D9`, `H1`, `H2`, `H4`, `H5`, `AM1` à `AM7`, `AB1`, `A-03`, `M7`, `I18` à `I20`, `I22`, `I31`, `I32`, `I37`.
 **Plans:** 0 plans
 
@@ -666,7 +666,7 @@ Plans:
 
 ### Phase 81: Agir sur une session depuis le cockpit
 
-> **Non cadrée, suspendue à une décision de Samuel** (`AUDC-Q3` : elle rouvre « pas de terminal sur l'onglet Équipe », Q8 du 2026-11-06). Inscrite le 2026-11-11 depuis l'audit du cockpit du 2026-11-10 (demande de Samuel, session principale Claude Code, 2026-11-10 ; numéro et découpage : décision déléguée par Samuel, message session principale, 2026-11-08, option recommandée).
+> **Non cadrée, suspendue à une décision de Samuel** (`AUDC-Q3` : elle rouvre « pas de terminal sur l'onglet Équipe », Q8 du 2026-11-06, les gestes réservés aux agents de la session courante, P68-D-03, et la frontière de la Phase 72, « Reprendre » sur les cartes Équipe). Inscrite le 2026-11-11 depuis l'audit du cockpit du 2026-11-10 (demande de Samuel, session principale Claude Code, 2026-11-10 ; numéro et découpage : décision déléguée par Samuel, message session principale, 2026-11-08, option recommandée).
 
 **Goal:** Depuis la fiche d'un agent ou d'une session, ouvrir la session dans le terminal, lui écrire, demander son arrêt ou la bifurquer : chaque action prépare une commande, la touche Entrée l'exécute. Un audit de sécurité complet accompagne la phase, comme pour la 71.
 **Requirements**: TBD — famille `AGIR` réservée, posée au cadrage.

@@ -23,7 +23,7 @@ Quatre sous-lots, à mener en parallèle quand leurs fichiers sont disjoints.
 | Ligne | Ce qui doit être vrai après | Pour mesurer |
 |---|---|---|
 | AUDC-D1 | Un sous-agent non fini et muet depuis dix minutes reste affiché, avec « outil en cours depuis N » ; sa session aussi. | `sondes/sonde-visibilite.mjs`, cas du worker en commande longue : rend 0 agent aujourd'hui |
-| AUDC-D2 | Une session du lab écrite depuis moins de 24 h reste listée, avec un état lu : occupée, au repos, vous attend, close. Une session au repos n'est jamais dite « terminé », et son badge suit son état. | même sonde, cas de la session au repos depuis 5 min |
+| AUDC-D2 | Une session du lab écrite depuis moins de 24 h reste listée, avec un état lu : occupée, au repos, vous attend, close. Une session au repos n'est jamais dite « terminé ». | même sonde, cas de la session au repos depuis 5 min |
 | AUDC-D3 | « À surveiller » et « commande en cours depuis 15 min » se déclenchent de bout en bout ; l'âge avance entre deux poussées. | collecteur réel, pas une donnée écrite à la main |
 | AUDC-D4 | Un worker vivant sous un manager terminé est dit « orphelin », jamais rangé dans « Terminés ». | même sonde, cas du worker frais sous manager terminé |
 | AUDC-D5 | Les plans de mission nommés `dag-*.json` sont lus comme les `*.dag.json`. | un lab d'essai aux deux nommages |
@@ -102,8 +102,8 @@ onglets, la traduction au point d'émission : ce sont les Phases 73, 74, 79 et 8
 
 - Un commit par ligne du registre, son identifiant `AUDC-…` dans le message.
 - Chaque ligne livre un test de suite qui rougit sur le code actuel et verdit après le correctif : une preuve doit
-  pouvoir rendre rouge. Les scripts de `sondes/` n'affirment rien et sortent toujours 0 : ils servent à mesurer avant
-  et après, pas de témoin.
+  pouvoir rendre rouge. Les scripts de `sondes/` n'affirment rien (leur code de sortie ne dit pas si le constat est
+  corrigé) : ils servent à mesurer avant et après, pas de témoin.
 - Toutes les suites du cockpit vertes. Trailer `Gate-Touche:` dès qu'un gate, sa suite, une donnée d'essai surveillée,
   le workflow CI ou un hook est touché (AUDC-AM7 touche `.github/workflows/ci.yml`).
 - CHANGELOG du module, section « Non publié », comme pour les retours du panel ; pas de bump racine.

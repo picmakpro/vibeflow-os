@@ -2,7 +2,7 @@
 
 Scripts de mesure écrits par les agents d'audit, versés tels quels à deux lignes près (un préfixe de dossier et une
 adresse par défaut remplacés par un argument), pour rejouer une mesure avant et après un correctif. Ils n'affirment
-rien et sortent toujours 0. Lecture seule : aucun n'écrit dans le dépôt ni dans `~/.claude` ; ceux qui parlent au serveur ne font
+rien : leur code de sortie ne dit pas si un constat est corrigé. Lecture seule : aucun n'écrit dans le dépôt ni dans `~/.claude` ; ceux qui parlent au serveur ne font
 que des requêtes de lecture. Ils ne sont ni testés ni maintenus : ce sont des instruments de mesure, pas de l'outillage ni des tests.
 
 | Script | Mesure | Arguments | Constats |

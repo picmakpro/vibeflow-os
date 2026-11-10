@@ -249,7 +249,8 @@ les sources, les bornes, le retrait, et ce qui reste à décider. Le cadrage res
 - L'audit y apporte : la régie (AUDC-I01, DESIGNS § 3) comme forme de l'onglet Équipe, dont la section « À vous »
   réalise l'idée 9 (ce qui attend une décision humaine) classée par impact (AUDC-I02) ; la vivacité (AUDC-I03) ;
   l'état « attend ses agents » (AUDC-I38) ; l'orphelin en ligne de régie (AUDC-D4) ; les notifications (AUDC-I09) ;
-  « ailleurs sur ce poste » (AUDC-I10) ; le bouton de l'étape suivante (AUDC-I34) ; AUDC-M3, F2.
+  « ailleurs sur ce poste » (AUDC-I10) ; le bouton de l'étape suivante (AUDC-I34) ; les trois graphes reliés
+  (AUDC-I21) ; AUDC-M3, F2. « Répondre » et l'arrêt d'un orphelin attendent AUDC-Q3.
 - Sources : état lu des sessions (lot 0), plan de mission déjà lu pour compter les nœuds en aval, registre du verrou.
 - Ne dépend pas de la Phase 79 : la régie se construit sur le flux actuel, enrichi par le lot 0.
 - Retraits : le canevas de l'onglet Équipe ; le nom écrit trois fois ; la carte « Terminés depuis moins de 24 h ».
@@ -262,8 +263,8 @@ les sources, les bornes, le retrait, et ce qui reste à décider. Le cadrage res
 - Trois corrections à la note d'origine : les horodatages sont dans les transcripts, pas dans `meta.json` ; « colorée
   par nœud de DAG » contredit DESIGN § 9, le nœud s'écrit sur la voie ; une frise au-delà de 24 h rouvre P69-D-18.
 - Dépend de la Phase 79 (index, route de frise). Lire le champ `usage` demande d'étendre le contrat de forme.
-- À décider au cadrage : AUDC-Q2, AUDC-Q4. Recoupement : Phase 52 (télémétrie et coût de mission), un seul calcul
-  à partager.
+- Hérite de AUDC-Q2 (tranchée au cadrage de la 79) pour les fenêtres au-delà de 24 h, et de AUDC-Q4 (tranchée au
+  cadrage de la 73). Recoupement : Phase 52 (télémétrie et coût de mission), un seul calcul à partager.
 
 **Phase 75 — L'activité posée sur le code** (inscrite le 2026-11-03, but inchangé)
 - L'audit y apporte : le radar de collisions (AUDC-I12), l'empreinte en direct (AUDC-I13), les trois idées de
@@ -307,11 +308,13 @@ AUDC-Q4 la vue d'agents de Claude Code comme source de référence ; AUDC-Q5 sui
 fork. Aucune ne bloque le lot 0 ni la Phase 80. AUDC-Q2 et AUDC-Q5 se tranchent au cadrage de la Phase 79, AUDC-Q4 à
 celui de la 73, AUDC-Q3 conditionne la 81 ; AUDC-Q1 porte sur un comportement déjà livré.
 
-Huit réouvertures d'arbitrages passés se tranchent au cadrage de la phase qui porte la ligne (registre § 5.1) ; deux
-d'entre elles ont sorti une ligne du lot 0 (AUDC-B-05, et AUDC-F6 qui est un point de goût déjà consigné).
+Huit réouvertures d'arbitrages passés se tranchent au cadrage de la phase qui porte la ligne (registre § 5.1) ; l'une
+a sorti une ligne du lot 0 (AUDC-B-05, à trancher avec AUDC-Q1). AUDC-F6 en est sortie aussi, sans être une
+réouverture : c'est un point de goût déjà consigné au BACKLOG.
 
-Onze choix ont été pris au versement, par l'option recommandée (registre § 5.2). Le plus engageant est AUDC-V11 : la
-phrase « Et que ça soit corrigé » est lue comme la validation des corrections du lot 0.
+Douze choix ont été pris au versement, par l'option recommandée (registre § 5.2). Le plus engageant est AUDC-V11 : la
+phrase « Et que ça soit corrigé » est lue comme la validation des corrections du lot 0 ; Samuel a confirmé cette
+intention le 2026-11-11.
 
 ## 11. Annexes
 
