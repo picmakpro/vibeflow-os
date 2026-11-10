@@ -553,3 +553,12 @@ ou de `vf-new-lab`.
 ## Team-kernel : témoin d'exécution de la doctrine Fin de mandat (#223)
 
 **Priorité : à arbitrer.** `[team-kernel, #223]` Témoin d'exécution de la doctrine Fin de mandat : la garde `test-fin-de-mandat.sh` vérifie que les prompts PORTENT la consigne, pas qu'un worker l'APPLIQUE. Un témoin de comportement (registre driver-lock : enfant fermé sans rapport final, ou `worktree-procs.sh list` non vide au close) reste à concevoir.
+## Jalon inscrit sans `gsd-new-milestone` : le STATE ne bascule jamais au démarrage de sa première phase — DIFFÉRÉ (2026-11-03)
+
+**Origine :** session principale du 2026-11-03. Samuel constate que le STATE du compartiment `fiabilite` pointe toujours `equipe-produit-v1.0` avec la Phase 67 « closed ». Inscription demandée par Samuel (session principale Claude Code, 2026-11-03).
+- **Constat, mesuré :** sur `main` et sur `feat/phase-69-suivi-travail`, le frontmatter du STATE dit `milestone: equipe-produit-v1.0`, `milestone_name: « l'équipe produit » — Phases 57-66`, `current_phase: 67`. Or la 67 appartient à `vibeflow-v2.0`, et `equipe-produit-v1.0` n'est pas clos (Phases 63 à 66 ouvertes).
+- **Cause :** la forme « section de jalon distincte, **sans `gsd-new-milestone`** », posée par `11882c80` (gouvernance-labs, 2026-09-23) puis recopiée pour ECC, equipe-produit et vibeflow-v2.0 (`16387283`), sert à inscrire un jalon **sans le démarrer**, parce que le STATE ne tient qu'une position. Elle ne prévoit pas le geste suivant : basculer le STATE quand une phase de ce jalon démarre vraiment. La 67 a été exécutée, releasée et close sans que personne bascule.
+- **Piste :** au démarrage d'une phase (cadrage, plan ou exécution), comparer le jalon de la phase dans le ROADMAP à celui du STATE ; s'ils diffèrent, proposer la bascule (édition à la main du frontmatter, jamais `state record-session`, destructif), jamais d'office. Témoin rouge : un STATE sur `equipe-produit-v1.0` et une phase 69 de `vibeflow-v2.0` qui démarre → aucune alerte aujourd'hui.
+- **Correction ponctuelle :** STATE basculé à la main sur `vibeflow-v2.0`, phase 69 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « vibeflow-v2.0, phase 69 (Recommandé) »), dans la PR qui inscrit les Phases 73 à 77.
+
+**Déclencheur de reprise :** la prochaine inscription d'un jalon, ou la Phase 64 (contrôles branchés en nœuds du plan de bataille).
