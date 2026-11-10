@@ -4,6 +4,11 @@
 principale, 2026-11-03 : « toutes les propositions sont bien, intègre-les au jalon », découpage « 5 phases
 thématiques (Recommandé) », ordre « Gouvernance tôt, reste après 72 (Recommandé) »). Aucune n'est cadrée.
 
+**Complément du 2026-11-11 :** l'audit du cockpit du 2026-11-10 (`.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2) donne
+une entrée de cadrage à chacune de ces phases. Il corrige deux points de la table ci-dessous pour l'idée 1 : les horodatages sont dans
+les transcripts, `meta.json` n'en porte aucun ; et « colorée par nœud de DAG » (but de la Phase 74) contredit `DESIGN.md` § 9, le nœud
+s'écrit sur la voie, la couleur reste aux états.
+
 ## Contraintes communes (reprises du cockpit livré)
 
 - Traces locales seulement, aucune lecture réseau (suite de CKPT-03 ; CI, PR, merge hors carte comme en 69).
