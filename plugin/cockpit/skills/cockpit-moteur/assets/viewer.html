@@ -336,6 +336,7 @@ svg.dim .edge:not(.hl) { opacity: .1; }
 #tooltip .th span { display: inline-flex; gap: var(--sp-6); align-items: center; }
 #loading { position: absolute; left: calc((100% - var(--pw)) / 2); top: 50%; transform: translate(-50%, -50%); padding: var(--sp-8) var(--sp-16); border-radius: 999px; font-size: 12.5px; color: var(--text-2); opacity: 0; transition: opacity .3s var(--ease); pointer-events: none; }
 #loading.on { opacity: 1; }
+#loading.now { transition: none; } /* vibeflow AUDC-M7 : posé avant un calcul qui bloque le fil, il doit être opaque dès l'image peinte */
 #empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-3); pointer-events: none; }
 
 /* ---------- inspector (floating) ---------- */
@@ -1126,12 +1127,15 @@ async function render(opts = {}) {
   const token = ++renderToken;
   hideTip(); // the cards are about to be redrawn
   const view = buildView(state.container);
-  const loading = setTimeout(() => $('#loading').classList.add('on'), 160);
+  // vibeflow AUDC-M7 : le calcul tourne sur le fil principal, une temporisation ne s'y déclenche jamais pendant un gros niveau (2,3 s de canevas blanc à 70 cartes) : à partir de 24 cartes l'indicateur est allumé tout de suite (sans fondu) et peint (une image) AVANT le calcul
+  const gros = view.visible.length >= 24, indicateur = $('#loading');
+  const loading = gros ? 0 : setTimeout(() => indicateur.classList.add('on'), 160);
+  if (gros) { indicateur.classList.add('on', 'now'); await new Promise((ok) => { const t = setTimeout(ok, 120); requestAnimationFrame(() => setTimeout(() => { clearTimeout(t); ok(); }, 0)); }); }
   let res;
   try { res = await layout(view); }
-  catch (e) { console.error(e); clearTimeout(loading); $('#loading').classList.remove('on'); $('#empty').hidden = false; $('#empty').textContent = 'Layout failed: ' + e.message; return; }
+  catch (e) { console.error(e); clearTimeout(loading); indicateur.classList.remove('on', 'now'); $('#empty').hidden = false; $('#empty').textContent = 'Layout failed: ' + e.message; return; }
   clearTimeout(loading);
-  $('#loading').classList.remove('on');
+  indicateur.classList.remove('on', 'now');
   if (token !== renderToken) return;
   state.view = view; state.layout = res;
   queueMicrotask(() => emit('render', { container: state.container, view }));
