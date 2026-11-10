@@ -64,6 +64,12 @@ Enchaîne les sous-phases en déléguant à la machinerie existante :
 
 Si une sous-phase est déjà faite (CONTEXT ou PLAN existants dans `.planning/phases/<étape>/`), ne la refais pas : reprends où c'est pertinent.
 
+**Mandat qui touche une UI** : lis `dev-orchestrator-references/design-craft-lexicon.md` (au
+moins la règle de dosage et les termes que cite le digest ; aucun cité → choisis-les toi-même
+dans la table « Quels termes pour quel écran ») et passe-les à la brique d'exécution comme
+contraintes d'implémentation. La DA du projet (`DESIGN.md`) prime. Au rapport, une ligne :
+termes appliqués, termes écartés à dessein avec leur motif.
+
 ## Compartiment de planning — passer `--ws`, ne jamais présumer
 
 `.planning/workstreams/` existe → le dépôt est partitionné : **passe `--ws <nom>`** aux commandes
