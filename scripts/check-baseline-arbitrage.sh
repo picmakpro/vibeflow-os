@@ -43,6 +43,22 @@
 # assume (repudiation, T-41-58), coherent avec la convention de tracabilite du `CLAUDE.md` : le
 # fait redevient relisable, l'attribution reste humaine.
 #
+# LIGNE DE DELEGATION EXCLUE (2026-11-12). Une ligne du message qui porte le radical « delegu » ou
+# « délégu », toute casse, avec ou sans accent, ne vaut PAS citation, meme avec le mot-cle, deux
+# virgules et une date : « décision déléguée par X (canal, date), option recommandée » dit qu'une
+# decision a ete confiee, pas qu'un arbitrage direct a eu lieu — la meme forme pouvait donc passer
+# pour un arbitrage detaille. Une AUTRE ligne du meme message qui porte une citation directe reste
+# acceptee, et c'est elle (jamais la ligne de delegation) qui est recopiee sur la sortie. La regle
+# vaut pour les trois usages de la citation (hausse, retrait d'une ligne dont la cible existe encore,
+# neutralisation de sentinelle) : un seul predicat les sert. Origine : « Samuel, message session
+# principale, 2026-11-12 : "oui tu as raison", en réponse au constat que la garde accepte la ligne de
+# délégation ; durcissement avant la release = option recommandée, décision déléguée par Samuel,
+# message session principale, 2026-11-08 ». Ce n'est PAS un arbitrage detaille de Samuel sur la
+# regle elle-meme. LIMITE QUI DEMEURE : une citation DIRECTE fabriquee passe toujours (verification
+# de forme, jamais de veracite, voir ci-dessus) ; le radical est cherche en octets (locale C) apres
+# repli explicite de É/é/È/è et de l'accent combinant, un homoglyphe ou une orthographe qui l'evite
+# (« confiee », « deleg-u ») n'est pas detecte.
+#
 # CASCADE DE RESOLUTION DE LA BASE (nommee, imprimee sur echec) : valeur de --base-ref si fournie,
 # sinon la premiere ref qui resout parmi refs/remotes/origin/main, origin/main, refs/heads/main,
 # main. Aucune ne resout -> rc 2. La base est ENSUITE `git merge-base HEAD <ref>` — JAMAIS `HEAD^`,
@@ -164,30 +180,43 @@ fi
 
 HEAD_SHA="$(git rev-parse HEAD)"
 
+# Point UNIQUE de la regle de citation : les trois usages (hausse, retrait de ligne, sentinelle) passent
+# par citation_ok / extract_citation_line, qui passent tous deux par ligne_citation_ok. Une ligne qui
+# porte le radical « delegu » (toute casse, avec ou sans accent) NE VAUT PAS citation : c'est la forme
+# d'une decision deleguee, pas d'un arbitrage direct. La comparaison se fait en locale C (octets) : le
+# tolower de certains awk ne baisse pas « É », donc les accents sont replies EXPLICITEMENT (É, é, È, è
+# vers e, accent aigu combinant U+0301 retire) avant de chercher « delegu ».
+AWK_CITATION_LIB='
+function est_delegation(s,   t) {
+  t = s
+  gsub(/É/, "é", t); gsub(/È/, "è", t)
+  gsub(/\314\201/, "", t)
+  t = tolower(t)
+  gsub(/é/, "e", t); gsub(/è/, "e", t)
+  return index(t, "delegu") > 0
+}
+function ligne_citation_ok(s,   kw, nc, l) {
+  if (est_delegation(s)) return 0
+  l = s
+  kw = (index(s, "arbitrage") > 0) || (index(s, "décision") > 0) || (index(s, "decision") > 0)
+  nc = gsub(/,/, ",", l)
+  return (kw && nc >= 2 && (s ~ /[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/)) ? 1 : 0
+}
+'
+
 citation_ok() {
   # <message complet> sur stdin (via printf par l'appelant) -> exit 0 si une ligne conforme existe.
-  awk '
-    {
-      line = $0
-      kw = (index(line, "arbitrage") > 0) || (index(line, "décision") > 0) || (index(line, "decision") > 0)
-      ncommas = gsub(/,/, ",", line)
-      has_date = ($0 ~ /[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/)
-      if (kw && ncommas >= 2 && has_date) { found = 1 }
-    }
+  LC_ALL=C awk "$AWK_CITATION_LIB"'
+    { if (ligne_citation_ok($0)) found = 1 }
     END { exit (found ? 0 : 1) }
   '
 }
 
 extract_citation_line() {
-  # <message complet> sur stdin -> imprime la premiere ligne conforme trouvee.
-  awk '
-    {
-      line = $0
-      kw = (index(line, "arbitrage") > 0) || (index(line, "décision") > 0) || (index(line, "decision") > 0)
-      ncommas = gsub(/,/, ",", line)
-      has_date = ($0 ~ /[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/)
-      if (kw && ncommas >= 2 && has_date && !found) { print $0; found = 1 }
-    }
+  # <message complet> sur stdin -> imprime la premiere ligne conforme trouvee (jamais une ligne de
+  # delegation : meme predicat que citation_ok).
+  LC_ALL=C awk "$AWK_CITATION_LIB"'
+    { if (ligne_citation_ok($0) && !found) { print $0; found = 1 } }
   '
 }
 

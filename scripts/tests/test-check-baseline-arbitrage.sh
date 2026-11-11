@@ -12,6 +12,8 @@
 # qui « echoue » par un plantage (rc 2) ou une plage vide (rc 3) la ou le cas attendait un flip 0/1
 # n'est PAS compte comme tue. La ligne de succes d'un mutant a une forme UNIQUE, exigee par le verify
 # du plan : « ✓ MUT-<n> TUE : rc_mutant=<x> attendu <x>, rc_original=<y> attendu <y> ».
+# Section DELEGATION (2026-11-12) : une ligne portant le radical « delegu » ne vaut pas citation (hausse,
+# retrait de ligne, sentinelle) ; mutant MUT-10 (exclusion retiree), tue sur le meme patron.
 set -uo pipefail
 
 SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/check-baseline-arbitrage.sh"
