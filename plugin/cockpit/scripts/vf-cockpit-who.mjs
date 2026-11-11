@@ -2,7 +2,7 @@
 // vf-cockpit-who — « qui est au travail ? » (socle du cockpit, P67-D-12, promu du spike 004). Lecture seule.
 // Exports : collectWho(root, opts) -> schéma vibeflow/cockpit-who@2 (JAMAIS de champ `doing`, P67-D-14)
 //           revealDoing(root, id, opts) -> schéma vibeflow/cockpit-doing@1 (dernière commande, à la demande)
-//           revealTranscript(root, id, opts) -> schéma vibeflow/cockpit-transcript@1 (mandat, messages, outils : jamais une sortie d'outil, P69-D-19)
+//           revealTranscript(root, id, opts) -> schéma vibeflow/cockpit-transcript@2 (mandat d'agent, fil daté de messages et d'outils : jamais une sortie d'outil, P69-D-19)
 //           agentsConnus(root, opts) -> sessions et sous-agents seuls (collecte allégée d'un clic, T-69-06) ; commandeAffichee(cmd)
 // Quatre sources disque : sessions Claude Code (~/.claude/projects), sous-agents (meta.json), verrous et
 // registre (driver-lock.sh, résolu hors de l'arbre observé : T-67-06), DAG de mission (nœuds running).
@@ -221,16 +221,16 @@ export function revealDoing(root, id, opts = {}) {
   return doing ? { schema: 'vibeflow/cockpit-doing@1', id, doing } : { schema: 'vibeflow/cockpit-doing@1', id, doing: null, erreur: 'sans-action' };
 }
 
-// P69-D-19 : le transcript d'un agent connu, réduit à son mandat, ses messages et ses outils (liste blanche, vf-cockpit-transcript.mjs) ; le chemin vient de la collecte, jamais de l'entrée (T-69-02)
+// P69-D-19 : le transcript d'un agent connu, réduit à son mandat (agent) et à son fil daté de messages et d'outils (liste blanche, vf-cockpit-transcript.mjs) ; le chemin vient de la collecte, jamais de l'entrée (T-69-02)
 export function revealTranscript(root, id, opts = {}) {
-  const S = 'vibeflow/cockpit-transcript@1';
+  const S = 'vibeflow/cockpit-transcript@2';
   if (typeof id !== 'string' || !ID_RE.test(id)) return { schema: S, id: String(id).slice(0, 128), erreur: 'id-invalide' };
   try { return reveler(root, id, opts, S); } catch { return { schema: S, id, erreur: 'inconnu' }; } // aucune exception ne remonte à l'appelant (F3)
 }
 function reveler(root, id, opts, S) {
   const connus = new Map(agentsConnus(root, opts).filter((x) => (x.kind === 'session' || x.kind === 'subagent') && x._tr).map((x) => [x.id, x]));
   const w = connus.get(id);
-  return w ? { schema: S, id, ...reduireTranscript(w._tr, { root: path.resolve(root), roles: rolesDe([...connus.values()]) }) } : { schema: S, id, erreur: 'inconnu' };
+  return w ? { schema: S, id, ...reduireTranscript(w._tr, { root: path.resolve(root), roles: rolesDe([...connus.values()]), kind: w.kind }) } : { schema: S, id, erreur: 'inconnu' };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {

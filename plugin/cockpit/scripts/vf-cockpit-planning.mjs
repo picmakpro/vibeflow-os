@@ -95,9 +95,9 @@ export function lireDags(root, layout, phaseDirs) {
     ...[...phaseDirs].map(([k, d]) => [k.split('|')[0] === '*' || k.startsWith('|') ? null : k.split('|')[0], d, k])];
   for (const [ws, d, dossierPhase] of lots) {
     if (seen.has(d)) continue; seen.add(d);
-    for (const f of ls(d).filter((x) => x.endsWith('.dag.json'))) {
+    for (const f of ls(d).filter((x) => x.endsWith('.dag.json') || (x.startsWith('dag-') && x.endsWith('.json')))) { // AUDC-D5 : deux nommages (`<nom>.dag.json`, `dag-<nom>.json`) ; un JSON sans `nodes` est ignoré
       let j; try { j = JSON.parse(read(path.join(d, f))); } catch { continue; }
-      if (j && Array.isArray(j.nodes)) dags.push({ name: f.replace(/\.dag\.json$/, ''), ws, wsDeclare: typeof j.ws === 'string' ? j.ws : null,
+      if (j && Array.isArray(j.nodes)) dags.push({ name: f.endsWith('.dag.json') ? f.slice(0, -'.dag.json'.length) : f.slice('dag-'.length, -'.json'.length), ws, wsDeclare: typeof j.ws === 'string' ? j.ws : null,
         phase: typeof j.phase === 'string' || typeof j.phase === 'number' ? String(j.phase) : null, file: path.relative(root, path.join(d, f)).split(path.sep).join('/'), nodes: j.nodes, dossierPhase });
     }
   }

@@ -582,7 +582,7 @@ const [, , scripts, root, home, ...ids] = process.argv;
 const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-who.mjs')).href);
 for (const id of ids) { try { const r = m.revealTranscript(root, id, { home, scriptsDir: '/nonexistent' }); console.log(id + '|' + r.schema + '|' + (r.erreur || 'rendu')); } catch (e) { console.log(id + '|exception|' + e.message); } }
 JS
-assert_eq "E29.6 (F3) — revealTranscript ne lève jamais : agent sain rendu, agent à cwd objet et identifiant inconnu sans exception" "$(node "$AUX/rv-e29.mjs" "$SCRIPTS" "$LAB" "$H29" ok1 a-cwd absent-xyz | tr '\n' ' ')" "ok1|vibeflow/cockpit-transcript@1|rendu a-cwd|vibeflow/cockpit-transcript@1|inconnu absent-xyz|vibeflow/cockpit-transcript@1|inconnu "
+assert_eq "E29.6 (F3) — revealTranscript ne lève jamais : agent sain rendu, agent à cwd objet et identifiant inconnu sans exception" "$(node "$AUX/rv-e29.mjs" "$SCRIPTS" "$LAB" "$H29" ok1 a-cwd absent-xyz | tr '\n' ' ')" "ok1|vibeflow/cockpit-transcript@2|rendu a-cwd|vibeflow/cockpit-transcript@2|inconnu absent-xyz|vibeflow/cockpit-transcript@2|inconnu "
 
 echo "=== EUI2 — correction de revue : rechargement, arrivée sur une carte, échappement, badge, lien jamais deviné (P69-D-14, D-15 ; F1, F2, F4, F5) ==="
 cat > "$AUX/jq.mjs" <<'JS'

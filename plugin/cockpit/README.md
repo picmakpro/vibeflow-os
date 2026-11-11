@@ -168,8 +168,8 @@ et `test-cockpit-chaine-xss.sh` (volet git C0g à C4g : un nom de branche, un me
 
 Chaque agent actif affiche sa **dernière action**, en une phrase lisible (« lit … », « modifie … », « lance une commande »,
 « lance un agent ») ; les libellés sont provisoires. Cliquer un agent ouvre son panneau : état, durée, dernière action,
-nœud de mission, puis **« Lire le transcript »**. Le transcript est lu **à la demande** seulement : il est réduit à son
-mandat, à ses messages et à la liste des outils employés (aucun résultat d'outil), rendu en texte brut, et rien n'en est
+nœud de mission, puis **« Lire le transcript »**. Le transcript est lu **à la demande** seulement : il est réduit au
+mandat de l'agent (une session n'en a pas) et à UN fil daté, dans l'ordre : ses messages et les outils employés, une heure par ligne (aucun résultat d'outil), rendu en texte brut, et rien n'en est
 gardé une fois le panneau fermé. Preuve : `test-cockpit-transcript.sh` (T24 à T26, dont T26.7 sous Chrome).
 
 ## Questions et modèle
@@ -340,7 +340,7 @@ Schémas lisibles dans `scripts/vf-cockpit-interface.json` (copié à l'identiqu
 `readPlanning` sur chaque phase : décompte de plans, correctifs, état dérivé, mission rattachée ; **monté de `@1` à `@2`** pour dire l'état de vie d'une mission :
 `abandonnee`, `inconnu` et le champ `vie`), `vibeflow/cockpit-signal@1` (ce que la pane lit : phases, jalons, missions, verrous, worktrees et retard, équipe),
 `vibeflow/cockpit-who@2` (arbre des agents : parent, état, action, rattachement, fenêtre de 24 h ; remplace `@1`),
-`vibeflow/cockpit-transcript@1` (transcript réduit) et `vibeflow/cockpit-equipe@1`. Les autres schémas restent à `@1`.
+`vibeflow/cockpit-transcript@2` (transcript réduit ; **monté de `@1` à `@2`** : `messages` et `outils` remplacés par le fil daté `fil`) et `vibeflow/cockpit-equipe@1`. Les autres schémas restent à `@1`.
 
 ## Code tiers
 
