@@ -556,7 +556,7 @@ Plans:
 
 ### Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte
 
-> **Cadrée le 2026-11-11** (`75-CONTEXT.md`, P75-D-01..21, décisions déléguées, option recommandée ; quatre questions non bloquantes à Samuel, Q-75-1 à Q-75-4). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
+> **Cadrée le 2026-11-11** (`75-CONTEXT.md`, P75-D-01..21, décisions déléguées, option recommandée ; cinq questions non bloquantes à Samuel, Q-75-1 à Q-75-5). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
 
 **Goal:** La carte Code se colore par l'activité : fréquence de changement croisée avec la taille, fichiers qui changent ensemble, fichiers couverts par un gate ou une suite et zones sans témoin, fichiers lus ou modifiés par la mission en cours.
 **Requirements**: ACTV-01, ACTV-02, ACTV-03, ACTV-04, ACTV-05, ACTV-06, ACTV-07, ACTV-08, ACTV-09, ACTV-10, ACTV-11, ACTV-12

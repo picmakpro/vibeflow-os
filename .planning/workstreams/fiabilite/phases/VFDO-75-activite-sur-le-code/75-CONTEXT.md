@@ -1,7 +1,7 @@
 # Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte - Context
 
 **Gathered:** 2026-11-11
-**Status:** Cadrée (2026-11-11) — frontière de questions vide côté mission ; quatre questions non bloquantes à Samuel
+**Status:** Cadrée (2026-11-11) — frontière de questions vide côté mission ; cinq questions non bloquantes à Samuel
 (section « À Samuel ») ; bâtie sur les contrats figés de la Phase 79 (branche `feat/phase-79-socle-cockpit`, commit
 `3119d82a`, `79-CONTEXT.md` § « Contrats fournis », C0 à C6, amendés par `2ae6607a` (A1-A14) et `6f66d878` (A21-A28)) ;
 les sept manques relayés à la 79 sont fermés par A21 à A27 (section « Contrats de la Phase 79 retenus »).
@@ -261,13 +261,14 @@ et ne sont pas rouverts.
   suite voisine sur un chiffre de hauteur, l'exécution s'arrête et remonte au manager, sans réécrire d'attendu. Décision
   déléguée par Samuel (message session principale, 2026-11-08), option recommandée (critique de la spec, G19).
 
-- **P75-D-26 (étage design, quatrième tour).** La spec d'interface a eu trois tours de critique par des juges neufs
+- **P75-D-26 (étage design, quatrième tour ; issue : 81/100, acceptée).** La spec d'interface a eu trois tours de critique par des juges neufs
   (67, 62, 69 sur 100, seuil 70). Quatrième tour accordé par la session principale ; décision déléguée par Samuel (message
   session principale, 2026-11-08), option recommandée. C'est le dernier : sous 70 au juge neuf suivant, la spec part avec
   sa note et ses constats ouverts, repris un par un comme critères dans les plans concernés ; pas de cinquième tour sans
   Samuel. Le juge neuf ne voit que la spec sur disque.
-- **P75-D-27 (pastille de compte du sélecteur).** Neutre en bureau comme dans le « ⋯ » : glyphe et mot (ou chiffre en
-  encre neutre), sans fond. Règle en vigueur : P71.5-D-19 et l'interdit « fond teinté pour un état » de `DESIGN.md` ; la
+- **P75-D-27 (pastille de compte du sélecteur).** Neutre en bureau comme dans le « ⋯ » : la pastille `--on` sur
+  `--on-text` déjà livrée dans le « ⋯ » (fond neutre, non teinté, jamais `--recent`) ; précision du 2026-11-11 après la
+  critique finale de la spec. Règle en vigueur : P71.5-D-19 et l'interdit « fond teinté pour un état » de `DESIGN.md` ; la
   pastille pleine `--recent` de l'actuel bouton « Travail récent » s'en écarte (question Q-75-5).
 
 ### Vérification attendue des plans
