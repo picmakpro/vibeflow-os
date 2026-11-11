@@ -403,6 +403,10 @@ Faits établis par la recherche qui corrigent la forme de décisions déjà pris
   « deux intentions d'élévation » (§ 9) et l'exception des rangées de 40 px du tiroir Git existant (§ 4), textes proposés
   dans `80-UI-SPEC-NAVIGATION.md`.
 
+- **P80-D-47 (plonger depuis les couloirs).** Cohérence avec le canevas : au bureau, la sélection suit le focus dans les
+  couloirs et la liste (le panneau montre la phase focalisée) et Entrée plonge dans la phase ; au téléphone, Entrée
+  sélectionne (ouvre la feuille) et « Ouvrir la phase » est dans la feuille.
+
 ### Claude's Discretion
 
 Noms exacts des fichiers neufs (dans la plage `ui/` qui garantit l'ordre de chargement), découpage interne sous le
