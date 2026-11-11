@@ -542,10 +542,11 @@ Plans:
 
 ### Phase 74: L'équipe dans le temps — swim-lanes, coût, replay
 
-> **Cadrée le 2026-11-11 (premier temps)** — `74-CONTEXT.md`, P74-D-01 à P74-D-43, décisions déléguées par Samuel
+> **Cadrée le 2026-11-11 (premier temps)** — `74-CONTEXT.md`, P74-D-01 à P74-D-45, décisions déléguées par Samuel
 > (message session principale, 2026-11-08), option recommandée ; spécification d'interface `74-UI-SPEC.md`. Inscrite le
-> 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Planification au second temps, sur les
-> contrats de la Phase 79.
+> 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Planifiée le 2026-11-11 (9 plans, 5
+> vagues) sur les contrats de la Phase 79 (`3119d82a`, amendements `2ae6607a` et `74501bb0`) ; les plans 74-04 à 74-09
+> sont à revalider sur les livraisons des Phases 79, 73 et 80.
 
 **Goal:** L'onglet Équipe montre les agents sur un axe de temps (une ligne par agent, colorée par nœud de DAG), le coût en jetons et en durée par mission, phase et agent, et rejoue une mission nœud par nœud avec un curseur temporel.
 **Lecture du but (P74-D-01) :** but arbitré non réécrit (AUDC-V6). « Colorée par nœud de DAG » contredit `DESIGN.md` § 9 :
@@ -565,11 +566,19 @@ qui les portent (aucun horodatage de transition dans les DAG).
 4. La fiche d'un agent s'ouvre en plein cadre depuis la frise et depuis la régie, dit son rattachement (parent, nœud, phase, chacun cliquable), ses durées par segments, ses jetons et ses erreurs, et son fil daté se filtre et suit le direct ; aucune sortie d'outil ni argument de commande n'y apparaît, et rien de la fiche n'est exporté.
 5. Les jetons d'une mission égalent la somme de ceux de ses agents, comptés une fois par message, et chaque total dit sa fenêtre ; les agents sans mission sont comptés à part.
 6. Les suites du cockpit restent vertes, la chaîne XSS couvre les données de frise et de fiche, et chaque comportement neuf a un témoin qui rougit sans le code.
-**Plans:** 0 plans — planification au second temps, après les contrats de la Phase 79
+**Plans:** 9 plans
 
 Plans:
 
-- [ ] À planifier (second temps de la mission Phase 74)
+- [ ] 74-01-PLAN.md — Modèle pur de la frise et du coût (vague 1)
+- [ ] 74-02-PLAN.md — Fil réduit étendu : échec, compaction, message de l'humain (vague 1)
+- [ ] 74-03-PLAN.md — Fil de la fiche et markdown fermé en texte (vague 2)
+- [ ] 74-04-PLAN.md — Frise : bascule, voies, segments, axe, direct (vague 3)
+- [ ] 74-05-PLAN.md — Fiche d'agent plein cadre (vague 3)
+- [ ] 74-06-PLAN.md — Curseur, encart « À cet instant », « Voir sur la carte » (vague 4)
+- [ ] 74-07-PLAN.md — Bandeau Dépôt, tiroir Git sur un commit, coût (vague 4)
+- [ ] 74-08-PLAN.md — Retraits et témoins réécrits contre la fiche (vague 4)
+- [ ] 74-09-PLAN.md — Bornes, chaîne XSS, contrat, documentation et compteur (vague 5)
 
 ### Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte
 
