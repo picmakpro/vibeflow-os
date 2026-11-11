@@ -3,6 +3,7 @@
 #   H2.1-H2.4  un seul appel au verrou par cycle du filet ; aucune collecte quand aucun onglet n'est connecté (témoin positif : un onglet connecté collecte)
 #   H2.8       la connexion d'un onglet relit l'état une fois (au plus un tour par période du filet)
 #   H2.5-H2.6  un changement de planning relit le planning UNE fois (exigences), sans interroger le verrou quand personne n'écoute
+#   AM7.*      en CI, une suite qui dépend de Chrome sort non-zéro sans lui (garde de hygiene.sh) ; hors CI le saut reste permis
 #   H3.*       journal daté avec motif d'arrêt, verrou de lanceur, relance identique / relance à option changée, activité authentifiée
 # Le test COMPTE des appels (faux verrou, lectures de fichier), il ne mesure aucun temps.
 # Lab neutre dans mktemp, HOME jetable, isolation git. Exit 0 si tout passe, 1 sinon.
@@ -150,6 +151,33 @@ for _ in $(seq 1 30); do grep -q 'retenu' "$WORK/srv-t.out" && break; sleep 0.3;
 assert_has "H3.17 — un terminal ouvert retient l'arrêt sur inactivité, et le journal le dit" "$(cat "$WORK/srv-t.out")" "arrêt sur inactivité retenu : un terminal est ouvert"
 assert_eq "H3.18 — le serveur au terminal ouvert est encore vivant" "$(kill -0 "$ST" 2>/dev/null && echo vivant || echo sorti)" "vivant"
 vf_hyg_stop "$ST" 2>/dev/null; vf_hyg_stop "$SI" 2>/dev/null
+
+echo "=== AM7 — en CI, l'absence de Chrome fait échouer une suite qui en dépend ==="
+HYG="$(cd "$(dirname "$0")" && pwd)/hygiene.sh"
+cat > "$WORK/mini-chrome.sh" <<'SH'
+#!/usr/bin/env bash
+# suite factice : la forme des vraies suites (WORK, trap EXIT, hygiene.sh, CHROME="" puis recherche, saut + exit 0)
+set -uo pipefail
+WORK="$(mktemp -d)"; trap 'vf_hyg_fin; rm -rf "$WORK"' EXIT
+. "$HYG"; vf_hyg_init
+CHROME=""
+[ -n "${FAUX_CHROME:-}" ] && CHROME="$FAUX_CHROME"
+if [ -z "$CHROME" ]; then echo "  ⊘ SUITE SAUTÉE : aucun navigateur"; exit 0; fi
+echo "  navigateur : $CHROME"; exit 0
+SH
+rc_mini() { env -u CI -u VF_CHROME_OPTIONNEL -u CHAINE_SANS_NAVIGATEUR HYG="$HYG" "$@" bash "$WORK/mini-chrome.sh" > "$WORK/mini.out" 2>&1; echo $?; }
+assert_eq "AM7.1 — hors CI, sans Chrome : le saut local sort 0" "$(rc_mini)" "0"
+assert_eq "AM7.2 — en CI, sans Chrome : la suite sort non-zéro (1)" "$(rc_mini CI=true)" "1"
+assert_has "AM7.3 — le message dit l'absence de navigateur en CI" "$(cat "$WORK/mini.out")" "AM7 aucun navigateur"
+assert_eq "AM7.4 — témoin positif : en CI, avec un Chrome trouvé, la suite sort 0" "$(rc_mini CI=true FAUX_CHROME=/usr/bin/chrome-factice)" "0"
+assert_eq "AM7.5 — échappatoire explicite VF_CHROME_OPTIONNEL en CI : sort 0" "$(rc_mini CI=true VF_CHROME_OPTIONNEL=1)" "0"
+# couverture : toute suite qui cherche un navigateur passe par hygiene.sh et son trap EXIT (sinon la garde ne s'applique pas à elle)
+HORS=""
+for f in "$(dirname "$0")"/test-*.sh; do
+  grep -qE '^[[:space:]]*(EK)?CHROME=""|(^|[;[:space:]])(EK)?CHROME=""' "$f" || continue
+  grep -q 'hygiene.sh' "$f" && grep -q 'vf_hyg_fin' "$f" || HORS="$HORS $(basename "$f")"
+done
+assert_eq "AM7.6 — toute suite qui cherche un navigateur utilise hygiene.sh et son filet de sortie (hors couverture : aucune)" "${HORS:-aucune}" "aucune"
 
 echo "== bilan : $PASS réussi(s), $FAIL échec(s) =="
 [ "$FAIL" -eq 0 ]
