@@ -326,7 +326,7 @@
  #legend label:hover { background: rgba(var(--ink), .07); }
  #legend label.off { color: var(--text-4); }
  #legend label.off .sw { opacity: .25; }
-@@ -274,202 +301,221 @@ svg.dim .edge:not(.hl) { opacity: .1; }
+@@ -274,202 +301,222 @@ svg.dim .edge:not(.hl) { opacity: .1; }
  #legend .sw { width: 16px; height: 3px; border-radius: 2px; }
  #legend .n { margin-left: auto; color: var(--text-3); font-variant-numeric: tabular-nums; font-size: 12px; }
  #legend .tog { width: 28px; height: 16px; border-radius: 999px; background: rgba(var(--ink), .12); position: relative; transition: background .2s var(--ease); flex: none; }
@@ -381,6 +381,7 @@
 +#tooltip .th span { display: inline-flex; gap: var(--sp-6); align-items: center; }
 +#loading { position: absolute; left: calc((100% - var(--pw)) / 2); top: 50%; transform: translate(-50%, -50%); padding: var(--sp-8) var(--sp-16); border-radius: 999px; font-size: 12.5px; color: var(--text-2); opacity: 0; transition: opacity .3s var(--ease); pointer-events: none; }
  #loading.on { opacity: 1; }
++#loading.now { transition: none; } /* vibeflow AUDC-M7 : posé avant un calcul qui bloque le fil, il doit être opaque dès l'image peinte */
  #empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-3); pointer-events: none; }
  
  /* ---------- inspector (floating) ---------- */
@@ -631,7 +632,7 @@
  /* Safari/WebKit: HTML inside <foreignObject> that gets its own render layer (position, overflow clip,
     transform, opacity, animation) is painted at the page origin, ignoring the SVG transform. Keep cards layer-free there. */
  html.wk .node foreignObject { overflow: hidden; }
-@@ -480,9 +526,8 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+@@ -480,9 +527,8 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
  /* ---------- phones and tablets: windows under 1000 px and touch screens under 1280 px (a mouse at 1000 px and wider is untouched) ---------- */
  @media (max-width: 999px), (max-width: 1279px) and (pointer: coarse) {
    #btn-up, .brand { flex: none; }
@@ -642,7 +643,7 @@
    .hl { flex: 1 1 240px; }
    .hc { flex: 2 3 min(460px, 24vw); max-width: 460px; min-width: 44px; justify-content: stretch; }
    #search-btn { width: 100%; min-width: 44px; }
-@@ -490,7 +535,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+@@ -490,7 +536,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
    .hr { flex: 0 0 auto; flex-wrap: wrap; }
    .brand #proj-name { display: none; }
    header .rel { position: static; } /* Flows and Filters open under the bar, inside the screen, wherever the bar wrapped */
@@ -651,7 +652,7 @@
    .hr .btn { position: relative; padding: 0; justify-content: center; }
    .hr .btn .bl { display: none; }
    .hr .btn .badge { position: absolute; }
-@@ -505,47 +550,47 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+@@ -505,47 +551,47 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
  }
  @media (max-width: 999px), (max-width: 1279px) and (pointer: coarse) {
    header .hr .btn { width: 44px; }
@@ -716,10 +717,11 @@
  }
  @media (prefers-reduced-motion: reduce) and (max-width: 999px), (prefers-reduced-motion: reduce) and (pointer: coarse) {
    #panel, body.no-panel #panel, #viewport.anim, #ask, #flowbar, #zoom button { transition: none; }
-@@ -555,6 +600,22 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+@@ -555,7 +601,23 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
  </head>
  <body>
  <script>if (matchMedia('(max-width: 700px)').matches && !/[#&]s=/.test(location.hash)) document.body.classList.add('no-panel'); // a phone starts with the details closed, so the panel doesn't flash open and shut</script>
+-<div id="stage">
 +<header>
 +  <div class="hl">
 +    <div class="brand"><img class="mark" src="__FLOORPLAN_LOGO__" alt="Floorplan" title="Floorplan"><span id="proj-name"></span></div>
@@ -736,10 +738,11 @@
 +    <button class="btn icon" id="btn-panel" title="Toggle details (P)" aria-label="Toggle details" aria-expanded="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
 +  </div>
 +</header>
- <div id="stage">
++<main id="stage">
    <svg id="svg" xmlns="http://www.w3.org/2000/svg"><g id="viewport"></g></svg>
    <div id="context"></div>
-@@ -572,29 +633,13 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+   <div id="zoom" class="glass">
+@@ -572,29 +634,13 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
        <span id="ask-chips"></span>
        <input id="ask-input" placeholder="Ask anything about this codebase…" spellcheck="false">
        <span class="engine" id="ask-engine"><i></i>checking…</span>
@@ -750,7 +753,7 @@
    <div id="tooltip" class="glass" hidden></div>
    <div id="loading" class="glass">Laying out…</div>
    <div id="empty" hidden></div>
- </div>
+-</div>
 -<header>
 -  <div class="hl">
 -    <div class="brand"><img class="mark" src="__FLOORPLAN_LOGO__" alt="Floorplan" title="Floorplan"><span id="proj-name"></span></div>
@@ -767,10 +770,11 @@
 -    <button class="btn icon" id="btn-panel" title="Toggle details (P)" aria-label="Toggle details" aria-expanded="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
 -  </div>
 -</header>
++</main>
  <aside id="panel"></aside>
  <div id="panel-resize" title="Drag to resize"></div>
  <div id="ctxmenu" class="menu glass" hidden></div>
-@@ -603,7 +648,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+@@ -603,7 +649,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
  <div id="palette"><div class="box glass">
    <div class="in"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="search" placeholder="Search by name, description, path or route…" autocomplete="off" spellcheck="false"></div>
    <div id="results"></div>
@@ -779,7 +783,7 @@
  </div></div>
  <!--__ELK_SCRIPT__-->
  <script>if (/AppleWebKit/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|OPR/.test(navigator.userAgent)) document.documentElement.classList.add('wk');</script>
-@@ -635,6 +680,7 @@ const KINDS = ['import', 'http', 'call', 'rpc', 'event', 'queue', 'data', 'confi
+@@ -635,6 +681,7 @@ const KINDS = ['import', 'http', 'call', 'rpc', 'event', 'queue', 'data', 'confi
  // connection names: plain by default, developer terms when "Show technical detail" is on
  const KIND_TECH = { contains: 'Contains', import: 'Imports', http: 'HTTP', call: 'Calls', rpc: 'RPC', event: 'Events', queue: 'Queues', data: 'Data', config: 'Config' };
  const KIND_PLAIN = { contains: 'Contains', import: 'Uses', http: 'Web requests', call: 'Calls', rpc: 'Calls', event: 'Events', queue: 'Background jobs', data: 'Reads & writes data', config: 'Settings' };
@@ -787,7 +791,7 @@
  const KIND_LABEL = new Proxy({}, { get: (_, k) => (technical() ? KIND_TECH : KIND_PLAIN)[k] || k });
  let technicalFlag = false;
  const technical = () => technicalFlag;
-@@ -686,6 +732,7 @@ const P = {
+@@ -686,6 +733,7 @@ const P = {
    left: '<path d="m15 18-6-6 6-6"/>',
    right: '<path d="m9 18 6-6-6-6"/>',
  };
@@ -795,7 +799,7 @@
  const icon = (k) => `<svg viewBox="0 0 24 24">${P[k] || P.file}</svg>`;
  const iconI = (k) => `<svg class="i" viewBox="0 0 24 24">${P[k] || P.file}</svg>`;
  const symIcon = (kind) => (['class', 'interface', 'struct', 'type', 'enum', 'record', 'trait', 'object'].includes(kind) ? 'class' : 'function');
-@@ -772,6 +819,24 @@ function info(item) {
+@@ -772,6 +820,24 @@ function info(item) {
  }
  const connEntity = (id) => id.replace(/^x:(in|out):/, '');
  const nameOf = (item) => info(item.startsWith('x:') ? connEntity(item) : item).name;
@@ -820,7 +824,7 @@
  // in plain mode a file opens only when it has endpoints to show (its exports are developer detail)
  const visibleKids = (item) => (kids.get(item) || []).filter((k) => technical() || !k.startsWith('s:'));
  const drillable = (item) => /^(n:|d:|f:)/.test(item) && visibleKids(item).length > 0;
-@@ -912,10 +977,10 @@ function buildView(container) {
+@@ -912,10 +978,10 @@ function buildView(container) {
  // sizes live in the hover tooltip and the details panel.
  // [width, min height]
  const SIZES = { node: [300, 128], dir: [272, 110], file: [284, 110], module: [284, 110], route: [300, 128], symbol: [260, 100] };
@@ -834,7 +838,7 @@
  /** Footer pieces: the card's size (modules / files / endpoints) and its recent-work pill. Empty when neither applies. */
  function cardFoot(item) {
    const i = info(item);
-@@ -924,16 +989,18 @@ function cardFoot(item) {
+@@ -924,16 +990,18 @@ function cardFoot(item) {
    else if (i.type === 'dir') size = plural(statsOf(item).files, 'file');
    else if (i.type === 'module') size = 'this file';
    else if (i.type === 'file') { const nr = (routesByFile.get(i.f.p) || []).length; size = nr ? plural(nr, 'endpoint') : ''; }
@@ -857,7 +861,7 @@
    return (cardFoot(item) ? FOOT_H : 0) + (textW(name, 15, 600) > room ? TITLE2_H : 0);
  }
  function cardHTML(item) {
-@@ -951,7 +1018,7 @@ function cardHTML(item) {
+@@ -951,7 +1019,7 @@ function cardHTML(item) {
    } else if (i.type === 'file' || i.type === 'module') {
      const f = i.f;
      if (f.note) cls += ' has-note';
@@ -866,7 +870,7 @@
      desc = dsc(f.d, 2);
    } else if (i.type === 'route') {
      const r = i.r;
-@@ -964,6 +1031,7 @@ function cardHTML(item) {
+@@ -964,6 +1032,7 @@ function cardHTML(item) {
    }
    const note = answerNote(item);
    const noteHTML = note ? `<div class="anote"><b>${note.n}</b><span>${h(note.text)}</span></div>` : '';
@@ -874,7 +878,7 @@
    if (recentOf(item)) cls += ' recent';
    else if (recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item)) cls += ' recent-in';
    return `<div class="card ${cls}" style="--c:${colorOf(i)}"><div class="head">${head}</div>${title}${desc}${noteHTML}${cardFoot(item)}</div>`;
-@@ -972,19 +1040,22 @@ function connectorHTML(c) {
+@@ -972,19 +1041,22 @@ function connectorHTML(c) {
    const i = info(c.entity);
    return `<div class="card connector" style="--c:${colorOf(i)}"><span class="ico">${icon(iconKey(i))}</span><span class="lbl">${h(i.name)}</span><span class="dir-ico">${icon(c.side === 'in' ? 'in' : 'out')}</span></div>`;
  }
@@ -901,7 +905,7 @@
  }
  /** Hover lines for recent work: what changed on this card and how it serves the request, or what changed inside it. */
  function recentTip(id) {
-@@ -1015,7 +1086,7 @@ async function layout(view) {
+@@ -1015,7 +1087,7 @@ async function layout(view) {
      children.push({ id: item, width: w, height: Math.max(hh + cardExtraH(item) + (answerNote(item) ? NOTE_H : 0), (deg.get(item) || 0) * 7 + 28), ...(ext ? { layoutOptions: { 'elk.layered.layering.layerConstraint': 'LAST' } } : {}) });
    }
    for (const c of view.connectors) {
@@ -910,7 +914,7 @@
        layoutOptions: { 'elk.layered.layering.layerConstraint': c.side === 'in' ? 'FIRST_SEPARATE' : 'LAST_SEPARATE' } });
    }
    return elk.layout({
-@@ -1026,8 +1097,10 @@ async function layout(view) {
+@@ -1026,8 +1098,10 @@ async function layout(view) {
        'elk.layered.spacing.nodeNodeBetweenLayers': '130', 'elk.spacing.nodeNode': '32',
        'elk.layered.spacing.edgeEdgeBetweenLayers': '8', 'elk.spacing.edgeEdge': '8', 'elk.layered.spacing.edgeNodeBetweenLayers': '24',
        'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX', 'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
@@ -922,15 +926,28 @@
      },
    });
  }
-@@ -1051,6 +1124,7 @@ function roundedPath(pts, r = 10) {
+@@ -1051,13 +1125,17 @@ function roundedPath(pts, r = 10) {
  let renderToken = 0;
  async function render(opts = {}) {
    const token = ++renderToken;
 +  hideTip(); // the cards are about to be redrawn
    const view = buildView(state.container);
-   const loading = setTimeout(() => $('#loading').classList.add('on'), 160);
+-  const loading = setTimeout(() => $('#loading').classList.add('on'), 160);
++  // vibeflow AUDC-M7 : le calcul tourne sur le fil principal, une temporisation ne s'y déclenche jamais pendant un gros niveau (2,3 s de canevas blanc à 70 cartes) : pour une navigation seulement (go, premier rendu : jamais un redessin en direct, qui garde la temporisation), l'indicateur est allumé tout de suite (sans fondu) et peint (une image) AVANT le calcul
++  const gros = !!opts.nav && view.visible.length >= 24, indicateur = $('#loading');
++  const loading = gros ? 0 : setTimeout(() => indicateur.classList.add('on'), 160);
++  if (gros) { indicateur.classList.add('on', 'now'); await new Promise((ok) => { const t = setTimeout(ok, 120); requestAnimationFrame(() => setTimeout(() => { clearTimeout(t); ok(); }, 0)); }); }
    let res;
-@@ -1078,6 +1152,7 @@ function draw(view, res) {
+   try { res = await layout(view); }
+-  catch (e) { console.error(e); clearTimeout(loading); $('#loading').classList.remove('on'); $('#empty').hidden = false; $('#empty').textContent = 'Layout failed: ' + e.message; return; }
++  catch (e) { console.error(e); clearTimeout(loading); indicateur.classList.remove('on', 'now'); $('#empty').hidden = false; $('#empty').textContent = 'Layout failed: ' + e.message; return; }
+   clearTimeout(loading);
+-  $('#loading').classList.remove('on');
++  indicateur.classList.remove('on', 'now');
+   if (token !== renderToken) return;
+   state.view = view; state.layout = res;
+   queueMicrotask(() => emit('render', { container: state.container, view }));
+@@ -1078,6 +1156,7 @@ function draw(view, res) {
    const gCols = el('g', { class: 'cols' }, vp);
    const gEdges = el('g', { class: 'edges' }, vp), gFx = el('g', {}, vp), gNodes = el('g', {}, vp), gPorts = el('g', { class: 'edges' }, vp);
    state.fxLayer = gFx;
@@ -938,7 +955,7 @@
    drawColumns(gCols, view, res);
    state.edgeEls = new Map(); state.chipEls = new Map();
    for (const re of res.edges || []) {
-@@ -1102,24 +1177,32 @@ function draw(view, res) {
+@@ -1102,24 +1181,32 @@ function draw(view, res) {
    }
    // cards rise in left-to-right, a few ms apart
    const order = res.children.slice().sort((a, b) => a.x - b.x || a.y - b.y);
@@ -972,7 +989,7 @@
  function drawColumns(g, view, res) {
    if (!view.connectors?.length || state.container === 'root' || state.container === 'q:answer') return;
    const span = (cs) => cs.length ? [Math.min(...cs.map((c) => c.x)), Math.max(...cs.map((c) => c.x + c.width))] : null;
-@@ -1127,36 +1210,52 @@ function drawColumns(g, view, res) {
+@@ -1127,36 +1214,52 @@ function drawColumns(g, view, res) {
    const outs = res.children.filter((c) => c.id.startsWith('x:out:'));
    const mid = res.children.filter((c) => !c.id.startsWith('x:'));
    const y = Math.min(...res.children.map((c) => c.y)) - 26;
@@ -1036,7 +1053,7 @@
  function endpointsOf(e) {
    const m = new Map();
    for (const l of e.links) for (const [ri] of l.calls || []) if (ri != null) m.set(ri, (m.get(ri) || 0) + 1);
-@@ -1170,7 +1269,7 @@ function edgeTip(e) {
+@@ -1170,7 +1273,7 @@ function edgeTip(e) {
    const desc = e.links.map((l) => l.desc).find(Boolean);
    const meta = eps.length ? eps.slice(0, 4).map((x) => `${x.r.m} ${x.r.p}`).join('\n') + (eps.length > 4 ? `\n+${eps.length - 4} more` : '')
      : names.length ? 'uses ' + names.slice(0, 8).join(', ') + (names.length > 8 ? '…' : '') : labels.slice(0, 4).join('\n');
@@ -1045,7 +1062,7 @@
  }
  
  // ======================= right-click menus =======================
-@@ -1200,8 +1299,8 @@ function itemMenu(id) {
+@@ -1200,8 +1303,8 @@ function itemMenu(id) {
    const url = fileForEditor && editorUrl(...fileForEditor);
    return [
      { title: i.name },
@@ -1056,7 +1073,7 @@
      state.container === 'q:answer' && !id.startsWith('x:') ? { label: 'Show on the map', icon: 'external', run: () => reveal(real) } : null,
      EXPORTED ? null : { label: 'Ask about this', icon: 'spark', run: () => addAskContext(real) },
      { label: 'Show details', icon: 'panel', run: () => { setPanel(true); if (id.startsWith('x:')) reveal(real); else select(id); } },
-@@ -1239,9 +1338,11 @@ window.addEventListener('blur', closeMenu);
+@@ -1239,9 +1342,11 @@ window.addEventListener('blur', closeMenu);
  // ======================= pan / zoom =======================
  function applyTransform() {
    const { x, y, k } = state.t;
@@ -1068,7 +1085,7 @@
  }
  const stageRect = () => svg.getBoundingClientRect();
  function setT(t, animate) {
-@@ -1261,8 +1362,13 @@ function freeArea() {
+@@ -1261,8 +1366,13 @@ function freeArea() {
  function fit(animate) {
    const b = state.bounds; if (!b) return;
    const a = freeArea();
@@ -1084,7 +1101,7 @@
  }
  function zoomBy(f, cx, cy) {
    const r = stageRect();
-@@ -1270,13 +1376,12 @@ function zoomBy(f, cx, cy) {
+@@ -1270,13 +1380,12 @@ function zoomBy(f, cx, cy) {
    const k = clamp(state.t.k * f, 0.08, 2.5);
    setT({ k, x: cx - (cx - state.t.x) * (k / state.t.k), y: cy - (cy - state.t.y) * (k / state.t.k) }, false);
  }
@@ -1101,7 +1118,7 @@
  }, { passive: false });
  let drag = null;
  const fingers = new Map(); let pinch = null; // touch only: the fingers on the map, and the pinch they make
-@@ -1354,9 +1459,12 @@ function readHash() {
+@@ -1354,9 +1463,12 @@ function readHash() {
  window.addEventListener('popstate', () => { const { v, s } = readHash(); go(v, { select: s, push: false }); });
  
  async function go(container, { select: sel = null, push = true, zoomFrom = null, after, force = false } = {}) {
@@ -1114,7 +1131,16 @@
    state.container = container; state.selected = sel;
    if (push) setHash(container, sel);
    if (!changed && state.layout && !force) { applySelection(); renderPanel(); if (after) after(); return; }
-@@ -1380,10 +1488,16 @@ function open(item) {
+@@ -1369,7 +1481,7 @@ async function go(container, { select: sel = null, push = true, zoomFrom = null,
+     await new Promise((ok) => setTimeout(ok, 260));
+   }
+   vp.classList.remove('anim'); vp.style.opacity = '0';
+-  await render({ after: () => { vp.classList.add('anim'); requestAnimationFrame(() => { vp.style.opacity = '1'; }); setTimeout(() => vp.classList.remove('anim'), 340); renderPanel(); if (after) after(); } });
++  await render({ nav: true, after: () => { vp.classList.add('anim'); requestAnimationFrame(() => { vp.style.opacity = '1'; }); setTimeout(() => vp.classList.remove('anim'), 340); renderPanel(); if (after) after(); } });
+ }
+ function open(item) {
+   if (item.startsWith('x:')) { reveal(connEntity(item)); return; }
+@@ -1380,10 +1492,16 @@ function open(item) {
    go(item, { zoomFrom: item });
  }
  function up() { if (state.container === 'root') return; closeSheet(); const from = state.container; go(parentOf.get(from) || 'root', { select: from }); }
@@ -1133,7 +1159,7 @@
  }
  /** Moves the map just far enough that a box isn't hidden behind the top bar or the sheet; the zoom and everything else stay as they are. */
  function bringIntoView(item) {
-@@ -1431,13 +1545,13 @@ function applySelection() {
+@@ -1431,13 +1549,13 @@ function applySelection() {
  // ======================= chrome: context, crumbs, legend =======================
  function renderContext() {
    if (state.container === 'q:answer') {
@@ -1149,7 +1175,7 @@
    foldContext();
  }
  /** On a phone the description folds to one line; the More / Less toggle shows only when there's more to read, and the choice is remembered on this device. */
-@@ -1449,11 +1563,22 @@ function foldContext() {
+@@ -1449,11 +1567,22 @@ function foldContext() {
    const long = desc.scrollHeight > desc.clientHeight + 1 || !!ctx.querySelector('.cx');
    ctx.classList.toggle('folded', !open);
    more.hidden = !long;
@@ -1174,7 +1200,7 @@
  function renderCrumbs() {
    const c = $('#crumbs'); c.innerHTML = '';
    const path = chain(state.container).slice().reverse();
-@@ -1497,16 +1622,19 @@ function renderLegend(view) {
+@@ -1497,16 +1626,19 @@ function renderLegend(view) {
  
  // ======================= inspector =======================
  const editorUrl = (p, line = 1) => G.meta.root && !PLAN ? `vscode://file/${encodeURI(G.meta.root.replace(/\\/g, '/'))}/${encodeURI(p)}:${line}` : null;
@@ -1198,7 +1224,7 @@
  function header(i) {
    const kind = i.type === 'node' ? i.kind : i.type === 'symbol' ? i.symKind : i.type === 'route' ? 'Endpoint' : i.type === 'module' ? 'file' : i.type;
    return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(kind)}</span></div>
-@@ -1520,7 +1648,7 @@ function renderPanel() {
+@@ -1520,7 +1652,7 @@ function renderPanel() {
    else if (sel && sel.startsWith('x:')) html = itemPanel(connEntity(sel), true);
    else if (sel && sel.startsWith('m:')) html = itemPanel('f:' + sel.slice(2));
    else if (sel) html = itemPanel(sel);
@@ -1207,7 +1233,7 @@
    // extensions add sections: 'overview' on the codebase panel, 'item' on a selected/opened item
    const where = sel && typeof sel === 'object' ? null : sel ? 'item' : state.container === 'root' ? 'overview' : state.container === 'q:answer' ? null : 'item';
    const target = sel && typeof sel === 'string' ? (sel.startsWith('x:') ? connEntity(sel) : sel.startsWith('m:') ? 'f:' + sel.slice(2) : sel) : state.container;
-@@ -1545,17 +1673,23 @@ function renderPanel() {
+@@ -1545,17 +1677,23 @@ function renderPanel() {
    panel.querySelectorAll('[data-open]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); open(a.dataset.open); }));
    panel.querySelectorAll('[data-flow]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); startFlow(a.dataset.flow); }));
    panel.querySelectorAll('[data-sel]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); select(a.dataset.sel); centerOn(a.dataset.sel); }));
@@ -1234,7 +1260,7 @@
  }
  
  // Top-level parts, grouped under names people understand instead of bare colour dots.
-@@ -1577,13 +1711,14 @@ function systemsSection(tops) {
+@@ -1577,13 +1715,14 @@ function systemsSection(tops) {
    return `<div class="sec"><h3>Systems <span class="c">${tops.length}</span></h3>${parts.join('')}</div>`;
  }
  
@@ -1251,7 +1277,7 @@
      ${systemsSection(tops)}
      ${listSec('Guided flows', G.flows.map((f) => `<a class="row" data-flow="${h(f.id)}"><span class="dot" style="background:var(--accent)"></span><span class="rt"><div class="rn">${h(f.title)}</div>${f.description ? `<div class="rd">${h(f.description)}</div>` : ''}</span><span class="rc">${f.steps.length} steps</span></a>`))}
      ${listSec('Repositories', G.meta.repos.map((r) => `<div class="row" style="cursor:default"><span class="dot" style="background:var(--text-4)"></span><span class="rt"><div class="rn">${h(r.name)}</div><div class="rp">${h(r.branch || '')} @ ${h((r.head || '').slice(0, 7))}</div></span></div>`))}
-@@ -1617,7 +1752,7 @@ function itemPanel(item, viaConnector) {
+@@ -1617,7 +1756,7 @@ function itemPanel(item, viaConnector) {
    if (viaConnector || (parentOf.get(item) !== state.container && state.container !== item)) actions.push(`<button class="btn soft" data-go="${h(item)}">Show on map</button>`);
    if (i.type === 'node' || i.type === 'dir') {
      const n = i.n, s = statsOf(item);
@@ -1260,7 +1286,7 @@
      if (n?.paths?.length || i.d) html += pathBox(i.d ? i.d.path + '/' : n.paths.join('  '));
      if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
      html += '</div>';
-@@ -1632,9 +1767,11 @@ function itemPanel(item, viaConnector) {
+@@ -1632,9 +1771,11 @@ function itemPanel(item, viaConnector) {
      if (n?.packages?.length || n?.hosts?.length || n?.tags?.length) html += `<div class="sec"><h3>Matched by</h3><div class="tags">${[...n.packages.map((p) => 'pkg ' + p), ...n.hosts.map((p) => 'host ' + p), ...n.tags.map((t) => '#' + t)].map((t) => `<span class="tag">${h(t)}</span>`).join('')}</div></div>`;
      html += listSec('Inside', (kids.get(item) || []).filter((k) => !k.startsWith('f:')).map((k) => rowFor(k)));
      const c = connections(item);
@@ -1274,7 +1300,7 @@
    } else if (i.type === 'file' || i.type === 'module') {
      const f = i.f, fid = 'f:' + f.p, url = editorUrl(f.p);
      if (f.note) html += `<div class="callout">${h(f.note)}</div>`;
-@@ -1643,13 +1780,15 @@ function itemPanel(item, viaConnector) {
+@@ -1643,13 +1784,15 @@ function itemPanel(item, viaConnector) {
      if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}Open in editor</a>`);
      if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
      const owner = nodes.get(f.n);
@@ -1294,7 +1320,7 @@
      const handlers = new Set((routesByFile.get(f.p) || []).map((ri) => routes[ri].h));
      if (technical()) html += listSec('Exports', (f.s || []).map((s, k) => [s, k]).filter(([s]) => !handlers.has(s[0])).map(([s, k]) => `<a class="row" ${parentOf.has(`s:${f.p}#${k}`) ? `data-go="s:${h(f.p)}#${k}"` : ''}><span class="dot" style="background:var(--n-symbol)"></span><span class="rt"><div class="rn" style="font-family:var(--mono);font-size:12px">${h(s[0])}</div>${s[4] ? `<div class="rd">${h(s[4])}</div>` : ''}</span><span class="rc">${h(s[1])} · L${s[2]}</span></a>`), undefined, 60);
    } else if (i.type === 'route') {
-@@ -1701,8 +1840,14 @@ const index = [
+@@ -1701,8 +1844,14 @@ const index = [
  ];
  const pal = $('#palette'), sInput = $('#search'), sRes = $('#results');
  let sActive = 0, sItems = [];
@@ -1311,7 +1337,7 @@
  function runSearch() {
    const terms = sInput.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
    let scored = [];
-@@ -1723,19 +1868,23 @@ function runSearch() {
+@@ -1723,19 +1872,23 @@ function runSearch() {
    sRes.innerHTML = sItems.map((it, i) => {
      const ii = info(it.id);
      const ic = it.kind === 'route' ? `<span class="method" style="--m:${methodVar(ii.r.m)}">${h(ii.r.m)}</span>` : `<span class="ico" style="--c:${colorOf(ii)}">${icon(iconKey(ii))}</span>`;
@@ -1339,7 +1365,7 @@
  $('#search-btn').onclick = openPalette;
  
  // ======================= flows =======================
-@@ -1805,16 +1954,23 @@ async function loadCustomFlows() {
+@@ -1805,16 +1958,23 @@ async function loadCustomFlows() {
    const S = window.FLOORPLAN_SERVER;
    if (!S || typeof EventSource === 'undefined') return;
    const reload = () => { toast('Map updated'); setTimeout(() => location.reload(), 500); };
@@ -1372,7 +1398,7 @@
  })();
  
  async function requestFlow(prompt) {
-@@ -1862,9 +2018,9 @@ function flowStep() {
+@@ -1862,9 +2022,9 @@ function flowStep() {
    const container = b ? lcaContainer(a, b) : parentOf.get(a) || 'root';
    const bar = $('#flowbar'); bar.hidden = false;
    bar.innerHTML = `<div class="ft"><div class="fk">${h(f.title)} · step ${i + 1} of ${f.steps.length}</div><b>${h(info(a).name)}</b>${b ? ` <span>→</span> <b>${h(info(b).name)}</b>` : ''}<br><span>${h(f.steps[i].note)}</span><div class="dots">${f.steps.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div></div>
@@ -1384,7 +1410,7 @@
    $('#fl-x').onclick = stopFlow;
    // an answer's walkthrough plays on the answer board itself
    if (state.flow.inPlace) { if (state.container === 'q:answer') highlightFlow(a, b); else go('q:answer', { after: () => highlightFlow(a, b) }); }
-@@ -1951,7 +2107,10 @@ function refChip(id) {
+@@ -1951,7 +2111,10 @@ function refChip(id) {
    return `<span class="ref" data-ref="${h(id)}" style="--c:${colorOf(ii)}"><i></i>${h(b.name)}</span>`;
  }
  function md(src) {
@@ -1396,7 +1422,7 @@
    const out = [];
    let list = null;
    for (const raw of String(src || '').split('\n')) {
-@@ -1965,18 +2124,27 @@ function md(src) {
+@@ -1965,18 +2128,27 @@ function md(src) {
    return out.join('');
  }
  
@@ -1428,7 +1454,7 @@
    });
    sheet.querySelectorAll('[data-follow]').forEach((b) => b.onclick = () => { askInput.value = b.dataset.follow; submitAsk(); });
    sheet.querySelector('[data-act="steps"]')?.addEventListener('click', () => {
-@@ -2002,7 +2170,12 @@ function showAnswer(raw, question) {
+@@ -2002,7 +2174,12 @@ function showAnswer(raw, question) {
    const a = { title: String(raw.title || 'Answer'), answer: String(raw.answer || ''), items: items.slice(0, 18), steps, followups: (raw.followups || []).map(String), question };
    askState.last = a;
    if (a.items.length) { state.answer = a; go('q:answer', { force: true, after: () => renderAnswer(a) }); }
@@ -1442,7 +1468,7 @@
  }
  function showFailure(question, code, message, partial) {
    if (code === 'not_logged_in' || code === 'not_granted') setWarning(code);
-@@ -2015,7 +2188,7 @@ function setBusy(b) {
+@@ -2015,7 +2192,7 @@ function setBusy(b) {
    askState.busy = b;
    askSend.classList.toggle('stop', b);
    askSend.innerHTML = b ? `<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>` : `<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
@@ -1451,7 +1477,7 @@
  }
  function cancelAsk() {
    askState.ctl?.abort();
-@@ -2160,6 +2333,8 @@ async function submitAsk() {
+@@ -2160,6 +2337,8 @@ async function submitAsk() {
    askState.context = []; renderChips();
    if (askState.mode === 'change') return requestChange(ctxIds.length ? `${question}\n\nThis is about: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.` : question);
    const shown = question;
@@ -1460,7 +1486,7 @@
    // what Claude sees: the question plus the pinned items, by id, so it starts from them
    if (ctxIds.length) question += `\n\nFocus on these map items: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.`;
    setBusy(true);
-@@ -2191,16 +2366,7 @@ if (EXPORTED) {
+@@ -2191,16 +2370,7 @@ if (EXPORTED) {
    tag.textContent = isNaN(at) ? 'Exported copy' : `Exported ${at.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
    tag.title = 'A copy of this map to look around in. Asking questions needs Floorplan with Claude Code or Codex, in the codebase itself.';
    $('#proj-name').after(tag);
@@ -1478,7 +1504,7 @@
  }
  document.title = `${G.project.name} map`;
  $('#btn-up').onclick = up;
-@@ -2262,7 +2428,7 @@ const setPanel = (on) => {
+@@ -2262,7 +2432,7 @@ const setPanel = (on) => {
      else if (!on && sheetReturn) { if (panel.contains(document.activeElement) || document.activeElement === document.body) sheetReturn.focus?.({ preventScroll: true }); sheetReturn = null; }
    }
  };
@@ -1487,7 +1513,7 @@
  $('#btn-panel').setAttribute('aria-expanded', String(!document.body.classList.contains('no-panel')));
  // the top bar can be one or two rows tall: everything under it follows its real height
  const headerEl = document.querySelector('header');
-@@ -2281,8 +2447,11 @@ window.addEventListener('keydown', (ev) => {
+@@ -2281,8 +2451,11 @@ window.addEventListener('keydown', (ev) => {
    else if (ev.key === 'Escape') {
      if (!ctxEl.hidden || fm.classList.contains('open') || legendEl.classList.contains('open')) { closeMenu(); fm.classList.remove('open'); legendEl.classList.remove('open'); }
      else if (isPhone() && !document.body.classList.contains('no-panel')) closeSheet(); // on a phone the first Escape puts the details sheet away
@@ -1500,7 +1526,7 @@
    else if (ev.key === 'f' || ev.key === 'F') fit(true);
    else if (ev.key === 'p' || ev.key === 'P') $('#btn-panel').click();
    else if (ev.key === 'Enter' && typeof state.selected === 'string') open(state.selected);
-@@ -2300,22 +2469,37 @@ function setTechnical(on) {
+@@ -2300,22 +2473,37 @@ function setTechnical(on) {
    render({ keepTransform: true, after: renderPanel });
    emit('technical', technicalFlag);
  }
@@ -1541,7 +1567,7 @@
    state.answer = a; askState.last = a;
    go('q:answer', { force: true });
  }
-@@ -2332,7 +2516,7 @@ window.Floorplan = Object.freeze({
+@@ -2332,7 +2520,7 @@ window.Floorplan = Object.freeze({
    version: 1,
    graph: G, query: Q, state, agent: AGENT, exported: EXPORTED,
    // model helpers
@@ -1550,7 +1576,7 @@
    files, nodes, routes, colorOf, iconKey,
    // html helpers
    h, icon, iconI, fmt, plural, md,
-@@ -2372,6 +2556,8 @@ window.Floorplan = Object.freeze({
+@@ -2372,6 +2560,8 @@ window.Floorplan = Object.freeze({
    technical, setTechnical,
    store,
    on(event, fn) { (ext.listeners[event] ||= []).push(fn); },
@@ -1559,14 +1585,14 @@
  });
  technicalFlag = !!store.get('technical', false);
  
-@@ -2379,7 +2565,9 @@ const init = readHash();
+@@ -2379,7 +2569,9 @@ const init = readHash();
  state.container = init.v; state.selected = init.s;
  if (init.s && isPhone()) { document.body.classList.remove('no-panel'); $('#btn-panel').setAttribute('aria-expanded', 'true'); } // a shared link to a box opens its details
  const fontsReady = document.fonts?.ready ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();
 -fontsReady.then(() => render({ after: () => { renderPanel(); emit('ready', {}); if (PLAN && window.FLOORPLAN_SERVER) showChangeResult(); } }));
 +// vibeflow K5 : le premier rendu et `ready` attendent aussi que les scripts d'extension (ui/*.js, posés APRÈS ce script par la page) aient été exécutés (DOMContentLoaded) : polices déjà prêtes (Linux), `fontsReady` est résolue à la fin de ce script et le rendu partait avant eux (titre du panneau, définitions au focus posés sur un rendu déjà fait, écouteurs de `ready` posés trop tard)
 +const extensionsPosees = document.readyState === 'loading' ? new Promise((ok) => document.addEventListener('DOMContentLoaded', ok, { once: true })) : Promise.resolve();
-+Promise.all([fontsReady, extensionsPosees]).then(() => render({ after: () => { renderPanel(); emit('ready', {}); if (PLAN && window.FLOORPLAN_SERVER) showChangeResult(); } }));
++Promise.all([fontsReady, extensionsPosees]).then(() => render({ nav: true, after: () => { renderPanel(); emit('ready', {}); if (PLAN && window.FLOORPLAN_SERVER) showChangeResult(); } }));
  })();
  </script>
  <!--__UI_EXTENSIONS__-->
