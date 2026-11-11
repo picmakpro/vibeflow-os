@@ -101,12 +101,13 @@ recommandée ; l'option recommandée vient du panel ou de l'éclaireur cité. Au
 
 **« À vous » et ce qu'elle bloque**
 
-- **P73-D-06 (sources de « À vous »).** Deux sources en Phase 73 : (a) les sessions à l'état officiel `attend` (« vous
+- **P73-D-06 (sources de « À vous »).** Trois sources (la troisième ajoutée par P73-D-37) : (a) les sessions à l'état officiel `attend` (« vous
   attend », lot 0, inchangé) ; (b) les phases dont un `*-VERIFICATION.md` porte `status: human_needed` dans son en-tête,
   lues en en-tête seul (aujourd'hui seule la présence du fichier est lue), rendues en ligne de niveau phase « Phase N :
-  vérification humaine demandée » reliée à la carte de la phase dans Projet. Écartées : une question `AskUserQuestion`
+  vérification humaine demandée » reliée à la carte de la phase dans Projet ; (c) les questions en attente écrites dans les cadrages au format posé
+  par la Phase 76 (P73-D-37). Écartées : une question `AskUserQuestion`
   sans réponse lue au transcript (rouvrirait la décision D2 du lot 0, voir « À Samuel » S-2) ; les sections « À Samuel »
-  des CONTEXT et des rapports (prose sans forme commune) ; les points d'arrêt des plans (disent « s'arrêtera », pas
+  des CONTEXT et des rapports tant qu'elles ne suivent pas le format de P73-D-37 (prose sans forme commune) ; les points d'arrêt des plans (disent « s'arrêtera », pas
   « attend ») ; les escalades `SendMessage` (pas sur disque) ; « à recetter » (reste à Projet ; doublon avec « Terminé, à
   relire »). Une ligne de session et une ligne de phase de la même phase restent deux lignes (P69-D-15).
 - **P73-D-07 (classement par impact, AUDC-I02).** L'aval d'une attente = nombre de nœuds non terminés atteignables en
@@ -303,10 +304,25 @@ recommandée ; l'option recommandée vient du panel ou de l'éclaireur cité. Au
   disent ce qui change après.
 
 - **P73-D-36 (extracteur des registres de décisions, recoupement signalé par la Phase 76, 2026-11-11).** La régie ne lit
-  pas les registres `P<N>-D-xx` des CONTEXT (P73-D-06 : seules les attentes structurées entrent dans « À vous » ; S-3) :
-  elle n'a pas besoin d'extracteur. Le fichier `plugin/cockpit/scripts/vf-cockpit-registres.mjs` est laissé à la Phase
-  76, qui le crée ; aucun plan de la 73 ne le touche. Si la convention structurée de S-3 est adoptée plus tard, son lecteur
-  passera par ce fichier et sa signature `definitionsRegistre(txt, { phase, ws, fichier, couper })`.
+  pas les registres `P<N>-D-xx` des CONTEXT : elle n'a pas besoin d'extracteur de décisions. Le fichier
+  `plugin/cockpit/scripts/vf-cockpit-registres.mjs` est laissé à la Phase 76, qui le crée ; aucun plan de la 73 ne le
+  touche. Les questions en attente (P73-D-37) sont lues par la 76, pas par la 73.
+
+- **P73-D-37 (questions en attente écrites dans les cadrages : format posé maintenant — arbitrage Samuel,
+  AskUserQuestion session principale, 2026-11-11).** Question posée par la session principale : le but écrit dit que la
+  régie montre « les arbitrages en attente, reliés à leur phase et à ce qu'ils bloquent » ; telle que cadrée, elle ne lisait
+  que deux sources, et les questions écrites en prose dans les cadrages n'y paraissaient pas. Deux options présentées : la
+  recommandation du manager de la 73 (reporter, convention au BACKLOG — ancienne S-3) et « Poser le format maintenant ».
+  Réponse de Samuel, mot pour mot : « Poser le format maintenant (Recommandé) » — « Un format court pour une question en
+  attente (identifiant, question, options, recommandation, ce qu'elle bloque), que les sept cadrages suivent déjà presque.
+  La Phase 76 le lit, la régie de la 73 l'affiche dans « À vous ». Coût : un plan de plus dans la 76 et un dans la 73. Le
+  manager de la 73 recommandait, lui, de reporter. » La recommandation du manager de la 73 était donc l'autre option.
+  Partage : la Phase 76 possède le format (convention d'écriture) et sa lecture (forme rendue à la page) ; la 73 possède
+  l'affichage dans « À vous ». La 73 s'exécute avant la 76 : son plan 73-11 livre l'emplacement et son rendu — une troisième
+  source de « À vous », chaque question reliée à sa phase et à ce qu'elle bloque, classée par la règle de P73-D-07 —,
+  prouvé sur une fixture à la forme du contrat de la 76, et qui reste vide en le disant tant que la lecture de la 76
+  n'existe pas ; le plan de la 76 le remplit. La forme n'est pas inventée par la 73 : 73-11 n'est finalisé qu'avec les
+  contrats de la 76.
 
 ### Claude's Discretion
 
@@ -373,10 +389,8 @@ inventés seulement : dépôt public), ordre des tâches dans une vague.
   sans réponse) passe aujourd'hui pour « au travail » quand l'état officiel est absent. La lire au transcript rouvrirait la
   décision D2 du lot 0 (« vous attend » vient seulement de l'état officiel). Options : (a) garder D2 ; (b) admettre ce
   repli. **Recommandation : (a)** — la source officielle couvre le cas quand elle est disponible.
-- **S-3 — « arbitrages en attente » écrits dans les CONTEXT.** Le but dit « arbitrages en attente reliés à leur phase » ;
-  la Phase 73 n'en lit que les formes structurées (sessions qui attendent, `human_needed`). Les sections « À Samuel »
-  sont en prose. Options : (a) en rester là ; (b) une convention structurée (marqueur d'en-tête dans le CONTEXT), lue
-  ensuite par le cockpit — touche la doctrine de cadrage. **Recommandation : (b), plus tard**, en sujet de BACKLOG.
+- **S-3 — tranchée** par Samuel le 2026-11-11 (AskUserQuestion session principale), autrement que la recommandation du
+  manager : voir P73-D-37.
 - **S-4 — notification du système.** Reportée (P73-D-15). Options : (a) reporter ; (b) l'ajouter en option éteinte par
   défaut dans la 73. **Recommandation : (a)** — elle écrit du texte hors de la page (centre de notifications du système),
   ce qui demande son propre examen de bornes.
@@ -385,7 +399,6 @@ inventés seulement : dépôt public), ordre des tâches dans une vague.
 ## Deferred Ideas
 
 - Notification du système (AUDC-I09, part).
-- Convention structurée pour les arbitrages en attente écrits dans les CONTEXT (S-3).
 - Actions sur une session, dont « Demander l'arrêt » d'un orphelin et « Répondre » (Phase 81, AUDC-Q3).
 </deferred>
 
