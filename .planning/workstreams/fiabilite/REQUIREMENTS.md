@@ -1040,6 +1040,13 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | GITC-12 | Phase 78 | Complete — 2026-11-06 (Phase 78, PR #216, publiée en `v2.76.0` ; revue, audit en lecture, critique design et recette par juges navigateur) |
 | GITC-13 | Phase 78 | Complete — 2026-11-06 (Phase 78, PR #216, publiée en `v2.76.0` ; revue, audit en lecture, critique design et recette par juges navigateur) |
 | GITC-14 | Phase 78 | Complete — 2026-11-06 (Phase 78, PR #216, publiée en `v2.76.0` ; revue, audit en lecture, critique design et recette par juges navigateur) |
+| — | Phase 73 | repère de cadrage, Phase 73 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
+| — | Phase 74 | repère de cadrage, Phase 74 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
+| — | Phase 75 | repère de cadrage, Phase 75 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
+| — | Phase 76 | repère de cadrage, Phase 76 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
+| — | Phase 77 | repère de cadrage, Phase 77 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
+| — | Phase 79 | repère de cadrage, Phase 79 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
+| — | Phase 80 | repère de cadrage, Phase 80 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1655,6 +1662,22 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **GITC-12**: Retrait et non-régression : liste « Repositories » de l'onglet Code retirée ; toutes les suites du cockpit vertes ; chaîne XSS étendue aux données git (nom de branche, message de commit, auteur hostiles) ; bump du module au-dessus de `main` (P78-D-09, P78-D-17, P78-D-18).
 - [x] **GITC-13**: Lectures git existantes durcies : `vf-cockpit-who.mjs`, `vf-cockpit-arbres.mjs`, `vf-cockpit-planning.mjs`, `vf-cockpit-paths.mjs` et le moteur passent par un environnement git unique (variables `GIT_*` héritées retirées, filtres du dépôt neutralisés) ; témoin : dépôt piégé (`filter.<x>.process`, `GIT_DIR` hérité) qui déclenche sans la parade et plus avec (P78-D-25).
 - [x] **GITC-14**: Attribution worktree des sous-agents : l'onglet Équipe montre le dernier worktree cité sur l'ensemble des appels de l'agent, pas le `cwd` de la session parente ; témoin : transcript dont le dernier appel ne cite aucun chemin (P78-D-26).
+
+<!-- Cadrage parallèle des Phases 73 à 77, 79 et 80 (2026-11-11) : chaque phase insère son bloc d'exigences juste après son repère, sans toucher à aucun repère. Repères retirés à la jointure. -->
+
+<!-- vf-cadrage:phase-73 -->
+
+<!-- vf-cadrage:phase-74 -->
+
+<!-- vf-cadrage:phase-75 -->
+
+<!-- vf-cadrage:phase-76 -->
+
+<!-- vf-cadrage:phase-77 -->
+
+<!-- vf-cadrage:phase-79 -->
+
+<!-- vf-cadrage:phase-80 -->
 
 ---
 *Requirements defined: 2026-06-04*
