@@ -139,6 +139,31 @@ session principale, 2026-11-08), option recommandée. Chacun a une entrée au BA
 | H3 | L'empreinte du code comparée à la relance ne couvre que `serve.mjs`, pas les autres modules. | AUDC-H3 | Phase 79, plan 79-06 (planifié 2026-11-11) |
 | A-04 | Pilotes nommés fermés par une liste de sous-commandes de lecture ; un script shell du socle lance git hors du point unique. | AUDC-A-04 | Phase 79, plan 79-07 (planifié 2026-11-11) |
 
+### Constats nés de la mission lot 0 bis (2026-11-11)
+
+Limites et points ouverts consignés par la mission (rapport `.planning/missions/2026-11-11-audit-cockpit-lot-0-bis.md`,
+section « Limites et points ouverts », six puces). Destinations décidées par le manager de la jointure après recherche
+dans les plans des Phases 73 à 77, 79 et 80 : aucun plan ne nomme ces sujets. Les trois destinations « BACKLOG » sont
+inscrites au BACKLOG par la jointure. Sécurité dite par classe, sans recette.
+
+| Réf. | Constat (classe, sans recette) | Ligne | Destination |
+|---|---|---|---|
+| L0b-1 | Fenêtre résiduelle de la correction B-05 : une course sur le dossier d'état du poste (renommage concurrent par le même compte) peut placer le support sous le lab ; le lab ne relit jamais ce support. | AUDC-B-05 | limite acceptée, dite dans l'en-tête du module (décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée), au rang de la limite « poste mono-utilisateur » ; aucune suite |
+| L0b-2 | Rien n'oblige par machine une future suite qui lance un vrai terminal à isoler le dossier d'état. | AUDC-B-05 | BACKLOG |
+| L0b-3 | `72-SECURITY.md` et `72-16-PLAN.md` décrivent encore l'ancien support (« fichier du lab ») au présent. | AUDC-B-05 | aucune suite : documents de phase close non réécrits, la note d'amendement de `72-CONTEXT.md` fait foi |
+| L0b-4 | À la fin du terminal, un bandeau affiché garde le tiroir rehaussé. | AUDC-M11 | comportement retenu (décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée) ; aucune suite |
+| L0b-5 | Constat de la recette, sans lien avec M11 : le bloc défilant du bandeau dépasse de 7 px sous son pied collant. | — | BACKLOG |
+| L0b-6 | Après « Lancer », le panneau garde « Confirmez-la dans le terminal » environ 1 s avant « Commande préparée ». | — | BACKLOG |
+
+### Constat né de la planification des cadrages (2026-11-11)
+
+Né du cadrage de la Phase 75 (rapport `.planning/missions/2026-11-11-phase-75-cadrage.md`, point 8 de « À verser par la
+jointure »), classe AUDC-A-02 / performance.
+
+| Réf. | Constat (classe, sans recette) | Ligne | Destination |
+|---|---|---|---|
+| C75-8 | `compileGlob` du moteur (`plugin/cockpit/skills/cockpit-moteur/scripts/lib/common.mjs`) est super-linéaire sur un motif à plusieurs `**` : `compileGlob('**/a/**/b/**/*.js')` contre `'a/'.repeat(N)+'x'` mesure 855,0 ms à N = 20 000 et 3 444,6 ms à N = 40 000 (mesure de planification, Phase 75, 2026-11-11). Pris par la 79 au point unique (P79-D-32, plan 79-21, `scripts/lib/vf-glob.mjs`) ; la 75 n'y pose plus de borne propre et garde un témoin de non-régression (75-06, V-N2N). | AUDC-A-02 (performance) | Phase 79, plan 79-21 (P79-D-32) |
+
 ## 2. Idées
 
 Statut : `nouveau`, `précise` une phase inscrite, ou `rouvre` une décision de Samuel. Les seize idées déjà inscrites
