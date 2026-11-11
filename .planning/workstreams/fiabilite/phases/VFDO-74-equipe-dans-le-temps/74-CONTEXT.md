@@ -282,7 +282,7 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
 
 ### Arbitrage de Samuel
 
-- **P74-D-46 (couleur de la frise, confirme P74-D-01).** Arbitrage Samuel, AskUserQuestion session principale,
+- **P74-D-46 (couleur de la frise, confirme P74-D-01 ; question P74-Q-01).** Arbitrage Samuel, AskUserQuestion session principale,
   2026-11-11. Question telle qu'elle a été posée : le but écrit dit « une frise colorée par nœud du plan de bataille » ;
   `DESIGN.md` § 9 réserve la couleur aux états ; le cadrage a suivi la règle de design. Réponse, mot pour mot (libellé
   coché) : « Suivre la règle de design (Recommandé) » — option telle qu'elle a été présentée : « La couleur continue de
@@ -304,6 +304,57 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
 - **Ordre de chargement.** `ui/74-vf-frise-carte.js` se charge avant le canal (`ui/75-vf-*`) : il n'appelle rien du
   canal au chargement du script, seulement au geste. Le préfixe `ui/74-vf-` reste réservé à la 74 (P74-D-43).
 
+### Reprise du 2026-11-11 : panels et revalidation sur les contrats voisins
+
+Toutes « décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée », sur trois panels
+(fil, relecture, Dépôt) et une revalidation contre les têtes des Phases 79 (`daae8bc9`, A15 à A47, P79-D-28 à D-33), 73
+(`e4466eba`, P73-D-14, P73-D-20, P73-D-26, P73-D-33) et 80 (`c9ec8756`, 80-02, 80-06, 80-10). Elles amendent les
+décisions citées ; le texte d'origine reste au-dessus pour l'historique.
+
+- **P74-D-48 (fil réduit, amende P74-D-38).** Le réducteur ne gagne que `echec: true` (résultat apparié par identifiant,
+  préfiltre sur le drapeau d'erreur vrai, `Map` des identifiants, un appel en échec jamais regroupé avec des appels
+  réussis, seul le drapeau lu). Les lignes `compaction` et `humain` du fil sont fusionnées CÔTÉ PAGE depuis les
+  `evenements` de la voie (C3), bornées au plus ancien horodatage du fil : une seule règle « humain » et « compaction »,
+  celle de l'index de la 79. Le fichier `vf-cockpit-transcript.mjs` est modifié aussi par 79-13 (règle de chemin unique,
+  `reduireCible`, forme `(worktree <nom>)`) : 74-02 s'exécute sur la base où 79-13 est fusionné, et le dit en précondition.
+- **P74-D-49 (relecture au curseur, amende P74-D-12, D-14, D-35 ; D-13 gardée).** Les fichiers « autour de t » se
+  cherchent sur les voies dont le travail recoupe [t − δ, t + δ], avec δ = max(2 min, pas du curseur / 2). Premier filtre :
+  `cibles[].dernierMs` (C3, A45) — dans la fenêtre : écrit, certain ; avant : non écrit, certain ; après : incertain, et
+  seul ce cas lit le fil réduit. Une entrée regroupée couvre l'intervalle jusqu'à l'élément suivant ; le fil est jugé trop
+  court quand son premier élément est après t − δ et qu'il est tronqué. Lecture 250 ms après le dernier déplacement ou au
+  relâché, au plus deux lectures en vol et six par instant, cache par (voie, `fin`) gardé tant que `fin` ne bouge pas ; au
+  delà, liste partielle et « N voies non lues », jamais six lectures jetées. `noeudsPortes` rend l'état de la voie qui
+  porte le nœud (travail, vous attend, attend ses agents, repos). L'issue d'un agent tirée du registre du verrou n'est
+  affichée que si la 79 la publie.
+- **P74-D-50 (Dépôt, amende P74-D-33 et D-40 ; D-07 gardée).** Couverture : le dépôt est « peut-être incomplet avant
+  <heure> » quand la marche est tronquée et que le plus récent des instants entre le plus ancien commit lu et la plus
+  récente rangée dont un parent n'a pas été lu (secondes × 1000) est dans la fenêtre — la marche est topologique, le plus
+  ancien commit lu ne borne rien seul. Descente du premier parent : la chaîne de la base d'abord, puis les branches
+  locales, puis les distantes ; les commits atteints par aucune forment une dernière ligne « Autres commits (branches
+  fusionnées ou sans nom) », jamais pliée. La route Git se lit au montage puis sur `VF_ETAT.abonner('git')`, jamais au
+  rythme de l'événement `frise`. Ouverture d'un commit : par le tiroir et le volet de détail de la Phase 80
+  (`VFGitTiroir.ouvrir`, puis `VFGitVolet.ouvrir(sha, rangee)`, 80-06) ; la 74 ne modifie plus
+  `ui/77-vf-git-vue-detail.js`.
+- **P74-D-51 (jointure avec la régie, P73-D-20 ; amende P74-D-02, D-04, D-28 (3), D-30, D-41).** La frise se déclare
+  comme une vue de la régie (`window.__vfEquipeVues.declarer({ id: 'frise', libelle: 'Frise', monter, demonter })`, dans
+  `section#vf-equipe`) : la bascule est dessinée par la 73, la 74 n'en pose pas. La fiche s'ouvre en annulant l'événement
+  de document `vf-agent:ouvrir` (déclencheurs convenus avec la 73) et émet `vf-agent:lu` à l'ouverture d'un agent
+  terminé. La 74 ne modifie aucun fichier de la 73. Le pli « Terminés » du tiroir « Au travail » est retiré par la 73
+  (P73-D-14, 73-10) et le tiroir quitte l'onglet Équipe : le retrait (3) de la 74 se réduit à la carte du canevas si elle
+  existe encore, et la durée du tiroir (D-41) tombe. `__vfEquipeRendu.transcript` reste exporté tant que le lecteur de
+  repli de la 73 l'utilise. Glyphes : `__vfEquipeRendu.GLYPHE_ETAT` (73-04).
+- **P74-D-52 (contrats de la 79 et de la 80 depuis A15).** `arbre: null` désigne l'arbre principal (A45), jamais
+  « inconnu » ; `cibles: null` = forme inconnue (A43) ; les comptes de fichiers se font par couple (`arbre`, `cible`) et
+  disent « 200 ou plus » au plafond ; une cible du fil réduit de forme `<chemin> (worktree <nom>)` se lit
+  `{ arbre: <nom>, cible }`, une cible coupée à 120 caractères ne se pose sur aucune carte. Quand `tronque` est vrai
+  (dont la coupe à 500 voies, A43, A47), la frise dit que des voies ne sont pas montrées et les totaux de coût disent
+  « incomplet ». Un 400 `bornes-invalides` donne l'état « indisponible ». Les phases lisent `VF_ETAT`, jamais `VF_FLUX`.
+  « Voir sur la carte » passe par `VF_ONGLETS.aller('code')` (80-10) quand il existe. Un fichier de code fait 299 lignes
+  au plus (A44) et aucune ligne de plus de 160 colonnes ; chaque module neuf a sa ligne `AJOUT` dans `VENDORED.txt`,
+  posée par 74-09 seul (journal de vendoring, seule exception à P74-D-31). La suite de la frise de la 74 s'appelle
+  `test-cockpit-frise-vue.sh` (`test-cockpit-frise.sh` appartient à 79-13). Les mutants se posent sur une copie du
+  MODULE servie par l'aide commune des suites, jamais sur une copie de la sortie (79-06, 79-16, A41).
+
 ### Claude's Discretion
 
 Laissés à la spécification d'interface et à la planification, dans les bornes ci-dessus : la géométrie de la frise
@@ -314,22 +365,36 @@ voies (P74-D-10), le mécanisme de mise en évidence sur la carte Code (P74-D-12
 <specifics>
 ## À Samuel
 
-Quatre points, aucun ne bloque la planification ; le premier est tranché (P74-D-46), les trois autres restent des options
-recommandées appliquées sous délégation, l'arbitrage en vigueur tient et le plan est bâti dessus.
+Format C76-Q1 (Phase 76, P76-D-34). Une question tranchée, quatre appliquées sous délégation ; aucune ne bloque un plan.
 
-1. **« Colorée par nœud de DAG »** — **tranché** (P74-D-46, arbitrage Samuel, AskUserQuestion session principale,
-   2026-11-11) : « Suivre la règle de design (Recommandé) ». La couleur dit l'état, le nœud s'écrit en toutes lettres sur
-   chaque voie. Le point reste listé ici pour mémoire.
-2. **Pas de montant en devise** (P74-D-20) : le coût se lit en jetons et en durée, comme le dit le but. DESIGNS § 5
-   proposait un « coût estimé au tarif public ». Recommandé : ne pas l'ajouter (table de tarifs à tenir, estimation que la
-   Phase 52 refuse). Si tu le veux, il entre dans une phase ultérieure, pas dans la 74.
-3. **Limites de 5 h et de 7 jours hors de la 74** (P74-D-24), alors que AUDC-I07 les plaçait ici. Recommandé : en réserve
-   avec le plafond de coût (AUDC-I35), parce qu'elles ne concernent que la session principale et demandent un relais par
-   la ligne d'état.
-4. **« Rejoue une mission nœud par nœud »** (même but) est tenu par dérivation : à l'instant t, un nœud est dit porté
-   par un agent au travail, au repos ou par aucun agent, d'après les voies (P74-D-13) ; le statut exact du DAG (`ready`,
-   `blocked`…) n'est pas rejoué, faute d'horodatage dans les plans de mission. Recommandé : s'en tenir là ; à voir à la
-   recette. Si tu veux le statut exact, il faut horodater les transitions de `dag.sh` (conductor), hors de cette phase.
+- **P74-Q-01 — Couleur de la frise.** Le but écrit dit « une frise colorée par nœud du plan de bataille » ; `DESIGN.md` § 9
+  réserve la couleur aux états ; faut-il colorer les voies par nœud ?
+  Options : (a) suivre la règle de design : la couleur dit l'état, le nom du nœud s'écrit sur chaque voie ; (b) colorer par nœud, en rouvrant Q9 .
+  Recommandation : (a) — une couleur par nœud demanderait une palette libre que Graphite interdit, et la couleur cesserait de dire l'état.
+  Bloque : rien
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (a) — « Suivre la règle de design (Recommandé) »
+- **P74-Q-02 — Montant en devise.** Le coût se lit-il seulement en jetons et en durée, ou aussi en devise, estimée au
+  tarif public (proposition de DESIGNS § 5) ?
+  Options : (a) jetons et durée seulement, comme le dit le but ; (b) ajouter un coût estimé au tarif public .
+  Recommandation : (a) — une estimation demande une table de tarifs à tenir dans le module, et la Phase 52 pose « jamais estimé ».
+  Bloque : rien
+  État : appliquée — décision déléguée par Samuel (message session principale, 2026-11-08), option (a) — P74-D-20
+- **P74-Q-03 — Limites de 5 h et de 7 jours.** AUDC-I07 plaçait ces limites dans la 74 ; les y garder ?
+  Options : (a) en réserve avec le plafond de coût (AUDC-I35) ; (b) dans la 74, par un relais de la ligne d'état .
+  Recommandation : (a) — elles ne concernent que la session principale, pour trois abonnements, et demandent un relais hors de ce que lit le socle.
+  Bloque : rien
+  État : appliquée — décision déléguée par Samuel (message session principale, 2026-11-08), option (a) — P74-D-24
+- **P74-Q-04 — Relecture nœud par nœud.** Le but dit « rejoue une mission nœud par nœud » ; les plans de mission
+  n'horodatent pas leurs transitions : l'état d'un nœud à l'instant t se dérive-t-il des voies des agents qui le portent ?
+  Options : (a) dériver l'état des voies (porté par un agent au travail, au repos, ou par aucun) ; (b) horodater les transitions de `dag.sh` (conductor, hors de cette phase) pour rejouer le statut exact .
+  Recommandation : (a) — aucune donnée nouvelle, rien d'inventé ; (b) touche le socle de gouvernance pour un gain que la recette dira.
+  Bloque : rien
+  État : appliquée — décision déléguée par Samuel (message session principale, 2026-11-08), option (a) — P74-D-13
+- **P74-Q-05 — Genre `silence` sur la frise.** La route de frise distingue le silence du repos : comment le dessiner ?
+  Options : (a) ne rien dessiner (un blanc sur la voie) ; (b) le dessiner comme le repos (pointillé neutre) .
+  Recommandation : (a) — quatre sortes de segment restent lisibles sans la couleur ; un blanc peut se lire comme une donnée manquante, à voir à la recette.
+  Bloque : rien
+  État : appliquée — décision déléguée par Samuel (message session principale, 2026-11-08), option (a) — P74-D-36
 </specifics>
 
 <canonical_refs>
