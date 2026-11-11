@@ -377,7 +377,8 @@ console.log(JSON.stringify({ brut: /</.test(m.decouper(out).donnees), allerRetou
 JS
 assert_eq "E1 — aucun « < » dans la zone de données, aller-retour exact, 2 balises script" "$(node "$AUX/emb.mjs" "$SCRIPTS" | node "$AUX/ev.mjs" 'j.brut+","+j.allerRetour+","+j.scripts')" "false,true,2"
 assert_eq "E2 — le moteur (build.mjs) échappe aussi chaque < en \\u003c" "$(grep -c "replace(/</g, '\\\\\\\\u003c')" "$ENG/scripts/build.mjs")" "1"
-assert_eq "E3 — l'export (serve.mjs) échappe de même" "$(grep -c "replace(/</g, '\\\\\\\\u003c')" "$ENG/assets/serve.mjs")" "1"
+assert_eq "E3 — l'export (serve.mjs) échappe de même" "$(grep -cF "JSON.stringify(out).replace(/</g, '\\\\u003c')" "$ENG/assets/serve.mjs")" "1"
+assert_eq "E3b — l'objet injecté dans les pages (version, modèle) échappe aussi chaque < (AUDC-B-06 1)" "$(grep -F 'window.FLOORPLAN_SERVER=' "$ENG/assets/serve.mjs" | grep -cF "replace(/</g, '\\\\u003c')")" "1"
 
 echo "=== C — sans vf-cockpit-server.mjs : échec franc ==="
 cp -R "$OUT" "$WORK/sortie-sans"; rm -f "$WORK/sortie-sans/vf-cockpit-server.mjs"

@@ -137,5 +137,78 @@ VF.stop(); process.exit(0);
 JS
 assert_eq "D3.3 — deux appels sans rien de changé : la page Équipe n'est construite qu'une fois ; une réécriture de la page Projet la fait reconstruire" "$(node "$AUX/memo.mjs" "$OUT" "$LAB" "$SCRIPTS" 2>&1 | tail -1)" '{"page":true,"identique":true,"constructions":1,"apresLoad":2}'
 
+echo "=== D4 — injection de version : « < » échappé (AUDC-B-06 1) ==="
+demarrer VF_FAKE_VERSION='</script><b id=zz>2.1.316'
+H r "$PORT" GET / '{}' "$WORK/d4.txt"; H r "$PORT" GET /project.html '{}' "$WORK/d4p.txt"
+assert_eq "D4.1 — la page ne porte jamais la balise fermante issue de la version (page Code, page Projet)" "$(grep -c '<b id=zz>' "$WORK/d4.txt")|$(grep -c '<b id=zz>' "$WORK/d4p.txt")" "0|0"
+assert_eq "D4.2 — témoin : la version reste lisible une fois l'objet relu" "$(node -e "const t=require('fs').readFileSync('$WORK/d4.txt','utf8');const m=/VF_COCKPIT_SERVER=(\{.*?\});<\/script>/.exec(t);console.log(m?JSON.parse(m[1]).version:'absent')")" "</script><b id=zz>2.1.316"
+
+echo "=== D5 — le jeton se compare en temps constant (AUDC-B-06 2) ==="
+: > "$WORK/spy.txt"; NODE_ARGS="--import $AUX/espion.mjs"; demarrer VF_SPY_FILE="$WORK/spy.txt"; NODE_ARGS=""
+H r "$PORT" GET /api/status "{\"x-vf-cockpit-token\":\"$TOK\"}" "$WORK/d5a.txt"
+H r "$PORT" GET /api/status "{\"x-vf-cockpit-token\":\"$(printf '%s' "$TOK" | sed 's/.$/0/;s/^\(.*\)0$/\1x/')\"}" "$WORK/d5b.txt"
+H r "$PORT" GET /api/status "{\"x-vf-cockpit-token\":\"${TOK}0\"}" "$WORK/d5c.txt"
+assert_eq "D5.1 — jeton exact 200 ; même longueur mais autre 403 ; plus long 403" "$(H statut "$WORK/d5a.txt")|$(H statut "$WORK/d5b.txt")|$(H statut "$WORK/d5c.txt")" "200|403|403"
+assert_eq "D5.2 — la comparaison passe par crypto.timingSafeEqual (au moins un appel pour la requête au bon jeton)" "$([ "$(wc -c < "$WORK/spy.txt" | tr -d ' ')" -ge 1 ] && echo oui || echo non)" "oui"
+cat > "$AUX/jeton.mjs" <<'JS'
+// jeton.mjs <sortie> <lab> <scripts> : jetonValide du crochet VibeFlow (jeton de la page Projet) — mêmes garanties
+import path from 'node:path'; import crypto from 'node:crypto'; import { pathToFileURL } from 'node:url';
+const [, , sortie, lab, scripts] = process.argv;
+let n = 0; const o = crypto.timingSafeEqual; crypto.timingSafeEqual = (x, y) => { n++; return o(x, y); };
+const { attach } = await import(pathToFileURL(path.join(sortie, 'vf-cockpit-server.mjs')).href);
+const VF = attach({ here: sortie, root: lab, token: 'ab'.repeat(16), inject: '<x>', log: () => {} });
+const p = VF.ptoken, faux = p.slice(0, -1) + (p.endsWith('0') ? '1' : '0');
+console.log(JSON.stringify({ ok: VF.jetonValide(p), meme: VF.jetonValide(faux), court: VF.jetonValide(p.slice(1)), long: VF.jetonValide(p + '0'), vide: VF.jetonValide(undefined), tableau: VF.jetonValide([p]), constant: n >= 1 }));
+VF.stop(); process.exit(0);
+JS
+assert_eq "D5.3 — jetonValide (jeton de la page Projet) : exact accepté, autre ou mal formé refusé, comparé par timingSafeEqual" "$(node "$AUX/jeton.mjs" "$OUT" "$LAB" "$SCRIPTS" 2>&1 | tail -1)" '{"ok":true,"meme":false,"court":false,"long":false,"vide":false,"tableau":false,"constant":true}'
+
+echo "=== D6 — le lanceur ne croit pas un dossier de scripts hérité (AUDC-B-06 3) ==="
+mkdir -p "$WORK/leurre"
+LAB6="$WORK/lab6"; cp -R "$LAB" "$LAB6"; rm -rf "$LAB6/.vibeflow"
+VF_COCKPIT_SCRIPTS_DIR="$WORK/leurre" node "$SCRIPTS/vf-cockpit.mjs" build --lab "$LAB6" > "$WORK/d6.out" 2>&1; RC6=$?
+assert_eq "D6.1 — avec une variable héritée vers un dossier sans moteur, le lanceur assemble quand même (code 0, sortie présente)" "$RC6|$([ -f "$LAB6/.vibeflow/cockpit/serve.mjs" ] && echo oui || echo non)" "0|oui"
+VF_COCKPIT_SCRIPTS_DIR="$WORK/leurre" node "$SCRIPTS/vf-cockpit.mjs" open --no-open --lab "$LAB6" --port "$(libre)" > "$WORK/d6o.out" 2>&1; RCO=$?
+PID6="$(sed -n 's/.*PID \([0-9][0-9]*\).*/\1/p' <(node "$SCRIPTS/vf-cockpit.mjs" status --lab "$LAB6") | head -1)"
+if [ -n "$PID6" ] && [ -r "/proc/$PID6/environ" ]; then ENV6="$(tr '\0' '\n' < "/proc/$PID6/environ")"; elif [ -n "$PID6" ]; then ENV6="$(ps eww -p "$PID6" 2>/dev/null | tr ' ' '\n')"; else ENV6=""; fi
+assert_eq "D6.2 — le serveur lancé reçoit le dossier de scripts du module, jamais la valeur héritée (démarrage $RCO)" "$(printf '%s\n' "$ENV6" | grep -F 'VF_COCKPIT_SCRIPTS_DIR=' | head -1)" "VF_COCKPIT_SCRIPTS_DIR=$SCRIPTS"
+node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$LAB6" > /dev/null 2>&1
+[ -n "$PID6" ] && vf_hyg_stop "$PID6"
+
+echo "=== D7 — citation shell sûre sous fish pour un chemin portant une barre oblique inverse (AUDC-B-06 4) ==="
+cat > "$AUX/fish.mjs" <<'JS'
+// Modèle de lecture d'UN mot par fish (documentation de fish, « Quotes » et « Escaping characters »), appliqué à la sortie de citer :
+// entre apostrophes, seuls « \\ » et « \' » sont des échappements (tout autre « \x » reste littéral) ; hors apostrophes, « \x » vaut « x ».
+// Rend le mot lu, ou null si la citation est mal formée (apostrophe non fermée, barre finale).
+import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const { citer, cmdCd } = await import(pathToFileURL(path.join(process.argv[2], 'vf-cockpit-git-commandes.mjs')).href);
+const fish = (w) => { let o = '', i = 0, q = false;
+  while (i < w.length) { const c = w[i];
+    if (q) { if (c === '\\' && (w[i + 1] === '\\' || w[i + 1] === "'")) { o += w[i + 1]; i += 2; } else if (c === "'") { q = false; i++; } else { o += c; i++; } }
+    else if (c === "'") { q = true; i++; } else if (c === '\\') { if (i + 1 >= w.length) return null; o += w[i + 1]; i += 2; } else { o += c; i++; } }
+  return q ? null : o; };
+const cas = ['plain', 'a b', 'a\\b', 'a\\', '\\', '\\\\', "it's", "a\\'b", '/tmp/wt\\x y/\\', "'", "\\'"];
+console.log(JSON.stringify(cas.filter((s) => fish(citer(s)) !== s)));
+console.log(cmdCd('/tmp/a\\') === "cd -- '/tmp/a'\\\\''" ? 'cd-ok' : 'cd-autre:' + cmdCd('/tmp/a\\'));
+JS
+assert_eq "D7.1 — lu par fish (modèle de la documentation), citer(s) rend s : barre finale, doublée, barre devant une apostrophe" "$(node "$AUX/fish.mjs" "$SCRIPTS" | sed -n 1p)" "[]"
+assert_eq "D7.2 — la commande « cd » d'un chemin à barre oblique inverse finale" "$(node "$AUX/fish.mjs" "$SCRIPTS" | sed -n 2p)" "cd-ok"
+cat > "$AUX/bash-citer.mjs" <<'JS'
+import path from 'node:path'; import { pathToFileURL } from 'node:url'; import { execFileSync } from 'node:child_process';
+const { citer } = await import(pathToFileURL(path.join(process.argv[2], 'vf-cockpit-git-commandes.mjs')).href);
+const mal = ['plain', 'a b', 'a\\b', 'a\\', '\\', '\\\\', "it's", "a\\'b", '$(x)', '`x`', 'a;b|c&d', '"q"', 'a\nb'].filter((s) => execFileSync('sh', ['-c', 'printf %s ' + citer(s)], { encoding: 'utf8' }) !== s);
+console.log(JSON.stringify(mal));
+JS
+assert_eq "D7.3 — témoin positif : sous sh, la même citation rend toujours le mot à l'octet" "$(node "$AUX/bash-citer.mjs" "$SCRIPTS")" "[]"
+
+echo "=== D8 — CLAUDE_EFFORT et CLAUDE_PID ne passent pas au terminal (AUDC-B-06 5) ==="
+cat > "$AUX/env.mjs" <<'JS'
+import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const { envShell } = await import(pathToFileURL(path.join(process.argv[2], 'vf-cockpit-terminal-env.mjs')).href);
+const e = envShell({ CLAUDE_EFFORT: 'high', CLAUDE_PID: '4242', CLAUDECODE: '1', CLAUDE_CODE_X: 'y', CLAUDE_CONFIG_DIR: '/x/cfg', HOME: '/h', PATH: '/bin' }, []);
+console.log(JSON.stringify({ effort: 'CLAUDE_EFFORT' in e, pid: 'CLAUDE_PID' in e, cc: 'CLAUDECODE' in e || 'CLAUDE_CODE_X' in e, config: e.CLAUDE_CONFIG_DIR, home: e.HOME }));
+JS
+assert_eq "D8.1 — filtrées : CLAUDE_EFFORT, CLAUDE_PID ; déjà filtrées : CLAUDECODE, CLAUDE_CODE_* ; passent : les autres (liste noire seulement, P71-D-03)" "$(node "$AUX/env.mjs" "$SCRIPTS")" '{"effort":false,"pid":false,"cc":false,"config":"/x/cfg","home":"/h"}'
+
 echo; echo "=== bilan : $PASS passés, $FAIL échoués ==="
 [ "$FAIL" -eq 0 ]

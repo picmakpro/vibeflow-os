@@ -66,7 +66,7 @@
 -const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange })};</script>`;
 +let TERM = null; // vibeflow P26 : terminal intégré, chargé seulement avec --terminal (second écouteur 127.0.0.1, aucun effet sans le drapeau)
 +if (has('terminal')) { try { TERM = (await import(new URL('./vf-cockpit-terminal.mjs', import.meta.url))).preparerTerminal({ here, root, jetons: () => [token, VF?.ptoken] }); } catch (e) { console.error(`vf-cockpit : terminal indisponible : ${e.message}. Relancer « vf-cockpit build ».`); } } // vibeflow P26
-+const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange })};</script>` + (TERM ? TERM.injection() : ''); // vibeflow P26
++const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange }).replace(/</g, '\\u003c')};</script>` + (TERM ? TERM.injection() : ''); // vibeflow P26
  let page, G, core, MODES;
 +// vibeflow P13 : serveur unique. Le direct, « au travail » et la page Projet vivent dans vf-cockpit-server.mjs, posé à côté de
 +// vibeflow P13 : ce fichier ; absent, le serveur reste celui de l'amont. Même port que la page, aucun en-tête CORS.
@@ -244,12 +244,13 @@
    try { return execFileSync(process.execPath, [path.join(dir, 'scripts', name), root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, timeout: 120000 }); }
    catch (e) { throw Object.assign(new Error(String(e.stdout || '') + String(e.stderr || '') || e.message), { checks: true }); }
  }
-@@ -509,16 +489,39 @@ function undoChange() {
+@@ -509,16 +489,40 @@ function undoChange() {
  }
  
  // ---------- http ----------
 +// vibeflow P18 : un corps n'est cru que s'il est un objet JSON (null, 5, "s", [..] : 400, jamais une exception)
 +const parseBody = (raw) => { try { const b = JSON.parse(raw); return b && typeof b === 'object' && !Array.isArray(b) ? b : null; } catch { return null; } };
++const sameToken = (a, b) => { if (typeof a !== 'string' || typeof b !== 'string') return false; const x = Buffer.from(a), y = Buffer.from(b); return x.length === y.length && crypto.timingSafeEqual(x, y); }; // vibeflow AUDC-B-06 : comparaison en temps constant
 +const bad = (res) => { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Requête invalide : un objet JSON est attendu.' })); };
 +// vibeflow P17 : en-têtes de toutes les réponses. La page ne charge que ses scripts en ligne (empreintes), aucune origine tierce,
 +// ne se laisse pas encadrer, n'envoie aucun formulaire. Les polices et logos sont des data: ; les styles en ligne sont admis (36 attributs style).
@@ -280,13 +281,13 @@
 -    const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' ? url.searchParams.get('token') : null);
 -    if (!sameOrigin || given !== token) { res.writeHead(403); return res.end(); }
 +    const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' || url.pathname === '/api/vf/events' ? url.searchParams.get('token') : null); // vibeflow P13
-+    if (!sameOrigin || (given !== token && !VF?.jetonValide(given))) { res.writeHead(403); return res.end(); } // vibeflow P13
++    if (!sameOrigin || (!sameToken(given, token) && !VF?.jetonValide(given))) { res.writeHead(403); return res.end(); } // vibeflow P13
 +    if (TERM && req.method === 'GET' && url.pathname === '/api/vf/terminal') return TERM.routeP(req, res); // vibeflow P26 : état du terminal (jamais un secret), après le Host et le jeton
 +    if (VF && url.pathname.startsWith('/api/vf/') && VF.route(req, res, url)) return; // vibeflow P13 : routes du serveur unique, après le Host et le jeton
      if (req.method === 'GET' && url.pathname === '/api/events') {
        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
        res.write('retry: 1000\n\n'); // reconnect quickly after a restart
-@@ -534,33 +537,13 @@ const server = http.createServer((req, res) => {
+@@ -534,33 +538,13 @@ const server = http.createServer((req, res) => {
        if (req.method === 'POST' || req.method === 'DELETE') {
          let raw = '';
          req.on('data', (d) => { raw += d; if (raw.length > 50000) req.destroy(); });
@@ -323,7 +324,7 @@
          return;
        }
      }
-@@ -573,7 +556,7 @@ const server = http.createServer((req, res) => {
+@@ -573,7 +557,7 @@ const server = http.createServer((req, res) => {
        let raw = '';
        req.on('data', (d) => { raw += d; if (raw.length > 500000) req.destroy(); });
        req.on('end', () => {
@@ -332,7 +333,7 @@
          try {
            const x = exportMap(Array.isArray(body.include) ? body.include.map(String) : EXPORT_DEFAULT, cleanFlows(body.flows));
            res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Content-Disposition': `attachment; filename="${x.name}"`, 'Cache-Control': 'no-store' });
-@@ -589,19 +572,28 @@ const server = http.createServer((req, res) => {
+@@ -589,19 +573,28 @@ const server = http.createServer((req, res) => {
      if (req.method === 'POST' && url.pathname === '/api/ask') {
        let raw = '';
        req.on('data', (d) => { raw += d; if (raw.length > 20000) req.destroy(); });
@@ -365,7 +366,7 @@
  // another map (or anything else) on the port: take the next free one
  let port = wantPort;
  server.on('error', (e) => {
-@@ -614,8 +606,10 @@ server.on('listening', () => {
+@@ -614,8 +607,10 @@ server.on('listening', () => {
    const u = `http://127.0.0.1:${port}`;
    try {
      fs.mkdirSync(path.dirname(stateFile), { recursive: true });

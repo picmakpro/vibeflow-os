@@ -171,7 +171,7 @@ if (cli) { try { version = execFileSync(cli.cmd, [...cli.args, '--version'], { e
 // code). Loaded at start and again whenever the map is rebuilt.
 let TERM = null; // vibeflow P26 : terminal intégré, chargé seulement avec --terminal (second écouteur 127.0.0.1, aucun effet sans le drapeau)
 if (has('terminal')) { try { TERM = (await import(new URL('./vf-cockpit-terminal.mjs', import.meta.url))).preparerTerminal({ here, root, jetons: () => [token, VF?.ptoken] }); } catch (e) { console.error(`vf-cockpit : terminal indisponible : ${e.message}. Relancer « vf-cockpit build ».`); } } // vibeflow P26
-const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange })};</script>` + (TERM ? TERM.injection() : ''); // vibeflow P26
+const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange }).replace(/</g, '\\u003c')};</script>` + (TERM ? TERM.injection() : ''); // vibeflow P26
 let page, G, core, MODES;
 // vibeflow P13 : serveur unique. Le direct, « au travail » et la page Projet vivent dans vf-cockpit-server.mjs, posé à côté de
 // vibeflow P13 : ce fichier ; absent, le serveur reste celui de l'amont. Même port que la page, aucun en-tête CORS.
@@ -491,6 +491,7 @@ function undoChange() {
 // ---------- http ----------
 // vibeflow P18 : un corps n'est cru que s'il est un objet JSON (null, 5, "s", [..] : 400, jamais une exception)
 const parseBody = (raw) => { try { const b = JSON.parse(raw); return b && typeof b === 'object' && !Array.isArray(b) ? b : null; } catch { return null; } };
+const sameToken = (a, b) => { if (typeof a !== 'string' || typeof b !== 'string') return false; const x = Buffer.from(a), y = Buffer.from(b); return x.length === y.length && crypto.timingSafeEqual(x, y); }; // vibeflow AUDC-B-06 : comparaison en temps constant
 const bad = (res) => { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Requête invalide : un objet JSON est attendu.' })); };
 // vibeflow P17 : en-têtes de toutes les réponses. La page ne charge que ses scripts en ligne (empreintes), aucune origine tierce,
 // ne se laisse pas encadrer, n'envoie aucun formulaire. Les polices et logos sont des data: ; les styles en ligne sont admis (36 attributs style).
@@ -519,7 +520,7 @@ function route(req, res) {
   if (url.pathname.startsWith('/api/')) {
     // EventSource can't send headers, so the events stream takes the token in the query string
     const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' || url.pathname === '/api/vf/events' ? url.searchParams.get('token') : null); // vibeflow P13
-    if (!sameOrigin || (given !== token && !VF?.jetonValide(given))) { res.writeHead(403); return res.end(); } // vibeflow P13
+    if (!sameOrigin || (!sameToken(given, token) && !VF?.jetonValide(given))) { res.writeHead(403); return res.end(); } // vibeflow P13
     if (TERM && req.method === 'GET' && url.pathname === '/api/vf/terminal') return TERM.routeP(req, res); // vibeflow P26 : état du terminal (jamais un secret), après le Host et le jeton
     if (VF && url.pathname.startsWith('/api/vf/') && VF.route(req, res, url)) return; // vibeflow P13 : routes du serveur unique, après le Host et le jeton
     if (req.method === 'GET' && url.pathname === '/api/events') {

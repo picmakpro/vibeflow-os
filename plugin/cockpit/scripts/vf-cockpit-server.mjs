@@ -34,6 +34,9 @@ let INTERDITS = []; // une seule source : le contrat, lu une fois au chargement
 try { const l = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json'), 'utf8')).schemas?.['vibeflow/cockpit-who@2']?.interdits; if (Array.isArray(l)) INTERDITS = l.filter((k) => typeof k === 'string' && k); } catch { INTERDITS = []; }
 const porteInterdit = (o) => !INTERDITS.length || (!!o && typeof o === 'object' && Object.entries(o).some(([k, v]) => INTERDITS.includes(k) || porteInterdit(v)));
 
+// comparaison de jeton en temps constant (AUDC-B-06) : jamais un `===` sur un secret
+const memeJeton = (a, b) => { if (typeof a !== 'string' || typeof b !== 'string') return false; const x = Buffer.from(a), y = Buffer.from(b); return x.length === y.length && crypto.timingSafeEqual(x, y); };
+
 export function attach({ here, root, token, inject, log = () => {} }) {
   const ptoken = crypto.randomBytes(16).toString('hex'); // onglet Projet : dit de quel onglet vient une requête
   let pageP = null, GP = null, gabarit = null, genP = 0, memoE = null; // genP : génération du gabarit ; memoE : la page Équipe déjà construite (AUDC-B-03)
@@ -147,7 +150,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
       memoE = { gen: genP, who, cles, html };
       return html;
     },
-    jetonValide: (j) => typeof j === 'string' && j === ptoken,
+    jetonValide: (j) => memeJeton(j, ptoken),
     stop() { live?.stop(); for (const c of clients) c.end(); },
   };
 }
