@@ -634,7 +634,7 @@ Plans:
   4. Le tiroir Git est lisible à 1024 × 768 sans pousser la carte ; les jetons repris passent les seuils de contraste mesurés dans les deux thèmes.
   5. Après la Phase 79, changer d'onglet ne recharge plus la page et garde tiroirs, zoom et historique du terminal.
   6. Toutes les suites du cockpit vertes sous macOS et Linux ; chaque comportement porte un témoin rouge sur la base puis vert.
-**Plans:** 20 plans en 11 vagues (vagues 1 à 3 sans dépendance à la Phase 79 ; à partir de 80-09 : 79-01 à 79-18 fusionnés ; 80-18 après 79-20 ; P80-Q-01 à P80-Q-05 tranchées, FORM-18 portée par 80-14, 80-15, 80-19 et 80-20)
+**Plans:** 21 plans en 11 vagues (vagues 1 à 3 sans dépendance à la Phase 79 ; à partir de 80-09 : 79-01 à 79-18 fusionnés ; 80-18 après 79-20 ; P80-Q-01 à P80-Q-05 tranchées, FORM-18 portée par 80-14, 80-15, 80-19 et 80-20)
 
 Plans:
 
@@ -678,6 +678,7 @@ Plans:
 - [ ] 80-15-PLAN.md — Aide ?, ligne du terminal (P80-D-55)
 - [ ] 80-16-PLAN.md — Jetons X5, DESIGN.md, découpe de 00-vibeflow.js
 - [ ] 80-19-PLAN.md — Santé en français (P80-Q-03, P80-D-54)
+- [ ] 80-21-PLAN.md — Échec d'un changement d'onglet : Lecture impossible, Réessayer
 
 **Vague 9** *(bloquée tant que la vague 8 n'est pas terminée)*
 
