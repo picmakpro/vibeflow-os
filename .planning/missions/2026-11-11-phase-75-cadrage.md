@@ -174,6 +174,11 @@ planning, canal de marquage des cartes réutilisable par la relecture de la 74, 
   d'une ligne des tables de routes et d'annotateurs (79-05), numéros des plans de la 80, canal de la 74, plage `ui/74-*`.
 - Le gate de sortie rendra son contrôle E4 en manque ou indéterminé (plans non exécutés, STATE non marqué) : attendu,
   non verdi.
+- Gate de sortie (`check-mission-exit.sh --ws fiabilite`, rejoué avant la remise) : E3 conforme après ajout des lignes
+  « Porte » et « Rayon d'explosion » au corps de la PR ; E4 sans étape à vérifier (attendu) ; E1 lit le registre du
+  verrou de COMPARTIMENT, où 6 agents d'autres managers de la vague sont « running » — le registre de la Phase 75 compte
+  0 orphelin ; E7 lit un instantané de budget partagé par les sept missions (date seule). Verdict global INDÉTERMINÉ,
+  attendu pour une mission de planification en verrou de phase.
 - STATE.md jamais touché : `git diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md` rend 0.
 
 ## Décompte
