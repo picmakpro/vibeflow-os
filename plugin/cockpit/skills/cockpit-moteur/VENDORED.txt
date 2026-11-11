@@ -22,11 +22,13 @@ PATCH assets/ui/30-screens.js P27 espacements : menu des écrans sur la grille (
 RETRAIT SKILL.md
 RETRAIT assets/ui/50-cloud.js
 RETRAIT agents/openai.yaml
+AJOUT assets/ui/00-vf-surcouches.js
 AJOUT assets/ui/00-vibeflow.js
 AJOUT scripts/lib/vf-git-sortant.mjs
 AJOUT assets/ui/01-vf-responsive.js
 AJOUT assets/ui/02-vf-telephone.js
 AJOUT assets/ui/03-vf-accessibilite.js
+AJOUT assets/ui/04-vf-clavier-canevas.js
 AJOUT assets/ui/39-vf-tour-placement.js
 AJOUT assets/ui/70-vf-live.js
 AJOUT assets/ui/71-vf-equipe-rendu.js
