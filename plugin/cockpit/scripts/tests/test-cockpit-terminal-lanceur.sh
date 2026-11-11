@@ -120,7 +120,7 @@ assert_eq "L6 — une seule ouverture" "$(nbl "$OUVERT")" "1"
 ADR="$(sed -n 1p "$OUVERT" 2>/dev/null)"; VB="$(cat "$AM" 2>/dev/null)"; PAGE="$OUT/.cache/terminal-ouvrir.html"
 assert_eq "L6 — l'ouvreur reçoit le chemin de la page de redirection, rien d'autre (D-27)" "$([ "$ADR" = "$PAGE" ] && echo oui || echo "non : [$ADR]")" "oui"
 assert_eq "L6 — l'argv de l'ouvreur ne porte pas l'amorçage (témoin : amorçage de 64 hexadécimaux)" "$([[ "$VB" =~ ^[0-9a-f]{64}$ ]] && ! grep -q -F -e "$VB" "$OUVERT" && echo oui || echo "non : $(court "$(cat "$OUVERT")")")" "oui"
-assert_eq "L6 — SAF-1 : la page de redirection mène à la page Projet http://127.0.0.1:<P>/project.html#t=<amorçage du fichier>, jamais à Q (Q ≠ P)" "$([ -n "$QB" ] && [ -n "$PB" ] && [ "$QB" != "$PB" ] && grep -q -F "url=http://127.0.0.1:$PB/project.html#t=$VB\"" "$WORK/run/page-ouverte.html" && ! grep -q -F ":$QB/" "$WORK/run/page-ouverte.html" && echo oui || echo "non : Q=$QB P=$PB $(court "$(cat "$WORK/run/page-ouverte.html" 2>/dev/null)")")" "oui"
+assert_eq "L6 — SAF-1 : la page de redirection mène à la page Projet http://127.0.0.1:<P>/project.html#t=<amorçage du fichier>, jamais à Q (Q ≠ P)" "$([ -n "$QB" ] && [ -n "$PB" ] && [ "$QB" != "$PB" ] && grep -q -E "url=http://127\.0\.0\.1:$PB/project\.html\?o=[0-9a-f]{64}#t=$VB\"" "$WORK/run/page-ouverte.html" && ! grep -q -F ":$QB/" "$WORK/run/page-ouverte.html" && echo oui || echo "non : Q=$QB P=$PB $(court "$(cat "$WORK/run/page-ouverte.html" 2>/dev/null)")")" "oui"
 assert_eq "L13 — la page de redirection est en mode 600 (jamais lisible d'un autre compte)" "$(mode "$PAGE")" "600"
 arrete; attendre_mort "$SPID"
 
@@ -210,11 +210,11 @@ rm -f "$SJ"
 lance "$LAUNCH" open --terminal --no-open; S12="$(sj j.pid)"; Q12="$(qport)"
 node -e "const fs=require('fs');const f=process.argv[1];const j=JSON.parse(fs.readFileSync(f,'utf8'));j.terminal={url:'file:///System/Applications/Calculator.app'};j.url='file:///System/Applications/Calculator.app';fs.writeFileSync(f,JSON.stringify(j))" "$SJ"
 rm -f "$OUVERT" "$WORK/run/page-ouverte.html"; lance "$LAUNCH" open --terminal; fichier_ouvert; sleep 0.5; S12B="$(sj j.pid)"; Q12B="$(qport)"
-assert_eq "L12b — serveur à nous, terminal.url remplacé par file:///… : ni l'argv ni la page ne portent file:, la page mène à http://127.0.0.1:<P réel>/project.html" "$(grep -c 'file:' "$OUVERT" 2>/dev/null || true) $(grep -c 'file:' "$WORK/run/page-ouverte.html" 2>/dev/null || true) $(grep -c -F "url=http://127.0.0.1:$(sj j.port)/project.html#t=" "$WORK/run/page-ouverte.html" 2>/dev/null || true)" "0 0 1"
+assert_eq "L12b — serveur à nous, terminal.url remplacé par file:///… : ni l'argv ni la page ne portent file:, la page mène à http://127.0.0.1:<P réel>/project.html" "$(grep -c 'file:' "$OUVERT" 2>/dev/null || true) $(grep -c 'file:' "$WORK/run/page-ouverte.html" 2>/dev/null || true) $(grep -c -E "url=http://127\.0\.0\.1:$(sj j.port)/project\.html\?o=[0-9a-f]{64}#t=" "$WORK/run/page-ouverte.html" 2>/dev/null || true)" "0 0 1"
 for v in 'http://127.0.0.1:80@evil.example' 'http://127.0.0.1:99999' 'http://127.0.0.1:1235/x' 'http://evil.example:1235' 'http://127.0.0.1:0x10'; do
   node -e "const fs=require('fs');const f=process.argv[1];const j=JSON.parse(fs.readFileSync(f,'utf8'));j.terminal={url:process.argv[2]};fs.writeFileSync(f,JSON.stringify(j))" "$SJ" "$v"
   rm -f "$OUVERT" "$WORK/run/page-ouverte.html"; lance "$LAUNCH" open --terminal; fichier_ouvert; sleep 0.3; P12C="$(sj j.port)"
-  assert_eq "L12c — terminal.url « $v » : l'ouvreur ne reçoit que la page, qui mène à http://127.0.0.1:<P réel>/project.html" "$(grep -c -F "$v" "$OUVERT" "$WORK/run/page-ouverte.html" 2>/dev/null | tr '\n' ' ') $(grep -c -F "url=http://127.0.0.1:$P12C/project.html#t=" "$WORK/run/page-ouverte.html" 2>/dev/null || true)" "$OUVERT:0 $WORK/run/page-ouverte.html:0  1"
+  assert_eq "L12c — terminal.url « $v » : l'ouvreur ne reçoit que la page, qui mène à http://127.0.0.1:<P réel>/project.html" "$(grep -c -F "$v" "$OUVERT" "$WORK/run/page-ouverte.html" 2>/dev/null | tr '\n' ' ') $(grep -c -E "url=http://127\.0\.0\.1:$P12C/project\.html\?o=[0-9a-f]{64}#t=" "$WORK/run/page-ouverte.html" 2>/dev/null || true)" "$OUVERT:0 $WORK/run/page-ouverte.html:0  1"
 done
 arrete; [ -n "$(sj j.pid)" ] && attendre_mort "$(sj j.pid)"
 
@@ -466,7 +466,7 @@ if mutant imprime 's|^function ouvrirQ(s, amorce, o, sortie) {|& console.log(amo
   assert_eq "M-IMPRIME — le mutant rougit L5 (valeur dans la sortie du lanceur)" "$([ -n "$V" ] && [ "$(cherche "$LOUT")" != 0 ] && echo rouge || echo "identique")" "rouge"
   arrete; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-IMPRIME — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant ouvrep 's|s\.url}/project\.html#t=|s.terminal.url}/#t=|'; then
+if mutant ouvrep 's|s\.url}/project\.html?o=\${secret}#t=|s.terminal.url}/#t=|'; then
   rm -f "$OUVERT" "$WORK/run/page-ouverte.html" "$AM"; lance "$MUT_L" open --terminal; fichier_ouvert; sleep 0.5; MS="$(sj j.pid)"; MQ="$(qport)"
   assert_eq "M-OUVRE-Q — le mutant (SAF-1 défait : le lanceur vise de nouveau Q) rougit L6 : la page de redirection mène à Q, plus à la page Projet" "$(grep -q -F "url=http://127.0.0.1:$MQ/#t=" "$WORK/run/page-ouverte.html" 2>/dev/null && echo rouge || echo "identique")" "rouge"
   arrete; [ -n "$MS" ] && attendre_mort "$MS"
