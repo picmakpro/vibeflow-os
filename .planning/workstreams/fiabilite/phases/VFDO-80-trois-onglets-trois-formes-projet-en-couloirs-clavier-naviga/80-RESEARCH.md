@@ -359,13 +359,16 @@ await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced
 | A4 | Le mécanisme `__vfFrDict` survit à la 79 (H4) | Q1 | dictionnaire de la 80 à déplacer |
 | A5 | `?vue=` sur une adresse `file://` est lu par la page | Q3 | `chrome-statut.mjs` à traiter à part |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Noms des contrats publics (`VibeFlow.surcouches`, `VibeFlow.panneau`) devenus impossibles.** Connu : objet gelé.
    Recommandation : `window.VF_SURCOUCHES`, `window.VF_PANNEAU`, amendement daté de `80-CONTEXT.md` et message aux 73, 74, 76.
+   RESOLVED : `VF_SURCOUCHES` et `VF_PANNEAU` retenus (80-CONTEXT) ; portés par les plans 80-02, 80-04, 80-14 et 80-15.
 2. **Réinitialisation des extensions par `chargerOnglet`** (Piège 9) : à poser à la 79 avant le plan FORM-16.
+   RESOLVED : précondition « posé à la 79 » du plan 80-10.
 3. **« Mentions » / « module »** : patch lot A (règle « document » ≈`viewer.html:1792`, ligne ≈1788 ; numéros de l'éclaireur,
    non relus ici).
+   RESOLVED : patch du lot A repris par le plan 80-11 (section PV).
 
 ## Environment Availability
 
