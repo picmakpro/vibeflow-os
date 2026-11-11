@@ -570,18 +570,19 @@ Plans:
 
 ### Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire
 
-> **Cadrée et planifiée le 2026-11-11** (mission de cadrage, `76-CONTEXT.md`, P76-D-01..31, décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée ; deux confirmations non bloquantes « À Samuel », A-1 et A-2). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Forme : panneaux reliés de l'onglet Projet, sans canevas ni quatrième onglet ; route `GET /api/vf/tracabilite` ; retrait : le nœud « Exigences » du graphe Projet.
+> **Cadrée et planifiée le 2026-11-11** (mission de cadrage, `76-CONTEXT.md`, P76-D-01..38 ; P76-D-32 à P76-D-34 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — marque neutre pour les trous, panneaux reliés, format des questions en attente posé maintenant ; les autres : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Forme : panneaux reliés de l'onglet Projet, sans canevas ni quatrième onglet ; route `GET /api/vf/tracabilite` ; questions en attente lues pour la régie de la Phase 73 ; retrait : le nœud « Exigences » et les liens « couvre » du graphe Projet.
 
 **Goal:** Le cockpit relie exigence → plan → SUMMARY → VERIFICATION → recette avec les trous en rouge, les décisions (ADR, arbitrages préfixés, commits qui les citent) en graphe navigable, et la mémoire des agents en graphe de liens avec ses entrées orphelines ou périmées.
-**Requirements**: TRAC-01 à TRAC-12.
-**Depends on:** Phase 69 (rattachement des missions) ; ordre du jalon : après la 75. Exécution : après la première vague de la Phase 79 et son plan 79-09 (contrats C0, A10 à A13, A30 à A32), et après la Phase 80 pour les plans de page (P80-C76-1 à 5) ; les plans repassent devant un vérificateur frais contre la base qui porte la 79 et la 80 avant exécution.
+**Requirements**: TRAC-01 à TRAC-13.
+**Depends on:** Phase 69 (rattachement des missions) ; ordre du jalon : après la 75. Exécution : après la Phase 79 (première vague et plans 79-05, 79-09, 79-16, 79-17 ; contrats C0, A10 à A13, A30 à A32, A34, A44, A47, A48, A51, A52, A54), et après la Phase 80 pour les plans de page (P80-C76-1 à 5) ; les plans repassent devant un vérificateur frais contre la base qui porte la 79 et la 80 avant exécution.
 
 **Success Criteria** (what must be TRUE):
   1. Le panneau d'une phase montre, pour chaque exigence rattachée, ses quatre maillons lus (plan, SUMMARY, VERIFICATION, recette) avec leur niveau et le premier trou en mot ; les contradictions du ledger se voient, en glyphe et mot, sans couleur d'alerte ni fond teinté.
   2. La vue d'ensemble de Projet donne une ligne par phase du jalon avec ses trous, la liste des ADR et des décisions de phase avec les commits qui les citent, et la mémoire des agents par agent avec ses liens cassés, ses entrées hors index et ses chemins disparus ; chaque objet s'ouvre d'un geste et le Retour commun ramène au précédent.
   3. Les preuves de vérification déjà écrites (VERIFICATION, recette, traces rouges, critères des plans) sont attachées à la phase et à ses plans, en liens vers leurs fichiers.
   4. Rien de la mémoire des agents au-delà de sa structure n'entre dans la page ; aucune donnée de la phase n'entre dans l'export ; un lab sans ADR, sans mémoire, sans compartiment ou sans git voit une ligne neutre et rien ne casse.
-  5. Le nœud « Exigences » quitte le graphe Projet ; toutes les suites du cockpit sont vertes sous macOS et Linux.
+  5. Les questions en attente écrites au format C76-Q1 dans les registres de phase sont lues et servies à la régie de la Phase 73 ; une entrée mal formée n'est jamais rendue « en attente ».
+  6. Le nœud « Exigences » quitte le graphe Projet après que la porte de la Phase 80 et le panneau d'exigence ont été rebranchés ; toutes les suites du cockpit sont vertes sous macOS et Linux.
 **Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 10, 11, 14) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2.
 **Plans:** 9 plans
 
