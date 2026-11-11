@@ -33,6 +33,10 @@
 #   driver-lock.sh register --agent=<id> --role=<role> [--node=<id DAG>] [--parent=<id>] [--depth=<n>] [--owner=<id>]
 #   driver-lock.sh close    --agent=<id> --status=done|failed|stopped   # ferme une entree (append)
 #   driver-lock.sh orphans                                              # entrees encore `running`, feuille -> racine
+#   driver-lock.sh registry                                             # dernier etat de chaque agent (archive puis courant), lecture seule
+#   Au `release` sans enfant `running`, le registre courant est VERSE dans l'archive frere
+#   <registre sans .jsonl>.closed.jsonl (par defaut <lock>.children.closed.jsonl) avant d'etre supprime :
+#   un agent clos reste lisible par `registry` apres le relachement (P79-D-17).
 #
 # Sortie : JSON une ligne (parsing). Exit 0 = action reussie ; exit 1 = refus (lock tenu, pas owner…).
 #
@@ -124,7 +128,7 @@ WS=""; WS_GIVEN=0; DEPOT=0; ALL=0; PHASE=""; PHASE_GIVEN=0
 AGENT=""; ROLE=""; NODE=""; PARENT=""; DEPTH=""; CSTATUS=""
 for arg in "$@"; do
   case "$arg" in
-    acquire|heartbeat|release|status|recover|takeover|reclaim|mark-progress|register|close|orphans) ACTION="$arg" ;;
+    acquire|heartbeat|release|status|recover|takeover|reclaim|mark-progress|register|close|orphans|registry) ACTION="$arg" ;;
     --owner=*)  OWNER="${arg#*=}" ;;
     --step=*)   STEP="${arg#*=}" ;;
     --ws=*)     WS="${arg#*=}"; WS_GIVEN=1 ;;
@@ -321,6 +325,7 @@ vf_dl_resolve() {
     local top="" named=0 mutating=1
     if [ "$WS_GIVEN" = 1 ] || [ "$DEPOT" = 1 ]; then named=1; fi
     case "$ACTION" in status|orphans) mutating=0 ;; esac
+    case "$ACTION" in registry) mutating=0 ;; esac
     if [ "$named" = 1 ] || [ "$mutating" = 1 ]; then
       top="$(git rev-parse --show-toplevel 2>/dev/null)" || top=""
       local why=""
@@ -667,8 +672,26 @@ sanitize_reg_field() { printf '%s' "$1" | tr -d '"\\\n\t'; }
 #   8 epoch · 9 depth (explicite au register, sinon derivee de la chaine parent, sinon 1)
 #   10 status (derniere ligne gagne ; un `close` d'un agent jamais consigne est ignore)
 # Registre absent -> aucune sortie, code 0.
+# Archive frere du registre courant : <registre sans .jsonl>.closed.jsonl (fonction, pas variable :
+# vf_dl_entry reassigne REG dans un sous-shell et le chemin doit suivre).
+arch_path() {
+  case "$REG" in
+    *.jsonl) printf '%s.closed.jsonl\n' "${REG%.jsonl}" ;;
+    *)       printf '%s.closed.jsonl\n' "$REG" ;;
+  esac
+}
+
+# Arguments : une liste de fichiers (defaut $REG), repliee dans l'ordre donne (archive d'abord, courant
+# ensuite : la derniere ligne par agent gagne d'un fichier a l'autre). Un fichier absent est ignore.
 registry_fold() {
-  [ -f "$REG" ] || return 0
+  [ "$#" -gt 0 ] || set -- "$REG"
+  local _n=$# _f
+  while [ "$_n" -gt 0 ]; do
+    _f="$1"; shift
+    if [ -f "$_f" ]; then set -- "$@" "$_f"; fi
+    _n=$((_n - 1))
+  done
+  [ "$#" -gt 0 ] || return 0
   awk '
     function val(s, key,   m) {
       if (match(s, "\"" key "\": \"[^\"]*\"")) {
@@ -708,7 +731,29 @@ registry_fold() {
                owner[id], gen[id], at[id], (ep[id] == "" ? 0 : ep[id]), d, status[id]
       }
     }
-  ' "$REG"
+  ' "$@"
+}
+
+# Verse le registre courant dans l'archive frere, puis supprime le courant. Appelee par le detenteur,
+# verrou encore tenu : un seul ecrivain. Temporaire de nom fixe renomme sur l'archive (un lecteur
+# concurrent ne voit jamais de ligne partielle). Silencieuse au succes ; sur tout echec : message sur
+# stderr, temporaire retire, archive intacte, registre courant conserve, code non nul (le release
+# n'en tient jamais compte).
+registry_archive() {
+  [ -f "$REG" ] || return 0
+  if [ ! -s "$REG" ]; then rm -f "$REG"; return 0; fi
+  local _arc _tmp; _arc="$(arch_path)"; _tmp="$_arc.tmp"
+  if { [ -e "$_arc" ] || [ -L "$_arc" ]; } && { [ ! -f "$_arc" ] || [ -L "$_arc" ]; }; then
+    log "registre non archivé : le nom de l'archive n'est pas un fichier regulier, registre courant conserve"
+    return 1
+  fi
+  if { if [ -f "$_arc" ]; then cat "$_arc"; fi; cat "$REG"; } > "$_tmp" 2>/dev/null && mv -f "$_tmp" "$_arc" 2>/dev/null; then
+    rm -f "$REG"
+    return 0
+  fi
+  rm -f "$_tmp" 2>/dev/null
+  log "registre non archivé : ecriture ou renommage impossible, registre courant conserve"
+  return 1
 }
 
 # Entrees encore `running`, ordonnees FEUILLE -> RACINE (profondeur decroissante, puis dispatch
@@ -728,6 +773,22 @@ orphans_json() {
   }')"
   printf '[%s]' "$out"
 }
+# Verbe `registry` (P79-D-17) : dernier etat de chaque agent, archive puis courant (le courant prime).
+# Lecture seule, aucun chemin dans la sortie ; chaque valeur est reduite des caracteres qui casseraient le JSON
+# (guillemet, antislash, caracteres de controle) : un fichier falsifie ne produit jamais un JSON invalide.
+registry_json() {
+  local _present=false _arc; _arc="$(arch_path)"
+  if [ -f "$REG" ] || [ -f "$_arc" ]; then _present=true; fi
+  registry_fold "$_arc" "$REG" | SCJ="$SCOPE_JSON" awk -F'\t' -v present="$_present" -v win=86400 '
+    function clean(v) { gsub(/[\\"]/, "", v); gsub(/[[:cntrl:]]/, "", v); return v }
+    {
+      out = out sprintf("%s{\"agent_id\": \"%s\", \"parent\": \"%s\", \"role\": \"%s\", \"node\": \"%s\", \"owner\": \"%s\", \"generation\": \"%s\", \"dispatched_at\": \"%s\", \"epoch\": %d, \"depth\": %d, \"status\": \"%s\"}",
+        (n++ > 0 ? ", " : ""), clean($1), clean($2), clean($3), clean($4), clean($5), clean($6), clean($7), $8 + 0, $9 + 0, clean($10))
+    }
+    END { printf "{\"present\": %s, \"window_seconds\": %d, \"count\": %d, \"agents\": [%s]%s}\n", present, win, n + 0, out, ENVIRON["SCJ"] }
+  '
+}
+
 # Enfants directs encore `running` d'un agent donne (ids JSON) : rendu par `close`, pour qu'un
 # parent qui se ferme voie ce qu'il laisse derriere lui.
 children_running_of_json() {
@@ -1227,17 +1288,19 @@ case "$ACTION" in
     lock_present || { printf '{"released": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 0; }
     held="$(meta_get owner)"
     if [ "$held" = "$OWNER" ]; then
-      drop_lock
       # Registre (issue #82) : un release avec des enfants consignes encore `running` RELACHE quand
       # meme (geste RAII, jamais conditionnel) mais garde le registre et le dit, c'est le cas
       # « manager termine, enfant jamais ferme » ; le gate de sortie le lit via status. Sans enfant
-      # ouvert, le registre est supprime : la mission est close proprement, rien a retrouver.
+      # ouvert, le registre courant est verse dans l'archive frere puis supprime (P79-D-17), AVANT de
+      # lacher le verrou : le detenteur est alors le seul ecrivain de l'archive. Un echec d'archivage
+      # ne fait jamais echouer le release (registry_archive le dit sur stderr, le courant est conserve).
       _orph="$(orphans_count)"
+      [ "$_orph" -gt 0 ] || registry_archive || true
+      drop_lock
       if [ "$_orph" -gt 0 ]; then
         log "release avec $_orph agent(s) consigne(s) encore running : registre conserve ($REG), a inventorier (orphans)"
         printf '{"released": true, "owner": "%s", "children_running": %s, "orphans": %s%s}\n' "$OWNER" "$_orph" "$(orphans_ids_json)" "$SCOPE_JSON"
       else
-        rm -f "$REG"
         printf '{"released": true, "owner": "%s", "children_running": 0%s}\n' "$OWNER" "$SCOPE_JSON"
       fi
       exit 0
@@ -1359,8 +1422,15 @@ case "$ACTION" in
     exit 0
     ;;
 
+  registry)
+    # Lecture seule, exit 0 dans tous les cas (aucun fichier cree ni modifie) : dernier etat de chaque agent,
+    # archive du relachement puis registre courant.
+    registry_json
+    exit 0
+    ;;
+
   *)
-    echo "Usage: $0 {acquire|takeover|reclaim|heartbeat|mark-progress|release|status|recover|register|close|orphans} [--owner=ID] [--step=X] [--agent=ID] [--role=R] [--node=N] [--parent=ID] [--depth=D] [--status=S]" >&2
+    echo "Usage: $0 {acquire|takeover|reclaim|heartbeat|mark-progress|release|status|recover|register|close|orphans|registry} [--owner=ID] [--step=X] [--agent=ID] [--role=R] [--node=N] [--parent=ID] [--depth=D] [--status=S]" >&2
     exit 1
     ;;
 esac
