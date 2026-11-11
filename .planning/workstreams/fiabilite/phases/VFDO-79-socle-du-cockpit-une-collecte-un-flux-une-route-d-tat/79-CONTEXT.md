@@ -426,6 +426,27 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   « observateur global retiré », pas « motifs retirés ». 79-21 range l'automate de correspondance dans un module neuf
   `scripts/lib/vf-glob.mjs` du moteur (ligne `AJOUT` de `VENDORED.txt`). Plafond effectif : un fichier de code du module
   vise **299 lignes au plus** (`check-file-size.sh` refuse à 300), quel que soit le plan.
+- **P79-D-33 / A45 — S-3 tranchée : un worktree prouvé du même dépôt compte comme le lab.** Arbitrage Samuel,
+  AskUserQuestion session principale, 2026-11-11. Réponse, mot pour mot (libellé coché) : « Les compter comme le lab
+  (Recommandé) ». Option telle qu'elle a été présentée : « Un worktree vérifié comme appartenant au même dépôt compte
+  comme le lab : le fichier s'affiche par son chemin relatif à la racine du worktree, aucun chemin absolu ne sort. Le
+  radar voit alors ces worktrees. Un dossier qui n'est pas un worktree du dépôt reste « hors du lab ». » L'appartenance
+  se **prouve** (même exigence que la correction B-01 du lot 0 : la vérification qui donne `verifie: true` dans
+  `cockpit-git-worktrees@1`), elle ne se déclare jamais ; un chemin qui se dit worktree sans l'être reste « un fichier
+  hors du lab ». CKPT-22 (« jamais un chemin hors du lab ») est précisée dans cette mesure exacte et pas au-delà : un
+  fichier d'un worktree vérifié du dépôt n'est pas « hors du lab ». Remplace la règle « arbre hors du lab » de A22 ;
+  A33 (sous-dossier du lab) s'applique dans chaque worktree.
+  **Forme du contrat (C3, A21-A28, A43 précisés) :**
+  - chaque entrée de `cibles.ecritures` et `cibles.lectures` devient `{ arbre, cible, n, dernierMs }` ;
+  - `arbre` = `null` pour l'arbre principal du lab, sinon le **`nom`** du worktree tel que le rend
+    `cockpit-git-worktrees@1` (`worktrees[].nom`, seulement si `verifie` est vrai) — jamais un chemin ;
+  - `cible` = chemin relatif à la racine réelle de cet arbre, ramené au sous-dossier du lab (A33), résolu physiquement
+    (A23) ; un fichier hors de tout arbre vérifié → `{ arbre: null, cible: "un fichier hors du lab" }` ;
+  - le champ `arbre` de la voie (C3) prend la même forme (`null` ou `nom` vérifié) ;
+  - `/api/vf/transcript` (`cockpit-transcript@2`, forme inchangée) écrit la cible d'un fichier d'un worktree vérifié
+    hors de l'arbre principal sous la forme textuelle `<chemin relatif> (worktree <nom>)` ;
+  - le radar de la Phase 75 joint les cibles par le couple (`arbre`, `cible`).
+  Plans touchés : 79-13 (cibles, voie, transcript), 79-08 et 79-09 si le libellé `arbre` de la voie y est calculé.
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
   gardé sans fin). Borne en vigueur : AUDC-Q2.
@@ -452,7 +473,7 @@ Questions qui ne bloquent rien : l'arbitrage en vigueur tient et le plan est bâ
   phase et par étage se calcule sur ces 24 h. Options : (a) garder ainsi ; (b) un agrégat persisté par phase, étage et
   modèle (jetons et durées, sans heure par agent) au-delà de 24 h. Recommandation : (a) pour cette vague, (b) à
   instruire avec la Phase 77 si le coût sur 24 h ne répond pas à la question.
-- **S-3 — Une écriture dans un worktree hors du dossier du lab est-elle « hors du lab » ?** CKPT-22 dit « jamais un
+- **S-3 — TRANCHÉE le 2026-11-11 (P79-D-33 / A45, option (b)). Question d'origine :** Une écriture dans un worktree hors du dossier du lab est-elle « hors du lab » ? CKPT-22 dit « jamais un
   chemin hors du lab ». En vigueur : oui, elle devient « un fichier hors du lab » ; le radar de la Phase 75 ne voit pas
   ces worktrees. Options : (a) garder ainsi ; (b) un worktree du même dépôt compte comme le lab, la cible restant
   relative à sa racine (aucun chemin absolu). Recommandation : (b), aucun chemin du poste ne sort et le radar devient
