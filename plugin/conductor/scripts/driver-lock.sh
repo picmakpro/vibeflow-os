@@ -1587,7 +1587,7 @@ case "$ACTION" in
     _pp="$(plan_project "$PLAN_FILE" 2>/dev/null)"; _prc=$?
     case "$_prc" in
       0) ;;
-      127) plan_refuse python3-missing ;;
+      127) plan_refuse python3-missing ;;   # meme refus que la sonde `command -v python3` : le code 127 vient de l'interpreteur
       *) plan_refuse plan-invalid ;;
     esac
     _pign="$(printf '%s\n' "$_pp" | sed -n 1p)"
