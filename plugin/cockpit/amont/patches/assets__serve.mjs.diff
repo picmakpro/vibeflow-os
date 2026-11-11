@@ -163,7 +163,7 @@
      },
    };
  }
-@@ -351,13 +321,17 @@ function codexRun(body, mode) {
+@@ -351,13 +321,18 @@ function codexRun(body, mode) {
    };
  }
  const CLOSED = Symbol('closed'); // the browser went away mid-request
@@ -173,6 +173,7 @@
  function runAgent(res, send, body) {
    return new Promise((resolve, reject) => {
 -    const run = ENGINES[engine].run(body, MODES[body.mode] || MODES.ask);
++    if (running.size >= MAX_ASK) return reject(new Error('Deux questions sont déjà en cours : attendez la fin de l’une d’elles.')); // vibeflow AUDC-B-02 : la borne tient aussi au second essai de « modifier le plan »
 +    const M = VF ? VF.modes(MODES, body) : MODES; // vibeflow P14 : consigne de l'onglet Projet
 +    const run = ENGINES[engine].run(body, Object.hasOwn(M, body.mode) ? M[body.mode] : M.ask);
      const child = spawn(cli.cmd, run.args, { cwd: root, env: cliEnv(), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
@@ -182,18 +183,18 @@
      send('start', { id });
      child.stdin.end(run.input);
      let buf = '', stderr = '', done = false;
-@@ -367,8 +341,8 @@ function runAgent(res, send, body) {
+@@ -367,8 +342,8 @@ function runAgent(res, send, body) {
      const hush = () => { clearTimeout(quiet); if (body.mode === 'change' && !done) quiet = setTimeout(() => say('Working on the updated plan'), 12000); };
      const out = {
        progress: (text) => { if (!done) { say(text); hush(); } },
 -      answer: (data) => { if (!done) { done = true; clearTimeout(quiet); resolve(data); } },
 -      fail: (message) => { if (!done) { done = true; clearTimeout(quiet); reject(new Error(message)); } },
-+      answer: (data) => { if (!done) { done = true; clearTimeout(quiet); clearTimeout(limit); resolve(data); } },
-+      fail: (message) => { if (!done) { done = true; clearTimeout(quiet); clearTimeout(limit); reject(new Error(message)); } },
++      answer: (data) => { if (!done) { done = true; clearTimeout(quiet); clearTimeout(limit); running.delete(id); resolve(data); } },
++      fail: (message) => { if (!done) { done = true; clearTimeout(quiet); clearTimeout(limit); running.delete(id); reject(new Error(message)); } },
      };
      hush();
      child.stdout.on('data', (d) => {
-@@ -384,19 +358,22 @@ function runAgent(res, send, body) {
+@@ -384,19 +359,22 @@ function runAgent(res, send, body) {
      child.stderr.on('data', (d) => { stderr = (stderr + d).slice(-2000); });
      child.on('error', (e) => out.fail(e.message));
      child.on('close', (code) => {
@@ -220,7 +221,7 @@
    runAgent(res, send, body)
      .then((a) => send('answer', a), (e) => { if (e !== CLOSED) send('failure', { code: failCode(e.message), message: e.message }); })
      .finally(() => res.end());
-@@ -407,6 +384,7 @@ function ask(req, res, body) {
+@@ -407,6 +385,7 @@ function ask(req, res, body) {
  // checks them with the skill's plan.mjs and build.mjs (build.mjs records where they are), saves them and
  // redraws the map, which reloads every open tab. Each change keeps the files it replaced, for Undo.
  const historyDir = path.join(here, '.cache', 'history');
@@ -228,7 +229,7 @@
  const PLAN_FILES = ['plan.json', 'architecture.json', 'recent-work.json'];
  let changing = false;
  function snapshot() {
-@@ -420,10 +398,12 @@ function restore(dir) {
+@@ -420,10 +399,12 @@ function restore(dir) {
    for (const f of PLAN_FILES) { const from = path.join(dir, f), to = path.join(here, f); if (fs.existsSync(from)) fs.copyFileSync(from, to); else fs.rmSync(to, { force: true }); }
  }
  /** Runs one of the skill's scripts on this project; throws with its output when it fails. */
@@ -244,7 +245,7 @@
    try { return execFileSync(process.execPath, [path.join(dir, 'scripts', name), root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, timeout: 120000 }); }
    catch (e) { throw Object.assign(new Error(String(e.stdout || '') + String(e.stderr || '') || e.message), { checks: true }); }
  }
-@@ -509,16 +489,40 @@ function undoChange() {
+@@ -509,16 +490,40 @@ function undoChange() {
  }
  
  // ---------- http ----------
@@ -287,7 +288,7 @@
      if (req.method === 'GET' && url.pathname === '/api/events') {
        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
        res.write('retry: 1000\n\n'); // reconnect quickly after a restart
-@@ -534,33 +538,13 @@ const server = http.createServer((req, res) => {
+@@ -534,33 +539,13 @@ const server = http.createServer((req, res) => {
        if (req.method === 'POST' || req.method === 'DELETE') {
          let raw = '';
          req.on('data', (d) => { raw += d; if (raw.length > 50000) req.destroy(); });
@@ -324,7 +325,7 @@
          return;
        }
      }
-@@ -573,7 +557,7 @@ const server = http.createServer((req, res) => {
+@@ -573,7 +558,7 @@ const server = http.createServer((req, res) => {
        let raw = '';
        req.on('data', (d) => { raw += d; if (raw.length > 500000) req.destroy(); });
        req.on('end', () => {
@@ -333,7 +334,7 @@
          try {
            const x = exportMap(Array.isArray(body.include) ? body.include.map(String) : EXPORT_DEFAULT, cleanFlows(body.flows));
            res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Content-Disposition': `attachment; filename="${x.name}"`, 'Cache-Control': 'no-store' });
-@@ -589,19 +573,28 @@ const server = http.createServer((req, res) => {
+@@ -589,19 +574,28 @@ const server = http.createServer((req, res) => {
      if (req.method === 'POST' && url.pathname === '/api/ask') {
        let raw = '';
        req.on('data', (d) => { raw += d; if (raw.length > 20000) req.destroy(); });
@@ -366,7 +367,7 @@
  // another map (or anything else) on the port: take the next free one
  let port = wantPort;
  server.on('error', (e) => {
-@@ -614,8 +607,10 @@ server.on('listening', () => {
+@@ -614,8 +608,10 @@ server.on('listening', () => {
    const u = `http://127.0.0.1:${port}`;
    try {
      fs.mkdirSync(path.dirname(stateFile), { recursive: true });

@@ -326,6 +326,7 @@ const ASK_DELAI = (() => { const n = Number(process.env.VF_COCKPIT_ASK_DELAI_MS)
 /** Runs the agent once for a request and resolves with its answer, streaming progress through `send`. */
 function runAgent(res, send, body) {
   return new Promise((resolve, reject) => {
+    if (running.size >= MAX_ASK) return reject(new Error('Deux questions sont déjà en cours : attendez la fin de l’une d’elles.')); // vibeflow AUDC-B-02 : la borne tient aussi au second essai de « modifier le plan »
     const M = VF ? VF.modes(MODES, body) : MODES; // vibeflow P14 : consigne de l'onglet Projet
     const run = ENGINES[engine].run(body, Object.hasOwn(M, body.mode) ? M[body.mode] : M.ask);
     const child = spawn(cli.cmd, run.args, { cwd: root, env: cliEnv(), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
@@ -341,8 +342,8 @@ function runAgent(res, send, body) {
     const hush = () => { clearTimeout(quiet); if (body.mode === 'change' && !done) quiet = setTimeout(() => say('Working on the updated plan'), 12000); };
     const out = {
       progress: (text) => { if (!done) { say(text); hush(); } },
-      answer: (data) => { if (!done) { done = true; clearTimeout(quiet); clearTimeout(limit); resolve(data); } },
-      fail: (message) => { if (!done) { done = true; clearTimeout(quiet); clearTimeout(limit); reject(new Error(message)); } },
+      answer: (data) => { if (!done) { done = true; clearTimeout(quiet); clearTimeout(limit); running.delete(id); resolve(data); } },
+      fail: (message) => { if (!done) { done = true; clearTimeout(quiet); clearTimeout(limit); running.delete(id); reject(new Error(message)); } },
     };
     hush();
     child.stdout.on('data', (d) => {

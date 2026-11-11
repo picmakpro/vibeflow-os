@@ -210,5 +210,9 @@ console.log(JSON.stringify({ effort: 'CLAUDE_EFFORT' in e, pid: 'CLAUDE_PID' in 
 JS
 assert_eq "D8.1 — filtrées : CLAUDE_EFFORT, CLAUDE_PID ; déjà filtrées : CLAUDECODE, CLAUDE_CODE_* ; passent : les autres (liste noire seulement, P71-D-03)" "$(node "$AUX/env.mjs" "$SCRIPTS")" '{"effort":false,"pid":false,"cc":false,"config":"/x/cfg","home":"/h"}'
 
+echo "=== D9 — corrections ciblées du tour 1 (AUDC-B-02, AUDC-B-06) ==="
+RUNA="$(node -e "const t=require('fs').readFileSync('$ENG/assets/serve.mjs','utf8');const a=t.indexOf('function runAgent(');const b=t.indexOf('spawn(cli.cmd',a);console.log(a>=0&&b>a?t.slice(a,b):'')")"
+assert_eq "D9.1 — la borne de deux exécutions est contrôlée par runAgent lui-même (donc aussi au second essai de « modifier le plan »)" "$([[ "$RUNA" == *MAX_ASK* ]] && echo oui || echo non)" "oui"
+
 echo; echo "=== bilan : $PASS passés, $FAIL échoués ==="
 [ "$FAIL" -eq 0 ]
