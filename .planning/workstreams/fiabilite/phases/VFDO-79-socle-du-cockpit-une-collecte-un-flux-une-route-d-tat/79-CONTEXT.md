@@ -259,6 +259,57 @@ sans en retirer rien.
 - **A14 (77) — voie du manager.** `rattachement` peut valoir `{ dag, noeud: null, source: "enfants" }` : une voie sans
   nœud propre dont tous les enfants rattachés pointent le même plan de mission reçoit ce plan ; enfants sur plusieurs
   plans ou aucun enfant rattaché → `null`. Le coût de l'étage manager se somme ainsi par mission et par phase.
+- **A15 (73) — verrous dans le flux : projection côté serveur.** Le payload brut de `driver-lock.sh` quitte le flux.
+  L'événement `lock` et le champ `lock` de `hello` portent désormais `{ seq, at, verrous }`, où `verrous` a la forme
+  de `signal.verrous` (C2) ; chaque entrée de `verrous.liste` est une **liste blanche** construite champ par champ,
+  plus aucune recopie de l'entrée brute : `ws`, `scope`, `phase`, `step` (≤ 80), `tenu`, `stale`, `ageS`, `ttl`,
+  `progressAgeS`, `owner` (≤ 80), `childrenRunning`, `dag` (A16). Aucun chemin, aucun emplacement de verrou, aucune
+  liste d'identifiants de session. `signal.verrous` passe par la même projection (les champs requis du contrat sont
+  gardés ; `step`, `childrenRunning`, `dag` sont des facultatifs ajoutés). Les lecteurs de la page sont mis à jour
+  dans le même plan. Ni verrous ni payload `lock` n'entrent dans l'export (règle C0-export ci-dessous).
+- **A16 (73) — plan de mission publié.** La 79 le prend, côté `plugin/conductor`, dans le plan **79-03** : un manager
+  qui tient un verrou publie le résumé de son plan de mission à côté du verrou (dossier du verrou, sous le dossier git
+  commun, jamais dans l'arbre de travail), par `driver-lock.sh` ; le résumé ne porte que les identifiants de nœuds,
+  leurs dépendances et leur statut, avec le compartiment et la phase du verrou ; `status --all` le rend dans un champ
+  `dag` de l'entrée, que la projection A15 transmet. Le texte libre d'un nœud n'est jamais publié. La doctrine
+  (plan **79-04**) dit au manager de publier son plan à l'initialisation et à chaque marque.
+- **A17 (73) — `cockpit-who@2`.** Les champs facultatifs que la 73 ajoute sont permis (C0). La signature du `who`
+  (`vf-cockpit-live.mjs`) est calculée sur l'objet entier moins une liste nommée de champs volatils (l'âge
+  aujourd'hui) : tout champ ajouté est couvert sans retouche ; un champ volatil ajouté s'inscrit dans cette liste.
+  Fusion : dans `vf-cockpit-interface.json`, la 79 ajoute des blocs de schémas neufs et ne modifie pas le bloc
+  `cockpit-who@2` hors des deux facultatifs de A20 ; dans `vf-cockpit-who.mjs`, la 79 n'intervient qu'aux plans de
+  l'environnement git (deuxième vague) et de la collecte (troisième vague). Ordre libre : la jointure résout.
+- **A18 (73) — `vf-cockpit-etat-officiel.mjs`.** La 79 n'y touche que dans le plan de la collecte (troisième vague),
+  pour A20 ; la fonction exportée de la 73 (AUDC-I10) s'ajoute en fin de fichier, sans recouvrement attendu.
+- **A19 (73) — `cockpit-equipe@1`.** Noté : forme stable, la route `graphe?onglet=equipe` la sert telle quelle.
+- **A20 (73) — silence et échec.** Deux facultatifs ajoutés à `cockpit-who@2` par le plan de la collecte :
+  `sortisSilence` (entier, au premier niveau : agents non finis sortis de la collecte pour un silence au-delà de
+  1 800 s, sur la fenêtre de 24 h) et `finMotif` (`echec` \| `arret` \| null, par travailleur, lu de l'état officiel :
+  `failed` → `echec`, `stopped` → `arret`). L'état reste `termine` ; seul le motif s'ajoute, derrière le contrat de
+  forme (`vueAgents`).
+- **A21 (75) — fraîcheur des cibles.** La signature portée par l'événement `frise` est calculée sur la projection
+  publique entière, `cibles` comprises : un changement de cible change la signature.
+- **A22 (75) — référentiel des cibles.** Chaque entrée de `cibles` porte `cible` relative à la **racine réelle de
+  l'arbre de la voie** quand cet arbre est sous le lab (worktrees sous le lab compris), à côté du libellé `arbre` de
+  la voie. Un arbre hors du lab reste « un fichier hors du lab » (borne CKPT-22 en vigueur ; question S-3).
+- **A23 (75) — chemin réel.** Une cible est calculée sur la résolution physique complète (lien symbolique résolu ;
+  fichier supprimé : résolution du plus proche parent existant puis le reste du nom) ; échec de résolution → « un
+  fichier hors du lab ». Même fonction que la classe restante d'AUDC-A-02, une seule règle.
+- **A24 (75) — outils comptés.** `lectures` : `Read` seul. `ecritures` : `Write`, `Edit`, `MultiEdit`,
+  `NotebookEdit`. `Grep`, `Glob`, `Bash` ne produisent aucune cible.
+- **A25 (75) — règle de C0, export.** L'index, la route d'état, la route de frise, les `cibles`, les verrous et le
+  plan de mission publié n'entrent **jamais** dans l'export autonome (P67-D-14, P69-D-19). Témoin : un lab dont
+  l'index, les cibles et un verrou portent un marqueur unique ; l'export ne contient le marqueur nulle part ; le même
+  marqueur placé dans une donnée exportée légitime apparaît (témoin positif).
+- **A26 (75) — route neuve.** `/api/vf/activite` s'ajoute par une ligne de la table (A10) et la réponse gardée (A11).
+- **A27 (75) — graphe de l'onglet Code.** `GET /api/vf/graphe?onglet=code` sert le `graph.json` construit sur disque
+  par l'assemblage (annoté par `vf-cockpit-build.mjs`), relu quand il change ; il n'est pas recalculé par requête. Une
+  phase ajoute des nœuds ou des attributs au graphe Code par un **annotateur** inscrit d'une ligne dans une table de
+  `vf-cockpit-build.mjs` (même règle que A10, livrée par le plan 79-05) ; il tourne à chaque assemblage. Un
+  changement de `.planning/` seul ne reconstruit pas le graphe Code : un besoin de fraîcheur plus courte se dit à la
+  79 par amendement.
+- **A28 (75, facultatif retenu) — `?champs=cibles`.** `GET /api/vf/frise?champs=cibles` rend chaque voie réduite à
+  `id`, `arbre` et `cibles` ; `champs` inconnu → 400 `{ "erreur": "champs-invalides" }`.
 - **Note C3.** Le coût en monnaie et les limites de 5 h et de 7 jours sont hors de cette vague (P74-D-20, P74-D-24).
 
 ## À Samuel
@@ -274,6 +325,11 @@ Questions qui ne bloquent rien : l'arbitrage en vigueur tient et le plan est bâ
   phase et par étage se calcule sur ces 24 h. Options : (a) garder ainsi ; (b) un agrégat persisté par phase, étage et
   modèle (jetons et durées, sans heure par agent) au-delà de 24 h. Recommandation : (a) pour cette vague, (b) à
   instruire avec la Phase 77 si le coût sur 24 h ne répond pas à la question.
+- **S-3 — Une écriture dans un worktree hors du dossier du lab est-elle « hors du lab » ?** CKPT-22 dit « jamais un
+  chemin hors du lab ». En vigueur : oui, elle devient « un fichier hors du lab » ; le radar de la Phase 75 ne voit pas
+  ces worktrees. Options : (a) garder ainsi ; (b) un worktree du même dépôt compte comme le lab, la cible restant
+  relative à sa racine (aucun chemin absolu). Recommandation : (b), aucun chemin du poste ne sort et le radar devient
+  complet ; à confirmer par Samuel, l'arbitrage en vigueur tient d'ici là.
 
 <decisions>
 ## Implementation Decisions
