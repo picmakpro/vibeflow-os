@@ -2,7 +2,8 @@
 
 **Gathered:** 2026-11-11
 **Status:** Cadrée (2026-11-11) — frontière de questions vide ; alignée sur les contrats figés de la Phase 79 (branche
-`feat/phase-79-socle-cockpit`, commit `3119d82a`, `79-CONTEXT.md` § « Contrats fournis », C0 à C6)
+`feat/phase-79-socle-cockpit`, commit `3119d82a`, `79-CONTEXT.md` § « Contrats fournis », C0 à C6 ; amendement du
+2026-11-11 au commit `2ae6607a`, A1 à A14)
 
 Cadrage par le manager de la mission Phase 74 (`vf-dev-manager`, worktree `.claude/worktrees/phase-74`, branche
 `feat/phase-74-equipe-dans-le-temps`, base `origin/integration/cockpit-audit` = `f763b556`). Jalon `vibeflow-v2.0`,
@@ -214,6 +215,28 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
 - **P74-D-31 (moteur vendorisé).** La 74 ne modifie aucun fichier du moteur (`viewer.html`, `serve.mjs`, `scan.mjs`) :
   tout son rendu vit dans des modules `ui/*vf*` et ses lectures passent par les routes de la 79. Elle s'exécute après la
   première vague de la 79 (retrait de `plugin/cockpit/amont/`, C6) et ne régénère aucun diff de patch.
+
+### Amendement de la Phase 79 (`2ae6607a`) et points de la spécification d'interface
+
+- **P74-D-32 (jetons et fenêtre).** Les `jetons` d'une voie (C3) couvrent sa vie dans les 24 h de l'index ; seuls
+  `segments` et `durees` sont coupés à la fenêtre demandée. Tout agrégat de jetons porte donc « sur les dernières 24 h »
+  (agents présents dans la fenêtre), les durées portent la fenêtre affichée : deux libellés, jamais un seul qui mentirait
+  pour l'un des deux. Aucun découpage des jetons n'est demandé à la 79.
+- **P74-D-33 (commits, A9).** `rangees[].at` est en secondes Unix (× 1000 pour la frise). La marche de la route Git est
+  bornée à 500 commits : la 74 mesure la couverture (commit le plus ancien lu postérieur au début de la fenêtre et borne
+  atteinte) et le bandeau « Dépôt » dit alors « incomplet » avec l'heure à partir de laquelle il l'est.
+- **P74-D-34 (voie du manager, A14).** `rattachement` `{ dag, noeud: null, source: "enfants" }` rattache le manager à la
+  mission (coût de l'étage manager par mission et par phase) ; sur la voie, aucun nœud n'est écrit pour lui ; la fiche dit
+  « rattaché par ses agents ». `rattachement.dag` vaut `signal.missions[].fichier` (A8) : la jointure mission → phase passe
+  par `phaseKey`.
+- **P74-D-35 (lectures du curseur).** Un déplacement du curseur relit au plus les fils réduits des voies au travail à
+  l'instant t, au plus six par instant, mis en cache dans la page jusqu'à l'événement `frise` suivant ; au-delà, ou quand
+  t est plus ancien que le fil réduit (plafond de 50 messages et 200 outils), l'encart dit « fichiers non lus ».
+- **P74-D-36 (genre `silence`).** Le genre `silence` de C3 ne dessine rien (un blanc sur la voie), distinct du repos ;
+  à confirmer à la recette.
+- **P74-D-37 (règles communes de la 79).** Toute lecture par la page passe par `VF_ETAT.jeton()` et `VF_ETAT.lireJson()`
+  (A13) ; « Voir sur la carte » passe par l'onglet Code tel que la coquille l'expose (A2, routage de la Phase 80) ; la 74
+  ne pose aucune route serveur (la règle A10/A11 ne la concerne que si un plan en ajoute une, par une ligne de la table).
 
 ### Claude's Discretion
 
