@@ -374,6 +374,22 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   gardes passent à la fonction de résolution physique de 79-07 au plan 79-16, qui touche `serve.mjs` de toute façon.
   `test-cockpit-confinement.sh` n'est touché que par 79-06 en vague 2 : les sections neuves de 79-07 vont dans
   `test-cockpit-git-config-depot.sh`.
+- **A38 (79-12).** La route neuve est `GET /api/vf/state` dans `vf-cockpit-state.mjs` ; la route privée existante
+  `/api/vf/etat` reste intacte. `etat` et `vie` portent `seq` sans l'avancer, `at` en millisecondes. Un lecteur d'état
+  sans onglet compte comme client (deux lectures à moins de 30 s). L'émetteur de `vf-signal` contrôle la réponse reçue
+  (schéma, forme, fraîcheur de `signal.at` < 20 s) avant de la rendre, sinon repli. `collecte` limité aux cinq champs
+  de C2. Limite nommée, inchangée depuis la Phase 69 : `signal.root`, `equipe.root` et `equipe.workers[].cwd` sont
+  des chemins absolus de forme inchangée (C0 « Versions »), servis comme ils le sont déjà par `hello` ; les masquer
+  demanderait un schéma `@2`, hors de cette phase (à verser au BACKLOG par la jointure).
+- **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
+  l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
+  gardé sans fin). Borne en vigueur : AUDC-Q2.
+- **P79-D-30 (mesure de forme, 79-08).** Tâche automatique avec précondition (version de Claude Code et au moins 20
+  transcripts de moins de 24 h sur le poste de l'exécuteur), pas un point de contrôle humain ; précondition non tenue
+  → arrêt et remontée.
+- **P79-D-31 (empreinte, 79-06).** L'empreinte du code se calcule sur l'ensemble des fichiers de code du module trouvés
+  à l'exécution (motif), jamais sur une liste figée : les modules neufs de 79-08, 79-09 et des plans suivants y entrent
+  sans retouche.
 - **P79-D-28 (79-03).** `registry --all` (comme `status --all`) et deux variables de réglage de la rétention, pour les
   suites, retenus.
 - **Note C3.** Le coût en monnaie et les limites de 5 h et de 7 jours sont hors de cette vague (P74-D-20, P74-D-24).
