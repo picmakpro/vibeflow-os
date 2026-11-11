@@ -291,6 +291,19 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
   sa note de lecture cite cet arbitrage. Les trois autres points « À Samuel » (devise, limites de 5 h et de 7 jours,
   relecture par dérivation) et le genre `silence` restent des décisions déléguées, option recommandée.
 
+### Jointure avec la Phase 75 (canal de marquage)
+
+- **P74-D-47 (canal de marquage des cartes).** Décision déléguée par Samuel (message session principale, 2026-11-08),
+  option recommandée (coordination de détail entre deux phases, tranchée par la session principale le 2026-11-11). La
+  Phase 75 pose le canal de marquage unique (P75-D-05 ; plan 75-07 : `ui/75-vf-marques.js`, `ui/75-vf-marques-glyphes.js`
+  et l'accroche dans la page, noms au commit `9ddbe831` de la branche de la 75). La 74 ne le pose pas (P74-D-31 : aucun fichier du moteur). D'ici là, « Voir sur la carte »
+  (74-06) passe par `showBoard` du moteur, mécanisme **provisoire** nommé comme tel ; dans le même lot que 75-07, la 75
+  rebranche ce geste sur une couche temporaire du canal (une ligne dans `ui/74-vf-frise-carte.js`, à ses
+  `files_modified`), avec un témoin que le geste marque bien les cartes. 74-06 écrit le contrat de branchement (point
+  d'appel, liste de fichiers passée, témoin à adapter).
+- **Ordre de chargement.** `ui/74-vf-frise-carte.js` se charge avant le canal (`ui/75-vf-*`) : il n'appelle rien du
+  canal au chargement du script, seulement au geste. Le préfixe `ui/74-vf-` reste réservé à la 74 (P74-D-43).
+
 ### Claude's Discretion
 
 Laissés à la spécification d'interface et à la planification, dans les bornes ci-dessus : la géométrie de la frise
