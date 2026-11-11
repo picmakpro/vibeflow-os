@@ -85,6 +85,59 @@ mkdir -p "$WORK/home"; QUI="$(node "$WORK/qui.mjs" "$SCRIPTS" "$LAB" "$WORK/home
 assert_eq "A6 — témoin positif : le DAG du lab alimente l'équipe" "$(printf '%s' "$QUI" | grep -o "$MK_OKDAG" | wc -l | tr -d ' ' | awk '{print ($1>=1)?"oui":"non"}')" "oui"
 assert_eq "A7 — un DAG lié hors du lab n'alimente pas l'équipe" "$(printf '%s' "$QUI" | grep -o "$MK_DAG" | wc -l | tr -d ' ')" "0"
 
+# ---------- G : dépôt git dont le dossier git sort du lab ----------
+echo "=== G — dépôt git extérieur ==="
+EXT="$WORK/ext-depot"; mkdir -p "$EXT"; G "$EXT" init -q; echo x > "$EXT/f"; G "$EXT" add -A; G "$EXT" commit -q -m "MARQUEUR-EXT-MSG"
+G "$EXT" branch -m MARQUEUR-EXT-BRANCH; G "$EXT" tag -a MARQUEUR-EXT-TAG -m "MARQUEUR-EXT-TAGMSG"
+mkplan() { wr "$1/.planning/ROADMAP.md" <<'MD'
+## Phases
+
+- [ ] **Phase 1: Socle** - premier jet
+
+### Phase 1: Socle
+**Goal**: Poser le socle
+MD
+  printf -- '---\nstatus: executing\ncurrent_phase: 1\n---\n' > "$1/.planning/STATE.md"; mkdir -p "$1/src"; printf 'export const u = 1;\n' > "$1/src/u.js"; }
+L2="$WORK/lab-g2"; mkplan "$L2"; ln -s "$EXT/.git" "$L2/.git"   # le .git du lab est un lien vers un dépôt extérieur
+node "$SCRIPTS/vf-cockpit-build.mjs" "$L2" --quiet > "$WORK/build-g2.out" 2>&1 || cat "$WORK/build-g2.out"
+L3="$WORK/lab-g3"; mkplan "$L3"; G "$L3" init -q && G "$L3" add -A && G "$L3" commit -q -m init; G "$L3" branch -m MARQUEUR-DANS-LE-LAB-BRANCH
+L5="$WORK/lab-g5"; mkplan "$L5"   # dossier de projets sans dépôt à la racine : les dépôts imbriqués sont découverts
+mkdir -p "$L5/sub" "$L5/sub2"; echo y > "$L5/sub/g.js"; printf 'gitdir: %s\n' "$EXT/.git" > "$L5/sub/.git"   # gitfile désignant un dépôt extérieur
+G "$L5/sub2" init -q; echo z > "$L5/sub2/h.js"; G "$L5/sub2" add -A; G "$L5/sub2" commit -q -m s; G "$L5/sub2" branch -m MARQUEUR-DANS-LE-LAB-SUBBRANCH   # dépôt imbriqué normal : témoin positif
+node "$SCRIPTS/vf-cockpit-build.mjs" "$L5" --quiet > "$WORK/build-g5.out" 2>&1 || cat "$WORK/build-g5.out"
+node "$SCRIPTS/vf-cockpit-build.mjs" "$L3" --quiet > "$WORK/build-g3.out" 2>&1 || cat "$WORK/build-g3.out"
+O2="$L2/.vibeflow/cockpit"; O3="$L3/.vibeflow/cockpit"; O5="$L5/.vibeflow/cockpit"
+assert_eq "G0 — les deux assemblages ont produit leurs pages" "$([ -s "$O2/project.html" ] && [ -s "$O3/project.html" ] && [ -s "$O5/project.html" ] && echo oui || echo non)" "oui"
+assert_eq "G1 — témoin positif : la branche du dépôt du lab est lue" "$([ "$(compte 'MARQUEUR-DANS-LE-LAB-BRANCH' "$O3/project.html" "$O3/index.html" "$O3/graph.json")" -ge 1 ] && echo oui || echo non)" "oui"
+assert_eq "G2 — témoin positif : un dépôt imbriqué normal du lab est lu" "$([ "$(compte 'MARQUEUR-DANS-LE-LAB-SUBBRANCH' "$O5/project.html" "$O5/index.html" "$O5/graph.json")" -ge 1 ] && echo oui || echo non)" "oui"
+assert_eq "G3 — un .git du lab lié vers un dépôt extérieur n'est pas lu (branche, tag, message, sha)" "$(compte 'MARQUEUR-EXT' "$O2/project.html" "$O2/index.html" "$O2/graph.json")" "0"
+assert_eq "G4 — un dépôt imbriqué dont le gitfile désigne un dépôt extérieur n'est pas lu" "$(compte 'MARQUEUR-EXT' "$O5/project.html" "$O5/index.html" "$O5/graph.json")" "0"
+
+# ---------- N : noms listés et pointeur de compartiment ----------
+echo "=== N — noms et pointeur ==="
+mkdir -p "$DEHORS/dossier-phase"; printf '<objective>x</objective>\n' > "$DEHORS/dossier-phase/01-99-PLAN.md"
+L4="$WORK/lab-n"; mkplan "$L4"; printf -- '- [ ] **Phase 2: Écran** - second\n' >> "$L4/.planning/ROADMAP.md"
+mkdir -p "$L4/.planning/phases/02-ecran"; printf '<objective>ok</objective>\n' > "$L4/.planning/phases/02-ecran/02-01-PLAN.md"; ln -s "$DEHORS/dossier-phase" "$L4/.planning/phases/01-socle"
+G "$L4" init -q && G "$L4" add -A && G "$L4" commit -q -m init
+L6="$WORK/lab-n2"; mkplan "$L6"; mkdir -p "$L6/.planning/workstreams/alpha" "$L6/.planning/workstreams/beta"
+for w in alpha beta; do printf -- '- [ ] **Phase 1: Un** - a\n' > "$L6/.planning/workstreams/$w/ROADMAP.md"; done
+printf 'beta\n' > "$DEHORS/pointeur"; ln -s "$DEHORS/pointeur" "$L6/.planning/active-workstream"
+L7="$WORK/lab-n3"; mkplan "$L7"; mkdir -p "$L7/.planning/workstreams/alpha" "$L7/.planning/workstreams/beta"
+for w in alpha beta; do printf -- '- [ ] **Phase 1: Un** - a\n' > "$L7/.planning/workstreams/$w/ROADMAP.md"; done
+printf 'beta\n' > "$L7/.planning/active-workstream"
+cat > "$WORK/noms.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab] = process.argv;
+const { buildProjectGraph } = await import(pathToFileURL(scripts + '/vf-cockpit-project.mjs').href);
+const { planningLayout } = await import(pathToFileURL(scripts + '/vf-cockpit-paths.mjs').href);
+const g = buildProjectGraph(lab);
+console.log(JSON.stringify({ exterieur: JSON.stringify(g).includes('01-99-PLAN'), interieur: JSON.stringify(g).includes('02-01-PLAN'), actif: planningLayout(lab).actif }));
+JS
+assert_eq "N0 — témoin positif : le plan d'un dossier de phase du lab est listé" "$(node "$WORK/noms.mjs" "$SCRIPTS" "$L4" | grep -c '"interieur":true')" "1"
+assert_eq "N1 — un dossier de phase lié hors du lab n'est pas listé (aucun nom de plan extérieur dans le graphe)" "$(node "$WORK/noms.mjs" "$SCRIPTS" "$L4" | grep -c '"exterieur":true')" "0"
+assert_eq "N2 — un pointeur active-workstream lié hors du lab est ignoré comme absent" "$(node "$WORK/noms.mjs" "$SCRIPTS" "$L6" | grep -c '"actif":"beta"')" "0"
+assert_eq "N3 — témoin positif : un pointeur du lab est lu" "$(node "$WORK/noms.mjs" "$SCRIPTS" "$L7" | grep -c '"actif":"beta"')" "1"
+
 # ---------- B : worktree déclaré non vérifié ----------
 echo "=== B — arbres du lab ==="
 AUTRE="$WORK/autre"; mkdir -p "$AUTRE"; G "$AUTRE" init -q; echo x > "$AUTRE/f"; G "$AUTRE" add -A; G "$AUTRE" commit -q -m autre
@@ -103,6 +156,14 @@ ARB="$(node "$WORK/arbres.mjs" "$SCRIPTS" "$LAB")"
 assert_eq "B1 — l'entrée déclarée mais non vérifiée n'est pas un arbre du lab" "$(printf '%s\n' "$ARB" | grep -c "^$AUTRE\$")" "0"
 assert_eq "B2 — témoin positif : le vrai worktree reste un arbre du lab" "$(printf '%s\n' "$ARB" | grep -c "^$WORK/vrai\$")" "1"
 assert_eq "B3 — témoin positif : l'arbre principal reste le premier" "$(printf '%s\n' "$ARB" | head -1)" "$LAB"
+cat > "$WORK/sortant.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const [, , scripts, ...dirs] = process.argv;
+const { gitSortant } = await import(pathToFileURL(scripts + '/vf-cockpit-git-sortant.mjs').href);
+console.log(dirs.map((d) => gitSortant(d)).join(','));
+JS
+printf 'gitdir: %s\n' "$AUTRE/.git" > "$WORK/gitfile-forge"; mkdir -p "$WORK/faux-wt"; cp "$WORK/gitfile-forge" "$WORK/faux-wt/.git"
+assert_eq "B4 — gitSortant : dépôt du lab, vrai worktree = faux ; .git lié vers l'extérieur, gitfile forgé vers un autre dépôt = vrai" "$(node "$WORK/sortant.mjs" "$SCRIPTS" "$LAB" "$WORK/vrai" "$L2" "$WORK/faux-wt")" "false,false,true,true"
 
 # ---------- D : métadonnées VibeFlow de l'export ----------
 echo "=== D — export ==="

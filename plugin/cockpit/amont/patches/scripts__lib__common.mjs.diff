@@ -27,3 +27,30 @@
    try {
      return execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }).trimEnd();
    } catch {
+@@ -202,8 +204,25 @@ export function discover(root, { includeWorktrees = false, maxLooseFiles = 5000
+   const loose = [];
+   const skipped = [];
+ 
++  // vibeflow AUDC-A-02 : `<dir>/.git` qui désigne un dossier git hors de la racine réelle du lab (lien sortant, gitfile sortant non worktree) n'est pas un dépôt lu ; même règle que gitSortant (scripts/vf-cockpit-git-sortant.mjs)
++  const rootReal = fs.realpathSync(root);
++  const sous = (p) => p === rootReal || p.startsWith(rootReal + path.sep);
++  const gitSortant = (dir) => {
++    const dotgit = path.join(dir, '.git');
++    try {
++      const st = fs.lstatSync(dotgit);
++      if (st.isDirectory()) return false;
++      if (st.isSymbolicLink()) return !sous(fs.realpathSync(dotgit));
++      if (!st.isFile() || st.size > 4096) return true;
++      const m = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(dotgit, 'utf8')); if (!m) return true;
++      const admin = fs.realpathSync(path.resolve(dir, m[1].trim()));
++      if (sous(admin)) return false;
++      if (path.basename(path.dirname(admin)) !== 'worktrees') return true;
++      return fs.realpathSync(fs.readFileSync(path.join(admin, 'gitdir'), 'utf8').trim()) !== fs.realpathSync(dotgit);
++    } catch { return true; }
++  };
+   const walk = (dir, depth) => {
+-    if (fs.existsSync(path.join(dir, '.git'))) {
++    if (fs.existsSync(path.join(dir, '.git')) && !gitSortant(dir)) {
+       repos.push({ abs: dir, path: rel(root, dir), worktreeOf: worktreeMain(dir) });
+       return;
+     }
