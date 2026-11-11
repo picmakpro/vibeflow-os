@@ -495,6 +495,19 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   neuf) ; `frise` part une fois par tour, pas à chaque paquet de la passe de fond ; la table en mémoire des agents est
   un module neuf `vf-cockpit-agents-table.mjs`, nourri par la collecte du tour, jamais par une seconde. Décision déléguée
   par Samuel (message session principale, 2026-11-08), option recommandée.
+- **A51 (73 et toute phase, règle de C5) — réexécution d'une extension.** La coquille garantit, sans compter sur la
+  discipline des extensions : `VF_COQUILLE.surOnglet(rappel, { cle })` — une inscription porteuse d'une `cle` déjà
+  inscrite **remplace** la précédente (le nettoyage rendu par l'ancienne est appelé d'abord) ; le nettoyage rendu par un
+  rappel est appelé avant chaque changement d'onglet. Idiome attendu de chaque extension : `cle` = nom de son fichier,
+  écouteurs, minuteries et observateurs posés dans le rappel et retirés dans la fonction qu'il rend. Une inscription
+  sans `cle` reste admise mais n'est pas dédoublonnée. Témoin du socle (79-16) : deux changements d'onglet et une
+  réexécution du même fichier → le rappel n'est appelé qu'une fois par arrivée, l'ancien nettoyage une fois. Décision
+  déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
+- **A52 (79-14) — liste `EVENEMENTS`.** Sans ordre contrôlé : une ligne de règle et un repère par phase (73, 74, 75,
+  76, 77, 80, 81 ; `// vf-repere:phase-NN`) ; `ROUTES`, `ANNOTATEURS` et les lignes `AJOUT` de `VENDORED.txt` gardent
+  leur ordre alphabétique contrôlé, sans repère ; ancres de 79-08 dans `vf-cockpit-interface.json` : `cockpit-index@1`
+  après `vibeflow/cockpit-transcript@2`, `claudeCode.index` après `transcriptSousAgent` ; le bloc
+  `vibeflow/cockpit-project@1` n'est pas touché.
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
   gardé sans fin). Borne en vigueur : AUDC-Q2.
