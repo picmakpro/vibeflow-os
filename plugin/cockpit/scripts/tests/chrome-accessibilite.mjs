@@ -48,5 +48,19 @@ await executer(chrome, async (s) => {
     o.x7[cle] = JSON.parse(await s.ev(`JSON.stringify({ titre: document.title, main: document.querySelectorAll('main').length, courants: [...document.querySelectorAll('[aria-current]')].map((e) => e.textContent.trim() + '=' + e.getAttribute('aria-current')), nom: document.querySelector('#proj-name').textContent })`));
   }
 
+  // ---------- X4 : un seul anneau de focus sur tout le parcours au clavier (page Code) ----------
+  // de vraies touches Tab depuis le début de la page ; à chaque arrêt, l'anneau réellement dessiné : le contour de l'élément, ou celui de son formulaire quand c'est lui qui entoure le champ (:has / :focus-within)
+  await charger('index.html', 'x4');
+  const ANNEAU = `(() => { const a = document.activeElement; if (!a || a === document.body) return JSON.stringify({ fin: true });
+    const sig = (e) => { const c = getComputedStyle(e); return (c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) > 0) ? c.outlineWidth + ' ' + c.outlineStyle + ' ' + c.outlineColor : ''; };
+    let r = sig(a); if (!r) { const f = a.closest('form'); if (f && sig(f)) r = sig(f); }
+    const W = (window.__tabIds ||= new WeakMap()); if (!W.has(a)) W.set(a, (window.__tabN = (window.__tabN || 0) + 1));
+    return JSON.stringify({ n: W.get(a), cle: a.id || a.tagName.toLowerCase() + '.' + String(a.className && a.className.baseVal !== undefined ? a.className.baseVal : a.className || '').split(/\\s+/)[0], anneau: r }); })()`;
+  await s.ev("(() => { document.activeElement && document.activeElement.blur(); const d = document.createElement('span'); d.id = 'vf-depart'; d.tabIndex = -1; d.setAttribute('style', 'position:fixed;left:0;top:0;width:0;height:0'); document.body.prepend(d); d.focus(); })()");
+  const arrets = [], vus = new Set();
+  for (let i = 0; i < 80; i++) { await touche('Tab', 'Tab', 9); const a = JSON.parse(await s.ev(ANNEAU)); if (a.fin || vus.has(a.n)) break; vus.add(a.n); arrets.push(a); }
+  await s.ev("document.getElementById('vf-depart')?.remove()");
+  o.x4 = { arrets };
+
   return o;
 });
