@@ -32,7 +32,7 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase : aucune en cours. Sept phases du jalon `vibeflow-v2.0` cadrées et planifiées le 2026-11-11 (73, 74, 75, 76, 77, 79, 80 : 93 plans, 109 exigences), fusionnées dans `integration/cockpit-audit` (jointure, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 : « Oui, dans la branche de travail (Recommandé) ») avec le lot 0 et le lot 0 bis ; PR #227 ouverte. Dernière phase close : 72.
+Phase: aucune en cours ; prochaines : 79 et 80, en parallèle. Sept phases du jalon `vibeflow-v2.0` cadrées et planifiées le 2026-11-11 (73, 74, 75, 76, 77, 79, 80 : 93 plans, 109 exigences), fusionnées dans `integration/cockpit-audit` (jointure, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 : « Oui, dans la branche de travail (Recommandé) ») avec le lot 0 et le lot 0 bis ; PR #227 ouverte. Dernière phase close : 72.
 
 Jalon `vibeflow-v2.0` (Phases 67-81, 16 phases) : 8 phases publiées sur 16 ; 79 plans exécutés sur 172 (la 71.5 est une mission design, sans plan GSD ; 93 plans planifiés, non exécutés).
 
@@ -61,8 +61,8 @@ Jalon `vibeflow-v2.0` (Phases 67-81, 16 phases) : 8 phases publiées sur 16 ; 79
 - 2026-11-11 — Phase 73 cadrée et planifiée (P73-D-01..36 : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée) : 11 plans en 8 vagues, REGI-01..17 ; `priseS` résolu par A36/A39 (plus de question vers la 79).
 - 2026-11-11 — Phases 74 et 76 cadrées et planifiées (10 et 9 plans ; P74-D-46 et P76-D-32 à D-34 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11).
 - 2026-11-11 — Phase 75 cadrée et planifiée (P75-D-01..31 ; P75-D-28 et P75-D-29 arbitrages Samuel, AskUserQuestion session principale, 2026-11-11) ; P75-Q-06 (amendements de DESIGN.md) en attente, bloque 75-10.
-- 2026-11-11 — Phase 77 cadrée et planifiée : 8 plans en 6 vagues, SYNT-01..10, deux questions appliquées par délégation (P77-Q-01, P77-Q-02).
-- 2026-11-11 — Phase 79 (socle du cockpit) cadrée et planifiée : 22 plans en 11 vagues, SOCL-01..27, contrats C0-C6 et amendements A1-A55 fournis aux Phases 73 à 77 et 80. P79-Q-03 (S-3) tranchée (P79-D-33, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) ; P79-Q-01 et Q-02 appliquées par décision déléguée ; P79-Q-04 (S-4, réduction d'I18) en attente, non bloquante.
+- 2026-11-11 — Phase 77 cadrée et planifiée : 8 plans, 6 vagues, SYNT-01..10, P77-Q-01 et P77-Q-02 appliquées par décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
+- 2026-11-11 — Phase 79 cadrée et planifiée : 22 plans, 11 vagues, SOCL-01..27, contrats C0-C6 et amendements A1-A55 fournis aux Phases 73 à 77 et 80. P79-Q-03 (S-3) tranchée (P79-D-33, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) ; P79-Q-01 et Q-02 appliquées par décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée ; P79-Q-04 (S-4, réduction d'I18) en attente, non bloquante.
 - 2026-11-11 — Phase 80 planifiée : 21 plans en 11 vagues ; vagues 1 à 3 exécutables sans la 79 ; 80-09 à 80-17 et 80-19 à 80-21 après 79-01 à 79-18 ; 80-18 après 79-20. Cadrée le 2026-11-11 (P80-D-01..60 ; P80-D-52..56 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; les autres : décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée).
 
 ### Pending Todos

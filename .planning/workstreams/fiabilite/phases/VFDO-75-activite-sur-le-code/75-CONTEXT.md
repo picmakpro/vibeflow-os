@@ -274,13 +274,13 @@ et ne sont pas rouverts.
 
 ### Arbitrages de Samuel du 2026-11-11 (AskUserQuestion, session principale ; relayés mot pour mot)
 
-- **P75-D-28 (Q-75-3, couche « Travail récent ») — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11.**
+- **P75-D-28 (P75-Q-03 (Q-75-3), couche « Travail récent ») — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11.**
   Réponse cochée : « La remplacer (Recommandé) ». Option telle qu'elle a été présentée : « L'empreinte observée prend sa
   place. L'entrée du menu « ⋯ » reste au même endroit, avec un libellé et une pastille de compte, et devient le sélecteur
   de vues. C'est aussi le retrait que le jalon demande à cette phase. » P70-D-01 est amendée dans cette mesure exacte, pas
   au-delà. Les conditions de départ posées le 2026-11-11 sur les tâches de retrait sont levées ; la branche de repli
   (lentille « Récent ») est retirée des plans.
-- **P75-D-29 (Q-75-4 = S-3 de la 79, worktrees hors du dossier du lab) — arbitrage Samuel, AskUserQuestion session
+- **P75-D-29 (P75-Q-04 (Q-75-4) = S-3 de la 79, worktrees hors du dossier du lab) — arbitrage Samuel, AskUserQuestion session
   principale, 2026-11-11.** Réponse cochée : « Les compter comme le lab (Recommandé) ». Option telle qu'elle a été
   présentée : « Un worktree vérifié comme appartenant au même dépôt compte comme le lab : le fichier s'affiche par son
   chemin relatif à la racine du worktree, aucun chemin absolu ne sort. Le radar voit alors ces worktrees. Un dossier qui

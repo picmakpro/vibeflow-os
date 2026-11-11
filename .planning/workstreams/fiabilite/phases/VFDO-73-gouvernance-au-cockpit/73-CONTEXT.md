@@ -480,7 +480,7 @@ Anciens libellés : S-1 → P73-Q-01, S-2 → P73-Q-02, S-3 → P73-Q-03, S-4 �
   attente, reliés à leur phase et à ce qu'ils bloquent » ; les questions écrites en prose dans les cadrages n'y
   paraissaient pas.
   Options : (a) reporter, une convention structurée au BACKLOG ; (b) poser le format maintenant, lu par la Phase 76 et affiché dans « À vous ».
-  Recommandation : (a) — recommandation du manager de la Phase 73, écartée par Samuel.
+  Recommandation : (a) — recommandation du manager de la Phase 73 ; le formulaire de la session principale portait « (Recommandé) » sur l'option (b), retenue par Samuel (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11).
   Bloque : 73-11, Phase 76
   État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « Poser le format maintenant (Recommandé) »
 - **P73-Q-04 — Notification du système.** Reportée par P73-D-15 ; elle écrirait du texte hors de la page (centre de
