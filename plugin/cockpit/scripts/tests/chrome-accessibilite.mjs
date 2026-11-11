@@ -51,19 +51,22 @@ await executer(chrome, async (s) => {
     o.x7[cle] = JSON.parse(await s.ev(`JSON.stringify({ titre: document.title, main: document.querySelectorAll('main').length, courants: [...document.querySelectorAll('[aria-current]')].map((e) => e.textContent.trim() + '=' + e.getAttribute('aria-current')), nom: document.querySelector('#proj-name').textContent })`));
   }
 
-  // ---------- X4 : un seul anneau de focus sur tout le parcours au clavier (page Code) ----------
+  // ---------- X4 : un seul anneau de focus sur tout le parcours au clavier (trois pages) ----------
   // de vraies touches Tab depuis le début de la page ; à chaque arrêt, l'anneau réellement dessiné : le contour de l'élément, ou celui de son formulaire quand c'est lui qui entoure le champ (:has / :focus-within)
-  await charger('index.html', 'x4');
-  const ANNEAU = `(() => { const a = document.activeElement; if (!a || a === document.body) return JSON.stringify({ fin: true });
-    const sig = (e) => { const c = getComputedStyle(e); return (c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) > 0) ? c.outlineWidth + ' ' + c.outlineStyle + ' ' + c.outlineColor : ''; };
-    let r = sig(a); if (!r) { const f = a.closest('form'); if (f && sig(f)) r = sig(f); }
-    const W = (window.__tabIds ||= new WeakMap()); if (!W.has(a)) W.set(a, (window.__tabN = (window.__tabN || 0) + 1));
-    return JSON.stringify({ n: W.get(a), cle: a.id || a.tagName.toLowerCase() + '.' + String(a.className && a.className.baseVal !== undefined ? a.className.baseVal : a.className || '').split(/\\s+/)[0], anneau: r }); })()`;
-  await s.ev("(() => { document.activeElement && document.activeElement.blur(); const d = document.createElement('span'); d.id = 'vf-depart'; d.tabIndex = -1; d.setAttribute('style', 'position:fixed;left:0;top:0;width:0;height:0'); document.body.prepend(d); d.focus(); })()");
-  const arrets = [], vus = new Set();
-  for (let i = 0; i < 80; i++) { await touche('Tab', 'Tab', 9); const a = JSON.parse(await s.ev(ANNEAU)); if (a.fin || vus.has(a.n)) break; vus.add(a.n); arrets.push(a); }
-  await s.ev("document.getElementById('vf-depart')?.remove()");
-  o.x4 = { arrets };
+  o.x4 = {};
+  for (const [cle, page] of [['code', 'index.html'], ['projet', 'project.html'], ['equipe', 'equipe.html']]) {
+    await charger(page, 'x4 ' + page);
+    const ANNEAU = `(() => { const a = document.activeElement; if (!a || a === document.body) return JSON.stringify({ fin: true });
+      const sig = (e) => { const c = getComputedStyle(e); return (c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) > 0) ? c.outlineWidth + ' ' + c.outlineStyle + ' ' + c.outlineColor : ''; };
+      let r = sig(a); if (!r) { const f = a.closest('form'); if (f && sig(f)) r = sig(f); }
+      const W = (window.__tabIds ||= new WeakMap()); if (!W.has(a)) W.set(a, (window.__tabN = (window.__tabN || 0) + 1));
+      return JSON.stringify({ n: W.get(a), cle: a.id || a.tagName.toLowerCase() + '.' + String(a.className && a.className.baseVal !== undefined ? a.className.baseVal : a.className || '').split(/\\s+/)[0], anneau: r }); })()`;
+    await s.ev("(() => { document.activeElement && document.activeElement.blur(); const d = document.createElement('span'); d.id = 'vf-depart'; d.tabIndex = -1; d.setAttribute('style', 'position:fixed;left:0;top:0;width:0;height:0'); document.body.prepend(d); d.focus(); })()");
+    const arrets = [], vus = new Set();
+    for (let i = 0; i < 80; i++) { await touche('Tab', 'Tab', 9); const a = JSON.parse(await s.ev(ANNEAU)); if (a.fin || vus.has(a.n)) break; vus.add(a.n); arrets.push(a); }
+    await s.ev("document.getElementById('vf-depart')?.remove()");
+    o.x4[cle] = arrets;
+  }
 
   // ---------- X6 : mouvement réduit ----------
   // animations actives (en cours ou sur le point de l'être) relevées dans la foulée d'une plongée : on attend que les cartes du niveau soient posées, puis on compte tout de suite
@@ -78,5 +81,12 @@ await executer(chrome, async (s) => {
   await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
   await charger('index.html', 'x6 réduit');
   o.x6.reduit = { repos: await s.ev(ANIMS), ...(await plonger()) };
+  // repères utiles, statiques : la carte repérée par la plongée porte un contour fixe (pas d'animation) puis le perd ; l'attente de « Demander » reste un anneau lisible ; les entrées qui retirent leur classe sur animationend la perdent quand même
+  o.x6.reduit.flash = { pose: await s.attendre("!!document.querySelector('#viewport .node.flash')", 'carte repérée').then(() => true, () => false) };
+  o.x6.reduit.flash.mesure = JSON.parse(await s.ev("JSON.stringify((() => { const c = document.querySelector('#viewport .node.flash .card'); if (!c) return null; const k = getComputedStyle(c); return { anim: k.animationName, contour: k.outlineColor, largeur: k.outlineWidth }; })())"));
+  o.x6.reduit.flash.perdu = await s.attendre("!document.querySelector('#viewport .node.flash')", 'contour retiré', 4000).then(() => true, () => false);
+  o.x6.reduit.attente = JSON.parse(await s.ev("JSON.stringify((() => { const e = document.createElement('span'); e.className = 'spin'; e.style.display = 'inline-flex'; document.body.appendChild(e); const k = getComputedStyle(e); const r = { anim: k.animationName, actives: e.getAnimations().length, largeur: e.getBoundingClientRect().width, quartColore: k.borderTopColor !== k.borderRightColor }; e.remove(); return r; })())"));
+  await s.ev("(() => { const e = document.createElement('div'); e.id = 'vf-essai-entree'; e.className = 'vf-git-entree'; e.addEventListener('animationend', () => e.classList.remove('vf-git-entree')); document.body.appendChild(e); })()");
+  o.x6.reduit.entree = await s.attendre("!document.getElementById('vf-essai-entree').classList.contains('vf-git-entree')", 'classe d\'entrée retirée', 3000).then(() => true, () => false);
   return o;
 });

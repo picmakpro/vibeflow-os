@@ -109,12 +109,6 @@
     #context:empty { display: none; }
     /* 71.5 (N5) : au survol, le trait vert/neutre des boutons passe en --text-2 (le trait d'état tombe à 2,68:1 sur le fond de survol en clair) */
     #btn-recent:hover svg.i, #btn-health.calm:hover svg.i { color: var(--text-2); }
-    /* AUDC-X4 : un seul anneau de focus, celui du jeton --ring (2 px, décalé de 2 px) : tout élément atteint au clavier le porte, onglets, fil d'Ariane, titre, « Demander » et définitions comprises (le bleu du navigateur et l'ombre des définitions disparaissent) ; :where() garde une spécificité nulle, les règles propres à un élément (décalage négatif d'une ligne, par exemple) l'emportent donc, et le champ de question, sans contour propre, le porte par son formulaire */
-    :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-    body .sc-term:focus-visible { box-shadow: none; outline: 2px solid var(--ring); outline-offset: 2px; }
-    #ask-form:has(#ask-input:focus-visible) { outline: 2px solid var(--ring); outline-offset: 2px; }
-    /* AUDC-X6 : mouvement réduit, à toute largeur et sur tout appareil (la règle du moteur ne couvrait que le téléphone) : ni fondu ni déplacement de plongée, ni apparition des cartes, ni pulsation d'état ; la vue change d'un coup, l'état final est celui des règles de base */
-    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
   `;
   // spike 005 : la barre de question reste visible quand serve.mjs (P7) sert l'onglet Projet
   // recette 69 : au zoom d'ouverture du jalon (lod-mid, ou lod-low plus loin) le pied des cartes (« à recetter · 9/9 plans … » et la pastille d'état) était masqué ou à 5 px :

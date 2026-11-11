@@ -25,6 +25,7 @@ RETRAIT agents/openai.yaml
 AJOUT assets/ui/00-vibeflow.js
 AJOUT assets/ui/01-vf-responsive.js
 AJOUT assets/ui/02-vf-telephone.js
+AJOUT assets/ui/03-vf-accessibilite.js
 AJOUT assets/ui/39-vf-tour-placement.js
 AJOUT assets/ui/70-vf-live.js
 AJOUT assets/ui/71-vf-equipe-rendu.js
@@ -54,7 +55,7 @@ AJOUT VENDORED.txt
 AJOUT LICENCES-TIERCES.txt
 TAILLE assets/serve.mjs 616
 TAILLE assets/vendor/elk.bundled.js 6697
-TAILLE assets/viewer.html 2573 .html, hors gate
+TAILLE assets/viewer.html 2577 .html, hors gate
 TAILLE scripts/build.mjs 484
 TAILLE scripts/lib/extract.mjs 602
 TAILLE scripts/lib/health.mjs 1213
