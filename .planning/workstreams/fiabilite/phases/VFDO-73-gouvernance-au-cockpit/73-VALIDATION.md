@@ -56,6 +56,7 @@ created: "2026-11-11"
 | REGI-14 | un style de bouton, nom une fois, santé | CDP + VM | RG14.*, M3.8 | 3 styles | pending |
 | REGI-15 | registre, bascule, événements annulables | VM | RG15.* | registre indéfini | pending |
 | REGI-16 | LE → LR, export, recherche, compteur, suites vertes | suites + gates | LR1-LR5, W23.*, RG16.* | `lancee` absent | pending |
+| REGI-17 | questions écrites des cadrages, troisième source de « À vous » | plan 73-11 | RG17.* (plan 73-11) | source absente | pending |
 
 *Les identifiants de tâche et la colonne « Fichier existe » sont renseignés par les plans (73-NN).*
 
