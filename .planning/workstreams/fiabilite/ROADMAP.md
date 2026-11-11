@@ -584,11 +584,11 @@ Plans:
 
 ### Phase 77: Santé de la méthode et synthèse — jauges, dernière visite, burn-up
 
-> **Cadrée et planifiée le 2026-11-11** (mission de cadrage parallèle, `77-CONTEXT.md`, P77-D-01..24 : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Deux questions non bloquantes à Samuel (A77-1, A77-2).
+> **Cadrée et planifiée le 2026-11-11** (mission de cadrage parallèle, `77-CONTEXT.md`, P77-D-01..36 : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Deux questions non bloquantes à Samuel (A77-1, A77-2).
 
 **Goal:** Le cockpit montre en jauges les budgets de la méthode (densité des agents, skills, taille du ROADMAP et du BACKLOG, baseline d'instructions), résume ce qui a changé depuis la dernière visite, et trace le burn-up du jalon en pourcentage strict.
 **Requirements**: SYNT-01, SYNT-02, SYNT-03, SYNT-04, SYNT-05, SYNT-06, SYNT-07, SYNT-08, SYNT-09, SYNT-10
-**Depends on:** Phase 69 (avancement des phases et du jalon) ; Phase 79 : table des routes et réponse gardée commune (79-05), instantané de la collecte (79-09), appareil de patchs retiré et installation par onglet `VF_COQUILLE.surOnglet` avant les plans du cockpit ; route de frise (79-13) pour le seul coût par phase et par étage ; Phase 74 pour l'agrégat de coût partagé (AUDC-I08) ; ordre du jalon : après la 76. Le plan des gates (`plugin/conductor`) ne dépend d'aucune phase.
+**Depends on:** Phase 69 (avancement des phases et du jalon) ; Phase 79, revalidée à `673c879d`, plan par plan : 79-05 (table `ROUTES`, réponse gardée), 79-07 (lanceur, `envGit`), 79-02 et 79-06 (lancement des suites depuis le module), 79-01 et 79-11 (inventaire `AJOUT`, cliquet de colonnes), 79-09 (instantané), 79-12 (route d'état), 79-16 (coquille, `surOnglet`, liste `/_vf/`), 79-17 (`VF_ETAT`) avant les plans du cockpit concernés ; 79-13 (frise) pour le seul coût par phase et par étage ; Phase 74 (74-01, agrégat de coût partagé) ; ordre du jalon : après la 76. Le plan des gates (`plugin/conductor`, 77-01) ne dépend d'aucune phase.
 **Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 12, 15, 16) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2, registre AUDC-I08 et AUDC-I14 ; contrats de la Phase 79 (`79-CONTEXT.md`, commits `3119d82a` et `2ae6607a` de `feat/phase-79-socle-cockpit`).
 **Retrait (un ajout, un retrait):** la prose recopiée du STATE sous « Maintenant » (`lastDesc`), remplacée par la synthèse datée (P77-D-12).
 
