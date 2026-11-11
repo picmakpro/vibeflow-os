@@ -273,11 +273,13 @@ function parseAnswer(ev) {
 const failCode = (msg) => /not logged in|logged out|\/login|log ?in again|sign in|authenticat|unauthori[sz]ed|\b401\b/i.test(msg) ? 'not_logged_in'
   : /usage limit|rate limit|too many requests|\b429\b/i.test(msg) ? 'rate_limited' : 'cli_error';
 // Claude Code: `claude -p` with read-only tools, answering in the schema; follow-ups resume its session
+const issued = new Set(); // vibeflow AUDC-A-01 : les identifiants de session que CE serveur a rendus ; « Demander » ne reprend rien d'autre
+const noteSession = (id) => { if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) return; issued.add(id); if (issued.size > 500) issued.delete(issued.values().next().value); };
 function claudeRun(body, mode) {
   const args = [...cli.args, '-p', '--output-format', 'stream-json', '--verbose',
     '--json-schema', JSON.stringify(mode.schema), '--append-system-prompt', mode.instructions,
     '--tools', 'Read,Grep,Glob,Bash', '--allowedTools', 'Bash(node floorplan/query.mjs:*)', 'Read', 'Grep', 'Glob'];
-  if (typeof body.session === 'string' && /^[0-9a-f-]{36}$/i.test(body.session)) args.push(`--resume=${body.session}`); // vibeflow P18 : un identifiant de session, jamais un drapeau
+  if (typeof body.session === 'string' && /^[0-9a-f-]{36}$/i.test(body.session) && issued.has(body.session)) args.push(`--resume=${body.session}`); // vibeflow P18 : un identifiant de session, jamais un drapeau
   if (model) args.push('--model', model);
   return {
     args: VF ? VF.argsAgent(args, body) : args, input: String(body.question || '').slice(0, 4000), // vibeflow P14 : confinement mesuré et modèle validé
@@ -285,7 +287,7 @@ function claudeRun(body, mode) {
       if (ev.type === 'assistant') for (const c of ev.message?.content || []) if (c.type === 'tool_use') out.progress(describeTool(c.name, c.input));
       if (ev.type !== 'result') return;
       if (ev.is_error) out.fail(String(ev.result || ev.subtype || 'Claude Code reported an error'));
-      else out.answer({ ...parseAnswer(ev), session: ev.session_id });
+      else { noteSession(ev.session_id); out.answer({ ...parseAnswer(ev), session: ev.session_id }); }
     },
   };
 }
@@ -367,6 +369,7 @@ function ask(req, res, body) {
   if (VF && VF.avantQuestion({ req, body, send }) === 'repondu') return res.end(); // vibeflow P14 : réponse locale ou refus de modèle
   if (!cli) { send('failure', { code: 'cli_missing', message: `${ENGINES[want].name} not found.` }); return res.end(); }
   if (body.mode === 'change') return changePlan(res, send, body);
+  if (engine === 'claude' && typeof body.session === 'string' && body.session && !issued.has(body.session)) { send('failure', { code: 'session_inconnue', message: 'Cette conversation n’a pas été ouverte par ce serveur : rechargez la page pour en commencer une nouvelle.' }); return res.end(); } // vibeflow AUDC-A-01
   runAgent(res, send, body)
     .then((a) => send('answer', a), (e) => { if (e !== CLOSED) send('failure', { code: failCode(e.message), message: e.message }); })
     .finally(() => res.end());

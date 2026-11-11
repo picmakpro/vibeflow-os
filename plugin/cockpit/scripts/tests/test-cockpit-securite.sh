@@ -137,18 +137,20 @@ done
 assert_eq "B1 — 15 combinaisons (5 corps × 3 routes) : toutes en 400" "$BADN" "0"
 assert_eq "B2 — témoin : le serveur répond encore (état)" "$(sta "$PORT" GET /api/vf/etat "$TOK")" "200"
 
-echo "=== S — session de reprise : un uuid, jamais un drapeau ==="
+echo "=== S — session de reprise : un identifiant rendu par ce serveur, jamais un drapeau ==="
 srv "$OUT" "$WORK/fk"; PORT=$SRV_PORT; PTOK="$(tok "$PORT" /project.html)"
 ask() { node "$AUX/req.mjs" "$PORT" POST /api/ask "$PTOK" "{\"question\":\"Pourquoi ce statut ?\",\"mode\":\"ask\",\"session\":\"$1\"}" > /dev/null; }
 rm -f "$WORK"/fkd/call-*; ask "--dangerously-skip-permissions"
-assert_eq "S1 — témoin : l'agent a été lancé une fois" "$(ls "$WORK"/fkd/call-*.json 2>/dev/null | wc -l | tr -d ' ')" "1"
+# AUDC-A-01 : un identifiant que ce serveur n'a pas rendu est refusé (avant : la forme seule était contrôlée, et l'agent était lancé sans reprise)
+assert_eq "S1 — un identifiant en forme de drapeau est refusé : l'agent n'est pas lancé" "$(ls "$WORK"/fkd/call-*.json 2>/dev/null | wc -l | tr -d ' ')" "0"
 cat > "$AUX/argv.mjs" <<'JS'
 import fs from 'node:fs'; const a = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).argv; const i = a.indexOf('--setting-sources');
 console.log(JSON.stringify({ drapeau: a.some((x) => /dangerously|^--resume/.test(x)), uuid: a.includes('--resume=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'), sources: i >= 0 && a[i + 1] === '' && a.includes('--strict-mcp-config') }));
 JS
-assert_eq "S2 — l'argv ne porte ni ce drapeau ni --resume" "$(node "$AUX/argv.mjs" "$WORK/fkd/call-1.json" | node "$AUX/ev.mjs" 'j.drapeau')" "false"
+ask ""
+assert_eq "S2 — témoin : une première question sans session lance l'agent, l'argv ne porte ni ce drapeau ni --resume" "$(ls "$WORK"/fkd/call-*.json 2>/dev/null | wc -l | tr -d ' ')|$(node "$AUX/argv.mjs" "$WORK/fkd/call-1.json" | node "$AUX/ev.mjs" 'j.drapeau')" "1|false"
 ask "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-assert_eq "S3 — un uuid valide passe en --resume=<uuid>" "$(node "$AUX/argv.mjs" "$WORK/fkd/call-2.json" | node "$AUX/ev.mjs" 'j.uuid')" "true"
+assert_eq "S3 — l'identifiant que ce serveur vient de rendre passe en --resume=<uuid>" "$(node "$AUX/argv.mjs" "$WORK/fkd/call-2.json" | node "$AUX/ev.mjs" 'j.uuid')" "true"
 assert_eq "S4 — l'argv du confinement porte --setting-sources vide et --strict-mcp-config" "$(node "$AUX/argv.mjs" "$WORK/fkd/call-2.json" | node "$AUX/ev.mjs" 'j.sources')" "true"
 unsrv
 

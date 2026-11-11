@@ -138,12 +138,18 @@
  
  // ---------- asking ----------
  const nameFor = (id) => { try { return core.q.brief(id)?.name || id; } catch { return id; } };
-@@ -309,10 +277,10 @@ function claudeRun(body, mode) {
+@@ -305,19 +273,21 @@ function parseAnswer(ev) {
+ const failCode = (msg) => /not logged in|logged out|\/login|log ?in again|sign in|authenticat|unauthori[sz]ed|\b401\b/i.test(msg) ? 'not_logged_in'
+   : /usage limit|rate limit|too many requests|\b429\b/i.test(msg) ? 'rate_limited' : 'cli_error';
+ // Claude Code: `claude -p` with read-only tools, answering in the schema; follow-ups resume its session
++const issued = new Set(); // vibeflow AUDC-A-01 : les identifiants de session que CE serveur a rendus ; « Demander » ne reprend rien d'autre
++const noteSession = (id) => { if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) return; issued.add(id); if (issued.size > 500) issued.delete(issued.values().next().value); };
+ function claudeRun(body, mode) {
    const args = [...cli.args, '-p', '--output-format', 'stream-json', '--verbose',
      '--json-schema', JSON.stringify(mode.schema), '--append-system-prompt', mode.instructions,
      '--tools', 'Read,Grep,Glob,Bash', '--allowedTools', 'Bash(node floorplan/query.mjs:*)', 'Read', 'Grep', 'Glob'];
 -  if (body.session) args.push('--resume', String(body.session));
-+  if (typeof body.session === 'string' && /^[0-9a-f-]{36}$/i.test(body.session)) args.push(`--resume=${body.session}`); // vibeflow P18 : un identifiant de session, jamais un drapeau
++  if (typeof body.session === 'string' && /^[0-9a-f-]{36}$/i.test(body.session) && issued.has(body.session)) args.push(`--resume=${body.session}`); // vibeflow P18 : un identifiant de session, jamais un drapeau
    if (model) args.push('--model', model);
    return {
 -    args, input: String(body.question || '').slice(0, 4000),
@@ -151,7 +157,13 @@
      onEvent(ev, out) {
        if (ev.type === 'assistant') for (const c of ev.message?.content || []) if (c.type === 'tool_use') out.progress(describeTool(c.name, c.input));
        if (ev.type !== 'result') return;
-@@ -354,7 +322,8 @@ const CLOSED = Symbol('closed'); // the browser went away mid-request
+       if (ev.is_error) out.fail(String(ev.result || ev.subtype || 'Claude Code reported an error'));
+-      else out.answer({ ...parseAnswer(ev), session: ev.session_id });
++      else { noteSession(ev.session_id); out.answer({ ...parseAnswer(ev), session: ev.session_id }); }
+     },
+   };
+ }
+@@ -354,7 +324,8 @@ const CLOSED = Symbol('closed'); // the browser went away mid-request
  /** Runs the agent once for a request and resolves with its answer, streaming progress through `send`. */
  function runAgent(res, send, body) {
    return new Promise((resolve, reject) => {
@@ -161,15 +173,18 @@
      const child = spawn(cli.cmd, run.args, { cwd: root, env: cliEnv(), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
      const id = crypto.randomBytes(6).toString('hex');
      running.set(id, child);
-@@ -395,6 +364,7 @@ function runAgent(res, send, body) {
+@@ -395,8 +366,10 @@ function runAgent(res, send, body) {
  function ask(req, res, body) {
    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
    const send = (event, data) => { if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
 +  if (VF && VF.avantQuestion({ req, body, send }) === 'repondu') return res.end(); // vibeflow P14 : réponse locale ou refus de modèle
    if (!cli) { send('failure', { code: 'cli_missing', message: `${ENGINES[want].name} not found.` }); return res.end(); }
    if (body.mode === 'change') return changePlan(res, send, body);
++  if (engine === 'claude' && typeof body.session === 'string' && body.session && !issued.has(body.session)) { send('failure', { code: 'session_inconnue', message: 'Cette conversation n’a pas été ouverte par ce serveur : rechargez la page pour en commencer une nouvelle.' }); return res.end(); } // vibeflow AUDC-A-01
    runAgent(res, send, body)
-@@ -407,6 +377,7 @@ function ask(req, res, body) {
+     .then((a) => send('answer', a), (e) => { if (e !== CLOSED) send('failure', { code: failCode(e.message), message: e.message }); })
+     .finally(() => res.end());
+@@ -407,6 +380,7 @@ function ask(req, res, body) {
  // checks them with the skill's plan.mjs and build.mjs (build.mjs records where they are), saves them and
  // redraws the map, which reloads every open tab. Each change keeps the files it replaced, for Undo.
  const historyDir = path.join(here, '.cache', 'history');
@@ -177,7 +192,7 @@
  const PLAN_FILES = ['plan.json', 'architecture.json', 'recent-work.json'];
  let changing = false;
  function snapshot() {
-@@ -420,10 +391,12 @@ function restore(dir) {
+@@ -420,10 +394,12 @@ function restore(dir) {
    for (const f of PLAN_FILES) { const from = path.join(dir, f), to = path.join(here, f); if (fs.existsSync(from)) fs.copyFileSync(from, to); else fs.rmSync(to, { force: true }); }
  }
  /** Runs one of the skill's scripts on this project; throws with its output when it fails. */
@@ -193,7 +208,7 @@
    try { return execFileSync(process.execPath, [path.join(dir, 'scripts', name), root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, timeout: 120000 }); }
    catch (e) { throw Object.assign(new Error(String(e.stdout || '') + String(e.stderr || '') || e.message), { checks: true }); }
  }
-@@ -509,7 +482,27 @@ function undoChange() {
+@@ -509,7 +485,27 @@ function undoChange() {
  }
  
  // ---------- http ----------
@@ -221,7 +236,7 @@
    // only this machine's own names: a website that points its domain at 127.0.0.1 (DNS rebinding) would
    // otherwise count as the same origin as the map, and could read its token from the page
    if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(String(req.headers.host || '').toLowerCase())) { res.writeHead(403); return res.end('unknown host'); }
-@@ -517,8 +510,10 @@ const server = http.createServer((req, res) => {
+@@ -517,8 +513,10 @@ const server = http.createServer((req, res) => {
    const sameOrigin = !req.headers.origin || req.headers.origin === `http://${req.headers.host}`;
    if (url.pathname.startsWith('/api/')) {
      // EventSource can't send headers, so the events stream takes the token in the query string
@@ -234,7 +249,7 @@
      if (req.method === 'GET' && url.pathname === '/api/events') {
        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
        res.write('retry: 1000\n\n'); // reconnect quickly after a restart
-@@ -534,33 +529,13 @@ const server = http.createServer((req, res) => {
+@@ -534,33 +532,13 @@ const server = http.createServer((req, res) => {
        if (req.method === 'POST' || req.method === 'DELETE') {
          let raw = '';
          req.on('data', (d) => { raw += d; if (raw.length > 50000) req.destroy(); });
@@ -271,7 +286,7 @@
          return;
        }
      }
-@@ -573,7 +548,7 @@ const server = http.createServer((req, res) => {
+@@ -573,7 +551,7 @@ const server = http.createServer((req, res) => {
        let raw = '';
        req.on('data', (d) => { raw += d; if (raw.length > 500000) req.destroy(); });
        req.on('end', () => {
@@ -280,7 +295,7 @@
          try {
            const x = exportMap(Array.isArray(body.include) ? body.include.map(String) : EXPORT_DEFAULT, cleanFlows(body.flows));
            res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Content-Disposition': `attachment; filename="${x.name}"`, 'Cache-Control': 'no-store' });
-@@ -589,19 +564,28 @@ const server = http.createServer((req, res) => {
+@@ -589,19 +567,28 @@ const server = http.createServer((req, res) => {
      if (req.method === 'POST' && url.pathname === '/api/ask') {
        let raw = '';
        req.on('data', (d) => { raw += d; if (raw.length > 20000) req.destroy(); });
@@ -313,7 +328,7 @@
  // another map (or anything else) on the port: take the next free one
  let port = wantPort;
  server.on('error', (e) => {
-@@ -614,8 +598,10 @@ server.on('listening', () => {
+@@ -614,8 +601,10 @@ server.on('listening', () => {
    const u = `http://127.0.0.1:${port}`;
    try {
      fs.mkdirSync(path.dirname(stateFile), { recursive: true });
