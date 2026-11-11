@@ -16,6 +16,10 @@
   const etat = () => {
     const b = bouton(), o = ouvert(); if (!b) return;
     b.setAttribute('aria-controls', 'panel'); b.setAttribute('aria-expanded', String(o));
+    if (o !== etaitOuvert) { // 80-02 : le tiroir s'inscrit dans la pile à l'ouverture et s'en retire au repli
+      if (o) window.VF_SURCOUCHES.ouvrir(panneau, { fermer: () => document.getElementById('btn-panel').click() });
+      else window.VF_SURCOUCHES.fermer(panneau);
+    }
     if (o && !etaitOuvert && ETROIT.matches) { // « Au travail » s'ouvre sous 1280 px : Git se replie s'il était ouvert (sans voler le focus à autre chose), et le focus va au tiroir qui s'ouvre (Q12, PU-G-203 ; recette du 2026-11-08 : il restait sur le bouton « N au travail », 15 à 20 Tab pour entrer)
       const gitOuvert = !!git() && git().ouvert(); if (gitOuvert) git().fermer(true);
       const a = document.activeElement, titre = panneau.querySelector(':scope > .vf-whop h3');
@@ -25,9 +29,8 @@
     etaitOuvert = o;
   };
   window.addEventListener('vf-git:etat', (e) => { if (e.detail && e.detail.ouvert && ETROIT.matches && ouvert()) document.getElementById('btn-panel').click(); }); // Git s'ouvre (le focus est déjà sur son titre) : « Au travail » se replie
-  const surcouche = () => !!document.querySelector('#palette.open, #flowmenu.open, #legend.open, #ctxmenu:not([hidden]), [role="dialog"]:not([hidden]), [aria-modal="true"]'); // une palette ou un menu ouvert prend l'Échap d'abord
   const echap = (e) => {
-    if (e.key !== 'Escape' || e.defaultPrevented || !ouvert() || surcouche()) return;
+    if (e.key !== 'Escape' || e.defaultPrevented || !ouvert() || window.VF_SURCOUCHES.couverte(panneau)) return; // la pile : une surcouche au-dessus prend l'Échap
     e.stopPropagation(); e.preventDefault(); // le viewer n'entend pas cet Échap : il ne remonte pas le canevas
     document.getElementById('btn-panel').click(); // la fermeture du viewer (animation, état mémorisé), pas une copie
     bouton()?.focus({ preventScroll: true });

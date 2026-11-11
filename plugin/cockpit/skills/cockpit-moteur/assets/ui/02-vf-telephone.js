@@ -220,7 +220,7 @@
     }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     document.addEventListener('keydown', (ev) => {
       if (ev.key !== 'Escape' || ev.defaultPrevented || !mi.matches || !ouvert() || panel.querySelector(':scope > .vf-whop')) return;
-      if (document.querySelector('#palette.open, #flowmenu.open, #legend.open, #ctxmenu:not([hidden])') || (window.FloorplanTour && window.FloorplanTour.active())) return; // une palette, un menu ou la visite prennent l'Échap d'abord
+      if (window.VF_SURCOUCHES.couverte(panel)) return; // une palette, un menu ou la visite (80-02 : la pile) prennent l'Échap d'abord
       if (ev.target && /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) return;
       ev.stopPropagation(); ev.preventDefault(); sansTrace(() => bascule(false)); // le viewer n'entend pas cet Échap : il ne remonte pas le canevas ni n'efface la sélection (R15.8)
     });

@@ -164,12 +164,14 @@
     tiroir.hidden = false; tiroir.classList.add('vf-git-entree'); document.body.classList.add('vf-git-ouvert');
     if (!donnees) recharger();
     eviter(); titre.focus({ preventScroll: true });
+    // 80-02 : le tiroir s'inscrit dans la pile (ordre d'Échap), sans piège ni prise de focus
+    window.VF_SURCOUCHES.ouvrir(tiroir, { modale: false, ouvreur: avant, fermer: () => fermer() });
     emettre('vf-git:etat', { ouvert: true }); crochet('etat', true);
   };
   const fermer = (sansFocus) => { // sansFocus === true : un autre tiroir latéral s'ouvre (73-vf-tiroir-travail.js) et prend le focus
     if (!ouvert) return;
     ouvert = false; seq++; corps.removeAttribute('aria-busy');
-    tiroir.hidden = true; tiroir.classList.remove('vf-git-entree'); document.body.classList.remove('vf-git-ouvert');
+    tiroir.hidden = true; tiroir.classList.remove('vf-git-entree'); document.body.classList.remove('vf-git-ouvert'); window.VF_SURCOUCHES.fermer(tiroir);
     const cible = [ligne(), ouvreur(), plus()].find(visible) || (avant && document.contains(avant) && visible(avant) ? avant : null);
     if (cible && sansFocus !== true) cible.focus({ preventScroll: true });
     emettre('vf-git:etat', { ouvert: false }); crochet('etat', false);
@@ -179,8 +181,7 @@
   fermerB.addEventListener('click', fermer);
   window.addEventListener('vf-git:basculer', basculer);
 
-  const surcouche = () => !!document.querySelector('#palette.open, #flowmenu.open, #legend.open, #ctxmenu:not([hidden])') || [...document.querySelectorAll('[role="dialog"]:not([hidden]), [aria-modal="true"]')].some((d) => getComputedStyle(d).visibility !== 'hidden'); // 201 : le panneau fermé d'un téléphone reste un role=dialog (visibility: hidden), il ne couvre rien
-  const echap = (e) => { if (ouvert && e.key === 'Escape' && !e.defaultPrevented && !surcouche()) { e.stopPropagation(); e.preventDefault(); fermer(); } };
+  const echap = (e) => { if (ouvert && e.key === 'Escape' && !e.defaultPrevented && !window.VF_SURCOUCHES.couverte(tiroir)) { e.stopPropagation(); e.preventDefault(); fermer(); } };
   tiroir.addEventListener('keydown', echap);
   document.addEventListener('keydown', (e) => { const l = ligne(), o = ouvreur(), p = plus(); if ((l && l === e.target) || (o && o === e.target) || (p && p === e.target)) echap(e); }, true);
   window.addEventListener('keydown', (e) => { // touche g : ni dans un champ, ni palette ouverte, ni avec Ctrl, Alt ou Meta, ni sans ouvreur
