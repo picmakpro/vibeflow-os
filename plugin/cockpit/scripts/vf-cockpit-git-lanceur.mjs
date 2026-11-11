@@ -1,10 +1,14 @@
-// vf-cockpit-git-lanceur — lancement borné de git et des enfants du socle (extrait de vf-cockpit-paths.mjs, P79-D-25 ; rien d'autre qu'un déplacement à l'identique, plan 79-07 tâche 2).
-// Exports : GIT_SUR (préfixe d'arguments de tout appel git), GIT_HERITE, envGit (environnement git unique, P78-D-25), OPTIONS_LECTURE, SOUS_COMMANDES_FILTRANTES, argsGit,
-//           avecEcheance(ms, fn), finDans(ms), MAX_FILTRES, filtresDeclares, filtresDeclaresAsync, filtresEtat, configFiltres, shBorne(cmd, args, cwd), lancerGit, lancerGitAsync.
-// Importé et ré-exporté par vf-cockpit-paths.mjs (aucun consommateur ne change d'import). N'importe aucun module local autre que env, git-sortant et git-durci : aucun cycle.
-// Ancres de test : test-cockpit-git-env.sh (E7, E9) et test-cockpit-git-details.sh mutent des copies de CE fichier par substitution de la première occurrence d'une ligne de code :
-// elles doivent rester présentes à l'identique, une seule fois, dans le code (jamais citées en commentaire, la substitution toucherait le commentaire).
-// Seul point de lancement des sous-processus du socle : la garde de test-cockpit-git-env.sh (E6) n'admet child_process que dans les modules de sa liste blanche.
+// vf-cockpit-git-lanceur — lancement borné de git et des enfants du socle (extrait de vf-cockpit-paths.mjs, P79-D-25, plan 79-07).
+// Exports : GIT_SUR (préfixe d'arguments de tout appel git), GIT_HERITE, envGit (environnement git unique, P78-D-25), OPTIONS_LECTURE,
+//           SOUS_COMMANDES_FILTRANTES, argsGit, avecEcheance(ms, fn), finDans(ms), MAX_FILTRES, filtresDeclares, filtresDeclaresAsync,
+//           filtresEtat, configFiltres, shBorne(cmd, args, cwd), lancerGit, lancerGitAsync.
+// Importé et ré-exporté par vf-cockpit-paths.mjs (aucun consommateur ne change d'import).
+// N'importe aucun module local autre que env, git-sortant et git-durci : aucun cycle.
+// Ancres de test : test-cockpit-git-env.sh (E7, E9) et test-cockpit-git-details.sh mutent des copies de CE fichier par substitution
+// de la première occurrence d'une ligne de code : elles doivent rester présentes à l'identique, une seule fois, dans le code
+// (jamais citées en commentaire, la substitution toucherait le commentaire).
+// Seul point de lancement des sous-processus du socle : la garde de test-cockpit-git-env.sh (E6)
+// n'admet child_process que dans les modules de sa liste blanche.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, execFile } from 'node:child_process';
@@ -109,7 +113,9 @@ export const configFiltres = (noms) => noms.flatMap((x) => [['clean', ''], ['smu
 // Pour `git` : envGit (GIT_* retirés), options de lecture insérées, filtres du dépôt vidés pour les sous-commandes filtrantes.
 export function shBorne(cmd, args, cwd, lab = cwd) {
   if (cmd !== 'git') return lancer(cmd, args, cwd, envEnfant(lab), 1 << 20).sortie;
-  const { argv, sous, dir } = argsGit(args), cour = cwd || process.cwd(), base = dir ? (path.isAbsolute(dir) ? dir : cour + path.sep + dir) : cour; // -C jugé tel quel par gitSortant, sans normalisation lexicale
+  const { argv, sous, dir } = argsGit(args), cour = cwd || process.cwd();
+  // -C jugé tel quel par gitSortant, sans normalisation lexicale
+  const base = dir ? (path.isAbsolute(dir) ? dir : cour + path.sep + dir) : cour;
   if (gitSortant(base, lab)) return ''; // AUDC-A-02 : point central — un .git qui désigne un dossier git hors du lab n'est jamais lu (lancerGit et lancerGitAsync de même)
   let config = [];
   if (SOUS_COMMANDES_FILTRANTES.includes(sous)) {
