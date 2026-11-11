@@ -408,6 +408,30 @@ Faits établis par la recherche qui corrigent la forme de décisions déjà pris
   couloirs et la liste (le panneau montre la phase focalisée) et Entrée plonge dans la phase ; au téléphone, Entrée
   sélectionne (ouvre la feuille) et « Ouvrir la phase » est dans la feuille.
 
+- **P80-D-48 (fusion de `VENDORED.txt` entre plans d'une même vague, précise P80-D-41 ; relevé par la vérification
+  fraîche des plans).** Quand deux plans d'une même vague s'exécutent en parallèle et ajoutent chacun une ligne `AJOUT`,
+  le conflit de fusion sur `VENDORED.txt` se résout par l'union des lignes, triées à leur place alphabétique, sans rien
+  retirer ; c'est la seule résolution permise. Après la fusion de la 79, la forme du fichier est celle que la 79 laisse
+  (C6-1) : les plans des vagues 4 et suivantes y inscrivent leurs fichiers neufs selon cette forme.
+- **P80-D-49 (taille du plan « après avis de Samuel »).** Le plan 80-19 compte 13 fichiers parce qu'il porte cinq
+  décisions indépendantes (S80-1 à S80-5) ; il n'est pas exécutable en l'état et sera redécoupé à la réponse de Samuel
+  (une option écartée retire ses fichiers). Pas de découpage préalable : il figerait des réponses non rendues.
+
+- **P80-D-50 (fermeture du dernier majeur de design, après trois tours de craft ; prime sur les UI-SPEC là où elles
+  diffèrent).** Le juge frais du troisième tour rend 85 et 86/100 et un majeur ouvert sous 1 000 px. Le budget de trois
+  tours étant atteint, le manager tranche et les specs reçoivent un erratum d'application, sans nouvelle conception :
+  (a) sous 1 000 px, la zone basse `--vf-bas` compte aussi la hauteur de la feuille de détail quand elle est ouverte ;
+  (b) les extrémités défilables et `scroll-padding-inline-*` ne valent qu'à partir de 1 000 px au pointeur fin (aucun
+  défilement horizontal à 390 px) ; (c) la pastille Terminal entre dans la liste des éléments dégagés de la zone basse ;
+  (d) un seul ordre de repli du focus orphelin, celui de la famille (`80-UI-SPEC.md` § 5) — ses instances (repères,
+  tiroir Git) le citent sans le réécrire ; (e) au changement d'onglet, la règle de repli unique s'applique (élément
+  sélectionné, sinon `h1`) ; (f) seuil de troncature 52 caractères partout, plus petite carte ≈ 226 px, mesure en
+  graisse 600.
+- **P80-D-51 (Entrée à toute largeur, révise P80-D-47).** Une seule règle de touches pour Projet, à toutes les largeurs
+  et dans toutes les formes, comme sur le canevas : Entrée plonge, Espace sélectionne ; au toucher, un appui sélectionne
+  (la feuille s'ouvre au téléphone) et « Ouvrir la phase » est dans la feuille. Au bureau, la sélection suit le focus
+  dans les couloirs et la liste.
+
 ### Claude's Discretion
 
 Noms exacts des fichiers neufs (dans la plage `ui/` qui garantit l'ordre de chargement), découpage interne sous le
