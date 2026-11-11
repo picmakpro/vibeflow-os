@@ -47,7 +47,7 @@ collecte, l'index et leur persistance (Phase 79) ; la régie elle-même (Phase 7
 ## Implementation Decisions
 
 Toutes les décisions ci-dessous sont des **décisions déléguées par Samuel (message session principale, 2026-11-08), option
-recommandée**, prises par le manager de la mission sur les sources citées. Aucune ne vaut arbitrage de Samuel. Les panels
+recommandée**, prises par le manager de la mission sur les sources citées. Aucune ne vaut arbitrage de Samuel, sauf P74-D-46 (et P74-D-01 qu'elle confirme). Les panels
 de recherche prévus n'ont pas pu être lancés (plafond de sous-agents simultanés de la session atteint par la vague des sept
 cadrages) : les faits ont été relevés par le manager lui-même dans le code et les annexes, chaque décision cite sa source.
 
@@ -308,7 +308,9 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
 
 Toutes « décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée », sur trois panels
 (fil, relecture, Dépôt) et une revalidation contre les têtes des Phases 79 (`daae8bc9`, A15 à A47, P79-D-28 à D-33), 73
-(`e4466eba`, P73-D-14, P73-D-20, P73-D-26, P73-D-33) et 80 (`c9ec8756`, 80-02, 80-06, 80-10). Elles amendent les
+(`e4466eba`, P73-D-14, P73-D-20, P73-D-26, P73-D-33) et 80 (`c9ec8756`, 80-02, 80-06, 80-10) ; les plans ont été
+revalidés ensuite contre la 79 à `673c879d` (A1 à A49, 21 plans), la 73 à `b5abfeec` (P73-C1 à C5) et la 80 à `3e5db01f`
+(contrats aux autres phases), puis amendés pour A51 et A52 (79, `c19c7461`) et P80-D-59, D-60 (80, `ecc855b4`). Elles amendent les
 décisions citées ; le texte d'origine reste au-dessus pour l'historique.
 
 - **P74-D-48 (fil réduit, amende P74-D-38).** Le réducteur ne gagne que `echec: true` (résultat apparié par identifiant,
@@ -355,7 +357,7 @@ décisions citées ; le texte d'origine reste au-dessus pour l'historique.
   `test-cockpit-frise-vue.sh` (`test-cockpit-frise.sh` appartient à 79-13). Les mutants se posent sur une copie du
   MODULE servie par l'aide commune des suites, jamais sur une copie de la sortie (79-06, 79-16, A41).
 
-- **P74-D-53 (Échap, amende P74-D-44 ; contrats de la 80 au commit `95ab6578` et de la 73 au commit `b5abfeec`).**
+- **P74-D-53 (Échap, amende P74-D-44, P74-D-50 et P74-D-51 ; contrats de la 80 au commit `95ab6578` et de la 73 au commit `b5abfeec`).**
   La fiche et le lecteur sont des vues de l'onglet Équipe, pas des surcouches. Échap s'écoute en phase de remontée (sur
   `document` ou la racine de la vue), jamais en capture sur `window` ; un appui dont `event.defaultPrevented` est vrai
   (une surcouche vient d'être fermée par la pile) est ignoré ; la vue ne lit jamais `VF_SURCOUCHES.ouverte()`. Sans
@@ -373,6 +375,19 @@ décisions citées ; le texte d'origine reste au-dessus pour l'historique.
   74-10 (la PR ne voit que l'état final). Les suites de la 73 ne sont modifiées que par 74-10, dans les limites de
   P73-C2. Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
 
+- **P74-D-55 (aller-retour d'onglet, A51 de la 79 et P80-D-59, D-60 de la 80).** Les extensions de la 74 sont rejouées
+  à chaque arrivée sur Équipe : chaque module `ui/74-vf-*.js` qui pose quelque chose s'inscrit par
+  `VF_COQUILLE.surOnglet(rappel, { cle: <nom du fichier> })` et rend son nettoyage (écouteurs, dont Échap en remontée,
+  minuteries, observateurs, abonnements à `VF_ETAT`, `finirRelecture`) ; rien ne garde une référence d'une exécution à
+  l'autre. Survivent à un aller-retour : la fenêtre (1 h 30, 6 h, 24 h) et la lecture (Horloge, Événements), gardées en
+  `sessionStorage` sous la clé `vibeflow-cockpit:frise-reglages`, jamais dans un fichier du lab. Ne survivent pas : le
+  curseur posé, la fiche ouverte, les dépliages, le défilement (retour sur la frise, curseur à « maintenant »). La position
+  de la bascule est gardée par la 73. Les lignes `AJOUT` de `VENDORED.txt` s'insèrent à leur place alphabétique (A52) ;
+  un nom d'événement que la 74 ajouterait à `EVENEMENTS` de `ui/69-vf-flux.js` irait derrière `// vf-repere:phase-74`
+  (aucun n'est prévu). Témoin : après Code → Équipe → Code → Équipe, fenêtre et lecture restituées, curseur absent,
+  fiche fermée, aucun écouteur ni abonnement doublé. Décision déléguée par Samuel (message session principale,
+  2026-11-08), option recommandée.
+
 ### Claude's Discretion
 
 Laissés à la spécification d'interface et à la planification, dans les bornes ci-dessus : la géométrie de la frise
@@ -387,7 +402,7 @@ Format C76-Q1 (Phase 76, P76-D-34). Une question tranchée, quatre appliquées s
 
 - **P74-Q-01 — Couleur de la frise.** Le but écrit dit « une frise colorée par nœud du plan de bataille » ; `DESIGN.md` § 9
   réserve la couleur aux états ; faut-il colorer les voies par nœud ?
-  Options : (a) suivre la règle de design : la couleur dit l'état, le nom du nœud s'écrit sur chaque voie ; (b) colorer par nœud, en rouvrant Q9 .
+  Options : (a) suivre la règle de design : la couleur dit l'état, le nom du nœud s'écrit sur chaque voie ; (b) une teinte par nœud, en amendant `DESIGN.md` § 9 (plans de la frise à réviser) .
   Recommandation : (a) — une couleur par nœud demanderait une palette libre que Graphite interdit, et la couleur cesserait de dire l'état.
   Bloque : rien
   État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (a) — « Suivre la règle de design (Recommandé) »

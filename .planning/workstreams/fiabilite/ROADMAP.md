@@ -542,11 +542,11 @@ Plans:
 
 ### Phase 74: L'équipe dans le temps — swim-lanes, coût, replay
 
-> **Cadrée le 2026-11-11 (premier temps)** — `74-CONTEXT.md`, P74-D-01 à P74-D-46, décisions déléguées par Samuel
+> **Cadrée le 2026-11-11** — `74-CONTEXT.md`, P74-D-01 à P74-D-55, décisions déléguées par Samuel
 > (message session principale, 2026-11-08), option recommandée ; spécification d'interface `74-UI-SPEC.md`. Inscrite le
-> 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Planifiée le 2026-11-11 (9 plans, 5
-> vagues) sur les contrats de la Phase 79 (`3119d82a`, amendements `2ae6607a` et `74501bb0`) ; les plans 74-04 à 74-09
-> sont à revalider sur les livraisons des Phases 79, 73 et 80.
+> 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Planifiée le 2026-11-11 (10 plans, 6
+> vagues), revalidée le même jour contre les Phases 79 (`673c879d`, A1 à A49), 73 (`b5abfeec`, P73-C1 à C5) et 80
+> (`3e5db01f`) ; ce qui dépend d'un livrable non encore écrit porte « à revalider » dans le plan.
 
 **Goal:** L'onglet Équipe montre les agents sur un axe de temps (une ligne par agent, colorée par nœud de DAG), le coût en jetons et en durée par mission, phase et agent, et rejoue une mission nœud par nœud avec un curseur temporel.
 **Lecture du but (P74-D-01) :** but arbitré non réécrit (AUDC-V6). « Colorée par nœud de DAG » contredit `DESIGN.md` § 9 :
@@ -555,9 +555,9 @@ AskUserQuestion session principale, 2026-11-11 : « Suivre la règle de design (
 (AUDC-Q2) : coût et relecture se lisent sur la fenêtre affichée. La relecture dérive l'état des nœuds des voies des agents
 qui les portent (aucun horodatage de transition dans les DAG).
 **Requirements**: TEMP-01, TEMP-02, TEMP-03, TEMP-04, TEMP-05, TEMP-06, TEMP-07, TEMP-08, TEMP-09, TEMP-10, TEMP-11, TEMP-12
-**Depends on:** Phase 79 (contrats figés au commit `3119d82a`, C0 à C6 : index des transcripts sur disque avec segments, compteurs et jetons dédoublonnés par message ; route de frise ; extension du contrat de forme) ; Phase 73 (régie : ouverture de la fiche depuis une ligne, place de la bascule « Régie · Frise ») ; Phase 69 (onglet Équipe, lien agent ↔ nœud) ; Phase 78 (tiroir Git ouvert sur un commit). Ordre du jalon : après la 79. Recoupements : Phase 75 (mise en évidence continue sur la carte Code : la 74 n'en pose qu'une ponctuelle) ; Phase 77 et Phase 52 (le coût réutilise le calcul de jetons de l'index de la 79, un seul calcul).
+**Depends on:** Phase 79 (contrats figés au commit `3119d82a`, C0 à C6 : index des transcripts sur disque avec segments, compteurs et jetons dédoublonnés par message ; route de frise ; extension du contrat de forme) ; Phase 73 (régie : ouverture de la fiche depuis une ligne, place de la bascule « Régie · Frise ») ; Phase 69 (onglet Équipe, lien agent ↔ nœud) ; Phase 80 (`VF_ONGLETS.aller('code')`, contrat d'Échap des vues d'Équipe, `VFGitTiroir.ouvrirSur`) ; Phase 75 (canal de marquage qui rebranche « Voir sur la carte », P74-D-47). Ordre du jalon : après la 79. Recoupements : Phase 75 (mise en évidence continue sur la carte Code : la 74 n'en pose qu'une ponctuelle) ; Phase 77 et Phase 52 (le coût réutilise le calcul de jetons de l'index de la 79, un seul calcul).
 **Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 1, 2, 3) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2, `REGISTRE.md` (AUDC-I04, I05, I06, I07, I08, I21, I28, M4, D8, D9), `DESIGNS.md` § 4 et § 5.
-**Un ajout, un retrait :** retirés la boîte de transcript du panneau et son bouton « Lire le transcript » (remplacés par la fiche plein cadre), la durée unique qui compte les veilles (remplacée par la durée par segments) ; avec la Phase 73, la carte « Terminés depuis moins de 24 h » (la frise en porte l'historique).
+**Un ajout, un retrait :** retirés la boîte de transcript du panneau et son bouton « Lire le transcript » (remplacés par la fiche plein cadre), la durée unique qui compte les veilles (remplacée par la durée par segments) ; la carte « Terminés depuis moins de 24 h » du canevas si elle existe encore (la frise en porte l'historique) ; le lecteur de repli de la régie et l'export `transcript` (74-10, P73-C2).
 
 **Success Criteria** (what must be TRUE):
 
@@ -567,19 +567,20 @@ qui les portent (aucun horodatage de transition dans les DAG).
 4. La fiche d'un agent s'ouvre en plein cadre depuis la frise et depuis la régie, dit son rattachement (parent, nœud, phase, chacun cliquable), ses durées par segments, ses jetons et ses erreurs, et son fil daté se filtre et suit le direct ; aucune sortie d'outil ni argument de commande n'y apparaît, et rien de la fiche n'est exporté.
 5. Les jetons d'une mission égalent la somme de ceux de ses agents, comptés une fois par message, et chaque total dit sa fenêtre ; les agents sans mission sont comptés à part.
 6. Les suites du cockpit restent vertes, la chaîne XSS couvre les données de frise et de fiche, et chaque comportement neuf a un témoin qui rougit sans le code.
-**Plans:** 9 plans
+**Plans:** 10 plans
 
 Plans:
 
-- [ ] 74-01-PLAN.md — Modèle pur de la frise et du coût (vague 1)
-- [ ] 74-02-PLAN.md — Fil réduit étendu : échec, compaction, message de l'humain (vague 1)
-- [ ] 74-03-PLAN.md — Fil de la fiche et markdown fermé en texte (vague 2)
-- [ ] 74-04-PLAN.md — Frise : bascule, voies, segments, axe, direct (vague 3)
-- [ ] 74-05-PLAN.md — Fiche d'agent plein cadre (vague 3)
+- [ ] 74-01-PLAN.md — Modèle pur de la frise, de la relecture et du coût (vague 1)
+- [ ] 74-02-PLAN.md — Fil réduit : échec d'outil apparié (vague 1, après 79-13)
+- [ ] 74-03-PLAN.md — Fil de la fiche, markdown fermé et fusion des événements (vague 2)
+- [ ] 74-04-PLAN.md — Frise : vue de la régie, voies, segments, axe, direct (vague 3)
+- [ ] 74-05-PLAN.md — Fiche d'agent plein cadre, ouverture depuis la régie, Échap (vague 3)
 - [ ] 74-06-PLAN.md — Curseur, encart « À cet instant », « Voir sur la carte » (vague 4)
-- [ ] 74-07-PLAN.md — Bandeau Dépôt, tiroir Git sur un commit, coût (vague 4)
-- [ ] 74-08-PLAN.md — Retraits et témoins réécrits contre la fiche (vague 4)
-- [ ] 74-09-PLAN.md — Bornes, chaîne XSS, contrat, documentation et compteur (vague 5)
+- [ ] 74-07-PLAN.md — Bandeau Dépôt, commit dans le tiroir Git, coût (vague 4)
+- [ ] 74-08-PLAN.md — Retraits et gardes d'absence, annulation des trois déclencheurs (vague 4)
+- [ ] 74-10-PLAN.md — Retrait du lecteur de repli de la régie (P73-C2) (vague 5)
+- [ ] 74-09-PLAN.md — Bornes, chaîne XSS, contrat, VENDORED, documentation et compteur (vague 6)
 
 ### Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte
 
