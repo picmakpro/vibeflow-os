@@ -264,6 +264,20 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
   espacements par variables seulement (garde `css-jetons.mjs`). Aucun bump de version du module dans la 74 : un seul
   pour la vague, à la jointure.
 
+### Jointure avec la Phase 80 (surcouches)
+
+- **P74-D-44 (fiche et pile de surcouches).** La fiche plein cadre est une vue de l'onglet Équipe, pas une surcouche :
+  elle ne s'inscrit pas dans la pile `window.VF_SURCOUCHES` de la Phase 80 (P80-D-33 à D-41 annoncées). Sa touche Échap
+  ne s'applique que si `VF_SURCOUCHES.ouverte()` est faux (une surcouche ouverte au-dessus garde Échap pour elle). Toute
+  surcouche que la 74 viendrait à poser passe par `VF_SURCOUCHES.ouvrir(el, { modale, ouvreur, fermer })`, jamais par une
+  gestion propre du focus et d'Échap. L'objet global du moteur est gelé : la 74 n'y ajoute rien, ses fonctions vivent
+  sous un espace de noms à elle (`window.__vfFrise`, `window.__vfFiche`). À revalider sur la 80 quand son commit est poussé.
+
+- **P74-D-45 (cycle de vie par onglet, A30 de la 79).** La frise, la fiche et le lecteur s'initialisent par
+  `VF_COQUILLE.surOnglet(rappel)` (amendement A30, commit `74501bb0` de la branche de la 79), jamais au seul chargement de
+  la page ; le rappel rend une fonction de nettoyage qui retire les abonnements à `VF_ETAT`, les minuteries, les
+  écouteurs et le DOM posé quand on quitte l'onglet Équipe. Chaque plan qui pose du rendu l'écrit dans ses critères.
+
 ### Claude's Discretion
 
 Laissés à la spécification d'interface et à la planification, dans les bornes ci-dessus : la géométrie de la frise
