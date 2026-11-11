@@ -139,7 +139,7 @@
       const v = tr(n.nodeValue); if (v != null) { n.nodeValue = v; probe.nodes++; }
     }
     const els = root.nodeType === 1 ? [root, ...root.querySelectorAll('[placeholder],[title],[aria-label]')] : [];
-    for (const el of els) for (const a of ATTRS) { const x = el.getAttribute?.(a); const v = x ? tr(x) : null; if (v != null) { el.setAttribute(a, v); probe.attrs++; } }
+    for (const el of els) for (const a of ATTRS) { if (a === 'title' && el.matches?.('.row.vf-rep')) continue; /* AUDC-H4 : le `title` d'une rangée de réponse reprend le nom de la carte (et sa note) : donnée du lab */ const x = el.getAttribute?.(a); const v = x ? tr(x) : null; if (v != null) { el.setAttribute(a, v); probe.attrs++; } }
     probe.passes++; probe.ms += performance.now() - t0;
   };
   document.documentElement.lang = 'fr';

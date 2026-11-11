@@ -55,9 +55,15 @@ await executer(chrome, async (s) => {
     lien = await stabiliser(() => s.ev("({ titre: document.querySelector('#panel .pt').textContent, desc: [...document.querySelectorAll('#panel .pd')].map((e) => e.textContent).join('|') })"), { pas: 400, max: 6000 });
   }
   // panneau « réponse » réel (showBoard, sans question au modèle) : le nom de chaque carte listée est une donnée du lab
-  await s.ev(`${FP}.showBoard({ title: 'Résultat', items: [${JSON.stringify(pose.Tokens)}, ${JSON.stringify(pose.Open)}], steps: [${JSON.stringify(pose.Health)}, ${JSON.stringify(pose.Open)}] })`);
+  await s.ev(`${FP}.showBoard({ title: 'Résultat', items: [${JSON.stringify(pose.Tokens)}, { id: ${JSON.stringify(pose.Open)}, note: 'Health' }], steps: [${JSON.stringify(pose.Health)}, ${JSON.stringify(pose.Open)}] })`);
   await s.ev(`${FP}.select(null)`); // la sélection du lien reste sinon affichée à la place de la réponse
   await s.attendre("document.querySelectorAll('#panel .row.vf-rep .rn').length >= 4", 'panneau réponse');
   const reponse = await stabiliser(() => s.ev("[...document.querySelectorAll('#panel .row.vf-rep .rn')].map((e) => e.textContent)"), { pas: 400, max: 6000 });
-  return { ...cartes, lien, reponse, nAretes: aretes ? aretes.length : 0, gabarits, descPosee: desc, panneau, panneauVide, recherche, ligne, miette, infobulle };
+  // attribut `title` de chaque rangée (nom de la carte, suivi de la note quand il y en a une) et note de la rangée : le nom reste donnée, la note reste traduite
+  const reponseTitres = await stabiliser(() => s.ev("[...document.querySelectorAll('#panel .row.vf-rep')].map((e) => e.getAttribute('title'))"), { pas: 400, max: 6000 });
+  const reponseNote = await stabiliser(() => s.ev("(document.querySelector('#panel .row.vf-rep .rd') || {}).textContent"), { pas: 400, max: 6000 });
+  // formes plurielles du texte de repli d'un lien (calculé par le viewer, sans donnée du lab) : posées dans le panneau, avec le balisage de viewer.html ; elles doivent être traduites
+  await s.ev(`(() => { const p = document.getElementById('panel'); for (const t of ['3 connections.', '2 connections across 3 endpoints.', '2 connections across 3 endpoints, matched from call sites to route definitions.']) { const e = document.createElement('p'); e.className = 'pd vf-test-repli'; e.textContent = t; p.appendChild(e); } })()`);
+  const replis = await stabiliser(() => s.ev("[...document.querySelectorAll('#panel .vf-test-repli')].map((e) => e.textContent)"), { pas: 400, max: 6000 });
+  return { ...cartes, lien, reponse, reponseTitres, reponseNote, replis, nAretes: aretes ? aretes.length : 0, gabarits, descPosee: desc, panneau, panneauVide, recherche, ligne, miette, infobulle };
 });

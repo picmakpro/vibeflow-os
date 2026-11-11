@@ -63,6 +63,9 @@ assert_eq "D5.4 — fil d'Ariane : le nom est gardé" "$(printf '%s' "$R" | node
 assert_eq "D6.0 — témoin : le conteneur porte au moins un lien (hors « contient »), le panneau du lien a été ouvert par un vrai clic" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.nAretes > 0 && !!j.lien')" "true"
 assert_eq "D6.1 — panneau d'un lien sans description : le texte de repli du viewer reste traduit (aucun « connection » anglais)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.lien ? (/connection|endpoint/.test(j.lien.desc) ? "anglais:" + j.lien.desc : "traduit") : "absent"')" "traduit"
 assert_eq "D6.2 — panneau « réponse » réel : les noms de cartes listées (rangées de la réponse et du parcours) sont ceux des fichiers" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.reponse.join(",")')" "Tokens,Open,1. Health,2. Open"
+assert_eq "D6.3 — panneau « réponse » : le title des rangées (nom de la carte, suivi de la note) n'est pas traduit" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.reponseTitres.join("|")')" "Tokens|Open — Health|Health|Open"
+assert_eq "D6.4 — panneau « réponse » : la NOTE d'une rangée reste traduite (« Health » → « Santé »)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.reponseNote')" "Santé"
+assert_eq "D6.5 — repli d'un lien, formes plurielles et « across m endpoints » (balisage du viewer posé dans le panneau) : toutes traduites" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.replis.filter((t) => /connection|endpoint|across/.test(t)).length + "/" + j.replis.length')" "0/3"
 assert_eq "D5.5 — gabarits à noms : « Tokens contient Open » (chrome traduit, noms gardés)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.gabarits.lien')" "Tokens contient Open"
 assert_eq "D5.6 — « Inside Tokens » → « Dans Tokens », « Everything behind Health » garde « Health »" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.gabarits.dans + "|" + j.gabarits.derriere')" "Dans Tokens|Tout ce qu'il y a derrière Health"
 vf_hyg_assert
