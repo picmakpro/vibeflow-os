@@ -58,3 +58,42 @@ accents graves, rien n'est lu) ; m2 la ligne qui suit « - Mission : » est « -
 ✓ T46 mutant (a5) m12 : zone « Digest de mission » privée de « identifiants distincts » (DISCRIMINANT) : mutant refusé — absent de la zone : « identifiants distincts » 
 ✓ T46 mutant (a5) m13 : zone « Digest de mission » privée de « register --node » (DISCRIMINANT) : mutant refusé — absent de la zone : « register --node » 
 ```
+
+## Tâche 2 — précondition et verbes relevés
+
+`driver-lock.sh --help` (indentation exigée, `^ +driver-lock.sh <verbe>`) rend treize verbes : acquire, close, heartbeat,
+mark-progress, orphans, publish-plan, reclaim, recover, register, registry, release, status, takeover. Verbe de publication :
+`publish-plan` ; forme d'appel de l'en-tête : `publish-plan --owner=<id> --file=<DAG de mission> [--ws=<sujet> [--phase=<N>]|--depot]`
+(identique à 79-03-SUMMARY). Forme du résumé : fichier `<lock>.plan.tsv` frère du verrou, réduit à l'identifiant, aux dépendances
+et au statut de chaque nœud, avec le compartiment et la phase du verrou ; texte libre jamais publié ; le champ `dag` de `status` et
+`status --all` ne paraît que pour un plan valide de la génération courante.
+
+## Tâche 2 — rouge sur la base du kernel
+
+Le kernel de base (sans la section neuve ni les verbes ajoutés) joué contre les assertions neuves : 470 OK / 20 KO / 0 SKIP, les 20
+KO tous du bloc T46. `mark-progress` manquait à la ligne « Verrou de driver » à la base (mesuré : b4 liste `mark-progress`,
+`publish-plan`, `registry`). b2 et c sont des gardes de dérive, vertes à la base ; leurs témoins sont les mutants (b2 : ligne
+recopiée ; c : corps d'agent avec la ligne) ; le mutant b2 est « identique » sur la base, faute de section où recopier la ligne.
+
+```
+✗ T46 (b1) : attendu — section neuve du kernel avec 13 ancres ; obtenu — section « Nœud dans le mandat » introuvable
+✗ T46 (b3) : attendu — verbes cités connus de --help dont publish-plan ; obtenu — section « Nœud dans le mandat » introuvable
+✗ T46 (b4) : attendu — ligne « Verrou de driver » alignée sur --help ; obtenu — verbe(s) de --help absent(s) de la ligne « Verrou de driver » : mark-progress publish-plan registry
+✗ T46 mutant (b1) 1 : section du kernel privée de « ligne `Nœud` » : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b1) 2 : section du kernel privée de « dev-orchestrator-references/mission-contracts.md » : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b1) 3 : section du kernel privée de « §Digest de mission » : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b1) 4 : section du kernel privée de « dag.sh add » : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b1) 5 : section du kernel privée de « remapped » : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b1) 6 : section du kernel privée de « plan de mission » : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b1) 7 : section du kernel privée de « à côté du verrou » : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b1) 8 : section du kernel privée de « dag.sh init » : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b1) 9 : section du kernel privée de « dag.sh mark » : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b1) 10 : section du kernel privée de « status --all » : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b1) 11 : section du kernel privée de « jamais le texte libre » : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b1) 12 : section du kernel privée de « ne bloque pas la mission » : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b1) 13 : section du kernel privée de « le disque fait foi » : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b2) : kernel avec la ligne du gabarit recopiée : mutant identique à l'original (la mutation n'a rien mordu)
+✗ T46 mutant (b3) : verbe de publication remplacé par un verbe fantôme : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b3) : verbe de publication remplacé par status (plus cité) : témoin positif absent (le contrôle refuse déjà le fichier réel)
+✗ T46 mutant (b4) : verbe de publication retiré de la ligne « Verrou de driver » : témoin positif absent (le contrôle refuse déjà le fichier réel)
+```

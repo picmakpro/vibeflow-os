@@ -8201,6 +8201,73 @@ t46_lecteur_mutant() { # <étiquette> <fonction> <nom> <expression sed>
   esac
 }
 
+# ---- T46 partie b : le kernel (nœud dans le mandat, plan de mission publié, verbes du verrou) ----
+T46_K="$REPO/conductor/references/team-kernel.md"
+T46_DL="$REPO/conductor/scripts/driver-lock.sh"
+T46_VERBE_PUB='publish-plan'   # nom posé par le plan 79-03 (A16), relu dans `--help` et dans 79-03-SUMMARY
+T46_KZS='^## Nœud dans le mandat'
+T46_KZE='^## '
+T46_ANCRES_B=('ligne `Nœud`' 'dev-orchestrator-references/mission-contracts.md' '§Digest de mission' 'dag.sh add' 'remapped'
+  'plan de mission' 'à côté du verrou' 'dag.sh init' 'dag.sh mark' 'status --all' 'jamais le texte libre'
+  'ne bloque pas la mission' 'le disque fait foi')
+
+t46_verbes_help() { # verbes documentés par `driver-lock.sh --help` (lignes d'usage indentées), un par ligne
+  (cd "$T46_TMP" && bash "$T46_DL" --help 2>&1) | awk '/^ +driver-lock\.sh [a-z][a-z-]*/ { print $2 }' | sort -u
+}
+t46_kernel_ancres() { # (b1) <kernel>
+  local z miss
+  z="$(t414_zone "$1" "$T46_KZS" "$T46_KZE")"
+  [ -n "$z" ] || { printf 'section « Nœud dans le mandat » introuvable'; return 1; }
+  miss="$(t414_missing "$z" "${T46_ANCRES_B[@]}")" || { printf 'absent de la section : %s' "$miss"; return 1; }
+}
+t46_voie_unique() { # (b2) <kernel> — la ligne du gabarit est au contrat, une fois ; le kernel ne la porte pas
+  local n
+  n="$("$GREP" -c '^- Nœud : ' "$T46_CONTRAT")"
+  [ "$n" -eq 1 ] || { printf 'le contrat porte %s ligne(s) « - Nœud : » (attendu 1)' "$n"; return 1; }
+  "$GREP" -q '^- Nœud : ' "$1" && { printf 'le kernel recopie la ligne du gabarit'; return 1; }
+  "$GREP" -qF '<id du nœud DAG>' "$1" && { printf 'le kernel porte l espace réservé du gabarit'; return 1; }
+  return 0
+}
+t46_verbes_cites() { # (b3) <kernel>
+  local z verbs cites v inconnus=""
+  z="$(t414_zone "$1" "$T46_KZS" "$T46_KZE")"
+  [ -n "$z" ] || { printf 'section « Nœud dans le mandat » introuvable'; return 1; }
+  verbs="$(t46_verbes_help)"
+  [ "$(printf '%s\n' "$verbs" | "$GREP" -c .)" -ge 13 ] || { printf '--help ne documente pas treize verbes (%s)' "$(printf '%s' "$verbs" | tr '\n' ' ')"; return 1; }
+  cites="$(printf '%s' "$z" | "$GREP" -oE 'driver-lock\.sh [a-z][a-z-]*' | awk '{ print $2 }' | sort -u)"
+  for v in $cites; do
+    printf '%s\n' "$verbs" | "$GREP" -qx -- "$v" || inconnus="$inconnus $v"
+  done
+  [ -z "$inconnus" ] || { printf 'verbe cité inconnu de --help :%s' "$inconnus"; return 1; }
+  printf '%s\n' "$cites" | "$GREP" -qx -- "$T46_VERBE_PUB" || { printf 'verbe de publication « %s » non cité dans la section' "$T46_VERBE_PUB"; return 1; }
+  printf '%s\n' "$verbs" | "$GREP" -qx -- "$T46_VERBE_PUB" || { printf 'verbe de publication « %s » absent de --help' "$T46_VERBE_PUB"; return 1; }
+}
+t46_ligne_verrou() { # (b4) <kernel> — chaque verbe de --help est mot entier dans la ligne « Verrou de driver »
+  local z v absents="" verbs
+  z="$(t414_zone "$1" '^[|] [*][*]Verrou de driver[*][*] [|]' '^[|] [*][*]Plan de bataille[*][*] [|]')"
+  [ -n "$z" ] || { printf 'ligne « Verrou de driver » introuvable'; return 1; }
+  verbs="$(t46_verbes_help)"
+  [ "$(printf '%s\n' "$verbs" | "$GREP" -c .)" -ge 13 ] || { printf '--help ne documente pas treize verbes'; return 1; }
+  for v in $verbs; do
+    printf '%s' "$z" | "$GREP" -qw -- "$v" || absents="$absents $v"
+  done
+  [ -z "$absents" ] || { printf 'verbe(s) de --help absent(s) de la ligne « Verrou de driver » :%s' "$absents"; return 1; }
+}
+t46_agent_propre() { # (c) <fichier> — ni la ligne du gabarit ni l'espace réservé
+  "$GREP" -qE '^- Nœud : |<id du nœud DAG>' "$1" && { printf 'le fichier porte la ligne du gabarit'; return 1; }
+  return 0
+}
+t46_agents_tous() { # (c) — tous les corps d'agent du dépôt ; vide-contre-vide refusé
+  local f n=0 sales=""
+  for f in "$REPO"/*/agents/*.md "$REPO"/*/AGENT.md; do
+    [ -f "$f" ] || continue
+    n=$((n+1)); t46_agent_propre "$f" >/dev/null 2>&1 || sales="$sales $(basename "$(dirname "$f")")/$(basename "$f")"
+  done
+  [ "$n" -ge 10 ] || { printf 'seulement %s corps d agent trouvés (balayage à vide)' "$n"; return 1; }
+  [ -z "$sales" ] || { printf 'corps d agent portant la ligne :%s' "$sales"; return 1; }
+  printf '%s corps d agent' "$n"
+}
+
 if [ ! -f "$MOD/AGENT.md" ]; then
   skip "T46 : disposition lab installé (pas de source du module cockpit ni du contrat à relire) — bloc non joué"
 else
@@ -8239,6 +8306,41 @@ else
       t414_ablate "$T46_CONTRAT" "$T46_TMP/c-m$t46_k.md" "$t46_a" "$T46_ZS" "$T46_ZE"
       t414_mutant "T46 mutant (a5) m$t46_k : zone « Digest de mission » privée de « $t46_a »" t46_doc_ancres "$T46_CONTRAT" "$T46_TMP/c-m$t46_k.md"
     done
+
+    # ---- partie b : kernel ----
+    t46_out="$(t46_kernel_ancres "$T46_K")" && ok "T46 (b1) : le kernel porte la section « Nœud dans le mandat, plan de mission publié » et ses ${#T46_ANCRES_B[@]} ancres" \
+      || ko "T46 (b1) : attendu — section neuve du kernel avec ${#T46_ANCRES_B[@]} ancres ; obtenu — $t46_out"
+    t46_out="$(t46_voie_unique "$T46_K")" && ok "T46 (b2) : la ligne du gabarit n'est définie qu'au contrat (une fois), le kernel n'en porte ni la ligne ni l'espace réservé" \
+      || ko "T46 (b2) : attendu — voix unique (ADR-057) ; obtenu — $t46_out"
+    t46_out="$(t46_verbes_cites "$T46_K")" && ok "T46 (b3) : chaque driver-lock.sh <verbe> cité dans la section existe dans --help, et « $T46_VERBE_PUB » est cité" \
+      || ko "T46 (b3) : attendu — verbes cités connus de --help dont $T46_VERBE_PUB ; obtenu — $t46_out"
+    t46_out="$(t46_ligne_verrou "$T46_K")" && ok "T46 (b4) : la ligne « Verrou de driver » nomme chacun des $(t46_verbes_help | "$GREP" -c .) verbes que --help documente (mark-progress, registry, $T46_VERBE_PUB compris)" \
+      || ko "T46 (b4) : attendu — ligne « Verrou de driver » alignée sur --help ; obtenu — $t46_out"
+    t46_out="$(t46_agents_tous)" && ok "T46 (c) : aucun corps d'agent ($t46_out) ne porte la ligne du gabarit ni l'espace réservé" \
+      || ko "T46 (c) : attendu — aucun corps d'agent ne porte la ligne ; obtenu — $t46_out"
+
+    # Mutants de la partie b
+    t46_k=0
+    for t46_a in "${T46_ANCRES_B[@]}"; do
+      t46_k=$((t46_k+1))
+      t414_ablate "$T46_K" "$T46_TMP/k-b1-$t46_k.md" "$t46_a" "$T46_KZS" "$T46_KZE"
+      t414_mutant "T46 mutant (b1) $t46_k : section du kernel privée de « $t46_a »" t46_kernel_ancres "$T46_K" "$T46_TMP/k-b1-$t46_k.md"
+    done
+    awk -v zs="$T46_KZS" '{ print } !d && $0 ~ zs { print ""; print "- Nœud : `<id du nœud DAG>`"; d = 1 }' "$T46_K" > "$T46_TMP/k-b2.md"
+    t414_mutant "T46 mutant (b2) : kernel avec la ligne du gabarit recopiée" t46_voie_unique "$T46_K" "$T46_TMP/k-b2.md"
+    sed 's/driver-lock\.sh publish-plan/driver-lock.sh publier-fantome/' "$T46_K" > "$T46_TMP/k-b3a.md"
+    t414_mutant "T46 mutant (b3) : verbe de publication remplacé par un verbe fantôme" t46_verbes_cites "$T46_K" "$T46_TMP/k-b3a.md"
+    sed 's/driver-lock\.sh publish-plan/driver-lock.sh status/' "$T46_K" > "$T46_TMP/k-b3b.md"
+    t414_mutant "T46 mutant (b3) : verbe de publication remplacé par status (plus cité)" t46_verbes_cites "$T46_K" "$T46_TMP/k-b3b.md"
+    sed '/^| \*\*Verrou de driver\*\* |/s/ ; publish-plan pour le plan de mission//' "$T46_K" > "$T46_TMP/k-b4.md"
+    t414_mutant "T46 mutant (b4) : verbe de publication retiré de la ligne « Verrou de driver »" t46_ligne_verrou "$T46_K" "$T46_TMP/k-b4.md"
+    T46_MGR="$REPO/dev-orchestrator/agents/vf-dev-manager.md"
+    if [ -f "$T46_MGR" ]; then
+      { cat "$T46_MGR"; printf '%s\n' '- Nœud : `<id du nœud DAG>`'; } > "$T46_TMP/mgr-c.md"
+      t414_mutant "T46 mutant (c) : vf-dev-manager.md avec la ligne du gabarit ajoutée" t46_agent_propre "$T46_MGR" "$T46_TMP/mgr-c.md"
+    else
+      ko "T46 mutant (c) : vf-dev-manager.md introuvable en disposition source"
+    fi
   fi
 fi
 
