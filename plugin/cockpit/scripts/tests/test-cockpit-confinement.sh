@@ -193,6 +193,35 @@ RES="$(node "$WORK/central.mjs" "$SCRIPTS" "$L2" "$L3" "$WORK/vrai" "$LAB")"
 assert_eq "G7 — lancerGit, lancerGitAsync, shBorne et arbresGit : rien d'un .git sortant ; témoins : dépôt du lab et worktree vérifié lus" "$RES" "-|MARQUEUR-DANS-LE-LAB-BRANCH|-|MARQUEUR-DANS-LE-LAB-BRANCH|-|MARQUEUR-DANS-LE-LAB-BRANCH|1:false|vrai"
 
 
+# G8-G14 : le critère porte sur le dossier git que git lit RÉELLEMENT (dossier git et dossier commun résolus), jamais sur la forme de `.git`
+echo "=== G8 — dossier git et dossier commun résolus ==="
+L8="$WORK/lab-g8"; mkplan "$L8"; G "$L8" init -q; mkdir -p "$L8/sub3"; G "$L8/sub3" init -q; printf '%s\n' "$EXT/.git" > "$L8/sub3/.git/commondir"; printf 'ref: refs/heads/MARQUEUR-EXT-BRANCH\n' > "$L8/sub3/.git/HEAD"   # .git est un DOSSIER, son dossier commun est un dépôt extérieur
+node "$SCRIPTS/vf-cockpit-build.mjs" "$L8" --quiet > "$WORK/build-g8.out" 2>&1 || cat "$WORK/build-g8.out"
+O8="$L8/.vibeflow/cockpit"
+assert_eq "G8 — un dépôt imbriqué dont le .git est un dossier au dossier commun extérieur n'est pas lu (assemblage)" "$(compte 'MARQUEUR-EXT' "$O8/project.html" "$O8/index.html" "$O8/graph.json")" "0"
+# gitfile vers un dossier INTERNE au lab qui porte un commondir extérieur
+mkdir -p "$L8/interne/admin" "$L8/sub4"; cp -R "$L8/sub3/.git/." "$L8/interne/admin/"; printf 'gitdir: %s\n' "$L8/interne/admin" > "$L8/sub4/.git"
+# sous-module légitime comme LAB (gitfile vers parent/.git/modules/x, core.worktree vers le lab) : son git reste lu
+SUBSRC="$WORK/subsrc"; mkdir -p "$SUBSRC"; G "$SUBSRC" init -q; echo s > "$SUBSRC/s"; G "$SUBSRC" add -A; G "$SUBSRC" commit -q -m s; G "$SUBSRC" branch -m MARQUEUR-DANS-LE-LAB-SUBMOD
+PAR="$WORK/parent-sm"; mkdir -p "$PAR"; G "$PAR" init -q; echo p > "$PAR/p"; G "$PAR" add -A; G "$PAR" commit -q -m p
+G "$PAR" -c protocol.file.allow=always submodule add -q "$SUBSRC" sm > /dev/null 2>&1
+# dépôt --separate-git-dir : aucun lien retour vers le lab
+SEP="$WORK/sep-work"; SEPD="$WORK/sep-gitd"; G "$WORK" init -q --separate-git-dir="$SEPD" "$SEP"
+# faux worktree : une entrée d'un dépôt extérieur dont le lien retour désigne ce .git mais dont le dossier commun est un autre dépôt
+FW="$WORK/faux-wt2"; mkdir -p "$FW" "$EXT/.git/worktrees/forge2"; printf 'gitdir: %s\n' "$EXT/.git/worktrees/forge2" > "$FW/.git"
+printf '%s\n' "$FW/.git" > "$EXT/.git/worktrees/forge2/gitdir"; printf 'ref: refs/heads/MARQUEUR-EXT-BRANCH\n' > "$EXT/.git/worktrees/forge2/HEAD"; printf '%s\n' "$AUTRE/.git" > "$EXT/.git/worktrees/forge2/commondir"
+cat > "$WORK/sortant-lab.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const [, , scripts, dir, lab] = process.argv;
+const { gitSortant } = await import(pathToFileURL(scripts + '/vf-cockpit-git-sortant.mjs').href);
+console.log(String(gitSortant(dir, lab)));
+JS
+assert_eq "G9 — gitSortant : .git dossier + commondir extérieur = vrai ; gitfile interne + commondir extérieur = vrai ; faux worktree à dossier commun étranger = vrai" "$(node "$WORK/sortant.mjs" "$SCRIPTS" "$L8/sub3" "$FW"),$(node "$WORK/sortant-lab.mjs" "$SCRIPTS" "$L8/sub4" "$L8")" "true,true,true"
+assert_eq "G10 — témoins : sous-module lu comme lab (gitfile vers parent/.git/modules, core.worktree vers le lab) = faux ; dépôt ordinaire = faux ; vrai worktree = faux" "$(node "$WORK/sortant.mjs" "$SCRIPTS" "$PAR/sm" "$L3" "$WORK/vrai")" "false,false,false"
+assert_eq "G11 — un dépôt --separate-git-dir sans lien retour vers le lab est ignoré (limite assumée)" "$(node "$WORK/sortant.mjs" "$SCRIPTS" "$SEP")" "true"
+RESG="$(node "$WORK/central.mjs" "$SCRIPTS" "$L8/sub3" "$PAR/sm" "$WORK/vrai" "$LAB")"
+assert_eq "G12 — lancerGit : le dépôt à dossier commun extérieur ne rend rien ; témoin : le sous-module lab est lu (HEAD)" "$(printf '%s' "$RESG" | cut -d'|' -f1,2)" "-|MARQUEUR-DANS-LE-LAB-SUBMOD"
+
 # ---------- D : métadonnées VibeFlow de l'export ----------
 echo "=== D — export ==="
 cat > "$WORK/cles.mjs" <<'JS'
