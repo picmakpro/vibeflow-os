@@ -242,7 +242,7 @@ Relayés mot pour mot par la session principale ; canal : arbitrage Samuel, AskU
   point confiné. Jamais `.claude/agent-memory-local/`, jamais la mémoire hors dépôt. `.claude/` ignoré par git : état
   vide qui le dit, avec le nombre de fichiers non suivis, sans leurs noms.
 - **P76-D-20 (champs montrés).** `name`, agent (le dossier), `metadata.type`, date du dernier commit (jour seul), nombre
-  de liens entrants et sortants, et les chemins absents (relatifs au dépôt seulement). Jamais `description`, jamais le
+  de liens entrants et sortants, le chemin du fichier de mémoire lui-même (relatif au dépôt, nécessaire au verdict « hors index » ; ajouté le 2026-11-11 sur la critique de l'UI-SPEC), et les chemins absents (relatifs au dépôt seulement). Jamais `description`, jamais le
   corps, jamais un chemin `~/` ou absolu. Panel « mémoire » : rien de masqué par liste de cas (une liste de cas ne ferme
   pas une classe) ; seule la structure entre dans la page.
 - **P76-D-21 (liens).** Extraction après retrait des blocs de code et des passages entre accents graves, et de toute
