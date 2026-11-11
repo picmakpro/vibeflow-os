@@ -36,7 +36,7 @@ created: "2026-11-11"
 
 ## Per-Task Verification Map
 
-La table par tâche est tenue par les plans (`<automated>` + `<fails_when>` sur chaque tâche). Table de couverture par exigence, réalignée le 2026-11-11 sur 8 plans en 6 vagues (scission de 77-05, P77-D-30 ; revalidation contre la Phase 79 à `67f7f481`, la Phase 74 à `dbdae634`) :
+La table par tâche est tenue par les plans (`<automated>` + `<fails_when>` sur chaque tâche). Table de couverture par exigence, réalignée le 2026-11-11 sur 8 plans en 6 vagues (scission de 77-05, P77-D-30 ; revalidation contre la Phase 79 à `c19c7461`, la Phase 74 à `33bb4aad`) :
 
 | Exigence | Plan | Vague | Témoin rouge sur le code présent | Suite |
 |----------|------|-------|----------------------------------|-------|
@@ -47,7 +47,7 @@ La table par tâche est tenue par les plans (`<automated>` + `<fails_when>` sur 
 | SYNT-01 (coquille) | 77-05 | 3 | bouton et panneau absents à la base ; fichiers partagés intacts depuis `AVANT` ; registre de blocs inscrit avant ou après la coquille (RB1) ; pas de doublon après changement d'onglet (O1) ; aucun jeton ni requête interdite (W11a, CS1) ; ligne-résumé prouvée par un bloc témoin du banc (W18) ; banc `chrome-synthese.mjs` créé avec sonde positive par outil | `test-cockpit-synthese-page.sh` |
 | SYNT-01, SYNT-04, SYNT-08 (page : burn-up et jauges) | 77-06 | 4 | blocs 2 et 3 absents à la base ; « N sur M · P % » égal au pied de jalon ; verdicts en mot et glyphe ; aucune lecture des gates au chargement (JA1) ; mutants sur copie de module chargée | `test-cockpit-synthese-blocs.sh` |
 | SYNT-05, SYNT-06, SYNT-07 (page : dernière visite) | 77-08 | 5 | bloc 1 absent à la base ; clé de stockage unique (W11) ; aucun fond teinté (W4) ; XSS inerte (W15) ; « Tout vu » et `storage` sans vol de focus (W13v) ; ordre final des blocs (OB1) ; documentation de l'effacement, de la persistance et de `base.h` (D1) ; rejeu de la suite de 77-05 | `test-cockpit-synthese-visite.sh` |
-| SYNT-10 | 77-07 | 6 | module pur absent ; voie sans rattachement comptée « non rattaché » (trois cas) ; aucune monnaie ; total coupé dit minorant avec le nombre de voies omises (CO11) ; cinq états de la frise (CO12) ; phase hors jalon (CO10) ; plan à revalider après les Phases 79 et 74 | `test-cockpit-synthese-cout.sh` |
+| SYNT-10 | 77-07 | 6 | module pur absent ; voie sans rattachement comptée « non rattaché » (trois cas) ; aucune monnaie ; total coupé dit minorant avec le nombre de voies omises (CO11) ; cinq états de la frise (CO12) ; `voiesOmises` à 0 sans nombre affiché (CO11) ; agrégat réel de la 74 consommé (CO7) ; deux changements d'onglet sans doublon (CO14, BO1, V10, O1) ; phase hors jalon (CO10) ; plan à revalider après les Phases 79 et 74 | `test-cockpit-synthese-cout.sh` |
 
 À réaligner après exécution : les identifiants de témoins de 77-01 à 77-04 sont ceux des plans à leur état commité ; la colonne ci-dessus les cite sans les redéfinir.
 
