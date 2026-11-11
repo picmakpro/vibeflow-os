@@ -155,6 +155,45 @@ cp "$FT/jetbrains-mono-2.304-regular.woff2" "$WORK/boite-mut.woff2"
 node -e 'const f=require("fs"),p=process.argv[1],b=f.readFileSync(p);b[10]=b[10]^1;f.writeFileSync(p,b)' "$WORK/boite-mut.woff2"
 assert_eq "V9.5 — M-SHA : un octet changé dans la police des traits de boîte est vu" "$([ "$(sha "$WORK/boite-mut.woff2")" != "$PIN_BOITE" ] && echo vu || echo aveugle)" "vu"
 
+echo "=== V10 — fork assumé : aucun appareil de patchs (AUDC-H5, P79-D-07) ==="
+# amont_present <racine du module> : « present » si un dossier amont y existe
+amont_present() { [ -d "$1/amont" ] && echo present || echo absent; }
+# lignes_hors_grammaire <VENDORED.txt> : nombre de lignes dont le premier mot est en capitales seules (verbe machine) et qui ne sont ni
+#   AJOUT à deux champs, ni TAILLE dont le troisième champ (s'il existe) ne commence pas par un chiffre
+lignes_hors_grammaire() { LC_ALL=C awk '$1 ~ /^[A-Z]+$/ { if ($1=="AJOUT" && NF==2) next; if ($1=="TAILLE" && (NF<3 || $3 !~ /^[0-9]/)) next; n++ } END { print n+0 }' "$1"; }
+# lignes_ajout_en_desordre <VENDORED.txt> : nombre de lignes AJOUT dont le chemin n'est pas strictement supérieur à celui de la ligne AJOUT précédente (octet par octet)
+lignes_ajout_en_desordre() { LC_ALL=C awk '$1=="AJOUT" { if (vu && !($2 > prev)) n++; prev=$2; vu=1 } END { print n+0 }' "$1"; }
+assert_eq "V10.1 — le module n'a pas de dossier amont" "$(amont_present "$SCRIPTS/..")" "absent"
+assert_eq "V10.2 — VENDORED.txt : zéro ligne machine hors grammaire (AJOUT à deux champs, TAILLE sans nombre)" "$(lignes_hors_grammaire "$MOTEUR/VENDORED.txt")" "0"
+# témoins V10.3 : la mesure sait voir un amont recréé et chaque classe d'écart
+mkdir -p "$WORK/m10/avec/amont" "$WORK/m10/sans"
+assert_eq "V10.3a — témoin : un dossier amont recréé est vu present" "$(amont_present "$WORK/m10/avec")" "present"
+assert_eq "V10.3a' — témoin négatif : sans dossier amont, absent" "$(amont_present "$WORK/m10/sans")" "absent"
+conforme10() { printf '%s\n' 'floorplan v0.6.0 @ 92d6854 (origine)' 'Licence : MIT.' '' 'AJOUT assets/a.js' 'AJOUT assets/b.js' 'TAILLE assets/serve.mjs' 'TAILLE assets/viewer.html .html, hors gate'; }
+conforme10 > "$WORK/m10/ok.txt"
+{ conforme10; echo 'PATCH assets/viewer.html P1 une description'; } > "$WORK/m10/patch.txt"
+{ conforme10; echo 'RETRAIT SKILL.md'; } > "$WORK/m10/retrait.txt"
+{ conforme10; echo 'TAILLE assets/scan.mjs 320'; } > "$WORK/m10/taille.txt"
+assert_eq "V10.3b — témoin : une ligne PATCH ajoutée compte 1" "$(lignes_hors_grammaire "$WORK/m10/patch.txt")" "1"
+assert_eq "V10.3c — témoin : une ligne RETRAIT ajoutée compte 1" "$(lignes_hors_grammaire "$WORK/m10/retrait.txt")" "1"
+assert_eq "V10.3d — témoin : une ligne TAILLE chiffrée ajoutée compte 1" "$(lignes_hors_grammaire "$WORK/m10/taille.txt")" "1"
+assert_eq "V10.3e — témoin positif : un fichier conforme minimal compte 0" "$(lignes_hors_grammaire "$WORK/m10/ok.txt")" "0"
+# V10.5 : forme et ordre des lignes AJOUT (chaque phase insère la sienne à sa place alphabétique : fusion sans conflit)
+assert_eq "V10.5 — lignes AJOUT de VENDORED.txt : sans doublon et rangées par chemin croissant (insérer à sa place, jamais en fin de fichier)" "$(lignes_ajout_en_desordre "$MOTEUR/VENDORED.txt")" "0"
+{ echo 'AJOUT assets/b.js'; echo 'AJOUT assets/c.js'; echo 'AJOUT assets/a.js'; } > "$WORK/m10/desordre.txt"
+{ echo 'AJOUT assets/a.js'; echo 'AJOUT assets/b.js'; echo 'AJOUT assets/b.js'; } > "$WORK/m10/doublon.txt"
+{ echo 'AJOUT assets/a.js'; echo 'AJOUT assets/b.js'; echo 'AJOUT assets/c.js'; } > "$WORK/m10/trie.txt"
+assert_eq "V10.5a — témoin : une ligne AJOUT déplacée en fin de fichier compte 1 désordre" "$(lignes_ajout_en_desordre "$WORK/m10/desordre.txt")" "1"
+assert_eq "V10.5b — témoin : un doublon compte 1" "$(lignes_ajout_en_desordre "$WORK/m10/doublon.txt")" "1"
+assert_eq "V10.5c — témoin positif : une copie triée compte 0" "$(lignes_ajout_en_desordre "$WORK/m10/trie.txt")" "0"
+# V10.4 : VENDORED.txt reste la sentinelle du moteur (engineDir)
+etat_moteur() { node --input-type=module -e "import { pathToFileURL } from 'node:url'; import path from 'node:path'; const m = await import(pathToFileURL(path.join(process.argv[1], 'vf-cockpit-paths.mjs')).href); console.log(m.engineDir(process.argv[2]).etat);" "$SCRIPTS" "$1" 2>&1; }
+assert_eq "V10.4a — engineDir du vrai module rend trouve avec VENDORED.txt réduit" "$(etat_moteur "$SCRIPTS")" "trouve"
+mkdir -p "$WORK/m104/scripts" "$WORK/m104/skills/cockpit-moteur/assets"; echo '<html></html>' > "$WORK/m104/skills/cockpit-moteur/assets/viewer.html"
+assert_eq "V10.4b — arbre jetable sans VENDORED.txt : engineDir rend absent" "$(etat_moteur "$WORK/m104/scripts")" "absent"
+echo 'floorplan v0.6.0 @ 92d6854' > "$WORK/m104/skills/cockpit-moteur/VENDORED.txt"
+assert_eq "V10.4c — le même arbre avec VENDORED.txt : engineDir rend trouve" "$(etat_moteur "$WORK/m104/scripts")" "trouve"
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"

@@ -249,6 +249,17 @@ const a = Object.keys(S).sort().join(','), b = Object.keys(B).sort().join(',');
 console.log(a && a === b && Object.keys(S).every((k) => S[k] === B[k]) ? 'identiques' : 'divergent ' + a + ' | ' + b);")" "identiques"
 
 echo "=== Q11 — constante = mesure ==="
+# racine_depot : racine du dépôt de dev quand le module est posé sous plugin/cockpit de cette racine ET qu'elle porte .planning/ ; rien sinon
+racine_depot() { local m r; m="$(cd "$SCRIPTS/.." && pwd -P)"; r="$(cd "$SCRIPTS/../../.." 2>/dev/null && pwd -P)"; [ -n "$r" ] && [ "$m" = "$r/plugin/cockpit" ] && [ -d "$r/.planning" ] && printf '%s' "$r"; }
+DEPOT="$(racine_depot)"
+if [ -n "$DEPOT" ]; then
+  assert_eq "Q11.0a — dépôt de dev : la mesure du confinement est trouvée (un saut ici passerait pour un vert)" "$([ -n "$MESURE" ] && echo oui || echo non)" "oui"
+fi
+# Q11.0b : la mesure retenue est celle au plus grand numéro de phase (tri numérique : un tri lexical rendrait 9)
+FD="$WORK/fauxdepot"; mkdir -p "$FD/.planning/a" "$FD/.planning/b" "$FD/.planning/c"
+AVANT="$(mesure_de "$FD")"; [ -n "$AVANT" ] && AVANT=trouvée || AVANT=vide
+: > "$FD/.planning/a/9-MESURE-claude-p.md"; : > "$FD/.planning/b/67-MESURE-claude-p.md"; : > "$FD/.planning/c/100-MESURE-claude-p.md"
+assert_eq "Q11.0b — mesure_de : vide sans fichier, puis le plus grand numéro de phase (9, 67, 100)" "$AVANT|$(basename "$(mesure_de "$FD")")" "vide|100-MESURE-claude-p.md"
 if [ -n "$MESURE" ]; then
   assert_eq "Q11.1 — la liste extraite de la mesure compte au moins 3 éléments" "$([ "$(grep -c . "$WORK/attendu.txt")" -ge 3 ] && echo oui || echo non)" "oui"
   assert_eq "Q11.2 — ARGS_CONFINEMENT = Combinaison retenue, élément par élément et dans l'ordre" "$(cmp -s "$WORK/const.txt" "$WORK/attendu.txt" && echo identique || echo different)" "identique"
