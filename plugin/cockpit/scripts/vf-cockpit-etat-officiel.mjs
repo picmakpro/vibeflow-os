@@ -26,6 +26,8 @@ export function formeEtats(json, CC = contrat()) {
     const st = typeof e.state === 'string' && Object.hasOwn(etats, e.state) ? etats[e.state] : null;
     const su = typeof e.status === 'string' && Object.hasOwn(statuts, e.status) ? statuts[e.status] : null;
     const etat = st === 'termine' || st === 'attend' ? st : su || st;
+    const avant = out.get(e[CC.cleSession]);
+    if (avant && avant.etat !== 'termine' && etat === 'termine') continue; // AUDC-D2 : un état vivant listé pour cet identifiant n'est jamais écrasé par « termine », quel que soit l'ordre
     out.set(e[CC.cleSession], { etat: etat || null }); // une session listée d'état inconnu est VIVANTE : présente, sans état
   }
   return out;

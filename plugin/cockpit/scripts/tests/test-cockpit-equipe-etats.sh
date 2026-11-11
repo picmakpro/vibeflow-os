@@ -221,6 +221,14 @@ const S = {
     eq('D2b.10 — liste non vide dont la clé de session est renommée (dérive de format) : illisible, jamais « close »', sess(await cas(renomme, 0, { session: { ageS: 300 } }))?.etat, 'au-repos');
     eq('D2b.11 — liste non vide à identifiant invalide : illisible, jamais « close »', sess(await cas(JSON.stringify([{ sessionId: '../x', status: 'idle' }]), 0, { session: { ageS: 300 } }))?.etat, 'au-repos');
     eq('D2b.12 — une entrée illisible parmi des entrées lisibles rend toute la liste illisible', sess(await cas(JSON.stringify([JSON.parse(autre)[0], { pid: 3 }]), 0, { session: { ageS: 300 } }))?.etat, 'au-repos');
+    // AUDC-D2 : un même identifiant listé deux fois avec des états contradictoires — un état vivant n'est jamais écrasé par « termine », quel que soit l'ordre
+    const dbl = (...o) => officiel.formeEtats(o.map((x) => ({ sessionId: SID, kind: 'interactive', pid: 1, cwd: lab, ...x })));
+    const lu = (m) => (m && m.has(SID) ? m.get(SID).etat : 'absente');
+    eq('D2b.13 — « terminé » puis « occupé » (et l\'inverse) : vivante, « actif » dans les deux ordres', [lu(dbl({ state: 'done' }, { status: 'busy' })), lu(dbl({ status: 'busy' }, { state: 'done' }))], ['actif', 'actif']);
+    eq('D2b.14 — « terminé » et « vous attend » : « attend » dans les deux ordres', [lu(dbl({ state: 'done' }, { status: 'waiting' })), lu(dbl({ status: 'waiting' }, { state: 'done' }))], ['attend', 'attend']);
+    eq('D2b.15 — « terminé » et « au repos » : « au-repos » dans les deux ordres', [lu(dbl({ state: 'done' }, { status: 'idle' })), lu(dbl({ status: 'idle' }, { state: 'done' }))], ['au-repos', 'au-repos']);
+    eq('D2b.16 — « terminé » et un état inconnu (vivante, sans état) : jamais « termine », dans les deux ordres', [lu(dbl({ state: 'done' }, {})), lu(dbl({}, { state: 'done' }))].map((x) => x !== 'termine'), [true, true]);
+    eq('D2b.17 — témoins : « terminé » seul ou doublé reste « termine » ; deux entrées vivantes, la dernière gagne', [lu(dbl({ state: 'done' })), lu(dbl({ state: 'done' }, { state: 'stopped' })), lu(dbl({ status: 'busy' }, { status: 'idle' }))], ['termine', 'termine', 'au-repos']);
     // chemin réel du serveur : startLive -> whoNow doit demander l'état officiel (un test par collectWho seul ne voit pas le câblage)
     fs.rmSync(marque, { force: true });
     const homeLive = monter({ session: { ageS: 300 } }); process.env.HOME = homeLive; process.env.VF_FAKE_SORTIE = autre;
