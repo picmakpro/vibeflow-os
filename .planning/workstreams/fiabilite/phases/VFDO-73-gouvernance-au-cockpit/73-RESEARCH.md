@@ -598,7 +598,7 @@ Ordre de pose relatif à la coquille de la 79 (C5) : V1 et V2 sont indépendants
 
 ## Open Questions
 
-1. **Que faire du couple `tenu` / « depuis » avec la 79 ?** — RESOLVED (73-04, hypothèse A3 : libellé « dernier signe il y a N min » ; la demande du champ `priseS` à la 79 reste à renvoyer par la session principale ; plan « à revalider »)
+1. **Que faire du couple `tenu` / « depuis » avec la 79 ?** — RESOLVED (73-04, hypothèse A3 résolue par A36 et A39 de la 79@6fb94fb7 : `leaseS` = temps depuis la prise, `ageS` = dernier battement ; aucune demande de `priseS` à renvoyer ; repli sur `lease_seconds` brut avant la fusion)
    - Ce qu'on sait : `tenu` est un booléen ; A15 exclut `lease_seconds` ; la spec veut « depuis N » (C3).
    - Ce qui manque : un champ numérique de prise dans la projection.
    - Recommandation : plan de verrou en V1/V2 avec repli A3 (libellé « dernier signe ») et une demande, à renvoyer par la session principale à la 79, d'un champ `priseS` ; le plan est marqué « à revalider ».
