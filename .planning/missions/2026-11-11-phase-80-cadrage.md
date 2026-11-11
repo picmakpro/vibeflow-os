@@ -68,6 +68,7 @@ parallèle) → `plan` rouvert une fois (révision ciblée) → `plancheck` → 
 | `DESIGN.md` (racine) | 80-16 | 75 possible (couleur sur la carte Code) | deux lignes nommées (P80-D-31, P80-D-46) |
 | `plugin/cockpit/skills/cockpit-moteur/scripts/lib/health.mjs` | 80-19 seul (après avis) | 79 (collecteur vendorisé, `scripts/lib/*` modifiés) | — |
 | Dictionnaires `78-vf-fr-dict-a.js`, `79-vf-fr-dict-b.js`, `80-vf-fr.js` | aucun (dictionnaire neuf `79-vf-fr-dict-c.js`, 80-14) | 79 | P80-D-27, P80-D-35 |
+| `plugin/cockpit/skills/cockpit-moteur/assets/ui/41-vf-projet-phase.js` (fonction `lireExigences(phaseId)`) | 80-07 | 76 (rebranche la fonction sur `meta.vf.trace.exigences` en retirant le nœud « Exigences », P76-D-25) | point de rebranchement unique, critère du plan 80-07 |
 | Jamais touchés par la 80 | `vf-cockpit-live.mjs`, `70-vf-live.js`, `75-vf-modele.js`, `serve.mjs` | 79 | P80-D-27 |
 
 ### Fichiers par plan
