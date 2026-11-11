@@ -19,6 +19,9 @@ Aucune valeur d'espacement hors grille 2, 4, 6, 8, 12, 16, 20, 24, 32 (les maque
 4. Surface neutre : ni fond teinté, ni halo, ni anneau coloré, ni contour coloré. La couleur d'état ne vit que dans un glyphe
    (et dans le remplissage de la barre d'un jalon en cours, § 1.2).
 5. Aucune animation active à repos ; chaque transition a sa forme statique en mouvement réduit (§ 6).
+6. **Deux définitions, citées partout (P80-D-50).** « **Feuille de détail** » = largeur ≤ 999 px **ou** pointeur grossier (tactile) à toute
+   largeur ; « **panneau latéral** » = ≥ 1 000 px **et** pointeur fin. Les conditions (a) zone basse et (b) extrémités défilables et
+   `scroll-padding-inline-*` se lisent sur elles. « Téléphone » ne désigne que la mise en page ≤ 700 px.
 
 ## 1. Écran racine : Projet en couloirs
 
@@ -45,7 +48,7 @@ Backlog, Graines, Releases, Missions hors phase (listes, § 1.6)
   `scroll-padding-inline-end: var(--pw)` tant que le panneau est ouvert, et `scroll-padding-inline-start` égal à la largeur
   du tiroir Git + `--edge` tant qu'il est ouvert (il recouvre le bord gauche). **Ces `scroll-padding-inline-*` et les
   extrémités défilables ne valent qu'à partir de 1 000 px au pointeur fin (P80-D-50 b) : sous 1 000 px et au tactile, aucun
-  défilement horizontal, à 390 px comme à 800 px (le panneau y est une feuille basse, § 3).** Pour que ce défilement soit
+  défilement horizontal, à 390 px comme à 800 px (le panneau y est une feuille de détail au sens du § 0, point 6).** Pour que ce défilement soit
   possible, la région de la vue est `overflow:auto` et porte, surcouche ouverte seulement, une extrémité de défilement de la largeur de cette
   surcouche (pseudo-éléments en début et en fin de rail : ils agrandissent l'étendue défilable, ils ne déplacent ni ne
   redimensionnent aucun couloir). Même règle que NAVIGATION § 4.6 « une surcouche n'est pas une zone de lecture », étendue à
@@ -161,7 +164,7 @@ accessible, plus bas) et dans le panneau ; le numéro et l'identifiant de plan s
   focus (re-rendu, bascule) ne change jamais la sélection. **P80-D-51 (révise P80-D-47) : une seule règle de touches pour
   Projet, à toutes les largeurs et dans toutes les formes, comme sur le canevas : Entrée plonge, Espace sélectionne** ;
   double-clic plonge ; le bouton « Ouvrir la phase » du panneau reste. Sur un plan (feuille), Entrée ouvre le panneau s'il est
-  fermé. **Au toucher, un appui sélectionne (la feuille s'ouvre au téléphone) et « Ouvrir la phase » est dans la feuille.**
+  fermé. **Au toucher, un appui sélectionne (la feuille de détail s'ouvre ; « Ouvrir la phase » y figure, comme dans le panneau).**
   Au bureau, la sélection suit le focus dans les couloirs et la liste. Aucune action ne lance de session (P80-D-26).
 
 ### 1.5 « Historique » (jalons clos)
@@ -254,11 +257,10 @@ Un `table` par bloc de jalon (même en-tête de jalon qu'en § 1.2, `aria-labell
 **Zone basse (P80-D-18), à toute largeur.** La vue DOM est un contenu défilant sous des éléments fixes : la barre de question
 `#ask`, le bloc `#vf-coin` (ligne d'état seule, sans minicarte dans ces formes ; absent sous 1 000 px) et, quand il est ouvert,
 le tiroir du terminal, qui relève `#stage` (la vue vit dans `#stage` et monte avec lui), la pastille « Terminal » (bas gauche)
-et, sous 1 000 px, la feuille de détail quand elle est ouverte (P80-D-50). La vue pose **à la fois**
+et, en feuille de détail (§ 0, point 6), cette feuille quand elle est ouverte (P80-D-50). La vue pose **à la fois**
 `padding-bottom` et `scroll-padding-block-end` égaux à `--vf-bas` = hauteur mesurée de `#ask` (0 si absente) + `--edge` +
 `--sp-8` + hauteur mesurée de `#vf-coin` (0 s'il n'est pas affiché) + `--edge` + `env(safe-area-inset-bottom)`, **sous 1 000 px
-plus la hauteur de la feuille de détail ouverte, et la hauteur de la pastille « Terminal » quand elle déborde la bande de
-`#ask`**, écrit `calc(…) /* dérivé : #ask + #vf-coin + feuille + pastille mesurés */` (exception écrite DESIGN § 4), relu à
+plus la hauteur de la feuille de détail ouverte (§ 0, point 6, y compris le tactile ≥ 1 000 px), et la hauteur de la pastille « Terminal »**, écrit `calc(…) /* dérivé : #ask + #vf-coin + feuille + pastille mesurés */` (exception écrite DESIGN § 4), relu à
 chaque changement de taille (`ResizeObserver`). Ainsi la dernière rangée, la touche Fin et une carte focalisée en bas ne
 passent jamais sous `#ask`, `#vf-coin`, la pastille « Terminal », la feuille de détail ni le zoom ; les contrôles de canevas (zoom, minicarte, repères) sont absents de ces formes. C'est la règle
 NAVIGATION § 4.6 (« une surcouche n'est pas une zone de lecture ») étendue aux vues DOM.
@@ -297,7 +299,7 @@ Une section de plan n'affiche pas une ligne dont la valeur est vide : elle dispa
 - Pile de sélections du panneau (`VibeFlow.panneau.retour()`) : un clic sur une carte, une rangée ou un nœud du canevas
   **repart d'une pile vide** ; un lien interne au panneau (plan, exigence, phase) **empile** ; Retour dépile et rappelle
   `select` sans empiler. Plafond 20, le plus ancien sort. Fermer le panneau vide la pile. Au bureau, Échap ne ferme pas le panneau
-  (il se ferme par `p` ou son bouton) et ne dépile jamais ; au téléphone, Échap ferme la feuille.
+  (il se ferme par `p` ou son bouton) et ne dépile jamais ; en feuille de détail, Échap ferme la feuille.
 - Pile vide : `aria-disabled="true"` (il reste focalisable et annoncé « Retour, indisponible »), texte `--text-4`, aucun
   survol. Le nom : « Retour » ; description : « Revenir à la sélection précédente » (`aria-describedby`, pas de `title` seul).
 - Il ne change ni la vue, ni la forme, ni le niveau : c'est la pile du panneau. « Monter » reste la remontée de niveau.
@@ -330,7 +332,7 @@ dans chaque collection (même principe que P80-D-10) : `tabindex=0` sur la derni
     direction** de la flèche ; sans couloir non vide dans cette direction sur la ligne, ne bouge pas.
   - Origine/Fin : première/dernière carte du bloc, dans l'ordre de lecture (couloir par couloir). Entrée : plonger ;
     Espace : sélectionner, à toutes les largeurs et dans toutes les formes (P80-D-51, § 1.4). Aucun champ : pas de recherche par frappe.
-- Liste : ↑/↓, Origine, Fin ; en-têtes de tri : Entrée/Espace.
+- Liste : ↑/↓, Origine, Fin ; Entrée plonge, Espace sélectionne (P80-D-51) ; en-têtes de tri : Entrée/Espace.
 - Aucune lettre seule ne déclenche une action hors garde de saisie (§ 2.1).
 
 | Élément | Rôle et nom |
@@ -372,7 +374,7 @@ puis précédent, de la même collection ; (4) l'arrêt itinérant de la collect
   chaîne d'Échap (NAVIGATION § 2) : depuis une carte ou une rangée focalisée, un premier appui désélectionne (le panneau
   revient à la vue d'ensemble, le focus reste), un appui suivant remonte d'un niveau dans une phase et ne fait rien à la
   racine ; un Échap venu d'un bouton du panneau ou d'un menu ne les atteint pas (garde PU-G-175).
-- Sélection d'une carte : le focus reste sur la carte (le panneau ne prend pas le focus, Q5) ; sur téléphone, la feuille
+- Sélection d'une carte : le focus reste sur la carte (le panneau ne prend pas le focus, Q5) ; en feuille de détail, la feuille
   prend la place standard de la feuille du moteur et Échap la ferme en rendant le focus à la carte.
 - Tri : annonce « Trié par État, croissant » ; focus reste sur le bouton de tri.
 
@@ -476,8 +478,8 @@ Espaces insécables avant `: ; ! ?` et dans « 1 024 px ». Pas de tiret long da
 | Liste | `th[aria-sort]` unique non `none` ; tri par défaut État puis numéro ; clic bascule ; rangée ≥ 44 px au tactile ; aucun défilement horizontal à 390 px |
 | Dans une phase | plans groupés par `h3` de vague ; exigences en `ul` sans `input` ; texte d'exigence présent une fois dans le panneau |
 | Panneau | aucun des mots « Élément », « module », « Mentions » dans le texte visible de Projet ; panneau de plan : statut, vague, exigences couvertes présents |
-| Retour | pile vide : `aria-disabled="true"` ; lien interne : actif ; `retour()` rappelle l'ancienne cible sans empiler ; **au téléphone**, Échap ferme la feuille sans dépiler ; au bureau, Échap ne ferme pas le panneau |
-| Sélection et plongée | bureau : Tab, flèche ou clic sur une carte la sélectionne (`aria-current`, panneau sur `ph-<N>`), Entrée plonge, Espace sélectionne, à **toutes les largeurs et dans toutes les formes** (P80-D-51) ; une restitution de focus programmée ne change pas la sélection ; toucher : un appui sélectionne (feuille au téléphone), « Ouvrir la phase » est dans la feuille |
+| Retour | pile vide : `aria-disabled="true"` ; lien interne : actif ; `retour()` rappelle l'ancienne cible sans empiler ; **en feuille de détail**, Échap ferme la feuille sans dépiler ; au bureau, Échap ne ferme pas le panneau |
+| Sélection et plongée | bureau : Tab, flèche ou clic sur une carte la sélectionne (`aria-current`, panneau sur `ph-<N>`), Entrée plonge, Espace sélectionne, à **toutes les largeurs et dans toutes les formes** (P80-D-51) ; une restitution de focus programmée ne change pas la sélection ; toucher : un appui sélectionne (feuille de détail), « Ouvrir la phase » est dans la feuille |
 | Repli du focus | après `v` ou une action de palette vers Graphe, `document.activeElement` est la carte itinérante, sinon `#stage` ; vers couloirs ou liste, l'élément sélectionné, sinon le `h1` ; changement d'onglet : idem selon la vue chargée ; jamais `body` ni un `h1` absent du DOM |
 | Focus orphelin | pour chaque contrôle de la famille (en-tête de tri re-rendu, `summary`, « Réessayer » réussi, rangée de backlog, phase disparue) : le contrôle focalisé retiré du DOM, `document.activeElement` suit l'ordre équivalent, fruit du geste, voisin, arrêt itinérant, repli ; jamais `body` |
 | Échap dans la vue DOM | focus sur une carte : 1er appui désélectionne, 2e remonte (dans une phase) ou sans effet (racine) ; depuis un bouton du panneau, aucun des deux |
@@ -487,7 +489,7 @@ Espaces insécables avant `: ; ! ?` et dans « 1 024 px ». Pas de tiret long da
 | Grille de flèches (1 024 px et 800 px) | à 1 024 (4 couloirs côte à côte) : → parcourt À faire, En cours, À recetter, Fait au rang plafonné, ← revient, ↑/↓ restent dans le couloir. À 800 (2 × 2) : ↓ au bas d'À faire va à la première carte d'À recetter, ↓ au bas d'En cours à la première de Fait, ↑ symétrique (dernière carte), ←/→ dans la ligne ; la suite des appuis visite les quatre couloirs, clavier seul, sans jamais mettre le focus sur `body`. Couloirs vides : À recetter vide, ↓ au bas d'À faire va à la première carte de Fait ; En cours vide, → depuis À faire n'a pas de cible sur la ligne et ne bouge pas |
 | Re-rendu en direct | un patch déclenché pendant que le focus est sur une carte : `document.activeElement` est le bouton de la même phase (même `ph-<N>`, même si elle a changé de couloir), jamais `body` ; `tabindex=0` sur elle ; `aria-current` inchangé ; `scrollTop` et `scrollLeft` égaux ; tri et `details` inchangés ; focus d'un champ ou du panneau non volé |
 | Plans d'une phase | un seul arrêt de tabulation pour la liste de plans ; ↑/↓ traversent les vagues |
-| Zone basse (toutes largeurs) | à 1 440, 1 024 et 390 px, panneau, tiroir Git et tiroir du terminal ouverts puis fermés : `padding-bottom` = `scroll-padding-block-end` ≥ `#ask` + `#vf-coin` mesurés + marges (+ feuille de détail ouverte sous 1 000 px, + pastille « Terminal » si elle déborde) ; après Fin, ↓ sur la dernière rangée, et focus sur une carte du bas, le rectangle de l'élément focalisé ou sélectionné n'intersecte ni `#ask`, ni `#vf-coin`, ni la pastille « Terminal », ni la feuille de détail, ni le tiroir Git, ni le panneau, ni le tiroir du terminal |
+| Zone basse (toutes largeurs) | à 1 440 et 1 024 px (panneau latéral), à 390 **et 800 px (feuille de détail ouverte puis fermée)**, tiroir Git et tiroir du terminal ouverts puis fermés ; tactile ≥ 1 000 px (feuille) inclus : `padding-bottom` = `scroll-padding-block-end` ≥ `#ask` + `#vf-coin` mesurés + marges (+ feuille de détail ouverte, + pastille « Terminal » toujours) ; après Fin, ↓ sur la dernière rangée, et focus sur une carte du bas, le rectangle de l'élément focalisé ou sélectionné n'intersecte ni `#ask`, ni `#vf-coin`, ni la pastille « Terminal », ni la feuille de détail, ni le tiroir Git, ni le panneau, ni le tiroir du terminal |
 | Clavier | un seul arrêt de tabulation par collection ; ←/→/↑/↓ comme § 5 ; focus jamais sur `body` après bascule, plongée, remontée |
 | Annonce | la zone `status` reçoit « Affichage en liste, N phases » à la bascule et « Trié par … » au tri |
 | Contraste | table § 5 remesurée en rendu dans les deux thèmes ; texte ≥ 4,5:1, non-texte ≥ 3:1 ; glyphe « En cours » ≥ 3,5:1 (cible P80-D-20, rouge en clair tant que le lot jetons n'est pas livré) ; « Retour » désactivé mesuré sur le fond réel du panneau |
@@ -515,7 +517,7 @@ Espaces insécables avant `: ; ! ?` et dans « 1 024 px ». Pas de tiret long da
    voient alors qu'en fermant le panneau. Le même mécanisme vaut pour les colonnes de droite des listes.
 7. **Écarts à `DESIGN.md` assumés** : carte de phase à `padding` 12 × 16 (DESIGN § 5 : 16 sur les quatre côtés) pour tenir
    une carte dense ; titre de carte à 13 px / 500 ou 600 (DESIGN § 3 : 15 px / 600, `.title`) car 15 px ne tient pas en
-   230 px de couloir ; variante `st-active` sans palier de fond (DESIGN § 5 : palier neutre au-dessus de `--surface-hover`) :
+   ≈ 226 px de couloir ; variante `st-active` sans palier de fond (DESIGN § 5 : palier neutre au-dessus de `--surface-hover`) :
    la phase en cours se distingue par la graisse 600 et `--text`, le palier gris se lisant « désactivé » en thème clair
    (DESIGNS § 8) ; la sélection prend `--surface-hover` et une bordure. Tailles de police employées : 22, 18, 13, 12,5 et 12 px,
    toutes dans l'échelle de DESIGN § 3 hors le 15 px du titre de carte.
