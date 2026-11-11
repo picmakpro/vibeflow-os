@@ -324,6 +324,23 @@ sans en retirer rien.
   l'onglet s'initialise par `surOnglet`, jamais au seul chargement du document. `VF_COQUILLE` et `VF_ETAT` sont des
   objets globaux propres à la 79 : ils n'étendent jamais l'objet gelé du moteur, et ne supposent rien des objets de
   la 80 (`VF_SURCOUCHES`, `VF_PANNEAU`).
+- **A31 (75, 76, 77, et toute phase) — règle de C0 : une collecte, lue en mémoire.** Une route d'une autre phase qui
+  calcule à partir de la collecte la lit **en mémoire**, par le module `plugin/cockpit/scripts/vf-cockpit-instantane.mjs`
+  : `instantane()` rend le dernier instantané gelé (`null` avant la première collecte) et `surInstantane(rappel)` →
+  désinscription, appelé à chaque nouvel instantané (donc après un `structural`). Contenu : `seq`, `signal`
+  (`cockpit-signal@1`, avec `equipe` en `cockpit-who@2`), `projet` (`cockpit-project@1`), `frise` (projection C3
+  complète, `etatOfficiel` et `cibles` compris). Ces fonctions ne déclenchent **jamais** de collecte ; une route ne se
+  rappelle jamais elle-même par HTTP et ne relance aucune lecture du lab par requête. Jamais exporté : le curseur de
+  l'index, le payload brut du verrou, un champ que la garde d'émission refuse ; la réponse d'une route qui en dérive
+  passe la réponse gardée (A11). Livraison : 79-09 crée le module (`signal`, `projet`), 79-13 y ajoute `frise`.
+- **A32 (75) — données du planning pour une autre phase.** Une donnée de planning qui manque à l'instantané (par
+  exemple les `files_modified` des plans) s'ajoute **dans la lecture du planning de la collecte**, comme champ
+  facultatif de `cockpit-project@1` (C0 : sans changement de version), par la phase demandeuse ; jamais par une lecture
+  propre à sa route.
+- **A33 (75) — cible quand le lab est un sous-dossier du dépôt.** La cible est relative au **lab tel qu'il apparaît
+  dans l'arbre de la voie** : pour un worktree, la racine de comparaison est `<racine réelle du worktree>/<chemin du lab
+  dans le dépôt>`, ce qui donne le même chemin que les cartes de l'onglet Code. Un fichier de l'arbre hors de ce
+  sous-dossier devient « un fichier hors du lab ». A22 est précisé en ce sens.
 - **Note C3.** Le coût en monnaie et les limites de 5 h et de 7 jours sont hors de cette vague (P74-D-20, P74-D-24).
 
 ## À Samuel
