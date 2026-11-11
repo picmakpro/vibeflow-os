@@ -576,11 +576,18 @@ Plans:
 **Requirements**: TBD — posées au cadrage.
 **Depends on:** Phase 69 (rattachement des missions) ; ordre du jalon : après la 75.
 **Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 10, 11, 14) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2.
-**Plans:** 0 plans
+**Plans:** 8 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 76 to break down)
+- [ ] 76-01-PLAN.md — Chaîne d'exigences : maillons, contradictions, preuves, bilans, Jalon (fonctions pures) — vague 1, TRAC-01/02/03/04/11
+- [ ] 76-02-PLAN.md — Décisions : extracteur `vf-cockpit-registres.mjs` et passage git des commits citants — vague 1, TRAC-05/06
+- [ ] 76-03-PLAN.md — Mémoire des agents : entrées, liens, états — vague 2, TRAC-07/08
+- [ ] 76-04-PLAN.md — Branchement dans la collecte (champs facultatifs de `cockpit-project@1`) — vague 2, TRAC-10/01/03/04/05
+- [ ] 76-05-PLAN.md — Route `GET /api/vf/tracabilite` — vague 3, TRAC-10/11/05/06/07
+- [ ] 76-06-PLAN.md — Page : section de phase, preuves, Jalon, panneau d'exigence — vague 4, TRAC-01/02/03/04/09/11
+- [ ] 76-07-PLAN.md — Page : Décisions, Mémoire, panneaux d'ADR, de décision, d'entrée, commits — vague 5, TRAC-05/06/07/08/09/11
+- [ ] 76-08-PLAN.md — Retrait du nœud `.req`, puis clôture — vague 6, TRAC-12
 
 ### Phase 77: Santé de la méthode et synthèse — jauges, dernière visite, burn-up
 
