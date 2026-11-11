@@ -302,10 +302,10 @@ Forme proposée du schéma (aucune clé interdite, tableaux de tuples) :
 
 ## Open Questions
 
-1. **D-11 face au pied réservé (O-1)** — recommandé : « identique » = données ; à acter par le manager.
-2. **Manques 8 et 9** — à relayer à la 79 par la session principale avant les plans 75-03 / 75-04.
-3. **Lab sous-dossier du dépôt et A22** — demander si `cible` est relative au worktree ou au lab dans le worktree.
-4. **Qui pose le canal (74 ou 75, D-05)** — à vérifier à l'exécution de 75-06 (`Floorplan.marques` déjà là ?).
+1. **D-11 face au pied réservé (O-1)** — RESOLVED : « identique » porte sur les données, la réserve du pied est posée avec ou sans git (P75-D-11, P75-D-25 pour le critère d'arrêt).
+2. **Manques 8 et 9** — RESOLVED : fermés par A31 de la 79 (`vf-cockpit-instantane.mjs`, P75-D-23).
+3. **Lab sous-dossier du dépôt et A22** — RESOLVED : A33 de la 79 (cible relative au lab tel qu'il apparaît dans l'arbre de la voie).
+4. **Qui pose le canal (74 ou 75, D-05)** — RESOLVED pour le nom (`VF_MARQUES`, hors de l'objet gelé, P75-D-05) ; reste à constater à l'exécution de 75-07 si la 74 l'a déjà posé (point « à revalider »).
 
 ## Environment Availability
 
