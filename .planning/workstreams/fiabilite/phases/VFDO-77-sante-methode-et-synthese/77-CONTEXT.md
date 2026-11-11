@@ -99,8 +99,13 @@ panels. Aucune ne vaut arbitrage de Samuel, et aucune ne rouvre un arbitrage dé
     le serveur environ 1,75 s ; un lanceur asynchrone exporté est à poser.
   Le script est résolu comme `driverLockScript` : dossier du module, puis le `conductor/scripts` voisin, puis le dossier
   de scripts de l'installation, et jamais un script pris dans le lab observé ni dans `.vibeflow/` (T-67-06). La route
-  suit les règles communes C0 de la Phase 79 (hôte, origine, jeton, 405, `no-store`, garde d'émission) et ne renvoie
-  jamais un chemin du poste.
+  suit les règles communes C0 de la Phase 79 et ne renvoie jamais un chemin du poste. Deux règles viennent de
+  l'amendement de la 79 (commit `2ae6607a`), toutes deux livrées par le plan 79-05 en première vague :
+  - A11 : la route appelle la fonction exportée unique qui applique les contrôles C0, la garde `porteInterdit`,
+    `no-store` et le 503, sans en recopier aucun ;
+  - A10 : elle s'ajoute par **une ligne** dans la table des routes de `vf-cockpit-server.mjs`, à sa place dans l'ordre
+    alphabétique des chemins (`/api/vf/methode`). Les Phases 75 (`/api/vf/activite`) et 76 (`/api/vf/tracabilite`)
+    ajoutent les leurs ailleurs dans la même table.
 - **P77-D-05 (lab tiers, valeurs absentes).** Le gate de densité ne mesure que le corpus `plugin/*` du dépôt de
   distribution ; dans un autre lab, il rend le code 2. La jauge dit alors « non applicable dans ce lab », jamais 0. Un
   gate absent, une copie installée trop ancienne (code 64), une version d'en-tête inconnue ou une échéance dépassée
@@ -160,8 +165,8 @@ panels. Aucune ne vaut arbitrage de Samuel, et aucune ne rouvre un arbitrage dé
     24 h, la synthèse dit « au moins N » avec la réserve « seules les 24 dernières heures sont gardées » (AUDC-Q2,
     non rouverte). Jamais un « 0 » sans cette réserve.
   - **Blocages :** les missions dont un nœud a échoué, les agents qui attendent, et les entrées de la section des
-    blocages du STATE du compartiment actif. Le STATE est lu côté serveur en lecture seule, et le texte nettoyé avant
-    d'être servi. Les blocages nouveaux sont nommés avec leur texte présent ; les blocages levés sont seulement
+    blocages du STATE du compartiment actif. Le STATE est lu côté serveur en lecture seule, par le point de lecture
+    confiné du lab (A12 de la Phase 79), et le texte est nettoyé avant d'être servi. Les blocages nouveaux sont nommés avec leur texte présent ; les blocages levés sont seulement
     comptés, puisque leur texte n'est pas gardé.
   La synthèse ne dépend pas de la fenêtre de 24 h pour les phases, les commits et les blocages.
 - **P77-D-11 (calcul pur).** Le calcul de la différence est un module pur, sans DOM ni stockage, testé sous node. Son
@@ -201,10 +206,15 @@ panels. Aucune ne vaut arbitrage de Samuel, et aucune ne rouvre un arbitrage dé
   24 h, et le bloc le dit dans son titre. L'arbitrage en vigueur est AUDC-Q2 (fenêtre de 24 h) ; la question d'un
   agrégat au-delà est S-2 de la Phase 79, reprise sous « À Samuel ».
 - **P77-D-16 (agrégation).**
-  - Une voie va à sa phase par la mission (`rattachement.dag`, puis le champ `phase` du DAG, règle P69-D-05).
+  - Une voie va à sa phase par la mission. `rattachement.dag` vaut exactement `signal.missions[].fichier` (A8 de la
+    79), et la mission donne sa phase par la règle P69-D-05.
+  - La voie du manager n'a pas de nœud propre. Elle se rattache par `{dag, noeud: null, source: "enfants"}` quand tous
+    ses enfants rattachés pointent le même plan de mission (A14 de la 79).
   - L'étage est le rôle de la voie (`role` = type d'agent) : manager, codeur, revue, audit, vérification, tête de
     session, autres.
-  - Une voie sans rattachement va dans « non rattaché », jamais dans une phase devinée.
+  - Une voie dont `rattachement` vaut `null` va dans une ligne « non rattaché », jamais dans une phase devinée. C'est
+    le cas d'une voie sans mission, et d'un manager dont les enfants pointent plusieurs plans ou aucun. Ses jetons
+    restent comptés dans le total.
   - Le calcul est un module pur partagé. Si la Phase 74 a déjà posé l'agrégat par phase (AUDC-I08 : « un seul calcul
     à partager »), la 77 n'ajoute que l'axe des étages et l'affichage.
   - Plan à part, déclaré dépendant de la Phase 79 (C3) et, pour l'agrégat, de la Phase 74. À revalider par une
@@ -217,7 +227,9 @@ panels. Aucune ne vaut arbitrage de Samuel, et aucune ne rouvre un arbitrage dé
   79**, qui retire l'appareil de patchs du moteur (C6) : un fichier `ui/` neuf n'appelle donc ni ligne `AJOUT` dans
   `VENDORED.txt` ni diff amont. S'ils devaient passer avant, chaque fichier `ui/` neuf ajouterait sa ligne `AJOUT`, et
   la fusion avec la 79 garderait la suppression. Les jauges, la synthèse et le burn-up lisent les sources en vigueur à
-  l'exécution, sans dépendre fonctionnellement des routes C2 et C4 de la 79.
+  l'exécution, sans dépendre fonctionnellement des routes C2 et C4 de la 79. Seule exception, de forme : un script de
+  page obtient le jeton par `VF_ETAT.jeton()` / `VF_ETAT.lireJson()` quand la coquille de la 79 les expose (A13), et
+  par le chemin en vigueur sinon.
 - **P77-D-18 (témoins).** Chaque comportement porte un témoin qui rougit sur le code présent, puis verdit. Chaque
   témoin est d'abord montré rouge par une mutation, sa trace (assertion, attendu, obtenu) gardée dans
   `77-NN-RED-TRACE.md`. Les témoins négatifs (réseau, écriture) ont d'abord une sonde positive ; par exemple, le faux
