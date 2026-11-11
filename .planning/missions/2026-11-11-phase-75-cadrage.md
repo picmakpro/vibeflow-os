@@ -48,7 +48,8 @@ Toutes au registre `75-CONTEXT.md` (P75-D-01 à D-27), « décision déléguée 
 - **Gardes** par la règle de citation de la CI réécrite en lecture ; zone sans témoin = « aucune suite ne le nomme » ;
   lentille absente hors lab VibeFlow (P75-D-16, D-17).
 - **Cartes prévues** par un annotateur du graphe Code ; constats de l'auditeur en réserve (P75-D-18, D-19).
-- **Retrait** (P75-D-20) : `scripts/recent.mjs` sans condition. Le retrait de la couche déclarative « Travail récent » n'est **pas** une décision déléguée : il touche P70-D-01, arbitrage rendu par Samuel, et attend sa réponse à Q-75-3. D'ici là, la couche reste sous la forme du repli (lentille « Récent »). Correction faite au mandat de clôture de la session principale.
+- **Retrait** (P75-D-20, P75-D-28) : la couche déclarative « Travail récent » et `scripts/recent.mjs`, retrait ferme depuis l'arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 (Q-75-3, « La remplacer (Recommandé) ») ; P70-D-01 amendée dans cette mesure exacte. Entre-temps (mandat de clôture du même jour), le retrait avait été conditionné, parce qu'il touchait un arbitrage rendu et ne relevait pas de la délégation.
+- **Worktrees du dépôt** (P75-D-29, P75-D-30) : un worktree prouvé du même dépôt compte comme le lab (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, Q-75-4 = S-3 de la 79, « Les compter comme le lab (Recommandé) ») ; forme A45 de la 79 ; sentinelle « hors du lab » écartée de la jointure ; même fichier dans deux arbres = « conflit de fusion possible », distinct de la collision dans un même arbre.
 - **Partage avec la 80** : la 80 pose `vague`, la 75 n'ajoute que `files_modified` (P75-D-24, P80-D-44, partage arrêté
   par la session principale).
 - **Étage design** : quatrième tour accordé par la session principale, dernier (P75-D-26) ; pastille de compte neutre
@@ -56,38 +57,39 @@ Toutes au registre `75-CONTEXT.md` (P75-D-01 à D-27), « décision déléguée 
 
 ## À Samuel
 
-Q-75-1, Q-75-2, Q-75-4 et Q-75-5 ne bloquent rien : l'arbitrage en vigueur tient et les plans sont bâtis dessus. **Q-75-3 fait exception** : elle touche un arbitrage rendu (P70-D-01) et n'est pas tranchée par délégation ; l'état en vigueur est « la couche reste, sous la forme du repli » ; les tâches de retrait de la couche portent une condition de départ (voir « Tâches conditionnées par Q-75-3 »).
+**Tranchées le 2026-11-11** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) : Q-75-3 « La remplacer
+(Recommandé) » (P75-D-28) ; Q-75-4 « Les compter comme le lab (Recommandé) » (P75-D-29).
 
-Texte complet et options : `75-CONTEXT.md` § « À Samuel ».
-
+**Encore ouvertes, non bloquantes** (l'arbitrage en vigueur tient et les plans sont bâtis dessus ; texte complet dans
+`75-CONTEXT.md`) :
 - **Q-75-1** Carte de chaleur à fond ou dégradé : non (recommandé), Q9 tient.
 - **Q-75-2** Empreinte au-delà de 24 h : non (recommandé) ; renvoie à S-1 de la 79.
-- **Q-75-3** Retrait du « Travail récent » : touche P70-D-01 (Q1-A, 2026-11-03), non tranchée par délégation. Recommandation de la 75 : (a) retirer, l'entrée devient le sélecteur ; la lecture « P70-D-01 fixe un emplacement, pas l'existence » est une interprétation, pas une décision. En vigueur jusqu'à la réponse : (b), lentille « Récent ».
-- **Q-75-4** Worktrees hors du dossier du lab : avis de la 75 pour l'option (b) de S-3 de la 79 (un worktree du même
-  dépôt compte comme le lab) ; aucun plan ne change.
 - **Q-75-5** Pastille de compte pleine `--recent` du bouton livré : neutre partout (recommandé, P71.5-D-19).
 
-## Tâches conditionnées par Q-75-3 (mandat de clôture, commit `d4d21a90`)
+**À montrer à Samuel avant application (porte de 75-10, point de contrôle humain bloquant) — amendements de
+`DESIGN.md` :**
+1. § 2 « Graphe de code » : puce « Lentilles d'activité (Phase 75) ».
+2. § 5 Carte : retrait de la variante `recent` (anneau, `.rw`, `.recent-in`) ; ajout de `st-prevu`.
+3. § 5 Pastille de statut : `(.vst, .rw)` devient `(.vst)` ; ajout de la marque de lentille `.lm` et de ses glyphes.
+4. § 4 Carte : pied de 28 unités réservé à toute carte marquable de l'onglet Code.
+5. § 7 Icônes : liste des glyphes de pastille élargie ; l'exception « glyphe d'une pastille de statut » couvre le glyphe « en cours ».
+6. § 9 Toujours : variante texte `--recent-text` sur `.card.module` en clair.
+7. § 5 Composants : menu à rangées radio avec légende hors du `role="menu"` (`#lens-menu`), bouton-compte de la rangée `.k`, pastille neutre `--on` sans exception.
+8. § 2 : `--recent` = « récent, succès, en cours d'écriture » ; § 6 : respiration du glyphe sur les cartes ; § 4 : compensation de la bordure de 1,5 px de la carte prévue.
+9. Tableau « Statuts de travail » : aucune ligne `--st-prevu` ajoutée.
 
-Condition de départ, écrite mot pour mot en tête de chaque tâche concernée : « réponse de Samuel à Q-75-3 consignée,
-option (a) ; à défaut de réponse ou si (b), appliquer le repli de P75-D-20 : « Récent » reste une lentille de plus, même
-canal, même emplacement, le retrait se réduit à `recent.mjs` ». Chaque tâche conditionnée décrit ce qu'elle fait sous le repli.
+## Conditions Q-75-3 levées (2026-11-11)
 
-| Plan | Tâches conditionnées | Tâches non conditionnées |
-|---|---|---|
-| 75-09a | 1a (`recent-work.json` de l'assemblage, sonde Y reportée) ; 2b (`recentWork` de `graph-query.js`, partie « Recent work » de `60-export.js`) | 1b (assertion Q2b, carte `prevu`) ; 2a (`recent.mjs`, étape « Mark recent work » de `refresh.mjs`) |
-| 75-09b | 1 (`25-recent.js`, `.recent`, `recentTip`, bascule, `#btn-recent`, suites `ecrans-recent` et `responsive`) | 0 (trace du retrait de `recent.mjs` dans `VENDORED.txt`) |
-| 75-09c | 1 (dictionnaires, `moteur-carte`, `chrome-moteur-carte`, `chrome-fr`, grep d'inventaire) | — |
-| 75-10 | 2b (variante `recent` et `.rw` dans `DESIGN.md`, ligne « récent » du README, grep d'inventaire à zéro) | 1 (chaîne XSS, `sans-git`) ; 2a (amendements de `DESIGN.md` hors retrait, README, CHANGELOG, compteur) |
-| 75-08 | aucune | toutes |
+Les conditions de départ posées au mandat de clôture (75-09a tâches 1a et 2b, 75-09b tâche 1, 75-09c entier, 75-10
+tâche 2b) sont levées par P75-D-28 ; la branche de repli (lentille « Récent », blocs « Sous le repli ») est retirée des
+plans, et avec elle les deux trous qu'elle aurait ouverts (75-07 : `.rw` et `.lm` sur le même emplacement ; 75-08 :
+sixième lentille). Témoin : `rtk proxy grep -n 'repli\|Récent »\|Q-75-3'` sur les douze plans rend une sortie vide
+(commit `9ddbe831`). `showBoard` (tableau générique du moteur, utilisé par la relecture de la 74) est préservé : témoin
+Q8b de 75-09b, mutant « `showBoard` retiré avec la couche ».
 
-**Plans qui ne peuvent pas démarrer sans la réponse :** 75-09c (vide sous le repli). 75-09b est quasi vide sous le repli
-(seule la tâche 0 reste). Les autres démarrent : 75-01 à 75-07, 75-08, 75-09a (tâches 1b et 2a), 75-10 (tâches 1 et 2a).
-
-**Deux trous sous le repli, non conçus (hors du mandat de clôture), à planifier si Samuel répond (b) ou ne répond pas :**
-- 75-07 : l'emplacement droit du pied suppose `.rw` retiré ; sous le repli, `.rw` et la marque de lentille `.lm`
-  se disputent le même emplacement.
-- 75-08 : la sixième ligne du sélecteur, la lentille « Récent », n'est planifiée nulle part.
+**Canal de marquage des cartes (relevé sur `origin/feat/phase-74-equipe-dans-le-temps`, `1da6dcab`) :** la 74 ne crée
+aucun canal ; sa relecture « Voir sur la carte » (P74-D-12) passe par `showBoard`. Le canal est créé par la 75, plan 75-07
+(`ui/75-vf-marques.js`). Pas de trou. Les fichiers neufs de la 75 sont renommés `ui/75-vf-*` (la 74 occupe `ui/74-vf-*`).
 
 ## Carte des fichiers
 
@@ -110,7 +112,7 @@ canal, même emplacement, le retrait se réduit à `recent.mjs` ». Chaque tâch
 | `DESIGN.md` | 75-10 (un seul plan) | 74, 79 (79-01), 80 | amendements du § 12 de la spec ; aucune exception de badge |
 | `README.md`, `README.fr.md` (compteur de suites gaté par `scripts/check-version-sync.sh`) | 75-10 (un seul plan) | toute phase qui ajoute une suite | |
 | Suites existantes adaptées (`test-cockpit-securite.sh`, `-onglet-code`, `-ecrans-recent` et sa fixture, `-moteur-carte`, `chrome-moteur-carte.mjs`, `-responsive`, `-chrome-fr`, `-chaine-xss`) | 75-09a, 75-09b, 75-09c, 75-10 | 79 (79-02 les migre vers `socle-serveur.sh`), 80 | adaptées, jamais supprimées |
-| Canal de marquage des cartes (`VF_MARQUES`, `ui/74-vf-marques*.js`) | 75-07 | 74 (relecture AUDC-I06) | qui le pose : la phase exécutée la première (P75-D-05) |
+| Canal de marquage des cartes (`VF_MARQUES`, `ui/75-vf-marques*.js`) | 75-07 | aucune (la 74 passe par `showBoard`) | créé par la 75 (P75-D-05, relevé du 2026-11-11) |
 
 ### Fichiers par plan
 
@@ -122,8 +124,8 @@ canal, même emplacement, le retrait se réduit à `recent.mjs` ». Chaque tâch
 | 75-04 `files_modified` | 1 | — | 79-09 ; plan de la 80 qui pose `vague` | ACTV-10, 11 | `vf-cockpit-planning.mjs`, `vf-cockpit-project.mjs` ; `tests/test-cockpit-activite-planning.sh` (neuf) |
 | 75-05 Route et schéma | 2 | 01-04 | 79-02, 79-05, 79-06, 79-09, 79-12, 79-13, 79-15 | ACTV-04, 08, 10, 12 | `vf-cockpit-activite.mjs` (neuf), `vf-cockpit-routes.mjs` (1 ligne), `vf-cockpit-interface.json`, `tests/test-cockpit-activite-route.sh` (neuf) |
 | 75-06 Cartes prévues | 2 | 03, 04 | 79-01, 79-02, 79-05, 79-09, 79-15 | ACTV-11 | `vf-cockpit-activite-prevues.mjs` (neuf), `vf-cockpit-build.mjs` (1 ligne) ; moteur `build.mjs`, `lib/common.mjs`, `serve.mjs` ; `tests/test-cockpit-activite-prevues.sh` (neuf) |
-| 75-07 Canal, pied réservé, marques | 3 | 05, 06 | 79-01, 79-02, 79-11, 79-16, 79-17, 79-18 ; 74 ; clavier du canevas de la 80 | ACTV-01, 02, 03, 10, 11 | `viewer.html`, `ui/74-vf-marques.js`, `ui/74-vf-marques-glyphes.js` (neufs), `VENDORED.txt`, `tests/test-cockpit-activite-carte.sh`, `chrome-activite-carte.mjs` (neufs) |
-| 75-08 Sélecteur, menu, panneau, radar | 4 | 05, 07 | 79-16, 79-17, 79-18 ; surcouches de la 80 ; 74 | ACTV-01, 02, 06, 07, 08, 10 | `ui/74-vf-activite.js`, `-menu.js`, `-tables.js`, `-panneau.js`, `-collisions.js` (neufs), `ui/02-vf-telephone.js`, `viewer.html`, `VENDORED.txt`, `tests/test-cockpit-activite-lentilles.sh`, `chrome-activite-lentilles.mjs` (neufs) |
+| 75-07 Canal, pied réservé, marques | 3 | 05, 06 | 79-01, 79-02, 79-11, 79-16, 79-17, 79-18 ; 74 ; clavier du canevas de la 80 | ACTV-01, 02, 03, 10, 11 | `viewer.html`, `ui/75-vf-marques.js`, `ui/75-vf-marques-glyphes.js` (neufs), `VENDORED.txt`, `tests/test-cockpit-activite-carte.sh`, `chrome-activite-carte.mjs` (neufs) |
+| 75-08 Sélecteur, menu, panneau, radar | 4 | 05, 07 | 79-16, 79-17, 79-18 ; surcouches de la 80 ; 74 | ACTV-01, 02, 06, 07, 08, 10 | `ui/75-vf-activite.js`, `-menu.js`, `-tables.js`, `-panneau.js`, `-collisions.js` (neufs), `ui/02-vf-telephone.js`, `viewer.html`, `VENDORED.txt`, `tests/test-cockpit-activite-lentilles.sh`, `chrome-activite-lentilles.mjs` (neufs) |
 | 75-09a Retrait, assemblage et moteur | 5 | 06, 07, 08 | 79-01, 79-15 | ACTV-12 | `vf-cockpit-build.mjs`, moteur `build.mjs`, `recent.mjs` (supprimé), `refresh.mjs`, `graph-query.js`, `ui/60-export.js`, `tests/test-cockpit-securite.sh`, `test-cockpit-onglet-code.sh` |
 | 75-09b Retrait, page et jetons | 6 | 07, 08, 09a | 79-11, 79-16 ; plans de la 80 qui touchent `viewer.html` | ACTV-12, 01 | `viewer.html`, `ui/25-recent.js` (supprimé), `ui/00-vibeflow.js`, `ui/01-vf-responsive.js`, `ui/02-vf-telephone.js`, `VENDORED.txt`, `test-cockpit-ecrans-recent.sh` et sa fixture, `test-cockpit-responsive.sh` |
 | 75-09c Retrait, dictionnaires et suites voisines | 7 | 09b | 79-10 ; dictionnaires de la 80 | ACTV-12 | `ui/78-vf-fr-dict-a.js`, `ui/80-vf-fr.js`, `test-cockpit-moteur-carte.sh`, `chrome-moteur-carte.mjs`, `test-cockpit-chrome-fr.sh` |
@@ -146,7 +148,7 @@ Toute la phase s'exécute après la Phase 79 entière et après la 74 (ordre du 
   (79-05), `socle-serveur.sh` (79-02), la coquille, `VF_ETAT` et `surOnglet` (79-16, 79-17), l'API du moteur en worker
   (79-18), le plafond en cliquet (79-11).
 - 80 : `vague` sur le plan (P80-D-44), la pile `VF_SURCOUCHES`, la fonction unique de nom accessible des cartes.
-- 74 : le canal de marquage s'il est posé en premier (P75-D-05).
+- 74 : rien (le canal est créé par la 75) ; 79-21 : correction de `compileGlob` au point unique, dont dépend 75-06.
 
 **Ce que la 75 fournit :** route `GET /api/vf/activite` (`vibeflow/cockpit-activite@1`), champ `files_modified` du
 planning, canal de marquage des cartes réutilisable par la relecture de la 74, cartes « prévues » sur le graphe Code.
@@ -159,12 +161,12 @@ planning, canal de marquage des cartes réutilisable par la relecture de la 74, 
 4. **REGISTRE.md de l'audit :** AUDC-I12 et AUDC-I13 → « planifié (Phase 75, 2026-11-11) » ; AUDC-I36 → « planifié en partie (Phase 75 : cartes prévues, agent par zone) ; constats de l'auditeur sur les cartes en réserve (P75-D-19) ».
 5. **BACKLOG, réserve :** « Constats de l'auditeur posés sur les cartes de l'onglet Code (AUDC-I36, troisième idée) — déclencheur : un fichier de constats de `vf-auditer` typé et versionné existe (P75-D-19, 2026-11-11). »
 6. **STATE.md, décisions :** « 2026-11-11 — Phase 75 cadrée et planifiée (P75-D-01..27, décisions déléguées) ; cinq questions non bloquantes à Samuel (Q-75-1..5). »
-7. **Recoupement avec la Phase 74 :** qui pose le canal de marquage des cartes (`VF_MARQUES`) — la première des deux phases exécutée ; noms de fichiers `ui/74-vf-*` de la 75 à renuméroter si la 74 prend la même plage.
-8. **Constat né de la planification, à verser au REGISTRE de l'audit et à la Phase 79 (classe AUDC-A-02 / performance) :**
+7. **Recoupement avec la Phase 74 :** réglé — la 75 crée le canal (75-07), la 74 n'en crée aucun ; fichiers de la 75 sous `ui/75-vf-*`.
+8. **Constat né de la planification, versé à la Phase 79 (P79-D-32, plan 79-21) et à verser au REGISTRE de l'audit (classe AUDC-A-02 / performance) :**
    « `compileGlob` du moteur (`plugin/cockpit/skills/cockpit-moteur/scripts/lib/common.mjs`) est super-linéaire sur un
    motif à plusieurs `**` : `compileGlob('**/a/**/b/**/*.js')` contre `'a/'.repeat(N)+'x'` mesure 855,0 ms à N = 20 000 et
-   3 444,6 ms à N = 40 000 (mesure de planification, Phase 75, 2026-11-11). La 75 s'en protège pour ses cartes prévues en
-   bornant le chemin à 4 096 octets avant rattachement (75-06, V-N2N) ; les autres appelants du moteur ne le sont pas. »
+   3 444,6 ms à N = 40 000 (mesure de planification, Phase 75, 2026-11-11). Pris par la 79 au point unique (P79-D-32, plan 79-21,
+   `scripts/lib/vf-glob.mjs`) ; la 75 n'y pose plus de borne propre et garde un témoin de non-régression (75-06, V-N2N). »
 9. **Durées des suites neuves** à inscrire dans `scripts/ci-shard-suites.sh` après exécution (touche un gate : trailer `Gate-Touche`).
 
 ## Mineurs ouverts de la dernière vérification (à traiter en tête d'exécution, non bloquants)

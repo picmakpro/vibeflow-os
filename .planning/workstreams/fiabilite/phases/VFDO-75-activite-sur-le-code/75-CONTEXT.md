@@ -106,11 +106,22 @@ et ne sont pas rouverts.
   s'il en faut un, est posé dans le source du moteur (fork assumé, AUDC-Q5 ; après la vague 1 de la 79, aucun diff de
   patch). Il s'initialise par `VF_COQUILLE.surOnglet(rappel)` quand l'onglet vaut Code et se nettoie quand on le quitte
   (amendement A30 de la 79, `74501bb0`) ; une surcouche éventuelle passe par `window.VF_SURCOUCHES` (P80-D-33 à D-41).
-  **Qui le pose (relevé le 2026-11-11 sur `origin/feat/phase-74-equipe-dans-le-temps`) :** la 75, au plan 75-07. La 74
-  ne crée aucun canal de marquage : sa relecture (AUDC-I06, « Voir sur la carte », P74-D-12) passe par le tableau existant
-  du moteur (`showBoard`) et ne pose aucune marque de carte persistante. Le canal sert donc la 75 seule (quatre lentilles,
-  collisions) ; la relecture de la 74 pourra s'y brancher plus tard. Les fichiers d'interface de la 75 ne réutilisent pas
-  la plage de noms `ui/75-vf-*` de la 74. (Panel A.)
+  **Qui le pose — amendé le 2026-11-11 (décision déléguée par Samuel, message session principale, 2026-11-08, option
+  recommandée ; coordination de détail entre la 74 et la 75 tranchée par la session principale le 2026-11-11) :** la 75
+  pose le canal (plan 75-07) **et rebranche, dans le même lot, le geste « Voir sur la carte » de la 74** (74-06,
+  `ui/74-vf-frise-carte.js`, P74-D-12) sur une **couche temporaire** du canal : une ligne dans ce fichier de la 74, ajoutée
+  aux `files_modified` de 75-07, avec un témoin capable de rougir (le geste marque les cartes ; `showBoard` n'est plus
+  appelé pour ce geste). Motif : la 74 passe avant la 75 mais P74-D-31 lui interdit tout fichier du moteur, donc
+  l'accroche dans la page ; sans ce rebranchement, deux mécanismes coexisteraient (marque et tableau). Point d'appel,
+  liste passée et témoin à adapter : ceux que la 74 écrit dans 74-06 (`origin/feat/phase-74-equipe-dans-le-temps`).
+  L'accroche vit dans la coquille unique de la 79 (C5, `VF_COQUILLE.surOnglet`, A30), jamais dans une page que la 79
+  remplace. Les fichiers d'interface neufs de la 75 sont nommés `ui/75-vf-*` (dont `ui/75-vf-marques.js` et
+  `ui/75-vf-marques-glyphes.js`), hors de la plage `ui/74-vf-*` de la 74. `showBoard` reste dans le moteur pour ses
+  autres appelants (Santé, Écrans). **Ordre de chargement indépendant du nom** (condition de la session principale,
+  2026-11-11) : aucun consommateur n'appelle le canal au chargement de son script ; le canal n'est résolu qu'au geste ou
+  à l'initialisation par `surOnglet`, par une recherche tardive de `window.VF_MARQUES` (absent → geste sans effet visible
+  ni erreur, puis appliqué quand le canal s'enregistre) ; témoin capable de rougir : un consommateur chargé avant le canal
+  ne casse rien, et le geste de la 74 marque bien les cartes. (Panel A.)
 - **P75-D-06 (accessibilité).** Le mot de la lentille active entre dans le nom accessible de la carte (forme posée par la
   Phase 80, AUDC-BL2) ; toute marque se lit sans la couleur ; contraste du glyphe ≥ 3:1 sur `--raise` et `--canvas` dans
   les deux thèmes.
