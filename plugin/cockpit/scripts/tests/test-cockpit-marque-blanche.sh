@@ -7,7 +7,6 @@
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 MOTEUR="$SCRIPTS/../skills/cockpit-moteur"
@@ -15,6 +14,7 @@ WORK="$(mktemp -d)"; AUX="$WORK/aux"; mkdir -p "$AUX"
 SRV=""
 trap '[ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; vf_hyg_fin; rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -70,11 +70,8 @@ echo "=== M1 — aucune occurrence visible du nom amont ==="
 assert_eq "M1.0 — l'assemblage rend 0" "$BRC" "0"
 assert_eq "M1.1 — témoin positif : le compteur voit le nom dans une chaîne jetable" "$(printf '%s\n' 'le moteur Floor''plan' | occ)" "1"
 assert_eq "M1.2 — témoin : une ligne de licence est exemptée" "$(printf '%s\n' '<!-- vibeflow:licence-tierce floor''plan -->' | occ)" "0"
-PORT=$(libre)
-node "$OUT/serve.mjs" --no-open --port "$PORT" > "$WORK/serve.out" 2>&1 &
-SRV=$!
-for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-RP=$(node "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)
+COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$LAB"; SRV="$VF_PID"
+RP="$VF_PORT"
 for _ in $(seq 1 50); do [ -s "$WORK/serve.out" ] && break; sleep 0.1; done
 node "$AUX/get.mjs" "$RP" / > "$WORK/racine.html"; node "$AUX/get.mjs" "$RP" /project.html > "$WORK/projet.html"
 vf_hyg_stop "$SRV"; SRV=""

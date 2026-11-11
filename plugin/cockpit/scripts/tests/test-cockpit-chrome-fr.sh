@@ -238,7 +238,7 @@ if [ -z "$CHROME" ]; then
   . "$SCRIPTS/tests/chrome-saut.sh"; vf_chrome_saut "  ⊘ F12 SAUTÉ : aucun navigateur (Chrome, Chromium) — le rendu visible NON vérifié, non compté comme réussi"
 else
   . "$SCRIPTS/tests/hygiene.sh"; vf_hyg_init
-  libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
+  . "$SCRIPTS/tests/socle-serveur.sh"
   REAL_HOME="$HOME"; mkdir -p "$WORK/home/.claude/scripts"
   printf '#!/usr/bin/env bash\ncase "$1" in status) echo %s ;; orphans) echo %s ;; esac\n' "'{\"locks\":[]}'" "'{\"orphans\":[]}'" > "$WORK/home/.claude/scripts/driver-lock.sh"
   # lab jetable GSD : STATE.md en statut brut « ready_to_execute », jalon dont le nom commence par une voyelle
@@ -249,11 +249,9 @@ else
   printf -- '---\ngsd_state_version: 1.0\nmilestone: Atelier\nstatus: ready_to_execute\ncurrent_phase: 1\nlast_activity: 2026-11-04\n---\n\n# State\n' > "$LAB12/.planning/STATE.md"
   git -C "$LAB12" init -q && git -C "$LAB12" add -A && git -C "$LAB12" -c user.email=t@t -c user.name=t commit -q -m init
   node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB12" --quiet >/dev/null 2>&1 || echo "  assemblage du lab F12 impossible"
-  O12="$LAB12/.vibeflow/cockpit"; ln -s "$SCRIPTS" "$WORK/scripts-hote"; rm -f "$O12/.cache/server.json"
-  ( cd "$LAB12" && HOME="$WORK/home" VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$WORK/scripts-hote" exec node "$O12/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve12.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV12=$!; PIDS+=($SRV12)
-  for _ in $(seq 1 300); do grep -q '"port"' "$O12/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  P12="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$O12/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  O12="$LAB12/.vibeflow/cockpit"; ln -s "$SCRIPTS" "$WORK/scripts-hote"
+  cockpit_lancer "$LAB12" HOME="$WORK/home" VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$WORK/scripts-hote"
+  SRV12="${VF_PID:-}"; P12="${VF_PORT:-0}"
   assert_eq "F12.0 : serveur du lab jetable démarré" "$([ "$P12" -gt 0 ] && echo oui || echo non)" "oui"
   REAL_HOME="$REAL_HOME" node "$SCRIPTS/tests/chrome-fr-rendu.mjs" "$CHROME" "http://127.0.0.1:$P12/index.html" "http://127.0.0.1:$P12/project.html" > "$WORK/rendu12.json" 2>"$WORK/rendu12.err"
   [ -n "${KEEP_F12:-}" ] && cp "$WORK/rendu12.json" "$KEEP_F12"
