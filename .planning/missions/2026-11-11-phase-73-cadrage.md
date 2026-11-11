@@ -154,7 +154,10 @@ Détail et options dans `73-CONTEXT.md` § « À Samuel ».
 ## Limites
 
 - Le gate de sortie dira son contrôle E4 en manque ou indéterminé : plans non exécutés, STATE non marqué. C'est attendu
-  pour une mission de planification ; non verdi.
+  pour une mission de planification ; non verdi. Mesuré avant la relâche du verrou : E4 « étape 73 : 10 case(s) de plan
+  non cochée(s) » ; E1 lit le registre du compartiment, où des agents des six autres missions de la vague sont encore
+  en cours (le registre de la phase 73 est à 0 orphelin) ; E7 : le snapshot de budget, partagé par le répertoire git
+  commun, est sans identité de mission.
 - Les contrats de la 79 et de la 80 sont lus sur des branches non fusionnées ; tous les plans sont marqués « à
   revalider ». La 80 n'a pas encore poussé le commit de P80-D-33..41 au moment du cadrage.
 - La forme réelle de `claude agents --json` n'est pas sondée par un plan : couverte par le contrat de forme du lot 0
@@ -176,6 +179,23 @@ cartographe, 1 planificateur et 3 tours de checker), 1 `gsd-plan-checker` frais 
 Lancements refusés par le plafond : 3. Tours de critique : 2. Tours de correction des plans : 1.
 
 ## Preuves E6
+
+```json
+{
+  "preuves": [
+    { "verdict": "gate:state-intact", "commande": "git diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md", "exit_code": 0, "sha": "69636215f31fdc29e6b15381018de787aed4a49a" },
+    { "verdict": "gate:check-machine-paths", "commande": "bash scripts/check-machine-paths.sh", "exit_code": 0, "sha": "69636215f31fdc29e6b15381018de787aed4a49a" },
+    { "verdict": "gate:check-mission-invariants", "commande": "bash plugin/conductor/scripts/check-mission-invariants.sh", "exit_code": 3, "sha": "69636215f31fdc29e6b15381018de787aed4a49a" },
+    { "verdict": "revue", "preuve": "amont" },
+    { "verdict": "gate:plan-checker-interne", "preuve": "amont" },
+    { "verdict": "gate:critique-design", "preuve": "amont" }
+  ]
+}
+```
+
+Lecture : `revue` = vérification fraîche indépendante des plans (`gsd-plan-checker`, `passed`, 0 bloquant) ;
+`gate:plan-checker-interne` = boucle du checker de `gsd-plan-phase` (3 tours) ; `gate:critique-design` = juge frais,
+80/100. Ces trois verdicts sont relayés tels que rendus, sans commande rejouable. `check-mission-invariants` : 3 = SAIN.
 
 ```
 $ git -C <worktree> diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md; echo $?
