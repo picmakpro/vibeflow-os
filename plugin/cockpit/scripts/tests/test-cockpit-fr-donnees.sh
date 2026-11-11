@@ -2,6 +2,7 @@
 # test-cockpit-fr-donnees.sh — AUDC-H4 (lot 0 de l'audit du cockpit) : la traduction du chrome ne réécrit pas les données du lab.
 #   D1 les titres de cartes d'un lab portant tokens.ts, open.mjs, health.mjs restent ceux que le moteur écrit : Tokens, Open, Health (avant : « Jetons », « Ouvrir », « Santé »)
 #   D2 une description de carte qui est une phrase du dictionnaire (« Health ») reste telle quelle
+#   D4 le panneau de détail d'une carte garde son titre (« Tokens ») et sa description (« Health ») ; D5 une ligne de liste, un résultat de recherche, l'infobulle et le fil d'Ariane gardent le nom (et la description) de la donnée
 #   D3 témoins : le chrome reste traduit (bouton « Santé », « Pas encore de description » d'une carte sans description)
 # Chrome headless ; sans navigateur la suite est SAUTÉE hors CI, et ÉCHOUE en CI (jamais un vert à vide).
 set -uo pipefail
@@ -50,6 +51,16 @@ assert_eq "D1 — les titres de cartes sont ceux des fichiers" "$(printf '%s' "$
 assert_eq "D2 — une description « Health » n'est pas traduite" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.descPosee')" "Health"
 assert_eq "D3.1 — témoin : le bouton de santé reste en français" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.temoin')" "Santé"
 assert_eq "D3.2 — témoin : une carte sans description dit « Pas encore de description »" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.cartes.filter((c) => c.vide).every((c) => c.desc === "Pas encore de description") && j.cartes.some((c) => c.vide)')" "true"
+assert_eq "D4.1 — panneau : le titre de la carte est le nom du fichier" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.panneau.titre')" "Tokens"
+assert_eq "D4.2 — panneau : la description « Health » n'est pas traduite" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.panneau.desc')" "Health"
+assert_eq "D4.3 — témoin : le panneau d'une carte sans description dit « Pas encore de description. »" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.panneauVide.vide && j.panneauVide.desc')" "Pas encore de description."
+assert_eq "D4.4 — le titre du panneau d'une autre carte (Open) reste le nom du fichier" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.panneauVide.titre')" "Open"
+assert_eq "D5.1 — ligne de liste : nom et description gardés" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.ligne.nom + "|" + j.ligne.desc')" "Tokens|Health"
+assert_eq "D5.2 — résultat de recherche : nom et description gardés" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.recherche.nom + "|" + j.recherche.desc')" "Tokens|Health"
+assert_eq "D5.3 — infobulle d'une carte : le nom est gardé" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.infobulle')" "Tokens"
+assert_eq "D5.4 — fil d'Ariane : le nom est gardé" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.miette')" "Tokens"
+assert_eq "D5.5 — gabarits à noms : « Tokens contient Open » (chrome traduit, noms gardés)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.gabarits.lien')" "Tokens contient Open"
+assert_eq "D5.6 — « Inside Tokens » → « Dans Tokens », « Everything behind Health » garde « Health »" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.gabarits.dans + "|" + j.gabarits.derriere')" "Dans Tokens|Tout ce qu'il y a derrière Health"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ "$FAIL" -eq 0 ]
