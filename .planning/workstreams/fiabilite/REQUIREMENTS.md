@@ -1057,6 +1057,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | REGI-14 | Phase 73 | Pending — 2026-11-11 (cadrage) |
 | REGI-15 | Phase 73 | Pending — 2026-11-11 (cadrage) |
 | REGI-16 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-17 | Phase 73 | Pending — 2026-11-11 (cadrage, P73-D-37) |
 | — | Phase 74 | repère de cadrage, Phase 74 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | — | Phase 75 | repère de cadrage, Phase 75 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | — | Phase 76 | repère de cadrage, Phase 76 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
@@ -1702,6 +1703,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **REGI-14**: Un seul style de bouton pour les actions de la régie, seule action « Lire le rapport » ; nom d'un agent écrit une fois par ligne ; section Santé ni calculée ni injectée sur Équipe (P73-D-17, P73-D-18).
 - [ ] **REGI-15**: Accroches de la Phase 74 : `section#vf-equipe`, registre `window.__vfEquipeVues`, bascule dessinée dès deux vues, événements `vf-agent:ouvrir` (annulable, repli sur le lecteur actuel) et `vf-agent:lu`, attributs `data-vf-agent` / `data-vf-noeud` / `data-vf-etat` ; ancres `#r=n:se-<id>` / `n:ag-<id>` traitées par la régie (P73-D-20).
 - [ ] **REGI-16**: Non-régression : témoins du canevas re-pointés (LE.* → LR.* pour la ligne « Lancée depuis la carte », champ `lancee`), nettoyage de la branche à l'émission, export d'Équipe sans contenu de régie, recherche par lignes ; une suite neuve au plus et compteur des README recompté ; toutes les suites du cockpit vertes sous macOS et Linux (P73-D-04, P73-D-05, P73-D-21, P73-D-22, P73-D-25).
+- [ ] **REGI-17**: Questions en attente des cadrages, troisième source de « À vous » : les entrées `etat` = `en-attente` de `meta.vf.questions` (contrat C76-Q2 de la Phase 76), chacune reliée à sa phase et à ce qu'elle bloque, classées par la règle de P73-D-07 ; le bilan des autres états dit en une ligne (« N questions écrites dans un autre format, non lues ») ; jamais une entrée `mal-formee` ou `a-verifier` montrée comme une question qui attend ; champ absent (lecture de la 76 pas encore livrée) → l'emplacement le dit ; prouvé sur une fixture à la forme du contrat (P73-D-37, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11).
 
 <!-- vf-cadrage:phase-74 -->
 

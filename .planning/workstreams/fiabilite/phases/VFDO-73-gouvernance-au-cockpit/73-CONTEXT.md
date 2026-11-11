@@ -106,7 +106,7 @@ recommandée ; l'option recommandée vient du panel ou de l'éclaireur cité. Au
   lues en en-tête seul (aujourd'hui seule la présence du fichier est lue), rendues en ligne de niveau phase « Phase N :
   vérification humaine demandée » reliée à la carte de la phase dans Projet ; (c) les questions en attente écrites dans les cadrages au format posé
   par la Phase 76 (P73-D-37). Écartées : une question `AskUserQuestion`
-  sans réponse lue au transcript (rouvrirait la décision D2 du lot 0, voir « À Samuel » S-2) ; les sections « À Samuel »
+  sans réponse lue au transcript (rouvrirait la décision D2 du lot 0, voir « À Samuel » P73-Q-02) ; les sections « À Samuel »
   des CONTEXT et des rapports tant qu'elles ne suivent pas le format de P73-D-37 (prose sans forme commune) ; les points d'arrêt des plans (disent « s'arrêtera », pas
   « attend ») ; les escalades `SendMessage` (pas sur disque) ; « à recetter » (reste à Projet ; doublon avec « Terminé, à
   relire »). Une ligne de session et une ligne de phase de la même phase restent deux lignes (P69-D-15).
@@ -312,7 +312,7 @@ recommandée ; l'option recommandée vient du panel ou de l'éclaireur cité. Au
   AskUserQuestion session principale, 2026-11-11).** Question posée par la session principale : le but écrit dit que la
   régie montre « les arbitrages en attente, reliés à leur phase et à ce qu'ils bloquent » ; telle que cadrée, elle ne lisait
   que deux sources, et les questions écrites en prose dans les cadrages n'y paraissaient pas. Deux options présentées : la
-  recommandation du manager de la 73 (reporter, convention au BACKLOG — ancienne S-3) et « Poser le format maintenant ».
+  recommandation du manager de la 73 (reporter, convention au BACKLOG — question P73-Q-03, ancienne S-3) et « Poser le format maintenant ».
   Réponse de Samuel, mot pour mot : « Poser le format maintenant (Recommandé) » — « Un format court pour une question en
   attente (identifiant, question, options, recommandation, ce qu'elle bloque), que les sept cadrages suivent déjà presque.
   La Phase 76 le lit, la régie de la 73 l'affiche dans « À vous ». Coût : un plan de plus dans la 76 et un dans la 73. Le
@@ -380,20 +380,37 @@ inventés seulement : dépôt public), ordre des tâches dans une vague.
 | aucun appel réseau sortant ; lecture seule sur `.planning/` | P73-D-06 lit l'en-tête des VERIFICATION ; P73-D-15 sans réseau |
 | PU-G-162 titre par `custom-title` seul | nom écrit une fois par ligne |
 
-## À Samuel (questions non bloquantes ; l'arbitrage en vigueur tient, le plan se bâtit dessus)
+## À Samuel (format C76-Q1 de la Phase 76 ; questions non bloquantes, l'option recommandée est appliquée en attendant)
 
-- **S-1 — pastilles du tiroir Git sur `--warn-bg`.** Le tiroir Git de la Phase 78 pose « modifiés » sur un fond
-  d'avertissement, en tension avec Q9 (« ni fond teinté »). La régie les rend neutres ; le tiroir n'est pas touché ici.
-  Options : (a) laisser tel quel ; (b) neutraliser dans un correctif du tiroir Git. **Recommandation : (b)**, hors de la 73.
-- **S-2 — question en suspens au transcript.** Une session bloquée sur une question de l'assistant (outil de question
-  sans réponse) passe aujourd'hui pour « au travail » quand l'état officiel est absent. La lire au transcript rouvrirait la
-  décision D2 du lot 0 (« vous attend » vient seulement de l'état officiel). Options : (a) garder D2 ; (b) admettre ce
-  repli. **Recommandation : (a)** — la source officielle couvre le cas quand elle est disponible.
-- **S-3 — tranchée** par Samuel le 2026-11-11 (AskUserQuestion session principale), autrement que la recommandation du
-  manager : voir P73-D-37.
-- **S-4 — notification du système.** Reportée (P73-D-15). Options : (a) reporter ; (b) l'ajouter en option éteinte par
-  défaut dans la 73. **Recommandation : (a)** — elle écrit du texte hors de la page (centre de notifications du système),
-  ce qui demande son propre examen de bornes.
+Une question tranchée garde son entrée ; seule sa ligne « État » change, et la décision qui en découle est au registre.
+Anciens libellés : S-1 → P73-Q-01, S-2 → P73-Q-02, S-3 → P73-Q-03, S-4 → P73-Q-04.
+
+- **P73-Q-01 — Pastilles du tiroir Git sur fond d'avertissement.** Le tiroir Git de la Phase 78 pose « modifiés » sur un
+  fond d'avertissement, en tension avec Q9 (« ni fond teinté ») ; la régie les rend neutres et ne touche pas le tiroir.
+  Options : (a) laisser le tiroir tel quel ; (b) neutraliser ces pastilles dans un correctif du tiroir Git, hors de la Phase 73.
+  Recommandation : (b) — une seule règle de couleur sur tout le cockpit, sans élargir la Phase 73.
+  Bloque : rien
+  État : en attente
+- **P73-Q-02 — Question de l'assistant restée sans réponse, lue au transcript.** Une session bloquée sur une question
+  de l'assistant passe pour « au travail » quand l'état officiel est absent ; la lire au transcript rouvrirait la décision
+  D2 du lot 0 (« vous attend » vient seulement de l'état officiel).
+  Options : (a) garder D2 ; (b) admettre ce repli au transcript.
+  Recommandation : (a) — la source officielle couvre le cas quand elle est disponible.
+  Bloque : rien
+  État : en attente
+- **P73-Q-03 — Questions en attente écrites dans les cadrages.** Le but dit que la régie montre « les arbitrages en
+  attente, reliés à leur phase et à ce qu'ils bloquent » ; les questions écrites en prose dans les cadrages n'y
+  paraissaient pas.
+  Options : (a) reporter, une convention structurée au BACKLOG ; (b) poser le format maintenant, lu par la Phase 76 et affiché dans « À vous ».
+  Recommandation : (a) — recommandation du manager de la Phase 73, écartée par Samuel.
+  Bloque : 73-11, Phase 76
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « Poser le format maintenant (Recommandé) »
+- **P73-Q-04 — Notification du système.** Reportée par P73-D-15 ; elle écrirait du texte hors de la page (centre de
+  notifications du système), ce qui demande son propre examen de bornes.
+  Options : (a) la reporter ; (b) l'ajouter dans la Phase 73 en option éteinte par défaut.
+  Recommandation : (a) — un examen de bornes à part, pour un gain faible tant que le titre et la pastille existent.
+  Bloque : rien
+  État : en attente
 
 <deferred>
 ## Deferred Ideas
