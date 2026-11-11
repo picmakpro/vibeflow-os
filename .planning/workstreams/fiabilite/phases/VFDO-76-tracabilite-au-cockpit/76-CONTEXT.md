@@ -145,6 +145,14 @@ dépôt.
 
 ### Décisions
 
+- **P76-D-15bis (où vit le corail, amendé le 2026-11-11 sur la critique de l'UI-SPEC).** Le trait corail est réservé
+  aux contradictions de la liste fermée de P76-D-04 (case cochée sans SUMMARY lu, statut « Complete » sans plan lu, lien
+  `[[…]]` cassé, mémoire hors index, chemin cité absent). « Exigence sans ligne de traçabilité » (rattachée par un PLAN)
+  et « ligne de traçabilité sans exigence » sont dites en mot neutre, sans corail : mesuré, la première touche 50
+  exigences du ledger `fiabilite`, ce qui ferait du corail la norme. « Ligne sans exigence » vit dans la vue d'ensemble
+  « Jalon » (pas de ligne d'exigence où la poser) ; « exigence sans ligne » est une mention de la ligne d'exigence,
+  hors des quatre maillons. Un mot de ligne ne masque jamais le premier trou de la bande.
+
 - **P76-D-16 (corpus).** ADR : sections `## ADR-NNN` de `docs/ADR.md` (32 ici ; une ADR citée sans section reste un
   identifiant cité, sans panneau) ; décisions : lignes de définition des registres `*-CONTEXT.md` des dossiers de phase
   (`- **Pnn-D-nn` et formes voisines mesurées). Une décision nue (`D-nn`) d'un registre est qualifiée par la phase de son
