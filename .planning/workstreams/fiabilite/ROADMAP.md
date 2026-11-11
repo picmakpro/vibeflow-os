@@ -528,12 +528,22 @@ référence, Phase 81 reportée.
 
 ### Phase 73: Gouvernance au cockpit — arbitrages en attente, worktrees et verrous
 
-> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
+> **Cadrée le 2026-11-11** (`73-CONTEXT.md`, P73-D-01..28 : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée, sur la direction « régie » retenue par Samuel le 2026-11-11, registre § 5.1). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
 
-**Goal:** Le cockpit montre ce qui attend une décision humaine (arbitrages en attente, reliés à leur phase et à ce qu'ils bloquent), qui tient le verrou de driver, quels worktrees et branches existent avec leur travail non commité, et l'alerte du watchdog posée sur le nœud de mission concerné.
-**Requirements**: TBD — posées au cadrage.
-**Depends on:** Phase 69 (objet `avancement`, collecteur `who`) ; ordre du jalon : juste après la 69. Depuis l'audit du 2026-11-10 : après le lot 0 (états lus des sessions).
-**Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 9, 13, 4) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2.
+**Goal:** Le cockpit montre ce qui attend une décision humaine (arbitrages en attente, reliés à leur phase et à ce qu'ils bloquent), qui tient le verrou de driver, quels worktrees et branches existent avec leur travail non commité, et l'alerte du watchdog posée sur le nœud de mission concerné. Forme ajoutée par l'audit du 2026-11-10 : l'onglet Équipe devient une régie — « À vous », « Au travail », « Terminé, à relire », « Au repos » — à la place de son canevas.
+**Requirements**: REGI-01, REGI-02, REGI-03, REGI-04, REGI-05, REGI-06, REGI-07, REGI-08, REGI-09, REGI-10, REGI-11, REGI-12, REGI-13, REGI-14, REGI-15, REGI-16
+**Depends on:** Phase 69 (objet `avancement`, collecteur `who`) ; lot 0 de l'audit (états lus des sessions, livré). Ne dépend pas de la Phase 79 : la régie se bâtit sur le flux actuel et lit le magasin de page de la 79 s'il existe (P73-D-02). Réutilise les routes de la Phase 78 pour les worktrees (P78-D-08). Pose les points d'accroche de la Phase 74 (P73-D-20).
+**Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 9, 13, 4) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2, `REGISTRE.md` (AUDC-I01, I02, I03, I09, I10, I21, I34, I38, reste de D4 et M3, F2), `DESIGNS.md` § 3 ; `73-UI-SPEC.md`.
+**Retraits:** le canevas de l'onglet Équipe ; le nom écrit trois fois ; la carte et le pli « Terminés depuis moins de 24 h » ; le panneau d'item d'Équipe et ses styles de bouton ; la section Santé injectée sur Équipe ; P70-D-20 / UIFN-14.
+
+**Success Criteria** (what must be TRUE):
+  1. L'onglet Équipe ne porte plus de canevas : quatre sections dans l'ordre, un agent qui attend en tête dans « À vous » et à sa place dans l'arbre ; aucun fichier du moteur vendorisé modifié.
+  2. « À vous » réunit les sessions qui vous attendent et les phases en `human_needed`, classées par ce qu'elles retiennent en aval, « impact inconnu » plutôt qu'une estimation.
+  3. Le tenant du verrou, l'alerte du watchdog (abandon, sans progrès) et les arbres de travail avec leur non commité se lisent sur la régie, sans appel git neuf ni champ brut du verrou dans la page.
+  4. Le titre de l'onglet dit « (N) vous attendent » et survit aux autres écrivains du titre ; « ailleurs sur ce poste » ne montre que nombre et nom de lab, nom qui ne sort jamais de la page servie (témoin de non-fuite).
+  5. « Terminé, à relire » se vide à la lecture, dans ce navigateur seulement, en 24 h au plus ; la seule action d'une ligne est « Lire le rapport ».
+  6. La Phase 74 peut brancher frise et fiche par le registre de vues et l'événement d'ouverture sans retoucher un fichier de la 73.
+  7. Toutes les suites du cockpit vertes sous macOS et Linux, les témoins du canevas re-pointés (aucun supprimé pour verdir), chaque exigence prouvée par un témoin rouge avant le code.
 **Plans:** 0 plans
 
 Plans:
