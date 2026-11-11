@@ -213,6 +213,7 @@ assert_eq "D8.1 — filtrées : CLAUDE_EFFORT, CLAUDE_PID ; déjà filtrées : C
 echo "=== D9 — corrections ciblées du tour 1 (AUDC-B-02, AUDC-B-06) ==="
 RUNA="$(node -e "const t=require('fs').readFileSync('$ENG/assets/serve.mjs','utf8');const a=t.indexOf('function runAgent(');const b=t.indexOf('spawn(cli.cmd',a);console.log(a>=0&&b>a?t.slice(a,b):'')")"
 assert_eq "D9.1 — la borne de deux exécutions est contrôlée par runAgent lui-même (donc aussi au second essai de « modifier le plan »)" "$([[ "$RUNA" == *MAX_ASK* ]] && echo oui || echo non)" "oui"
+assert_eq "D9.2 — aucune comparaison directe (=== ou !==) d'un jeton du cockpit dans le serveur et son crochet" "$(grep -hcE "(===|!==)[[:space:]]*(ptoken|token|jeton)\b|\b(ptoken|token|jeton)[[:space:]]*(===|!==)|token'\][[:space:]]*(===|!==)" "$ENG/assets/serve.mjs" "$SCRIPTS/vf-cockpit-server.mjs" | tr '\n' ',')" "0,0,"
 
 echo; echo "=== bilan : $PASS passés, $FAIL échoués ==="
 [ "$FAIL" -eq 0 ]
