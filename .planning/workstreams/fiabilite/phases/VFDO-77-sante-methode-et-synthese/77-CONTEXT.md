@@ -345,6 +345,11 @@ dans chaque plan.
   - Le jeton de page passe par `VF_ETAT` seulement, une fois 79-17 livré.
   - La précondition sur `surOnglet` prouve que la coquille le définit.
 
+- **P77-D-35 (métadonnées git hors du lab).** Un dépôt dont les métadonnées git pointent hors du lab rend la source de
+  méthode « indisponible », avec la cause `echec` de la liste fermée existante. Aucune cause neuve : l'UI-SPEC n'est pas
+  touchée, et le détail reste dans le journal du serveur. Décision déléguée par Samuel (message session principale,
+  2026-11-08), option recommandée.
+
 ### Claude's Discretion
 
 - Le numéro et le nom du fichier `ui/` neuf : un numéro libre au moment de l'exécution, à vérifier contre les fichiers
