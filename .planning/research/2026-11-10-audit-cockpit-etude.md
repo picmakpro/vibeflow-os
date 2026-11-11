@@ -238,7 +238,8 @@ les sources, les bornes, le retrait, et ce qui reste à décider. Le cadrage res
   idées AUDC-I23 à I27, I29, I30.
 - Forme : DESIGNS § 6 (couloirs) et § 7 ; le canevas reçoit rôle, nom, tabulation itinérante et flèches.
 - Première vague conseillée : BL2 et M6 (clavier), puis les couloirs.
-- Bornes : points de rupture inchangés (Q11) ; le tiroir ne pousse jamais la carte (Q12) ; grille d'espacements
+- Bornes : points de rupture inchangés (Q11) ; un tiroir latéral ne pousse jamais la carte (Q12 ; le tiroir du terminal,
+  lui, réserve sa place sous la carte : P71-D-35) ; grille d'espacements
   fermée (P71.5-D-01) ; ni fond teinté ni couleur d'alerte (Q9).
 - Retraits : le canevas comme vue par défaut de Projet ; les vignettes Backlog et Releases.
 - À décider au cadrage : Q10 (AUDC-M2), P70-D-04 (AUDC-M8), P70-D-22 et « Garder ce compromis » (AUDC-M5), P71-D-02
