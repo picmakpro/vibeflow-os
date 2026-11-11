@@ -5,7 +5,7 @@
 import { construireTiroir } from './vf-cockpit-terminal-tiroir-ui.mjs';
 import { STYLE_TIROIR } from './vf-cockpit-terminal-tiroir-style.mjs';
 
-export const LISTE_MESSAGES = Object.freeze(['ready', 'etat:connecte', 'etat:reconnexion', 'etat:termine', 'etat:refuse', 'etat:expire', 'etat:arrete', 'toggle', 'proposition']);
+export const LISTE_MESSAGES = Object.freeze(['ready', 'etat:connecte', 'etat:reconnexion', 'etat:termine', 'etat:refuse', 'etat:expire', 'etat:arrete', 'toggle', 'proposition', 'annulation']);
 // mesure O8 (71-06) : allow-popups ouvre une fenêtre dont l'opener est nul ; la décision du manager retient ces cinq jetons, aucun autre (jamais de navigation du haut, ni de formulaire)
 const SANDBOX = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox';
 const TEXTES = {
@@ -174,7 +174,10 @@ function scriptTiroir(cfg, accepte, construire) {
         (visible ? ouvreur : d.pastille).focus();
       };
       // 72-14 : mot fixe de Q ; ouvrir est idempotent et ne donne jamais le focus au cadre, puis l'annonce seule est dite
-      const proposer = () => { ouvrir(false); if (!plein && h < 300) { h = borne(300); appliquer(); } annoncer(T.annonceProposition); };
+      // AUDC-M11 : le bandeau de Q (phrase, commande exacte, modes) a une hauteur d'environ 260 px et ne s'affiche en entier que dans 60 % du cadre : la page ne lit pas le cadre (autre origine, liste de messages fermée), elle donne donc au tiroir la hauteur qu'il lui faut,
+      // 480 px au plus et jamais plus de 60 % de la fenêtre ; une hauteur déjà plus grande n'est jamais réduite, la hauteur mémorisée n'est pas touchée
+      const hautBandeau = () => Math.min(480, Math.round(window.innerHeight * 0.6));
+      const proposer = () => { ouvrir(false); if (!plein && h < 300) { h = borne(300); appliquer(); } if (!plein && h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); } annoncer(T.annonceProposition); };
       const basculerPlein = () => {
         plein = !plein; d.region.classList.toggle('vf-term-plein-etat', plein);
         d.boutonPlein.setAttribute('aria-pressed', String(plein)); d.boutonPlein.setAttribute('aria-label', plein ? T.reduire : T.agrandir); d.boutonPlein.title = d.boutonPlein.getAttribute('aria-label');
@@ -226,6 +229,7 @@ function scriptTiroir(cfg, accepte, construire) {
           clearTimeout(minuterie); clearTimeout(chargeur); d.charge.hidden = true; retirerCarte();
         } else if (e.data === 'toggle') fermer();
         else if (e.data === 'proposition') proposer();
+        else if (e.data === 'annulation') document.dispatchEvent(new Event('vf-lancer-annule')); // AUDC-M11 : l'annulation faite dans Q se dit à la section de lancement du panneau, qui remet son statut à zéro
         else etat(e.data.slice(5));
       });
 

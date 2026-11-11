@@ -4,7 +4,9 @@
 #   FIN.2  POST /api/vf/terminal/terminer : refusé sans le jeton de la page ; avec lui, le shell disparaît (processus), la session est « terminée », le serveur reste actif
 #          (une attache neuve lance un autre shell) ; sans session, la demande est inoffensive
 #   FIN.3  page Projet réelle sous Chrome : « Terminer la session » demande un double geste, le premier ne termine rien, le second fait disparaître le shell ; la barre dit « Terminé »
-# Chaque absence a son témoin positif dans le même scénario. Sans Chrome : FIN.1 et FIN.3 annoncent « NON vérifiée ». Exit 0 si tout passe, 1 sinon.
+#   FIN.4  bandeau de lancement à la hauteur par défaut : la phrase « écrit cette ligne sans la lancer » et la liste des modes sont visibles, le tiroir s'ajuste au bandeau ;
+#          après « Annuler », le statut du panneau (« Proposition envoyée… Confirmez-la ») revient à zéro
+# Chaque absence a son témoin positif dans le même scénario. Sans Chrome : FIN.1, FIN.3 et FIN.4 annoncent « NON vérifiée ». Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -102,7 +104,7 @@ assert_eq "FIN.2 — sans session : la demande est inoffensive (200)" "$(termine
 unsrv
 
 # ---------- FIN.3 et FIN.4 : page Projet réelle ----------
-echo "=== FIN.3 — page Projet sous Chrome ==="
+echo "=== FIN.3 et FIN.4 — page Projet sous Chrome ==="
 if [ -n "$CHROME" ]; then
   srv
   R="$(chrome_fin "$(printf '{"mode":"session","P":%s,"Q":%s,"amorce":"%s","pidShell":"%s"}' "$SRV_PORT" "$QP" "$AMORCE" "$RUN/shell.pid")")"
@@ -112,9 +114,22 @@ if [ -n "$CHROME" ]; then
   assert_eq "FIN.3 — le premier geste ne termine rien (le bouton demande confirmation)" "$(g 'j.pidVivantApresPremier') $(g 'j.apresPremier' | grep -ci 'confirmer')" "true 1"
   assert_eq "FIN.3 — le second geste : le processus du shell a disparu" "$(g 'j.pidVivantApres')" "false"
   assert_eq "FIN.3 — la barre du tiroir dit « Terminé » et le bouton se retire" "$(g 'j.barre') $(g 'j.boutonMasque')" "Terminé true"
-  assert_eq "FIN.3 — aucune étape du scénario n'a échoué" "$(g 'JSON.stringify(j.erreurs)')" "{}"
+  assert_eq "FIN.4 — témoin : le panneau a dit « Proposition envoyée » avant l'annulation" "$(g 'j.statutEnvoi' | grep -c 'Proposition envoyée')" "1"
+  assert_eq "FIN.4 — la phrase « écrit cette ligne sans la lancer » est visible à la hauteur par défaut" "$(g 'j.phrase')" "visible"
+  assert_eq "FIN.4 — la liste des modes est visible (le tiroir s'ajuste au bandeau)" "$(g 'j.modes')" "visible"
+  assert_eq "FIN.4 — le bandeau n'est pas rogné : rien ne défile" "$(g 'j.bandeau.defile <= j.bandeau.client + 1')" "true"
+  assert_eq "FIN.4 — le tiroir ne dépasse pas 60 % de la fenêtre (900 px)" "$(g 'j.tiroir <= 540')" "true"
+  assert_eq "FIN.4 — après « Annuler », le statut du panneau revient à zéro" "$(g 'j.statutApresAnnuler')" ""
+  assert_eq "FIN.3/4 — aucune étape du scénario n'a échoué" "$(g 'JSON.stringify(j.erreurs)')" "{}"
   unsrv
-else nonverif "FIN.3"; fi
+  # fenêtre plus basse (1280 x 720 : tiroir de 259 px par défaut, avant la proposition) : la phrase reste visible, le tiroir ne dépasse pas 60 % de la fenêtre
+  srv
+  R="$(chrome_fin "$(printf '{"mode":"session","P":%s,"Q":%s,"amorce":"%s","pidShell":"%s","largeur":1280,"hauteur":720}' "$SRV_PORT" "$QP" "$AMORCE" "$RUN/shell.pid")")"
+  echo "     [mesures 720] $(printf '%s' "$R" | node "$AUX/ev.mjs" 'JSON.stringify({tiroir:j.tiroir,cadre:j.cadre,bandeau:j.bandeau,phrase:j.phrase,modes:j.modes,erreurs:j.erreurs})')"
+  assert_eq "FIN.4 (1280 x 720) — la phrase « écrit cette ligne sans la lancer » est visible à la hauteur par défaut" "$(g 'j.phrase')" "visible"
+  assert_eq "FIN.4 (1280 x 720) — le tiroir ne dépasse pas 60 % de la fenêtre (432 px)" "$(g 'j.tiroir <= 432')" "true"
+  unsrv
+else nonverif "FIN.3"; nonverif "FIN.4"; fi
 
 echo
 echo "Résultat : $PASS réussi(s), $FAIL échec(s), $NONVERIF non vérifié(s)"

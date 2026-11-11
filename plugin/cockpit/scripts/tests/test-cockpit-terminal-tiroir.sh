@@ -67,12 +67,14 @@ const cas = [['accepte', {}], ['accepte-ready', { data: 'ready' }], ['origine-de
   ['non-fiable', { isTrusted: false }], ['confiance-absente', { isTrusted: undefined }]];
 console.log(cas.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
 // 72-14 : la phase 71 garde ses huit valeurs (ligne 2), la phase 72 ajoute des valeurs FIXES, déclarées ici (ligne 3), avec leur table de cas (ligne 4)
-const AJOUTS_72 = ['proposition'];
+const AJOUTS_72 = ['proposition', 'annulation']; // annulation : AUDC-M11 (audit du cockpit, lot 0), la proposition annulée dans Q se dit au panneau de P
 console.log('liste=' + [...L].filter((v) => !AJOUTS_72.includes(v)).sort().join(','));
 console.log('ajouts72=' + AJOUTS_72.filter((v) => L.includes(v)).sort().join(','));
 const casP = [['prop', {}], ['prop-suffixe', { data: 'proposition:ouvre' }], ['prop-majuscule', { data: 'Proposition' }], ['prop-espace', { data: 'proposition ' }],
   ['prop-10000', { data: 'proposition' + 'x'.repeat(9989) }], ['prop-origine-de-P', { origin: P }], ['prop-source-autre', { source: {} }], ['prop-non-fiable', { isTrusted: false }]];
 console.log(casP.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, data: 'proposition', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
+const casA = [['ann', {}], ['ann-suffixe', { data: 'annulation:x' }], ['ann-majuscule', { data: 'Annulation' }], ['ann-origine-de-P', { origin: P }], ['ann-source-autre', { source: {} }], ['ann-non-fiable', { isTrusted: false }]];
+console.log(casA.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, data: 'annulation', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
 JS
 cat > "$AUX/harnais-liste-q.mjs" <<'JS'
 // harnais-liste-q.mjs <sortie> : la liste fermée de P égale l'ensemble des valeurs de la table MESSAGES du client de Q (72-14, contrat §8) ; une ligne JSON
@@ -355,8 +357,10 @@ await executer(chrome, async (s) => {
       r.haut = {};
       await cas('bas-evt', 0, 0, evenement, false);
       await cas('bas-msg', 0, 0, message, false);
-      await cas('haut-evt', 2, 3, evenement, false);
-      await cas('haut-msg', 2, 3, message, false);
+      await cas('moyen-evt', 2, 3, evenement, false); // 424 px : sous la hauteur du bandeau (AUDC-M11), rehaussé
+      await cas('moyen-msg', 2, 3, message, false);
+      await cas('haut-evt', 4, 0, evenement, false); // 544 px : déjà au-dessus de la hauteur du bandeau, jamais réduit
+      await cas('haut-msg', 4, 0, message, false);
       await cas('plein-evt', 0, 0, evenement, true);
       await cas('plein-msg', 0, 0, message, true);
     });
@@ -427,7 +431,7 @@ await executer(chrome, async (s) => {
   });
   }
   await essai('tu14', async () => { // J4 : focus clavier de la poignée = bague autour du grip, pas deux bandes pleine largeur
-    await s.ev(`document.querySelector('.vf-term-plein').focus()`); await touche('Tab', 'Tab', 9, 8); // Maj+Tab depuis le bouton : le clavier amène le focus sur la poignée
+    await s.ev(`(document.querySelector('.vf-term-terminer:not([hidden])') || document.querySelector('.vf-term-plein')).focus()`); await touche('Tab', 'Tab', 9, 8); // Maj+Tab depuis le premier bouton de la barre (« Terminer la session » quand une session tourne, AUDC-M10, sinon Agrandir) : le clavier amène le focus sur la poignée
     r.tu14 = await attendreEtStabiliser(() => s.ev(`(() => { const p = document.querySelector('.vf-term-poignee'), g = document.querySelector('.vf-term-grip'), cp = getComputedStyle(p), cg = getComputedStyle(g), b = g.getBoundingClientRect(), q = p.getBoundingClientRect();
       return { sur_poignee: document.activeElement === p, fv: p.matches(':focus-visible'), poignee: cp.outlineStyle, grip: cg.outlineStyle + '/' + cg.outlineWidth, opaque: cg.opacity, grip_larg: Math.round(b.width), poignee_larg: Math.round(q.width) }; })()`), (v) => !!v && v.sur_poignee === true, { max: 5000 });
   });
@@ -924,10 +928,11 @@ mut_msg M-MSG-LISTE 's|typeof e.data === .string. && liste.indexOf(e.data) >= 0|
 mut_msg M-MSG-CONFIANCE 's|if (!e \|\| e.isTrusted !== true) return false;|if (!e) return false;|' non-fiable
 
 echo "=== TP — valeur fixe « proposition » de Q vers P (72-14 ; P72-D-09, P71-D-18 ; contrat §8) ==="
-assert_eq "TP.1 — la liste de la phase 71 garde ses huit valeurs (ligne 2 du harnais), la phase 72 ajoute exactement une valeur fixe (ligne 3)" "$(sed -n 2p "$WORK/h.out") $(sed -n 3p "$WORK/h.out")" "liste=etat:arrete,etat:connecte,etat:expire,etat:reconnexion,etat:refuse,etat:termine,ready,toggle ajouts72=proposition"
+assert_eq "TP.1 — la liste de la phase 71 garde ses huit valeurs (ligne 2 du harnais), la phase 72 ajoute une valeur fixe (« proposition »), le lot 0 de l'audit une autre (« annulation », AUDC-M11) (ligne 3)" "$(sed -n 2p "$WORK/h.out") $(sed -n 3p "$WORK/h.out")" "liste=etat:arrete,etat:connecte,etat:expire,etat:reconnexion,etat:refuse,etat:termine,ready,toggle ajouts72=annulation,proposition"
 assert_eq "TP.2 — accepteMessage : « proposition » seule passe ; refusés : suffixe, majuscule, espace final, 10 000 caractères, origine de P, autre source, non fiable" "$(sed -n 4p "$WORK/h.out")" "prop=oui prop-suffixe=non prop-majuscule=non prop-espace=non prop-10000=non prop-origine-de-P=non prop-source-autre=non prop-non-fiable=non"
 node "$AUX/harnais-liste-q.mjs" "$OUT" > "$WORK/hq.out" 2>&1
-assert_eq "TP.3 — câblage : LISTE_MESSAGES de P = ensemble des valeurs de la table MESSAGES du client de Q (neuf valeurs), et le client appelle emettre sur la clé de « proposition »" "$(tail -n 1 "$WORK/hq.out" | node "$AUX/ev.mjs" '"q="+j.q+" p="+j.p+" egal="+j.egal+" cle="+j.cle+" appel="+j.appel')" "q=9 p=9 egal=true cle=proposition appel=true"
+assert_eq "TP.2b — AUDC-M11 : accepteMessage : « annulation » seule passe ; refusés : suffixe, majuscule, origine de P, autre source, non fiable" "$(sed -n 5p "$WORK/h.out")" "ann=oui ann-suffixe=non ann-majuscule=non ann-origine-de-P=non ann-source-autre=non ann-non-fiable=non"
+assert_eq "TP.3 — câblage : LISTE_MESSAGES de P = ensemble des valeurs de la table MESSAGES du client de Q (dix valeurs), et le client appelle emettre sur la clé de « proposition »" "$(tail -n 1 "$WORK/hq.out" | node "$AUX/ev.mjs" '"q="+j.q+" p="+j.p+" egal="+j.egal+" cle="+j.cle+" appel="+j.appel')" "q=10 p=10 egal=true cle=proposition appel=true"
 mut_prop() { # mut_prop <libellé> <nom> <expression-sed> <cas qui doit passer à « oui » dans la ligne 4>
   if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
     node "$AUX/harnais-msg.mjs" "$MUT_OUT" > "$WORK/hm-$2.out" 2>&1
@@ -1106,18 +1111,19 @@ mut_prop_nav() { # mut_prop_nav <libellé> <nom> <expression-sed> <expression de
     assert_eq "$1 $2 — le mutant rougit : $5 (témoin : aucune erreur de scénario)" "$(rj "$PJ" '(j.erreur||JSON.stringify(j.erreurs))+" rouge="+('"$4"')')" "{} rouge=true"
   else sans_effet "$1 $2"; fi
 }
-mut_prop_nav TP.10 M-LISTE-SANS-PROPOSITION "s|, 'proposition'\]);|]);|" '!(j.ouvre1&&j.ouvre1.ouvert)' "le tiroir ne s'ouvre plus (liste sans la valeur)"
+mut_prop_nav TP.10 M-LISTE-SANS-PROPOSITION "s|, 'proposition', 'annulation'\]);|, 'annulation']);|" '!(j.ouvre1&&j.ouvre1.ouvert)' "le tiroir ne s'ouvre plus (liste sans la valeur)"
 mut_prop_nav TP.11 M-PROPOSITION-COMME-ETAT 's|else if (e.data === .proposition.) proposer();||' '!(j.ouvre1&&j.ouvre1.barre==="Connecté")' "la barre perd son libellé « Connecté »"
 mut_prop_nav TP.12 M-FOCUS-VOLE 's|const proposer = () => { ouvrir(false);|const proposer = () => { ouvrir(true);|' '!(j.ouvre1&&j.ouvre1.focus==="temoin")' "le focus passe au cadre"
 
 echo "=== TH — la proposition ouvre le tiroir à 300 px au moins (PU-G-136) ==="
 run_haut "$OUT"; PH="$PJ"
 HV() { rj "$PH" "(()=>{const c=j.haut&&j.haut['$1'];if(!c)return 'absent';$2})()"; }
-assert_eq "TH.0 — témoin : aucune étape en erreur, les six cas ont été mesurés" "$(rj "$PH" '(j.erreur||JSON.stringify(j.erreurs))+" cas="+Object.keys(j.haut||{}).length')" "{} cas=6"
+assert_eq "TH.0 — témoin : aucune étape en erreur, les huit cas ont été mesurés" "$(rj "$PH" '(j.erreur||JSON.stringify(j.erreurs))+" cas="+Object.keys(j.haut||{}).length')" "{} cas=8"
 for ch in evt msg; do
   assert_eq "TH.1 ($ch) — tiroir fermé réglé à 160 px : la proposition l'ouvre à 300 px au moins (avant : 160), hauteur mesurée ET aria-valuenow" "$(HV bas-$ch 'return "avant="+c.avantNow+" ouvert="+c.ouvert+" now="+(c.now>=300)+" px="+(c.px>=300)')" "avant=160 ouvert=true now=true px=true"
-  assert_eq "TH.2 ($ch) — tiroir réglé à 424 px : la proposition le laisse à 424 (jamais réduit)" "$(HV haut-$ch 'return "avant="+c.avantNow+" now="+c.now+" px="+c.px')" "avant=424 now=424 px=424"
-  assert_eq "TH.3 ($ch) — la hauteur mémorisée (vf.terminal.h) n'est pas touchée par le rehaussement : 160 avant, 160 après (cas bas) ; 424 avant, 424 après (cas haut)" "$(HV bas-$ch 'return c.avantMemo+"/"+c.memo') $(HV haut-$ch 'return c.avantMemo+"/"+c.memo')" "160/160 424/424"
+  assert_eq "TH.2 ($ch) — tiroir réglé à 544 px (au-dessus de la hauteur du bandeau) : la proposition le laisse à 544 (jamais réduit)" "$(HV haut-$ch 'return "avant="+c.avantNow+" now="+c.now+" px="+c.px')" "avant=544 now=544 px=544"
+  assert_eq "TH.2b ($ch) — AUDC-M11 : tiroir réglé à 424 px (sous la hauteur du bandeau) : la proposition le rehausse à 480 px, 60 % de la fenêtre de 800 px (hauteur mesurée ET aria-valuenow), sans toucher la hauteur mémorisée" "$(HV moyen-$ch 'return "avant="+c.avantNow+" now="+c.now+" px="+c.px+" memo="+c.avantMemo+"/"+c.memo')" "avant=424 now=480 px=480 memo=424/424"
+  assert_eq "TH.3 ($ch) — la hauteur mémorisée (vf.terminal.h) n'est pas touchée par le rehaussement : 160 avant, 160 après (cas bas) ; 544 avant, 544 après (cas haut)" "$(HV bas-$ch 'return c.avantMemo+"/"+c.memo') $(HV haut-$ch 'return c.avantMemo+"/"+c.memo')" "160/160 544/544"
   assert_eq "TH.4 ($ch) — plein écran : la proposition ne rehausse pas (hauteur interne restée à 160, état plein conservé)" "$(HV plein-$ch 'return "avant="+c.avantNow+" now="+c.now+" plein="+c.plein+" ouvert="+c.ouvert+" memo="+c.memo')" "avant=160 now=160 plein=true ouvert=true memo=160"
 done
 mut_haut() { # mut_haut <libellé> <nom> <expression-sed> <expression de rougissement>
@@ -1126,9 +1132,10 @@ mut_haut() { # mut_haut <libellé> <nom> <expression-sed> <expression de rougiss
     assert_eq "$1 $2 — le mutant rougit : $5 (témoin : aucune erreur de scénario)" "$(rj "$PJ" '(j.erreur||JSON.stringify(j.erreurs))+" rouge="+('"$4"')')" "{} rouge=true"
   else sans_effet "$1 $2"; fi
 }
-mut_haut TH.9 M-HAUT-SANS-REHAUSSEMENT 's|if (!plein \&\& h < 300) { h = borne(300); appliquer(); }||' 'j.haut["bas-evt"].now<300&&j.haut["bas-msg"].now<300' "le tiroir reste sous 300 px par les deux chemins"
+mut_haut TH.9 M-HAUT-SANS-REHAUSSEMENT 's|if (!plein \&\& h < 300) { h = borne(300); appliquer(); }||;s|if (!plein \&\& h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); }||' 'j.haut["bas-evt"].now<300&&j.haut["bas-msg"].now<300' "le tiroir reste sous 300 px par les deux chemins"
+mut_haut TH.13 M-HAUT-SANS-BANDEAU 's|if (!plein \&\& h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); }||' 'j.haut["moyen-evt"].now<480&&j.haut["moyen-msg"].now<480' "un tiroir de 424 px n'est pas rehaussé à la hauteur du bandeau (AUDC-M11)"
 mut_haut TH.10 M-HAUT-ECRASE-MEMO 's|h = borne(300); appliquer(); }|h = borne(300); appliquer(); memoH(); }|' 'j.haut["bas-evt"].memo!=="160"' "la hauteur mémorisée est écrasée"
-mut_haut TH.11 M-HAUT-REDUIT 's|if (!plein \&\& h < 300) { h = borne(300)|if (!plein) { h = borne(300)|' 'j.haut["haut-evt"].now!==424' "un tiroir à 424 px est ramené à 300"
+mut_haut TH.11 M-HAUT-REDUIT 's|if (!plein \&\& h < 300) { h = borne(300)|if (!plein) { h = borne(300)|' 'j.haut["haut-evt"].now!==544' "un tiroir à 544 px est ramené à 300"
 mut_haut TH.12 M-HAUT-EN-PLEIN 's|if (!plein \&\& h < 300)|if (h < 300)|' 'j.haut["plein-evt"].now>=300' "le plein écran est rehaussé"
 fi
 
