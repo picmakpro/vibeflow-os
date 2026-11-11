@@ -5,6 +5,7 @@ des Phases 73, 74, 75, 76, 77, 79 et 80 (demande de Samuel, session principale C
 **Compartiment / jalon :** `fiabilite` / `vibeflow-v2.0`. **Mode :** autonome, design `auto`.
 **Base :** `origin/integration/cockpit-audit` à `f763b556`. **Branche :** `feat/phase-75-activite-sur-le-code`, worktree
 `.claude/worktrees/phase-75`. **Verrou :** de phase, `--ws fiabilite --phase 75`.
+**PR :** #233 vers `integration/cockpit-audit` (ouverte, non mergée ; publications gelées).
 **Périmètre :** cadrage, recherche, spécification d'interface, plans et leur vérification. Aucune exécution, aucun
 fichier de code ni de test.
 
