@@ -1,7 +1,7 @@
 ---
 phase: "76"
 slug: "tracabilite-au-cockpit"
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: "2026-11-11"
