@@ -6,7 +6,7 @@ wave: 6
 depends_on: ["75-07", "75-08", "75-09a"]
 cross_phase:
   - "79-01 (`VENDORED.txt` réduit à l'origine, la sentinelle et l'inventaire du plafond : ligne `RETRAIT` à confirmer sur la forme livrée, 75-RESEARCH O-4 ; aucun diff de patch)"
-  - "Fichiers communs : `viewer.html` (80-09, 80-11, 80-13, 80-14, 80-16, 80-19), `ui/00-vibeflow.js` (80-16), `ui/01-vf-responsive.js` (80-17, 80-19), `ui/02-vf-telephone.js` (80-02, 80-17) : relire l'état livré"
+  - "Fichiers communs : `viewer.html` (80-09, 80-11, 80-13, 80-14, 80-16, 80-20), `ui/00-vibeflow.js` (80-16), `ui/01-vf-responsive.js` (80-17, 80-20), `ui/02-vf-telephone.js` (80-02, 80-17) : relire l'état livré"
   - "79-02 (`socle-serveur.sh`)"
   - "79-11 (cliquet du plafond de lignes de `viewer.html` : le retrait ne fait que le BAISSER)"
   - "79-16 (`viewer.html`, coquille : état livré relu)"
@@ -82,7 +82,7 @@ Mutants côté page (A48 point 41 de la 79 ; 79-06 et 79-02, aide `plugin/cockpi
 
 <precondition>
 75-09a, 75-07, 75-08 livrés ET verts. Relire `VENDORED.txt` livré (O-4). Refaire le grep d'inventaire (commande de 75-09a, `btn-recent` compris) et consigner l'écart avec la table de 75-RESEARCH § Retrait. Compter les assertions de chaque suite à adapter AVANT. Mesurer les lignes de `viewer.html` (cliquet 79-11).
-Dépendances vers 79-15 à 79-21, revalidées : 79-16 (vague 7 : touche `viewer.html`, `VENDORED.txt` et `test-cockpit-responsive.sh`, que ce plan adapte : relire l'état livré avant d'adapter) ; 79-17 (vague 8 : `VENDORED.txt`) ; 79-18 (vague 9 : `viewer.html`) ; 79-11 (V4 et cliquet de colonnes : le retrait ne fait que baisser) ; 79-20 : `V12` de `test-cockpit-vendor.sh`, rejoué par la dernière commande. Revalidé sur la tête 67f7f481 de la 79 (numéros lus dans les `files_modified` et les contrats des plans eux-mêmes).
+Dépendances vers 79-15 à 79-21, revalidées : 79-16 (vague 7 : touche `viewer.html`, `VENDORED.txt` et `test-cockpit-responsive.sh`, que ce plan adapte : relire l'état livré avant d'adapter) ; 79-17 (vague 8 : `VENDORED.txt`) ; 79-18 (vague 9 : `viewer.html`) ; 79-11 (V4 et cliquet de colonnes : le retrait ne fait que baisser) ; 79-20 : `V12` de `test-cockpit-vendor.sh`, rejoué par la dernière commande. Revalidé sur la tête 94d6d3a0 de la 79 (relue à la source, correction n° 10 ; numéros lus dans les `files_modified` et les contrats des plans eux-mêmes).
 </precondition>
 
 <tasks>

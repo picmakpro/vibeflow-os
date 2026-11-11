@@ -447,7 +447,7 @@ Commande : celle de 75-09c et 75-10, motifs de § Retrait (`btn-recent` compris)
 
 ### 5. Contrats de la Phase 79 relus au commit 29fd3e71 (A34 à A37)
 
-La table `ROUTES` et `repondreGardee` vivent dans `plugin/cockpit/scripts/vf-cockpit-server.mjs` (79-05, exports `ROUTES`, `repondreGardee`, `attach`) ; le mécanisme (régimes, répartiteur) est dans le module neuf `vf-cockpit-routes.mjs` (correction n° 10, relu à la tête c19c7461) ; points d'extension d'essai `attach(…, routes)` et `assembler(…, annotateurs)` ; annotateurs rangés dans l'ordre alphabétique de leur nom ; `vf-cockpit-server.mjs` reçoit UNE ligne de la 75 dans `ROUTES` (75-05). L'instantané porte `at` et n'expose pas les voies brutes : la projection `frise` y entre au plan 79-13, `rattachement` y est joint, 2 000 voies au plus. Une seule règle de chemin : la fonction de résolution physique de 79-07.
+La table `ROUTES` et `repondreGardee` vivent dans `plugin/cockpit/scripts/vf-cockpit-server.mjs` (79-05, exports `ROUTES`, `repondreGardee`, `attach`) ; le mécanisme (régimes, répartiteur) est dans le module neuf `vf-cockpit-routes.mjs` (correction n° 10, relu à la tête 94d6d3a0) ; points d'extension d'essai `attach(…, routes)` et `assembler(…, annotateurs)` ; annotateurs rangés dans l'ordre alphabétique de leur nom ; `vf-cockpit-server.mjs` reçoit UNE ligne de la 75 dans `ROUTES` (75-05). L'instantané porte `at` et n'expose pas les voies brutes : la projection `frise` y entre au plan 79-13, `rattachement` y est joint, 2 000 voies au plus. Une seule règle de chemin : la fonction de résolution physique de 79-07.
 
 ### 6. Contrats de la Phase 79 relus au commit 6fb94fb7 (A34 à A45, P79-D-28 à D-33), Phases 80 et 74
 
@@ -466,13 +466,13 @@ Règle inchangée : un motif visé par une `<automated>` est retrouvé dans le f
 | `test-cockpit-frise-curseur.sh` (75-07 t4) | exit 0 ; pour `C8` et chacun des sept `M-…` : `grep -cF "✅ PASS — <id> :"` >= 1 et `grep -cF "❌ FAIL — <id> :"` = 0 | format FIXÉ par 74-06 (copie à sa tête 33bb4aad, l. 145, 168, 191 : `✅ PASS — ${x} :`, `❌ FAIL — ${x} :`, espace avant les deux-points) ; la suite n'existe pas encore (seul 74-06 la crée) ; les sept noms : `M-BOUTON-VIDE`, `M-APPEL-CONTOURNE`, `M-CANAL-AU-CHARGEMENT` (de la 74, présents dans 74-06) et `M-SHOWBOARD-RESTAURE`, `M-RETIRER-VIDE`, `M-RETOUR-UNDEFINED`, `M-ARBRE-IGNORE` (de la 75, ajoutés par 75-07) | motif établi ; suite à relire une fois livrée |
 | `test-cockpit-responsive.sh` (75-09b) | `PASS — Q9\.` et `Q9\.[0-9]+ — mutant` (deux) | convention des assertions ajoutées à une suite existante (§ 1, ligne « mutants AJOUTÉS ») ; la suite imprime `Résultats : ` (l. 801) | convention |
 | `test-cockpit-chrome-fr.sh` (75-09c) | `PASS — Q13\.[0-9]+ — mutant` (un) | même convention ; la suite imprime `Résultats : ` (l. 293) | convention |
-| 75-07, 75-08, 75-09b, 75-09c : mutants côté page | `cockpit_module_muter`, `cockpit_module_copie`, `COCKPIT_MODULE`, code 5 de `cockpit_lancer` | plan 79-06 sur la tête 67f7f481 (`socle-serveur.sh`, aide des suites : `cockpit_module_copie <destination> [fichier…]`, `cockpit_module_muter <nom> <fichier-du-module> <expression sed>`, code 5 si la copie visée n'est pas chargée) ; A48 en donne l'emploi sans destination : forme exacte à relever sur le livré | à relever sur le livré |
+| 75-07, 75-08, 75-09b, 75-09c : mutants côté page | `cockpit_module_muter`, `cockpit_module_copie`, `COCKPIT_MODULE`, code 5 de `cockpit_lancer` | plan 79-06 sur la tête 94d6d3a0 (`socle-serveur.sh`, aide des suites : `cockpit_module_copie <destination> [fichier…]`, `cockpit_module_muter <nom> <fichier-du-module> <expression sed>`, code 5 si la copie visée n'est pas chargée) ; A48 en donne l'emploi sans destination : forme exacte à relever sur le livré | à relever sur le livré |
 | 75-07 t1, t2 ; 75-08 t1, t3 : lignes `AJOUT` | `^AJOUT assets/ui/75-vf-….js$` | forme lue à la base dans `VENDORED.txt` (`AJOUT assets/ui/00-vibeflow.js`, 32 lignes) et lue par `test-cockpit-vendor.sh:56` (`while read -r k f … [ "$k" = AJOUT ]`) ; 79-01 peut changer la forme | à relever après 79-01 |
 | 75-05 R6 (espion `binaire`) | zéro invocation | `lancerGitAsync(dir, args, { …, binaire = 'git' })` (`vf-cockpit-paths.mjs:249-261`, § Standard Stack) : l'espion voit chaque argv | établi |
 
 Fichiers appelés par ces commandes : existent (`git ls-files`) `scripts/check-machine-paths.sh`, `plugin/cockpit/scripts/tests/test-cockpit-vendor.sh`, `test-cockpit-responsive.sh`, `test-cockpit-chrome-fr.sh` ; créés par un plan nommé : `test-cockpit-frise-curseur.sh` (74-06), `socle-serveur.sh` et ses aides (79-02, 79-06), `doc-chiffres.sh` (79-20), `colonnes-cliquet.mjs` (79-11).
 
-## Dépendances de la 75 envers la 79, vérifiées sur la tête 67f7f481
+## Dépendances de la 75 envers la 79, vérifiées sur la tête 94d6d3a0
 
 | Plan de la 75 | Plans de la 79 dont il dépend (vague de la 79) | Ce que le plan de la 75 en tire, relu dans le plan de la 79 |
 |---|---|---|

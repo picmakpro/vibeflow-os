@@ -6,7 +6,7 @@ wave: 7
 depends_on: ["75-09b"]
 cross_phase:
   - "79-01 (aucun diff de patch ; `VENDORED.txt` : pas touché ici, 75-09b l'a fait)"
-  - "79-10 (`ui/80-vf-fr.js` : A44, les motifs R et P sont GARDÉS pour reconnaître les constats de Santé : ce plan n'y touche pas) ; `test-cockpit-chrome-fr.sh` est aussi touché par 79-02, 79-06 et 79-11 ; 80-14 touche `ui/79-vf-fr-dict-c.js` (autre fichier) : relire l'état livré avant d'adapter F13.3"
+  - "79-10 (`ui/80-vf-fr.js` : A44, les motifs R et P sont GARDÉS pour reconnaître les constats de Santé : ce plan n'y touche pas) ; `test-cockpit-chrome-fr.sh` est aussi touché par 79-02, 79-06, 79-10, 79-11, 80-14 et 80-19 ; `ui/80-vf-fr.js` par 79-10 seulement (80-14 touche `ui/79-vf-fr-dict-c.js`, autre fichier) : relire l'état livré avant d'adapter F13.3"
   - "Phase 74 (dictionnaires éventuellement touchés : relire)"
 files_modified:
   - plugin/cockpit/skills/cockpit-moteur/assets/ui/78-vf-fr-dict-a.js
@@ -36,7 +36,7 @@ must_haves:
 <objective>
 Aligner les dictionnaires français et les suites voisines sur le retrait de la couche « Travail récent » (ACTV-12), moitié « dictionnaires et suites voisines » de l'ancien 75-09b.
 
-Placement : après 75-09b (la page ne porte plus la couche), donc après la Phase 79 entière, la Phase 74 et 75-07 à 75-09b ; dernier plan du lot retrait. `ui/80-vf-fr.js` et `test-cockpit-chrome-fr.sh` sont aussi modifiés par la Phase 80 (80-14) : relire l'état livré. Aucun diff de patch ; suites par `socle-serveur.sh` (livré par 79-02).
+Placement : après 75-09b (la page ne porte plus la couche), donc après la Phase 79 entière, la Phase 74 et 75-07 à 75-09b ; dernier plan du lot retrait. `test-cockpit-chrome-fr.sh` est aussi modifié par 79-10, 80-14 et 80-19, et `ui/80-vf-fr.js` par 79-10 : relire l'état livré. Aucun diff de patch ; suites par `socle-serveur.sh` (livré par 79-02).
 
 Purpose: fermer le retrait, grep d'inventaire à zéro.
 Output: dictionnaires nettoyés, trois suites adaptées, une trace.
@@ -61,8 +61,8 @@ Mutants côté page (A48 point 41 de la 79 ; 79-06 et 79-02, aide `plugin/cockpi
 </context>
 
 <precondition>
-75-09b livré et vert. Compter les assertions de `test-cockpit-moteur-carte.sh` et `test-cockpit-chrome-fr.sh` AVANT adaptation. Relire `ui/80-vf-fr.js` et `test-cockpit-chrome-fr.sh` tels que livrés par 80-14.
-Dépendances vers 79-15 à 79-21, revalidées : aucune pièce de 79-15 à 79-19 n'est consommée ; 79-20 touche `test-cockpit-vendor.sh` (`V12`), rejoué par la dernière commande : vert exigé. Revalidé sur la tête 67f7f481 de la 79 (numéros lus dans les `files_modified` et les contrats des plans eux-mêmes).
+75-09b livré et vert. Compter les assertions de `test-cockpit-moteur-carte.sh` et `test-cockpit-chrome-fr.sh` AVANT adaptation. Relire `ui/80-vf-fr.js` et `test-cockpit-chrome-fr.sh` tels que livrés par 79-10, 80-14 et 80-19.
+Dépendances vers 79-15 à 79-21, revalidées : aucune pièce de 79-15 à 79-19 n'est consommée ; 79-20 touche `test-cockpit-vendor.sh` (`V12`), rejoué par la dernière commande : vert exigé. Revalidé sur la tête 94d6d3a0 de la 79 (relue à la source, correction n° 10 ; numéros lus dans les `files_modified` et les contrats des plans eux-mêmes).
 </precondition>
 
 <tasks>
