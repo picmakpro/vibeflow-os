@@ -70,3 +70,13 @@ Amendement du plan : les ancres de mutation de worktreeVerifie (X7), voir le pla
 Interface de 79-13 : `cheminPhysique(chemin, { plusProcheParent = false } = {})` existe, exportée de vf-cockpit-git-sortant.mjs, copie octet pour octet dans le moteur, figée par G17.
 
 État : porte non levée. Un constat de l'audit de sécurité intermédiaire (obligatoire, amendement de la porte) est à obtenir avant la tâche 4 ; la reprise est une décision de la session principale. L'arbre est partiellement rouge par construction (A8, A9, A10, A12, D6.1 à D6.5) : ne pas fusionner ici.
+
+## Reprise après le point d'arrêt de la tâche 3
+
+Reprise autorisée par la session principale, décision déléguée par Samuel (AskUserQuestion session principale, 2026-11-11, « Claude, sur preuves (Recommandé) »). Levée le 2026-11-12 à 00 h 11, réponse « reprendre tâche 4 ».
+
+Contrôles de la session principale, recopiés :
+- trace lue (rubrique du point d'arrêt) ; AVANT 1f4197ce est un ancêtre de la tête ; 7 commits (79-07) ;
+- fichiers touchés hors files_modified : 79-07-PLAN.md seul (amendement daté b17f5510) ;
+- rapport de l'auditeur lu dans son propre transcript : passed, aucun constat haut ;
+- rejeu indépendant sur une copie détachée à bca33d4b, retirée depuis : git-config-depot 75 PASS / 9 FAIL, exactement A8, A9, A10, A12, D6.1 à D6.5 ; 19 identifiants de la règle, 17 assertions de mutants ; copies du module identiques ; 0 realpathSync(, 0 path.resolve(, 1 export de cheminPhysique ; git-sortant 150 lignes, paths 166 ; graine 424242 conforme ; git-env 134 / 0 ; git-details 136 / 0 ; confinement 66 / 0. Avancement et terminal-serveur non rejouées par elle (le rejeu de l'exécuteur fait foi).
