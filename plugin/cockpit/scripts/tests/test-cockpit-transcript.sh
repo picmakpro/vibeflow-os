@@ -568,7 +568,7 @@ JS
   rafraichir
   RF="$(CI sc-f.js "http://127.0.0.1:$PORT/equipe.html#t")"
   assert_eq "T27.F1 — recette : le badge « au travail » égale les actifs de l'onglet Équipe, même avec un verrou, un nœud de DAG et un enregistrement dans la collecte (apparié : le nombre est non nul)" "$(echo "$RF" | sed -E 's/^badge=([0-9]+) \| actifs=([0-9]+) .*/\1 \2/' | awk '{print ($1==$2 && $1>0) ? "égaux" : "badge=" $1 " actifs=" $2}')" "égaux"
-  assert_eq "T27.F2 — recette : le titre de l'onglet est « Équipe · <nom que la page Projet affiche> », jamais le nom du dossier" "$(echo "$RF" | sed -E 's/.* \| titre=([^|]*) \| libelle.*/\1/' | sed 's/ *$//')" "Équipe · Labo-Recette"
+  assert_eq "T27.F2 — recette : le titre de l'onglet est « Équipe · <nom que l'en-tête affiche> » (AUDC-X7 : le nom du dépôt, labsrv), jamais le titre de PROJECT.md" "$(echo "$RF" | sed -E 's/.* \| titre=([^|]*) \| libelle.*/\1/' | sed 's/ *$//')" "Équipe · labsrv"
   assert_eq "T27.F3 — recette : la recherche de l'onglet Équipe trouve des agents (un rôle tapé rend des résultats) et son libellé le dit" "$(echo "$RF" | sed -E 's/.* \| libelle=(.*)$/\1/')" "Chercher un agent ou une session | trouves=true"
 
 fi
