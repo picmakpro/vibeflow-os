@@ -302,6 +302,12 @@ recommandée ; l'option recommandée vient du panel ou de l'éclaireur cité. Au
   répond par la réponse gardée commune (A11) quand elle existe. Avant la 79, les plans gardent les sources actuelles et
   disent ce qui change après.
 
+- **P73-D-36 (extracteur des registres de décisions, recoupement signalé par la Phase 76, 2026-11-11).** La régie ne lit
+  pas les registres `P<N>-D-xx` des CONTEXT (P73-D-06 : seules les attentes structurées entrent dans « À vous » ; S-3) :
+  elle n'a pas besoin d'extracteur. Le fichier `plugin/cockpit/scripts/vf-cockpit-registres.mjs` est laissé à la Phase
+  76, qui le crée ; aucun plan de la 73 ne le touche. Si la convention structurée de S-3 est adoptée plus tard, son lecteur
+  passera par ce fichier et sa signature `definitionsRegistre(txt, { phase, ws, fichier, couper })`.
+
 ### Claude's Discretion
 
 Noms internes des fonctions et modules neufs, découpage fin des fichiers d'interface, forme exacte des fixtures (noms
