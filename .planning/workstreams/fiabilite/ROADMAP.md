@@ -634,7 +634,7 @@ Plans:
   4. Le tiroir Git est lisible à 1024 × 768 sans pousser la carte ; les jetons repris passent les seuils de contraste mesurés dans les deux thèmes.
   5. Après la Phase 79, changer d'onglet ne recharge plus la page et garde tiroirs, zoom et historique du terminal.
   6. Toutes les suites du cockpit vertes sous macOS et Linux ; chaque comportement porte un témoin rouge sur la base puis vert.
-**Plans:** 20 plans en 10 vagues (vagues 1 à 3 sans dépendance à la Phase 79 ; à partir de 80-09 : 79-01 à 79-18 fusionnés ; 80-18 après 79-20 ; S80-1 à S80-5 tranchées, FORM-18 portée par 80-14, 80-15, 80-19 et 80-20)
+**Plans:** 20 plans en 11 vagues (vagues 1 à 3 sans dépendance à la Phase 79 ; à partir de 80-09 : 79-01 à 79-18 fusionnés ; 80-18 après 79-20 ; P80-Q-01 à P80-Q-05 tranchées, FORM-18 portée par 80-14, 80-15, 80-19 et 80-20)
 
 Plans:
 
@@ -677,14 +677,17 @@ Plans:
 
 - [ ] 80-15-PLAN.md — Aide ?, ligne du terminal (P80-D-55)
 - [ ] 80-16-PLAN.md — Jetons X5, DESIGN.md, découpe de 00-vibeflow.js
-- [ ] 80-17-PLAN.md — Finitions F1, F3, F4, F5
-- [ ] 80-19-PLAN.md — Santé en français (S80-2, P80-D-54)
+- [ ] 80-19-PLAN.md — Santé en français (P80-Q-03, P80-D-54)
 
 **Vague 9** *(bloquée tant que la vague 8 n'est pas terminée)*
 
-- [ ] 80-20-PLAN.md — Titre de vue, en-tête en trois groupes, chevron, icônes, ouvreur Git 36/44 (S80-1, S80-3, S80-5)
+- [ ] 80-17-PLAN.md — Finitions F1, F3, F4, F5 (après 80-16 : colonnes-baseline.txt partagé)
 
 **Vague 10** *(bloquée tant que la vague 9 n'est pas terminée)*
+
+- [ ] 80-20-PLAN.md — Titre de vue, en-tête en trois groupes, chevron, icônes, ouvreur Git 36/44 (P80-Q-01, P80-Q-02, P80-Q-05)
+
+**Vague 11** *(bloquée tant que la vague 10 n'est pas terminée)*
 
 - [ ] 80-18-PLAN.md — Assemblage : compteur des README, table du partage CI, CHANGELOG, non-régression
 
