@@ -363,13 +363,13 @@ de la session principale et les réponses de Samuel du 2026-11-11 les citent.
   Options : (a) la remplacer : l'entrée du menu reste au même endroit et devient le sélecteur ; (b) la garder comme lentille « Récent », le retrait se réduisant à `scripts/recent.mjs`.
   Recommandation : (a) — approximation remplacée par de l'observé, retrait demandé par le jalon.
   Bloque : rien
-  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (a) — « L'empreinte observée prend sa place. L'entrée du menu « ⋯ » reste au même endroit, avec un libellé et une pastille de compte, et devient le sélecteur de vues. C'est aussi le retrait que le jalon demande à cette phase. »
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (a) — « La remplacer (Recommandé) »
 - **P75-Q-04 — Worktrees hors du dossier du lab (Q-75-4, S-3 de la Phase 79).** Une écriture dans un worktree hors du
   dossier du lab est-elle « hors du lab » ?
   Options : (a) oui, le radar ne la voit pas et le dit ; (b) un worktree vérifié du même dépôt compte comme le lab.
   Recommandation : (b) — radar complet, aucun chemin du poste ne sort.
   Bloque : rien
-  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « Un worktree vérifié comme appartenant au même dépôt compte comme le lab : le fichier s'affiche par son chemin relatif à la racine du worktree, aucun chemin absolu ne sort. Le radar voit alors ces worktrees. Un dossier qui n'est pas un worktree du dépôt reste « hors du lab ». »
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « Les compter comme le lab (Recommandé) »
 - **P75-Q-05 — Pastille de compte pleine (Q-75-5).** Le bouton « Travail récent » livré porte en bureau une pastille à fond
   plein `--recent`, contre P71.5-D-19 et l'interdit « fond teinté pour un état » de `DESIGN.md`.
   Options : (a) pastille neutre partout ; (b) garder la pastille pleine en bureau comme exception écrite dans `DESIGN.md`.

@@ -460,13 +460,13 @@ restent ici, réécrites au format, comme premiers cas réels pour la lecture.
   Options : (a) glyphe et mot neutres pour une absence, octogone au trait corail pour une contradiction lue ; (b) trait corail pour tout trou ; (c) tout neutre.
   Recommandation : (a) — seule lecture qui tient les deux textes.
   Bloque : 76-06, 76-07
-  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (a) — « Une absence se dit par un glyphe et un mot, sans couleur. Seule une contradiction réellement lue (deux sources qui se contredisent) prend un octogone au trait corail. C'est ce que les plans prévoient déjà. »
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (a) — « Marque neutre (Recommandé) »
 - **P76-Q-02 — Graphe navigable réalisé sans dessin.** Le but parle de « graphe navigable » et de « graphe de liens » :
   dessin ou panneaux reliés ?
   Options : (a) panneaux reliés, voisinage seul ; (b) en plus, un dessin de l'îlot de mémoire d'un agent ; (c) un canevas des décisions.
   Recommandation : (a) — tient la direction « trois onglets, trois formes ».
   Bloque : 76-06, 76-07
-  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (a) — « Dans l'onglet Projet, un clic sur un objet ouvre l'objet voisin (l'exigence ouvre son plan, sa décision, sa preuve), avec un seul bouton Retour. Ni canevas ni quatrième onglet. »
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (a) — « Panneaux reliés (Recommandé) »
 - **P76-Q-03 — Poids ajouté à la page Projet.** La règle A32 de la Phase 79 fait entrer les manques du planning
   (maillons, définitions de décisions, preuves, questions) dans `cockpit-project@1`, environ 0,4 Mo de JSON de plus
   selon le planificateur : garder ?

@@ -458,8 +458,9 @@ reprennent les propositions de la Phase 74, relayées par la session principale 
 ## À Samuel (format C76-Q1 de la Phase 76, amendé par P76-D-37)
 
 Une question tranchée ou appliquée garde son entrée ; seule sa ligne « État » change, et la décision qui en découle est
-au registre. P73-Q-01 reste « en attente » sans rien bloquer : son option recommandée (corriger le tiroir Git) n'est
-appliquée par aucune décision de ce registre, la régie se bornant à rendre ses propres pastilles neutres (P73-D-10).
+au registre. P73-Q-01 est tranchée le 2026-11-11 (option b) hors de cette phase : le correctif du tiroir Git est porté
+par l'exécution de la Phase 80, la régie se bornant à rendre ses propres pastilles neutres (P73-D-10) ; aucune décision
+`P73-D-NN` ne la porte, la décision qui en découle vit hors de ce registre (tranchée hors phase).
 Anciens libellés : S-1 → P73-Q-01, S-2 → P73-Q-02, S-3 → P73-Q-03, S-4 → P73-Q-04.
 
 - **P73-Q-01 — Pastilles du tiroir Git sur fond d'avertissement.** Le tiroir Git de la Phase 78 pose « modifiés » sur un
@@ -467,7 +468,7 @@ Anciens libellés : S-1 → P73-Q-01, S-2 → P73-Q-02, S-3 → P73-Q-03, S-4 �
   Options : (a) laisser le tiroir tel quel ; (b) neutraliser ces pastilles dans un correctif du tiroir Git, hors de la Phase 73.
   Recommandation : (b) — une seule règle de couleur sur tout le cockpit, sans élargir la Phase 73.
   Bloque : rien
-  État : en attente
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « Les neutraliser (Recommandé) »
 - **P73-Q-02 — Question de l'assistant restée sans réponse, lue au transcript.** Une session bloquée sur une question
   de l'assistant passe pour « au travail » quand l'état officiel est absent ; la lire au transcript rouvrirait la décision
   D2 du lot 0 (« vous attend » vient seulement de l'état officiel).

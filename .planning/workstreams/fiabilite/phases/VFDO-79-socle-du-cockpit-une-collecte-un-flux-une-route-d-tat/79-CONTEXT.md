@@ -575,6 +575,7 @@ parenthèses.
   Bloque : rien
   État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « Les compter comme le lab (Recommandé) »
 - **P79-Q-04 — Réduire AUDC-I18 (S-4).** I18 voulait un journal des hooks qui remplace la relecture des transcripts ; l'index (C1) et l'état officiel (AUDC-Q4) font ce travail ; le plan 79-19 commence par une sonde.
+  Le 2026-11-11, Samuel a répondu « Claude la joue » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; ce n'était pas l'option recommandée) sur la seule exécution de la sonde S0 : elle est jouée par un banc qui pilote le terminal, sur son compte, et il en relit le tableau. Cette réponse ne tranche pas la présente question, qui reste à lui.
   Options : (a) garder la forme minimale d'I18 (journal des attentes) quoi que dise la sonde ; (b) retirer I18 de la phase si la sonde montre que l'état officiel voit les attentes de permission, garder la forme minimale sinon.
   Recommandation : (b) — un second écrivain dans le lab n'est utile que si l'état officiel ne voit pas les attentes.
   Bloque : rien
