@@ -9,7 +9,7 @@
 // Aucun effet de bord à l'import ni à la création : le disque n'est lu qu'à une requête servie. Pas de `git status` (P72-D-07).
 import fs from 'node:fs';
 import { planningLayout } from './vf-cockpit-paths.mjs';
-import { readPlanning } from './vf-cockpit-planning.mjs';
+import { readPlanning, lireConfine, lister } from './vf-cockpit-planning.mjs';
 import { lireAilleurs, fusionner } from './vf-cockpit-ailleurs.mjs';
 import * as gabarit from './vf-cockpit-lancer-gabarit.mjs';
 import { calculerCibles, listePourQ, verdict } from './vf-cockpit-lancer-cibles.mjs';
@@ -36,7 +36,7 @@ export function creerLancer({ root, here, ptoken, log = () => {} }) {
   };
   const fichiers = (ph) => { // noms du dossier de la phase, tels que relevés par readPlanning
     const d = dernier && dernier.phaseDirs && (dernier.phaseDirs.get(`${ph.ws || ''}|${ph.n}`) || dernier.phaseDirs.get(`*|${ph.n}`));
-    return d ? sur(() => fs.readdirSync(d), []) : [];
+    return d ? sur(() => lireConfine(root, () => lister(d)), []) : []; // AUDC-A-02 : un dossier lié hors du lab n'est pas listé
   };
   function calculer() {
     const c = canal();
