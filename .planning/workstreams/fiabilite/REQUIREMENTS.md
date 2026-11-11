@@ -1047,6 +1047,24 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | — | Phase 77 | repère de cadrage, Phase 77 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | — | Phase 79 | repère de cadrage, Phase 79 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | — | Phase 80 | repère de cadrage, Phase 80 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
+| FORM-01 | Phase 80 | Pending |
+| FORM-02 | Phase 80 | Pending |
+| FORM-03 | Phase 80 | Pending |
+| FORM-04 | Phase 80 | Pending |
+| FORM-05 | Phase 80 | Pending |
+| FORM-06 | Phase 80 | Pending |
+| FORM-07 | Phase 80 | Pending |
+| FORM-08 | Phase 80 | Pending |
+| FORM-09 | Phase 80 | Pending |
+| FORM-10 | Phase 80 | Pending |
+| FORM-11 | Phase 80 | Pending |
+| FORM-12 | Phase 80 | Pending |
+| FORM-13 | Phase 80 | Pending |
+| FORM-14 | Phase 80 | Pending |
+| FORM-15 | Phase 80 | Pending |
+| FORM-16 | Phase 80 | Pending |
+| FORM-17 | Phase 80 | Pending |
+| FORM-18 | Phase 80 | Pending — après avis de Samuel (S80-1 à S80-4) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1678,6 +1696,28 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 <!-- vf-cadrage:phase-79 -->
 
 <!-- vf-cadrage:phase-80 -->
+
+### Trois onglets, trois formes (Phase 80 — posées au cadrage, 2026-11-11)
+> Dérivent de P80-D-01..27 (`80-CONTEXT.md` ; décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée, tranchées par panel sur faits établis). Famille neuve `FORM`, réservée par le ROADMAP, vérifiée libre le 2026-11-11 (0 occurrence de `FORM-<n>` sous `.planning/` et `plugin/` à `f763b556`). FORM-18 attend l'avis de Samuel.
+
+- [ ] **FORM-01**: Canevas au clavier : un seul arrêt de tabulation pour le canevas (Code, et Projet en mode graphe), flèches entre cartes par voisin spatial, Origine/Fin, Entrée plonge et Échap remonte avec le focus rendu à une carte ; `listbox` nommé, cartes `option` avec titre, mot d'état et compte ; arêtes masquées aux lecteurs d'écran ; témoin : 0 carte atteinte aujourd'hui → exactement 1 arrêt et une flèche qui change de carte (AUDC-BL2, P80-D-10).
+- [ ] **FORM-02**: Surcouches : pile unique, Échap au niveau du document ferme le dessus, modales avec piège à Tab, `inert` derrière et focus rendu à l'ouvreur, non modales sans prise de focus (Q5), terminal exclu d'Échap et son `inert` jamais levé par la pile, panneau fermé non tabulable ; les trois listes recopiées retirées ; témoins : palette ouverte + Tab + Échap → fermée, export + 15 Tab → focus dedans, panneau fermé → 0 élément tabulable (AUDC-M6, P80-D-11).
+- [ ] **FORM-03**: Zoom centré sur la carte sélectionnée visible, sinon sur la zone libre ; facteurs 1,25/0,8 partout (aller-retour exact) ; garde de saisie unique (`INPUT`, `TEXTAREA`, `SELECT`, `contenteditable`, modificateurs) ; aide `?` générée depuis un registre unique des raccourcis (AUDC-X3, P80-D-12, P80-D-13).
+- [ ] **FORM-04**: Palette de commandes : la recherche existante étendue par des sources et des actions (vue, bascule couloirs/liste/graphe, Git, aide, changement d'onglet, copier le lien de la vue), préfixe `>` ; aucune action n'envoie rien (Q4) ; entités des autres onglets après la Phase 79 (AUDC-I24, P80-D-14).
+- [ ] **FORM-05**: Projet en couloirs : à la racine, vue par défaut à toute largeur, un bloc par jalon actif (en-tête, barre neutre, pourcentage strict), quatre colonnes À faire, En cours, À recetter, Fait avec glyphe, mot et compte, carte de phase (numéro, titre, ligne d'état) ; graphe à la demande (bascule et `?vue=`) ; le canevas cesse d'être la vue par défaut de Projet (retrait) ; contrats P80-C76-1 à 4 tenus pour la Phase 76 (AUDC-BL1, AUDC-I23, P80-D-01 à 04).
+- [ ] **FORM-06**: Données de Projet : champs facultatifs `avancement` et `exigences {faits,total}` sur le nœud phase (même calcul que `piedExigences`), `vague` sur le nœud plan, `recette` ajouté aux statuts du contrat ; `cockpit-project@1` gardé (ajout seul) ; `foot` et `st` inchangés (P80-D-06).
+- [ ] **FORM-07**: Backlog, Graines et Releases en une liste sous les couloirs, plus de vignettes (retrait) ; le statut du backlog sort du pied de carte, la pastille dit seule l'état (AUDC-X2, P80-D-07).
+- [ ] **FORM-08**: Vocabulaire du planning : plus de « Élément », « module » ni « Mentions » sur Projet ; le panneau d'un plan dit statut, vague et exigences couvertes ; le texte d'une exigence n'est plus répété trois fois ; pile de sélections « Retour » du panneau (AUDC-X1, P80-D-08, P80-C76-3).
+- [ ] **FORM-09**: Liste ou tableau : touche `v` et bouton, liste triable (numéro, état, plans, exigences), plans par vague et exigences en liste à cocher dans une phase, liste par défaut au téléphone, choix mémorisé par lab hors de `.planning/` (AUDC-I25, P80-D-05).
+- [ ] **FORM-10**: Carte du code : minicarte (≥ 1 000 px, souris) et repères de bord « N cartes par là » cliquables à toute largeur ; une seule formule de cadrage exposée et appelée par l'en-tête Git et la visite (retrait des copies) ; plancher 11/13 gardé (PU-G-026) ; `freeArea()` ne déduit pas le tiroir Git (PU-G-204) (AUDC-M1, AUDC-I26, P80-D-15, P80-D-16).
+- [ ] **FORM-11**: Cadrer la carte sélectionnée et ses voisins du niveau courant, plancher respecté, sans nouvelle mise en page ; le mode focus recomposé reste en réserve (AUDC-I27, P80-D-17).
+- [ ] **FORM-12**: Ligne d'état jointe à la minicarte (≥ 1 000 px) : branche entière, point du direct, heure de mise à jour ; rien du terminal sans `--terminal` ; au téléphone, zone basse dégagée et cibles tactiles à taille (AUDC-I29, AUDC-X8, P80-D-18).
+- [ ] **FORM-13**: Tiroir Git : pagination (≤ ~110 rangées au départ), worktrees repliés avec leur compte, détail d'un commit dans un volet bas lisible à 1024 × 768, poignée de largeur au clavier bornée et mémorisée, carte jamais poussée (AUDC-M12, P80-D-19).
+- [ ] **FORM-14**: Jetons et finitions : contraste mesuré dans les deux thèmes (texte ≥ 4,5:1, non-texte ≥ 3:1, glyphe « En cours » ≥ 3,5:1, cartes estompées ≥ 4,5:1), carte active en clair sans fond teinté, chiffres tabulaires, mêmes teintes de pastilles à toutes largeurs, une taille de bouton d'en-tête, triangles et sélecteurs à la charte ; `DESIGN.md` à jour (AUDC-X5, F1, F3, F4, F5, P80-D-20).
+- [ ] **FORM-15**: Lien de vue : le fragment porte vue, sélection, zoom et tiroir Git ; « Copier le lien de cette vue » ; l'état des tiroirs survit au changement d'onglet (P80-D-21).
+- [ ] **FORM-16**: Onglets sans rechargement sur la coquille de la Phase 79 (`VF_COQUILLE.chargerOnglet`) : routage, `vf:onglet`, Précédent/Suivant, focus annoncé, titre « <Onglet> · <nom> » ; tiroirs, zoom et historique du terminal gardés, amorce du terminal inchangée (AUDC-I30, AUDC-X7 reste, AUDC-F7, P80-D-22).
+- [ ] **FORM-17**: Non-régression : toutes les suites du cockpit vertes sous macOS et Linux, aucune affaiblie ; chaque comportement porte un témoin rouge sur la base puis vert, un mutant par garde ; mouvement réduit tenu (zéro animation active) ; plafond de 300 lignes par extension ; compteur de suites, table de durées et CHANGELOG du module tenus par le plan d'assemblage (P80-D-24, P80-D-25, P80-D-26).
+- [ ] **FORM-18**: Après avis de Samuel seulement : titre de vue (AUDC-M2, rouvre Q10), en-tête (AUDC-M5, rouvre P70-D-22 et PU-G-001), Santé en français (AUDC-M8, rouvre P70-D-04), explication du terminal sans `--terminal` (AUDC-M10 reste, rouvre P71-D-02) — questions S80-1 à S80-4 de `80-CONTEXT.md` ; non exécutable tant qu'elles ne sont pas tranchées.
 
 ---
 *Requirements defined: 2026-06-04*

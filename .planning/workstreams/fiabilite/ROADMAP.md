@@ -620,17 +620,25 @@ Plans:
 
 ### Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation
 
-> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-11 depuis l'audit du cockpit du 2026-11-10 (demande de Samuel, session principale Claude Code, 2026-11-10 ; numéro et découpage : décision déléguée par Samuel, message session principale, 2026-11-08, option recommandée).
+> **Cadrée le 2026-11-11** par le manager de la mission (`80-CONTEXT.md`, P80-D-01 à P80-D-27, décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée ; quatre réouvertures rangées « À Samuel », S80-1 à S80-4). Inscrite le 2026-11-11 depuis l'audit du cockpit du 2026-11-10 (demande de Samuel, session principale Claude Code, 2026-11-10).
 
 **Goal:** L'onglet Projet se lit d'un regard à toute largeur (les phases rangées par état, le graphe à la demande), chaque carte du canevas est atteignable au clavier et nommée pour un lecteur d'écran, et l'on ne se perd plus sur la carte du code : un ajustement qui montre tout, une minicarte, une palette de commandes, des surcouches qui retiennent le focus.
-**Requirements**: TBD — famille `FORM` réservée, posée au cadrage.
-**Depends on:** Phase 71.5 (jetons de couleur et d'espacement) ; Phase 78 (en-tête). Les onglets sans rechargement attendent la Phase 79. En parallèle de la 79.
-**Sources:** `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2 ; `2026-11-10-audit-cockpit/DESIGNS.md` § 6 et § 7 ; registre `AUDC-BL1`, `BL2`, `M1`, `M2`, `M5`, `M6`, `M8`, `M10`, `M12`, `X1` à `X3`, `X5`, `X7`, `X8`, `F1`, `F3` à `F5`, `F7`, `I23` à `I27`, `I29`, `I30`.
-**Plans:** 0 plans
+**Requirements**: FORM-01 à FORM-18 (FORM-18 après avis de Samuel).
+**Depends on:** Phase 71.5 (jetons de couleur et d'espacement) ; Phase 78 (en-tête). Vagues 1 et 2 sans dépendance à la Phase 79 ; le lot moteur (`viewer.html`), les jetons et les onglets sans rechargement après la fusion de la Phase 79 (contrats C5, C6 et amendement A1 à A7 de `79-CONTEXT.md`, commits `3119d82a` et `2ae6607a` de `feat/phase-79-socle-cockpit`). Fournit à la Phase 76 les contrats P80-C76-1 à 4 (panneau de Projet) et aux Phases 73 et 74 la pile de surcouches.
+**Sources:** `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2 ; `2026-11-10-audit-cockpit/DESIGNS.md` § 6 et § 7 ; registre `AUDC-BL1`, `BL2`, `M1`, `M2`, `M5`, `M6`, `M8`, `M10`, `M12`, `X1` à `X3`, `X5`, `X7`, `X8`, `F1`, `F3` à `F5`, `F7`, `I23` à `I27`, `I29`, `I30` (X4, X6, M7, M11 et les parts lot 0 de M10 et X7 sont livrés).
+**Retraits:** le canevas comme vue par défaut de Projet ; les vignettes Backlog, Graines et Releases ; les copies de la formule de cadrage ; les listes « surcouche ouverte » recopiées.
+**Success Criteria** (what must be TRUE):
+  1. À 1440, 1024 et 390 px, la racine de Projet montre les phases en quatre couloirs par état, titres lisibles sans zoom ; le graphe s'ouvre par une bascule ; au téléphone, une liste triable.
+  2. Au clavier seul, on atteint, parcourt et ouvre toute carte du canevas, et chaque surcouche retient le focus puis se ferme à Échap en rendant le focus à son ouvreur.
+  3. Sur Code, la minicarte et les repères de bord mènent à toute carte hors champ sans descendre sous le plancher de lisibilité ; `+` et `-` gardent la carte sélectionnée en place ; la palette atteint vues, actions et onglets.
+  4. Le tiroir Git est lisible à 1024 × 768 sans pousser la carte ; les jetons repris passent les seuils de contraste mesurés dans les deux thèmes.
+  5. Après la Phase 79, changer d'onglet ne recharge plus la page et garde tiroirs, zoom et historique du terminal.
+  6. Toutes les suites du cockpit vertes sous macOS et Linux ; chaque comportement porte un témoin rouge sur la base puis vert.
+**Plans:** à poser par la planification de la mission de cadrage
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 80 to break down)
+- [ ] TBD (planification en cours)
 
 ### Phase 81: Agir sur une session depuis le cockpit
 
