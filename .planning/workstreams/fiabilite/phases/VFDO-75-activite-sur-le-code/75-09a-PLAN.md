@@ -77,7 +77,9 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
 <tasks>
 
 <task type="tdd" tdd="true">
-  <name>Tâche 1 (tracer) : l'assemblage n'écrit plus `recent-work.json` et supprime l'ancien, la sonde Y reportée sur `.gitignore`</name>
+  <name>Tâche 1a (tracer ; CONDITIONNÉE) : l'assemblage n'écrit plus `recent-work.json` et supprime l'ancien, la sonde Y reportée sur `.gitignore`</name>
+  Condition de départ : réponse de Samuel à Q-75-3 consignée, option (a) ; à défaut de réponse ou si (b), appliquer le repli de P75-D-20 : « Récent » reste une lentille de plus, même canal, même emplacement, le retrait se réduit à `recent.mjs`.
+  Sous le repli : `recent-work.json` reste écrit par l'assemblage et lu par le moteur ; la sonde Y garde sa cible actuelle (elle n'est pas reportée) ; C6.3 reste inchangée ; le grep d'inventaire n'exige plus zéro pour `recent-work`. L'assertion « un plan non fait donne une carte prévue » (Q2b) n'est pas conditionnée : elle a sa tâche 1b.
   <files>plugin/cockpit/scripts/vf-cockpit-build.mjs, plugin/cockpit/skills/cockpit-moteur/scripts/build.mjs, plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh, plugin/cockpit/scripts/tests/test-cockpit-securite.sh, .planning/workstreams/fiabilite/phases/VFDO-75-activite-sur-le-code/75-09a-RED-TRACE.md</files>
   <read_first>
   - plugin/cockpit/scripts/vf-cockpit-build.mjs (l. 70-82 : `recent`, `recent-work.json`, `GITIGNORE`) et le moteur `scripts/build.mjs` (lecture de `recent-work.json`, ligne de rapport)
@@ -85,7 +87,7 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
   </read_first>
   <behavior>
   - Q1 : un assemblage d'un lab fixture n'écrit AUCUN `recent-work.json` (rouge sur la base : fichier présent) ; un `recent-work.json` laissé par un assemblage antérieur est supprimé (rouge sur la base : conservé) ; la suppression n'a lieu qu'APRÈS `verifierSortie` (un lien symbolique en son lieu est refusé, jamais suivi)
-  - Q2 (C6.3 adaptée) : « aucun `recent-work.json` écrit » ET « un plan non fait dont `files_modified` vise un fichier absent donne une carte `st: prevu` » (fixture : ROADMAP non cochée) ; l'intention de C6.3 est remplacée par l'assertion équivalente sur l'empreinte et les prévues, nommée dans la trace
+  - Q2 (C6.3 adaptée) : « aucun `recent-work.json` écrit » ; l'intention de C6.3 est remplacée par l'assertion équivalente, nommée dans la trace ; l'assertion sur les cartes prévues est Q2b, tâche 1b
   - Q3 (sonde Y reportée) : lien symbolique posé sur `.gitignore` de la sortie : `verifierSortie` refuse avant toute écriture, `dehors.txt` jamais réécrit ; Y1 et Y2 inchangés ; TÉMOIN ROUGE : `verifierSortie` neutralisé (mutant) : `dehors.txt` réécrit
   - Q4 : le moteur ne lit plus `recent-work.json` ni n'écrit sa ligne de rapport ; son comportement sur un `graph.json` sans `recent` est inchangé (suite du moteur rejouée)
   </behavior>
@@ -107,29 +109,54 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
 </task>
 
 <task type="tdd" tdd="true">
-  <name>Tâche 2 : `recent.mjs`, l'étape de `refresh.mjs`, `recentWork` et la partie d'export retirés</name>
-  <files>plugin/cockpit/skills/cockpit-moteur/scripts/recent.mjs, plugin/cockpit/skills/cockpit-moteur/scripts/refresh.mjs, plugin/cockpit/skills/cockpit-moteur/assets/graph-query.js, plugin/cockpit/skills/cockpit-moteur/assets/ui/60-export.js, plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh, .planning/workstreams/fiabilite/phases/VFDO-75-activite-sur-le-code/75-09a-RED-TRACE.md</files>
+  <name>Tâche 1b (NON conditionnée) : une carte `prevu` pour un plan non fait, assertion de C6.3 ajoutée</name>
+  <files>plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh, .planning/workstreams/fiabilite/phases/VFDO-75-activite-sur-le-code/75-09a-RED-TRACE.md</files>
+  <behavior>
+  - Q2b : un plan non fait dont `files_modified` vise un fichier absent donne une carte `st: prevu` (fixture : ROADMAP non cochée) ; assertion AJOUTÉE à `test-cockpit-onglet-code.sh` (ACTV-11), aucune assertion existante modifiée ; rouge sur la base (aucune carte)
+  </behavior>
+  <action>Assertion `Q2b.1 — …` ajoutée, rouge sur la base, verte après 75-06 ; ne dépend ni du retrait ni de la réponse à Q-75-3.</action>
+  <verify>
+    <automated>O="${TMPDIR:-/tmp}/75-09a-t1b.out"; bash plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh > "$O" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O" || exit 1; rtk proxy grep -q "PASS — Q2b\." "$O" || exit 1; bash scripts/check-machine-paths.sh || exit 1</automated>
+    <fails_when>l'assertion Q2b est verte sur la base, ou une assertion existante a été modifiée</fails_when>
+  </verify>
+  <done>La carte prévue d'un plan non fait est prouvée dans la suite de l'onglet Code.</done>
+</task>
+
+<task type="tdd" tdd="true">
+  <name>Tâche 2a (NON conditionnée) : `recent.mjs` et l'étape « Mark recent work » de `refresh.mjs` retirés</name>
+  <files>plugin/cockpit/skills/cockpit-moteur/scripts/recent.mjs, plugin/cockpit/skills/cockpit-moteur/scripts/refresh.mjs, plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh, .planning/workstreams/fiabilite/phases/VFDO-75-activite-sur-le-code/75-09a-RED-TRACE.md</files>
   <read_first>
   - plugin/cockpit/skills/cockpit-moteur/scripts/refresh.mjs (l. ~137 écriture de `changes.json` « for recent.mjs », l. ~173 l'étape « Mark recent work »)
+  </read_first>
+  <behavior>
+  - Q5 : `scripts/recent.mjs` n'existe plus ; `refresh.mjs` ne recommande plus d'exécuter `recent.mjs` (sa sortie ne contient plus l'étape « Mark recent work », rouge sur la base) ; aucun appelant de `recent.mjs` (grep des appelants, vide). Retrait de `recent.mjs` seul, jamais appelé : NON conditionné par Q-75-3
+  </behavior>
+  <action>Témoin Q5 d'abord (rouge sur la base), puis retrait de `recent.mjs` et de l'étape de `refresh.mjs`. Mutant : étape de `refresh.mjs` conservée (Q5 rouge).</action>
+  <verify>
+    <automated>O="${TMPDIR:-/tmp}/75-09a-t2a.out"; bash plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh > "$O" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O" || exit 1; rtk proxy grep -q "PASS — Q5\." "$O" || exit 1; test "$(rtk proxy grep -c 'PASS — Q[0-9]*\.[0-9]* — mutant' "$O")" -ge 1 || exit 1; test ! -e plugin/cockpit/skills/cockpit-moteur/scripts/recent.mjs || exit 1; bash scripts/check-machine-paths.sh || exit 1</automated>
+    <fails_when>un appelant de `recent.mjs` subsiste, ou l'étape de `refresh.mjs` guide encore vers un script supprimé</fails_when>
+  </verify>
+  <done>Le moteur ne recommande plus un script supprimé.</done>
+</task>
+
+<task type="tdd" tdd="true">
+  <name>Tâche 2b (CONDITIONNÉE) : `recentWork` et la partie d'export « Recent work » retirés</name>
+  Condition de départ : réponse de Samuel à Q-75-3 consignée, option (a) ; à défaut de réponse ou si (b), appliquer le repli de P75-D-20 : « Récent » reste une lentille de plus, même canal, même emplacement, le retrait se réduit à `recent.mjs`.
+  Sous le repli : `recentWork` de `graph-query.js` et la partie d'export « Recent work » de `60-export.js` restent (la couche vit comme lentille « Récent ») ; Q6 et Q7 ne sont pas posés ; le grep d'inventaire n'exige plus zéro pour les motifs de la couche.
+  <files>plugin/cockpit/skills/cockpit-moteur/assets/graph-query.js, plugin/cockpit/skills/cockpit-moteur/assets/ui/60-export.js, plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh, .planning/workstreams/fiabilite/phases/VFDO-75-activite-sur-le-code/75-09a-RED-TRACE.md</files>
+  <read_first>
   - plugin/cockpit/skills/cockpit-moteur/assets/graph-query.js (l. ~101-102, ~172 : `recentWork`), plugin/cockpit/skills/cockpit-moteur/assets/ui/60-export.js (l. ~35 : « Recent work »)
   </read_first>
   <behavior>
-  - Q5 : `scripts/recent.mjs` n'existe plus ; `refresh.mjs` ne mentionne plus `recent.mjs` ni `recent-work.json` (sa sortie ne contient plus l'étape « Mark recent work », rouge sur la base) ; aucun appelant de `recent.mjs` (grep des appelants, vide)
   - Q6 : `graph-query.js` ne porte plus `recentWork`, `60-export.js` plus la partie « Recent work » ; l'export autonome d'un lab ne la contient plus ; les autres parties d'export inchangées (comparaison)
-  - Q7 : le grep d'inventaire de la précondition ne rend, pour les fichiers de ce plan, que les exceptions nommées (`serve.mjs`, `references/schema.md`)
+  - Q7 : le grep d'inventaire de la précondition ne rend, pour les fichiers de ce plan, que les exceptions nommées
   </behavior>
-  <action>
-  Témoin d'abord (Q5 à Q7, rouges sur la tâche 1 seule), puis retraits. Mutants : étape de `refresh.mjs` conservée (Q5 rouge), `recentWork` conservé (Q6 rouge).
-  </action>
+  <action>Témoin d'abord (Q6, Q7 rouges), puis retraits. Mutant : `recentWork` conservé (Q6 rouge).</action>
   <verify>
-    <automated>O="${TMPDIR:-/tmp}/75-09a-t2.out"; bash plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh > "$O" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O" || exit 1; rtk proxy grep -q "PASS — Q5\." "$O" || exit 1; rtk proxy grep -q "PASS — Q6\." "$O" || exit 1; rtk proxy grep -q "PASS — Q7\." "$O" || exit 1; test "$(rtk proxy grep -c 'PASS — Q[0-9]*\.[0-9]* — mutant' "$O")" -ge 2 || exit 1; test ! -e plugin/cockpit/skills/cockpit-moteur/scripts/recent.mjs || exit 1; bash scripts/check-machine-paths.sh || exit 1</automated>
-    <fails_when>un appelant de `recent.mjs` subsiste, ou l'étape de `refresh.mjs` guide encore vers un script supprimé</fails_when>
+    <automated>O="${TMPDIR:-/tmp}/75-09a-t2b.out"; bash plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh > "$O" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O" || exit 1; rtk proxy grep -q "PASS — Q6\." "$O" || exit 1; rtk proxy grep -q "PASS — Q7\." "$O" || exit 1; test "$(rtk proxy grep -c 'PASS — Q[0-9]*\.[0-9]* — mutant' "$O")" -ge 1 || exit 1; bash scripts/check-machine-paths.sh || exit 1</automated>
+    <fails_when>`recentWork` subsiste dans l'export</fails_when>
   </verify>
-  <acceptance_criteria>
-  - la trace consigne les deux mutants et la liste des appelants de `recent.mjs` (vide)
-  - `git diff --stat` ne liste ni `viewer.html`, ni `DESIGN.md`, ni `README*`, ni `CHANGELOG.md`
-  </acceptance_criteria>
-  <done>Le moteur ne produit, ne lit ni ne recommande plus la couche.</done>
+  <done>Le moteur ne produit plus la partie « Recent work » de l'export.</done>
 </task>
 
 </tasks>

@@ -82,7 +82,23 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
 <tasks>
 
 <task type="tdd" tdd="true">
-  <name>Tâche 1 (tracer) : la page ne porte plus la couche : en-tête, légende, classes, `#btn-recent` migré, `25-recent.js`</name>
+  <name>Tâche 0 (NON conditionnée) : trace du retrait de `scripts/recent.mjs` dans `VENDORED.txt`</name>
+  <files>plugin/cockpit/skills/cockpit-moteur/VENDORED.txt, .planning/workstreams/fiabilite/phases/VFDO-75-activite-sur-le-code/75-09b-RED-TRACE.md</files>
+  <behavior>
+  - Q8a : `VENDORED.txt` porte la trace du retrait de `scripts/recent.mjs` (ligne `RETRAIT` si la forme livrée par 79-01 en porte, sinon l'inventaire du plafond, 75-RESEARCH O-4) ; retrait de `recent.mjs` seul : NON conditionné par Q-75-3
+  </behavior>
+  <action>Poser la ligne selon la forme livrée ; consigner la forme dans la trace.</action>
+  <verify>
+    <automated>test "$(rtk proxy grep -c 'recent\.mjs' plugin/cockpit/skills/cockpit-moteur/VENDORED.txt)" -ge 1 || exit 1; bash scripts/check-machine-paths.sh || exit 1</automated>
+    <fails_when>`VENDORED.txt` ne dit rien du retrait de `recent.mjs`</fails_when>
+  </verify>
+  <done>Le retrait de `recent.mjs` est tracé.</done>
+</task>
+
+<task type="tdd" tdd="true">
+  <name>Tâche 1 (tracer ; CONDITIONNÉE) : la page ne porte plus la couche : en-tête, légende, classes, `#btn-recent` migré, `25-recent.js`</name>
+  Condition de départ : réponse de Samuel à Q-75-3 consignée, option (a) ; à défaut de réponse ou si (b), appliquer le repli de P75-D-20 : « Récent » reste une lentille de plus, même canal, même emplacement, le retrait se réduit à `recent.mjs`.
+  Sous le repli : `ui/25-recent.js`, `.recent`/`.recent-in`, `recentTip`, la bascule et `#btn-recent` restent ; le sélecteur reçoit la lentille « Récent » dans le même canal, à l'emplacement de l'ancienne entrée, entrée et pastille conservées ; `ecrans-recent` et `responsive` ne changent pas ; seule la trace du retrait de `recent.mjs` (tâche 0) est posée.
   <files>plugin/cockpit/skills/cockpit-moteur/assets/viewer.html, plugin/cockpit/skills/cockpit-moteur/assets/ui/25-recent.js, plugin/cockpit/skills/cockpit-moteur/assets/ui/00-vibeflow.js, plugin/cockpit/skills/cockpit-moteur/assets/ui/01-vf-responsive.js, plugin/cockpit/skills/cockpit-moteur/assets/ui/02-vf-telephone.js, plugin/cockpit/skills/cockpit-moteur/VENDORED.txt, plugin/cockpit/scripts/tests/test-cockpit-ecrans-recent.sh, plugin/cockpit/scripts/tests/fixtures/test-cockpit-ecrans-recent/recent-doublons.json, plugin/cockpit/scripts/tests/test-cockpit-responsive.sh, .planning/workstreams/fiabilite/phases/VFDO-75-activite-sur-le-code/75-09b-RED-TRACE.md</files>
   <read_first>
   - 75-RESEARCH.md § « Retrait » (table des fichiers) ; 75-UI-SPEC « Sondes visuelles à rejouer » (S1, S13) et « Sélecteur de lentilles » (Place et forme : références à migrer)
