@@ -258,6 +258,28 @@ panels. Aucune ne vaut arbitrage de Samuel, et aucune ne rouvre un arbitrage dé
     La réponse passe par la réponse gardée commune (A11). Cette décision fixe la durée du cache, laissée à discrétion
     plus bas.
 
+### Décisions du manager après la recherche (2026-11-11, questions ouvertes de `77-RESEARCH.md`)
+
+Mêmes régime et mention que plus haut : décisions déléguées par Samuel (message session principale, 2026-11-08),
+option recommandée.
+
+- **P77-D-21 (sommet de base, OQ-1).** `/api/vf/git` ne sert pas aujourd'hui le sha du sommet de la branche de base,
+  que P77-D-08 met en mémoire. Il est ajouté en champ facultatif `base.h` (sha de 40 caractères) de `cockpit-git@1`.
+  C'est un ajout facultatif, sans changement de version (règle C0 de la 79), dans le plan qui en a besoin.
+- **P77-D-22 (sens de « commits arrivés », OQ-2).** Les commits arrivés sont les ancêtres du sommet courant de la
+  branche de base, moins les ancêtres de `tete`, soit l'équivalent de `tete..sommet`. Les branches longues non
+  fusionnées ne sont donc pas comptées à chaque visite. Ce sens précise P77-D-10 sans le changer : on ne filtre
+  toujours pas sur la date, et la synthèse dit « plus de 500 » hors fenêtre.
+- **P77-D-23 (mesures qui ne parlent qu'au dépassement, OQ-3).** « Paragraphe de STATE » et « lignes par entrée de
+  BACKLOG » ne produisent une valeur qu'en cas de dépassement. En `--format=tsv`, le gate émet pour chacune la valeur
+  la plus haute observée, calculée par le gate lui-même dans la boucle qui mesure déjà : ce n'est pas un recalcul côté
+  cockpit. La sortie texte reste inchangée.
+- **P77-D-24 (écarts constatés par la recherche).**
+  - `vf-cockpit-paths.mjs` est à 296 lignes sur 300 (plafond du test de vendor). Le code neuf va dans des modules
+    neufs ; ce fichier ne reçoit que l'`export` du lanceur asynchrone et le paramètre de nom de `driverLockScript`.
+  - L'assertion R3.25 de `test-cockpit-projet-visite.sh` lit la prose `lastDesc`. Elle est réécrite dans le plan du
+    retrait (P77-D-12), pour asserter l'absence du texte.
+
 ### Claude's Discretion
 
 - Le numéro et le nom du fichier `ui/` neuf : un numéro libre au moment de l'exécution, à vérifier contre les fichiers
