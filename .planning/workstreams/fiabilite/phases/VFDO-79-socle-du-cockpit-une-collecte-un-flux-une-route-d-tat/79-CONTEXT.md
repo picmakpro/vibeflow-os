@@ -515,8 +515,8 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   sur `window`). (2) Aucune liste fermée ni baseline des scripts persistants : la classe est lue du marqueur au démarrage
   par la coquille, sur les fichiers de `ui/` du module (même liste que `/_vf/`, A40) ; seul geste : poser le marqueur.
   (3) Ordre garanti au premier chargement : bibliothèques, puis scripts persistants par ordre alphabétique de nom, puis le
-  premier onglet et ses extensions — un persistant pose ses écouteurs avant toute vue (`00-vf-surcouches.js` de la 80
-  passe en tête). 79-16 part de la base où 80-02 est fusionné et reprend ce fichier tel que livré, marqueur compris ;
+  premier onglet et ses extensions — tout persistant pose ses écouteurs avant toute vue (aucun persistant ne suppose
+  d'être le premier : l'ordre alphabétique entre persistants est seul garanti). 79-16 part de la base où 80-02 est fusionné et reprend ce fichier tel que livré, marqueur compris ;
   témoin : un persistant de fixture est évalué une seule fois sur deux changements d'onglet, avant toute extension
   d'onglet. Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
