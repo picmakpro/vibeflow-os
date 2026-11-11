@@ -314,6 +314,16 @@ sans en retirer rien.
   (C5), il écrit à chaque changement un fichier de données `projet.json` (`cockpit-project@1`, 0600, temporaire puis
   renommage) dans la sortie, lu par l'outil de requête de l'agent « Demander » ; aucune donnée nouvelle, jamais
   exporté.
+- **A30 (80, et toute phase) — règle de C5 : cycle de vie d'un onglet.** `VF_COQUILLE.chargerOnglet(nom)` garantit
+  la réinitialisation des extensions ; la Phase 80 n'a pas à les connaître. Forme unique :
+  `VF_COQUILLE.surOnglet(rappel)` → fonction de désinscription. `rappel({ onglet })` est appelé après le premier rendu
+  du chargement initial puis après chaque `chargerOnglet` ; s'il rend une fonction, celle-ci est appelée juste avant
+  le changement d'onglet suivant (nettoyage : observateurs, minuteries, écouteurs). Les extensions `ui/` de la 79 qui
+  lisent l'onglet une seule fois (cadrage `fit`, `80-vf-fr.js`, `70-vf-live.js` et celles que le plan 79-16 relève)
+  sont converties par le plan 79-16. **Règle commune** : une extension d'une autre phase (73 à 77, 80) qui dépend de
+  l'onglet s'initialise par `surOnglet`, jamais au seul chargement du document. `VF_COQUILLE` et `VF_ETAT` sont des
+  objets globaux propres à la 79 : ils n'étendent jamais l'objet gelé du moteur, et ne supposent rien des objets de
+  la 80 (`VF_SURCOUCHES`, `VF_PANNEAU`).
 - **Note C3.** Le coût en monnaie et les limites de 5 h et de 7 jours sont hors de cette vague (P74-D-20, P74-D-24).
 
 ## À Samuel
