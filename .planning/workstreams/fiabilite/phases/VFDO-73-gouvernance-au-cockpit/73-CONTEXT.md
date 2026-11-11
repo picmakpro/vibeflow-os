@@ -16,7 +16,7 @@ Trois éclaireurs en lecture seule (code de l'onglet Équipe, sources de gouvern
 de trois chercheurs (« À vous » et impact ; architecture de la page ; état « relu », notifications, « ailleurs ») ont
 établi les faits ; la spec d'interface `73-UI-SPEC.md` a été écrite en parallèle et se conforme à ce fichier.
 
-**Exigences :** REGI-01 à REGI-16. Préfixe neuf, vérifié libre le 2026-11-11 dans tous les ledgers
+**Exigences :** REGI-01 à REGI-17 (REGI-17 ajoutée à la reprise du 2026-11-11, P73-D-37). Préfixe neuf, vérifié libre le 2026-11-11 dans tous les ledgers
 `.planning/workstreams/*/REQUIREMENTS.md`, dans le dépôt (`git grep`) et sur les branches des Phases 7x/8x, d'intégration
 et `main` (témoin positif du même contrôle : `REG-D-01` trouvé).
 
@@ -337,6 +337,26 @@ recommandée ; l'option recommandée vient du panel ou de l'éclaireur cité. Au
   entrée à relever dans la baseline des observateurs du plan 79-17. Option écartée : relever une entrée de cette baseline,
   qui demanderait une citation d'arbitrage pour un besoin évitable. Décision déléguée par Samuel (message session
   principale, 2026-11-08), option recommandée.
+
+- **P73-D-39 (questions en attente sur l'onglet Équipe avant la coquille, constat O-1 du plan 73-11).** Avant la coquille
+  C5 de la Phase 79, seule la page Projet porte `cockpit-project@1` ; l'enveloppe d'Équipe n'est pas élargie pour les
+  questions (P73-D-03, P73-D-25 inchangées). La régie lit `meta.vf.questions` par `VF_ETAT` ou la route
+  `graphe?onglet=projet` de la coquille (plans 79-15 et 79-16) ; sans eux, l'emplacement dit « pas encore livrée »,
+  comme quand le champ est absent. Limite écrite : si la lecture de la 76 (76-09) fusionne avant la coquille, l'onglet
+  Équipe la dira absente jusqu'à la coquille, et le nombre du titre n'inclut les questions que là où elles sont lues.
+  Option écartée : copier le champ dans l'enveloppe d'Équipe côté serveur (touche l'export et la liste de `meta`).
+- **P73-D-40 (module de lecture des questions à part, O-2).** La lecture de `meta.vf.questions` vit dans un module voisin
+  de l'adaptateur de 73-05, `72-vf-regie-questions-source.js`, et non dans `72-vf-regie-source.js` : plafond de lignes, et
+  le titre lit le même compte sur les trois onglets. L'adaptateur reste la seule porte du flux `who` et `lock`.
+- **P73-D-41 (questions dans un rang, O-3).** Dans un même rang de P73-D-07, les lignes qui portent une ancienneté
+  d'attente (sessions) passent avant les lignes de question, rangées entre elles par phase puis identifiant (ordre du
+  contrat C76-Q2).
+- **P73-D-42 (libellés neufs de 73-11, O-4).** Les libellés des défauts en mots, du bilan et du message « illisible »
+  sont écrits par le plan 73-11 au § 18 de `73-UI-SPEC.md` à son exécution, et passent devant le juge de design de
+  l'exécution ; « À vérifier (N) » ne liste que les `a-verifier`, les `mal-formee` sont des lignes de signalement du bilan.
+
+Décisions P73-D-39 à P73-D-42 : décisions déléguées par Samuel (message session principale, 2026-11-08), option
+recommandée.
 
 ### Claude's Discretion
 
