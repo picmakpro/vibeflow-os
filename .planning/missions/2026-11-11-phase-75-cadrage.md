@@ -14,7 +14,7 @@ fichier de code ni de test.
 **Planifiée, prête à exécuter après les Phases 79, 80 et 74.** Cadrage `75-CONTEXT.md` (P75-D-01 à D-27), famille
 d'exigences neuve **ACTV-01 à ACTV-12**, recherche `75-RESEARCH.md` avec une table de preuves rejouable des commandes de
 vérification, spécification d'interface `75-UI-SPEC.md` acceptée à **81/100** au quatrième tour (seuil 70), **12 plans en
-8 vagues**, dont la dernière vérification fraîche rend `passed` (0 bloquant, 0 majeur, 6 mineurs ouverts ci-dessous).
+9 vagues**, dont la dernière vérification fraîche rend `passed` (0 bloquant, 0 majeur, 6 mineurs ouverts ci-dessous).
 Aucune exécution, aucun fichier de code ni de test ; STATE.md intact.
 
 ## Reprise du 2026-11-11 (après les arbitrages de Samuel)
@@ -50,7 +50,7 @@ Aucune exécution, aucun fichier de code ni de test ; STATE.md intact.
 | (temps 2 enchaîné sans rendre la main, consigne de la session principale) | | | |
 | research-75 | `75-RESEARCH.md` | gsd-phase-researcher | fait `686df387` |
 | uispec-75 / critique | `75-UI-SPEC.md`, 4 tours de craft, 4 juges neufs | vf-crafter, vf-design-judge | 67, 62, 69, puis **81/100 passed** (quatrième tour accordé par la session principale) ; 10 constats du juge final repris comme critères dans 75-07 et 75-08 |
-| plan-75 | 12 plans, 8 vagues | vf-coder (planification seule) | fait `3a7094c7`, corrigé `f0a5c41d`, `370633f9`, `fb104665`, `e5efa88a`, `02f0c12b` |
+| plan-75 | 12 plans, 9 vagues | vf-coder (planification seule) | fait `3a7094c7`, corrigé `f0a5c41d`, `370633f9`, `fb104665`, `e5efa88a`, `02f0c12b` |
 | plancheck-75 | 3 vérifications fraîches | gsd-plan-checker | 5 vérifications fraîches + 1 figée (voir Incidents) : `issues_found` ×4 (6/16/11, 3/4/6, 3/4/5, 0/4/9), puis **`passed`** sur `3c260aa0` (0/0/6) |
 | pr-rapport | PR vers `integration/cockpit-audit`, ce rapport | manager | fait |
 
@@ -120,7 +120,8 @@ aucun canal ; sa relecture « Voir sur la carte » (P74-D-12) passe par `showBoa
 
 | Fichier | Plan(s) de la 75 | Partagé avec | Nature |
 |---|---|---|---|
-| `plugin/cockpit/scripts/vf-cockpit-server.mjs` (table `ROUTES` de 79-05 ; le mécanisme vit dans `vf-cockpit-routes.mjs`) | 75-05 | 79 (79-05), 76 (`/api/vf/tracabilite`), 77 (`/api/vf/methode`) | une ligne `[chemin, lecteur, régime?]`, place alphabétique (`/api/vf/activite`) ; `test-cockpit-routes.sh` non modifié |
+| `plugin/cockpit/scripts/vf-cockpit-server.mjs` (table `ROUTES` de 79-05 ; le mécanisme vit dans `vf-cockpit-routes.mjs`) | 75-05 | 79 (79-05), 76 (`/api/vf/tracabilite`), 77 (`/api/vf/methode`) | une ligne `[chemin, lecteur, régime?]`, place alphabétique (`/api/vf/activite`), après 79-22 |
+| `plugin/cockpit/scripts/tests/test-cockpit-routes.sh` | 75-05 | 79 (79-05, 79-12, 79-13, 79-15), 76, 77 | une ligne dans la liste écrite à la main de RK.1, à sa place alphabétique |
 | `plugin/cockpit/scripts/vf-cockpit-interface.json` | 75-05 | 79, 74, 76, 77 | schéma `vibeflow/cockpit-activite@1` |
 | `plugin/cockpit/scripts/vf-cockpit-planning.mjs`, `vf-cockpit-project.mjs` | 75-04 | 79 (79-09), 80 (`vague`, `avancement`, `exigences`) | champ facultatif `files_modified` seulement |
 | `plugin/cockpit/scripts/vf-cockpit-build.mjs` | 75-06 (annotateur `prevues`, 1 ligne, ordre alphabétique de nom), 75-09a (retrait) | 79 (79-05, table des annotateurs, A27/A34) | |
@@ -146,20 +147,20 @@ aucun canal ; sa relecture « Voir sur la carte » (P74-D-12) passe par `showBoa
 | 75-03 Chemins, empreinte, collisions | 1 | — | 79-07, 79-09, 79-13 | ACTV-08, 09, 10 | `vf-cockpit-activite-chemins.mjs`, `-empreinte.mjs`, `-collisions.mjs`, `tests/test-cockpit-activite-chemins.sh`, `-empreinte.sh` (neufs) |
 | 75-04 `files_modified` | 1 | — | 79-09 ; plan de la 80 qui pose `vague` | ACTV-10, 11 | `vf-cockpit-planning.mjs`, `vf-cockpit-project.mjs` ; `tests/test-cockpit-activite-planning.sh` (neuf) |
 | 75-05 Route et schéma | 2 | 01-04 | 79-02, 79-05, 79-06, 79-09, 79-12, 79-13, 79-15 | ACTV-04, 08, 10, 12 | `vf-cockpit-activite.mjs` (neuf), `vf-cockpit-server.mjs` (1 ligne dans `ROUTES`), `vf-cockpit-interface.json`, `tests/test-cockpit-activite-route.sh` (neuf) |
-| 75-06 Cartes prévues | 2 | 03, 04 | 79-01, 79-02, 79-05, 79-09, 79-15 | ACTV-11 | `vf-cockpit-activite-prevues.mjs` (neuf), `vf-cockpit-build.mjs` (1 ligne) ; moteur `build.mjs`, `lib/common.mjs`, `serve.mjs` ; `tests/test-cockpit-activite-prevues.sh` (neuf) |
-| 75-07 Canal, pied réservé, marques | 3 | 05, 06 | 79-01, 79-02, 79-11, 79-16, 79-17, 79-18 ; 74 ; clavier du canevas de la 80 | ACTV-01, 02, 03, 10, 11 | `viewer.html`, `ui/75-vf-marques.js`, `ui/75-vf-marques-glyphes.js` (neufs), `VENDORED.txt`, `tests/test-cockpit-activite-carte.sh`, `chrome-activite-carte.mjs` (neufs) |
-| 75-08 Sélecteur, menu, panneau, radar | 4 | 05, 07 | 79-16, 79-17, 79-18 ; surcouches de la 80 ; 74 | ACTV-01, 02, 06, 07, 08, 10 | `ui/75-vf-activite.js`, `-menu.js`, `-tables.js`, `-panneau.js`, `-collisions.js` (neufs), `ui/02-vf-telephone.js`, `viewer.html`, `VENDORED.txt`, `tests/test-cockpit-activite-lentilles.sh`, `chrome-activite-lentilles.mjs` (neufs) |
-| 75-09a Retrait, assemblage et moteur | 5 | 06, 07, 08 | 79-01, 79-15 | ACTV-12 | `vf-cockpit-build.mjs`, moteur `build.mjs`, `recent.mjs` (supprimé), `refresh.mjs`, `graph-query.js`, `ui/60-export.js`, `tests/test-cockpit-securite.sh`, `test-cockpit-onglet-code.sh` |
-| 75-09b Retrait, page et jetons | 6 | 07, 08, 09a | 79-11, 79-16 ; plans de la 80 qui touchent `viewer.html` | ACTV-12, 01 | `viewer.html`, `ui/25-recent.js` (supprimé), `ui/00-vibeflow.js`, `ui/01-vf-responsive.js`, `ui/02-vf-telephone.js`, `VENDORED.txt`, `test-cockpit-ecrans-recent.sh` et sa fixture, `test-cockpit-responsive.sh` |
-| 75-09c Retrait, dictionnaires et suites voisines | 7 | 09b | 79-10 ; dictionnaires de la 80 | ACTV-12 | `ui/78-vf-fr-dict-a.js`, `ui/80-vf-fr.js`, `test-cockpit-moteur-carte.sh`, `chrome-moteur-carte.mjs`, `test-cockpit-chrome-fr.sh` |
-| 75-10 Non-régression et docs | 8 | 05-09c | 79-20 ; 74, 80 | ACTV-12 | `tests/test-cockpit-chaine-xss.sh`, `test-cockpit-activite-sans-git.sh` (neuf), `plugin/cockpit/CHANGELOG.md`, `plugin/cockpit/README.md`, `DESIGN.md`, `README.md`, `README.fr.md` |
+| 75-06 Cartes prévues | 3 | 03, 04, 05 | 79-01, 79-02, 79-05, 79-09, 79-15 | ACTV-11 | `vf-cockpit-activite-prevues.mjs` (neuf), `vf-cockpit-build.mjs` (1 ligne) ; moteur `build.mjs`, `lib/common.mjs`, `serve.mjs` ; `tests/test-cockpit-activite-prevues.sh` (neuf) |
+| 75-07 Canal, pied réservé, marques | 4 | 05, 06 | 79-01, 79-02, 79-11, 79-16, 79-17, 79-18 ; 74 ; clavier du canevas de la 80 | ACTV-01, 02, 03, 10, 11 | `viewer.html`, `ui/75-vf-marques.js`, `ui/75-vf-marques-glyphes.js` (neufs), `VENDORED.txt`, `tests/test-cockpit-activite-carte.sh`, `chrome-activite-carte.mjs` (neufs) |
+| 75-08 Sélecteur, menu, panneau, radar | 5 | 05, 07 | 79-16, 79-17, 79-18 ; surcouches de la 80 ; 74 | ACTV-01, 02, 06, 07, 08, 10 | `ui/75-vf-activite.js`, `-menu.js`, `-tables.js`, `-panneau.js`, `-collisions.js` (neufs), `ui/02-vf-telephone.js`, `viewer.html`, `VENDORED.txt`, `tests/test-cockpit-activite-lentilles.sh`, `chrome-activite-lentilles.mjs` (neufs) |
+| 75-09a Retrait, assemblage et moteur | 6 | 06, 07, 08 | 79-01, 79-15 | ACTV-12 | `vf-cockpit-build.mjs`, moteur `build.mjs`, `recent.mjs` (supprimé), `refresh.mjs`, `graph-query.js`, `ui/60-export.js`, `tests/test-cockpit-securite.sh`, `test-cockpit-onglet-code.sh` |
+| 75-09b Retrait, page et jetons | 7 | 07, 08, 09a | 79-11, 79-16 ; plans de la 80 qui touchent `viewer.html` | ACTV-12, 01 | `viewer.html`, `ui/25-recent.js` (supprimé), `ui/00-vibeflow.js`, `ui/01-vf-responsive.js`, `ui/02-vf-telephone.js`, `VENDORED.txt`, `test-cockpit-ecrans-recent.sh` et sa fixture, `test-cockpit-responsive.sh` |
+| 75-09c Retrait, dictionnaires et suites voisines | 8 | 09b | 79-10 ; dictionnaires de la 80 | ACTV-12 | `ui/78-vf-fr-dict-a.js`, `ui/80-vf-fr.js`, `test-cockpit-moteur-carte.sh`, `chrome-moteur-carte.mjs`, `test-cockpit-chrome-fr.sh` |
+| 75-10 Non-régression et docs | 9 | 05-09c | 79-20 ; 74, 80 | ACTV-12 | `tests/test-cockpit-chaine-xss.sh`, `test-cockpit-activite-sans-git.sh` (neuf), `plugin/cockpit/CHANGELOG.md`, `plugin/cockpit/README.md`, `DESIGN.md`, `README.md`, `README.fr.md` |
 
 Chaque plan écrit aussi sa trace de rouge `75-NN-RED-TRACE.md` dans le dossier de la phase. Chemins abrégés :
 `scripts/` = `plugin/cockpit/scripts/`, `tests/` = `plugin/cockpit/scripts/tests/`, `ui/` et `viewer.html` sous
 `plugin/cockpit/skills/cockpit-moteur/assets/`.
 
-**Ordre des vagues :** 1 (01, 02, 03, 04, fichiers disjoints) → 2 (05, 06) → 3 (07) → 4 (08) → 5 (09a) → 6 (09b) →
-7 (09c) → 8 (10). Plans de la 80 cités d'après `origin/feat/phase-80-trois-formes` : 80-01 (clavier du canevas, nom de
+**Ordre des vagues :** 1 (01, 02, 03, 04, fichiers disjoints) → 2 (05) → 3 (06, qui dépend de 05 : les deux touchent
+`test-cockpit-routes.sh`, RK.1 puis AN.1, A54) → 4 (07) → 5 (08) → 6 (09a) → 7 (09b) → 8 (09c) → 9 (10). Plans de la 80 cités d'après `origin/feat/phase-80-trois-formes` : 80-01 (clavier du canevas, nom de
 carte), 80-02 (pile de surcouches), 80-03 (`vague`, avant 75-04) ; 80-09, 11, 13, 14, 16 et 19 touchent aussi
 `viewer.html` (collision nommée, résolue par l'ordre des phases).
 Toute la phase s'exécute après la Phase 79 entière et après la 74 (ordre du jalon). Aucun diff de patch régénéré
@@ -178,7 +179,7 @@ planning, canal de marquage des cartes réutilisable par la relecture de la 74, 
 
 ## À verser par la jointure (texte exact à poser par la session principale)
 
-1. **ROADMAP, ligne de checklist de la Phase 75 :** `- [ ] **Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte** — cadrée et planifiée le 2026-11-11 (12 plans, 8 vagues, ACTV-01..12)`.
+1. **ROADMAP, ligne de checklist de la Phase 75 :** `- [ ] **Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte** — cadrée et planifiée le 2026-11-11 (12 plans, 9 vagues, ACTV-01..12)`.
 2. **ROADMAP, table `## Progress`, ligne de la Phase 75 :** `| 75. L'activité posée sur le code | 0/12 | Planifiée | - |`.
 3. **REQUIREMENTS, repères :** retirer `<!-- vf-cadrage:phase-75 -->` et la ligne repère « repère de cadrage, Phase 75 » de la table `## Traceability` ; compteurs globaux : + 12 exigences (ACTV-01..12, Pending).
 4. **REGISTRE.md de l'audit :** AUDC-I12 et AUDC-I13 → « planifié (Phase 75, 2026-11-11) » ; AUDC-I36 → « planifié en partie (Phase 75 : cartes prévues, agent par zone) ; constats de l'auditeur sur les cartes en réserve (P75-D-19) ».

@@ -556,7 +556,7 @@ Plans:
 
 ### Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte
 
-> **Cadrée le 2026-11-11** (`75-CONTEXT.md`, P75-D-01..21, décisions déléguées, option recommandée ; Q-75-3 et Q-75-4 tranchées par Samuel le 2026-11-11, Q-75-1, 2 et 5 ouvertes et non bloquantes). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
+> **Cadrée le 2026-11-11** (`75-CONTEXT.md`, P75-D-01..31, décisions déléguées, option recommandée, sauf P75-D-28 et P75-D-29 (arbitrages Samuel, AskUserQuestion session principale, 2026-11-11) ; questions au format C76-Q1, P75-Q-06 en attente, bloque 75-10). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
 
 **Goal:** La carte Code se colore par l'activité : fréquence de changement croisée avec la taille, fichiers qui changent ensemble, fichiers couverts par un gate ou une suite et zones sans témoin, fichiers lus ou modifiés par la mission en cours.
 **Requirements**: ACTV-01, ACTV-02, ACTV-03, ACTV-04, ACTV-05, ACTV-06, ACTV-07, ACTV-08, ACTV-09, ACTV-10, ACTV-11, ACTV-12
@@ -571,7 +571,7 @@ Plans:
   4. Les fichiers lus ou écrits par les agents des dernières 24 h s'allument avec le nom de l'agent ; un même fichier visé par deux agents, deux branches ou deux plans d'une même vague est signalé avant la fusion, y compris dans les worktrees prouvés du dépôt hors du dossier du lab (P75-D-29).
   5. Les fichiers que les plans non faits vont créer apparaissent en cartes « prévues ».
   6. La couche « Travail récent » et `scripts/recent.mjs` sont retirés ; toutes les suites du cockpit sont vertes sous macOS et Linux, chaîne XSS étendue aux chemins et noms hostiles.
-**Plans:** 12 plans (planifiés le 2026-11-11, corrigés après vérification ; exécution après la Phase 79 entière et la Phase 74)
+**Plans:** 12 plans en 9 vagues (planifiés le 2026-11-11, corrigés après vérification ; exécution après la Phase 79 entière, la 80 et la 74)
 
 Plans:
 
@@ -580,13 +580,13 @@ Plans:
 - [ ] 75-03-PLAN.md — Chemins, empreinte et collisions d'agents et de plans, preuve générative (vague 1 ; ACTV-08, 09, 10)
 - [ ] 75-04-PLAN.md — `files_modified` borné jusqu'à l'instantané, avec la vague de la Phase 80 (vague 1 ; ACTV-10, 11)
 - [ ] 75-05-PLAN.md — Route `/api/vf/activite`, schéma `cockpit-activite@1`, témoin d'export (vague 2 ; ACTV-04, 08, 10, 12)
-- [ ] 75-06-PLAN.md — Cartes « prévues » : annotateur, règle de rattachement extraite, export sans les prévues (vague 2 ; ACTV-11)
-- [ ] 75-07-PLAN.md — Canal de marquage, pied réservé, glyphes, nom accessible, rendu des prévues (vague 3 ; ACTV-01, 02, 03, 11)
-- [ ] 75-08-PLAN.md — Sélecteur de lentilles, menu, panneau, compte du radar (vague 4 ; ACTV-01, 02, 06, 07, 08, 10)
-- [ ] 75-09a-PLAN.md — Retrait côté assemblage et moteur : `recent-work.json`, `recent.mjs`, étape de `refresh.mjs`, sonde Y reportée (vague 5 ; ACTV-12)
-- [ ] 75-09b-PLAN.md — Retrait côté page et jetons : `25-recent.js`, `#btn-recent`, survol, suites `ecrans-recent` et `responsive` adaptées (vague 6 ; ACTV-12, 01)
-- [ ] 75-09c-PLAN.md — Retrait : dictionnaires, `moteur-carte`, `chrome-moteur-carte`, `chrome-fr`, grep d'inventaire à zéro (vague 7 ; ACTV-12)
-- [ ] 75-10-PLAN.md — Chaîne XSS étendue, sans git, DESIGN.md, CHANGELOG, compteur de suites (vague 8 ; ACTV-12)
+- [ ] 75-06-PLAN.md — Cartes « prévues » : annotateur, règle de rattachement extraite, export sans les prévues (vague 3 ; ACTV-11)
+- [ ] 75-07-PLAN.md — Canal de marquage, pied réservé, glyphes, nom accessible, rendu des prévues (vague 4 ; ACTV-01, 02, 03, 11)
+- [ ] 75-08-PLAN.md — Sélecteur de lentilles, menu, panneau, compte du radar (vague 5 ; ACTV-01, 02, 06, 07, 08, 10)
+- [ ] 75-09a-PLAN.md — Retrait côté assemblage et moteur : `recent-work.json`, `recent.mjs`, étape de `refresh.mjs`, sonde Y reportée (vague 6 ; ACTV-12)
+- [ ] 75-09b-PLAN.md — Retrait côté page et jetons : `25-recent.js`, `#btn-recent`, survol, suites `ecrans-recent` et `responsive` adaptées (vague 7 ; ACTV-12, 01)
+- [ ] 75-09c-PLAN.md — Retrait : dictionnaires, `moteur-carte`, `chrome-moteur-carte`, `chrome-fr`, grep d'inventaire à zéro (vague 8 ; ACTV-12)
+- [ ] 75-10-PLAN.md — Chaîne XSS étendue, sans git, DESIGN.md, CHANGELOG, compteur de suites (vague 9 ; ACTV-12)
 
 ### Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire
 
