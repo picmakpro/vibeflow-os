@@ -1683,9 +1683,9 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 
 ### L'équipe dans le temps — frise, fiche d'agent, coût, relecture (Phase 74 — posées au cadrage, 2026-11-11)
 
-Dérivées de P74-D-01 à P74-D-28 (`74-CONTEXT.md`), décisions déléguées par Samuel (message session principale,
+Dérivées de P74-D-01 à P74-D-31 (`74-CONTEXT.md`), décisions déléguées par Samuel (message session principale,
 2026-11-08), option recommandée ; aucun arbitrage neuf. Préfixe `TEMP` vérifié libre le 2026-11-11. Dépendent des
-contrats de la Phase 79 (index, route de frise, contrat de forme) et de la régie de la Phase 73.
+contrats de la Phase 79 (figés au commit `3119d82a` : index, route de frise, flux, contrat de forme) et de la régie de la Phase 73.
 
 - [ ] **TEMP-01**: Frise des sessions dans l'onglet Équipe, derrière une bascule « Régie · Frise » (régie par défaut, aucun quatrième onglet) : une voie par agent, l'enfant sous son parent avec un trait au dispatch, horloge commune au lab, fenêtres 1 h 30 (défaut), 6 h et 24 h, jamais au-delà ; une session vivante sans activité reste listée au repos ; une mission commencée avant la fenêtre le dit (P74-D-02, D-05, D-08 ; AUDC-I05, AUDC-Q2).
 - [ ] **TEMP-02**: Segments et événements lisibles sans la couleur : au travail (barre pleine), vous attend (hachures sans contour coloré), attend ses agents (trait fin), au repos (pointillé) ; compaction, erreur d'outil, message humain, rapport rendu posés sur la voie ; commits sur un bandeau « Dépôt » par branche, jamais attribués à un agent, un clic ouvre le tiroir Git sur le commit ; trois teintes d'état seulement, le nœud du plan écrit sur la voie, jamais une couleur par nœud (P74-D-01, D-06, D-07 ; DESIGN.md § 9).

@@ -542,7 +542,7 @@ Plans:
 
 ### Phase 74: L'équipe dans le temps — swim-lanes, coût, replay
 
-> **Cadrée le 2026-11-11 (premier temps)** — `74-CONTEXT.md`, P74-D-01 à P74-D-28, décisions déléguées par Samuel
+> **Cadrée le 2026-11-11 (premier temps)** — `74-CONTEXT.md`, P74-D-01 à P74-D-31, décisions déléguées par Samuel
 > (message session principale, 2026-11-08), option recommandée ; spécification d'interface `74-UI-SPEC.md`. Inscrite le
 > 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Planification au second temps, sur les
 > contrats de la Phase 79.
@@ -553,7 +553,7 @@ le nœud s'écrit sur la voie, la couleur reste aux trois états ; signalé à S
 (AUDC-Q2) : coût et relecture se lisent sur la fenêtre affichée. La relecture dérive l'état des nœuds des voies des agents
 qui les portent (aucun horodatage de transition dans les DAG).
 **Requirements**: TEMP-01, TEMP-02, TEMP-03, TEMP-04, TEMP-05, TEMP-06, TEMP-07, TEMP-08, TEMP-09, TEMP-10, TEMP-11, TEMP-12
-**Depends on:** Phase 79 (index des transcripts sur disque avec segments, compteurs et jetons dédoublonnés par message ; route de frise ; extension du contrat de forme) ; Phase 73 (régie : ouverture de la fiche depuis une ligne, place de la bascule « Régie · Frise ») ; Phase 69 (onglet Équipe, lien agent ↔ nœud) ; Phase 78 (tiroir Git ouvert sur un commit). Ordre du jalon : après la 79. Recoupements : Phase 75 (mise en évidence continue sur la carte Code : la 74 n'en pose qu'une ponctuelle) ; Phase 77 et Phase 52 (le coût réutilise le calcul de jetons de l'index de la 79, un seul calcul).
+**Depends on:** Phase 79 (contrats figés au commit `3119d82a`, C0 à C6 : index des transcripts sur disque avec segments, compteurs et jetons dédoublonnés par message ; route de frise ; extension du contrat de forme) ; Phase 73 (régie : ouverture de la fiche depuis une ligne, place de la bascule « Régie · Frise ») ; Phase 69 (onglet Équipe, lien agent ↔ nœud) ; Phase 78 (tiroir Git ouvert sur un commit). Ordre du jalon : après la 79. Recoupements : Phase 75 (mise en évidence continue sur la carte Code : la 74 n'en pose qu'une ponctuelle) ; Phase 77 et Phase 52 (le coût réutilise le calcul de jetons de l'index de la 79, un seul calcul).
 **Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 1, 2, 3) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2, `REGISTRE.md` (AUDC-I04, I05, I06, I07, I08, I21, I28, M4, D8, D9), `DESIGNS.md` § 4 et § 5.
 **Un ajout, un retrait :** retirés la boîte de transcript du panneau et son bouton « Lire le transcript » (remplacés par la fiche plein cadre), la durée unique qui compte les veilles (remplacée par la durée par segments) ; avec la Phase 73, la carte « Terminés depuis moins de 24 h » (la frise en porte l'historique).
 

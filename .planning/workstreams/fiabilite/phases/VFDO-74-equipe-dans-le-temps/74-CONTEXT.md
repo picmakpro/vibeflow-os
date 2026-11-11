@@ -1,8 +1,8 @@
 # Phase 74: L'équipe dans le temps — swim-lanes, coût, replay - Context
 
 **Gathered:** 2026-11-11
-**Status:** Cadrée (2026-11-11), premier temps — frontière de questions vide ; planification au second temps, après les
-contrats de la Phase 79
+**Status:** Cadrée (2026-11-11) — frontière de questions vide ; alignée sur les contrats figés de la Phase 79 (branche
+`feat/phase-79-socle-cockpit`, commit `3119d82a`, `79-CONTEXT.md` § « Contrats fournis », C0 à C6)
 
 Cadrage par le manager de la mission Phase 74 (`vf-dev-manager`, worktree `.claude/worktrees/phase-74`, branche
 `feat/phase-74-equipe-dans-le-temps`, base `origin/integration/cockpit-audit` = `f763b556`). Jalon `vibeflow-v2.0`,
@@ -29,8 +29,9 @@ rejoue un instant : ce que chacun faisait, quels nœuds du plan étaient portés
 erreurs, fichiers) à gauche, son fil daté à droite (le lecteur). Le **coût** se lit en jetons et en durée, par agent, par
 mission, par phase et par étage, sur la fenêtre affichée.
 
-**Dépend de :** Phase 79 (index des transcripts sur disque, segments et compteurs par agent, route de frise, extension du
-contrat de forme) ; Phase 73 (régie de l'onglet Équipe : point d'ouverture de la fiche, place de la bascule) ; Phase 69
+**Dépend de :** Phase 79 (contrats figés au commit `3119d82a` : C1 index privé, C3 route de frise
+`GET /api/vf/frise` → `vibeflow/cockpit-frise@1`, C4 événement `frise` et magasin de page `window.VF_ETAT`, C6 contrat de
+forme étendu par la 79 elle-même et retrait de `plugin/cockpit/amont/`) ; Phase 73 (régie de l'onglet Équipe : point d'ouverture de la fiche, place de la bascule) ; Phase 69
 (onglet Équipe, lien agent ↔ nœud). Le lot 0 de l'audit, déjà dans la base, a livré le fil unique ordonné et daté
 (`cockpit-transcript@2`) : la 74 n'en porte que le lecteur (reste de AUDC-D8).
 
@@ -96,7 +97,8 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
   agents = trait fin ; au repos = pointillé neutre. Une erreur ne teinte jamais une voie : elle est un événement.
 - **P74-D-07 (événements).** Posés sur la voie de l'agent : compaction (triangle vide), erreur d'outil (croix, teinte
   corail portée par le seul glyphe), message de l'humain (point), rapport rendu (coche), dispatch (trait vers l'enfant).
-  Les **commits** sont posés sur un bandeau « Dépôt » en tête de frise, par branche, jamais attribués à une voie d'agent :
+  Les **commits** sont posés sur un bandeau « Dépôt » en tête de frise, par branche, lus sur la route Git existante
+  (`vibeflow/cockpit-git@1` ; les commits sont hors de la route de frise, C3), jamais attribués à une voie d'agent :
   aucune donnée ne relie un commit à l'agent qui l'a fait sans deviner (P69-D-15, P69-D-16 interdit de lire l'argument
   d'une commande). Un clic sur un commit ouvre le tiroir Git sur ce commit (Phase 78).
 - **P74-D-08 (fenêtres).** 1 h 30 (défaut), 6 h, 24 h. Jamais au-delà (AUDC-Q2). Une mission plus longue que la fenêtre
@@ -107,8 +109,9 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
 - **P74-D-10 (échelle).** Au-delà de douze voies visibles, les workers se replient sous leur manager (« + N agents »,
   dépliable) ; le bandeau haut porte la courbe du nombre d'agents au travail. Seuil à confirmer par la spécification
   d'interface ; il n'agrège jamais en silence (le compte replié est écrit).
-- **P74-D-11 (direct).** La frise suit le flux partagé de la Phase 79 (un événement sans contenu, puis une lecture
-  authentifiée de la route de frise) ; le trait « maintenant » avance ; aucune donnée de frise ne passe dans le flux.
+- **P74-D-11 (direct).** La frise suit le flux partagé de la Phase 79 (C4 : événement `frise` porteur de la seule
+  signature, puis relecture authentifiée de `GET /api/vf/frise` ; abonnement par `VF_ETAT.abonner('frise', …)`) ; tant que
+  `source.etat` vaut `en-construction`, la frise le dit et montre les voies déjà connues ; le trait « maintenant » avance ; aucune donnée de frise ne passe dans le flux.
 
 ### Relecture au curseur (AUDC-I06, idée 3)
 
@@ -124,18 +127,21 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
   `dag.sh` n'est pas modifié par la 74.
 - **P74-D-14 (fichiers à l'instant t).** Lus à la demande depuis le fil réduit de l'agent (`cockpit-transcript@2` : heure,
   verbe, cible réduite), jamais depuis une cible persistée par la 74 : l'index sur disque reste borné à heures, durées,
-  jetons et verbes (AUDC-Q2). Si la Phase 79 persiste les cibles des écritures pour la Phase 75, la 74 peut les lire, sans
-  l'exiger.
+  jetons et verbes (AUDC-Q2, C1). Les `cibles` de la voie (C3) sont des agrégats en mémoire (nombre, dernière écriture),
+  sans heure par écriture : elles servent aux comptes de la fiche, pas à l'instant t.
 
 ### Fiche d'agent et lecteur
 
 - **P74-D-15 (faits).** Rattachement (« Worker de <parent> · nœud <id> · Phase <n> », chaque terme ouvre sa cible : fiche
   du parent, carte de mission, phase — les trois graphes reliés, AUDC-I21) ; nom, nœud, arbre, modèle ; puis : durée au
   travail dont temps à attendre l'humain ; contexte au dernier tour (en jetons) et nombre de compactions ; appels d'outil
-  dont erreurs ; jetons (entrée, sortie, cache lu, cache écrit) ; fichiers écrits et lus (comptes). Une donnée que la
+  dont erreurs ; jetons (entrée, sortie, cache lu, cache écrit) ; fichiers écrits et lus (comptes, depuis `cibles` de C3 ;
+  « en cours de lecture » tant que `cibles.etat` vaut `en-construction`). Les compactions sont comptées, sans leurs tailles
+  (absentes de C3). Une donnée que la
   source ne donne pas s'écrit « inconnu », jamais un zéro (même règle que la Phase 52 : « jamais estimé »).
 - **P74-D-16 (part du contexte).** En pourcentage seulement si la taille de la fenêtre de contexte vient d'une source
-  documentée ; sinon en jetons. Le pourcentage tiré d'une fenêtre supposée est heuristique (A1 § 3) : il n'est pas affiché.
+  documentée ; sinon en jetons (`jetons.contexteDernier` de C3 ; `contexteMax` est le plus haut observé, pas la taille de
+  la fenêtre). Le pourcentage tiré d'une fenêtre supposée est heuristique (A1 § 3) : il n'est pas affiché.
 - **P74-D-17 (fil).** Une liste datée, du mandat à maintenant ; chaque ligne : heure, glyphe, verbe et cible réduite, ou
   message. Filtres : messages, outils, erreurs (cumulables). Suivi en direct : la liste reste collée en bas tant que
   l'utilisateur n'a pas remonté ; « Revenir au direct » sinon. Plafond de la réduction inchangé (50 messages, 200 outils,
@@ -159,7 +165,7 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
   un coût de phase sur 24 h n'est jamais présenté comme le coût de la phase.
 - **P74-D-22 (le calcul partagé avec la Phase 52).** Un seul calcul : **la somme des jetons de `message.usage`,
   dédoublonnée par identifiant de message (2 à 8 lignes par message, A1 § 3), par transcript, posée dans l'index de la
-  Phase 79**. La 74 l'agrège, elle ne recompte jamais les transcripts. La Phase 52 réutilise cette fonction (ou lit
+  Phase 79** (C1 : curseur `dernierMsgId` et son `usage` ; C3 : `jetons` de la voie). La 74 l'agrège, elle ne recompte jamais les transcripts. La Phase 52 réutilise cette fonction (ou lit
   l'index quand le cockpit est installé) au lieu d'en écrire une seconde : consigné pour son cadrage (« À verser par la
   jointure » du rapport).
 - **P74-D-23 (temps perdu à attendre l'humain).** Somme des segments « vous attend » d'un agent ou d'une fenêtre, tirés
@@ -174,13 +180,13 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
 
 - **P74-D-25 (lecture par le socle seul).** La 74 ne lit aucun transcript elle-même : elle consomme la route de frise et
   l'index de la Phase 79, la route d'état, et la route de transcript existante (`/api/vf/transcript`). Toute clé lue est
-  déclarée au contrat de forme (`vf-cockpit-interface.json`) ; l'extension pour `usage`, `compact_boundary`, `is_error`,
-  les horodatages et l'appariement `tool_use` ↔ `tool_result` appartient à la 79 (qui écrit l'index) ; la 74 vérifie
-  que chaque champ affiché y figure.
+  déclarée au contrat de forme (`vf-cockpit-interface.json`) ; l'extension pour `message.usage`, `message.id`,
+  `compact_boundary`, `turn_duration` et les identifiants d'appel et de résultat d'outil est faite par la 79 (C6) ; la 74
+  vérifie que chaque champ affiché y figure et lit `schema` avant tout champ (C0).
 - **P74-D-26 (durées par segments, AUDC-D9).** La durée affichée d'un agent est la somme de ses segments au travail
   (et non `dureeS`, qui compte les veilles d'un agent réveillé, jusqu'à 101 h). Le retrait de `dureeS` des consommateurs
-  de la 74 suit la politique de version des schémas ; si `vf-signal` le lit encore, il est gardé côté émetteur et retiré
-  par la 79 (à régler entre les deux phases).
+  de la 74 se fait côté page : la fiche et la frise lisent `durees` de C3 ; le champ `dureeS` de `cockpit-who@2` reste
+  émis sans changement de forme (C0 : les schémas existants ne changent pas), pour ses autres lecteurs.
 - **P74-D-27 (bornes d'émission).** Routes en GET seul, derrière Host, Origin et jeton ; clés `doing`, `mandat`,
   `messages`, `outils`, `fil` refusées dans le flux ; l'export ne contient ni frise, ni fiche, ni fil ; aucune lecture
   réseau ; la dernière commande n'apparaît nulle part. La chaîne XSS des suites est étendue aux données de la frise et de
@@ -193,6 +199,21 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
   remplacée par la durée par segments. (3) Partagé avec la 73 (registre § 3) : la carte « Terminés depuis moins de 24 h ».
   La 73 la retire avec le canevas de l'onglet ; la 74 en porte la compensation pour l'historique (la frise sur 24 h,
   P69-D-18 tenue). Si la 73 ne la retire pas, la 74 le fait.
+
+### Jointure avec la régie et la spécification d'interface
+
+- **P74-D-29 (glyphes).** La frise et la fiche n'ont pas de jeu de glyphes propre : elles prennent la table unique de
+  la régie (Phase 73) ou, à défaut, la table `GLYPHE` présente (`71-vf-equipe-rendu.js`). Un glyphe d'état n'existe qu'à
+  un endroit.
+- **P74-D-30 (choix de forme de la spécification d'interface, acceptés).** « Attend ses agents » en trait neutre (la
+  couleur ne dit que ce qui appelle l'humain ou travaille) ; clic sur la colonne de gauche = fiche, clic dans la zone des
+  segments = curseur ; faits de la fiche sur l'horizon de l'index (24 h), libellé visible ; « autour de t » = ± 2 min ;
+  ligne de synthèse en entrée et sortie, cache dans le détail ; liens `#r=` du tiroir « Au travail » redirigés vers la
+  fiche (jointure avec la 73) ; au téléphone, colonne de gauche collante et pistes en défilement horizontal propre à la
+  frise ; position de la bascule en mémoire de la page (`sessionStorage`), jamais dans un fichier du lab.
+- **P74-D-31 (moteur vendorisé).** La 74 ne modifie aucun fichier du moteur (`viewer.html`, `serve.mjs`, `scan.mjs`) :
+  tout son rendu vit dans des modules `ui/*vf*` et ses lectures passent par les routes de la 79. Elle s'exécute après la
+  première vague de la 79 (retrait de `plugin/cockpit/amont/`, C6) et ne régénère aucun diff de patch.
 
 ### Claude's Discretion
 
