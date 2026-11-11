@@ -421,6 +421,11 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   français à la source (ils le restent sous `?lang=en`, limite) ; l'aide de page `node …/serve.mjs` est réécrite par
   79-16 ; **les constats de Santé produits à l'assemblage restent affichés comme aujourd'hui** : 79-10 ne change pas
   leur rendu (P70-D-04 et sa réouverture AUDC-M8 appartiennent à la Phase 80).
+- **A44 (79-10, 79-21, tous) — précisions.** 79-10 garde les motifs `R` et `P` de `80-vf-fr.js` : ils ne s'appliquent
+  plus au DOM et servent seulement à reconnaître les constats de Santé traduits à l'affichage (A43) ; P79-D-16 se lit
+  « observateur global retiré », pas « motifs retirés ». 79-21 range l'automate de correspondance dans un module neuf
+  `scripts/lib/vf-glob.mjs` du moteur (ligne `AJOUT` de `VENDORED.txt`). Plafond effectif : un fichier de code du module
+  vise **299 lignes au plus** (`check-file-size.sh` refuse à 300), quel que soit le plan.
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
   gardé sans fin). Borne en vigueur : AUDC-Q2.
