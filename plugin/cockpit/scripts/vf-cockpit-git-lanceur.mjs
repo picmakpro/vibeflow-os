@@ -109,7 +109,7 @@ export const configFiltres = (noms) => noms.flatMap((x) => [['clean', ''], ['smu
 // Pour `git` : envGit (GIT_* retirés), options de lecture insérées, filtres du dépôt vidés pour les sous-commandes filtrantes.
 export function shBorne(cmd, args, cwd, lab = cwd) {
   if (cmd !== 'git') return lancer(cmd, args, cwd, envEnfant(lab), 1 << 20).sortie;
-  const { argv, sous, dir } = argsGit(args), base = dir ? path.resolve(cwd || '.', dir) : cwd || process.cwd();
+  const { argv, sous, dir } = argsGit(args), cour = cwd || process.cwd(), base = dir ? (path.isAbsolute(dir) ? dir : cour + path.sep + dir) : cour; // -C jugé tel quel par gitSortant, sans normalisation lexicale
   if (gitSortant(base, lab)) return ''; // AUDC-A-02 : point central — un .git qui désigne un dossier git hors du lab n'est jamais lu (lancerGit et lancerGitAsync de même)
   let config = [];
   if (SOUS_COMMANDES_FILTRANTES.includes(sous)) {

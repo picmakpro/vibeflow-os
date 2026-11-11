@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { shBorne, GIT_SUR } from './vf-cockpit-git-lanceur.mjs';
+import { cheminPhysique } from './vf-cockpit-git-sortant.mjs';
 export * from './vf-cockpit-git-lanceur.mjs'; // lancement borné de git (P79-D-25) : tous les noms déplacés restent importables d'ici
 
 const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
@@ -63,8 +64,13 @@ export function trustedScriptsDir() {
   return e && path.isAbsolute(e) && isDir(e) ? e : null;
 }
 
-const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
-export const realUnder = (p, dir) => { const r = real(p), d = real(dir); return r === d || r.startsWith(d + path.sep); };
+// SOCL-10 : un chemin n'est jugé que par sa résolution physique (cheminPhysique) ; un échec rend `siEchec` (faux : « pas dedans », pour les gardes
+// de lecture ; vrai pour les appelants de polarité inverse, qui écartent un candidat quand il est dedans). Le dossier peut être encore absent :
+// il ne contient alors rien.
+export const realUnder = (p, dir, { siEchec = false } = {}) => {
+  const r = cheminPhysique(p), d = cheminPhysique(dir, { plusProcheParent: true });
+  return r === null || d === null ? siEchec : r === d || r.startsWith(d + path.sep);
+};
 // T-67-06 : jamais un script pris dans l'arbre observé. Comparaison sur realpath (un lien `.claude/scripts -> plugin/x` ne passe pas) :
 // aucun candidat sous le lab, sauf le dossier de scripts du module (posé par le lanceur) s'il n'est pas dans la sortie .vibeflow/ du lab.
 export function driverLockScript({ scriptsDir, labRoot, home } = {}) {
@@ -77,29 +83,32 @@ export function driverLockScript({ scriptsDir, labRoot, home } = {}) {
   if (home) cands.push({ c: path.join(home, '.claude', 'scripts', 'driver-lock.sh'), module: false });
   for (const { c, module } of cands) {
     if (!isFile(c)) continue;
-    if (labRoot && module && sortie && realUnder(c, sortie)) continue;
-    if (labRoot && !module && realUnder(c, labRoot)) continue;
+    if (labRoot && module && sortie && realUnder(c, sortie, { siEchec: true })) continue;
+    if (labRoot && !module && realUnder(c, labRoot, { siEchec: true })) continue;
     return { chemin: c, etat: 'trouve' };
   }
   return { chemin: null, etat: 'absent' };
 }
 
 // garde partagée (67-SECURITY M4) : <sortie> ne doit être, ni lui ni aucun de ses fichiers, un lien symbolique sortant du lab.
-// confiner(lab, cible) : cible dans le lab par realpath ; refuse un lien symbolique ou un fichier qui en sort. Lève sinon.
+// confiner(lab, cible) : le plus proche parent existant de la cible est dans le lab (résolution physique) ; refuse un lien symbolique ou un fichier
+// qui en sort. Lève sinon.
 export function confiner(lab, cible) {
   let st = null; try { st = fs.lstatSync(cible); } catch {}
   if (st?.isSymbolicLink()) throw Object.assign(new Error(`lien symbolique refusé dans la sortie du cockpit : ${cible}`), { code: 4 });
-  const parent = real(path.dirname(cible));
-  const racine = real(lab);
-  if (parent !== racine && !parent.startsWith(racine + path.sep)) throw Object.assign(new Error(`écriture hors du lab refusée : ${cible}`), { code: 4 });
+  const parent = cheminPhysique(path.dirname(cible), { plusProcheParent: true }), racine = cheminPhysique(lab);
+  if (parent === null || racine === null || (parent !== racine && !parent.startsWith(racine + path.sep))) {
+    throw Object.assign(new Error(`écriture hors du lab refusée : ${cible}`), { code: 4 });
+  }
   return cible;
 }
 
-// verifierSortie(lab, sortie) : la sortie est sous le lab (realpath) et aucun de ses éléments n'est un lien symbolique ; lève sinon.
+// verifierSortie(lab, sortie) : la sortie est sous le lab (résolution physique) et aucun de ses éléments n'est un lien symbolique ; lève sinon.
 export function verifierSortie(lab, sortie) {
-  const racine = real(lab);
-  const r = real(sortie);
-  if (r !== racine && !r.startsWith(racine + path.sep)) throw Object.assign(new Error(`sortie du cockpit hors du lab : ${sortie}`), { code: 4 });
+  const racine = cheminPhysique(lab), r = cheminPhysique(sortie);
+  if (racine === null || r === null || (r !== racine && !r.startsWith(racine + path.sep))) {
+    throw Object.assign(new Error(`sortie du cockpit hors du lab : ${sortie}`), { code: 4 });
+  }
   const marche = (d) => {
     for (const e of ls(d)) {
       const p = path.join(d, e);
