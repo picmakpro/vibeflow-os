@@ -105,23 +105,25 @@ const sha = async (lab, ref, fin) => { const r = await lancerGitAsync(lab, ['rev
 // piégé peut forger pour désigner un dossier arbitraire du poste. Vérifié = `<chemin>/.git` est (a) le dépôt principal : un dossier (jamais un lien symbolique) dont le chemin réel est le dossier commun,
 // ou (b) un fichier `gitdir: <X>` dont X, résolu, est EXACTEMENT `<commun>/worktrees/<id>` et dont le fichier `gitdir` désigne en retour ce `.git`. Tout le reste : « non vérifié » (lecture seule, fs seul, aucun git).
 const joindre = (base, valeur) => (path.isAbsolute(valeur) ? valeur : base + path.sep + valeur); // sans normalisation : le noyau résout
+// SOCL-10 : la résolution physique unique (nul = non résolu). Le nom et les lignes qui l'emploient sont gardés : ancres de mutation de
+// test-cockpit-git-details.sh (X7).
+const reelOuNull = (p) => cheminPhysique(p);
 export function worktreeVerifie(communReel, chemin) {
   if (typeof communReel !== 'string' || typeof chemin !== 'string') return false;
-  const commun = cheminPhysique(communReel); // SOCL-10 : chaque comparaison porte sur des chemins résolus par le noyau, un échec = non vérifié
-  if (commun === null) return false;
-  if (cheminPhysique(chemin) === commun) return true; // dépôt nu : le dossier commun lui-même
+  communReel = reelOuNull(communReel); // chaque comparaison porte sur des chemins résolus par le noyau ; un échec = non vérifié
+  if (communReel === null) return false;
+  if (reelOuNull(chemin) === communReel) return true; // dépôt nu : le dossier commun lui-même
   const dotgit = path.join(chemin, '.git');
   try {
     const st = fs.lstatSync(dotgit);
-    if (st.isDirectory()) return cheminPhysique(dotgit) === commun;
+    if (st.isDirectory()) return reelOuNull(dotgit) === communReel;
     if (!st.isFile() || st.size > 4096) return false;
     const m = /^gitdir: (.+)$/.exec(fs.readFileSync(dotgit, 'utf8').replace(/\r?\n$/, ''));
     if (!m) return false;
-    const admin = cheminPhysique(joindre(chemin, m[1]));
-    if (!admin || path.dirname(admin) !== path.join(commun, 'worktrees')) return false;
-    const retour = cheminPhysique(fs.readFileSync(path.join(admin, 'gitdir'), 'utf8').replace(/\r?\n$/, ''));
-    const propre = cheminPhysique(dotgit);
-    return retour !== null && retour === propre;
+    const admin = reelOuNull(joindre(chemin, m[1]));
+    if (!admin || path.dirname(admin) !== path.join(communReel, 'worktrees')) return false;
+    const retour = fs.readFileSync(path.join(admin, 'gitdir'), 'utf8').replace(/\r?\n$/, '');
+    return reelOuNull(retour) === reelOuNull(dotgit) && reelOuNull(dotgit) !== null;
   } catch { return false; }
 }
 
@@ -134,7 +136,7 @@ export async function etatWorktrees(lab) {
     const lw = wl.ok ? lireWorktrees(wl.sortie) : ko('worktree list');
     if (!lw.ok) return ind('indisponible');
     const cm = await lancerGitAsync(lab, ['rev-parse', '--path-format=absolute', '--git-common-dir'], { fin });
-    const commun = cm.ok ? cheminPhysique(cm.sortie.trim()) : null;
+    const commun = cm.ok ? reelOuNull(cm.sortie.trim()) : null;
     if (!commun) return ind('indisponible');
     const approximatif = (await filtresDeclaresAsync(lab, lab, fin)).length > 0;
     const nomBase = await brancheBaseAsync(lab, { fin });
