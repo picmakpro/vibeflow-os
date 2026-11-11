@@ -426,7 +426,7 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   « observateur global retiré », pas « motifs retirés ». 79-21 range l'automate de correspondance dans un module neuf
   `scripts/lib/vf-glob.mjs` du moteur (ligne `AJOUT` de `VENDORED.txt`). Plafond effectif : un fichier de code du module
   vise **299 lignes au plus** (`check-file-size.sh` refuse à 300), quel que soit le plan.
-- **P79-D-33 / A45 — S-3 tranchée : un worktree prouvé du même dépôt compte comme le lab.** Arbitrage Samuel,
+- **P79-D-33 / A45 — S-3 (P79-Q-03) tranchée : un worktree prouvé du même dépôt compte comme le lab.** Arbitrage Samuel,
   AskUserQuestion session principale, 2026-11-11. Réponse, mot pour mot (libellé coché) : « Les compter comme le lab
   (Recommandé) ». Option telle qu'elle a été présentée : « Un worktree vérifié comme appartenant au même dépôt compte
   comme le lab : le fichier s'affiche par son chemin relatif à la racine du worktree, aucun chemin absolu ne sort. Le
@@ -476,27 +476,29 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
 
 ## À Samuel
 
-Questions qui ne bloquent rien : l'arbitrage en vigueur tient et le plan est bâti dessus.
+Format : contrat C76-Q1 de la Phase 76 (P76-D-34 à D-37). Les anciens libellés S-1 à S-4 sont rappelés entre
+parenthèses.
 
-- **S-1 — Persister les cibles réduites dans l'index ?** AUDC-Q2 borne l'index à « heures, durées, jetons et
-  verbes ». Le radar de la Phase 75 a besoin des cibles d'écriture (chemin relatif au lab). En vigueur : cibles en
-  mémoire seulement, reconstruites au démarrage par une passe de fond sur 24 h (le radar est incomplet pendant
-  quelques secondes après un démarrage). Options : (a) garder ainsi ; (b) persister la cible réduite, même classe que
-  « verbe et cible réduite » (P69-D-16). Recommandation : (a), le coût est faible et rien n'est rouvert.
-- **S-2 — Coût par phase au-delà de 24 h (Phase 77) ?** En vigueur : la fenêtre de 24 h vaut pour l'index ; le coût par
-  phase et par étage se calcule sur ces 24 h. Options : (a) garder ainsi ; (b) un agrégat persisté par phase, étage et
-  modèle (jetons et durées, sans heure par agent) au-delà de 24 h. Recommandation : (a) pour cette vague, (b) à
-  instruire avec la Phase 77 si le coût sur 24 h ne répond pas à la question.
-- **S-3 — TRANCHÉE le 2026-11-11 (P79-D-33 / A45, option (b)). Question d'origine :** Une écriture dans un worktree hors du dossier du lab est-elle « hors du lab » ? CKPT-22 dit « jamais un
-  chemin hors du lab ». En vigueur : oui, elle devient « un fichier hors du lab » ; le radar de la Phase 75 ne voit pas
-  ces worktrees. Options : (a) garder ainsi ; (b) un worktree du même dépôt compte comme le lab, la cible restant
-  relative à sa racine (aucun chemin absolu). Recommandation : (b), aucun chemin du poste ne sort et le radar devient
-  complet ; à confirmer par Samuel, l'arbitrage en vigueur tient d'ici là.
-- **S-4 — Réduire AUDC-I18 ?** I18 voulait un journal des hooks qui remplace la relecture des transcripts ; l'index
-  (C1) et l'état officiel (AUDC-Q4) font ce travail. En vigueur : le plan garde une forme minimale (journal des
-  attentes, P79-D-22), détachable, que la sonde de première vague peut rendre inutile. Options : (a) garder la forme
-  minimale ; (b) retirer I18 de la phase si la sonde montre que l'état officiel voit les attentes de permission.
-  Recommandation : (b) sur sonde verte, (a) sinon. C'est une modification de périmètre : à Samuel.
+- **P79-Q-01 — Persister les cibles réduites dans l'index (S-1).** AUDC-Q2 borne l'index à « heures, durées, jetons et verbes » ; le radar de la Phase 75 a besoin des cibles d'écriture.
+  Options : (a) cibles en mémoire seulement, reconstruites au démarrage par une passe de fond sur 24 h ; (b) persister la cible réduite dans l'index, même classe que « verbe et cible réduite » (P69-D-16).
+  Recommandation : (a) — coût faible, rien n'est rouvert.
+  Bloque : rien
+  État : appliquée — décision déléguée par Samuel (message session principale, 2026-11-08), option (a) — P79-D-04
+- **P79-Q-02 — Coût par phase au-delà de 24 h (S-2).** La fenêtre de 24 h vaut pour l'index ; la Phase 77 voudrait un coût par phase et par étage.
+  Options : (a) coût calculé sur la fenêtre de 24 h ; (b) agrégat persisté par phase, étage et modèle (jetons et durées, sans heure par agent) au-delà de 24 h.
+  Recommandation : (a) — suffisant pour cette vague, (b) à instruire avec la Phase 77 si le coût sur 24 h ne répond pas à la question.
+  Bloque : rien
+  État : appliquée — décision déléguée par Samuel (message session principale, 2026-11-08), option (a) — P79-D-05
+- **P79-Q-03 — Une écriture dans un worktree hors du dossier du lab est-elle hors du lab (S-3).** CKPT-22 dit « jamais un chemin hors du lab ».
+  Options : (a) oui, elle devient « un fichier hors du lab » ; (b) un worktree vérifié comme appartenant au même dépôt compte comme le lab, chemin relatif à sa racine, aucun chemin absolu.
+  Recommandation : (b) — aucun chemin du poste ne sort et le radar devient complet.
+  Bloque : rien
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « Les compter comme le lab (Recommandé) »
+- **P79-Q-04 — Réduire AUDC-I18 (S-4).** I18 voulait un journal des hooks qui remplace la relecture des transcripts ; l'index (C1) et l'état officiel (AUDC-Q4) font ce travail ; le plan 79-19 commence par une sonde.
+  Options : (a) garder la forme minimale d'I18 (journal des attentes) quoi que dise la sonde ; (b) retirer I18 de la phase si la sonde montre que l'état officiel voit les attentes de permission, garder la forme minimale sinon.
+  Recommandation : (b) — un second écrivain dans le lab n'est utile que si l'état officiel ne voit pas les attentes.
+  Bloque : rien
+  État : en attente
 
 <decisions>
 ## Implementation Decisions
