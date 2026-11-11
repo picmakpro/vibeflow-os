@@ -93,7 +93,7 @@
     const marques = (orphe ? '<span class="r-flag">orphelin ?</span>' : '') + (w.stale ? '<span class="r-flag">donnée ancienne</span>' : '') + (hors && raison === 'ambigu' ? '<span class="r-flag">non rattaché (ambigu)</span>' : '');
     const v = verbe(w);
     const meta = sess ? `${h(tpath(w.tree))}${w.branch ? ' · ' + h(w.branch) : ''}${marques}`
-      : `<b>${h(w.role || 'Agent')}</b>${calme(w) ? (longue(w) ? ' · commande en cours, sans nouvelle depuis ' : ' · sans nouvelle depuis ') + h(duree(w.ageS)) : ''}${w.etat === 'en-attente' ? ' · en attente' : w.etat === 'bloque' ? ' · bloqué' : ''}${!calme(w) && v ? ' · ' + h(v) : ''}${puce}${marques}`;
+      : `<b>${h(w.role || 'Agent')}</b>${calme(w) ? (longue(w) ? ' · commande en cours, sans nouvelle depuis ' : w.enCours ? ' · outil en cours, sans nouvelle depuis ' : ' · sans nouvelle depuis ') + h(duree(w.ageS)) : ''}${w.etat === 'en-attente' ? ' · en attente' : w.etat === 'bloque' ? ' · bloqué' : ''}${!calme(w) && v ? ' · ' + h(v) : ''}${puce}${marques}`;
     const corps = `<span class="r-top"><span class="r-task">${h(tache)}${sr}</span>${temps(w, h)}</span>${fini ? '' : `<span class="r-meta">${meta}</span>`}`;
     const rang = `<a class="r-row" href="${h(lien('equipe.html', carte(w)))}" title="${h(tache)} — voir dans l'onglet Équipe">${glyphe(nom, (w.etat === 'actif' && !orphe ? 'aw-pulse ' : '') + 'aw-s-' + nom)}<span class="r-main">${corps}</span></a>`;
     const repli = ks.length ? `<button type="button" class="r-tog" data-vf-repli="${h(w.id)}" aria-expanded="true" aria-controls="k-${h(w.id)}" aria-label="Sous-agents de ${h(w.role || 'la session')}, ${ks.length}">${glyphe('repli', 'r-caret')}</button>` : '';

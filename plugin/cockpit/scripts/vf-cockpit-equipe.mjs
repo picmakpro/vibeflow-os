@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ls, mtime, readJson, ID_RE, premiereLigne, titreSession } from './vf-cockpit-lecture.mjs';
 import { derniereAction, citationsDuMandat } from './vf-cockpit-transcript.mjs';
+import { SILENCE_MAX_S, ATTEND_UN_ENFANT, outilEnCours } from './vf-cockpit-equipe-etat.mjs';
 
 export const FENETRE = 86400;
 const PROFONDEUR_MAX = 8;
@@ -58,7 +59,11 @@ export function collecteAgents(ctx) {
         const c = charge(aid, true); if (!c) { inconnuSub++; continue; } // identifiant hors ID_RE
         cands.push(c);
       }
-      const propre = (c) => (c.meta.finished === true || c.forme === 'arretee' ? 'termine' : c.sAge < fresh ? 'actif' : 'en-attente');
+      // AUDC-D1 : un agent non fini et muet reste vivant tant que son silence ne passe pas SILENCE_MAX_S ; « actif » s'il a un appel d'outil sans résultat (autre qu'une attente d'agent), sinon « en attente »
+      const enCours = (c) => { if (c.pend === undefined) c.pend = c.meta.finished === true || c.forme === 'arretee' || c.sAge >= SILENCE_MAX_S ? null : outilEnCours(c.tr); return c.pend; };
+      const propre = (c) => { if (c.meta.finished === true || c.forme === 'arretee') return 'termine'; if (c.sAge < fresh) return 'actif'; const p = enCours(c); return p && !ATTEND_UN_ENFANT.has(p.nom) ? 'actif' : 'en-attente'; };
+      const parentsFrais = new Set(); // un agent muet qui a un descendant en train d'écrire attend celui-ci : « en attente », jamais « actif » (E19.4)
+      const final = (x) => { const e = propre(x); return e === 'actif' && x.sAge >= fresh && parentsFrais.has(x.id) ? 'en-attente' : e; };
       const inclus = new Map(); // identifiant -> { c, etat }
       for (const c of cands) {
         if (!c.forme) { inconnuSub++; continue; }
@@ -70,9 +75,11 @@ export function collecteAgents(ctx) {
         }
         if (casse) { inconnuSub++; continue; }
         const etat = propre(c);
-        if (etat === 'en-attente') continue; // un candidat ni fini ni frais n'est présent que comme ancêtre
-        for (const x of [c, ...anc]) if (!inclus.has(x.id)) inclus.set(x.id, { c: x, etat: propre(x) });
+        if (etat === 'en-attente' && c.sAge >= SILENCE_MAX_S) continue; // un candidat ni fini ni vivant (muet depuis plus de SILENCE_MAX_S) n'est présent que comme ancêtre
+        if (etat === 'actif' && c.sAge < fresh) for (const x of anc) parentsFrais.add(x.id);
+        for (const x of [c, ...anc]) if (!inclus.has(x.id)) inclus.set(x.id, { c: x, etat: null });
       }
+      for (const v of inclus.values()) v.etat = final(v.c);
       if (age > fresh && !inclus.size) continue;
       scanned++;
       const last = tail(file);
@@ -94,6 +101,7 @@ export function collecteAgents(ctx) {
         const w = { kind: 'subagent', id: c.id, parent, role: c.meta.agentType, task: c.meta.description || '', ...(c.forme === 'complete' ? { depth: c.meta.spawnDepth, background: c.meta.requestShape === 'background' } : {}),
           tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, sl?.gitBranch, last.gitBranch), ageS: Math.round(c.sAge), source: 'subagent-meta', etat };
         if (fin) w.finAt = new Date(fin).toISOString();
+        if (etat === 'actif' && enCours(c)) w.enCours = true; // l'appel d'outil sans résultat dont l'âge (ageS) est la durée (AUDC-D1)
         if (Number.isFinite(t0)) w.dureeS = Math.max(0, Math.round(((fin || now) - t0) / 1000));
         w._tr = c.tr; workers.push(action(w));
       }
