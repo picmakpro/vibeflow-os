@@ -331,6 +331,13 @@ recommandée ; l'option recommandée vient du panel ou de l'éclaireur cité. Au
   `mal-formee`, non structurées) ne sont dits que par le bilan. Libellé choisi par le manager (décision déléguée par Samuel
   (message session principale, 2026-11-08), option recommandée).
 
+- **P73-D-38 (compositeur du titre sans observateur, cliquet 79-17).** Le compositeur unique du titre (P73-D-15,
+  `90-vf-titre.js`) n'observe pas le `<title>` : tous les écrivains l'appellent (00-vibeflow.js, 76-vf-git-entete.js ; le
+  troisième, l'observateur de `80-vf-fr.js`, est retiré par le plan 79-10). Aucun `MutationObserver` neuf, donc aucune
+  entrée à relever dans la baseline des observateurs du plan 79-17. Option écartée : relever une entrée de cette baseline,
+  qui demanderait une citation d'arbitrage pour un besoin évitable. Décision déléguée par Samuel (message session
+  principale, 2026-11-08), option recommandée.
+
 ### Claude's Discretion
 
 Noms internes des fonctions et modules neufs, découpage fin des fichiers d'interface, forme exacte des fixtures (noms
