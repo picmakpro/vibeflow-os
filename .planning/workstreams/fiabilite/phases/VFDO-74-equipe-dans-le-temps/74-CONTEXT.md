@@ -355,6 +355,17 @@ décisions citées ; le texte d'origine reste au-dessus pour l'historique.
   `test-cockpit-frise-vue.sh` (`test-cockpit-frise.sh` appartient à 79-13). Les mutants se posent sur une copie du
   MODULE servie par l'aide commune des suites, jamais sur une copie de la sortie (79-06, 79-16, A41).
 
+- **P74-D-53 (Échap, amende P74-D-44 ; contrats de la 80 au commit `95ab6578` et de la 73 au commit `b5abfeec`).**
+  La fiche et le lecteur sont des vues de l'onglet Équipe, pas des surcouches. Échap s'écoute en phase de remontée (sur
+  `document` ou la racine de la vue), jamais en capture sur `window` ; un appui dont `event.defaultPrevented` est vrai
+  (une surcouche vient d'être fermée par la pile) est ignoré ; la vue ne lit jamais `VF_SURCOUCHES.ouverte()`. Sans
+  surcouche, Échap ferme la fiche et rend le focus à l'élément ouvreur (`declencheur` quand la fiche vient de la régie).
+  Ouverture d'un commit : la seule entrée publique `window.VFGitTiroir.ouvrirSur(sha)` (promesse vrai ou faux, jamais
+  d'exception) remplace la composition interne écrite dans P74-D-50. Retrait du lecteur de repli de la 73 (P73-C2) :
+  plan 74-10, en un geste (`ouvrirRepli` et son appel dans `ui/72-vf-regie-source.js`, propriété `transcript` de
+  `__vfEquipeRendu`), après le témoin de l'annulation des trois déclencheurs `nom`, `ancre`, `rapport` ; seule exception
+  à P73-D-20. Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
+
 ### Claude's Discretion
 
 Laissés à la spécification d'interface et à la planification, dans les bornes ci-dessus : la géométrie de la frise
