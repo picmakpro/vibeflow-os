@@ -36,8 +36,9 @@ const porteInterdit = (o) => !INTERDITS.length || (!!o && typeof o === 'object' 
 
 export function attach({ here, root, token, inject, log = () => {} }) {
   const ptoken = crypto.randomBytes(16).toString('hex'); // onglet Projet : dit de quel onglet vient une requête
-  let pageP = null, GP = null, gabarit = null;
+  let pageP = null, GP = null, gabarit = null, genP = 0, memoE = null; // genP : génération du gabarit ; memoE : la page Équipe déjà construite (AUDC-B-03)
   const load = () => { // relue après chaque réécriture de project.html par le direct
+    genP++;
     try {
       const html = fs.readFileSync(path.join(here, 'project.html'), 'utf8');
       GP = extraireGraphe(html); gabarit = html; pageP = html.replace('</head>', inject.replace(token, ptoken) + '</head>');
@@ -132,14 +133,19 @@ export function attach({ here, root, token, inject, log = () => {} }) {
   return {
     ptoken, load, route, avantQuestion, modes, argsAgent,
     pageProjet: () => pageP,
-    // onglet Équipe (69-05, P69-D-17) : construite en mémoire à chaque appel depuis le gabarit de project.html, jamais écrite ; jeton de la page Code (inject tel quel)
+    // onglet Équipe (69-05, P69-D-17) : construite en mémoire depuis le gabarit de project.html, jamais écrite ; jeton de la page Code (inject tel quel)
+    // AUDC-B-03 : mémorisée tant que rien n'a changé (même gabarit, même instantané du direct, mêmes cartes lancées) : une requête de plus ne reconstruit pas 2,5 Mo
     pageEquipe: () => {
       if (!gabarit) return null;
       const who = live ? live.snapshot().who : null;
       if (!INTERDITS.length || (who && porteInterdit(who))) { log('error', 'page Équipe refusée : contrat illisible ou contenu interdit'); return null; } // même garde que le flux, fermée par défaut
       // `nom` : celui que la page Projet affiche (P69-D-33), jamais le nom du dossier
+      const cles = JSON.stringify([...lancer.lancees()]);
+      if (memoE && memoE.gen === genP && memoE.who === who && memoE.cles === cles) return memoE.html;
       const g = buildEquipeGraph(who, { nom: String(GP?.project?.name || '').replace(/ — Projet$/, '') || GP?.meta?.rootName || path.basename(root), racine: GP?.meta?.root, logos: GP?.meta?.vfLogos, git: GP?.meta?.vfGit, missions: missionsEnCours(GP), lancees: lancer.lancees() }); // 78-04 : en-tête Git et bloc de vue
-      return insererGraphe(gabarit, g).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Équipe</title>').replace('</head>', () => inject + '</head>');
+      const html = insererGraphe(gabarit, g).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Équipe</title>').replace('</head>', () => inject + '</head>');
+      memoE = { gen: genP, who, cles, html };
+      return html;
     },
     jetonValide: (j) => typeof j === 'string' && j === ptoken,
     stop() { live?.stop(); for (const c of clients) c.end(); },

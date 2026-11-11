@@ -111,5 +111,31 @@ sleep 1; PIDF="$(H json "$(ls "$WORK"/fkd/call-*.json | head -1)" 'j.pid')"
 assert_eq "D2.5 — l'agent arrêté n'est plus en vie" "$(kill -0 "$PIDF" 2>/dev/null && echo vivant || echo mort)" "mort"
 echo 0 > "$WORK/fkd/sleep-ms"
 
+echo "=== D3 — pages sans jeton : inter-sites refusé, navigation normale intacte, page Équipe mémorisée (AUDC-B-03) ==="
+demarrer
+for p in / /project.html /equipe.html; do
+  H r "$PORT" GET "$p" '{"Sec-Fetch-Site":"cross-site"}' "$WORK/d3.txt"; X="$(H statut "$WORK/d3.txt")"
+  H r "$PORT" GET "$p" '{"Sec-Fetch-Site":"same-origin"}' "$WORK/d3.txt"; SO="$(H statut "$WORK/d3.txt")"
+  H r "$PORT" GET "$p" '{"Sec-Fetch-Site":"none"}' "$WORK/d3.txt"; NO="$(H statut "$WORK/d3.txt")"
+  H r "$PORT" GET "$p" '{}' "$WORK/d3.txt"; AB="$(H statut "$WORK/d3.txt")"
+  assert_eq "D3.1 — $p : inter-sites 403 ; même origine, saisie directe et en-tête absent 200" "$X|$SO|$NO|$AB" "403|200|200|200"
+done
+H r "$PORT" GET /api/vf/etat "{\"x-vf-cockpit-token\":\"$TOK\",\"Sec-Fetch-Site\":\"same-origin\"}" "$WORK/d3.txt"
+assert_eq "D3.2 — témoin : une route d'API avec son jeton répond toujours" "$(H statut "$WORK/d3.txt")" "200"
+cat > "$AUX/memo.mjs" <<'JS'
+// memo.mjs <sortie> <lab> : (le module de la SORTIE assemblée, marque blanche appliquée) le serveur du cockpit reconstruit-il la page Équipe à chaque appel ? (l'espion : inject est concaténé à chaque construction)
+import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , sortie, lab, scripts] = process.argv;
+const { attach } = await import(pathToFileURL(path.join(sortie, 'vf-cockpit-server.mjs')).href);
+let n = 0; const inject = { replace: () => '<!--p-->', [Symbol.toPrimitive]: () => { n++; return '<!--i-->'; } };
+const VF = attach({ here: sortie, root: lab, token: 'ab'.repeat(16), inject, log: () => {} });
+let a = null; for (let i = 0; i < 100 && !(a = VF.pageEquipe()); i++) await new Promise((r) => setTimeout(r, 100)); // le direct écrit la page Projet (avec ses données) peu après le démarrage
+const b = VF.pageEquipe(); const apres2 = n;
+VF.load(); VF.pageEquipe();
+console.log(JSON.stringify({ page: typeof a === 'string' && a.length > 1000, identique: a === b, constructions: apres2, apresLoad: n }));
+VF.stop(); process.exit(0);
+JS
+assert_eq "D3.3 — deux appels sans rien de changé : la page Équipe n'est construite qu'une fois ; une réécriture de la page Projet la fait reconstruire" "$(node "$AUX/memo.mjs" "$OUT" "$LAB" "$SCRIPTS" 2>&1 | tail -1)" '{"page":true,"identique":true,"constructions":1,"apresLoad":2}'
+
 echo; echo "=== bilan : $PASS passés, $FAIL échoués ==="
 [ "$FAIL" -eq 0 ]

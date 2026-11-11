@@ -244,7 +244,7 @@
    try { return execFileSync(process.execPath, [path.join(dir, 'scripts', name), root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, timeout: 120000 }); }
    catch (e) { throw Object.assign(new Error(String(e.stdout || '') + String(e.stderr || '') || e.message), { checks: true }); }
  }
-@@ -509,7 +489,27 @@ function undoChange() {
+@@ -509,16 +489,39 @@ function undoChange() {
  }
  
  // ---------- http ----------
@@ -272,8 +272,9 @@
    // only this machine's own names: a website that points its domain at 127.0.0.1 (DNS rebinding) would
    // otherwise count as the same origin as the map, and could read its token from the page
    if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(String(req.headers.host || '').toLowerCase())) { res.writeHead(403); return res.end('unknown host'); }
-@@ -517,8 +517,10 @@ const server = http.createServer((req, res) => {
+   const url = new URL(req.url, `http://${req.headers.host}`);
    const sameOrigin = !req.headers.origin || req.headers.origin === `http://${req.headers.host}`;
++  if (!url.pathname.startsWith('/api/') && req.headers['sec-fetch-site'] === 'cross-site') { res.writeHead(403); return res.end(); } // vibeflow AUDC-B-03 : une page d'un autre site n'obtient ni page ni fichier du cockpit
    if (url.pathname.startsWith('/api/')) {
      // EventSource can't send headers, so the events stream takes the token in the query string
 -    const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' ? url.searchParams.get('token') : null);
@@ -285,7 +286,7 @@
      if (req.method === 'GET' && url.pathname === '/api/events') {
        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
        res.write('retry: 1000\n\n'); // reconnect quickly after a restart
-@@ -534,33 +536,13 @@ const server = http.createServer((req, res) => {
+@@ -534,33 +537,13 @@ const server = http.createServer((req, res) => {
        if (req.method === 'POST' || req.method === 'DELETE') {
          let raw = '';
          req.on('data', (d) => { raw += d; if (raw.length > 50000) req.destroy(); });
@@ -322,7 +323,7 @@
          return;
        }
      }
-@@ -573,7 +555,7 @@ const server = http.createServer((req, res) => {
+@@ -573,7 +556,7 @@ const server = http.createServer((req, res) => {
        let raw = '';
        req.on('data', (d) => { raw += d; if (raw.length > 500000) req.destroy(); });
        req.on('end', () => {
@@ -331,7 +332,7 @@
          try {
            const x = exportMap(Array.isArray(body.include) ? body.include.map(String) : EXPORT_DEFAULT, cleanFlows(body.flows));
            res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Content-Disposition': `attachment; filename="${x.name}"`, 'Cache-Control': 'no-store' });
-@@ -589,19 +571,28 @@ const server = http.createServer((req, res) => {
+@@ -589,19 +572,28 @@ const server = http.createServer((req, res) => {
      if (req.method === 'POST' && url.pathname === '/api/ask') {
        let raw = '';
        req.on('data', (d) => { raw += d; if (raw.length > 20000) req.destroy(); });
@@ -364,7 +365,7 @@
  // another map (or anything else) on the port: take the next free one
  let port = wantPort;
  server.on('error', (e) => {
-@@ -614,8 +605,10 @@ server.on('listening', () => {
+@@ -614,8 +606,10 @@ server.on('listening', () => {
    const u = `http://127.0.0.1:${port}`;
    try {
      fs.mkdirSync(path.dirname(stateFile), { recursive: true });

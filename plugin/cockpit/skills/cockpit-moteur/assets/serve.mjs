@@ -515,6 +515,7 @@ function route(req, res) {
   if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(String(req.headers.host || '').toLowerCase())) { res.writeHead(403); return res.end('unknown host'); }
   const url = new URL(req.url, `http://${req.headers.host}`);
   const sameOrigin = !req.headers.origin || req.headers.origin === `http://${req.headers.host}`;
+  if (!url.pathname.startsWith('/api/') && req.headers['sec-fetch-site'] === 'cross-site') { res.writeHead(403); return res.end(); } // vibeflow AUDC-B-03 : une page d'un autre site n'obtient ni page ni fichier du cockpit
   if (url.pathname.startsWith('/api/')) {
     // EventSource can't send headers, so the events stream takes the token in the query string
     const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' || url.pathname === '/api/vf/events' ? url.searchParams.get('token') : null); // vibeflow P13
