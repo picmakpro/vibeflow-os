@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, execFile } from 'node:child_process';
 import { envEnfant } from './vf-cockpit-env.mjs';
+import { gitSortant } from './vf-cockpit-git-sortant.mjs';
 
 const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
 const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
@@ -35,7 +36,8 @@ export function planningLayout(root) {
   if (!compartiments.length) return { forme: 'plat', actif: null, compartiments: [{ ws: null, dir: base }] };
   let actif = null;
   try {
-    const pf = path.join(base, 'active-workstream'); const st = fs.statSync(pf); // jamais un fichier non régulier ni démesuré (un lien vers /dev/zero ne finit pas)
+    const pf = path.join(base, 'active-workstream'); if (!realUnder(pf, root)) throw 0; const st = fs.statSync(pf); // AUDC-A-02 : un pointeur lié hors du lab est ignoré comme absent
+    // jamais un fichier non régulier ni démesuré (un lien vers /dev/zero ne finit pas)
     const nom = st.isFile() && st.size <= 4096 ? fs.readFileSync(pf, 'utf8').trim() : '';
     if (compartiments.some((c) => c.ws === nom)) actif = nom;
   } catch {}
@@ -64,7 +66,6 @@ export function trustedScriptsDir() {
 
 const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
 export const realUnder = (p, dir) => { const r = real(p), d = real(dir); return r === d || r.startsWith(d + path.sep); };
-
 // T-67-06 : jamais un script pris dans l'arbre observé. Comparaison sur realpath (un lien `.claude/scripts -> plugin/x` ne passe pas) :
 // aucun candidat sous le lab, sauf le dossier de scripts du module (posé par le lanceur) s'il n'est pas dans la sortie .vibeflow/ du lab.
 export function driverLockScript({ scriptsDir, labRoot, home } = {}) {
@@ -216,6 +217,7 @@ export const configFiltres = (noms) => noms.flatMap((x) => [['clean', ''], ['smu
 export function shBorne(cmd, args, cwd, lab = cwd) {
   if (cmd !== 'git') return lancer(cmd, args, cwd, envEnfant(lab), 1 << 20).sortie;
   const { argv, sous, dir } = argsGit(args), base = dir ? path.resolve(cwd || '.', dir) : cwd || process.cwd();
+  if (gitSortant(base, lab)) return ''; // AUDC-A-02 : point central — un .git qui désigne un dossier git hors du lab n'est jamais lu (lancerGit et lancerGitAsync de même)
   let config = [];
   if (SOUS_COMMANDES_FILTRANTES.includes(sous)) {
     const f = lireFiltres(lancer('git', argsFiltres(base), base, envGit(lab), 1 << 20));
@@ -229,6 +231,7 @@ export function shBorne(cmd, args, cwd, lab = cwd) {
 // { ok (code 0 sans sortie tronquée, sans échéance), sortie, code, tronque (ENOBUFS : sortie partielle, jamais présentée comme complète), absent (ENOENT) } ; `binaire` ne sert qu'aux tests, jamais lu d'une variable d'environnement.
 export function lancerGit(dir, args, { lab = dir, maxBuffer = 4 << 20, binaire = 'git' } = {}) {
   if (!isDir(dir)) return { ok: false, sortie: '', code: null, tronque: false, absent: false, delai: false };
+  if (gitSortant(dir, lab)) return { ok: false, sortie: '', code: null, tronque: false, absent: false, delai: false, refuse: true }; // AUDC-A-02 : voir shBorne
   const { argv, sous } = argsGit([...GIT_SUR, '-C', dir, ...args]);
   let config = [];
   if (SOUS_COMMANDES_FILTRANTES.includes(sous)) {
@@ -243,6 +246,7 @@ export function lancerGit(dir, args, { lab = dir, maxBuffer = 4 << 20, binaire =
 // Même contrat et mêmes arguments que `lancerGit`, rendu en promesse ; `fin` : date butoir de l'appelant (voir `finDans`).
 export async function lancerGitAsync(dir, args, { lab = dir, maxBuffer = 4 << 20, binaire = 'git', fin } = {}) {
   if (!isDir(dir)) return { ok: false, sortie: '', code: null, tronque: false, absent: false, delai: false };
+  if (gitSortant(dir, lab)) return { ok: false, sortie: '', code: null, tronque: false, absent: false, delai: false, refuse: true }; // AUDC-A-02 : voir shBorne
   const { argv, sous } = argsGit([...GIT_SUR, '-C', dir, ...args]);
   let config = [];
   if (SOUS_COMMANDES_FILTRANTES.includes(sous)) {

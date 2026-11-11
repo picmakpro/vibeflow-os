@@ -29,7 +29,15 @@
    try { fs.unlinkSync(stateFile); } catch {}
    console.log(stopped ? `Stopped the map server (${s.url}).` : 'The map server was not running.');
    process.exit(0);
-@@ -56,9 +61,9 @@ function exportMap(include, extraFlows = []) {
+@@ -49,16 +54,16 @@ function exportMap(include, extraFlows = []) {
+   const out = {
+     ...g,
+     // the remote can carry a sign-in token; the folder path is this computer's
+-    meta: { ...g.meta, root: null, repos: (g.meta.repos || []).map(({ remote, ...r }) => r), exported: { at: new Date().toISOString(), include: on } },
++    meta: { ...(({ vfTouch, vfGit, ...m }) => m)(g.meta), root: null, repos: (g.meta.repos || []).map(({ remote, ...r }) => r), exported: { at: new Date().toISOString(), include: on } }, // vibeflow AUDC-B-04 : ni les plans touchés par fichier (vfTouch) ni dépôt, worktree et branche (vfGit)
+     flows: on.includes('flows') ? [...g.flows, ...extraFlows.filter((f) => !g.flows.some((x) => x.id === f.id))] : [],
+     tour: on.includes('flows') ? g.tour : [],
+     files: on.includes('notes') ? g.files : g.files.map(({ note, ...f }) => f),
    };
    if (!on.includes('recent')) delete out.recent;
    if (!on.includes('health')) delete out.health;

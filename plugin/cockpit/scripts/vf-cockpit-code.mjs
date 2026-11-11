@@ -6,11 +6,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { architectureVibeflow } from './vf-cockpit-code-vf.mjs';
+import { lireConfine } from './vf-cockpit-planning.mjs';
 
 const aDesModules = (lab) => { try { return fs.readdirSync(path.join(lab, 'plugin'), { withFileTypes: true }).some((e) => e.isDirectory() && fs.existsSync(path.join(lab, 'plugin', e.name, 'module.json'))); } catch { return false; } };
 
 export function ecrireArchitecture({ lab, sortie }) {
-  return aDesModules(lab) ? architectureVibeflow({ lab, sortie }) : architectureBrute({ lab, sortie });
+  // AUDC-A-02 : les lectures du lab faites ici (module.json, VERSION, agents…) se font sous confinement à la racine réelle du lab, comme le reste de l'assemblage
+  return lireConfine(lab, () => aDesModules(lab) ? architectureVibeflow({ lab, sortie }) : architectureBrute({ lab, sortie }));
 }
 
 function architectureBrute({ lab, sortie }) {

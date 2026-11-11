@@ -10,6 +10,7 @@ import path from 'node:path';
 import { masque } from './vf-cockpit-lecture.mjs';
 import { normNum } from './vf-cockpit-planning.mjs';
 import { GIT_SUR, shBorne, lancerGitAsync } from './vf-cockpit-paths.mjs';
+import { worktreeVerifie } from './vf-cockpit-git-details.mjs';
 
 // GIT_SUR (défini dans vf-cockpit-paths.mjs, partagé par toute la chaîne de l'émetteur : F-03) neutralise un core.fsmonitor exécutable du .git/config (T-68-04)
 export { GIT_SUR };
@@ -24,9 +25,13 @@ const entier = (s) => (/^\d+$/.test(String(s).trim()) ? Number(String(s).trim())
 export function arbresGit(root, { sh = shDefaut } = {}) {
   root = path.resolve(root);
   const arbres = [];
+  // AUDC-B-01 (même contrôle que le tiroir Git, P78-D-38) : un arbre déclaré dont le lien retour n'est pas vérifié n'élargit pas la liste ; sans dossier commun lisible, seul l'arbre principal reste
+  let commun; // lu à la première entrée non principale seulement (un lab à un seul arbre ne paie aucun appel de plus)
+  const dossierCommun = () => { if (commun === undefined) { commun = null; try { const c = git(sh, root, root, 'rev-parse', '--path-format=absolute', '--git-common-dir').trim(); commun = c ? fs.realpathSync(c) : null; } catch {} } return commun; };
   for (const b of git(sh, root, root, 'worktree', 'list', '--porcelain').split('\n\n')) {
     const t = /^worktree (.*)$/m.exec(b)?.[1];
     if (!t || !fs.existsSync(t)) continue;
+    if (arbres.length > 0 && !(dossierCommun() && worktreeVerifie(commun, t))) continue;
     const branche = /^branch refs\/heads\/(.*)$/m.exec(b)?.[1] || (b.includes('detached') ? '(détachée)' : '');
     arbres.push({ chemin: fs.realpathSync(t), branche, principal: arbres.length === 0 });
   }

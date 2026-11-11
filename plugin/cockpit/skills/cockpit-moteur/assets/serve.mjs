@@ -54,7 +54,7 @@ function exportMap(include, extraFlows = []) {
   const out = {
     ...g,
     // the remote can carry a sign-in token; the folder path is this computer's
-    meta: { ...g.meta, root: null, repos: (g.meta.repos || []).map(({ remote, ...r }) => r), exported: { at: new Date().toISOString(), include: on } },
+    meta: { ...(({ vfTouch, vfGit, ...m }) => m)(g.meta), root: null, repos: (g.meta.repos || []).map(({ remote, ...r }) => r), exported: { at: new Date().toISOString(), include: on } }, // vibeflow AUDC-B-04 : ni les plans touchés par fichier (vfTouch) ni dépôt, worktree et branche (vfGit)
     flows: on.includes('flows') ? [...g.flows, ...extraFlows.filter((f) => !g.flows.some((x) => x.id === f.id))] : [],
     tour: on.includes('flows') ? g.tour : [],
     files: on.includes('notes') ? g.files : g.files.map(({ note, ...f }) => f),
