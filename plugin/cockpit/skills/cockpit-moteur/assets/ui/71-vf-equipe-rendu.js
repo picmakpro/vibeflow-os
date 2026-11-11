@@ -227,5 +227,5 @@
     .aw-foot { margin: var(--sp-12) 0 0; color: var(--text-3); font-size: 12px; line-height: 20px; }
   `;
 
-  window.__vfEquipeRendu = { glyphe, nomDeSession: (workers, id) => nommer(workers).get(id) || null, arbre, agentsDuNoeud, transcript, pied, piedCarte, st, duree, versNoeud, actif, surveiller, titreEquipe, ligneAgents, css: CSS };
+  window.__vfEquipeRendu = { glyphe, nomDeSession: (workers, id) => nommer(workers).get(id) || null, arbre, agentsDuNoeud, transcript, pied, piedCarte, st, etat, duree, versNoeud, actif, surveiller, titreEquipe, ligneAgents, css: CSS };
 })();

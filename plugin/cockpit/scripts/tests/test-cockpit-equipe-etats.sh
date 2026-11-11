@@ -3,7 +3,7 @@
 # Chaque ligne du registre a sa section ; toutes traversent le COLLECTEUR RÉEL (collectWho, puis buildEquipeGraph), jamais une donnée écrite à la main
 # pour le rendu seul. Un HOME jetable porte les transcripts ; le lab est un dépôt git jetable.
 #   D1  un sous-agent non fini et muet reste listé (« outil en cours »), sa session aussi
-#   D2  une session écrite depuis moins de 24 h reste listée avec un état lu (occupée, au repos, vous attend, close)
+#   D2  une session écrite depuis moins de 24 h reste listée avec un état lu (occupée, au repos, vous attend, close) ; le panneau d'une carte dit le même état que la carte à chaque poussée (D2c)
 #   D3  « À surveiller » et « commande en cours depuis 15 min » atteignables de bout en bout ; l'âge avance dans la page
 #   D4  un worker vivant sous un manager terminé est dit orphelin, jamais rangé dans « Terminés »
 #   M3  le titre de la vue Équipe dit le nombre d'agents actifs ; la santé d'Équipe ne contredit plus celle de Code
@@ -267,6 +267,32 @@ const S = {
     const panneau = sections ? sections('n:ag-a') : '';
     ok('D3b.4 — la ligne « Activité » du panneau porte le même âge avancé', /au travail depuis 12 min/.test(texte(panneau)), texte(panneau));
   },
+  // ---- D2c (AUDC-D2) : un seul état affiché pour une session ; le panneau suit chaque poussée (avant : « État : actif » au panneau, « vous attend » sur la carte) ----
+  async D2c() {
+    console.log('=== D2c — le panneau suit l\'état à chaque poussée ===');
+    const ecoutes = {}; let rerendus = 0;
+    const G = { meta: { vfTab: 'equipe', vf: {} }, project: { name: 'P' }, nodes: [
+      { id: 'se-s1', kind: 'session', foot: '', details: 'Rôle : vf-dev-manager\n\nÉtat : actif\n\nIdentifiant : s1s1s1s1', summary: 'Session sans tâche annoncée · actif' },
+      { id: 'ag-a', kind: 'agent', foot: '', details: 'État : actif\n\nOrphelin : son parent est terminé, cet agent travaille encore.', summary: 'Orphelin · tâche du worker' }] };
+    const SC = { graph: G, h, exists: () => false, on() {}, setOverview() {}, addPanelSection() {}, rerender: async () => { rerendus++; }, fit() {}, reveal() {}, plafond() {} };
+    const sb = { window: { Floorplan: SC, FLOORPLAN_SERVER: {}, __vfLive: {} }, document: { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], addEventListener(n, f) { ecoutes[n] = f; }, hidden: false, documentElement: {} }, location: { hash: '' }, sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+      MutationObserver: class { observe() {} }, URLSearchParams, setInterval: () => 1, setTimeout, fetch: async () => ({ ok: false }), console };
+    vm.createContext(sb);
+    vm.runInContext(fs.readFileSync(path.join(ui, '71-vf-equipe-rendu.js'), 'utf8'), sb);
+    vm.runInContext(fs.readFileSync(path.join(ui, '72-vf-equipe.js'), 'utf8'), sb);
+    ok('D2c.0 — témoin : la page écoute le flux « who »', typeof ecoutes['vf-who'] === 'function');
+    const pousse = async (etatSession, etatAgent) => { sb.window.__vfLive = { who: { workers: [{ kind: 'session', id: 's1', etat: etatSession, tree: '.', ageS: 5 }, { kind: 'subagent', id: 'a', etat: etatAgent, tree: '.', role: 'vf-coder', task: 'x', ageS: 5, orphan: true }] }, whoAt: Date.now() }; await ecoutes['vf-who'](); };
+    const ligneEtat = (n) => (/État : ([^\n]*)/.exec(n.details) || [])[1];
+    await pousse('attend', 'actif');
+    eq('D2c.1 — la session qui « vous attend » : le panneau le dit aussi (une seule vérité avec la carte)', ligneEtat(G.nodes[0]), 'vous attend');
+    ok('D2c.2 — le repli de la description dit le même état', /· vous attend$/.test(G.nodes[0].summary), G.nodes[0].summary);
+    eq('D2c.3 — témoin : l\'agent encore actif garde « actif »', ligneEtat(G.nodes[1]), 'actif');
+    await pousse('au-repos', 'en-attente');
+    eq('D2c.4 — poussée suivante : « au repos » au panneau', ligneEtat(G.nodes[0]), 'au repos');
+    eq('D2c.5 — poussée suivante : l\'agent en attente est dit « en attente »', ligneEtat(G.nodes[1]), 'en attente');
+    ok('D2c.6 — les autres lignes du panneau sont intactes', /Rôle : vf-dev-manager/.test(G.nodes[0].details) && /Identifiant : s1s1s1s1/.test(G.nodes[0].details) && /Orphelin : son parent/.test(G.nodes[1].details), G.nodes[0].details);
+    ok('D2c.7 — la description d\'un agent qui porte une tâche n\'est pas réécrite', G.nodes[1].summary === 'Orphelin · tâche du worker', G.nodes[1].summary);
+  },
 };
 
 for (const s of sections) { if (!S[s]) { console.log(`  ❌ FAIL — section inconnue ${s}`); fail++; continue; } await S[s](); }
@@ -283,7 +309,7 @@ run() { # sections...
   PASS=$((PASS + $(echo "$t" | cut -d' ' -f2))); FAIL=$((FAIL + $(echo "$t" | cut -d' ' -f3)))
 }
 
-run D1 D2 D2b D4 D3 D3b M3
+run D1 D2 D2b D2c D4 D3 D3b M3
 
 echo
 echo "=== Bilan : $PASS réussi(s), $FAIL échec(s) ==="
