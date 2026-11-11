@@ -70,7 +70,7 @@ Boîte 1,45 em (= celle de `.vst`, 16 px à l'échelle 1), même technique de ma
 | Empreinte : modifié | **triangle plein** pointe en haut (base 11) | `--text-3` |
 | Empreinte : lu | **carré en contour** (côté 11, trait 2,5) | `--text-4` |
 | Empreinte : fini | **tiret plein** (10 × 2,5, centré) | `--text-4` |
-| Prévu (§ 7) | **anneau ouvert à trois arcs** (trois traits de 90° séparés de vides, plein pas de pointillé) | `--st-todo` |
+| Prévu (§ 7) | **anneau ouvert à trois arcs** (trois traits de 90° séparés par des vides ; plus de pointillé) | `--st-todo` |
 **Silhouettes d'Empreinte (F4)** : les quatre degrés ont une silhouette pleine distincte (rond, triangle, carré creux à trait 2,5, tiret) : ni le rond et le carré pleins, qui se confondent à 6 px, ni un contour de 1,75 qui se lit plein ; chaque degré a sa forme propre, dont « fini » ; la nuance de gris n'est qu'un renfort. Barres : largeur 3 au moins (le trait de 2,5 s'estompait à 6 px). Un palier se lit par le nombre de barres : sans couleur, en niveaux de gris et à `lod-low` (la forme tient à 10 px à l'écran : 1,45 em de 18 px = 26 unités du graphe).
 
 ### 2.2 Contraste (calculé, WCAG 2.x ; `--surface` / `--raise` / `--bg` = canvas)
@@ -164,7 +164,7 @@ Titre « Collisions possibles » + compte. Une rangée par collision : glyphe ·
 ## 7. Cartes « prévues » (D-18)
 
 ### 7.1 Rendu
-Statut `prevu`, mécanisme `st-*` / `.vst` existant : classe `st-prevu` sur la carte, `.vst-prevu` dans le pied, mot **« Prévu »** (`STATE_WORD`), glyphe **anneau ouvert à trois arcs** (trois traits de 90° séparés de vides, plein pas de pointillé) `--st-todo`, mot `--text-2`, 11 px 500. Carte : fond transparent, une seule intention : bordure 1,5 px pointillée `--hair-2`, **sans** ombre (`--shadow-card` retirée) ; le padding perd 1,5 px de compensation (`calc(var(--inset-card) - 1.5px) /* dérivé : bordure 1,5 */`) pour que le contenu ne bouge pas ; titre mono 500 `--text-2` ; icône nue `--text-3` (pas la couleur de famille : le fichier n'existe pas) ; description : « Créé par le plan 75-02 » (`.desc` `--text-3`, une ligne). Aucun lien (la carte n'a pas d'arête).
+Statut `prevu`, mécanisme `st-*` / `.vst` existant : classe `st-prevu` sur la carte, `.vst-prevu` dans le pied, mot **« Prévu »** (`STATE_WORD`), glyphe **anneau ouvert à trois arcs** (trois traits de 90° séparés par des vides ; plus de pointillé) `--st-todo`, mot `--text-2`, 11 px 500. Carte : fond transparent, une seule intention : bordure 1,5 px pointillée `--hair-2`, **sans** ombre (`--shadow-card` retirée) ; le padding perd 1,5 px de compensation (`calc(var(--inset-card) - 1.5px) /* dérivé : bordure 1,5 */`) pour que le contenu ne bouge pas ; titre mono 500 `--text-2` ; icône nue `--text-3` (pas la couleur de famille : le fichier n'existe pas) ; description : « Créé par le plan 75-02 » (`.desc` `--text-3`, une ligne). Aucun lien (la carte n'a pas d'arête).
 ### 7.2 Actions absentes
 « Ouvrir » et « taille » n'existent pas sur une prévue (ni dans le menu contextuel, ni dans le panneau, ni de `.meta` de taille). Le panneau montre : titre, « Prévu par : 75-02, 75-04 » (plans en texte), « Ce fichier n'existe pas encore. ». Un chemin hors du lab ou malformé n'est pas dessiné (compté « n prévus ignorés » dans la légende de Gardes, où ils sont hors décompte).
 ### 7.3 Fraîcheur
@@ -224,7 +224,7 @@ Chaque sonde : clair et sombre, 1440, 1024, 390 ; une sonde verte sans témoin r
 ## 12. Amendements à `DESIGN.md` (F8 ; à poser par l'exécution, dans le même lot que les marques ; tableaux du § 2 et format M10 intacts)
 1. **§ 2, « Graphe de code »** : ajouter une puce « Lentilles d'activité (Phase 75) : points chauds, couplage, gardes, empreinte marquent une carte par un glyphe neutre et un mot, jamais par une teinte ; la seule teinte est `--recent` (écriture en cours). »
 2. **§ 5, Carte** : retirer la variante `recent` (anneau, `.rw`, `.recent-in`, retirés par P75-D-20) ; ajouter `st-prevu` : fond transparent, bordure pointillée 1,5 px `--hair-2`, sans ombre, glyphe anneau à trois arcs `--st-todo`, mot « Prévu ».
-3. **§ 5, Pastille de statut** : « (`.vst`, `.rw`) » devient « (`.vst`) » ; ajouter la **marque de lentille** (`.lm`) : emplacement droit du pied, glyphe 1,45 em + mot 11 px `--text-2`, sans fond ; glyphes : barres 1/2/3 (largeur ≥ 3), confluent, bouclier, bouclier barré, rond, carré, tiret, triangle pleins, anneau à trois arcs ; `lod-low` : glyphe seul.
+3. **§ 5, Pastille de statut** : « (`.vst`, `.rw`) » devient « (`.vst`) » ; ajouter la **marque de lentille** (`.lm`) : emplacement droit du pied, glyphe 1,45 em + mot 11 px `--text-2`, sans fond ; glyphes : barres 1/2/3 (largeur ≥ 3), confluent, bouclier, bouclier barré, rond plein, triangle plein, carré creux, tiret, anneau à trois arcs ; `lod-low` : glyphe seul.
 4. **§ 4, Carte** : un pied de 28 unités est réservé à toute carte marquable, posé à la construction du graphe (géométrie invariante au changement de lentille).
 5. **§ 7, Icônes** : la liste des glyphes de pastille s'allonge de ceux du point 3 ; l'exception « glyphe d'une pastille de statut » couvre le glyphe « en cours » de l'empreinte.
 6. **§ 9, Toujours** : « Sur `.card.module` en clair, un glyphe d'état prend la variante texte (`--recent-text`), jamais `--recent` (2,91:1). » **Jamais** inchangé (la bordure pointillée est neutre).
