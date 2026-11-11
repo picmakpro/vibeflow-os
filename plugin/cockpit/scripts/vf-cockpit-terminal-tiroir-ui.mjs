@@ -1,5 +1,5 @@
 // vf-cockpit-terminal-tiroir-ui — construction du DOM du tiroir du terminal (71-07 ; UI-SPEC §2, §5, §7, §12).
-// Export : construireTiroir(document, textes) -> { pastille, point, region, barre, etatPoint, etatTexte, boutonPlein, boutonFermer, poignee, emplacementCadre, charge,
+// Export : construireTiroir(document, textes) -> { pastille, point, region, barre, etatPoint, etatTexte, boutonPlein, boutonFermer, boutonTerminer, poignee, emplacementCadre, charge,
 //   annonce, puce, carteInjoignable }. Sérialisée par .toString() dans le script injecté : autonome, aucune référence à un identifiant du module.
 // Tout par createElement et textContent (aucun innerHTML) ; les textes viennent de l'UI-SPEC §12 via `textes`.
 export function construireTiroir(document, textes) {
@@ -26,7 +26,10 @@ export function construireTiroir(document, textes) {
   const etatTexte = el('span', 'vf-term-etat');
   const boutonPlein = bouton('vf-term-plein', textes.agrandir, 'M3 6V3h3 M13 6V3h-3 M3 10v3h3 M13 10v3h-3'); boutonPlein.setAttribute('aria-pressed', 'false');
   const boutonFermer = bouton('vf-term-fermer', textes.fermer, 'M4 4l8 8 M12 4l-8 8');
-  [etatPoint, el('span', 'vf-term-titre', textes.titre), etatTexte, el('span', 'vf-term-espace'), boutonPlein, boutonFermer].forEach((n) => barre.appendChild(n));
+  // AUDC-M10 : « Terminer la session » (le mot et un glyphe, jamais une teinte d'alerte), caché tant qu'aucune session ne tourne ; double geste (le script pose le texte de confirmation)
+  const boutonTerminer = el('button', 'vf-term-bouton vf-term-terminer'); boutonTerminer.type = 'button'; boutonTerminer.hidden = true; boutonTerminer.title = textes.terminerAide;
+  boutonTerminer.setAttribute('aria-label', textes.terminer); boutonTerminer.appendChild(picto('M4 4h8v8H4z')); boutonTerminer.appendChild(el('span', 'vf-term-terminer-texte', textes.terminer));
+  [etatPoint, el('span', 'vf-term-titre', textes.titre), etatTexte, el('span', 'vf-term-espace'), boutonTerminer, boutonPlein, boutonFermer].forEach((n) => barre.appendChild(n));
   const emplacementCadre = el('div', 'vf-term-zone');
   const charge = el('div', 'vf-term-charge', textes.charge); charge.hidden = true; emplacementCadre.appendChild(charge);
   corps.appendChild(barre); corps.appendChild(emplacementCadre);
@@ -37,5 +40,5 @@ export function construireTiroir(document, textes) {
   const carteInjoignable = el('div', 'vf-term-carte'); carteInjoignable.setAttribute('role', 'alert'); carteInjoignable.tabIndex = -1;
   carteInjoignable.appendChild(document.createTextNode(textes.injoignable));
   const colle = el('span', 'vf-term-insecable'); colle.appendChild(el('code', '', textes.commande)); colle.appendChild(document.createTextNode('.')); carteInjoignable.appendChild(colle); // commande et point final ne se coupent jamais
-  return { pastille, point, region, barre, etatPoint, etatTexte, boutonPlein, boutonFermer, poignee, emplacementCadre, charge, annonce, puce, carteInjoignable };
+  return { pastille, point, region, barre, etatPoint, etatTexte, boutonPlein, boutonFermer, boutonTerminer, poignee, emplacementCadre, charge, annonce, puce, carteInjoignable };
 }

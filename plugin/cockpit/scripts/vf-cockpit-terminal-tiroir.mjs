@@ -12,6 +12,7 @@ const TEXTES = {
   pastille: 'Terminal', titre: 'Terminal', ouvrir: 'Ouvrir le terminal (Ctrl+Maj+Espace)', ouvrirEnCours: 'Ouvrir le terminal, une session est en cours',
   windows: 'Terminal indisponible sous Windows.', localhost: "Ouvrez le cockpit à l'adresse 127.0.0.1 pour utiliser le terminal.",
   agrandir: 'Agrandir le terminal', reduire: 'Réduire le terminal', fermer: 'Fermer le terminal (Ctrl+Maj+Espace)', poignee: 'Hauteur du terminal',
+  terminer: 'Terminer la session', terminerConfirme: 'Confirmer : terminer', terminerAide: 'Ferme le shell et ce qui y tourne ; le terminal pourra être rouvert.', annonceTermine: 'Fin de la session demandée', annonceConfirme: 'Confirmez pour terminer la session',
   charge: 'Ouverture du terminal…', injoignable: 'Le terminal ne répond pas. Relancez ', commande: '/vf-cockpit --terminal', annonceOuvert: 'Terminal ouvert', annonceFerme: 'Terminal fermé', annonceProposition: 'Proposition de lancement dans le terminal.',
   // table unique état -> libellé de la barre (J1 de la critique 71) : chaque état de la carte de Q a son mot ; « Arrêté » ne sert plus qu'à l'état arrêté
   etats: { connecte: 'Connecté', reconnexion: 'Reconnexion…', termine: 'Terminé', arrete: 'Arrêté', refuse: 'Déjà ouvert', expire: 'Session expirée' },
@@ -121,8 +122,20 @@ function scriptTiroir(cfg, accepte, construire) {
         d.poignee.setAttribute('aria-valuenow', String(h)); d.poignee.setAttribute('aria-valuetext', h + ' px'); d.poignee.setAttribute('aria-valuemax', String(pleinMax())); // PU-G-142 : la valeur se lit avec son unité (« 324 px »)
       };
       const memoH = () => { perso = true; stock.ecrire('vf.terminal.h', h); };
+      // AUDC-M10 : « Terminer la session », double geste (le premier arme et change le mot, le second termine ; blur ou 5 s sans second geste : retour au repos) ; la page ne connaît que la route de P, qui parle à Q
+      let armeFin = null;
+      const desarmerFin = () => { clearTimeout(armeFin); armeFin = null; const t = d.boutonTerminer.querySelector('.vf-term-terminer-texte'); if (t) t.textContent = T.terminer; d.boutonTerminer.setAttribute('aria-label', T.terminer); };
+      d.boutonTerminer.addEventListener('click', () => {
+        if (armeFin === null) {
+          d.boutonTerminer.querySelector('.vf-term-terminer-texte').textContent = T.terminerConfirme; d.boutonTerminer.setAttribute('aria-label', T.terminerConfirme);
+          armeFin = setTimeout(desarmerFin, 5000); annoncer(T.annonceConfirme); return;
+        }
+        desarmerFin(); annoncer(T.annonceTermine);
+        fetch('/api/vf/terminal/terminer', { method: 'POST', headers: { 'x-vf-cockpit-token': jeton, 'Content-Type': 'application/json' }, body: '{}', cache: 'no-store' }).catch(() => { void 0; });
+      });
+      d.boutonTerminer.addEventListener('blur', desarmerFin);
       const pastilleEtat = () => {
-        d.point.hidden = !(session && !ouvert);
+        d.point.hidden = !(session && !ouvert); d.boutonTerminer.hidden = !session; if (!session) desarmerFin(); // AUDC-M10 : l'action n'existe que tant qu'une session tourne
         d.pastille.setAttribute('aria-label', session ? T.ouvrirEnCours : T.ouvrir); d.pastille.title = d.pastille.getAttribute('aria-label');
       };
       const etat = (cle) => {

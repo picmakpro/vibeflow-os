@@ -2,7 +2,7 @@
 // vf-cockpit-terminal.mjs (dans le processus de serve.mjs) le lance par child_process.fork : Q n'est plus sur la boucle d'événements de serve.mjs,
 // dont le travail synchrone (minuterie de 5 s) gelait frappes et sortie. Canal parent/enfant = l'IPC de fork (jamais l'argv, jamais l'environnement) :
 //   parent -> enfant : { t:'init', engineDir, root, here, jetons, portP, envOrigine } · { t:'jetons', jetons } · { t:'arret' }
-//     · { t:'cibles', cibles } (liste fermée recalculée par P) · { t:'proposition', cible, verbe, chat?, bloquants, avertissements } (72-10 ; P72-D-10, D-12)
+//     · { t:'terminer' } (fin de la session du shell, AUDC-M10) · { t:'cibles', cibles } (liste fermée recalculée par P) · { t:'proposition', cible, verbe, chat?, bloquants, avertissements } (72-10 ; P72-D-10, D-12)
 //   enfant -> parent : { t:'pret', port } · { t:'occupe', v } · { t:'echec', code } · { t:'lancee', cible, verbe, session, at } (la ligne a été écrite au shell)
 // Lancement (72-10) : GET /proposition, POST /lancer { id, mode, chat? } et POST /annuler { id } sous les contrôles des routes voisines. La ligne ne vient JAMAIS du client (P72-D-13) :
 // elle est composée par l'état de Q (vf-cockpit-lancer-q.mjs) ; elle est écrite au shell sans retour chariot, une fois, seulement armée et le shell au repos ; aucune ligne ni UUID n'est journalisé.
@@ -184,7 +184,9 @@ function demarrerQ({ engineDir, root, here, jetons: jetons0, portP, envOrigine }
   const ppid0 = process.ppid;
   process.on('disconnect', () => { if (phase !== 'arret') sortir(); });
   setInterval(() => { if (process.ppid !== ppid0 && phase !== 'arret') sortir(); }, 500).unref();
-  return { jetons: (j) => { jetons = j || []; }, cibles: recevoirCibles, proposition: recevoirProposition, arret };
+  // AUDC-M10 : fin volontaire de la SESSION (le shell), jamais du serveur : flux fermé, EOF et signal à l'assistant, la place se libère ; une attache neuve lance un autre shell. Sans session : sans effet.
+  const terminer = () => { if (phase !== 'arret') sessions.arreterTout(); };
+  return { jetons: (j) => { jetons = j || []; }, cibles: recevoirCibles, proposition: recevoirProposition, arret, terminer };
 }
 
 if (process.send) {
@@ -196,6 +198,7 @@ if (process.send) {
     else if (msg.t === 'jetons' && Q) Q.jetons(msg.jetons);
     else if (msg.t === 'cibles' && Q) Q.cibles(msg.cibles);
     else if (msg.t === 'proposition' && Q) Q.proposition(msg);
+    else if (msg.t === 'terminer' && Q) Q.terminer();
     else if (msg.t === 'arret' && Q) Q.arret();
   });
   for (const sig of ['SIGINT', 'SIGHUP']) process.on(sig, () => {}); // le groupe du terminal du lanceur signale aussi l'enfant : c'est le parent qui décide
