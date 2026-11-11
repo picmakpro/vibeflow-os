@@ -11,11 +11,15 @@ fichier de code ni de test.
 
 ## Verdict
 
-**Planifiée, prête à exécuter après les Phases 79, 80 et 74.** Cadrage `75-CONTEXT.md` (P75-D-01 à D-27), famille
-d'exigences neuve **ACTV-01 à ACTV-12**, recherche `75-RESEARCH.md` avec une table de preuves rejouable des commandes de
-vérification, spécification d'interface `75-UI-SPEC.md` acceptée à **81/100** au quatrième tour (seuil 70), **12 plans en
-9 vagues**, dont la dernière vérification fraîche rend `passed` (0 bloquant, 0 majeur, 6 mineurs ouverts ci-dessous).
-Aucune exécution, aucun fichier de code ni de test ; STATE.md intact.
+**Planifiée, prête à exécuter après les Phases 79 (22 plans), 80 et 74.** Cadrage `75-CONTEXT.md` (P75-D-01 à D-31 ;
+P75-D-28 et P75-D-29 sont des arbitrages de Samuel, AskUserQuestion session principale, 2026-11-11 ; les autres sont
+déléguées), famille d'exigences neuve **ACTV-01 à ACTV-12**, recherche `75-RESEARCH.md` avec une table de preuves
+rejouable des commandes de vérification, spécification d'interface `75-UI-SPEC.md` acceptée à **81/100** au quatrième
+tour (seuil 70), **12 plans en 9 vagues**. La dernière vérification fraîche (commit `f8cba978`) rend `passed` : 0 bloquant,
+0 majeur ; ses deux mineurs de ponctuation sont corrigés, le troisième reste ouvert (ci-dessous). Revalidation contre la 79
+à la tête `d4d0cd41` (79-01 à 79-22 écrits, A1 à A54), contre la 74 à `e3768442` et la 80 à `3e5db01f`. Aucune
+exécution, aucun fichier de code ni de test ; STATE.md intact. Une question attend Samuel et bloque 75-10 seulement :
+P75-Q-06, les neuf amendements de `DESIGN.md`.
 
 ## Reprise du 2026-11-11 (après les arbitrages de Samuel)
 
@@ -50,8 +54,8 @@ Aucune exécution, aucun fichier de code ni de test ; STATE.md intact.
 | (temps 2 enchaîné sans rendre la main, consigne de la session principale) | | | |
 | research-75 | `75-RESEARCH.md` | gsd-phase-researcher | fait `686df387` |
 | uispec-75 / critique | `75-UI-SPEC.md`, 4 tours de craft, 4 juges neufs | vf-crafter, vf-design-judge | 67, 62, 69, puis **81/100 passed** (quatrième tour accordé par la session principale) ; 10 constats du juge final repris comme critères dans 75-07 et 75-08 |
-| plan-75 | 12 plans, 9 vagues | vf-coder (planification seule) | fait `3a7094c7`, corrigé `f0a5c41d`, `370633f9`, `fb104665`, `e5efa88a`, `02f0c12b` |
-| plancheck-75 | 3 vérifications fraîches | gsd-plan-checker | 5 vérifications fraîches + 1 figée (voir Incidents) : `issues_found` ×4 (6/16/11, 3/4/6, 3/4/5, 0/4/9), puis **`passed`** sur `3c260aa0` (0/0/6) |
+| plan-75 | 12 plans, 9 vagues | vf-coder (planification seule) | fait `3a7094c7`, onze corrections ciblées jusqu'à `5f95f30b`, alignements du manager jusqu'à `f8cba978` |
+| plancheck-75 | vérifications fraîches | gsd-plan-checker | 13 vérifications fraîches + 1 figée (voir Incidents) ; dernière **`passed`** sur `f8cba978` (0 bloquant, 0 majeur, 3 mineurs) |
 | pr-rapport | PR vers `integration/cockpit-audit`, ce rapport | manager | fait |
 
 ## Décisions prises en autonomie
@@ -80,17 +84,17 @@ Toutes au registre `75-CONTEXT.md` (P75-D-01 à D-27), « décision déléguée 
 
 ## À Samuel
 
-**Tranchées le 2026-11-11** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) : Q-75-3 « La remplacer
-(Recommandé) » (P75-D-28) ; Q-75-4 « Les compter comme le lab (Recommandé) » (P75-D-29).
+**Tranchées le 2026-11-11** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; identifiants C76-Q1 du CONTEXT entre parenthèses) : P75-Q-03 (Q-75-3) « La remplacer
+(Recommandé) » (P75-D-28) ; P75-Q-04 (Q-75-4) « Les compter comme le lab (Recommandé) » (P75-D-29).
 
-**Encore ouvertes, non bloquantes** (l'arbitrage en vigueur tient et les plans sont bâtis dessus ; texte complet dans
+**Appliquées par délégation, contestables** (l'option recommandée est appliquée, rien n'est bloqué ; texte complet dans
 `75-CONTEXT.md`) :
-- **Q-75-1** Carte de chaleur à fond ou dégradé : non (recommandé), Q9 tient.
-- **Q-75-2** Empreinte au-delà de 24 h : non (recommandé) ; renvoie à S-1 de la 79.
-- **Q-75-5** Pastille de compte pleine `--recent` du bouton livré : neutre partout (recommandé, P71.5-D-19).
+- **P75-Q-01 (Q-75-1)** Carte de chaleur à fond ou dégradé : non (recommandé), Q9 tient.
+- **P75-Q-02 (Q-75-2)** Empreinte au-delà de 24 h : non (recommandé) ; renvoie à S-1 de la 79.
+- **P75-Q-05 (Q-75-5)** Pastille de compte pleine `--recent` du bouton livré : neutre partout (recommandé, P71.5-D-19).
 
-**À montrer à Samuel avant application (porte de 75-10, point de contrôle humain bloquant) — amendements de
-`DESIGN.md` :**
+**En attente — P75-Q-06, bloque 75-10 (point de contrôle humain bloquant) — amendements de `DESIGN.md` à montrer à
+Samuel avant application (neuf, et non huit : le planificateur a scindé le dernier) :**
 1. § 2 « Graphe de code » : puce « Lentilles d'activité (Phase 75) ».
 2. § 5 Carte : retrait de la variante `recent` (anneau, `.rw`, `.recent-in`) ; ajout de `st-prevu`.
 3. § 5 Pastille de statut : `(.vst, .rw)` devient `(.vst)` ; ajout de la marque de lentille `.lm` et de ses glyphes.
@@ -184,7 +188,7 @@ planning, canal de marquage des cartes réutilisable par la relecture de la 74, 
 3. **REQUIREMENTS, repères :** retirer `<!-- vf-cadrage:phase-75 -->` et la ligne repère « repère de cadrage, Phase 75 » de la table `## Traceability` ; compteurs globaux : + 12 exigences (ACTV-01..12, Pending).
 4. **REGISTRE.md de l'audit :** AUDC-I12 et AUDC-I13 → « planifié (Phase 75, 2026-11-11) » ; AUDC-I36 → « planifié en partie (Phase 75 : cartes prévues, agent par zone) ; constats de l'auditeur sur les cartes en réserve (P75-D-19) ».
 5. **BACKLOG, réserve :** « Constats de l'auditeur posés sur les cartes de l'onglet Code (AUDC-I36, troisième idée) — déclencheur : un fichier de constats de `vf-auditer` typé et versionné existe (P75-D-19, 2026-11-11). »
-6. **STATE.md, décisions :** « 2026-11-11 — Phase 75 cadrée et planifiée (P75-D-01..27, décisions déléguées) ; cinq questions non bloquantes à Samuel (Q-75-1..5). »
+6. **STATE.md, décisions :** « 2026-11-11 — Phase 75 cadrée et planifiée (P75-D-01..31 ; P75-D-28 et P75-D-29 arbitrages Samuel, AskUserQuestion session principale, 2026-11-11) ; P75-Q-06 (amendements de DESIGN.md) en attente, bloque 75-10. »
 7. **Recoupement avec la Phase 74 :** réglé — la 75 crée le canal (75-07), la 74 n'en crée aucun ; fichiers de la 75 sous `ui/75-vf-*`.
 8. **Constat né de la planification, versé à la Phase 79 (P79-D-32, plan 79-21) et à verser au REGISTRE de l'audit (classe AUDC-A-02 / performance) :**
    « `compileGlob` du moteur (`plugin/cockpit/skills/cockpit-moteur/scripts/lib/common.mjs`) est super-linéaire sur un
@@ -193,16 +197,11 @@ planning, canal de marquage des cartes réutilisable par la relecture de la 74, 
    `scripts/lib/vf-glob.mjs`) ; la 75 n'y pose plus de borne propre et garde un témoin de non-régression (75-06, V-N2N). »
 9. **Durées des suites neuves** à inscrire dans `scripts/ci-shard-suites.sh` après exécution (touche un gate : trailer `Gate-Touche`).
 
-## Mineurs ouverts de la dernière vérification (à traiter en tête d'exécution, non bloquants)
+## Mineur ouvert de la dernière vérification (non bloquant, à traiter en tête d'exécution)
 
-1. 75-09c : le filtre d'inventaire exempte en plus `DESIGN.md` et `plugin/cockpit/README.md` (provisoire jusqu'à 75-10) ;
-   la prose dit « identiques dans les quatre plans » : le dire provisoire.
-2. 75-06 : le mutant s'appelle encore « `lstat` omis » alors que la règle est la résolution physique de 79-07 (A37) ;
-   renvoi de 75-03 à corriger.
-3. 75-06 : citer 79-07 et 79-16 dans `cross_phase`.
-4. 75-09a, 09b, 09c : rappeler dans chaque tâche qui adapte une assertion d'absence la règle du littéral en deux morceaux.
-5. 75-09c, 75-10 : l'exception `--recent` n'est pas ancrée (elle masquerait un reste `#btn-recent { color: var(--recent) }`).
-6. 75-10 : épingler la garde `PASS — Q1\.2 — mutant` au lieu de n'importe quel `Q.x`.
+1. 75-05 et 75-06 : le rouge de RK.1 (resp. AN.1) avant la mise à jour de la liste est exigé dans le comportement, mais
+   aucun critère d'acceptation n'impose de le consigner dans la trace de rouge (attendu, obtenu). Le risque est faible :
+   l'exactitude de la liste a déjà son témoin rouge dans 79-05.
 
 ## Incidents
 
@@ -210,7 +209,13 @@ planning, canal de marquage des cartes réutilisable par la relecture de la 74, 
   fichier écrit, aucun processus, transcript immobile) ; remplacé par un vérificateur neuf, arrêté par la session
   principale à la demande du manager (un parent ne peut pas arrêter son enfant) ; aucun de ses résultats n'est repris.
 - **Plafond d'agents simultanés de la session** (20, partagé par les sept missions) atteint à plusieurs reprises :
-  dispatches retardés, jamais contournés.
+  dispatches retardés, jamais contournés ; relevé à 100 par Samuel le 2026-11-11.
+- **Coupure de session** (quota du compte atteint, HTTP 429, vers 15 h 33) : manager et planificateur arrêtés net ;
+  reprise sur un autre compte à la demande de Samuel ; état mesuré sur disque, rien de perdu (seul le rapport était non
+  commité, il l'a été à la reprise) ; un enfant resté inscrit « en cours » au registre a été fermé.
+- **Consignes relayées corrigées en cours de route** : la table `ROUTES` vit dans `vf-cockpit-server.mjs` (pas dans
+  `vf-cockpit-routes.mjs`) et `test-cockpit-routes.sh` est à modifier (liste écrite à la main de RK.1 et AN.1, A54) ;
+  les deux points, d'abord relayés autrement, ont été rétablis par les vérifications fraîches et corrigés.
 - **Rapport de juge référencé avant d'exister** : le premier mandat de correction de la spec citait un fichier écrit par le
   manager quelques secondes plus tard ; le crafter a traité 7 constats sur 16 puis l'a signalé ; renvoyé au tour suivant.
 - **Exception de badge retirée** : le manager avait d'abord tranché « exception de la 71.5 gardée » sur la foi d'une
@@ -220,8 +225,9 @@ planning, canal de marquage des cartes réutilisable par la relecture de la 74, 
 ## Limites
 
 - Aucune exécution : les témoins sont décrits, aucun n'a été rejoué ; aucune sonde de navigateur (navigateur partagé).
-- Points « à revalider » à l'exécution : forme de `VENDORED.txt` après 79-01, nom du gate de plafond de 79-11, forme
-  d'une ligne des tables de routes et d'annotateurs (79-05), numéros des plans de la 80, canal de la 74, plage `ui/74-*`.
+- Points « à revalider » à l'exécution : format de la suite `test-cockpit-frise-curseur.sh` de la 74 (motifs repris de
+  74-06, suite pas encore écrite) ; motifs RK.1, RK.7 et AN.1 prouvés contre le plan 79-05, à relire sur la suite livrée ;
+  forme des lignes `AJOUT` de `VENDORED.txt` après 79-01 ; glyphe et mot de la couche `relecture`.
 - Le gate de sortie rendra son contrôle E4 en manque ou indéterminé (plans non exécutés, STATE non marqué) : attendu,
   non verdi.
 - Gate de sortie (`check-mission-exit.sh --ws fiabilite`, rejoué avant la remise) : E3 conforme après ajout des lignes
@@ -233,8 +239,11 @@ planning, canal de marquage des cartes réutilisable par la relecture de la 74, 
 
 ## Décompte
 
-- Minds dispatchés (mandats émis, comptés) : 29 — 19 agents neufs (2 éclaireurs, 4 panels, 1 chercheur, 1 crafter, 4 juges, 1 planificateur, 6 vérificateurs de plans dont le figé) et 10 reprises par message (crafter 4, planificateur 5, juge 1).
-- Tours : spec d'interface 4 tours de craft, 4 juges neufs (67, 62, 69, 81) ; plans : 1 écriture + 4 corrections ciblées, 6 vérifications fraîches (dont 1 figée, sans résultat repris).
+- Minds dispatchés (mandats émis, comptés sur les mandats émis) : 53 — 27 agents neufs (2 éclaireurs, 4 panels,
+  1 chercheur, 1 crafter, 4 juges, 2 planificateurs, 13 vérificateurs de plans dont le figé) et 26 messages de reprise ou
+  de complément (planificateurs 18, crafter 5, juge 1, chercheur 1, vérificateur figé 1).
+- Tours : spec d'interface 4 tours de craft, 4 juges neufs (67, 62, 69, 81) ; plans : 1 écriture + 11 corrections ciblées,
+  14 vérifications fraîches (dont 1 figée, sans résultat repris).
 
 ## Preuves E6
 
