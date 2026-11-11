@@ -243,6 +243,19 @@ et ne sont pas rouverts.
   Le schéma `vibeflow/cockpit-activite@1` sert des tableaux de tuples, jamais un chemin comme clé d'objet (`porteInterdit`
   teste les clés : un fichier nommé `fil` ferait refuser la réponse). (75-RESEARCH.md O-2.)
 
+- **P75-D-23 (accès en mémoire, amendements A31 à A33 de la 79, `e04c43e7`).** Le calcul côté serveur lit
+  `vf-cockpit-instantane.mjs` (`instantane()`, `surInstantane(rappel)`) : `signal` et `projet` (plan 79-09), `frise` avec
+  `etatOfficiel` et `cibles` (plan 79-13) ; jamais de collecte déclenchée, jamais de route rappelée par HTTP ; la réponse
+  dérivée passe par la réponse gardée commune (A11). Lab en sous-dossier du dépôt : la cible est relative au lab tel qu'il
+  apparaît dans l'arbre de la voie, même chemin que les cartes (A33). Le repli de P75-D-22 tombe.
+- **P75-D-24 (champs du planning partagés avec la Phase 80).** Partage arrêté entre les deux phases par la session
+  principale le 2026-11-11 (P80-D-44, `58881bd3` sur `feat/phase-80-trois-formes`) ; décision déléguée par Samuel
+  (message session principale, 2026-11-08), option recommandée : la 80 pose `vague` sur le plan (et `avancement`,
+  `exigences` sur le nœud de phase) dans `vf-cockpit-planning.mjs` (`readPlanning`), projetés par
+  `vf-cockpit-project.mjs` ; la 75 n'y ajoute que `files_modified` (champ facultatif de `cockpit-project@1`, A32), et
+  son plan des collisions « prévues » lit `vague` sans la poser et dépend du plan de la 80 qui la pose. Les deux
+  fichiers sont partagés avec la 79 et la 80.
+
 ### Vérification attendue des plans
 
 - **P75-D-21.** Chaque comportement porte un témoin qui rougit sur la base et verdit après ; les mutants des suites du
