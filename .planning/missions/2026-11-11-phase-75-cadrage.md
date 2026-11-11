@@ -48,22 +48,46 @@ Toutes au registre `75-CONTEXT.md` (P75-D-01 à D-27), « décision déléguée 
 - **Gardes** par la règle de citation de la CI réécrite en lecture ; zone sans témoin = « aucune suite ne le nomme » ;
   lentille absente hors lab VibeFlow (P75-D-16, D-17).
 - **Cartes prévues** par un annotateur du graphe Code ; constats de l'auditeur en réserve (P75-D-18, D-19).
-- **Retrait** : couche déclarative « Travail récent » et `scripts/recent.mjs` (P75-D-20).
+- **Retrait** (P75-D-20) : `scripts/recent.mjs` sans condition. Le retrait de la couche déclarative « Travail récent » n'est **pas** une décision déléguée : il touche P70-D-01, arbitrage rendu par Samuel, et attend sa réponse à Q-75-3. D'ici là, la couche reste sous la forme du repli (lentille « Récent »). Correction faite au mandat de clôture de la session principale.
 - **Partage avec la 80** : la 80 pose `vague`, la 75 n'ajoute que `files_modified` (P75-D-24, P80-D-44, partage arrêté
   par la session principale).
 - **Étage design** : quatrième tour accordé par la session principale, dernier (P75-D-26) ; pastille de compte neutre
   sur la règle P71.5-D-19 (P75-D-27).
 
-## À Samuel (non bloquant — l'arbitrage en vigueur tient, les plans sont bâtis dessus)
+## À Samuel
+
+Q-75-1, Q-75-2, Q-75-4 et Q-75-5 ne bloquent rien : l'arbitrage en vigueur tient et les plans sont bâtis dessus. **Q-75-3 fait exception** : elle touche un arbitrage rendu (P70-D-01) et n'est pas tranchée par délégation ; l'état en vigueur est « la couche reste, sous la forme du repli » ; les tâches de retrait de la couche portent une condition de départ (voir « Tâches conditionnées par Q-75-3 »).
 
 Texte complet et options : `75-CONTEXT.md` § « À Samuel ».
 
 - **Q-75-1** Carte de chaleur à fond ou dégradé : non (recommandé), Q9 tient.
 - **Q-75-2** Empreinte au-delà de 24 h : non (recommandé) ; renvoie à S-1 de la 79.
-- **Q-75-3** Retrait du « Travail récent » (P70-D-01 lue comme emplacement) : retirer (recommandé).
+- **Q-75-3** Retrait du « Travail récent » : touche P70-D-01 (Q1-A, 2026-11-03), non tranchée par délégation. Recommandation de la 75 : (a) retirer, l'entrée devient le sélecteur ; la lecture « P70-D-01 fixe un emplacement, pas l'existence » est une interprétation, pas une décision. En vigueur jusqu'à la réponse : (b), lentille « Récent ».
 - **Q-75-4** Worktrees hors du dossier du lab : avis de la 75 pour l'option (b) de S-3 de la 79 (un worktree du même
   dépôt compte comme le lab) ; aucun plan ne change.
 - **Q-75-5** Pastille de compte pleine `--recent` du bouton livré : neutre partout (recommandé, P71.5-D-19).
+
+## Tâches conditionnées par Q-75-3 (mandat de clôture, commit `d4d21a90`)
+
+Condition de départ, écrite mot pour mot en tête de chaque tâche concernée : « réponse de Samuel à Q-75-3 consignée,
+option (a) ; à défaut de réponse ou si (b), appliquer le repli de P75-D-20 : « Récent » reste une lentille de plus, même
+canal, même emplacement, le retrait se réduit à `recent.mjs` ». Chaque tâche conditionnée décrit ce qu'elle fait sous le repli.
+
+| Plan | Tâches conditionnées | Tâches non conditionnées |
+|---|---|---|
+| 75-09a | 1a (`recent-work.json` de l'assemblage, sonde Y reportée) ; 2b (`recentWork` de `graph-query.js`, partie « Recent work » de `60-export.js`) | 1b (assertion Q2b, carte `prevu`) ; 2a (`recent.mjs`, étape « Mark recent work » de `refresh.mjs`) |
+| 75-09b | 1 (`25-recent.js`, `.recent`, `recentTip`, bascule, `#btn-recent`, suites `ecrans-recent` et `responsive`) | 0 (trace du retrait de `recent.mjs` dans `VENDORED.txt`) |
+| 75-09c | 1 (dictionnaires, `moteur-carte`, `chrome-moteur-carte`, `chrome-fr`, grep d'inventaire) | — |
+| 75-10 | 2b (variante `recent` et `.rw` dans `DESIGN.md`, ligne « récent » du README, grep d'inventaire à zéro) | 1 (chaîne XSS, `sans-git`) ; 2a (amendements de `DESIGN.md` hors retrait, README, CHANGELOG, compteur) |
+| 75-08 | aucune | toutes |
+
+**Plans qui ne peuvent pas démarrer sans la réponse :** 75-09c (vide sous le repli). 75-09b est quasi vide sous le repli
+(seule la tâche 0 reste). Les autres démarrent : 75-01 à 75-07, 75-08, 75-09a (tâches 1b et 2a), 75-10 (tâches 1 et 2a).
+
+**Deux trous sous le repli, non conçus (hors du mandat de clôture), à planifier si Samuel répond (b) ou ne répond pas :**
+- 75-07 : l'emplacement droit du pied suppose `.rw` retiré ; sous le repli, `.rw` et la marque de lentille `.lm`
+  se disputent le même emplacement.
+- 75-08 : la sixième ligne du sélecteur, la lentille « Récent », n'est planifiée nulle part.
 
 ## Carte des fichiers
 

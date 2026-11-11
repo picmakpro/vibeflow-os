@@ -37,9 +37,10 @@ le lab ; aucune lecture réseau.
 « prévues », agent par zone fondu dans l'empreinte) ; idées 5, 6, 7 et 8 de la note du 2026-11-03 ; la part « hotspots et
 couplage » laissée à la 75 par P78-D-08.
 
-**Retire (un ajout, un retrait) :** la couche déclarative « Travail récent » (fichiers des deux dernières phases faites :
-`recent-work.json`, tableau `ui/25-recent.js`, classes `.recent`/`.recent-in`, bascule binaire) et `scripts/recent.mjs` du
-moteur, jamais appelé. L'entrée du menu qui la portait devient le sélecteur de lentilles (P75-D-14).
+**Retire (un ajout, un retrait) :** en vigueur, `scripts/recent.mjs` du moteur, jamais appelé. Le retrait de la couche
+déclarative « Travail récent » (`recent-work.json`, tableau `ui/25-recent.js`, classes `.recent`/`.recent-in`, bascule
+binaire) touche un arbitrage rendu par Samuel (P70-D-01) : il attend sa réponse à Q-75-3 et n'est pas tranché par
+délégation. D'ici là, la couche reste, sous la forme du repli de P75-D-20 (lentille « Récent »).
 
 **Hors périmètre :**
 - Les constats de l'auditeur posés sur les cartes (troisième idée de AUDC-I36) : aucune source typée sur disque ; en
@@ -219,20 +220,27 @@ et ne sont pas rouverts.
 
 ### Retrait
 
-- **P75-D-20 (retrait principal).** Retirés : l'écriture de `recent-work.json` (`vf-cockpit-build.mjs:70-80`), le tableau
+- **P75-D-20 (retrait principal — CONDITIONNÉ à Q-75-3).** **État en vigueur (2026-11-11, mandat de clôture de la session
+  principale) :** Q-75-3 touche un arbitrage rendu, P70-D-01 (réponse Q1-A de Samuel, 2026-11-03, qui nomme « Travail
+  récent » parmi les actions du menu « ⋯ » avec sa pastille de compte) ; l'audit du 2026-11-10 ne range pas cette couche
+  parmi ses retraits (registre § 3). Le retrait de la couche n'est donc **pas tranché par délégation** : la couche
+  **reste, sous la forme du repli** ci-dessous, et seul `scripts/recent.mjs` est retiré sans condition. Les tâches des
+  plans qui exécutent une part du retrait portent une condition de départ (réponse de Samuel à Q-75-3, option (a)).
+  Description du retrait, applicable seulement si Samuel répond (a) — retirés : l'écriture de `recent-work.json` (`vf-cockpit-build.mjs:70-80`), le tableau
   `ui/25-recent.js` (patchs du moteur), les classes `.recent`/`.recent-in` et l'infobulle `recentTip`, la bascule
   binaire « Travail récent », et `scripts/recent.mjs` du moteur (jamais appelé par l'assemblage VibeFlow) ; une ligne
   `RETRAIT` dans `VENDORED.txt` pour chacun. Le jeton `--recent` reste (P71.5-D-26, D-29 ; il porte la teinte « en
   cours »). L'entrée du menu « ⋯ » qui portait « Travail récent » devient le sélecteur de lentilles **à la même place,
   avec un libellé et sa pastille de compte** (compte des fichiers en cours d'écriture) : la composition de P70-D-01 est
-  tenue (lecture : P70-D-01 fixe un emplacement et un libellé, pas l'existence de la couche ; question Q-75-3). Motif : la
+  tenue selon une lecture de P70-D-01 (« un emplacement et un libellé, pas l'existence de la couche ») qui est une
+  interprétation et ne vaut pas décision ; question Q-75-3. Motif : la
   couche est une approximation déclarative (le spike la disait « à remplacer par le diff réel ») que l'empreinte observée,
   les cartes prévues et la frise de la 74 remplacent. Retrait **dans le même lot** que la mise en service de l'empreinte,
   jamais avant. Suites qui la citent (`test-cockpit-ecrans-recent.sh`, `test-cockpit-onglet-code.sh` C6.3,
   `chrome-moteur-carte`, la sonde de lien symbolique M4 de `test-cockpit-securite.sh`) **adaptées, jamais supprimées** :
   la sonde M4 est reportée sur un autre fichier écrit par le socle (doctrine du 2026-09-16, « ne pas supprimer pour
-  verdir »). Repli si Samuel refuse le retrait (Q-75-3) : « Récent » devient une lentille de plus, même canal, même
-  emplacement ; le retrait se reporte sur `scripts/recent.mjs` seul. (Panel D.)
+  verdir »). **Repli, en vigueur tant que Samuel n'a pas répondu (a) :** « Récent » devient une lentille de plus, même
+  canal, même emplacement ; le retrait se réduit à `scripts/recent.mjs` seul. (Panel D.)
 
 ### Calcul côté serveur
 
@@ -308,8 +316,9 @@ paliers (fixés par la spécification d'interface et sa critique), format intern
   demandent une pastille sans fond. La 75 bâtit son sélecteur sur la règle (P75-D-27). Options : (a) pastille neutre
   partout **(recommandé : la règle écrite, et le « ⋯ » la tient déjà)** ; (b) garder la pastille pleine en bureau comme
   exception écrite dans `DESIGN.md`.
-- **Q-75-3 — Retrait du « Travail récent ».** P70-D-01 (votre réponse Q1-A du 2026-11-03) range « Travail récent » dans le
-  menu « ⋯ » avec sa pastille. Le cadrage remplace cette couche par l'empreinte observée et met le sélecteur de lentilles à
+- **Q-75-3 — Retrait du « Travail récent » (touche un arbitrage rendu : non tranchée par délégation).** P70-D-01 (votre
+  réponse Q1-A du 2026-11-03) range « Travail récent » dans le menu « ⋯ » avec sa pastille. **En vigueur jusqu'à votre
+  réponse : la couche reste, sous la forme du repli (lentille « Récent »).** Le cadrage remplace cette couche par l'empreinte observée et met le sélecteur de lentilles à
   la même place (P75-D-20). Options : (a) retirer la couche, l'entrée devient le sélecteur **(recommandé : la couche est
   une approximation que la phase remplace par de l'observé, et c'est le retrait que le jalon exige)** ; (b) la garder comme
   une lentille « Récent » de plus, le retrait se réduisant à `recent.mjs`.

@@ -562,7 +562,7 @@ Plans:
 **Requirements**: ACTV-01, ACTV-02, ACTV-03, ACTV-04, ACTV-05, ACTV-06, ACTV-07, ACTV-08, ACTV-09, ACTV-10, ACTV-11, ACTV-12
 **Depends on:** Phase 67 (onglet Code) ; Phase 69 (empreinte des agents) ; Phase 79 (contrats C0 à C6 figés le 2026-11-11, amendés A1-A28 : route de frise et champ `cibles` en mémoire, magasin `VF_ETAT`, coquille et graphe servi, retrait de l'appareil de patchs en vague 1) ; Phase 74 (canal de marquage partagé avec la relecture AUDC-I06, P75-D-05) ; ordre du jalon : après la 74. Partage la carte Code avec la Phase 80 (elle la rend navigable, la 75 la marque).
 **Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 5, 6, 7, 8) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2 (AUDC-I12, I13, I36).
-**Retrait (un ajout, un retrait) :** la couche déclarative « Travail récent » (fichiers des deux dernières phases) et `scripts/recent.mjs` du moteur ; l'entrée du menu devient le sélecteur de lentilles (P75-D-20).
+**Retrait (un ajout, un retrait) :** `scripts/recent.mjs` du moteur ; le retrait de la couche déclarative « Travail récent » attend la réponse de Samuel à Q-75-3 (touche P70-D-01) — d'ici là elle reste comme lentille « Récent » (repli de P75-D-20).
 
 **Success Criteria** (what must be TRUE):
   1. Dans l'onglet Code, une lentille choisie dans le menu (Points chauds, Couplage, Gardes, Empreinte) marque chaque carte d'un glyphe à paliers et d'un mot, lisibles sans couleur, sans fond teinté ni couleur d'alerte, et sans déplacer aucune carte.
@@ -570,7 +570,7 @@ Plans:
   3. Les fichiers qu'aucune suite ni aucun gate ne nomme se lisent « aucune suite ne le nomme » sur un lab VibeFlow ; ailleurs la lentille se dit absente.
   4. Les fichiers lus ou écrits par les agents des dernières 24 h s'allument avec le nom de l'agent ; un même fichier visé par deux agents, deux branches ou deux plans d'une même vague est signalé avant la fusion.
   5. Les fichiers que les plans non faits vont créer apparaissent en cartes « prévues ».
-  6. La couche « Travail récent » est retirée ; toutes les suites du cockpit sont vertes sous macOS et Linux, chaîne XSS étendue aux chemins et noms hostiles.
+  6. `scripts/recent.mjs` est retiré ; la couche « Travail récent » est retirée si Samuel répond (a) à Q-75-3, sinon elle devient la lentille « Récent » ; toutes les suites du cockpit sont vertes sous macOS et Linux, chaîne XSS étendue aux chemins et noms hostiles.
 **Plans:** 12 plans (planifiés le 2026-11-11, corrigés après vérification ; exécution après la Phase 79 entière et la Phase 74)
 
 Plans:
