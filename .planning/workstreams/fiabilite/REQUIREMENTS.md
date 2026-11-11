@@ -1071,6 +1071,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | SOCL-23 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
 | SOCL-24 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
 | SOCL-25 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
+| SOCL-26 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
 | — | Phase 80 | repère de cadrage, Phase 80 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 
 **Coverage:**
@@ -1730,6 +1731,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **SOCL-23**: Ni l'index, ni l'état, ni la frise, ni les cibles, ni les verrous, ni le plan de mission publié n'entrent dans l'export autonome ; témoin à marqueur avec témoin positif (A25).
 - [ ] **SOCL-24**: Journal des attentes par hook `command` (I18 réduit, P79-D-22), précédé d'une sonde qui peut le rendre inutile ; jamais de commande, de texte ni de chemin dans le fichier.
 - [ ] **SOCL-25**: Documentation du module : README (code jamais lu depuis la sortie, limite de la pose projet, CSP, `vf-signal`), CHANGELOG, version mineure ; un ajout, un retrait nommés (P79-D-27).
+- [ ] **SOCL-26**: La correspondance de motifs du moteur a un coût borné, au point unique, quelle que soit l'entrée fournie par le lab (motif à plusieurs `**`, chemin très long) ; preuve générative de croissance au plus linéaire (constat de la Phase 75, P79-D-32).
 
 <!-- vf-cadrage:phase-80 -->
 

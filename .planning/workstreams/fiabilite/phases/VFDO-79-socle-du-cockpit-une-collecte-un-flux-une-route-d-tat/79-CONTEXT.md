@@ -31,7 +31,7 @@ AUDC-I30, sur la coquille fournie ici) ; toute action sur une session (Phase 81,
 
 ## Contrats fournis
 
-Section figée le 2026-11-11 avant la recherche détaillée et les plans, pour les Phases 73, 74, 75, 77 et 80. Elle dit
+Section figée le 2026-11-11 avant la recherche détaillée et les plans, pour les Phases 73 à 77 et 80. Elle dit
 ce que la Phase 79 livre et ce que ses consommateurs peuvent tenir pour acquis. Un plan de la 79 qui s'en écarte doit
 le dire ici, en amendement daté, avant d'être exécuté.
 
@@ -401,6 +401,13 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   viennent du gabarit au lieu de l'instantané, pour que `test-cockpit-securite.sh` garde son pouvoir de rougir ; sans
   le réglage, rien ne change. Les pages assemblées « en parties » de 79-15 sont une transition que 79-16 remplace par
   la coquille : 79-15 en écrit le motif.
+- **P79-D-32 (coût de `compileGlob`, constat de la Phase 75).** Pris par la 79 dans un plan neuf, **79-21** : la
+  fonction de correspondance de motifs du moteur (`scripts/lib/common.mjs`) est super-linéaire sur un motif à plusieurs
+  `**` (mesure de la 75 : 855 ms à 20 000 segments, 3 445 ms à 40 000). Classe : coût d'une fonction de correspondance
+  sur une entrée fournie par le lab (motif ou chemin), donc disponibilité du serveur face à un lab piégé. La borne se pose
+  au point unique (la fonction ou son entrée), jamais appelant par appelant ; témoin de performance génératif, rouge
+  avant, vert après (tailles N et 2N, croissance au plus linéaire). Décision déléguée par Samuel (message session
+  principale, 2026-11-08), option recommandée.
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
   gardé sans fin). Borne en vigueur : AUDC-Q2.
@@ -583,9 +590,10 @@ annoncés aux autres phases : 79-01, 79-02, 79-05, 79-06.
 | 79-18 | Mise en page dans un worker, API du moteur gardée (A4) | SOCL-22 | 8 | 79-16, 79-17 | § 79-13 |
 | 79-19 | Journal des attentes (I18 réduit, P79-D-22), sonde d'abord, détachable | SOCL-24 | 9 | 79-06 | § 79-16 + P79-D-22 |
 | 79-20 | Documentation, version mineure du module, limites (pose projet, CSP, `vf-signal`) | SOCL-25 | 9 | tous | § 79-17 |
+| 79-21 | Coût borné de la correspondance de motifs du moteur (`compileGlob`), point unique, preuve générative (P79-D-32) | SOCL-26 | 3 | 79-06, 79-07 | constat de la Phase 75 |
 
-Exigences `SOCL-01` à `SOCL-25` : texte dans `REQUIREMENTS.md`. Audit de sécurité à l'exécution : 79-06, 79-07, 79-09,
-79-12, 79-13, 79-16, 79-18, 79-19.
+Exigences `SOCL-01` à `SOCL-26` : texte dans `REQUIREMENTS.md`. Audit de sécurité à l'exécution : 79-06, 79-07, 79-09,
+79-12, 79-13, 79-16, 79-18, 79-19, 79-21.
 
 </decisions>
 
