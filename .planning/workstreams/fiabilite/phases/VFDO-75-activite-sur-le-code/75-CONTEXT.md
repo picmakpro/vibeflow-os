@@ -261,6 +261,15 @@ et ne sont pas rouverts.
   suite voisine sur un chiffre de hauteur, l'exécution s'arrête et remonte au manager, sans réécrire d'attendu. Décision
   déléguée par Samuel (message session principale, 2026-11-08), option recommandée (critique de la spec, G19).
 
+- **P75-D-26 (étage design, quatrième tour).** La spec d'interface a eu trois tours de critique par des juges neufs
+  (67, 62, 69 sur 100, seuil 70). Quatrième tour accordé par la session principale ; décision déléguée par Samuel (message
+  session principale, 2026-11-08), option recommandée. C'est le dernier : sous 70 au juge neuf suivant, la spec part avec
+  sa note et ses constats ouverts, repris un par un comme critères dans les plans concernés ; pas de cinquième tour sans
+  Samuel. Le juge neuf ne voit que la spec sur disque.
+- **P75-D-27 (pastille de compte du sélecteur).** Neutre en bureau comme dans le « ⋯ » : glyphe et mot (ou chiffre en
+  encre neutre), sans fond. Règle en vigueur : P71.5-D-19 et l'interdit « fond teinté pour un état » de `DESIGN.md` ; la
+  pastille pleine `--recent` de l'actuel bouton « Travail récent » s'en écarte (question Q-75-5).
+
 ### Vérification attendue des plans
 
 - **P75-D-21.** Chaque comportement porte un témoin qui rougit sur la base et verdit après ; les mutants des suites du
@@ -293,6 +302,11 @@ paliers (fixés par la spécification d'interface et sa critique), format intern
   Avis de la 75 sur S-3 : l'option (b) de la 79 (un worktree du même dépôt compte comme le lab, cible relative à sa
   racine) rendrait le radar complet sans faire sortir de chemin du poste ; c'est précisément le cas d'une flotte de
   managers en worktrees frères. Aucun plan de la 75 ne change si (b) est retenue : la cible arrive déjà par arbre (A22).
+- **Q-75-5 — Pastille de compte pleine.** Le bouton « Travail récent » livré porte en largeur de bureau une pastille de
+  compte à fond plein `--recent`, alors que P71.5-D-19 et `DESIGN.md` (interdits : « un fond teinté pour un état »)
+  demandent une pastille sans fond. La 75 bâtit son sélecteur sur la règle (P75-D-27). Options : (a) pastille neutre
+  partout **(recommandé : la règle écrite, et le « ⋯ » la tient déjà)** ; (b) garder la pastille pleine en bureau comme
+  exception écrite dans `DESIGN.md`.
 - **Q-75-3 — Retrait du « Travail récent ».** P70-D-01 (votre réponse Q1-A du 2026-11-03) range « Travail récent » dans le
   menu « ⋯ » avec sa pastille. Le cadrage remplace cette couche par l'empreinte observée et met le sélecteur de lentilles à
   la même place (P75-D-20). Options : (a) retirer la couche, l'entrée devient le sélecteur **(recommandé : la couche est
