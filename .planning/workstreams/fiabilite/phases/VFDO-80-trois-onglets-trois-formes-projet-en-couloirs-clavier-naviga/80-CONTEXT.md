@@ -193,6 +193,17 @@ La Phase 76 se branche sur le panneau de l'onglet Projet par une route à elle (
   Projet (cibles `body`/canevas, PU-G-175), jamais dans une vue d'Équipe. Si une surcouche est ouverte par-dessus une
   vue d'Équipe, Échap ferme d'abord la surcouche. `window.VF_PANNEAU` (pile Retour) n'existe que sur l'onglet Projet et
   se vide au changement d'onglet : il n'agit ni sur la fiche d'agent ni sur le lecteur.
+  **Échap consommé (demande des Phases 73 et 74, relayée par la session principale le 2026-11-11).** Quand la pile ferme
+  une surcouche sur un appui d'Échap, elle appelle `event.preventDefault()` puis `event.stopPropagation()` sur cet
+  événement (écouteur en capture sur `window`). Le moyen garanti par contrat pour une vue est **`event.defaultPrevented`**
+  : une vue d'Équipe (régie, fiche, lecteur) qui écoute Échap ignore tout appui dont `defaultPrevented` vaut vrai
+  (l'arrêt de la propagation est une protection en plus, pas le contrat). Cas inverse : quand aucune surcouche n'est
+  ouverte (ou que le dessus de pile est le terminal, exclu d'Échap), la pile ne touche pas l'événement — ni
+  `preventDefault`, ni arrêt de propagation — et l'appui arrive intact à la vue (`defaultPrevented` faux). La vue ne
+  lit pas `VF_SURCOUCHES.ouverte()` pour décider : au moment où elle reçoit l'appui, la pile a déjà fermé la
+  surcouche. Témoin au plan 80-02 : surcouche ouverte + Échap → `defaultPrevented` vrai et un écouteur de vue posé sur
+  `document` n'est pas appelé ; aucune surcouche + Échap → l'écouteur de vue est appelé avec `defaultPrevented` faux.
+  Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
 - **Tiroir Git, ouverture sur un commit (Phase 74)** : une seule entrée publique,
   `window.VFGitTiroir.ouvrirSur(sha)`, livrée par le plan 80-06 (vague 2). Elle valide le SHA par le motif strict
   existant, ouvre le tiroir s'il est fermé, ouvre le volet bas de détail sur ce commit (détail lu par la route
