@@ -454,3 +454,35 @@ La table des routes et la réponse gardée vivent dans `plugin/cockpit/scripts/v
 - A45 / P79-D-33 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, « Les compter comme le lab ») : `cibles` = `{ arbre, cible, n, dernierMs }`, jointure par (`arbre`, `cible`), worktrees vérifiés du même dépôt comptés comme le lab. A43 : `cibles` null pour une voie de forme inconnue, cible coupée à 120 caractères (jamais jointe), 500 voies au plus. A44 : 299 lignes au plus par fichier. A40, A41 : CSP `script-src` limité aux scripts du module sous `/_vf/` (liste fermée), sortie non servie en statique. P79-D-32 / 79-21 : `compileGlob` corrigé au point unique `scripts/lib/vf-glob.mjs`, 75-06 en dépend.
 - Phase 74 (`origin/feat/phase-74-equipe-dans-le-temps`) : utilise des fichiers `ui/74-vf-*` ; les fichiers neufs de la 75 sont `ui/75-vf-*` (`75-vf-marques.js`, `75-vf-marques-glyphes.js`, `75-vf-activite.js`, `-menu`, `-tables`, `-panneau`, `-collisions`). La 74 ne crée aucun canal de marquage.
 - `showBoard` est défini dans `viewer.html` (exposé par `SC.showBoard`), appelé par `20-health.js`, `25-recent.js` et `30-screens.js` : le retrait de `25-recent.js` ne l'emporte pas (Santé et Écrans le gardent ; le geste « Voir sur la carte » de la 74 est rebranché sur le canal par 75-07, il n'appelle plus `showBoard`).
+
+## Preuves des commandes retouchées (correction n° 9, relevé sans lancer aucune suite)
+
+Règle inchangée : un motif visé par une `<automated>` est retrouvé dans le format d'impression de la suite visée ; un fichier appelé existe ou est créé par un plan nommé.
+
+| Commande retouchée | Motif | Où il est établi | Statut |
+|---|---|---|---|
+| 75-07 t1 à t3, 75-08 t1 à t3, 75-03, 75-05 (suites neuves) | `❌ FAIL`, `PASS — <id> `, `MUTANT-ROUGE`, `BILAN : ` | convention des plans, imprimée par la suite elle-même (modèle `assert_eq`, `test-cockpit-vendor.sh:18` : `echo "  ✅ PASS — $1"` et `❌ FAIL — $1`) ; prouvée à l'exécution par la trace du rouge | convention |
+| `test-cockpit-vendor.sh` (75-07 t3, 75-08 t3, 75-09b, 75-09c, 75-10) | `PASS — V4 ` ; `Résultats : ` | `test-cockpit-vendor.sh:48-61` (étiquettes `"V4 — …"`) et `:160` (`echo "  Résultats : $PASS PASS / $FAIL FAIL"`), relu dans le worktree ; le cliquet de colonnes de 79-11 vit DANS V4 (même étiquette), `V12` est ajouté par 79-20 | établi |
+| `test-cockpit-frise-curseur.sh` (75-07 t4) | exit 0 ; noms `M-BOUTON-VIDE`, `M-APPEL-CONTOURNE`, `M-CANAL-AU-CHARGEMENT` (de la 74), `M-SHOWBOARD-RESTAURE`, `M-RETIRER-VIDE`, `M-RETOUR-UNDEFINED`, `M-ARBRE-IGNORE` (de la 75) ; lignes `C8.` ou `C8:` sans `FAIL` | la suite n'existe nulle part à ce jour (`git ls-tree` de la branche de la 74 : aucun fichier `test-cockpit-frise*` ; seul le plan 74-06 la crée) ; les trois noms de la 74 et le filtre `C(n)[.:]` sont ceux de la propre `<automated>` de 74-06 (`grep -q "$m"`, `grep -E 'C(1|2|…)[.:]' \| grep -c FAIL`) ; le format des lignes `PASS`/`FAIL` n'est pas fixé par 74-06, donc aucun motif de plus n'est inventé | **à revalider sur la suite livrée par 74-06** |
+| `test-cockpit-responsive.sh` (75-09b) | `PASS — Q9\.` et `Q9\.[0-9]+ — mutant` (deux) | convention des assertions ajoutées à une suite existante (§ 1, ligne « mutants AJOUTÉS ») ; la suite imprime `Résultats : ` (l. 801) | convention |
+| `test-cockpit-chrome-fr.sh` (75-09c) | `PASS — Q13\.[0-9]+ — mutant` (un) | même convention ; la suite imprime `Résultats : ` (l. 293) | convention |
+| 75-07, 75-08, 75-09b, 75-09c : mutants côté page | `cockpit_module_muter`, `cockpit_module_copie`, `COCKPIT_MODULE`, code 5 de `cockpit_lancer` | plan 79-06 sur la tête 67f7f481 (`socle-serveur.sh`, aide des suites : `cockpit_module_copie <destination> [fichier…]`, `cockpit_module_muter <nom> <fichier-du-module> <expression sed>`, code 5 si la copie visée n'est pas chargée) ; A48 en donne l'emploi sans destination : forme exacte à relever sur le livré | à relever sur le livré |
+| 75-07 t1, t2 ; 75-08 t1, t3 : lignes `AJOUT` | `^AJOUT assets/ui/75-vf-….js$` | forme lue à la base dans `VENDORED.txt` (`AJOUT assets/ui/00-vibeflow.js`, 32 lignes) et lue par `test-cockpit-vendor.sh:56` (`while read -r k f … [ "$k" = AJOUT ]`) ; 79-01 peut changer la forme | à relever après 79-01 |
+| 75-05 R6 (espion `binaire`) | zéro invocation | `lancerGitAsync(dir, args, { …, binaire = 'git' })` (`vf-cockpit-paths.mjs:249-261`, § Standard Stack) : l'espion voit chaque argv | établi |
+
+Fichiers appelés par ces commandes : existent (`git ls-files`) `scripts/check-machine-paths.sh`, `plugin/cockpit/scripts/tests/test-cockpit-vendor.sh`, `test-cockpit-responsive.sh`, `test-cockpit-chrome-fr.sh` ; créés par un plan nommé : `test-cockpit-frise-curseur.sh` (74-06), `socle-serveur.sh` et ses aides (79-02, 79-06), `doc-chiffres.sh` (79-20), `colonnes-cliquet.mjs` (79-11).
+
+## Dépendances de la 75 envers la 79, vérifiées sur la tête 67f7f481
+
+| Plan de la 75 | Plans de la 79 dont il dépend (vague de la 79) | Ce que le plan de la 75 en tire, relu dans le plan de la 79 |
+|---|---|---|
+| 75-01, 75-02, 75-04 | aucun plan 79-15 à 79-20 ; 79-02 (1) pour `socle-serveur.sh`, 79-01 (1) pour `VENDORED.txt` | aide de lancement, forme de `VENDORED.txt` |
+| 75-03 | 79-07 (2), 79-09 (3), 79-13 (5) | résolution physique unique, projection `frise` et `cibles` (retouche A48 de 79-13 : à revalider) |
+| 75-05 | 79-05 (1), 79-09 (3), 79-12 (4), 79-13 (5), 79-15 (6) | table des routes et réponse gardée ; `instantane()` = `{ seq, at, git, signal, projet }` avec `git: { sig, at } \| null` ; `instantane().frise` ; route graphe, `graph.json`, témoin d'export A25 |
+| 75-06 | 79-05 (1), 79-15 (6), 79-21 (3) | annotateurs ; `serve.mjs` (export) ; `compileGlob` de `scripts/lib/vf-glob.mjs` |
+| 75-07 | 79-11 (4), 79-16 (7), 79-17 (8), 79-18 (9), 79-20 (11) | cliquet de colonnes ; `VF_COQUILLE.surOnglet` et `chargerOnglet` ; `VF_ETAT` ; `render`, `state.layout.children` (`width`, `height`) ; `V12` |
+| 75-08 | 79-11, 79-16, 79-17, 79-18 | idem ; `VF_ETAT.abonner` sans appel immédiat, clés `connexion`, `frise`, `git`, `planning` |
+| 75-09a | 79-15 (6), 79-16 (7), 79-18 (9) (`serve.mjs` relu, non modifié) | état livré de l'export |
+| 75-09b | 79-11 (4), 79-16 (7), 79-17 (8), 79-18 (9), 79-20 (11) | `viewer.html`, `VENDORED.txt`, `test-cockpit-responsive.sh` communs ; V4 et `V12` rejoués |
+| 75-09c | 79-20 (11) | `test-cockpit-vendor.sh` rejoué |
+| 75-10 | 79-16 (7), 79-20 (11) | `test-cockpit-chaine-xss.sh` commun ; README et CHANGELOG du module, `V12`, `doc-chiffres.sh` |

@@ -73,7 +73,7 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
 
 <precondition>
 75-06, 75-07 et 75-08 livrés ET verts (rejouer leurs suites en tête) : sinon arrêt, le retrait ne part jamais avant la mise en service. Refaire la mesure d'inventaire : `rtk proxy grep -rnI -E "recent-work|25-recent|recentTip|recent\.mjs|no-recent|Travail récent|Recent work|graph\.recent|\.recent-in|\.recent\b|'rw'|\.rw\b|Récent|btn-recent" plugin scripts .github DESIGN.md README.md README.fr.md` (hors CHANGELOG), la comparer à la table de 75-RESEARCH § Retrait (numéros de ligne périmés par la 79 et la 80) : toute différence est consignée. Compter les assertions de chaque suite à adapter AVANT. Relever les autres consommateurs de `.cache/changes.json` (écrit par `refresh.mjs:137` « for recent.mjs ») : s'il n'y en a aucun, le dire dans la trace et retirer l'écriture et son commentaire ; sinon la laisser et corriger le commentaire.
-Dépendances vers 79-15 à 79-21 : à revalider à l'écriture de 79-15..21 (plans pas encore écrits sur la branche de la 79 au moment de cette planification).
+Dépendances vers 79-15 à 79-21, revalidées : `serve.mjs` (export) est touché par 79-15, 79-16 et 79-18 : relire l'état livré, ce plan ne le modifie pas ; aucune autre pièce de 79-15 à 79-21 n'est consommée. Revalidé sur la tête 67f7f481 de la 79 (numéros lus dans les `files_modified` et les contrats des plans eux-mêmes).
 </precondition>
 
 <tasks>

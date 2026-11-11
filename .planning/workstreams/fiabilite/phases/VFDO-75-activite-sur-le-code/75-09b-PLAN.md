@@ -82,7 +82,7 @@ Mutants côté page (A48 point 41 de la 79 ; 79-06 et 79-02, aide `plugin/cockpi
 
 <precondition>
 75-09a, 75-07, 75-08 livrés ET verts. Relire `VENDORED.txt` livré (O-4). Refaire le grep d'inventaire (commande de 75-09a, `btn-recent` compris) et consigner l'écart avec la table de 75-RESEARCH § Retrait. Compter les assertions de chaque suite à adapter AVANT. Mesurer les lignes de `viewer.html` (cliquet 79-11).
-Dépendances vers 79-15 à 79-21 : à revalider à l'écriture de 79-15..21 (plans pas encore écrits sur la branche de la 79 au moment de cette planification).
+Dépendances vers 79-15 à 79-21, revalidées : 79-16 (vague 7 : touche `viewer.html`, `VENDORED.txt` et `test-cockpit-responsive.sh`, que ce plan adapte : relire l'état livré avant d'adapter) ; 79-17 (vague 8 : `VENDORED.txt`) ; 79-18 (vague 9 : `viewer.html`) ; 79-11 (V4 et cliquet de colonnes : le retrait ne fait que baisser) ; 79-20 : `V12` de `test-cockpit-vendor.sh`, rejoué par la dernière commande. Revalidé sur la tête 67f7f481 de la 79 (numéros lus dans les `files_modified` et les contrats des plans eux-mêmes).
 </precondition>
 
 <tasks>
