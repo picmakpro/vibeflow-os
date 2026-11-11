@@ -80,7 +80,7 @@ dépôt.
 - **P76-D-03 (navigation).** Ouverture d'un objet par `select(id)` (panneau sans changer de vue) et `reveal(id)` de la
   page, déjà exportés ; Retour par la pile de sélections commune que la Phase 80 pose sur Projet
   (`window.VF_PANNEAU.retour()` et bouton « Retour » de l'en-tête du panneau, P80-C76-3) : la 76 y empile en appelant
-  `select`, sans pile propre ; fil d'Ariane et ancre par objet ; un commit s'ouvre dans le tiroir Git existant
+  `select`, sans pile propre ni fil d'Ariane (P76-D-30) ; ancre par objet ; un commit s'ouvre dans le tiroir Git existant
   (Phase 78, détail sans diff) ; une phase s'ouvre dans son panneau Projet (identifiant stable `ph-<N>` ou
   `ph-<N>@<ws>`). Clavier : tout lien est un élément focalisable natif, Échap ferme, ordre de tabulation dans le
   panneau. Amendé le 2026-11-11 sur la réponse de la Phase 80 (pile locale abandonnée ; nom corrigé par la 80 le même jour : l'objet global du moteur est gelé, P80-D-33 à P80-D-41). Une surcouche éventuelle passe par la pile commune `window.VF_SURCOUCHES` de la 80 (`ouvrir`, `dessus`, `ouverte`).
@@ -245,12 +245,13 @@ dépôt.
   extension qui dépend de l'onglet s'initialise par `VF_COQUILLE.surOnglet(rappel)`, jamais au seul chargement ; les
   sections de panneau et la lecture de `GET /api/vf/tracabilite` de la 76 s'installent quand l'onglet vaut Projet et
   le rappel rend leur nettoyage (écouteurs, minuteries, DOM posé). **À revalider** après exécution de la 79.
-- **P76-D-30 (objets qui ne sont pas des nœuds).** Phase et plan sont des nœuds du graphe : ouverts par `select(id)`.
-  Exigence (après le retrait de P76-D-25), ADR, décision, entrée de mémoire : panneaux sur mesure par
-  `SC.showPanel(html, bind)`. Leur entrée dans la pile Retour commune de la 80 est demandée à la 80 (une entrée de pile
-  qui rouvre un panneau sur mesure) ; tant qu'elle n'est pas confirmée, le fil d'Ariane de la 76 sert de retour pour
-  ces panneaux. **À revalider.** Décision déléguée par Samuel (message session principale, 2026-11-08), option
-  recommandée.
+- **P76-D-30 (objets qui ne sont pas des nœuds).** Phase et plan sont des nœuds du graphe : ouverts par `select(id)`,
+  ils s'empilent d'eux-mêmes. Exigence (après le retrait de P76-D-25), ADR, décision, entrée de mémoire : panneaux sur
+  mesure par `SC.showPanel(html, bind)`, précédés d'un appel à `window.VF_PANNEAU.empiler({ titre, rouvrir })`
+  (P80-C76-5, commit `1325f65a` de `feat/phase-80-trois-formes`) ; `titre` est une donnée du lab, rendue en texte,
+  jamais en HTML. Un seul Retour par panneau, celui de la 80 : **la 76 n'a pas de fil d'Ariane**. La pile est vidée au
+  changement d'onglet, ce qui se combine avec l'initialisation par `surOnglet`. Décision déléguée par Samuel (message
+  session principale, 2026-11-08), option recommandée ; amendée le 2026-11-11 sur la réponse de la 80.
 - **Partagé avec la Phase 73** : l'extracteur de définitions des registres (P76-D-18).
 - **Fourni à la Phase 77** : les compteurs de la mémoire par la route (P76-D-23).
 
