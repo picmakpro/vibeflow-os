@@ -215,7 +215,10 @@ Toutes « décision déléguée par Samuel (message session principale, 2026-11-
   dit « aucune phase » en texte neutre.
 - **P80-D-04 (profondeur).** Couloirs à la racine seulement. À l'intérieur d'une phase : le graphe du moteur (les liens
   « puis » et « couvre » y ont un sens) ou la liste (P80-D-05). Couloirs de plans écartés (trois états seulement, liens
-  perdus).
+  perdus). Le nœud « Exigences » (`<ph>.req`) et les liens « couvre » sont dessinés dans le graphe d'une phase tant que
+  le graphe les porte ; aucun témoin de la 80 n'affirme leur présence dans le graphe (les suites de la 80 lisent les
+  exigences et la couverture par `lireExigences`, P80-C76-6) : le retrait de la Phase 76 (P76-D-25, 76-08) ne rougit
+  aucune suite de la 80. Précision du 2026-11-11, à la demande de la session principale.
 - **P80-D-05 (liste et tableau, AUDC-I25).** Un seul modèle, deux mises en page : « tableau » = les couloirs (colonnes
   empilées ≤ 700 px) ; « liste » = rangées triables (numéro, état, plans, exigences ; dans une phase : plans par vague,
   exigences en liste à cocher, lecture seule). Touche `v` (bascule), bouton équivalent ; liste par défaut au téléphone.
