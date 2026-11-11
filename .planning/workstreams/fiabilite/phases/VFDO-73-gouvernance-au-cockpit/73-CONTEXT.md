@@ -285,6 +285,13 @@ recommandée ; l'option recommandée vient du panel ou de l'éclaireur cité. Au
   pas utilisés par la régie (l'ancre est traitée par la régie, P73-D-20). Plan concerné marqué « à revalider » jusqu'à
   la fusion de la 80.
 
+- **P73-D-34 (initialisation par onglet, règle commune A30 de la Phase 79, `74501bb0`).** Les modules de page de la
+  régie s'initialisent par `VF_COQUILLE.surOnglet(rappel)` quand la coquille de la 79 existe : `rappel({onglet})` monte
+  la régie quand l'onglet vaut Équipe et rend une fonction de nettoyage (écouteurs, abonnements `VF_ETAT`, minuteries,
+  DOM posé) appelée avant le changement d'onglet suivant ; jamais d'initialisation au seul chargement de la page. Avant la
+  coquille, la régie garde l'initialisation présente (au chargement de `equipe.html`) ; chaque plan d'interface écrit les
+  deux cas dans sa dépendance envers la 79 et est marqué « à revalider » jusqu'à la fusion de la coquille.
+
 ### Claude's Discretion
 
 Noms internes des fonctions et modules neufs, découpage fin des fichiers d'interface, forme exacte des fixtures (noms
