@@ -26,6 +26,9 @@ const argv = process.argv.slice(2);
 const opt = (name, dflt) => { const i = argv.indexOf('--' + name); return i < 0 ? dflt : argv[i + 1]; };
 const has = (name) => argv.includes('--' + name);
 const stateFile = path.join(here, '.cache', 'server.json');
+// vibeflow AUDC-H3 : le journal (serveur.log) porte la date et le motif de chaque arrêt ; jamais un jeton ni un contenu
+const journal = (m) => console.log(`${new Date().toISOString()} ${m}`);
+let motifArret = 'fin du processus';
 const readState = () => { try { return JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { return null; } };
 if (has('stop')) {
   const s = readState();
@@ -217,7 +220,13 @@ fs.watchFile(path.join(here, 'index.html'), { interval: 1000 }, (cur, prev) => {
   clearTimeout(reloadTimer);
   reloadTimer = setTimeout(() => { try { load(); broadcast('reload'); console.log('map rebuilt: reloaded open tabs'); } catch {} }, 800);
 });
-if (idleExit) setInterval(() => { if (!tabs.size && !running.size && !TERM?.occupe() && Date.now() - lastTab > idleExit) process.exit(0); }, 60000).unref(); // vibeflow P26 : une session de terminal ouverte empêche l'arrêt pour inactivité
+// vibeflow P26 : une session de terminal ouverte empêche l'arrêt pour inactivité ; AUDC-H3 : toute requête authentifiée et tout flux de page ouvert comptent comme activité, et la rétention par le terminal est écrite au journal
+let retenuDit = false;
+if (idleExit) setInterval(() => {
+  if (tabs.size || running.size || VF?.ouverts?.() || Date.now() - lastTab <= idleExit) return;
+  if (TERM?.occupe()) { if (!retenuDit) { retenuDit = true; journal("arrêt sur inactivité retenu : un terminal est ouvert"); } return; }
+  motifArret = `inactivité (${idleExit / 60000} min sans requête authentifiée ni onglet)`; process.exit(0);
+}, (() => { const n = Number(process.env.VF_COCKPIT_IDLE_TICK_MS); return Number.isInteger(n) && n >= 100 && n < 60000 ? n : 60000; })()).unref(); // période de contrôle : 60 s, réglage de test seulement
 const flowsFile = path.join(here, 'custom-flows.json');
 const readFlows = () => { try { return JSON.parse(fs.readFileSync(flowsFile, 'utf8')).flows || []; } catch { return []; } };
 
@@ -523,6 +532,7 @@ function route(req, res) {
     // EventSource can't send headers, so the events stream takes the token in the query string
     const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' || url.pathname === '/api/vf/events' ? url.searchParams.get('token') : null); // vibeflow P13
     if (!sameOrigin || (!sameToken(given, token) && !VF?.jetonValide(given))) { res.writeHead(403); return res.end(); } // vibeflow P13
+    lastTab = Date.now(); // vibeflow AUDC-H3 : une requête authentifiée est une activité (l'arrêt sur inactivité ne regarde plus les seuls flux de page) ; après le refus 403, une requête non authentifiée ne compte jamais
     if (TERM && req.method === 'GET' && url.pathname === '/api/vf/terminal') return TERM.routeP(req, res); // vibeflow P26 : état du terminal (jamais un secret), après le Host et le jeton
     if (VF && url.pathname.startsWith('/api/vf/') && VF.route(req, res, url)) return; // vibeflow P13 : routes du serveur unique, après le Host et le jeton
     if (req.method === 'GET' && url.pathname === '/api/events') {
@@ -615,7 +625,9 @@ server.on('listening', () => {
   TERM?.demarrer(port); // vibeflow P26 : second écouteur du terminal, une fois server.json écrit
   const forget = () => { try { if (readState()?.pid === process.pid) fs.unlinkSync(stateFile); } catch {} };
   process.on('exit', forget);
-  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => process.exit(0));
+  process.on('exit', () => journal(`arrêt : ${motifArret} (PID ${process.pid})`)); // vibeflow AUDC-H3
+  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => { motifArret = `signal ${sig}`; process.exit(0); });
+  journal(`démarrage : PID ${process.pid}, port ${port}${TERM ? ', terminal' : ''}`);
   console.log(`Floorplan: ${u}`);
   console.log(cli
     ? `asking via ${ENGINES[engine].name} ${version || ''} (${cli.path})${model ? `, model ${model}` : ''}`

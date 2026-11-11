@@ -70,7 +70,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
   };
   let live = null;
   try {
-    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => { if (nom === 'structural' || nom === 'patch') load(); diffuser(nom, data); } });
+    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => { if (nom === 'structural' || nom === 'patch') load(); diffuser(nom, data); }, aClient: () => clients.size > 0 }); // AUDC-H2 : le filet ne collecte que si un onglet écoute
   } catch (e) { log('error', `direct indisponible : ${e.message}`); }
   lancer.sourceWho(() => (live ? live.snapshot().who : null)); // états attendue / vue / terminee des cartes lancées (72-07)
 
@@ -82,6 +82,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
     if (url.pathname === '/api/vf/events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
       res.write('retry: 1000\n\n');
+      live?.reveil?.(); // AUDC-H2 : rien n'a été collecté depuis un moment s'il n'y avait aucun onglet
       const snap = live ? live.snapshot() : { seq: 0, lock: { available: false }, who: { workers: [], sources: {} } };
       if (porteInterdit(snap)) { log('error', 'hello refusé : contenu interdit'); res.end(); return true; }
       res.write(`event: hello\ndata: ${JSON.stringify(snap)}\n\n`);
@@ -140,6 +141,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
     // AUDC-B-03 : mémorisée tant que rien n'a changé (même gabarit, même instantané du direct, mêmes cartes lancées) : une requête de plus ne reconstruit pas 2,5 Mo
     pageEquipe: () => {
       if (!gabarit) return null;
+      live?.reveil?.();
       const who = live ? live.snapshot().who : null;
       if (!INTERDITS.length || (who && porteInterdit(who))) { log('error', 'page Équipe refusée : contrat illisible ou contenu interdit'); return null; } // même garde que le flux, fermée par défaut
       // `nom` : celui que la page Projet affiche (P69-D-33), jamais le nom du dossier
@@ -150,6 +152,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
       memoE = { gen: genP, who, cles, html };
       return html;
     },
+    ouverts: () => clients.size, // AUDC-H3 : des flux de page ouverts retiennent l'arrêt sur inactivité
     jetonValide: (j) => memeJeton(j, ptoken),
     stop() { live?.stop(); for (const c of clients) c.end(); },
   };

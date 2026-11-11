@@ -52,7 +52,7 @@ AJOUT assets/vendor/fonts/SHA256SUMS
 AJOUT terminal/vf-cockpit-pty.py
 AJOUT VENDORED.txt
 AJOUT LICENCES-TIERCES.txt
-TAILLE assets/serve.mjs 627
+TAILLE assets/serve.mjs 639
 TAILLE assets/vendor/elk.bundled.js 6697
 TAILLE assets/viewer.html 2573 .html, hors gate
 TAILLE scripts/build.mjs 484

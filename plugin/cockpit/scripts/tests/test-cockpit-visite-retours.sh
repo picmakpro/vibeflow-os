@@ -13,7 +13,7 @@ export HOME="$WORK/home"; mkdir -p "$HOME"
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
-if [ -z "$CHROME" ]; then echo "  ⊘ SAUTÉE : aucun navigateur — les retours de visite ne sont PAS vérifiés"; exit 0; fi
+if [ -z "$CHROME" ]; then . "$(dirname "$0")/chrome-saut.sh"; vf_chrome_saut "  ⊘ SAUTÉE : aucun navigateur — les retours de visite ne sont PAS vérifiés"; exit 0; fi
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 L="$WORK/lab"; mkdir -p "$L/.planning"
