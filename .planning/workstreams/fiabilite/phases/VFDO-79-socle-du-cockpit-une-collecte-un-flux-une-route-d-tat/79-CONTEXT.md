@@ -449,10 +449,18 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   Plans touchés : 79-13 (cibles, voie, transcript), 79-08 et 79-09 si le libellé `arbre` de la voie y est calculé.
 - **A46 (79-13, limites d'A45).** Deux limites nommées, versées au BACKLOG par la jointure : (1) le `nom` d'un worktree
   n'est pas unique (deux worktrees au même nom de dossier rendent le couple (`arbre`, `cible`) ambigu pour le radar ;
-  `cockpit-git-worktrees@1` le dit déjà) ; (2) la dernière action d'un agent (`who`, `doing`, P69-D-16) garde sa règle
+  `cockpit-git-worktrees@1` le dit déjà) — règle fermée par défaut : un `nom` porté par deux worktrees vérifiés n'est
+  pas admis, leurs fichiers deviennent « un fichier hors du lab » ; (2) la dernière action d'un agent (`who`, `doing`, P69-D-16) garde sa règle
   actuelle : un fichier d'un worktree hors de l'arbre principal y reste « un fichier hors du lab » ; l'étendre touche
   le collecteur `who` et se décide avec la régie (Phase 73). Décision déléguée par Samuel (message session principale,
   2026-11-08), option recommandée.
+- **A47 (75) — instantané : signature git et borne de la frise.** (1) `instantane()` (A31) porte aussi
+  `git: { sig, at } | null` : la signature (HEAD, refs, worktrees) que la collecte calcule déjà pour l'événement `git`
+  (C4), 16 caractères, `at` en ms ; une route d'une autre phase recalcule quand `git.sig` change, sans lire git par
+  requête (A31 tenue). Livré par 79-09, qui crée le module. (2) `instantane().frise` porte la projection complète de
+  l'index, donc jusqu'à 2 000 voies (borne de sûreté d'A35), avec `tronque: true` si l'index a dû évincer des voies ;
+  la borne de 500 voies (A43) ne vaut que pour la réponse HTTP de `/api/vf/frise`, qui dit elle aussi `tronque`. Livré
+  par 79-13. Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
   gardé sans fin). Borne en vigueur : AUDC-Q2.
