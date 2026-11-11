@@ -15,7 +15,7 @@ export HOME="$WORK/home"
 trap 'vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 PASS=0; FAIL=0
-assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
+assert_eq() { if [ "$#" -ne 3 ]; then echo "  ❌ FAIL — $1 (assert_eq a reçu $# arguments au lieu de 3 : expansion d'accolades de bash 3.2 ?)"; FAIL=$((FAIL+1)); elif [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 assert_has() { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): [$3]"; echo "     obtenu:  [${2:0:300}]"; FAIL=$((FAIL+1)); fi; }
 assert_ge() { if [ "${2:--1}" -ge "$3" ] 2>/dev/null; then echo "  ✅ PASS — $1 ($2 >= $3)"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 (obtenu $2, attendu >= $3)"; FAIL=$((FAIL+1)); fi; }
 
@@ -247,6 +247,94 @@ rm -f "$CP"/tests/zz-am7-*.sh
 assert_ge "AM7.6a — témoin : au moins vingt suites cherchent un navigateur, dont au moins six appellent le helper du point de saut" "$NSUITES" 20
 assert_ge "AM7.6c — au moins six suites appellent le helper" "$NSAUT" 6
 assert_eq "AM7.6 — chaque suite qui saute sa moitié navigateur sort non-zéro en CI sans Chrome, sur place (rouge : aucune)" "${BAD:-aucune}" "aucune"
+
+echo "=== AM7.S — aide commune socle-serveur.sh : lancer, interroger, arrêter sous l'hygiène (A6, SOCL-02) ==="
+SOCLE="$(cd "$(dirname "$0")" && pwd)/socle-serveur.sh"
+AIDE=absente
+{ [ -f "$SOCLE" ] && bash -n "$SOCLE" 2>/dev/null; } && { . "$SOCLE"; AIDE=oui; }
+fonctions_manquantes() { local f r=""; for f in cockpit_lancer cockpit_arreter cockpit_get attendre cockpit_lancement_brut; do [ "$(type -t "$f")" = function ] || r="$r $f"; done; echo "${r:-aucune}"; }
+assert_eq "AM7.S1 — socle-serveur.sh existe, passe bash -n, et ses cinq fonctions sont définies (manquantes : aucune)" "$AIDE$(fonctions_manquantes | sed 's/^/ /')" "oui aucune"
+# formes de lancement assemblées à l'exécution (aucun littéral) pour que cette suite ne se détecte pas elle-même
+PJ=".mjs\""; SV="serve"; NO1="--no"; NO2="-open"; IMP="--imp"; ORT="ort"
+if [ "$AIDE" != oui ]; then # aide absente : des remplaçants qui échouent, pour que chaque témoin rougisse nommément au lieu d'arrêter la suite
+  cockpit_lancer() { echo "aide absente" >&2; VF_PORT=0; VF_JETON=""; VF_PID=""; VF_SORTIE=""; return 127; }
+  cockpit_arreter() { return 127; }
+  cockpit_get() { VF_CODE=000; return 127; }
+  attendre() { return 127; }
+  cockpit_lancement_brut() { return 0; }
+fi
+nproc_sortie() { ps -eo args | S="$1/serve.mjs" awk 'index($0, ENVIRON["S"]) { n++ } END { print n + 0 }'; }  # le motif passe par l'environnement : jamais dans la ligne de commande d'awk, qui se compterait elle-même
+LS="$WORK/labs2"; mklab "$LS"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LS" --quiet > "$WORK/build-s2.out" 2>&1 || cat "$WORK/build-s2.out"
+export VF_AM7_TEMOIN=temoin-env-ok
+cockpit_lancer "$LS" > "$WORK/s2.out" 2> "$WORK/s2.err"; RC2=$?
+PIDJ="$(node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).pid)}catch{console.log("")}' "$LS/.vibeflow/cockpit/.cache/server.json")"
+SORTIE_REELLE="$(cd "$LS/.vibeflow/cockpit" && pwd -P)"
+ENV_OK="$(ps eww -p "${VF_PID:-0}" 2>/dev/null | grep -c 'VF_AM7_TEMOIN=temoin-env-ok')"
+assert_eq "AM7.S2 — cockpit_lancer : rend 0, port > 0, jeton >= 16, pid vivant = pid de server.json, sortie = chemin réel, rien sur stdout, variable héritée vue du serveur" "$RC2 $([ "${VF_PORT:-0}" -gt 0 ] && echo oui || echo non) $([ "${#VF_JETON}" -ge 16 ] && echo oui || echo non) $({ [ -n "${VF_PID:-}" ] && [ "$VF_PID" = "$PIDJ" ] && ps -p "$VF_PID" > /dev/null 2>&1; } && echo oui || echo non) $([ "${VF_SORTIE:-}" = "$SORTIE_REELLE" ] && echo oui || echo non) $([ ! -s "$WORK/s2.out" ] && echo oui || echo non) $([ "$ENV_OK" = 1 ] && echo oui || echo non)" "0 oui oui oui oui oui oui"
+unset VF_AM7_TEMOIN
+INSCRIT=non; for q in ${PIDS[@]+"${PIDS[@]}"}; do [ "$q" = "${VF_PID:-x}" ] && INSCRIT=oui; done
+assert_eq "AM7.S3 — hygiène : vf_hyg_vivants liste VF_PID, PIDS le contient, un seul processus pour la sortie" "$(vf_hyg_vivants | awk '{print $1}' | grep -cx "${VF_PID:-x}") $INSCRIT $(nproc_sortie "$SORTIE_REELLE")" "1 oui 1"
+cockpit_get /api/vf/etat > "$WORK/s4.json" 2> /dev/null; C1="$VF_CODE"
+cockpit_get /api/vf/inconnu-am7 > /dev/null 2>&1; C2="$VF_CODE"
+assert_eq "AM7.S4 — cockpit_get : /api/vf/etat rend un JSON non vide et VF_CODE=200 ; un chemin inconnu rend VF_CODE=404" "$C1 $(node -e 'try{JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log("json")}catch{console.log("nonjson")}' "$WORK/s4.json") $C2" "200 json 404"
+sleep 300 & ETR=$!
+cockpit_arreter "$ETR"
+ETR_ETAT="$(ps -p "$ETR" > /dev/null 2>&1 && echo vivant || echo mort)"
+SERVEUR_PID="${VF_PID:-0}"; AVANT="$(ps -p "$SERVEUR_PID" > /dev/null 2>&1 && echo vivant || echo absent)"; cockpit_arreter
+APRES="$(ps -p "$SERVEUR_PID" > /dev/null 2>&1 && echo vivant || echo sorti)"; DANS=non; for q in ${PIDS[@]+"${PIDS[@]}"}; do [ "$q" = "$SERVEUR_PID" ] && DANS=oui; done
+kill "$ETR" 2> /dev/null; wait "$ETR" 2> /dev/null
+assert_eq "AM7.S5 — cockpit_arreter : le serveur marqué est arrêté (VF_PID vidé, absent de PIDS) ET le processus étranger sans la marque survit" "avant=$AVANT serveur=$APRES vide=$([ -z "${VF_PID:-}" ] && echo oui || echo non) pids=$([ "$DANS" = oui ] && echo avec || echo sans) etranger=$ETR_ETAT" "avant=vivant serveur=sorti vide=oui pids=sans etranger=vivant"
+t_s() { local a=$SECONDS; "$@"; echo "$? $((SECONDS - a))"; }
+SA="$(t_s attendre 5 true)"
+SB="$(t_s attendre 2 false)"
+( sleep 1; : > "$WORK/pret-s6" ) & SBG=$!
+SC="$(t_s attendre 6 test -e "$WORK/pret-s6")"; wait "$SBG" 2> /dev/null
+assert_eq "AM7.S6 — attendre : (a) vraie : 0 en moins de 2 s ; (b) jamais vraie, délai 2 s : 1 entre 2 et 4 s ; (c) vraie après 1 s : 0 avant le délai" "$([ "${SA%% *}" = 0 ] && [ "${SA##* }" -lt 2 ] && echo ok || echo "a=$SA") $([ "${SB%% *}" = 1 ] && [ "${SB##* }" -ge 2 ] && [ "${SB##* }" -le 4 ] && echo ok || echo "b=$SB") $([ "${SC%% *}" = 0 ] && [ "${SC##* }" -lt 6 ] && echo ok || echo "c=$SC")" "ok ok ok"
+cp -R "$LS/.vibeflow/cockpit" "$WORK/sortie-sans"; rm -f "$WORK/sortie-sans/vf-cockpit-server.mjs"
+T0=$SECONDS; COCKPIT_SORTIE="$WORK/sortie-sans" COCKPIT_ATTENTE=20 COCKPIT_LOG="$WORK/s7-serve.out" cockpit_lancer "$LS" > /dev/null 2> "$WORK/s7.err"; RC7=$?; D7=$((SECONDS - T0))
+assert_eq "AM7.S7 — serveur mort avant d'écouter : retour 1, en moins de 15 s, VF_PID vide, VF_PORT=0, journal non vide" "$RC7 $([ "$D7" -lt 15 ] && echo oui || echo non) $([ -z "${VF_PID:-}" ] && echo oui || echo non) ${VF_PORT:-?} $([ -s "$WORK/s7-serve.out" ] && echo oui || echo non)" "1 oui oui 0 oui"
+RC8="$(env -u VF_HYG_TAG bash -c '. "$1"; cockpit_lancer "$2" > /dev/null 2>&1; echo $?' x "$SOCLE" "$LS" 2> /dev/null)"
+assert_eq "AM7.S8 — hygiène non initialisée (bash enfant) : retour 2 et aucun processus de la sortie (ps + awk)" "$RC8 $(nproc_sortie "$SORTIE_REELLE")" "2 0"
+HORS="$(mktemp -d)"; cp -R "$LS/.vibeflow/cockpit" "$HORS/sortie"
+COCKPIT_SORTIE="$HORS/sortie" cockpit_lancer "$LS" > /dev/null 2>&1; RC9=$?
+assert_eq "AM7.S9 — sortie hors de la marque de la suite : retour 3 et rien lancé (ps + awk)" "$RC9 $(nproc_sortie "$HORS/sortie")" "3 0"
+# sonde des effets de bord : trois clés indépendantes (inscrit / invisible / stale), jouée avec l'aide puis avec ses mutants
+sonde_aide() {
+  ( . "$1"; local r_i=non r_v r_s q
+    cockpit_lancer "$LS" > /dev/null 2>&1; for q in ${PIDS[@]+"${PIDS[@]}"}; do [ "$q" = "${VF_PID:-x}" ] && r_i=oui; done; cockpit_arreter
+    COCKPIT_SORTIE="$HORS/sortie" cockpit_lancer "$LS" > /dev/null 2>&1; r_v=$?
+    [ "$r_v" = 0 ] && { kill "$VF_PID" 2> /dev/null; wait "$VF_PID" 2> /dev/null; ps -p "$VF_PID" > /dev/null 2>&1 && r_v="$r_v(survit)"; }
+    printf '{"pid":2147483000,"port":9,"token":"perime","url":"http://127.0.0.1:9"}\n' > "$LS/.vibeflow/cockpit/.cache/server.json"
+    cockpit_lancer "$LS" > /dev/null 2>&1; r_s="$([ "${VF_PORT:-0}" = 9 ] && echo suivi || echo ignoré)"; cockpit_arreter
+    echo "inscrit=$r_i invisible=$r_v stale=$r_s" )
+}
+mutant_de() { sed "/$1/d" "$SOCLE" > "$WORK/mut-$1.sh"; echo "$(cmp -s "$SOCLE" "$WORK/mut-$1.sh" && echo identique || echo different) $(bash -n "$WORK/mut-$1.sh" 2> /dev/null && echo valide || echo invalide) $(sonde_aide "$WORK/mut-$1.sh")"; }
+if [ "$AIDE" = oui ]; then
+  BASE_SONDE="$(sonde_aide "$SOCLE")"
+  M_PIDS="$(mutant_de am7:pids)"; M_VIS="$(mutant_de am7:visible)"; M_STALE="$(mutant_de am7:stale)"
+else BASE_SONDE="aide absente"; M_PIDS="aide absente"; M_VIS="aide absente"; M_STALE="aide absente"; fi
+assert_eq "AM7.S10 — mutant am7:pids (inscription à PIDS retirée) : seule la clé inscrit change (oui -> non), l'aide intacte donne les trois clés attendues" "$BASE_SONDE | $M_PIDS" "inscrit=oui invisible=3 stale=ignoré | different valide inscrit=non invisible=3 stale=ignoré"
+assert_eq "AM7.S11 — mutant am7:visible (refus hors marque retiré) : seule la clé invisible change (3 -> 0), le serveur lancé hors marque est arrêté par la suite" "$M_VIS" "different valide inscrit=oui invisible=0 stale=ignoré"
+assert_eq "AM7.S12 — mutant am7:stale (effacement et contrôle du pid retirés) : seule la clé stale change (ignoré -> suivi)" "$M_STALE" "different valide inscrit=oui invisible=3 stale=suivi"
+rm -rf "$HORS"
+
+echo "=== AM7.K — la classe « lancement direct du serveur » est fermée (A6, P79-D-23) ==="
+# Exceptions : suites que le plan 79-01 édite et que 79-06 migre. Liste écrite une seule fois, elle ne peut que rétrécir.
+EXC_LANCEMENT="test-cockpit-questions.sh test-cockpit-git-env.sh"
+DIR_T="$(cd "$(dirname "$0")" && pwd)"
+printf '%s\n' "node \"\$O/$SV$PJ $NO1$NO2 --port 1" "\"\$NODE\" \$NA \"\$O/$SV$PJ $NO1$NO2" "node $IMP$ORT /x/sonde.mjs $NO1$NO2 --port 2" "# node \"\$O/$SV$PJ $NO1$NO2 (commentaire : jamais compté)" > "$WORK/k1.txt"
+assert_eq "AM7.K1 — le détecteur nomme les trois formes brutes (node, \$NODE avec arguments, --import) et ignore le commentaire ; il voit une ligne dans test-cockpit-questions.sh (pas aveugle)" "$(cockpit_lancement_brut "$WORK/k1.txt" | grep -c .) $([ "$(cockpit_lancement_brut "$DIR_T/test-cockpit-questions.sh" | grep -c .)" -ge 1 ] && echo voit || echo aveugle)" "3 voit"
+cp "$DIR_T/test-cockpit-assemblage.sh" "$WORK/k2-intacte.sh"; cp "$WORK/k2-intacte.sh" "$WORK/k2-augmentee.sh"
+printf '%s\n' "node \"\$OUT/$SV$PJ $NO1$NO2 --port 1 &" >> "$WORK/k2-augmentee.sh"
+assert_eq "AM7.K2 — copie de test-cockpit-assemblage.sh (migrée) : intacte non nommée, augmentée d'une ligne de lancement brute nommée" "intacte=$(cockpit_lancement_brut "$WORK/k2-intacte.sh" | grep -c .) augmentee=$(cockpit_lancement_brut "$WORK/k2-augmentee.sh" | grep -c .)" "intacte=0 augmentee=1"
+K3_FICHIERS=""; for f in "$DIR_T"/test-*.sh; do case " $EXC_LANCEMENT " in *" $(basename "$f") "*) continue ;; esac; K3_FICHIERS="$K3_FICHIERS $f"; done
+# base (aide absente) : même motif posé en ligne, pour mesurer la classe avant la migration
+brut_base() { local f; for f in "$@"; do grep -n -E "$SV\\$PJ[^|]* $NO1$NO2|$IMP$ORT [^|]* $NO1$NO2" "$f" 2> /dev/null | grep -v -E '^[0-9]+:[[:space:]]*#' | sed "s#^#$f:#"; done; }
+DET=cockpit_lancement_brut; [ "$AIDE" = oui ] || DET=brut_base
+# shellcheck disable=SC2086
+K3_N="$($DET $K3_FICHIERS | cut -d: -f1 | sort -u | awk 'END { print NR }')"
+assert_eq "AM7.K3 — aucune suite hors exceptions ne lance le serveur à la main (suites nommées par le détecteur ; base : 43)" "$K3_N" "0"
+vf_hyg_assert
 
 echo "== bilan : $PASS réussi(s), $FAIL échec(s) =="
 [ "$FAIL" -eq 0 ]
