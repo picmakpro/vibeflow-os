@@ -43,8 +43,10 @@ Backlog, Graines, Releases, Missions hors phase (listes, § 1.6)
   identiques panneau ouvert ou fermé. Si le panneau couvre la carte (ou la rangée) sélectionnée, la vue la ramène dans la
   partie visible : `scrollIntoView({inline:'nearest', block:'nearest', behavior:'auto'})` (instantané, aucune animation), avec
   `scroll-padding-inline-end: var(--pw)` tant que le panneau est ouvert, et `scroll-padding-inline-start` égal à la largeur
-  du tiroir Git + `--edge` tant qu'il est ouvert (il recouvre le bord gauche). Pour que ce défilement soit possible, la région
-  de la vue est `overflow:auto` et porte, surcouche ouverte seulement, une extrémité de défilement de la largeur de cette
+  du tiroir Git + `--edge` tant qu'il est ouvert (il recouvre le bord gauche). **Ces `scroll-padding-inline-*` et les
+  extrémités défilables ne valent qu'à partir de 1 000 px au pointeur fin (P80-D-50 b) : sous 1 000 px et au tactile, aucun
+  défilement horizontal, à 390 px comme à 800 px (le panneau y est une feuille basse, § 3).** Pour que ce défilement soit
+  possible, la région de la vue est `overflow:auto` et porte, surcouche ouverte seulement, une extrémité de défilement de la largeur de cette
   surcouche (pseudo-éléments en début et en fin de rail : ils agrandissent l'étendue défilable, ils ne déplacent ni ne
   redimensionnent aucun couloir). Même règle que NAVIGATION § 4.6 « une surcouche n'est pas une zone de lecture », étendue à
   la vue DOM (le bas : § 3, zone basse). Voir § 8, point 6.
@@ -120,9 +122,10 @@ Même ligne pour les quatre états (rythme égal entre couloirs). Les maquettes 
 **Troncature qui garde la partie distinctive.** Aucune ellipse de fin sauf le filet ci-dessous. La capacité est **calculée à la
 plus petite carte, barre de défilement classique comprise** (4 couloirs à 1 000 px avec une barre de ≈ 15 px : couloir de
 (1 000 − 15 − 2 × 16 − 3 × 16) / 4 ≈ 226 px ; texte = 226 − 2 × 16 (marge interne) − 38 (numéro mono de 5 ch à 12,5 px) − 8
-(gap) ≈ 148 px ; Inter 13 px ≈ 6,6 px par caractère moyen, soit ≈ 22 caractères par ligne ; 3 lignes ≈ 66 caractères, ≈ 59
-après la perte du retour à la ligne par mots). Seuil de coupe : **52 caractères**, soit une marge de 7 caractères sous la
-capacité mesurée. Un titre de 52 caractères ou moins s'affiche en entier sur ≤ 3 lignes dans toutes les largeurs ; au-delà,
+(gap) ≈ 148 px ; **mesure en graisse 600** (la plus large, titre d'une phase en cours) : Inter 13 px ≈ 6,9 px par caractère
+moyen, soit ≈ 21 caractères par ligne ; 3 lignes ≈ 64 caractères, ≈ 58 après la perte du retour à la ligne par mots). Seuil de
+coupe : **52 caractères partout** (carte, rangée, plan, nom accessible), soit une marge de 6 caractères sous la capacité
+mesurée. Un titre de 52 caractères ou moins s'affiche en entier sur ≤ 3 lignes dans toutes les largeurs ; au-delà,
 une ellipse **du milieu** : 31 premiers caractères, « … », 20 derniers (52 caractères). Aux autres largeurs la capacité est
 plus grande (≈ 37 caractères par ligne à 701 px, ≈ 42 à 390 px) : le seuil reste unique par simplicité. Le titre porte
 `overflow-wrap: anywhere` (un identifiant long sans espace ne déborde pas). Filet : si malgré tout le `line-clamp` de 3
@@ -148,18 +151,18 @@ accessible, plus bas) et dans le panneau ; le numéro et l'identifiant de plan s
 - Pas de bordure ni d'ombre colorée selon l'état, pas de point `has-note`.
 - **Nom accessible** (une seule fonction, enrichissable par la 75/76) : il **commence par le texte visible** (WCAG 2.5.3) :
   « 72 Lancer du travail depuis les cartes du cockpit, 16 plans sur 16 · 11 exigences sur 12, phase, À recetter » (+ mot de
-  preuve avant « phase »). Titre tel qu'affiché (coupé si > 60 caractères) ; le titre complet est porté par
+  preuve avant « phase »). Titre tel qu'affiché (coupé si > 52 caractères) ; le titre complet est porté par
   `aria-describedby` (span masqué). Glyphe `aria-hidden` ; le mot d'état, absent de la carte (il est dans l'en-tête du
   couloir), est ajouté en fin de nom.
 - **Sélection et plongée (P80-D-47, cohérence avec le canevas).** Au **bureau** (≥ 1 000 px, pointeur fin), la sélection
   **suit le focus** dans les couloirs et la liste : toute arrivée du focus par l'utilisateur sur une carte ou une rangée (Tab,
   flèches, Origine/Fin, clic) appelle `select(id)` avec l'identifiant de nœud stable (`ph-<N>` ou `ph-<N>@<ws>`, P80-C76-1) ;
   le panneau montre la phase focalisée ; un déplacement repart d'une pile de Retour vide. Une restitution programmée du
-  focus (re-rendu, bascule) ne change jamais la sélection. **Entrée plonge** dans la phase (comme sur le canevas) ; Espace
-  sélectionne ; double-clic plonge ; le bouton « Ouvrir la phase » du panneau reste. Sur un plan (feuille), Entrée ouvre le
-  panneau s'il est fermé. Au **téléphone** (≤ 999 px ou tactile), la sélection ne suit pas le focus : Entrée, Espace et le
-  toucher sélectionnent (ouverture de la feuille), « Ouvrir la phase » est **dans la feuille**. Aucune action ne lance de
-  session (P80-D-26).
+  focus (re-rendu, bascule) ne change jamais la sélection. **P80-D-51 (révise P80-D-47) : une seule règle de touches pour
+  Projet, à toutes les largeurs et dans toutes les formes, comme sur le canevas : Entrée plonge, Espace sélectionne** ;
+  double-clic plonge ; le bouton « Ouvrir la phase » du panneau reste. Sur un plan (feuille), Entrée ouvre le panneau s'il est
+  fermé. **Au toucher, un appui sélectionne (la feuille s'ouvre au téléphone) et « Ouvrir la phase » est dans la feuille.**
+  Au bureau, la sélection suit le focus dans les couloirs et la liste. Aucune action ne lance de session (P80-D-26).
 
 ### 1.5 « Historique » (jalons clos)
 
@@ -244,18 +247,20 @@ Un `table` par bloc de jalon (même en-tête de jalon qu'en § 1.2, `aria-labell
 | Largeur | Disposition |
 |---|---|
 | **1 440 px** | vue utile 1 408 px (marges 16), 4 couloirs de ≈ 340 px (gouttière 16), identiques panneau ouvert ou fermé ; le panneau (≈ 360 px à droite) recouvre alors le couloir Fait et le bord du couloir À recetter : la carte sélectionnée est ramenée dans la partie visible (§ 1.1). `h1` et bascule sur une rangée. Carte ≈ 340 × 62 px (titre et ligne d'état d'une ligne) à ≈ 98 px (titre sur 3 lignes). Barre de jalon 180 px à droite. Blocs de jalon empilés. Pied de vue : zone basse `--vf-bas` (ci-dessous) |
-| **1 024 px** | 4 couloirs de ≈ 236 px (vue utile 992 px), même mise en page panneau ouvert ou fermé ; carte ≈ 236 × 80 à 115 px (titre 1 à 3 lignes, ligne d'état 1 à 2 lignes). Bascule inchangée (36 px). Plus petite carte du système : 230 px à 1 000 px |
+| **1 024 px** | 4 couloirs de ≈ 236 px (vue utile 992 px), même mise en page panneau ouvert ou fermé ; carte ≈ 236 × 80 à 115 px (titre 1 à 3 lignes, ligne d'état 1 à 2 lignes). Bascule inchangée (36 px). Plus petite carte du système : ≈ 226 px à 1 000 px (barre de défilement classique comprise) |
 | **800 px** (701 à 999 px) | grille 2 × 2 (≈ 376 px par couloir), mêmes cartes ; panneau fermé par défaut (P29), ouvert au choix |
 | **390 px** | **Liste par défaut** (§ 2.2). Marges `--edge` 16, vue utile 358 px. `h1`, puis bascule pleine largeur 3 × 44 px, puis blocs. Couloirs choisis : empilés, une colonne, cartes pleine largeur. Aucune échelle de zoom, aucun contrôle de zoom ni minicarte dans ces formes. Cibles ≥ 44 px (segments, cartes, rangées, en-têtes de tri, `summary`, bouton de thème). Panneau : feuille basse existante (P29) ; la carte sélectionnée reste visible au-dessus de la feuille (défilement de la vue pour la dégager, `scrollIntoView` instantané) |
 
 **Zone basse (P80-D-18), à toute largeur.** La vue DOM est un contenu défilant sous des éléments fixes : la barre de question
 `#ask`, le bloc `#vf-coin` (ligne d'état seule, sans minicarte dans ces formes ; absent sous 1 000 px) et, quand il est ouvert,
-le tiroir du terminal, qui relève `#stage` (la vue vit dans `#stage` et monte avec lui). La vue pose **à la fois**
+le tiroir du terminal, qui relève `#stage` (la vue vit dans `#stage` et monte avec lui), la pastille « Terminal » (bas gauche)
+et, sous 1 000 px, la feuille de détail quand elle est ouverte (P80-D-50). La vue pose **à la fois**
 `padding-bottom` et `scroll-padding-block-end` égaux à `--vf-bas` = hauteur mesurée de `#ask` (0 si absente) + `--edge` +
-`--sp-8` + hauteur mesurée de `#vf-coin` (0 s'il n'est pas affiché) + `--edge` + `env(safe-area-inset-bottom)`, écrit
-`calc(…) /* dérivé : #ask + #vf-coin mesurés */` (exception écrite DESIGN § 4), relu à chaque changement de taille
-(`ResizeObserver`). Ainsi la dernière rangée, la touche Fin et une carte focalisée en bas ne passent jamais sous `#ask`,
-`#vf-coin` ni le zoom ; les contrôles de canevas (zoom, minicarte, repères) sont absents de ces formes. C'est la règle
+`--sp-8` + hauteur mesurée de `#vf-coin` (0 s'il n'est pas affiché) + `--edge` + `env(safe-area-inset-bottom)`, **sous 1 000 px
+plus la hauteur de la feuille de détail ouverte, et la hauteur de la pastille « Terminal » quand elle déborde la bande de
+`#ask`**, écrit `calc(…) /* dérivé : #ask + #vf-coin + feuille + pastille mesurés */` (exception écrite DESIGN § 4), relu à
+chaque changement de taille (`ResizeObserver`). Ainsi la dernière rangée, la touche Fin et une carte focalisée en bas ne
+passent jamais sous `#ask`, `#vf-coin`, la pastille « Terminal », la feuille de détail ni le zoom ; les contrôles de canevas (zoom, minicarte, repères) sont absents de ces formes. C'est la règle
 NAVIGATION § 4.6 (« une surcouche n'est pas une zone de lecture ») étendue aux vues DOM.
 
 ## 4. Panneau
@@ -323,8 +328,8 @@ dans chaque collection (même principe que P80-D-10) : `tabindex=0` sur la derni
     ↑/↓ restent dans le couloir.
   - ←/→ : même rang (plafonné à la dernière carte) dans le **prochain couloir non vide de la même ligne d'écran dans la
     direction** de la flèche ; sans couloir non vide dans cette direction sur la ligne, ne bouge pas.
-  - Origine/Fin : première/dernière carte du bloc, dans l'ordre de lecture (couloir par couloir). Entrée : plonger au bureau,
-    sélectionner au téléphone ; Espace : sélectionner (§ 1.4). Aucun champ : pas de recherche par frappe.
+  - Origine/Fin : première/dernière carte du bloc, dans l'ordre de lecture (couloir par couloir). Entrée : plonger ;
+    Espace : sélectionner, à toutes les largeurs et dans toutes les formes (P80-D-51, § 1.4). Aucun champ : pas de recherche par frappe.
 - Liste : ↑/↓, Origine, Fin ; en-têtes de tri : Entrée/Espace.
 - Aucune lettre seule ne déclenche une action hors garde de saisie (§ 2.1).
 
@@ -360,8 +365,9 @@ puis précédent, de la même collection ; (4) l'arrêt itinérant de la collect
 - Entrée dans une phase ou retour : focus sur la cible de repli de la forme d'arrivée (liste : `h1` de la phase ; Graphe :
   première carte du niveau, comme NAVIGATION § 1) ; à la remontée, focus rendu **sur la carte** (ou la rangée) de la phase
   quittée, jamais sur `body`.
-- Changement d'onglet (P80-D-22) : focus sur la cible de repli de la vue chargée (`h1` « Projet » en couloirs ou en liste ;
-  carte itinérante, sinon `#stage`, sur Code ou sur Projet en Graphe) ; annonce par la zone `status` « Projet ».
+- Changement d'onglet (P80-D-22, P80-D-50 e) : la **règle de repli unique** ci-dessus s'applique à la vue chargée :
+  élément sélectionné, sinon `h1` « Projet » en couloirs ou en liste (Graphe et Code : carte itinérante, sinon `#stage`) ;
+  annonce par la zone `status` « Projet ».
 - **Échap.** La vue DOM de Projet (couloirs, liste, intérieur de phase) compte comme **canevas** pour les crans 7 et 8 de la
   chaîne d'Échap (NAVIGATION § 2) : depuis une carte ou une rangée focalisée, un premier appui désélectionne (le panneau
   revient à la vue d'ensemble, le focus reste), un appui suivant remonte d'un niveau dans une phase et ne fait rien à la
@@ -471,17 +477,17 @@ Espaces insécables avant `: ; ! ?` et dans « 1 024 px ». Pas de tiret long da
 | Dans une phase | plans groupés par `h3` de vague ; exigences en `ul` sans `input` ; texte d'exigence présent une fois dans le panneau |
 | Panneau | aucun des mots « Élément », « module », « Mentions » dans le texte visible de Projet ; panneau de plan : statut, vague, exigences couvertes présents |
 | Retour | pile vide : `aria-disabled="true"` ; lien interne : actif ; `retour()` rappelle l'ancienne cible sans empiler ; **au téléphone**, Échap ferme la feuille sans dépiler ; au bureau, Échap ne ferme pas le panneau |
-| Sélection et plongée | bureau : Tab, flèche ou clic sur une carte la sélectionne (`aria-current`, panneau sur `ph-<N>`), Entrée plonge ; une restitution de focus programmée ne change pas la sélection ; téléphone : Entrée sélectionne (feuille), « Ouvrir la phase » est dans la feuille |
+| Sélection et plongée | bureau : Tab, flèche ou clic sur une carte la sélectionne (`aria-current`, panneau sur `ph-<N>`), Entrée plonge, Espace sélectionne, à **toutes les largeurs et dans toutes les formes** (P80-D-51) ; une restitution de focus programmée ne change pas la sélection ; toucher : un appui sélectionne (feuille au téléphone), « Ouvrir la phase » est dans la feuille |
 | Repli du focus | après `v` ou une action de palette vers Graphe, `document.activeElement` est la carte itinérante, sinon `#stage` ; vers couloirs ou liste, l'élément sélectionné, sinon le `h1` ; changement d'onglet : idem selon la vue chargée ; jamais `body` ni un `h1` absent du DOM |
 | Focus orphelin | pour chaque contrôle de la famille (en-tête de tri re-rendu, `summary`, « Réessayer » réussi, rangée de backlog, phase disparue) : le contrôle focalisé retiré du DOM, `document.activeElement` suit l'ordre équivalent, fruit du geste, voisin, arrêt itinérant, repli ; jamais `body` |
 | Échap dans la vue DOM | focus sur une carte : 1er appui désélectionne, 2e remonte (dans une phase) ou sans effet (racine) ; depuis un bouton du panneau, aucun des deux |
 | Phase 76 | une section ajoutée par `addPanelSection('item')` apparaît après un clic sur une carte de couloir, cible `ph-<N>` |
-| Largeurs | 1440 et 1024 : 4 couloirs de ≥ 230 px, positions et largeurs **identiques panneau ouvert et fermé** ; 800 : 2 × 2 ; 390 : Liste par défaut, zéro `transform: scale`, aucune cible < 44 px, pas de recouvrement de la carte sélectionnée |
+| Largeurs | 1440 et 1024 : 4 couloirs de ≥ 226 px, positions et largeurs **identiques panneau ouvert et fermé** ; 800 : 2 × 2 ; 390 : Liste par défaut, zéro `transform: scale`, aucune cible < 44 px, pas de recouvrement de la carte sélectionnée, **`scrollWidth` ≤ `clientWidth` de la vue (aucun défilement horizontal) à 390 et 800 px, feuille ouverte ou non** |
 | Panneau par-dessus | panneau ouvert sur une carte du couloir Fait à 1 440 px : la carte est entièrement hors de la zone du panneau (`getBoundingClientRect`), obtenu sans animation ; position de mise en page des couloirs inchangée à l'ouverture et à la fermeture (`offsetLeft`, `offsetTop`, `offsetWidth` identiques ; le défilement est exclu de la mesure) |
 | Grille de flèches (1 024 px et 800 px) | à 1 024 (4 couloirs côte à côte) : → parcourt À faire, En cours, À recetter, Fait au rang plafonné, ← revient, ↑/↓ restent dans le couloir. À 800 (2 × 2) : ↓ au bas d'À faire va à la première carte d'À recetter, ↓ au bas d'En cours à la première de Fait, ↑ symétrique (dernière carte), ←/→ dans la ligne ; la suite des appuis visite les quatre couloirs, clavier seul, sans jamais mettre le focus sur `body`. Couloirs vides : À recetter vide, ↓ au bas d'À faire va à la première carte de Fait ; En cours vide, → depuis À faire n'a pas de cible sur la ligne et ne bouge pas |
 | Re-rendu en direct | un patch déclenché pendant que le focus est sur une carte : `document.activeElement` est le bouton de la même phase (même `ph-<N>`, même si elle a changé de couloir), jamais `body` ; `tabindex=0` sur elle ; `aria-current` inchangé ; `scrollTop` et `scrollLeft` égaux ; tri et `details` inchangés ; focus d'un champ ou du panneau non volé |
 | Plans d'une phase | un seul arrêt de tabulation pour la liste de plans ; ↑/↓ traversent les vagues |
-| Zone basse (toutes largeurs) | à 1 440, 1 024 et 390 px, panneau, tiroir Git et tiroir du terminal ouverts puis fermés : `padding-bottom` = `scroll-padding-block-end` ≥ `#ask` + `#vf-coin` mesurés + marges ; après Fin, ↓ sur la dernière rangée, et focus sur une carte du bas, le rectangle de l'élément focalisé ou sélectionné n'intersecte ni `#ask`, ni `#vf-coin`, ni le tiroir Git, ni le panneau, ni le tiroir du terminal |
+| Zone basse (toutes largeurs) | à 1 440, 1 024 et 390 px, panneau, tiroir Git et tiroir du terminal ouverts puis fermés : `padding-bottom` = `scroll-padding-block-end` ≥ `#ask` + `#vf-coin` mesurés + marges (+ feuille de détail ouverte sous 1 000 px, + pastille « Terminal » si elle déborde) ; après Fin, ↓ sur la dernière rangée, et focus sur une carte du bas, le rectangle de l'élément focalisé ou sélectionné n'intersecte ni `#ask`, ni `#vf-coin`, ni la pastille « Terminal », ni la feuille de détail, ni le tiroir Git, ni le panneau, ni le tiroir du terminal |
 | Clavier | un seul arrêt de tabulation par collection ; ←/→/↑/↓ comme § 5 ; focus jamais sur `body` après bascule, plongée, remontée |
 | Annonce | la zone `status` reçoit « Affichage en liste, N phases » à la bascule et « Trié par … » au tri |
 | Contraste | table § 5 remesurée en rendu dans les deux thèmes ; texte ≥ 4,5:1, non-texte ≥ 3:1 ; glyphe « En cours » ≥ 3,5:1 (cible P80-D-20, rouge en clair tant que le lot jetons n'est pas livré) ; « Retour » désactivé mesuré sur le fond réel du panneau |
@@ -504,8 +510,8 @@ Espaces insécables avant `: ; ! ?` et dans « 1 024 px ». Pas de tiret long da
 6. **Panneau par-dessus, sans réserve** (décision du manager, P80-D-29 révisée ; DESIGN § 5 fait foi). À 1 440 px le panneau
    (≈ 360 px) recouvre le couloir Fait et le bord d'À recetter ; à 1 024 px, la moitié de À recetter et tout Fait. Seul remède
    spécifié : ramener la carte sélectionnée dans la partie visible par un défilement horizontal instantané, rendu possible par
-   une extrémité défilable de largeur `--pw` ajoutée au rail panneau ouvert (elle agrandit l'étendue défilable, ne déplace
-   aucun couloir). Si le juge y lit une « réserve », l'alternative est de ne rien ajouter : les couloirs recouverts ne se
+   une extrémité défilable de largeur `--pw` ajoutée au rail panneau ouvert, **à partir de 1 000 px au pointeur fin seulement**
+   (P80-D-50 b ; elle agrandit l'étendue défilable, ne déplace aucun couloir). Si le juge y lit une « réserve », l'alternative est de ne rien ajouter : les couloirs recouverts ne se
    voient alors qu'en fermant le panneau. Le même mécanisme vaut pour les colonnes de droite des listes.
 7. **Écarts à `DESIGN.md` assumés** : carte de phase à `padding` 12 × 16 (DESIGN § 5 : 16 sur les quatre côtés) pour tenir
    une carte dense ; titre de carte à 13 px / 500 ou 600 (DESIGN § 3 : 15 px / 600, `.title`) car 15 px ne tient pas en
