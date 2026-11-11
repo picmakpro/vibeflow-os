@@ -154,6 +154,20 @@ session : 5 au premier tour, puis 4 sur la vérification des plans. Jetons relev
 
 ## Preuves E6
 
+```json
+{
+  "preuves": [
+    { "verdict": "gate:check-machine-paths", "commande": "bash scripts/check-machine-paths.sh", "exit_code": 0, "sha": "1818f9f9" },
+    { "verdict": "gate:state-inchange", "commande": "git diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md", "exit_code": 0, "sha": "1818f9f9" },
+    { "verdict": "revue", "preuve": "amont" }
+  ]
+}
+```
+
+La ligne `revue` désigne les juges frais de la mission (critique d'interface, vérification du cadrage, vérification des
+plans), relayés sans commande rejouable. Le reste de cette section les détaille.
+
+
 - Périmètre d'écriture : `git -C <worktree> diff --name-only origin/integration/cockpit-audit` → ROADMAP.md,
   REQUIREMENTS.md, le dossier de phase, ce rapport (vérificateur frais, contrôle A1 à A3 `passed`).
 - STATE : `git -C <worktree> diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md`
@@ -166,4 +180,6 @@ session : 5 au premier tour, puis 4 sur la vérification des plans. Jetons relev
   corrigés au commit `d8bbf0da` ; second passage par un `gsd-plan-checker` frais : **PASS**, 0 bloquant, 3 avertissements
   (W1 à W3) corrigés au commit final de la mission. Le dernier passage (W1 à W3, et le retrait par le manager d'un chemin
   fictif du frontmatter de 74-08) n'a pas été rejugé.
-- Gate de sortie : voir § Gate de sortie.
+- Gate de sortie (`check-mission-exit.sh --ws fiabilite --phase 74 --step 74 --report <ce fichier>`) : INDÉTERMINÉ,
+  attendu — E4 « 9 cases de plan non cochées » (plans non exécutés, STATE non marqué) ; E7 snapshot de budget réécrit par
+  une autre mission (fichier unique du dépôt commun). Aucun de ces contrôles n'a été forcé au vert.
