@@ -285,6 +285,7 @@ recouvrement nommé de la vague 1 (79-02 et 79-05 sur `T/test-cockpit-lancer-mod
 - 79-16 déclare `["79-11", "79-15"]`, le découpage dit 79-15 seul (79-11 est en vague 4, déjà fusionnée).
 - 79-20 déclare les vingt plans 79-01 à 79-19 et 79-21, le découpage dit « tous » : **79-22 n'y est pas** (vague 8,
   donc fusionnée avant la vague 11 de toute façon).
+  > Note datée 2026-11-11 (revalidation, avant exécution) : ce constat est périmé pour 79-20 : son frontmatter déclare déjà 79-22 depuis le commit d4d0cd41 (la note plus bas dans ce rapport le dit) ; rien à corriger dans le plan. L'historique ci-dessus n'est pas réécrit.
 
 ### (c) Fichiers par plan
 
