@@ -66,7 +66,7 @@
 -const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange })};</script>`;
 +let TERM = null; // vibeflow P26 : terminal intégré, chargé seulement avec --terminal (second écouteur 127.0.0.1, aucun effet sans le drapeau)
 +if (has('terminal')) { try { TERM = (await import(new URL('./vf-cockpit-terminal.mjs', import.meta.url))).preparerTerminal({ here, root, jetons: () => [token, VF?.ptoken] }); } catch (e) { console.error(`vf-cockpit : terminal indisponible : ${e.message}. Relancer « vf-cockpit build ».`); } } // vibeflow P26
-+const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange, unFlux: true })};</script>` + (TERM ? TERM.injection() : ''); // vibeflow P26
++const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange, unFlux: fs.existsSync(path.join(here, 'vf-cockpit-server.mjs')) })};</script>` + (TERM ? TERM.injection() : ''); // vibeflow P26
  let page, G, core, MODES;
 +// vibeflow P13 : serveur unique. Le direct, « au travail » et la page Projet vivent dans vf-cockpit-server.mjs, posé à côté de
 +// vibeflow P13 : ce fichier ; absent, le serveur reste celui de l'amont. Même port que la page, aucun en-tête CORS.
