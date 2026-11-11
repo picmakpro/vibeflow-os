@@ -53,3 +53,24 @@ PC3.3 : `L` vide, AVANT = HEAD et APRES = arbre : `0-|0+|aucun-changement`, atte
      obtenu:  [1-|1+|hors-ancre]
   Résultats : 5 PASS / 7 FAIL
 ```
+
+## Correction ciblée de revue — champs épinglés, exigences asymétriques, wave décimale
+
+Suite rejouée sur le code AVANT correction du point 3 (`Number(wave)`) : PC2.2 rouge (obtenu `[16,10,null,3]`, 0x10 et 1e1 acceptés), M-VAGUE sans ancre (le code corrigé n existe pas encore). Les quatre mutants de champs (M-PLANS, M-CORR, M-VERS, M-ETAT) et M-EXIG rougissent sur la fixture asymétrique (ph-4 : 1 plan sur 3, un correctif, version 2 ; ph-1 : exigences 2 sur 3).
+
+```
+  ✅ PASS — PC1.1 — ph-1 : etat fait, plans 2/2, exigences 2 sur 3 (compte asymétrique)
+  ✅ PASS — PC1.5 — ph-4 asymétrique : version 2, en-cours, plans 1 sur 3, un correctif
+  ❌ FAIL — PC2.2 — wave 0x10, 1e1 et 0 donnent null, 3 donne 3 (chiffres décimaux seuls, T-80-06)
+     attendu: [[null,null,null,3]]
+     obtenu:  [[16,10,null,3]]
+  ✅ PASS — M-PLANS — le mutant rougit PC1.5 : plans { faits: total, total }
+  ✅ PASS — M-CORR — le mutant rougit PC1.5 : correctifs figé à 0
+  ✅ PASS — M-VERS — le mutant rougit PC1.5 : version null
+  ✅ PASS — M-ETAT — le mutant rougit PC1.5 : etat figé à fait
+  ✅ PASS — M-EXIG — le mutant rougit PC1.1 : compte des cochées inversé (!r.done)
+  ❌ FAIL — M-VAGUE — le mutant rougit PC2.2 : Number(wave) laisse passer 0x10 et 1e1
+     attendu: [[16,10,null,3]]
+     obtenu:  [ancre-absente]
+  Résultats : 18 PASS / 2 FAIL
+```

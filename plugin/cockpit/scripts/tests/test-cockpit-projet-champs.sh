@@ -20,13 +20,16 @@ wr "$B/ROADMAP.md" <<'MD'
 - [x] **Phase 1: Socle** - premier jet
 - [ ] **Phase 2: Écran** - second jet
 - [ ] **Phase 3: Liens** - troisième jet
+- [ ] **Phase 4: Reprise** - quatrième jet
 MD
 wr "$B/REQUIREMENTS.md" <<'MD'
 - [x] **FORM-01**: premier
-- [ ] **FORM-02**: second
+- [x] **FORM-02**: second
+- [ ] **FORM-03**: troisième
 
 | FORM-01 | Phase 1 | Complete |
-| FORM-02 | Phase 1 | Pending |
+| FORM-02 | Phase 1 | Complete |
+| FORM-03 | Phase 1 | Pending |
 MD
 wr "$B/STATE.md" <<'MD'
 ---
@@ -39,15 +42,20 @@ printf '<objective>Plan liens</objective>\n' | wr "$B/phases/03-liens/03-01-PLAN
 wr "$B/missions/MISSION-LIENS.dag.json" <<'JSON'
 {"phase":"3","nodes":[{"id":"a","step":"s","deps":[],"status":"done"},{"id":"b","step":"s","deps":["a"],"status":"running"}]}
 JSON
+for n in 01 02 03; do printf '<objective>Reprise %s</objective>\n' "$n" | wr "$B/phases/04-reprise/04-$n-PLAN.md"; done
+echo ok > "$B/phases/04-reprise/04-01-SUMMARY.md"; echo ok > "$B/phases/04-reprise/04-99-SUMMARY.md"   # 1 plan sur 3, un correctif
 graph "$L1" "$WORK/c1.json"
 echo "=== PC1 — avancement et exigences structurés sur la phase ==="
 c1() { G "$WORK/c1.json" "$1"; }
 nd() { c1 "(n=>$2)(j.nodes.find(x=>x.id==='$1'))"; }   # nd <id> <expression sur n>
 AV1='[n.avancement?.etat,JSON.stringify(n.avancement?.plans),JSON.stringify(n.exigences)].join("|")'
-assert_eq "PC1.1 — ph-1 : etat fait, plans 2/2, exigences 1 sur 2" "$(nd ph-1 "$AV1")" 'fait|{"faits":2,"total":2}|{"faits":1,"total":2}'
+assert_eq "PC1.1 — ph-1 : etat fait, plans 2/2, exigences 2 sur 3 (compte asymétrique)" "$(nd ph-1 "$AV1")" \
+  'fait|{"faits":2,"total":2}|{"faits":2,"total":3}'
 assert_eq "PC1.2 — témoin d'invariance : pied et statut de ph-1 inchangés" "$(nd ph-1 'n.foot+"|"+n.st')" "2/2 plans · 1 exigence non cochée|done"
 AV3='[n.avancement?.plans?.total,n.avancement?.reste?.includes("cadrage"),JSON.stringify(n.exigences)].join("|")'
 assert_eq "PC1.3 — ph-2 sans dossier : plans 0, reste « cadrage », exigences 0 sur 0" "$(nd ph-2 "$AV3")" '0|true|{"faits":0,"total":0}'
+AV5='[n.avancement?.version,n.avancement?.etat,JSON.stringify(n.avancement?.plans),n.avancement?.correctifs].join("|")'
+assert_eq "PC1.5 — ph-4 asymétrique : version 2, en-cours, plans 1 sur 3, un correctif" "$(nd ph-4 "$AV5")" '2|en-cours|{"faits":1,"total":3}|1'
 CLES='/"(vie|tenu|stale|ttl|owner|progressAgeS)":/.test(JSON.stringify(j))'
 MI='{"nom":"MISSION-LIENS","etat":"running"}'
 assert_eq "PC1.4 — mission d'une phase vivante = {nom, etat}, aucune clé de verrou dans le graphe" \
@@ -135,6 +143,17 @@ assert_eq "PC2.1 — ph.plans trié (vague 1, 2, null), même vague sur l'élém
   '[[{"id":"01-01","fichier":"01-01-PLAN.md","vague":1},{"id":"01-02","fichier":"01-02-PLAN.md","vague":2},'\
 '{"id":"01-03","fichier":"01-03-PLAN.md","vague":null}]]|[1,2,null]|vague 1,vague 2,vague ?'
 
+L5="$WORK/pc2b"; B="$L5/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+## Phases
+
+- [ ] **Phase 1: Socle** - premier jet
+MD
+i=0; for w in 0x10 1e1 0 3; do i=$((i+1)); printf -- '---\nwave: %s\n---\n<objective>P</objective>\n' "$w" | wr "$B/phases/01-socle/01-0$i-PLAN.md"; done
+VAG='JSON.stringify(m[0].map((x)=>x.vague))'
+assert_eq "PC2.2 — wave 0x10, 1e1 et 0 donnent null, 3 donne 3 (chiffres décimaux seuls, T-80-06)" \
+  "$(node "$AUX/pl.mjs" "$SCRIPTS" "$L5" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log($VAG)")" "[null,null,null,3]"
+
 # ---------- PC3 — contrat cockpit-project@1 ----------
 L3="$WORK/pc3"; B="$L3/.planning"
 wr "$B/ROADMAP.md" <<'MD'
@@ -195,5 +214,26 @@ assert_eq "M-STATUTS — le mutant rougit PC3.1 : « recette » retiré de statu
 if [ -s "$WORK/avant.json" ] && node "$AUX/mutlien.mjs" "$WORK/apres.json" "$WORK/mut-lien.json" > /dev/null; then
   ML="$(ecart_contrat "$WORK/avant.json" "$WORK/mut-lien.json")"; else ML=HISTORIQUE-ABSENT; fi
 assert_eq "M-AUTRE-LIGNE — le mutant rougit PC3.3 : la ligne \"lien\" du bloc cockpit-project@1 modifiée (valeur exacte)" "$ML" "2-|3+|hors-ancre"
+
+# mutants des champs : copie de vf-cockpit-project.mjs, une ligne mutée ; le mutant rougit si la valeur épinglée diffère de l'attendu (graphe non vide exigé)
+mutchamp() { # nom ancre remplacement id expression attendu
+  local got; mut7 "$1" vf-cockpit-project.mjs "$2" "$3" > /dev/null || { echo ancre-absente; return; }
+  VF_COCKPIT_SCRIPTS_DIR="$WORK/locks" node "$AUX/qm.mjs" "$WORK/mut-$1" "$L1" > "$WORK/m-$1.json" 2>/dev/null
+  got="$(G "$WORK/m-$1.json" "(n=>$5)(j.nodes.find(x=>x.id==='$4'))")"
+  if [ -z "$got" ] || [ "$got" = "|||" ]; then echo vide; elif [ "$got" = "$6" ]; then echo non-rouge; else echo rougit; fi
+}
+A5='2|en-cours|{"faits":1,"total":3}|1'
+assert_eq "M-PLANS — le mutant rougit PC1.5 : plans { faits: total, total }" \
+  "$(mutchamp plans 'plans: { ...av.plans }' 'plans: { faits: av.plans.total, total: av.plans.total }' ph-4 "$AV5" "$A5")" rougit
+assert_eq "M-CORR — le mutant rougit PC1.5 : correctifs figé à 0" "$(mutchamp corr 'correctifs: av.correctifs,' 'correctifs: 0,' ph-4 "$AV5" "$A5")" rougit
+assert_eq "M-VERS — le mutant rougit PC1.5 : version null" "$(mutchamp vers 'version: av.version' 'version: null' ph-4 "$AV5" "$A5")" rougit
+assert_eq "M-ETAT — le mutant rougit PC1.5 : etat figé à fait" "$(mutchamp etat 'etat: av.etat, plans' 'etat: "fait", plans' ph-4 "$AV5" "$A5")" rougit
+assert_eq "M-EXIG — le mutant rougit PC1.1 : compte des cochées inversé (!r.done)" \
+  "$(mutchamp exig 'faits: reqs.filter((r) => r.done).length' 'faits: reqs.filter((r) => !r.done).length' \
+  ph-1 "$AV1" 'fait|{"faits":2,"total":2}|{"faits":2,"total":3}')" rougit
+if mut7 vague vf-cockpit-planning.mjs "/^\\d+\$/.test(w ?? '') ? Number(w) : 0" 'Number(w)' > /dev/null; then
+  MG="$(node "$AUX/pl.mjs" "$WORK/mut-vague" "$L5" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log($VAG)")"
+else MG=ancre-absente; fi
+assert_eq "M-VAGUE — le mutant rougit PC2.2 : Number(wave) laisse passer 0x10 et 1e1" "$MG" "[16,10,null,3]"
 
 bilan
