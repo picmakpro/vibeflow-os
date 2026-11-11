@@ -620,7 +620,7 @@ Plans:
 
 ### Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation
 
-> **Cadrée le 2026-11-11** par le manager de la mission (`80-CONTEXT.md`, P80-D-01 à P80-D-27, décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée ; quatre réouvertures rangées « À Samuel », S80-1 à S80-4). Inscrite le 2026-11-11 depuis l'audit du cockpit du 2026-11-10 (demande de Samuel, session principale Claude Code, 2026-11-10).
+> **Cadrée le 2026-11-11** par le manager de la mission (`80-CONTEXT.md`, P80-D-01 à P80-D-43, décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée ; cinq réouvertures rangées « À Samuel », S80-1 à S80-5). Inscrite le 2026-11-11 depuis l'audit du cockpit du 2026-11-10 (demande de Samuel, session principale Claude Code, 2026-11-10).
 
 **Goal:** L'onglet Projet se lit d'un regard à toute largeur (les phases rangées par état, le graphe à la demande), chaque carte du canevas est atteignable au clavier et nommée pour un lecteur d'écran, et l'on ne se perd plus sur la carte du code : un ajustement qui montre tout, une minicarte, une palette de commandes, des surcouches qui retiennent le focus.
 **Requirements**: FORM-01 à FORM-18 (FORM-18 après avis de Samuel).

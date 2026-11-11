@@ -1,7 +1,7 @@
 # Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation - Context
 
 **Gathered:** 2026-11-11
-**Status:** Cadrée (2026-11-11) — frontière de questions vide ; quatre réouvertures rangées « À Samuel », non bloquantes
+**Status:** Cadrée (2026-11-11) — frontière de questions vide ; cinq réouvertures rangées « À Samuel », non bloquantes
 
 Cadrage par le manager de la mission Phase 80 (`vf-dev-manager`, worktree `.claude/worktrees/phase-80`, branche
 `feat/phase-80-trois-formes`, base `origin/integration/cockpit-audit` `f763b556`, lot 0 de l'audit déjà fusionné). Jalon
@@ -142,7 +142,7 @@ La Phase 76 se branche sur le panneau de l'onglet Projet par une route à elle (
 - **P80-C76-3 — tenu sous une autre forme.** Ouverture programmatique : `select(id)` (panneau sur le nœud, sans changer
   de vue) et `reveal(id)` (va au nœud), déjà exportés et inchangés ; en mode couloirs, `reveal(id)` d'une phase
   sélectionne la carte de couloir au lieu de basculer sur le graphe. Le Retour commun est une **pile de sélections du
-  panneau** posée par la 80 sur l'onglet Projet (`VibeFlow.panneau.retour()`, un bouton « Retour » dans l'en-tête du
+  panneau** posée par la 80 sur l'onglet Projet (`window.VF_PANNEAU.retour()` — l'objet `VibeFlow` du moteur est gelé (`Object.freeze`), d'où une globale à part, un bouton « Retour » dans l'en-tête du
   panneau, désactivé quand la pile est vide) ; la 76 y empile en appelant `select`.
 - **P80-C76-4 — tenu tel quel.** Le compte « x/y exigences » de la carte de phase est celui de `piedExigences` ; le champ
   structuré `exigences {faits, total}` ajouté par la 80 (P80-D-06) est calculé par la même fonction, une seule fois. La 76
@@ -150,7 +150,7 @@ La Phase 76 se branche sur le panneau de l'onglet Projet par une route à elle (
 
 ## Contrats fournis aux autres phases
 
-- **Pile de surcouches (Phases 73, 74)** : `VibeFlow.surcouches.ouvrir(el, { modale, ouvreur, fermer })`, `dessus()`,
+- **Pile de surcouches (Phases 73, 74)** : `window.VF_SURCOUCHES.ouvrir(el, { modale, ouvreur, fermer })` (globale à part : l'objet `VibeFlow` du moteur est gelé), `dessus()`,
   `ouverte()`. Toute surcouche nouvelle (fiche d'agent, lecteur plein cadre de la 74, régie de la 73) s'y enregistre au
   lieu de recopier une liste. Échap ferme le dessus de pile ; le terminal y est enregistré mais exclu d'Échap.
 - **Clavier du canevas (Phase 75)** : les attributs (rôle, nom, `tabindex`) sont reposés à chaque `on('render')` ; la 75
@@ -313,6 +313,69 @@ Toutes « décision déléguée par Samuel (message session principale, 2026-11-
   placés après la fusion de la 79 (P80-D-15), et nommé dans la carte des fichiers du rapport. Toute suite écrite après la
   première vague de la 79 lance le serveur par `socle-serveur.sh` (A6) ; avant, par le moyen actuel.
 
+### Points relevés par le craft (`80-UI-SPEC.md` § 8), tranchés au cadrage
+
+- **P80-D-28 (barre d'avancement d'un jalon en cours).** `DESIGN.md` fait foi : la barre d'un élément en cours prend la
+  teinte d'état prévue par `DESIGN.md` § 5, comme toute barre « en cours » (« barres neutres sauf en cours »,
+  P71.5-D-12 et suivantes) ; neutre sinon. Les maquettes de l'audit (neutre partout) cèdent à la référence.
+- **P80-D-29 (place du panneau dans la vue couloirs — révisée après la critique).** `DESIGN.md` § 5 fait foi : le
+  panneau de détail se pose par-dessus sans pousser ni réserver de place. La mise en page des couloirs ne change pas à
+  l'ouverture ou à la fermeture du panneau (pas de bascule de quatre colonnes vers une grille 2 × 2) ; la carte
+  sélectionnée est amenée dans la partie visible si le panneau la couvre (défilement instantané). La réserve proposée au
+  craft est écartée.
+- **P80-D-30 (écarts des maquettes).** Valeurs hors grille des maquettes (10 px, 34 px) ramenées à la grille fermée ;
+  cartes sur `--surface` (`DESIGN.md` § 5) ; ligne d'état présente sur toutes les cartes, « Fait » compris ; « Missions
+  hors phase » rangées avec Backlog, Graines et Releases.
+
+- **P80-D-31 (carte active en thème clair, AUDC-X5).** La ligne de `DESIGN.md` § 5 qui prescrit le gris pour la carte
+  active claire, que l'audit mesure « lue comme désactivée », est modifiée par le lot jetons : contour ou glyphe d'état,
+  jamais un fond teinté ; `--st-active` clair passe à une valeur ≥ 3,5:1 sur `--bg` sans toucher `--sev-medium` (pour ne
+  pas faire tomber le texte des puces), et l'exception s'écrit dans `DESIGN.md`. Pas une réouverture : aucun registre ne
+  porte un arbitrage de Samuel sur cette valeur ; `DESIGN.md` reste la référence et change avec sa justification mesurée.
+- **P80-D-32 (raccourcis proposés par le craft).** Maj+F pour « cadrer la sélection et ses voisins » (P80-D-17) ; Espace
+  sélectionne au téléphone ; les repères de bord sont des boutons dans l'ordre de tabulation. L'aide `?` les liste.
+
+### Amendement du 2026-11-11 après la recherche (`80-RESEARCH.md`)
+
+Faits établis par la recherche qui corrigent la forme de décisions déjà prises ; aucune n'en change le fond.
+
+- **P80-D-33 (globales à part).** L'objet `VibeFlow` (`window.Floorplan` du moteur) est gelé : les contrats publics de la
+  80 sont `window.VF_SURCOUCHES` (pile, P80-D-11) et `window.VF_PANNEAU` (Retour, P80-C76-3). Signalé aux Phases 73, 74
+  et 76 par la session principale.
+- **P80-D-34 (pile et modale du moteur, précise P80-D-11).** La modale du moteur intercepte Échap avant la pile (écouteur
+  en capture sur `window`) : la pile observe `#modal` et `#palette` (ouverture, fermeture) au lieu de les fermer elle-même,
+  et ferme seule ce qui lui appartient. Le panneau fermé sort de la tabulation par une règle CSS de la couche VF, sur le
+  modèle de celle du téléphone : ce point passe en vague 1, hors lot moteur.
+- **P80-D-35 (« Élément », précise P80-D-08 et P80-D-27).** Le dictionnaire `80-vf-fr.js` réapplique « Élément » après
+  fusion et une suite l'exige pour le Code : la correction de Projet passe par le moteur (libellé de type tiré de
+  `meta.kindLabels`, lot A), sans toucher `80-vf-fr.js` ni la suite. Les libellés neufs de la couche VF sont écrits en
+  français dans leur fichier (la couche VF est hors inventaire de traduction) ; s'il faut traduire une phrase du moteur,
+  un dictionnaire neuf `79-vf-fr-dict-c.js` est chargé et fusionné sans toucher aux trois existants.
+- **P80-D-36 (anneau de focus des cartes, précise P80-D-10).** L'anneau se dessine sur la `.card` ; la mesure de la sonde
+  X4 existante est étendue à la `.card` dans le même plan, jamais affaiblie.
+- **P80-D-37 (adresse de `project.html`, précise P80-D-02).** `?vue=graphe` se pose une fois dans `naviguer()` de
+  `chrome-session.mjs`, avec une option de sortie pour les suites des couloirs ; les deux pilotes propres et la page
+  `file://` relevés par la recherche sont traités un par un.
+- **P80-D-38 (visite, précise P80-D-09).** `window.FloorplanTour` est exposé : la bascule en graphe avant la visite se fait
+  depuis la couche VF (clic du bouton intercepté ; ouverture automatique détectée, le moteur restant rendu sous les
+  couloirs), sans patch de `40-tour.js`.
+- **P80-D-39 (mémoire par lab, précise P80-D-05 et P80-D-19).** Le stockage du moteur ne distingue pas les labs et
+  l'origine change avec le port : les clés `localStorage` de la 80 portent le nom du lab.
+- **P80-D-40 (aide de lancement).** `socle-serveur.sh` n'existe pas encore : les suites des vagues 1 et 2 lancent le
+  serveur comme `test-cockpit-accessibilite.sh` ; celles écrites après la première vague de la 79 utilisent l'aide.
+- **P80-D-41 (lignes `AJOUT`).** Chaque plan insère la ligne `AJOUT` de son fichier neuf à sa place alphabétique dans
+  `VENDORED.txt` (lignes non voisines entre plans parallèles).
+
+- **P80-D-42 (initialisation par onglet, A30 de la 79, commit `74501bb0`).** Tout module de page neuf de la 80 qui dépend
+  de l'onglet s'initialise par `VF_COQUILLE.surOnglet(rappel)` quand la coquille existe (le rappel rend sa fonction de
+  nettoyage), et par l'événement `ready` du moteur avant la livraison de la 79 ; jamais au seul chargement de la page. Le
+  plan des onglets sans rechargement n'a donc pas à connaître la liste des extensions à réabonner : la 79 convertit les
+  siennes (plan 79-16).
+- **P80-D-43 (extrémité défilable des couloirs, précise P80-D-29).** Panneau ouvert, le rail des couloirs gagne une
+  extrémité défilable de la largeur du panneau : l'étendue défilable s'allonge, aucun couloir ne bouge. Ce n'est pas une
+  réserve (la mise en page est identique panneau ouvert ou fermé) ; elle permet d'amener la carte sélectionnée hors du
+  panneau.
+
 ### Claude's Discretion
 
 Noms exacts des fichiers neufs (dans la plage `ui/` qui garantit l'ordre de chargement), découpage interne sous le
@@ -322,7 +385,8 @@ décisions ci-dessus et l'UI-SPEC de la phase.
 
 ## À Samuel
 
-Quatre lignes rouvrent un arbitrage déjà rendu. L'arbitrage en vigueur tient ; les plans sont bâtis dessus ; ces quatre
+Cinq points rouvrent un arbitrage déjà rendu (les quatre lignes désignées par le registre, et S80-5 relevé au craft).
+L'arbitrage en vigueur tient ; les plans sont bâtis dessus ; ces cinq
 points sont rangés dans un plan à part, « après avis de Samuel », non exécutable en l'état. Rien d'autre n'en dépend.
 
 - **S80-1 — Titre de vue flottant (AUDC-M2, rouvre Q10 « Flou gardé, texte court »).** Le bloc de titre, sans fond, se
@@ -346,6 +410,13 @@ points sont rangés dans un plan à part, « après avis de Samuel », non exéc
   inerte expliquée. Recommandation : (b) — elle explique sans rien ajouter à l'écran et ne touche ni à la politique de
   contenu ni au périmètre réseau.
 
+- **S80-5 — Ouvreur Git à 44 px parmi des boutons à 36 (AUDC-F3, rouvre P78-D-34, ratifiée par Samuel le
+  2026-11-05).** Relevé par le craft de navigation : F3 demande une seule taille de bouton d'en-tête, mais l'icône
+  44 px de l'ouvreur Git de 701 à 1 279 px est un arbitrage ratifié. En vigueur : l'ouvreur reste à 44 px ; le lot jetons
+  n'aligne que le bouton de thème (F3 au sens strict). Options : (a) garder ; (b) visuel à 36 px avec une zone d'appui
+  de 44 px (cible tactile tenue) ; (c) 36 px partout au-delà de 999 px. Recommandation : (b), la cible d'appui de
+  P78-D-34 est gardée et l'en-tête retrouve une taille. Rangé dans le plan « après avis de Samuel ».
+
 Signalés sans réouverture : le tiroir du terminal resté rehaussé après « Annuler » (AUDC-M11, en attente du regard de
 Samuel depuis le lot 0, non touché) ; la source exacte de la borne « un tiroir latéral ne pousse jamais la carte » est
 PU-G-204, pas Q12.
@@ -359,7 +430,7 @@ PU-G-204, pas Q12.
 - `.planning/research/2026-11-10-audit-cockpit/A4-interface-parcours.md`
 - `.planning/missions/2026-11-11-audit-cockpit-lot-0.md` (« Décisions », « Limites », « Fichiers par sous-lot »)
 - `79-CONTEXT.md` § « Contrats fournis », branche `feat/phase-79-socle-cockpit`, commit `3119d82a`, et son
-  « Amendement du 2026-11-11 » (A1 à A7, A10, A11), commit `2ae6607a`, et second amendement (A15 à A28), commit `6f66d878`
+  « Amendement du 2026-11-11 » (A1 à A7, A10, A11), commit `2ae6607a`, second amendement (A15 à A28), commit `6f66d878`, et A30 (`surOnglet`), commit `74501bb0`
 - `DESIGN.md` (direction « Graphite »)
 - `plugin/cockpit/CHANGELOG.md` § Non publié (Q4 à Q14 du 2026-11-06, PU-G-001, PU-G-026, PU-G-204)
 - Registres d'arbitrage : `70-CONTEXT.md` (P70-D-04, P70-D-22), `71-CONTEXT.md` (P71-D-02, P71-D-27, P71-D-35),
